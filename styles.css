@@ -272,6 +272,20 @@ a:focus {
   transition: transform var(--transition), box-shadow var(--transition);
 }
 
+.display__link {
+  display: block;
+  color: inherit;
+}
+
+.display__link:focus {
+  outline: none;
+}
+
+.display__link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
 .display:hover,
 .display:focus-within {
   transform: translateY(-6px);
@@ -307,6 +321,21 @@ a:focus {
 
 .display__screen.game {
   background: linear-gradient(135deg, rgba(255, 144, 208, 0.75), rgba(132, 34, 212, 0.85));
+}
+
+.display__screen--image {
+  background: none;
+  border: none;
+  display: block;
+  overflow: hidden;
+}
+
+.display__screen--image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  display: block;
 }
 
 .display__info {
@@ -450,6 +479,259 @@ a:focus {
   color: var(--fg-primary);
 }
 
+.portfolio-header {
+  position: sticky;
+  top: 0;
+  z-index: 24;
+  backdrop-filter: blur(18px);
+  background: rgba(8, 9, 20, 0.92);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.portfolio-header__inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1rem clamp(1.5rem, 5vw, 3rem);
+}
+
+.portfolio-nav {
+  list-style: none;
+  display: flex;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+}
+
+.portfolio-nav a {
+  color: var(--fg-secondary);
+  font-size: 0.9rem;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 0.2rem;
+  transition: border-color var(--transition), color var(--transition);
+}
+
+.portfolio-nav a:hover,
+.portfolio-nav a:focus {
+  color: var(--fg-primary);
+  border-color: var(--accent);
+}
+
+.hero--portfolio {
+  padding-top: clamp(4rem, 7vw, 6.5rem);
+}
+
+.hero-display--portfolio {
+  width: min(360px, 80vw);
+  aspect-ratio: 1 / 1;
+}
+
+.portfolio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.8rem;
+  margin-top: 2.4rem;
+}
+
+.portfolio-card {
+  background: var(--bg-panel-alt);
+  border-radius: 18px;
+  padding: 1.8rem;
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-soft);
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.portfolio-card h3 {
+  margin: 0;
+  font-family: var(--font-heading);
+}
+
+.portfolio-card p {
+  margin: 0;
+  color: var(--fg-secondary);
+  flex: 1;
+}
+
+.tool-stack {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 2rem;
+}
+
+.tool-stack h3 {
+  margin-top: 0;
+  font-family: var(--font-heading);
+}
+
+.tool-stack ul {
+  margin: 1rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--fg-secondary);
+}
+
+.notes-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 2rem;
+  margin-top: 2.4rem;
+}
+
+.note {
+  background: rgba(12, 16, 40, 0.85);
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  padding: 1.8rem;
+  box-shadow: var(--shadow-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.note h3 {
+  margin: 0;
+  font-family: var(--font-heading);
+}
+
+.note p {
+  margin: 0;
+  color: var(--fg-secondary);
+  flex: 1;
+}
+
+.contact {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2.4rem;
+  align-items: center;
+}
+
+.contact-card {
+  background: rgba(16, 18, 40, 0.85);
+  border-radius: 16px;
+  border: 1px solid var(--border-soft);
+  padding: 2.2rem;
+  box-shadow: var(--shadow-soft);
+  text-align: center;
+}
+
+.contact-card__label {
+  margin: 0 0 0.5rem;
+  color: var(--fg-secondary);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+}
+
+.contact-card__value {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 1.6rem;
+}
+
+.play-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.play-embed {
+  margin: 2rem 0;
+  border-radius: 18px;
+  border: 1px solid var(--border-soft);
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background: rgba(12, 16, 40, 0.8);
+  box-shadow: var(--shadow-soft);
+}
+
+.play-embed iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #000;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.8rem;
+  margin-top: 2.4rem;
+}
+
+.gallery-card {
+  margin: 0;
+  background: rgba(12, 14, 36, 0.8);
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.gallery-placeholder {
+  display: grid;
+  place-items: center;
+  min-height: 160px;
+  background: linear-gradient(135deg, rgba(132, 60, 212, 0.6), rgba(40, 16, 90, 0.8));
+  color: rgba(255, 255, 255, 0.8);
+  font-family: var(--font-heading);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.gallery-card figcaption {
+  margin: 0;
+  padding: 1rem 1.2rem 1.4rem;
+  color: var(--fg-secondary);
+  font-size: 0.9rem;
+}
+
+.game-full {
+  margin: 0;
+  min-height: 100vh;
+  background: #000;
+  overflow: hidden;
+}
+
+.game-full__frame {
+  width: 100vw;
+  height: 100vh;
+  border: none;
+  display: block;
+  background: #000;
+}
+
+.game-full__back {
+  position: fixed;
+  top: clamp(0.75rem, 2vw, 1.5rem);
+  right: clamp(0.75rem, 2vw, 1.5rem);
+  z-index: 10;
+  padding: 0.6rem 1.2rem;
+  border-radius: 999px;
+  background: rgba(6, 7, 18, 0.85);
+  border: 1px solid rgba(140, 140, 255, 0.4);
+  color: var(--fg-primary);
+  font-family: var(--font-heading);
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.game-full__back:hover,
+.game-full__back:focus-visible {
+  background: rgba(140, 140, 255, 0.2);
+  border-color: var(--fg-primary);
+  color: var(--fg-primary);
+}
+
 @media (max-width: 720px) {
   .site-header {
     flex-direction: column;
@@ -457,6 +739,16 @@ a:focus {
   }
   .site-nav ul {
     flex-wrap: wrap;
+  }
+  .portfolio-header__inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .portfolio-nav {
+    flex-wrap: wrap;
+  }
+  .play-actions {
+    justify-content: flex-start;
   }
 }
 
