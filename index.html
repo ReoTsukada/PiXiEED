@@ -21,7 +21,7 @@
         <li><a href="#showcase">制作物</a></li>
         <li><a href="#tools">ツール</a></li>
         <li><a href="#games">ゲーム</a></li>
-        <li><a href="#portfolio">アルタ</a></li>
+        <li><a href="portfolio/index.html">アルタ</a></li>
         <li><a href="#news">お知らせ</a></li>
       </ul>
     </nav>
@@ -31,10 +31,10 @@
     <section class="hero" id="hero">
       <div class="hero-copy">
         <h1>PiXiEED ホームページ</h1>
-        <p>ブラウザツールやゲームを中心に制作活動を行うクリエイターズグループです。最新の作品やアップデートをここからチェックできます。</p>
+        <p>ブラウザで遊べるツールとゲームを届けるPiXiEEDの拠点です。</p>
         <div class="hero-cta">
           <a class="cta-primary" href="#showcase">制作物を見る</a>
-          <a class="cta-secondary" href="#portfolio">アルタのポートフォリオ</a>
+          <a class="cta-secondary" href="portfolio/index.html">アルタのポートフォリオ</a>
         </div>
       </div>
       <div class="hero-visual" role="presentation">
@@ -52,11 +52,11 @@
     <section class="section section--accent" id="news">
       <div class="section-inner news">
         <h2>お知らせ・アップデート</h2>
-        <p>広告導入や新規リリースなど、PiXiEEDからのお知らせをここに掲載します。今は雛形のためダミーテキストです。</p>
+        <p>直近の予定や更新メモを簡潔にまとめています。</p>
         <ul class="news-list">
-          <li class="news-item">[MM/DD] 新作ブラウザゲーム「タイトル未定」を近日公開予定です。</li>
-          <li class="news-item">[MM/DD] PiXiEED サイトの広告枠を準備中です。詳細は追ってお知らせします。</li>
-          <li class="news-item">[MM/DD] 「アルタ」ポートフォリオの新規作品を追加しました。</li>
+          <li class="news-item">[MM/DD] 新作ブラウザゲームを近日リリース予定。</li>
+          <li class="news-item">[MM/DD] サイトに広告枠を試験導入します。</li>
+          <li class="news-item">[MM/DD] アルタのポートフォリオを小幅更新。</li>
         </ul>
       </div>
     </section>
@@ -64,7 +64,7 @@
     <section class="section" id="showcase">
       <div class="section-inner">
         <h2>ディスプレイに並ぶ PiXiEED の作品</h2>
-        <p>ブラウザツールやゲームをディスプレイに映し出すようなレイアウトで紹介します。サムネイルをクリックすると詳細ページへ誘導できます。</p>
+        <p>主なツールとゲームをショーケース形式で紹介します。</p>
         <div class="display-wall" role="list">
           <article class="display" role="listitem">
             <div class="display__frame">
@@ -72,17 +72,21 @@
             </div>
             <div class="display__info">
               <h3 class="display__title">ブラウザツール A</h3>
-              <p class="display__description">タスク管理をサポートするPiXiEED制作のツール。シンプルながら強力な機能を搭載。</p>
+              <p class="display__description">タスク管理を素早く整理するシンプルツール。</p>
             </div>
           </article>
           <article class="display" role="listitem">
-            <div class="display__frame">
-              <div class="display__screen placeholder game">Game B</div>
-            </div>
-            <div class="display__info">
-              <h3 class="display__title">ブラウザゲーム B</h3>
-              <p class="display__description">ピクセルアートとテンポの良いアクションが特徴のブラウザゲーム。ランキング機能搭載予定。</p>
-            </div>
+            <a class="display__link" href="maoitu/index.html">
+              <div class="display__frame">
+                <div class="display__screen display__screen--image">
+                  <img src="https://reotsukada.github.io/maoitu/ogp.png" alt="魔王様!!いつまでよければいいですか!? のスクリーンショット">
+                </div>
+              </div>
+              <div class="display__info">
+                <h3 class="display__title">魔王様!!いつまでよければいいですか!?</h3>
+                <p class="display__description">弾幕を避け続ける高速アクション。</p>
+              </div>
+            </a>
           </article>
           <article class="display" role="listitem">
             <div class="display__frame">
@@ -90,7 +94,7 @@
             </div>
             <div class="display__info">
               <h3 class="display__title">制作支援ツール C</h3>
-              <p class="display__description">サウンドやグラフィック素材の管理を効率化するクリエイター向けツール。</p>
+              <p class="display__description">素材をまとめて管理できる制作サポート。</p>
             </div>
           </article>
           <article class="display" role="listitem">
@@ -99,7 +103,7 @@
             </div>
             <div class="display__info">
               <h3 class="display__title">ブラウザゲーム D</h3>
-              <p class="display__description">協力プレイに対応したオンラインゲーム。PiXiEEDが開発中の最新作です。</p>
+              <p class="display__description">協力プレイ対応の最新ブラウザゲーム。</p>
             </div>
           </article>
         </div>
@@ -110,15 +114,15 @@
       <div class="section-inner split">
         <div>
           <h2>ブラウザツール</h2>
-          <p>制作したツールをカテゴリ別に整理して紹介します。フィルタリングやタグによる検索機能も将来的に追加可能です。</p>
-          <a class="link-more" href="#">ツール一覧を見る</a>
+          <p>軽量な制作支援ツールをカテゴリ別に公開しています。</p>
+          <a class="link-more" href="#">ツール一覧</a>
         </div>
         <div class="feature-card">
           <h3>ピックアップツール</h3>
           <ul>
-            <li>TaskFlow：日々のタスクを管理するダッシュボード</li>
-            <li>Pix Palette：カラーセットを直感的に生成</li>
-            <li>SoundSeed：ゲーム用SEをブラウザで合成</li>
+            <li>TaskFlow：日々のタスク整理</li>
+            <li>Pix Palette：配色を即生成</li>
+            <li>SoundSeed：ブラウザでSE制作</li>
           </ul>
         </div>
       </div>
@@ -136,8 +140,8 @@
         </div>
         <div>
           <h2>ブラウザゲーム</h2>
-          <p>作品紹介ページ、プレイデモ、アップデート履歴などをまとめた詳細ページにジャンプできます。</p>
-          <a class="link-more" href="#">ゲーム一覧を見る</a>
+          <p>プレイページと更新ログをまとめた特設サイトに遷移します。</p>
+          <a class="link-more" href="#">ゲーム一覧</a>
         </div>
       </div>
     </section>
@@ -146,8 +150,8 @@
       <div class="section-inner portfolio">
         <div>
           <h2>アルタ ポートフォリオ</h2>
-          <p>PiXiEEDメンバー「アルタ」のポートフォリオ入口です。開発したゲームやデザイン、ツールの制作背景を紹介します。</p>
-          <a class="cta-primary" href="#">ポートフォリオに入る</a>
+          <p>PiXiEEDメンバー「アルタ」の代表作と制作メモをまとめています。</p>
+          <a class="cta-primary" href="portfolio/index.html">ポートフォリオに入る</a>
         </div>
         <div class="portfolio-preview" aria-hidden="true">
           <div class="portfolio-window">
@@ -163,7 +167,7 @@
     <section class="section" id="sponsors">
       <div class="section-inner">
         <h2>広告・スポンサー枠</h2>
-        <p>将来的な広告導入を想定したレイアウトのサンプルです。サイズや配置は調整できます。</p>
+        <p>広告導入時の配置案サンプルです。</p>
         <div class="ad-grid">
           <div class="ad-slot">広告枠 300×250</div>
           <div class="ad-slot">広告枠 300×250</div>
