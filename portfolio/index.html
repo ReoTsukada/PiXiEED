@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PiXiEED | アルタ ポートフォリオ</title>
+  <meta name="description" content="PiXiEEDメンバー アルタのポートフォリオ。ブラウザツールやゲーム、制作ノートをまとめた紹介ページです。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body class="portfolio-page">
+  <header class="portfolio-header">
+    <div class="portfolio-header__inner">
+      <a class="logo" href="../index.html">PiXiEED</a>
+      <nav aria-label="ポートフォリオ ナビゲーション">
+        <ul class="portfolio-nav">
+          <li><a href="#projects">作品</a></li>
+          <li><a href="#tools">ツール</a></li>
+          <li><a href="#notes">制作ノート</a></li>
+          <li><a href="#contact">コンタクト</a></li>
+        </ul>
+      </nav>
+      <a class="cta-secondary" href="../index.html">トップへ戻る</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero hero--portfolio">
+      <div class="hero-copy">
+        <h1>Alta Portfolio</h1>
+        <p>PiXiEED所属クリエイター「アルタ」の作品と実験ログを集約しています。</p>
+        <div class="hero-cta">
+          <a class="cta-primary" href="#projects">代表作を見る</a>
+          <a class="cta-secondary" href="#notes">制作ノートを読む</a>
+        </div>
+      </div>
+      <div class="hero-visual" role="presentation">
+        <div class="hero-display hero-display--portfolio">
+          <span class="scanline"></span>
+          <span class="glow"></span>
+          <div class="hero-display__frame">
+            <p>Alta</p>
+            <small>Creative Developer</small>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--accent" id="projects">
+      <div class="section-inner">
+        <h2>代表プロジェクト</h2>
+        <div class="portfolio-grid">
+          <article class="portfolio-card">
+            <h3>Pixel Voyage</h3>
+            <p>探索型ブラウザゲーム。レベルとUIを担当。</p>
+            <a class="link-more" href="#">詳細を見る</a>
+          </article>
+          <article class="portfolio-card">
+            <h3>TaskFlow Dashboard</h3>
+            <p>チームタスクを可視化するReactダッシュボード。</p>
+            <a class="link-more" href="#">ツールページへ</a>
+          </article>
+          <article class="portfolio-card">
+            <h3>SoundSeed Studio</h3>
+            <p>WebAudioでSEを生成する実験ツール。</p>
+            <a class="link-more" href="#">デモを試す</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="tools">
+      <div class="section-inner">
+        <h2>使用ツール</h2>
+        <div class="tool-stack">
+          <div>
+            <h3>得意分野</h3>
+            <ul>
+              <li>WebGL / Canvas 演出</li>
+              <li>WebAudio サウンド設計</li>
+              <li>TypeScript / React / Vue 実装</li>
+              <li>Figma / Photoshop / Procreate</li>
+            </ul>
+          </div>
+          <div>
+            <h3>制作環境</h3>
+            <ul>
+              <li>VS Code + GitHub Copilot</li>
+              <li>Notion / Linear</li>
+              <li>Affinity Suite</li>
+              <li>Logic Pro X</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--highlight" id="notes">
+      <div class="section-inner">
+        <h2>ノート</h2>
+        <div class="notes-list">
+          <article class="note">
+            <h3>ボスバトル演出のシェーダー実験</h3>
+            <p>ノイズと時間制御で作るボス演出メモ。</p>
+            <a class="link-more" href="#">読む</a>
+          </article>
+          <article class="note">
+            <h3>ブラウザで完結する音作りのワークフロー</h3>
+            <p>SoundSeed制作時のWebAudio試行メモ。</p>
+            <a class="link-more" href="#">読む</a>
+          </article>
+          <article class="note">
+            <h3>UIモーションのプロトタイピング</h3>
+            <p>After EffectsとLottieによるUIモーション試験。</p>
+            <a class="link-more" href="#">読む</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="contact">
+      <div class="section-inner contact">
+        <div>
+          <h2>コンタクト</h2>
+          <p>制作依頼やコラボの相談はメールでどうぞ。</p>
+          <a class="cta-primary" href="mailto:contact@pixieed.jp">contact@pixieed.jp</a>
+        </div>
+        <div class="contact-card" aria-hidden="true">
+          <p class="contact-card__label">次回着手</p>
+          <p class="contact-card__value">2024 Q4</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <small>&copy; <span id="year"></span> PiXiEED / Alta Portfolio</small>
+      <div class="footer-links">
+        <a href="../index.html">トップ</a>
+        <a href="mailto:contact@pixieed.jp">お問い合わせ</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="../scripts.js"></script>
+</body>
+</html>
