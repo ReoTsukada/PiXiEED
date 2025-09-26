@@ -1,7 +1,7 @@
 {
   "name": "魔王様!!いつまでよければいいですか!?",
   "short_name": "まおいつ",
-  "start_url": "/maoitu/game.html",
+  "start_url": "/maoitu/index.html",
   "scope": "/maoitu/",
   "display": "standalone",
   "background_color": "#000000",
