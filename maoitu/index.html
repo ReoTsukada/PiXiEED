@@ -1,440 +1,203 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>魔王様!! いつまでよければいいですか!? | PiXiEED</title>
-  <meta name="description" content="PiXiEED制作のブラウザゲーム『魔王様!!いつまでよければいいですか!?』をブラウザでプレイ。">
-  <link rel="manifest" href="/maoitu/manifest.webmanifest">
-  <meta name="theme-color" content="#050505">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="apple-touch-icon" href="/maoitu/icons/icon-192.png">
-  <link rel="icon" type="image/png" sizes="192x192" href="/maoitu/icons/icon-192.png">
-  <link rel="icon" type="image/png" sizes="512x512" href="/maoitu/icons/icon-512.png">
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-LLSD5KLJVN"></script>
-  <script>
-    const GA_MEASUREMENT_ID = 'G-LLSD5KLJVN';
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', GA_MEASUREMENT_ID);
-  </script>
-  <style>
-    html,body{margin:0;background:#000;height:100%;display:grid;place-items:center;touch-action:none;overscroll-behavior:none}
-    body{position:relative;color:#fff}
-    .back-link{
-      position:fixed;
-      top:16px;
-      left:16px;
-      padding:10px 16px;
-      border-radius:999px;
-      background:rgba(0,0,0,0.7);
-      border:1px solid rgba(255,255,255,0.3);
-      color:#fff;
-      font:600 14px/1.2 system-ui;
-      text-decoration:none;
-      z-index:15;
-      transition:background 0.2s ease, color 0.2s ease;
-    }
-    .back-link:focus-visible,
-    .back-link:hover{background:#fff;color:#000;}
-    #c{display:block;touch-action:none;image-rendering:pixelated}
-    #sharePanel{
-      position:absolute;
-      bottom:24px;
-      left:50%;
-      display:none;
-      flex-direction:row;
-      gap:12px;
-      padding:12px 18px;
-      justify-content:center;
-      flex-wrap:wrap;
-      text-align:center;
-      background:rgba(0,0,0,0.8);
-      border:1px solid rgba(255,255,255,0.25);
-      border-radius:12px;
-      color:#fff;
-      font-family:sans-serif;
-      font-size:12px;
-      transform:translateX(-50%);
-      align-items:center;
-      z-index:10;
-    }
-    #sharePanel button{
-      font:700 12px system-ui;
-      padding:8px 14px;
-      border:0;
-      border-radius:10px;
-      cursor:pointer;
-    }
-    #shareScoreLabel{font-size:18px;font-weight:700;text-align:center;flex-basis:100%;}
-    #footer{
-      position:absolute;
-      bottom:12px;
-      right:14px;
-      color:rgba(255,255,255,0.6);
-      font:10px/1.2 monospace;
-      user-select:none;
-      pointer-events:none;
-    }
-    #instructions{
-      position:absolute;
-      top:20px;
-      right:20px;
-      max-width:240px;
-      padding:18px 16px 16px;
-      background:rgba(0,0,0,0.7);
-      border:1px solid rgba(255,255,255,0.2);
-      border-radius:12px;
-      color:#fff;
-      font:12px/1.4 system-ui;
-      pointer-events:auto;
-      user-select:none;
-      z-index:5;
-      display:none;
-    }
-    #instructions strong{display:block;font-size:13px;margin-bottom:6px;}
-    #instructions p{margin:0 0 6px;}
-    #instructions p:last-child{margin-bottom:0;}
-    #instructionsClose{
-      position:absolute;
-      top:6px;
-      right:6px;
-      width:26px;
-      height:26px;
-      padding:0;
-      border:1px solid rgba(255,255,255,0.3);
-      border-radius:999px;
-      background:rgba(0,0,0,0.5);
-      color:#fff;
-      font:13px/1 system-ui;
-      cursor:pointer;
-    }
-    #instructionsToggle{
-      position:absolute;
-      top:20px;
-      right:20px;
-      display:block;
-      padding:8px 12px;
-      background:rgba(0,0,0,0.7);
-      border:1px solid rgba(255,255,255,0.3);
-      border-radius:999px;
-      color:#fff;
-      font:14px/1 system-ui;
-      cursor:pointer;
-      z-index:5;
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>魔王様！！いつまでよければいいですか！？</title>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
+<script>
+const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', GA_MEASUREMENT_ID);
+</script>
+
+<!-- ▼ OGP / Twitterカード -->
+<meta property="og:title" content="魔王様！！いつまでよければいいですか！？">
+<meta property="og:description" content="避けゲーアクション！皆もやってみてね！">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://pixieed.jp/maoitu/">
+<meta property="og:image" content="https://pixieed.jp/maoitu/ogp.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@ARTa_PIXELART">
+<link rel="icon" type="image/png" sizes="192x192" href="/maoitu/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/maoitu/icons/icon-512.png">
+<link rel="apple-touch-icon" href="/maoitu/icons/icon-192.png">
+<link rel="manifest" href="/maoitu/manifest.webmanifest">
+<meta name="theme-color" content="#000000">
+<style>
+body {
+  margin:0;
+  min-height:100vh;
+  background:#000;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:20px;
+  color:#fff;
+  font-family:'Noto Sans JP', system-ui, sans-serif;
+  text-align:center;
+}
+h1 { font-size:22px; margin:60px 0 0; }
+button {
+  font:700 16px system-ui;
+  padding:10px 20px;
+  border:0;
+  border-radius:12px;
+  cursor:pointer;
+}
+a { color:#7dd3fc; }
+.primary-controls {
+  display:flex;
+  align-items:center;
+  gap:18px;
+}
+.instructions-card {
+  max-width:320px;
+  padding:16px 20px;
+  background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.15);
+  border-radius:16px;
+  color:#f3f4f6;
+  font-size:14px;
+  line-height:1.6;
+  text-align:left;
+}
+.instructions-card h2 {
+  margin:0 0 8px;
+  font-size:16px;
+  color:#fff;
+}
+.instructions-card ul {
+  margin:0;
+  padding-left:18px;
+}
+.instructions-card li {
+  margin-bottom:6px;
+}
+.switch {
+  position:relative;
+  display:inline-block;
+  width:48px;
+  height:26px;
+}
+.switch input { opacity:0; width:0; height:0; }
+.slider {
+  position:absolute;
+  inset:0;
+  background:#4b5563;
+  border-radius:20px;
+  transition:0.2s;
+}
+.slider:before {
+  content:"";
+  position:absolute;
+  height:20px;
+  width:20px;
+  left:3px;
+  top:3px;
+  background:#fff;
+  border-radius:50%;
+  transition:0.2s;
+}
+.switch input:checked + .slider { background:#22c55e; }
+.switch input:checked + .slider:before { transform:translateX(22px); }
+.volume-label {
+  font-size:14px;
+  color:#ccc;
+}
+#titleShareBtn {
+  background:#22c55e;
+  color:#000;
+  padding:12px 24px;
+  border-radius:12px;
+  font:700 16px system-ui;
+}
+#playBtn {
+  font-size:18px;
+  padding:14px 24px;
+  background:#22c55e;
+  color:#000;
+  border-radius:12px;
+}
+</style>
 </head>
 <body>
-  <a class="back-link" href="../index.html#showcase">戻る</a>
-  <audio id="bgm" src="bgm.mp3" loop autoplay hidden volume="0.5"></audio>
-  <canvas id="c"></canvas>
-  <div id="instructions">
-    <button id="instructionsClose" type="button">X</button>
-    <strong>遊び方</strong>
-    <p>操作方法：画面をタップ / マウスでドラッグ、または ←→ キーで移動。</p>
-    <p>敵にぶつかると即ゲームオーバー。</p>
-    <p>エンジェリンに触れると一度だけ身代わりが発動し、次の衝突を防ぎます。</p>
+
+<!-- 開発者表記 -->
+<div style="position:absolute;top:10px;left:0;right:0;text-align:center;font-size:14px;color:#ccc;">
+  開発者: <a href="https://x.com/ARTa_PIXELART" target="_blank" rel="noopener" style="color:#1DA1F2;text-decoration:none;">@ARTa_PIXELART</a>
+</div>
+
+<h1>魔王様！！いつまでよければいいですか！？</h1>
+<p style="margin:0;color:rgba(255,255,255,0.8);">リンクを開くとゲームが始まります。</p>
+
+<!-- プレイボタン + 音量スイッチ -->
+<div class="primary-controls">
+  <button id="playBtn">▶ プレイ</button>
+  <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;">
+    <label class="switch">
+      <input type="checkbox" id="audioToggle">
+      <span class="slider"></span>
+    </label>
+    <span id="audioToggleLabel" class="volume-label"></span>
   </div>
-  <button id="instructionsToggle" type="button">?</button>
-  <div id="sharePanel">
-    <div id="shareScoreLabel">SCORE: 0</div>
-    <button id="shareActionBtn" style="background:#22c55e;color:#000;">シェアする</button>
-    <button id="restartActionBtn" style="background:#3b82f6;color:#fff;">もう一度遊ぶ</button>
-  </div>
-  <div id="footer">© 2025 アルタ</div>
-  <script>
+</div>
+
+<!-- シェアボタン -->
+<button id="titleShareBtn">シェアする</button>
+
+<div class="instructions-card">
+  <h2>遊び方</h2>
+  <ul>
+    <li>操作：画面をタップ / マウスドラッグ、または ←→ キーで移動します。</li>
+    <li>敵にぶつかると即ゲームオーバーです。</li>
+    <li>エンジェリンを取ると一度だけ身代わりが発動し、次の衝突を防ぎます。</li>
+  </ul>
+</div>
+
+<script>
+const GAME_URL = './game.html';
 const AUDIO_KEY = 'maoitu_audio';
-const H = 320;
-const W = 192;
+const GAME_CANONICAL_URL = `${window.location.origin}/maoitu/`;
+const playBtn = document.getElementById('playBtn');
+const shareBtn = document.getElementById('titleShareBtn');
+const audioToggle = document.getElementById('audioToggle');
+const audioToggleLabel = document.getElementById('audioToggleLabel');
 
-function loadImage(src){
-  const img = new Image();
-  img.src = src;
-  return img;
-}
-
-function makeSprite(src, w, h){
-  return { imgSrc: src, img: loadImage(src), w, h };
+function baseShareText(){
+  return `開発者:@ARTa_PIXELART\n『魔王様！！いつまでよければいいですか！？』\n皆もやってみてね！！！\n\nリンクから遊べるよ！！#PiXiEED\n\n${GAME_CANONICAL_URL}`;
 }
 
-const PLAYER = makeSprite('assets/player.svg', 24, 24);
-const ANGEL = makeSprite('assets/angel.svg', 24, 24);
-const ENEMY_SKINS = [
-  makeSprite('assets/enemy-purple.svg', 16, 16),
-  makeSprite('assets/enemy-blue.svg', 16, 16),
-  makeSprite('assets/enemy-green.svg', 16, 16),
-  makeSprite('assets/enemy-red.svg', 16, 16)
-];
-const PLAYER_START_X = (W-PLAYER.w)/2;
-const PLAYER_START_Y = H-PLAYER.h-20;
-const PLAYER_START_TX = PLAYER_START_X;
-const ANGEL_BASE_INTERVAL = 280;
-const ANGEL_SPAWN_PROB = 0.65;
-const DIFFICULTY_STEP_SEC = 10;
-const GA_CATEGORY = 'maoitu';
-const bgm = document.getElementById('bgm');
-bgm.volume = 0.5;
-function syncAudioSetting(){
-  const enabled = localStorage.getItem(AUDIO_KEY) !== 'off';
-  if(enabled){
-    bgm.volume = 0.5;
-    const playPromise = bgm.play();
-    if(playPromise !== undefined){
-      playPromise.catch(()=>{});
-    }
-  }else{
-    bgm.pause();
-  }
-}
-const sharePanel = document.getElementById('sharePanel');
-const shareScoreLabel = document.getElementById('shareScoreLabel');
-const shareActionBtn = document.getElementById('shareActionBtn');
-const restartActionBtn = document.getElementById('restartActionBtn');
-const instructions = document.getElementById('instructions');
-const instructionsToggle = document.getElementById('instructionsToggle');
-const instructionsClose = document.getElementById('instructionsClose');
-function showInstructions(){
-  instructions.style.display='block';
-  instructionsToggle.style.display='none';
-}
-function closeInstructions(){
-  instructions.style.display='none';
-  instructionsToggle.style.display='block';
-}
-instructionsToggle.addEventListener('click',showInstructions);
-instructionsClose.addEventListener('click',closeInstructions);
-const c = document.getElementById('c');
-const x = c.getContext('2d');
-c.width = W;
-c.height = H;
-let alive = true;
-let S = 0;
-let o = 0;
-let shield = false;
-let enemySpawnIntervalFrames = 22;
-let enemiesPerSpawn = 1;
-let lastDifficultyUpdateSec = 0;
-let elapsedFrames = 0;
-let difficultyLevel = 1;
-let P = { x: PLAYER_START_X, y: PLAYER_START_Y, v: 4, skin: PLAYER, w: PLAYER.w, h: PLAYER.h };
-let tx = PLAYER_START_TX;
-let E = [];
-let angels = [];
-
-function setPlayerSkin(skin){
-  P.skin = skin;
-  P.w = skin.w;
-  P.h = skin.h;
-}
-function spawnEnemy(){
-  const skin = ENEMY_SKINS[Math.floor(Math.random()*ENEMY_SKINS.length)];
-  const x = Math.random()*(W-skin.w);
-  const v = 2 + Math.random()*2.4;
-  E.push({ skin, w: skin.w, h: skin.h, x, y: -skin.h, v });
-}
-function spawnAngel(){
-  const skin = ANGEL;
-  const x = Math.random()*(W-skin.w);
-  const v = 1.4;
-  angels.push({ skin, w: skin.w, h: skin.h, x, y: -skin.h, v });
-}
-function isOnSharePanel(target){
-  return target === sharePanel || sharePanel.contains(target);
-}
-function isOnInstructionUi(target){
-  return target === instructions || instructions.contains(target);
-}
-function logPlayEvent(action, params={}){
-  if(typeof gtag === 'function'){
-    gtag('event', action, { event_category: GA_CATEGORY, ...params });
-  }
-}
-function logPlayStart(){
-  logPlayEvent('play_start');
-}
-function logShare(score){
-  logPlayEvent('share', { score });
-}
-function hideSharePanel(){
-  sharePanel.style.display='none';
-}
-function showSharePanel(score){
-  shareScoreLabel.textContent = `SCORE: ${score}`;
-  sharePanel.style.display='flex';
-}
-shareActionBtn.addEventListener('click', async ()=>{
-  if(navigator.share){
-    try{
-      await navigator.share({ title:'魔王様!!いつまでよければいいですか!?', text:`SCORE: ${S}\nまた遊んでね！`, url:location.href });
-      logShare(S);
-    }catch(err){
-      console.log(err);
-    }
-  }else{
-    navigator.clipboard.writeText(`SCORE: ${S} - ${location.href}`);
-    logShare(S);
-    alert('スコアとURLをコピーしました！');
+shareBtn.addEventListener('click', async () => {
+  try{
+    await navigator.clipboard.writeText(baseShareText());
+    alert('シェア用テキストをコピーしました！');
+  }catch(err){
+    alert('クリップボードへのコピーに失敗しました。手動で共有してください。');
   }
 });
-restartActionBtn.addEventListener('click', ()=>{
-  reset(false);
-  alive = true;
+
+playBtn.addEventListener('click', () => {
+  window.location.href = GAME_URL;
 });
-function hitBox(a,b){
-  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+function updateAudioLabel(){
+  audioToggleLabel.textContent = audioToggle.checked ? '音量 ON' : '音量 OFF';
 }
-function pos(e){
-  const rect = c.getBoundingClientRect();
-  return (e.clientX ?? (e.touches && e.touches[0].clientX) ?? 0) - rect.left;
-}
-document.onpointerdown = e => {
-  if(isOnSharePanel(e.target)) return;
-  if(isOnInstructionUi(e.target)) return;
-  if(e.cancelable) e.preventDefault();
-  tx = pos(e) - P.w/2;
-};
-document.onpointermove = e => {
-  if(isOnSharePanel(e.target)) return;
-  if(isOnInstructionUi(e.target)) return;
-  if(e.cancelable) e.preventDefault();
-  if(!alive) return;
-  tx = pos(e) - P.w/2;
-};
-addEventListener('keydown',e=>{ if(!alive) return; if(e.key==='ArrowLeft')tx-=20; else if(e.key==='ArrowRight')tx+=20; });
-function reset(countPlay = true){ alive=true; E.length=0; angels.length=0; o=0; S=0; shield=false; P.x=PLAYER_START_X; P.y=PLAYER_START_Y; tx=PLAYER_START_TX; setPlayerSkin(PLAYER);
-  enemySpawnIntervalFrames = 22;
-  enemiesPerSpawn = 1;
-  lastDifficultyUpdateSec = 0;
-  elapsedFrames = 0;
-  difficultyLevel = 1;
-  closeInstructions();
-  hideSharePanel();
-  if(countPlay) logPlayStart();
-}
-function endRun(){
-  if(!alive) return;
-  alive = false;
-  logPlayEvent('game_over', { score: S });
-}
-function step(){
-  if(o % enemySpawnIntervalFrames === 0){
-    for(let i=0;i<enemiesPerSpawn;i++) spawnEnemy();
-  }
-  if(o % ANGEL_BASE_INTERVAL === 0 && Math.random() < ANGEL_SPAWN_PROB) spawnAngel();
-  o++;
-  elapsedFrames++;
-  E.forEach(e=>e.y+=e.v);
-  angels.forEach(a=>a.y+=a.v);
-  const dx=tx-P.x; P.x+=Math.sign(dx)*Math.min(Math.abs(dx),P.v);
-  P.x=Math.max(0,Math.min(W-P.w,P.x));
-  angels = angels.filter(a=>{
-    if(hitBox(P,a)){ shield=true; setPlayerSkin(ANGEL); return false; }
-    return a.y<H+20;
-  });
-  for(const e of E){
-    if(hitBox(P,e)){
-      if(shield){
-        shield=false; setPlayerSkin(PLAYER); e.y=H+99;
-      }else{
-        endRun();
-        break;
-      }
-    }
-  }
-  E=E.filter(e=>e.y<H+20);
-  S++;
-  if(!alive && sharePanel.style.display==='none'){
-    showSharePanel(S);
-  }
-  const elapsedSec = elapsedFrames / 60;
-  if(elapsedSec - lastDifficultyUpdateSec >= DIFFICULTY_STEP_SEC){
-    lastDifficultyUpdateSec += DIFFICULTY_STEP_SEC;
-    difficultyLevel++;
-    if(enemySpawnIntervalFrames > 2){
-      enemySpawnIntervalFrames = Math.max(2, enemySpawnIntervalFrames - 2);
-    }else{
-      enemiesPerSpawn = Math.min(enemiesPerSpawn + 1, 6);
-    }
-  }
-}
-function draw(){
-  x.fillStyle='#000'; x.fillRect(0,0,W,H);
-  E.forEach(e=>{
-    const skin = e.skin;
-    if(skin.img.complete){
-      x.drawImage(skin.img,e.x,e.y,skin.w,skin.h);
-    }else{
-      x.fillStyle='#f33';
-      x.fillRect(e.x,e.y,skin.w,skin.h);
-    }
-  });
-  angels.forEach(a=>{
-    const skin = a.skin;
-    if(skin.img.complete){
-      x.drawImage(skin.img,a.x,a.y,skin.w,skin.h);
-    }else{
-      x.fillStyle='#fff';
-      x.fillRect(a.x,a.y,skin.w,skin.h);
-    }
-  });
-  const playerSkin = P.skin;
-  if(playerSkin.img.complete){
-    x.drawImage(playerSkin.img,P.x,P.y,playerSkin.w,playerSkin.h);
-  }else{
-    x.fillStyle='#0ff';
-    x.fillRect(P.x,P.y,playerSkin.w,playerSkin.h);
-  }
-  x.fillStyle='#fff';
-  x.font='bold 16px monospace';
-  x.fillText('S:'+S,4,16);
-  x.font='10px monospace';
-  x.fillText('エンジェルの加護:'+(shield?'あり':'なし'),4,30);
-  x.fillText('難易度: '+difficultyLevel,4,42);
-  if(!alive){
-    x.fillStyle='rgba(0,0,0,0.6)'; x.fillRect(10,90,140,70);
-    x.strokeStyle='rgba(255,255,255,0.25)'; x.strokeRect(10,90,140,70);
-    x.fillStyle='#fff'; x.font='bold 18px monospace'; x.fillText('GAME OVER',28,115);
-    x.font='12px monospace'; x.fillText('右上のボタンで共有や再挑戦',4,135);
-  }
-}
-const FIXED_DT_MS = 1000/60;
-let last = performance.now();
-let acc  = 0;
-function loop(now){
-  let dt = now - last;
-  last = now;
-  if (dt > 1000) dt = 1000;
-  acc += dt;
-  const MAX_STEPS = 5;
-  let steps = 0;
-  while (acc >= FIXED_DT_MS && steps < MAX_STEPS){
-    if (alive) step();
-    acc -= FIXED_DT_MS;
-    steps++;
-  }
-  draw();
-  requestAnimationFrame(loop);
-}
-reset();
-requestAnimationFrame(loop);
-addEventListener('visibilitychange',()=>{ if(document.hidden){ bgm.pause(); } else { syncAudioSetting(); }});
-document.addEventListener('DOMContentLoaded', syncAudioSetting);
-  </script>
-  <script>
-    const swProtocol = window.location.protocol;
-    const canUseServiceWorker = swProtocol === 'https:' || swProtocol === 'http:';
-    if ('serviceWorker' in navigator && canUseServiceWorker) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/maoitu/service-worker.js', { scope: '/maoitu/' })
-          .catch(err => console.error('Service Worker registration failed:', err));
-      });
-    } else if ('serviceWorker' in navigator && !canUseServiceWorker) {
-      console.info('Service Worker registration skipped: this page must be served over http/https.');
-    }
-  </script>
+
+const storedAudio = localStorage.getItem(AUDIO_KEY);
+audioToggle.checked = storedAudio !== 'off';
+updateAudioLabel();
+
+audioToggle.addEventListener('change', () => {
+  localStorage.setItem(AUDIO_KEY, audioToggle.checked ? 'on' : 'off');
+  updateAudioLabel();
+});
+</script>
+
 </body>
 </html>
