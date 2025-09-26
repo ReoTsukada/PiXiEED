@@ -46,6 +46,6 @@ self.addEventListener('fetch', event => {
         }
         return networkResponse;
       })
-    ).catch(() => caches.match('/maoitu/game.html'))
+    ).catch(() => caches.match('/maoitu/index.html'))
   );
 });
