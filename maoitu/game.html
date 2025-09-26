@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>魔王様！！いつまでよければいいですか！？</title>
+<link rel="manifest" href="/maoitu/manifest.webmanifest">
+<meta name="theme-color" content="#000000">
+<link rel="apple-touch-icon" href="/maoitu/icons/icon-192.png">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-LLSD5KLJVN"></script>
+<script>
+const GA_MEASUREMENT_ID = 'G-LLSD5KLJVN';
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', GA_MEASUREMENT_ID);
+</script>
+<style>
+  html,body{margin:0;background:#000;height:100%;display:grid;place-items:center;touch-action:none;overscroll-behavior:none}
+  #c{display:block;touch-action:none;image-rendering:pixelated}
+  #sharePanel{
+    position:absolute;
+    bottom:24px;
+    left:50%;
+    display:none;
+    flex-direction:row;
+    gap:12px;
+    padding:12px 18px;
+    justify-content:center;
+    flex-wrap:wrap;
+    text-align:center;
+    background:rgba(0,0,0,0.8);
+    border:1px solid rgba(255,255,255,0.25);
+    border-radius:12px;
+    color:#fff;
+    font-family:sans-serif;
+    font-size:12px;
+    transform:translateX(-50%);
+    align-items:center;
+    z-index:10;
+  }
+  #sharePanel button{
+    font:700 12px system-ui;
+    padding:8px 14px;
+    border:0;
+    border-radius:10px;
+    cursor:pointer;
+  }
+  #shareScoreLabel{font-size:18px;font-weight:700;text-align:center;flex-basis:100%;}
+  #footer{
+    position:absolute;
+    bottom:12px;
+    right:14px;
+    color:rgba(255,255,255,0.6);
+    font:10px/1.2 monospace;
+    user-select:none;
+    pointer-events:none;
+  }
+  #instructions{
+    position:absolute;
+    top:20px;
+    right:20px;
+    max-width:240px;
+    padding:18px 16px 16px;
+    background:rgba(0,0,0,0.7);
+    border:1px solid rgba(255,255,255,0.2);
+    border-radius:12px;
+    color:#fff;
+    font:12px/1.4 system-ui;
+    pointer-events:auto;
+    user-select:none;
+    z-index:5;
+    display:none;
+  }
+  #instructions strong{display:block;font-size:13px;margin-bottom:6px;}
+  #instructions p{margin:0 0 6px;}
+  #instructions p:last-child{margin-bottom:0;}
+  #instructionsClose{
+    position:absolute;
+    top:6px;
+    right:6px;
+    width:26px;
+    height:26px;
+    padding:0;
+    border:1px solid rgba(255,255,255,0.3);
+    border-radius:999px;
+    background:rgba(0,0,0,0.5);
+    color:#fff;
+    font:13px/1 system-ui;
+    cursor:pointer;
+  }
+  #instructionsToggle{
+    position:absolute;
+    top:20px;
+    right:20px;
+    display:block;
+    padding:8px 12px;
+    background:rgba(0,0,0,0.7);
+    border:1px solid rgba(255,255,255,0.3);
+    border-radius:999px;
+    color:#fff;
+    font:14px/1 system-ui;
+    cursor:pointer;
+    z-index:5;
+  }
+</style>
+</head>
+<body>
+<audio id="bgm" src="bgm.mp3" loop autoplay hidden volume="0.5"></audio>
+<canvas id="c"></canvas>
+<div id="instructions">
+  <button id="instructionsClose" type="button">X</button>
+  <strong>遊び方</strong>
+  <p>操作方法：画面をタップ / マウスでドラッグ、または ←→ キーで移動。</p>
+  <p>敵にぶつかると即ゲームオーバー。</p>
+  <p>エンジェリンに触れると一度だけ身代わりが発動し、次の衝突を防ぎます。</p>
+</div>
+<button id="instructionsToggle" type="button">?</button>
+<div id="sharePanel">
+  <div id="shareScoreLabel">SCORE: 0</div>
+  <button id="shareActionBtn" style="background:#22c55e;color:#000;">シェアする</button>
+  <button id="restartActionBtn" style="background:#3b82f6;color:#fff;">もう一度遊ぶ</button>
+</div>
+<div id="footer">© 2025 アルタ</div>
+<script>
+const bgm = document.getElementById('bgm');
+bgm.volume = 0.5;
+const AUDIO_KEY = 'maoitu_audio';
+const GAME_CANONICAL_URL = `${window.location.origin}/maoitu/`;
+function syncAudioSetting(){
+  const enabled = localStorage.getItem(AUDIO_KEY) !== 'off';
+  bgm.muted = !enabled;
+  if(!enabled && !bgm.paused) bgm.pause();
+  return enabled;
+}
+let audioEnabled = syncAudioSetting();
+const sharePanel = document.getElementById('sharePanel');
+const shareScoreLabel = document.getElementById('shareScoreLabel');
+const shareActionBtn = document.getElementById('shareActionBtn');
+const restartActionBtn = document.getElementById('restartActionBtn');
+const instructions = document.getElementById('instructions');
+const instructionsCloseBtn = document.getElementById('instructionsClose');
+const instructionsToggleBtn = document.getElementById('instructionsToggle');
+let shareScore = 0;
+
+function openInstructions(){
+  instructions.style.display = 'block';
+  instructionsToggleBtn.style.display = 'none';
+}
+
+function closeInstructions(){
+  instructions.style.display = 'none';
+  instructionsToggleBtn.style.display = 'block';
+}
+
+function logPlayEvent(eventName, params={}){
+  if(typeof window.gtag === 'function' && GA_MEASUREMENT_ID){
+    window.gtag('event', eventName, params);
+  }
+}
+
+function logPlayStart(){
+  logPlayEvent('play_started');
+}
+
+function shareText(score){
+  return `開発者:@ARTa_PIXELART\n『魔王様！！いつまでよければいいですか！？』\nスコア: ${score}\n皆もやってみてね！！！\n\nリンクから遊べるよ！！#PiXiEED\n\n${GAME_CANONICAL_URL}`;
+}
+
+async function copyShareText(text){
+  try{
+    await navigator.clipboard.writeText(text);
+    alert('シェア用テキストをコピーしました！');
+  }catch(err){
+    alert('シェア機能が利用できません。手動でスコアを共有してください。');
+  }
+}
+
+shareActionBtn.addEventListener('click', async () => {
+  const text = shareText(shareScore);
+  copyShareText(text);
+});
+
+restartActionBtn.addEventListener('click', () => {
+  hideSharePanel();
+  reset();
+});
+
+instructionsCloseBtn.addEventListener('click', () => {
+  closeInstructions();
+});
+
+instructionsToggleBtn.addEventListener('click', () => {
+  openInstructions();
+});
+
+function showSharePanel(score){
+  shareScore = score;
+  shareScoreLabel.textContent = `SCORE: ${score}`;
+  sharePanel.style.display = 'flex';
+  openInstructions();
+  if(typeof restartActionBtn.focus === 'function'){
+    try{
+      restartActionBtn.focus({ preventScroll: true });
+    }catch(_){
+      restartActionBtn.focus();
+    }
+  }
+}
+
+function hideSharePanel(){
+  sharePanel.style.display = 'none';
+}
+hideSharePanel();
+function isOnSharePanel(target){
+  return sharePanel.style.display !== 'none' && sharePanel.contains(target);
+}
+function isOnInstructionUi(target){
+  if(instructions.style.display !== 'none' && instructions.contains(target)) return true;
+  if(instructionsToggleBtn.style.display !== 'none' && instructionsToggleBtn.contains(target)) return true;
+  return false;
+}
+// モバイル環境での自動再生対策
+document.addEventListener('click', () => {
+  audioEnabled = syncAudioSetting();
+  if (audioEnabled && bgm.paused) {
+    bgm.play().catch(()=>{});
+  }
+}, { once: true });
+// ====== 画像（Base64） ======
+// ====== 敵キャラ（解禁スケジュール付き） ======
+const ENEMY_TYPES_DATA=[
+  {src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAQRJREFUOI3tkjFLA0EQhb89L8LBHZxFmq3sAoKQTgj4A6yutrT0F6W0s7cKgl2CcF2qgJ0gbJPCg12InCFjIXe5jWsg1k45s9/beY+B/1KBnhzC7AqIyJafORzA3K5TgIWF8aDncSoEzxzu3qxTU23FltUGY1ZcjVJPJArBc+vDAP08QuuEybPj9uWztRp3HzXw01s4hn4eAcmPQGRqxQOX1WaPwHfpXDEe9FoLLCx74d9mEZ2U/1JtBqYSHi6OveHp3TsArzcnXr8oa86yzgbN+qPHDwCmVtzuT02vKGt0rhhmsaNzB1KUdevRmFVwXa0Trs+PGGaxu8xUCijvkA60rwC+AHX1dn623PVvAAAAAElFTkSuQmCC",speed:2.0,unlockSec:0},
+  {src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAPlJREFUOI2dU7EOgjAUvFZ+wriQAGFB6wc4+AksfCUO+CcYXYjVzTgykxjqgK+2tGj0kibtpXe9tFcGP9QEz74RCgDqo1+/Xurt7gSAGgtFBuz2rlmRc61lplhkw+JwAs4Xhdu9d8SLObdMAm9WA42cNqEETnQ6vZE9zpeH5pNoOC+NORZzjiLnCMZCAJZYXjvLPIkCNLLXKXQWkQ3CT2J57axElgHd9pTYNPEa/II05kgi9r+B+QoEVVa9ejVRj3DVqnDVOnx9VDS3E5TV8Oa+KhNnFg7jKpPBuANJFCCNObabGUQGMPZusfczkRGBLuzbZ3KMPHD2PwEgq485RM69+AAAAABJRU5ErkJggg==",speed:1.5,unlockSec:5},
+  {src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAARNJREFUOI1jZMAO/uMQZyQowMDA8P//f4j+W+sRgvf3/GXwmMaCoYcFl+YT3f8wTO5XeM9Q+EDwP7IhTIRsRga8omwM/QrvGZC9yESsZgYGBgYZU3YMQxjxaX53B+KNjw+wh6nHNBZEGCD7WUiFiWFb0Qe4sxkYGBgEZFkZPjz+jeIauBdw2YxLMzJgwiqKppmBgYHh8+tfxBsA8zNMM48ETnsgYfDuzj+MgII5G9lmZDa/AgeK+v/9Cu//Q6MGjueYfv0/x/QrhvjNdf9hbLgXGAsfCMLil+HmOsxog4ndXPefQT2IkQGWGtHzwv9+hffwAEQHtpVcKJqxGQA3RNOLF0WQX4GRwbKMGUMPNgMYSMnOAMtAf3plqr/eAAAAAElFTkSuQmCC",speed:2.6,unlockSec:10},
+  {src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAYBJREFUOI2lU79rwkAYfQkRO2TIcNDRGxxFupR2EFwzNHuH/gn9D3TsnyLY/RxuFHRI6SCImwGzqSRDhoBK1K+Ll56n0qEf3PLuvXffj/ssXA+6gVsm4FwVSuLCA9cvggwxfEsZl0bWmVgSL+7x5jRTP7Xdum7Ajnm0nzJZWaMH34qV1jHF2cP2nUX50MuZlDuMAcCvogV31XCa8IspQ0USP2VTJkDFhDoJbZY0X/RFSO2ENks6JKNiQh0RUluE1Kb5oq8wvU8ESTU6JCNdLEJqQ1JNP7oJJNUAkA0AwgNPbbe+z/ns+Wn7GX7dvQYZYr0HwgMPMsT7nM9S262rJts6Se4wZsc8MsVlH04cHbdN4n7KpImZI71p4FfRMl8QHvjLY/pxNhEtHJw+CUWr4WDHxyp94YEr8uCbdYMMsfDAHTdusKMbBdndWZmkjeb3qAkYuD7GsoTKGr1iQl0ASGizUlmo+hVWTKhbWaOndP/+yuZ2/bVMqu6ry3RpdBkX/B/RH/qbfqrLJgAAAABJRU5ErkJggg==",speed:1.0,unlockSec:15},
+  {src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAQZJREFUOI2Nk01OwzAQhb+ReoCyJyAWEXeouuNnBYfpSVhwgFwBiQVRxK7tHUBIQRRxjsdmpnJdOzCSZfnZ74szMzbqoWxtpUOzmlkSwCfwCGBmKkFKAGm9BuiBS9c6SUVIDpC2IywueuAtATQ1SArQdy9YEOYd8O5757WbBECvgzi9OTB/ALe+3yYfOoDMAD3phyuOzF/+C8MfECRplDR66fbD9YeCvpK0ilLvhRAlvcQsaZ5pcx93gNIkdkAj6R5oJQ2RA0knPjfAEtikVTAzi8bpEmDrOYlogGs/szSz50giE5CzKXPeByXILumDI3MOmLrJpmQuAXIInjRKZmpP1ONfz/kX+Gq5jszpIJsAAAAASUVORK5CYII=",speed:3.2,unlockSec:20}
+];
+const PLAYER_SRC="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAQRJREFUOI3tkDtOw1AQRY+hQ7iI05CPkFLYRUSNKHARBbEFV6whBRtIFhCldZcNsAtTIJBYgC3hipgGGztBIDePwt+Xj9JSZKSnuXP15s7MhUP8sxhkSQCirV9sxYM9GsIBMbwbCfJcx04uUm84LpHahTQZn5ye83qm0jT6zB7mfLwFfN3eEP8m/Cy+eUljULsT0gQABQDNgNAVXN7D9RU0WtWIKMjqKMjqxyd4noJmKIRuLgBycxTA+6d8XKdZ4UIElKOS7Om7m0HmevqmeVh23SRRcFi2xDkFn5tZbeB7mJYNgLMUq/UJBWdaNvheyW+auGU9KXxPMrEKzYD1E3a97C8AfzBBfBZb3sdTAAAAAElFTkSuQmCC";
+const ANGEL_SRC="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAARZJREFUOI2lkz1OxDAQRt9YCAGSG0REg5ZqC67ABTgB0jZ0ewMqTkC1N6CjQeIEcACuQJGKFRJCRttYWtA2Q+FMsk4C4eer7PE8zzcZB/4pAbS1N2lPbudMANWHSxhvIsV5E7u5yunJtDkLMyhXyPEFDoB5AeUKDbPm9lFAJtMEjkJd2WDmRWZLAdadVJc1DixWVbawkKvd91eSzgLQa73jgCeOgP23mBGve55H4JlDzuSkZusWVH9a3Lwn3gF6//I7GKBi1AEsw2B+R8Y4gK04kN0jYxyA/4MDYzYAxj5tpDVV+7B9cWOSg0UOtB/ResxyjKnH+H6rxF0oI8QCPjzspNfKMqSefUhu/QK2T9MYv/v7hiQAn7kqbU+zGAhDAAAAAElFTkSuQmCC";
+
+// ====== 画像読み込み & アルファマップ ======
+function withAlpha(src){
+  const img=new Image(); img.src=src;
+  const out={img,ready:false,alpha:null};
+  img.onload=()=>{
+    const oc=document.createElement('canvas'); oc.width=16; oc.height=16;
+    const ctx=oc.getContext('2d'); ctx.drawImage(img,0,0,16,16);
+    out.alpha=ctx.getImageData(0,0,16,16).data; out.ready=true;
+  };
+  return out;
+}
+const ENEMY_TYPES=ENEMY_TYPES_DATA.map(t=>({...t,skin:withAlpha(t.src)}));
+const PLAYER=withAlpha(PLAYER_SRC);
+const ANGEL=withAlpha(ANGEL_SRC);
+const PLAYER_START_X = 72;
+const PLAYER_START_Y = 180;
+const PLAYER_START_TX = 80;
+
+// ====== 基本設定 ======
+let c=document.getElementById('c'),x=c.getContext('2d',{alpha:false}),W=160,H=240;
+let P={x:PLAYER_START_X,y:PLAYER_START_Y,w:16,h:16,v:2,skin:PLAYER};
+let E=[], angels=[], o=0, tx=PLAYER_START_TX, S=0, alive=true, shield=false;
+
+// ====== 表示フィット ======
+function fit(){
+  const d=devicePixelRatio||1, ar=H/W;
+  const w=Math.min(innerWidth*.98, innerHeight*.98/ar)|0;
+  const h=(w*ar)|0;
+  c.style.width=w+'px'; c.style.height=h+'px';
+  c.width=(w*d)|0; c.height=(h*d)|0;
+  x.setTransform((w*d)/W,0,0,(h*d)/H,0,0);
+  x.imageSmoothingEnabled=false;
+}
+addEventListener('resize', fit); fit();
+
+// ====== 生成 ======
+function rnd(a,b){return Math.random()*(b-a)+a}
+function spawnEnemy(){
+  const elapsedSec = elapsedFrames / 60;
+  const candidates = ENEMY_TYPES.filter(t=>elapsedSec >= t.unlockSec);
+  const type = candidates[(Math.random()*candidates.length)|0];
+  E.push({x:rnd(0,W-16),y:-18,w:16,h:16,v:type.speed,skin:type.skin});
+}
+function spawnAngel(){
+  angels.push({x:rnd(0,W-16),y:-18,w:16,h:16,v:1.4,skin:ANGEL});
+}
+
+// ====== Angelin 出現頻度（5秒ごと判定 + 低確率） ======
+const ANGEL_BASE_INTERVAL = 300;
+const ANGEL_SPAWN_PROB    = 0.10;
+
+// ====== 難易度スケーリング（時間ベース） ======
+let enemySpawnIntervalFrames = 22;
+let enemiesPerSpawn = 1;
+let difficultyLevel = 1;
+const DIFFICULTY_STEP_SEC = 5;
+let lastDifficultyUpdateSec = 0;
+let elapsedFrames = 0;
+
+// ====== 楕円ベースのゆるい当たり判定 ======
+function hitBox(a, b){
+  function ellipse(o, fx=0.8, fy=0.6){
+    const rx = o.w * fx / 2;
+    const ry = o.h * fy / 2;
+    return {
+      cx: o.x + o.w / 2,
+      cy: o.y + o.h / 2,
+      rx,
+      ry
+    };
+  }
+  const ea = ellipse(a, 0.8, 0.6);
+  const eb = ellipse(b, 0.8, 0.6);
+  const dx = ea.cx - eb.cx;
+  const dy = ea.cy - eb.cy;
+  const rx = ea.rx + eb.rx;
+  const ry = ea.ry + eb.ry;
+  if(rx === 0 || ry === 0) return false;
+  return (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1;
+}
+
+// ====== 入力 ======
+function pos(e){const r=c.getBoundingClientRect();return (e.clientX-r.left)/r.width*W}
+document.onpointerdown = e => {
+  if(isOnSharePanel(e.target)) return;
+  if(isOnInstructionUi(e.target)) return;
+  if(e.cancelable) e.preventDefault();
+  if(!alive) return;
+  tx = pos(e) - P.w/2;
+};
+document.onpointermove = e => {
+  if(isOnSharePanel(e.target)) return;
+  if(isOnInstructionUi(e.target)) return;
+  if(e.cancelable) e.preventDefault();
+  if(!alive) return;
+  tx = pos(e) - P.w/2;
+};
+addEventListener('keydown',e=>{ if(!alive) return; if(e.key==='ArrowLeft')tx-=20; else if(e.key==='ArrowRight')tx+=20; });
+
+function reset(countPlay = true){ alive=true; E.length=0; angels.length=0; o=0; S=0; shield=false; P.x=PLAYER_START_X; P.y=PLAYER_START_Y; tx=PLAYER_START_TX; P.skin=PLAYER;
+  enemySpawnIntervalFrames = 22;
+  enemiesPerSpawn = 1;
+  lastDifficultyUpdateSec = 0;
+  elapsedFrames = 0;
+  difficultyLevel = 1;
+  closeInstructions();
+  hideSharePanel();
+  if(countPlay) logPlayStart();
+}
+
+function endRun(){
+  if(!alive) return;
+  alive = false;
+  logPlayEvent('game_over', { score: S });
+}
+
+// ====== 1フレーム ======
+function step(){
+  if(o % enemySpawnIntervalFrames === 0){
+    for(let i=0;i<enemiesPerSpawn;i++) spawnEnemy();
+  }
+  if(o % ANGEL_BASE_INTERVAL === 0 && Math.random() < ANGEL_SPAWN_PROB) spawnAngel();
+  o++;
+  elapsedFrames++;
+
+  E.forEach(e=>e.y+=e.v);
+  angels.forEach(a=>a.y+=a.v);
+
+  const dx=tx-P.x; P.x+=Math.sign(dx)*Math.min(Math.abs(dx),P.v);
+  P.x=Math.max(0,Math.min(W-P.w,P.x));
+
+  angels = angels.filter(a=>{
+    if(hitBox(P,a)){ shield=true; P.skin=ANGEL; return false; }
+    return a.y<H+20;
+  });
+
+  for(const e of E){
+    if(hitBox(P,e)){
+      if(shield){
+        shield=false; P.skin=PLAYER; e.y=H+99;
+      }else{
+        endRun();
+        break;
+      }
+    }
+  }
+  E=E.filter(e=>e.y<H+20);
+  S++;
+
+  if(!alive && sharePanel.style.display==='none'){
+    showSharePanel(S);
+  }
+
+  const elapsedSec = elapsedFrames / 60;
+  if(elapsedSec - lastDifficultyUpdateSec >= DIFFICULTY_STEP_SEC){
+    lastDifficultyUpdateSec += DIFFICULTY_STEP_SEC;
+    difficultyLevel++;
+    if(enemySpawnIntervalFrames > 2){
+      enemySpawnIntervalFrames = Math.max(2, enemySpawnIntervalFrames - 2);
+    }else{
+      enemiesPerSpawn = Math.min(enemiesPerSpawn + 1, 6);
+    }
+  }
+}
+
+// ====== 描画 ======
+function draw(){
+  x.fillStyle='#000'; x.fillRect(0,0,W,H);
+  E.forEach(e=> e.skin.img.complete ? x.drawImage(e.skin.img,e.x,e.y,e.w,e.h) : (x.fillStyle='#f33',x.fillRect(e.x,e.y,e.w,e.h)));
+  angels.forEach(a=> a.skin.img.complete ? x.drawImage(a.skin.img,a.x,a.y,a.w,a.h) : (x.fillStyle='#fff',x.fillRect(a.x,a.y,a.w,a.h)));
+  if(P.skin.img.complete) x.drawImage(P.skin.img,P.x,P.y,P.w,P.h); else { x.fillStyle='#0ff'; x.fillRect(P.x,P.y,P.w,P.h); }
+
+  x.fillStyle='#fff';
+  x.font='bold 16px monospace';
+  x.fillText('S:'+S,4,16);
+  x.font='10px monospace';
+  x.fillText('エンジェルの加護:'+(shield?'あり':'なし'),4,30);
+  x.fillText('難易度: '+difficultyLevel,4,42);
+
+  if(!alive){
+    x.fillStyle='rgba(0,0,0,0.6)'; x.fillRect(10,90,140,70);
+    x.strokeStyle='rgba(255,255,255,0.25)'; x.strokeRect(10,90,140,70);
+    x.fillStyle='#fff'; x.font='bold 18px monospace'; x.fillText('GAME OVER',28,115);
+    x.font='12px monospace'; x.fillText('右上のボタンで共有や再挑戦',4,135);
+  }
+}
+
+// ====== ループ（固定タイムステップ 60Hz） ======
+const FIXED_DT_MS = 1000/60;
+let last = performance.now();
+let acc  = 0;
+
+function loop(now){
+  let dt = now - last;
+  last = now;
+  if (dt > 1000) dt = 1000;
+  acc += dt;
+
+  const MAX_STEPS = 5;
+  let steps = 0;
+  while (acc >= FIXED_DT_MS && steps < MAX_STEPS){
+    if (alive) step();
+    acc -= FIXED_DT_MS;
+    steps++;
+  }
+
+  draw();
+  requestAnimationFrame(loop);
+}
+reset();
+requestAnimationFrame(loop);
+
+const isFileProtocol = window.location.protocol === 'file:';
+const canUseServiceWorker = 'serviceWorker' in navigator && window.isSecureContext && !isFileProtocol;
+if (canUseServiceWorker) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/maoitu/service-worker.js', { scope: '/maoitu/' })
+      .catch(err => console.error('Service worker registration failed:', err));
+  });
+} else if (isFileProtocol) {
+  console.info('Service worker not registered: load the site over http(s) to enable offline support.');
+} else {
+  console.info('Service worker not registered: secure context required.');
+}
+</script>
+</body>
+</html>
