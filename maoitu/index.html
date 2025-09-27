@@ -123,6 +123,21 @@ a { color:#7dd3fc; }
   color:#000;
   border-radius:12px;
 }
+.install-btn {
+  background:#facc15;
+  color:#000;
+  padding:12px 24px;
+  border-radius:12px;
+  font:700 16px system-ui;
+  border:0;
+  cursor:pointer;
+  display:none;
+}
+.install-btn:hover,
+.install-btn:focus-visible {
+  filter:brightness(1.05);
+  outline:none;
+}
 </style>
 </head>
 <body>
@@ -149,6 +164,7 @@ a { color:#7dd3fc; }
 
 <!-- シェアボタン -->
 <button id="titleShareBtn">シェアする</button>
+<button id="installBtn" class="install-btn">アプリをインストール</button>
 
 <div class="instructions-card">
   <h2>遊び方</h2>
@@ -167,6 +183,8 @@ const playBtn = document.getElementById('playBtn');
 const shareBtn = document.getElementById('titleShareBtn');
 const audioToggle = document.getElementById('audioToggle');
 const audioToggleLabel = document.getElementById('audioToggleLabel');
+const installBtn = document.getElementById('installBtn');
+let deferredInstallPrompt = null;
 
 function baseShareText(){
   return `開発者:@ARTa_PIXELART\n『魔王様！！いつまでよければいいですか！？』\n皆もやってみてね！！！\n\nリンクから遊べるよ！！#PiXiEED\n\n${GAME_CANONICAL_URL}`;
@@ -196,6 +214,30 @@ updateAudioLabel();
 audioToggle.addEventListener('change', () => {
   localStorage.setItem(AUDIO_KEY, audioToggle.checked ? 'on' : 'off');
   updateAudioLabel();
+});
+
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  installBtn.style.display = 'inline-block';
+});
+
+installBtn.addEventListener('click', async () => {
+  if(!deferredInstallPrompt){
+    alert('ブラウザがインストールに対応していません。');
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  const result = await deferredInstallPrompt.userChoice;
+  if(result.outcome === 'accepted'){
+    installBtn.style.display = 'none';
+  }
+  deferredInstallPrompt = null;
+});
+
+window.addEventListener('appinstalled', () => {
+  installBtn.style.display = 'none';
+  deferredInstallPrompt = null;
 });
 </script>
 
