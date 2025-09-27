@@ -123,6 +123,26 @@ a { color:#7dd3fc; }
   color:#000;
   border-radius:12px;
 }
+.back-link {
+  position:absolute;
+  top:16px;
+  left:16px;
+  padding:8px 14px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,0.35);
+  background:rgba(0,0,0,0.65);
+  color:#fff;
+  font:600 13px/1.2 system-ui;
+  text-decoration:none;
+  transition:background 0.2s ease,color 0.2s ease,transform 0.2s ease;
+}
+.back-link:hover,
+.back-link:focus-visible {
+  background:#fff;
+  color:#000;
+  transform:translateY(-1px);
+  outline:none;
+}
 .install-btn {
   background:#facc15;
   color:#000;
@@ -141,6 +161,8 @@ a { color:#7dd3fc; }
 </style>
 </head>
 <body>
+
+<a class="back-link" href="../index.html#showcase">← ホームに戻る</a>
 
 <!-- 開発者表記 -->
 <div style="position:absolute;top:10px;left:0;right:0;text-align:center;font-size:14px;color:#ccc;">
