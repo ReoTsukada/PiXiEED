@@ -9,6 +9,50 @@
   const showcaseCards = Array.from(document.querySelectorAll('.display-wall .display'));
   const heroReel = document.querySelector('.hero-reel');
   const heroTrack = heroReel ? heroReel.querySelector('.hero-reel__track') : null;
+  const contactOverlay = document.getElementById('contactOverlay');
+  const contactOpeners = Array.from(document.querySelectorAll('.js-contact-open'));
+  const contactCloseBtn = contactOverlay ? contactOverlay.querySelector('.js-contact-close') : null;
+
+  let lastFocusedElement = null;
+
+  function openContactOverlay() {
+    if (!contactOverlay) return;
+    lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    contactOverlay.hidden = false;
+    contactOverlay.setAttribute('aria-hidden', 'false');
+    document.body.style.setProperty('overflow', 'hidden');
+    if (contactCloseBtn) {
+      contactCloseBtn.focus();
+    }
+  }
+
+  function closeContactOverlay() {
+    if (!contactOverlay) return;
+    contactOverlay.hidden = true;
+    contactOverlay.setAttribute('aria-hidden', 'true');
+    document.body.style.removeProperty('overflow');
+    if (lastFocusedElement) {
+      lastFocusedElement.focus();
+    }
+  }
+
+  if (contactOverlay) {
+    contactOpeners.forEach(btn => btn.addEventListener('click', openContactOverlay));
+    if (contactCloseBtn) {
+      contactCloseBtn.addEventListener('click', closeContactOverlay);
+    }
+    contactOverlay.addEventListener('click', (event) => {
+      if (event.target === contactOverlay) {
+        closeContactOverlay();
+      }
+    });
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !contactOverlay.hidden) {
+        event.preventDefault();
+        closeContactOverlay();
+      }
+    });
+  }
 
   if (heroReel && heroTrack) {
     const heroItems = Array.from(heroTrack.children);
