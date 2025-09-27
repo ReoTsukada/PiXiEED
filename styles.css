@@ -691,6 +691,15 @@ a:focus {
   color: var(--fg-secondary);
 }
 
+.footer-contact {
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  color: var(--fg-secondary);
+  cursor: pointer;
+  padding: 0;
+}
+
 .footer-link--x {
   display: inline-flex;
   align-items: center;
@@ -706,9 +715,94 @@ a:focus {
   opacity: 0.8;
 }
 
+.footer-contact:hover,
+.footer-contact:focus,
 .footer-links a:hover,
 .footer-links a:focus {
   color: var(--fg-primary);
+}
+
+.contact-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 7, 16, 0.75);
+  backdrop-filter: blur(8px);
+  z-index: 60;
+}
+
+.contact-overlay[hidden] {
+  display: none !important;
+}
+
+.contact-panel {
+  position: relative;
+  width: min(420px, 90vw);
+  background: rgba(14, 16, 32, 0.92);
+  border-radius: 20px;
+  border: 1px solid rgba(140, 140, 255, 0.28);
+  box-shadow: var(--shadow-hard);
+  padding: 2.2rem 2rem 2rem;
+  color: var(--fg-primary);
+}
+
+.contact-panel h2 {
+  margin: 0 0 0.6rem;
+  font-family: var(--font-heading);
+}
+
+.contact-panel p {
+  margin: 0 0 1.4rem;
+  color: var(--fg-secondary);
+}
+
+.contact-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--fg-primary);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.contact-options {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.contact-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1rem 1.2rem;
+  border-radius: 14px;
+  border: 1px solid rgba(140, 140, 255, 0.25);
+  background: rgba(255, 255, 255, 0.05);
+  transition: border var(--transition), transform var(--transition);
+  color: var(--fg-primary);
+}
+
+.contact-option:hover,
+.contact-option:focus {
+  border-color: rgba(140, 140, 255, 0.6);
+  transform: translateY(-2px);
+}
+
+.contact-option__title {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.contact-option__detail {
+  color: var(--fg-secondary);
+  font-size: 0.85rem;
 }
 
 .portfolio-header {
