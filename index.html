@@ -37,111 +37,113 @@
           <a class="cta-secondary" href="portfolio/index.html">アルタのポートフォリオ</a>
         </div>
       </div>
-      <div class="hero-visual" role="presentation">
-        <div class="hero-display">
-          <span class="scanline"></span>
-          <span class="glow"></span>
-          <div class="hero-display__frame">
-            <p>PiXiEED</p>
-            <small>Web Tools &amp; Games</small>
+      <div class="hero-visual" aria-label="PiXiEED Showcase">
+        <div class="hero-reel" role="list">
+          <div class="hero-reel__track">
+            <a class="hero-card hero-card--project" role="listitem" href="maoitu/index.html">
+              <figure>
+                <img src="maoitu/ogp.png" alt="魔王様!!いつまでよければいいですか!? のスクリーンショット" loading="lazy">
+                <figcaption>
+                  <span class="hero-card__tag">ゲーム</span>
+                  <strong>魔王様!!いつまでよければいいですか!?</strong>
+                  <p>避け続ける緊張感をブラウザで。</p>
+                </figcaption>
+              </figure>
+            </a>
+            <div class="hero-card hero-card--coming" role="listitem">
+              <span class="hero-card__tag">近日公開</span>
+              <strong>次の制作物が待機中</strong>
+              <p>最新のツールやゲームが順番にここへ並びます。</p>
+            </div>
+            <div class="hero-card hero-card--ad" role="listitem">
+              <span class="hero-card__tag">スポンサー</span>
+              <strong>広告枠を掲載できます</strong>
+              <p>企業コラボやキャンペーン告知などお気軽にご相談ください。</p>
+            </div>
+            <div class="hero-card hero-card--slot" role="listitem">
+              <span class="hero-card__tag">Slot</span>
+              <strong>新しい企画を準備中</strong>
+              <p>ツール / ゲーム問わず、最新プロジェクトのハイライトに使用します。</p>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
-
-    <section class="section section--accent" id="news">
-      <div class="section-inner news">
-        <h2>お知らせ・アップデート</h2>
-        <p>直近の予定や更新メモを簡潔にまとめています。</p>
-        <ul class="news-list">
-          <li class="news-item">[MM/DD] 新作ブラウザゲームを近日リリース予定。</li>
-          <li class="news-item">[MM/DD] サイトに広告枠を試験導入します。</li>
-          <li class="news-item">[MM/DD] アルタのポートフォリオを小幅更新。</li>
-        </ul>
       </div>
     </section>
 
     <section class="section" id="showcase">
       <div class="section-inner">
         <h2>ディスプレイに並ぶ PiXiEED の作品</h2>
-        <p>主なツールとゲームをショーケース形式で紹介します。</p>
+        <p>主なツールとゲームをショーケース形式で紹介します。検索やカテゴリで絞り込みができます。</p>
+        <div class="showcase-controls" role="region" aria-label="ショーケースのフィルター">
+          <label class="showcase-search">
+            <span class="sr-only">制作物を検索</span>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10.5 3a7.5 7.5 0 0 1 5.96 12.1l4.22 4.2-1.42 1.42-4.2-4.22A7.5 7.5 0 1 1 10.5 3Zm0 2a5.5 5.5 0 1 0 0 11a5.5 5.5 0 0 0 0-11Z"/></svg>
+            <input type="search" id="showcaseSearch" placeholder="作品名・説明で検索" autocomplete="off">
+          </label>
+          <div class="showcase-categories" role="radiogroup" aria-label="カテゴリ選択">
+            <button class="showcase-chip is-active" type="button" data-category="all" aria-pressed="true">すべて</button>
+            <button class="showcase-chip" type="button" data-category="game" aria-pressed="false">ゲーム</button>
+            <button class="showcase-chip" type="button" data-category="tool" aria-pressed="false">ツール</button>
+          </div>
+        </div>
         <div class="display-wall" role="list">
-          <article class="display" role="listitem">
-            <div class="display__frame">
-              <div class="display__screen placeholder tool">Tool A</div>
-            </div>
-            <div class="display__info">
-              <h3 class="display__title">ブラウザツール A</h3>
-              <p class="display__description">タスク管理を素早く整理するシンプルツール。</p>
-            </div>
-          </article>
-          <article class="display" role="listitem">
+          <article class="display" role="listitem" data-type="game" data-title="魔王様!!いつまでよければいいですか!?" data-description="ブラウザで遊べる避けゲーアクション。インストール対応。" data-difficulty="1">
+            <header class="display__header">
+              <span class="display__badge display__badge--game">Game</span>
+              <h3 class="display__title">魔王様!!いつまでよければいいですか!?</h3>
+            </header>
             <a class="display__link" href="maoitu/index.html">
               <div class="display__frame">
                 <div class="display__screen display__screen--image">
                   <img src="maoitu/ogp.png" alt="魔王様!!いつまでよければいいですか!? のスクリーンショット">
                 </div>
               </div>
-              <div class="display__info">
-                <h3 class="display__title">魔王様!!いつまでよければいいですか!?</h3>
-                <p class="display__description">弾幕を避け続ける高速アクション。</p>
-              </div>
+              <p class="display__description">ブラウザで遊べる避けゲーアクション。インストール対応。</p>
             </a>
+            <div class="display__meta">
+              <span class="display__difficulty" data-difficulty="1" aria-label="難易度 1">
+                <span class="display__difficulty-label">難易度</span>
+                <span class="display__difficulty-scale" aria-hidden="true">
+                  <span class="is-filled"></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </span>
+                <span class="display__difficulty-value">1</span>
+              </span>
+            </div>
           </article>
-          <article class="display" role="listitem">
+          <article class="display" role="listitem" data-type="tool" data-title="次期ブラウザツール（制作中）" data-description="制作メモやモックアップが整い次第、ここに掲載予定です。">
+            <header class="display__header">
+              <span class="display__badge display__badge--tool">Tool</span>
+              <h3 class="display__title">次期ブラウザツール（制作中）</h3>
+            </header>
             <div class="display__frame">
-              <div class="display__screen placeholder tool">Tool C</div>
+              <div class="display__screen placeholder tool">Coming Soon</div>
             </div>
-            <div class="display__info">
-              <h3 class="display__title">制作支援ツール C</h3>
-              <p class="display__description">素材をまとめて管理できる制作サポート。</p>
-            </div>
+            <p class="display__description">制作メモやモックアップが整い次第、ここに掲載予定です。</p>
           </article>
-          <article class="display" role="listitem">
+          <article class="display" role="listitem" data-type="slot" data-title="新規プロジェクト枠" data-description="ゲーム / ツール問わず、新しい作品が揃い次第追加されます。">
+            <header class="display__header">
+              <span class="display__badge display__badge--slot">Slot</span>
+              <h3 class="display__title">新規プロジェクト枠</h3>
+            </header>
             <div class="display__frame">
-              <div class="display__screen placeholder game">Game D</div>
+              <div class="display__screen placeholder slot">Reserve</div>
             </div>
-            <div class="display__info">
-              <h3 class="display__title">ブラウザゲーム D</h3>
-              <p class="display__description">協力プレイ対応の最新ブラウザゲーム。</p>
-            </div>
+            <p class="display__description">ゲーム / ツール問わず、新しい作品が揃い次第追加されます。</p>
           </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="section" id="tools">
-      <div class="section-inner split">
-        <div>
-          <h2>ブラウザツール</h2>
-          <p>軽量な制作支援ツールをカテゴリ別に公開しています。</p>
-          <a class="link-more" href="#">ツール一覧</a>
-        </div>
-        <div class="feature-card">
-          <h3>ピックアップツール</h3>
-          <ul>
-            <li>TaskFlow：日々のタスク整理</li>
-            <li>Pix Palette：配色を即生成</li>
-            <li>SoundSeed：ブラウザでSE制作</li>
-          </ul>
-        </div>
-      </div>
-    </section>
-
-    <section class="section" id="games">
-      <div class="section-inner split">
-        <div class="feature-card">
-          <h3>ブラウザゲーム開発中</h3>
-          <ul>
-            <li>Star Drift：スピード感のあるドリフトレースゲーム</li>
-            <li>Codebreaker：パズルとプログラミングを融合した新感覚作品</li>
-            <li>Pixel Voyage：探索と収集をテーマにしたアドベンチャー</li>
-          </ul>
-        </div>
-        <div>
-          <h2>ブラウザゲーム</h2>
-          <p>プレイページと更新ログをまとめた特設サイトに遷移します。</p>
-          <a class="link-more" href="#">ゲーム一覧</a>
+          <article class="display" role="listitem" data-type="ad" data-title="広告募集中" data-description="企業スポンサー向けバナーや特設ページと連携可能。">
+            <header class="display__header">
+              <span class="display__badge display__badge--ad">Sponsor</span>
+              <h3 class="display__title">広告募集中</h3>
+            </header>
+            <div class="display__frame">
+              <div class="display__screen placeholder ad">Advertising</div>
+            </div>
+            <p class="display__description">掲載をご希望の企業様はお問い合わせフォームからご連絡ください。</p>
+          </article>
         </div>
       </div>
     </section>
@@ -181,9 +183,10 @@
     <div class="footer-inner">
       <small>&copy; <span id="year"></span> PiXiEED. All rights reserved.</small>
       <div class="footer-links">
-        <a href="#">利用規約</a>
-        <a href="#">プライバシーポリシー</a>
+        <a href="terms/index.html">利用規約</a>
+        <a href="privacy/index.html">プライバシーポリシー</a>
         <a href="#">お問い合わせ</a>
+        <a class="footer-link--x" href="https://x.com/ARTa_PIXELART" target="_blank" rel="noopener">公式X (旧Twitter)</a>
       </div>
     </div>
   </footer>
