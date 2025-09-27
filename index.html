@@ -185,11 +185,29 @@
       <div class="footer-links">
         <a href="terms/index.html">利用規約</a>
         <a href="privacy/index.html">プライバシーポリシー</a>
-        <a href="#">お問い合わせ</a>
+        <button type="button" class="footer-contact js-contact-open">お問い合わせ</button>
         <a class="footer-link--x" href="https://x.com/ARTa_PIXELART" target="_blank" rel="noopener">公式X (旧Twitter)</a>
       </div>
     </div>
   </footer>
+
+  <div id="contactOverlay" class="contact-overlay" hidden aria-hidden="true">
+    <div class="contact-panel" role="dialog" aria-modal="true" aria-labelledby="contactTitle">
+      <button type="button" class="contact-close js-contact-close" aria-label="閉じる">×</button>
+      <h2 id="contactTitle">お問い合わせ</h2>
+      <p>ご希望の連絡手段を選択してください。</p>
+      <div class="contact-options">
+        <a class="contact-option" href="mailto:arta@pixieed.jp">
+          <span class="contact-option__title">メールで問い合わせる</span>
+          <span class="contact-option__detail">arta@pixieed.jp</span>
+        </a>
+        <a class="contact-option" href="https://x.com/ARTa_PIXELART" target="_blank" rel="noopener">
+          <span class="contact-option__title">X (旧Twitter) のDM</span>
+          <span class="contact-option__detail">@ARTa_PIXELART</span>
+        </a>
+      </div>
+    </div>
+  </div>
 
   <script src="scripts.js"></script>
 </body>
