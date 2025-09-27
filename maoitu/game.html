@@ -19,6 +19,28 @@ gtag('config', GA_MEASUREMENT_ID);
 <style>
   html,body{margin:0;background:#000;height:100%;display:grid;place-items:center;touch-action:none;overscroll-behavior:none}
   #c{display:block;touch-action:none;image-rendering:pixelated}
+  .back-link{
+    position:absolute;
+    top:18px;
+    left:18px;
+    padding:8px 14px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,0.35);
+    background:rgba(0,0,0,0.65);
+    color:#fff;
+    font:600 13px/1.2 system-ui;
+    text-decoration:none;
+    display:none;
+    z-index:12;
+    transition:background 0.2s ease,color 0.2s ease,transform 0.2s ease;
+  }
+  .back-link:hover,
+  .back-link:focus-visible{
+    background:#fff;
+    color:#000;
+    transform:translateY(-1px);
+    outline:none;
+  }
   #sharePanel{
     position:absolute;
     bottom:24px;
@@ -107,6 +129,7 @@ gtag('config', GA_MEASUREMENT_ID);
 </style>
 </head>
 <body>
+<a id="backLink" class="back-link" href="../index.html#showcase">← ホームに戻る</a>
 <audio id="bgm" src="bgm.mp3" loop autoplay hidden volume="0.5"></audio>
 <canvas id="c"></canvas>
 <div id="instructions">
@@ -142,6 +165,7 @@ const restartActionBtn = document.getElementById('restartActionBtn');
 const instructions = document.getElementById('instructions');
 const instructionsCloseBtn = document.getElementById('instructionsClose');
 const instructionsToggleBtn = document.getElementById('instructionsToggle');
+const backLink = document.getElementById('backLink');
 let shareScore = 0;
 
 function openInstructions(){
@@ -194,6 +218,14 @@ instructionsCloseBtn.addEventListener('click', () => {
 instructionsToggleBtn.addEventListener('click', () => {
   openInstructions();
 });
+
+function showBackLink(){
+  backLink.style.display = 'inline-flex';
+}
+
+function hideBackLink(){
+  backLink.style.display = 'none';
+}
 
 function showSharePanel(score){
   shareScore = score;
@@ -347,12 +379,14 @@ function reset(countPlay = true){ alive=true; E.length=0; angels.length=0; o=0; 
   difficultyLevel = 1;
   closeInstructions();
   hideSharePanel();
+  hideBackLink();
   if(countPlay) logPlayStart();
 }
 
 function endRun(){
   if(!alive) return;
   alive = false;
+  showBackLink();
   logPlayEvent('game_over', { score: S });
 }
 
