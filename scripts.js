@@ -1,4 +1,13 @@
+
 (function () {
+  const fallbackConfig = { hero: [], showcase: null, footer: [] };
+
+  function init(adConfigInput) {
+    const adConfig = adConfigInput && typeof adConfigInput === 'object' ? adConfigInput : fallbackConfig;
+    const heroAds = Array.isArray(adConfig.hero) ? adConfig.hero.filter(Boolean) : [];
+    const showcaseAd = adConfig.showcase || null;
+    const footerAds = Array.isArray(adConfig.footer) ? adConfig.footer.filter(Boolean) : [];
+
   const yearElement = document.getElementById("year");
   if (yearElement) {
     yearElement.textContent = new Date().getFullYear().toString();
@@ -6,14 +15,100 @@
 
   const searchInput = document.getElementById('showcaseSearch');
   const categoryChips = Array.from(document.querySelectorAll('.showcase-chip'));
-  const showcaseCards = Array.from(document.querySelectorAll('.display-wall .display'));
+  const showcaseContainer = document.querySelector('.display-wall');
+  let showcaseCards = Array.from(document.querySelectorAll('.display-wall .display'));
   const heroReel = document.querySelector('.hero-reel');
   const heroTrack = heroReel ? heroReel.querySelector('.hero-reel__track') : null;
   const contactOverlay = document.getElementById('contactOverlay');
   const contactOpeners = Array.from(document.querySelectorAll('.js-contact-open'));
   const contactCloseBtn = contactOverlay ? contactOverlay.querySelector('.js-contact-close') : null;
+  const footerAdGrid = document.querySelector('.ad-grid');
 
   let lastFocusedElement = null;
+
+  function createHeroAdCard(item) {
+    if (!item || !item.image || !heroTrack) return null;
+    const hasLink = Boolean(item.link);
+    const wrapper = document.createElement(hasLink ? 'a' : 'div');
+    wrapper.className = 'hero-card hero-card--ad';
+    wrapper.setAttribute('role', 'listitem');
+    if (hasLink) {
+      wrapper.href = item.link;
+      wrapper.target = '_blank';
+      wrapper.rel = 'noopener';
+    }
+    const badge = item.tag || 'スポンサー';
+    wrapper.innerHTML = `
+      <figure>
+        <img src="${item.image}" alt="${item.alt || item.title || 'スポンサー広告'}" loading="lazy">
+        <figcaption>
+          <span class="hero-card__tag">${badge}</span>
+          <strong>${item.title || ''}</strong>
+          <p>${item.description || ''}</p>
+        </figcaption>
+      </figure>
+    `;
+    return wrapper;
+  }
+
+  function createShowcaseAdCard(item) {
+    if (!item || !showcaseContainer) return null;
+    const article = document.createElement('article');
+    article.className = 'display display--ad';
+    article.setAttribute('role', 'listitem');
+    article.dataset.type = 'ad';
+    article.dataset.title = item.title || '';
+    article.dataset.description = item.description || '';
+
+    const linkTag = document.createElement(item.link ? 'a' : 'div');
+    linkTag.classList.add('display__link');
+    if (item.link) {
+      linkTag.href = item.link;
+      linkTag.target = '_blank';
+      linkTag.rel = 'noopener';
+    }
+
+    linkTag.innerHTML = `
+      <div class="display__frame">
+        <div class="display__screen display__screen--image">
+          ${item.image ? `<img src="${item.image}" alt="${item.alt || item.title || 'スポンサー広告'}">` : '<div class="display__screen placeholder ad">Sponsor</div>'}
+        </div>
+      </div>
+      <p class="display__description">${item.description || ''}</p>
+    `;
+
+    article.innerHTML = `
+      <header class="display__header">
+        <span class="display__badge display__badge--ad">${item.badge || 'Sponsor'}</span>
+        <h3 class="display__title">${item.title || ''}</h3>
+      </header>
+    `;
+    article.appendChild(linkTag);
+    return article;
+  }
+
+  function createFooterAdSlot(item) {
+    if (!item || !footerAdGrid) return null;
+    const hasLink = Boolean(item.link);
+    const slot = document.createElement(hasLink ? 'a' : 'div');
+    slot.className = 'ad-slot ad-slot--filled';
+    if (hasLink) {
+      slot.href = item.link;
+      slot.target = '_blank';
+      slot.rel = 'noopener';
+    }
+
+    if (item.image) {
+      const img = document.createElement('img');
+      img.src = item.image;
+      img.alt = item.alt || item.label || 'スポンサー広告';
+      img.loading = 'lazy';
+      slot.appendChild(img);
+    } else if (item.label) {
+      slot.textContent = item.label;
+    }
+    return slot;
+  }
 
   function openContactOverlay() {
     if (!contactOverlay) return;
@@ -52,6 +147,35 @@
         closeContactOverlay();
       }
     });
+  }
+
+  if (heroTrack && heroAds.length) {
+    heroAds.slice(0, 3).forEach(ad => {
+      const card = createHeroAdCard(ad);
+      if (card) {
+        heroTrack.appendChild(card);
+      }
+    });
+  }
+
+  if (showcaseAd && showcaseContainer) {
+    const adCard = createShowcaseAdCard(showcaseAd);
+    if (adCard) {
+      showcaseContainer.appendChild(adCard);
+      showcaseCards.push(adCard);
+    }
+  }
+
+  if (footerAdGrid && footerAds.length) {
+    footerAds.slice(0, 3).forEach(ad => {
+      const slot = createFooterAdSlot(ad);
+      if (slot) {
+        footerAdGrid.appendChild(slot);
+      }
+    });
+    if (footerAdGrid.children.length) {
+      footerAdGrid.hidden = false;
+    }
   }
 
   if (heroReel && heroTrack) {
@@ -158,4 +282,13 @@
     searchTerm = searchInput.value.trim().toLowerCase();
     applyShowcaseFilter();
   });
+  }
+
+  const ready = window.PIXIEED_ADS_READY instanceof Promise
+    ? window.PIXIEED_ADS_READY
+    : Promise.resolve(window.PIXIEED_ADS || fallbackConfig);
+
+  ready
+    .then(config => init(config))
+    .catch(() => init(fallbackConfig));
 })();
