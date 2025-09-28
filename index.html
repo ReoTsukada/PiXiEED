@@ -23,6 +23,7 @@
         <li><a href="#games">ゲーム</a></li>
         <li><a href="portfolio/index.html">アルタ</a></li>
         <li><a href="#news">お知らせ</a></li>
+        <li><a href="ads/index.html">広告掲載</a></li>
       </ul>
     </nav>
   </header>
@@ -31,7 +32,8 @@
     <section class="hero" id="hero">
       <div class="hero-copy">
         <h1>PiXiEED ホームページ</h1>
-        <p>ブラウザで遊べるツールとゲームを届けるPiXiEEDの拠点です。</p>
+        <p>PiXiEEDは、「アプリ全盛の今だからこそ、ブラウザの自由度と即時性を最大限に活かした遊びとツールを届けたい」という想いから生まれた個人制作サイトです。</p>
+        <p>ドット絵という限られた表現領域の「上限を突破する」ことをテーマに、ブラウザだけで遊べるゲームとツールを継続的に公開していきます。</p>
         <div class="hero-cta">
           <a class="cta-primary" href="#showcase">制作物を見る</a>
           <a class="cta-secondary" href="portfolio/index.html">アルタのポートフォリオ</a>
@@ -54,11 +56,6 @@
               <span class="hero-card__tag">近日公開</span>
               <strong>次の制作物が待機中</strong>
               <p>最新のツールやゲームが順番にここへ並びます。</p>
-            </div>
-            <div class="hero-card hero-card--ad" role="listitem">
-              <span class="hero-card__tag">スポンサー</span>
-              <strong>広告枠を掲載できます</strong>
-              <p>企業コラボやキャンペーン告知などお気軽にご相談ください。</p>
             </div>
             <div class="hero-card hero-card--slot" role="listitem">
               <span class="hero-card__tag">Slot</span>
@@ -134,16 +131,6 @@
             </div>
             <p class="display__description">ゲーム / ツール問わず、新しい作品が揃い次第追加されます。</p>
           </article>
-          <article class="display" role="listitem" data-type="ad" data-title="広告募集中" data-description="企業スポンサー向けバナーや特設ページと連携可能。">
-            <header class="display__header">
-              <span class="display__badge display__badge--ad">Sponsor</span>
-              <h3 class="display__title">広告募集中</h3>
-            </header>
-            <div class="display__frame">
-              <div class="display__screen placeholder ad">Advertising</div>
-            </div>
-            <p class="display__description">掲載をご希望の企業様はお問い合わせフォームからご連絡ください。</p>
-          </article>
         </div>
       </div>
     </section>
@@ -169,12 +156,12 @@
     <section class="section" id="sponsors">
       <div class="section-inner">
         <h2>広告・スポンサー枠</h2>
-        <p>広告導入時の配置案サンプルです。</p>
-        <div class="ad-grid">
-          <div class="ad-slot">広告枠 300×250</div>
-          <div class="ad-slot">広告枠 300×250</div>
-          <div class="ad-slot">広告枠 728×90</div>
+        <p>トップヒーロー（最大3枠）、ショーケース末尾（1枠）、ページ下部（最大3枠）に広告を設置できます。</p>
+        <div class="sponsor-cta">
+          <a class="cta-primary" href="ads/index.html">広告掲載の詳細を見る</a>
+          <a class="cta-secondary" href="downloads/pixieed-sponsor-kit.zip">スポンサーキットをダウンロード</a>
         </div>
+        <div class="ad-grid" hidden></div>
       </div>
     </section>
   </main>
@@ -209,6 +196,7 @@
     </div>
   </div>
 
+  <script src="ads-config.js"></script>
   <script src="scripts.js"></script>
 </body>
 </html>
