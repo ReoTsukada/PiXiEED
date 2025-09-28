@@ -651,6 +651,18 @@ a:focus {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
+.sponsor-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 1.5rem 0 2.5rem;
+}
+
+.sponsor-cta .cta-primary,
+.sponsor-cta .cta-secondary {
+  min-width: 240px;
+}
+
 .ad-slot {
   display: grid;
   place-items: center;
@@ -661,6 +673,20 @@ a:focus {
   text-transform: uppercase;
   letter-spacing: 0.14em;
   background: rgba(16, 18, 40, 0.8);
+}
+
+.ad-slot--filled {
+  border-style: solid;
+  border-color: rgba(140, 140, 255, 0.2);
+  background: rgba(10, 12, 28, 0.85);
+  padding: 0.75rem;
+}
+
+.ad-slot--filled img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
 }
 
 .site-footer {
@@ -1058,6 +1084,223 @@ a:focus {
   color: var(--fg-primary);
 }
 
+/* Advertising page */
+.ad-page .hero {
+  padding-bottom: clamp(2rem, 5vw, 3.5rem);
+}
+
+.hero--ad {
+  background: linear-gradient(150deg, rgba(24, 26, 70, 0.85), rgba(12, 14, 30, 0.85));
+  border-bottom: 1px solid rgba(140, 140, 255, 0.2);
+}
+
+.hero-visual--ad {
+  display: flex;
+  justify-content: center;
+}
+
+.hero-visual__panel {
+  background: rgba(10, 12, 32, 0.75);
+  border: 1px solid rgba(140, 140, 255, 0.3);
+  border-radius: 20px;
+  padding: 2rem clamp(1.5rem, 4vw, 2.5rem);
+  box-shadow: var(--shadow-soft);
+  max-width: 360px;
+}
+
+.hero-visual__panel span {
+  display: block;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.65);
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+
+.hero-visual__panel ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.hero-visual__panel li {
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 0.95rem;
+}
+
+.ad-packages {
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  margin-top: 2.5rem;
+}
+
+.ad-package {
+  background: var(--bg-panel);
+  border: 1px solid rgba(140, 140, 255, 0.2);
+  border-radius: 20px;
+  padding: 1.8rem;
+  box-shadow: 0 18px 28px rgba(8, 12, 32, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.ad-package h3 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-family: var(--font-heading);
+}
+
+.ad-package__lead {
+  margin: 0;
+  color: var(--fg-secondary);
+  font-size: 0.95rem;
+}
+
+.ad-package__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.ad-package__list li {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.ad-package__list strong {
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.65);
+  text-transform: uppercase;
+}
+
+.ad-package__list span {
+  font-size: 0.95rem;
+}
+
+.ad-sample-set {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0.4rem 0 1rem;
+}
+
+.ad-sample {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: linear-gradient(145deg, rgba(140, 140, 255, 0.24), rgba(60, 70, 200, 0.12));
+  box-shadow: 0 12px 18px rgba(8, 12, 40, 0.25);
+  color: var(--fg-primary);
+  font-family: var(--font-heading);
+  letter-spacing: 0.05em;
+}
+
+.ad-sample__label {
+  font-size: 1rem;
+}
+
+.ad-sample__note {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.65);
+  letter-spacing: 0.08em;
+}
+
+.ad-sample--hero {
+  width: clamp(220px, 50vw, 360px);
+  aspect-ratio: 16 / 9;
+}
+
+.ad-sample--showcase {
+  width: clamp(220px, 45vw, 320px);
+  aspect-ratio: 16 / 9;
+}
+
+.ad-sample--footer {
+  width: clamp(200px, 55vw, 320px);
+  aspect-ratio: 16 / 5;
+}
+
+.ad-workflow {
+  margin: 2.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 1.8rem;
+}
+
+.ad-workflow li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1.2rem;
+  align-items: start;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(140, 140, 255, 0.22);
+  border-radius: 18px;
+  padding: 1.6rem;
+}
+
+.ad-workflow__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #05060b;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.ad-workflow h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.ad-workflow p {
+  margin: 0;
+  color: var(--fg-secondary);
+}
+
+.ad-cta {
+  display: flex;
+  justify-content: center;
+  text-align: center;
+}
+
+.ad-cta > div {
+  max-width: 640px;
+  display: grid;
+  gap: 1.5rem;
+}
+
+.ad-cta p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.ad-cta__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+}
+
 @media (max-width: 720px) {
   .site-header {
     flex-direction: column;
@@ -1075,6 +1318,25 @@ a:focus {
   }
   .play-actions {
     justify-content: flex-start;
+  }
+  .hero-visual--ad {
+    margin-top: 2rem;
+  }
+  .ad-packages {
+    grid-template-columns: 1fr;
+  }
+  .ad-workflow li {
+    grid-template-columns: 1fr;
+  }
+  .ad-workflow__step {
+    justify-self: start;
+  }
+  .sponsor-cta {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ad-sample-set {
+    justify-content: center;
   }
 }
 
