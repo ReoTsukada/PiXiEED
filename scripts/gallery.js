@@ -3,10 +3,14 @@
   const buttonsContainer = document.getElementById('dotGalleryButtons');
   if (!viewer || !buttonsContainer) return;
 
-  fetch('../portfolio/dots/manifest.json', { cache: 'no-store' })
-    .then(response => response.ok ? response.json() : Promise.reject())
-    .then(data => initialize(Array.isArray(data) ? data : []))
-    .catch(() => initialize([]));
+  if (Array.isArray(window.DOT_GALLERY_MANIFEST) && window.DOT_GALLERY_MANIFEST.length) {
+    initialize(window.DOT_GALLERY_MANIFEST);
+  } else {
+    fetch('../portfolio/dots/manifest.json', { cache: 'no-store' })
+      .then(response => response.ok ? response.json() : Promise.reject())
+      .then(data => initialize(Array.isArray(data) ? data : []))
+      .catch(() => initialize([]));
+  }
 
   function initialize(entries) {
     if (!entries.length) {
