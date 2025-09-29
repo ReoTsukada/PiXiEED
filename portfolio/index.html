@@ -51,22 +51,42 @@
     <section class="section section--accent" id="projects">
       <div class="section-inner">
         <h2>代表プロジェクト</h2>
-        <div class="portfolio-grid">
-          <article class="portfolio-card">
-            <h3>Pixel Voyage</h3>
-            <p>探索型ブラウザゲーム。レベルとUIを担当。</p>
-            <a class="link-more" href="#">詳細を見る</a>
-          </article>
-          <article class="portfolio-card">
-            <h3>TaskFlow Dashboard</h3>
-            <p>チームタスクを可視化するReactダッシュボード。</p>
-            <a class="link-more" href="#">ツールページへ</a>
-          </article>
-          <article class="portfolio-card">
-            <h3>SoundSeed Studio</h3>
-            <p>WebAudioでSEを生成する実験ツール。</p>
-            <a class="link-more" href="#">デモを試す</a>
-          </article>
+        <div class="ogp-grid">
+          <a class="ogp-card" href="../maoitu/index.html">
+            <img src="../maoitu/ogp.png" alt="魔王様!!いつまでよければいいですか!? のOGP画像">
+            <div class="ogp-card__meta">
+              <span class="ogp-card__tag">Game</span>
+              <h3 class="ogp-card__title">魔王様!!いつまでよければいいですか!?</h3>
+              <p class="ogp-card__description">避け続けるスリルをブラウザで楽しめる人気No.1アクション。</p>
+            </div>
+          </a>
+          <a class="ogp-card ogp-card--placeholder" href="../index.html#showcase">
+            <div class="ogp-card__meta">
+              <span class="ogp-card__tag">Coming Soon</span>
+              <h3 class="ogp-card__title">次期ブラウザツール</h3>
+              <p class="ogp-card__description">新作ツールは公開準備中です。完成次第ここに追加されます。</p>
+            </div>
+          </a>
+          <a class="ogp-card ogp-card--placeholder" href="../index.html#showcase">
+            <div class="ogp-card__meta">
+              <span class="ogp-card__tag">Coming Soon</span>
+              <h3 class="ogp-card__title">次回ゲームプロジェクト</h3>
+              <p class="ogp-card__description">人気投票をもとに制作中。最新情報は公式Xでお知らせします。</p>
+            </div>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="dot-gallery">
+      <div class="section-inner">
+        <h2>ドットポートフォリオ</h2>
+        <p class="dot-gallery__intro">これまで描いてきた風景ドットの一部を掲載しています。下のボタンを選ぶと上部のビュアーが切り替わります。</p>
+        <div class="dot-gallery__viewer">
+          <img id="dotGalleryMain" src="" alt="" loading="lazy">
+        </div>
+        <div class="dot-gallery__buttons" id="dotGalleryButtons">
+          <!-- ボタンはスクリプトで生成します -->
         </div>
       </div>
     </section>
@@ -76,21 +96,12 @@
         <h2>使用ツール</h2>
         <div class="tool-stack">
           <div>
-            <h3>得意分野</h3>
+            <h3>使用ツール</h3>
             <ul>
-              <li>WebGL / Canvas 演出</li>
-              <li>WebAudio サウンド設計</li>
-              <li>TypeScript / React / Vue 実装</li>
-              <li>Figma / Photoshop / Procreate</li>
-            </ul>
-          </div>
-          <div>
-            <h3>制作環境</h3>
-            <ul>
-              <li>VS Code + GitHub Copilot</li>
-              <li>Notion / Linear</li>
-              <li>Affinity Suite</li>
-              <li>Logic Pro X</li>
+              <li>Aseprite</li>
+              <li>GitHub</li>
+              <li>ChatGPT</li>
+              <li>VS Code</li>
             </ul>
           </div>
         </div>
@@ -102,19 +113,20 @@
         <h2>ノート</h2>
         <div class="notes-list">
           <article class="note">
-            <h3>ボスバトル演出のシェーダー実験</h3>
-            <p>ノイズと時間制御で作るボス演出メモ。</p>
-            <a class="link-more" href="#">読む</a>
-          </article>
-          <article class="note">
-            <h3>ブラウザで完結する音作りのワークフロー</h3>
-            <p>SoundSeed制作時のWebAudio試行メモ。</p>
-            <a class="link-more" href="#">読む</a>
-          </article>
-          <article class="note">
-            <h3>UIモーションのプロトタイピング</h3>
-            <p>After EffectsとLottieによるUIモーション試験。</p>
-            <a class="link-more" href="#">読む</a>
+            <button class="note__header" type="button" data-note="browser">
+              <div class="note__meta">
+                <span class="note__date">2025-03-12</span>
+                <h3 class="note__title">なぜブラウザゲームを作るのか</h3>
+              </div>
+              <span class="note__toggle" aria-hidden="true">+</span>
+            </button>
+            <div class="note__body" id="note-browser" hidden>
+              <p>ブラウザの最大の魅力は「見つけてもらえさえすれば、ダウンロードなしで遊んでもらえる」こと。URLやQRコードを渡すだけで、その場でゲームやツールが立ち上がります。イベント会場でQRをプリントしたカードやキーホルダーを配れば、文字どおり“ゲームを持ち歩く”体験を提供できます。</p>
+              <p>アプリはワンタップで起動できる反面、ストアで見つけてもらうところに高いハードルがあります。見つけてもらい、ダウンロードしてもらい、さらに有料となればもうひとつ壁が立ちはだかる。その点ブラウザなら、URLにアクセスした瞬間に遊び始めてもらえる。障壁が少ないからこそ、気軽に試してもらえるチャンスが広がります。</p>
+              <p>さらに、QRコードをグッズ化すれば、新しいマネタイズの形にもなります。キーホルダーを購入してくださった方がいれば、その時点で価値が生まれる。課金に抵抗がある方でも、グッズとして応援できる導線を用意できるのは大きな強みです。</p>
+              <p>もちろんアプリにも利点はありますが、個人クリエイターがストア審査や公開準備まで駆け抜けるのは負担が大きい。その労力をブラウザに注ぐことで、制作→公開→改善のサイクルを高速に回しながら、ショートカット登録やホーム画面追加などアプリライクな体験も提供できます。</p>
+              <p>だからこそ、ブラウザの強みを活かして「アプリより楽しく、手軽に遊べるゲームとツール」を作り続けたい。ブラウザ文化をもっと根強いものにしていければと思っています。</p>
+            </div>
           </article>
         </div>
       </div>
@@ -125,11 +137,7 @@
         <div>
           <h2>コンタクト</h2>
           <p>制作依頼やコラボの相談はメールでどうぞ。</p>
-          <a class="cta-primary" href="mailto:contact@pixieed.jp">contact@pixieed.jp</a>
-        </div>
-        <div class="contact-card" aria-hidden="true">
-          <p class="contact-card__label">次回着手</p>
-          <p class="contact-card__value">2024 Q4</p>
+          <a class="cta-primary" href="mailto:arta@pixieed.jp">arta@pixieed.jp</a>
         </div>
       </div>
     </section>
@@ -140,11 +148,12 @@
       <small>&copy; <span id="year"></span> PiXiEED / Alta Portfolio</small>
       <div class="footer-links">
         <a href="../index.html">トップ</a>
-        <a href="mailto:contact@pixieed.jp">お問い合わせ</a>
+        <a href="mailto:arta@pixieed.jp">お問い合わせ</a>
       </div>
     </div>
   </footer>
 
   <script src="../scripts.js"></script>
+  <script src="../scripts/notes.js"></script>
 </body>
 </html>
