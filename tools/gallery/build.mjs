@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '../../');
 const dotsDir = path.join(projectRoot, 'portfolio', 'dots');
 const manifestPath = path.join(dotsDir, 'manifest.json');
+const manifestScriptPath = path.join(dotsDir, 'manifest.js');
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp']);
 
@@ -38,8 +39,11 @@ async function buildManifest() {
 
   files.sort((a, b) => b.date.localeCompare(a.date));
 
-  await fs.writeFile(manifestPath, JSON.stringify(files, null, 2) + '\n', 'utf8');
-  console.log(`[gallery] manifest written with ${files.length} entries -> portfolio/dots/manifest.json`);
+  const json = JSON.stringify(files, null, 2) + '\n';
+  await fs.writeFile(manifestPath, json, 'utf8');
+  const scriptContent = `window.DOT_GALLERY_MANIFEST = ${JSON.stringify(files, null, 2)};\n`;
+  await fs.writeFile(manifestScriptPath, scriptContent, 'utf8');
+  console.log(`[gallery] manifest written with ${files.length} entries -> portfolio/dots/manifest.(json|js)`);
 }
 
 buildManifest().catch(error => {
