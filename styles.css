@@ -13,6 +13,7 @@
   --font-heading: "Montserrat", "Noto Sans JP", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-body: "Noto Sans JP", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --transition: 220ms ease;
+  --header-height: clamp(72px, 12vh, 104px);
 }
 
 * {
@@ -52,6 +53,7 @@ a:focus {
   gap: 1.5rem;
   padding: 0.65rem clamp(1.2rem, 4vw, 3rem);
   align-items: center;
+  min-height: var(--header-height);
 }
 
 .site-brand {
@@ -288,7 +290,7 @@ a:focus {
 }
 
 .section {
-  padding: clamp(2rem, 4.5vw, 3.5rem) clamp(1.2rem, 4vw, 3rem);
+  padding: clamp(2.5rem, 6vw, 4rem) clamp(1.3rem, 5vw, 3.2rem);
 }
 
 .section--accent {
@@ -299,9 +301,61 @@ a:focus {
   background: linear-gradient(135deg, rgba(24, 30, 74, 0.9), rgba(14, 16, 42, 0.9));
 }
 
+.section + .section,
+.hero + .section {
+  margin-top: clamp(1.5rem, 4vw, 2.5rem);
+}
+
 .section-inner {
   max-width: min(1100px, 92vw);
   margin: 0 auto;
+}
+
+@media (orientation: landscape) and (min-width: 900px) {
+  body {
+    scroll-snap-type: y proximity;
+    scroll-padding-top: var(--header-height);
+  }
+
+  .site-header {
+    scroll-snap-align: none;
+  }
+
+  main > .hero,
+  main > .section {
+    min-height: calc(100vh - var(--header-height));
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    padding-top: clamp(2rem, 6vh, 4rem);
+    padding-bottom: clamp(2rem, 6vh, 4rem);
+  }
+
+  main > .section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  main > .section > .section-inner {
+    width: min(960px, 86vw);
+  }
+
+  .hero {
+    min-height: calc(100vh - var(--header-height));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: center;
+    padding-top: clamp(2rem, 6vh, 4rem);
+    padding-bottom: clamp(2rem, 6vh, 4rem);
+  }
+
+  .hero-visual,
+  .hero-copy {
+    align-self: center;
+  }
+
+  .section-inner {
+    width: min(960px, 86vw);
+  }
 }
 
 .showcase-controls {
