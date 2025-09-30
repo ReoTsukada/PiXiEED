@@ -17,9 +17,9 @@
     .catch(() => defaultConfig)
     .then(data => {
       const normalized = normalize(data);
-      window.PIXIEED_ADS = normalized;
+      window.PiXiEED_ADS = normalized;
       return normalized;
     });
 
-  window.PIXIEED_ADS_READY = configPromise;
+  window.PiXiEED_ADS_READY = configPromise;
 })();
