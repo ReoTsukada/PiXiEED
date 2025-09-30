@@ -284,9 +284,9 @@
   });
   }
 
-  const ready = window.PIXIEED_ADS_READY instanceof Promise
-    ? window.PIXIEED_ADS_READY
-    : Promise.resolve(window.PIXIEED_ADS || fallbackConfig);
+  const ready = window.PiXiEED_ADS_READY instanceof Promise
+    ? window.PiXiEED_ADS_READY
+    : Promise.resolve(window.PiXiEED_ADS || fallbackConfig);
 
   ready
     .then(config => init(config))
