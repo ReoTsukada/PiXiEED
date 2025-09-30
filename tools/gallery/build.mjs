@@ -9,6 +9,7 @@ const projectRoot = path.resolve(__dirname, '../../');
 const dotsDir = path.join(projectRoot, 'portfolio', 'dots');
 const manifestPath = path.join(dotsDir, 'manifest.json');
 const manifestScriptPath = path.join(dotsDir, 'manifest.js');
+const thumbsDir = path.join(dotsDir, 'thumbs');
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp']);
 
@@ -21,6 +22,7 @@ function prettify(filename) {
 
 async function buildManifest() {
   await fs.mkdir(dotsDir, { recursive: true });
+  await fs.mkdir(thumbsDir, { recursive: true });
   const entries = await fs.readdir(dotsDir, { withFileTypes: true });
   const files = [];
   for (const entry of entries) {
@@ -29,8 +31,24 @@ async function buildManifest() {
     if (!IMAGE_EXTENSIONS.has(ext)) continue;
     const filePath = path.join(dotsDir, entry.name);
     const stats = await fs.stat(filePath);
+    let thumb = entry.name;
+    try {
+      const { spawnSync } = await import('child_process');
+      const thumbName = `${path.parse(entry.name).name}.png`;
+      const thumbPath = path.join(thumbsDir, thumbName);
+      const result = spawnSync('convert', [filePath + '[0]', '-thumbnail', '128x128', thumbPath]);
+      if (result.status === 0) {
+        thumb = `thumbs/${thumbName}`;
+      } else {
+        console.warn(`[gallery] imagemagick convert failed for ${entry.name}: ${result.stderr?.toString()}`);
+      }
+    } catch (error) {
+      console.warn(`[gallery] thumbnail generation skipped for ${entry.name}: ${error.message}`);
+    }
+
     files.push({
       file: entry.name,
+      thumb,
       label: prettify(entry.name),
       date: stats.mtime.toISOString().slice(0, 10),
       alt: prettify(entry.name)
