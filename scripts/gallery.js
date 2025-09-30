@@ -24,6 +24,8 @@
       ];
     }
 
+    window.addEventListener('resize', () => fitImage(viewer));
+
     const buttons = entries.map((entry, index) => {
       const button = document.createElement('button');
       button.type = 'button';
@@ -31,10 +33,20 @@
       const src = entry.file.startsWith('http') || entry.file.startsWith('data:')
         ? entry.file
         : `../portfolio/dots/${entry.file}`;
+      const thumb = entry.thumb
+        ? (entry.thumb.startsWith('http') || entry.thumb.startsWith('data:')
+            ? entry.thumb
+            : `../portfolio/dots/${entry.thumb}`)
+        : src;
       button.dataset.src = src;
       button.dataset.alt = entry.alt || entry.label || '';
-      button.textContent = `${entry.date || ''}｜${entry.label || entry.file}`;
+      button.setAttribute('aria-label', `${entry.label || entry.file}`);
       button.addEventListener('click', () => selectArtwork(buttons, button));
+      const preview = document.createElement('img');
+      preview.src = thumb;
+      preview.alt = '';
+      preview.loading = 'lazy';
+      button.appendChild(preview);
       buttonsContainer.appendChild(button);
       return button;
     });
@@ -48,6 +60,22 @@
     const alt = button.dataset.alt;
     viewer.src = src;
     viewer.alt = alt;
+    if (viewer.complete) {
+      fitImage(viewer);
+    } else {
+      viewer.addEventListener('load', () => fitImage(viewer), { once: true });
+    }
     allButtons.forEach(btn => btn.classList.toggle('is-active', btn === button));
+  }
+
+  function fitImage(img) {
+    const container = img.parentElement;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const naturalWidth = img.naturalWidth || rect.width;
+    const naturalHeight = img.naturalHeight || rect.height;
+    if (!naturalWidth || !naturalHeight) return;
+    const scale = Math.min(rect.width / naturalWidth, rect.height / naturalHeight);
+    img.style.transform = `scale(${scale})`;
   }
 })();
