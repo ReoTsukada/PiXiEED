@@ -30,6 +30,10 @@ gtag('config', GA_MEASUREMENT_ID);
 <link rel="manifest" href="/maoitu/manifest.webmanifest">
 <meta name="theme-color" content="#000000">
 <style>
+html,body {
+  height:100%;
+  overflow:hidden;
+}
 body {
   margin:0;
   min-height:100vh;
@@ -42,6 +46,8 @@ body {
   color:#fff;
   font-family:'Noto Sans JP', system-ui, sans-serif;
   text-align:center;
+  padding-bottom:calc(300px + env(safe-area-inset-bottom, 0px));
+  box-sizing:border-box;
 }
 h1 { font-size:22px; margin:60px 0 0; }
 button {
@@ -57,19 +63,19 @@ a { color:#7dd3fc; }
   align-items:center;
   gap:18px;
 }
-.ad-container {
-  position:absolute;
-  top:14px;
+.start-bottom-ad {
+  position:fixed;
+  bottom:calc(16px + env(safe-area-inset-bottom, 0px));
   left:50%;
   transform:translateX(-50%);
-  width:min(320px,88vw);
-  z-index:5;
+  width:min(90vw, 300px);
+  z-index:8;
 }
-.ad-container .adsbygoogle {
+.start-bottom-ad .adsbygoogle {
   display:block;
-  width:100%;
-  min-height:60px;
-  height:auto;
+  width:300px;
+  max-width:100%;
+  height:250px;
 }
 .instructions-card {
   max-width:320px;
@@ -224,6 +230,13 @@ a { color:#7dd3fc; }
   </ul>
 </div>
 
+<div class="start-bottom-ad">
+  <ins class="adsbygoogle"
+       style="display:inline-block;width:300px;height:250px"
+       data-ad-client="ca-pub-9801602250480253"
+       data-ad-slot="2435364404"></ins>
+</div>
+
 <script>
 const GAME_URL = './game.html';
 const AUDIO_KEY = 'maoitu_audio';
@@ -233,6 +246,7 @@ const shareBtn = document.getElementById('titleShareBtn');
 const audioToggle = document.getElementById('audioToggle');
 const audioToggleLabel = document.getElementById('audioToggleLabel');
 const installBtn = document.getElementById('installBtn');
+const startAdSlot = document.querySelector('.start-bottom-ad .adsbygoogle');
 let deferredInstallPrompt = null;
 
 function baseShareText(){
@@ -287,6 +301,23 @@ installBtn.addEventListener('click', async () => {
 window.addEventListener('appinstalled', () => {
   installBtn.style.display = 'none';
   deferredInstallPrompt = null;
+});
+
+function initStartAd(){
+  if(!startAdSlot) return;
+  if(startAdSlot.offsetWidth === 0){
+    setTimeout(initStartAd, 300);
+    return;
+  }
+  try{
+    (adsbygoogle = window.adsbygoogle || []).push({});
+  }catch(_){
+    setTimeout(initStartAd, 500);
+  }
+}
+
+window.addEventListener('load', () => {
+  requestAnimationFrame(initStartAd);
 });
 </script>
 
