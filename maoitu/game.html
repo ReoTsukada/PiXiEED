@@ -119,12 +119,10 @@ gtag('config', GA_MEASUREMENT_ID);
     flex:1;
     margin:24px 0;
   }
-  .gameover-ad .ad-placeholder{
+  .gameover-ad .adsbygoogle{
     width:300px;
     max-width:100%;
     height:250px;
-    background:#fff;
-    border-radius:8px;
   }
   #footer{
     position:absolute;
@@ -202,7 +200,10 @@ gtag('config', GA_MEASUREMENT_ID);
     <div id="shareScoreLabel">SCORE: 0</div>
   </div>
   <div class="gameover-ad">
-    <div id="gameOverAdSlot" class="ad-placeholder"></div>
+    <ins class="adsbygoogle"
+         style="display:inline-block;width:300px;height:250px"
+         data-ad-client="ca-pub-9801602250480253"
+         data-ad-slot="2435364404"></ins>
   </div>
   <div id="sharePanel">
     <button id="shareActionBtn" style="background:#22c55e;color:#000;">シェアする</button>
@@ -231,13 +232,18 @@ const instructions = document.getElementById('instructions');
 const instructionsCloseBtn = document.getElementById('instructionsClose');
 const instructionsToggleBtn = document.getElementById('instructionsToggle');
 const backLink = document.getElementById('backLink');
-const gameOverAdSlot = document.getElementById('gameOverAdSlot');
+const gameOverAdSlot = document.querySelector('.gameover-ad .adsbygoogle');
 let gameOverAdLoaded = false;
 let shareScore = 0;
 
 function requestGameOverAd(){
   if(gameOverAdLoaded || !gameOverAdSlot) return;
-  gameOverAdLoaded = true;
+  try{
+    (adsbygoogle = window.adsbygoogle || []).push({});
+    gameOverAdLoaded = true;
+  }catch(_){
+    setTimeout(requestGameOverAd, 1000);
+  }
 }
 
 function openInstructions(){
