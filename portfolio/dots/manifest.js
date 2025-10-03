@@ -10,5 +10,11 @@ window.DOT_GALLERY_MANIFEST = [
     "label": "ARTA TabunnItumonoShibuya",
     "date": "2025-09-29",
     "alt": "ARTA TabunnItumonoShibuya"
+  },
+  {
+    "file": "nyuudou 1.png",
+    "label": "Alta Nyuudougumo",
+    "date": "2025-10-05",
+    "alt": "夕日に照らされた入道雲のドットアート"
   }
 ];
