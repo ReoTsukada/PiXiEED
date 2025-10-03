@@ -238,6 +238,10 @@ let shareScore = 0;
 
 function requestGameOverAd(){
   if(gameOverAdLoaded || !gameOverAdSlot) return;
+  if(gameOverAdSlot.offsetWidth === 0){
+    setTimeout(requestGameOverAd, 300);
+    return;
+  }
   try{
     (adsbygoogle = window.adsbygoogle || []).push({});
     gameOverAdLoaded = true;
