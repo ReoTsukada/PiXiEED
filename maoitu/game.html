@@ -19,11 +19,24 @@ gtag('config', GA_MEASUREMENT_ID);
 <!-- Google AdSense -->
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
 <style>
-  html,body{margin:0;background:#000;height:100%;display:grid;place-items:center;touch-action:none;overscroll-behavior:none}
+  :root{
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  html,body{
+    margin:0;
+    background:#000;
+    height:100%;
+    display:grid;
+    place-items:center;
+    touch-action:none;
+    overscroll-behavior:none;
+  }
+  body{position:relative;}
   #c{display:block;touch-action:none;image-rendering:pixelated}
   .back-link{
     position:absolute;
-    top:18px;
+    top:calc(var(--safe-top) + 18px);
     left:18px;
     padding:8px 14px;
     border-radius:999px;
@@ -33,7 +46,7 @@ gtag('config', GA_MEASUREMENT_ID);
     font:600 13px/1.2 system-ui;
     text-decoration:none;
     display:none;
-    z-index:12;
+    z-index:40;
     transition:background 0.2s ease,color 0.2s ease,transform 0.2s ease;
   }
   .back-link:hover,
@@ -43,30 +56,41 @@ gtag('config', GA_MEASUREMENT_ID);
     transform:translateY(-1px);
     outline:none;
   }
-  .ad-container{
-    position:absolute;
-    top:12px;
-    left:50%;
-    transform:translateX(-50%);
-    width:min(320px,88vw);
-    z-index:11;
+  #gameOverUi{
+    position:fixed;
+    inset:0;
+    display:none;
+    flex-direction:column;
+    align-items:center;
+    justify-content:space-between;
+    padding:calc(var(--safe-top) + 33vh) 16px calc(var(--safe-bottom) + 24px);
+    z-index:20;
+    box-sizing:border-box;
   }
-  .ad-container .adsbygoogle{
-    display:block;
-    width:100%;
-    min-height:60px;
-    height:auto;
+  #gameOverPanel{
+    width:min(90vw, 336px);
+    padding:14px 16px;
+    background:rgba(0,0,0,0.85);
+    border:1px solid rgba(255,255,255,0.25);
+    border-radius:12px;
+    color:#fff;
+    text-align:center;
+    font-family:sans-serif;
+    box-sizing:border-box;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .gameover-title{
+    font-size:16px;
+    font-weight:700;
+    letter-spacing:0.06em;
   }
   #sharePanel{
-    position:absolute;
-    bottom:24px;
-    left:50%;
     display:none;
-    flex-direction:row;
-    gap:12px;
-    padding:12px 18px;
-    justify-content:center;
-    flex-wrap:wrap;
+    flex-direction:column;
+    gap:10px;
+    padding:12px 16px;
     text-align:center;
     background:rgba(0,0,0,0.8);
     border:1px solid rgba(255,255,255,0.25);
@@ -74,21 +98,37 @@ gtag('config', GA_MEASUREMENT_ID);
     color:#fff;
     font-family:sans-serif;
     font-size:12px;
-    transform:translateX(-50%);
-    align-items:center;
-    z-index:10;
+    align-items:stretch;
+    width:min(90vw, 336px);
+    box-sizing:border-box;
   }
   #sharePanel button{
     font:700 12px system-ui;
-    padding:8px 14px;
+    padding:10px 16px;
     border:0;
     border-radius:10px;
     cursor:pointer;
+    width:100%;
   }
-  #shareScoreLabel{font-size:18px;font-weight:700;text-align:center;flex-basis:100%;}
+  #shareScoreLabel{font-size:16px;font-weight:700;text-align:center;}
+  .gameover-ad{
+    width:min(90vw, 336px);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    flex:1;
+    margin:24px 0;
+  }
+  .gameover-ad .ad-placeholder{
+    width:300px;
+    max-width:100%;
+    height:250px;
+    background:#fff;
+    border-radius:8px;
+  }
   #footer{
     position:absolute;
-    bottom:12px;
+    bottom:calc(var(--safe-bottom) + 12px);
     right:14px;
     color:rgba(255,255,255,0.6);
     font:10px/1.2 monospace;
@@ -97,7 +137,7 @@ gtag('config', GA_MEASUREMENT_ID);
   }
   #instructions{
     position:absolute;
-    top:20px;
+    top:calc(var(--safe-top) + 20px);
     right:20px;
     max-width:240px;
     padding:18px 16px 16px;
@@ -130,7 +170,7 @@ gtag('config', GA_MEASUREMENT_ID);
   }
   #instructionsToggle{
     position:absolute;
-    top:20px;
+    top:calc(var(--safe-top) + 20px);
     right:20px;
     display:block;
     padding:8px 12px;
@@ -145,18 +185,7 @@ gtag('config', GA_MEASUREMENT_ID);
 </style>
 </head>
 <body>
-<div class="ad-container" id="adContainer">
-  <ins class="adsbygoogle"
-       style="display:block"
-       data-ad-client="ca-pub-9801602250480253"
-       data-ad-slot="0000000000"
-       data-ad-format="auto"
-       data-full-width-responsive="true"></ins>
-  <script>
-    (adsbygoogle = window.adsbygoogle || []).push({});
-  </script>
-</div>
-<a id="backLink" class="back-link" href="../index.html#showcase">← ホームに戻る</a>
+<a id="backLink" class="back-link" href="./index.html">← スタート画面に戻る</a>
 <audio id="bgm" src="bgm.mp3" loop autoplay hidden volume="0.5"></audio>
 <canvas id="c"></canvas>
 <div id="instructions">
@@ -167,10 +196,18 @@ gtag('config', GA_MEASUREMENT_ID);
   <p>エンジェリンに触れると一度だけ身代わりが発動し、次の衝突を防ぎます。</p>
 </div>
 <button id="instructionsToggle" type="button">?</button>
-<div id="sharePanel">
-  <div id="shareScoreLabel">SCORE: 0</div>
-  <button id="shareActionBtn" style="background:#22c55e;color:#000;">シェアする</button>
-  <button id="restartActionBtn" style="background:#3b82f6;color:#fff;">もう一度遊ぶ</button>
+<div id="gameOverUi">
+  <div id="gameOverPanel">
+    <div class="gameover-title">GAME OVER</div>
+    <div id="shareScoreLabel">SCORE: 0</div>
+  </div>
+  <div class="gameover-ad">
+    <div id="gameOverAdSlot" class="ad-placeholder"></div>
+  </div>
+  <div id="sharePanel">
+    <button id="shareActionBtn" style="background:#22c55e;color:#000;">シェアする</button>
+    <button id="restartActionBtn" style="background:#3b82f6;color:#fff;">もう一度遊ぶ</button>
+  </div>
 </div>
 <div id="footer">© 2025 アルタ</div>
 <script>
@@ -185,6 +222,7 @@ function syncAudioSetting(){
   return enabled;
 }
 let audioEnabled = syncAudioSetting();
+const gameOverUi = document.getElementById('gameOverUi');
 const sharePanel = document.getElementById('sharePanel');
 const shareScoreLabel = document.getElementById('shareScoreLabel');
 const shareActionBtn = document.getElementById('shareActionBtn');
@@ -193,7 +231,14 @@ const instructions = document.getElementById('instructions');
 const instructionsCloseBtn = document.getElementById('instructionsClose');
 const instructionsToggleBtn = document.getElementById('instructionsToggle');
 const backLink = document.getElementById('backLink');
+const gameOverAdSlot = document.getElementById('gameOverAdSlot');
+let gameOverAdLoaded = false;
 let shareScore = 0;
+
+function requestGameOverAd(){
+  if(gameOverAdLoaded || !gameOverAdSlot) return;
+  gameOverAdLoaded = true;
+}
 
 function openInstructions(){
   instructions.style.display = 'block';
@@ -257,7 +302,9 @@ function hideBackLink(){
 function showSharePanel(score){
   shareScore = score;
   shareScoreLabel.textContent = `SCORE: ${score}`;
+  gameOverUi.style.display = 'flex';
   sharePanel.style.display = 'flex';
+  requestGameOverAd();
   openInstructions();
   if(typeof restartActionBtn.focus === 'function'){
     try{
@@ -270,10 +317,11 @@ function showSharePanel(score){
 
 function hideSharePanel(){
   sharePanel.style.display = 'none';
+  gameOverUi.style.display = 'none';
 }
 hideSharePanel();
 function isOnSharePanel(target){
-  return sharePanel.style.display !== 'none' && sharePanel.contains(target);
+  return gameOverUi.style.display !== 'none' && gameOverUi.contains(target);
 }
 function isOnInstructionUi(target){
   if(instructions.style.display !== 'none' && instructions.contains(target)) return true;
@@ -481,10 +529,7 @@ function draw(){
   x.fillText('難易度: '+difficultyLevel,4,42);
 
   if(!alive){
-    x.fillStyle='rgba(0,0,0,0.6)'; x.fillRect(10,90,140,70);
-    x.strokeStyle='rgba(255,255,255,0.25)'; x.strokeRect(10,90,140,70);
-    x.fillStyle='#fff'; x.font='bold 18px monospace'; x.fillText('GAME OVER',28,115);
-    x.font='12px monospace'; x.fillText('右上のボタンで共有や再挑戦',4,135);
+    // キャンバス上ではパネルを描かず、HTML側のUIに委ねる
   }
 }
 
