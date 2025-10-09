@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PiXiEEDraw | PiXiEED ツール紹介</title>
+  <meta name="description" content="PiXiEEDが開発するブラウザ向けドット絵エディター『PiXiEEDraw』の紹介ページ。特徴や公開予定、開発ロードマップをまとめています。">
+  <meta property="og:title" content="PiXiEEDraw | PiXiEED ツール紹介">
+  <meta property="og:description" content="ブラウザ完結のドット絵エディター PiXiEEDraw の開発状況と特徴をまとめた公式紹介ページ。">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://pixieed.jp/projects/pixiedraw/">
+  <meta property="og:image" content="https://pixieed.jp/pixiedraw/ogp.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@PiXiEED_arta">
+  <meta name="theme-color" content="#090b1a">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" sizes="192x192" href="../../pixiedraw/icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="../../pixiedraw/icons/icon-512.png">
+  <link rel="apple-touch-icon" href="../../pixiedraw/icons/icon-192.png">
+  <link rel="stylesheet" href="../../styles.css">
+</head>
+<body class="project-page">
+  <header class="site-header">
+    <div class="site-brand">
+      <a href="../../index.html" class="logo">PiXiEED</a>
+      <p class="tagline">遊びとツールを、ブラウザから届けるクリエイターズグループ</p>
+    </div>
+    <nav class="site-nav" aria-label="メイン">
+      <ul>
+        <li><a href="../../index.html#showcase" aria-current="page">制作物</a></li>
+        <li><a href="../../games.html#tools-section">ツール</a></li>
+        <li><a href="../../games.html#games-section">ゲーム</a></li>
+        <li><a href="../../portfolio/index.html">アルタ</a></li>
+        <li><a href="../../ads/index.html">広告掲載</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" id="overview">
+      <div class="hero-copy">
+        <h1>PiXiEEDraw</h1>
+        <p>ブラウザ単体で編集から書き出しまで完結するレスポンシブなドット絵エディターです。レイヤーやタイルセットをリアルタイムにプレビューしながら制作でき、PC・タブレット・スマホで同じUI体験を提供します。</p>
+        <p>アプリインストール不要で共有リンクからすぐ開ける制作環境を目指し、PiXiEED内の他コンテンツと同じPWA設計・軽量アーキテクチャで開発を進めています。</p>
+        <div class="hero-cta">
+          <a class="cta-primary" href="../../pixiedraw/index.html">ツールを開く（早期アクセス）</a>
+          <a class="cta-secondary" href="../../games.html#tools-section">ツール一覧に戻る</a>
+        </div>
+      </div>
+      <div class="hero-visual" aria-hidden="true">
+        <div class="project-visual">
+          <img src="../../pixiedraw/ogp.png" alt="PiXiEEDraw のUIプレビューイメージ" loading="lazy">
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--accent" id="features">
+      <div class="section-inner">
+        <h2>PiXiEEDraw の特徴</h2>
+        <p>クラウド同期や高解像度出力といった定番機能に加え、ドット絵づくりに特化した体験を準備しています。開発中の注目ポイントをご紹介します。</p>
+        <ul class="project-feature-list">
+          <li>
+            <strong>リビルド不要のタイルプレビュー</strong>
+            タイルセットを描いた瞬間に、同じパレットを使うシーン全体へライブ反映。配置済みマップを壊さず配色チェックができます。
+          </li>
+          <li>
+            <strong>ショートカット自動同期</strong>
+            ブラウザ版・ホームアプリ版で操作体系を共有。複数デバイスでも同じショートカットが同期されるよう設計しました。
+          </li>
+          <li>
+            <strong>カラーピッカーの履歴スタック</strong>
+            任意の色セットをワンクリック保管し、履歴をパレットとして再活用。アクセシビリティガイドも同時に表示します。
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section" id="details">
+      <div class="section-inner">
+        <h2>基本データ</h2>
+        <div class="project-meta-grid">
+          <dl class="project-meta">
+            <dt>カテゴリ</dt>
+            <dd>ブラウザドット絵エディター / ツール</dd>
+          </dl>
+          <dl class="project-meta">
+            <dt>対応デバイス</dt>
+            <dd>Chrome / Safari / Edge / Firefox</dd>
+          </dl>
+          <dl class="project-meta">
+            <dt>リリース</dt>
+            <dd>2025年 ベータ公開予定</dd>
+          </dl>
+          <dl class="project-meta">
+            <dt>推奨入力</dt>
+            <dd>マウス・ペンタブレット・マルチタッチ</dd>
+          </dl>
+        </div>
+        <div class="project-note">
+          <strong>ロードマップ</strong>
+          <p>プレビュー版では 16×16 / 32×32 のキャンバス編集と PNG 出力、履歴とグリッド表示のON/OFF切り替えに対応予定です。レイヤー合成やクラウドバックアップは段階的に追加し、完成後は PiXiEED の他ツールと共通ログインで連携します。</p>
+          <div class="project-actions">
+            <a class="cta-primary" href="../../pixiedraw/index.html">プレビューを試す</a>
+            <a class="cta-secondary" href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">進捗をフォロー</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--highlight" id="share">
+      <div class="section-inner">
+        <h2>ご意見・フィードバック募集</h2>
+        <p>操作感や機能リクエストを常時募集中です。PiXiEEDraw 内のフィードバックボタン、または公式Xのハッシュタグ <code>#PiXiEEDraw</code> からお寄せください。</p>
+        <div class="project-actions">
+          <a class="cta-primary" href="../../pixiedraw/index.html">PiXiEEDraw を開く</a>
+          <a class="cta-secondary" href="mailto:arta@pixieed.jp">メールで連絡する</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <small>&copy; <span id="year"></span> PiXiEED. All rights reserved.</small>
+      <div class="footer-links">
+        <a href="../../terms/index.html">利用規約</a>
+        <a href="../../privacy/index.html">プライバシーポリシー</a>
+        <button type="button" class="footer-contact js-contact-open">お問い合わせ</button>
+        <a class="footer-link--x" href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">公式X (旧Twitter)</a>
+      </div>
+    </div>
+  </footer>
+
+  <div id="contactOverlay" class="contact-overlay" hidden aria-hidden="true">
+    <div class="contact-panel" role="dialog" aria-modal="true" aria-labelledby="contactTitle">
+      <button type="button" class="contact-close js-contact-close" aria-label="閉じる">×</button>
+      <h2 id="contactTitle">お問い合わせ</h2>
+      <p>ご希望の連絡手段を選択してください。</p>
+      <div class="contact-options">
+        <a class="contact-option" href="mailto:arta@pixieed.jp">
+          <span class="contact-option__title">メールで相談する</span>
+          <span class="contact-option__detail">arta@pixieed.jp</span>
+        </a>
+        <a class="contact-option" href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">
+          <span class="contact-option__title">X (旧Twitter) のDM</span>
+          <span class="contact-option__detail">@PiXiEED_arta</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../scripts.js"></script>
+</body>
+</html>
