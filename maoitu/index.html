@@ -41,15 +41,14 @@ body {
   display:flex;
   flex-direction:column;
   align-items:center;
-  justify-content:center;
-  gap:20px;
   color:#fff;
   font-family:'Noto Sans JP', system-ui, sans-serif;
   text-align:center;
-  padding-bottom:calc(300px + env(safe-area-inset-bottom, 0px));
   box-sizing:border-box;
+  padding:48px 16px calc(320px + env(safe-area-inset-bottom, 0px));
+  gap:16px;
 }
-h1 { font-size:22px; margin:60px 0 0; }
+h1 { font-size:22px; margin:32px 0 8px; }
 button {
   font:700 16px system-ui;
   padding:10px 20px;
@@ -58,10 +57,41 @@ button {
   cursor:pointer;
 }
 a { color:#7dd3fc; }
-.primary-controls {
+.control-bar {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:center;
+  gap:16px;
+}
+.control-bar__btn {
+  font:700 16px system-ui;
+  padding:12px 24px;
+  border-radius:12px;
+  border:0;
+  cursor:pointer;
+  transition:transform 0.15s ease, filter 0.15s ease;
+}
+.control-bar__btn:hover,
+.control-bar__btn:focus-visible {
+  transform:translateY(-1px);
+  filter:brightness(1.05);
+  outline:none;
+}
+.control-bar__btn--primary {
+  background:#22c55e;
+  color:#000;
+  font-size:18px;
+}
+.control-bar__btn--secondary {
+  background:rgba(255,255,255,0.12);
+  color:#fff;
+  border:1px solid rgba(255,255,255,0.25);
+}
+.control-bar__audio {
   display:flex;
   align-items:center;
-  gap:18px;
+  gap:8px;
 }
 .start-bottom-ad {
   position:fixed;
@@ -76,6 +106,16 @@ a { color:#7dd3fc; }
   width:300px;
   max-width:100%;
   height:250px;
+}
+.start-bottom-ad .ad-placeholder {
+  display:block;
+  width:300px;
+  max-width:100%;
+  height:250px;
+  border-radius:12px;
+  background:#fff;
+  box-shadow:0 0 0 1px rgba(15,23,42,0.12);
+  object-fit:cover;
 }
 .instructions-card {
   max-width:320px;
@@ -131,20 +171,6 @@ a { color:#7dd3fc; }
   font-size:14px;
   color:#ccc;
 }
-#titleShareBtn {
-  background:#22c55e;
-  color:#000;
-  padding:12px 24px;
-  border-radius:12px;
-  font:700 16px system-ui;
-}
-#playBtn {
-  font-size:18px;
-  padding:14px 24px;
-  background:#22c55e;
-  color:#000;
-  border-radius:12px;
-}
 .back-link {
   position:absolute;
   top:16px;
@@ -173,53 +199,74 @@ a { color:#7dd3fc; }
   font:700 16px system-ui;
   border:0;
   cursor:pointer;
-  display:none;
+  min-height:48px;
+  visibility:hidden;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity 0.2s ease;
+}
+.install-btn.is-visible {
+  visibility:visible;
+  opacity:1;
+  pointer-events:auto;
 }
 .install-btn:hover,
 .install-btn:focus-visible {
   filter:brightness(1.05);
   outline:none;
 }
+.developer-credit {
+  font-size:14px;
+  color:#9ca3af;
+  margin:0 0 12px;
+}
+.developer-credit a {
+  color:#1DA1F2;
+  text-decoration:none;
+}
+.developer-credit a:hover,
+.developer-credit a:focus-visible {
+  text-decoration:underline;
+}
+.control-bar-wrapper {
+  position:fixed;
+  left:0;
+  right:0;
+  bottom:calc(env(safe-area-inset-bottom, 0px) + 250px + 20px);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:16px;
+  padding:0 16px;
+  box-sizing:border-box;
+}
+@media (max-width:480px) {
+  .control-bar-wrapper {
+    bottom:calc(env(safe-area-inset-bottom, 0px) + 250px + 24px);
+  }
+}
 </style>
 </head>
 <body>
 
-<div class="ad-container" id="titleAdContainer">
-  <ins class="adsbygoogle"
-       style="display:block"
-       data-ad-client="ca-pub-9801602250480253"
-       data-ad-slot="0000000000"
-       data-ad-format="auto"
-       data-full-width-responsive="true"></ins>
-  <script>
-    (adsbygoogle = window.adsbygoogle || []).push({});
-  </script>
-</div>
 <a class="back-link" href="../index.html#showcase">← ホームに戻る</a>
 
-<!-- 開発者表記 -->
-<div style="position:absolute;top:80px;left:0;right:0;text-align:center;font-size:14px;color:#ccc;">
-  開発者: <a href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener" style="color:#1DA1F2;text-decoration:none;">@PiXiEED_arta</a>
-</div>
-
 <h1>魔王様！！いつまでよければいいですか！？</h1>
-<p style="margin:0;color:rgba(255,255,255,0.8);">リンクを開くとゲームが始まります。</p>
-
-<!-- プレイボタン + 音量スイッチ -->
-<div class="primary-controls">
-  <button id="playBtn">▶ プレイ</button>
-  <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;">
-    <label class="switch">
-      <input type="checkbox" id="audioToggle">
-      <span class="slider"></span>
-    </label>
-    <span id="audioToggleLabel" class="volume-label"></span>
+<p class="developer-credit">開発者: <a href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">@PiXiEED_arta</a></p>
+<div class="control-bar-wrapper" role="region" aria-label="ゲーム操作">
+  <div class="control-bar">
+    <button id="playBtn" class="control-bar__btn control-bar__btn--primary">▶ プレイ</button>
+    <button id="titleShareBtn" class="control-bar__btn control-bar__btn--secondary">シェアする</button>
+    <div class="control-bar__audio">
+      <label class="switch">
+        <input type="checkbox" id="audioToggle">
+        <span class="slider"></span>
+      </label>
+      <span id="audioToggleLabel" class="volume-label"></span>
+    </div>
   </div>
+  <button id="installBtn" class="install-btn">アプリをインストール</button>
 </div>
-
-<!-- シェアボタン -->
-<button id="titleShareBtn">シェアする</button>
-<button id="installBtn" class="install-btn">アプリをインストール</button>
 
 <div class="instructions-card">
   <h2>遊び方</h2>
@@ -231,6 +278,7 @@ a { color:#7dd3fc; }
 </div>
 
 <div class="start-bottom-ad">
+  <img class="ad-placeholder" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAEsCAIAAAD24Ib0AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAGXRFWHRTb2Z0d2FyZQBQYWludC5ORVQgNC4wLjEzQdB+UgAAABV0RVh0Q3JlYXRpb24gVGltZQAwOS8yNS8wOIG81DcAAABOSURBVHic7cEBDQAAAMKg909tDjegAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgG0JAAABQnBVAAAAAElFTkSuQmCC" alt="広告枠">
   <ins class="adsbygoogle"
        style="display:inline-block;width:300px;height:250px"
        data-ad-client="ca-pub-9801602250480253"
@@ -247,6 +295,7 @@ const audioToggle = document.getElementById('audioToggle');
 const audioToggleLabel = document.getElementById('audioToggleLabel');
 const installBtn = document.getElementById('installBtn');
 const startAdSlot = document.querySelector('.start-bottom-ad .adsbygoogle');
+const adPlaceholder = document.querySelector('.start-bottom-ad .ad-placeholder');
 let deferredInstallPrompt = null;
 
 function baseShareText(){
@@ -282,7 +331,7 @@ audioToggle.addEventListener('change', () => {
 window.addEventListener('beforeinstallprompt', (event) => {
   event.preventDefault();
   deferredInstallPrompt = event;
-  installBtn.style.display = 'inline-block';
+  installBtn.classList.add('is-visible');
 });
 
 installBtn.addEventListener('click', async () => {
@@ -293,24 +342,48 @@ installBtn.addEventListener('click', async () => {
   deferredInstallPrompt.prompt();
   const result = await deferredInstallPrompt.userChoice;
   if(result.outcome === 'accepted'){
-    installBtn.style.display = 'none';
+    installBtn.classList.remove('is-visible');
   }
   deferredInstallPrompt = null;
 });
 
 window.addEventListener('appinstalled', () => {
-  installBtn.style.display = 'none';
+  installBtn.classList.remove('is-visible');
   deferredInstallPrompt = null;
 });
 
+function hideAdPlaceholderIfLoaded(){
+  if(!startAdSlot || !adPlaceholder) return false;
+  const iframe = startAdSlot.querySelector('iframe');
+  if(iframe && iframe.offsetHeight > 0){
+    adPlaceholder.style.display = 'none';
+    return true;
+  }
+  return false;
+}
+
+function monitorAdSlot(){
+  if(!startAdSlot || !adPlaceholder) return;
+  if(hideAdPlaceholderIfLoaded()) return;
+  const observer = new MutationObserver(() => {
+    if(hideAdPlaceholderIfLoaded()) {
+      observer.disconnect();
+    }
+  });
+  observer.observe(startAdSlot, { childList: true, subtree: true });
+  setTimeout(() => observer.disconnect(), 10000);
+}
+
 function initStartAd(){
   if(!startAdSlot) return;
+  hideAdPlaceholderIfLoaded();
   if(startAdSlot.offsetWidth === 0){
     setTimeout(initStartAd, 300);
     return;
   }
   try{
     (adsbygoogle = window.adsbygoogle || []).push({});
+    monitorAdSlot();
   }catch(_){
     setTimeout(initStartAd, 500);
   }
