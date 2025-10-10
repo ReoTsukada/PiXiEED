@@ -93,6 +93,8 @@
       autosaveStatus: document.getElementById('autosaveStatus'),
       memoryUsage: document.getElementById('memoryUsage'),
       memoryClear: document.getElementById('memoryClear'),
+      spriteScaleInput: document.getElementById('spriteScaleInput'),
+      applySpriteScale: document.getElementById('applySpriteScale'),
     },
     newProject: {
       button: document.getElementById('newProject'),
@@ -110,6 +112,11 @@
       confirmPng: document.getElementById('confirmExportPng'),
       confirmGif: document.getElementById('confirmExportGif'),
       cancel: document.getElementById('cancelExport'),
+      scaleSlider: document.getElementById('exportScaleSlider'),
+      scaleInput: document.getElementById('exportScaleInput'),
+      pixelWidthInput: document.getElementById('exportPixelWidth'),
+      pixelHeightInput: document.getElementById('exportPixelHeight'),
+      scaleHint: document.getElementById('exportScaleHint'),
     },
   };
 
@@ -166,9 +173,15 @@
   const MIN_ZOOM_SCALE = ZOOM_STEPS[0];
   const ZOOM_EPSILON = 1e-6;
 
-  const DEFAULT_DOCUMENT_NAME = '新規ドキュメント';
+  const PROJECT_FILE_EXTENSION = '.pixieedraw';
+  const DEFAULT_DOCUMENT_BASENAME = '新規ドキュメント';
+  const DEFAULT_DOCUMENT_NAME = `${DEFAULT_DOCUMENT_BASENAME}${PROJECT_FILE_EXTENSION}`;
+  const DEFAULT_CANVAS_SIZE = 32;
   const MIN_CANVAS_SIZE = 1;
   const MAX_CANVAS_SIZE = 256;
+  const FIRST_OPEN_COMPLETE_KEY = 'pixieedraw:first-open-complete';
+  const MAX_EXPORT_DIMENSION = 2000;
+  const MAX_EXPORT_SCALE_OPTIONS = MAX_EXPORT_DIMENSION;
 
   const layoutMap = {
     tools: { desktop: dom.leftTabPanes || dom.leftRail, mobile: dom.mobilePanels.tools },
@@ -215,7 +228,11 @@
   let autosaveWriteTimer = null;
   let autosaveRestoring = false;
   let autosaveDirty = false;
+  let autosaveDocumentRestored = false;
   const brushOffsetCache = new Map();
+  let exportScale = 1;
+  let exportSheetInfo = null;
+  let exportMaxScale = 1;
 
   const rails = { leftCollapsed: false, rightCollapsed: window.innerWidth <= 900 };
   const BACKGROUND_TILE_COLORS = Object.freeze({
@@ -249,6 +266,7 @@
     ellipseFill: '⬤',
   };
   const state = createInitialState();
+  let sessionStateRestored = false;
   restoreSessionState();
   state.colorMode = 'index';
   updateGridDecorations();
@@ -315,12 +333,12 @@
 
   function createInitialState(options = {}) {
     const {
-      width: requestedWidth = 128,
-      height: requestedHeight = 128,
+      width: requestedWidth = DEFAULT_CANVAS_SIZE,
+      height: requestedHeight = DEFAULT_CANVAS_SIZE,
       name: requestedName = DEFAULT_DOCUMENT_NAME,
     } = options || {};
-    const width = clamp(Math.round(Number(requestedWidth) || 128), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
-    const height = clamp(Math.round(Number(requestedHeight) || 128), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    const width = clamp(Math.round(Number(requestedWidth) || DEFAULT_CANVAS_SIZE), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    const height = clamp(Math.round(Number(requestedHeight) || DEFAULT_CANVAS_SIZE), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
     const palette = [
       { r: 0, g: 0, b: 0, a: 0 },
       { r: 20, g: 20, b: 20, a: 255 },
@@ -1097,15 +1115,27 @@
     updateMemoryStatus();
   }
 
-  function normalizeDocumentName(value) {
+  function extractDocumentBaseName(value) {
     if (typeof value !== 'string') {
-      return DEFAULT_DOCUMENT_NAME;
+      return DEFAULT_DOCUMENT_BASENAME;
     }
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return DEFAULT_DOCUMENT_NAME;
+    const ext = PROJECT_FILE_EXTENSION;
+    let base = value.trim();
+    if (!base) {
+      return DEFAULT_DOCUMENT_BASENAME;
     }
-    return trimmed.slice(0, 120);
+    if (base.toLowerCase().endsWith(ext)) {
+      base = base.slice(0, -ext.length);
+    }
+    base = base.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
+    return base || DEFAULT_DOCUMENT_BASENAME;
+  }
+
+  function normalizeDocumentName(value) {
+    const base = extractDocumentBaseName(value);
+    const maxBaseLength = Math.max(1, 120 - PROJECT_FILE_EXTENSION.length);
+    const limitedBase = base.slice(0, maxBaseLength);
+    return `${limitedBase}${PROJECT_FILE_EXTENSION}`;
   }
 
   function updateDocumentMetadata() {
@@ -1117,24 +1147,49 @@
     document.title = `${name} • ${baseTitle}`;
   }
 
+  function sanitizeDocumentFileBase(name) {
+    const base = extractDocumentBaseName(name);
+    return base
+      .replace(/[\\/:*?"<>|]/g, '_')
+      .replace(/\s+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '') || DEFAULT_DOCUMENT_BASENAME.replace(/\s+/g, '_');
+  }
+
   function createAutosaveFileName(name = state.documentName) {
-    const normalized = normalizeDocumentName(name);
-    const sanitized = normalized.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
-    let base = sanitized || DEFAULT_DOCUMENT_NAME;
-    const ext = '.pixieedraw';
-    if (base.toLowerCase().endsWith(ext)) {
-      return base;
-    }
-    return `${base}${ext}`;
+    const sanitizedBase = sanitizeDocumentFileBase(name);
+    return `${sanitizedBase}${PROJECT_FILE_EXTENSION}`;
   }
 
   function createExportFileName(extension, suffix = '') {
-    const normalized = normalizeDocumentName(state.documentName);
-    const sanitized = normalized.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
-    const safeBase = sanitized || DEFAULT_DOCUMENT_NAME.replace(/\s+/g, '_');
+    const sanitized = sanitizeDocumentFileBase(state.documentName);
+    const safeBase =
+      sanitized || DEFAULT_DOCUMENT_BASENAME.replace(/\s+/g, '_');
     const safeSuffix = suffix ? `_${suffix}` : '';
     const normalizedExt = extension ? extension.replace(/^\.+/, '') : '';
     return normalizedExt ? `${safeBase}${safeSuffix}.${normalizedExt}` : `${safeBase}${safeSuffix}`;
+  }
+
+  function hasCompletedFirstOpen() {
+    if (!canUseSessionStorage) {
+      return false;
+    }
+    try {
+      return window.localStorage.getItem(FIRST_OPEN_COMPLETE_KEY) === 'true';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function markFirstOpenComplete() {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(FIRST_OPEN_COMPLETE_KEY, 'true');
+    } catch (error) {
+      // ignore storage failures silently
+    }
   }
 
   function beginHistory(label) {
@@ -1222,6 +1277,7 @@
       requestRender();
       requestOverlayRender();
     }
+    markFirstOpenComplete();
     scheduleSessionPersist();
     return true;
   }
@@ -1861,6 +1917,36 @@
     updateHistoryButtons();
   }
 
+  function getMaxSpriteMultiplier() {
+    const largest = Math.max(state.width || 0, state.height || 0);
+    if (!largest) return 1;
+    return Math.max(1, Math.floor(MAX_CANVAS_SIZE / largest));
+  }
+
+  function updateSpriteScaleControlLimits() {
+    const input = dom.controls.spriteScaleInput;
+    const button = dom.controls.applySpriteScale;
+    if (!input) return;
+    const maxMultiplier = getMaxSpriteMultiplier();
+    if (maxMultiplier <= 1) {
+      input.min = '1';
+      input.max = '1';
+      input.value = '1';
+      input.disabled = true;
+      if (button) button.setAttribute('disabled', 'true');
+    } else {
+      input.min = '1';
+      input.max = String(maxMultiplier);
+      const current = Math.max(1, Math.min(maxMultiplier, Math.floor(Number(input.value) || 1)));
+      input.value = String(current);
+      input.disabled = false;
+      if (button) {
+        if (current > 1) button.removeAttribute('disabled');
+        else button.setAttribute('disabled', 'true');
+      }
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Autosave & File System Access support
   // -------------------------------------------------------------------------
@@ -1991,6 +2077,8 @@
       autosaveRestoring = false;
       autosaveDirty = false;
       updateMemoryStatus();
+      autosaveDocumentRestored = true;
+      markFirstOpenComplete();
       return true;
     } catch (error) {
       autosaveRestoring = false;
@@ -2187,6 +2275,7 @@
     }
     const dialog = config.dialog;
     if (dialog && typeof dialog.showModal === 'function') {
+      refreshExportScaleControls();
       dialog.showModal();
     } else {
       exportProjectWithFallback();
@@ -2207,6 +2296,24 @@
     }
     const normalized = choice.trim().toLowerCase();
     if (normalized === 'png') {
+      const candidates = getExportScaleCandidates();
+      applyExportScaleConstraints(candidates);
+      syncExportScaleInputs();
+      const maxScale = exportMaxScale || 1;
+      if (maxScale > 1 && exportSheetInfo) {
+        const minW = exportSheetInfo.sheetWidth;
+        const minH = exportSheetInfo.sheetHeight;
+        const maxW = minW * maxScale;
+        const maxH = minH * maxScale;
+        const scaleInput = window.prompt(
+          `書き出し倍率を入力してください (1〜${maxScale})\n幅 ${minW}〜${maxW}PX / 高さ ${minH}〜${maxH}PX`,
+          String(exportScale),
+        );
+        if (scaleInput === null) {
+          return;
+        }
+        setExportScale(scaleInput);
+      }
       exportProjectAsPng();
     } else if (normalized === 'gif') {
       exportProjectAsGif();
@@ -2372,6 +2479,60 @@
     } else if (dialog) {
       dialog.hidden = true;
     }
+
+    const slider = config.scaleSlider;
+    if (slider && slider.dataset.bound !== 'true') {
+      slider.dataset.bound = 'true';
+      slider.addEventListener('input', event => {
+        setExportScale(event.target.value);
+      });
+    }
+
+    const scaleInput = config.scaleInput;
+    if (scaleInput && scaleInput.dataset.bound !== 'true') {
+      scaleInput.dataset.bound = 'true';
+      scaleInput.addEventListener('change', event => {
+        setExportScale(event.target.value);
+      });
+    }
+
+    const widthInput = config.pixelWidthInput;
+    if (widthInput && widthInput.dataset.bound !== 'true') {
+      widthInput.dataset.bound = 'true';
+      widthInput.addEventListener('change', event => {
+        if (!exportSheetInfo) {
+          syncExportScaleInputs();
+          return;
+        }
+        const desiredWidth = Math.round(Number(event.target.value));
+        if (!Number.isFinite(desiredWidth) || desiredWidth <= 0) {
+          syncExportScaleInputs();
+          return;
+        }
+        const baseWidth = Math.max(1, exportSheetInfo.sheetWidth);
+        const targetScale = clamp(Math.round(desiredWidth / baseWidth), 1, exportMaxScale || 1);
+        setExportScale(targetScale);
+      });
+    }
+
+    const heightInput = config.pixelHeightInput;
+    if (heightInput && heightInput.dataset.bound !== 'true') {
+      heightInput.dataset.bound = 'true';
+      heightInput.addEventListener('change', event => {
+        if (!exportSheetInfo) {
+          syncExportScaleInputs();
+          return;
+        }
+        const desiredHeight = Math.round(Number(event.target.value));
+        if (!Number.isFinite(desiredHeight) || desiredHeight <= 0) {
+          syncExportScaleInputs();
+          return;
+        }
+        const baseHeight = Math.max(1, exportSheetInfo.sheetHeight);
+        const targetScale = clamp(Math.round(desiredHeight / baseHeight), 1, exportMaxScale || 1);
+        setExportScale(targetScale);
+      });
+    }
   }
 
   function closeNewProjectDialog() {
@@ -2454,8 +2615,28 @@
     } else {
       updateAutosaveStatus('新しいプロジェクトを作成しました', 'info');
     }
+    markFirstOpenComplete();
     scheduleSessionPersist();
     return true;
+  }
+
+  function shouldPromptFirstOpen() {
+    if (autosaveDocumentRestored) return false;
+    if (sessionStateRestored) return false;
+    if (hasCompletedFirstOpen()) return false;
+    return true;
+  }
+
+  function handleFirstOpenExperience() {
+    if (!shouldPromptFirstOpen()) {
+      return;
+    }
+    markFirstOpenComplete();
+    if (dom.newProject?.dialog && typeof dom.newProject.dialog.showModal === 'function') {
+      openNewProjectDialog();
+    } else {
+      promptNewProjectFallback();
+    }
   }
 
   async function loadDocumentFromHandle(handle) {
@@ -2648,8 +2829,16 @@
     if (!payload || typeof payload !== 'object') {
       throw new Error('Invalid document payload');
     }
-    const width = clamp(Math.round(Number(payload.width) || state.width || 128), 1, 4096);
-    const height = clamp(Math.round(Number(payload.height) || state.height || 128), 1, 4096);
+    const width = clamp(
+      Math.round(Number(payload.width) || state.width || DEFAULT_CANVAS_SIZE),
+      1,
+      4096
+    );
+    const height = clamp(
+      Math.round(Number(payload.height) || state.height || DEFAULT_CANVAS_SIZE),
+      1,
+      4096
+    );
     const pixelCount = width * height;
     const paletteSource = Array.isArray(payload.palette) ? payload.palette : [];
     const palette = paletteSource.length ? paletteSource.map(color => normalizeColorValue(color)) : state.palette.map(color => ({ ...color }));
@@ -2783,18 +2972,22 @@
     }
     try {
       const { width, height } = state;
+      const candidates = getExportScaleCandidates();
+      const selectedScale = applyExportScaleConstraints(candidates);
+      syncExportScaleInputs();
       const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
       const { canvas, columns, rows } = createSpriteSheetCanvas(framePixels, width, height);
-      const blob = await canvasToBlob(canvas, 'image/png');
+      const outputCanvas = scaleCanvasNearestNeighbor(canvas, selectedScale);
+      const blob = await canvasToBlob(outputCanvas, 'image/png');
       if (!blob) {
         throw new Error('Failed to create PNG blob');
       }
       const suffix = frameCount > 1
-        ? `sheet_${columns}x${rows}`
-        : `frame_${String(state.activeFrame + 1).padStart(2, '0')}`;
+        ? `sheet_${columns}x${rows}${selectedScale > 1 ? `_x${selectedScale}` : ''}`
+        : `frame_${String(state.activeFrame + 1).padStart(2, '0')}${selectedScale > 1 ? `_x${selectedScale}` : ''}`;
       const filename = createExportFileName('png', suffix);
       triggerDownloadFromBlob(blob, filename);
-      updateAutosaveStatus('PNGを書き出しました', 'success');
+      updateAutosaveStatus(`PNGを書き出しました (×${selectedScale})`, 'success');
     } catch (error) {
       console.error('PNG export failed', error);
       updateAutosaveStatus('PNGの書き出しに失敗しました', 'error');
@@ -2887,10 +3080,146 @@
     return output;
   }
 
-  function createSpriteSheetCanvas(framePixelsList, width, height) {
-    const frameCount = framePixelsList.length;
-    const columns = Math.max(1, Math.ceil(Math.sqrt(frameCount)));
-    const rows = Math.max(1, Math.ceil(frameCount / columns));
+  function computeSpriteSheetLayout(frameCount) {
+    const safeCount = Math.max(1, Math.floor(Number(frameCount) || 0));
+    const columns = Math.max(1, Math.ceil(Math.sqrt(safeCount)));
+    const rows = Math.max(1, Math.ceil(safeCount / columns));
+    return { columns, rows };
+  }
+
+  function getExportScaleCandidates() {
+    const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
+    const { columns, rows } = computeSpriteSheetLayout(frameCount);
+    const sheetWidth = Math.max(1, state.width * columns);
+    const sheetHeight = Math.max(1, state.height * rows);
+    const maxScaleWidth = Math.floor(MAX_EXPORT_DIMENSION / sheetWidth);
+    const maxScaleHeight = Math.floor(MAX_EXPORT_DIMENSION / sheetHeight);
+    const maxScale = Math.max(1, Math.min(
+      Math.max(1, maxScaleWidth || 0),
+      Math.max(1, maxScaleHeight || 0),
+    ));
+    const limit = Math.max(1, Math.min(MAX_EXPORT_SCALE_OPTIONS, maxScale));
+    const options = [];
+    for (let scale = 1; scale <= limit; scale += 1) {
+      options.push({
+        scale,
+        width: sheetWidth * scale,
+        height: sheetHeight * scale,
+      });
+    }
+    return {
+      options,
+      maxScale,
+      sheetWidth,
+      sheetHeight,
+      columns,
+      rows,
+    };
+  }
+
+  function applyExportScaleConstraints(candidates) {
+    exportSheetInfo = {
+      sheetWidth: candidates.sheetWidth,
+      sheetHeight: candidates.sheetHeight,
+      columns: candidates.columns,
+      rows: candidates.rows,
+    };
+    const options = candidates.options;
+    exportMaxScale = options.length ? options[options.length - 1].scale : 1;
+    if (!options.length) {
+      exportScale = 1;
+      return exportScale;
+    }
+    const maxAllowed = exportMaxScale;
+    if (exportScale > maxAllowed) {
+      exportScale = maxAllowed;
+    }
+    if (exportScale < 1) {
+      exportScale = 1;
+    }
+    return exportScale;
+  }
+
+  function updateExportScaleHint() {
+    const hintNode = dom.exportDialog?.scaleHint;
+    if (!hintNode) return;
+    if (!exportSheetInfo) {
+      hintNode.textContent = '';
+      return;
+    }
+    const width = exportSheetInfo.sheetWidth * exportScale;
+    const height = exportSheetInfo.sheetHeight * exportScale;
+    hintNode.textContent = `書き出しサイズ: ${width} × ${height}PX (倍率 ×${exportScale})`;
+  }
+
+  function syncExportScaleInputs() {
+    const slider = dom.exportDialog?.scaleSlider;
+    if (slider) {
+      slider.disabled = exportMaxScale <= 1;
+      slider.min = '1';
+      slider.max = String(exportMaxScale);
+      slider.step = '1';
+      slider.value = String(exportScale);
+    }
+
+    const scaleInput = dom.exportDialog?.scaleInput;
+    if (scaleInput) {
+      scaleInput.disabled = exportMaxScale <= 1;
+      scaleInput.min = '1';
+      scaleInput.max = String(exportMaxScale);
+      scaleInput.step = '1';
+      scaleInput.value = String(exportScale);
+    }
+
+    const widthInput = dom.exportDialog?.pixelWidthInput;
+    const heightInput = dom.exportDialog?.pixelHeightInput;
+    if (!exportSheetInfo) {
+      if (widthInput) {
+        widthInput.disabled = true;
+        widthInput.value = '';
+      }
+      if (heightInput) {
+        heightInput.disabled = true;
+        heightInput.value = '';
+      }
+    } else {
+      const baseWidth = Math.max(1, exportSheetInfo.sheetWidth);
+      const baseHeight = Math.max(1, exportSheetInfo.sheetHeight);
+      const maxWidth = Math.max(baseWidth, baseWidth * exportMaxScale);
+      const maxHeight = Math.max(baseHeight, baseHeight * exportMaxScale);
+      if (widthInput) {
+        widthInput.disabled = exportMaxScale <= 1;
+        widthInput.min = String(baseWidth);
+        widthInput.max = String(maxWidth);
+        widthInput.step = String(baseWidth);
+        widthInput.value = String(baseWidth * exportScale);
+      }
+      if (heightInput) {
+        heightInput.disabled = exportMaxScale <= 1;
+        heightInput.min = String(baseHeight);
+        heightInput.max = String(maxHeight);
+        heightInput.step = String(baseHeight);
+        heightInput.value = String(baseHeight * exportScale);
+      }
+    }
+
+    updateExportScaleHint();
+  }
+
+  function setExportScale(value) {
+    const maxAllowed = exportMaxScale || 1;
+    const normalized = clamp(Math.round(Number(value) || exportScale || 1), 1, maxAllowed);
+    exportScale = normalized;
+    syncExportScaleInputs();
+  }
+
+  function refreshExportScaleControls() {
+    const candidates = getExportScaleCandidates();
+    applyExportScaleConstraints(candidates);
+    syncExportScaleInputs();
+  }
+function createSpriteSheetCanvas(framePixelsList, width, height) {
+    const { columns, rows } = computeSpriteSheetLayout(framePixelsList.length);
     const canvas = document.createElement('canvas');
     canvas.width = columns * width;
     canvas.height = rows * height;
@@ -2904,6 +3233,25 @@
       ctx.putImageData(new ImageData(pixels, width, height), col * width, row * height);
     });
     return { canvas, columns, rows };
+  }
+
+  function scaleCanvasNearestNeighbor(sourceCanvas, scale) {
+    const numericScale = Math.max(1, Math.floor(Number(scale) || 1));
+    if (numericScale <= 1) {
+      return sourceCanvas;
+    }
+    const output = document.createElement('canvas');
+    output.width = Math.max(1, sourceCanvas.width * numericScale);
+    output.height = Math.max(1, sourceCanvas.height * numericScale);
+    const ctx = output.getContext('2d');
+    if (!ctx) {
+      throw new Error('拡大先キャンバスのコンテキストを取得できませんでした');
+    }
+    ctx.imageSmoothingEnabled = false;
+    ctx.msImageSmoothingEnabled = false;
+    ctx.webkitImageSmoothingEnabled = false;
+    ctx.drawImage(sourceCanvas, 0, 0, output.width, output.height);
+    return output;
   }
 
   function canvasToBlob(canvas, mimeType) {
@@ -3584,6 +3932,7 @@
     initMemoryMonitor();
     updateDocumentMetadata();
     renderEverything();
+    handleFirstOpenExperience();
   }
 
   function getActiveTool() {
@@ -3846,6 +4195,24 @@
       });
     }
 
+    if (dom.controls.applySpriteScale) {
+      dom.controls.applySpriteScale.addEventListener('click', () => {
+        const value = dom.controls.spriteScaleInput?.value ?? 1;
+        applySpriteScaleMultiplier(value);
+      });
+    }
+    if (dom.controls.spriteScaleInput) {
+      dom.controls.spriteScaleInput.addEventListener('input', () => {
+        updateSpriteScaleControlLimits();
+      });
+      dom.controls.spriteScaleInput.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          applySpriteScaleMultiplier(dom.controls.spriteScaleInput.value);
+        }
+      });
+    }
+
     dom.controls.canvasWidth?.addEventListener('change', handleCanvasResizeRequest);
     dom.controls.canvasHeight?.addEventListener('change', handleCanvasResizeRequest);
 
@@ -3874,6 +4241,7 @@
     dom.controls.redoAction?.addEventListener('click', () => redo());
 
     syncControlsWithState();
+    updateSpriteScaleControlLimits();
   }
 
   function handleCanvasResizeRequest() {
@@ -3928,6 +4296,116 @@
         return resized;
       });
     });
+  }
+
+  function scaleDocumentByRatio(numerator, denominator) {
+    const num = Math.floor(Number(numerator));
+    const den = Math.floor(Number(denominator));
+    if (!Number.isFinite(num) || !Number.isFinite(den) || num <= 0 || den <= 0) {
+      return false;
+    }
+    const originalWidth = state.width;
+    const originalHeight = state.height;
+    const newWidthRaw = (originalWidth * num) / den;
+    const newHeightRaw = (originalHeight * num) / den;
+    if (!Number.isInteger(newWidthRaw) || !Number.isInteger(newHeightRaw)) {
+      return false;
+    }
+    const newWidth = newWidthRaw | 0;
+    const newHeight = newHeightRaw | 0;
+    if (newWidth < 1 || newHeight < 1 || newWidth > MAX_CANVAS_SIZE || newHeight > MAX_CANVAS_SIZE) {
+      return false;
+    }
+
+    state.frames.forEach(frame => {
+      frame.layers = frame.layers.map(layer => {
+        const scaled = createLayer(layer.name, newWidth, newHeight);
+        scaled.id = layer.id;
+        scaled.visible = layer.visible;
+        scaled.opacity = layer.opacity;
+
+        const sourceIndices = layer.indices;
+        const destIndices = scaled.indices;
+        const hasDirect = layer.direct instanceof Uint8ClampedArray;
+        const sourceDirect = hasDirect ? layer.direct : null;
+        const targetDirect = hasDirect ? ensureLayerDirect(scaled, newWidth, newHeight) : null;
+
+        for (let y = 0; y < newHeight; y += 1) {
+          const srcY = Math.min(originalHeight - 1, Math.floor((y * den) / num));
+          const srcRowStart = srcY * originalWidth;
+          const destRowStart = y * newWidth;
+          for (let x = 0; x < newWidth; x += 1) {
+            const srcX = Math.min(originalWidth - 1, Math.floor((x * den) / num));
+            const srcIndex = srcRowStart + srcX;
+            const destIndex = destRowStart + x;
+            destIndices[destIndex] = sourceIndices[srcIndex];
+            if (targetDirect && sourceDirect) {
+              const baseSrc = srcIndex * 4;
+              const baseDst = destIndex * 4;
+              targetDirect[baseDst] = sourceDirect[baseSrc];
+              targetDirect[baseDst + 1] = sourceDirect[baseSrc + 1];
+              targetDirect[baseDst + 2] = sourceDirect[baseSrc + 2];
+              targetDirect[baseDst + 3] = sourceDirect[baseSrc + 3];
+            }
+          }
+        }
+
+        return scaled;
+      });
+    });
+
+    state.width = newWidth;
+    state.height = newHeight;
+    const ratio = num / den;
+    state.pan.x = Math.round((state.pan.x || 0) * ratio);
+    state.pan.y = Math.round((state.pan.y || 0) * ratio);
+    state.selectionMask = null;
+    state.selectionBounds = null;
+    return true;
+  }
+
+  function applySpriteScaleMultiplier(rawValue) {
+    const input = dom.controls.spriteScaleInput;
+    let factor = Number(rawValue);
+    if (!Number.isFinite(factor)) factor = 1;
+    factor = Math.max(1, Math.floor(factor));
+    if (input) {
+      input.value = String(factor);
+    }
+
+    const maxMultiplier = getMaxSpriteMultiplier();
+    if (factor === 1) {
+      updateSpriteScaleControlLimits();
+      return;
+    }
+    if (factor > maxMultiplier) {
+      window.alert(`拡大後のサイズが上限 (${MAX_CANVAS_SIZE}px) を超えます。最大倍率は ×${maxMultiplier} です。`);
+      updateSpriteScaleControlLimits();
+      return;
+    }
+
+    beginHistory('scaleSprite');
+    const success = scaleDocumentByRatio(factor, 1);
+    if (!success) {
+      rollbackPendingHistory({ reRender: false });
+      updateAutosaveStatus('スプライト倍率を適用できませんでした', 'warn');
+      updateSpriteScaleControlLimits();
+      return;
+    }
+
+    markHistoryDirty();
+    resizeCanvases();
+    clearSelection();
+    requestRender();
+    requestOverlayRender();
+    commitHistory();
+    scheduleSessionPersist();
+    updateMemoryStatus();
+    if (input) {
+      input.value = '1';
+    }
+    updateSpriteScaleControlLimits();
+    updateAutosaveStatus(`スプライト倍率 ×${factor} を適用しました`, 'info');
   }
 
   function setupTools() {
@@ -4991,6 +5469,7 @@
       dom.canvases.selection.style.height = `${height * scale}px`;
     }
     applyViewportTransform();
+    updateSpriteScaleControlLimits();
     syncControlsWithState();
     markCanvasDirty();
     renderCanvas();
@@ -7258,6 +7737,9 @@
     if (!payload || typeof payload !== 'object') {
       return;
     }
+
+    sessionStateRestored = true;
+    markFirstOpenComplete();
 
     if (Number.isFinite(payload.scale)) {
       state.scale = normalizeZoomScale(payload.scale, state.scale || MIN_ZOOM_SCALE);
