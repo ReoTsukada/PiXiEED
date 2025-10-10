@@ -1119,12 +1119,6 @@ a:focus {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
-@media (min-width: 1200px) {
-  .game-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
 .ogp-card:hover,
 .ogp-card:focus-visible {
   transform: translateY(-4px);
