@@ -36,6 +36,7 @@ html,body {
 }
 body {
   margin:0;
+  height:100dvh;
   min-height:100vh;
   background:#000;
   display:flex;
@@ -45,8 +46,9 @@ body {
   font-family:'Noto Sans JP', system-ui, sans-serif;
   text-align:center;
   box-sizing:border-box;
-  padding:48px 16px calc(320px + env(safe-area-inset-bottom, 0px));
-  gap:16px;
+  padding:48px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  gap:12px;
+  overflow:hidden;
 }
 h1 { font-size:22px; margin:32px 0 8px; }
 button {
@@ -93,30 +95,6 @@ a { color:#7dd3fc; }
   align-items:center;
   gap:8px;
 }
-.start-bottom-ad {
-  position:fixed;
-  bottom:calc(16px + env(safe-area-inset-bottom, 0px));
-  left:50%;
-  transform:translateX(-50%);
-  width:min(90vw, 300px);
-  z-index:8;
-}
-.start-bottom-ad .adsbygoogle {
-  display:block;
-  width:300px;
-  max-width:100%;
-  height:250px;
-}
-.start-bottom-ad .ad-placeholder {
-  display:block;
-  width:300px;
-  max-width:100%;
-  height:250px;
-  border-radius:12px;
-  background:#fff;
-  box-shadow:0 0 0 1px rgba(15,23,42,0.12);
-  object-fit:cover;
-}
 .instructions-card {
   max-width:320px;
   padding:16px 20px;
@@ -127,6 +105,32 @@ a { color:#7dd3fc; }
   font-size:14px;
   line-height:1.6;
   text-align:left;
+}
+.start-content {
+  flex:1 1 auto;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:20px;
+  width:100%;
+  max-width:360px;
+  min-height:0;
+  overflow:auto;
+  padding-bottom:8px;
+}
+.start-bottom-ad {
+  width:100%;
+  max-width:320px;
+  margin:0 auto;
+  flex-shrink:0;
+  margin-top:auto;
+}
+.start-bottom-ad .adsbygoogle {
+  display:block;
+  width:100%;
+  height:auto;
+  min-height:250px;
 }
 .instructions-card h2 {
   margin:0 0 8px;
@@ -229,21 +233,14 @@ a { color:#7dd3fc; }
   text-decoration:underline;
 }
 .control-bar-wrapper {
-  position:fixed;
-  left:0;
-  right:0;
-  bottom:calc(env(safe-area-inset-bottom, 0px) + 250px + 20px);
+  width:100%;
+  max-width:360px;
   display:flex;
   flex-direction:column;
   align-items:center;
   gap:16px;
   padding:0 16px;
   box-sizing:border-box;
-}
-@media (max-width:480px) {
-  .control-bar-wrapper {
-    bottom:calc(env(safe-area-inset-bottom, 0px) + 250px + 24px);
-  }
 }
 </style>
 </head>
@@ -253,36 +250,39 @@ a { color:#7dd3fc; }
 
 <h1>魔王様！！いつまでよければいいですか！？</h1>
 <p class="developer-credit">開発者: <a href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">@PiXiEED_arta</a></p>
-<div class="control-bar-wrapper" role="region" aria-label="ゲーム操作">
-  <div class="control-bar">
-    <button id="playBtn" class="control-bar__btn control-bar__btn--primary">▶ プレイ</button>
-    <button id="titleShareBtn" class="control-bar__btn control-bar__btn--secondary">シェアする</button>
-    <div class="control-bar__audio">
-      <label class="switch">
-        <input type="checkbox" id="audioToggle">
-        <span class="slider"></span>
-      </label>
-      <span id="audioToggleLabel" class="volume-label"></span>
-    </div>
+<div class="start-content">
+  <div class="instructions-card">
+    <h2>遊び方</h2>
+    <ul>
+      <li>操作：画面をタップ / マウスドラッグ、または ←→ キーで移動します。</li>
+      <li>敵にぶつかると即ゲームオーバーです。</li>
+      <li>エンジェリンを取ると一度だけ身代わりが発動し、次の衝突を防ぎます。</li>
+    </ul>
   </div>
-  <button id="installBtn" class="install-btn">アプリをインストール</button>
-</div>
 
-<div class="instructions-card">
-  <h2>遊び方</h2>
-  <ul>
-    <li>操作：画面をタップ / マウスドラッグ、または ←→ キーで移動します。</li>
-    <li>敵にぶつかると即ゲームオーバーです。</li>
-    <li>エンジェリンを取ると一度だけ身代わりが発動し、次の衝突を防ぎます。</li>
-  </ul>
+  <div class="control-bar-wrapper" role="region" aria-label="ゲーム操作">
+    <div class="control-bar">
+      <button id="playBtn" class="control-bar__btn control-bar__btn--primary">▶ プレイ</button>
+      <button id="titleShareBtn" class="control-bar__btn control-bar__btn--secondary">シェアする</button>
+      <div class="control-bar__audio">
+        <label class="switch">
+          <input type="checkbox" id="audioToggle">
+          <span class="slider"></span>
+        </label>
+        <span id="audioToggleLabel" class="volume-label"></span>
+      </div>
+    </div>
+    <button id="installBtn" class="install-btn">アプリをインストール</button>
+  </div>
 </div>
 
 <div class="start-bottom-ad">
-  <img class="ad-placeholder" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAEsCAIAAAD24Ib0AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAGXRFWHRTb2Z0d2FyZQBQYWludC5ORVQgNC4wLjEzQdB+UgAAABV0RVh0Q3JlYXRpb24gVGltZQAwOS8yNS8wOIG81DcAAABOSURBVHic7cEBDQAAAMKg909tDjegAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgG0JAAABQnBVAAAAAElFTkSuQmCC" alt="広告枠">
   <ins class="adsbygoogle"
-       style="display:inline-block;width:300px;height:250px"
+       style="display:block"
        data-ad-client="ca-pub-9801602250480253"
-       data-ad-slot="2435364404"></ins>
+       data-ad-slot="2435364404"
+       data-ad-format="auto"
+       data-full-width-responsive="true"></ins>
 </div>
 
 <script>
@@ -295,7 +295,6 @@ const audioToggle = document.getElementById('audioToggle');
 const audioToggleLabel = document.getElementById('audioToggleLabel');
 const installBtn = document.getElementById('installBtn');
 const startAdSlot = document.querySelector('.start-bottom-ad .adsbygoogle');
-const adPlaceholder = document.querySelector('.start-bottom-ad .ad-placeholder');
 let deferredInstallPrompt = null;
 
 function baseShareText(){
@@ -352,45 +351,23 @@ window.addEventListener('appinstalled', () => {
   deferredInstallPrompt = null;
 });
 
-function hideAdPlaceholderIfLoaded(){
-  if(!startAdSlot || !adPlaceholder) return false;
-  const iframe = startAdSlot.querySelector('iframe');
-  if(iframe && iframe.offsetHeight > 0){
-    adPlaceholder.style.display = 'none';
-    return true;
-  }
-  return false;
-}
-
-function monitorAdSlot(){
-  if(!startAdSlot || !adPlaceholder) return;
-  if(hideAdPlaceholderIfLoaded()) return;
-  const observer = new MutationObserver(() => {
-    if(hideAdPlaceholderIfLoaded()) {
-      observer.disconnect();
-    }
-  });
-  observer.observe(startAdSlot, { childList: true, subtree: true });
-  setTimeout(() => observer.disconnect(), 10000);
-}
-
 function initStartAd(){
   if(!startAdSlot) return;
-  hideAdPlaceholderIfLoaded();
   if(startAdSlot.offsetWidth === 0){
     setTimeout(initStartAd, 300);
     return;
   }
   try{
     (adsbygoogle = window.adsbygoogle || []).push({});
-    monitorAdSlot();
   }catch(_){
     setTimeout(initStartAd, 500);
   }
 }
 
 window.addEventListener('load', () => {
-  requestAnimationFrame(initStartAd);
+  if(startAdSlot){
+    requestAnimationFrame(initStartAd);
+  }
 });
 </script>
 
