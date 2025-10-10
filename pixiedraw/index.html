@@ -40,9 +40,9 @@
         <main class="stage" id="stage" aria-label="ドットキャンバス">
           <div class="stage__canvas" id="canvasViewport">
             <div class="canvas-stack" id="canvasStack" aria-live="off">
-              <canvas id="drawingCanvas" width="128" height="128" aria-label="描画キャンバス"></canvas>
-              <canvas id="overlayCanvas" width="128" height="128" aria-hidden="true"></canvas>
-              <canvas id="selectionCanvas" width="128" height="128" aria-hidden="true"></canvas>
+              <canvas id="drawingCanvas" width="32" height="32" aria-label="描画キャンバス"></canvas>
+              <canvas id="overlayCanvas" width="32" height="32" aria-hidden="true"></canvas>
+              <canvas id="selectionCanvas" width="32" height="32" aria-hidden="true"></canvas>
             </div>
             <div class="canvas-controls">
               <button type="button" class="chip" id="undoAction" aria-label="元に戻す" disabled>↺</button>
@@ -266,13 +266,24 @@
             <div class="field field--inline">
               <label class="field field--tiny">
                 <span>横</span>
-                <input type="number" id="canvasWidth" min="1" max="256" value="128" />
+                <input type="number" id="canvasWidth" min="1" max="256" value="32" />
               </label>
               <label class="field field--tiny">
                 <span>縦</span>
-                <input type="number" id="canvasHeight" min="1" max="256" value="128" />
+                <input type="number" id="canvasHeight" min="1" max="256" value="32" />
               </label>
             </div>
+          </label>
+          <label class="field">
+            <span>スプライト倍率</span>
+            <div class="field field--inline">
+              <label class="field field--tiny">
+                <span>倍率</span>
+                <input type="number" id="spriteScaleInput" min="1" step="1" value="1" inputmode="numeric" />
+              </label>
+              <button type="button" class="button" id="applySpriteScale" disabled>倍率を適用</button>
+            </div>
+            <p class="help-text">キャンバスと描画済みのピクセルを整数倍で拡大します。</p>
           </label>
           <label class="field">
             <span>ズーム</span>
@@ -328,6 +339,27 @@
         </header>
         <div class="modal__body">
           <div class="field field--list">
+            <span>書き出し倍率</span>
+            <div class="scale-controls">
+              <div class="scale-control scale-control--wide">
+                <label for="exportScaleSlider">倍率 (×)</label>
+                <input type="range" id="exportScaleSlider" min="1" max="1" step="1" value="1" />
+                <input type="number" id="exportScaleInput" min="1" value="1" inputmode="numeric" />
+              </div>
+              <div class="scale-control scale-control--pair">
+                <label class="scale-field" for="exportPixelWidth">
+                  <span>幅 (PX)</span>
+                  <input type="number" id="exportPixelWidth" min="1" value="32" inputmode="numeric" />
+                </label>
+                <label class="scale-field" for="exportPixelHeight">
+                  <span>高さ (PX)</span>
+                  <input type="number" id="exportPixelHeight" min="1" value="32" inputmode="numeric" />
+                </label>
+              </div>
+            </div>
+            <p class="help-text" id="exportScaleHint"></p>
+          </div>
+          <div class="field field--list">
             <button type="button" class="button button--primary" id="confirmExportPng">PNG（スプライトシート）</button>
             <p class="help-text">全フレームをグリッドに並べた PNG を保存します</p>
           </div>
@@ -350,17 +382,18 @@
         <div class="modal__body">
           <label class="field">
             <span>ファイル名</span>
-            <input type="text" id="newProjectName" required maxlength="120" />
+            <input type="text" id="newProjectName" required maxlength="120" placeholder="example.pixieedraw" />
+            <p class="help-text">拡張子まで含めた名前を設定できます（例: mycanvas.pixieedraw）。</p>
           </label>
           <div class="field field--inline">
             <span>キャンバスサイズ</span>
             <label class="field field--tiny">
               <span>横</span>
-              <input type="number" id="newProjectWidth" min="1" max="256" required />
+              <input type="number" id="newProjectWidth" min="1" max="256" required value="32" />
             </label>
             <label class="field field--tiny">
               <span>縦</span>
-              <input type="number" id="newProjectHeight" min="1" max="256" required />
+              <input type="number" id="newProjectHeight" min="1" max="256" required value="32" />
             </label>
           </div>
         </div>
