@@ -11,10 +11,14 @@
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-LLSD5KLJVN"></script>
 <script>
 const GA_MEASUREMENT_ID = 'G-LLSD5KLJVN';
+const GA_PAGE_PATH = '/maoitu/game';
 window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
-gtag('config', GA_MEASUREMENT_ID);
+gtag('config', GA_MEASUREMENT_ID, {
+  page_path: GA_PAGE_PATH,
+  page_title: document.title
+});
 </script>
 <!-- Google AdSense -->
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
