@@ -5,6 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PiXiEED | ホーム</title>
   <meta name="description" content="PiXiEEDの公式ホームページ。ブラウザゲームやツールの公開、アルタのポートフォリオへの入り口を用意しています。">
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
+  <script>
+  const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
+  const GA_PAGE_PATH = '/';
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', GA_MEASUREMENT_ID, {
+    page_path: GA_PAGE_PATH,
+    page_title: document.title
+  });
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
@@ -97,7 +110,7 @@
           <article class="display" role="listitem" data-type="game" data-title="魔王様!!いつまでよければいいですか!? アップデート" data-description="新しいギミックを追加した最新バージョンを公開しました。" data-difficulty="1">
             <header class="display__header">
               <span class="display__badge display__badge--game">新着ゲーム</span>
-              <h3 class="display__title">魔王様!!いつまでよければいいですか!? Ver.1.1</h3>
+              <h3 class="display__title">魔王様!!いつまでよければいいですか!?</h3>
             </header>
             <a class="display__link" href="projects/maoitu/index.html">
               <div class="display__frame">
@@ -105,7 +118,7 @@
                   <img src="maoitu/ogp.png" alt="魔王様!!いつまでよければいいですか!? のアップデートプレビュー">
                 </div>
               </div>
-              <p class="display__description">新しいギミックを追加した最新バージョンを公開しました。ブラウザからすぐ遊べます。</p>
+              <p class="display__description">Ver.1.1で新しいギミックを追加した最新バージョンを公開しました。ブラウザからすぐ遊べます。</p>
             </a>
             <div class="display__meta">
               <span class="display__difficulty" data-difficulty="1" aria-label="難易度 1">
