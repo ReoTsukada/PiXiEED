@@ -15,6 +15,8 @@
     rightTabButtons: Array.from(document.querySelectorAll('[data-right-tab]')),
     rightTabPanes: document.getElementById('rightRailPanes'),
     mobileDrawer: document.getElementById('mobileDrawer'),
+    mobileTopBar: document.getElementById('mobileTopBar'),
+    mobileShortcutsMount: document.getElementById('mobileShortcutsMount'),
     mobileTabs: Array.from(document.querySelectorAll('.mobile-tab')),
     colorTabSwatch: document.getElementById('colorTabSwatch'),
     mobileColorTabSwatch: document.getElementById('mobileColorTabSwatch'),
@@ -38,6 +40,7 @@
       overlay: /** @type {HTMLCanvasElement} */ (document.getElementById('overlayCanvas')),
       selection: /** @type {HTMLCanvasElement} */ (document.getElementById('selectionCanvas')),
     },
+    canvasControls: document.querySelector('.canvas-controls'),
     toggles: {
       left: document.getElementById('openLeftRail'),
       right: document.getElementById('openRightRail'),
@@ -50,17 +53,16 @@
       toggleBackgroundMode: document.getElementById('toggleBackgroundMode'),
       undoAction: document.getElementById('undoAction'),
       redoAction: document.getElementById('redoAction'),
-      zoomOut: document.getElementById('zoomOut'),
-      zoomIn: document.getElementById('zoomIn'),
-      zoomLevel: document.getElementById('zoomLevel'),
+      canvasControlButtons: document.getElementById('canvasControlButtons'),
+      canvasControlPrimary: document.getElementById('canvasControlPrimary'),
+      canvasControlSecondary: document.getElementById('canvasControlSecondary'),
       zoomSlider: document.getElementById('zoomSlider'),
       brushSize: document.getElementById('brushSize'),
       brushSizeValue: document.getElementById('brushSizeValue'),
-      brushOpacity: document.getElementById('brushOpacity'),
-      brushOpacityValue: document.getElementById('brushOpacityValue'),
       colorMode: Array.from(document.querySelectorAll('input[name="colorMode"]')),
       paletteList: document.getElementById('paletteList'),
       addPaletteColor: document.getElementById('addPaletteColor'),
+      removePaletteColor: document.getElementById('removePaletteColor'),
       paletteIndex: document.getElementById('paletteIndex'),
       paletteHue: document.getElementById('paletteHue'),
       paletteSaturation: document.getElementById('paletteSaturation'),
@@ -123,7 +125,7 @@
   const LEFT_TAB_KEYS = ['tools', 'color'];
   const RIGHT_TAB_KEYS = ['frames', 'settings'];
   const TOOL_GROUPS = {
-    selection: { label: '範囲選択', tools: ['selectRect', 'selectLasso', 'selectSame'] },
+    selection: { label: '範囲選択', tools: ['move', 'selectRect', 'selectLasso', 'selectSame'] },
     pen: { label: 'ペン', tools: ['pen', 'eyedropper'] },
     eraser: { label: '消しゴム', tools: ['eraser'] },
     shape: { label: '図形', tools: ['line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill'] },
@@ -190,6 +192,9 @@
     settings: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.settings },
   };
 
+  const canvasControlsDefaultParent = dom.canvasControls?.parentElement || null;
+  const canvasControlsDefaultNextSibling = dom.canvasControls?.nextSibling || null;
+
   const ctx = {
     drawing: dom.canvases.drawing?.getContext('2d', { willReadFrequently: true }) || null,
     overlay: dom.canvases.overlay?.getContext('2d', { willReadFrequently: true }) || null,
@@ -253,8 +258,9 @@
   const BRUSH_TOOLS = new Set(['pen', 'eraser']);
   const FILL_TOOLS = new Set(['fill']);
   const SHAPE_TOOLS = new Set(['line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill']);
-  const SELECTION_TOOLS = new Set(['selectRect', 'selectLasso', 'selectSame']);
+  const SELECTION_TOOLS = new Set(['move', 'selectRect', 'selectLasso', 'selectSame', 'selectionMove', 'layerMove']);
   const TOOL_ICON_FALLBACK = {
+    move: '⇕',
     selectRect: '□',
     selectLasso: '⌁',
     selectSame: '★',
@@ -330,6 +336,16 @@
     wheelPointer: { active: false, pointerId: null, upHandler: null },
   };
   let dirtyRegion = null;
+  let canvasControlMode = 'zoom';
+
+  function makeIcon(name, fallback, opts = {}) {
+    const img = new Image(opts.width || 24, opts.height || 24);
+    img.src = `assets/icons/${name}.svg`;
+    img.alt = fallback;
+    img.width = opts.width || 24;
+    img.height = opts.height || 24;
+    return img;
+  }
 
   function createInitialState(options = {}) {
     const {
@@ -356,10 +372,9 @@
       pan: { x: 0, y: 0 },
       tool: 'pen',
       brushSize: 1,
-      brushOpacity: 1,
       showGrid: true,
       showPixelGuides: true,
-      showMajorGrid: false,
+      showMajorGrid: true,
       gridScreenStep: 8,
       majorGridSpacing: 16,
       backgroundMode: 'dark',
@@ -377,6 +392,7 @@
       activeLayer: frames[0].layers[0].id,
       selectionMask: null,
       selectionBounds: null,
+      pendingPasteMoveState: null,
       playback: { isPlaying: false, lastFrame: 0 },
       documentName: normalizeDocumentName(requestedName),
     };
@@ -450,6 +466,10 @@
     };
   }
 
+  const internalClipboard = {
+    selection: null,
+  };
+
   const TOUCH_PAN_MIN_POINTERS = 2;
   const activeTouchPointers = new Map();
 
@@ -501,7 +521,6 @@
     if (includeUiState) {
       snapshot.tool = state.tool;
       snapshot.brushSize = state.brushSize;
-      snapshot.brushOpacity = state.brushOpacity;
       snapshot.colorMode = state.colorMode;
       snapshot.activeToolGroup = state.activeToolGroup;
       snapshot.lastGroupTool = { ...(state.lastGroupTool || DEFAULT_GROUP_TOOL) };
@@ -734,9 +753,6 @@
     if (Object.prototype.hasOwnProperty.call(snapshot, 'brushSize')) {
       compressed.brushSize = snapshot.brushSize;
     }
-    if (Object.prototype.hasOwnProperty.call(snapshot, 'brushOpacity')) {
-      compressed.brushOpacity = snapshot.brushOpacity;
-    }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'colorMode')) {
       compressed.colorMode = snapshot.colorMode;
     }
@@ -807,9 +823,6 @@
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'brushSize')) {
       decompressed.brushSize = snapshot.brushSize;
-    }
-    if (Object.prototype.hasOwnProperty.call(snapshot, 'brushOpacity')) {
-      decompressed.brushOpacity = snapshot.brushOpacity;
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'colorMode')) {
       decompressed.colorMode = snapshot.colorMode;
@@ -954,15 +967,13 @@
   function updateMemoryStatus() {
     const usageNode = dom.controls.memoryUsage || document.getElementById('memoryUsage');
     if (!usageNode) return;
-    let usage = getMemoryUsageBreakdown();
-    usage = trimHistoryForMemoryIfNeeded(usage);
-    let text = `メモリ: ${formatBytes(usage.total)}`;
-    if (memoryThresholds.maxBytes) {
-      text += ` | 警告 ${formatBytes(memoryThresholds.warningBytes)} | 上限目安 ${formatBytes(memoryThresholds.maxBytes)}`;
-    } else {
-      text += ` | 警告 ${formatBytes(memoryThresholds.warningBytes)}`;
-    }
-    text += ` | ヒストリー ${history.past.length}/${history.limit}`;
+  let usage = getMemoryUsageBreakdown();
+  usage = trimHistoryForMemoryIfNeeded(usage);
+  let text = `メモリ: ${formatBytes(usage.total)}`;
+  if (memoryThresholds.maxBytes) {
+    text += ` | 上限目安 ${formatBytes(memoryThresholds.maxBytes)}`;
+  }
+  text += ` | ヒストリー ${history.past.length}/${history.limit}`;
     const now = performance && typeof performance.now === 'function' ? performance.now() : Date.now();
     if (historyTrimmedRecently) {
       if (now - historyTrimmedAt <= 6000) {
@@ -971,9 +982,9 @@
         historyTrimmedRecently = false;
       }
     }
-    usageNode.textContent = text;
-    usageNode.style.color = usage.total >= memoryThresholds.warningBytes ? '#ff5c5c' : '';
-  }
+  usageNode.textContent = text;
+  usageNode.style.color = usage.total >= memoryThresholds.warningBytes ? '#ff5c5c' : '';
+}
 
   function clearMemoryUsage() {
     history.past = [];
@@ -1023,9 +1034,6 @@
     if (Object.prototype.hasOwnProperty.call(snapshot, 'brushSize')) {
       state.brushSize = snapshot.brushSize;
     }
-    if (Object.prototype.hasOwnProperty.call(snapshot, 'brushOpacity')) {
-      state.brushOpacity = snapshot.brushOpacity;
-    }
     state.colorMode = 'index';
     state.palette = snapshot.palette.map(color => ({ ...color }));
     state.activePaletteIndex = snapshot.activePaletteIndex;
@@ -1067,8 +1075,10 @@
     } else {
       state.selectionBounds = null;
     }
+    state.pendingPasteMoveState = null;
+    updateCanvasControlButtons();
     state.showGrid = snapshot.showGrid;
-    state.showMajorGrid = snapshot.showMajorGrid ?? false;
+    state.showMajorGrid = snapshot.showMajorGrid ?? true;
     state.gridScreenStep = snapshot.gridScreenStep ?? state.gridScreenStep ?? 16;
     state.majorGridSpacing = snapshot.majorGridSpacing ?? state.majorGridSpacing ?? 16;
     state.backgroundMode = snapshot.backgroundMode ?? 'dark';
@@ -1291,6 +1301,45 @@
     }
   }
 
+  function updateCanvasControlButtons() {
+    const primary = dom.controls.canvasControlPrimary;
+    const secondary = dom.controls.canvasControlSecondary;
+    if (!primary || !secondary) {
+      return;
+    }
+    const hasSelection = selectionMaskHasPixels(state.selectionMask);
+    const hasClipboard = Boolean(internalClipboard.selection);
+    const nextMode = hasSelection ? 'clipboard' : 'zoom';
+    if (canvasControlMode !== nextMode) {
+      canvasControlMode = nextMode;
+      if (dom.controls.canvasControlButtons) {
+        dom.controls.canvasControlButtons.setAttribute('aria-label', nextMode === 'clipboard' ? 'コピーと貼り付け' : 'ズーム');
+      }
+      if (nextMode === 'clipboard') {
+        primary.replaceChildren(makeIcon('copy', 'C'));
+        primary.dataset.action = 'copy';
+        primary.setAttribute('aria-label', 'コピー');
+        secondary.replaceChildren(makeIcon('paste', 'P'));
+        secondary.dataset.action = 'paste';
+        secondary.setAttribute('aria-label', '貼り付け');
+      } else {
+        primary.replaceChildren(makeIcon('zoomdown', '−'));
+        primary.dataset.action = 'zoomOut';
+        primary.setAttribute('aria-label', 'ズームアウト');
+        secondary.replaceChildren(makeIcon('zoomup', '＋'));
+        secondary.dataset.action = 'zoomIn';
+        secondary.setAttribute('aria-label', 'ズームイン');
+      }
+    }
+    if (canvasControlMode === 'clipboard') {
+      primary.disabled = !hasSelection;
+      secondary.disabled = !hasClipboard;
+    } else {
+      primary.disabled = false;
+      secondary.disabled = false;
+    }
+  }
+
   function setupLeftTabs() {
     dom.leftTabButtons = Array.from(document.querySelectorAll('[data-left-tab]'));
     if (!dom.leftTabButtons || !dom.leftTabButtons.length) return;
@@ -1495,18 +1544,12 @@
 
   function updateToolVisibility() {
     if (!toolButtons || !toolButtons.length) return;
-    const isMobile = layoutMode === 'mobilePortrait';
-    const activeGroup = isMobile ? null : (state.activeToolGroup || TOOL_TO_GROUP[state.tool] || 'pen');
+    const activeGroup = state.activeToolGroup || TOOL_TO_GROUP[state.tool] || 'pen';
     toolButtons.forEach(button => {
       const group = button.dataset.toolGroup || TOOL_TO_GROUP[button.dataset.tool];
-      const show = !activeGroup || !group || group === activeGroup;
-      if (isMobile) {
-        button.hidden = false;
-        button.setAttribute('aria-hidden', 'false');
-      } else {
-        button.hidden = !show;
-        button.setAttribute('aria-hidden', String(!show));
-      }
+      const show = !group || group === activeGroup;
+      button.hidden = !show;
+      button.setAttribute('aria-hidden', String(!show));
     });
     if (dom.toolGrid) {
       if (activeGroup) {
@@ -1863,12 +1906,6 @@
     if (dom.controls.brushSizeValue) {
       dom.controls.brushSizeValue.textContent = `${state.brushSize}px`;
     }
-    if (dom.controls.brushOpacity) {
-      dom.controls.brushOpacity.value = String(Math.round(state.brushOpacity * 100));
-    }
-    if (dom.controls.brushOpacityValue) {
-      dom.controls.brushOpacityValue.textContent = `${Math.round(state.brushOpacity * 100)}%`;
-    }
     if (dom.controls.canvasWidth) {
       dom.controls.canvasWidth.value = String(state.width);
     }
@@ -1915,6 +1952,7 @@
     updateRightTabVisibility();
     updateGridDecorations();
     updateHistoryButtons();
+    updateCanvasControlButtons();
   }
 
   function getMaxSpriteMultiplier() {
@@ -2929,7 +2967,6 @@
       },
       tool: activeTool,
       brushSize: clamp(Math.round(Number(payload.brushSize) || state.brushSize || 1), 1, 64),
-      brushOpacity: clamp(Number(payload.brushOpacity ?? state.brushOpacity ?? 1), 0, 1),
       colorMode,
       palette,
       activePaletteIndex,
@@ -3921,6 +3958,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     setupLeftTabs();
     setupRightTabs();
     setupLayout();
+    setupGlobalFocusDismiss();
     setupControls();
     setupExportDialog();
     setupTools();
@@ -4039,6 +4077,22 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
   function applyLayoutMode() {
     const isMobile = layoutMode === 'mobilePortrait';
     dom.mobileDrawer.hidden = !isMobile;
+    if (dom.mobileTopBar) {
+      dom.mobileTopBar.hidden = !isMobile;
+    }
+    if (dom.canvasControls) {
+      if (isMobile && dom.mobileShortcutsMount) {
+        dom.canvasControls.dataset.mobile = 'true';
+        dom.mobileShortcutsMount.appendChild(dom.canvasControls);
+      } else if (!isMobile && canvasControlsDefaultParent) {
+        delete dom.canvasControls.dataset.mobile;
+        if (canvasControlsDefaultNextSibling && canvasControlsDefaultNextSibling.parentNode === canvasControlsDefaultParent) {
+          canvasControlsDefaultParent.insertBefore(dom.canvasControls, canvasControlsDefaultNextSibling);
+        } else {
+          canvasControlsDefaultParent.appendChild(dom.canvasControls);
+        }
+      }
+    }
     if (isMobile) {
       dom.leftRail.dataset.collapsed = 'true';
       dom.rightRail.dataset.collapsed = 'true';
@@ -4121,9 +4175,6 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     });
 
     const zoomSlider = dom.controls.zoomSlider;
-    dom.controls.zoomOut?.addEventListener('click', () => adjustZoomBySteps(-1));
-    dom.controls.zoomIn?.addEventListener('click', () => adjustZoomBySteps(1));
-
     if (zoomSlider) {
       zoomSlider.min = '0';
       zoomSlider.max = String(ZOOM_STEPS.length - 1);
@@ -4135,19 +4186,37 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       });
     }
 
+    const handleCanvasControlClick = event => {
+      const action = event.currentTarget?.dataset?.action;
+      if (!action) return;
+      if (action === 'zoomOut') {
+        adjustZoomBySteps(-1);
+      } else if (action === 'zoomIn') {
+        adjustZoomBySteps(1);
+      } else if (action === 'copy') {
+        copySelection();
+      } else if (action === 'paste') {
+        pasteSelection();
+      }
+      updateCanvasControlButtons();
+    };
+
+    dom.controls.canvasControlPrimary?.addEventListener('click', handleCanvasControlClick);
+    dom.controls.canvasControlSecondary?.addEventListener('click', handleCanvasControlClick);
+
+    if (dom.controls.undoAction) {
+      dom.controls.undoAction.replaceChildren(makeIcon('action-undo', '↺'));
+    }
+    if (dom.controls.redoAction) {
+      dom.controls.redoAction.replaceChildren(makeIcon('action-redo', '↻'));
+    }
+
+    updateCanvasControlButtons();
+
     dom.controls.brushSize?.addEventListener('input', event => {
       state.brushSize = clamp(Math.round(Number(event.target.value)), 1, 32);
       if (dom.controls.brushSizeValue) {
         dom.controls.brushSizeValue.textContent = `${state.brushSize}px`;
-      }
-      scheduleSessionPersist();
-    });
-
-    dom.controls.brushOpacity?.addEventListener('input', event => {
-      const value = clamp(Number(event.target.value), 0, 100);
-      state.brushOpacity = value / 100;
-      if (dom.controls.brushOpacityValue) {
-        dom.controls.brushOpacityValue.textContent = `${value}%`;
       }
       scheduleSessionPersist();
     });
@@ -4240,6 +4309,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     dom.controls.undoAction?.addEventListener('click', () => undo());
     dom.controls.redoAction?.addEventListener('click', () => redo());
 
+    setupNumberSteppers();
     syncControlsWithState();
     updateSpriteScaleControlLimits();
   }
@@ -4266,6 +4336,48 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     requestOverlayRender();
     commitHistory();
     scheduleSessionPersist();
+  }
+
+  function setupNumberSteppers() {
+    const inputs = document.querySelectorAll('input[type="number"][data-stepper]');
+    inputs.forEach(input => {
+      if (input.dataset.stepperAttached === 'true') return;
+      const parent = input.parentElement;
+      if (!parent) return;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'number-stepper';
+
+      const createButton = (label, delta) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'number-stepper__btn';
+        btn.textContent = label;
+        btn.addEventListener('click', () => {
+          const step = Number(input.step) || 1;
+          const min = input.min !== '' ? Number(input.min) : -Infinity;
+          const max = input.max !== '' ? Number(input.max) : Infinity;
+          const current = Number(input.value);
+          const base = Number.isFinite(current) ? current : 0;
+          let next = base + delta * step;
+          if (Number.isFinite(min)) next = Math.max(min, next);
+          if (Number.isFinite(max)) next = Math.min(max, next);
+          input.value = String(next);
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        return btn;
+      };
+
+      const minus = createButton('−', -1);
+      const plus = createButton('＋', 1);
+
+      parent.insertBefore(wrapper, input);
+      wrapper.appendChild(minus);
+      wrapper.appendChild(input);
+      wrapper.appendChild(plus);
+
+      input.dataset.stepperAttached = 'true';
+    });
   }
 
   function resizeAllLayers(width, height) {
@@ -4560,6 +4672,12 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       commitHistory();
     });
 
+    dom.controls.removePaletteColor?.addEventListener('click', () => {
+      if (state.palette.length <= 1) return;
+      const index = clamp(state.activePaletteIndex, 0, state.palette.length - 1);
+      removePaletteColor(index);
+    });
+
     dom.controls.paletteIndex?.addEventListener('change', () => {
       const target = clamp(Number(dom.controls.paletteIndex.value), 0, state.palette.length - 1);
       if (Number.isNaN(target)) return;
@@ -4675,6 +4793,9 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       container.appendChild(button);
     });
     updateColorTabSwatch();
+    if (dom.controls.removePaletteColor) {
+      dom.controls.removePaletteColor.disabled = state.palette.length <= 1;
+    }
   }
 
   function removePaletteColor(index) {
@@ -5590,6 +5711,21 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       } else if ((key === 'z' && event.shiftKey) || key === 'y') {
         event.preventDefault();
         redo();
+      } else if (key === 'c') {
+        const success = copySelection();
+        if (success) {
+          event.preventDefault();
+        }
+      } else if (key === 'x') {
+        const success = cutSelection();
+        if (success) {
+          event.preventDefault();
+        }
+      } else if (key === 'v') {
+        const success = pasteSelection();
+        if (success) {
+          event.preventDefault();
+        }
       }
     });
   }
@@ -5633,7 +5769,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     if (!pointerState.active) {
       return;
     }
-    if (pointerState.tool === 'selectionMove') {
+    if (pointerState.tool === 'selectionMove' || pointerState.tool === 'layerMove') {
       finalizeSelectionMove();
     }
     detachPointerListeners();
@@ -5783,7 +5919,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     pointerState.selectionMove = null;
 
     const selectionMask = state.selectionMask;
-    const isSelectionTool = activeTool === 'selectRect' || activeTool === 'selectLasso' || activeTool === 'selectSame';
+    const isSelectionTool = activeTool === 'selectRect' || activeTool === 'selectLasso' || activeTool === 'selectSame' || activeTool === 'move';
     if (isSelectionTool && selectionMask) {
       const maskIndex = position.y * state.width + position.x;
       const insideSelection = selectionMask[maskIndex] === 1;
@@ -5796,6 +5932,18 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
           return;
         }
       }
+    }
+
+    if (activeTool === 'move') {
+      const hasSelection = Boolean(state.selectionMask && selectionMaskHasPixels(state.selectionMask));
+      if (!hasSelection) {
+        const movedWholeLayer = beginLayerMove(event, position, layer);
+        if (movedWholeLayer) {
+          return;
+        }
+      }
+      pointerState.active = false;
+      return;
     }
 
     if (activeTool === 'curve') {
@@ -5836,16 +5984,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       return;
     }
 
-    if (activeTool === 'selectSame') {
-      createSelectionByColor(position.x, position.y);
-      pointerState.active = false;
-      if (dom.canvases.drawing) {
-        dom.canvases.drawing.releasePointerCapture(event.pointerId);
-      }
-      return;
-    }
-
-    if (activeTool === 'fill') {
+        if (activeTool === 'fill') {
       floodFill(position.x, position.y);
       commitHistory();
       pointerState.active = false;
@@ -5856,7 +5995,15 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       return;
     }
 
-    if (activeTool === 'selectRect' || activeTool === 'selectLasso') {
+    if (activeTool === 'selectSame') {
+      createSelectionByColor(position.x, position.y);
+      const moved = beginSelectionMove(event, position);
+      if (moved) {
+        return;
+      }
+    }
+
+    if (activeTool === 'selectRect' || activeTool === 'selectLasso' || activeTool === 'selectSame') {
       pointerState.selectionPreview = { start: position, points: [position] };
     } else if (activeTool === 'line' || activeTool === 'rect' || activeTool === 'rectFill' || activeTool === 'ellipse' || activeTool === 'ellipseFill') {
       pointerState.preview = { start: position, end: position, points: [position] };
@@ -5921,7 +6068,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     } else if (pointerState.tool === 'line' || pointerState.tool === 'rect' || pointerState.tool === 'rectFill' || pointerState.tool === 'ellipse' || pointerState.tool === 'ellipseFill') {
       pointerState.preview = { start: pointerState.start, end: position, points: pointerState.path.slice() };
       requestOverlayRender();
-    } else if (pointerState.tool === 'selectionMove') {
+    } else if (pointerState.tool === 'selectionMove' || pointerState.tool === 'layerMove') {
       handleSelectionMoveDrag(position);
     } else if (pointerState.tool === 'selectRect' || pointerState.tool === 'selectLasso') {
       pointerState.selectionPreview.points.push(position);
@@ -5981,7 +6128,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       drawEllipse(pointerState.start, pointerState.current, false);
     } else if (tool === 'ellipseFill') {
       drawEllipse(pointerState.start, pointerState.current, true);
-    } else if (tool === 'selectionMove') {
+    } else if (tool === 'selectionMove' || tool === 'layerMove') {
       finalizeSelectionMove();
     } else if (tool === 'selectRect') {
       if (!(pointerState.selectionClearedOnDown && pointerState.path.length <= 1)) {
@@ -6023,6 +6170,34 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     }
   }
 
+  function beginLayerMove(event, startPosition, layer) {
+    if (!layer || !dom.canvases.drawing) {
+      return false;
+    }
+    const moveState = createLayerMoveState(layer);
+    if (!moveState) {
+      return false;
+    }
+
+    dom.canvases.drawing.setPointerCapture(event.pointerId);
+    hoverPixel = null;
+    requestOverlayRender();
+    pointerState.active = true;
+    pointerState.pointerId = event.pointerId;
+    pointerState.tool = 'layerMove';
+    pointerState.start = startPosition;
+    pointerState.current = startPosition;
+    pointerState.last = startPosition;
+    pointerState.path = startPosition ? [startPosition] : [];
+    pointerState.preview = null;
+    pointerState.selectionPreview = null;
+    pointerState.selectionMove = moveState;
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    return true;
+  }
+
   function beginSelectionMove(event, startPosition) {
     const mask = state.selectionMask;
     const bounds = state.selectionBounds;
@@ -6030,10 +6205,31 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     if (!mask || !bounds || !layer) {
       return false;
     }
-    const moveState = createSelectionMoveState(layer, bounds, mask);
+    let moveState = null;
+    const pendingMove = state.pendingPasteMoveState;
+    if (
+      pendingMove
+      && pendingMove.layerId
+      && layer.id
+      && pendingMove.layerId === layer.id
+      && pendingMove.bounds
+      && bounds
+      && pendingMove.bounds.x0 === bounds.x0
+      && pendingMove.bounds.y0 === bounds.y0
+      && pendingMove.bounds.x1 === bounds.x1
+      && pendingMove.bounds.y1 === bounds.y1
+    ) {
+      moveState = pendingMove;
+      state.pendingPasteMoveState = null;
+    } else {
+      moveState = createSelectionMoveState(layer, bounds, mask);
+    }
     if (!moveState) {
       return false;
     }
+    moveState.layer = layer;
+    moveState.layerId = layer?.id || moveState.layerId || null;
+    moveState.offset = moveState.offset || { x: 0, y: 0 };
 
     dom.canvases.drawing.setPointerCapture(event.pointerId);
     hoverPixel = null;
@@ -6146,7 +6342,461 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       imageData,
       offset: { x: 0, y: 0 },
       hasCleared: false,
+      applySelectionOnFinalize: true,
     };
+  }
+
+  function selectionMaskHasPixels(mask) {
+    if (!mask) {
+      return false;
+    }
+    for (let i = 0; i < mask.length; i += 1) {
+      if (mask[i] === 1) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function snapshotSelectionForClipboard() {
+    if (pointerState.active) {
+      return null;
+    }
+    const mask = state.selectionMask;
+    const bounds = state.selectionBounds;
+    if (!mask || !bounds) {
+      return null;
+    }
+    const layer = getActiveLayer();
+    if (!layer) {
+      return null;
+    }
+    const moveState = createSelectionMoveState(layer, bounds, mask);
+    if (!moveState) {
+      return null;
+    }
+    if (!selectionMaskHasPixels(moveState.mask)) {
+      return null;
+    }
+    return moveState;
+  }
+
+  function cloneImageData(imageData) {
+    if (!imageData) {
+      return null;
+    }
+    const width = Number(imageData.width) || 0;
+    const height = Number(imageData.height) || 0;
+    const source = imageData.data instanceof Uint8ClampedArray
+      ? imageData.data
+      : new Uint8ClampedArray(imageData.data || []);
+
+    if (typeof ImageData === 'function') {
+      try {
+        const clone = new ImageData(width, height);
+        clone.data.set(source);
+        return clone;
+      } catch (error) {
+        try {
+          return new ImageData(new Uint8ClampedArray(source), width, height);
+        } catch (innerError) {
+          // fall through
+        }
+      }
+    }
+
+    if (ctx.overlay && typeof ctx.overlay.createImageData === 'function') {
+      const clone = ctx.overlay.createImageData(width, height);
+      clone.data.set(source);
+      return clone;
+    }
+
+    return null;
+  }
+
+  function createBlankImageData(width, height) {
+    const w = Math.max(0, Math.floor(width) || 0);
+    const h = Math.max(0, Math.floor(height) || 0);
+    if (w === 0 || h === 0) {
+      return null;
+    }
+    if (ctx.overlay && typeof ctx.overlay.createImageData === 'function') {
+      return ctx.overlay.createImageData(w, h);
+    }
+    if (typeof ImageData === 'function') {
+      try {
+        return new ImageData(w, h);
+      } catch (error) {
+        try {
+          return new ImageData(new Uint8ClampedArray(w * h * 4), w, h);
+        } catch (innerError) {
+          return null;
+        }
+      }
+    }
+    return null;
+  }
+
+  function populateImageDataFromPixels(imageData, indices, direct, mask) {
+    if (!imageData) {
+      return;
+    }
+    const data = imageData.data;
+    if (!(data instanceof Uint8ClampedArray)) {
+      return;
+    }
+    const palette = state.palette;
+    const size = mask ? mask.length : 0;
+    for (let i = 0; i < size; i += 1) {
+      const base = i * 4;
+      if (mask[i] === 1) {
+        const paletteIndex = indices instanceof Int16Array ? indices[i] : -1;
+        let r = 0;
+        let g = 0;
+        let b = 0;
+        let a = 0;
+        if (paletteIndex >= 0 && palette[paletteIndex]) {
+          const color = palette[paletteIndex];
+          r = color.r;
+          g = color.g;
+          b = color.b;
+          a = color.a;
+        } else if (direct instanceof Uint8ClampedArray) {
+          r = direct[base];
+          g = direct[base + 1];
+          b = direct[base + 2];
+          a = direct[base + 3];
+        }
+        data[base] = r;
+        data[base + 1] = g;
+        data[base + 2] = b;
+        data[base + 3] = a;
+      } else {
+        data[base] = 0;
+        data[base + 1] = 0;
+        data[base + 2] = 0;
+        data[base + 3] = 0;
+      }
+    }
+  }
+
+  function storeSelectionInClipboard(moveState) {
+    if (!moveState) {
+      internalClipboard.selection = null;
+      return;
+    }
+    internalClipboard.selection = {
+      width: moveState.width,
+      height: moveState.height,
+      mask: new Uint8Array(moveState.mask),
+      indices: new Int16Array(moveState.indices),
+      direct: new Uint8ClampedArray(moveState.direct),
+      bounds: { ...moveState.bounds },
+      imageData: moveState.imageData ? cloneImageData(moveState.imageData) : null,
+    };
+  }
+
+  function copySelection() {
+    const moveState = snapshotSelectionForClipboard();
+    if (!moveState) {
+      updateCanvasControlButtons();
+      return false;
+    }
+    storeSelectionInClipboard(moveState);
+    state.pendingPasteMoveState = null;
+    updateCanvasControlButtons();
+    return true;
+  }
+
+  function createMoveStateFromClipboard(clip, bounds, layer) {
+    if (!clip) {
+      return null;
+    }
+    const width = Math.max(0, Math.floor(Number(clip.width) || 0));
+    const height = Math.max(0, Math.floor(Number(clip.height) || 0));
+    if (width === 0 || height === 0) {
+      return null;
+    }
+    const size = width * height;
+    const mask = clip.mask instanceof Uint8Array && clip.mask.length === size
+      ? new Uint8Array(clip.mask)
+      : new Uint8Array(size);
+    const indices = clip.indices instanceof Int16Array && clip.indices.length === size
+      ? new Int16Array(clip.indices)
+      : new Int16Array(size);
+    const direct = clip.direct instanceof Uint8ClampedArray && clip.direct.length === size * 4
+      ? new Uint8ClampedArray(clip.direct)
+      : new Uint8ClampedArray(size * 4);
+    let imageData = null;
+    if (clip.imageData) {
+      imageData = cloneImageData(clip.imageData);
+    } else {
+      imageData = createBlankImageData(width, height);
+      if (imageData) {
+        populateImageDataFromPixels(imageData, indices, direct, mask);
+      }
+    }
+    return {
+      layer,
+      layerId: layer?.id || null,
+      bounds: { ...bounds },
+      width,
+      height,
+      mask,
+      indices,
+      direct,
+      imageData,
+      offset: { x: 0, y: 0 },
+      hasCleared: false,
+      restoreIndices: null,
+      restoreDirect: null,
+      applySelectionOnFinalize: true,
+    };
+  }
+
+  function createPasteRestoreSnapshot(layer, bounds, width, height) {
+    const snappedWidth = Math.max(0, Math.floor(width) || 0);
+    const snappedHeight = Math.max(0, Math.floor(height) || 0);
+    if (snappedWidth === 0 || snappedHeight === 0) {
+      return { indices: null, direct: null };
+    }
+    const size = snappedWidth * snappedHeight;
+    const indices = new Int16Array(size);
+    let direct = null;
+    const layerDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    if (layerDirect) {
+      direct = new Uint8ClampedArray(size * 4);
+    }
+    for (let y = 0; y < snappedHeight; y += 1) {
+      for (let x = 0; x < snappedWidth; x += 1) {
+        const localIndex = y * snappedWidth + x;
+        const canvasX = bounds.x0 + x;
+        const canvasY = bounds.y0 + y;
+        if (canvasX < 0 || canvasY < 0 || canvasX >= state.width || canvasY >= state.height) {
+          indices[localIndex] = -1;
+          if (direct) {
+            const localBase = localIndex * 4;
+            direct[localBase] = 0;
+            direct[localBase + 1] = 0;
+            direct[localBase + 2] = 0;
+            direct[localBase + 3] = 0;
+          }
+          continue;
+        }
+        const canvasIndex = canvasY * state.width + canvasX;
+        indices[localIndex] = layer.indices[canvasIndex];
+        if (direct) {
+          const localBase = localIndex * 4;
+          const canvasBase = canvasIndex * 4;
+          direct[localBase] = layerDirect[canvasBase];
+          direct[localBase + 1] = layerDirect[canvasBase + 1];
+          direct[localBase + 2] = layerDirect[canvasBase + 2];
+          direct[localBase + 3] = layerDirect[canvasBase + 3];
+        }
+      }
+    }
+    return { indices, direct };
+  }
+
+  function createLayerMoveState(layer) {
+    if (!layer) {
+      return null;
+    }
+    const width = state.width;
+    const height = state.height;
+    if (width <= 0 || height <= 0) {
+      return null;
+    }
+    const layerDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    const bounds = { x0: width, y0: height, x1: -1, y1: -1 };
+    const palette = state.palette;
+
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const idx = y * width + x;
+        const paletteIndex = layer.indices[idx];
+        let alpha = 0;
+        if (paletteIndex >= 0 && palette[paletteIndex]) {
+          alpha = palette[paletteIndex].a;
+        } else if (layerDirect) {
+          const base = idx * 4;
+          alpha = layerDirect[base + 3];
+        }
+        if (paletteIndex >= 0 || alpha > 0) {
+          if (x < bounds.x0) bounds.x0 = x;
+          if (y < bounds.y0) bounds.y0 = y;
+          if (x > bounds.x1) bounds.x1 = x;
+          if (y > bounds.y1) bounds.y1 = y;
+        }
+      }
+    }
+
+    if (bounds.x1 < bounds.x0 || bounds.y1 < bounds.y0) {
+      return null;
+    }
+
+    const moveWidth = bounds.x1 - bounds.x0 + 1;
+    const moveHeight = bounds.y1 - bounds.y0 + 1;
+    const size = moveWidth * moveHeight;
+    const mask = new Uint8Array(size);
+    const indices = new Int16Array(size);
+    const direct = new Uint8ClampedArray(size * 4);
+    const imageData = createBlankImageData(moveWidth, moveHeight);
+
+    for (let y = 0; y < moveHeight; y += 1) {
+      for (let x = 0; x < moveWidth; x += 1) {
+        const canvasX = bounds.x0 + x;
+        const canvasY = bounds.y0 + y;
+        const canvasIndex = canvasY * width + canvasX;
+        const localIndex = y * moveWidth + x;
+        const paletteIndex = layer.indices[canvasIndex];
+        const canvasBase = canvasIndex * 4;
+        const localBase = localIndex * 4;
+        let hasPixel = false;
+        if (paletteIndex >= 0) {
+          indices[localIndex] = paletteIndex;
+          hasPixel = true;
+          if (layerDirect) {
+            direct[localBase] = layerDirect[canvasBase];
+            direct[localBase + 1] = layerDirect[canvasBase + 1];
+            direct[localBase + 2] = layerDirect[canvasBase + 2];
+            direct[localBase + 3] = layerDirect[canvasBase + 3];
+          }
+          if (imageData && palette[paletteIndex]) {
+            const color = palette[paletteIndex];
+            imageData.data[localBase] = color.r;
+            imageData.data[localBase + 1] = color.g;
+            imageData.data[localBase + 2] = color.b;
+            imageData.data[localBase + 3] = color.a;
+          } else if (imageData) {
+            imageData.data[localBase] = 0;
+            imageData.data[localBase + 1] = 0;
+            imageData.data[localBase + 2] = 0;
+            imageData.data[localBase + 3] = 0;
+          }
+        } else if (layerDirect && layerDirect[canvasBase + 3] > 0) {
+          indices[localIndex] = -1;
+          direct[localBase] = layerDirect[canvasBase];
+          direct[localBase + 1] = layerDirect[canvasBase + 1];
+          direct[localBase + 2] = layerDirect[canvasBase + 2];
+          direct[localBase + 3] = layerDirect[canvasBase + 3];
+          hasPixel = true;
+          if (imageData) {
+            imageData.data[localBase] = direct[localBase];
+            imageData.data[localBase + 1] = direct[localBase + 1];
+            imageData.data[localBase + 2] = direct[localBase + 2];
+            imageData.data[localBase + 3] = direct[localBase + 3];
+          }
+        } else {
+          indices[localIndex] = -1;
+          if (imageData) {
+            imageData.data[localBase] = 0;
+            imageData.data[localBase + 1] = 0;
+            imageData.data[localBase + 2] = 0;
+            imageData.data[localBase + 3] = 0;
+          }
+        }
+        if (hasPixel) {
+          mask[localIndex] = 1;
+        }
+      }
+    }
+
+    return {
+      layer,
+      layerId: layer.id,
+      bounds,
+      width: moveWidth,
+      height: moveHeight,
+      mask,
+      indices,
+      direct,
+      imageData,
+      offset: { x: 0, y: 0 },
+      hasCleared: false,
+      restoreIndices: null,
+      restoreDirect: null,
+      applySelectionOnFinalize: false,
+    };
+  }
+
+  function cutSelection() {
+    const moveState = snapshotSelectionForClipboard();
+    if (!moveState) {
+      updateCanvasControlButtons();
+      return false;
+    }
+    storeSelectionInClipboard(moveState);
+    state.pendingPasteMoveState = null;
+    beginHistory('selectionCut');
+    clearSelectionSourcePixels(moveState);
+    commitHistory();
+    requestOverlayRender();
+    updateCanvasControlButtons();
+    return true;
+  }
+
+  function pasteSelection() {
+    if (pointerState.active) {
+      updateCanvasControlButtons();
+      return false;
+    }
+    const clip = internalClipboard.selection;
+    if (!clip) {
+      updateCanvasControlButtons();
+      return false;
+    }
+    const layer = getActiveLayer();
+    if (!layer) {
+      updateCanvasControlButtons();
+      return false;
+    }
+    const width = Math.max(0, Math.floor(clip.width) || 0);
+    const height = Math.max(0, Math.floor(clip.height) || 0);
+    if (width === 0 || height === 0) {
+      updateCanvasControlButtons();
+      return false;
+    }
+    const maxX0 = Math.max(0, state.width - width);
+    const maxY0 = Math.max(0, state.height - height);
+    let x0 = Number.isFinite(clip.bounds?.x0) ? Math.round(clip.bounds.x0) : 0;
+    let y0 = Number.isFinite(clip.bounds?.y0) ? Math.round(clip.bounds.y0) : 0;
+    x0 = clamp(x0, 0, maxX0);
+    y0 = clamp(y0, 0, maxY0);
+    const bounds = { x0, y0, x1: x0 + width - 1, y1: y0 + height - 1 };
+    const moveState = createMoveStateFromClipboard(clip, bounds, layer);
+    if (!moveState) {
+      updateCanvasControlButtons();
+      return false;
+    }
+    const restoreSnapshot = createPasteRestoreSnapshot(layer, bounds, width, height);
+    moveState.restoreIndices = restoreSnapshot.indices;
+    moveState.restoreDirect = restoreSnapshot.direct;
+    moveState.layer = layer;
+    moveState.layerId = layer?.id || null;
+    moveState.offset.x = 0;
+    moveState.offset.y = 0;
+    moveState.hasCleared = false;
+    state.pendingPasteMoveState = moveState;
+    beginHistory('selectionPaste');
+    const result = placeSelectionPixels(moveState, 0, 0);
+    let success = false;
+    if (result.placed && result.bounds) {
+      markHistoryDirty();
+      state.selectionMask = result.mask;
+      state.selectionBounds = result.bounds;
+      internalClipboard.selection.bounds = { ...result.bounds };
+      markDirtyRect(result.bounds.x0, result.bounds.y0, result.bounds.x1, result.bounds.y1);
+      requestRender();
+      requestOverlayRender();
+      success = true;
+    }
+    commitHistory();
+    if (!success) {
+      state.pendingPasteMoveState = null;
+    }
+    updateCanvasControlButtons();
+    return success;
   }
 
   function handleSelectionMoveDrag(position) {
@@ -6176,7 +6826,12 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     if (!layer) {
       return;
     }
-    const layerDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    const restoreIndices = moveState.restoreIndices instanceof Int16Array ? moveState.restoreIndices : null;
+    const restoreDirect = moveState.restoreDirect instanceof Uint8ClampedArray ? moveState.restoreDirect : null;
+    let layerDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    if (!layerDirect && restoreDirect) {
+      layerDirect = ensureLayerDirect(layer);
+    }
     let modified = false;
     for (let y = 0; y < height; y += 1) {
       for (let x = 0; x < width; x += 1) {
@@ -6187,16 +6842,45 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
         if (canvasX < 0 || canvasY < 0 || canvasX >= state.width || canvasY >= state.height) continue;
         const canvasIndex = canvasY * state.width + canvasX;
         const base = canvasIndex * 4;
-        const alpha = layerDirect ? layerDirect[base + 3] : 0;
-        if (layer.indices[canvasIndex] !== -1 || alpha !== 0) {
-          modified = true;
-        }
-        layer.indices[canvasIndex] = -1;
+        const previousIndex = layer.indices[canvasIndex];
+        let previousAlpha = 0;
         if (layerDirect) {
-          layerDirect[base] = 0;
-          layerDirect[base + 1] = 0;
-          layerDirect[base + 2] = 0;
-          layerDirect[base + 3] = 0;
+          previousAlpha = layerDirect[base + 3];
+        } else if (previousIndex >= 0 && state.palette[previousIndex]) {
+          previousAlpha = state.palette[previousIndex].a;
+        }
+        let nextIndex = -1;
+        let nextAlpha = 0;
+        if (restoreIndices) {
+          nextIndex = restoreIndices[localIndex] ?? -1;
+          layer.indices[canvasIndex] = nextIndex;
+        } else {
+          layer.indices[canvasIndex] = -1;
+        }
+        if (layerDirect) {
+          if (restoreDirect) {
+            const localBase = localIndex * 4;
+            layerDirect[base] = restoreDirect[localBase];
+            layerDirect[base + 1] = restoreDirect[localBase + 1];
+            layerDirect[base + 2] = restoreDirect[localBase + 2];
+            layerDirect[base + 3] = restoreDirect[localBase + 3];
+            nextAlpha = restoreDirect[localBase + 3];
+          } else {
+            layerDirect[base] = 0;
+            layerDirect[base + 1] = 0;
+            layerDirect[base + 2] = 0;
+            layerDirect[base + 3] = 0;
+            nextAlpha = 0;
+          }
+        } else {
+          if (nextIndex >= 0 && state.palette[nextIndex]) {
+            nextAlpha = state.palette[nextIndex].a;
+          } else {
+            nextAlpha = 0;
+          }
+        }
+        if (layer.indices[canvasIndex] !== previousIndex || nextAlpha !== previousAlpha) {
+          modified = true;
         }
       }
     }
@@ -6204,6 +6888,8 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       markHistoryDirty();
       markDirtyRect(bounds.x0, bounds.y0, bounds.x1, bounds.y1);
     }
+    moveState.restoreIndices = null;
+    moveState.restoreDirect = null;
     moveState.hasCleared = true;
     requestRender();
   }
@@ -6221,24 +6907,40 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     }
 
     const { offset } = moveState;
+    const applySelection = moveState.applySelectionOnFinalize !== false;
     const result = placeSelectionPixels(moveState, offset.x, offset.y);
     pointerState.selectionMove = null;
     pointerState.tool = state.tool;
+    state.pendingPasteMoveState = null;
 
     if (result.placed) {
       if (result.bounds) {
         markDirtyRect(result.bounds.x0, result.bounds.y0, result.bounds.x1, result.bounds.y1);
       }
-      state.selectionMask = result.mask;
-      state.selectionBounds = result.bounds;
+      if (applySelection) {
+        state.selectionMask = result.mask;
+        state.selectionBounds = result.bounds;
+        if (internalClipboard.selection && result.bounds) {
+          internalClipboard.selection.bounds = { ...result.bounds };
+        }
+      } else {
+        state.selectionMask = null;
+        state.selectionBounds = null;
+      }
     } else {
-      clearSelection();
+      if (applySelection) {
+        clearSelection();
+      } else {
+        state.selectionMask = null;
+        state.selectionBounds = null;
+      }
     }
 
     markHistoryDirty();
     requestRender();
     requestOverlayRender();
     commitHistory();
+    updateCanvasControlButtons();
   }
 
   function placeSelectionPixels(moveState, offsetX, offsetY) {
@@ -6774,6 +7476,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
 
     state.selectionMask = mask;
     state.selectionBounds = bounds;
+    updateCanvasControlButtons();
     requestOverlayRender();
   }
 
@@ -6824,6 +7527,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
 
     state.selectionMask = mask;
     state.selectionBounds = selectedBounds;
+    updateCanvasControlButtons();
     requestOverlayRender();
   }
 
@@ -6873,6 +7577,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
 
     state.selectionMask = mask;
     state.selectionBounds = bounds;
+    updateCanvasControlButtons();
     requestOverlayRender();
   }
 
@@ -6887,6 +7592,9 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
   function clearSelection() {
     state.selectionMask = null;
     state.selectionBounds = null;
+    state.pendingPasteMoveState = null;
+    pointerState.selectionMove = null;
+    updateCanvasControlButtons();
     requestOverlayRender();
   }
 
@@ -7095,7 +7803,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       drawBrushPreview(focusPixel, activeTool, overrideSize);
     }
 
-    if (ctx.overlay && !pointerState.active && activeTool === 'fill' && focusPixel) {
+    if (state.showPixelGuides && ctx.overlay && !pointerState.active && activeTool === 'fill' && focusPixel) {
       const previewPixels = getFillPreviewPixels(focusPixel.x, focusPixel.y);
       if (previewPixels && previewPixels.length) {
         ctx.overlay.save();
@@ -7109,11 +7817,11 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       }
     }
 
-    if (pointerState.preview && ctx.overlay && (pointerState.tool === 'line' || pointerState.tool === 'rect' || pointerState.tool === 'rectFill' || pointerState.tool === 'ellipse' || pointerState.tool === 'ellipseFill' || pointerState.tool === 'curve')) {
+    if (state.showPixelGuides && pointerState.preview && ctx.overlay && (pointerState.tool === 'line' || pointerState.tool === 'rect' || pointerState.tool === 'rectFill' || pointerState.tool === 'ellipse' || pointerState.tool === 'ellipseFill' || pointerState.tool === 'curve')) {
       drawPreviewShape(pointerState);
     }
 
-    if (ctx.overlay && state.tool === 'curve' && curveBuilder) {
+    if (state.showPixelGuides && ctx.overlay && state.tool === 'curve' && curveBuilder) {
       drawCurveGuides(curveBuilder);
     }
 
@@ -7261,7 +7969,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       return;
     }
     if (BRUSH_TOOLS.has(tool)) {
-      const penColor = getActiveDrawColor(state.brushOpacity);
+      const penColor = getActiveDrawColor();
       const resolver = tool === 'pen'
         ? () => penColor
         : (x, y) => getEraserPreviewColor(x, y);
@@ -7694,14 +8402,13 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     try {
       const snapshot = {
         scale: normalizeZoomScale(state.scale, MIN_ZOOM_SCALE),
-        pan: {
-          x: Math.round(Number(state.pan?.x) || 0),
-          y: Math.round(Number(state.pan?.y) || 0),
-        },
-        tool: state.tool,
-        brushSize: clamp(Math.round(state.brushSize || 1), 1, 32),
-        brushOpacity: clamp(Number(state.brushOpacity ?? 1), 0, 1),
-        showGrid: Boolean(state.showGrid),
+      pan: {
+        x: Math.round(Number(state.pan?.x) || 0),
+        y: Math.round(Number(state.pan?.y) || 0),
+      },
+      tool: state.tool,
+      brushSize: clamp(Math.round(state.brushSize || 1), 1, 32),
+      showGrid: Boolean(state.showGrid),
         gridScreenStep: clamp(Math.round(state.gridScreenStep || 16), 1, 256),
         showMajorGrid: Boolean(state.showMajorGrid),
         majorGridSpacing: clamp(Math.round(state.majorGridSpacing || 16), 2, 512),
@@ -7753,9 +8460,6 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     }
     if (Number.isFinite(payload.brushSize)) {
       state.brushSize = clamp(Math.round(payload.brushSize), 1, 32);
-    }
-    if (Number.isFinite(payload.brushOpacity)) {
-      state.brushOpacity = clamp(payload.brushOpacity, 0, 1);
     }
     if (typeof payload.showGrid === 'boolean') {
       state.showGrid = payload.showGrid;
@@ -8016,6 +8720,53 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       clearTimeout(handle);
       handle = setTimeout(() => fn(...args), wait);
     };
+  }
+
+  function isInputControlElement(node) {
+    if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
+    if (node.matches('input, textarea, select')) return true;
+    if (node instanceof Element && node.hasAttribute('contenteditable') && node.getAttribute('contenteditable') !== 'false') {
+      return true;
+    }
+    return false;
+  }
+
+  function isLabelForElement(label, control) {
+    if (!label || !control || label.nodeType !== Node.ELEMENT_NODE || control.nodeType !== Node.ELEMENT_NODE) {
+      return false;
+    }
+    if (label.tagName !== 'LABEL') {
+      return false;
+    }
+    if (label.contains(control)) {
+      return true;
+    }
+    const htmlFor = label.getAttribute('for');
+    return Boolean(htmlFor && control.id && htmlFor === control.id);
+  }
+
+  function setupGlobalFocusDismiss() {
+    document.addEventListener(
+      'pointerdown',
+      (event) => {
+        const active = document.activeElement;
+        if (!isInputControlElement(active)) {
+          return;
+        }
+        const path = typeof event.composedPath === 'function' ? event.composedPath() : [event.target];
+        const shouldRetain = path.some((node) => {
+          if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
+          return isInputControlElement(node) || isLabelForElement(node, active);
+        });
+        if (shouldRetain) {
+          return;
+        }
+        if (typeof active.blur === 'function') {
+          active.blur();
+        }
+      },
+      true
+    );
   }
 
   init();
