@@ -23,6 +23,29 @@
   <body>
     <div class="app" id="appRoot">
       <div class="app-banner" id="appBanner" aria-label="バナー広告スペース"></div>
+      <div class="mobile-topbar" id="mobileTopBar" hidden>
+        <div class="mobile-topbar__inner">
+          <div class="mobile-tabs" role="tablist" aria-label="モバイル操作パネル">
+            <button type="button" class="mobile-tab is-active" id="mobileTabTools" data-mobile-tab="tools" role="tab" aria-controls="mobilePanelTools" aria-selected="true" aria-label="ツール">
+              <span class="tab-icon-container" id="mobileToolTabIcon"></span>
+              <span class="sr-only">ツール</span>
+            </button>
+            <button type="button" class="mobile-tab" id="mobileTabColor" data-mobile-tab="color" role="tab" aria-controls="mobilePanelColor" aria-selected="false" tabindex="-1" aria-label="カラー">
+              <span class="tab-swatch pixel-frame" id="mobileColorTabSwatch"></span>
+              <span class="sr-only">カラー</span>
+            </button>
+            <button type="button" class="mobile-tab" id="mobileTabFrames" data-mobile-tab="frames" role="tab" aria-controls="mobilePanelFrames" aria-selected="false" tabindex="-1" aria-label="フレームとレイヤー">
+              <img src="assets/icons/menu-frame.png" alt="" class="tab-icon" />
+              <span class="sr-only">フレームとレイヤー</span>
+            </button>
+            <button type="button" class="mobile-tab" id="mobileTabSettings" data-mobile-tab="settings" role="tab" aria-controls="mobilePanelSettings" aria-selected="false" tabindex="-1" aria-label="設定">
+              <img src="assets/icons/menu-settings.svg" alt="" class="tab-icon" />
+              <span class="sr-only">設定</span>
+            </button>
+          </div>
+          <div class="mobile-shortcuts" id="mobileShortcutsMount" aria-label="モバイルショートカット"></div>
+        </div>
+      </div>
       <div class="layout" id="appLayout">
         <aside class="rail rail--left" id="leftRail" data-collapsed="false" aria-label="ツールとカラー設定">
           <div class="rail-tabs" id="leftRailTabs" role="tablist" aria-label="左パネル切替">
@@ -45,12 +68,15 @@
               <canvas id="selectionCanvas" width="32" height="32" aria-hidden="true"></canvas>
             </div>
             <div class="canvas-controls">
-              <button type="button" class="chip" id="undoAction" aria-label="元に戻す" disabled>↺</button>
-              <button type="button" class="chip" id="redoAction" aria-label="やり直す" disabled>↻</button>
-              <div class="zoom-control" role="group" aria-label="ズーム">
-                <button type="button" class="chip" id="zoomOut">−</button>
-                <span id="zoomLevel">100%</span>
-                <button type="button" class="chip" id="zoomIn">＋</button>
+              <button type="button" class="chip" id="undoAction" aria-label="元に戻す" disabled></button>
+              <button type="button" class="chip" id="redoAction" aria-label="やり直す" disabled></button>
+              <div class="canvas-control-buttons" id="canvasControlButtons" role="group" aria-label="ズーム">
+                <button type="button" class="chip" id="canvasControlPrimary" data-action="zoomOut" aria-label="ズームアウト">
+                  <img src="assets/icons/zoomdown.svg" alt="ズームアウト" width="24" height="24" />
+                </button>
+                <button type="button" class="chip" id="canvasControlSecondary" data-action="zoomIn" aria-label="ズームイン">
+                  <img src="assets/icons/zoomup.svg" alt="ズームイン" width="24" height="24" />
+                </button>
               </div>
             </div>
             <button type="button" class="rail-toggle rail-toggle--left" id="openLeftRail" aria-label="左パネルを表示">⟨</button>
@@ -73,24 +99,6 @@
       </div>
 
       <div class="mobile-drawer" id="mobileDrawer" hidden>
-        <div class="mobile-tabs" role="tablist" aria-label="モバイル操作パネル">
-          <button type="button" class="mobile-tab is-active" id="mobileTabTools" data-mobile-tab="tools" role="tab" aria-controls="mobilePanelTools" aria-selected="true" aria-label="ツール">
-            <span class="tab-icon-container" id="mobileToolTabIcon"></span>
-            <span class="sr-only">ツール</span>
-          </button>
-          <button type="button" class="mobile-tab" id="mobileTabColor" data-mobile-tab="color" role="tab" aria-controls="mobilePanelColor" aria-selected="false" tabindex="-1" aria-label="カラー">
-            <span class="tab-swatch pixel-frame" id="mobileColorTabSwatch"></span>
-            <span class="sr-only">カラー</span>
-          </button>
-          <button type="button" class="mobile-tab" id="mobileTabFrames" data-mobile-tab="frames" role="tab" aria-controls="mobilePanelFrames" aria-selected="false" tabindex="-1" aria-label="フレームとレイヤー">
-            <img src="assets/icons/menu-frame.png" alt="" class="tab-icon" />
-            <span class="sr-only">フレームとレイヤー</span>
-          </button>
-          <button type="button" class="mobile-tab" id="mobileTabSettings" data-mobile-tab="settings" role="tab" aria-controls="mobilePanelSettings" aria-selected="false" tabindex="-1" aria-label="設定">
-            <img src="assets/icons/menu-settings.svg" alt="" class="tab-icon" />
-            <span class="sr-only">設定</span>
-          </button>
-        </div>
         <div class="mobile-panels" id="mobilePanels">
           <div class="mobile-panel is-active" id="mobilePanelTools" role="tabpanel" aria-labelledby="mobileTabTools"></div>
           <div class="mobile-panel" id="mobilePanelColor" role="tabpanel" aria-labelledby="mobileTabColor" hidden></div>
@@ -149,6 +157,10 @@
               <img src="assets/icons/tool-fill.png" alt="塗りつぶし" width="32" height="32" />
               <span>塗りつぶし</span>
             </button>
+            <button type="button" class="tool-button" data-tool="move" data-tool-group="selection" aria-pressed="false">
+              <img src="assets/icons/tool-pan.svg" alt="移動" width="32" height="32" />
+              <span>移動</span>
+            </button>
             <button type="button" class="tool-button" data-tool="selectRect" data-tool-group="selection" aria-pressed="false">
               <img src="assets/icons/tool-select-rect.svg" alt="矩形選択" width="32" height="32" />
               <span>矩形選択</span>
@@ -168,11 +180,6 @@
               <input type="range" id="brushSize" min="1" max="12" value="1" />
               <output id="brushSizeValue" for="brushSize">1px</output>
             </label>
-            <label class="field">
-              <span>不透明度</span>
-              <input type="range" id="brushOpacity" min="0" max="100" value="100" />
-              <output id="brushOpacityValue" for="brushOpacity">100%</output>
-            </label>
           </div>
         </div>
       </section>
@@ -181,14 +188,16 @@
         <div class="panel-section__body">
           <div class="color-mode color-mode--index" id="colorModeIndex">
             <div class="palette-header">
-              <span>パレット</span>
-              <button type="button" class="chip" id="addPaletteColor">＋ 追加</button>
+              <div class="palette-actions">
+                <button type="button" class="chip" id="removePaletteColor" aria-label="選択した色を削除">-</button>
+                <button type="button" class="chip" id="addPaletteColor" aria-label="色を追加">+</button>
+              </div>
             </div>
             <div class="palette-grid" id="paletteList" role="listbox" aria-label="カラーパレット"></div>
             <div class="palette-editor" id="paletteEditor">
               <label class="field field--compact">
                 <span>インデックス</span>
-                <input type="number" id="paletteIndex" min="0" step="1" />
+                <input type="number" id="paletteIndex" min="0" step="1" data-stepper="true" />
               </label>
               <div class="palette-hsv" id="paletteHsvControls">
                 <div class="palette-wheel" id="paletteWheelWrapper">
@@ -249,7 +258,7 @@
               <div class="timeline-fps" role="group" aria-label="フレームレート設定">
                 <label class="field field--tiny timeline-fps-control">
                   <span>fps</span>
-                  <input type="number" id="animationFps" min="1" max="60" value="12" />
+                  <input type="number" id="animationFps" min="1" max="60" value="12" data-stepper="true" />
                 </label>
                 <span class="timeline-fps-hint" id="animationFpsMs">83ms</span>
                 <button type="button" class="chip" id="applyFpsAll" aria-label="全フレームに現在の fps を適用">全体適用</button>
@@ -266,11 +275,11 @@
             <div class="field field--inline">
               <label class="field field--tiny">
                 <span>横</span>
-                <input type="number" id="canvasWidth" min="1" max="256" value="32" />
+                <input type="number" id="canvasWidth" min="1" max="256" value="32" data-stepper="true" />
               </label>
               <label class="field field--tiny">
                 <span>縦</span>
-                <input type="number" id="canvasHeight" min="1" max="256" value="32" />
+                <input type="number" id="canvasHeight" min="1" max="256" value="32" data-stepper="true" />
               </label>
             </div>
           </label>
@@ -279,7 +288,7 @@
             <div class="field field--inline">
               <label class="field field--tiny">
                 <span>倍率</span>
-                <input type="number" id="spriteScaleInput" min="1" step="1" value="1" inputmode="numeric" />
+                <input type="number" id="spriteScaleInput" min="1" step="1" value="1" inputmode="numeric" data-stepper="true" />
               </label>
               <button type="button" class="button" id="applySpriteScale" disabled>倍率を適用</button>
             </div>
@@ -344,16 +353,16 @@
               <div class="scale-control scale-control--wide">
                 <label for="exportScaleSlider">倍率 (×)</label>
                 <input type="range" id="exportScaleSlider" min="1" max="1" step="1" value="1" />
-                <input type="number" id="exportScaleInput" min="1" value="1" inputmode="numeric" />
+                <input type="number" id="exportScaleInput" min="1" value="1" inputmode="numeric" data-stepper="true" />
               </div>
               <div class="scale-control scale-control--pair">
                 <label class="scale-field" for="exportPixelWidth">
                   <span>幅 (PX)</span>
-                  <input type="number" id="exportPixelWidth" min="1" value="32" inputmode="numeric" />
+                  <input type="number" id="exportPixelWidth" min="1" value="32" inputmode="numeric" data-stepper="true" />
                 </label>
                 <label class="scale-field" for="exportPixelHeight">
                   <span>高さ (PX)</span>
-                  <input type="number" id="exportPixelHeight" min="1" value="32" inputmode="numeric" />
+                  <input type="number" id="exportPixelHeight" min="1" value="32" inputmode="numeric" data-stepper="true" />
                 </label>
               </div>
             </div>
@@ -389,11 +398,11 @@
             <span>キャンバスサイズ</span>
             <label class="field field--tiny">
               <span>横</span>
-              <input type="number" id="newProjectWidth" min="1" max="256" required value="32" />
+              <input type="number" id="newProjectWidth" min="1" max="256" required value="32" data-stepper="true" />
             </label>
             <label class="field field--tiny">
               <span>縦</span>
-              <input type="number" id="newProjectHeight" min="1" max="256" required value="32" />
+              <input type="number" id="newProjectHeight" min="1" max="256" required value="32" data-stepper="true" />
             </label>
           </div>
         </div>
