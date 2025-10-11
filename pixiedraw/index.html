@@ -237,11 +237,15 @@
               <div class="timeline-toolbar__group" role="group" aria-label="レイヤー操作">
                 <button type="button" class="pixel-button pixel-frame" id="addLayer" aria-label="レイヤーを追加">＋</button>
                 <button type="button" class="pixel-button pixel-frame" id="removeLayer" aria-label="レイヤーを削除">－</button>
+                <button type="button" class="pixel-button pixel-frame" id="moveLayerUp" aria-label="選択中のレイヤーを上に移動">▼</button>
+                <button type="button" class="pixel-button pixel-frame" id="moveLayerDown" aria-label="選択中のレイヤーを下に移動">▲</button>
                 <span class="timeline-toolbar__label">レイヤー</span>
               </div>
               <div class="timeline-toolbar__group" role="group" aria-label="フレーム操作">
                 <button type="button" class="pixel-button pixel-frame" id="addFrame" aria-label="フレームを追加">＋</button>
                 <button type="button" class="pixel-button pixel-frame" id="removeFrame" aria-label="フレームを削除">－</button>
+                <button type="button" class="pixel-button pixel-frame" id="moveFrameUp" aria-label="選択中のフレームを左に移動">◀</button>
+                <button type="button" class="pixel-button pixel-frame" id="moveFrameDown" aria-label="選択中のフレームを右に移動">▶</button>
                 <span class="timeline-toolbar__label">フレーム</span>
               </div>
             </div>
@@ -389,21 +393,26 @@
           <h2 class="modal__title" id="newProjectTitle">新規プロジェクト</h2>
         </header>
         <div class="modal__body">
-          <label class="field">
+          <label class="field new-project__name-field">
             <span>ファイル名</span>
-            <input type="text" id="newProjectName" required maxlength="120" placeholder="example.pixieedraw" />
-            <p class="help-text">拡張子まで含めた名前を設定できます（例: mycanvas.pixieedraw）。</p>
+            <div class="new-project__name-input">
+              <input type="text" id="newProjectName" required maxlength="109" placeholder="example" />
+              <span class="new-project__name-suffix" aria-hidden="true">.pixieedraw</span>
+            </div>
+            <p class="help-text">ファイル名のみ入力してください。拡張子 .pixieedraw は自動で付きます。</p>
           </label>
-          <div class="field field--inline">
+          <div class="field field--inline new-project__size-fields">
             <span>キャンバスサイズ</span>
-            <label class="field field--tiny">
-              <span>横</span>
-              <input type="number" id="newProjectWidth" min="1" max="256" required value="32" data-stepper="true" />
-            </label>
-            <label class="field field--tiny">
-              <span>縦</span>
-              <input type="number" id="newProjectHeight" min="1" max="256" required value="32" data-stepper="true" />
-            </label>
+            <div class="new-project__size-inputs">
+              <label class="field field--tiny">
+                <span>横</span>
+                <input type="number" id="newProjectWidth" min="1" max="256" required value="32" data-stepper="true" />
+              </label>
+              <label class="field field--tiny">
+                <span>縦</span>
+                <input type="number" id="newProjectHeight" min="1" max="256" required value="32" data-stepper="true" />
+              </label>
+            </div>
           </div>
         </div>
         <footer class="modal__footer">
