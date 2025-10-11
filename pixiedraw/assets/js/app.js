@@ -75,8 +75,12 @@
       timelineMatrix: document.getElementById('timelineMatrix'),
       addLayer: document.getElementById('addLayer'),
       removeLayer: document.getElementById('removeLayer'),
+      moveLayerUp: document.getElementById('moveLayerUp'),
+      moveLayerDown: document.getElementById('moveLayerDown'),
       addFrame: document.getElementById('addFrame'),
       removeFrame: document.getElementById('removeFrame'),
+      moveFrameUp: document.getElementById('moveFrameUp'),
+      moveFrameDown: document.getElementById('moveFrameDown'),
       playAnimation: document.getElementById('playAnimation'),
       stopAnimation: document.getElementById('stopAnimation'),
       rewindAnimation: document.getElementById('rewindAnimation'),
@@ -2468,7 +2472,8 @@
     const dialog = config.dialog;
     if (dialog && typeof dialog.showModal === 'function') {
       if (config.nameInput) {
-        config.nameInput.value = state.documentName || DEFAULT_DOCUMENT_NAME;
+        const currentName = state.documentName || DEFAULT_DOCUMENT_NAME;
+        config.nameInput.value = extractDocumentBaseName(currentName);
       }
       if (config.widthInput) {
         config.widthInput.value = String(state.width);
@@ -2587,13 +2592,17 @@
         return;
       }
     }
-    const name = config?.nameInput?.value ?? state.documentName;
+    const rawName = config?.nameInput?.value ?? state.documentName;
+    const name = normalizeDocumentName(rawName);
     const widthValue = config?.widthInput?.value;
     const heightValue = config?.heightInput?.value;
     const width = Number(widthValue);
     const height = Number(heightValue);
     const created = createNewProject({ name, width, height });
     if (created) {
+      if (config?.nameInput) {
+        config.nameInput.value = extractDocumentBaseName(name);
+      }
       closeNewProjectDialog();
     } else {
       window.alert(`キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`);
@@ -5035,6 +5044,57 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     writePaletteColorFromHsv();
   }
 
+  function moveActiveLayer(offset) {
+    const activeFrame = getActiveFrame();
+    if (!activeFrame) return;
+    const currentIndex = getActiveLayerIndex();
+    if (currentIndex < 0) return;
+    const targetIndex = clamp(currentIndex + offset, 0, activeFrame.layers.length - 1);
+    if (targetIndex === currentIndex) return;
+    beginHistory(offset < 0 ? 'moveLayerUp' : 'moveLayerDown');
+    state.frames.forEach(frame => {
+      if (currentIndex < 0 || currentIndex >= frame.layers.length) return;
+      const [layer] = frame.layers.splice(currentIndex, 1);
+      frame.layers.splice(targetIndex, 0, layer);
+    });
+    const updatedFrame = getActiveFrame();
+    if (updatedFrame && updatedFrame.layers[targetIndex]) {
+      state.activeLayer = updatedFrame.layers[targetIndex].id;
+    }
+    markHistoryDirty();
+    scheduleSessionPersist();
+    renderFrameList();
+    renderLayerList();
+    requestRender();
+    requestOverlayRender();
+    commitHistory();
+  }
+
+  function moveActiveFrame(offset) {
+    if (!Number.isFinite(offset) || offset === 0) return;
+    const currentIndex = state.activeFrame;
+    const frameCount = state.frames.length;
+    if (!Number.isFinite(currentIndex) || currentIndex < 0 || currentIndex >= frameCount || frameCount <= 1) {
+      return;
+    }
+    const targetIndex = clamp(currentIndex + offset, 0, frameCount - 1);
+    if (targetIndex === currentIndex) {
+      return;
+    }
+    beginHistory(offset < 0 ? 'moveFrameLeft' : 'moveFrameRight');
+    const [frame] = state.frames.splice(currentIndex, 1);
+    const destinationIndex = clamp(targetIndex, 0, state.frames.length);
+    state.frames.splice(destinationIndex, 0, frame);
+    state.activeFrame = destinationIndex;
+    markHistoryDirty();
+    scheduleSessionPersist();
+    renderFrameList();
+    renderLayerList();
+    requestRender();
+    requestOverlayRender();
+    commitHistory();
+  }
+
   function setupFramesAndLayers() {
     dom.controls.addLayer?.addEventListener('click', () => {
       const activeFrame = getActiveFrame();
@@ -5081,6 +5141,14 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       commitHistory();
     });
 
+    dom.controls.moveLayerUp?.addEventListener('click', () => {
+      moveActiveLayer(-1);
+    });
+
+    dom.controls.moveLayerDown?.addEventListener('click', () => {
+      moveActiveLayer(1);
+    });
+
     dom.controls.addFrame?.addEventListener('click', () => {
       const baseFrame = getActiveFrame();
       if (!baseFrame) return;
@@ -5112,6 +5180,14 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       requestRender();
       requestOverlayRender();
       commitHistory();
+    });
+
+    dom.controls.moveFrameUp?.addEventListener('click', () => {
+      moveActiveFrame(-1);
+    });
+
+    dom.controls.moveFrameDown?.addEventListener('click', () => {
+      moveActiveFrame(1);
     });
 
     dom.controls.playAnimation?.addEventListener('click', () => {
