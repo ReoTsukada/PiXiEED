@@ -69,20 +69,18 @@
     }
 
     linkTag.innerHTML = `
+      <span class="display__badge display__badge--ad">${item.badge || 'Sponsor'}</span>
       <div class="display__frame">
         <div class="display__screen display__screen--image">
           ${item.image ? `<img src="${item.image}" alt="${item.alt || item.title || 'スポンサー広告'}">` : '<div class="display__screen placeholder ad">Sponsor</div>'}
         </div>
       </div>
-      <p class="display__description">${item.description || ''}</p>
+      <div class="display__body">
+        <h3 class="display__title">${item.title || ''}</h3>
+        <p class="display__description">${item.description || ''}</p>
+      </div>
     `;
 
-    article.innerHTML = `
-      <header class="display__header">
-        <span class="display__badge display__badge--ad">${item.badge || 'Sponsor'}</span>
-        <h3 class="display__title">${item.title || ''}</h3>
-      </header>
-    `;
     article.appendChild(linkTag);
     return article;
   }
