@@ -7,24 +7,60 @@
     const heroAds = Array.isArray(adConfig.hero) ? adConfig.hero.filter(Boolean) : [];
     const showcaseAd = adConfig.showcase || null;
     const footerAds = Array.isArray(adConfig.footer) ? adConfig.footer.filter(Boolean) : [];
+    const yearElement = document.getElementById("year");
+    if (yearElement) {
+      yearElement.textContent = new Date().getFullYear().toString();
+    }
 
-  const yearElement = document.getElementById("year");
-  if (yearElement) {
-    yearElement.textContent = new Date().getFullYear().toString();
-  }
+    const searchInput = document.getElementById('showcaseSearch');
+    const categoryChips = Array.from(document.querySelectorAll('.showcase-chip'));
+    const showcaseContainer = document.querySelector('.display-wall');
+    let showcaseCards = Array.from(document.querySelectorAll('.display-wall .display'));
+    const heroReel = document.querySelector('.hero-reel');
+    const heroTrack = heroReel ? heroReel.querySelector('.hero-reel__track') : null;
+    const contactOverlay = document.getElementById('contactOverlay');
+    const contactOpeners = Array.from(document.querySelectorAll('.js-contact-open'));
+    const contactCloseBtn = contactOverlay ? contactOverlay.querySelector('.js-contact-close') : null;
+    const footerAdGrid = document.querySelector('.ad-grid');
+    const lastUpdatedTargets = Array.from(document.querySelectorAll('[data-last-updated]'));
 
-  const searchInput = document.getElementById('showcaseSearch');
-  const categoryChips = Array.from(document.querySelectorAll('.showcase-chip'));
-  const showcaseContainer = document.querySelector('.display-wall');
-  let showcaseCards = Array.from(document.querySelectorAll('.display-wall .display'));
-  const heroReel = document.querySelector('.hero-reel');
-  const heroTrack = heroReel ? heroReel.querySelector('.hero-reel__track') : null;
-  const contactOverlay = document.getElementById('contactOverlay');
-  const contactOpeners = Array.from(document.querySelectorAll('.js-contact-open'));
-  const contactCloseBtn = contactOverlay ? contactOverlay.querySelector('.js-contact-close') : null;
-  const footerAdGrid = document.querySelector('.ad-grid');
+    if (lastUpdatedTargets.length) {
+      const lastModifiedDate = new Date(document.lastModified);
+      const isValidDate = !Number.isNaN(lastModifiedDate.getTime());
+      if (isValidDate) {
+        let formatted = '';
+        if (typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function') {
+          const formatter = new Intl.DateTimeFormat('ja-JP', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+          formatted = formatter.format(lastModifiedDate);
+        } else {
+          const y = lastModifiedDate.getFullYear();
+          const m = String(lastModifiedDate.getMonth() + 1).padStart(2, '0');
+          const d = String(lastModifiedDate.getDate()).padStart(2, '0');
+          formatted = `${y}年${m}月${d}日`;
+        }
+        const isoDate = lastModifiedDate.toISOString().split('T')[0];
+        lastUpdatedTargets.forEach(target => {
+          const valueElement = target.querySelector('.project-update__value');
+          if (valueElement instanceof HTMLElement) {
+            valueElement.textContent = formatted;
+            if (valueElement.tagName === 'TIME') {
+              valueElement.setAttribute('datetime', isoDate);
+            }
+          } else {
+            target.textContent = formatted;
+          }
+          target.removeAttribute('hidden');
+        });
+      } else {
+        lastUpdatedTargets.forEach(target => target.setAttribute('hidden', ''));
+      }
+    }
 
-  let lastFocusedElement = null;
+    let lastFocusedElement = null;
 
   function createHeroAdCard(item) {
     if (!item || !item.image || !heroTrack) return null;
