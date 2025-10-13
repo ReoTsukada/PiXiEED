@@ -305,6 +305,12 @@
     initialized: false,
     scale: DEFAULT_FLOATING_DRAW_BUTTON_SCALE,
   };
+  const virtualCursorDrawState = {
+    active: false,
+    historyStarted: false,
+    lastPosition: null,
+    tool: null,
+  };
   let drawButtonResizeListenerBound = false;
   const toolIconCache = new Map();
   let sessionStateRestored = false;
@@ -5749,21 +5755,127 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     canvasWheelListenerBound = true;
   }
 
+  function getVirtualCursorCellPosition(cursor = virtualCursor) {
+    if (!cursor) {
+      return null;
+    }
+    const width = Math.max(1, Number(state.width) || 0);
+    const height = Math.max(1, Number(state.height) || 0);
+    if (!Number.isFinite(cursor.x) || !Number.isFinite(cursor.y)) {
+      return null;
+    }
+    const x = clamp(Math.floor(cursor.x), 0, width - 1);
+    const y = clamp(Math.floor(cursor.y), 0, height - 1);
+    return { x, y };
+  }
+
+  function updateVirtualCursorPosition(nextX, nextY, { requestRender = true } = {}) {
+    if (!Number.isFinite(nextX) || !Number.isFinite(nextY)) {
+      return false;
+    }
+    if (virtualCursor && virtualCursor.x === nextX && virtualCursor.y === nextY) {
+      return false;
+    }
+    virtualCursor = { x: nextX, y: nextY };
+    if (state.showVirtualCursor && requestRender) {
+      requestOverlayRender();
+    }
+    handleVirtualCursorPositionChanged(virtualCursor);
+    return true;
+  }
+
   function setVirtualCursor(position) {
     if (!position) {
       return;
     }
     const nextX = Number(position.x);
     const nextY = Number(position.y);
-    if (!Number.isFinite(nextX) || !Number.isFinite(nextY)) {
+    updateVirtualCursorPosition(nextX, nextY);
+  }
+
+  function handleVirtualCursorPositionChanged(next) {
+    if (!virtualCursorDrawState.active) {
       return;
     }
-    if (!virtualCursor || virtualCursor.x !== nextX || virtualCursor.y !== nextY) {
-      virtualCursor = { x: nextX, y: nextY };
-      if (state.showVirtualCursor) {
-        requestOverlayRender();
+    if (!state.showVirtualCursor) {
+      return;
+    }
+    if (!next) {
+      return;
+    }
+    const tool = virtualCursorDrawState.tool;
+    if (!tool || !BRUSH_TOOLS.has(tool)) {
+      return;
+    }
+    const currentCell = getVirtualCursorCellPosition(next);
+    if (!currentCell) {
+      return;
+    }
+    const last = virtualCursorDrawState.lastPosition;
+    if (!last) {
+      applyBrushStroke(currentCell.x, currentCell.y, currentCell.x, currentCell.y);
+      virtualCursorDrawState.lastPosition = { ...currentCell };
+      return;
+    }
+    if (last.x === currentCell.x && last.y === currentCell.y) {
+      return;
+    }
+    applyBrushStroke(last.x, last.y, currentCell.x, currentCell.y);
+    virtualCursorDrawState.lastPosition = { ...currentCell };
+  }
+
+  function startVirtualCursorDrawSession() {
+    if (virtualCursorDrawState.active) {
+      return false;
+    }
+    if (!state.showVirtualCursor || !virtualCursor) {
+      return false;
+    }
+    const activeTool = state.tool;
+    if (!BRUSH_TOOLS.has(activeTool)) {
+      return false;
+    }
+    const layer = getActiveLayer();
+    if (!layer && HISTORY_DRAW_TOOLS.has(activeTool)) {
+      return false;
+    }
+    const cell = getVirtualCursorCellPosition();
+    if (!cell) {
+      return false;
+    }
+    virtualCursorDrawState.active = true;
+    virtualCursorDrawState.tool = activeTool;
+    virtualCursorDrawState.lastPosition = { ...cell };
+    virtualCursorDrawState.historyStarted = false;
+
+    if (HISTORY_DRAW_TOOLS.has(activeTool)) {
+      beginHistory(activeTool);
+      virtualCursorDrawState.historyStarted = true;
+    }
+    applyBrushStroke(cell.x, cell.y, cell.x, cell.y);
+    return true;
+  }
+
+  function finishVirtualCursorDrawSession({ commit = true } = {}) {
+    if (!virtualCursorDrawState.active) {
+      return;
+    }
+    if (virtualCursorDrawState.historyStarted) {
+      if (commit) {
+        commitHistory();
+      } else {
+        rollbackPendingHistory({ reRender: false });
       }
     }
+    virtualCursorDrawState.active = false;
+    virtualCursorDrawState.historyStarted = false;
+    virtualCursorDrawState.lastPosition = null;
+    virtualCursorDrawState.tool = null;
+    requestOverlayRender();
+  }
+
+  function cancelVirtualCursorDrawSession() {
+    finishVirtualCursorDrawSession({ commit: false });
   }
 
   function getClampedPointerPosition(event) {
@@ -5976,8 +6088,8 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       return;
     }
     const position = {
-      x: clamp(Math.round(virtualCursor.x), 0, state.width - 1),
-      y: clamp(Math.round(virtualCursor.y), 0, state.height - 1),
+      x: clamp(Math.floor(virtualCursor.x), 0, state.width - 1),
+      y: clamp(Math.floor(virtualCursor.y), 0, state.height - 1),
     };
     const activeTool = state.tool;
     const layer = getActiveLayer();
@@ -6124,6 +6236,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     window.addEventListener('pointermove', handleFloatingDrawButtonPointerMove);
     window.addEventListener('pointerup', handleFloatingDrawButtonPointerUp);
     window.addEventListener('pointercancel', handleFloatingDrawButtonPointerCancel);
+    startVirtualCursorDrawSession();
   }
 
   function handleFloatingDrawButtonPointerMove(event) {
@@ -6136,6 +6249,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       const distance = Math.hypot(dx, dy);
       if (distance >= DRAW_BUTTON_DRAG_THRESHOLD) {
         floatingDrawButtonState.dragging = true;
+        cancelVirtualCursorDrawSession();
       }
     }
     if (floatingDrawButtonState.dragging) {
@@ -6159,13 +6273,20 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       }
     }
     const wasDragging = floatingDrawButtonState.dragging;
+    const wasDrawing = virtualCursorDrawState.active;
     floatingDrawButtonState.pointerId = null;
     floatingDrawButtonState.dragging = false;
     floatingDrawButtonState.startPointer = null;
     floatingDrawButtonState.startPosition = null;
-    if (!wasDragging) {
-      performVirtualCursorAction();
+    if (wasDragging) {
+      cancelVirtualCursorDrawSession();
+      return;
     }
+    if (wasDrawing) {
+      finishVirtualCursorDrawSession({ commit: true });
+      return;
+    }
+    performVirtualCursorAction();
   }
 
   function handleFloatingDrawButtonPointerCancel(event) {
@@ -6181,6 +6302,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
         // ignore release errors
       }
     }
+    cancelVirtualCursorDrawSession();
     floatingDrawButtonState.pointerId = null;
     floatingDrawButtonState.dragging = false;
     floatingDrawButtonState.startPointer = null;
@@ -6207,6 +6329,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       } catch (error) {
         // ignore release errors
       }
+      cancelVirtualCursorDrawSession();
       floatingDrawButtonState.pointerId = null;
       floatingDrawButtonState.dragging = false;
       floatingDrawButtonState.startPointer = null;
@@ -8660,12 +8783,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     const deltaY = unitY ? dy / unitY : 0;
     const nextX = clamp(base.x + deltaX, 0, state.width - 1);
     const nextY = clamp(base.y + deltaY, 0, state.height - 1);
-    if (virtualCursor.x !== nextX || virtualCursor.y !== nextY) {
-      virtualCursor = { x: nextX, y: nextY };
-      if (state.showVirtualCursor) {
-        requestOverlayRender();
-      }
-    }
+    updateVirtualCursorPosition(nextX, nextY);
   }
 
   function clearVirtualCursorCanvas() {
@@ -8717,8 +8835,8 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
             const drawWidth = sourceWidth * scaleFactor;
             const drawHeight = sourceHeight * scaleFactor;
             const drawX = anchorX;
-        const drawY = anchorY;
-        ctx.virtual.drawImage(image, drawX, drawY - drawHeight, drawWidth, drawHeight);
+            const drawY = anchorY;
+            ctx.virtual.drawImage(image, drawX, drawY - drawHeight, drawWidth, drawHeight);
             ctx.virtual.restore();
             return;
           }
