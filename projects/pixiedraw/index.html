@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PiXiEEDraw | PiXiEED ツール紹介</title>
-  <meta name="description" content="PiXiEEDが開発するブラウザ向けドット絵エディター『PiXiEEDraw』の紹介ページ。特徴や公開予定、開発ロードマップをまとめています。">
+  <meta name="description" content="PiXiEEDが開発するブラウザ向けドット絵エディター『PiXiEEDraw』の紹介ページ。特徴や公開予定、アップデート情報をまとめています。">
   <meta property="og:title" content="PiXiEEDraw | PiXiEED ツール紹介">
   <meta property="og:description" content="ブラウザ完結のドット絵エディター PiXiEEDraw の開発状況と特徴をまとめた公式紹介ページ。">
   <meta property="og:type" content="website">
@@ -63,8 +63,12 @@
         </p>
         <div class="hero-cta">
           <a class="cta-primary" href="../../pixiedraw/index.html">ツールを開く（早期アクセス）</a>
+          <button type="button" class="cta-secondary" data-open-chrome>Chromeで開く</button>
           <a class="cta-secondary" href="../../games.html#tools-section">ツール一覧に戻る</a>
         </div>
+        <p class="cta-helper" id="chromeHelper" hidden>
+          Chromeがインストール済みの端末でお試しください。起動できない場合は既定ブラウザの設定をご確認ください。
+        </p>
       </div>
       <div class="hero-visual" aria-hidden="true">
         <div class="project-visual">
@@ -115,14 +119,6 @@
             <dd>マウス・ペンタブレット・マルチタッチ</dd>
           </dl>
         </div>
-        <div class="project-note">
-          <strong>ロードマップ</strong>
-          <p>プレビュー版では 16×16 / 32×32 のキャンバス編集と PNG 出力、履歴とグリッド表示のON/OFF切り替えに対応予定です。レイヤー合成やクラウドバックアップは段階的に追加し、完成後は PiXiEED の他ツールと共通ログインで連携します。</p>
-          <div class="project-actions">
-            <a class="cta-primary" href="../../pixiedraw/index.html">プレビューを試す</a>
-            <a class="cta-secondary" href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">進捗をフォロー</a>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -169,5 +165,54 @@
   </div>
 
   <script src="../../scripts.js"></script>
+  <script>
+  (function () {
+    const chromeTrigger = document.querySelector('[data-open-chrome]');
+    if (!chromeTrigger) {
+      return;
+    }
+    const helper = document.getElementById('chromeHelper');
+    const defaultMessage = helper ? helper.textContent.trim() : '';
+
+    function showMessage(text) {
+      if (!helper) return;
+      if (text) {
+        helper.textContent = text;
+      } else {
+        helper.textContent = defaultMessage;
+      }
+      helper.hidden = false;
+    }
+
+    chromeTrigger.addEventListener('click', () => {
+      const targetUrl = new URL('../../pixiedraw/index.html', window.location.href).href;
+      const ua = navigator.userAgent || '';
+      const isChrome = /\bChrome\//.test(ua) && !/\bEdg\//.test(ua) && !/\bOPR\//.test(ua) && !/\bBrave\//.test(ua);
+
+      if (isChrome) {
+        showMessage('現在表示しているブラウザはChromeです。PiXiEEDrawのページをそのまま開き直します。');
+        window.location.href = targetUrl;
+        return;
+      }
+
+      showMessage();
+      const isMobile = /iP(ad|hone|od)/.test(ua) || /Android/.test(ua);
+      const schemeUrl = isMobile
+        ? `googlechrome://navigate?url=${encodeURIComponent(targetUrl)}`
+        : `googlechrome://${targetUrl.replace(/^https?:\/\//, '')}`;
+
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = schemeUrl;
+      document.body.appendChild(iframe);
+
+      window.setTimeout(() => {
+        if (iframe.parentNode) {
+          iframe.parentNode.removeChild(iframe);
+        }
+      }, 1500);
+    });
+  })();
+  </script>
 </body>
 </html>
