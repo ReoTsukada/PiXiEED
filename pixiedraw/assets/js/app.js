@@ -39,8 +39,12 @@
       drawing: /** @type {HTMLCanvasElement} */ (document.getElementById('drawingCanvas')),
       overlay: /** @type {HTMLCanvasElement} */ (document.getElementById('overlayCanvas')),
       selection: /** @type {HTMLCanvasElement} */ (document.getElementById('selectionCanvas')),
+      virtualCursor: /** @type {HTMLCanvasElement} */ (document.getElementById('virtualCursorCanvas')),
     },
+    canvasViewport: document.getElementById('canvasViewport'),
     canvasControls: document.querySelector('.canvas-controls'),
+    floatingDrawButton: document.getElementById('floatingDrawButton'),
+    zoomIndicator: document.getElementById('zoomIndicator'),
     toggles: {
       left: document.getElementById('openLeftRail'),
       right: document.getElementById('openRightRail'),
@@ -92,6 +96,9 @@
       canvasHeight: document.getElementById('canvasHeight'),
       toggleChecker: document.getElementById('toggleChecker'),
       togglePixelPreview: document.getElementById('togglePixelPreview'),
+      toggleVirtualCursor: document.getElementById('toggleVirtualCursor'),
+      virtualCursorButtonScale: document.getElementById('virtualCursorButtonScale'),
+      virtualCursorButtonScaleValue: document.getElementById('virtualCursorButtonScaleValue'),
       openDocument: document.getElementById('openDocument'),
       exportProject: document.getElementById('exportProject'),
       clearCanvas: document.getElementById('clearCanvas'),
@@ -150,9 +157,6 @@
   }, {});
 
   const ZOOM_STEPS = Object.freeze([
-    0.3333333333333,
-    0.5,
-    0.75,
     1,
     1.25,
     1.5,
@@ -178,6 +182,7 @@
   ]);
   const MIN_ZOOM_SCALE = ZOOM_STEPS[0];
   const ZOOM_EPSILON = 1e-6;
+  const ZOOM_INDICATOR_TIMEOUT = 1800;
 
   const PROJECT_FILE_EXTENSION = '.pixieedraw';
   const DEFAULT_DOCUMENT_BASENAME = '新規ドキュメント';
@@ -203,6 +208,7 @@
     drawing: dom.canvases.drawing?.getContext('2d', { willReadFrequently: true }) || null,
     overlay: dom.canvases.overlay?.getContext('2d', { willReadFrequently: true }) || null,
     selection: dom.canvases.selection?.getContext('2d', { willReadFrequently: true }) || null,
+    virtual: dom.canvases.virtualCursor?.getContext('2d') || null,
   };
 
   if (ctx.drawing) {
@@ -213,6 +219,9 @@
   }
   if (ctx.selection) {
     ctx.selection.imageSmoothingEnabled = false;
+  }
+  if (ctx.virtual) {
+    ctx.virtual.imageSmoothingEnabled = true;
   }
 
   const SESSION_STORAGE_KEY = 'pixieedraw:sessionState';
@@ -275,7 +284,29 @@
     ellipse: '◯',
     ellipseFill: '⬤',
   };
+  const FLOATING_DRAW_BUTTON_SCALE_VALUES = [1, 1.5, 2];
+  const DEFAULT_FLOATING_DRAW_BUTTON_SCALE = 2;
   const state = createInitialState();
+  let virtualCursor = createInitialVirtualCursor(state);
+  const virtualCursorControl = {
+    pointerId: null,
+    pointerType: null,
+    captureElement: null,
+    startClient: null,
+    baseCursor: null,
+  };
+  let mouseInsideViewport = false;
+  const floatingDrawButtonState = {
+    position: { x: 16, y: 16 },
+    pointerId: null,
+    dragging: false,
+    startPointer: null,
+    startPosition: null,
+    initialized: false,
+    scale: DEFAULT_FLOATING_DRAW_BUTTON_SCALE,
+  };
+  let drawButtonResizeListenerBound = false;
+  const toolIconCache = new Map();
   let sessionStateRestored = false;
   restoreSessionState();
   state.colorMode = 'index';
@@ -285,6 +316,7 @@
     window.addEventListener('beforeunload', persistSessionState);
   }
   let hoverPixel = null;
+  let zoomIndicatorTimeoutId = null;
   let overlayNeedsRedraw = true;
   const SELECTION_DASH_SPEED = 40;
   let selectionDashScreenOffset = 0;
@@ -296,6 +328,7 @@
   const HISTORY_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', 'fill']);
   const MEMORY_MONITOR_INTERVAL = 2000;
   const MEMORY_WARNING_DEFAULT = 250 * 1024 * 1024;
+  const DRAW_BUTTON_DRAG_THRESHOLD = 6;
   const TIMELINE_CELL_SIZE = 32;
   const TIMELINE_CELL_VARIANTS = {
     corner: { fill: 'rgba(16, 22, 32, 0.94)', border: 'rgba(210, 220, 240, 0.45)' },
@@ -378,6 +411,8 @@
       brushSize: 1,
       showGrid: true,
       showPixelGuides: true,
+      showVirtualCursor: false,
+      virtualCursorButtonScale: DEFAULT_FLOATING_DRAW_BUTTON_SCALE,
       showMajorGrid: true,
       gridScreenStep: 8,
       majorGridSpacing: 16,
@@ -400,6 +435,14 @@
       playback: { isPlaying: false, lastFrame: 0 },
       documentName: normalizeDocumentName(requestedName),
     };
+  }
+
+  function createInitialVirtualCursor(source = state) {
+    const width = Math.max(1, Math.floor(Number(source?.width) || DEFAULT_CANVAS_SIZE));
+    const height = Math.max(1, Math.floor(Number(source?.height) || DEFAULT_CANVAS_SIZE));
+    const centerX = Math.min(width - 1, Math.max(0, Math.floor(width / 2)));
+    const centerY = Math.min(height - 1, Math.max(0, Math.floor(height / 2)));
+    return { x: centerX, y: centerY };
   }
 
   function createLayer(name, width, height) {
@@ -507,6 +550,7 @@
       majorGridSpacing: state.majorGridSpacing,
       backgroundMode: state.backgroundMode,
       showPixelGuides: state.showPixelGuides,
+      showVirtualCursor: state.showVirtualCursor,
       showChecker: state.showChecker,
       documentName: state.documentName,
     };
@@ -736,6 +780,7 @@
       majorGridSpacing: snapshot.majorGridSpacing,
       backgroundMode: snapshot.backgroundMode,
       showPixelGuides: snapshot.showPixelGuides,
+      showVirtualCursor: snapshot.showVirtualCursor,
       showChecker: snapshot.showChecker,
       documentName: snapshot.documentName,
     };
@@ -807,6 +852,7 @@
       majorGridSpacing: snapshot.majorGridSpacing,
       backgroundMode: snapshot.backgroundMode,
       showPixelGuides: snapshot.showPixelGuides,
+      showVirtualCursor: snapshot.showVirtualCursor,
       showChecker: snapshot.showChecker,
       documentName: snapshot.documentName,
     };
@@ -1099,6 +1145,7 @@
       state.activeRightTab = snapshot.activeRightTab ?? state.activeRightTab ?? 'frames';
     }
     state.showPixelGuides = snapshot.showPixelGuides;
+    state.showVirtualCursor = Boolean(snapshot.showVirtualCursor);
     state.showChecker = snapshot.showChecker;
     if (Object.prototype.hasOwnProperty.call(snapshot, 'playback')) {
       state.playback = { ...snapshot.playback };
@@ -1112,6 +1159,14 @@
     pointerState.startClient = null;
     pointerState.panOrigin = { x: 0, y: 0 };
     hoverPixel = null;
+    if (state.showVirtualCursor && !virtualCursor) {
+      virtualCursor = createInitialVirtualCursor();
+    }
+    if (!state.showVirtualCursor) {
+      releaseVirtualCursorPointer();
+    }
+    updateFloatingDrawButtonEnabledState();
+    refreshViewportCursorStyle();
 
     resizeCanvases();
     renderFrameList();
@@ -1940,6 +1995,10 @@
     if (dom.controls.togglePixelPreview) {
       dom.controls.togglePixelPreview.checked = state.showPixelGuides;
     }
+    if (dom.controls.toggleVirtualCursor) {
+      dom.controls.toggleVirtualCursor.checked = state.showVirtualCursor;
+    }
+    updateFloatingDrawButtonScaleControl();
     if (dom.controls.zoomSlider) {
       dom.controls.zoomSlider.value = String(getZoomStepIndex(state.scale));
     }
@@ -2868,6 +2927,7 @@
       backgroundMode: snapshot.backgroundMode,
       documentName: normalizeDocumentName(snapshot.documentName),
       showPixelGuides: snapshot.showPixelGuides,
+      showVirtualCursor: snapshot.showVirtualCursor,
       showChecker: snapshot.showChecker,
     };
   }
@@ -2995,6 +3055,7 @@
       activeLeftTab,
       activeRightTab,
       showPixelGuides: Boolean(payload.showPixelGuides ?? state.showPixelGuides),
+      showVirtualCursor: Boolean(payload.showVirtualCursor ?? state.showVirtualCursor),
       showChecker: Boolean(payload.showChecker ?? state.showChecker),
       playback: typeof payload.playback === 'object' && payload.playback
         ? {
@@ -4132,6 +4193,9 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     updateRailToggleVisibility();
     updateToolVisibility();
     applyViewportTransform();
+    clampFloatingDrawButtonPosition();
+    resizeVirtualCursorCanvas();
+    requestOverlayRender();
   }
 
   function updateRailToggleVisibility() {
@@ -4241,6 +4305,34 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       requestOverlayRender();
       scheduleSessionPersist();
     });
+
+    dom.controls.toggleVirtualCursor?.addEventListener('change', event => {
+      state.showVirtualCursor = Boolean(event.target.checked);
+      if (state.showVirtualCursor && !virtualCursor) {
+        virtualCursor = createInitialVirtualCursor();
+      }
+      if (!state.showVirtualCursor) {
+        releaseVirtualCursorPointer();
+      }
+      requestOverlayRender();
+      scheduleSessionPersist();
+      updateFloatingDrawButtonEnabledState();
+      refreshViewportCursorStyle();
+    });
+
+    if (dom.controls.virtualCursorButtonScale instanceof HTMLInputElement) {
+      const slider = dom.controls.virtualCursorButtonScale;
+      slider.min = String(FLOATING_DRAW_BUTTON_SCALE_VALUES[0]);
+      slider.max = String(FLOATING_DRAW_BUTTON_SCALE_VALUES[FLOATING_DRAW_BUTTON_SCALE_VALUES.length - 1]);
+      slider.step = '0.5';
+      slider.addEventListener('input', event => {
+        setVirtualCursorButtonScale(event.target.value, { persist: false, updateControl: false });
+        updateFloatingDrawButtonScaleControl();
+      });
+      slider.addEventListener('change', event => {
+        setVirtualCursorButtonScale(event.target.value);
+      });
+    }
 
     dom.controls.openDocument?.addEventListener('click', () => {
       openDocumentDialog();
@@ -4545,6 +4637,15 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     window.addEventListener('pointercancel', handlePointerCancel);
     dom.canvases.drawing.addEventListener('pointermove', event => {
       if (pointerState.active) return;
+      const controllingTouch = state.showVirtualCursor
+        && event.pointerType === 'touch'
+        && virtualCursorControl.pointerId === event.pointerId;
+      if (controllingTouch) {
+        event.preventDefault();
+        updateVirtualCursorFromControlDelta(event);
+        return;
+      }
+      updateVirtualCursorFromEvent(event);
       const awaitingLineEnd = curveBuilder && curveBuilder.stage === 'line' && curveBuilder.awaitingEndPoint && curveBuilder.start;
       const position = getPointerPosition(event);
 
@@ -5624,6 +5725,16 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
   function setupCanvas() {
     resizeCanvases();
     ensureCanvasWheelListener();
+    setupFloatingDrawButton();
+    if (dom.canvasViewport) {
+      dom.canvasViewport.addEventListener('pointerenter', handleViewportPointerEnter);
+      dom.canvasViewport.addEventListener('pointerleave', handleViewportPointerLeave);
+      dom.canvasViewport.addEventListener('pointerdown', handleViewportPointerDown, { passive: false });
+      dom.canvasViewport.addEventListener('pointermove', handleViewportPointerMove, { passive: false });
+      dom.canvasViewport.addEventListener('pointerup', handleViewportPointerUp, { passive: false });
+      dom.canvasViewport.addEventListener('pointercancel', handleViewportPointerCancel, { passive: false });
+    }
+    refreshViewportCursorStyle();
   }
 
   function ensureCanvasWheelListener() {
@@ -5636,6 +5747,542 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     }
     stack.addEventListener('wheel', handleCanvasWheel, { passive: false });
     canvasWheelListenerBound = true;
+  }
+
+  function setVirtualCursor(position) {
+    if (!position) {
+      return;
+    }
+    const nextX = Number(position.x);
+    const nextY = Number(position.y);
+    if (!Number.isFinite(nextX) || !Number.isFinite(nextY)) {
+      return;
+    }
+    if (!virtualCursor || virtualCursor.x !== nextX || virtualCursor.y !== nextY) {
+      virtualCursor = { x: nextX, y: nextY };
+      if (state.showVirtualCursor) {
+        requestOverlayRender();
+      }
+    }
+  }
+
+  function getClampedPointerPosition(event) {
+    const drawing = dom.canvases.drawing;
+    if (!drawing) {
+      return null;
+    }
+    const rect = drawing.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      return null;
+    }
+    const relativeX = (event.clientX - rect.left) / rect.width;
+    const relativeY = (event.clientY - rect.top) / rect.height;
+    if (!Number.isFinite(relativeX) || !Number.isFinite(relativeY)) {
+      return null;
+    }
+    const x = relativeX * state.width;
+    const y = relativeY * state.height;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return null;
+    }
+    return { x, y };
+  }
+
+  function updateVirtualCursorFromEvent(event) {
+    const position = getClampedPointerPosition(event);
+    if (position) {
+      setVirtualCursor(position);
+    }
+  }
+
+  function normalizeFloatingDrawButtonScale(value) {
+    const numeric = Number.parseFloat(value);
+    if (!Number.isFinite(numeric)) {
+      return DEFAULT_FLOATING_DRAW_BUTTON_SCALE;
+    }
+    let closest = FLOATING_DRAW_BUTTON_SCALE_VALUES[0] || DEFAULT_FLOATING_DRAW_BUTTON_SCALE;
+    let minDiff = Number.POSITIVE_INFINITY;
+    for (const candidate of FLOATING_DRAW_BUTTON_SCALE_VALUES) {
+      const diff = Math.abs(candidate - numeric);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closest = candidate;
+      }
+    }
+    return closest;
+  }
+
+  function formatFloatingDrawButtonScale(value) {
+    const normalized = normalizeFloatingDrawButtonScale(value);
+    return Number.isInteger(normalized) ? String(normalized) : normalized.toFixed(1);
+  }
+
+  function updateFloatingDrawButtonScaleControl() {
+    const slider = dom.controls.virtualCursorButtonScale;
+    const output = dom.controls.virtualCursorButtonScaleValue;
+    const scale = state.virtualCursorButtonScale || DEFAULT_FLOATING_DRAW_BUTTON_SCALE;
+    if (slider) {
+      slider.value = String(scale);
+    }
+    if (output) {
+      output.textContent = `${formatFloatingDrawButtonScale(scale)}×`;
+    }
+  }
+
+  function setVirtualCursorButtonScale(nextScale, options = {}) {
+    const {
+      persist = true,
+      clampPosition = true,
+      updateControl = true,
+    } = options || {};
+    const normalized = normalizeFloatingDrawButtonScale(nextScale);
+    state.virtualCursorButtonScale = normalized;
+    floatingDrawButtonState.scale = normalized;
+    const button = dom.floatingDrawButton;
+    if (button) {
+      button.style.setProperty('--floating-draw-button-scale', String(normalized));
+    }
+    if (
+      clampPosition &&
+      button &&
+      floatingDrawButtonState.initialized
+    ) {
+      setFloatingDrawButtonPosition(
+        floatingDrawButtonState.position.x,
+        floatingDrawButtonState.position.y,
+      );
+    }
+    if (updateControl) {
+      updateFloatingDrawButtonScaleControl();
+    }
+    if (persist) {
+      scheduleSessionPersist();
+    }
+  }
+
+  function refreshFloatingDrawButtonScale(button) {
+    if (!button || typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') {
+      floatingDrawButtonState.scale = state.virtualCursorButtonScale || DEFAULT_FLOATING_DRAW_BUTTON_SCALE;
+      return floatingDrawButtonState.scale;
+    }
+    const computed = window.getComputedStyle(button);
+    const raw = computed ? computed.getPropertyValue('--floating-draw-button-scale') : '';
+    const parsed = raw ? Number.parseFloat(raw) : Number.NaN;
+    const scale = Number.isFinite(parsed) && parsed > 0
+      ? normalizeFloatingDrawButtonScale(parsed)
+      : (state.virtualCursorButtonScale || DEFAULT_FLOATING_DRAW_BUTTON_SCALE);
+    if (!Number.isFinite(parsed) || parsed <= 0 || Math.abs(scale - parsed) > Number.EPSILON) {
+      button.style.setProperty('--floating-draw-button-scale', String(scale));
+    }
+    floatingDrawButtonState.scale = scale;
+    state.virtualCursorButtonScale = scale;
+    updateFloatingDrawButtonScaleControl();
+    return scale;
+  }
+
+  function setFloatingDrawButtonPosition(x, y) {
+    const button = dom.floatingDrawButton;
+    if (!button) {
+      return;
+    }
+    const baseX = floatingDrawButtonState.position.x || 0;
+    const baseY = floatingDrawButtonState.position.y || 0;
+    const rawX = Number.isFinite(x) ? Math.round(x) : baseX;
+    const rawY = Number.isFinite(y) ? Math.round(y) : baseY;
+    let scale = floatingDrawButtonState.scale;
+    if (!Number.isFinite(scale) || scale <= 0) {
+      scale = refreshFloatingDrawButtonScale(button);
+    }
+    const margin = 8;
+    const buttonWidth = button.offsetWidth || button.clientWidth || 0;
+    const buttonHeight = button.offsetHeight || button.clientHeight || 0;
+    const viewportWidth = window.innerWidth || document.documentElement?.clientWidth || 0;
+    const viewportHeight = window.innerHeight || document.documentElement?.clientHeight || 0;
+    const scaledWidth = Math.max(0, buttonWidth * scale);
+    const scaledHeight = Math.max(0, buttonHeight * scale);
+    const maxX = Math.max(margin, (viewportWidth || 0) - scaledWidth - margin);
+    const maxY = Math.max(margin, (viewportHeight || 0) - scaledHeight - margin);
+    const clampedX = clamp(rawX, margin, maxX);
+    const clampedY = clamp(rawY, margin, maxY);
+    floatingDrawButtonState.position.x = clampedX;
+    floatingDrawButtonState.position.y = clampedY;
+    button.style.setProperty('--floating-draw-button-x', `${clampedX}px`);
+    button.style.setProperty('--floating-draw-button-y', `${clampedY}px`);
+    floatingDrawButtonState.initialized = true;
+  }
+
+  function clampFloatingDrawButtonPosition() {
+    const button = dom.floatingDrawButton;
+    if (!button || !floatingDrawButtonState.initialized) {
+      return;
+    }
+    setFloatingDrawButtonPosition(
+      floatingDrawButtonState.position.x,
+      floatingDrawButtonState.position.y,
+    );
+  }
+
+  function handleFloatingDrawButtonResize() {
+    resizeVirtualCursorCanvas();
+    clampFloatingDrawButtonPosition();
+    requestOverlayRender();
+  }
+
+  function getToolIconEntry(tool) {
+    if (!tool || !toolButtons.length) {
+      return null;
+    }
+    const button = toolButtons.find(btn => btn.dataset.tool === tool);
+    if (!button) {
+      return null;
+    }
+    const img = button.querySelector('img');
+    if (!(img instanceof HTMLImageElement)) {
+      return null;
+    }
+    const src = img.currentSrc || img.src;
+    if (!src) {
+      return null;
+    }
+    let entry = toolIconCache.get(src);
+    if (!entry) {
+      const image = new Image();
+      entry = {
+        image,
+        ready: false,
+        error: false,
+      };
+      image.addEventListener('load', () => {
+        entry.ready = true;
+        requestOverlayRender();
+      });
+      image.addEventListener('error', () => {
+        entry.error = true;
+      });
+      image.src = src;
+      toolIconCache.set(src, entry);
+    }
+    if (entry.error) {
+      return null;
+    }
+    if (!entry.ready) {
+      return null;
+    }
+    return entry;
+  }
+
+  function performVirtualCursorAction() {
+    if (!state.showVirtualCursor || !virtualCursor) {
+      return;
+    }
+    const position = {
+      x: clamp(Math.round(virtualCursor.x), 0, state.width - 1),
+      y: clamp(Math.round(virtualCursor.y), 0, state.height - 1),
+    };
+    const activeTool = state.tool;
+    const layer = getActiveLayer();
+    let startedHistory = false;
+    let actionPerformed = false;
+
+    const beginHistoryIfNeeded = () => {
+      if (!startedHistory && HISTORY_DRAW_TOOLS.has(activeTool)) {
+        beginHistory(activeTool);
+        startedHistory = true;
+      }
+    };
+
+    if (activeTool === 'eyedropper') {
+      sampleColor(position.x, position.y);
+      actionPerformed = true;
+      requestOverlayRender();
+      scheduleSessionPersist();
+      return;
+    }
+
+    if (activeTool === 'selectSame') {
+      createSelectionByColor(position.x, position.y);
+      actionPerformed = true;
+      scheduleSessionPersist();
+      return;
+    }
+
+    if (activeTool === 'selectRect') {
+      createSelectionRect(position, position);
+      actionPerformed = true;
+      scheduleSessionPersist();
+      return;
+    }
+
+    if (activeTool === 'selectLasso') {
+      const points = [
+        { x: position.x, y: position.y },
+        { x: clamp(position.x + 1, 0, state.width - 1), y: position.y },
+        {
+          x: clamp(position.x + 1, 0, state.width - 1),
+          y: clamp(position.y + 1, 0, state.height - 1),
+        },
+        { x: position.x, y: clamp(position.y + 1, 0, state.height - 1) },
+      ];
+      createSelectionLasso(points);
+      actionPerformed = true;
+      scheduleSessionPersist();
+      return;
+    }
+
+    if (activeTool === 'move') {
+      // Move tool requires drag; single tap falls back to selection highlight.
+      if (state.selectionMask) {
+        // keep selection active; nothing else to do
+        actionPerformed = true;
+      }
+      scheduleSessionPersist();
+      return;
+    }
+
+    if (!layer && HISTORY_DRAW_TOOLS.has(activeTool)) {
+      return;
+    }
+
+    beginHistoryIfNeeded();
+
+    switch (activeTool) {
+      case 'pen':
+      case 'eraser':
+        applyBrushStroke(position.x, position.y, position.x, position.y);
+        actionPerformed = true;
+        break;
+      case 'fill':
+        floodFill(position.x, position.y);
+        actionPerformed = true;
+        break;
+      case 'line':
+        drawLine(position, position);
+        actionPerformed = true;
+        break;
+      case 'rect':
+        drawRectangle(position, position, false);
+        actionPerformed = true;
+        break;
+      case 'rectFill':
+        drawRectangle(position, position, true);
+        actionPerformed = true;
+        break;
+      case 'ellipse':
+        drawEllipse(position, position, false);
+        actionPerformed = true;
+        break;
+      case 'ellipseFill':
+        drawEllipse(position, position, true);
+        actionPerformed = true;
+        break;
+      case 'curve':
+        applyBrushStroke(position.x, position.y, position.x, position.y);
+        actionPerformed = true;
+        break;
+      default:
+        break;
+    }
+
+    if (startedHistory) {
+      if (actionPerformed) {
+        commitHistory();
+      } else {
+        rollbackPendingHistory({ reRender: false });
+      }
+    }
+
+    if (actionPerformed) {
+      requestOverlayRender();
+      scheduleSessionPersist();
+    }
+  }
+
+  function teardownFloatingDrawButtonPointerHandlers() {
+    window.removeEventListener('pointermove', handleFloatingDrawButtonPointerMove);
+    window.removeEventListener('pointerup', handleFloatingDrawButtonPointerUp);
+    window.removeEventListener('pointercancel', handleFloatingDrawButtonPointerCancel);
+  }
+
+  function handleFloatingDrawButtonPointerDown(event) {
+    if (event.button !== undefined && event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+    const button = dom.floatingDrawButton;
+    if (!button) {
+      return;
+    }
+    floatingDrawButtonState.pointerId = event.pointerId ?? -1;
+    floatingDrawButtonState.dragging = false;
+    floatingDrawButtonState.startPointer = { x: event.clientX, y: event.clientY };
+    floatingDrawButtonState.startPosition = { ...floatingDrawButtonState.position };
+    try {
+      button.setPointerCapture?.(event.pointerId);
+    } catch (error) {
+      // ignore capture errors
+    }
+    window.addEventListener('pointermove', handleFloatingDrawButtonPointerMove);
+    window.addEventListener('pointerup', handleFloatingDrawButtonPointerUp);
+    window.addEventListener('pointercancel', handleFloatingDrawButtonPointerCancel);
+  }
+
+  function handleFloatingDrawButtonPointerMove(event) {
+    if (floatingDrawButtonState.pointerId !== event.pointerId) {
+      return;
+    }
+    const dx = event.clientX - (floatingDrawButtonState.startPointer?.x || 0);
+    const dy = event.clientY - (floatingDrawButtonState.startPointer?.y || 0);
+    if (!floatingDrawButtonState.dragging) {
+      const distance = Math.hypot(dx, dy);
+      if (distance >= DRAW_BUTTON_DRAG_THRESHOLD) {
+        floatingDrawButtonState.dragging = true;
+      }
+    }
+    if (floatingDrawButtonState.dragging) {
+      const nextX = (floatingDrawButtonState.startPosition?.x || 0) + dx;
+      const nextY = (floatingDrawButtonState.startPosition?.y || 0) + dy;
+      setFloatingDrawButtonPosition(nextX, nextY);
+    }
+  }
+
+  function handleFloatingDrawButtonPointerUp(event) {
+    if (floatingDrawButtonState.pointerId !== event.pointerId) {
+      return;
+    }
+    teardownFloatingDrawButtonPointerHandlers();
+    const button = dom.floatingDrawButton;
+    if (button) {
+      try {
+        button.releasePointerCapture?.(event.pointerId);
+      } catch (error) {
+        // ignore release errors
+      }
+    }
+    const wasDragging = floatingDrawButtonState.dragging;
+    floatingDrawButtonState.pointerId = null;
+    floatingDrawButtonState.dragging = false;
+    floatingDrawButtonState.startPointer = null;
+    floatingDrawButtonState.startPosition = null;
+    if (!wasDragging) {
+      performVirtualCursorAction();
+    }
+  }
+
+  function handleFloatingDrawButtonPointerCancel(event) {
+    if (floatingDrawButtonState.pointerId !== event.pointerId) {
+      return;
+    }
+    teardownFloatingDrawButtonPointerHandlers();
+    const button = dom.floatingDrawButton;
+    if (button) {
+      try {
+        button.releasePointerCapture?.(event.pointerId);
+      } catch (error) {
+        // ignore release errors
+      }
+    }
+    floatingDrawButtonState.pointerId = null;
+    floatingDrawButtonState.dragging = false;
+    floatingDrawButtonState.startPointer = null;
+    floatingDrawButtonState.startPosition = null;
+  }
+
+  function updateFloatingDrawButtonEnabledState() {
+    const button = dom.floatingDrawButton;
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    const hidden = !state.showVirtualCursor;
+    if (hidden) {
+      button.classList.add('is-disabled');
+      button.classList.add('is-hidden');
+      button.setAttribute('hidden', '');
+      button.setAttribute('aria-hidden', 'true');
+      button.setAttribute('aria-disabled', 'true');
+      teardownFloatingDrawButtonPointerHandlers();
+      try {
+        if (floatingDrawButtonState.pointerId !== null) {
+          button.releasePointerCapture?.(floatingDrawButtonState.pointerId);
+        }
+      } catch (error) {
+        // ignore release errors
+      }
+      floatingDrawButtonState.pointerId = null;
+      floatingDrawButtonState.dragging = false;
+      floatingDrawButtonState.startPointer = null;
+      floatingDrawButtonState.startPosition = null;
+    } else {
+      button.classList.remove('is-hidden');
+      button.classList.remove('is-disabled');
+      button.removeAttribute('hidden');
+      button.setAttribute('aria-hidden', 'false');
+      button.setAttribute('aria-disabled', 'false');
+      clampFloatingDrawButtonPosition();
+    }
+  }
+
+  function setupFloatingDrawButton() {
+    const button = dom.floatingDrawButton;
+    const viewport = dom.canvasViewport;
+    if (!button || !viewport) {
+      return;
+    }
+    setVirtualCursorButtonScale(state.virtualCursorButtonScale, { persist: false, clampPosition: false });
+    const scale = refreshFloatingDrawButtonScale(button);
+    button.addEventListener('pointerdown', handleFloatingDrawButtonPointerDown);
+    button.addEventListener('click', event => event.preventDefault());
+    if (!drawButtonResizeListenerBound) {
+      window.addEventListener('resize', handleFloatingDrawButtonResize);
+      drawButtonResizeListenerBound = true;
+    }
+    if (!floatingDrawButtonState.initialized) {
+      const initialX = 16;
+      const baseHeight = button.offsetHeight || button.clientHeight || 48;
+      const scaledHeight = Math.max(0, baseHeight * (Number.isFinite(scale) && scale > 0 ? scale : 1));
+      const initialY = Math.max(16, (viewport.clientHeight || 0) - scaledHeight - 32);
+      setFloatingDrawButtonPosition(initialX, initialY);
+    } else {
+      clampFloatingDrawButtonPosition();
+    }
+    updateFloatingDrawButtonEnabledState();
+  }
+
+  function resizeVirtualCursorCanvas() {
+    const canvas = dom.canvases.virtualCursor;
+    const viewport = dom.canvasViewport;
+    if (!canvas || !viewport) {
+      return;
+    }
+    if (!ctx.virtual && typeof canvas.getContext === 'function') {
+      ctx.virtual = canvas.getContext('2d');
+      if (ctx.virtual) {
+        ctx.virtual.imageSmoothingEnabled = true;
+      }
+    }
+    const rect = viewport.getBoundingClientRect();
+    const cssWidth = rect.width || viewport.clientWidth || 0;
+    const cssHeight = rect.height || viewport.clientHeight || 0;
+    if (cssWidth <= 0 || cssHeight <= 0) {
+      const needsReset = canvas.width !== 1 || canvas.height !== 1;
+      if (needsReset) {
+        canvas.width = 1;
+        canvas.height = 1;
+        if (ctx.virtual) {
+          ctx.virtual.imageSmoothingEnabled = true;
+        }
+      }
+      return;
+    }
+    const dpr = window.devicePixelRatio || 1;
+    const targetWidth = Math.max(1, Math.round(cssWidth * dpr));
+    const targetHeight = Math.max(1, Math.round(cssHeight * dpr));
+    if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      if (ctx.virtual) {
+        ctx.virtual.imageSmoothingEnabled = true;
+      }
+    }
   }
 
   function resizeCanvases() {
@@ -5665,12 +6312,32 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       dom.canvases.selection.style.width = `${width * scale}px`;
       dom.canvases.selection.style.height = `${height * scale}px`;
     }
+    resizeVirtualCursorCanvas();
     applyViewportTransform();
+    clampFloatingDrawButtonPosition();
     updateSpriteScaleControlLimits();
     syncControlsWithState();
     markCanvasDirty();
     renderCanvas();
     requestOverlayRender();
+  }
+
+  function showZoomIndicator(scale) {
+    const indicator = dom.zoomIndicator;
+    if (!indicator) {
+      return;
+    }
+    indicator.textContent = formatZoomLabel(scale);
+    indicator.classList.add('is-visible');
+    indicator.setAttribute('aria-hidden', 'false');
+    if (zoomIndicatorTimeoutId !== null) {
+      window.clearTimeout(zoomIndicatorTimeoutId);
+    }
+    zoomIndicatorTimeoutId = window.setTimeout(() => {
+      indicator.classList.remove('is-visible');
+      indicator.setAttribute('aria-hidden', 'true');
+      zoomIndicatorTimeoutId = null;
+    }, ZOOM_INDICATOR_TIMEOUT);
   }
 
   function setZoom(nextScale, focus) {
@@ -5710,6 +6377,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     }
 
     applyViewportTransform();
+    showZoomIndicator(targetScale);
     scheduleSessionPersist();
   }
 
@@ -5841,6 +6509,25 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     requestOverlayRender();
   }
 
+  function resetPointerStateForVirtualCursor() {
+    pointerState.active = false;
+    pointerState.pointerId = null;
+    pointerState.tool = null;
+    pointerState.start = null;
+    pointerState.current = null;
+    pointerState.last = null;
+    pointerState.path = [];
+    pointerState.preview = null;
+    pointerState.selectionPreview = null;
+    pointerState.selectionMove = null;
+    pointerState.selectionClearedOnDown = false;
+    pointerState.startClient = null;
+    pointerState.panMode = null;
+    pointerState.touchPanStart = null;
+    pointerState.curveHandle = null;
+    pointerState.panOrigin = { x: state.pan.x, y: state.pan.y };
+  }
+
   function abortActivePointerInteraction({ commitHistory: shouldCommit = true } = {}) {
     if (!pointerState.active) {
       return;
@@ -5955,6 +6642,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
 
     if (isTouch && hasActiveMultiTouch()) {
       event.preventDefault();
+      releaseVirtualCursorPointer();
       if (pointerState.active && pointerState.tool !== 'pan') {
         abortActivePointerInteraction({ commitHistory: false });
         rollbackPendingHistory();
@@ -5989,6 +6677,40 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     if (!position) {
       pointerState.active = false;
       return;
+    }
+
+    if (!(state.showVirtualCursor && event.pointerType === 'touch')) {
+      setVirtualCursor(position);
+    }
+
+    if (state.showVirtualCursor) {
+      if (event.pointerType === 'mouse' || event.pointerType === 'pen') {
+        mouseInsideViewport = true;
+        refreshViewportCursorStyle();
+      }
+      pointerState.active = false;
+      pointerState.pointerId = null;
+      pointerState.tool = null;
+      pointerState.start = null;
+      pointerState.current = null;
+      pointerState.last = null;
+      pointerState.path = [];
+      pointerState.preview = null;
+      pointerState.selectionPreview = null;
+      pointerState.selectionMove = null;
+      pointerState.selectionClearedOnDown = false;
+      if (isTouch) {
+        hoverPixel = null;
+        captureVirtualCursorPointer(event.pointerId, event.pointerType, dom.canvases.drawing, event);
+        requestOverlayRender();
+        return;
+      }
+      if (event.pointerType === 'mouse' || event.pointerType === 'pen') {
+        hoverPixel = null;
+        captureVirtualCursorPointer(event.pointerId, event.pointerType, dom.canvases.drawing, event);
+        requestOverlayRender();
+        return;
+      }
     }
 
     pointerState.selectionClearedOnDown = false;
@@ -6115,6 +6837,7 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
         state.pan.x = Math.round(originX + dx);
         state.pan.y = Math.round(originY + dy);
         applyViewportTransform();
+        updateVirtualCursorFromEvent(event);
         return;
       }
       if (event.pointerId !== pointerState.pointerId) return;
@@ -6125,9 +6848,11 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       state.pan.x = Math.round(originX + dx);
       state.pan.y = Math.round(originY + dy);
       applyViewportTransform();
+      updateVirtualCursorFromEvent(event);
       return;
     }
     if (event.pointerId !== pointerState.pointerId) return;
+    updateVirtualCursorFromEvent(event);
     if (pointerState.tool === 'curve') {
       handleCurvePointerMove(event);
       return;
@@ -6157,6 +6882,25 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     if (event.pointerType === 'touch') {
       removeTouchPointer(event);
     }
+    if (state.showVirtualCursor && virtualCursorControl.pointerId === event.pointerId) {
+      const pointerType = virtualCursorControl.pointerType;
+      releaseVirtualCursorPointer();
+      if (pointerType !== 'touch') {
+        updateVirtualCursorFromEvent(event);
+      }
+      requestOverlayRender();
+      if (pointerType === 'mouse' || pointerType === 'pen') {
+        if (typeof document.elementFromPoint === 'function') {
+          const target = document.elementFromPoint(event.clientX, event.clientY);
+          if (!target || !dom.canvasViewport || !dom.canvasViewport.contains(target)) {
+            mouseInsideViewport = false;
+            refreshViewportCursorStyle();
+          }
+        }
+        performVirtualCursorAction();
+      }
+      return;
+    }
     if (!pointerState.active) return;
     const isPanTool = pointerState.tool === 'pan';
     const isMultiTouchPan = isPanTool && pointerState.panMode === 'multiTouch';
@@ -6179,6 +6923,8 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     if (event.pointerId !== pointerState.pointerId) {
       return;
     }
+
+    updateVirtualCursorFromEvent(event);
 
     if (dom.canvases.drawing) {
       dom.canvases.drawing.releasePointerCapture(event.pointerId);
@@ -6233,6 +6979,15 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
   function handlePointerCancel(event) {
     if (event.pointerType === 'touch') {
       removeTouchPointer(event);
+    }
+    if (state.showVirtualCursor && virtualCursorControl.pointerId === event.pointerId) {
+      releaseVirtualCursorPointer();
+      if (event.pointerType === 'mouse' || event.pointerType === 'pen') {
+        mouseInsideViewport = false;
+        refreshViewportCursorStyle();
+      }
+      requestOverlayRender();
+      return;
     }
     if (!pointerState.active) {
       return;
@@ -7841,9 +8596,293 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     });
   }
 
+  function captureVirtualCursorPointer(pointerId, pointerType, element, event) {
+    if (!Number.isFinite(pointerId)) {
+      return;
+    }
+    if (virtualCursorControl.pointerId !== null && virtualCursorControl.pointerId !== pointerId) {
+      releaseVirtualCursorPointer();
+    }
+    virtualCursorControl.pointerId = pointerId;
+    virtualCursorControl.pointerType = pointerType || null;
+    const captureTarget = element || dom.canvases.drawing || dom.canvasViewport || null;
+    virtualCursorControl.captureElement = captureTarget;
+    virtualCursorControl.startClient = event ? { x: event.clientX, y: event.clientY } : null;
+    virtualCursorControl.baseCursor = virtualCursor ? { x: virtualCursor.x, y: virtualCursor.y } : { x: 0, y: 0 };
+    if (captureTarget && typeof captureTarget.setPointerCapture === 'function') {
+      try {
+        captureTarget.setPointerCapture(pointerId);
+      } catch (error) {
+        // Ignore pointer capture errors; some browsers may not allow it.
+      }
+    }
+    refreshViewportCursorStyle();
+  }
+
+  function releaseVirtualCursorPointer() {
+    if (virtualCursorControl.pointerId === null) {
+      return;
+    }
+    const captureTarget = virtualCursorControl.captureElement;
+    if (captureTarget && typeof captureTarget.releasePointerCapture === 'function') {
+      try {
+        captureTarget.releasePointerCapture(virtualCursorControl.pointerId);
+      } catch (error) {
+        // Ignore capture release errors.
+      }
+    }
+    virtualCursorControl.pointerId = null;
+    virtualCursorControl.pointerType = null;
+    virtualCursorControl.captureElement = null;
+    virtualCursorControl.startClient = null;
+    virtualCursorControl.baseCursor = null;
+    refreshViewportCursorStyle();
+  }
+
+  function updateVirtualCursorFromControlDelta(event) {
+    if (!virtualCursor || !dom.canvases.drawing) {
+      return;
+    }
+    const start = virtualCursorControl.startClient;
+    const base = virtualCursorControl.baseCursor;
+    if (!start || !base) {
+      return;
+    }
+    const rect = dom.canvases.drawing.getBoundingClientRect();
+    if (!rect.width || !rect.height) {
+      return;
+    }
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    const unitX = rect.width / Math.max(1, state.width);
+    const unitY = rect.height / Math.max(1, state.height);
+    const deltaX = unitX ? dx / unitX : 0;
+    const deltaY = unitY ? dy / unitY : 0;
+    const nextX = clamp(base.x + deltaX, 0, state.width - 1);
+    const nextY = clamp(base.y + deltaY, 0, state.height - 1);
+    if (virtualCursor.x !== nextX || virtualCursor.y !== nextY) {
+      virtualCursor = { x: nextX, y: nextY };
+      if (state.showVirtualCursor) {
+        requestOverlayRender();
+      }
+    }
+  }
+
+  function clearVirtualCursorCanvas() {
+    if (!ctx.virtual) {
+      return;
+    }
+    const canvas = ctx.virtual.canvas;
+    if (!canvas) {
+      return;
+    }
+    ctx.virtual.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.virtual.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function drawVirtualCursor(position) {
+    if (!position) {
+      return;
+    }
+    const viewportElement = dom.canvasViewport;
+    const drawingCanvas = dom.canvases.drawing;
+    if (ctx.virtual && viewportElement && drawingCanvas) {
+      const viewportRect = viewportElement.getBoundingClientRect();
+      const drawingRect = drawingCanvas.getBoundingClientRect();
+      const width = Math.max(1, Number(state.width) || 0);
+      const height = Math.max(1, Number(state.height) || 0);
+      if (viewportRect.width > 0 && viewportRect.height > 0 && drawingRect.width > 0 && drawingRect.height > 0) {
+        const unitX = drawingRect.width / width;
+        const unitY = drawingRect.height / height;
+        const clampedX = clamp(position.x, -2, state.width + 2);
+        const clampedY = clamp(position.y, -2, state.height + 2);
+        const offsetX = drawingRect.left - viewportRect.left;
+        const offsetY = drawingRect.top - viewportRect.top;
+        const anchorX = offsetX + clampedX * unitX;
+        const anchorY = offsetY + clampedY * unitY;
+        const dpr = window.devicePixelRatio || 1;
+        const activeTool = getActiveTool();
+        const iconEntry = getToolIconEntry(activeTool);
+
+        ctx.virtual.save();
+        ctx.virtual.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        if (iconEntry && iconEntry.ready) {
+          const image = iconEntry.image;
+          const sourceWidth = image.naturalWidth || image.width;
+          const sourceHeight = image.naturalHeight || image.height;
+          if (sourceWidth > 0 && sourceHeight > 0) {
+            const targetPixelSize = 24;
+            const scaleFactor = targetPixelSize / Math.max(sourceWidth, sourceHeight);
+            const drawWidth = sourceWidth * scaleFactor;
+            const drawHeight = sourceHeight * scaleFactor;
+            const drawX = anchorX;
+        const drawY = anchorY;
+        ctx.virtual.drawImage(image, drawX, drawY - drawHeight, drawWidth, drawHeight);
+            ctx.virtual.restore();
+            return;
+          }
+        }
+
+        const markerSize = 12;
+        ctx.virtual.lineWidth = 2;
+        ctx.virtual.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+        ctx.virtual.fillStyle = 'rgba(255, 255, 255, 0.92)';
+        ctx.virtual.beginPath();
+        ctx.virtual.moveTo(anchorX, anchorY);
+        ctx.virtual.lineTo(anchorX, anchorY - markerSize * 2);
+        ctx.virtual.lineTo(anchorX + markerSize * 1.4, anchorY - markerSize);
+        ctx.virtual.closePath();
+        ctx.virtual.fill();
+        ctx.virtual.stroke();
+        ctx.virtual.restore();
+        return;
+      }
+    }
+
+    if (!ctx.overlay) {
+      return;
+    }
+
+    const clampedX = clamp(position.x, -2, state.width + 2);
+    const clampedY = clamp(position.y, -2, state.height + 2);
+    const viewportScale = Math.max(Number(state.scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE);
+    const activeTool = getActiveTool();
+    const iconEntry = getToolIconEntry(activeTool);
+    if (iconEntry && iconEntry.ready) {
+      const image = iconEntry.image;
+      const sourceWidth = image.naturalWidth || image.width;
+      const sourceHeight = image.naturalHeight || image.height;
+      if (sourceWidth > 0 && sourceHeight > 0) {
+        const targetPixelSize = 24;
+        const scaleFactor = targetPixelSize / Math.max(sourceWidth, sourceHeight);
+        const drawWidth = (sourceWidth * scaleFactor) / viewportScale;
+        const drawHeight = (sourceHeight * scaleFactor) / viewportScale;
+        const drawX = clampedX;
+        const drawY = clampedY;
+        ctx.overlay.drawImage(image, drawX, drawY - drawHeight, drawWidth, drawHeight);
+        return;
+      }
+    }
+
+    ctx.overlay.save();
+    const markerSize = Math.max(1.2 / viewportScale, 0.4);
+    ctx.overlay.lineWidth = Math.max(0.5 / viewportScale, 0.2);
+    ctx.overlay.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+    ctx.overlay.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.overlay.beginPath();
+    ctx.overlay.moveTo(clampedX, clampedY);
+    ctx.overlay.lineTo(clampedX, clampedY - (markerSize * 2));
+    ctx.overlay.lineTo(clampedX + markerSize * 1.5, clampedY - markerSize);
+    ctx.overlay.closePath();
+    ctx.overlay.fill();
+    ctx.overlay.stroke();
+    ctx.overlay.restore();
+  }
+
+  function refreshViewportCursorStyle() {
+    if (!dom.canvasViewport) {
+      return;
+    }
+    const shouldHideCursor = Boolean(state.showVirtualCursor && mouseInsideViewport);
+    dom.canvasViewport.classList.toggle('is-virtual-cursor-active', shouldHideCursor);
+  }
+
+  function handleViewportPointerEnter(event) {
+    if (event.pointerType !== 'mouse' && event.pointerType !== 'pen') {
+      return;
+    }
+    mouseInsideViewport = true;
+    refreshViewportCursorStyle();
+  }
+
+  function handleViewportPointerLeave(event) {
+    if (event.pointerType !== 'mouse' && event.pointerType !== 'pen') {
+      return;
+    }
+    mouseInsideViewport = false;
+    refreshViewportCursorStyle();
+  }
+
+  function isCanvasSurfaceTarget(target) {
+    return target === dom.canvases.drawing || target === dom.canvases.overlay || target === dom.canvases.selection;
+  }
+
+  function isViewportControlTarget(target) {
+    if (!(target instanceof Element)) {
+      return false;
+    }
+    return Boolean(target.closest('.canvas-controls') || target.closest('.floating-draw-button'));
+  }
+
+  function handleViewportPointerDown(event) {
+    if (!state.showVirtualCursor) {
+      return;
+    }
+    if (event.pointerType !== 'touch') {
+      return;
+    }
+    if (virtualCursorControl.pointerId !== null) {
+      return;
+    }
+    const targetElement = event.target instanceof Element ? event.target : null;
+    if (targetElement && (isCanvasSurfaceTarget(targetElement) || isViewportControlTarget(targetElement))) {
+      return;
+    }
+    updateTouchPointer(event);
+    event.preventDefault();
+    hoverPixel = null;
+    resetPointerStateForVirtualCursor();
+    captureVirtualCursorPointer(event.pointerId, event.pointerType, dom.canvasViewport, event);
+  }
+
+  function handleViewportPointerMove(event) {
+    if (!state.showVirtualCursor) {
+      return;
+    }
+    if (virtualCursorControl.pointerId !== event.pointerId) {
+      return;
+    }
+    if (event.pointerType === 'touch') {
+      updateTouchPointer(event);
+    }
+    event.preventDefault();
+    updateVirtualCursorFromControlDelta(event);
+  }
+
+  function handleViewportPointerUp(event) {
+    if (!state.showVirtualCursor) {
+      return;
+    }
+    if (virtualCursorControl.pointerId !== event.pointerId) {
+      return;
+    }
+    if (event.pointerType === 'touch') {
+      removeTouchPointer(event);
+    }
+    releaseVirtualCursorPointer();
+    requestOverlayRender();
+  }
+
+  function handleViewportPointerCancel(event) {
+    if (!state.showVirtualCursor) {
+      return;
+    }
+    if (virtualCursorControl.pointerId !== event.pointerId) {
+      return;
+    }
+    if (event.pointerType === 'touch') {
+      removeTouchPointer(event);
+    }
+    releaseVirtualCursorPointer();
+    requestOverlayRender();
+  }
+
   function renderOverlay(timestamp) {
     const { width, height } = state;
     const now = Number.isFinite(timestamp) ? timestamp : performance.now();
+    resizeVirtualCursorCanvas();
+    clearVirtualCursorCanvas();
     if (ctx.overlay) {
       ctx.overlay.clearRect(0, 0, width, height);
     }
@@ -7907,6 +8946,10 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
 
     if (pointerState.selectionPreview && pointerState.tool === 'selectRect') {
       drawRectanglePreview(pointerState.selectionPreview.start, pointerState.selectionPreview.end);
+    }
+
+    if (state.showVirtualCursor && virtualCursor) {
+      drawVirtualCursor(virtualCursor);
     }
 
     if (hasSelectionOutline) {
@@ -8489,6 +9532,8 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
         showMajorGrid: Boolean(state.showMajorGrid),
         majorGridSpacing: clamp(Math.round(state.majorGridSpacing || 16), 2, 512),
         showPixelGuides: Boolean(state.showPixelGuides),
+        showVirtualCursor: Boolean(state.showVirtualCursor),
+        virtualCursorButtonScale: normalizeFloatingDrawButtonScale(state.virtualCursorButtonScale),
         showChecker: Boolean(state.showChecker),
         activeFrame: clamp(Number(state.activeFrame) || 0, 0, state.frames.length - 1),
         activeLayer: state.activeLayer,
@@ -8567,9 +9612,16 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     if (typeof payload.showPixelGuides === 'boolean') {
       state.showPixelGuides = payload.showPixelGuides;
     }
+    if (typeof payload.showVirtualCursor === 'boolean') {
+      state.showVirtualCursor = payload.showVirtualCursor;
+    }
+    if (Number.isFinite(payload.virtualCursorButtonScale)) {
+      state.virtualCursorButtonScale = normalizeFloatingDrawButtonScale(payload.virtualCursorButtonScale);
+    }
     if (typeof payload.showChecker === 'boolean') {
       state.showChecker = payload.showChecker;
     }
+    setVirtualCursorButtonScale(state.virtualCursorButtonScale, { persist: false, clampPosition: false });
     state.colorMode = 'index';
     if (Number.isFinite(payload.paletteIndex)) {
       state.activePaletteIndex = clamp(Math.round(payload.paletteIndex), 0, state.palette.length - 1);
@@ -8590,6 +9642,14 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     if (typeof payload.documentName === 'string') {
       state.documentName = normalizeDocumentName(payload.documentName);
     }
+    if (state.showVirtualCursor && !virtualCursor) {
+      virtualCursor = createInitialVirtualCursor();
+    }
+    if (!state.showVirtualCursor) {
+      releaseVirtualCursorPointer();
+    }
+    updateFloatingDrawButtonEnabledState();
+    refreshViewportCursorStyle();
   }
 
   function rgbaToHex({ r, g, b, a }) {
