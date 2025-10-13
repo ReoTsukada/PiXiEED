@@ -67,6 +67,7 @@
               <canvas id="overlayCanvas" width="32" height="32" aria-hidden="true"></canvas>
               <canvas id="selectionCanvas" width="32" height="32" aria-hidden="true"></canvas>
             </div>
+            <canvas id="virtualCursorCanvas" class="virtual-cursor-canvas" width="0" height="0" aria-hidden="true"></canvas>
             <div class="canvas-controls">
               <button type="button" class="chip" id="undoAction" aria-label="元に戻す" disabled></button>
               <button type="button" class="chip" id="redoAction" aria-label="やり直す" disabled></button>
@@ -79,6 +80,7 @@
                 </button>
               </div>
             </div>
+            <div class="zoom-indicator" id="zoomIndicator" role="status" aria-live="polite" aria-hidden="true"></div>
             <button type="button" class="rail-toggle rail-toggle--left" id="openLeftRail" aria-label="左パネルを表示">⟨</button>
             <button type="button" class="rail-toggle rail-toggle--right" id="openRightRail" aria-label="右パネルを表示">⟩</button>
           </div>
@@ -97,6 +99,7 @@
           <div class="rail-tabpanes" id="rightRailPanes"></div>
         </aside>
       </div>
+      <button type="button" class="floating-draw-button" id="floatingDrawButton" aria-label="描画ボタン">描画</button>
 
       <div class="mobile-drawer" id="mobileDrawer" hidden>
         <div class="mobile-panels" id="mobilePanels">
@@ -328,7 +331,40 @@
                   <span>1px ガイド</span>
                 </label>
               </li>
+              <li>
+                <label class="toggle-option" for="toggleVirtualCursor">
+                  <input type="checkbox" id="toggleVirtualCursor" />
+                  <span>仮想カーソル</span>
+                </label>
+              </li>
             </ul>
+            <div class="virtual-cursor-scale">
+              <label class="virtual-cursor-scale__control" for="virtualCursorButtonScale">
+                <span class="virtual-cursor-scale__label">仮想カーソルボタンサイズ</span>
+                <input
+                  type="range"
+                  id="virtualCursorButtonScale"
+                  min="1"
+                  max="2"
+                  step="0.5"
+                  value="2"
+                  list="virtualCursorButtonScaleMarks"
+                />
+              </label>
+              <div class="virtual-cursor-scale__meta">
+                <div class="virtual-cursor-scale__ticks" aria-hidden="true">
+                  <span>1×</span>
+                  <span>1.5×</span>
+                  <span>2×</span>
+                </div>
+                <output id="virtualCursorButtonScaleValue" for="virtualCursorButtonScale" class="virtual-cursor-scale__value">2×</output>
+              </div>
+              <datalist id="virtualCursorButtonScaleMarks">
+                <option value="1" label="1×"></option>
+                <option value="1.5" label="1.5×"></option>
+                <option value="2" label="2×"></option>
+              </datalist>
+            </div>
             <button type="button" class="chip" id="toggleBackgroundMode" aria-pressed="false">背景</button>
           </div>
           <button type="button" class="button" id="newProject">新規作成</button>
