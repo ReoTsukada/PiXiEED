@@ -569,6 +569,16 @@ button {
   pointer-events: none;
 }
 
+#virtualCursorCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 4;
+  pointer-events: none;
+  touch-action: none;
+}
+
 .canvas-controls {
   position: absolute;
   top: 12px;
@@ -596,6 +606,80 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.zoom-indicator {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 6px 12px;
+  background: rgba(8, 18, 26, 0.85);
+  border: 1px solid rgba(112, 246, 255, 0.35);
+  color: var(--fg);
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 160ms ease, transform 160ms ease;
+  text-shadow: 0 0 6px rgba(5, 12, 18, 0.75);
+  border-radius: 0;
+  z-index: 4;
+}
+
+.zoom-indicator.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.floating-draw-button {
+  --floating-draw-button-scale: 2;
+  --floating-draw-button-x: 16px;
+  --floating-draw-button-y: 16px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+  transform:
+    translate(var(--floating-draw-button-x), var(--floating-draw-button-y))
+    scale(var(--floating-draw-button-scale));
+  padding: 10px 18px;
+  background: rgba(255, 168, 82, 0.28);
+  color: var(--fg);
+  font-weight: 600;
+  border: 1px solid rgba(255, 168, 82, 0.78);
+  border-radius: 0;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.65),
+    0 4px 12px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  z-index: 2000;
+}
+
+.floating-draw-button.is-hidden {
+  display: none;
+}
+
+.floating-draw-button:active {
+  background: rgba(255, 168, 82, 0.4);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.7),
+    0 2px 8px rgba(0, 0, 0, 0.36);
+}
+
+.floating-draw-button.is-disabled {
+  opacity: 0.55;
+  cursor: default;
+  background: rgba(255, 168, 82, 0.16);
+}
+
+.floating-draw-button.is-disabled:active {
+  background: rgba(255, 168, 82, 0.16);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.65),
+    0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .canvas-control-buttons.is-clipboard-mode .chip {
@@ -860,6 +944,11 @@ input[type='range']::-moz-focus-outer {
   background: linear-gradient(90deg, #1a2230 0%, rgba(88, 196, 255, 0.85) 100%);
 }
 
+#virtualCursorButtonScale::-webkit-slider-runnable-track,
+#virtualCursorButtonScale::-moz-range-track {
+  background: linear-gradient(90deg, rgba(62, 226, 203, 0.25) 0%, rgba(112, 246, 255, 0.85) 100%);
+}
+
 #exportScaleSlider::-webkit-slider-runnable-track,
 #exportScaleSlider::-moz-range-track {
   background: linear-gradient(90deg, rgba(88, 196, 255, 0.2) 0%, rgba(88, 196, 255, 0.9) 100%);
@@ -905,6 +994,48 @@ input[type='range']::-moz-focus-outer {
   height: 18px;
   margin: 0;
   accent-color: var(--accent);
+}
+
+.virtual-cursor-scale {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.virtual-cursor-scale__control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.84rem;
+}
+
+.virtual-cursor-scale__label {
+  color: var(--fg-muted);
+}
+
+#virtualCursorButtonScale {
+  width: 100%;
+}
+
+.virtual-cursor-scale__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--fg-muted);
+}
+
+.virtual-cursor-scale__ticks {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 1;
+}
+
+.virtual-cursor-scale__value {
+  font-weight: 600;
+  color: var(--fg);
 }
 
 .field--list > .chip {
