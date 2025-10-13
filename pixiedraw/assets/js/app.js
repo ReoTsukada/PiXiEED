@@ -27,12 +27,14 @@
       color: document.getElementById('mobilePanelColor'),
       frames: document.getElementById('mobilePanelFrames'),
       settings: document.getElementById('mobilePanelSettings'),
+      file: document.getElementById('mobilePanelFile'),
     },
     sections: {
       tools: document.getElementById('panelTools'),
       color: document.getElementById('panelColor'),
       frames: document.getElementById('panelFrames'),
       settings: document.getElementById('panelSettings'),
+      file: document.getElementById('panelFile'),
     },
     canvases: {
       stack: document.getElementById('canvasStack'),
@@ -134,7 +136,7 @@
   };
 
   const LEFT_TAB_KEYS = ['tools', 'color'];
-  const RIGHT_TAB_KEYS = ['frames', 'settings'];
+  const RIGHT_TAB_KEYS = ['frames', 'settings', 'file'];
   const TOOL_GROUPS = {
     selection: { label: '範囲選択', tools: ['move', 'selectRect', 'selectLasso', 'selectSame'] },
     pen: { label: 'ペン', tools: ['pen', 'eyedropper'] },
@@ -163,7 +165,7 @@
     2,
     2.5,
     3,
-    4.5,
+    4,
     5,
     6,
     7,
@@ -175,9 +177,10 @@
     16,
     18,
     20,
-    25,
+    24,
+    28,
     30,
-    35,
+    32,
     40,
   ]);
   const MIN_ZOOM_SCALE = ZOOM_STEPS[0];
@@ -189,16 +192,18 @@
   const DEFAULT_DOCUMENT_NAME = `${DEFAULT_DOCUMENT_BASENAME}${PROJECT_FILE_EXTENSION}`;
   const DEFAULT_CANVAS_SIZE = 32;
   const MIN_CANVAS_SIZE = 1;
-  const MAX_CANVAS_SIZE = 256;
+  const MAX_CANVAS_SIZE = 512;
   const FIRST_OPEN_COMPLETE_KEY = 'pixieedraw:first-open-complete';
   const MAX_EXPORT_DIMENSION = 2000;
   const MAX_EXPORT_SCALE_OPTIONS = MAX_EXPORT_DIMENSION;
+  const MAX_SELECTION_CANVAS_DIMENSION = 8192;
 
   const layoutMap = {
     tools: { desktop: dom.leftTabPanes || dom.leftRail, mobile: dom.mobilePanels.tools },
     color: { desktop: dom.leftTabPanes || dom.leftRail, mobile: dom.mobilePanels.color },
     frames: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.frames },
     settings: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.settings },
+    file: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.file },
   };
 
   const canvasControlsDefaultParent = dom.canvasControls?.parentElement || null;
@@ -210,6 +215,9 @@
     selection: dom.canvases.selection?.getContext('2d', { willReadFrequently: true }) || null,
     virtual: dom.canvases.virtualCursor?.getContext('2d') || null,
   };
+
+  let selectionDisplayScale = MIN_ZOOM_SCALE;
+  let selectionRenderScale = MIN_ZOOM_SCALE;
 
   if (ctx.drawing) {
     ctx.drawing.imageSmoothingEnabled = false;
@@ -234,6 +242,13 @@
   })();
   let sessionPersistHandle = null;
   const AUTOSAVE_SUPPORTED = typeof window !== 'undefined' && 'showSaveFilePicker' in window && 'indexedDB' in window;
+  const SUPPORTS_ANCHOR_DOWNLOAD =
+    typeof HTMLAnchorElement !== 'undefined' && 'download' in HTMLAnchorElement.prototype;
+  const CAN_USE_WEB_SHARE =
+    typeof navigator !== 'undefined' &&
+    typeof navigator.share === 'function' &&
+    typeof navigator.canShare === 'function' &&
+    typeof File === 'function';
   const AUTOSAVE_DB_NAME = 'pixieedraw-autosave';
   const AUTOSAVE_DB_VERSION = 1;
   const AUTOSAVE_STORE_NAME = 'handles';
@@ -2322,12 +2337,14 @@
       try {
         const [handle] = await window.showOpenFilePicker({
           multiple: false,
+          excludeAcceptAllOption: false,
           types: [
             {
-              description: 'PiXiEEDraw ドキュメント',
+              description: '対応ファイル (PiXiEEDraw / PNG)',
               accept: {
                 'application/json': ['.json', '.pxdraw', '.pixieedraw'],
                 'application/x-pixieedraw': ['.pixieedraw'],
+                'image/png': ['.png'],
               },
             },
           ],
@@ -2340,7 +2357,10 @@
           return;
         }
         console.warn('Document open failed', error);
-        updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
+        const message = error?.source === 'png-import'
+          ? 'PNGの読み込みに失敗しました'
+          : 'ドキュメントを開けませんでした';
+        updateAutosaveStatus(message, 'error');
         return;
       }
     }
@@ -2350,7 +2370,7 @@
   function openDocumentViaInput() {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.json,.pxdraw,.pixieedraw,application/json,application/x-pixieedraw';
+    input.accept = '.json,.pxdraw,.pixieedraw,.png,application/json,application/x-pixieedraw,image/png';
     input.addEventListener('change', async () => {
       const file = input.files && input.files[0];
       if (!file) {
@@ -2358,11 +2378,16 @@
         return;
       }
       try {
-        const text = await file.text();
-        await loadDocumentFromText(text, null);
+        if (isPngFile(file)) {
+          await loadDocumentFromImageFile(file);
+        } else {
+          const text = await file.text();
+          await loadDocumentFromText(text, null);
+        }
       } catch (error) {
         console.warn('Document load failed', error);
-        updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
+        const message = isPngFile(file) ? 'PNGの読み込みに失敗しました' : 'ドキュメントを開けませんでした';
+        updateAutosaveStatus(message, 'error');
       } finally {
         input.value = '';
         input.remove();
@@ -2372,6 +2397,198 @@
       input.value = '';
     });
     input.click();
+  }
+
+  function isPngFile(file) {
+    if (!file) return false;
+    if (typeof file.type === 'string' && file.type.toLowerCase() === 'image/png') {
+      return true;
+    }
+    if (typeof file.name === 'string' && file.name.toLowerCase().endsWith('.png')) {
+      return true;
+    }
+    return false;
+  }
+
+  function createPngImportError(message, cause) {
+    const error = new Error(message);
+    error.source = 'png-import';
+    if (cause) {
+      error.cause = cause;
+    }
+    return error;
+  }
+
+  async function loadDocumentFromImageFile(file) {
+    let imageData;
+    try {
+      imageData = await decodeImageFileToImageData(file);
+    } catch (error) {
+      throw createPngImportError('画像を読み込めませんでした', error);
+    }
+    if (!imageData || !Number.isFinite(imageData.width) || !Number.isFinite(imageData.height)) {
+      throw createPngImportError('画像サイズが不正です');
+    }
+    const width = Math.max(1, Math.floor(imageData.width));
+    const height = Math.max(1, Math.floor(imageData.height));
+    if (width > MAX_CANVAS_SIZE || height > MAX_CANVAS_SIZE) {
+      throw createPngImportError(`PNGのサイズが大きすぎます (最大 ${MAX_CANVAS_SIZE}px)`);
+    }
+
+    const layer = createLayer('PNG レイヤー', width, height);
+    const direct = ensureLayerDirect(layer, width, height);
+    direct.set(imageData.data);
+
+    const frame = {
+      id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}`,
+      name: 'フレーム 1',
+      duration: 1000 / 12,
+      layers: [layer],
+    };
+
+    const paletteSource = state.palette && state.palette.length
+      ? state.palette
+      : createInitialState({ width, height }).palette;
+    const palette = paletteSource.map(color => ({ ...color }));
+    const activePaletteIndex = palette.length
+      ? clamp(state.activePaletteIndex ?? 0, 0, palette.length - 1)
+      : 0;
+    const activeRgb = state.activeRgb
+      ? { ...state.activeRgb }
+      : (palette[activePaletteIndex] ? { ...palette[activePaletteIndex] } : { r: 255, g: 255, b: 255, a: 255 });
+    const documentName = normalizeDocumentName(typeof file?.name === 'string' ? file.name : state.documentName);
+    const activeToolGroup = TOOL_GROUPS[state.activeToolGroup] ? state.activeToolGroup : (TOOL_TO_GROUP[state.tool] || 'pen');
+
+    const snapshot = {
+      width,
+      height,
+      scale: normalizeZoomScale(state.scale, state.scale || MIN_ZOOM_SCALE),
+      pan: { x: 0, y: 0 },
+      tool: state.tool,
+      brushSize: state.brushSize,
+      palette,
+      activePaletteIndex,
+      activeRgb,
+      frames: [frame],
+      activeFrame: 0,
+      activeLayer: layer.id,
+      selectionMask: null,
+      selectionBounds: null,
+      showGrid: state.showGrid ?? true,
+      showMajorGrid: state.showMajorGrid ?? true,
+      gridScreenStep: state.gridScreenStep ?? 8,
+      majorGridSpacing: state.majorGridSpacing ?? 16,
+      backgroundMode: state.backgroundMode ?? 'dark',
+      documentName,
+      showPixelGuides: state.showPixelGuides ?? true,
+      showVirtualCursor: state.showVirtualCursor ?? false,
+      showChecker: state.showChecker ?? true,
+      activeToolGroup,
+      lastGroupTool: { ...DEFAULT_GROUP_TOOL, ...(state.lastGroupTool || {}) },
+      activeLeftTab: state.activeLeftTab ?? 'tools',
+      activeRightTab: state.activeRightTab ?? 'frames',
+    };
+
+    applyHistorySnapshot(snapshot);
+    history.past = [];
+    history.future = [];
+    history.pending = null;
+    updateHistoryButtons();
+
+    autosaveHandle = null;
+    pendingAutosaveHandle = null;
+    clearPendingPermissionListener();
+
+    if (AUTOSAVE_SUPPORTED) {
+      clearStoredAutosaveHandle().catch(error => {
+        console.warn('Failed to clear previous autosave handle', error);
+      });
+      if (dom.controls.enableAutosave) {
+        dom.controls.enableAutosave.textContent = '保存先を変更';
+      }
+      const suggestedName = createAutosaveFileName(documentName);
+      updateAutosaveStatus('自動保存: 保存先を選択してください', 'info');
+      requestAutosaveBinding({ suggestedName }).catch(error => {
+        console.warn('Autosave binding after PNG import failed', error);
+        updateAutosaveStatus('自動保存: 保存先を設定できませんでした', 'error');
+      });
+    } else {
+      updateAutosaveStatus('PNGを読み込みました', 'success');
+    }
+    markFirstOpenComplete();
+    scheduleSessionPersist();
+  }
+
+  async function decodeImageFileToImageData(file) {
+    if (!file) {
+      throw createPngImportError('ファイルが選択されていません');
+    }
+    if (typeof createImageBitmap === 'function') {
+      try {
+        const bitmap = await createImageBitmap(file);
+        try {
+          return imageBitmapToImageData(bitmap);
+        } finally {
+          if (typeof bitmap.close === 'function') {
+            bitmap.close();
+          }
+        }
+      } catch (error) {
+        console.warn('createImageBitmap failed, falling back to Image', error);
+      }
+    }
+    return await imageElementToImageData(file);
+  }
+
+  function imageBitmapToImageData(bitmap) {
+    if (!bitmap || !bitmap.width || !bitmap.height) {
+      throw createPngImportError('画像サイズが不正です');
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw createPngImportError('画像を処理できませんでした');
+    }
+    ctx.drawImage(bitmap, 0, 0);
+    return ctx.getImageData(0, 0, canvas.width, canvas.height);
+  }
+
+  function imageElementToImageData(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const image = new Image();
+      image.decoding = 'async';
+      image.onload = () => {
+        try {
+          const width = image.naturalWidth || image.width;
+          const height = image.naturalHeight || image.height;
+          if (!width || !height) {
+            throw createPngImportError('画像サイズが不正です');
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            throw createPngImportError('画像を処理できませんでした');
+          }
+          ctx.drawImage(image, 0, 0);
+          const data = ctx.getImageData(0, 0, width, height);
+          resolve(data);
+        } catch (error) {
+          reject(createPngImportError('画像を処理できませんでした', error));
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      };
+      image.onerror = event => {
+        URL.revokeObjectURL(url);
+        reject(createPngImportError('画像の読み込みに失敗しました'));
+      };
+      image.src = url;
+    });
   }
 
   function openExportDialog() {
@@ -2754,11 +2971,20 @@
   async function loadDocumentFromHandle(handle) {
     try {
       const file = await handle.getFile();
+      if (isPngFile(file)) {
+        await loadDocumentFromImageFile(file);
+        return;
+      }
       const text = await file.text();
       await loadDocumentFromText(text, handle);
     } catch (error) {
       console.warn('Document handle load failed', error);
-      updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
+      const message = error && error.name === 'AbortError'
+        ? null
+        : (error?.source === 'png-import' ? 'PNGの読み込みに失敗しました' : 'ドキュメントを開けませんでした');
+      if (message) {
+        updateAutosaveStatus(message, 'error');
+      }
     }
   }
 
@@ -3089,18 +3315,100 @@
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
-      const { canvas, columns, rows } = createSpriteSheetCanvas(framePixels, width, height);
-      const outputCanvas = scaleCanvasNearestNeighbor(canvas, selectedScale);
+      if (frameCount > 1) {
+        let exportedCount = 0;
+        let wasCancelled = false;
+        let hadFailure = false;
+        const scaleLabel = selectedScale > 1 ? ` ×${selectedScale}` : '';
+        for (let index = 0; index < frameCount; index += 1) {
+          const baseCanvas = createFrameCanvas(framePixels[index], width, height);
+          const outputCanvas = scaleCanvasNearestNeighbor(baseCanvas, selectedScale);
+          const blob = await canvasToBlob(outputCanvas, 'image/png');
+          if (!blob) {
+            hadFailure = true;
+            break;
+          }
+          const suffixParts = [`frame_${String(index + 1).padStart(2, '0')}`];
+          if (selectedScale > 1) {
+            suffixParts.push(`x${selectedScale}`);
+          }
+          const filename = createExportFileName('png', suffixParts.join('_'));
+          const deliveryResult = await triggerDownloadFromBlob(blob, filename, {
+            mimeType: 'image/png',
+            fileExtensions: ['.png'],
+            shareTitle: state.documentName || 'PiXiEEDraw',
+            shareText: `フレーム${index + 1}のPNGを書き出しました`,
+            allowFilePicker: index === 0,
+          });
+          switch (deliveryResult) {
+            case 'picker':
+            case 'download':
+            case 'share':
+            case 'window':
+              exportedCount += 1;
+              break;
+            case 'picker-cancel':
+            case 'share-cancel':
+              wasCancelled = true;
+              break;
+            default:
+              hadFailure = true;
+              break;
+          }
+          if (wasCancelled || hadFailure) {
+            break;
+          }
+        }
+        if (exportedCount === frameCount) {
+          updateAutosaveStatus(`PNGを書き出しました (全${frameCount}フレーム${scaleLabel})`, 'success');
+        } else if (wasCancelled) {
+          const remaining = frameCount - exportedCount;
+          updateAutosaveStatus(remaining === frameCount
+            ? 'PNGの書き出しをキャンセルしました'
+            : `PNGを書き出しましたが ${remaining} 件はキャンセルされました`, 'warn');
+        } else if (exportedCount > 0 && hadFailure) {
+          updateAutosaveStatus(`PNGを書き出しましたが ${frameCount - exportedCount} 件エクスポートできませんでした`, 'warn');
+        } else {
+          updateAutosaveStatus('PNGの書き出しに失敗しました', 'error');
+        }
+        return;
+      }
+
+      const baseCanvas = createFrameCanvas(framePixels[0], width, height);
+      const outputCanvas = scaleCanvasNearestNeighbor(baseCanvas, selectedScale);
       const blob = await canvasToBlob(outputCanvas, 'image/png');
       if (!blob) {
         throw new Error('Failed to create PNG blob');
       }
-      const suffix = frameCount > 1
-        ? `sheet_${columns}x${rows}${selectedScale > 1 ? `_x${selectedScale}` : ''}`
-        : `frame_${String(state.activeFrame + 1).padStart(2, '0')}${selectedScale > 1 ? `_x${selectedScale}` : ''}`;
+      const scaleSuffix = selectedScale > 1 ? `_x${selectedScale}` : '';
+      const scaleDisplay = selectedScale > 1 ? `×${selectedScale}` : '';
+      const suffix = `frame_${String(state.activeFrame + 1).padStart(2, '0')}${scaleSuffix}`;
       const filename = createExportFileName('png', suffix);
-      triggerDownloadFromBlob(blob, filename);
-      updateAutosaveStatus(`PNGを書き出しました (×${selectedScale})`, 'success');
+      const deliveryResult = await triggerDownloadFromBlob(blob, filename, {
+        mimeType: 'image/png',
+        fileExtensions: ['.png'],
+        shareTitle: state.documentName || 'PiXiEEDraw',
+        shareText: 'PNGを書き出しました',
+      });
+      switch (deliveryResult) {
+        case 'picker':
+        case 'download':
+          updateAutosaveStatus(`PNGを書き出しました${scaleDisplay ? ` (${scaleDisplay})` : ''}`, 'success');
+          break;
+        case 'share':
+          updateAutosaveStatus('PNGを書き出しました。共有メニューから「ファイルに保存」または「画像を保存」を選択してください。', 'info');
+          break;
+        case 'window':
+          updateAutosaveStatus('PNGを新しいタブで開きました。ブラウザの共有メニューから保存してください。', 'info');
+          break;
+        case 'picker-cancel':
+        case 'share-cancel':
+          updateAutosaveStatus('PNGの書き出しをキャンセルしました', 'warn');
+          break;
+        default:
+          updateAutosaveStatus('PNGの書き出しに失敗しました', 'error');
+          break;
+      }
     } catch (error) {
       console.error('PNG export failed', error);
       updateAutosaveStatus('PNGの書き出しに失敗しました', 'error');
@@ -3120,8 +3428,31 @@
       const gifBytes = buildGifFromPixels(framePixels, frameDurations, width, height);
       const blob = new Blob([gifBytes], { type: 'image/gif' });
       const filename = createExportFileName('gif', 'animation');
-      triggerDownloadFromBlob(blob, filename);
-      updateAutosaveStatus('GIFを書き出しました', 'success');
+      const deliveryResult = await triggerDownloadFromBlob(blob, filename, {
+        mimeType: 'image/gif',
+        fileExtensions: ['.gif'],
+        shareTitle: state.documentName || 'PiXiEEDraw',
+        shareText: 'GIFを書き出しました',
+      });
+      switch (deliveryResult) {
+        case 'picker':
+        case 'download':
+          updateAutosaveStatus('GIFを書き出しました', 'success');
+          break;
+        case 'share':
+          updateAutosaveStatus('GIFを書き出しました。共有メニューから「ファイルに保存」などを選択してください。', 'info');
+          break;
+        case 'window':
+          updateAutosaveStatus('GIFを新しいタブで開きました。ブラウザの共有メニューから保存してください。', 'info');
+          break;
+        case 'picker-cancel':
+        case 'share-cancel':
+          updateAutosaveStatus('GIFの書き出しをキャンセルしました', 'warn');
+          break;
+        default:
+          updateAutosaveStatus('GIFの書き出しに失敗しました', 'error');
+          break;
+      }
     } catch (error) {
       console.error('GIF export failed', error);
       updateAutosaveStatus('GIFの書き出しに失敗しました', 'error');
@@ -3203,10 +3534,10 @@
   function getExportScaleCandidates() {
     const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
     const { columns, rows } = computeSpriteSheetLayout(frameCount);
-    const sheetWidth = Math.max(1, state.width * columns);
-    const sheetHeight = Math.max(1, state.height * rows);
-    const maxScaleWidth = Math.floor(MAX_EXPORT_DIMENSION / sheetWidth);
-    const maxScaleHeight = Math.floor(MAX_EXPORT_DIMENSION / sheetHeight);
+    const frameWidth = Math.max(1, state.width);
+    const frameHeight = Math.max(1, state.height);
+    const maxScaleWidth = Math.floor(MAX_EXPORT_DIMENSION / frameWidth);
+    const maxScaleHeight = Math.floor(MAX_EXPORT_DIMENSION / frameHeight);
     const maxScale = Math.max(1, Math.min(
       Math.max(1, maxScaleWidth || 0),
       Math.max(1, maxScaleHeight || 0),
@@ -3216,15 +3547,15 @@
     for (let scale = 1; scale <= limit; scale += 1) {
       options.push({
         scale,
-        width: sheetWidth * scale,
-        height: sheetHeight * scale,
+        width: frameWidth * scale,
+        height: frameHeight * scale,
       });
     }
     return {
       options,
       maxScale,
-      sheetWidth,
-      sheetHeight,
+      sheetWidth: frameWidth,
+      sheetHeight: frameHeight,
       columns,
       rows,
     };
@@ -3331,21 +3662,17 @@
     applyExportScaleConstraints(candidates);
     syncExportScaleInputs();
   }
-function createSpriteSheetCanvas(framePixelsList, width, height) {
-    const { columns, rows } = computeSpriteSheetLayout(framePixelsList.length);
+
+  function createFrameCanvas(pixels, width, height) {
     const canvas = document.createElement('canvas');
-    canvas.width = columns * width;
-    canvas.height = rows * height;
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-      throw new Error('Canvasのコンテキストを取得できませんでした');
+      throw new Error('フレーム描画用キャンバスのコンテキストを取得できませんでした');
     }
-    framePixelsList.forEach((pixels, index) => {
-      const col = index % columns;
-      const row = Math.floor(index / columns);
-      ctx.putImageData(new ImageData(pixels, width, height), col * width, row * height);
-    });
-    return { canvas, columns, rows };
+    ctx.putImageData(new ImageData(pixels, width, height), 0, 0);
+    return canvas;
   }
 
   function scaleCanvasNearestNeighbor(sourceCanvas, scale) {
@@ -3403,15 +3730,106 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     return new Blob([bytes], { type: mimeType });
   }
 
-  function triggerDownloadFromBlob(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = event => {
+        const result = event?.target?.result;
+        if (typeof result === 'string') {
+          resolve(result);
+        } else {
+          reject(new Error('Failed to convert blob to data URL'));
+        }
+      };
+      reader.onerror = () => {
+        reject(reader.error || new Error('Failed to read blob as data URL'));
+      };
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function triggerDownloadFromBlob(blob, filename, options = {}) {
+    if (!blob) {
+      throw new Error('Cannot download an empty blob');
+    }
+    const mimeType = options.mimeType || blob.type || 'application/octet-stream';
+    const shareTitle = options.shareTitle || filename;
+    const shareText = options.shareText || '';
+    const fileExtensions = Array.isArray(options.fileExtensions) && options.fileExtensions.length
+      ? options.fileExtensions
+      : (() => {
+          const match = filename.match(/(\.[^./]+)$/);
+          return match ? [match[1].toLowerCase()] : [];
+        })();
+
+    if (typeof window.showSaveFilePicker === 'function' && options.allowFilePicker !== false) {
+      try {
+        const pickerTypes =
+          mimeType && fileExtensions.length
+            ? [
+                {
+                  description: `${mimeType} file`,
+                  accept: { [mimeType]: fileExtensions },
+                },
+              ]
+            : undefined;
+        const handle = await window.showSaveFilePicker({
+          suggestedName: filename,
+          types: pickerTypes,
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return 'picker';
+      } catch (error) {
+        if (error && error.name === 'AbortError') {
+          return 'picker-cancel';
+        }
+        console.warn('showSaveFilePicker failed', error);
+      }
+    }
+
+    if (SUPPORTS_ANCHOR_DOWNLOAD) {
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.rel = 'noopener';
+      anchor.style.display = 'none';
+      document.body.appendChild(anchor);
+      anchor.click();
+      window.setTimeout(() => {
+        anchor.remove();
+        URL.revokeObjectURL(url);
+      }, 1500);
+      return 'download';
+    }
+
+    if (CAN_USE_WEB_SHARE) {
+      try {
+        const shareFile = new File([blob], filename, { type: mimeType });
+        if (navigator.canShare({ files: [shareFile] })) {
+          await navigator.share({
+            files: [shareFile],
+            title: shareTitle,
+            text: shareText || undefined,
+          });
+          return 'share';
+        }
+      } catch (error) {
+        if (error && error.name === 'AbortError') {
+          return 'share-cancel';
+        }
+        console.warn('navigator.share failed', error);
+      }
+    }
+
+    const dataUrl = await blobToDataUrl(blob);
+    const opened = window.open(dataUrl, '_blank', 'noopener');
+    if (!opened) {
+      window.location.href = dataUrl;
+    }
+    return 'window';
   }
 
   function buildGifFromPixels(framePixels, frameDurations, width, height) {
@@ -6918,13 +7336,8 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       return;
     }
 
-        if (activeTool === 'fill') {
+    if (activeTool === 'fill') {
       floodFill(position.x, position.y);
-      commitHistory();
-      pointerState.active = false;
-      if (dom.canvases.drawing) {
-        dom.canvases.drawing.releasePointerCapture(event.pointerId);
-      }
       requestOverlayRender();
       return;
     }
@@ -9392,17 +9805,28 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
   function ensureSelectionCanvasResolution(scale) {
     const canvas = dom.canvases.selection;
     if (!canvas) return;
-    const desiredWidth = state.width * scale;
-    const desiredHeight = state.height * scale;
-    if (canvas.width !== desiredWidth || canvas.height !== desiredHeight) {
-      canvas.width = desiredWidth;
-      canvas.height = desiredHeight;
+    const displayScale = Math.max(Number(scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE);
+    const maxScaleForWidth = MAX_SELECTION_CANVAS_DIMENSION / Math.max(1, state.width);
+    const maxScaleForHeight = MAX_SELECTION_CANVAS_DIMENSION / Math.max(1, state.height);
+    const renderScale = Math.max(
+      MIN_ZOOM_SCALE,
+      Math.min(displayScale, maxScaleForWidth, maxScaleForHeight)
+    );
+    selectionDisplayScale = displayScale;
+    selectionRenderScale = renderScale;
+
+    const renderWidth = Math.max(1, Math.round(state.width * renderScale));
+    const renderHeight = Math.max(1, Math.round(state.height * renderScale));
+    if (canvas.width !== renderWidth || canvas.height !== renderHeight) {
+      canvas.width = renderWidth;
+      canvas.height = renderHeight;
       if (ctx.selection) {
+        ctx.selection.setTransform(1, 0, 0, 1, 0, 0);
         ctx.selection.imageSmoothingEnabled = false;
       }
     }
-    const cssWidth = `${desiredWidth}px`;
-    const cssHeight = `${desiredHeight}px`;
+    const cssWidth = `${state.width * displayScale}px`;
+    const cssHeight = `${state.height * displayScale}px`;
     if (canvas.style.width !== cssWidth) {
       canvas.style.width = cssWidth;
     }
@@ -9417,32 +9841,35 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     if (!targetCtx || typeof targetCtx.setLineDash !== 'function') {
       return;
     }
-    const scale = Math.max(Number(state.scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE);
-    ensureSelectionCanvasResolution(scale);
-    const lineWidth = 1;
-    const dashPattern = options.dashPattern || [4, 4];
-    const dashCycle = dashPattern.reduce((sum, value) => sum + value, 0) || 8;
-    const dashOffset = ((selectionDashScreenOffset) % dashCycle + dashCycle) % dashCycle;
+    const displayScale = Math.max(Number(state.scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE);
+    ensureSelectionCanvasResolution(displayScale);
+    const renderScale = selectionRenderScale;
+    const scaleRatio = renderScale / selectionDisplayScale;
+    const dashPatternScreen = options.dashPattern || [4, 4];
+    const dashPatternRender = dashPatternScreen.map(value => value * scaleRatio);
+    const dashCycleScreen = dashPatternScreen.reduce((sum, value) => sum + value, 0) || 8;
+    const dashOffsetScreen = ((selectionDashScreenOffset) % dashCycleScreen + dashCycleScreen) % dashCycleScreen;
+    const firstDashScreen = dashPatternScreen[0] || dashCycleScreen;
 
     targetCtx.save();
     if (options.translateHalf) {
-      targetCtx.translate(0.5, 0.5);
+      targetCtx.translate(0.5 * scaleRatio, 0.5 * scaleRatio);
     }
-    targetCtx.lineWidth = lineWidth;
-    targetCtx.setLineDash(dashPattern);
+    targetCtx.lineWidth = scaleRatio;
+    targetCtx.setLineDash(dashPatternRender);
     targetCtx.lineJoin = 'miter';
     targetCtx.lineCap = 'butt';
 
     targetCtx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
-    targetCtx.lineDashOffset = dashOffset;
+    targetCtx.lineDashOffset = dashOffsetScreen * scaleRatio;
     targetCtx.beginPath();
-    trace(targetCtx, scale);
+    trace(targetCtx, renderScale);
     targetCtx.stroke();
 
     targetCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-    targetCtx.lineDashOffset = (dashOffset + dashPattern[0]) % dashCycle;
+    targetCtx.lineDashOffset = (dashOffsetScreen + firstDashScreen) * scaleRatio;
     targetCtx.beginPath();
-    trace(targetCtx, scale);
+    trace(targetCtx, renderScale);
     targetCtx.stroke();
 
     targetCtx.restore();
