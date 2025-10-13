@@ -1381,10 +1381,10 @@
         dom.controls.canvasControlButtons.setAttribute('aria-label', nextMode === 'clipboard' ? 'コピーと貼り付け' : 'ズーム');
       }
       if (nextMode === 'clipboard') {
-        primary.replaceChildren(makeIcon('copy', 'C'));
+        primary.replaceChildren(document.createTextNode('C'));
         primary.dataset.action = 'copy';
         primary.setAttribute('aria-label', 'コピー');
-        secondary.replaceChildren(makeIcon('paste', 'P'));
+        secondary.replaceChildren(document.createTextNode('P'));
         secondary.dataset.action = 'paste';
         secondary.setAttribute('aria-label', '貼り付け');
       } else {
@@ -6265,7 +6265,6 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       const distance = Math.hypot(dx, dy);
       if (distance >= DRAW_BUTTON_DRAG_THRESHOLD) {
         floatingDrawButtonState.dragging = true;
-        cancelVirtualCursorDrawSession();
       }
     }
     if (floatingDrawButtonState.dragging) {
@@ -6294,15 +6293,13 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     floatingDrawButtonState.dragging = false;
     floatingDrawButtonState.startPointer = null;
     floatingDrawButtonState.startPosition = null;
-    if (wasDragging) {
-      cancelVirtualCursorDrawSession();
-      return;
-    }
     if (wasDrawing) {
       finishVirtualCursorDrawSession({ commit: true });
       return;
     }
-    performVirtualCursorAction();
+    if (!wasDragging) {
+      performVirtualCursorAction();
+    }
   }
 
   function handleFloatingDrawButtonPointerCancel(event) {
