@@ -14,7 +14,7 @@
     <meta name="twitter:title" content="PiXiEEDraw" />
     <meta name="twitter:description" content="ブラウザから直接操作できるピクセルアートエディター PiXiEEDraw" />
     <meta name="twitter:image" content="https://pixieed.jp/pixiedraw/ogp.png" />
-    <meta name="build-version" content="2025-10-13T11:30:31Z" />
+  <meta name="build-version" content="2025-10-13T20:32:49Z" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
@@ -42,6 +42,10 @@
             <button type="button" class="mobile-tab" id="mobileTabSettings" data-mobile-tab="settings" role="tab" aria-controls="mobilePanelSettings" aria-selected="false" tabindex="-1" aria-label="設定">
               <img src="assets/icons/menu-settings.svg" alt="" class="tab-icon" />
               <span class="sr-only">設定</span>
+            </button>
+            <button type="button" class="mobile-tab" id="mobileTabFile" data-mobile-tab="file" role="tab" aria-controls="mobilePanelFile" aria-selected="false" tabindex="-1" aria-label="ファイル">
+              <img src="assets/icons/action-save.svg" alt="" class="tab-icon" />
+              <span class="sr-only">ファイル</span>
             </button>
           </div>
           <div class="mobile-shortcuts" id="mobileShortcutsMount" aria-label="モバイルショートカット"></div>
@@ -86,7 +90,7 @@
             <button type="button" class="rail-toggle rail-toggle--right" id="openRightRail" aria-label="右パネルを表示">⟩</button>
           </div>
         </main>
-        <aside class="rail rail--right" id="rightRail" data-collapsed="false" aria-label="フレーム、レイヤー、設定">
+        <aside class="rail rail--right" id="rightRail" data-collapsed="false" aria-label="フレーム、レイヤー、設定、ファイル">
           <div class="rail-tabs" id="rightRailTabs" role="tablist" aria-label="右パネル切り替え">
             <button type="button" class="rail-tab is-active" data-right-tab="frames" role="tab" aria-selected="true" aria-controls="panelFrames" aria-label="フレームとレイヤー">
               <img src="assets/icons/menu-frame.png" alt="" class="tab-icon" />
@@ -95,6 +99,10 @@
             <button type="button" class="rail-tab" data-right-tab="settings" role="tab" aria-selected="false" aria-controls="panelSettings" tabindex="-1" aria-label="設定">
               <img src="assets/icons/menu-settings.svg" alt="" class="tab-icon" />
               <span class="sr-only">設定</span>
+            </button>
+            <button type="button" class="rail-tab" data-right-tab="file" role="tab" aria-selected="false" aria-controls="panelFile" tabindex="-1" aria-label="ファイル">
+              <img src="assets/icons/action-save.svg" alt="" class="tab-icon" />
+              <span class="sr-only">ファイル</span>
             </button>
           </div>
           <div class="rail-tabpanes" id="rightRailPanes"></div>
@@ -108,6 +116,7 @@
           <div class="mobile-panel" id="mobilePanelColor" role="tabpanel" aria-labelledby="mobileTabColor" hidden></div>
           <div class="mobile-panel" id="mobilePanelFrames" role="tabpanel" aria-labelledby="mobileTabFrames" hidden></div>
           <div class="mobile-panel" id="mobilePanelSettings" role="tabpanel" aria-labelledby="mobileTabSettings" hidden></div>
+          <div class="mobile-panel" id="mobilePanelFile" role="tabpanel" aria-labelledby="mobileTabFile" hidden></div>
         </div>
       </div>
 
@@ -276,6 +285,23 @@
         </div>
       </section>
 
+      <section class="panel-section" id="panelFile" data-section="file">
+        <div class="panel-section__body">
+          <div class="field-group">
+            <button type="button" class="button" id="newProject">新規作成</button>
+            <button type="button" class="button" id="openDocument">ファイルを開く</button>
+            <button type="button" class="button" id="exportProject">エクスポート</button>
+            <button type="button" class="button" id="clearCanvas">キャンバスをクリア</button>
+            <button type="button" class="button" id="enableAutosave">ローカルに自動保存</button>
+          </div>
+          <p class="help-text" id="autosaveStatus" aria-live="polite"></p>
+          <div class="field memory-control" role="status" aria-live="polite">
+            <span id="memoryUsage">メモリ: 計測中…</span>
+            <button type="button" class="chip" id="memoryClear">メモリ削除</button>
+          </div>
+        </div>
+      </section>
+
       <section class="panel-section" id="panelSettings" data-section="settings">
         <div class="panel-section__body">
           <label class="field">
@@ -283,11 +309,11 @@
             <div class="field field--inline">
               <label class="field field--tiny">
                 <span>横</span>
-                <input type="number" id="canvasWidth" min="1" max="256" value="32" data-stepper="true" />
+                <input type="number" id="canvasWidth" min="1" max="512" value="32" data-stepper="true" />
               </label>
               <label class="field field--tiny">
                 <span>縦</span>
-                <input type="number" id="canvasHeight" min="1" max="256" value="32" data-stepper="true" />
+                <input type="number" id="canvasHeight" min="1" max="512" value="32" data-stepper="true" />
               </label>
             </div>
           </label>
@@ -368,16 +394,6 @@
             </div>
             <button type="button" class="chip" id="toggleBackgroundMode" aria-pressed="false">背景</button>
           </div>
-          <button type="button" class="button" id="newProject">新規作成</button>
-          <button type="button" class="button" id="openDocument">ファイルを開く</button>
-          <button type="button" class="button" id="exportProject">エクスポート</button>
-          <button type="button" class="button" id="clearCanvas">キャンバスをクリア</button>
-          <button type="button" class="button" id="enableAutosave">ローカルに自動保存</button>
-          <p class="help-text" id="autosaveStatus" aria-live="polite"></p>
-          <div class="field memory-control" role="status" aria-live="polite">
-            <span id="memoryUsage">メモリ: 計測中…</span>
-            <button type="button" class="chip" id="memoryClear">メモリ削除</button>
-          </div>
         </div>
       </section>
     </div>
@@ -443,11 +459,11 @@
             <div class="new-project__size-inputs">
               <label class="field field--tiny">
                 <span>横</span>
-                <input type="number" id="newProjectWidth" min="1" max="256" required value="32" data-stepper="true" />
+                <input type="number" id="newProjectWidth" min="1" max="512" required value="32" data-stepper="true" />
               </label>
               <label class="field field--tiny">
                 <span>縦</span>
-                <input type="number" id="newProjectHeight" min="1" max="256" required value="32" data-stepper="true" />
+                <input type="number" id="newProjectHeight" min="1" max="512" required value="32" data-stepper="true" />
               </label>
             </div>
           </div>
