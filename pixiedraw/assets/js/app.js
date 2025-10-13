@@ -4319,6 +4319,10 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
       }
       if (!state.showVirtualCursor) {
         releaseVirtualCursorPointer();
+        if (!pointerState.active && hoverPixel) {
+          hoverPixel = null;
+          requestOverlayRender();
+        }
       }
       requestOverlayRender();
       scheduleSessionPersist();
@@ -5803,12 +5807,24 @@ function createSpriteSheetCanvas(framePixelsList, width, height) {
     if (!next) {
       return;
     }
-    const tool = virtualCursorDrawState.tool;
-    if (!tool || !BRUSH_TOOLS.has(tool)) {
-      return;
-    }
     const currentCell = getVirtualCursorCellPosition(next);
     if (!currentCell) {
+      if (!pointerState.active && hoverPixel) {
+        hoverPixel = null;
+        requestOverlayRender();
+      }
+      return;
+    }
+
+    if (!pointerState.active) {
+      if (!hoverPixel || hoverPixel.x !== currentCell.x || hoverPixel.y !== currentCell.y) {
+        hoverPixel = { ...currentCell };
+        requestOverlayRender();
+      }
+    }
+
+    const tool = virtualCursorDrawState.tool;
+    if (!virtualCursorDrawState.active || !tool || !BRUSH_TOOLS.has(tool)) {
       return;
     }
     const last = virtualCursorDrawState.lastPosition;
