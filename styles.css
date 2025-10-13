@@ -1778,6 +1778,49 @@ a:focus {
   gap: clamp(1.5rem, 4vw, 2.8rem);
 }
 
+.project-update {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.6rem 0 0;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(140, 140, 255, 0.22);
+  background: rgba(18, 20, 48, 0.65);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  width: fit-content;
+  box-shadow: 0 16px 28px rgba(8, 12, 48, 0.25);
+}
+
+.project-update::before {
+  content: "";
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.95), rgba(192, 132, 252, 0.95));
+  box-shadow: 0 0 0 2px rgba(86, 110, 255, 0.28);
+}
+
+.project-update__label {
+  font-family: var(--font-heading);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.project-update__value {
+  font-weight: 600;
+  color: var(--fg-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.project-update__value[datetime=""] {
+  opacity: 0.6;
+}
+
 .project-visual {
   width: min(420px, 92%);
   margin: 0 auto;
