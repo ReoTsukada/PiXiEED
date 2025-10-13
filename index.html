@@ -101,66 +101,60 @@
 
     <section class="section" id="showcase">
       <div class="section-inner">
-        <h2>ディスプレイに並ぶ PiXiEED の作品</h2>
-        <div class="showcase-controls" role="region" aria-label="ショーケースの導線">
-          <a class="cta-primary" href="games.html#games-section">全てのゲームを探す</a>
-          <a class="cta-secondary" href="games.html#tools-section">全てのツールを探す</a>
-        </div>
-        <div class="display-wall" role="list">
-          <article class="display" role="listitem" data-type="game" data-title="魔王様!!いつまでよければいいですか!? アップデート" data-description="新しいギミックを追加した最新バージョンを公開しました。" data-difficulty="1">
-            <a class="display__link" href="projects/maoitu/index.html">
-              <span class="display__badge display__badge--game">新着ゲーム</span>
-              <div class="display__frame">
-                <div class="display__screen display__screen--image">
-                  <img src="maoitu/ogp.png" alt="魔王様!!いつまでよければいいですか!? のアップデートプレビュー">
-                </div>
-              </div>
-              <div class="display__body">
-                <h3 class="display__title">魔王様!!いつまでよければいいですか!?</h3>
-                <p class="display__description">Ver.1.1で新しいギミックを追加した最新バージョンを公開しました。ブラウザからすぐ遊べます。</p>
-              </div>
-              <div class="display__meta">
-                <span class="display__difficulty" data-difficulty="1" aria-label="難易度 1">
-                  <span class="display__difficulty-label">難易度</span>
-                  <span class="display__difficulty-scale" aria-hidden="true">
-                    <span class="is-filled"></span>
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </span>
-                  <span class="display__difficulty-value">1</span>
-                </span>
-              </div>
-            </a>
-          </article>
-          <article class="display" role="listitem" data-type="tool" data-title="PiXiEEDraw プレビュー" data-description="ブラウザで完結するPiXiEEDrawの先行公開。マルチレイヤーやライブプレビューを順次実装予定です。">
-            <a class="display__link" href="projects/pixiedraw/index.html">
-              <span class="display__badge display__badge--tool">新着ツール</span>
-              <div class="display__frame">
-                <div class="display__screen display__screen--image">
-                  <img src="pixiedraw/ogp.png" alt="PiXiEEDraw のプレビューイメージ">
-                </div>
-              </div>
-              <div class="display__body">
-                <h3 class="display__title">PiXiEEDraw</h3>
-                <p class="display__description">PiXiEEDraw プレビュー版を公開。レスポンシブUI・ライブタイル更新などブラウザ向けの新機能を試せます。</p>
-              </div>
-            </a>
-          </article>
+        <h2>PiXiEEDのコンテンツ</h2>
+        <p class="showcase-intro">ツール・ゲーム・作品・ノート。知りたい場所へそのまま移動できます。</p>
+        <div class="content-grid" role="list">
+          <a class="content-card content-card--primary" role="listitem" href="projects/pixiedraw/index.html">
+            <h3>PiXiEEDraw</h3>
+            <p>ブラウザで完結するドット絵エディターのプレビュー版。無料で今すぐ試せます。</p>
+            <span class="content-card__cta">ツールページへ</span>
+          </a>
+          <a class="content-card" role="listitem" href="games.html#tools-section">
+            <h3>ツール一覧</h3>
+            <p>ブラウザで動くドット絵ツールをまとめています。アップデートもこちらから。</p>
+            <span class="content-card__cta">全てのツールを見る</span>
+          </a>
+          <a class="content-card" role="listitem" href="games.html#games-section">
+            <h3>ブラウザゲーム</h3>
+            <p>PiXiEEDが制作する遊べるコンテンツ。避けゲーなど短時間で楽しめる作品です。</p>
+            <span class="content-card__cta">ゲームページへ</span>
+          </a>
+          <a class="content-card" role="listitem" href="portfolio/index.html">
+            <h3>アルタのポートフォリオ</h3>
+            <p>新作ドットと背景表現を掲載。GIFアニメや制作ノートにもすぐアクセスできます。</p>
+            <span class="content-card__cta">作品を見る</span>
+          </a>
+          <a class="content-card" role="listitem" href="portfolio/index.html#notes">
+            <h3>制作ノート</h3>
+            <p>制作背景や公開戦略をまとめた短い読み物。更新履歴もここで確認できます。</p>
+            <span class="content-card__cta">ノートを読む</span>
+          </a>
         </div>
       </div>
     </section>
 
-    <section class="section" id="sponsors">
+    <section class="section section--accent" id="sponsors">
       <div class="section-inner">
-        <h2>広告・スポンサー枠</h2>
-        <p>トップヒーロー（最大3枠）、ショーケース末尾（1枠）、ページ下部（最大3枠）に広告を設置できます。</p>
-        <div class="sponsor-cta">
+        <h2>広告・スポンサー</h2>
+        <p>PiXiEEDの活動を応援いただけるスポンサーを募集しています。ミニマルな構成に合わせ、掲載枠もシンプルにしています。</p>
+        <div class="content-grid" role="list">
+          <div class="content-card" role="listitem">
+            <h3>ホームコンテンツカード</h3>
+            <p>トップページのコンテンツカード群にスポンサー向けカードを表示します。PiXiEEDrawと並んで露出できます。</p>
+          </div>
+          <div class="content-card" role="listitem">
+            <h3>制作ページ内枠</h3>
+            <p>各ツール・ゲーム紹介ページ内にバナーとテキストで導線を掲載できます。</p>
+          </div>
+          <div class="content-card" role="listitem">
+            <h3>制作ノート連動</h3>
+            <p>制作ノートでの特集記事やタイアップレポートを通じてブランドの背景を紹介します。</p>
+          </div>
+        </div>
+        <div class="hero-cta">
           <a class="cta-primary" href="ads/index.html">広告掲載の詳細を見る</a>
           <a class="cta-secondary" href="downloads/pixieed-sponsor-kit.zip">スポンサーキットをダウンロード</a>
         </div>
-        <div class="ad-grid" hidden></div>
       </div>
     </section>
   </main>
