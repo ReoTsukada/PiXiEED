@@ -1424,15 +1424,27 @@
     if (!primary || !secondary) {
       return;
     }
+    const moveState = pointerState.selectionMove;
+    const movePending = Boolean(moveState && moveState.hasCleared);
     const hasSelection = selectionMaskHasPixels(state.selectionMask);
     const hasClipboard = Boolean(internalClipboard.selection);
-    const nextMode = hasSelection ? 'clipboard' : 'zoom';
+    const nextMode = movePending ? 'selectionMove' : (hasSelection ? 'clipboard' : 'zoom');
     if (canvasControlMode !== nextMode) {
       canvasControlMode = nextMode;
       if (dom.controls.canvasControlButtons) {
-        dom.controls.canvasControlButtons.setAttribute('aria-label', nextMode === 'clipboard' ? 'コピーと貼り付け' : 'ズーム');
+        const label = nextMode === 'selectionMove'
+          ? '選択範囲の確定操作'
+          : (nextMode === 'clipboard' ? 'コピーと貼り付け' : 'ズーム');
+        dom.controls.canvasControlButtons.setAttribute('aria-label', label);
       }
-      if (nextMode === 'clipboard') {
+      if (nextMode === 'selectionMove') {
+        primary.replaceChildren(document.createTextNode('取消'));
+        primary.dataset.action = 'cancelSelectionMove';
+        primary.setAttribute('aria-label', '選択移動を取り消す');
+        secondary.replaceChildren(document.createTextNode('確定'));
+        secondary.dataset.action = 'confirmSelectionMove';
+        secondary.setAttribute('aria-label', '選択移動を確定する');
+      } else if (nextMode === 'clipboard') {
         primary.replaceChildren(document.createTextNode('C'));
         primary.dataset.action = 'copy';
         primary.setAttribute('aria-label', 'コピー');
@@ -1448,7 +1460,10 @@
         secondary.setAttribute('aria-label', 'ズームイン');
       }
     }
-    if (canvasControlMode === 'clipboard') {
+    if (canvasControlMode === 'selectionMove') {
+      primary.disabled = false;
+      secondary.disabled = false;
+    } else if (canvasControlMode === 'clipboard') {
       primary.disabled = !hasSelection;
       secondary.disabled = !hasClipboard;
     } else {
@@ -5264,6 +5279,10 @@
         copySelection();
       } else if (action === 'paste') {
         pasteSelection();
+      } else if (action === 'cancelSelectionMove') {
+        cancelPendingSelectionMove();
+      } else if (action === 'confirmSelectionMove') {
+        confirmPendingSelectionMove();
       }
       updateCanvasControlButtons();
     };
@@ -7925,7 +7944,11 @@
   function setupKeyboard() {
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape') {
-        clearSelection();
+        if (hasPendingSelectionMove()) {
+          cancelPendingSelectionMove();
+        } else {
+          clearSelection();
+        }
         return;
       }
       const isModifier = event.metaKey || event.ctrlKey;
@@ -8225,16 +8248,13 @@
     const selectionMask = state.selectionMask;
     const isSelectionTool = activeTool === 'selectRect' || activeTool === 'selectLasso' || activeTool === 'selectSame' || activeTool === 'move';
     if (isSelectionTool && selectionMask) {
-      const maskIndex = position.y * state.width + position.x;
-      const insideSelection = selectionMask[maskIndex] === 1;
-      if (!insideSelection) {
-        clearSelection();
-        pointerState.selectionClearedOnDown = true;
-      } else if (activeTool !== 'selectSame') {
-        const moved = beginSelectionMove(event, position);
-        if (moved) {
-          return;
-        }
+      if (pointerState.selectionMove && pointerState.selectionMove.hasCleared) {
+        state.pendingPasteMoveState = pointerState.selectionMove;
+      }
+      const moved = beginSelectionMove(event, position, { reuseOffset: Boolean(state.pendingPasteMoveState) });
+      if (moved) {
+        updateCanvasControlButtons();
+        return;
       }
     }
 
@@ -8431,7 +8451,29 @@
     }
 
     hoverPixel = getPointerPosition(event);
-    const tool = pointerState.tool;
+    let tool = pointerState.tool;
+    const moveState = pointerState.selectionMove;
+    const movePending = Boolean(moveState && moveState.hasCleared);
+
+    if ((tool === 'selectionMove' || tool === 'layerMove') && moveState) {
+      if (movePending) {
+        pointerState.tool = state.tool;
+        pointerState.pointerId = null;
+        pointerState.preview = null;
+        pointerState.selectionPreview = null;
+        pointerState.selectionClearedOnDown = false;
+        pointerState.current = hoverPixel || pointerState.current;
+        pointerState.last = pointerState.current;
+        pointerState.path = [];
+        pointerState.active = false;
+        state.pendingPasteMoveState = moveState;
+        updateCanvasControlButtons();
+        requestOverlayRender();
+        return;
+      }
+      finalizeSelectionMove();
+      tool = pointerState.tool || state.tool;
+    }
 
     if (tool === 'line') {
       drawLine(pointerState.start, pointerState.current);
@@ -8527,7 +8569,8 @@
     return true;
   }
 
-  function beginSelectionMove(event, startPosition) {
+  function beginSelectionMove(event, startPosition, options = {}) {
+    const { reuseOffset = false } = options || {};
     const mask = state.selectionMask;
     const bounds = state.selectionBounds;
     const layer = getActiveLayer();
@@ -8559,6 +8602,10 @@
     moveState.layer = layer;
     moveState.layerId = layer?.id || moveState.layerId || null;
     moveState.offset = moveState.offset || { x: 0, y: 0 };
+    if (!reuseOffset) {
+      moveState.offset.x = 0;
+      moveState.offset.y = 0;
+    }
 
     dom.canvases.drawing.setPointerCapture(event.pointerId);
     hoverPixel = null;
@@ -8566,7 +8613,14 @@
     pointerState.active = true;
     pointerState.pointerId = event.pointerId;
     pointerState.tool = 'selectionMove';
-    pointerState.start = startPosition;
+    if (reuseOffset && moveState.hasCleared) {
+      pointerState.start = {
+        x: startPosition.x - moveState.offset.x,
+        y: startPosition.y - moveState.offset.y,
+      };
+    } else {
+      pointerState.start = startPosition;
+    }
     pointerState.current = startPosition;
     pointerState.last = startPosition;
     pointerState.path = startPosition ? [startPosition] : [];
@@ -8576,6 +8630,7 @@
 
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
+    updateCanvasControlButtons();
     return true;
   }
 
@@ -9045,7 +9100,7 @@
       hasCleared: false,
       restoreIndices: null,
       restoreDirect: null,
-      applySelectionOnFinalize: false,
+      applySelectionOnFinalize: true,
     };
   }
 
@@ -9217,10 +9272,9 @@
       markHistoryDirty();
       markDirtyRect(bounds.x0, bounds.y0, bounds.x1, bounds.y1);
     }
-    moveState.restoreIndices = null;
-    moveState.restoreDirect = null;
     moveState.hasCleared = true;
     requestRender();
+    updateCanvasControlButtons();
   }
 
   function finalizeSelectionMove() {
@@ -9270,6 +9324,38 @@
     requestOverlayRender();
     commitHistory();
     updateCanvasControlButtons();
+  }
+
+  function hasPendingSelectionMove() {
+    return Boolean(pointerState.selectionMove && pointerState.selectionMove.hasCleared);
+  }
+
+  function confirmPendingSelectionMove() {
+    const moveState = pointerState.selectionMove;
+    if (!moveState || !moveState.hasCleared) {
+      return;
+    }
+    finalizeSelectionMove();
+    updateCanvasControlButtons();
+  }
+
+  function cancelPendingSelectionMove() {
+    const moveState = pointerState.selectionMove;
+    if (!moveState || !moveState.hasCleared) {
+      return;
+    }
+    pointerState.selectionMove = null;
+    pointerState.tool = state.tool;
+    state.pendingPasteMoveState = null;
+    pointerState.pointerId = null;
+    pointerState.active = false;
+    pointerState.preview = null;
+    pointerState.selectionPreview = null;
+    pointerState.selectionClearedOnDown = false;
+    pointerState.path = [];
+    rollbackPendingHistory({ reRender: true });
+    updateCanvasControlButtons();
+    requestOverlayRender();
   }
 
   function placeSelectionPixels(moveState, offsetX, offsetY) {
