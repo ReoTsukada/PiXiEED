@@ -102,6 +102,7 @@
       virtualCursorButtonScale: document.getElementById('virtualCursorButtonScale'),
       virtualCursorButtonScaleValue: document.getElementById('virtualCursorButtonScaleValue'),
       openDocument: document.getElementById('openDocument'),
+      installApp: document.getElementById('installApp'),
       exportProject: document.getElementById('exportProject'),
       clearCanvas: document.getElementById('clearCanvas'),
       enableAutosave: document.getElementById('enableAutosave'),
@@ -110,6 +111,16 @@
       memoryClear: document.getElementById('memoryClear'),
       spriteScaleInput: document.getElementById('spriteScaleInput'),
       applySpriteScale: document.getElementById('applySpriteScale'),
+    },
+    startup: {
+      screen: document.getElementById('startupScreen'),
+      newButton: document.getElementById('startupActionNew'),
+      openButton: document.getElementById('startupActionOpen'),
+      installButton: document.getElementById('startupActionInstall'),
+      skipButton: document.getElementById('startupActionSkip'),
+      hint: document.getElementById('startupScreenHint'),
+      recentSection: document.getElementById('startupRecentProjects'),
+      recentList: document.getElementById('startupRecentList'),
     },
     newProject: {
       button: document.getElementById('newProject'),
@@ -193,7 +204,6 @@
   const DEFAULT_CANVAS_SIZE = 32;
   const MIN_CANVAS_SIZE = 1;
   const MAX_CANVAS_SIZE = 512;
-  const FIRST_OPEN_COMPLETE_KEY = 'pixieedraw:first-open-complete';
   const MAX_EXPORT_DIMENSION = 2000;
   const MAX_EXPORT_SCALE_OPTIONS = MAX_EXPORT_DIMENSION;
   const MAX_SELECTION_CANVAS_DIMENSION = 8192;
@@ -250,18 +260,42 @@
     typeof navigator.canShare === 'function' &&
     typeof File === 'function';
   const AUTOSAVE_DB_NAME = 'pixieedraw-autosave';
-  const AUTOSAVE_DB_VERSION = 1;
+  const AUTOSAVE_DB_VERSION = 2;
   const AUTOSAVE_STORE_NAME = 'handles';
+  const RECENT_PROJECTS_STORE = 'recentProjects';
   const AUTOSAVE_HANDLE_KEY = 'document';
   const AUTOSAVE_WRITE_DELAY = 1000;
+  const RECENT_PROJECT_LIMIT = 12;
+  const THUMBNAIL_MAX_EDGE = 144;
+  const THUMBNAIL_CANVAS_SIZE = 160;
   const DOCUMENT_FILE_VERSION = 1;
+  function upgradeAutosaveDatabase(db) {
+    if (!db) return;
+    if (!db.objectStoreNames.contains(AUTOSAVE_STORE_NAME)) {
+      db.createObjectStore(AUTOSAVE_STORE_NAME);
+    }
+    if (!db.objectStoreNames.contains(RECENT_PROJECTS_STORE)) {
+      db.createObjectStore(RECENT_PROJECTS_STORE);
+    }
+  }
+
+  function openAutosaveDatabase() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(AUTOSAVE_DB_NAME, AUTOSAVE_DB_VERSION);
+      request.onupgradeneeded = event => {
+        const db = event.target.result;
+        upgradeAutosaveDatabase(db);
+      };
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+  }
   let autosaveHandle = null;
   let pendingAutosaveHandle = null;
   let autosavePermissionListener = null;
   let autosaveWriteTimer = null;
   let autosaveRestoring = false;
   let autosaveDirty = false;
-  let autosaveDocumentRestored = false;
   const brushOffsetCache = new Map();
   let exportScale = 1;
   let exportSheetInfo = null;
@@ -284,6 +318,20 @@
   });
   const TRANSPARENT_TILE_SIZE = 8;
   const BRUSH_TOOLS = new Set(['pen', 'eraser']);
+  const VIRTUAL_CURSOR_SUPPORTED_TOOLS = new Set([
+    'pen',
+    'eraser',
+    'line',
+    'rect',
+    'rectFill',
+    'ellipse',
+    'ellipseFill',
+    'selectRect',
+    'selectLasso',
+    'curve',
+  ]);
+  const VIRTUAL_CURSOR_SHAPE_TOOLS = new Set(['line', 'rect', 'rectFill', 'ellipse', 'ellipseFill']);
+  const VIRTUAL_CURSOR_SELECTION_TOOLS = new Set(['selectRect', 'selectLasso']);
   const FILL_TOOLS = new Set(['fill']);
   const SHAPE_TOOLS = new Set(['line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill']);
   const SELECTION_TOOLS = new Set(['move', 'selectRect', 'selectLasso', 'selectSame', 'selectionMove', 'layerMove']);
@@ -325,10 +373,16 @@
     historyStarted: false,
     lastPosition: null,
     tool: null,
+    startPosition: null,
+    currentPosition: null,
+    path: [],
+    points: [],
+    selectionClearedOnStart: false,
+    curveStage: null,
   };
   let drawButtonResizeListenerBound = false;
   const toolIconCache = new Map();
-  let sessionStateRestored = false;
+  let startupVisible = false;
   restoreSessionState();
   state.colorMode = 'index';
   updateGridDecorations();
@@ -339,6 +393,7 @@
   let hoverPixel = null;
   let zoomIndicatorTimeoutId = null;
   let overlayNeedsRedraw = true;
+  const recentProjectsCache = new Map();
   const SELECTION_DASH_SPEED = 40;
   let selectionDashScreenOffset = 0;
   let lastSelectionDashTime = 0;
@@ -393,6 +448,10 @@
     hsv: { h: 0, s: 0, v: 1, a: 255 },
     wheelPointer: { active: false, pointerId: null, upHandler: null },
   };
+  let deferredInstallPrompt = null;
+  const displayModeMedia = (typeof window !== 'undefined' && typeof window.matchMedia === 'function')
+    ? window.matchMedia('(display-mode: standalone)')
+    : null;
   let dirtyRegion = null;
   let canvasControlMode = 'zoom';
 
@@ -525,13 +584,14 @@
       preview: null,
       selectionPreview: null,
       selectionMove: null,
-      selectionClearedOnDown: false,
-      startClient: null,
-      panOrigin: { x: 0, y: 0 },
-      panMode: null,
-      touchPanStart: null,
-      curveHandle: null,
-    };
+    selectionClearedOnDown: false,
+    startClient: null,
+    panOrigin: { x: 0, y: 0 },
+    panMode: null,
+    touchPanStart: null,
+    curveHandle: null,
+    panCaptureElement: null,
+  };
   }
 
   const internalClipboard = {
@@ -1260,28 +1320,6 @@
     return normalizedExt ? `${safeBase}${safeSuffix}.${normalizedExt}` : `${safeBase}${safeSuffix}`;
   }
 
-  function hasCompletedFirstOpen() {
-    if (!canUseSessionStorage) {
-      return false;
-    }
-    try {
-      return window.localStorage.getItem(FIRST_OPEN_COMPLETE_KEY) === 'true';
-    } catch (error) {
-      return false;
-    }
-  }
-
-  function markFirstOpenComplete() {
-    if (!canUseSessionStorage) {
-      return;
-    }
-    try {
-      window.localStorage.setItem(FIRST_OPEN_COMPLETE_KEY, 'true');
-    } catch (error) {
-      // ignore storage failures silently
-    }
-  }
-
   function beginHistory(label) {
     if (history.pending) return;
     history.pending = {
@@ -1367,7 +1405,6 @@
       requestRender();
       requestOverlayRender();
     }
-    markFirstOpenComplete();
     scheduleSessionPersist();
     return true;
   }
@@ -2172,6 +2209,9 @@
       await writable.close();
       autosaveDirty = false;
       updateAutosaveStatus('自動保存: 保存済み', 'success');
+      recordRecentProject(autosaveHandle, snapshot).catch(error => {
+        console.warn('Failed to update recent projects snapshot', error);
+      });
     } catch (error) {
       throw error;
     }
@@ -2199,8 +2239,6 @@
       autosaveRestoring = false;
       autosaveDirty = false;
       updateMemoryStatus();
-      autosaveDocumentRestored = true;
-      markFirstOpenComplete();
       return true;
     } catch (error) {
       autosaveRestoring = false;
@@ -2349,54 +2387,74 @@
             },
           ],
         });
-        if (!handle) return;
+        if (!handle) {
+          return false;
+        }
         await loadDocumentFromHandle(handle);
-        return;
+        return true;
       } catch (error) {
         if (error && error.name === 'AbortError') {
-          return;
+          return false;
         }
         console.warn('Document open failed', error);
         const message = error?.source === 'png-import'
           ? 'PNGの読み込みに失敗しました'
           : 'ドキュメントを開けませんでした';
         updateAutosaveStatus(message, 'error');
-        return;
+        return false;
       }
     }
-    openDocumentViaInput();
+    return openDocumentViaInput();
   }
 
   function openDocumentViaInput() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json,.pxdraw,.pixieedraw,.png,application/json,application/x-pixieedraw,image/png';
-    input.addEventListener('change', async () => {
-      const file = input.files && input.files[0];
-      if (!file) {
-        input.remove();
-        return;
-      }
-      try {
-        if (isPngFile(file)) {
-          await loadDocumentFromImageFile(file);
-        } else {
-          const text = await file.text();
-          await loadDocumentFromText(text, null);
-        }
-      } catch (error) {
-        console.warn('Document load failed', error);
-        const message = isPngFile(file) ? 'PNGの読み込みに失敗しました' : 'ドキュメントを開けませんでした';
-        updateAutosaveStatus(message, 'error');
-      } finally {
+    return new Promise(resolve => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json,.pxdraw,.pixieedraw,.png,application/json,application/x-pixieedraw,image/png';
+      input.style.display = 'none';
+      let settled = false;
+      const finish = success => {
+        if (settled) return;
+        settled = true;
+        resolve(Boolean(success));
+      };
+      const cleanup = () => {
         input.value = '';
         input.remove();
-      }
+      };
+      input.addEventListener('change', async () => {
+        const file = input.files && input.files[0];
+        cleanup();
+        if (!file) {
+          finish(false);
+          return;
+        }
+        try {
+          if (isPngFile(file)) {
+            await loadDocumentFromImageFile(file);
+          } else {
+            const text = await file.text();
+            await loadDocumentFromText(text, null);
+          }
+          finish(true);
+        } catch (error) {
+          console.warn('Document load failed', error);
+          const message = isPngFile(file) ? 'PNGの読み込みに失敗しました' : 'ドキュメントを開けませんでした';
+          updateAutosaveStatus(message, 'error');
+          finish(false);
+        }
+      });
+      input.addEventListener('cancel', () => {
+        cleanup();
+        finish(false);
+      });
+      input.addEventListener('click', () => {
+        input.value = '';
+      });
+      document.body.appendChild(input);
+      input.click();
     });
-    input.addEventListener('click', () => {
-      input.value = '';
-    });
-    input.click();
   }
 
   function isPngFile(file) {
@@ -2515,7 +2573,6 @@
     } else {
       updateAutosaveStatus('PNGを読み込みました', 'success');
     }
-    markFirstOpenComplete();
     scheduleSessionPersist();
   }
 
@@ -2944,32 +3001,161 @@
     } else {
       updateAutosaveStatus('新しいプロジェクトを作成しました', 'info');
     }
-    markFirstOpenComplete();
     scheduleSessionPersist();
     return true;
   }
 
-  function shouldPromptFirstOpen() {
-    if (autosaveDocumentRestored) return false;
-    if (sessionStateRestored) return false;
-    if (hasCompletedFirstOpen()) return false;
-    return true;
-  }
-
-  function handleFirstOpenExperience() {
-    if (!shouldPromptFirstOpen()) {
+  function showStartupScreen() {
+    const container = dom.startup?.screen;
+    if (!container) {
       return;
     }
-    markFirstOpenComplete();
-    if (dom.newProject?.dialog && typeof dom.newProject.dialog.showModal === 'function') {
+    if (AUTOSAVE_SUPPORTED) {
+      refreshRecentProjectsUI().catch(error => {
+        console.warn('Failed to refresh recent projects', error);
+      });
+    } else if (dom.startup?.recentSection) {
+      dom.startup.recentSection.hidden = true;
+    }
+    updateInstallButtonState();
+    if (startupVisible) {
+      return;
+    }
+    startupVisible = true;
+    container.hidden = false;
+    container.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('is-startup-active');
+    window.requestAnimationFrame(() => {
+      container.focus?.({ preventScroll: true });
+      const defaultTarget = dom.startup?.newButton || dom.startup?.openButton || dom.startup?.skipButton || container;
+      defaultTarget?.focus?.({ preventScroll: true });
+    });
+  }
+
+  function hideStartupScreen() {
+    const container = dom.startup?.screen;
+    if (!container || !startupVisible) {
+      return;
+    }
+    startupVisible = false;
+    container.hidden = true;
+    container.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('is-startup-active');
+  }
+
+  function setupStartupScreen() {
+    const container = dom.startup?.screen;
+    if (!container) {
+      return;
+    }
+    if (dom.startup?.hint) {
+      dom.startup.hint.textContent = AUTOSAVE_SUPPORTED
+        ? 'ファイルを開くと既存の自動保存先を引き継ぎます。'
+        : 'このブラウザでは自動保存が利用できません。エクスポートをお忘れなく。';
+    }
+    container.addEventListener('keydown', event => {
+      if (!startupVisible) {
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        hideStartupScreen();
+        return;
+      }
+      if (event.key === 'Tab') {
+        const focusableSelectors = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+        const focusableElements = Array.from(container.querySelectorAll(focusableSelectors))
+          .filter(element => !element.hasAttribute('disabled') && element.offsetParent !== null);
+        if (!focusableElements.length) {
+          event.preventDefault();
+          container.focus();
+          return;
+        }
+        const first = focusableElements[0];
+        const last = focusableElements[focusableElements.length - 1];
+        if (event.shiftKey) {
+          if (document.activeElement === first || document.activeElement === container) {
+            event.preventDefault();
+            last.focus();
+          }
+        } else if (document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    });
+    dom.startup?.newButton?.addEventListener('click', () => {
+      hideStartupScreen();
       openNewProjectDialog();
-    } else {
-      promptNewProjectFallback();
+    });
+    dom.startup?.openButton?.addEventListener('click', async () => {
+      const opened = await openDocumentDialog();
+      if (opened) {
+        hideStartupScreen();
+      }
+    });
+    dom.startup?.installButton?.addEventListener('click', handleInstallRequest);
+    dom.startup?.skipButton?.addEventListener('click', () => {
+      hideStartupScreen();
+    });
+    dom.startup?.recentList?.addEventListener('click', async event => {
+      const target = event.target instanceof Element ? event.target.closest('.startup-recent-card') : null;
+      if (!target) {
+        return;
+      }
+      const projectId = target.dataset.projectId;
+      const entry = projectId ? recentProjectsCache.get(projectId) : null;
+      if (!entry) {
+        if (AUTOSAVE_SUPPORTED) {
+          refreshRecentProjectsUI().catch(error => {
+            console.warn('Failed to refresh recent projects', error);
+          });
+        }
+        return;
+      }
+      target.disabled = true;
+      const success = await openRecentProject(entry);
+      if (!success) {
+        target.disabled = false;
+      }
+    });
+    if (AUTOSAVE_SUPPORTED) {
+      refreshRecentProjectsUI().catch(error => {
+        console.warn('Failed to refresh recent projects', error);
+      });
+    } else if (dom.startup?.recentSection) {
+      dom.startup.recentSection.hidden = true;
+    }
+    updateInstallButtonState();
+  }
+
+  window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    updateInstallButtonState();
+  });
+
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    updateInstallButtonState();
+  });
+
+  if (displayModeMedia) {
+    const handleDisplayModeChange = () => updateInstallButtonState();
+    if (typeof displayModeMedia.addEventListener === 'function') {
+      displayModeMedia.addEventListener('change', handleDisplayModeChange);
+    } else if (typeof displayModeMedia.addListener === 'function') {
+      displayModeMedia.addListener(handleDisplayModeChange);
     }
   }
 
   async function loadDocumentFromHandle(handle) {
     try {
+      const granted = await ensureHandlePermission(handle, { request: true });
+      if (!granted) {
+        updateAutosaveStatus('自動保存: 権限が必要です', 'warn');
+        return;
+      }
       const file = await handle.getFile();
       if (isPngFile(file)) {
         await loadDocumentFromImageFile(file);
@@ -3030,6 +3216,11 @@
 
     scheduleSessionPersist();
     scheduleAutosaveSnapshot();
+    if (handle) {
+      recordRecentProject(handle, snapshot).catch(error => {
+        console.warn('Failed to register recent project', error);
+      });
+    }
   }
 
   function snapshotFromDocumentText(text) {
@@ -3042,90 +3233,468 @@
   }
 
   async function storeAutosaveHandle(handle) {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(AUTOSAVE_DB_NAME, AUTOSAVE_DB_VERSION);
-      request.onupgradeneeded = event => {
-        const db = event.target.result;
-        if (!db.objectStoreNames.contains(AUTOSAVE_STORE_NAME)) {
-          db.createObjectStore(AUTOSAVE_STORE_NAME);
-        }
-      };
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const db = request.result;
-        const tx = db.transaction(AUTOSAVE_STORE_NAME, 'readwrite');
+    if (!AUTOSAVE_SUPPORTED) return;
+    try {
+      const db = await openAutosaveDatabase();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction([AUTOSAVE_STORE_NAME], 'readwrite');
         const store = tx.objectStore(AUTOSAVE_STORE_NAME);
-        const putRequest = store.put(handle, AUTOSAVE_HANDLE_KEY);
-        putRequest.onsuccess = () => resolve();
-        putRequest.onerror = () => reject(putRequest.error);
-        tx.oncomplete = () => db.close();
-        tx.onerror = () => {
-          const { error } = tx;
+        const request = store.put(handle, AUTOSAVE_HANDLE_KEY);
+        request.onerror = () => reject(request.error);
+        tx.oncomplete = () => {
           db.close();
-          if (error) reject(error);
+          resolve();
         };
-      };
-    });
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+    } catch (error) {
+      console.warn('Failed to store autosave handle', error);
+    }
   }
 
   async function loadStoredAutosaveHandle() {
     if (!AUTOSAVE_SUPPORTED) return null;
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(AUTOSAVE_DB_NAME, AUTOSAVE_DB_VERSION);
-      request.onupgradeneeded = event => {
-        const db = event.target.result;
-        if (!db.objectStoreNames.contains(AUTOSAVE_STORE_NAME)) {
-          db.createObjectStore(AUTOSAVE_STORE_NAME);
-        }
-      };
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const db = request.result;
-        const tx = db.transaction(AUTOSAVE_STORE_NAME, 'readonly');
+    try {
+      const db = await openAutosaveDatabase();
+      return await new Promise((resolve, reject) => {
+        let value = null;
+        const tx = db.transaction([AUTOSAVE_STORE_NAME], 'readonly');
         const store = tx.objectStore(AUTOSAVE_STORE_NAME);
-        const getRequest = store.get(AUTOSAVE_HANDLE_KEY);
-        getRequest.onsuccess = () => {
-          resolve(getRequest.result || null);
+        const request = store.get(AUTOSAVE_HANDLE_KEY);
+        request.onsuccess = () => {
+          value = request.result || null;
         };
-        getRequest.onerror = () => reject(getRequest.error);
-        tx.oncomplete = () => db.close();
-        tx.onerror = () => {
-          const { error } = tx;
+        request.onerror = () => {
+          reject(request.error);
+        };
+        tx.oncomplete = () => {
           db.close();
-          if (error) reject(error);
+          resolve(value);
         };
-      };
-    }).catch(error => {
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+    } catch (error) {
       console.warn('Autosave handle load failed', error);
       return null;
-    });
+    }
   }
 
   async function clearStoredAutosaveHandle() {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(AUTOSAVE_DB_NAME, AUTOSAVE_DB_VERSION);
-      request.onupgradeneeded = event => {
-        const db = event.target.result;
-        if (!db.objectStoreNames.contains(AUTOSAVE_STORE_NAME)) {
-          db.createObjectStore(AUTOSAVE_STORE_NAME);
-        }
-      };
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        const db = request.result;
-        const tx = db.transaction(AUTOSAVE_STORE_NAME, 'readwrite');
+    if (!AUTOSAVE_SUPPORTED) return;
+    try {
+      const db = await openAutosaveDatabase();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction([AUTOSAVE_STORE_NAME], 'readwrite');
         const store = tx.objectStore(AUTOSAVE_STORE_NAME);
-        const deleteRequest = store.delete(AUTOSAVE_HANDLE_KEY);
-        deleteRequest.onsuccess = () => resolve();
-        deleteRequest.onerror = () => reject(deleteRequest.error);
-        tx.oncomplete = () => db.close();
-        tx.onerror = () => {
-          const { error } = tx;
+        const request = store.delete(AUTOSAVE_HANDLE_KEY);
+        request.onerror = () => reject(request.error);
+        tx.oncomplete = () => {
           db.close();
-          if (error) reject(error);
+          resolve();
         };
-      };
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+    } catch (error) {
+      console.warn('Failed to clear autosave handle', error);
+    }
+  }
+
+  async function loadRecentProjectsMetadata() {
+    if (!AUTOSAVE_SUPPORTED) return [];
+    try {
+      const db = await openAutosaveDatabase();
+      return await new Promise((resolve, reject) => {
+        let entries = [];
+        const tx = db.transaction([RECENT_PROJECTS_STORE], 'readonly');
+        const store = tx.objectStore(RECENT_PROJECTS_STORE);
+        const request = store.getAll();
+        request.onsuccess = () => {
+          entries = Array.isArray(request.result) ? request.result.slice() : [];
+        };
+        request.onerror = () => {
+          reject(request.error);
+        };
+        tx.oncomplete = () => {
+          db.close();
+          entries.sort((a, b) => {
+            const aTime = typeof a?.updatedAt === 'string' ? a.updatedAt : '';
+            const bTime = typeof b?.updatedAt === 'string' ? b.updatedAt : '';
+            return bTime.localeCompare(aTime);
+          });
+          resolve(entries);
+        };
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+    } catch (error) {
+      console.warn('Failed to load recent projects', error);
+      return [];
+    }
+  }
+
+  async function saveRecentProjectsList(existingEntries, nextEntries) {
+    if (!AUTOSAVE_SUPPORTED) return;
+    const existingIds = new Set((existingEntries || []).map(entry => entry?.id).filter(Boolean));
+    const nextIds = new Set((nextEntries || []).map(entry => entry?.id).filter(Boolean));
+    try {
+      const db = await openAutosaveDatabase();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction([RECENT_PROJECTS_STORE], 'readwrite');
+        const store = tx.objectStore(RECENT_PROJECTS_STORE);
+        (nextEntries || []).forEach(entry => {
+          if (!entry || !entry.id) {
+            return;
+          }
+          store.put(entry, entry.id);
+        });
+        existingIds.forEach(id => {
+          if (!nextIds.has(id)) {
+            store.delete(id);
+          }
+        });
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+    } catch (error) {
+      console.warn('Failed to update recent projects', error);
+    }
+  }
+
+  function setRecentProjectsCache(entries) {
+    recentProjectsCache.clear();
+    if (Array.isArray(entries)) {
+      entries.forEach(entry => {
+        if (entry && entry.id) {
+          recentProjectsCache.set(entry.id, entry);
+        }
+      });
+    }
+    renderRecentProjectsList(entries || []);
+  }
+
+  function isStandaloneDisplayMode() {
+    if (displayModeMedia && displayModeMedia.matches) {
+      return true;
+    }
+    if (typeof navigator !== 'undefined' && 'standalone' in navigator && navigator.standalone) {
+      return true;
+    }
+    return false;
+  }
+
+  function updateInstallButtonState() {
+    const canInstall = Boolean(deferredInstallPrompt) && !isStandaloneDisplayMode();
+    const buttons = [dom.controls.installApp, dom.startup?.installButton];
+    buttons.forEach(button => {
+      if (!button) {
+        return;
+      }
+      button.hidden = !canInstall;
+      button.disabled = !canInstall;
+      button.setAttribute('aria-hidden', canInstall ? 'false' : 'true');
     });
+  }
+
+  async function handleInstallRequest(event) {
+    if (event?.preventDefault) {
+      event.preventDefault();
+    }
+    if (!deferredInstallPrompt) {
+      updateInstallButtonState();
+      if (!isStandaloneDisplayMode()) {
+        window.alert('インストールに対応していない環境、またはすでにインストール済みです。');
+      }
+      return;
+    }
+    const promptEvent = deferredInstallPrompt;
+    deferredInstallPrompt = null;
+    try {
+      promptEvent.prompt();
+      await promptEvent.userChoice;
+    } catch (error) {
+      console.warn('PWA install prompt failed', error);
+    }
+    updateInstallButtonState();
+  }
+
+  function renderRecentProjectsList(entries) {
+    const section = dom.startup?.recentSection;
+    const list = dom.startup?.recentList;
+    if (!section || !list) {
+      return;
+    }
+    list.innerHTML = '';
+    if (!AUTOSAVE_SUPPORTED || !entries || entries.length === 0) {
+      section.hidden = true;
+      return;
+    }
+    section.hidden = false;
+    entries.forEach(entry => {
+      if (!entry || !entry.id) {
+        return;
+      }
+      const displayLabel = entry.fileName || entry.name || DEFAULT_DOCUMENT_NAME;
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'startup-recent-card';
+      card.dataset.projectId = entry.id;
+      card.setAttribute('role', 'listitem');
+      card.setAttribute('aria-label', `${displayLabel} を開く`);
+      const thumb = document.createElement('div');
+      thumb.className = 'startup-recent-card__thumb';
+      if (entry.thumbnail) {
+        const img = new Image();
+        img.src = entry.thumbnail;
+        img.alt = `${entry.fileName || entry.name || 'プロジェクト'} のプレビュー`;
+        img.decoding = 'async';
+        thumb.appendChild(img);
+      } else {
+        const placeholder = document.createElement('span');
+        placeholder.className = 'startup-recent-card__thumb-placeholder';
+        placeholder.textContent = 'プレビューなし';
+        thumb.appendChild(placeholder);
+      }
+      const nameNode = document.createElement('span');
+      nameNode.className = 'startup-recent-card__name';
+      nameNode.textContent = displayLabel;
+      nameNode.title = displayLabel;
+      card.appendChild(thumb);
+      card.appendChild(nameNode);
+      list.appendChild(card);
+    });
+  }
+
+  async function refreshRecentProjectsUI() {
+    const section = dom.startup?.recentSection;
+    const list = dom.startup?.recentList;
+    if (!section || !list) {
+      return;
+    }
+    if (!AUTOSAVE_SUPPORTED) {
+      recentProjectsCache.clear();
+      list.innerHTML = '';
+      section.hidden = true;
+      return;
+    }
+    const entries = await loadRecentProjectsMetadata();
+    setRecentProjectsCache(entries);
+  }
+
+  async function generateSnapshotThumbnail(snapshot) {
+    if (!snapshot || !snapshot.frames || !snapshot.frames.length) {
+      return null;
+    }
+    const width = Math.max(1, Math.floor(Number(snapshot.width) || 0));
+    const height = Math.max(1, Math.floor(Number(snapshot.height) || 0));
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      return null;
+    }
+    const frameIndex = clamp(Number(snapshot.activeFrame) || 0, 0, snapshot.frames.length - 1);
+    const frame = snapshot.frames[frameIndex];
+    if (!frame || !Array.isArray(frame.layers)) {
+      return null;
+    }
+    const offscreen = document.createElement('canvas');
+    offscreen.width = width;
+    offscreen.height = height;
+    const offscreenCtx = offscreen.getContext('2d', { willReadFrequently: true });
+    if (!offscreenCtx) {
+      return null;
+    }
+    const imageData = offscreenCtx.createImageData(width, height);
+    const data = imageData.data;
+    const palette = Array.isArray(snapshot.palette) ? snapshot.palette : [];
+    frame.layers.forEach(layer => {
+      if (!layer || !layer.visible || !(layer.opacity > 0)) {
+        return;
+      }
+      const opacity = Number.isFinite(layer.opacity) ? layer.opacity : 1;
+      if (opacity <= 0) {
+        return;
+      }
+      const indices = layer.indices instanceof Int16Array ? layer.indices : null;
+      const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+      if (!indices && !direct) {
+        return;
+      }
+      for (let y = 0; y < height; y += 1) {
+        const rowOffset = y * width;
+        for (let x = 0; x < width; x += 1) {
+          const pixelIndex = rowOffset + x;
+          let srcA = 0;
+          let srcR = 0;
+          let srcG = 0;
+          let srcB = 0;
+          if (indices) {
+            const paletteIndex = indices[pixelIndex];
+            if (paletteIndex >= 0) {
+              const color = palette[paletteIndex];
+              if (!color) {
+                continue;
+              }
+              srcR = color.r;
+              srcG = color.g;
+              srcB = color.b;
+              srcA = color.a;
+            }
+          }
+          if (srcA === 0 && direct) {
+            const base = pixelIndex * 4;
+            srcA = direct[base + 3];
+            if (srcA > 0) {
+              srcR = direct[base];
+              srcG = direct[base + 1];
+              srcB = direct[base + 2];
+            }
+          }
+          if (srcA <= 0) {
+            continue;
+          }
+          const destBase = pixelIndex * 4;
+          const destR = data[destBase];
+          const destG = data[destBase + 1];
+          const destB = data[destBase + 2];
+          const destA = data[destBase + 3] / 255;
+          const alpha = (srcA / 255) * opacity;
+          if (alpha <= 0) {
+            continue;
+          }
+          const outA = alpha + destA * (1 - alpha);
+          if (outA <= 0) {
+            data[destBase] = 0;
+            data[destBase + 1] = 0;
+            data[destBase + 2] = 0;
+            data[destBase + 3] = 0;
+            continue;
+          }
+          const srcFactor = alpha / outA;
+          const destFactor = (destA * (1 - alpha)) / outA;
+          data[destBase] = Math.round(srcR * srcFactor + destR * destFactor);
+          data[destBase + 1] = Math.round(srcG * srcFactor + destG * destFactor);
+          data[destBase + 2] = Math.round(srcB * srcFactor + destB * destFactor);
+          data[destBase + 3] = Math.round(outA * 255);
+        }
+      }
+    });
+    offscreenCtx.putImageData(imageData, 0, 0);
+
+    const previewCanvas = document.createElement('canvas');
+    previewCanvas.width = THUMBNAIL_CANVAS_SIZE;
+    previewCanvas.height = THUMBNAIL_CANVAS_SIZE;
+    const previewCtx = previewCanvas.getContext('2d');
+    if (!previewCtx) {
+      return null;
+    }
+    previewCtx.fillStyle = 'rgba(12, 20, 32, 0.92)';
+    previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+    const padding = Math.round((THUMBNAIL_CANVAS_SIZE - THUMBNAIL_MAX_EDGE) / 2);
+    const scale = Math.min(
+      (THUMBNAIL_CANVAS_SIZE - padding * 2) / width,
+      (THUMBNAIL_CANVAS_SIZE - padding * 2) / height,
+    );
+    const drawWidth = Math.max(1, Math.round(width * scale));
+    const drawHeight = Math.max(1, Math.round(height * scale));
+    const offsetX = Math.round((THUMBNAIL_CANVAS_SIZE - drawWidth) / 2);
+    const offsetY = Math.round((THUMBNAIL_CANVAS_SIZE - drawHeight) / 2);
+    previewCtx.imageSmoothingEnabled = false;
+    previewCtx.drawImage(offscreen, 0, 0, width, height, offsetX, offsetY, drawWidth, drawHeight);
+    return previewCanvas.toDataURL('image/png');
+  }
+
+  async function recordRecentProject(handle, snapshot) {
+    if (!AUTOSAVE_SUPPORTED) {
+      return;
+    }
+    if (!handle || typeof handle !== 'object') {
+      return;
+    }
+    try {
+      const existingEntries = await loadRecentProjectsMetadata();
+      const workingEntries = existingEntries.slice();
+      let matchedIndex = -1;
+      for (let index = 0; index < workingEntries.length; index += 1) {
+        const entry = workingEntries[index];
+        if (!entry || !entry.handle || typeof entry.handle.isSameEntry !== 'function') {
+          continue;
+        }
+        try {
+          const same = await entry.handle.isSameEntry(handle);
+          if (same) {
+            matchedIndex = index;
+            break;
+          }
+        } catch (error) {
+          // Ignore errors from isSameEntry comparisons.
+        }
+      }
+      if (matchedIndex >= 0) {
+        workingEntries.splice(matchedIndex, 1);
+      }
+      const id = matchedIndex >= 0
+        ? existingEntries[matchedIndex].id
+        : (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `project-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6)}`);
+      const fileName = (handle && typeof handle.name === 'string' && handle.name) || snapshot?.documentName || DEFAULT_DOCUMENT_NAME;
+      const displayName = extractDocumentBaseName(snapshot?.documentName || fileName);
+      const thumbnail = await generateSnapshotThumbnail(snapshot);
+      const updatedEntry = {
+        id,
+        name: displayName,
+        fileName,
+        updatedAt: new Date().toISOString(),
+        thumbnail: thumbnail || null,
+        handle,
+      };
+      workingEntries.unshift(updatedEntry);
+      const limited = workingEntries.slice(0, RECENT_PROJECT_LIMIT);
+      await saveRecentProjectsList(existingEntries, limited);
+      setRecentProjectsCache(limited);
+    } catch (error) {
+      console.warn('Failed to record recent project', error);
+    }
+  }
+
+  async function openRecentProject(entry) {
+    if (!entry || !entry.handle) {
+      return false;
+    }
+    try {
+      const granted = await ensureHandlePermission(entry.handle, { request: true });
+      if (!granted) {
+        updateAutosaveStatus('自動保存: 権限が必要です', 'warn');
+        return false;
+      }
+      await loadDocumentFromHandle(entry.handle);
+      hideStartupScreen();
+      return true;
+    } catch (error) {
+      console.warn('Failed to open recent project', error);
+      updateAutosaveStatus('プロジェクトを開けませんでした', 'error');
+      return false;
+    }
   }
 
   function serializeDocumentSnapshot(snapshot) {
@@ -4463,8 +5032,9 @@
     setupKeyboard();
     initMemoryMonitor();
     updateDocumentMetadata();
+    setupStartupScreen();
     renderEverything();
-    handleFirstOpenExperience();
+    showStartupScreen();
   }
 
   function getActiveTool() {
@@ -4770,6 +5340,8 @@
       openExportDialog();
     });
 
+    dom.controls.installApp?.addEventListener('click', handleInstallRequest);
+
     if (dom.newProject?.button) {
       dom.newProject.button.addEventListener('click', () => {
         openNewProjectDialog();
@@ -4841,6 +5413,7 @@
     setupNumberSteppers();
     syncControlsWithState();
     updateSpriteScaleControlLimits();
+    updateInstallButtonState();
   }
 
   function handleCanvasResizeRequest() {
@@ -6242,20 +6815,112 @@
     }
 
     const tool = virtualCursorDrawState.tool;
-    if (!virtualCursorDrawState.active || !tool || !BRUSH_TOOLS.has(tool)) {
+    if (!virtualCursorDrawState.active || !tool) {
       return;
     }
-    const last = virtualCursorDrawState.lastPosition;
-    if (!last) {
-      applyBrushStroke(currentCell.x, currentCell.y, currentCell.x, currentCell.y);
+
+    if (BRUSH_TOOLS.has(tool)) {
+      const last = virtualCursorDrawState.lastPosition;
+      if (!last) {
+        applyBrushStroke(currentCell.x, currentCell.y, currentCell.x, currentCell.y);
+        virtualCursorDrawState.lastPosition = { ...currentCell };
+        return;
+      }
+      if (last.x === currentCell.x && last.y === currentCell.y) {
+        return;
+      }
+      applyBrushStroke(last.x, last.y, currentCell.x, currentCell.y);
       virtualCursorDrawState.lastPosition = { ...currentCell };
       return;
     }
-    if (last.x === currentCell.x && last.y === currentCell.y) {
+
+    if (VIRTUAL_CURSOR_SHAPE_TOOLS.has(tool)) {
+      const previous = virtualCursorDrawState.currentPosition;
+      if (previous && previous.x === currentCell.x && previous.y === currentCell.y) {
+        return;
+      }
+      virtualCursorDrawState.currentPosition = { ...currentCell };
+      pointerState.current = { ...currentCell };
+      pointerState.last = { ...currentCell };
+      const lastPoint = pointerState.path[pointerState.path.length - 1];
+      if (!lastPoint || lastPoint.x !== currentCell.x || lastPoint.y !== currentCell.y) {
+        pointerState.path.push({ ...currentCell });
+      }
+      pointerState.preview = {
+        start: { ...(virtualCursorDrawState.startPosition || currentCell) },
+        end: { ...pointerState.current },
+        points: pointerState.path.slice(),
+      };
+      virtualCursorDrawState.path = pointerState.path.slice();
+      requestOverlayRender();
       return;
     }
-    applyBrushStroke(last.x, last.y, currentCell.x, currentCell.y);
-    virtualCursorDrawState.lastPosition = { ...currentCell };
+
+    if (VIRTUAL_CURSOR_SELECTION_TOOLS.has(tool)) {
+      const previous = virtualCursorDrawState.currentPosition;
+      if (previous && previous.x === currentCell.x && previous.y === currentCell.y) {
+        return;
+      }
+      virtualCursorDrawState.currentPosition = { ...currentCell };
+      pointerState.current = { ...currentCell };
+      pointerState.last = { ...currentCell };
+      const lastPathPoint = pointerState.path[pointerState.path.length - 1];
+      if (!lastPathPoint || lastPathPoint.x !== currentCell.x || lastPathPoint.y !== currentCell.y) {
+        pointerState.path.push({ ...currentCell });
+      }
+      if (!pointerState.selectionPreview) {
+        pointerState.selectionPreview = {
+          start: { ...(virtualCursorDrawState.startPosition || currentCell) },
+          end: { ...currentCell },
+          points: [{ ...(virtualCursorDrawState.startPosition || currentCell) }],
+        };
+      }
+      if (tool === 'selectLasso') {
+        const selectionPoints = pointerState.selectionPreview.points;
+        const lastSelectionPoint = selectionPoints[selectionPoints.length - 1];
+        if (!lastSelectionPoint || lastSelectionPoint.x !== currentCell.x || lastSelectionPoint.y !== currentCell.y) {
+          selectionPoints.push({ ...currentCell });
+        }
+        pointerState.selectionPreview.end = { ...currentCell };
+        virtualCursorDrawState.points = selectionPoints.map(point => ({ ...point }));
+      } else {
+        pointerState.selectionPreview.end = { ...currentCell };
+        virtualCursorDrawState.points = [
+          { ...(pointerState.selectionPreview.start || virtualCursorDrawState.startPosition || currentCell) },
+          { ...currentCell },
+        ];
+      }
+      virtualCursorDrawState.path = pointerState.path.slice();
+      requestOverlayRender();
+      return;
+    }
+
+    if (tool === 'curve') {
+      virtualCursorDrawState.currentPosition = { ...currentCell };
+      pointerState.current = { ...currentCell };
+      pointerState.last = { ...currentCell };
+      const stage = virtualCursorDrawState.curveStage || (curveBuilder ? curveBuilder.stage : null);
+      if (!curveBuilder || !stage) {
+        return;
+      }
+      if (stage === 'line') {
+        const lastPoint = pointerState.path[pointerState.path.length - 1];
+        if (!lastPoint || lastPoint.x !== currentCell.x || lastPoint.y !== currentCell.y) {
+          pointerState.path.push({ ...currentCell });
+        }
+        curveBuilder.end = { ...currentCell };
+        pointerState.preview = {
+          start: { ...(curveBuilder.start || virtualCursorDrawState.startPosition || currentCell) },
+          end: { ...currentCell },
+        };
+      } else if (stage === 'control1') {
+        curveBuilder.control1 = { ...currentCell };
+      } else if (stage === 'control2') {
+        curveBuilder.control2 = { ...currentCell };
+      }
+      virtualCursorDrawState.curveStage = stage;
+      requestOverlayRender();
+    }
   }
 
   function startVirtualCursorDrawSession() {
@@ -6266,45 +6931,314 @@
       return false;
     }
     const activeTool = state.tool;
-    if (!BRUSH_TOOLS.has(activeTool)) {
-      return false;
-    }
-    const layer = getActiveLayer();
-    if (!layer && HISTORY_DRAW_TOOLS.has(activeTool)) {
+    if (!VIRTUAL_CURSOR_SUPPORTED_TOOLS.has(activeTool)) {
       return false;
     }
     const cell = getVirtualCursorCellPosition();
     if (!cell) {
       return false;
     }
+    const layer = getActiveLayer();
+    const requiresLayer = HISTORY_DRAW_TOOLS.has(activeTool);
+    if (requiresLayer && !layer) {
+      return false;
+    }
+
+    resetPointerStateForVirtualCursor();
+    hoverPixel = null;
+
     virtualCursorDrawState.active = true;
     virtualCursorDrawState.tool = activeTool;
-    virtualCursorDrawState.lastPosition = { ...cell };
     virtualCursorDrawState.historyStarted = false;
+    virtualCursorDrawState.lastPosition = BRUSH_TOOLS.has(activeTool) ? { ...cell } : null;
+    virtualCursorDrawState.startPosition = { ...cell };
+    virtualCursorDrawState.currentPosition = { ...cell };
+    virtualCursorDrawState.path = [{ ...cell }];
+    virtualCursorDrawState.points = [{ ...cell }];
+    virtualCursorDrawState.selectionClearedOnStart = false;
+    virtualCursorDrawState.curveStage = null;
+
+    pointerState.tool = activeTool;
+    pointerState.start = { ...cell };
+    pointerState.current = { ...cell };
+    pointerState.last = { ...cell };
+    pointerState.path = [{ ...cell }];
+    pointerState.preview = null;
+    pointerState.selectionPreview = null;
+    pointerState.selectionMove = null;
+    pointerState.selectionClearedOnDown = false;
+    pointerState.curveHandle = null;
 
     if (HISTORY_DRAW_TOOLS.has(activeTool)) {
       beginHistory(activeTool);
       virtualCursorDrawState.historyStarted = true;
     }
-    applyBrushStroke(cell.x, cell.y, cell.x, cell.y);
-    return true;
+    if (BRUSH_TOOLS.has(activeTool)) {
+      applyBrushStroke(cell.x, cell.y, cell.x, cell.y);
+      requestOverlayRender();
+      return true;
+    }
+
+    if (VIRTUAL_CURSOR_SHAPE_TOOLS.has(activeTool)) {
+      pointerState.preview = {
+        start: { ...virtualCursorDrawState.startPosition },
+        end: { ...virtualCursorDrawState.currentPosition },
+        points: pointerState.path.slice(),
+      };
+      requestOverlayRender();
+      return true;
+    }
+
+    if (VIRTUAL_CURSOR_SELECTION_TOOLS.has(activeTool)) {
+      if (state.selectionMask) {
+        clearSelection();
+        virtualCursorDrawState.selectionClearedOnStart = true;
+        pointerState.selectionClearedOnDown = true;
+      }
+      const preview = {
+        start: { ...virtualCursorDrawState.startPosition },
+        end: { ...virtualCursorDrawState.currentPosition },
+        points: [{ ...virtualCursorDrawState.startPosition }],
+      };
+      pointerState.selectionPreview = preview;
+      pointerState.tool = activeTool;
+      virtualCursorDrawState.points = preview.points.map(point => ({ ...point }));
+      requestOverlayRender();
+      return true;
+    }
+
+    if (activeTool === 'curve') {
+      if (!curveBuilder) {
+        beginHistory('curve');
+        curveBuilder = {
+          stage: 'line',
+          start: { ...cell },
+          end: { ...cell },
+          control1: null,
+          control2: null,
+          awaitingEndPoint: true,
+        };
+      }
+      virtualCursorDrawState.curveStage = curveBuilder.stage;
+      pointerState.tool = 'curve';
+      if (curveBuilder.stage === 'line') {
+        if (!curveBuilder.start) {
+          curveBuilder.start = { ...cell };
+        }
+        curveBuilder.end = { ...cell };
+        pointerState.start = { ...curveBuilder.start };
+        pointerState.current = { ...curveBuilder.end };
+        pointerState.last = { ...curveBuilder.end };
+        pointerState.path = [{ ...curveBuilder.start }, { ...curveBuilder.end }];
+        pointerState.preview = {
+          start: { ...curveBuilder.start },
+          end: { ...curveBuilder.end },
+        };
+      } else if (curveBuilder.stage === 'control1') {
+        pointerState.curveHandle = 'control1';
+        pointerState.start = { ...cell };
+        pointerState.current = { ...cell };
+        pointerState.last = { ...cell };
+        pointerState.path = [{ ...cell }];
+        curveBuilder.control1 = { ...cell };
+        pointerState.preview = null;
+      } else if (curveBuilder.stage === 'control2') {
+        pointerState.curveHandle = 'control2';
+        pointerState.start = { ...cell };
+        pointerState.current = { ...cell };
+        pointerState.last = { ...cell };
+        pointerState.path = [{ ...cell }];
+        curveBuilder.control2 = { ...cell };
+        pointerState.preview = null;
+      }
+      requestOverlayRender();
+      return true;
+    }
+
+    virtualCursorDrawState.active = false;
+    virtualCursorDrawState.historyStarted = false;
+    virtualCursorDrawState.lastPosition = null;
+    virtualCursorDrawState.tool = null;
+    virtualCursorDrawState.startPosition = null;
+    virtualCursorDrawState.currentPosition = null;
+    virtualCursorDrawState.path = [];
+    virtualCursorDrawState.points = [];
+    virtualCursorDrawState.selectionClearedOnStart = false;
+    virtualCursorDrawState.curveStage = null;
+    return false;
   }
 
   function finishVirtualCursorDrawSession({ commit = true } = {}) {
     if (!virtualCursorDrawState.active) {
       return;
     }
-    if (virtualCursorDrawState.historyStarted) {
-      if (commit) {
-        commitHistory();
+    const tool = virtualCursorDrawState.tool;
+    let actionPerformed = false;
+    let shouldCommitHistory = false;
+    let shouldRollbackHistory = false;
+
+    if (tool === 'curve') {
+      if (!curveBuilder) {
+        if (!commit && history.pending && history.pending.label === 'curve') {
+          rollbackPendingHistory({ reRender: false });
+        }
+      } else if (!commit) {
+        if (history.pending && history.pending.label === 'curve') {
+          rollbackPendingHistory({ reRender: false });
+        }
+        resetCurveBuilder();
       } else {
-        rollbackPendingHistory({ reRender: false });
+        const stage = virtualCursorDrawState.curveStage || curveBuilder.stage;
+        const currentPoint = virtualCursorDrawState.currentPosition || pointerState.current || curveBuilder.end;
+        if (stage === 'line') {
+          if (currentPoint) {
+            curveBuilder.end = { ...currentPoint };
+          }
+          const start = curveBuilder.start;
+          const moved = start && currentPoint && (start.x !== currentPoint.x || start.y !== currentPoint.y);
+          pointerState.preview = null;
+          pointerState.path = [];
+          pointerState.curveHandle = null;
+          pointerState.tool = null;
+          if (!moved) {
+            curveBuilder.awaitingEndPoint = true;
+          } else {
+            curveBuilder.awaitingEndPoint = false;
+            if (!curveBuilder.control1) {
+              curveBuilder.control1 = { ...curveBuilder.start };
+            }
+            if (!curveBuilder.control2) {
+              curveBuilder.control2 = { ...curveBuilder.end };
+            }
+            curveBuilder.stage = 'control1';
+          }
+          requestOverlayRender();
+        } else if (stage === 'control1') {
+          if (currentPoint) {
+            curveBuilder.control1 = { ...currentPoint };
+          }
+          curveBuilder.stage = 'control2';
+          pointerState.curveHandle = null;
+          pointerState.path = [];
+          pointerState.tool = null;
+          requestOverlayRender();
+          scheduleSessionPersist();
+        } else if (stage === 'control2') {
+          if (currentPoint) {
+            curveBuilder.control2 = { ...currentPoint };
+          }
+          pointerState.curveHandle = null;
+          pointerState.path = [];
+          pointerState.tool = null;
+          finalizeCurve();
+        }
+      }
+    } else if (BRUSH_TOOLS.has(tool)) {
+      if (virtualCursorDrawState.historyStarted) {
+        if (commit) {
+          shouldCommitHistory = true;
+        } else {
+          shouldRollbackHistory = true;
+        }
+      }
+    } else if (VIRTUAL_CURSOR_SHAPE_TOOLS.has(tool)) {
+      const start = virtualCursorDrawState.startPosition;
+      const end = virtualCursorDrawState.currentPosition;
+      if (commit && start && end) {
+        switch (tool) {
+          case 'line':
+            drawLine(start, end);
+            actionPerformed = true;
+            break;
+          case 'rect':
+            drawRectangle(start, end, false);
+            actionPerformed = true;
+            break;
+          case 'rectFill':
+            drawRectangle(start, end, true);
+            actionPerformed = true;
+            break;
+          case 'ellipse':
+            drawEllipse(start, end, false);
+            actionPerformed = true;
+            break;
+          case 'ellipseFill':
+            drawEllipse(start, end, true);
+            actionPerformed = true;
+            break;
+          default:
+            break;
+        }
+        if (virtualCursorDrawState.historyStarted) {
+          if (actionPerformed) {
+            shouldCommitHistory = true;
+          } else {
+            shouldRollbackHistory = true;
+          }
+        }
+      } else if (virtualCursorDrawState.historyStarted) {
+        shouldRollbackHistory = true;
+      }
+    } else if (VIRTUAL_CURSOR_SELECTION_TOOLS.has(tool)) {
+      if (commit) {
+        const pathLength = virtualCursorDrawState.path.length;
+        if (tool === 'selectRect') {
+          const start = virtualCursorDrawState.startPosition;
+          const end = virtualCursorDrawState.currentPosition;
+          if (start && end && !(virtualCursorDrawState.selectionClearedOnStart && pathLength <= 1)) {
+            createSelectionRect(start, end);
+            actionPerformed = true;
+          }
+        } else if (tool === 'selectLasso') {
+          const points = pointerState.selectionPreview?.points || virtualCursorDrawState.points || [];
+          const effectivePoints = points.map(point => ({ ...point })).filter(Boolean);
+          if (effectivePoints.length > 1 && !(virtualCursorDrawState.selectionClearedOnStart && effectivePoints.length <= 1)) {
+            createSelectionLasso(effectivePoints);
+            actionPerformed = true;
+          }
+        }
+        if (actionPerformed) {
+          scheduleSessionPersist();
+        }
+      }
+    } else if (virtualCursorDrawState.historyStarted) {
+      if (commit) {
+        shouldCommitHistory = true;
+      } else {
+        shouldRollbackHistory = true;
       }
     }
+
+    if (shouldCommitHistory) {
+      commitHistory();
+    } else if (shouldRollbackHistory) {
+      rollbackPendingHistory({ reRender: false });
+    }
+
+    if (commit && virtualCursorDrawState.currentPosition) {
+      hoverPixel = { ...virtualCursorDrawState.currentPosition };
+    }
+
+    pointerState.preview = null;
+    pointerState.selectionPreview = null;
+    pointerState.selectionMove = null;
+    pointerState.path = [];
+    pointerState.selectionClearedOnDown = false;
+    if (tool !== 'curve') {
+      pointerState.tool = state.tool;
+      pointerState.curveHandle = null;
+    }
+
     virtualCursorDrawState.active = false;
     virtualCursorDrawState.historyStarted = false;
     virtualCursorDrawState.lastPosition = null;
     virtualCursorDrawState.tool = null;
+    virtualCursorDrawState.startPosition = null;
+    virtualCursorDrawState.currentPosition = null;
+    virtualCursorDrawState.path = [];
+    virtualCursorDrawState.points = [];
+    virtualCursorDrawState.selectionClearedOnStart = false;
+    virtualCursorDrawState.curveStage = null;
     requestOverlayRender();
   }
 
@@ -7034,11 +7968,14 @@
   }
 
   function resetPointerState({ commitHistory: shouldCommit = false } = {}) {
-    if (pointerState.pointerId !== null && dom.canvases.drawing) {
-      try {
-        dom.canvases.drawing.releasePointerCapture(pointerState.pointerId);
-      } catch (error) {
-        // Ignore release failures when capture is not set.
+    if (pointerState.pointerId !== null) {
+      const captureTarget = pointerState.panCaptureElement || dom.canvases.drawing;
+      if (captureTarget && typeof captureTarget.releasePointerCapture === 'function') {
+        try {
+          captureTarget.releasePointerCapture(pointerState.pointerId);
+        } catch (error) {
+          // Ignore release failures when capture is not set.
+        }
       }
     }
     pointerState.active = false;
@@ -7057,6 +7994,7 @@
     pointerState.panMode = null;
     pointerState.touchPanStart = null;
     pointerState.curveHandle = null;
+    pointerState.panCaptureElement = null;
     if (shouldCommit) {
       commitHistory();
     }
@@ -7080,6 +8018,7 @@
     pointerState.touchPanStart = null;
     pointerState.curveHandle = null;
     pointerState.panOrigin = { x: state.pan.x, y: state.pan.y };
+    pointerState.panCaptureElement = null;
   }
 
   function abortActivePointerInteraction({ commitHistory: shouldCommit = true } = {}) {
@@ -7133,7 +8072,7 @@
     pointerState.panOrigin = { x: state.pan.x, y: state.pan.y };
   }
 
-  function startPanInteraction(event, { multiTouch = false } = {}) {
+  function startPanInteraction(event, { multiTouch = false, captureElement = dom.canvases.drawing } = {}) {
     pointerState.active = true;
     pointerState.tool = 'pan';
     pointerState.panMode = multiTouch ? 'multiTouch' : 'single';
@@ -7146,12 +8085,21 @@
       if (!pointerState.touchPanStart) {
         pointerState.touchPanStart = { x: event.clientX, y: event.clientY };
       }
+      pointerState.panCaptureElement = null;
     } else {
       pointerState.pointerId = event.pointerId;
       pointerState.startClient = { x: event.clientX, y: event.clientY };
       pointerState.touchPanStart = null;
-      if (dom.canvases.drawing) {
-        dom.canvases.drawing.setPointerCapture(event.pointerId);
+      const captureTarget = captureElement && typeof captureElement.setPointerCapture === 'function'
+        ? captureElement
+        : dom.canvases.drawing;
+      pointerState.panCaptureElement = captureTarget || null;
+      if (pointerState.panCaptureElement && typeof pointerState.panCaptureElement.setPointerCapture === 'function') {
+        try {
+          pointerState.panCaptureElement.setPointerCapture(event.pointerId);
+        } catch (error) {
+          pointerState.panCaptureElement = null;
+        }
       }
     }
     window.addEventListener('pointermove', handlePointerMove);
@@ -7160,11 +8108,14 @@
 
   function finishPanInteraction() {
     detachPointerListeners();
-    if (pointerState.pointerId !== null && dom.canvases.drawing) {
-      try {
-        dom.canvases.drawing.releasePointerCapture(pointerState.pointerId);
-      } catch (error) {
-        // Ignore capture release issues.
+    if (pointerState.pointerId !== null) {
+      const captureTarget = pointerState.panCaptureElement || dom.canvases.drawing;
+      if (captureTarget && typeof captureTarget.releasePointerCapture === 'function') {
+        try {
+          captureTarget.releasePointerCapture(pointerState.pointerId);
+        } catch (error) {
+          // Ignore capture release issues.
+        }
       }
     }
     pointerState.active = false;
@@ -7174,6 +8125,7 @@
     pointerState.touchPanStart = null;
     pointerState.startClient = null;
     pointerState.path = [];
+    pointerState.panCaptureElement = null;
     activeTouchPointers.clear();
     requestOverlayRender();
     scheduleSessionPersist();
@@ -7342,15 +8294,7 @@
       return;
     }
 
-    if (activeTool === 'selectSame') {
-      createSelectionByColor(position.x, position.y);
-      const moved = beginSelectionMove(event, position);
-      if (moved) {
-        return;
-      }
-    }
-
-    if (activeTool === 'selectRect' || activeTool === 'selectLasso' || activeTool === 'selectSame') {
+    if (activeTool === 'selectRect' || activeTool === 'selectLasso') {
       pointerState.selectionPreview = { start: position, points: [position] };
     } else if (activeTool === 'line' || activeTool === 'rect' || activeTool === 'rectFill' || activeTool === 'ellipse' || activeTool === 'ellipseFill') {
       pointerState.preview = { start: position, end: position, points: [position] };
@@ -7509,6 +8453,11 @@
       const pointCount = pointerState.selectionPreview?.points?.length || 0;
       if (!(pointerState.selectionClearedOnDown && pointCount <= 1)) {
         createSelectionLasso(pointerState.selectionPreview.points);
+      }
+    } else if (tool === 'selectSame') {
+      const target = pointerState.current || pointerState.start;
+      if (target) {
+        createSelectionByColor(target.x, target.y);
       }
     }
 
@@ -9189,7 +10138,23 @@
   }
 
   function updateVirtualCursorFromControlDelta(event) {
-    if (!virtualCursor || !dom.canvases.drawing) {
+    if (!dom.canvases.drawing) {
+      return;
+    }
+    const captureTarget = virtualCursorControl.captureElement;
+    const shouldUseAbsolutePosition = captureTarget === dom.canvasViewport || captureTarget === dom.canvases.drawing;
+
+    if (shouldUseAbsolutePosition) {
+      const position = getClampedPointerPosition(event);
+      if (position) {
+        const nextX = clamp(position.x, 0, state.width - 1);
+        const nextY = clamp(position.y, 0, state.height - 1);
+        updateVirtualCursorPosition(nextX, nextY);
+        return;
+      }
+    }
+
+    if (!virtualCursor) {
       return;
     }
     const start = virtualCursorControl.startClient;
@@ -9360,6 +10325,44 @@
   }
 
   function handleViewportPointerDown(event) {
+    const targetElement = event.target instanceof Element ? event.target : null;
+    const isCanvasTarget = targetElement && isCanvasSurfaceTarget(targetElement);
+    const isControlTarget = targetElement && isViewportControlTarget(targetElement);
+    const isTouch = event.pointerType === 'touch';
+
+    if (!isCanvasTarget && !isControlTarget) {
+      if (isTouch) {
+        updateTouchPointer(event);
+        if (hasActiveMultiTouch()) {
+          event.preventDefault();
+          releaseVirtualCursorPointer();
+          if (pointerState.active && pointerState.tool !== 'pan') {
+            abortActivePointerInteraction({ commitHistory: false });
+            rollbackPendingHistory();
+          }
+          if (!pointerState.active || pointerState.tool !== 'pan' || pointerState.panMode !== 'multiTouch') {
+            abortActivePointerInteraction();
+            startPanInteraction(event, { multiTouch: true });
+          } else {
+            refreshTouchPanBaseline();
+          }
+          return;
+        }
+      }
+
+      const isMiddleMousePan = !isTouch && event.button === 1;
+      const isPrimaryButton = !isTouch && (event.button === 0 || event.button === undefined);
+      const wantsPan = !isTouch && (isMiddleMousePan || (state.tool === 'pan' && isPrimaryButton));
+      if (wantsPan) {
+        event.preventDefault();
+        if (pointerState.active) {
+          abortActivePointerInteraction({ commitHistory: false });
+        }
+        startPanInteraction(event, { captureElement: dom.canvasViewport });
+        return;
+      }
+    }
+
     if (!state.showVirtualCursor) {
       return;
     }
@@ -9369,8 +10372,7 @@
     if (virtualCursorControl.pointerId !== null) {
       return;
     }
-    const targetElement = event.target instanceof Element ? event.target : null;
-    if (targetElement && (isCanvasSurfaceTarget(targetElement) || isViewportControlTarget(targetElement))) {
+    if (targetElement && (isCanvasTarget || isControlTarget)) {
       return;
     }
     updateTouchPointer(event);
@@ -10123,9 +11125,6 @@
     if (!payload || typeof payload !== 'object') {
       return;
     }
-
-    sessionStateRestored = true;
-    markFirstOpenComplete();
 
     if (Number.isFinite(payload.scale)) {
       state.scale = normalizeZoomScale(payload.scale, state.scale || MIN_ZOOM_SCALE);
