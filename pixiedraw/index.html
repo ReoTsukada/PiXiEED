@@ -23,6 +23,26 @@
   </head>
   <body>
     <div class="app" id="appRoot">
+      <div class="startup-screen" id="startupScreen" role="dialog" aria-modal="true" aria-labelledby="startupScreenTitle" tabindex="-1" hidden>
+        <div class="startup-screen__backdrop"></div>
+        <div class="startup-screen__content">
+          <div class="startup-screen__header">
+            <h1 class="startup-screen__title" id="startupScreenTitle">PiXiEEDraw</h1>
+            <p class="startup-screen__subtitle">ドット絵づくりをはじめよう</p>
+          </div>
+          <div class="startup-screen__actions">
+            <button type="button" class="button button--primary" id="startupActionNew">新規作成</button>
+            <button type="button" class="button" id="startupActionOpen">ファイルを開く</button>
+            <button type="button" class="button button--ghost" id="startupActionInstall" hidden>インストール</button>
+          </div>
+          <button type="button" class="startup-screen__link" id="startupActionSkip">編集を続ける</button>
+          <p class="startup-screen__hint" id="startupScreenHint">ファイルを開くと既存の自動保存先を引き継ぎます。</p>
+          <div class="startup-screen__recent" id="startupRecentProjects" hidden>
+            <h2 class="startup-screen__recent-title">最近のプロジェクト</h2>
+            <div class="startup-recent-list" id="startupRecentList" role="list"></div>
+          </div>
+        </div>
+      </div>
       <div class="app-banner" id="appBanner" aria-label="バナー広告スペース"></div>
       <div class="mobile-topbar" id="mobileTopBar" hidden>
         <div class="mobile-topbar__inner">
@@ -290,6 +310,7 @@
           <div class="field-group">
             <button type="button" class="button" id="newProject">新規作成</button>
             <button type="button" class="button" id="openDocument">ファイルを開く</button>
+            <button type="button" class="button" id="installApp" hidden>インストール</button>
             <button type="button" class="button" id="exportProject">エクスポート</button>
             <button type="button" class="button" id="clearCanvas">キャンバスをクリア</button>
             <button type="button" class="button" id="enableAutosave">ローカルに自動保存</button>
