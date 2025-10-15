@@ -204,6 +204,7 @@
   const DEFAULT_CANVAS_SIZE = 32;
   const MIN_CANVAS_SIZE = 1;
   const MAX_CANVAS_SIZE = 512;
+  const MAX_IMPORTED_PALETTE_COLORS = 256;
   const MAX_EXPORT_DIMENSION = 2000;
   const MAX_EXPORT_SCALE_OPTIONS = MAX_EXPORT_DIMENSION;
   const MAX_SELECTION_CANVAS_DIMENSION = 8192;
@@ -2492,6 +2493,59 @@
     return error;
   }
 
+  function buildIndexedPaletteFromImageData(data, maxColors = MAX_IMPORTED_PALETTE_COLORS) {
+    if (!(data instanceof Uint8ClampedArray)) {
+      return { palette: [], indices: new Int16Array(0), overflow: false };
+    }
+    const pixelCount = Math.floor(data.length / 4);
+    const colorMap = new Map();
+    const palette = [];
+    let overflow = false;
+
+    for (let i = 0; i < pixelCount; i += 1) {
+      const base = i * 4;
+      const a = data[base + 3];
+      if (a === 0) {
+        continue;
+      }
+      const r = data[base];
+      const g = data[base + 1];
+      const b = data[base + 2];
+      const key = `${r},${g},${b},${a}`;
+      if (!colorMap.has(key)) {
+        if (palette.length >= maxColors) {
+          overflow = true;
+          break;
+        }
+        colorMap.set(key, palette.length);
+        palette.push({ r, g, b, a });
+      }
+    }
+
+    if (overflow) {
+      return { palette, indices: null, overflow: true };
+    }
+
+    const indices = new Int16Array(pixelCount).fill(-1);
+    for (let i = 0; i < pixelCount; i += 1) {
+      const base = i * 4;
+      const a = data[base + 3];
+      if (a === 0) {
+        continue;
+      }
+      const r = data[base];
+      const g = data[base + 1];
+      const b = data[base + 2];
+      const key = `${r},${g},${b},${a}`;
+      const paletteIndex = colorMap.get(key);
+      if (paletteIndex !== undefined) {
+        indices[i] = paletteIndex;
+      }
+    }
+
+    return { palette, indices, overflow: false };
+  }
+
   async function loadDocumentFromImageFile(file) {
     let imageData;
     try {
@@ -2509,8 +2563,31 @@
     }
 
     const layer = createLayer('PNG レイヤー', width, height);
-    const direct = ensureLayerDirect(layer, width, height);
-    direct.set(imageData.data);
+    const extraction = buildIndexedPaletteFromImageData(imageData.data);
+    let palette = [];
+    let activePaletteIndex = 0;
+    let activeRgb = { r: 255, g: 255, b: 255, a: 255 };
+
+    if (!extraction.overflow && extraction.palette.length > 0) {
+      layer.indices = extraction.indices;
+      layer.direct = null;
+      palette = extraction.palette.map(color => ({ ...color }));
+      activePaletteIndex = 0;
+      activeRgb = { ...palette[activePaletteIndex] };
+    } else {
+      const direct = ensureLayerDirect(layer, width, height);
+      direct.set(imageData.data);
+      const paletteSource = state.palette && state.palette.length
+        ? state.palette
+        : createInitialState({ width, height }).palette;
+      palette = paletteSource.map(color => ({ ...color }));
+      activePaletteIndex = palette.length
+        ? clamp(state.activePaletteIndex ?? 0, 0, palette.length - 1)
+        : 0;
+      activeRgb = state.activeRgb
+        ? { ...state.activeRgb }
+        : (palette[activePaletteIndex] ? { ...palette[activePaletteIndex] } : { r: 255, g: 255, b: 255, a: 255 });
+    }
 
     const frame = {
       id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}`,
@@ -2519,16 +2596,6 @@
       layers: [layer],
     };
 
-    const paletteSource = state.palette && state.palette.length
-      ? state.palette
-      : createInitialState({ width, height }).palette;
-    const palette = paletteSource.map(color => ({ ...color }));
-    const activePaletteIndex = palette.length
-      ? clamp(state.activePaletteIndex ?? 0, 0, palette.length - 1)
-      : 0;
-    const activeRgb = state.activeRgb
-      ? { ...state.activeRgb }
-      : (palette[activePaletteIndex] ? { ...palette[activePaletteIndex] } : { r: 255, g: 255, b: 255, a: 255 });
     const documentName = normalizeDocumentName(typeof file?.name === 'string' ? file.name : state.documentName);
     const activeToolGroup = TOOL_GROUPS[state.activeToolGroup] ? state.activeToolGroup : (TOOL_TO_GROUP[state.tool] || 'pen');
 
