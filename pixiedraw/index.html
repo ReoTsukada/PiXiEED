@@ -311,7 +311,7 @@
             <button type="button" class="button" id="newProject">新規作成</button>
             <button type="button" class="button" id="openDocument">ファイルを開く</button>
             <button type="button" class="button" id="installApp" hidden>インストール</button>
-            <button type="button" class="button" id="exportProject">エクスポート</button>
+            <button type="button" class="button" id="exportProject">保存</button>
             <button type="button" class="button" id="clearCanvas">キャンバスをクリア</button>
             <button type="button" class="button" id="enableAutosave">ローカルに自動保存</button>
           </div>
@@ -433,26 +433,20 @@
                 <input type="range" id="exportScaleSlider" min="1" max="1" step="1" value="1" />
                 <input type="number" id="exportScaleInput" min="1" value="1" inputmode="numeric" data-stepper="true" />
               </div>
-              <div class="scale-control scale-control--pair">
-                <label class="scale-field" for="exportPixelWidth">
-                  <span>幅 (PX)</span>
-                  <input type="number" id="exportPixelWidth" min="1" value="32" inputmode="numeric" data-stepper="true" />
-                </label>
-                <label class="scale-field" for="exportPixelHeight">
-                  <span>高さ (PX)</span>
-                  <input type="number" id="exportPixelHeight" min="1" value="32" inputmode="numeric" data-stepper="true" />
-                </label>
-              </div>
             </div>
             <p class="help-text" id="exportScaleHint"></p>
           </div>
           <div class="field field--list">
-            <button type="button" class="button button--primary" id="confirmExportPng">PNG（スプライトシート）</button>
+            <button type="button" class="button button--primary" id="confirmExportPng">PNG（画像）</button>
             <p class="help-text">全フレームをグリッドに並べた PNG を保存します</p>
           </div>
           <div class="field field--list">
             <button type="button" class="button button--primary" id="confirmExportGif">GIF（アニメーション）</button>
             <p class="help-text">フレーム時間を維持したアニメーション GIF を保存します</p>
+          </div>
+          <div class="field field--list">
+            <button type="button" class="button button--primary" id="saveProject">プロジェクトを保存</button>
+            <p class="help-text">現在の編集内容を .pixieedraw ファイルとして保存します</p>
           </div>
         </div>
         <footer class="modal__footer">
