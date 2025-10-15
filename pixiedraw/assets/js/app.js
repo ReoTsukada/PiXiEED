@@ -8311,11 +8311,23 @@
     if (activeTool === 'fill') {
       floodFill(position.x, position.y);
       requestOverlayRender();
+      pointerState.active = false;
+      pointerState.tool = state.tool;
+      pointerState.pointerId = null;
+      if (dom.canvases.drawing) {
+        try {
+          dom.canvases.drawing.releasePointerCapture(event.pointerId);
+        } catch (error) {
+          // Ignore capture release issues.
+        }
+      }
       return;
     }
 
     if (activeTool === 'selectRect' || activeTool === 'selectLasso') {
       pointerState.selectionPreview = { start: position, points: [position] };
+    } else if (activeTool === 'selectSame') {
+      pointerState.selectionPreview = null;
     } else if (activeTool === 'line' || activeTool === 'rect' || activeTool === 'rectFill' || activeTool === 'ellipse' || activeTool === 'ellipseFill') {
       pointerState.preview = { start: position, end: position, points: [position] };
     } else {
@@ -8496,14 +8508,15 @@
       if (!(pointerState.selectionClearedOnDown && pointCount <= 1)) {
         createSelectionLasso(pointerState.selectionPreview.points);
       }
+    }
+
+    if (HISTORY_DRAW_TOOLS.has(tool)) {
+      commitHistory();
     } else if (tool === 'selectSame') {
       const target = pointerState.current || pointerState.start;
       if (target) {
         createSelectionByColor(target.x, target.y);
       }
-    }
-
-    if (HISTORY_DRAW_TOOLS.has(tool)) {
       commitHistory();
     }
 
@@ -9336,6 +9349,7 @@
       return;
     }
     finalizeSelectionMove();
+    clearSelection();
     updateCanvasControlButtons();
   }
 
@@ -9354,6 +9368,7 @@
     pointerState.selectionClearedOnDown = false;
     pointerState.path = [];
     rollbackPendingHistory({ reRender: true });
+    clearSelection();
     updateCanvasControlButtons();
     requestOverlayRender();
   }
@@ -9959,12 +9974,20 @@
   }
 
   function createSelectionByColor(x, y) {
-    const frame = getActiveFrame();
+    const layer = getActiveLayer();
+    if (!layer) {
+      clearSelection();
+      return;
+    }
     const mask = new Uint8Array(state.width * state.height);
     const bounds = { x0: state.width, y0: state.height, x1: 0, y1: 0 };
     const stack = [[x, y]];
     const visited = new Uint8Array(state.width * state.height);
-    const target = sampleCompositeColor(x, y);
+    const targetSample = getLayerPixelColor(layer, x, y);
+    if (!targetSample || targetSample.a === 0) {
+      clearSelection();
+      return;
+    }
 
     while (stack.length > 0) {
       const [px, py] = stack.pop();
@@ -9972,8 +9995,9 @@
       const idx = py * state.width + px;
       if (visited[idx]) continue;
       visited[idx] = 1;
-      const sample = sampleCompositeColor(px, py);
-      if (!compositeColorMatches(sample, target)) continue;
+      const sample = getLayerPixelColor(layer, px, py);
+      if (!sample || sample.a === 0) continue;
+      if (!layerColorMatches(sample, targetSample)) continue;
       mask[idx] = 1;
       bounds.x0 = Math.min(bounds.x0, px);
       bounds.y0 = Math.min(bounds.y0, py);
@@ -10002,6 +10026,38 @@
       return a.index === b.index;
     }
     return a.color.r === b.color.r && a.color.g === b.color.g && a.color.b === b.color.b && a.color.a === b.color.a;
+  }
+
+  function getLayerPixelColor(layer, x, y) {
+    if (!layer) return null;
+    if (x < 0 || y < 0 || x >= state.width || y >= state.height) return null;
+    const idx = y * state.width + x;
+    const paletteIndex = layer.indices[idx];
+    if (paletteIndex >= 0) {
+      const color = state.palette[paletteIndex];
+      if (color) {
+        return { r: color.r, g: color.g, b: color.b, a: color.a };
+      }
+    }
+    const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    if (direct) {
+      const base = idx * 4;
+      const a = direct[base + 3];
+      if (a > 0) {
+        return {
+          r: direct[base],
+          g: direct[base + 1],
+          b: direct[base + 2],
+          a,
+        };
+      }
+    }
+    return null;
+  }
+
+  function layerColorMatches(sample, target) {
+    if (!sample || !target) return false;
+    return sample.r === target.r && sample.g === target.g && sample.b === target.b && sample.a === target.a;
   }
 
   function clearSelection() {
@@ -10224,23 +10280,7 @@
   }
 
   function updateVirtualCursorFromControlDelta(event) {
-    if (!dom.canvases.drawing) {
-      return;
-    }
-    const captureTarget = virtualCursorControl.captureElement;
-    const shouldUseAbsolutePosition = captureTarget === dom.canvasViewport || captureTarget === dom.canvases.drawing;
-
-    if (shouldUseAbsolutePosition) {
-      const position = getClampedPointerPosition(event);
-      if (position) {
-        const nextX = clamp(position.x, 0, state.width - 1);
-        const nextY = clamp(position.y, 0, state.height - 1);
-        updateVirtualCursorPosition(nextX, nextY);
-        return;
-      }
-    }
-
-    if (!virtualCursor) {
+    if (!dom.canvases.drawing || !virtualCursor) {
       return;
     }
     const start = virtualCursorControl.startClient;
