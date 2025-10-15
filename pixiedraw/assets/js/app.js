@@ -103,6 +103,7 @@
       virtualCursorButtonScaleValue: document.getElementById('virtualCursorButtonScaleValue'),
       openDocument: document.getElementById('openDocument'),
       installApp: document.getElementById('installApp'),
+      saveProject: document.getElementById('saveProject'),
       exportProject: document.getElementById('exportProject'),
       clearCanvas: document.getElementById('clearCanvas'),
       enableAutosave: document.getElementById('enableAutosave'),
@@ -208,6 +209,7 @@
   const MAX_EXPORT_DIMENSION = 2000;
   const MAX_EXPORT_SCALE_OPTIONS = MAX_EXPORT_DIMENSION;
   const MAX_SELECTION_CANVAS_DIMENSION = 8192;
+  const TARGET_EXPORT_OUTPUT_SIZE = 640;
 
   const layoutMap = {
     tools: { desktop: dom.leftTabPanes || dom.leftRail, mobile: dom.mobilePanels.tools },
@@ -260,6 +262,17 @@
     typeof navigator.share === 'function' &&
     typeof navigator.canShare === 'function' &&
     typeof File === 'function';
+  const IS_IOS_DEVICE =
+    typeof navigator !== 'undefined' && /iphone|ipod|ipad/i.test((navigator.userAgent || '').toLowerCase());
+  const IOS_SNAPSHOT_SUPPORTED =
+    IS_IOS_DEVICE && typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined' && window.indexedDB !== null;
+  const IOS_SNAPSHOT_DB_NAME = 'pixieedraw-ios-snapshots';
+  const IOS_SNAPSHOT_DB_VERSION = 1;
+  const IOS_SNAPSHOT_STORE_NAME = 'snapshots';
+  const IOS_SNAPSHOT_KEY = 'latest';
+  const IOS_SNAPSHOT_WRITE_DELAY = 60 * 1000;
+  const IOS_SNAPSHOT_COMPRESSION_THRESHOLD = 32 * 1024;
+  const textCompression = createTextCompression();
   const AUTOSAVE_DB_NAME = 'pixieedraw-autosave';
   const AUTOSAVE_DB_VERSION = 2;
   const AUTOSAVE_STORE_NAME = 'handles';
@@ -297,10 +310,17 @@
   let autosaveWriteTimer = null;
   let autosaveRestoring = false;
   let autosaveDirty = false;
+  let iosSnapshotDbPromise = null;
+  let iosSnapshotDirty = false;
+  let iosSnapshotTimer = null;
+  let iosSnapshotRestoring = false;
+  let iosSnapshotInitialized = false;
+  let iosSnapshotUnloadListenerBound = false;
   const brushOffsetCache = new Map();
   let exportScale = 1;
   let exportSheetInfo = null;
   let exportMaxScale = 1;
+  let exportScaleUserOverride = false;
 
   const rails = { leftCollapsed: false, rightCollapsed: window.innerWidth <= 900 };
   const BACKGROUND_TILE_COLORS = Object.freeze({
@@ -2173,7 +2193,7 @@
       if (granted) {
         autosaveHandle = handle;
         if (button) {
-          button.textContent = '保存先を変更';
+          button.textContent = '自動保存先を変更';
         }
         const restored = await restoreAutosaveDocument(handle);
         if (restored) {
@@ -2291,7 +2311,7 @@
       clearPendingPermissionListener();
       await storeAutosaveHandle(handle);
       if (dom.controls.enableAutosave) {
-        dom.controls.enableAutosave.textContent = '保存先を変更';
+        dom.controls.enableAutosave.textContent = '自動保存先を変更';
       }
       updateAutosaveStatus('自動保存: 保存中…');
       autosaveDirty = true;
@@ -2355,6 +2375,227 @@
     autosavePermissionListener = null;
   }
 
+  // -------------------------------------------------------------------------
+  // iOS IndexedDB snapshot fallback
+  // -------------------------------------------------------------------------
+
+  function upgradeIosSnapshotDatabase(db) {
+    if (!db) return;
+    if (!db.objectStoreNames.contains(IOS_SNAPSHOT_STORE_NAME)) {
+      db.createObjectStore(IOS_SNAPSHOT_STORE_NAME, { keyPath: 'id' });
+    }
+  }
+
+  function ensureIosSnapshotDatabase() {
+    if (!IOS_SNAPSHOT_SUPPORTED) {
+      return Promise.resolve(null);
+    }
+    if (iosSnapshotDbPromise) {
+      return iosSnapshotDbPromise;
+    }
+    iosSnapshotDbPromise = new Promise((resolve, reject) => {
+      const request = window.indexedDB.open(IOS_SNAPSHOT_DB_NAME, IOS_SNAPSHOT_DB_VERSION);
+      request.onupgradeneeded = event => {
+        const database = event.target.result;
+        upgradeIosSnapshotDatabase(database);
+      };
+      request.onsuccess = () => {
+        const database = request.result;
+        if (database) {
+          database.onversionchange = () => {
+            database.close();
+          };
+        }
+        resolve(database);
+      };
+      request.onerror = () => {
+        reject(request.error || new Error('Failed to open iOS snapshot database'));
+      };
+      request.onblocked = () => {
+        console.warn('iOS snapshot database upgrade is blocked by another tab');
+      };
+    })
+      .catch(error => {
+        console.warn('Failed to initialise iOS snapshot database', error);
+        iosSnapshotDbPromise = null;
+        return null;
+      });
+    return iosSnapshotDbPromise;
+  }
+
+  function bindIosSnapshotUnloadListener() {
+    if (!IOS_SNAPSHOT_SUPPORTED) return;
+    if (iosSnapshotUnloadListenerBound) return;
+    const flush = () => {
+      persistIosSnapshot(true).catch(() => {
+        // Ignore unload persistence failures
+      });
+    };
+    window.addEventListener('beforeunload', flush);
+    window.addEventListener('pagehide', flush);
+    iosSnapshotUnloadListenerBound = true;
+  }
+
+  function scheduleIosSnapshotPersist() {
+    if (!IOS_SNAPSHOT_SUPPORTED) return;
+    if (iosSnapshotRestoring) return;
+    iosSnapshotDirty = true;
+    if (iosSnapshotTimer !== null) {
+      return;
+    }
+    iosSnapshotTimer = window.setTimeout(() => {
+      iosSnapshotTimer = null;
+      const shouldWrite = iosSnapshotDirty;
+      iosSnapshotDirty = false;
+      if (!shouldWrite) return;
+      persistIosSnapshot().catch(error => {
+        console.warn('Failed to persist iOS snapshot', error);
+      });
+    }, IOS_SNAPSHOT_WRITE_DELAY);
+  }
+
+  async function persistIosSnapshot(force = false) {
+    if (!IOS_SNAPSHOT_SUPPORTED) return;
+    if (iosSnapshotRestoring) return;
+    if (!force && !iosSnapshotDirty) return;
+    const database = await ensureIosSnapshotDatabase();
+    if (!database) {
+      return;
+    }
+    iosSnapshotDirty = false;
+    let snapshotText = '';
+    try {
+      const snapshot = makeHistorySnapshot();
+      const payload = serializeDocumentSnapshot(snapshot);
+      snapshotText = JSON.stringify({
+        version: DOCUMENT_FILE_VERSION,
+        snapshot: payload,
+      });
+    } catch (error) {
+      console.warn('Failed to create iOS snapshot payload', error);
+      return;
+    }
+    let data = snapshotText;
+    let compressed = false;
+    if (snapshotText.length > IOS_SNAPSHOT_COMPRESSION_THRESHOLD) {
+      try {
+        data = textCompression.compressToUTF16(snapshotText);
+        if (typeof data === 'string' && data.length) {
+          compressed = true;
+        } else {
+          data = snapshotText;
+        }
+      } catch (error) {
+        console.warn('Failed to compress iOS snapshot payload', error);
+        data = snapshotText;
+      }
+    }
+    await new Promise((resolve, reject) => {
+      try {
+        const transaction = database.transaction(IOS_SNAPSHOT_STORE_NAME, 'readwrite');
+        transaction.oncomplete = () => resolve();
+        transaction.onabort = () => reject(transaction.error || new Error('iOS snapshot transaction aborted'));
+        transaction.onerror = () => reject(transaction.error || new Error('iOS snapshot transaction error'));
+        const store = transaction.objectStore(IOS_SNAPSHOT_STORE_NAME);
+        store.put({
+          id: IOS_SNAPSHOT_KEY,
+          data,
+          compressed,
+          savedAt: Date.now(),
+          size: snapshotText.length,
+        });
+      } catch (error) {
+        reject(error);
+      }
+    }).catch(error => {
+      iosSnapshotDirty = true;
+      throw error;
+    });
+  }
+
+  async function restoreIosSnapshotFallback() {
+    if (!IOS_SNAPSHOT_SUPPORTED) return false;
+    const database = await ensureIosSnapshotDatabase();
+    if (!database) {
+      return false;
+    }
+    const record = await new Promise((resolve, reject) => {
+      try {
+        const transaction = database.transaction(IOS_SNAPSHOT_STORE_NAME, 'readonly');
+        transaction.oncomplete = () => {};
+        transaction.onabort = () => reject(transaction.error || new Error('iOS snapshot read aborted'));
+        transaction.onerror = () => reject(transaction.error || new Error('iOS snapshot read error'));
+        const store = transaction.objectStore(IOS_SNAPSHOT_STORE_NAME);
+        const request = store.get(IOS_SNAPSHOT_KEY);
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error || new Error('iOS snapshot get failed'));
+      } catch (error) {
+        reject(error);
+      }
+    }).catch(error => {
+      console.warn('Failed to read iOS snapshot', error);
+      return null;
+    });
+    if (!record || !record.data) {
+      return false;
+    }
+    let snapshotText = '';
+    if (record.compressed) {
+      try {
+        snapshotText = textCompression.decompressFromUTF16(record.data) || '';
+      } catch (error) {
+        console.warn('Failed to decompress iOS snapshot payload', error);
+        snapshotText = '';
+      }
+    } else if (typeof record.data === 'string') {
+      snapshotText = record.data;
+    }
+    if (!snapshotText) {
+      return false;
+    }
+    let payload;
+    try {
+      const parsed = JSON.parse(snapshotText);
+      payload = parsed && typeof parsed === 'object' && parsed.snapshot ? parsed.snapshot : parsed;
+    } catch (error) {
+      console.warn('Failed to parse iOS snapshot payload', error);
+      return false;
+    }
+    let snapshot;
+    try {
+      snapshot = deserializeDocumentPayload(payload);
+    } catch (error) {
+      console.warn('Failed to deserialize iOS snapshot', error);
+      return false;
+    }
+    iosSnapshotRestoring = true;
+    try {
+      applyHistorySnapshot(snapshot);
+      history.past = [];
+      history.future = [];
+      history.pending = null;
+      updateMemoryStatus();
+    } finally {
+      iosSnapshotRestoring = false;
+    }
+    return true;
+  }
+
+  async function initializeIosSnapshotFallback() {
+    if (!IOS_SNAPSHOT_SUPPORTED) return;
+    if (iosSnapshotInitialized) return;
+    iosSnapshotInitialized = true;
+    try {
+      const restored = await restoreIosSnapshotFallback();
+      if (restored) {
+        console.info('Restored canvas from iOS IndexedDB snapshot');
+      }
+    } catch (error) {
+      console.warn('Failed to restore iOS snapshot', error);
+    }
+    bindIosSnapshotUnloadListener();
+  }
+
   async function attemptAutosaveReauthorization() {
     if (!pendingAutosaveHandle) {
       return false;
@@ -2370,7 +2611,7 @@
     pendingAutosaveHandle = null;
     autosaveHandle = handle;
     if (dom.controls.enableAutosave) {
-      dom.controls.enableAutosave.textContent = '保存先を変更';
+      dom.controls.enableAutosave.textContent = '自動保存先を変更';
     }
     try {
       const restored = await restoreAutosaveDocument(handle);
@@ -2634,6 +2875,7 @@
     history.future = [];
     history.pending = null;
     updateHistoryButtons();
+    resetExportScaleDefaults();
 
     autosaveHandle = null;
     pendingAutosaveHandle = null;
@@ -2644,7 +2886,7 @@
         console.warn('Failed to clear previous autosave handle', error);
       });
       if (dom.controls.enableAutosave) {
-        dom.controls.enableAutosave.textContent = '保存先を変更';
+        dom.controls.enableAutosave.textContent = '自動保存先を変更';
       }
       const suggestedName = createAutosaveFileName(documentName);
       updateAutosaveStatus('自動保存: 保存先を選択してください', 'info');
@@ -2775,6 +3017,7 @@
         if (scaleInput === null) {
           return;
         }
+        exportScaleUserOverride = true;
         setExportScale(scaleInput);
       }
       exportProjectAsPng();
@@ -2948,6 +3191,7 @@
     if (slider && slider.dataset.bound !== 'true') {
       slider.dataset.bound = 'true';
       slider.addEventListener('input', event => {
+        exportScaleUserOverride = true;
         setExportScale(event.target.value);
       });
     }
@@ -2956,6 +3200,7 @@
     if (scaleInput && scaleInput.dataset.bound !== 'true') {
       scaleInput.dataset.bound = 'true';
       scaleInput.addEventListener('change', event => {
+        exportScaleUserOverride = true;
         setExportScale(event.target.value);
       });
     }
@@ -2964,6 +3209,7 @@
     if (widthInput && widthInput.dataset.bound !== 'true') {
       widthInput.dataset.bound = 'true';
       widthInput.addEventListener('change', event => {
+        exportScaleUserOverride = true;
         if (!exportSheetInfo) {
           syncExportScaleInputs();
           return;
@@ -2983,6 +3229,7 @@
     if (heightInput && heightInput.dataset.bound !== 'true') {
       heightInput.dataset.bound = 'true';
       heightInput.addEventListener('change', event => {
+        exportScaleUserOverride = true;
         if (!exportSheetInfo) {
           syncExportScaleInputs();
           return;
@@ -3063,6 +3310,7 @@
     history.future = [];
     history.pending = null;
     updateHistoryButtons();
+    resetExportScaleDefaults();
 
     if (AUTOSAVE_SUPPORTED) {
       autosaveHandle = null;
@@ -3073,7 +3321,7 @@
       });
       const suggestedName = createAutosaveFileName(name);
       if (dom.controls.enableAutosave) {
-        dom.controls.enableAutosave.textContent = '保存先を変更';
+        dom.controls.enableAutosave.textContent = '自動保存先を変更';
       }
       updateAutosaveStatus('自動保存: 保存先を選択してください', 'info');
       requestAutosaveBinding({ suggestedName }).catch(error => {
@@ -3272,6 +3520,7 @@
     history.future = [];
     history.pending = null;
     autosaveRestoring = false;
+    resetExportScaleDefaults();
 
     if (handle) {
       const granted = await ensureHandlePermission(handle, { request: true });
@@ -3281,7 +3530,7 @@
         clearPendingPermissionListener();
         await storeAutosaveHandle(handle);
         if (dom.controls.enableAutosave) {
-          dom.controls.enableAutosave.textContent = '保存先を変更';
+          dom.controls.enableAutosave.textContent = '自動保存先を変更';
         }
         updateAutosaveStatus('自動保存: 有効', 'success');
       } else {
@@ -4212,6 +4461,11 @@
     };
   }
 
+  function resetExportScaleDefaults() {
+    exportScale = 1;
+    exportScaleUserOverride = false;
+  }
+
   function applyExportScaleConstraints(candidates) {
     exportSheetInfo = {
       sheetWidth: candidates.sheetWidth,
@@ -4226,6 +4480,12 @@
       return exportScale;
     }
     const maxAllowed = exportMaxScale;
+    if (!exportScaleUserOverride) {
+      const baseDimension = Math.max(exportSheetInfo.sheetWidth, exportSheetInfo.sheetHeight);
+      const recommendedScale = baseDimension > 0 ? Math.round(TARGET_EXPORT_OUTPUT_SIZE / baseDimension) : 1;
+      const clampedRecommendation = Math.max(1, Math.min(maxAllowed, recommendedScale));
+      exportScale = clampedRecommendation;
+    }
     if (exportScale > maxAllowed) {
       exportScale = maxAllowed;
     }
@@ -4481,6 +4741,33 @@
       window.location.href = dataUrl;
     }
     return 'window';
+  }
+
+  async function saveProjectAsPixieedraw() {
+    try {
+      const snapshot = makeHistorySnapshot();
+      const payload = serializeDocumentSnapshot(snapshot);
+      const packaged = {
+        version: DOCUMENT_FILE_VERSION,
+        document: payload,
+        updatedAt: new Date().toISOString(),
+      };
+      const json = JSON.stringify(packaged);
+      const blob = new Blob([json], { type: 'application/json' });
+      const filename = createAutosaveFileName();
+      const result = await triggerDownloadFromBlob(blob, filename, {
+        mimeType: 'application/json',
+        fileExtensions: [PROJECT_FILE_EXTENSION, '.json'],
+        shareTitle: state.documentName,
+        shareText: `${state.documentName} (PiXiEEDraw)`,
+      });
+      if (result && !String(result).endsWith('cancel')) {
+        updateAutosaveStatus('手動保存: ファイルを書き出しました', 'success');
+      }
+    } catch (error) {
+      console.error('Manual project save failed', error);
+      updateAutosaveStatus('手動保存: ファイルを書き出せませんでした', 'error');
+    }
   }
 
   function buildGifFromPixels(framePixels, frameDurations, width, height) {
@@ -5008,6 +5295,413 @@
     return p;
   }
 
+  function createTextCompression() {
+    const lz = createLzString();
+    return {
+      compressToUTF16(input) {
+        if (typeof input !== 'string' || input.length === 0) {
+          return '';
+        }
+        return lz.compressToUTF16(input);
+      },
+      decompressFromUTF16(input) {
+        if (typeof input !== 'string' || input.length === 0) {
+          return '';
+        }
+        return lz.decompressFromUTF16(input) || '';
+      },
+    };
+  }
+
+  function createLzString() {
+    const f = String.fromCharCode;
+    const LZ = {
+      compressToUTF16(input) {
+        if (input == null) return '';
+        return LZ._compress(input, 15, value => f(value + 32)) + ' ';
+      },
+      decompressFromUTF16(compressed) {
+        if (compressed == null) return '';
+        if (compressed === '') return '';
+        return LZ._decompress(compressed.length, 16384, index => compressed.charCodeAt(index) - 32);
+      },
+      _compress(uncompressed, bitsPerChar, getCharFromInt) {
+        if (uncompressed == null) return '';
+        let i;
+        let value;
+        const contextDictionary = Object.create(null);
+        const contextDictionaryToCreate = Object.create(null);
+        let contextC = '';
+        let contextWC = '';
+        let contextW = '';
+        let contextEnlargeIn = 2;
+        let contextDictSize = 3;
+        let contextNumBits = 2;
+        const contextData = [];
+        let contextDataVal = 0;
+        let contextDataPosition = 0;
+        for (let ii = 0; ii < uncompressed.length; ii += 1) {
+          contextC = uncompressed.charAt(ii);
+          if (!Object.prototype.hasOwnProperty.call(contextDictionary, contextC)) {
+            contextDictionary[contextC] = contextDictSize;
+            contextDictSize += 1;
+            contextDictionaryToCreate[contextC] = true;
+          }
+          contextWC = contextW + contextC;
+          if (Object.prototype.hasOwnProperty.call(contextDictionary, contextWC)) {
+            contextW = contextWC;
+          } else {
+            if (Object.prototype.hasOwnProperty.call(contextDictionaryToCreate, contextW)) {
+              if (contextW.charCodeAt(0) < 256) {
+                for (i = 0; i < contextNumBits; i += 1) {
+                  contextDataVal <<= 1;
+                  if (contextDataPosition === bitsPerChar - 1) {
+                    contextDataPosition = 0;
+                    contextData.push(getCharFromInt(contextDataVal));
+                    contextDataVal = 0;
+                  } else {
+                    contextDataPosition += 1;
+                  }
+                }
+                value = contextW.charCodeAt(0);
+                for (i = 0; i < 8; i += 1) {
+                  contextDataVal = (contextDataVal << 1) | (value & 1);
+                  if (contextDataPosition === bitsPerChar - 1) {
+                    contextDataPosition = 0;
+                    contextData.push(getCharFromInt(contextDataVal));
+                    contextDataVal = 0;
+                  } else {
+                    contextDataPosition += 1;
+                  }
+                  value >>= 1;
+                }
+              } else {
+                value = 1;
+                for (i = 0; i < contextNumBits; i += 1) {
+                  contextDataVal = (contextDataVal << 1) | value;
+                  if (contextDataPosition === bitsPerChar - 1) {
+                    contextDataPosition = 0;
+                    contextData.push(getCharFromInt(contextDataVal));
+                    contextDataVal = 0;
+                  } else {
+                    contextDataPosition += 1;
+                  }
+                  value = 0;
+                }
+                value = contextW.charCodeAt(0);
+                for (i = 0; i < 16; i += 1) {
+                  contextDataVal = (contextDataVal << 1) | (value & 1);
+                  if (contextDataPosition === bitsPerChar - 1) {
+                    contextDataPosition = 0;
+                    contextData.push(getCharFromInt(contextDataVal));
+                    contextDataVal = 0;
+                  } else {
+                    contextDataPosition += 1;
+                  }
+                  value >>= 1;
+                }
+              }
+              contextEnlargeIn -= 1;
+              if (contextEnlargeIn === 0) {
+                contextEnlargeIn = 2 ** contextNumBits;
+                contextNumBits += 1;
+              }
+              delete contextDictionaryToCreate[contextW];
+            } else {
+              value = contextDictionary[contextW];
+              for (i = 0; i < contextNumBits; i += 1) {
+                contextDataVal = (contextDataVal << 1) | (value & 1);
+                if (contextDataPosition === bitsPerChar - 1) {
+                  contextDataPosition = 0;
+                  contextData.push(getCharFromInt(contextDataVal));
+                  contextDataVal = 0;
+                } else {
+                  contextDataPosition += 1;
+                }
+                value >>= 1;
+              }
+            }
+            contextEnlargeIn -= 1;
+            if (contextEnlargeIn === 0) {
+              contextEnlargeIn = 2 ** contextNumBits;
+              contextNumBits += 1;
+            }
+            contextDictionary[contextWC] = contextDictSize;
+            contextDictSize += 1;
+            contextW = String(contextC);
+          }
+        }
+        if (contextW !== '') {
+          if (Object.prototype.hasOwnProperty.call(contextDictionaryToCreate, contextW)) {
+            if (contextW.charCodeAt(0) < 256) {
+              for (i = 0; i < contextNumBits; i += 1) {
+                contextDataVal <<= 1;
+                if (contextDataPosition === bitsPerChar - 1) {
+                  contextDataPosition = 0;
+                  contextData.push(getCharFromInt(contextDataVal));
+                  contextDataVal = 0;
+                } else {
+                  contextDataPosition += 1;
+                }
+              }
+              value = contextW.charCodeAt(0);
+              for (i = 0; i < 8; i += 1) {
+                contextDataVal = (contextDataVal << 1) | (value & 1);
+                if (contextDataPosition === bitsPerChar - 1) {
+                  contextDataPosition = 0;
+                  contextData.push(getCharFromInt(contextDataVal));
+                  contextDataVal = 0;
+                } else {
+                  contextDataPosition += 1;
+                }
+                value >>= 1;
+              }
+            } else {
+              value = 1;
+              for (i = 0; i < contextNumBits; i += 1) {
+                contextDataVal = (contextDataVal << 1) | value;
+                if (contextDataPosition === bitsPerChar - 1) {
+                  contextDataPosition = 0;
+                  contextData.push(getCharFromInt(contextDataVal));
+                  contextDataVal = 0;
+                } else {
+                  contextDataPosition += 1;
+                }
+                value = 0;
+              }
+              value = contextW.charCodeAt(0);
+              for (i = 0; i < 16; i += 1) {
+                contextDataVal = (contextDataVal << 1) | (value & 1);
+                if (contextDataPosition === bitsPerChar - 1) {
+                  contextDataPosition = 0;
+                  contextData.push(getCharFromInt(contextDataVal));
+                  contextDataVal = 0;
+                } else {
+                  contextDataPosition += 1;
+                }
+                value >>= 1;
+              }
+            }
+            contextEnlargeIn -= 1;
+            if (contextEnlargeIn === 0) {
+              contextEnlargeIn = 2 ** contextNumBits;
+              contextNumBits += 1;
+            }
+            delete contextDictionaryToCreate[contextW];
+          } else {
+            value = contextDictionary[contextW];
+            for (i = 0; i < contextNumBits; i += 1) {
+              contextDataVal = (contextDataVal << 1) | (value & 1);
+              if (contextDataPosition === bitsPerChar - 1) {
+                contextDataPosition = 0;
+                contextData.push(getCharFromInt(contextDataVal));
+                contextDataVal = 0;
+              } else {
+                contextDataPosition += 1;
+              }
+              value >>= 1;
+            }
+          }
+          contextEnlargeIn -= 1;
+          if (contextEnlargeIn === 0) {
+            contextEnlargeIn = 2 ** contextNumBits;
+            contextNumBits += 1;
+          }
+        }
+        value = 2;
+        for (i = 0; i < contextNumBits; i += 1) {
+          contextDataVal = (contextDataVal << 1) | (value & 1);
+          if (contextDataPosition === bitsPerChar - 1) {
+            contextDataPosition = 0;
+            contextData.push(getCharFromInt(contextDataVal));
+            contextDataVal = 0;
+          } else {
+            contextDataPosition += 1;
+          }
+          value >>= 1;
+        }
+        while (true) {
+          contextDataVal <<= 1;
+          if (contextDataPosition === bitsPerChar - 1) {
+            contextData.push(getCharFromInt(contextDataVal));
+            break;
+          } else {
+            contextDataPosition += 1;
+          }
+        }
+        return contextData.join('');
+      },
+      _decompress(length, resetValue, getNextValue) {
+        if (length === 0) return '';
+        const dictionary = [];
+        let next;
+        let enlargeIn = 4;
+        let dictSize = 4;
+        let numBits = 3;
+        let entry = '';
+        const result = [];
+        let w;
+        let bits;
+        let resb;
+        let maxpower;
+        let power;
+        let c;
+        const data = { val: getNextValue(0), position: resetValue, index: 1 };
+        for (let i = 0; i < 3; i += 1) {
+          dictionary[i] = i;
+        }
+        maxpower = 4;
+        power = 1;
+        bits = 0;
+        while (power !== maxpower) {
+          resb = data.val & data.position;
+          data.position >>= 1;
+          if (data.position === 0) {
+            data.position = resetValue;
+            data.val = getNextValue(data.index);
+            data.index += 1;
+          }
+          bits |= (resb > 0 ? 1 : 0) * power;
+          power <<= 1;
+        }
+        switch (next = bits) {
+          case 0: {
+            maxpower = 256;
+            power = 1;
+            bits = 0;
+            while (power !== maxpower) {
+              resb = data.val & data.position;
+              data.position >>= 1;
+              if (data.position === 0) {
+                data.position = resetValue;
+                data.val = getNextValue(data.index);
+                data.index += 1;
+              }
+              bits |= (resb > 0 ? 1 : 0) * power;
+              power <<= 1;
+            }
+            c = f(bits);
+            break;
+          }
+          case 1: {
+            maxpower = 65536;
+            power = 1;
+            bits = 0;
+            while (power !== maxpower) {
+              resb = data.val & data.position;
+              data.position >>= 1;
+              if (data.position === 0) {
+                data.position = resetValue;
+                data.val = getNextValue(data.index);
+                data.index += 1;
+              }
+              bits |= (resb > 0 ? 1 : 0) * power;
+              power <<= 1;
+            }
+            c = f(bits);
+            break;
+          }
+          case 2:
+            return '';
+          default:
+            c = '';
+            break;
+        }
+        dictionary[3] = c;
+        w = c;
+        result.push(c);
+        while (true) {
+          if (data.index > length) {
+            return '';
+          }
+          maxpower = 2 ** numBits;
+          power = 1;
+          bits = 0;
+          while (power !== maxpower) {
+            resb = data.val & data.position;
+            data.position >>= 1;
+            if (data.position === 0) {
+              data.position = resetValue;
+              data.val = getNextValue(data.index);
+              data.index += 1;
+            }
+            bits |= (resb > 0 ? 1 : 0) * power;
+            power <<= 1;
+          }
+          switch (c = bits) {
+            case 0: {
+              maxpower = 256;
+              power = 1;
+              bits = 0;
+              while (power !== maxpower) {
+                resb = data.val & data.position;
+                data.position >>= 1;
+                if (data.position === 0) {
+                  data.position = resetValue;
+                  data.val = getNextValue(data.index);
+                  data.index += 1;
+                }
+                bits |= (resb > 0 ? 1 : 0) * power;
+                power <<= 1;
+              }
+              dictionary[dictSize] = f(bits);
+              dictSize += 1;
+              c = dictSize - 1;
+              enlargeIn -= 1;
+              break;
+            }
+            case 1: {
+              maxpower = 65536;
+              power = 1;
+              bits = 0;
+              while (power !== maxpower) {
+                resb = data.val & data.position;
+                data.position >>= 1;
+                if (data.position === 0) {
+                  data.position = resetValue;
+                  data.val = getNextValue(data.index);
+                  data.index += 1;
+                }
+                bits |= (resb > 0 ? 1 : 0) * power;
+                power <<= 1;
+              }
+              dictionary[dictSize] = f(bits);
+              dictSize += 1;
+              c = dictSize - 1;
+              enlargeIn -= 1;
+              break;
+            }
+            case 2:
+              return result.join('');
+            default:
+              break;
+          }
+          if (enlargeIn === 0) {
+            enlargeIn = 2 ** numBits;
+            numBits += 1;
+          }
+          if (dictionary[c]) {
+            entry = dictionary[c];
+          } else if (c === dictSize) {
+            entry = w + w.charAt(0);
+          } else {
+            return '';
+          }
+          result.push(entry);
+          dictionary[dictSize] = w + entry.charAt(0);
+          dictSize += 1;
+          enlargeIn -= 1;
+          w = entry;
+          if (enlargeIn === 0) {
+            enlargeIn = 2 ** numBits;
+            numBits += 1;
+          }
+        }
+      },
+    };
+    return LZ;
+  }
+
   function encodeTypedArray(view) {
     if (!view) return '';
     const bytes = view instanceof Uint8Array
@@ -5099,6 +5793,7 @@
   }
 
   async function init() {
+    await initializeIosSnapshotFallback();
     await initializeAutosave();
     setupLeftTabs();
     setupRightTabs();
@@ -5420,6 +6115,10 @@
 
     dom.controls.openDocument?.addEventListener('click', () => {
       openDocumentDialog();
+    });
+
+    dom.controls.saveProject?.addEventListener('click', () => {
+      saveProjectAsPixieedraw();
     });
 
     dom.controls.exportProject?.addEventListener('click', () => {
@@ -8377,6 +9076,7 @@
 
     if (activeTool === 'fill') {
       floodFill(position.x, position.y);
+      commitHistory();
       requestOverlayRender();
       pointerState.active = false;
       pointerState.tool = state.tool;
@@ -11261,6 +11961,7 @@
 
   function scheduleSessionPersist() {
     scheduleAutosaveSnapshot();
+    scheduleIosSnapshotPersist();
     if (!canUseSessionStorage) return;
     if (sessionPersistHandle !== null) return;
     sessionPersistHandle = window.setTimeout(() => {
