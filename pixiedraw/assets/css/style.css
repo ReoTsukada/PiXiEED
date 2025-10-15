@@ -1715,6 +1715,216 @@ input[type='range']::-moz-focus-outer {
   margin-top: 8px;
 }
 
+body.is-startup-active {
+  overflow: hidden;
+}
+
+.startup-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 520;
+}
+
+.startup-screen[hidden] {
+  display: none;
+}
+
+.startup-screen__backdrop {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top, rgba(88, 196, 255, 0.22), rgba(6, 12, 20, 0.86));
+  backdrop-filter: blur(8px);
+}
+
+.startup-screen__content {
+  position: relative;
+  width: min(100%, 420px);
+  padding: 36px 40px;
+  border-radius: 24px;
+  background:
+    linear-gradient(0deg, rgba(112, 246, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(112, 246, 255, 0.14) 1px, transparent 1px),
+    var(--bg-panel);
+  border: 1px solid rgba(112, 246, 255, 0.28);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  text-align: center;
+}
+
+.startup-screen__header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.startup-screen__title {
+  margin: 0;
+  font-size: clamp(1.8rem, 2.4vw + 1.2rem, 2.6rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.startup-screen__subtitle {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.95rem;
+}
+
+.startup-screen__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.startup-screen__actions .button {
+  width: 100%;
+  font-size: 1rem;
+  padding-block: 14px;
+}
+
+.startup-screen__link {
+  background: none;
+  border: none;
+  font: inherit;
+  color: rgba(112, 246, 255, 0.85);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.startup-screen__link:hover {
+  color: #70f6ff;
+}
+
+.startup-screen__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.startup-screen__recent {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.startup-screen__recent-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.startup-recent-list {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 12px;
+  width: 100%;
+  overflow-x: auto;
+  padding: 4px 4px 12px;
+  margin: 0 -4px;
+  scroll-snap-type: x mandatory;
+}
+
+.startup-recent-list::-webkit-scrollbar {
+  height: 6px;
+}
+
+.startup-recent-list::-webkit-scrollbar-thumb {
+  background: rgba(112, 246, 255, 0.28);
+  border-radius: 999px;
+}
+
+.startup-recent-list::-webkit-scrollbar-track {
+  background: rgba(6, 12, 20, 0.4);
+}
+
+.startup-recent-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  background:
+    linear-gradient(0deg, rgba(112, 246, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(112, 246, 255, 0.08) 1px, transparent 1px),
+    rgba(10, 22, 32, 0.92);
+  border: 1px solid rgba(112, 246, 255, 0.2);
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  outline: none;
+  transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+  scroll-snap-align: start;
+  flex: 0 0 148px;
+}
+
+.startup-recent-card:hover,
+.startup-recent-card:focus-visible {
+  border-color: rgba(112, 246, 255, 0.6);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  transform: translateY(-2px);
+}
+
+.startup-recent-card:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.startup-recent-card__thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(20, 30, 44, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(112, 246, 255, 0.12);
+}
+
+.startup-recent-card__thumb img {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  object-fit: contain;
+}
+
+.startup-recent-card__thumb-placeholder {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.startup-recent-card__name {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.82);
+  word-break: break-all;
+}
+
+@media (min-width: 600px) {
+  .startup-screen__actions {
+    flex-direction: row;
+  }
+
+  .startup-screen__actions .button {
+    flex: 1 1 auto;
+  }
+}
+
 .modal {
   border: none;
   border-radius: 18px;
