@@ -13,6 +13,8 @@ const APP_SHELL = [
   './assets/js/app.js',
   './assets/js/pwa.js',
   './assets/icons/menu-canvas.png',
+  './assets/icons/menu-file.svg',
+  './assets/icons/menu-settings.svg',
   './assets/icons/tool-cursor.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
