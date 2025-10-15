@@ -2171,6 +2171,12 @@ body.is-startup-active {
   .mobile-topbar {
     display: block;
   }
+  .mobile-tab .tab-icon-container,
+  .mobile-tab .tab-icon-container img,
+  .mobile-tab .tab-icon-container svg {
+    width: 22px;
+    height: 22px;
+  }
   .panel-section[data-section='tools'] .tool-group-tabs {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
