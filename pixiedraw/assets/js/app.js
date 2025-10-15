@@ -2668,7 +2668,19 @@
     return new Promise(resolve => {
       const input = document.createElement('input');
       input.type = 'file';
-      input.accept = '.json,.pxdraw,.pixieedraw,.png,application/json,application/x-pixieedraw,image/png';
+      const acceptTypes = [
+        '.json',
+        '.pxdraw',
+        '.pixieedraw',
+        '.png',
+        'application/json',
+        'application/x-pixieedraw',
+        'image/png',
+      ];
+      if (IS_IOS_DEVICE) {
+        acceptTypes.push('.txt', 'text/plain');
+      }
+      input.accept = acceptTypes.join(',');
       input.style.display = 'none';
       let settled = false;
       const finish = success => {
