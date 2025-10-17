@@ -2823,47 +2823,36 @@
   }
 
   async function loadDocumentFromImageFile(file) {
-    let importResult;
+    let imageData;
     try {
-      importResult = await decodeImageFileToFrames(file);
+      imageData = await decodeImageFileToImageData(file);
     } catch (error) {
       throw createImageImportError('画像を読み込めませんでした', error);
     }
-    const framesData = Array.isArray(importResult?.frames) ? importResult.frames : [];
-    if (!framesData.length) {
-      throw createImageImportError('画像を読み込めませんでした');
-    }
-
-    const inferredWidth = Number(importResult?.width ?? framesData[0]?.imageData?.width ?? 0);
-    const inferredHeight = Number(importResult?.height ?? framesData[0]?.imageData?.height ?? 0);
-    if (!Number.isFinite(inferredWidth) || !Number.isFinite(inferredHeight) || inferredWidth <= 0 || inferredHeight <= 0) {
+    if (!imageData || !Number.isFinite(imageData.width) || !Number.isFinite(imageData.height)) {
       throw createImageImportError('画像サイズが不正です');
     }
-    const width = Math.max(1, Math.floor(inferredWidth));
-    const height = Math.max(1, Math.floor(inferredHeight));
+    const width = Math.max(1, Math.floor(imageData.width));
+    const height = Math.max(1, Math.floor(imageData.height));
     if (width > MAX_CANVAS_SIZE || height > MAX_CANVAS_SIZE) {
       throw createImageImportError(`画像のサイズが大きすぎます (最大 ${MAX_CANVAS_SIZE}px)`);
     }
 
-    const singleFrame = framesData.length === 1;
-    const firstFramePixels = singleFrame && framesData[0]?.imageData?.data instanceof Uint8ClampedArray
-      ? framesData[0].imageData.data
-      : null;
-    let indexedExtraction = null;
-    let useIndexedImport = false;
-    if (firstFramePixels) {
-      indexedExtraction = buildIndexedPaletteFromImageData(firstFramePixels);
-      useIndexedImport = Boolean(indexedExtraction && !indexedExtraction.overflow && indexedExtraction.palette.length > 0);
-    }
+    const layer = createLayer('画像レイヤー', width, height);
+    const extraction = buildIndexedPaletteFromImageData(imageData.data);
+    let palette = [];
+    let activePaletteIndex = 0;
+    let activeRgb = { r: 255, g: 255, b: 255, a: 255 };
 
-    let palette;
-    let activePaletteIndex;
-    let activeRgb;
-    if (useIndexedImport && indexedExtraction) {
-      palette = indexedExtraction.palette.map(color => ({ ...color }));
+    if (!extraction.overflow && extraction.palette.length > 0) {
+      layer.indices = extraction.indices;
+      layer.direct = null;
+      palette = extraction.palette.map(color => ({ ...color }));
       activePaletteIndex = 0;
-      activeRgb = palette[activePaletteIndex] ? { ...palette[activePaletteIndex] } : { r: 255, g: 255, b: 255, a: 255 };
+      activeRgb = { ...palette[activePaletteIndex] };
     } else {
+      const direct = ensureLayerDirect(layer, width, height);
+      direct.set(imageData.data);
       const paletteSource = state.palette && state.palette.length
         ? state.palette
         : createInitialState({ width, height }).palette;
@@ -2876,32 +2865,12 @@
         : (palette[activePaletteIndex] ? { ...palette[activePaletteIndex] } : { r: 255, g: 255, b: 255, a: 255 });
     }
 
-    const frames = framesData.map((frameInfo, index) => {
-      const layerName = framesData.length > 1 ? `画像レイヤー ${index + 1}` : '画像レイヤー';
-      const layer = createLayer(layerName, width, height);
-      if (useIndexedImport && index === 0 && indexedExtraction) {
-        layer.indices = indexedExtraction.indices;
-        layer.direct = null;
-      } else {
-        const direct = ensureLayerDirect(layer, width, height);
-        if (frameInfo?.imageData?.data instanceof Uint8ClampedArray) {
-          direct.set(frameInfo.imageData.data);
-        } else {
-          direct.fill(0);
-        }
-      }
-      return {
-        id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}-${index}`,
-        name: framesData.length > 1 ? `フレーム ${index + 1}` : 'フレーム 1',
-        duration: normalizeImportFrameDuration(frameInfo?.duration),
-        layers: [layer],
-      };
-    });
-
-    const activeLayerId = frames[0]?.layers[0]?.id;
-    if (!activeLayerId) {
-      throw createImageImportError('画像を読み込めませんでした');
-    }
+    const frame = {
+      id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}`,
+      name: 'フレーム 1',
+      duration: DEFAULT_IMPORT_FRAME_DURATION,
+      layers: [layer],
+    };
 
     const documentName = normalizeDocumentName(typeof file?.name === 'string' ? file.name : state.documentName);
     const activeToolGroup = TOOL_GROUPS[state.activeToolGroup] ? state.activeToolGroup : (TOOL_TO_GROUP[state.tool] || 'pen');
@@ -2916,9 +2885,9 @@
       palette,
       activePaletteIndex,
       activeRgb,
-      frames,
+      frames: [frame],
       activeFrame: 0,
-      activeLayer: activeLayerId,
+      activeLayer: layer.id,
       selectionMask: null,
       selectionBounds: null,
       showGrid: state.showGrid ?? true,
