@@ -198,6 +198,9 @@
   const MIN_ZOOM_SCALE = ZOOM_STEPS[0];
   const ZOOM_EPSILON = 1e-6;
   const ZOOM_INDICATOR_TIMEOUT = 1800;
+  const DEFAULT_IMPORT_FRAME_DURATION = 1000 / 12;
+  const IMPORT_FRAME_DURATION_MIN_MS = 16;
+  const IMPORT_FRAME_DURATION_MAX_MS = 2000;
 
   const PROJECT_FILE_EXTENSION = '.pixieedraw';
   const DEFAULT_DOCUMENT_BASENAME = '新規ドキュメント';
@@ -2729,6 +2732,16 @@
     });
   }
 
+  function isGifFile(file) {
+    if (!file) return false;
+    const type = typeof file.type === 'string' ? file.type.toLowerCase() : '';
+    if (type === 'image/gif') {
+      return true;
+    }
+    const name = typeof file.name === 'string' ? file.name.toLowerCase() : '';
+    return name.endsWith('.gif');
+  }
+
   function isImportableImageFile(file) {
     if (!file) return false;
     const type = typeof file.type === 'string' ? file.type.toLowerCase() : '';
@@ -2746,6 +2759,14 @@
       error.cause = cause;
     }
     return error;
+  }
+
+  function normalizeImportFrameDuration(durationMs) {
+    const numeric = Number(durationMs);
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+      return DEFAULT_IMPORT_FRAME_DURATION;
+    }
+    return clamp(Math.round(numeric), IMPORT_FRAME_DURATION_MIN_MS, IMPORT_FRAME_DURATION_MAX_MS);
   }
 
   function buildIndexedPaletteFromImageData(data, maxColors = MAX_IMPORTED_PALETTE_COLORS) {
@@ -2802,36 +2823,47 @@
   }
 
   async function loadDocumentFromImageFile(file) {
-    let imageData;
+    let importResult;
     try {
-      imageData = await decodeImageFileToImageData(file);
+      importResult = await decodeImageFileToFrames(file);
     } catch (error) {
       throw createImageImportError('画像を読み込めませんでした', error);
     }
-    if (!imageData || !Number.isFinite(imageData.width) || !Number.isFinite(imageData.height)) {
+    const framesData = Array.isArray(importResult?.frames) ? importResult.frames : [];
+    if (!framesData.length) {
+      throw createImageImportError('画像を読み込めませんでした');
+    }
+
+    const inferredWidth = Number(importResult?.width ?? framesData[0]?.imageData?.width ?? 0);
+    const inferredHeight = Number(importResult?.height ?? framesData[0]?.imageData?.height ?? 0);
+    if (!Number.isFinite(inferredWidth) || !Number.isFinite(inferredHeight) || inferredWidth <= 0 || inferredHeight <= 0) {
       throw createImageImportError('画像サイズが不正です');
     }
-    const width = Math.max(1, Math.floor(imageData.width));
-    const height = Math.max(1, Math.floor(imageData.height));
+    const width = Math.max(1, Math.floor(inferredWidth));
+    const height = Math.max(1, Math.floor(inferredHeight));
     if (width > MAX_CANVAS_SIZE || height > MAX_CANVAS_SIZE) {
       throw createImageImportError(`画像のサイズが大きすぎます (最大 ${MAX_CANVAS_SIZE}px)`);
     }
 
-    const layer = createLayer('画像レイヤー', width, height);
-    const extraction = buildIndexedPaletteFromImageData(imageData.data);
-    let palette = [];
-    let activePaletteIndex = 0;
-    let activeRgb = { r: 255, g: 255, b: 255, a: 255 };
+    const singleFrame = framesData.length === 1;
+    const firstFramePixels = singleFrame && framesData[0]?.imageData?.data instanceof Uint8ClampedArray
+      ? framesData[0].imageData.data
+      : null;
+    let indexedExtraction = null;
+    let useIndexedImport = false;
+    if (firstFramePixels) {
+      indexedExtraction = buildIndexedPaletteFromImageData(firstFramePixels);
+      useIndexedImport = Boolean(indexedExtraction && !indexedExtraction.overflow && indexedExtraction.palette.length > 0);
+    }
 
-    if (!extraction.overflow && extraction.palette.length > 0) {
-      layer.indices = extraction.indices;
-      layer.direct = null;
-      palette = extraction.palette.map(color => ({ ...color }));
+    let palette;
+    let activePaletteIndex;
+    let activeRgb;
+    if (useIndexedImport && indexedExtraction) {
+      palette = indexedExtraction.palette.map(color => ({ ...color }));
       activePaletteIndex = 0;
-      activeRgb = { ...palette[activePaletteIndex] };
+      activeRgb = palette[activePaletteIndex] ? { ...palette[activePaletteIndex] } : { r: 255, g: 255, b: 255, a: 255 };
     } else {
-      const direct = ensureLayerDirect(layer, width, height);
-      direct.set(imageData.data);
       const paletteSource = state.palette && state.palette.length
         ? state.palette
         : createInitialState({ width, height }).palette;
@@ -2844,12 +2876,32 @@
         : (palette[activePaletteIndex] ? { ...palette[activePaletteIndex] } : { r: 255, g: 255, b: 255, a: 255 });
     }
 
-    const frame = {
-      id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}`,
-      name: 'フレーム 1',
-      duration: 1000 / 12,
-      layers: [layer],
-    };
+    const frames = framesData.map((frameInfo, index) => {
+      const layerName = framesData.length > 1 ? `画像レイヤー ${index + 1}` : '画像レイヤー';
+      const layer = createLayer(layerName, width, height);
+      if (useIndexedImport && index === 0 && indexedExtraction) {
+        layer.indices = indexedExtraction.indices;
+        layer.direct = null;
+      } else {
+        const direct = ensureLayerDirect(layer, width, height);
+        if (frameInfo?.imageData?.data instanceof Uint8ClampedArray) {
+          direct.set(frameInfo.imageData.data);
+        } else {
+          direct.fill(0);
+        }
+      }
+      return {
+        id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}-${index}`,
+        name: framesData.length > 1 ? `フレーム ${index + 1}` : 'フレーム 1',
+        duration: normalizeImportFrameDuration(frameInfo?.duration),
+        layers: [layer],
+      };
+    });
+
+    const activeLayerId = frames[0]?.layers[0]?.id;
+    if (!activeLayerId) {
+      throw createImageImportError('画像を読み込めませんでした');
+    }
 
     const documentName = normalizeDocumentName(typeof file?.name === 'string' ? file.name : state.documentName);
     const activeToolGroup = TOOL_GROUPS[state.activeToolGroup] ? state.activeToolGroup : (TOOL_TO_GROUP[state.tool] || 'pen');
@@ -2864,9 +2916,9 @@
       palette,
       activePaletteIndex,
       activeRgb,
-      frames: [frame],
+      frames,
       activeFrame: 0,
-      activeLayer: layer.id,
+      activeLayer: activeLayerId,
       selectionMask: null,
       selectionBounds: null,
       showGrid: state.showGrid ?? true,
@@ -2912,6 +2964,170 @@
       updateAutosaveStatus('画像を読み込みました', 'success');
     }
     scheduleSessionPersist();
+  }
+
+  async function decodeImageFileToFrames(file) {
+    if (isGifFile(file)) {
+      return await decodeGifFileToFrames(file);
+    }
+    const imageData = await decodeImageFileToImageData(file);
+    if (!imageData) {
+      throw createImageImportError('画像を読み込めませんでした');
+    }
+    return {
+      width: imageData.width,
+      height: imageData.height,
+      frames: [
+        {
+          imageData,
+          duration: DEFAULT_IMPORT_FRAME_DURATION,
+        },
+      ],
+    };
+  }
+
+  async function decodeGifFileToFrames(file) {
+    if (!file) {
+      throw createImageImportError('ファイルが選択されていません');
+    }
+    let buffer;
+    try {
+      buffer = await file.arrayBuffer();
+    } catch (error) {
+      throw createImageImportError('画像を読み込めませんでした', error);
+    }
+    if (!(buffer instanceof ArrayBuffer) || buffer.byteLength === 0) {
+      throw createImageImportError('画像を読み込めませんでした');
+    }
+
+    const mimeType = typeof file.type === 'string' && file.type ? file.type : 'image/gif';
+    if (typeof window !== 'undefined' && typeof window.ImageDecoder === 'function') {
+      try {
+        return await decodeGifWithImageDecoder(buffer, mimeType);
+      } catch (error) {
+        console.warn('ImageDecoder GIF decode failed, falling back to JavaScript decoder', error);
+      }
+    }
+    return decodeGifWithReader(new Uint8Array(buffer));
+  }
+
+  async function decodeGifWithImageDecoder(buffer, mimeType) {
+    let decoder;
+    try {
+      decoder = new ImageDecoder({ data: buffer, type: mimeType });
+    } catch (error) {
+      throw createImageImportError('画像を読み込めませんでした', error);
+    }
+    try {
+      const track = decoder.tracks?.selectedTrack ?? decoder.tracks?.[0] ?? null;
+      const frameCount = Number(track?.frameCount);
+      const total = Number.isFinite(frameCount) && frameCount > 0 ? frameCount : 1;
+      const frames = [];
+      for (let i = 0; i < total; i += 1) {
+        const result = await decoder.decode({ frameIndex: i, completeFramesOnly: true });
+        const bitmap = result?.image;
+        const imageData = imageBitmapToImageData(bitmap);
+        if (bitmap && typeof bitmap.close === 'function') {
+          bitmap.close();
+        }
+        const durationSeconds = Number(result?.duration);
+        frames.push({
+          imageData,
+          duration: Number.isFinite(durationSeconds) && durationSeconds > 0
+            ? durationSeconds * 1000
+            : DEFAULT_IMPORT_FRAME_DURATION,
+        });
+      }
+      const width = frames[0]?.imageData?.width ?? 0;
+      const height = frames[0]?.imageData?.height ?? 0;
+      if (!frames.length || !width || !height) {
+        throw new Error('GIF decode returned no frames');
+      }
+      return {
+        frames,
+        width,
+        height,
+        loopCount: typeof track?.repetitionCount === 'number' ? track.repetitionCount : null,
+      };
+    } catch (error) {
+      throw createImageImportError('画像を読み込めませんでした', error);
+    } finally {
+      if (decoder && typeof decoder.close === 'function') {
+        decoder.close();
+      }
+    }
+  }
+
+  function decodeGifWithReader(bytes) {
+    if (!(bytes instanceof Uint8Array)) {
+      bytes = new Uint8Array(bytes);
+    }
+    let reader;
+    try {
+      reader = new GifReader(bytes);
+    } catch (error) {
+      throw createImageImportError('画像を読み込めませんでした', error);
+    }
+    const width = Number(reader.width);
+    const height = Number(reader.height);
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      throw createImageImportError('画像サイズが不正です');
+    }
+    const frameCount = Number(reader.numFrames());
+    if (!Number.isFinite(frameCount) || frameCount <= 0) {
+      throw createImageImportError('GIFにフレームが含まれていません');
+    }
+    const pixels = new Uint8ClampedArray(width * height * 4);
+    const previous = new Uint8ClampedArray(pixels.length);
+    const frames = [];
+
+    for (let i = 0; i < frameCount; i += 1) {
+      const info = reader.frameInfo(i);
+      if (info.disposal === 3) {
+        previous.set(pixels);
+      }
+      reader.decodeAndBlitFrameRGBA(i, pixels);
+      const framePixels = new Uint8ClampedArray(pixels);
+      const delayHundredths = Number(info.delay);
+      frames.push({
+        imageData: new ImageData(framePixels, width, height),
+        duration: Number.isFinite(delayHundredths) && delayHundredths > 0
+          ? delayHundredths * 10
+          : DEFAULT_IMPORT_FRAME_DURATION,
+      });
+      if (info.disposal === 2) {
+        clearGifFrameRect(pixels, width, height, info);
+      } else if (info.disposal === 3) {
+        pixels.set(previous);
+      }
+    }
+
+    return {
+      frames,
+      width,
+      height,
+      loopCount: typeof reader.loopCount === 'function' ? reader.loopCount() : null,
+    };
+  }
+
+  function clearGifFrameRect(pixels, width, height, frame) {
+    const rawX = Number(frame.x);
+    const rawY = Number(frame.y);
+    const rawW = Number(frame.width);
+    const rawH = Number(frame.height);
+    const x = clamp(Number.isFinite(rawX) ? rawX : 0, 0, width);
+    const y = clamp(Number.isFinite(rawY) ? rawY : 0, 0, height);
+    const availableW = width - x;
+    const availableH = height - y;
+    const w = clamp(Number.isFinite(rawW) ? rawW : availableW, 0, availableW);
+    const h = clamp(Number.isFinite(rawH) ? rawH : availableH, 0, availableH);
+    if (w === 0 || h === 0) {
+      return;
+    }
+    for (let row = 0; row < h; row += 1) {
+      const offset = ((y + row) * width + x) * 4;
+      pixels.fill(0, offset, offset + w * 4);
+    }
   }
 
   async function decodeImageFileToImageData(file) {
@@ -5307,6 +5523,316 @@
       buf[p++] = 0;
     }
     return p;
+  }
+
+  // GifReader implementation adapted from https://github.com/deanm/omggif (MIT License).
+  function GifReader(buf) {
+    let p = 0;
+
+    if (buf[p++] !== 0x47 || buf[p++] !== 0x49 || buf[p++] !== 0x46 ||
+        buf[p++] !== 0x38 || (buf[p++] + 1 & 0xfd) !== 0x38 || buf[p++] !== 0x61) {
+      throw new Error('Invalid GIF 87a/89a header.');
+    }
+
+    const width = buf[p++] | buf[p++] << 8;
+    const height = buf[p++] | buf[p++] << 8;
+    const pf0 = buf[p++];
+    const globalPaletteFlag = pf0 >> 7;
+    const numGlobalColorsPow2 = pf0 & 0x7;
+    const numGlobalColors = 1 << (numGlobalColorsPow2 + 1);
+    const background = buf[p++];
+    buf[p++];
+
+    let globalPaletteOffset = null;
+    let globalPaletteSize = null;
+
+    if (globalPaletteFlag) {
+      globalPaletteOffset = p;
+      globalPaletteSize = numGlobalColors;
+      p += numGlobalColors * 3;
+    }
+
+    let noEof = true;
+    const frames = [];
+
+    let delay = 0;
+    let transparentIndex = null;
+    let disposal = 0;
+    let loopCount = null;
+
+    this.width = width;
+    this.height = height;
+
+    while (noEof && p < buf.length) {
+      switch (buf[p++]) {
+        case 0x21: {
+          const label = buf[p++];
+          if (label === 0xff) {
+            if (buf[p] === 0x0b &&
+                buf[p + 1] === 0x4e && buf[p + 2] === 0x45 && buf[p + 3] === 0x54 &&
+                buf[p + 4] === 0x53 && buf[p + 5] === 0x43 && buf[p + 6] === 0x41 &&
+                buf[p + 7] === 0x50 && buf[p + 8] === 0x45 && buf[p + 9] === 0x32 &&
+                buf[p + 10] === 0x2e && buf[p + 11] === 0x30 &&
+                buf[p + 12] === 0x03 && buf[p + 13] === 0x01 && buf[p + 16] === 0) {
+              p += 14;
+              loopCount = buf[p++] | buf[p++] << 8;
+              p++;
+            } else {
+              p += 12;
+              while (true) {
+                const blockSize = buf[p++];
+                if (!(blockSize >= 0)) throw new Error('Invalid block size');
+                if (blockSize === 0) break;
+                p += blockSize;
+              }
+            }
+          } else if (label === 0xf9) {
+            if (buf[p++] !== 0x4 || buf[p + 4] !== 0) {
+              throw new Error('Invalid graphics extension block.');
+            }
+            const pf1 = buf[p++];
+            delay = buf[p++] | buf[p++] << 8;
+            transparentIndex = buf[p++];
+            if ((pf1 & 1) === 0) transparentIndex = null;
+            disposal = pf1 >> 2 & 0x7;
+            p++;
+          } else if (label === 0x01 || label === 0xfe) {
+            while (true) {
+              const blockSize = buf[p++];
+              if (!(blockSize >= 0)) throw new Error('Invalid block size');
+              if (blockSize === 0) break;
+              p += blockSize;
+            }
+          } else {
+            throw new Error(`Unknown graphic control label: 0x${buf[p - 1].toString(16)}`);
+          }
+          break;
+        }
+
+        case 0x2c: {
+          const x = buf[p++] | buf[p++] << 8;
+          const y = buf[p++] | buf[p++] << 8;
+          const w = buf[p++] | buf[p++] << 8;
+          const h = buf[p++] | buf[p++] << 8;
+          const pf2 = buf[p++];
+          const localPaletteFlag = pf2 >> 7;
+          const interlaceFlag = pf2 >> 6 & 1;
+          const numLocalColorsPow2 = pf2 & 0x7;
+          const numLocalColors = 1 << (numLocalColorsPow2 + 1);
+          let paletteOffset = globalPaletteOffset;
+          let paletteSize = globalPaletteSize;
+          if (localPaletteFlag) {
+            paletteOffset = p;
+            paletteSize = numLocalColors;
+            p += numLocalColors * 3;
+          }
+
+          const dataOffset = p;
+          p++;
+          while (true) {
+            const blockSize = buf[p++];
+            if (!(blockSize >= 0)) throw new Error('Invalid block size');
+            if (blockSize === 0) break;
+            p += blockSize;
+          }
+
+          frames.push({
+            x,
+            y,
+            width: w,
+            height: h,
+            has_local_palette: Boolean(localPaletteFlag),
+            palette_offset: paletteOffset,
+            palette_size: paletteSize,
+            data_offset: dataOffset,
+            data_length: p - dataOffset,
+            transparent_index: transparentIndex,
+            interlaced: Boolean(interlaceFlag),
+            delay,
+            disposal,
+          });
+          break;
+        }
+
+        case 0x3b:
+          noEof = false;
+          break;
+
+        default:
+          throw new Error(`Unknown gif block: 0x${buf[p - 1].toString(16)}`);
+      }
+    }
+
+    this.numFrames = function numFrames() {
+      return frames.length;
+    };
+
+    this.loopCount = function loopCountFn() {
+      return loopCount;
+    };
+
+    this.frameInfo = function frameInfo(frameNum) {
+      if (frameNum < 0 || frameNum >= frames.length) {
+        throw new Error('Frame index out of range.');
+      }
+      return frames[frameNum];
+    };
+
+    this.decodeAndBlitFrameRGBA = function decodeAndBlitFrameRGBA(frameNum, pixels) {
+      const frame = this.frameInfo(frameNum);
+      const numPixels = frame.width * frame.height;
+      const indexStream = new Uint8Array(numPixels);
+      GifReaderLZWOutputIndexStream(buf, frame.data_offset, indexStream, numPixels);
+      const paletteOffset = frame.palette_offset;
+
+      let trans = frame.transparent_index;
+      if (trans === null) trans = 256;
+
+      const frameWidth = frame.width;
+      const frameStride = width - frameWidth;
+      let xLeft = frameWidth;
+
+      const opBeg = ((frame.y * width) + frame.x) * 4;
+      const opEnd = ((frame.y + frame.height) * width + frame.x) * 4;
+      let op = opBeg;
+
+      let scanStride = frameStride * 4;
+      if (frame.interlaced === true) {
+        scanStride += width * 4 * 7;
+      }
+
+      let interlaceSkip = 8;
+
+      for (let i = 0, il = indexStream.length; i < il; ++i) {
+        const index = indexStream[i];
+
+        if (xLeft === 0) {
+          op += scanStride;
+          xLeft = frameWidth;
+          if (op >= opEnd) {
+            scanStride = frameStride * 4 + width * 4 * (interlaceSkip - 1);
+            op = opBeg + (frameWidth + frameStride) * (interlaceSkip << 1);
+            interlaceSkip >>= 1;
+          }
+        }
+
+        if (index === trans) {
+          op += 4;
+        } else {
+          const r = buf[paletteOffset + index * 3];
+          const g = buf[paletteOffset + index * 3 + 1];
+          const b = buf[paletteOffset + index * 3 + 2];
+          pixels[op++] = r;
+          pixels[op++] = g;
+          pixels[op++] = b;
+          pixels[op++] = 255;
+        }
+        --xLeft;
+      }
+    };
+  }
+
+  function GifReaderLZWOutputIndexStream(codeStream, p, output, outputLength) {
+    const minCodeSize = codeStream[p++];
+
+    const clearCode = 1 << minCodeSize;
+    const eoiCode = clearCode + 1;
+    let nextCode = eoiCode + 1;
+
+    let curCodeSize = minCodeSize + 1;
+    let codeMask = (1 << curCodeSize) - 1;
+    let curShift = 0;
+    let cur = 0;
+
+    let op = 0;
+
+    let subblockSize = codeStream[p++];
+
+    const codeTable = new Int32Array(4096);
+
+    let prevCode = null;
+
+    while (true) {
+      while (curShift < 16) {
+        if (subblockSize === 0) break;
+
+        cur |= codeStream[p++] << curShift;
+        curShift += 8;
+
+        if (subblockSize === 1) {
+          subblockSize = codeStream[p++];
+        } else {
+          --subblockSize;
+        }
+      }
+
+      if (curShift < curCodeSize) {
+        break;
+      }
+
+      const code = cur & codeMask;
+      cur >>= curCodeSize;
+      curShift -= curCodeSize;
+
+      if (code === clearCode) {
+        nextCode = eoiCode + 1;
+        curCodeSize = minCodeSize + 1;
+        codeMask = (1 << curCodeSize) - 1;
+        prevCode = null;
+        continue;
+      } else if (code === eoiCode) {
+        break;
+      }
+
+      const chaseCode = code < nextCode ? code : prevCode;
+
+      let chaseLength = 0;
+      let chase = chaseCode;
+      while (chase > clearCode) {
+        chase = codeTable[chase] >> 8;
+        ++chaseLength;
+      }
+
+      const k = chase;
+
+      const opEnd = op + chaseLength + (chaseCode !== code ? 1 : 0);
+      if (opEnd > outputLength) {
+        console.warn('Warning, gif stream longer than expected.');
+        return;
+      }
+
+      output[op++] = k;
+
+      op += chaseLength;
+      let b = op;
+
+      chase = chaseCode;
+      while (chase > clearCode) {
+        chase = codeTable[chase];
+        output[--b] = chase & 0xff;
+        chase >>= 8;
+      }
+
+      if (opEnd === outputLength) {
+        continue;
+      }
+
+      output[op++] = k;
+
+      if (prevCode !== null) {
+        if (nextCode === 4096) {
+          break;
+        }
+        codeTable[nextCode++] = prevCode << 8 | k;
+
+        if (nextCode === 1 << curCodeSize && curCodeSize < 12) {
+          ++curCodeSize;
+          codeMask = (1 << curCodeSize) - 1;
+        }
+      }
+
+      prevCode = code;
+    }
   }
 
   function createTextCompression() {
