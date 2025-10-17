@@ -676,6 +676,10 @@ button {
   touch-action: none;
 }
 
+body.is-startup-active #virtualCursorCanvas {
+  display: none;
+}
+
 .canvas-controls {
   position: absolute;
   top: 12px;
