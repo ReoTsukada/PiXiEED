@@ -2823,39 +2823,71 @@
   }
 
   async function loadDocumentFromImageFile(file) {
-    let imageData;
+    let importResult;
     try {
-      imageData = await decodeImageFileToImageData(file);
+      importResult = await decodeImageFileToFrames(file);
     } catch (error) {
       throw createImageImportError('画像を読み込めませんでした', error);
     }
-    if (!imageData || !Number.isFinite(imageData.width) || !Number.isFinite(imageData.height)) {
+
+    const framesData = Array.isArray(importResult?.frames) ? importResult.frames : [];
+    if (!framesData.length) {
+      throw createImageImportError('画像を読み込めませんでした');
+    }
+
+    const inferredWidth = Number(importResult?.width ?? framesData[0]?.imageData?.width ?? 0);
+    const inferredHeight = Number(importResult?.height ?? framesData[0]?.imageData?.height ?? 0);
+    if (!Number.isFinite(inferredWidth) || !Number.isFinite(inferredHeight) || inferredWidth <= 0 || inferredHeight <= 0) {
       throw createImageImportError('画像サイズが不正です');
     }
-    const width = Math.max(1, Math.floor(imageData.width));
-    const height = Math.max(1, Math.floor(imageData.height));
+
+    const width = Math.max(1, Math.floor(inferredWidth));
+    const height = Math.max(1, Math.floor(inferredHeight));
     if (width > MAX_CANVAS_SIZE || height > MAX_CANVAS_SIZE) {
       throw createImageImportError(`画像のサイズが大きすぎます (最大 ${MAX_CANVAS_SIZE}px)`);
     }
 
-    const layer = createLayer('画像レイヤー', width, height);
-    const extraction = buildIndexedPaletteFromImageData(imageData.data);
+    const paletteSource = state.palette && state.palette.length
+      ? state.palette
+      : createInitialState({ width, height }).palette;
+
+    const frames = [];
     let palette = [];
     let activePaletteIndex = 0;
     let activeRgb = { r: 255, g: 255, b: 255, a: 255 };
 
-    if (!extraction.overflow && extraction.palette.length > 0) {
-      layer.indices = extraction.indices;
-      layer.direct = null;
-      palette = extraction.palette.map(color => ({ ...color }));
-      activePaletteIndex = 0;
-      activeRgb = { ...palette[activePaletteIndex] };
+    if (framesData.length === 1) {
+      const frameInfo = framesData[0];
+      const imageData = frameInfo?.imageData;
+      if (!imageData || !Number.isFinite(imageData.width) || !Number.isFinite(imageData.height)) {
+        throw createImageImportError('画像を読み込めませんでした');
+      }
+      const layer = createLayer('画像レイヤー', width, height);
+      const extraction = buildIndexedPaletteFromImageData(imageData.data);
+      if (!extraction.overflow && extraction.palette.length > 0) {
+        layer.indices = extraction.indices;
+        layer.direct = null;
+        palette = extraction.palette.map(color => ({ ...color }));
+        activePaletteIndex = 0;
+        activeRgb = { ...palette[activePaletteIndex] };
+      } else {
+        const direct = ensureLayerDirect(layer, width, height);
+        direct.set(imageData.data);
+        palette = paletteSource.map(color => ({ ...color }));
+        activePaletteIndex = palette.length
+          ? clamp(state.activePaletteIndex ?? 0, 0, palette.length - 1)
+          : 0;
+        activeRgb = state.activeRgb
+          ? { ...state.activeRgb }
+          : (palette[activePaletteIndex] ? { ...palette[activePaletteIndex] } : { r: 255, g: 255, b: 255, a: 255 });
+      }
+      frames.push({
+        id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}`,
+        name: 'フレーム 1',
+        duration: normalizeImportFrameDuration(frameInfo?.duration),
+        layers: [layer],
+      });
     } else {
-      const direct = ensureLayerDirect(layer, width, height);
-      direct.set(imageData.data);
-      const paletteSource = state.palette && state.palette.length
-        ? state.palette
-        : createInitialState({ width, height }).palette;
       palette = paletteSource.map(color => ({ ...color }));
       activePaletteIndex = palette.length
         ? clamp(state.activePaletteIndex ?? 0, 0, palette.length - 1)
@@ -2863,14 +2895,31 @@
       activeRgb = state.activeRgb
         ? { ...state.activeRgb }
         : (palette[activePaletteIndex] ? { ...palette[activePaletteIndex] } : { r: 255, g: 255, b: 255, a: 255 });
+
+      framesData.forEach((frameInfo, index) => {
+        const layer = createLayer('画像レイヤー', width, height);
+        layer.indices.fill(-1);
+        const direct = ensureLayerDirect(layer, width, height);
+        if (frameInfo?.imageData?.data instanceof Uint8ClampedArray
+          && frameInfo.imageData.width === width
+          && frameInfo.imageData.height === height) {
+          direct.set(frameInfo.imageData.data);
+        } else {
+          direct.fill(0);
+        }
+        frames.push({
+          id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}-${index}`,
+          name: `フレーム ${index + 1}`,
+          duration: normalizeImportFrameDuration(frameInfo?.duration),
+          layers: [layer],
+        });
+      });
     }
 
-    const frame = {
-      id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}`,
-      name: 'フレーム 1',
-      duration: DEFAULT_IMPORT_FRAME_DURATION,
-      layers: [layer],
-    };
+    const activeLayerId = frames[0]?.layers[0]?.id;
+    if (!activeLayerId) {
+      throw createImageImportError('画像を読み込めませんでした');
+    }
 
     const documentName = normalizeDocumentName(typeof file?.name === 'string' ? file.name : state.documentName);
     const activeToolGroup = TOOL_GROUPS[state.activeToolGroup] ? state.activeToolGroup : (TOOL_TO_GROUP[state.tool] || 'pen');
@@ -2885,9 +2934,9 @@
       palette,
       activePaletteIndex,
       activeRgb,
-      frames: [frame],
+      frames,
       activeFrame: 0,
-      activeLayer: layer.id,
+      activeLayer: activeLayerId,
       selectionMask: null,
       selectionBounds: null,
       showGrid: state.showGrid ?? true,
@@ -3047,14 +3096,34 @@
       throw createImageImportError('GIFにフレームが含まれていません');
     }
     const pixels = new Uint8ClampedArray(width * height * 4);
-    const previous = new Uint8ClampedArray(pixels.length);
+    const restoreBuffer = new Uint8ClampedArray(pixels.length);
+    const backgroundColor = typeof reader.getBackgroundColor === 'function' ? reader.getBackgroundColor() : null;
+    const backgroundIndex = typeof reader.getBackgroundIndex === 'function' ? reader.getBackgroundIndex() : null;
     const frames = [];
+    let previousFrameInfo = null;
+
+    if (backgroundColor && backgroundColor.a > 0) {
+      fillGifCanvas(pixels, backgroundColor);
+    } else {
+      pixels.fill(0);
+    }
 
     for (let i = 0; i < frameCount; i += 1) {
       const info = reader.frameInfo(i);
-      if (info.disposal === 3) {
-        previous.set(pixels);
+
+      if (previousFrameInfo) {
+        if (previousFrameInfo.disposal === 2) {
+          const fillColor = resolveDisposalFillColor(previousFrameInfo, backgroundColor, backgroundIndex);
+          clearGifFrameRect(pixels, width, height, previousFrameInfo, fillColor);
+        } else if (previousFrameInfo.disposal === 3) {
+          pixels.set(restoreBuffer);
+        }
       }
+
+      if (info.disposal === 3) {
+        restoreBuffer.set(pixels);
+      }
+
       reader.decodeAndBlitFrameRGBA(i, pixels);
       const framePixels = new Uint8ClampedArray(pixels);
       const delayHundredths = Number(info.delay);
@@ -3064,11 +3133,8 @@
           ? delayHundredths * 10
           : DEFAULT_IMPORT_FRAME_DURATION,
       });
-      if (info.disposal === 2) {
-        clearGifFrameRect(pixels, width, height, info);
-      } else if (info.disposal === 3) {
-        pixels.set(previous);
-      }
+
+      previousFrameInfo = info;
     }
 
     return {
@@ -3079,7 +3145,33 @@
     };
   }
 
-  function clearGifFrameRect(pixels, width, height, frame) {
+  function fillGifCanvas(pixels, color) {
+    if (!color) {
+      pixels.fill(0);
+      return;
+    }
+    for (let i = 0; i < pixels.length; i += 4) {
+      pixels[i] = color.r;
+      pixels[i + 1] = color.g;
+      pixels[i + 2] = color.b;
+      pixels[i + 3] = color.a;
+    }
+  }
+
+  function resolveDisposalFillColor(frameInfo, backgroundColor, backgroundIndex) {
+    if (!backgroundColor) {
+      return null;
+    }
+    const transparentIndex = typeof frameInfo?.transparent_index === 'number' ? frameInfo.transparent_index : null;
+    if (transparentIndex !== null && transparentIndex >= 0) {
+      if (typeof backgroundIndex === 'number' && backgroundIndex === transparentIndex) {
+        return null;
+      }
+    }
+    return backgroundColor;
+  }
+
+  function clearGifFrameRect(pixels, width, height, frame, fillColor = null) {
     const rawX = Number(frame.x);
     const rawY = Number(frame.y);
     const rawW = Number(frame.width);
@@ -3095,7 +3187,18 @@
     }
     for (let row = 0; row < h; row += 1) {
       const offset = ((y + row) * width + x) * 4;
-      pixels.fill(0, offset, offset + w * 4);
+      if (!fillColor) {
+        pixels.fill(0, offset, offset + w * 4);
+      } else {
+        let cursor = offset;
+        for (let col = 0; col < w; col += 1) {
+          pixels[cursor] = fillColor.r;
+          pixels[cursor + 1] = fillColor.g;
+          pixels[cursor + 2] = fillColor.b;
+          pixels[cursor + 3] = fillColor.a;
+          cursor += 4;
+        }
+      }
     }
   }
 
