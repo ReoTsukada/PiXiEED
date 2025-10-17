@@ -14,7 +14,7 @@
     <meta name="twitter:title" content="PiXiEEDraw" />
     <meta name="twitter:description" content="ブラウザから直接操作できるピクセルアートエディター PiXiEEDraw" />
     <meta name="twitter:image" content="https://pixieed.jp/pixiedraw/ogp.png" />
-    <meta name="build-version" content="2025-10-17T03:46:18Z" />
+    <meta name="build-version" content="2025-10-17T06:01:31Z" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
@@ -437,16 +437,15 @@
             <p class="help-text" id="exportScaleHint"></p>
           </div>
           <div class="field field--list">
-            <button type="button" class="button button--primary" id="confirmExportPng">PNG（画像）</button>
-            <p class="help-text">全フレームをグリッドに並べた PNG を保存します</p>
-          </div>
-          <div class="field field--list">
-            <button type="button" class="button button--primary" id="confirmExportGif">GIF（アニメーション）</button>
-            <p class="help-text">フレーム時間を維持したアニメーション GIF を保存します</p>
-          </div>
-          <div class="field field--list">
-            <button type="button" class="button button--primary" id="saveProject">プロジェクトを保存</button>
-            <p class="help-text">現在の編集内容を .pixieedraw ファイルとして保存します</p>
+            <div class="export-guidance" aria-live="polite">
+              <p class="help-text"><strong>iPhoneで保存</strong> 共有 → ファイルに保存</p>
+              <p class="help-text"><strong>Androidで保存</strong> 保存</p>
+            </div>
+            <div class="export-actions" role="group" aria-label="書き出し形式の選択">
+              <button type="button" class="button button--primary" id="confirmExportPng">PNG（画像）</button>
+              <button type="button" class="button button--primary" id="confirmExportGif">GIF（アニメーション）</button>
+              <button type="button" class="button button--primary" id="saveProject">プロジェクトを保存</button>
+            </div>
           </div>
         </div>
         <footer class="modal__footer">
