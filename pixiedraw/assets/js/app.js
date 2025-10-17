@@ -2635,11 +2635,12 @@
           excludeAcceptAllOption: false,
           types: [
             {
-              description: '対応ファイル (PiXiEEDraw / PNG)',
+              description: '対応ファイル (PiXiEEDraw / PNG / GIF)',
               accept: {
                 'application/json': ['.json', '.pxdraw', '.pixieedraw'],
                 'application/x-pixieedraw': ['.pixieedraw'],
                 'image/png': ['.png'],
+                'image/gif': ['.gif'],
               },
             },
           ],
@@ -2654,8 +2655,8 @@
           return false;
         }
         console.warn('Document open failed', error);
-        const message = error?.source === 'png-import'
-          ? 'PNGの読み込みに失敗しました'
+        const message = error?.source === 'image-import'
+          ? '画像の読み込みに失敗しました'
           : 'ドキュメントを開けませんでした';
         updateAutosaveStatus(message, 'error');
         return false;
@@ -2673,9 +2674,11 @@
         '.pxdraw',
         '.pixieedraw',
         '.png',
+        '.gif',
         'application/json',
         'application/x-pixieedraw',
         'image/png',
+        'image/gif',
       ];
       if (IS_IOS_DEVICE) {
         acceptTypes.push('.txt', 'text/plain');
@@ -2700,7 +2703,7 @@
           return;
         }
         try {
-          if (isPngFile(file)) {
+          if (isImportableImageFile(file)) {
             await loadDocumentFromImageFile(file);
           } else {
             const text = await file.text();
@@ -2709,7 +2712,7 @@
           finish(true);
         } catch (error) {
           console.warn('Document load failed', error);
-          const message = isPngFile(file) ? 'PNGの読み込みに失敗しました' : 'ドキュメントを開けませんでした';
+          const message = isImportableImageFile(file) ? '画像の読み込みに失敗しました' : 'ドキュメントを開けませんでした';
           updateAutosaveStatus(message, 'error');
           finish(false);
         }
@@ -2726,20 +2729,19 @@
     });
   }
 
-  function isPngFile(file) {
+  function isImportableImageFile(file) {
     if (!file) return false;
-    if (typeof file.type === 'string' && file.type.toLowerCase() === 'image/png') {
+    const type = typeof file.type === 'string' ? file.type.toLowerCase() : '';
+    if (type === 'image/png' || type === 'image/gif') {
       return true;
     }
-    if (typeof file.name === 'string' && file.name.toLowerCase().endsWith('.png')) {
-      return true;
-    }
-    return false;
+    const name = typeof file.name === 'string' ? file.name.toLowerCase() : '';
+    return name.endsWith('.png') || name.endsWith('.gif');
   }
 
-  function createPngImportError(message, cause) {
+  function createImageImportError(message, cause) {
     const error = new Error(message);
-    error.source = 'png-import';
+    error.source = 'image-import';
     if (cause) {
       error.cause = cause;
     }
@@ -2804,18 +2806,18 @@
     try {
       imageData = await decodeImageFileToImageData(file);
     } catch (error) {
-      throw createPngImportError('画像を読み込めませんでした', error);
+      throw createImageImportError('画像を読み込めませんでした', error);
     }
     if (!imageData || !Number.isFinite(imageData.width) || !Number.isFinite(imageData.height)) {
-      throw createPngImportError('画像サイズが不正です');
+      throw createImageImportError('画像サイズが不正です');
     }
     const width = Math.max(1, Math.floor(imageData.width));
     const height = Math.max(1, Math.floor(imageData.height));
     if (width > MAX_CANVAS_SIZE || height > MAX_CANVAS_SIZE) {
-      throw createPngImportError(`PNGのサイズが大きすぎます (最大 ${MAX_CANVAS_SIZE}px)`);
+      throw createImageImportError(`画像のサイズが大きすぎます (最大 ${MAX_CANVAS_SIZE}px)`);
     }
 
-    const layer = createLayer('PNG レイヤー', width, height);
+    const layer = createLayer('画像レイヤー', width, height);
     const extraction = buildIndexedPaletteFromImageData(imageData.data);
     let palette = [];
     let activePaletteIndex = 0;
@@ -2903,18 +2905,18 @@
       const suggestedName = createAutosaveFileName(documentName);
       updateAutosaveStatus('自動保存: 保存先を選択してください', 'info');
       requestAutosaveBinding({ suggestedName }).catch(error => {
-        console.warn('Autosave binding after PNG import failed', error);
+        console.warn('Autosave binding after image import failed', error);
         updateAutosaveStatus('自動保存: 保存先を設定できませんでした', 'error');
       });
     } else {
-      updateAutosaveStatus('PNGを読み込みました', 'success');
+      updateAutosaveStatus('画像を読み込みました', 'success');
     }
     scheduleSessionPersist();
   }
 
   async function decodeImageFileToImageData(file) {
     if (!file) {
-      throw createPngImportError('ファイルが選択されていません');
+      throw createImageImportError('ファイルが選択されていません');
     }
     if (typeof createImageBitmap === 'function') {
       try {
@@ -2935,14 +2937,14 @@
 
   function imageBitmapToImageData(bitmap) {
     if (!bitmap || !bitmap.width || !bitmap.height) {
-      throw createPngImportError('画像サイズが不正です');
+      throw createImageImportError('画像サイズが不正です');
     }
     const canvas = document.createElement('canvas');
     canvas.width = bitmap.width;
     canvas.height = bitmap.height;
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-      throw createPngImportError('画像を処理できませんでした');
+      throw createImageImportError('画像を処理できませんでした');
     }
     ctx.drawImage(bitmap, 0, 0);
     return ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -2958,27 +2960,27 @@
           const width = image.naturalWidth || image.width;
           const height = image.naturalHeight || image.height;
           if (!width || !height) {
-            throw createPngImportError('画像サイズが不正です');
+            throw createImageImportError('画像サイズが不正です');
           }
           const canvas = document.createElement('canvas');
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           if (!ctx) {
-            throw createPngImportError('画像を処理できませんでした');
+            throw createImageImportError('画像を処理できませんでした');
           }
           ctx.drawImage(image, 0, 0);
           const data = ctx.getImageData(0, 0, width, height);
           resolve(data);
         } catch (error) {
-          reject(createPngImportError('画像を処理できませんでした', error));
+          reject(createImageImportError('画像を処理できませんでした', error));
         } finally {
           URL.revokeObjectURL(url);
         }
       };
       image.onerror = event => {
         URL.revokeObjectURL(url);
-        reject(createPngImportError('画像の読み込みに失敗しました'));
+        reject(createImageImportError('画像の読み込みに失敗しました'));
       };
       image.src = url;
     });
@@ -3499,7 +3501,7 @@
         return;
       }
       const file = await handle.getFile();
-      if (isPngFile(file)) {
+      if (isImportableImageFile(file)) {
         await loadDocumentFromImageFile(file);
         return;
       }
@@ -3509,7 +3511,7 @@
       console.warn('Document handle load failed', error);
       const message = error && error.name === 'AbortError'
         ? null
-        : (error?.source === 'png-import' ? 'PNGの読み込みに失敗しました' : 'ドキュメントを開けませんでした');
+        : (error?.source === 'image-import' ? '画像の読み込みに失敗しました' : 'ドキュメントを開けませんでした');
       if (message) {
         updateAutosaveStatus(message, 'error');
       }
