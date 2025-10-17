@@ -4,6 +4,11 @@
   "start_url": "/maoitu/index.html",
   "scope": "/maoitu/",
   "display": "standalone",
+  "display_override": [
+    "fullscreen",
+    "standalone"
+  ],
+  "orientation": "portrait",
   "background_color": "#000000",
   "theme_color": "#050505",
   "lang": "ja",
