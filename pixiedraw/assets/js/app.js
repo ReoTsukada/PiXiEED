@@ -407,6 +407,7 @@
   let drawButtonResizeListenerBound = false;
   const toolIconCache = new Map();
   let startupVisible = false;
+  let startupVirtualCursorState = null;
   restoreSessionState();
   state.colorMode = 'index';
   updateGridDecorations();
@@ -3653,6 +3654,10 @@
     if (startupVisible) {
       return;
     }
+    startupVirtualCursorState = state.showVirtualCursor;
+    if (state.showVirtualCursor) {
+      setVirtualCursorEnabled(false, { persist: false });
+    }
     startupVisible = true;
     container.hidden = false;
     container.setAttribute('aria-hidden', 'false');
@@ -3673,6 +3678,10 @@
     container.hidden = true;
     container.setAttribute('aria-hidden', 'true');
     document.body.classList.remove('is-startup-active');
+    if (startupVirtualCursorState === true) {
+      setVirtualCursorEnabled(true, { persist: false });
+    }
+    startupVirtualCursorState = null;
   }
 
   function setupStartupScreen() {
@@ -6602,6 +6611,36 @@
     }
   }
 
+  function setVirtualCursorEnabled(enabled, options = {}) {
+    const { persist = true, updateControl = true } = options;
+    const next = Boolean(enabled);
+    const prev = state.showVirtualCursor;
+
+    if (updateControl && dom.controls.toggleVirtualCursor instanceof HTMLInputElement) {
+      dom.controls.toggleVirtualCursor.checked = next;
+    }
+    if (prev === next) {
+      return;
+    }
+
+    state.showVirtualCursor = next;
+    if (next && !virtualCursor) {
+      virtualCursor = createInitialVirtualCursor();
+    }
+    if (!next) {
+      releaseVirtualCursorPointer();
+      if (!pointerState.active && hoverPixel) {
+        hoverPixel = null;
+      }
+    }
+    requestOverlayRender();
+    if (persist) {
+      scheduleSessionPersist();
+    }
+    updateFloatingDrawButtonEnabledState();
+    refreshViewportCursorStyle();
+  }
+
   function setupControls() {
     if (dom.controls.toggleGrid instanceof HTMLInputElement) {
       dom.controls.toggleGrid.addEventListener('change', () => {
@@ -6694,21 +6733,10 @@
     });
 
     dom.controls.toggleVirtualCursor?.addEventListener('change', event => {
-      state.showVirtualCursor = Boolean(event.target.checked);
-      if (state.showVirtualCursor && !virtualCursor) {
-        virtualCursor = createInitialVirtualCursor();
+      if (!(event.target instanceof HTMLInputElement)) {
+        return;
       }
-      if (!state.showVirtualCursor) {
-        releaseVirtualCursorPointer();
-        if (!pointerState.active && hoverPixel) {
-          hoverPixel = null;
-          requestOverlayRender();
-        }
-      }
-      requestOverlayRender();
-      scheduleSessionPersist();
-      updateFloatingDrawButtonEnabledState();
-      refreshViewportCursorStyle();
+      setVirtualCursorEnabled(Boolean(event.target.checked));
     });
 
     if (dom.controls.virtualCursorButtonScale instanceof HTMLInputElement) {
