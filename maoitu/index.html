@@ -2,7 +2,10 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="まおいつ">
 <title>魔王様！！いつまでよければいいですか！？</title>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
@@ -293,6 +296,19 @@ a { color:#7dd3fc; }
 </div>
 
 <script>
+// Prevent pinch-zoom for the standalone PWA shell on iOS.
+['gesturestart', 'gesturechange', 'gestureend'].forEach((eventName) => {
+  document.addEventListener(eventName, (event) => {
+    event.preventDefault();
+  }, { passive: false });
+});
+
+document.addEventListener('touchmove', (event) => {
+  if(event.touches.length > 1){
+    event.preventDefault();
+  }
+}, { passive: false });
+
 const GAME_URL = './game.html';
 const AUDIO_KEY = 'maoitu_audio';
 const GAME_CANONICAL_URL = `${window.location.origin}/maoitu/`;
