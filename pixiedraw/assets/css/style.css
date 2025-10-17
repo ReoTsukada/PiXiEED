@@ -2341,3 +2341,16 @@ body.is-startup-active {
 .mobile-panel .panel-section {
   margin-bottom: 16px;
 }
+:root {
+*** End Patch
+  .tool-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+  }
+  .tool-grid .tool-button {
+    flex: 1 1 calc(33.333% - 12px);
+    min-width: 80px;
+  }
+}
