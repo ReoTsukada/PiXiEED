@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PiXFIND | PiXiEED プロジェクト紹介</title>
+  <meta name="description" content="PiXFINDはドット絵に特化したブラウザ向けの間違い探しゲーム。公式パズルを難易度別に収録し、イベントや配信でも使いやすいUIを備えています。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../styles.css">
+</head>
+<body class="project-page">
+  <header class="site-header">
+    <div class="site-brand">
+      <a href="../../index.html" class="logo">PiXiEED</a>
+      <p class="tagline">遊びとツールを、ブラウザから届けるクリエイターズグループ</p>
+    </div>
+    <nav class="site-nav" aria-label="メイン">
+      <ul>
+        <li><a href="../../index.html#showcase" aria-current="page">制作物</a></li>
+        <li><a href="../../games.html#tools-section">ツール</a></li>
+        <li><a href="../../games.html#games-section">ゲーム</a></li>
+        <li><a href="../../portfolio/index.html">アルタ</a></li>
+        <li><a href="../../ads/index.html">広告掲載</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" id="overview">
+      <div class="hero-copy">
+        <h1>PiXFIND</h1>
+        <p>PiXFINDは「ドット絵で間違い探しを楽しむ」という一点に特化したブラウザゲームです。正解画像と間違い画像の差分をエンジンが自動抽出し、難易度別にパズルを選んで遊べます。</p>
+        <p>ホーム画面に追加すればフルスクリーンで起動でき、タッチ・クリックいずれの操作にも対応。展示会や配信でもシンプルな導線で利用できます。</p>
+        <p class="project-update" data-last-updated>
+          <span class="project-update__label">最終更新</span>
+          <time class="project-update__value" datetime="">--</time>
+        </p>
+        <div class="hero-cta">
+          <a class="cta-primary" href="../../pixfind/index.html">ブラウザでプレイ</a>
+          <a class="cta-secondary" href="../../games.html#games-section">ゲーム一覧を見る</a>
+        </div>
+      </div>
+      <div class="hero-visual" aria-hidden="true">
+        <div class="project-visual">
+          <img src="../../pixfind/ogp.png" alt="PiXFIND のプレイ画面イメージ" loading="lazy">
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--accent" id="features">
+      <div class="section-inner">
+        <h2>ゲームの特徴</h2>
+        <ul class="project-feature-list">
+          <li>
+            <strong>公式パズルを難易度で整理</strong>
+            公式パズルは★1〜★3の3段階。プレイ履歴に関係なく、思い立ったらすぐに好きな難易度から遊べます。
+          </li>
+          <li>
+            <strong>差分検出をエンジンが自動処理</strong>
+            ドット単位で差分を抽出し、距離感に応じてヒット判定を最適化。間違いの表示位置もシンクロして光らせます。
+          </li>
+          <li>
+            <strong>イベントや配信でも扱いやすいUI</strong>
+            タッチ対応の大きなUIと、ミス回数やタイマーを即表示するHUDで、そのまま配信用オーバーレイとしても利用できます。
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section" id="details">
+      <div class="section-inner">
+        <h2>基本データ</h2>
+        <div class="project-meta-grid">
+          <dl class="project-meta">
+            <dt>ジャンル</dt>
+            <dd>ドット絵間違い探し / パズル</dd>
+          </dl>
+          <dl class="project-meta">
+            <dt>プレイ難易度</dt>
+            <dd>
+              <span class="display__difficulty" data-difficulty="2" aria-label="難易度 2">
+                <span class="display__difficulty-label">難易度</span>
+                <span class="display__difficulty-scale" aria-hidden="true">
+                  <span class="is-filled"></span>
+                  <span class="is-filled"></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </span>
+                <span class="display__difficulty-value">2</span>
+              </span>
+            </dd>
+          </dl>
+          <dl class="project-meta">
+            <dt>対応ブラウザ</dt>
+            <dd>Chrome / Safari / Edge / Firefox</dd>
+          </dl>
+          <dl class="project-meta">
+            <dt>リリース</dt>
+            <dd>2025年 公開</dd>
+          </dl>
+        </div>
+        <div class="project-note">
+          <strong>制作背景</strong>
+          <p>ドット絵の資料を見ながら「差分を強制的に探す」遊びをイベントで提供したいという構想から生まれました。PiXiEEDraw のピクセル補完ロジックをベースに、ブラウザで動作する差分検出エンジンとして組み直し、誰でもURL一つでアクセスできる形にしています。</p>
+          <div class="project-actions">
+            <a class="cta-primary" href="../../pixfind/index.html">ブラウザでプレイ</a>
+            <a class="cta-secondary" href="../../portfolio/index.html#notes">制作ノートを読む</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--highlight" id="share">
+      <div class="section-inner">
+        <h2>楽しんでいただけたら</h2>
+        <p>クリアタイムや発見数はワンクリックで共有リンクに変換できます。ハッシュタグ <code>#PiXiEED</code> を付けて感想やスクリーンショットを拡散していただけると制作の励みになります。</p>
+        <div class="project-actions">
+          <a class="cta-primary" href="../../pixfind/index.html">今すぐ遊ぶ</a>
+          <a class="cta-secondary" href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">公式X (旧Twitter)</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <small>&copy; <span id="year"></span> PiXiEED. All rights reserved.</small>
+      <div class="footer-links">
+        <a href="../../terms/index.html">利用規約</a>
+        <a href="../../privacy/index.html">プライバシーポリシー</a>
+        <button type="button" class="footer-contact js-contact-open">お問い合わせ</button>
+        <a class="footer-link--x" href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">公式X (旧Twitter)</a>
+      </div>
+    </div>
+  </footer>
+
+  <div id="contactOverlay" class="contact-overlay" hidden aria-hidden="true">
+    <div class="contact-panel" role="dialog" aria-modal="true" aria-labelledby="contactTitle">
+      <button type="button" class="contact-close js-contact-close" aria-label="閉じる">×</button>
+      <h2 id="contactTitle">お問い合わせ</h2>
+      <p>ご希望の連絡手段を選択してください。</p>
+      <div class="contact-options">
+        <a class="contact-option" href="mailto:arta@pixieed.jp">
+          <span class="contact-option__title">メールで相談する</span>
+          <span class="contact-option__detail">arta@pixieed.jp</span>
+        </a>
+        <a class="contact-option" href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">
+          <span class="contact-option__title">X (旧Twitter) のDM</span>
+          <span class="contact-option__detail">@PiXiEED_arta</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../scripts.js"></script>
+</body>
+</html>
