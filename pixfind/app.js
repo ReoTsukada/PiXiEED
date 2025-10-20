@@ -44,7 +44,7 @@ const FALLBACK_OFFICIAL_PUZZLES = [
   {
     id: 'd1-maousama',
     slug: 'd1-maousama',
-    label: '魔王様!!いつまでよければいいですか!?',
+    label: '魔王様!!',
     description: '秒で始められる避けゲーをモチーフにした公式間違い探し。まずはここから挑戦！',
     difficulty: 1,
     original: 'assets/puzzles/d1-maousama/original.png',
