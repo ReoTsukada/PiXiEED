@@ -1,0 +1,696 @@
+:root {
+  color-scheme: light;
+  --bg: #f5f6fb;
+  --panel: #ffffff;
+  --panel-shadow: 0 24px 40px -28px rgba(25, 45, 90, 0.45);
+  --accent: #ff6f8d;
+  --accent-dark: #f04f70;
+  --text: #1f2430;
+  --text-muted: #5b6374;
+  --border: rgba(40, 50, 80, 0.16);
+  font-family: "M PLUS Rounded 1c", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+  font-size: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 700;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+body.is-playing {
+  overflow: hidden;
+}
+
+.app {
+  position: relative;
+  width: min(1100px, 100%);
+  height: 100vh;
+  margin: 0 auto;
+  display: grid;
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  padding: clamp(1rem, 2.5vw, 2.5rem);
+  display: grid;
+  gap: 1.5rem;
+  overflow: hidden;
+  transform: translateX(0);
+  transition: transform 400ms cubic-bezier(0.6, 0, 0.2, 1);
+}
+
+.screen[aria-hidden="true"] {
+  pointer-events: none;
+}
+
+.screen[hidden] {
+  display: none;
+}
+
+.screen--start {
+  grid-template-rows: 1fr auto;
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+  padding-block: clamp(2rem, 6vh, 3.5rem);
+}
+
+.screen--difficulty {
+  grid-template-rows: auto auto 1fr;
+  gap: 0.9rem;
+}
+
+.difficulty-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.section-title {
+  margin: 0;
+  font-size: clamp(1.9rem, 4vw, 2.6rem);
+  letter-spacing: 0.05em;
+}
+
+.section-subtitle {
+  margin: 0.35rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.98rem;
+}
+
+
+.difficulty-selector {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.4rem;
+  scrollbar-width: thin;
+  align-items: stretch;
+  -webkit-overflow-scrolling: touch;
+}
+
+.difficulty-selector::-webkit-scrollbar {
+  height: 6px;
+}
+
+.difficulty-selector::-webkit-scrollbar-thumb {
+  background: rgba(40, 50, 80, 0.2);
+  border-radius: 999px;
+}
+
+.difficulty-chip {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.75rem 1.1rem;
+  border-radius: 18px;
+  background: var(--panel);
+  border: 2px solid rgba(40, 50, 80, 0.1);
+  box-shadow: var(--panel-shadow);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  min-width: 180px;
+  transition: transform 0.15s ease, border 0.2s ease, box-shadow 0.2s ease;
+}
+
+.difficulty-chip span {
+  font-weight: 500;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  letter-spacing: 0;
+}
+
+.difficulty-chip[aria-pressed="true"] {
+  border-color: rgba(255, 111, 141, 0.65);
+  box-shadow: 0 18px 34px -22px rgba(255, 111, 141, 0.6);
+  transform: translateY(-4px);
+}
+
+.difficulty-chip:focus-visible {
+  outline: 3px solid rgba(255, 111, 141, 0.35);
+  outline-offset: 4px;
+}
+
+
+.puzzle-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  overflow: hidden;
+}
+
+.puzzle-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  justify-content: center;
+  align-content: flex-start;
+  flex: 1;
+}
+
+.puzzle-card {
+  position: relative;
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  border-radius: 18px;
+  background: var(--panel);
+  border: 1px solid rgba(40, 50, 80, 0.12);
+  box-shadow: var(--panel-shadow);
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border 0.18s ease;
+  min-width: 200px;
+  min-height: 180px;
+}
+
+.puzzle-card--official {
+  padding-top: 1.4rem;
+}
+
+.puzzle-card__badge {
+  position: absolute;
+  top: 0.75rem;
+  left: 1rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(255, 111, 141, 0.2);
+  border: 1px solid rgba(255, 111, 141, 0.55);
+  color: var(--accent);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.puzzle-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 36px -24px rgba(40, 50, 80, 0.45);
+  border-color: rgba(255, 111, 141, 0.4);
+}
+
+.puzzle-card__actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.puzzle-card__thumb {
+  aspect-ratio: 1;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  width: 120px;
+  background: repeating-linear-gradient(135deg, #fce4ed 0, #fce4ed 12px, #f9d3e0 12px, #f9d3e0 24px);
+  color: rgba(120, 40, 70, 0.75);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-size: 0.85rem;
+}
+
+.puzzle-card__thumb--image {
+  width: 140px;
+  background: rgba(20, 28, 40, 0.14);
+  border: 1px solid rgba(40, 50, 80, 0.18);
+}
+
+.puzzle-card__thumb--image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: inherit;
+  image-rendering: pixelated;
+}
+
+.puzzle-card__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.puzzle-card__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.puzzle-card__description {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.puzzle-card--official .puzzle-card__meta {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.4rem;
+}
+
+.panel {
+  max-width: 620px;
+  padding: clamp(1.5rem, 3vw, 2.8rem);
+  background: var(--panel);
+  border-radius: 32px;
+  box-shadow: var(--panel-shadow);
+  display: grid;
+  gap: 1.75rem;
+}
+
+.panel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.app-title {
+  margin: 0;
+  font-size: clamp(2.6rem, 6vw, 4rem);
+  letter-spacing: 0.08em;
+}
+
+.tagline {
+  margin: 0;
+  color: var(--accent);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.description {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.85rem 2.4rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.05em;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.button:focus-visible {
+  outline: 3px solid rgba(255, 111, 141, 0.35);
+  outline-offset: 3px;
+}
+
+.button--compact {
+  padding: 0.55rem 1.2rem;
+  font-size: 0.92rem;
+}
+
+.button--primary {
+  color: #fff;
+  background: linear-gradient(130deg, #ff6f8d, #ff9ea0);
+  box-shadow: 0 18px 30px -16px rgba(255, 111, 141, 0.6);
+}
+
+.button--primary:hover {
+  transform: translateY(-2px);
+}
+
+.button--ghost {
+  color: var(--text);
+  background: transparent;
+  border-color: rgba(40, 50, 80, 0.18);
+}
+
+.button--ghost:hover {
+  background: rgba(40, 50, 80, 0.06);
+}
+
+.puzzle-card__play {
+  flex: 1;
+  min-width: 90px;
+}
+
+.puzzle-card__share {
+  flex: 1;
+  min-width: 90px;
+}
+
+.button--outline {
+  color: var(--accent);
+  background: rgba(255, 111, 141, 0.08);
+  border-color: rgba(255, 111, 141, 0.4);
+}
+
+.button--outline:hover {
+  background: rgba(255, 111, 141, 0.16);
+}
+
+.button--wide {
+  text-decoration: none;
+  justify-content: center;
+}
+
+.start-footer {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.screen--game {
+  grid-template-rows: auto auto 1fr;
+  gap: 0.6rem;
+  overflow: hidden;
+  transform: translateX(100%);
+}
+
+.game-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem 1.2rem;
+}
+
+.game-title {
+  margin: 0;
+  font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+  letter-spacing: 0.04em;
+}
+
+.game-controls {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.game-metrics {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.game-layout {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: center;
+  justify-items: center;
+  height: 100%;
+}
+
+.stage {
+  background: var(--panel);
+  border-radius: 24px;
+  padding: 0.2rem;
+  box-shadow: var(--panel-shadow);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.canvas-frame {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 18px;
+  border: 1px solid rgba(40, 50, 80, 0.12);
+  background: repeating-linear-gradient(45deg, #f7f7fb 0, #f7f7fb 12px, #eff0f6 12px, #eff0f6 24px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  width: clamp(340px, 74vh, 940px);
+  height: clamp(340px, 74vh, 940px);
+  max-width: min(48vw, 940px);
+}
+
+.spot-canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.canvas-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.marker {
+  position: absolute;
+  border: 3px solid rgba(255, 111, 141, 0.85);
+  border-radius: 999px;
+  background: rgba(255, 111, 141, 0.22);
+  pointer-events: none;
+  transform-origin: center;
+  animation: marker-burst 380ms cubic-bezier(0.25, 0.75, 0.35, 1.3) forwards;
+}
+
+.miss-marker {
+  position: absolute;
+  pointer-events: none;
+  display: block;
+  animation: miss-pop 220ms cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.miss-marker::before,
+.miss-marker::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 100%;
+  background: rgba(255, 111, 141, 0.95);
+  border-radius: 999px;
+  transform-origin: center;
+  box-shadow: 0 0 12px rgba(255, 111, 141, 0.45);
+}
+
+.miss-marker::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.miss-marker::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+.global-flash {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: flash-fade 420ms ease forwards;
+}
+
+.global-flash__circle {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  border: 6px solid rgba(255, 111, 141, 0.75);
+  background: rgba(255, 111, 141, 0.18);
+}
+
+@keyframes marker-burst {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+}
+
+@keyframes miss-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes flash-fade {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+}
+
+.status-card {
+  background: var(--panel);
+  border-radius: 16px;
+  box-shadow: 0 10px 22px -18px rgba(25, 45, 90, 0.45);
+  padding: 0.45rem 0.65rem;
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.status-row {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.status-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.status-value {
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.hint-card p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+@media (max-width: 720px) {
+  .panel {
+    padding: 2rem 1.6rem;
+  }
+
+  .puzzle-card__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .difficulty-selector {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+
+  .game-layout {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .game-header {
+    align-items: flex-start;
+  }
+
+  .canvas-frame {
+    width: clamp(240px, 82vw, 580px);
+    height: clamp(240px, 82vw, 580px);
+  }
+}
+
+.app.is-playing .screen--start {
+  transform: translateX(-100%);
+}
+
+.app.is-playing .screen--game {
+  transform: translateX(0);
+}
+
+.puzzle-card--official {
+  border: 1px solid rgba(255, 111, 141, 0.45);
+}
+
+.completion-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.94);
+  transition: opacity 420ms cubic-bezier(0.23, 1, 0.32, 1), transform 420ms cubic-bezier(0.23, 1, 0.32, 1);
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.18), rgba(12, 16, 28, 0.92));
+  backdrop-filter: blur(2px);
+  z-index: 999;
+}
+
+.completion-overlay.is-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.completion-overlay span {
+  font-size: clamp(3rem, 11vw, 7rem);
+  font-weight: 800;
+  letter-spacing: 0.45em;
+  color: rgba(255, 255, 255, 0.94);
+  text-transform: uppercase;
+  text-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.55),
+    0 0 30px rgba(255, 111, 141, 0.48);
+  animation: completion-flash 1.2s ease-out;
+}
+
+.completion-overlay--failure {
+  background: radial-gradient(circle at center, rgba(255, 200, 200, 0.2), rgba(60, 0, 20, 0.9));
+}
+
+.completion-overlay--failure span {
+  color: rgba(255, 134, 134, 0.96);
+  text-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.6),
+    0 0 30px rgba(255, 40, 70, 0.6);
+}
+
+@keyframes completion-flash {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
