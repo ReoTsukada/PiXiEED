@@ -614,15 +614,23 @@ body.is-playing {
   .game-layout {
     grid-template-columns: 1fr;
     gap: 0.75rem;
+    height: auto;
+    align-content: flex-start;
+    justify-items: stretch;
   }
 
   .game-header {
     align-items: flex-start;
   }
 
+  .stage {
+    height: auto;
+  }
+
   .canvas-frame {
-    width: clamp(240px, 82vw, 580px);
-    height: clamp(240px, 82vw, 580px);
+    width: max(180px, min(82vw, calc((100vh - 14rem) / 2)));
+    height: max(180px, min(82vw, calc((100vh - 14rem) / 2)));
+    max-width: 100%;
   }
 }
 
