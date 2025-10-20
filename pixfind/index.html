@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PiXFIND | ドット絵で遊ぶ間違い探し</title>
+  <meta name="description" content="PiXFINDはドット絵に特化したブラウザ向けの間違い探しゲーム。難易度を選び、公式パズルでスコアに挑戦できます。">
+  <meta name="theme-color" content="#ff6f8d">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="PiXFIND">
+  <meta property="og:description" content="ドット絵に特化したブラウザ向けの間違い探しゲーム PiXFIND。難易度を選び、公式パズルでスコアを伸ばそう。">
+  <meta property="og:url" content="https://pixieed.jp/pixfind/">
+  <meta property="og:image" content="https://pixieed.jp/pixfind/ogp.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PiXFIND">
+  <meta name="twitter:description" content="ドット絵に特化したブラウザ向けの間違い探しゲーム PiXFIND。難易度を選び、公式パズルでスコアを伸ばそう。">
+  <meta name="twitter:image" content="https://pixieed.jp/pixfind/ogp.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <section class="screen screen--start" id="startScreen">
+      <div class="panel" role="region" aria-labelledby="introHeading">
+        <div>
+          <p class="tagline">Dot Spot the Difference</p>
+          <h1 class="app-title" id="introHeading">PiXFIND</h1>
+          <p class="description">PiXFINDはドット絵に特化した「間違い探し」専用ゲーム。解析エンジンが差分を検出した公式パズルを難易度別に収録しました。ブラウザからすぐに遊べて、イベントや配信でも活用できます。</p>
+        </div>
+        <div class="panel-actions">
+          <button type="button" class="button button--primary button--wide" id="startButton">ゲームを始める</button>
+          <button type="button" class="button button--outline button--wide" id="installButton" hidden>ホーム画面に追加</button>
+          <a class="button button--ghost button--wide" href="../games.html#games-section">PiXiEEDのゲーム一覧を見る</a>
+        </div>
+        <p class="start-footer">公式パズルは随時追加予定。難易度は★1〜★3まで用意しています。</p>
+      </div>
+    </section>
+
+    <section class="screen screen--difficulty" id="difficultyScreen" hidden aria-hidden="true">
+      <header class="difficulty-header">
+        <div>
+          <h2 class="section-title">挑戦する難易度を選んでください</h2>
+          <p class="section-subtitle">★が多いほど発見が難しくなります。タップまたはクリックでいつでも変更できます。</p>
+        </div>
+        <button type="button" class="button button--ghost button--compact" id="difficultyBackButton">タイトルにもどる</button>
+      </header>
+      <div class="difficulty-selector" role="tablist" aria-label="難易度の選択">
+        <button type="button" class="difficulty-chip" data-difficulty="1" aria-pressed="true">
+          <strong>★☆☆</strong>
+          <span>まずはここから</span>
+        </button>
+        <button type="button" class="difficulty-chip" data-difficulty="2" aria-pressed="false">
+          <strong>★★☆</strong>
+          <span>目を慣らして挑戦</span>
+        </button>
+        <button type="button" class="difficulty-chip" data-difficulty="3" aria-pressed="false">
+          <strong>★★★</strong>
+          <span>見逃し厳禁の上級者向け</span>
+        </button>
+      </div>
+      <div class="puzzle-gallery">
+        <h3 class="section-title">公式パズル</h3>
+        <div class="puzzle-list" id="puzzleList"></div>
+      </div>
+    </section>
+
+    <section class="screen screen--game" id="gameScreen" hidden aria-hidden="true">
+      <header class="game-header">
+        <h2 class="game-title" id="gameTitle">PiXFIND</h2>
+        <div class="game-controls">
+          <button type="button" class="button button--ghost button--compact" id="gameBackButton">難易度選択に戻る</button>
+          <button type="button" class="button button--ghost button--compact" id="backButton">タイトルへ</button>
+          <button type="button" class="button button--primary button--compact" id="resetButton">もう一度遊ぶ</button>
+        </div>
+      </header>
+      <div class="game-metrics" role="status" aria-live="polite">
+        <div class="status-card" aria-labelledby="foundLabel">
+          <div class="status-row">
+            <span class="status-label" id="foundLabel">FOUND</span>
+            <span class="status-value"><span id="foundCount">0</span> / <span id="totalCount">0</span></span>
+          </div>
+        </div>
+        <div class="status-card" aria-labelledby="timerLabelHeading">
+          <div class="status-row">
+            <span class="status-label" id="timerLabelHeading">TIME</span>
+            <span class="status-value" id="timerLabel">00:00</span>
+          </div>
+        </div>
+        <div class="status-card" aria-labelledby="mistakeLabelHeading">
+          <div class="status-row">
+            <span class="status-label" id="mistakeLabelHeading">MISS</span>
+            <span class="status-value" id="mistakeLabel">0 / 3</span>
+          </div>
+        </div>
+      </div>
+      <div class="game-layout">
+        <div class="stage" aria-live="polite">
+          <div class="canvas-frame">
+            <canvas id="canvasOriginal" class="spot-canvas" width="0" height="0" aria-label="お手本画像"></canvas>
+            <div class="canvas-overlay" id="overlayOriginal" aria-hidden="true"></div>
+          </div>
+        </div>
+        <div class="stage" aria-live="polite">
+          <div class="canvas-frame">
+            <canvas id="canvasChallenge" class="spot-canvas" width="0" height="0" aria-label="間違いを探す画像"></canvas>
+            <div class="canvas-overlay" id="overlayChallenge" aria-hidden="true"></div>
+          </div>
+        </div>
+      </div>
+      <div class="hint-card" role="note">
+        <p id="hintMessage">星を選んで、挑戦したい難易度を選んでください。</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="completion-overlay" id="completionOverlay" aria-hidden="true">
+    <span>Great!</span>
+  </div>
+  <div class="completion-overlay completion-overlay--failure" id="failureOverlay" aria-hidden="true">
+    <span>Miss!</span>
+  </div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
