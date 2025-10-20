@@ -1,0 +1,10 @@
+window.PIXFIND_OFFICIAL_PUZZLES = [
+  {
+    "id": "d1-maousama",
+    "slug": "maousama",
+    "label": "魔王様!!",
+    "difficulty": 1,
+    "original": "assets/puzzles/d1-maousama/original.png",
+    "diff": "assets/puzzles/d1-maousama/diff.png"
+  }
+];
