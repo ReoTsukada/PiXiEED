@@ -38,7 +38,11 @@ const ctx = {
 
 const MIN_CLUSTER_PIXELS = 1;
 const MARKER_PADDING = 1;
-const REGION_MERGE_DISTANCE = 3; // Merge difference pixels that are this close (Manhattan distance)
+const REGION_MERGE_DISTANCE_BY_DIFFICULTY = {
+  1: 2,
+  2: 4,
+  3: 8,
+}; // Manhattan merge distance (px) per difficulty level
 const MAX_MISTAKES = 3;
 
 const FALLBACK_OFFICIAL_PUZZLES = [
@@ -286,6 +290,13 @@ async function sharePuzzle(puzzle) {
   window.prompt('共有リンクをコピーしてください。', shareUrl);
 }
 
+function resolveRegionMergeDistance(difficultyOverride = null) {
+  const normalized = normalizeDifficulty(
+    difficultyOverride ?? state.currentPuzzle?.difficulty ?? state.currentDifficulty ?? 1,
+  );
+  return REGION_MERGE_DISTANCE_BY_DIFFICULTY[normalized] ?? REGION_MERGE_DISTANCE_BY_DIFFICULTY[1];
+}
+
 function setActiveScreen(target) {
   const mapping = {
     start: dom.startScreen,
@@ -462,7 +473,7 @@ async function startOfficialPuzzle(puzzle) {
       setHint('公式画像のサイズが一致しません。');
       return;
     }
-    const diffResult = computeDifferenceRegions(originalImage, challengeImage);
+    const diffResult = computeDifferenceRegions(originalImage, challengeImage, { difficulty: puzzle.difficulty });
     if (!diffResult || !diffResult.regions.length) {
       setHint('差分が見つかりませんでした。');
       return;
@@ -817,7 +828,7 @@ function updateTimer(now) {
   state.timerId = requestAnimationFrame(updateTimer);
 }
 
-function computeDifferenceRegions(originalImage, challengeImage) {
+function computeDifferenceRegions(originalImage, challengeImage, options = {}) {
   const width = originalImage.width;
   const height = originalImage.height;
   const offscreen = document.createElement('canvas');
@@ -850,7 +861,8 @@ function computeDifferenceRegions(originalImage, challengeImage) {
   const visited = new Uint8Array(width * height);
   const regions = [];
   const queue = [];
-  const mergeDistance = Math.max(1, Math.floor(REGION_MERGE_DISTANCE));
+  const requestedMerge = Number.isFinite(options.mergeDistance) ? options.mergeDistance : null;
+  const mergeDistance = Math.max(1, Math.floor(requestedMerge ?? resolveRegionMergeDistance(options.difficulty ?? null)));
   const neighborOffsets = [];
 
   for (let offsetY = -mergeDistance; offsetY <= mergeDistance; offsetY += 1) {
