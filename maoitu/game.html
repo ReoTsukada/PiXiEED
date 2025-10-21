@@ -201,16 +201,6 @@ gtag('config', GA_MEASUREMENT_ID, {
     width:100%;
   }
   #shareScoreLabel{font-size:16px;font-weight:700;text-align:center;}
-  .gameover-ad{
-    width:100%;
-    max-width:336px;
-  }
-  .gameover-ad .adsbygoogle{
-    display:block;
-    width:100%;
-    height:auto;
-    min-height:120px;
-  }
   #footer{
     position:absolute;
     bottom:calc(var(--safe-bottom) + 12px);
@@ -286,14 +276,6 @@ gtag('config', GA_MEASUREMENT_ID, {
     <div class="gameover-title">GAME OVER</div>
     <div id="shareScoreLabel">SCORE: 0</div>
   </div>
-  <div class="gameover-ad">
-    <ins class="adsbygoogle"
-         style="display:block"
-         data-ad-client="ca-pub-9801602250480253"
-         data-ad-slot="2435364404"
-         data-ad-format="auto"
-         data-full-width-responsive="true"></ins>
-  </div>
   <div id="sharePanel">
     <button id="shareActionBtn" style="background:#22c55e;color:#000;">シェアする</button>
     <button id="restartActionBtn" style="background:#3b82f6;color:#fff;">もう一度遊ぶ</button>
@@ -334,25 +316,7 @@ const instructions = document.getElementById('instructions');
 const instructionsCloseBtn = document.getElementById('instructionsClose');
 const instructionsToggleBtn = document.getElementById('instructionsToggle');
 const backLink = document.getElementById('backLink');
-const gameOverAdSlot = document.querySelector('.gameover-ad .adsbygoogle');
 let shareScore = 0;
-
-function requestGameOverAd(){
-  if(!gameOverAdSlot) return;
-  if(gameOverAdSlot.dataset.loaded === 'true'){
-    return;
-  }
-  if(gameOverAdSlot.offsetWidth === 0){
-    setTimeout(requestGameOverAd, 300);
-    return;
-  }
-  try{
-    (adsbygoogle = window.adsbygoogle || []).push({});
-    gameOverAdSlot.dataset.loaded = 'true';
-  }catch(_){
-    setTimeout(requestGameOverAd, 500);
-  }
-}
 
 function openInstructions(){
   instructions.style.display = 'block';
@@ -418,7 +382,6 @@ function showSharePanel(score){
   shareScoreLabel.textContent = `SCORE: ${score}`;
   gameOverUi.style.display = 'flex';
   sharePanel.style.display = 'flex';
-  requestGameOverAd();
   if(typeof restartActionBtn.focus === 'function'){
     try{
       restartActionBtn.focus({ preventScroll: true });
