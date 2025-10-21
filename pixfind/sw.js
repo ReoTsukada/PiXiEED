@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pixfind-cache-v2';
+const CACHE_NAME = 'pixfind-cache-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -8,9 +8,14 @@ const ASSETS = [
   './ogp.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
+  './assets/puzzles/manifest.js',
   './assets/puzzles/manifest.json',
   './assets/puzzles/d1-maousama/original.png',
-  './assets/puzzles/d1-maousama/diff.png'
+  './assets/puzzles/d1-maousama/diff.png',
+  './assets/puzzles/d2-si-sa-/original.png',
+  './assets/puzzles/d2-si-sa-/diff.png',
+  './assets/puzzles/d3-tabun-shibuya/original.png',
+  './assets/puzzles/d3-tabun-shibuya/diff.png'
 ];
 
 self.addEventListener('install', event => {
