@@ -38,6 +38,7 @@ const ctx = {
 
 const MIN_CLUSTER_PIXELS = 1;
 const MARKER_PADDING = 1;
+const REGION_MERGE_DISTANCE = 2; // Merge difference pixels that are this close (Manhattan distance)
 const MAX_MISTAKES = 3;
 
 const FALLBACK_OFFICIAL_PUZZLES = [
@@ -849,6 +850,18 @@ function computeDifferenceRegions(originalImage, challengeImage) {
   const visited = new Uint8Array(width * height);
   const regions = [];
   const queue = [];
+  const mergeDistance = Math.max(1, Math.floor(REGION_MERGE_DISTANCE));
+  const neighborOffsets = [];
+
+  for (let offsetY = -mergeDistance; offsetY <= mergeDistance; offsetY += 1) {
+    for (let offsetX = -mergeDistance; offsetX <= mergeDistance; offsetX += 1) {
+      const distance = Math.abs(offsetX) + Math.abs(offsetY);
+      if (distance === 0 || distance > mergeDistance) {
+        continue;
+      }
+      neighborOffsets.push({ offsetX, offsetY });
+    }
+  }
 
   for (let index = 0; index < diffMask.length; index += 1) {
     if (!diffMask[index] || visited[index]) {
@@ -878,16 +891,18 @@ function computeDifferenceRegions(originalImage, challengeImage) {
       if (y < minY) minY = y;
       if (y > maxY) maxY = y;
 
-      const neighbors = [];
-      if (x > 0) neighbors.push(idx - 1);
-      if (x < width - 1) neighbors.push(idx + 1);
-      if (y > 0) neighbors.push(idx - width);
-      if (y < height - 1) neighbors.push(idx + width);
-
-      for (const neighbor of neighbors) {
-        if (!diffMask[neighbor] || visited[neighbor]) continue;
-        visited[neighbor] = 1;
-        queue.push(neighbor);
+      for (const { offsetX, offsetY } of neighborOffsets) {
+        const neighborX = x + offsetX;
+        const neighborY = y + offsetY;
+        if (neighborX < 0 || neighborX >= width || neighborY < 0 || neighborY >= height) {
+          continue;
+        }
+        const neighborIndex = neighborY * width + neighborX;
+        if (!diffMask[neighborIndex] || visited[neighborIndex]) {
+          continue;
+        }
+        visited[neighborIndex] = 1;
+        queue.push(neighborIndex);
       }
     }
 
