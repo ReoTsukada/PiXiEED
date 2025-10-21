@@ -51,6 +51,26 @@ const FALLBACK_OFFICIAL_PUZZLES = [
     diff: 'assets/puzzles/d1-maousama/diff.png',
     thumbnail: 'assets/puzzles/d1-maousama/diff.png',
   },
+  {
+    id: 'd2-si-sa-',
+    slug: 'si-sa-',
+    label: 'シーサー',
+    description: '宮殿の狛犬に潜んだ細かな違いを見抜けるかな？色や向きに注目してみよう。',
+    difficulty: 2,
+    original: 'assets/puzzles/d2-si-sa-/original.png',
+    diff: 'assets/puzzles/d2-si-sa-/diff.png',
+    thumbnail: 'assets/puzzles/d2-si-sa-/diff.png',
+  },
+  {
+    id: 'd3-tabun-shibuya',
+    slug: 'tabun-shibuya',
+    label: '多分いつもの渋谷',
+    description: '交差点にあふれる人や看板の差分をすべて見抜けるかな？視線の誘導に惑わされずに挑戦しよう。',
+    difficulty: 3,
+    original: 'assets/puzzles/d3-tabun-shibuya/original.png',
+    diff: 'assets/puzzles/d3-tabun-shibuya/diff.png',
+    thumbnail: 'assets/puzzles/d3-tabun-shibuya/diff.png',
+  },
 ];
 
 const state = {
@@ -455,7 +475,7 @@ async function startOfficialPuzzle(puzzle) {
     prepareGameBoard(originalImage, challengeImage, diffResult, metadata);
     dom.gameTitle.textContent = metadata.name;
     dom.totalCount.textContent = String(diffResult.regions.length);
-    setHint(`${diffResult.regions.length} 箇所の間違いがあります。`);
+    setHint('左右の画像を見比べて、違いをタップしてください。');
     setActiveScreen('game');
     resetRound();
   } catch (error) {
@@ -594,7 +614,6 @@ function handleCanvasClick(event, canvas) {
     addMissMarker(targetCanvas, x, y);
     state.mistakes = Math.min(state.mistakes + 1, MAX_MISTAKES);
     updateMistakeLabel();
-    const remaining = MAX_MISTAKES - state.mistakes;
     if (state.mistakes >= MAX_MISTAKES) {
       setHint('ミスが3回に達したためラウンドをリセットします。');
       state.roundCompleted = true;
@@ -606,7 +625,7 @@ function handleCanvasClick(event, canvas) {
         resetRound();
       }, 1700);
     } else {
-      setHint(`まだ見つけていない間違いはあと ${state.total - state.found} 箇所です。ミスはあと ${remaining} 回までです。`);
+      setHint('まだ間違いが隠れています。落ち着いて探し続けましょう。');
     }
     return;
   }
@@ -624,7 +643,7 @@ function handleCanvasClick(event, canvas) {
     setHint('全ての間違いを発見しました！おめでとうございます。');
     showCompletionOverlay();
   } else {
-    setHint(`ナイス！残り ${state.total - state.found} 箇所です。`);
+    setHint('ナイス！まだ他にも間違いが潜んでいます。');
   }
 }
 
