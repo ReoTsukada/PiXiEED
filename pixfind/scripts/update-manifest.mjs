@@ -5,6 +5,7 @@ import path from 'path';
 const ROOT = process.cwd();
 const PUZZLE_DIR = path.join(ROOT, 'assets', 'puzzles');
 const MANIFEST_PATH = path.join(PUZZLE_DIR, 'manifest.json');
+const MANIFEST_JS_PATH = path.join(PUZZLE_DIR, 'manifest.js');
 
 const DIFFICULTY_MAP = new Map([
   ['d1', 1],
@@ -37,6 +38,16 @@ async function fileExists(file) {
   }
 }
 
+async function readExistingManifest() {
+  try {
+    const raw = await fs.readFile(MANIFEST_PATH, 'utf8');
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
 async function buildManifest() {
   const entries = [];
   const items = await fs.readdir(PUZZLE_DIR, { withFileTypes: true }).catch(() => []);
@@ -50,18 +61,43 @@ async function buildManifest() {
     const hasOriginal = await fileExists(originalPath);
     const hasDiff = await fileExists(diffPath);
     if (!hasOriginal || !hasDiff) continue;
-    entries.push({
+    const baseEntry = {
       id: item.name,
       slug: parsed.slug,
       label: parsed.label,
+      description: '',
       difficulty: parsed.difficulty,
       original: path.posix.join('assets/puzzles', item.name, 'original.png'),
       diff: path.posix.join('assets/puzzles', item.name, 'diff.png'),
-    });
+      thumbnail: path.posix.join('assets/puzzles', item.name, 'diff.png'),
+    };
+    entries.push(baseEntry);
   }
   entries.sort((a, b) => a.difficulty - b.difficulty || a.label.localeCompare(b.label, 'ja'));
-  await fs.writeFile(MANIFEST_PATH, JSON.stringify(entries, null, 2) + '\n', 'utf8');
-  console.log(`Generated manifest with ${entries.length} puzzle(s) at ${path.relative(ROOT, MANIFEST_PATH)}`);
+
+  const previousEntries = await readExistingManifest();
+  if (previousEntries.length) {
+    const previousMap = new Map(previousEntries.map(entry => [entry.id ?? entry.slug, entry]));
+    for (let index = 0; index < entries.length; index += 1) {
+      const entry = entries[index];
+      const key = entry.id ?? entry.slug;
+      const previous = key ? previousMap.get(key) : undefined;
+      if (!previous) continue;
+      entries[index] = {
+        ...entry,
+        slug: previous.slug ?? entry.slug,
+        label: previous.label ?? entry.label,
+        description: previous.description ?? entry.description ?? '',
+        thumbnail: previous.thumbnail ?? entry.thumbnail,
+      };
+    }
+  }
+
+  const manifestJson = JSON.stringify(entries, null, 2);
+  await fs.writeFile(MANIFEST_PATH, `${manifestJson}\n`, 'utf8');
+  const manifestJs = `window.PIXFIND_OFFICIAL_PUZZLES = ${manifestJson};\n`;
+  await fs.writeFile(MANIFEST_JS_PATH, manifestJs, 'utf8');
+  console.log(`Generated manifest with ${entries.length} puzzle(s)\n - ${path.relative(ROOT, MANIFEST_PATH)}\n - ${path.relative(ROOT, MANIFEST_JS_PATH)}`);
 }
 
 buildManifest().catch(error => {
