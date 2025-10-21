@@ -38,7 +38,7 @@ const ctx = {
 
 const MIN_CLUSTER_PIXELS = 1;
 const MARKER_PADDING = 1;
-const REGION_MERGE_DISTANCE = 2; // Merge difference pixels that are this close (Manhattan distance)
+const REGION_MERGE_DISTANCE = 3; // Merge difference pixels that are this close (Manhattan distance)
 const MAX_MISTAKES = 3;
 
 const FALLBACK_OFFICIAL_PUZZLES = [
