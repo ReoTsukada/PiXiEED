@@ -3,8 +3,30 @@
     "id": "d1-maousama",
     "slug": "maousama",
     "label": "魔王様!!",
+    "description": "秒で始められる避けゲーをモチーフにした公式間違い探し。まずはここから挑戦！",
     "difficulty": 1,
     "original": "assets/puzzles/d1-maousama/original.png",
-    "diff": "assets/puzzles/d1-maousama/diff.png"
+    "diff": "assets/puzzles/d1-maousama/diff.png",
+    "thumbnail": "assets/puzzles/d1-maousama/diff.png"
+  },
+  {
+    "id": "d2-si-sa-",
+    "slug": "si-sa-",
+    "label": "シーサー",
+    "description": "宮殿の狛犬に潜んだ細かな違いを見抜けるかな？色や向きに注目してみよう。",
+    "difficulty": 2,
+    "original": "assets/puzzles/d2-si-sa-/original.png",
+    "diff": "assets/puzzles/d2-si-sa-/diff.png",
+    "thumbnail": "assets/puzzles/d2-si-sa-/diff.png"
+  },
+  {
+    "id": "d3-tabun-shibuya",
+    "slug": "tabun-shibuya",
+    "label": "多分いつもの渋谷",
+    "description": "交差点にあふれる人や看板の差分をすべて見抜けるかな？視線の誘導に惑わされずに挑戦しよう。",
+    "difficulty": 3,
+    "original": "assets/puzzles/d3-tabun-shibuya/original.png",
+    "diff": "assets/puzzles/d3-tabun-shibuya/diff.png",
+    "thumbnail": "assets/puzzles/d3-tabun-shibuya/diff.png"
   }
 ]
