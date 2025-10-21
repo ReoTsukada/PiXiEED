@@ -1,7 +1,0 @@
-url=
-priority=
-title=
-description=
-link=
-image=
-alt=
