@@ -22,7 +22,6 @@ gtag('config', GA_MEASUREMENT_ID, {
 </script>
 <!-- Google AdSense -->
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
-
 <!-- ▼ OGP / Twitterカード -->
 <meta property="og:title" content="魔王様！！いつまでよければいいですか！？">
 <meta property="og:description" content="避けゲーアクション！皆もやってみてね！">
@@ -128,19 +127,6 @@ a { color:#7dd3fc; }
   min-height:0;
   overflow:auto;
   padding-bottom:8px;
-}
-.start-bottom-ad {
-  width:100%;
-  max-width:320px;
-  margin:0 auto;
-  flex-shrink:0;
-  margin-top:auto;
-}
-.start-bottom-ad .adsbygoogle {
-  display:block;
-  width:100%;
-  height:auto;
-  min-height:250px;
 }
 .instructions-card h2 {
   margin:0 0 8px;
@@ -286,15 +272,6 @@ a { color:#7dd3fc; }
   </div>
 </div>
 
-<div class="start-bottom-ad">
-  <ins class="adsbygoogle"
-       style="display:block"
-       data-ad-client="ca-pub-9801602250480253"
-       data-ad-slot="2435364404"
-       data-ad-format="auto"
-       data-full-width-responsive="true"></ins>
-</div>
-
 <script>
 // Prevent pinch-zoom for the standalone PWA shell on iOS.
 ['gesturestart', 'gesturechange', 'gestureend'].forEach((eventName) => {
@@ -317,7 +294,6 @@ const shareBtn = document.getElementById('titleShareBtn');
 const audioToggle = document.getElementById('audioToggle');
 const audioToggleLabel = document.getElementById('audioToggleLabel');
 const installBtn = document.getElementById('installBtn');
-const startAdSlot = document.querySelector('.start-bottom-ad .adsbygoogle');
 let deferredInstallPrompt = null;
 
 function baseShareText(){
@@ -374,24 +350,6 @@ window.addEventListener('appinstalled', () => {
   deferredInstallPrompt = null;
 });
 
-function initStartAd(){
-  if(!startAdSlot) return;
-  if(startAdSlot.offsetWidth === 0){
-    setTimeout(initStartAd, 300);
-    return;
-  }
-  try{
-    (adsbygoogle = window.adsbygoogle || []).push({});
-  }catch(_){
-    setTimeout(initStartAd, 500);
-  }
-}
-
-window.addEventListener('load', () => {
-  if(startAdSlot){
-    requestAnimationFrame(initStartAd);
-  }
-});
 </script>
 
 </body>
