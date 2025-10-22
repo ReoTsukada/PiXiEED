@@ -476,7 +476,12 @@ const ANGEL_BASE_INTERVAL = 300;
 const ANGEL_SPAWN_PROB    = 0.10;
 
 // ====== 難易度スケーリング（時間ベース） ======
-let enemySpawnIntervalFrames = 22;
+const INITIAL_SPAWN_INTERVAL_FRAMES = 20;
+const SPAWN_INTERVAL_DECREASE = 1;
+const MIN_SPAWN_INTERVAL_FRAMES = 8;
+const MAX_ENEMIES_PER_SPAWN = 6;
+
+let enemySpawnIntervalFrames = INITIAL_SPAWN_INTERVAL_FRAMES;
 let enemiesPerSpawn = 1;
 let difficultyLevel = 1;
 const DIFFICULTY_STEP_SEC = 5;
@@ -524,7 +529,7 @@ document.onpointermove = e => {
 addEventListener('keydown',e=>{ if(!alive) return; if(e.key==='ArrowLeft')tx-=20; else if(e.key==='ArrowRight')tx+=20; });
 
 function reset(countPlay = true){ alive=true; E.length=0; angels.length=0; o=0; S=0; shield=false; P.x=PLAYER_START_X; P.y=PLAYER_START_Y; tx=PLAYER_START_TX; P.skin=PLAYER;
-  enemySpawnIntervalFrames = 22;
+  enemySpawnIntervalFrames = INITIAL_SPAWN_INTERVAL_FRAMES;
   enemiesPerSpawn = 1;
   lastDifficultyUpdateSec = 0;
   elapsedFrames = 0;
@@ -583,10 +588,10 @@ function step(){
   if(elapsedSec - lastDifficultyUpdateSec >= DIFFICULTY_STEP_SEC){
     lastDifficultyUpdateSec += DIFFICULTY_STEP_SEC;
     difficultyLevel++;
-    if(enemySpawnIntervalFrames > 2){
-      enemySpawnIntervalFrames = Math.max(2, enemySpawnIntervalFrames - 2);
+    if(enemySpawnIntervalFrames > MIN_SPAWN_INTERVAL_FRAMES){
+      enemySpawnIntervalFrames = Math.max(MIN_SPAWN_INTERVAL_FRAMES, enemySpawnIntervalFrames - SPAWN_INTERVAL_DECREASE);
     }else{
-      enemiesPerSpawn = Math.min(enemiesPerSpawn + 1, 6);
+      enemiesPerSpawn = Math.min(enemiesPerSpawn + 1, MAX_ENEMIES_PER_SPAWN);
     }
   }
 }
