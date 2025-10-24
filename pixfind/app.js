@@ -44,6 +44,16 @@ const REGION_MERGE_DISTANCE_BY_DIFFICULTY = {
   3: 8,
 }; // Manhattan merge distance (px) per difficulty level
 const MAX_MISTAKES = 3;
+const TAP_MAX_MOVEMENT_PX = 8;
+const TAP_MAX_DURATION_MS = 320;
+const ZOOM_MIN_SCALE = 1;
+const ZOOM_MAX_SCALE = 3.2;
+const ZOOM_WHEEL_STEP = 0.12;
+
+const zoomControllers = {
+  original: null,
+  challenge: null,
+};
 
 const FALLBACK_OFFICIAL_PUZZLES = [
   {
@@ -134,20 +144,7 @@ async function init() {
     void handleInstallButtonClick();
   });
 
-  dom.canvasChallenge?.addEventListener('click', event => handleCanvasClick(event, dom.canvasChallenge));
-  dom.canvasOriginal?.addEventListener('click', event => handleCanvasClick(event, dom.canvasOriginal));
-  dom.canvasChallenge?.addEventListener('touchstart', event => {
-    const touch = event.changedTouches[0];
-    if (!touch) return;
-    handleCanvasClick(touch, dom.canvasChallenge);
-    event.preventDefault();
-  }, { passive: false });
-  dom.canvasOriginal?.addEventListener('touchstart', event => {
-    const touch = event.changedTouches[0];
-    if (!touch) return;
-    handleCanvasClick(touch, dom.canvasOriginal);
-    event.preventDefault();
-  }, { passive: false });
+  initializeCanvasInteractions();
 
   dom.difficultyChips.forEach(chip => {
     chip.addEventListener('click', () => {
@@ -295,6 +292,17 @@ function resolveRegionMergeDistance(difficultyOverride = null) {
     difficultyOverride ?? state.currentPuzzle?.difficulty ?? state.currentDifficulty ?? 1,
   );
   return REGION_MERGE_DISTANCE_BY_DIFFICULTY[normalized] ?? REGION_MERGE_DISTANCE_BY_DIFFICULTY[1];
+}
+
+function resolveBuildVersionToken() {
+  const meta = document.querySelector('meta[name="build-version"]')?.content;
+  const sanitizedMeta = meta?.trim();
+  if (sanitizedMeta) {
+    return sanitizedMeta;
+  }
+  const parsed = Date.parse(document.lastModified || '');
+  const timestamp = Number.isNaN(parsed) ? Date.now() : parsed;
+  return `pixfind-${timestamp}`;
 }
 
 function setActiveScreen(target) {
@@ -532,6 +540,7 @@ function prepareGameBoard(originalImage, challengeImage, diffResult, metadata = 
     ctx.challenge.drawImage(challengeImage, 0, 0);
   }
   fitCanvasesToFrame();
+  resetAllZoomTransforms();
   clearMarkers();
   updateProgressLabel();
 }
@@ -550,6 +559,7 @@ function fitCanvasesToFrame() {
     canvas.style.width = `${maxSize}px`;
     canvas.style.height = `${maxSize}px`;
   });
+  refreshZoomBounds();
 }
 
 window.addEventListener('resize', () => {
@@ -592,6 +602,7 @@ function resetRound() {
 function leaveGame(targetScreen) {
   stopTimer();
   clearMarkers();
+  resetAllZoomTransforms();
   clearCanvas(ctx.original, dom.canvasOriginal);
   clearCanvas(ctx.challenge, dom.canvasChallenge);
   hideCompletionOverlay();
@@ -612,14 +623,10 @@ function leaveGame(targetScreen) {
   setActiveScreen(targetScreen);
 }
 
-function handleCanvasClick(event, canvas) {
+function processCanvasSelection(targetCanvas, x, y) {
   if (!state.differences.length || state.roundCompleted) {
     return;
   }
-  const targetCanvas = canvas ?? dom.canvasChallenge;
-  if (!targetCanvas) return;
-  const { x, y } = getImageCoordinates(targetCanvas, event);
-  if (Number.isNaN(x) || Number.isNaN(y)) return;
 
   const region = state.differences.find(diff => !diff.found && isPointInsideRegion(diff, x, y));
   if (!region) {
@@ -953,6 +960,293 @@ function getImageCoordinates(canvas, event) {
   };
 }
 
+function initializeCanvasInteractions() {
+  zoomControllers.original = createCanvasInteractionController(dom.canvasOriginal, dom.overlayOriginal, event => {
+    if (!dom.canvasOriginal) return;
+    const { x, y } = getImageCoordinates(dom.canvasOriginal, event);
+    if (Number.isNaN(x) || Number.isNaN(y)) return;
+    processCanvasSelection(dom.canvasOriginal, x, y);
+  });
+  zoomControllers.challenge = createCanvasInteractionController(dom.canvasChallenge, dom.overlayChallenge, event => {
+    if (!dom.canvasChallenge) return;
+    const { x, y } = getImageCoordinates(dom.canvasChallenge, event);
+    if (Number.isNaN(x) || Number.isNaN(y)) return;
+    processCanvasSelection(dom.canvasChallenge, x, y);
+  });
+}
+
+function resetAllZoomTransforms() {
+  Object.values(zoomControllers).forEach(controller => {
+    if (controller?.reset) {
+      controller.reset();
+    }
+  });
+}
+
+function refreshZoomBounds() {
+  Object.values(zoomControllers).forEach(controller => {
+    if (controller?.refresh) {
+      controller.refresh();
+    }
+  });
+}
+
+function createCanvasInteractionController(canvas, overlay, onTap) {
+  if (!canvas) return null;
+  const frame = canvas.parentElement;
+  if (!frame) return null;
+
+  frame.style.touchAction = 'none';
+  canvas.style.touchAction = 'none';
+
+  const controllerState = {
+    scale: 1,
+    offsetX: 0,
+    offsetY: 0,
+    pointers: new Map(),
+    initialScale: 1,
+    initialDistance: 0,
+    lastPanPoint: null,
+    tapCandidate: null,
+  };
+
+  const config = {
+    minScale: ZOOM_MIN_SCALE,
+    maxScale: ZOOM_MAX_SCALE,
+  };
+
+  function applyTransform() {
+    const transform = `translate3d(${controllerState.offsetX}px, ${controllerState.offsetY}px, 0) scale(${controllerState.scale})`;
+    canvas.style.transform = transform;
+    if (overlay) {
+      overlay.style.transform = transform;
+    }
+  }
+
+  function clampOffsets() {
+    const frameWidth = frame.clientWidth || canvas.clientWidth || 0;
+    const frameHeight = frame.clientHeight || canvas.clientHeight || 0;
+    if (!frameWidth || !frameHeight) {
+      controllerState.offsetX = 0;
+      controllerState.offsetY = 0;
+      return;
+    }
+    const maxOffsetX = Math.max(0, (frameWidth * (controllerState.scale - 1)) / 2);
+    const maxOffsetY = Math.max(0, (frameHeight * (controllerState.scale - 1)) / 2);
+    controllerState.offsetX = clamp(controllerState.offsetX, -maxOffsetX, maxOffsetX);
+    controllerState.offsetY = clamp(controllerState.offsetY, -maxOffsetY, maxOffsetY);
+  }
+
+  function updatePan(point) {
+    if (!point) return;
+    if (!controllerState.lastPanPoint) {
+      controllerState.lastPanPoint = { x: point.x, y: point.y };
+      return;
+    }
+    const deltaX = point.x - controllerState.lastPanPoint.x;
+    const deltaY = point.y - controllerState.lastPanPoint.y;
+    controllerState.lastPanPoint = { x: point.x, y: point.y };
+    controllerState.offsetX += deltaX;
+    controllerState.offsetY += deltaY;
+    clampOffsets();
+    applyTransform();
+  }
+
+  function handlePointerDown(event) {
+    if (event.pointerType === 'touch' || event.pointerType === 'pen') {
+      event.preventDefault();
+    }
+    canvas.setPointerCapture(event.pointerId);
+    controllerState.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (controllerState.pointers.size === 1) {
+      controllerState.tapCandidate = {
+        id: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        time: getTimestamp(),
+      };
+      controllerState.lastPanPoint = { x: event.clientX, y: event.clientY };
+    } else if (controllerState.pointers.size === 2) {
+      const [first, second] = Array.from(controllerState.pointers.values());
+      controllerState.initialDistance = calculatePointerDistance(first, second);
+      controllerState.initialScale = controllerState.scale;
+      controllerState.tapCandidate = null;
+    } else {
+      controllerState.tapCandidate = null;
+    }
+  }
+
+  function handlePointerMove(event) {
+    if (!controllerState.pointers.has(event.pointerId)) {
+      return;
+    }
+    controllerState.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    if (controllerState.pointers.size >= 2) {
+      const [first, second] = Array.from(controllerState.pointers.values());
+      if (!first || !second) {
+        return;
+      }
+      if (controllerState.initialDistance <= 0) {
+        controllerState.initialDistance = calculatePointerDistance(first, second);
+      }
+      if (controllerState.initialDistance <= 0) {
+        return;
+      }
+      const prevScale = controllerState.scale;
+      const distance = calculatePointerDistance(first, second);
+      const rawScale = controllerState.initialScale * (distance / controllerState.initialDistance);
+      const nextScale = clamp(rawScale, config.minScale, config.maxScale);
+      if (!Number.isFinite(nextScale) || Number.isNaN(nextScale)) {
+        return;
+      }
+      const scaleChange = prevScale ? nextScale / prevScale : 1;
+      controllerState.scale = nextScale;
+
+      if (scaleChange && Number.isFinite(scaleChange) && !Number.isNaN(scaleChange)) {
+        const frameRect = frame.getBoundingClientRect();
+        const centerX = ((first.x + second.x) / 2) - (frameRect.left + frameRect.width / 2);
+        const centerY = ((first.y + second.y) / 2) - (frameRect.top + frameRect.height / 2);
+        controllerState.offsetX -= (scaleChange - 1) * centerX;
+        controllerState.offsetY -= (scaleChange - 1) * centerY;
+      }
+      clampOffsets();
+      applyTransform();
+      controllerState.tapCandidate = null;
+    } else if (controllerState.pointers.size === 1) {
+      const point = controllerState.pointers.get(event.pointerId);
+      if (controllerState.tapCandidate) {
+        const moveX = Math.abs(point.x - controllerState.tapCandidate.x);
+        const moveY = Math.abs(point.y - controllerState.tapCandidate.y);
+        if (moveX > TAP_MAX_MOVEMENT_PX || moveY > TAP_MAX_MOVEMENT_PX) {
+          controllerState.tapCandidate = null;
+        }
+      }
+      if (controllerState.scale > 1) {
+        updatePan(point);
+      } else {
+        controllerState.lastPanPoint = { x: point.x, y: point.y };
+      }
+    }
+  }
+
+  function handlePointerUp(event) {
+    const point = controllerState.pointers.get(event.pointerId) ?? { x: event.clientX, y: event.clientY };
+    controllerState.pointers.delete(event.pointerId);
+    if (canvas.hasPointerCapture(event.pointerId)) {
+      canvas.releasePointerCapture(event.pointerId);
+    }
+
+    let shouldTap = false;
+    if (controllerState.tapCandidate && controllerState.tapCandidate.id === event.pointerId) {
+      const duration = getTimestamp() - controllerState.tapCandidate.time;
+      const moveX = Math.abs(point.x - controllerState.tapCandidate.x);
+      const moveY = Math.abs(point.y - controllerState.tapCandidate.y);
+      if (moveX <= TAP_MAX_MOVEMENT_PX && moveY <= TAP_MAX_MOVEMENT_PX && duration <= TAP_MAX_DURATION_MS) {
+        shouldTap = true;
+      }
+    }
+
+    if (controllerState.pointers.size === 1) {
+      const [remaining] = controllerState.pointers.values();
+      controllerState.lastPanPoint = remaining ? { x: remaining.x, y: remaining.y } : null;
+      controllerState.initialScale = controllerState.scale;
+      controllerState.initialDistance = 0;
+    } else {
+      controllerState.lastPanPoint = null;
+      controllerState.initialScale = controllerState.scale;
+      controllerState.initialDistance = 0;
+    }
+
+    controllerState.tapCandidate = null;
+
+    if (shouldTap && typeof onTap === 'function') {
+      onTap(event);
+    }
+  }
+
+  function handlePointerCancel(event) {
+    controllerState.pointers.delete(event.pointerId);
+    controllerState.tapCandidate = null;
+    controllerState.lastPanPoint = null;
+    controllerState.initialScale = controllerState.scale;
+    controllerState.initialDistance = 0;
+    if (canvas.hasPointerCapture(event.pointerId)) {
+      canvas.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function handleWheel(event) {
+    if (!event.ctrlKey) {
+      return;
+    }
+    event.preventDefault();
+    const prevScale = controllerState.scale;
+    const delta = -event.deltaY * ZOOM_WHEEL_STEP;
+    const factor = Math.exp(delta);
+    const nextScale = clamp(prevScale * factor, config.minScale, config.maxScale);
+    if (nextScale === prevScale) {
+      return;
+    }
+    const frameRect = frame.getBoundingClientRect();
+    const relativeX = event.clientX - (frameRect.left + frameRect.width / 2);
+    const relativeY = event.clientY - (frameRect.top + frameRect.height / 2);
+    const scaleChange = nextScale / prevScale;
+    controllerState.scale = nextScale;
+    controllerState.offsetX -= (scaleChange - 1) * relativeX;
+    controllerState.offsetY -= (scaleChange - 1) * relativeY;
+    clampOffsets();
+    applyTransform();
+  }
+
+  canvas.addEventListener('pointerdown', handlePointerDown);
+  canvas.addEventListener('pointermove', handlePointerMove);
+  canvas.addEventListener('pointerup', handlePointerUp);
+  canvas.addEventListener('pointercancel', handlePointerCancel);
+  canvas.addEventListener('lostpointercapture', handlePointerCancel);
+  canvas.addEventListener('wheel', handleWheel, { passive: false });
+
+  applyTransform();
+
+  return {
+    reset() {
+      controllerState.scale = 1;
+      controllerState.offsetX = 0;
+      controllerState.offsetY = 0;
+      controllerState.tapCandidate = null;
+      controllerState.lastPanPoint = null;
+      controllerState.pointers.clear();
+      controllerState.initialScale = 1;
+      controllerState.initialDistance = 0;
+      applyTransform();
+    },
+    refresh() {
+      clampOffsets();
+      applyTransform();
+    },
+  };
+}
+
+function calculatePointerDistance(a, b) {
+  if (!a || !b) return 0;
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return Math.hypot(dx, dy);
+}
+
+function getTimestamp() {
+  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+    return performance.now();
+  }
+  return Date.now();
+}
+
+function clamp(value, min, max) {
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
+}
+
 function loadImageFromUrl(url) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -1186,10 +1480,53 @@ function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) {
     return;
   }
+  let isReloading = false;
+  let hasController = Boolean(navigator.serviceWorker.controller);
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hasController) {
+      hasController = true;
+      return;
+    }
+    if (isReloading) {
+      return;
+    }
+    isReloading = true;
+    window.location.reload();
+  });
+
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(error => {
-      console.warn('Service worker registration failed', error);
-    });
+    const versionToken = resolveBuildVersionToken();
+    const serviceWorkerUrl = `./sw.js?v=${encodeURIComponent(versionToken)}`;
+    navigator.serviceWorker
+      .register(serviceWorkerUrl)
+      .then(registration => {
+        const requestSkipWaiting = () => {
+          const waiting = registration.waiting;
+          if (waiting && navigator.serviceWorker.controller) {
+            waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+        };
+
+        if (registration.waiting) {
+          requestSkipWaiting();
+        }
+
+        registration.addEventListener('updatefound', () => {
+          const installing = registration.installing;
+          if (!installing) {
+            return;
+          }
+          installing.addEventListener('statechange', () => {
+            if (installing.state === 'installed') {
+              requestSkipWaiting();
+            }
+          });
+        });
+      })
+      .catch(error => {
+        console.warn('Service worker registration failed', error);
+      });
   });
 }
 
