@@ -1,4 +1,7 @@
-const CACHE_NAME = 'pixfind-cache-v3';
+const SW_PARAMS = new URL(self.location.href);
+const BUILD_VERSION = SW_PARAMS.searchParams.get('v') || 'static';
+const CACHE_PREFIX = 'pixfind-cache';
+const CACHE_NAME = `${CACHE_PREFIX}-${BUILD_VERSION}`;
 const ASSETS = [
   './',
   './index.html',
@@ -30,10 +33,18 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
-        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+        keys
+          .filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
+          .map(key => caches.delete(key))
       )
     ).then(() => self.clients.claim())
   );
+});
+
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', event => {
