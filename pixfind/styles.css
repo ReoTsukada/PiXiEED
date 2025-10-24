@@ -447,6 +447,7 @@ body.is-playing {
   width: clamp(340px, 74vh, 940px);
   height: clamp(340px, 74vh, 940px);
   max-width: min(48vw, 940px);
+  touch-action: none;
 }
 
 .spot-canvas {
@@ -456,12 +457,16 @@ body.is-playing {
   display: block;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+  transform-origin: center center;
+  will-change: transform;
 }
 
 .canvas-overlay {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  transform-origin: center center;
+  will-change: transform;
 }
 
 .marker {
