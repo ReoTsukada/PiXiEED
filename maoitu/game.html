@@ -727,10 +727,11 @@ const canUseServiceWorker = 'serviceWorker' in navigator && window.isSecureConte
 
 if (canUseServiceWorker) {
   const versionToken = (() => {
-    const metaVersion = document.querySelector('meta[name="build-version"]')?.content;
+    const metaVersion = document.querySelector('meta[name="build-version"]')?.content?.trim();
     if (metaVersion) return metaVersion;
-    const parsed = Date.parse(document.lastModified);
-    return Number.isNaN(parsed) ? Date.now().toString() : parsed.toString();
+    const parsed = Date.parse(document.lastModified || '');
+    const timestamp = Number.isNaN(parsed) ? Date.now() : parsed;
+    return `maoitu-${timestamp}`;
   })();
   const serviceWorkerURL = `/maoitu/service-worker.js?v=${encodeURIComponent(versionToken)}`;
   let updateBanner = null;
