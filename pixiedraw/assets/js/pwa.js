@@ -8,15 +8,22 @@
     return;
   }
 
-  const versionSource =
-    document.querySelector('meta[name="build-version"]')?.content ||
-    document.documentElement.getAttribute('data-build-version') ||
-    (() => {
-      const time = Date.parse(document.lastModified);
-      return Number.isNaN(time) ? Date.now().toString() : time.toString();
-    })();
+  const resolveBuildVersion = () => {
+    const meta = document.querySelector('meta[name="build-version"]')?.content?.trim();
+    if (meta) {
+      return meta;
+    }
+    const dataAttr = document.documentElement.getAttribute('data-build-version')?.trim();
+    if (dataAttr) {
+      return dataAttr;
+    }
+    const parsed = Date.parse(document.lastModified || '');
+    const timestamp = Number.isNaN(parsed) ? Date.now() : parsed;
+    return `pixiedraw-${timestamp}`;
+  };
 
-  const serviceWorkerURL = `service-worker.js?v=${encodeURIComponent(versionSource)}`;
+  const versionToken = resolveBuildVersion();
+  const serviceWorkerURL = `service-worker.js?v=${encodeURIComponent(versionToken)}`;
   let updateBanner = null;
   let isReloading = false;
 
