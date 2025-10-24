@@ -15,6 +15,9 @@
   <meta name="twitter:title" content="PiXiEE Lens | Fullscreen Camera">
   <meta name="twitter:description" content="PiXiEE Lens は全画面カメラとドットモードを備えた実験ページです。">
   <meta name="twitter:image" content="https://pixieed.jp/pixiee-lens/ogp.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
+  <link rel="apple-touch-icon" href="./icon-192.png">
   <style>
     :root {
       color-scheme: dark;
@@ -47,14 +50,7 @@
       object-fit: cover;
       background: #020409;
       filter: saturate(1.05);
-    }
-    canvas#dotCanvas {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      image-rendering: pixelated;
+      z-index: 1;
     }
     .hud {
       position: absolute;
@@ -63,8 +59,9 @@
       flex-direction: column;
       justify-content: space-between;
       padding: clamp(18px, 4vw, 42px);
-      pointer-events: none;
       text-shadow: 0 18px 36px rgba(0, 0, 0, 0.55);
+      pointer-events: none;
+      z-index: 3;
     }
     .hud-top {
       display: flex;
@@ -107,6 +104,11 @@
       display: flex;
       flex-wrap: wrap;
       gap: 12px;
+    }
+    .controls--options {
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 0;
     }
     button {
       border: none;
@@ -157,166 +159,27 @@
       </div>
       <div class="hud-bottom">
         <span id="statusPill" class="pill">カメラを初期化しています…</span>
-        <div class="controls">
+        <div class="controls controls--options">
           <button id="toggleFacingBtn" type="button" disabled>フロントカメラに切替</button>
-          <button id="dotModeBtn" type="button" disabled>ドットモード ON</button>
-          <button id="paletteBtn" type="button" disabled>パレット読込</button>
           <button id="resumeBtn" type="button" hidden>再接続</button>
         </div>
       </div>
     </div>
-    <canvas id="dotCanvas" hidden></canvas>
   </main>
-  <input id="paletteInput" type="file" accept="image/*" hidden>
   <script>
     const video = document.getElementById('cameraFeed');
-    const dotCanvas = document.getElementById('dotCanvas');
-    const dotCtx = dotCanvas.getContext('2d');
     const statusPill = document.getElementById('statusPill');
     const toggleFacingBtn = document.getElementById('toggleFacingBtn');
-    const dotModeBtn = document.getElementById('dotModeBtn');
-    const paletteBtn = document.getElementById('paletteBtn');
     const resumeBtn = document.getElementById('resumeBtn');
-    const paletteInput = document.getElementById('paletteInput');
-
-    const coverCanvas = document.createElement('canvas');
-    const coverCtx = coverCanvas.getContext('2d', { willReadFrequently: true });
-    const sampleCanvas = document.createElement('canvas');
-    const sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
 
     const state = {
       stream: null,
       useFrontCamera: false,
-      dotMode: false,
-      blockSize: 16,
-      palette: null
+      restarting: false
     };
-
-    updateDotUI();
 
     function setStatus(message) {
       statusPill.textContent = message;
-    }
-
-    function updateDotUI() {
-      dotModeBtn.textContent = state.dotMode ? 'ドットモード OFF' : 'ドットモード ON';
-      if (state.dotMode) {
-        video.style.visibility = 'hidden';
-        dotCanvas.hidden = false;
-        paletteBtn.disabled = false;
-      } else {
-        video.style.visibility = 'visible';
-        dotCanvas.hidden = true;
-      }
-    }
-
-    async function loadPaletteFromFile(file) {
-      try {
-        const bitmap = await createImageBitmap(file);
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = bitmap.width;
-        tempCanvas.height = bitmap.height;
-        const ctx = tempCanvas.getContext('2d', { willReadFrequently: true });
-        ctx.drawImage(bitmap, 0, 0);
-        const imageData = ctx.getImageData(0, 0, bitmap.width, bitmap.height).data;
-        const map = new Map();
-        for (let i = 0; i < imageData.length; i += 4) {
-          const r = imageData[i];
-          const g = imageData[i + 1];
-          const b = imageData[i + 2];
-          const a = imageData[i + 3];
-          if (a < 32) continue;
-          const key = `${r},${g},${b}`;
-          if (!map.has(key)) {
-            map.set(key, [r, g, b]);
-            if (map.size >= 256) break;
-          }
-        }
-        state.palette = map.size ? Array.from(map.values()) : null;
-        if (state.palette) {
-          setStatus(state.dotMode ? `ドットモード: ${state.palette.length}色パレット` : `パレット読込: ${state.palette.length}色`);
-        } else {
-          setStatus('パレットを取得できませんでした');
-        }
-      } catch (error) {
-        console.error(error);
-        setStatus('パレットの読み込みに失敗しました');
-      }
-    }
-
-    function drawDotFrame() {
-      if (!state.stream || !video.videoWidth || !video.videoHeight) {
-        return false;
-      }
-      const vw = video.videoWidth;
-      const vh = video.videoHeight;
-      const cw = window.innerWidth;
-      const ch = window.innerHeight;
-      dotCanvas.width = cw;
-      dotCanvas.height = ch;
-
-      const scale = Math.max(cw / vw, ch / vh);
-      const scaledWidth = vw * scale;
-      const scaledHeight = vh * scale;
-      const dx = (cw - scaledWidth) / 2;
-      const dy = (ch - scaledHeight) / 2;
-
-      coverCanvas.width = cw;
-      coverCanvas.height = ch;
-      coverCtx.imageSmoothingEnabled = false;
-      coverCtx.clearRect(0, 0, cw, ch);
-      coverCtx.drawImage(video, 0, 0, vw, vh, dx, dy, scaledWidth, scaledHeight);
-
-      const block = state.blockSize;
-      const sampleWidth = Math.max(1, Math.floor(cw / block));
-      const sampleHeight = Math.max(1, Math.floor(ch / block));
-      sampleCanvas.width = sampleWidth;
-      sampleCanvas.height = sampleHeight;
-      sampleCtx.imageSmoothingEnabled = false;
-      sampleCtx.clearRect(0, 0, sampleWidth, sampleHeight);
-      sampleCtx.drawImage(coverCanvas, 0, 0, cw, ch, 0, 0, sampleWidth, sampleHeight);
-
-      if (state.palette && state.palette.length) {
-        const imageData = sampleCtx.getImageData(0, 0, sampleWidth, sampleHeight);
-        const data = imageData.data;
-        const palette = state.palette;
-        for (let i = 0; i < data.length; i += 4) {
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
-          let bestIndex = 0;
-          let bestDistance = Infinity;
-          for (let p = 0; p < palette.length; p += 1) {
-            const color = palette[p];
-            const dr = r - color[0];
-            const dg = g - color[1];
-            const db = b - color[2];
-            const distance = dr * dr + dg * dg + db * db;
-            if (distance < bestDistance) {
-              bestDistance = distance;
-              bestIndex = p;
-            }
-          }
-          const chosen = palette[bestIndex];
-          data[i] = chosen[0];
-          data[i + 1] = chosen[1];
-          data[i + 2] = chosen[2];
-        }
-        sampleCtx.putImageData(imageData, 0, 0);
-      }
-
-      dotCtx.imageSmoothingEnabled = false;
-      dotCtx.clearRect(0, 0, cw, ch);
-      dotCtx.drawImage(sampleCanvas, 0, 0, sampleWidth, sampleHeight, 0, 0, cw, ch);
-      return true;
-    }
-
-    function renderLoop() {
-      if (state.dotMode) {
-        const drawn = drawDotFrame();
-        dotCanvas.hidden = !drawn;
-      }
-      requestAnimationFrame(renderLoop);
     }
 
     function stopCamera() {
@@ -326,17 +189,24 @@
       }
       video.srcObject = null;
       toggleFacingBtn.disabled = true;
-      dotModeBtn.disabled = true;
-      paletteBtn.disabled = true;
-      dotCanvas.hidden = true;
-      video.style.visibility = 'visible';
-      resumeBtn.hidden = false;
     }
 
     async function startCamera() {
+      if (state.restarting) {
+        return;
+      }
+      state.restarting = true;
       setStatus('カメラを初期化しています…');
       toggleFacingBtn.disabled = true;
       resumeBtn.hidden = true;
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setStatus('このブラウザはカメラアクセスに対応していません。');
+        resumeBtn.hidden = false;
+        state.restarting = false;
+        return;
+      }
+
       try {
         stopCamera();
         const constraints = {
@@ -354,54 +224,19 @@
         video.style.transform = state.useFrontCamera ? 'scaleX(-1)' : 'scaleX(1)';
         toggleFacingBtn.textContent = state.useFrontCamera ? '背面カメラに切替' : 'フロントカメラに切替';
         toggleFacingBtn.disabled = false;
-        resumeBtn.hidden = true;
-        dotModeBtn.disabled = false;
-        paletteBtn.disabled = !state.dotMode;
-        updateDotUI();
-        if (state.dotMode) {
-          setStatus(state.palette && state.palette.length ? `ドットモード: ${state.palette.length}色パレット` : 'ドットモード: モザイク表示');
-        } else {
-          setStatus(state.useFrontCamera ? 'フロントカメラ表示中' : '背面カメラ表示中');
-        }
+        setStatus(state.useFrontCamera ? 'フロントカメラ表示中' : '背面カメラ表示中');
       } catch (error) {
         console.error(error);
         setStatus('カメラにアクセスできませんでした。設定をご確認ください。');
-        toggleFacingBtn.disabled = true;
-        dotModeBtn.disabled = true;
-        paletteBtn.disabled = true;
         resumeBtn.hidden = false;
+      } finally {
+        state.restarting = false;
       }
     }
 
     toggleFacingBtn.addEventListener('click', async () => {
       state.useFrontCamera = !state.useFrontCamera;
       await startCamera();
-    });
-
-    dotModeBtn.addEventListener('click', () => {
-      if (dotModeBtn.disabled) return;
-      state.dotMode = !state.dotMode;
-      updateDotUI();
-      if (state.dotMode) {
-        paletteBtn.disabled = false;
-        setStatus(state.palette && state.palette.length ? `ドットモード: ${state.palette.length}色パレット` : 'ドットモード: モザイク表示');
-      } else {
-        paletteBtn.disabled = true;
-        setStatus(state.useFrontCamera ? 'フロントカメラ表示中' : '背面カメラ表示中');
-      }
-    });
-
-    paletteBtn.addEventListener('click', () => {
-      if (!paletteBtn.disabled) {
-        paletteInput.click();
-      }
-    });
-
-    paletteInput.addEventListener('change', async (event) => {
-      const [file] = event.target.files;
-      if (!file) return;
-      await loadPaletteFromFile(file);
-      paletteInput.value = '';
     });
 
     resumeBtn.addEventListener('click', () => {
@@ -417,18 +252,9 @@
     });
 
     window.addEventListener('beforeunload', stopCamera);
+    window.addEventListener('pagehide', stopCamera);
 
-    renderLoop();
-
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setStatus('このブラウザはカメラアクセスに対応していません。');
-      toggleFacingBtn.disabled = true;
-      dotModeBtn.disabled = true;
-      paletteBtn.disabled = true;
-      resumeBtn.hidden = false;
-    } else {
-      startCamera();
-    }
+    startCamera();
   </script>
 </body>
 </html>
