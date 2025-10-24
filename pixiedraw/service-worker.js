@@ -1,5 +1,5 @@
 const SW_PARAMS = new URL(self.location.href);
-const BUILD_ID = SW_PARAMS.searchParams.get('v') || 'static-v20251018';
+const BUILD_ID = SW_PARAMS.searchParams.get('v') || 'static';
 const CACHE_PREFIX = 'pixieedraw-static';
 const CACHE_VERSION = `${CACHE_PREFIX}-${BUILD_ID}`;
 const SCOPE_URL = self.registration?.scope || `${self.location.origin}/`;
