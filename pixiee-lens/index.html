@@ -1300,8 +1300,7 @@
       dotMode: false,
       dotScale: 1,
       colorDepth: '4',
-      cameraSettings: { ...CAMERA_SETTING_DEFAULTS },
-      captureAngle: 0
+      cameraSettings: { ...CAMERA_SETTING_DEFAULTS }
     };
 
     const overlays = [];
@@ -1784,24 +1783,6 @@
           landscapeCaptureSlot.setAttribute('aria-hidden', 'true');
         }
       }
-    }
-
-    function normalizeCaptureAngle(angle) {
-      let value = ((angle % 360) + 360) % 360;
-      if (value === 270) {
-        value = -90;
-      }
-      return value;
-    }
-
-    function updateOrientationAngle() {
-      let angle = 0;
-      if (window.screen && window.screen.orientation && typeof window.screen.orientation.angle === 'number') {
-        angle = window.screen.orientation.angle;
-      } else if (typeof window.orientation === 'number') {
-        angle = window.orientation;
-      }
-      state.captureAngle = normalizeCaptureAngle(angle);
     }
 
     function setStatus(message) {
@@ -4150,31 +4131,6 @@
         outputWidth = sw;
         outputHeight = sh;
       }
-      const rotation = state.captureAngle || 0;
-      if (rotation !== 0) {
-        const radians = rotation * (Math.PI / 180);
-        const requiresSwap = Math.abs(rotation) === 90;
-        const rotatedCanvas = document.createElement('canvas');
-        rotatedCanvas.width = requiresSwap ? outputHeight : outputWidth;
-        rotatedCanvas.height = requiresSwap ? outputWidth : outputHeight;
-        const rCtx = rotatedCanvas.getContext('2d', { willReadFrequently: false });
-        rCtx.save();
-        if (rotation === 90 || rotation === -270) {
-          rCtx.translate(rotatedCanvas.width, 0);
-          rCtx.rotate(Math.PI / 2);
-        } else if (rotation === -90 || rotation === 270) {
-          rCtx.translate(0, rotatedCanvas.height);
-          rCtx.rotate(-Math.PI / 2);
-        } else if (rotation === 180 || rotation === -180) {
-          rCtx.translate(rotatedCanvas.width, rotatedCanvas.height);
-          rCtx.rotate(Math.PI);
-        }
-        rCtx.drawImage(outputCanvas, 0, 0);
-        rCtx.restore();
-        outputCanvas = rotatedCanvas;
-        outputWidth = rotatedCanvas.width;
-        outputHeight = rotatedCanvas.height;
-      }
       return canvasToBlobWithFallback(outputCanvas).then((payload) => ({
         ...payload,
         width: outputWidth,
@@ -4223,7 +4179,6 @@
       if (captureInProgress) {
         return;
       }
-      updateOrientationAngle();
       if (!cameraReady || !state.stream || !video || video.readyState < 2) {
         setStatus('カメラの準備が完了してから撮影してください');
         return;
@@ -4452,7 +4407,6 @@
       if (state.dotMode) {
         ensureDotResolution();
       }
-      updateOrientationAngle();
       updateControlPlacement();
       overlays.forEach((overlay) => {
         if (!overlay.hasImage) {
@@ -4475,7 +4429,6 @@
         if (state.dotMode) {
           ensureDotResolution();
         }
-        updateOrientationAngle();
         updateControlPlacement();
       };
       window.visualViewport.addEventListener('resize', handleViewportChange);
@@ -4483,7 +4436,6 @@
     }
 
     const handleOrientationChange = () => {
-      updateOrientationAngle();
       updateControlPlacement();
     };
 
@@ -4495,7 +4447,6 @@
     updatePaletteToggleAvailability();
     updateDotModeUI();
     setAspectMode(state.aspectMode);
-    updateOrientationAngle();
     updateControlPlacement();
     startCamera();
   </script>
