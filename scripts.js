@@ -3,6 +3,7 @@
     updateCopyrightYear();
     revealLastUpdated();
     setupContactOverlay();
+    setupProjectGate();
     setupHeroReel();
     setupShowcaseFilter();
   }
@@ -96,6 +97,176 @@
       if (event.key === 'Escape' && !overlay.hidden) {
         event.preventDefault();
         closeOverlay();
+      }
+    });
+  }
+
+  function setupProjectGate() {
+    const overlay = document.getElementById('projectGateOverlay');
+    const projectLinkSelector = 'a[data-project-gate="project"]';
+    if (!overlay || !document.querySelector(projectLinkSelector)) {
+      return;
+    }
+
+    const AUTH_KEY = 'pixieed:project-pass';
+    const PASS_HASH = '8752f24ec0a8ac50ef732fbaa26f2df1cea32e477b8d4ad4160748155ed23054';
+    const PASS_FALLBACK = '00169785';
+
+    const form = overlay.querySelector('#projectGateForm');
+    const input = overlay.querySelector('#projectGateInput');
+    const errorLabel = overlay.querySelector('#projectGateError');
+    const closeBtn = overlay.querySelector('.project-gate__close');
+    const cancelBtn = overlay.querySelector('.project-gate__cancel');
+    let pendingHref = null;
+    let lastFocusedElement = null;
+
+    const isAuthorized = () => sessionStorage.getItem(AUTH_KEY) === '1';
+
+    function openOverlay(targetHref) {
+      pendingHref = targetHref || null;
+      lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      overlay.hidden = false;
+      overlay.setAttribute('aria-hidden', 'false');
+      document.body.style.setProperty('overflow', 'hidden');
+      if (errorLabel) {
+        errorLabel.hidden = true;
+      }
+      if (input) {
+        input.value = '';
+        setTimeout(() => input.focus(), 0);
+      }
+    }
+
+    function closeOverlay() {
+      overlay.hidden = true;
+      overlay.setAttribute('aria-hidden', 'true');
+      document.body.style.removeProperty('overflow');
+      if (lastFocusedElement) {
+        lastFocusedElement.focus();
+      }
+      pendingHref = null;
+    }
+
+    function toHex(buffer) {
+      return Array.from(new Uint8Array(buffer))
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('');
+    }
+
+    function digest(code) {
+      if (window.crypto && window.crypto.subtle && window.TextEncoder) {
+        try {
+          const encoder = new TextEncoder();
+          return window.crypto.subtle.digest('SHA-256', encoder.encode(code))
+            .then(toHex)
+            .catch(() => null);
+        } catch (error) {
+          return Promise.resolve(null);
+        }
+      }
+      return Promise.resolve(null);
+    }
+
+    function simpleHash(value) {
+      let acc = 0;
+      for (let i = 0; i < value.length; i += 1) {
+        acc = ((acc * 31) + value.charCodeAt(i)) >>> 0;
+      }
+      return acc.toString(16).padStart(8, '0');
+    }
+
+    function verify(code) {
+      if (!code) {
+        return Promise.resolve(false);
+      }
+      return digest(code).then(hash => {
+        if (hash === PASS_HASH) {
+          return true;
+        }
+        return simpleHash(code) === PASS_FALLBACK;
+      });
+    }
+
+    function showError(message) {
+      if (errorLabel) {
+        errorLabel.textContent = message;
+        errorLabel.hidden = false;
+      }
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    }
+
+    function markAuthorized() {
+      sessionStorage.setItem(AUTH_KEY, '1');
+    }
+
+    function handleSubmit() {
+      if (!input) {
+        return;
+      }
+      const code = input.value.trim();
+      verify(code).then((ok) => {
+        if (!ok) {
+          showError('コードが一致しません。');
+          return;
+        }
+        markAuthorized();
+        closeOverlay();
+        if (pendingHref) {
+          window.location.href = pendingHref;
+        }
+      });
+    }
+
+    if (!isAuthorized()) {
+      document.addEventListener('click', (event) => {
+        const target = event.target instanceof Element ? event.target.closest(projectLinkSelector) : null;
+        if (!target) {
+          return;
+        }
+        if (isAuthorized()) {
+          return;
+        }
+        const href = target instanceof HTMLAnchorElement ? target.href : target.getAttribute('href');
+        event.preventDefault();
+        openOverlay(href);
+      }, true);
+    }
+
+    if (form) {
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        handleSubmit();
+      });
+    }
+
+    const dismissors = [closeBtn, cancelBtn];
+    dismissors.forEach((btn) => {
+      if (btn) {
+        btn.addEventListener('click', () => {
+          closeOverlay();
+        });
+      }
+    });
+
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) {
+        closeOverlay();
+      }
+    });
+
+    window.addEventListener('keydown', (event) => {
+      if (overlay.hidden) {
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeOverlay();
+      } else if (event.key === 'Enter' && document.activeElement === input) {
+        event.preventDefault();
+        handleSubmit();
       }
     });
   }
