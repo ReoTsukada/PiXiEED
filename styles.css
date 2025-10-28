@@ -905,6 +905,89 @@ a:focus {
   font-size: 0.85rem;
 }
 
+.project-gate-overlay {
+  z-index: 70;
+}
+
+.project-gate-panel {
+  width: min(360px, 88vw);
+  padding: 2.1rem 2rem 2rem;
+}
+
+.project-gate__description {
+  margin: 0 0 1.2rem;
+  color: var(--fg-secondary);
+  line-height: 1.6;
+}
+
+.project-gate__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.project-gate__label {
+  font-weight: 600;
+  color: var(--fg-secondary);
+}
+
+.project-gate__input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(140, 140, 255, 0.32);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fg-primary);
+  font-size: 1rem;
+  letter-spacing: 0.18em;
+  text-align: center;
+}
+
+.project-gate__input:focus {
+  outline: 2px solid rgba(172, 176, 255, 0.6);
+  outline-offset: 2px;
+}
+
+.project-gate__error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #ff8a8a;
+}
+
+.project-gate__actions {
+  display: flex;
+  gap: 0.8rem;
+  justify-content: flex-end;
+}
+
+.project-gate__submit,
+.project-gate__cancel {
+  padding: 0.65rem 1.2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(140, 140, 255, 0.32);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--fg-primary);
+  cursor: pointer;
+  transition: border var(--transition), transform var(--transition);
+}
+
+.project-gate__submit {
+  background: linear-gradient(135deg, rgba(140, 140, 255, 0.35), rgba(90, 110, 255, 0.5));
+  border-color: rgba(140, 140, 255, 0.45);
+}
+
+.project-gate__submit:hover,
+.project-gate__submit:focus {
+  transform: translateY(-1px);
+  border-color: rgba(140, 140, 255, 0.7);
+}
+
+.project-gate__cancel:hover,
+.project-gate__cancel:focus {
+  transform: translateY(-1px);
+  border-color: rgba(140, 140, 255, 0.5);
+}
+
 .portfolio-header {
   position: sticky;
   top: 0;
