@@ -220,6 +220,26 @@
       height: clamp(60px, 18vw, 96px);
       pointer-events: auto;
     }
+    body.is-landscape .hud-bottom__capture-slot {
+      display: none;
+    }
+    .hud-landscape-capture {
+      position: absolute;
+      top: calc(var(--hud-padding) + var(--safe-top));
+      bottom: calc(var(--hud-padding) + var(--safe-bottom));
+      right: calc(var(--hud-padding) + var(--safe-right));
+      display: none;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 6;
+    }
+    body.is-landscape .hud-landscape-capture {
+      display: flex;
+    }
+    .hud-landscape-capture > * {
+      pointer-events: auto;
+    }
     .hud-bottom__menus {
       display: flex;
       flex-direction: column;
@@ -1144,6 +1164,7 @@
           </div>
         </div>
       </div>
+      <div class="hud-landscape-capture" aria-hidden="true"></div>
     </div>
     <div id="pixelPreview" class="pixel-preview" hidden></div>
   </main>
@@ -1166,6 +1187,8 @@
     const aspectMenuBtn = document.getElementById('aspectMenuBtn');
     const pixelArtInput = document.getElementById('pixelArtInput');
     const pixelPreview = document.getElementById('pixelPreview');
+    const landscapeCaptureSlot = document.querySelector('.hud-landscape-capture');
+    const captureButtonOriginalParent = captureBtn ? captureBtn.parentElement : null;
     const cameraSettingSliders = cameraSettingsPanel ? Array.from(cameraSettingsPanel.querySelectorAll('input[data-setting]')) : [];
     const cameraSettingValueEls = cameraSettingsPanel
       ? new Map(
@@ -1277,7 +1300,8 @@
       dotMode: false,
       dotScale: 1,
       colorDepth: '4',
-      cameraSettings: { ...CAMERA_SETTING_DEFAULTS }
+      cameraSettings: { ...CAMERA_SETTING_DEFAULTS },
+      captureAngle: 0
     };
 
     const overlays = [];
@@ -1736,6 +1760,48 @@
         return;
       }
       setMenuOpen(key, false);
+    }
+
+    function updateControlPlacement() {
+      if (!captureBtn || !captureButtonOriginalParent) {
+        return;
+      }
+      const isLandscape = window.innerWidth > window.innerHeight;
+      if (isLandscape) {
+        document.body.classList.add('is-landscape');
+        if (landscapeCaptureSlot && captureBtn.parentElement !== landscapeCaptureSlot) {
+          landscapeCaptureSlot.appendChild(captureBtn);
+        }
+        if (landscapeCaptureSlot) {
+          landscapeCaptureSlot.setAttribute('aria-hidden', 'false');
+        }
+      } else {
+        document.body.classList.remove('is-landscape');
+        if (captureBtn.parentElement !== captureButtonOriginalParent) {
+          captureButtonOriginalParent.appendChild(captureBtn);
+        }
+        if (landscapeCaptureSlot) {
+          landscapeCaptureSlot.setAttribute('aria-hidden', 'true');
+        }
+      }
+    }
+
+    function normalizeCaptureAngle(angle) {
+      let value = ((angle % 360) + 360) % 360;
+      if (value === 270) {
+        value = -90;
+      }
+      return value;
+    }
+
+    function updateOrientationAngle() {
+      let angle = 0;
+      if (window.screen && window.screen.orientation && typeof window.screen.orientation.angle === 'number') {
+        angle = window.screen.orientation.angle;
+      } else if (typeof window.orientation === 'number') {
+        angle = window.orientation;
+      }
+      state.captureAngle = normalizeCaptureAngle(angle);
     }
 
     function setStatus(message) {
@@ -4084,6 +4150,31 @@
         outputWidth = sw;
         outputHeight = sh;
       }
+      const rotation = state.captureAngle || 0;
+      if (rotation !== 0) {
+        const radians = rotation * (Math.PI / 180);
+        const requiresSwap = Math.abs(rotation) === 90;
+        const rotatedCanvas = document.createElement('canvas');
+        rotatedCanvas.width = requiresSwap ? outputHeight : outputWidth;
+        rotatedCanvas.height = requiresSwap ? outputWidth : outputHeight;
+        const rCtx = rotatedCanvas.getContext('2d', { willReadFrequently: false });
+        rCtx.save();
+        if (rotation === 90 || rotation === -270) {
+          rCtx.translate(rotatedCanvas.width, 0);
+          rCtx.rotate(Math.PI / 2);
+        } else if (rotation === -90 || rotation === 270) {
+          rCtx.translate(0, rotatedCanvas.height);
+          rCtx.rotate(-Math.PI / 2);
+        } else if (rotation === 180 || rotation === -180) {
+          rCtx.translate(rotatedCanvas.width, rotatedCanvas.height);
+          rCtx.rotate(Math.PI);
+        }
+        rCtx.drawImage(outputCanvas, 0, 0);
+        rCtx.restore();
+        outputCanvas = rotatedCanvas;
+        outputWidth = rotatedCanvas.width;
+        outputHeight = rotatedCanvas.height;
+      }
       return canvasToBlobWithFallback(outputCanvas).then((payload) => ({
         ...payload,
         width: outputWidth,
@@ -4132,6 +4223,7 @@
       if (captureInProgress) {
         return;
       }
+      updateOrientationAngle();
       if (!cameraReady || !state.stream || !video || video.readyState < 2) {
         setStatus('カメラの準備が完了してから撮影してください');
         return;
@@ -4360,6 +4452,8 @@
       if (state.dotMode) {
         ensureDotResolution();
       }
+      updateOrientationAngle();
+      updateControlPlacement();
       overlays.forEach((overlay) => {
         if (!overlay.hasImage) {
           return;
@@ -4381,14 +4475,28 @@
         if (state.dotMode) {
           ensureDotResolution();
         }
+        updateOrientationAngle();
+        updateControlPlacement();
       };
       window.visualViewport.addEventListener('resize', handleViewportChange);
       window.visualViewport.addEventListener('scroll', handleViewportChange);
     }
 
+    const handleOrientationChange = () => {
+      updateOrientationAngle();
+      updateControlPlacement();
+    };
+
+    window.addEventListener('orientationchange', handleOrientationChange);
+    if (window.screen && window.screen.orientation && typeof window.screen.orientation.addEventListener === 'function') {
+      window.screen.orientation.addEventListener('change', handleOrientationChange);
+    }
+
     updatePaletteToggleAvailability();
     updateDotModeUI();
     setAspectMode(state.aspectMode);
+    updateOrientationAngle();
+    updateControlPlacement();
     startCamera();
   </script>
 </body>
