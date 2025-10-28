@@ -147,6 +147,16 @@
     },
   };
 
+  const referenceDom = {
+    overlay: document.getElementById('referenceOverlay'),
+    wrap: document.getElementById('referenceWrap'),
+    image: document.getElementById('referenceImage'),
+    handles: Array.from(document.querySelectorAll('.reference-handle')),
+    loadButton: document.getElementById('loadReferenceImageBtn'),
+    clearButton: document.getElementById('clearReferenceImageBtn'),
+    input: document.getElementById('referenceImageInput'),
+  };
+
   const LEFT_TAB_KEYS = ['tools', 'color'];
   const RIGHT_TAB_KEYS = ['frames', 'settings', 'file'];
   const TOOL_GROUPS = {
@@ -3019,15 +3029,22 @@
       throw createImageImportError('画像を読み込めませんでした');
     }
 
+    const bytes = new Uint8Array(buffer);
     const mimeType = typeof file.type === 'string' && file.type ? file.type : 'image/gif';
     if (typeof window !== 'undefined' && typeof window.ImageDecoder === 'function') {
       try {
-        return await decodeGifWithImageDecoder(buffer, mimeType);
+        const decoded = await decodeGifWithImageDecoder(bytes, mimeType);
+        if (decoded && Array.isArray(decoded.frames) && decoded.frames.length > 1) {
+          return decoded;
+        }
+        if (decoded && decoded.frames?.length === 1) {
+          console.warn('ImageDecoder GIF decode returned single frame; falling back to JavaScript decoder');
+        }
       } catch (error) {
         console.warn('ImageDecoder GIF decode failed, falling back to JavaScript decoder', error);
       }
     }
-    return decodeGifWithReader(new Uint8Array(buffer));
+    return decodeGifWithReader(bytes);
   }
 
   async function decodeGifWithImageDecoder(buffer, mimeType) {
@@ -6413,6 +6430,302 @@
     updateGridDecorations();
   }
 
+
+  const referenceState = {
+    objectUrl: null,
+    hasImage: false,
+    baseWidth: 0,
+    baseHeight: 0,
+    scale: 1,
+    minScale: 1,
+    maxScale: 64,
+    resize: null,
+  };
+
+  function hasReferenceElements() {
+    return Boolean(
+      referenceDom.overlay &&
+      referenceDom.wrap &&
+      referenceDom.image &&
+      referenceDom.loadButton &&
+      referenceDom.input
+    );
+  }
+
+  function updateReferenceStatus(message, tone = 'info') {
+    if (typeof updateAutosaveStatus === 'function') {
+      updateAutosaveStatus(message, tone);
+    }
+  }
+
+  function clearReferenceImage(updateMessage = true) {
+    if (!hasReferenceElements()) {
+      return;
+    }
+    if (referenceState.objectUrl) {
+      URL.revokeObjectURL(referenceState.objectUrl);
+      referenceState.objectUrl = null;
+    }
+    referenceState.hasImage = false;
+    referenceState.baseWidth = 0;
+    referenceState.baseHeight = 0;
+    referenceState.scale = referenceState.minScale;
+    referenceState.resize = null;
+    referenceDom.image.onload = null;
+    referenceDom.image.onerror = null;
+    referenceDom.image.removeAttribute('src');
+    referenceDom.image.style.width = '0px';
+    referenceDom.image.style.height = '0px';
+    referenceDom.wrap.style.width = '0px';
+    referenceDom.wrap.style.height = '0px';
+    referenceDom.wrap.classList.remove('is-active');
+    referenceDom.overlay.hidden = true;
+    if (referenceDom.clearButton) {
+      referenceDom.clearButton.hidden = true;
+    }
+    if (updateMessage) {
+      updateReferenceStatus('参考画像を閉じました', 'info');
+    }
+  }
+
+  function getReferenceViewportScaleLimit(width = referenceState.baseWidth, height = referenceState.baseHeight) {
+    if (!width || !height) {
+      return referenceState.maxScale;
+    }
+    const limitW = Math.max(1, Math.floor((window.innerWidth * 0.9) / width));
+    const limitH = Math.max(1, Math.floor((window.innerHeight * 0.85) / height));
+    const viewportLimit = Math.max(1, Math.min(limitW, limitH));
+    return Math.max(referenceState.minScale, Math.min(referenceState.maxScale, viewportLimit));
+  }
+
+  function applyReferenceScale() {
+    if (!referenceState.hasImage || !referenceState.baseWidth || !referenceState.baseHeight) {
+      return;
+    }
+    const viewportLimit = getReferenceViewportScaleLimit();
+    if (referenceState.scale > viewportLimit) {
+      referenceState.scale = viewportLimit;
+    }
+    const displayWidth = referenceState.baseWidth * referenceState.scale;
+    const displayHeight = referenceState.baseHeight * referenceState.scale;
+    referenceDom.image.style.width = `${displayWidth}px`;
+    referenceDom.image.style.height = `${displayHeight}px`;
+    referenceDom.wrap.style.width = `${displayWidth}px`;
+    referenceDom.wrap.style.height = `${displayHeight}px`;
+    referenceDom.overlay.hidden = false;
+    if (referenceDom.clearButton) {
+      referenceDom.clearButton.hidden = false;
+    }
+  }
+
+  function setReferenceScale(scale) {
+    if (!referenceState.hasImage) {
+      return;
+    }
+    const limit = getReferenceViewportScaleLimit();
+    const clamped = Math.max(referenceState.minScale, Math.min(limit, Math.round(scale)));
+    if (clamped === referenceState.scale) {
+      applyReferenceScale();
+      updateReferenceStatus(`参考画像: ${referenceState.baseWidth}×${referenceState.baseHeight}px / x${referenceState.scale}`);
+      return;
+    }
+    referenceState.scale = clamped;
+    applyReferenceScale();
+    updateReferenceStatus(`参考画像: ${referenceState.baseWidth}×${referenceState.baseHeight}px / x${referenceState.scale}`);
+  }
+
+  function getReferenceAnchorPoint(handle, rect) {
+    switch (handle) {
+      case 'nw':
+        return { x: rect.right, y: rect.bottom };
+      case 'ne':
+        return { x: rect.left, y: rect.bottom };
+      case 'sw':
+        return { x: rect.right, y: rect.top };
+      case 'se':
+      default:
+        return { x: rect.left, y: rect.top };
+    }
+  }
+
+  function onReferenceHandlePointerDown(event) {
+    if (!referenceState.hasImage || !referenceState.baseWidth || !referenceState.baseHeight) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const handle = event.currentTarget;
+    const rect = referenceDom.wrap.getBoundingClientRect();
+    referenceDom.wrap.classList.add('is-active');
+    const anchor = getReferenceAnchorPoint(handle.dataset.handle, rect);
+    referenceState.resize = {
+      pointerId: event.pointerId,
+      handle,
+      anchorX: anchor.x,
+      anchorY: anchor.y,
+    };
+    try {
+      handle.setPointerCapture(event.pointerId);
+    } catch (error) {
+      console.debug('Reference handle pointer capture failed', error);
+    }
+  }
+
+  function onReferenceHandlePointerMove(event) {
+    const resize = referenceState.resize;
+    if (!resize || event.pointerId !== resize.pointerId) {
+      return;
+    }
+    if (!referenceState.baseWidth || !referenceState.baseHeight) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const distX = Math.abs(event.clientX - resize.anchorX);
+    const distY = Math.abs(event.clientY - resize.anchorY);
+    const desiredScale = Math.max(
+      distX / referenceState.baseWidth,
+      distY / referenceState.baseHeight,
+      referenceState.minScale
+    );
+    setReferenceScale(desiredScale);
+  }
+
+  function onReferenceHandlePointerUp(event) {
+    const resize = referenceState.resize;
+    if (!resize || event.pointerId !== resize.pointerId) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      resize.handle.releasePointerCapture(event.pointerId);
+    } catch (error) {
+      console.debug('Reference handle pointer release failed', error);
+    }
+    referenceState.resize = null;
+    updateReferenceStatus(`参考画像: ${referenceState.baseWidth}×${referenceState.baseHeight}px / x${referenceState.scale}`);
+  }
+
+  function setReferenceActive(active) {
+    if (!referenceState.hasImage) {
+      return;
+    }
+    referenceDom.wrap.classList.toggle('is-active', Boolean(active));
+  }
+
+  function loadReferenceImage(file) {
+    if (!file || !hasReferenceElements()) {
+      return;
+    }
+    const previousUrl = referenceState.objectUrl;
+    const objectUrl = URL.createObjectURL(file);
+    const tempImage = new Image();
+    tempImage.decoding = 'async';
+    tempImage.onload = () => {
+      tempImage.onload = null;
+      tempImage.onerror = null;
+      const width = tempImage.naturalWidth || tempImage.width;
+      const height = tempImage.naturalHeight || tempImage.height;
+      if (!width || !height) {
+        URL.revokeObjectURL(objectUrl);
+        updateReferenceStatus('参考画像の読み込みに失敗しました', 'error');
+        return;
+      }
+      if (previousUrl) {
+        URL.revokeObjectURL(previousUrl);
+      }
+      referenceState.objectUrl = objectUrl;
+      referenceState.hasImage = true;
+      referenceState.baseWidth = width;
+      referenceState.baseHeight = height;
+      referenceState.resize = null;
+      const viewportLimit = getReferenceViewportScaleLimit(width, height);
+      const initialScaleCandidate = Math.min(
+        viewportLimit,
+        Math.max(1, Math.floor((window.innerWidth * 0.35) / width)),
+        Math.max(1, Math.floor((window.innerHeight * 0.35) / height))
+      ) || 1;
+      referenceState.scale = Math.max(referenceState.minScale, Math.min(viewportLimit, initialScaleCandidate));
+      referenceDom.image.onload = null;
+      referenceDom.image.onerror = null;
+      referenceDom.image.src = objectUrl;
+      applyReferenceScale();
+      setReferenceActive(true);
+      updateReferenceStatus(`参考画像: ${width}×${height}px / x${referenceState.scale}`, 'success');
+    };
+    tempImage.onerror = () => {
+      tempImage.onload = null;
+      tempImage.onerror = null;
+      URL.revokeObjectURL(objectUrl);
+      updateReferenceStatus('参考画像の読み込みに失敗しました', 'error');
+    };
+    tempImage.src = objectUrl;
+  }
+
+  function setupReferenceOverlay() {
+    if (!hasReferenceElements()) {
+      return;
+    }
+    clearReferenceImage(false);
+    referenceDom.loadButton?.addEventListener('click', event => {
+      event.stopPropagation();
+      if (referenceDom.input) {
+        referenceDom.input.value = '';
+        referenceDom.input.click();
+      }
+    });
+    referenceDom.input?.addEventListener('change', event => {
+      const file = event.target.files && event.target.files[0];
+      if (file) {
+        loadReferenceImage(file);
+      }
+      event.target.value = '';
+    });
+    referenceDom.clearButton?.addEventListener('click', event => {
+      event.stopPropagation();
+      clearReferenceImage();
+    });
+    referenceDom.handles.forEach(handle => {
+      handle.addEventListener('pointerdown', onReferenceHandlePointerDown);
+      handle.addEventListener('pointermove', onReferenceHandlePointerMove);
+      handle.addEventListener('pointerup', onReferenceHandlePointerUp);
+      handle.addEventListener('pointercancel', onReferenceHandlePointerUp);
+      handle.addEventListener('click', event => event.stopPropagation());
+    });
+    referenceDom.wrap?.addEventListener('click', event => {
+      if (!referenceState.hasImage) {
+        return;
+      }
+      setReferenceActive(true);
+      event.stopPropagation();
+    });
+    document.addEventListener('click', event => {
+      if (!referenceState.hasImage) {
+        return;
+      }
+      if (referenceDom.wrap && referenceDom.wrap.contains(event.target)) {
+        return;
+      }
+      if (referenceState.resize) {
+        return;
+      }
+      setReferenceActive(false);
+    });
+    window.addEventListener('resize', () => {
+      if (!referenceState.hasImage) {
+        return;
+      }
+      const limit = getReferenceViewportScaleLimit();
+      if (referenceState.scale > limit) {
+        setReferenceScale(limit);
+      } else {
+        applyReferenceScale();
+        updateReferenceStatus(`参考画像: ${referenceState.baseWidth}×${referenceState.baseHeight}px / x${referenceState.scale}`);
+      }
+    });
+  }
+
   async function init() {
     await initializeIosSnapshotFallback();
     await initializeAutosave();
@@ -6427,6 +6740,7 @@
     setupPaletteEditor();
     setupFramesAndLayers();
     setupCanvas();
+    setupReferenceOverlay();
     setupKeyboard();
     initMemoryMonitor();
     updateDocumentMetadata();
