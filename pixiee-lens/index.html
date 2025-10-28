@@ -2061,10 +2061,35 @@
       return { width, height, offsetX, offsetY };
     }
 
+    function getViewportMetrics() {
+      const viewportWidth = Math.max(1, Math.round(window.innerWidth || 0));
+      const viewportHeight = Math.max(1, Math.round(window.innerHeight || 0));
+      if (window.visualViewport) {
+        const vv = window.visualViewport;
+        return {
+          width: Math.max(1, Math.round(vv.width)),
+          height: Math.max(1, Math.round(vv.height)),
+          offsetLeft: Math.round(vv.offsetLeft || 0),
+          offsetTop: Math.round(vv.offsetTop || 0),
+          pageWidth: viewportWidth,
+          pageHeight: viewportHeight
+        };
+      }
+      return {
+        width: viewportWidth,
+        height: viewportHeight,
+        offsetLeft: 0,
+        offsetTop: 0,
+        pageWidth: viewportWidth,
+        pageHeight: viewportHeight
+      };
+    }
+
     function updateDotCanvasLayout(targetWidth, targetHeight, shadeWidth, shadeHeight) {
       if (!dotCanvas) {
         return;
       }
+      const metrics = getViewportMetrics();
       let width;
       let height;
       let offsetX;
@@ -2079,8 +2104,8 @@
         const contain = getContainLayout();
         width = contain.width;
         height = contain.height;
-        offsetX = contain.offsetX;
-        offsetY = contain.offsetY;
+        offsetX = contain.offsetX + metrics.offsetLeft;
+        offsetY = contain.offsetTop + metrics.offsetTop;
       }
 
       dotCanvas.style.width = `${width}px`;
@@ -2097,21 +2122,22 @@
       if (!dotCanvas) {
         return;
       }
+      const metrics = getViewportMetrics();
       const { width, height, offsetX, offsetY } = dotState.layout || {};
       if (!width || !height) {
         const contain = getContainLayout();
         dotCanvas.style.width = `${contain.width}px`;
         dotCanvas.style.height = `${contain.height}px`;
-        dotCanvas.style.left = `${contain.offsetX}px`;
-        dotCanvas.style.top = `${contain.offsetY}px`;
+        dotCanvas.style.left = `${contain.offsetX + metrics.offsetLeft}px`;
+        dotCanvas.style.top = `${contain.offsetY + metrics.offsetTop}px`;
         dotCanvas.style.right = '';
         dotCanvas.style.bottom = '';
         return;
       }
       dotCanvas.style.width = `${width}px`;
       dotCanvas.style.height = `${height}px`;
-      dotCanvas.style.left = `${offsetX}px`;
-      dotCanvas.style.top = `${offsetY}px`;
+      dotCanvas.style.left = `${offsetX + metrics.offsetLeft}px`;
+      dotCanvas.style.top = `${offsetY + metrics.offsetTop}px`;
       dotCanvas.style.right = '';
       dotCanvas.style.bottom = '';
     }
