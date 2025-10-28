@@ -27,6 +27,10 @@
       --accent: #7bcfff;
       font-family: "Inter", "Hiragino Sans", "Noto Sans JP", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
       --hud-padding: clamp(18px, 4vw, 42px);
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
     }
     * {
       box-sizing: border-box;
@@ -117,9 +121,9 @@
     }
     .hud-top {
       position: absolute;
-      top: var(--hud-padding);
-      left: var(--hud-padding);
-      right: var(--hud-padding);
+      top: calc(var(--hud-padding) + var(--safe-top));
+      left: calc(var(--hud-padding) + var(--safe-left));
+      right: calc(var(--hud-padding) + var(--safe-right));
       display: flex;
       flex-direction: column;
       gap: 18px;
@@ -175,9 +179,9 @@
     }
     .hud-bottom {
       position: absolute;
-      bottom: var(--hud-padding);
-      left: var(--hud-padding);
-      right: var(--hud-padding);
+      bottom: calc(var(--hud-padding) + var(--safe-bottom));
+      left: calc(var(--hud-padding) + var(--safe-left));
+      right: calc(var(--hud-padding) + var(--safe-right));
       display: flex;
       flex-direction: column;
       gap: 16px;
@@ -2038,16 +2042,17 @@
     }
 
     function getContainLayout() {
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
+      const metrics = getViewportMetrics();
+      const viewportWidth = metrics.width;
+      const viewportHeight = metrics.height;
       const sourceWidth = video.videoWidth || viewportWidth;
       const sourceHeight = video.videoHeight || viewportHeight;
       if (!sourceWidth || !sourceHeight) {
         return {
           width: viewportWidth,
           height: viewportHeight,
-          offsetX: 0,
-          offsetY: 0
+          offsetX: Math.round((metrics.pageWidth - viewportWidth) / 2),
+          offsetY: Math.round((metrics.pageHeight - viewportHeight) / 2)
         };
       }
       const scale = Math.min(
@@ -2056,8 +2061,8 @@
       );
       const width = Math.max(1, Math.round(sourceWidth * scale));
       const height = Math.max(1, Math.round(sourceHeight * scale));
-      const offsetX = Math.round((viewportWidth - width) / 2);
-      const offsetY = Math.round((viewportHeight - height) / 2);
+      const offsetX = Math.round((metrics.pageWidth - width) / 2);
+      const offsetY = Math.round((metrics.pageHeight - height) / 2);
       return { width, height, offsetX, offsetY };
     }
 
@@ -2098,8 +2103,8 @@
       if (Number.isFinite(targetWidth) && Number.isFinite(targetHeight) && Number.isFinite(shadeWidth) && Number.isFinite(shadeHeight)) {
         width = Math.max(1, Math.round(targetWidth));
         height = Math.max(1, Math.round(targetHeight));
-        offsetX = Math.round(shadeWidth);
-        offsetY = Math.round(shadeHeight);
+        offsetX = Math.round(shadeWidth) + metrics.offsetLeft;
+        offsetY = Math.round(shadeHeight) + metrics.offsetTop;
       } else {
         const contain = getContainLayout();
         width = contain.width;
@@ -2122,22 +2127,22 @@
       if (!dotCanvas) {
         return;
       }
-      const metrics = getViewportMetrics();
       const { width, height, offsetX, offsetY } = dotState.layout || {};
       if (!width || !height) {
         const contain = getContainLayout();
+        const fallbackMetrics = getViewportMetrics();
         dotCanvas.style.width = `${contain.width}px`;
         dotCanvas.style.height = `${contain.height}px`;
-        dotCanvas.style.left = `${contain.offsetX + metrics.offsetLeft}px`;
-        dotCanvas.style.top = `${contain.offsetY + metrics.offsetTop}px`;
+        dotCanvas.style.left = `${contain.offsetX + fallbackMetrics.offsetLeft}px`;
+        dotCanvas.style.top = `${contain.offsetY + fallbackMetrics.offsetTop}px`;
         dotCanvas.style.right = '';
         dotCanvas.style.bottom = '';
         return;
       }
       dotCanvas.style.width = `${width}px`;
       dotCanvas.style.height = `${height}px`;
-      dotCanvas.style.left = `${offsetX + metrics.offsetLeft}px`;
-      dotCanvas.style.top = `${offsetY + metrics.offsetTop}px`;
+      dotCanvas.style.left = `${offsetX}px`;
+      dotCanvas.style.top = `${offsetY}px`;
       dotCanvas.style.right = '';
       dotCanvas.style.bottom = '';
     }
@@ -4369,6 +4374,17 @@
       });
       refreshOverlayStatus();
     });
+
+    if (window.visualViewport) {
+      const handleViewportChange = () => {
+        updateAspectLayout();
+        if (state.dotMode) {
+          ensureDotResolution();
+        }
+      };
+      window.visualViewport.addEventListener('resize', handleViewportChange);
+      window.visualViewport.addEventListener('scroll', handleViewportChange);
+    }
 
     updatePaletteToggleAvailability();
     updateDotModeUI();
