@@ -74,7 +74,10 @@
     }
     .aspect-overlay {
       position: absolute;
-      inset: 0;
+      top: calc(-1 * var(--safe-top));
+      bottom: calc(-1 * var(--safe-bottom));
+      left: calc(-1 * var(--safe-left));
+      right: calc(-1 * var(--safe-right));
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -1927,6 +1930,10 @@
       if (!aspectOverlay || !aspectCenter || !aspectFrame || !aspectShadeTop || !aspectShadeBottom || !aspectShadeLeft || !aspectShadeRight) {
         return;
       }
+      const metrics = getViewportMetrics();
+      const safe = getSafeInsets();
+      const viewportWidth = metrics.width;
+      const viewportHeight = metrics.height;
       const ratioEntry = ASPECT_RATIOS[state.aspectMode];
       const ratio = typeof ratioEntry === 'function' ? ratioEntry() : ratioEntry;
       if (!ratio) {
@@ -1952,8 +1959,6 @@
         return;
       }
       aspectOverlay.hidden = false;
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
       const ratioWidth = Math.max(1, ratio.width);
       const ratioHeight = Math.max(1, ratio.height);
       const scaleBase = Math.min(
@@ -1969,10 +1974,10 @@
       aspectCenter.style.height = `${Math.round(targetHeight)}px`;
       aspectFrame.style.width = `${Math.round(targetWidth)}px`;
       aspectFrame.style.height = `${Math.round(targetHeight)}px`;
-      aspectShadeTop.style.height = `${Math.floor(shadeHeight)}px`;
-      aspectShadeBottom.style.height = `${Math.ceil(shadeHeight)}px`;
-      aspectShadeLeft.style.width = `${Math.floor(shadeWidth)}px`;
-      aspectShadeRight.style.width = `${Math.ceil(shadeWidth)}px`;
+      aspectShadeTop.style.height = `${Math.floor(shadeHeight + safe.top)}px`;
+      aspectShadeBottom.style.height = `${Math.ceil(shadeHeight + safe.bottom)}px`;
+      aspectShadeLeft.style.width = `${Math.floor(shadeWidth + safe.left)}px`;
+      aspectShadeRight.style.width = `${Math.ceil(shadeWidth + safe.right)}px`;
       updateDotCanvasLayout(targetWidth, targetHeight, shadeWidth, shadeHeight);
     }
 
@@ -2090,11 +2095,27 @@
       };
     }
 
+    function getSafeInsets() {
+      const styles = getComputedStyle(document.documentElement);
+      const parse = (prop) => {
+        const value = styles.getPropertyValue(prop);
+        const parsed = Number.parseFloat(value);
+        return Number.isNaN(parsed) ? 0 : parsed;
+      };
+      return {
+        top: parse('--safe-top'),
+        right: parse('--safe-right'),
+        bottom: parse('--safe-bottom'),
+        left: parse('--safe-left')
+      };
+    }
+
     function updateDotCanvasLayout(targetWidth, targetHeight, shadeWidth, shadeHeight) {
       if (!dotCanvas) {
         return;
       }
       const metrics = getViewportMetrics();
+      const safe = getSafeInsets();
       let width;
       let height;
       let offsetX;
@@ -2103,14 +2124,14 @@
       if (Number.isFinite(targetWidth) && Number.isFinite(targetHeight) && Number.isFinite(shadeWidth) && Number.isFinite(shadeHeight)) {
         width = Math.max(1, Math.round(targetWidth));
         height = Math.max(1, Math.round(targetHeight));
-        offsetX = Math.round(shadeWidth) + metrics.offsetLeft;
-        offsetY = Math.round(shadeHeight) + metrics.offsetTop;
+        offsetX = Math.round(shadeWidth + safe.left) + metrics.offsetLeft;
+        offsetY = Math.round(shadeHeight + safe.top) + metrics.offsetTop;
       } else {
         const contain = getContainLayout();
         width = contain.width;
         height = contain.height;
-        offsetX = contain.offsetX + metrics.offsetLeft;
-        offsetY = contain.offsetTop + metrics.offsetTop;
+        offsetX = contain.offsetX + metrics.offsetLeft + safe.left;
+        offsetY = contain.offsetY + metrics.offsetTop + safe.top;
       }
 
       dotCanvas.style.width = `${width}px`;
@@ -2131,10 +2152,11 @@
       if (!width || !height) {
         const contain = getContainLayout();
         const fallbackMetrics = getViewportMetrics();
+        const safe = getSafeInsets();
         dotCanvas.style.width = `${contain.width}px`;
         dotCanvas.style.height = `${contain.height}px`;
-        dotCanvas.style.left = `${contain.offsetX + fallbackMetrics.offsetLeft}px`;
-        dotCanvas.style.top = `${contain.offsetY + fallbackMetrics.offsetTop}px`;
+        dotCanvas.style.left = `${contain.offsetX + fallbackMetrics.offsetLeft + safe.left}px`;
+        dotCanvas.style.top = `${contain.offsetY + fallbackMetrics.offsetTop + safe.top}px`;
         dotCanvas.style.right = '';
         dotCanvas.style.bottom = '';
         return;
