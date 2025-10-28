@@ -54,7 +54,7 @@
       <div class="hero-visual" aria-label="PiXiEED Showcase">
         <div class="hero-reel" role="list">
           <div class="hero-reel__track">
-            <a class="hero-card hero-card--project" role="listitem" href="projects/pixfind/index.html">
+            <a class="hero-card hero-card--project" role="listitem" href="projects/pixfind/index.html" data-project-gate="project">
               <figure>
                 <img src="pixfind/ogp.png" alt="PiXFIND のスクリーンショット" loading="lazy">
                 <figcaption>
@@ -64,7 +64,7 @@
                 </figcaption>
               </figure>
             </a>
-            <a class="hero-card hero-card--project" role="listitem" href="projects/maoitu/index.html">
+            <a class="hero-card hero-card--project" role="listitem" href="projects/maoitu/index.html" data-project-gate="project">
               <figure>
                 <img src="maoitu/ogp.png" alt="魔王様!!いつまでよければいいですか!? のスクリーンショット" loading="lazy">
                 <figcaption>
@@ -74,7 +74,7 @@
                 </figcaption>
               </figure>
             </a>
-            <a class="hero-card hero-card--tool" role="listitem" href="projects/pixiedraw/index.html">
+            <a class="hero-card hero-card--tool" role="listitem" href="projects/pixiedraw/index.html" data-project-gate="project">
               <figure>
                 <img src="pixiedraw/ogp.png" alt="PiXiEEDraw のプレビューイメージ" loading="lazy">
                 <figcaption>
@@ -124,7 +124,7 @@
         <h2>PiXiEEDのコンテンツ</h2>
         <p class="showcase-intro">ツール・ゲーム・作品・ノート。知りたい場所へそのまま移動できます。</p>
         <div class="content-grid" role="list">
-          <a class="content-card content-card--primary" role="listitem" href="projects/pixiedraw/index.html">
+          <a class="content-card content-card--primary" role="listitem" href="projects/pixiedraw/index.html" data-project-gate="project">
             <h3>PiXiEEDraw</h3>
             <p>ブラウザで完結するドット絵エディターのプレビュー版。無料で今すぐ試せます。</p>
             <span class="content-card__cta">ツールページへ</span>
@@ -183,6 +183,23 @@
           <span class="contact-option__detail">@PiXiEED_arta</span>
         </a>
       </div>
+    </div>
+  </div>
+
+  <div id="projectGateOverlay" class="contact-overlay project-gate-overlay" hidden aria-hidden="true">
+    <div class="contact-panel project-gate-panel" role="dialog" aria-modal="true" aria-labelledby="projectGateTitle">
+      <button type="button" class="contact-close project-gate__close" aria-label="閉じる">×</button>
+      <h2 id="projectGateTitle">プロジェクトアクセス</h2>
+      <p class="project-gate__description">プロジェクトページを表示するにはアクセスコードが必要です。</p>
+      <form id="projectGateForm" class="project-gate__form" novalidate>
+        <label for="projectGateInput" class="project-gate__label">アクセスコード</label>
+        <input type="password" id="projectGateInput" class="project-gate__input" inputmode="numeric" autocomplete="off" aria-required="true">
+        <p id="projectGateError" class="project-gate__error" aria-live="polite" hidden>コードが一致しません。</p>
+        <div class="project-gate__actions">
+          <button type="submit" class="project-gate__submit">確認</button>
+          <button type="button" class="project-gate__cancel">キャンセル</button>
+        </div>
+      </form>
     </div>
   </div>
 
