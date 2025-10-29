@@ -270,6 +270,12 @@
       padding: 18px 12px;
       overflow: hidden;
       background: transparent;
+      touch-action: none;
+      cursor: ew-resize;
+      user-select: none;
+    }
+    .zoom-meter.is-collapsed .zoom-meter__tape {
+      padding: 12px 10px;
     }
     .zoom-meter__tape::before {
       content: '';
@@ -316,6 +322,7 @@
       transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
       padding: 6px 0;
       will-change: transform;
+      pointer-events: none;
     }
     .zoom-meter__scale-track.is-static {
       transition: none;
@@ -329,6 +336,7 @@
       font-weight: 500;
       color: rgba(231, 238, 255, 0.55);
       position: relative;
+      pointer-events: none;
       transition: transform 0.2s ease, color 0.2s ease;
     }
     .zoom-meter__scale-value::after {
@@ -361,11 +369,11 @@
       position: absolute;
       inset: 0;
       opacity: 0;
-      cursor: pointer;
+      cursor: default;
       -webkit-appearance: none;
       appearance: none;
       z-index: 3;
-      pointer-events: auto;
+      pointer-events: none;
     }
     .zoom-meter__slider::-webkit-slider-thumb,
     .zoom-meter__slider::-moz-range-thumb,
@@ -1373,34 +1381,45 @@
     }
     const zoomControl = document.getElementById('zoomControl');
     const zoomSlider = document.getElementById('cameraZoomSlider');
+    const zoomMeterTape = zoomControl ? zoomControl.querySelector('.zoom-meter__tape') : null;
     const zoomScaleWrapper = zoomControl ? zoomControl.querySelector('.zoom-meter__scale') : null;
     const zoomScaleTrack = zoomScaleWrapper ? zoomScaleWrapper.querySelector('.zoom-meter__scale-track') : null;
     let zoomScaleItems = [];
     let zoomScaleMarks = [];
+    let zoomScaleTranslate = 0;
+    let zoomMeterLastAppliedIndex = -1;
+    const zoomMeterDrag = {
+      active: false,
+      pointerId: null,
+      startClientX: 0,
+      startTranslate: 0
+    };
     let zoomMeterCollapseTimeout = null;
     if (zoomSlider && !cameraSettingSliders.includes(zoomSlider)) {
       cameraSettingSliders.push(zoomSlider);
     }
     if (zoomSlider) {
-      zoomSlider.addEventListener('pointerdown', () => {
+      zoomSlider.addEventListener('focus', () => {
         setZoomMeterExpanded(true);
         if (zoomMeterCollapseTimeout) {
           clearTimeout(zoomMeterCollapseTimeout);
           zoomMeterCollapseTimeout = null;
         }
       });
-      zoomSlider.addEventListener('pointerup', () => {
-        scheduleZoomMeterCollapse(900);
-      });
-      zoomSlider.addEventListener('pointercancel', () => {
-        scheduleZoomMeterCollapse(900);
-      });
-      zoomSlider.addEventListener('focus', () => {
-        setZoomMeterExpanded(true);
-      });
       zoomSlider.addEventListener('blur', () => {
         scheduleZoomMeterCollapse(700);
       });
+      zoomSlider.addEventListener('keydown', (event) => {
+        if (event.key === 'Tab') {
+          setZoomMeterExpanded(false);
+        }
+      });
+      zoomSlider.addEventListener('change', () => {
+        scheduleZoomMeterCollapse(600);
+      });
+    }
+    if (zoomMeterTape) {
+      zoomMeterTape.addEventListener('pointerdown', handleZoomMeterPointerDown);
     }
     const dotCanvas = document.getElementById('dotCanvas');
     const dotCanvasCtx = dotCanvas ? dotCanvas.getContext('2d', { willReadFrequently: true }) : null;
@@ -1688,7 +1707,7 @@
       }
     }
 
-    function scheduleZoomMeterCollapse(delay = 900) {
+    function scheduleZoomMeterCollapse(delay = 400) {
       if (!zoomControl || zoomControl.hidden) {
         return;
       }
@@ -1976,6 +1995,10 @@
       if (!zoomControl || zoomControl.hidden) {
         return;
       }
+      if (zoomMeterDrag.active) {
+        updateZoomScaleActiveFromLayout({ commit: false });
+        return;
+      }
       updateZoomScaleDisplay(value);
     }
 
@@ -2026,6 +2049,8 @@
         return;
       }
       zoomScaleTrack.textContent = '';
+      setZoomScaleTranslate(0, { animate: false });
+      zoomMeterLastAppliedIndex = -1;
       if (!zoomScaleMarks.length) {
         zoomScaleItems = [];
         return;
@@ -2042,7 +2067,10 @@
     }
 
     function updateZoomScaleDisplay(value = state.cameraSettings.zoom ?? 0, { animate = true } = {}) {
-      if (!zoomScaleTrack || !zoomScaleWrapper || !zoomScaleMarks.length) {
+      if (!zoomScaleWrapper || !zoomScaleTrack || !zoomScaleMarks.length) {
+        return;
+      }
+      if (zoomMeterDrag.active) {
         return;
       }
       if (!zoomScaleItems.length) {
@@ -2055,51 +2083,264 @@
       if (!Number.isFinite(targetZoom)) {
         return;
       }
-      let activeIndex = 0;
+      let bestIndex = 0;
       let minDiff = Number.POSITIVE_INFINITY;
       zoomScaleMarks.forEach((mark, index) => {
         const diff = Math.abs(Number(mark) - targetZoom);
         if (diff < minDiff) {
           minDiff = diff;
-          activeIndex = index;
+          bestIndex = index;
         }
       });
-      zoomScaleItems.forEach((item) => {
-        const base = Number(item.dataset.zoomValue);
-        if (Number.isFinite(base)) {
-          item.textContent = formatZoomScaleLabel(base);
-        }
-      });
-      zoomScaleItems.forEach((item, index) => {
-        item.classList.toggle('is-active', index === activeIndex);
-      });
-      const activeEl = zoomScaleItems[activeIndex];
-      if (!activeEl) {
+      alignZoomScaleToIndex(bestIndex, { animate });
+      updateZoomScaleActiveFromLayout({ commit: false });
+      zoomMeterLastAppliedIndex = bestIndex;
+    }
+
+    function setZoomScaleTranslate(translate, { animate = true } = {}) {
+      if (!zoomScaleTrack) {
+        zoomScaleTranslate = translate;
         return;
       }
-      activeEl.textContent = formatZoomScaleLabel(targetZoom);
-      const wrapperRect = zoomScaleWrapper.getBoundingClientRect();
-      const activeRect = activeEl.getBoundingClientRect();
-      if (wrapperRect.width <= 0 || activeRect.width <= 0) {
-        if (zoomControl && zoomControl.hidden) {
-          return;
-        }
-        requestAnimationFrame(() => {
-          updateZoomScaleDisplay(value, { animate });
-        });
-        return;
-      }
-      const translate = (wrapperRect.width / 2) - (activeRect.left - wrapperRect.left + activeRect.width / 2);
       if (!animate) {
         zoomScaleTrack.classList.add('is-static');
+      } else {
+        zoomScaleTrack.classList.remove('is-static');
       }
-      const safeTranslate = Number.isFinite(translate) ? translate : 0;
-      zoomScaleTrack.style.transform = `translateX(${safeTranslate}px)`;
+      zoomScaleTranslate = translate;
+      zoomScaleTrack.style.transform = `translateX(${translate}px)`;
       if (!animate) {
         requestAnimationFrame(() => {
           zoomScaleTrack.classList.remove('is-static');
         });
       }
+    }
+
+    function alignZoomScaleToIndex(index, { animate = true } = {}) {
+      if (!zoomScaleWrapper || !zoomScaleTrack) {
+        return false;
+      }
+      if (!zoomScaleItems.length) {
+        zoomScaleItems = Array.from(zoomScaleTrack.children);
+      }
+      const targetItem = zoomScaleItems[index];
+      if (!targetItem) {
+        return false;
+      }
+      const wrapperRect = zoomScaleWrapper.getBoundingClientRect();
+      const centerX = wrapperRect.left + wrapperRect.width / 2;
+      const itemRect = targetItem.getBoundingClientRect();
+      const itemCenterX = itemRect.left + itemRect.width / 2;
+      const adjustment = centerX - itemCenterX;
+      if (!Number.isFinite(adjustment)) {
+        return false;
+      }
+      setZoomScaleTranslate(zoomScaleTranslate + adjustment, { animate });
+      updateZoomScaleActiveFromLayout({ commit: false });
+      return true;
+    }
+
+    function updateZoomScaleActiveFromLayout({ commit = false, animate = false } = {}) {
+      if (!zoomScaleWrapper || !zoomScaleTrack) {
+        return null;
+      }
+      if (!zoomScaleItems.length) {
+        zoomScaleItems = Array.from(zoomScaleTrack.children);
+      }
+      if (!zoomScaleItems.length || !zoomScaleMarks.length) {
+        return null;
+      }
+      const wrapperRect = zoomScaleWrapper.getBoundingClientRect();
+      const centerX = wrapperRect.left + wrapperRect.width / 2;
+      let bestIndex = 0;
+      let minDistance = Number.POSITIVE_INFINITY;
+      zoomScaleItems.forEach((item, index) => {
+        const baseValue = Number(item.dataset.zoomValue);
+        if (Number.isFinite(baseValue)) {
+          item.textContent = formatZoomScaleLabel(baseValue);
+        }
+        const rect = item.getBoundingClientRect();
+        const itemCenter = rect.left + rect.width / 2;
+        const distance = Math.abs(itemCenter - centerX);
+        if (distance < minDistance) {
+          minDistance = distance;
+          bestIndex = index;
+        }
+      });
+      zoomScaleItems.forEach((item, index) => {
+        item.classList.toggle('is-active', index === bestIndex);
+      });
+      const activeValue = Number(zoomScaleMarks[bestIndex]);
+      if (commit && Number.isFinite(activeValue) && bestIndex !== zoomMeterLastAppliedIndex) {
+        commitZoomMarkIndex(bestIndex, { animate, fromDrag: zoomMeterDrag.active });
+      }
+      return { index: bestIndex, value: activeValue };
+    }
+
+    function getSliderValueForZoom(markValue) {
+      if (!Number.isFinite(markValue)) {
+        return null;
+      }
+      if (cameraZoomCapability) {
+        const mapped = mapCapabilityValueToSlider(markValue, cameraZoomCapability, 'zoom');
+        if (Number.isFinite(mapped)) {
+          return mapped;
+        }
+      }
+      if (zoomScaleMarks.length) {
+        const min = Number(zoomScaleMarks[0]);
+        const max = Number(zoomScaleMarks[zoomScaleMarks.length - 1]);
+        if (Number.isFinite(min) && Number.isFinite(max) && max > min) {
+          const ratio = (markValue - min) / (max - min);
+          if (Number.isFinite(ratio)) {
+            return getSliderValueFromRatio(ratio, 'zoom');
+          }
+        }
+      }
+      return null;
+    }
+
+    function commitZoomMarkIndex(index, { animate = false, fromDrag = false } = {}) {
+      if (!Array.isArray(zoomScaleMarks) || index < 0 || index >= zoomScaleMarks.length) {
+        return;
+      }
+      const markValue = Number(zoomScaleMarks[index]);
+      if (!Number.isFinite(markValue)) {
+        return;
+      }
+      const sliderValue = getSliderValueForZoom(markValue);
+      if (!Number.isFinite(sliderValue)) {
+        return;
+      }
+      if (zoomMeterLastAppliedIndex === index && state.cameraSettings.zoom === sliderValue) {
+        return;
+      }
+      zoomMeterLastAppliedIndex = index;
+      setCameraSettingValue('zoom', sliderValue, { syncInput: !fromDrag });
+      if (!fromDrag) {
+        updateZoomScaleDisplay(state.cameraSettings.zoom ?? sliderValue, { animate });
+      }
+    }
+
+    function getNearestMarkIndexByClientX(clientX) {
+      if (!zoomScaleItems.length) {
+        zoomScaleItems = Array.from(zoomScaleTrack.children);
+      }
+      if (!zoomScaleItems.length) {
+        return -1;
+      }
+      let bestIndex = 0;
+      let minDistance = Number.POSITIVE_INFINITY;
+      zoomScaleItems.forEach((item, index) => {
+        const rect = item.getBoundingClientRect();
+        const itemCenter = rect.left + rect.width / 2;
+        const distance = Math.abs(itemCenter - clientX);
+        if (distance < minDistance) {
+          minDistance = distance;
+          bestIndex = index;
+        }
+      });
+      return bestIndex;
+    }
+
+    function alignZoomMeterToPointer(clientX, { commit = true } = {}) {
+      if (!zoomScaleWrapper || !zoomScaleTrack || !zoomScaleMarks.length) {
+        return;
+      }
+      const index = getNearestMarkIndexByClientX(clientX);
+      if (index < 0) {
+        return;
+      }
+      alignZoomScaleToIndex(index, { animate: false });
+      updateZoomScaleActiveFromLayout({ commit: false });
+      if (commit) {
+        commitZoomMarkIndex(index, { animate: false, fromDrag: true });
+      }
+    }
+
+    function handleZoomMeterPointerDown(event) {
+      if (!zoomControl || zoomControl.hidden) {
+        return;
+      }
+      if (zoomMeterDrag.active) {
+        return;
+      }
+      if (event.pointerType === 'mouse' && event.button !== 0) {
+        return;
+      }
+      event.preventDefault();
+      setZoomMeterExpanded(true);
+      if (zoomMeterCollapseTimeout) {
+        clearTimeout(zoomMeterCollapseTimeout);
+        zoomMeterCollapseTimeout = null;
+      }
+      zoomMeterDrag.active = true;
+      zoomMeterDrag.pointerId = event.pointerId;
+      if (zoomMeterTape && typeof zoomMeterTape.setPointerCapture === 'function') {
+        zoomMeterTape.setPointerCapture(event.pointerId);
+      }
+      alignZoomMeterToPointer(event.clientX, { commit: true });
+      zoomMeterDrag.startTranslate = zoomScaleTranslate;
+      zoomMeterDrag.startClientX = event.clientX;
+      window.addEventListener('pointermove', handleZoomMeterPointerMove);
+      window.addEventListener('pointerup', handleZoomMeterPointerUp);
+      window.addEventListener('pointercancel', handleZoomMeterPointerUp);
+    }
+
+    function handleZoomMeterPointerMove(event) {
+      if (!zoomMeterDrag.active || event.pointerId !== zoomMeterDrag.pointerId) {
+        return;
+      }
+      event.preventDefault();
+      const delta = event.clientX - zoomMeterDrag.startClientX;
+      setZoomScaleTranslate(zoomMeterDrag.startTranslate + delta, { animate: false });
+      if (!updateZoomScaleActiveFromLayout({ commit: true, animate: false })) {
+        return;
+      }
+      // Clamp translation so first/last marks do not drift past center excessively
+      if (zoomScaleItems.length) {
+        const wrapperRect = zoomScaleWrapper.getBoundingClientRect();
+        const centerX = wrapperRect.left + wrapperRect.width / 2;
+        const firstRect = zoomScaleItems[0].getBoundingClientRect();
+        const lastRect = zoomScaleItems[zoomScaleItems.length - 1].getBoundingClientRect();
+        let adjustedTranslate = zoomScaleTranslate;
+        const firstCenter = firstRect.left + firstRect.width / 2;
+        const lastCenter = lastRect.left + lastRect.width / 2;
+        if (firstCenter > centerX) {
+          adjustedTranslate += centerX - firstCenter;
+        }
+        if (lastCenter < centerX) {
+          adjustedTranslate += centerX - lastCenter;
+        }
+        if (adjustedTranslate !== zoomScaleTranslate) {
+          setZoomScaleTranslate(adjustedTranslate, { animate: false });
+          updateZoomScaleActiveFromLayout({ commit: true, animate: false });
+        }
+      }
+    }
+
+    function handleZoomMeterPointerUp(event) {
+      if (!zoomMeterDrag.active || event.pointerId !== zoomMeterDrag.pointerId) {
+        return;
+      }
+      event.preventDefault();
+      zoomMeterDrag.active = false;
+      zoomMeterDrag.pointerId = null;
+      if (zoomMeterTape && typeof zoomMeterTape.releasePointerCapture === 'function') {
+        try {
+          zoomMeterTape.releasePointerCapture(event.pointerId);
+        } catch (error) {
+          // ignore
+        }
+      }
+      window.removeEventListener('pointermove', handleZoomMeterPointerMove);
+      window.removeEventListener('pointerup', handleZoomMeterPointerUp);
+      window.removeEventListener('pointercancel', handleZoomMeterPointerUp);
+      const result = updateZoomScaleActiveFromLayout({ commit: true, animate: true });
+      if (result && Number.isInteger(result.index)) {
+        alignZoomScaleToIndex(result.index, { animate: true });
+      }
+      scheduleZoomMeterCollapse();
     }
 
     function setZoomSliderStepFromCapability() {
@@ -2148,7 +2389,6 @@
         setZoomSliderStepFromCapability();
         zoomSlider.removeAttribute('aria-disabled');
         updateZoomScaleOptions();
-        setZoomMeterExpanded(false);
       } else {
         zoomControl.hidden = true;
         zoomControl.setAttribute('aria-hidden', 'true');
@@ -2156,10 +2396,11 @@
         zoomSlider.setAttribute('aria-disabled', 'true');
         if (zoomScaleTrack) {
           zoomScaleTrack.textContent = '';
-          zoomScaleTrack.style.transform = 'translateX(0)';
+          setZoomScaleTranslate(0, { animate: false });
         }
         zoomScaleMarks = [];
         zoomScaleItems = [];
+        zoomMeterLastAppliedIndex = -1;
         setZoomMeterExpanded(false);
       }
       zoomSlider.value = String(value);
