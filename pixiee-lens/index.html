@@ -402,6 +402,10 @@
       cursor: pointer;
       background: none;
       color: inherit;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
     }
     button:disabled {
       cursor: not-allowed;
@@ -608,6 +612,13 @@
       width: 26px;
       height: 26px;
       display: block;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      -webkit-user-drag: none;
+      -khtml-user-drag: none;
     }
     .control-icon rect,
     .control-icon path {
@@ -966,7 +977,7 @@
               <span class="icon-button__label visually-hidden">ドット絵を読み込む</span>
             </button>
             <button id="stampBtn" class="icon-button" type="button" aria-label="スタンプを開く" aria-expanded="false" aria-controls="stampPanel">
-              <img src="./icon-stamp.svg" class="control-icon" alt="" aria-hidden="true">
+              <img src="./icon-stamp.svg" class="control-icon" alt="" aria-hidden="true" draggable="false">
               <span class="icon-button__label visually-hidden">スタンプを開く</span>
             </button>
             <button id="clearPixelBtn" class="icon-button icon-button--ghost" type="button" aria-label="ドット絵を閉じる">
@@ -1122,6 +1133,7 @@
                   <option value="1">x1</option>
                   <option value="2">x2</option>
                   <option value="3">x3</option>
+                  <option value="4">x4</option>
                 </select>
               </label>
               <label for="colorDepthSelect" class="select-control">
@@ -1141,13 +1153,7 @@
         <div class="hud-bottom__actions" role="group" aria-label="操作">
           <div class="hud-bottom__actions-group hud-bottom__actions-group--left">
             <button id="dotModeBtn" class="icon-button" type="button" aria-label="ドットモードを切替" aria-pressed="false">
-              <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-                <rect x="3" y="3" width="6" height="6" fill="currentColor"></rect>
-                <rect x="15" y="3" width="6" height="6" fill="currentColor" opacity="0.75"></rect>
-                <rect x="3" y="15" width="6" height="6" fill="currentColor" opacity="0.75"></rect>
-                <rect x="15" y="15" width="6" height="6" fill="currentColor"></rect>
-                <rect x="9" y="9" width="6" height="6" fill="currentColor" opacity="0.5"></rect>
-              </svg>
+              <img src="./icon-dotmode.svg" class="control-icon" alt="" aria-hidden="true" draggable="false">
               <span class="icon-button__label visually-hidden">ドットモード</span>
             </button>
           </div>
@@ -2045,7 +2051,8 @@
       const scaleMap = {
         1: 256,
         2: 128,
-        3: 64
+        3: 64,
+        4: 32
       };
       const basePixels = scaleMap[state.dotScale] || 64;
       const minPixels = 16;
@@ -4160,6 +4167,15 @@
       if (!linkTarget) {
         return false;
       }
+      const canUseDownloadAttr = 'download' in HTMLAnchorElement.prototype;
+      const isIOS = /iP(hone|ad|od)/i.test(navigator.userAgent);
+      if (!canUseDownloadAttr || isIOS) {
+        const opened = window.open(linkTarget, '_blank', 'noopener');
+        if (objectUrl) {
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        }
+        return Boolean(opened);
+      }
       const anchor = document.createElement('a');
       anchor.href = linkTarget;
       anchor.download = filename;
@@ -4242,7 +4258,7 @@
         if (value === state.dotScale) {
           return;
         }
-        state.dotScale = Math.max(1, Math.min(3, Math.round(value)));
+        state.dotScale = Math.max(1, Math.min(4, Math.round(value)));
         ensureDotResolution();
         if (state.dotMode) {
           refreshOverlayStatus();
