@@ -192,6 +192,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-wrap: nowrap;
       gap: clamp(12px, 4vw, 20px);
       width: 100%;
       pointer-events: none;
@@ -236,9 +237,152 @@
     }
     body.is-landscape .hud-landscape-capture {
       display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: clamp(16px, 4vw, 24px);
     }
     .hud-landscape-capture > * {
       pointer-events: auto;
+    }
+    .zoom-meter {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+      width: min(520px, 92vw);
+      margin-inline: auto;
+      pointer-events: auto;
+      transition: transform 0.22s ease, opacity 0.22s ease;
+      transform-origin: center top;
+    }
+    .zoom-meter.is-collapsed {
+      opacity: 0.8;
+      transform: translateY(6px) scaleY(0.74);
+    }
+    .zoom-meter.is-expanded {
+      opacity: 1;
+      transform: translateY(0) scaleY(1);
+    }
+    .zoom-meter__tape {
+      position: relative;
+      width: 100%;
+      padding: 18px 12px;
+      overflow: hidden;
+      background: transparent;
+    }
+    .zoom-meter__tape::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 1px;
+      background: rgba(231, 238, 255, 0.28);
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+    .zoom-meter__indicator {
+      position: absolute;
+      top: 8px;
+      bottom: 8px;
+      left: 50%;
+      width: 2px;
+      background: var(--accent);
+      box-shadow: 0 0 12px rgba(123, 207, 255, 0.55);
+      transform: translateX(-50%);
+      pointer-events: none;
+      z-index: 2;
+    }
+    .zoom-meter.is-collapsed .zoom-meter__indicator {
+      top: 6px;
+      bottom: 6px;
+    }
+    .zoom-meter.is-collapsed .zoom-meter__tape::before {
+      background: rgba(231, 238, 255, 0.2);
+    }
+    .zoom-meter__scale {
+      position: relative;
+      overflow: hidden;
+      width: 100%;
+      pointer-events: none;
+      mask-image: linear-gradient(90deg, transparent 0 4%, #000 20% 80%, transparent 96% 100%);
+    }
+    .zoom-meter__scale-track {
+      display: inline-flex;
+      align-items: center;
+      gap: clamp(18px, 4vw, 30px);
+      transform: translateX(0);
+      transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+      padding: 6px 0;
+      will-change: transform;
+    }
+    .zoom-meter__scale-track.is-static {
+      transition: none;
+    }
+    .zoom-meter__scale-value {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 48px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: rgba(231, 238, 255, 0.55);
+      position: relative;
+      transition: transform 0.2s ease, color 0.2s ease;
+    }
+    .zoom-meter__scale-value::after {
+      content: '';
+      position: absolute;
+      bottom: -12px;
+      left: 50%;
+      width: 2px;
+      height: 8px;
+      background: rgba(231, 238, 255, 0.28);
+      transform: translateX(-50%);
+    }
+    .zoom-meter.is-collapsed .zoom-meter__scale-value {
+      transform: scale(0.86);
+      font-size: 0.85rem;
+    }
+    .zoom-meter.is-collapsed .zoom-meter__scale-value::after {
+      height: 6px;
+    }
+    .zoom-meter__scale-value.is-active {
+      color: var(--accent);
+      font-weight: 600;
+      transform: scale(1.12);
+    }
+    .zoom-meter__scale-value.is-active::after {
+      height: 14px;
+      background: var(--accent);
+    }
+    .zoom-meter__slider {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+      z-index: 3;
+      pointer-events: auto;
+    }
+    .zoom-meter__slider::-webkit-slider-thumb,
+    .zoom-meter__slider::-moz-range-thumb,
+    .zoom-meter__slider::-ms-thumb {
+      width: 0;
+      height: 0;
+      appearance: none;
+      -webkit-appearance: none;
+      border: 0;
+      background: transparent;
+    }
+    body.is-landscape .zoom-meter {
+      width: clamp(320px, 36vw, 420px);
+      margin-inline: auto;
+    }
+    body.is-landscape .zoom-meter__tape {
+      padding: 18px 16px;
     }
     .hud-bottom__menus {
       display: flex;
@@ -930,6 +1074,19 @@
         min-width: clamp(56px, 24vw, 84px);
         height: clamp(56px, 24vw, 84px);
       }
+      .zoom-meter {
+        width: 100%;
+        gap: 12px;
+      }
+      .zoom-meter__tape {
+        padding: 20px 14px;
+      }
+      .zoom-meter__scale-track {
+        gap: clamp(14px, 8vw, 24px);
+      }
+      .zoom-meter__scale-value {
+        min-width: 42px;
+      }
       .hud-bottom__menus > * {
         width: 100%;
       }
@@ -1150,14 +1307,23 @@
             <div id="paletteDisplay" class="palette-display" aria-hidden="true"></div>
           </div>
         </div>
-        <div class="hud-bottom__actions" role="group" aria-label="操作">
-          <div class="hud-bottom__actions-group hud-bottom__actions-group--left">
-            <button id="dotModeBtn" class="icon-button" type="button" aria-label="ドットモードを切替" aria-pressed="false">
-              <img src="./icon-dotmode.svg" class="control-icon" alt="" aria-hidden="true" draggable="false">
-              <span class="icon-button__label visually-hidden">ドットモード</span>
-            </button>
+      <div id="zoomControl" class="zoom-meter is-collapsed" hidden>
+        <div class="zoom-meter__tape">
+          <div class="zoom-meter__indicator" aria-hidden="true"></div>
+          <div class="zoom-meter__scale" aria-hidden="true">
+            <div class="zoom-meter__scale-track"></div>
           </div>
-          <div class="hud-bottom__capture-slot">
+          <input id="cameraZoomSlider" class="zoom-meter__slider" type="range" min="0" max="100" step="1" value="0" aria-label="ズーム倍率" data-setting="zoom">
+        </div>
+      </div>
+      <div class="hud-bottom__actions" role="group" aria-label="操作">
+        <div class="hud-bottom__actions-group hud-bottom__actions-group--left">
+          <button id="dotModeBtn" class="icon-button" type="button" aria-label="ドットモードを切替" aria-pressed="false">
+            <img src="./icon-dotmode.svg" class="control-icon" alt="" aria-hidden="true" draggable="false">
+            <span class="icon-button__label visually-hidden">ドットモード</span>
+          </button>
+        </div>
+        <div class="hud-bottom__capture-slot">
             <button id="captureBtn" class="capture-button" type="button" aria-label="撮影">
               <img src="./icon-capture.svg" class="capture-button__icon" alt="" aria-hidden="true" draggable="false">
             </button>
@@ -1196,14 +1362,46 @@
     const landscapeCaptureSlot = document.querySelector('.hud-landscape-capture');
     const captureButtonOriginalParent = captureBtn ? captureBtn.parentElement : null;
     const cameraSettingSliders = cameraSettingsPanel ? Array.from(cameraSettingsPanel.querySelectorAll('input[data-setting]')) : [];
-    const cameraSettingValueEls = cameraSettingsPanel
-      ? new Map(
-          Array.from(cameraSettingsPanel.querySelectorAll('[data-setting-value]')).map((element) => [
-            element.dataset.settingValue,
-            element
-          ])
-        )
-      : new Map();
+    const cameraSettingValueEls = new Map();
+    if (cameraSettingsPanel) {
+      Array.from(cameraSettingsPanel.querySelectorAll('[data-setting-value]')).forEach((element) => {
+        const key = element.dataset.settingValue;
+        if (key) {
+          cameraSettingValueEls.set(key, element);
+        }
+      });
+    }
+    const zoomControl = document.getElementById('zoomControl');
+    const zoomSlider = document.getElementById('cameraZoomSlider');
+    const zoomScaleWrapper = zoomControl ? zoomControl.querySelector('.zoom-meter__scale') : null;
+    const zoomScaleTrack = zoomScaleWrapper ? zoomScaleWrapper.querySelector('.zoom-meter__scale-track') : null;
+    let zoomScaleItems = [];
+    let zoomScaleMarks = [];
+    let zoomMeterCollapseTimeout = null;
+    if (zoomSlider && !cameraSettingSliders.includes(zoomSlider)) {
+      cameraSettingSliders.push(zoomSlider);
+    }
+    if (zoomSlider) {
+      zoomSlider.addEventListener('pointerdown', () => {
+        setZoomMeterExpanded(true);
+        if (zoomMeterCollapseTimeout) {
+          clearTimeout(zoomMeterCollapseTimeout);
+          zoomMeterCollapseTimeout = null;
+        }
+      });
+      zoomSlider.addEventListener('pointerup', () => {
+        scheduleZoomMeterCollapse(900);
+      });
+      zoomSlider.addEventListener('pointercancel', () => {
+        scheduleZoomMeterCollapse(900);
+      });
+      zoomSlider.addEventListener('focus', () => {
+        setZoomMeterExpanded(true);
+      });
+      zoomSlider.addEventListener('blur', () => {
+        scheduleZoomMeterCollapse(700);
+      });
+    }
     const dotCanvas = document.getElementById('dotCanvas');
     const dotCanvasCtx = dotCanvas ? dotCanvas.getContext('2d', { willReadFrequently: true }) : null;
     const smoothingCanvas = dotCanvas ? document.createElement('canvas') : null;
@@ -1277,19 +1475,29 @@
       }
     }
 
-    const CAMERA_SETTING_KEYS = ['brightness', 'exposure', 'saturation', 'shadows'];
-    const CAMERA_SETTING_DEFAULTS = Object.freeze({
-      brightness: 0,
-      exposure: 0,
-      saturation: 0,
-      shadows: 0
+    const CAMERA_SETTING_CONFIG = Object.freeze({
+      brightness: { min: -100, max: 100, step: 1, default: 0 },
+      exposure: { min: -100, max: 100, step: 1, default: 0 },
+      saturation: { min: -100, max: 100, step: 1, default: 0 },
+      shadows: { min: -100, max: 100, step: 1, default: 0 },
+      zoom: { min: 0, max: 100, step: 1, default: 0 }
     });
+    const CAMERA_SETTING_KEYS = Object.freeze(Object.keys(CAMERA_SETTING_CONFIG));
+    const CAMERA_SETTING_DEFAULTS = Object.freeze(
+      CAMERA_SETTING_KEYS.reduce((accumulator, key) => {
+        const config = CAMERA_SETTING_CONFIG[key] || {};
+        const defaultValue = Number(config.default);
+        accumulator[key] = Number.isFinite(defaultValue) ? defaultValue : 0;
+        return accumulator;
+      }, {})
+    );
     const CAMERA_BASE_SATURATION = 1.05;
     const CAMERA_TRACK_CAPABILITY_MAP = {
       brightness: 'brightness',
       exposure: 'exposureCompensation',
       saturation: 'saturation',
-      shadows: 'contrast'
+      shadows: 'contrast',
+      zoom: 'zoom'
     };
     const STAMP_LIBRARY = Object.freeze([
       { id: 'sparkle', label: 'スパークル', src: './stamps/sparkle.png' },
@@ -1318,6 +1526,8 @@
       listenersAttached: false
     };
 
+    let cameraZoomCapability = null;
+    let cameraZoomCapabilityKnown = false;
     let cameraStatusMessage = '';
     let dotScalePanelOpen = false;
     const dotState = {
@@ -1348,15 +1558,160 @@
     let cameraConstraintsFrameScheduled = false;
     let cameraConstraintErrorLogged = false;
 
-    function clampCameraSettingValue(value) {
-      if (!Number.isFinite(value)) {
-        return 0;
-      }
-      return Math.max(-100, Math.min(100, Math.round(value)));
+    function getCameraSettingConfig(key) {
+      return CAMERA_SETTING_CONFIG[key] || null;
     }
 
-    function formatCameraSettingValue(value) {
-      const clamped = clampCameraSettingValue(value);
+    function getCameraSettingRange(key) {
+      const config = getCameraSettingConfig(key);
+      const min = config && Number.isFinite(config.min) ? Number(config.min) : -100;
+      const max = config && Number.isFinite(config.max) ? Number(config.max) : 100;
+      if (max < min) {
+        return { min: max, max: min };
+      }
+      return { min, max };
+    }
+
+    function clampCameraSettingValue(value, key) {
+      const config = getCameraSettingConfig(key);
+      const { min, max } = getCameraSettingRange(key);
+      const step = config && Number.isFinite(config.step) && config.step > 0 ? Number(config.step) : null;
+      let numeric = Number(value);
+      if (!Number.isFinite(numeric)) {
+        const fallback = config && Number.isFinite(config.default) ? Number(config.default) : 0;
+        numeric = fallback;
+      }
+      if (numeric < min) {
+        numeric = min;
+      } else if (numeric > max) {
+        numeric = max;
+      }
+      if (step) {
+        numeric = min + Math.round((numeric - min) / step) * step;
+        if (numeric < min) {
+          numeric = min;
+        } else if (numeric > max) {
+          numeric = max;
+        }
+      }
+      return Number(Number.isFinite(numeric) ? numeric : min);
+    }
+
+    function getCameraSettingRatio(value, key) {
+      const { min, max } = getCameraSettingRange(key);
+      const clamped = clampCameraSettingValue(value, key);
+      if (max <= min) {
+        return 0;
+      }
+      const ratio = (clamped - min) / (max - min);
+      return Math.min(1, Math.max(0, Number.isFinite(ratio) ? ratio : 0));
+    }
+
+    function getSliderValueFromRatio(ratio, key) {
+      const { min, max } = getCameraSettingRange(key);
+      const normalized = Math.min(1, Math.max(0, Number.isFinite(ratio) ? ratio : 0));
+      return clampCameraSettingValue(min + (max - min) * normalized, key);
+    }
+
+    function getZoomDisplayValue(value) {
+      const ratio = getCameraSettingRatio(value, 'zoom');
+      if (cameraZoomCapability) {
+        if (Array.isArray(cameraZoomCapability)) {
+          if (!cameraZoomCapability.length) {
+            return null;
+          }
+          const index = Math.min(
+            cameraZoomCapability.length - 1,
+            Math.max(0, Math.round(ratio * (cameraZoomCapability.length - 1)))
+          );
+          const option = Number(cameraZoomCapability[index]);
+          return Number.isFinite(option) ? option : null;
+        }
+        const min = Number(cameraZoomCapability.min);
+        const max = Number(cameraZoomCapability.max);
+        if (Number.isFinite(min) && Number.isFinite(max) && max > min) {
+          let mapped = min + (max - min) * ratio;
+          const step = Number(cameraZoomCapability.step);
+          if (Number.isFinite(step) && step > 0) {
+            mapped = min + Math.round((mapped - min) / step) * step;
+          }
+          if (mapped < min) {
+            mapped = min;
+          } else if (mapped > max) {
+            mapped = max;
+          }
+          return mapped;
+        }
+      }
+      const fallbackMin = 1;
+      const fallbackMax = 4;
+      return fallbackMin + (fallbackMax - fallbackMin) * ratio;
+    }
+
+    function formatZoomDisplay(value) {
+      const zoomValue = getZoomDisplayValue(value);
+      if (!Number.isFinite(zoomValue)) {
+        return `${clampCameraSettingValue(value, 'zoom')}%`;
+      }
+      const formatted = zoomValue.toFixed(2).replace(/\.?0+$/, '');
+      return `${formatted}x`;
+    }
+
+    function formatZoomScaleLabel(value) {
+      if (!Number.isFinite(value)) {
+        return '';
+      }
+      const decimals = value < 10 ? 2 : 1;
+      let formatted = value.toFixed(decimals);
+      formatted = formatted.replace(/(\.\d*?)0+$/, '$1');
+      formatted = formatted.replace(/\.$/, '.0');
+      if (!formatted.includes('.')) {
+        formatted = `${formatted}.0`;
+      }
+      return formatted;
+    }
+
+    function setZoomMeterExpanded(expanded) {
+      if (!zoomControl) {
+        return;
+      }
+      if (zoomMeterCollapseTimeout) {
+        clearTimeout(zoomMeterCollapseTimeout);
+        zoomMeterCollapseTimeout = null;
+      }
+      if (expanded) {
+        zoomControl.classList.add('is-expanded');
+        zoomControl.classList.remove('is-collapsed');
+      } else {
+        zoomControl.classList.add('is-collapsed');
+        zoomControl.classList.remove('is-expanded');
+      }
+    }
+
+    function scheduleZoomMeterCollapse(delay = 900) {
+      if (!zoomControl || zoomControl.hidden) {
+        return;
+      }
+      if (zoomMeterCollapseTimeout) {
+        clearTimeout(zoomMeterCollapseTimeout);
+      }
+      zoomMeterCollapseTimeout = window.setTimeout(() => {
+        zoomMeterCollapseTimeout = null;
+        setZoomMeterExpanded(false);
+      }, Math.max(0, delay));
+    }
+
+    function formatCameraSettingValue(value, key) {
+      const clamped = clampCameraSettingValue(value, key);
+      if (key === 'zoom') {
+        if (!cameraZoomCapabilityKnown) {
+          return '---';
+        }
+        if (!cameraZoomCapability) {
+          return '未対応';
+        }
+        return formatZoomDisplay(clamped);
+      }
       return clamped > 0 ? `+${clamped}` : `${clamped}`;
     }
 
@@ -1367,7 +1722,7 @@
       const element = cameraSettingValueEls.get(key);
       if (element) {
         const value = state.cameraSettings[key] ?? 0;
-        element.textContent = formatCameraSettingValue(value);
+        element.textContent = formatCameraSettingValue(value, key);
       }
     }
 
@@ -1380,7 +1735,10 @@
         const value = state.cameraSettings[key] ?? 0;
         slider.value = String(value);
         slider.setAttribute('aria-valuenow', String(value));
-        slider.setAttribute('aria-valuetext', formatCameraSettingValue(value));
+        slider.setAttribute('aria-valuetext', formatCameraSettingValue(value, key));
+        if (key === 'zoom') {
+          refreshZoomMeterVisuals(value);
+        }
       });
     }
 
@@ -1399,10 +1757,10 @@
           `saturate(${CAMERA_BASE_SATURATION.toFixed(3)})`
         ];
       }
-      const brightnessValue = clampCameraSettingValue(settings.brightness ?? 0) / 100;
-      const exposureValue = clampCameraSettingValue(settings.exposure ?? 0) / 100;
-      const saturationValue = clampCameraSettingValue(settings.saturation ?? 0) / 100;
-      const shadowValue = clampCameraSettingValue(settings.shadows ?? 0) / 100;
+      const brightnessValue = clampCameraSettingValue(settings.brightness ?? 0, 'brightness') / 100;
+      const exposureValue = clampCameraSettingValue(settings.exposure ?? 0, 'exposure') / 100;
+      const saturationValue = clampCameraSettingValue(settings.saturation ?? 0, 'saturation') / 100;
+      const shadowValue = clampCameraSettingValue(settings.shadows ?? 0, 'shadows') / 100;
 
       const brightnessFactor = clampFilterFactor(1 + brightnessValue * 0.6, 0.2, 3);
       const exposureFactor = clampFilterFactor(1 + exposureValue * 0.9, 0.2, 3);
@@ -1447,7 +1805,7 @@
       if (!state.cameraSettings || !Object.prototype.hasOwnProperty.call(state.cameraSettings, key)) {
         return;
       }
-      const value = clampCameraSettingValue(Number(rawValue));
+      const value = clampCameraSettingValue(Number(rawValue), key);
       if (state.cameraSettings[key] === value) {
         updateCameraSettingDisplay(key);
         if (syncInput) {
@@ -1457,6 +1815,9 @@
       }
       state.cameraSettings[key] = value;
       updateCameraSettingDisplay(key);
+      if (key === 'zoom') {
+        refreshZoomMeterVisuals(value);
+      }
       if (syncInput) {
         syncCameraSettingInputs();
       }
@@ -1465,22 +1826,25 @@
 
     function resetCameraSettings() {
       CAMERA_SETTING_KEYS.forEach((key) => {
-        state.cameraSettings[key] = CAMERA_SETTING_DEFAULTS[key] ?? 0;
+        const defaultValue = CAMERA_SETTING_DEFAULTS[key] ?? 0;
+        state.cameraSettings[key] = clampCameraSettingValue(defaultValue, key);
         updateCameraSettingDisplay(key);
       });
       syncCameraSettingInputs();
+      updateZoomSliderAvailability();
       applyCameraSettings();
     }
 
     function initializeCameraSettingsUI() {
       CAMERA_SETTING_KEYS.forEach((key) => {
         if (!Object.prototype.hasOwnProperty.call(state.cameraSettings, key)) {
-          state.cameraSettings[key] = CAMERA_SETTING_DEFAULTS[key] ?? 0;
+          state.cameraSettings[key] = clampCameraSettingValue(CAMERA_SETTING_DEFAULTS[key] ?? 0, key);
         }
         updateCameraSettingDisplay(key);
       });
       syncCameraSettingInputs();
       updateCameraFilters();
+      updateZoomSliderAvailability();
     }
 
     function getActiveVideoTrack() {
@@ -1494,18 +1858,23 @@
       return tracks[0] || null;
     }
 
-    function mapSliderValueToCapability(value, capability) {
+    function mapSliderValueToCapability(value, capability, key) {
       if (capability == null) {
         return null;
       }
-      const clamped = clampCameraSettingValue(value);
-      const ratio = (clamped + 100) / 200;
+      const ratio = getCameraSettingRatio(value, key);
       if (Array.isArray(capability)) {
         if (!capability.length) {
           return null;
         }
+        if (capability.length === 1) {
+          const single = Number(capability[0]);
+          return Number.isFinite(single) ? single : capability[0];
+        }
         const index = Math.min(capability.length - 1, Math.max(0, Math.round(ratio * (capability.length - 1))));
-        return capability[index];
+        const candidate = capability[index];
+        const numericCandidate = Number(candidate);
+        return Number.isFinite(numericCandidate) ? numericCandidate : candidate;
       }
       const min = Number(capability.min);
       const max = Number(capability.max);
@@ -1518,7 +1887,7 @@
       const step = Number(capability.step);
       let mapped = min + (max - min) * ratio;
       if (Number.isFinite(step) && step > 0) {
-        mapped = Math.round(mapped / step) * step;
+        mapped = min + Math.round((mapped - min) / step) * step;
       }
       if (mapped > max) {
         mapped = max;
@@ -1526,6 +1895,277 @@
         mapped = min;
       }
       return mapped;
+    }
+
+    function mapCapabilityValueToSlider(value, capability, key) {
+      if (capability == null) {
+        return clampCameraSettingValue(value, key);
+      }
+      const numericValue = Number(value);
+      if (!Number.isFinite(numericValue)) {
+        return clampCameraSettingValue(value, key);
+      }
+      if (Array.isArray(capability)) {
+        if (!capability.length) {
+          return clampCameraSettingValue(value, key);
+        }
+        const finiteValues = capability
+          .map((entry) => Number(entry))
+          .filter((entry) => Number.isFinite(entry))
+          .sort((a, b) => a - b);
+        if (!finiteValues.length) {
+          return clampCameraSettingValue(value, key);
+        }
+        const min = finiteValues[0];
+        const max = finiteValues[finiteValues.length - 1];
+        if (max <= min) {
+          return clampCameraSettingValue(value, key);
+        }
+        let closest = finiteValues[0];
+        let minDiff = Math.abs(numericValue - closest);
+        for (let index = 1; index < finiteValues.length; index += 1) {
+          const candidate = finiteValues[index];
+          const diff = Math.abs(candidate - numericValue);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closest = candidate;
+          }
+        }
+        const ratio = (closest - min) / (max - min);
+        return getSliderValueFromRatio(ratio, key);
+      }
+      const min = Number(capability.min);
+      const max = Number(capability.max);
+      if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) {
+        return clampCameraSettingValue(value, key);
+      }
+      const ratio = (numericValue - min) / (max - min);
+      return getSliderValueFromRatio(ratio, key);
+    }
+
+    function syncZoomStateFromTrack(track) {
+      if (!track || typeof track.getSettings !== 'function') {
+        return;
+      }
+      if (!cameraZoomCapability) {
+        return;
+      }
+      let settings;
+      try {
+        settings = track.getSettings();
+      } catch (error) {
+        return;
+      }
+      if (!settings || !Number.isFinite(settings.zoom)) {
+        return;
+      }
+      const sliderValue = mapCapabilityValueToSlider(settings.zoom, cameraZoomCapability, 'zoom');
+      if (!Number.isFinite(sliderValue)) {
+        return;
+      }
+      const clamped = clampCameraSettingValue(sliderValue, 'zoom');
+      if (state.cameraSettings.zoom === clamped) {
+        return;
+      }
+      state.cameraSettings.zoom = clamped;
+      syncCameraSettingInputs();
+      updateZoomSliderAvailability();
+    }
+
+    function refreshZoomMeterVisuals(value = state.cameraSettings.zoom ?? 0) {
+      if (!zoomControl || zoomControl.hidden) {
+        return;
+      }
+      updateZoomScaleDisplay(value);
+    }
+
+    function computeZoomScaleMarks() {
+      if (Array.isArray(cameraZoomCapability) && cameraZoomCapability.length) {
+        const sorted = Array.from(
+          new Set(
+            cameraZoomCapability
+              .map((entry) => Number(entry))
+              .filter((entry) => Number.isFinite(entry))
+          )
+        ).sort((a, b) => a - b);
+        if (sorted.length > 24) {
+          const step = Math.ceil(sorted.length / 24);
+          return sorted.filter((_, index) => index % step === 0 || index === sorted.length - 1);
+        }
+        return sorted;
+      }
+      if (cameraZoomCapability && typeof cameraZoomCapability === 'object') {
+        const min = Number(cameraZoomCapability.min);
+        const max = Number(cameraZoomCapability.max);
+        if (Number.isFinite(min) && Number.isFinite(max) && max > min) {
+          const segments = 10;
+          const marks = [];
+          for (let index = 0; index <= segments; index += 1) {
+            const ratio = index / segments;
+            marks.push(min + (max - min) * ratio);
+          }
+          return marks;
+        }
+      }
+      return [1, 1.5, 2, 2.5, 3];
+    }
+
+    function updateZoomScaleOptions() {
+      if (!zoomScaleTrack) {
+        zoomScaleMarks = [];
+        zoomScaleItems = [];
+        return;
+      }
+      const nextMarks = computeZoomScaleMarks();
+      const hasChanged =
+        nextMarks.length !== zoomScaleMarks.length ||
+        nextMarks.some((mark, index) => Math.abs((zoomScaleMarks[index] ?? Number.NaN) - mark) > 0.0001);
+      zoomScaleMarks = nextMarks;
+      if (!hasChanged && zoomScaleItems.length === zoomScaleMarks.length && zoomScaleItems.length > 0) {
+        updateZoomScaleDisplay(state.cameraSettings.zoom ?? 0);
+        return;
+      }
+      zoomScaleTrack.textContent = '';
+      if (!zoomScaleMarks.length) {
+        zoomScaleItems = [];
+        return;
+      }
+      zoomScaleMarks.forEach((mark) => {
+        const label = document.createElement('span');
+        label.className = 'zoom-meter__scale-value';
+        label.dataset.zoomValue = String(mark);
+        label.textContent = formatZoomScaleLabel(mark);
+        zoomScaleTrack.appendChild(label);
+      });
+      zoomScaleItems = Array.from(zoomScaleTrack.children);
+      updateZoomScaleDisplay(state.cameraSettings.zoom ?? 0, { animate: false });
+    }
+
+    function updateZoomScaleDisplay(value = state.cameraSettings.zoom ?? 0, { animate = true } = {}) {
+      if (!zoomScaleTrack || !zoomScaleWrapper || !zoomScaleMarks.length) {
+        return;
+      }
+      if (!zoomScaleItems.length) {
+        zoomScaleItems = Array.from(zoomScaleTrack.children);
+      }
+      if (!zoomScaleItems.length) {
+        return;
+      }
+      const targetZoom = Number(getZoomDisplayValue(value));
+      if (!Number.isFinite(targetZoom)) {
+        return;
+      }
+      let activeIndex = 0;
+      let minDiff = Number.POSITIVE_INFINITY;
+      zoomScaleMarks.forEach((mark, index) => {
+        const diff = Math.abs(Number(mark) - targetZoom);
+        if (diff < minDiff) {
+          minDiff = diff;
+          activeIndex = index;
+        }
+      });
+      zoomScaleItems.forEach((item) => {
+        const base = Number(item.dataset.zoomValue);
+        if (Number.isFinite(base)) {
+          item.textContent = formatZoomScaleLabel(base);
+        }
+      });
+      zoomScaleItems.forEach((item, index) => {
+        item.classList.toggle('is-active', index === activeIndex);
+      });
+      const activeEl = zoomScaleItems[activeIndex];
+      if (!activeEl) {
+        return;
+      }
+      activeEl.textContent = formatZoomScaleLabel(targetZoom);
+      const wrapperRect = zoomScaleWrapper.getBoundingClientRect();
+      const activeRect = activeEl.getBoundingClientRect();
+      if (wrapperRect.width <= 0 || activeRect.width <= 0) {
+        if (zoomControl && zoomControl.hidden) {
+          return;
+        }
+        requestAnimationFrame(() => {
+          updateZoomScaleDisplay(value, { animate });
+        });
+        return;
+      }
+      const translate = (wrapperRect.width / 2) - (activeRect.left - wrapperRect.left + activeRect.width / 2);
+      if (!animate) {
+        zoomScaleTrack.classList.add('is-static');
+      }
+      const safeTranslate = Number.isFinite(translate) ? translate : 0;
+      zoomScaleTrack.style.transform = `translateX(${safeTranslate}px)`;
+      if (!animate) {
+        requestAnimationFrame(() => {
+          zoomScaleTrack.classList.remove('is-static');
+        });
+      }
+    }
+
+    function setZoomSliderStepFromCapability() {
+      if (!zoomSlider) {
+        return;
+      }
+      let stepValue = 1;
+      if (Array.isArray(cameraZoomCapability)) {
+        if (cameraZoomCapability.length > 1) {
+          stepValue = 100 / (cameraZoomCapability.length - 1);
+        }
+      } else if (cameraZoomCapability && typeof cameraZoomCapability === 'object') {
+        const min = Number(cameraZoomCapability.min);
+        const max = Number(cameraZoomCapability.max);
+        const step = Number(cameraZoomCapability.step);
+        if (Number.isFinite(min) && Number.isFinite(max) && max > min && Number.isFinite(step) && step > 0) {
+          const ratioStep = (step / (max - min)) * 100;
+          if (Number.isFinite(ratioStep) && ratioStep > 0) {
+            stepValue = ratioStep;
+          }
+        }
+      }
+      if (!Number.isFinite(stepValue) || stepValue <= 0) {
+        stepValue = 1;
+      }
+      if (stepValue >= 1) {
+        const fractional = Math.abs(stepValue - Math.round(stepValue)) > 0.0001;
+        zoomSlider.step = fractional ? stepValue.toFixed(2) : String(Math.round(stepValue));
+      } else {
+        const clamped = Math.max(stepValue, 0.001);
+        zoomSlider.step = clamped.toFixed(3);
+      }
+    }
+
+    function updateZoomSliderAvailability() {
+      if (!zoomSlider || !zoomControl) {
+        return;
+      }
+      const value = state.cameraSettings.zoom ?? 0;
+      const formatted = formatCameraSettingValue(value, 'zoom');
+      const available = cameraZoomCapabilityKnown && Boolean(cameraZoomCapability);
+      zoomSlider.disabled = !available;
+      if (available) {
+        zoomControl.hidden = false;
+        zoomControl.setAttribute('aria-hidden', 'false');
+        setZoomSliderStepFromCapability();
+        zoomSlider.removeAttribute('aria-disabled');
+        updateZoomScaleOptions();
+        setZoomMeterExpanded(false);
+      } else {
+        zoomControl.hidden = true;
+        zoomControl.setAttribute('aria-hidden', 'true');
+        zoomSlider.step = '1';
+        zoomSlider.setAttribute('aria-disabled', 'true');
+        if (zoomScaleTrack) {
+          zoomScaleTrack.textContent = '';
+          zoomScaleTrack.style.transform = 'translateX(0)';
+        }
+        zoomScaleMarks = [];
+        zoomScaleItems = [];
+        setZoomMeterExpanded(false);
+      }
+      zoomSlider.value = String(value);
+      zoomSlider.setAttribute('aria-valuenow', String(value));
+      zoomSlider.setAttribute('aria-valuetext', formatted);
+      refreshZoomMeterVisuals(value);
     }
 
     async function applyCameraSettingsToTrack() {
@@ -1546,6 +2186,17 @@
       if (!capabilities) {
         return false;
       }
+      const hadKnownZoomCapability = cameraZoomCapabilityKnown;
+      cameraZoomCapabilityKnown = true;
+      if (Object.prototype.hasOwnProperty.call(capabilities, 'zoom')) {
+        cameraZoomCapability = capabilities.zoom;
+      } else {
+        cameraZoomCapability = null;
+      }
+      if (!hadKnownZoomCapability && cameraZoomCapability) {
+        syncZoomStateFromTrack(track);
+      }
+      updateZoomSliderAvailability();
       const constraint = {};
       let hasConstraint = false;
       CAMERA_SETTING_KEYS.forEach((key) => {
@@ -1554,7 +2205,7 @@
           return;
         }
         const capability = capabilities[capabilityName];
-        const mappedValue = mapSliderValueToCapability(state.cameraSettings[key], capability);
+        const mappedValue = mapSliderValueToCapability(state.cameraSettings[key], capability, key);
         if (mappedValue == null) {
           return;
         }
@@ -1774,10 +2425,10 @@
       const isLandscape = window.innerWidth > window.innerHeight;
       if (isLandscape) {
         document.body.classList.add('is-landscape');
-        if (landscapeCaptureSlot && captureBtn.parentElement !== landscapeCaptureSlot) {
-          landscapeCaptureSlot.appendChild(captureBtn);
-        }
         if (landscapeCaptureSlot) {
+          if (captureBtn.parentElement !== landscapeCaptureSlot) {
+            landscapeCaptureSlot.appendChild(captureBtn);
+          }
           landscapeCaptureSlot.setAttribute('aria-hidden', 'false');
         }
       } else {
@@ -1788,6 +2439,9 @@
         if (landscapeCaptureSlot) {
           landscapeCaptureSlot.setAttribute('aria-hidden', 'true');
         }
+      }
+      if (zoomControl && !zoomControl.hidden) {
+        updateZoomScaleDisplay(state.cameraSettings.zoom ?? 0, { animate: false });
       }
     }
 
@@ -3890,15 +4544,18 @@
         event.stopPropagation();
         setCameraSettingValue(key, slider.value);
         slider.setAttribute('aria-valuenow', slider.value);
-        slider.setAttribute('aria-valuetext', formatCameraSettingValue(Number(slider.value)));
+        slider.setAttribute('aria-valuetext', formatCameraSettingValue(Number(slider.value), key));
       });
       slider.addEventListener('change', (event) => {
         event.stopPropagation();
         setCameraSettingValue(key, slider.value);
         slider.setAttribute('aria-valuenow', slider.value);
-        slider.setAttribute('aria-valuetext', formatCameraSettingValue(Number(slider.value)));
+        slider.setAttribute('aria-valuetext', formatCameraSettingValue(Number(slider.value), key));
       });
       slider.addEventListener('pointerdown', (event) => {
+        event.stopPropagation();
+      });
+      slider.addEventListener('click', (event) => {
         event.stopPropagation();
       });
     });
@@ -4170,11 +4827,43 @@
       const canUseDownloadAttr = 'download' in HTMLAnchorElement.prototype;
       const isIOS = /iP(hone|ad|od)/i.test(navigator.userAgent);
       if (!canUseDownloadAttr || isIOS) {
-        const opened = window.open(linkTarget, '_blank', 'noopener');
-        if (objectUrl) {
-          setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        const fallbackWindow = window.open('', '_blank', 'noopener');
+        if (!fallbackWindow) {
+          if (objectUrl) {
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+          }
+          return false;
         }
-        return Boolean(opened);
+        fallbackWindow.document.title = 'PiXiEED Capture';
+        fallbackWindow.document.body.style.margin = '0';
+        fallbackWindow.document.body.style.display = 'flex';
+        fallbackWindow.document.body.style.flexDirection = 'column';
+        fallbackWindow.document.body.style.alignItems = 'center';
+        fallbackWindow.document.body.style.justifyContent = 'center';
+        fallbackWindow.document.body.style.background = '#050812';
+        fallbackWindow.document.body.style.color = '#e7eeff';
+        const instructions = fallbackWindow.document.createElement('div');
+        instructions.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+        instructions.style.padding = '16px';
+        instructions.style.textAlign = 'center';
+        instructions.innerHTML = `
+          <p>この画像を長押しして「写真に追加」または「保存」してください。</p>
+        `;
+        const image = fallbackWindow.document.createElement('img');
+        image.src = linkTarget;
+        image.alt = 'Captured photo';
+        image.style.maxWidth = '100%';
+        image.style.height = 'auto';
+        image.style.display = 'block';
+        image.style.borderRadius = '12px';
+        fallbackWindow.document.body.appendChild(instructions);
+        fallbackWindow.document.body.appendChild(image);
+        if (objectUrl) {
+          fallbackWindow.addEventListener('pagehide', () => {
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+          });
+        }
+        return true;
       }
       const anchor = document.createElement('a');
       anchor.href = linkTarget;
@@ -4343,6 +5032,9 @@
       video.srcObject = null;
       stopDotRendering();
       cameraReady = false;
+      cameraZoomCapability = null;
+      cameraZoomCapabilityKnown = false;
+      updateZoomSliderAvailability();
       updateCameraActionState();
     }
 
@@ -4354,6 +5046,9 @@
       setCameraStatus('カメラを初期化しています…');
       cameraReady = false;
       updateCameraActionState();
+      cameraZoomCapability = null;
+      cameraZoomCapabilityKnown = false;
+      updateZoomSliderAvailability();
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         setCameraStatus('このブラウザはカメラアクセスに対応していません。');
@@ -4378,6 +5073,23 @@
         state.stream = stream;
         cameraConstraintErrorLogged = false;
         video.srcObject = stream;
+        const track = getActiveVideoTrack();
+        if (track && typeof track.getCapabilities === 'function') {
+          try {
+            const capabilities = track.getCapabilities();
+            cameraZoomCapabilityKnown = true;
+            if (capabilities && Object.prototype.hasOwnProperty.call(capabilities, 'zoom')) {
+              cameraZoomCapability = capabilities.zoom;
+              syncZoomStateFromTrack(track);
+            } else {
+              cameraZoomCapability = null;
+            }
+          } catch (error) {
+            cameraZoomCapability = null;
+            cameraZoomCapabilityKnown = false;
+          }
+        }
+        updateZoomSliderAvailability();
         await video.play().catch(() => {});
         video.style.transform = state.useFrontCamera ? 'scaleX(-1)' : 'scaleX(1)';
         applyCameraSettings();
