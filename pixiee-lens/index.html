@@ -317,7 +317,7 @@
     .zoom-meter__scale-track {
       display: inline-flex;
       align-items: center;
-      gap: clamp(4px, 0.8vw, 6px);
+      gap: clamp(10px, 2.2vw, 18px);
       transform: translateX(0);
       transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
       padding: 6px 0;
@@ -1398,11 +1398,9 @@
     const zoomMeterTape = zoomControl ? zoomControl.querySelector('.zoom-meter__tape') : null;
     const zoomScaleWrapper = zoomControl ? zoomControl.querySelector('.zoom-meter__scale') : null;
     const zoomScaleTrack = zoomScaleWrapper ? zoomScaleWrapper.querySelector('.zoom-meter__scale-track') : null;
-    const ZOOM_MARK_STEP = 0.1;
-    const ZOOM_MAJOR_STEP = 1;
-    const ZOOM_SPLIT_THRESHOLD = 10;
+    const ZOOM_MARK_STEP = 0.5;
     const ZOOM_FALLBACK_MIN = 1;
-    const ZOOM_FALLBACK_MAX = 10;
+    const ZOOM_FALLBACK_MAX = 8;
     const ZOOM_MAJOR_EPSILON = 1e-3;
     let zoomScaleItems = [];
     let zoomScaleMarks = [];
@@ -2037,23 +2035,22 @@
       return Math.abs(value - Math.round(value)) < ZOOM_MAJOR_EPSILON;
     }
 
-    function generateZoomMarks(min, max) {
+    function generateZoomMarks(min, max, step = ZOOM_MARK_STEP) {
       let effectiveMin = Number.isFinite(min) ? Math.max(min, ZOOM_FALLBACK_MIN) : ZOOM_FALLBACK_MIN;
       let effectiveMax = Number.isFinite(max) ? Math.max(effectiveMin, max) : ZOOM_FALLBACK_MAX;
       effectiveMin = roundZoomValue(effectiveMin);
       effectiveMax = roundZoomValue(effectiveMax);
+      const adjustedStep = Number.isFinite(step) && step > 0 ? step : ZOOM_MARK_STEP;
       const marks = new Set();
-      const lowerMax = Math.min(ZOOM_SPLIT_THRESHOLD, effectiveMax);
-      if (lowerMax > effectiveMin) {
-        generateLinearMarks(effectiveMin, lowerMax, ZOOM_MARK_STEP).forEach((value) => marks.add(value));
-      }
-      if (effectiveMax > ZOOM_SPLIT_THRESHOLD) {
-        const upperStartBase = Math.max(ZOOM_SPLIT_THRESHOLD, effectiveMin);
-        const upperStart = roundZoomValue(Math.ceil(upperStartBase / ZOOM_MAJOR_STEP) * ZOOM_MAJOR_STEP);
-        generateLinearMarks(upperStart, effectiveMax, ZOOM_MAJOR_STEP).forEach((value) => marks.add(value));
+      const epsilon = 1e-6;
+      let current = effectiveMin;
+      while (current <= effectiveMax + epsilon) {
+        marks.add(roundZoomValue(current));
+        current += adjustedStep;
       }
       if (!marks.size) {
-        return generateLinearMarks(ZOOM_FALLBACK_MIN, ZOOM_FALLBACK_MAX, ZOOM_MARK_STEP);
+        marks.add(ZOOM_FALLBACK_MIN);
+        marks.add(ZOOM_FALLBACK_MAX);
       }
       return Array.from(marks).sort((a, b) => a - b);
     }
