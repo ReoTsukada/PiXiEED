@@ -213,6 +213,15 @@
     .hud-bottom__actions-group--right {
       justify-content: flex-end;
     }
+    .hud-bottom__center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      flex: 1 1 auto;
+      pointer-events: auto;
+    }
     .hud-bottom__capture-slot {
       display: flex;
       align-items: center;
@@ -402,6 +411,16 @@
     body.is-landscape .zoom-meter {
       width: clamp(320px, 36vw, 420px);
       margin-inline: auto;
+    }
+    body.is-landscape .hud-bottom__center {
+      flex-direction: row;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 18px;
+    }
+    body.is-landscape .hud-bottom__center .zoom-meter {
+      width: clamp(280px, 32vw, 360px);
+      margin-inline: 0;
     }
     body.is-landscape .zoom-meter__tape {
       padding: 18px 16px;
@@ -1100,6 +1119,12 @@
         width: 100%;
         gap: 12px;
       }
+      .hud-bottom__center {
+        width: 100%;
+      }
+      .hud-bottom__center .zoom-meter {
+        width: 100%;
+      }
       .zoom-meter__tape {
         padding: 20px 14px;
       }
@@ -1329,15 +1354,6 @@
             <div id="paletteDisplay" class="palette-display" aria-hidden="true"></div>
           </div>
         </div>
-      <div id="zoomControl" class="zoom-meter is-collapsed" hidden>
-        <div class="zoom-meter__tape">
-          <div class="zoom-meter__indicator" aria-hidden="true"></div>
-          <div class="zoom-meter__scale" aria-hidden="true">
-            <div class="zoom-meter__scale-track"></div>
-          </div>
-          <input id="cameraZoomSlider" class="zoom-meter__slider" type="range" min="0" max="100" step="1" value="0" aria-label="ズーム倍率" data-setting="zoom">
-        </div>
-      </div>
       <div class="hud-bottom__actions" role="group" aria-label="操作">
         <div class="hud-bottom__actions-group hud-bottom__actions-group--left">
           <button id="dotModeBtn" class="icon-button" type="button" aria-label="ドットモードを切替" aria-pressed="false">
@@ -1345,17 +1361,27 @@
             <span class="icon-button__label visually-hidden">ドットモード</span>
           </button>
         </div>
-        <div class="hud-bottom__capture-slot">
+        <div class="hud-bottom__center">
+          <div id="zoomControl" class="zoom-meter is-collapsed" hidden>
+            <div class="zoom-meter__tape">
+              <div class="zoom-meter__indicator" aria-hidden="true"></div>
+              <div class="zoom-meter__scale" aria-hidden="true">
+                <div class="zoom-meter__scale-track"></div>
+              </div>
+              <input id="cameraZoomSlider" class="zoom-meter__slider" type="range" min="0" max="100" step="1" value="0" aria-label="ズーム倍率" data-setting="zoom">
+            </div>
+          </div>
+          <div class="hud-bottom__capture-slot">
             <button id="captureBtn" class="capture-button" type="button" aria-label="撮影">
               <img src="./icon-capture.svg" class="capture-button__icon" alt="" aria-hidden="true" draggable="false">
             </button>
           </div>
-          <div class="hud-bottom__actions-group hud-bottom__actions-group--right">
-            <button id="aspectMenuBtn" class="icon-button" type="button" aria-expanded="false" aria-controls="aspectMenu" aria-label="キャンバスサイズを選択">
-              <img src="./icon-aspect.svg" class="control-icon" alt="" aria-hidden="true">
-              <span class="icon-button__label visually-hidden">キャンバスサイズ</span>
-            </button>
-          </div>
+        </div>
+        <div class="hud-bottom__actions-group hud-bottom__actions-group--right">
+          <button id="aspectMenuBtn" class="icon-button" type="button" aria-expanded="false" aria-controls="aspectMenu" aria-label="キャンバスサイズを選択">
+            <img src="./icon-aspect.svg" class="control-icon" alt="" aria-hidden="true">
+            <span class="icon-button__label visually-hidden">キャンバスサイズ</span>
+          </button>
         </div>
       </div>
       <div class="hud-landscape-capture" aria-hidden="true"></div>
@@ -1410,7 +1436,14 @@
       active: false,
       pointerId: null,
       startClientX: 0,
-      startTranslate: 0
+      startTranslate: 0,
+      samples: []
+    };
+    const zoomMeterInertia = {
+      active: false,
+      frameId: 0,
+      velocity: 0,
+      lastTimestamp: 0
     };
     let zoomMeterCollapseTimeout = null;
     if (zoomSlider && !cameraSettingSliders.includes(zoomSlider)) {
@@ -1727,6 +1760,9 @@
 
     function scheduleZoomMeterCollapse(delay = 400) {
       if (!zoomControl || zoomControl.hidden) {
+        return;
+      }
+      if (zoomMeterInertia.active) {
         return;
       }
       if (zoomMeterCollapseTimeout) {
@@ -2150,7 +2186,7 @@
     function setZoomScaleTranslate(translate, { animate = true } = {}) {
       if (!zoomScaleTrack) {
         zoomScaleTranslate = translate;
-        return;
+        return zoomScaleTranslate;
       }
       if (!animate) {
         zoomScaleTrack.classList.add('is-static');
@@ -2164,6 +2200,30 @@
           zoomScaleTrack.classList.remove('is-static');
         });
       }
+      return zoomScaleTranslate;
+    }
+
+    function clampZoomScaleTranslate({ animate = false } = {}) {
+      if (!zoomScaleWrapper || !zoomScaleTrack || !zoomScaleItems.length) {
+        return zoomScaleTranslate;
+      }
+      const wrapperRect = zoomScaleWrapper.getBoundingClientRect();
+      const centerX = wrapperRect.left + wrapperRect.width / 2;
+      const firstRect = zoomScaleItems[0].getBoundingClientRect();
+      const lastRect = zoomScaleItems[zoomScaleItems.length - 1].getBoundingClientRect();
+      let adjustedTranslate = zoomScaleTranslate;
+      const firstCenter = firstRect.left + firstRect.width / 2;
+      const lastCenter = lastRect.left + lastRect.width / 2;
+      if (firstCenter > centerX) {
+        adjustedTranslate += centerX - firstCenter;
+      }
+      if (lastCenter < centerX) {
+        adjustedTranslate += centerX - lastCenter;
+      }
+      if (adjustedTranslate !== zoomScaleTranslate) {
+        return setZoomScaleTranslate(adjustedTranslate, { animate });
+      }
+      return zoomScaleTranslate;
     }
 
     function alignZoomScaleToIndex(index, { animate = true } = {}) {
@@ -2294,6 +2354,23 @@
       return bestIndex;
     }
 
+    function stopZoomMeterInertia({ finalize = false } = {}) {
+      if (!zoomMeterInertia.active) {
+        return;
+      }
+      zoomMeterInertia.active = false;
+      if (zoomMeterInertia.frameId) {
+        cancelAnimationFrame(zoomMeterInertia.frameId);
+        zoomMeterInertia.frameId = 0;
+      }
+      zoomMeterInertia.velocity = 0;
+      zoomMeterInertia.lastTimestamp = 0;
+      if (finalize) {
+        finalizeZoomMeterPosition({ animate: true });
+        scheduleZoomMeterCollapse();
+      }
+    }
+
     function handleZoomMeterPointerDown(event) {
       if (!zoomControl || zoomControl.hidden) {
         return;
@@ -2305,6 +2382,7 @@
         return;
       }
       event.preventDefault();
+      stopZoomMeterInertia({ finalize: false });
       setZoomMeterExpanded(true);
       if (zoomMeterCollapseTimeout) {
         clearTimeout(zoomMeterCollapseTimeout);
@@ -2317,6 +2395,7 @@
       }
       zoomMeterDrag.startTranslate = zoomScaleTranslate;
       zoomMeterDrag.startClientX = event.clientX;
+      zoomMeterDrag.samples = [{ time: event.timeStamp, x: event.clientX }];
       updateZoomScaleActiveFromLayout({ commit: false });
       window.addEventListener('pointermove', handleZoomMeterPointerMove);
       window.addEventListener('pointerup', handleZoomMeterPointerUp);
@@ -2330,29 +2409,76 @@
       event.preventDefault();
       const delta = event.clientX - zoomMeterDrag.startClientX;
       setZoomScaleTranslate(zoomMeterDrag.startTranslate + delta, { animate: false });
-      if (!updateZoomScaleActiveFromLayout({ commit: true, animate: false })) {
+      clampZoomScaleTranslate({ animate: false });
+      updateZoomScaleActiveFromLayout({ commit: true, animate: false });
+      if (Array.isArray(zoomMeterDrag.samples)) {
+        zoomMeterDrag.samples.push({ time: event.timeStamp, x: event.clientX });
+        const cutoff = event.timeStamp - 120;
+        zoomMeterDrag.samples = zoomMeterDrag.samples.filter((sample) => sample.time >= cutoff);
+      }
+    }
+
+    function computeZoomDragVelocity(time) {
+      const samples = Array.isArray(zoomMeterDrag.samples) ? zoomMeterDrag.samples : [];
+      if (samples.length < 2) {
+        return 0;
+      }
+      const first = samples[0];
+      const last = samples[samples.length - 1];
+      const dt = (time ?? last.time) - first.time;
+      if (!Number.isFinite(dt) || dt <= 0) {
+        return 0;
+      }
+      return (last.x - first.x) / dt; // px per ms
+    }
+
+    function finalizeZoomMeterPosition({ animate = true } = {}) {
+      const state = updateZoomScaleActiveFromLayout({ commit: true, animate });
+      if (state && Number.isInteger(state.index)) {
+        alignZoomScaleToIndex(state.index, { animate });
+      }
+    }
+
+    function startZoomMeterInertia(initialVelocity) {
+      stopZoomMeterInertia();
+      if (!zoomScaleWrapper || !zoomScaleTrack) {
+        finalizeZoomMeterPosition({ animate: true });
+        scheduleZoomMeterCollapse();
         return;
       }
-      // Clamp translation so first/last marks do not drift past center excessively
-      if (zoomScaleItems.length) {
-        const wrapperRect = zoomScaleWrapper.getBoundingClientRect();
-        const centerX = wrapperRect.left + wrapperRect.width / 2;
-        const firstRect = zoomScaleItems[0].getBoundingClientRect();
-        const lastRect = zoomScaleItems[zoomScaleItems.length - 1].getBoundingClientRect();
-        let adjustedTranslate = zoomScaleTranslate;
-        const firstCenter = firstRect.left + firstRect.width / 2;
-        const lastCenter = lastRect.left + lastRect.width / 2;
-        if (firstCenter > centerX) {
-          adjustedTranslate += centerX - firstCenter;
+      zoomMeterInertia.active = true;
+      zoomMeterInertia.velocity = initialVelocity;
+      zoomMeterInertia.lastTimestamp = performance.now();
+      const friction = 0.0015; // px per ms^2
+      const minVelocity = 0.04;
+
+      const step = (timestamp) => {
+        if (!zoomMeterInertia.active) {
+          return;
         }
-        if (lastCenter < centerX) {
-          adjustedTranslate += centerX - lastCenter;
+        const dt = Math.max(1, timestamp - zoomMeterInertia.lastTimestamp);
+        zoomMeterInertia.lastTimestamp = timestamp;
+        const translateDelta = zoomMeterInertia.velocity * dt;
+        setZoomScaleTranslate(zoomScaleTranslate + translateDelta, { animate: false });
+        const beforeClamp = zoomScaleTranslate;
+        const clampedTranslate = clampZoomScaleTranslate({ animate: false });
+        updateZoomScaleActiveFromLayout({ commit: true, animate: false });
+
+        const velocitySign = Math.sign(zoomMeterInertia.velocity);
+        zoomMeterInertia.velocity -= velocitySign * friction * dt;
+        if (Math.sign(zoomMeterInertia.velocity) !== velocitySign) {
+          zoomMeterInertia.velocity = 0;
         }
-        if (adjustedTranslate !== zoomScaleTranslate) {
-          setZoomScaleTranslate(adjustedTranslate, { animate: false });
-          updateZoomScaleActiveFromLayout({ commit: true, animate: false });
+
+        const atEdge = clampedTranslate !== beforeClamp;
+        if (Math.abs(zoomMeterInertia.velocity) <= minVelocity || atEdge) {
+          stopZoomMeterInertia({ finalize: true });
+          return;
         }
-      }
+        zoomMeterInertia.frameId = requestAnimationFrame(step);
+      };
+
+      zoomMeterInertia.frameId = requestAnimationFrame(step);
     }
 
     function handleZoomMeterPointerUp(event) {
@@ -2372,11 +2498,16 @@
       window.removeEventListener('pointermove', handleZoomMeterPointerMove);
       window.removeEventListener('pointerup', handleZoomMeterPointerUp);
       window.removeEventListener('pointercancel', handleZoomMeterPointerUp);
-      const result = updateZoomScaleActiveFromLayout({ commit: true, animate: true });
-      if (result && Number.isInteger(result.index)) {
-        alignZoomScaleToIndex(result.index, { animate: true });
+
+      const velocity = computeZoomDragVelocity(event.timeStamp);
+      zoomMeterDrag.samples = [];
+
+      if (Math.abs(velocity) > 0.18) {
+        startZoomMeterInertia(velocity);
+      } else {
+        finalizeZoomMeterPosition({ animate: true });
+        scheduleZoomMeterCollapse();
       }
-      scheduleZoomMeterCollapse();
     }
 
     function setZoomSliderStepFromCapability() {
@@ -2430,6 +2561,7 @@
         zoomControl.setAttribute('aria-hidden', 'true');
         zoomSlider.step = '1';
         zoomSlider.setAttribute('aria-disabled', 'true');
+        stopZoomMeterInertia({ finalize: false });
         if (zoomScaleTrack) {
           zoomScaleTrack.textContent = '';
           setZoomScaleTranslate(0, { animate: false });
