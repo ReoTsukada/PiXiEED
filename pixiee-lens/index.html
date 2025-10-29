@@ -365,6 +365,20 @@
       height: 14px;
       background: var(--accent);
     }
+    .zoom-meter__scale-value--major {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: rgba(231, 238, 255, 0.85);
+    }
+    .zoom-meter__scale-value--major::after {
+      height: 12px;
+      width: 3px;
+      background: rgba(231, 238, 255, 0.42);
+    }
+    .zoom-meter.is-collapsed .zoom-meter__scale-value--major {
+      font-size: 0.94rem;
+      transform: scale(0.95);
+    }
     .zoom-meter__slider {
       position: absolute;
       inset: 0;
@@ -1384,6 +1398,10 @@
     const zoomMeterTape = zoomControl ? zoomControl.querySelector('.zoom-meter__tape') : null;
     const zoomScaleWrapper = zoomControl ? zoomControl.querySelector('.zoom-meter__scale') : null;
     const zoomScaleTrack = zoomScaleWrapper ? zoomScaleWrapper.querySelector('.zoom-meter__scale-track') : null;
+    const ZOOM_MARK_STEP = 0.1;
+    const ZOOM_FALLBACK_MIN = 1;
+    const ZOOM_FALLBACK_MAX = 8;
+    const ZOOM_MAJOR_EPSILON = 1e-3;
     let zoomScaleItems = [];
     let zoomScaleMarks = [];
     let zoomScaleTranslate = 0;
@@ -2002,35 +2020,68 @@
       updateZoomScaleDisplay(value);
     }
 
+    function roundZoomValue(value, precision = 2) {
+      if (!Number.isFinite(value)) {
+        return 0;
+      }
+      const factor = 10 ** precision;
+      return Math.round(value * factor) / factor;
+    }
+
+    function isMajorZoomValue(value) {
+      if (!Number.isFinite(value)) {
+        return false;
+      }
+      return Math.abs(value - Math.round(value)) < ZOOM_MAJOR_EPSILON;
+    }
+
+    function generateZoomMarks(min, max, step = ZOOM_MARK_STEP) {
+      if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) {
+        min = ZOOM_FALLBACK_MIN;
+        max = ZOOM_FALLBACK_MAX;
+      }
+      const adjustedStep = Number.isFinite(step) && step > 0 ? step : ZOOM_MARK_STEP;
+      const marks = new Set();
+      const normalizedMin = roundZoomValue(min);
+      const normalizedMax = roundZoomValue(max);
+      marks.add(normalizedMin);
+      const epsilon = 1e-6;
+      let current = Math.ceil((normalizedMin + epsilon) / adjustedStep) * adjustedStep;
+      while (current < normalizedMax - adjustedStep / 2) {
+        marks.add(roundZoomValue(current));
+        current += adjustedStep;
+      }
+      marks.add(normalizedMax);
+      const ordered = Array.from(marks).sort((a, b) => a - b);
+      if (ordered.length > 1 && ordered[0] < normalizedMin - adjustedStep / 2) {
+        ordered.shift();
+      }
+      return ordered;
+    }
+
     function computeZoomScaleMarks() {
       if (Array.isArray(cameraZoomCapability) && cameraZoomCapability.length) {
-        const sorted = Array.from(
+        const unique = Array.from(
           new Set(
             cameraZoomCapability
               .map((entry) => Number(entry))
               .filter((entry) => Number.isFinite(entry))
           )
         ).sort((a, b) => a - b);
-        if (sorted.length > 24) {
-          const step = Math.ceil(sorted.length / 24);
-          return sorted.filter((_, index) => index % step === 0 || index === sorted.length - 1);
+        if (unique.length >= 2) {
+          const min = unique[0];
+          const max = unique[unique.length - 1];
+          return generateZoomMarks(min, max, ZOOM_MARK_STEP);
         }
-        return sorted;
       }
       if (cameraZoomCapability && typeof cameraZoomCapability === 'object') {
         const min = Number(cameraZoomCapability.min);
         const max = Number(cameraZoomCapability.max);
         if (Number.isFinite(min) && Number.isFinite(max) && max > min) {
-          const segments = 10;
-          const marks = [];
-          for (let index = 0; index <= segments; index += 1) {
-            const ratio = index / segments;
-            marks.push(min + (max - min) * ratio);
-          }
-          return marks;
+          return generateZoomMarks(min, max, ZOOM_MARK_STEP);
         }
       }
-      return [1, 1.5, 2, 2.5, 3];
+      return generateZoomMarks(ZOOM_FALLBACK_MIN, ZOOM_FALLBACK_MAX, ZOOM_MARK_STEP);
     }
 
     function updateZoomScaleOptions() {
@@ -2060,6 +2111,9 @@
         label.className = 'zoom-meter__scale-value';
         label.dataset.zoomValue = String(mark);
         label.textContent = formatZoomScaleLabel(mark);
+        if (isMajorZoomValue(mark)) {
+          label.classList.add('zoom-meter__scale-value--major');
+        }
         zoomScaleTrack.appendChild(label);
       });
       zoomScaleItems = Array.from(zoomScaleTrack.children);
@@ -2158,6 +2212,7 @@
         const baseValue = Number(item.dataset.zoomValue);
         if (Number.isFinite(baseValue)) {
           item.textContent = formatZoomScaleLabel(baseValue);
+          item.classList.toggle('zoom-meter__scale-value--major', isMajorZoomValue(baseValue));
         }
         const rect = item.getBoundingClientRect();
         const itemCenter = rect.left + rect.width / 2;
@@ -2243,21 +2298,6 @@
       return bestIndex;
     }
 
-    function alignZoomMeterToPointer(clientX, { commit = true } = {}) {
-      if (!zoomScaleWrapper || !zoomScaleTrack || !zoomScaleMarks.length) {
-        return;
-      }
-      const index = getNearestMarkIndexByClientX(clientX);
-      if (index < 0) {
-        return;
-      }
-      alignZoomScaleToIndex(index, { animate: false });
-      updateZoomScaleActiveFromLayout({ commit: false });
-      if (commit) {
-        commitZoomMarkIndex(index, { animate: false, fromDrag: true });
-      }
-    }
-
     function handleZoomMeterPointerDown(event) {
       if (!zoomControl || zoomControl.hidden) {
         return;
@@ -2279,9 +2319,9 @@
       if (zoomMeterTape && typeof zoomMeterTape.setPointerCapture === 'function') {
         zoomMeterTape.setPointerCapture(event.pointerId);
       }
-      alignZoomMeterToPointer(event.clientX, { commit: true });
       zoomMeterDrag.startTranslate = zoomScaleTranslate;
       zoomMeterDrag.startClientX = event.clientX;
+      updateZoomScaleActiveFromLayout({ commit: false });
       window.addEventListener('pointermove', handleZoomMeterPointerMove);
       window.addEventListener('pointerup', handleZoomMeterPointerUp);
       window.addEventListener('pointercancel', handleZoomMeterPointerUp);
