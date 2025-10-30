@@ -221,6 +221,7 @@
       gap: 12px;
       flex: 0 1 auto;
       pointer-events: auto;
+      width: clamp(220px, 50vw, 280px);
     }
     .hud-bottom__capture-slot {
       display: flex;
@@ -259,7 +260,7 @@
       flex-direction: column;
       align-items: stretch;
       gap: 8px;
-      width: clamp(220px, 70vw, 360px);
+      width: 100%;
       margin-inline: auto;
       pointer-events: auto;
       transition: transform 0.22s ease, opacity 0.22s ease;
@@ -1115,15 +1116,13 @@
         min-width: clamp(56px, 24vw, 84px);
         height: clamp(56px, 24vw, 84px);
       }
+      .hud-bottom__center {
+        width: clamp(220px, 70vw, 300px);
+        margin-inline: auto;
+      }
       .zoom-meter {
         width: 100%;
         gap: 12px;
-      }
-      .hud-bottom__center {
-        width: 100%;
-      }
-      .hud-bottom__center .zoom-meter {
-        width: 100%;
       }
       .zoom-meter__tape {
         padding: 20px 14px;
