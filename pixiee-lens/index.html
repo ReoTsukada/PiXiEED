@@ -219,7 +219,7 @@
       align-items: center;
       justify-content: center;
       gap: 12px;
-      flex: 1 1 auto;
+      flex: 0 1 auto;
       pointer-events: auto;
     }
     .hud-bottom__capture-slot {
@@ -234,10 +234,10 @@
       display: none;
     }
     .hud-landscape-capture {
-      position: absolute;
-      top: calc(var(--hud-padding) + var(--safe-top));
-      bottom: calc(var(--hud-padding) + var(--safe-bottom));
+      position: fixed;
+      top: 50%;
       right: calc(var(--hud-padding) + var(--safe-right));
+      transform: translateY(-50%);
       display: none;
       align-items: center;
       justify-content: center;
@@ -246,9 +246,9 @@
     }
     body.is-landscape .hud-landscape-capture {
       display: flex;
-      flex-direction: row;
+      flex-direction: column;
       align-items: center;
-      gap: clamp(16px, 4vw, 24px);
+      gap: clamp(12px, 3vw, 18px);
     }
     .hud-landscape-capture > * {
       pointer-events: auto;
@@ -259,7 +259,7 @@
       flex-direction: column;
       align-items: stretch;
       gap: 8px;
-      width: min(520px, 92vw);
+      width: clamp(220px, 70vw, 360px);
       margin-inline: auto;
       pointer-events: auto;
       transition: transform 0.22s ease, opacity 0.22s ease;
@@ -1314,6 +1314,20 @@
                 </span>
                 <input id="cameraSettingShadows" type="range" min="-100" max="100" step="1" value="0" data-setting="shadows">
               </label>
+              <label class="slider-control">
+                <span class="slider-control__label-row">
+                  <span class="slider-control__label">コントラスト</span>
+                  <span class="slider-control__value" data-setting-value="contrast">0</span>
+                </span>
+                <input id="cameraSettingContrast" type="range" min="-100" max="100" step="1" value="0" data-setting="contrast">
+              </label>
+              <label class="slider-control">
+                <span class="slider-control__label-row">
+                  <span class="slider-control__label">ホワイトバランス</span>
+                  <span class="slider-control__value" data-setting-value="whiteBalance">0</span>
+                </span>
+                <input id="cameraSettingWhiteBalance" type="range" min="-100" max="100" step="1" value="0" data-setting="whiteBalance">
+              </label>
             </div>
             <button id="cameraSettingsResetBtn" class="option-button camera-settings__reset" type="button">設定をリセット</button>
           </div>
@@ -1356,9 +1370,9 @@
         </div>
       <div class="hud-bottom__actions" role="group" aria-label="操作">
         <div class="hud-bottom__actions-group hud-bottom__actions-group--left">
-          <button id="dotModeBtn" class="icon-button" type="button" aria-label="ドットモードを切替" aria-pressed="false">
+          <button id="dotModeBtn" class="icon-button" type="button" aria-label="ドット設定を開く" aria-pressed="true">
             <img src="./icon-dotmode.svg" class="control-icon" alt="" aria-hidden="true" draggable="false">
-            <span class="icon-button__label visually-hidden">ドットモード</span>
+            <span class="icon-button__label visually-hidden">ドット設定</span>
           </button>
         </div>
         <div class="hud-bottom__center">
@@ -1523,7 +1537,7 @@
       if (dotModeBtn) {
         dotModeBtn.disabled = true;
         dotModeBtn.setAttribute('aria-disabled', 'true');
-        dotModeBtn.title = 'ドットモードはこのブラウザで利用できません';
+        dotModeBtn.title = 'ドット設定はこのブラウザで利用できません';
       }
       setSelectEnabled(dotScaleSelect, false);
       setSelectEnabled(colorDepthSelect, false);
@@ -1550,6 +1564,8 @@
       exposure: { min: -100, max: 100, step: 1, default: 0 },
       saturation: { min: -100, max: 100, step: 1, default: 0 },
       shadows: { min: -100, max: 100, step: 1, default: 0 },
+      contrast: { min: -100, max: 100, step: 1, default: 0 },
+      whiteBalance: { min: -100, max: 100, step: 1, default: 0 },
       zoom: { min: 0, max: 100, step: 1, default: 0 }
     });
     const CAMERA_SETTING_KEYS = Object.freeze(Object.keys(CAMERA_SETTING_CONFIG));
@@ -1566,7 +1582,8 @@
       brightness: 'brightness',
       exposure: 'exposureCompensation',
       saturation: 'saturation',
-      shadows: 'contrast',
+      contrast: 'contrast',
+      whiteBalance: 'colorTemperature',
       zoom: 'zoom'
     };
     const STAMP_LIBRARY = Object.freeze([
@@ -1581,7 +1598,7 @@
       useFrontCamera: false,
       restarting: false,
       aspectMode: '3:2',
-      dotMode: false,
+      dotMode: true,
       dotScale: 1,
       colorDepth: '4',
       cameraSettings: { ...CAMERA_SETTING_DEFAULTS }
@@ -1834,20 +1851,57 @@
       const exposureValue = clampCameraSettingValue(settings.exposure ?? 0, 'exposure') / 100;
       const saturationValue = clampCameraSettingValue(settings.saturation ?? 0, 'saturation') / 100;
       const shadowValue = clampCameraSettingValue(settings.shadows ?? 0, 'shadows') / 100;
+      const contrastValue = clampCameraSettingValue(settings.contrast ?? 0, 'contrast') / 100;
+      const whiteBalanceValue = clampCameraSettingValue(settings.whiteBalance ?? 0, 'whiteBalance') / 100;
 
       const brightnessFactor = clampFilterFactor(1 + brightnessValue * 0.6, 0.2, 3);
       const exposureFactor = clampFilterFactor(1 + exposureValue * 0.9, 0.2, 3);
       const saturationFactor = clampFilterFactor(1 + saturationValue, 0.1, 3);
-      const contrastFactor = clampFilterFactor(1 + shadowValue * 0.9, 0.2, 3);
+      const shadowContrastFactor = clampFilterFactor(1 + shadowValue * 0.6, 0.2, 3);
+      const userContrastFactor = clampFilterFactor(1 + contrastValue, 0.2, 4);
+      const combinedContrast = clampFilterFactor(userContrastFactor * shadowContrastFactor, 0.2, 4);
 
       const combinedBrightness = clampFilterFactor(brightnessFactor * exposureFactor, 0.2, 3);
       const combinedSaturation = clampFilterFactor(CAMERA_BASE_SATURATION * saturationFactor, 0.05, 4);
 
-      return [
+      const components = [
         `brightness(${combinedBrightness.toFixed(3)})`,
-        `contrast(${contrastFactor.toFixed(3)})`,
+        `contrast(${combinedContrast.toFixed(3)})`,
         `saturate(${combinedSaturation.toFixed(3)})`
       ];
+
+      const whiteBalanceFilters = computeWhiteBalanceFilters(whiteBalanceValue);
+      if (whiteBalanceFilters.length) {
+        components.push(...whiteBalanceFilters);
+      }
+
+      return components;
+    }
+
+    function computeWhiteBalanceFilters(value) {
+      if (!Number.isFinite(value) || Math.abs(value) < 0.001) {
+        return [];
+      }
+      const filters = [];
+      const clamped = Math.max(-1, Math.min(1, value));
+      const warm = clamped > 0;
+      const intensity = Math.abs(clamped);
+      const hueRotate = warm ? intensity * 12 : -intensity * 12;
+      filters.push(`hue-rotate(${hueRotate.toFixed(3)}deg)`);
+      const saturateFactor = clampFilterFactor(1 + intensity * 0.25 * (warm ? 1 : -0.5), 0.4, 2.5);
+      filters.push(`saturate(${saturateFactor.toFixed(3)})`);
+      if (warm) {
+        const sepia = Math.min(0.35, intensity * 0.45);
+        if (sepia > 0.001) {
+          filters.push(`sepia(${sepia.toFixed(3)})`);
+        }
+        const brighten = clampFilterFactor(1 + intensity * 0.08, 0.5, 1.5);
+        filters.push(`brightness(${brighten.toFixed(3)})`);
+      } else {
+        const coolBrightness = clampFilterFactor(1 + intensity * -0.08, 0.5, 1.5);
+        filters.push(`brightness(${coolBrightness.toFixed(3)})`);
+      }
+      return filters;
     }
 
     function updateCameraFilters() {
@@ -4040,8 +4094,9 @@
 
     function updateDotModeUI() {
       if (dotModeBtn) {
-        dotModeBtn.classList.toggle('is-active', state.dotMode);
-        dotModeBtn.setAttribute('aria-pressed', state.dotMode ? 'true' : 'false');
+        dotModeBtn.classList.add('is-active');
+        dotModeBtn.setAttribute('aria-pressed', 'true');
+        setIconButtonLabel(dotModeBtn, 'ドット設定を開く');
       }
       setDotSettingsOpen(dotScalePanelOpen && state.dotMode);
       if (dotScaleSelect) {
@@ -4163,31 +4218,19 @@
       }
     }
 
-    function setDotMode(enabled) {
-      const desired = Boolean(enabled);
-      if (state.dotMode === desired) {
+    function setDotMode(enabled = true) {
+      if (!enabled) {
         return;
       }
-      if (desired && (!dotCanvas || !dotCanvasCtx)) {
-        return;
-      }
-      state.dotMode = desired;
+      state.dotMode = true;
       updateDotModeUI();
-      if (dotModeBtn) {
-        setIconButtonLabel(dotModeBtn, state.dotMode ? 'ドットモードを解除' : 'ドットモードを切替');
+      if (!dotCanvas || !dotCanvasCtx) {
+        return;
       }
-      if (state.dotMode) {
-        openMenuExclusive('dotScale');
-        startDotRendering();
-        resnapAllOverlaysToDotGrid();
-        refreshOverlayStatus();
-        updatePaletteDisplay(true);
-      } else {
-        closeAllMenus();
-        stopDotRendering();
-        refreshOverlayStatus();
-        resetPaletteDisplay();
-      }
+      startDotRendering();
+      resnapAllOverlaysToDotGrid();
+      refreshOverlayStatus();
+      updatePaletteDisplay(true);
     }
 
     function getDotGridInfo() {
@@ -4991,13 +5034,14 @@
     }
 
     if (dotModeBtn) {
-      dotModeBtn.addEventListener('click', () => {
-        if (state.dotMode && !dotScalePanelOpen) {
+      dotModeBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        setDotMode(true);
+        if (dotScalePanelOpen && dotSettingsPanel && !dotSettingsPanel.hidden) {
+          closeAllMenus();
+        } else {
           openMenuExclusive('dotScale');
-          return;
         }
-        closeAllMenus();
-        setDotMode(!state.dotMode);
       });
     }
 
@@ -5582,6 +5626,7 @@
     }
 
     updatePaletteToggleAvailability();
+    setDotMode(true);
     updateDotModeUI();
     setAspectMode(state.aspectMode);
     updateControlPlacement();
