@@ -222,6 +222,18 @@
       flex: 0 1 auto;
       pointer-events: auto;
     }
+    .zoom-meter__mode-label {
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(231, 238, 255, 0.72);
+      margin-bottom: 2px;
+      display: none;
+      pointer-events: none;
+    }
+    .zoom-meter__mode-label.is-visible {
+      display: block;
+    }
     .hud-bottom__capture-slot {
       display: flex;
       align-items: center;
@@ -375,18 +387,19 @@
       background: var(--accent);
     }
     .zoom-meter__scale-value--major {
-      font-size: 1.05rem;
-      font-weight: 600;
-      color: rgba(231, 238, 255, 0.85);
+      font-size: 1.08rem;
+      font-weight: 700;
+      color: rgba(231, 238, 255, 0.9);
+      letter-spacing: 0.02em;
     }
     .zoom-meter__scale-value--major::after {
       height: 12px;
       width: 3px;
-      background: rgba(231, 238, 255, 0.42);
+      background: rgba(231, 238, 255, 0.55);
     }
     .zoom-meter.is-collapsed .zoom-meter__scale-value--major {
-      font-size: 0.94rem;
-      transform: scale(0.95);
+      font-size: 0.95rem;
+      transform: scale(0.96);
     }
     .zoom-meter__slider {
       position: absolute;
@@ -1376,6 +1389,7 @@
           </button>
         </div>
         <div class="hud-bottom__center">
+          <span id="zoomMeterModeLabel" class="zoom-meter__mode-label" aria-live="polite" hidden></span>
           <div id="zoomControl" class="zoom-meter is-collapsed" hidden>
             <div class="zoom-meter__tape">
               <div class="zoom-meter__indicator" aria-hidden="true"></div>
@@ -1438,6 +1452,7 @@
     const zoomMeterTape = zoomControl ? zoomControl.querySelector('.zoom-meter__tape') : null;
     const zoomScaleWrapper = zoomControl ? zoomControl.querySelector('.zoom-meter__scale') : null;
     const zoomScaleTrack = zoomScaleWrapper ? zoomScaleWrapper.querySelector('.zoom-meter__scale-track') : null;
+    const zoomMeterModeLabel = document.getElementById('zoomMeterModeLabel');
     const ZOOM_MARK_STEP = 0.5;
     const ZOOM_FALLBACK_MIN = 1;
     const ZOOM_FALLBACK_MAX = 8;
@@ -1772,6 +1787,21 @@
       } else {
         zoomControl.classList.add('is-collapsed');
         zoomControl.classList.remove('is-expanded');
+      }
+    }
+
+    function updateZoomMeterModeLabel() {
+      if (!zoomMeterModeLabel) {
+        return;
+      }
+      if (dotScalePanelOpen) {
+        zoomMeterModeLabel.textContent = 'ドット倍率';
+        zoomMeterModeLabel.hidden = false;
+        zoomMeterModeLabel.classList.add('is-visible');
+      } else {
+        zoomMeterModeLabel.textContent = '';
+        zoomMeterModeLabel.hidden = true;
+        zoomMeterModeLabel.classList.remove('is-visible');
       }
     }
 
@@ -2797,6 +2827,7 @@
       } else if (openMenuKey === 'dotScale') {
         openMenuKey = null;
       }
+      updateZoomMeterModeLabel();
     }
 
     function setDotSettingsOpen(open) {
@@ -4231,6 +4262,7 @@
       resnapAllOverlaysToDotGrid();
       refreshOverlayStatus();
       updatePaletteDisplay(true);
+      updateZoomMeterModeLabel();
     }
 
     function getDotGridInfo() {
@@ -5628,6 +5660,7 @@
     updatePaletteToggleAvailability();
     setDotMode(true);
     updateDotModeUI();
+    updateZoomMeterModeLabel();
     setAspectMode(state.aspectMode);
     updateControlPlacement();
     startCamera();
