@@ -221,7 +221,7 @@
       gap: 12px;
       flex: 0 1 auto;
       pointer-events: auto;
-      width: clamp(220px, 50vw, 280px);
+      width: clamp(160px, 45vw, 220px);
     }
     .hud-bottom__capture-slot {
       display: flex;
@@ -261,6 +261,7 @@
       align-items: stretch;
       gap: 8px;
       width: 100%;
+      max-width: 220px;
       margin-inline: auto;
       pointer-events: auto;
       transition: transform 0.22s ease, opacity 0.22s ease;
@@ -1117,11 +1118,12 @@
         height: clamp(56px, 24vw, 84px);
       }
       .hud-bottom__center {
-        width: clamp(220px, 70vw, 300px);
+        width: clamp(160px, 60vw, 220px);
         margin-inline: auto;
       }
       .zoom-meter {
         width: 100%;
+        max-width: 220px;
         gap: 12px;
       }
       .zoom-meter__tape {
