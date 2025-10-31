@@ -580,6 +580,86 @@
       outline: 2px solid rgba(123, 207, 255, 0.75);
       outline-offset: 3px;
     }
+    .camera-permission {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1100;
+    }
+    .camera-permission.is-visible {
+      display: flex;
+    }
+    .camera-permission__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(5, 8, 18, 0.78);
+      backdrop-filter: blur(12px);
+      pointer-events: auto;
+    }
+    .camera-permission__panel {
+      position: relative;
+      width: min(440px, 92vw);
+      background: rgba(9, 13, 28, 0.94);
+      border: 1px solid rgba(123, 207, 255, 0.38);
+      border-radius: 22px;
+      padding: clamp(18px, 4vw, 28px);
+      box-shadow: 0 24px 56px rgba(3, 5, 12, 0.52);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      pointer-events: auto;
+    }
+    .camera-permission__title {
+      margin: 0;
+      font-size: clamp(1rem, 2.6vw, 1.4rem);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .camera-permission__message {
+      margin: 0;
+      color: rgba(231, 238, 255, 0.85);
+      font-size: clamp(0.92rem, 2.5vw, 1.05rem);
+      line-height: 1.7;
+    }
+    .camera-permission__actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .camera-permission__button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 11px 24px;
+      border-radius: 999px;
+      border: 1px solid rgba(123, 207, 255, 0.3);
+      background: rgba(123, 207, 255, 0.18);
+      color: #fff;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+    .camera-permission__button:hover {
+      background: rgba(123, 207, 255, 0.28);
+      border-color: rgba(123, 207, 255, 0.5);
+    }
+    .camera-permission__button:focus-visible {
+      outline: 2px solid rgba(123, 207, 255, 0.75);
+      outline-offset: 3px;
+    }
+    .camera-permission__button--primary {
+      background: rgba(123, 207, 255, 0.32);
+      border-color: rgba(123, 207, 255, 0.6);
+    }
+    .camera-permission__button--primary:hover {
+      background: rgba(123, 207, 255, 0.42);
+      border-color: rgba(123, 207, 255, 0.75);
+    }
     .capture-preview {
       position: fixed;
       inset: 0;
@@ -1744,6 +1824,16 @@
     </div>
     <div id="pixelPreview" class="pixel-preview" hidden></div>
   </main>
+  <div id="cameraStartOverlay" class="camera-permission" hidden aria-hidden="true">
+    <div class="camera-permission__backdrop" id="cameraStartBackdrop"></div>
+    <div class="camera-permission__panel" role="dialog" aria-modal="true" aria-labelledby="cameraStartHeading" aria-describedby="cameraStartMessage">
+      <h2 id="cameraStartHeading" class="camera-permission__title">カメラを起動</h2>
+      <p id="cameraStartMessage" class="camera-permission__message">ホーム画面から利用する場合は、下のボタンをタップしてカメラを起動してください。</p>
+      <div class="camera-permission__actions">
+        <button type="button" class="camera-permission__button camera-permission__button--primary" id="cameraStartButton">カメラを起動</button>
+      </div>
+    </div>
+  </div>
   <div id="capturePreviewOverlay" class="capture-preview" hidden aria-hidden="true">
     <div class="capture-preview__backdrop" id="capturePreviewBackdrop"></div>
     <div class="capture-preview__panel" role="dialog" aria-modal="true" aria-labelledby="capturePreviewHeading">
@@ -1782,6 +1872,11 @@
     const pixelPreview = document.getElementById('pixelPreview');
     const landscapeCaptureSlot = document.querySelector('.hud-landscape-capture');
     const captureButtonOriginalParent = captureBtn ? captureBtn.parentElement : null;
+    const cameraStartOverlay = document.getElementById('cameraStartOverlay');
+    const cameraStartMessage = document.getElementById('cameraStartMessage');
+    const cameraStartButton = document.getElementById('cameraStartButton');
+    const cameraStartBackdrop = document.getElementById('cameraStartBackdrop');
+    const cameraStartButtonLabel = cameraStartButton ? (cameraStartButton.textContent || '').trim() || 'カメラを起動' : 'カメラを起動';
     const capturePreviewOverlay = document.getElementById('capturePreviewOverlay');
     const capturePreviewImage = document.getElementById('capturePreviewImage');
     const capturePreviewInfo = document.getElementById('capturePreviewInfo');
@@ -1879,6 +1974,25 @@
     }
     if (zoomMeterTape) {
       zoomMeterTape.addEventListener('pointerdown', handleZoomMeterPointerDown);
+    }
+    if (cameraStartButton) {
+      cameraStartButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        cameraStartLocked = false;
+        handleCameraStartRequest();
+      });
+    }
+    if (cameraStartBackdrop) {
+      cameraStartBackdrop.addEventListener('click', (event) => {
+        event.preventDefault();
+      });
+    }
+    if (cameraStartOverlay) {
+      cameraStartOverlay.addEventListener('click', (event) => {
+        if (event.target === cameraStartOverlay) {
+          event.preventDefault();
+        }
+      });
     }
     if (capturePreviewCloseBtn) {
       capturePreviewCloseBtn.addEventListener('click', () => {
@@ -2103,6 +2217,8 @@
     let capturePreviewObjectUrl = null;
     let capturePreviewSharePayload = null;
     let capturePreviewLastFocus = null;
+    let cameraStartOverlayLastFocus = null;
+    let cameraStartButtonBusy = false;
 
     let cameraPermissionDenied = false;
     let cameraReady = false;
@@ -3471,6 +3587,74 @@
       capturePreviewLastFocus = null;
     }
 
+    function showCameraStartOverlay(message) {
+      if (!cameraStartOverlay) {
+        return;
+      }
+      cameraStartLocked = true;
+      if (cameraStartMessage) {
+        cameraStartMessage.textContent = message;
+      }
+      if (cameraStartButton) {
+        cameraStartButton.disabled = false;
+        cameraStartButton.textContent = cameraStartButtonLabel;
+        cameraStartButton.removeAttribute('aria-busy');
+      }
+      cameraStartButtonBusy = false;
+      cameraStartOverlayLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      cameraStartOverlay.hidden = false;
+      cameraStartOverlay.setAttribute('aria-hidden', 'false');
+      cameraStartOverlay.classList.add('is-visible');
+      setCameraStatus(message);
+      if (cameraStartButton) {
+        cameraStartButton.focus({ preventScroll: true });
+      }
+    }
+
+    function hideCameraStartOverlay() {
+      if (!cameraStartOverlay) {
+        return;
+      }
+      cameraStartOverlay.hidden = true;
+      cameraStartOverlay.setAttribute('aria-hidden', 'true');
+      cameraStartOverlay.classList.remove('is-visible');
+      if (cameraStartButton) {
+        cameraStartButton.disabled = false;
+        cameraStartButton.textContent = cameraStartButtonLabel;
+        cameraStartButton.removeAttribute('aria-busy');
+      }
+      cameraStartButtonBusy = false;
+      if (cameraStartOverlayLastFocus && document.contains(cameraStartOverlayLastFocus)) {
+        cameraStartOverlayLastFocus.focus({ preventScroll: true });
+      }
+      cameraStartOverlayLastFocus = null;
+    }
+
+    async function handleCameraStartRequest() {
+      if (cameraStartButtonBusy) {
+        return;
+      }
+      cameraStartButtonBusy = true;
+      if (cameraStartButton) {
+        cameraStartButton.disabled = true;
+        cameraStartButton.textContent = '起動中…';
+        cameraStartButton.setAttribute('aria-busy', 'true');
+      }
+      try {
+        const success = await startCamera();
+        if (!success && !cameraPermissionDenied) {
+          setCameraStatus('カメラを起動できませんでした。もう一度お試しください。');
+        }
+      } finally {
+        cameraStartButtonBusy = false;
+        if (cameraStartButton) {
+          cameraStartButton.disabled = false;
+          cameraStartButton.textContent = cameraStartButtonLabel;
+          cameraStartButton.removeAttribute('aria-busy');
+        }
+      }
+    }
+
     function showCapturePreview({ url, filename, width, height, sharePayload, infoMessage }) {
       if (!capturePreviewOverlay || !capturePreviewImage) {
         if (url) {
@@ -3609,7 +3793,7 @@
         const label = state.useFrontCamera ? '背面カメラに切替' : 'フロントカメラに切替';
         setIconButtonLabel(cameraActionBtn, label);
       } else {
-        const label = cameraStartLocked ? 'カメラを開始' : '再接続';
+        const label = cameraStartLocked ? 'カメラを起動' : '再接続';
         setIconButtonLabel(cameraActionBtn, label);
       }
     }
@@ -5932,6 +6116,9 @@
         if (cameraStartLocked) {
           cameraStartLocked = false;
         }
+        if (cameraActionMode !== 'switch') {
+          hideCameraStartOverlay();
+        }
         await startCamera();
       });
     }
@@ -6461,24 +6648,26 @@
 
     async function startCamera() {
       if (state.restarting) {
-        return;
+        return cameraReady;
       }
       state.restarting = true;
-      setCameraStatus('カメラを初期化しています…');
       cameraReady = false;
-      updateCameraActionState();
+      setCameraStatus('カメラを初期化しています…');
       cameraZoomCapability = null;
       cameraZoomCapabilityKnown = false;
       updateZoomSliderAvailability();
+      updateCameraActionState();
 
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         setCameraStatus('このブラウザはカメラアクセスに対応していません。');
         cameraPermissionDenied = false;
-        updateCameraActionState();
         state.restarting = false;
         updateCameraActionState();
-        return;
+        return false;
       }
+
+      let success = false;
+      let failureMessage = null;
 
       try {
         stopCamera();
@@ -6541,7 +6730,6 @@
         applyCameraSettings();
         cameraPermissionDenied = false;
         cameraReady = true;
-        updateCameraActionState();
         const cameraStatus = state.useFrontCamera ? 'フロントカメラ表示中' : '';
         setCameraStatus(cameraStatus);
         updateAspectLayout();
@@ -6550,19 +6738,36 @@
         } else {
           stopDotRendering();
         }
+        success = true;
       } catch (error) {
         console.error(error);
         const isPermissionError = error && (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError');
         cameraPermissionDenied = Boolean(isPermissionError);
         cameraReady = false;
-        setStatus('カメラにアクセスできませんでした。設定をご確認ください。');
-        setCameraStatus('カメラにアクセスできませんでした。設定をご確認ください。');
-        updateCameraActionState();
+        failureMessage = cameraPermissionDenied
+          ? 'カメラへのアクセスが許可されませんでした。設定アプリで「PiXiEELENS」のカメラを有効にしてください。'
+          : 'カメラにアクセスできませんでした。端末の設定をご確認ください。';
+        setStatus(failureMessage);
+        setCameraStatus(failureMessage);
         stopDotRendering();
+        if (requiresCameraUserGesture) {
+          cameraStartLocked = true;
+        }
       } finally {
         state.restarting = false;
         updateCameraActionState();
       }
+
+      if (success) {
+        cameraStartLocked = false;
+        hideCameraStartOverlay();
+      } else if (requiresCameraUserGesture) {
+        const overlayMessage = failureMessage || 'カメラを起動できませんでした。もう一度お試しください。';
+        showCameraStartOverlay(overlayMessage);
+      }
+
+      updateCameraActionState();
+      return success;
     }
 
     document.addEventListener('visibilitychange', () => {
@@ -6575,6 +6780,22 @@
 
     window.addEventListener('beforeunload', stopCamera);
     window.addEventListener('pagehide', stopCamera);
+
+    window.addEventListener('focus', () => {
+      if (document.hidden) {
+        return;
+      }
+      if (cameraStartLocked) {
+        return;
+      }
+      if (cameraReady) {
+        return;
+      }
+      if (cameraStartOverlay && !cameraStartOverlay.hidden) {
+        return;
+      }
+      startCamera();
+    });
 
     window.addEventListener('resize', () => {
       updateAspectLayout();
@@ -6624,24 +6845,11 @@
     setAspectMode(state.aspectMode);
     updateControlPlacement();
 
-    const unlockCameraWithGesture = (event) => {
-      document.removeEventListener('click', unlockCameraWithGesture);
-      document.removeEventListener('touchend', unlockCameraWithGesture);
-      if (!cameraStartLocked) {
-        return;
-      }
-      if (event && event.type === 'touchend' && event.touches && event.touches.length > 1) {
-        return;
-      }
-      cameraStartLocked = false;
-      startCamera();
-    };
-
-    if (cameraStartLocked) {
-      setCameraStatus('画面をタップするとカメラが起動します。');
-      document.addEventListener('click', unlockCameraWithGesture);
-      document.addEventListener('touchend', unlockCameraWithGesture, { passive: true });
+    if (requiresCameraUserGesture) {
+      cameraStartLocked = true;
+      showCameraStartOverlay('「カメラを起動」をタップするとカメラの許可ダイアログが表示されます。「許可」を選択してから撮影を行ってください。');
     } else {
+      cameraStartLocked = false;
       startCamera();
     }
   </script>
