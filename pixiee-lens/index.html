@@ -1908,6 +1908,7 @@
     const ZOOM_FALLBACK_MIN = 1;
     const ZOOM_FALLBACK_MAX = 8;
     const ZOOM_MAJOR_EPSILON = 1e-3;
+    const CAMERA_READY_TIMEOUT_MS = 5000;
     let zoomScaleItems = [];
     let zoomScaleMarks = [];
     let zoomScaleTranslate = 0;
@@ -1975,6 +1976,13 @@
     if (zoomMeterTape) {
       zoomMeterTape.addEventListener('pointerdown', handleZoomMeterPointerDown);
     }
+    if (video) {
+      video.setAttribute('playsinline', '');
+      video.setAttribute('autoplay', '');
+      video.muted = true;
+      video.playsInline = true;
+    }
+
     if (cameraStartButton) {
       const triggerCameraStart = (event) => {
         if (event) {
@@ -2225,6 +2233,7 @@
     let cameraStartOverlayLastFocus = null;
     let cameraStartButtonBusy = false;
     let gestureStartRegistered = false;
+    let gestureStartHandler = null;
 
     let cameraPermissionDenied = false;
     let cameraReady = false;
@@ -3597,19 +3606,25 @@
       if (gestureStartRegistered) {
         return;
       }
-      const handler = (event) => {
+      if (gestureStartHandler) {
+        document.removeEventListener('click', gestureStartHandler, true);
+        document.removeEventListener('touchend', gestureStartHandler, true);
+        gestureStartHandler = null;
+      }
+      gestureStartHandler = (event) => {
         gestureStartRegistered = false;
-        if (cameraReady || cameraStartButtonBusy) {
-          return;
-        }
+        gestureStartHandler = null;
         if (event && typeof event.preventDefault === 'function') {
           event.preventDefault();
+        }
+        if (cameraReady || cameraStartButtonBusy) {
+          return;
         }
         cameraStartLocked = false;
         handleCameraStartRequest();
       };
-      document.addEventListener('click', handler, { once: true, capture: true });
-      document.addEventListener('touchend', handler, { once: true, capture: true, passive: false });
+      document.addEventListener('click', gestureStartHandler, { once: true, capture: true });
+      document.addEventListener('touchend', gestureStartHandler, { once: true, capture: true, passive: false });
       gestureStartRegistered = true;
     }
 
@@ -3651,10 +3666,57 @@
         cameraStartButton.removeAttribute('aria-busy');
       }
       cameraStartButtonBusy = false;
+      if (gestureStartHandler) {
+        document.removeEventListener('click', gestureStartHandler, true);
+        document.removeEventListener('touchend', gestureStartHandler, true);
+      }
+      gestureStartHandler = null;
+      gestureStartRegistered = false;
       if (cameraStartOverlayLastFocus && document.contains(cameraStartOverlayLastFocus)) {
         cameraStartOverlayLastFocus.focus({ preventScroll: true });
       }
       cameraStartOverlayLastFocus = null;
+    }
+
+    function waitForVideoReady(timeout = CAMERA_READY_TIMEOUT_MS) {
+      if (!video) {
+        return Promise.reject(new Error('Video element unavailable'));
+      }
+      if (video.readyState >= 2 && video.videoWidth && video.videoHeight) {
+        return Promise.resolve();
+      }
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        let timer = null;
+        const cleanup = () => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          if (timer !== null) {
+            clearTimeout(timer);
+            timer = null;
+          }
+          video.removeEventListener('loadeddata', onLoaded);
+          video.removeEventListener('canplay', onLoaded);
+          video.removeEventListener('error', onError);
+        };
+        const onLoaded = () => {
+          cleanup();
+          resolve();
+        };
+        const onError = (event) => {
+          cleanup();
+          reject(event?.error || new Error('Camera stream error'));
+        };
+        timer = setTimeout(() => {
+          cleanup();
+          reject(new Error('CameraReadyTimeout'));
+        }, timeout);
+        video.addEventListener('loadeddata', onLoaded, { once: true });
+        video.addEventListener('canplay', onLoaded, { once: true });
+        video.addEventListener('error', onError, { once: true });
+      });
     }
 
     async function handleCameraStartRequest() {
@@ -6752,7 +6814,12 @@
           }
         }
         updateZoomSliderAvailability();
-        await video.play().catch(() => {});
+        try {
+          await video.play();
+        } catch (playError) {
+          throw playError instanceof Error ? playError : new Error('Camera playback failed');
+        }
+        await waitForVideoReady();
         video.style.transform = state.useFrontCamera ? 'scaleX(-1)' : 'scaleX(1)';
         applyCameraSettings();
         cameraPermissionDenied = false;
@@ -6777,6 +6844,7 @@
           : `カメラにアクセスできませんでした。端末の設定をご確認ください。${errorDetail}`;
         setStatus(failureMessage);
         setCameraStatus(failureMessage);
+        stopCamera();
         stopDotRendering();
         if (requiresCameraUserGesture) {
           cameraStartLocked = true;
