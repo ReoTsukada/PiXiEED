@@ -1,7 +1,7 @@
 const SW_PARAMS = new URL(self.location.href);
 const BUILD_VERSION = SW_PARAMS.searchParams.get('v') || 'static';
-const CACHE_PREFIX = 'pixiee-lens-cache-v2';
-const LEGACY_CACHE_PREFIXES = ['pixiee-lens-cache'];
+const CACHE_PREFIX = 'pixiee-lens-cache-v3';
+const LEGACY_CACHE_PREFIXES = ['pixiee-lens-cache', 'pixiee-lens-cache-v2'];
 const CACHE_NAME = `${CACHE_PREFIX}-${BUILD_VERSION}`;
 
 const ASSETS = [
