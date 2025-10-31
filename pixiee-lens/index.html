@@ -1978,6 +1978,7 @@
     if (cameraStartButton) {
       cameraStartButton.addEventListener('click', (event) => {
         event.preventDefault();
+        event.stopPropagation();
         cameraStartLocked = false;
         handleCameraStartRequest();
       });
@@ -2219,6 +2220,7 @@
     let capturePreviewLastFocus = null;
     let cameraStartOverlayLastFocus = null;
     let cameraStartButtonBusy = false;
+    let gestureStartRegistered = false;
 
     let cameraPermissionDenied = false;
     let cameraReady = false;
@@ -3587,6 +3589,23 @@
       capturePreviewLastFocus = null;
     }
 
+    function registerGestureCameraStarter() {
+      if (gestureStartRegistered) {
+        return;
+      }
+      const handler = (event) => {
+        gestureStartRegistered = false;
+        if (cameraReady || cameraStartButtonBusy) {
+          return;
+        }
+        cameraStartLocked = false;
+        handleCameraStartRequest();
+      };
+      document.addEventListener('click', handler, { once: true });
+      document.addEventListener('touchend', handler, { once: true, passive: true });
+      gestureStartRegistered = true;
+    }
+
     function showCameraStartOverlay(message) {
       if (!cameraStartOverlay) {
         return;
@@ -3609,6 +3628,7 @@
       if (cameraStartButton) {
         cameraStartButton.focus({ preventScroll: true });
       }
+      registerGestureCameraStarter();
     }
 
     function hideCameraStartOverlay() {
@@ -6847,7 +6867,7 @@
 
     if (requiresCameraUserGesture) {
       cameraStartLocked = true;
-      showCameraStartOverlay('「カメラを起動」をタップするとカメラの許可ダイアログが表示されます。「許可」を選択してから撮影を行ってください。');
+      showCameraStartOverlay('「カメラを起動」をタップするとカメラの許可ダイアログが表示されます。「許可」を選び、再度撮影をお試しください。');
     } else {
       cameraStartLocked = false;
       startCamera();
