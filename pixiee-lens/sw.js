@@ -1,6 +1,7 @@
 const SW_PARAMS = new URL(self.location.href);
 const BUILD_VERSION = SW_PARAMS.searchParams.get('v') || 'static';
 const CACHE_PREFIX = 'pixiee-lens-cache-v2';
+const LEGACY_CACHE_PREFIXES = ['pixiee-lens-cache'];
 const CACHE_NAME = `${CACHE_PREFIX}-${BUILD_VERSION}`;
 
 const ASSETS = [
@@ -49,7 +50,15 @@ self.addEventListener('activate', (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
+            .filter((key) => {
+              if (key === CACHE_NAME) {
+                return false;
+              }
+              if (key.startsWith(CACHE_PREFIX)) {
+                return true;
+              }
+              return LEGACY_CACHE_PREFIXES.some((prefix) => key.startsWith(prefix));
+            })
             .map((key) => caches.delete(key))
         )
       )
