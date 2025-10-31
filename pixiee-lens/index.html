@@ -1872,6 +1872,21 @@
       listenersAttached: false
     };
 
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const displayModeStandalone = (() => {
+      if (window.matchMedia) {
+        try {
+          return window.matchMedia('(display-mode: standalone)').matches;
+        } catch (error) {
+          return false;
+        }
+      }
+      return false;
+    })();
+    const isStandaloneApp = Boolean(window.navigator && window.navigator.standalone) || displayModeStandalone;
+    const requiresCameraUserGesture = isIOSDevice && isStandaloneApp;
+    let cameraStartLocked = requiresCameraUserGesture;
+
     let cameraZoomCapability = null;
     let cameraZoomCapabilityKnown = false;
     let cameraStatusMessage = '';
@@ -5650,6 +5665,9 @@
         if (cameraActionMode === 'switch') {
           state.useFrontCamera = !state.useFrontCamera;
         }
+        if (cameraStartLocked) {
+          cameraStartLocked = false;
+        }
         await startCamera();
       });
     }
@@ -6263,7 +6281,7 @@
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         stopCamera();
-      } else {
+      } else if (!cameraStartLocked) {
         startCamera();
       }
     });
@@ -6318,7 +6336,27 @@
     updateDotModeUI();
     setAspectMode(state.aspectMode);
     updateControlPlacement();
-    startCamera();
+
+    const unlockCameraWithGesture = (event) => {
+      document.removeEventListener('click', unlockCameraWithGesture);
+      document.removeEventListener('touchend', unlockCameraWithGesture);
+      if (!cameraStartLocked) {
+        return;
+      }
+      if (event && event.type === 'touchend' && event.touches && event.touches.length > 1) {
+        return;
+      }
+      cameraStartLocked = false;
+      startCamera();
+    };
+
+    if (cameraStartLocked) {
+      setCameraStatus('画面をタップするとカメラが起動します。');
+      document.addEventListener('click', unlockCameraWithGesture);
+      document.addEventListener('touchend', unlockCameraWithGesture, { passive: true });
+    } else {
+      startCamera();
+    }
   </script>
 </body>
 </html>
