@@ -1,0 +1,25 @@
+{
+  "name": "PiXiEE Lens",
+  "short_name": "PiXiEE Lens",
+  "description": "PiXiEE Lens は全画面カメラとドットモードを備えた実験アプリです。",
+  "lang": "ja",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "theme_color": "#050812",
+  "background_color": "#050812",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
