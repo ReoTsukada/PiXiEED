@@ -1976,12 +1976,16 @@
       zoomMeterTape.addEventListener('pointerdown', handleZoomMeterPointerDown);
     }
     if (cameraStartButton) {
-      cameraStartButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
+      const triggerCameraStart = (event) => {
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
         cameraStartLocked = false;
         handleCameraStartRequest();
-      });
+      };
+      cameraStartButton.addEventListener('click', triggerCameraStart);
+      cameraStartButton.addEventListener('touchend', triggerCameraStart, { passive: false });
     }
     if (cameraStartBackdrop) {
       cameraStartBackdrop.addEventListener('click', (event) => {
@@ -3598,11 +3602,14 @@
         if (cameraReady || cameraStartButtonBusy) {
           return;
         }
+        if (event && typeof event.preventDefault === 'function') {
+          event.preventDefault();
+        }
         cameraStartLocked = false;
         handleCameraStartRequest();
       };
-      document.addEventListener('click', handler, { once: true });
-      document.addEventListener('touchend', handler, { once: true, passive: true });
+      document.addEventListener('click', handler, { once: true, capture: true });
+      document.addEventListener('touchend', handler, { once: true, capture: true, passive: false });
       gestureStartRegistered = true;
     }
 
@@ -6764,9 +6771,10 @@
         const isPermissionError = error && (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError');
         cameraPermissionDenied = Boolean(isPermissionError);
         cameraReady = false;
+        const errorDetail = error && error.name ? ` (${error.name}${error.message ? `: ${error.message}` : ''})` : '';
         failureMessage = cameraPermissionDenied
-          ? 'カメラへのアクセスが許可されませんでした。設定アプリで「PiXiEELENS」のカメラを有効にしてください。'
-          : 'カメラにアクセスできませんでした。端末の設定をご確認ください。';
+          ? `カメラへのアクセスが許可されませんでした。設定アプリで「PiXiEELENS」のカメラを有効にしてください。${errorDetail}`
+          : `カメラにアクセスできませんでした。端末の設定をご確認ください。${errorDetail}`;
         setStatus(failureMessage);
         setCameraStatus(failureMessage);
         stopDotRendering();
