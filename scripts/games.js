@@ -21,25 +21,24 @@
 
   function filterGames() {
     const term = normalize(searchInput.value.trim());
-    if (!term) {
-      playable.forEach(card => { card.hidden = false; });
-      placeholders.forEach(card => { card.hidden = false; });
-      return;
-    }
+    let visibleCount = 0;
 
-    let anyVisible = false;
     playable.forEach(card => {
-      const match = keywords.get(card).includes(term);
+      const match = !term || keywords.get(card).includes(term);
       card.hidden = !match;
-      if (match) anyVisible = true;
+      if (match) {
+        visibleCount += 1;
+      }
     });
-    placeholders.forEach(card => { card.hidden = true; });
 
-    if (!anyVisible) {
-      // 何も見つからない場合はプレースホルダーを1枚だけ表示
-      const firstPlaceholder = placeholders[0];
-      if (firstPlaceholder) firstPlaceholder.hidden = false;
-    }
+    const placeholderCount = Math.min(
+      placeholders.length,
+      Math.max(0, 3 - visibleCount)
+    );
+
+    placeholders.forEach((card, index) => {
+      card.hidden = index >= placeholderCount;
+    });
   }
 
   searchInput.addEventListener('input', filterGames);
