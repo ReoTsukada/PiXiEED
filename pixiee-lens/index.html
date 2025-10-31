@@ -1990,8 +1990,13 @@
           event.stopPropagation();
         }
         if (iosStandaloneUnsupported) {
-          if (typeof window !== 'undefined' && typeof window.open === 'function') {
-            window.open('https://pixieed.jp/pixiee-lens/', '_blank', 'noopener');
+          if (typeof window !== 'undefined' && window.location) {
+            const targetUrl = 'https://pixieed.jp/pixiee-lens/';
+            try {
+              window.location.href = targetUrl;
+            } catch (error) {
+              console.warn('Failed to redirect to Safari', error);
+            }
           }
           return;
         }
@@ -3668,7 +3673,7 @@
         return;
       }
       cameraStartLocked = true;
-      const message = 'iPhone のホーム画面に追加した PiXiEELENS ではカメラが利用できません。Safari でこのページを開いてご利用ください。';
+      const message = 'iPhone のホーム画面に追加した PiXiEELENS ではカメラが利用できません。Safari でこのページを開き直してご利用ください。（共有ボタン → “Safariで開く” またはこのボタンをタップ）';
       if (cameraStartMessage) {
         cameraStartMessage.textContent = message;
       }
