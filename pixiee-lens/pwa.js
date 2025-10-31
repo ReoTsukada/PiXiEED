@@ -156,7 +156,7 @@
     if (!canShowInstallPrompt) {
       return;
     }
-    if (isAppInstalled()) {
+    if (isAppInstalled() || getDismissedState()) {
       return;
     }
     event.preventDefault();
