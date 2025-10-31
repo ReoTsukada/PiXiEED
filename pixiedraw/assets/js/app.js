@@ -147,6 +147,33 @@
     },
   };
 
+  const preventBrowserZoom = (event) => {
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+    }
+  };
+
+  window.addEventListener('wheel', preventBrowserZoom, { passive: false });
+  window.addEventListener(
+    'keydown',
+    (event) => {
+      if ((event.ctrlKey || event.metaKey) && ['=', '+', '-', '_', '0', 'Add', 'Subtract'].includes(event.key)) {
+        event.preventDefault();
+      }
+    },
+    { passive: false }
+  );
+  window.addEventListener('gesturestart', (event) => {
+    event.preventDefault();
+  });
+
+  document.addEventListener('selectstart', (event) => {
+    const target = event.target;
+    if (target instanceof HTMLElement && target.closest('button, .button, .tool-button, .pixel-button, .rail-tab, .chip, .timeline-slot, .timeline-frame-button, .timeline-layer-tag, .mobile-tab, .mobile-shortcut')) {
+      event.preventDefault();
+    }
+  });
+
   const referenceDom = {
     overlay: document.getElementById('referenceOverlay'),
     wrap: document.getElementById('referenceWrap'),
