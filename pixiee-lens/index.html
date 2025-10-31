@@ -15,6 +15,7 @@
   <meta name="twitter:title" content="PiXiEE Lens | Fullscreen Camera">
   <meta name="twitter:description" content="PiXiEE Lens は全画面カメラとドットモードを備えた実験ページです。">
   <meta name="twitter:image" content="https://pixieed.jp/pixiee-lens/ogp.png">
+  <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
   <link rel="apple-touch-icon" href="./icon-192.png">
@@ -410,6 +411,81 @@
       border: 0;
       background: transparent;
     }
+    .zoom-meter__color {
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+      padding: 18px 16px 22px;
+    }
+    .zoom-meter__control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .zoom-meter__control-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .zoom-meter__control-title {
+      font-size: 0.88rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: rgba(231, 238, 255, 0.72);
+    }
+    .zoom-meter__control-value {
+      font-weight: 700;
+      color: var(--accent);
+      font-size: 0.92rem;
+      letter-spacing: 0.04em;
+    }
+    .zoom-meter__control-slider {
+      width: 100%;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 14px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(231, 238, 255, 0.15), rgba(231, 238, 255, 0.45));
+      outline: none;
+      cursor: pointer;
+      box-shadow: inset 0 0 12px rgba(5, 8, 18, 0.55);
+    }
+    .zoom-meter__control-slider--hue {
+      background: linear-gradient(90deg, #ff004c, #ff7b00, #ffe600, #4ddf00, #00c2ff, #6a4dff, #ff004c);
+    }
+    .zoom-meter__control-slider--saturation {
+      background: linear-gradient(90deg, rgba(231, 238, 255, 0.1), rgba(123, 207, 255, 0.85));
+    }
+    .zoom-meter__control-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid rgba(231, 238, 255, 0.85);
+      background: #050812;
+      box-shadow: 0 0 12px rgba(123, 207, 255, 0.65);
+    }
+    .zoom-meter__control-slider::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid rgba(231, 238, 255, 0.85);
+      background: #050812;
+      box-shadow: 0 0 12px rgba(123, 207, 255, 0.65);
+    }
+    .zoom-meter__control-slider:focus-visible {
+      outline: 2px solid rgba(123, 207, 255, 0.7);
+      outline-offset: 3px;
+    }
+    .zoom-meter.is-color-mode .zoom-meter__tape {
+      display: none;
+    }
+    .zoom-meter.is-color-mode .zoom-meter__color {
+      display: flex;
+    }
     body.is-landscape .zoom-meter {
       width: clamp(320px, 36vw, 420px);
       margin-inline: auto;
@@ -437,6 +513,41 @@
     }
     .hud-bottom__menus > * {
       width: min(420px, 92vw);
+    }
+    .install-banner {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+      pointer-events: auto;
+    }
+    .install-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 22px;
+      border-radius: 999px;
+      border: 1px solid rgba(231, 238, 255, 0.2);
+      background: rgba(5, 8, 18, 0.7);
+      color: var(--fg);
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-size: 0.88rem;
+      line-height: 1;
+      cursor: pointer;
+      transition: border-color 0.2s ease, background 0.2s ease, transform 0.18s ease;
+    }
+    .install-button:hover {
+      background: rgba(123, 207, 255, 0.2);
+      border-color: rgba(123, 207, 255, 0.5);
+    }
+    .install-button:focus-visible {
+      outline: 2px solid rgba(123, 207, 255, 0.65);
+      outline-offset: 3px;
+    }
+    .install-button:disabled {
+      opacity: 0.6;
+      cursor: progress;
     }
     .hud-top__actions {
       pointer-events: auto;
@@ -501,8 +612,24 @@
     }
     .stamp-panel__grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-      gap: 4px;
+      grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+      gap: 6px;
+      max-height: min(360px, 48vh);
+      overflow-y: auto;
+      padding-right: 4px;
+      overscroll-behavior: contain;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(123, 207, 255, 0.35) transparent;
+    }
+    .stamp-panel__grid::-webkit-scrollbar {
+      width: 6px;
+    }
+    .stamp-panel__grid::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .stamp-panel__grid::-webkit-scrollbar-thumb {
+      background: rgba(123, 207, 255, 0.35);
+      border-radius: 999px;
     }
     .stamp-panel__empty {
       font-size: 0.8rem;
@@ -519,8 +646,9 @@
       justify-content: center;
       padding: 0;
       border-radius: 12px;
-      background: transparent;
-      border: none;
+      background: rgba(26, 30, 38, 0.95);
+      border: 1px solid rgba(86, 104, 140, 0.65);
+      box-shadow: 0 10px 24px rgba(5, 8, 18, 0.45);
       color: inherit;
       aspect-ratio: 1 / 1;
       width: 100%;
@@ -533,26 +661,30 @@
     }
     .stamp-button:hover,
     .stamp-button:focus-visible {
-      background: rgba(123, 207, 255, 0.14);
+      background: rgba(42, 48, 60, 0.95);
       transform: translateY(-1px);
       outline: none;
+      box-shadow: 0 12px 28px rgba(5, 8, 18, 0.45);
     }
     .stamp-button:active {
       transform: translateY(1px) scale(0.96);
+      box-shadow: 0 6px 18px rgba(5, 8, 18, 0.38);
     }
     .stamp-button__preview {
       width: 100%;
       height: 100%;
       border-radius: inherit;
-      background: rgba(8, 13, 26, 0.55);
+      background: radial-gradient(circle at 30% 30%, rgba(72, 82, 104, 0.9), rgba(32, 36, 46, 0.9));
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 2px;
+      padding: 0;
+      box-shadow: inset 0 1px 4px rgba(255, 255, 255, 0.12), inset 0 8px 18px rgba(0, 0, 0, 0.4);
     }
     .stamp-button__preview img {
-      max-width: 100%;
-      max-height: 100%;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
       image-rendering: pixelated;
       display: block;
       pointer-events: none;
@@ -834,12 +966,33 @@
       pointer-events: auto;
     }
     .pixel-canvas {
+      position: relative;
       display: block;
       width: 100%;
       height: auto;
       image-rendering: pixelated;
       border-radius: 12px;
       background: transparent;
+      z-index: 1;
+    }
+    .pixel-canvas--tint {
+      position: absolute;
+      inset: 0;
+      border-radius: 12px;
+      background: transparent;
+      pointer-events: none;
+      image-rendering: pixelated;
+      z-index: 2;
+      mix-blend-mode: multiply;
+      filter:
+        drop-shadow(0 0 0 rgba(0, 0, 0, 1))
+        drop-shadow(0 1px 0 rgba(0, 0, 0, 1))
+        drop-shadow(1px 0 0 rgba(0, 0, 0, 1))
+        drop-shadow(0 -1px 0 rgba(0, 0, 0, 1))
+        drop-shadow(-1px 0 0 rgba(0, 0, 0, 1));
+    }
+    .pixel-canvas--colorized {
+      filter: saturate(0) brightness(1.05);
     }
     .pixel-canvas-wrap {
       position: absolute;
@@ -1144,6 +1297,7 @@
       }
     }
   </style>
+  <script src="./pwa.js" defer></script>
 </head>
   <body>
   <main>
@@ -1368,6 +1522,9 @@
             </div>
             <div id="paletteDisplay" class="palette-display" aria-hidden="true"></div>
           </div>
+          <div id="installPrompt" class="install-banner" hidden>
+            <button id="installAppBtn" class="install-button" type="button">PiXiEE Lens をホーム画面に追加</button>
+          </div>
         </div>
       <div class="hud-bottom__actions" role="group" aria-label="操作">
         <div class="hud-bottom__actions-group hud-bottom__actions-group--left">
@@ -1384,6 +1541,22 @@
                 <div class="zoom-meter__scale-track"></div>
               </div>
               <input id="cameraZoomSlider" class="zoom-meter__slider" type="range" min="0" max="100" step="1" value="0" aria-label="ズーム倍率" data-setting="zoom">
+            </div>
+            <div id="colorControl" class="zoom-meter__color" hidden>
+              <div class="zoom-meter__control-group">
+                <div class="zoom-meter__control-header">
+                  <span class="zoom-meter__control-title" aria-hidden="true">Hue</span>
+                  <span id="hueValueDisplay" class="zoom-meter__control-value">0°</span>
+                </div>
+                <input id="hueSlider" class="zoom-meter__control-slider zoom-meter__control-slider--hue" type="range" min="0" max="360" step="1" value="0" aria-label="色相">
+              </div>
+              <div class="zoom-meter__control-group">
+                <div class="zoom-meter__control-header">
+                  <span class="zoom-meter__control-title" aria-hidden="true">Saturation</span>
+                  <span id="saturationValueDisplay" class="zoom-meter__control-value">220%</span>
+                </div>
+                <input id="saturationSlider" class="zoom-meter__control-slider zoom-meter__control-slider--saturation" type="range" min="0" max="300" step="1" value="220" aria-label="彩度">
+              </div>
             </div>
           </div>
           <div class="hud-bottom__capture-slot">
@@ -1439,6 +1612,11 @@
     const zoomMeterTape = zoomControl ? zoomControl.querySelector('.zoom-meter__tape') : null;
     const zoomScaleWrapper = zoomControl ? zoomControl.querySelector('.zoom-meter__scale') : null;
     const zoomScaleTrack = zoomScaleWrapper ? zoomScaleWrapper.querySelector('.zoom-meter__scale-track') : null;
+    const colorControl = document.getElementById('colorControl');
+    const hueSlider = document.getElementById('hueSlider');
+    const hueValueDisplay = document.getElementById('hueValueDisplay');
+    const saturationSlider = document.getElementById('saturationSlider');
+    const saturationValueDisplay = document.getElementById('saturationValueDisplay');
     const ZOOM_MARK_STEP = 0.5;
     const ZOOM_FALLBACK_MIN = 1;
     const ZOOM_FALLBACK_MAX = 8;
@@ -1461,9 +1639,6 @@
       lastTimestamp: 0
     };
     let zoomMeterCollapseTimeout = null;
-    if (zoomSlider && !cameraSettingSliders.includes(zoomSlider)) {
-      cameraSettingSliders.push(zoomSlider);
-    }
     if (zoomSlider) {
       zoomSlider.addEventListener('focus', () => {
         setZoomMeterExpanded(true);
@@ -1482,6 +1657,32 @@
       });
       zoomSlider.addEventListener('change', () => {
         scheduleZoomMeterCollapse(600);
+      });
+    }
+    if (hueSlider) {
+      hueSlider.addEventListener('input', (event) => {
+        event.stopPropagation();
+        handleHueSliderInput(hueSlider.value);
+      });
+      hueSlider.addEventListener('change', (event) => {
+        event.stopPropagation();
+        handleHueSliderInput(hueSlider.value);
+      });
+      ['pointerdown', 'click'].forEach((type) => {
+        hueSlider.addEventListener(type, (event) => event.stopPropagation());
+      });
+    }
+    if (saturationSlider) {
+      saturationSlider.addEventListener('input', (event) => {
+        event.stopPropagation();
+        handleSaturationSliderInput(saturationSlider.value);
+      });
+      saturationSlider.addEventListener('change', (event) => {
+        event.stopPropagation();
+        handleSaturationSliderInput(saturationSlider.value);
+      });
+      ['pointerdown', 'click'].forEach((type) => {
+        saturationSlider.addEventListener(type, (event) => event.stopPropagation());
       });
     }
     if (zoomMeterTape) {
@@ -1588,16 +1789,16 @@
       zoom: 'zoom'
     };
     const STAMP_LIBRARY = Object.freeze([
-      { id: 'st-kira', label: 'キラキラ', src: './stamps/st-kira.png' },
-      { id: 'st-star', label: '星', src: './stamps/st-star.png' },
-      { id: 'st-dot', label: 'ドット', src: './stamps/st-dot.png' },
       { id: 'st-glass', label: 'グラス', src: './stamps/st-glass.png' },
-      { id: 'st-heart', label: 'ハート', src: './stamps/st-heart.png' },
-      { id: 'st-supe', label: 'スぺード', src: './stamps/st-supe.png' },
-      { id: 'st-sizuku', label: 'しずく', src: './stamps/st-sizuku.png' },
-      { id: 'st-tira', label: 'ティアラ', src: './stamps/st-tira.png' },
-      { id: 'st-kurabu', label: 'クラブ', src: './stamps/st-kurabu.png' },
-      { id: 'st-megane', label: 'めがね', src: './stamps/st-megane.png' }
+      { id: 'st-megane', label: 'めがね', src: './stamps/st-megane.png' },
+      { id: 'wst-kira', label: 'キラキラ（カラー）', src: './stamps/wst-kira.png', hueAdjustable: true },
+      { id: 'wst-star', label: '星（カラー）', src: './stamps/wst-star.png', hueAdjustable: true },
+      { id: 'wst-dot', label: 'ドット（カラー）', src: './stamps/wst-dot.png', hueAdjustable: true },
+      { id: 'wst-heart', label: 'ハート（カラー）', src: './stamps/wst-heart.png', hueAdjustable: true },
+      { id: 'wst-supe', label: 'スペード（カラー）', src: './stamps/wst-supe.png', hueAdjustable: true },
+      { id: 'wst-sizuku', label: 'しずく（カラー）', src: './stamps/wst-sizuku.png', hueAdjustable: true },
+      { id: 'wst-tira', label: 'ティアラ（カラー）', src: './stamps/wst-tira.png', hueAdjustable: true },
+      { id: 'wst-kurabu', label: 'クラブ（カラー）', src: './stamps/wst-kurabu.png', hueAdjustable: true }
     ]);
 
     const state = {
@@ -1613,6 +1814,14 @@
 
     const overlays = [];
     let activeOverlay = null;
+    const HUE_CONTROL_RANGE = Object.freeze({ min: 0, max: 360, step: 1 });
+    const SATURATION_CONTROL_RANGE = Object.freeze({ min: 0, max: 300, step: 1 });
+    const COLOR_CONTROL_DEFAULTS = Object.freeze({
+      hue: 0,
+      saturation: 220
+    });
+    let zoomControlMode = 'zoom';
+    let colorControlOverlayId = null;
 
     const interactionState = {
       dragOverlay: null,
@@ -1766,7 +1975,7 @@
     }
 
     function setZoomMeterExpanded(expanded) {
-      if (!zoomControl) {
+      if (!zoomControl || zoomControlMode === 'color') {
         return;
       }
       if (zoomMeterCollapseTimeout) {
@@ -1783,7 +1992,7 @@
     }
 
     function scheduleZoomMeterCollapse(delay = 400) {
-      if (!zoomControl || zoomControl.hidden) {
+      if (!zoomControl || zoomControl.hidden || zoomControlMode === 'color') {
         return;
       }
       if (zoomMeterInertia.active) {
@@ -2110,6 +2319,9 @@
       if (!zoomControl || zoomControl.hidden) {
         return;
       }
+      if (zoomControlMode === 'color') {
+        return;
+      }
       if (zoomMeterDrag.active) {
         updateZoomScaleActiveFromLayout({ commit: false });
         return;
@@ -2178,6 +2390,11 @@
     }
 
     function updateZoomScaleOptions() {
+      if (zoomControlMode === 'color') {
+        zoomScaleMarks = [];
+        zoomScaleItems = [];
+        return;
+      }
       if (!zoomScaleTrack) {
         zoomScaleMarks = [];
         zoomScaleItems = [];
@@ -2214,6 +2431,9 @@
     }
 
     function updateZoomScaleDisplay(value = state.cameraSettings.zoom ?? 0, { animate = true } = {}) {
+      if (zoomControlMode === 'color') {
+        return;
+      }
       if (!zoomScaleWrapper || !zoomScaleTrack || !zoomScaleMarks.length) {
         return;
       }
@@ -2433,7 +2653,7 @@
     }
 
     function handleZoomMeterPointerDown(event) {
-      if (!zoomControl || zoomControl.hidden) {
+      if (!zoomControl || zoomControl.hidden || zoomControlMode === 'color') {
         return;
       }
       if (zoomMeterDrag.active) {
@@ -2607,6 +2827,20 @@
       if (!zoomSlider || !zoomControl) {
         return;
       }
+      if (zoomControlMode === 'color') {
+        zoomControl.hidden = false;
+        zoomControl.setAttribute('aria-hidden', 'false');
+        zoomSlider.disabled = true;
+        zoomSlider.setAttribute('aria-disabled', 'true');
+        if (colorControl) {
+          colorControl.hidden = false;
+        }
+        syncColorControls(activeOverlay && isOverlayHueAdjustable(activeOverlay) ? activeOverlay : null);
+        return;
+      }
+      if (colorControl) {
+        colorControl.hidden = true;
+      }
       const value = state.cameraSettings.zoom ?? 0;
       const formatted = formatCameraSettingValue(value, 'zoom');
       const available = cameraZoomCapabilityKnown && Boolean(cameraZoomCapability);
@@ -2717,10 +2951,11 @@
         targetButton.classList.add('is-loading');
       }
       try {
-        const result = await createOverlayFromImageSource(stamp.src);
+        const result = await createOverlayFromImageSource(stamp.src, { stamp });
         if (!result) {
           throw new Error('Failed to create overlay from stamp');
         }
+        closeMenu('stamps');
       } catch (error) {
         console.error('スタンプの読み込みに失敗しました', error);
         setStatus('スタンプを読み込めませんでした');
@@ -2742,7 +2977,6 @@
         updateStampEmptyState(true);
         return;
       }
-      updateStampEmptyState(false);
       stamps.forEach((stamp) => {
         const button = document.createElement('button');
         button.type = 'button';
@@ -2752,11 +2986,22 @@
         const preview = document.createElement('span');
         preview.className = 'stamp-button__preview';
         const image = document.createElement('img');
+        image.decoding = 'async';
+        image.loading = 'lazy';
         image.src = stamp.src;
         image.alt = '';
         image.draggable = false;
+        image.addEventListener('error', () => {
+          if (button.parentElement === stampList) {
+            stampList.removeChild(button);
+            updateStampEmptyState(!stampList.querySelector('.stamp-button'));
+          }
+        });
         preview.appendChild(image);
         button.appendChild(preview);
+        if (stamp.hueAdjustable) {
+          button.dataset.hueAdjustable = 'true';
+        }
         ['pointerdown', 'mousedown', 'touchstart'].forEach((type) => {
           button.addEventListener(type, (event) => event.stopPropagation(), { passive: false });
         });
@@ -2766,6 +3011,7 @@
         });
         stampList.appendChild(button);
       });
+      updateStampEmptyState(!stampList.querySelector('.stamp-button'));
     }
 
     populateStampPanel();
@@ -3052,7 +3298,12 @@
       if (activeOverlay && activeOverlay.hasImage) {
         const overlayIndex = overlays.indexOf(activeOverlay);
         const prefix = overlays.length > 1 ? `ドット絵 ${overlayIndex + 1}/${overlays.length}` : 'ドット絵';
-        setStatus(`${prefix}: ${activeOverlay.baseWidth}×${activeOverlay.baseHeight}px / x${activeOverlay.scale}`);
+        let detail = ` / x${activeOverlay.scale}`;
+        if (isOverlayHueAdjustable(activeOverlay)) {
+          detail += ` / 色相 ${formatHueValue(activeOverlay.hue ?? COLOR_CONTROL_DEFAULTS.hue)}`;
+          detail += ` / 彩度 ${formatSaturationValue(activeOverlay.saturation ?? COLOR_CONTROL_DEFAULTS.saturation)}`;
+        }
+        setStatus(`${prefix}: ${activeOverlay.baseWidth}×${activeOverlay.baseHeight}px${detail}`);
       } else if (state.dotMode && dotState.width && dotState.height) {
         const dotCount = dotState.width * dotState.height;
         let depthLabel;
@@ -4428,6 +4679,7 @@
       wrap.className = 'pixel-canvas-wrap';
       wrap.style.left = '24px';
       wrap.style.top = '24px';
+      wrap.style.isolation = 'isolate';
 
       const moveHandle = document.createElement('button');
       moveHandle.type = 'button';
@@ -4439,6 +4691,12 @@
       image.className = 'pixel-canvas';
       image.alt = '';
       wrap.appendChild(image);
+
+      const tint = document.createElement('canvas');
+      tint.className = 'pixel-canvas pixel-canvas--tint';
+      tint.hidden = true;
+      tint.style.opacity = '0';
+      wrap.appendChild(tint);
 
       const labelMap = {
         nw: '左上ハンドル',
@@ -4457,7 +4715,7 @@
         return button;
       });
 
-      return { wrap, moveHandle, image, handles };
+      return { wrap, moveHandle, image, tint, handles };
     }
 
     function updateOverlayStacking() {
@@ -4500,6 +4758,347 @@
       clearPixelBtn.classList.toggle('is-visible', hasOverlays);
       clearPixelBtn.setAttribute('aria-hidden', hasOverlays ? 'false' : 'true');
       clearPixelBtn.disabled = !hasOverlays;
+      updateZoomControlMode(activeOverlay);
+      refreshOverlayStatus();
+    }
+
+    function clampHueValue(value) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) {
+        return 0;
+      }
+      const normalized = ((numeric % 360) + 360) % 360;
+      return Math.round(normalized);
+    }
+
+    function formatHueValue(value) {
+      return `${clampHueValue(value)}°`;
+    }
+
+    function isOverlayHueAdjustable(overlay) {
+      return Boolean(overlay && overlay.hueAdjustable);
+    }
+
+    function clampSaturationValue(value) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) {
+        return SATURATION_CONTROL_RANGE.min;
+      }
+      const clamped = Math.min(SATURATION_CONTROL_RANGE.max, Math.max(SATURATION_CONTROL_RANGE.min, Math.round(numeric)));
+      return clamped;
+    }
+
+    function formatSaturationValue(value) {
+      return `${clampSaturationValue(value)}%`;
+    }
+
+    function ensureOverlayTintResources(overlay) {
+      if (!overlay || !overlay.hueAdjustable || !overlay.elements) {
+        return null;
+      }
+      const tintCanvas = overlay.elements.tint;
+      if (!tintCanvas || !overlay.baseWidth || !overlay.baseHeight) {
+        return null;
+      }
+      const ctx = overlay.tintCtx || tintCanvas.getContext('2d');
+      if (!ctx) {
+        return null;
+      }
+      if (tintCanvas.width !== overlay.baseWidth || tintCanvas.height !== overlay.baseHeight) {
+        tintCanvas.width = overlay.baseWidth;
+        tintCanvas.height = overlay.baseHeight;
+      }
+      overlay.tintCtx = ctx;
+      return ctx;
+    }
+
+    function renderOverlayTint(overlay) {
+      if (!overlay || !overlay.hueAdjustable || !overlay.elements) {
+        return;
+      }
+      const tintCanvas = overlay.elements.tint;
+      const imageElement = overlay.elements.image;
+      const params = overlay.tintParams;
+      if (!tintCanvas || !imageElement || !params || params.ratio <= 0.001) {
+        if (tintCanvas) {
+          tintCanvas.hidden = true;
+          tintCanvas.style.opacity = '0';
+        }
+        return;
+      }
+      const ctx = ensureOverlayTintResources(overlay);
+      if (!ctx) {
+        tintCanvas.hidden = true;
+        tintCanvas.style.opacity = '0';
+        return;
+      }
+      const { hue, saturation } = params;
+      const width = overlay.baseWidth;
+      const height = overlay.baseHeight;
+      const saturationNormalized = Math.min(1, Math.max(0, saturation / SATURATION_CONTROL_RANGE.max));
+      const fillSaturation = Math.max(5, Math.round(saturationNormalized * 100));
+      const fillLightness = Math.round(48 + (1 - saturationNormalized) * 20);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.clearRect(0, 0, width, height);
+      ctx.save();
+      const alphaFactor = Math.max(0.08, saturationNormalized);
+      ctx.globalAlpha = alphaFactor;
+      ctx.fillStyle = `hsl(${hue}deg ${fillSaturation}% ${fillLightness}%)`;
+      ctx.fillRect(0, 0, width, height);
+      ctx.restore();
+      ctx.globalCompositeOperation = 'destination-in';
+      ctx.drawImage(imageElement, 0, 0, width, height);
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.globalAlpha = 1;
+      ctx.drawImage(imageElement, 0, 0, width, height);
+      ctx.globalCompositeOperation = 'source-over';
+      tintCanvas.hidden = false;
+      tintCanvas.style.opacity = '1';
+      if (typeof window !== 'undefined' && window.PIXIEE_DEBUG_TINT) {
+        try {
+          console.debug('PiXiEE tint preview:', tintCanvas.toDataURL('image/png'));
+        } catch (error) {
+          console.debug('PiXiEE tint preview failed:', error);
+        }
+      }
+    }
+
+    function applyOverlayColorTransform(overlay, { hue = null, saturation = null } = {}) {
+      if (!overlay || !overlay.elements || !overlay.elements.wrap) {
+        return;
+      }
+      const { image, tint } = overlay.elements;
+      if (!isOverlayHueAdjustable(overlay)) {
+        overlay.hue = COLOR_CONTROL_DEFAULTS.hue;
+        overlay.saturation = COLOR_CONTROL_DEFAULTS.saturation;
+        if (image) {
+          image.classList.remove('pixel-canvas--colorized');
+          image.style.mixBlendMode = '';
+          image.style.filter = '';
+        }
+      if (tint) {
+        tint.hidden = true;
+        tint.style.backgroundColor = 'transparent';
+        tint.style.opacity = '0';
+        tint.style.maskImage = '';
+        tint.style.webkitMaskImage = '';
+        tint.style.maskRepeat = '';
+        tint.style.webkitMaskRepeat = '';
+        tint.style.maskPosition = '';
+        tint.style.webkitMaskPosition = '';
+        tint.style.maskSize = '';
+        tint.style.webkitMaskSize = '';
+        tint.style.maskMode = '';
+        tint.style.webkitMaskMode = '';
+      }
+      overlay.tintParams = null;
+      overlay.tintUpdateScheduled = false;
+      overlay.elements.wrap.removeAttribute('data-hue');
+      overlay.elements.wrap.removeAttribute('data-saturation');
+      return;
+    }
+      if (hue != null) {
+        overlay.hue = clampHueValue(hue);
+      } else {
+        overlay.hue = clampHueValue(overlay.hue);
+      }
+      if (saturation != null) {
+        overlay.saturation = clampSaturationValue(saturation);
+      } else {
+        overlay.saturation = clampSaturationValue(overlay.saturation);
+      }
+      const hueValue = overlay.hue;
+      const saturationValue = overlay.saturation;
+      const ratio = Math.min(1, Math.max(0, (saturationValue - SATURATION_CONTROL_RANGE.min) /
+        Math.max(1, SATURATION_CONTROL_RANGE.max - SATURATION_CONTROL_RANGE.min)));
+      if (tint && ratio <= 0.001) {
+        tint.hidden = true;
+        tint.style.opacity = '0';
+        overlay.tintParams = null;
+        overlay.tintUpdateScheduled = false;
+        if (overlay.tintCtx) {
+          overlay.tintCtx.clearRect(0, 0, overlay.baseWidth || 0, overlay.baseHeight || 0);
+        }
+        if (overlay.elements && overlay.elements.wrap) {
+          overlay.elements.wrap.dataset.hue = String(hueValue);
+          overlay.elements.wrap.dataset.saturation = String(saturationValue);
+        }
+        return;
+      }
+      if (overlay.hueAdjustable) {
+        ensureOverlayTintResources(overlay);
+      }
+      if (image) {
+        image.classList.add('pixel-canvas--colorized');
+        image.style.mixBlendMode = '';
+        image.style.filter = '';
+      }
+      overlay.elements.wrap.dataset.hue = String(hueValue);
+      overlay.elements.wrap.dataset.saturation = String(saturationValue);
+      overlay.tintParams = { hue: hueValue, saturation: saturationValue, ratio };
+      if (!overlay.tintUpdateScheduled) {
+        overlay.tintUpdateScheduled = true;
+        requestAnimationFrame(() => {
+          overlay.tintUpdateScheduled = false;
+          renderOverlayTint(overlay);
+        });
+      }
+    }
+
+    function getHueFromSliderValue(value) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) {
+        return HUE_CONTROL_RANGE.min;
+      }
+      return clampHueValue(numeric);
+    }
+
+    function getSliderValueFromHue(hue) {
+      return clampHueValue(hue);
+    }
+
+    function getSaturationFromSliderValue(value) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) {
+        return SATURATION_CONTROL_RANGE.min;
+      }
+      return clampSaturationValue(numeric);
+    }
+
+    function getSliderValueFromSaturation(saturation) {
+      return clampSaturationValue(saturation);
+    }
+
+    function syncColorControls(overlay) {
+      if (!colorControl || !hueSlider || !hueValueDisplay || !saturationSlider || !saturationValueDisplay) {
+        return;
+      }
+      hueSlider.min = String(HUE_CONTROL_RANGE.min);
+      hueSlider.max = String(HUE_CONTROL_RANGE.max);
+      hueSlider.step = String(Math.max(1, HUE_CONTROL_RANGE.step || 1));
+      saturationSlider.min = String(SATURATION_CONTROL_RANGE.min);
+      saturationSlider.max = String(SATURATION_CONTROL_RANGE.max);
+      saturationSlider.step = String(Math.max(1, SATURATION_CONTROL_RANGE.step || 1));
+      const enabled = overlay && isOverlayHueAdjustable(overlay);
+      colorControl.hidden = !enabled;
+      if (!enabled) {
+        const fallbackHue = clampHueValue(COLOR_CONTROL_DEFAULTS.hue);
+        const fallbackSat = clampSaturationValue(COLOR_CONTROL_DEFAULTS.saturation);
+        hueSlider.value = String(fallbackHue);
+        hueSlider.setAttribute('aria-valuenow', String(fallbackHue));
+        hueSlider.setAttribute('aria-valuetext', formatHueValue(fallbackHue));
+        hueSlider.disabled = true;
+        hueSlider.setAttribute('aria-disabled', 'true');
+        hueValueDisplay.textContent = formatHueValue(fallbackHue);
+        saturationSlider.value = String(fallbackSat);
+        saturationSlider.setAttribute('aria-valuenow', String(fallbackSat));
+        saturationSlider.setAttribute('aria-valuetext', formatSaturationValue(fallbackSat));
+        saturationSlider.disabled = true;
+        saturationSlider.setAttribute('aria-disabled', 'true');
+        saturationValueDisplay.textContent = formatSaturationValue(fallbackSat);
+        return;
+      }
+      const hueValue = clampHueValue(overlay.hue ?? HUE_CONTROL_RANGE.min);
+      const sliderValue = getSliderValueFromHue(hueValue);
+      const saturationValue = clampSaturationValue(overlay.saturation ?? COLOR_CONTROL_DEFAULTS.saturation);
+      const saturationSliderValue = getSliderValueFromSaturation(saturationValue);
+      hueSlider.disabled = false;
+      hueSlider.removeAttribute('aria-disabled');
+      hueSlider.value = String(sliderValue);
+      hueSlider.setAttribute('aria-valuenow', String(sliderValue));
+      hueSlider.setAttribute('aria-valuetext', formatHueValue(hueValue));
+      hueValueDisplay.textContent = formatHueValue(hueValue);
+      saturationSlider.disabled = false;
+      saturationSlider.removeAttribute('aria-disabled');
+      saturationSlider.value = String(saturationSliderValue);
+      saturationSlider.setAttribute('aria-valuenow', String(saturationSliderValue));
+      saturationSlider.setAttribute('aria-valuetext', formatSaturationValue(saturationValue));
+      saturationValueDisplay.textContent = formatSaturationValue(saturationValue);
+    }
+
+    function syncZoomSliderFromCamera() {
+      if (!zoomSlider) {
+        return;
+      }
+      const value = state.cameraSettings.zoom ?? 0;
+      zoomSlider.value = String(value);
+      zoomSlider.setAttribute('aria-valuenow', String(value));
+      zoomSlider.setAttribute('aria-valuetext', formatCameraSettingValue(value, 'zoom'));
+      zoomSlider.setAttribute('aria-label', 'ズーム倍率');
+      refreshZoomMeterVisuals(value);
+    }
+
+    function updateZoomControlMode(overlay) {
+      const colorizableOverlay = overlay && isOverlayHueAdjustable(overlay) ? overlay : null;
+      const desiredMode = colorizableOverlay ? 'color' : 'zoom';
+      if (zoomControlMode === desiredMode && (desiredMode !== 'color' || (colorizableOverlay && colorControlOverlayId === colorizableOverlay.id))) {
+        if (desiredMode === 'color') {
+          syncColorControls(colorizableOverlay);
+        } else {
+          syncZoomSliderFromCamera();
+        }
+        return;
+      }
+      zoomControlMode = desiredMode;
+      if (desiredMode === 'color') {
+        colorControlOverlayId = colorizableOverlay ? colorizableOverlay.id : null;
+        if (zoomControl) {
+          zoomControl.classList.add('is-color-mode');
+          zoomControl.hidden = false;
+          zoomControl.setAttribute('aria-hidden', 'false');
+          zoomControl.classList.remove('is-collapsed');
+          zoomControl.classList.add('is-expanded');
+        }
+        if (zoomSlider) {
+          zoomSlider.disabled = true;
+          zoomSlider.setAttribute('aria-disabled', 'true');
+        }
+        syncColorControls(colorizableOverlay);
+      } else {
+        colorControlOverlayId = null;
+        if (zoomControl) {
+          zoomControl.classList.remove('is-color-mode');
+        }
+        if (colorControl) {
+          colorControl.hidden = true;
+        }
+        const zoomAvailable = cameraZoomCapabilityKnown && Boolean(cameraZoomCapability);
+        if (zoomSlider) {
+          zoomSlider.disabled = !zoomAvailable;
+          if (zoomAvailable) {
+            zoomSlider.removeAttribute('aria-disabled');
+          } else {
+            zoomSlider.setAttribute('aria-disabled', 'true');
+          }
+        }
+        syncZoomSliderFromCamera();
+        if (zoomAvailable) {
+          updateZoomScaleOptions();
+        }
+      }
+      syncColorControls(colorizableOverlay);
+      updateZoomSliderAvailability();
+    }
+
+    function handleHueSliderInput(rawValue) {
+      const overlay = activeOverlay && isOverlayHueAdjustable(activeOverlay) ? activeOverlay : null;
+      if (!overlay) {
+        return;
+      }
+      const hueValue = getHueFromSliderValue(rawValue);
+      applyOverlayColorTransform(overlay, { hue: hueValue });
+      syncColorControls(overlay);
+      refreshOverlayStatus();
+    }
+
+    function handleSaturationSliderInput(rawValue) {
+      const overlay = activeOverlay && isOverlayHueAdjustable(activeOverlay) ? activeOverlay : null;
+      if (!overlay) {
+        return;
+      }
+      const saturationValue = getSaturationFromSliderValue(rawValue);
+      applyOverlayColorTransform(overlay, { saturation: saturationValue });
+      syncColorControls(overlay);
       refreshOverlayStatus();
     }
 
@@ -4525,6 +5124,10 @@
       }
       overlay.elements.image.style.width = `${appliedWidth}px`;
       overlay.elements.image.style.height = `${appliedHeight}px`;
+      if (overlay.elements.tint) {
+        overlay.elements.tint.style.width = `${appliedWidth}px`;
+        overlay.elements.tint.style.height = `${appliedHeight}px`;
+      }
       overlay.elements.wrap.style.width = `${appliedWidth}px`;
       overlay.elements.wrap.style.height = `${appliedHeight}px`;
       overlay.elements.wrap.style.left = `${appliedX}px`;
@@ -4829,6 +5432,10 @@
       }
       overlay.drag = null;
       overlay.resize = null;
+      overlay.tintCanvas = null;
+      overlay.tintCtx = null;
+      overlay.tintParams = null;
+      overlay.tintUpdateScheduled = false;
       overlays.splice(index, 1);
       updateOverlayStacking();
       if (overlay.objectUrl) {
@@ -4847,6 +5454,7 @@
         clearPixelBtn.classList.remove('is-visible');
         clearPixelBtn.setAttribute('aria-hidden', 'true');
         clearPixelBtn.disabled = true;
+        updateZoomControlMode(null);
         refreshOverlayStatus();
       }
       detachGlobalInteractionListeners();
@@ -4859,14 +5467,26 @@
       removeOverlay(activeOverlay);
     }
 
-    function createOverlayFromImageSource(imageSrc, { objectUrl = null } = {}) {
+    function createOverlayFromImageSource(imageSrc, { objectUrl = null, stamp = null } = {}) {
       if (!imageSrc) {
         return Promise.resolve(false);
       }
       return new Promise((resolve) => {
+        const initialHue = clampHueValue(
+          stamp && Number.isFinite(Number(stamp.defaultHue)) ? Number(stamp.defaultHue) : COLOR_CONTROL_DEFAULTS.hue
+        );
+        const initialSaturation = clampSaturationValue(
+          stamp && Number.isFinite(Number(stamp.defaultSaturation))
+            ? Number(stamp.defaultSaturation)
+            : COLOR_CONTROL_DEFAULTS.saturation
+        );
         const overlay = {
           id: `overlay-${Date.now()}-${Math.random().toString(16).slice(2)}`,
           objectUrl,
+          stampId: stamp && stamp.id ? String(stamp.id) : null,
+          hueAdjustable: Boolean(stamp && stamp.hueAdjustable),
+          hue: initialHue,
+          saturation: initialSaturation,
           hasImage: false,
           baseWidth: 0,
           baseHeight: 0,
@@ -4877,8 +5497,25 @@
           offsetY: 24,
           drag: null,
           resize: null,
+          tintCanvas: null,
+          tintCtx: null,
+          tintParams: null,
+          tintUpdateScheduled: false,
+          imageSource: imageSrc,
           elements: createOverlayElements()
         };
+
+        if (overlay.elements && overlay.elements.wrap) {
+          overlay.elements.wrap.dataset.overlayId = overlay.id;
+          if (overlay.stampId) {
+            overlay.elements.wrap.dataset.stampId = overlay.stampId;
+          }
+          if (overlay.hueAdjustable) {
+            overlay.elements.wrap.dataset.hueAdjustable = 'true';
+          } else {
+            delete overlay.elements.wrap.dataset.hueAdjustable;
+          }
+        }
 
         setupOverlayEvents(overlay);
         pixelPreview.appendChild(overlay.elements.wrap);
@@ -4916,6 +5553,7 @@
           clearPixelBtn.classList.add('is-visible');
           clearPixelBtn.setAttribute('aria-hidden', 'false');
           clearPixelBtn.disabled = false;
+          applyOverlayColorTransform(overlay);
           refreshOverlayStatus();
           resolve(true);
         };
