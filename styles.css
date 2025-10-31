@@ -1183,16 +1183,69 @@ a:focus {
   gap: 0.8rem;
 }
 
+.install-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .install-card__title {
   margin: 0;
   font-family: var(--font-heading);
   font-size: clamp(1.1rem, 3vw, 1.35rem);
 }
 
+.install-card__toggle {
+  background: rgba(140, 140, 255, 0.18);
+  border: 1px solid rgba(140, 140, 255, 0.3);
+  border-radius: 999px;
+  color: #fff;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  white-space: nowrap;
+}
+
+.install-card__toggle::after {
+  content: '+';
+  font-weight: 700;
+  line-height: 1;
+  font-size: 0.85rem;
+}
+
+.install-card__toggle[aria-expanded="true"]::after {
+  content: '−';
+}
+
+.install-card__toggle:hover {
+  background: rgba(140, 140, 255, 0.32);
+  border-color: rgba(140, 140, 255, 0.6);
+}
+
+.install-card__toggle:focus-visible {
+  outline: 2px solid rgba(140, 140, 255, 0.75);
+  outline-offset: 3px;
+}
+
+.install-card__toggle:active {
+  transform: scale(0.97);
+}
+
 .install-card__lead {
   margin: 0;
   color: var(--fg-secondary);
   font-size: clamp(0.9rem, 2.3vw, 1.02rem);
+}
+
+.install-card__content {
+  border-top: 1px solid rgba(140, 140, 255, 0.18);
+  padding-top: 0.75rem;
 }
 
 .install-steps {
