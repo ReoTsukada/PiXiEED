@@ -1,6 +1,6 @@
 const SW_PARAMS = new URL(self.location.href);
 const BUILD_VERSION = SW_PARAMS.searchParams.get('v') || 'static';
-const CACHE_PREFIX = 'pixiee-lens-cache';
+const CACHE_PREFIX = 'pixiee-lens-cache-v2';
 const CACHE_NAME = `${CACHE_PREFIX}-${BUILD_VERSION}`;
 
 const ASSETS = [
@@ -81,7 +81,12 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
           return response;
         })
-        .catch(() => cachedResponse);
+        .catch((error) => {
+          if (request.mode === 'navigate' || (request.destination === 'document' && request.mode === 'same-origin')) {
+            return caches.match('./index.html');
+          }
+          return Promise.reject(error);
+        });
     })
   );
 });
