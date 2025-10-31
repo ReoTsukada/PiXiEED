@@ -6,6 +6,7 @@ const CACHE_NAME = `${CACHE_PREFIX}-${BUILD_VERSION}`;
 const ASSETS = [
   './',
   './index.html',
+  './pwa.js',
   './manifest.webmanifest',
   './icon-192.png',
   './icon-512.png',
