@@ -3,6 +3,7 @@
     updateCopyrightYear();
     revealLastUpdated();
     setupContactOverlay();
+    setupInstallGuides();
     setupProjectGate();
     setupHeroReel();
     setupShowcaseFilter();
@@ -98,6 +99,38 @@
         event.preventDefault();
         closeOverlay();
       }
+    });
+  }
+
+  function setupInstallGuides() {
+    const toggles = Array.from(document.querySelectorAll('.js-install-toggle'));
+    if (!toggles.length) {
+      return;
+    }
+
+    const SHOW_LABEL = '手順を表示';
+    const HIDE_LABEL = '手順を閉じる';
+
+    const setExpandedState = (toggle, content, expanded) => {
+      toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      toggle.textContent = expanded ? HIDE_LABEL : SHOW_LABEL;
+      content.hidden = !expanded;
+    };
+
+    toggles.forEach(toggle => {
+      const controlsId = toggle.getAttribute('aria-controls');
+      const content = controlsId ? document.getElementById(controlsId) : null;
+      if (!(content instanceof HTMLElement)) {
+        return;
+      }
+
+      const initialExpanded = toggle.getAttribute('aria-expanded') === 'true';
+      setExpandedState(toggle, content, initialExpanded);
+
+      toggle.addEventListener('click', () => {
+        const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
+        setExpandedState(toggle, content, !isExpanded);
+      });
     });
   }
 
