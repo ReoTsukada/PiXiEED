@@ -2,6 +2,39 @@
   const installBanner = document.getElementById('installPrompt');
   const installButton = document.getElementById('installAppBtn');
   let deferredPrompt = null;
+  const STORAGE_KEY = 'pixiee-lens:pwa-installed';
+
+  const isDisplayModeStandalone = () => {
+    if (window.matchMedia) {
+      try {
+        return window.matchMedia('(display-mode: standalone)').matches;
+      } catch (error) {
+        return false;
+      }
+    }
+    return false;
+  };
+
+  const isIOSStandalone = () => window.navigator?.standalone === true;
+
+  const getStoredInstallState = () => {
+    try {
+      return window.localStorage.getItem(STORAGE_KEY) === '1';
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const setStoredInstallState = () => {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, '1');
+    } catch (error) {
+      // ignore storage errors (e.g., Safari private mode)
+    }
+  };
+
+  const isAppInstalled = () =>
+    isDisplayModeStandalone() || isIOSStandalone() || getStoredInstallState();
 
   const showInstallPrompt = () => {
     if (installBanner) {
@@ -21,6 +54,12 @@
     }
   };
 
+  const markAppInstalled = () => {
+    setStoredInstallState();
+    hideInstallPrompt();
+    deferredPrompt = null;
+  };
+
   if (installButton) {
     installButton.addEventListener('click', async () => {
       if (!deferredPrompt) {
@@ -29,7 +68,11 @@
       try {
         installButton.disabled = true;
         deferredPrompt.prompt();
-        await deferredPrompt.userChoice.catch(() => undefined);
+        const choice = await deferredPrompt.userChoice.catch(() => undefined);
+        if (choice && choice.outcome === 'accepted') {
+          markAppInstalled();
+          return;
+        }
       } catch (error) {
         console.warn('PWA install prompt failed', error);
       } finally {
@@ -40,15 +83,34 @@
   }
 
   window.addEventListener('beforeinstallprompt', (event) => {
+    if (isAppInstalled()) {
+      return;
+    }
     event.preventDefault();
     deferredPrompt = event;
     showInstallPrompt();
   });
 
   window.addEventListener('appinstalled', () => {
-    deferredPrompt = null;
-    hideInstallPrompt();
+    markAppInstalled();
   });
+
+  if (isAppInstalled()) {
+    hideInstallPrompt();
+  } else if (window.matchMedia) {
+    try {
+      const standaloneWatcher = window.matchMedia('(display-mode: standalone)');
+      if (standaloneWatcher && typeof standaloneWatcher.addEventListener === 'function') {
+        standaloneWatcher.addEventListener('change', (event) => {
+          if (event.matches) {
+            markAppInstalled();
+          }
+        });
+      }
+    } catch (error) {
+      // ignore matchMedia errors
+    }
+  }
 
   const supportsServiceWorker = 'serviceWorker' in navigator;
   if (!supportsServiceWorker || !window.isSecureContext) {
