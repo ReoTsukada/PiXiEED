@@ -1,7 +1,7 @@
 {
-  "name": "PiXiEE Lens",
-  "short_name": "PiXiEE Lens",
-  "description": "PiXiEE Lens は全画面カメラとドットモードを備えた実験アプリです。",
+  "name": "PiXiEELENS",
+  "short_name": "PiXiEELENS",
+  "description": "PiXiEELENS は全画面カメラとドットモードを備えた実験アプリです。",
   "lang": "ja",
   "start_url": ".",
   "scope": ".",
