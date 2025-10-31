@@ -580,6 +580,131 @@
       outline: 2px solid rgba(123, 207, 255, 0.75);
       outline-offset: 3px;
     }
+    .capture-preview {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1200;
+    }
+    .capture-preview.is-visible {
+      display: flex;
+    }
+    .capture-preview__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(5, 8, 18, 0.78);
+      backdrop-filter: blur(12px);
+      pointer-events: auto;
+    }
+    .capture-preview__panel {
+      position: relative;
+      width: min(480px, 92vw);
+      max-height: min(720px, 88vh);
+      background: rgba(9, 13, 28, 0.92);
+      border: 1px solid rgba(123, 207, 255, 0.35);
+      border-radius: 20px;
+      box-shadow: 0 24px 56px rgba(3, 5, 12, 0.52);
+      padding: clamp(18px, 4vw, 26px);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      pointer-events: auto;
+      overflow-y: auto;
+    }
+    .capture-preview__body {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow: hidden;
+    }
+    .capture-preview__close {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid rgba(123, 207, 255, 0.25);
+      background: rgba(123, 207, 255, 0.12);
+      color: #fff;
+      font-size: 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .capture-preview__close::before {
+      content: '\00D7';
+      font-size: 1rem;
+      line-height: 1;
+    }
+    .capture-preview__close:focus-visible {
+      outline: 2px solid rgba(123, 207, 255, 0.75);
+      outline-offset: 2px;
+    }
+    .capture-preview__title {
+      margin: 0;
+      font-size: clamp(1rem, 2.6vw, 1.4rem);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .capture-preview__image-wrap {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: rgba(7, 11, 26, 0.85);
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(123, 207, 255, 0.18);
+      padding: 12px;
+      max-height: min(60vh, 420px);
+    }
+    .capture-preview__image-wrap img {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 12px;
+    }
+    .capture-preview__info {
+      margin: 0;
+      color: rgba(231, 238, 255, 0.85);
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+    .capture-preview__actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+    .capture-preview__button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 20px;
+      border-radius: 999px;
+      border: 1px solid rgba(123, 207, 255, 0.3);
+      background: rgba(123, 207, 255, 0.14);
+      color: #fff;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+    .capture-preview__button:hover {
+      background: rgba(123, 207, 255, 0.24);
+      border-color: rgba(123, 207, 255, 0.5);
+    }
+    .capture-preview__button--primary {
+      background: rgba(123, 207, 255, 0.28);
+      border-color: rgba(123, 207, 255, 0.55);
+    }
+    .capture-preview__button--primary:hover {
+      background: rgba(123, 207, 255, 0.4);
+    }
     .hud-top__actions {
       pointer-events: auto;
     }
@@ -1619,6 +1744,23 @@
     </div>
     <div id="pixelPreview" class="pixel-preview" hidden></div>
   </main>
+  <div id="capturePreviewOverlay" class="capture-preview" hidden aria-hidden="true">
+    <div class="capture-preview__backdrop" id="capturePreviewBackdrop"></div>
+    <div class="capture-preview__panel" role="dialog" aria-modal="true" aria-labelledby="capturePreviewHeading">
+      <button type="button" class="capture-preview__close" id="capturePreviewCloseBtn" aria-label="閉じる"></button>
+      <div class="capture-preview__body">
+        <h2 id="capturePreviewHeading" class="capture-preview__title">撮影結果</h2>
+        <div class="capture-preview__image-wrap">
+          <img id="capturePreviewImage" alt="撮影した画像のプレビュー" loading="lazy">
+        </div>
+        <p id="capturePreviewInfo" class="capture-preview__info">画像を長押しして保存してください。</p>
+        <div class="capture-preview__actions">
+          <button type="button" class="capture-preview__button capture-preview__button--primary" id="capturePreviewShareBtn" hidden>共有する</button>
+          <button type="button" class="capture-preview__button" id="capturePreviewCloseActionBtn">閉じる</button>
+        </div>
+      </div>
+    </div>
+  </div>
   <input id="pixelArtInput" type="file" accept="image/png, image/gif, image/webp, image/bmp" multiple hidden>
   <script>
     const video = document.getElementById('cameraFeed');
@@ -1640,6 +1782,13 @@
     const pixelPreview = document.getElementById('pixelPreview');
     const landscapeCaptureSlot = document.querySelector('.hud-landscape-capture');
     const captureButtonOriginalParent = captureBtn ? captureBtn.parentElement : null;
+    const capturePreviewOverlay = document.getElementById('capturePreviewOverlay');
+    const capturePreviewImage = document.getElementById('capturePreviewImage');
+    const capturePreviewInfo = document.getElementById('capturePreviewInfo');
+    const capturePreviewCloseBtn = document.getElementById('capturePreviewCloseBtn');
+    const capturePreviewCloseActionBtn = document.getElementById('capturePreviewCloseActionBtn');
+    const capturePreviewShareBtn = document.getElementById('capturePreviewShareBtn');
+    const capturePreviewBackdrop = document.getElementById('capturePreviewBackdrop');
     const cameraSettingSliders = cameraSettingsPanel ? Array.from(cameraSettingsPanel.querySelectorAll('input[data-setting]')) : [];
     const cameraSettingValueEls = new Map();
     if (cameraSettingsPanel) {
@@ -1731,6 +1880,54 @@
     if (zoomMeterTape) {
       zoomMeterTape.addEventListener('pointerdown', handleZoomMeterPointerDown);
     }
+    if (capturePreviewCloseBtn) {
+      capturePreviewCloseBtn.addEventListener('click', () => {
+        closeCapturePreview();
+      });
+    }
+    if (capturePreviewCloseActionBtn) {
+      capturePreviewCloseActionBtn.addEventListener('click', () => {
+        closeCapturePreview();
+      });
+    }
+    if (capturePreviewBackdrop) {
+      capturePreviewBackdrop.addEventListener('click', () => {
+        closeCapturePreview();
+      });
+    }
+    if (capturePreviewOverlay) {
+      capturePreviewOverlay.addEventListener('click', (event) => {
+        if (event.target === capturePreviewOverlay) {
+          closeCapturePreview();
+        }
+      });
+    }
+    if (capturePreviewShareBtn) {
+      capturePreviewShareBtn.addEventListener('click', async () => {
+        if (!capturePreviewSharePayload || !capturePreviewSharePayload.file || typeof navigator.share !== 'function') {
+          return;
+        }
+        try {
+          await navigator.share({
+            files: [capturePreviewSharePayload.file],
+            title: 'PiXiEELENS',
+            text: '撮影した画像'
+          });
+          setStatus('共有しました');
+          closeCapturePreview();
+        } catch (error) {
+          if (!error || error.name !== 'AbortError') {
+            console.warn('Share failed', error);
+            setStatus('共有できませんでした');
+          }
+        }
+      });
+    }
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && capturePreviewOverlay && !capturePreviewOverlay.hidden) {
+        closeCapturePreview();
+      }
+    });
     const dotCanvas = document.getElementById('dotCanvas');
     const dotCanvasCtx = dotCanvas ? dotCanvas.getContext('2d', { willReadFrequently: true }) : null;
     const smoothingCanvas = dotCanvas ? document.createElement('canvas') : null;
@@ -1903,6 +2100,9 @@
         mode: 'contain'
       }
     };
+    let capturePreviewObjectUrl = null;
+    let capturePreviewSharePayload = null;
+    let capturePreviewLastFocus = null;
 
     let cameraPermissionDenied = false;
     let cameraReady = false;
@@ -3243,6 +3443,69 @@
       }
     }
 
+    function releaseCapturePreviewUrl() {
+      if (capturePreviewObjectUrl) {
+        URL.revokeObjectURL(capturePreviewObjectUrl);
+        capturePreviewObjectUrl = null;
+      }
+      if (capturePreviewSharePayload && capturePreviewSharePayload.blobUrl && capturePreviewSharePayload.blobUrl !== capturePreviewObjectUrl) {
+        URL.revokeObjectURL(capturePreviewSharePayload.blobUrl);
+      }
+    }
+
+    function closeCapturePreview() {
+      if (!capturePreviewOverlay) {
+        return;
+      }
+      releaseCapturePreviewUrl();
+      capturePreviewOverlay.hidden = true;
+      capturePreviewOverlay.setAttribute('aria-hidden', 'true');
+      capturePreviewOverlay.classList.remove('is-visible');
+      if (capturePreviewImage) {
+        capturePreviewImage.src = '';
+      }
+      capturePreviewSharePayload = null;
+      if (capturePreviewLastFocus && document.contains(capturePreviewLastFocus)) {
+        capturePreviewLastFocus.focus({ preventScroll: true });
+      }
+      capturePreviewLastFocus = null;
+    }
+
+    function showCapturePreview({ url, filename, width, height, sharePayload, infoMessage }) {
+      if (!capturePreviewOverlay || !capturePreviewImage) {
+        if (url) {
+          window.open(url, '_blank', 'noopener');
+        }
+        return;
+      }
+      capturePreviewLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      releaseCapturePreviewUrl();
+      if (sharePayload && sharePayload.blobUrl) {
+        capturePreviewObjectUrl = sharePayload.blobUrl;
+      } else if (typeof url === 'string' && url.startsWith('blob:')) {
+        capturePreviewObjectUrl = url;
+      }
+      capturePreviewImage.src = url;
+      capturePreviewImage.alt = `撮影した画像 ${width}×${height}`;
+      if (capturePreviewInfo) {
+        capturePreviewInfo.textContent = infoMessage || '画像を長押しするか共有メニューから保存してください。';
+      }
+      const canShare = Boolean(sharePayload && sharePayload.file) && typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare({ files: [sharePayload.file] }));
+      capturePreviewSharePayload = canShare && sharePayload
+        ? { file: sharePayload.file, blobUrl: sharePayload.blobUrl }
+        : null;
+      if (capturePreviewShareBtn) {
+        capturePreviewShareBtn.hidden = !capturePreviewSharePayload;
+        capturePreviewShareBtn.disabled = !capturePreviewSharePayload;
+      }
+      capturePreviewOverlay.hidden = false;
+      capturePreviewOverlay.setAttribute('aria-hidden', 'false');
+      capturePreviewOverlay.classList.add('is-visible');
+      if (capturePreviewCloseBtn) {
+        capturePreviewCloseBtn.focus({ preventScroll: true });
+      }
+    }
+
     const CAMERA_ICON_SWITCH_CONTENT = [
       '<rect x="5" y="0" width="6" height="1" fill="#FFFFFF"></rect>',
       '<rect x="13" y="0" width="6" height="1" fill="#FFFFFF"></rect>',
@@ -3346,7 +3609,8 @@
         const label = state.useFrontCamera ? '背面カメラに切替' : 'フロントカメラに切替';
         setIconButtonLabel(cameraActionBtn, label);
       } else {
-        setIconButtonLabel(cameraActionBtn, '再接続');
+        const label = cameraStartLocked ? 'カメラを開始' : '再接続';
+        setIconButtonLabel(cameraActionBtn, label);
       }
     }
 
@@ -5968,75 +6232,73 @@
       return `pixiee-lens-${timestamp}.png`;
     }
 
-    function downloadCaptureResult(result, filename) {
+    async function deliverCaptureResult(result, filename) {
       if (!result) {
         return false;
       }
-      let linkTarget = null;
-      let objectUrl = null;
-      if (result.blob instanceof Blob) {
-        objectUrl = URL.createObjectURL(result.blob);
-        linkTarget = objectUrl;
-      } else if (typeof result.dataUrl === 'string' && result.dataUrl.startsWith('data:image/png')) {
-        linkTarget = result.dataUrl;
-      }
-      if (!linkTarget) {
-        return false;
-      }
-      const canUseDownloadAttr = 'download' in HTMLAnchorElement.prototype;
+      const { blob, dataUrl, cssWidth, cssHeight } = result;
+      const supportsDownloadAttr = 'download' in HTMLAnchorElement.prototype;
       const isIOS = /iP(hone|ad|od)/i.test(navigator.userAgent);
-      if (!canUseDownloadAttr || isIOS) {
-        const fallbackWindow = window.open('', '_blank', 'noopener');
-        if (!fallbackWindow) {
-          if (objectUrl) {
-            setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      if (blob instanceof Blob) {
+        const shareFile = new File([blob], filename, { type: 'image/png' });
+        const canShareFiles = typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare({ files: [shareFile] }));
+        if (canShareFiles) {
+          try {
+            await navigator.share({
+              files: [shareFile],
+              title: 'PiXiEELENS',
+              text: '撮影した画像'
+            });
+            return true;
+          } catch (error) {
+            if (error && error.name !== 'AbortError') {
+              console.warn('Share failed', error);
+            }
+            // continue to fallback preview
           }
-          return false;
         }
-        fallbackWindow.document.title = 'PiXiEED Capture';
-        fallbackWindow.document.body.style.margin = '0';
-        fallbackWindow.document.body.style.display = 'flex';
-        fallbackWindow.document.body.style.flexDirection = 'column';
-        fallbackWindow.document.body.style.alignItems = 'center';
-        fallbackWindow.document.body.style.justifyContent = 'center';
-        fallbackWindow.document.body.style.background = '#050812';
-        fallbackWindow.document.body.style.color = '#e7eeff';
-        const instructions = fallbackWindow.document.createElement('div');
-        instructions.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
-        instructions.style.padding = '16px';
-        instructions.style.textAlign = 'center';
-        instructions.innerHTML = `
-          <p>この画像を長押しして「写真に追加」または「保存」してください。</p>
-        `;
-        const image = fallbackWindow.document.createElement('img');
-        image.src = linkTarget;
-        image.alt = 'Captured photo';
-        image.style.maxWidth = '100%';
-        image.style.height = 'auto';
-        image.style.display = 'block';
-        image.style.borderRadius = '12px';
-        fallbackWindow.document.body.appendChild(instructions);
-        fallbackWindow.document.body.appendChild(image);
-        if (objectUrl) {
-          fallbackWindow.addEventListener('pagehide', () => {
-            setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-          });
+        if (supportsDownloadAttr && !isIOS) {
+          const objectUrl = URL.createObjectURL(blob);
+          const anchor = document.createElement('a');
+          anchor.href = objectUrl;
+          anchor.download = filename;
+          anchor.rel = 'noopener';
+          anchor.style.position = 'absolute';
+          anchor.style.left = '-9999px';
+          document.body.appendChild(anchor);
+          anchor.click();
+          document.body.removeChild(anchor);
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+          return true;
         }
+        const previewUrl = URL.createObjectURL(blob);
+        showCapturePreview({
+          url: previewUrl,
+          filename,
+          width: cssWidth,
+          height: cssHeight,
+          sharePayload: {
+            file: canShareFiles ? shareFile : null,
+            blobUrl: previewUrl
+          },
+          infoMessage: canShareFiles
+            ? '「共有する」ボタンから写真アプリに保存できます。長押しでも保存できます。'
+            : '画像を長押しして写真に保存してください。'
+        });
         return true;
       }
-      const anchor = document.createElement('a');
-      anchor.href = linkTarget;
-      anchor.download = filename;
-      anchor.rel = 'noopener';
-      anchor.style.position = 'absolute';
-      anchor.style.left = '-9999px';
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      if (objectUrl) {
-        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/png')) {
+        showCapturePreview({
+          url: dataUrl,
+          filename,
+          width: cssWidth,
+          height: cssHeight,
+          sharePayload: null,
+          infoMessage: '画像を長押しして保存してください。'
+        });
+        return true;
       }
-      return true;
+      return false;
     }
 
     async function handleCaptureAction() {
@@ -6059,7 +6321,7 @@
           return;
         }
         const filename = getCaptureFilename();
-        const saved = downloadCaptureResult(result, filename);
+        const saved = await deliverCaptureResult(result, filename);
         if (!saved) {
           setStatus('撮影データを保存できませんでした');
           return;
@@ -6220,15 +6482,40 @@
 
       try {
         stopCamera();
-        const constraints = {
-          video: {
-            facingMode: state.useFrontCamera ? 'user' : { ideal: 'environment' },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
+        const facingMode = state.useFrontCamera ? 'user' : 'environment';
+        const constraintCandidates = [
+          {
+            video: {
+              facingMode,
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
+            },
+            audio: false
           },
-          audio: false
-        };
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          {
+            video: {
+              facingMode
+            },
+            audio: false
+          },
+          {
+            video: true,
+            audio: false
+          }
+        ];
+        let stream = null;
+        let lastError = null;
+        for (const constraints of constraintCandidates) {
+          try {
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+            break;
+          } catch (error) {
+            lastError = error;
+          }
+        }
+        if (!stream) {
+          throw lastError || new Error('Camera unavailable');
+        }
         state.stream = stream;
         cameraConstraintErrorLogged = false;
         video.srcObject = stream;
