@@ -515,39 +515,70 @@
       width: min(420px, 92vw);
     }
     .install-banner {
-      display: flex;
-      justify-content: center;
-      width: 100%;
+      position: fixed;
+      top: calc(var(--safe-top) + 18px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(540px, 96vw);
+      z-index: 999;
       pointer-events: auto;
+      display: none;
+    }
+    .install-banner.is-visible {
+      display: block;
+    }
+    .install-banner__body {
+      background: rgba(7, 11, 26, 0.9);
+      border: 1px solid rgba(123, 207, 255, 0.35);
+      border-radius: 18px;
+      padding: 18px 20px;
+      box-shadow: 0 18px 48px rgba(4, 6, 16, 0.45);
+      backdrop-filter: blur(14px);
+    }
+    .install-banner__copy {
+      margin: 0 0 14px;
+      font-size: clamp(0.9rem, 2.4vw, 1.05rem);
+      line-height: 1.6;
+      color: rgba(231, 238, 255, 0.9);
+    }
+    .install-banner__actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
     }
     .install-button {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      padding: 12px 22px;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 10px 20px;
       border-radius: 999px;
-      border: 1px solid rgba(231, 238, 255, 0.2);
-      background: rgba(5, 8, 18, 0.7);
-      color: var(--fg);
+      border: 1px solid rgba(123, 207, 255, 0.35);
+      background: rgba(123, 207, 255, 0.22);
+      color: #fff;
       font-weight: 600;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
+      letter-spacing: 0.04em;
       font-size: 0.88rem;
       line-height: 1;
       cursor: pointer;
-      transition: border-color 0.2s ease, background 0.2s ease, transform 0.18s ease;
+      transition: background 0.2s ease, border-color 0.2s ease, transform 0.18s ease;
+    }
+    .install-button--ghost {
+      background: transparent;
+      border-color: rgba(123, 207, 255, 0.25);
+      color: rgba(231, 238, 255, 0.8);
     }
     .install-button:hover {
-      background: rgba(123, 207, 255, 0.2);
-      border-color: rgba(123, 207, 255, 0.5);
+      background: rgba(123, 207, 255, 0.32);
+      border-color: rgba(123, 207, 255, 0.55);
+    }
+    .install-button--ghost:hover {
+      background: rgba(123, 207, 255, 0.18);
+      color: #fff;
     }
     .install-button:focus-visible {
-      outline: 2px solid rgba(123, 207, 255, 0.65);
+      outline: 2px solid rgba(123, 207, 255, 0.75);
       outline-offset: 3px;
-    }
-    .install-button:disabled {
-      opacity: 0.6;
-      cursor: progress;
     }
     .hud-top__actions {
       pointer-events: auto;
@@ -1489,7 +1520,7 @@
         </div>
       </div>
       <div class="hud-bottom">
-        <div class="hud-bottom__menus">
+          <div class="hud-bottom__menus">
           <div id="aspectMenu" class="menu-panel" hidden>
             <div class="controls controls--aspect" role="group" aria-label="アスペクト比">
               <button class="option-button is-active" type="button" data-aspect="3:2" aria-pressed="true">3:2</button>
@@ -1522,8 +1553,20 @@
             </div>
             <div id="paletteDisplay" class="palette-display" aria-hidden="true"></div>
           </div>
-          <div id="installPrompt" class="install-banner" hidden>
-            <button id="installAppBtn" class="install-button" type="button">PiXiEELENS をインストール</button>
+          <div id="installPrompt" class="install-banner" hidden role="alert">
+            <div class="install-banner__body">
+              <p class="install-banner__copy">
+                PiXiEELENS をホーム画面に追加して、ワンタップで起動できます。今すぐインストールしますか？
+              </p>
+              <div class="install-banner__actions">
+                <button id="installLaterBtn" class="install-button install-button--ghost" type="button">
+                  あとで
+                </button>
+                <button id="installAppBtn" class="install-button" type="button">
+                  インストール
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       <div class="hud-bottom__actions" role="group" aria-label="操作">
