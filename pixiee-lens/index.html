@@ -190,35 +190,29 @@
       pointer-events: none;
     }
     .hud-bottom__actions {
+      position: relative;
       display: flex;
-      align-items: center;
+      align-items: flex-end;
       justify-content: space-between;
       flex-wrap: nowrap;
       gap: clamp(12px, 4vw, 20px);
       width: 100%;
       pointer-events: none;
-      flex-wrap: nowrap;
     }
     .hud-bottom__actions > * {
       pointer-events: auto;
     }
     .hud-bottom__actions-group {
       display: inline-flex;
-      align-items: center;
+      align-items: flex-end;
       gap: clamp(10px, 3vw, 16px);
       flex: 0 0 auto;
-    }
-    .hud-bottom__actions-group--left {
-      justify-content: flex-start;
-    }
-    .hud-bottom__actions-group--right {
-      justify-content: flex-end;
     }
     .hud-bottom__center {
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-end;
       gap: 12px;
       flex: 0 1 auto;
       pointer-events: auto;
@@ -231,6 +225,7 @@
       min-width: clamp(60px, 18vw, 96px);
       height: clamp(60px, 18vw, 96px);
       pointer-events: auto;
+      margin-bottom: 0;
     }
     body.is-landscape .hud-bottom__capture-slot {
       display: none;
@@ -414,22 +409,27 @@
     .zoom-meter__color {
       display: none;
       flex-direction: column;
-      gap: 16px;
-      padding: 18px 16px 22px;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px 10px;
     }
     .zoom-meter__control-group {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      align-items: stretch;
+      gap: 4px;
+      width: clamp(220px, 60vw, 360px);
     }
     .zoom-meter__control-header {
       display: flex;
-      align-items: center;
+      flex-direction: row;
+      align-items: flex-start;
       justify-content: space-between;
-      gap: 12px;
+      min-width: 0;
+      gap: 6px;
     }
     .zoom-meter__control-title {
-      font-size: 0.88rem;
+      font-size: 0.8rem;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       font-weight: 600;
@@ -438,19 +438,20 @@
     .zoom-meter__control-value {
       font-weight: 700;
       color: var(--accent);
-      font-size: 0.92rem;
+      font-size: 0.8rem;
       letter-spacing: 0.04em;
     }
     .zoom-meter__control-slider {
-      width: 100%;
+      flex: 1 1 auto;
+      min-width: clamp(200px, 55vw, 420px);
       -webkit-appearance: none;
       appearance: none;
-      height: 14px;
+      height: 12px;
       border-radius: 999px;
       background: linear-gradient(90deg, rgba(231, 238, 255, 0.15), rgba(231, 238, 255, 0.45));
       outline: none;
       cursor: pointer;
-      box-shadow: inset 0 0 12px rgba(5, 8, 18, 0.55);
+      box-shadow: inset 0 0 12px rgba(5, 8, 18, 0.6);
     }
     .zoom-meter__control-slider--hue {
       background: linear-gradient(90deg, #ff004c, #ff7b00, #ffe600, #4ddf00, #00c2ff, #6a4dff, #ff004c);
@@ -495,6 +496,15 @@
       align-items: flex-end;
       justify-content: center;
       gap: 18px;
+      position: fixed;
+      bottom: calc(var(--safe-bottom) + 12px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(520px, 88vw);
+      pointer-events: none;
+    }
+    body.is-landscape .hud-bottom__center > * {
+      pointer-events: auto;
     }
     body.is-landscape .hud-bottom__center .zoom-meter {
       width: clamp(280px, 32vw, 360px);
@@ -1062,18 +1072,18 @@
       box-shadow: none;
     }
     .dot-settings-panel {
-      gap: 12px;
+      gap: 8px;
     }
     .dot-settings-panel__row {
       display: flex;
       flex-wrap: wrap;
       align-items: flex-end;
       justify-content: center;
-      gap: 12px;
+      gap: 10px;
     }
     .dot-settings-panel__row .select-control {
-      flex: 1 1 160px;
-      min-width: 140px;
+      flex: 1 1 150px;
+      min-width: 120px;
     }
     .dot-settings-panel__row .palette-toggle {
       flex: 0 0 auto;
@@ -1082,15 +1092,15 @@
       align-items: center;
       justify-content: center;
       white-space: nowrap;
-      padding: 10px 18px;
+      padding: 8px 14px;
     }
     .camera-settings-panel {
-      gap: 16px;
+      gap: 12px;
     }
     .controls--camera {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 12px;
     }
     .slider-control {
       display: flex;
@@ -1108,6 +1118,15 @@
     .slider-control__value {
       font-size: 0.8rem;
       color: var(--muted);
+    }
+    @media (orientation: landscape) and (max-height: 600px) {
+      .menu-panel {
+        padding: 8px 12px;
+        max-height: min(70svh, 70vh);
+      }
+      .camera-settings-panel {
+        gap: 10px;
+      }
     }
     .slider-control input[type="range"] {
       width: 100%;
@@ -1220,12 +1239,7 @@
       image-rendering: pixelated;
       z-index: 2;
       mix-blend-mode: multiply;
-      filter:
-        drop-shadow(0 0 0 rgba(0, 0, 0, 1))
-        drop-shadow(0 1px 0 rgba(0, 0, 0, 1))
-        drop-shadow(1px 0 0 rgba(0, 0, 0, 1))
-        drop-shadow(0 -1px 0 rgba(0, 0, 0, 1))
-        drop-shadow(-1px 0 0 rgba(0, 0, 0, 1));
+      filter: none;
     }
     .pixel-canvas--colorized {
       filter: saturate(0) brightness(1.05);
@@ -1252,14 +1266,22 @@
     }
     .menu-panel {
       display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
       flex-direction: column;
-      gap: 10px;
-      margin-top: 14px;
-      padding: 14px 16px;
+      gap: 8px;
+      margin: 0;
+      padding: 10px 14px;
       border-radius: 14px;
-      background: rgba(5, 9, 18, 0.72);
-      border: 1px solid rgba(123, 207, 255, 0.28);
-      box-shadow: 0 22px 38px rgba(0, 0, 0, 0.35);
+      background: rgba(5, 9, 18, 0.9);
+      border: 1px solid rgba(123, 207, 255, 0.32);
+      box-shadow: 0 24px 44px rgba(0, 0, 0, 0.45);
+      max-height: min(78svh, 78vh);
+      width: min(480px, 92vw);
+      overflow-y: auto;
+      z-index: 20;
     }
     .menu-panel.is-open {
       display: flex;
@@ -1834,6 +1856,18 @@
       </div>
     </div>
   </div>
+  <div id="iosInstallHintOverlay" class="camera-permission" hidden aria-hidden="true">
+    <div class="camera-permission__backdrop" id="iosInstallHintBackdrop"></div>
+    <div class="camera-permission__panel" role="dialog" aria-modal="true" aria-labelledby="iosInstallHintHeading" aria-describedby="iosInstallHintMessage">
+      <h2 id="iosInstallHintHeading" class="camera-permission__title">ホーム画面に追加するには</h2>
+      <p id="iosInstallHintMessage" class="camera-permission__message">
+        Safari の共有メニューから「ホーム画面に追加」を選ぶと、このページをブラウザ経由で素早く開けます。共有ボタン → ホーム画面に追加 をお試しください。
+      </p>
+      <div class="camera-permission__actions">
+        <button type="button" class="camera-permission__button" id="iosInstallHintDismissBtn">閉じる</button>
+      </div>
+    </div>
+  </div>
   <div id="capturePreviewOverlay" class="capture-preview" hidden aria-hidden="true">
     <div class="capture-preview__backdrop" id="capturePreviewBackdrop"></div>
     <div class="capture-preview__panel" role="dialog" aria-modal="true" aria-labelledby="capturePreviewHeading">
@@ -1875,8 +1909,13 @@
     const cameraStartOverlay = document.getElementById('cameraStartOverlay');
     const cameraStartMessage = document.getElementById('cameraStartMessage');
     const cameraStartButton = document.getElementById('cameraStartButton');
+    const cameraStartActions = cameraStartOverlay ? cameraStartOverlay.querySelector('.camera-permission__actions') : null;
     const cameraStartBackdrop = document.getElementById('cameraStartBackdrop');
     const cameraStartButtonLabel = cameraStartButton ? (cameraStartButton.textContent || '').trim() || 'カメラを起動' : 'カメラを起動';
+    const iosInstallHintOverlay = document.getElementById('iosInstallHintOverlay');
+    const iosInstallHintBackdrop = document.getElementById('iosInstallHintBackdrop');
+    const iosInstallHintDismissBtn = document.getElementById('iosInstallHintDismissBtn');
+    const iosInstallHintActions = iosInstallHintOverlay ? iosInstallHintOverlay.querySelector('.camera-permission__actions') : null;
     const capturePreviewOverlay = document.getElementById('capturePreviewOverlay');
     const capturePreviewImage = document.getElementById('capturePreviewImage');
     const capturePreviewInfo = document.getElementById('capturePreviewInfo');
@@ -1909,6 +1948,7 @@
     const ZOOM_FALLBACK_MAX = 8;
     const ZOOM_MAJOR_EPSILON = 1e-3;
     const CAMERA_READY_TIMEOUT_MS = 5000;
+    const IOS_INSTALL_HINT_KEY = 'pixiee-lens:ios-install-hint-dismissed';
     let zoomScaleItems = [];
     let zoomScaleMarks = [];
     let zoomScaleTranslate = 0;
@@ -2015,6 +2055,34 @@
       cameraStartOverlay.addEventListener('click', (event) => {
         if (event.target === cameraStartOverlay) {
           event.preventDefault();
+        }
+      });
+    }
+    if (iosInstallHintDismissBtn) {
+      iosInstallHintDismissBtn.addEventListener('click', () => {
+        if (iosInstallHintOverlay) {
+          iosInstallHintOverlay.hidden = true;
+          iosInstallHintOverlay.setAttribute('aria-hidden', 'true');
+          iosInstallHintOverlay.classList.remove('is-visible');
+        }
+        try {
+          window.localStorage.setItem(IOS_INSTALL_HINT_KEY, '1');
+        } catch (error) {
+          // ignore storage errors
+        }
+      });
+    }
+    if (iosInstallHintBackdrop) {
+      iosInstallHintBackdrop.addEventListener('click', () => {
+        if (iosInstallHintOverlay) {
+          iosInstallHintOverlay.classList.remove('is-visible');
+          iosInstallHintOverlay.hidden = true;
+          iosInstallHintOverlay.setAttribute('aria-hidden', 'true');
+        }
+        try {
+          window.localStorage.setItem(IOS_INSTALL_HINT_KEY, '1');
+        } catch (error) {
+          // ignore
         }
       });
     }
@@ -3673,7 +3741,7 @@
         return;
       }
       cameraStartLocked = true;
-      const message = 'iPhone のホーム画面に追加した PiXiEELENS ではカメラが利用できません。Safari でこのページを開き直してご利用ください。（共有ボタン → “Safariで開く” またはこのボタンをタップ）';
+      const message = 'iPhone のホーム画面に追加した PiXiEELENS ではカメラが利用できません。Safari でこのページを開き直してご利用ください。（共有ボタン → “Safariで開く” を実行した後にご利用ください）';
       if (cameraStartMessage) {
         cameraStartMessage.textContent = message;
       }
@@ -3683,10 +3751,11 @@
       setCameraStatus(message);
       cameraStartButtonBusy = false;
       if (cameraStartButton) {
-        cameraStartButton.disabled = false;
-        cameraStartButton.removeAttribute('aria-busy');
-        cameraStartButton.textContent = 'Safariで開く';
-        cameraStartButton.focus({ preventScroll: true });
+        cameraStartButton.style.display = 'none';
+        cameraStartButton.disabled = true;
+      }
+      if (cameraStartActions) {
+        cameraStartActions.style.display = 'none';
       }
       if (gestureStartHandler) {
         document.removeEventListener('click', gestureStartHandler, true);
@@ -6561,7 +6630,7 @@
       if (blob instanceof Blob) {
         const shareFile = new File([blob], filename, { type: 'image/png' });
         const canShareFiles = typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare({ files: [shareFile] }));
-        if (canShareFiles) {
+        if (isIOS && canShareFiles) {
           try {
             await navigator.share({
               files: [shareFile],
@@ -6992,6 +7061,19 @@
     } else {
       cameraStartLocked = false;
       startCamera();
+      if (isIOSDevice) {
+        let dismissed = false;
+        try {
+          dismissed = window.localStorage.getItem(IOS_INSTALL_HINT_KEY) === '1';
+        } catch (error) {
+          dismissed = false;
+        }
+        if (!dismissed && iosInstallHintOverlay) {
+          iosInstallHintOverlay.hidden = false;
+          iosInstallHintOverlay.setAttribute('aria-hidden', 'false');
+          iosInstallHintOverlay.classList.add('is-visible');
+        }
+      }
     }
   </script>
 </body>
