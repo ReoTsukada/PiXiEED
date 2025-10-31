@@ -1,8 +1,28 @@
 (() => {
   const installBanner = document.getElementById('installPrompt');
   const installButton = document.getElementById('installAppBtn');
+  const installLaterButton = document.getElementById('installLaterBtn');
   let deferredPrompt = null;
   const STORAGE_KEY = 'pixiee-lens:pwa-installed';
+  const DISMISS_KEY = 'pixiee-lens:pwa-dismissed';
+
+  const isAndroidChrome = () => {
+    const ua = navigator.userAgent || '';
+    const isAndroid = /android/i.test(ua);
+    if (!isAndroid) {
+      return false;
+    }
+    const isChrome = /chrome/i.test(ua) && !/crios/i.test(ua);
+    if (!isChrome) {
+      return false;
+    }
+    const isEdge = /edg/i.test(ua);
+    const isOpera = /opr|opera/i.test(ua);
+    const isSamsung = /samsungbrowser/i.test(ua);
+    return !isEdge && !isOpera && !isSamsung;
+  };
+
+  const canShowInstallPrompt = isAndroidChrome();
 
   const isDisplayModeStandalone = () => {
     if (window.matchMedia) {
@@ -25,11 +45,48 @@
     }
   };
 
+  const getDismissedState = () => {
+    try {
+      return window.localStorage.getItem(DISMISS_KEY) === '1';
+    } catch (error) {
+      return false;
+    }
+  };
+
   const setStoredInstallState = () => {
     try {
       window.localStorage.setItem(STORAGE_KEY, '1');
     } catch (error) {
       // ignore storage errors (e.g., Safari private mode)
+    }
+  };
+
+  const setDismissedState = () => {
+    try {
+      const timestamp = Date.now();
+      window.localStorage.setItem(DISMISS_KEY, String(timestamp));
+    } catch (error) {
+      // ignore storage errors
+    }
+  };
+
+  const resetDismissedStateIfExpired = () => {
+    try {
+      const raw = window.localStorage.getItem(DISMISS_KEY);
+      if (!raw) {
+        return;
+      }
+      const timestamp = Number(raw);
+      if (!Number.isFinite(timestamp)) {
+        window.localStorage.removeItem(DISMISS_KEY);
+        return;
+      }
+      const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+      if (Date.now() - timestamp >= ONE_DAY_MS) {
+        window.localStorage.removeItem(DISMISS_KEY);
+      }
+    } catch (error) {
+      // ignore errors
     }
   };
 
@@ -39,18 +96,14 @@
   const showInstallPrompt = () => {
     if (installBanner) {
       installBanner.hidden = false;
-    }
-    if (installButton) {
-      installButton.disabled = false;
+      installBanner.classList.add('is-visible');
     }
   };
 
   const hideInstallPrompt = () => {
     if (installBanner) {
       installBanner.hidden = true;
-    }
-    if (installButton) {
-      installButton.disabled = false;
+      installBanner.classList.remove('is-visible');
     }
   };
 
@@ -60,13 +113,12 @@
     deferredPrompt = null;
   };
 
-  if (installButton) {
+  if (installButton && canShowInstallPrompt) {
     installButton.addEventListener('click', async () => {
       if (!deferredPrompt) {
         return;
       }
       try {
-        installButton.disabled = true;
         deferredPrompt.prompt();
         const choice = await deferredPrompt.userChoice.catch(() => undefined);
         if (choice && choice.outcome === 'accepted') {
@@ -80,9 +132,30 @@
         hideInstallPrompt();
       }
     });
+  } else {
+    hideInstallPrompt();
+  }
+
+  if (installBanner) {
+    installBanner.addEventListener('click', (event) => {
+      if (event.target === installBanner) {
+        setDismissedState();
+        hideInstallPrompt();
+      }
+    });
+  }
+
+  if (installLaterButton) {
+    installLaterButton.addEventListener('click', () => {
+      setDismissedState();
+      hideInstallPrompt();
+    });
   }
 
   window.addEventListener('beforeinstallprompt', (event) => {
+    if (!canShowInstallPrompt) {
+      return;
+    }
     if (isAppInstalled()) {
       return;
     }
@@ -94,6 +167,8 @@
   window.addEventListener('appinstalled', () => {
     markAppInstalled();
   });
+
+  resetDismissedStateIfExpired();
 
   if (isAppInstalled()) {
     hideInstallPrompt();
