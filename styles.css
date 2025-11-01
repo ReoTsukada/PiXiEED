@@ -1065,7 +1065,7 @@ a:focus {
 .ogp-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1.1rem;
+  gap: 1.4rem;
   margin-top: 1.5rem;
 }
 
@@ -1277,7 +1277,7 @@ a:focus {
 }
 
 .games-search {
-  margin: 1rem 0 1.4rem;
+  margin: 0 0 1.5rem;
 }
 
 .games-search__field {
@@ -1304,6 +1304,7 @@ a:focus {
   display: grid;
   gap: 1.4rem;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-top: 1.5rem;
 }
 
 .ogp-card:hover,
@@ -1398,6 +1399,7 @@ a:focus {
   .hero-copy h1 {
     font-size: clamp(1.6rem, 9vw, 2.2rem);
   }
+  .game-grid,
   .ogp-grid {
     grid-template-columns: 1fr;
   }
