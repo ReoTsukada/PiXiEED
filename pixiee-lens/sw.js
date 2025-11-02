@@ -24,6 +24,8 @@ const ASSETS = [
   './st-megane.png',
   './stamps/st-glass.png',
   './stamps/st-megane.png',
+  './stamps/st-mao1.png',
+  './stamps/st-mao2.png',
   './stamps/wst-dot.png',
   './stamps/wst-heart.png',
   './stamps/wst-kira.png',
