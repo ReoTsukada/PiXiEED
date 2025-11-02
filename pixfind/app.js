@@ -1482,6 +1482,42 @@ function registerServiceWorker() {
   }
   let isReloading = false;
   let hasController = Boolean(navigator.serviceWorker.controller);
+  let updateBanner = null;
+
+  const removeUpdateBanner = () => {
+    if (updateBanner) {
+      updateBanner.remove();
+      updateBanner = null;
+    }
+  };
+
+  const showUpdateBanner = (registration) => {
+    const waiting = registration.waiting;
+    if (!waiting || !navigator.serviceWorker.controller || updateBanner) {
+      return;
+    }
+    const banner = document.createElement('div');
+    banner.className = 'update-toast';
+    banner.innerHTML = `
+      <div class="update-toast__body">
+        <p class="update-toast__message">PiXFIND の新しいバージョンが利用できます。</p>
+        <div class="update-toast__actions">
+          <button type="button" class="update-toast__btn update-toast__btn--primary">今すぐ更新</button>
+          <button type="button" class="update-toast__btn">あとで</button>
+        </div>
+      </div>
+    `;
+    const [updateNowBtn, laterBtn] = banner.querySelectorAll('button');
+    updateNowBtn.addEventListener('click', () => {
+      waiting.postMessage({ type: 'SKIP_WAITING' });
+      removeUpdateBanner();
+    }, { once: true });
+    laterBtn.addEventListener('click', () => {
+      removeUpdateBanner();
+    }, { once: true });
+    document.body.appendChild(banner);
+    updateBanner = banner;
+  };
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!hasController) {
@@ -1491,6 +1527,7 @@ function registerServiceWorker() {
     if (isReloading) {
       return;
     }
+    removeUpdateBanner();
     isReloading = true;
     window.location.reload();
   });
@@ -1501,15 +1538,8 @@ function registerServiceWorker() {
     navigator.serviceWorker
       .register(serviceWorkerUrl)
       .then(registration => {
-        const requestSkipWaiting = () => {
-          const waiting = registration.waiting;
-          if (waiting && navigator.serviceWorker.controller) {
-            waiting.postMessage({ type: 'SKIP_WAITING' });
-          }
-        };
-
         if (registration.waiting) {
-          requestSkipWaiting();
+          showUpdateBanner(registration);
         }
 
         registration.addEventListener('updatefound', () => {
@@ -1519,7 +1549,7 @@ function registerServiceWorker() {
           }
           installing.addEventListener('statechange', () => {
             if (installing.state === 'installed') {
-              requestSkipWaiting();
+              showUpdateBanner(registration);
             }
           });
         });
