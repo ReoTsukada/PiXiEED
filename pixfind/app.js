@@ -425,6 +425,18 @@ function createOfficialCard(puzzle) {
     </div>
   `;
 
+  const thumbImage = card.querySelector('.puzzle-card__thumb img');
+  if (thumbImage) {
+    thumbImage.setAttribute('draggable', 'false');
+    thumbImage.setAttribute('aria-hidden', 'true');
+    ['pointerdown', 'touchstart', 'mousedown', 'contextmenu'].forEach((type) => {
+      thumbImage.addEventListener(type, (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }, { passive: false });
+    });
+  }
+
   const handleSelect = () => {
     startOfficialPuzzle(puzzle);
   };
