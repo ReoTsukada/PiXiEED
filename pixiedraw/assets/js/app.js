@@ -3895,6 +3895,10 @@
       setVirtualCursorEnabled(true, { persist: false });
     }
     startupVirtualCursorState = null;
+    if (lensImportRequested) {
+      window.history.replaceState({}, document.title, window.location.href);
+      lensImportRequested = false;
+    }
   }
 
   function setupStartupScreen() {
