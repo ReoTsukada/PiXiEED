@@ -1766,15 +1766,16 @@
                   <option value="2">x2</option>
                   <option value="3">x3</option>
                   <option value="4">x4</option>
+                  <option value="5">x5</option>
                 </select>
               </label>
               <label for="colorDepthSelect" class="select-control">
                 <span class="select-control__label">色数</span>
                 <select id="colorDepthSelect" name="colorDepth">
-                  <option value="full">フルカラー</option>
-                  <option value="gray">グレースケール</option>
-                  <option value="4" selected>4色</option>
-                  <option value="2">2色</option>
+                  <option value="full">８BIT（カラー）</option>
+                  <option value="gray">８BIT（グレー）</option>
+                  <option value="4" selected>2BIT</option>
+                  <option value="2">1BIT</option>
                 </select>
               </label>
               <button id="paletteToggleBtn" class="option-button palette-toggle" type="button" aria-pressed="false" aria-label="パレットを表示">パレット</button>
@@ -2555,6 +2556,10 @@
         `contrast(${combinedContrast.toFixed(3)})`,
         `saturate(${combinedSaturation.toFixed(3)})`
       ];
+
+      if (state.colorDepth === 'gray') {
+        components.push('grayscale(1)');
+      }
 
       const whiteBalanceFilters = computeWhiteBalanceFilters(whiteBalanceValue);
       if (whiteBalanceFilters.length) {
@@ -4016,9 +4021,13 @@
         const dotCount = dotState.width * dotState.height;
         let depthLabel;
         if (state.colorDepth === 'full') {
-          depthLabel = 'フルカラー';
+          depthLabel = '８BIT（カラー）';
         } else if (state.colorDepth === 'gray') {
-          depthLabel = 'グレースケール';
+          depthLabel = '８BIT（グレー）';
+        } else if (state.colorDepth === '4') {
+          depthLabel = '2BIT';
+        } else if (state.colorDepth === '2') {
+          depthLabel = '1BIT';
         } else {
           depthLabel = `${state.colorDepth}色`;
         }
@@ -4047,6 +4056,12 @@
     const COLOR_DEPTHS = ['full', 'gray', '4', '2'];
     const BLACK_COLOR = { r: 0, g: 0, b: 0 };
     const WHITE_COLOR = { r: 255, g: 255, b: 255 };
+    const GRAY_TINT_DEFAULT_COLOR = { r: 192, g: 192, b: 192 };
+    const GRAY_TINT_MIN_SATURATION = 0.22;
+    const GRAY_TINT_MIN_LIGHTNESS = 0.04;
+    const GRAY_TINT_MAX_LIGHTNESS = 0.9;
+    const GRAY_TINT_EDIT_SATURATION = 0.35;
+    const GRAY_TINT_EDIT_LIGHTNESS = 0.65;
     const FIXED_FOUR_COLOR_PALETTE = [
       { r: 224, g: 248, b: 208 }, // lightest green
       { r: 168, g: 192, b: 112 }, // light green
@@ -4135,7 +4150,8 @@
         1: 256,
         2: 128,
         3: 64,
-        4: 32
+        4: 32,
+        5: 16
       };
       const basePixels = scaleMap[state.dotScale] || 64;
       const minPixels = 16;
@@ -4459,8 +4475,7 @@
     function setPaletteDisplayEnabled(enabled) {
       const canEnable = Boolean(enabled)
         && state.dotMode
-        && state.colorDepth !== 'full'
-        && state.colorDepth !== 'gray';
+        && state.colorDepth !== 'full';
       paletteDisplayEnabled = canEnable;
       if (paletteToggleBtn) {
         paletteToggleBtn.classList.toggle('is-active', canEnable);
@@ -4553,9 +4568,20 @@
       const current = paletteState.colors[index];
       const [baseHue, baseS, baseL] = rgbToHsl(original.r, original.g, original.b);
       const [currentHue] = rgbToHsl(current.r, current.g, current.b);
+      let editS = baseS;
+      let editL = baseL;
+      if (state.colorDepth === 'gray') {
+        if (paletteState.userEdited) {
+          editS = Math.max(baseS, GRAY_TINT_MIN_SATURATION);
+          editL = Math.min(Math.max(baseL, GRAY_TINT_EDIT_LIGHTNESS), GRAY_TINT_MAX_LIGHTNESS);
+        } else {
+          editS = GRAY_TINT_EDIT_SATURATION;
+          editL = GRAY_TINT_EDIT_LIGHTNESS;
+        }
+      }
       paletteEditState.activeIndex = index;
-      paletteEditState.baseS = baseS;
-      paletteEditState.baseL = baseL;
+      paletteEditState.baseS = editS;
+      paletteEditState.baseL = editL;
       updateActivePaletteSwatch(index);
       editor.hidden = false;
 
@@ -4624,7 +4650,17 @@
       const normalizedDeg = ((hueDeg % 360) + 360) % 360;
       const hueNormalized = normalizedDeg / 360;
       const index = paletteEditState.activeIndex;
-      const newColor = hslToRgb(hueNormalized, paletteEditState.baseS, paletteEditState.baseL);
+      let targetS = paletteEditState.baseS;
+      let targetL = paletteEditState.baseL;
+      if (state.colorDepth === 'gray') {
+        const fallbackS = Number.isFinite(targetS) ? targetS : GRAY_TINT_EDIT_SATURATION;
+        const fallbackL = Number.isFinite(targetL) ? targetL : GRAY_TINT_EDIT_LIGHTNESS;
+        targetS = Math.max(fallbackS, GRAY_TINT_MIN_SATURATION);
+        targetL = Math.min(Math.max(fallbackL, GRAY_TINT_EDIT_LIGHTNESS), GRAY_TINT_MAX_LIGHTNESS);
+        paletteEditState.baseS = targetS;
+        paletteEditState.baseL = targetL;
+      }
+      const newColor = hslToRgb(hueNormalized, targetS, targetL);
       applyPaletteColorAtIndex(index, newColor);
       if (paletteEditState.elements.value) {
         paletteEditState.elements.value.textContent = `${Math.round(normalizedDeg)}°`;
@@ -4646,8 +4682,6 @@
         return;
       }
       const [origHue, origS, origL] = rgbToHsl(original.r, original.g, original.b);
-      paletteEditState.baseS = origS;
-      paletteEditState.baseL = origL;
       const normalizedDeg = Math.round((((origHue % 1) + 1) % 1) * 360);
       if (paletteEditState.elements.slider) {
         paletteEditState.elements.slider.value = String(normalizedDeg);
@@ -4655,15 +4689,20 @@
       if (paletteEditState.elements.value) {
         paletteEditState.elements.value.textContent = `${normalizedDeg}°`;
       }
+      paletteEditState.baseS = origS;
+      paletteEditState.baseL = origL;
       applyPaletteColorAtIndex(index, { ...original });
+      if (state.colorDepth === 'gray') {
+        paletteEditState.baseS = GRAY_TINT_EDIT_SATURATION;
+        paletteEditState.baseL = GRAY_TINT_EDIT_LIGHTNESS;
+      }
     }
     function updatePaletteToggleAvailability() {
       if (!paletteToggleBtn) {
         return;
       }
       const canShow = state.dotMode
-        && state.colorDepth !== 'full'
-        && state.colorDepth !== 'gray';
+        && state.colorDepth !== 'full';
       paletteToggleBtn.disabled = !canShow;
       if (canShow) {
         paletteToggleBtn.removeAttribute('aria-disabled');
@@ -4970,26 +5009,73 @@
           updatePaletteDisplay(true);
         }
       } else if (depth === 'gray') {
-        const dataArr = imageData.data;
-        for (let i = 0; i < dataArr.length; i += 4) {
-          const value = Math.round(
-            0.2126 * dataArr[i] +
-            0.7152 * dataArr[i + 1] +
-            0.0722 * dataArr[i + 2]
-          );
-          const clamped = Math.max(0, Math.min(255, value));
-          dataArr[i] = clamped;
-          dataArr[i + 1] = clamped;
-          dataArr[i + 2] = clamped;
+        const needsInit = paletteState.depth !== 'gray'
+          || paletteState.colors.length !== 1;
+        if (needsInit) {
+          applyNewPaletteColors([GRAY_TINT_DEFAULT_COLOR]);
+          paletteState.depth = 'gray';
+          paletteState.desired = 1;
+          paletteState.lastUpdated = timestamp;
+          paletteState.userEdited = false;
+          if (paletteDisplayEnabled) {
+            updatePaletteDisplay(true);
+          }
+        } else {
+          paletteState.depth = 'gray';
+          paletteState.desired = 1;
+          paletteState.lastUpdated = timestamp;
         }
-        paletteState.colors = [];
-        paletteState.originalColors = [];
-        paletteState.cache = new Map();
-        paletteState.depth = 'gray';
-        paletteState.desired = 0;
-        paletteState.lastUpdated = timestamp;
-        paletteState.userEdited = false;
-        resetPaletteDisplay();
+        const baseColor = paletteState.colors[0] || GRAY_TINT_DEFAULT_COLOR;
+        const [baseHue, baseSaturation, baseLightness] = rgbToHsl(
+          baseColor.r,
+          baseColor.g,
+          baseColor.b
+        );
+        const tintActive = paletteState.userEdited && baseSaturation > 0.001;
+        const dataArr = imageData.data;
+        if (!tintActive) {
+          for (let i = 0; i < dataArr.length; i += 4) {
+            const value = Math.round(
+              0.2126 * dataArr[i] +
+              0.7152 * dataArr[i + 1] +
+              0.0722 * dataArr[i + 2]
+            );
+            const clamped = Math.max(0, Math.min(255, value));
+            dataArr[i] = clamped;
+            dataArr[i + 1] = clamped;
+            dataArr[i + 2] = clamped;
+          }
+        } else {
+          const minLightness = Math.min(
+            GRAY_TINT_MAX_LIGHTNESS * 0.25,
+            Math.max(GRAY_TINT_MIN_LIGHTNESS, baseLightness * 0.12)
+          );
+          const maxLightness = Math.min(
+            GRAY_TINT_MAX_LIGHTNESS,
+            Math.max(baseLightness, GRAY_TINT_EDIT_LIGHTNESS)
+          );
+          const tintSaturation = Math.max(baseSaturation, GRAY_TINT_MIN_SATURATION);
+          for (let i = 0; i < dataArr.length; i += 4) {
+            const luminance = Math.max(
+              0,
+              Math.min(
+                255,
+                Math.round(
+                  0.2126 * dataArr[i] +
+                  0.7152 * dataArr[i + 1] +
+                  0.0722 * dataArr[i + 2]
+                )
+              )
+            );
+            const normalized = luminance / 255;
+            const lightness = minLightness + (maxLightness - minLightness) * normalized;
+            const saturation = tintSaturation * (0.25 + 0.75 * normalized);
+            const tinted = hslToRgb(baseHue, saturation, lightness);
+            dataArr[i] = tinted.r;
+            dataArr[i + 1] = tinted.g;
+            dataArr[i + 2] = tinted.b;
+          }
+        }
         return;
       } else {
         const desiredColors = Math.max(2, Number(depth) || 4);
@@ -6759,7 +6845,7 @@
         if (value === state.dotScale) {
           return;
         }
-        state.dotScale = Math.max(1, Math.min(4, Math.round(value)));
+        state.dotScale = Math.max(1, Math.min(5, Math.round(value)));
         ensureDotResolution();
         if (state.dotMode) {
           refreshOverlayStatus();
