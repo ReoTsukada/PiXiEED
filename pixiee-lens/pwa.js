@@ -192,6 +192,75 @@
     return;
   }
 
+  let updateBanner = null;
+  let isReloading = false;
+
+  const removeUpdateBanner = () => {
+    if (updateBanner) {
+      updateBanner.remove();
+      updateBanner = null;
+    }
+  };
+
+  const createUpdateBanner = (message, primaryLabel, onPrimary, secondaryLabel, onSecondary) => {
+    const banner = document.createElement('div');
+    banner.className = 'update-toast';
+    banner.innerHTML = `
+      <div class="update-toast__body">
+        <p class="update-toast__message">${message}</p>
+        <div class="update-toast__actions">
+          <button type="button" class="update-toast__btn update-toast__btn--primary">${primaryLabel}</button>
+          <button type="button" class="update-toast__btn">${secondaryLabel}</button>
+        </div>
+      </div>
+    `;
+    const buttons = banner.querySelectorAll('button');
+    const primaryButton = buttons[0];
+    const secondaryButton = buttons[1];
+    primaryButton.addEventListener('click', () => {
+      onPrimary();
+      removeUpdateBanner();
+    }, { once: true });
+    secondaryButton.addEventListener('click', () => {
+      onSecondary();
+      removeUpdateBanner();
+    }, { once: true });
+    return banner;
+  };
+
+  const promptForUpdate = (registration) => {
+    const waitingWorker = registration.waiting;
+    if (!waitingWorker || !navigator.serviceWorker.controller) {
+      return;
+    }
+    if (updateBanner) {
+      return;
+    }
+    const requestUpdate = () => {
+      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+    };
+    const dismiss = () => {
+      // no-op, banner is removed in handler
+    };
+    updateBanner = createUpdateBanner(
+      'PiXiEELENS の新しいバージョンがあります。',
+      '今すぐ更新',
+      requestUpdate,
+      'あとで',
+      dismiss
+    );
+    document.body.appendChild(updateBanner);
+  };
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (isReloading) {
+      return;
+    }
+    removeUpdateBanner();
+    isReloading = true;
+    window.location.reload();
+  });
+
   const resolveBuildVersion = () => {
     const meta = document.querySelector('meta[name="build-version"]');
     const metaContent = meta?.content?.trim();
@@ -209,6 +278,22 @@
 
     navigator.serviceWorker
       .register(serviceWorkerUrl)
+      .then((registration) => {
+        if (registration.waiting) {
+          promptForUpdate(registration);
+        }
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          if (!newWorker) {
+            return;
+          }
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed') {
+              promptForUpdate(registration);
+            }
+          });
+        });
+      })
       .catch((error) => {
         console.warn('Service worker registration failed', error);
       });
