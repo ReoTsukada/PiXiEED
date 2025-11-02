@@ -55,6 +55,81 @@
       width: 100vw;
       height: 100dvh;
     }
+    .update-toast {
+      position: fixed;
+      left: 50%;
+      bottom: calc(var(--hud-padding) + var(--safe-bottom));
+      transform: translateX(-50%);
+      width: min(92vw, 420px);
+      background: rgba(8, 12, 24, 0.92);
+      backdrop-filter: blur(18px);
+      border: 1px solid rgba(123, 207, 255, 0.28);
+      border-radius: 18px;
+      box-shadow: 0 22px 48px rgba(0, 0, 0, 0.55);
+      color: var(--fg);
+      padding: 16px 20px;
+      z-index: 50;
+      pointer-events: auto;
+    }
+    .update-toast__body {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .update-toast__message {
+      margin: 0;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      color: var(--fg);
+    }
+    .update-toast__actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .update-toast__btn {
+      flex: 1 1 auto;
+      min-width: 120px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(123, 207, 255, 0.35);
+      background: rgba(6, 10, 22, 0.8);
+      color: var(--fg);
+      font-size: 0.9rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    }
+    .update-toast__btn:hover,
+    .update-toast__btn:focus-visible {
+      outline: none;
+      border-color: rgba(123, 207, 255, 0.65);
+      background: rgba(10, 18, 34, 0.95);
+      transform: translateY(-1px);
+    }
+    .update-toast__btn--primary {
+      background: linear-gradient(135deg, rgba(123, 207, 255, 0.9), rgba(143, 132, 255, 0.9));
+      border: 1px solid rgba(123, 207, 255, 0.8);
+      color: #050812;
+      text-shadow: none;
+    }
+    .update-toast__btn--primary:hover,
+    .update-toast__btn--primary:focus-visible {
+      background: linear-gradient(135deg, rgba(143, 199, 255, 1), rgba(173, 162, 255, 1));
+      border-color: rgba(143, 199, 255, 0.95);
+    }
+    @media (max-width: 520px) {
+      .update-toast {
+        padding: 14px 16px;
+      }
+      .update-toast__actions {
+        flex-direction: column;
+      }
+      .update-toast__btn {
+        width: 100%;
+      }
+    }
     video {
       position: absolute;
       inset: 0;
