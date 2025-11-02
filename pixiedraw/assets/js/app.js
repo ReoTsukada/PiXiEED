@@ -313,6 +313,17 @@
   const IOS_SNAPSHOT_WRITE_DELAY = 60 * 1000;
   const IOS_SNAPSHOT_COMPRESSION_THRESHOLD = 32 * 1024;
   const textCompression = createTextCompression();
+  const lensImportRequested = (() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('lens') === '1';
+    } catch (error) {
+      return false;
+    }
+  })();
   const AUTOSAVE_DB_NAME = 'pixieedraw-autosave';
   const AUTOSAVE_DB_VERSION = 2;
   const AUTOSAVE_STORE_NAME = 'handles';
@@ -323,6 +334,7 @@
   const THUMBNAIL_MAX_EDGE = 144;
   const THUMBNAIL_CANVAS_SIZE = 160;
   const DOCUMENT_FILE_VERSION = 1;
+  const LENS_IMPORT_STORAGE_KEY = 'pixiee-lens:pending-draw-import';
   function upgradeAutosaveDatabase(db) {
     if (!db) return;
     if (!db.objectStoreNames.contains(AUTOSAVE_STORE_NAME)) {
@@ -2236,9 +2248,13 @@
         if (button) {
           button.textContent = '自動保存先を変更';
         }
-        const restored = await restoreAutosaveDocument(handle);
-        if (restored) {
-          updateAutosaveStatus('自動保存: 有効');
+        if (lensImportRequested) {
+          updateAutosaveStatus('自動保存: 設定済み (PiXiEELENS からの画像を読み込み中)', 'info');
+        } else {
+          const restored = await restoreAutosaveDocument(handle);
+          if (restored) {
+            updateAutosaveStatus('自動保存: 有効');
+          }
         }
       } else {
         schedulePendingAutosavePermission(handle);
@@ -2860,6 +2876,30 @@
     return { palette, indices, overflow: false };
   }
 
+  function dataUrlToBlob(dataUrl) {
+    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
+      return null;
+    }
+    const match = dataUrl.match(/^data:([^;]+);base64,(.*)$/);
+    if (!match) {
+      return null;
+    }
+    const mimeType = match[1] || 'application/octet-stream';
+    const base64Data = match[2] || '';
+    try {
+      const binary = atob(base64Data);
+      const length = binary.length;
+      const bytes = new Uint8Array(length);
+      for (let i = 0; i < length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return new Blob([bytes], { type: mimeType });
+    } catch (error) {
+      console.warn('Failed to convert data URL to blob', error);
+      return null;
+    }
+  }
+
   async function loadDocumentFromImageFile(file) {
     let importResult;
     try {
@@ -3020,6 +3060,118 @@
       updateAutosaveStatus('画像を読み込みました', 'success');
     }
     scheduleSessionPersist();
+  }
+
+  async function fallbackRestoreAutosaveAfterLensFailure() {
+    if (!lensImportRequested) {
+      return;
+    }
+    if (!autosaveHandle) {
+      return;
+    }
+    try {
+      const restored = await restoreAutosaveDocument(autosaveHandle);
+      if (restored) {
+        updateAutosaveStatus('自動保存: 有効', 'info');
+      }
+    } catch (error) {
+      console.warn('Failed to restore autosave after PiXiEELENS import failure', error);
+    }
+  }
+
+  function clearLensImportRequestParam() {
+    if (typeof window === 'undefined' || typeof window.location === 'undefined') {
+      return;
+    }
+    try {
+      const currentUrl = new URL(window.location.href);
+      if (!currentUrl.searchParams.has('lens')) {
+        return;
+      }
+      currentUrl.searchParams.delete('lens');
+      window.history.replaceState({}, document.title, currentUrl.toString());
+    } catch (error) {
+      // Ignore URL manipulation errors.
+    }
+  }
+
+  async function maybeImportLensCapture() {
+    let shouldImport = false;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      shouldImport = params.get('lens') === '1';
+    } catch (error) {
+      shouldImport = false;
+    }
+    if (!shouldImport) {
+      return false;
+    }
+
+    let rawPayload = null;
+    try {
+      rawPayload = window.localStorage.getItem(LENS_IMPORT_STORAGE_KEY);
+    } catch (error) {
+      console.warn('PiXiEELENS transfer storage is not available', error);
+    }
+
+    let payload = null;
+    if (rawPayload) {
+      try {
+        payload = JSON.parse(rawPayload);
+      } catch (error) {
+        console.warn('Failed to parse PiXiEELENS transfer payload', error);
+      }
+    }
+
+    try {
+      window.localStorage.removeItem(LENS_IMPORT_STORAGE_KEY);
+    } catch (error) {
+      // Ignore removal errors; storage might be unavailable.
+    }
+
+    clearLensImportRequestParam();
+
+    if (!payload || typeof payload !== 'object' || typeof payload.dataUrl !== 'string') {
+      updateAutosaveStatus('PiXiEELENS からのデータが見つかりませんでした', 'warn');
+      await fallbackRestoreAutosaveAfterLensFailure();
+      return false;
+    }
+
+    if (payload.expiresAt && Number.isFinite(payload.expiresAt) && Date.now() > payload.expiresAt) {
+      updateAutosaveStatus('PiXiEELENS からのデータが期限切れです。再度送信してください。', 'warn');
+      await fallbackRestoreAutosaveAfterLensFailure();
+      return false;
+    }
+
+    const blob = dataUrlToBlob(payload.dataUrl);
+    if (!blob) {
+      updateAutosaveStatus('PiXiEELENS の画像データを読み込めませんでした', 'error');
+      await fallbackRestoreAutosaveAfterLensFailure();
+      return false;
+    }
+
+    const inferredName = typeof payload.filename === 'string' && payload.filename
+      ? payload.filename
+      : 'pixiee-lens.png';
+    let file;
+    try {
+      file = new File([blob], inferredName, { type: blob.type || 'image/png' });
+    } catch (error) {
+      file = blob;
+      file.name = inferredName;
+    }
+
+    try {
+      await loadDocumentFromImageFile(file);
+      hideStartupScreen();
+      updateAutosaveStatus('PiXiEELENS から画像を取り込みました', 'success');
+      return true;
+    } catch (error) {
+      console.warn('Failed to import capture from PiXiEELENS', error);
+      updateAutosaveStatus('PiXiEELENS の取り込みに失敗しました', 'error');
+      await fallbackRestoreAutosaveAfterLensFailure();
+      return false;
+    }
   }
 
   async function decodeImageFileToFrames(file) {
@@ -6772,8 +6924,14 @@
     initMemoryMonitor();
     updateDocumentMetadata();
     setupStartupScreen();
+    if (lensImportRequested) {
+      hideStartupScreen();
+    }
+    const importedFromLens = await maybeImportLensCapture();
     renderEverything();
-    showStartupScreen();
+    if (!lensImportRequested && !importedFromLens) {
+      showStartupScreen();
+    }
   }
 
   function getActiveTool() {
