@@ -1881,6 +1881,7 @@
         </div>
         <p id="capturePreviewInfo" class="capture-preview__info">画像を長押しして保存してください。</p>
         <div class="capture-preview__actions">
+          <button type="button" class="capture-preview__button" id="capturePreviewEditBtn" hidden>PiXiEEDrawで編集</button>
           <button type="button" class="capture-preview__button capture-preview__button--primary" id="capturePreviewShareBtn" hidden>共有する</button>
           <button type="button" class="capture-preview__button" id="capturePreviewCloseActionBtn">閉じる</button>
         </div>
@@ -1924,6 +1925,7 @@
     const capturePreviewCloseBtn = document.getElementById('capturePreviewCloseBtn');
     const capturePreviewCloseActionBtn = document.getElementById('capturePreviewCloseActionBtn');
     const capturePreviewShareBtn = document.getElementById('capturePreviewShareBtn');
+    const capturePreviewEditBtn = document.getElementById('capturePreviewEditBtn');
     const capturePreviewBackdrop = document.getElementById('capturePreviewBackdrop');
     const cameraSettingSliders = cameraSettingsPanel ? Array.from(cameraSettingsPanel.querySelectorAll('input[data-setting]')) : [];
     const cameraSettingValueEls = new Map();
@@ -2131,6 +2133,12 @@
         }
       });
     }
+    if (capturePreviewEditBtn) {
+      capturePreviewEditBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        openCaptureInDraw();
+      });
+    }
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && capturePreviewOverlay && !capturePreviewOverlay.hidden) {
         closeCapturePreview();
@@ -2311,6 +2319,7 @@
     };
     let capturePreviewObjectUrl = null;
     let capturePreviewSharePayload = null;
+    let capturePreviewEditPayload = null;
     let capturePreviewLastFocus = null;
     let cameraStartOverlayLastFocus = null;
     let cameraStartButtonBusy = false;
@@ -3682,6 +3691,11 @@
         capturePreviewImage.src = '';
       }
       capturePreviewSharePayload = null;
+      capturePreviewEditPayload = null;
+      if (capturePreviewEditBtn) {
+        capturePreviewEditBtn.hidden = true;
+        capturePreviewEditBtn.disabled = true;
+      }
       if (capturePreviewLastFocus && document.contains(capturePreviewLastFocus)) {
         capturePreviewLastFocus.focus({ preventScroll: true });
       }
@@ -3862,7 +3876,7 @@
       }
     }
 
-    function showCapturePreview({ url, filename, width, height, sharePayload, infoMessage }) {
+    function showCapturePreview({ url, filename, width, height, sharePayload, infoMessage, drawPayload }) {
       if (!capturePreviewOverlay || !capturePreviewImage) {
         if (url) {
           window.open(url, '_blank', 'noopener');
@@ -3878,6 +3892,9 @@
       }
       capturePreviewImage.src = url;
       capturePreviewImage.alt = `撮影した画像 ${width}×${height}`;
+      if (!infoMessage && drawPayload) {
+        infoMessage = '画像を長押しして保存するか、「PiXiEEDrawで編集」で編集できます。';
+      }
       if (capturePreviewInfo) {
         capturePreviewInfo.textContent = infoMessage || '画像を長押しするか共有メニューから保存してください。';
       }
@@ -3888,6 +3905,14 @@
       if (capturePreviewShareBtn) {
         capturePreviewShareBtn.hidden = !capturePreviewSharePayload;
         capturePreviewShareBtn.disabled = !capturePreviewSharePayload;
+      }
+      capturePreviewEditPayload = drawPayload && typeof drawPayload.dataUrl === 'string' && drawPayload.dataUrl
+        ? { ...drawPayload }
+        : null;
+      if (capturePreviewEditBtn) {
+        const available = Boolean(capturePreviewEditPayload);
+        capturePreviewEditBtn.hidden = !available;
+        capturePreviewEditBtn.disabled = !available;
       }
       capturePreviewOverlay.hidden = false;
       capturePreviewOverlay.setAttribute('aria-hidden', 'false');
@@ -4072,6 +4097,9 @@
       { r: 0, g: 0, b: 0 },
       { r: 255, g: 255, b: 255 }
     ];
+    const DRAW_IMPORT_STORAGE_KEY = 'pixiee-lens:pending-draw-import';
+    const DRAW_IMPORT_STORAGE_VERSION = 1;
+    const DRAW_IMPORT_EXPIRY_MS = 1000 * 60 * 5;
     const FOUR_COLOR_DARK_THRESHOLD = 96;
 
     function updateAspectLayout() {
@@ -6635,6 +6663,107 @@
       });
     }
 
+    function blobToDataUrl(blob) {
+      return new Promise((resolve, reject) => {
+        if (!(blob instanceof Blob)) {
+          resolve(null);
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = typeof reader.result === 'string' ? reader.result : null;
+          resolve(result);
+        };
+        reader.onerror = () => reject(reader.error || new Error('blob-to-dataurl-error'));
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    async function createDrawImportPayload(result, filename) {
+      if (!result) {
+        return null;
+      }
+      let width = Number(result.width);
+      let height = Number(result.height);
+      let dataUrl = typeof result.dataUrl === 'string' && result.dataUrl ? result.dataUrl : null;
+
+      if (state.dotMode && dotCanvas && dotCanvas.width && dotCanvas.height) {
+        try {
+          dataUrl = dotCanvas.toDataURL('image/png');
+          width = dotCanvas.width;
+          height = dotCanvas.height;
+        } catch (error) {
+          console.warn('Failed to capture dot canvas for PiXiEEDraw import', error);
+        }
+      }
+
+      if (!dataUrl && result.blob instanceof Blob) {
+        try {
+          dataUrl = await blobToDataUrl(result.blob);
+        } catch (error) {
+          console.warn('Failed to build data URL for PiXiEEDraw import', error);
+          dataUrl = null;
+        }
+      }
+
+      if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+        return null;
+      }
+      if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
+        return null;
+      }
+      const payload = {
+        version: DRAW_IMPORT_STORAGE_VERSION,
+        createdAt: Date.now(),
+        filename: typeof filename === 'string' && filename ? filename : 'pixiee-lens.png',
+        width,
+        height,
+        dotScale: state.dotScale,
+        colorDepth: state.colorDepth,
+        dataUrl
+      };
+      return payload;
+    }
+
+    function storeDrawImportPayload(payload) {
+      if (!payload || typeof payload !== 'object') {
+        return false;
+      }
+      try {
+        const enriched = {
+          ...payload,
+          expiresAt: Date.now() + DRAW_IMPORT_EXPIRY_MS
+        };
+        localStorage.setItem(DRAW_IMPORT_STORAGE_KEY, JSON.stringify(enriched));
+        return true;
+      } catch (error) {
+        console.warn('Failed to store PiXiEEDraw transfer payload', error);
+        return false;
+      }
+    }
+
+    function openCaptureInDraw() {
+      if (!capturePreviewEditPayload || typeof capturePreviewEditPayload.dataUrl !== 'string') {
+        setStatus('PiXiEEDraw に送信できるデータがありません');
+        return;
+      }
+      const stored = storeDrawImportPayload(capturePreviewEditPayload);
+      if (!stored) {
+        setStatus('PiXiEEDraw への送信に失敗しました');
+        return;
+      }
+      const baseUrl = new URL('./', window.location.href);
+      const drawUrl = new URL('../pixiedraw/index.html', baseUrl);
+      drawUrl.searchParams.set('lens', '1');
+      const opened = window.open(drawUrl.toString(), '_blank', 'noopener');
+      if (!opened) {
+        setStatus('PiXiEEDraw を開けませんでした。ポップアップがブロックされていないか確認してください。');
+        return;
+      }
+      setStatus('PiXiEEDraw を新しいタブで開きました');
+      closeCapturePreview();
+    }
+
     function composeCaptureFrame() {
       const viewportWidth = Math.max(1, Math.round(window.innerWidth || 0));
       const viewportHeight = Math.max(1, Math.round(window.innerHeight || 0));
@@ -6714,6 +6843,15 @@
       const { blob, dataUrl, cssWidth, cssHeight } = result;
       const supportsDownloadAttr = 'download' in HTMLAnchorElement.prototype;
       const isIOS = /iP(hone|ad|od)/i.test(navigator.userAgent);
+      const drawPayload = await createDrawImportPayload(result, filename);
+      let previewUrl = drawPayload && typeof drawPayload.dataUrl === 'string' ? drawPayload.dataUrl : null;
+      if (!previewUrl && typeof dataUrl === 'string' && dataUrl) {
+        previewUrl = dataUrl;
+      }
+      let sharePayload = null;
+      let infoMessage = drawPayload
+        ? 'PiXiEEDrawで編集するか、画像を保存してご利用ください。'
+        : '画像を保存してご利用ください。';
       if (blob instanceof Blob) {
         const shareFile = new File([blob], filename, { type: 'image/png' });
         const canShareFiles = isIOS && typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare({ files: [shareFile] }));
@@ -6724,7 +6862,6 @@
               title: 'PiXiEELENS',
               text: '撮影した画像'
             });
-            return true;
           } catch (error) {
             if (error && error.name !== 'AbortError') {
               console.warn('Share failed', error);
@@ -6733,9 +6870,9 @@
           }
         }
         if (supportsDownloadAttr) {
-          const objectUrl = URL.createObjectURL(blob);
+          const downloadUrl = URL.createObjectURL(blob);
           const anchor = document.createElement('a');
-          anchor.href = objectUrl;
+          anchor.href = downloadUrl;
           anchor.download = filename;
           anchor.rel = 'noopener';
           anchor.style.position = 'absolute';
@@ -6743,39 +6880,50 @@
           document.body.appendChild(anchor);
           anchor.click();
           document.body.removeChild(anchor);
-          setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-          return true;
+          setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+          infoMessage = drawPayload
+            ? '画像を自動的に保存しました。「PiXiEEDrawで編集」で続けて編集できます。'
+            : '画像を自動的に保存しました。';
+        } else if (canShareFiles) {
+          infoMessage = drawPayload
+            ? '「共有する」ボタンで保存するか、「PiXiEEDrawで編集」で編集できます。'
+            : '「共有する」ボタンから保存してください。';
+        } else {
+          infoMessage = drawPayload
+            ? '画像を長押しして保存するか、「PiXiEEDrawで編集」で編集できます。'
+            : '画像を長押しして写真に保存してください。';
         }
-        const previewUrl = URL.createObjectURL(blob);
-        showCapturePreview({
-          url: previewUrl,
-          filename,
-          width: cssWidth,
-          height: cssHeight,
-          sharePayload: canShareFiles
-            ? {
-                file: shareFile,
-                blobUrl: previewUrl
-              }
-            : null,
-          infoMessage: canShareFiles
-            ? '「共有する」ボタンから写真アプリに保存できます。長押しでも保存できます。'
-            : '画像を長押しして写真に保存してください。'
-        });
-        return true;
+        if (canShareFiles) {
+          const shareUrl = previewUrl && previewUrl.startsWith('blob:')
+            ? previewUrl
+            : URL.createObjectURL(blob);
+          sharePayload = {
+            file: shareFile,
+            blobUrl: shareUrl
+          };
+          if (!previewUrl) {
+            previewUrl = shareUrl;
+          }
+        }
+        if (!previewUrl) {
+          previewUrl = URL.createObjectURL(blob);
+        }
       }
-      if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/png')) {
-        showCapturePreview({
-          url: dataUrl,
-          filename,
-          width: cssWidth,
-          height: cssHeight,
-          sharePayload: null,
-          infoMessage: '画像を長押しして保存してください。'
-        });
-        return true;
+      if (!previewUrl) {
+        return false;
       }
-      return false;
+      const previewWidth = drawPayload ? drawPayload.width : cssWidth;
+      const previewHeight = drawPayload ? drawPayload.height : cssHeight;
+      showCapturePreview({
+        url: previewUrl,
+        filename,
+        width: previewWidth,
+        height: previewHeight,
+        sharePayload,
+        infoMessage,
+        drawPayload
+      });
+      return true;
     }
 
     async function handleCaptureAction() {
