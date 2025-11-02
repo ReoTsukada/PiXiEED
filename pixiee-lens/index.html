@@ -6630,7 +6630,7 @@
       const isIOS = /iP(hone|ad|od)/i.test(navigator.userAgent);
       if (blob instanceof Blob) {
         const shareFile = new File([blob], filename, { type: 'image/png' });
-        const canShareFiles = typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare({ files: [shareFile] }));
+        const canShareFiles = isIOS && typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare({ files: [shareFile] }));
         if (isIOS && canShareFiles) {
           try {
             await navigator.share({
@@ -6646,7 +6646,7 @@
             // continue to fallback preview
           }
         }
-        if (supportsDownloadAttr && !isIOS) {
+        if (supportsDownloadAttr) {
           const objectUrl = URL.createObjectURL(blob);
           const anchor = document.createElement('a');
           anchor.href = objectUrl;
@@ -6666,10 +6666,12 @@
           filename,
           width: cssWidth,
           height: cssHeight,
-          sharePayload: {
-            file: canShareFiles ? shareFile : null,
-            blobUrl: previewUrl
-          },
+          sharePayload: canShareFiles
+            ? {
+                file: shareFile,
+                blobUrl: previewUrl
+              }
+            : null,
           infoMessage: canShareFiles
             ? '「共有する」ボタンから写真アプリに保存できます。長押しでも保存できます。'
             : '画像を長押しして写真に保存してください。'
