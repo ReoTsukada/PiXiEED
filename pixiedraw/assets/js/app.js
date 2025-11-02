@@ -174,6 +174,24 @@
     }
   });
 
+  function disableImageLongPress(element) {
+    if (!element || !(element instanceof HTMLElement)) {
+      return;
+    }
+    element.setAttribute('draggable', 'false');
+    ['pointerdown', 'touchstart', 'mousedown'].forEach((type) => {
+      element.addEventListener(type, (event) => {
+        event.stopPropagation();
+      }, { passive: false });
+    });
+    element.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    }, { passive: false });
+  }
+
+  document.querySelectorAll('img, svg, [data-longpress-block="true"]').forEach(disableImageLongPress);
+
   const referenceDom = {
     overlay: document.getElementById('referenceOverlay'),
     wrap: document.getElementById('referenceWrap'),
@@ -3123,12 +3141,6 @@
       }
     }
 
-    try {
-      window.localStorage.removeItem(LENS_IMPORT_STORAGE_KEY);
-    } catch (error) {
-      // Ignore removal errors; storage might be unavailable.
-    }
-
     clearLensImportRequestParam();
 
     if (!payload || typeof payload !== 'object' || typeof payload.dataUrl !== 'string') {
@@ -3165,6 +3177,11 @@
       await loadDocumentFromImageFile(file);
       hideStartupScreen();
       updateAutosaveStatus('PiXiEELENS から画像を取り込みました', 'success');
+      try {
+        window.localStorage.removeItem(LENS_IMPORT_STORAGE_KEY);
+      } catch (error) {
+        // ignore
+      }
       return true;
     } catch (error) {
       console.warn('Failed to import capture from PiXiEELENS', error);
