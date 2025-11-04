@@ -6950,6 +6950,13 @@
 
   async function init() {
     await initializeIosSnapshotFallback();
+    if (window.__PIXIEEDRAW_SW_READY__ instanceof Promise) {
+      try {
+        await window.__PIXIEEDRAW_SW_READY__;
+      } catch (error) {
+        console.warn('Service worker initialization promise rejected', error);
+      }
+    }
     await initializeAutosave();
     setupLeftTabs();
     setupRightTabs();
