@@ -3134,6 +3134,89 @@
     }
   }
 
+  async function waitForServiceWorkerInstallation(worker) {
+    if (!worker) {
+      return;
+    }
+    if (worker.state === 'installed' || worker.state === 'redundant') {
+      return;
+    }
+    await new Promise((resolve) => {
+      const handleStateChange = () => {
+        if (worker.state === 'installed' || worker.state === 'redundant') {
+          worker.removeEventListener('statechange', handleStateChange);
+          resolve();
+        }
+      };
+      worker.addEventListener('statechange', handleStateChange);
+    });
+  }
+
+  async function activateWaitingServiceWorker(registration) {
+    const waiting = registration?.waiting;
+    if (!waiting) {
+      return false;
+    }
+    let resolved = false;
+    return await new Promise((resolve) => {
+      const settle = (didChange) => {
+        if (resolved) {
+          return;
+        }
+        resolved = true;
+        clearTimeout(timeoutId);
+        navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+        waiting.removeEventListener('statechange', handleStateChange);
+        resolve(didChange);
+      };
+      const handleControllerChange = () => {
+        settle(true);
+      };
+      navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+      const handleStateChange = () => {
+        if (waiting.state === 'redundant') {
+          settle(false);
+        }
+      };
+      waiting.addEventListener('statechange', handleStateChange);
+      const timeoutId = setTimeout(() => settle(false), 8000);
+      try {
+        waiting.postMessage({ type: 'SKIP_WAITING' });
+      } catch (error) {
+        settle(false);
+      }
+    });
+  }
+
+  async function ensureLatestServiceWorkerForLensImport() {
+    if (!lensImportRequested) {
+      return false;
+    }
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+      return false;
+    }
+    let registration;
+    try {
+      registration = await navigator.serviceWorker.ready;
+    } catch (error) {
+      console.warn('Failed to obtain service worker readiness before lens import', error);
+      return false;
+    }
+    if (!registration) {
+      return false;
+    }
+    try {
+      await registration.update();
+    } catch (error) {
+      console.warn('Service worker update check failed before lens import', error);
+    }
+    if (!registration.waiting && registration.installing) {
+      await waitForServiceWorkerInstallation(registration.installing);
+    }
+    const reloading = await activateWaitingServiceWorker(registration);
+    return reloading;
+  }
+
   async function maybeImportLensCapture() {
     let shouldImport = false;
     try {
@@ -6956,6 +7039,18 @@
       } catch (error) {
         console.warn('Service worker initialization promise rejected', error);
       }
+    }
+    let pendingReload = false;
+    if (lensImportRequested) {
+      try {
+        pendingReload = await ensureLatestServiceWorkerForLensImport();
+      } catch (error) {
+        console.warn('Service worker update synchronization failed before lens import', error);
+        pendingReload = false;
+      }
+    }
+    if (pendingReload) {
+      return;
     }
     await initializeAutosave();
     setupLeftTabs();
