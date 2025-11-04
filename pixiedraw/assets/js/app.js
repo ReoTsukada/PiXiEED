@@ -2401,6 +2401,27 @@
     }
   }
 
+  async function ensureAutosaveForLensImport(filename) {
+    if (!AUTOSAVE_SUPPORTED) {
+      return;
+    }
+    if (autosaveHandle) {
+      autosaveDirty = true;
+      scheduleAutosaveSnapshot();
+      return;
+    }
+    const baseName = typeof filename === 'string' && filename.trim()
+      ? sanitizeDocumentFileBase(filename.trim())
+      : sanitizeDocumentFileBase(state.documentName);
+    const suggestedName = `${baseName || 'pixiee-lens-import'}.pixieedraw`;
+    updateAutosaveStatus('PiXiEELENS の画像を保存するため、保存先を選択してください。', 'info');
+    try {
+      await requestAutosaveBinding({ suggestedName });
+    } catch (error) {
+      console.warn('Autosave binding after lens import failed', error);
+    }
+  }
+
   async function ensureHandlePermission(handle, { request = false } = {}) {
     if (!handle) return false;
     const opts = { mode: 'readwrite' };
@@ -3182,6 +3203,7 @@
       } catch (error) {
         // ignore
       }
+      await ensureAutosaveForLensImport(inferredName);
       return true;
     } catch (error) {
       console.warn('Failed to import capture from PiXiEELENS', error);
