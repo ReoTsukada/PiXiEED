@@ -26,6 +26,7 @@
   const serviceWorkerURL = `service-worker.js?v=${encodeURIComponent(versionToken)}`;
   let updateBanner = null;
   let isReloading = false;
+  let hasController = Boolean(navigator.serviceWorker.controller);
 
   function removeBanner() {
     if (updateBanner) {
@@ -82,6 +83,10 @@
   }
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hasController) {
+      hasController = true;
+      return;
+    }
     if (isReloading) {
       return;
     }
