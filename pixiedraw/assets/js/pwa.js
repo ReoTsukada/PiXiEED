@@ -24,6 +24,10 @@
 
   const versionToken = resolveBuildVersion();
   const serviceWorkerURL = `service-worker.js?v=${encodeURIComponent(versionToken)}`;
+  let swReadyResolve;
+  const swReadyPromise = new Promise((resolve) => {
+    swReadyResolve = resolve;
+  });
   let updateBanner = null;
   let isReloading = false;
   let hasController = Boolean(navigator.serviceWorker.controller);
@@ -91,6 +95,9 @@
       return;
     }
     isReloading = true;
+    if (typeof swReadyResolve === 'function') {
+      swReadyResolve();
+    }
     window.location.reload();
   });
 
@@ -98,6 +105,9 @@
     navigator.serviceWorker
       .register(serviceWorkerURL, { scope: './' })
       .then(registration => {
+        if (typeof swReadyResolve === 'function') {
+          swReadyResolve();
+        }
         if (registration.waiting) {
           promptForUpdate(registration);
         }
@@ -116,6 +126,11 @@
       })
       .catch(error => {
         console.warn('Service worker registration failed:', error);
+        if (typeof swReadyResolve === 'function') {
+          swReadyResolve();
+        }
       });
   });
+
+  window.__PIXIEEDRAW_SW_READY__ = swReadyPromise;
 })();
