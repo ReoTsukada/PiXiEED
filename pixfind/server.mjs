@@ -74,5 +74,5 @@ const PORT = Number(process.env.PORT) || 3000;
 const server = createServer();
 
 server.listen(PORT, () => {
-  console.log(`PiXFIND dev server running at http://localhost:${PORT}`);
+  console.log(`PiXFiND dev server running at http://localhost:${PORT}`);
 });
