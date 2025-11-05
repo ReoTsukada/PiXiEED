@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PiXFIND</title>
-  <meta name="description" content="PiXFINDはドット絵に特化したブラウザ向けの間違い探しゲーム。公式パズルを難易度別に収録し、イベントや配信でも使いやすいUIを備えています。">
+  <title>PiXFiND</title>
+  <meta name="description" content="PiXFiNDはドット絵に特化したブラウザ向けの間違い探しゲーム。公式パズルを難易度別に収録し、イベントや配信でも使いやすいUIを備えています。">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
@@ -30,21 +30,22 @@
   <main>
     <section class="hero" id="overview">
       <div class="hero-copy">
-        <h1>PiXFIND</h1>
-        <p>PiXFINDは「ドット絵で間違い探しを楽しむ」という一点に特化したブラウザゲームです。正解画像と間違い画像の差分をエンジンが自動抽出し、難易度別にパズルを選んで遊べます。</p>
+        <h1>PiXFiND</h1>
+        <p>PiXFiNDは「ドット絵で間違い探しを楽しむ」という一点に特化したブラウザゲームです。正解画像と間違い画像の差分をエンジンが自動抽出し、難易度別にパズルを選んで遊べます。</p>
         <p>ホーム画面に追加すればフルスクリーンで起動でき、タッチ・クリックいずれの操作にも対応。展示会や配信でもシンプルな導線で利用できます。</p>
+        <p class="project-status">現在調整中のため、アクセスコードをお持ちの方のみプレイできます。</p>
         <p class="project-update" data-last-updated>
           <span class="project-update__label">最終更新</span>
           <time class="project-update__value" datetime="">--</time>
         </p>
         <div class="hero-cta">
-          <a class="cta-primary" href="../../pixfind/index.html">ブラウザでプレイ</a>
+          <a class="cta-primary" href="../../pixfind/index.html" data-project-gate="project">ブラウザでプレイ</a>
           <a class="cta-secondary" href="../../games.html#games-section">ゲーム一覧を見る</a>
         </div>
       </div>
       <div class="hero-visual" aria-hidden="true">
         <div class="project-visual">
-          <img src="../../pixfind/ogp.png" alt="PiXFIND のプレイ画面イメージ" loading="lazy">
+          <img src="../../pixfind/ogp.png" alt="PiXFiND のプレイ画面イメージ" loading="lazy">
         </div>
       </div>
     </section>
@@ -105,8 +106,9 @@
         <div class="project-note">
           <strong>制作背景</strong>
           <p>ドット絵の資料を見ながら「差分を強制的に探す」遊びをイベントで提供したいという構想から生まれました。PiXiEEDraw のピクセル補完ロジックをベースに、ブラウザで動作する差分検出エンジンとして組み直し、誰でもURL一つでアクセスできる形にしています。</p>
+          <p>公開環境を調整中のため、一時的にアクセスコードによる限定公開としています。</p>
           <div class="project-actions">
-            <a class="cta-primary" href="../../pixfind/index.html">ブラウザでプレイ</a>
+            <a class="cta-primary" href="../../pixfind/index.html" data-project-gate="project">ブラウザでプレイ</a>
             <a class="cta-secondary" href="../../portfolio/index.html#notes">制作ノートを読む</a>
           </div>
         </div>
@@ -118,7 +120,7 @@
         <h2>楽しんでいただけたら</h2>
         <p>クリアタイムや発見数はワンクリックで共有リンクに変換できます。ハッシュタグ <code>#PiXiEED</code> を付けて感想やスクリーンショットを拡散していただけると制作の励みになります。</p>
         <div class="project-actions">
-          <a class="cta-primary" href="../../pixfind/index.html">今すぐ遊ぶ</a>
+          <a class="cta-primary" href="../../pixfind/index.html" data-project-gate="project">今すぐ遊ぶ</a>
           <a class="cta-secondary" href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">公式X (旧Twitter)</a>
         </div>
       </div>
@@ -152,6 +154,23 @@
           <span class="contact-option__detail">@PiXiEED_arta</span>
         </a>
       </div>
+    </div>
+  </div>
+
+  <div id="projectGateOverlay" class="contact-overlay project-gate-overlay" hidden aria-hidden="true">
+    <div class="contact-panel project-gate-panel" role="dialog" aria-modal="true" aria-labelledby="projectGateTitle">
+      <button type="button" class="contact-close project-gate__close" aria-label="閉じる">×</button>
+      <h2 id="projectGateTitle">プロジェクトアクセス</h2>
+      <p class="project-gate__description">プロジェクトページを表示するにはアクセスコードが必要です。</p>
+      <form id="projectGateForm" class="project-gate__form" novalidate>
+        <label for="projectGateInput" class="project-gate__label">アクセスコード</label>
+        <input type="password" id="projectGateInput" class="project-gate__input" inputmode="numeric" autocomplete="off" aria-required="true">
+        <p id="projectGateError" class="project-gate__error" aria-live="polite" hidden>コードが一致しません。</p>
+        <div class="project-gate__actions">
+          <button type="submit" class="project-gate__submit">確認</button>
+          <button type="button" class="project-gate__cancel">キャンセル</button>
+        </div>
+      </form>
     </div>
   </div>
 
