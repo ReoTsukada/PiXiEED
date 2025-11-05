@@ -238,7 +238,7 @@ function normalizePuzzleEntry(entry) {
   return {
     id: entry.id ?? identifier,
     slug: entry.slug ?? identifier,
-    label: entry.label ?? entry.slug ?? entry.id ?? 'PiXFIND Puzzle',
+    label: entry.label ?? entry.slug ?? entry.id ?? 'PiXFiND Puzzle',
     description: entry.description ?? '',
     difficulty: normalizeDifficulty(entry.difficulty),
     original,
@@ -257,7 +257,7 @@ function createShareUrl(puzzle) {
 async function sharePuzzle(puzzle) {
   const shareUrl = createShareUrl(puzzle);
   const shareData = {
-    title: `PiXFIND | ${puzzle.label}`,
+    title: `PiXFiND | ${puzzle.label}`,
     text: `${puzzle.label}（${createStarLabel(puzzle.difficulty)}）に挑戦してみてください。`,
     url: shareUrl,
   };
@@ -525,7 +525,7 @@ function prepareGameBoard(originalImage, challengeImage, diffResult, metadata = 
     markers: {},
   }));
   state.currentPuzzle = metadata || {
-    name: 'PiXFIND Puzzle',
+    name: 'PiXFiND Puzzle',
     difficulty: state.currentDifficulty,
     size: `${originalImage.width}×${originalImage.height}px`,
   };
@@ -1512,7 +1512,7 @@ function registerServiceWorker() {
     banner.className = 'update-toast';
     banner.innerHTML = `
       <div class="update-toast__body">
-        <p class="update-toast__message">PiXFIND の新しいバージョンが利用できます。</p>
+        <p class="update-toast__message">PiXFiND の新しいバージョンが利用できます。</p>
         <div class="update-toast__actions">
           <button type="button" class="update-toast__btn update-toast__btn--primary">今すぐ更新</button>
           <button type="button" class="update-toast__btn">あとで</button>
