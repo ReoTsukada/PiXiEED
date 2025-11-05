@@ -11,13 +11,13 @@
   "main": "app.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ReoTsukada/PiXFIND.git"
+    "url": "git+https://github.com/ReoTsukada/PiXFiND.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/ReoTsukada/PiXFIND/issues"
+    "url": "https://github.com/ReoTsukada/PiXFiND/issues"
   },
-  "homepage": "https://github.com/ReoTsukada/PiXFIND#readme"
+  "homepage": "https://github.com/ReoTsukada/PiXFiND#readme"
 }
