@@ -1,7 +1,7 @@
 {
-  "name": "PiXFIND",
-  "short_name": "PiXFIND",
-  "description": "ドット絵で間違い探しが楽しめる PiXFIND の公式アプリ。",
+  "name": "PiXFiND",
+  "short_name": "PiXFiND",
+  "description": "ドット絵で間違い探しが楽しめる PiXFiND の公式アプリ。",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
