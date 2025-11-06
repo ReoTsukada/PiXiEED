@@ -3,18 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ドット絵専門ブラウザツール | PiXiEED</title>
-  <meta name="description" content="PiXiEEDはドット絵専門のブラウザツールとゲームを公開する個人制作サイト。エディターや作品集、アルタのポートフォリオにすぐアクセスできます。">
+  <title>PiXiEED | ドット絵専用総合サイト</title>
+  <meta name="description" content="PiXiEEDはドット絵専用のブラウザツールとゲーム、アルタの制作ノートを集約した個人制作サイトです。">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="PiXiEED">
-  <meta property="og:title" content="ドット絵専門ブラウザツール | PiXiEED">
-  <meta property="og:description" content="PiXiEEDはドット絵専門のブラウザツールとゲームを公開する個人制作サイト。エディターや作品集、アルタのポートフォリオにすぐアクセスできます。">
+  <meta property="og:title" content="PiXiEED | ドット絵専用総合サイト">
+  <meta property="og:description" content="ドット絵に特化したブラウザツールとゲーム、アルタの制作記録をワンページで紹介するPiXiEEDの公式サイト。">
   <meta property="og:url" content="https://pixieed.jp/">
   <meta property="og:image" content="https://pixieed.jp/pixiedraw/ogp.png">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="ドット絵専門ブラウザツール | PiXiEED">
-  <meta name="twitter:description" content="PiXiEEDはドット絵専門のブラウザツールとゲームを公開する個人制作サイト。エディターや作品集、アルタのポートフォリオにすぐアクセスできます。">
+  <meta name="twitter:title" content="PiXiEED | ドット絵専用総合サイト">
+  <meta name="twitter:description" content="ドット絵に特化したブラウザツールとゲームを公開するPiXiEEDの公式サイト。制作ノートやポートフォリオも掲載。">
   <meta name="twitter:image" content="https://pixieed.jp/pixiedraw/ogp.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
   <script>
@@ -29,185 +33,164 @@
   });
   gtag('event', 'home_visit');
   </script>
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-  <header class="site-header">
-    <div class="site-brand">
-      <a href="#" class="logo">PiXiEED</a>
-      <p class="tagline">遊びとツールを、ブラウザから届けるクリエイターズグループ</p>
+<body class="portfolio-page">
+  <header class="portfolio-header">
+    <div class="portfolio-header__inner">
+      <a class="logo" href="index.html">PiXiEED</a>
+      <nav class="portfolio-header__nav" aria-label="ポートフォリオ ナビゲーション">
+        <ul class="portfolio-nav">
+          <li><a href="#projects">作品</a></li>
+          <li><a href="#tools">ツール</a></li>
+          <li><a href="#notes">制作ノート</a></li>
+          <li><a href="#contact">コンタクト</a></li>
+        </ul>
+      </nav>
+      <nav class="portfolio-header__links" aria-label="関連リンク">
+        <a href="terms/index.html">利用規約</a>
+        <a href="privacy/index.html">プライバシーポリシー</a>
+        <a href="contact/index.html">お問い合わせ</a>
+        <a href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">公式X</a>
+      </nav>
     </div>
-    <nav class="site-nav" aria-label="メイン">
-      <ul>
-        <li><a href="#showcase">制作物</a></li>
-        <li><a href="games.html">ツール/ゲーム</a></li>
-        <li><a href="portfolio/index.html">アルタ</a></li>
-      </ul>
-    </nav>
   </header>
 
   <main>
-    <section class="hero" id="hero">
-      <div class="hero-copy">
-        <h1>PiXiEED ホームページ</h1>
-        <p>PiXiEEDは、「アプリ全盛の今だからこそ、ブラウザの自由度と即時性を最大限に活かした遊びとツールを届けたい」という想いから生まれた個人制作サイトです。</p>
-        <p>ドット絵という限られた表現領域の「上限を突破する」ことをテーマに、ブラウザだけで遊べるゲームとツールを継続的に公開していきます。</p>
-        <div class="hero-cta">
-          <a class="cta-primary" href="#showcase">制作物を見る</a>
-          <a class="cta-secondary" href="portfolio/index.html">アルタのポートフォリオ</a>
+    <section class="section section--accent" id="projects">
+      <div class="section-inner">
+        <h2>制作プロジェクト</h2>
+        <div class="ogp-grid">
+          <a class="ogp-card" href="projects/maoitu/index.html">
+            <img src="maoitu/ogp.png" alt="魔王様!!いつまでよければいいですか!? のOGP画像">
+            <div class="ogp-card__meta">
+              <span class="ogp-card__tag">Game</span>
+              <h3 class="ogp-card__title">魔王様!!いつまでよければいいですか!?</h3>
+              <p class="ogp-card__description">避け続けるスリルをブラウザで楽しめる人気No.1アクション。</p>
+            </div>
+          </a>
+          <a class="ogp-card" href="projects/pixfind/index.html">
+            <img src="pixfind/ogp.png" alt="PiXFiND のOGP画像">
+            <div class="ogp-card__meta">
+              <span class="ogp-card__tag">Game</span>
+              <h3 class="ogp-card__title">PiXFiND（調整中）</h3>
+              <p class="ogp-card__description">ドット絵に特化した間違い探し。現在調整中のため、アクセスコードが必要です。</p>
+            </div>
+          </a>
+          <a class="ogp-card" href="projects/pixiedraw/index.html">
+            <img src="pixiedraw/ogp.png" alt="PiXiEEDraw のOGP画像">
+            <div class="ogp-card__meta">
+              <span class="ogp-card__tag">Tool</span>
+              <h3 class="ogp-card__title">PiXiEEDraw</h3>
+              <p class="ogp-card__description">ブラウザだけで動作するドット絵エディター。描画補助と公開機能を備えたプレリリース版です。</p>
+            </div>
+          </a>
+          <a class="ogp-card" href="projects/pixiee-lens/index.html">
+            <img src="pixiee-lens/ogp.png" alt="PiXiEELENS のOGP画像" loading="lazy">
+            <div class="ogp-card__meta">
+              <span class="ogp-card__tag">Tool</span>
+              <h3 class="ogp-card__title">PiXiEELENS</h3>
+              <p class="ogp-card__description">全画面カメラのラボ版。ドットモードとパレット読込で配色を遊べます。</p>
+            </div>
+          </a>
         </div>
       </div>
-      <div class="hero-visual" aria-label="PiXiEED Showcase">
-        <div class="hero-reel" role="list">
-          <div class="hero-reel__track">
-            <a class="hero-card hero-card--project" role="listitem" href="projects/pixfind/index.html">
-              <figure>
-                <img src="pixfind/ogp.png" alt="PiXFiND のスクリーンショット" loading="lazy">
-                <figcaption>
-                  <span class="hero-card__tag">ゲーム</span>
-                  <strong>PiXFiND 調整中</strong>
-                  <p>ドット絵で楽しむ間違い探し。現在調整中のため、アクセスコードが必要です。</p>
-                </figcaption>
-              </figure>
-            </a>
-            <a class="hero-card hero-card--project" role="listitem" href="projects/maoitu/index.html">
-              <figure>
-                <img src="maoitu/ogp.png" alt="魔王様!!いつまでよければいいですか!? のスクリーンショット" loading="lazy">
-                <figcaption>
-                  <span class="hero-card__tag">ゲーム</span>
-                  <strong>魔王様!!いつまでよければいいですか!?</strong>
-                  <p>避け続ける緊張感をブラウザで。</p>
-                </figcaption>
-              </figure>
-            </a>
-            <a class="hero-card hero-card--tool" role="listitem" href="projects/pixiedraw/index.html" data-project-gate="project">
-              <figure>
-                <img src="pixiedraw/ogp.png" alt="PiXiEEDraw のプレビューイメージ" loading="lazy">
-                <figcaption>
-                  <span class="hero-card__tag">ツール</span>
-                  <strong>PiXiEEDraw プレビュー公開</strong>
-                  <p>ブラウザ特化のドット絵エディターをプレリリースで体験できます。</p>
-                </figcaption>
-              </figure>
-            </a>
-            <a class="hero-card hero-card--tool" role="listitem" href="pixiee-lens/index.html">
-              <figure>
-                <img src="pixiee-lens/ogp.png" alt="PiXiEELENS のプレビューイメージ" loading="lazy">
-                <figcaption>
-                  <span class="hero-card__tag">ツール</span>
-                  <strong>PiXiEELENS Camera Lab</strong>
-                  <p>全画面カメラのラボ版。ドットモードとパレット読込にも対応しています。</p>
-                </figcaption>
-              </figure>
-            </a>
-            <a class="hero-card hero-card--portfolio" role="listitem" href="portfolio/index.html#dot-gallery">
-              <figure>
-                <img src="portfolio/dots/ARTA_HinyariToNyanbiri.gif" alt="アルタのドットポートフォリオの最新作品 Hinyari To Nyanbiri" loading="lazy">
-                <figcaption>
-                  <span class="hero-card__tag">ポートフォリオ</span>
-                  <strong>Alta Dot Gallery 更新</strong>
-                  <p>新しい風景ドットを追加。GIFアニメで奥行きと光を表現しています。</p>
-                </figcaption>
-              </figure>
-            </a>
-            <a class="hero-card hero-card--note" role="listitem" href="portfolio/index.html#notes">
-              <figure>
-                <div class="hero-card__preview hero-card__preview--note" aria-hidden="true"></div>
-                <figcaption>
-                  <span class="hero-card__tag">ノート</span>
-                  <strong>制作ノート最新回</strong>
-                  <p>ポートフォリオ内でブラウザ制作の背景や公開戦略をまとめた読み物を公開中です。</p>
-                </figcaption>
-              </figure>
-            </a>
+    </section>
+
+    <section class="section" id="dot-gallery">
+      <div class="section-inner">
+        <h2>ドットポートフォリオ</h2>
+        <p class="dot-gallery__intro">これまで描いてきた風景ドットの一部を掲載しています。下のボタンを選ぶと上部のビュアーが切り替わります。</p>
+        <div class="dot-gallery__viewer">
+          <img id="dotGalleryMain" src="" alt="" loading="lazy">
+        </div>
+        <div class="dot-gallery__buttons" id="dotGalleryButtons">
+          <!-- ボタンはスクリプトで生成します -->
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="tools">
+      <div class="section-inner">
+        <h2>使用ツール</h2>
+        <div class="tool-stack">
+          <div>
+            <h3>使用ツール</h3>
+            <ul>
+              <li>Aseprite</li>
+              <li>GitHub</li>
+              <li>ChatGPT</li>
+              <li>VS Code</li>
+            </ul>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="section" id="showcase">
+    <section class="section section--highlight" id="notes">
       <div class="section-inner">
-        <h2>PiXiEEDのコンテンツ</h2>
-        <p class="showcase-intro">ツール・ゲーム・作品・ノート。知りたい場所へそのまま移動できます。</p>
-        <div class="content-grid" role="list">
-          <a class="content-card content-card--primary" role="listitem" href="projects/pixiedraw/index.html" data-project-gate="project">
-            <h3>PiXiEEDraw</h3>
-            <p>ブラウザで完結するドット絵エディターのプレビュー版。無料で今すぐ試せます。</p>
-            <span class="content-card__cta">ツールページへ</span>
-          </a>
-          <a class="content-card" role="listitem" href="games.html">
-            <h3>ツール/ゲーム</h3>
-            <p>ブラウザで動くツールと遊べるコンテンツをまとめています。アップデート状況もこちらから。</p>
-            <span class="content-card__cta">一覧を見る</span>
-          </a>
-          <a class="content-card" role="listitem" href="portfolio/index.html">
-            <h3>アルタのポートフォリオ</h3>
-            <p>新作ドットと背景表現を掲載。GIFアニメや制作ノートにもすぐアクセスできます。</p>
-            <span class="content-card__cta">作品を見る</span>
-          </a>
-          <a class="content-card" role="listitem" href="portfolio/index.html#notes">
-            <h3>制作ノート</h3>
-            <p>制作背景や公開戦略をまとめた短い読み物。更新履歴もここで確認できます。</p>
-            <span class="content-card__cta">ノートを読む</span>
-          </a>
+        <h2>ノート</h2>
+        <div class="notes-list">
+          <article class="note">
+            <button class="note__header" type="button" data-note="maoitu">
+              <div class="note__meta">
+                <span class="note__date">2025-10-03</span>
+                <h3 class="note__title">『魔王様!!』をブラウザで作り直した理由</h3>
+              </div>
+              <span class="note__toggle" aria-hidden="true">+</span>
+            </button>
+            <div class="note__body" id="note-maoitu" hidden>
+              <p>以前は Unity でアプリを制作し、Google Play や App Store の審査・バージョン管理を並行でこなしていましたが、更新のたびに多面的なチェックと提出が必要で体力的にも時間的にも負担が大きいと感じていました。せっかく作ったキャラクターのデータは手元に残っていたので、もっと気軽に遊んでもらえる形で生かせないかと考え始めたのがブラウザ版『魔王様!!』制作のきっかけです。</p>
+              <p>決め手になったのは「QR コードに mini ゲームを埋め込む」という海外動画を見たことでした。実際に試してみると自分の領域では手が届かない技術スタックだと分かりましたが、昔遊んでいた無料ブラウザゲームの記憶がよみがえり、URL ひとつで届けられる体験に再挑戦しようと決めました。小さい頃に憧れたサイトのワクワク感を、今の自分のキャラクターたちで再現してみたかったのです。</p>
+              <p>ブラウザは手軽さが命なので、背景を描き込むよりも操作レスポンスと再挑戦の速さを優先しました。難易度は 1 に設定し、プレイ中にレベルが上がっても操作はシンプルなまま。ちょっとした待ち時間に開ける「暇つぶしで楽しい避けゲー」を目指したので、ぜひ URL をシェアして遊んでみてください。</p>
+            </div>
+          </article>
+          <article class="note">
+            <button class="note__header" type="button" data-note="browser">
+              <div class="note__meta">
+                <span class="note__date">2025-09-15</span>
+                <h3 class="note__title">なぜブラウザゲームを作るのか</h3>
+              </div>
+              <span class="note__toggle" aria-hidden="true">+</span>
+            </button>
+            <div class="note__body" id="note-browser" hidden>
+              <p>ブラウザの最大の魅力は「見つけてもらえさえすれば、ダウンロードなしで遊んでもらえる」こと。URLやQRコードを渡すだけで、その場でゲームやツールが立ち上がります。イベント会場でQRをプリントしたカードやキーホルダーを配れば、文字どおり“ゲームを持ち歩く”体験を提供できます。</p>
+              <p>アプリはワンタップで起動できる反面、ストアで見つけてもらうところに高いハードルがあります。見つけてもらい、ダウンロードしてもらい、さらに有料となればもうひとつ壁が立ちはだかる。その点ブラウザなら、URLにアクセスした瞬間に遊び始めてもらえる。障壁が少ないからこそ、気軽に試してもらえるチャンスが広がります。</p>
+              <p>さらに、QRコードをグッズ化すれば、新しいマネタイズの形にもなります。キーホルダーを購入してくださった方がいれば、その時点で価値が生まれる。課金に抵抗がある方でも、グッズとして応援できる導線を用意できるのは大きな強みです。</p>
+              <p>もちろんアプリにも利点はありますが、個人クリエイターがストア審査や公開準備まで駆け抜けるのは負担が大きい。その労力をブラウザに注ぐことで、制作→公開→改善のサイクルを高速に回しながら、ショートカット登録やホーム画面追加などアプリライクな体験も提供できます。</p>
+              <p>だからこそ、ブラウザの強みを活かして「アプリより楽しく、手軽に遊べるゲームとツール」を作り続けたい。ブラウザ文化をもっと根強いものにしていければと思っています。</p>
+            </div>
+          </article>
         </div>
       </div>
     </section>
 
+    <section class="section" id="contact">
+      <div class="section-inner contact">
+        <div>
+          <h2>コンタクト</h2>
+          <p>制作依頼やコラボの相談はメールでどうぞ。</p>
+          <a class="cta-primary" href="mailto:arta@pixieed.jp">arta@pixieed.jp</a>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer class="site-footer">
     <div class="footer-inner">
-      <small>&copy; <span id="year"></span> PiXiEED. All rights reserved.</small>
+      <small>&copy; <span id="year"></span> PiXiEED / Alta Portfolio</small>
       <div class="footer-links">
+        <a href="index.html">ホーム</a>
         <a href="terms/index.html">利用規約</a>
         <a href="privacy/index.html">プライバシーポリシー</a>
-        <a href="portfolio/index.html">アルタポートフォリオ</a>
-        <button type="button" class="footer-contact js-contact-open">お問い合わせ</button>
-        <a class="footer-link--x" href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">公式X (旧Twitter)</a>
+        <a href="contact/index.html">お問い合わせ</a>
+        <a href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">公式X</a>
       </div>
     </div>
   </footer>
 
-  <div id="contactOverlay" class="contact-overlay" hidden aria-hidden="true">
-    <div class="contact-panel" role="dialog" aria-modal="true" aria-labelledby="contactTitle">
-      <button type="button" class="contact-close js-contact-close" aria-label="閉じる">×</button>
-      <h2 id="contactTitle">お問い合わせ</h2>
-      <p>ご希望の連絡手段を選択してください。</p>
-      <div class="contact-options">
-        <a class="contact-option" href="mailto:arta@pixieed.jp">
-          <span class="contact-option__title">メールで問い合わせる</span>
-          <span class="contact-option__detail">arta@pixieed.jp</span>
-        </a>
-        <a class="contact-option" href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">
-          <span class="contact-option__title">X (旧Twitter) のDM</span>
-          <span class="contact-option__detail">@PiXiEED_arta</span>
-        </a>
-      </div>
-    </div>
-  </div>
-
-  <div id="projectGateOverlay" class="contact-overlay project-gate-overlay" hidden aria-hidden="true">
-    <div class="contact-panel project-gate-panel" role="dialog" aria-modal="true" aria-labelledby="projectGateTitle">
-      <button type="button" class="contact-close project-gate__close" aria-label="閉じる">×</button>
-      <h2 id="projectGateTitle">プロジェクトアクセス</h2>
-      <p class="project-gate__description">プロジェクトページを表示するにはアクセスコードが必要です。</p>
-      <form id="projectGateForm" class="project-gate__form" novalidate>
-        <label for="projectGateInput" class="project-gate__label">アクセスコード</label>
-        <input type="password" id="projectGateInput" class="project-gate__input" inputmode="numeric" autocomplete="off" aria-required="true">
-        <p id="projectGateError" class="project-gate__error" aria-live="polite" hidden>コードが一致しません。</p>
-        <div class="project-gate__actions">
-          <button type="submit" class="project-gate__submit">確認</button>
-          <button type="button" class="project-gate__cancel">キャンセル</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
   <script src="scripts.js"></script>
+  <script src="portfolio/dots/manifest.js"></script>
+  <script src="scripts/gallery.js"></script>
+  <script src="scripts/notes.js"></script>
 </body>
 </html>
