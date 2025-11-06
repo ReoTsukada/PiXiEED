@@ -15,6 +15,28 @@
   <meta name="twitter:title" content="PiXFiND">
   <meta name="twitter:description" content="ドット絵に特化したブラウザ向けの間違い探しゲーム PiXFiND。難易度を選び、公式パズルでスコアを伸ばそう。">
   <meta name="twitter:image" content="https://pixieed.jp/pixfind/ogp.png">
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
+  <script>
+    const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
+    const GA_PAGE_PATH = '/pixfind/';
+    const PROJECT_SLUG = 'pixfind';
+    const PROJECT_NAME = 'PiXFiND';
+    const PROJECT_TYPE = 'game';
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', GA_MEASUREMENT_ID, {
+      page_path: GA_PAGE_PATH,
+      page_title: document.title
+    });
+    gtag('event', 'project_open', {
+      project_slug: PROJECT_SLUG,
+      project_type: PROJECT_TYPE,
+      project_name: PROJECT_NAME
+    });
+    gtag('event', 'project_open_pixfind');
+  </script>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
