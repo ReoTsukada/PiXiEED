@@ -11,10 +11,14 @@
 <meta name="theme-color" content="#000000">
 <link rel="apple-touch-icon" href="/maoitu/icons/icon-192.png">
 <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-LLSD5KLJVN"></script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
 <script>
-const GA_MEASUREMENT_ID = 'G-LLSD5KLJVN';
+const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
+const GA_ADDITIONAL_IDS = ['G-LLSD5KLJVN'];
 const GA_PAGE_PATH = '/maoitu/game';
+const PROJECT_SLUG = 'maoitu';
+const PROJECT_NAME = '魔王様!!いつまでよければいいですか!?';
+const PROJECT_TYPE = 'game';
 window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
@@ -22,6 +26,18 @@ gtag('config', GA_MEASUREMENT_ID, {
   page_path: GA_PAGE_PATH,
   page_title: document.title
 });
+GA_ADDITIONAL_IDS.forEach(id => {
+  gtag('config', id, {
+    page_path: GA_PAGE_PATH,
+    page_title: document.title
+  });
+});
+gtag('event', 'project_open', {
+  project_slug: PROJECT_SLUG,
+  project_type: PROJECT_TYPE,
+  project_name: PROJECT_NAME
+});
+gtag('event', 'project_open_maoitu');
 </script>
 <!-- Google AdSense -->
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
