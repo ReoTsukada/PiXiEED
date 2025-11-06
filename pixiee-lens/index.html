@@ -16,6 +16,28 @@
   <meta name="twitter:description" content="PiXiEELENS は全画面カメラとドットモードを備えた実験ページです。">
   <meta name="twitter:image" content="https://pixieed.jp/pixiee-lens/ogp.png">
   <meta name="build-version" content="20241102-01">
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
+  <script>
+    const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
+    const GA_PAGE_PATH = '/pixiee-lens/';
+    const PROJECT_SLUG = 'pixiee-lens';
+    const PROJECT_NAME = 'PiXiEELENS';
+    const PROJECT_TYPE = 'tool';
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', GA_MEASUREMENT_ID, {
+      page_path: GA_PAGE_PATH,
+      page_title: document.title
+    });
+    gtag('event', 'project_open', {
+      project_slug: PROJECT_SLUG,
+      project_type: PROJECT_TYPE,
+      project_name: PROJECT_NAME
+    });
+    gtag('event', 'project_open_pixiee_lens');
+  </script>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
