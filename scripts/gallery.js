@@ -6,7 +6,7 @@
   if (Array.isArray(window.DOT_GALLERY_MANIFEST) && window.DOT_GALLERY_MANIFEST.length) {
     initialize(window.DOT_GALLERY_MANIFEST);
   } else {
-    fetch('../portfolio/dots/manifest.json', { cache: 'no-store' })
+    fetch('portfolio/dots/manifest.json', { cache: 'no-store' })
       .then(response => response.ok ? response.json() : Promise.reject())
       .then(data => initialize(Array.isArray(data) ? data : []))
       .catch(() => initialize([]));
@@ -16,7 +16,7 @@
     if (!entries.length) {
       entries = [
         {
-          file: '../maoitu/ogp.png',
+          file: 'maoitu/ogp.png',
           label: 'Maoitu',
           date: new Date().toISOString().slice(0, 10),
           alt: '魔王様!!いつまでよければいいですか!? のタイトル背景'
@@ -32,11 +32,11 @@
       button.className = 'dot-gallery__button' + (index === 0 ? ' is-active' : '');
       const src = entry.file.startsWith('http') || entry.file.startsWith('data:')
         ? entry.file
-        : `../portfolio/dots/${entry.file}`;
+        : (entry.file.includes('/') ? entry.file : `portfolio/dots/${entry.file}`);
       const thumb = entry.thumb
         ? (entry.thumb.startsWith('http') || entry.thumb.startsWith('data:')
             ? entry.thumb
-            : `../portfolio/dots/${entry.thumb}`)
+            : (entry.thumb.includes('/') ? entry.thumb : `portfolio/dots/${entry.thumb}`))
         : src;
       button.dataset.src = src;
       button.dataset.alt = entry.alt || entry.label || '';
