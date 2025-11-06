@@ -132,5 +132,5 @@
       });
   });
 
-  window.__PIXIEEDRAW_SW_READY__ = swReadyPromise;
+  window.__PiXiEEDRAW_SW_READY__ = swReadyPromise;
 })();
