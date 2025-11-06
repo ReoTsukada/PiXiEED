@@ -14,6 +14,28 @@
     <meta name="twitter:title" content="PiXiEEDraw" />
     <meta name="twitter:description" content="ブラウザから直接操作できるピクセルアートエディター PiXiEEDraw" />
     <meta name="twitter:image" content="https://pixieed.jp/pixiedraw/ogp.png" />
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
+    <script>
+      const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
+      const GA_PAGE_PATH = '/pixiedraw/';
+      const PROJECT_SLUG = 'pixiedraw';
+      const PROJECT_NAME = 'PiXiEEDraw';
+      const PROJECT_TYPE = 'tool';
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', GA_MEASUREMENT_ID, {
+        page_path: GA_PAGE_PATH,
+        page_title: document.title
+      });
+      gtag('event', 'project_open', {
+        project_slug: PROJECT_SLUG,
+        project_type: PROJECT_TYPE,
+        project_name: PROJECT_NAME
+      });
+      gtag('event', 'project_open_pixiedraw');
+    </script>
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
