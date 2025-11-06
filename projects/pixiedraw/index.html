@@ -43,10 +43,10 @@
     </div>
     <nav class="site-nav" aria-label="メイン">
       <ul>
-        <li><a href="../../index.html#showcase" aria-current="page">制作物</a></li>
-        <li><a href="../../games.html#tools-section">ツール</a></li>
-        <li><a href="../../games.html#games-section">ゲーム</a></li>
-        <li><a href="../../portfolio/index.html">アルタ</a></li>
+        <li><a href="../../index.html#projects" aria-current="page">制作プロジェクト</a></li>
+        <li><a href="../../index.html#tools">使用ツール</a></li>
+        <li><a href="../../index.html#notes">制作ノート</a></li>
+        <li><a href="../../index.html#contact">コンタクト</a></li>
       </ul>
     </nav>
   </header>
@@ -62,17 +62,37 @@
           <time class="project-update__value" datetime="">--</time>
         </p>
         <div class="hero-cta">
-          <a class="cta-primary" href="../../pixiedraw/index.html">ツールを開く（早期アクセス）</a>
-          <button type="button" class="cta-secondary" data-open-chrome>Chromeで開く</button>
-          <a class="cta-secondary" href="../../games.html#tools-section">ツール一覧に戻る</a>
+          <a class="cta-primary" href="../../pixiedraw/index.html">プレイする（ツールを開く）</a>
+          <a class="cta-secondary" href="../../index.html#projects">制作プロジェクト一覧に戻る</a>
         </div>
-        <p class="cta-helper" id="chromeHelper" hidden>
-          Chromeがインストール済みの端末でお試しください。起動できない場合は既定ブラウザの設定をご確認ください。
-        </p>
       </div>
       <div class="hero-visual" aria-hidden="true">
         <div class="project-visual">
           <img src="../../pixiedraw/ogp.png" alt="PiXiEEDraw のUIプレビューイメージ" loading="lazy">
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="howto">
+      <div class="section-inner">
+        <h2>使い方</h2>
+        <ol class="project-howto">
+          <li>起動後のスタート画面で「新規作成」または「ファイルを開く」を選び、キャンバスサイズや読み込むデータを設定します。</li>
+          <li>左レールでツール、右レールでレイヤーやアニメーションを切り替えながらドットを配置します。モバイルでは画面下部のタブから同じ機能にアクセスできます。</li>
+          <li>編集中は数秒ごとに自動保存が行われます。エクスポート時はPNG・スプライトシート・タイルセットなど目的に合わせた書き出し形式を選択してください。</li>
+          <li>ブラウザのメニューから「ホーム画面に追加」すると、フルスクリーン表示で素早く起動できるPWAとして利用できます。</li>
+        </ol>
+        <p class="project-howto__note">Chromeでの利用を推奨しています。Chrome以外のブラウザでは一部機能に制限がかかる場合があります。</p>
+      </div>
+    </section>
+
+    <section class="section" id="install">
+      <div class="section-inner">
+        <h2>インストール</h2>
+        <div class="project-install-buttons">
+          <button type="button" class="button button--outline project-install-button">iOS / Safari</button>
+          <button type="button" class="button button--outline project-install-button">Android / Chrome</button>
+          <button type="button" class="button button--outline project-install-button">PC / Chrome・Edge</button>
         </div>
       </div>
     </section>
@@ -127,7 +147,7 @@
         <h2>ご意見・フィードバック募集</h2>
         <p>操作感や機能リクエストを常時募集中です。PiXiEEDraw 内のフィードバックボタン、または公式Xのハッシュタグ <code>#PiXiEEDraw</code> からお寄せください。</p>
         <div class="project-actions">
-          <a class="cta-primary" href="../../pixiedraw/index.html">PiXiEEDraw を開く</a>
+          <a class="cta-primary" href="../../pixiedraw/index.html">プレイする（ツールを開く）</a>
           <a class="cta-secondary" href="mailto:arta@pixieed.jp">メールで連絡する</a>
         </div>
       </div>
@@ -165,54 +185,5 @@
   </div>
 
   <script src="../../scripts.js"></script>
-  <script>
-  (function () {
-    const chromeTrigger = document.querySelector('[data-open-chrome]');
-    if (!chromeTrigger) {
-      return;
-    }
-    const helper = document.getElementById('chromeHelper');
-    const defaultMessage = helper ? helper.textContent.trim() : '';
-
-    function showMessage(text) {
-      if (!helper) return;
-      if (text) {
-        helper.textContent = text;
-      } else {
-        helper.textContent = defaultMessage;
-      }
-      helper.hidden = false;
-    }
-
-    chromeTrigger.addEventListener('click', () => {
-      const targetUrl = new URL('../../pixiedraw/index.html', window.location.href).href;
-      const ua = navigator.userAgent || '';
-      const isChrome = /\bChrome\//.test(ua) && !/\bEdg\//.test(ua) && !/\bOPR\//.test(ua) && !/\bBrave\//.test(ua);
-
-      if (isChrome) {
-        showMessage('現在表示しているブラウザはChromeです。PiXiEEDrawのページをそのまま開き直します。');
-        window.location.href = targetUrl;
-        return;
-      }
-
-      showMessage();
-      const isMobile = /iP(ad|hone|od)/.test(ua) || /Android/.test(ua);
-      const schemeUrl = isMobile
-        ? `googlechrome://navigate?url=${encodeURIComponent(targetUrl)}`
-        : `googlechrome://${targetUrl.replace(/^https?:\/\//, '')}`;
-
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = schemeUrl;
-      document.body.appendChild(iframe);
-
-      window.setTimeout(() => {
-        if (iframe.parentNode) {
-          iframe.parentNode.removeChild(iframe);
-        }
-      }, 1500);
-    });
-  })();
-  </script>
 </body>
 </html>
