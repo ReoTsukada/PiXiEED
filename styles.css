@@ -1605,18 +1605,20 @@ a:focus {
   border: 1px solid rgba(140, 140, 255, 0.3);
   background: rgba(10, 12, 30, 0.9);
   overflow: hidden;
-  aspect-ratio: 16 / 9;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: min(100%, 720px);
+  margin-left: auto;
+  margin-right: auto;
   box-shadow: var(--shadow-soft);
 }
 
 .dot-gallery__viewer img {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
+  display: block;
+  width: 100%;
   height: auto;
+  max-height: none;
   image-rendering: pixelated;
   transform-origin: center;
 }
@@ -1894,17 +1896,6 @@ a:focus {
   font-size: 1.05rem;
   color: var(--fg-primary);
   margin-bottom: 0.4rem;
-}
-
-.project-install-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.8rem;
-  margin-top: 1.2rem;
-}
-
-.project-install-button {
-  min-width: 180px;
 }
 
 .project-actions {
