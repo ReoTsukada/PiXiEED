@@ -67,7 +67,7 @@ a:focus {
   font-family: var(--font-heading);
   font-weight: 700;
   letter-spacing: 0.12em;
-  text-transform: uppercase;
+  text-transform: none;
   font-size: clamp(1.2rem, 2vw, 1.6rem);
 }
 
@@ -1029,6 +1029,25 @@ a:focus {
   border-color: var(--accent);
 }
 
+.portfolio-header__links {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.portfolio-header__links a {
+  color: var(--fg-secondary);
+  text-decoration: none;
+  transition: color var(--transition);
+}
+
+.portfolio-header__links a:hover,
+.portfolio-header__links a:focus-visible {
+  color: var(--fg-primary);
+}
+
 .hero--portfolio {
   padding-top: clamp(4rem, 7vw, 6.5rem);
 }
@@ -1701,9 +1720,25 @@ a:focus {
   .portfolio-nav {
     flex-wrap: wrap;
   }
-  .play-actions {
+  .portfolio-header__links {
+    width: 100%;
     justify-content: flex-start;
   }
+.play-actions {
+  justify-content: flex-start;
+}
+}
+
+.project-status {
+  display: inline-block;
+  margin: 0.6rem 0 0;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(140, 140, 255, 0.18);
+  border: 1px solid rgba(140, 140, 255, 0.32);
+  color: var(--fg-primary);
+  font-size: clamp(0.88rem, 2.3vw, 1rem);
+  letter-spacing: 0.02em;
 }
 
 .project-page main {
@@ -1797,6 +1832,23 @@ a:focus {
   margin-bottom: 0.35rem;
 }
 
+.project-howto {
+  margin: 1.2rem 0 0;
+  padding-left: 1.4rem;
+  color: var(--fg-secondary);
+  line-height: 1.7;
+}
+
+.project-howto li {
+  margin-bottom: 0.65rem;
+}
+
+.project-howto__note {
+  margin-top: 1.2rem;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: clamp(0.9rem, 2.4vw, 1.02rem);
+}
+
 .project-meta-grid {
   display: grid;
   gap: 1.1rem;
@@ -1842,6 +1894,17 @@ a:focus {
   font-size: 1.05rem;
   color: var(--fg-primary);
   margin-bottom: 0.4rem;
+}
+
+.project-install-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-top: 1.2rem;
+}
+
+.project-install-button {
+  min-width: 180px;
 }
 
 .project-actions {
