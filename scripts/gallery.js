@@ -69,13 +69,9 @@
   }
 
   function fitImage(img) {
-    const container = img.parentElement;
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-    const naturalWidth = img.naturalWidth || rect.width;
-    const naturalHeight = img.naturalHeight || rect.height;
-    if (!naturalWidth || !naturalHeight) return;
-    const scale = Math.min(rect.width / naturalWidth, rect.height / naturalHeight);
-    img.style.transform = `scale(${scale})`;
+    if (!img) return;
+    img.style.transform = 'none';
+    img.style.width = '100%';
+    img.style.height = 'auto';
   }
 })();
