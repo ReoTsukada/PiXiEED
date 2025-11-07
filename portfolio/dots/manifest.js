@@ -70,5 +70,11 @@ window.DOT_GALLERY_MANIFEST = [
     "label": "SRA Landscape",
     "date": "2025-10-10",
     "alt": "湖畔の風景を描いた落ち着いた色調のドット絵"
+  },
+  {
+    "file": "tyou.gif",
+    "label": "Butterfly Echo",
+    "date": "2025-11-08",
+    "alt": "柔らかな光の中を舞う蝶のドットアニメーション"
   }
 ];
