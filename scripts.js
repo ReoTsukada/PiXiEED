@@ -7,6 +7,7 @@
     setupProjectGate();
     setupHeroReel();
     setupShowcaseFilter();
+    disableImageInteractions();
   }
 
   function updateCopyrightYear() {
@@ -14,6 +15,20 @@
     if (yearElement) {
       yearElement.textContent = new Date().getFullYear().toString();
     }
+  }
+
+  function disableImageInteractions() {
+    document.addEventListener('contextmenu', event => {
+      if (event.target instanceof HTMLImageElement) {
+        event.preventDefault();
+      }
+    });
+
+    document.addEventListener('dragstart', event => {
+      if (event.target instanceof HTMLImageElement) {
+        event.preventDefault();
+      }
+    });
   }
 
   function revealLastUpdated() {
