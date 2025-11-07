@@ -1011,6 +1011,7 @@ a:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: nowrap;
   gap: 1.5rem;
   padding: 1rem clamp(1.5rem, 5vw, 3rem);
 }
@@ -1040,21 +1041,67 @@ a:focus {
 .portfolio-header__links {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
+  gap: 0.75rem;
+  flex-wrap: nowrap;
+  min-width: 0;
   font-size: 0.85rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.portfolio-header__links::-webkit-scrollbar {
+  display: none;
 }
 
 .portfolio-header__links a {
   color: var(--fg-secondary);
   text-decoration: none;
   transition: color var(--transition);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .portfolio-header__links a:hover,
 .portfolio-header__links a:focus-visible {
   color: var(--fg-primary);
 }
+
+.wick-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 1.2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(140, 140, 255, 0.65);
+  background: linear-gradient(135deg, rgba(40, 44, 90, 0.9), rgba(20, 24, 56, 0.85));
+  color: var(--fg-primary);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: transform var(--transition), border-color var(--transition), background var(--transition);
+}
+
+.wick-button::after {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  margin-left: 0.2rem;
+}
+
+.wick-button:hover,
+.wick-button:focus-visible {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, rgba(76, 82, 150, 0.95), rgba(38, 42, 92, 0.95));
+  transform: translateY(-1px);
+  outline: none;
+}
+
 
 .hero--portfolio {
   padding-top: clamp(4rem, 7vw, 6.5rem);
@@ -1754,19 +1801,36 @@ a:focus {
     padding: 0.25rem 0.45rem;
   }
   .portfolio-header__inner {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .portfolio-header__inner .logo {
+    order: 0;
+  }
+  .portfolio-header__links {
+    order: 1;
+    margin-left: auto;
+    width: auto;
+    justify-content: flex-end;
+    overflow: visible;
+  }
+  .portfolio-header__nav {
+    order: 2;
+    flex: 1 0 100%;
+    margin-top: 0.5rem;
   }
   .portfolio-nav {
     flex-wrap: wrap;
   }
-  .portfolio-header__links {
+  .wick-button {
+    justify-content: center;
     width: 100%;
+    white-space: normal;
+  }
+  .play-actions {
     justify-content: flex-start;
   }
-.play-actions {
-  justify-content: flex-start;
-}
 }
 
 .project-status {
