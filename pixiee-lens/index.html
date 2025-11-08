@@ -38,7 +38,6 @@
     });
     gtag('event', 'project_open_pixiee_lens');
   </script>
-  <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
   <link rel="apple-touch-icon" href="./icon-192.png">
@@ -621,72 +620,6 @@
     }
     .hud-bottom__menus > * {
       width: min(420px, 92vw);
-    }
-    .install-banner {
-      position: fixed;
-      top: calc(var(--safe-top) + 18px);
-      left: 50%;
-      transform: translateX(-50%);
-      width: min(540px, 96vw);
-      z-index: 999;
-      pointer-events: auto;
-      display: none;
-    }
-    .install-banner.is-visible {
-      display: block;
-    }
-    .install-banner__body {
-      background: rgba(7, 11, 26, 0.9);
-      border: 1px solid rgba(123, 207, 255, 0.35);
-      border-radius: 18px;
-      padding: 18px 20px;
-      box-shadow: 0 18px 48px rgba(4, 6, 16, 0.45);
-      backdrop-filter: blur(14px);
-    }
-    .install-banner__copy {
-      margin: 0 0 14px;
-      font-size: clamp(0.9rem, 2.4vw, 1.05rem);
-      line-height: 1.6;
-      color: rgba(231, 238, 255, 0.9);
-    }
-    .install-banner__actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 12px;
-    }
-    .install-button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.4rem;
-      padding: 10px 20px;
-      border-radius: 999px;
-      border: 1px solid rgba(123, 207, 255, 0.35);
-      background: rgba(123, 207, 255, 0.22);
-      color: #fff;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      font-size: 0.88rem;
-      line-height: 1;
-      cursor: pointer;
-      transition: background 0.2s ease, border-color 0.2s ease, transform 0.18s ease;
-    }
-    .install-button--ghost {
-      background: transparent;
-      border-color: rgba(123, 207, 255, 0.25);
-      color: rgba(231, 238, 255, 0.8);
-    }
-    .install-button:hover {
-      background: rgba(123, 207, 255, 0.32);
-      border-color: rgba(123, 207, 255, 0.55);
-    }
-    .install-button--ghost:hover {
-      background: rgba(123, 207, 255, 0.18);
-      color: #fff;
-    }
-    .install-button:focus-visible {
-      outline: 2px solid rgba(123, 207, 255, 0.75);
-      outline-offset: 3px;
     }
     .camera-permission {
       position: fixed;
@@ -1653,7 +1586,6 @@
       }
     }
   </style>
-  <script src="./pwa.js" defer></script>
 </head>
   <body>
   <main>
@@ -1879,21 +1811,6 @@
             </div>
             <div id="paletteDisplay" class="palette-display" aria-hidden="true"></div>
           </div>
-          <div id="installPrompt" class="install-banner" hidden role="alert">
-            <div class="install-banner__body">
-              <p class="install-banner__copy">
-                PiXiEELENS をホーム画面に追加して、ワンタップで起動できます。今すぐインストールしますか？
-              </p>
-              <div class="install-banner__actions">
-                <button id="installLaterBtn" class="install-button install-button--ghost" type="button">
-                  あとで
-                </button>
-                <button id="installAppBtn" class="install-button" type="button">
-                  インストール
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       <div class="hud-bottom__actions" role="group" aria-label="操作">
         <div class="hud-bottom__actions-group hud-bottom__actions-group--left">
@@ -1955,18 +1872,6 @@
       </div>
     </div>
   </div>
-  <div id="iosInstallHintOverlay" class="camera-permission" hidden aria-hidden="true">
-    <div class="camera-permission__backdrop" id="iosInstallHintBackdrop"></div>
-    <div class="camera-permission__panel" role="dialog" aria-modal="true" aria-labelledby="iosInstallHintHeading" aria-describedby="iosInstallHintMessage">
-      <h2 id="iosInstallHintHeading" class="camera-permission__title">ホーム画面に追加するには</h2>
-      <p id="iosInstallHintMessage" class="camera-permission__message">
-        Safari の共有メニューから「ホーム画面に追加」を選ぶと、このページをブラウザ経由で素早く開けます。共有ボタン → ホーム画面に追加 をお試しください。
-      </p>
-      <div class="camera-permission__actions">
-        <button type="button" class="camera-permission__button" id="iosInstallHintDismissBtn">閉じる</button>
-      </div>
-    </div>
-  </div>
   <div id="capturePreviewOverlay" class="capture-preview" hidden aria-hidden="true">
     <div class="capture-preview__backdrop" id="capturePreviewBackdrop"></div>
     <div class="capture-preview__panel" role="dialog" aria-modal="true" aria-labelledby="capturePreviewHeading">
@@ -2012,10 +1917,6 @@
     const cameraStartActions = cameraStartOverlay ? cameraStartOverlay.querySelector('.camera-permission__actions') : null;
     const cameraStartBackdrop = document.getElementById('cameraStartBackdrop');
     const cameraStartButtonLabel = cameraStartButton ? (cameraStartButton.textContent || '').trim() || 'カメラを起動' : 'カメラを起動';
-    const iosInstallHintOverlay = document.getElementById('iosInstallHintOverlay');
-    const iosInstallHintBackdrop = document.getElementById('iosInstallHintBackdrop');
-    const iosInstallHintDismissBtn = document.getElementById('iosInstallHintDismissBtn');
-    const iosInstallHintActions = iosInstallHintOverlay ? iosInstallHintOverlay.querySelector('.camera-permission__actions') : null;
     const capturePreviewOverlay = document.getElementById('capturePreviewOverlay');
     const capturePreviewImage = document.getElementById('capturePreviewImage');
     const capturePreviewInfo = document.getElementById('capturePreviewInfo');
@@ -2049,7 +1950,6 @@
     const ZOOM_FALLBACK_MAX = 8;
     const ZOOM_MAJOR_EPSILON = 1e-3;
     const CAMERA_READY_TIMEOUT_MS = 5000;
-    const IOS_INSTALL_HINT_KEY = 'pixiee-lens:ios-install-hint-dismissed';
     let zoomScaleItems = [];
     let zoomScaleMarks = [];
     let zoomScaleTranslate = 0;
@@ -2156,34 +2056,6 @@
       cameraStartOverlay.addEventListener('click', (event) => {
         if (event.target === cameraStartOverlay) {
           event.preventDefault();
-        }
-      });
-    }
-    if (iosInstallHintDismissBtn) {
-      iosInstallHintDismissBtn.addEventListener('click', () => {
-        if (iosInstallHintOverlay) {
-          iosInstallHintOverlay.hidden = true;
-          iosInstallHintOverlay.setAttribute('aria-hidden', 'true');
-          iosInstallHintOverlay.classList.remove('is-visible');
-        }
-        try {
-          window.localStorage.setItem(IOS_INSTALL_HINT_KEY, '1');
-        } catch (error) {
-          // ignore storage errors
-        }
-      });
-    }
-    if (iosInstallHintBackdrop) {
-      iosInstallHintBackdrop.addEventListener('click', () => {
-        if (iosInstallHintOverlay) {
-          iosInstallHintOverlay.classList.remove('is-visible');
-          iosInstallHintOverlay.hidden = true;
-          iosInstallHintOverlay.setAttribute('aria-hidden', 'true');
-        }
-        try {
-          window.localStorage.setItem(IOS_INSTALL_HINT_KEY, '1');
-        } catch (error) {
-          // ignore
         }
       });
     }
@@ -7397,19 +7269,6 @@
     } else {
       cameraStartLocked = false;
       startCamera();
-      if (isIOSDevice) {
-        let dismissed = false;
-        try {
-          dismissed = window.localStorage.getItem(IOS_INSTALL_HINT_KEY) === '1';
-        } catch (error) {
-          dismissed = false;
-        }
-        if (!dismissed && iosInstallHintOverlay) {
-          iosInstallHintOverlay.hidden = false;
-          iosInstallHintOverlay.setAttribute('aria-hidden', 'false');
-          iosInstallHintOverlay.classList.add('is-visible');
-        }
-      }
     }
   </script>
 </body>
