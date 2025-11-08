@@ -36,7 +36,6 @@
       });
       gtag('event', 'project_open_pixiedraw');
     </script>
-    <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
@@ -55,7 +54,6 @@
           <div class="startup-screen__actions">
             <button type="button" class="button button--primary" id="startupActionNew">新規作成</button>
             <button type="button" class="button" id="startupActionOpen">ファイルを開く</button>
-            <button type="button" class="button button--ghost" id="startupActionInstall" hidden>インストール</button>
           </div>
           <button type="button" class="startup-screen__link" id="startupActionSkip">編集を続ける</button>
           <p class="startup-screen__hint" id="startupScreenHint">ファイルを開くと既存の自動保存先を引き継ぎます。</p>
@@ -331,7 +329,6 @@
           <div class="field-group">
             <button type="button" class="button" id="newProject">新規作成</button>
             <button type="button" class="button" id="openDocument">ファイルを開く</button>
-            <button type="button" class="button" id="installApp" hidden>インストール</button>
             <button type="button" class="button" id="exportProject">保存</button>
             <button type="button" class="button" id="clearCanvas">キャンバスをクリア</button>
             <button type="button" class="button" id="enableAutosave">ローカルに自動保存</button>
@@ -545,6 +542,5 @@
       })();
     </script>
     <script src="assets/js/app.js" defer></script>
-    <script src="assets/js/pwa.js" defer></script>
   </body>
 </html>
