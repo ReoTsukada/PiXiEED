@@ -102,7 +102,6 @@
       virtualCursorButtonScale: document.getElementById('virtualCursorButtonScale'),
       virtualCursorButtonScaleValue: document.getElementById('virtualCursorButtonScaleValue'),
       openDocument: document.getElementById('openDocument'),
-      installApp: document.getElementById('installApp'),
       saveProject: document.getElementById('saveProject'),
       exportProject: document.getElementById('exportProject'),
       clearCanvas: document.getElementById('clearCanvas'),
@@ -117,7 +116,6 @@
       screen: document.getElementById('startupScreen'),
       newButton: document.getElementById('startupActionNew'),
       openButton: document.getElementById('startupActionOpen'),
-      installButton: document.getElementById('startupActionInstall'),
       skipButton: document.getElementById('startupActionSkip'),
       hint: document.getElementById('startupScreenHint'),
       recentSection: document.getElementById('startupRecentProjects'),
@@ -552,10 +550,6 @@
     hsv: { h: 0, s: 0, v: 1, a: 255 },
     wheelPointer: { active: false, pointerId: null, upHandler: null },
   };
-  let deferredInstallPrompt = null;
-  const displayModeMedia = (typeof window !== 'undefined' && typeof window.matchMedia === 'function')
-    ? window.matchMedia('(display-mode: standalone)')
-    : null;
   let dirtyRegion = null;
   let canvasControlMode = 'zoom';
 
@@ -3183,30 +3177,6 @@
     clearLensImportSessionFlag();
   }
 
-  async function ensureLatestServiceWorkerForLensImport() {
-    if (!lensImportRequested) {
-      return;
-    }
-    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
-      return;
-    }
-    let registration;
-    try {
-      registration = await navigator.serviceWorker.ready;
-    } catch (error) {
-      console.warn('Failed to obtain service worker readiness before lens import', error);
-      return;
-    }
-    if (!registration) {
-      return;
-    }
-    try {
-      await registration.update();
-    } catch (error) {
-      console.warn('Service worker update check failed before lens import', error);
-    }
-  }
-
   async function maybeImportLensCapture() {
     let shouldImport = false;
     try {
@@ -3968,7 +3938,6 @@
     } else if (dom.startup?.recentSection) {
       dom.startup.recentSection.hidden = true;
     }
-    updateInstallButtonState();
     if (startupVisible) {
       return;
     }
@@ -4057,7 +4026,6 @@
         hideStartupScreen();
       }
     });
-    dom.startup?.installButton?.addEventListener('click', handleInstallRequest);
     dom.startup?.skipButton?.addEventListener('click', () => {
       hideStartupScreen();
     });
@@ -4088,27 +4056,6 @@
       });
     } else if (dom.startup?.recentSection) {
       dom.startup.recentSection.hidden = true;
-    }
-    updateInstallButtonState();
-  }
-
-  window.addEventListener('beforeinstallprompt', event => {
-    event.preventDefault();
-    deferredInstallPrompt = event;
-    updateInstallButtonState();
-  });
-
-  window.addEventListener('appinstalled', () => {
-    deferredInstallPrompt = null;
-    updateInstallButtonState();
-  });
-
-  if (displayModeMedia) {
-    const handleDisplayModeChange = () => updateInstallButtonState();
-    if (typeof displayModeMedia.addEventListener === 'function') {
-      displayModeMedia.addEventListener('change', handleDisplayModeChange);
-    } else if (typeof displayModeMedia.addListener === 'function') {
-      displayModeMedia.addListener(handleDisplayModeChange);
     }
   }
 
@@ -4356,51 +4303,6 @@
       });
     }
     renderRecentProjectsList(entries || []);
-  }
-
-  function isStandaloneDisplayMode() {
-    if (displayModeMedia && displayModeMedia.matches) {
-      return true;
-    }
-    if (typeof navigator !== 'undefined' && 'standalone' in navigator && navigator.standalone) {
-      return true;
-    }
-    return false;
-  }
-
-  function updateInstallButtonState() {
-    const canInstall = Boolean(deferredInstallPrompt) && !isStandaloneDisplayMode();
-    const buttons = [dom.controls.installApp, dom.startup?.installButton];
-    buttons.forEach(button => {
-      if (!button) {
-        return;
-      }
-      button.hidden = !canInstall;
-      button.disabled = !canInstall;
-      button.setAttribute('aria-hidden', canInstall ? 'false' : 'true');
-    });
-  }
-
-  async function handleInstallRequest(event) {
-    if (event?.preventDefault) {
-      event.preventDefault();
-    }
-    if (!deferredInstallPrompt) {
-      updateInstallButtonState();
-      if (!isStandaloneDisplayMode()) {
-        window.alert('インストールに対応していない環境、またはすでにインストール済みです。');
-      }
-      return;
-    }
-    const promptEvent = deferredInstallPrompt;
-    deferredInstallPrompt = null;
-    try {
-      promptEvent.prompt();
-      await promptEvent.userChoice;
-    } catch (error) {
-      console.warn('PWA install prompt failed', error);
-    }
-    updateInstallButtonState();
   }
 
   function renderRecentProjectsList(entries) {
@@ -7033,20 +6935,6 @@
 
   async function init() {
     await initializeIosSnapshotFallback();
-    if (window.__PiXiEEDRAW_SW_READY__ instanceof Promise) {
-      try {
-        await window.__PiXiEEDRAW_SW_READY__;
-      } catch (error) {
-        console.warn('Service worker initialization promise rejected', error);
-      }
-    }
-    if (lensImportRequested) {
-      try {
-        await ensureLatestServiceWorkerForLensImport();
-      } catch (error) {
-        console.warn('Service worker update synchronization failed before lens import', error);
-      }
-    }
     await initializeAutosave();
     setupLeftTabs();
     setupRightTabs();
@@ -7404,7 +7292,6 @@
       openExportDialog();
     });
 
-    dom.controls.installApp?.addEventListener('click', handleInstallRequest);
 
     if (dom.newProject?.button) {
       dom.newProject.button.addEventListener('click', () => {
@@ -7477,7 +7364,6 @@
     setupNumberSteppers();
     syncControlsWithState();
     updateSpriteScaleControlLimits();
-    updateInstallButtonState();
   }
 
   function handleCanvasResizeRequest() {
