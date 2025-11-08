@@ -15,7 +15,6 @@ const dom = {
   totalCount: document.getElementById('totalCount'),
   timerLabel: document.getElementById('timerLabel'),
   mistakeLabel: document.getElementById('mistakeLabel'),
-  installButton: document.getElementById('installButton'),
   canvasOriginal: document.getElementById('canvasOriginal'),
   canvasChallenge: document.getElementById('canvasChallenge'),
   overlayOriginal: document.getElementById('overlayOriginal'),
@@ -105,7 +104,6 @@ const state = {
   completionTimeout: null,
   failureTimeout: null,
   resetTimeout: null,
-  installPromptEvent: null,
   officialPuzzles: [],
 };
 
@@ -116,8 +114,6 @@ async function init() {
 
   await loadOfficialPuzzles();
   await handleInitialPuzzleFromUrl();
-
-  updateInstallButtonVisibility();
 
   dom.startButton?.addEventListener('click', () => {
     setActiveScreen('difficulty');
@@ -138,10 +134,6 @@ async function init() {
   dom.resetButton?.addEventListener('click', () => {
     if (!state.currentPuzzle) return;
     resetRound();
-  });
-
-  dom.installButton?.addEventListener('click', () => {
-    void handleInstallButtonClick();
   });
 
   initializeCanvasInteractions();
@@ -332,45 +324,6 @@ function setActiveScreen(target) {
     dom.app?.classList.remove('is-playing');
     document.body.classList.remove('is-playing');
   }
-}
-
-function updateInstallButtonVisibility() {
-  if (!dom.installButton) return;
-  const available = Boolean(state.installPromptEvent);
-  dom.installButton.hidden = !available;
-  dom.installButton.disabled = !available;
-}
-
-function handleBeforeInstallPrompt(event) {
-  event.preventDefault();
-  state.installPromptEvent = event;
-  updateInstallButtonVisibility();
-}
-
-async function handleInstallButtonClick() {
-  const promptEvent = state.installPromptEvent;
-  if (!promptEvent || !dom.installButton) {
-    return;
-  }
-
-  try {
-    dom.installButton.disabled = true;
-    promptEvent.prompt();
-    await promptEvent.userChoice.catch(() => undefined);
-  } catch (error) {
-    console.warn('PWA install prompt failed', error);
-  } finally {
-    state.installPromptEvent = null;
-    updateInstallButtonVisibility();
-    if (state.installPromptEvent) {
-      dom.installButton.disabled = false;
-    }
-  }
-}
-
-function handleAppInstalled() {
-  state.installPromptEvent = null;
-  updateInstallButtonVisibility();
 }
 
 function selectDifficulty(level) {
@@ -1487,93 +1440,5 @@ function createStarLabel(level) {
   const blanks = '☆☆☆';
   return stars.slice(0, clamped) + blanks.slice(clamped);
 }
-
-function registerServiceWorker() {
-  if (!('serviceWorker' in navigator)) {
-    return;
-  }
-  let isReloading = false;
-  let hasController = Boolean(navigator.serviceWorker.controller);
-  let updateBanner = null;
-
-  const removeUpdateBanner = () => {
-    if (updateBanner) {
-      updateBanner.remove();
-      updateBanner = null;
-    }
-  };
-
-  const showUpdateBanner = (registration) => {
-    const waiting = registration.waiting;
-    if (!waiting || !navigator.serviceWorker.controller || updateBanner) {
-      return;
-    }
-    const banner = document.createElement('div');
-    banner.className = 'update-toast';
-    banner.innerHTML = `
-      <div class="update-toast__body">
-        <p class="update-toast__message">PiXFiND の新しいバージョンが利用できます。</p>
-        <div class="update-toast__actions">
-          <button type="button" class="update-toast__btn update-toast__btn--primary">今すぐ更新</button>
-          <button type="button" class="update-toast__btn">あとで</button>
-        </div>
-      </div>
-    `;
-    const [updateNowBtn, laterBtn] = banner.querySelectorAll('button');
-    updateNowBtn.addEventListener('click', () => {
-      waiting.postMessage({ type: 'SKIP_WAITING' });
-      removeUpdateBanner();
-    }, { once: true });
-    laterBtn.addEventListener('click', () => {
-      removeUpdateBanner();
-    }, { once: true });
-    document.body.appendChild(banner);
-    updateBanner = banner;
-  };
-
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!hasController) {
-      hasController = true;
-      return;
-    }
-    if (isReloading) {
-      return;
-    }
-    removeUpdateBanner();
-    isReloading = true;
-    window.location.reload();
-  });
-
-  window.addEventListener('load', () => {
-    const versionToken = resolveBuildVersionToken();
-    const serviceWorkerUrl = `./sw.js?v=${encodeURIComponent(versionToken)}`;
-    navigator.serviceWorker
-      .register(serviceWorkerUrl)
-      .then(registration => {
-        if (registration.waiting) {
-          showUpdateBanner(registration);
-        }
-
-        registration.addEventListener('updatefound', () => {
-          const installing = registration.installing;
-          if (!installing) {
-            return;
-          }
-          installing.addEventListener('statechange', () => {
-            if (installing.state === 'installed') {
-              showUpdateBanner(registration);
-            }
-          });
-        });
-      })
-      .catch(error => {
-        console.warn('Service worker registration failed', error);
-      });
-  });
-}
-
-registerServiceWorker();
-window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-window.addEventListener('appinstalled', handleAppInstalled);
 
 init();
