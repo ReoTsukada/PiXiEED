@@ -331,16 +331,28 @@
   const IOS_SNAPSHOT_WRITE_DELAY = 60 * 1000;
   const IOS_SNAPSHOT_COMPRESSION_THRESHOLD = 32 * 1024;
   const textCompression = createTextCompression();
-  const lensImportRequested = (() => {
+  const LENS_IMPORT_SESSION_FLAG = 'pixiee-lens:import-request';
+  let lensImportRequested = (() => {
     if (typeof window === 'undefined') {
       return false;
     }
     try {
       const params = new URLSearchParams(window.location.search);
-      return params.get('lens') === '1';
+      if (params.get('lens') === '1') {
+        setLensImportSessionFlag();
+        return true;
+      }
     } catch (error) {
       return false;
     }
+    if (canUseSessionStorage) {
+      try {
+        return window.sessionStorage.getItem(LENS_IMPORT_SESSION_FLAG) === '1';
+      } catch (error) {
+        return false;
+      }
+    }
+    return false;
   })();
   const AUTOSAVE_DB_NAME = 'pixieedraw-autosave';
   const AUTOSAVE_DB_VERSION = 2;
@@ -3134,87 +3146,65 @@
     }
   }
 
-  async function waitForServiceWorkerInstallation(worker) {
-    if (!worker) {
+  function setLensImportSessionFlag() {
+    if (!canUseSessionStorage) {
       return;
     }
-    if (worker.state === 'installed' || worker.state === 'redundant') {
-      return;
+    try {
+      window.sessionStorage.setItem(LENS_IMPORT_SESSION_FLAG, '1');
+    } catch (error) {
+      // ignore
     }
-    await new Promise((resolve) => {
-      const handleStateChange = () => {
-        if (worker.state === 'installed' || worker.state === 'redundant') {
-          worker.removeEventListener('statechange', handleStateChange);
-          resolve();
-        }
-      };
-      worker.addEventListener('statechange', handleStateChange);
-    });
   }
 
-  async function activateWaitingServiceWorker(registration) {
-    const waiting = registration?.waiting;
-    if (!waiting) {
-      return false;
-    }
-    let resolved = false;
-    return await new Promise((resolve) => {
-      const settle = (didChange) => {
-        if (resolved) {
-          return;
-        }
-        resolved = true;
-        clearTimeout(timeoutId);
-        navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
-        waiting.removeEventListener('statechange', handleStateChange);
-        resolve(didChange);
-      };
-      const handleControllerChange = () => {
-        settle(true);
-      };
-      navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
-      const handleStateChange = () => {
-        if (waiting.state === 'redundant') {
-          settle(false);
-        }
-      };
-      waiting.addEventListener('statechange', handleStateChange);
-      const timeoutId = setTimeout(() => settle(false), 8000);
+  function clearLensImportSessionFlag() {
+    if (canUseSessionStorage) {
       try {
-        waiting.postMessage({ type: 'SKIP_WAITING' });
+        window.sessionStorage.removeItem(LENS_IMPORT_SESSION_FLAG);
       } catch (error) {
-        settle(false);
+        // ignore
       }
-    });
+    }
+    lensImportRequested = false;
+  }
+
+  function removeLensImportPayload() {
+    try {
+      window.localStorage.removeItem(LENS_IMPORT_STORAGE_KEY);
+    } catch (error) {
+      // ignore
+    }
+  }
+
+  function finalizeLensImportAttempt({ clearPayload = false } = {}) {
+    if (clearPayload) {
+      removeLensImportPayload();
+    }
+    clearLensImportSessionFlag();
   }
 
   async function ensureLatestServiceWorkerForLensImport() {
     if (!lensImportRequested) {
-      return false;
+      return;
     }
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
-      return false;
+      return;
     }
     let registration;
     try {
       registration = await navigator.serviceWorker.ready;
     } catch (error) {
       console.warn('Failed to obtain service worker readiness before lens import', error);
-      return false;
+      return;
     }
     if (!registration) {
-      return false;
+      return;
     }
     try {
       await registration.update();
     } catch (error) {
       console.warn('Service worker update check failed before lens import', error);
     }
-    if (!registration.waiting && registration.installing) {
-      await waitForServiceWorkerInstallation(registration.installing);
-    }
-    const reloading = await activateWaitingServiceWorker(registration);
-    return reloading;
   }
 
   async function maybeImportLensCapture() {
@@ -3224,6 +3214,9 @@
       shouldImport = params.get('lens') === '1';
     } catch (error) {
       shouldImport = false;
+    }
+    if (!shouldImport && lensImportRequested) {
+      shouldImport = true;
     }
     if (!shouldImport) {
       return false;
@@ -3250,12 +3243,14 @@
     if (!payload || typeof payload !== 'object' || typeof payload.dataUrl !== 'string') {
       updateAutosaveStatus('PiXiEELENS からのデータが見つかりませんでした', 'warn');
       await fallbackRestoreAutosaveAfterLensFailure();
+      finalizeLensImportAttempt({ clearPayload: true });
       return false;
     }
 
     if (payload.expiresAt && Number.isFinite(payload.expiresAt) && Date.now() > payload.expiresAt) {
       updateAutosaveStatus('PiXiEELENS からのデータが期限切れです。再度送信してください。', 'warn');
       await fallbackRestoreAutosaveAfterLensFailure();
+      finalizeLensImportAttempt({ clearPayload: true });
       return false;
     }
 
@@ -3263,6 +3258,7 @@
     if (!blob) {
       updateAutosaveStatus('PiXiEELENS の画像データを読み込めませんでした', 'error');
       await fallbackRestoreAutosaveAfterLensFailure();
+      finalizeLensImportAttempt({ clearPayload: true });
       return false;
     }
 
@@ -3281,17 +3277,21 @@
       await loadDocumentFromImageFile(file);
       hideStartupScreen();
       updateAutosaveStatus('PiXiEELENS から画像を取り込みました', 'success');
-      try {
-        window.localStorage.removeItem(LENS_IMPORT_STORAGE_KEY);
-      } catch (error) {
-        // ignore
-      }
       await ensureAutosaveForLensImport(inferredName);
+      if (AUTOSAVE_SUPPORTED && autosaveHandle) {
+        try {
+          await writeAutosaveSnapshot(true);
+        } catch (error) {
+          console.warn('Immediate autosave after PiXiEELENS import failed', error);
+        }
+      }
+      finalizeLensImportAttempt({ clearPayload: true });
       return true;
     } catch (error) {
       console.warn('Failed to import capture from PiXiEELENS', error);
       updateAutosaveStatus('PiXiEELENS の取り込みに失敗しました', 'error');
       await fallbackRestoreAutosaveAfterLensFailure();
+      finalizeLensImportAttempt();
       return false;
     }
   }
@@ -7040,17 +7040,12 @@
         console.warn('Service worker initialization promise rejected', error);
       }
     }
-    let pendingReload = false;
     if (lensImportRequested) {
       try {
-        pendingReload = await ensureLatestServiceWorkerForLensImport();
+        await ensureLatestServiceWorkerForLensImport();
       } catch (error) {
         console.warn('Service worker update synchronization failed before lens import', error);
-        pendingReload = false;
       }
-    }
-    if (pendingReload) {
-      return;
     }
     await initializeAutosave();
     setupLeftTabs();
