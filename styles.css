@@ -119,6 +119,34 @@ a:focus {
   margin: 0 0 1.1rem;
 }
 
+.project-alert {
+  max-width: min(1100px, 92vw);
+  margin: clamp(0.75rem, 2.5vw, 1.4rem) auto;
+  padding: 1rem 1.4rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  color: var(--fg-primary);
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 20px 36px rgba(4, 8, 30, 0.55);
+}
+
+.project-alert strong {
+  display: block;
+  font-family: var(--font-heading);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+  color: #fcd34d;
+}
+
+.project-alert--warning {
+  border-color: rgba(255, 220, 120, 0.45);
+  background: linear-gradient(135deg, rgba(255, 176, 77, 0.18), rgba(255, 255, 255, 0.04));
+}
+
 .hero-copy p {
   margin: 0 0 1.4rem;
   color: var(--fg-secondary);
