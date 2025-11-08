@@ -7,7 +7,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="まおいつ">
 <title>魔王様！！いつまでよければいいですか！？</title>
-<link rel="manifest" href="/maoitu/manifest.webmanifest">
 <meta name="theme-color" content="#000000">
 <link rel="apple-touch-icon" href="/maoitu/icons/icon-192.png">
 <!-- Google tag (gtag.js) -->
@@ -56,86 +55,6 @@ gtag('event', 'project_open_maoitu');
     overscroll-behavior:none;
   }
   body{position:relative;}
-  .update-toast{
-    position:fixed;
-    bottom:24px;
-    right:24px;
-    z-index:9999;
-    max-width:min(320px, 92vw);
-    background:rgba(10,10,10,0.92);
-    border:1px solid rgba(255,255,255,0.25);
-    border-radius:18px;
-    box-shadow:0 18px 36px rgba(0,0,0,0.55);
-    backdrop-filter:blur(10px);
-    animation:update-toast-in 0.3s ease;
-  }
-  .update-toast__body{
-    display:grid;
-    gap:12px;
-    padding:18px 20px;
-  }
-  .update-toast__message{
-    margin:0;
-    font-size:14px;
-    line-height:1.5;
-    color:#fff;
-  }
-  .update-toast__actions{
-    display:flex;
-    gap:10px;
-    flex-wrap:wrap;
-  }
-  .update-toast__btn{
-    flex:1 1 auto;
-    min-width:120px;
-    padding:10px 16px;
-    border-radius:999px;
-    border:1px solid rgba(255,255,255,0.3);
-    background:rgba(255,255,255,0.08);
-    color:#fff;
-    font-weight:700;
-    cursor:pointer;
-    transition:transform 0.18s ease,box-shadow 0.18s ease,border-color 0.18s ease;
-  }
-  .update-toast__btn:hover,
-  .update-toast__btn:focus-visible{
-    transform:translateY(-1px);
-    box-shadow:0 12px 20px rgba(0,0,0,0.45);
-    border-color:rgba(255,255,255,0.5);
-    outline:none;
-  }
-  .update-toast__btn--primary{
-    background:#22c55e;
-    color:#000;
-    border-color:#22c55e;
-  }
-  .update-toast__btn--primary:hover,
-  .update-toast__btn--primary:focus-visible{
-    box-shadow:0 12px 22px rgba(34,197,94,0.4);
-  }
-  @media (max-width:600px){
-    .update-toast{
-      left:16px;
-      right:16px;
-      bottom:calc(16px + env(safe-area-inset-bottom, 0px));
-    }
-    .update-toast__actions{
-      flex-direction:column;
-    }
-    .update-toast__btn{
-      width:100%;
-    }
-  }
-  @keyframes update-toast-in{
-    from{
-      opacity:0;
-      transform:translateY(10px);
-    }
-    to{
-      opacity:1;
-      transform:translateY(0);
-    }
-  }
   #c{display:block;touch-action:none;image-rendering:pixelated}
   .back-link{
     position:absolute;
@@ -299,7 +218,7 @@ gtag('event', 'project_open_maoitu');
 </div>
 <div id="footer">© 2025 アルタ</div>
 <script>
-// Prevent pinch-zoom for the standalone PWA shell on iOS.
+// Prevent pinch-zoom on iOS to keep the layout stable.
 ['gesturestart', 'gesturechange', 'gestureend'].forEach((eventName) => {
   document.addEventListener(eventName, (event) => {
     event.preventDefault();
@@ -738,87 +657,6 @@ function loop(now){
 reset();
 requestAnimationFrame(loop);
 
-const isFileProtocol = window.location.protocol === 'file:';
-const canUseServiceWorker = 'serviceWorker' in navigator && window.isSecureContext && !isFileProtocol;
-
-if (canUseServiceWorker) {
-  const versionToken = (() => {
-    const metaVersion = document.querySelector('meta[name="build-version"]')?.content?.trim();
-    if (metaVersion) return metaVersion;
-    const parsed = Date.parse(document.lastModified || '');
-    const timestamp = Number.isNaN(parsed) ? Date.now() : parsed;
-    return `maoitu-${timestamp}`;
-  })();
-  const serviceWorkerURL = `/maoitu/service-worker.js?v=${encodeURIComponent(versionToken)}`;
-  let updateBanner = null;
-  let isReloading = false;
-
-  function removeUpdateBanner() {
-    if (updateBanner) {
-      updateBanner.remove();
-      updateBanner = null;
-    }
-  }
-
-  function showUpdateBanner(registration) {
-    const waitingWorker = registration.waiting;
-    if (!waitingWorker || !navigator.serviceWorker.controller || updateBanner) {
-      return;
-    }
-
-    updateBanner = document.createElement('div');
-    updateBanner.className = 'update-toast';
-    updateBanner.innerHTML = `
-      <div class="update-toast__body">
-        <p class="update-toast__message">新しいバージョンの「まおいつ」が利用できます。</p>
-        <div class="update-toast__actions">
-          <button type="button" class="update-toast__btn update-toast__btn--primary">今すぐ更新</button>
-          <button type="button" class="update-toast__btn">あとで</button>
-        </div>
-      </div>
-    `;
-
-    const [updateNowButton, laterButton] = updateBanner.querySelectorAll('button');
-    updateNowButton.addEventListener('click', () => {
-      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
-      removeUpdateBanner();
-    }, { once: true });
-    laterButton.addEventListener('click', () => {
-      removeUpdateBanner();
-    }, { once: true });
-
-    document.body.appendChild(updateBanner);
-  }
-
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (isReloading) return;
-    isReloading = true;
-    window.location.reload();
-  });
-
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register(serviceWorkerURL, { scope: '/maoitu/' })
-      .then(registration => {
-        if (registration.waiting) {
-          showUpdateBanner(registration);
-        }
-        registration.addEventListener('updatefound', () => {
-          const newWorker = registration.installing;
-          if (!newWorker) return;
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed') {
-              showUpdateBanner(registration);
-            }
-          });
-        });
-      })
-      .catch(err => console.error('Service worker registration failed:', err));
-  });
-} else if (isFileProtocol) {
-  console.info('Service worker not registered: load the site over http(s) to enable offline support.');
-} else {
-  console.info('Service worker not registered: secure context required.');
-}
 </script>
 </body>
 </html>
