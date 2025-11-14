@@ -24,6 +24,7 @@
 
   const reduceMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
   const typingControllers = new Map();
+  const DEFAULT_IMAGE_SCALE = 0.7;
 
   const manifest = getManifest();
   if (!manifest.length) {
@@ -87,6 +88,7 @@
     typeText(nameEl, entry.name || 'キャラクター（仮）');
     typeText(weightEl, `重さ: ${entry.weight || '調整中'}`);
     typeText(detailEl, entry.detail || entry.background || entry.description || '詳細メモを準備中');
+    applyScale(DEFAULT_IMAGE_SCALE);
     if (traitsEl) {
       traitsEl.innerHTML = '';
       const traits = Array.isArray(entry.traits) && entry.traits.length ? entry.traits : ['特徴メモを準備中'];
@@ -106,6 +108,17 @@
     }
 
     adjustDetailsScale();
+  }
+
+  function applyScale(scaleValue) {
+    const scale = typeof scaleValue === 'number' ? scaleValue : DEFAULT_IMAGE_SCALE;
+    if (viewer) {
+      viewer.style.setProperty('--character-image-scale', scale);
+    }
+    const frame = viewer?.parentElement;
+    if (frame) {
+      frame.style.setProperty('--character-image-scale', scale);
+    }
   }
 
   function typeText(element, text) {
