@@ -40,8 +40,9 @@
       <a class="logo" href="index.html">PiXiEED</a>
       <nav class="portfolio-header__nav" aria-label="ポートフォリオ ナビゲーション">
         <ul class="portfolio-nav">
-          <li><a href="#dot-gallery">ドット絵</a></li>
+          <li><a href="#dot-gallery">ポートフォリオ</a></li>
           <li><a href="#projects">プロジェクト</a></li>
+          <li><a href="#character-intro">キャラクター</a></li>
           <li><a href="#notes">ノート</a></li>
           <li><a href="#contact">コンタクト</a></li>
         </ul>
@@ -57,7 +58,7 @@
   <main>
     <section class="section" id="dot-gallery">
       <div class="section-inner">
-        <h2>ドットポートフォリオ</h2>
+        <h2>ポートフォリオ</h2>
         <div class="dot-gallery__viewer">
           <img id="dotGalleryMain" src="" alt="" loading="lazy">
         </div>
@@ -107,20 +108,39 @@
       </div>
     </section>
 
-    <section class="section" id="tools">
+    <section class="section section--highlight" id="character-intro">
       <div class="section-inner">
-        <h2>ドット絵</h2>
-        <div class="tool-stack">
-          <div>
-            <h3>ドット絵</h3>
-            <ul>
-              <li>Aseprite</li>
-              <li>GitHub</li>
-              <li>ChatGPT</li>
-              <li>VS Code</li>
-            </ul>
+        <p class="section-eyebrow">Original Character Workbench</p>
+        <div class="character-preview__heading">
+          <h2>キャラクター</h2>
+          <p>ここではジェリンを中心としてオリジナルキャラクターの紹介をしています。ゲームのシリーズに登場します。</p>
+        </div>
+        <div class="character-preview" aria-live="polite">
+            <div class="character-preview__frame">
+              <img id="characterGalleryMain" src="" alt="" loading="lazy" hidden>
+              <div class="character-preview__placeholder" id="characterGalleryPlaceholder">
+                <small id="characterPlaceholderMeta">差し替え待ち</small>
+              </div>
+            </div>
+          <div class="character-preview__details" id="characterPreviewDetails">
+            <h3 class="character-preview__name" id="characterGalleryName">キャラクターA（仮）</h3>
+            <p class="character-preview__weight" id="characterGalleryWeight">Weight: 調整中</p>
+            <div class="character-preview__traits">
+              <h4>特徴</h4>
+              <ul id="characterTraits">
+                <li>特徴メモ</li>
+              </ul>
+            </div>
+            <div class="character-preview__detail">
+              <h4>詳細</h4>
+              <p id="characterGalleryDetail">
+                選択したキャラクターの詳細がここに表示されます。
+              </p>
+            </div>
           </div>
         </div>
+        <p class="character-sprites__hint">下のPNGをクリックするとプレビューと詳細が切り替わります。</p>
+        <div class="character-preview__buttons" id="characterGalleryButtons" aria-label="キャラクター一覧" role="listbox"></div>
       </div>
     </section>
 
@@ -167,6 +187,8 @@
   <script src="scripts.js"></script>
   <script src="portfolio/dots/manifest.js"></script>
   <script src="scripts/gallery.js"></script>
+  <script src="character-dots/manifest.js"></script>
+  <script src="scripts/character-gallery.js"></script>
   <script src="scripts/notes.js"></script>
 </body>
 </html>
