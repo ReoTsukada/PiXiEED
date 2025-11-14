@@ -29,6 +29,15 @@ body {
   font-family: var(--font-body);
   line-height: 1.7;
   min-height: 100vh;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+body * {
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 img {
@@ -1815,7 +1824,6 @@ a:focus {
 .character-preview__frame,
 .character-preview__details {
   min-height: var(--character-panel-height);
-  height: var(--character-panel-height);
   align-self: stretch;
 }
 
@@ -1828,7 +1836,8 @@ a:focus {
   justify-content: center;
   position: relative;
   overflow: hidden;
-  padding: clamp(1.8rem, 4vw, 2.8rem);
+  padding: clamp(1.2rem, 3vw, 2rem);
+  --character-image-scale: 0.7;
 }
 
 @media (min-width: 768px) {
@@ -1845,10 +1854,13 @@ a:focus {
 
 .character-preview__frame img {
   display: block;
-  width: min(320px, 90%);
+  width: min(520px, 100%);
   max-width: 100%;
-  max-height: 90%;
+  max-height: min(520px, 100%);
+  height: auto;
   image-rendering: pixelated;
+  transform: scale(var(--character-image-scale, 0.85));
+  transform-origin: center;
 }
 
 .character-preview__placeholder {
@@ -1949,7 +1961,7 @@ a:focus {
   background: rgba(12, 14, 34, 0.58);
   border: none;
   border-radius: 0;
-  padding: clamp(1.8rem, 4vw, 2.8rem);
+  padding: clamp(1.2rem, 4vw, 2rem);
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
@@ -1980,16 +1992,16 @@ a:focus {
 }
 
 .character-preview__traits {
-  margin: 0.6rem 0 0;
+  margin: 0.4rem 0 0;
   padding: 0;
   border: none;
   background: none;
 }
 
 .character-preview__detail {
-  margin: 0.6rem 0 0;
-  padding: clamp(0.55rem, 2vw, 0.9rem);
-  border-radius: 14px;
+  margin: 0.4rem 0 0;
+  padding: clamp(0.45rem, 2vw, 0.75rem);
+  border-radius: 12px;
   border: 1px solid rgba(140, 140, 255, 0.2);
   background: rgba(8, 10, 28, 0.55);
   overflow: auto;
@@ -2007,7 +2019,7 @@ a:focus {
 
 .character-preview__traits ul {
   margin: 0;
-  padding-left: 1.1rem;
+  padding-left: 1rem;
   color: var(--fg-secondary);
   font-size: calc(0.95rem * var(--character-details-scale));
   line-height: 1.6;
@@ -2020,8 +2032,8 @@ a:focus {
 .character-preview__detail p {
   margin: 0;
   color: var(--fg-secondary);
-  font-size: calc(0.98rem * var(--character-details-scale));
-  line-height: 1.7;
+  font-size: calc(0.94rem * var(--character-details-scale));
+  line-height: 1.55;
 }
 
 .game-full {
