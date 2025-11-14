@@ -27,6 +27,7 @@
   const DEFAULT_IMAGE_SCALE = 0.7;
 
   const manifest = getManifest();
+  const initialCharacterId = getInitialCharacterId();
   if (!manifest.length) {
     return;
   }
@@ -56,14 +57,20 @@
     button.appendChild(img);
     button.appendChild(label);
 
-    button.addEventListener('click', () => selectCharacter(entry, button));
+    button.addEventListener('click', () => selectCharacter(entry, button, { updateUrl: true }));
     buttonsContainer.appendChild(button);
     return button;
   });
 
-  selectCharacter(manifest[0], buttons[0]);
+  const initialIndex = manifest.findIndex(entry => entry.id === initialCharacterId);
+  if (initialIndex >= 0) {
+    selectCharacter(manifest[initialIndex], buttons[initialIndex], { updateUrl: false });
+  } else {
+    selectCharacter(manifest[0], buttons[0], { updateUrl: false });
+  }
 
-  function selectCharacter(entry, activeButton) {
+  function selectCharacter(entry, activeButton, options = {}) {
+    const { updateUrl = false } = options;
     if (!entry) return;
     const src = normalizePath(entry.file);
     if (src) {
@@ -108,6 +115,9 @@
     }
 
     adjustDetailsScale();
+    if (updateUrl) {
+      syncCharacterParam(entry.id);
+    }
   }
 
   function applyScale(scaleValue) {
@@ -158,6 +168,26 @@
       clearTimeout(controller);
       typingControllers.delete(element);
     }
+  }
+
+  function syncCharacterParam(characterId) {
+    if (!characterId || typeof history.replaceState !== 'function') return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('character', characterId);
+    history.replaceState(null, '', url.toString());
+  }
+
+  function getInitialCharacterId() {
+    const params = new URLSearchParams(window.location.search);
+    const paramId = params.get('character');
+    if (paramId) {
+      return paramId;
+    }
+    const hash = window.location.hash;
+    if (hash && hash.startsWith('#character-')) {
+      return hash.replace('#character-', '').trim();
+    }
+    return null;
   }
 
   function adjustDetailsScale() {
