@@ -6724,7 +6724,7 @@
         return;
       }
       const baseUrl = new URL('./', window.location.href);
-      const drawUrl = new URL('..//pixiedraw/', baseUrl);
+      const drawUrl = new URL('../pixiedraw/', baseUrl);
       drawUrl.searchParams.set('lens', '1');
       const opened = window.open(drawUrl.toString(), '_blank', 'noopener');
       if (!opened) {
