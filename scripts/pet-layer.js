@@ -166,7 +166,15 @@ const petReady = () => {
       petButton.classList.remove('is-wobbling');
     };
 
-    return { schedule, stop };
+    const triggerNow = () => {
+      if (isHatched() || prefersReducedMotion()) {
+        return;
+      }
+      triggerWobble();
+      schedule();
+    };
+
+    return { schedule, stop, trigger: triggerNow };
   }
 
   function prefersReducedMotion() {
@@ -227,6 +235,7 @@ const petReady = () => {
       walker.nudge();
     } else {
       applyEggClickBonus();
+      eggWobbler.trigger();
     }
   });
 
