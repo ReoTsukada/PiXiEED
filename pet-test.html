@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PiXiEED Pet Test</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body {
+      min-height: 100vh;
+      margin: 0;
+      background: radial-gradient(circle at top, rgba(36, 44, 86, 0.8), #090b1a);
+      color: #f8fbff;
+      font-family: 'Noto Sans JP', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+    }
+    .pet-test-panel {
+      max-width: 640px;
+      width: 100%;
+      background: rgba(12, 16, 36, 0.85);
+      border: 1px solid rgba(140, 140, 255, 0.25);
+      border-radius: 24px;
+      padding: clamp(1.5rem, 3vw, 2.5rem);
+      box-shadow: 0 30px 60px rgba(5, 8, 28, 0.55);
+    }
+    .pet-test-panel h1 {
+      margin-top: 0;
+      font-size: clamp(1.4rem, 3vw, 2.2rem);
+    }
+    .pet-test-panel p {
+      line-height: 1.7;
+      margin-bottom: 1rem;
+    }
+    .pet-test-help {
+      font-size: 0.95rem;
+      color: rgba(255, 255, 255, 0.78);
+    }
+    .pet-test-links {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+    .pet-test-links a {
+      color: #fff;
+      text-decoration: none;
+      padding: 0.65rem 1.2rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+    }
+  </style>
+</head>
+<body>
+  <div class="pet-test-panel">
+    <h1>ピクセルペット テストエリア</h1>
+    <p>このページでは孵化サイクルやクリック挙動などのテストを行えます。<br>ブラウザのConsoleで<code>pixiePetReset()</code>を実行すると成長度をリセットできます。</p>
+    <p class="pet-test-help">卵が表示されない場合はページを再読込し、ほかのPiXiEEDタブを閉じてください。</p>
+    <div class="pet-test-links">
+      <a href="index.html">通常のホームへ戻る</a>
+    </div>
+  </div>
+
+  <div class="pixie-pet-layer" aria-live="polite">
+    <div class="pixie-pet-wrapper" id="pixiePetWrapper">
+      <button type="button" class="pixie-pet" id="pixiePet" aria-label="PiXiEEDペット テスト表示">
+        <img id="pixiePetSprite" alt="" loading="eager" decoding="async">
+      </button>
+      <p class="pixie-pet__speech" id="pixiePetSpeech" role="status" hidden></p>
+    </div>
+  </div>
+
+  <script src="scripts/pet-layer.js"></script>
+</body>
+</html>
