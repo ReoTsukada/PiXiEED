@@ -13,10 +13,14 @@ const EGG_CLICK_BONUS_MS = 10 * 1000; // 卵をクリックしたときの短縮
 
 const CLICK_REACTIONS = [
   'ふよふよ…？',
-  'タップありがと！',
   'むにっ',
   '遊ぼー！',
-  'きらりん♪'
+  'きらりん♪',
+  '遊んでくれるの！？',
+  'わーい！！',
+  'もっと大っきくなりたいな',
+  '魔王様に遊んでもらお',
+  'もっとゲームで遊びたい！！'
 ];
 const EGG_CLICK_REACTIONS = [
   'ぽよん…殻の中でぬくぬく',
@@ -39,12 +43,40 @@ const GREETINGS = [
   'PiXiEEDへようこそ！',
   '後ろで見守ってるからね'
 ];
+const PET_EXTERNAL_ACTIONS = {
+  '1': {
+    speech: 'ジャンプするよ！',
+    jump: true
+  }
+};
 
 const motionQuery = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
   ? window.matchMedia('(prefers-reduced-motion: reduce)')
   : null;
 
-const PET_SPRITE = 'pet-assets/JELLNALL1.png';
+const PET_HATCHED_STAGE_INTERVAL_MS = 60 * 60 * 1000; // 1時間ごとに段階変化
+const PET_HATCHED_SPRITES = [
+  'pet-assets/baburinpng.png',
+  'character-dots/JELLNALL1.png',
+  'character-dots/JELLNALL2.png',
+  'character-dots/JELLNALL3.png',
+  'character-dots/JELLNALL4.png',
+  'character-dots/JELLNALL5.png',
+  'character-dots/JELLNALL6.png',
+  'character-dots/JELLNALL7.png',
+  'character-dots/JELLNALL8.png',
+  'character-dots/JELLNALL9.png',
+  'character-dots/JELLNALL10.png',
+  'character-dots/JELLNALL11.png',
+  'character-dots/JELLNALL12.png',
+  'character-dots/JELLNALL13.png',
+  'character-dots/JELLNALL14.png',
+  'character-dots/JELLNALL15.png',
+  'character-dots/JELLNALL16.png',
+  'character-dots/JELLNALL17.png',
+  'character-dots/JELLNALL18.png',
+  'character-dots/JELLNALL19.png'
+];
 const PET_EGG_SPRITES = [
   'pet-assets/egg1.png',
   'pet-assets/egg2.png',
@@ -58,6 +90,10 @@ const petReady = () => {
   const petButton = document.getElementById('pixiePet');
   const sprite = document.getElementById('pixiePetSprite');
   const speech = document.getElementById('pixiePetSpeech');
+  const expFill = document.getElementById('pixiePetExpFill');
+  const expText = document.getElementById('pixiePetExpText');
+  const expTrack = document.getElementById('pixiePetExpTrack');
+  const nest = document.getElementById('pixiePetNest');
 
   if (!wrapper || !petButton || !sprite || !speech) {
     createUsageTracker(totalMs => {
@@ -74,6 +110,14 @@ const petReady = () => {
 
   let petStage = loadPetStage();
   let usageTotalMs = getStoredUsageMs();
+  let isDocked = false;
+  let isDragging = false;
+  let dragPointerId = null;
+  let dragStartPoint = null;
+  let dragOffset = { x: 0, y: 0 };
+  let suppressNextClick = false;
+  let suppressResetTimer = null;
+  let walkerHasStarted = false;
 
   const isHatched = () => petStage === PET_STAGE.HATCHED;
 
@@ -90,14 +134,21 @@ const petReady = () => {
   applyStage();
 
   function applyStage() {
-    sprite.src = isHatched() ? PET_SPRITE : getEggSprite(usageTotalMs);
+    sprite.src = isHatched() ? getHatchedSprite(usageTotalMs) : getEggSprite(usageTotalMs);
     wrapper.dataset.petState = petStage;
+    wrapper.dataset.petStage = petStage;
     petButton.dataset.state = petStage;
     if (isHatched()) {
       eggWobbler.stop();
+      if (isDocked) {
+        const target = getNestPosition();
+        walker.setPosition(target.x, target.y, { immediate: true, lockFacing: true });
+      }
     } else {
+      dockPet({ silent: true });
       eggWobbler.schedule();
     }
+    updateExpBar();
   }
 
   function showSpeech(text, ttl = 2600) {
@@ -112,6 +163,38 @@ const petReady = () => {
   const idleSpeaker = createIdleSpeaker(() => {
     showSpeech(getIdleLine(), 3200);
   });
+
+  function updateExpBar() {
+    if (!expFill || !expText) {
+      return;
+    }
+    const clamp = value => Math.min(Math.max(value, 0), 1);
+    let ratio = 0;
+    let label = '';
+    if (!isHatched()) {
+      ratio = clamp(PET_HATCH_THRESHOLD_MS ? usageTotalMs / PET_HATCH_THRESHOLD_MS : 0);
+      const percent = Math.round(ratio * 100);
+      label = ratio >= 1 ? '孵化準備完了' : `${percent}%`;
+    } else {
+      const stageData = getHatchedStageData(usageTotalMs);
+      if (stageData.stageIndex >= stageData.maxIndex) {
+        ratio = 1;
+        label = 'MAX';
+      } else {
+        ratio = clamp(stageData.stageProgress / stageData.interval);
+        const percent = Math.round(ratio * 100);
+        label = `${percent}%`;
+      }
+    }
+    const percentNow = Math.round(clamp(ratio) * 100);
+    expFill.style.width = `${percentNow}%`;
+    expText.textContent = label;
+    if (expTrack) {
+      expTrack.setAttribute('aria-valuenow', String(percentNow));
+    }
+  }
+
+  const pendingExternalAction = consumeExternalActionCode();
 
   function createIdleSpeaker(render) {
     let timer = null;
@@ -133,6 +216,21 @@ const petReady = () => {
     };
 
     return { schedule, stop };
+  }
+
+  const canRoam = () => isHatched() && !isDocked && !prefersReducedMotion();
+
+  function startRoaming() {
+    if (!canRoam()) {
+      return;
+    }
+    if (!walkerHasStarted) {
+      walker.start();
+      walkerHasStarted = true;
+    } else {
+      walker.resume();
+    }
+    idleSpeaker.schedule(true);
   }
 
   function createEggWobbler() {
@@ -177,6 +275,92 @@ const petReady = () => {
     return { schedule, stop, trigger: triggerNow };
   }
 
+  function getNestRect() {
+    return nest ? nest.getBoundingClientRect() : null;
+  }
+
+  function getNestPosition() {
+    const rect = getNestRect();
+    const { maxX, maxY, width, height } = walker.getBounds();
+    if (!rect) {
+      return {
+        x: Math.min(20, maxX),
+        y: maxY
+      };
+    }
+    const x = rect.left + (rect.width - width) / 2;
+    const y = rect.top + (rect.height - height) / 2;
+    return {
+      x: Math.min(Math.max(x, 0), maxX),
+      y: Math.min(Math.max(y, 0), maxY)
+    };
+  }
+
+  function isPointInNest(x, y) {
+    const rect = getNestRect();
+    if (!rect) return false;
+    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+  }
+
+  function updateNestHighlight(active) {
+    if (!nest) return;
+    nest.classList.toggle('is-target', Boolean(active));
+  }
+
+  function dockPet(options = {}) {
+    const { silent = false } = options;
+    if (isDocked) {
+      const target = getNestPosition();
+      walker.setPosition(target.x, target.y, { immediate: true, lockFacing: true });
+      return;
+    }
+    isDocked = true;
+    walker.stop();
+    idleSpeaker.stop();
+    wrapper.classList.add('is-docked');
+    if (nest) {
+      nest.classList.add('is-active');
+    }
+    const target = getNestPosition();
+    walker.setPosition(target.x, target.y, { immediate: true, lockFacing: true });
+    if (!silent && !isHatched()) {
+      showSpeech('ここが居場所だよ', 2600);
+    }
+  }
+
+  function undockPet(options = {}) {
+    const { resume = true, disableForEgg = false } = options;
+    if (!isDocked) {
+      return;
+    }
+    if (disableForEgg && !isHatched()) {
+      dockPet({ silent: true });
+      return;
+    }
+    isDocked = false;
+    wrapper.classList.remove('is-docked');
+    if (nest) {
+      nest.classList.remove('is-active');
+      nest.classList.remove('is-target');
+    }
+    if (resume !== false) {
+      startRoaming();
+    }
+  }
+
+  function clearDockingState() {
+    isDocked = false;
+    wrapper.classList.remove('is-docked');
+    if (nest) {
+      nest.classList.remove('is-active');
+      nest.classList.remove('is-target');
+    }
+  }
+
+  function movePetTo(x, y) {
+    walker.setPosition(x, y, { immediate: true, lockFacing: true });
+  }
+
   function prefersReducedMotion() {
     return Boolean(motionQuery && motionQuery.matches);
   }
@@ -192,8 +376,9 @@ const petReady = () => {
         eggWobbler.stop();
       } else {
         if (isHatched()) {
-          walker.resume();
-          idleSpeaker.schedule(true);
+          if (!isDocked) {
+            startRoaming();
+          }
         } else {
           eggWobbler.schedule();
         }
@@ -210,8 +395,7 @@ const petReady = () => {
 
   if (!prefersReducedMotion()) {
     if (isHatched()) {
-      walker.start();
-      idleSpeaker.schedule(true);
+      startRoaming();
     } else {
       eggWobbler.schedule();
     }
@@ -226,36 +410,131 @@ const petReady = () => {
   }
   console.info('PiXiEED device id:', deviceId);
 
+  if (pendingExternalAction) {
+    window.setTimeout(() => {
+      triggerExternalAction(pendingExternalAction);
+    }, 800);
+  }
+
+  petButton.addEventListener('pointerdown', handlePointerDown);
+
   petButton.addEventListener('click', () => {
+    if (suppressNextClick) {
+      suppressNextClick = false;
+      return;
+    }
     petButton.classList.remove('is-reacting');
     void petButton.offsetWidth; // restart animation
     petButton.classList.add('is-reacting');
     showSpeech(getClickReaction(), 3000);
     if (isHatched()) {
-      walker.nudge();
+      if (!isDocked) {
+        walker.nudge();
+      }
     } else {
       applyEggClickBonus();
       eggWobbler.trigger();
     }
   });
 
-  window.addEventListener('resize', () => walker.refreshBounds());
+  window.addEventListener('resize', () => {
+    walker.refreshBounds();
+    if (isDocked) {
+      const target = getNestPosition();
+      walker.setPosition(target.x, target.y, { immediate: true, lockFacing: true });
+    }
+  });
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       walker.stop();
       idleSpeaker.stop();
       eggWobbler.stop();
-    } else if (!prefersReducedMotion() && isHatched()) {
-      walker.resume();
-      idleSpeaker.schedule(true);
+    } else if (canRoam()) {
+      startRoaming();
     } else {
       walker.refreshBounds();
       if (!document.hidden && !prefersReducedMotion() && !isHatched()) {
         eggWobbler.schedule();
       }
+      if (isDocked) {
+        const target = getNestPosition();
+        walker.setPosition(target.x, target.y, { immediate: true, lockFacing: true });
+      }
     }
   });
+
+  function handlePointerDown(event) {
+    if (event.button !== 0) {
+      return;
+    }
+    dragPointerId = event.pointerId;
+    const rect = wrapper.getBoundingClientRect();
+    dragStartPoint = { x: event.clientX, y: event.clientY };
+    dragOffset = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top
+    };
+    petButton.setPointerCapture(dragPointerId);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+  }
+
+  function handlePointerMove(event) {
+    if (event.pointerId !== dragPointerId) {
+      return;
+    }
+    const distance = Math.hypot(
+      event.clientX - dragStartPoint.x,
+      event.clientY - dragStartPoint.y
+    );
+    if (!isDragging && distance > 6) {
+      isDragging = true;
+      walker.stop();
+      idleSpeaker.stop();
+      wrapper.classList.add('is-dragging');
+    }
+    if (!isDragging) {
+      return;
+    }
+    event.preventDefault();
+    movePetTo(event.clientX - dragOffset.x, event.clientY - dragOffset.y);
+    updateNestHighlight(isPointInNest(event.clientX, event.clientY));
+  }
+
+  function handlePointerUp(event) {
+    if (event.pointerId !== dragPointerId) {
+      return;
+    }
+    window.removeEventListener('pointermove', handlePointerMove);
+    window.removeEventListener('pointerup', handlePointerUp);
+    window.removeEventListener('pointercancel', handlePointerUp);
+    petButton.releasePointerCapture(dragPointerId);
+    const droppedInNest = isDragging && isPointInNest(event.clientX, event.clientY);
+    if (isDragging) {
+      event.preventDefault();
+      suppressNextClick = true;
+      window.clearTimeout(suppressResetTimer);
+      suppressResetTimer = window.setTimeout(() => {
+        suppressNextClick = false;
+      }, 400);
+      wrapper.classList.remove('is-dragging');
+      updateNestHighlight(false);
+      if (droppedInNest) {
+        dockPet();
+      } else if (isDocked) {
+        undockPet({ disableForEgg: true });
+      } else if (canRoam()) {
+        startRoaming();
+      }
+    } else {
+      updateNestHighlight(false);
+    }
+    isDragging = false;
+    dragPointerId = null;
+    dragStartPoint = null;
+  }
 
   if (typeof window !== 'undefined') {
     window.addEventListener(PET_RESET_EVENT, handlePetReset);
@@ -269,14 +548,18 @@ const petReady = () => {
     applyStage();
     walker.stop();
     idleSpeaker.stop();
+    clearDockingState();
+    walkerHasStarted = false;
     if (!prefersReducedMotion()) {
       eggWobbler.schedule();
     }
     showSpeech('成長をリセットしたよ！', 3200);
+    updateExpBar();
   }
 
   function handleUsageProgress(totalMs) {
     usageTotalMs = totalMs;
+    updateExpBar();
     if (!isHatched()) {
       applyStage();
       if (totalMs >= PET_HATCH_THRESHOLD_MS) {
@@ -285,6 +568,18 @@ const petReady = () => {
         showSpeech(formatEggProgress(totalMs), 3200);
         eggWobbler.schedule();
       }
+    } else {
+      applyStage();
+    }
+  }
+
+  function triggerExternalAction(action) {
+    if (!action) return;
+    if (action.speech) {
+      showSpeech(action.speech, 3600);
+    }
+    if (action.jump) {
+      playJumpAnimation();
     }
   }
 
@@ -306,9 +601,8 @@ const petReady = () => {
     applyStage();
     showSpeech('孵化したよ！これからよろしくね！', 3600);
     if (!prefersReducedMotion()) {
-      walker.start();
-      idleSpeaker.schedule(true);
       eggWobbler.stop();
+      undockPet({ disableForEgg: true });
     }
   }
 
@@ -340,22 +634,46 @@ const petReady = () => {
     return PET_EGG_SPRITES[spriteIndex] || PET_EGG_FALLBACK;
   }
 
-  function getEggStageIndex(totalMs) {
-    if (!PET_EGG_SPRITES.length) {
-      return 0;
-    }
-    const clampedMs = Math.max(0, Number.isFinite(totalMs) ? totalMs : 0);
-    return Math.min(
-      PET_EGG_SPRITES.length - 1,
-      Math.floor(clampedMs / PET_EGG_STAGE_MS)
-    );
+function getHatchedSprite(totalMs) {
+  if (!PET_HATCHED_SPRITES.length) {
+    return 'pet-assets/baburinpng.png';
   }
+  const { stageIndex } = getHatchedStageData(totalMs);
+  return PET_HATCHED_SPRITES[stageIndex] || PET_HATCHED_SPRITES[0];
+}
 
-  function getWobbleInterval(totalMs) {
-    const index = getEggStageIndex(totalMs);
-    const fallback = PET_EGG_WOBBLE_INTERVALS[0] || 30000;
-    return PET_EGG_WOBBLE_INTERVALS[Math.min(index, PET_EGG_WOBBLE_INTERVALS.length - 1)] || fallback;
+function getEggStageIndex(totalMs) {
+  if (!PET_EGG_SPRITES.length) {
+    return 0;
   }
+  const clampedMs = Math.max(0, Number.isFinite(totalMs) ? totalMs : 0);
+  return Math.min(
+    PET_EGG_SPRITES.length - 1,
+    Math.floor(clampedMs / PET_EGG_STAGE_MS)
+  );
+}
+
+function getWobbleInterval(totalMs) {
+  const index = getEggStageIndex(totalMs);
+  const fallback = PET_EGG_WOBBLE_INTERVALS[0] || 30000;
+  return PET_EGG_WOBBLE_INTERVALS[Math.min(index, PET_EGG_WOBBLE_INTERVALS.length - 1)] || fallback;
+}
+
+function getHatchedStageData(totalMs) {
+  const interval = PET_HATCHED_STAGE_INTERVAL_MS || 1;
+  const maxIndex = Math.max(PET_HATCHED_SPRITES.length - 1, 0);
+  if (!PET_HATCHED_SPRITES.length) {
+    return { stageIndex: 0, stageProgress: 0, interval, maxIndex };
+  }
+  const baseline = Math.max(0, Number.isFinite(totalMs) ? totalMs : 0);
+  const progress = Math.max(0, baseline - PET_HATCH_THRESHOLD_MS);
+  const stageIndex = Math.min(
+    maxIndex,
+    Math.floor(progress / interval)
+  );
+  const stageProgress = Math.min(Math.max(progress - stageIndex * interval, 0), interval);
+  return { stageIndex, stageProgress, interval, maxIndex };
+}
 };
 
 function ensureDeviceId() {
@@ -389,14 +707,17 @@ function createWalker(wrapper, petButton) {
 
   const prefersReducedMotion = () => Boolean(motionQuery && motionQuery.matches);
 
-  const applyPosition = (x, y) => {
+  const applyPosition = (x, y, options = {}) => {
+    const { immediate = false, lockFacing = false } = options;
     const deltaX = x - currentX;
     const deltaY = y - currentY;
     const travel = Math.hypot(deltaX, deltaY);
-    const duration = Math.max(3800, Math.min(9000, travel * 24));
+    const duration = immediate ? 0 : Math.max(3800, Math.min(9000, travel * 24));
     wrapper.style.setProperty('--pet-duration', `${duration}ms`);
     wrapper.style.transform = `translate(${x}px, ${y}px)`;
-    petButton.dataset.facing = deltaX < 0 ? 'left' : 'right';
+    if (!lockFacing) {
+      petButton.dataset.facing = deltaX < 0 ? 'left' : 'right';
+    }
     currentX = x;
     currentY = y;
   };
@@ -408,6 +729,14 @@ function createWalker(wrapper, petButton) {
     const maxX = Math.max(window.innerWidth - width - 12, 0);
     const maxY = Math.max(window.innerHeight - height - 24, 0);
     return { width, height, maxX, maxY };
+  };
+
+  const clampToBounds = (x, y) => {
+    const { maxX, maxY } = bounds();
+    return {
+      x: Math.min(Math.max(x, 0), maxX),
+      y: Math.min(Math.max(y, 0), maxY)
+    };
   };
 
   const moveRandom = () => {
@@ -445,12 +774,18 @@ function createWalker(wrapper, petButton) {
     },
     refreshBounds: () => {
       const { maxX, maxY } = bounds();
-      applyPosition(Math.min(currentX, maxX), Math.min(currentY, maxY));
+      applyPosition(Math.min(currentX, maxX), Math.min(currentY, maxY), { immediate: true, lockFacing: true });
     },
     nudge: () => {
       moveRandom();
       schedule();
-    }
+    },
+    setPosition: (x, y, options) => {
+      const clamped = clampToBounds(x, y);
+      applyPosition(clamped.x, clamped.y, options);
+    },
+    getBounds: () => bounds(),
+    getPosition: () => ({ x: currentX, y: currentY })
   };
 }
 
@@ -597,6 +932,44 @@ function randomFrom(list) {
 }
 
 exposePetReset();
+
+function playJumpAnimation() {
+  try {
+    const button = document.getElementById('pixiePet');
+    if (!button) return;
+    button.classList.remove('is-jumping');
+    void button.offsetWidth;
+    button.classList.add('is-jumping');
+    window.setTimeout(() => {
+      button.classList.remove('is-jumping');
+    }, 900);
+  } catch (error) {
+    // ignore animation failures
+  }
+}
+
+function consumeExternalActionCode() {
+  try {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+    const url = new URL(window.location.href);
+    const params = url.searchParams;
+    const codeParam = params.get('petcode') || params.get('code');
+    if (!codeParam) {
+      return null;
+    }
+    const normalized = codeParam.trim().toLowerCase();
+    params.delete('petcode');
+    params.delete('code');
+    const nextSearch = params.toString();
+    const nextUrl = `${url.pathname}${nextSearch ? `?${nextSearch}` : ''}${url.hash}`;
+    window.history.replaceState({}, document.title, nextUrl);
+    return PET_EXTERNAL_ACTIONS[normalized] || null;
+  } catch (error) {
+    return null;
+  }
+}
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', petReady);
