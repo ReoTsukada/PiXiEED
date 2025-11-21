@@ -20,6 +20,26 @@ window.CHARACTER_GALLERY_MANIFEST = [
     ]
   },
   {
+    "id": "baburin",
+    "name": "バブリン",
+    "role": "BABURIN",
+    "tagline": "",
+    "description": "",
+    "detail": "魔王様が生み出したジェリンの最初の姿、ここから皆大きくなっていくんですね（感無量）。",
+    "weight": "0.25 kg",
+    "sprite": "",
+    "palette": "",
+    "pose": "",
+    "status": "",
+    "file": "baburinpng.png",
+    "buttonLabel": "バブリン",
+    "buttonStatus": "",
+    "background": "",
+    "traits": [
+      "見た目はジェリンのより小さな姿。"
+    ]
+  },
+  {
     "id": "sky-jellnall",
     "name": "スカイジェリン",
     "role": "JELLNALL",
