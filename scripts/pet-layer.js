@@ -181,7 +181,7 @@ const petReady = () => {
     return Boolean(motionQuery && motionQuery.matches);
   }
 
-  createUsageTracker(handleUsageProgress);
+  const usageTracker = createUsageTracker(handleUsageProgress);
 
   function addMotionListener() {
     if (!motionQuery) return;
@@ -296,13 +296,7 @@ const petReady = () => {
     if (nextTotal === usageTotalMs) {
       return;
     }
-    usageTotalMs = nextTotal;
-    setStoredUsageMs(nextTotal);
-    if (usageTotalMs >= PET_HATCH_THRESHOLD_MS) {
-      hatchPet();
-    } else {
-      applyStage();
-    }
+    usageTracker.override(nextTotal);
   }
 
   function hatchPet() {
@@ -342,7 +336,8 @@ const petReady = () => {
       return PET_EGG_FALLBACK;
     }
     const stageIndex = getEggStageIndex(totalMs);
-    return PET_EGG_SPRITES[stageIndex] || PET_EGG_FALLBACK;
+    const spriteIndex = Math.min(stageIndex, PET_EGG_SPRITES.length - 1);
+    return PET_EGG_SPRITES[spriteIndex] || PET_EGG_FALLBACK;
   }
 
   function getEggStageIndex(totalMs) {
@@ -502,11 +497,21 @@ function setStoredUsageMs(value) {
 
 function createUsageTracker(onUpdate) {
   let totalMs = getStoredUsageMs();
-  if (typeof onUpdate === 'function') {
-    onUpdate(totalMs);
-  }
-
   let sessionStart = document.hidden ? null : Date.now();
+
+  const emitUpdate = () => {
+    if (typeof onUpdate === 'function') {
+      onUpdate(totalMs);
+    }
+  };
+
+  const setTotal = value => {
+    totalMs = Math.max(0, Math.floor(value));
+    setStoredUsageMs(totalMs);
+    emitUpdate();
+  };
+
+  emitUpdate();
 
   const commit = () => {
     if (sessionStart == null) {
@@ -516,12 +521,8 @@ function createUsageTracker(onUpdate) {
     if (delta <= 0) {
       return;
     }
-    totalMs += delta;
+    setTotal(totalMs + delta);
     sessionStart = Date.now();
-    setStoredUsageMs(totalMs);
-    if (typeof onUpdate === 'function') {
-      onUpdate(totalMs);
-    }
   };
 
   const handleVisibility = () => {
@@ -541,9 +542,15 @@ function createUsageTracker(onUpdate) {
     }
   }, 15000);
 
+  const override = value => {
+    setTotal(value);
+    sessionStart = Date.now();
+  };
+
   return {
     syncNow: commit,
-    getTotal: () => totalMs
+    getTotal: () => totalMs,
+    override
   };
 }
 
