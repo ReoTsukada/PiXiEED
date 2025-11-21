@@ -66,6 +66,18 @@
   </div>
 
   <div class="pixie-pet-layer" aria-live="polite">
+    <div class="pixie-pet-nest" id="pixiePetNest" aria-hidden="true">
+      <span>ジェリンの住処</span>
+    </div>
+    <div class="pixie-exp-bar" id="pixiePetExp" aria-live="polite">
+      <div class="pixie-exp-bar__meta">
+        <span class="pixie-exp-bar__label">EXP</span>
+        <small class="pixie-exp-bar__value" id="pixiePetExpText">0%</small>
+      </div>
+      <div class="pixie-exp-bar__track" id="pixiePetExpTrack" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="pixie-exp-bar__fill" id="pixiePetExpFill"></div>
+      </div>
+    </div>
     <div class="pixie-pet-wrapper" id="pixiePetWrapper">
       <button type="button" class="pixie-pet" id="pixiePet" aria-label="PiXiEEDペット テスト表示">
         <img id="pixiePetSprite" alt="" loading="eager" decoding="async">
