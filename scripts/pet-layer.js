@@ -43,6 +43,14 @@ const GREETINGS = [
   'PiXiEEDへようこそ！',
   '後ろで見守ってるからね'
 ];
+const CANDY_CONFIG = {
+  rewardMs: 10 * 60 * 1000,
+  dailyLimit: 3,
+  sprites: ['pet-assets/candy1.png', 'pet-assets/candy2.png', 'pet-assets/candy3.png'],
+  storageKey: 'pixieed:candy-state',
+  resetHourJST: 6
+};
+const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const PET_EXTERNAL_ACTIONS = {
   '1': {
     speech: 'ジャンプするよ！',
@@ -54,7 +62,8 @@ const motionQuery = typeof window !== 'undefined' && typeof window.matchMedia ==
   ? window.matchMedia('(prefers-reduced-motion: reduce)')
   : null;
 
-const PET_HATCHED_STAGE_INTERVAL_MS = 60 * 60 * 1000; // 1時間ごとに段階変化
+const PET_HATCHED_STAGE_BASE_MS = 60 * 60 * 1000;
+const PET_HATCHED_STAGE_INCREMENT_MS = 30 * 60 * 1000;
 const PET_HATCHED_SPRITES = [
   'pet-assets/baburinpng.png',
   'character-dots/JELLNALL1.png',
@@ -93,6 +102,7 @@ const petReady = () => {
   const expFill = document.getElementById('pixiePetExpFill');
   const expText = document.getElementById('pixiePetExpText');
   const expTrack = document.getElementById('pixiePetExpTrack');
+  const candyField = document.getElementById('pixieCandyField');
   const nest = document.getElementById('pixiePetNest');
 
   if (!wrapper || !petButton || !sprite || !speech) {
@@ -110,6 +120,7 @@ const petReady = () => {
 
   let petStage = loadPetStage();
   let usageTotalMs = getStoredUsageMs();
+  let candyState = null;
   let isDocked = false;
   let isDragging = false;
   let dragPointerId = null;
@@ -195,6 +206,7 @@ const petReady = () => {
   }
 
   const pendingExternalAction = consumeExternalActionCode();
+  initCandyField();
 
   function createIdleSpeaker(render) {
     let timer = null;
@@ -216,6 +228,97 @@ const petReady = () => {
     };
 
     return { schedule, stop };
+  }
+
+  function initCandyField() {
+    if (!candyField) {
+      return;
+    }
+    candyState = loadCandyStateFromStorage();
+    ensureCandyState();
+    renderCandyField();
+    candyField.addEventListener('click', handleCandyClick);
+    window.setInterval(() => {
+      if (ensureCandyState()) {
+        renderCandyField();
+      }
+    }, 60 * 1000);
+  }
+
+  function ensureCandyState() {
+    const cycleStart = getCandyCycleStart();
+    const expected = CANDY_CONFIG.dailyLimit;
+    const needsReset = !candyState ||
+      candyState.cycleStart !== cycleStart ||
+      !Array.isArray(candyState.consumed) ||
+      candyState.consumed.length !== expected ||
+      !Array.isArray(candyState.positions) ||
+      candyState.positions.length !== expected;
+    if (needsReset) {
+      candyState = createCandyState(cycleStart);
+      saveCandyStateToStorage(candyState);
+      return true;
+    }
+    return false;
+  }
+
+  function createCandyState(cycleStart) {
+    return {
+      cycleStart,
+      consumed: Array.from({ length: CANDY_CONFIG.dailyLimit }, () => false),
+      sprites: Array.from({ length: CANDY_CONFIG.dailyLimit }, () => Math.floor(Math.random() * CANDY_CONFIG.sprites.length)),
+      positions: Array.from({ length: CANDY_CONFIG.dailyLimit }, () => randomCandyPosition())
+    };
+  }
+
+  function renderCandyField() {
+    if (!candyField || !candyState) {
+      return;
+    }
+    if (!Array.isArray(candyState.positions)) {
+      candyState.positions = createCandyState(candyState.cycleStart).positions;
+      saveCandyStateToStorage(candyState);
+    }
+    candyField.innerHTML = '';
+    candyState.positions.forEach((pos, index) => {
+      const consumed = Boolean(candyState.consumed?.[index]);
+      if (consumed) {
+        return;
+      }
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'pixie-candy';
+      button.dataset.candyIndex = String(index);
+      button.style.left = `${pos.x}px`;
+      button.style.top = `${pos.y}px`;
+      const img = document.createElement('img');
+      const spriteIndex = candyState.sprites?.[index] ?? 0;
+      img.src = CANDY_CONFIG.sprites[spriteIndex % CANDY_CONFIG.sprites.length];
+      img.alt = '';
+      button.appendChild(img);
+      candyField.appendChild(button);
+    });
+  }
+
+  function handleCandyClick(event) {
+    if (!candyState || !event.target) return;
+    const button = event.target.closest('.pixie-candy');
+    if (!(button instanceof HTMLButtonElement)) return;
+    const index = Number(button.dataset.candyIndex);
+    if (!Number.isInteger(index) || index < 0 || index >= CANDY_CONFIG.dailyLimit) {
+      return;
+    }
+    if (ensureCandyState()) {
+      renderCandyField();
+    }
+    if (candyState.consumed[index]) {
+      return;
+    }
+    candyState.consumed[index] = true;
+    saveCandyStateToStorage(candyState);
+    renderCandyField();
+    showSpeech('キャンディおいしい！', 2600);
+    usageTracker.override(usageTotalMs + CANDY_CONFIG.rewardMs);
   }
 
   const canRoam = () => isHatched() && !isDocked && !prefersReducedMotion();
@@ -660,19 +763,24 @@ function getWobbleInterval(totalMs) {
 }
 
 function getHatchedStageData(totalMs) {
-  const interval = PET_HATCHED_STAGE_INTERVAL_MS || 1;
+  const base = PET_HATCHED_STAGE_BASE_MS || 1;
+  const increment = PET_HATCHED_STAGE_INCREMENT_MS || 0;
   const maxIndex = Math.max(PET_HATCHED_SPRITES.length - 1, 0);
   if (!PET_HATCHED_SPRITES.length) {
-    return { stageIndex: 0, stageProgress: 0, interval, maxIndex };
+    return { stageIndex: 0, stageProgress: 0, interval: base, maxIndex };
   }
   const baseline = Math.max(0, Number.isFinite(totalMs) ? totalMs : 0);
   const progress = Math.max(0, baseline - PET_HATCH_THRESHOLD_MS);
-  const stageIndex = Math.min(
-    maxIndex,
-    Math.floor(progress / interval)
-  );
-  const stageProgress = Math.min(Math.max(progress - stageIndex * interval, 0), interval);
-  return { stageIndex, stageProgress, interval, maxIndex };
+  let stageIndex = 0;
+  let accumulated = 0;
+  let currentInterval = base;
+  while (stageIndex < maxIndex && progress >= accumulated + currentInterval) {
+    accumulated += currentInterval;
+    stageIndex += 1;
+    currentInterval = base + increment * stageIndex;
+  }
+  const stageProgress = Math.min(Math.max(progress - accumulated, 0), currentInterval);
+  return { stageIndex, stageProgress, interval: currentInterval, maxIndex };
 }
 };
 
@@ -968,6 +1076,54 @@ function consumeExternalActionCode() {
     return PET_EXTERNAL_ACTIONS[normalized] || null;
   } catch (error) {
     return null;
+  }
+}
+
+function randomCandyPosition() {
+  const margin = 60;
+  const width = Math.max(window.innerWidth, margin * 2);
+  const height = Math.max(window.innerHeight, margin * 2);
+  return {
+    x: margin + Math.random() * (width - margin * 2),
+    y: margin + Math.random() * (height - margin * 2)
+  };
+}
+
+function getCandyCycleStart(date = new Date()) {
+  const now = date.getTime();
+  const jstTime = now + JST_OFFSET_MS;
+  const jstDate = new Date(jstTime);
+  const year = jstDate.getUTCFullYear();
+  const month = jstDate.getUTCMonth();
+  const day = jstDate.getUTCDate();
+  const resetHour = CANDY_CONFIG.resetHourJST || 0;
+  let anchor = Date.UTC(year, month, day, resetHour, 0, 0);
+  if (jstDate.getUTCHours() < resetHour) {
+    anchor = Date.UTC(year, month, day - 1, resetHour, 0, 0);
+  }
+  return anchor - JST_OFFSET_MS;
+}
+
+function loadCandyStateFromStorage() {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return null;
+    }
+    const raw = window.localStorage.getItem(CANDY_CONFIG.storageKey);
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function saveCandyStateToStorage(state) {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    window.localStorage.setItem(CANDY_CONFIG.storageKey, JSON.stringify(state));
+  } catch (error) {
+    // ignore
   }
 }
 
