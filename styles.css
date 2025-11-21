@@ -2463,11 +2463,6 @@ a:focus {
   opacity: 0.4;
 }
 
-.pixie-pet-wrapper[data-pet-state="egg"] {
-  transform: translate(1.2rem, calc(100vh - 12rem)) !important;
-  transition-duration: 0.4s;
-}
-
 .pixie-pet {
   position: relative;
   width: 100%;
