@@ -285,12 +285,13 @@ const petReady = () => {
       if (consumed) {
         return;
       }
+      const coords = clampCandyPosition(pos);
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'pixie-candy';
       button.dataset.candyIndex = String(index);
-      button.style.left = `${pos.x}px`;
-      button.style.top = `${pos.y}px`;
+      button.style.left = `${coords.x}px`;
+      button.style.top = `${coords.y}px`;
       const img = document.createElement('img');
       const spriteIndex = candyState.sprites?.[index] ?? 0;
       img.src = CANDY_CONFIG.sprites[spriteIndex % CANDY_CONFIG.sprites.length];
@@ -1086,6 +1087,16 @@ function randomCandyPosition() {
   return {
     x: margin + Math.random() * (width - margin * 2),
     y: margin + Math.random() * (height - margin * 2)
+  };
+}
+
+function clampCandyPosition(pos) {
+  const margin = 60;
+  const width = Math.max(window.innerWidth, margin * 2);
+  const height = Math.max(window.innerHeight, margin * 2);
+  return {
+    x: Math.min(Math.max(pos.x, margin), width - margin),
+    y: Math.min(Math.max(pos.y, margin), height - margin)
   };
 }
 
