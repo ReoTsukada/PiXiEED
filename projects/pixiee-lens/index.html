@@ -1,21 +1,22 @@
 <!DOCTYPE html>
+
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PiXiEELENS</title>
-  <meta name="description" content="PiXiEELENS はブラウザ上で全画面カメラとドットモードを切り替えられる実験的ツール。イベント演出や配信の合成用に設計しています。">
-  <meta property="og:title" content="PiXiEELENS">
-  <meta property="og:description" content="フルスクリーンカメラとドットモードを備えたPiXiEELENSの紹介ページ。特徴や使い方、ブラウザからの起動手順をまとめています。">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://pixieed.jp/projects/pixiee-lens/">
-  <meta property="og:image" content="https://pixieed.jp/pixiee-lens/ogp.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:site" content="@PiXiEED_arta">
-  <meta name="theme-color" content="#050812">
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
-  <script>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PiXiEELENS</title>
+<meta content="PiXiEELENS はブラウザ上で全画面カメラとドットモードを切り替えられる実験的ツール。イベント演出や配信の合成用に設計しています。" name="description"/>
+<meta content="PiXiEELENS" property="og:title"/>
+<meta content="フルスクリーンカメラとドットモードを備えたPiXiEELENSの紹介ページ。特徴や使い方、ブラウザからの起動手順をまとめています。" property="og:description"/>
+<meta content="website" property="og:type"/>
+<meta content="https://pixieed.jp/projects/pixiee-lens/" property="og:url"/>
+<meta content="https://pixieed.jp/pixiee-lens/ogp.png" property="og:image"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="@PiXiEED_arta" name="twitter:site"/>
+<meta content="#050812" name="theme-color"/>
+<!-- Google tag (gtag.js) -->
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
+<script>
   const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
   const GA_PAGE_PATH = '/projects/pixiee-lens/';
   window.dataLayer = window.dataLayer || [];
@@ -26,163 +27,155 @@
     page_title: document.title
   });
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="icon" type="image/png" sizes="192x192" href="../../pixiee-lens/icon-192.png">
-  <link rel="icon" type="image/png" sizes="512x512" href="../../pixiee-lens/icon-512.png">
-  <link rel="apple-touch-icon" href="../../pixiee-lens/icon-192.png">
-  <link rel="stylesheet" href="../../styles.css">
-</head>
-<body class="project-page">
-  <header class="site-header">
-    <div class="site-brand">
-      <a href="../../index.html" class="logo">PiXiEED</a>
-      <p class="tagline">遊びとツールを、ブラウザから届けるクリエイターズグループ</p>
-    </div>
-    <nav class="site-nav" aria-label="メイン">
-      <ul>
-        <li><a href="../../index.html#dot-gallery">ドット絵</a></li>
-        <li><a href="../../index.html#projects" aria-current="page">プロジェクト</a></li>
-        <li><a href="../../index.html#notes">ノート</a></li>
-        <li><a href="../../index.html#contact">コンタクト</a></li>
-      </ul>
-    </nav>
-  </header>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&amp;family=Noto+Sans+JP:wght@400;700&amp;display=swap" rel="stylesheet"/>
 
-  <main>
-    <section class="hero" id="overview">
-      <div class="hero-copy">
-        <h1>PiXiEELENS</h1>
-        <p>ブラウザだけで全画面カメラを起動し、ピクセル化・パレット適用・グリッド表示などを即座に切り替えられる実験的ツールです。ライブ配信のワンポイント演出や、展示会のフォトブースとして使えるよう軽量化しています。</p>
-        <p class="project-status">ラボ版として公開中です。PC/モバイルともに Chrome 最新版でのご利用を推奨します。</p>
-        <p class="project-update" data-last-updated>
-          <span class="project-update__label">最終更新</span>
-          <time class="project-update__value" datetime="">--</time>
-        </p>
-        <div class="project-alert project-alert--warning" role="alert">
-          <strong>お知らせ</strong>
+
+
+<link href="../../styles.css" rel="stylesheet"/>
+<link href="/character-dots/mao1.png" rel="icon" type="image/png"/></head>
+<body class="project-page">
+<header class="site-header">
+<div class="site-brand">
+<a class="logo" href="../../index.html">PiXiEED</a>
+<p class="tagline">遊びとツールを、ブラウザから届けるクリエイターズグループ</p>
+</div>
+<nav aria-label="メイン" class="site-nav">
+<ul>
+<li><a href="../../index.html#dot-gallery">ドット絵</a></li>
+<li><a aria-current="page" href="../../index.html#projects">プロジェクト</a></li>
+<li><a href="../../index.html#notes">ノート</a></li>
+<li><a href="../../index.html#contact">コンタクト</a></li>
+</ul>
+</nav>
+</header>
+<main>
+<section class="hero" id="overview">
+<div class="hero-copy">
+<h1>PiXiEELENS</h1>
+<p>ブラウザだけで全画面カメラを起動し、ピクセル化・パレット適用・グリッド表示などを即座に切り替えられる実験的ツールです。ライブ配信のワンポイント演出や、展示会のフォトブースとして使えるよう軽量化しています。</p>
+<p class="project-status">ラボ版として公開中です。PC/モバイルともに Chrome 最新版でのご利用を推奨します。</p>
+<p class="project-update" data-last-updated="">
+<span class="project-update__label">最終更新</span>
+<time class="project-update__value" datetime="">--</time>
+</p>
+<div class="project-alert project-alert--warning" role="alert">
+<strong>お知らせ</strong>
           旧PWA版 PiXiEELENS のサポートは終了しました。ブラウザ版からアクセスし、最新の機能をご確認ください。
         </div>
-        <div class="hero-cta">
-          <a class="cta-primary" href="../../pixiee-lens/index.html">プレイする</a>
-          <a class="cta-secondary" href="../../index.html#projects">プロジェクト一覧に戻る</a>
-        </div>
-      </div>
-      <div class="hero-visual" aria-hidden="true">
-        <div class="project-visual">
-          <img src="../../pixiee-lens/ogp.png" alt="PiXiEELENS のプレビューイメージ" loading="lazy">
-        </div>
-      </div>
-    </section>
-
-    <section class="section section--accent" id="features">
-      <div class="section-inner">
-        <h2>PiXiEELENS の特徴</h2>
-        <ul class="project-feature-list">
-          <li>
-            <strong>全画面カメラ + ドットモード</strong>
+<div class="hero-cta">
+<a class="cta-primary" href="../../pixiee-lens/index.html">プレイする</a>
+<a class="cta-secondary" href="../../index.html#projects">プロジェクト一覧に戻る</a>
+</div>
+</div>
+<div aria-hidden="true" class="hero-visual">
+<div class="project-visual">
+<img alt="PiXiEELENS のプレビューイメージ" loading="lazy" src="../../pixiee-lens/ogp.png"/>
+</div>
+</div>
+</section>
+<section class="section section--accent" id="features">
+<div class="section-inner">
+<h2>PiXiEELENS の特徴</h2>
+<ul class="project-feature-list">
+<li>
+<strong>全画面カメラ + ドットモード</strong>
             任意の倍率で映像をピクセル化し、観測用のグリッドやアスペクトガイドをワンタップで重ねられます。
           </li>
-          <li>
-            <strong>色パレットの即時適用</strong>
+<li>
+<strong>色パレットの即時適用</strong>
             GBC風やCPC風などプリセットに加え、カスタムパレットJSONも読み込めます。配信やイベントで特定の色味を維持するのに便利です。
           </li>
-          <li>
-            <strong>オフラインでも動作</strong>
+<li>
+<strong>オフラインでも動作</strong>
             通信が不安定な会場でも各種設定は端末内に保存され、再訪時に前回の構成をそのまま復元して起動できます。
           </li>
-        </ul>
-      </div>
-    </section>
-
-    <section class="section" id="howto">
-      <div class="section-inner">
-        <h2>使い方</h2>
-        <ol class="project-howto">
-          <li>起動後、ブラウザから表示されるカメラ利用許可に「許可」を選択します。</li>
-          <li>右下の HUD からドットモード・パレット・アスペクト比・HUD 表示のオン/オフを切り替えます。</li>
-          <li>ピクセル化の粒度はスライダーで変更可能です。必要に応じてスクリーンショットボタンから PNG を保存できます。</li>
-          <li>必要に応じて画面右下の「設定」からHUD配置やタッチ操作ガイドを切り替え、利用シーンに合わせた表示に調整してください。</li>
-        </ol>
-        <p class="project-howto__note">カメラが起動しない場合は、ブラウザのサイト設定からカメラ権限を再度許可してください。外部ディスプレイにミラーリングすればフォトブースとしても利用できます。</p>
-      </div>
-    </section>
-
-    <section class="section" id="details">
-      <div class="section-inner">
-        <h2>基本データ</h2>
-        <div class="project-meta-grid">
-          <dl class="project-meta">
-            <dt>カテゴリ</dt>
-            <dd>ブラウザカメラ / ピクセルラボ</dd>
-          </dl>
-          <dl class="project-meta">
-            <dt>対応ブラウザ</dt>
-            <dd>Chrome / Edge / Safari (最新)</dd>
-          </dl>
-          <dl class="project-meta">
-            <dt>推奨デバイス</dt>
-            <dd>Webカメラ搭載 PC / USB カメラ対応端末</dd>
-          </dl>
-          <dl class="project-meta">
-            <dt>リリース</dt>
-            <dd>2024年 ラボ公開</dd>
-          </dl>
-        </div>
-        <div class="project-note">
-          <strong>制作メモ</strong>
-          <p>PiXiEELENS は PiXiEEDraw のカラーマネージメント機能を応用し、撮影映像をリアルタイムに減色・ピクセル化するためのサンドボックスとして制作しています。ブラウザで誰でも色味を合わせられるよう、最小限のUIで実験できる構成にしました。</p>
-          <div class="project-actions">
-            <a class="cta-primary" href="../../pixiee-lens/index.html">プレイする</a>
-            <a class="cta-secondary" href="/portfolio/index.html#notes">ノートを読む</a>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="section section--highlight" id="share">
-      <div class="section-inner">
-        <h2>活用アイデアを募集中</h2>
-        <p>配信やイベントでの利用例を共有いただけると今後のアップデート参考になります。ハッシュタグ <code>#PiXiEELENS</code> や公式X宛にスクリーンショットをお寄せください。</p>
-        <div class="project-actions">
-          <a class="cta-primary" href="../../pixiee-lens/index.html">プレイする</a>
-          <a class="cta-secondary" href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">公式X (旧Twitter)</a>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <footer class="site-footer">
-    <div class="footer-inner">
-      <small>&copy; <span id="year"></span> PiXiEED. All rights reserved.</small>
-      <div class="footer-links">
-        <a href="../../terms/index.html">利用規約</a>
-        <a href="../../privacy/index.html">プライバシーポリシー</a>
-        <button type="button" class="footer-contact js-contact-open">コンタクト</button>
-        <a class="footer-link--x" href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">公式X (旧Twitter)</a>
-      </div>
-    </div>
-  </footer>
-
-  <div id="contactOverlay" class="contact-overlay" hidden aria-hidden="true">
-    <div class="contact-panel" role="dialog" aria-modal="true" aria-labelledby="contactTitle">
-      <button type="button" class="contact-close js-contact-close" aria-label="閉じる">×</button>
-      <h2 id="contactTitle">コンタクト</h2>
-      <p>ご希望の連絡手段を選択してください。</p>
-      <div class="contact-options">
-        <a class="contact-option" href="mailto:arta@pixieed.jp">
-          <span class="contact-option__title">メールで相談する</span>
-          <span class="contact-option__detail">arta@pixieed.jp</span>
-        </a>
-        <a class="contact-option" href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">
-          <span class="contact-option__title">X (旧Twitter) のDM</span>
-          <span class="contact-option__detail">@PiXiEED_arta</span>
-        </a>
-      </div>
-    </div>
-  </div>
-
-  <script src="../../scripts.js"></script>
+</ul>
+</div>
+</section>
+<section class="section" id="howto">
+<div class="section-inner">
+<h2>使い方</h2>
+<ol class="project-howto">
+<li>起動後、ブラウザから表示されるカメラ利用許可に「許可」を選択します。</li>
+<li>右下の HUD からドットモード・パレット・アスペクト比・HUD 表示のオン/オフを切り替えます。</li>
+<li>ピクセル化の粒度はスライダーで変更可能です。必要に応じてスクリーンショットボタンから PNG を保存できます。</li>
+<li>必要に応じて画面右下の「設定」からHUD配置やタッチ操作ガイドを切り替え、利用シーンに合わせた表示に調整してください。</li>
+</ol>
+<p class="project-howto__note">カメラが起動しない場合は、ブラウザのサイト設定からカメラ権限を再度許可してください。外部ディスプレイにミラーリングすればフォトブースとしても利用できます。</p>
+</div>
+</section>
+<section class="section" id="details">
+<div class="section-inner">
+<h2>基本データ</h2>
+<div class="project-meta-grid">
+<dl class="project-meta">
+<dt>カテゴリ</dt>
+<dd>ブラウザカメラ / ピクセルラボ</dd>
+</dl>
+<dl class="project-meta">
+<dt>対応ブラウザ</dt>
+<dd>Chrome / Edge / Safari (最新)</dd>
+</dl>
+<dl class="project-meta">
+<dt>推奨デバイス</dt>
+<dd>Webカメラ搭載 PC / USB カメラ対応端末</dd>
+</dl>
+<dl class="project-meta">
+<dt>リリース</dt>
+<dd>2024年 ラボ公開</dd>
+</dl>
+</div>
+<div class="project-note">
+<strong>制作メモ</strong>
+<p>PiXiEELENS は PiXiEEDraw のカラーマネージメント機能を応用し、撮影映像をリアルタイムに減色・ピクセル化するためのサンドボックスとして制作しています。ブラウザで誰でも色味を合わせられるよう、最小限のUIで実験できる構成にしました。</p>
+<div class="project-actions">
+<a class="cta-primary" href="../../pixiee-lens/index.html">プレイする</a>
+<a class="cta-secondary" href="/portfolio/index.html#notes">ノートを読む</a>
+</div>
+</div>
+</div>
+</section>
+<section class="section section--highlight" id="share">
+<div class="section-inner">
+<h2>活用アイデアを募集中</h2>
+<p>配信やイベントでの利用例を共有いただけると今後のアップデート参考になります。ハッシュタグ <code>#PiXiEELENS</code> や公式X宛にスクリーンショットをお寄せください。</p>
+<div class="project-actions">
+<a class="cta-primary" href="../../pixiee-lens/index.html">プレイする</a>
+<a class="cta-secondary" href="https://x.com/PiXiEED_arta" rel="noopener" target="_blank">公式X (旧Twitter)</a>
+</div>
+</div>
+</section>
+</main>
+<footer class="site-footer">
+<div class="footer-inner">
+<small>© <span id="year"></span> PiXiEED. All rights reserved.</small>
+<div class="footer-links">
+<a href="../../terms/index.html">利用規約</a>
+<a href="../../privacy/index.html">プライバシーポリシー</a>
+<button class="footer-contact js-contact-open" type="button">コンタクト</button>
+<a class="footer-link--x" href="https://x.com/PiXiEED_arta" rel="noopener" target="_blank">公式X (旧Twitter)</a>
+</div>
+</div>
+</footer>
+<div aria-hidden="true" class="contact-overlay" hidden="" id="contactOverlay">
+<div aria-labelledby="contactTitle" aria-modal="true" class="contact-panel" role="dialog">
+<button aria-label="閉じる" class="contact-close js-contact-close" type="button">×</button>
+<h2 id="contactTitle">コンタクト</h2>
+<p>ご希望の連絡手段を選択してください。</p>
+<div class="contact-options">
+<a class="contact-option" href="mailto:arta@pixieed.jp">
+<span class="contact-option__title">メールで相談する</span>
+<span class="contact-option__detail">arta@pixieed.jp</span>
+</a>
+<a class="contact-option" href="https://x.com/PiXiEED_arta" rel="noopener" target="_blank">
+<span class="contact-option__title">X (旧Twitter) のDM</span>
+<span class="contact-option__detail">@PiXiEED_arta</span>
+</a>
+</div>
+</div>
+</div>
+<script src="../../scripts.js"></script>
 </body>
 </html>
