@@ -139,6 +139,7 @@ const petReady = () => {
 
   const walker = createWalker(wrapper, petButton);
   let speechTimer = null;
+  function startRoaming() {}
 
   function showSpeech(text, ttl = 2600) {
     window.clearTimeout(speechTimer);
@@ -323,20 +324,7 @@ const petReady = () => {
     usageTracker.override(usageTotalMs + CANDY_CONFIG.rewardMs);
   }
 
-  const canRoam = () => isHatched() && !isDocked && !prefersReducedMotion();
-
-  function startRoaming() {
-    if (!canRoam()) {
-      return;
-    }
-    if (!walkerHasStarted) {
-      walker.start();
-      walkerHasStarted = true;
-    } else {
-      walker.resume();
-    }
-    idleSpeaker.schedule(true);
-  }
+  const canRoam = () => false;
 
   function createEggWobbler() {
     let timer = null;
