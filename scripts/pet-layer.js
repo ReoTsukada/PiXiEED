@@ -129,9 +129,6 @@ const petReady = () => {
   let suppressNextClick = false;
   let suppressResetTimer = null;
   let walkerHasStarted = false;
-  let motionOverride = false;
-  let pointerActive = false;
-  let lastTapTime = 0;
 
   const isHatched = () => petStage === PET_STAGE.HATCHED;
 
@@ -383,20 +380,6 @@ const petReady = () => {
     return { schedule, stop, trigger: triggerNow };
   }
 
-  function enableMotionOverride() {
-    if (motionOverride) {
-      return;
-    }
-    motionOverride = true;
-    if (isHatched()) {
-      if (!isDocked) {
-        startRoaming();
-      }
-    } else {
-      eggWobbler.schedule();
-    }
-  }
-
   function getNestRect() {
     return nest ? nest.getBoundingClientRect() : null;
   }
@@ -410,9 +393,8 @@ const petReady = () => {
         y: maxY
       };
     }
-    const padding = 6;
     const x = rect.left + (rect.width - width) / 2;
-    const y = rect.top + rect.height - height - padding;
+    const y = rect.top + (rect.height - height) / 2;
     return {
       x: Math.min(Math.max(x, 0), maxX),
       y: Math.min(Math.max(y, 0), maxY)
@@ -485,7 +467,7 @@ const petReady = () => {
   }
 
   function prefersReducedMotion() {
-    return !motionOverride && Boolean(motionQuery && motionQuery.matches);
+    return Boolean(motionQuery && motionQuery.matches);
   }
 
   const usageTracker = createUsageTracker(handleUsageProgress);
@@ -493,7 +475,7 @@ const petReady = () => {
   function addMotionListener() {
     if (!motionQuery) return;
     const handler = event => {
-      if (event.matches && !motionOverride) {
+      if (event.matches) {
         walker.stop();
         idleSpeaker.stop();
         eggWobbler.stop();
@@ -591,9 +573,7 @@ const petReady = () => {
     if (event.button !== 0) {
       return;
     }
-    enableMotionOverride();
-    currentPointerType = event.pointerType || 'mouse';
-    pointerActive = true;
+    dragPointerId = event.pointerId;
     const rect = wrapper.getBoundingClientRect();
     dragStartPoint = { x: event.clientX, y: event.clientY };
     dragOffset = {
@@ -614,20 +594,16 @@ const petReady = () => {
       event.clientX - dragStartPoint.x,
       event.clientY - dragStartPoint.y
     );
-    const threshold = currentPointerType === 'touch' ? 18 : 6;
-    if (!isDragging && distance > threshold) {
+    if (!isDragging && distance > 6) {
       isDragging = true;
       walker.stop();
       idleSpeaker.stop();
       wrapper.classList.add('is-dragging');
     }
     if (!isDragging) {
-      lastTapTime = Date.now();
       return;
     }
-    if (currentPointerType === 'touch') {
-      event.preventDefault();
-    }
+    event.preventDefault();
     movePetTo(event.clientX - dragOffset.x, event.clientY - dragOffset.y);
     updateNestHighlight(isPointInNest(event.clientX, event.clientY));
   }
@@ -646,12 +622,7 @@ const petReady = () => {
       suppressNextClick = true;
       window.clearTimeout(suppressResetTimer);
       suppressResetTimer = window.setTimeout(() => {
-    if (!isDragging && pointerActive) {
-      const now = Date.now();
-      if (now - lastTapTime > 400) {
         suppressNextClick = false;
-      }
-    }
       }, 400);
       wrapper.classList.remove('is-dragging');
       updateNestHighlight(false);
@@ -666,7 +637,8 @@ const petReady = () => {
       updateNestHighlight(false);
     }
     isDragging = false;
-    pointerActive = false;
+    dragPointerId = null;
+    dragStartPoint = null;
   }
 
   if (typeof window !== 'undefined') {
