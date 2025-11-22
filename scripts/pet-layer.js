@@ -93,6 +93,7 @@ const PET_EGG_SPRITES = [
 const PET_EGG_FALLBACK = 'pet-assets/egg-placeholder.png';
 
 const petReady = () => {
+  removeLegacyPetElements();
   ensurePetLayerDom();
   const wrapper = document.getElementById('pixiePetWrapper');
   const petButton = document.getElementById('pixiePet');
@@ -1033,6 +1034,13 @@ function clampCandyPosition(pos) {
     x: Math.min(Math.max(pos.x, margin), width - margin),
     y: Math.min(Math.max(pos.y, margin), height - margin)
   };
+}
+
+function removeLegacyPetElements() {
+  if (typeof document === 'undefined') {
+    return;
+  }
+  document.querySelectorAll('.pixie-pet-nest').forEach(node => node.remove());
 }
 
 function ensurePetLayerDom() {
