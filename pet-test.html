@@ -1,11 +1,12 @@
 <!DOCTYPE html>
+
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PiXiEED Pet Test</title>
-  <link rel="stylesheet" href="styles.css">
-  <style>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PiXiEED Pet Test</title>
+<link href="styles.css" rel="stylesheet"/>
+<style>
     body {
       min-height: 100vh;
       margin: 0;
@@ -54,39 +55,37 @@
       border: 1px solid rgba(255, 255, 255, 0.35);
     }
   </style>
-</head>
+<link href="/character-dots/mao1.png" rel="icon" type="image/png"/></head>
 <body>
-  <div class="pet-test-panel">
-    <h1>ピクセルペット テストエリア</h1>
-    <p>このページでは孵化サイクルやクリック挙動などのテストを行えます。<br>ブラウザのConsoleで<code>pixiePetReset()</code>を実行すると成長度をリセットできます。</p>
-    <p class="pet-test-help">卵が表示されない場合はページを再読込し、ほかのPiXiEEDタブを閉じてください。</p>
-    <div class="pet-test-links">
-      <a href="index.html">通常のホームへ戻る</a>
-    </div>
-  </div>
-
-  <div class="pixie-pet-layer" aria-live="polite">
-    <div class="pixie-pet-nest" id="pixiePetNest" aria-hidden="true">
-      <span>ジェリンの住処</span>
-    </div>
-    <div class="pixie-exp-bar" id="pixiePetExp" aria-live="polite">
-      <div class="pixie-exp-bar__meta">
-        <span class="pixie-exp-bar__label">EXP</span>
-        <small class="pixie-exp-bar__value" id="pixiePetExpText">0%</small>
-      </div>
-      <div class="pixie-exp-bar__track" id="pixiePetExpTrack" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-        <div class="pixie-exp-bar__fill" id="pixiePetExpFill"></div>
-      </div>
-    </div>
-    <div class="pixie-pet-wrapper" id="pixiePetWrapper">
-      <button type="button" class="pixie-pet" id="pixiePet" aria-label="PiXiEEDペット テスト表示">
-        <img id="pixiePetSprite" alt="" loading="eager" decoding="async">
-      </button>
-      <p class="pixie-pet__speech" id="pixiePetSpeech" role="status" hidden></p>
-    </div>
-    <div class="pixie-candy-field" id="pixieCandyField" aria-live="polite"></div>
-  </div>
-
-  <script src="scripts/pet-layer.js"></script>
+<div class="pet-test-panel">
+<h1>ピクセルペット テストエリア</h1>
+<p>このページでは孵化サイクルやクリック挙動などのテストを行えます。<br/>ブラウザのConsoleで<code>pixiePetReset()</code>を実行すると成長度をリセットできます。</p>
+<p class="pet-test-help">卵が表示されない場合はページを再読込し、ほかのPiXiEEDタブを閉じてください。</p>
+<div class="pet-test-links">
+<a href="index.html">通常のホームへ戻る</a>
+</div>
+</div>
+<div aria-live="polite" class="pixie-pet-layer">
+<div aria-hidden="true" class="pixie-pet-nest" id="pixiePetNest">
+<span>ジェリンの住処</span>
+</div>
+<div aria-live="polite" class="pixie-exp-bar" id="pixiePetExp">
+<div class="pixie-exp-bar__meta">
+<span class="pixie-exp-bar__label">EXP</span>
+<small class="pixie-exp-bar__value" id="pixiePetExpText">0%</small>
+</div>
+<div aria-valuemax="100" aria-valuemin="0" aria-valuenow="0" class="pixie-exp-bar__track" id="pixiePetExpTrack" role="progressbar">
+<div class="pixie-exp-bar__fill" id="pixiePetExpFill"></div>
+</div>
+</div>
+<div class="pixie-pet-wrapper" id="pixiePetWrapper">
+<button aria-label="PiXiEEDペット テスト表示" class="pixie-pet" id="pixiePet" type="button">
+<img alt="" decoding="async" id="pixiePetSprite" loading="eager"/>
+</button>
+<p class="pixie-pet__speech" hidden="" id="pixiePetSpeech" role="status"></p>
+</div>
+<div aria-live="polite" class="pixie-candy-field" id="pixieCandyField"></div>
+</div>
+<script src="scripts/pet-layer.js"></script>
 </body>
 </html>
