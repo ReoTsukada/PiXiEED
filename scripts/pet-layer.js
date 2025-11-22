@@ -149,6 +149,10 @@ const petReady = () => {
     }, ttl);
   }
 
+  const idleSpeaker = createIdleSpeaker(() => {
+    showSpeech(getIdleLine(), 3200);
+  });
+
   const eggWobbler = createEggWobbler();
 
   sprite.alt = 'PiXiEEDを歩き回るピクセルペット';
@@ -171,10 +175,6 @@ const petReady = () => {
     }
     updateExpBar();
   }
-
-  const idleSpeaker = createIdleSpeaker(() => {
-    showSpeech(getIdleLine(), 3200);
-  });
 
   function updateExpBar() {
     if (!expFill || !expText) {
