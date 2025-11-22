@@ -62,10 +62,8 @@ const motionQuery = typeof window !== 'undefined' && typeof window.matchMedia ==
   ? window.matchMedia('(prefers-reduced-motion: reduce)')
   : null;
 
-const PET_HATCHED_STAGE_BASE_MS = 60 * 60 * 1000;
-const PET_HATCHED_STAGE_INCREMENT_MS = 30 * 60 * 1000;
+const PET_HATCHED_STAGE_MS = 60 * 60 * 1000;
 const PET_HATCHED_SPRITES = [
-  'pet-assets/baburinpng.png',
   'character-dots/JELLNALL1.png',
   'character-dots/JELLNALL2.png',
   'character-dots/JELLNALL3.png',
@@ -160,18 +158,16 @@ const petReady = () => {
   applyStage();
 
   function applyStage() {
-    sprite.src = isHatched() ? getHatchedSprite(usageTotalMs) : getEggSprite(usageTotalMs);
+    sprite.src = isHatched() ? getRandomHatchedSprite(usageTotalMs) : getEggSprite(usageTotalMs);
     wrapper.dataset.petState = petStage;
     wrapper.dataset.petStage = petStage;
     petButton.dataset.state = petStage;
     if (isHatched()) {
       eggWobbler.stop();
-      if (isDocked) {
-        const target = getNestPosition();
-        walker.setPosition(target.x, target.y, { immediate: true, lockFacing: true });
-      }
     } else {
-      dockPet({ silent: true, skipShowSpeech: true });
+      const left = 24;
+      const bottomOffset = 140;
+      walker.setPosition(left, window.innerHeight - bottomOffset, { immediate: true, lockFacing: true });
       eggWobbler.schedule();
     }
     updateExpBar();
@@ -277,6 +273,10 @@ const petReady = () => {
     if (!candyField || !candyState) {
       return;
     }
+    if (!isHatched()) {
+      candyField.innerHTML = '';
+      return;
+    }
     if (!Array.isArray(candyState.positions)) {
       candyState.positions = createCandyState(candyState.cycleStart).positions;
       saveCandyStateToStorage(candyState);
@@ -373,20 +373,11 @@ const petReady = () => {
   }
 
   function getNestPosition() {
-    const rect = getNestRect();
-    const { maxX, maxY, width, height } = walker.getBounds();
-    if (!rect) {
-      return {
-        x: Math.min(20, maxX),
-        y: maxY
-      };
-    }
-    const x = rect.left + (rect.width - width) / 2;
-    const y = rect.top + (rect.height - height) / 2;
-    return {
-      x: Math.min(Math.max(x, 0), maxX),
-      y: Math.min(Math.max(y, 0), maxY)
-    };
+    const { maxX, maxY } = walker.getBounds();
+    const padding = 20;
+    const targetX = Math.min(24, maxX);
+    const targetY = Math.max(maxY - padding, 0);
+    return { x: targetX, y: targetY };
   }
 
   function isPointInNest(x, y) {
@@ -396,58 +387,20 @@ const petReady = () => {
   }
 
   function updateNestHighlight(active) {
-    if (!nest) return;
-    nest.classList.toggle('is-target', Boolean(active));
+    // Nest removed
   }
 
   function dockPet(options = {}) {
-    const { silent = false, skipShowSpeech = false } = options;
-    if (isDocked) {
-      const target = getNestPosition();
-      walker.setPosition(target.x, target.y, { immediate: true, lockFacing: true });
-      return;
-    }
-    isDocked = true;
-    walker.stop();
-    idleSpeaker.stop();
-    wrapper.classList.add('is-docked');
-    if (nest) {
-      nest.classList.add('is-active');
-    }
-    const target = getNestPosition();
-    walker.setPosition(target.x, target.y, { immediate: true, lockFacing: true });
-    if (!silent && !skipShowSpeech && !isHatched()) {
-      showSpeech('ここが居場所だよ', 2600);
-    }
+    // noop
   }
 
   function undockPet(options = {}) {
-    const { resume = true, disableForEgg = false } = options;
-    if (!isDocked) {
-      return;
-    }
-    if (disableForEgg && !isHatched()) {
-      dockPet({ silent: true });
-      return;
-    }
-    isDocked = false;
-    wrapper.classList.remove('is-docked');
-    if (nest) {
-      nest.classList.remove('is-active');
-      nest.classList.remove('is-target');
-    }
-    if (resume !== false) {
-      startRoaming();
-    }
+    // noop
   }
 
   function clearDockingState() {
     isDocked = false;
     wrapper.classList.remove('is-docked');
-    if (nest) {
-      nest.classList.remove('is-active');
-      nest.classList.remove('is-target');
-    }
   }
 
   function movePetTo(x, y) {
@@ -520,11 +473,7 @@ const petReady = () => {
     void petButton.offsetWidth; // restart animation
     petButton.classList.add('is-reacting');
     showSpeech(getClickReaction(), 3000);
-    if (isHatched()) {
-      if (!isDocked) {
-        walker.nudge();
-      }
-    } else {
+    if (!isHatched()) {
       applyEggClickBonus();
       eggWobbler.trigger();
     }
@@ -729,10 +678,11 @@ const petReady = () => {
 
 function getHatchedSprite(totalMs) {
   if (!PET_HATCHED_SPRITES.length) {
-    return 'pet-assets/baburinpng.png';
+    return 'character-dots/JELLNALL1.png';
   }
-  const { stageIndex } = getHatchedStageData(totalMs);
-  return PET_HATCHED_SPRITES[stageIndex] || PET_HATCHED_SPRITES[0];
+  const cycleKey = Math.floor((Math.max(0, totalMs - PET_HATCH_THRESHOLD_MS)) / PET_HATCHED_STAGE_MS);
+  const randomIndex = Math.floor((cycleKey * 9301 + 49297) % 233280) % PET_HATCHED_SPRITES.length;
+  return PET_HATCHED_SPRITES[randomIndex] || PET_HATCHED_SPRITES[0];
 }
 
 function getEggStageIndex(totalMs) {
@@ -753,24 +703,19 @@ function getWobbleInterval(totalMs) {
 }
 
 function getHatchedStageData(totalMs) {
-  const base = PET_HATCHED_STAGE_BASE_MS || 1;
-  const increment = PET_HATCHED_STAGE_INCREMENT_MS || 0;
+  const interval = PET_HATCHED_STAGE_MS || 1;
   const maxIndex = Math.max(PET_HATCHED_SPRITES.length - 1, 0);
   if (!PET_HATCHED_SPRITES.length) {
-    return { stageIndex: 0, stageProgress: 0, interval: base, maxIndex };
+    return { stageIndex: 0, stageProgress: 0, interval, maxIndex };
   }
   const baseline = Math.max(0, Number.isFinite(totalMs) ? totalMs : 0);
   const progress = Math.max(0, baseline - PET_HATCH_THRESHOLD_MS);
-  let stageIndex = 0;
-  let accumulated = 0;
-  let currentInterval = base;
-  while (stageIndex < maxIndex && progress >= accumulated + currentInterval) {
-    accumulated += currentInterval;
-    stageIndex += 1;
-    currentInterval = base + increment * stageIndex;
-  }
-  const stageProgress = Math.min(Math.max(progress - accumulated, 0), currentInterval);
-  return { stageIndex, stageProgress, interval: currentInterval, maxIndex };
+  const stageIndex = Math.min(
+    maxIndex,
+    Math.floor(progress / interval)
+  );
+  const stageProgress = Math.min(Math.max(progress - stageIndex * interval, 0), interval);
+  return { stageIndex, stageProgress, interval, maxIndex };
 }
 };
 
