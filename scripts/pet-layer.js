@@ -130,6 +130,8 @@ const petReady = () => {
   let suppressResetTimer = null;
   let walkerHasStarted = false;
   let motionOverride = false;
+  let pointerActive = false;
+  let lastTapTime = 0;
 
   const isHatched = () => petStage === PET_STAGE.HATCHED;
 
@@ -591,7 +593,7 @@ const petReady = () => {
     }
     enableMotionOverride();
     currentPointerType = event.pointerType || 'mouse';
-    dragPointerId = event.pointerId;
+    pointerActive = true;
     const rect = wrapper.getBoundingClientRect();
     dragStartPoint = { x: event.clientX, y: event.clientY };
     dragOffset = {
@@ -620,6 +622,7 @@ const petReady = () => {
       wrapper.classList.add('is-dragging');
     }
     if (!isDragging) {
+      lastTapTime = Date.now();
       return;
     }
     if (currentPointerType === 'touch') {
@@ -643,7 +646,12 @@ const petReady = () => {
       suppressNextClick = true;
       window.clearTimeout(suppressResetTimer);
       suppressResetTimer = window.setTimeout(() => {
+    if (!isDragging && pointerActive) {
+      const now = Date.now();
+      if (now - lastTapTime > 400) {
         suppressNextClick = false;
+      }
+    }
       }, 400);
       wrapper.classList.remove('is-dragging');
       updateNestHighlight(false);
@@ -658,9 +666,7 @@ const petReady = () => {
       updateNestHighlight(false);
     }
     isDragging = false;
-    dragPointerId = null;
-    dragStartPoint = null;
-    currentPointerType = null;
+    pointerActive = false;
   }
 
   if (typeof window !== 'undefined') {
