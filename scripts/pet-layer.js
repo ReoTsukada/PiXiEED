@@ -93,6 +93,7 @@ const PET_EGG_SPRITES = [
 const PET_EGG_FALLBACK = 'pet-assets/egg-placeholder.png';
 
 const petReady = () => {
+  ensurePetLayerDom();
   const wrapper = document.getElementById('pixiePetWrapper');
   const petButton = document.getElementById('pixiePet');
   const sprite = document.getElementById('pixiePetSprite');
@@ -1032,6 +1033,37 @@ function clampCandyPosition(pos) {
     x: Math.min(Math.max(pos.x, margin), width - margin),
     y: Math.min(Math.max(pos.y, margin), height - margin)
   };
+}
+
+function ensurePetLayerDom() {
+  if (typeof document === 'undefined') {
+    return;
+  }
+  if (document.getElementById('pixiePetWrapper')) {
+    return;
+  }
+  const layer = document.createElement('div');
+  layer.className = 'pixie-pet-layer';
+  layer.setAttribute('aria-live', 'polite');
+  layer.innerHTML = `
+    <div class="pixie-exp-bar" id="pixiePetExp" aria-live="polite">
+      <div class="pixie-exp-bar__meta">
+        <span class="pixie-exp-bar__label">EXP</span>
+        <small class="pixie-exp-bar__value" id="pixiePetExpText">0%</small>
+      </div>
+      <div class="pixie-exp-bar__track" id="pixiePetExpTrack" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="pixie-exp-bar__fill" id="pixiePetExpFill"></div>
+      </div>
+    </div>
+    <div class="pixie-pet-wrapper" id="pixiePetWrapper">
+      <button type="button" class="pixie-pet" id="pixiePet" aria-label="PiXiEEDペット">
+        <img id="pixiePetSprite" alt="" loading="eager" decoding="async">
+      </button>
+      <p class="pixie-pet__speech" id="pixiePetSpeech" role="status" hidden></p>
+    </div>
+    <div class="pixie-candy-field" id="pixieCandyField" aria-live="polite"></div>
+  `;
+  document.body.appendChild(layer);
 }
 
 function getCandyCycleStart(date = new Date()) {
