@@ -139,6 +139,16 @@ const petReady = () => {
 
   const walker = createWalker(wrapper, petButton);
   let speechTimer = null;
+
+  function showSpeech(text, ttl = 2600) {
+    window.clearTimeout(speechTimer);
+    speech.textContent = text.replace('#{id}', shortId);
+    speech.hidden = false;
+    speechTimer = window.setTimeout(() => {
+      speech.hidden = true;
+    }, ttl);
+  }
+
   const eggWobbler = createEggWobbler();
 
   sprite.alt = 'PiXiEEDを歩き回るピクセルペット';
@@ -156,19 +166,10 @@ const petReady = () => {
         walker.setPosition(target.x, target.y, { immediate: true, lockFacing: true });
       }
     } else {
-      dockPet({ silent: true });
+      dockPet({ silent: true, skipShowSpeech: true });
       eggWobbler.schedule();
     }
     updateExpBar();
-  }
-
-  function showSpeech(text, ttl = 2600) {
-    window.clearTimeout(speechTimer);
-    speech.textContent = text.replace('#{id}', shortId);
-    speech.hidden = false;
-    speechTimer = window.setTimeout(() => {
-      speech.hidden = true;
-    }, ttl);
   }
 
   const idleSpeaker = createIdleSpeaker(() => {
@@ -412,7 +413,7 @@ const petReady = () => {
   }
 
   function dockPet(options = {}) {
-    const { silent = false } = options;
+    const { silent = false, skipShowSpeech = false } = options;
     if (isDocked) {
       const target = getNestPosition();
       walker.setPosition(target.x, target.y, { immediate: true, lockFacing: true });
@@ -427,7 +428,7 @@ const petReady = () => {
     }
     const target = getNestPosition();
     walker.setPosition(target.x, target.y, { immediate: true, lockFacing: true });
-    if (!silent && !isHatched()) {
+    if (!silent && !skipShowSpeech && !isHatched()) {
       showSpeech('ここが居場所だよ', 2600);
     }
   }
