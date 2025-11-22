@@ -1,24 +1,25 @@
 <!DOCTYPE html>
+
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PiXiEELENS</title>
-  <meta name="description" content="PiXiEELENS は全画面カメラとドットモードを備えた実験ページです。">
-  <meta name="theme-color" content="#050812">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="PiXiEELENS">
-  <meta property="og:description" content="PiXiEELENS は全画面カメラとドットモードを備えた実験ページです。">
-  <meta property="og:image" content="https://pixieed.jp/pixiee-lens/ogp.png">
-  <meta property="og:url" content="https://pixieed.jp//pixiee-lens/">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="PiXiEELENS">
-  <meta name="twitter:description" content="PiXiEELENS は全画面カメラとドットモードを備えた実験ページです。">
-  <meta name="twitter:image" content="https://pixieed.jp/pixiee-lens/ogp.png">
-  <meta name="build-version" content="20241102-01">
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
-  <script>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>PiXiEELENS</title>
+<meta content="PiXiEELENS は全画面カメラとドットモードを備えた実験ページです。" name="description"/>
+<meta content="#050812" name="theme-color"/>
+<meta content="website" property="og:type"/>
+<meta content="PiXiEELENS" property="og:title"/>
+<meta content="PiXiEELENS は全画面カメラとドットモードを備えた実験ページです。" property="og:description"/>
+<meta content="https://pixieed.jp/pixiee-lens/ogp.png" property="og:image"/>
+<meta content="https://pixieed.jp//pixiee-lens/" property="og:url"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="PiXiEELENS" name="twitter:title"/>
+<meta content="PiXiEELENS は全画面カメラとドットモードを備えた実験ページです。" name="twitter:description"/>
+<meta content="https://pixieed.jp/pixiee-lens/ogp.png" name="twitter:image"/>
+<meta content="20241102-01" name="build-version"/>
+<!-- Google tag (gtag.js) -->
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
+<script>
     const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
     const GA_PAGE_PATH = '/pixiee-lens/';
     const PROJECT_SLUG = 'pixiee-lens';
@@ -38,10 +39,10 @@
     });
     gtag('event', 'project_open_pixiee_lens');
   </script>
-  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
-  <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
-  <link rel="apple-touch-icon" href="./icon-192.png">
-  <style>
+
+
+
+<style>
     :root {
       color-scheme: dark;
       --bg: radial-gradient(circle at 20% 15%, rgba(123, 207, 255, 0.18), transparent 55%), radial-gradient(circle at 80% 8%, rgba(255, 143, 246, 0.15), transparent 50%), #050812;
@@ -1586,312 +1587,312 @@
       }
     }
   </style>
-</head>
-  <body>
-  <main>
-    <video id="cameraFeed" autoplay muted playsinline></video>
-    <canvas id="dotCanvas" class="dot-canvas" hidden></canvas>
-    <div id="aspectOverlay" class="aspect-overlay" hidden>
-      <div id="aspectShadeTop" class="aspect-shade" aria-hidden="true"></div>
-      <div id="aspectCenter" class="aspect-middle" aria-hidden="true">
-        <div id="aspectShadeLeft" class="aspect-side-shade"></div>
-        <div id="aspectFrame" class="aspect-frame"></div>
-        <div id="aspectShadeRight" class="aspect-side-shade"></div>
-      </div>
-      <div id="aspectShadeBottom" class="aspect-shade" aria-hidden="true"></div>
-    </div>
-    <div class="hud">
-      <div class="hud-top">
-        <div class="hud-top__bar">
-          <div class="hud-top__actions" role="group" aria-label="ドット絵コントロール">
-            <button id="pixelArtBtn" class="icon-button" type="button" aria-label="ドット絵を読み込む">
-              <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">
-                <rect x="1" y="0" width="14" height="1" fill="#FFFFFF"></rect>
-                <rect x="0" y="1" width="2" height="1" fill="#FFFFFF"></rect>
-                <rect x="14" y="1" width="2" height="1" fill="#FFFFFF"></rect>
-                <rect x="0" y="2" width="1" height="21" fill="#FFFFFF"></rect>
-                <rect x="15" y="2" width="1" height="2" fill="#FFFFFF"></rect>
-                <rect x="16" y="3" width="7" height="1" fill="#FFFFFF"></rect>
-                <rect x="22" y="4" width="2" height="1" fill="#FFFFFF"></rect>
-                <rect x="23" y="5" width="1" height="18" fill="#FFFFFF"></rect>
-                <rect x="1" y="9" width="22" height="1" fill="#FFFFFF"></rect>
-                <rect x="1" y="10" width="1" height="1" fill="#FFFFFF"></rect>
-                <rect x="22" y="10" width="1" height="1" fill="#FFFFFF"></rect>
-                <rect x="1" y="22" width="1" height="2" fill="#FFFFFF"></rect>
-                <rect x="22" y="22" width="1" height="2" fill="#FFFFFF"></rect>
-                <rect x="2" y="23" width="20" height="1" fill="#FFFFFF"></rect>
-              </svg>
-              <span class="icon-button__label visually-hidden">ドット絵を読み込む</span>
-            </button>
-            <button id="stampBtn" class="icon-button" type="button" aria-label="スタンプを開く" aria-expanded="false" aria-controls="stampPanel">
-              <img src="./icon-stamp.svg" class="control-icon" alt="" aria-hidden="true" draggable="false">
-              <span class="icon-button__label visually-hidden">スタンプを開く</span>
-            </button>
-            <button id="clearPixelBtn" class="icon-button icon-button--ghost" type="button" aria-label="ドット絵を閉じる">
-              <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">
-                <rect x="2" y="0" width="2" height="6" fill="#FFFFFF"></rect>
-                <rect x="20" y="0" width="2" height="6" fill="#FFFFFF"></rect>
-                <rect x="1" y="1" width="1" height="4" fill="#FFFFFF"></rect>
-                <rect x="4" y="1" width="1" height="7" fill="#FFFFFF"></rect>
-                <rect x="19" y="1" width="1" height="7" fill="#FFFFFF"></rect>
-                <rect x="22" y="1" width="1" height="4" fill="#FFFFFF"></rect>
-                <rect x="0" y="2" width="1" height="2" fill="#FFFFFF"></rect>
-                <rect x="5" y="2" width="1" height="7" fill="#FFFFFF"></rect>
-                <rect x="18" y="2" width="1" height="7" fill="#FFFFFF"></rect>
-                <rect x="23" y="2" width="1" height="2" fill="#FFFFFF"></rect>
-                <rect x="6" y="3" width="1" height="7" fill="#FFFFFF"></rect>
-                <rect x="17" y="3" width="1" height="7" fill="#FFFFFF"></rect>
-                <rect x="7" y="4" width="1" height="7" fill="#FFFFFF"></rect>
-                <rect x="16" y="4" width="1" height="7" fill="#FFFFFF"></rect>
-                <rect x="8" y="5" width="1" height="14" fill="#FFFFFF"></rect>
-                <rect x="15" y="5" width="1" height="14" fill="#FFFFFF"></rect>
-                <rect x="3" y="6" width="1" height="1" fill="#FFFFFF"></rect>
-                <rect x="9" y="6" width="1" height="12" fill="#FFFFFF"></rect>
-                <rect x="14" y="6" width="1" height="12" fill="#FFFFFF"></rect>
-                <rect x="20" y="6" width="1" height="1" fill="#FFFFFF"></rect>
-                <rect x="10" y="7" width="1" height="10" fill="#FFFFFF"></rect>
-                <rect x="13" y="7" width="1" height="10" fill="#FFFFFF"></rect>
-                <rect x="11" y="8" width="2" height="8" fill="#FFFFFF"></rect>
-                <rect x="7" y="13" width="1" height="7" fill="#FFFFFF"></rect>
-                <rect x="16" y="13" width="1" height="7" fill="#FFFFFF"></rect>
-                <rect x="6" y="14" width="1" height="7" fill="#FFFFFF"></rect>
-                <rect x="17" y="14" width="1" height="7" fill="#FFFFFF"></rect>
-                <rect x="5" y="15" width="1" height="7" fill="#FFFFFF"></rect>
-                <rect x="18" y="15" width="1" height="7" fill="#FFFFFF"></rect>
-                <rect x="4" y="16" width="1" height="7" fill="#FFFFFF"></rect>
-                <rect x="19" y="16" width="1" height="7" fill="#FFFFFF"></rect>
-                <rect x="3" y="17" width="1" height="7" fill="#FFFFFF"></rect>
-                <rect x="20" y="17" width="1" height="7" fill="#FFFFFF"></rect>
-                <rect x="2" y="18" width="1" height="6" fill="#FFFFFF"></rect>
-                <rect x="21" y="18" width="1" height="6" fill="#FFFFFF"></rect>
-                <rect x="1" y="19" width="1" height="4" fill="#FFFFFF"></rect>
-                <rect x="22" y="19" width="1" height="4" fill="#FFFFFF"></rect>
-                <rect x="0" y="20" width="1" height="2" fill="#FFFFFF"></rect>
-                <rect x="23" y="20" width="1" height="2" fill="#FFFFFF"></rect>
-              </svg>
-              <span class="icon-button__label visually-hidden">ドット絵を閉じる</span>
-            </button>
-          </div>
-          <div class="hud-top__actions hud-top__actions--right" role="group" aria-label="カメラ操作">
-            <button id="cameraActionBtn" class="icon-button" type="button" aria-label="再接続" data-mode="resume">
-              <svg id="cameraActionIcon" class="control-icon" viewBox="0 0 24 24" aria-hidden="true" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">
-                <rect x="17" y="0" width="6" height="1" fill="#FFFFFF"></rect>
-                <rect x="16" y="1" width="2" height="1" fill="#FFFFFF"></rect>
-                <rect x="22" y="1" width="2" height="1" fill="#FFFFFF"></rect>
-                <rect x="16" y="2" width="1" height="5" fill="#FFFFFF"></rect>
-                <rect x="21" y="2" width="1" height="1" fill="#FFFFFF"></rect>
-                <rect x="23" y="2" width="1" height="5" fill="#FFFFFF"></rect>
-                <rect x="20" y="3" width="1" height="1" fill="#FFFFFF"></rect>
-                <rect x="19" y="4" width="1" height="1" fill="#FFFFFF"></rect>
-                <rect x="18" y="5" width="1" height="1" fill="#FFFFFF"></rect>
-                <rect x="17" y="6" width="1" height="2" fill="#FFFFFF"></rect>
-                <rect x="22" y="6" width="1" height="2" fill="#FFFFFF"></rect>
-                <rect x="8" y="7" width="8" height="1" fill="#FFFFFF"></rect>
-                <rect x="18" y="7" width="4" height="1" fill="#FFFFFF"></rect>
-                <rect x="3" y="8" width="3" height="2" fill="#FFFFFF"></rect>
-                <rect x="7" y="8" width="2" height="1" fill="#FFFFFF"></rect>
-                <rect x="15" y="8" width="2" height="1" fill="#FFFFFF"></rect>
-                <rect x="1" y="9" width="2" height="1" fill="#FFFFFF"></rect>
-                <rect x="6" y="9" width="2" height="1" fill="#FFFFFF"></rect>
-                <rect x="10" y="9" width="4" height="1" fill="#FFFFFF"></rect>
-                <rect x="16" y="9" width="7" height="1" fill="#FFFFFF"></rect>
-                <rect x="0" y="10" width="2" height="1" fill="#FFFFFF"></rect>
-                <rect x="22" y="10" width="2" height="1" fill="#FFFFFF"></rect>
-                <rect x="0" y="11" width="1" height="12" fill="#FFFFFF"></rect>
-                <rect x="23" y="11" width="1" height="12" fill="#FFFFFF"></rect>
-                <rect x="9" y="12" width="6" height="1" fill="#FFFFFF"></rect>
-                <rect x="8" y="13" width="1" height="1" fill="#FFFFFF"></rect>
-                <rect x="15" y="13" width="1" height="1" fill="#FFFFFF"></rect>
-                <rect x="7" y="14" width="1" height="6" fill="#FFFFFF"></rect>
-                <rect x="16" y="14" width="1" height="6" fill="#FFFFFF"></rect>
-                <rect x="8" y="20" width="1" height="1" fill="#FFFFFF"></rect>
-                <rect x="15" y="20" width="1" height="1" fill="#FFFFFF"></rect>
-                <rect x="9" y="21" width="6" height="1" fill="#FFFFFF"></rect>
-                <rect x="1" y="22" width="1" height="2" fill="#FFFFFF"></rect>
-                <rect x="22" y="22" width="1" height="2" fill="#FFFFFF"></rect>
-                <rect x="2" y="23" width="20" height="1" fill="#FFFFFF"></rect>
-              </svg>
-              <span class="icon-button__label visually-hidden">再接続</span>
-            </button>
-            <button id="cameraSettingsBtn" class="icon-button" type="button" aria-label="カメラ設定" aria-expanded="false" aria-controls="cameraSettingsPanel">
-              <img src="./icon-setting.svg" class="control-icon" alt="" aria-hidden="true">
-              <span class="icon-button__label visually-hidden">カメラ設定</span>
-            </button>
-          </div>
-        </div>
-        <div class="hud-top__panel-wrap hud-top__panel-wrap--left">
-          <div id="stampPanel" class="menu-panel stamp-panel" hidden>
-            <p class="stamp-panel__hint">スタンプを選択すると画面に追加されます。</p>
-            <div id="stampList" class="stamp-panel__grid" role="group" aria-label="スタンプ一覧"></div>
-            <p id="stampEmptyMessage" class="stamp-panel__empty" hidden>スタンプがまだ登録されていません。</p>
-          </div>
-        </div>
-        <div class="hud-top__panel-wrap hud-top__panel-wrap--right">
-          <div id="cameraSettingsPanel" class="menu-panel camera-settings-panel" hidden>
-            <div class="controls controls--camera" role="group" aria-label="カメラ基本設定">
-              <label class="slider-control">
-                <span class="slider-control__label-row">
-                  <span class="slider-control__label">明るさ</span>
-                  <span class="slider-control__value" data-setting-value="brightness">0</span>
-                </span>
-                <input id="cameraSettingBrightness" type="range" min="-100" max="100" step="1" value="0" data-setting="brightness">
-              </label>
-              <label class="slider-control">
-                <span class="slider-control__label-row">
-                  <span class="slider-control__label">露光</span>
-                  <span class="slider-control__value" data-setting-value="exposure">0</span>
-                </span>
-                <input id="cameraSettingExposure" type="range" min="-100" max="100" step="1" value="0" data-setting="exposure">
-              </label>
-              <label class="slider-control">
-                <span class="slider-control__label-row">
-                  <span class="slider-control__label">彩度</span>
-                  <span class="slider-control__value" data-setting-value="saturation">0</span>
-                </span>
-                <input id="cameraSettingSaturation" type="range" min="-100" max="100" step="1" value="0" data-setting="saturation">
-              </label>
-              <label class="slider-control">
-                <span class="slider-control__label-row">
-                  <span class="slider-control__label">シャドウ</span>
-                  <span class="slider-control__value" data-setting-value="shadows">0</span>
-                </span>
-                <input id="cameraSettingShadows" type="range" min="-100" max="100" step="1" value="0" data-setting="shadows">
-              </label>
-              <label class="slider-control">
-                <span class="slider-control__label-row">
-                  <span class="slider-control__label">コントラスト</span>
-                  <span class="slider-control__value" data-setting-value="contrast">0</span>
-                </span>
-                <input id="cameraSettingContrast" type="range" min="-100" max="100" step="1" value="0" data-setting="contrast">
-              </label>
-              <label class="slider-control">
-                <span class="slider-control__label-row">
-                  <span class="slider-control__label">ホワイトバランス</span>
-                  <span class="slider-control__value" data-setting-value="whiteBalance">0</span>
-                </span>
-                <input id="cameraSettingWhiteBalance" type="range" min="-100" max="100" step="1" value="0" data-setting="whiteBalance">
-              </label>
-            </div>
-            <button id="cameraSettingsResetBtn" class="option-button camera-settings__reset" type="button">設定をリセット</button>
-          </div>
-        </div>
-      </div>
-      <div class="hud-bottom">
-          <div class="hud-bottom__menus">
-          <div id="aspectMenu" class="menu-panel" hidden>
-            <div class="controls controls--aspect" role="group" aria-label="アスペクト比">
-              <button class="option-button is-active" type="button" data-aspect="3:2" aria-pressed="true">3:2</button>
-              <button class="option-button" type="button" data-aspect="1:1" aria-pressed="false">1:1</button>
-              <button class="option-button" type="button" data-aspect="4:3" aria-pressed="false">4:3</button>
-              <button class="option-button" type="button" data-aspect="16:9" aria-pressed="false">16:9</button>
-            </div>
-          </div>
-          <div id="dotSettingsPanel" class="menu-panel dot-settings-panel" hidden>
-            <div class="dot-settings-panel__row">
-              <label for="dotScaleSelect" class="select-control">
-                <span class="select-control__label">ドット拡大率</span>
-                <select id="dotScaleSelect" name="dotScale">
-                  <option value="1">x1</option>
-                  <option value="2">x2</option>
-                  <option value="3">x3</option>
-                  <option value="4">x4</option>
-                  <option value="5">x5</option>
-                </select>
-              </label>
-              <label for="colorDepthSelect" class="select-control">
-                <span class="select-control__label">色数</span>
-                <select id="colorDepthSelect" name="colorDepth">
-                  <option value="full">８BIT（カラー）</option>
-                  <option value="gray">８BIT（グレー）</option>
-                  <option value="4" selected>2BIT</option>
-                  <option value="2">1BIT</option>
-                </select>
-              </label>
-              <button id="paletteToggleBtn" class="option-button palette-toggle" type="button" aria-pressed="false" aria-label="パレットを表示">パレット</button>
-            </div>
-            <div id="paletteDisplay" class="palette-display" aria-hidden="true"></div>
-          </div>
-        </div>
-      <div class="hud-bottom__actions" role="group" aria-label="操作">
-        <div class="hud-bottom__actions-group hud-bottom__actions-group--left">
-          <button id="dotModeBtn" class="icon-button" type="button" aria-label="ドット設定を開く" aria-pressed="true">
-            <img src="./icon-dotmode.svg" class="control-icon" alt="" aria-hidden="true" draggable="false">
-            <span class="icon-button__label visually-hidden">ドット設定</span>
-          </button>
-        </div>
-        <div class="hud-bottom__center">
-          <div id="zoomControl" class="zoom-meter is-collapsed" hidden>
-            <div class="zoom-meter__tape">
-              <div class="zoom-meter__indicator" aria-hidden="true"></div>
-              <div class="zoom-meter__scale" aria-hidden="true">
-                <div class="zoom-meter__scale-track"></div>
-              </div>
-              <input id="cameraZoomSlider" class="zoom-meter__slider" type="range" min="0" max="100" step="1" value="0" aria-label="ズーム倍率" data-setting="zoom">
-            </div>
-            <div id="colorControl" class="zoom-meter__color" hidden>
-              <div class="zoom-meter__control-group">
-                <div class="zoom-meter__control-header">
-                  <span class="zoom-meter__control-title" aria-hidden="true">Hue</span>
-                  <span id="hueValueDisplay" class="zoom-meter__control-value">0°</span>
-                </div>
-                <input id="hueSlider" class="zoom-meter__control-slider zoom-meter__control-slider--hue" type="range" min="0" max="360" step="1" value="0" aria-label="色相">
-              </div>
-              <div class="zoom-meter__control-group">
-                <div class="zoom-meter__control-header">
-                  <span class="zoom-meter__control-title" aria-hidden="true">Saturation</span>
-                  <span id="saturationValueDisplay" class="zoom-meter__control-value">220%</span>
-                </div>
-                <input id="saturationSlider" class="zoom-meter__control-slider zoom-meter__control-slider--saturation" type="range" min="0" max="300" step="1" value="220" aria-label="彩度">
-              </div>
-            </div>
-          </div>
-          <div class="hud-bottom__capture-slot">
-            <button id="captureBtn" class="capture-button" type="button" aria-label="撮影">
-              <img src="./icon-capture.svg" class="capture-button__icon" alt="" aria-hidden="true" draggable="false">
-            </button>
-          </div>
-        </div>
-        <div class="hud-bottom__actions-group hud-bottom__actions-group--right">
-          <button id="aspectMenuBtn" class="icon-button" type="button" aria-expanded="false" aria-controls="aspectMenu" aria-label="キャンバスサイズを選択">
-            <img src="./icon-aspect.svg" class="control-icon" alt="" aria-hidden="true">
-            <span class="icon-button__label visually-hidden">キャンバスサイズ</span>
-          </button>
-        </div>
-      </div>
-      <div class="hud-landscape-capture" aria-hidden="true"></div>
-    </div>
-    <div id="pixelPreview" class="pixel-preview" hidden></div>
-  </main>
-  <div id="cameraStartOverlay" class="camera-permission" hidden aria-hidden="true">
-    <div class="camera-permission__backdrop" id="cameraStartBackdrop"></div>
-    <div class="camera-permission__panel" role="dialog" aria-modal="true" aria-labelledby="cameraStartHeading" aria-describedby="cameraStartMessage">
-      <h2 id="cameraStartHeading" class="camera-permission__title">カメラを起動</h2>
-      <p id="cameraStartMessage" class="camera-permission__message">ホーム画面から利用する場合は、下のボタンをタップしてカメラを起動してください。</p>
-      <div class="camera-permission__actions">
-        <button type="button" class="camera-permission__button camera-permission__button--primary" id="cameraStartButton">カメラを起動</button>
-      </div>
-    </div>
-  </div>
-  <div id="capturePreviewOverlay" class="capture-preview" hidden aria-hidden="true">
-    <div class="capture-preview__backdrop" id="capturePreviewBackdrop"></div>
-    <div class="capture-preview__panel" role="dialog" aria-modal="true" aria-labelledby="capturePreviewHeading">
-      <button type="button" class="capture-preview__close" id="capturePreviewCloseBtn" aria-label="閉じる"></button>
-      <div class="capture-preview__body">
-        <h2 id="capturePreviewHeading" class="capture-preview__title">撮影結果</h2>
-        <div class="capture-preview__image-wrap">
-          <img id="capturePreviewImage" alt="撮影した画像のプレビュー" loading="lazy">
-        </div>
-        <p id="capturePreviewInfo" class="capture-preview__info">画像を長押しして保存してください。</p>
-        <div class="capture-preview__actions">
-          <button type="button" class="capture-preview__button" id="capturePreviewEditBtn" hidden>PiXiEEDrawで編集</button>
-          <button type="button" class="capture-preview__button capture-preview__button--primary" id="capturePreviewShareBtn" hidden>共有する</button>
-          <button type="button" class="capture-preview__button" id="capturePreviewCloseActionBtn">閉じる</button>
-        </div>
-      </div>
-    </div>
-  </div>
-  <input id="pixelArtInput" type="file" accept="image/png, image/gif, image/webp, image/bmp" multiple hidden>
-  <script>
+<link href="/character-dots/mao1.png" rel="icon" type="image/png"/></head>
+<body>
+<main>
+<video autoplay="" id="cameraFeed" muted="" playsinline=""></video>
+<canvas class="dot-canvas" hidden="" id="dotCanvas"></canvas>
+<div class="aspect-overlay" hidden="" id="aspectOverlay">
+<div aria-hidden="true" class="aspect-shade" id="aspectShadeTop"></div>
+<div aria-hidden="true" class="aspect-middle" id="aspectCenter">
+<div class="aspect-side-shade" id="aspectShadeLeft"></div>
+<div class="aspect-frame" id="aspectFrame"></div>
+<div class="aspect-side-shade" id="aspectShadeRight"></div>
+</div>
+<div aria-hidden="true" class="aspect-shade" id="aspectShadeBottom"></div>
+</div>
+<div class="hud">
+<div class="hud-top">
+<div class="hud-top__bar">
+<div aria-label="ドット絵コントロール" class="hud-top__actions" role="group">
+<button aria-label="ドット絵を読み込む" class="icon-button" id="pixelArtBtn" type="button">
+<svg aria-hidden="true" class="control-icon" shape-rendering="crispEdges" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<rect fill="#FFFFFF" height="1" width="14" x="1" y="0"></rect>
+<rect fill="#FFFFFF" height="1" width="2" x="0" y="1"></rect>
+<rect fill="#FFFFFF" height="1" width="2" x="14" y="1"></rect>
+<rect fill="#FFFFFF" height="21" width="1" x="0" y="2"></rect>
+<rect fill="#FFFFFF" height="2" width="1" x="15" y="2"></rect>
+<rect fill="#FFFFFF" height="1" width="7" x="16" y="3"></rect>
+<rect fill="#FFFFFF" height="1" width="2" x="22" y="4"></rect>
+<rect fill="#FFFFFF" height="18" width="1" x="23" y="5"></rect>
+<rect fill="#FFFFFF" height="1" width="22" x="1" y="9"></rect>
+<rect fill="#FFFFFF" height="1" width="1" x="1" y="10"></rect>
+<rect fill="#FFFFFF" height="1" width="1" x="22" y="10"></rect>
+<rect fill="#FFFFFF" height="2" width="1" x="1" y="22"></rect>
+<rect fill="#FFFFFF" height="2" width="1" x="22" y="22"></rect>
+<rect fill="#FFFFFF" height="1" width="20" x="2" y="23"></rect>
+</svg>
+<span class="icon-button__label visually-hidden">ドット絵を読み込む</span>
+</button>
+<button aria-controls="stampPanel" aria-expanded="false" aria-label="スタンプを開く" class="icon-button" id="stampBtn" type="button">
+<img alt="" aria-hidden="true" class="control-icon" draggable="false" src="./icon-stamp.svg"/>
+<span class="icon-button__label visually-hidden">スタンプを開く</span>
+</button>
+<button aria-label="ドット絵を閉じる" class="icon-button icon-button--ghost" id="clearPixelBtn" type="button">
+<svg aria-hidden="true" class="control-icon" shape-rendering="crispEdges" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<rect fill="#FFFFFF" height="6" width="2" x="2" y="0"></rect>
+<rect fill="#FFFFFF" height="6" width="2" x="20" y="0"></rect>
+<rect fill="#FFFFFF" height="4" width="1" x="1" y="1"></rect>
+<rect fill="#FFFFFF" height="7" width="1" x="4" y="1"></rect>
+<rect fill="#FFFFFF" height="7" width="1" x="19" y="1"></rect>
+<rect fill="#FFFFFF" height="4" width="1" x="22" y="1"></rect>
+<rect fill="#FFFFFF" height="2" width="1" x="0" y="2"></rect>
+<rect fill="#FFFFFF" height="7" width="1" x="5" y="2"></rect>
+<rect fill="#FFFFFF" height="7" width="1" x="18" y="2"></rect>
+<rect fill="#FFFFFF" height="2" width="1" x="23" y="2"></rect>
+<rect fill="#FFFFFF" height="7" width="1" x="6" y="3"></rect>
+<rect fill="#FFFFFF" height="7" width="1" x="17" y="3"></rect>
+<rect fill="#FFFFFF" height="7" width="1" x="7" y="4"></rect>
+<rect fill="#FFFFFF" height="7" width="1" x="16" y="4"></rect>
+<rect fill="#FFFFFF" height="14" width="1" x="8" y="5"></rect>
+<rect fill="#FFFFFF" height="14" width="1" x="15" y="5"></rect>
+<rect fill="#FFFFFF" height="1" width="1" x="3" y="6"></rect>
+<rect fill="#FFFFFF" height="12" width="1" x="9" y="6"></rect>
+<rect fill="#FFFFFF" height="12" width="1" x="14" y="6"></rect>
+<rect fill="#FFFFFF" height="1" width="1" x="20" y="6"></rect>
+<rect fill="#FFFFFF" height="10" width="1" x="10" y="7"></rect>
+<rect fill="#FFFFFF" height="10" width="1" x="13" y="7"></rect>
+<rect fill="#FFFFFF" height="8" width="2" x="11" y="8"></rect>
+<rect fill="#FFFFFF" height="7" width="1" x="7" y="13"></rect>
+<rect fill="#FFFFFF" height="7" width="1" x="16" y="13"></rect>
+<rect fill="#FFFFFF" height="7" width="1" x="6" y="14"></rect>
+<rect fill="#FFFFFF" height="7" width="1" x="17" y="14"></rect>
+<rect fill="#FFFFFF" height="7" width="1" x="5" y="15"></rect>
+<rect fill="#FFFFFF" height="7" width="1" x="18" y="15"></rect>
+<rect fill="#FFFFFF" height="7" width="1" x="4" y="16"></rect>
+<rect fill="#FFFFFF" height="7" width="1" x="19" y="16"></rect>
+<rect fill="#FFFFFF" height="7" width="1" x="3" y="17"></rect>
+<rect fill="#FFFFFF" height="7" width="1" x="20" y="17"></rect>
+<rect fill="#FFFFFF" height="6" width="1" x="2" y="18"></rect>
+<rect fill="#FFFFFF" height="6" width="1" x="21" y="18"></rect>
+<rect fill="#FFFFFF" height="4" width="1" x="1" y="19"></rect>
+<rect fill="#FFFFFF" height="4" width="1" x="22" y="19"></rect>
+<rect fill="#FFFFFF" height="2" width="1" x="0" y="20"></rect>
+<rect fill="#FFFFFF" height="2" width="1" x="23" y="20"></rect>
+</svg>
+<span class="icon-button__label visually-hidden">ドット絵を閉じる</span>
+</button>
+</div>
+<div aria-label="カメラ操作" class="hud-top__actions hud-top__actions--right" role="group">
+<button aria-label="再接続" class="icon-button" data-mode="resume" id="cameraActionBtn" type="button">
+<svg aria-hidden="true" class="control-icon" id="cameraActionIcon" shape-rendering="crispEdges" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<rect fill="#FFFFFF" height="1" width="6" x="17" y="0"></rect>
+<rect fill="#FFFFFF" height="1" width="2" x="16" y="1"></rect>
+<rect fill="#FFFFFF" height="1" width="2" x="22" y="1"></rect>
+<rect fill="#FFFFFF" height="5" width="1" x="16" y="2"></rect>
+<rect fill="#FFFFFF" height="1" width="1" x="21" y="2"></rect>
+<rect fill="#FFFFFF" height="5" width="1" x="23" y="2"></rect>
+<rect fill="#FFFFFF" height="1" width="1" x="20" y="3"></rect>
+<rect fill="#FFFFFF" height="1" width="1" x="19" y="4"></rect>
+<rect fill="#FFFFFF" height="1" width="1" x="18" y="5"></rect>
+<rect fill="#FFFFFF" height="2" width="1" x="17" y="6"></rect>
+<rect fill="#FFFFFF" height="2" width="1" x="22" y="6"></rect>
+<rect fill="#FFFFFF" height="1" width="8" x="8" y="7"></rect>
+<rect fill="#FFFFFF" height="1" width="4" x="18" y="7"></rect>
+<rect fill="#FFFFFF" height="2" width="3" x="3" y="8"></rect>
+<rect fill="#FFFFFF" height="1" width="2" x="7" y="8"></rect>
+<rect fill="#FFFFFF" height="1" width="2" x="15" y="8"></rect>
+<rect fill="#FFFFFF" height="1" width="2" x="1" y="9"></rect>
+<rect fill="#FFFFFF" height="1" width="2" x="6" y="9"></rect>
+<rect fill="#FFFFFF" height="1" width="4" x="10" y="9"></rect>
+<rect fill="#FFFFFF" height="1" width="7" x="16" y="9"></rect>
+<rect fill="#FFFFFF" height="1" width="2" x="0" y="10"></rect>
+<rect fill="#FFFFFF" height="1" width="2" x="22" y="10"></rect>
+<rect fill="#FFFFFF" height="12" width="1" x="0" y="11"></rect>
+<rect fill="#FFFFFF" height="12" width="1" x="23" y="11"></rect>
+<rect fill="#FFFFFF" height="1" width="6" x="9" y="12"></rect>
+<rect fill="#FFFFFF" height="1" width="1" x="8" y="13"></rect>
+<rect fill="#FFFFFF" height="1" width="1" x="15" y="13"></rect>
+<rect fill="#FFFFFF" height="6" width="1" x="7" y="14"></rect>
+<rect fill="#FFFFFF" height="6" width="1" x="16" y="14"></rect>
+<rect fill="#FFFFFF" height="1" width="1" x="8" y="20"></rect>
+<rect fill="#FFFFFF" height="1" width="1" x="15" y="20"></rect>
+<rect fill="#FFFFFF" height="1" width="6" x="9" y="21"></rect>
+<rect fill="#FFFFFF" height="2" width="1" x="1" y="22"></rect>
+<rect fill="#FFFFFF" height="2" width="1" x="22" y="22"></rect>
+<rect fill="#FFFFFF" height="1" width="20" x="2" y="23"></rect>
+</svg>
+<span class="icon-button__label visually-hidden">再接続</span>
+</button>
+<button aria-controls="cameraSettingsPanel" aria-expanded="false" aria-label="カメラ設定" class="icon-button" id="cameraSettingsBtn" type="button">
+<img alt="" aria-hidden="true" class="control-icon" src="./icon-setting.svg"/>
+<span class="icon-button__label visually-hidden">カメラ設定</span>
+</button>
+</div>
+</div>
+<div class="hud-top__panel-wrap hud-top__panel-wrap--left">
+<div class="menu-panel stamp-panel" hidden="" id="stampPanel">
+<p class="stamp-panel__hint">スタンプを選択すると画面に追加されます。</p>
+<div aria-label="スタンプ一覧" class="stamp-panel__grid" id="stampList" role="group"></div>
+<p class="stamp-panel__empty" hidden="" id="stampEmptyMessage">スタンプがまだ登録されていません。</p>
+</div>
+</div>
+<div class="hud-top__panel-wrap hud-top__panel-wrap--right">
+<div class="menu-panel camera-settings-panel" hidden="" id="cameraSettingsPanel">
+<div aria-label="カメラ基本設定" class="controls controls--camera" role="group">
+<label class="slider-control">
+<span class="slider-control__label-row">
+<span class="slider-control__label">明るさ</span>
+<span class="slider-control__value" data-setting-value="brightness">0</span>
+</span>
+<input data-setting="brightness" id="cameraSettingBrightness" max="100" min="-100" step="1" type="range" value="0"/>
+</label>
+<label class="slider-control">
+<span class="slider-control__label-row">
+<span class="slider-control__label">露光</span>
+<span class="slider-control__value" data-setting-value="exposure">0</span>
+</span>
+<input data-setting="exposure" id="cameraSettingExposure" max="100" min="-100" step="1" type="range" value="0"/>
+</label>
+<label class="slider-control">
+<span class="slider-control__label-row">
+<span class="slider-control__label">彩度</span>
+<span class="slider-control__value" data-setting-value="saturation">0</span>
+</span>
+<input data-setting="saturation" id="cameraSettingSaturation" max="100" min="-100" step="1" type="range" value="0"/>
+</label>
+<label class="slider-control">
+<span class="slider-control__label-row">
+<span class="slider-control__label">シャドウ</span>
+<span class="slider-control__value" data-setting-value="shadows">0</span>
+</span>
+<input data-setting="shadows" id="cameraSettingShadows" max="100" min="-100" step="1" type="range" value="0"/>
+</label>
+<label class="slider-control">
+<span class="slider-control__label-row">
+<span class="slider-control__label">コントラスト</span>
+<span class="slider-control__value" data-setting-value="contrast">0</span>
+</span>
+<input data-setting="contrast" id="cameraSettingContrast" max="100" min="-100" step="1" type="range" value="0"/>
+</label>
+<label class="slider-control">
+<span class="slider-control__label-row">
+<span class="slider-control__label">ホワイトバランス</span>
+<span class="slider-control__value" data-setting-value="whiteBalance">0</span>
+</span>
+<input data-setting="whiteBalance" id="cameraSettingWhiteBalance" max="100" min="-100" step="1" type="range" value="0"/>
+</label>
+</div>
+<button class="option-button camera-settings__reset" id="cameraSettingsResetBtn" type="button">設定をリセット</button>
+</div>
+</div>
+</div>
+<div class="hud-bottom">
+<div class="hud-bottom__menus">
+<div class="menu-panel" hidden="" id="aspectMenu">
+<div aria-label="アスペクト比" class="controls controls--aspect" role="group">
+<button aria-pressed="true" class="option-button is-active" data-aspect="3:2" type="button">3:2</button>
+<button aria-pressed="false" class="option-button" data-aspect="1:1" type="button">1:1</button>
+<button aria-pressed="false" class="option-button" data-aspect="4:3" type="button">4:3</button>
+<button aria-pressed="false" class="option-button" data-aspect="16:9" type="button">16:9</button>
+</div>
+</div>
+<div class="menu-panel dot-settings-panel" hidden="" id="dotSettingsPanel">
+<div class="dot-settings-panel__row">
+<label class="select-control" for="dotScaleSelect">
+<span class="select-control__label">ドット拡大率</span>
+<select id="dotScaleSelect" name="dotScale">
+<option value="1">x1</option>
+<option value="2">x2</option>
+<option value="3">x3</option>
+<option value="4">x4</option>
+<option value="5">x5</option>
+</select>
+</label>
+<label class="select-control" for="colorDepthSelect">
+<span class="select-control__label">色数</span>
+<select id="colorDepthSelect" name="colorDepth">
+<option value="full">８BIT（カラー）</option>
+<option value="gray">８BIT（グレー）</option>
+<option selected="" value="4">2BIT</option>
+<option value="2">1BIT</option>
+</select>
+</label>
+<button aria-label="パレットを表示" aria-pressed="false" class="option-button palette-toggle" id="paletteToggleBtn" type="button">パレット</button>
+</div>
+<div aria-hidden="true" class="palette-display" id="paletteDisplay"></div>
+</div>
+</div>
+<div aria-label="操作" class="hud-bottom__actions" role="group">
+<div class="hud-bottom__actions-group hud-bottom__actions-group--left">
+<button aria-label="ドット設定を開く" aria-pressed="true" class="icon-button" id="dotModeBtn" type="button">
+<img alt="" aria-hidden="true" class="control-icon" draggable="false" src="./icon-dotmode.svg"/>
+<span class="icon-button__label visually-hidden">ドット設定</span>
+</button>
+</div>
+<div class="hud-bottom__center">
+<div class="zoom-meter is-collapsed" hidden="" id="zoomControl">
+<div class="zoom-meter__tape">
+<div aria-hidden="true" class="zoom-meter__indicator"></div>
+<div aria-hidden="true" class="zoom-meter__scale">
+<div class="zoom-meter__scale-track"></div>
+</div>
+<input aria-label="ズーム倍率" class="zoom-meter__slider" data-setting="zoom" id="cameraZoomSlider" max="100" min="0" step="1" type="range" value="0"/>
+</div>
+<div class="zoom-meter__color" hidden="" id="colorControl">
+<div class="zoom-meter__control-group">
+<div class="zoom-meter__control-header">
+<span aria-hidden="true" class="zoom-meter__control-title">Hue</span>
+<span class="zoom-meter__control-value" id="hueValueDisplay">0°</span>
+</div>
+<input aria-label="色相" class="zoom-meter__control-slider zoom-meter__control-slider--hue" id="hueSlider" max="360" min="0" step="1" type="range" value="0"/>
+</div>
+<div class="zoom-meter__control-group">
+<div class="zoom-meter__control-header">
+<span aria-hidden="true" class="zoom-meter__control-title">Saturation</span>
+<span class="zoom-meter__control-value" id="saturationValueDisplay">220%</span>
+</div>
+<input aria-label="彩度" class="zoom-meter__control-slider zoom-meter__control-slider--saturation" id="saturationSlider" max="300" min="0" step="1" type="range" value="220"/>
+</div>
+</div>
+</div>
+<div class="hud-bottom__capture-slot">
+<button aria-label="撮影" class="capture-button" id="captureBtn" type="button">
+<img alt="" aria-hidden="true" class="capture-button__icon" draggable="false" src="./icon-capture.svg"/>
+</button>
+</div>
+</div>
+<div class="hud-bottom__actions-group hud-bottom__actions-group--right">
+<button aria-controls="aspectMenu" aria-expanded="false" aria-label="キャンバスサイズを選択" class="icon-button" id="aspectMenuBtn" type="button">
+<img alt="" aria-hidden="true" class="control-icon" src="./icon-aspect.svg"/>
+<span class="icon-button__label visually-hidden">キャンバスサイズ</span>
+</button>
+</div>
+</div>
+<div aria-hidden="true" class="hud-landscape-capture"></div>
+</div>
+<div class="pixel-preview" hidden="" id="pixelPreview"></div>
+</div></main>
+<div aria-hidden="true" class="camera-permission" hidden="" id="cameraStartOverlay">
+<div class="camera-permission__backdrop" id="cameraStartBackdrop"></div>
+<div aria-describedby="cameraStartMessage" aria-labelledby="cameraStartHeading" aria-modal="true" class="camera-permission__panel" role="dialog">
+<h2 class="camera-permission__title" id="cameraStartHeading">カメラを起動</h2>
+<p class="camera-permission__message" id="cameraStartMessage">ホーム画面から利用する場合は、下のボタンをタップしてカメラを起動してください。</p>
+<div class="camera-permission__actions">
+<button class="camera-permission__button camera-permission__button--primary" id="cameraStartButton" type="button">カメラを起動</button>
+</div>
+</div>
+</div>
+<div aria-hidden="true" class="capture-preview" hidden="" id="capturePreviewOverlay">
+<div class="capture-preview__backdrop" id="capturePreviewBackdrop"></div>
+<div aria-labelledby="capturePreviewHeading" aria-modal="true" class="capture-preview__panel" role="dialog">
+<button aria-label="閉じる" class="capture-preview__close" id="capturePreviewCloseBtn" type="button"></button>
+<div class="capture-preview__body">
+<h2 class="capture-preview__title" id="capturePreviewHeading">撮影結果</h2>
+<div class="capture-preview__image-wrap">
+<img alt="撮影した画像のプレビュー" id="capturePreviewImage" loading="lazy"/>
+</div>
+<p class="capture-preview__info" id="capturePreviewInfo">画像を長押しして保存してください。</p>
+<div class="capture-preview__actions">
+<button class="capture-preview__button" hidden="" id="capturePreviewEditBtn" type="button">PiXiEEDrawで編集</button>
+<button class="capture-preview__button capture-preview__button--primary" hidden="" id="capturePreviewShareBtn" type="button">共有する</button>
+<button class="capture-preview__button" id="capturePreviewCloseActionBtn" type="button">閉じる</button>
+</div>
+</div>
+</div>
+</div>
+<input accept="image/png, image/gif, image/webp, image/bmp" hidden="" id="pixelArtInput" multiple="" type="file"/>
+<script>
     const video = document.getElementById('cameraFeed');
     const cameraActionBtn = document.getElementById('cameraActionBtn');
     const cameraActionIcon = document.getElementById('cameraActionIcon');
