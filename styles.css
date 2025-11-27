@@ -1877,6 +1877,10 @@ a:focus {
   transform-origin: center;
 }
 
+.character-preview__frame img[data-silhouette="true"] {
+  filter: brightness(0) invert(1);
+}
+
 .character-preview__placeholder {
   position: absolute;
   inset: clamp(1rem, 4vw, 1.6rem);
@@ -1951,6 +1955,10 @@ a:focus {
   height: 74px;
   image-rendering: pixelated;
   object-fit: contain;
+}
+
+.character-sprite img[data-silhouette="true"] {
+  filter: brightness(0) invert(1);
 }
 
 .character-sprite span {
