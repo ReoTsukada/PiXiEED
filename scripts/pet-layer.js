@@ -1,6 +1,8 @@
 const STORAGE_KEY = 'pixieed:pet-device-id';
 const STORAGE_STAGE_KEY = 'pixieed:pet-stage';
 const STORAGE_USAGE_KEY = 'pixieed:pet-usage-ms';
+const PET_FEATURE_ENABLED = false;
+
 const PET_STAGE = {
   EGG: 'egg',
   HATCHED: 'hatched'
@@ -46,7 +48,7 @@ const GREETINGS = [
 const CANDY_CONFIG = {
   rewardMs: 10 * 60 * 1000,
   dailyLimit: 3,
-  sprites: ['pet-assets/candy1.png', 'pet-assets/candy2.png', 'pet-assets/candy3.png'],
+  sprites: ['character-dots/pet/candy1.png', 'character-dots/pet/candy2.png', 'character-dots/pet/candy3.png'],
   storageKey: 'pixieed:candy-state',
   resetHourJST: 6
 };
@@ -85,14 +87,29 @@ const PET_HATCHED_SPRITES = [
   'character-dots/JELLNALL19.png'
 ];
 const PET_EGG_SPRITES = [
-  'pet-assets/egg1.png',
-  'pet-assets/egg2.png',
-  'pet-assets/egg3.png',
-  'pet-assets/egg4.png'
+  'character-dots/pet/egg1.png',
+  'character-dots/pet/egg2.png',
+  'character-dots/pet/egg3.png',
+  'character-dots/pet/egg4.png'
 ];
-const PET_EGG_FALLBACK = 'pet-assets/egg-placeholder.png';
+const PET_EGG_FALLBACK = 'character-dots/pet/egg-placeholder.png';
 
 const petReady = () => {
+  if (!PET_FEATURE_ENABLED) {
+    if (typeof document !== 'undefined') {
+      const layer = document.querySelector('.pixie-pet-layer');
+      if (layer) {
+        layer.remove();
+      }
+      const wrapper = document.getElementById('pixiePetWrapper');
+      if (wrapper) wrapper.remove();
+      const expBar = document.getElementById('pixiePetExp');
+      if (expBar) expBar.remove();
+      const candyField = document.getElementById('pixieCandyField');
+      if (candyField) candyField.remove();
+    }
+    return;
+  }
   const wrapper = document.getElementById('pixiePetWrapper');
   const petButton = document.getElementById('pixiePet');
   const sprite = document.getElementById('pixiePetSprite');
@@ -708,18 +725,14 @@ function getWobbleInterval(totalMs) {
 
 function getHatchedStageData(totalMs) {
   const interval = PET_HATCHED_STAGE_MS || 1;
-  const maxIndex = Math.max(PET_HATCHED_SPRITES.length - 1, 0);
   if (!PET_HATCHED_SPRITES.length) {
-    return { stageIndex: 0, stageProgress: 0, interval, maxIndex };
+    return { stageIndex: 0, stageProgress: 0, interval, maxIndex: 0 };
   }
   const baseline = Math.max(0, Number.isFinite(totalMs) ? totalMs : 0);
   const progress = Math.max(0, baseline - PET_HATCH_THRESHOLD_MS);
-  const stageIndex = Math.min(
-    maxIndex,
-    Math.floor(progress / interval)
-  );
+  const stageIndex = Math.max(0, Math.floor(progress / interval));
   const stageProgress = Math.min(Math.max(progress - stageIndex * interval, 0), interval);
-  return { stageIndex, stageProgress, interval, maxIndex };
+  return { stageIndex, stageProgress, interval, maxIndex: Infinity };
 }
 };
 
