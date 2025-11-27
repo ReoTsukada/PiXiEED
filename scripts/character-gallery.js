@@ -25,58 +25,51 @@
   const reduceMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
   const typingControllers = new Map();
   const DEFAULT_IMAGE_SCALE = 0.7;
+  const SECRET_UNLOCK_STORAGE_KEY = 'pixieed:secret-unlocks';
+  const SECRET_UNLOCK_EVENT_NAME = 'pixiePet:secretUnlocked';
+  const PLACEHOLDER_IMG = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
 
-  const manifest = getManifest();
-  const initialCharacterId = getInitialCharacterId();
-  if (!manifest.length) {
+  const manifestEntries = getManifest();
+  if (!manifestEntries.length) {
     return;
   }
 
-  const buttons = manifest.map((entry, index) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'character-sprite' + (index === 0 ? ' is-active' : '');
-    button.setAttribute('aria-pressed', index === 0 ? 'true' : 'false');
-    button.setAttribute('role', 'option');
-    button.setAttribute('data-character-id', entry.id || `character-${index + 1}`);
-    button.setAttribute('aria-label', `${entry.name || entry.buttonLabel || `Character ${index + 1}`} を表示`);
+  const initialCharacterId = getInitialCharacterId();
+  let secretUnlocks = loadSecretUnlockState();
+  const displayEntries = manifestEntries.map(entry => getDisplayEntry(entry));
+  const buttons = displayEntries.map((entry, index) => createButton(entry, index));
+  let currentCharacterId = null;
 
-    const img = document.createElement('img');
-    const src = normalizePath(entry.file);
-    if (src) {
-      img.src = src;
-    } else {
-      img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
-    }
-    img.alt = `${entry.name || 'キャラクター'}のドット絵`;
-    img.loading = 'lazy';
-
-    const label = document.createElement('span');
-    label.textContent = entry.buttonLabel || entry.name || `Character ${index + 1}`;
-
-    button.appendChild(img);
-    button.appendChild(label);
-
-    button.addEventListener('click', () => selectCharacter(entry, button, { updateUrl: true }));
-    buttonsContainer.appendChild(button);
-    return button;
-  });
-
-  const initialIndex = manifest.findIndex(entry => entry.id === initialCharacterId);
+  const initialIndex = manifestEntries.findIndex(entry => entry.id === initialCharacterId);
   if (initialIndex >= 0) {
-    selectCharacter(manifest[initialIndex], buttons[initialIndex], { updateUrl: false });
+    selectCharacter(displayEntries[initialIndex], buttons[initialIndex], { updateUrl: false });
   } else {
-    selectCharacter(manifest[0], buttons[0], { updateUrl: false });
+    selectCharacter(displayEntries[0], buttons[0], { updateUrl: false });
   }
+
+  window.addEventListener('storage', handleStorageEvent);
+  window.addEventListener(SECRET_UNLOCK_EVENT_NAME, event => {
+    const entryId = event?.detail?.id;
+    if (!entryId) return;
+    markSecretUnlocked(entryId);
+    refreshSecretEntry(entryId);
+  });
 
   function selectCharacter(entry, activeButton, options = {}) {
     const { updateUrl = false } = options;
     if (!entry) return;
+    currentCharacterId = entry.id || null;
     const src = normalizePath(entry.file);
+    const isSilhouette = isSilhouetteEntry(entry);
     if (src) {
       viewer.hidden = false;
       viewer.src = src;
       viewer.alt = `${entry.name || 'キャラクター'}のドットプレビュー`;
+      if (isSilhouette) {
+        viewer.dataset.silhouette = 'true';
+      } else {
+        delete viewer.dataset.silhouette;
+      }
       placeholder.hidden = true;
       if (placeholderMeta) {
         placeholderMeta.textContent = '';
@@ -84,6 +77,7 @@
     } else {
       viewer.hidden = true;
       viewer.removeAttribute('src');
+      delete viewer.dataset.silhouette;
       placeholder.hidden = false;
       if (placeholderMeta) {
         placeholderMeta.textContent = entry.status
@@ -117,6 +111,55 @@
     adjustDetailsScale();
     if (updateUrl) {
       syncCharacterParam(entry.id);
+    }
+  }
+
+  function createButton(entry, index) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'character-sprite' + (index === 0 ? ' is-active' : '');
+    button.setAttribute('aria-pressed', index === 0 ? 'true' : 'false');
+    button.setAttribute('role', 'option');
+    button.dataset.entryIndex = String(index);
+
+    const img = document.createElement('img');
+    const label = document.createElement('span');
+    button._pixieImageEl = img;
+    button._pixieLabelEl = label;
+
+    button.appendChild(img);
+    button.appendChild(label);
+    applyEntryToButton(button, entry, index);
+
+    button.addEventListener('click', () => {
+      const nextEntry = displayEntries[index];
+      selectCharacter(nextEntry, button, { updateUrl: true });
+    });
+    buttonsContainer.appendChild(button);
+    return button;
+  }
+
+  function applyEntryToButton(button, entry, index) {
+    if (!button || !entry) return;
+    const labelText = entry.buttonLabel || entry.name || `Character ${index + 1}`;
+    button.setAttribute('data-character-id', entry.id || `character-${index + 1}`);
+    button.setAttribute('aria-label', `${labelText} を表示`);
+
+    const img = button._pixieImageEl || button.querySelector('img');
+    if (img) {
+      const src = normalizePath(entry.file);
+      img.src = src || PLACEHOLDER_IMG;
+      img.alt = `${entry.name || 'キャラクター'}のドット絵`;
+      img.loading = 'lazy';
+      if (isSilhouetteEntry(entry)) {
+        img.dataset.silhouette = 'true';
+      } else {
+        delete img.dataset.silhouette;
+      }
+    }
+    const label = button._pixieLabelEl || button.querySelector('span');
+    if (label) {
+      label.textContent = labelText;
     }
   }
 
@@ -212,10 +255,134 @@
     if (!file) {
       return '';
     }
-    if (/^(?:https?:)?\/\//.test(file) || file.startsWith('data:') || file.startsWith('/')) {
+    const isAbsolute = /^(?:https?:)?\/\//.test(file) || file.startsWith('data:') || file.startsWith('/');
+    if (isAbsolute) {
+      return file;
+    }
+    if (file.startsWith('./') || file.startsWith('../') || file.startsWith('character-dots/')) {
       return file;
     }
     return `character-dots/${file}`;
+  }
+
+  function isSilhouetteEntry(entry) {
+    return Boolean(entry?.isSecretPlaceholder);
+  }
+
+  function getDisplayEntry(entry) {
+    if (!entry) return entry;
+    const secretId = entry.secret?.id || entry.id;
+    const releaseUnlocked = hasAutoRelease(entry.secret);
+    const releaseLabel = formatReleaseLabel(entry.secret);
+    const locked = entry.secret && !(isSecretUnlocked(secretId) || releaseUnlocked);
+    if (locked) {
+      return {
+        ...entry,
+        name: releaseLabel ? `解放予定: ${releaseLabel}` : '？？？',
+        role: '？？？',
+        tagline: '？？？',
+        description: '？？？',
+        detail: '？？？',
+        weight: '？？？',
+        sprite: '？？？',
+        palette: '？？？',
+        pose: '？？？',
+        status: '？？？',
+        file: entry.secret.placeholderFile || entry.file,
+        buttonLabel: releaseLabel ? `解放予定: ${releaseLabel}` : '？？？',
+        buttonStatus: '？？？',
+        background: '？？？',
+        traits: ['？？？'],
+        isSecretPlaceholder: true
+      };
+    }
+    return { ...entry, isSecretPlaceholder: false };
+  }
+
+  function isSecretUnlocked(entryId) {
+    if (!entryId || !secretUnlocks) {
+      return false;
+    }
+    return Boolean(secretUnlocks[entryId]);
+  }
+
+  function loadSecretUnlockState() {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) {
+        return {};
+      }
+      const raw = window.localStorage.getItem(SECRET_UNLOCK_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function markSecretUnlocked(entryId) {
+    if (!entryId) return;
+    secretUnlocks = {
+      ...(secretUnlocks || {}),
+      [entryId]: true
+    };
+  }
+
+  function hasAutoRelease(secret) {
+    if (!secret || !secret.releaseAtJst) {
+      return false;
+    }
+    const releaseTime = Date.parse(secret.releaseAtJst);
+    if (!Number.isFinite(releaseTime)) {
+      return false;
+    }
+    const now = Date.now();
+    return now >= releaseTime;
+  }
+
+  function formatReleaseLabel(secret) {
+    if (!secret || !secret.releaseAtJst) {
+      return '';
+    }
+    const timestamp = Date.parse(secret.releaseAtJst);
+    if (!Number.isFinite(timestamp)) {
+      return '';
+    }
+    const date = new Date(timestamp);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}/${month}/${day}`;
+  }
+
+  function handleStorageEvent(event) {
+    if (event.key !== SECRET_UNLOCK_STORAGE_KEY) {
+      return;
+    }
+    secretUnlocks = loadSecretUnlockState();
+    refreshAllSecretEntries();
+  }
+
+  function refreshSecretEntry(entryId) {
+    if (!entryId) return;
+    const index = manifestEntries.findIndex(entry => entry.id === entryId);
+    if (index < 0) return;
+    displayEntries[index] = getDisplayEntry(manifestEntries[index]);
+    applyEntryToButton(buttons[index], displayEntries[index], index);
+    if (displayEntries[index] && displayEntries[index].id === currentCharacterId) {
+      selectCharacter(displayEntries[index], buttons[index], { updateUrl: false });
+    }
+  }
+
+  function refreshAllSecretEntries() {
+    manifestEntries.forEach((entry, index) => {
+      displayEntries[index] = getDisplayEntry(entry);
+      applyEntryToButton(buttons[index], displayEntries[index], index);
+    });
+    if (currentCharacterId) {
+      const idx = manifestEntries.findIndex(entry => entry.id === currentCharacterId);
+      if (idx >= 0) {
+        selectCharacter(displayEntries[idx], buttons[idx], { updateUrl: false });
+      }
+    }
   }
 
   function getManifest() {
