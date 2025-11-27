@@ -418,5 +418,180 @@ window.CHARACTER_GALLERY_MANIFEST = [
     "traits": [
       "きゃわいい祝祭天使ジェリン。"
     ]
+  },
+  {
+    "id": "jerin-shadow-1",
+    "name": "フェアリン",
+    "role": "JERIN",
+    "tagline": "PiXiEEDペット専用に観測された追加フォーム。",
+    "description": "エンジェリンの小さい頃とされる伝承上の存在。",
+    "detail": "世界各地のフェアリンが集結するとエンジェリンに進化するという言い伝えがあるが、おとぎ話にもならないほど出会える者は少ない。",
+    "weight": "0.38 kg",
+    "sprite": "16×16 px",
+    "palette": "8 colors",
+    "pose": "Idle",
+    "status": "Pet only",
+    "file": "Jerin1.png",
+    "buttonLabel": "フェアリン",
+    "buttonStatus": "Pet",
+    "background": "研究ドームからPiXiEEDホームへ送られた応援担当。1時間ごとに次のフォームへ席を譲ります。",
+    "traits": [
+      "エンジェリンへ至る前段階の貴重な個体。",
+      "世界中を旅するために軽やかさを保っている。"
+    ]
+  },
+  {
+    "id": "jerin-shadow-2",
+    "name": "天星ジェリン",
+    "role": "JERIN",
+    "tagline": "エンジェリンによく似たスカイジェリン。",
+    "description": "エンジェリンの雛型として目撃されるレア個体。",
+    "detail": "魔王様の魔力によりスカイジェリンがエンジェリンへと進化した姿。ジェリン的にはあまり違いはないらしい。",
+    "weight": "0.41 kg",
+    "sprite": "16×16 px",
+    "palette": "8 colors",
+    "pose": "Idle",
+    "status": "Pet only",
+    "file": "Jerin2.png",
+    "buttonLabel": "天星ジェリン",
+    "buttonStatus": "Pet",
+    "background": "NFCアクションのテストベッドとして育成班に貸し出されたフォーム。その後、一般端末にも開放されました。",
+    "traits": [
+      "エンジェリンと瓜二つの外見を持つスカイジェリン。",
+      "魔王様の魔力を浴びたご褒美として輝きを増す。"
+    ]
+  },
+  {
+    "id": "jerin-shadow-3",
+    "name": "コウリン",
+    "role": "JERIN",
+    "tagline": "光に近づいたエンジェリンの進化体。",
+    "description": "エンジェリンの輝きがさらに増し、「光」そのものに近づいた姿。",
+    "detail": "魔力量はジェリンの中でも突出しており、コウリンが生まれた裏では恐ろしい個体も現れたという。時間を超越し未来に飛ぶ力を持つが、コウリン自体が存在していなかった過去へは飛ぶことができない。",
+    "weight": "369 kg",
+    "sprite": "16×16 px",
+    "palette": "8 colors",
+    "pose": "Idle",
+    "status": "Pet only",
+    "file": "Jerin3.png",
+    "buttonLabel": "コウリン",
+    "buttonStatus": "Pet",
+    "background": "画面を開きっぱなしにしているユーザーへ、進化ゲージの状況を身振りで知らせる役目を担うフォームです。",
+    "traits": [
+      "眩い光で周囲を導くエンジェリンの上位形態。",
+      "「光」に近づいた姿。"
+    ]
+  },
+  {
+    "id": "jerin-shadow-4",
+    "name": "デビリン",
+    "role": "JERIN",
+    "tagline": "コウリンの登場と共に生まれた闇のフェアリン。",
+    "description": "唯一魔王様が意図せず誕生したジェリン。光をねじ曲げ、吸収し、闇へと変換する力を秘めている。",
+    "detail": "コウリンが顕現した影響で生まれた闇のフェアリン。まだ小さいながら強力な力を宿しており、光を吸収して闇へ変換すると伝えられる。",
+    "weight": "0.66 kg",
+    "sprite": "16×16 px",
+    "palette": "8 colors",
+    "pose": "Idle",
+    "status": "Pet only",
+    "file": "Jerin4.png",
+    "buttonLabel": "デビリン",
+    "buttonStatus": "Pet",
+    "background": "意図しない誕生のため記録が少なく、闇のフェアリンとして研究対象になっている。",
+    "traits": [
+      "コウリンの影で生まれた闇のフェアリン。"
+    ]
+  },
+  {
+    "id": "jerin-shadow-5",
+    "name": "デモリン",
+    "role": "JERIN",
+    "tagline": "デビリンが進化した闇の守護者。",
+    "description": "光を吸い込み闇に変換する力でさらなる出力を得た重量型。時間すらねじ曲げる闇を操ることができる。",
+    "detail": "デビリンが進化して生まれた個体。光を吸収し闇へ変換することで強大な魔力を得ており、デモリンの闇は時間という概念すら歪め、自分の思うままに操れる。遅刻癖のある魔王様は必ず飼いならしたいと語るほどの希少種。",
+    "weight": "66.6 kg",
+    "sprite": "16×16 px",
+    "palette": "8 colors",
+    "pose": "Idle",
+    "status": "Pet only",
+    "file": "Jerin5.png",
+    "buttonLabel": "デモリン",
+    "buttonStatus": "Pet",
+    "background": "フェアリン→天星ジェリン→コウリン→デビリン→デモリンと続く闇側の系譜。時間をも操る闇を制御し、魔王様の遅刻を正す頼れる助手として注目されている。",
+    "traits": [
+      "光を吸い込み闇へ変換する力を極限まで高めた姿。",
+      "時間をねじ曲げられる闇を身にまとい、自在に操る。"
+    ]
+  },
+  {
+    "id": "jerin-shadow-6",
+    "name": "クンリン",
+    "role": "JERIN",
+    "tagline": "コウリンの対となる闇の終着点。",
+    "description": "デモリンがさらに進化した存在で、過去すら改変できる凶悪なジェリン。現在の魔王様でも手を付けられない力を持つ。",
+    "detail": "デモリンの闇を極限まで高めた最終形。過去を改変する力を持つため、魔王様がせっかく建てたお菓子のお城を食べてしまっても世界ごと巻き戻し、怒られない時間線にしてしまう。魔王様はそれに気付かず、現在24回目のお菓子城建設計画を練っている。",
+    "weight": "666 kg",
+    "sprite": "16×16 px",
+    "palette": "8 colors",
+    "pose": "Idle",
+    "status": "Pet only",
+    "file": "Jerin6.png",
+    "buttonLabel": "クンリン",
+    "buttonStatus": "Pet",
+    "background": "フェアリン→天星ジェリン→コウリン→デビリン→デモリン→クンリンと続く闇系譜の終着点。過去改変まで可能なため、魔王様は手綱を握るのに苦労している。",
+    "traits": [
+      "コウリンと対を成す闇の終着点。",
+      "デモリンの闇を超越し、過去を改変できるほどの力を持つ。"
+    ]
+  },
+  {
+    "id": "jerin-shadow-7",
+    "name": "シェンリン",
+    "role": "JERIN",
+    "tagline": "神々しい龍の姿をしたジェリン。",
+    "description": "永遠と空へ昇り続けるシャボリンが天界で融合し進化した姿と言われる。",
+    "detail": "永遠に空へ昇るシャボリン同士が天界でくっついて進化した姿。もちろん魔王様はそこまで見越していたらしいが、天から降りてきた瞬間はさすがに驚いていたとか。",
+    "weight": "0.55 kg",
+    "sprite": "16×16 px",
+    "palette": "8 colors",
+    "pose": "Idle",
+    "status": "Release",
+    "file": "Jerin7.png",
+    "buttonLabel": "シェンリン",
+    "buttonStatus": "Pet",
+    "background": "神話伝承に基づき、天界での融合を再現した特別モデル。祭礼時には上空から降臨する演出が予定されている。",
+    "traits": [
+      "神々しい龍の姿をしたジェリン。",
+      "天界由来の光をまとい、登場時には空から降りてくる。"
+    ],
+    "secret": {
+      "placeholderFile": "silhouettes/Jerin7.png",
+      "releaseAtJst": "2025-12-01T00:00:00+09:00"
+    }
+  },
+  {
+    "id": "jerin-shadow-8",
+    "name": "ガオリン",
+    "role": "JERIN",
+    "tagline": "遥か彼方で獣と戯れていたジェリンが真似て進化した姿。",
+    "description": "魔王様のお気に入りで、よく背中に乗せて移動している頼もしい従者。",
+    "detail": "遠い地で獣と遊んでいたジェリンが姿を真似て進化した個体。見た目とは裏腹に戦闘能力は非常に高く、鋭い爪を隠し持つ。擬似的な耳を備えているため魔王様の言葉がわかる数少ないジェリンで、背中に乗せて旅するのが習慣になっている。",
+    "weight": "0.60 kg",
+    "sprite": "16×16 px",
+    "palette": "8 colors",
+    "pose": "Idle",
+    "status": "Release",
+    "file": "Jerin8.png",
+    "buttonLabel": "ガオリン",
+    "buttonStatus": "Pet",
+    "background": "獣に憧れたジェリンが遥か遠方で進化し、魔王様の旅を支える専用騎獣として連れ帰られた。",
+    "traits": [
+      "遥か彼方の獣を真似て進化したジェリン。",
+      "魔王様の言葉を理解できる擬似耳を備えた、お気に入りの移動パートナー。"
+    ],
+    "secret": {
+      "placeholderFile": "silhouettes/Jerin8.png",
+      "releaseAtJst": "2025-12-01T00:00:00+09:00"
+    }
   }
 ]
