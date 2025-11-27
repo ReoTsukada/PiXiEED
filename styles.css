@@ -2326,6 +2326,63 @@ a:focus {
   z-index: 999;
 }
 
+.pixie-ad-overlay[hidden] {
+  display: none;
+}
+
+.pixie-ad-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.pixie-ad-overlay__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 4, 12, 0.8);
+  backdrop-filter: blur(6px);
+}
+
+.pixie-ad-overlay__content {
+  position: relative;
+  background: rgba(10, 12, 30, 0.94);
+  border-radius: 18px;
+  padding: 1.5rem;
+  max-width: min(420px, 90vw);
+  width: min(420px, 90vw);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.pixie-ad-overlay__label {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.pixie-ad-overlay__close {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.25rem;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1.4rem;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.has-ad-overlay {
+  overflow: hidden;
+}
+
 .pixie-exp-bar {
   position: fixed;
   left: 0.75rem;
