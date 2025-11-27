@@ -2319,6 +2319,17 @@ a:focus {
   margin-top: 1.6rem;
 }
 
+.ad-block {
+  margin: 2rem auto;
+  max-width: min(900px, 90vw);
+  text-align: center;
+}
+
+.ad-block--section {
+  margin-top: -1rem;
+  margin-bottom: 2.5rem;
+}
+
 .pixie-pet-layer {
   position: fixed;
   inset: 0;
