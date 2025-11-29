@@ -205,6 +205,21 @@ a { color:#7dd3fc; }
 .developer-credit a:focus-visible {
   text-decoration:underline;
 }
+.ad-footer{
+  width:100%;
+  max-width:360px;
+  padding:0 0 8px;
+  box-sizing:border-box;
+  display:flex;
+  justify-content:center;
+}
+.ad-footer ins{
+  display:block;
+  width:320px;
+  max-width:320px;
+  height:50px;
+  overflow:hidden;
+}
 .control-bar-wrapper {
   width:100%;
   max-width:360px;
@@ -243,6 +258,12 @@ a { color:#7dd3fc; }
 </div>
 </div>
 </div>
+</div>
+<div class="ad-footer">
+<ins class="adsbygoogle"
+     style="display:block"
+     data-ad-client="ca-pub-9801602250480253"
+     data-ad-slot="2141591954"></ins>
 </div>
 <script>
 // Prevent pinch-zoom on iOS to keep the layout stable.
@@ -295,6 +316,7 @@ audioToggle.addEventListener('change', () => {
   localStorage.setItem(AUDIO_KEY, audioToggle.checked ? 'on' : 'off');
   updateAudioLabel();
 });
+try{ (adsbygoogle = window.adsbygoogle || []).push({}); }catch(e){}
 
 </script>
 </body>
