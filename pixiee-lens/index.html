@@ -17,6 +17,7 @@
 <meta content="PiXiEELENS は全画面カメラとドットモードを備えた実験ページです。" name="twitter:description"/>
 <meta content="https://pixieed.jp/pixiee-lens/ogp.png" name="twitter:image"/>
 <meta content="20241102-01" name="build-version"/>
+<script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
 <!-- Google tag (gtag.js) -->
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
 <script>
@@ -140,6 +141,35 @@
     .update-toast__btn--primary:focus-visible {
       background: linear-gradient(135deg, rgba(143, 199, 255, 1), rgba(173, 162, 255, 1));
       border-color: rgba(143, 199, 255, 0.95);
+    }
+    .lens-ad-banner{
+      position: fixed;
+      top: calc(var(--safe-top) + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(900px, 92vw);
+      height: 60px;
+      z-index: 70;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      pointer-events:auto;
+    }
+    .lens-ad-banner ins{
+      display:block;
+      width:100%;
+      height:100%;
+    }
+    .capture-preview__ad{
+      margin: 12px 0 8px;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+    }
+    .capture-preview__ad ins{
+      display:block;
+      width: min(360px, 90vw);
+      height: 180px;
     }
     @media (max-width: 520px) {
       .update-toast {
@@ -1589,6 +1619,12 @@
   </style>
 <link href="../character-dots/mao1.png" rel="icon" type="image/png"/></head>
 <body>
+<div class="lens-ad-banner">
+  <ins class="adsbygoogle"
+       style="display:block"
+       data-ad-client="ca-pub-9801602250480253"
+       data-ad-slot="2141591954"></ins>
+</div>
 <main>
 <video autoplay="" id="cameraFeed" muted="" playsinline=""></video>
 <canvas class="dot-canvas" hidden="" id="dotCanvas"></canvas>
@@ -1878,20 +1914,32 @@
 <div aria-labelledby="capturePreviewHeading" aria-modal="true" class="capture-preview__panel" role="dialog">
 <button aria-label="閉じる" class="capture-preview__close" id="capturePreviewCloseBtn" type="button"></button>
 <div class="capture-preview__body">
-<h2 class="capture-preview__title" id="capturePreviewHeading">撮影結果</h2>
-<div class="capture-preview__image-wrap">
-<img alt="撮影した画像のプレビュー" id="capturePreviewImage" loading="lazy"/>
-</div>
-<p class="capture-preview__info" id="capturePreviewInfo">画像を長押しして保存してください。</p>
-<div class="capture-preview__actions">
-<button class="capture-preview__button" hidden="" id="capturePreviewEditBtn" type="button">PiXiEEDrawで編集</button>
-<button class="capture-preview__button capture-preview__button--primary" hidden="" id="capturePreviewShareBtn" type="button">共有する</button>
-<button class="capture-preview__button" id="capturePreviewCloseActionBtn" type="button">閉じる</button>
-</div>
+      <h2 class="capture-preview__title" id="capturePreviewHeading">撮影結果</h2>
+      <div class="capture-preview__image-wrap">
+        <img alt="撮影した画像のプレビュー" id="capturePreviewImage" loading="lazy"/>
+      </div>
+      <p class="capture-preview__info" id="capturePreviewInfo">画像を長押しして保存してください。</p>
+      <div class="capture-preview__ad">
+        <ins class="adsbygoogle"
+             style="display:block"
+             data-ad-client="ca-pub-9801602250480253"
+             data-ad-slot="2141591954"></ins>
+      </div>
+      <div class="capture-preview__actions">
+        <button class="capture-preview__button" hidden="" id="capturePreviewEditBtn" type="button">PiXiEEDrawで編集</button>
+        <button class="capture-preview__button capture-preview__button--primary" hidden="" id="capturePreviewShareBtn" type="button">共有する</button>
+        <button class="capture-preview__button" id="capturePreviewCloseActionBtn" type="button">閉じる</button>
+      </div>
 </div>
 </div>
 </div>
 <input accept="image/png, image/gif, image/webp, image/bmp" hidden="" id="pixelArtInput" multiple="" type="file"/>
+<script>
+  try {
+    (adsbygoogle = window.adsbygoogle || []).push({});
+    (adsbygoogle = window.adsbygoogle || []).push({});
+  } catch(e) {}
+</script>
 <script>
     const video = document.getElementById('cameraFeed');
     const cameraActionBtn = document.getElementById('cameraActionBtn');
