@@ -8,6 +8,7 @@
     setupHeroReel();
     setupShowcaseFilter();
     disableImageInteractions();
+    injectFooterAd();
   }
 
   function updateCopyrightYear() {
@@ -147,6 +148,55 @@
         setExpandedState(toggle, content, !isExpanded);
       });
     });
+  }
+
+  function injectFooterAd() {
+    const path = window.location.pathname || '';
+    if (/\/(terms|privacy)\//.test(path)) return; // 利用規約/プライバシーは除外
+    if (document.querySelector('.ad-footer')) return; // 既に配置済みなら何もしない
+
+    const STYLE_ID = 'pixieed-ad-footer-style';
+    if (!document.getElementById(STYLE_ID)) {
+      const style = document.createElement('style');
+      style.id = STYLE_ID;
+      style.textContent = `
+        .ad-footer{
+          width:100%;
+          max-width:640px;
+          padding:8px 0 calc(8px + env(safe-area-inset-bottom, 0px));
+          box-sizing:border-box;
+          display:flex;
+          justify-content:center;
+          background:#fff;
+          border-top:1px solid rgba(0,0,0,0.08);
+          margin:0 auto;
+        }
+        .ad-footer ins{
+          display:block;
+          width:320px;
+          max-width:320px;
+          height:50px;
+          overflow:hidden;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    const footer = document.createElement('div');
+    footer.className = 'ad-footer';
+    footer.innerHTML = `
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="ca-pub-9801602250480253"
+           data-ad-slot="2141591954"></ins>
+    `;
+    document.body.appendChild(footer);
+
+    try {
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+    } catch (e) {
+      // ignore
+    }
   }
 
   function setupProjectGate() {
