@@ -403,7 +403,8 @@ const ENEMY_TYPES_DATA=[
   {name:"プリズリン",src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAQZJREFUOI2Nk01OwzAQhb+ReoCyJyAWEXeouuNnBYfpSVhwgFwBiQVRxK7tHUBIQRRxjsdmpnJdOzCSZfnZ74szMzbqoWxtpUOzmlkSwCfwCGBmKkFKAGm9BuiBS9c6SUVIDpC2IywueuAtATQ1SArQdy9YEOYd8O5757WbBECvgzi9OTB/ALe+3yYfOoDMAD3phyuOzF/+C8MfECRplDR66fbD9YeCvpK0ilLvhRAlvcQsaZ5pcx93gNIkdkAj6R5oJQ2RA0knPjfAEtikVTAzi8bpEmDrOYlogGs/szSz50giE5CzKXPeByXILumDI3MOmLrJpmQuAXIInjRKZmpP1ONfz/kX+Gq5jszpIJsAAAAASUVORK5CYII=",speed:2.8,unlockSec:35},
   {name:"ヘドリン",src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAZZJREFUOI2FUzFrwkAU/myPpEMI4qSCEIhYiwUHh3S8rdQhP8HY31HEtFC6SceO1qHQrUgRnAzdHKQEWihSMYtb1gy1adPBXryYtH5wy/fe++67d++lkIzgDz61jQgAQHc1s/qhm1f3Zw4L+Lag4HYZq9uNFBsCWoMLSHs5CJ+iIte868BfpI9OtIf945w1yy6U76yQhv1lAjgHgB2+mFSXTiGTdyVPprbYNwGgVNMslVAKAPWG1iXVpQNDCN0Sdj2pLp1iBc6jd2NBTG6ASiitN9Ad9MZNH1CYgwCGgGIFTqmmWSx50Bs3p5MxBQDJk6lKKJU8OXTCXLAngBUzu8UKwgbaYt+UPJkWMnkXAJhw5AkqoXTmW9amIC9ie+vY290z5ZsYszmdjClz8x9CgaTu8+62CnSeTl9YMcPMtyyVUHoglg95nu8BQ0A6mP/+bXh0V2vrrtbe5LnctQAMIQy0FpcBgKA8xKg8xIjnSAdzGAITi+xCOI3Y+EYAeH9dDQ63E6lNAYS2VkMSR8IyxdYzIhRHLP8H/uGrhM0W27cAAAAASUVORK5CYII=",speed:1.2,unlockSec:45,sticky:true},
   {name:"バブリン",src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAOVJREFUOI3tULsKwkAQnMQHCkZiYZMqnWCjpXZ2lqns9Wf8BUvt/YUgSEBMJwipBSFNCoMXEcRkLcJdyBkLW3GaW2aZ2bkB/vgBKAUcfaORDYgo02+u6ezd4vRlwKJTyekUWbxlhGMUwz6/BwnCBD2zlDPhBuQwig7s2bDPhCBMCrO3dRUAYOiKMFH5MiZqeAwfxTyBjDIfjlEMPyTsxjWxNJcXAMBp1hKc5T7Q1TIDkcBjGekwiuRLnDN0BX2tLPa5Ei33gSBM4Pt3Qe6nawxWk/TvRh3zYRWjpgq5RGHysYA8hO4F8NhaA9cs3eAAAAAASUVORK5CYII=",speed:1.0,unlockSec:65},
-  {name:"ボムリン",src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAQFJREFUOI2Vkz1qxDAQhb8xLhdyggW1SuNib5EyPzA+Sw4UyJI2Tc6whSu1gr3CVsGgFN4xWktKyAM1T/N+ECOhjtTg5S8iAQzDgPf+5iKEwDRNJHqEWRJ9EmbJDZIJnXPV+N35xOv3F4zAG8gR6Vpi7/16AKbPj2VyzOv2yQwKcV59dz4BcNkfGN8VHnvkCMIsnaXXEEJYk4eHJ2KMSwl95qpZGmwfzMSGy/6wirct+1ay4e5+EbcetquReSPnXFNcGFjNvMEWNnNjkAtijMVQjd+GJFVN101cj6o2edvaLndU1cXtpaxunKrepFdX+TfYnzDtvz/TNrj4nrlRBcX8DyFAhQiIvZawAAAAAElFTkSuQmCC",speed:1.2,unlockSec:75,ignoreShield:true}
+  {name:"ボムリン",src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAQFJREFUOI2Vkz1qxDAQhb8xLhdyggW1SuNib5EyPzA+Sw4UyJI2Tc6whSu1gr3CVsGgFN4xWktKyAM1T/N+ECOhjtTg5S8iAQzDgPf+5iKEwDRNJHqEWRJ9EmbJDZIJnXPV+N35xOv3F4zAG8gR6Vpi7/16AKbPj2VyzOv2yQwKcV59dz4BcNkfGN8VHnvkCMIsnaXXEEJYk4eHJ2KMSwl95qpZGmwfzMSGy/6wirct+1ay4e5+EbcetquReSPnXFNcGFjNvMEWNnNjkAtijMVQjd+GJFVN101cj6o2edvaLndU1cXtpaxunKrepFdX+TfYnzDtvz/TNrj4nrlRBcX8DyFAhQiIvZawAAAAAElFTkSuQmCC",speed:1.2,unlockSec:75,ignoreShield:true},
+  {name:"デモリン",src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAATNJREFUOI2lkrFKw1AYhb8rjWNBUJvFwaFeqF3yAJ0UnLPE0aew+AhCn6JLoQ7tXLBQ8AGkQwfjIMWltULAodA4/A5tYm5uiqIH7vLfc05uzn/gn1CAbJkXweIqQMJuzMvjnNnTB2/vM64fzopMpNUYcrjv4uoyx16Fk8vd9UXYjWXjLoBEnie5r0mrMTQ4GQ1ZskSeJyOtDfIWYwGklH/qeLlk5d8zKAhg3D+3csqKZXDzmuawiOaG+GCvkv7/xe2RZSBtf1IozCMxuuqfAqid5MLV5R/FAItojqvL1lzCbmyF16x3pFnvGLOR1sYG0hdUA4dprbd2E7tbyWxa61ENnHSuTI7wfPdplAowylMNHJSyFvBtkpx8cXInRSlnoDJGtP0JbAIGjPX9Blur+1cUGnwBRRiqy88D/g4AAAAASUVORK5CYII=",speed:2.0,unlockSec:85,followPlayer:true,followStrength:0.2}
 ];
 const PLAYER_SRC="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAQRJREFUOI3tkDtOw1AQRY+hQ7iI05CPkFLYRUSNKHARBbEFV6whBRtIFhCldZcNsAtTIJBYgC3hipgGGztBIDePwt+Xj9JSZKSnuXP15s7MhUP8sxhkSQCirV9sxYM9GsIBMbwbCfJcx04uUm84LpHahTQZn5ye83qm0jT6zB7mfLwFfN3eEP8m/Cy+eUljULsT0gQABQDNgNAVXN7D9RU0WtWIKMjqKMjqxyd4noJmKIRuLgBycxTA+6d8XKdZ4UIElKOS7Om7m0HmevqmeVh23SRRcFi2xDkFn5tZbeB7mJYNgLMUq/UJBWdaNvheyW+auGU9KXxPMrEKzYD1E3a97C8AfzBBfBZb3sdTAAAAAElFTkSuQmCC";
 const ANGEL_SRC="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAARZJREFUOI2lkz1OxDAQRt9YCAGSG0REg5ZqC67ABTgB0jZ0ewMqTkC1N6CjQeIEcACuQJGKFRJCRttYWtA2Q+FMsk4C4eer7PE8zzcZB/4pAbS1N2lPbudMANWHSxhvIsV5E7u5yunJtDkLMyhXyPEFDoB5AeUKDbPm9lFAJtMEjkJd2WDmRWZLAdadVJc1DixWVbawkKvd91eSzgLQa73jgCeOgP23mBGve55H4JlDzuSkZusWVH9a3Lwn3gF6//I7GKBi1AEsw2B+R8Y4gK04kN0jYxyA/4MDYzYAxj5tpDVV+7B9cWOSg0UOtB/ResxyjKnH+H6rxF0oI8QCPjzspNfKMqSefUhu/QK2T9MYv/v7hiQAn7kqbU+zGAhDAAAAAElFTkSuQmCC";
@@ -460,6 +461,8 @@ function spawnEnemy(){
     sticky: Boolean(type.sticky),
     clearOnShieldHit: Boolean(type.clearOnShieldHit),
     ignoreShield: Boolean(type.ignoreShield),
+    followPlayer: Boolean(type.followPlayer),
+    followStrength: type.followStrength || 0,
     absorbed: 0,
     skin: type.skin
   });
@@ -568,7 +571,15 @@ function step(){
   o++;
   elapsedFrames++;
 
-  E.forEach(e=>e.y+=e.v);
+  E.forEach(e=>{
+    if (e.followPlayer) {
+      const dx = (P.x - e.x);
+      const step = Math.sign(dx) * Math.min(Math.abs(dx), e.followStrength);
+      e.x += step;
+      e.x = Math.max(0, Math.min(W - e.w, e.x));
+    }
+    e.y+=e.v;
+  });
   angels.forEach(a=>a.y+=a.v);
 
   const dx=tx-P.x; P.x+=Math.sign(dx)*Math.min(Math.abs(dx),P.v);
