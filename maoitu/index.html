@@ -55,7 +55,7 @@ body {
   font-family:'Noto Sans JP', system-ui, sans-serif;
   text-align:center;
   box-sizing:border-box;
-  padding:48px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  padding:48px 16px calc(24px + env(safe-area-inset-bottom, 0px));
   gap:12px;
   overflow:hidden;
   --kago-icon: url('assets/kago.png');
@@ -208,7 +208,7 @@ a { color:#7dd3fc; }
 .ad-footer{
   width:100%;
   max-width:360px;
-  padding:0 0 8px;
+  padding:0 0 calc(12px + env(safe-area-inset-bottom, 0px));
   box-sizing:border-box;
   display:flex;
   justify-content:center;
