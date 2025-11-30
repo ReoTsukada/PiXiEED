@@ -56,6 +56,7 @@
       --safe-right: env(safe-area-inset-right, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
       --safe-left: env(safe-area-inset-left, 0px);
+      --ad-header-offset: 52px; /* 40pxバナー + 余白の目安 */
     }
     * {
       box-sizing: border-box;
@@ -77,7 +78,7 @@
       position: relative;
       width: 100vw;
       height: 100dvh;
-      padding-top: calc(52px + var(--safe-top));
+      padding-top: calc(var(--ad-header-offset) + var(--safe-top));
     }
     .update-toast {
       position: fixed;
@@ -257,7 +258,7 @@
     }
     .hud-top {
       position: absolute;
-      top: calc(var(--hud-padding) + var(--safe-top));
+      top: calc(var(--hud-padding) + var(--safe-top) + var(--ad-header-offset));
       left: calc(var(--hud-padding) + var(--safe-left));
       right: calc(var(--hud-padding) + var(--safe-right));
       display: flex;
