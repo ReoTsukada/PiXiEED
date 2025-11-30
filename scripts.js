@@ -167,8 +167,8 @@
           box-sizing:border-box;
           display:flex;
           justify-content:center;
-          background:#fff;
-          border-top:1px solid rgba(0,0,0,0.08);
+          background:#000;
+          border-top:1px solid rgba(255,255,255,0.08);
           margin:0 auto;
         }
         .ad-footer ins{
