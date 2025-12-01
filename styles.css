@@ -2330,6 +2330,51 @@ a:focus {
   margin-bottom: 2.5rem;
 }
 
+/* PiXiEED home (portfolio-page) ad spacing + test highlight */
+body.portfolio-page .ad-block {
+  clear: both;
+  margin: clamp(0.5rem, 1vw, 1rem) auto;
+  padding: 12px 0;
+  max-width: min(960px, 92vw);
+  background: transparent;
+  border: none;
+}
+
+body.portfolio-page .ad-block--section {
+  margin-top: clamp(0.5rem, 1vw, 1rem);
+  margin-bottom: clamp(0.5rem, 1vw, 1rem);
+}
+
+body.portfolio-page ins.adsbygoogle {
+  display: block;
+  width: 100% !important;
+  max-width: 900px;
+  min-height: 60px;
+  margin: 0 auto;
+  background: transparent;
+  outline: none;
+}
+
+body.portfolio-page .ad-block--project {
+  margin: clamp(0.8rem, 3vh, 1.8rem) auto;
+}
+
+body.portfolio-page .ad-block--portfolio {
+  margin-top: clamp(0.4rem, 1.2vh, 1rem);
+  margin-bottom: clamp(1.2rem, 4vh, 2rem);
+}
+
+/* tighten top spacing so portfolio + first ad fit in view */
+body.portfolio-page main > .section:first-of-type {
+  padding-top: clamp(0.4rem, 1vh, 0.9rem);
+}
+
+@media (orientation: landscape) and (min-width: 900px) {
+  body.portfolio-page main > .section:first-of-type {
+    padding-top: clamp(0.6rem, 1.4vh, 1.1rem);
+  }
+}
+
 .pixie-pet-layer {
   position: fixed;
   inset: 0;
