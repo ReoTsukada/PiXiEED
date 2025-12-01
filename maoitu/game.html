@@ -263,7 +263,7 @@ gtag('event', 'project_open_maoitu');
   <button id="instructionsToggle" type="button">?</button>
   <div id="gameOverUi">
   <div id="gameOverPanel">
-  <div class="gameover-title">GAME OVER</div>
+  <div class="gameover-title" id="gameoverTitle">GAME OVER</div>
   <div id="shareScoreLabel">SCORE: 0</div>
   </div>
   <div id="sharePanel">
@@ -308,6 +308,7 @@ function syncAudioSetting(){
 let audioEnabled = syncAudioSetting();
 const gameOverUi = document.getElementById('gameOverUi');
 const sharePanel = document.getElementById('sharePanel');
+const gameOverTitle = document.getElementById('gameoverTitle');
 const shareScoreLabel = document.getElementById('shareScoreLabel');
 const shareActionBtn = document.getElementById('shareActionBtn');
 const restartActionBtn = document.getElementById('restartActionBtn');
@@ -316,6 +317,7 @@ const instructionsCloseBtn = document.getElementById('instructionsClose');
 const instructionsToggleBtn = document.getElementById('instructionsToggle');
 const backLink = document.getElementById('backLink');
 let shareScore = 0;
+let runCleared = false;
 
 function openInstructions(){
   instructions.style.display = 'block';
@@ -379,6 +381,9 @@ function hideBackLink(){
 function showSharePanel(score){
   shareScore = score;
   shareScoreLabel.textContent = `SCORE: ${score}`;
+  if(gameOverTitle){
+    gameOverTitle.textContent = runCleared ? 'GAME CLEAR!' : 'GAME OVER';
+  }
   gameOverUi.style.display = 'flex';
   sharePanel.style.display = 'flex';
   if(typeof restartActionBtn.focus === 'function'){
@@ -546,23 +551,57 @@ const ANGEL_SPAWN_PROB    = 0.10;
 const ANGEL_GUARANTEE_INTERVAL_SEC = 30;
 let lastAngelGuaranteeSec = 0;
 
+// ====== 難易度プリセット ======
+const DIFFICULTY_PRESETS = {
+  easy:   { key:'easy',   label:'簡単',     initialSpawnIntervalFrames:36, minSpawnIntervalFrames:20, maxEnemiesPerSpawn:3, startShieldCharges:1, maxDifficultyLevel:10 },
+  normal: { key:'normal', label:'普通',     initialSpawnIntervalFrames:26, minSpawnIntervalFrames:14, maxEnemiesPerSpawn:4, startShieldCharges:0, maxDifficultyLevel:10 },
+  endless:{ key:'endless',label:'エンドレス', initialSpawnIntervalFrames:20, minSpawnIntervalFrames:8,  maxEnemiesPerSpawn:6, startShieldCharges:0, maxDifficultyLevel:Infinity }
+};
+const DIFFICULTY_STORAGE_KEY = 'maoitu_difficulty';
+
 // ====== 難易度スケーリング（時間ベース） ======
-const INITIAL_SPAWN_INTERVAL_FRAMES = 20;
 const SPAWN_INTERVAL_DECREASE = 1;
-const MIN_SPAWN_INTERVAL_FRAMES = 8;
-const MAX_ENEMIES_PER_SPAWN = 6;
 const SLOW_DECREASE_THRESHOLD_FRAMES = 15;
 
-let enemySpawnIntervalFrames = INITIAL_SPAWN_INTERVAL_FRAMES;
+let initialSpawnIntervalFrames = DIFFICULTY_PRESETS.endless.initialSpawnIntervalFrames;
+let minSpawnIntervalFrames = DIFFICULTY_PRESETS.endless.minSpawnIntervalFrames;
+let maxEnemiesPerSpawn = DIFFICULTY_PRESETS.endless.maxEnemiesPerSpawn;
+let startShieldCharges = DIFFICULTY_PRESETS.endless.startShieldCharges;
+let maxDifficultyLevel = DIFFICULTY_PRESETS.endless.maxDifficultyLevel;
+let enemySpawnIntervalFrames = initialSpawnIntervalFrames;
 let enemiesPerSpawn = 1;
 let difficultyLevel = 1;
 const DIFFICULTY_STEP_SEC = 10;
 let lastDifficultyUpdateSec = 0;
 let elapsedFrames = 0;
 let slowDecreaseToggle = false;
+let difficultyLabel = DIFFICULTY_PRESETS.endless.label;
 
 const heroShieldIcon = new Image();
 heroShieldIcon.src = './assets/kago.png';
+
+function readDifficulty(){
+  const params = new URLSearchParams(location.search);
+  const q = params.get('mode');
+  const stored = localStorage.getItem(DIFFICULTY_STORAGE_KEY);
+  if(q && DIFFICULTY_PRESETS[q]) return q;
+  if(stored && DIFFICULTY_PRESETS[stored]) return stored;
+  return 'endless';
+}
+
+function applyDifficultyPreset(key){
+  const preset = DIFFICULTY_PRESETS[key] || DIFFICULTY_PRESETS.endless;
+  initialSpawnIntervalFrames = preset.initialSpawnIntervalFrames;
+  minSpawnIntervalFrames = preset.minSpawnIntervalFrames;
+  maxEnemiesPerSpawn = preset.maxEnemiesPerSpawn;
+  startShieldCharges = preset.startShieldCharges || 0;
+  maxDifficultyLevel = preset.maxDifficultyLevel || Infinity;
+  difficultyLabel = preset.label;
+  localStorage.setItem(DIFFICULTY_STORAGE_KEY, preset.key);
+}
+
+const difficultyKey = readDifficulty();
+applyDifficultyPreset(difficultyKey);
 
 // ====== 楕円ベースのゆるい当たり判定 ======
 function hitBox(a, b){
@@ -613,8 +652,8 @@ document.onpointermove = e => {
 };
 addEventListener('keydown',e=>{ if(!alive) return; if(e.key==='ArrowLeft')tx-=20; else if(e.key==='ArrowRight')tx+=20; });
 
-function reset(countPlay = true){ alive=true; E.length=0; angels.length=0; o=0; S=0; shieldCharges=0; P.x=PLAYER_START_X; P.y=PLAYER_START_Y; tx=PLAYER_START_TX; P.skin=PLAYER;
-  enemySpawnIntervalFrames = INITIAL_SPAWN_INTERVAL_FRAMES;
+function reset(countPlay = true){ alive=true; E.length=0; angels.length=0; o=0; S=0; shieldCharges=startShieldCharges||0; P.x=PLAYER_START_X; P.y=PLAYER_START_Y; tx=PLAYER_START_TX; P.skin=PLAYER;
+  enemySpawnIntervalFrames = initialSpawnIntervalFrames;
   enemiesPerSpawn = 1;
   lastDifficultyUpdateSec = 0;
   elapsedFrames = 0;
@@ -623,6 +662,7 @@ function reset(countPlay = true){ alive=true; E.length=0; angels.length=0; o=0; 
   starOffset = 0;
   starOffsetNear = 0;
   lastAngelGuaranteeSec = 0;
+  runCleared = false;
   closeInstructions();
   hideSharePanel();
   hideBackLink();
@@ -634,6 +674,16 @@ function endRun(){
   alive = false;
   showBackLink();
   logPlayEvent('game_over', { score: S });
+}
+
+function clearRun(){
+  if(!alive) return;
+  alive = false;
+  runCleared = true;
+  showBackLink();
+  logPlayEvent('game_clear', { score: S, difficulty: difficultyLabel });
+   // クリア時もパネルを即表示
+  showSharePanel(S);
 }
 
 // ====== 1フレーム ======
@@ -746,7 +796,7 @@ function step(){
   if(elapsedSec - lastDifficultyUpdateSec >= DIFFICULTY_STEP_SEC){
     lastDifficultyUpdateSec += DIFFICULTY_STEP_SEC;
     difficultyLevel++;
-    if(enemySpawnIntervalFrames > MIN_SPAWN_INTERVAL_FRAMES){
+    if(enemySpawnIntervalFrames > minSpawnIntervalFrames){
       if(enemySpawnIntervalFrames > SLOW_DECREASE_THRESHOLD_FRAMES){
         enemySpawnIntervalFrames = Math.max(SLOW_DECREASE_THRESHOLD_FRAMES, enemySpawnIntervalFrames - SPAWN_INTERVAL_DECREASE);
         if(enemySpawnIntervalFrames <= SLOW_DECREASE_THRESHOLD_FRAMES){
@@ -754,12 +804,17 @@ function step(){
         }
       }else{
         if(slowDecreaseToggle){
-          enemySpawnIntervalFrames = Math.max(MIN_SPAWN_INTERVAL_FRAMES, enemySpawnIntervalFrames - SPAWN_INTERVAL_DECREASE);
+          enemySpawnIntervalFrames = Math.max(minSpawnIntervalFrames, enemySpawnIntervalFrames - SPAWN_INTERVAL_DECREASE);
         }
         slowDecreaseToggle = !slowDecreaseToggle;
       }
     }else{
-      enemiesPerSpawn = Math.min(enemiesPerSpawn + 1, MAX_ENEMIES_PER_SPAWN);
+      enemiesPerSpawn = Math.min(enemiesPerSpawn + 1, maxEnemiesPerSpawn);
+    }
+    if(difficultyLevel >= maxDifficultyLevel){
+      difficultyLevel = maxDifficultyLevel;
+      clearRun();
+      return;
     }
   }
 }
@@ -843,6 +898,10 @@ function draw(){
     x.fillText(shieldCharges ? ('×' + shieldCharges) : '', iconBaseX, iconBaseY + iconSize);
   }
   x.fillText('難易度: '+difficultyLevel,4,iconBaseY + 24);
+  x.save();
+  x.textAlign = 'right';
+  x.fillText('モード: '+difficultyLabel,W-4,12);
+  x.restore();
 
   if(!alive){
     // キャンバス上ではパネルを描かず、HTML側のUIに委ねる
