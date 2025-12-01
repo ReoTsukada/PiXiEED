@@ -867,6 +867,25 @@ a:focus {
   color: var(--fg-primary);
 }
 
+@media (max-width: 640px), (orientation: portrait) {
+  .site-footer {
+    padding: 1.25rem 1rem;
+  }
+  .footer-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  .footer-links {
+    width: 100%;
+    gap: 0.8rem 1rem;
+  }
+  .footer-links a,
+  .footer-contact {
+    font-size: 0.95rem;
+  }
+}
+
 .contact-overlay {
   position: fixed;
   inset: 0;
@@ -1180,6 +1199,28 @@ a:focus {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1.4rem;
   margin-top: 1.5rem;
+}
+
+.ogp-card--ad {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.ogp-card--ad .ad-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 280px;
+}
+
+.ogp-card--ad .ad-card ins {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 280px !important;
 }
 
 .ogp-card {
@@ -1532,6 +1573,13 @@ a:focus {
   }
   .note-chip {
     flex-basis: 100%;
+  }
+}
+
+@media (min-width: 900px) {
+  .ogp-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
   }
 }
 
@@ -2330,12 +2378,39 @@ a:focus {
   margin-bottom: 2.5rem;
 }
 
+/* Ad label */
+.ad-block,
+.ad-card,
+.ogp-card--ad .ad-card,
+.ad-footer {
+  position: relative;
+}
+
+.ad-block::before,
+.ad-card::before,
+.ogp-card--ad .ad-card::before,
+.ad-footer::before {
+  content: "広告";
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 11px;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  border-radius: 6px;
+  letter-spacing: 0.05em;
+  pointer-events: none;
+  z-index: 2;
+}
+
 /* PiXiEED home (portfolio-page) ad spacing + test highlight */
 body.portfolio-page .ad-block {
   clear: both;
   margin: clamp(0.5rem, 1vw, 1rem) auto;
   padding: 12px 0;
-  max-width: min(960px, 92vw);
+  width: 100%;
+  max-width: min(960px, 96vw);
   background: transparent;
   border: none;
 }
@@ -2348,20 +2423,55 @@ body.portfolio-page .ad-block--section {
 body.portfolio-page ins.adsbygoogle {
   display: block;
   width: 100% !important;
-  max-width: 900px;
-  min-height: 60px;
+  max-width: 100% !important;
+  min-height: 90px;
+  height: 90px;
   margin: 0 auto;
+  background: transparent;
+  outline: none;
+}
+
+.ad-footer {
+  background: rgba(0, 0, 0, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  width: 100%;
+  max-width: min(960px, 96vw);
+  box-sizing: border-box;
+}
+
+.ad-footer ins {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 90px !important;
+  height: 90px !important;
   background: transparent;
   outline: none;
 }
 
 body.portfolio-page .ad-block--project {
   margin: clamp(0.8rem, 3vh, 1.8rem) auto;
+  width: 100%;
+  max-width: min(960px, 96vw);
+  padding: 8px 0;
 }
 
 body.portfolio-page .ad-block--portfolio {
   margin-top: clamp(0.4rem, 1.2vh, 1rem);
   margin-bottom: clamp(1.2rem, 4vh, 2rem);
+}
+
+@media (min-width: 900px) {
+  body.portfolio-page .ad-block--project {
+    max-width: 360px;
+    padding: 6px 0;
+  }
+  body.portfolio-page .ad-block--project ins.adsbygoogle {
+    max-width: 320px !important;
+    width: 320px !important;
+    height: 320px;
+    min-height: 320px;
+  }
 }
 
 /* tighten top spacing so portfolio + first ad fit in view */
