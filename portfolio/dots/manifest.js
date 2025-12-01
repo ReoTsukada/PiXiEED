@@ -1,5 +1,11 @@
 window.DOT_GALLERY_MANIFEST = [
   {
+    "file": "akuarium.gif",
+    "label": "Akuarium",
+    "date": "2025-10-10",
+    "alt": "水槽を泳ぐクラゲのドットアニメーション"
+  },
+  {
     "file": "ARTA_HinyariToNyanbiri.gif",
     "label": "ARTA HinyariToNyanbiri",
     "date": "2025-09-29",
@@ -12,52 +18,22 @@ window.DOT_GALLERY_MANIFEST = [
     "alt": "ARTA TabunnItumonoShibuya"
   },
   {
-    "file": "nyuudou 1.png",
-    "label": "Alta Nyuudougumo",
-    "date": "2025-10-05",
-    "alt": "夕日に照らされた入道雲のドットアート"
+    "file": "akinoowarimin.png",
+    "label": "Akino Owari",
+    "date": "2025-11-09",
+    "alt": "秋の終わりを描いたドットアート"
   },
   {
-    "file": "akuarium.gif",
-    "label": "Akuarium",
-    "date": "2025-10-10",
-    "alt": "水槽を泳ぐクラゲのドットアニメーション"
+    "file": "ajisai150.png",
+    "label": "Ajisai",
+    "date": "2025-11-10",
+    "alt": "紫陽花のドットアート"
   },
   {
-    "file": "ame2.png",
-    "label": "Rainy Street",
-    "date": "2025-10-10",
-    "alt": "雨に濡れた夜の街並みを描いたドット絵"
-  },
-  {
-    "file": "KUSA100.png",
-    "label": "KUSA Field",
-    "date": "2025-10-10",
-    "alt": "草むらに差し込む光を描いたピクセルアート"
-  },
-  {
-    "file": "Moon.png",
-    "label": "Moonlight",
-    "date": "2025-10-10",
-    "alt": "大きな月が浮かぶ夜空のドットアート"
-  },
-  {
-    "file": "kurage800.gif",
-    "label": "Floating Jellyfish",
-    "date": "2025-10-10",
-    "alt": "海中を漂うクラゲのドットアニメーション"
-  },
-  {
-    "file": "kyoryu.gif",
-    "label": "Dino Parade",
-    "date": "2025-10-10",
-    "alt": "恐竜が行進するGIFアニメーション"
-  },
-  {
-    "file": "sakura sitagaki data300.png",
-    "label": "Sakura Draft",
-    "date": "2025-10-10",
-    "alt": "桜の下書きを思わせる淡いドット絵"
+    "file": "tyou.gif",
+    "label": "Butterfly Echo",
+    "date": "2025-11-08",
+    "alt": "柔らかな光の中を舞う蝶のドットアニメーション"
   },
   {
     "file": "soranijibig.png",
@@ -66,15 +42,82 @@ window.DOT_GALLERY_MANIFEST = [
     "alt": "空のグラデーションを描いた広いピクセルアート"
   },
   {
+    "file": "Moon.png",
+    "label": "Moonlight",
+    "date": "2025-10-10",
+    "alt": "大きな月が浮かぶ夜空のドットアート"
+  },
+  {
+    "file": "kyoryu.gif",
+    "label": "Dino Parade",
+    "date": "2025-10-10",
+    "alt": "恐竜が行進するGIFアニメーション"
+  },
+  {
+    "file": "KUSA100.png",
+    "label": "KUSA Field",
+    "date": "2025-10-10",
+    "alt": "草むらに差し込む光を描いたピクセルアート"
+  },
+  {
+    "file": "ame2.png",
+    "label": "Rainy Street",
+    "date": "2025-10-10",
+    "alt": "雨に濡れた夜の街並みを描いたドット絵"
+  },
+  {
+    "file": "hodoukyou .png",
+    "label": "Hodoukyou",
+    "date": "2025-11-10",
+    "alt": "歩道橋のドットアート"
+  },
+  {
+    "file": "kaidan5 min.png",
+    "label": "Kaidan5",
+    "date": "2025-11-10",
+    "alt": "階段を描いたドットアート"
+  },
+  {
+    "file": "川1.png",
+    "label": "River",
+    "date": "2025-11-10",
+    "alt": "川のドットアート"
+  },
+  {
+    "file": "apple.png",
+    "label": "Apple",
+    "date": "2025-11-10",
+    "alt": "リンゴのドットアート"
+  },
+  {
+    "file": "kurage800.gif",
+    "label": "Floating Jellyfish",
+    "date": "2025-10-10",
+    "alt": "海中を漂うクラゲのドットアニメーション"
+  },
+  {
+    "file": "nyuudou 1.png",
+    "label": "Alta Nyuudougumo",
+    "date": "2025-10-05",
+    "alt": "夕日に照らされた入道雲のドットアート"
+  },
+  {
+    "file": "sakura sitagaki data300.png",
+    "label": "Sakura Draft",
+    "date": "2025-10-10",
+    "alt": "桜の下書きを思わせる淡いドット絵"
+  },
+  {
     "file": "sra.png",
     "label": "SRA Landscape",
     "date": "2025-10-10",
     "alt": "湖畔の風景を描いた落ち着いた色調のドット絵"
   },
   {
-    "file": "tyou.gif",
-    "label": "Butterfly Echo",
-    "date": "2025-11-08",
-    "alt": "柔らかな光の中を舞う蝶のドットアニメーション"
+    "file": "FFFFFFFF1.png",
+    "label": "FFFFFFFF1",
+    "date": "2025-11-10",
+    "alt": "FFFFFFFF1"
   }
-];
+]
+;
