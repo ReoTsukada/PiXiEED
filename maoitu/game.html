@@ -51,7 +51,7 @@ gtag('event', 'project_open_maoitu');
     margin:0;
     background:#000;
     height:100%;
-    min-height:100%;
+    min-height:100svh;
     touch-action:none;
     overscroll-behavior:none;
   }
@@ -61,7 +61,7 @@ gtag('event', 'project_open_maoitu');
     flex-direction:column;
     align-items:center;
     justify-content:flex-start;
-    min-height:100vh;
+    min-height:var(--vvh, 100svh);
     /* 上部の重なりを最小限にしてキャンバスをさらに上寄せ */
     padding-top:clamp(0px, 1vh, 12px);
     padding-bottom:calc(90px + var(--safe-bottom)); /* 固定広告ぶんの余白を下に確保しつつ余裕を持たせる */
@@ -309,6 +309,16 @@ const bgm = document.getElementById('bgm');
 bgm.volume = 0.5;
 const AUDIO_KEY = 'maoitu_audio';
 const GAME_CANONICAL_URL = `${window.location.origin}/maoitu/`;
+function setViewportHeight(){
+  if(window.visualViewport){
+    document.documentElement.style.setProperty('--vvh', `${window.visualViewport.height}px`);
+  }else{
+    document.documentElement.style.setProperty('--vvh', `${window.innerHeight}px`);
+  }
+}
+setViewportHeight();
+window.addEventListener('resize', setViewportHeight);
+window.addEventListener('orientationchange', setViewportHeight);
 function syncAudioSetting(){
   const enabled = localStorage.getItem(AUDIO_KEY) !== 'off';
   bgm.muted = !enabled;
