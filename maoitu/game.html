@@ -62,7 +62,8 @@ gtag('event', 'project_open_maoitu');
     align-items:center;
     justify-content:flex-start;
     min-height:100vh;
-    padding-top:clamp(8px, 4vh, 40px);
+    /* 上部の重なりを最小限にしてキャンバスを上寄せ */
+    padding-top:clamp(0px, 2vh, 20px);
     padding-bottom:calc(90px + var(--safe-bottom)); /* 固定広告ぶんの余白を下に確保しつつ余裕を持たせる */
   }
   .ad-header{
@@ -91,7 +92,8 @@ gtag('event', 'project_open_maoitu');
     align-items:center;
     min-height:0;
     box-sizing:border-box;
-    padding:clamp(8px, 6vh, 64px) 0;
+    /* 上下余白を少し控えめにしてキャンバス位置を上へ */
+    padding:clamp(4px, 4vh, 40px) 0;
   }
   #c{display:block;touch-action:none;image-rendering:pixelated}
   .back-link{
