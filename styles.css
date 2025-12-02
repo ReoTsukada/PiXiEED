@@ -867,6 +867,8 @@ a:focus {
   color: var(--fg-primary);
 }
 
+
+
 @media (max-width: 640px), (orientation: portrait) {
   .site-footer {
     padding: 1.25rem 1rem;
