@@ -3,6 +3,7 @@
   const placeholder = document.getElementById('characterGalleryPlaceholder');
   const placeholderMeta = document.getElementById('characterPlaceholderMeta');
   const buttonsContainer = document.getElementById('characterGalleryButtons');
+  const headerCharacterLink = document.querySelector('.portfolio-nav a[href="#character-intro"]');
   const nameEl = document.getElementById('characterGalleryName');
   const weightEl = document.getElementById('characterGalleryWeight');
   const detailEl = document.getElementById('characterGalleryDetail');
@@ -25,6 +26,7 @@
   const reduceMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
   const typingControllers = new Map();
   const DEFAULT_IMAGE_SCALE = 0.7;
+  const CHARACTER_SEEN_STORAGE_KEY = 'pixieed:characterGallerySeen';
   const SECRET_UNLOCK_STORAGE_KEY = 'pixieed:secret-unlocks';
   const SECRET_UNLOCK_EVENT_NAME = 'pixiePet:secretUnlocked';
   const PLACEHOLDER_IMG = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
@@ -35,6 +37,7 @@
   }
 
   const initialCharacterId = getInitialCharacterId();
+  let seenCharacters = loadSeenCharacterState();
   let secretUnlocks = loadSecretUnlockState();
   const displayEntries = manifestEntries.map(entry => getDisplayEntry(entry));
   const buttons = displayEntries.map((entry, index) => createButton(entry, index));
@@ -46,6 +49,13 @@
   } else {
     selectCharacter(displayEntries[0], buttons[0], { updateUrl: false });
   }
+  updateHeaderIndicator();
+  announceUnseenCharacters({ autoHide: true, duration: 4200 });
+  window.PIXIEED_CHARACTER_GALLERY = {
+    hasUnseenCharacters: () => getUnseenEntries().length > 0,
+    getUnseenCharacterCount: () => getUnseenEntries().length,
+    announceUnseenCharacters
+  };
 
   window.addEventListener('storage', handleStorageEvent);
   window.addEventListener(SECRET_UNLOCK_EVENT_NAME, event => {
@@ -56,7 +66,7 @@
   });
 
   function selectCharacter(entry, activeButton, options = {}) {
-    const { updateUrl = false } = options;
+    const { updateUrl = false, markViewed = false } = options;
     if (!entry) return;
     currentCharacterId = entry.id || null;
     const src = normalizePath(entry.file);
@@ -112,6 +122,15 @@
     if (updateUrl) {
       syncCharacterParam(entry.id);
     }
+
+    if (markViewed) {
+      const index = manifestEntries.findIndex(item => item.id === entry.id);
+      const entryId = entry.id || (index >= 0 ? getEntryId(entry, index) : null);
+      if (entryId) {
+        markCharacterSeen(entryId);
+      }
+    }
+    updateHeaderIndicator();
   }
 
   function createButton(entry, index) {
@@ -133,7 +152,7 @@
 
     button.addEventListener('click', () => {
       const nextEntry = displayEntries[index];
-      selectCharacter(nextEntry, button, { updateUrl: true });
+      selectCharacter(nextEntry, button, { updateUrl: true, markViewed: true });
     });
     buttonsContainer.appendChild(button);
     return button;
@@ -142,8 +161,10 @@
   function applyEntryToButton(button, entry, index) {
     if (!button || !entry) return;
     const labelText = entry.buttonLabel || entry.name || `Character ${index + 1}`;
-    button.setAttribute('data-character-id', entry.id || `character-${index + 1}`);
-    button.setAttribute('aria-label', `${labelText} を表示`);
+    const entryId = getEntryId(entry, index);
+    const seen = isCharacterSeen(entryId);
+    button.setAttribute('data-character-id', entryId);
+    button.setAttribute('aria-label', `${labelText} を表示${seen ? '' : '（新着）'}`);
 
     const img = button._pixieImageEl || button.querySelector('img');
     if (img) {
@@ -160,6 +181,11 @@
     const label = button._pixieLabelEl || button.querySelector('span');
     if (label) {
       label.textContent = labelText;
+    }
+    if (seen) {
+      button.removeAttribute('data-unseen');
+    } else {
+      button.setAttribute('data-unseen', 'true');
     }
   }
 
@@ -354,11 +380,16 @@
   }
 
   function handleStorageEvent(event) {
-    if (event.key !== SECRET_UNLOCK_STORAGE_KEY) {
+    if (event.key === SECRET_UNLOCK_STORAGE_KEY) {
+      secretUnlocks = loadSecretUnlockState();
+      refreshAllSecretEntries();
       return;
     }
-    secretUnlocks = loadSecretUnlockState();
-    refreshAllSecretEntries();
+    if (event.key === CHARACTER_SEEN_STORAGE_KEY) {
+      seenCharacters = loadSeenCharacterState();
+      refreshSeenStates();
+      return;
+    }
   }
 
   function refreshSecretEntry(entryId) {
@@ -382,6 +413,136 @@
       if (idx >= 0) {
         selectCharacter(displayEntries[idx], buttons[idx], { updateUrl: false });
       }
+    }
+    updateHeaderIndicator();
+  }
+
+  function getUnseenEntries() {
+    return displayEntries.filter((entry, index) => {
+      const entryId = getEntryId(entry, index);
+      if (!entryId || entry.isSecretPlaceholder) {
+        return false;
+      }
+      return !isCharacterSeen(entryId);
+    });
+  }
+
+  function getEntryId(entry, index) {
+    if (entry?.id) {
+      return entry.id;
+    }
+    if (Number.isFinite(index) && index >= 0) {
+      return `character-${index + 1}`;
+    }
+    return '';
+  }
+
+  function isCharacterSeen(entryId) {
+    if (!entryId || !seenCharacters) {
+      return false;
+    }
+    return Boolean(seenCharacters[entryId]);
+  }
+
+  function markCharacterSeen(entryId) {
+    if (!entryId || isCharacterSeen(entryId)) {
+      return;
+    }
+    seenCharacters = {
+      ...(seenCharacters || {}),
+      [entryId]: true
+    };
+    persistSeenCharacterState();
+    updateButtonSeenState(entryId);
+    updateHeaderIndicator();
+  }
+
+  function updateButtonSeenState(entryId) {
+    if (!entryId) return;
+    const index = manifestEntries.findIndex((entry, idx) => entry.id === entryId || getEntryId(entry, idx) === entryId);
+    if (index < 0 || !buttons[index]) {
+      return;
+    }
+    applyEntryToButton(buttons[index], displayEntries[index], index);
+  }
+
+  function loadSeenCharacterState() {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) {
+        return {};
+      }
+      const raw = window.localStorage.getItem(CHARACTER_SEEN_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function persistSeenCharacterState() {
+    try {
+      if (!seenCharacters || typeof window === 'undefined' || !window.localStorage) {
+        return;
+      }
+      window.localStorage.setItem(CHARACTER_SEEN_STORAGE_KEY, JSON.stringify(seenCharacters));
+    } catch (error) {
+      // ignore
+    }
+  }
+
+  function refreshSeenStates() {
+    displayEntries.forEach((entry, index) => {
+      applyEntryToButton(buttons[index], entry, index);
+    });
+    updateHeaderIndicator();
+  }
+
+  function announceUnseenCharacters(options = {}) {
+    const { autoHide = true, duration = 4000, mount } = options;
+    const unseen = getUnseenEntries();
+    if (!unseen.length) {
+      return false;
+    }
+    const target =
+      mount instanceof HTMLElement
+        ? mount
+        : buttonsContainer?.parentElement || buttonsContainer || document.body;
+    if (!target) {
+      return false;
+    }
+
+    const existing = target.querySelector('.character-new-alert');
+    if (existing) {
+      existing.remove();
+    }
+
+    const alertEl = document.createElement('div');
+    alertEl.className = 'character-new-alert';
+    alertEl.setAttribute('role', 'status');
+    alertEl.textContent = unseen.length === 1 ? '新しいキャラが1体追加されています' : `新しいキャラが${unseen.length}体追加されています`;
+
+    if (target.firstChild) {
+      target.insertBefore(alertEl, target.firstChild);
+    } else {
+      target.appendChild(alertEl);
+    }
+
+    if (autoHide && duration > 0) {
+      window.setTimeout(() => {
+        alertEl.remove();
+      }, duration);
+    }
+    return true;
+  }
+
+  function updateHeaderIndicator() {
+    if (!headerCharacterLink) {
+      return;
+    }
+    const hasUnseen = getUnseenEntries().length > 0;
+    if (hasUnseen) {
+      headerCharacterLink.setAttribute('data-unseen', 'true');
+    } else {
+      headerCharacterLink.removeAttribute('data-unseen');
     }
   }
 
