@@ -8,6 +8,7 @@
     setupHeroReel();
     setupShowcaseFilter();
     setupProjectBadges();
+    setupRecentUpdates();
     disableImageInteractions();
     injectFooterAd();
   }
@@ -198,6 +199,119 @@
     } catch (e) {
       // ignore
     }
+  }
+
+  function setupRecentUpdates() {
+    const updates = [
+      {
+        title: 'ヒーローカードを矢印＆ドット付きカルーセル化',
+        summary: '3枚並びのヒーローを左右ナビとドットで操作できるようにし、導線を整理しました。',
+        date: '2025-11-18',
+        tag: 'UI/UX',
+        href: '#home-hero'
+      },
+      {
+        title: 'メールアドレスをGmailに統一',
+        summary: '全ページの連絡先を pixieed.arta@gmail.com に更新し、JSON-LDにも反映しました。',
+        date: '2025-11-18',
+        tag: 'Info',
+        href: '#contact'
+      },
+      {
+        title: 'ポートフォリオ・プロジェクトに新着バッジ追加',
+        summary: '未閲覧のドット絵サムネとプロジェクトカードに赤点を表示し、ヘッダーにも未読を連動。',
+        date: '2025-11-17',
+        tag: 'Feature',
+        href: '#dot-gallery'
+      },
+      {
+        title: 'サイトマップを追加',
+        summary: 'sitemap.xmlを配置し、サーチコンソール送信用の準備を完了しました。',
+        date: '2025-11-17',
+        tag: 'SEO',
+        href: '/sitemap.xml'
+      }
+    ];
+
+    const now = Date.now();
+    const ONE_WEEK = 7 * 24 * 60 * 60 * 1000;
+    const parsed = updates
+      .map(entry => ({
+        ...entry,
+        timestamp: Date.parse(entry.date)
+      }))
+      .filter(entry => Number.isFinite(entry.timestamp));
+
+    const recent = parsed.filter(entry => now - entry.timestamp <= ONE_WEEK && now >= entry.timestamp);
+    const list = (recent.length ? recent : parsed).sort((a, b) => b.timestamp - a.timestamp).slice(0, 6);
+
+    // expose for hero cards
+    window.__PIXIEED_RECENT_UPDATES = list;
+
+    const container = document.getElementById('recentUpdates');
+    if (!container) {
+      return;
+    }
+
+    container.innerHTML = '';
+    if (!list.length) {
+      container.innerHTML = '<p class="news-item">最近の更新情報を準備中です。</p>';
+      return;
+    }
+
+    // if someday revived, keep renderer:
+    const fragment = document.createDocumentFragment();
+    list.forEach(entry => {
+      const card = document.createElement('article');
+      card.className = 'update-card';
+
+      if (entry.tag) {
+        const tag = document.createElement('span');
+        tag.className = 'update-card__tag';
+        tag.textContent = entry.tag;
+        card.appendChild(tag);
+      }
+
+      const title = document.createElement('h3');
+      title.textContent = entry.title;
+      card.appendChild(title);
+
+      const summary = document.createElement('p');
+      summary.textContent = entry.summary;
+      card.appendChild(summary);
+
+      if (entry.date) {
+        const time = document.createElement('time');
+        time.dateTime = entry.date;
+        time.textContent = formatDate(entry.timestamp);
+        card.appendChild(time);
+      }
+
+      if (entry.href) {
+        const link = document.createElement('a');
+        link.href = entry.href;
+        link.textContent = '詳しく見る';
+        card.appendChild(link);
+      }
+
+      fragment.appendChild(card);
+    });
+
+    container.appendChild(fragment);
+
+    function formatDate(timestamp) {
+      if (!Number.isFinite(timestamp)) return '';
+      const d = new Date(timestamp);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}/${m}/${day}`;
+    }
+  }
+
+  function getRecentUpdatesData() {
+    const data = Array.isArray(window.__PIXIEED_RECENT_UPDATES) ? window.__PIXIEED_RECENT_UPDATES : [];
+    return data;
   }
 
   function setupProjectBadges() {
