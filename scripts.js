@@ -7,6 +7,7 @@
     setupProjectGate();
     setupHeroReel();
     setupShowcaseFilter();
+    setupProjectBadges();
     disableImageInteractions();
     injectFooterAd();
   }
@@ -196,6 +197,88 @@
       (window.adsbygoogle = window.adsbygoogle || []).push({});
     } catch (e) {
       // ignore
+    }
+  }
+
+  function setupProjectBadges() {
+    const cards = Array.from(document.querySelectorAll('.ogp-card:not(.ogp-card--ad)'));
+    if (!cards.length) return;
+    const navLink = document.querySelector('.portfolio-nav a[href="#projects"]');
+    const STORAGE_KEY = 'pixieed:projectsSeen';
+    let seenProjects = loadSeen();
+
+    cards.forEach((card, index) => {
+      const projectId = getProjectId(card, index);
+      card.dataset.projectId = projectId;
+      applyState(card, projectId);
+      card.addEventListener('click', () => {
+        markSeen(projectId);
+        applyState(card, projectId);
+        updateNav();
+      });
+    });
+
+    updateNav();
+
+    window.addEventListener('storage', event => {
+      if (event.key !== STORAGE_KEY) return;
+      seenProjects = loadSeen();
+      cards.forEach((card, index) => applyState(card, getProjectId(card, index)));
+      updateNav();
+    });
+
+    function getProjectId(card, index) {
+      const href = card?.getAttribute('href') || '';
+      if (href) return `href:${href}`;
+      if (Number.isFinite(index)) return `project-${index + 1}`;
+      return '';
+    }
+
+    function loadSeen() {
+      try {
+        const raw = window.localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : {};
+      } catch (_error) {
+        return {};
+      }
+    }
+
+    function persistSeen() {
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seenProjects || {}));
+      } catch (_error) {
+        // ignore
+      }
+    }
+
+    function isSeen(id) {
+      if (!id || !seenProjects) return false;
+      return Boolean(seenProjects[id]);
+    }
+
+    function markSeen(id) {
+      if (!id || isSeen(id)) return;
+      seenProjects = { ...(seenProjects || {}), [id]: true };
+      persistSeen();
+    }
+
+    function applyState(card, id) {
+      if (!card) return;
+      if (id && !isSeen(id)) {
+        card.setAttribute('data-unseen', 'true');
+      } else {
+        card.removeAttribute('data-unseen');
+      }
+    }
+
+    function updateNav() {
+      if (!navLink) return;
+      const hasUnseen = cards.some((card, index) => !isSeen(getProjectId(card, index)));
+      if (hasUnseen) {
+        navLink.setAttribute('data-unseen', 'true');
+      } else {
+        navLink.removeAttribute('data-unseen');
+      }
     }
   }
 
