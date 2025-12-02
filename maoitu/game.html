@@ -60,9 +60,10 @@ gtag('event', 'project_open_maoitu');
     display:flex;
     flex-direction:column;
     align-items:center;
-    justify-content:center;
+    justify-content:flex-start;
     min-height:100vh;
-    padding-bottom:calc(90px + var(--safe-bottom)); /* 固定広告ぶんの余白を下に確保しつつ中央寄せ */
+    padding-top:clamp(8px, 4vh, 40px);
+    padding-bottom:calc(90px + var(--safe-bottom)); /* 固定広告ぶんの余白を下に確保しつつ余裕を持たせる */
   }
   .ad-header{
     width:100%;
@@ -90,6 +91,7 @@ gtag('event', 'project_open_maoitu');
     align-items:center;
     min-height:0;
     box-sizing:border-box;
+    padding:clamp(8px, 6vh, 64px) 0;
   }
   #c{display:block;touch-action:none;image-rendering:pixelated}
   .back-link{
