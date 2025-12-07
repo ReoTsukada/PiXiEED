@@ -145,11 +145,31 @@ gtag('event', 'project_open_maoitu');
     display:flex;
     flex-direction:column;
     gap:8px;
+    transition:box-shadow 0.2s ease,border-color 0.2s ease,background 0.2s ease;
+  }
+  #gameOverPanel.is-clear{
+    background:linear-gradient(160deg, rgba(22,163,74,0.25), rgba(0,0,0,0.8));
+    border-color:rgba(74,222,128,0.7);
+    box-shadow:0 0 18px rgba(74,222,128,0.45);
   }
   .gameover-title{
     font-size:16px;
     font-weight:700;
     letter-spacing:0.06em;
+  }
+  .gameover-title.is-clear{ color:#4ade80; text-shadow:0 0 6px rgba(74,222,128,0.5); }
+  .clear-badge{
+    display:none;
+    font:800 14px/1.2 system-ui;
+    color:#bbf7d0;
+    background:rgba(34,197,94,0.18);
+    border:1px solid rgba(34,197,94,0.55);
+    border-radius:999px;
+    padding:6px 10px;
+    margin:0 auto;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    box-shadow:0 0 10px rgba(34,197,94,0.35);
   }
   #sharePanel{
     display:none;
@@ -274,6 +294,7 @@ gtag('event', 'project_open_maoitu');
   <div id="gameOverUi">
   <div id="gameOverPanel">
   <div class="gameover-title" id="gameoverTitle">GAME OVER</div>
+  <div class="clear-badge" id="clearBadge">GAME CLEAR!</div>
   <div id="shareScoreLabel">SCORE: 0</div>
   </div>
   <div id="sharePanel">
@@ -336,6 +357,8 @@ const instructions = document.getElementById('instructions');
 const instructionsCloseBtn = document.getElementById('instructionsClose');
 const instructionsToggleBtn = document.getElementById('instructionsToggle');
 const backLink = document.getElementById('backLink');
+const gameOverPanel = document.getElementById('gameOverPanel');
+const clearBadge = document.getElementById('clearBadge');
 let shareScore = 0;
 let runCleared = false;
 
@@ -403,6 +426,13 @@ function showSharePanel(score){
   shareScoreLabel.textContent = `SCORE: ${score}`;
   if(gameOverTitle){
     gameOverTitle.textContent = runCleared ? 'GAME CLEAR!' : 'GAME OVER';
+    gameOverTitle.classList.toggle('is-clear', runCleared);
+  }
+  if(gameOverPanel){
+    gameOverPanel.classList.toggle('is-clear', runCleared);
+  }
+  if(clearBadge){
+    clearBadge.style.display = runCleared ? 'inline-flex' : 'none';
   }
   gameOverUi.style.display = 'flex';
   sharePanel.style.display = 'flex';
