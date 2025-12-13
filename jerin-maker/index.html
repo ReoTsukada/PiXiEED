@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0" name="viewport"/>
+<title>PiXiEEDraw Lite</title>
+<meta content="PiXiEEDrawのライト版（通称ピクドラ）。16×16固定の超シンプルなブラウザ向けドットツールで、ジェリンプレビューや日替わりお題で気軽にドット練習ができます。" name="description"/>
+<meta content="PiXiEEDraw Lite,ピクドラ,ピクセル,ドット絵,ジェリン,ブラウザお絵描き,16x16ドット,ドットツール" name="keywords"/>
+<meta content="#0b0f1f" name="theme-color"/>
+<link href="../character-dots/mao1.png" rel="icon" type="image/png"/>
+<script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0d1224;
+    --line: rgba(255, 255, 255, 0.16);
+    --accent: #58c4ff;
+    --text: #eaf1ff;
+    --pad: clamp(12px, 3vw, 20px);
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: calc(var(--pad) + var(--safe-top)) calc(var(--pad) + var(--safe-right)) calc(var(--pad) + var(--safe-bottom)) calc(var(--pad) + var(--safe-left));
+    overflow: hidden;
+    user-select: none;
+  }
+  input,
+  textarea {
+    user-select: auto;
+  }
+  .shell {
+    width: min(1200px, 100%);
+    min-height: calc(100vh - (var(--pad) + var(--safe-top)) - (var(--pad) + var(--safe-bottom)));
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: clamp(10px, 2vw, 14px);
+  }
+  @supports (height: 100dvh) {
+    body {
+      min-height: 100dvh;
+    }
+    .shell {
+      min-height: calc(100dvh - (var(--pad) + var(--safe-top)) - (var(--pad) + var(--safe-bottom)));
+    }
+  }
+  .topbar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: transparent;
+    border: 0;
+    padding: 10px 0;
+    gap: 12px;
+  }
+  .ad-slot {
+    flex: 0 0 auto;
+    width: 320px;
+    max-width: 100%;
+    height: 50px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: transparent;
+    border: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ad-slot ins {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .app {
+    width: 100%;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(260px, 360px);
+    gap: clamp(16px, 3vw, 24px);
+    min-height: 0;
+    overflow: hidden;
+  }
+  .canvas-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .canvas-frame {
+    padding: clamp(12px, 3vw, 20px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 0;
+    border-radius: 12px;
+  }
+  .canvas-stack {
+    position: relative;
+    --canvas-size: min(82vw, min(56vh, 520px));
+    width: var(--canvas-size);
+    height: var(--canvas-size);
+    max-width: 100%;
+  }
+  .canvas-stack canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    image-rendering: pixelated;
+    border-radius: 0;
+    touch-action: none;
+  }
+  .canvas-base {
+    background-color: #e5e7eb;
+    background-image: repeating-conic-gradient(#f6f7fb 0% 25%, #d4d8e0 25% 50%);
+    background-size: var(--checker-size, 12px) var(--checker-size, 12px);
+    border: 1px solid var(--line);
+    z-index: 0;
+  }
+  #jelinCanvas {
+    pointer-events: none;
+    z-index: 1;
+  }
+  #canvas { background: transparent; z-index: 2; }
+  #gridCanvas {
+    background: transparent;
+    border: 0;
+    pointer-events: none;
+    z-index: 3;
+  }
+  button {
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+    padding: 10px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  button:hover { border-color: rgba(88, 196, 255, 0.8); }
+  .icon-btn {
+    width: 44px;
+    height: 44px;
+    padding: 8px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .icon-btn[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .icon-btn.is-active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(88, 196, 255, 0.35);
+  }
+  .icon-btn img {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    image-rendering: pixelated;
+  }
+  .panel {
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: clamp(12px, 3vw, 16px);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: calc(100vh - 140px);
+    overflow: auto;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .palette {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
+    gap: 8px;
+  }
+  .prompt {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.04);
+    font-size: 0.9rem;
+    line-height: 1.4;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .prompt-title {
+    font-weight: 700;
+    color: var(--accent);
+    margin: 0;
+    padding: 0;
+    display: inline-block;
+  }
+  .swatch {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.22);
+    cursor: pointer;
+  }
+  .swatch.is-active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(88, 196, 255, 0.35);
+  }
+  .swatch--transparent {
+    background-color: #cfcfcf;
+    background-image:
+      linear-gradient(45deg, #ffffff 25%, transparent 25%, transparent 75%, #ffffff 75%, #ffffff),
+      linear-gradient(45deg, #ffffff 25%, transparent 25%, transparent 75%, #ffffff 75%, #ffffff);
+    background-size: 10px 10px;
+    background-position: 0 0, 5px 5px;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4) inset;
+  }
+  .inline-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .swatch-editor {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    width: 0;
+    height: 0;
+  }
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  @media (max-width: 960px) {
+    .app { grid-template-columns: 1fr; }
+    .topbar { flex-direction: column; align-items: flex-start; }
+    .ad-slot { width: 100%; }
+    .panel { max-height: none; }
+  }
+  @media (max-height: 720px) {
+    .canvas-stack { --canvas-size: min(78vw, min(48vh, 460px)); }
+    .canvas-frame { padding: 8px; }
+    .panel { max-height: calc(100vh - 110px); gap: 10px; }
+    .app { gap: clamp(10px, 2vw, 16px); }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <div class="ad-slot">
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="ca-pub-9801602250480253"
+           data-ad-slot="2141591954"></ins>
+    </div>
+  </header>
+  <div class="app">
+  <div class="canvas-wrap">
+    <div class="canvas-frame">
+      <div class="canvas-stack">
+        <canvas aria-hidden="true" class="canvas-base" height="16" id="bgCanvas" width="16"></canvas>
+        <canvas aria-hidden="true" class="jelin-overlay" height="16" id="jelinCanvas" width="16"></canvas>
+        <canvas aria-label="16×16のドットキャンバス" height="16" id="canvas" width="16"></canvas>
+        <canvas aria-hidden="true" height="16" id="gridCanvas" width="16"></canvas>
+      </div>
+    </div>
+  </div>
+  <aside class="panel">
+    <div class="row">
+      <input aria-label="色を選択" id="colorPicker" type="color" value="#58c4ff"/>
+        <div class="inline-buttons">
+          <button class="icon-btn" id="btnCycleSize" title="キャンバスサイズを切り替え (8px / 16px / 32px)" type="button">16px</button>
+          <button class="icon-btn" id="btnJelinMode" title="スカイジェリンをプレビューする" type="button">
+            <img alt="ジェリンモード" src="./JELLNALL1.svg"/>
+          </button>
+          <button class="icon-btn" id="btnExport" title="PNGを書き出す" type="button">
+            <img alt="書き出し" src="../pixiedraw/assets/icons/action-export.svg"/>
+          </button>
+        </div>
+    </div>
+    <div class="prompt" id="dailyPrompt">
+      <span class="prompt-title">今日のお題：</span>
+      <span class="prompt-body">読み込み中...</span>
+    </div>
+    <div class="palette" id="palette"></div>
+    <input aria-hidden="true" class="swatch-editor" id="swatchEditor" tabindex="-1" type="color" />
+  </aside>
+</div>
+<script>
+(() => {
+  const CANVAS_SIZES = [8, 16, 32];
+  let canvasSizeIndex = 1;
+  let canvasSize = CANVAS_SIZES[canvasSizeIndex];
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas?.getContext('2d', { willReadFrequently: true });
+  if (!canvas || !ctx) return;
+
+  const palette = [
+    'transparent',
+    '#58c4ff',
+    '#ffffff',
+    '#141414',
+    '#ffd966',
+    '#ff96a0',
+    '#8a7fff',
+    '#00d4aa',
+    '#ffa500',
+    '#4fd1c5',
+    '#f472b6',
+    '#fbbf24',
+    '#c084fc',
+    '#38bdf8',
+    '#fb7185',
+    '#94a3b8',
+  ];
+  let activeSwatchIndex = 1;
+  let currentColor = palette[activeSwatchIndex];
+  let drawing = false;
+  let eraseMode = false;
+  let showGrid = true;
+  let lastTouchEnd = 0;
+  let jelinMode = false;
+  const dailyPrompts = [
+    // 花・植物
+    'バラ',
+    'チューリップ',
+    'ラベンダー',
+    'ひまわり',
+    '桜(さくら)',
+    '梅(うめ)',
+    '藤の花(ふじのはな)',
+    '紫陽花(あじさい)',
+    'コスモス',
+    '彼岸花(ひがんばな)',
+    'スズラン',
+    'カーネーション',
+    'ガーベラ',
+    'ダリア',
+    'ポピー',
+    'パンジー',
+    'ビオラ',
+    'マーガレット',
+    'キンギョソウ',
+    'スイートピー',
+    'アイリス',
+    'アネモネ',
+    'ヒナゲシ',
+    'デイジー',
+    'ヤグルマギク',
+    'デルフィニウム',
+    'クレマチス',
+    'ジャスミン',
+    'ハイビスカス',
+    'プルメリア',
+    'マリーゴールド',
+    'ロベリア',
+    'ナデシコ',
+    'サクラソウ(さくらそう)',
+    'サボテンの花(さぼてんのはな)',
+    'エーデルワイス',
+    'リンドウ',
+    'スノードロップ',
+    'クロッカス',
+    'ジギタリス',
+    'カラーリリー',
+    'オダマキ',
+    'ミヤコワスレ',
+    '黄花コスモス(きばなコスモス)',
+    'ハーブの苗トレイ(はーぶのなえトレイ)',
+    '苔テラリウム(こけてらりうむ)',
+    'スイセン',
+    'ジニア',
+    'ロータス',
+    'ススキ',
+    '苔盆栽(こけばんさい)',
+    'アサガオ',
+    'ユリ',
+    'カトレア',
+    '蘭の花(らんのはな)',
+    'ベゴニア',
+    'アザミ',
+    'レンゲソウ',
+    'シロツメクサ',
+    'クローバー',
+    'タンポポ',
+    'ミモザ',
+    'ローズマリー',
+    'タイム',
+    'バジル',
+    'ミント',
+    'カモミール',
+    'セージ',
+    'レモンバーム',
+    'オレガノ',
+    'ユーカリ',
+    'ユーカリの枝(ゆーかりのえだ)',
+    'コニファー',
+    'モンステラ',
+    'ポトス',
+    'フィカス',
+    'シュガーバイン',
+    'アロエ',
+    'ガジュマル',
+    'パキラ',
+    'オリーブ',
+    '多肉植物(たにくしょくぶつ)',
+    'サボテン',
+    'チランジア',
+    '苔玉(こけだま)',
+    'コケ(こけ)',
+    '竹(たけ)',
+    '笹(ささ)',
+    '松ぼっくり(まつぼっくり)',
+    'ヤシの木(やしのき)',
+    'モミの木(もみのき)',
+    'クリスマスツリー',
+    '紅葉(こうよう)',
+    '銀杏の葉(いちょうのは)',
+    '柳の枝(やなぎのえだ)',
+    '枝物の花瓶(えだもののかびん)',
+    // 果物・木の実
+    'いちご',
+    'ブルーベリー',
+    'ラズベリー',
+    'チェリー',
+    'リンゴ',
+    '洋ナシ(ようなし)',
+    'プラム',
+    'もも',
+    'ぶどう',
+    'マスカット',
+    'オレンジ',
+    'レモン',
+    'ライム',
+    'グレープフルーツ',
+    'バナナ',
+    'ドラゴンフルーツ',
+    'ライチ',
+    'スターフルーツ',
+    'イチジク',
+    'メロン',
+    'スイカ',
+    'パイナップル',
+    'マンゴー',
+    'キウイ',
+    'パパイヤ',
+    'ザクロ',
+    'ココナッツ',
+    'アボカド',
+    'ドングリ',
+    '木の実のリース(きのみのリース)',
+    'アサイー',
+    'クコの実(くこのみ)',
+    'マカダミアナッツ',
+    'カカオの実(かかおのみ)',
+    // 野菜・ハーブ
+    'トマト',
+    'ミニトマト',
+    'カボチャ',
+    'ナス',
+    'ピーマン',
+    'パプリカ',
+    'トウモロコシ',
+    'ニンジン',
+    'ジャガイモ',
+    'タマネギ',
+    'ニンニク',
+    'ショウガ',
+    'ネギ',
+    'レタス',
+    'キャベツ',
+    'ホウレンソウ',
+    'アスパラガス',
+    'ブロッコリー',
+    'カリフラワー',
+    'オクラ',
+    '枝豆(えだまめ)',
+    'ゴーヤ',
+    'ヘーゼルナッツ',
+    'ピスタチオ',
+    'カシューナッツ',
+    // 宝石・鉱石
+    'ダイヤモンド',
+    'サファイア',
+    'エメラルド',
+    'ルビー',
+    'アメジスト',
+    'トパーズ',
+    'オパール',
+    'ガーネット',
+    'ターコイズ',
+    'アクアマリン',
+    'シトリン',
+    'ペリドット',
+    'スピネル',
+    'タンザナイト',
+    'モルガナイト',
+    'ラピスラズリ',
+    'ムーンストーン',
+    'ラブラドライト',
+    'ヘマタイト',
+    'ソーダライト',
+    'ピンクトルマリン',
+    'ラリマー',
+    'シュンガイト',
+    'ブラックオニキス',
+    'マラカイト',
+    'クォーツ',
+    'ローズクォーツ',
+    'スモーキークォーツ',
+    'タイガーアイ',
+    'ジャスパー',
+    'カルサイト',
+    'アゲート',
+    'アレキサンドライト',
+    'コハク',
+    'パール',
+    'サンゴ',
+    '真珠の首飾り(しんじゅのくびかざり)',
+    // 花器・アレンジ
+    '花瓶(かびん)',
+    'ガラスの一輪挿し(がらすのいちりんざし)',
+    '陶器の花瓶(とうきのかびん)',
+    'ブーケ',
+    'リース',
+    'スワッグ',
+    'ハーバリウム',
+    'ドライフラワー',
+    // 動物・自然少しだけ
+    '金魚(きんぎょ)',
+    '熱帯魚(ねったいぎょ)',
+    'イルカ',
+    'クジラ',
+    'サメ',
+    'マンタ',
+    'エイ',
+    'ウミガメ',
+    'タツノオトシゴ',
+    'タコ',
+    'イカ',
+    'クラゲ',
+    'ウミウシ',
+    'ヒトデ',
+    'マンボウ',
+    'ナポレオンフィッシュ',
+    'カクレクマノミ',
+    'チョウチョウウオ',
+    'トビウオ',
+    'カツオ',
+    'マグロ',
+    'サンマ',
+    'イワシ',
+    'アジ',
+    'フグ',
+    'アンコウ',
+    'ウツボ',
+    'ホオジロザメ',
+    'ジンベエザメ',
+    'シュモクザメ',
+    'メガマウス',
+    'リュウグウノツカイ',
+    'ダイオウイカ',
+    'マッコウクジラ',
+    'シャチ',
+    'セミクジラ',
+    'ゴマフアザラシ',
+    'トド',
+    'オットセイ',
+    'ラッコ',
+    'カワウソ',
+    'ウミヘビ',
+    'クリオネ',
+    'ニシオンデンザメ',
+    'チョウチンアンコウ',
+    'ミズダコ',
+    'ホタルイカ',
+    'サケ',
+    'ニシン',
+    'タラ',
+    'ウナギ',
+    'ハゼ',
+    'サンゴ',
+    'イソギンチャク',
+    'ヒラムシ',
+    'クラカケアザラシ',
+    'ゼニガタアザラシ',
+    'イソマグロ',
+    'カメ',
+    'カエル',
+    'シロクマ',
+    'シマリス',
+    '小鳥(ことり)',
+    'フクロウ',
+    'ペンギン',
+    // そのほかシンプル小物
+    '木の葉の標本(このはのひょうほん)',
+    '押し花(おしばな)',
+    'ハチミツの瓶(はちみつのびん)',
+    '木の枝のリース(きのえだのリース)',
+    'キャンプファイヤー',
+    '石ころ(いしころ)',
+    '苔むした石(こけむしたいし)',
+    'インク瓶(いんくびん)',
+    '鍵束(かぎたば)',
+    'ベル',
+    'ルーペ',
+    '万華鏡(まんげきょう)',
+    '砂時計(すなどけい)',
+    '羽根ペン(はねぺん)',
+    '車(くるま)',
+    'バス',
+    '列車(れっしゃ)',
+    '飛行機(ひこうき)',
+    'ヨット',
+    '気球(ききゅう)',
+    '自転車(じてんしゃ)',
+    'セスナ機(せすなき)',
+    'カヌー',
+    'カヤック',
+    'そり',
+    '換気扇(かんきせん)',
+    '煙突(えんとつ)',
+    'カラーコーン',
+    '工事用バリケード(こうじようバリケード)',
+    'ショートケーキ',
+    'チョコレートケーキ',
+    'チーズケーキ',
+    'レアチーズケーキ',
+    'ベイクドチーズケーキ',
+    'モンブラン',
+    'シフォンケーキ',
+    'ガトーショコラ',
+    'パウンドケーキ',
+    'ロールケーキ',
+    'カップケーキ',
+    'ミルフィーユ',
+    'フルーツタルト',
+    'チーズタルト',
+    'アップルパイ',
+    'パンプキンパイ',
+    'レモンタルト',
+    'バスクチーズケーキ',
+    'パンナコッタ',
+    'クレームブリュレ',
+    'バウムクーヘン',
+    'フィナンシェ',
+    'シュークリーム',
+    'わらび餅(わらびもち)',
+    'マドレーヌ',
+    'カヌレ',
+    'エクレア',
+    'ティラミス',
+    '大福(だいふく)',
+    'どら焼き(どらやき)',
+    '羊羹(ようかん)',
+    '抹茶ラテ(まっちゃラテ)',
+    'カフェラテ',
+    'ソーダフロート',
+    'フルーツティー',
+    'ハーブティー',
+    'ミルクセーキ',
+    'クラフトコーラ',
+    'ミントティー',
+    'ベリースムージー',
+    'グリーンスムージー',
+    // 料理系
+    'カレーライス',
+    'ビーフシチュー',
+    'ハヤシライス',
+    'ハンバーグ',
+    'ステーキ',
+    'ローストチキン',
+    '唐揚げ(からあげ)',
+    '焼き魚(やきざかな)',
+    'サバの味噌煮(さばのみそに)',
+    '鮭の塩焼き(さけのしおやき)',
+    '天ぷら盛り合わせ(てんぷらもりあわせ)',
+    'かき揚げ(かきあげ)',
+    'カツ丼(かつどん)',
+    '親子丼(おやこどん)',
+    '牛丼(ぎゅうどん)',
+    'オムライス',
+    'ナポリタン',
+    'カルボナーラ',
+    'ボロネーゼ',
+    'グラタン',
+    'ラザニア',
+    'ピラフ',
+    'チャーハン',
+    '焼きそば(やきそば)',
+    'たこ焼き(たこやき)',
+    'お好み焼き(おこのみやき)',
+    'ぎょうざ',
+    'シュウマイ',
+    '春巻き(はるまき)',
+    '麻婆豆腐(まーぼーどうふ)',
+    '酸辣湯(さんらーたん)',
+    'フォー',
+    'ラーメン',
+    'うどん',
+    'そば',
+    '味噌汁(みそしる)',
+    'ポトフ',
+    'ミネストローネ',
+    'シーザーサラダ',
+    'ポテトサラダ',
+    'カプレーゼ',
+    'ポキ丼(ぽきどん)',
+    // 追加分
+    'スノーフレーク',
+    'コチョウラン',
+    'ブルースター',
+    'オーニソガラム',
+    'ネモフィラ',
+    'ライム',
+    'グアバ',
+    'マンゴスチン',
+    'ピーカンナッツ',
+    'ロードナイト',
+    'プレーナイト',
+    'ブルートパーズ',
+    'ハーキマーダイヤ',
+    'オブシディアン',
+    'みたらし団子(みたらしだんご)',
+    '桜餅(さくらもち)',
+    'カッププリン',
+    'ジェラート',
+    'ベリータルト',
+    '黒糖タピオカミルク(こくとうタピオカミルク)',
+    'アイスコーヒー',
+    'ホットココア',
+    'オレンジソーダ',
+    'チャイ',
+    '折り紙の星(おりがみのほし)',
+    '鉛筆削り(えんぴつけずり)',
+    '定規(じょうぎ)',
+    '紙テープ(かみテープ)',
+    '懐中電灯(かいちゅうでんとう)',
+    '方位磁石(ほういじしゃく)',
+    'トラム',
+    '帆かけ舟(ほかけぶね)',
+    'ジェットスキー',
+    '雪上車(せつじょうしゃ)',
+    // 陸の動物・鳥・虫など
+    'トラ',
+    'ライオン',
+    'ヒョウ',
+    'チーター',
+    'ジャガー',
+    'ピューマ',
+    'ハイエナ',
+    'レッサーパンダ',
+    'フェネック',
+    'ハリネズミ',
+    'モモンガ',
+    'ナマケモノ',
+    'アリクイ',
+    'カピバラ',
+    'ビーバー',
+    'バッファロー',
+    'バイソン',
+    'イノシシ',
+    'シカ',
+    'ウサギ',
+    'ハムスター',
+    'キツネ',
+    'オオカミ',
+    'タヌキ',
+    'アライグマ',
+    'セイウチ',
+    'アシカ',
+    'リャマ',
+    'ヤギ',
+    'ヒツジ',
+    'ウシ',
+    'ウマ',
+    'ロバ',
+    'ラバ',
+    'ヤク',
+    'ミーアキャット',
+    'プレーリードッグ',
+    'コアラ',
+    'オポッサム',
+    'アルマジロ',
+    'カンガルー',
+    'エリマキトカゲ',
+    'カメレオン',
+    'イグアナ',
+    'ヘビ',
+    'トカゲ',
+    'カメレオン',
+    'カエル',
+    'サラマンダー',
+    'スズメ',
+    'ツバメ',
+    'ハト',
+    'カラス',
+    'カモメ',
+    'ペリカン',
+    'フラミンゴ',
+    'クジャク',
+    'ワシ',
+    'タカ',
+    'ミミズク',
+    'コウノトリ',
+    'ツル',
+    'カワセミ',
+    'キツツキ',
+    'インコ',
+    'オウム',
+    'オオハシ',
+    'シギ',
+    'ダチョウ',
+    'エミュー',
+    'ウズラ',
+    'ニワトリ',
+    'ヒヨコ',
+    'アヒル',
+    'ガチョウ',
+    'カナリア',
+    'ヨウム',
+    'モモイロインコ',
+    'ホタル',
+    'カブトムシ',
+    'クワガタ',
+    'ミツバチ',
+    'アリ',
+    'テントウムシ',
+    'トンボ',
+    'カマキリ',
+    'バッタ',
+    'コオロギ',
+    'アゲハチョウ',
+    'モンシロチョウ',
+    'ガ',
+    'セミ',
+    'ハエトリグモ',
+    'ジェリン',
+  ];
+
+  const colorPicker = document.getElementById('colorPicker');
+  const paletteEl = document.getElementById('palette');
+  const btnExport = document.getElementById('btnExport');
+  const btnCycleSize = document.getElementById('btnCycleSize');
+  const btnJelinMode = document.getElementById('btnJelinMode');
+  const swatchEditor = /** @type {HTMLInputElement|null} */ (document.getElementById('swatchEditor'));
+  const dailyPromptEl = document.getElementById('dailyPrompt');
+  const dailyPromptBody = dailyPromptEl?.querySelector('.prompt-body');
+  const gridCanvas = /** @type {HTMLCanvasElement|null} */ (document.getElementById('gridCanvas'));
+  const gridCtx = gridCanvas?.getContext('2d', { willReadFrequently: true }) || null;
+  const bgCanvas = /** @type {HTMLCanvasElement|null} */ (document.getElementById('bgCanvas'));
+  const bgCtx = bgCanvas?.getContext('2d', { willReadFrequently: true }) || null;
+  const jelinCanvas = /** @type {HTMLCanvasElement|null} */ (document.getElementById('jelinCanvas'));
+  const jelinCtx = jelinCanvas?.getContext('2d', { willReadFrequently: true }) || null;
+  const adsQueue = window.adsbygoogle || [];
+  const JELIN_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAQRJREFUOI3tkjFLA0EQhb89L8LBHZxFmq3sAoKQTgj4A6yutrT0F6W0s7cKgl2CcF2qgJ0gbJPCg12InCFjIXe5jWsg1k45s9/beY+B/1KBnhzC7AqIyJafORzA3K5TgIWF8aDncSoEzxzu3qxTU23FltUGY1ZcjVJPJArBc+vDAP08QuuEybPj9uWztRp3HzXw01s4hn4eAcmPQGRqxQOX1WaPwHfpXDEe9FoLLCx74d9mEZ2U/1JtBqYSHi6OveHp3TsArzcnXr8oa86yzgbN+qPHDwCmVtzuT02vKGt0rhhmsaNzB1KUdevRmFVwXa0Trs+PGGaxu8xUCijvkA60rwC+AHX1dn623PVvAAAAAElFTkSuQmCC';
+  const jelInImage = new Image();
+  jelInImage.src = JELIN_DATA_URL;
+  let jelInImageBitmap = null;
+  let jelInImageLoaded = false;
+  let pendingOverlay = false;
+  async function toBitmap(image) {
+    try {
+      return await createImageBitmap(image);
+    } catch (err) {
+      return null;
+    }
+  }
+  jelInImage.onload = async () => {
+    jelInImageLoaded = true;
+    jelInImageBitmap = await toBitmap(jelInImage);
+    if (pendingOverlay) {
+      pendingOverlay = false;
+    }
+    drawJelinOverlay();
+  };
+  jelInImage.onerror = err => {
+    console.error('ジェリン画像の読み込みに失敗しました', err);
+    jelInImageLoaded = false;
+  };
+
+  let imageData = ctx.createImageData(canvasSize, canvasSize);
+  let data = imageData.data;
+  ctx.imageSmoothingEnabled = false;
+  // ブラウザのページズームを抑止してキャンバス座標のずれを防ぐ
+  function preventBrowserZoom() {
+    const blockedKeys = new Set(['=', '+', '-', '_', '0']);
+    const blockedCodes = new Set(['Equal', 'Minus', 'Digit0', 'NumpadAdd', 'NumpadSubtract', 'Numpad0']);
+    window.addEventListener('wheel', event => {
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, { passive: false });
+    window.addEventListener('keydown', event => {
+      if ((event.ctrlKey || event.metaKey) && (blockedKeys.has(event.key) || blockedCodes.has(event.code))) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, { passive: false });
+    window.addEventListener('gesturestart', event => {
+      event.preventDefault();
+    });
+    document.addEventListener('touchend', event => {
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) {
+        event.preventDefault();
+      }
+      lastTouchEnd = now;
+    }, { passive: false });
+  }
+  preventBrowserZoom();
+
+  // 画像保存防止（右クリック保存やドラッグの抑止）
+  document.addEventListener('contextmenu', event => {
+    if (event.target instanceof HTMLImageElement || event.target === canvas) {
+      event.preventDefault();
+    }
+  });
+  document.addEventListener('dragstart', event => {
+    if (event.target instanceof HTMLImageElement || event.target === canvas) {
+      event.preventDefault();
+    }
+  });
+
+  function hexToRgba(hex) {
+    if (typeof hex === 'string' && hex.toLowerCase() === 'transparent') {
+      return { r: 0, g: 0, b: 0, a: 0 };
+    }
+    const normalized = hex.replace('#', '');
+    const chunk = normalized.length === 3 ? normalized.split('').map(c => c + c).join('') : normalized;
+    const value = parseInt(chunk, 16);
+    return { r: (value >> 16) & 255, g: (value >> 8) & 255, b: value & 255, a: 255 };
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function setDailyPrompt() {
+    if (!dailyPromptBody) return;
+    // 日本時間の0時基準で1日1つに固定
+    const now = Date.now();
+    const JST_OFFSET = 9 * 60 * 60 * 1000;
+    const jst = new Date(now + JST_OFFSET);
+    const seedBase = jst.getUTCFullYear() * 10000 + (jst.getUTCMonth() + 1) * 100 + jst.getUTCDate();
+    let state = seedBase;
+    state = (1664525 * state + 1013904223) >>> 0; // LCGで決定的に散らす
+    const idx = Math.floor((state / 0xffffffff) * dailyPrompts.length);
+    dailyPromptBody.textContent = dailyPrompts[idx];
+  }
+
+  function updateSizeButton() {
+    if (btnCycleSize) {
+      btnCycleSize.textContent = `${canvasSize}px`;
+    }
+  }
+
+  function applyCanvasSize(nextSize) {
+    const target = CANVAS_SIZES.includes(nextSize) ? nextSize : CANVAS_SIZES[1];
+    const sourceCanvas = document.createElement('canvas');
+    sourceCanvas.width = canvasSize;
+    sourceCanvas.height = canvasSize;
+    const sourceCtx = sourceCanvas.getContext('2d', { willReadFrequently: true });
+    if (sourceCtx) {
+      sourceCtx.putImageData(imageData, 0, 0);
+    }
+
+    const scaledCanvas = document.createElement('canvas');
+    scaledCanvas.width = target;
+    scaledCanvas.height = target;
+    const scaledCtx = scaledCanvas.getContext('2d', { willReadFrequently: true });
+    if (scaledCtx && sourceCtx) {
+      scaledCtx.imageSmoothingEnabled = false;
+      scaledCtx.drawImage(sourceCanvas, 0, 0, target, target);
+    }
+
+    imageData = scaledCtx ? scaledCtx.getImageData(0, 0, target, target) : ctx.createImageData(target, target);
+    data = imageData.data;
+    canvasSize = target;
+    canvasSizeIndex = CANVAS_SIZES.indexOf(target);
+    canvas.width = target;
+    canvas.height = target;
+    if (jelinCanvas) {
+      jelinCanvas.width = target;
+      jelinCanvas.height = target;
+    }
+    resizeGridCanvas();
+    render();
+    updateSizeButton();
+  }
+
+  function cycleCanvasSize() {
+    const nextIndex = (canvasSizeIndex + 1) % CANVAS_SIZES.length;
+    applyCanvasSize(CANVAS_SIZES[nextIndex]);
+  }
+  function setJelinMode(enabled) {
+    jelinMode = enabled;
+    if (btnJelinMode) {
+      btnJelinMode.classList.toggle('is-active', enabled);
+      btnJelinMode.setAttribute('aria-pressed', String(enabled));
+    }
+    if (enabled) {
+      applyCanvasSize(16);
+      if (btnCycleSize) {
+        btnCycleSize.disabled = true;
+      }
+      if (jelInImageLoaded) {
+        drawJelinOverlay();
+      } else {
+        pendingOverlay = true;
+      }
+    } else {
+      if (btnCycleSize) {
+        btnCycleSize.disabled = false;
+      }
+      drawJelinOverlay();
+    }
+  }
+
+  function setCurrentColor(hex, options = {}) {
+    const { updatePalette = true } = options;
+    if (activeSwatchIndex === 0) {
+      currentColor = palette[0];
+      if (colorPicker) colorPicker.value = '#000000';
+      return;
+    }
+    currentColor = hex;
+    if (updatePalette) {
+      palette[activeSwatchIndex] = hex;
+      updateSwatchColors();
+    }
+    if (colorPicker) colorPicker.value = hex;
+    const sw = paletteEl?.children?.[activeSwatchIndex];
+    if (sw instanceof HTMLElement) {
+      Array.from(paletteEl.children).forEach(el => el.classList.remove('is-active'));
+      sw.classList.add('is-active');
+    }
+    eraseMode = false;
+  }
+
+  function openSwatchEditor(baseColor) {
+    if (!swatchEditor) return;
+    swatchEditor.value = baseColor;
+    swatchEditor.click();
+  }
+
+  function updateSwatchColors() {
+    if (!paletteEl) return;
+    Array.from(paletteEl.children).forEach((el, index) => {
+      if (el instanceof HTMLElement) {
+        el.style.background = palette[index];
+        el.classList.toggle('is-active', index === activeSwatchIndex);
+      }
+    });
+  }
+
+  function resizeGridCanvas() {
+    drawGrid();
+  }
+  function drawJelinOverlay() {
+    if (!jelinCtx || !jelinCanvas) return;
+    jelinCanvas.style.display = jelinMode && jelInImageLoaded ? 'block' : 'none';
+    jelinCtx.clearRect(0, 0, jelinCanvas.width, jelinCanvas.height);
+    if (!jelinMode || !jelInImageLoaded) return;
+    const source = jelInImageBitmap || jelInImage;
+    if (!source) return;
+    jelinCanvas.width = canvasSize;
+    jelinCanvas.height = canvasSize;
+    jelinCtx.imageSmoothingEnabled = false;
+    jelinCtx.clearRect(0, 0, canvasSize, canvasSize);
+    jelinCtx.drawImage(source, 0, 0, canvasSize, canvasSize);
+  }
+  function setPixel(x, y) {
+    if (x < 0 || y < 0 || x >= canvasSize || y >= canvasSize) return;
+    const idx = (y * canvasSize + x) * 4;
+    if (eraseMode) {
+      data[idx] = data[idx + 1] = data[idx + 2] = 0;
+      data[idx + 3] = 0;
+    } else {
+      const rgba = hexToRgba(currentColor);
+      data[idx] = rgba.r;
+      data[idx + 1] = rgba.g;
+      data[idx + 2] = rgba.b;
+      data[idx + 3] = rgba.a;
+    }
+    render();
+  }
+
+  function render() {
+    ctx.putImageData(imageData, 0, 0);
+    drawGrid();
+    drawJelinOverlay();
+  }
+
+  function drawGrid() {
+    if (!gridCtx || !gridCanvas) return;
+    gridCanvas.style.display = showGrid ? 'block' : 'none';
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const checkerSize = rect.width / canvasSize;
+    const stack = canvas.parentElement;
+    if (stack) {
+      stack.style.setProperty('--checker-size', `${checkerSize}px`);
+    }
+    if (bgCanvas) {
+      bgCanvas.width = canvasSize;
+      bgCanvas.height = canvasSize;
+    }
+    gridCanvas.width = rect.width * dpr;
+    gridCanvas.height = rect.height * dpr;
+    gridCanvas.style.width = `${rect.width}px`;
+    gridCanvas.style.height = `${rect.height}px`;
+    gridCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    gridCtx.clearRect(0, 0, rect.width, rect.height);
+    if (!showGrid) return;
+    gridCtx.save();
+    gridCtx.strokeStyle = 'rgba(0, 0, 0, 0.6)'; // 黒系のグリッド
+    gridCtx.lineWidth = 0.8;
+    gridCtx.setLineDash([]);
+    const cellW = rect.width / canvasSize;
+    const cellH = rect.height / canvasSize;
+    for (let i = 0; i <= canvasSize; i++) {
+      const x = i * cellW;
+      const y = i * cellH;
+      gridCtx.beginPath(); gridCtx.moveTo(x, 0); gridCtx.lineTo(x, rect.height); gridCtx.stroke();
+      gridCtx.beginPath(); gridCtx.moveTo(0, y); gridCtx.lineTo(rect.width, y); gridCtx.stroke();
+    }
+    gridCtx.restore();
+  }
+
+  function canvasPosToCell(event) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvasSize / rect.width;
+    const scaleY = canvasSize / rect.height;
+    return {
+      x: Math.floor((event.clientX - rect.left) * scaleX),
+      y: Math.floor((event.clientY - rect.top) * scaleY),
+    };
+  }
+
+  function onPointerDown(event) {
+    event.preventDefault();
+    const { x, y } = canvasPosToCell(event);
+    eraseMode = event.button === 2 || event.altKey || event.metaKey;
+    drawing = true;
+    setPixel(x, y);
+  }
+  function onPointerMove(event) {
+    if (!drawing) return;
+    const { x, y } = canvasPosToCell(event);
+    setPixel(x, y);
+  }
+  function onPointerUp() {
+    drawing = false;
+  }
+
+  function initPalette() {
+    if (!paletteEl) return;
+    paletteEl.innerHTML = '';
+    palette.forEach((color, index) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'swatch' + (index === activeSwatchIndex ? ' is-active' : '') + (index === 0 ? ' swatch--transparent' : '');
+      btn.style.background = color === 'transparent' ? '' : color;
+      btn.setAttribute('aria-label', `色 ${color}`);
+      const handleSelect = () => {
+        currentColor = color;
+        activeSwatchIndex = index;
+        if (colorPicker) {
+          colorPicker.value = color === 'transparent' ? '#000000' : color;
+        }
+        Array.from(paletteEl.children).forEach(el => el.classList.remove('is-active'));
+        btn.classList.add('is-active');
+        eraseMode = false;
+      };
+      btn.addEventListener('click', handleSelect);
+      let holdTimer = null;
+      const startHold = event => {
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        if (index === 0) return;
+        clearTimeout(holdTimer);
+        holdTimer = setTimeout(() => {
+          handleSelect();
+          openSwatchEditor(color);
+        }, 420);
+      };
+      const clearHold = () => {
+        clearTimeout(holdTimer);
+        holdTimer = null;
+      };
+      btn.addEventListener('pointerdown', startHold);
+      btn.addEventListener('pointerup', clearHold);
+      btn.addEventListener('pointerleave', clearHold);
+      btn.addEventListener('pointercancel', clearHold);
+      paletteEl.appendChild(btn);
+    });
+  }
+
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+  canvas.addEventListener('contextmenu', event => event.preventDefault());
+
+  btnCycleSize?.addEventListener('click', cycleCanvasSize);
+  btnJelinMode?.addEventListener('click', () => {
+    setJelinMode(!jelinMode);
+  });
+
+  colorPicker?.addEventListener('input', event => {
+    if (activeSwatchIndex === 0) return;
+    setCurrentColor(event.target.value);
+  });
+
+  swatchEditor?.addEventListener('input', event => {
+    if (activeSwatchIndex === 0) return;
+    const next = event.target.value;
+    setCurrentColor(next);
+  });
+
+  btnExport?.addEventListener('click', () => {
+    const targetSize = 640;
+    const temp = document.createElement('canvas');
+    temp.width = targetSize;
+    temp.height = targetSize;
+    const tctx = temp.getContext('2d');
+    if (!tctx) return;
+    tctx.imageSmoothingEnabled = false;
+
+    // 元サイズでジェリン＋描画を合成
+    const composite = document.createElement('canvas');
+    composite.width = canvasSize;
+    composite.height = canvasSize;
+    const cctx = composite.getContext('2d', { willReadFrequently: true });
+    if (!cctx) return;
+    cctx.imageSmoothingEnabled = false;
+    // ジェリンレイヤーを先に
+    if (jelinMode && jelInImageLoaded) {
+      const source = jelInImageBitmap || jelInImage;
+      if (source) {
+        cctx.drawImage(source, 0, 0, canvasSize, canvasSize);
+      }
+    }
+    // 描画レイヤー（メインキャンバスのImageData）
+    const srcCanvas = document.createElement('canvas');
+    srcCanvas.width = canvasSize;
+    srcCanvas.height = canvasSize;
+    const sctx = srcCanvas.getContext('2d', { willReadFrequently: true });
+    if (!sctx) return;
+    sctx.putImageData(imageData, 0, 0);
+    cctx.drawImage(srcCanvas, 0, 0, canvasSize, canvasSize);
+
+    // 640pxへ拡大
+    tctx.drawImage(composite, 0, 0, targetSize, targetSize);
+      const url = temp.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `pixieedrawlite-${canvasSize}px@640.png`;
+      link.click();
+  });
+
+  initPalette();
+  setCurrentColor(palette[activeSwatchIndex], { updatePalette: false });
+  applyCanvasSize(canvasSize);
+  setJelinMode(false);
+  setDailyPrompt();
+  adsQueue.push({});
+
+  window.addEventListener('resize', resizeGridCanvas);
+
+  // テキスト選択・ドラッグ抑止（必要な入力は除外）
+  function isInputControl(node) {
+    return (
+      node instanceof HTMLInputElement ||
+      node instanceof HTMLTextAreaElement ||
+      (node instanceof HTMLElement && node.isContentEditable)
+    );
+  }
+  document.addEventListener(
+    'selectstart',
+    event => {
+      const target = event.target;
+      if (isInputControl(target)) return;
+      event.preventDefault();
+    },
+    { passive: false }
+  );
+  document.addEventListener('dragstart', event => {
+    if (event.target instanceof HTMLImageElement || event.target === canvas) {
+      event.preventDefault();
+    }
+  });
+})();
+</script>
+</body>
+</html>
