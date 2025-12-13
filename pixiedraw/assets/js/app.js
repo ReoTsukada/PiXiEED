@@ -255,17 +255,97 @@
   const IMPORT_FRAME_DURATION_MIN_MS = 16;
   const IMPORT_FRAME_DURATION_MAX_MS = 2000;
 
-  const PROJECT_FILE_EXTENSION = '.pixieedraw';
-  const DEFAULT_DOCUMENT_BASENAME = '新規ドキュメント';
-  const DEFAULT_DOCUMENT_NAME = `${DEFAULT_DOCUMENT_BASENAME}${PROJECT_FILE_EXTENSION}`;
   const DEFAULT_CANVAS_SIZE = 32;
   const MIN_CANVAS_SIZE = 1;
   const MAX_CANVAS_SIZE = 512;
+  const PROJECT_FILE_EXTENSION = '.pixieedraw';
+  const EMBED_CONFIG = parseEmbedConfig();
+  const DEFAULT_DOCUMENT_BASENAME = EMBED_CONFIG.documentName
+    ? String(EMBED_CONFIG.documentName).trim()
+    : '新規ドキュメント';
+  const DEFAULT_DOCUMENT_NAME = `${DEFAULT_DOCUMENT_BASENAME}${PROJECT_FILE_EXTENSION}`;
   const MAX_IMPORTED_PALETTE_COLORS = 256;
   const MAX_EXPORT_DIMENSION = 2000;
   const MAX_EXPORT_SCALE_OPTIONS = MAX_EXPORT_DIMENSION;
   const MAX_SELECTION_CANVAS_DIMENSION = 8192;
   const TARGET_EXPORT_OUTPUT_SIZE = 640;
+
+  function parseEmbedConfig() {
+    const raw =
+      typeof window !== 'undefined' &&
+      window.PIXIEEDRAW_EMBED_CONFIG &&
+      typeof window.PIXIEEDRAW_EMBED_CONFIG === 'object' &&
+      !Array.isArray(window.PIXIEEDRAW_EMBED_CONFIG)
+        ? { ...window.PIXIEEDRAW_EMBED_CONFIG }
+        : {};
+
+    let params = null;
+    try {
+      params = new URLSearchParams(window.location.search);
+    } catch (error) {
+      params = null;
+    }
+
+    const normalizeDim = value => {
+      const num = Math.round(Number(value));
+      return Number.isFinite(num) ? clamp(num, MIN_CANVAS_SIZE, MAX_CANVAS_SIZE) : null;
+    };
+
+    const setDim = (key, value) => {
+      const dim = normalizeDim(value);
+      if (dim !== null) {
+        raw[key] = dim;
+      }
+    };
+
+    if (params) {
+      const sizeParam = params.get('size');
+      if (sizeParam && /^\d+x\d+$/i.test(sizeParam)) {
+        const [w, h] = sizeParam.toLowerCase().split('x');
+        setDim('initialWidth', w);
+        setDim('initialHeight', h);
+      }
+      setDim('initialWidth', params.get('width') ?? params.get('w'));
+      setDim('initialHeight', params.get('height') ?? params.get('h'));
+      const lockParam = params.get('lockSize') ?? params.get('lockCanvas') ?? params.get('lock');
+      if (lockParam === '1' || lockParam === 'true') {
+        raw.lockCanvasSize = true;
+      }
+      const skipParam = params.get('skipStartup') ?? params.get('embed');
+      if (skipParam === '1' || skipParam === 'true') {
+        raw.skipStartup = true;
+      }
+      const nameParam = params.get('name') ?? params.get('title');
+      if (nameParam) {
+        raw.documentName = nameParam;
+      }
+    }
+
+    const normalizedWidth = normalizeDim(raw.initialWidth ?? raw.width);
+    const normalizedHeight = normalizeDim(raw.initialHeight ?? raw.height ?? normalizedWidth);
+
+    const normalized = {};
+    if (normalizedWidth !== null) {
+      normalized.initialWidth = normalizedWidth;
+    }
+    if (normalizedHeight !== null) {
+      normalized.initialHeight = normalizedHeight;
+    }
+    if (typeof raw.documentName === 'string') {
+      normalized.documentName = raw.documentName.trim();
+    }
+    if (raw.lockCanvasSize === 'true') {
+      normalized.lockCanvasSize = true;
+    } else if (typeof raw.lockCanvasSize === 'boolean') {
+      normalized.lockCanvasSize = raw.lockCanvasSize;
+    }
+    if (raw.skipStartup === 'true') {
+      normalized.skipStartup = true;
+    } else if (typeof raw.skipStartup === 'boolean') {
+      normalized.skipStartup = raw.skipStartup;
+    }
+    return normalized;
+  }
 
   const layoutMap = {
     tools: { desktop: dom.leftTabPanes || dom.leftRail, mobile: dom.mobilePanels.tools },
@@ -450,7 +530,13 @@
   };
   const FLOATING_DRAW_BUTTON_SCALE_VALUES = [1, 1.5, 2];
   const DEFAULT_FLOATING_DRAW_BUTTON_SCALE = 2;
+  let lockedCanvasWidth = null;
+  let lockedCanvasHeight = null;
   const state = createInitialState();
+  if (EMBED_CONFIG.lockCanvasSize) {
+    lockedCanvasWidth = state.width;
+    lockedCanvasHeight = state.height;
+  }
   let virtualCursor = createInitialVirtualCursor(state);
   const virtualCursorControl = {
     pointerId: null,
@@ -563,13 +649,24 @@
   }
 
   function createInitialState(options = {}) {
+    const preferredWidth = EMBED_CONFIG.initialWidth ?? EMBED_CONFIG.width ?? DEFAULT_CANVAS_SIZE;
+    const preferredHeight =
+      EMBED_CONFIG.initialHeight ?? EMBED_CONFIG.height ?? EMBED_CONFIG.initialWidth ?? DEFAULT_CANVAS_SIZE;
     const {
-      width: requestedWidth = DEFAULT_CANVAS_SIZE,
-      height: requestedHeight = DEFAULT_CANVAS_SIZE,
+      width: requestedWidth = preferredWidth,
+      height: requestedHeight = preferredHeight,
       name: requestedName = DEFAULT_DOCUMENT_NAME,
     } = options || {};
-    const width = clamp(Math.round(Number(requestedWidth) || DEFAULT_CANVAS_SIZE), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
-    const height = clamp(Math.round(Number(requestedHeight) || DEFAULT_CANVAS_SIZE), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    const width = clamp(
+      Math.round(Number(requestedWidth) || preferredWidth || DEFAULT_CANVAS_SIZE),
+      MIN_CANVAS_SIZE,
+      MAX_CANVAS_SIZE
+    );
+    const height = clamp(
+      Math.round(Number(requestedHeight) || preferredHeight || DEFAULT_CANVAS_SIZE),
+      MIN_CANVAS_SIZE,
+      MAX_CANVAS_SIZE
+    );
     const palette = [
       { r: 0, g: 0, b: 0, a: 0 },
       { r: 20, g: 20, b: 20, a: 255 },
@@ -3883,8 +3980,8 @@
   }
 
   function createNewProject({ name, width, height }) {
-    const widthNumber = Number(width);
-    const heightNumber = Number(height);
+    const widthNumber = lockedCanvasWidth !== null ? lockedCanvasWidth : Number(width);
+    const heightNumber = lockedCanvasHeight !== null ? lockedCanvasHeight : Number(height);
     if (!Number.isFinite(widthNumber) || !Number.isFinite(heightNumber)) {
       return false;
     }
@@ -6623,8 +6720,43 @@
     };
   }
 
+  // Keep the entire canvas visible when the zoom level is at the minimum (100%).
+  function clampPanToViewportAtMinZoom() {
+    const viewport = dom.canvasViewport;
+    const stack = dom.canvases.stack;
+    const scale = Number(state.scale) || MIN_ZOOM_SCALE;
+    if (!viewport || !stack) return;
+    if (Math.abs(scale - MIN_ZOOM_SCALE) > ZOOM_EPSILON) return;
+    const viewportRect = viewport.getBoundingClientRect();
+    const stackRect = stack.getBoundingClientRect();
+    if (viewportRect.width <= 0 || viewportRect.height <= 0 || stackRect.width <= 0 || stackRect.height <= 0) {
+      return;
+    }
+    let panAdjusted = false;
+    if (stackRect.width <= viewportRect.width) {
+      const horizontalLimit = (viewportRect.width - stackRect.width) / 2;
+      const clampedX = clamp(Number(state.pan.x) || 0, -horizontalLimit, horizontalLimit);
+      if (clampedX !== state.pan.x) {
+        state.pan.x = clampedX;
+        panAdjusted = true;
+      }
+    }
+    if (stackRect.height <= viewportRect.height) {
+      const verticalLimit = (viewportRect.height - stackRect.height) / 2;
+      const clampedY = clamp(Number(state.pan.y) || 0, -verticalLimit, verticalLimit);
+      if (clampedY !== state.pan.y) {
+        state.pan.y = clampedY;
+        panAdjusted = true;
+      }
+    }
+    if (panAdjusted) {
+      scheduleSessionPersist();
+    }
+  }
+
   function applyViewportTransform() {
     if (!dom.canvases.stack) return;
+    clampPanToViewportAtMinZoom();
     const panX = Math.round(Number(state.pan.x) || 0);
     const panY = Math.round(Number(state.pan.y) || 0);
     if (panX !== state.pan.x) {
@@ -6952,12 +7084,13 @@
     initMemoryMonitor();
     updateDocumentMetadata();
     setupStartupScreen();
-    if (lensImportRequested) {
+    const skipStartup = EMBED_CONFIG.skipStartup === true;
+    if (lensImportRequested || skipStartup) {
       hideStartupScreen();
     }
     const importedFromLens = await maybeImportLensCapture();
     renderEverything();
-    if (!lensImportRequested && !importedFromLens) {
+    if (!lensImportRequested && !importedFromLens && !skipStartup) {
       showStartupScreen();
     }
   }
@@ -7364,9 +7497,46 @@
     setupNumberSteppers();
     syncControlsWithState();
     updateSpriteScaleControlLimits();
+    applyEmbedGuardrails();
+  }
+
+  function applyEmbedGuardrails() {
+    const lockWidth = lockedCanvasWidth !== null;
+    const lockHeight = lockedCanvasHeight !== null;
+    if (lockWidth && dom.controls.canvasWidth) {
+      dom.controls.canvasWidth.value = String(lockedCanvasWidth);
+      dom.controls.canvasWidth.setAttribute('disabled', 'true');
+      dom.controls.canvasWidth.setAttribute('aria-disabled', 'true');
+    }
+    if (lockHeight && dom.controls.canvasHeight) {
+      dom.controls.canvasHeight.value = String(lockedCanvasHeight);
+      dom.controls.canvasHeight.setAttribute('disabled', 'true');
+      dom.controls.canvasHeight.setAttribute('aria-disabled', 'true');
+    }
+    if (lockWidth && dom.newProject?.widthInput) {
+      dom.newProject.widthInput.value = String(lockedCanvasWidth);
+      dom.newProject.widthInput.readOnly = true;
+      dom.newProject.widthInput.setAttribute('aria-readonly', 'true');
+      dom.newProject.widthInput.title = 'キャンバスは固定サイズで利用中';
+    }
+    if (lockHeight && dom.newProject?.heightInput) {
+      dom.newProject.heightInput.value = String(lockedCanvasHeight);
+      dom.newProject.heightInput.readOnly = true;
+      dom.newProject.heightInput.setAttribute('aria-readonly', 'true');
+      dom.newProject.heightInput.title = 'キャンバスは固定サイズで利用中';
+    }
   }
 
   function handleCanvasResizeRequest() {
+    if (lockedCanvasWidth !== null || lockedCanvasHeight !== null) {
+      if (dom.controls.canvasWidth) {
+        dom.controls.canvasWidth.value = String(state.width);
+      }
+      if (dom.controls.canvasHeight) {
+        dom.controls.canvasHeight.value = String(state.height);
+      }
+      return;
+    }
     const width = clamp(Number(dom.controls.canvasWidth.value), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE) || state.width;
     const height = clamp(Number(dom.controls.canvasHeight.value), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE) || state.height;
     if (width === state.width && height === state.height) {
