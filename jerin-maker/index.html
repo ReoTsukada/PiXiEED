@@ -266,26 +266,24 @@
     .panel { max-height: calc(100vh - 110px); gap: 10px; }
     .app { gap: clamp(10px, 2vw, 16px); }
   }
-  .topbar-banner {
+  .top-banner {
     width: 100%;
-    max-width: 900px;
-    height: 60px;
+    max-width: 100%;
     display: flex;
     justify-content: center;
-    align-items: center;
-    margin: 0 auto;
+    margin-bottom: 8px;
   }
 </style>
 </head>
 <body>
+<div class="top-banner">
+  <ins class="adsbygoogle"
+       style="display:block;width:100%;max-width:900px;height:60px;"
+       data-ad-client="ca-pub-9801602250480253"
+       data-ad-slot="2141591954"></ins>
+</div>
 <div class="shell">
   <header class="topbar">
-    <div class="topbar-banner">
-      <ins class="adsbygoogle"
-           style="display:block;width:100%;max-width:900px;height:60px;"
-           data-ad-client="ca-pub-9801602250480253"
-           data-ad-slot="2141591954"></ins>
-    </div>
     <div class="ad-slot">
       <ins class="adsbygoogle"
            style="display:block"
@@ -1303,6 +1301,7 @@
   applyCanvasSize(canvasSize);
   setJelinMode(false);
   setDailyPrompt();
+  (window.adsbygoogle = window.adsbygoogle || []).push({});
   adsQueue.push({});
 
   window.addEventListener('resize', resizeGridCanvas);
