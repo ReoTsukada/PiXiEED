@@ -55,20 +55,18 @@
       min-height: calc(100dvh - (var(--pad) + var(--safe-top)) - (var(--pad) + var(--safe-bottom)));
     }
   }
-  .topbar {
+  .topbar { display: none; }
+  .footer {
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: center;
-    background: transparent;
-    border: 0;
-    padding: 10px 0;
-    gap: 12px;
+    padding: 8px 0;
   }
   .ad-slot {
     flex: 0 0 auto;
-    width: 320px;
-    max-width: 100%;
-    height: 50px;
+    width: 100%;
+    max-width: 900px;
+    height: 60px;
     border-radius: 10px;
     overflow: hidden;
     background: transparent;
@@ -77,29 +75,42 @@
     align-items: center;
     justify-content: center;
   }
-  .ad-slot ins {
-    display: block;
-    width: 100%;
-    height: 100%;
-  }
+  .ad-slot ins { display: block; width: 100%; height: 100%; }
   .app {
     width: 100%;
     background: transparent;
     border: 0;
     padding: 0;
-    display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(260px, 360px);
-    gap: clamp(16px, 3vw, 24px);
+    display: flex;
+    flex-direction: column;
+    gap: clamp(10px, 2vw, 16px);
     min-height: 0;
     overflow: hidden;
   }
+  .workspace {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(10px, 2vw, 14px);
+    min-height: 0;
+  }
+  @media (min-width: 960px), (orientation: landscape) {
+    .workspace {
+      flex-direction: row;
+      align-items: stretch;
+    }
+    .workspace > .canvas-wrap { flex: 1 1 0; }
+    .workspace > aside.panel { width: min(340px, 32vw); max-width: 360px; }
+  }
+  aside.panel { position: relative; }
   .canvas-wrap {
     display: flex;
     flex-direction: column;
     gap: 12px;
+    flex: 1 1 auto;
+    min-height: 0;
   }
   .canvas-frame {
-    padding: clamp(12px, 3vw, 20px);
+    padding: clamp(6px, 2vw, 12px);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -130,17 +141,15 @@
     border: 1px solid var(--line);
     z-index: 0;
   }
-  #jelinCanvas {
+  #tutorialOverlay { pointer-events: none; z-index: 3; }
+  #cutsceneOverlay {
     pointer-events: none;
-    z-index: 1;
+    z-index: 10;
+    mix-blend-mode: normal;
   }
+  #jelinCanvas { pointer-events: none; z-index: 1; }
   #canvas { background: transparent; z-index: 2; }
-  #gridCanvas {
-    background: transparent;
-    border: 0;
-    pointer-events: none;
-    z-index: 3;
-  }
+  #gridCanvas { background: transparent; border: 0; pointer-events: none; z-index: 5; }
   button {
     border: 1px solid var(--border);
     background: rgba(255, 255, 255, 0.06);
@@ -179,12 +188,96 @@
     background: transparent;
     border: 1px solid var(--line);
     border-radius: 12px;
-    padding: clamp(12px, 3vw, 16px);
+    padding: 6px;
+    display: grid;
+    grid-template-rows: repeat(4, auto);
+    gap: 6px;
+    max-height: calc(100vh - 160px);
+    overflow: hidden;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .maou-dialog {
+    position: fixed;
+    top: calc(var(--safe-top) + 8px);
+    right: calc(var(--safe-right) + 8px);
+    max-width: min(320px, 48vw);
+    background: rgba(13, 18, 36, 0.9);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: none;
+    gap: 8px;
+    z-index: 15;
+    pointer-events: auto;
+  }
+  .maou-dialog.is-active { display: flex; }
+  .maou-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #fff, #c0e7ff 60%, #7aa8ff 100%);
+    border: 2px solid #58c4ff;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    color: #0d1224;
+  }
+  .maou-body {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    max-height: calc(100vh - 140px);
-    overflow: auto;
+    gap: 6px;
+    min-width: 0;
+  }
+  .maou-name { font-weight: 700; color: var(--accent); }
+  .maou-text { font-size: 0.9rem; line-height: 1.4; }
+  .maou-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .maou-actions button {
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,0.08);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .maou-overlay { display: none; }
+  .maou-overlay.is-active { display: none; }
+  .maou-box { display: none; }
+  .maou-lines { display: none; }
+  .maou-cta { display: none; }
+  .cutscene {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(13, 18, 36, 0.9);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px;
+    z-index: 5;
+  }
+  .cutscene.is-active { display: flex; }
+  .cutscene-box {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    align-items: center;
+    width: min(98%, 540px);
+  }
+  .cutscene-img {
+    width: 104px;
+    height: 104px;
+    object-fit: contain;
+    display: block;
+  }
+  .cutscene-text {
+    font-size: clamp(1.15rem, 3vw, 1.4rem);
+    font-weight: 800;
+    line-height: 1.45;
+    white-space: pre-line;
+    overflow: visible;
   }
   .row {
     display: flex;
@@ -194,19 +287,239 @@
   }
   .palette {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 2px;
+    margin: 0;
+  }
+.palette-wrap { position: relative; }
+  .lite-color-picker-overlay {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: stretch;
+    justify-content: stretch;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 5;
+    padding: 0;
+  }
+  .lite-color-picker-overlay.is-active { display: flex; }
+  .lite-color-picker-card {
+    background: #0f1425;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 6px;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  }
+  .lite-color-content {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 10px;
+    overflow: hidden;
+    min-height: 0;
+    height: 100%;
+  }
+  .lite-color-side {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+    flex: 1 1 0;
+    min-width: 180px;
+    height: 100%;
+  }
+  .lite-left { display: none; }
+  .lite-color-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     gap: 8px;
+    font-weight: 700;
+  }
+  .lite-color-header .icon-btn.small {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+  }
+  .lite-color-wheel-wrap {
+    position: relative;
+    width: 160px;
+    aspect-ratio: 1;
+    min-height: 140px;
+    max-height: 180px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #0b0f1f;
+    border: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+  #liteColorWheel {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .lite-color-wheel-cursor {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(0,0,0,0.4);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+  }
+  .lite-color-slider {
+    display: grid;
+    grid-template-columns: 54px 1fr;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    width: 100%;
+    min-height: 48px;
+    flex: 0 0 auto;
+  }
+  #liteValueSlider {
+    width: 100%;
+    accent-color: var(--accent);
+  }
+  .lite-canvas-preview {
+    margin-top: 4px;
+    display: grid;
+    gap: 4px;
+    flex-shrink: 1;
+    width: 100%;
+  }
+#liteCanvasPreview {
+    width: min(100%, 180px);
+    max-width: clamp(120px, 45vw, 180px);
+    max-height: clamp(120px, 45vw, 180px);
+    aspect-ratio: 1;
+    image-rendering: pixelated;
+    background: repeating-conic-gradient(#1b2235 0% 25%, #0d1224 0% 50%) 0 0/12px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    display: block;
+  }
+  .lite-color-previews {
+    display: none;
+  }
+  .lite-preview-block {
+    display: grid;
+    gap: 2px;
+    font-size: 0.8rem;
+  }
+  .lite-preview {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    min-height: clamp(28px, 10vw, 44px);
+    background: repeating-conic-gradient(#1b2235 0% 25%, #0d1224 0% 50%) 0 0/12px 12px;
+    position: relative;
+    overflow: hidden;
+  }
+  .lite-preview.is-new { box-shadow: 0 0 0 1px var(--accent); }
+  .lite-preview::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+  /* 縦画面: ホイール左 / 右側にスライダー＋ボタンを縦積み（ボタンは横並び） */
+  @media (orientation: portrait) {
+    .lite-color-content {
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 10px;
+      justify-content: space-between;
+    }
+    .lite-color-wheel-wrap {
+      max-width: 180px;
+      max-height: 180px;
+      min-height: 140px;
+      flex-shrink: 0;
+    }
+    .lite-color-side { min-width: 180px; }
+    .lite-color-slider {
+      width: 100%;
+      grid-template-columns: 54px 1fr;
+      min-height: 48px;
+      flex: 0 0 auto;
+    }
+    .lite-color-actions {
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+      justify-content: flex-end;
+      width: 100%;
+      flex: 0 0 auto;
+      margin-top: auto;
+    }
+  }
+  .lite-color-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: auto;
+    align-self: stretch;
+  }
+  .lite-color-actions button {
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,0.08);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .lite-color-actions .primary {
+    background: var(--accent);
+    color: #0b0f1f;
+    border-color: var(--accent);
+    font-weight: 700;
   }
   .prompt {
     border: 1px solid var(--line);
     border-radius: 10px;
-    padding: 10px 12px;
+    padding: 6px 8px;
     background: rgba(255, 255, 255, 0.04);
     font-size: 0.9rem;
     line-height: 1.4;
     display: inline-flex;
     align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-height: 0;
+    flex-shrink: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .prompt .maou-inline {
+    display: inline-flex;
+    align-items: center;
     gap: 6px;
+  }
+  .prompt .maou-chip {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--accent);
+    background: #0b0f1f;
+    display: block;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .prompt .maou-chip img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
   }
   .prompt-title {
     font-weight: 700;
@@ -236,6 +549,10 @@
     padding-left: 16px;
   }
   .tutorial-steps li { margin: 2px 0; }
+  .tutorial-progress {
+    font-weight: 700;
+    color: var(--accent);
+  }
   .tutorial-actions {
     display: flex;
     gap: 8px;
@@ -257,19 +574,30 @@
     border-radius: 12px;
     border: 2px solid rgba(255, 255, 255, 0.22);
     cursor: pointer;
+    position: relative;
+    overflow: hidden;
   }
   .swatch.is-active {
     border-color: var(--accent);
     box-shadow: 0 0 0 2px rgba(88, 196, 255, 0.35);
   }
+  .swatch.is-hint {
+    box-shadow: 0 0 0 2px rgba(255, 192, 80, 0.8);
+    animation: pulse 0.6s ease-in-out 0s 2;
+  }
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
   .swatch--transparent {
-    background-color: #cfcfcf;
+    background-color: #dcdcdc;
     background-image:
-      linear-gradient(45deg, #ffffff 25%, transparent 25%, transparent 75%, #ffffff 75%, #ffffff),
-      linear-gradient(45deg, #ffffff 25%, transparent 25%, transparent 75%, #ffffff 75%, #ffffff);
+      linear-gradient(45deg, #f5f5f5 25%, transparent 25%, transparent 75%, #f5f5f5 75%),
+      linear-gradient(45deg, #f5f5f5 25%, #c4c4c4 25%, #c4c4c4 75%, #f5f5f5 75%);
     background-size: 10px 10px;
     background-position: 0 0, 5px 5px;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4) inset;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35) inset;
   }
   .inline-buttons {
     display: flex;
@@ -297,10 +625,23 @@
     .panel { max-height: none; }
   }
   @media (max-height: 720px) {
-    .canvas-stack { --canvas-size: min(78vw, min(48vh, 460px)); }
+    .canvas-stack { --canvas-size: min(78vw, min(46vh, 460px)); }
     .canvas-frame { padding: 8px; }
-    .panel { max-height: calc(100vh - 110px); gap: 10px; }
-    .app { gap: clamp(10px, 2vw, 16px); }
+    .panel { max-height: calc(100vh - 140px); gap: 8px; }
+    .app { gap: clamp(8px, 2vw, 12px); }
+    .prompt { font-size: 0.82rem; padding: 8px 10px; }
+  }
+  @media (max-height: 620px) {
+    :root { --pad: clamp(6px, 1.5vw, 10px); }
+    .canvas-stack { --canvas-size: min(70vw, min(38vh, 340px)); }
+    .panel { max-height: calc(100vh - 170px); gap: 6px; }
+    .prompt { font-size: 0.76rem; padding: 6px 8px; }
+    .footer { padding: 4px 0; }
+  }
+  @media (min-height: 900px) and (orientation: portrait) {
+    .canvas-stack { --canvas-size: min(86vw, min(64vh, 560px)); }
+    .app { gap: clamp(12px, 2.5vw, 18px); }
+    .panel { max-height: calc(100vh - 180px); }
   }
   .topbar {
     display: flex;
@@ -327,46 +668,102 @@
 </head>
 <body>
 <div class="shell">
-  <header class="topbar">
-    <div class="ad-slot">
-      <ins class="adsbygoogle"
-           style="display:block"
-           data-ad-client="ca-pub-9801602250480253"
-           data-ad-slot="2141591954"></ins>
+<div class="app">
+  <div class="prompt" id="dailyPrompt">
+    <span class="prompt-title" id="promptTitle">今日のお題：</span>
+    <span class="prompt-body" id="promptBody">読み込み中...</span>
+    <span class="maou-inline" id="maouInline" aria-live="polite" style="display:none">
+      <span class="maou-chip"><img src="./魔王1.png" alt="魔王さま"/></span>
+      <span id="maouInlineText"></span>
+    </span>
+  </div>
+  <div class="workspace">
+    <div class="canvas-wrap">
+      <div class="canvas-frame">
+        <div class="canvas-stack">
+          <canvas aria-hidden="true" class="canvas-base" height="16" id="bgCanvas" width="16"></canvas>
+          <canvas aria-hidden="true" class="tutorial-overlay" height="16" id="tutorialOverlay" width="16"></canvas>
+          <canvas aria-hidden="true" class="cutscene-overlay" height="16" id="cutsceneOverlay" width="16"></canvas>
+          <canvas aria-hidden="true" class="jelin-overlay" height="16" id="jelinCanvas" width="16"></canvas>
+          <canvas aria-label="16×16のドットキャンバス" height="16" id="canvas" width="16"></canvas>
+          <canvas aria-hidden="true" height="16" id="gridCanvas" width="16"></canvas>
+        </div>
+      </div>
     </div>
-  </header>
-  <div class="app">
-  <div class="canvas-wrap">
-    <div class="canvas-frame">
-      <div class="canvas-stack">
-        <canvas aria-hidden="true" class="canvas-base" height="16" id="bgCanvas" width="16"></canvas>
-        <canvas aria-hidden="true" class="jelin-overlay" height="16" id="jelinCanvas" width="16"></canvas>
-        <canvas aria-label="16×16のドットキャンバス" height="16" id="canvas" width="16"></canvas>
-        <canvas aria-hidden="true" height="16" id="gridCanvas" width="16"></canvas>
+    <aside class="panel">
+      <div class="row">
+        <input aria-label="色を選択" id="colorPicker" type="color" value="#58c4ff"/>
+          <div class="inline-buttons">
+            <button class="icon-btn" id="btnCycleSize" title="キャンバスサイズを切り替え (8px / 16px / 32px)" type="button">16px</button>
+            <button class="icon-btn" id="btnJelinMode" title="スカイジェリンをプレビューする" type="button">
+              <img alt="ジェリンモード" src="./JELLNALL1.svg"/>
+            </button>
+            <button class="icon-btn" id="btnUndo" title="一つ戻す" type="button">Undo</button>
+            <button class="icon-btn" id="btnRedo" title="やり直す" type="button">Redo</button>
+            <button class="icon-btn" id="btnTutorialRestart" title="チュートリアルを最初から (ハテナ)" type="button">?</button>
+            <button class="icon-btn" id="btnExport" title="PNGを書き出す" type="button">
+              <img alt="書き出し" src="../pixiedraw/assets/icons/action-export.svg"/>
+            </button>
+          </div>
+      </div>
+      <div class="palette-wrap">
+        <div class="palette" id="palette"></div>
+      </div>
+      <input aria-hidden="true" class="swatch-editor" id="swatchEditor" tabindex="-1" type="color" />
+      <div class="lite-color-picker-overlay" id="liteColorPicker" aria-hidden="true">
+        <div class="lite-color-picker-card">
+          <div class="lite-color-content">
+            <div class="lite-color-wheel-wrap">
+              <canvas id="liteColorWheel" width="180" height="180"></canvas>
+              <div class="lite-color-wheel-cursor" id="liteColorWheelCursor"></div>
+            </div>
+            <div class="lite-color-side">
+              <div class="lite-color-slider">
+                <label for="liteValueSlider">明るさ</label>
+                <input type="range" id="liteValueSlider" min="0" max="100" value="100" />
+              </div>
+              <div class="lite-color-actions">
+                <button type="button" id="liteColorCancel">キャンセル</button>
+                <button type="button" id="liteColorApply" class="primary">決定</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cutscene" id="cutscene">
+        <div class="cutscene-box">
+          <img src="./魔王1.png" alt="魔王さま" class="cutscene-img"/>
+          <div class="cutscene-text" id="cutsceneText">・・・</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+  <div class="maou-dialog" id="maouDialog" aria-live="polite">
+    <div class="maou-avatar">魔</div>
+    <div class="maou-body">
+      <div class="maou-name">魔王さま</div>
+      <div class="maou-text" id="maouText">準備中…</div>
+      <div class="maou-actions">
+        <button type="button" id="btnMaouStart">描き始める</button>
       </div>
     </div>
   </div>
-  <aside class="panel">
-    <div class="row">
-      <input aria-label="色を選択" id="colorPicker" type="color" value="#58c4ff"/>
-        <div class="inline-buttons">
-          <button class="icon-btn" id="btnCycleSize" title="キャンバスサイズを切り替え (8px / 16px / 32px)" type="button">16px</button>
-          <button class="icon-btn" id="btnJelinMode" title="スカイジェリンをプレビューする" type="button">
-            <img alt="ジェリンモード" src="./JELLNALL1.svg"/>
-          </button>
-          <button class="icon-btn" id="btnExport" title="PNGを書き出す" type="button">
-            <img alt="書き出し" src="../pixiedraw/assets/icons/action-export.svg"/>
-          </button>
-        </div>
+  <div class="maou-overlay" id="maouOverlay">
+    <div class="maou-box">
+      <img src="./魔王1.png" alt="魔王さま"/>
+      <div class="maou-lines" id="maouOverlayText"></div>
+      <div class="maou-cta">タップで進む</div>
     </div>
-    <div class="prompt" id="dailyPrompt">
-      <span class="prompt-title">今日のお題：</span>
-      <span class="prompt-body">読み込み中...</span>
-    </div>
-    <div class="palette" id="palette"></div>
-    <input aria-hidden="true" class="swatch-editor" id="swatchEditor" tabindex="-1" type="color" />
-  </aside>
-</div>
+  </div>
+<footer class="footer">
+  <div class="ad-slot">
+    <ins class="adsbygoogle"
+         style="display:block"
+         data-ad-client="ca-pub-9801602250480253"
+         data-ad-slot="2141591954"></ins>
+  </div>
+</footer>
 <script>
 (() => {
   const CANVAS_SIZES = [8, 16, 32];
@@ -376,24 +773,85 @@
   const ctx = canvas?.getContext('2d', { willReadFrequently: true });
   if (!canvas || !ctx) return;
 
-  const palette = [
+  const PALETTE_KEY = 'pixieedrawlite_palette_v1';
+  const DEFAULT_PALETTE = [
     'transparent',
     '#58c4ff',
     '#ffffff',
     '#141414',
+    '#684428',
+    '#727e24',
+    '#6d8b29',
+    '#77972e',
+    '#81a62e',
+    '#7db436',
+    '#6bc6df',
     '#ffd966',
     '#ff96a0',
     '#8a7fff',
     '#00d4aa',
-    '#ffa500',
     '#4fd1c5',
-    '#f472b6',
-    '#fbbf24',
-    '#c084fc',
-    '#38bdf8',
-    '#fb7185',
-    '#94a3b8',
   ];
+  let palette = [...DEFAULT_PALETTE];
+  const TUTORIAL_RED = '#ff2c00';
+  const TUTORIAL_COLORS = [
+    '#ff2c00', // step0
+    '#ff2c00', // step1
+    '#bc1329', // step2
+    ['#ffb790', '#727e24'], // step3 (2色使用)
+    '#000000', // step4 (0005)
+    '#000000', // step5 (0006)
+  ];
+  const MAOU_INTRO_LINES = [
+    'おやおや？',
+    'わしが魔王様じゃ\nドット絵に興味があるのか？',
+    'よっしゃ！わしがドット絵について\nマスターさせちゃるぞ',
+    'まずはリンゴを書いてみい',
+    '色は用意してある'
+  ];
+  const MAOU_CUTSCENE_LINES = [
+    '今の点でもれっきとしたりんごになる。',
+    'ほれ、見てみい',
+    'これがドット絵の醍醐味じゃ。',
+    '何をどのように見せたいのかで',
+    'もののサイズが変わるんじゃ。',
+    'でも今回はもう少し大きいリンゴを',
+    '打っていくぞい！！'
+  ];
+  const MAOU_LINES = [
+    'まずは中央に小さなドットを置いてみよ。',
+    '今度は形を広げて大きくしてみるのだ。',
+    'この色で深みを足してみよ。',
+    '2色を使い分けて彩りを付けるがよい。',
+    '仕上げだ。焦らず整えてくれ。',
+  ];
+  const MAOU_ENDING_LINES = [
+    'おおお！素晴らしい！！\n立派なリンゴの完成じゃ！！',
+    'どうじゃ？楽しいじゃろう？',
+    'ドット絵は○○っぽい\n絵を描けばいいんじゃ',
+    '例えば',
+    'リンゴを描こうとした時に',
+    'ちゃんとリンゴの形をかけなくても',
+    'リンゴに見えればいいのじゃ',
+    '使う色も形も大きさも自由なのじゃ',
+    'このサイトでは毎日違うお題が\nランダムで出される',
+    'あ！！！！ちなみに色の変更は\nパレットを長押しすると\n色変更ができるぞ！',
+    'では、わしは左上で見とるから',
+    '好きな様にドットを打って\n毎日見せてくれ！'
+  ];
+  const tutorialState = {
+    active: false,
+    step: 0,
+    basePalette: null,
+    required: new Set(),
+    hits: new Set(),
+    currentSprite: null,
+    currentOverlay: null,
+    requiredColors: new Map(),
+  };
+  const tutorialSprites = [];
+  let tutorialPaletteSet = new Set();
+  let tutorialSpritesLoaded = false;
   let activeSwatchIndex = 1;
   let currentColor = palette[activeSwatchIndex];
   let drawing = false;
@@ -401,6 +859,24 @@
   let showGrid = true;
   let lastTouchEnd = 0;
   let jelinMode = false;
+  let cutsceneActive = false;
+  let liteColorPickerState = { index: null, hsv: { h: 0, s: 0, v: 1 }, originalHex: '#ffffff' };
+  let liteColorWheelCtx = null;
+  let liteCanvasOriginalData = null;
+  let liteCanvasSnapshot = null;
+  let litePreviewUndoState = null;
+  let liteLastPreviewHex = null;
+  const undoStack = [];
+  const redoStack = [];
+  const MAX_UNDO = 30;
+  let tutorialOverlayCanvas = null;
+  let tutorialOverlayCtx = null;
+  let tutorialOverlayAlpha = 0.7;
+  let cutsceneOverlayAlpha = 1;
+  let cutsceneSprite0Image = null;
+  let cutsceneOverlayImage = null;
+  let endingCutscenePlayed = false;
+  let sprite0FadeFrame = null;
   const dailyPrompts = [
     // 花・植物
     'バラ',
@@ -924,15 +1400,44 @@
   const btnExport = document.getElementById('btnExport');
   const btnCycleSize = document.getElementById('btnCycleSize');
   const btnJelinMode = document.getElementById('btnJelinMode');
+  const btnUndo = document.getElementById('btnUndo');
+  const btnRedo = document.getElementById('btnRedo');
   const swatchEditor = /** @type {HTMLInputElement|null} */ (document.getElementById('swatchEditor'));
+  const liteColorPicker = document.getElementById('liteColorPicker');
+  const liteColorWheel = /** @type {HTMLCanvasElement|null} */ (document.getElementById('liteColorWheel'));
+  const liteColorWheelCursor = document.getElementById('liteColorWheelCursor');
+  const liteValueSlider = /** @type {HTMLInputElement|null} */ (document.getElementById('liteValueSlider'));
+  const liteColorPreview = document.getElementById('liteColorPreview');
+  const liteColorPreviewOrig = document.getElementById('liteColorPreviewOrig');
+  const liteColorApply = document.getElementById('liteColorApply');
+  const liteColorCancel = document.getElementById('liteColorCancel');
+  const liteColorClose = document.getElementById('liteColorClose');
+  const liteCanvasPreview = /** @type {HTMLCanvasElement|null} */ (document.getElementById('liteCanvasPreview'));
+  const liteCanvasPreviewCtx = liteCanvasPreview?.getContext('2d', { willReadFrequently: true }) || null;
   const dailyPromptEl = document.getElementById('dailyPrompt');
-  const dailyPromptBody = dailyPromptEl?.querySelector('.prompt-body');
+  const dailyPromptBody = document.getElementById('promptBody');
+  const dailyPromptTitle = document.getElementById('promptTitle');
   const gridCanvas = /** @type {HTMLCanvasElement|null} */ (document.getElementById('gridCanvas'));
   const gridCtx = gridCanvas?.getContext('2d', { willReadFrequently: true }) || null;
   const bgCanvas = /** @type {HTMLCanvasElement|null} */ (document.getElementById('bgCanvas'));
   const bgCtx = bgCanvas?.getContext('2d', { willReadFrequently: true }) || null;
   const jelinCanvas = /** @type {HTMLCanvasElement|null} */ (document.getElementById('jelinCanvas'));
   const jelinCtx = jelinCanvas?.getContext('2d', { willReadFrequently: true }) || null;
+  tutorialOverlayCanvas = /** @type {HTMLCanvasElement|null} */ (document.getElementById('tutorialOverlay'));
+  tutorialOverlayCtx = tutorialOverlayCanvas?.getContext('2d', { willReadFrequently: true }) || null;
+  const cutsceneOverlayCanvas = /** @type {HTMLCanvasElement|null} */ (document.getElementById('cutsceneOverlay'));
+  const cutsceneOverlayCtx = cutsceneOverlayCanvas?.getContext('2d', { willReadFrequently: true }) || null;
+  const tutorialCard = null;
+  const tutorialModal = null;
+  const maouDialog = document.getElementById('maouDialog');
+  const maouText = document.getElementById('maouText');
+  const maouInline = document.getElementById('maouInline');
+  const maouInlineText = document.getElementById('maouInlineText');
+  const btnMaouStart = document.getElementById('btnMaouStart');
+  const tutorialDoneBtn = document.getElementById('btnTutorialDone');
+  const tutorialRestartBtn = document.getElementById('btnTutorialRestart');
+  const cutsceneEl = document.getElementById('cutscene');
+  const cutsceneText = document.getElementById('cutsceneText');
   const adsQueue = window.adsbygoogle || [];
   const JELIN_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAQRJREFUOI3tkjFLA0EQhb89L8LBHZxFmq3sAoKQTgj4A6yutrT0F6W0s7cKgl2CcF2qgJ0gbJPCg12InCFjIXe5jWsg1k45s9/beY+B/1KBnhzC7AqIyJafORzA3K5TgIWF8aDncSoEzxzu3qxTU23FltUGY1ZcjVJPJArBc+vDAP08QuuEybPj9uWztRp3HzXw01s4hn4eAcmPQGRqxQOX1WaPwHfpXDEe9FoLLCx74d9mEZ2U/1JtBqYSHi6OveHp3TsArzcnXr8oa86yzgbN+qPHDwCmVtzuT02vKGt0rhhmsaNzB1KUdevRmFVwXa0Trs+PGGaxu8xUCijvkA60rwC+AHX1dn623PVvAAAAAElFTkSuQmCC';
   const jelInImage = new Image();
@@ -1017,9 +1522,124 @@
   function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
   }
+  function hexToRgb(hex) {
+    const normalized = hex.replace('#', '');
+    const chunk = normalized.length === 3 ? normalized.split('').map(c => c + c).join('') : normalized;
+    const value = parseInt(chunk, 16);
+    return { r: (value >> 16) & 255, g: (value >> 8) & 255, b: value & 255 };
+  }
+  function rgbToHex({ r, g, b }) {
+    const toHex = v => v.toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  }
+  function rgbToHsv(r, g, b) {
+    const rp = r / 255;
+    const gp = g / 255;
+    const bp = b / 255;
+    const cMax = Math.max(rp, gp, bp);
+    const cMin = Math.min(rp, gp, bp);
+    const delta = cMax - cMin;
+    let h = 0;
+    if (delta !== 0) {
+      if (cMax === rp) h = 60 * (((gp - bp) / delta) % 6);
+      else if (cMax === gp) h = 60 * (((bp - rp) / delta) + 2);
+      else h = 60 * (((rp - gp) / delta) + 4);
+    }
+    if (h < 0) h += 360;
+    const s = cMax === 0 ? 0 : delta / cMax;
+    const v = cMax;
+    return { h, s, v };
+  }
+  function hsvToRgb(h, s, v) {
+    const c = v * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = v - c;
+    let rp = 0, gp = 0, bp = 0;
+    if (h >= 0 && h < 60) { rp = c; gp = x; bp = 0; }
+    else if (h >= 60 && h < 120) { rp = x; gp = c; bp = 0; }
+    else if (h >= 120 && h < 180) { rp = 0; gp = c; bp = x; }
+    else if (h >= 180 && h < 240) { rp = 0; gp = x; bp = c; }
+    else if (h >= 240 && h < 300) { rp = x; gp = 0; bp = c; }
+    else { rp = c; gp = 0; bp = x; }
+    return {
+      r: Math.round((rp + m) * 255),
+      g: Math.round((gp + m) * 255),
+      b: Math.round((bp + m) * 255),
+    };
+  }
+  function hexToHsv(hex) {
+    const { r, g, b } = hexToRgb(hex);
+    return rgbToHsv(r, g, b);
+  }
+
+  const TUTORIAL_KEY = 'pixieedrawlite_tutorial_done';
+  const TUTORIAL_RESET_MIGRATION = 'pixieedrawlite_tutorial_reset_force';
+  let tutorialForceStart = false;
+  const CUTSCENE_SPRITE0_SRC = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAAXNSR0IArs4c6QAAAJVJREFUGJV9jjEKwkAURF/CCiJBO6+RA3gBEWTxHF7EC3iQNDb26WNlpxCCjc3G5bNmJbGQVWPhg4GBGZiJ1vmp4w8qmOlZ8xgPAWhKh00zAOLvUNWOpnQAJIX+FABU7RADo8lLgRjAHAUxsNkeEAPXyuMvAkAUTiaFRqxncPMA3Of7/oRNM9rZDsnVO+wVflktFwA8AdPSOANHImkJAAAAAElFTkSuQmCC';
+  const TUTORIAL_SPRITE_DATAURLS = [
+    // レベル1〜6用（すべて8×8）
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAAXNSR0IArs4c6QAAABNJREFUGJVjYBhk4L8Ow/8BsBYA/2UCK+RDtDEAAAAASUVORK5CYII=', // 0001
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAAXNSR0IArs4c6QAAACdJREFUGJVjYCAAGGGM/zoM/1EkrkDkGLFJIitiImQF5QoIOpIgAABTigkKOZkPfQAAAABJRU5ErkJggg==', // 0002
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAAXNSR0IArs4c6QAAAFBJREFUGJVjYCAAGGGM/zoM/1EkrkDkmJAl9z7XZNj7XJOBgYGBYY+w5n8GBgYGFmRdzpLXMaxgwmYvzBS4CcgCOB0JsxMGXN5eZ8SqAx0AAPJxE5dzzI3YAAAAAElFTkSuQmCC', // 0003
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAAXNSR0IArs4c6QAAAGxJREFUGJVjYCAAGGGM/zoM/2Hs4iAVBgYGBoa+pjuMcMn/2yf83yOs+X+PsOb//zoM//cIa/5nYGBgYEI2znlJOoOz5HVMK5CNZ2BgYNj7XJOBgYGBweXtdUYWZAG8joTZCQMub68zYtWBDgA9BiDWPiqQLgAAAABJRU5ErkJggg==', // 0004
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAAXNSR0IArs4c6QAAAHJJREFUGJVtjz0RgDAUg79yOOjEztI7XIACTCAABwjgEIEHlqKjCzsTGsLET6HfmOTyXgwP4o8xl6nqUfu2BGActtuUlkneOnnrpAp56wQoe/fVc0ddhPjGtx5g3R0AzRHI30KK+0lv41BzhGhFaqYBOAHAhiTULbB9SwAAAABJRU5ErkJggg==', // 0005
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAAXNSR0IArs4c6QAAAINJREFUGJVjZECA/wyYgJERJvlfB8LIlNBg4LL6w8DAwMDQ13SHgQku2T2BYe9zTQbZ15oMvevuMAhv1IUYAVfgEAcx4sAiBgYGBoa9zzUZXN5eZ2CB2waVgEnCAAu6AAyclNFgYHh7nYGJgYGB0eXtdYgAkmT1xfUovsDmTUYGBgYGAFb/J0Zg/lIJAAAAAElFTkSuQmCC' // 0006
+  ];
+  function isTutorialPending() {
+    try {
+      return localStorage.getItem(TUTORIAL_KEY) !== 'done';
+    } catch {
+      return true;
+    }
+  }
+  function runTutorialResetMigration() {
+    try {
+      if (localStorage.getItem(TUTORIAL_RESET_MIGRATION) === 'done') return;
+      localStorage.removeItem(TUTORIAL_KEY);
+      localStorage.setItem(TUTORIAL_RESET_MIGRATION, 'done');
+      tutorialForceStart = true;
+    } catch {
+      tutorialForceStart = true;
+    }
+  }
+  function setTutorialDone() {
+    try {
+      localStorage.setItem(TUTORIAL_KEY, 'done');
+    } catch {
+      /* ignore */
+    }
+  }
+  function updateTutorialUI() {
+    const pending = isTutorialPending();
+    if (tutorialModal instanceof HTMLElement) {
+      tutorialModal.classList.toggle('is-active', pending && tutorialState.active);
+    }
+    const progress = document.getElementById('tutorialProgress');
+    if (progress) {
+      if (!tutorialState.active) {
+        progress.textContent = '';
+      } else {
+        const total = tutorialSprites.length || 4;
+        progress.textContent = `レベル${tutorialState.step + 1}/${total}: 見本の赤いドットを全てタップしよう`;
+      }
+    }
+    if (tutorialDoneBtn instanceof HTMLButtonElement) {
+      tutorialDoneBtn.style.display = tutorialState.active ? 'none' : 'inline-flex';
+      tutorialDoneBtn.disabled = tutorialState.active;
+    }
+  }
 
   function setDailyPrompt() {
-    if (!dailyPromptBody) return;
+    if (!dailyPromptBody || !dailyPromptTitle) return;
+    if (isTutorialPending()) {
+      dailyPromptTitle.style.display = 'none';
+      dailyPromptBody.style.display = 'none';
+      if (maouInline) maouInline.style.display = 'inline-flex';
+      return;
+    }
+    dailyPromptTitle.style.display = 'inline';
+    dailyPromptBody.style.display = 'inline';
+    if (maouInline) maouInline.style.display = 'none';
     // 日本時間の0時基準で1日1つに固定
     const now = Date.now();
     const JST_OFFSET = 9 * 60 * 60 * 1000;
@@ -1035,6 +1655,90 @@
     const queue = window.adsbygoogle || [];
     document.querySelectorAll('ins.adsbygoogle').forEach(() => queue.push({}));
     window.adsbygoogle = queue;
+  }
+
+  // PNGへtEXtチャンクを埋め込み、パレット情報を保持
+  function injectTextChunk(dataURL, keyword, text) {
+    try {
+      const b64 = dataURL.split(',')[1];
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+      const sig = bytes.slice(0, 8);
+      let offset = 8;
+      const chunks = [];
+      while (offset < bytes.length) {
+        const size = (bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3];
+        const type = String.fromCharCode(bytes[offset + 4], bytes[offset + 5], bytes[offset + 6], bytes[offset + 7]);
+        const dataStart = offset + 8;
+        const dataEnd = dataStart + size;
+        const crcEnd = dataEnd + 4;
+        chunks.push({ type, raw: bytes.slice(offset, crcEnd) });
+        offset = crcEnd;
+      }
+      const iendIndex = chunks.findIndex(c => c.type === 'IEND');
+      if (iendIndex === -1) return dataURL;
+
+      const encoder = new TextEncoder();
+      const payload = encoder.encode(`${keyword}\0${text}`);
+      const typeBytes = encoder.encode('tEXt');
+      const sizeBytes = new Uint8Array([
+        (payload.length >> 24) & 0xff,
+        (payload.length >> 16) & 0xff,
+        (payload.length >> 8) & 0xff,
+        payload.length & 0xff,
+      ]);
+      const crcInput = new Uint8Array(typeBytes.length + payload.length);
+      crcInput.set(typeBytes, 0);
+      crcInput.set(payload, typeBytes.length);
+      const crcVal = crc32(crcInput);
+      const crcBytes = new Uint8Array([
+        (crcVal >> 24) & 0xff,
+        (crcVal >> 16) & 0xff,
+        (crcVal >> 8) & 0xff,
+        crcVal & 0xff,
+      ]);
+
+      const chunkBuf = new Uint8Array(4 + 4 + payload.length + 4);
+      chunkBuf.set(sizeBytes, 0);
+      chunkBuf.set(typeBytes, 4);
+      chunkBuf.set(payload, 8);
+      chunkBuf.set(crcBytes, 8 + payload.length);
+
+      const assembled = [
+        sig,
+        ...chunks.slice(0, iendIndex).map(c => c.raw),
+        chunkBuf,
+        ...chunks.slice(iendIndex).map(c => c.raw),
+      ];
+      const totalLength = assembled.reduce((sum, arr) => sum + arr.length, 0);
+      const out = new Uint8Array(totalLength);
+      let pos = 0;
+      for (const arr of assembled) {
+        out.set(arr, pos);
+        pos += arr.length;
+      }
+      let str = '';
+      for (let i = 0; i < out.length; i++) {
+        str += String.fromCharCode(out[i]);
+      }
+      return 'data:image/png;base64,' + btoa(str);
+    } catch {
+      return dataURL;
+    }
+  }
+
+  function crc32(bytes) {
+    let crc = 0xffffffff;
+    for (let i = 0; i < bytes.length; i++) {
+      crc ^= bytes[i];
+      for (let j = 0; j < 8; j++) {
+        const mask = -(crc & 1);
+        crc = (crc >>> 1) ^ (0xedb88320 & mask);
+      }
+    }
+    return (crc ^ 0xffffffff) >>> 0;
   }
 
   function updateSizeButton() {
@@ -1068,6 +1772,14 @@
     canvasSizeIndex = CANVAS_SIZES.indexOf(target);
     canvas.width = target;
     canvas.height = target;
+    if (tutorialOverlayCanvas) {
+      tutorialOverlayCanvas.width = target;
+      tutorialOverlayCanvas.height = target;
+    }
+    if (cutsceneOverlayCanvas) {
+      cutsceneOverlayCanvas.width = target;
+      cutsceneOverlayCanvas.height = target;
+    }
     if (jelinCanvas) {
       jelinCanvas.width = target;
       jelinCanvas.height = target;
@@ -1112,12 +1824,15 @@
       if (colorPicker) colorPicker.value = '#000000';
       return;
     }
+    const oldHex = palette[activeSwatchIndex];
     currentColor = hex;
     if (updatePalette) {
       palette[activeSwatchIndex] = hex;
+      replaceColorOnCanvas(oldHex, hex);
       updateSwatchColors();
+      savePalette();
     }
-    if (colorPicker) colorPicker.value = hex;
+    if (colorPicker) colorPicker.value = hex === 'transparent' ? '#000000' : hex;
     const sw = paletteEl?.children?.[activeSwatchIndex];
     if (sw instanceof HTMLElement) {
       Array.from(paletteEl.children).forEach(el => el.classList.remove('is-active'));
@@ -1126,10 +1841,258 @@
     eraseMode = false;
   }
 
+  function captureUndoState() {
+    if (!imageData || !data) return null;
+    return {
+      pixels: new Uint8ClampedArray(data),
+      palette: [...palette],
+      activeIndex: activeSwatchIndex,
+    };
+  }
+  function updateUndoRedoUI() {
+    if (btnUndo) btnUndo.disabled = undoStack.length === 0;
+    if (btnRedo) btnRedo.disabled = redoStack.length === 0;
+  }
+  function pushUndoState(stateOverride = null) {
+    const snap = stateOverride || captureUndoState();
+    if (!snap) return;
+    undoStack.push(snap);
+    if (undoStack.length > MAX_UNDO) undoStack.shift();
+    redoStack.length = 0;
+    updateUndoRedoUI();
+  }
+  function applyState(state) {
+    if (!state) return;
+    data.set(state.pixels);
+    render();
+    palette = state.palette.slice(0, MAX_COLORS);
+    updateSwatchColors();
+    activeSwatchIndex = Math.min(state.activeIndex ?? 1, palette.length - 1);
+    currentColor = palette[activeSwatchIndex] || currentColor;
+    if (colorPicker) colorPicker.value = currentColor === 'transparent' ? '#000000' : currentColor;
+    const sw = paletteEl?.children?.[activeSwatchIndex];
+    if (sw instanceof HTMLElement) {
+      Array.from(paletteEl.children).forEach(el => el.classList.remove('is-active'));
+      sw.classList.add('is-active');
+    }
+    eraseMode = false;
+  }
+  function undo() {
+    if (undoStack.length === 0) return;
+    const current = captureUndoState();
+    const state = undoStack.pop();
+    if (current) redoStack.push(current);
+    applyState(state);
+    updateUndoRedoUI();
+  }
+  function redo() {
+    if (redoStack.length === 0) return;
+    const current = captureUndoState();
+    const state = redoStack.pop();
+    if (current) undoStack.push(current);
+    applyState(state);
+    updateUndoRedoUI();
+  }
+
   function openSwatchEditor(baseColor) {
+    if (tutorialState.active) return;
     if (!swatchEditor) return;
     swatchEditor.value = baseColor;
     swatchEditor.click();
+  }
+  function ensureLiteColorWheelCtx() {
+    if (!liteColorWheelCtx && liteColorWheel instanceof HTMLCanvasElement) {
+      liteColorWheelCtx = liteColorWheel.getContext('2d', { willReadFrequently: true });
+    }
+  }
+  function getLiteHexFromState() {
+    const { h, s, v } = liteColorPickerState.hsv;
+    return rgbToHex(hsvToRgb(h, s, v));
+  }
+  function updateLiteValueSliderBg() {
+    if (!liteValueSlider) return;
+    const { h, s } = liteColorPickerState.hsv;
+    const dark = rgbToHex(hsvToRgb(h, s, 0));
+    const bright = rgbToHex(hsvToRgb(h, s, 1));
+    liteValueSlider.style.background = `linear-gradient(90deg, ${dark} 0%, ${bright} 100%)`;
+  }
+  function updateLiteWheelCursor() {
+    if (!liteColorWheelCursor || !(liteColorWheel instanceof HTMLCanvasElement)) return;
+    const rect = liteColorWheel.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const radius = rect.width / 2;
+    const angle = (liteColorPickerState.hsv.h * Math.PI) / 180;
+    const distance = clamp(liteColorPickerState.hsv.s, 0, 1) * radius;
+    const x = radius + Math.cos(angle) * distance;
+    const y = radius + Math.sin(angle) * distance;
+    liteColorWheelCursor.style.left = `${x}px`;
+    liteColorWheelCursor.style.top = `${y}px`;
+  }
+  function drawLiteColorWheel() {
+    ensureLiteColorWheelCtx();
+    if (!liteColorWheelCtx || !(liteColorWheel instanceof HTMLCanvasElement)) return;
+    const rect = liteColorWheel.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const size = Math.max(120, Math.round(Math.min(rect.width || 160, rect.height || 160) * dpr));
+    if (liteColorWheel.width !== size || liteColorWheel.height !== size) {
+      liteColorWheel.width = size;
+      liteColorWheel.height = size;
+    }
+    const value = clamp(liteColorPickerState.hsv.v, 0, 1);
+    const imageData = liteColorWheelCtx.createImageData(size, size);
+    const data = imageData.data;
+    const radius = size / 2;
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const dx = x + 0.5 - radius;
+        const dy = y + 0.5 - radius;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const index = (y * size + x) * 4;
+        if (distance > radius) {
+          data[index + 3] = 0;
+          continue;
+        }
+        const saturation = clamp(distance / radius, 0, 1);
+        let hue = Math.atan2(dy, dx) * (180 / Math.PI);
+        if (hue < 0) hue += 360;
+        const rgb = hsvToRgb(hue, saturation, value);
+        data[index] = rgb.r;
+        data[index + 1] = rgb.g;
+        data[index + 2] = rgb.b;
+        data[index + 3] = 255;
+      }
+    }
+    liteColorWheelCtx.putImageData(imageData, 0, 0);
+  }
+  function updateLitePreviews() {
+    const pattern = 'repeating-conic-gradient(#1b2235 0% 25%, #0d1224 0% 50%)';
+    if (liteColorPreview) {
+      liteColorPreview.style.backgroundImage = `linear-gradient(${getLiteHexFromState()}, ${getLiteHexFromState()}), ${pattern}`;
+      liteColorPreview.style.backgroundSize = '100% 100%, 12px 12px';
+    }
+    if (liteColorPreviewOrig) {
+      liteColorPreviewOrig.style.backgroundImage = `linear-gradient(${liteColorPickerState.originalHex}, ${liteColorPickerState.originalHex}), ${pattern}`;
+      liteColorPreviewOrig.style.backgroundSize = '100% 100%, 12px 12px';
+    }
+    updateLiteValueSliderBg();
+  }
+  function applyLiteLivePreview() {
+    if (!imageData || !data) return;
+    if (liteColorPickerState.index === null) return;
+    const newHex = getLiteHexFromState();
+    // 直前のプレビュー色を最新色に置き換え
+    if (liteLastPreviewHex) {
+      replaceColorInBuffer(data, liteLastPreviewHex, newHex);
+    }
+    // 元色も最新色に置き換え
+    replaceColorInBuffer(data, liteColorPickerState.originalHex, newHex);
+    liteLastPreviewHex = newHex;
+    currentColor = newHex;
+    if (colorPicker) colorPicker.value = newHex;
+    render();
+  }
+  function updateLiteCanvasPreview() {
+    if (!liteCanvasPreview || !liteCanvasPreviewCtx || !liteCanvasSnapshot) return;
+    const temp = new ImageData(new Uint8ClampedArray(liteCanvasSnapshot.data), liteCanvasSnapshot.width, liteCanvasSnapshot.height);
+    replaceColorInBuffer(temp.data, liteColorPickerState.originalHex, getLiteHexFromState());
+    liteCanvasPreview.width = temp.width;
+    liteCanvasPreview.height = temp.height;
+    liteCanvasPreviewCtx.imageSmoothingEnabled = false;
+    liteCanvasPreviewCtx.clearRect(0, 0, temp.width, temp.height);
+    liteCanvasPreviewCtx.putImageData(temp, 0, 0);
+  }
+  function updateLiteStateFromWheelEvent(event) {
+    if (!(liteColorWheel instanceof HTMLCanvasElement)) return;
+    const rect = liteColorWheel.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const scale = liteColorWheel.width / rect.width;
+    const x = (event.clientX - rect.left) * scale;
+    const y = (event.clientY - rect.top) * scale;
+    const radius = liteColorWheel.width / 2;
+    const dx = x - radius;
+    const dy = y - radius;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const maxRadius = radius;
+    const clampedDistance = Math.min(distance, maxRadius);
+    let hue = Math.atan2(dy, dx) * (180 / Math.PI);
+    if (hue < 0) hue += 360;
+    const saturation = clamp(clampedDistance / maxRadius, 0, 1);
+    liteColorPickerState.hsv.h = hue;
+    liteColorPickerState.hsv.s = saturation;
+    drawLiteColorWheel();
+    updateLiteWheelCursor();
+    updateLitePreviews();
+    updateLiteCanvasPreview();
+    applyLiteLivePreview();
+  }
+  function openLiteColorPicker(index) {
+    if (tutorialState.active) return;
+    if (index === 0) return;
+    if (!(liteColorPicker instanceof HTMLElement)) return;
+    litePreviewUndoState = captureUndoState();
+    activeSwatchIndex = index;
+    const baseColor = palette[index] || '#ffffff';
+    liteColorPickerState = {
+      index,
+      hsv: hexToHsv(baseColor),
+      originalHex: baseColor,
+    };
+    liteCanvasOriginalData = new Uint8ClampedArray(data);
+    liteCanvasSnapshot = new ImageData(new Uint8ClampedArray(data), imageData.width, imageData.height);
+    liteLastPreviewHex = null;
+    if (liteValueSlider) {
+      liteValueSlider.value = String(Math.round(liteColorPickerState.hsv.v * 100));
+    }
+    liteColorPicker.classList.add('is-active');
+    liteColorPicker.setAttribute('aria-hidden', 'false');
+    drawLiteColorWheel();
+    updateLiteWheelCursor();
+    updateLitePreviews();
+    updateLiteCanvasPreview();
+    applyLiteLivePreview();
+  }
+  function closeLiteColorPicker(apply = false) {
+    if (!(liteColorPicker instanceof HTMLElement)) return;
+    liteColorPicker.classList.remove('is-active');
+    liteColorPicker.setAttribute('aria-hidden', 'true');
+    if (apply && liteColorPickerState.index !== null) {
+      pushUndoState(litePreviewUndoState);
+      const hex = getLiteHexFromState();
+      setCurrentColor(hex);
+    } else if (!apply && liteColorPickerState.index !== null) {
+      // キャンセル時も描画内容は保持。パレット色のみ元に戻す。
+      setCurrentColor(liteColorPickerState.originalHex, { updatePalette: false });
+    }
+    liteColorPickerState = { index: null, hsv: { h: 0, s: 0, v: 1 }, originalHex: '#ffffff' };
+    liteCanvasSnapshot = null;
+    liteCanvasOriginalData = null;
+    liteLastPreviewHex = null;
+    litePreviewUndoState = null;
+    updateUndoRedoUI();
+  }
+  let liteWheelPointerId = null;
+  function handleLiteWheelPointerDown(event) {
+    if (!(liteColorWheel instanceof HTMLCanvasElement)) return;
+    if (liteWheelPointerId !== null) return;
+    event.preventDefault();
+    liteWheelPointerId = event.pointerId;
+    liteColorWheel.setPointerCapture?.(event.pointerId);
+    updateLiteStateFromWheelEvent(event);
+    window.addEventListener('pointermove', handleLiteWheelPointerMove);
+    window.addEventListener('pointerup', handleLiteWheelPointerUp);
+  }
+  function handleLiteWheelPointerMove(event) {
+    if (liteWheelPointerId === null || event.pointerId !== liteWheelPointerId) return;
+    updateLiteStateFromWheelEvent(event);
+  }
+  function handleLiteWheelPointerUp(event) {
+    if (liteWheelPointerId === null || event.pointerId !== liteWheelPointerId) return;
+    if (liteColorWheel?.hasPointerCapture?.(event.pointerId)) {
+      liteColorWheel.releasePointerCapture(event.pointerId);
+    }
+    liteWheelPointerId = null;
+    window.removeEventListener('pointermove', handleLiteWheelPointerMove);
+    window.removeEventListener('pointerup', handleLiteWheelPointerUp);
   }
 
   function updateSwatchColors() {
@@ -1140,6 +2103,515 @@
         el.classList.toggle('is-active', index === activeSwatchIndex);
       }
     });
+  }
+
+  function savePalette() {
+    try {
+      localStorage.setItem(PALETTE_KEY, JSON.stringify(palette));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function loadPalette() {
+    try {
+      const stored = localStorage.getItem(PALETTE_KEY);
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      if (!Array.isArray(parsed) || parsed.length !== palette.length) return;
+      const valid = parsed.every(c => typeof c === 'string' && c.length > 0);
+      if (!valid) return;
+      parsed[0] = 'transparent';
+      palette = parsed;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function loadTutorialSprite(src) {
+    return new Promise(resolve => {
+      const img = new Image();
+      img.decoding = 'async';
+      img.crossOrigin = 'anonymous';
+      img.src = src;
+      img.onload = () => {
+        try {
+          const off = document.createElement('canvas');
+          off.width = img.width;
+          off.height = img.height;
+          const octx = off.getContext('2d', { willReadFrequently: true });
+          if (!octx) return resolve(null);
+          octx.drawImage(img, 0, 0);
+          const data = octx.getImageData(0, 0, img.width, img.height).data;
+          const required = [];
+          const colors = new Map();
+          const uniques = new Set();
+          for (let y = 0; y < img.height; y++) {
+            for (let x = 0; x < img.width; x++) {
+              const idx = (y * img.width + x) * 4;
+              if (data[idx + 3] > 0) {
+                const key = `${x},${y}`;
+                required.push(key);
+                const col = `#${data[idx].toString(16).padStart(2, '0')}${data[idx + 1].toString(16).padStart(2, '0')}${data[idx + 2].toString(16).padStart(2, '0')}`;
+                colors.set(key, col);
+                uniques.add(col);
+              }
+            }
+          }
+          resolve({ image: img, required, colors, uniqueColors: Array.from(uniques) });
+        } catch {
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+    });
+  }
+
+  function createFallbackSprite0() {
+    const size = 8;
+    const off = document.createElement('canvas');
+    off.width = size;
+    off.height = size;
+    const octx = off.getContext('2d', { willReadFrequently: true });
+    if (!octx) return null;
+    const cx = Math.floor(size / 2);
+    const cy = Math.floor(size / 2);
+    octx.fillStyle = '#ff2c00';
+    octx.fillRect(cx, cy, 1, 1);
+    const required = [`${cx},${cy}`];
+    const colors = new Map([[`${cx},${cy}`, '#ff2c00']]);
+    return { image: off, required, colors, uniqueColors: ['#ff2c00'] };
+  }
+
+  function ensureTutorialSprites() {
+    if (tutorialSpritesLoaded) return Promise.resolve();
+    return Promise.all([
+      loadTutorialSprite(CUTSCENE_SPRITE0_SRC),
+      ...TUTORIAL_SPRITE_DATAURLS.map(loadTutorialSprite),
+    ]).then(results => {
+      const valid = results.filter(Boolean);
+      const cutsceneSlot = valid[0] || null;
+      const main = valid.slice(1);
+      tutorialSprites.push(...main);
+      if (!tutorialSprites[0] || (tutorialSprites[0].required && tutorialSprites[0].required.length === 0)) {
+        const fallback = createFallbackSprite0();
+        if (fallback) tutorialSprites.unshift(fallback);
+      }
+      if (cutsceneSlot?.image) {
+        cutsceneSprite0Image = cutsceneSlot.image;
+      } else {
+        const fallback = createFallbackSprite0();
+        cutsceneSprite0Image = fallback?.image || null;
+      }
+      tutorialPaletteSet = new Set();
+      tutorialSprites.forEach(s => {
+        if (s.uniqueColors) {
+          s.uniqueColors.forEach(c => tutorialPaletteSet.add(c));
+        }
+      });
+      tutorialSpritesLoaded = true;
+    });
+  }
+
+  function clearCanvas() {
+    imageData = ctx.createImageData(canvasSize, canvasSize);
+    data = imageData.data;
+    render();
+  }
+
+  function canDrawInTutorial(x, y) {
+    if (!tutorialState.active) return true;
+    return tutorialState.required.has(`${x},${y}`);
+  }
+
+  function getRequiredColor(x, y) {
+    const key = `${x},${y}`;
+    return tutorialState.requiredColors.get(key) || tutorialState.currentSprite?.colors?.get(key) || null;
+  }
+
+  function matchesTutorialColor(x, y) {
+    const expected = getRequiredColor(x, y);
+    if (!expected) return false;
+    const targetR = parseInt(expected.slice(1, 3), 16);
+    const targetG = parseInt(expected.slice(3, 5), 16);
+    const targetB = parseInt(expected.slice(5, 7), 16);
+    const dataIdx = (y * canvasSize + x) * 4;
+    if (data[dataIdx + 3] !== 255) return false;
+    return (
+      data[dataIdx] === targetR &&
+      data[dataIdx + 1] === targetG &&
+      data[dataIdx + 2] === targetB
+    );
+  }
+
+  function tutorialPaletteList() {
+    const merged = new Set();
+    // colors discovered from sprites
+    if (tutorialPaletteSet && tutorialPaletteSet.size) {
+      tutorialPaletteSet.forEach(c => merged.add(c));
+    }
+    // colors declared in TUTORIAL_COLORS
+    TUTORIAL_COLORS.forEach(c => {
+      if (Array.isArray(c)) {
+        c.forEach(col => merged.add(col));
+      } else {
+        merged.add(c);
+      }
+    });
+    return ['transparent', ...Array.from(merged)];
+  }
+
+  function tutorialPalette16() {
+    const list = tutorialPaletteList().slice(1); // without transparent
+    const uniq = Array.from(new Set(list));
+    const capped = uniq.slice(0, 15);
+    while (capped.length < 15) capped.push('#000000');
+    return ['transparent', ...capped];
+  }
+
+  function currentTutorialColor() {
+    const idx = tutorialState.step;
+    if (idx >= 0 && idx < TUTORIAL_COLORS.length) {
+      const spec = TUTORIAL_COLORS[idx];
+      if (Array.isArray(spec)) return spec[0];
+      if (typeof spec === 'string') return spec;
+    }
+    if (tutorialState.currentSprite?.uniqueColors?.length) {
+      return tutorialState.currentSprite.uniqueColors[0];
+    }
+    return TUTORIAL_RED;
+  }
+
+  function checkTutorialProgress(x, y) {
+    if (!tutorialState.active) return;
+    if (!tutorialState.required.has(`${x},${y}`)) return;
+    if (matchesTutorialColor(x, y)) {
+      tutorialState.hits.add(`${x},${y}`);
+    }
+    if (tutorialState.hits.size >= tutorialState.required.size) {
+      const nextStep = tutorialState.step + 1;
+      const isLastStep = nextStep >= tutorialSprites.length;
+      if (isLastStep && !endingCutscenePlayed) {
+        endingCutscenePlayed = true;
+        cutsceneActive = true;
+        playCutscene(MAOU_ENDING_LINES, {
+          onDone: () => {
+            cutsceneActive = false;
+            completeTutorial();
+          },
+        });
+        return;
+      } else if (isLastStep) {
+        completeTutorial();
+      } else if (tutorialState.step === 0) {
+        startMaouCutsceneOverlay();
+        playCutscene(MAOU_CUTSCENE_LINES, {
+          onLine: handleMaouCutsceneLine,
+          onDone: () => {
+            endMaouCutsceneOverlay();
+            setTutorialStep(nextStep);
+          },
+        });
+      } else {
+        setTutorialStep(nextStep);
+      }
+    }
+  }
+
+  function setTutorialPalette() {
+    const plist = tutorialPalette16();
+    palette = plist;
+    const allowed = new Set(plist.map(c => c.toLowerCase()));
+    const current = (currentColor || '').toLowerCase();
+    const prefer = allowed.has(current) ? currentColor : plist[1] || plist[0];
+    activeSwatchIndex = Math.max(plist.findIndex(c => c.toLowerCase() === prefer.toLowerCase()), 1);
+    initPalette();
+    setCurrentColor(prefer, { updatePalette: false });
+  }
+
+  function restoreUserPalette() {
+    palette = tutorialState.basePalette ? [...tutorialState.basePalette] : [...DEFAULT_PALETTE];
+    activeSwatchIndex = 1;
+    initPalette();
+    setCurrentColor(palette[activeSwatchIndex], { updatePalette: false });
+  }
+
+  function disableNonTutorialControls(disabled) {
+    if (btnCycleSize) btnCycleSize.disabled = disabled;
+    if (btnJelinMode) btnJelinMode.disabled = disabled;
+    if (colorPicker) colorPicker.disabled = disabled;
+    if (btnExport) btnExport.disabled = disabled;
+  }
+
+  function setTutorialStep(stepIndex) {
+    const sprite = tutorialSprites[stepIndex];
+    if (!sprite) return;
+    const prior = new Set();
+    const priorColors = new Map();
+    for (let i = 0; i < stepIndex; i++) {
+      const prev = tutorialSprites[i];
+      if (prev?.required) {
+        prev.required.forEach(cell => prior.add(cell));
+      }
+      if (prev?.colors) {
+        prev.colors.forEach((col, cell) => {
+          priorColors.set(cell, col);
+        });
+      }
+    }
+    let delta = sprite.required.filter(cell => {
+      const prevCol = priorColors.get(cell);
+      const nextCol = sprite.colors?.get(cell);
+      return prevCol !== nextCol;
+    });
+    // 全セル同じと判定された場合でも、そのステップをきちんと踏ませるため required 全体を使用
+    if (delta.length === 0) {
+      delta = [...sprite.required];
+    }
+    tutorialState.step = stepIndex;
+    tutorialState.required = new Set(delta);
+    tutorialState.hits = new Set();
+    tutorialState.currentSprite = sprite;
+    tutorialState.requiredColors = new Map();
+    const colorSpec = stepIndex >= 0 && stepIndex < TUTORIAL_COLORS.length ? TUTORIAL_COLORS[stepIndex] : currentTutorialColor();
+    delta.forEach(cell => {
+      const col = sprite.colors?.get(cell) || (Array.isArray(colorSpec) ? colorSpec[0] : colorSpec);
+      tutorialState.requiredColors.set(cell, col);
+    });
+    tutorialState.currentOverlay = makeOverlayImage(sprite.image, tutorialState.required);
+    // 変更が必要なセルだけ透明にクリア
+    delta.forEach(cell => {
+      const [cx, cy] = cell.split(',').map(Number);
+      if (cx >= 0 && cy >= 0 && cx < canvasSize && cy < canvasSize) {
+        const idx = (cy * canvasSize + cx) * 4;
+        data[idx] = data[idx + 1] = data[idx + 2] = 0;
+        data[idx + 3] = 0;
+      }
+    });
+    applyCanvasSize(8);
+    if (stepIndex === 0) {
+      clearCanvas();
+    }
+    setTutorialPalette();
+    drawTutorialOverlay(tutorialState.currentOverlay || sprite.image);
+    setDailyPrompt();
+    hideMaouDialog();
+    showMaouDialog(stepIndexToDialogue(stepIndex));
+    updateTutorialUI();
+    render();
+  }
+
+  function startTutorial() {
+    endingCutscenePlayed = false;
+    tutorialState.active = true;
+    tutorialState.basePalette = [...palette];
+    tutorialState.currentSprite = null;
+    disableNonTutorialControls(true);
+    setDailyPrompt();
+    updateTutorialUI();
+    ensureTutorialSprites().then(() => {
+      if (!tutorialSprites.length) {
+        completeTutorial();
+        return;
+      }
+      playCutscene(MAOU_INTRO_LINES, {
+        onDone: () => {
+          setTutorialStep(0);
+          showMaouDialog(stepIndexToDialogue(0));
+        }
+      });
+    });
+  }
+
+  function completeTutorial() {
+    endingCutscenePlayed = false;
+    tutorialState.active = false;
+    setTutorialDone();
+    disableNonTutorialControls(false);
+    if (tutorialOverlayCtx && tutorialOverlayCanvas) {
+      tutorialOverlayCtx.clearRect(0, 0, tutorialOverlayCanvas.width, tutorialOverlayCanvas.height);
+    }
+    if (tutorialModal instanceof HTMLElement) {
+      tutorialModal.classList.remove('is-active');
+    }
+    hideMaouDialog();
+    tutorialState.currentSprite = null;
+    restoreUserPalette();
+    applyCanvasSize(16);
+    setDailyPrompt();
+    updateTutorialUI();
+    render();
+  }
+
+  function resetTutorial() {
+    try {
+      localStorage.removeItem(TUTORIAL_KEY);
+    } catch {
+      /* ignore */
+    }
+    tutorialForceStart = true;
+    tutorialState.active = false;
+    tutorialState.step = 0;
+    tutorialState.required = new Set();
+    tutorialState.hits = new Set();
+    tutorialState.currentSprite = null;
+    tutorialState.requiredColors = new Map();
+    endingCutscenePlayed = false;
+    if (tutorialOverlayCtx && tutorialOverlayCanvas) {
+      tutorialOverlayCtx.clearRect(0, 0, tutorialOverlayCanvas.width, tutorialOverlayCanvas.height);
+    }
+    hideMaouDialog();
+    startTutorial();
+  }
+
+  function stepIndexToDialogue(idx) {
+    return MAOU_LINES[idx] || 'さあ進めよう。';
+  }
+
+  function showMaouDialog(text) {
+    if (maouInline) {
+      maouInline.style.display = 'inline-flex';
+    }
+    if (maouInlineText) {
+      maouInlineText.textContent = text;
+    }
+    if (maouDialog instanceof HTMLElement) {
+      maouDialog.classList.remove('is-active');
+    }
+  }
+
+  function hideMaouDialog() {
+    if (maouInline) maouInline.style.display = 'none';
+    if (maouDialog instanceof HTMLElement) {
+      maouDialog.classList.remove('is-active');
+    }
+    if (maouInlineText) {
+      maouInlineText.textContent = '';
+    }
+  }
+
+  function startMaouCutsceneOverlay() {
+    let img = tutorialSprites[0]?.image || tutorialState.currentSprite?.image || cutsceneOverlayImage;
+    if (!img) {
+      const fallback = createFallbackSprite0();
+      if (fallback) {
+        tutorialSprites[0] = fallback;
+        img = fallback.image;
+      }
+    }
+    if (img) {
+      cutsceneOverlayImage = img;
+      if (!img.complete) {
+        img.onload = () => {
+          cutsceneOverlayAlpha = 1;
+          drawCutsceneOverlay(cutsceneOverlayImage);
+          render();
+        };
+      }
+    }
+    cutsceneOverlayAlpha = 1;
+    drawCutsceneOverlay(cutsceneOverlayImage);
+    render();
+  }
+
+  function endMaouCutsceneOverlay() {
+    cutsceneOverlayImage = null;
+    clearCutsceneOverlay();
+    tutorialOverlayAlpha = 0.7;
+    drawTutorialOverlay(tutorialState.currentOverlay || tutorialState.currentSprite?.image);
+    render();
+  }
+
+  function fadeSprite0(targetAlpha, duration = 300, onFinish) {
+    if (sprite0FadeFrame) cancelAnimationFrame(sprite0FadeFrame);
+    const start = performance.now();
+    const fromA = cutsceneOverlayAlpha;
+    const toA = clamp(targetAlpha, 0, 1);
+    const tick = now => {
+      const t = clamp((now - start) / duration, 0, 1);
+      const alpha = fromA + (toA - fromA) * t;
+      cutsceneOverlayAlpha = alpha;
+      tutorialOverlayAlpha = alpha;
+      if (cutsceneOverlayImage) {
+        drawCutsceneOverlay(cutsceneOverlayImage);
+        drawTutorialOverlay(cutsceneOverlayImage);
+      }
+      render();
+      if (t < 1) {
+        sprite0FadeFrame = requestAnimationFrame(tick);
+      } else {
+        sprite0FadeFrame = null;
+        if (toA === 0) {
+          cutsceneOverlayImage = null;
+          clearCutsceneOverlay();
+          tutorialOverlayAlpha = 0.7;
+          drawTutorialOverlay(tutorialState.currentOverlay || tutorialState.currentSprite?.image);
+        }
+        onFinish?.();
+      }
+    };
+    sprite0FadeFrame = requestAnimationFrame(tick);
+  }
+
+  function handleMaouCutsceneLine(idx, line) {
+    // 「ほれ、見てみい」でチュートリアルスプライト0000をチュートリアルオーバーレイに表示
+    if (idx === 1) {
+      const img = cutsceneSprite0Image || cutsceneOverlayImage || createFallbackSprite0()?.image;
+      const show = () => {
+        cutsceneOverlayImage = img;
+        cutsceneOverlayAlpha = 0;
+        tutorialOverlayAlpha = 0;
+        fadeSprite0(1, 250);
+      };
+      if (img) {
+        if (img.complete) {
+          show();
+        } else {
+          img.onload = show;
+          img.onerror = show;
+        }
+      }
+    }
+    // 「打っていくぞい」で非表示に戻す
+    if (line.includes('打っていくぞい')) {
+      fadeSprite0(0, 250);
+    }
+  }
+
+  function playCutscene(lines, options) {
+    const opts = typeof options === 'function' ? { onDone: options } : (options || {});
+    if (!(cutsceneEl instanceof HTMLElement) || !cutsceneText) {
+      opts.onDone?.();
+      return;
+    }
+    cutsceneActive = true;
+    if (maouInline) {
+      maouInline.style.opacity = '0';
+      maouInline.style.visibility = 'visible';
+    }
+    let idx = 0;
+    const showLine = () => {
+      const line = lines[idx] || '';
+      cutsceneText.textContent = line;
+      opts.onLine?.(idx, line);
+    };
+    const step = () => {
+      if (!cutsceneActive) return;
+      if (idx >= lines.length) {
+        cutsceneEl.classList.remove('is-active');
+        cutsceneActive = false;
+        if (maouInline) {
+          maouInline.style.opacity = '1';
+        }
+        opts.onDone?.();
+        return;
+      }
+      showLine();
+      idx += 1;
+      setTimeout(step, 2000);
+    };
+    cutsceneEl.classList.add('is-active');
+    step();
   }
 
   function resizeGridCanvas() {
@@ -1160,6 +2632,15 @@
   }
   function setPixel(x, y) {
     if (x < 0 || y < 0 || x >= canvasSize || y >= canvasSize) return;
+    if (cutsceneActive) return;
+    if (tutorialState.active && !canDrawInTutorial(x, y)) return;
+    if (tutorialState.active) {
+      const requiredColor = getRequiredColor(x, y);
+      if (requiredColor && requiredColor.toLowerCase() !== currentColor.toLowerCase()) {
+        highlightAllowedPalette([requiredColor]);
+        return;
+      }
+    }
     const idx = (y * canvasSize + x) * 4;
     if (eraseMode) {
       data[idx] = data[idx + 1] = data[idx + 2] = 0;
@@ -1172,12 +2653,54 @@
       data[idx + 3] = rgba.a;
     }
     render();
+    if (tutorialState.active) {
+      checkTutorialProgress(x, y);
+    }
+  }
+
+  function replaceColorOnCanvas(oldHex, newHex) {
+    if (!oldHex || !newHex || oldHex.toLowerCase() === newHex.toLowerCase()) return;
+    const from = hexToRgba(oldHex);
+    const to = hexToRgba(newHex);
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] === from.r && data[i + 1] === from.g && data[i + 2] === from.b && data[i + 3] === from.a) {
+        data[i] = to.r;
+        data[i + 1] = to.g;
+        data[i + 2] = to.b;
+        data[i + 3] = to.a;
+      }
+    }
+    render();
+  }
+  function replaceColorInBuffer(buffer, oldHex, newHex) {
+    if (!buffer || !oldHex || !newHex || oldHex.toLowerCase() === newHex.toLowerCase()) return buffer;
+    const from = hexToRgba(oldHex);
+    const to = hexToRgba(newHex);
+    for (let i = 0; i < buffer.length; i += 4) {
+      if (buffer[i] === from.r && buffer[i + 1] === from.g && buffer[i + 2] === from.b && buffer[i + 3] === from.a) {
+        buffer[i] = to.r;
+        buffer[i + 1] = to.g;
+        buffer[i + 2] = to.b;
+        buffer[i + 3] = to.a;
+      }
+    }
+    return buffer;
   }
 
   function render() {
     ctx.putImageData(imageData, 0, 0);
     drawGrid();
     drawJelinOverlay();
+    if (tutorialState.active && (tutorialState.currentOverlay || tutorialState.currentSprite)) {
+      drawTutorialOverlay(tutorialState.currentOverlay || tutorialState.currentSprite.image);
+    } else {
+      drawTutorialOverlay(null);
+    }
+    if (tutorialState.active && cutsceneOverlayImage) {
+      drawCutsceneOverlay(cutsceneOverlayImage);
+    } else {
+      clearCutsceneOverlay();
+    }
   }
 
   function drawGrid() {
@@ -1216,6 +2739,79 @@
     gridCtx.restore();
   }
 
+  function drawTutorialOverlay(image) {
+    if (!tutorialOverlayCtx || !tutorialOverlayCanvas) return;
+    if (!tutorialState.active || !image) {
+      tutorialOverlayCanvas.style.display = 'none';
+      tutorialOverlayCtx.clearRect(0, 0, tutorialOverlayCanvas.width, tutorialOverlayCanvas.height);
+      return;
+    }
+    tutorialOverlayCanvas.style.display = 'block';
+    tutorialOverlayCanvas.width = canvasSize;
+    tutorialOverlayCanvas.height = canvasSize;
+    tutorialOverlayCtx.imageSmoothingEnabled = false;
+    tutorialOverlayCtx.clearRect(0, 0, canvasSize, canvasSize);
+    tutorialOverlayCtx.globalAlpha = clamp(tutorialOverlayAlpha, 0, 1);
+    tutorialOverlayCtx.drawImage(image, 0, 0, canvasSize, canvasSize);
+    tutorialOverlayCtx.globalAlpha = 1;
+  }
+
+  function drawCutsceneOverlay(image) {
+    if (!cutsceneOverlayCtx || !cutsceneOverlayCanvas || !image) {
+      clearCutsceneOverlay();
+      return;
+    }
+    cutsceneOverlayCanvas.style.opacity = '1';
+    cutsceneOverlayCanvas.style.visibility = 'visible';
+    cutsceneOverlayCanvas.style.display = 'block';
+    cutsceneOverlayCanvas.width = canvasSize;
+    cutsceneOverlayCanvas.height = canvasSize;
+    cutsceneOverlayCanvas.style.width = '100%';
+    cutsceneOverlayCanvas.style.height = '100%';
+    cutsceneOverlayCanvas.style.zIndex = '10';
+    cutsceneOverlayCtx.imageSmoothingEnabled = false;
+    cutsceneOverlayCtx.clearRect(0, 0, canvasSize, canvasSize);
+    cutsceneOverlayCtx.globalAlpha = clamp(cutsceneOverlayAlpha, 0, 1);
+    // 軽い背景で存在を視認しやすくする
+    cutsceneOverlayCtx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+    cutsceneOverlayCtx.fillRect(0, 0, canvasSize, canvasSize);
+    // スプライトをピクセルパーフェクトで拡大
+    const w = image.width || canvasSize;
+    const h = image.height || canvasSize;
+    cutsceneOverlayCtx.drawImage(image, 0, 0, w, h, 0, 0, canvasSize, canvasSize);
+    cutsceneOverlayCtx.globalAlpha = 1;
+  }
+
+  function clearCutsceneOverlay() {
+    if (!cutsceneOverlayCtx || !cutsceneOverlayCanvas) return;
+    cutsceneOverlayCanvas.style.display = 'none';
+    cutsceneOverlayCanvas.style.visibility = 'hidden';
+    cutsceneOverlayCanvas.style.opacity = '0';
+    cutsceneOverlayCtx.clearRect(0, 0, cutsceneOverlayCanvas.width, cutsceneOverlayCanvas.height);
+  }
+
+  function makeOverlayImage(image, requiredSet) {
+    const off = document.createElement('canvas');
+    off.width = image.width || canvasSize;
+    off.height = image.height || canvasSize;
+    const octx = off.getContext('2d', { willReadFrequently: true });
+    if (!octx) return image;
+    octx.drawImage(image, 0, 0, off.width, off.height);
+    const imgData = octx.getImageData(0, 0, off.width, off.height);
+    const d = imgData.data;
+    for (let y = 0; y < off.height; y++) {
+      for (let x = 0; x < off.width; x++) {
+        const key = `${x},${y}`;
+        if (!requiredSet.has(key)) {
+          const idx = (y * off.width + x) * 4;
+          d[idx + 3] = 0; // clear alpha
+        }
+      }
+    }
+    octx.putImageData(imgData, 0, 0);
+    return off;
+  }
+
   function canvasPosToCell(event) {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvasSize / rect.width;
@@ -1229,6 +2825,11 @@
   function onPointerDown(event) {
     event.preventDefault();
     const { x, y } = canvasPosToCell(event);
+    if (tutorialState.active && !canDrawInTutorial(x, y)) {
+      drawing = false;
+      return;
+    }
+    pushUndoState();
     eraseMode = event.button === 2 || event.altKey || event.metaKey;
     drawing = true;
     setPixel(x, y);
@@ -1270,7 +2871,7 @@
         clearTimeout(holdTimer);
         holdTimer = setTimeout(() => {
           handleSelect();
-          openSwatchEditor(palette[index]);
+          openLiteColorPicker(index);
         }, 420);
       };
       const clearHold = () => {
@@ -1294,16 +2895,63 @@
   btnJelinMode?.addEventListener('click', () => {
     setJelinMode(!jelinMode);
   });
+  function highlightAllowedPalette(colors) {
+    if (!paletteEl) return;
+    const normalized = new Set(colors.map(c => c.toLowerCase()));
+    Array.from(paletteEl.children).forEach(el => el.classList.remove('is-hint'));
+    Array.from(paletteEl.children).forEach((el, idx) => {
+      const col = palette[idx];
+      if (normalized.has(col.toLowerCase())) {
+        el.classList.add('is-hint');
+        setTimeout(() => el.classList.remove('is-hint'), 1200);
+      }
+    });
+  }
 
   colorPicker?.addEventListener('input', event => {
+    if (tutorialState.active) return;
     if (activeSwatchIndex === 0) return;
     setCurrentColor(event.target.value);
   });
 
   swatchEditor?.addEventListener('input', event => {
+    if (tutorialState.active) return;
     if (activeSwatchIndex === 0) return;
     const next = event.target.value;
     setCurrentColor(next);
+  });
+  liteColorWheel?.addEventListener('pointerdown', handleLiteWheelPointerDown);
+  liteValueSlider?.addEventListener('input', () => {
+    if (liteColorPickerState.index === null) return;
+    liteColorPickerState.hsv.v = clamp(Number(liteValueSlider.value) / 100, 0, 1);
+    drawLiteColorWheel();
+    updateLiteWheelCursor();
+    updateLitePreviews();
+    updateLiteCanvasPreview();
+    applyLiteLivePreview();
+  });
+  btnUndo?.addEventListener('click', () => undo());
+  btnRedo?.addEventListener('click', () => redo());
+  liteColorApply?.addEventListener('click', () => closeLiteColorPicker(true));
+  liteColorCancel?.addEventListener('click', () => closeLiteColorPicker(false));
+  liteColorClose?.addEventListener('click', () => closeLiteColorPicker(false));
+  liteColorPicker?.addEventListener('click', event => {
+    if (event.target === liteColorPicker) {
+      closeLiteColorPicker(false);
+    }
+  });
+  window.addEventListener('resize', () => {
+    if (liteColorPicker?.classList.contains('is-active')) {
+      drawLiteColorWheel();
+      updateLiteWheelCursor();
+    }
+  });
+
+  tutorialDoneBtn?.addEventListener('click', () => {
+    completeTutorial();
+  });
+  tutorialRestartBtn?.addEventListener('click', () => {
+    resetTutorial();
   });
 
   btnExport?.addEventListener('click', () => {
@@ -1340,22 +2988,37 @@
 
     // 640pxへ拡大
     tctx.drawImage(composite, 0, 0, targetSize, targetSize);
-      const url = temp.toDataURL('image/png');
+      const baseUrl = temp.toDataURL('image/png');
+      const meta = JSON.stringify({ palette });
+      const url = injectTextChunk(baseUrl, 'palette', meta);
       const link = document.createElement('a');
       link.href = url;
       link.download = `pixieedrawlite-${canvasSize}px@640.png`;
       link.click();
   });
 
+  runTutorialResetMigration();
+  loadPalette();
   initPalette();
   setCurrentColor(palette[activeSwatchIndex], { updatePalette: false });
+  updateUndoRedoUI();
   applyCanvasSize(canvasSize);
   setJelinMode(false);
-  setDailyPrompt();
+  if (tutorialForceStart || isTutorialPending()) {
+    startTutorial();
+  } else {
+    setDailyPrompt();
+    updateTutorialUI();
+  }
   initAds();
   adsQueue.push({});
 
-  window.addEventListener('resize', resizeGridCanvas);
+  window.addEventListener('resize', () => {
+    resizeGridCanvas();
+    if (tutorialState.active && tutorialState.currentSprite) {
+      drawTutorialOverlay(tutorialState.currentSprite.image);
+    }
+  });
 
   // テキスト選択・ドラッグ抑止（必要な入力は除外）
   function isInputControl(node) {
