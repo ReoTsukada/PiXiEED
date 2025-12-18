@@ -599,6 +599,50 @@
     background-position: 0 0, 5px 5px;
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35) inset;
   }
+  .color-open-btn {
+    width: 44px;
+    height: 32px;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .color-chip {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+    border: 2px solid rgba(255, 255, 255, 0.22);
+    box-sizing: border-box;
+  }
+  .color-chip.is-transparent {
+    background-color: #dcdcdc;
+    background-image:
+      linear-gradient(45deg, #f5f5f5 25%, transparent 25%, transparent 75%, #f5f5f5 75%),
+      linear-gradient(45deg, #f5f5f5 25%, #c4c4c4 25%, #c4c4c4 75%, #f5f5f5 75%);
+    background-size: 10px 10px;
+    background-position: 0 0, 5px 5px;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35) inset;
+  }
+  .btn-color-chip {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    margin: 0 4px 0 0;
+    vertical-align: middle;
+    box-sizing: border-box;
+  }
+  .btn-color-chip.is-transparent {
+    background-color: #dcdcdc;
+    background-image:
+      linear-gradient(45deg, #f5f5f5 25%, transparent 25%, transparent 75%, #f5f5f5 75%),
+      linear-gradient(45deg, #f5f5f5 25%, #c4c4c4 25%, #c4c4c4 75%, #f5f5f5 75%);
+    background-size: 10px 10px;
+    background-position: 0 0, 5px 5px;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35) inset;
+  }
   .inline-buttons {
     display: flex;
     gap: 8px;
@@ -692,14 +736,20 @@
     </div>
     <aside class="panel">
       <div class="row">
-        <input aria-label="色を選択" id="colorPicker" type="color" value="#58c4ff"/>
           <div class="inline-buttons">
+            <button class="icon-btn color-open-btn" id="btnOpenColorPanel" title="色を編集する" type="button">
+              <span class="color-chip" id="btnColorChip"></span>
+            </button>
             <button class="icon-btn" id="btnCycleSize" title="キャンバスサイズを切り替え (8px / 16px / 32px)" type="button">16px</button>
             <button class="icon-btn" id="btnJelinMode" title="スカイジェリンをプレビューする" type="button">
               <img alt="ジェリンモード" src="./JELLNALL1.svg"/>
             </button>
-            <button class="icon-btn" id="btnUndo" title="一つ戻す" type="button">Undo</button>
-            <button class="icon-btn" id="btnRedo" title="やり直す" type="button">Redo</button>
+            <button class="icon-btn" id="btnUndo" title="一つ戻す" type="button">
+              <img alt="元に戻す" src="../pixiedraw/assets/icons/action-undo.svg"/>
+            </button>
+            <button class="icon-btn" id="btnRedo" title="やり直す" type="button">
+              <img alt="やり直す" src="../pixiedraw/assets/icons/action-redo.svg"/>
+            </button>
             <button class="icon-btn" id="btnTutorialRestart" title="チュートリアルを最初から (ハテナ)" type="button">?</button>
             <button class="icon-btn" id="btnExport" title="PNGを書き出す" type="button">
               <img alt="書き出し" src="../pixiedraw/assets/icons/action-export.svg"/>
@@ -724,7 +774,9 @@
               </div>
               <div class="lite-color-actions">
                 <button type="button" id="liteColorCancel">キャンセル</button>
-                <button type="button" id="liteColorApply" class="primary">決定</button>
+                <button type="button" id="liteColorApply" class="primary">
+                  <span class="btn-color-chip" id="liteApplyChip"></span>決定
+                </button>
               </div>
             </div>
           </div>
@@ -1395,13 +1447,15 @@
     'ジェリン',
   ];
 
-  const colorPicker = document.getElementById('colorPicker');
+  const colorPicker = null; // 標準カラー入力は廃止
   const paletteEl = document.getElementById('palette');
   const btnExport = document.getElementById('btnExport');
   const btnCycleSize = document.getElementById('btnCycleSize');
   const btnJelinMode = document.getElementById('btnJelinMode');
   const btnUndo = document.getElementById('btnUndo');
   const btnRedo = document.getElementById('btnRedo');
+  const btnOpenColorPanel = document.getElementById('btnOpenColorPanel');
+  const btnColorChip = document.getElementById('btnColorChip');
   const swatchEditor = /** @type {HTMLInputElement|null} */ (document.getElementById('swatchEditor'));
   const liteColorPicker = document.getElementById('liteColorPicker');
   const liteColorWheel = /** @type {HTMLCanvasElement|null} */ (document.getElementById('liteColorWheel'));
@@ -1414,6 +1468,7 @@
   const liteColorClose = document.getElementById('liteColorClose');
   const liteCanvasPreview = /** @type {HTMLCanvasElement|null} */ (document.getElementById('liteCanvasPreview'));
   const liteCanvasPreviewCtx = liteCanvasPreview?.getContext('2d', { willReadFrequently: true }) || null;
+  const liteApplyChip = document.getElementById('liteApplyChip');
   const dailyPromptEl = document.getElementById('dailyPrompt');
   const dailyPromptBody = document.getElementById('promptBody');
   const dailyPromptTitle = document.getElementById('promptTitle');
@@ -1821,7 +1876,6 @@
     const { updatePalette = true } = options;
     if (activeSwatchIndex === 0) {
       currentColor = palette[0];
-      if (colorPicker) colorPicker.value = '#000000';
       return;
     }
     const oldHex = palette[activeSwatchIndex];
@@ -1832,13 +1886,13 @@
       updateSwatchColors();
       savePalette();
     }
-    if (colorPicker) colorPicker.value = hex === 'transparent' ? '#000000' : hex;
     const sw = paletteEl?.children?.[activeSwatchIndex];
     if (sw instanceof HTMLElement) {
       Array.from(paletteEl.children).forEach(el => el.classList.remove('is-active'));
       sw.classList.add('is-active');
     }
     eraseMode = false;
+    updateColorOpenButton();
   }
 
   function captureUndoState() {
@@ -1852,6 +1906,30 @@
   function updateUndoRedoUI() {
     if (btnUndo) btnUndo.disabled = undoStack.length === 0;
     if (btnRedo) btnRedo.disabled = redoStack.length === 0;
+  }
+  function updateColorOpenButton() {
+    if (!btnColorChip) return;
+    const hex = palette[activeSwatchIndex] || currentColor || '#ffffff';
+    const isTransparent = hex === 'transparent';
+    btnColorChip.classList.toggle('is-transparent', isTransparent);
+    if (isTransparent) {
+      btnColorChip.style.background = '';
+      btnColorChip.style.borderColor = 'rgba(0,0,0,0.35)';
+    } else {
+      btnColorChip.style.background = hex;
+      btnColorChip.style.borderColor = 'rgba(255,255,255,0.22)';
+    }
+  }
+  function updateApplyButtonChip() {
+    if (!liteApplyChip) return;
+    const hex = getLiteHexFromState?.() || palette[activeSwatchIndex] || '#ffffff';
+    const isTransparent = hex === 'transparent';
+    liteApplyChip.classList.toggle('is-transparent', isTransparent);
+    if (isTransparent) {
+      liteApplyChip.style.background = '';
+    } else {
+      liteApplyChip.style.background = hex;
+    }
   }
   function pushUndoState(stateOverride = null) {
     const snap = stateOverride || captureUndoState();
@@ -1975,6 +2053,7 @@
       liteColorPreviewOrig.style.backgroundSize = '100% 100%, 12px 12px';
     }
     updateLiteValueSliderBg();
+    updateApplyButtonChip();
   }
   function applyLiteLivePreview() {
     if (!imageData || !data) return;
@@ -1988,7 +2067,7 @@
     replaceColorInBuffer(data, liteColorPickerState.originalHex, newHex);
     liteLastPreviewHex = newHex;
     currentColor = newHex;
-    if (colorPicker) colorPicker.value = newHex;
+    updateColorOpenButton();
     render();
   }
   function updateLiteCanvasPreview() {
@@ -2050,6 +2129,7 @@
     updateLitePreviews();
     updateLiteCanvasPreview();
     applyLiteLivePreview();
+    updateApplyButtonChip();
   }
   function closeLiteColorPicker(apply = false) {
     if (!(liteColorPicker instanceof HTMLElement)) return;
@@ -2101,8 +2181,10 @@
       if (el instanceof HTMLElement) {
         el.style.background = palette[index];
         el.classList.toggle('is-active', index === activeSwatchIndex);
+        el.classList.toggle('is-transparent', palette[index] === 'transparent');
       }
     });
+    updateColorOpenButton();
   }
 
   function savePalette() {
@@ -2339,7 +2421,7 @@
   function disableNonTutorialControls(disabled) {
     if (btnCycleSize) btnCycleSize.disabled = disabled;
     if (btnJelinMode) btnJelinMode.disabled = disabled;
-    if (colorPicker) colorPicker.disabled = disabled;
+    if (btnOpenColorPanel) btnOpenColorPanel.disabled = disabled;
     if (btnExport) btnExport.disabled = disabled;
   }
 
@@ -2833,6 +2915,7 @@
     eraseMode = event.button === 2 || event.altKey || event.metaKey;
     drawing = true;
     setPixel(x, y);
+    updateColorOpenButton();
   }
   function onPointerMove(event) {
     if (!drawing) return;
@@ -2914,11 +2997,8 @@
     setCurrentColor(event.target.value);
   });
 
-  swatchEditor?.addEventListener('input', event => {
-    if (tutorialState.active) return;
-    if (activeSwatchIndex === 0) return;
-    const next = event.target.value;
-    setCurrentColor(next);
+  btnOpenColorPanel?.addEventListener('click', () => {
+    openLiteColorPicker(activeSwatchIndex);
   });
   liteColorWheel?.addEventListener('pointerdown', handleLiteWheelPointerDown);
   liteValueSlider?.addEventListener('input', () => {
@@ -3002,6 +3082,7 @@
   initPalette();
   setCurrentColor(palette[activeSwatchIndex], { updatePalette: false });
   updateUndoRedoUI();
+  updateColorOpenButton();
   applyCanvasSize(canvasSize);
   setJelinMode(false);
   if (tutorialForceStart || isTutorialPending()) {
