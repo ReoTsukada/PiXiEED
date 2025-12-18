@@ -8,6 +8,19 @@
 <meta content="PiXiEEDrawのライト版（通称ピクドラ）。16×16固定の超シンプルなブラウザ向けドットツールで、ジェリンプレビューや日替わりお題で気軽にドット練習ができます。" name="description"/>
 <meta content="PiXiEEDraw Lite,ピクドラ,ピクセル,ドット絵,ジェリン,ブラウザお絵描き,16x16ドット,ドットツール" name="keywords"/>
 <meta content="#0b0f1f" name="theme-color"/>
+<meta content="website" property="og:type"/>
+<meta content="PiXiEEDraw Lite（ピクドラ）" property="og:title"/>
+<meta content="PiXiEEDrawのライト版（通称ピクドラ）。16×16固定の超シンプルなブラウザ向けドットツールで、ジェリンプレビューや日替わりお題で気軽にドット練習ができます。" property="og:description"/>
+<meta content="https://pixieed.jp/jerin-maker/" property="og:url"/>
+<meta content="https://pixieed.jp/jerin-maker/ogp-app.png" property="og:image"/>
+<meta content="PiXiEED" property="og:site_name"/>
+<meta content="ja_JP" property="og:locale"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="@PiXiEED_arta" name="twitter:site"/>
+<meta content="https://pixieed.jp/jerin-maker/" name="twitter:url"/>
+<meta content="PiXiEEDraw Lite（ピクドラ）" name="twitter:title"/>
+<meta content="PiXiEEDrawのライト版（通称ピクドラ）。16×16固定の超シンプルなブラウザ向けドットツールで、ジェリンプレビューや日替わりお題で気軽にドット練習ができます。" name="twitter:description"/>
+<meta content="https://pixieed.jp/jerin-maker/ogp-app.png" name="twitter:image"/>
 <link href="../character-dots/mao1.png" rel="icon" type="image/png"/>
 <script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
 <style>
@@ -162,10 +175,10 @@
   }
   button:hover { border-color: rgba(88, 196, 255, 0.8); }
   .icon-btn {
-    width: 44px;
-    height: 44px;
-    padding: 8px;
-    border-radius: 12px;
+    width: 40px;
+    height: 40px;
+    padding: 6px;
+    border-radius: 10px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -179,8 +192,8 @@
     box-shadow: 0 0 0 2px rgba(88, 196, 255, 0.35);
   }
   .icon-btn img {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     object-fit: contain;
     image-rendering: pixelated;
   }
@@ -645,9 +658,42 @@
   }
   .inline-buttons {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    width: 100%;
+  }
+  .inline-buttons .icon-btn[aria-hidden="true"] {
+    opacity: 0;
+    pointer-events: none;
+  }
+  #btnTutorialSpacerLeft,
+  #btnTutorialSpacerRight {
+    width: 8px;
+    min-width: 8px;
+    padding: 0;
+  }
+  #btnExport { margin-left: auto; }
+  @media (orientation: landscape) {
+    .inline-buttons {
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      padding: 4px;
+      border-radius: 8px;
+    }
+    .icon-btn img {
+      width: 20px;
+      height: 20px;
+    }
+    #btnExport { margin-left: auto; }
+    .palette {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
   }
   .swatch-editor {
     position: absolute;
@@ -750,7 +796,9 @@
             <button class="icon-btn" id="btnRedo" title="やり直す" type="button">
               <img alt="やり直す" src="../pixiedraw/assets/icons/action-redo.svg"/>
             </button>
-            <button class="icon-btn" id="btnTutorialRestart" title="チュートリアルを最初から (ハテナ)" type="button">?</button>
+            <button class="icon-btn" id="btnTutorialSpacerLeft" title="" type="button" aria-hidden="true"></button>
+            <button class="icon-btn" id="btnTutorialRestart" title="チュートリアルを最初から (ハテナ)" type="button" aria-hidden="true">?</button>
+            <button class="icon-btn" id="btnTutorialSpacerRight" title="" type="button" aria-hidden="true"></button>
             <button class="icon-btn" id="btnExport" title="PNGを書き出す" type="button">
               <img alt="書き出し" src="../pixiedraw/assets/icons/action-export.svg"/>
             </button>
@@ -1457,6 +1505,8 @@
   const btnRedo = document.getElementById('btnRedo');
   const btnOpenColorPanel = document.getElementById('btnOpenColorPanel');
   const btnColorChip = document.getElementById('btnColorChip');
+  const btnTutorialSpacerLeft = document.getElementById('btnTutorialSpacerLeft');
+  const btnTutorialSpacerRight = document.getElementById('btnTutorialSpacerRight');
   const swatchEditor = /** @type {HTMLInputElement|null} */ (document.getElementById('swatchEditor'));
   const liteColorPicker = document.getElementById('liteColorPicker');
   const liteColorWheel = /** @type {HTMLCanvasElement|null} */ (document.getElementById('liteColorWheel'));
@@ -1696,15 +1746,48 @@
     dailyPromptTitle.style.display = 'inline';
     dailyPromptBody.style.display = 'inline';
     if (maouInline) maouInline.style.display = 'none';
-    // 日本時間の0時基準で1日1つに固定
+    // 日本時間の0時基準で1日1つに固定（前日と同じインデックスなら一つ先を使う）
+    const now = Date.now();
+    const JST_OFFSET = 9 * 60 * 60 * 1000;
+    const dayId = Math.floor((now + JST_OFFSET) / (24 * 60 * 60 * 1000)); // JST日数
+    const prevDayId = dayId - 1;
+    const hashDay = d => {
+      let x = d >>> 0;
+      x ^= x << 13;
+      x ^= x >>> 17;
+      x ^= x << 5;
+      return x >>> 0;
+    };
+    const wrapDist = (a, b, len) => {
+      const d = Math.abs(a - b);
+      return Math.min(d, len - d);
+    };
+    const baseIdx = hashDay(dayId) % dailyPrompts.length;
+    const prevIdx = hashDay(prevDayId) % dailyPrompts.length;
+    let idx = baseIdx;
+    if (wrapDist(baseIdx, prevIdx, dailyPrompts.length) <= 3) {
+      idx = (baseIdx + Math.floor(dailyPrompts.length / 3) + 1) % dailyPrompts.length;
+    }
+    dailyPromptBody.textContent = dailyPrompts[idx];
+  }
+
+  let dailyPromptTimer = null;
+  function scheduleDailyPromptRefresh() {
+    if (dailyPromptTimer) {
+      clearTimeout(dailyPromptTimer);
+      dailyPromptTimer = null;
+    }
+    // 次のJST 00:00 までの残りミリ秒を計算
     const now = Date.now();
     const JST_OFFSET = 9 * 60 * 60 * 1000;
     const jst = new Date(now + JST_OFFSET);
-    const seedBase = jst.getUTCFullYear() * 10000 + (jst.getUTCMonth() + 1) * 100 + jst.getUTCDate();
-    let state = seedBase;
-    state = (1664525 * state + 1013904223) >>> 0; // LCGで決定的に散らす
-    const idx = Math.floor((state / 0xffffffff) * dailyPrompts.length);
-    dailyPromptBody.textContent = dailyPrompts[idx];
+    jst.setUTCHours(0, 0, 0, 0);
+    const nextMidnight = jst.getTime() + 24 * 60 * 60 * 1000 - JST_OFFSET;
+    const delay = Math.max(1000, nextMidnight - now + 50); // 少し余裕を持たせる
+    dailyPromptTimer = setTimeout(() => {
+      setDailyPrompt();
+      scheduleDailyPromptRefresh();
+    }, delay);
   }
 
   function initAds() {
@@ -2424,6 +2507,18 @@
     if (btnJelinMode) btnJelinMode.disabled = disabled;
     if (btnOpenColorPanel) btnOpenColorPanel.disabled = disabled;
     if (btnExport) btnExport.disabled = disabled;
+    if (btnTutorialRestart) {
+      btnTutorialRestart.style.opacity = disabled ? '0' : '0';
+      btnTutorialRestart.style.pointerEvents = 'none';
+    }
+    if (btnTutorialSpacerLeft) {
+      btnTutorialSpacerLeft.style.opacity = '0';
+      btnTutorialSpacerLeft.style.pointerEvents = 'none';
+    }
+    if (btnTutorialSpacerRight) {
+      btnTutorialSpacerRight.style.opacity = '0';
+      btnTutorialSpacerRight.style.pointerEvents = 'none';
+    }
   }
 
   function setTutorialStep(stepIndex) {
@@ -2530,6 +2625,10 @@
   }
 
   function resetTutorial() {
+    if (btnTutorialRestart) {
+      btnTutorialRestart.style.opacity = '0';
+      btnTutorialRestart.style.pointerEvents = 'none';
+    }
     try {
       localStorage.removeItem(TUTORIAL_KEY);
     } catch {
@@ -3104,10 +3203,18 @@
     startTutorial();
   } else {
     setDailyPrompt();
+    scheduleDailyPromptRefresh();
     updateTutorialUI();
   }
   initAds();
   adsQueue.push({});
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      setDailyPrompt();
+      scheduleDailyPromptRefresh();
+    }
+  });
 
   window.addEventListener('resize', () => {
     resizeGridCanvas();
