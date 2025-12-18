@@ -900,6 +900,7 @@
     currentSprite: null,
     currentOverlay: null,
     requiredColors: new Map(),
+    prevCanvasSize: null,
   };
   const tutorialSprites = [];
   let tutorialPaletteSet = new Set();
@@ -2486,6 +2487,7 @@
   function startTutorial() {
     endingCutscenePlayed = false;
     tutorialState.active = true;
+    tutorialState.prevCanvasSize = canvasSize;
     tutorialState.basePalette = [...palette];
     tutorialState.currentSprite = null;
     disableNonTutorialControls(true);
@@ -2519,7 +2521,9 @@
     hideMaouDialog();
     tutorialState.currentSprite = null;
     restoreUserPalette();
-    applyCanvasSize(16);
+    if (tutorialState.prevCanvasSize) {
+      applyCanvasSize(tutorialState.prevCanvasSize);
+    }
     setDailyPrompt();
     updateTutorialUI();
     render();
@@ -2538,6 +2542,7 @@
     tutorialState.hits = new Set();
     tutorialState.currentSprite = null;
     tutorialState.requiredColors = new Map();
+    tutorialState.prevCanvasSize = null;
     endingCutscenePlayed = false;
     if (tutorialOverlayCtx && tutorialOverlayCanvas) {
       tutorialOverlayCtx.clearRect(0, 0, tutorialOverlayCanvas.width, tutorialOverlayCanvas.height);
@@ -2672,11 +2677,6 @@
       maouInline.style.visibility = 'visible';
     }
     let idx = 0;
-    const showLine = () => {
-      const line = lines[idx] || '';
-      cutsceneText.textContent = line;
-      opts.onLine?.(idx, line);
-    };
     const step = () => {
       if (!cutsceneActive) return;
       if (idx >= lines.length) {
@@ -2688,9 +2688,24 @@
         opts.onDone?.();
         return;
       }
-      showLine();
-      idx += 1;
-      setTimeout(step, 2000);
+      const line = lines[idx] || '';
+      cutsceneText.textContent = '';
+      opts.onLine?.(idx, line);
+      let pos = 0;
+      const typeNext = () => {
+        if (!cutsceneActive) return;
+        cutsceneText.textContent = line.slice(0, pos + 1);
+        pos += 1;
+        if (pos < line.length) {
+          setTimeout(typeNext, 40); // 文字送り速度
+        } else {
+          setTimeout(() => {
+            idx += 1;
+            step();
+          }, 1000); // 全文字表示後の待機
+        }
+      };
+      typeNext();
     };
     cutsceneEl.classList.add('is-active');
     step();
