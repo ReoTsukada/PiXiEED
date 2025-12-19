@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>QRコードメーカー | PiXiEED</title>
+<meta content="URLやテキストをブラウザ上で即座にQRコード化。サイズ・余白・誤り訂正・色を調整してPNG保存できる軽量ツールです。" name="description"/>
+<meta content="website" property="og:type"/>
+<meta content="QRコードメーカー | PiXiEED" property="og:title"/>
+<meta content="URLやテキストをブラウザ上で即座にQRコード化。サイズ・余白・誤り訂正・色を調整してPNG保存できる軽量ツールです。" property="og:description"/>
+<meta content="https://pixieed.jp/qr-maker/qrogp.png" property="og:image"/>
+<meta content="https://pixieed.jp/qr-maker/" property="og:url"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="https://pixieed.jp/qr-maker/qrogp.png" name="twitter:image"/>
+<meta content="#080d1f" name="theme-color"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Noto+Sans+JP:wght@400;600;700&display=swap" rel="stylesheet"/>
+<link href="../character-dots/mao1.png" rel="icon" type="image/png"/>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
+<script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
+<script>
+  const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
+  const GA_PAGE_PATH = '/qr-maker/';
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', GA_MEASUREMENT_ID, {
+    page_path: GA_PAGE_PATH,
+    page_title: document.title
+  });
+  gtag('event', 'project_open', {
+    project_slug: 'qr-maker',
+    project_type: 'tool',
+    project_name: 'QRコードメーカー'
+  });
+  gtag('event', 'qr_maker_open');
+  </script>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: radial-gradient(circle at 18% 16%, rgba(123, 207, 255, 0.18), transparent 40%), radial-gradient(circle at 82% 10%, rgba(255, 170, 118, 0.14), transparent 38%), #080d1f;
+    --panel: rgba(7, 11, 24, 0.82);
+    --panel-strong: rgba(10, 16, 32, 0.94);
+    --border: rgba(126, 154, 255, 0.28);
+    --accent: #7bcfff;
+    --accent-2: #ffa95c;
+    --text: #eaf1ff;
+    --muted: #98a7c7;
+    --input: rgba(11, 17, 32, 0.9);
+    --shadow: 0 20px 70px rgba(0, 0, 0, 0.45);
+    --radius: 18px;
+    --gap: clamp(16px, 2vw, 22px);
+    font-family: "Montserrat", "Noto Sans JP", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    padding: clamp(8px, 2.5vw, 18px);
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  textarea, input, select { user-select: text; -webkit-user-select: text; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .qr-shell {
+    width: min(1100px, 100%);
+    background: linear-gradient(145deg, rgba(10, 18, 36, 0.9), rgba(8, 14, 30, 0.92));
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 26px;
+    box-shadow: var(--shadow);
+    padding: clamp(14px, 2vw, 22px);
+    backdrop-filter: blur(8px);
+    height: calc(100vh - 2 * clamp(12px, 3vw, 24px));
+    max-height: 100%;
+    display: grid;
+    grid-template-rows: auto auto 1fr auto;
+    gap: 12px;
+    overflow: hidden;
+  }
+  header {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    min-width: 0;
+    width: 100%;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .brand__logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, rgba(123, 207, 255, 0.4), rgba(123, 207, 255, 0.16)), #0c142d;
+    color: #0c142d;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-weight: 700;
+    font-size: 0.9rem;
+  }
+  .brand__name {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .brand__name small {
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .brand__name strong {
+    font-size: 1.02rem;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  h1 {
+    font-size: clamp(1.3rem, 3.4vw, 1.8rem);
+    margin: 6px 0 4px;
+    letter-spacing: 0.01em;
+  }
+  .lead {
+    margin: 0 0 10px;
+    color: var(--muted);
+    line-height: 1.5;
+    font-weight: 500;
+  }
+  .hero-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 2px 0 4px;
+    padding-right: 4px;
+  }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    min-width: max-content;
+    justify-content: flex-end;
+  }
+  .header-actions .btn {
+    white-space: nowrap;
+    padding: 7px 9px;
+    font-size: 0.9rem;
+  }
+  .hero-heading {
+    display: block;
+    min-width: 0;
+  }
+  .hero-heading h1 {
+    margin: 8px 0 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .btn {
+    appearance: none;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-weight: 700;
+    background: linear-gradient(135deg, rgba(123, 207, 255, 0.3), rgba(90, 125, 255, 0.24));
+    color: var(--text);
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+  }
+  .btn:hover, .btn:focus-visible {
+    transform: translateY(-1px);
+    border-color: rgba(123, 207, 255, 0.65);
+    outline: none;
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
+  }
+  .btn.secondary {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+  .qr-grid {
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: clamp(12px, 2vw, 18px);
+    margin-top: 10px;
+    min-height: 0;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius);
+    padding: clamp(16px, 2vw, 20px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+  .panel h2 {
+    margin: 0 0 8px;
+    font-size: 1.15rem;
+    letter-spacing: 0.02em;
+  }
+  .panel p {
+    margin: 0 0 14px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  label {
+    display: block;
+    font-weight: 700;
+    margin-bottom: 6px;
+    letter-spacing: 0.01em;
+  }
+  textarea, select, input[type="color"], input[type="range"] {
+    width: 100%;
+    font-family: inherit;
+  }
+  textarea, select {
+    background: var(--input);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 12px;
+    font-size: 1rem;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  }
+  textarea:focus, select:focus {
+    outline: none;
+    border-color: rgba(123, 207, 255, 0.6);
+    box-shadow: 0 0 0 3px rgba(123, 207, 255, 0.16);
+  }
+  textarea {
+    resize: vertical;
+    min-height: 120px;
+  }
+  .field-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin: 12px 0;
+  }
+  .range-wrap {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+  }
+  input[type="range"] {
+    accent-color: var(--accent);
+  }
+  .range-value {
+    color: var(--muted);
+    font-weight: 600;
+    min-width: 64px;
+    text-align: right;
+  }
+.color-field {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  input[type="color"] {
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    width: 70px;
+    height: 52px;
+    cursor: pointer;
+    padding: 0;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 6px 18px rgba(0,0,0,0.28);
+  }
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 0.92rem;
+  }
+  .meta-row span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .status {
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .qr-preview {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 14px;
+  }
+  .qr-canvas {
+    background: var(--panel-strong);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius);
+    display: grid;
+    place-items: center;
+    padding: clamp(10px, 1.5vw, 14px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    min-height: 260px;
+  }
+  canvas {
+    width: min(100%, 300px);
+    height: auto;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.3);
+  }
+  .qr-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .small {
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+  .ad-slot {
+    width: 100%;
+    max-width: 960px;
+    min-height: 60px;
+    padding: 6px 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 14px;
+  }
+  .ad-slot ins {
+    display: block;
+    width: 100%;
+    max-width: 900px;
+    height: 60px;
+  }
+  @media (max-width: 940px) {
+    .qr-grid {
+      grid-template-columns: 1fr;
+    }
+    .qr-shell {
+      grid-template-rows: auto auto 1fr auto;
+    }
+    .qr-canvas {
+      min-height: 260px;
+    }
+  }
+  @media (max-width: 540px) {
+    header { grid-template-columns: auto 1fr auto; }
+    body { padding: 10px; }
+    .qr-shell { padding: 14px; }
+    .hero-actions { flex-direction: column; }
+    .hero-heading { gap: 4px; }
+    .hero-heading h1 { font-size: 1.2rem; }
+    .header-actions .btn { padding: 7px 9px; font-size: 0.88rem; }
+  }
+</style>
+</head>
+<body>
+<div class="qr-shell">
+<header>
+<div class="brand">
+<div aria-hidden="true" class="brand__logo">QR</div>
+<div class="brand__name">
+<small>PiXiEED Tool</small>
+<strong>QRコードメーカー</strong>
+</div>
+</div>
+<div class="header-actions">
+<a class="btn secondary" href="../projects/qr-maker/index.html">一覧へ戻る</a>
+</div>
+</header>
+<div class="ad-slot">
+<ins class="adsbygoogle"
+     style="display:block"
+     data-ad-client="ca-pub-9801602250480253"
+     data-ad-slot="2141591954"></ins>
+<script>
+  (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+</div>
+<main style="overflow:auto; min-height:0; padding-bottom:6px;">
+<div class="hero-heading" aria-hidden="true">
+<h1 style="visibility:hidden;height:0;margin:0;padding:0;">&nbsp;</h1>
+</div>
+<div class="qr-grid">
+<section class="panel">
+<h2>1. テキストを入力</h2>
+<label for="qrInput">エンコードする内容</label>
+<textarea id="qrInput" maxlength="1200" placeholder="https://example.com や テキストを入力…">https://pixieed.jp/</textarea>
+<div class="meta-row" aria-live="polite">
+<span>文字数: <span id="charCount">0</span> / 900 推奨</span>
+<span>状態: <span class="status" id="qrStatus">未生成</span></span>
+</div>
+<div class="field-row">
+<div>
+<label for="qrLevel">誤り訂正レベル</label>
+<select id="qrLevel">
+<option value="M">M（標準）</option>
+<option value="L">L（軽量）</option>
+<option value="Q">Q（高耐性）</option>
+<option value="H">H（最高耐性）</option>
+</select>
+</div>
+<div>
+<label for="qrSize">サイズ</label>
+<div class="range-wrap">
+<input id="qrSize" max="640" min="180" step="10" type="range" value="320"/>
+<span class="range-value" id="qrSizeValue">320px</span>
+</div>
+</div>
+</div>
+<div class="field-row">
+<div>
+<label for="qrMargin">余白（クワイエットゾーン）</label>
+<div class="range-wrap">
+<input id="qrMargin" max="12" min="0" step="1" type="range" value="4"/>
+<span class="range-value" id="qrMarginValue">4px</span>
+</div>
+</div>
+<div>
+<label>色</label>
+<div class="color-field">
+<div>
+<span class="small">黒側</span>
+<input id="qrDark" type="color" value="#0f172a"/>
+</div>
+<div>
+<span class="small">背景</span>
+<input id="qrLight" type="color" value="#ffffff"/>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="panel qr-preview">
+<div>
+<h2>2. プレビュー</h2>
+<p class="small">カメラで読みやすいか確認してください。</p>
+</div>
+<div class="qr-canvas">
+<canvas height="280" id="qrCanvas" width="280"></canvas>
+</div>
+<div class="qr-actions">
+<button class="btn" id="downloadBtn" type="button">PNGを保存</button>
+<button class="btn secondary" id="copyDataBtn" type="button">テキストをコピー</button>
+</div>
+</section>
+</div>
+<div class="ad-slot">
+<ins class="adsbygoogle"
+     style="display:block"
+     data-ad-client="ca-pub-9801602250480253"
+     data-ad-slot="2141591954"></ins>
+<script>
+  (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
+</div>
+</div>
+<script src="./qrcode.min.js"></script>
+<script>
+  const input = document.getElementById('qrInput');
+  const qrCanvas = document.getElementById('qrCanvas');
+  const qrStatus = document.getElementById('qrStatus');
+  const charCount = document.getElementById('charCount');
+  const sizeInput = document.getElementById('qrSize');
+  const sizeValue = document.getElementById('qrSizeValue');
+  const marginInput = document.getElementById('qrMargin');
+  const marginValue = document.getElementById('qrMarginValue');
+  const levelSelect = document.getElementById('qrLevel');
+  const colorDark = document.getElementById('qrDark');
+  const colorLight = document.getElementById('qrLight');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const copyBtn = document.getElementById('copyDataBtn');
+
+  const DEFAULT_TEXT = 'https://pixieed.jp/';
+  const TEXT_LIMIT = 900;
+
+  const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
+
+  function syncLabels() {
+    charCount.textContent = input.value.length;
+    sizeValue.textContent = sizeInput.value + 'px';
+    marginValue.textContent = marginInput.value + 'px';
+  }
+
+  async function renderQRCode() {
+    if (!window.QRCode || typeof QRCode.toCanvas !== 'function') {
+      qrStatus.textContent = 'QRライブラリを読み込めませんでした';
+      qrStatus.style.color = '#ffa95c';
+      return;
+    }
+    const text = (input.value.trim() || DEFAULT_TEXT).slice(0, TEXT_LIMIT);
+    const width = clamp(parseInt(sizeInput.value || '320', 10), 180, 640);
+    const margin = clamp(parseInt(marginInput.value || '4', 10), 0, 24);
+    const options = {
+      errorCorrectionLevel: levelSelect.value,
+      width,
+      margin,
+      color: {
+        dark: colorDark.value || '#0f172a',
+        light: colorLight.value || '#ffffff'
+      }
+    };
+    try {
+      await QRCode.toCanvas(qrCanvas, text, options);
+      qrStatus.textContent = '更新しました';
+      qrStatus.style.color = '#7bcfff';
+    } catch (err) {
+      qrStatus.textContent = '生成に失敗しました';
+      qrStatus.style.color = '#ffa95c';
+      console.error(err);
+    }
+  }
+
+  function downloadPNG() {
+    const link = document.createElement('a');
+    link.download = 'pixieed-qr.png';
+    link.href = qrCanvas.toDataURL('image/png');
+    link.click();
+  }
+
+  function copyData() {
+    const text = input.value.trim() || DEFAULT_TEXT;
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+      qrStatus.textContent = 'クリップボード非対応の環境です';
+      qrStatus.style.color = '#ffa95c';
+      return;
+    }
+    navigator.clipboard.writeText(text).then(() => {
+      qrStatus.textContent = 'テキストをコピーしました';
+      qrStatus.style.color = '#7bcfff';
+    }).catch(() => {
+      qrStatus.textContent = 'クリップボードにコピーできませんでした';
+      qrStatus.style.color = '#ffa95c';
+    });
+  }
+
+  input.addEventListener('input', () => {
+    syncLabels();
+    renderQRCode();
+  });
+  [sizeInput, marginInput, levelSelect, colorDark, colorLight].forEach(el => {
+    el.addEventListener('input', () => {
+      syncLabels();
+      renderQRCode();
+    });
+  });
+  // 初期描画
+  downloadBtn.addEventListener('click', downloadPNG);
+  copyBtn.addEventListener('click', copyData);
+
+  syncLabels();
+  renderQRCode();
+</script>
+</body>
+</html>
