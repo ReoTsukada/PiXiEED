@@ -144,6 +144,81 @@
       background: linear-gradient(135deg, rgba(143, 199, 255, 1), rgba(173, 162, 255, 1));
       border-color: rgba(143, 199, 255, 0.95);
     }
+    .qr-readout {
+      position: fixed;
+      left: calc(var(--hud-padding) + var(--safe-left));
+      bottom: calc(var(--hud-padding) + var(--safe-bottom) + 10px);
+      width: min(460px, 94vw);
+      background: rgba(8, 12, 24, 0.9);
+      border: 1px solid rgba(123, 207, 255, 0.28);
+      border-radius: 16px;
+      box-shadow: 0 18px 36px rgba(0, 0, 0, 0.48);
+      padding: 14px 16px;
+      z-index: 55;
+      pointer-events: auto;
+      backdrop-filter: blur(10px);
+    }
+    .qr-readout__header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .qr-readout__title {
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+    .qr-readout__state {
+      margin-left: auto;
+      font-size: 0.85rem;
+      padding: 4px 10px;
+      border-radius: 10px;
+      background: rgba(123, 207, 255, 0.18);
+      border: 1px solid rgba(123, 207, 255, 0.3);
+      color: var(--accent);
+      letter-spacing: 0.04em;
+    }
+    .qr-readout__message {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 0.95rem;
+    }
+    .qr-readout__result {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(231, 238, 255, 0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .qr-readout__label {
+      margin: 0;
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+      color: rgba(231, 238, 255, 0.75);
+    }
+    .qr-readout__text {
+      margin: 0;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
+    .qr-readout__actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .qr-readout__actions .option-button {
+      flex: 1 1 120px;
+      text-align: center;
+      padding: 10px 12px;
+    }
+    .qr-readout--detected {
+      border-color: rgba(123, 207, 255, 0.55);
+      box-shadow: 0 18px 44px rgba(123, 207, 255, 0.18), 0 12px 38px rgba(0, 0, 0, 0.38);
+    }
     .lens-ad-banner{
       position: fixed;
       top: 0;
@@ -190,6 +265,12 @@
       }
       .update-toast__btn {
         width: 100%;
+      }
+      .qr-readout {
+        left: clamp(12px, 4vw, 18px);
+        right: clamp(12px, 4vw, 18px);
+        width: auto;
+        bottom: calc(var(--hud-padding) + var(--safe-bottom) + 6px);
       }
     }
     video {
@@ -1908,6 +1989,21 @@
 <div aria-hidden="true" class="hud-landscape-capture"></div>
 </div>
 <div class="pixel-preview" hidden="" id="pixelPreview"></div>
+<div aria-live="polite" class="qr-readout" hidden="" id="qrReadout" role="status">
+<div class="qr-readout__header">
+<span class="qr-readout__title">QRスキャン</span>
+<span class="qr-readout__state" id="qrReadoutState">停止中</span>
+</div>
+<p class="qr-readout__message" id="qrReadoutMessage">「QR」ボタンをオンにするとスキャンを開始します。</p>
+<div class="qr-readout__result" hidden="" id="qrReadoutResult">
+<p class="qr-readout__label">検出された内容</p>
+<div class="qr-readout__text" id="qrReadoutText"></div>
+<div class="qr-readout__actions">
+<button class="option-button" disabled="" id="qrCopyBtn" type="button">コピー</button>
+<button class="option-button" disabled="" id="qrOpenBtn" type="button">リンクを開く</button>
+</div>
+</div>
+</div>
 </div></main>
 <div aria-hidden="true" class="camera-permission" hidden="" id="cameraStartOverlay">
 <div class="camera-permission__backdrop" id="cameraStartBackdrop"></div>
@@ -1968,6 +2064,13 @@
     const aspectMenuBtn = document.getElementById('aspectMenuBtn');
     const pixelArtInput = document.getElementById('pixelArtInput');
     const pixelPreview = document.getElementById('pixelPreview');
+    const qrReadout = document.getElementById('qrReadout');
+    const qrReadoutState = document.getElementById('qrReadoutState');
+    const qrReadoutMessage = document.getElementById('qrReadoutMessage');
+    const qrReadoutResult = document.getElementById('qrReadoutResult');
+    const qrReadoutText = document.getElementById('qrReadoutText');
+    const qrCopyBtn = document.getElementById('qrCopyBtn');
+    const qrOpenBtn = document.getElementById('qrOpenBtn');
     const landscapeCaptureSlot = document.querySelector('.hud-landscape-capture');
     const captureButtonOriginalParent = captureBtn ? captureBtn.parentElement : null;
     const cameraStartOverlay = document.getElementById('cameraStartOverlay');
@@ -2286,6 +2389,9 @@
       { id: 'wst-tira', label: 'ティアラ（カラー）', src: './stamps/wst-tira.png', hueAdjustable: true },
       { id: 'wst-kurabu', label: 'クラブ（カラー）', src: './stamps/wst-kurabu.png', hueAdjustable: true }
     ]);
+    const QR_SCAN_BASE_WIDTH = 480;
+    const QR_SCAN_MIN_HEIGHT = 240;
+    const QR_SCAN_DEFAULT_INTERVAL_MS = 520;
 
     const state = {
       stream: null,
@@ -2359,6 +2465,14 @@
     let cameraPermissionDenied = false;
     let cameraReady = false;
     let captureInProgress = false;
+    let qrScanEnabled = true;
+    let qrSupportAvailable = null;
+    let qrDetector = null;
+    let qrScanLoopHandle = null;
+    let qrLastValue = '';
+    let qrOpenTarget = '';
+    const qrScanCanvas = document.createElement('canvas');
+    const qrScanCtx = qrScanCanvas.getContext ? qrScanCanvas.getContext('2d', { willReadFrequently: true }) : null;
 
     const menus = {
       aspect: { button: aspectMenuBtn, panel: aspectMenu },
@@ -3696,6 +3810,231 @@
       cameraStatusMessage = message;
       if (!activeOverlay || !activeOverlay.hasImage) {
         setStatus(message);
+      }
+    }
+
+    function setQrReadoutVisibility(visible) {
+      if (!qrReadout) {
+        return;
+      }
+      const desired = Boolean(visible);
+      qrReadout.hidden = !desired;
+      qrReadout.setAttribute('aria-hidden', desired ? 'false' : 'true');
+    }
+
+    function normalizeQrValue(value) {
+      return typeof value === 'string' ? value.trim() : '';
+    }
+
+    function truncateQrValue(value, maxLength = 120) {
+      const normalized = normalizeQrValue(value);
+      if (!normalized) {
+        return '';
+      }
+      if (normalized.length <= maxLength) {
+        return normalized;
+      }
+      return `${normalized.slice(0, maxLength)}…`;
+    }
+
+    function getOpenableUrl(value) {
+      const normalized = normalizeQrValue(value);
+      if (!normalized) {
+        return '';
+      }
+      try {
+        const url = new URL(normalized, window.location.href);
+        if (url.protocol === 'http:' || url.protocol === 'https:') {
+          return url.toString();
+        }
+      } catch (error) {
+        return '';
+      }
+      return '';
+    }
+
+    function updateQrReadout(message, stateLabel, options = {}) {
+      if (!qrReadout) {
+        return;
+      }
+      const { resultText = null, openUrl = '', forceShow = false } = options;
+      const normalizedResult = normalizeQrValue(resultText) || qrLastValue;
+      const hasResult = Boolean(normalizedResult);
+      const shouldShow = forceShow || hasResult || Boolean(qrLastValue);
+      if (!shouldShow) {
+        setQrReadoutVisibility(false);
+        return;
+      }
+      setQrReadoutVisibility(true);
+      if (qrReadoutState) {
+        qrReadoutState.textContent = stateLabel || '';
+      }
+      if (qrReadoutMessage) {
+        qrReadoutMessage.textContent = message || '';
+      }
+      if (qrReadoutResult) {
+        qrReadoutResult.hidden = !hasResult;
+      }
+      if (qrReadoutText) {
+        qrReadoutText.textContent = hasResult ? normalizedResult : '';
+      }
+      qrReadout.classList.toggle('qr-readout--detected', hasResult);
+      if (qrCopyBtn) {
+        qrCopyBtn.disabled = !hasResult;
+      }
+      const resolvedOpenUrl = hasResult ? (openUrl || getOpenableUrl(normalizedResult)) : '';
+      qrOpenTarget = resolvedOpenUrl;
+      if (qrOpenBtn) {
+        qrOpenBtn.disabled = !qrOpenTarget;
+      }
+    }
+
+    async function ensureQrDetector() {
+      if (qrDetector) {
+        qrSupportAvailable = true;
+        return qrDetector;
+      }
+      if (qrSupportAvailable === false) {
+        return null;
+      }
+      if (!('BarcodeDetector' in window)) {
+        qrSupportAvailable = false;
+        return null;
+      }
+      try {
+        if (typeof window.BarcodeDetector.getSupportedFormats === 'function') {
+          const supported = await window.BarcodeDetector.getSupportedFormats();
+          if (Array.isArray(supported) && !supported.includes('qr_code')) {
+            qrSupportAvailable = false;
+            return null;
+          }
+        }
+        qrDetector = new window.BarcodeDetector({ formats: ['qr_code'] });
+        qrSupportAvailable = true;
+        return qrDetector;
+      } catch (error) {
+        qrSupportAvailable = false;
+        console.warn('BarcodeDetector unavailable', error);
+        return null;
+      }
+    }
+
+    function stopQrScanLoop() {
+      if (qrScanLoopHandle) {
+        clearTimeout(qrScanLoopHandle);
+        qrScanLoopHandle = null;
+      }
+    }
+
+    function scheduleQrScanLoop(delay = QR_SCAN_DEFAULT_INTERVAL_MS) {
+      if (!qrScanEnabled) {
+        stopQrScanLoop();
+        return;
+      }
+      stopQrScanLoop();
+      qrScanLoopHandle = window.setTimeout(() => {
+        qrScanLoopHandle = null;
+        void handleQrScanTick();
+      }, Math.max(60, Number.isFinite(delay) ? delay : QR_SCAN_DEFAULT_INTERVAL_MS));
+    }
+
+    async function scanQrFrame() {
+      if (!qrScanCanvas || !qrScanCtx || !video || video.readyState < 2) {
+        return null;
+      }
+      const viewportWidth = Math.max(1, Math.round(window.innerWidth || video.videoWidth || QR_SCAN_BASE_WIDTH));
+      const viewportHeight = Math.max(1, Math.round(window.innerHeight || video.videoHeight || QR_SCAN_MIN_HEIGHT));
+      const aspectRatio = viewportHeight > 0 ? viewportWidth / viewportHeight : 1;
+      const targetWidth = QR_SCAN_BASE_WIDTH;
+      const targetHeight = Math.max(QR_SCAN_MIN_HEIGHT, Math.round(targetWidth / Math.max(aspectRatio, 0.1)));
+      qrScanCanvas.width = targetWidth;
+      qrScanCanvas.height = targetHeight;
+      const sourceRect = getVideoCoverSourceRect(targetWidth, targetHeight);
+      if (!sourceRect) {
+        return null;
+      }
+      qrScanCtx.clearRect(0, 0, targetWidth, targetHeight);
+      qrScanCtx.drawImage(
+        video,
+        sourceRect.sx,
+        sourceRect.sy,
+        sourceRect.sw,
+        sourceRect.sh,
+        0,
+        0,
+        targetWidth,
+        targetHeight
+      );
+      const detector = await ensureQrDetector();
+      if (!detector) {
+        return null;
+      }
+      const barcodes = await detector.detect(qrScanCanvas);
+      if (Array.isArray(barcodes) && barcodes.length) {
+        const code = barcodes.find((entry) => normalizeQrValue(entry.rawValue)) || barcodes[0];
+        if (code && typeof code.rawValue === 'string') {
+          return code.rawValue.trim();
+        }
+      }
+      return null;
+    }
+
+    function handleQrDetection(value) {
+      const normalized = normalizeQrValue(value);
+      if (!normalized) {
+        return;
+      }
+      const isNew = normalized !== qrLastValue;
+      qrLastValue = normalized;
+      const openUrl = getOpenableUrl(normalized);
+      updateQrReadout('QRコードを読み取りました。', '検出', {
+        resultText: normalized,
+        openUrl,
+        forceShow: true
+      });
+      setStatus(`QR検出: ${truncateQrValue(normalized, 64)}`);
+      if (isNew && navigator.vibrate) {
+        try {
+          navigator.vibrate(80);
+        } catch (error) {
+          // ignore vibration failures
+        }
+      }
+    }
+
+    async function handleQrScanTick() {
+      if (!qrScanEnabled) {
+        stopQrScanLoop();
+        return;
+      }
+      if (!qrScanCtx) {
+        qrSupportAvailable = false;
+        setStatus('このブラウザはQRスキャンに対応していません。最新のブラウザでお試しください。');
+        stopQrScanLoop();
+        return;
+      }
+      if (!cameraReady || !state.stream || !video || video.readyState < 2) {
+        scheduleQrScanLoop(800);
+        return;
+      }
+      const detector = await ensureQrDetector();
+      if (!detector) {
+        qrScanEnabled = false;
+        setStatus('このブラウザはQRスキャンに対応していません。最新のブラウザでお試しください。');
+        stopQrScanLoop();
+        return;
+      }
+      try {
+        const value = await scanQrFrame();
+        if (value) {
+          handleQrDetection(value);
+          scheduleQrScanLoop(1100);
+        } else {
+          scheduleQrScanLoop(QR_SCAN_DEFAULT_INTERVAL_MS);
+        }
+      } catch (error) {
+        console.warn('QR scan failed', error);
+        scheduleQrScanLoop(1000);
       }
     }
 
@@ -6450,6 +6789,59 @@
       clearActiveOverlay();
     });
 
+    if (qrReadout) {
+      ['click', 'pointerdown', 'mousedown', 'touchstart'].forEach((type) => {
+        qrReadout.addEventListener(type, (event) => event.stopPropagation(), { passive: false });
+      });
+    }
+
+    if (qrCopyBtn) {
+      qrCopyBtn.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        if (!qrLastValue) {
+          return;
+        }
+        const textToCopy = qrLastValue;
+        try {
+          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            await navigator.clipboard.writeText(textToCopy);
+          } else {
+            const textarea = document.createElement('textarea');
+            textarea.value = textToCopy;
+            textarea.style.position = 'absolute';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+          }
+          updateQrReadout('コピーしました。', qrScanEnabled ? 'スキャン中' : '停止中', {
+            resultText: qrLastValue,
+            openUrl: qrOpenTarget || getOpenableUrl(qrLastValue),
+            forceShow: true
+          });
+          setStatus('QRの内容をコピーしました');
+        } catch (error) {
+          console.warn('Failed to copy QR result', error);
+          setStatus('QRのコピーに失敗しました');
+        }
+      });
+    }
+
+    if (qrOpenBtn) {
+      qrOpenBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const targetUrl = qrOpenTarget || getOpenableUrl(qrLastValue);
+        if (!targetUrl) {
+          return;
+        }
+        const opened = window.open(targetUrl, '_blank', 'noopener');
+        if (!opened) {
+          setStatus('リンクを開けませんでした');
+        }
+      });
+    }
+
     if (cameraActionBtn) {
       cameraActionBtn.addEventListener('click', async () => {
         if (state.restarting) {
@@ -7101,6 +7493,7 @@
     });
 
     function stopCamera() {
+      stopQrScanLoop();
       if (state.stream) {
         state.stream.getTracks().forEach((track) => track.stop());
         state.stream = null;
@@ -7205,6 +7598,9 @@
         cameraReady = true;
         const cameraStatus = state.useFrontCamera ? 'フロントカメラ表示中' : '';
         setCameraStatus(cameraStatus);
+        if (qrScanEnabled) {
+          scheduleQrScanLoop(120);
+        }
         updateAspectLayout();
         if (state.dotMode) {
           startDotRendering();
@@ -7248,13 +7644,25 @@
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         stopCamera();
-      } else if (!cameraStartLocked) {
-        startCamera();
+        stopQrScanLoop();
+      } else {
+        if (qrScanEnabled) {
+          scheduleQrScanLoop(200);
+        }
+        if (!cameraStartLocked) {
+          startCamera();
+        }
       }
     });
 
-    window.addEventListener('beforeunload', stopCamera);
-    window.addEventListener('pagehide', stopCamera);
+    window.addEventListener('beforeunload', () => {
+      stopQrScanLoop();
+      stopCamera();
+    });
+    window.addEventListener('pagehide', () => {
+      stopQrScanLoop();
+      stopCamera();
+    });
 
     window.addEventListener('focus', () => {
       if (document.hidden) {
@@ -7268,6 +7676,9 @@
       }
       if (cameraStartOverlay && !cameraStartOverlay.hidden) {
         return;
+      }
+      if (qrScanEnabled) {
+        scheduleQrScanLoop(200);
       }
       startCamera();
     });
@@ -7319,6 +7730,7 @@
     updateDotModeUI();
     setAspectMode(state.aspectMode);
     updateControlPlacement();
+    setQrReadoutVisibility(false);
 
     if (iosStandaloneUnsupported) {
       showIOSStandaloneUnsupportedOverlay();
