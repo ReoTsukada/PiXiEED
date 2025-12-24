@@ -1250,31 +1250,6 @@
     .camera-settings-panel {
       gap: 12px;
     }
-    .camera-settings__actions {
-      display: flex;
-      justify-content: flex-end;
-      align-items: stretch;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .camera-settings__actions .option-button {
-      min-width: 120px;
-    }
-    .camera-settings__auto {
-      background: linear-gradient(135deg, rgba(123, 207, 255, 0.9), rgba(143, 132, 255, 0.9));
-      border-color: rgba(123, 207, 255, 0.8);
-      color: #050812;
-      font-weight: 700;
-      box-shadow: 0 12px 28px rgba(123, 207, 255, 0.18);
-    }
-    .camera-settings__auto:hover,
-    .camera-settings__auto:focus-visible {
-      background: linear-gradient(135deg, rgba(143, 199, 255, 1), rgba(173, 162, 255, 1));
-      border-color: rgba(143, 199, 255, 0.95);
-    }
-    .camera-settings__auto:disabled {
-      opacity: 0.65;
-    }
     .controls--camera {
       display: flex;
       flex-direction: column;
@@ -1924,10 +1899,7 @@
 <input data-setting="whiteBalance" id="cameraSettingWhiteBalance" max="100" min="-100" step="1" type="range" value="0"/>
 </label>
 </div>
-<div class="camera-settings__actions">
-<button class="option-button camera-settings__auto" id="cameraSettingsAutoBtn" type="button">自動調整</button>
 <button class="option-button camera-settings__reset" id="cameraSettingsResetBtn" type="button">設定をリセット</button>
-</div>
 </div>
 </div>
 </div>
@@ -2079,7 +2051,6 @@
     const cameraActionIcon = document.getElementById('cameraActionIcon');
     const cameraSettingsBtn = document.getElementById('cameraSettingsBtn');
     const cameraSettingsPanel = document.getElementById('cameraSettingsPanel');
-    const cameraSettingsAutoBtn = document.getElementById('cameraSettingsAutoBtn');
     const cameraSettingsResetBtn = document.getElementById('cameraSettingsResetBtn');
     const stampBtn = document.getElementById('stampBtn');
     const stampPanel = document.getElementById('stampPanel');
@@ -2783,7 +2754,7 @@
       return filters;
     }
 
-    function sampleFrameForAutoAdjust() {
+    function sampleFrameForAutoAdjust(focusPoint = null) {
       if (!video || video.readyState < 2 || !autoAdjustCtx || !autoAdjustCanvas) {
         return null;
       }
@@ -2799,6 +2770,25 @@
       if (!sourceRect) {
         return null;
       }
+      let crop = {
+        sx: sourceRect.sx,
+        sy: sourceRect.sy,
+        sw: sourceRect.sw,
+        sh: sourceRect.sh
+      };
+      if (focusPoint && Number.isFinite(focusPoint.x) && Number.isFinite(focusPoint.y)) {
+        const fx = Math.min(Math.max(focusPoint.x, 0), 1);
+        const fy = Math.min(Math.max(focusPoint.y, 0), 1);
+        const focusSourceX = sourceRect.sx + sourceRect.sw * fx;
+        const focusSourceY = sourceRect.sy + sourceRect.sh * fy;
+        const cropWidth = Math.max(48, Math.min(sourceRect.sw, sourceRect.sw * 0.32));
+        const cropHeight = Math.max(48, Math.min(sourceRect.sh, sourceRect.sh * 0.32));
+        const halfW = cropWidth / 2;
+        const halfH = cropHeight / 2;
+        const sx = Math.max(sourceRect.sx, Math.min(focusSourceX - halfW, sourceRect.sx + sourceRect.sw - cropWidth));
+        const sy = Math.max(sourceRect.sy, Math.min(focusSourceY - halfH, sourceRect.sy + sourceRect.sh - cropHeight));
+        crop = { sx, sy, sw: cropWidth, sh: cropHeight };
+      }
       const targetWidth = AUTO_ADJUST_SAMPLE_SIZE.width;
       const targetHeight = AUTO_ADJUST_SAMPLE_SIZE.height;
       autoAdjustCanvas.width = targetWidth;
@@ -2807,10 +2797,10 @@
       autoAdjustCtx.filter = 'none';
       autoAdjustCtx.drawImage(
         video,
-        sourceRect.sx,
-        sourceRect.sy,
-        sourceRect.sw,
-        sourceRect.sh,
+        crop.sx,
+        crop.sy,
+        crop.sw,
+        crop.sh,
         0,
         0,
         targetWidth,
@@ -3024,40 +3014,6 @@
       syncCameraSettingInputs();
       updateCameraFilters();
       updateZoomSliderAvailability();
-    }
-
-    function handleAutoAdjustCameraSettings() {
-      if (!video || video.readyState < 2 || !state.stream) {
-        setStatus('カメラ映像の準備ができてから自動調整をお試しください');
-        return;
-      }
-      if (!autoAdjustCtx) {
-        setStatus('自動調整を利用できませんでした');
-        return;
-      }
-      if (cameraSettingsAutoBtn) {
-        cameraSettingsAutoBtn.disabled = true;
-        cameraSettingsAutoBtn.setAttribute('aria-busy', 'true');
-      }
-      try {
-        const metrics = sampleFrameForAutoAdjust();
-        if (!metrics) {
-          setStatus('映像の解析に失敗しました');
-          return;
-        }
-        const nextSettings = buildAutoAdjustedSettings(metrics);
-        if (!nextSettings) {
-          setStatus('自動調整を適用できませんでした');
-          return;
-        }
-        applyCameraSettingsBatch(nextSettings);
-        setStatus('映像を自動で整えました');
-      } finally {
-        if (cameraSettingsAutoBtn) {
-          cameraSettingsAutoBtn.disabled = false;
-          cameraSettingsAutoBtn.removeAttribute('aria-busy');
-        }
-      }
     }
 
     function getActiveVideoTrack() {
@@ -7141,18 +7097,42 @@
       });
     });
 
-    if (cameraSettingsAutoBtn) {
-      cameraSettingsAutoBtn.addEventListener('click', (event) => {
-        event.stopPropagation();
-        handleAutoAdjustCameraSettings();
-      });
-    }
-
     if (cameraSettingsResetBtn) {
       cameraSettingsResetBtn.addEventListener('click', (event) => {
         event.stopPropagation();
         resetCameraSettings();
       });
+    }
+
+    function handleTapAutoAdjust(event) {
+      if (!video || video.readyState < 2) {
+        return;
+      }
+      if (event.button != null && event.button !== 0) {
+        return;
+      }
+      const rect = video.getBoundingClientRect();
+      if (!rect.width || !rect.height) {
+        return;
+      }
+      const x = (event.clientX - rect.left) / rect.width;
+      const y = (event.clientY - rect.top) / rect.height;
+      const metrics = sampleFrameForAutoAdjust({ x, y });
+      if (!metrics) {
+        setStatus('タップした位置の解析に失敗しました');
+        return;
+      }
+      const nextSettings = buildAutoAdjustedSettings(metrics);
+      if (!nextSettings) {
+        setStatus('自動調整を適用できませんでした');
+        return;
+      }
+      applyCameraSettingsBatch(nextSettings);
+      setStatus('タップ位置を基準に自動調整しました');
+    }
+
+    if (video) {
+      video.addEventListener('pointerdown', handleTapAutoAdjust);
     }
 
     if (paletteToggleBtn) {
@@ -7829,7 +7809,7 @@
           throw playError instanceof Error ? playError : new Error('Camera playback failed');
         }
         await waitForVideoReady();
-        video.style.transform = state.useFrontCamera ? 'scaleX(-1)' : 'scaleX(1)';
+        video.style.transform = 'scaleX(1)';
         applyCameraSettings();
         cameraPermissionDenied = false;
         cameraReady = true;
