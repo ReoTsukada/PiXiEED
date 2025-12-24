@@ -280,7 +280,7 @@
       height: 100%;
       object-fit: cover;
       background: #020409;
-      filter: saturate(1.05);
+      filter: none;
       z-index: 1;
     }
     .dot-canvas {
@@ -1250,6 +1250,31 @@
     .camera-settings-panel {
       gap: 12px;
     }
+    .camera-settings__actions {
+      display: flex;
+      justify-content: flex-end;
+      align-items: stretch;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .camera-settings__actions .option-button {
+      min-width: 120px;
+    }
+    .camera-settings__auto {
+      background: linear-gradient(135deg, rgba(123, 207, 255, 0.9), rgba(143, 132, 255, 0.9));
+      border-color: rgba(123, 207, 255, 0.8);
+      color: #050812;
+      font-weight: 700;
+      box-shadow: 0 12px 28px rgba(123, 207, 255, 0.18);
+    }
+    .camera-settings__auto:hover,
+    .camera-settings__auto:focus-visible {
+      background: linear-gradient(135deg, rgba(143, 199, 255, 1), rgba(173, 162, 255, 1));
+      border-color: rgba(143, 199, 255, 0.95);
+    }
+    .camera-settings__auto:disabled {
+      opacity: 0.65;
+    }
     .controls--camera {
       display: flex;
       flex-direction: column;
@@ -1330,7 +1355,6 @@
       background: transparent;
     }
     .camera-settings__reset {
-      align-self: flex-end;
       padding: 8px 16px;
       font-size: 0.8rem;
       letter-spacing: 0.08em;
@@ -1900,7 +1924,10 @@
 <input data-setting="whiteBalance" id="cameraSettingWhiteBalance" max="100" min="-100" step="1" type="range" value="0"/>
 </label>
 </div>
+<div class="camera-settings__actions">
+<button class="option-button camera-settings__auto" id="cameraSettingsAutoBtn" type="button">自動調整</button>
 <button class="option-button camera-settings__reset" id="cameraSettingsResetBtn" type="button">設定をリセット</button>
+</div>
 </div>
 </div>
 </div>
@@ -2052,6 +2079,7 @@
     const cameraActionIcon = document.getElementById('cameraActionIcon');
     const cameraSettingsBtn = document.getElementById('cameraSettingsBtn');
     const cameraSettingsPanel = document.getElementById('cameraSettingsPanel');
+    const cameraSettingsAutoBtn = document.getElementById('cameraSettingsAutoBtn');
     const cameraSettingsResetBtn = document.getElementById('cameraSettingsResetBtn');
     const stampBtn = document.getElementById('stampBtn');
     const stampPanel = document.getElementById('stampPanel');
@@ -2366,7 +2394,7 @@
         return accumulator;
       }, {})
     );
-    const CAMERA_BASE_SATURATION = 1.05;
+    const CAMERA_BASE_SATURATION = 1;
     const CAMERA_TRACK_CAPABILITY_MAP = {
       brightness: 'brightness',
       exposure: 'exposureCompensation',
@@ -2392,6 +2420,13 @@
     const QR_SCAN_BASE_WIDTH = 480;
     const QR_SCAN_MIN_HEIGHT = 240;
     const QR_SCAN_DEFAULT_INTERVAL_MS = 520;
+    const AUTO_ADJUST_SAMPLE_SIZE = Object.freeze({ width: 180, height: 120 });
+    const autoAdjustCanvas = document.createElement('canvas');
+    autoAdjustCanvas.width = AUTO_ADJUST_SAMPLE_SIZE.width;
+    autoAdjustCanvas.height = AUTO_ADJUST_SAMPLE_SIZE.height;
+    const autoAdjustCtx = autoAdjustCanvas.getContext
+      ? autoAdjustCanvas.getContext('2d', { willReadFrequently: true })
+      : null;
 
     const state = {
       stream: null,
@@ -2748,6 +2783,152 @@
       return filters;
     }
 
+    function sampleFrameForAutoAdjust() {
+      if (!video || video.readyState < 2 || !autoAdjustCtx || !autoAdjustCanvas) {
+        return null;
+      }
+      const viewportWidth = Math.max(
+        1,
+        Math.round(window.innerWidth || video.videoWidth || AUTO_ADJUST_SAMPLE_SIZE.width)
+      );
+      const viewportHeight = Math.max(
+        1,
+        Math.round(window.innerHeight || video.videoHeight || AUTO_ADJUST_SAMPLE_SIZE.height)
+      );
+      const sourceRect = getVideoCoverSourceRect(viewportWidth, viewportHeight);
+      if (!sourceRect) {
+        return null;
+      }
+      const targetWidth = AUTO_ADJUST_SAMPLE_SIZE.width;
+      const targetHeight = AUTO_ADJUST_SAMPLE_SIZE.height;
+      autoAdjustCanvas.width = targetWidth;
+      autoAdjustCanvas.height = targetHeight;
+      autoAdjustCtx.save();
+      autoAdjustCtx.filter = 'none';
+      autoAdjustCtx.drawImage(
+        video,
+        sourceRect.sx,
+        sourceRect.sy,
+        sourceRect.sw,
+        sourceRect.sh,
+        0,
+        0,
+        targetWidth,
+        targetHeight
+      );
+      autoAdjustCtx.restore();
+      let imageData;
+      try {
+        imageData = autoAdjustCtx.getImageData(0, 0, targetWidth, targetHeight);
+      } catch (error) {
+        console.warn('Failed to sample frame for auto adjust', error);
+        return null;
+      }
+      if (!imageData || !imageData.data) {
+        return null;
+      }
+      const { data } = imageData;
+      const totalPixels = targetWidth * targetHeight;
+      if (!totalPixels) {
+        return null;
+      }
+      let sumL = 0;
+      let sumL2 = 0;
+      let sumR = 0;
+      let sumG = 0;
+      let sumB = 0;
+      let darkPixels = 0;
+      let brightPixels = 0;
+      let chromaDistance = 0;
+      for (let index = 0; index < data.length; index += 4) {
+        const r = data[index];
+        const g = data[index + 1];
+        const b = data[index + 2];
+        const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        sumL += luminance;
+        sumL2 += luminance * luminance;
+        sumR += r;
+        sumG += g;
+        sumB += b;
+        if (luminance < 64) {
+          darkPixels += 1;
+        } else if (luminance > 200) {
+          brightPixels += 1;
+        }
+        chromaDistance += Math.abs(r - luminance) + Math.abs(g - luminance) + Math.abs(b - luminance);
+      }
+      const avgL = sumL / totalPixels;
+      const variance = Math.max(0, sumL2 / totalPixels - avgL * avgL);
+      const stdL = Math.sqrt(variance) / 255;
+      const saturationMetric = chromaDistance / (totalPixels * 3 * 255);
+      return {
+        avgL,
+        stdL,
+        avgR: sumR / totalPixels,
+        avgG: sumG / totalPixels,
+        avgB: sumB / totalPixels,
+        darkRatio: darkPixels / totalPixels,
+        brightRatio: brightPixels / totalPixels,
+        saturationMetric
+      };
+    }
+
+    function buildAutoAdjustedSettings(metrics) {
+      if (!metrics) {
+        return null;
+      }
+      const targetLuma = 132;
+      const desiredFactor = Math.min(2.4, Math.max(0.55, targetLuma / Math.max(metrics.avgL || 1, 1)));
+      const primaryFactor = Math.sqrt(desiredFactor);
+      const secondaryFactor = desiredFactor / Math.max(primaryFactor, 0.0001);
+      const brightnessValue = clampCameraSettingValue(
+        Math.round(((primaryFactor - 1) / 0.6) * 100),
+        'brightness'
+      );
+      const exposureValue = clampCameraSettingValue(
+        Math.round(((secondaryFactor - 1) / 0.9) * 100),
+        'exposure'
+      );
+      const targetStd = 0.22;
+      const desiredContrastFactor = Math.min(
+        1.6,
+        Math.max(0.55, targetStd / Math.max(metrics.stdL || 0.001, 0.001))
+      );
+      const contrastValue = clampCameraSettingValue(
+        Math.round((desiredContrastFactor - 1) * 100),
+        'contrast'
+      );
+      const baseSaturation = Math.max(0.05, Math.min(0.7, metrics.saturationMetric));
+      const targetSaturation = 0.18;
+      const desiredSaturationFactor = Math.min(
+        1.45,
+        Math.max(0.6, targetSaturation / baseSaturation)
+      );
+      const saturationValue = clampCameraSettingValue(
+        Math.round((desiredSaturationFactor - 1) * 100),
+        'saturation'
+      );
+      const tempBias = (metrics.avgB - metrics.avgR) / Math.max(metrics.avgR + metrics.avgG + metrics.avgB, 1);
+      const whiteBalanceValue = clampCameraSettingValue(
+        Math.round(tempBias * 140),
+        'whiteBalance'
+      );
+      const shadowTarget = 0.42;
+      const shadowDelta = shadowTarget - metrics.darkRatio;
+      const shadowsValue = clampCameraSettingValue(
+        Math.round(shadowDelta * 120),
+        'shadows'
+      );
+      return {
+        brightness: brightnessValue,
+        exposure: exposureValue,
+        contrast: contrastValue,
+        saturation: saturationValue,
+        whiteBalance: whiteBalanceValue,
+        shadows: shadowsValue
+      };
+    }
+
     function updateCameraFilters() {
       const components = computeCameraFilterComponents();
       currentCameraFilterString = components.join(' ');
@@ -2795,6 +2976,33 @@
       applyCameraSettings();
     }
 
+    function applyCameraSettingsBatch(updates, { syncInput = true } = {}) {
+      if (!updates || typeof updates !== 'object' || !state.cameraSettings) {
+        return;
+      }
+      let changed = false;
+      CAMERA_SETTING_KEYS.forEach((key) => {
+        if (!Object.prototype.hasOwnProperty.call(updates, key)) {
+          return;
+        }
+        const clamped = clampCameraSettingValue(updates[key], key);
+        if (state.cameraSettings[key] !== clamped) {
+          state.cameraSettings[key] = clamped;
+          changed = true;
+        }
+        updateCameraSettingDisplay(key);
+        if (key === 'zoom') {
+          refreshZoomMeterVisuals(clamped);
+        }
+      });
+      if (syncInput) {
+        syncCameraSettingInputs();
+      }
+      if (changed) {
+        applyCameraSettings();
+      }
+    }
+
     function resetCameraSettings() {
       CAMERA_SETTING_KEYS.forEach((key) => {
         const defaultValue = CAMERA_SETTING_DEFAULTS[key] ?? 0;
@@ -2816,6 +3024,40 @@
       syncCameraSettingInputs();
       updateCameraFilters();
       updateZoomSliderAvailability();
+    }
+
+    function handleAutoAdjustCameraSettings() {
+      if (!video || video.readyState < 2 || !state.stream) {
+        setStatus('カメラ映像の準備ができてから自動調整をお試しください');
+        return;
+      }
+      if (!autoAdjustCtx) {
+        setStatus('自動調整を利用できませんでした');
+        return;
+      }
+      if (cameraSettingsAutoBtn) {
+        cameraSettingsAutoBtn.disabled = true;
+        cameraSettingsAutoBtn.setAttribute('aria-busy', 'true');
+      }
+      try {
+        const metrics = sampleFrameForAutoAdjust();
+        if (!metrics) {
+          setStatus('映像の解析に失敗しました');
+          return;
+        }
+        const nextSettings = buildAutoAdjustedSettings(metrics);
+        if (!nextSettings) {
+          setStatus('自動調整を適用できませんでした');
+          return;
+        }
+        applyCameraSettingsBatch(nextSettings);
+        setStatus('映像を自動で整えました');
+      } finally {
+        if (cameraSettingsAutoBtn) {
+          cameraSettingsAutoBtn.disabled = false;
+          cameraSettingsAutoBtn.removeAttribute('aria-busy');
+        }
+      }
     }
 
     function getActiveVideoTrack() {
@@ -5595,10 +5837,6 @@
             : `blur(${DOT_SMOOTHING_BLUR}px)`;
           smoothingCtx.filter = smoothingFilter;
           smoothingCtx.clearRect(0, 0, targetWidth, targetHeight);
-          if (state.useFrontCamera) {
-            smoothingCtx.translate(targetWidth, 0);
-            smoothingCtx.scale(-1, 1);
-          }
           smoothingCtx.drawImage(
             video,
             crop.sx,
@@ -5619,10 +5857,6 @@
           dotCanvasCtx.save();
           dotCanvasCtx.imageSmoothingEnabled = false;
           dotCanvasCtx.clearRect(0, 0, targetWidth, targetHeight);
-          if (state.useFrontCamera) {
-            dotCanvasCtx.translate(targetWidth, 0);
-            dotCanvasCtx.scale(-1, 1);
-          }
           dotCanvasCtx.drawImage(
             video,
             crop.sx,
@@ -6907,6 +7141,13 @@
       });
     });
 
+    if (cameraSettingsAutoBtn) {
+      cameraSettingsAutoBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        handleAutoAdjustCameraSettings();
+      });
+    }
+
     if (cameraSettingsResetBtn) {
       cameraSettingsResetBtn.addEventListener('click', (event) => {
         event.stopPropagation();
@@ -6977,10 +7218,6 @@
       }
       ctx.save();
       ctx.filter = currentCameraFilterString || 'none';
-      if (state.useFrontCamera) {
-        ctx.translate(viewportWidth, 0);
-        ctx.scale(-1, 1);
-      }
       ctx.drawImage(
         video,
         source.sx,
