@@ -157,6 +157,7 @@
       z-index: 55;
       pointer-events: auto;
       backdrop-filter: blur(10px);
+      position: fixed;
     }
     .qr-readout__header {
       display: flex;
@@ -178,6 +179,42 @@
       color: var(--accent);
       letter-spacing: 0.04em;
     }
+    .qr-readout__close {
+      margin-left: auto;
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      border: 1px solid rgba(123, 207, 255, 0.35);
+      background: rgba(6, 10, 22, 0.8);
+      color: var(--fg);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease, transform 0.18s ease;
+    }
+    .qr-readout__close:hover,
+    .qr-readout__close:focus-visible {
+      background: rgba(123, 207, 255, 0.15);
+      border-color: rgba(123, 207, 255, 0.6);
+      outline: none;
+      transform: translateY(-1px);
+    }
+    .qr-readout__close::before,
+    .qr-readout__close::after {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 2px;
+      background: currentColor;
+      border-radius: 999px;
+    }
+    .qr-readout__close::before {
+      transform: rotate(45deg);
+    }
+    .qr-readout__close::after {
+      transform: rotate(-45deg);
+    }
     .qr-readout__message {
       margin: 0;
       color: var(--muted);
@@ -197,6 +234,24 @@
       font-size: 0.85rem;
       letter-spacing: 0.05em;
       color: rgba(231, 238, 255, 0.75);
+    }
+    .qr-readout__preview {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px;
+      background: rgba(12, 16, 28, 0.65);
+      border: 1px solid rgba(123, 207, 255, 0.18);
+      border-radius: 12px;
+    }
+    .qr-readout__preview canvas {
+      width: 180px;
+      height: 180px;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      background: #000;
+      border-radius: 8px;
+      border: 1px solid rgba(123, 207, 255, 0.25);
     }
     .qr-readout__text {
       margin: 0;
@@ -1907,10 +1962,7 @@
 <div class="hud-bottom__menus">
 <div class="menu-panel" hidden="" id="aspectMenu">
 <div aria-label="アスペクト比" class="controls controls--aspect" role="group">
-<button aria-pressed="true" class="option-button is-active" data-aspect="3:2" type="button">3:2</button>
-<button aria-pressed="false" class="option-button" data-aspect="1:1" type="button">1:1</button>
-<button aria-pressed="false" class="option-button" data-aspect="4:3" type="button">4:3</button>
-<button aria-pressed="false" class="option-button" data-aspect="16:9" type="button">16:9</button>
+<button aria-pressed="true" class="option-button is-active" data-aspect="1:1" type="button">1:1</button>
 </div>
 </div>
 <div class="menu-panel dot-settings-panel" hidden="" id="dotSettingsPanel">
@@ -1992,10 +2044,14 @@
 <div class="qr-readout__header">
 <span class="qr-readout__title">QRスキャン</span>
 <span class="qr-readout__state" id="qrReadoutState">停止中</span>
+<button aria-label="閉じる" class="qr-readout__close" id="qrCloseBtn" type="button"></button>
 </div>
 <p class="qr-readout__message" id="qrReadoutMessage">「QR」ボタンをオンにするとスキャンを開始します。</p>
 <div class="qr-readout__result" hidden="" id="qrReadoutResult">
 <p class="qr-readout__label">検出された内容</p>
+<div class="qr-readout__preview" hidden="" id="qrPreviewWrap">
+<canvas aria-hidden="true" id="qrPreviewCanvas"></canvas>
+</div>
 <div class="qr-readout__text" id="qrReadoutText"></div>
 <div class="qr-readout__actions">
 <button class="option-button" disabled="" id="qrCopyBtn" type="button">コピー</button>
@@ -2068,6 +2124,9 @@
     const qrReadoutMessage = document.getElementById('qrReadoutMessage');
     const qrReadoutResult = document.getElementById('qrReadoutResult');
     const qrReadoutText = document.getElementById('qrReadoutText');
+    const qrPreviewWrap = document.getElementById('qrPreviewWrap');
+    const qrPreviewCanvas = document.getElementById('qrPreviewCanvas');
+    const qrCloseBtn = document.getElementById('qrCloseBtn');
     const qrCopyBtn = document.getElementById('qrCopyBtn');
     const qrOpenBtn = document.getElementById('qrOpenBtn');
     const landscapeCaptureSlot = document.querySelector('.hud-landscape-capture');
@@ -2388,9 +2447,9 @@
       { id: 'wst-tira', label: 'ティアラ（カラー）', src: './stamps/wst-tira.png', hueAdjustable: true },
       { id: 'wst-kurabu', label: 'クラブ（カラー）', src: './stamps/wst-kurabu.png', hueAdjustable: true }
     ]);
-    const QR_SCAN_BASE_WIDTH = 480;
-    const QR_SCAN_MIN_HEIGHT = 240;
-    const QR_SCAN_DEFAULT_INTERVAL_MS = 520;
+    const QR_SCAN_BASE_SIZE = 640;
+    const QR_SCAN_MIN_SIZE = 320;
+    const QR_SCAN_DEFAULT_INTERVAL_MS = 260;
     const AUTO_ADJUST_SAMPLE_SIZE = Object.freeze({ width: 180, height: 120 });
     const autoAdjustCanvas = document.createElement('canvas');
     autoAdjustCanvas.width = AUTO_ADJUST_SAMPLE_SIZE.width;
@@ -2403,7 +2462,7 @@
       stream: null,
       useFrontCamera: false,
       restarting: false,
-      aspectMode: '3:2',
+      aspectMode: '1:1',
       dotMode: true,
       dotScale: 1,
       colorDepth: '4',
@@ -4055,7 +4114,7 @@
       if (!qrReadout) {
         return;
       }
-      const { resultText = null, openUrl = '', forceShow = false } = options;
+      const { resultText = null, openUrl = '', forceShow = false, showPreview = false } = options;
       const normalizedResult = normalizeQrValue(resultText) || qrLastValue;
       const hasResult = Boolean(normalizedResult);
       const shouldShow = forceShow || hasResult || Boolean(qrLastValue);
@@ -4084,6 +4143,13 @@
       qrOpenTarget = resolvedOpenUrl;
       if (qrOpenBtn) {
         qrOpenBtn.disabled = !qrOpenTarget;
+      }
+      if (qrPreviewWrap && qrPreviewCanvas) {
+        const hasPreview =
+          !qrPreviewWrap.hidden &&
+          qrPreviewCanvas.width > 0 &&
+          qrPreviewCanvas.height > 0;
+        qrPreviewWrap.hidden = !(showPreview && hasPreview);
       }
     }
 
@@ -4133,20 +4199,56 @@
       qrScanLoopHandle = window.setTimeout(() => {
         qrScanLoopHandle = null;
         void handleQrScanTick();
-      }, Math.max(60, Number.isFinite(delay) ? delay : QR_SCAN_DEFAULT_INTERVAL_MS));
+      }, Math.max(40, Number.isFinite(delay) ? delay : QR_SCAN_DEFAULT_INTERVAL_MS));
+    }
+
+    function updateQrPreviewFromDetection(boundingBox) {
+      if (!qrPreviewCanvas || !qrPreviewWrap || !qrScanCtx || !qrScanCanvas) {
+        return false;
+      }
+      const ctx = qrPreviewCanvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx || !boundingBox) {
+        return false;
+      }
+      const margin = 8;
+      const sx = Math.max(0, Math.floor((boundingBox.x || 0) - margin));
+      const sy = Math.max(0, Math.floor((boundingBox.y || 0) - margin));
+      const sw = Math.max(1, Math.min(qrScanCanvas.width - sx, Math.ceil((boundingBox.width || 0) + margin * 2)));
+      const sh = Math.max(1, Math.min(qrScanCanvas.height - sy, Math.ceil((boundingBox.height || 0) + margin * 2)));
+      let imageData = null;
+      try {
+        imageData = qrScanCtx.getImageData(sx, sy, sw, sh);
+      } catch (error) {
+        imageData = null;
+      }
+      if (!imageData) {
+        return false;
+      }
+      qrPreviewCanvas.width = sw;
+      qrPreviewCanvas.height = sh;
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, sw, sh);
+      ctx.putImageData(imageData, 0, 0);
+      const targetSize = Math.min(280, Math.max(140, sw * 2));
+      const displayWidth = targetSize;
+      const displayHeight = Math.max(80, Math.round((targetSize * sh) / sw));
+      qrPreviewCanvas.style.width = `${displayWidth}px`;
+      qrPreviewCanvas.style.height = `${displayHeight}px`;
+      qrPreviewWrap.hidden = false;
+      return true;
     }
 
     async function scanQrFrame() {
       if (!qrScanCanvas || !qrScanCtx || !video || video.readyState < 2) {
         return null;
       }
-      const viewportWidth = Math.max(1, Math.round(window.innerWidth || video.videoWidth || QR_SCAN_BASE_WIDTH));
-      const viewportHeight = Math.max(1, Math.round(window.innerHeight || video.videoHeight || QR_SCAN_MIN_HEIGHT));
-      const aspectRatio = viewportHeight > 0 ? viewportWidth / viewportHeight : 1;
-      const targetWidth = QR_SCAN_BASE_WIDTH;
-      const targetHeight = Math.max(QR_SCAN_MIN_HEIGHT, Math.round(targetWidth / Math.max(aspectRatio, 0.1)));
+      const viewportWidth = Math.max(1, Math.round(window.innerWidth || video.videoWidth || QR_SCAN_BASE_SIZE));
+      const viewportHeight = Math.max(1, Math.round(window.innerHeight || video.videoHeight || QR_SCAN_MIN_SIZE));
+      const targetWidth = Math.max(QR_SCAN_MIN_SIZE, Math.min(QR_SCAN_BASE_SIZE, viewportWidth));
+      const targetHeight = Math.max(QR_SCAN_MIN_SIZE, Math.min(QR_SCAN_BASE_SIZE, viewportHeight));
       qrScanCanvas.width = targetWidth;
       qrScanCanvas.height = targetHeight;
+      qrScanCtx.imageSmoothingEnabled = false;
       const sourceRect = getVideoCoverSourceRect(targetWidth, targetHeight);
       if (!sourceRect) {
         return null;
@@ -4163,6 +4265,31 @@
         targetWidth,
         targetHeight
       );
+      let imageData;
+      try {
+        imageData = qrScanCtx.getImageData(0, 0, targetWidth, targetHeight);
+      } catch (error) {
+        imageData = null;
+      }
+      if (imageData && imageData.data) {
+        const { data } = imageData;
+        let sum = 0;
+        const total = data.length / 4;
+        for (let i = 0; i < data.length; i += 4) {
+          const l = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+          sum += l;
+        }
+        const avg = total ? sum / total : 128;
+        const threshold = Math.min(240, Math.max(48, avg * 0.94));
+        for (let i = 0; i < data.length; i += 4) {
+          const l = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+          const v = l >= threshold ? 255 : 0;
+          data[i] = v;
+          data[i + 1] = v;
+          data[i + 2] = v;
+        }
+        qrScanCtx.putImageData(imageData, 0, 0);
+      }
       const detector = await ensureQrDetector();
       if (!detector) {
         return null;
@@ -4171,14 +4298,15 @@
       if (Array.isArray(barcodes) && barcodes.length) {
         const code = barcodes.find((entry) => normalizeQrValue(entry.rawValue)) || barcodes[0];
         if (code && typeof code.rawValue === 'string') {
-          return code.rawValue.trim();
+          const previewGenerated = updateQrPreviewFromDetection(code.boundingBox || null);
+          return { value: code.rawValue.trim(), previewGenerated };
         }
       }
       return null;
     }
 
-    function handleQrDetection(value) {
-      const normalized = normalizeQrValue(value);
+    function handleQrDetection(payload) {
+      const normalized = normalizeQrValue(payload && typeof payload === 'object' ? payload.value : payload);
       if (!normalized) {
         return;
       }
@@ -4188,7 +4316,8 @@
       updateQrReadout('QRコードを読み取りました。', '検出', {
         resultText: normalized,
         openUrl,
-        forceShow: true
+        forceShow: true,
+        showPreview: Boolean(payload && payload.previewGenerated)
       });
       setStatus(`QR検出: ${truncateQrValue(normalized, 64)}`);
       if (isNew && navigator.vibrate) {
@@ -4226,13 +4355,13 @@
         const value = await scanQrFrame();
         if (value) {
           handleQrDetection(value);
-          scheduleQrScanLoop(1100);
+          scheduleQrScanLoop(700);
         } else {
           scheduleQrScanLoop(QR_SCAN_DEFAULT_INTERVAL_MS);
         }
       } catch (error) {
         console.warn('QR scan failed', error);
-        scheduleQrScanLoop(1000);
+        scheduleQrScanLoop(600);
       }
     }
 
@@ -4630,19 +4759,7 @@
     }
 
     const ASPECT_RATIOS = {
-      '1:1': { width: 1, height: 1 },
-      '3:2': () => {
-        const isLandscape = window.innerWidth >= window.innerHeight;
-        return isLandscape ? { width: 3, height: 2 } : { width: 2, height: 3 };
-      },
-      '4:3': () => {
-        const isLandscape = window.innerWidth >= window.innerHeight;
-        return isLandscape ? { width: 4, height: 3 } : { width: 3, height: 4 };
-      },
-      '16:9': () => {
-        const isLandscape = window.innerWidth >= window.innerHeight;
-        return isLandscape ? { width: 16, height: 9 } : { width: 9, height: 16 };
-      }
+      '1:1': { width: 1, height: 1 }
     };
 
     const COLOR_DEPTHS = ['full', 'gray', '4', '2'];
@@ -4725,7 +4842,7 @@
 
     function setAspectMode(mode) {
       if (!Object.prototype.hasOwnProperty.call(ASPECT_RATIOS, mode)) {
-        mode = '3:2';
+        mode = '1:1';
       }
       state.aspectMode = mode;
       aspectButtons.forEach((button) => {
@@ -4750,43 +4867,9 @@
       };
       const basePixels = scaleMap[state.dotScale] || 64;
       const minPixels = 16;
-      const layout = dotState.layout || {};
-      const layoutRatio = layout.width && layout.height ? layout.width / layout.height : null;
-
-      if (state.aspectMode === '1:1') {
-        return {
-          width: Math.max(minPixels, basePixels),
-          height: Math.max(minPixels, basePixels)
-        };
-      }
-
-      let ratio = layoutRatio;
-      if (!Number.isFinite(ratio) || ratio <= 0) {
-        const sourceWidth = video.videoWidth || 0;
-        const sourceHeight = video.videoHeight || 0;
-        if (sourceWidth > 0 && sourceHeight > 0) {
-          ratio = sourceWidth / sourceHeight;
-        } else {
-          ratio = 1;
-        }
-      }
-
-      let width = basePixels;
-      let height = Math.round(width / ratio);
-
-      if (height < minPixels) {
-        height = minPixels;
-        width = Math.round(height * ratio);
-      }
-
-      if (width < minPixels) {
-        width = minPixels;
-        height = Math.round(width / ratio);
-      }
-
       return {
-        width: Math.max(minPixels, width),
-        height: Math.max(minPixels, height)
+        width: Math.max(minPixels, basePixels),
+        height: Math.max(minPixels, basePixels)
       };
     }
 
@@ -6984,6 +7067,12 @@
         qrReadout.addEventListener(type, (event) => event.stopPropagation(), { passive: false });
       });
     }
+    if (qrCloseBtn) {
+      qrCloseBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        setQrReadoutVisibility(false);
+      });
+    }
 
     if (qrCopyBtn) {
       qrCopyBtn.addEventListener('click', async (event) => {
@@ -7197,6 +7286,7 @@
         return false;
       }
       ctx.save();
+      ctx.imageSmoothingEnabled = false;
       ctx.filter = currentCameraFilterString || 'none';
       ctx.drawImage(
         video,
@@ -7415,6 +7505,7 @@
       viewportCanvas.width = Math.max(1, Math.round(viewportWidth * pixelRatio));
       viewportCanvas.height = Math.max(1, Math.round(viewportHeight * pixelRatio));
       const ctx = viewportCanvas.getContext('2d', { willReadFrequently: false });
+      ctx.imageSmoothingEnabled = false;
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, viewportCanvas.width, viewportCanvas.height);
       ctx.save();
@@ -7446,6 +7537,7 @@
         croppedCanvas.width = sw;
         croppedCanvas.height = sh;
         const croppedCtx = croppedCanvas.getContext('2d', { willReadFrequently: false });
+        croppedCtx.imageSmoothingEnabled = false;
         croppedCtx.drawImage(
           viewportCanvas,
           sx,
@@ -7613,7 +7705,7 @@
 
     aspectButtons.forEach((button) => {
       button.addEventListener('click', () => {
-        const mode = button.dataset.aspect || '3:2';
+        const mode = button.dataset.aspect || '1:1';
         setAspectMode(mode);
       });
     });
