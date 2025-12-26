@@ -2450,6 +2450,8 @@
     const QR_SCAN_BASE_SIZE = 640;
     const QR_SCAN_MIN_SIZE = 320;
     const QR_SCAN_DEFAULT_INTERVAL_MS = 260;
+    const COLOR_SIMPLIFY_MAX_COLORS = 24;
+    const COLOR_SIMPLIFY_BUCKET = 18;
     const AUTO_ADJUST_SAMPLE_SIZE = Object.freeze({ width: 180, height: 120 });
     const autoAdjustCanvas = document.createElement('canvas');
     autoAdjustCanvas.width = AUTO_ADJUST_SAMPLE_SIZE.width;
@@ -5822,6 +5824,82 @@
       }
     }
 
+    function buildSimplifiedPalette(imageData, maxColors = COLOR_SIMPLIFY_MAX_COLORS, bucket = COLOR_SIMPLIFY_BUCKET) {
+      if (!imageData || !imageData.data || !imageData.data.length) {
+        return [];
+      }
+      const data = imageData.data;
+      const freq = new Map();
+      const step = Math.max(1, Number.isFinite(bucket) ? bucket : 16);
+      for (let i = 0; i < data.length; i += 4) {
+        const r = Math.min(255, Math.max(0, Math.round(data[i] / step) * step));
+        const g = Math.min(255, Math.max(0, Math.round(data[i + 1] / step) * step));
+        const b = Math.min(255, Math.max(0, Math.round(data[i + 2] / step) * step));
+        const key = `${r},${g},${b}`;
+        freq.set(key, (freq.get(key) || 0) + 1);
+      }
+      const sorted = Array.from(freq.entries())
+        .map(([key, count]) => {
+          const [r, g, b] = key.split(',').map((v) => Number(v));
+          return { r, g, b, count };
+        })
+        .sort((a, b) => b.count - a.count);
+      return sorted.slice(0, Math.max(1, Math.round(maxColors || 8))).map(({ r, g, b }) => ({ r, g, b }));
+    }
+
+    function applyPaletteToImage(imageData, palette) {
+      if (!imageData || !imageData.data || !palette || !palette.length) {
+        return false;
+      }
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        let bestIndex = 0;
+        let bestDist = Number.POSITIVE_INFINITY;
+        for (let j = 0; j < palette.length; j += 1) {
+          const color = palette[j];
+          const dr = data[i] - color.r;
+          const dg = data[i + 1] - color.g;
+          const db = data[i + 2] - color.b;
+          const dist = dr * dr + dg * dg + db * db;
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestIndex = j;
+          }
+        }
+        const chosen = palette[bestIndex];
+        data[i] = chosen.r;
+        data[i + 1] = chosen.g;
+        data[i + 2] = chosen.b;
+      }
+      return true;
+    }
+
+    function simplifyCanvasColors(canvas) {
+      if (!canvas || !canvas.getContext) {
+        return false;
+      }
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) {
+        return false;
+      }
+      let imageData;
+      try {
+        imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      } catch (error) {
+        return false;
+      }
+      const palette = buildSimplifiedPalette(imageData);
+      if (!palette.length) {
+        return false;
+      }
+      const applied = applyPaletteToImage(imageData, palette);
+      if (!applied) {
+        return false;
+      }
+      ctx.putImageData(imageData, 0, 0);
+      return true;
+    }
+
     function updateDotModeUI() {
       if (dotModeBtn) {
         dotModeBtn.classList.add('is-active');
@@ -7552,6 +7630,9 @@
         outputCanvas = croppedCanvas;
         outputWidth = sw;
         outputHeight = sh;
+      }
+      if (state.colorDepth === 'full') {
+        simplifyCanvasColors(outputCanvas);
       }
       return canvasToBlobWithFallback(outputCanvas).then((payload) => ({
         ...payload,
