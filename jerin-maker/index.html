@@ -31,6 +31,7 @@
     --accent: #58c4ff;
     --text: #eaf1ff;
     --pad: clamp(12px, 3vw, 20px);
+    --footer-height: 68px;
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-right: env(safe-area-inset-right, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -45,7 +46,10 @@
     font-family: 'Noto Sans JP', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     display: flex;
     justify-content: center;
-    padding: calc(var(--pad) + var(--safe-top)) calc(var(--pad) + var(--safe-right)) calc(var(--pad) + var(--safe-bottom)) calc(var(--pad) + var(--safe-left));
+    padding: calc(var(--pad) + var(--safe-top))
+      calc(var(--pad) + var(--safe-right))
+      calc(var(--pad) + var(--safe-bottom) + var(--footer-height))
+      calc(var(--pad) + var(--safe-left));
     overflow: hidden;
     user-select: none;
   }
@@ -59,6 +63,7 @@
     display: grid;
     grid-template-rows: auto 1fr;
     gap: clamp(10px, 2vw, 14px);
+    padding-bottom: calc(40px + var(--footer-height));
   }
   @supports (height: 100dvh) {
     body {
@@ -71,14 +76,20 @@
   .topbar { display: none; }
   .footer {
     display: flex;
-    justify-content: flex-start;
+    justify-content: center;
     align-items: center;
-    padding: 8px 0;
+    padding: 6px calc(var(--pad) + var(--safe-right)) calc(6px + var(--safe-bottom)) calc(var(--pad) + var(--safe-left));
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 12;
+    backdrop-filter: blur(10px);
+    background: linear-gradient(180deg, rgba(13, 18, 36, 0) 0%, rgba(13, 18, 36, 0.82) 45%);
   }
   .ad-slot {
     flex: 0 0 auto;
-    width: 100%;
-    max-width: 900px;
+    width: min(900px, 100%);
     height: 60px;
     border-radius: 10px;
     overflow: hidden;
@@ -87,6 +98,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    margin: 0 auto;
   }
   .ad-slot ins { display: block; width: 100%; height: 100%; }
   .app {
@@ -306,14 +318,14 @@
   }
 .palette-wrap { position: relative; }
   .lite-color-picker-overlay {
-    position: fixed;
+    position: absolute;
     inset: 0;
     display: none;
-    align-items: center;
-    justify-content: center;
+    align-items: stretch;
+    justify-content: stretch;
     background: rgba(0, 0, 0, 0.35);
     z-index: 10;
-    padding: calc(var(--pad) + var(--safe-top)) calc(var(--pad) + var(--safe-right)) calc(var(--pad) + var(--safe-bottom)) calc(var(--pad) + var(--safe-left));
+    padding: 0;
     touch-action: none;
   }
   .lite-color-picker-overlay.is-active { display: flex; }
@@ -321,10 +333,9 @@
     background: #0f1425;
     border: 1px solid var(--line);
     border-radius: 8px;
-    padding: 10px;
-    width: min(760px, calc(100vw - (var(--pad) * 2)));
-    height: min(78vh, calc(100vh - var(--safe-top) - var(--safe-bottom) - 32px));
-    touch-action: none;
+    padding: 6px;
+    width: 100%;
+    height: 100%;
     overflow: hidden;
     overflow-x: hidden;
     display: flex;
