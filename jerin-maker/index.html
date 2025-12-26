@@ -320,9 +320,9 @@
     background: #0f1425;
     border: 1px solid var(--line);
     border-radius: 8px;
-    padding: 10px;
-    width: min(760px, calc(100vw - (var(--pad) * 2)));
-    height: min(78vh, calc(100vh - var(--safe-top) - var(--safe-bottom) - 32px));
+    padding: 6px;
+    width: 100%;
+    height: 100%;
     overflow: hidden;
     overflow-x: hidden;
     display: flex;
@@ -364,10 +364,10 @@
   }
   .lite-color-wheel-wrap {
     position: relative;
-    width: clamp(140px, 52vw, 200px);
+    width: 160px;
     aspect-ratio: 1;
     min-height: 140px;
-    max-height: clamp(140px, 52vh, 220px);
+    max-height: 180px;
     border-radius: 12px;
     overflow: hidden;
     background: #0b0f1f;
@@ -378,7 +378,6 @@
     width: 100%;
     height: 100%;
     display: block;
-    touch-action: none;
   }
   .lite-color-wheel-cursor {
     position: absolute;
@@ -453,8 +452,8 @@
       justify-content: space-between;
     }
     .lite-color-wheel-wrap {
-      max-width: clamp(140px, 52vw, 200px);
-      max-height: clamp(140px, 52vh, 200px);
+      max-width: 180px;
+      max-height: 180px;
       min-height: 140px;
       flex-shrink: 0;
     }
@@ -473,21 +472,6 @@
       width: 100%;
       flex: 0 0 auto;
       margin-top: auto;
-    }
-  }
-  @media (max-width: 720px) {
-    .lite-color-content {
-      flex-direction: column;
-      align-items: center;
-    }
-    .lite-color-side {
-      width: 100%;
-      min-width: 0;
-      align-items: center;
-    }
-    .lite-color-wheel-wrap {
-      width: clamp(140px, 64vw, 200px);
-      max-height: clamp(140px, 60vh, 200px);
     }
   }
   .lite-color-actions {
@@ -2180,33 +2164,13 @@
     liteCanvasPreviewCtx.clearRect(0, 0, temp.width, temp.height);
     liteCanvasPreviewCtx.putImageData(temp, 0, 0);
   }
-  function getLiteWheelPoint(event) {
-    if ('touches' in event && event.touches) {
-      const activeId = liteWheelPointerId;
-      const touch =
-        (Number.isInteger(activeId)
-          ? Array.from(event.touches).find(t => t.identifier === activeId)
-          : null) ||
-        event.touches[0] ||
-        event.changedTouches?.[0];
-      if (touch) {
-        return { clientX: touch.clientX, clientY: touch.clientY };
-      }
-    }
-    if ('clientX' in event && 'clientY' in event) {
-      return { clientX: event.clientX, clientY: event.clientY };
-    }
-    return null;
-  }
   function updateLiteStateFromWheelEvent(event) {
     if (!(liteColorWheel instanceof HTMLCanvasElement)) return;
     const rect = liteColorWheel.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
-    const point = getLiteWheelPoint(event);
-    if (!point) return;
     const scale = liteColorWheel.width / rect.width;
-    const x = (point.clientX - rect.left) * scale;
-    const y = (point.clientY - rect.top) * scale;
+    const x = (event.clientX - rect.left) * scale;
+    const y = (event.clientY - rect.top) * scale;
     const radius = liteColorWheel.width / 2;
     const dx = x - radius;
     const dy = y - radius;
@@ -2271,12 +2235,10 @@
     updateUndoRedoUI();
   }
   let liteWheelPointerId = null;
-  let liteWheelMode = null;
   function handleLiteWheelPointerDown(event) {
     if (!(liteColorWheel instanceof HTMLCanvasElement)) return;
-    if (liteWheelPointerId !== null && liteWheelMode !== 'pointer') return;
+    if (liteWheelPointerId !== null) return;
     event.preventDefault();
-    liteWheelMode = 'pointer';
     liteWheelPointerId = event.pointerId;
     liteColorWheel.setPointerCapture?.(event.pointerId);
     updateLiteStateFromWheelEvent(event);
@@ -2288,44 +2250,13 @@
     updateLiteStateFromWheelEvent(event);
   }
   function handleLiteWheelPointerUp(event) {
-    if (liteWheelPointerId === null || event.pointerId !== liteWheelPointerId || liteWheelMode !== 'pointer') return;
+    if (liteWheelPointerId === null || event.pointerId !== liteWheelPointerId) return;
     if (liteColorWheel?.hasPointerCapture?.(event.pointerId)) {
       liteColorWheel.releasePointerCapture(event.pointerId);
     }
     liteWheelPointerId = null;
-    liteWheelMode = null;
     window.removeEventListener('pointermove', handleLiteWheelPointerMove);
     window.removeEventListener('pointerup', handleLiteWheelPointerUp);
-  }
-  function handleLiteWheelTouchStart(event) {
-    if (!(liteColorWheel instanceof HTMLCanvasElement)) return;
-    if (liteWheelPointerId !== null && liteWheelMode !== 'touch') return;
-    if (event.cancelable) {
-      event.preventDefault();
-    }
-    const touch = event.touches && event.touches[0];
-    if (!touch) return;
-    liteWheelMode = 'touch';
-    liteWheelPointerId = touch.identifier;
-    updateLiteStateFromWheelEvent(event);
-    window.addEventListener('touchmove', handleLiteWheelTouchMove, { passive: false });
-    window.addEventListener('touchend', handleLiteWheelTouchEnd);
-    window.addEventListener('touchcancel', handleLiteWheelTouchEnd);
-  }
-  function handleLiteWheelTouchMove(event) {
-    if (liteWheelPointerId === null || liteWheelMode !== 'touch') return;
-    if (event.cancelable) {
-      event.preventDefault();
-    }
-    updateLiteStateFromWheelEvent(event);
-  }
-  function handleLiteWheelTouchEnd(event) {
-    if (liteWheelMode !== 'touch') return;
-    liteWheelPointerId = null;
-    liteWheelMode = null;
-    window.removeEventListener('touchmove', handleLiteWheelTouchMove);
-    window.removeEventListener('touchend', handleLiteWheelTouchEnd);
-    window.removeEventListener('touchcancel', handleLiteWheelTouchEnd);
   }
 
   function updateSwatchColors() {
@@ -3184,7 +3115,6 @@
     openLiteColorPicker(activeSwatchIndex);
   });
   liteColorWheel?.addEventListener('pointerdown', handleLiteWheelPointerDown);
-  liteColorWheel?.addEventListener('touchstart', handleLiteWheelTouchStart, { passive: false });
   liteValueSlider?.addEventListener('input', () => {
     if (liteColorPickerState.index === null) return;
     liteColorPickerState.hsv.v = clamp(Number(liteValueSlider.value) / 100, 0, 1);
