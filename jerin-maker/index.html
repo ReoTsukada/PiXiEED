@@ -45,7 +45,7 @@
     font-family: 'Noto Sans JP', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     display: flex;
     justify-content: center;
-    padding: calc(var(--pad) + var(--safe-top)) calc(var(--pad) + var(--safe-right)) calc(var(--pad) + var(--safe-bottom)) calc(var(--pad) + var(--safe-left));
+    padding: calc(var(--pad) + var(--safe-top)) calc(var(--pad) + var(--safe-right)) calc(var(--pad) + var(--safe-bottom) + 76px) calc(var(--pad) + var(--safe-left));
     overflow: hidden;
     user-select: none;
   }
@@ -59,6 +59,7 @@
     display: grid;
     grid-template-rows: auto 1fr;
     gap: clamp(10px, 2vw, 14px);
+    padding-bottom: 40px;
   }
   @supports (height: 100dvh) {
     body {
@@ -66,6 +67,7 @@
     }
     .shell {
       min-height: calc(100dvh - (var(--pad) + var(--safe-top)) - (var(--pad) + var(--safe-bottom)));
+      padding-bottom: 40px;
     }
   }
   .topbar { display: none; }
@@ -73,12 +75,18 @@
     display: flex;
     justify-content: flex-start;
     align-items: center;
-    padding: 8px 0;
+    padding: 8px calc(var(--pad) + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(var(--pad) + var(--safe-left));
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 6;
+    backdrop-filter: blur(10px);
+    background: linear-gradient(180deg, rgba(13, 18, 36, 0) 0%, rgba(13, 18, 36, 0.78) 40%);
   }
   .ad-slot {
     flex: 0 0 auto;
-    width: 100%;
-    max-width: 900px;
+    width: min(900px, 100%);
     height: 60px;
     border-radius: 10px;
     overflow: hidden;
@@ -87,6 +95,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    margin: 0 auto;
   }
   .ad-slot ins { display: block; width: 100%; height: 100%; }
   .app {
@@ -306,23 +315,23 @@
   }
 .palette-wrap { position: relative; }
   .lite-color-picker-overlay {
-    position: absolute;
+    position: fixed;
     inset: 0;
     display: none;
-    align-items: stretch;
-    justify-content: stretch;
+    align-items: center;
+    justify-content: center;
     background: rgba(0, 0, 0, 0.35);
-    z-index: 5;
-    padding: 0;
+    z-index: 10;
+    padding: calc(var(--pad) + var(--safe-top)) calc(var(--pad) + var(--safe-right)) calc(var(--pad) + var(--safe-bottom)) calc(var(--pad) + var(--safe-left));
   }
   .lite-color-picker-overlay.is-active { display: flex; }
   .lite-color-picker-card {
     background: #0f1425;
     border: 1px solid var(--line);
     border-radius: 8px;
-    padding: 6px;
-    width: 100%;
-    height: 100%;
+    padding: 10px;
+    width: min(760px, calc(100vw - (var(--pad) * 2)));
+    height: min(84vh, calc(100vh - var(--safe-top) - var(--safe-bottom) - 24px));
     overflow: hidden;
     overflow-x: hidden;
     display: flex;
@@ -364,10 +373,10 @@
   }
   .lite-color-wheel-wrap {
     position: relative;
-    width: 160px;
+    width: 180px;
     aspect-ratio: 1;
-    min-height: 140px;
-    max-height: 180px;
+    min-height: 160px;
+    max-height: 240px;
     border-radius: 12px;
     overflow: hidden;
     background: #0b0f1f;
@@ -378,6 +387,7 @@
     width: 100%;
     height: 100%;
     display: block;
+    touch-action: none;
   }
   .lite-color-wheel-cursor {
     position: absolute;
@@ -398,6 +408,20 @@
     width: 100%;
     min-height: 48px;
     flex: 0 0 auto;
+  }
+  @media (max-width: 720px) {
+    .lite-color-content {
+      flex-direction: column;
+      align-items: center;
+    }
+    .lite-color-side {
+      width: 100%;
+      min-width: 0;
+    }
+    .lite-color-wheel-wrap {
+      width: min(240px, 100%);
+      max-height: 260px;
+    }
   }
   #liteValueSlider {
     width: 100%;
@@ -2164,13 +2188,33 @@
     liteCanvasPreviewCtx.clearRect(0, 0, temp.width, temp.height);
     liteCanvasPreviewCtx.putImageData(temp, 0, 0);
   }
+  function getLiteWheelPoint(event) {
+    if ('touches' in event && event.touches) {
+      const activeId = liteWheelPointerId;
+      const touch =
+        (Number.isInteger(activeId)
+          ? Array.from(event.touches).find(t => t.identifier === activeId)
+          : null) ||
+        event.touches[0] ||
+        event.changedTouches?.[0];
+      if (touch) {
+        return { clientX: touch.clientX, clientY: touch.clientY };
+      }
+    }
+    if ('clientX' in event && 'clientY' in event) {
+      return { clientX: event.clientX, clientY: event.clientY };
+    }
+    return null;
+  }
   function updateLiteStateFromWheelEvent(event) {
     if (!(liteColorWheel instanceof HTMLCanvasElement)) return;
     const rect = liteColorWheel.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
+    const point = getLiteWheelPoint(event);
+    if (!point) return;
     const scale = liteColorWheel.width / rect.width;
-    const x = (event.clientX - rect.left) * scale;
-    const y = (event.clientY - rect.top) * scale;
+    const x = (point.clientX - rect.left) * scale;
+    const y = (point.clientY - rect.top) * scale;
     const radius = liteColorWheel.width / 2;
     const dx = x - radius;
     const dy = y - radius;
@@ -2235,10 +2279,12 @@
     updateUndoRedoUI();
   }
   let liteWheelPointerId = null;
+  let liteWheelMode = null;
   function handleLiteWheelPointerDown(event) {
     if (!(liteColorWheel instanceof HTMLCanvasElement)) return;
-    if (liteWheelPointerId !== null) return;
+    if (liteWheelPointerId !== null && liteWheelMode !== 'pointer') return;
     event.preventDefault();
+    liteWheelMode = 'pointer';
     liteWheelPointerId = event.pointerId;
     liteColorWheel.setPointerCapture?.(event.pointerId);
     updateLiteStateFromWheelEvent(event);
@@ -2250,13 +2296,44 @@
     updateLiteStateFromWheelEvent(event);
   }
   function handleLiteWheelPointerUp(event) {
-    if (liteWheelPointerId === null || event.pointerId !== liteWheelPointerId) return;
+    if (liteWheelPointerId === null || event.pointerId !== liteWheelPointerId || liteWheelMode !== 'pointer') return;
     if (liteColorWheel?.hasPointerCapture?.(event.pointerId)) {
       liteColorWheel.releasePointerCapture(event.pointerId);
     }
     liteWheelPointerId = null;
+    liteWheelMode = null;
     window.removeEventListener('pointermove', handleLiteWheelPointerMove);
     window.removeEventListener('pointerup', handleLiteWheelPointerUp);
+  }
+  function handleLiteWheelTouchStart(event) {
+    if (!(liteColorWheel instanceof HTMLCanvasElement)) return;
+    if (liteWheelPointerId !== null && liteWheelMode !== 'touch') return;
+    if (event.cancelable) {
+      event.preventDefault();
+    }
+    const touch = event.touches && event.touches[0];
+    if (!touch) return;
+    liteWheelMode = 'touch';
+    liteWheelPointerId = touch.identifier;
+    updateLiteStateFromWheelEvent(event);
+    window.addEventListener('touchmove', handleLiteWheelTouchMove, { passive: false });
+    window.addEventListener('touchend', handleLiteWheelTouchEnd);
+    window.addEventListener('touchcancel', handleLiteWheelTouchEnd);
+  }
+  function handleLiteWheelTouchMove(event) {
+    if (liteWheelPointerId === null || liteWheelMode !== 'touch') return;
+    if (event.cancelable) {
+      event.preventDefault();
+    }
+    updateLiteStateFromWheelEvent(event);
+  }
+  function handleLiteWheelTouchEnd(event) {
+    if (liteWheelMode !== 'touch') return;
+    liteWheelPointerId = null;
+    liteWheelMode = null;
+    window.removeEventListener('touchmove', handleLiteWheelTouchMove);
+    window.removeEventListener('touchend', handleLiteWheelTouchEnd);
+    window.removeEventListener('touchcancel', handleLiteWheelTouchEnd);
   }
 
   function updateSwatchColors() {
@@ -3115,6 +3192,7 @@
     openLiteColorPicker(activeSwatchIndex);
   });
   liteColorWheel?.addEventListener('pointerdown', handleLiteWheelPointerDown);
+  liteColorWheel?.addEventListener('touchstart', handleLiteWheelTouchStart, { passive: false });
   liteValueSlider?.addEventListener('input', () => {
     if (liteColorPickerState.index === null) return;
     liteColorPickerState.hsv.v = clamp(Number(liteValueSlider.value) / 100, 0, 1);
