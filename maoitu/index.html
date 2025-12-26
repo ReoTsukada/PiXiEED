@@ -38,7 +38,17 @@ gtag('config', GA_MEASUREMENT_ID, {
 
 
 <meta content="#000000" name="theme-color"/>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"/>
 <style>
+ :root{
+   --ui-bg: #05070f;
+   --ui-panel: #0f172a;
+   --ui-border: #4b5563;
+   --ui-accent: #22d3ee;
+   --ui-accent-strong: #f97316;
+   --ui-text: #e5e7eb;
+   --ui-muted: #94a3b8;
+ }
 html,body {
   height:100%;
   overflow:hidden;
@@ -47,12 +57,17 @@ body {
   margin:0;
   height:100dvh;
   min-height:100vh;
-  background:#000;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+    radial-gradient(circle at 20% 20%, rgba(34,211,238,0.08), transparent 50%),
+    radial-gradient(circle at 80% 0%, rgba(99,102,241,0.08), transparent 50%),
+    var(--ui-bg);
   display:flex;
   flex-direction:column;
   align-items:center;
-  color:#fff;
-  font-family:'Noto Sans JP', system-ui, sans-serif;
+  color:var(--ui-text);
+  font-family:'Press Start 2P','Montserrat','Noto Sans JP', system-ui, sans-serif;
   text-align:center;
   box-sizing:border-box;
   padding:48px 16px calc(56px + env(safe-area-inset-bottom, 0px));
@@ -62,11 +77,14 @@ body {
 }
 h1 { font-size:22px; margin:32px 0 8px; }
 button {
-  font:700 16px system-ui;
-  padding:10px 20px;
-  border:0;
-  border-radius:12px;
+  font:700 12px 'Press Start 2P', system-ui;
+  padding:12px 14px;
+  border:2px solid var(--ui-border);
+  border-radius:6px;
   cursor:pointer;
+  background:var(--ui-panel);
+  color:var(--ui-text);
+  box-shadow:4px 4px 0 #000;
 }
 a { color:#7dd3fc; }
 .control-bar {
@@ -77,12 +95,15 @@ a { color:#7dd3fc; }
   gap:16px;
 }
 .control-bar__btn {
-  font:700 16px system-ui;
-  padding:12px 24px;
-  border-radius:12px;
-  border:0;
+  font:700 12px 'Press Start 2P', system-ui;
+  padding:14px 18px;
+  border-radius:6px;
+  border:2px solid var(--ui-border);
   cursor:pointer;
   transition:transform 0.15s ease, filter 0.15s ease;
+  background:var(--ui-panel);
+  color:var(--ui-text);
+  box-shadow:4px 4px 0 #000;
 }
 .control-bar__btn:hover,
 .control-bar__btn:focus-visible {
@@ -93,12 +114,13 @@ a { color:#7dd3fc; }
 .control-bar__btn--primary {
   background:#22c55e;
   color:#000;
-  font-size:18px;
+  font-size:13px;
+  border-color:#15803d;
 }
 .control-bar__btn--secondary {
   background:rgba(255,255,255,0.12);
-  color:#fff;
-  border:1px solid rgba(255,255,255,0.25);
+  color:var(--ui-text);
+  border:2px solid var(--ui-border);
 }
 .control-bar__audio {
   display:flex;
@@ -112,14 +134,15 @@ a { color:#7dd3fc; }
   justify-content:center;
 }
 .difficulty-btn{
-  font:900 15px system-ui;
-  padding:12px 16px;
-  border-radius:10px;
-  border:1px solid rgba(255,255,255,0.25);
+  font:900 12px 'Press Start 2P', system-ui;
+  padding:12px 14px;
+  border-radius:6px;
+  border:2px solid var(--ui-border);
   background:rgba(255,255,255,0.08);
-  color:#fff;
+  color:var(--ui-text);
   cursor:pointer;
   transition:transform 0.15s ease, filter 0.15s ease, border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  box-shadow:3px 3px 0 #000;
 }
 .difficulty-btn:hover,
 .difficulty-btn:focus-visible{
@@ -128,30 +151,31 @@ a { color:#7dd3fc; }
   outline:none;
 }
 .difficulty-btn.is-active[data-mode="easy"]{
-  border-color:rgba(56,189,248,0.7);
+  border-color:rgba(56,189,248,0.9);
   background:rgba(56,189,248,0.18);
   color:#bae6fd;
 }
 .difficulty-btn.is-active[data-mode="normal"]{
-  border-color:rgba(34,197,94,0.7);
+  border-color:rgba(34,197,94,0.9);
   background:rgba(34,197,94,0.18);
   color:#bbf7d0;
 }
 .difficulty-btn.is-active[data-mode="endless"]{
-  border-color:rgba(249,115,22,0.7);
+  border-color:rgba(249,115,22,0.9);
   background:rgba(249,115,22,0.18);
   color:#fed7aa;
 }
 .instructions-card {
   max-width:320px;
   padding:16px 20px;
-  background:rgba(255,255,255,0.08);
-  border:1px solid rgba(255,255,255,0.15);
-  border-radius:16px;
-  color:#f3f4f6;
-  font-size:14px;
+  background:var(--ui-panel);
+  border:3px solid var(--ui-border);
+  border-radius:8px;
+  color:var(--ui-text);
+  font-size:12px;
   line-height:1.6;
   text-align:left;
+  box-shadow:6px 6px 0 #000;
 }
 .start-content {
   flex:1 1 auto;
@@ -168,8 +192,8 @@ a { color:#7dd3fc; }
 }
 .instructions-card h2 {
   margin:0 0 8px;
-  font-size:16px;
-  color:#fff;
+  font-size:14px;
+  color:var(--ui-text);
 }
 .instructions-card ul {
   margin:0;
