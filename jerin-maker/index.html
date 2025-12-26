@@ -105,7 +105,7 @@
     width: 100%;
     background: transparent;
     border: 0;
-    padding: 0;
+    padding: 0 0 calc(var(--footer-height) + var(--pad)) 0;
     display: flex;
     flex-direction: column;
     gap: clamp(10px, 2vw, 16px);
@@ -117,6 +117,7 @@
     flex-direction: column;
     gap: clamp(10px, 2vw, 14px);
     min-height: 0;
+    padding-bottom: calc(var(--footer-height));
   }
   @media (min-width: 960px), (orientation: landscape) {
     .workspace {
@@ -215,9 +216,9 @@
     border-radius: 12px;
     padding: 6px;
     display: grid;
-    grid-template-rows: repeat(4, auto);
-    gap: 6px;
-    max-height: calc(100vh - 160px);
+    grid-template-rows: auto 1fr auto;
+    gap: 10px;
+    max-height: calc(100vh - 120px - var(--footer-height));
     overflow: hidden;
     flex-shrink: 0;
     position: relative;
@@ -316,13 +317,21 @@
     gap: 2px;
     margin: 0;
   }
-.palette-wrap { position: relative; }
+.palette-wrap {
+    position: relative;
+    margin: 12px 0;
+    min-height: clamp(240px, 50vh, 320px);
+    display: grid;
+    align-items: center;
+    justify-items: stretch;
+    gap: 8px;
+  }
   .lite-color-picker-overlay {
     position: absolute;
     inset: 0;
     display: none;
-    align-items: stretch;
-    justify-content: stretch;
+    align-items: center;
+    justify-content: center;
     background: rgba(0, 0, 0, 0.35);
     z-index: 10;
     padding: 0;
@@ -731,21 +740,21 @@
   @media (max-height: 720px) {
     .canvas-stack { --canvas-size: min(78vw, min(46vh, 460px)); }
     .canvas-frame { padding: 8px; }
-    .panel { max-height: calc(100vh - 140px); gap: 8px; }
+    .panel { max-height: calc(100vh - 140px - var(--footer-height)); gap: 8px; }
     .app { gap: clamp(8px, 2vw, 12px); }
     .prompt { font-size: 0.9rem; padding: 10px 10px; }
   }
   @media (max-height: 620px) {
     :root { --pad: clamp(6px, 1.5vw, 10px); }
     .canvas-stack { --canvas-size: min(70vw, min(38vh, 340px)); }
-    .panel { max-height: calc(100vh - 170px); gap: 6px; }
+    .panel { max-height: calc(100vh - 170px - var(--footer-height)); gap: 6px; }
     .prompt { font-size: 0.86rem; padding: 8px 8px; }
-    .footer { padding: 4px 0; }
+    .footer { padding: 4px calc(var(--pad) + var(--safe-right)) calc(4px + var(--safe-bottom)) calc(var(--pad) + var(--safe-left)); }
   }
   @media (min-height: 900px) and (orientation: portrait) {
     .canvas-stack { --canvas-size: min(86vw, min(64vh, 560px)); }
     .app { gap: clamp(12px, 2.5vw, 18px); }
-    .panel { max-height: calc(100vh - 180px); }
+    .panel { max-height: calc(100vh - 180px - var(--footer-height)); }
   }
   .topbar {
     display: flex;
@@ -820,25 +829,25 @@
       </div>
       <div class="palette-wrap">
         <div class="palette" id="palette"></div>
-      </div>
-      <input aria-hidden="true" class="swatch-editor" id="swatchEditor" tabindex="-1" type="color" />
-      <div class="lite-color-picker-overlay" id="liteColorPicker" aria-hidden="true">
-        <div class="lite-color-picker-card">
-          <div class="lite-color-content">
-            <div class="lite-color-wheel-wrap">
-              <canvas id="liteColorWheel" width="180" height="180"></canvas>
-              <div class="lite-color-wheel-cursor" id="liteColorWheelCursor"></div>
-            </div>
-            <div class="lite-color-side">
-              <div class="lite-color-slider">
-                <label for="liteValueSlider">明るさ</label>
-                <input type="range" id="liteValueSlider" min="0" max="100" value="100" />
+        <input aria-hidden="true" class="swatch-editor" id="swatchEditor" tabindex="-1" type="color" />
+        <div class="lite-color-picker-overlay" id="liteColorPicker" aria-hidden="true">
+          <div class="lite-color-picker-card">
+            <div class="lite-color-content">
+              <div class="lite-color-wheel-wrap">
+                <canvas id="liteColorWheel" width="180" height="180"></canvas>
+                <div class="lite-color-wheel-cursor" id="liteColorWheelCursor"></div>
               </div>
-              <div class="lite-color-actions">
-                <button type="button" id="liteColorCancel">キャンセル</button>
-                <button type="button" id="liteColorApply" class="primary">
-                  <span class="btn-color-chip" id="liteApplyChip"></span>決定
-                </button>
+              <div class="lite-color-side">
+                <div class="lite-color-slider">
+                  <label for="liteValueSlider">明るさ</label>
+                  <input type="range" id="liteValueSlider" min="0" max="100" value="100" />
+                </div>
+                <div class="lite-color-actions">
+                  <button type="button" id="liteColorCancel">キャンセル</button>
+                  <button type="button" id="liteColorApply" class="primary">
+                    <span class="btn-color-chip" id="liteApplyChip"></span>決定
+                  </button>
+                </div>
               </div>
             </div>
           </div>
