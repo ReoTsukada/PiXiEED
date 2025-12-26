@@ -377,10 +377,10 @@
   }
   .lite-color-wheel-wrap {
     position: relative;
-    width: clamp(130px, 42vw, 180px);
+    width: clamp(110px, 36vw, 150px);
     aspect-ratio: 1;
-    min-height: 130px;
-    max-height: 190px;
+    min-height: 110px;
+    max-height: 150px;
     border-radius: 12px;
     overflow: hidden;
     background: #0b0f1f;
@@ -462,13 +462,13 @@
     .lite-color-content {
       flex-direction: row;
       align-items: flex-start;
-      gap: 10px;
+      gap: 8px;
       justify-content: space-between;
     }
     .lite-color-wheel-wrap {
-      max-width: clamp(130px, 46vw, 180px);
-      max-height: clamp(130px, 46vh, 190px);
-      min-height: 130px;
+      max-width: clamp(110px, 42vw, 150px);
+      max-height: clamp(110px, 42vh, 150px);
+      min-height: 110px;
       flex-shrink: 0;
     }
     .lite-color-side { min-width: 180px; }
@@ -826,7 +826,7 @@
         <div class="lite-color-picker-card">
           <div class="lite-color-content">
             <div class="lite-color-wheel-wrap">
-              <canvas id="liteColorWheel" width="160" height="160"></canvas>
+              <canvas id="liteColorWheel" width="140" height="140"></canvas>
               <div class="lite-color-wheel-cursor" id="liteColorWheelCursor"></div>
             </div>
             <div class="lite-color-side">
@@ -2109,7 +2109,7 @@
     if (!liteColorWheelCtx || !(liteColorWheel instanceof HTMLCanvasElement)) return;
     const rect = liteColorWheel.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    const size = Math.max(120, Math.round(Math.min(rect.width || 160, rect.height || 160) * dpr));
+    const size = Math.max(120, Math.round(Math.min(rect.width || 140, rect.height || 140) * dpr));
     if (liteColorWheel.width !== size || liteColorWheel.height !== size) {
       liteColorWheel.width = size;
       liteColorWheel.height = size;
