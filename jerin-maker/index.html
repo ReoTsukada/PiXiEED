@@ -2168,9 +2168,11 @@
     if (!(liteColorWheel instanceof HTMLCanvasElement)) return;
     const rect = liteColorWheel.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
+    const point = getLiteWheelPoint(event);
+    if (!point) return;
     const scale = liteColorWheel.width / rect.width;
-    const x = (event.clientX - rect.left) * scale;
-    const y = (event.clientY - rect.top) * scale;
+    const x = (point.clientX - rect.left) * scale;
+    const y = (point.clientY - rect.top) * scale;
     const radius = liteColorWheel.width / 2;
     const dx = x - radius;
     const dy = y - radius;
@@ -2235,10 +2237,30 @@
     updateUndoRedoUI();
   }
   let liteWheelPointerId = null;
+  let liteWheelMode = null;
+  function getLiteWheelPoint(event) {
+    if ('touches' in event && event.touches) {
+      const activeId = liteWheelPointerId;
+      const touch =
+        (Number.isInteger(activeId)
+          ? Array.from(event.touches).find(t => t.identifier === activeId)
+          : null) ||
+        event.touches[0] ||
+        event.changedTouches?.[0];
+      if (touch) {
+        return { clientX: touch.clientX, clientY: touch.clientY };
+      }
+    }
+    if ('clientX' in event && 'clientY' in event) {
+      return { clientX: event.clientX, clientY: event.clientY };
+    }
+    return null;
+  }
   function handleLiteWheelPointerDown(event) {
     if (!(liteColorWheel instanceof HTMLCanvasElement)) return;
-    if (liteWheelPointerId !== null) return;
+    if (liteWheelPointerId !== null && liteWheelMode !== 'pointer') return;
     event.preventDefault();
+    liteWheelMode = 'pointer';
     liteWheelPointerId = event.pointerId;
     liteColorWheel.setPointerCapture?.(event.pointerId);
     updateLiteStateFromWheelEvent(event);
@@ -2250,13 +2272,44 @@
     updateLiteStateFromWheelEvent(event);
   }
   function handleLiteWheelPointerUp(event) {
-    if (liteWheelPointerId === null || event.pointerId !== liteWheelPointerId) return;
+    if (liteWheelPointerId === null || event.pointerId !== liteWheelPointerId || liteWheelMode !== 'pointer') return;
     if (liteColorWheel?.hasPointerCapture?.(event.pointerId)) {
       liteColorWheel.releasePointerCapture(event.pointerId);
     }
     liteWheelPointerId = null;
+    liteWheelMode = null;
     window.removeEventListener('pointermove', handleLiteWheelPointerMove);
     window.removeEventListener('pointerup', handleLiteWheelPointerUp);
+  }
+  function handleLiteWheelTouchStart(event) {
+    if (!(liteColorWheel instanceof HTMLCanvasElement)) return;
+    if (liteWheelPointerId !== null && liteWheelMode !== 'touch') return;
+    if (event.cancelable) {
+      event.preventDefault();
+    }
+    const touch = event.touches && event.touches[0];
+    if (!touch) return;
+    liteWheelMode = 'touch';
+    liteWheelPointerId = touch.identifier;
+    updateLiteStateFromWheelEvent(event);
+    window.addEventListener('touchmove', handleLiteWheelTouchMove, { passive: false });
+    window.addEventListener('touchend', handleLiteWheelTouchEnd);
+    window.addEventListener('touchcancel', handleLiteWheelTouchEnd);
+  }
+  function handleLiteWheelTouchMove(event) {
+    if (liteWheelPointerId === null || liteWheelMode !== 'touch') return;
+    if (event.cancelable) {
+      event.preventDefault();
+    }
+    updateLiteStateFromWheelEvent(event);
+  }
+  function handleLiteWheelTouchEnd(event) {
+    if (liteWheelMode !== 'touch') return;
+    liteWheelPointerId = null;
+    liteWheelMode = null;
+    window.removeEventListener('touchmove', handleLiteWheelTouchMove);
+    window.removeEventListener('touchend', handleLiteWheelTouchEnd);
+    window.removeEventListener('touchcancel', handleLiteWheelTouchEnd);
   }
 
   function updateSwatchColors() {
@@ -3115,6 +3168,7 @@
     openLiteColorPicker(activeSwatchIndex);
   });
   liteColorWheel?.addEventListener('pointerdown', handleLiteWheelPointerDown);
+  liteColorWheel?.addEventListener('touchstart', handleLiteWheelTouchStart, { passive: false });
   liteValueSlider?.addEventListener('input', () => {
     if (liteColorPickerState.index === null) return;
     liteColorPickerState.hsv.v = clamp(Number(liteValueSlider.value) / 100, 0, 1);
