@@ -45,7 +45,7 @@
     font-family: 'Noto Sans JP', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     display: flex;
     justify-content: center;
-    padding: calc(var(--pad) + var(--safe-top)) calc(var(--pad) + var(--safe-right)) calc(var(--pad) + var(--safe-bottom) + 76px) calc(var(--pad) + var(--safe-left));
+    padding: calc(var(--pad) + var(--safe-top)) calc(var(--pad) + var(--safe-right)) calc(var(--pad) + var(--safe-bottom)) calc(var(--pad) + var(--safe-left));
     overflow: hidden;
     user-select: none;
   }
@@ -59,7 +59,6 @@
     display: grid;
     grid-template-rows: auto 1fr;
     gap: clamp(10px, 2vw, 14px);
-    padding-bottom: 40px;
   }
   @supports (height: 100dvh) {
     body {
@@ -67,7 +66,6 @@
     }
     .shell {
       min-height: calc(100dvh - (var(--pad) + var(--safe-top)) - (var(--pad) + var(--safe-bottom)));
-      padding-bottom: 40px;
     }
   }
   .topbar { display: none; }
@@ -75,18 +73,12 @@
     display: flex;
     justify-content: flex-start;
     align-items: center;
-    padding: 8px calc(var(--pad) + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(var(--pad) + var(--safe-left));
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 6;
-    backdrop-filter: blur(10px);
-    background: linear-gradient(180deg, rgba(13, 18, 36, 0) 0%, rgba(13, 18, 36, 0.78) 40%);
+    padding: 8px 0;
   }
   .ad-slot {
     flex: 0 0 auto;
-    width: min(900px, 100%);
+    width: 100%;
+    max-width: 900px;
     height: 60px;
     border-radius: 10px;
     overflow: hidden;
@@ -95,7 +87,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto;
   }
   .ad-slot ins { display: block; width: 100%; height: 100%; }
   .app {
@@ -315,14 +306,14 @@
   }
 .palette-wrap { position: relative; }
   .lite-color-picker-overlay {
-    position: fixed;
+    position: absolute;
     inset: 0;
     display: none;
-    align-items: center;
-    justify-content: center;
+    align-items: stretch;
+    justify-content: stretch;
     background: rgba(0, 0, 0, 0.35);
-    z-index: 10;
-    padding: calc(var(--pad) + var(--safe-top)) calc(var(--pad) + var(--safe-right)) calc(var(--pad) + var(--safe-bottom)) calc(var(--pad) + var(--safe-left));
+    z-index: 5;
+    padding: 0;
   }
   .lite-color-picker-overlay.is-active { display: flex; }
   .lite-color-picker-card {
@@ -331,7 +322,7 @@
     border-radius: 8px;
     padding: 10px;
     width: min(760px, calc(100vw - (var(--pad) * 2)));
-    height: min(84vh, calc(100vh - var(--safe-top) - var(--safe-bottom) - 24px));
+    height: min(78vh, calc(100vh - var(--safe-top) - var(--safe-bottom) - 32px));
     overflow: hidden;
     overflow-x: hidden;
     display: flex;
@@ -373,10 +364,10 @@
   }
   .lite-color-wheel-wrap {
     position: relative;
-    width: 180px;
+    width: clamp(140px, 52vw, 200px);
     aspect-ratio: 1;
-    min-height: 160px;
-    max-height: 240px;
+    min-height: 140px;
+    max-height: clamp(140px, 52vh, 220px);
     border-radius: 12px;
     overflow: hidden;
     background: #0b0f1f;
@@ -408,20 +399,6 @@
     width: 100%;
     min-height: 48px;
     flex: 0 0 auto;
-  }
-  @media (max-width: 720px) {
-    .lite-color-content {
-      flex-direction: column;
-      align-items: center;
-    }
-    .lite-color-side {
-      width: 100%;
-      min-width: 0;
-    }
-    .lite-color-wheel-wrap {
-      width: min(240px, 100%);
-      max-height: 260px;
-    }
   }
   #liteValueSlider {
     width: 100%;
@@ -476,8 +453,8 @@
       justify-content: space-between;
     }
     .lite-color-wheel-wrap {
-      max-width: 180px;
-      max-height: 180px;
+      max-width: clamp(140px, 52vw, 200px);
+      max-height: clamp(140px, 52vh, 200px);
       min-height: 140px;
       flex-shrink: 0;
     }
@@ -496,6 +473,21 @@
       width: 100%;
       flex: 0 0 auto;
       margin-top: auto;
+    }
+  }
+  @media (max-width: 720px) {
+    .lite-color-content {
+      flex-direction: column;
+      align-items: center;
+    }
+    .lite-color-side {
+      width: 100%;
+      min-width: 0;
+      align-items: center;
+    }
+    .lite-color-wheel-wrap {
+      width: clamp(140px, 64vw, 200px);
+      max-height: clamp(140px, 60vh, 200px);
     }
   }
   .lite-color-actions {
