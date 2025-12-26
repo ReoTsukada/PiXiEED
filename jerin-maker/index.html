@@ -221,6 +221,7 @@
     overflow: hidden;
     flex-shrink: 0;
     position: relative;
+    margin-top: 8px;
   }
   .maou-dialog {
     position: fixed;
@@ -405,9 +406,9 @@
   }
   .lite-color-slider {
     display: grid;
-    grid-template-columns: 54px 1fr;
+    grid-template-columns: 52px 1fr;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     font-size: 0.9rem;
     width: 100%;
     min-height: 48px;
@@ -416,6 +417,7 @@
   #liteValueSlider {
     width: 100%;
     accent-color: var(--accent);
+    min-width: 0;
   }
   .lite-canvas-preview {
     margin-top: 4px;
@@ -509,6 +511,27 @@
     color: #0b0f1f;
     border-color: var(--accent);
     font-weight: 700;
+  }
+  /* タブレット縦長(iPad等)で縦が厳しい場合の圧縮 */
+  @media (min-width: 700px) and (max-height: 950px) {
+    .panel {
+      padding: 4px;
+      gap: 4px;
+      max-height: calc(100vh - 150px);
+    }
+    .row { gap: 6px; }
+    .palette { gap: 1px; }
+    .lite-color-content { gap: 6px; }
+    .lite-color-wheel-wrap {
+      width: clamp(100px, 32vw, 130px);
+      min-height: 100px;
+      max-height: 130px;
+    }
+    .lite-color-slider {
+      grid-template-columns: 48px 1fr;
+      gap: 4px;
+    }
+    .lite-color-actions { gap: 6px; }
   }
   .prompt {
     border: 1px solid var(--line);
@@ -826,7 +849,7 @@
         <div class="lite-color-picker-card">
           <div class="lite-color-content">
             <div class="lite-color-wheel-wrap">
-              <canvas id="liteColorWheel" width="140" height="140"></canvas>
+              <canvas id="liteColorWheel" width="130" height="130"></canvas>
               <div class="lite-color-wheel-cursor" id="liteColorWheelCursor"></div>
             </div>
             <div class="lite-color-side">
