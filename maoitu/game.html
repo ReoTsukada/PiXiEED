@@ -415,6 +415,20 @@ const bgm = document.getElementById('bgm');
 bgm.volume = 0.5;
 const AUDIO_KEY = 'maoitu_audio';
 const GAME_CANONICAL_URL = `${window.location.origin}/maoitu/`;
+function lsGet(key){
+  try{
+    return localStorage.getItem(key);
+  }catch(_){
+    return null;
+  }
+}
+function lsSet(key, value){
+  try{
+    localStorage.setItem(key, value);
+  }catch(_){
+    // 無視（プライベートモードなどで弾かれるケース）
+  }
+}
 function setViewportHeight(){
   if(window.visualViewport){
     document.documentElement.style.setProperty('--vvh', `${window.visualViewport.height}px`);
@@ -426,7 +440,7 @@ setViewportHeight();
 window.addEventListener('resize', setViewportHeight);
 window.addEventListener('orientationchange', setViewportHeight);
 function syncAudioSetting(){
-  const enabled = localStorage.getItem(AUDIO_KEY) !== 'off';
+  const enabled = lsGet(AUDIO_KEY) !== 'off';
   bgm.muted = !enabled;
   if(!enabled && !bgm.paused) bgm.pause();
   return enabled;
@@ -510,7 +524,7 @@ function closeTutorial(markSeen = false){
   tutorialOverlay.setAttribute('hidden','hidden');
   tutorialOverlay.style.display = 'none';
   if(markSeen){
-    try{ localStorage.setItem(TUTORIAL_KEY, '1'); }catch(_){}
+    lsSet(TUTORIAL_KEY, '1');
   }
 }
 
@@ -670,7 +684,7 @@ function hideSharePanel(){
 }
 hideSharePanel();
 function showTutorialIfNeeded(){
-  const seen = (()=>{ try{return localStorage.getItem(TUTORIAL_KEY)==='1';}catch(_){ return false; }})();
+  const seen = lsGet(TUTORIAL_KEY) === '1';
   if(!seen){
     openTutorial();
   }
@@ -881,7 +895,7 @@ heroShieldIcon.src = './assets/kago.png';
 function readDifficulty(){
   const params = new URLSearchParams(location.search);
   const q = params.get('mode');
-  const stored = localStorage.getItem(DIFFICULTY_STORAGE_KEY);
+  const stored = lsGet(DIFFICULTY_STORAGE_KEY);
   if(q && DIFFICULTY_PRESETS[q]) return q;
   if(stored && DIFFICULTY_PRESETS[stored]) return stored;
   return 'endless';
@@ -895,7 +909,7 @@ function applyDifficultyPreset(key){
   startShieldCharges = preset.startShieldCharges || 0;
   maxDifficultyLevel = preset.maxDifficultyLevel || Infinity;
   difficultyLabel = preset.label;
-  localStorage.setItem(DIFFICULTY_STORAGE_KEY, preset.key);
+  lsSet(DIFFICULTY_STORAGE_KEY, preset.key);
 }
 
 function nextDifficultyKey(current){
