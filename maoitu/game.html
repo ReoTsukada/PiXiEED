@@ -467,6 +467,7 @@ const tutorialNextBtn = document.getElementById('tutorialNext');
 // v2: チュートリアルを新規表示するためキーを更新
 const TUTORIAL_KEY = 'maoitu_tutorial_seen_v2';
 let tutorialPage = 0;
+let tutorialActive = false;
 const tutorialSlides = [
   {
     img: './assets/1.png',
@@ -793,7 +794,6 @@ let shakeFrames=0;
 let shakeIntensity=0;
 let feverGauge=0;
 let feverFrames=0;
-let tutorialActive = false;
 
 // ====== 表示フィット ======
 const DPR_CAP = 1.25; // 高DPI端末での描画負荷を抑える上限（下げて負荷軽減）
