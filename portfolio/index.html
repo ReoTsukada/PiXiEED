@@ -2,16 +2,103 @@
 
 <html lang="ja">
 <head>
-<meta content="https://pixieed.jp/PiXiEEDogp.png" property="og:image"/>
 <meta charset="utf-8"/>
-<meta content="0; url=../index.html" http-equiv="refresh"/>
-<title>PiXiEED | アルタ ポートフォリオ</title>
-<link href="../index.html" rel="canonical"/>
-<script>
-    window.location.replace('../index.html');
-  </script>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PiXiEED | 企業向けポートフォリオ</title>
+<meta content="PiXiEED（アルタ）の企業向けポートフォリオ。ドット絵・アニメーション・ブラウザ演出の実績と提供サービスをまとめています。" name="description"/>
+<meta content="https://pixieed.jp/PiXiEEDogp.png" property="og:image"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="../styles.css" rel="stylesheet"/>
 <link href="../character-dots/mao1.png" rel="icon" type="image/png"/></head>
-<body>
-<p><a href="../index.html">PiXiEED ホーム</a>に移動します。</p>
+<body class="portfolio-standalone">
+<header class="site-header">
+<div class="site-brand">
+<a class="logo" href="../index.html">PiXiEED</a>
+<p class="tagline">ドット絵・アニメーション・ブラウザ演出</p>
+</div>
+<nav aria-label="メイン" class="site-nav">
+<ul>
+<li><a href="../index.html#dot-gallery">ドット絵</a></li>
+<li><a href="../index.html#projects">プロジェクト</a></li>
+<li><a href="../index.html#notes">ノート</a></li>
+<li><a href="../contact/index.html">コンタクト</a></li>
+<li><a aria-current="page" href="#">ポートフォリオ</a></li>
+</ul>
+</nav>
+</header>
+<main>
+<section class="hero hero--portfolio" id="portfolio-hero">
+<div class="hero-copy">
+<p class="section-eyebrow">Alta Portfolio</p>
+<h1>企業向けポートフォリオ</h1>
+<p>ドット絵・アニメーション・ブラウザ演出の受託実績をまとめたページです。ゲーム/配信/プロモーション向けの制作・改修をご提案します。</p>
+<div class="hero-cta">
+<a class="cta-primary" href="mailto:pixieed.arta@gmail.com">制作を相談する</a>
+<a class="cta-secondary" href="../contact/index.html">連絡方法を見る</a>
+</div>
+</div>
+<div class="hero-display hero-display--portfolio">
+<div class="portfolio-window">
+<div>
+<span class="window-dot"></span>
+<span class="window-dot"></span>
+<span class="window-dot"></span>
+</div>
+<div class="portfolio-window__content">
+PIXEL<br/>
+ANIMATION
+</div>
+</div>
+</div>
+</section>
+<section class="section" id="portfolio-record">
+<div class="section-inner">
+<h2>これまでの案件</h2>
+<ul class="news-list">
+<li class="news-item">VTuber様 OP/ED アニメーション制作</li>
+<li class="news-item">64x64px キャラクタードットアニメーション（7キャラ、年間運用／業務委託）</li>
+<li class="news-item">ダンススクール児童モチーフのキャラクタードット（静止画）制作</li>
+<li class="news-item">Shibuya Pixel Art 2025 ノミネート 2作品</li>
+</ul>
+</div>
+</section>
+<section class="section" id="portfolio-services">
+<div class="section-inner">
+<h2>提供サービス</h2>
+<div class="portfolio-grid">
+<article class="portfolio-card">
+<h3>ドット絵・アニメーション</h3>
+<p>キャラクター/背景/UIドット、ループ演出、OP/ED映像のモーション制作。解像度やテイストに合わせて提案します。</p>
+</article>
+<article class="portfolio-card">
+<h3>ゲーム・ブラウザ演出</h3>
+<p>ブラウザゲームの演出調整、インタラクション実装、配信・イベント向けのリアルタイム演出制作。</p>
+</article>
+<article class="portfolio-card">
+<h3>コラボ・プロモーション</h3>
+<p>キャンペーン用ドット素材、展示・配信連動のコンテンツ制作、ワークショップや企画協力。</p>
+</article>
+</div>
+<div class="hero-cta" style="margin-top:1.4rem;">
+<a class="cta-primary" href="mailto:pixieed.arta@gmail.com">案件の相談をする</a>
+<a class="cta-secondary" href="https://x.com/PiXiEED_arta" rel="noopener" target="_blank">X のDM</a>
+</div>
+</div>
+</section>
+</main>
+<footer class="site-footer">
+<div class="footer-inner">
+<small>© <span id="year"></span> PiXiEED. All rights reserved.</small>
+<div class="footer-links">
+<a href="../index.html">ホーム</a>
+<a href="../terms/index.html">利用規約</a>
+<a href="../privacy/index.html">プライバシーポリシー</a>
+<a href="../contact/index.html">コンタクト</a>
+<a class="footer-link--x" href="https://x.com/PiXiEED_arta" rel="noopener" target="_blank">公式X (旧Twitter)</a>
+</div>
+</div>
+</footer>
+<script src="../scripts.js"></script>
 </body>
 </html>
