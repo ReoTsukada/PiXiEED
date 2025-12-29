@@ -1175,7 +1175,6 @@ a:focus {
   outline: none;
 }
 
-
 .hero--portfolio {
   padding-top: clamp(4rem, 7vw, 6.5rem);
 }
@@ -2227,7 +2226,7 @@ a:focus {
     margin-left: auto;
     width: auto;
     justify-content: flex-end;
-    overflow: visible;
+    align-items: center;
   }
   .portfolio-header__nav {
     order: 2;
