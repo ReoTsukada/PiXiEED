@@ -178,6 +178,99 @@ a { color:#7dd3fc; }
 .instructions-card li {
   margin-bottom:6px;
 }
+.rank-form {
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  margin-top:12px;
+}
+.rank-field {
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.rank-field input {
+  padding:10px 12px;
+  border-radius:8px;
+  border:1px solid rgba(255,255,255,0.25);
+  background:rgba(0,0,0,0.4);
+  color:#fff;
+  font-size:14px;
+}
+.rank-list {
+  list-style:none;
+  padding:0;
+  margin:12px 0 0;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.rank-item {
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+  padding:8px 10px;
+  border:1px solid rgba(255,255,255,0.15);
+  border-radius:10px;
+  background:rgba(255,255,255,0.05);
+  font-size:14px;
+}
+.rank-index { color:#9ca3af; }
+.rank-name { flex:1; text-align:left; }
+.rank-score { font-weight:700; }
+.rank-status { color:#cbd5e1; font-size:13px; min-height:18px; }
+.ranking-modal {
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  background:rgba(0,0,0,0.65);
+  backdrop-filter:blur(4px);
+  z-index:2000;
+}
+.ranking-modal.is-open { display:flex; }
+.ranking-modal__dialog {
+  width:100%;
+  max-width:400px;
+  max-height:80vh;
+  overflow:hidden;
+  background:rgba(0,0,0,0.9);
+  border:1px solid rgba(255,255,255,0.2);
+  border-radius:18px;
+  box-shadow:0 20px 50px rgba(0,0,0,0.35);
+  display:flex;
+  flex-direction:column;
+}
+.ranking-modal__header {
+  padding:14px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  border-bottom:1px solid rgba(255,255,255,0.12);
+}
+.ranking-modal__title { margin:0; font-size:16px; }
+.ranking-modal__close {
+  background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.2);
+  color:#fff;
+  padding:6px 10px;
+  border-radius:10px;
+  cursor:pointer;
+}
+.ranking-modal__body {
+  padding:16px;
+  overflow:auto;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.ranking-button {
+  width:100%;
+  max-width:360px;
+}
 .switch {
   position:relative;
   display:inline-block;
@@ -300,8 +393,27 @@ a { color:#7dd3fc; }
 <div class="control-bar">
 <button class="control-bar__btn control-bar__btn--primary" id="playBtn">▶ プレイ</button>
 <button class="control-bar__btn control-bar__btn--secondary" id="titleShareBtn">シェアする</button>
+<button class="control-bar__btn control-bar__btn--secondary" id="openRankingBtn">ランキング</button>
 </div>
 </div>
+</div>
+<div class="ranking-modal" id="rankingModal" aria-hidden="true" role="dialog" aria-modal="true">
+  <div class="ranking-modal__dialog">
+    <div class="ranking-modal__header">
+      <h3 class="ranking-modal__title">ランキング</h3>
+      <button class="ranking-modal__close" id="closeRankingBtn" type="button">閉じる</button>
+    </div>
+    <div class="ranking-modal__body">
+      <form class="rank-form" id="rankForm">
+        <label class="rank-field">
+          <span>名前</span>
+          <input maxlength="24" name="rankName" placeholder="なまえ" type="text"/>
+        </label>
+        <p class="rank-status" id="rankStatus"></p>
+      </form>
+      <ol class="rank-list" id="rankList"></ol>
+    </div>
+  </div>
 </div>
 <div class="ad-footer">
 <ins class="adsbygoogle"
@@ -329,10 +441,13 @@ const DIFFICULTY_KEY = 'maoitu_difficulty';
 const GAME_CANONICAL_URL = `${window.location.origin}/maoitu/`;
 const playBtn = document.getElementById('playBtn');
 const shareBtn = document.getElementById('titleShareBtn');
+const openRankingBtn = document.getElementById('openRankingBtn');
 const audioToggle = document.getElementById('audioToggle');
 const audioToggleLabel = document.getElementById('audioToggleLabel');
 const difficultyToggle = document.getElementById('difficultyToggle');
 const difficultyButtons = Array.from(difficultyToggle.querySelectorAll('.difficulty-btn'));
+const rankingModal = document.getElementById('rankingModal');
+const closeRankingBtn = document.getElementById('closeRankingBtn');
 let selectedDifficulty = 'endless';
 
 function baseShareText(){
@@ -352,6 +467,33 @@ playBtn.addEventListener('click', () => {
   const url = `${GAME_URL}?mode=${encodeURIComponent(selectedDifficulty)}`;
   window.location.href = url;
 });
+
+function openRanking(){
+  if(!rankingModal) return;
+  rankingModal.classList.add('is-open');
+  rankingModal.setAttribute('aria-hidden', 'false');
+  if(window.__rankingController && typeof window.__rankingController.refresh === 'function'){
+    window.__rankingController.refresh();
+  }
+}
+function closeRanking(){
+  if(!rankingModal) return;
+  rankingModal.classList.remove('is-open');
+  rankingModal.setAttribute('aria-hidden', 'true');
+}
+if(openRankingBtn){
+  openRankingBtn.addEventListener('click', openRanking);
+}
+if(closeRankingBtn){
+  closeRankingBtn.addEventListener('click', closeRanking);
+}
+if(rankingModal){
+  rankingModal.addEventListener('click', (e) => {
+    if(e.target === rankingModal){
+      closeRanking();
+    }
+  });
+}
 
 function updateAudioLabel(){
   audioToggleLabel.textContent = audioToggle.checked ? '音量 ON' : '音量 OFF';
@@ -387,6 +529,16 @@ difficultyButtons.forEach(btn=>{
 });
 try{ (adsbygoogle = window.adsbygoogle || []).push({}); }catch(e){}
 
+</script>
+<script type="module">
+import { initRankingUI } from './assets/js/ranking.js';
+initRankingUI({
+  formSelector: '#rankForm',
+  listSelector: '#rankList',
+  statusSelector: '#rankStatus'
+}).then(ctrl => {
+  window.__rankingController = ctrl;
+});
 </script>
 </body>
 </html>
