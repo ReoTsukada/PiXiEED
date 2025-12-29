@@ -10,6 +10,7 @@
 <meta content="まおいつ" name="apple-mobile-web-app-title"/>
 <title>魔王様！！いつまでよければいいですか！？</title>
 <meta content="#000000" name="theme-color"/>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet"/>
 
 <!-- Google tag (gtag.js) -->
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
@@ -56,6 +57,10 @@ gtag('event', 'project_open_maoitu');
     touch-action:none;
     overscroll-behavior:none;
   }
+  *{
+    -webkit-user-select:none;
+    user-select:none;
+  }
   body{
     position:relative;
     display:flex;
@@ -63,6 +68,7 @@ gtag('event', 'project_open_maoitu');
     align-items:center;
     justify-content:flex-start;
     min-height:var(--vvh, 100svh);
+    font-family:'Press Start 2P','Noto Sans JP',system-ui,sans-serif;
     /* 上部の重なりを最小限にしてキャンバスをさらに上寄せ */
     padding-top:clamp(0px, 1vh, 12px);
     padding-bottom:calc(90px + var(--safe-bottom)); /* 固定広告ぶんの余白を下に確保しつつ余裕を持たせる */
@@ -171,6 +177,11 @@ gtag('event', 'project_open_maoitu');
     text-transform:uppercase;
     letter-spacing:0.08em;
     box-shadow:0 0 10px rgba(34,197,94,0.35);
+  }
+  .rank-percent-label{
+    font:600 13px/1.5 system-ui;
+    color:#e5e7eb;
+    margin-top:4px;
   }
   #sharePanel{
     display:none;
@@ -361,6 +372,7 @@ gtag('event', 'project_open_maoitu');
   <div class="gameover-title" id="gameoverTitle">GAME OVER</div>
   <div class="clear-badge" id="clearBadge">GAME CLEAR!</div>
   <div id="shareScoreLabel">SCORE: 0</div>
+  <div class="rank-percent-label" id="rankPercentLabel"></div>
   </div>
 <div id="sharePanel">
   <button id="shareActionBtn" style="background:#22c55e;color:#000;">シェアする</button>
@@ -415,6 +427,16 @@ const bgm = document.getElementById('bgm');
 bgm.volume = 0.5;
 const AUDIO_KEY = 'maoitu_audio';
 const GAME_CANONICAL_URL = `${window.location.origin}/maoitu/`;
+let submitScoreAuto = null;
+let fetchRankInfo = null;
+let scoreSubmitted = false;
+let currentRankRequestId = 0;
+import('./assets/js/ranking-submit.js').then(mod => {
+  submitScoreAuto = mod.submitScoreAuto;
+  fetchRankInfo = mod.fetchRankInfo;
+}).catch(() => {
+  // ignore
+});
 function lsGet(key){
   try{
     return localStorage.getItem(key);
@@ -450,6 +472,7 @@ const gameOverUi = document.getElementById('gameOverUi');
 const sharePanel = document.getElementById('sharePanel');
 const gameOverTitle = document.getElementById('gameoverTitle');
 const shareScoreLabel = document.getElementById('shareScoreLabel');
+const rankPercentLabel = document.getElementById('rankPercentLabel');
 const shareActionBtn = document.getElementById('shareActionBtn');
 const restartActionBtn = document.getElementById('restartActionBtn');
 const tutorialAgainBtn = document.getElementById('tutorialAgainBtn');
@@ -504,6 +527,9 @@ const tutorialSlides = [
 ];
 let shareScore = 0;
 let runCleared = false;
+
+const HUD_FONT = '12px "Press Start 2P", monospace';
+const HUD_FONT_SMALL = '9px "Press Start 2P", monospace';
 
 function openTutorial(){
   if(!tutorialOverlay) return;
@@ -655,6 +681,9 @@ function hideBackLink(){
 function showSharePanel(score){
   shareScore = score;
   shareScoreLabel.textContent = `SCORE: ${score}`;
+  if(rankPercentLabel){
+    rankPercentLabel.textContent = '';
+  }
   if(gameOverTitle){
     gameOverTitle.textContent = runCleared ? 'GAME CLEAR!' : 'GAME OVER';
     gameOverTitle.classList.toggle('is-clear', runCleared);
@@ -670,6 +699,7 @@ function showSharePanel(score){
   }
   gameOverUi.style.display = 'flex';
   sharePanel.style.display = 'flex';
+  refreshRankLabel(score);
   if(typeof restartActionBtn.focus === 'function'){
     try{
       restartActionBtn.focus({ preventScroll: true });
@@ -680,6 +710,10 @@ function showSharePanel(score){
 }
 
 function hideSharePanel(){
+  currentRankRequestId++;
+  if(rankPercentLabel){
+    rankPercentLabel.textContent = '';
+  }
   sharePanel.style.display = 'none';
   gameOverUi.style.display = 'none';
 }
@@ -707,20 +741,20 @@ document.addEventListener('click', () => {
 // ====== 画像（Base64） ======
 // ====== 敵キャラ（解禁スケジュール付き） ======
 const ENEMY_TYPES_DATA=[
-  {name:"ジェリン",src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAQRJREFUOI3tkjFLA0EQhb89L8LBHZxFmq3sAoKQTgj4A6yutrT0F6W0s7cKgl2CcF2qgJ0gbJPCg12InCFjIXe5jWsg1k45s9/beY+B/1KBnhzC7AqIyJafORzA3K5TgIWF8aDncSoEzxzu3qxTU23FltUGY1ZcjVJPJArBc+vDAP08QuuEybPj9uWztRp3HzXw01s4hn4eAcmPQGRqxQOX1WaPwHfpXDEe9FoLLCx74d9mEZ2U/1JtBqYSHi6OveHp3TsArzcnXr8oa86yzgbN+qPHDwCmVtzuT02vKGt0rhhmsaNzB1KUdevRmFVwXa0Trs+PGGaxu8xUCijvkA60rwC+AHX1dn623PVvAAAAAElFTkSuQmCC",speed:1.8,unlockSec:0},
-  {name:"ポワリン",src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAPlJREFUOI2dU7EOgjAUvFZ+wriQAGFB6wc4+AksfCUO+CcYXYjVzTgykxjqgK+2tGj0kibtpXe9tFcGP9QEz74RCgDqo1+/Xurt7gSAGgtFBuz2rlmRc61lplhkw+JwAs4Xhdu9d8SLObdMAm9WA42cNqEETnQ6vZE9zpeH5pNoOC+NORZzjiLnCMZCAJZYXjvLPIkCNLLXKXQWkQ3CT2J57axElgHd9pTYNPEa/II05kgi9r+B+QoEVVa9ejVRj3DVqnDVOnx9VDS3E5TV8Oa+KhNnFg7jKpPBuANJFCCNObabGUQGMPZusfczkRGBLuzbZ3KMPHD2PwEgq485RM69+AAAAABJRU5ErkJggg==",speed:1.3,unlockSec:5},
-  {name:"ブリン",src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAARNJREFUOI1jZMAO/uMQZyQowMDA8P//f4j+W+sRgvf3/GXwmMaCoYcFl+YT3f8wTO5XeM9Q+EDwP7IhTIRsRga8omwM/QrvGZC9yESsZgYGBgYZU3YMQxjxaX53B+KNjw+wh6nHNBZEGCD7WUiFiWFb0Qe4sxkYGBgEZFkZPjz+jeIauBdw2YxLMzJgwiqKppmBgYHh8+tfxBsA8zNMM48ETnsgYfDuzj+MgII5G9lmZDa/AgeK+v/9Cu//Q6MGjueYfv0/x/QrhvjNdf9hbLgXGAsfCMLil+HmOsxog4ndXPefQT2IkQGWGtHzwv9+hffwAEQHtpVcKJqxGQA3RNOLF0WQX4GRwbKMGUMPNgMYSMnOAMtAf3plqr/eAAAAAElFTkSuQmCC",speed:2.3,unlockSec:15},
-  {name:"シャボリン",src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAYBJREFUOI2lU79rwkAYfQkRO2TIcNDRGxxFupR2EFwzNHuH/gn9D3TsnyLY/RxuFHRI6SCImwGzqSRDhoBK1K+Ll56n0qEf3PLuvXffj/ssXA+6gVsm4FwVSuLCA9cvggwxfEsZl0bWmVgSL+7x5jRTP7Xdum7Ajnm0nzJZWaMH34qV1jHF2cP2nUX50MuZlDuMAcCvogV31XCa8IspQ0USP2VTJkDFhDoJbZY0X/RFSO2ENks6JKNiQh0RUluE1Kb5oq8wvU8ESTU6JCNdLEJqQ1JNP7oJJNUAkA0AwgNPbbe+z/ns+Wn7GX7dvQYZYr0HwgMPMsT7nM9S262rJts6Se4wZsc8MsVlH04cHbdN4n7KpImZI71p4FfRMl8QHvjLY/pxNhEtHJw+CUWr4WDHxyp94YEr8uCbdYMMsfDAHTdusKMbBdndWZmkjeb3qAkYuD7GsoTKGr1iQl0ASGizUlmo+hVWTKhbWaOndP/+yuZ2/bVMqu6ry3RpdBkX/B/RH/qbfqrLJgAAAABJRU5ErkJggg==",speed:0.5,unlockSec:25},
-  {name:"プリズリン",src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAQZJREFUOI2Nk01OwzAQhb+ReoCyJyAWEXeouuNnBYfpSVhwgFwBiQVRxK7tHUBIQRRxjsdmpnJdOzCSZfnZ74szMzbqoWxtpUOzmlkSwCfwCGBmKkFKAGm9BuiBS9c6SUVIDpC2IywueuAtATQ1SArQdy9YEOYd8O5757WbBECvgzi9OTB/ALe+3yYfOoDMAD3phyuOzF/+C8MfECRplDR66fbD9YeCvpK0ilLvhRAlvcQsaZ5pcx93gNIkdkAj6R5oJQ2RA0knPjfAEtikVTAzi8bpEmDrOYlogGs/szSz50giE5CzKXPeByXILumDI3MOmLrJpmQuAXIInjRKZmpP1ONfz/kX+Gq5jszpIJsAAAAASUVORK5CYII=",speed:2.8,unlockSec:35},
-  {name:"ヘドリン",src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAZZJREFUOI2FUzFrwkAU/myPpEMI4qSCEIhYiwUHh3S8rdQhP8HY31HEtFC6SceO1qHQrUgRnAzdHKQEWihSMYtb1gy1adPBXryYtH5wy/fe++67d++lkIzgDz61jQgAQHc1s/qhm1f3Zw4L+Lag4HYZq9uNFBsCWoMLSHs5CJ+iIte868BfpI9OtIf945w1yy6U76yQhv1lAjgHgB2+mFSXTiGTdyVPprbYNwGgVNMslVAKAPWG1iXVpQNDCN0Sdj2pLp1iBc6jd2NBTG6ASiitN9Ad9MZNH1CYgwCGgGIFTqmmWSx50Bs3p5MxBQDJk6lKKJU8OXTCXLAngBUzu8UKwgbaYt+UPJkWMnkXAJhw5AkqoXTmW9amIC9ie+vY290z5ZsYszmdjClz8x9CgaTu8+62CnSeTl9YMcPMtyyVUHoglg95nu8BQ0A6mP/+bXh0V2vrrtbe5LnctQAMIQy0FpcBgKA8xKg8xIjnSAdzGAITi+xCOI3Y+EYAeH9dDQ63E6lNAYS2VkMSR8IyxdYzIhRHLP8H/uGrhM0W27cAAAAASUVORK5CYII=",speed:1.2,unlockSec:45,sticky:true},
-  {name:"バブリン",src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAOVJREFUOI3tULsKwkAQnMQHCkZiYZMqnWCjpXZ2lqns9Wf8BUvt/YUgSEBMJwipBSFNCoMXEcRkLcJdyBkLW3GaW2aZ2bkB/vgBKAUcfaORDYgo02+u6ezd4vRlwKJTyekUWbxlhGMUwz6/BwnCBD2zlDPhBuQwig7s2bDPhCBMCrO3dRUAYOiKMFH5MiZqeAwfxTyBjDIfjlEMPyTsxjWxNJcXAMBp1hKc5T7Q1TIDkcBjGekwiuRLnDN0BX2tLPa5Ei33gSBM4Pt3Qe6nawxWk/TvRh3zYRWjpgq5RGHysYA8hO4F8NhaA9cs3eAAAAAASUVORK5CYII=",speed:1.0,unlockSec:65},
-  {name:"ボムリン",src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAQFJREFUOI2Vkz1qxDAQhb8xLhdyggW1SuNib5EyPzA+Sw4UyJI2Tc6whSu1gr3CVsGgFN4xWktKyAM1T/N+ECOhjtTg5S8iAQzDgPf+5iKEwDRNJHqEWRJ9EmbJDZIJnXPV+N35xOv3F4zAG8gR6Vpi7/16AKbPj2VyzOv2yQwKcV59dz4BcNkfGN8VHnvkCMIsnaXXEEJYk4eHJ2KMSwl95qpZGmwfzMSGy/6wirct+1ay4e5+EbcetquReSPnXFNcGFjNvMEWNnNjkAtijMVQjd+GJFVN101cj6o2edvaLndU1cXtpaxunKrepFdX+TfYnzDtvz/TNrj4nrlRBcX8DyFAhQiIvZawAAAAAElFTkSuQmCC",speed:1.2,unlockSec:75,ignoreShield:true},
-  {name:"デモリン",src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAATNJREFUOI2lkrFKw1AYhb8rjWNBUJvFwaFeqF3yAJ0UnLPE0aew+AhCn6JLoQ7tXLBQ8AGkQwfjIMWltULAodA4/A5tYm5uiqIH7vLfc05uzn/gn1CAbJkXweIqQMJuzMvjnNnTB2/vM64fzopMpNUYcrjv4uoyx16Fk8vd9UXYjWXjLoBEnie5r0mrMTQ4GQ1ZskSeJyOtDfIWYwGklH/qeLlk5d8zKAhg3D+3csqKZXDzmuawiOaG+GCvkv7/xe2RZSBtf1IozCMxuuqfAqid5MLV5R/FAItojqvL1lzCbmyF16x3pFnvGLOR1sYG0hdUA4dprbd2E7tbyWxa61ENnHSuTI7wfPdplAowylMNHJSyFvBtkpx8cXInRSlnoDJGtP0JbAIGjPX9Blur+1cUGnwBRRiqy88D/g4AAAAASUVORK5CYII=",speed:2.0,unlockSec:85,followPlayer:true,followStrength:0.2},
-  {name:"ガオリン",src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAANlJREFUOI3FUrENwzAMo4Oekjc6NKO+8BX2lmQLeoT2PpFBPSojO9mwGyfpVgEGDJmiSMnAv8Md5PkrtmsVk4SZgSRUFWZ2RIpbU5arm6nqgdC9grKLS7L7vi/fm0qSdJJkAWQIId+/3nOXyjvmGe9hwLIsFXuMEfd1BcYxWdwNlSEEliEiFJEqVyg6LjazXJyOmZ2SVICrMLM9AUlymqoBtobKaaoG2QGgiMB7j7htAIDX87FbUcrFbYP3HiKS157Zf7FRyK9sUFUvSVJxwpa7TEzu7Kc1MO4Drbc0qIgGYWoAAAAASUVORK5CYII=",speed:1.6,unlockSec:95,zigzag:true,hSpeed:1.3},
-  {name:"グラビリン",src:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAU9JREFUOI2Nkj1Lw1AUhp9o90ChiFAkv0B36ZzZRXB08C90cBeEBP0BnUQHhy4Zy93jUoRQnNql1cEvhAsZFLG8DrUxaZPqC5f7wX2fc+85B1ZLP6NSa6vMcSR6sVgFqZVEBCCORDwMYQjRQOxtO3mIUwbQe1ekdRilEA9DfN8HwPRCzKN4a0Bt/YV9Z0NzSOEFaR0ubkMAfN/H87xsba5m55vtneocjFIKZtd1cV0Xz/Oy1zSZlAI0/3PePFce0g8tT+oU8qU4koIgUJIkstaqStZaJUmiIAik1zMBWgNIG1VFWqHRZ2GraCDlGkdAFnnp/Oa0tMFkHpUZFwHZvGB28oDrL/FwvlzG8XiMMQaA9lYd5+Ao8xYAXT3zQUKTCf3Q/jaSMbRbU7hvwN0hzkmtFFAozZM6XIZ2FrU1xdk9zt9b9JVKej2rTNh/9af5GyQ23ONUaR1XAAAAAElFTkSuQmCC",speed:2.0,unlockSec:105,sizeMult:1.5}
+  {name:"ジェリン",src:"./assets/sprites/jerin.png",speed:1.8,unlockSec:0},
+  {name:"ポワリン",src:"./assets/sprites/powarin.png",speed:1.3,unlockSec:5},
+  {name:"ブリン",src:"./assets/sprites/burin.png",speed:2.3,unlockSec:15},
+  {name:"シャボリン",src:"./assets/sprites/shaborin.png",speed:0.5,unlockSec:25},
+  {name:"プリズリン",src:"./assets/sprites/prizurin.png",speed:2.8,unlockSec:35},
+  {name:"ヘドリン",src:"./assets/sprites/hedorin.png",speed:1.2,unlockSec:45,sticky:true},
+  {name:"バブリン",src:"./assets/sprites/baburin.png",speed:1.0,unlockSec:65},
+  {name:"ボムリン",src:"./assets/sprites/bomurin.png",speed:1.2,unlockSec:75,ignoreShield:true},
+  {name:"デモリン",src:"./assets/sprites/demorin.png",speed:2.0,unlockSec:85,followPlayer:true,followStrength:0.2},
+  {name:"ガオリン",src:"./assets/sprites/gaorin.png",speed:1.6,unlockSec:95,zigzag:true,hSpeed:1.3},
+  {name:"グラビリン",src:"./assets/sprites/gurabirin.png",speed:2.0,unlockSec:105,sizeMult:1.5,gravity:true}
 ];
-const PLAYER_SRC="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAQRJREFUOI3tkDtOw1AQRY+hQ7iI05CPkFLYRUSNKHARBbEFV6whBRtIFhCldZcNsAtTIJBYgC3hipgGGztBIDePwt+Xj9JSZKSnuXP15s7MhUP8sxhkSQCirV9sxYM9GsIBMbwbCfJcx04uUm84LpHahTQZn5ye83qm0jT6zB7mfLwFfN3eEP8m/Cy+eUljULsT0gQABQDNgNAVXN7D9RU0WtWIKMjqKMjqxyd4noJmKIRuLgBycxTA+6d8XKdZ4UIElKOS7Om7m0HmevqmeVh23SRRcFi2xDkFn5tZbeB7mJYNgLMUq/UJBWdaNvheyW+auGU9KXxPMrEKzYD1E3a97C8AfzBBfBZb3sdTAAAAAElFTkSuQmCC";
-const ANGEL_SRC="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAARZJREFUOI2lkz1OxDAQRt9YCAGSG0REg5ZqC67ABTgB0jZ0ewMqTkC1N6CjQeIEcACuQJGKFRJCRttYWtA2Q+FMsk4C4eer7PE8zzcZB/4pAbS1N2lPbudMANWHSxhvIsV5E7u5yunJtDkLMyhXyPEFDoB5AeUKDbPm9lFAJtMEjkJd2WDmRWZLAdadVJc1DixWVbawkKvd91eSzgLQa73jgCeOgP23mBGve55H4JlDzuSkZusWVH9a3Lwn3gF6//I7GKBi1AEsw2B+R8Y4gK04kN0jYxyA/4MDYzYAxj5tpDVV+7B9cWOSg0UOtB/ResxyjKnH+H6rxF0oI8QCPjzspNfKMqSefUhu/QK2T9MYv/v7hiQAn7kqbU+zGAhDAAAAAElFTkSuQmCC";
+const PLAYER_SRC="./assets/sprites/player.png";
+const ANGEL_SRC="./assets/sprites/jerin-angel.png";
 
 // ====== 画像読み込み & アルファマップ ======
 function withAlpha(src){
@@ -841,6 +875,7 @@ function createEnemyFromType(type, spawnX){
     followPlayer: Boolean(type.followPlayer),
     followStrength: type.followStrength || 0,
     zigzag: Boolean(type.zigzag),
+    gravity: Boolean(type.gravity),
     absorbed: 0,
     skin: type.skin
   };
@@ -862,6 +897,12 @@ const ANGEL_BASE_INTERVAL = 600; // 約10秒ごと
 const ANGEL_SPAWN_PROB    = 0.10;
 const ANGEL_GUARANTEE_INTERVAL_SEC = 30;
 let lastAngelGuaranteeSec = 0;
+
+// ====== グラビリン重力設定 ======
+const GRAVITY_RADIUS = 64;
+const GRAVITY_PULL_PLAYER = 0.03;
+const GRAVITY_PULL_ENEMY = 0.02;
+let gravityTestSpawned = false;
 
 // ====== 難易度プリセット ======
 const DIFFICULTY_PRESETS = {
@@ -989,6 +1030,7 @@ function reset(countPlay = true){ alive=true; E.length=0; angels.length=0; o=0; 
   shakeIntensity = 0;
   feverGauge = 0;
   feverFrames = 0;
+  gravityTestSpawned = false;
   enemySpawnIntervalFrames = initialSpawnIntervalFrames;
   enemiesPerSpawn = 1;
   lastDifficultyUpdateSec = 0;
@@ -999,9 +1041,45 @@ function reset(countPlay = true){ alive=true; E.length=0; angels.length=0; o=0; 
   starOffsetNear = 0;
   lastAngelGuaranteeSec = 0;
   runCleared = false;
+  scoreSubmitted = false;
   hideSharePanel();
   hideBackLink();
   if(countPlay) logPlayStart();
+}
+
+async function refreshRankLabel(score){
+  if(!rankPercentLabel) return;
+  if(!fetchRankInfo){
+    rankPercentLabel.textContent = '';
+    return;
+  }
+  const requestId = ++currentRankRequestId;
+  rankPercentLabel.textContent = '順位計算中...';
+  try{
+    const { total, rank, percentile } = await fetchRankInfo(score);
+    if(requestId !== currentRankRequestId) return;
+    if(!total){
+      rankPercentLabel.textContent = 'まだスコアがありません';
+      return;
+    }
+    if(rank <= 100){
+      rankPercentLabel.textContent = `現在の順位: ${rank}位`;
+    }else{
+      const rounded = Math.max(1, Math.round(percentile * 10) / 10);
+      rankPercentLabel.textContent = `上位 ${rounded}%`;
+    }
+  }catch(_){
+    if(requestId === currentRankRequestId){
+      rankPercentLabel.textContent = '';
+    }
+  }
+}
+
+function finalizeScore(score){
+  if (submitScoreAuto && !scoreSubmitted) {
+    scoreSubmitted = true;
+    submitScoreAuto(score);
+  }
 }
 
 function endRun(){
@@ -1009,6 +1087,7 @@ function endRun(){
   alive = false;
   showBackLink();
   logPlayEvent('game_over', { score: S });
+  finalizeScore(S);
 }
 
 function clearRun(){
@@ -1019,6 +1098,7 @@ function clearRun(){
   logPlayEvent('game_clear', { score: S, difficulty: difficultyLabel });
    // クリア時もパネルを即表示
   showSharePanel(S);
+  finalizeScore(S);
 }
 
 // ====== 1フレーム ======
@@ -1051,6 +1131,48 @@ function step(){
   const playerSpeed = feverFrames > 0 ? P.v * FEVER_PLAYER_SPEED_MULT : P.v;
 
   E.forEach(e=>{
+    if (e.gravity) {
+      const radius = GRAVITY_RADIUS;
+      const gx = e.x + e.w * 0.5;
+      const gy = e.y + e.h * 0.5;
+      // 重力オーラ描画
+      const auraPulse = 0.45 + 0.25 * Math.sin(elapsedFrames * 0.3);
+      const grad = x.createRadialGradient(gx, gy, radius * 0.25, gx, gy, radius);
+      grad.addColorStop(0, `rgba(255, 102, 102, ${auraPulse})`);
+      grad.addColorStop(0.55, `rgba(210, 50, 50, ${auraPulse * 0.55})`);
+      grad.addColorStop(1, 'rgba(120, 20, 20, 0)');
+      x.save();
+      x.fillStyle = grad;
+      x.beginPath();
+      x.arc(gx, gy, radius, 0, Math.PI * 2);
+      x.fill();
+      x.restore();
+      // プレイヤーを吸引
+      const pdx = P.x + P.w * 0.5 - gx;
+      const pdy = P.y + P.h * 0.5 - gy;
+      const pd2 = pdx * pdx + pdy * pdy;
+      if (pd2 > 0 && pd2 < radius * radius) {
+        const pull = GRAVITY_PULL_PLAYER * speedScale;
+        P.x -= pdx * pull;
+        P.y -= pdy * pull * 0.6;
+        P.x = Math.max(0, Math.min(W - P.w, P.x));
+        P.y = Math.max(0, Math.min(H - P.h, P.y));
+      }
+      // 他の敵を吸引
+      for (let k = 0; k < E.length; k++) {
+        const other = E[k];
+        if (other === e) continue;
+        const odx = other.x + other.w * 0.5 - gx;
+        const ody = other.y + other.h * 0.5 - gy;
+        const od2 = odx * odx + ody * ody;
+        if (od2 === 0 || od2 > radius * radius) continue;
+        const pullE = GRAVITY_PULL_ENEMY * speedScale;
+        other.x -= odx * pullE;
+        other.y -= ody * pullE * 0.7;
+        other.x = Math.max(0, Math.min(W - other.w, other.x));
+        other.y = Math.max(-20, Math.min(H, other.y));
+      }
+    }
     if (e.followPlayer) {
       const dx = (P.x - e.x);
       const step = Math.sign(dx) * Math.min(Math.abs(dx), e.followStrength * speedScale);
@@ -1211,6 +1333,22 @@ function draw(){
     x.fillRect(0,0,W,H);
   }
   E.forEach(e=>{
+    if(e.gravity){
+      const radius = GRAVITY_RADIUS;
+      const gx = e.x + e.w * 0.5;
+      const gy = e.y + e.h * 0.5;
+      const auraPulse = 0.6 + 0.15 * Math.sin(elapsedFrames * 0.3);
+      const grad = x.createRadialGradient(gx, gy, radius * 0.35, gx, gy, radius);
+      grad.addColorStop(0, `rgba(255, 120, 120, ${auraPulse})`);
+      grad.addColorStop(0.7, 'rgba(230, 60, 60, 0.12)');
+      grad.addColorStop(1, 'rgba(150, 20, 20, 0)');
+      x.save();
+      x.fillStyle = grad;
+      x.beginPath();
+      x.arc(gx, gy, radius, 0, Math.PI * 2);
+      x.fill();
+      x.restore();
+    }
     if(e.ignoreShield){
       const pulse = ((Math.sin(elapsedFrames * 0.25) + 1) * 0.3) + 0.3; // 0.3〜0.9
       const cx = e.x + e.w * 0.5;
@@ -1265,9 +1403,9 @@ function draw(){
   }
 
   x.fillStyle='#fff';
-  x.font='bold 16px monospace';
+  x.font=HUD_FONT;
   x.fillText('S:'+S,4,16);
-  x.font='10px monospace';
+  x.font=HUD_FONT_SMALL;
   const iconSize = 12;
   const iconBaseX = 4;
   const iconBaseY = 24;
