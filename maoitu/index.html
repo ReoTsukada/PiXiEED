@@ -203,21 +203,63 @@ a { color:#7dd3fc; }
   margin:12px 0 0;
   display:flex;
   flex-direction:column;
-  gap:6px;
+  gap:10px;
 }
 .rank-item {
   display:flex;
+  align-items:center;
   justify-content:space-between;
-  gap:8px;
-  padding:8px 10px;
-  border:1px solid rgba(255,255,255,0.15);
-  border-radius:10px;
-  background:rgba(255,255,255,0.05);
+  gap:10px;
+  padding:10px 12px;
+  border:1px solid rgba(255,255,255,0.18);
+  border-radius:12px;
+  background:linear-gradient(135deg, rgba(30,41,59,0.85), rgba(15,23,42,0.85));
+  box-shadow:0 6px 18px rgba(0,0,0,0.3);
   font-size:14px;
 }
-.rank-index { color:#9ca3af; }
-.rank-name { flex:1; text-align:left; }
-.rank-score { font-weight:700; }
+.rank-item[data-rank="1"] { border-color:rgba(248,113,113,0.65); box-shadow:0 0 16px rgba(248,113,113,0.35); }
+.rank-item[data-rank="2"] { border-color:rgba(125,211,252,0.55); box-shadow:0 0 14px rgba(125,211,252,0.25); }
+.rank-item[data-rank="3"] { border-color:rgba(190,242,100,0.55); box-shadow:0 0 12px rgba(190,242,100,0.22); }
+.rank-left{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+}
+.rank-index {
+  color:#9ca3af;
+  font-weight:700;
+  min-width:28px;
+}
+.rank-medal{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:24px;
+  height:24px;
+  border-radius:8px;
+  background:rgba(255,255,255,0.08);
+  color:#fff;
+  font-size:13px;
+  letter-spacing:0.02em;
+}
+.rank-medal--1{ background:rgba(248,113,113,0.28); }
+.rank-medal--2{ background:rgba(125,211,252,0.24); }
+.rank-medal--3{ background:rgba(190,242,100,0.24); }
+.rank-name {
+  flex:1;
+  text-align:left;
+  color:#e5e7eb;
+  font-weight:600;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.rank-score {
+  font-weight:800;
+  color:#fbbf24;
+  letter-spacing:0.03em;
+}
 .rank-status { color:#cbd5e1; font-size:13px; min-height:18px; }
 .ranking-modal {
   position:fixed;
@@ -263,6 +305,7 @@ a { color:#7dd3fc; }
 .ranking-modal__body {
   padding:16px;
   overflow:auto;
+  max-height:70vh;
   display:flex;
   flex-direction:column;
   gap:10px;
@@ -270,6 +313,11 @@ a { color:#7dd3fc; }
 .ranking-button {
   width:100%;
   max-width:360px;
+}
+.rank-list {
+  max-height:60vh;
+  overflow:auto;
+  scrollbar-width:thin;
 }
 .switch {
   position:relative;
