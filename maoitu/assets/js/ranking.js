@@ -50,7 +50,12 @@ export async function initRankingUI({ formSelector, listSelector, statusSelector
       rows.forEach((row, idx) => {
         const li = document.createElement('li');
         li.className = 'rank-item';
-        li.innerHTML = `<span class="rank-index">${idx + 1}.</span><span class="rank-name">${escapeHtml(row.name)}</span><span class="rank-score">${row.score}</span>`;
+        li.dataset.rank = String(idx + 1);
+        const medal = idx === 0 ? '<span class="rank-medal rank-medal--1">1st</span>'
+          : idx === 1 ? '<span class="rank-medal rank-medal--2">2nd</span>'
+          : idx === 2 ? '<span class="rank-medal rank-medal--3">3rd</span>'
+          : '';
+        li.innerHTML = `<div class="rank-left"><span class="rank-index">${idx + 1}.</span>${medal}<span class="rank-name">${escapeHtml(row.name)}</span></div><span class="rank-score">${row.score}</span>`;
         list.appendChild(li);
       });
     } catch (e) {
