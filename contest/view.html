@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+  <title>ドット作品</title>
+  <link rel="icon" type="image/png" href="../character-dots/mao1.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
+  <style>
+    :root{ color-scheme: dark; }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family:'Fredoka','DotGothic16',system-ui,sans-serif;
+      background:radial-gradient(circle at 20% 20%, rgba(59,130,246,0.22), rgba(15,23,42,1)),
+                 radial-gradient(circle at 80% 0%, rgba(236,72,153,0.18), rgba(15,23,42,1)),
+                 #0b1224;
+      color:#e5e7eb;
+      min-height:100vh;
+      padding:20px 12px 48px;
+      display:flex;
+      justify-content:center;
+    }
+    .page{ width:100%; max-width:900px; display:grid; gap:16px; }
+    header{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .back-link{
+      color:#93c5fd;
+      text-decoration:none;
+      font-weight:700;
+    }
+    h1{ margin:0; font-size:22px; }
+    .card{
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:12px;
+      padding:12px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.3);
+    }
+    .entry-hero{
+      position:relative;
+      width:100%;
+      height:min(80vh, 100vw);
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.12);
+      overflow:hidden;
+      border-radius:12px;
+    }
+    .entry-hero img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      image-rendering:pixelated;
+      background:transparent;
+    }
+    .heart-btn{
+      position:absolute;
+      right:8px;
+      bottom:8px;
+      border:none;
+      background:transparent;
+      padding:0;
+      width:36px;
+      height:36px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      z-index:2;
+    }
+    .heart-btn img{ width:100%; height:100%; object-fit:contain; display:block; }
+    .meta{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      margin-top:10px;
+    }
+    .title{ font-size:18px; font-weight:800; margin:0; }
+    .author{ margin:0; color:#cbd5e1; font-size:13px; }
+    .likes{ color:#fbbf24; font-weight:800; }
+    .gallery{
+      display:grid;
+      gap:12px;
+      grid-template-columns:repeat(3, 1fr);
+    }
+    .entry-card{
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:0 0 10px 10px;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      position:relative;
+      text-decoration:none;
+      color:inherit;
+    }
+    .entry-imgwrap{
+      padding:0;
+      background:transparent;
+      display:block;
+      position:relative;
+    }
+    .entry-imgwrap img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      image-rendering:pixelated;
+      border:0;
+      background:transparent;
+      position:relative;
+      z-index:1;
+    }
+    .heart-btn{
+      position:absolute;
+      right:4px;
+      bottom:4px;
+      border:none;
+      background:transparent;
+      padding:0;
+      width:32px;
+      height:32px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      z-index:2;
+    }
+    .heart-btn img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      display:block;
+    }
+    .entry-meta{ padding:10px; display:flex; flex-direction:column; gap:6px; }
+    .entry-meta__top{ display:flex; align-items:center; justify-content:space-between; gap:6px; }
+    .entry-title{ font-weight:800; color:#f9fafb; }
+    .entry-like{ color:#fbbf24; font-weight:800; }
+    .entry-author{ margin:0; color:#cbd5e1; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <a class="back-link" href="./index.html">← ギャラリーへ</a>
+      <h1>作品</h1>
+    </header>
+    <section class="card">
+      <div class="entry-hero" id="hero">
+        <img id="heroImg" alt="dot work"/>
+        <button class="heart-btn" id="heroLike" aria-label="いいね"><img id="heroLikeIcon" alt="like icon"/></button>
+      </div>
+      <div class="meta">
+        <div>
+          <p class="title" id="heroTitle">タイトル</p>
+          <p class="author" id="heroAuthor">by ???</p>
+        </div>
+        <span class="likes" id="heroLikes">❤ 0</span>
+      </div>
+    </section>
+    <section class="card">
+      <h2 style="margin:0 0 8px;font-size:16px;">ほかの作品</h2>
+      <div id="relatedGallery" class="gallery"></div>
+    </section>
+  </div>
+  <script type="module">
+    const NFAV_SRC = '../pixiedraw/assets/NFav.png';
+    const FAV_SRC = '../pixiedraw/assets/Fav.png';
+    const SAMPLE_COLORS = ['#7dd3fc','#f472b6','#facc15','#34d399','#c084fc','#60a5fa','#f59e0b','#a3e635','#f43f5e','#38bdf8'];
+    const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
+    const MAX_SIZE = 512;
+    const MAX_COLORS = 256;
+    let clientId = null;
+    let likedEntries = new Set();
+    let supabase = null;
+    let entry = null;
+    let cachedEntries = [];
+
+    function $(id){ return document.getElementById(id); }
+
+    function ensureClientId(){
+      const KEY = 'pixieed_client_id';
+      try{
+        const saved = localStorage.getItem(KEY) || window.PIXIEED_CLIENT_ID;
+        if(saved){
+          clientId = saved;
+          if(!localStorage.getItem(KEY)) localStorage.setItem(KEY, saved);
+          return;
+        }
+        const id = crypto.randomUUID ? crypto.randomUUID() : `guest-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+        localStorage.setItem(KEY, id);
+        clientId = id;
+      }catch(_){
+        clientId = `guest-${Math.random().toString(36).slice(2,8)}`;
+      }
+    }
+
+    function render(){
+      const img = $('heroImg');
+      const titleEl = $('heroTitle');
+      const authorEl = $('heroAuthor');
+      const likesEl = $('heroLikes');
+      const likeIcon = $('heroLikeIcon');
+      if(!entry) return;
+      img.src = entry.image_base64;
+      img.alt = entry.title || 'dot work';
+      titleEl.textContent = entry.title || '無題';
+      authorEl.textContent = `by ${entry.name || '名無し'}`;
+      likesEl.textContent = `❤ ${entry.likeCount || 0}`;
+      const isLiked = likedEntries.has(entry.id);
+      likeIcon.src = isLiked ? FAV_SRC : NFAV_SRC;
+    }
+
+    async function likeEntry(){
+      if(!entry) return;
+      ensureClientId();
+      const already = likedEntries.has(entry.id);
+      if(already){
+        likedEntries.delete(entry.id);
+        entry.likeCount = Math.max(0, (entry.likeCount || 0) - 1);
+      }else{
+        likedEntries.add(entry.id);
+        entry.likeCount = (entry.likeCount || 0) + 1;
+      }
+      render();
+      if(supabase && !already){
+        try{
+          await supabase.from('contest_likes').insert({ entry_id: entry.id, client_id });
+        }catch(err){
+          console.error(err);
+        }
+      }
+    }
+
+    async function fetchEntry(id){
+      // プレース
+      const color = SAMPLE_COLORS[id % SAMPLE_COLORS.length];
+      entry = {
+        id,
+        name: 'サンプル',
+        title: 'サンプル作品',
+        width: MAX_SIZE,
+        height: MAX_SIZE,
+        colors: 256,
+        image_base64: makePlaceholder(color),
+        submitted_at: new Date().toISOString(),
+        likeCount: 0,
+        mode: 'free'
+      };
+      if(!supabase) return;
+      try{
+        const res = await supabase
+          .from('contest_entries')
+          .select('id,name,title,prompt,mode,submitted_at,width,height,colors,image_base64')
+          .eq('id', id)
+          .maybeSingle();
+        if(!res.error && res.data){
+          entry = {
+            ...entry,
+            ...res.data
+          };
+        }
+        const likeRes = await supabase
+          .from('contest_likes')
+          .select('entry_id, client_id')
+          .eq('entry_id', id);
+        if(!likeRes.error && Array.isArray(likeRes.data)){
+          entry.likeCount = likeRes.data.length;
+          likeRes.data.forEach(l => {
+            if(l.client_id === clientId) likedEntries.add(id);
+          });
+        }
+      }catch(err){
+        console.error(err);
+      }
+    }
+
+    function renderRelated(entries){
+      const wrap = document.getElementById('relatedGallery');
+      if(!wrap) return;
+      if(!entries.length){
+        wrap.innerHTML = '<p class="empty">まだ投稿がありません。</p>';
+        return;
+      }
+      wrap.innerHTML = '';
+      entries.slice(0,9).forEach(e => {
+        const item = document.createElement('a');
+        item.className = 'entry-card';
+        item.href = `view.html?id=${e.id}`;
+        item.innerHTML = `
+          <div class="entry-imgwrap">
+            <img src="${e.image_base64}" alt="${e.title}">
+            <button class="heart-btn" data-id="${e.id}" aria-label="いいね">
+              <img src="${likedEntries.has(e.id) ? FAV_SRC : NFAV_SRC}" alt="like icon">
+            </button>
+          </div>
+          <div class="entry-meta">
+            <div class="entry-meta__top">
+              <span class="entry-title">${escapeHtml(e.title || '無題')}</span>
+              <span class="entry-like">❤ ${e.likeCount || 0}</span>
+            </div>
+            <p class="entry-author">by ${escapeHtml(e.name || '名無し')}</p>
+          </div>
+        `;
+        wrap.appendChild(item);
+      });
+      wrap.querySelectorAll('.heart-btn').forEach(btn => {
+        btn.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          likeEntry(Number(btn.dataset.id));
+        });
+      });
+    }
+
+    async function fetchRelated(){
+      // プレース
+      cachedEntries = Array.from({ length: 9 }, (_, i) => ({
+        id: 500000 + i,
+        name: `サンプル${i+1}`,
+        title: `サンプル${i+1}`,
+        width: MAX_SIZE,
+        height: MAX_SIZE,
+        colors: MAX_COLORS,
+        image_base64: makePlaceholder(SAMPLE_COLORS[i % SAMPLE_COLORS.length]),
+        submitted_at: new Date().toISOString(),
+        likeCount: 0,
+        mode: i % 2 === 0 ? 'timed10' : 'free'
+      }));
+      if(supabase){
+        try{
+          const res = await supabase
+            .from('contest_entries')
+            .select('id,name,title,mode,submitted_at,width,height,colors,image_base64')
+            .order('submitted_at', { ascending:false })
+            .limit(30);
+          if(!res.error && Array.isArray(res.data) && res.data.length){
+            cachedEntries = res.data;
+          }
+          const likeRes = await supabase
+            .from('contest_likes')
+            .select('entry_id, client_id')
+            .limit(2000);
+          const likeCounts = {};
+          if(!likeRes.error && Array.isArray(likeRes.data)){
+            likeRes.data.forEach(l => {
+              likeCounts[l.entry_id] = (likeCounts[l.entry_id] || 0) + 1;
+              if(l.client_id === clientId){
+                likedEntries.add(l.entry_id);
+              }
+            });
+          }
+          cachedEntries = cachedEntries.map(e => ({
+            ...e,
+            likeCount: likeCounts[e.id] || e.likeCount || 0
+          }));
+        }catch(err){
+          console.error(err);
+        }
+      }
+      renderRelated(cachedEntries.filter(e => e.id !== entry?.id));
+    }
+
+    function makePlaceholder(color){
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="${color}"/></svg>`;
+      return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+    }
+
+    async function initSupabase(){
+      try{
+        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.46.1/+esm');
+        supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      }catch(err){
+        console.warn('Supabase unavailable, using placeholder only.', err);
+        supabase = null;
+      }
+    }
+
+    async function init(){
+      ensureClientId();
+      await initSupabase();
+      const params = new URLSearchParams(location.search);
+      const id = Number(params.get('id')) || 0;
+      await fetchEntry(id);
+      await fetchRelated();
+      render();
+      const likeBtn = $('heroLike');
+      if(likeBtn){
+        likeBtn.addEventListener('click', likeEntry);
+      }
+    }
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
