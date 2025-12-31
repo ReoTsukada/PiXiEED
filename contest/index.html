@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+  <title>PiXiEED ドットギャラリー</title>
+  <link rel="icon" type="image/png" href="../character-dots/mao1.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
+  <style>
+    :root{ color-scheme: dark; }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family:'Fredoka', 'DotGothic16', system-ui, sans-serif;
+      background:radial-gradient(circle at 20% 20%, rgba(59,130,246,0.22), rgba(15,23,42,1)),
+                 radial-gradient(circle at 80% 0%, rgba(236,72,153,0.18), rgba(15,23,42,1)),
+                 #0b1224;
+      color:#e5e7eb;
+      min-height:100vh;
+      padding:28px 14px 60px;
+      display:flex;
+      justify-content:center;
+    }
+    .page{ width:100%; max-width:640px; display:grid; gap:14px; position:relative; }
+    header{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      align-items:flex-start;
+      position:sticky;
+      top:0;
+      z-index:40;
+      padding:10px 12px;
+      margin:-10px -12px 0;
+      background:rgba(11,18,36,0.92);
+      backdrop-filter:blur(6px);
+      border-bottom:1px solid rgba(255,255,255,0.08);
+    }
+    h1{ margin:0; font-size:22px; letter-spacing:0.02em; color:#f9fafb; }
+    .subtitle{ margin:0; color:#cbd5e1; font-size:12px; }
+    .card{
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:12px;
+      padding:12px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.3);
+    }
+    .grid{ display:grid; gap:14px; grid-template-columns:1fr; }
+    .prompt{ display:flex; flex-direction:column; gap:6px; }
+    .prompt-title{ margin:0; font-size:15px; color:#f9fafb; }
+    .prompt-text{
+      padding:10px;
+      border-radius:10px;
+      background:rgba(59,130,246,0.18);
+      border:1px solid rgba(59,130,246,0.35);
+      color:#e0f2fe;
+      font-family:'DotGothic16', monospace;
+    }
+    .button{
+      appearance:none;
+      border:0;
+      border-radius:10px;
+      padding:10px 14px;
+      font:700 14px/1.2 'Fredoka', system-ui, sans-serif;
+      cursor:pointer;
+      color:#ffffff;
+      background:linear-gradient(135deg, #ff719a, #ff9f43);
+      box-shadow:0 4px 0 #e35c82, 0 8px 16px rgba(255,113,154,0.35);
+      transition:transform 0.1s ease, filter 0.1s ease;
+    }
+    .button:hover,
+    .button:focus-visible{ transform:translateY(-1px); filter:brightness(1.05); }
+    form{ display:flex; flex-direction:column; gap:10px; }
+    .field{ display:flex; flex-direction:column; gap:4px; }
+    label{ font-weight:700; color:#e5e7eb; }
+    input[type="text"], input[type="file"]{
+      width:100%;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(0,0,0,0.35);
+      color:#f9fafb;
+      padding:10px 12px;
+      font-size:14px;
+      font-family:'DotGothic16', monospace;
+    }
+    .helper{ color:#cbd5e1; font-size:12px; margin:0; }
+    .status{ min-height:20px; color:#fef3c7; font-size:12px; margin:4px 0 0; }
+    .gallery{
+      display:grid;
+      gap:12px;
+      grid-template-columns:repeat(3, 1fr);
+    }
+    .tabs{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    .tab-btn{
+      border:1px solid rgba(255,255,255,0.25);
+      background:rgba(255,255,255,0.06);
+      color:#e5e7eb;
+      border-radius:10px;
+      padding:8px 12px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .tab-btn.is-active{
+      background:linear-gradient(135deg,#ff719a,#ff9f43);
+      border-color:transparent;
+      color:#0b1224;
+    }
+    .sort-tabs{
+      display:flex;
+      gap:6px;
+      align-items:center;
+      margin-left:auto;
+      flex-wrap:wrap;
+    }
+    .sort-btn{
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(255,255,255,0.05);
+      color:#e5e7eb;
+      border-radius:8px;
+      padding:6px 10px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .sort-btn.is-active{
+      background:rgba(251,191,36,0.22);
+      border-color:rgba(251,191,36,0.6);
+      color:#0b1224;
+    }
+    .entry-card{
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:0 0 10px 10px;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      box-shadow:0 8px 24px rgba(0,0,0,0.26);
+      position:relative;
+      text-decoration:none;
+      color:inherit;
+    }
+    .entry-imgwrap{
+      padding:0;
+      background:transparent;
+      display:block;
+      position:relative;
+    }
+    .entry-imgwrap img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      image-rendering:pixelated;
+      border:0;
+      background:transparent;
+      position:relative;
+      z-index:1;
+    }
+    .heart-btn{
+      position:absolute;
+      right:4px;
+      bottom:4px;
+      border:none;
+      background:transparent;
+      padding:0;
+      width:32px;
+      height:32px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      z-index:2;
+    }
+    .heart-btn img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      display:block;
+    }
+    .heart-btn:disabled{
+      opacity:0.5;
+      cursor:not-allowed;
+    }
+    .entry-meta{ padding:10px; display:flex; flex-direction:column; gap:6px; }
+    .entry-meta__top{ display:flex; align-items:center; justify-content:space-between; gap:6px; }
+    .entry-title{ font-weight:800; color:#f9fafb; }
+    .entry-like{ color:#fbbf24; font-weight:800; }
+    .entry-author{ margin:0; color:#cbd5e1; font-size:12px; }
+    .entry-info{ margin:0; color:#94a3b8; font-size:11px; }
+    .like-btn{
+      border:1px solid rgba(251,191,36,0.5);
+      background:rgba(251,191,36,0.12);
+      color:#fbbf24;
+      border-radius:8px;
+      padding:8px 10px;
+      cursor:pointer;
+      font-weight:700;
+      font-family:'DotGothic16', monospace;
+    }
+    .like-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+    .empty{ color:#cbd5e1; text-align:center; margin:8px 0 0; font-family:'DotGothic16', monospace; }
+    .feed-subtitle{
+      margin:0;
+      color:#9ca3af;
+      font-size:12px;
+    }
+    .fab{
+      position:fixed;
+      right:18px;
+      bottom:18px;
+      width:56px;
+      height:56px;
+      border-radius:50%;
+      background:linear-gradient(135deg, #ff719a, #ff9f43);
+      color:#fff;
+      font:800 28px/1 'Fredoka', system-ui, sans-serif;
+      border:0;
+      box-shadow:0 8px 20px rgba(0,0,0,0.25);
+      cursor:pointer;
+      z-index:60;
+    }
+    .fab:focus-visible{ outline:3px solid rgba(255,255,255,0.4); }
+    .post-panel{
+      position:fixed;
+      inset:0;
+      display:none;
+      align-items:flex-end;
+      justify-content:center;
+      background:rgba(0,0,0,0.65);
+      backdrop-filter:blur(4px);
+      padding:16px;
+      z-index:50;
+    }
+    .post-panel.is-open{ display:flex; }
+    .post-card{
+      width:100%;
+      max-width:560px;
+      background:rgba(15,23,42,0.92);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:16px;
+      padding:14px;
+      box-shadow:0 12px 40px rgba(0,0,0,0.4);
+    }
+    .post-header{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:8px;
+      margin-bottom:10px;
+    }
+    .post-title{ margin:0; font-size:16px; color:#f9fafb; }
+    .close-btn{
+      border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.08);
+      color:#fff;
+      border-radius:8px;
+      padding:6px 10px;
+      cursor:pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div>
+        <h1>ドットギャラリー</h1>
+        <p class="subtitle">みんなのドットを眺めよう。512x512以内 / 256色以内のPNGを投稿もできます。</p>
+        <p class="feed-subtitle">最新→いいね順で並びます</p>
+      </div>
+    </header>
+    <section class="card">
+      <div class="tabs">
+        <div id="filterTabs" style="display:flex; gap:8px;">
+          <button class="tab-btn is-active" data-filter="all" type="button">すべて</button>
+          <button class="tab-btn" data-filter="timed10" type="button">10m</button>
+          <button class="tab-btn" data-filter="px32" type="button">32px</button>
+        </div>
+        <div class="sort-tabs" id="sortTabs">
+          <span class="helper" style="margin-right:4px;">並び替え:</span>
+          <button class="sort-btn is-active" data-sort="new" type="button">新着</button>
+          <button class="sort-btn" data-sort="popular" type="button">人気</button>
+        </div>
+      </div>
+      <div id="contestGallery" class="gallery"></div>
+    </section>
+
+    <div class="grid">
+    </div>
+  </div>
+  <button class="fab" id="openPostPanel">＋</button>
+  <div class="post-panel" id="postPanel" aria-hidden="true">
+    <div class="post-card">
+      <div class="post-header">
+        <h3 class="post-title">投稿する</h3>
+        <button class="close-btn" type="button" id="closePostPanel">閉じる</button>
+      </div>
+      <form id="contestForm">
+        <div class="field">
+          <label for="name">名前</label>
+          <input id="name" name="name" type="text" placeholder="ハンドルネーム"/>
+        </div>
+        <div class="field">
+          <label for="title">作品名</label>
+          <input id="title" name="title" type="text" placeholder="無題"/>
+        </div>
+        <div class="field">
+          <label for="contestFile">PNG / GIF</label>
+          <input id="contestFile" name="contestFile" type="file" accept="image/png,image/gif"/>
+          <p class="helper">PNG または GIF（サムネは1フレーム表示） / 512x512以内 / 256色以内</p>
+        </div>
+        <button class="button" type="submit">投稿する</button>
+        <p class="status" id="contestStatus"></p>
+      </form>
+    </div>
+  </div>
+  <script type="module">
+    // インライン版：file:// でも必ずダミー表示。Supabaseが使えない場合もプレース表示。
+    const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
+    const FORM_ID = 'contestForm';
+    const FILE_INPUT_ID = 'contestFile';
+    const STATUS_ID = 'contestStatus';
+    const GALLERY_ID = 'contestGallery';
+    const MAX_SIZE = 512;
+    const MAX_COLORS = 256;
+
+    let clientId = null;
+    let likedEntries = new Set();
+    let currentFilter = 'all';
+    let currentSort = 'new';
+    let cachedEntries = [];
+    let placeholderCache = null;
+    let supabase = null;
+
+    const NFAV_SRC = '../pixiedraw/assets/NFav.png';
+    const FAV_SRC = '../pixiedraw/assets/Fav.png';
+
+    const SAMPLE_COLORS = ['#7dd3fc','#f472b6','#facc15','#34d399','#c084fc','#60a5fa','#f59e0b','#a3e635','#f43f5e','#38bdf8'];
+    const PLACEHOLDERS = Array.from({ length: 10 }, (_, i) => ({
+      id: 100000 + i,
+      title: `サンプル${i + 1}`,
+      name: `サンプル${i + 1}`,
+      width: 512,
+      height: 512,
+      colors: 256,
+      image_base64: makePlaceholder(SAMPLE_COLORS[i % SAMPLE_COLORS.length]),
+      submitted_at: new Date().toISOString(),
+      likeCount: 0,
+      mode: i % 2 === 0 ? 'timed10' : 'free',
+      color: SAMPLE_COLORS[i % SAMPLE_COLORS.length]
+    }));
+
+    function $(id){ return document.getElementById(id); }
+
+    function ensureClientId(){
+      const KEY = 'pixieed_client_id';
+      try{
+        const saved = localStorage.getItem(KEY) || window.PIXIEED_CLIENT_ID;
+        if(saved){
+          clientId = saved;
+          if(!localStorage.getItem(KEY)) localStorage.setItem(KEY, saved);
+          return;
+        }
+        const id = crypto.randomUUID ? crypto.randomUUID() : `guest-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+        localStorage.setItem(KEY, id);
+        clientId = id;
+      }catch(_){
+        clientId = `guest-${Math.random().toString(36).slice(2,8)}`;
+      }
+    }
+
+    function setStatus(msg){
+      const el = $(STATUS_ID);
+      if(el) el.textContent = msg || '';
+    }
+
+    function setupTabs(){
+      const filterTabs = document.getElementById('filterTabs');
+      const sortTabs = document.getElementById('sortTabs');
+      if(filterTabs){
+        filterTabs.querySelectorAll('.tab-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            currentFilter = btn.dataset.filter || 'all';
+            filterTabs.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('is-active', b === btn));
+            renderEntries(applyFilterAndSort(cachedEntries));
+          });
+        });
+      }
+      if(sortTabs){
+        sortTabs.querySelectorAll('.sort-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            currentSort = btn.dataset.sort || 'new';
+            sortTabs.querySelectorAll('.sort-btn').forEach(b => b.classList.toggle('is-active', b === btn));
+            renderEntries(applyFilterAndSort(cachedEntries));
+          });
+        });
+      }
+    }
+
+    async function fileToImageInfo(file){
+      const type = (file.type || '').toLowerCase();
+      if(type !== 'image/png' && type !== 'image/gif'){
+        throw new Error('PNGまたはGIFのみ投稿できます');
+      }
+      const img = await createImageBitmap(file);
+      const { width, height } = img;
+      if(width > MAX_SIZE || height > MAX_SIZE){
+        throw new Error(`画像サイズは${MAX_SIZE}x${MAX_SIZE}以内にしてください`);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const data = ctx.getImageData(0,0,width,height).data;
+      const colors = new Set();
+      for(let i=0;i<data.length;i+=4){
+        colors.add(`${data[i]}-${data[i+1]}-${data[i+2]}-${data[i+3]}`);
+        if(colors.size > MAX_COLORS){
+          throw new Error(`色数は${MAX_COLORS}色以内にしてください`);
+        }
+      }
+      // GIFもPNGサムネに変換して保存
+      const dataUrl = canvas.toDataURL('image/png');
+      return { width, height, colors: colors.size, dataUrl };
+    }
+
+    async function handleSubmit(e){
+      e.preventDefault();
+      const form = e.currentTarget;
+      const name = form.name.value.trim() || '名無し';
+      const title = form.title.value.trim() || '無題';
+      const file = form[FILE_INPUT_ID]?.files?.[0];
+      if(!file){
+        setStatus('画像ファイルを選択してください');
+        return;
+      }
+      setStatus('画像を確認しています...');
+      let imageInfo;
+      try{
+        imageInfo = await fileToImageInfo(file);
+      }catch(err){
+        setStatus(err.message || '画像の解析に失敗しました');
+        return;
+      }
+      if(!supabase){
+        setStatus('オンライン投稿は無効です（プレース表示のみ）');
+        return;
+      }
+      setStatus('投稿しています...');
+      try{
+        const payload = {
+          name,
+          title,
+          prompt: '自由投稿',
+          mode: 'free',
+          started_at: null,
+          submitted_at: new Date().toISOString(),
+          width: imageInfo.width,
+          height: imageInfo.height,
+          colors: imageInfo.colors,
+          image_base64: imageInfo.dataUrl
+        };
+        await supabase.from('contest_entries').insert(payload);
+        form.reset();
+        setStatus('投稿しました！');
+      }catch(err){
+        setStatus('投稿に失敗しました');
+        console.error(err);
+      }
+      await fetchAndRender();
+    }
+
+    function renderEntries(entries){
+      const gallery = $(GALLERY_ID);
+      if(!gallery) return;
+      if(!entries.length){
+        gallery.innerHTML = '<p class="empty">まだ投稿がありません。</p>';
+        return;
+      }
+      gallery.innerHTML = '';
+      entries.forEach(entry => {
+        const item = document.createElement('a');
+        item.className = 'entry-card';
+        item.href = `view.html?id=${entry.id}`;
+        item.innerHTML = `
+          <div class="entry-imgwrap">
+            <img src="${entry.image_base64}" alt="${entry.title}">
+            <button class="heart-btn" data-id="${entry.id}" aria-label="いいね">
+              <img src="${likedEntries.has(entry.id) ? FAV_SRC : NFAV_SRC}" alt="like icon">
+            </button>
+          </div>
+          <div class="entry-meta">
+            <div class="entry-meta__top">
+              <span class="entry-title">${escapeHtml(entry.title || '無題')}</span>
+              <span class="entry-like">❤ ${entry.likeCount || 0}</span>
+            </div>
+            <p class="entry-author">by ${escapeHtml(entry.name || '名無し')}</p>
+          </div>
+        `;
+        gallery.appendChild(item);
+      });
+      gallery.querySelectorAll('.heart-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          likeEntry(Number(btn.dataset.id));
+        });
+      });
+    }
+
+    async function fetchAndRender(){
+      ensureClientId();
+      setStatus('読み込み中...');
+      let entries = [];
+      let likes = [];
+      if(supabase){
+        try{
+          const res = await supabase
+            .from('contest_entries')
+            .select('id,name,title,prompt,mode,submitted_at,width,height,colors,image_base64')
+            .order('submitted_at', { ascending:false })
+            .limit(100);
+          if(!res.error && Array.isArray(res.data)){
+            entries = res.data;
+          }
+          const likeRes = await supabase
+            .from('contest_likes')
+            .select('entry_id, client_id')
+            .limit(1000);
+          if(!likeRes.error && Array.isArray(likeRes.data)){
+            likes = likeRes.data;
+          }
+        }catch(err){
+          console.error(err);
+        }
+      }
+
+      const likeCounts = {};
+      likedEntries = new Set();
+      likes.forEach(l => {
+        likeCounts[l.entry_id] = (likeCounts[l.entry_id] || 0) + 1;
+        if(l.client_id === clientId){
+          likedEntries.add(l.entry_id);
+        }
+      });
+
+      let useEntries = Array.isArray(entries) ? entries : [];
+      if(useEntries.length === 0){
+        useEntries = await buildPlaceholders();
+      }
+      const enriched = useEntries.map(e => ({
+        ...e,
+        likeCount: likeCounts[e.id] || e.likeCount || 0
+      }));
+      cachedEntries = enriched;
+      renderEntries(applyFilterAndSort(cachedEntries));
+      setStatus('');
+    }
+
+    async function buildPlaceholders(){
+      if(placeholderCache) return placeholderCache;
+      placeholderCache = PLACEHOLDERS.map(p => ({
+        ...p,
+        width: 512,
+        height: 512,
+        colors: 256,
+        image_base64: makePlaceholder(p.color || '#7dd3fc')
+      }));
+      return placeholderCache;
+    }
+
+    function applyFilterAndSort(entries){
+      let filtered = entries.slice();
+      if(currentFilter === 'timed10'){
+        filtered = filtered.filter(e => e.mode === 'timed10');
+      }else if(currentFilter === 'px32'){
+        filtered = filtered.filter(e => (e.width || 999) <= 32 && (e.height || 999) <= 32);
+      }
+      if(currentSort === 'popular'){
+        filtered.sort((a,b) => {
+          if(b.likeCount !== a.likeCount) return b.likeCount - a.likeCount;
+          return new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime();
+        });
+      }else{
+        filtered.sort((a,b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
+      }
+      return filtered;
+    }
+
+  async function likeEntry(id){
+    if(!clientId) ensureClientId();
+    // オフラインでもトグル可能にする
+    const already = likedEntries.has(id);
+    if(already){
+      likedEntries.delete(id);
+    }else{
+      likedEntries.add(id);
+    }
+    const target = cachedEntries.find(e => e.id === id);
+    if(target){
+      target.likeCount = Math.max(0, (target.likeCount || 0) + (already ? -1 : 1));
+    }
+    renderEntries(applyFilterAndSort(cachedEntries));
+
+    if(supabase){
+      try{
+        if(!already){
+          await supabase.from('contest_likes').insert({ entry_id:id, client_id: clientId });
+        }
+      }catch(err){
+        console.error(err);
+      }
+    }
+  }
+
+    function escapeHtml(str){
+      return str.replace(/[&<>"']/g, s => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s] || s
+      ));
+    }
+
+    function makePlaceholder(color){
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="${color}"/></svg>`;
+      return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+    }
+
+    function setupPostPanel(){
+      const openBtn = document.getElementById('openPostPanel');
+      const panel = document.getElementById('postPanel');
+      const closeBtn = document.getElementById('closePostPanel');
+      if(!openBtn || !panel) return;
+      const open = () => {
+        panel.classList.add('is-open');
+        panel.setAttribute('aria-hidden','false');
+      };
+      const close = () => {
+        panel.classList.remove('is-open');
+        panel.setAttribute('aria-hidden','true');
+      };
+      openBtn.addEventListener('click', open);
+      if(closeBtn){
+        closeBtn.addEventListener('click', close);
+      }
+      panel.addEventListener('click', (e) => {
+        if(e.target === panel) close();
+      });
+    }
+
+    async function initSupabase(){
+      try{
+        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.46.1/+esm');
+        supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      }catch(err){
+        console.warn('Supabase初期化に失敗: オフラインプレース表示のみ', err);
+        supabase = null;
+      }
+    }
+
+    async function init(){
+      ensureClientId();
+      setupTabs();
+      setupPostPanel();
+      const form = $(FORM_ID);
+      if(form){
+        form.addEventListener('submit', handleSubmit);
+      }
+      await initSupabase();
+      await fetchAndRender();
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
