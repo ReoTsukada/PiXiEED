@@ -1,5 +1,6 @@
 (function () {
   function init() {
+    ensureGlobalClientId();
     updateCopyrightYear();
     revealLastUpdated();
     setupContactOverlay();
@@ -32,6 +33,27 @@
         event.preventDefault();
       }
     });
+  }
+
+  // 端末ごとの共通クライアントIDを払い出す（全ページ共通）
+  function ensureGlobalClientId() {
+    const KEY = 'pixieed_client_id';
+    if (window.PIXIEED_CLIENT_ID) return window.PIXIEED_CLIENT_ID;
+    try {
+      const existing = localStorage.getItem(KEY);
+      if (existing) {
+        window.PIXIEED_CLIENT_ID = existing;
+        return existing;
+      }
+      const id = crypto.randomUUID ? crypto.randomUUID() : `pix-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      localStorage.setItem(KEY, id);
+      window.PIXIEED_CLIENT_ID = id;
+      return id;
+    } catch (_) {
+      const fallback = `guest-${Math.random().toString(36).slice(2, 8)}`;
+      window.PIXIEED_CLIENT_ID = fallback;
+      return fallback;
+    }
   }
 
   function revealLastUpdated() {
