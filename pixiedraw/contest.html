@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+  <title>PiXiEEDraw Lite - 10分ドット投稿</title>
+  <link rel="icon" type="image/png" href="../character-dots/mao1.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      color-scheme: dark;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family:'M PLUS 1p', system-ui, sans-serif;
+      background:radial-gradient(circle at 20% 20%, rgba(59,130,246,0.22), rgba(15,23,42,1)),
+                 radial-gradient(circle at 80% 0%, rgba(236,72,153,0.18), rgba(15,23,42,1)),
+                 #0b1224;
+      color:#e5e7eb;
+      min-height:100vh;
+      padding:32px 16px 64px;
+      display:flex;
+      justify-content:center;
+    }
+    .page{
+      width:100%;
+      max-width:1080px;
+      display:grid;
+      gap:20px;
+    }
+    header{
+      display:flex;
+      flex-wrap:wrap;
+      gap:12px;
+      align-items:flex-end;
+      justify-content:space-between;
+    }
+    h1{ margin:0; font-size:28px; letter-spacing:0.04em; }
+    .subtitle{ margin:0; color:#94a3b8; font-size:14px; }
+    .card{
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:14px;
+      padding:16px;
+      box-shadow:0 12px 40px rgba(0,0,0,0.35);
+    }
+    .grid{
+      display:grid;
+      gap:16px;
+      grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));
+    }
+    .prompt{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .prompt-title{ margin:0; font-size:18px; }
+    .prompt-text{
+      padding:12px;
+      border-radius:12px;
+      background:rgba(59,130,246,0.12);
+      border:1px solid rgba(59,130,246,0.3);
+      color:#e0f2fe;
+    }
+    .timer-row{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .timer-chip{
+      padding:10px 14px;
+      border-radius:12px;
+      background:rgba(15,23,42,0.8);
+      border:1px solid rgba(148,163,184,0.35);
+      font-weight:700;
+      letter-spacing:0.04em;
+    }
+    .button{
+      appearance:none;
+      border:0;
+      border-radius:12px;
+      padding:12px 16px;
+      font:700 14px/1.2 'M PLUS 1p', system-ui, sans-serif;
+      cursor:pointer;
+      color:#0b1224;
+      background:linear-gradient(135deg, #a855f7, #38bdf8);
+      box-shadow:0 10px 20px rgba(59,130,246,0.25);
+      transition:transform 0.15s ease, filter 0.15s ease;
+    }
+    .button:hover,
+    .button:focus-visible{ transform:translateY(-1px); filter:brightness(1.05); }
+    form{
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .field{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    label{ font-weight:700; color:#cbd5e1; }
+    input[type="text"],
+    input[type="file"]{
+      width:100%;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.15);
+      background:rgba(0,0,0,0.35);
+      color:#e5e7eb;
+      padding:12px 14px;
+      font-size:14px;
+    }
+    input[type="checkbox"]{ transform:scale(1.1); }
+    .helper{ color:#94a3b8; font-size:13px; margin:0; }
+    .status{ min-height:20px; color:#fef3c7; font-size:13px; }
+    .gallery{
+      display:grid;
+      gap:14px;
+      grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
+    }
+    .entry-card{
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:12px;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      box-shadow:0 10px 30px rgba(0,0,0,0.3);
+    }
+    .entry-imgwrap{
+      padding:10px;
+      background:rgba(15,23,42,0.8);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .entry-imgwrap img{
+      max-width:100%;
+      height:auto;
+      image-rendering:pixelated;
+    }
+    .entry-meta{
+      padding:12px;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .entry-meta__top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+    }
+    .entry-title{ font-weight:800; color:#f8fafc; }
+    .entry-like{ color:#fbbf24; font-weight:800; }
+    .entry-author{ margin:0; color:#cbd5e1; font-size:13px; }
+    .entry-info{ margin:0; color:#94a3b8; font-size:12px; }
+    .like-btn{
+      border:1px solid rgba(251,191,36,0.5);
+      background:rgba(251,191,36,0.12);
+      color:#fbbf24;
+      border-radius:10px;
+      padding:8px 10px;
+      cursor:pointer;
+      font-weight:700;
+    }
+    .like-btn:disabled{
+      opacity:0.5;
+      cursor:not-allowed;
+    }
+    .empty{
+      color:#cbd5e1;
+      text-align:center;
+      margin:8px 0 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div>
+        <h1>10分ドット投稿</h1>
+        <p class="subtitle">PiXiEEDraw Lite から出力したPNGを投稿できます（512x512以内 / 256色以内）</p>
+      </div>
+      <div class="timer-row">
+        <span class="timer-chip" id="timerLabel">未開始</span>
+        <button class="button" type="button" id="startTimedBtn">10分モードを開始</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section class="card prompt">
+        <h2 class="prompt-title">今日のお題</h2>
+        <div class="prompt-text" id="promptText">今日のお題: --</div>
+        <p class="helper">※お題は公開表示のまま。10分モード開始でカウントダウンがスタートします。</p>
+      </section>
+
+      <section class="card">
+        <h2 class="prompt-title">投稿する</h2>
+        <form id="contestForm">
+          <div class="field">
+            <label for="name">名前</label>
+            <input id="name" name="name" type="text" placeholder="ハンドルネーム"/>
+          </div>
+          <div class="field">
+            <label for="title">作品名</label>
+            <input id="title" name="title" type="text" placeholder="無題"/>
+          </div>
+          <div class="field">
+            <label for="contestFile">PNGファイル</label>
+            <input id="contestFile" name="contestFile" type="file" accept="image/png"/>
+            <p class="helper">512x512以内 / 256色以内</p>
+          </div>
+          <label><input type="checkbox" id="timedMode" name="timedMode"/> 10分ドットモードで投稿する</label>
+          <button class="button" type="submit">投稿する</button>
+          <p class="status" id="contestStatus"></p>
+        </form>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2 class="prompt-title">みんなの10分ドット</h2>
+      <div id="contestGallery" class="gallery"></div>
+    </section>
+  </div>
+  <script type="module" src="./assets/js/contest.js"></script>
+</body>
+</html>
