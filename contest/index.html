@@ -334,26 +334,10 @@
     let currentFilter = 'all';
     let currentSort = 'new';
     let cachedEntries = [];
-    let placeholderCache = null;
     let supabase = null;
 
     const NFAV_SRC = '../pixiedraw/assets/NFav.png';
     const FAV_SRC = '../pixiedraw/assets/Fav.png';
-
-    const SAMPLE_COLORS = ['#7dd3fc','#f472b6','#facc15','#34d399','#c084fc','#60a5fa','#f59e0b','#a3e635','#f43f5e','#38bdf8'];
-    const PLACEHOLDERS = Array.from({ length: 10 }, (_, i) => ({
-      id: 100000 + i,
-      title: `サンプル${i + 1}`,
-      name: `サンプル${i + 1}`,
-      width: 512,
-      height: 512,
-      colors: 256,
-      image_base64: makePlaceholder(SAMPLE_COLORS[i % SAMPLE_COLORS.length]),
-      submitted_at: new Date().toISOString(),
-      likeCount: 0,
-      mode: i % 2 === 0 ? 'timed10' : 'free',
-      color: SAMPLE_COLORS[i % SAMPLE_COLORS.length]
-    }));
 
     function $(id){ return document.getElementById(id); }
 
@@ -550,10 +534,7 @@
         }
       });
 
-      let useEntries = Array.isArray(entries) ? entries : [];
-      if(useEntries.length === 0){
-        useEntries = await buildPlaceholders();
-      }
+      const useEntries = Array.isArray(entries) ? entries : [];
       const enriched = useEntries.map(e => ({
         ...e,
         likeCount: likeCounts[e.id] || e.likeCount || 0
@@ -561,18 +542,6 @@
       cachedEntries = enriched;
       renderEntries(applyFilterAndSort(cachedEntries));
       setStatus('');
-    }
-
-    async function buildPlaceholders(){
-      if(placeholderCache) return placeholderCache;
-      placeholderCache = PLACEHOLDERS.map(p => ({
-        ...p,
-        width: 512,
-        height: 512,
-        colors: 256,
-        image_base64: makePlaceholder(p.color || '#7dd3fc')
-      }));
-      return placeholderCache;
     }
 
     function applyFilterAndSort(entries){
