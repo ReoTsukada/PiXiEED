@@ -120,6 +120,7 @@
     .entry-like{ color:#fbbf24; font-weight:800; }
     .entry-author{ margin:0; color:#cbd5e1; font-size:12px; }
     .empty{ color:#cbd5e1; text-align:center; margin:8px 0 0; }
+    .status{ color:#fef3c7; font-size:12px; min-height:18px; }
   </style>
 </head>
 <body>
@@ -140,6 +141,7 @@
         </div>
         <span class="likes" id="heroLikes">❤ 0</span>
       </div>
+      <p class="status" id="viewStatus"></p>
     </section>
     <section class="card">
       <h2 style="margin:0 0 8px;font-size:16px;">ほかの作品</h2>
@@ -149,16 +151,21 @@
   <script type="module">
     const NFAV_SRC = '../pixiedraw/assets/NFav.png';
     const FAV_SRC = '../pixiedraw/assets/Fav.png';
-    const SAMPLE_COLORS = ['#7dd3fc','#f472b6','#facc15','#34d399','#c084fc','#60a5fa','#f59e0b','#a3e635','#f43f5e','#38bdf8'];
     const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
+    const SUPABASE_REST = `${SUPABASE_URL}/rest/v1`;
     const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
+    const SAMPLE_COLORS = ['#7dd3fc','#f472b6','#facc15','#34d399','#c084fc','#60a5fa','#f59e0b','#a3e635','#f43f5e','#38bdf8'];
     let clientId = null;
     let likedEntries = new Set();
-    let supabase = null;
     let entry = null;
     let cachedEntries = [];
 
     function $(id){ return document.getElementById(id); }
+
+    function setStatus(msg){
+      const el = $('viewStatus');
+      if(el) el.textContent = msg || '';
+    }
 
     function ensureClientId(){
       const KEY = 'pixieed_client_id';
@@ -211,54 +218,46 @@
         entry.likeCount = (entry.likeCount || 0) + 1;
       }
       render();
-      if(supabase && !already){
-        try{
-          await supabase.from('contest_likes').insert({ entry_id: entry.id, client_id });
-        }catch(err){
-          console.error(err);
-        }
-      }
-    }
-
-    async function fetchEntry(id){
-      entry = null;
-      if(!supabase){
-        entry = {
-          id,
-          name: 'サンプル',
-          title: 'サンプル作品',
-          width: MAX_SIZE,
-          height: MAX_SIZE,
-          colors: 256,
-          image_base64: makePlaceholder(SAMPLE_COLORS[id % SAMPLE_COLORS.length]),
-          submitted_at: new Date().toISOString(),
-          likeCount: 0,
-          mode: 'free'
-        };
-        return;
-      }
       try{
-        const res = await supabase
-          .from('contest_entries')
-          .select('id,name,title,prompt,mode,submitted_at,width,height,colors,image_base64')
-          .eq('id', id)
-          .maybeSingle();
-        if(!res.error && res.data){
-          entry = res.data;
-        }
-        const likeRes = await supabase
-          .from('contest_likes')
-          .select('entry_id, client_id')
-          .eq('entry_id', id);
-        if(!likeRes.error && Array.isArray(likeRes.data)){
-          entry.likeCount = likeRes.data.length;
-          likeRes.data.forEach(l => {
-            if(l.client_id === clientId) likedEntries.add(id);
-          });
+        if(!already){
+          await supabaseInsert('contest_likes', { entry_id: entry.id, client_id });
         }
       }catch(err){
         console.error(err);
       }
+    }
+
+    async function fetchEntry(id){
+      setStatus('読み込み中...');
+      entry = {
+        id,
+        name: 'サンプル',
+        title: 'サンプル作品',
+        width: 512,
+        height: 512,
+        colors: 256,
+        image_base64: makePlaceholder(SAMPLE_COLORS[id % SAMPLE_COLORS.length]),
+        submitted_at: new Date().toISOString(),
+        likeCount: 0,
+        mode: 'free'
+      };
+      try{
+        const res = await supabaseSelect('contest_entries', { eq: { id }, limit: 1 });
+        if(res.length){
+          entry = res[0];
+        }else{
+          setStatus('ネットワークエラーまたは作品が見つかりません');
+        }
+        const likeRes = await supabaseSelect('contest_likes', { eq: { entry_id: id }, limit: 2000 });
+        entry.likeCount = likeRes.length;
+        likeRes.forEach(l => {
+          if(l.client_id === clientId) likedEntries.add(id);
+        });
+      }catch(err){
+        console.error(err);
+        setStatus('ネットワークエラーが発生しています');
+      }
+      render();
     }
 
     function renderRelated(entries){
@@ -299,54 +298,40 @@
       });
     }
 
-    async function fetchRelated(){
+    async function fetchRelated(currentId){
       cachedEntries = [];
-      if(supabase){
-        try{
-          const res = await supabase
-            .from('contest_entries')
-            .select('id,name,title,mode,submitted_at,width,height,colors,image_base64')
-            .order('submitted_at', { ascending:false })
-            .limit(30);
-          if(!res.error && Array.isArray(res.data) && res.data.length){
-            cachedEntries = res.data;
+      try{
+        cachedEntries = await supabaseSelect('contest_entries', { order: 'submitted_at.desc', limit: 30 });
+        const likeRes = await supabaseSelect('contest_likes', { limit: 2000 });
+        const likeCounts = {};
+        likeRes.forEach(l => {
+          likeCounts[l.entry_id] = (likeCounts[l.entry_id] || 0) + 1;
+          if(l.client_id === clientId){
+            likedEntries.add(l.entry_id);
           }
-          const likeRes = await supabase
-            .from('contest_likes')
-            .select('entry_id, client_id')
-            .limit(2000);
-          const likeCounts = {};
-          if(!likeRes.error && Array.isArray(likeRes.data)){
-            likeRes.data.forEach(l => {
-              likeCounts[l.entry_id] = (likeCounts[l.entry_id] || 0) + 1;
-              if(l.client_id === clientId){
-                likedEntries.add(l.entry_id);
-              }
-            });
-          }
-          cachedEntries = cachedEntries.map(e => ({
-            ...e,
-            likeCount: likeCounts[e.id] || e.likeCount || 0
-          }));
-        }catch(err){
-          console.error(err);
-        }
+        });
+        cachedEntries = cachedEntries.map(e => ({
+          ...e,
+          likeCount: likeCounts[e.id] || e.likeCount || 0
+        }));
+      }catch(err){
+        console.error(err);
       }
       if(cachedEntries.length === 0){
         cachedEntries = Array.from({ length: 9 }, (_, i) => ({
           id: 500000 + i,
           name: `サンプル${i+1}`,
           title: `サンプル${i+1}`,
-          width: MAX_SIZE,
-          height: MAX_SIZE,
-          colors: MAX_COLORS,
+          width: 512,
+          height: 512,
+          colors: 256,
           image_base64: makePlaceholder(SAMPLE_COLORS[i % SAMPLE_COLORS.length]),
           submitted_at: new Date().toISOString(),
           likeCount: 0,
           mode: i % 2 === 0 ? 'timed10' : 'free'
         }));
       }
-      renderRelated(cachedEntries.filter(e => e.id !== entry?.id));
+      renderRelated(cachedEntries.filter(e => e.id !== currentId));
     }
 
     function escapeHtml(str){
@@ -360,25 +345,53 @@
       return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
     }
 
-    async function initSupabase(){
-      try{
-        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.46.1/+esm');
-        supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      }catch(err){
-        console.warn('Supabase unavailable, using placeholders only.', err);
-        supabase = null;
+    function supabaseHeaders(){
+      return {
+        'Content-Type':'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      };
+    }
+
+    async function supabaseSelect(table, { eq = {}, order, limit } = {}){
+      const params = new URLSearchParams();
+      params.set('select','*');
+      Object.entries(eq).forEach(([k,v]) => params.set(k, `eq.${v}`));
+      if(order){
+        const [col, dir] = order.split('.');
+        params.set('order', col);
+        if(dir === 'desc'){
+          params.set('order', `${col}.desc`);
+        }
       }
+      if(limit){
+        params.set('limit', String(limit));
+      }
+      const res = await fetch(`${SUPABASE_REST}/${table}?${params.toString()}`, {
+        headers: supabaseHeaders()
+      });
+      if(!res.ok) throw new Error(`supabase select failed: ${res.status}`);
+      return res.json();
+    }
+
+    async function supabaseInsert(table, payload){
+      const res = await fetch(`${SUPABASE_REST}/${table}`, {
+        method:'POST',
+        headers: supabaseHeaders(),
+        body: JSON.stringify(payload)
+      });
+      if(!res.ok) throw new Error(`supabase insert failed: ${res.status}`);
+      return res.json();
     }
 
     async function init(){
       ensureClientId();
-      await initSupabase();
       const params = new URLSearchParams(location.search);
       const id = Number(params.get('id')) || 0;
       await fetchEntry(id);
-      await fetchRelated();
+      await fetchRelated(id);
       render();
-      const likeBtn = document.getElementById('heroLike');
+      const likeBtn = $('heroLike');
       if(likeBtn){
         likeBtn.addEventListener('click', likeEntry);
       }
