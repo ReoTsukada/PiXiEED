@@ -149,6 +149,7 @@
   <script type="module">
     const NFAV_SRC = '../pixiedraw/assets/NFav.png';
     const FAV_SRC = '../pixiedraw/assets/Fav.png';
+    const SAMPLE_COLORS = ['#7dd3fc','#f472b6','#facc15','#34d399','#c084fc','#60a5fa','#f59e0b','#a3e635','#f43f5e','#38bdf8'];
     const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
     let clientId = null;
@@ -222,6 +223,18 @@
     async function fetchEntry(id){
       entry = null;
       if(!supabase){
+        entry = {
+          id,
+          name: 'サンプル',
+          title: 'サンプル作品',
+          width: MAX_SIZE,
+          height: MAX_SIZE,
+          colors: 256,
+          image_base64: makePlaceholder(SAMPLE_COLORS[id % SAMPLE_COLORS.length]),
+          submitted_at: new Date().toISOString(),
+          likeCount: 0,
+          mode: 'free'
+        };
         return;
       }
       try{
@@ -318,6 +331,20 @@
         }catch(err){
           console.error(err);
         }
+      }
+      if(cachedEntries.length === 0){
+        cachedEntries = Array.from({ length: 9 }, (_, i) => ({
+          id: 500000 + i,
+          name: `サンプル${i+1}`,
+          title: `サンプル${i+1}`,
+          width: MAX_SIZE,
+          height: MAX_SIZE,
+          colors: MAX_COLORS,
+          image_base64: makePlaceholder(SAMPLE_COLORS[i % SAMPLE_COLORS.length]),
+          submitted_at: new Date().toISOString(),
+          likeCount: 0,
+          mode: i % 2 === 0 ? 'timed10' : 'free'
+        }));
       }
       renderRelated(cachedEntries.filter(e => e.id !== entry?.id));
     }
