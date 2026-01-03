@@ -335,6 +335,20 @@
     let currentSort = 'new';
     let cachedEntries = [];
     let supabase = null;
+    const SAMPLE_COLORS = ['#7dd3fc','#f472b6','#facc15','#34d399','#c084fc','#60a5fa','#f59e0b','#a3e635','#f43f5e','#38bdf8'];
+    const PLACEHOLDERS = Array.from({ length: 10 }, (_, i) => ({
+      id: 100000 + i,
+      title: `サンプル${i + 1}`,
+      name: `サンプル${i + 1}`,
+      width: 512,
+      height: 512,
+      colors: 256,
+      image_base64: makePlaceholder(SAMPLE_COLORS[i % SAMPLE_COLORS.length]),
+      submitted_at: new Date().toISOString(),
+      likeCount: 0,
+      mode: i % 2 === 0 ? 'timed10' : 'free',
+      color: SAMPLE_COLORS[i % SAMPLE_COLORS.length]
+    }));
 
     const NFAV_SRC = '../pixiedraw/assets/NFav.png';
     const FAV_SRC = '../pixiedraw/assets/Fav.png';
@@ -522,7 +536,13 @@
           }
         }catch(err){
           console.error(err);
+          entries = [];
+          likes = [];
         }
+      }
+
+      if(!entries || entries.length === 0){
+        entries = PLACEHOLDERS;
       }
 
       const likeCounts = {};
