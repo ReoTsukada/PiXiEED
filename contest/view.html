@@ -25,11 +25,7 @@
     }
     .page{ width:100%; max-width:900px; display:grid; gap:16px; }
     header{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-    .back-link{
-      color:#93c5fd;
-      text-decoration:none;
-      font-weight:700;
-    }
+    .back-link{ color:#93c5fd; text-decoration:none; font-weight:700; }
     h1{ margin:0; font-size:22px; }
     .card{
       background:rgba(255,255,255,0.05);
@@ -112,32 +108,18 @@
       position:relative;
       z-index:1;
     }
-    .heart-btn{
-      position:absolute;
+    .entry-card .heart-btn{
       right:4px;
       bottom:4px;
-      border:none;
-      background:transparent;
-      padding:0;
       width:32px;
       height:32px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      cursor:pointer;
-      z-index:2;
-    }
-    .heart-btn img{
-      width:100%;
-      height:100%;
-      object-fit:contain;
-      display:block;
     }
     .entry-meta{ padding:10px; display:flex; flex-direction:column; gap:6px; }
     .entry-meta__top{ display:flex; align-items:center; justify-content:space-between; gap:6px; }
     .entry-title{ font-weight:800; color:#f9fafb; }
     .entry-like{ color:#fbbf24; font-weight:800; }
     .entry-author{ margin:0; color:#cbd5e1; font-size:12px; }
+    .empty{ color:#cbd5e1; text-align:center; margin:8px 0 0; }
   </style>
 </head>
 <body>
@@ -167,11 +149,8 @@
   <script type="module">
     const NFAV_SRC = '../pixiedraw/assets/NFav.png';
     const FAV_SRC = '../pixiedraw/assets/Fav.png';
-    const SAMPLE_COLORS = ['#7dd3fc','#f472b6','#facc15','#34d399','#c084fc','#60a5fa','#f59e0b','#a3e635','#f43f5e','#38bdf8'];
     const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
-    const MAX_SIZE = 512;
-    const MAX_COLORS = 256;
     let clientId = null;
     let likedEntries = new Set();
     let supabase = null;
@@ -203,7 +182,13 @@
       const authorEl = $('heroAuthor');
       const likesEl = $('heroLikes');
       const likeIcon = $('heroLikeIcon');
-      if(!entry) return;
+      if(!entry){
+        img.src = '';
+        titleEl.textContent = '読み込めませんでした';
+        authorEl.textContent = '';
+        likesEl.textContent = '';
+        return;
+      }
       img.src = entry.image_base64;
       img.alt = entry.title || 'dot work';
       titleEl.textContent = entry.title || '無題';
@@ -235,21 +220,10 @@
     }
 
     async function fetchEntry(id){
-      // プレース
-      const color = SAMPLE_COLORS[id % SAMPLE_COLORS.length];
-      entry = {
-        id,
-        name: 'サンプル',
-        title: 'サンプル作品',
-        width: MAX_SIZE,
-        height: MAX_SIZE,
-        colors: 256,
-        image_base64: makePlaceholder(color),
-        submitted_at: new Date().toISOString(),
-        likeCount: 0,
-        mode: 'free'
-      };
-      if(!supabase) return;
+      entry = null;
+      if(!supabase){
+        return;
+      }
       try{
         const res = await supabase
           .from('contest_entries')
@@ -257,10 +231,7 @@
           .eq('id', id)
           .maybeSingle();
         if(!res.error && res.data){
-          entry = {
-            ...entry,
-            ...res.data
-          };
+          entry = res.data;
         }
         const likeRes = await supabase
           .from('contest_likes')
@@ -316,19 +287,7 @@
     }
 
     async function fetchRelated(){
-      // プレース
-      cachedEntries = Array.from({ length: 9 }, (_, i) => ({
-        id: 500000 + i,
-        name: `サンプル${i+1}`,
-        title: `サンプル${i+1}`,
-        width: MAX_SIZE,
-        height: MAX_SIZE,
-        colors: MAX_COLORS,
-        image_base64: makePlaceholder(SAMPLE_COLORS[i % SAMPLE_COLORS.length]),
-        submitted_at: new Date().toISOString(),
-        likeCount: 0,
-        mode: i % 2 === 0 ? 'timed10' : 'free'
-      }));
+      cachedEntries = [];
       if(supabase){
         try{
           const res = await supabase
@@ -363,6 +322,12 @@
       renderRelated(cachedEntries.filter(e => e.id !== entry?.id));
     }
 
+    function escapeHtml(str){
+      return str.replace(/[&<>"']/g, s => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s] || s
+      ));
+    }
+
     function makePlaceholder(color){
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="${color}"/></svg>`;
       return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -373,7 +338,7 @@
         const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.46.1/+esm');
         supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       }catch(err){
-        console.warn('Supabase unavailable, using placeholder only.', err);
+        console.warn('Supabase unavailable, using placeholders only.', err);
         supabase = null;
       }
     }
@@ -386,7 +351,7 @@
       await fetchEntry(id);
       await fetchRelated();
       render();
-      const likeBtn = $('heroLike');
+      const likeBtn = document.getElementById('heroLike');
       if(likeBtn){
         likeBtn.addEventListener('click', likeEntry);
       }
