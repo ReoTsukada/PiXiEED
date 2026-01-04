@@ -215,6 +215,39 @@
       color:#9ca3af;
       font-size:12px;
     }
+    .auth-row{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-top:6px;
+    }
+    .auth-input{
+      min-width:200px;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(255,255,255,0.05);
+      color:#fff;
+      padding:8px 10px;
+      font-size:13px;
+    }
+    .auth-btn{
+      border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.08);
+      color:#fff;
+      border-radius:10px;
+      padding:8px 12px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .auth-btn:hover,
+    .auth-btn:focus-visible{
+      background:rgba(255,255,255,0.14);
+    }
+    .auth-status{
+      font-size:12px;
+      color:#cbd5e1;
+    }
     .fab{
       position:fixed;
       right:18px;
@@ -282,6 +315,11 @@
       <h1>ドットギャラリー</h1>
       <p class="subtitle">みんなのドットを眺めよう。512x512以内 / 256色以内のPNGを投稿もできます。</p>
       <p class="feed-subtitle">最新→いいね順で並びます</p>
+      <div class="auth-row">
+        <input class="auth-input" id="authEmail" type="email" placeholder="メールアドレス" autocomplete="email">
+        <button class="auth-btn" id="authBtn" type="button">メールでログイン</button>
+        <span class="auth-status" id="authStatus"></span>
+      </div>
     </section>
     <section class="card">
       <div class="tabs">
@@ -339,6 +377,9 @@
     const MAX_SIZE = 512;
     const MAX_COLORS = 256;
     let supportsClientId = true;
+    let supabaseUser = null;
+    let supabaseSession = null;
+    let migrationDone = false;
 
     let clientId = null;
     let likedEntries = new Set();
@@ -399,6 +440,11 @@
 
     function setStatus(msg){
       const el = $(STATUS_ID);
+      if(el) el.textContent = msg || '';
+    }
+
+    function setAuthStatus(msg){
+      const el = document.getElementById('authStatus');
       if(el) el.textContent = msg || '';
     }
 
@@ -536,7 +582,7 @@
       }
       setStatus('投稿しています...');
       try{
-      const payload = {
+        const payload = {
           name,
           title,
           prompt: '自由投稿',
@@ -548,6 +594,9 @@
           colors: imageInfo.colors,
           image_base64: imageInfo.dataUrl
         };
+        if(supabaseUser?.id){
+          payload.user_id = supabaseUser.id;
+        }
         if(supportsClientId){
           payload.client_id = clientId;
         }
@@ -626,7 +675,7 @@
           }
           const likeRes = await supabase
             .from('contest_likes')
-            .select('entry_id, client_id')
+            .select('entry_id, client_id, user_id')
             .limit(1000);
           if(!likeRes.error && Array.isArray(likeRes.data)){
             likes = likeRes.data;
@@ -649,7 +698,7 @@
       likedEntries = new Set();
       likes.forEach(l => {
         likeCounts[l.entry_id] = (likeCounts[l.entry_id] || 0) + 1;
-        if(l.client_id === clientId){
+        if((supabaseUser?.id && l.user_id === supabaseUser.id) || l.client_id === clientId){
           likedEntries.add(l.entry_id);
         }
       });
@@ -700,7 +749,20 @@
     if(supabase){
       try{
         if(!already){
-          await supabase.from('contest_likes').insert({ entry_id:id, client_id: clientId });
+          const payload = { entry_id:id };
+          if(supabaseUser?.id){
+            payload.user_id = supabaseUser.id;
+          }
+          if(supportsClientId){
+            payload.client_id = clientId;
+          }
+          let res = await supabase.from('contest_likes').insert(payload);
+          if(res.error && supportsClientId && String(res.error.message || '').includes('client_id')){
+            supportsClientId = false;
+            delete payload.client_id;
+            res = await supabase.from('contest_likes').insert(payload);
+          }
+          if(res.error) throw res.error;
         }
       }catch(err){
         console.error(err);
@@ -741,14 +803,101 @@
       });
     }
 
+    async function migrateGuestData(){
+      if(!supabase || !supabaseUser?.id || migrationDone || !clientId) return;
+      try{
+        await supabase.from('contest_entries').update({ user_id: supabaseUser.id }).eq('client_id', clientId);
+        await supabase.from('contest_likes').update({ user_id: supabaseUser.id }).eq('client_id', clientId);
+        const nick = loadNickname();
+        if(nick){
+          await supabase.from('user_profiles').upsert({ id: supabaseUser.id, nickname: nick });
+        }
+        migrationDone = true;
+      }catch(err){
+        console.error('migrate error', err);
+      }
+    }
+
+    function updateAuthUI(){
+      const btn = document.getElementById('authBtn');
+      const emailInput = document.getElementById('authEmail');
+      const nick = loadNickname();
+      if(!btn) return;
+      if(supabaseUser){
+        btn.textContent = 'ログアウト';
+        setAuthStatus(`ログイン中${supabaseUser.email ? `: ${supabaseUser.email}` : ''}${nick ? ` / ${nick}` : ''}`);
+        if(emailInput){
+          emailInput.value = supabaseUser.email || emailInput.value;
+          emailInput.disabled = true;
+        }
+      }else{
+        btn.textContent = 'メールでログイン';
+        setAuthStatus(nick ? `ニックネーム: ${nick}` : '');
+        if(emailInput){
+          emailInput.disabled = false;
+        }
+      }
+    }
+
     async function initSupabase(){
       try{
         const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.46.1/+esm');
-        supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          global:{ headers:{ 'x-client-id': clientId || '' } }
+        });
+        const { data } = await supabase.auth.getSession();
+        supabaseSession = data?.session || null;
+        supabaseUser = supabaseSession?.user || null;
+        supabase.auth.onAuthStateChange((_event, session) => {
+          supabaseSession = session || null;
+          supabaseUser = session?.user || null;
+          migrateGuestData();
+          updateAuthUI();
+          fetchAndRender();
+        });
+        await migrateGuestData();
+        updateAuthUI();
       }catch(err){
         console.warn('Supabase初期化に失敗: オフラインプレース表示のみ', err);
         supabase = null;
       }
+    }
+
+    function setupAuthButton(){
+      const btn = document.getElementById('authBtn');
+      if(!btn) return;
+      btn.addEventListener('click', async () => {
+        if(!supabase){
+          setAuthStatus('オンラインでログインしてください');
+          return;
+        }
+        if(supabaseUser){
+          await supabase.auth.signOut();
+          supabaseUser = null;
+          supabaseSession = null;
+          migrationDone = false;
+          updateAuthUI();
+          fetchAndRender();
+          return;
+        }
+        const emailInput = document.getElementById('authEmail');
+        const email = (emailInput?.value || '').trim();
+        if(!email){
+          setAuthStatus('メールアドレスを入力してください');
+          return;
+        }
+        setAuthStatus('ログインリンクを送信しています...');
+        try{
+          await supabase.auth.signInWithOtp({
+            email,
+            options:{ emailRedirectTo: window.location.href }
+          });
+          setAuthStatus('メールを確認してください');
+        }catch(err){
+          console.error(err);
+          setAuthStatus('ログインに失敗しました');
+        }
+      });
     }
 
     async function init(){
@@ -756,6 +905,7 @@
       try{ (window.adsbygoogle = window.adsbygoogle || []).push({}); }catch(_){}
       setupTabs();
       setupPostPanel();
+      setupAuthButton();
       const form = $(FORM_ID);
       if(form){
         const saved = loadNickname();
@@ -765,6 +915,7 @@
         form.addEventListener('submit', handleSubmit);
       }
       await initSupabase();
+      updateAuthUI();
       await fetchAndRender();
     }
 
