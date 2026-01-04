@@ -126,6 +126,39 @@
     .entry-author{ margin:0; color:#cbd5e1; font-size:12px; }
     .empty{ color:#cbd5e1; text-align:center; margin:8px 0 0; }
     .status{ color:#fef3c7; font-size:12px; min-height:18px; }
+    .auth-row{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-top:8px;
+    }
+    .auth-input{
+      min-width:200px;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(255,255,255,0.05);
+      color:#fff;
+      padding:8px 10px;
+      font-size:13px;
+    }
+    .auth-btn{
+      border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.08);
+      color:#fff;
+      border-radius:10px;
+      padding:8px 12px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .auth-btn:hover,
+    .auth-btn:focus-visible{
+      background:rgba(255,255,255,0.14);
+    }
+    .auth-status{
+      font-size:12px;
+      color:#cbd5e1;
+    }
     .danger-btn{
       border:1px solid rgba(248,113,113,0.5);
       background:rgba(248,113,113,0.12);
@@ -146,6 +179,11 @@
     <header>
       <a class="back-link" href="./index.html">← ギャラリーへ</a>
       <h1>作品</h1>
+      <div class="auth-row">
+        <input class="auth-input" id="authEmail" type="email" placeholder="メールアドレス" autocomplete="email">
+        <button class="auth-btn" id="authBtn" type="button">メールでログイン</button>
+        <span class="auth-status" id="authStatus"></span>
+      </div>
     </header>
     <section class="card">
       <div class="entry-hero" id="hero">
@@ -176,15 +214,33 @@
     const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
     const SAMPLE_COLORS = ['#7dd3fc','#f472b6','#facc15','#34d399','#c084fc','#60a5fa','#f59e0b','#a3e635','#f43f5e','#38bdf8'];
     let clientId = null;
+    let supabaseAuth = null;
+    let supabaseSession = null;
+    let supabaseUser = null;
+    let migrationDone = false;
     let likedEntries = new Set();
     let entry = null;
     let cachedEntries = [];
+    let currentEntryId = 0;
 
     function $(id){ return document.getElementById(id); }
 
     function setStatus(msg){
       const el = $('viewStatus');
       if(el) el.textContent = msg || '';
+    }
+
+    function setAuthStatus(msg){
+      const el = $('authStatus');
+      if(el) el.textContent = msg || '';
+    }
+
+    function loadNickname(){
+      try{
+        return localStorage.getItem('pixieed_nickname') || '';
+      }catch(_){
+        return '';
+      }
     }
 
     function setDeleteNotice(msg){
@@ -209,6 +265,108 @@
       }
     }
 
+    async function migrateGuestData(){
+      if(!supabaseAuth || !supabaseUser?.id || migrationDone || !clientId) return;
+      try{
+        await supabaseAuth.from('contest_entries').update({ user_id: supabaseUser.id }).eq('client_id', clientId);
+        await supabaseAuth.from('contest_likes').update({ user_id: supabaseUser.id }).eq('client_id', clientId);
+        const nick = loadNickname();
+        if(nick){
+          await supabaseAuth.from('user_profiles').upsert({ id: supabaseUser.id, nickname: nick });
+        }
+        migrationDone = true;
+      }catch(err){
+        console.error('migrate error', err);
+      }
+    }
+
+    function updateAuthUI(){
+      const btn = document.getElementById('authBtn');
+      const emailInput = document.getElementById('authEmail');
+      const nick = loadNickname();
+      if(!btn) return;
+      if(supabaseUser){
+        btn.textContent = 'ログアウト';
+        setAuthStatus(`ログイン中${supabaseUser.email ? `: ${supabaseUser.email}` : ''}${nick ? ` / ${nick}` : ''}`);
+        if(emailInput){
+          emailInput.value = supabaseUser.email || emailInput.value;
+          emailInput.disabled = true;
+        }
+      }else{
+        btn.textContent = 'メールでログイン';
+        setAuthStatus(nick ? `ニックネーム: ${nick}` : '');
+        if(emailInput){
+          emailInput.disabled = false;
+        }
+      }
+    }
+
+    async function initSupabaseAuth(){
+      try{
+        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.46.1/+esm');
+        supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          global:{ headers:{ 'x-client-id': clientId || '' } }
+        });
+        const { data } = await supabaseAuth.auth.getSession();
+        supabaseSession = data?.session || null;
+        supabaseUser = supabaseSession?.user || null;
+        supabaseAuth.auth.onAuthStateChange(async (_event, session) => {
+          supabaseSession = session || null;
+          supabaseUser = session?.user || null;
+          migrationDone = false;
+          await migrateGuestData();
+          updateAuthUI();
+          if(currentEntryId){
+            await fetchEntry(currentEntryId);
+            await fetchRelated(currentEntryId);
+          }
+        });
+        await migrateGuestData();
+        updateAuthUI();
+      }catch(err){
+        console.warn('Supabase auth init failed', err);
+        supabaseAuth = null;
+      }
+    }
+
+    function setupAuthButton(){
+      const btn = document.getElementById('authBtn');
+      if(!btn) return;
+      btn.addEventListener('click', async () => {
+        if(!supabaseAuth){
+          setAuthStatus('オンラインでログインしてください');
+          return;
+        }
+        if(supabaseUser){
+          await supabaseAuth.auth.signOut();
+          supabaseSession = null;
+          supabaseUser = null;
+          migrationDone = false;
+          updateAuthUI();
+          await fetchEntry(currentEntryId);
+          await fetchRelated(currentEntryId);
+          return;
+        }
+        const emailInput = document.getElementById('authEmail');
+        const email = (emailInput?.value || '').trim();
+        if(!email){
+          setAuthStatus('メールアドレスを入力してください');
+          return;
+        }
+        setAuthStatus('ログインリンクを送信しています...');
+        try{
+          await supabaseAuth.auth.signInWithOtp({
+            email,
+            options:{ emailRedirectTo: window.location.href }
+          });
+          setAuthStatus('メールを確認してください');
+        }catch(err){
+          console.error(err);
+          setAuthStatus('ログインに失敗しました');
+        }
+      });
+    }
+
     function render(){
       const img = $('heroImg');
       const titleEl = $('heroTitle');
@@ -231,7 +389,7 @@
       likesEl.textContent = `${entry.likeCount || 0}`;
       const isLiked = likedEntries.has(entry.id);
       likeIcon.src = isLiked ? FAV_SRC : NFAV_SRC;
-      const canDelete = entry.client_id && entry.client_id === clientId;
+      const canDelete = (entry.user_id && supabaseUser?.id === entry.user_id) || (!entry.user_id && entry.client_id === clientId);
       if(delBtn){
         delBtn.style.display = canDelete ? 'inline-block' : 'none';
         delBtn.disabled = !canDelete;
@@ -253,7 +411,12 @@
       render();
       try{
         if(!already){
-          await supabaseInsert('contest_likes', { entry_id: entry.id, client_id });
+          const payload = { entry_id: entry.id };
+          if(supabaseUser?.id){
+            payload.user_id = supabaseUser.id;
+          }
+          payload.client_id = clientId;
+          await supabaseInsert('contest_likes', payload);
         }
       }catch(err){
         console.error(err);
@@ -265,7 +428,8 @@
         setDeleteNotice('作品が読み込まれていません');
         return;
       }
-      if(!entry.client_id || entry.client_id !== clientId){
+      const canDelete = (entry.user_id && supabaseUser?.id === entry.user_id) || (!entry.user_id && entry.client_id === clientId);
+      if(!canDelete){
         setDeleteNotice('この作品はこの端末から削除できません');
         return;
       }
@@ -274,7 +438,13 @@
       }
       setStatus('削除しています...');
       try{
-        await supabaseDelete('contest_entries', { eq: { id: entry.id, client_id: clientId } });
+        const eq = { id: entry.id };
+        if(entry.user_id && supabaseUser?.id === entry.user_id){
+          eq.user_id = supabaseUser.id;
+        }else if(entry.client_id){
+          eq.client_id = entry.client_id;
+        }
+        await supabaseDelete('contest_entries', { eq });
         setStatus('削除しました');
         location.href = './index.html';
       }catch(err){
@@ -296,7 +466,8 @@
         submitted_at: new Date().toISOString(),
         likeCount: 0,
         mode: 'free',
-        client_id: null
+        client_id: null,
+        user_id: null
       };
       try{
         const res = await supabaseSelect('contest_entries', { eq: { id }, limit: 1 });
@@ -308,7 +479,7 @@
         const likeRes = await supabaseSelect('contest_likes', { eq: { entry_id: id }, limit: 2000 });
         entry.likeCount = likeRes.length;
         likeRes.forEach(l => {
-          if(l.client_id === clientId) likedEntries.add(id);
+          if((supabaseUser?.id && l.user_id === supabaseUser.id) || l.client_id === clientId) likedEntries.add(id);
         });
       }catch(err){
         console.error(err);
@@ -363,7 +534,7 @@
         const likeCounts = {};
         likeRes.forEach(l => {
           likeCounts[l.entry_id] = (likeCounts[l.entry_id] || 0) + 1;
-          if(l.client_id === clientId){
+          if((supabaseUser?.id && l.user_id === supabaseUser.id) || l.client_id === clientId){
             likedEntries.add(l.entry_id);
           }
         });
@@ -403,10 +574,12 @@
     }
 
     function supabaseHeaders(){
+      const token = supabaseSession?.access_token || SUPABASE_ANON_KEY;
       return {
         'Content-Type':'application/json',
         'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        'Authorization': `Bearer ${token}`,
+        'x-client-id': clientId || ''
       };
     }
 
@@ -454,10 +627,12 @@
 
     async function init(){
       ensureClientId();
+      setupAuthButton();
+      await initSupabaseAuth();
       const params = new URLSearchParams(location.search);
-      const id = Number(params.get('id')) || 0;
-      await fetchEntry(id);
-      await fetchRelated(id);
+      currentEntryId = Number(params.get('id')) || 0;
+      await fetchEntry(currentEntryId);
+      await fetchRelated(currentEntryId);
       render();
       const likeBtn = $('heroLike');
       if(likeBtn){
