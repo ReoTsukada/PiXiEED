@@ -10,7 +10,12 @@
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
   <style>
     :root{ color-scheme: dark; }
-    *{ box-sizing:border-box; }
+    *{
+      box-sizing:border-box;
+      user-select:none;
+      -webkit-user-select:none;
+      -ms-user-select:none;
+    }
     body{
       margin:0;
       font-family:'Fredoka','DotGothic16',system-ui,sans-serif;
@@ -121,6 +126,19 @@
     .entry-author{ margin:0; color:#cbd5e1; font-size:12px; }
     .empty{ color:#cbd5e1; text-align:center; margin:8px 0 0; }
     .status{ color:#fef3c7; font-size:12px; min-height:18px; }
+    .danger-btn{
+      border:1px solid rgba(248,113,113,0.5);
+      background:rgba(248,113,113,0.12);
+      color:#fecaca;
+      border-radius:10px;
+      padding:10px 12px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .danger-btn:disabled{
+      opacity:0.5;
+      cursor:not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -139,9 +157,11 @@
           <p class="title" id="heroTitle">タイトル</p>
           <p class="author" id="heroAuthor">by ???</p>
         </div>
-        <span class="likes" id="heroLikes">❤ 0</span>
+        <span class="likes" id="heroLikes">0</span>
       </div>
       <p class="status" id="viewStatus"></p>
+      <button class="danger-btn" id="deleteEntry" style="display:none;">この作品を削除する</button>
+      <p class="status" id="deleteNotice"></p>
     </section>
     <section class="card">
       <h2 style="margin:0 0 8px;font-size:16px;">ほかの作品</h2>
@@ -164,6 +184,11 @@
 
     function setStatus(msg){
       const el = $('viewStatus');
+      if(el) el.textContent = msg || '';
+    }
+
+    function setDeleteNotice(msg){
+      const el = $('deleteNotice');
       if(el) el.textContent = msg || '';
     }
 
@@ -190,20 +215,28 @@
       const authorEl = $('heroAuthor');
       const likesEl = $('heroLikes');
       const likeIcon = $('heroLikeIcon');
+      const delBtn = $('deleteEntry');
       if(!entry){
         img.src = '';
         titleEl.textContent = '読み込めませんでした';
         authorEl.textContent = '';
         likesEl.textContent = '';
+        if(delBtn) delBtn.style.display = 'none';
         return;
       }
       img.src = entry.image_base64;
       img.alt = entry.title || 'dot work';
       titleEl.textContent = entry.title || '無題';
       authorEl.textContent = `by ${entry.name || '名無し'}`;
-      likesEl.textContent = `❤ ${entry.likeCount || 0}`;
+      likesEl.textContent = `${entry.likeCount || 0}`;
       const isLiked = likedEntries.has(entry.id);
       likeIcon.src = isLiked ? FAV_SRC : NFAV_SRC;
+      const canDelete = entry.client_id && entry.client_id === clientId;
+      if(delBtn){
+        delBtn.style.display = canDelete ? 'inline-block' : 'none';
+        delBtn.disabled = !canDelete;
+      }
+      setDeleteNotice(canDelete ? '' : '※この端末から投稿した作品のみ削除できます');
     }
 
     async function likeEntry(){
@@ -227,6 +260,29 @@
       }
     }
 
+    async function deleteEntry(){
+      if(!entry){
+        setDeleteNotice('作品が読み込まれていません');
+        return;
+      }
+      if(!entry.client_id || entry.client_id !== clientId){
+        setDeleteNotice('この作品はこの端末から削除できません');
+        return;
+      }
+      if(!confirm('この作品を削除しますか？')){
+        return;
+      }
+      setStatus('削除しています...');
+      try{
+        await supabaseDelete('contest_entries', { eq: { id: entry.id, client_id: clientId } });
+        setStatus('削除しました');
+        location.href = './index.html';
+      }catch(err){
+        console.error(err);
+        setStatus('削除に失敗しました');
+      }
+    }
+
     async function fetchEntry(id){
       setStatus('読み込み中...');
       entry = {
@@ -239,7 +295,8 @@
         image_base64: makePlaceholder(SAMPLE_COLORS[id % SAMPLE_COLORS.length]),
         submitted_at: new Date().toISOString(),
         likeCount: 0,
-        mode: 'free'
+        mode: 'free',
+        client_id: null
       };
       try{
         const res = await supabaseSelect('contest_entries', { eq: { id }, limit: 1 });
@@ -282,7 +339,7 @@
           <div class="entry-meta">
             <div class="entry-meta__top">
               <span class="entry-title">${escapeHtml(e.title || '無題')}</span>
-              <span class="entry-like">❤ ${e.likeCount || 0}</span>
+              <span class="entry-like">${e.likeCount || 0}</span>
             </div>
             <p class="entry-author">by ${escapeHtml(e.name || '名無し')}</p>
           </div>
@@ -384,6 +441,17 @@
       return res.json();
     }
 
+    async function supabaseDelete(table, { eq = {} } = {}){
+      const params = new URLSearchParams();
+      Object.entries(eq).forEach(([k,v]) => params.set(k, `eq.${v}`));
+      const res = await fetch(`${SUPABASE_REST}/${table}?${params.toString()}`, {
+        method:'DELETE',
+        headers: supabaseHeaders()
+      });
+      if(!res.ok) throw new Error(`supabase delete failed: ${res.status}`);
+      return res.json();
+    }
+
     async function init(){
       ensureClientId();
       const params = new URLSearchParams(location.search);
@@ -394,6 +462,10 @@
       const likeBtn = $('heroLike');
       if(likeBtn){
         likeBtn.addEventListener('click', likeEntry);
+      }
+      const delBtn = $('deleteEntry');
+      if(delBtn){
+        delBtn.addEventListener('click', deleteEntry);
       }
     }
     window.addEventListener('DOMContentLoaded', init);
