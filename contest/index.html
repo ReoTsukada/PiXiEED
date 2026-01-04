@@ -8,9 +8,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
+  <script async crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
   <style>
     :root{ color-scheme: dark; }
-    *{ box-sizing:border-box; }
+    *{
+      box-sizing:border-box;
+      user-select:none;
+      -webkit-user-select:none;
+      -ms-user-select:none;
+    }
     body{
       margin:0;
       font-family:'Fredoka', 'DotGothic16', system-ui, sans-serif;
@@ -266,13 +272,17 @@
 </head>
 <body>
   <div class="page">
-    <header>
-      <div>
-        <h1>ドットギャラリー</h1>
-        <p class="subtitle">みんなのドットを眺めよう。512x512以内 / 256色以内のPNGを投稿もできます。</p>
-        <p class="feed-subtitle">最新→いいね順で並びます</p>
-      </div>
+    <header aria-label="ad-area">
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="ca-pub-9801602250480253"
+           data-ad-slot="2141591954"></ins>
     </header>
+    <section class="card">
+      <h1>ドットギャラリー</h1>
+      <p class="subtitle">みんなのドットを眺めよう。512x512以内 / 256色以内のPNGを投稿もできます。</p>
+      <p class="feed-subtitle">最新→いいね順で並びます</p>
+    </section>
     <section class="card">
       <div class="tabs">
         <div id="filterTabs" style="display:flex; gap:8px;">
@@ -328,6 +338,7 @@
     const GALLERY_ID = 'contestGallery';
     const MAX_SIZE = 512;
     const MAX_COLORS = 256;
+    let supportsClientId = true;
 
     let clientId = null;
     let likedEntries = new Set();
@@ -354,6 +365,20 @@
     const FAV_SRC = '../pixiedraw/assets/Fav.png';
 
     function $(id){ return document.getElementById(id); }
+
+    function loadNickname(){
+      try{
+        return localStorage.getItem('pixieed_nickname') || '';
+      }catch(_){
+        return '';
+      }
+    }
+
+    function saveNickname(name){
+      try{
+        localStorage.setItem('pixieed_nickname', name);
+      }catch(_){}
+    }
 
     function ensureClientId(){
       const KEY = 'pixieed_client_id';
@@ -415,29 +440,88 @@
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0);
-      const data = ctx.getImageData(0,0,width,height).data;
+
+      // 色数チェック（原画ベース）
+      const baseData = ctx.getImageData(0,0,width,height).data;
       const colors = new Set();
-      for(let i=0;i<data.length;i+=4){
-        colors.add(`${data[i]}-${data[i+1]}-${data[i+2]}-${data[i+3]}`);
+      for(let i=0;i<baseData.length;i+=4){
+        colors.add(`${baseData[i]}-${baseData[i+1]}-${baseData[i+2]}-${baseData[i+3]}`);
         if(colors.size > MAX_COLORS){
           throw new Error(`色数は${MAX_COLORS}色以内にしてください`);
         }
       }
+
+      // 透かしを薄く付与
+      drawWatermark(ctx, width, height);
+      // 不可視ハッシュをLSBに埋め込み
+      await embedInvisibleHash(canvas);
+
       // GIFもPNGサムネに変換して保存
       const dataUrl = canvas.toDataURL('image/png');
       return { width, height, colors: colors.size, dataUrl };
     }
 
+    function drawWatermark(ctx, width, height){
+      ctx.save();
+      const size = Math.max(12, Math.round(Math.min(width, height) * 0.08));
+      ctx.font = `${size}px 'DotGothic16', sans-serif`;
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.textBaseline = 'bottom';
+      ctx.textAlign = 'right';
+      ctx.filter = 'drop-shadow(0 0 6px rgba(0,0,0,0.45))';
+      ctx.fillText('PiXiEED', width - 8, height - 6);
+      ctx.restore();
+    }
+
+    async function embedInvisibleHash(canvas){
+      const ctx = canvas.getContext('2d');
+      const { width, height } = canvas;
+      const imageData = ctx.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      const hashBytes = await createHashBytes(`${clientId || 'guest'}-${Date.now()}-${Math.random()}`);
+      const bitsNeeded = hashBytes.length * 8;
+      const totalPixels = data.length / 4;
+      const startPixel = Math.max(0, totalPixels - bitsNeeded); // 画像末尾側に格納
+      let bitIndex = 0;
+      for(let i=0; i<bitsNeeded && (startPixel + i) < totalPixels; i++){
+        const byte = hashBytes[Math.floor(bitIndex / 8)];
+        const bit = (byte >> (bitIndex % 8)) & 1;
+        const dataIndex = (startPixel + i) * 4 + 3; // alpha
+        data[dataIndex] = (data[dataIndex] & 0xFE) | bit;
+        bitIndex++;
+      }
+      ctx.putImageData(imageData, 0, 0);
+    }
+
+    async function createHashBytes(text){
+      const enc = new TextEncoder().encode(text);
+      try{
+        const buf = await crypto.subtle.digest('SHA-256', enc);
+        return new Uint8Array(buf).slice(0, 16); // 128bit
+      }catch(_){
+        // Fallback: simple hash
+        let h = 0;
+        for(const b of enc){ h = (h * 31 + b) >>> 0; }
+        const arr = new Uint8Array(16);
+        for(let i=0;i<16;i++){
+          h = (h * 1664525 + 1013904223) >>> 0;
+          arr[i] = h & 0xFF;
+        }
+        return arr;
+      }
+    }
+
     async function handleSubmit(e){
       e.preventDefault();
       const form = e.currentTarget;
-      const name = form.name.value.trim() || '名無し';
+      const name = form.name.value.trim() || loadNickname() || '名無し';
       const title = form.title.value.trim() || '無題';
       const file = form[FILE_INPUT_ID]?.files?.[0];
       if(!file){
         setStatus('画像ファイルを選択してください');
         return;
       }
+      saveNickname(name);
       setStatus('画像を確認しています...');
       let imageInfo;
       try{
@@ -452,7 +536,7 @@
       }
       setStatus('投稿しています...');
       try{
-        const payload = {
+      const payload = {
           name,
           title,
           prompt: '自由投稿',
@@ -464,7 +548,19 @@
           colors: imageInfo.colors,
           image_base64: imageInfo.dataUrl
         };
-        await supabase.from('contest_entries').insert(payload);
+        if(supportsClientId){
+          payload.client_id = clientId;
+        }
+        let res = await supabase.from('contest_entries').insert(payload);
+        if(res.error && supportsClientId && String(res.error.message || '').includes('client_id')){
+          // client_id カラムが無い環境用フォールバック
+          supportsClientId = false;
+          delete payload.client_id;
+          res = await supabase.from('contest_entries').insert(payload);
+        }
+        if(res.error){
+          throw res.error;
+        }
         form.reset();
         setStatus('投稿しました！');
       }catch(err){
@@ -496,7 +592,7 @@
           <div class="entry-meta">
             <div class="entry-meta__top">
               <span class="entry-title">${escapeHtml(entry.title || '無題')}</span>
-              <span class="entry-like">❤ ${entry.likeCount || 0}</span>
+              <span class="entry-like">${entry.likeCount || 0}</span>
             </div>
             <p class="entry-author">by ${escapeHtml(entry.name || '名無し')}</p>
           </div>
@@ -657,10 +753,15 @@
 
     async function init(){
       ensureClientId();
+      try{ (window.adsbygoogle = window.adsbygoogle || []).push({}); }catch(_){}
       setupTabs();
       setupPostPanel();
       const form = $(FORM_ID);
       if(form){
+        const saved = loadNickname();
+        if(saved){
+          form.name.value = saved;
+        }
         form.addEventListener('submit', handleSubmit);
       }
       await initSupabase();
