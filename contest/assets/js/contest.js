@@ -34,6 +34,12 @@ function ensureClientId(){
       if(!localStorage.getItem(KEY)) localStorage.setItem(KEY, saved);
       return;
     }
+    const target = document.body;
+    if(target){
+      target.style.userSelect = 'none';
+      target.style.webkitUserSelect = 'none';
+      target.style.msUserSelect = 'none';
+    }
     const id = crypto.randomUUID();
     localStorage.setItem(KEY, id);
     clientId = id;
@@ -153,10 +159,10 @@ function renderEntries(entries){
               <img src="${likedEntries.has(entry.id) ? '../pixiedraw/assets/Fav.svg' : '../pixiedraw/assets/NFav.svg'}" alt="like icon">
             </button>
           </div>
-        <div class="entry-meta">
+          <div class="entry-meta">
           <div class="entry-meta__top">
             <span class="entry-title">${escapeHtml(entry.title || '無題')}</span>
-            <span class="entry-like">❤ ${entry.likeCount || 0}</span>
+            <span class="entry-like">${entry.likeCount || 0}</span>
           </div>
         <p class="entry-author">by ${escapeHtml(entry.name || '名無し')}</p>
         </div>
