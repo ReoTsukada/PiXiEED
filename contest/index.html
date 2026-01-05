@@ -730,13 +730,19 @@
       const data = imageData.data;
       const hashBytes = await createHashBytes(`${clientId || 'guest'}-${Date.now()}-${Math.random()}`);
       const bitsNeeded = hashBytes.length * 8;
-      const totalPixels = data.length / 4;
-      const startPixel = Math.max(0, totalPixels - bitsNeeded); // 画像末尾側に格納
+      // 透過ピクセルには書き込まない（透過面で白い点が出るのを防ぐ）
+      const opaquePixels = [];
+      for(let p=0; p<data.length/4; p++){
+        const a = data[p*4 + 3];
+        if(a >= 200) opaquePixels.push(p);
+      }
+      if(!opaquePixels.length) return;
       let bitIndex = 0;
-      for(let i=0; i<bitsNeeded && (startPixel + i) < totalPixels; i++){
+      for(let i=0; i<bitsNeeded && i<opaquePixels.length; i++){
         const byte = hashBytes[Math.floor(bitIndex / 8)];
         const bit = (byte >> (bitIndex % 8)) & 1;
-        const dataIndex = (startPixel + i) * 4 + 3; // alpha
+        const pix = opaquePixels[opaquePixels.length - 1 - i]; // 末尾側から
+        const dataIndex = pix * 4 + 3; // alpha
         data[dataIndex] = (data[dataIndex] & 0xFE) | bit;
         bitIndex++;
       }
