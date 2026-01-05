@@ -179,8 +179,7 @@
     <header>
       <a class="back-link" href="./index.html">← ギャラリーへ</a>
       <h1>作品</h1>
-      <div class="auth-row">
-        <input class="auth-input" id="authEmail" type="email" placeholder="メールアドレス" autocomplete="email">
+      <div class="auth-row" style="justify-content:flex-end;">
         <button class="auth-btn" id="authBtn" type="button">メールでログイン</button>
         <span class="auth-status" id="authStatus"></span>
       </div>
@@ -282,22 +281,14 @@
 
     function updateAuthUI(){
       const btn = document.getElementById('authBtn');
-      const emailInput = document.getElementById('authEmail');
       const nick = loadNickname();
       if(!btn) return;
       if(supabaseUser){
         btn.textContent = 'ログアウト';
         setAuthStatus(`ログイン中${supabaseUser.email ? `: ${supabaseUser.email}` : ''}${nick ? ` / ${nick}` : ''}`);
-        if(emailInput){
-          emailInput.value = supabaseUser.email || emailInput.value;
-          emailInput.disabled = true;
-        }
       }else{
-        btn.textContent = 'メールでログイン';
+        btn.textContent = 'メール＋パスコードでログイン';
         setAuthStatus(nick ? `ニックネーム: ${nick}` : '');
-        if(emailInput){
-          emailInput.disabled = false;
-        }
       }
     }
 
@@ -347,19 +338,35 @@
           await fetchRelated(currentEntryId);
           return;
         }
-        const emailInput = document.getElementById('authEmail');
-        const email = (emailInput?.value || '').trim();
+        let email = window.prompt('メールアドレスを入力してください') || '';
         if(!email){
           setAuthStatus('メールアドレスを入力してください');
           return;
         }
-        setAuthStatus('ログインリンクを送信しています...');
+        let passcode = window.prompt('パスコード（6〜20文字）を入力してください') || '';
+        if(passcode.length < 6 || passcode.length > 20){
+          setAuthStatus('パスコードは6〜20文字で入力してください');
+          return;
+        }
+        setAuthStatus('サインインしています...');
         try{
-          await supabaseAuth.auth.signInWithOtp({
-            email,
-            options:{ emailRedirectTo: window.location.href }
-          });
-          setAuthStatus('メールを確認してください');
+          const { error } = await supabaseAuth.auth.signInWithPassword({ email, password: passcode });
+          if(error){
+            if(String(error.message || '').toLowerCase().includes('confirm')){
+              await supabaseAuth.auth.resend({ type:'signup', email, options:{ emailRedirectTo: window.location.href } });
+              setAuthStatus('確認メールを再送しました。メールを確認してください');
+              return;
+            }
+            const { error: signUpError } = await supabaseAuth.auth.signUp({ email, password: passcode, options:{ emailRedirectTo: window.location.href } });
+            if(signUpError){
+              setAuthStatus('ログイン／登録に失敗しました');
+              console.error(signUpError);
+              return;
+            }
+            setAuthStatus('確認メールを送信しました。メールを確認してください');
+          }else{
+            setAuthStatus('サインインしました');
+          }
         }catch(err){
           console.error(err);
           setAuthStatus('ログインに失敗しました');
