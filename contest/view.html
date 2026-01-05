@@ -29,9 +29,145 @@
       justify-content:center;
     }
     .page{ width:100%; max-width:900px; display:grid; gap:16px; }
-    header{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-    .back-link{ color:#93c5fd; text-decoration:none; font-weight:700; }
+    header{
+      position:sticky;
+      top:0;
+      z-index:60;
+      background:rgba(11,18,36,0.94);
+      backdrop-filter:blur(8px);
+      border-bottom:1px solid rgba(255,255,255,0.08);
+      margin:-28px -12px 12px;
+      padding:10px 14px;
+    }
+    .header-inner{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-weight:800;
+      letter-spacing:0.01em;
+      background:none;
+      border:0;
+      padding:0;
+      cursor:pointer;
+    }
+    .brand-icon{
+      width:34px;
+      height:34px;
+      border-radius:10px;
+      background:rgba(255,255,255,0.12);
+      padding:4px;
+      border:1px solid rgba(255,255,255,0.2);
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+    }
+    .brand-icon img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      display:block;
+    }
+    .brand-text{
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+    }
+    .brand-title{ margin:0; font-size:16px; color:#f9fafb; }
+    .brand-sub{ margin:0; font-size:12px; color:#9ca3af; }
     h1{ margin:0; font-size:22px; }
+    .auth-panel{
+      position:fixed;
+      inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background:rgba(0,0,0,0.65);
+      backdrop-filter:blur(4px);
+      padding:16px;
+      z-index:70;
+    }
+    .auth-panel.is-open{ display:flex; }
+    .auth-card{
+      width:100%;
+      max-width:420px;
+      background:rgba(15,23,42,0.95);
+      border:1px solid rgba(255,255,255,0.14);
+      border-radius:16px;
+      padding:16px;
+      box-shadow:0 18px 40px rgba(0,0,0,0.45);
+      display:grid;
+      gap:12px;
+    }
+    .auth-input{
+      width:100%;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(255,255,255,0.05);
+      color:#fff;
+      padding:10px 12px;
+      font-size:14px;
+    }
+    .auth-btn{
+      border:1px solid rgba(255,255,255,0.2);
+      background:linear-gradient(135deg,#4f46e5,#7c3aed);
+      color:#fff;
+      border-radius:12px;
+      padding:10px 14px;
+      font-weight:800;
+      cursor:pointer;
+      text-align:center;
+    }
+    .auth-btn.logout{
+      background:rgba(255,255,255,0.08);
+      border-color:rgba(255,255,255,0.2);
+    }
+    .auth-status{ font-size:12px; color:#cbd5e1; min-height:16px; }
+    .close-btn{
+      border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.08);
+      color:#fff;
+      border-radius:8px;
+      padding:6px 10px;
+      cursor:pointer;
+    }
+    .profile-block{
+      display:grid;
+      gap:10px;
+      padding:10px;
+      border-radius:12px;
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.08);
+    }
+    .avatar-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(64px,1fr));
+      gap:10px;
+    }
+    .avatar-option{
+      width:100%;
+      aspect-ratio:1;
+      border-radius:12px;
+      border:2px solid transparent;
+      background:rgba(255,255,255,0.08);
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#fff;
+      font-weight:800;
+      transition:border-color 0.15s ease, transform 0.1s ease;
+    }
+    .avatar-option.is-active{
+      border-color:#7c3aed;
+      transform:translateY(-1px);
+    }
     .card{
       background:rgba(255,255,255,0.05);
       border:1px solid rgba(255,255,255,0.12);
@@ -126,39 +262,6 @@
     .entry-author{ margin:0; color:#cbd5e1; font-size:12px; }
     .empty{ color:#cbd5e1; text-align:center; margin:8px 0 0; }
     .status{ color:#fef3c7; font-size:12px; min-height:18px; }
-    .auth-row{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      flex-wrap:wrap;
-      margin-top:8px;
-    }
-    .auth-input{
-      min-width:200px;
-      border-radius:8px;
-      border:1px solid rgba(255,255,255,0.18);
-      background:rgba(255,255,255,0.05);
-      color:#fff;
-      padding:8px 10px;
-      font-size:13px;
-    }
-    .auth-btn{
-      border:1px solid rgba(255,255,255,0.2);
-      background:rgba(255,255,255,0.08);
-      color:#fff;
-      border-radius:10px;
-      padding:8px 12px;
-      font-weight:700;
-      cursor:pointer;
-    }
-    .auth-btn:hover,
-    .auth-btn:focus-visible{
-      background:rgba(255,255,255,0.14);
-    }
-    .auth-status{
-      font-size:12px;
-      color:#cbd5e1;
-    }
     .danger-btn{
       border:1px solid rgba(248,113,113,0.5);
       background:rgba(248,113,113,0.12);
@@ -176,12 +279,16 @@
 </head>
 <body>
   <div class="page">
-    <header>
-      <a class="back-link" href="./index.html">← ギャラリーへ</a>
-      <h1>作品</h1>
-      <div class="auth-row" style="justify-content:flex-end;">
-        <button class="auth-btn" id="authBtn" type="button">メールでログイン</button>
-        <span class="auth-status" id="authStatus"></span>
+    <header aria-label="top-nav">
+      <div class="header-inner">
+        <button class="brand" id="openProfilePanel" type="button">
+          <span class="brand-icon" id="brandAvatar"><img src="../character-dots/mao1.png" alt="logo"></span>
+          <div class="brand-text">
+            <p class="brand-title">PiXiEED</p>
+            <p class="brand-sub">Dot Gallery</p>
+          </div>
+        </button>
+        <div></div>
       </div>
     </header>
     <section class="card">
@@ -205,6 +312,36 @@
       <div id="relatedGallery" class="gallery"></div>
     </section>
   </div>
+  <div class="auth-panel" id="authPanel" aria-hidden="true">
+    <div class="auth-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <h3 style="margin:0;font-size:16px;color:#f9fafb;">プロフィール</h3>
+        <button class="close-btn" type="button" id="closeAuthPanel">閉じる</button>
+      </div>
+      <div class="profile-block">
+        <label style="display:flex; flex-direction:column; gap:6px;">
+          <span style="font-weight:700; color:#e5e7eb;">ニックネーム</span>
+          <input class="auth-input" id="profileNickname" type="text" placeholder="なまえ" maxlength="32">
+        </label>
+        <div>
+          <p class="author" style="margin:0 0 6px;">アイコン</p>
+          <div class="avatar-grid" id="avatarGrid"></div>
+        </div>
+        <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
+      </div>
+      <div class="profile-block">
+        <p class="author" style="margin:0 0 6px;">アカウント紐付け</p>
+        <p class="author" id="linkedEmail" style="margin:0 0 6px; display:none;"></p>
+        <div id="authInputs" style="display:grid; gap:8px;">
+          <input class="auth-input" id="authEmail" type="email" placeholder="メールアドレス" autocomplete="email">
+          <input class="auth-input" id="authPasscode" type="password" placeholder="パスコード（6〜20文字）" autocomplete="current-password">
+        </div>
+        <button class="auth-btn" id="authBtn" type="button">メール＋パスコードでログイン</button>
+        <button class="auth-btn logout" id="logoutBtn" type="button" style="display:none;">ログアウト</button>
+      </div>
+      <p class="auth-status" id="authStatus"></p>
+    </div>
+  </div>
   <script type="module">
     const NFAV_SRC = '../pixiedraw/assets/NFav.png';
     const FAV_SRC = '../pixiedraw/assets/Fav.png';
@@ -212,6 +349,14 @@
     const SUPABASE_REST = `${SUPABASE_URL}/rest/v1`;
     const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
     const SAMPLE_COLORS = ['#7dd3fc','#f472b6','#facc15','#34d399','#c084fc','#60a5fa','#f59e0b','#a3e635','#f43f5e','#38bdf8'];
+    const AVATARS = [
+      { id:'pink', style:'background:linear-gradient(135deg,#f472b6,#fb7185);' },
+      { id:'blue', style:'background:linear-gradient(135deg,#60a5fa,#22d3ee);' },
+      { id:'green', style:'background:linear-gradient(135deg,#34d399,#a3e635);' },
+      { id:'gold', style:'background:linear-gradient(135deg,#fbbf24,#f59e0b);' },
+      { id:'violet', style:'background:linear-gradient(135deg,#c084fc,#7c3aed);' },
+      { id:'gray', style:'background:linear-gradient(135deg,#94a3b8,#475569);' }
+    ];
     let clientId = null;
     let supabaseAuth = null;
     let supabaseSession = null;
@@ -240,6 +385,59 @@
       }catch(_){
         return '';
       }
+    }
+    function saveNickname(name){
+      try{
+        localStorage.setItem('pixieed_nickname', name);
+      }catch(_){}
+    }
+
+    function loadAvatar(){
+      try{
+        return localStorage.getItem('pixieed_avatar') || 'pink';
+      }catch(_){
+        return 'pink';
+      }
+    }
+    function saveAvatar(id){
+      try{
+        localStorage.setItem('pixieed_avatar', id);
+      }catch(_){}
+    }
+
+    function applyAvatarToBrand(){
+      const brand = document.getElementById('brandAvatar');
+      const avatarId = loadAvatar();
+      const found = AVATARS.find(a => a.id === avatarId);
+      if(brand){
+        if(found){
+          brand.style = `${found.style} border:1px solid rgba(255,255,255,0.25);`;
+          brand.innerHTML = '';
+        }else{
+          brand.style = '';
+          brand.innerHTML = `<img src="../character-dots/mao1.png" alt="logo">`;
+        }
+      }
+    }
+
+    function renderAvatarChoices(){
+      const grid = document.getElementById('avatarGrid');
+      if(!grid) return;
+      grid.innerHTML = '';
+      const current = loadAvatar();
+      AVATARS.forEach(a => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `avatar-option${current === a.id ? ' is-active' : ''}`;
+        btn.style = a.style;
+        btn.textContent = '';
+        btn.addEventListener('click', () => {
+          saveAvatar(a.id);
+          renderAvatarChoices();
+          applyAvatarToBrand();
+        });
+        grid.appendChild(btn);
+      });
     }
 
     function setDeleteNotice(msg){
@@ -282,13 +480,41 @@
     function updateAuthUI(){
       const btn = document.getElementById('authBtn');
       const nick = loadNickname();
+      const emailInput = document.getElementById('authEmail');
+      const passInput = document.getElementById('authPasscode');
+      const authInputs = document.getElementById('authInputs');
+      const linkedEmail = document.getElementById('linkedEmail');
       if(!btn) return;
       if(supabaseUser){
         btn.textContent = 'ログアウト';
         setAuthStatus(`ログイン中${supabaseUser.email ? `: ${supabaseUser.email}` : ''}${nick ? ` / ${nick}` : ''}`);
+        if(emailInput){
+          emailInput.value = supabaseUser.email || emailInput.value;
+          emailInput.disabled = true;
+        }
+        if(passInput){
+          passInput.value = '';
+          passInput.disabled = true;
+        }
+        if(authInputs) authInputs.style.display = 'none';
+        if(linkedEmail){
+          linkedEmail.style.display = 'block';
+          linkedEmail.textContent = supabaseUser.email ? `紐付け済み: ${supabaseUser.email}` : '紐付け済み';
+        }
       }else{
         btn.textContent = 'メール＋パスコードでログイン';
         setAuthStatus(nick ? `ニックネーム: ${nick}` : '');
+        if(emailInput){
+          emailInput.disabled = false;
+        }
+        if(passInput){
+          passInput.disabled = false;
+        }
+        if(authInputs) authInputs.style.display = 'grid';
+        if(linkedEmail){
+          linkedEmail.style.display = 'none';
+          linkedEmail.textContent = '';
+        }
       }
     }
 
@@ -314,6 +540,7 @@
         });
         await migrateGuestData();
         updateAuthUI();
+        applyAvatarToBrand();
       }catch(err){
         console.warn('Supabase auth init failed', err);
         supabaseAuth = null;
@@ -322,6 +549,50 @@
 
     function setupAuthButton(){
       const btn = document.getElementById('authBtn');
+      const logoutBtn = document.getElementById('logoutBtn');
+      const openBtn = document.getElementById('openProfilePanel');
+      const closeBtn = document.getElementById('closeAuthPanel');
+      const panel = document.getElementById('authPanel');
+      const saveBtn = document.getElementById('saveProfile');
+      const nicknameInput = document.getElementById('profileNickname');
+      const togglePanel = (open) => {
+        if(!panel) return;
+        if(open){
+          if(nicknameInput) nicknameInput.value = loadNickname();
+          panel.classList.add('is-open');
+          panel.setAttribute('aria-hidden','false');
+        }else{
+          panel.classList.remove('is-open');
+          panel.setAttribute('aria-hidden','true');
+        }
+      };
+      if(openBtn) openBtn.addEventListener('click', () => {
+        if(nicknameInput) nicknameInput.value = loadNickname();
+        renderAvatarChoices();
+        togglePanel(true);
+      });
+      if(closeBtn) closeBtn.addEventListener('click', () => togglePanel(false));
+      if(panel){
+        panel.addEventListener('click', (e) => { if(e.target === panel) togglePanel(false); });
+      }
+      if(saveBtn){
+        saveBtn.addEventListener('click', async () => {
+          const nick = (nicknameInput?.value || '').trim();
+          if(nick) saveNickname(nick);
+          applyAvatarToBrand();
+          if(supabaseAuth && supabaseUser?.id){
+            try{
+              await supabaseAuth.from('user_profiles').upsert({ id: supabaseUser.id, nickname: nick || null, avatar: loadAvatar() });
+              setAuthStatus('プロフィールを保存しました');
+            }catch(err){
+              console.warn('profile save fallback', err);
+              setAuthStatus('ローカルに保存しました');
+            }
+          }else{
+            setAuthStatus('ローカルに保存しました');
+          }
+        });
+      }
       if(!btn) return;
       btn.addEventListener('click', async () => {
         if(!supabaseAuth){
@@ -336,6 +607,7 @@
           updateAuthUI();
           await fetchEntry(currentEntryId);
           await fetchRelated(currentEntryId);
+          togglePanel(false);
           return;
         }
         let email = window.prompt('メールアドレスを入力してください') || '';
@@ -641,6 +913,8 @@
       await fetchEntry(currentEntryId);
       await fetchRelated(currentEntryId);
       render();
+      applyAvatarToBrand();
+      renderAvatarChoices();
       const likeBtn = $('heroLike');
       if(likeBtn){
         likeBtn.addEventListener('click', likeEntry);
