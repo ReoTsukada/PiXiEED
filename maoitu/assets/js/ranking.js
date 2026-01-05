@@ -1,17 +1,50 @@
 import { supabase } from './supabase.js';
 
 const RANKING_LIMIT = 100;
+const PAGE_SIZE = 500;
+const MAX_PAGES = 10;
 const NAME_STORAGE_KEY = 'maoitu_rank_name';
 
+function accountKey(name) {
+  return (name || '').trim().toLowerCase() || 'guest';
+}
+
+function uniqueByAccount(rows, limit = Infinity) {
+  const seen = new Set();
+  const unique = [];
+  for (const row of rows) {
+    const key = accountKey(row.name);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(row);
+    if (unique.length >= limit) break;
+  }
+  return unique;
+}
+
 async function fetchTopScores() {
-  const { data, error } = await supabase
-    .from('scores')
-    .select('name, score, created_at')
-    .order('score', { ascending: false })
-    .order('created_at', { ascending: true })
-    .limit(RANKING_LIMIT);
-  if (error) throw error;
-  return data || [];
+  const collected = [];
+  let from = 0;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await supabase
+      .from('scores')
+      .select('name, score, created_at')
+      .order('score', { ascending: false })
+      .order('created_at', { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    const rows = data || [];
+    if (rows.length) {
+      collected.push(...rows);
+    }
+    const unique = uniqueByAccount(collected, RANKING_LIMIT);
+    if (unique.length >= RANKING_LIMIT || rows.length < PAGE_SIZE) {
+      return unique;
+    }
+    from += PAGE_SIZE;
+  }
+  return uniqueByAccount(collected, RANKING_LIMIT);
 }
 
 export async function initRankingUI({ formSelector, listSelector, statusSelector }) {
