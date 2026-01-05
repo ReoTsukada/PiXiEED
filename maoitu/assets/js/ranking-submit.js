@@ -2,6 +2,25 @@ import { supabase } from './supabase.js';
 
 const NAME_STORAGE_KEY = 'maoitu_rank_name';
 const LAST_SCORE_KEY = 'maoitu_last_score';
+const PAGE_SIZE = 500;
+const MAX_PAGES = 20;
+
+function accountKey(name) {
+  return (name || '').trim().toLowerCase() || 'guest';
+}
+
+function uniqueByAccount(rows, limit = Infinity) {
+  const seen = new Set();
+  const unique = [];
+  for (const row of rows) {
+    const key = accountKey(row.name);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(row);
+    if (unique.length >= limit) break;
+  }
+  return unique;
+}
 
 export async function submitScoreAuto(score) {
   const safeScore = Math.max(0, Math.floor(Number(score) || 0));
@@ -30,18 +49,38 @@ export function getName() {
 
 export async function fetchRankInfo(score) {
   const safeScore = Math.max(0, Math.floor(Number(score) || 0));
-  let total = 0;
+  const collected = [];
+  let from = 0;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await supabase
+      .from('scores')
+      .select('name, score, created_at')
+      .order('score', { ascending: false })
+      .order('created_at', { ascending: true })
+      .range(from, to);
+    if (error) throw error;
+    const rows = data || [];
+    if (rows.length) {
+      collected.push(...rows);
+    }
+    if (rows.length < PAGE_SIZE) {
+      break;
+    }
+    from += PAGE_SIZE;
+  }
+  const unique = uniqueByAccount(collected);
+  const total = unique.length;
   let greater = 0;
-  const totalRes = await supabase.from('scores').select('score', { count: 'exact', head: true });
-  if (totalRes.error) throw totalRes.error;
-  total = totalRes.count || 0;
-  const greaterRes = await supabase
-    .from('scores')
-    .select('score', { count: 'exact', head: true })
-    .gt('score', safeScore);
-  if (greaterRes.error) throw greaterRes.error;
-  greater = greaterRes.count || 0;
-  const rank = greater + 1;
+  for (const row of unique) {
+    const rowScore = Math.max(0, Math.floor(Number(row.score) || 0));
+    if (rowScore > safeScore) {
+      greater++;
+    } else {
+      break;
+    }
+  }
+  const rank = total > 0 ? greater + 1 : 0;
   const percentile = total > 0 ? Math.min(100, Math.max(0, (rank / total) * 100)) : 100;
   return { total, rank, percentile };
 }
