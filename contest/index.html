@@ -206,6 +206,16 @@
       position:relative;
       z-index:1;
     }
+    .entry-watermark{
+      position:absolute;
+      color:rgba(255,255,255,0.04);
+      font-weight:800;
+      font-size:14px;
+      letter-spacing:0.08em;
+      text-shadow:0 0 12px rgba(0,0,0,0.18);
+      z-index:2;
+      pointer-events:none;
+    }
     .heart-btn{
       position:absolute;
       right:4px;
@@ -691,8 +701,15 @@
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0);
 
-      // 色数チェック（原画ベース）
-      const baseData = ctx.getImageData(0,0,width,height).data;
+      // 余白をトリミング
+      const trimmed = trimTransparent(canvas);
+      const tCanvas = trimmed.canvas;
+      const tCtx = trimmed.ctx;
+      const tWidth = tCanvas.width;
+      const tHeight = tCanvas.height;
+
+      // 色数チェック（トリミング後ベース）
+      const baseData = tCtx.getImageData(0,0,tWidth,tHeight).data;
       const colors = new Set();
       for(let i=0;i<baseData.length;i+=4){
         colors.add(`${baseData[i]}-${baseData[i+1]}-${baseData[i+2]}-${baseData[i+3]}`);
@@ -701,14 +718,13 @@
         }
       }
 
-      // 透かしを薄く付与
-      drawWatermark(ctx, width, height);
-      // 不可視ハッシュをLSBに埋め込み
-      await embedInvisibleHash(canvas);
+      // 近似ハッシュ用に小さく縮小（16x16グレースケール）
+      const phash = await computePHash(tCanvas);
+      const hash = await hashUint8(new Uint8Array(baseData));
 
-      // GIFもPNGサムネに変換して保存
-      const dataUrl = canvas.toDataURL('image/png');
-      return { width, height, colors: colors.size, dataUrl };
+      // GIFもPNGサムネに変換して保存（トリミング後のキャンバスを使用）
+      const dataUrl = tCanvas.toDataURL('image/png');
+      return { width: tWidth, height: tHeight, colors: colors.size, dataUrl, hash, phash };
     }
 
     function drawWatermark(ctx, width, height){
@@ -767,6 +783,82 @@
       }
     }
 
+    async function hashUint8(uint8){
+      try{
+        const buf = await crypto.subtle.digest('SHA-256', uint8);
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+      }catch(_){
+        let h = 0;
+        for(const b of uint8){ h = (h * 31 + b) >>> 0; }
+        let out = '';
+        for(let i=0;i<16;i++){
+          h = (h * 1664525 + 1013904223) >>> 0;
+          out += (h & 0xff).toString(16).padStart(2,'0');
+        }
+        return out;
+      }
+    }
+
+    function trimTransparent(canvas){
+      const ctx = canvas.getContext('2d');
+      const { width, height } = canvas;
+      const imgData = ctx.getImageData(0,0,width,height);
+      const data = imgData.data;
+      let minX = width, minY = height, maxX = -1, maxY = -1;
+      for(let y=0; y<height; y++){
+        for(let x=0; x<width; x++){
+          const i = (y*width + x)*4;
+          const a = data[i+3];
+          if(a !== 0){
+            if(x < minX) minX = x;
+            if(y < minY) minY = y;
+            if(x > maxX) maxX = x;
+            if(y > maxY) maxY = y;
+          }
+        }
+      }
+      if(maxX === -1){ // 全部透明
+        return { canvas, ctx };
+      }
+      const cropW = maxX - minX + 1;
+      const cropH = maxY - minY + 1;
+      const trimmed = document.createElement('canvas');
+      trimmed.width = cropW;
+      trimmed.height = cropH;
+      const tCtx = trimmed.getContext('2d');
+      tCtx.putImageData(ctx.getImageData(minX, minY, cropW, cropH), 0, 0);
+      return { canvas: trimmed, ctx: tCtx };
+    }
+
+    async function computePHash(srcCanvas){
+      // 16x16グレースケール平均ハッシュ
+      const size = 16;
+      const c = document.createElement('canvas');
+      c.width = size;
+      c.height = size;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(srcCanvas, 0, 0, size, size);
+      const img = ctx.getImageData(0,0,size,size).data;
+      const gray = [];
+      for(let i=0;i<img.length;i+=4){
+        const g = img[i]*0.299 + img[i+1]*0.587 + img[i+2]*0.114;
+        gray.push(g);
+      }
+      const avg = gray.reduce((a,b)=>a+b,0) / gray.length;
+      let bits = '';
+      gray.forEach(g => { bits += g > avg ? '1' : '0'; });
+      return bits;
+    }
+
+    function hammingDistance(a, b){
+      if(a.length !== b.length) return Infinity;
+      let d = 0;
+      for(let i=0;i<a.length;i++){
+        if(a[i] !== b[i]) d++;
+      }
+      return d;
+    }
+
     async function handleSubmit(e){
       e.preventDefault();
       const form = e.currentTarget;
@@ -790,6 +882,39 @@
         setStatus('オンライン投稿は無効です（プレース表示のみ）');
         return;
       }
+      // 重複画像チェック（完全一致 + 類似）
+      try{
+        const dupHash = await supabase
+          .from('contest_entries')
+          .select('id')
+          .eq('image_hash', imageInfo.hash)
+          .limit(1);
+        if(!dupHash.error && dupHash.data && dupHash.data.length){
+          setStatus('同じ画像が既に投稿されています');
+          return;
+        }
+        const dupP = await supabase
+          .from('contest_entries')
+          .select('id,phash,user_id,client_id')
+          .not('phash','is',null)
+          .limit(200);
+        if(!dupP.error && Array.isArray(dupP.data)){
+          const isSimilar = dupP.data.some(row => {
+            if((supabaseUser?.id && row.user_id === supabaseUser.id) || row.client_id === clientId){
+              return false; // 自分の投稿は許可
+            }
+            if(!row.phash || row.phash.length !== imageInfo.phash.length) return false;
+            const dist = hammingDistance(row.phash, imageInfo.phash);
+            return dist <= 5; // 閾値
+          });
+          if(isSimilar){
+            setStatus('類似した画像が既に投稿されています');
+            return;
+          }
+        }
+      }catch(err){
+        console.warn('duplicate check skipped', err);
+      }
       setStatus('投稿しています...');
       try{
         const payload = {
@@ -802,7 +927,9 @@
           width: imageInfo.width,
           height: imageInfo.height,
           colors: imageInfo.colors,
-          image_base64: imageInfo.dataUrl
+          image_base64: imageInfo.dataUrl,
+          image_hash: imageInfo.hash,
+          phash: imageInfo.phash
         };
         if(supabaseUser?.id){
           payload.user_id = supabaseUser.id;
@@ -844,6 +971,15 @@
         item.innerHTML = `
           <div class="entry-imgwrap">
             <img src="${entry.image_base64}" alt="${entry.title}">
+            <span class="entry-watermark" style="top:6px; left:6px;">PiXiEED</span>
+            <span class="entry-watermark" style="top:6px; right:6px;">PiXiEED</span>
+            <span class="entry-watermark" style="right:6px; bottom:6px;">PiXiEED</span>
+            <span class="entry-watermark" style="left:6px; bottom:6px;">PiXiEED</span>
+            <span class="entry-watermark" style="left:50%; top:50%; transform:translate(-50%,-50%);">PiXiEED</span>
+            <span class="entry-watermark" style="left:50%; top:25%; transform:translate(-50%,-50%);">PiXiEED</span>
+            <span class="entry-watermark" style="left:50%; top:75%; transform:translate(-50%,-50%);">PiXiEED</span>
+            <span class="entry-watermark" style="left:25%; top:50%; transform:translate(-50%,-50%);">PiXiEED</span>
+            <span class="entry-watermark" style="left:75%; top:50%; transform:translate(-50%,-50%);">PiXiEED</span>
             <button class="heart-btn" data-id="${entry.id}" aria-label="いいね">
               <img src="${likedEntries.has(entry.id) ? FAV_SRC : NFAV_SRC}" alt="like icon">
             </button>
