@@ -70,6 +70,8 @@
       height:100%;
       object-fit:contain;
       display:block;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
     }
     .brand-text{
       display:flex;
@@ -195,16 +197,22 @@
       background:transparent;
       display:block;
       position:relative;
+      aspect-ratio:1/1;
     }
     .entry-imgwrap img{
       width:100%;
       height:100%;
       object-fit:cover;
       image-rendering:pixelated;
+      image-rendering:crisp-edges;
+      -ms-interpolation-mode:nearest-neighbor;
       border:0;
       background:transparent;
       position:relative;
       z-index:1;
+      pointer-events:none;
+      -webkit-user-drag:none;
+      user-select:none;
     }
     .entry-watermark{
       position:absolute;
@@ -348,8 +356,8 @@
     }
     .avatar-grid{
       display:grid;
-      grid-template-columns:repeat(auto-fit,minmax(64px,1fr));
-      gap:10px;
+      grid-template-columns:repeat(6, minmax(0, 1fr));
+      gap:4px;
     }
     .avatar-option{
       width:100%;
@@ -564,12 +572,35 @@
     function $(id){ return document.getElementById(id); }
 
     const AVATARS = [
-      { id:'pink', label:'Pink', style:'background:linear-gradient(135deg,#f472b6,#fb7185);' },
-      { id:'blue', label:'Blue', style:'background:linear-gradient(135deg,#60a5fa,#22d3ee);' },
-      { id:'green', label:'Green', style:'background:linear-gradient(135deg,#34d399,#a3e635);' },
-      { id:'gold', label:'Gold', style:'background:linear-gradient(135deg,#fbbf24,#f59e0b);' },
-      { id:'violet', label:'Violet', style:'background:linear-gradient(135deg,#c084fc,#7c3aed);' },
-      { id:'gray', label:'Gray', style:'background:linear-gradient(135deg,#94a3b8,#475569);' }
+      { id:'mao', type:'img', src:'../character-dots/mao1.png' },
+      { id:'jerin1', type:'img', src:'../character-dots/Jerin1.png' },
+      { id:'jerin2', type:'img', src:'../character-dots/Jerin2.png' },
+      { id:'jerin3', type:'img', src:'../character-dots/Jerin3.png' },
+      { id:'jerin4', type:'img', src:'../character-dots/Jerin4.png' },
+      { id:'jerin5', type:'img', src:'../character-dots/Jerin5.png' },
+      { id:'jerin6', type:'img', src:'../character-dots/Jerin6.png' },
+      { id:'jerin7', type:'img', src:'../character-dots/Jerin7.png' },
+      { id:'jerin8', type:'img', src:'../character-dots/Jerin8.png' },
+      { id:'jellnall1', type:'img', src:'../character-dots/JELLNALL1.png' },
+      { id:'jellnall2', type:'img', src:'../character-dots/JELLNALL2.png' },
+      { id:'jellnall3', type:'img', src:'../character-dots/JELLNALL3.png' },
+      { id:'jellnall4', type:'img', src:'../character-dots/JELLNALL4.png' },
+      { id:'jellnall5', type:'img', src:'../character-dots/JELLNALL5.png' },
+      { id:'jellnall6', type:'img', src:'../character-dots/JELLNALL6.png' },
+      { id:'jellnall7', type:'img', src:'../character-dots/JELLNALL7.png' },
+      { id:'jellnall8', type:'img', src:'../character-dots/JELLNALL8.png' },
+      { id:'jellnall9', type:'img', src:'../character-dots/JELLNALL9.png' },
+      { id:'jellnall10', type:'img', src:'../character-dots/JELLNALL10.png' },
+      { id:'jellnall11', type:'img', src:'../character-dots/JELLNALL11.png' },
+      { id:'jellnall12', type:'img', src:'../character-dots/JELLNALL12.png' },
+      { id:'jellnall13', type:'img', src:'../character-dots/JELLNALL13.png' },
+      { id:'jellnall14', type:'img', src:'../character-dots/JELLNALL14.png' },
+      { id:'jellnall15', type:'img', src:'../character-dots/JELLNALL15.png' },
+      { id:'jellnall16', type:'img', src:'../character-dots/JELLNALL16.png' },
+      { id:'jellnall17', type:'img', src:'../character-dots/JELLNALL17.png' },
+      { id:'jellnall18', type:'img', src:'../character-dots/JELLNALL18.png' },
+      { id:'jellnall19', type:'img', src:'../character-dots/JELLNALL19.png' },
+      { id:'baburin', type:'img', src:'../character-dots/baburinpng.png' }
     ];
 
     function loadNickname(){
@@ -588,9 +619,9 @@
 
     function loadAvatar(){
       try{
-        return localStorage.getItem('pixieed_avatar') || 'pink';
+        return localStorage.getItem('pixieed_avatar') || 'mao';
       }catch(_){
-        return 'pink';
+        return 'mao';
       }
     }
 
@@ -632,11 +663,14 @@
       const avatarId = loadAvatar();
       const found = AVATARS.find(a => a.id === avatarId);
       if(brand){
-        if(found){
+        if(found && found.type === 'img'){
+          brand.style = 'border:1px solid rgba(255,255,255,0.25); background:rgba(255,255,255,0.08);';
+          brand.innerHTML = `<img src="${found.src}" alt="avatar">`;
+        }else if(found && found.style){
           brand.style = `${found.style} border:1px solid rgba(255,255,255,0.25);`;
           brand.innerHTML = '';
         }else{
-          brand.style = '';
+          brand.style = 'border:1px solid rgba(255,255,255,0.25); background:rgba(255,255,255,0.08);';
           brand.innerHTML = `<img src="../character-dots/mao1.png" alt="logo">`;
         }
       }
@@ -651,8 +685,22 @@
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = `avatar-option${current === a.id ? ' is-active' : ''}`;
-        btn.style = a.style;
-        btn.textContent = '';
+        if(a.type === 'img' && a.src){
+          btn.style = 'background:rgba(0,0,0,0.7);';
+          const im = document.createElement('img');
+          im.src = a.src;
+          im.alt = a.id;
+          im.style.width = '80%';
+          im.style.height = '80%';
+          im.style.objectFit = 'contain';
+          im.style.pointerEvents = 'none';
+          im.style.imageRendering = 'pixelated';
+          im.style.imageRendering = 'crisp-edges';
+          btn.appendChild(im);
+        }else{
+          btn.style = a.style;
+          btn.textContent = '';
+        }
         btn.addEventListener('click', () => {
           saveAvatar(a.id);
           renderAvatarChoices();
@@ -970,7 +1018,7 @@
         item.href = `view.html?id=${entry.id}`;
         item.innerHTML = `
           <div class="entry-imgwrap">
-            <img src="${entry.image_base64}" alt="${entry.title}">
+            <img src="${entry.image_base64}" alt="${entry.title}" draggable="false">
             <span class="entry-watermark" style="top:6px; left:6px;">PiXiEED</span>
             <span class="entry-watermark" style="top:6px; right:6px;">PiXiEED</span>
             <span class="entry-watermark" style="right:6px; bottom:6px;">PiXiEED</span>
@@ -1345,6 +1393,11 @@
       setupTabs();
       setupPostPanel();
       setupAuthButton();
+      document.addEventListener('dragstart', (e) => {
+        if(e.target && e.target.tagName === 'IMG'){
+          e.preventDefault();
+        }
+      });
       const form = $(FORM_ID);
       if(form){
         const saved = loadNickname();
