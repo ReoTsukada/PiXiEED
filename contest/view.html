@@ -249,6 +249,16 @@
       position:relative;
       z-index:1;
     }
+    .entry-watermark{
+      position:absolute;
+      color:rgba(255,255,255,0.04);
+      font-weight:800;
+      font-size:14px;
+      letter-spacing:0.08em;
+      text-shadow:0 0 12px rgba(0,0,0,0.18);
+      z-index:2;
+      pointer-events:none;
+    }
     .entry-card .heart-btn{
       right:4px;
       bottom:4px;
@@ -294,6 +304,15 @@
     <section class="card">
       <div class="entry-hero" id="hero">
         <img id="heroImg" alt="dot work"/>
+        <span class="entry-watermark" style="top:6px; left:6px;">PiXiEED</span>
+        <span class="entry-watermark" style="top:6px; right:6px;">PiXiEED</span>
+        <span class="entry-watermark" style="right:6px; bottom:6px;">PiXiEED</span>
+        <span class="entry-watermark" style="left:6px; bottom:6px;">PiXiEED</span>
+        <span class="entry-watermark" style="left:50%; top:50%; transform:translate(-50%,-50%);">PiXiEED</span>
+        <span class="entry-watermark" style="left:50%; top:25%; transform:translate(-50%,-50%);">PiXiEED</span>
+        <span class="entry-watermark" style="left:50%; top:75%; transform:translate(-50%,-50%);">PiXiEED</span>
+        <span class="entry-watermark" style="left:25%; top:50%; transform:translate(-50%,-50%);">PiXiEED</span>
+        <span class="entry-watermark" style="left:75%; top:50%; transform:translate(-50%,-50%);">PiXiEED</span>
         <button class="heart-btn" id="heroLike" aria-label="いいね"><img id="heroLikeIcon" alt="like icon"/></button>
       </div>
       <div class="meta">
@@ -725,6 +744,7 @@
         }
         await supabaseDelete('contest_entries', { eq });
         setStatus('削除しました');
+        setDeleteNotice('');
         location.href = './index.html';
       }catch(err){
         console.error(err);
@@ -782,6 +802,15 @@
         item.innerHTML = `
           <div class="entry-imgwrap">
             <img src="${e.image_base64}" alt="${e.title}">
+            <span class="entry-watermark" style="top:6px; left:6px;">PiXiEED</span>
+            <span class="entry-watermark" style="top:6px; right:6px;">PiXiEED</span>
+            <span class="entry-watermark" style="right:6px; bottom:6px;">PiXiEED</span>
+            <span class="entry-watermark" style="left:6px; bottom:6px;">PiXiEED</span>
+            <span class="entry-watermark" style="left:50%; top:50%; transform:translate(-50%,-50%);">PiXiEED</span>
+            <span class="entry-watermark" style="left:50%; top:25%; transform:translate(-50%,-50%);">PiXiEED</span>
+            <span class="entry-watermark" style="left:50%; top:75%; transform:translate(-50%,-50%);">PiXiEED</span>
+            <span class="entry-watermark" style="left:25%; top:50%; transform:translate(-50%,-50%);">PiXiEED</span>
+            <span class="entry-watermark" style="left:75%; top:50%; transform:translate(-50%,-50%);">PiXiEED</span>
             <button class="heart-btn" data-id="${e.id}" aria-label="いいね">
               <img src="${likedEntries.has(e.id) ? FAV_SRC : NFAV_SRC}" alt="like icon">
             </button>
