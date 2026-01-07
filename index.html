@@ -84,7 +84,171 @@
 }
 </script>
 <link href="character-dots/mao1.png" rel="icon" type="image/png"/></head>
+<style>
+/* 共通ヘッダー（contestと合わせたシンプル版） */
+.top-nav{
+  position:sticky;
+  top:0;
+  z-index:80;
+  background:rgba(11,18,36,0.94);
+  backdrop-filter:blur(8px);
+  border-bottom:1px solid rgba(255,255,255,0.08);
+  padding:10px 16px;
+  margin:-8px -16px 12px;
+}
+.top-nav__inner{
+  max-width:1200px;
+  margin:0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-weight:800;
+  letter-spacing:0.01em;
+  background:none;
+  border:0;
+  padding:0;
+  cursor:pointer;
+  color:#f9fafb;
+  text-decoration:none;
+}
+.brand-icon{
+  width:36px;
+  height:36px;
+  border-radius:10px;
+  background:rgba(255,255,255,0.12);
+  padding:4px;
+  border:1px solid rgba(255,255,255,0.2);
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+}
+.brand-icon img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  image-rendering:pixelated;
+  image-rendering:crisp-edges;
+}
+.brand-text{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.brand-title{ margin:0; font-size:16px; color:#f9fafb; }
+.brand-sub{ margin:0; font-size:12px; color:#9ca3af; }
+.auth-panel{
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,0.65);
+  backdrop-filter:blur(4px);
+  padding:16px;
+  z-index:90;
+}
+.auth-panel.is-open{ display:flex; }
+.auth-card{
+  width:100%;
+  max-width:420px;
+  background:rgba(15,23,42,0.95);
+  border:1px solid rgba(255,255,255,0.14);
+  border-radius:16px;
+  padding:16px;
+  box-shadow:0 18px 40px rgba(0,0,0,0.45);
+  display:grid;
+  gap:12px;
+}
+.auth-input{
+  width:100%;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,0.18);
+  background:rgba(255,255,255,0.05);
+  color:#fff;
+  padding:10px 12px;
+  font-size:14px;
+}
+.auth-btn{
+  border:1px solid rgba(255,255,255,0.2);
+  background:linear-gradient(135deg,#4f46e5,#7c3aed);
+  color:#fff;
+  border-radius:12px;
+  padding:10px 14px;
+  font-weight:800;
+  cursor:pointer;
+  text-align:center;
+}
+.close-btn{
+  border:1px solid rgba(255,255,255,0.2);
+  background:rgba(255,255,255,0.08);
+  color:#fff;
+  border-radius:8px;
+  padding:6px 10px;
+  cursor:pointer;
+}
+.auth-status{
+  font-size:12px;
+  color:#cbd5e1;
+  min-height:16px;
+}
+.auth-status{
+  font-size:12px;
+  color:#cbd5e1;
+  min-height:16px;
+}
+.profile-block{
+  display:grid;
+  gap:10px;
+  padding:10px;
+  border-radius:12px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.08);
+}
+.avatar-grid{
+  display:grid;
+  grid-template-columns:repeat(6, minmax(0, 1fr));
+  gap:4px;
+}
+.avatar-option{
+  width:100%;
+  aspect-ratio:1;
+  border-radius:12px;
+  border:2px solid transparent;
+  background:rgba(0,0,0,0.7);
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:border-color 0.15s ease, transform 0.1s ease;
+}
+.avatar-option.is-active{
+  border-color:#7c3aed;
+  transform:translateY(-1px);
+}
+</style>
 <body class="portfolio-page">
+<header class="top-nav" aria-label="top-nav">
+  <div class="top-nav__inner">
+    <a class="brand" id="openProfilePanel" href="#">
+      <span class="brand-icon" id="brandAvatar"><img src="character-dots/mao1.png" alt="logo"></span>
+      <div class="brand-text">
+        <p class="brand-title">PiXiEED</p>
+        <p class="brand-sub">Dot Gallery</p>
+      </div>
+    </a>
+    <div></div>
+  </div>
+</header>
+<main>
+<section class="section" style="margin-top:0; padding-top:0;">
+<div class="section-inner">
 <header class="portfolio-header">
 <div class="portfolio-header__inner">
 <a class="logo" href="index.html">PiXiEED</a>
@@ -104,7 +268,8 @@
 </nav>
 </div>
 </header>
-<main>
+</div>
+</section>
 <section class="section" id="dot-gallery">
 <div class="section-inner">
 <h2>ドット絵</h2>
@@ -307,6 +472,226 @@
 </div>
 </div>
 </footer>
+<div class="auth-panel" id="authPanel" aria-hidden="true">
+  <div class="auth-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <h3 style="margin:0;font-size:16px;color:#f9fafb;">プロフィール</h3>
+      <button class="close-btn" type="button" id="closeAuthPanel">閉じる</button>
+    </div>
+    <div class="profile-block">
+      <label style="display:flex; flex-direction:column; gap:6px;">
+        <span style="font-weight:700; color:#e5e7eb;">ニックネーム</span>
+        <input class="auth-input" id="profileNickname" type="text" placeholder="なまえ" maxlength="32">
+      </label>
+      <div>
+        <p class="author" style="margin:0 0 6px;">アイコン</p>
+        <div class="avatar-grid" id="avatarGrid"></div>
+      </div>
+      <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
+    </div>
+    <div class="profile-block">
+      <p class="author" style="margin:0 0 6px;">アカウント紐付け</p>
+      <p class="author" id="linkedEmail" style="margin:0 0 6px; display:none;"></p>
+      <div id="authInputs" style="display:grid; gap:8px;">
+        <input class="auth-input" id="authEmail" type="email" placeholder="メールアドレス" autocomplete="email">
+        <input class="auth-input" id="authPasscode" type="password" placeholder="パスコード（6〜20文字）" autocomplete="current-password">
+      </div>
+      <button class="auth-btn" id="authBtn" type="button">メール＋パスコードでログイン</button>
+      <button class="auth-btn logout" id="logoutBtn" type="button" style="display:none;">ログアウト</button>
+    </div>
+    <p class="auth-status" id="authStatus"></p>
+  </div>
+</div>
+<script>
+  (function(){
+    function loadNickname(){
+      try{ return localStorage.getItem('pixieed_nickname') || ''; }catch(_){ return ''; }
+    }
+    function loadAvatar(){
+      try{ return localStorage.getItem('pixieed_avatar') || 'mao'; }catch(_){ return 'mao'; }
+    }
+    const AVATARS = {
+      mao:'character-dots/mao1.png',
+      jerin1:'character-dots/Jerin1.png',
+      jerin2:'character-dots/Jerin2.png',
+      jerin3:'character-dots/Jerin3.png',
+      jerin4:'character-dots/Jerin4.png',
+      jerin5:'character-dots/Jerin5.png',
+      jerin6:'character-dots/Jerin6.png',
+      jerin7:'character-dots/Jerin7.png',
+      jerin8:'character-dots/Jerin8.png',
+      jellnall1:'character-dots/JELLNALL1.png',
+      jellnall2:'character-dots/JELLNALL2.png',
+      jellnall3:'character-dots/JELLNALL3.png',
+      jellnall4:'character-dots/JELLNALL4.png',
+      jellnall5:'character-dots/JELLNALL5.png',
+      jellnall6:'character-dots/JELLNALL6.png',
+      jellnall7:'character-dots/JELLNALL7.png',
+      jellnall8:'character-dots/JELLNALL8.png',
+      jellnall9:'character-dots/JELLNALL9.png',
+      jellnall10:'character-dots/JELLNALL10.png',
+      jellnall11:'character-dots/JELLNALL11.png',
+      jellnall12:'character-dots/JELLNALL12.png',
+      jellnall13:'character-dots/JELLNALL13.png',
+      jellnall14:'character-dots/JELLNALL14.png',
+      jellnall15:'character-dots/JELLNALL15.png',
+      jellnall16:'character-dots/JELLNALL16.png',
+      jellnall17:'character-dots/JELLNALL17.png',
+      jellnall18:'character-dots/JELLNALL18.png',
+      jellnall19:'character-dots/JELLNALL19.png',
+      baburin:'character-dots/baburinpng.png'
+    };
+    function applyAvatar(){
+      const brand = document.getElementById('brandAvatar');
+      const avatar = loadAvatar();
+      const src = AVATARS[avatar] || AVATARS.mao;
+      if(brand){
+        brand.innerHTML = `<img src=\"${src}\" alt=\"avatar\">`;
+      }
+      const nick = loadNickname();
+      const sub = document.querySelector('.brand-sub');
+      if(sub && nick){
+        sub.textContent = nick;
+      }
+    }
+    document.addEventListener('DOMContentLoaded', applyAvatar);
+  })();
+</script>
+<script>
+  (function(){
+    function loadNickname(){ try{ return localStorage.getItem('pixieed_nickname') || ''; }catch(_){ return ''; } }
+    function saveNickname(name){ try{ localStorage.setItem('pixieed_nickname', name); }catch(_){ } }
+    function loadAvatar(){ try{ return localStorage.getItem('pixieed_avatar') || 'mao'; }catch(_){ return 'mao'; } }
+    function saveAvatar(id){ try{ localStorage.setItem('pixieed_avatar', id); }catch(_){ } }
+    const AVATARS = {
+      mao:'character-dots/mao1.png',
+      jerin1:'character-dots/Jerin1.png',
+      jerin2:'character-dots/Jerin2.png',
+      jerin3:'character-dots/Jerin3.png',
+      jerin4:'character-dots/Jerin4.png',
+      jerin5:'character-dots/Jerin5.png',
+      jerin6:'character-dots/Jerin6.png',
+      jerin7:'character-dots/Jerin7.png',
+      jerin8:'character-dots/Jerin8.png',
+      jellnall1:'character-dots/JELLNALL1.png',
+      jellnall2:'character-dots/JELLNALL2.png',
+      jellnall3:'character-dots/JELLNALL3.png',
+      jellnall4:'character-dots/JELLNALL4.png',
+      jellnall5:'character-dots/JELLNALL5.png',
+      jellnall6:'character-dots/JELLNALL6.png',
+      jellnall7:'character-dots/JELLNALL7.png',
+      jellnall8:'character-dots/JELLNALL8.png',
+      jellnall9:'character-dots/JELLNALL9.png',
+      jellnall10:'character-dots/JELLNALL10.png',
+      jellnall11:'character-dots/JELLNALL11.png',
+      jellnall12:'character-dots/JELLNALL12.png',
+      jellnall13:'character-dots/JELLNALL13.png',
+      jellnall14:'character-dots/JELLNALL14.png',
+      jellnall15:'character-dots/JELLNALL15.png',
+      jellnall16:'character-dots/JELLNALL16.png',
+      jellnall17:'character-dots/JELLNALL17.png',
+      jellnall18:'character-dots/JELLNALL18.png',
+      jellnall19:'character-dots/JELLNALL19.png',
+      baburin:'character-dots/baburinpng.png'
+    };
+    function applyAvatar(){
+      const brand = document.getElementById('brandAvatar');
+      const avatar = loadAvatar();
+      const src = AVATARS[avatar] || AVATARS.mao;
+      if(brand){ brand.innerHTML = `<img src=\"${src}\" alt=\"avatar\">`; }
+      const nick = loadNickname();
+      const sub = document.querySelector('.brand-sub');
+      if(sub){
+        sub.textContent = nick || 'ユーザー';
+      }
+    }
+    function renderAvatarChoices(){
+      const grid = document.getElementById('avatarGrid');
+      if(!grid) return;
+      grid.innerHTML = '';
+      const current = loadAvatar();
+      Object.entries(AVATARS).forEach(([id, src]) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `avatar-option${current === id ? ' is-active' : ''}`;
+        btn.style.background = 'rgba(0,0,0,0.7)';
+        const im = document.createElement('img');
+        im.src = src;
+        im.alt = id;
+        im.style.width = '80%';
+        im.style.height = '80%';
+        im.style.objectFit = 'contain';
+        im.style.pointerEvents = 'none';
+        im.style.imageRendering = 'pixelated';
+        im.style.imageRendering = 'crisp-edges';
+        btn.appendChild(im);
+        btn.addEventListener('click', () => {
+          saveAvatar(id);
+          renderAvatarChoices();
+          applyAvatar();
+        });
+        grid.appendChild(btn);
+      });
+    }
+    function setupProfileModal(){
+      const openBtn = document.getElementById('openProfilePanel');
+      const panel = document.getElementById('authPanel');
+      const closeBtn = document.getElementById('closeAuthPanel');
+      const saveBtn = document.getElementById('saveProfile');
+      const nickInput = document.getElementById('profileNickname');
+      const emailInput = document.getElementById('authEmail');
+      const passInput = document.getElementById('authPasscode');
+      const authInputs = document.getElementById('authInputs');
+      const linkedEmail = document.getElementById('linkedEmail');
+      const authBtn = document.getElementById('authBtn');
+      const logoutBtn = document.getElementById('logoutBtn');
+      const status = document.getElementById('authStatus');
+      const toggle = (open) => {
+        if(!panel) return;
+        if(open){
+          if(nickInput) nickInput.value = loadNickname();
+          renderAvatarChoices();
+          panel.classList.add('is-open');
+          panel.setAttribute('aria-hidden','false');
+        }else{
+          panel.classList.remove('is-open');
+          panel.setAttribute('aria-hidden','true');
+        }
+      };
+      if(openBtn) openBtn.addEventListener('click', (e) => { e.preventDefault(); toggle(true); });
+      if(closeBtn) closeBtn.addEventListener('click', () => toggle(false));
+      if(panel){ panel.addEventListener('click', (e) => { if(e.target === panel) toggle(false); }); }
+      if(saveBtn){
+        saveBtn.addEventListener('click', () => {
+          const nick = (nickInput?.value || '').trim();
+          if(nick){ saveNickname(nick); }
+          applyAvatar();
+          if(status) status.textContent = 'プロフィールを保存しました';
+        });
+      }
+      // ログイン操作はギャラリーでのみ対応
+      if(authInputs) authInputs.style.display = 'none';
+      if(linkedEmail){
+        linkedEmail.style.display = 'block';
+        linkedEmail.textContent = '紐付けはギャラリーで設定してください';
+      }
+      if(emailInput) emailInput.disabled = true;
+      if(passInput) passInput.disabled = true;
+      if(authBtn){
+        authBtn.disabled = false;
+        authBtn.textContent = 'ギャラリーでログイン';
+        authBtn.addEventListener('click', () => {
+          window.location.href = 'contest/index.html#auth';
+        });
+      }
+      if(logoutBtn) logoutBtn.style.display = 'none';
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      applyAvatar();
+      setupProfileModal();
+    });
+  })();
+</script>
 <script src="scripts.js"></script>
 <script src="portfolio/dots/manifest.js"></script>
 <script src="scripts/gallery.js"></script>
