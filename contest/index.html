@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+  <meta name="robots" content="noai,noimageai,nosnippet,noarchive"/>
   <title>PiXiEED ドットギャラリー</title>
   <link rel="icon" type="image/png" href="../character-dots/mao1.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -442,7 +443,7 @@
           </span>
           <div class="brand-text">
             <p class="brand-title">PiXiEED</p>
-            <p class="brand-sub">Dot Gallery</p>
+            <p class="brand-sub" id="brandUser">ユーザー</p>
           </div>
         </button>
         <div class="header-actions"></div>
@@ -660,6 +661,7 @@
 
     function applyAvatarToBrand(){
       const brand = document.getElementById('brandAvatar');
+      const brandUser = document.getElementById('brandUser');
       const avatarId = loadAvatar();
       const found = AVATARS.find(a => a.id === avatarId);
       if(brand){
@@ -673,6 +675,10 @@
           brand.style = 'border:1px solid rgba(255,255,255,0.25); background:rgba(255,255,255,0.08);';
           brand.innerHTML = `<img src="../character-dots/mao1.png" alt="logo">`;
         }
+      }
+      if(brandUser){
+        const nick = loadNickname();
+        brandUser.textContent = nick || 'ユーザー';
       }
     }
 
@@ -1212,6 +1218,25 @@
       }
     }
 
+    async function syncProfileFromServer(){
+      if(!supabase || !supabaseUser?.id) return;
+      try{
+        const { data, error } = await supabase.from('user_profiles').select('nickname').eq('id', supabaseUser.id).maybeSingle();
+        if(!error && data && data.nickname){
+          saveNickname(data.nickname);
+          const nickInput = document.getElementById('profileNickname');
+          if(nickInput) nickInput.value = data.nickname;
+          const form = $(FORM_ID);
+          if(form && !form.name.value){
+            form.name.value = data.nickname;
+          }
+          applyAvatarToBrand();
+        }
+      }catch(err){
+        console.warn('profile sync failed', err);
+      }
+    }
+
     function updateAuthUI(){
       const btn = document.getElementById('authBtn');
       const logoutBtn = document.getElementById('logoutBtn');
@@ -1271,10 +1296,12 @@
           supabaseSession = session || null;
           supabaseUser = session?.user || null;
           migrateGuestData();
+          syncProfileFromServer();
           updateAuthUI();
           fetchAndRender();
         });
         await migrateGuestData();
+        await syncProfileFromServer();
         updateAuthUI();
       }catch(err){
         console.warn('Supabase初期化に失敗: オフラインプレース表示のみ', err);
@@ -1388,11 +1415,23 @@
       }
     }
 
-    async function init(){
-      ensureClientId();
-      setupTabs();
-      setupPostPanel();
-      setupAuthButton();
+  async function init(){
+    ensureClientId();
+    setupTabs();
+    setupPostPanel();
+    setupAuthButton();
+    // 画像のコンテキストメニューを抑止
+    document.addEventListener('contextmenu', (e) => {
+      if(e.target && e.target.tagName === 'IMG'){
+        e.preventDefault();
+      }
+    });
+      if(location.hash === '#auth'){
+        const openBtn = document.getElementById('openProfilePanel');
+        if(openBtn){
+          openBtn.click();
+        }
+      }
       document.addEventListener('dragstart', (e) => {
         if(e.target && e.target.tagName === 'IMG'){
           e.preventDefault();
