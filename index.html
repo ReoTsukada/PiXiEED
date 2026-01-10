@@ -19,6 +19,7 @@
   <style>
     :root{ color-scheme: dark; }
     *{ box-sizing:border-box; user-select:none; -webkit-user-select:none; -ms-user-select:none; }
+    html,body{ overflow-x:hidden; }
     body{
       margin:0;
       font-family:'Fredoka','DotGothic16',system-ui,sans-serif;
@@ -125,7 +126,7 @@
     .hero-grid{
       display:grid;
       gap:16px;
-      grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));
+      grid-template-columns:1fr;
       align-items:start;
     }
     .hero-copy{
