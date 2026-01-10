@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
   <style>
     :root{ color-scheme: dark; }
     *{
@@ -18,7 +19,7 @@
       -ms-user-select:none;
     }
     body{
-      margin:0;
+      margin:0 auto;
       font-family:'Fredoka', 'DotGothic16', system-ui, sans-serif;
       background:radial-gradient(circle at 20% 20%, rgba(59,130,246,0.22), rgba(15,23,42,1)),
                  radial-gradient(circle at 80% 0%, rgba(236,72,153,0.18), rgba(15,23,42,1)),
@@ -28,8 +29,20 @@
       padding:20px 14px 120px;
       display:flex;
       justify-content:center;
+      max-width:100vw;
+      overflow-x:hidden;
+      box-sizing:border-box;
     }
-    .page{ width:100%; max-width:1200px; display:grid; gap:14px; position:relative; margin:0 auto; }
+    .page{
+      width:100%;
+      max-width:min(1200px, 100vw);
+      display:grid;
+      gap:14px;
+      position:relative;
+      margin:0 auto;
+      box-sizing:border-box;
+      overflow:hidden;
+    }
     header{
       position:sticky;
       top:0;
@@ -37,17 +50,25 @@
       background:rgba(11,18,36,0.94);
       backdrop-filter:blur(8px);
       border-bottom:1px solid rgba(255,255,255,0.08);
-      margin:-20px -14px 8px;
-      padding:10px 14px;
+      margin:0 auto 8px;
+      padding:12px 14px;
+      width:100%;
+      max-width:min(1200px, 100vw);
+      box-sizing:border-box;
     }
     .header-inner{
       width:100%;
-      max-width:1200px;
+      max-width:min(1200px, 100vw);
       margin:0 auto;
       display:flex;
       align-items:center;
       justify-content:space-between;
       gap:12px;
+    }
+    img,video,canvas,svg{
+      max-width:100%;
+      height:auto;
+      display:block;
     }
     .ad-banner{
       position:relative;
