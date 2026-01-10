@@ -1,20 +1,680 @@
 <!DOCTYPE html>
-
 <html lang="ja">
 <head>
-<meta content="https://pixieed.jp/PiXiEEDogp.png" property="og:image"/>
-<meta charset="utf-8"/>
-<meta content="0; url=index.html#tools" http-equiv="refresh"/>
-<title>PiXiEED | ツール一覧</title>
-<meta content="noindex" name="robots"/>
-<link href="index.html#tools" rel="canonical"/>
-<script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
-<link href="character-dots/mao1.png" rel="icon" type="image/png"/></head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+  <title>PiXiEED | ツール & ゲーム</title>
+  <meta name="description" content="PiXiEEDのツールとゲームを一覧表示。ドット絵エディターや実験的なラボ作品までまとめてチェックできます。"/>
+  <link rel="icon" type="image/png" href="character-dots/mao1.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
+  <style>
+    :root{ color-scheme: dark; }
+    *{
+      box-sizing:border-box;
+      user-select:none;
+      -webkit-user-select:none;
+      -ms-user-select:none;
+    }
+    body{
+      margin:0;
+      font-family:'Fredoka','DotGothic16',system-ui,sans-serif;
+      background:radial-gradient(circle at 20% 20%, rgba(59,130,246,0.22), rgba(15,23,42,1)),
+                 radial-gradient(circle at 80% 0%, rgba(236,72,153,0.18), rgba(15,23,42,1)),
+                 #0b1224;
+      color:#e5e7eb;
+      min-height:100vh;
+      padding:20px 14px 120px;
+      display:flex;
+      justify-content:center;
+    }
+    .page{ width:100%; max-width:none; display:grid; gap:14px; }
+    header{
+      position:sticky;
+      top:0;
+      z-index:70;
+      background:rgba(11,18,36,0.94);
+      backdrop-filter:blur(8px);
+      border-bottom:1px solid rgba(255,255,255,0.08);
+      margin:-20px -14px 8px;
+      padding:10px 14px;
+    }
+    .header-inner{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      width:100%;
+      max-width:none;
+      margin:0 auto;
+    }
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-weight:800;
+      letter-spacing:0.01em;
+      background:none;
+      border:0;
+      padding:0;
+      cursor:pointer;
+      color:#f9fafb;
+      text-decoration:none;
+    }
+    .brand-icon{
+      width:34px;
+      height:34px;
+      border-radius:10px;
+      background:rgba(255,255,255,0.12);
+      padding:4px;
+      border:1px solid rgba(255,255,255,0.2);
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+    }
+    .brand-icon img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      display:block;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .brand-text{ display:flex; flex-direction:column; gap:2px; }
+    .brand-title{ margin:0; font-size:16px; color:#f9fafb; }
+    .brand-sub{ margin:0; font-size:12px; color:#9ca3af; }
+    h1{ margin:0; font-size:22px; }
+    .subtitle{ margin:0; color:#cbd5e1; font-size:12px; }
+    .card{
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:12px;
+      padding:16px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.3);
+    }
+    .filters{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      align-items:center;
+    }
+    .chip{
+      border:1px solid rgba(255,255,255,0.18);
+      background:transparent;
+      color:#e5e7eb;
+      border-radius:12px;
+      padding:8px 12px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .chip.is-active{
+      background:linear-gradient(135deg,#ff719a,#ff9f43);
+      border-color:transparent;
+      color:#0b1224;
+    }
+    .search-box{
+      width:100%;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(0,0,0,0.35);
+      color:#f9fafb;
+      padding:10px 12px;
+      font-size:14px;
+      font-family:'DotGothic16', monospace;
+    }
+    .grid{
+      display:grid;
+      gap:14px;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+    }
+    .ad-inline{
+      grid-column:1 / -1;
+    }
+    .ad-block{
+      border:1px dashed rgba(255,255,255,0.2);
+      border-radius:12px;
+      background:linear-gradient(150deg, rgba(255,255,255,0.04), rgba(15,23,42,0.9));
+      padding:12px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.28);
+    }
+    .ad-slot{
+      display:block;
+      width:100%;
+      height:90px;
+    }
+    @media(max-width:640px){
+      .ad-slot{ height:60px; }
+    }
+    .item{
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:0 0 10px 10px;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      text-decoration:none;
+      color:inherit;
+      box-shadow:0 8px 24px rgba(0,0,0,0.25);
+      transition:transform 0.1s ease, box-shadow 0.1s ease;
+    }
+    .item:hover{ transform:translateY(-1px); box-shadow:0 12px 26px rgba(0,0,0,0.3); }
+    .thumb{
+      position:relative;
+      aspect-ratio:4/3;
+      background:rgba(0,0,0,0.25);
+      overflow:hidden;
+    }
+    .thumb img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      display:block;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+      background:transparent;
+      -webkit-user-drag:none;
+      user-select:none;
+    }
+    .tag{
+      position:absolute;
+      top:8px;
+      left:8px;
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:11px;
+      font-weight:800;
+      color:#0b1224;
+      background:rgba(255,255,255,0.9);
+    }
+    .body{
+      padding:10px 12px 12px;
+      display:grid;
+      gap:6px;
+      flex:1;
+    }
+    .title{ margin:0; font-size:15px; color:#f9fafb; }
+    .desc{ margin:0; font-size:12px; color:#cbd5e1; line-height:1.5; }
+    .bottom-nav{
+      position:fixed;
+      bottom:0;
+      left:0;
+      right:0;
+      height:68px;
+      background:rgba(11,18,36,0.96);
+      border-top:1px solid rgba(255,255,255,0.08);
+      display:flex;
+      justify-content:space-around;
+      align-items:center;
+      z-index:90;
+      backdrop-filter:blur(8px);
+    }
+    .bottom-nav__item{
+      flex:1;
+      text-align:center;
+      color:#cbd5e1;
+      text-decoration:none;
+      font-weight:700;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:4px;
+      font-size:12px;
+      padding:8px 0;
+    }
+    .bottom-nav__item .icon{ font-size:18px; }
+    .bottom-nav__item.is-active{ color:#f9fafb; }
+    .auth-panel{
+      position:fixed;
+      inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background:rgba(0,0,0,0.65);
+      backdrop-filter:blur(4px);
+      padding:16px;
+      z-index:110;
+    }
+    .auth-panel.is-open{ display:flex; }
+    .auth-card{
+      width:100%;
+      max-width:420px;
+      background:rgba(15,23,42,0.95);
+      border:1px solid rgba(255,255,255,0.14);
+      border-radius:16px;
+      padding:16px;
+      box-shadow:0 18px 40px rgba(0,0,0,0.45);
+      display:grid;
+      gap:12px;
+    }
+    .auth-input{
+      width:100%;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(255,255,255,0.05);
+      color:#fff;
+      padding:10px 12px;
+      font-size:14px;
+    }
+    .auth-btn{
+      border:1px solid rgba(255,255,255,0.2);
+      background:linear-gradient(135deg,#4f46e5,#7c3aed);
+      color:#fff;
+      border-radius:12px;
+      padding:10px 14px;
+      font-weight:800;
+      cursor:pointer;
+      text-align:center;
+    }
+    .close-btn{
+      border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.08);
+      color:#fff;
+      border-radius:8px;
+      padding:6px 10px;
+      cursor:pointer;
+    }
+    .profile-block{
+      display:grid;
+      gap:10px;
+      padding:10px;
+      border-radius:12px;
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.08);
+    }
+    .avatar-grid{
+      display:grid;
+      grid-template-columns:repeat(6, minmax(0, 1fr));
+      gap:4px;
+    }
+    .avatar-option{
+      width:100%;
+      aspect-ratio:1;
+      border-radius:12px;
+      border:2px solid transparent;
+      background:rgba(0,0,0,0.7);
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      transition:border-color 0.15s ease, transform 0.1s ease;
+    }
+    .avatar-option.is-active{
+      border-color:#7c3aed;
+      transform:translateY(-1px);
+    }
+    .helper{ color:#cbd5e1; font-size:12px; margin:0; }
+  </style>
+</head>
 <body>
-<script>
-    window.location.replace('index.html#tools');
+  <div class="page">
+    <header aria-label="top-nav">
+      <div class="header-inner">
+        <button class="brand" id="openProfilePanel" type="button">
+          <span class="brand-icon" id="brandAvatar"><img src="character-dots/mao1.png" alt="logo"></span>
+          <div class="brand-text">
+            <p class="brand-title">PiXiEED</p>
+            <p class="brand-sub" id="brandUser">ユーザー</p>
+          </div>
+        </button>
+        <div></div>
+      </div>
+    </header>
+    <section class="card">
+      <h1>ツール & ゲーム</h1>
+      <p class="subtitle">ドット絵制作向けのツールとゲームをまとめました。検索やカテゴリで絞り込めます。</p>
+    </section>
+    <section class="card">
+      <div class="filters">
+        <button class="chip is-active" data-filter="all" type="button">すべて</button>
+        <button class="chip" data-filter="tool" type="button">ツール</button>
+        <button class="chip" data-filter="game" type="button">ゲーム</button>
+        <input class="search-box" id="searchBox" type="search" placeholder="キーワードで探す（例: QR, 16x16）" aria-label="検索">
+      </div>
+    </section>
+    <section class="card" aria-label="広告">
+      <div class="ad-block">
+        <ins class="adsbygoogle ad-slot"
+             style="display:block"
+             data-ad-client="ca-pub-9801602250480253"
+             data-ad-slot="2141591954"
+             data-ad-format="horizontal"
+             data-full-width-responsive="true"></ins>
+      </div>
+    </section>
+    <section class="card">
+      <div class="grid" id="toolsGrid"></div>
+    </section>
+  </div>
+  <nav class="bottom-nav">
+    <a class="bottom-nav__item" data-tab="home" href="./index.html">
+      <span class="icon">🏠</span><span>ホーム</span>
+    </a>
+    <a class="bottom-nav__item" data-tab="contest" href="contest/index.html">
+      <span class="icon">🎨</span><span>コンテスト</span>
+    </a>
+    <a class="bottom-nav__item is-active" data-tab="tools" href="tools.html">
+      <span class="icon">🛠️</span><span>ツール/ゲーム</span>
+    </a>
+    <a class="bottom-nav__item" data-tab="portfolio" href="portfolio/index.html">
+      <span class="icon">🏢</span><span>企業向け</span>
+    </a>
+  </nav>
+
+  <div class="auth-panel" id="authPanel" aria-hidden="true">
+    <div class="auth-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <h3 style="margin:0;font-size:16px;color:#f9fafb;">プロフィール</h3>
+        <button class="close-btn" type="button" id="closeAuthPanel">閉じる</button>
+      </div>
+      <div class="profile-block">
+        <label style="display:flex; flex-direction:column; gap:6px;">
+          <span style="font-weight:700; color:#e5e7eb;">ニックネーム</span>
+          <input class="auth-input" id="profileNickname" type="text" placeholder="なまえ" maxlength="32">
+        </label>
+        <div>
+          <p class="helper" style="margin:0 0 6px;">アイコン</p>
+          <div class="avatar-grid" id="avatarGrid"></div>
+        </div>
+        <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
+      </div>
+      <div class="profile-block">
+        <p class="helper" style="margin:0 0 6px;">アカウント紐付け</p>
+        <p class="helper" id="linkedEmail" style="margin:0 0 6px; display:block;">紐付け・ログインはギャラリーで行ってください</p>
+        <button class="auth-btn" id="authBtn" type="button">ギャラリーでログイン</button>
+      </div>
+      <p class="helper" id="authStatus"></p>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      function loadNickname(){ try{ return localStorage.getItem('pixieed_nickname') || ''; }catch(_){ return ''; } }
+      function saveNickname(name){ try{ localStorage.setItem('pixieed_nickname', name); }catch(_){ } }
+      function loadAvatar(){ try{ return localStorage.getItem('pixieed_avatar') || 'mao'; }catch(_){ return 'mao'; } }
+      function saveAvatar(id){ try{ localStorage.setItem('pixieed_avatar', id); }catch(_){ } }
+      const AVATARS = {
+        mao:'character-dots/mao1.png',
+        jerin1:'character-dots/Jerin1.png',
+        jerin2:'character-dots/Jerin2.png',
+        jerin3:'character-dots/Jerin3.png',
+        jerin4:'character-dots/Jerin4.png',
+        jerin5:'character-dots/Jerin5.png',
+        jerin6:'character-dots/Jerin6.png',
+        jerin7:'character-dots/Jerin7.png',
+        jerin8:'character-dots/Jerin8.png',
+        jellnall1:'character-dots/JELLNALL1.png',
+        jellnall2:'character-dots/JELLNALL2.png',
+        jellnall3:'character-dots/JELLNALL3.png',
+        jellnall4:'character-dots/JELLNALL4.png',
+        jellnall5:'character-dots/JELLNALL5.png',
+        jellnall6:'character-dots/JELLNALL6.png',
+        jellnall7:'character-dots/JELLNALL7.png',
+        jellnall8:'character-dots/JELLNALL8.png',
+        jellnall9:'character-dots/JELLNALL9.png',
+        jellnall10:'character-dots/JELLNALL10.png',
+        jellnall11:'character-dots/JELLNALL11.png',
+        jellnall12:'character-dots/JELLNALL12.png',
+        jellnall13:'character-dots/JELLNALL13.png',
+        jellnall14:'character-dots/JELLNALL14.png',
+        jellnall15:'character-dots/JELLNALL15.png',
+        jellnall16:'character-dots/JELLNALL16.png',
+        jellnall17:'character-dots/JELLNALL17.png',
+        jellnall18:'character-dots/JELLNALL18.png',
+        jellnall19:'character-dots/JELLNALL19.png',
+        baburin:'character-dots/baburinpng.png'
+      };
+
+      const ITEMS = [
+        {
+          id:'maoitu',
+          title:'魔王様!!いつまでよければいいですか!?',
+          desc:'避け続けるスリルをブラウザで楽しめる人気No.1アクション。',
+          tag:'Game',
+          category:'game',
+          href:'projects/maoitu/index.html',
+          image:'maoitu/ogp.png'
+        },
+        {
+          id:'pixfind',
+          title:'PiXFiND（調整中）',
+          desc:'ドット絵に特化した間違い探し。アクセスコードが必要です。',
+          tag:'Game',
+          category:'game',
+          href:'projects/pixfind/index.html',
+          image:'pixfind/ogp.png'
+        },
+        {
+          id:'pixiedraw',
+          title:'PiXiEEDraw',
+          desc:'ブラウザだけで動く本格ドットエディター。配色・保存・公開に対応。',
+          tag:'Tool',
+          category:'tool',
+          href:'projects/pixiedraw/index.html',
+          image:'pixiedraw/ogp-app.png'
+        },
+        {
+          id:'jerin-maker',
+          title:'PiXiEEDraw Lite（ピクドラ）',
+          desc:'16×16固定のライト版ドットツール。ジェリンの下絵付きでサクッと描けます。',
+          tag:'Tool',
+          category:'tool',
+          href:'projects/jerin-maker/index.html',
+          image:'jerin-maker/ogp-app.png'
+        },
+        {
+          id:'pixiee-lens',
+          title:'PiXiEELENS',
+          desc:'全画面カメラのラボ版。ドットモードとパレット読込で配色を遊べます。',
+          tag:'Tool',
+          category:'tool',
+          href:'projects/pixiee-lens/index.html',
+          image:'pixiee-lens/ogp.png'
+        },
+        {
+          id:'qr-maker',
+          title:'QRコードメーカー',
+          desc:'色・余白・誤り訂正を指定してQR化。ブラウザ内で即座にPNG保存できます。',
+          tag:'Tool',
+          category:'tool',
+          href:'projects/qr-maker/index.html',
+          image:'qr-maker/qrogp.png'
+        }
+      ];
+
+      function applyAvatar(){
+        const brand = document.getElementById('brandAvatar');
+        const brandUser = document.getElementById('brandUser');
+        const avatar = loadAvatar();
+        const src = AVATARS[avatar] || AVATARS.mao;
+        if(brand){
+          brand.innerHTML = `<img src="${src}" alt="avatar">`;
+        }
+        const nick = loadNickname();
+        if(brandUser){
+          brandUser.textContent = nick || 'ユーザー';
+        }
+      }
+
+      function renderAvatarChoices(){
+        const grid = document.getElementById('avatarGrid');
+        if(!grid) return;
+        grid.innerHTML = '';
+        const current = loadAvatar();
+        Object.entries(AVATARS).forEach(([id, src]) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = `avatar-option${current === id ? ' is-active' : ''}`;
+          btn.style.background = 'rgba(0,0,0,0.7)';
+          const im = document.createElement('img');
+          im.src = src;
+          im.alt = id;
+          im.style.width = '80%';
+          im.style.height = '80%';
+          im.style.objectFit = 'contain';
+          im.style.pointerEvents = 'none';
+          im.style.imageRendering = 'pixelated';
+          im.style.imageRendering = 'crisp-edges';
+          btn.appendChild(im);
+          btn.addEventListener('click', () => {
+            saveAvatar(id);
+            renderAvatarChoices();
+            applyAvatar();
+          });
+          grid.appendChild(btn);
+        });
+      }
+
+      function setupProfileModal(){
+        const openBtn = document.getElementById('openProfilePanel');
+        const panel = document.getElementById('authPanel');
+        const closeBtn = document.getElementById('closeAuthPanel');
+        const saveBtn = document.getElementById('saveProfile');
+        const nickInput = document.getElementById('profileNickname');
+        const authBtn = document.getElementById('authBtn');
+        const status = document.getElementById('authStatus');
+        const toggle = (open) => {
+          if(!panel) return;
+          if(open){
+            if(nickInput) nickInput.value = loadNickname();
+            renderAvatarChoices();
+            panel.classList.add('is-open');
+            panel.setAttribute('aria-hidden','false');
+          }else{
+            panel.classList.remove('is-open');
+            panel.setAttribute('aria-hidden','true');
+          }
+        };
+        if(openBtn) openBtn.addEventListener('click', () => toggle(true));
+        if(closeBtn) closeBtn.addEventListener('click', () => toggle(false));
+        if(panel){ panel.addEventListener('click', (e) => { if(e.target === panel) toggle(false); }); }
+        if(saveBtn){
+          saveBtn.addEventListener('click', () => {
+            const nick = (nickInput?.value || '').trim();
+            if(nick){ saveNickname(nick); }
+            applyAvatar();
+            if(status) status.textContent = 'プロフィールを保存しました';
+          });
+        }
+        if(authBtn){
+          authBtn.addEventListener('click', () => {
+            window.location.href = 'contest/index.html#auth';
+          });
+        }
+      }
+
+      function renderList(filter, keyword){
+        const wrap = document.getElementById('toolsGrid');
+        if(!wrap) return;
+        const kw = (keyword || '').toLowerCase();
+        const list = ITEMS.filter(item => {
+          const matchFilter = filter === 'all' || item.category === filter;
+          const matchKw = !kw || item.title.toLowerCase().includes(kw) || item.desc.toLowerCase().includes(kw) || item.tag.toLowerCase().includes(kw);
+          return matchFilter && matchKw;
+        });
+        if(!list.length){
+          wrap.innerHTML = '<p class="helper" style="text-align:center;">該当する作品がありません</p>';
+          return;
+        }
+        wrap.innerHTML = '';
+        const AD_SLOTS = ['2141591954','9073878884','2261515379'];
+        const createAd = (slotId) => {
+          const ad = document.createElement('div');
+          ad.className = 'ad-block ad-inline';
+          ad.innerHTML = `
+            <ins class="adsbygoogle ad-slot"
+                 style="display:block"
+                 data-ad-client="ca-pub-9801602250480253"
+                 data-ad-slot="${slotId}"
+                 data-ad-format="horizontal"
+                 data-full-width-responsive="true"></ins>
+          `;
+          return ad;
+        };
+        list.forEach((item, idx) => {
+          const card = document.createElement('a');
+          card.className = 'item';
+          card.href = item.href;
+          card.innerHTML = `
+            <div class="thumb">
+              <img src="${item.image}" alt="${item.title}" draggable="false">
+              <span class="tag">${item.tag}</span>
+            </div>
+            <div class="body">
+              <p class="title">${item.title}</p>
+              <p class="desc">${item.desc}</p>
+            </div>
+          `;
+          wrap.appendChild(card);
+          if((idx + 1) % 6 === 0){
+            const slotId = AD_SLOTS[(idx / 6) % AD_SLOTS.length | 0];
+            wrap.appendChild(createAd(slotId));
+          }
+        });
+        try{
+          const ads = document.querySelectorAll('.adsbygoogle');
+          if(ads.length){
+            ads.forEach(() => (window.adsbygoogle = window.adsbygoogle || []).push({}));
+          }
+        }catch(e){
+          console.warn('ads render skipped', e);
+        }
+      }
+
+      function setupFilters(){
+        let currentFilter = 'all';
+        let currentKw = '';
+        const chips = document.querySelectorAll('.chip');
+        chips.forEach(chip => {
+          chip.addEventListener('click', () => {
+            currentFilter = chip.dataset.filter || 'all';
+            chips.forEach(c => c.classList.toggle('is-active', c === chip));
+            renderList(currentFilter, currentKw);
+          });
+        });
+        const search = document.getElementById('searchBox');
+        if(search){
+          search.addEventListener('input', () => {
+            currentKw = search.value;
+            renderList(currentFilter, currentKw);
+          });
+        }
+        renderList(currentFilter, currentKw);
+      }
+
+      function setActiveNav(){
+        document.querySelectorAll('.bottom-nav__item').forEach(item => {
+          item.classList.toggle('is-active', item.dataset.tab === 'tools');
+        });
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        applyAvatar();
+        setupProfileModal();
+        setupFilters();
+        setActiveNav();
+        try{
+          const ads = document.querySelectorAll('.adsbygoogle');
+          if(ads.length){
+            ads.forEach(() => (window.adsbygoogle = window.adsbygoogle || []).push({}));
+          }
+        }catch(e){
+          console.warn('ads render skipped', e);
+        }
+        document.addEventListener('contextmenu', (e) => {
+          if(e.target && e.target.tagName === 'IMG'){
+            e.preventDefault();
+          }
+        });
+        document.addEventListener('dragstart', (e) => {
+          if(e.target && e.target.tagName === 'IMG'){
+            e.preventDefault();
+          }
+        });
+      });
+    })();
   </script>
-<p>新しいツール紹介ページは <a href="index.html#tools">こちら</a> です。</p>
-<p>自動的にリダイレクトされない場合はリンクをクリックしてください。</p>
 </body>
 </html>
