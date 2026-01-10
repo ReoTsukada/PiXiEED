@@ -17,14 +17,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
   <style>
-    :root{
-      color-scheme: dark;
-      --ad-height: 280px;
-      --ad-height-mobile: 150px;
-      --ad-max-height: 320px;
-      --ad-max-height-mobile: 200px;
-      --ad-max-width: 720px;
-    }
+    :root{ color-scheme: dark; }
     *{ box-sizing:border-box; user-select:none; -webkit-user-select:none; -ms-user-select:none; }
     html,body{ overflow-x:hidden; }
     body{
@@ -35,7 +28,7 @@
                  #0b1224;
       color:#e5e7eb;
       min-height:100vh;
-      padding:20px 14px 120px;
+      padding:0 14px 120px;
       width:100%;
       display:block;
     }
@@ -54,8 +47,8 @@
       background:rgba(11,18,36,0.94);
       backdrop-filter:blur(8px);
       border-bottom:1px solid rgba(255,255,255,0.08);
-      margin:-20px -14px 8px;
-      padding:10px 14px;
+      margin:0 -14px 8px;
+      padding:12px 14px;
       font-family:'Fredoka','DotGothic16',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     }
     .header-inner{
@@ -201,8 +194,6 @@
       display:flex;
       justify-content:center;
       align-items:center;
-      min-height:var(--ad-height);
-      max-height:var(--ad-max-height);
     }
     .ad-note{
       display:block;
@@ -214,31 +205,10 @@
     .ad-slot{
       display:block;
       width:100%;
-      max-width:var(--ad-max-width);
-      height:var(--ad-height) !important;
-      min-height:var(--ad-height) !important;
-      max-height:var(--ad-max-height) !important;
+      max-width:100%;
       margin:0 auto;
       overflow:hidden;
       line-height:0;
-      flex:0 0 auto;
-    }
-    .ad-slot iframe{
-      width:100% !important;
-      height:100% !important;
-      display:block;
-    }
-    @media(max-width:640px){
-      .ad-block{
-        min-height:var(--ad-height-mobile);
-        max-height:var(--ad-max-height-mobile);
-      }
-      .ad-slot{
-        max-width:100%;
-        height:var(--ad-height-mobile) !important;
-        min-height:var(--ad-height-mobile) !important;
-        max-height:var(--ad-max-height-mobile) !important;
-      }
     }
     .link-thumb{
       position:relative;
