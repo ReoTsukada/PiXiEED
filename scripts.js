@@ -176,7 +176,7 @@
 
   function injectFooterAd() {
     const path = window.location.pathname || '';
-    if (/\/(terms|privacy)\//.test(path)) return; // 利用規約/プライバシーは除外
+    if (/\/(terms|privacy|portfolio|index\.html|\/$)/.test(path)) return; // ホームと規約/プライバシー/企業向けは除外
     if (document.querySelector('.ad-footer')) return; // 既に配置済みなら何もしない
 
     const STYLE_ID = 'pixieed-ad-footer-style';
