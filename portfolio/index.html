@@ -9,50 +9,281 @@
 <meta content="https://pixieed.jp/PiXiEEDogp.png" property="og:image"/>
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-<link href="../styles.css" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet"/>
+<style>
+  :root{ color-scheme: dark; }
+  html, body{ overflow-x:hidden; }
+  *{
+    box-sizing:border-box;
+    user-select:none;
+    -webkit-user-select:none;
+    -ms-user-select:none;
+  }
+  html, body{ overflow-x:hidden; }
+  body{
+    margin:0;
+    font-family:'Fredoka','DotGothic16',system-ui,sans-serif;
+    background:radial-gradient(circle at 20% 20%, rgba(59,130,246,0.22), rgba(15,23,42,1)),
+               radial-gradient(circle at 80% 0%, rgba(236,72,153,0.18), rgba(15,23,42,1)),
+               #0b1224;
+    color:#e5e7eb;
+    min-height:100vh;
+    padding:0 14px 120px;
+    width:100%;
+    display:block;
+  }
+  .page{
+    width:100%;
+    max-width:1200px;
+    display:grid;
+    gap:14px;
+    position:relative;
+    margin:0 auto;
+    grid-template-columns:1fr;
+  }
+  main{
+    display:grid;
+    gap:14px;
+    width:100%;
+    grid-template-columns:1fr;
+  }
+  header{
+    position:sticky;
+    top:0;
+    z-index:70;
+    background:rgba(11,18,36,0.94);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid rgba(255,255,255,0.08);
+    margin:0 -14px 8px;
+    padding:10px 14px;
+    font-family:'Fredoka','DotGothic16',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  }
+  .header-inner{
+    width:100%;
+    max-width:1200px;
+    margin:0 auto;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-weight:800;
+    letter-spacing:0.01em;
+    background:none;
+    border:0;
+    padding:0;
+    cursor:pointer;
+    color:#f9fafb;
+    text-decoration:none;
+    font-family:'Fredoka','DotGothic16',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  }
+  .brand-icon{
+    width:34px;
+    height:34px;
+    border-radius:10px;
+    background:rgba(255,255,255,0.12);
+    padding:4px;
+    border:1px solid rgba(255,255,255,0.2);
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+  }
+  .brand-icon img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    display:block;
+    image-rendering:pixelated;
+    image-rendering:crisp-edges;
+  }
+  .brand-text{ display:flex; flex-direction:column; gap:2px; }
+  .brand-title{ margin:0; font-size:16px; color:#f9fafb; }
+  .brand-sub{ margin:0; font-size:12px; color:#9ca3af; }
+  h1{ margin:0; font-size:24px; letter-spacing:0.02em; color:#f9fafb; }
+  h2{ margin:0; font-size:18px; color:#f9fafb; letter-spacing:0.01em; }
+  p{ margin:0; }
+  .card,
+  .section{
+    background:rgba(255,255,255,0.05);
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:12px;
+    padding:12px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.3);
+    width:100%;
+    max-width:100%;
+  }
+  .section-inner{
+    display:grid;
+    gap:12px;
+    width:100%;
+    max-width:100%;
+    margin:0;
+  }
+  .partner-map{
+    display:grid;
+    gap:12px;
+    grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));
+    align-items:start;
+  }
+  .partner-map__map{
+    position:relative;
+    width:100%;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,0.12);
+    background:radial-gradient(circle at 20% 30%, rgba(140,140,255,0.14), rgba(12,14,32,0.9)),
+               linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+    min-height:220px;
+    overflow:hidden;
+    box-shadow:0 10px 30px rgba(0,0,0,0.3);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .partner-map__overlay{
+    color:#cbd5e1;
+    font-weight:800;
+    letter-spacing:0.06em;
+    text-align:center;
+    padding:16px;
+  }
+  .partner-map__list{
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:12px;
+    padding:12px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.3);
+  }
+  .partner-map__list h3{
+    margin:0 0 8px;
+    font-size:16px;
+    color:#f9fafb;
+  }
+  .partner-map__items{
+    margin:0;
+    padding-left:16px;
+    color:#cbd5e1;
+    line-height:1.6;
+  }
+  /* hide auto-injected footer ad on portfolio page */
+  .ad-footer{ display:none !important; }
+  .section--highlight{
+    background:rgba(255,255,255,0.06);
+    border-color:rgba(255,255,255,0.14);
+  }
+  .section-eyebrow{
+    margin:0;
+    font-size:12px;
+    letter-spacing:0.16em;
+    text-transform:uppercase;
+    color:#cbd5e1;
+  }
+  .hero-cta{
+    display:flex;
+    flex-wrap:wrap;
+    gap:0.8rem;
+  }
+  .cta-primary,
+  .cta-secondary{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:10px 14px;
+    border-radius:10px;
+    font:700 14px/1.2 'Fredoka', system-ui, sans-serif;
+    cursor:pointer;
+    text-decoration:none;
+  }
+  .cta-primary{
+    color:#ffffff;
+    background:linear-gradient(135deg, #ff719a, #ff9f43);
+    box-shadow:0 4px 0 #e35c82, 0 8px 16px rgba(255,113,154,0.35);
+  }
+  .cta-secondary{
+    color:#e5e7eb;
+    border:1px solid rgba(255,255,255,0.18);
+    background:transparent;
+  }
+  .bottom-nav{
+    position:fixed;
+    bottom:0;
+    left:0;
+    right:0;
+    height:68px;
+    background:rgba(11,18,36,0.96);
+    border-top:1px solid rgba(255,255,255,0.08);
+    display:flex;
+    justify-content:space-around;
+    align-items:center;
+    z-index:90;
+    backdrop-filter:blur(8px);
+  }
+  .bottom-nav__item{
+    flex:1;
+    text-align:center;
+    color:#cbd5e1;
+    text-decoration:none;
+    font-weight:700;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    font-size:12px;
+    padding:8px 0;
+  }
+  .bottom-nav__item .icon{ font-size:18px; }
+  .bottom-nav__item.is-active{ color:#f9fafb; }
+</style>
 <link href="../character-dots/mao1.png" rel="icon" type="image/png"/></head>
-<body class="portfolio-standalone">
-<header class="site-header">
-<div class="site-brand">
-<a class="logo" href="../index.html">PiXiEED</a>
-<p class="tagline">ドット絵・アニメーション・ブラウザ演出</p>
+<body class="with-bottom-nav">
+<div class="page">
+<header aria-label="top-nav">
+<div class="header-inner">
+<button class="brand" id="openProfilePanel" type="button" aria-label="プロフィールを開く">
+<span class="brand-icon" id="brandAvatar"><img alt="logo" src="../character-dots/mao1.png"/></span>
+<div class="brand-text">
+<p class="brand-title">PiXiEED</p>
+<p class="brand-sub" id="brandUser">ユーザー</p>
 </div>
-<nav aria-label="メイン" class="site-nav">
-<ul>
-<li><a href="../index.html#dot-gallery">ドット絵</a></li>
-<li><a href="../index.html#projects">プロジェクト</a></li>
-<li><a href="../index.html#notes">ノート</a></li>
-<li><a href="../contact/index.html">コンタクト</a></li>
-<li><a aria-current="page" href="#">ポートフォリオ</a></li>
-</ul>
-</nav>
+</button>
+<div></div>
+</div>
 </header>
-<main>
-<section class="hero hero--portfolio" id="portfolio-hero">
-<div class="hero-copy">
-<p class="section-eyebrow">Alta Portfolio</p>
-<h1>企業向けポートフォリオ</h1>
-<p>ドット絵・アニメーション・ブラウザ演出の受託実績をまとめたページです。ゲーム/配信/プロモーション向けの制作・改修をご提案します。</p>
-<div class="hero-cta">
-<a class="cta-primary" href="mailto:pixieed.arta@gmail.com">制作を相談する</a>
-<a class="cta-secondary" href="../contact/index.html">連絡方法を見る</a>
-</div>
-</div>
-<div class="hero-display hero-display--portfolio">
-<div class="portfolio-window">
-<div>
-<span class="window-dot"></span>
-<span class="window-dot"></span>
-<span class="window-dot"></span>
-</div>
-<div class="portfolio-window__content">
-PIXEL<br/>
-ANIMATION
-</div>
+<main class="section section--highlight">
+<section class="section" id="client-map">
+<div class="section-inner">
+<h2>ご協力先MAP</h2>
+<p>ご協力いただいたカフェや営業先の社名と所在地をここに掲載します。準備が整い次第、マップと一覧に反映します。</p>
+<div class="partner-map">
+  <div aria-label="協力先の地図（準備中）" class="partner-map__map">
+    <div class="partner-map__overlay">MAP プレース（協力先を反映予定）</div>
+  </div>
+  <div class="partner-map__list">
+    <h3>協力先一覧（準備中）</h3>
+    <ul class="partner-map__items">
+      <li>ご協力先A（カフェ / 東京）</li>
+      <li>ご協力先B（企業 / 大阪）</li>
+      <li>ご協力先C（調整中）</li>
+    </ul>
+  </div>
 </div>
 </div>
 </section>
-<section class="section" id="portfolio-record">
+<section class="card" id="enterprise-offer">
+<div class="section-inner">
+<h2>企業向けに絵を描きます</h2>
+<p>広告・配信・イベント用のドット絵やアニメーションを企画から制作まで一貫対応します。演出の調整やブラウザ実装もセットでご相談ください。</p>
+<div class="hero-cta" style="margin-top:1rem;">
+<a class="cta-primary" href="mailto:pixieed.arta@gmail.com">制作相談を送る</a>
+<a class="cta-secondary" href="../contact/index.html">別の連絡方法</a>
+</div>
+</div>
+</section>
+<section class="card" id="portfolio-record">
 <div class="section-inner">
 <h2>これまでの案件</h2>
 <ul class="news-list">
@@ -63,7 +294,7 @@ ANIMATION
 </ul>
 </div>
 </section>
-<section class="section" id="portfolio-services">
+<section class="card" id="portfolio-services">
 <div class="section-inner">
 <h2>提供サービス</h2>
 <div class="portfolio-grid">
@@ -91,14 +322,81 @@ ANIMATION
 <div class="footer-inner">
 <small>© <span id="year"></span> PiXiEED. All rights reserved.</small>
 <div class="footer-links">
-<a href="../index.html">ホーム</a>
 <a href="../terms/index.html">利用規約</a>
 <a href="../privacy/index.html">プライバシーポリシー</a>
-<a href="../contact/index.html">コンタクト</a>
-<a class="footer-link--x" href="https://x.com/PiXiEED_arta" rel="noopener" target="_blank">公式X (旧Twitter)</a>
 </div>
 </div>
 </footer>
+<nav class="bottom-nav">
+<a class="bottom-nav__item" data-tab="home" href="../index.html">
+<span class="icon">🏠</span><span>ホーム</span>
+</a>
+<a class="bottom-nav__item" data-tab="contest" href="../contest/index.html">
+<span class="icon">🎨</span><span>コンテスト</span>
+</a>
+<a class="bottom-nav__item" data-tab="tools" href="../tools.html">
+<span class="icon">🛠️</span><span>ツール/ゲーム</span>
+</a>
+<a class="bottom-nav__item is-active" data-tab="portfolio" href="./index.html">
+<span class="icon">🏢</span><span>企業向け</span>
+</a>
+</nav>
 <script src="../scripts.js"></script>
+<script>
+  (function(){
+    function loadNickname(){ try{ return localStorage.getItem('pixieed_nickname') || ''; }catch(_){ return ''; } }
+    function loadAvatar(){ try{ return localStorage.getItem('pixieed_avatar') || 'mao'; }catch(_){ return 'mao'; } }
+    const AVATARS = {
+      mao:'../character-dots/mao1.png',
+      jerin1:'../character-dots/Jerin1.png',
+      jerin2:'../character-dots/Jerin2.png',
+      jerin3:'../character-dots/Jerin3.png',
+      jerin4:'../character-dots/Jerin4.png',
+      jerin5:'../character-dots/Jerin5.png',
+      jerin6:'../character-dots/Jerin6.png',
+      jerin7:'../character-dots/Jerin7.png',
+      jerin8:'../character-dots/Jerin8.png',
+      jellnall1:'../character-dots/JELLNALL1.png',
+      jellnall2:'../character-dots/JELLNALL2.png',
+      jellnall3:'../character-dots/JELLNALL3.png',
+      jellnall4:'../character-dots/JELLNALL4.png',
+      jellnall5:'../character-dots/JELLNALL5.png',
+      jellnall6:'../character-dots/JELLNALL6.png',
+      jellnall7:'../character-dots/JELLNALL7.png',
+      jellnall8:'../character-dots/JELLNALL8.png',
+      jellnall9:'../character-dots/JELLNALL9.png',
+      jellnall10:'../character-dots/JELLNALL10.png',
+      jellnall11:'../character-dots/JELLNALL11.png',
+      jellnall12:'../character-dots/JELLNALL12.png',
+      jellnall13:'../character-dots/JELLNALL13.png',
+      jellnall14:'../character-dots/JELLNALL14.png',
+      jellnall15:'../character-dots/JELLNALL15.png',
+      jellnall16:'../character-dots/JELLNALL16.png',
+      jellnall17:'../character-dots/JELLNALL17.png',
+      jellnall18:'../character-dots/JELLNALL18.png',
+      jellnall19:'../character-dots/JELLNALL19.png',
+      baburin:'../character-dots/baburinpng.png'
+    };
+    function applyAvatar(){
+      const brand = document.getElementById('brandAvatar');
+      const avatar = loadAvatar();
+      const src = AVATARS[avatar] || AVATARS.mao;
+      if(brand){ brand.innerHTML = `<img src="${src}" alt="avatar">`; }
+      const nick = loadNickname();
+      const sub = document.getElementById('brandUser');
+      if(sub){ sub.textContent = nick || 'ユーザー'; }
+    }
+    function setActiveNav(){
+      document.querySelectorAll('.bottom-nav__item').forEach(item => {
+        item.classList.toggle('is-active', item.dataset.tab === 'portfolio');
+      });
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      applyAvatar();
+      setActiveNav();
+    });
+  })();
+</script>
+</div>
 </body>
 </html>
