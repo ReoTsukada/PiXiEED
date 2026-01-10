@@ -2566,11 +2566,24 @@ body.portfolio-page main > .section > .section-inner {
   margin: 2rem auto;
   max-width: min(900px, 90vw);
   text-align: center;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .ad-block--section {
   margin-top: -1rem;
   margin-bottom: 2.5rem;
+}
+.ad-block ins.adsbygoogle{
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 auto;
+  line-height: 0;
+  overflow: hidden;
 }
 
 /* Ad label */
