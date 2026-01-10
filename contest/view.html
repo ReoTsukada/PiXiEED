@@ -25,22 +25,25 @@
                  #0b1224;
       color:#e5e7eb;
       min-height:100vh;
-      padding:20px 12px 48px;
+      padding:20px 14px 120px;
       display:flex;
       justify-content:center;
     }
-    .page{ width:100%; max-width:900px; display:grid; gap:16px; }
+    .page{ width:100%; max-width:none; display:grid; gap:16px; }
     header{
       position:sticky;
       top:0;
-      z-index:60;
+      z-index:70;
       background:rgba(11,18,36,0.94);
       backdrop-filter:blur(8px);
       border-bottom:1px solid rgba(255,255,255,0.08);
-      margin:-28px -12px 12px;
+      margin:-20px -14px 8px;
       padding:10px 14px;
     }
     .header-inner{
+      width:100%;
+      max-width:none;
+      margin:0 auto;
       display:flex;
       align-items:center;
       justify-content:space-between;
@@ -223,7 +226,7 @@
     .gallery{
       display:grid;
       gap:12px;
-      grid-template-columns:repeat(3, 1fr);
+      grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
     }
     .entry-card{
       background:rgba(255,255,255,0.05);
@@ -294,6 +297,39 @@
       opacity:0.5;
       cursor:not-allowed;
     }
+    .bottom-nav{
+      position:fixed;
+      bottom:0;
+      left:0;
+      right:0;
+      height:68px;
+      background:rgba(11,18,36,0.96);
+      border-top:1px solid rgba(255,255,255,0.08);
+      display:flex;
+      justify-content:space-around;
+      align-items:center;
+      z-index:80;
+      backdrop-filter:blur(8px);
+    }
+    .bottom-nav__item{
+      flex:1;
+      text-align:center;
+      color:#cbd5e1;
+      text-decoration:none;
+      font-weight:700;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:4px;
+      font-size:12px;
+      padding:8px 0;
+    }
+    .bottom-nav__item .icon{
+      font-size:18px;
+    }
+    .bottom-nav__item.is-active{
+      color:#f9fafb;
+    }
   </style>
 </head>
 <body>
@@ -340,6 +376,20 @@
       <div id="relatedGallery" class="gallery"></div>
     </section>
   </div>
+  <nav class="bottom-nav">
+    <a class="bottom-nav__item" data-tab="home" href="../index.html">
+      <span class="icon">🏠</span><span>ホーム</span>
+    </a>
+    <a class="bottom-nav__item is-active" data-tab="contest" href="./index.html">
+      <span class="icon">🎨</span><span>コンテスト</span>
+    </a>
+    <a class="bottom-nav__item" data-tab="tools" href="../tools.html">
+      <span class="icon">🛠️</span><span>ツール/ゲーム</span>
+    </a>
+    <a class="bottom-nav__item" data-tab="portfolio" href="../portfolio/index.html">
+      <span class="icon">🏢</span><span>企業向け</span>
+    </a>
+  </nav>
   <div class="auth-panel" id="authPanel" aria-hidden="true">
     <div class="auth-card">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
@@ -814,7 +864,7 @@
         await supabaseDelete('contest_entries', { eq });
         setStatus('削除しました');
         setDeleteNotice('');
-        location.href = './index.html';
+        location.replace('./index.html');
       }catch(err){
         console.error(err);
         setStatus('削除に失敗しました');
@@ -1002,6 +1052,14 @@
       return res.json();
     }
 
+    function setActiveNav(){
+      const tab = 'contest';
+      document.querySelectorAll('.bottom-nav__item').forEach(item => {
+        const isMatch = item.dataset.tab === tab;
+        item.classList.toggle('is-active', isMatch);
+      });
+    }
+
     async function init(){
       ensureClientId();
       setupAuthButton();
@@ -1023,6 +1081,7 @@
       render();
       applyAvatarToBrand();
       renderAvatarChoices();
+      setActiveNav();
       const likeBtn = $('heroLike');
       if(likeBtn){
         likeBtn.addEventListener('click', likeEntry);
