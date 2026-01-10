@@ -2735,13 +2735,6 @@ body.project-page .hero-copy p {
 .adsbygoogle{
   max-width:100% !important;
   display:block !important;
-  max-height:320px !important;
-  overflow:hidden !important;
-}
-@media(max-width:640px){
-  .adsbygoogle{
-    max-height:200px !important;
-  }
 }
 body.project-page .hero-cta {
   display: grid;
