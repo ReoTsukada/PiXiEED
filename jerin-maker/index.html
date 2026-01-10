@@ -144,10 +144,14 @@
   }
   .canvas-stack {
     position: relative;
-    --canvas-size: min(82vw, min(56vh, 520px));
+    --canvas-base: min(82vw, min(56vh, 520px));
+    --canvas-zoom: 1;
+    --canvas-size: calc(var(--canvas-base) * var(--canvas-zoom));
     width: var(--canvas-size);
     height: var(--canvas-size);
-    max-width: 100%;
+    max-width: min(96vw, 560px);
+    max-height: min(70vh, 560px);
+    transition: width 0.12s ease, height 0.12s ease;
   }
   .canvas-stack canvas {
     position: absolute;
@@ -752,7 +756,7 @@
     .panel { max-height: none; }
   }
   @media (max-height: 720px) {
-    .canvas-stack { --canvas-size: min(78vw, min(46vh, 460px)); }
+    .canvas-stack { --canvas-base: min(78vw, min(46vh, 460px)); }
     .canvas-frame { padding: 8px; }
     .panel { max-height: calc(100vh - 140px); gap: 8px; }
     .app { gap: clamp(8px, 2vw, 12px); }
@@ -760,13 +764,13 @@
   }
   @media (max-height: 620px) {
     :root { --pad: clamp(6px, 1.5vw, 10px); }
-    .canvas-stack { --canvas-size: min(70vw, min(38vh, 340px)); }
+    .canvas-stack { --canvas-base: min(70vw, min(38vh, 340px)); }
     .panel { max-height: calc(100vh - 170px); gap: 6px; }
     .prompt { font-size: 0.86rem; padding: 8px 8px; }
     .footer { padding: 4px 0; }
   }
   @media (min-height: 900px) and (orientation: portrait) {
-    .canvas-stack { --canvas-size: min(86vw, min(64vh, 560px)); }
+    .canvas-stack { --canvas-base: min(86vw, min(64vh, 560px)); }
     .app { gap: clamp(12px, 2.5vw, 18px); }
     .panel { max-height: calc(100vh - 180px); }
   }
