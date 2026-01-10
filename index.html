@@ -1,721 +1,733 @@
 <!DOCTYPE html>
-
 <html lang="ja">
 <head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>PiXiEED | ドット絵専用総合サイト</title>
-<meta content="PiXiEEDはドット絵制作・pixel art commission、ブラウザゲーム用アセット制作、ツールとゲームをまとめた個人サイトです。依頼・業務委託・コラボ相談も受付中。" name="description"/>
-<meta content="website" property="og:type"/>
-<meta content="PiXiEED" property="og:site_name"/>
-<meta content="PiXiEED | ドット絵専用総合サイト" property="og:title"/>
-<meta content="ドット絵制作の外注・pixel art commission、ブラウザゲーム用アセット制作、ツールとゲーム、制作ノートを紹介するPiXiEEDの公式サイト。" property="og:description"/>
-<meta content="https://pixieed.jp/" property="og:url"/>
-<meta content="https://pixieed.jp/PiXiEEDogp.png" property="og:image"/>
-<meta content="summary_large_image" name="twitter:card"/>
-<meta content="PiXiEED | ドット絵専用総合サイト" name="twitter:title"/>
-<meta content="ドット絵制作の外注・pixel art commission、ブラウザゲーム用アセット制作を受託。ツールとゲーム、制作ノートを公開するPiXiEED公式サイト。" name="twitter:description"/>
-<meta content="https://pixieed.jp/PiXiEEDogp.png" name="twitter:image"/>
-<link href="https://fonts.googleapis.com" rel="preconnect"/>
-<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&amp;family=Noto+Sans+JP:wght@400;700&amp;display=swap" rel="stylesheet"/>
-<script async="" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
-<link href="styles.css" rel="stylesheet"/>
-<!-- Google tag (gtag.js) -->
-<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
-<script>
-  const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
-  const GA_PAGE_PATH = '/';
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', GA_MEASUREMENT_ID, {
-    page_path: GA_PAGE_PATH,
-    page_title: document.title
-  });
-  gtag('event', 'home_visit');
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+  <title>PiXiEED | ドット絵専用総合サイト</title>
+  <meta name="description" content="ドット絵制作・pixel art commission、ブラウザゲーム用アセット、ツールとゲームをまとめたPiXiEED公式サイト。"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:site_name" content="PiXiEED"/>
+  <meta property="og:title" content="PiXiEED | ドット絵専用総合サイト"/>
+  <meta property="og:description" content="ドット絵制作の外注・pixel art commission、ブラウザゲーム用アセット制作、ツールとゲームを紹介するPiXiEED公式サイト。"/>
+  <meta property="og:url" content="https://pixieed.jp/"/>
+  <meta property="og:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <link rel="icon" type="image/png" href="character-dots/mao1.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
+  <style>
+    :root{ color-scheme: dark; }
+    *{ box-sizing:border-box; user-select:none; -webkit-user-select:none; -ms-user-select:none; }
+    body{
+      margin:0;
+      font-family:'Fredoka','DotGothic16',system-ui,sans-serif;
+      background:radial-gradient(circle at 20% 20%, rgba(59,130,246,0.22), rgba(15,23,42,1)),
+                 radial-gradient(circle at 80% 0%, rgba(236,72,153,0.18), rgba(15,23,42,1)),
+                 #0b1224;
+      color:#e5e7eb;
+      min-height:100vh;
+      padding:20px 14px 120px;
+      width:100%;
+      display:block;
+    }
+    .page{
+      width:100%;
+      max-width:1200px;
+      display:grid;
+      gap:14px;
+      position:relative;
+      margin:0 auto;
+    }
+    header{
+      position:sticky;
+      top:0;
+      z-index:70;
+      background:rgba(11,18,36,0.94);
+      backdrop-filter:blur(8px);
+      border-bottom:1px solid rgba(255,255,255,0.08);
+      margin:-20px -14px 8px;
+      padding:10px 14px;
+      font-family:'Fredoka','DotGothic16',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    }
+    .header-inner{
+      width:100%;
+      max-width:1200px;
+      margin:0 auto;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-weight:800;
+      letter-spacing:0.01em;
+      background:none;
+      border:0;
+      padding:0;
+      cursor:pointer;
+      color:#f9fafb;
+      text-decoration:none;
+      font-family:'Fredoka','DotGothic16',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    }
+    .brand-icon{
+      width:34px;
+      height:34px;
+      border-radius:10px;
+      background:rgba(255,255,255,0.12);
+      padding:4px;
+      border:1px solid rgba(255,255,255,0.2);
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+    }
+    .brand-icon img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      display:block;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .brand-text{ display:flex; flex-direction:column; gap:2px; }
+    .brand-title{ margin:0; font-size:16px; color:#f9fafb; }
+    .brand-sub{ margin:0; font-size:12px; color:#9ca3af; }
+
+    h1{ margin:0; font-size:24px; letter-spacing:0.02em; color:#f9fafb; }
+    h2{ margin:0; font-size:18px; color:#f9fafb; letter-spacing:0.01em; }
+    p{ margin:0; }
+    .subtitle{ margin:0; color:#cbd5e1; font-size:13px; line-height:1.6; }
+
+    .card,
+    .section{
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:12px;
+      padding:16px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.3);
+    }
+    .section-inner{ display:grid; gap:12px; }
+    .section--highlight{
+      background:rgba(255,255,255,0.06);
+      border-color:rgba(255,255,255,0.14);
+    }
+    .section-eyebrow{
+      margin:0;
+      font-size:12px;
+      letter-spacing:0.16em;
+      text-transform:uppercase;
+      color:#cbd5e1;
+    }
+    .hero-grid{
+      display:grid;
+      gap:16px;
+      grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));
+      align-items:start;
+    }
+    .hero-copy{
+      display:grid;
+      gap:12px;
+    }
+    .chips{ display:flex; gap:8px; flex-wrap:wrap; }
+    .chip{
+      border:1px solid rgba(255,255,255,0.18);
+      background:transparent;
+      color:#e5e7eb;
+      border-radius:12px;
+      padding:8px 12px;
+      font-weight:700;
+      font-size:12px;
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+    }
+    .button{
+      appearance:none;
+      border:0;
+      border-radius:10px;
+      padding:10px 14px;
+      font:700 14px/1.2 'Fredoka', system-ui, sans-serif;
+      cursor:pointer;
+      color:#ffffff;
+      background:linear-gradient(135deg, #ff719a, #ff9f43);
+      box-shadow:0 4px 0 #e35c82, 0 8px 16px rgba(255,113,154,0.35);
+      transition:transform 0.1s ease, filter 0.1s ease;
+    }
+    .button:hover,
+    .button:focus-visible{ transform:translateY(-1px); filter:brightness(1.05); }
+    .grid{
+      display:grid;
+      gap:14px;
+      grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
+    }
+    .link-card{
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:12px;
+      padding:12px;
+      text-decoration:none;
+      color:inherit;
+      display:grid;
+      gap:8px;
+      box-shadow:0 8px 24px rgba(0,0,0,0.26);
+      transition:transform 0.1s ease, box-shadow 0.1s ease, border-color 0.1s ease;
+    }
+    .link-card:hover{
+      transform:translateY(-2px);
+      box-shadow:0 12px 28px rgba(0,0,0,0.32);
+      border-color:rgba(255,255,255,0.18);
+    }
+    .ad-block{
+      margin-top:12px;
+      border-radius:12px;
+      padding:10px;
+      background:linear-gradient(160deg, rgba(255,255,255,0.03), rgba(15,23,42,0.9));
+      border:1px dashed rgba(255,255,255,0.24);
+      box-shadow:0 12px 28px rgba(0,0,0,0.28);
+    }
+    .ad-note{
+      display:block;
+      margin-top:6px;
+      color:#cbd5e1;
+      font-size:11px;
+      letter-spacing:0.02em;
+    }
+    .ad-slot{
+      display:block;
+      width:100%;
+      max-width:100%;
+      height:280px;
+    }
+    @media(max-width:640px){
+      .ad-slot{ height:150px; }
+    }
+    .link-thumb{
+      position:relative;
+      aspect-ratio:4/3;
+      background:rgba(0,0,0,0.25);
+      border-radius:10px;
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .link-thumb img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      display:block;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .link-tag{
+      position:absolute;
+      top:8px;
+      left:8px;
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:11px;
+      font-weight:800;
+      color:#0b1224;
+      background:rgba(255,255,255,0.9);
+    }
+    .link-title{ margin:0; font-size:15px; color:#f9fafb; }
+    .link-desc{ margin:0; font-size:12px; color:#cbd5e1; line-height:1.5; }
+
+    /* Dot gallery */
+    .dot-hero{
+      display:grid;
+      gap:12px;
+    }
+    .dot-gallery__viewer{
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,0.16);
+      background:rgba(11,18,36,0.9);
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      aspect-ratio:4/3;
+      width:100%;
+      box-shadow:0 12px 30px rgba(0,0,0,0.32);
+    }
+    .dot-gallery__viewer img{
+      display:block;
+      max-width:100%;
+      max-height:100%;
+      object-fit:contain;
+      image-rendering:pixelated;
+    }
+    .dot-gallery__buttons{
+      display:flex;
+      gap:10px;
+      overflow-x:auto;
+      padding:8px 2px 10px;
+      -webkit-overflow-scrolling:touch;
+      scroll-snap-type:x proximity;
+    }
+    .dot-gallery__buttons::-webkit-scrollbar{ height:6px; }
+    .dot-gallery__buttons::-webkit-scrollbar-thumb{
+      background:rgba(255,255,255,0.35);
+      border-radius:999px;
+    }
+    .dot-gallery__button{
+      position:relative;
+      flex:0 0 auto;
+      width:96px;
+      height:96px;
+      padding:0;
+      border-radius:12px;
+      border:2px solid transparent;
+      background:rgba(15,23,42,0.85);
+      cursor:pointer;
+      display:grid;
+      place-items:center;
+      transition:border 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+      scroll-snap-align:center;
+    }
+    .dot-gallery__button.is-active{
+      border-color:rgba(255,255,255,0.5);
+      box-shadow:0 10px 20px rgba(0,0,0,0.28);
+      transform:translateY(-2px);
+    }
+    .dot-gallery__button img{
+      max-width:100%;
+      max-height:100%;
+      border-radius:9px;
+      image-rendering:pixelated;
+    }
+
+    /* Character hero */
+    .character-preview{
+      margin-top:8px;
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,0.16);
+      overflow:hidden;
+      background:rgba(11,18,36,0.9);
+      box-shadow:0 12px 30px rgba(0,0,0,0.32);
+    }
+    .character-preview__frame,
+    .character-preview__details{
+      min-height:320px;
+      align-self:stretch;
+    }
+    .character-preview__frame{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:rgba(15,23,42,0.9);
+      position:relative;
+      padding:16px;
+    }
+    .character-preview__frame img{
+      width:min(520px,100%);
+      max-height:420px;
+      image-rendering:pixelated;
+      object-fit:contain;
+    }
+    .character-preview__placeholder{
+      position:absolute;
+      inset:16px;
+      border:1px dashed rgba(255,255,255,0.3);
+      border-radius:12px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#cbd5e1;
+      letter-spacing:0.12em;
+      font-size:12px;
+      background:rgba(255,255,255,0.03);
+    }
+    .character-preview__details{
+      padding:16px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      background:rgba(9,12,22,0.85);
+    }
+    .character-preview__heading h2{ margin:0; }
+    .character-preview__heading p{ margin:0.5rem 0 0; color:#cbd5e1; }
+    .character-preview__name{ margin:0; font-size:22px; }
+    .character-preview__weight{ margin:0; color:#cbd5e1; font-size:13px; }
+    .character-preview__traits h4,
+    .character-preview__detail h4{ margin:0 0 6px; }
+    .character-preview__traits ul{ margin:0; padding-left:18px; color:#cbd5e1; }
+    .character-preview__detail p{ margin:0; color:#cbd5e1; line-height:1.6; }
+    .character-sprites__hint{
+      margin:8px 0 4px;
+      color:#cbd5e1;
+      font-size:12px;
+      text-align:center;
+    }
+    .character-preview__buttons{
+      display:flex;
+      gap:10px;
+      overflow-x:auto;
+      padding:8px 2px 10px;
+      -webkit-overflow-scrolling:touch;
+      scroll-snap-type:x proximity;
+    }
+    .character-preview__buttons::-webkit-scrollbar{ height:6px; }
+    .character-preview__buttons::-webkit-scrollbar-thumb{
+      background:rgba(255,255,255,0.35);
+      border-radius:999px;
+    }
+    .character-sprite{
+      flex:0 0 auto;
+      width:96px;
+      min-height:120px;
+      border:1px solid rgba(255,255,255,0.2);
+      border-radius:12px;
+      background:rgba(15,23,42,0.85);
+      padding:8px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:6px;
+      cursor:pointer;
+      transition:border 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+      scroll-snap-align:center;
+    }
+    .character-sprite img{
+      width:74px;
+      height:74px;
+      object-fit:contain;
+      image-rendering:pixelated;
+    }
+    .character-sprite span{
+      font-size:11px;
+      color:#cbd5e1;
+      text-align:center;
+      line-height:1.2;
+    }
+    .character-sprite.is-active{
+      border-color:rgba(255,255,255,0.5);
+      box-shadow:0 10px 20px rgba(0,0,0,0.28);
+      transform:translateY(-2px);
+    }
+
+    .bottom-nav{
+      position:fixed;
+      bottom:0;
+      left:0;
+      right:0;
+      height:68px;
+      background:rgba(11,18,36,0.96);
+      border-top:1px solid rgba(255,255,255,0.08);
+      display:flex;
+      justify-content:space-around;
+      align-items:center;
+      z-index:90;
+      backdrop-filter:blur(8px);
+    }
+    .bottom-nav__item{
+      flex:1;
+      text-align:center;
+      color:#cbd5e1;
+      text-decoration:none;
+      font-weight:700;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:4px;
+      font-size:12px;
+      padding:8px 0;
+    }
+    .bottom-nav__item .icon{ font-size:18px; }
+    .bottom-nav__item.is-active{ color:#f9fafb; }
+    footer{
+      color:#cbd5e1;
+      text-align:center;
+      font-size:12px;
+      display:grid;
+      gap:8px;
+    }
+    .footer-links{
+      display:flex;
+      flex-wrap:wrap;
+      justify-content:center;
+      gap:12px;
+      padding:0;
+      margin:0;
+      list-style:none;
+    }
+    .footer-links a{
+      color:#cbd5e1;
+      text-decoration:none;
+      border:1px solid rgba(255,255,255,0.16);
+      border-radius:10px;
+      padding:6px 10px;
+      background:rgba(255,255,255,0.04);
+      font-weight:700;
+      transition:transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    .footer-links a:hover,
+    .footer-links a:focus-visible{
+      transform:translateY(-1px);
+      border-color:rgba(255,255,255,0.26);
+      background:rgba(255,255,255,0.08);
+    }
+  </style>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
+  <script>
+    const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
+    const GA_PAGE_PATH = '/';
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', GA_MEASUREMENT_ID, { page_path: GA_PAGE_PATH, page_title: document.title });
+    gtag('event', 'home_visit');
   </script>
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "WebSite",
-      "@id": "https://pixieed.jp/#website",
-      "url": "https://pixieed.jp/",
-      "name": "PiXiEED",
-      "inLanguage": "ja"
-    },
-    {
-      "@type": "Organization",
-      "@id": "https://pixieed.jp/#org",
-      "name": "PiXiEED",
-      "url": "https://pixieed.jp/",
-      "logo": "https://pixieed.jp/PiXiEEDogp.png",
-      "contactPoint": [
-        {
-          "@type": "ContactPoint",
-          "contactType": "business",
-          "email": "pixieed.arta@gmail.com",
-          "availableLanguage": ["ja", "en"],
-          "areaServed": "JP"
-        }
-      ],
-      "sameAs": [
-        "https://x.com/PiXiEED_arta",
-        "https://note.com/jaxya"
-      ]
-    },
-    {
-      "@type": "Service",
-      "name": "ドット絵制作・pixel art commission",
-      "serviceType": "Pixel art / sprite / game asset production",
-      "provider": { "@id": "https://pixieed.jp/#org" },
-      "areaServed": "JP",
-      "availableChannel": {
-        "@type": "ContactPoint",
-        "contactType": "customer service",
-        "email": "pixieed.arta@gmail.com",
-        "url": "https://pixieed.jp/contact/"
-      },
-      "description": "ドット絵制作、ブラウザゲーム用スプライト・UI・アニメーションの外注・業務委託を受け付けています。"
-    }
-  ]
-}
-</script>
-<link href="character-dots/mao1.png" rel="icon" type="image/png"/></head>
-<style>
-/* 共通ヘッダー（contestと合わせたシンプル版） */
-.top-nav{
-  position:sticky;
-  top:0;
-  z-index:80;
-  background:rgba(11,18,36,0.94);
-  backdrop-filter:blur(8px);
-  border-bottom:1px solid rgba(255,255,255,0.08);
-  padding:10px 16px;
-  margin:-8px -16px 12px;
-}
-.top-nav__inner{
-  max-width:1200px;
-  margin:0 auto;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-}
-.brand{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  font-weight:800;
-  letter-spacing:0.01em;
-  background:none;
-  border:0;
-  padding:0;
-  cursor:pointer;
-  color:#f9fafb;
-  text-decoration:none;
-}
-.brand-icon{
-  width:36px;
-  height:36px;
-  border-radius:10px;
-  background:rgba(255,255,255,0.12);
-  padding:4px;
-  border:1px solid rgba(255,255,255,0.2);
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  overflow:hidden;
-}
-.brand-icon img{
-  width:100%;
-  height:100%;
-  object-fit:contain;
-  image-rendering:pixelated;
-  image-rendering:crisp-edges;
-}
-.brand-text{
-  display:flex;
-  flex-direction:column;
-  gap:2px;
-}
-.brand-title{ margin:0; font-size:16px; color:#f9fafb; }
-.brand-sub{ margin:0; font-size:12px; color:#9ca3af; }
-.auth-panel{
-  position:fixed;
-  inset:0;
-  display:none;
-  align-items:center;
-  justify-content:center;
-  background:rgba(0,0,0,0.65);
-  backdrop-filter:blur(4px);
-  padding:16px;
-  z-index:90;
-}
-.auth-panel.is-open{ display:flex; }
-.auth-card{
-  width:100%;
-  max-width:420px;
-  background:rgba(15,23,42,0.95);
-  border:1px solid rgba(255,255,255,0.14);
-  border-radius:16px;
-  padding:16px;
-  box-shadow:0 18px 40px rgba(0,0,0,0.45);
-  display:grid;
-  gap:12px;
-}
-.auth-input{
-  width:100%;
-  border-radius:10px;
-  border:1px solid rgba(255,255,255,0.18);
-  background:rgba(255,255,255,0.05);
-  color:#fff;
-  padding:10px 12px;
-  font-size:14px;
-}
-.auth-btn{
-  border:1px solid rgba(255,255,255,0.2);
-  background:linear-gradient(135deg,#4f46e5,#7c3aed);
-  color:#fff;
-  border-radius:12px;
-  padding:10px 14px;
-  font-weight:800;
-  cursor:pointer;
-  text-align:center;
-}
-.close-btn{
-  border:1px solid rgba(255,255,255,0.2);
-  background:rgba(255,255,255,0.08);
-  color:#fff;
-  border-radius:8px;
-  padding:6px 10px;
-  cursor:pointer;
-}
-.auth-status{
-  font-size:12px;
-  color:#cbd5e1;
-  min-height:16px;
-}
-.auth-status{
-  font-size:12px;
-  color:#cbd5e1;
-  min-height:16px;
-}
-.profile-block{
-  display:grid;
-  gap:10px;
-  padding:10px;
-  border-radius:12px;
-  background:rgba(255,255,255,0.04);
-  border:1px solid rgba(255,255,255,0.08);
-}
-.avatar-grid{
-  display:grid;
-  grid-template-columns:repeat(6, minmax(0, 1fr));
-  gap:4px;
-}
-.avatar-option{
-  width:100%;
-  aspect-ratio:1;
-  border-radius:12px;
-  border:2px solid transparent;
-  background:rgba(0,0,0,0.7);
-  cursor:pointer;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  transition:border-color 0.15s ease, transform 0.1s ease;
-}
-.avatar-option.is-active{
-  border-color:#7c3aed;
-  transform:translateY(-1px);
-}
-</style>
-<body class="portfolio-page">
-<header class="top-nav" aria-label="top-nav">
-  <div class="top-nav__inner">
-    <a class="brand" id="openProfilePanel" href="#">
-      <span class="brand-icon" id="brandAvatar"><img src="character-dots/mao1.png" alt="logo"></span>
-      <div class="brand-text">
-        <p class="brand-title">PiXiEED</p>
-        <p class="brand-sub">Dot Gallery</p>
+  <!-- Google AdSense -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
+</head>
+<body class="with-bottom-nav">
+  <div class="page">
+    <header aria-label="top-nav">
+      <div class="header-inner">
+        <button class="brand" id="openProfilePanel" type="button" aria-label="プロフィールを開く">
+          <span class="brand-icon" id="brandAvatar">
+            <img src="character-dots/mao1.png" alt="logo">
+          </span>
+          <div class="brand-text">
+            <p class="brand-title">PiXiEED</p>
+            <p class="brand-sub" id="brandUser">ユーザー</p>
+          </div>
+        </button>
+        <div></div>
       </div>
+    </header>
+
+    <section class="card">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <h1>PiXiEED ホーム</h1>
+        </div>
+        <div class="dot-hero">
+          <h2>ドット絵</h2>
+          <div class="dot-gallery__viewer">
+            <img alt="" id="dotGalleryMain" loading="lazy" src=""/>
+          </div>
+          <div class="dot-gallery__buttons" id="dotGalleryButtons" aria-label="ドット絵一覧"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-label="広告">
+      <div class="ad-block">
+        <ins class="adsbygoogle ad-slot"
+             style="display:block"
+             data-ad-client="ca-pub-9801602250480253"
+             data-ad-slot="2141591954"
+             data-ad-format="auto"
+             data-full-width-responsive="true"></ins>
+      </div>
+    </section>
+
+    <section class="section section--highlight" id="character-intro">
+      <div class="section-inner">
+        <p class="section-eyebrow">Original Character Workbench</p>
+        <div class="character-preview__heading">
+          <h2>キャラクター</h2>
+          <p>ここではジェリンを中心としてオリジナルキャラクターの紹介をしています。ゲームのシリーズに登場します。</p>
+        </div>
+        <div aria-live="polite" class="character-preview">
+          <div class="character-preview__frame">
+            <img alt="" hidden id="characterGalleryMain" loading="lazy" src=""/>
+            <div class="character-preview__placeholder" id="characterGalleryPlaceholder">
+              <small id="characterPlaceholderMeta">差し替え待ち</small>
+            </div>
+          </div>
+          <div class="character-preview__details" id="characterPreviewDetails">
+            <h3 class="character-preview__name" id="characterGalleryName">キャラクターA（仮）</h3>
+            <p class="character-preview__weight" id="characterGalleryWeight">Weight: 調整中</p>
+            <div class="character-preview__traits">
+              <h4>特徴</h4>
+              <ul id="characterTraits">
+                <li>特徴メモ</li>
+              </ul>
+            </div>
+            <div class="character-preview__detail">
+              <h4>詳細</h4>
+              <p id="characterGalleryDetail">選択したキャラクターの詳細がここに表示されます。</p>
+            </div>
+          </div>
+        </div>
+        <p class="character-sprites__hint">下のPNGをクリックするとプレビューと詳細が切り替わります。</p>
+        <div aria-label="キャラクター一覧" class="character-preview__buttons" id="characterGalleryButtons" role="listbox"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>プロジェクト</h2>
+      <div class="grid">
+        <a class="link-card" href="projects/maoitu/index.html">
+          <div class="link-thumb">
+            <img src="maoitu/ogp.png" alt="魔王様!!いつまでよければいいですか!?">
+            <span class="link-tag">Game</span>
+          </div>
+          <h3 class="link-title">魔王様!!いつまでよければいいですか!?</h3>
+          <p class="link-desc">ひたすら避け続けるアクション。短時間で遊べる人気タイトルです。</p>
+        </a>
+        <a class="link-card" href="projects/pixfind/index.html">
+          <div class="link-thumb">
+            <img src="pixfind/ogp.png" alt="PiXFiND">
+            <span class="link-tag">Game</span>
+          </div>
+          <h3 class="link-title">PiXFiND（調整中）</h3>
+          <p class="link-desc">ドット絵特化の間違い探し。現在クローズド調整中です。</p>
+        </a>
+        <div class="ad-block" aria-label="広告枠">
+          <ins class="adsbygoogle ad-slot"
+               style="display:block"
+               data-ad-client="ca-pub-9801602250480253"
+               data-ad-slot="2261515379"
+               data-ad-format="auto"
+               data-full-width-responsive="true"></ins>
+        </div>
+        <a class="link-card" href="projects/jerin-maker/index.html">
+          <div class="link-thumb">
+            <img src="jerin-maker/ogp-app.png" alt="PiXiEEDraw Lite">
+            <span class="link-tag">Tool</span>
+          </div>
+          <h3 class="link-title">PiXiEEDraw Lite</h3>
+          <p class="link-desc">16×16固定のライト版ドットツール。ブラウザですぐ描いてPNG保存。</p>
+        </a>
+        <a class="link-card" href="projects/pixiee-lens/index.html">
+          <div class="link-thumb">
+            <img src="pixiee-lens/ogp.png" alt="PiXiEELENS">
+            <span class="link-tag">Lab</span>
+          </div>
+          <h3 class="link-title">PiXiEELENS</h3>
+          <p class="link-desc">全画面カメラのラボ版。ドットモードとパレット読み込みで配色を試せます。</p>
+        </a>
+        <a class="link-card" href="projects/qr-maker/index.html">
+          <div class="link-thumb">
+            <img src="qr-maker/qrogp.png" alt="QRコードメーカー">
+            <span class="link-tag">Tool</span>
+          </div>
+          <h3 class="link-title">QRコードメーカー</h3>
+          <p class="link-desc">色や余白を指定してQRを生成し、即座にPNG保存できます。</p>
+        </a>
+      </div>
+      <div class="ad-block" aria-label="広告枠">
+        <ins class="adsbygoogle ad-slot"
+             style="display:block"
+             data-ad-client="ca-pub-9801602250480253"
+             data-ad-slot="9073878884"
+             data-ad-format="auto"
+             data-full-width-responsive="true"></ins>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>コンタクト</h2>
+      <p class="subtitle">ドット絵制作・pixel art commission、ブラウザゲーム用アセット制作、業務委託・コラボの相談はこちら。</p>
+      <div class="chips">
+        <a class="button" href="mailto:pixieed.arta@gmail.com">メールで相談する</a>
+        <a class="button" href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">公式X</a>
+      </div>
+    </section>
+
+    <footer>
+      <p>© <span id="year"></span> PiXiEED. All rights reserved.</p>
+      <div class="footer-links">
+        <a href="terms/index.html">利用規約</a>
+        <a href="privacy/index.html">プライバシーポリシー</a>
+      </div>
+    </footer>
+  </div>
+
+  <nav class="bottom-nav">
+    <a class="bottom-nav__item is-active" data-tab="home" href="./index.html">
+      <span class="icon">🏠</span><span>ホーム</span>
     </a>
-    <div></div>
-  </div>
-</header>
-<main>
-<section class="section" style="margin-top:0; padding-top:0;">
-<div class="section-inner">
-<header class="portfolio-header">
-<div class="portfolio-header__inner">
-<a class="logo" href="index.html">PiXiEED</a>
-<nav aria-label="サイト ナビゲーション" class="portfolio-header__nav">
-<ul class="portfolio-nav">
-<li><a href="#dot-gallery">ドット絵</a></li>
-<li><a href="#projects">プロジェクト</a></li>
-<li><a href="#character-intro">キャラクター</a></li>
-<li><a href="#notes">ノート</a></li>
-<li><a href="#contact">コンタクト</a></li>
-</ul>
-</nav>
-<nav aria-label="関連リンク" class="portfolio-header__links">
-<a class="wick-button" href="https://prod.api.wick-service.com/sns/share/Feq07B1v" rel="noopener" target="_blank">
-          Wickにて誠意活動中
-        </a>
-</nav>
-</div>
-</header>
-</div>
-</section>
-<section class="section" id="dot-gallery">
-<div class="section-inner">
-<h2>ドット絵</h2>
-<div class="dot-gallery__viewer">
-<img alt="" id="dotGalleryMain" loading="lazy" src=""/>
-</div>
-<div class="dot-gallery__buttons" id="dotGalleryButtons">
-<!-- ボタンはスクリプトで生成します -->
-</div>
-</div>
-</section>
-<div class="ad-block ad-block--section">
-<!-- プレース間 -->
-<ins class="adsbygoogle"
-     style="display:block;width:100%;max-width:900px;height:60px;margin:0 auto;"
-     data-ad-client="ca-pub-9801602250480253"
-     data-ad-slot="2141591954"></ins>
-<script>
-  (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-</div>
-<section class="section section--accent" id="projects">
-<div class="section-inner">
-<h2>プロジェクト</h2>
-<div class="ogp-grid">
-<a class="ogp-card" href="projects/maoitu/index.html">
-<img alt="魔王様!!いつまでよければいいですか!? のOGP画像" src="maoitu/ogp.png"/>
-<div class="ogp-card__meta">
-<span class="ogp-card__tag">Game</span>
-<h3 class="ogp-card__title">魔王様!!いつまでよければいいですか!?</h3>
-<p class="ogp-card__description">避け続けるスリルをブラウザで楽しめる人気No.1アクション。</p>
-</div>
-</a>
-<a class="ogp-card" href="projects/pixfind/index.html">
-<img alt="PiXFiND のOGP画像" src="pixfind/ogp.png"/>
-<div class="ogp-card__meta">
-<span class="ogp-card__tag">Game</span>
-<h3 class="ogp-card__title">PiXFiND（調整中）</h3>
-<p class="ogp-card__description">ドット絵に特化した間違い探し。現在調整中のため、アクセスコードが必要です。</p>
-</div>
-</a>
-<div class="ogp-card ogp-card--ad">
-<div class="ad-card">
-<ins class="adsbygoogle"
-     style="display:block;width:100%;height:100%;margin:0 auto;"
-     data-ad-client="ca-pub-9801602250480253"
-     data-ad-slot="2141591954"></ins>
-<script>
-  (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-</div>
-</div>
-<a class="ogp-card" href="projects/pixiedraw/index.html">
-<img alt="PiXiEEDraw のOGP画像" src="pixiedraw/ogp-app.png"/>
-<div class="ogp-card__meta">
-<span class="ogp-card__tag">Tool</span>
-<h3 class="ogp-card__title">PiXiEEDraw</h3>
-<p class="ogp-card__description">ブラウザだけで動作するドット絵エディター。描画補助と公開機能を備えたプレリリース版です。</p>
-</div>
-</a>
-<a class="ogp-card" href="projects/jerin-maker/index.html">
-<img alt="PiXiEEDraw Lite（ピクドラ）のプレビュー" loading="lazy" src="jerin-maker/ogp-app.png"/>
-<div class="ogp-card__meta">
-<span class="ogp-card__tag">Tool</span>
-<h3 class="ogp-card__title">PiXiEEDraw Lite（ピクドラ）</h3>
-<p class="ogp-card__description">16×16固定のライト版ドットツール。ジェリンの下絵プレビュー付きで、ブラウザですぐ描いてPNG保存できます。</p>
-</div>
-</a>
-<a class="ogp-card" href="projects/pixiee-lens/index.html">
-<img alt="PiXiEELENS のOGP画像" loading="lazy" src="pixiee-lens/ogp.png"/>
-<div class="ogp-card__meta">
-<span class="ogp-card__tag">Tool</span>
-<h3 class="ogp-card__title">PiXiEELENS</h3>
-<p class="ogp-card__description">全画面カメラのラボ版。ドットモードとパレット読込で配色を遊べます。</p>
-</div>
-</a>
-<a class="ogp-card" href="projects/qr-maker/index.html">
-<img alt="QRコードメーカーのプレビュー" loading="lazy" src="qr-maker/qrogp.png"/>
-<div class="ogp-card__meta">
-<span class="ogp-card__tag">Tool</span>
-<h3 class="ogp-card__title">QRコードメーカー</h3>
-<p class="ogp-card__description">URLやテキストを色・余白・誤り訂正を指定してQR化。ブラウザ内で即座にPNG保存できます。</p>
-</div>
-</a>
-<div class="ogp-card ogp-card--ad">
-<div class="ad-card">
-<ins class="adsbygoogle"
-     style="display:block;width:100%;height:100%;margin:0 auto;"
-     data-ad-client="ca-pub-9801602250480253"
-     data-ad-slot="2141591954"></ins>
-<script>
-  (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-</div>
-</div>
-</div>
-</div>
-</section>
-<div class="ad-block ad-block--section">
-<!-- プレース間 -->
-<ins class="adsbygoogle"
-     style="display:block;width:100%;max-width:900px;height:60px;margin:0 auto;"
-     data-ad-client="ca-pub-9801602250480253"
-     data-ad-slot="2141591954"></ins>
-<script>
-  (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-</div>
-<section class="section section--highlight" id="character-intro">
-<div class="section-inner">
-<p class="section-eyebrow">Original Character Workbench</p>
-<div class="character-preview__heading">
-<h2>キャラクター</h2>
-<p>ここではジェリンを中心としてオリジナルキャラクターの紹介をしています。ゲームのシリーズに登場します。</p>
-</div>
-<div aria-live="polite" class="character-preview">
-<div class="character-preview__frame">
-<img alt="" hidden="" id="characterGalleryMain" loading="lazy" src=""/>
-<div class="character-preview__placeholder" id="characterGalleryPlaceholder">
-<small id="characterPlaceholderMeta">差し替え待ち</small>
-</div>
-</div>
-<div class="character-preview__details" id="characterPreviewDetails">
-<h3 class="character-preview__name" id="characterGalleryName">キャラクターA（仮）</h3>
-<p class="character-preview__weight" id="characterGalleryWeight">Weight: 調整中</p>
-<div class="character-preview__traits">
-<h4>特徴</h4>
-<ul id="characterTraits">
-<li>特徴メモ</li>
-</ul>
-</div>
-<div class="character-preview__detail">
-<h4>詳細</h4>
-<p id="characterGalleryDetail">
-                選択したキャラクターの詳細がここに表示されます。
-              </p>
-</div>
-</div>
-</div>
-<p class="character-sprites__hint">下のPNGをクリックするとプレビューと詳細が切り替わります。</p>
-<div aria-label="キャラクター一覧" class="character-preview__buttons" id="characterGalleryButtons" role="listbox"></div>
-</div>
-</section>
-<div class="ad-block ad-block--section">
-<!-- プレース間 -->
-<ins class="adsbygoogle"
-     style="display:block;width:100%;max-width:900px;height:60px;margin:0 auto;"
-     data-ad-client="ca-pub-9801602250480253"
-     data-ad-slot="2141591954"></ins>
-<script>
-  (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-</div>
-<section class="section section--highlight" id="notes">
-<div class="section-inner">
-<h2>ノート</h2>
-<ul aria-label="note更新情報" aria-live="polite" class="notes-list notes-list--compact" id="notesList"></ul>
-<p class="notes-footnote">
-<a class="cta-secondary" href="https://note.com/jaxya" rel="noopener" target="_blank">noteで一覧を見る</a>
-</p>
-<noscript>
-<p class="notes-noscript">最新のnoteは <a href="https://note.com/jaxya" rel="noopener" target="_blank">note.com</a> でご確認ください。</p>
-</noscript>
-</div>
-</section>
-<div class="ad-block ad-block--section">
-<!-- ノート下 -->
-<ins class="adsbygoogle"
-     style="display:block;width:100%;max-width:900px;height:60px;margin:0 auto;"
-     data-ad-client="ca-pub-9801602250480253"
-     data-ad-slot="2141591954"></ins>
-<script>
-  (adsbygoogle = window.adsbygoogle || []).push({});
-</script>
-</div>
-<section class="section" id="contact">
-<div class="section-inner contact">
-<div>
-<h2>コンタクト</h2>
-<p>ドット絵制作・pixel art commission、ブラウザゲーム用アセット制作、業務委託やコラボの相談はメールでどうぞ。</p>
-<a class="cta-primary" href="mailto:pixieed.arta@gmail.com">pixieed.arta@gmail.com</a>
-</div>
-</div>
-</section>
-</main>
-<footer class="site-footer">
-<div class="footer-inner">
-<small>© <span id="year"></span> PiXiEED / Alta Portfolio</small>
-<div class="footer-links">
-<a href="index.html">ホーム</a>
-<a href="terms/index.html">利用規約</a>
-<a href="privacy/index.html">プライバシーポリシー</a>
-<a href="contact/index.html">コンタクト</a>
-<a href="https://x.com/PiXiEED_arta" rel="noopener" target="_blank">公式X</a>
-<a class="wick-button" href="https://prod.api.wick-service.com/sns/share/Feq07B1v" rel="noopener" target="_blank">
-          Wickにて誠意活動中
-        </a>
-<a class="wick-button" href="contest/index.html">10分ドット投稿はこちら</a>
-<a class="wick-button" href="portfolio/index.html">企業向けポートフォリオはこちら</a>
-</div>
-</div>
-</footer>
-<div class="auth-panel" id="authPanel" aria-hidden="true">
-  <div class="auth-card">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-      <h3 style="margin:0;font-size:16px;color:#f9fafb;">プロフィール</h3>
-      <button class="close-btn" type="button" id="closeAuthPanel">閉じる</button>
-    </div>
-    <div class="profile-block">
-      <label style="display:flex; flex-direction:column; gap:6px;">
-        <span style="font-weight:700; color:#e5e7eb;">ニックネーム</span>
-        <input class="auth-input" id="profileNickname" type="text" placeholder="なまえ" maxlength="32">
-      </label>
-      <div>
-        <p class="author" style="margin:0 0 6px;">アイコン</p>
-        <div class="avatar-grid" id="avatarGrid"></div>
-      </div>
-      <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
-    </div>
-    <div class="profile-block">
-      <p class="author" style="margin:0 0 6px;">アカウント紐付け</p>
-      <p class="author" id="linkedEmail" style="margin:0 0 6px; display:none;"></p>
-      <div id="authInputs" style="display:grid; gap:8px;">
-        <input class="auth-input" id="authEmail" type="email" placeholder="メールアドレス" autocomplete="email">
-        <input class="auth-input" id="authPasscode" type="password" placeholder="パスコード（6〜20文字）" autocomplete="current-password">
-      </div>
-      <button class="auth-btn" id="authBtn" type="button">メール＋パスコードでログイン</button>
-      <button class="auth-btn logout" id="logoutBtn" type="button" style="display:none;">ログアウト</button>
-    </div>
-    <p class="auth-status" id="authStatus"></p>
-  </div>
-</div>
-<script>
-  (function(){
-    function loadNickname(){
-      try{ return localStorage.getItem('pixieed_nickname') || ''; }catch(_){ return ''; }
-    }
-    function loadAvatar(){
-      try{ return localStorage.getItem('pixieed_avatar') || 'mao'; }catch(_){ return 'mao'; }
-    }
-    const AVATARS = {
-      mao:'character-dots/mao1.png',
-      jerin1:'character-dots/Jerin1.png',
-      jerin2:'character-dots/Jerin2.png',
-      jerin3:'character-dots/Jerin3.png',
-      jerin4:'character-dots/Jerin4.png',
-      jerin5:'character-dots/Jerin5.png',
-      jerin6:'character-dots/Jerin6.png',
-      jerin7:'character-dots/Jerin7.png',
-      jerin8:'character-dots/Jerin8.png',
-      jellnall1:'character-dots/JELLNALL1.png',
-      jellnall2:'character-dots/JELLNALL2.png',
-      jellnall3:'character-dots/JELLNALL3.png',
-      jellnall4:'character-dots/JELLNALL4.png',
-      jellnall5:'character-dots/JELLNALL5.png',
-      jellnall6:'character-dots/JELLNALL6.png',
-      jellnall7:'character-dots/JELLNALL7.png',
-      jellnall8:'character-dots/JELLNALL8.png',
-      jellnall9:'character-dots/JELLNALL9.png',
-      jellnall10:'character-dots/JELLNALL10.png',
-      jellnall11:'character-dots/JELLNALL11.png',
-      jellnall12:'character-dots/JELLNALL12.png',
-      jellnall13:'character-dots/JELLNALL13.png',
-      jellnall14:'character-dots/JELLNALL14.png',
-      jellnall15:'character-dots/JELLNALL15.png',
-      jellnall16:'character-dots/JELLNALL16.png',
-      jellnall17:'character-dots/JELLNALL17.png',
-      jellnall18:'character-dots/JELLNALL18.png',
-      jellnall19:'character-dots/JELLNALL19.png',
-      baburin:'character-dots/baburinpng.png'
-    };
-    function applyAvatar(){
-      const brand = document.getElementById('brandAvatar');
-      const avatar = loadAvatar();
-      const src = AVATARS[avatar] || AVATARS.mao;
-      if(brand){
-        brand.innerHTML = `<img src=\"${src}\" alt=\"avatar\">`;
-      }
-      const nick = loadNickname();
-      const sub = document.querySelector('.brand-sub');
-      if(sub && nick){
-        sub.textContent = nick;
-      }
-    }
-    document.addEventListener('DOMContentLoaded', applyAvatar);
-  })();
-</script>
-<script>
-  (function(){
-    function loadNickname(){ try{ return localStorage.getItem('pixieed_nickname') || ''; }catch(_){ return ''; } }
-    function saveNickname(name){ try{ localStorage.setItem('pixieed_nickname', name); }catch(_){ } }
-    function loadAvatar(){ try{ return localStorage.getItem('pixieed_avatar') || 'mao'; }catch(_){ return 'mao'; } }
-    function saveAvatar(id){ try{ localStorage.setItem('pixieed_avatar', id); }catch(_){ } }
-    const AVATARS = {
-      mao:'character-dots/mao1.png',
-      jerin1:'character-dots/Jerin1.png',
-      jerin2:'character-dots/Jerin2.png',
-      jerin3:'character-dots/Jerin3.png',
-      jerin4:'character-dots/Jerin4.png',
-      jerin5:'character-dots/Jerin5.png',
-      jerin6:'character-dots/Jerin6.png',
-      jerin7:'character-dots/Jerin7.png',
-      jerin8:'character-dots/Jerin8.png',
-      jellnall1:'character-dots/JELLNALL1.png',
-      jellnall2:'character-dots/JELLNALL2.png',
-      jellnall3:'character-dots/JELLNALL3.png',
-      jellnall4:'character-dots/JELLNALL4.png',
-      jellnall5:'character-dots/JELLNALL5.png',
-      jellnall6:'character-dots/JELLNALL6.png',
-      jellnall7:'character-dots/JELLNALL7.png',
-      jellnall8:'character-dots/JELLNALL8.png',
-      jellnall9:'character-dots/JELLNALL9.png',
-      jellnall10:'character-dots/JELLNALL10.png',
-      jellnall11:'character-dots/JELLNALL11.png',
-      jellnall12:'character-dots/JELLNALL12.png',
-      jellnall13:'character-dots/JELLNALL13.png',
-      jellnall14:'character-dots/JELLNALL14.png',
-      jellnall15:'character-dots/JELLNALL15.png',
-      jellnall16:'character-dots/JELLNALL16.png',
-      jellnall17:'character-dots/JELLNALL17.png',
-      jellnall18:'character-dots/JELLNALL18.png',
-      jellnall19:'character-dots/JELLNALL19.png',
-      baburin:'character-dots/baburinpng.png'
-    };
-    function applyAvatar(){
-      const brand = document.getElementById('brandAvatar');
-      const avatar = loadAvatar();
-      const src = AVATARS[avatar] || AVATARS.mao;
-      if(brand){ brand.innerHTML = `<img src=\"${src}\" alt=\"avatar\">`; }
-      const nick = loadNickname();
-      const sub = document.querySelector('.brand-sub');
-      if(sub){
-        sub.textContent = nick || 'ユーザー';
-      }
-    }
-    function renderAvatarChoices(){
-      const grid = document.getElementById('avatarGrid');
-      if(!grid) return;
-      grid.innerHTML = '';
-      const current = loadAvatar();
-      Object.entries(AVATARS).forEach(([id, src]) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = `avatar-option${current === id ? ' is-active' : ''}`;
-        btn.style.background = 'rgba(0,0,0,0.7)';
-        const im = document.createElement('img');
-        im.src = src;
-        im.alt = id;
-        im.style.width = '80%';
-        im.style.height = '80%';
-        im.style.objectFit = 'contain';
-        im.style.pointerEvents = 'none';
-        im.style.imageRendering = 'pixelated';
-        im.style.imageRendering = 'crisp-edges';
-        btn.appendChild(im);
-        btn.addEventListener('click', () => {
-          saveAvatar(id);
-          renderAvatarChoices();
-          applyAvatar();
-        });
-        grid.appendChild(btn);
-      });
-    }
-    function setupProfileModal(){
-      const openBtn = document.getElementById('openProfilePanel');
-      const panel = document.getElementById('authPanel');
-      const closeBtn = document.getElementById('closeAuthPanel');
-      const saveBtn = document.getElementById('saveProfile');
-      const nickInput = document.getElementById('profileNickname');
-      const emailInput = document.getElementById('authEmail');
-      const passInput = document.getElementById('authPasscode');
-      const authInputs = document.getElementById('authInputs');
-      const linkedEmail = document.getElementById('linkedEmail');
-      const authBtn = document.getElementById('authBtn');
-      const logoutBtn = document.getElementById('logoutBtn');
-      const status = document.getElementById('authStatus');
-      const toggle = (open) => {
-        if(!panel) return;
-        if(open){
-          if(nickInput) nickInput.value = loadNickname();
-          renderAvatarChoices();
-          panel.classList.add('is-open');
-          panel.setAttribute('aria-hidden','false');
-        }else{
-          panel.classList.remove('is-open');
-          panel.setAttribute('aria-hidden','true');
-        }
+    <a class="bottom-nav__item" data-tab="contest" href="contest/index.html">
+      <span class="icon">🎨</span><span>コンテスト</span>
+    </a>
+    <a class="bottom-nav__item" data-tab="tools" href="tools.html">
+      <span class="icon">🛠️</span><span>ツール/ゲーム</span>
+    </a>
+    <a class="bottom-nav__item" data-tab="portfolio" href="portfolio/index.html">
+      <span class="icon">🏢</span><span>企業向け</span>
+    </a>
+  </nav>
+
+  <script>
+    (function(){
+      function loadNickname(){ try{ return localStorage.getItem('pixieed_nickname') || ''; }catch(_){ return ''; } }
+      function loadAvatar(){ try{ return localStorage.getItem('pixieed_avatar') || 'mao'; }catch(_){ return 'mao'; } }
+      const AVATARS = {
+        mao:'character-dots/mao1.png',
+        jerin1:'character-dots/Jerin1.png',
+        jerin2:'character-dots/Jerin2.png',
+        jerin3:'character-dots/Jerin3.png',
+        jerin4:'character-dots/Jerin4.png',
+        jerin5:'character-dots/Jerin5.png',
+        jerin6:'character-dots/Jerin6.png',
+        jerin7:'character-dots/Jerin7.png',
+        jerin8:'character-dots/Jerin8.png',
+        jellnall1:'character-dots/JELLNALL1.png',
+        jellnall2:'character-dots/JELLNALL2.png',
+        jellnall3:'character-dots/JELLNALL3.png',
+        jellnall4:'character-dots/JELLNALL4.png',
+        jellnall5:'character-dots/JELLNALL5.png',
+        jellnall6:'character-dots/JELLNALL6.png',
+        jellnall7:'character-dots/JELLNALL7.png',
+        jellnall8:'character-dots/JELLNALL8.png',
+        jellnall9:'character-dots/JELLNALL9.png',
+        jellnall10:'character-dots/JELLNALL10.png',
+        jellnall11:'character-dots/JELLNALL11.png',
+        jellnall12:'character-dots/JELLNALL12.png',
+        jellnall13:'character-dots/JELLNALL13.png',
+        jellnall14:'character-dots/JELLNALL14.png',
+        jellnall15:'character-dots/JELLNALL15.png',
+        jellnall16:'character-dots/JELLNALL16.png',
+        jellnall17:'character-dots/JELLNALL17.png',
+        jellnall18:'character-dots/JELLNALL18.png',
+        jellnall19:'character-dots/JELLNALL19.png',
+        baburin:'character-dots/baburinpng.png'
       };
-      if(openBtn) openBtn.addEventListener('click', (e) => { e.preventDefault(); toggle(true); });
-      if(closeBtn) closeBtn.addEventListener('click', () => toggle(false));
-      if(panel){ panel.addEventListener('click', (e) => { if(e.target === panel) toggle(false); }); }
-      if(saveBtn){
-        saveBtn.addEventListener('click', () => {
-          const nick = (nickInput?.value || '').trim();
-          if(nick){ saveNickname(nick); }
-          applyAvatar();
-          if(status) status.textContent = 'プロフィールを保存しました';
-        });
+      function applyAvatar(){
+        const brand = document.getElementById('brandAvatar');
+        const avatar = loadAvatar();
+        const src = AVATARS[avatar] || AVATARS.mao;
+        if(brand){ brand.innerHTML = `<img src="${src}" alt="avatar">`; }
+        const nick = loadNickname();
+        const sub = document.getElementById('brandUser');
+        if(sub){ sub.textContent = nick || 'ユーザー'; }
       }
-      // ログイン操作はギャラリーでのみ対応
-      if(authInputs) authInputs.style.display = 'none';
-      if(linkedEmail){
-        linkedEmail.style.display = 'block';
-        linkedEmail.textContent = '紐付けはギャラリーで設定してください';
+      document.addEventListener('DOMContentLoaded', () => {
+        applyAvatar();
+        const y = document.getElementById('year');
+        if(y) y.textContent = new Date().getFullYear();
+      });
+    })();
+  </script>
+  <script>
+    // AdSense init: replace client/slot above, then enable push
+    window.addEventListener('load', () => {
+      try{
+        const slots = document.querySelectorAll('.adsbygoogle');
+        if(slots.length){
+          slots.forEach(() => (adsbygoogle = window.adsbygoogle || []).push({}));
+        }
+      }catch(e){
+        console.warn('AdSense init skipped', e);
       }
-      if(emailInput) emailInput.disabled = true;
-      if(passInput) passInput.disabled = true;
-      if(authBtn){
-        authBtn.disabled = false;
-        authBtn.textContent = 'ギャラリーでログイン';
-        authBtn.addEventListener('click', () => {
-          window.location.href = 'contest/index.html#auth';
-        });
-      }
-      if(logoutBtn) logoutBtn.style.display = 'none';
-    }
-    document.addEventListener('DOMContentLoaded', () => {
-      applyAvatar();
-      setupProfileModal();
     });
-  })();
-</script>
-<script src="scripts.js"></script>
-<script src="portfolio/dots/manifest.js"></script>
-<script src="scripts/gallery.js"></script>
-<script src="character-dots/manifest.js"></script>
-<script src="scripts/character-gallery.js"></script>
-<script src="scripts/notes.js"></script>
-<div aria-live="polite" class="pixie-pet-layer">
-<div aria-live="polite" class="pixie-exp-bar" id="pixiePetExp">
-<div class="pixie-exp-bar__meta">
-<span class="pixie-exp-bar__label">EXP</span>
-<small class="pixie-exp-bar__value" id="pixiePetExpText">0%</small>
-</div>
-<div aria-valuemax="100" aria-valuemin="0" aria-valuenow="0" class="pixie-exp-bar__track" id="pixiePetExpTrack" role="progressbar">
-<div class="pixie-exp-bar__fill" id="pixiePetExpFill"></div>
-</div>
-</div>
-<div class="pixie-pet-wrapper" id="pixiePetWrapper">
-<button aria-label="PiXiEEDペット" class="pixie-pet" id="pixiePet" type="button">
-<img alt="" decoding="async" id="pixiePetSprite" loading="eager"/>
-</button>
-<p class="pixie-pet__speech" hidden="" id="pixiePetSpeech" role="status"></p>
-</div>
-<div aria-live="polite" class="pixie-candy-field" id="pixieCandyField"></div>
-</div>
-<script src="scripts/pet-layer.js"></script>
+  </script>
+  <script src="scripts.js"></script>
+  <script src="portfolio/dots/manifest.js"></script>
+  <script src="scripts/gallery.js"></script>
+  <script src="character-dots/manifest.js"></script>
+  <script src="scripts/character-gallery.js"></script>
 </body>
 </html>
