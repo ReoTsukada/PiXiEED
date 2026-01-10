@@ -2731,6 +2731,11 @@ body.project-page .hero-copy h1 {
 body.project-page .hero-copy p {
   color: #cbd5e1;
 }
+/* global ad safety */
+.adsbygoogle{
+  max-width:100% !important;
+  display:block !important;
+}
 body.project-page .hero-cta {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -2766,11 +2771,25 @@ body.project-page .project-ad ins.adsbygoogle{
   width:100%;
   height:90px;
   max-width:100%;
+  overflow:hidden;
 }
 @media(max-width:640px){
   body.project-page .project-ad ins.adsbygoogle{
     height:60px;
   }
+}
+body.project-page .project-ad__label{
+  position:absolute;
+  top:6px;
+  left:10px;
+  background:rgba(0,0,0,0.6);
+  color:#cbd5e1;
+  font-size:11px;
+  padding:4px 8px;
+  border-radius:999px;
+  letter-spacing:0.06em;
+  display:inline-flex;
+  align-items:center;
 }
 
 /* --- PiXiEED home: align look with gallery/tools --- */
