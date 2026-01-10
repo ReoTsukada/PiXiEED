@@ -9,7 +9,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
   <style>
     :root{ color-scheme: dark; }
     *{
@@ -543,15 +542,6 @@
         <div class="header-actions"></div>
       </div>
     </header>
-    <section class="card ad-banner" aria-label="広告">
-      <ins class="adsbygoogle"
-           style="display:block"
-           data-ad-client="ca-pub-9801602250480253"
-           data-ad-slot="2141591954"
-           data-ad-format="horizontal"
-           data-full-width-responsive="true"></ins>
-      <small class="ad-banner__label">広告</small>
-    </section>
     <section class="card">
       <div class="top-bar">
         <h1>ドットギャラリー</h1>
@@ -1127,23 +1117,6 @@
       await fetchAndRender();
     }
 
-    function createAdCard(slotId){
-      const wrap = document.createElement('div');
-      wrap.className = 'entry-card entry-card--ad';
-      wrap.innerHTML = `
-        <div class="entry-ad-slot">
-          <ins class="adsbygoogle"
-               style="display:block"
-               data-ad-client="ca-pub-9801602250480253"
-               data-ad-slot="${slotId}"
-               data-ad-format="auto"
-               data-full-width-responsive="true"></ins>
-        </div>
-        <p class="entry-ad-note">広告</p>
-      `;
-      return wrap;
-    }
-
     function renderEntries(entries){
       const gallery = $(GALLERY_ID);
       if(!gallery) return;
@@ -1152,7 +1125,6 @@
         return;
       }
       gallery.innerHTML = '';
-      const AD_SLOTS = ['2141591954','9073878884','2261515379'];
       entries.forEach((entry, idx) => {
         const item = document.createElement('a');
         item.className = 'entry-card';
@@ -1182,11 +1154,6 @@
           </div>
         `;
         gallery.appendChild(item);
-        // 9件ごとに広告を挿入
-        if((idx + 1) % 9 === 0){
-          const slotId = AD_SLOTS[(idx / 9) % AD_SLOTS.length | 0];
-          gallery.appendChild(createAdCard(slotId));
-        }
       });
       gallery.querySelectorAll('.heart-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -1195,15 +1162,6 @@
           likeEntry(Number(btn.dataset.id));
         });
       });
-      // trigger AdSense render
-      try{
-        const ads = document.querySelectorAll('.adsbygoogle');
-        if(ads.length){
-          ads.forEach(() => (adsbygoogle = window.adsbygoogle || []).push({}));
-        }
-      }catch(e){
-        console.warn('ads render skipped', e);
-      }
     }
 
     async function fetchAndRender(){
@@ -1611,14 +1569,6 @@
       renderAvatarChoices();
       applyAvatarToBrand();
       setActiveNav();
-      try{
-        const ads = document.querySelectorAll('.adsbygoogle');
-        if(ads.length){
-          ads.forEach(() => (window.adsbygoogle = window.adsbygoogle || []).push({}));
-        }
-      }catch(e){
-        console.warn('ads render skipped', e);
-      }
       await fetchAndRender();
     }
 
