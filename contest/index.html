@@ -391,6 +391,7 @@
     .auth-card{
       width:100%;
       max-width:420px;
+      max-height:90vh;
       background:rgba(15,23,42,0.95);
       border:1px solid rgba(255,255,255,0.14);
       border-radius:16px;
@@ -398,6 +399,8 @@
       box-shadow:0 18px 40px rgba(0,0,0,0.45);
       display:grid;
       gap:12px;
+      box-sizing:border-box;
+      overflow:hidden;
     }
     .auth-input{
       min-width:0;
@@ -473,6 +476,10 @@
       display:grid;
       grid-template-columns:repeat(6, minmax(0, 1fr));
       gap:4px;
+      max-height:220px;
+      overflow-y:auto;
+      padding-right:4px;
+      -webkit-overflow-scrolling:touch;
     }
     .avatar-option{
       width:100%;
