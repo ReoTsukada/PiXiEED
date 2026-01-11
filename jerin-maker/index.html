@@ -145,12 +145,13 @@
   .canvas-stack {
     position: relative;
     --canvas-base: min(82vw, min(56vh, 520px));
+    --canvas-max: min(92vw, 560px);
     --canvas-zoom: 1;
-    --canvas-size: calc(var(--canvas-base) * var(--canvas-zoom));
+    --canvas-size: clamp(240px, calc(var(--canvas-base) * var(--canvas-zoom)), var(--canvas-max));
     width: var(--canvas-size);
     height: var(--canvas-size);
-    max-width: min(96vw, 560px);
-    max-height: min(70vh, 560px);
+    max-width: var(--canvas-max);
+    max-height: var(--canvas-max);
     transition: width 0.12s ease, height 0.12s ease;
   }
   .canvas-stack canvas {
@@ -190,48 +191,6 @@
     font-size: 0.95rem;
   }
   button:hover { border-color: rgba(88, 196, 255, 0.8); }
-  .zoom-controls {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    margin: 2px auto 0;
-    padding: 6px 8px;
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(6, 10, 28, 0.55);
-    box-shadow: 0 10px 24px rgba(5, 8, 20, 0.35);
-    backdrop-filter: blur(8px);
-    width: min(420px, 94%);
-  }
-  .zoom-btn {
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    border-radius: 10px;
-    font-size: 1.2rem;
-    font-weight: 800;
-    line-height: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.08);
-  }
-  .zoom-level {
-    min-width: 62px;
-    text-align: center;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    color: var(--text);
-  }
-  @media (max-width: 640px) {
-    .zoom-controls {
-      width: 100%;
-      justify-content: space-between;
-      padding-inline: 10px;
-    }
-    .zoom-btn { width: 44px; height: 44px; font-size: 1.3rem; }
-  }
   .icon-btn {
     width: 40px;
     height: 40px;
@@ -862,11 +821,6 @@
           <canvas aria-hidden="true" height="16" id="gridCanvas" width="16"></canvas>
         </div>
       </div>
-      <div class="zoom-controls" id="zoomControls" aria-label="ズーム調整">
-        <button type="button" class="zoom-btn" id="zoomOut" aria-label="縮小">−</button>
-        <div class="zoom-level" id="zoomLevel" aria-live="polite">1.0x</div>
-        <button type="button" class="zoom-btn" id="zoomIn" aria-label="拡大">＋</button>
-      </div>
     </div>
     <aside class="panel">
       <div class="row">
@@ -960,41 +914,6 @@
   const canvas = document.getElementById('canvas');
   const ctx = canvas?.getContext('2d', { willReadFrequently: true });
   if (!canvas || !ctx) return;
-
-  const canvasStack = document.querySelector('.canvas-stack');
-  const zoomControls = document.getElementById('zoomControls');
-  const zoomLevelEl = document.getElementById('zoomLevel');
-  const zoomInBtn = document.getElementById('zoomIn');
-  const zoomOutBtn = document.getElementById('zoomOut');
-  const DEFAULT_ZOOM_BY_SIZE = { 8: 1.4, 16: 1.9, 32: 2.6 };
-  const MIN_ZOOM = 1;
-  const MAX_ZOOM = 3;
-  const ZOOM_STEP = 0.25;
-  let zoomLevel = DEFAULT_ZOOM_BY_SIZE[canvasSize] || MIN_ZOOM;
-  let pinchStartDistance = null;
-  let pinchStartZoom = zoomLevel;
-
-  function setZoom(nextZoom) {
-    zoomLevel = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom));
-    if (canvasStack) {
-      canvasStack.style.setProperty('--canvas-zoom', zoomLevel.toString());
-    }
-    if (zoomLevelEl) {
-      zoomLevelEl.textContent = `${zoomLevel.toFixed(1)}x`;
-    }
-  }
-
-  function resetZoomToDefault(size = canvasSize) {
-    setZoom(DEFAULT_ZOOM_BY_SIZE[size] || MIN_ZOOM);
-  }
-
-  function touchDistance(touches) {
-    if (touches.length < 2) return 0;
-    const [a, b] = touches;
-    const dx = a.clientX - b.clientX;
-    const dy = a.clientY - b.clientY;
-    return Math.hypot(dx, dy);
-  }
 
   const PALETTE_KEY = 'pixieedrawlite_palette_v1';
   const DEFAULT_PALETTE = [
@@ -2046,7 +1965,6 @@
       jelinCanvas.width = target;
       jelinCanvas.height = target;
     }
-    resetZoomToDefault(target);
     resizeGridCanvas();
     render();
     updateSizeButton();
@@ -3279,45 +3197,6 @@
   canvas.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', onPointerUp);
   canvas.addEventListener('contextmenu', event => event.preventDefault());
-
-  zoomInBtn?.addEventListener('click', () => setZoom(zoomLevel + ZOOM_STEP));
-  zoomOutBtn?.addEventListener('click', () => setZoom(zoomLevel - ZOOM_STEP));
-  zoomLevelEl?.addEventListener('click', () => resetZoomToDefault());
-  const handleWheelZoom = event => {
-    if (!canvasStack) return;
-    if (event.ctrlKey || event.metaKey) {
-      event.preventDefault();
-      const direction = event.deltaY < 0 ? 1 : -1;
-      setZoom(zoomLevel + direction * ZOOM_STEP);
-    }
-  };
-  const handlePinchStart = event => {
-    if (event.touches.length === 2) {
-      pinchStartDistance = touchDistance(event.touches);
-      pinchStartZoom = zoomLevel;
-    }
-  };
-  const handlePinchMove = event => {
-    if (event.touches.length === 2 && pinchStartDistance) {
-      event.preventDefault();
-      const dist = touchDistance(event.touches);
-      if (dist > 0) {
-        setZoom(pinchStartZoom * (dist / pinchStartDistance));
-      }
-    }
-  };
-  const handlePinchEnd = () => {
-    pinchStartDistance = null;
-  };
-  canvasStack?.addEventListener('wheel', handleWheelZoom, { passive: false });
-  canvasStack?.addEventListener('touchstart', handlePinchStart, { passive: true });
-  canvasStack?.addEventListener('touchmove', handlePinchMove, { passive: false });
-  canvasStack?.addEventListener('touchend', handlePinchEnd);
-  canvasStack?.addEventListener('touchcancel', handlePinchEnd);
-  canvasStack?.addEventListener('dblclick', event => {
-    event.preventDefault();
-    resetZoomToDefault();
-  });
 
   btnCycleSize?.addEventListener('click', cycleCanvasSize);
   btnJelinMode?.addEventListener('click', () => {
