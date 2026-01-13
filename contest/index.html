@@ -510,6 +510,37 @@
       padding:14px;
       box-shadow:0 12px 40px rgba(0,0,0,0.4);
     }
+    .post-preview{
+      width:100%;
+      height:clamp(160px, 32vw, 240px);
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,0.12);
+      background-color:#0f172a;
+      background-image:
+        linear-gradient(45deg, rgba(255,255,255,0.07) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.07) 75%, rgba(255,255,255,0.07)),
+        linear-gradient(45deg, rgba(255,255,255,0.07) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.07) 75%, rgba(255,255,255,0.07));
+      background-size:16px 16px;
+      background-position:0 0, 8px 8px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:10px;
+    }
+    .post-preview img{
+      width:100%;
+      height:100%;
+      display:none;
+      object-fit:contain;
+      image-rendering:pixelated;
+      border-radius:8px;
+      box-shadow:0 6px 16px rgba(0,0,0,0.4);
+    }
+    .post-preview.is-filled img{ display:block; }
+    .post-preview__empty{
+      color:#94a3b8;
+      font-size:12px;
+    }
+    .post-preview.is-filled .post-preview__empty{ display:none; }
     .post-header{
       display:flex;
       justify-content:space-between;
@@ -596,6 +627,13 @@
           <input id="title" name="title" type="text" placeholder="無題"/>
         </div>
         <div class="field">
+          <label>プレビュー</label>
+          <div class="post-preview" id="postPreview">
+            <span class="post-preview__empty" id="postPreviewEmpty">画像が選択されていません</span>
+            <img id="postPreviewImage" alt="投稿プレビュー"/>
+          </div>
+        </div>
+        <div class="field">
           <label for="contestFile">PNG / GIF</label>
           <input id="contestFile" name="contestFile" type="file" accept="image/png,image/gif"/>
           <p class="helper">PNG または GIF（サムネは1フレーム表示） / 512x512以内 / 256色以内</p>
@@ -659,6 +697,7 @@
     const GALLERY_ID = 'contestGallery';
     const MAX_SIZE = 512;
     const MAX_COLORS = 256;
+    const PENDING_UPLOAD_KEY = 'pixieed_contest_upload_v1';
     let supportsClientId = true;
     let supabaseUser = null;
     let supabaseSession = null;
@@ -770,6 +809,66 @@
     function setStatus(msg){
       const el = $(STATUS_ID);
       if(el) el.textContent = msg || '';
+    }
+
+    function setPostPreview(dataUrl){
+      const wrap = document.getElementById('postPreview');
+      const img = document.getElementById('postPreviewImage');
+      if(!wrap || !img) return;
+      if(dataUrl){
+        img.src = dataUrl;
+        wrap.classList.add('is-filled');
+      }else{
+        img.removeAttribute('src');
+        wrap.classList.remove('is-filled');
+      }
+    }
+
+    function dataUrlToFile(dataUrl, filename){
+      if(!dataUrl) return null;
+      const parts = dataUrl.split(',');
+      if(parts.length < 2) return null;
+      const match = parts[0].match(/data:(.*?);base64/);
+      const mime = match ? match[1] : 'image/png';
+      const binary = atob(parts[1]);
+      const bytes = new Uint8Array(binary.length);
+      for(let i = 0; i < binary.length; i++){
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return new File([bytes], filename, { type: mime });
+    }
+
+    function restorePendingUpload(){
+      let payload;
+      try{
+        const raw = localStorage.getItem(PENDING_UPLOAD_KEY);
+        if(!raw) return;
+        localStorage.removeItem(PENDING_UPLOAD_KEY);
+        payload = JSON.parse(raw);
+      }catch(err){
+        console.warn('pending upload parse failed', err);
+        return;
+      }
+      const dataUrl = payload?.dataUrl;
+      if(!dataUrl) return;
+      const file = dataUrlToFile(dataUrl, `pixieedrawlite-${payload?.canvasSize || ''}px.png`);
+      if(!file) return;
+      const input = $(FILE_INPUT_ID);
+      if(!input) return;
+      try{
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        input.files = dt.files;
+      }catch(err){
+        console.warn('file inject failed', err);
+        return;
+      }
+      const openBtn = document.getElementById('openPostPanel');
+      if(openBtn){
+        openBtn.click();
+      }
+      setPostPreview(dataUrl);
+      setStatus('画像を読み込みました。内容を確認して投稿してください。');
     }
 
     function setAuthStatus(msg){
@@ -1120,6 +1219,7 @@
           throw res.error;
         }
         form.reset();
+        setPostPreview('');
         setStatus('投稿しました！');
       }catch(err){
         setStatus('投稿に失敗しました');
@@ -1603,6 +1703,26 @@
         }
         form.addEventListener('submit', handleSubmit);
       }
+      const fileInput = $(FILE_INPUT_ID);
+      if(fileInput){
+        fileInput.addEventListener('change', async () => {
+          const file = fileInput.files?.[0];
+          if(!file){
+            setPostPreview('');
+            return;
+          }
+          setStatus('画像を読み込み中...');
+          try{
+            const info = await fileToImageInfo(file);
+            setPostPreview(info.dataUrl);
+            setStatus('');
+          }catch(err){
+            setPostPreview('');
+            setStatus(err?.message || '画像の読み込みに失敗しました');
+          }
+        });
+      }
+      restorePendingUpload();
       const profileNick = document.getElementById('profileNickname');
       if(profileNick){
         profileNick.value = loadNickname();
