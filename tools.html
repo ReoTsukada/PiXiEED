@@ -18,8 +18,12 @@
       -webkit-user-select:none;
       -ms-user-select:none;
     }
+    html,body{
+      overflow-x:hidden;
+      max-width:100vw;
+    }
     body{
-      margin:0;
+      margin:0 auto;
       font-family:'Fredoka','DotGothic16',system-ui,sans-serif;
       background:radial-gradient(circle at 20% 20%, rgba(59,130,246,0.22), rgba(15,23,42,1)),
                  radial-gradient(circle at 80% 0%, rgba(236,72,153,0.18), rgba(15,23,42,1)),
@@ -27,10 +31,20 @@
       color:#e5e7eb;
       min-height:100vh;
       padding:20px 14px 120px;
-      display:flex;
-      justify-content:center;
+      width:100%;
+      display:block;
+      max-width:100vw;
+      box-sizing:border-box;
     }
-    .page{ width:100%; max-width:none; display:grid; gap:14px; }
+    .page{
+      width:100%;
+      max-width:min(1200px, 100vw);
+      display:grid;
+      gap:14px;
+      position:relative;
+      margin:0 auto;
+      box-sizing:border-box;
+    }
     header{
       position:sticky;
       top:0;
@@ -40,6 +54,9 @@
       border-bottom:1px solid rgba(255,255,255,0.08);
       margin:-20px -14px 8px;
       padding:10px 14px;
+      width:calc(100% + 28px);
+      max-width:100vw;
+      box-sizing:border-box;
     }
     .header-inner{
       display:flex;
@@ -47,8 +64,9 @@
       justify-content:space-between;
       gap:12px;
       width:100%;
-      max-width:none;
+      max-width:1200px;
       margin:0 auto;
+      box-sizing:border-box;
     }
     .brand{
       display:flex;
