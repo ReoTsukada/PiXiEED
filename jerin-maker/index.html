@@ -53,6 +53,10 @@
     overflow: hidden;
     user-select: none;
   }
+  html[data-compact="true"] body {
+    font-size: 0.95rem;
+    --pad: clamp(8px, 2vw, 14px);
+  }
   input,
   textarea {
     user-select: auto;
@@ -110,7 +114,7 @@
     flex-direction: column;
     gap: clamp(10px, 2vw, 16px);
     min-height: 0;
-    overflow: hidden;
+    overflow: visible;
   }
   .workspace {
     display: flex;
@@ -141,18 +145,17 @@
     align-items: center;
     border: 0;
     border-radius: 12px;
+    overflow: hidden;
   }
   .canvas-stack {
     position: relative;
     --canvas-base: min(82vw, min(56vh, 520px));
-    --canvas-max: min(92vw, 560px);
-    --canvas-zoom: 1;
-    --canvas-size: clamp(240px, calc(var(--canvas-base) * var(--canvas-zoom)), var(--canvas-max));
+    --canvas-size: var(--canvas-base);
     width: var(--canvas-size);
     height: var(--canvas-size);
-    max-width: var(--canvas-max);
-    max-height: var(--canvas-max);
-    transition: width 0.12s ease, height 0.12s ease;
+    max-width: min(92vw, 560px);
+    max-height: min(70vh, 560px);
+    transform-origin: top left;
   }
   .canvas-stack canvas {
     position: absolute;
@@ -191,6 +194,48 @@
     font-size: 0.95rem;
   }
   button:hover { border-color: rgba(88, 196, 255, 0.8); }
+  .viewport-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 6px auto 0;
+    padding: 6px 8px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(6, 10, 28, 0.55);
+    box-shadow: 0 10px 24px rgba(5, 8, 20, 0.35);
+    backdrop-filter: blur(8px);
+    width: min(480px, 96%);
+  }
+  .viewport-controls .vp-btn {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 10px;
+    font-size: 1.05rem;
+    font-weight: 800;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+  }
+  .viewport-controls .vp-btn:active { transform: translateY(1px); }
+  @media (max-width: 640px) {
+    .viewport-controls {
+      width: 100%;
+      gap: 6px;
+      padding-inline: 10px;
+    }
+    .viewport-controls .vp-btn {
+      width: 40px;
+      height: 40px;
+      font-size: 1rem;
+    }
+  }
   .icon-btn {
     width: 40px;
     height: 40px;
@@ -223,10 +268,47 @@
     grid-template-rows: repeat(4, auto);
     gap: 6px;
     max-height: calc(100vh - 160px);
-    overflow: hidden;
+    overflow: hidden auto;
     flex-shrink: 0;
     position: relative;
     margin-top: 8px;
+  }
+  html[data-compact="true"] {
+    --pad: clamp(8px, 2vw, 14px);
+    --footer-height: 52px;
+    font-size: 0.95rem;
+  }
+  html[data-compact="true"] .shell { gap: 6px; padding-bottom: calc(18px + var(--footer-height)); }
+  html[data-compact="true"] .app { gap: 8px; }
+  html[data-compact="true"] .workspace { gap: 6px; }
+  html[data-compact="true"] .canvas-wrap { gap: 4px; }
+  html[data-compact="true"] .canvas-frame { padding: 4px; }
+  html[data-compact="true"] .canvas-stack {
+    max-width: min(86vw, 440px);
+    max-height: min(56vh, 420px);
+  }
+  html[data-compact="true"] .panel {
+    padding: 4px;
+    gap: 4px;
+    margin-top: 2px;
+    max-height: none;
+    overflow: hidden;
+  }
+  html[data-compact="true"] .palette {
+    gap: 5px;
+  }
+  html[data-compact="true"] .viewport-controls {
+    gap: 6px;
+    padding: 4px 6px;
+    margin-top: 0;
+  }
+  html[data-compact="true"] .viewport-controls .vp-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 0.92rem;
+  }
+  html[data-compact="true"] .ad-slot {
+    height: 44px;
   }
   .maou-dialog {
     position: fixed;
@@ -757,7 +839,7 @@
     .panel { max-height: none; }
   }
   @media (max-height: 720px) {
-    .canvas-stack { --canvas-base: min(78vw, min(46vh, 460px)); }
+    .canvas-stack { --canvas-size: min(78vw, min(46vh, 460px)); }
     .canvas-frame { padding: 8px; }
     .panel { max-height: calc(100vh - 140px); gap: 8px; }
     .app { gap: clamp(8px, 2vw, 12px); }
@@ -765,13 +847,13 @@
   }
   @media (max-height: 620px) {
     :root { --pad: clamp(6px, 1.5vw, 10px); }
-    .canvas-stack { --canvas-base: min(70vw, min(38vh, 340px)); }
+    .canvas-stack { --canvas-size: min(70vw, min(38vh, 340px)); }
     .panel { max-height: calc(100vh - 170px); gap: 6px; }
     .prompt { font-size: 0.86rem; padding: 8px 8px; }
     .footer { padding: 4px 0; }
   }
   @media (min-height: 900px) and (orientation: portrait) {
-    .canvas-stack { --canvas-base: min(86vw, min(64vh, 560px)); }
+    .canvas-stack { --canvas-size: min(86vw, min(64vh, 560px)); }
     .app { gap: clamp(12px, 2.5vw, 18px); }
     .panel { max-height: calc(100vh - 180px); }
   }
@@ -820,6 +902,14 @@
           <canvas aria-label="16×16のドットキャンバス" height="16" id="canvas" width="16"></canvas>
           <canvas aria-hidden="true" height="16" id="gridCanvas" width="16"></canvas>
         </div>
+      </div>
+      <div class="viewport-controls" aria-label="ズームと移動">
+        <button type="button" class="vp-btn" id="zoomOut" aria-label="縮小">−</button>
+        <button type="button" class="vp-btn" id="panLeft" aria-label="左に移動">←</button>
+        <button type="button" class="vp-btn" id="panUp" aria-label="上に移動">↑</button>
+        <button type="button" class="vp-btn" id="panDown" aria-label="下に移動">↓</button>
+        <button type="button" class="vp-btn" id="panRight" aria-label="右に移動">→</button>
+        <button type="button" class="vp-btn" id="zoomIn" aria-label="拡大">＋</button>
       </div>
     </div>
     <aside class="panel">
@@ -914,6 +1004,32 @@
   const canvas = document.getElementById('canvas');
   const ctx = canvas?.getContext('2d', { willReadFrequently: true });
   if (!canvas || !ctx) return;
+  const canvasStack = document.querySelector('.canvas-stack');
+  const canvasFrame = canvas.closest('.canvas-frame');
+  const zoomInBtn = document.getElementById('zoomIn');
+  const zoomOutBtn = document.getElementById('zoomOut');
+  const panUpBtn = document.getElementById('panUp');
+  const panDownBtn = document.getElementById('panDown');
+  const panLeftBtn = document.getElementById('panLeft');
+  const panRightBtn = document.getElementById('panRight');
+  let zoomStep = 0;
+  let maxZoomStep = calcMaxZoomStep(canvasSize);
+  let viewSize = canvasSize;
+  let viewOffsetX = 0;
+  let viewOffsetY = 0;
+  let currentScale = 1;
+  let currentUnit = 1;
+  let currentTx = 0;
+  let currentTy = 0;
+  function updateCompactMode() {
+    const isCompact = window.innerHeight < 960;
+    const root = document.documentElement;
+    if (isCompact) {
+      root.setAttribute('data-compact', 'true');
+    } else {
+      root.removeAttribute('data-compact');
+    }
+  }
 
   const PALETTE_KEY = 'pixieedrawlite_palette_v1';
   const DEFAULT_PALETTE = [
@@ -967,6 +1083,118 @@
     '2色を使い分けて彩りを付けるがよい。',
     '仕上げだ。焦らず整えてくれ。',
   ];
+  function calcMaxZoomStep(size) {
+    return Math.max(0, Math.ceil(Math.log2(size / 4)));
+  }
+  function getViewSizeForStep(size, step) {
+    return Math.max(4, Math.round(size / Math.pow(2, step)));
+  }
+  const canvasWrap = document.querySelector('.canvas-wrap');
+  const workspaceEl = document.querySelector('.workspace');
+  const appEl = document.querySelector('.app');
+  const viewportControls = document.querySelector('.viewport-controls');
+  const panelEl = document.querySelector('aside.panel');
+  function getIdealCanvasSize() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const isPortrait = window.matchMedia('(orientation: portrait)').matches;
+    let size = Math.min(w * 0.82, Math.min(h * 0.56, 520));
+    if (h <= 720) {
+      size = Math.min(w * 0.78, Math.min(h * 0.46, 460));
+    }
+    if (h <= 620) {
+      size = Math.min(w * 0.7, Math.min(h * 0.38, 340));
+    }
+    if (h >= 900 && isPortrait) {
+      size = Math.min(w * 0.86, Math.min(h * 0.64, 560));
+    }
+    return size;
+  }
+  function getGapSize(el) {
+    if (!el) return 0;
+    const style = window.getComputedStyle(el);
+    const gap = parseFloat(style.rowGap || style.gap || '0');
+    return Number.isFinite(gap) ? gap : 0;
+  }
+  function getCanvasFrameWidth() {
+    if (!canvasFrame) return null;
+    const frameWidth = canvasFrame.clientWidth || canvasFrame.getBoundingClientRect().width;
+    const style = window.getComputedStyle(canvasFrame);
+    const padX = parseFloat(style.paddingLeft || '0') + parseFloat(style.paddingRight || '0');
+    return Math.max(0, frameWidth - padX);
+  }
+  function getCanvasHeightLimit() {
+    const bodyStyle = window.getComputedStyle(document.body);
+    const padTop = parseFloat(bodyStyle.paddingTop || '0');
+    const padBottom = parseFloat(bodyStyle.paddingBottom || '0');
+    const promptHeight = dailyPromptEl?.getBoundingClientRect().height || 0;
+    const controlsHeight = viewportControls?.getBoundingClientRect().height || 0;
+    const appGap = getGapSize(appEl);
+    const wrapGap = getGapSize(canvasWrap);
+    let height = window.innerHeight - padTop - padBottom - promptHeight - controlsHeight - appGap - wrapGap;
+    const isSideBySide = window.matchMedia('(min-width: 960px), (orientation: landscape)').matches;
+    if (!isSideBySide) {
+      const workspaceGap = getGapSize(workspaceEl);
+      const panelHeight = panelEl?.getBoundingClientRect().height || 0;
+      height -= workspaceGap + panelHeight;
+    }
+    return Math.max(height, canvasSize);
+  }
+  function snapCanvasStackSize() {
+    if (!canvasStack) return;
+    const ideal = getIdealCanvasSize();
+    const frameWidth = getCanvasFrameWidth();
+    const heightLimit = getCanvasHeightLimit();
+    const limit = Math.min(ideal, frameWidth || ideal, heightLimit);
+    const unit = Math.max(1, Math.floor(limit / canvasSize));
+    const snapped = Math.max(canvasSize, unit * canvasSize);
+    const sizePx = `${snapped}px`;
+    canvasStack.style.setProperty('--canvas-size', sizePx);
+    canvasStack.style.width = sizePx;
+    canvasStack.style.height = sizePx;
+    canvasStack.style.maxWidth = sizePx;
+    canvasStack.style.maxHeight = sizePx;
+  }
+  function applyViewportTransform() {
+    snapCanvasStackSize();
+    viewSize = getViewSizeForStep(canvasSize, zoomStep);
+    const maxOffset = Math.max(0, canvasSize - viewSize);
+    viewOffsetX = clamp(viewOffsetX, 0, maxOffset);
+    viewOffsetY = clamp(viewOffsetY, 0, maxOffset);
+    if (canvasStack) {
+      const baseSize = canvasStack.clientWidth || canvasSize;
+      currentUnit = baseSize / canvasSize;
+      currentScale = canvasSize / viewSize;
+      currentTx = -viewOffsetX * currentUnit;
+      currentTy = -viewOffsetY * currentUnit;
+      canvasStack.style.transform = `scale(${currentScale}) translate(${currentTx}px, ${currentTy}px)`;
+    }
+  }
+  function resetViewport() {
+    zoomStep = 0;
+    viewOffsetX = 0;
+    viewOffsetY = 0;
+    maxZoomStep = calcMaxZoomStep(canvasSize);
+    applyViewportTransform();
+  }
+  function changeZoom(delta) {
+    const next = clamp(zoomStep + delta, 0, maxZoomStep);
+    if (next === zoomStep) return;
+    const prevCenterX = viewOffsetX + viewSize / 2;
+    const prevCenterY = viewOffsetY + viewSize / 2;
+    zoomStep = next;
+    const nextViewSize = getViewSizeForStep(canvasSize, zoomStep);
+    viewOffsetX = clamp(Math.round(prevCenterX - nextViewSize / 2), 0, canvasSize - nextViewSize);
+    viewOffsetY = clamp(Math.round(prevCenterY - nextViewSize / 2), 0, canvasSize - nextViewSize);
+    applyViewportTransform();
+  }
+  function moveViewport(dx, dy) {
+    viewSize = getViewSizeForStep(canvasSize, zoomStep);
+    const maxOffset = Math.max(0, canvasSize - viewSize);
+    viewOffsetX = clamp(viewOffsetX + dx, 0, maxOffset);
+    viewOffsetY = clamp(viewOffsetY + dy, 0, maxOffset);
+    applyViewportTransform();
+  }
   const MAOU_ENDING_LINES = [
     'おおお！素晴らしい！！\n立派なリンゴの完成じゃ！！',
     'どうじゃ？楽しいじゃろう？',
@@ -1965,6 +2193,8 @@
       jelinCanvas.width = target;
       jelinCanvas.height = target;
     }
+    maxZoomStep = calcMaxZoomStep(canvasSize);
+    resetViewport();
     resizeGridCanvas();
     render();
     updateSizeButton();
@@ -3012,35 +3242,36 @@
   function drawGrid() {
     if (!gridCtx || !gridCanvas) return;
     gridCanvas.style.display = showGrid ? 'block' : 'none';
-    const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
-    const checkerSize = rect.width / canvasSize;
-    const stack = canvas.parentElement;
-    if (stack) {
-      stack.style.setProperty('--checker-size', `${checkerSize}px`);
-    }
+    const baseSize = (canvasStack?.getBoundingClientRect().width) || canvasSize;
+    const scale = currentScale || 1;
+    const scaledSize = baseSize / scale; // transform scale後にbaseSizeへ戻る
+    const checkerSize = scaledSize / Math.max(canvasSize, 1);
+    canvasStack?.style.setProperty('--checker-size', `${checkerSize}px`);
     if (bgCanvas) {
       bgCanvas.width = canvasSize;
       bgCanvas.height = canvasSize;
     }
-    gridCanvas.width = rect.width * dpr;
-    gridCanvas.height = rect.height * dpr;
-    gridCanvas.style.width = `${rect.width}px`;
-    gridCanvas.style.height = `${rect.height}px`;
+    gridCanvas.width = scaledSize * dpr;
+    gridCanvas.height = scaledSize * dpr;
+    gridCanvas.style.width = `${scaledSize}px`;
+    gridCanvas.style.height = `${scaledSize}px`;
     gridCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    gridCtx.clearRect(0, 0, rect.width, rect.height);
+    gridCtx.clearRect(0, 0, scaledSize, scaledSize);
     if (!showGrid) return;
     gridCtx.save();
     gridCtx.strokeStyle = 'rgba(0, 0, 0, 0.6)'; // 黒系のグリッド
     gridCtx.lineWidth = 0.8;
     gridCtx.setLineDash([]);
-    const cellW = rect.width / canvasSize;
-    const cellH = rect.height / canvasSize;
+    const positions = [];
     for (let i = 0; i <= canvasSize; i++) {
-      const x = i * cellW;
-      const y = i * cellH;
-      gridCtx.beginPath(); gridCtx.moveTo(x, 0); gridCtx.lineTo(x, rect.height); gridCtx.stroke();
-      gridCtx.beginPath(); gridCtx.moveTo(0, y); gridCtx.lineTo(rect.width, y); gridCtx.stroke();
+      positions.push(Math.round((i * scaledSize) / canvasSize));
+    }
+    for (const x of positions) {
+      gridCtx.beginPath(); gridCtx.moveTo(x, 0); gridCtx.lineTo(x, scaledSize); gridCtx.stroke();
+    }
+    for (const y of positions) {
+      gridCtx.beginPath(); gridCtx.moveTo(0, y); gridCtx.lineTo(scaledSize, y); gridCtx.stroke();
     }
     gridCtx.restore();
   }
@@ -3119,12 +3350,16 @@
   }
 
   function canvasPosToCell(event) {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvasSize / rect.width;
-    const scaleY = canvasSize / rect.height;
+    const stackRect = canvasStack?.getBoundingClientRect() || canvas.getBoundingClientRect();
+    const px = event.clientX - stackRect.left;
+    const py = event.clientY - stackRect.top;
+    const scale = currentScale || 1;
+    const unit = (stackRect.width / scale) / canvasSize || 1;
+    const localX = (px / scale);
+    const localY = (py / scale);
     return {
-      x: Math.floor((event.clientX - rect.left) * scaleX),
-      y: Math.floor((event.clientY - rect.top) * scaleY),
+      x: clamp(Math.floor(localX / unit), 0, canvasSize - 1),
+      y: clamp(Math.floor(localY / unit), 0, canvasSize - 1),
     };
   }
 
@@ -3197,6 +3432,18 @@
   canvas.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', onPointerUp);
   canvas.addEventListener('contextmenu', event => event.preventDefault());
+  zoomInBtn?.addEventListener('click', () => changeZoom(1));
+  zoomOutBtn?.addEventListener('click', () => changeZoom(-1));
+  panUpBtn?.addEventListener('click', () => moveViewport(0, -1));
+  panDownBtn?.addEventListener('click', () => moveViewport(0, 1));
+  panLeftBtn?.addEventListener('click', () => moveViewport(-1, 0));
+  panRightBtn?.addEventListener('click', () => moveViewport(1, 0));
+  canvasStack?.addEventListener('wheel', event => {
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      changeZoom(event.deltaY < 0 ? 1 : -1);
+    }
+  }, { passive: false });
 
   btnCycleSize?.addEventListener('click', cycleCanvasSize);
   btnJelinMode?.addEventListener('click', () => {
@@ -3250,6 +3497,7 @@
       drawLiteColorWheel();
       updateLiteWheelCursor();
     }
+    updateCompactMode();
   });
 
   tutorialDoneBtn?.addEventListener('click', () => {
@@ -3308,6 +3556,7 @@
   setCurrentColor(palette[activeSwatchIndex], { updatePalette: false });
   updateUndoRedoUI();
   updateColorOpenButton();
+  updateCompactMode();
   applyCanvasSize(canvasSize);
   setJelinMode(false);
   if (tutorialForceStart || isTutorialPending()) {
@@ -3328,6 +3577,7 @@
   });
 
   window.addEventListener('resize', () => {
+    applyViewportTransform();
     resizeGridCanvas();
     if (tutorialState.active && tutorialState.currentSprite) {
       drawTutorialOverlay(tutorialState.currentSprite.image);
