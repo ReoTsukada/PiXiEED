@@ -194,22 +194,7 @@
     font-size: 0.95rem;
   }
   button:hover { border-color: rgba(88, 196, 255, 0.8); }
-  .viewport-controls {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin: 6px auto 0;
-    padding: 6px 8px;
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(6, 10, 28, 0.55);
-    box-shadow: 0 10px 24px rgba(5, 8, 20, 0.35);
-    backdrop-filter: blur(8px);
-    width: min(480px, 96%);
-  }
-  .viewport-controls .vp-btn {
+  .vp-btn {
     width: 44px;
     height: 44px;
     padding: 0;
@@ -223,14 +208,11 @@
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.14);
   }
-  .viewport-controls .vp-btn:active { transform: translateY(1px); }
+  .vp-row-start { margin-left: auto; }
+  .vp-row-end { margin-right: auto; }
+  .vp-btn:active { transform: translateY(1px); }
   @media (max-width: 640px) {
-    .viewport-controls {
-      width: 100%;
-      gap: 6px;
-      padding-inline: 10px;
-    }
-    .viewport-controls .vp-btn {
+    .vp-btn {
       width: 40px;
       height: 40px;
       font-size: 1rem;
@@ -782,11 +764,15 @@
   }
   .inline-buttons {
     display: flex;
-    gap: 6px;
+    flex-wrap: wrap;
+    column-gap: 6px;
+    row-gap: 10px;
     align-items: center;
-    flex-wrap: nowrap;
-    justify-content: flex-start;
     width: 100%;
+  }
+  .inline-break {
+    flex-basis: 100%;
+    height: 0;
   }
   .inline-buttons .icon-btn[aria-hidden="true"] {
     opacity: 0;
@@ -801,8 +787,8 @@
   #btnExport { margin-left: auto; }
   @media (orientation: landscape) {
     .inline-buttons {
-      gap: 4px;
-      flex-wrap: wrap;
+      row-gap: 8px;
+      column-gap: 4px;
     }
     .icon-btn {
       width: 36px;
@@ -893,50 +879,49 @@
   </div>
   <div class="workspace">
     <div class="canvas-wrap">
-      <div class="canvas-frame">
-        <div class="canvas-stack">
-          <canvas aria-hidden="true" class="canvas-base" height="16" id="bgCanvas" width="16"></canvas>
-          <canvas aria-hidden="true" class="tutorial-overlay" height="16" id="tutorialOverlay" width="16"></canvas>
-          <canvas aria-hidden="true" class="cutscene-overlay" height="16" id="cutsceneOverlay" width="16"></canvas>
-          <canvas aria-hidden="true" class="jelin-overlay" height="16" id="jelinCanvas" width="16"></canvas>
-          <canvas aria-label="16×16のドットキャンバス" height="16" id="canvas" width="16"></canvas>
-          <canvas aria-hidden="true" height="16" id="gridCanvas" width="16"></canvas>
-        </div>
-      </div>
-      <div class="viewport-controls" aria-label="ズームと移動">
-        <button type="button" class="vp-btn" id="zoomOut" aria-label="縮小">−</button>
-        <button type="button" class="vp-btn" id="panLeft" aria-label="左に移動">←</button>
-        <button type="button" class="vp-btn" id="panUp" aria-label="上に移動">↑</button>
-        <button type="button" class="vp-btn" id="panDown" aria-label="下に移動">↓</button>
-        <button type="button" class="vp-btn" id="panRight" aria-label="右に移動">→</button>
-        <button type="button" class="vp-btn" id="zoomIn" aria-label="拡大">＋</button>
+    <div class="canvas-frame">
+      <div class="canvas-stack">
+        <canvas aria-hidden="true" class="canvas-base" height="16" id="bgCanvas" width="16"></canvas>
+        <canvas aria-hidden="true" class="tutorial-overlay" height="16" id="tutorialOverlay" width="16"></canvas>
+        <canvas aria-hidden="true" class="cutscene-overlay" height="16" id="cutsceneOverlay" width="16"></canvas>
+        <canvas aria-hidden="true" class="jelin-overlay" height="16" id="jelinCanvas" width="16"></canvas>
+        <canvas aria-label="16×16のドットキャンバス" height="16" id="canvas" width="16"></canvas>
+        <canvas aria-hidden="true" height="16" id="gridCanvas" width="16"></canvas>
       </div>
     </div>
-    <aside class="panel">
-      <div class="row">
-          <div class="inline-buttons">
-            <button class="icon-btn color-open-btn" id="btnOpenColorPanel" title="色を編集する" type="button">
-              <span class="color-chip" id="btnColorChip"></span>
-            </button>
-            <button class="icon-btn" id="btnCycleSize" title="キャンバスサイズを切り替え (8px / 16px / 32px)" type="button">16px</button>
-            <button class="icon-btn" id="btnJelinMode" title="スカイジェリンをプレビューする" type="button">
-              <img alt="ジェリンモード" src="./JELLNALL1.svg"/>
-            </button>
-            <button class="icon-btn" id="btnUndo" title="一つ戻す" type="button">
-              <img alt="元に戻す" src="../pixiedraw/assets/icons/action-undo.svg"/>
-            </button>
-            <button class="icon-btn" id="btnRedo" title="やり直す" type="button">
-              <img alt="やり直す" src="../pixiedraw/assets/icons/action-redo.svg"/>
-            </button>
-            <button class="icon-btn" id="btnTutorialSpacerLeft" title="" type="button" aria-hidden="true"></button>
-            <button class="icon-btn" id="btnTutorialRestart" title="チュートリアルを最初から (ハテナ)" type="button" aria-hidden="true">?</button>
-            <button class="icon-btn" id="btnTutorialSpacerRight" title="" type="button" aria-hidden="true"></button>
-            <button class="icon-btn" id="btnExport" title="PNGを書き出す" type="button">
-              <img alt="書き出し" src="../pixiedraw/assets/icons/action-export.svg"/>
-            </button>
-          </div>
-      </div>
-      <div class="palette-wrap">
+  </div>
+  <aside class="panel">
+    <div class="row">
+        <div class="inline-buttons">
+          <button type="button" class="vp-btn vp-row-start" id="zoomOut" aria-label="縮小">−</button>
+          <button type="button" class="vp-btn" id="panLeft" aria-label="左に移動">←</button>
+          <button type="button" class="vp-btn" id="panUp" aria-label="上に移動">↑</button>
+          <button type="button" class="vp-btn" id="panDown" aria-label="下に移動">↓</button>
+          <button type="button" class="vp-btn" id="panRight" aria-label="右に移動">→</button>
+          <button type="button" class="vp-btn vp-row-end" id="zoomIn" aria-label="拡大">＋</button>
+          <span class="inline-break" aria-hidden="true"></span>
+          <button class="icon-btn color-open-btn" id="btnOpenColorPanel" title="色を編集する" type="button">
+            <span class="color-chip" id="btnColorChip"></span>
+          </button>
+          <button class="icon-btn" id="btnCycleSize" title="キャンバスサイズを切り替え (8px / 16px / 32px)" type="button">16px</button>
+          <button class="icon-btn" id="btnJelinMode" title="スカイジェリンをプレビューする" type="button">
+            <img alt="ジェリンモード" src="./JELLNALL1.svg"/>
+          </button>
+          <button class="icon-btn" id="btnUndo" title="一つ戻す" type="button">
+            <img alt="元に戻す" src="../pixiedraw/assets/icons/action-undo.svg"/>
+          </button>
+          <button class="icon-btn" id="btnRedo" title="やり直す" type="button">
+            <img alt="やり直す" src="../pixiedraw/assets/icons/action-redo.svg"/>
+          </button>
+          <button class="icon-btn" id="btnTutorialSpacerLeft" title="" type="button" aria-hidden="true"></button>
+          <button class="icon-btn" id="btnTutorialRestart" title="チュートリアルを最初から (ハテナ)" type="button" aria-hidden="true">?</button>
+          <button class="icon-btn" id="btnTutorialSpacerRight" title="" type="button" aria-hidden="true"></button>
+          <button class="icon-btn" id="btnExport" title="PNGを書き出す" type="button">
+            <img alt="書き出し" src="../pixiedraw/assets/icons/action-export.svg"/>
+          </button>
+        </div>
+    </div>
+    <div class="palette-wrap">
         <div class="palette" id="palette"></div>
       </div>
       <input aria-hidden="true" class="swatch-editor" id="swatchEditor" tabindex="-1" type="color" />
@@ -1092,7 +1077,6 @@
   const canvasWrap = document.querySelector('.canvas-wrap');
   const workspaceEl = document.querySelector('.workspace');
   const appEl = document.querySelector('.app');
-  const viewportControls = document.querySelector('.viewport-controls');
   const panelEl = document.querySelector('aside.panel');
   function getIdealCanvasSize() {
     const w = window.innerWidth;
@@ -1128,10 +1112,9 @@
     const padTop = parseFloat(bodyStyle.paddingTop || '0');
     const padBottom = parseFloat(bodyStyle.paddingBottom || '0');
     const promptHeight = dailyPromptEl?.getBoundingClientRect().height || 0;
-    const controlsHeight = viewportControls?.getBoundingClientRect().height || 0;
     const appGap = getGapSize(appEl);
     const wrapGap = getGapSize(canvasWrap);
-    let height = window.innerHeight - padTop - padBottom - promptHeight - controlsHeight - appGap - wrapGap;
+    let height = window.innerHeight - padTop - padBottom - promptHeight - appGap - wrapGap;
     const isSideBySide = window.matchMedia('(min-width: 960px), (orientation: landscape)').matches;
     if (!isSideBySide) {
       const workspaceGap = getGapSize(workspaceEl);
