@@ -32,6 +32,32 @@ body {
   -webkit-user-select: none;
   -ms-user-select: none;
   user-select: none;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* Clamp common containers to viewport to prevent horizontal overflow (e.g. auto ads) */
+body,
+main,
+.page,
+header,
+footer,
+.site-header {
+  width: 100%;
+  max-width: min(1200px, 100vw);
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+}
+
+img,
+video,
+canvas,
+svg,
+iframe {
+  max-width: 100%;
+  height: auto;
+  display: block;
 }
 
 body * {
