@@ -916,6 +916,9 @@
           <button class="icon-btn" id="btnTutorialSpacerLeft" title="" type="button" aria-hidden="true"></button>
           <button class="icon-btn" id="btnTutorialRestart" title="チュートリアルを最初から (ハテナ)" type="button" aria-hidden="true">?</button>
           <button class="icon-btn" id="btnTutorialSpacerRight" title="" type="button" aria-hidden="true"></button>
+          <button class="icon-btn" id="btnUpload" title="コンテストへ送る" type="button">
+            <img alt="アップロード" src="../pixiedraw/assets/icons/action-open.svg"/>
+          </button>
           <button class="icon-btn" id="btnExport" title="PNGを書き出す" type="button">
             <img alt="書き出し" src="../pixiedraw/assets/icons/action-export.svg"/>
           </button>
@@ -1760,6 +1763,7 @@
   const btnColorChip = document.getElementById('btnColorChip');
   const btnTutorialSpacerLeft = document.getElementById('btnTutorialSpacerLeft');
   const btnTutorialSpacerRight = document.getElementById('btnTutorialSpacerRight');
+  const btnUpload = document.getElementById('btnUpload');
   const swatchEditor = /** @type {HTMLInputElement|null} */ (document.getElementById('swatchEditor'));
   const liteColorPicker = document.getElementById('liteColorPicker');
   const liteColorWheel = /** @type {HTMLCanvasElement|null} */ (document.getElementById('liteColorWheel'));
@@ -3490,47 +3494,111 @@
     resetTutorial();
   });
 
-  btnExport?.addEventListener('click', () => {
-    const targetSize = 640;
-    const temp = document.createElement('canvas');
-    temp.width = targetSize;
-    temp.height = targetSize;
-    const tctx = temp.getContext('2d');
-    if (!tctx) return;
-    tctx.imageSmoothingEnabled = false;
-
-    // 元サイズでジェリン＋描画を合成
+  function buildCompositeCanvas() {
     const composite = document.createElement('canvas');
     composite.width = canvasSize;
     composite.height = canvasSize;
     const cctx = composite.getContext('2d', { willReadFrequently: true });
-    if (!cctx) return;
+    if (!cctx) return null;
     cctx.imageSmoothingEnabled = false;
-    // ジェリンレイヤーを先に
     if (jelinMode && jelInImageLoaded) {
       const source = jelInImageBitmap || jelInImage;
       if (source) {
         cctx.drawImage(source, 0, 0, canvasSize, canvasSize);
       }
     }
-    // 描画レイヤー（メインキャンバスのImageData）
     const srcCanvas = document.createElement('canvas');
     srcCanvas.width = canvasSize;
     srcCanvas.height = canvasSize;
     const sctx = srcCanvas.getContext('2d', { willReadFrequently: true });
-    if (!sctx) return;
+    if (!sctx) return null;
     sctx.putImageData(imageData, 0, 0);
     cctx.drawImage(srcCanvas, 0, 0, canvasSize, canvasSize);
-
-    // 640pxへ拡大
+    return composite;
+  }
+  function exportCompositeToDataUrl(targetSize) {
+    const composite = buildCompositeCanvas();
+    if (!composite) return null;
+    const temp = document.createElement('canvas');
+    temp.width = targetSize;
+    temp.height = targetSize;
+    const tctx = temp.getContext('2d');
+    if (!tctx) return null;
+    tctx.imageSmoothingEnabled = false;
     tctx.drawImage(composite, 0, 0, targetSize, targetSize);
-      const baseUrl = temp.toDataURL('image/png');
-      const meta = JSON.stringify({ palette });
-      const url = injectTextChunk(baseUrl, 'palette', meta);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `pixieedrawlite-${canvasSize}px@640.png`;
-      link.click();
+    return temp.toDataURL('image/png');
+  }
+  function exportCompositeToDataUrlRaw() {
+    const composite = buildCompositeCanvas();
+    if (!composite) return null;
+    return composite.toDataURL('image/png');
+  }
+  const DOWNLOAD_GUARD_KEY = 'pixieedrawlite_download_guard_v1';
+  function getCompositeSignature() {
+    const composite = buildCompositeCanvas();
+    if (!composite) return null;
+    const cctx = composite.getContext('2d', { willReadFrequently: true });
+    if (!cctx) return null;
+    const img = cctx.getImageData(0, 0, canvasSize, canvasSize);
+    const hash = crc32(new Uint8Array(img.data.buffer));
+    return `${canvasSize}:${hash}`;
+  }
+  function markDownloaded() {
+    const signature = getCompositeSignature();
+    if (!signature) return;
+    try {
+      localStorage.setItem(DOWNLOAD_GUARD_KEY, JSON.stringify({
+        signature,
+        at: new Date().toISOString(),
+      }));
+    } catch (err) {
+      console.warn('download guard store failed', err);
+    }
+  }
+  function hasDownloadedCurrent() {
+    const signature = getCompositeSignature();
+    if (!signature) return false;
+    try {
+      const raw = localStorage.getItem(DOWNLOAD_GUARD_KEY);
+      if (!raw) return false;
+      const stored = JSON.parse(raw);
+      return stored?.signature === signature;
+    } catch (err) {
+      console.warn('download guard read failed', err);
+      return false;
+    }
+  }
+  btnExport?.addEventListener('click', () => {
+    const baseUrl = exportCompositeToDataUrl(640);
+    if (!baseUrl) return;
+    const meta = JSON.stringify({ palette });
+    const url = injectTextChunk(baseUrl, 'palette', meta);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `pixieedrawlite-${canvasSize}px@640.png`;
+    link.click();
+    markDownloaded();
+  });
+  btnUpload?.addEventListener('click', () => {
+    if (!hasDownloadedCurrent()) {
+      alert('先にダウンロードしてください。');
+      return;
+    }
+    const dataUrl = exportCompositeToDataUrlRaw();
+    if (!dataUrl) return;
+    try {
+      const payload = {
+        dataUrl,
+        canvasSize,
+        width: canvasSize,
+        height: canvasSize,
+        createdAt: new Date().toISOString(),
+      };
+      localStorage.setItem('pixieed_contest_upload_v1', JSON.stringify(payload));
+    } catch (err) {
+      console.warn('upload store failed', err);
+    }
+    window.location.href = '../contest/index.html#post';
   });
 
   runTutorialResetMigration();
