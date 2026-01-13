@@ -636,18 +636,10 @@
           }
         });
         try{
-      const renderAds = () => {
-        document.querySelectorAll('ins.adsbygoogle').forEach(ad => {
-          if (ad.getAttribute('data-adsbygoogle-status') === 'done' || ad.dataset.pushed === 'true') return;
-          try {
-            (window.adsbygoogle = window.adsbygoogle || []).push({});
-            ad.dataset.pushed = 'true';
-          } catch (e) {
-            console.warn('ads render skipped', e);
+          const ads = document.querySelectorAll('.adsbygoogle');
+          if(ads.length){
+            ads.forEach(() => (window.adsbygoogle = window.adsbygoogle || []).push({}));
           }
-        });
-      };
-      renderAds();
         }catch(e){
           console.warn('ads render skipped', e);
         }
@@ -686,15 +678,10 @@
         setupFilters();
         setActiveNav();
         try{
-      document.querySelectorAll('ins.adsbygoogle').forEach(ad => {
-        if (ad.getAttribute('data-adsbygoogle-status') === 'done' || ad.dataset.pushed === 'true') return;
-        try {
-          (window.adsbygoogle = window.adsbygoogle || []).push({});
-          ad.dataset.pushed = 'true';
-        } catch (e) {
-          console.warn('ads render skipped', e);
-        }
-      });
+          const ads = document.querySelectorAll('.adsbygoogle');
+          if(ads.length){
+            ads.forEach(() => (window.adsbygoogle = window.adsbygoogle || []).push({}));
+          }
         }catch(e){
           console.warn('ads render skipped', e);
         }
