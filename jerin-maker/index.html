@@ -38,6 +38,10 @@
     --safe-left: env(safe-area-inset-left, 0px);
   }
   * { box-sizing: border-box; }
+  html, body {
+    overscroll-behavior: none;
+    touch-action: none;
+  }
   body {
     margin: 0;
     min-height: 100vh;
@@ -59,6 +63,7 @@
   }
   input,
   textarea {
+    touch-action: manipulation;
     user-select: auto;
   }
   .shell {
@@ -1871,6 +1876,17 @@
       event.preventDefault();
     }
   });
+  document.addEventListener(
+    'touchmove',
+    event => {
+      const target = event.target;
+      if (isInputControl(target)) return;
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+    },
+    { passive: false }
+  );
 
   function hexToRgba(hex) {
     if (typeof hex === 'string' && hex.toLowerCase() === 'transparent') {
