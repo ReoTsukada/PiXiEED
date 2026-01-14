@@ -222,6 +222,9 @@
       position:relative;
       text-decoration:none;
       color:inherit;
+      -webkit-touch-callout:none;
+      -webkit-user-select:none;
+      user-select:none;
     }
     .entry-card--ad{
       border-radius:10px;
@@ -258,6 +261,7 @@
       display:block;
       position:relative;
       aspect-ratio:1/1;
+      -webkit-touch-callout:none;
     }
     .entry-imgwrap img{
       width:100%;
@@ -272,6 +276,7 @@
       z-index:1;
       pointer-events:none;
       -webkit-user-drag:none;
+      -webkit-touch-callout:none;
       user-select:none;
     }
     .entry-watermark{
@@ -594,6 +599,30 @@
       min-width: 0 !important;
     }
   </style>
+  <style id="interaction-guard">
+    * {
+      -webkit-touch-callout: none;
+      -webkit-user-drag: none;
+      -webkit-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    input,
+    textarea,
+    [contenteditable] {
+      -webkit-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+  </style>
+  <script id="interaction-guard-js">
+    document.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+    });
+    document.addEventListener('dragstart', (event) => {
+      event.preventDefault();
+    });
+  </script>
 </head>
 <body>
   <div class="page">
@@ -1718,17 +1747,15 @@
       setupTabs();
       setupPostPanel();
       setupAuthButton();
-      // 画像のコンテキストメニューを抑止
-      document.addEventListener('contextmenu', (e) => {
-        if(e.target && e.target.tagName === 'IMG'){
+      // ギャラリー内は右クリック・長押し・ドラッグを抑止
+      const blockGalleryAction = (e) => {
+        if(!(e.target instanceof Element)) return;
+        if(e.target.closest('.entry-card')){
           e.preventDefault();
         }
-      });
-      document.addEventListener('dragstart', (e) => {
-        if(e.target && e.target.tagName === 'IMG'){
-          e.preventDefault();
-        }
-      });
+      };
+      document.addEventListener('contextmenu', blockGalleryAction);
+      document.addEventListener('dragstart', blockGalleryAction);
       const form = $(FORM_ID);
       if(form){
         const saved = loadNickname();
