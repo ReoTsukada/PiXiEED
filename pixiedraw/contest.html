@@ -120,7 +120,17 @@
     .gallery{
       display:grid;
       gap:14px;
-      grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+    }
+    @media (max-width: 900px){
+      .gallery{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+      }
+    }
+    @media (max-width: 620px){
+      .gallery{
+        grid-template-columns:1fr;
+      }
     }
     .entry-card{
       background:rgba(255,255,255,0.05);
