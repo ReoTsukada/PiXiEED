@@ -769,15 +769,36 @@
   }
   .inline-buttons {
     display: flex;
+    flex-direction: column;
+    row-gap: 10px;
+    width: 100%;
+  }
+  .inline-buttons__row {
+    display: flex;
     flex-wrap: wrap;
     column-gap: 6px;
     row-gap: 10px;
     align-items: center;
     width: 100%;
   }
-  .inline-break {
-    flex-basis: 100%;
-    height: 0;
+  .inline-buttons__row--top {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    column-gap: 6px;
+    align-items: center;
+  }
+  .inline-buttons__vp {
+    grid-column: 2;
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 6px;
+    row-gap: 10px;
+    align-items: center;
+    justify-content: center;
+  }
+  .inline-buttons__row--top #btnUpload {
+    grid-column: 3;
+    justify-self: end;
   }
   .inline-buttons .icon-btn[aria-hidden="true"] {
     opacity: 0;
@@ -793,7 +814,17 @@
   @media (orientation: landscape) {
     .inline-buttons {
       row-gap: 8px;
+    }
+    .inline-buttons__row {
       column-gap: 4px;
+      row-gap: 8px;
+    }
+    .inline-buttons__row--top {
+      column-gap: 4px;
+    }
+    .inline-buttons__vp {
+      column-gap: 4px;
+      row-gap: 8px;
     }
     .icon-btn {
       width: 36px;
@@ -870,6 +901,28 @@
   }
   .ad-slot ins { display: block; width: 100%; height: 100%; }
 </style>
+  <style id="ads-safe">
+    html, body {
+      max-width: 100vw;
+      overflow-x: hidden;
+    }
+    .adsbygoogle,
+    ins.adsbygoogle {
+      display: block !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+    .adsbygoogle iframe,
+    ins.adsbygoogle iframe {
+      display: block;
+      width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+    }
+  </style>
 </head>
 <body>
 <div class="shell">
@@ -898,35 +951,40 @@
   <aside class="panel">
     <div class="row">
         <div class="inline-buttons">
-          <button type="button" class="vp-btn vp-row-start" id="zoomOut" aria-label="縮小">−</button>
-          <button type="button" class="vp-btn" id="panLeft" aria-label="左に移動">←</button>
-          <button type="button" class="vp-btn" id="panUp" aria-label="上に移動">↑</button>
-          <button type="button" class="vp-btn" id="panDown" aria-label="下に移動">↓</button>
-          <button type="button" class="vp-btn" id="panRight" aria-label="右に移動">→</button>
-          <button type="button" class="vp-btn vp-row-end" id="zoomIn" aria-label="拡大">＋</button>
-          <span class="inline-break" aria-hidden="true"></span>
-          <button class="icon-btn color-open-btn" id="btnOpenColorPanel" title="色を編集する" type="button">
-            <span class="color-chip" id="btnColorChip"></span>
-          </button>
-          <button class="icon-btn" id="btnCycleSize" title="キャンバスサイズを切り替え (8px / 16px / 32px)" type="button">16px</button>
-          <button class="icon-btn" id="btnJelinMode" title="スカイジェリンをプレビューする" type="button">
-            <img alt="ジェリンモード" src="./JELLNALL1.svg"/>
-          </button>
-          <button class="icon-btn" id="btnUndo" title="一つ戻す" type="button">
-            <img alt="元に戻す" src="../pixiedraw/assets/icons/action-undo.svg"/>
-          </button>
-          <button class="icon-btn" id="btnRedo" title="やり直す" type="button">
-            <img alt="やり直す" src="../pixiedraw/assets/icons/action-redo.svg"/>
-          </button>
-          <button class="icon-btn" id="btnTutorialSpacerLeft" title="" type="button" aria-hidden="true"></button>
-          <button class="icon-btn" id="btnTutorialRestart" title="チュートリアルを最初から (ハテナ)" type="button" aria-hidden="true">?</button>
-          <button class="icon-btn" id="btnTutorialSpacerRight" title="" type="button" aria-hidden="true"></button>
-          <button class="icon-btn" id="btnUpload" title="コンテストへ送る" type="button">
-            <img alt="アップロード" src="../pixiedraw/assets/icons/action-open.svg"/>
-          </button>
-          <button class="icon-btn" id="btnExport" title="PNGを書き出す" type="button">
-            <img alt="書き出し" src="../pixiedraw/assets/icons/action-export.svg"/>
-          </button>
+          <div class="inline-buttons__row inline-buttons__row--top">
+            <div class="inline-buttons__vp">
+              <button type="button" class="vp-btn" id="zoomOut" aria-label="縮小">−</button>
+              <button type="button" class="vp-btn" id="panLeft" aria-label="左に移動">←</button>
+              <button type="button" class="vp-btn" id="panUp" aria-label="上に移動">↑</button>
+              <button type="button" class="vp-btn" id="panDown" aria-label="下に移動">↓</button>
+              <button type="button" class="vp-btn" id="panRight" aria-label="右に移動">→</button>
+              <button type="button" class="vp-btn" id="zoomIn" aria-label="拡大">＋</button>
+            </div>
+            <button class="icon-btn" id="btnUpload" title="コンテストへ送る" type="button">
+              <img alt="アップロード" src="../pixiedraw/assets/icons/action-open.svg"/>
+            </button>
+          </div>
+          <div class="inline-buttons__row inline-buttons__row--bottom">
+            <button class="icon-btn color-open-btn" id="btnOpenColorPanel" title="色を編集する" type="button">
+              <span class="color-chip" id="btnColorChip"></span>
+            </button>
+            <button class="icon-btn" id="btnCycleSize" title="キャンバスサイズを切り替え (8px / 16px / 32px)" type="button">16px</button>
+            <button class="icon-btn" id="btnJelinMode" title="スカイジェリンをプレビューする" type="button">
+              <img alt="ジェリンモード" src="./JELLNALL1.svg"/>
+            </button>
+            <button class="icon-btn" id="btnUndo" title="一つ戻す" type="button">
+              <img alt="元に戻す" src="../pixiedraw/assets/icons/action-undo.svg"/>
+            </button>
+            <button class="icon-btn" id="btnRedo" title="やり直す" type="button">
+              <img alt="やり直す" src="../pixiedraw/assets/icons/action-redo.svg"/>
+            </button>
+            <button class="icon-btn" id="btnTutorialSpacerLeft" title="" type="button" aria-hidden="true"></button>
+            <button class="icon-btn" id="btnTutorialRestart" title="チュートリアルを最初から (ハテナ)" type="button" aria-hidden="true">?</button>
+            <button class="icon-btn" id="btnTutorialSpacerRight" title="" type="button" aria-hidden="true"></button>
+            <button class="icon-btn" id="btnExport" title="PNGを書き出す" type="button">
+              <img alt="書き出し" src="../pixiedraw/assets/icons/action-export.svg"/>
+            </button>
+          </div>
         </div>
     </div>
     <div class="palette-wrap">
@@ -1217,6 +1275,7 @@
   let activeSwatchIndex = 1;
   let currentColor = palette[activeSwatchIndex];
   let drawing = false;
+  let lastDrawCell = null;
   let eraseMode = false;
   let showGrid = true;
   let lastTouchEnd = 0;
@@ -3169,6 +3228,26 @@
     jelinCtx.clearRect(0, 0, canvasSize, canvasSize);
     jelinCtx.drawImage(source, 0, 0, canvasSize, canvasSize);
   }
+  function drawLineCells(x0, y0, x1, y1) {
+    let dx = Math.abs(x1 - x0);
+    let dy = Math.abs(y1 - y0);
+    const sx = x0 < x1 ? 1 : -1;
+    const sy = y0 < y1 ? 1 : -1;
+    let err = dx - dy;
+    while (true) {
+      setPixel(x0, y0);
+      if (x0 === x1 && y0 === y1) break;
+      const e2 = err * 2;
+      if (e2 > -dy) {
+        err -= dy;
+        x0 += sx;
+      }
+      if (e2 < dx) {
+        err += dx;
+        y0 += sy;
+      }
+    }
+  }
   function setPixel(x, y) {
     if (x < 0 || y < 0 || x >= canvasSize || y >= canvasSize) return;
     if (cutsceneActive) return;
@@ -3371,21 +3450,31 @@
     const { x, y } = canvasPosToCell(event);
     if (tutorialState.active && !canDrawInTutorial(x, y)) {
       drawing = false;
+      lastDrawCell = null;
       return;
     }
     pushUndoState();
     eraseMode = event.button === 2 || event.altKey || event.metaKey;
     drawing = true;
     setPixel(x, y);
+    lastDrawCell = { x, y };
     updateColorOpenButton();
   }
   function onPointerMove(event) {
     if (!drawing) return;
     const { x, y } = canvasPosToCell(event);
-    setPixel(x, y);
+    if (!lastDrawCell) {
+      setPixel(x, y);
+      lastDrawCell = { x, y };
+      return;
+    }
+    if (lastDrawCell.x === x && lastDrawCell.y === y) return;
+    drawLineCells(lastDrawCell.x, lastDrawCell.y, x, y);
+    lastDrawCell = { x, y };
   }
   function onPointerUp() {
     drawing = false;
+    lastDrawCell = null;
   }
 
   function initPalette() {
