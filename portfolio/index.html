@@ -250,7 +250,31 @@
     }
   .bottom-nav__item.is-active{ color:#f9fafb; }
 </style>
-<link href="../character-dots/mao1.png" rel="icon" type="image/png"/></head>
+<link href="../character-dots/mao1.png" rel="icon" type="image/png"/>  <style id="interaction-guard">
+    * {
+      -webkit-touch-callout: none;
+      -webkit-user-drag: none;
+      -webkit-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    input,
+    textarea,
+    [contenteditable] {
+      -webkit-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+  </style>
+  <script id="interaction-guard-js">
+    document.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+    });
+    document.addEventListener('dragstart', (event) => {
+      event.preventDefault();
+    });
+  </script>
+</head>
 <body class="with-bottom-nav">
 <div class="page">
 <header aria-label="top-nav">
