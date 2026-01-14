@@ -395,6 +395,30 @@
       min-width: 0 !important;
     }
   </style>
+  <style id="interaction-guard">
+    * {
+      -webkit-touch-callout: none;
+      -webkit-user-drag: none;
+      -webkit-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    input,
+    textarea,
+    [contenteditable] {
+      -webkit-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+  </style>
+  <script id="interaction-guard-js">
+    document.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+    });
+    document.addEventListener('dragstart', (event) => {
+      event.preventDefault();
+    });
+  </script>
 </head>
 <body>
   <div class="page">
