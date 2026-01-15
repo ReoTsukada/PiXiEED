@@ -11,6 +11,8 @@ const PROMPT_TEXT = '今日のお題: 「自由投稿」 (本番用に差し替�
 const MAX_SIZE = 512;
 const MAX_COLORS = 256;
 const TIMED_DURATION_MS = 10 * 60 * 1000;
+const NAME_DISPLAY_ID = 'contestNameDisplay';
+const NICKNAME_KEY = 'pixieed_nickname';
 
 let deadline = null;
 let timerHandle = null;
@@ -20,6 +22,21 @@ let likedEntries = new Set();
 
 function $(id){
   return document.getElementById(id);
+}
+
+function loadNickname(){
+  try{
+    return localStorage.getItem(NICKNAME_KEY) || '';
+  }catch(_){
+    return '';
+  }
+}
+
+function updateNameDisplay(){
+  const el = $(NAME_DISPLAY_ID);
+  if(!el) return;
+  const nick = loadNickname();
+  el.textContent = nick || '未設定';
 }
 
 function ensureClientId(){
@@ -103,7 +120,7 @@ async function fileToImageInfo(file){
 async function handleSubmit(e){
   e.preventDefault();
   const form = e.currentTarget;
-  const name = form.name.value.trim() || '名無し';
+  const name = loadNickname() || '名無し';
   const title = form.title.value.trim() || '無題';
   const isTimed = form[TIMED_CHECKBOX_ID]?.checked;
   const file = form[FILE_INPUT_ID]?.files?.[0];
@@ -257,6 +274,7 @@ function initUI(){
   if(form){
     form.addEventListener('submit', handleSubmit);
   }
+  updateNameDisplay();
   const startBtn = $(START_BTN_ID);
   if(startBtn){
     startBtn.addEventListener('click', () => {
