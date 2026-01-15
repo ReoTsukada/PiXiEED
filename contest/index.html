@@ -11,7 +11,11 @@
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
   <style>
-    :root{ color-scheme: dark; }
+    :root{
+      color-scheme: dark;
+      --header-offset:64px;
+      --bottom-nav:68px;
+    }
     *{
       box-sizing:border-box;
       user-select:none;
@@ -52,7 +56,7 @@
     .ad-banner{
       background:rgba(255,255,255,0.05);
       border:1px solid rgba(255,255,255,0.12);
-      border-radius:12px;
+      border-radius:0;
       padding:10px;
       box-shadow:0 10px 30px rgba(0,0,0,0.28);
       max-width:100%;
@@ -121,7 +125,7 @@
     .card{
       background:rgba(255,255,255,0.05);
       border:1px solid rgba(255,255,255,0.12);
-      border-radius:12px;
+      border-radius:0;
       padding:12px;
       box-shadow:0 10px 30px rgba(0,0,0,0.3);
     }
@@ -153,7 +157,17 @@
     form{ display:flex; flex-direction:column; gap:10px; }
     .field{ display:flex; flex-direction:column; gap:4px; }
     label{ font-weight:700; color:#e5e7eb; }
-    input[type="text"], input[type="file"]{
+    input[type="text"], input[type="file"], input[type="search"]{
+      width:100%;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(0,0,0,0.35);
+      color:#f9fafb;
+      padding:10px 12px;
+      font-size:14px;
+      font-family:'DotGothic16', monospace;
+    }
+    .static-input{
       width:100%;
       border-radius:10px;
       border:1px solid rgba(255,255,255,0.18);
@@ -165,6 +179,86 @@
     }
     .helper{ color:#cbd5e1; font-size:12px; margin:0; }
     .status{ min-height:20px; color:#fef3c7; font-size:12px; margin:4px 0 0; }
+    .tag-input{
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+    .tag-input input{
+      flex:1;
+      min-width:0;
+    }
+    .tag-add-btn{
+      border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.08);
+      color:#e5e7eb;
+      border-radius:10px;
+      padding:8px 12px;
+      font-weight:700;
+      cursor:pointer;
+      white-space:nowrap;
+    }
+    .tag-list{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      min-height:28px;
+    }
+    .download-settings{
+      display:grid;
+      gap:8px;
+    }
+    .toggle{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-weight:700;
+      color:#e5e7eb;
+    }
+    .toggle input{
+      width:18px;
+      height:18px;
+      accent-color:#ff9f43;
+    }
+    .download-passcode{
+      display:grid;
+      gap:8px;
+    }
+    .tag-chip{
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:11px;
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(255,255,255,0.05);
+      color:#e5e7eb;
+    }
+    .tag-chip .tag-remove{
+      font-weight:800;
+      opacity:0.7;
+    }
+    .tag-search{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-top:8px;
+    }
+    .tag-search label{
+      font-weight:700;
+      color:#e5e7eb;
+    }
+    .tag-search input{
+      flex:1;
+      min-width:180px;
+    }
+    .entry-tags{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+    }
     .gallery{
       display:grid;
       gap:12px;
@@ -214,7 +308,7 @@
     .entry-card{
       background:rgba(255,255,255,0.05);
       border:1px solid rgba(255,255,255,0.12);
-      border-radius:0 0 10px 10px;
+      border-radius:12px;
       overflow:hidden;
       display:flex;
       flex-direction:column;
@@ -261,6 +355,8 @@
       display:block;
       position:relative;
       aspect-ratio:1/1;
+      border-radius:12px;
+      overflow:hidden;
       -webkit-touch-callout:none;
     }
     .entry-imgwrap img{
@@ -516,8 +612,8 @@
       justify-content:center;
       background:rgba(0,0,0,0.65);
       backdrop-filter:blur(4px);
-      padding:16px;
-      z-index:50;
+      padding:calc(16px + env(safe-area-inset-top, 0px) + var(--header-offset)) 16px calc(16px + env(safe-area-inset-bottom, 0px) + var(--bottom-nav));
+      z-index:95;
     }
     .post-panel.is-open{ display:flex; }
     .post-card{
@@ -528,6 +624,13 @@
       border-radius:16px;
       padding:14px;
       box-shadow:0 12px 40px rgba(0,0,0,0.4);
+      max-height:calc(100vh - (env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px) + var(--bottom-nav) + var(--header-offset) + 32px));
+      overflow:auto;
+    }
+    @supports (height: 100dvh){
+      .post-card{
+        max-height:calc(100dvh - (env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px) + var(--bottom-nav) + var(--header-offset) + 32px));
+      }
     }
     .post-preview{
       width:100%;
@@ -668,6 +771,10 @@
           <button class="sort-btn" data-sort="popular" type="button">人気</button>
         </div>
       </div>
+      <div class="tag-search">
+        <label for="tagSearch">タグ検索</label>
+        <input id="tagSearch" type="search" placeholder="タグで絞り込み（例: 夜景）" aria-label="タグ検索"/>
+      </div>
       <div id="contestGallery" class="gallery"></div>
     </section>
 
@@ -683,12 +790,38 @@
       </div>
       <form id="contestForm">
         <div class="field">
-          <label for="name">名前</label>
-          <input id="name" name="name" type="text" placeholder="ハンドルネーム"/>
+          <label>名前</label>
+          <div class="static-input" id="nameDisplay">未設定</div>
         </div>
         <div class="field">
           <label for="title">作品名</label>
           <input id="title" name="title" type="text" placeholder="無題"/>
+        </div>
+        <div class="field">
+          <label for="tagInput">タグ</label>
+          <div class="tag-input">
+            <input id="tagInput" type="text" placeholder="例: 夜景, キャラ" maxlength="24"/>
+            <button class="tag-add-btn" id="addTagBtn" type="button">追加</button>
+          </div>
+          <div class="tag-list" id="tagList" aria-live="polite"></div>
+          <p class="helper">Enter / 追加でタグをセット（最大5）</p>
+        </div>
+        <div class="field">
+          <label>ダウンロード設定</label>
+          <div class="download-settings">
+            <label class="toggle">
+              <input id="allowDownload" type="checkbox"/>
+              ダウンロードを許可
+            </label>
+            <div class="download-passcode" id="downloadPasscodeWrap" hidden>
+              <label class="toggle">
+                <input id="requirePasscode" type="checkbox"/>
+                パスコードを設定
+              </label>
+              <input id="downloadPasscode" type="text" placeholder="パスコード（4〜12文字）" maxlength="12"/>
+              <p class="helper">英数字のみ（例: 1234 / pixieed）</p>
+            </div>
+          </div>
         </div>
         <div class="field">
           <label>プレビュー</label>
@@ -759,10 +892,21 @@
     const FILE_INPUT_ID = 'contestFile';
     const STATUS_ID = 'contestStatus';
     const GALLERY_ID = 'contestGallery';
+    const TAG_INPUT_ID = 'tagInput';
+    const TAG_LIST_ID = 'tagList';
+    const TAG_SEARCH_ID = 'tagSearch';
+    const ADD_TAG_BTN_ID = 'addTagBtn';
+    const ALLOW_DOWNLOAD_ID = 'allowDownload';
+    const REQUIRE_PASSCODE_ID = 'requirePasscode';
+    const PASSCODE_INPUT_ID = 'downloadPasscode';
+    const PASSCODE_WRAP_ID = 'downloadPasscodeWrap';
     const MAX_SIZE = 512;
     const MAX_COLORS = 256;
+    const MAX_TAGS = 5;
     const PENDING_UPLOAD_KEY = 'pixieed_contest_upload_v1';
     let supportsClientId = true;
+    let supportsTags = true;
+    let supportsDownloadSettings = true;
     let supabaseUser = null;
     let supabaseSession = null;
     let migrationDone = false;
@@ -771,7 +915,9 @@
     let likedEntries = new Set();
     let currentFilter = 'all';
     let currentSort = 'new';
+    let currentTagQuery = '';
     let cachedEntries = [];
+    let postTags = [];
     let supabase = null;
     const SAMPLE_COLORS = ['#7dd3fc','#f472b6','#facc15','#34d399','#c084fc','#60a5fa','#f59e0b','#a3e635','#f43f5e','#38bdf8'];
     const PLACEHOLDERS = Array.from({ length: 10 }, (_, i) => ({
@@ -837,6 +983,13 @@
       try{
         localStorage.setItem('pixieed_nickname', name);
       }catch(_){}
+    }
+
+    function updateNameDisplay(){
+      const el = document.getElementById('nameDisplay');
+      if(!el) return;
+      const nick = loadNickname();
+      el.textContent = nick || '未設定';
     }
 
     function loadAvatar(){
@@ -1020,6 +1173,116 @@
       }
     }
 
+    function normalizeTag(value){
+      return String(value || '').replace(/^[#＃]+/, '').trim();
+    }
+
+    function parseTags(value){
+      if(!value) return [];
+      const raw = Array.isArray(value) ? value : String(value).split(',');
+      const out = [];
+      raw.forEach(tag => {
+        const normalized = normalizeTag(tag);
+        if(!normalized) return;
+        if(!out.some(t => t.toLowerCase() === normalized.toLowerCase())){
+          out.push(normalized);
+        }
+      });
+      return out;
+    }
+
+    function renderPostTags(){
+      const list = $(TAG_LIST_ID);
+      if(!list) return;
+      list.innerHTML = '';
+      if(!postTags.length) return;
+      postTags.forEach(tag => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'tag-chip';
+        chip.setAttribute('aria-label', `${tag} を削除`);
+        const label = document.createElement('span');
+        label.textContent = `#${tag}`;
+        const remove = document.createElement('span');
+        remove.className = 'tag-remove';
+        remove.textContent = '×';
+        chip.append(label, remove);
+        chip.addEventListener('click', () => {
+          postTags = postTags.filter(t => t.toLowerCase() !== tag.toLowerCase());
+          renderPostTags();
+        });
+        list.appendChild(chip);
+      });
+    }
+
+    function addTagsFromInput(){
+      const input = $(TAG_INPUT_ID);
+      if(!input) return;
+      const raw = input.value;
+      if(!raw) return;
+      const candidates = raw.split(/[,，、。．\s]+/).map(normalizeTag).filter(Boolean);
+      candidates.forEach(tag => {
+        if(postTags.length >= MAX_TAGS) return;
+        if(!postTags.some(t => t.toLowerCase() === tag.toLowerCase())){
+          postTags.push(tag);
+        }
+      });
+      input.value = '';
+      renderPostTags();
+    }
+
+    function setupTagInput(){
+      const input = $(TAG_INPUT_ID);
+      const btn = $(ADD_TAG_BTN_ID);
+      if(!input) return;
+      if(btn) btn.addEventListener('click', addTagsFromInput);
+      input.addEventListener('keydown', (e) => {
+        if(e.key === 'Enter'){
+          e.preventDefault();
+          addTagsFromInput();
+        }
+      });
+      renderPostTags();
+    }
+
+    function setupTagSearch(){
+      const input = $(TAG_SEARCH_ID);
+      if(!input) return;
+      input.addEventListener('input', () => {
+        const raw = normalizeTag(input.value);
+        currentTagQuery = raw.toLowerCase();
+        renderEntries(applyFilterAndSort(cachedEntries));
+      });
+    }
+
+    function updateDownloadSettingsUI(){
+      const allow = $(ALLOW_DOWNLOAD_ID);
+      const requirePass = $(REQUIRE_PASSCODE_ID);
+      const passInput = $(PASSCODE_INPUT_ID);
+      const wrap = $(PASSCODE_WRAP_ID);
+      if(!allow || !requirePass || !passInput || !wrap) return;
+      if(!allow.checked){
+        wrap.hidden = true;
+        requirePass.checked = false;
+        passInput.value = '';
+        passInput.disabled = true;
+        return;
+      }
+      wrap.hidden = false;
+      passInput.disabled = !requirePass.checked;
+      if(!requirePass.checked){
+        passInput.value = '';
+      }
+    }
+
+    function setupDownloadSettings(){
+      const allow = $(ALLOW_DOWNLOAD_ID);
+      const requirePass = $(REQUIRE_PASSCODE_ID);
+      if(allow) allow.addEventListener('change', updateDownloadSettingsUI);
+      if(requirePass) requirePass.addEventListener('change', updateDownloadSettingsUI);
+      updateDownloadSettingsUI();
+    }
+
     async function fileToImageInfo(file){
       const type = (file.type || '').toLowerCase();
       if(type !== 'image/png' && type !== 'image/gif'){
@@ -1197,14 +1460,27 @@
     async function handleSubmit(e){
       e.preventDefault();
       const form = e.currentTarget;
-      const name = form.name.value.trim() || loadNickname() || '名無し';
+      const name = loadNickname() || '名無し';
       const title = form.title.value.trim() || '無題';
+      const tags = postTags.slice(0, MAX_TAGS);
+      const allowDownload = form[ALLOW_DOWNLOAD_ID]?.checked || false;
+      const requirePasscode = form[REQUIRE_PASSCODE_ID]?.checked || false;
+      const passcode = (form[PASSCODE_INPUT_ID]?.value || '').trim();
       const file = form[FILE_INPUT_ID]?.files?.[0];
       if(!file){
         setStatus('画像ファイルを選択してください');
         return;
       }
-      saveNickname(name);
+      if(allowDownload && requirePasscode){
+        if(!passcode){
+          setStatus('パスコードを入力してください');
+          return;
+        }
+        if(!/^[a-zA-Z0-9]{4,12}$/.test(passcode)){
+          setStatus('パスコードは英数字4〜12文字で入力してください');
+          return;
+        }
+      }
       setStatus('画像を確認しています...');
       let imageInfo;
       try{
@@ -1266,24 +1542,50 @@
           image_hash: imageInfo.hash,
           phash: imageInfo.phash
         };
+        if(supportsTags && tags.length){
+          payload.tags = tags.join(',');
+        }
+        if(supportsDownloadSettings){
+          payload.allow_download = allowDownload;
+          payload.download_passcode = allowDownload && requirePasscode ? passcode : null;
+        }
         if(supabaseUser?.id){
           payload.user_id = supabaseUser.id;
         }
         if(supportsClientId){
           payload.client_id = clientId;
         }
-        let res = await supabase.from('contest_entries').insert(payload);
-        if(res.error && supportsClientId && String(res.error.message || '').includes('client_id')){
-          // client_id カラムが無い環境用フォールバック
-          supportsClientId = false;
-          delete payload.client_id;
+        let res = null;
+        for(let attempt = 0; attempt < 3; attempt++){
           res = await supabase.from('contest_entries').insert(payload);
+          if(!res.error) break;
+          const msg = String(res.error.message || '').toLowerCase();
+          if(supportsTags && msg.includes('tags')){
+            supportsTags = false;
+            delete payload.tags;
+            continue;
+          }
+          if(supportsDownloadSettings && (msg.includes('allow_download') || msg.includes('download_passcode'))){
+            supportsDownloadSettings = false;
+            delete payload.allow_download;
+            delete payload.download_passcode;
+            continue;
+          }
+          if(supportsClientId && msg.includes('client_id')){
+            supportsClientId = false;
+            delete payload.client_id;
+            continue;
+          }
+          break;
         }
-        if(res.error){
+        if(res?.error){
           throw res.error;
         }
         form.reset();
         setPostPreview('');
+        postTags = [];
+        renderPostTags();
+        updateDownloadSettingsUI();
         setStatus('投稿しました！');
       }catch(err){
         setStatus('投稿に失敗しました');
@@ -1337,13 +1639,6 @@
               <img src="${likedEntries.has(entry.id) ? FAV_SRC : NFAV_SRC}" alt="like icon">
             </button>
           </div>
-          <div class="entry-meta">
-            <div class="entry-meta__top">
-              <span class="entry-title">${escapeHtml(entry.title || '無題')}</span>
-              <span class="entry-like">${entry.likeCount || 0}</span>
-            </div>
-            <p class="entry-author">by ${escapeHtml(entry.name || '名無し')}</p>
-          </div>
         `;
         gallery.appendChild(item);
         // 9件ごとに広告を挿入
@@ -1378,11 +1673,21 @@
       let networkError = false;
       if(supabase){
         try{
-          const res = await supabase
+          const baseSelect = 'id,name,title,prompt,mode,submitted_at,width,height,colors,image_base64';
+          const selectColumns = supportsTags ? `${baseSelect},tags` : baseSelect;
+          let res = await supabase
             .from('contest_entries')
-            .select('id,name,title,prompt,mode,submitted_at,width,height,colors,image_base64')
+            .select(selectColumns)
             .order('submitted_at', { ascending:false })
             .limit(100);
+          if(res.error && supportsTags && String(res.error.message || '').toLowerCase().includes('tags')){
+            supportsTags = false;
+            res = await supabase
+              .from('contest_entries')
+              .select(baseSelect)
+              .order('submitted_at', { ascending:false })
+              .limit(100);
+          }
           if(!res.error && Array.isArray(res.data)){
             entries = res.data;
           }
@@ -1432,6 +1737,13 @@
         filtered = filtered.filter(e => e.mode === 'timed10');
       }else if(currentFilter === 'px32'){
         filtered = filtered.filter(e => (e.width || 999) <= 32 && (e.height || 999) <= 32);
+      }
+      if(currentTagQuery){
+        const query = currentTagQuery.toLowerCase();
+        filtered = filtered.filter(e => {
+          const tags = parseTags(e.tags);
+          return tags.some(tag => tag.toLowerCase().includes(query));
+        });
       }
       if(currentSort === 'popular'){
         filtered.sort((a,b) => {
@@ -1539,10 +1851,7 @@
           saveNickname(data.nickname);
           const nickInput = document.getElementById('profileNickname');
           if(nickInput) nickInput.value = data.nickname;
-          const form = $(FORM_ID);
-          if(form && !form.name.value){
-            form.name.value = data.nickname;
-          }
+          updateNameDisplay();
           applyAvatarToBrand();
         }
       }catch(err){
@@ -1656,6 +1965,7 @@
           if(nick){
             saveNickname(nick);
           }
+          updateNameDisplay();
           applyAvatarToBrand();
           renderAvatarChoices();
           if(supabase && supabaseUser?.id){
@@ -1745,7 +2055,10 @@
         }
       }
       setupTabs();
+      setupTagSearch();
       setupPostPanel();
+      setupTagInput();
+      setupDownloadSettings();
       setupAuthButton();
       // ギャラリー内は右クリック・長押し・ドラッグを抑止
       const blockGalleryAction = (e) => {
@@ -1758,10 +2071,7 @@
       document.addEventListener('dragstart', blockGalleryAction);
       const form = $(FORM_ID);
       if(form){
-        const saved = loadNickname();
-        if(saved){
-          form.name.value = saved;
-        }
+        updateNameDisplay();
         form.addEventListener('submit', handleSubmit);
       }
       const fileInput = $(FILE_INPUT_ID);
