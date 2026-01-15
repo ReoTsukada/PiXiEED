@@ -41,10 +41,18 @@ export async function submitScoreAuto(score) {
 
 export function getName() {
   try {
-    const saved = localStorage.getItem(NAME_STORAGE_KEY);
-    if (saved) return saved.trim().slice(0, 24) || 'Guest';
+    const profile = localStorage.getItem('pixieed_nickname');
+    if (profile) {
+      const normalized = profile.trim().slice(0, 24) || '名無し';
+      try { localStorage.setItem(NAME_STORAGE_KEY, normalized); } catch (_) {}
+      return normalized;
+    }
   } catch (_) {}
-  return 'Guest';
+  try {
+    const saved = localStorage.getItem(NAME_STORAGE_KEY);
+    if (saved) return saved.trim().slice(0, 24) || '名無し';
+  } catch (_) {}
+  return '名無し';
 }
 
 export async function fetchRankInfo(score) {
