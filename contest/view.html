@@ -120,6 +120,15 @@
       padding:10px 12px;
       font-size:14px;
     }
+    .tag-input input{
+      width:100%;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(255,255,255,0.05);
+      color:#fff;
+      padding:10px 12px;
+      font-size:14px;
+    }
     .auth-btn{
       border:1px solid rgba(255,255,255,0.2);
       background:linear-gradient(135deg,#4f46e5,#7c3aed);
@@ -223,6 +232,65 @@
     .title{ font-size:18px; font-weight:800; margin:0; }
     .author{ margin:0; color:#cbd5e1; font-size:13px; }
     .likes{ color:#fbbf24; font-weight:800; }
+    .tag-block{
+      display:grid;
+      gap:8px;
+      margin-top:10px;
+    }
+    .tag-label{
+      margin:0;
+      font-size:12px;
+      color:#cbd5e1;
+    }
+    .tag-view{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      min-height:24px;
+    }
+    .tag-empty{
+      font-size:12px;
+      color:#94a3b8;
+    }
+    .tag-chip{
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:11px;
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(255,255,255,0.05);
+      color:#e5e7eb;
+    }
+    .tag-chip .tag-remove{
+      font-weight:800;
+      opacity:0.7;
+    }
+    .tag-editor{
+      display:grid;
+      gap:8px;
+    }
+    .tag-input{
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+    .tag-input input{
+      flex:1;
+      min-width:0;
+    }
+    .tag-add-btn,
+    .tag-save{
+      border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.08);
+      color:#e5e7eb;
+      border-radius:10px;
+      padding:8px 12px;
+      font-weight:700;
+      cursor:pointer;
+      white-space:nowrap;
+    }
     .gallery{
       display:grid;
       gap:12px;
@@ -401,6 +469,19 @@
         </div>
         <span class="likes" id="heroLikes">0</span>
       </div>
+      <div class="tag-block">
+        <p class="tag-label">タグ</p>
+        <div class="tag-view" id="tagView"></div>
+        <div class="tag-editor" id="tagEditor" style="display:none;">
+          <div class="tag-input">
+            <input id="tagEditInput" type="text" placeholder="タグを追加（例: 花, 草）" maxlength="24"/>
+            <button class="tag-add-btn" id="tagAddBtn" type="button">追加</button>
+          </div>
+          <div class="tag-view" id="tagEditList"></div>
+          <button class="tag-save" id="tagSaveBtn" type="button">タグを保存</button>
+          <p class="status" id="tagStatus"></p>
+        </div>
+      </div>
       <p class="status" id="viewStatus"></p>
       <button class="danger-btn" id="deleteEntry" style="display:none;">この作品を削除する</button>
       <p class="status" id="deleteNotice"></p>
@@ -460,6 +541,13 @@
     const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
     const SUPABASE_REST = `${SUPABASE_URL}/rest/v1`;
     const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
+    const MAX_TAGS = 5;
+    const TAG_INPUT_ID = 'tagEditInput';
+    const TAG_LIST_ID = 'tagEditList';
+    const TAG_VIEW_ID = 'tagView';
+    const TAG_ADD_BTN_ID = 'tagAddBtn';
+    const TAG_SAVE_BTN_ID = 'tagSaveBtn';
+    const TAG_STATUS_ID = 'tagStatus';
     const SAMPLE_COLORS = ['#7dd3fc','#f472b6','#facc15','#34d399','#c084fc','#60a5fa','#f59e0b','#a3e635','#f43f5e','#38bdf8'];
     const AVATARS = [
       { id:'mao', type:'img', src:'../character-dots/mao1.png' },
@@ -501,6 +589,7 @@
     let entry = null;
     let cachedEntries = [];
     let currentEntryId = 0;
+    let editTags = [];
 
     function $(id){ return document.getElementById(id); }
 
@@ -512,6 +601,154 @@
     function setAuthStatus(msg){
       const el = $('authStatus');
       if(el) el.textContent = msg || '';
+    }
+
+    function setTagStatus(msg){
+      const el = $(TAG_STATUS_ID);
+      if(el) el.textContent = msg || '';
+    }
+
+    function normalizeTag(value){
+      return String(value || '').replace(/^[#＃]+/, '').trim();
+    }
+
+    function parseTags(value){
+      if(!value) return [];
+      const raw = Array.isArray(value) ? value : String(value).split(',');
+      const out = [];
+      raw.forEach(tag => {
+        const normalized = normalizeTag(tag);
+        if(!normalized) return;
+        if(!out.some(t => t.toLowerCase() === normalized.toLowerCase())){
+          out.push(normalized);
+        }
+      });
+      return out;
+    }
+
+    function canEditEntry(){
+      if(!entry) return false;
+      if(entry.user_id && supabaseUser?.id && entry.user_id === supabaseUser.id){
+        return true;
+      }
+      if(!entry.user_id && entry.client_id && entry.client_id === clientId){
+        return true;
+      }
+      return false;
+    }
+
+    function renderTagView(tags){
+      const view = $(TAG_VIEW_ID);
+      if(!view) return;
+      view.innerHTML = '';
+      if(!tags.length){
+        const empty = document.createElement('span');
+        empty.className = 'tag-empty';
+        empty.textContent = 'タグなし';
+        view.appendChild(empty);
+        return;
+      }
+      tags.forEach(tag => {
+        const chip = document.createElement('span');
+        chip.className = 'tag-chip';
+        chip.textContent = `#${tag}`;
+        view.appendChild(chip);
+      });
+    }
+
+    function renderTagEditor(){
+      const editor = document.getElementById('tagEditor');
+      const list = $(TAG_LIST_ID);
+      if(!editor || !list) return;
+      const editable = canEditEntry();
+      editor.style.display = editable ? 'grid' : 'none';
+      list.innerHTML = '';
+      editTags.forEach(tag => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'tag-chip';
+        chip.setAttribute('aria-label', `${tag} を削除`);
+        const label = document.createElement('span');
+        label.textContent = `#${tag}`;
+        const remove = document.createElement('span');
+        remove.className = 'tag-remove';
+        remove.textContent = '×';
+        chip.append(label, remove);
+        chip.addEventListener('click', () => {
+          editTags = editTags.filter(t => t.toLowerCase() !== tag.toLowerCase());
+          renderTagEditor();
+        });
+        list.appendChild(chip);
+      });
+    }
+
+    function addTag(tag){
+      const normalized = normalizeTag(tag);
+      if(!normalized) return;
+      if(editTags.length >= MAX_TAGS) return;
+      if(!editTags.some(t => t.toLowerCase() === normalized.toLowerCase())){
+        editTags.push(normalized);
+      }
+      renderTagEditor();
+    }
+
+    function addTagsFromInput(){
+      const input = $(TAG_INPUT_ID);
+      if(!input) return;
+      const raw = input.value;
+      if(!raw) return;
+      const candidates = raw.split(/[,，、。．\s]+/).map(normalizeTag).filter(Boolean);
+      candidates.forEach(addTag);
+      input.value = '';
+    }
+
+    async function saveTags(){
+      if(!entry){
+        setTagStatus('作品が読み込まれていません');
+        return;
+      }
+      if(!canEditEntry()){
+        setTagStatus('この作品は編集できません');
+        return;
+      }
+      const tags = editTags.slice(0, MAX_TAGS);
+      const payload = { tags: tags.length ? tags.join(',') : null };
+      const eq = { id: entry.id };
+      if(entry.user_id && supabaseUser?.id){
+        eq.user_id = supabaseUser.id;
+      }else if(entry.client_id){
+        eq.client_id = entry.client_id;
+      }
+      if(!eq.user_id && !eq.client_id){
+        setTagStatus('編集権限が確認できません');
+        return;
+      }
+      setTagStatus('保存中...');
+      try{
+        await supabaseUpdate('contest_entries', payload, { eq });
+        entry.tags = payload.tags || '';
+        renderTagView(parseTags(entry.tags));
+        setTagStatus('保存しました');
+      }catch(err){
+        console.error(err);
+        setTagStatus('タグの保存に失敗しました');
+      }
+    }
+
+    function setupTagEditor(){
+      const input = $(TAG_INPUT_ID);
+      const addBtn = $(TAG_ADD_BTN_ID);
+      const saveBtn = $(TAG_SAVE_BTN_ID);
+      if(input){
+        input.addEventListener('keydown', (e) => {
+          if(e.key === 'Enter'){
+            e.preventDefault();
+            addTagsFromInput();
+          }
+        });
+      }
+      if(addBtn) addBtn.addEventListener('click', addTagsFromInput);
+      if(saveBtn) saveBtn.addEventListener('click', saveTags);
     }
 
     function loadNickname(){
@@ -845,6 +1082,10 @@
         delBtn.style.display = canDelete ? 'inline-block' : 'none';
         delBtn.disabled = !canDelete;
       }
+      editTags = parseTags(entry.tags);
+      renderTagView(editTags);
+      renderTagEditor();
+      setTagStatus('');
       setDeleteNotice(canDelete ? '' : '※この端末から投稿した作品のみ削除できます');
     }
 
@@ -919,7 +1160,8 @@
         likeCount: 0,
         mode: 'free',
         client_id: null,
-        user_id: null
+        user_id: null,
+        tags: ''
       };
       try{
         const res = await supabaseSelect('contest_entries', { eq: { id }, limit: 1 });
@@ -1086,6 +1328,18 @@
       return res.json();
     }
 
+    async function supabaseUpdate(table, payload, { eq = {} } = {}){
+      const params = new URLSearchParams();
+      Object.entries(eq).forEach(([k,v]) => params.set(k, `eq.${v}`));
+      const res = await fetch(`${SUPABASE_REST}/${table}?${params.toString()}`, {
+        method:'PATCH',
+        headers: { ...supabaseHeaders(), Prefer: 'return=representation' },
+        body: JSON.stringify(payload)
+      });
+      if(!res.ok) throw new Error(`supabase update failed: ${res.status}`);
+      return res.json();
+    }
+
     function setActiveNav(){
       const tab = 'contest';
       document.querySelectorAll('.bottom-nav__item').forEach(item => {
@@ -1097,6 +1351,7 @@
     async function init(){
       ensureClientId();
       setupAuthButton();
+      setupTagEditor();
       await initSupabaseAuth();
       document.addEventListener('contextmenu', (e) => {
         if(e.target && e.target.tagName === 'IMG'){
