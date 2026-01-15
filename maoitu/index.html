@@ -197,6 +197,14 @@ a { color:#7dd3fc; }
   color:#fff;
   font-size:14px;
 }
+.rank-name-display{
+  padding:10px 12px;
+  border-radius:8px;
+  border:1px solid rgba(255,255,255,0.25);
+  background:rgba(0,0,0,0.4);
+  color:#fff;
+  font-size:14px;
+}
 .rank-list {
   list-style:none;
   padding:0;
@@ -501,7 +509,7 @@ a { color:#7dd3fc; }
       <form class="rank-form" id="rankForm">
         <label class="rank-field">
           <span>名前</span>
-          <input maxlength="24" name="rankName" placeholder="なまえ" type="text"/>
+          <div class="rank-name-display" id="rankNameDisplay">未設定</div>
         </label>
         <p class="rank-status" id="rankStatus"></p>
       </form>
