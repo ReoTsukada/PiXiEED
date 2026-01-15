@@ -264,6 +264,24 @@
       gap:12px;
       grid-template-columns:repeat(3, minmax(0, 1fr));
     }
+    .load-more{
+      display:flex;
+      justify-content:center;
+      margin-top:14px;
+    }
+    .load-more-btn{
+      border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.08);
+      color:#e5e7eb;
+      border-radius:10px;
+      padding:10px 16px;
+      font-weight:800;
+      cursor:pointer;
+    }
+    .load-more-btn:disabled{
+      opacity:0.6;
+      cursor:not-allowed;
+    }
     .tabs{
       display:flex;
       gap:8px;
@@ -869,6 +887,9 @@
         <input id="tagSearch" type="search" placeholder="タグで絞り込み（例: 夜景）" aria-label="タグ検索"/>
       </div>
       <div id="contestGallery" class="gallery"></div>
+      <div class="load-more" id="loadMoreWrap" hidden>
+        <button class="load-more-btn" id="loadMoreBtn" type="button">もっと見る</button>
+      </div>
     </section>
 
     <div class="grid">
@@ -988,6 +1009,8 @@
     const TAG_INPUT_ID = 'tagInput';
     const TAG_LIST_ID = 'tagList';
     const TAG_SEARCH_ID = 'tagSearch';
+    const LOAD_MORE_BTN_ID = 'loadMoreBtn';
+    const LOAD_MORE_WRAP_ID = 'loadMoreWrap';
     const ADD_TAG_BTN_ID = 'addTagBtn';
     const ALLOW_DOWNLOAD_ID = 'allowDownload';
     const REQUIRE_PASSCODE_ID = 'requirePasscode';
@@ -996,6 +1019,7 @@
     const MAX_SIZE = 512;
     const MAX_COLORS = 256;
     const MAX_TAGS = 5;
+    const PAGE_SIZE = 12;
     const PENDING_UPLOAD_KEY = 'pixieed_contest_upload_v1';
     let supportsClientId = true;
     let supportsTags = true;
@@ -1006,10 +1030,15 @@
 
     let clientId = null;
     let likedEntries = new Set();
+    let likesCache = [];
+    let likeCounts = {};
     let currentFilter = 'all';
     let currentSort = 'new';
     let currentTagQuery = '';
     let cachedEntries = [];
+    let currentOffset = 0;
+    let hasMoreEntries = true;
+    let isLoadingEntries = false;
     let postTags = [];
     let supabase = null;
     const SAMPLE_COLORS = ['#7dd3fc','#f472b6','#facc15','#34d399','#c084fc','#60a5fa','#f59e0b','#a3e635','#f43f5e','#38bdf8'];
@@ -1345,6 +1374,23 @@
         const raw = normalizeTag(input.value);
         currentTagQuery = raw.toLowerCase();
         renderEntries(applyFilterAndSort(cachedEntries));
+      });
+    }
+
+    function updateLoadMoreUI(){
+      const wrap = $(LOAD_MORE_WRAP_ID);
+      const btn = $(LOAD_MORE_BTN_ID);
+      if(!wrap || !btn) return;
+      wrap.hidden = !hasMoreEntries;
+      btn.disabled = isLoadingEntries;
+      btn.textContent = isLoadingEntries ? '読み込み中...' : 'もっと見る';
+    }
+
+    function setupLoadMore(){
+      const btn = $(LOAD_MORE_BTN_ID);
+      if(!btn) return;
+      btn.addEventListener('click', () => {
+        fetchAndRender({ append: true });
       });
     }
 
@@ -1757,11 +1803,20 @@
       }
     }
 
-    async function fetchAndRender(){
+    async function fetchAndRender({ append = false } = {}){
+      if(isLoadingEntries) return;
+      if(!append){
+        currentOffset = 0;
+        cachedEntries = [];
+        hasMoreEntries = true;
+      }
+      if(append && !hasMoreEntries) return;
+      isLoadingEntries = true;
+      updateLoadMoreUI();
       ensureClientId();
-      setStatus('読み込み中...');
+      setStatus(append ? '追加読み込み中...' : '読み込み中...');
       let entries = [];
-      let likes = [];
+      let likes = likesCache;
       let networkError = false;
       if(supabase){
         try{
@@ -1771,24 +1826,26 @@
             .from('contest_entries')
             .select(selectColumns)
             .order('submitted_at', { ascending:false })
-            .limit(100);
+            .range(currentOffset, currentOffset + PAGE_SIZE - 1);
           if(res.error && supportsTags && String(res.error.message || '').toLowerCase().includes('tags')){
             supportsTags = false;
             res = await supabase
               .from('contest_entries')
               .select(baseSelect)
               .order('submitted_at', { ascending:false })
-              .limit(100);
+              .range(currentOffset, currentOffset + PAGE_SIZE - 1);
           }
           if(!res.error && Array.isArray(res.data)){
             entries = res.data;
           }
-          const likeRes = await supabase
-            .from('contest_likes')
-            .select('entry_id, client_id, user_id')
-            .limit(1000);
-          if(!likeRes.error && Array.isArray(likeRes.data)){
-            likes = likeRes.data;
+          if(!append){
+            const likeRes = await supabase
+              .from('contest_likes')
+              .select('entry_id, client_id, user_id')
+              .limit(1000);
+            if(!likeRes.error && Array.isArray(likeRes.data)){
+              likes = likeRes.data;
+            }
           }
         }catch(err){
           console.error(err);
@@ -1800,27 +1857,46 @@
         networkError = true;
       }
 
-      if((!entries || entries.length === 0) && networkError){
-        setStatus('ネットワークエラーが発生しています');
+      if(networkError){
+        setStatus(append ? '追加読み込みに失敗しました' : 'ネットワークエラーが発生しています');
+        isLoadingEntries = false;
+        if(!append){
+          hasMoreEntries = false;
+        }
+        updateLoadMoreUI();
+        return;
       }
 
-      const likeCounts = {};
-      likedEntries = new Set();
-      likes.forEach(l => {
-        likeCounts[l.entry_id] = (likeCounts[l.entry_id] || 0) + 1;
-        if((supabaseUser?.id && l.user_id === supabaseUser.id) || l.client_id === clientId){
-          likedEntries.add(l.entry_id);
-        }
-      });
+      if(!append){
+        likesCache = Array.isArray(likes) ? likes : [];
+        likeCounts = {};
+        likedEntries = new Set();
+        likesCache.forEach(l => {
+          likeCounts[l.entry_id] = (likeCounts[l.entry_id] || 0) + 1;
+          if((supabaseUser?.id && l.user_id === supabaseUser.id) || l.client_id === clientId){
+            likedEntries.add(l.entry_id);
+          }
+        });
+      }
 
       const useEntries = Array.isArray(entries) ? entries : [];
       const enriched = useEntries.map(e => ({
         ...e,
         likeCount: likeCounts[e.id] || e.likeCount || 0
       }));
-      cachedEntries = enriched;
+      if(append){
+        cachedEntries = cachedEntries.concat(enriched);
+      }else{
+        cachedEntries = enriched;
+      }
+      currentOffset += enriched.length;
+      if(enriched.length < PAGE_SIZE){
+        hasMoreEntries = false;
+      }
       renderEntries(applyFilterAndSort(cachedEntries));
       setStatus('');
+      isLoadingEntries = false;
+      updateLoadMoreUI();
     }
 
     function applyFilterAndSort(entries){
@@ -2148,6 +2224,7 @@
       }
       setupTabs();
       setupTagSearch();
+      setupLoadMore();
       setupPostPanel();
       setupTagInput();
       setupDownloadSettings();
