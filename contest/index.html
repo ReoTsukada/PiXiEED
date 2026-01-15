@@ -1780,9 +1780,9 @@
           </div>
         `;
         gallery.appendChild(item);
-        // 9件ごとに広告を挿入
-        if((idx + 1) % 9 === 0){
-          const slotId = AD_SLOTS[(idx / 9) % AD_SLOTS.length | 0];
+        // 12件ごとに広告を挿入
+        if((idx + 1) % 12 === 0){
+          const slotId = AD_SLOTS[(idx / 12) % AD_SLOTS.length | 0];
           gallery.appendChild(createAdCard(slotId));
         }
       });
