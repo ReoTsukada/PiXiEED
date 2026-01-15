@@ -216,10 +216,8 @@
     `;
     document.body.appendChild(footer);
 
-    try {
-      (window.adsbygoogle = window.adsbygoogle || []).push({});
-    } catch (e) {
-      // ignore
+    if (window.pixieedObserveAds) {
+      window.pixieedObserveAds();
     }
   }
 
