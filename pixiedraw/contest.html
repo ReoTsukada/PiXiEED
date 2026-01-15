@@ -114,6 +114,15 @@
       padding:12px 14px;
       font-size:14px;
     }
+    .static-input{
+      width:100%;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.15);
+      background:rgba(0,0,0,0.35);
+      color:#e5e7eb;
+      padding:12px 14px;
+      font-size:14px;
+    }
     input[type="checkbox"]{ transform:scale(1.1); }
     .helper{ color:#94a3b8; font-size:13px; margin:0; }
     .status{ min-height:20px; color:#fef3c7; font-size:13px; }
@@ -237,8 +246,8 @@
         <h2 class="prompt-title">投稿する</h2>
         <form id="contestForm">
           <div class="field">
-            <label for="name">名前</label>
-            <input id="name" name="name" type="text" placeholder="ハンドルネーム"/>
+            <label>名前</label>
+            <div class="static-input" id="contestNameDisplay">未設定</div>
           </div>
           <div class="field">
             <label for="title">作品名</label>
