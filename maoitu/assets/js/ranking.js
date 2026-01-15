@@ -51,21 +51,19 @@ export async function initRankingUI({ formSelector, listSelector, statusSelector
   const form = formSelector ? document.querySelector(formSelector) : null;
   const list = listSelector ? document.querySelector(listSelector) : null;
   const statusEl = statusSelector ? document.querySelector(statusSelector) : null;
-  const nameInput = form ? form.querySelector('input[name="rankName"]') : document.querySelector('input[name="rankName"]');
+  const nameDisplay = form ? form.querySelector('#rankNameDisplay') : document.getElementById('rankNameDisplay');
   if (!list) return;
 
   const baseStatus = 'スコアはゲーム終了時に自動送信されます';
   const renderStatus = msg => { if (statusEl) statusEl.textContent = msg || ''; };
 
-  // 既存の名前をセット（入力を保存のみ・送信はゲーム終了時に自動）
+  // プロフィール名を反映（編集はプロフィールパネルのみ）
   try {
-    if (nameInput) {
-      const saved = localStorage.getItem(NAME_STORAGE_KEY);
-      if (saved) nameInput.value = saved;
-      nameInput.addEventListener('input', () => {
-        try { localStorage.setItem(NAME_STORAGE_KEY, nameInput.value); } catch (_) {}
-      });
-    }
+    const nick = localStorage.getItem('pixieed_nickname') || '';
+    const displayName = nick.trim() || '未設定';
+    const saveName = nick.trim() || '名無し';
+    if (nameDisplay) nameDisplay.textContent = displayName;
+    try { localStorage.setItem(NAME_STORAGE_KEY, saveName); } catch (_) {}
   } catch (_) {
     // ignore
   }
@@ -97,16 +95,6 @@ export async function initRankingUI({ formSelector, listSelector, statusSelector
   }
 
   renderStatus(baseStatus);
-
-  if (form) {
-    form.addEventListener('submit', e => {
-      e.preventDefault();
-      if (nameInput) {
-        try { localStorage.setItem(NAME_STORAGE_KEY, nameInput.value); } catch (_) {}
-      }
-      renderStatus('名前を保存しました（スコアは自動送信）');
-    });
-  }
 
   await refreshList();
   return {
