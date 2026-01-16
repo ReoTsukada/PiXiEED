@@ -2592,13 +2592,20 @@
     const PIXCODE_TABLE = 'pixfind_codes';
     const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
-    const PIX_ART_SIZE = 32;
+    const PIX_ART_SIZE = 16;
     const PIX_FINDER_SIZE = 7;
     const PIX_FINDER_GAP = 2;
     const PIX_FRAME_OFFSET = PIX_FINDER_SIZE + PIX_FINDER_GAP;
     const PIX_FRAME_SIZE = PIX_ART_SIZE + PIX_FRAME_OFFSET * 2;
     const PIX_FINDER_CENTER_OFFSET = 3;
     const PIX_AXIS_CELLS = PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET * 2;
+    const PIX_TIMING_ROW = PIX_FINDER_SIZE;
+    const PIX_TIMING_COL = PIX_FINDER_SIZE;
+    const PIX_TIMING_START = PIX_FINDER_SIZE;
+    const PIX_TIMING_END = PIX_FRAME_SIZE - PIX_FINDER_SIZE - 1;
+    const PIX_ALIGN_SIZE = 2;
+    const PIX_ALIGN_START = PIX_FRAME_OFFSET + PIX_ART_SIZE;
+    const PIX_ALIGN_CENTER = PIX_ALIGN_START + (PIX_ALIGN_SIZE - 1) / 2;
     const COLOR_SIMPLIFY_MAX_COLORS = 24;
     const COLOR_SIMPLIFY_BUCKET = 18;
     const AUTO_ADJUST_SAMPLE_SIZE = Object.freeze({ width: 180, height: 120 });
@@ -4343,6 +4350,10 @@
       return r < 100 && g < 100 && b < 100;
     }
 
+    function isYellowSample({ r, g, b }) {
+      return r > 140 && g > 140 && Math.abs(r - g) < 45 && b < 120;
+    }
+
     function samplePixel(data, width, height, x, y, radius = 1) {
       let r = 0;
       let g = 0;
@@ -4485,6 +4496,36 @@
       return best;
     }
 
+    function findAlignmentCenter(imageData, width, height, target, searchRadius, sampleRadius) {
+      const data = imageData.data;
+      if (!target || !Number.isFinite(target.x) || !Number.isFinite(target.y)) {
+        return null;
+      }
+      const radius = clampValue(Math.round(searchRadius), 6, 36);
+      const startX = Math.max(0, Math.floor(target.x - radius));
+      const endX = Math.min(width - 1, Math.ceil(target.x + radius));
+      const startY = Math.max(0, Math.floor(target.y - radius));
+      const endY = Math.min(height - 1, Math.ceil(target.y + radius));
+      let sumX = 0;
+      let sumY = 0;
+      let count = 0;
+      for (let y = startY; y <= endY; y += 2) {
+        for (let x = startX; x <= endX; x += 2) {
+          const color = samplePixel(data, width, height, x, y, sampleRadius);
+          if (!isYellowSample(color)) {
+            continue;
+          }
+          sumX += x;
+          sumY += y;
+          count += 1;
+        }
+      }
+      if (count < 6) {
+        return null;
+      }
+      return { x: sumX / count, y: sumY / count };
+    }
+
     // Solve homography from grid to image for perspective correction.
     function computeHomography(srcPoints, dstPoints) {
       if (!Array.isArray(srcPoints) || srcPoints.length !== 4 || !Array.isArray(dstPoints) || dstPoints.length !== 4) {
@@ -4619,12 +4660,57 @@
       if (!matrix) {
         return null;
       }
-      const sampleAt = (gx, gy) => {
+      const predictedAlign = applyHomography(matrix, PIX_ALIGN_CENTER, PIX_ALIGN_CENTER);
+      let alignOffset = { x: 0, y: 0 };
+      if (predictedAlign) {
+        const alignCenter = findAlignmentCenter(
+          imageData,
+          width,
+          height,
+          predictedAlign,
+          avgCell * 6,
+          sampleRadius
+        );
+        if (alignCenter) {
+          alignOffset = { x: alignCenter.x - predictedAlign.x, y: alignCenter.y - predictedAlign.y };
+        }
+      }
+      const mapGridPoint = (gx, gy) => {
         const pt = applyHomography(matrix, gx, gy);
         if (!pt) {
+          return null;
+        }
+        return { x: pt.x + alignOffset.x, y: pt.y + alignOffset.y };
+      };
+      const sampleAt = (gx, gy) => {
+        const offsets = [
+          [0, 0],
+          [0.25, 0],
+          [-0.25, 0],
+          [0, 0.25],
+          [0, -0.25]
+        ];
+        const reds = [];
+        const greens = [];
+        const blues = [];
+        offsets.forEach(([ox, oy]) => {
+          const pt = mapGridPoint(gx + ox, gy + oy);
+          if (!pt) {
+            return;
+          }
+          const color = samplePixel(imageData.data, width, height, pt.x, pt.y, sampleRadius);
+          reds.push(color.r);
+          greens.push(color.g);
+          blues.push(color.b);
+        });
+        if (!reds.length) {
           return { r: 255, g: 255, b: 255 };
         }
-        return samplePixel(imageData.data, width, height, pt.x, pt.y, sampleRadius);
+        const median = (values) => {
+          const sorted = values.slice().sort((a, b) => a - b);
+          return sorted[Math.floor(sorted.length / 2)];
+        };
+        return { r: median(reds), g: median(greens), b: median(blues) };
       };
       const sampleRed = sampleAt(PIX_FINDER_CENTER_OFFSET, PIX_FINDER_CENTER_OFFSET);
       const sampleGreen = sampleAt(PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET, PIX_FINDER_CENTER_OFFSET);
@@ -4634,6 +4720,36 @@
         PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET
       );
       if (!isRedSample(sampleRed) || !isGreenSample(sampleGreen) || !isBlueSample(sampleBlue) || !isBlackSample(sampleBlack)) {
+        return null;
+      }
+      const checkTiming = () => {
+        let matches = 0;
+        let total = 0;
+        const threshold = 140;
+        for (let x = PIX_TIMING_START; x <= PIX_TIMING_END; x += 1) {
+          const color = sampleAt(x, PIX_TIMING_ROW);
+          const lum = (color.r + color.g + color.b) / 3;
+          const expectDark = (x - PIX_TIMING_START) % 2 === 0;
+          if ((lum < threshold) === expectDark) {
+            matches += 1;
+          }
+          total += 1;
+        }
+        for (let y = PIX_TIMING_START; y <= PIX_TIMING_END; y += 1) {
+          const color = sampleAt(PIX_TIMING_COL, y);
+          const lum = (color.r + color.g + color.b) / 3;
+          const expectDark = (y - PIX_TIMING_START) % 2 === 0;
+          if ((lum < threshold) === expectDark) {
+            matches += 1;
+          }
+          total += 1;
+        }
+        if (!total) {
+          return 0;
+        }
+        return matches / total;
+      };
+      if (checkTiming() < 0.6) {
         return null;
       }
       const biasR = sampleBlack.r;
@@ -4658,10 +4774,10 @@
       const hash = await hashPixQuantized(quantized);
       if (!hash) return null;
       const cornerPoints = [
-        applyHomography(matrix, 0, 0),
-        applyHomography(matrix, PIX_FRAME_SIZE - 1, 0),
-        applyHomography(matrix, 0, PIX_FRAME_SIZE - 1),
-        applyHomography(matrix, PIX_FRAME_SIZE - 1, PIX_FRAME_SIZE - 1)
+        mapGridPoint(0, 0),
+        mapGridPoint(PIX_FRAME_SIZE - 1, 0),
+        mapGridPoint(0, PIX_FRAME_SIZE - 1),
+        mapGridPoint(PIX_FRAME_SIZE - 1, PIX_FRAME_SIZE - 1)
       ].filter(Boolean);
       if (cornerPoints.length < 4) {
         return null;
