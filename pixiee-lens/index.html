@@ -4328,19 +4328,19 @@
     }
 
     function isRedSample({ r, g, b }) {
-      return r > 150 && r - g > 60 && r - b > 60;
+      return r > 120 && r - g > 40 && r - b > 40;
     }
 
     function isGreenSample({ r, g, b }) {
-      return g > 150 && g - r > 60 && g - b > 60;
+      return g > 120 && g - r > 40 && g - b > 40;
     }
 
     function isBlueSample({ r, g, b }) {
-      return b > 150 && b - r > 60 && b - g > 60;
+      return b > 120 && b - r > 40 && b - g > 40;
     }
 
     function isBlackSample({ r, g, b }) {
-      return r < 70 && g < 70 && b < 70;
+      return r < 100 && g < 100 && b < 100;
     }
 
     function samplePixel(data, width, height, x, y, radius = 1) {
@@ -4371,49 +4371,88 @@
     function findColorCenters(imageData, width, height) {
       const data = imageData.data;
       const stride = 2;
-      const stats = {
-        red: { count: 0, sumX: 0, sumY: 0 },
-        green: { count: 0, sumX: 0, sumY: 0 },
-        blue: { count: 0, sumX: 0, sumY: 0 }
+      const candidates = {
+        red: { score: -Infinity, x: 0, y: 0 },
+        green: { score: -Infinity, x: 0, y: 0 },
+        blue: { score: -Infinity, x: 0, y: 0 }
       };
+      const maxIndexX = Math.max(1, width - 1);
+      const maxIndexY = Math.max(1, height - 1);
       for (let y = 0; y < height; y += stride) {
+        const invY = 1 - y / maxIndexY;
+        const normY = y / maxIndexY;
         for (let x = 0; x < width; x += stride) {
           const idx = (y * width + x) * 4;
           const r = data[idx];
           const g = data[idx + 1];
           const b = data[idx + 2];
-          if (r > 150 && r - g > 60 && r - b > 60) {
-            stats.red.count += 1;
-            stats.red.sumX += x;
-            stats.red.sumY += y;
-          } else if (g > 150 && g - r > 60 && g - b > 60) {
-            stats.green.count += 1;
-            stats.green.sumX += x;
-            stats.green.sumY += y;
-          } else if (b > 150 && b - r > 60 && b - g > 60) {
-            stats.blue.count += 1;
-            stats.blue.sumX += x;
-            stats.blue.sumY += y;
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          if (max < 120 || max - min < 50) {
+            continue;
+          }
+          const invX = 1 - x / maxIndexX;
+          const normX = x / maxIndexX;
+          const redScore = r - (g + b) / 2;
+          if (redScore > 60 && r - g > 40 && r - b > 40) {
+            const bias = (invX + invY) / 2;
+            const score = redScore + bias * 120;
+            if (score > candidates.red.score) {
+              candidates.red = { score, x, y };
+            }
+          }
+          const greenScore = g - (r + b) / 2;
+          if (greenScore > 60 && g - r > 40 && g - b > 40) {
+            const bias = (normX + invY) / 2;
+            const score = greenScore + bias * 120;
+            if (score > candidates.green.score) {
+              candidates.green = { score, x, y };
+            }
+          }
+          const blueScore = b - (r + g) / 2;
+          if (blueScore > 60 && b - r > 40 && b - g > 40) {
+            const bias = (invX + normY) / 2;
+            const score = blueScore + bias * 120;
+            if (score > candidates.blue.score) {
+              candidates.blue = { score, x, y };
+            }
           }
         }
       }
-      const minCount = 18;
-      if (stats.red.count < minCount || stats.green.count < minCount || stats.blue.count < minCount) {
+      if (!Number.isFinite(candidates.red.score) || !Number.isFinite(candidates.green.score) || !Number.isFinite(candidates.blue.score)) {
         return null;
       }
-      return {
-        red: {
-          x: stats.red.sumX / stats.red.count,
-          y: stats.red.sumY / stats.red.count
-        },
-        green: {
-          x: stats.green.sumX / stats.green.count,
-          y: stats.green.sumY / stats.green.count
-        },
-        blue: {
-          x: stats.blue.sumX / stats.blue.count,
-          y: stats.blue.sumY / stats.blue.count
+      const refineRadius = clampValue(Math.round(Math.min(width, height) * 0.04), 4, 18);
+      const refineCenter = (candidate, testFn) => {
+        let sumX = 0;
+        let sumY = 0;
+        let count = 0;
+        const startX = Math.max(0, Math.floor(candidate.x - refineRadius));
+        const endX = Math.min(width - 1, Math.ceil(candidate.x + refineRadius));
+        const startY = Math.max(0, Math.floor(candidate.y - refineRadius));
+        const endY = Math.min(height - 1, Math.ceil(candidate.y + refineRadius));
+        for (let y = startY; y <= endY; y += 1) {
+          for (let x = startX; x <= endX; x += 1) {
+            const idx = (y * width + x) * 4;
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+            if (testFn({ r, g, b })) {
+              sumX += x;
+              sumY += y;
+              count += 1;
+            }
+          }
         }
+        if (!count) {
+          return { x: candidate.x, y: candidate.y };
+        }
+        return { x: sumX / count, y: sumY / count };
+      };
+      return {
+        red: refineCenter(candidates.red, isRedSample),
+        green: refineCenter(candidates.green, isGreenSample),
+        blue: refineCenter(candidates.blue, isBlueSample)
       };
     }
 
