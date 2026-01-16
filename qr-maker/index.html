@@ -738,6 +738,8 @@
   const FINDER_GAP = 2;
   const PIX_FRAME_OFFSET = FINDER_SIZE + FINDER_GAP;
   const PIX_FRAME_SIZE = PIX_ART_SIZE + (PIX_FRAME_OFFSET * 2);
+  const PIX_QUIET_ZONE = 4;
+  const PIX_RENDER_SIZE = PIX_FRAME_SIZE + PIX_QUIET_ZONE * 2;
   const FINDER_INNER_COLORS = {
     tl: '#ff0000',
     tr: '#00ff00',
@@ -897,8 +899,8 @@
   function drawPixCode() {
     if (!pixCanvas || !pixQuantized) return;
     const targetSize = clamp(parseInt(pixSize.value || '320', 10), 200, 640);
-    const cellSize = Math.max(1, Math.floor(targetSize / PIX_FRAME_SIZE));
-    const canvasSize = cellSize * PIX_FRAME_SIZE;
+    const cellSize = Math.max(1, Math.floor(targetSize / PIX_RENDER_SIZE));
+    const canvasSize = cellSize * PIX_RENDER_SIZE;
     pixCanvas.width = canvasSize;
     pixCanvas.height = canvasSize;
     const ctx = pixCanvas.getContext('2d');
@@ -906,14 +908,15 @@
     ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvasSize, canvasSize);
-    const tlX = 0;
-    const tlY = 0;
-    const trX = PIX_FRAME_SIZE - FINDER_SIZE;
-    const trY = 0;
-    const blX = 0;
-    const blY = PIX_FRAME_SIZE - FINDER_SIZE;
-    const brX = PIX_FRAME_SIZE - FINDER_SIZE;
-    const brY = PIX_FRAME_SIZE - FINDER_SIZE;
+    const frameOffset = PIX_QUIET_ZONE;
+    const tlX = frameOffset;
+    const tlY = frameOffset;
+    const trX = frameOffset + PIX_FRAME_SIZE - FINDER_SIZE;
+    const trY = frameOffset;
+    const blX = frameOffset;
+    const blY = frameOffset + PIX_FRAME_SIZE - FINDER_SIZE;
+    const brX = frameOffset + PIX_FRAME_SIZE - FINDER_SIZE;
+    const brY = frameOffset + PIX_FRAME_SIZE - FINDER_SIZE;
     drawFinderBlock(ctx, tlX, tlY, cellSize, FINDER_INNER_COLORS.tl);
     drawFinderBlock(ctx, trX, trY, cellSize, FINDER_INNER_COLORS.tr);
     drawFinderBlock(ctx, blX, blY, cellSize, FINDER_INNER_COLORS.bl);
@@ -925,7 +928,12 @@
         const g = pixQuantized[idx + 1] * 17;
         const b = pixQuantized[idx + 2] * 17;
         ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-        ctx.fillRect((x + PIX_FRAME_OFFSET) * cellSize, (y + PIX_FRAME_OFFSET) * cellSize, cellSize, cellSize);
+        ctx.fillRect(
+          (x + PIX_FRAME_OFFSET + frameOffset) * cellSize,
+          (y + PIX_FRAME_OFFSET + frameOffset) * cellSize,
+          cellSize,
+          cellSize
+        );
       }
     }
   }
