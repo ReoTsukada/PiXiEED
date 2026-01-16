@@ -205,6 +205,49 @@
     padding: clamp(16px, 2vw, 20px);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
   }
+  [hidden] {
+    display: none !important;
+  }
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .mode-switch {
+    display: inline-flex;
+    gap: 6px;
+    padding: 4px;
+    border-radius: 12px;
+    background: rgba(9, 14, 28, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .mode-btn {
+    appearance: none;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--muted);
+    border-radius: 9px;
+    padding: 6px 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .mode-btn.is-active {
+    background: linear-gradient(135deg, rgba(123, 207, 255, 0.6), rgba(255, 169, 92, 0.5));
+    color: #0b1022;
+    border-color: transparent;
+  }
+  .mode-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 8px;
+  }
+  .hash-text {
+    font-size: 0.85rem;
+    word-break: break-all;
+  }
   .panel h2 {
     margin: 0 0 8px;
     font-size: 1.15rem;
@@ -537,7 +580,14 @@
 </div>
 <div class="qr-grid">
 <section class="panel">
-<h2>1. テキストを入力</h2>
+<div class="panel-head">
+<h2>1. 内容を設定</h2>
+<div class="mode-switch" role="tablist" aria-label="モード">
+<button class="mode-btn is-active" data-mode="qr" type="button" role="tab" aria-selected="true">QR</button>
+<button class="mode-btn" data-mode="pix" type="button" role="tab" aria-selected="false">PiXiEEDコード</button>
+</div>
+</div>
+<div class="mode-section" id="qrControls">
 <label for="qrInput">エンコードする内容</label>
 <textarea id="qrInput" maxlength="1200" placeholder="https://example.com や テキストを入力…">https://pixieed.jp/</textarea>
 <div class="meta-row" aria-live="polite">
@@ -584,18 +634,52 @@
 </div>
 </div>
 </div>
+</div>
+<div class="mode-section" id="pixControls" hidden>
+<label for="pixInput">32×32ドット絵（PNG / GIF）</label>
+<input id="pixInput" type="file" accept="image/png,image/gif"/>
+<p class="small">32×32推奨。別サイズは32×32に近似します。</p>
+<div class="field-row">
+<div>
+<label for="pixPayloadType">返す内容</label>
+<select id="pixPayloadType">
+<option value="url">URL</option>
+<option value="text">テキスト</option>
+</select>
+</div>
+<div>
+<label for="pixSize">出力サイズ</label>
+<div class="range-wrap">
+<input id="pixSize" max="640" min="200" step="20" type="range" value="320"/>
+<span class="range-value" id="pixSizeValue">320px</span>
+</div>
+</div>
+</div>
+<label for="pixPayload">内容</label>
+<textarea id="pixPayload" maxlength="800" placeholder="URL または テキストを入力…"></textarea>
+<div class="meta-row" aria-live="polite">
+<span>ハッシュ: <span class="hash-text" id="pixHash">--</span></span>
+<span>状態: <span class="status" id="pixStatus">未生成</span></span>
+</div>
+</div>
 </section>
 <section class="panel qr-preview">
 <div>
 <h2>2. プレビュー</h2>
-<p class="small">カメラで読みやすいか確認してください。</p>
+<p class="small">モードに合わせてプレビューされます。</p>
 </div>
 <div class="qr-canvas">
 <canvas height="280" id="qrCanvas" width="280"></canvas>
+<canvas height="280" id="pixCanvas" width="280" hidden></canvas>
 </div>
-<div class="qr-actions">
+<div class="qr-actions" id="qrActions">
 <button class="btn" id="downloadBtn" type="button">PNGを保存</button>
 <button class="btn secondary" id="copyDataBtn" type="button">テキストをコピー</button>
+</div>
+<div class="qr-actions" id="pixActions" hidden>
+<button class="btn" id="pixDownloadBtn" type="button">PNGを保存</button>
+<button class="btn secondary" id="pixCopyHashBtn" type="button">ハッシュをコピー</button>
+<button class="btn secondary" id="pixRegisterBtn" type="button">DBへ登録</button>
 </div>
 </section>
 </div>
@@ -626,11 +710,46 @@
   const colorLight = document.getElementById('qrLight');
   const downloadBtn = document.getElementById('downloadBtn');
   const copyBtn = document.getElementById('copyDataBtn');
+  const qrActions = document.getElementById('qrActions');
+  const pixActions = document.getElementById('pixActions');
+  const pixCanvas = document.getElementById('pixCanvas');
+  const pixInput = document.getElementById('pixInput');
+  const pixPayloadType = document.getElementById('pixPayloadType');
+  const pixPayload = document.getElementById('pixPayload');
+  const pixStatus = document.getElementById('pixStatus');
+  const pixHash = document.getElementById('pixHash');
+  const pixSize = document.getElementById('pixSize');
+  const pixSizeValue = document.getElementById('pixSizeValue');
+  const pixDownloadBtn = document.getElementById('pixDownloadBtn');
+  const pixCopyHashBtn = document.getElementById('pixCopyHashBtn');
+  const pixRegisterBtn = document.getElementById('pixRegisterBtn');
+  const modeButtons = document.querySelectorAll('.mode-btn');
+  const qrControls = document.getElementById('qrControls');
+  const pixControls = document.getElementById('pixControls');
 
   const DEFAULT_TEXT = 'https://pixieed.jp/';
   const TEXT_LIMIT = 900;
+  const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
+  const PIXCODE_TABLE = 'pixfind_codes';
+  const PIX_CLIENT_KEY = 'pixfind_client_id';
+  const PIX_ART_SIZE = 32;
+  const FINDER_SIZE = 7; // 1:1:3:1:1 finder
+  const FINDER_GAP = 2;
+  const PIX_FRAME_OFFSET = FINDER_SIZE + FINDER_GAP;
+  const PIX_FRAME_SIZE = PIX_ART_SIZE + (PIX_FRAME_OFFSET * 2);
+  const FINDER_INNER_COLORS = {
+    tl: '#ff0000',
+    tr: '#00ff00',
+    bl: '#0000ff',
+    br: '#000000'
+  };
 
   const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
+  let currentMode = 'qr';
+  let pixQuantized = null;
+  let pixHashValue = '';
+  let supportsPixClientId = true;
 
   function syncLabels() {
     charCount.textContent = input.value.length;
@@ -667,6 +786,235 @@
     }
   }
 
+  function syncPixLabels() {
+    if (!pixSizeValue || !pixSize) return;
+    pixSizeValue.textContent = pixSize.value + 'px';
+  }
+
+  function setPixStatus(message, color) {
+    if (!pixStatus) return;
+    pixStatus.textContent = message;
+    pixStatus.style.color = color || '#7bcfff';
+  }
+
+  function setMode(mode) {
+    currentMode = mode;
+    modeButtons.forEach(btn => {
+      const isActive = btn.dataset.mode === mode;
+      btn.classList.toggle('is-active', isActive);
+      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    if (qrControls) qrControls.hidden = mode !== 'qr';
+    if (pixControls) pixControls.hidden = mode !== 'pix';
+    if (qrCanvas) qrCanvas.hidden = mode !== 'qr';
+    if (pixCanvas) pixCanvas.hidden = mode !== 'pix';
+    if (qrActions) qrActions.hidden = mode !== 'qr';
+    if (pixActions) pixActions.hidden = mode !== 'pix';
+    if (mode === 'qr') {
+      syncLabels();
+      renderQRCode();
+    } else if (pixQuantized) {
+      renderPixCode();
+    }
+  }
+
+  function quantizeChannel(value) {
+    return Math.min(15, Math.max(0, Math.round(value / 17)));
+  }
+
+  function buildQuantizedArt(imageData) {
+    const total = PIX_ART_SIZE * PIX_ART_SIZE;
+    const quantized = new Uint8Array(total * 3);
+    for (let i = 0; i < total; i++) {
+      const idx = i * 4;
+      const alpha = imageData[idx + 3];
+      const r = alpha < 128 ? 255 : imageData[idx];
+      const g = alpha < 128 ? 255 : imageData[idx + 1];
+      const b = alpha < 128 ? 255 : imageData[idx + 2];
+      quantized[i * 3] = quantizeChannel(r);
+      quantized[i * 3 + 1] = quantizeChannel(g);
+      quantized[i * 3 + 2] = quantizeChannel(b);
+    }
+    return quantized;
+  }
+
+  async function hashQuantized(quantized) {
+    if (!crypto?.subtle?.digest) return '';
+    const digest = await crypto.subtle.digest('SHA-256', quantized);
+    return Array.from(new Uint8Array(digest))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+  async function loadPixImage(file) {
+    if (!file) return null;
+    const blobUrl = URL.createObjectURL(file);
+    try {
+      const img = new Image();
+      img.decoding = 'sync';
+      img.src = blobUrl;
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+      const temp = document.createElement('canvas');
+      temp.width = PIX_ART_SIZE;
+      temp.height = PIX_ART_SIZE;
+      const ctx = temp.getContext('2d');
+      if (!ctx) return null;
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, temp.width, temp.height);
+      ctx.drawImage(img, 0, 0, PIX_ART_SIZE, PIX_ART_SIZE);
+      const data = ctx.getImageData(0, 0, PIX_ART_SIZE, PIX_ART_SIZE).data;
+      return { data, width: img.naturalWidth || img.width, height: img.naturalHeight || img.height };
+    } finally {
+      URL.revokeObjectURL(blobUrl);
+    }
+  }
+
+  function drawFrameCell(ctx, x, y, cellSize, color) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+  }
+
+  function drawFinderBlock(ctx, startX, startY, cellSize, innerColor) {
+    const edge = FINDER_SIZE - 1;
+    for (let y = 0; y < FINDER_SIZE; y++) {
+      for (let x = 0; x < FINDER_SIZE; x++) {
+        let color = '#ffffff';
+        if (x === 0 || y === 0 || x === edge || y === edge) {
+          color = '#000000';
+        } else if (x === 1 || y === 1 || x === edge - 1 || y === edge - 1) {
+          color = '#ffffff';
+        } else {
+          color = innerColor;
+        }
+        drawFrameCell(ctx, startX + x, startY + y, cellSize, color);
+      }
+    }
+  }
+
+  function drawPixCode() {
+    if (!pixCanvas || !pixQuantized) return;
+    const targetSize = clamp(parseInt(pixSize.value || '320', 10), 200, 640);
+    const cellSize = Math.max(1, Math.floor(targetSize / PIX_FRAME_SIZE));
+    const canvasSize = cellSize * PIX_FRAME_SIZE;
+    pixCanvas.width = canvasSize;
+    pixCanvas.height = canvasSize;
+    const ctx = pixCanvas.getContext('2d');
+    if (!ctx) return;
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvasSize, canvasSize);
+    const tlX = 0;
+    const tlY = 0;
+    const trX = PIX_FRAME_SIZE - FINDER_SIZE;
+    const trY = 0;
+    const blX = 0;
+    const blY = PIX_FRAME_SIZE - FINDER_SIZE;
+    const brX = PIX_FRAME_SIZE - FINDER_SIZE;
+    const brY = PIX_FRAME_SIZE - FINDER_SIZE;
+    drawFinderBlock(ctx, tlX, tlY, cellSize, FINDER_INNER_COLORS.tl);
+    drawFinderBlock(ctx, trX, trY, cellSize, FINDER_INNER_COLORS.tr);
+    drawFinderBlock(ctx, blX, blY, cellSize, FINDER_INNER_COLORS.bl);
+    drawFinderBlock(ctx, brX, brY, cellSize, FINDER_INNER_COLORS.br);
+    for (let y = 0; y < PIX_ART_SIZE; y++) {
+      for (let x = 0; x < PIX_ART_SIZE; x++) {
+        const idx = (y * PIX_ART_SIZE + x) * 3;
+        const r = pixQuantized[idx] * 17;
+        const g = pixQuantized[idx + 1] * 17;
+        const b = pixQuantized[idx + 2] * 17;
+        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+        ctx.fillRect((x + PIX_FRAME_OFFSET) * cellSize, (y + PIX_FRAME_OFFSET) * cellSize, cellSize, cellSize);
+      }
+    }
+  }
+
+  async function renderPixCode() {
+    if (!pixQuantized) return;
+    drawPixCode();
+    if (pixHash) pixHash.textContent = pixHashValue || '--';
+    setPixStatus('更新しました', '#7bcfff');
+  }
+
+  function ensurePixClientId() {
+    try {
+      let id = localStorage.getItem(PIX_CLIENT_KEY);
+      if (!id) {
+        id = `pix-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+        localStorage.setItem(PIX_CLIENT_KEY, id);
+      }
+      return id;
+    } catch {
+      return null;
+    }
+  }
+
+  async function registerPixCode() {
+    if (!pixHashValue) {
+      setPixStatus('先に画像を読み込んでください', '#ffa95c');
+      return;
+    }
+    const payload = (pixPayload?.value || '').trim();
+    if (!payload) {
+      setPixStatus('内容を入力してください', '#ffa95c');
+      return;
+    }
+    const clientId = ensurePixClientId();
+    if (supportsPixClientId && !clientId) {
+      setPixStatus('この環境では登録できません', '#ffa95c');
+      return;
+    }
+    const basePayload = {
+      hash: pixHashValue,
+      payload_type: pixPayloadType?.value || 'url',
+      payload_value: payload,
+      updated_at: new Date().toISOString()
+    };
+    if (supportsPixClientId && clientId) {
+      basePayload.client_id = clientId;
+    }
+    const registerUrl = supportsPixClientId && clientId
+      ? `${SUPABASE_URL}/rest/v1/${PIXCODE_TABLE}?on_conflict=client_id`
+      : `${SUPABASE_URL}/rest/v1/${PIXCODE_TABLE}`;
+    try {
+      const res = await fetch(registerUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          Prefer: 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify(basePayload)
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        if (supportsPixClientId && text.includes('client_id')) {
+          supportsPixClientId = false;
+          delete basePayload.client_id;
+          const retry = await fetch(`${SUPABASE_URL}/rest/v1/${PIXCODE_TABLE}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+              Prefer: 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify(basePayload)
+          });
+          if (!retry.ok) throw new Error(await retry.text());
+        } else {
+          throw new Error(text);
+        }
+      }
+      setPixStatus('登録しました', '#7bcfff');
+    } catch (err) {
+      console.warn(err);
+      setPixStatus('登録に失敗しました', '#ffa95c');
+    }
+  }
+
   function downloadPNG() {
     const link = document.createElement('a');
     link.download = 'pixieed-qr.png';
@@ -692,12 +1040,94 @@
 
   input.addEventListener('input', () => {
     syncLabels();
-    renderQRCode();
+    if (currentMode === 'qr') {
+      renderQRCode();
+    }
   });
   [sizeInput, marginInput, levelSelect, colorDark, colorLight].forEach(el => {
     el.addEventListener('input', () => {
       syncLabels();
-      renderQRCode();
+      if (currentMode === 'qr') {
+        renderQRCode();
+      }
+    });
+  });
+  if (pixInput) {
+    pixInput.addEventListener('change', async () => {
+      const file = pixInput.files?.[0];
+      if (!file) {
+        pixQuantized = null;
+        pixHashValue = '';
+        if (pixHash) pixHash.textContent = '--';
+        setPixStatus('未生成', '#7bcfff');
+        return;
+      }
+      setPixStatus('読み込み中...', '#ffa95c');
+      try {
+        const info = await loadPixImage(file);
+        if (!info) throw new Error('画像を読み込めませんでした');
+        if (info.width !== PIX_ART_SIZE || info.height !== PIX_ART_SIZE) {
+          setPixStatus('32×32に近似しました', '#ffa95c');
+        }
+        pixQuantized = buildQuantizedArt(info.data);
+        pixHashValue = await hashQuantized(pixQuantized);
+        if (pixHash) pixHash.textContent = pixHashValue || '--';
+        drawPixCode();
+        setPixStatus('更新しました', '#7bcfff');
+      } catch (err) {
+        console.error(err);
+        pixQuantized = null;
+        pixHashValue = '';
+        if (pixHash) pixHash.textContent = '--';
+        setPixStatus('画像の読み込みに失敗しました', '#ffa95c');
+      }
+    });
+  }
+  if (pixSize) {
+    pixSize.addEventListener('input', () => {
+      syncPixLabels();
+      if (currentMode === 'pix' && pixQuantized) {
+        drawPixCode();
+      }
+    });
+  }
+  if (pixDownloadBtn) {
+    pixDownloadBtn.addEventListener('click', () => {
+      if (!pixCanvas || !pixQuantized) {
+        setPixStatus('画像を読み込んでください', '#ffa95c');
+        return;
+      }
+      const link = document.createElement('a');
+      link.download = 'pixfind-code.png';
+      link.href = pixCanvas.toDataURL('image/png');
+      link.click();
+    });
+  }
+  if (pixCopyHashBtn) {
+    pixCopyHashBtn.addEventListener('click', () => {
+      if (!pixHashValue) {
+        setPixStatus('ハッシュがありません', '#ffa95c');
+        return;
+      }
+      if (!navigator.clipboard || !navigator.clipboard.writeText) {
+        setPixStatus('クリップボード非対応です', '#ffa95c');
+        return;
+      }
+      navigator.clipboard.writeText(pixHashValue).then(() => {
+        setPixStatus('ハッシュをコピーしました', '#7bcfff');
+      }).catch(() => {
+        setPixStatus('コピーに失敗しました', '#ffa95c');
+      });
+    });
+  }
+  if (pixRegisterBtn) {
+    pixRegisterBtn.addEventListener('click', () => {
+      registerPixCode();
+    });
+  }
+  modeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      setMode(btn.dataset.mode || 'qr');
     });
   });
   // 初期描画
@@ -705,7 +1135,9 @@
   copyBtn.addEventListener('click', copyData);
 
   syncLabels();
+  syncPixLabels();
   renderQRCode();
+  setMode(currentMode);
 </script>
 </body>
 </html>
