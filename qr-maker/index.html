@@ -950,6 +950,27 @@
     }
   }
 
+  async function fetchPixCodeByHash(hash) {
+    if (!hash) {
+      return null;
+    }
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${PIXCODE_TABLE}?hash=eq.${hash}&select=hash,client_id&limit=1`, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+        }
+      });
+      if (!res.ok) {
+        return null;
+      }
+      const data = await res.json();
+      return Array.isArray(data) && data[0] ? data[0] : null;
+    } catch {
+      return null;
+    }
+  }
+
   async function registerPixCode() {
     if (!pixHashValue) {
       setPixStatus('先に画像を読み込んでください', '#ffa95c');
@@ -964,6 +985,15 @@
     if (supportsPixClientId && !clientId) {
       setPixStatus('この環境では登録できません', '#ffa95c');
       return;
+    }
+    const existing = await fetchPixCodeByHash(pixHashValue);
+    if (existing) {
+      const existingClientId = typeof existing.client_id === 'string' ? existing.client_id : '';
+      const canOverwrite = supportsPixClientId && clientId && existingClientId && existingClientId === clientId;
+      if (!canOverwrite) {
+        setPixStatus('このコードはすでに登録されています', '#ffa95c');
+        return;
+      }
     }
     const basePayload = {
       hash: pixHashValue,
@@ -990,6 +1020,10 @@
       });
       if (!res.ok) {
         const text = await res.text();
+        if (res.status === 409 || text.includes('duplicate key') || text.includes('pixfind_codes_pkey')) {
+          setPixStatus('このコードはすでに登録されています', '#ffa95c');
+          return;
+        }
         if (supportsPixClientId && text.includes('client_id')) {
           supportsPixClientId = false;
           delete basePayload.client_id;
