@@ -2181,11 +2181,11 @@
 <div class="pixel-preview" hidden="" id="pixelPreview"></div>
 <div aria-live="polite" class="qr-readout" hidden="" id="qrReadout" role="status">
 <div class="qr-readout__header">
-<span class="qr-readout__title">QRスキャン</span>
+<span class="qr-readout__title" id="qrReadoutTitle">QRスキャン</span>
 <span class="qr-readout__state" id="qrReadoutState">停止中</span>
 <button aria-label="閉じる" class="qr-readout__close" id="qrCloseBtn" type="button"></button>
 </div>
-<p class="qr-readout__message" id="qrReadoutMessage">「QR」ボタンをオンにするとスキャンを開始します。</p>
+<p class="qr-readout__message" id="qrReadoutMessage">QR / PiXiEEDコードのスキャンを開始します。</p>
 <div class="qr-readout__result" hidden="" id="qrReadoutResult">
 <p class="qr-readout__label">検出された内容</p>
 <div class="qr-readout__preview" hidden="" id="qrPreviewWrap">
@@ -2258,6 +2258,7 @@
     const pixelArtInput = document.getElementById('pixelArtInput');
     const pixelPreview = document.getElementById('pixelPreview');
     const qrReadout = document.getElementById('qrReadout');
+    const qrReadoutTitle = document.getElementById('qrReadoutTitle');
     const qrReadoutState = document.getElementById('qrReadoutState');
     const qrReadoutMessage = document.getElementById('qrReadoutMessage');
     const qrReadoutResult = document.getElementById('qrReadoutResult');
@@ -2588,6 +2589,16 @@
     const QR_SCAN_BASE_SIZE = 640;
     const QR_SCAN_MIN_SIZE = 320;
     const QR_SCAN_DEFAULT_INTERVAL_MS = 260;
+    const PIXCODE_TABLE = 'pixfind_codes';
+    const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
+    const PIX_ART_SIZE = 32;
+    const PIX_FINDER_SIZE = 7;
+    const PIX_FINDER_GAP = 2;
+    const PIX_FRAME_OFFSET = PIX_FINDER_SIZE + PIX_FINDER_GAP;
+    const PIX_FRAME_SIZE = PIX_ART_SIZE + PIX_FRAME_OFFSET * 2;
+    const PIX_FINDER_CENTER_OFFSET = 3;
+    const PIX_AXIS_CELLS = PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET * 2;
     const COLOR_SIMPLIFY_MAX_COLORS = 24;
     const COLOR_SIMPLIFY_BUCKET = 18;
     const AUTO_ADJUST_SAMPLE_SIZE = Object.freeze({ width: 180, height: 120 });
@@ -2672,12 +2683,17 @@
     let captureInProgress = false;
     let qrScanEnabled = true;
     let qrSupportAvailable = null;
+    let qrSupportWarningShown = false;
     let qrDetector = null;
     let qrScanLoopHandle = null;
     let qrLastValue = '';
     let qrOpenTarget = '';
     const qrScanCanvas = document.createElement('canvas');
     const qrScanCtx = qrScanCanvas.getContext ? qrScanCanvas.getContext('2d', { willReadFrequently: true }) : null;
+    let pixLastHash = '';
+    let pixLastDetectedAt = 0;
+    const pixLookupCache = new Map();
+    const pixLookupPromises = new Map();
 
     const menus = {
       aspect: { button: aspectMenuBtn, panel: aspectMenu },
@@ -4254,7 +4270,13 @@
       if (!qrReadout) {
         return;
       }
-      const { resultText = null, openUrl = '', forceShow = false, showPreview = false } = options;
+      const {
+        resultText = null,
+        openUrl = '',
+        forceShow = false,
+        showPreview = false,
+        allowAutoOpen = true
+      } = options;
       const normalizedResult = normalizeQrValue(resultText) || qrLastValue;
       const hasResult = Boolean(normalizedResult);
       const shouldShow = forceShow || hasResult || Boolean(qrLastValue);
@@ -4279,7 +4301,9 @@
       if (qrCopyBtn) {
         qrCopyBtn.disabled = !hasResult;
       }
-      const resolvedOpenUrl = hasResult ? (openUrl || getOpenableUrl(normalizedResult)) : '';
+      const resolvedOpenUrl = hasResult
+        ? (openUrl || (allowAutoOpen ? getOpenableUrl(normalizedResult) : ''))
+        : '';
       qrOpenTarget = resolvedOpenUrl;
       if (qrOpenBtn) {
         qrOpenBtn.disabled = !qrOpenTarget;
@@ -4291,6 +4315,222 @@
           qrPreviewCanvas.height > 0;
         qrPreviewWrap.hidden = !(showPreview && hasPreview);
       }
+    }
+
+    function setQrReadoutTitle(text) {
+      if (qrReadoutTitle) {
+        qrReadoutTitle.textContent = text;
+      }
+    }
+
+    function clampValue(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function isRedSample({ r, g, b }) {
+      return r > 150 && r - g > 60 && r - b > 60;
+    }
+
+    function isGreenSample({ r, g, b }) {
+      return g > 150 && g - r > 60 && g - b > 60;
+    }
+
+    function isBlueSample({ r, g, b }) {
+      return b > 150 && b - r > 60 && b - g > 60;
+    }
+
+    function isBlackSample({ r, g, b }) {
+      return r < 70 && g < 70 && b < 70;
+    }
+
+    function samplePixel(data, width, height, x, y, radius = 1) {
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let count = 0;
+      const cx = Math.round(x);
+      const cy = Math.round(y);
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const px = cx + dx;
+          const py = cy + dy;
+          if (px < 0 || py < 0 || px >= width || py >= height) continue;
+          const idx = (py * width + px) * 4;
+          r += data[idx];
+          g += data[idx + 1];
+          b += data[idx + 2];
+          count += 1;
+        }
+      }
+      if (!count) {
+        return { r: 255, g: 255, b: 255 };
+      }
+      return { r: r / count, g: g / count, b: b / count };
+    }
+
+    function findColorCenters(imageData, width, height) {
+      const data = imageData.data;
+      const stride = 2;
+      const stats = {
+        red: { count: 0, sumX: 0, sumY: 0 },
+        green: { count: 0, sumX: 0, sumY: 0 },
+        blue: { count: 0, sumX: 0, sumY: 0 }
+      };
+      for (let y = 0; y < height; y += stride) {
+        for (let x = 0; x < width; x += stride) {
+          const idx = (y * width + x) * 4;
+          const r = data[idx];
+          const g = data[idx + 1];
+          const b = data[idx + 2];
+          if (r > 150 && r - g > 60 && r - b > 60) {
+            stats.red.count += 1;
+            stats.red.sumX += x;
+            stats.red.sumY += y;
+          } else if (g > 150 && g - r > 60 && g - b > 60) {
+            stats.green.count += 1;
+            stats.green.sumX += x;
+            stats.green.sumY += y;
+          } else if (b > 150 && b - r > 60 && b - g > 60) {
+            stats.blue.count += 1;
+            stats.blue.sumX += x;
+            stats.blue.sumY += y;
+          }
+        }
+      }
+      const minCount = 18;
+      if (stats.red.count < minCount || stats.green.count < minCount || stats.blue.count < minCount) {
+        return null;
+      }
+      return {
+        red: {
+          x: stats.red.sumX / stats.red.count,
+          y: stats.red.sumY / stats.red.count
+        },
+        green: {
+          x: stats.green.sumX / stats.green.count,
+          y: stats.green.sumY / stats.green.count
+        },
+        blue: {
+          x: stats.blue.sumX / stats.blue.count,
+          y: stats.blue.sumY / stats.blue.count
+        }
+      };
+    }
+
+    function gridToImagePoint(origin, vx, vy, gx, gy) {
+      return {
+        x: origin.x + (gx - PIX_FINDER_CENTER_OFFSET) * vx.x + (gy - PIX_FINDER_CENTER_OFFSET) * vy.x,
+        y: origin.y + (gx - PIX_FINDER_CENTER_OFFSET) * vx.y + (gy - PIX_FINDER_CENTER_OFFSET) * vy.y
+      };
+    }
+
+    async function hashPixQuantized(quantized) {
+      if (!crypto?.subtle?.digest) return '';
+      const digest = await crypto.subtle.digest('SHA-256', quantized);
+      return Array.from(new Uint8Array(digest))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+    }
+
+    async function detectPixieeCode(imageData, width, height) {
+      const centers = findColorCenters(imageData, width, height);
+      if (!centers) return null;
+      const vx = {
+        x: (centers.green.x - centers.red.x) / PIX_AXIS_CELLS,
+        y: (centers.green.y - centers.red.y) / PIX_AXIS_CELLS
+      };
+      const vy = {
+        x: (centers.blue.x - centers.red.x) / PIX_AXIS_CELLS,
+        y: (centers.blue.y - centers.red.y) / PIX_AXIS_CELLS
+      };
+      const vxLen = Math.hypot(vx.x, vx.y);
+      const vyLen = Math.hypot(vy.x, vy.y);
+      if (vxLen < 1 || vyLen < 1) {
+        return null;
+      }
+      const dot = (vx.x * vy.x + vx.y * vy.y) / (vxLen * vyLen);
+      if (Math.abs(dot) > 0.5) {
+        return null;
+      }
+      const sampleRadius = clampValue(Math.round(Math.min(vxLen, vyLen) * 0.4), 1, 3);
+      const sampleAt = (gx, gy) => {
+        const pt = gridToImagePoint(centers.red, vx, vy, gx, gy);
+        return samplePixel(imageData.data, width, height, pt.x, pt.y, sampleRadius);
+      };
+      const sampleRed = sampleAt(PIX_FINDER_CENTER_OFFSET, PIX_FINDER_CENTER_OFFSET);
+      const sampleGreen = sampleAt(PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET, PIX_FINDER_CENTER_OFFSET);
+      const sampleBlue = sampleAt(PIX_FINDER_CENTER_OFFSET, PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET);
+      const sampleBlack = sampleAt(
+        PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET,
+        PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET
+      );
+      if (!isRedSample(sampleRed) || !isGreenSample(sampleGreen) || !isBlueSample(sampleBlue) || !isBlackSample(sampleBlack)) {
+        return null;
+      }
+      const biasR = sampleBlack.r;
+      const biasG = sampleBlack.g;
+      const biasB = sampleBlack.b;
+      const gainR = clampValue(255 / Math.max(8, sampleRed.r - biasR), 0.6, 3.2);
+      const gainG = clampValue(255 / Math.max(8, sampleGreen.g - biasG), 0.6, 3.2);
+      const gainB = clampValue(255 / Math.max(8, sampleBlue.b - biasB), 0.6, 3.2);
+      const quantized = new Uint8Array(PIX_ART_SIZE * PIX_ART_SIZE * 3);
+      let writeIndex = 0;
+      for (let y = 0; y < PIX_ART_SIZE; y++) {
+        for (let x = 0; x < PIX_ART_SIZE; x++) {
+          const color = sampleAt(PIX_FRAME_OFFSET + x, PIX_FRAME_OFFSET + y);
+          const r = clampValue((color.r - biasR) * gainR, 0, 255);
+          const g = clampValue((color.g - biasG) * gainG, 0, 255);
+          const b = clampValue((color.b - biasB) * gainB, 0, 255);
+          quantized[writeIndex++] = Math.round(r / 17);
+          quantized[writeIndex++] = Math.round(g / 17);
+          quantized[writeIndex++] = Math.round(b / 17);
+        }
+      }
+      const hash = await hashPixQuantized(quantized);
+      if (!hash) return null;
+      const cornerPoints = [
+        gridToImagePoint(centers.red, vx, vy, 0, 0),
+        gridToImagePoint(centers.red, vx, vy, PIX_FRAME_SIZE - 1, 0),
+        gridToImagePoint(centers.red, vx, vy, 0, PIX_FRAME_SIZE - 1),
+        gridToImagePoint(centers.red, vx, vy, PIX_FRAME_SIZE - 1, PIX_FRAME_SIZE - 1)
+      ];
+      const xs = cornerPoints.map((p) => p.x);
+      const ys = cornerPoints.map((p) => p.y);
+      const previewBox = {
+        x: clampValue(Math.min(...xs), 0, width - 1),
+        y: clampValue(Math.min(...ys), 0, height - 1),
+        width: clampValue(Math.max(...xs) - Math.min(...xs), 1, width),
+        height: clampValue(Math.max(...ys) - Math.min(...ys), 1, height)
+      };
+      return { hash, previewBox };
+    }
+
+    async function fetchPixCodePayload(hash) {
+      if (!hash) return null;
+      if (pixLookupCache.has(hash)) {
+        return pixLookupCache.get(hash);
+      }
+      if (pixLookupPromises.has(hash)) {
+        return pixLookupPromises.get(hash);
+      }
+      const promise = fetch(`${SUPABASE_URL}/rest/v1/${PIXCODE_TABLE}?hash=eq.${hash}&select=payload_type,payload_value&limit=1`, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+        }
+      }).then(async (res) => {
+        if (!res.ok) return null;
+        const data = await res.json();
+        const payload = Array.isArray(data) && data[0] ? data[0] : null;
+        if (payload) {
+          pixLookupCache.set(hash, payload);
+        }
+        return payload;
+      }).catch(() => null).finally(() => {
+        pixLookupPromises.delete(hash);
+      });
+      pixLookupPromises.set(hash, promise);
+      return promise;
     }
 
     async function ensureQrDetector() {
@@ -4411,6 +4651,14 @@
       } catch (error) {
         imageData = null;
       }
+      let pixResult = null;
+      if (imageData && imageData.data) {
+        try {
+          pixResult = await detectPixieeCode(imageData, targetWidth, targetHeight);
+        } catch (error) {
+          pixResult = null;
+        }
+      }
       if (imageData && imageData.data) {
         const { data } = imageData;
         let sum = 0;
@@ -4432,17 +4680,17 @@
       }
       const detector = await ensureQrDetector();
       if (!detector) {
-        return null;
+        return { qr: null, pix: pixResult };
       }
       const barcodes = await detector.detect(qrScanCanvas);
       if (Array.isArray(barcodes) && barcodes.length) {
         const code = barcodes.find((entry) => normalizeQrValue(entry.rawValue)) || barcodes[0];
         if (code && typeof code.rawValue === 'string') {
           const previewGenerated = updateQrPreviewFromDetection(code.boundingBox || null);
-          return { value: code.rawValue.trim(), previewGenerated };
+          return { qr: { value: code.rawValue.trim(), previewGenerated }, pix: pixResult };
         }
       }
-      return null;
+      return { qr: null, pix: pixResult };
     }
 
     function handleQrDetection(payload) {
@@ -4452,6 +4700,7 @@
       }
       const isNew = normalized !== qrLastValue;
       qrLastValue = normalized;
+      setQrReadoutTitle('QRスキャン');
       const openUrl = getOpenableUrl(normalized);
       updateQrReadout('QRコードを読み取りました。', '検出', {
         resultText: normalized,
@@ -4469,6 +4718,52 @@
       }
     }
 
+    async function handlePixDetection(payload) {
+      if (!payload || !payload.hash) {
+        return false;
+      }
+      const now = Date.now();
+      if (payload.hash === pixLastHash && now - pixLastDetectedAt < 2000) {
+        return true;
+      }
+      pixLastHash = payload.hash;
+      pixLastDetectedAt = now;
+      setQrReadoutTitle('PiXiEEDコード');
+      let previewGenerated = false;
+      if (payload.previewBox) {
+        previewGenerated = updateQrPreviewFromDetection(payload.previewBox);
+      }
+      updateQrReadout('PiXiEEDコードを検出しました。照会中...', '検出中', {
+        resultText: payload.hash.slice(0, 16),
+        forceShow: true,
+        showPreview: previewGenerated,
+        allowAutoOpen: false
+      });
+      const record = await fetchPixCodePayload(payload.hash);
+      if (record && record.payload_value) {
+        qrLastValue = record.payload_value;
+        const openUrl = record.payload_type === 'url' ? record.payload_value : '';
+        updateQrReadout('PiXiEEDコードを読み取りました。', '検出', {
+          resultText: record.payload_value,
+          openUrl,
+          forceShow: true,
+          showPreview: previewGenerated,
+          allowAutoOpen: record.payload_type === 'url'
+        });
+        setStatus(`PiXiEEDコード検出: ${truncateQrValue(record.payload_value, 64)}`);
+      } else {
+        qrLastValue = '';
+        updateQrReadout('PiXiEEDコードは未登録です。', '未登録', {
+          resultText: '未登録のコード',
+          forceShow: true,
+          showPreview: previewGenerated,
+          allowAutoOpen: false
+        });
+        setStatus('PiXiEEDコードは未登録です');
+      }
+      return true;
+    }
+
     async function handleQrScanTick() {
       if (!qrScanEnabled) {
         stopQrScanLoop();
@@ -4484,21 +4779,23 @@
         scheduleQrScanLoop(800);
         return;
       }
-      const detector = await ensureQrDetector();
-      if (!detector) {
-        qrScanEnabled = false;
-        setStatus('このブラウザはQRスキャンに対応していません。最新のブラウザでお試しください。');
-        stopQrScanLoop();
-        return;
-      }
       try {
-        const value = await scanQrFrame();
-        if (value) {
-          handleQrDetection(value);
-          scheduleQrScanLoop(700);
-        } else {
-          scheduleQrScanLoop(QR_SCAN_DEFAULT_INTERVAL_MS);
+        const result = await scanQrFrame();
+        if (qrSupportAvailable === false && !qrSupportWarningShown) {
+          setStatus('QRスキャン非対応のため、PiXiEEDコードのみ検出します。');
+          qrSupportWarningShown = true;
         }
+        if (result && result.qr) {
+          handleQrDetection(result.qr);
+          scheduleQrScanLoop(700);
+          return;
+        }
+        if (result && result.pix) {
+          await handlePixDetection(result.pix);
+          scheduleQrScanLoop(700);
+          return;
+        }
+        scheduleQrScanLoop(QR_SCAN_DEFAULT_INTERVAL_MS);
       } catch (error) {
         console.warn('QR scan failed', error);
         scheduleQrScanLoop(600);
