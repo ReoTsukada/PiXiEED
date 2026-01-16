@@ -636,9 +636,9 @@
 </div>
 </div>
 <div class="mode-section" id="pixControls" hidden>
-<label for="pixInput">32×32ドット絵（PNG / GIF）</label>
+<label for="pixInput">16×16ドット絵（PNG / GIF）</label>
 <input id="pixInput" type="file" accept="image/png,image/gif"/>
-<p class="small">32×32推奨。別サイズは32×32に近似します。</p>
+<p class="small">16×16推奨。別サイズは16×16に近似します。</p>
 <div class="field-row">
 <div>
 <label for="pixPayloadType">返す内容</label>
@@ -733,13 +733,20 @@
   const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
   const PIXCODE_TABLE = 'pixfind_codes';
   const PIX_CLIENT_KEY = 'pixfind_client_id';
-  const PIX_ART_SIZE = 32;
+  const PIX_ART_SIZE = 16;
   const FINDER_SIZE = 7; // 1:1:3:1:1 finder
   const FINDER_GAP = 2;
   const PIX_FRAME_OFFSET = FINDER_SIZE + FINDER_GAP;
   const PIX_FRAME_SIZE = PIX_ART_SIZE + (PIX_FRAME_OFFSET * 2);
   const PIX_QUIET_ZONE = 4;
   const PIX_RENDER_SIZE = PIX_FRAME_SIZE + PIX_QUIET_ZONE * 2;
+  const PIX_TIMING_ROW = FINDER_SIZE;
+  const PIX_TIMING_COL = FINDER_SIZE;
+  const PIX_TIMING_START = FINDER_SIZE;
+  const PIX_TIMING_END = PIX_FRAME_SIZE - FINDER_SIZE - 1;
+  const PIX_ALIGN_SIZE = 2;
+  const PIX_ALIGN_START = PIX_FRAME_OFFSET + PIX_ART_SIZE;
+  const PIX_ALIGN_COLOR = '#ffd400';
   const FINDER_INNER_COLORS = {
     tl: '#ff0000',
     tr: '#00ff00',
@@ -896,6 +903,31 @@
     }
   }
 
+  function drawTimingPatterns(ctx, cellSize, frameOffset) {
+    for (let x = PIX_TIMING_START; x <= PIX_TIMING_END; x++) {
+      const isDark = (x - PIX_TIMING_START) % 2 === 0;
+      drawFrameCell(ctx, frameOffset + x, frameOffset + PIX_TIMING_ROW, cellSize, isDark ? '#000000' : '#ffffff');
+    }
+    for (let y = PIX_TIMING_START; y <= PIX_TIMING_END; y++) {
+      const isDark = (y - PIX_TIMING_START) % 2 === 0;
+      drawFrameCell(ctx, frameOffset + PIX_TIMING_COL, frameOffset + y, cellSize, isDark ? '#000000' : '#ffffff');
+    }
+  }
+
+  function drawAlignmentMarker(ctx, cellSize, frameOffset) {
+    for (let y = 0; y < PIX_ALIGN_SIZE; y++) {
+      for (let x = 0; x < PIX_ALIGN_SIZE; x++) {
+        drawFrameCell(
+          ctx,
+          frameOffset + PIX_ALIGN_START + x,
+          frameOffset + PIX_ALIGN_START + y,
+          cellSize,
+          PIX_ALIGN_COLOR
+        );
+      }
+    }
+  }
+
   function drawPixCode() {
     if (!pixCanvas || !pixQuantized) return;
     const targetSize = clamp(parseInt(pixSize.value || '320', 10), 200, 640);
@@ -921,6 +953,8 @@
     drawFinderBlock(ctx, trX, trY, cellSize, FINDER_INNER_COLORS.tr);
     drawFinderBlock(ctx, blX, blY, cellSize, FINDER_INNER_COLORS.bl);
     drawFinderBlock(ctx, brX, brY, cellSize, FINDER_INNER_COLORS.br);
+    drawTimingPatterns(ctx, cellSize, frameOffset);
+    drawAlignmentMarker(ctx, cellSize, frameOffset);
     for (let y = 0; y < PIX_ART_SIZE; y++) {
       for (let x = 0; x < PIX_ART_SIZE; x++) {
         const idx = (y * PIX_ART_SIZE + x) * 3;
@@ -1134,7 +1168,7 @@
         const info = await loadPixImage(file);
         if (!info) throw new Error('画像を読み込めませんでした');
         if (info.width !== PIX_ART_SIZE || info.height !== PIX_ART_SIZE) {
-          setPixStatus('32×32に近似しました', '#ffa95c');
+          setPixStatus('16×16に近似しました', '#ffa95c');
         }
         pixQuantized = buildQuantizedArt(info.data);
         pixHashValue = await hashQuantized(pixQuantized);
