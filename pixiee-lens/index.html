@@ -4376,11 +4376,10 @@
         green: { score: -Infinity, x: 0, y: 0 },
         blue: { score: -Infinity, x: 0, y: 0 }
       };
-      const maxIndexX = Math.max(1, width - 1);
-      const maxIndexY = Math.max(1, height - 1);
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const maxDist = Math.hypot(centerX, centerY) || 1;
       for (let y = 0; y < height; y += stride) {
-        const invY = 1 - y / maxIndexY;
-        const normY = y / maxIndexY;
         for (let x = 0; x < width; x += stride) {
           const idx = (y * width + x) * 4;
           const r = data[idx];
@@ -4391,28 +4390,24 @@
           if (max < 120 || max - min < 50) {
             continue;
           }
-          const invX = 1 - x / maxIndexX;
-          const normX = x / maxIndexX;
+          const edgeBias = (Math.hypot(x - centerX, y - centerY) / maxDist) * 80;
           const redScore = r - (g + b) / 2;
           if (redScore > 60 && r - g > 40 && r - b > 40) {
-            const bias = (invX + invY) / 2;
-            const score = redScore + bias * 120;
+            const score = redScore + edgeBias;
             if (score > candidates.red.score) {
               candidates.red = { score, x, y };
             }
           }
           const greenScore = g - (r + b) / 2;
           if (greenScore > 60 && g - r > 40 && g - b > 40) {
-            const bias = (normX + invY) / 2;
-            const score = greenScore + bias * 120;
+            const score = greenScore + edgeBias;
             if (score > candidates.green.score) {
               candidates.green = { score, x, y };
             }
           }
           const blueScore = b - (r + g) / 2;
           if (blueScore > 60 && b - r > 40 && b - g > 40) {
-            const bias = (invX + normY) / 2;
-            const score = blueScore + bias * 120;
+            const score = blueScore + edgeBias;
             if (score > candidates.blue.score) {
               candidates.blue = { score, x, y };
             }
@@ -4456,6 +4451,117 @@
       };
     }
 
+    function findBlackCenterNear(imageData, width, height, target, searchRadius, sampleRadius) {
+      const data = imageData.data;
+      if (!target || !Number.isFinite(target.x) || !Number.isFinite(target.y)) {
+        return null;
+      }
+      const radius = clampValue(Math.round(searchRadius), 6, 32);
+      let best = null;
+      let bestScore = -Infinity;
+      const startX = Math.max(0, Math.floor(target.x - radius));
+      const endX = Math.min(width - 1, Math.ceil(target.x + radius));
+      const startY = Math.max(0, Math.floor(target.y - radius));
+      const endY = Math.min(height - 1, Math.ceil(target.y + radius));
+      for (let y = startY; y <= endY; y += 2) {
+        for (let x = startX; x <= endX; x += 2) {
+          const color = samplePixel(data, width, height, x, y, sampleRadius);
+          const darkness = 255 - (color.r + color.g + color.b) / 3;
+          const dist = Math.hypot(x - target.x, y - target.y);
+          const score = darkness - dist * 1.4;
+          if (score > bestScore) {
+            bestScore = score;
+            best = { x, y };
+          }
+        }
+      }
+      if (!best) {
+        return null;
+      }
+      const sample = samplePixel(data, width, height, best.x, best.y, sampleRadius);
+      if (!isBlackSample(sample)) {
+        return null;
+      }
+      return best;
+    }
+
+    // Solve homography from grid to image for perspective correction.
+    function computeHomography(srcPoints, dstPoints) {
+      if (!Array.isArray(srcPoints) || srcPoints.length !== 4 || !Array.isArray(dstPoints) || dstPoints.length !== 4) {
+        return null;
+      }
+      const A = [];
+      const b = [];
+      for (let i = 0; i < 4; i += 1) {
+        const src = srcPoints[i];
+        const dst = dstPoints[i];
+        if (!src || !dst) {
+          return null;
+        }
+        const x = src.x;
+        const y = src.y;
+        const X = dst.x;
+        const Y = dst.y;
+        if (![x, y, X, Y].every((value) => Number.isFinite(value))) {
+          return null;
+        }
+        A.push([x, y, 1, 0, 0, 0, -x * X, -y * X]);
+        b.push(X);
+        A.push([0, 0, 0, x, y, 1, -x * Y, -y * Y]);
+        b.push(Y);
+      }
+      const n = 8;
+      for (let col = 0; col < n; col += 1) {
+        let pivotRow = col;
+        let max = Math.abs(A[col][col]);
+        for (let row = col + 1; row < n; row += 1) {
+          const value = Math.abs(A[row][col]);
+          if (value > max) {
+            max = value;
+            pivotRow = row;
+          }
+        }
+        if (max < 1e-9) {
+          return null;
+        }
+        if (pivotRow !== col) {
+          const tmpRow = A[col];
+          A[col] = A[pivotRow];
+          A[pivotRow] = tmpRow;
+          const tmpB = b[col];
+          b[col] = b[pivotRow];
+          b[pivotRow] = tmpB;
+        }
+        const pivot = A[col][col];
+        for (let c = col; c < n; c += 1) {
+          A[col][c] /= pivot;
+        }
+        b[col] /= pivot;
+        for (let row = 0; row < n; row += 1) {
+          if (row === col) continue;
+          const factor = A[row][col];
+          if (Math.abs(factor) < 1e-9) continue;
+          for (let c = col; c < n; c += 1) {
+            A[row][c] -= factor * A[col][c];
+          }
+          b[row] -= factor * b[col];
+        }
+      }
+      const h = b;
+      return [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1];
+    }
+
+    function applyHomography(matrix, x, y) {
+      const denom = matrix[6] * x + matrix[7] * y + matrix[8];
+      if (!Number.isFinite(denom) || Math.abs(denom) < 1e-6) {
+        return null;
+      }
+      return {
+        x: (matrix[0] * x + matrix[1] * y + matrix[2]) / denom,
+        y: (matrix[3] * x + matrix[4] * y + matrix[5]) / denom
+      };
+    }
+
     function gridToImagePoint(origin, vx, vy, gx, gy) {
       return {
         x: origin.x + (gx - PIX_FINDER_CENTER_OFFSET) * vx.x + (gy - PIX_FINDER_CENTER_OFFSET) * vy.x,
@@ -4491,9 +4597,33 @@
       if (Math.abs(dot) > 0.5) {
         return null;
       }
-      const sampleRadius = clampValue(Math.round(Math.min(vxLen, vyLen) * 0.4), 1, 3);
+      const avgCell = (vxLen + vyLen) / 2;
+      const sampleRadius = clampValue(Math.round(avgCell * 0.35), 1, 4);
+      const predictedBlack = gridToImagePoint(
+        centers.red,
+        vx,
+        vy,
+        PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET,
+        PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET
+      );
+      const blackCenter = findBlackCenterNear(imageData, width, height, predictedBlack, avgCell * 6, sampleRadius) || predictedBlack;
+      const matrix = computeHomography(
+        [
+          { x: PIX_FINDER_CENTER_OFFSET, y: PIX_FINDER_CENTER_OFFSET },
+          { x: PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET, y: PIX_FINDER_CENTER_OFFSET },
+          { x: PIX_FINDER_CENTER_OFFSET, y: PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET },
+          { x: PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET, y: PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET }
+        ],
+        [centers.red, centers.green, centers.blue, blackCenter]
+      );
+      if (!matrix) {
+        return null;
+      }
       const sampleAt = (gx, gy) => {
-        const pt = gridToImagePoint(centers.red, vx, vy, gx, gy);
+        const pt = applyHomography(matrix, gx, gy);
+        if (!pt) {
+          return { r: 255, g: 255, b: 255 };
+        }
         return samplePixel(imageData.data, width, height, pt.x, pt.y, sampleRadius);
       };
       const sampleRed = sampleAt(PIX_FINDER_CENTER_OFFSET, PIX_FINDER_CENTER_OFFSET);
@@ -4528,11 +4658,14 @@
       const hash = await hashPixQuantized(quantized);
       if (!hash) return null;
       const cornerPoints = [
-        gridToImagePoint(centers.red, vx, vy, 0, 0),
-        gridToImagePoint(centers.red, vx, vy, PIX_FRAME_SIZE - 1, 0),
-        gridToImagePoint(centers.red, vx, vy, 0, PIX_FRAME_SIZE - 1),
-        gridToImagePoint(centers.red, vx, vy, PIX_FRAME_SIZE - 1, PIX_FRAME_SIZE - 1)
-      ];
+        applyHomography(matrix, 0, 0),
+        applyHomography(matrix, PIX_FRAME_SIZE - 1, 0),
+        applyHomography(matrix, 0, PIX_FRAME_SIZE - 1),
+        applyHomography(matrix, PIX_FRAME_SIZE - 1, PIX_FRAME_SIZE - 1)
+      ].filter(Boolean);
+      if (cornerPoints.length < 4) {
+        return null;
+      }
       const xs = cornerPoints.map((p) => p.x);
       const ys = cornerPoints.map((p) => p.y);
       const previewBox = {
