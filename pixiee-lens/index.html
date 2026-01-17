@@ -4354,6 +4354,34 @@
       return r > 140 && g > 140 && Math.abs(r - g) < 45 && b < 120;
     }
 
+    function sampleTimingWhites(sampleAt) {
+      const reds = [];
+      const greens = [];
+      const blues = [];
+      for (let x = PIX_TIMING_START; x <= PIX_TIMING_END; x += 1) {
+        if ((x - PIX_TIMING_START) % 2 === 0) continue;
+        const color = sampleAt(x, PIX_TIMING_ROW);
+        reds.push(color.r);
+        greens.push(color.g);
+        blues.push(color.b);
+      }
+      for (let y = PIX_TIMING_START; y <= PIX_TIMING_END; y += 1) {
+        if ((y - PIX_TIMING_START) % 2 === 0) continue;
+        const color = sampleAt(PIX_TIMING_COL, y);
+        reds.push(color.r);
+        greens.push(color.g);
+        blues.push(color.b);
+      }
+      if (!reds.length) {
+        return null;
+      }
+      const median = (values) => {
+        const sorted = values.slice().sort((a, b) => a - b);
+        return sorted[Math.floor(sorted.length / 2)];
+      };
+      return { r: median(reds), g: median(greens), b: median(blues) };
+    }
+
     function samplePixel(data, width, height, x, y, radius = 1) {
       let r = 0;
       let g = 0;
@@ -4755,24 +4783,39 @@
       const biasR = sampleBlack.r;
       const biasG = sampleBlack.g;
       const biasB = sampleBlack.b;
-      const gainR = clampValue(255 / Math.max(8, sampleRed.r - biasR), 0.6, 3.2);
-      const gainG = clampValue(255 / Math.max(8, sampleGreen.g - biasG), 0.6, 3.2);
-      const gainB = clampValue(255 / Math.max(8, sampleBlue.b - biasB), 0.6, 3.2);
-      const quantized = new Uint8Array(PIX_ART_SIZE * PIX_ART_SIZE * 3);
-      let writeIndex = 0;
-      for (let y = 0; y < PIX_ART_SIZE; y++) {
-        for (let x = 0; x < PIX_ART_SIZE; x++) {
-          const color = sampleAt(PIX_FRAME_OFFSET + x, PIX_FRAME_OFFSET + y);
-          const r = clampValue((color.r - biasR) * gainR, 0, 255);
-          const g = clampValue((color.g - biasG) * gainG, 0, 255);
-          const b = clampValue((color.b - biasB) * gainB, 0, 255);
-          quantized[writeIndex++] = Math.round(r / 17);
-          quantized[writeIndex++] = Math.round(g / 17);
-          quantized[writeIndex++] = Math.round(b / 17);
+      const colorGainR = clampValue(255 / Math.max(8, sampleRed.r - biasR), 0.6, 3.2);
+      const colorGainG = clampValue(255 / Math.max(8, sampleGreen.g - biasG), 0.6, 3.2);
+      const colorGainB = clampValue(255 / Math.max(8, sampleBlue.b - biasB), 0.6, 3.2);
+      const whiteSample = sampleTimingWhites(sampleAt);
+      const whiteGainR = whiteSample ? clampValue(255 / Math.max(8, whiteSample.r - biasR), 0.6, 3.2) : null;
+      const whiteGainG = whiteSample ? clampValue(255 / Math.max(8, whiteSample.g - biasG), 0.6, 3.2) : null;
+      const whiteGainB = whiteSample ? clampValue(255 / Math.max(8, whiteSample.b - biasB), 0.6, 3.2) : null;
+
+      const buildQuantized = (gainR, gainG, gainB) => {
+        const quantized = new Uint8Array(PIX_ART_SIZE * PIX_ART_SIZE * 3);
+        let writeIndex = 0;
+        for (let y = 0; y < PIX_ART_SIZE; y++) {
+          for (let x = 0; x < PIX_ART_SIZE; x++) {
+            const color = sampleAt(PIX_FRAME_OFFSET + x, PIX_FRAME_OFFSET + y);
+            const r = clampValue((color.r - biasR) * gainR, 0, 255);
+            const g = clampValue((color.g - biasG) * gainG, 0, 255);
+            const b = clampValue((color.b - biasB) * gainB, 0, 255);
+            quantized[writeIndex++] = Math.round(r / 17);
+            quantized[writeIndex++] = Math.round(g / 17);
+            quantized[writeIndex++] = Math.round(b / 17);
+          }
         }
-      }
-      const hash = await hashPixQuantized(quantized);
+        return quantized;
+      };
+
+      const primaryQuantized = buildQuantized(colorGainR, colorGainG, colorGainB);
+      const hash = await hashPixQuantized(primaryQuantized);
       if (!hash) return null;
+      let altHash = '';
+      if (whiteGainR && whiteGainG && whiteGainB) {
+        const whiteQuantized = buildQuantized(whiteGainR, whiteGainG, whiteGainB);
+        altHash = await hashPixQuantized(whiteQuantized);
+      }
       const cornerPoints = [
         mapGridPoint(0, 0),
         mapGridPoint(PIX_FRAME_SIZE - 1, 0),
@@ -4790,18 +4833,26 @@
         width: clampValue(Math.max(...xs) - Math.min(...xs), 1, width),
         height: clampValue(Math.max(...ys) - Math.min(...ys), 1, height)
       };
-      return { hash, previewBox };
+      const hashes = [hash];
+      if (altHash && altHash !== hash) {
+        hashes.push(altHash);
+      }
+      return { hash, hashes, previewBox };
     }
 
-    async function fetchPixCodePayload(hash) {
-      if (!hash) return null;
-      if (pixLookupCache.has(hash)) {
-        return pixLookupCache.get(hash);
+    async function fetchPixCodePayload(hashes) {
+      const list = Array.isArray(hashes) ? hashes.filter(Boolean) : [hashes].filter(Boolean);
+      if (!list.length) return null;
+      const cacheHit = list.find((item) => pixLookupCache.has(item));
+      if (cacheHit) {
+        return { hash: cacheHit, payload: pixLookupCache.get(cacheHit) };
       }
-      if (pixLookupPromises.has(hash)) {
-        return pixLookupPromises.get(hash);
+      const cacheKey = list.join(',');
+      if (pixLookupPromises.has(cacheKey)) {
+        return pixLookupPromises.get(cacheKey);
       }
-      const promise = fetch(`${SUPABASE_URL}/rest/v1/${PIXCODE_TABLE}?hash=eq.${hash}&select=payload_type,payload_value&limit=1`, {
+      const filter = list.length === 1 ? `hash=eq.${list[0]}` : `hash=in.(${list.join(',')})`;
+      const promise = fetch(`${SUPABASE_URL}/rest/v1/${PIXCODE_TABLE}?${filter}&select=hash,payload_type,payload_value&limit=1`, {
         headers: {
           apikey: SUPABASE_ANON_KEY,
           Authorization: `Bearer ${SUPABASE_ANON_KEY}`
@@ -4810,14 +4861,15 @@
         if (!res.ok) return null;
         const data = await res.json();
         const payload = Array.isArray(data) && data[0] ? data[0] : null;
-        if (payload) {
-          pixLookupCache.set(hash, payload);
+        if (payload && payload.hash) {
+          pixLookupCache.set(payload.hash, payload);
+          return { hash: payload.hash, payload };
         }
-        return payload;
+        return null;
       }).catch(() => null).finally(() => {
-        pixLookupPromises.delete(hash);
+        pixLookupPromises.delete(cacheKey);
       });
-      pixLookupPromises.set(hash, promise);
+      pixLookupPromises.set(cacheKey, promise);
       return promise;
     }
 
@@ -5027,7 +5079,11 @@
         showPreview: previewGenerated,
         allowAutoOpen: false
       });
-      const record = await fetchPixCodePayload(payload.hash);
+      const lookup = await fetchPixCodePayload(payload.hashes || payload.hash);
+      const record = lookup && lookup.payload ? lookup.payload : null;
+      if (lookup && lookup.hash) {
+        pixLastHash = lookup.hash;
+      }
       if (record && record.payload_value) {
         qrLastValue = record.payload_value;
         const openUrl = record.payload_type === 'url' ? record.payload_value : '';
@@ -5042,7 +5098,7 @@
       } else {
         qrLastValue = '';
         updateQrReadout('PiXiEEDコードは未登録です。', '未登録', {
-          resultText: '未登録のコード',
+          resultText: payload.hash,
           forceShow: true,
           showPreview: previewGenerated,
           allowAutoOpen: false
