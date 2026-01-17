@@ -360,6 +360,8 @@
     background: #fff;
     border-radius: 10px;
     box-shadow: 0 14px 30px rgba(0, 0, 0, 0.3);
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
   }
   .qr-actions {
     display: flex;
@@ -935,6 +937,9 @@
     const canvasSize = cellSize * PIX_RENDER_SIZE;
     pixCanvas.width = canvasSize;
     pixCanvas.height = canvasSize;
+    pixCanvas.style.width = `${canvasSize}px`;
+    pixCanvas.style.height = 'auto';
+    pixCanvas.style.maxWidth = '100%';
     const ctx = pixCanvas.getContext('2d');
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
