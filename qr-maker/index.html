@@ -1031,12 +1031,21 @@
     const existing = await fetchPixCodeByHash(pixHashValue);
     if (existing) {
       const existingClientId = typeof existing.client_id === 'string' ? existing.client_id : '';
+      const canClaim = supportsPixClientId && clientId && !existingClientId;
       const canOverwrite = supportsPixClientId && clientId && existingClientId && existingClientId === clientId;
-      if (!canOverwrite) {
+      if (!canOverwrite && !canClaim) {
         setPixStatus('このコードはすでに登録されています', '#ffa95c');
         return;
       }
       try {
+        const updatePayload = {
+          payload_type: pixPayloadType?.value || 'url',
+          payload_value: payload,
+          updated_at: new Date().toISOString()
+        };
+        if (canClaim) {
+          updatePayload.client_id = clientId;
+        }
         const res = await fetch(`${SUPABASE_URL}/rest/v1/${PIXCODE_TABLE}?hash=eq.${pixHashValue}`, {
           method: 'PATCH',
           headers: {
@@ -1045,11 +1054,7 @@
             Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
             Prefer: 'return=representation'
           },
-          body: JSON.stringify({
-            payload_type: pixPayloadType?.value || 'url',
-            payload_value: payload,
-            updated_at: new Date().toISOString()
-          })
+          body: JSON.stringify(updatePayload)
         });
         if (!res.ok) {
           throw new Error(await res.text());
