@@ -4388,9 +4388,14 @@
     }
 
     function isCmykPrimary(r, g, b) {
-      const isCyan = r < 60 && g > 200 && b > 200;
-      const isMagenta = g < 60 && r > 200 && b > 200;
-      const isYellow = b < 60 && r > 200 && g > 200;
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      if (max < 140 || (max - min) < 90) {
+        return false;
+      }
+      const isCyan = r < 110 && g > 150 && b > 150;
+      const isMagenta = g < 110 && r > 150 && b > 150;
+      const isYellow = b < 110 && r > 150 && g > 150;
       return isCyan || isMagenta || isYellow;
     }
 
@@ -4839,6 +4844,14 @@
         };
         return { r: median(reds), g: median(greens), b: median(blues) };
       };
+      const calibrationRadius = clampValue(Math.round(avgCell * 0.15), 0, 1);
+      const sampleAtExact = (gx, gy, radius = calibrationRadius) => {
+        const pt = mapGridPoint(gx, gy);
+        if (!pt) {
+          return { r: 255, g: 255, b: 255 };
+        }
+        return samplePixel(imageData.data, width, height, pt.x, pt.y, radius);
+      };
 
       const timingSamples = () => {
         const darkLuma = [];
@@ -4908,7 +4921,7 @@
         const colors = [];
         for (let y = 0; y < size; y += 1) {
           for (let x = 0; x < size; x += 1) {
-            colors.push(sampleAt(startX + x, startY + y));
+            colors.push(sampleAtExact(startX + x, startY + y));
           }
         }
         return averageColors(colors);
@@ -4917,13 +4930,13 @@
         const colors = [];
         for (let y = 0; y < height; y += 1) {
           for (let x = 0; x < width; x += 1) {
-            colors.push(sampleAt(startX + x, startY + y));
+            colors.push(sampleAtExact(startX + x, startY + y));
           }
         }
         return averageColors(colors);
       };
       const samplePointsAverage = (points) => {
-        const colors = points.map((point) => sampleAt(point.x, point.y));
+        const colors = points.map((point) => sampleAtExact(point.x, point.y));
         return averageColors(colors);
       };
       const isNearWhite = (color) => {
@@ -4940,9 +4953,9 @@
         { x: 1, y: PIX_FINDER_SIZE },
         { x: PIX_FINDER_SIZE, y: PIX_FINDER_SIZE }
       ]);
-      const redRef = sampleAt(PIX_RGB_PATCH_X + 1, PIX_RGB_PATCH_Y + 1);
-      const greenRef = sampleAt(PIX_RGB_PATCH_X + 1, PIX_RGB_PATCH_Y + 1 + (PIX_RGB_PATCH_SIZE + PIX_RGB_PATCH_GAP));
-      const blueRef = sampleAt(PIX_RGB_PATCH_X + 1, PIX_RGB_PATCH_Y + 1 + (PIX_RGB_PATCH_SIZE + PIX_RGB_PATCH_GAP) * 2);
+      const redRef = sampleAtExact(PIX_RGB_PATCH_X + 1, PIX_RGB_PATCH_Y + 1);
+      const greenRef = sampleAtExact(PIX_RGB_PATCH_X + 1, PIX_RGB_PATCH_Y + 1 + (PIX_RGB_PATCH_SIZE + PIX_RGB_PATCH_GAP));
+      const blueRef = sampleAtExact(PIX_RGB_PATCH_X + 1, PIX_RGB_PATCH_Y + 1 + (PIX_RGB_PATCH_SIZE + PIX_RGB_PATCH_GAP) * 2);
       const fallbackBlack = timing?.darkColor ? timing.darkColor : { r: 0, g: 0, b: 0 };
       const fallbackWhite = timing?.lightColor ? timing.lightColor : { r: 255, g: 255, b: 255 };
       const refBlack = blackRef || fallbackBlack;
