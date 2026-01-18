@@ -357,17 +357,6 @@
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
     min-height: 260px;
   }
-  .pix-canvas-note {
-    font-size: 0.78rem;
-    color: rgba(226, 232, 240, 0.78);
-    text-align: center;
-    max-width: 240px;
-    line-height: 1.4;
-    padding: 4px 10px;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(8, 12, 24, 0.35);
-  }
   canvas {
     width: min(100%, 300px);
     height: auto;
@@ -376,13 +365,6 @@
     box-shadow: 0 14px 30px rgba(0, 0, 0, 0.3);
     image-rendering: pixelated;
     image-rendering: crisp-edges;
-  }
-  .pix-code-canvas {
-    width: auto;
-    height: auto;
-    max-width: none;
-    border-radius: 0;
-    box-shadow: none;
   }
   .qr-actions {
     display: flex;
@@ -605,10 +587,6 @@
 <section class="panel">
 <div class="panel-head">
 <h2>1. 内容を設定</h2>
-<div class="mode-switch" role="tablist" aria-label="モード">
-<button class="mode-btn is-active" data-mode="qr" type="button" role="tab" aria-selected="true">QR</button>
-<button class="mode-btn" data-mode="pix" type="button" role="tab" aria-selected="false">PiXiEEDコード</button>
-</div>
 </div>
 <div class="mode-section" id="qrControls">
 <label for="qrInput">エンコードする内容</label>
@@ -658,52 +636,18 @@
 </div>
 </div>
 </div>
-<div class="mode-section" id="pixControls" hidden>
-<label for="pixInput">16×16 白黒ドット絵（PNG / GIF）</label>
-<input id="pixInput" type="file" accept="image/png,image/gif"/>
-<p class="small">16×16推奨。色は白黒に変換されます。</p>
-<div class="field-row">
-<div>
-<label for="pixPayloadType">返す内容</label>
-<select id="pixPayloadType">
-<option value="url">URL</option>
-<option value="text">テキスト</option>
-</select>
-</div>
-<div>
-<label for="pixSize">出力サイズ</label>
-<div class="range-wrap">
-<input id="pixSize" max="640" min="480" step="20" type="range" value="520"/>
-<span class="range-value" id="pixSizeValue">520px</span>
-</div>
-</div>
-</div>
-<label for="pixPayload">内容</label>
-<textarea id="pixPayload" maxlength="800" placeholder="URL または テキストを入力…"></textarea>
-<div class="meta-row" aria-live="polite">
-<span>ハッシュ: <span class="hash-text" id="pixHash">--</span></span>
-<span>状態: <span class="status" id="pixStatus">未生成</span></span>
-</div>
-</div>
 </section>
 <section class="panel qr-preview">
 <div>
 <h2>2. プレビュー</h2>
-<p class="small">モードに合わせてプレビューされます。</p>
+<p class="small">QRコードのプレビューです。</p>
 </div>
 <div class="qr-canvas">
 <canvas height="280" id="qrCanvas" width="280"></canvas>
-<canvas height="280" id="pixCanvas" class="pix-code-canvas" width="280" hidden></canvas>
-<div class="pix-canvas-note" id="pixCanvasNote" hidden>このコードはPiXiEELENSでのみ読み取り可能です</div>
 </div>
 <div class="qr-actions" id="qrActions">
 <button class="btn" id="downloadBtn" type="button">PNGを保存</button>
 <button class="btn secondary" id="copyDataBtn" type="button">テキストをコピー</button>
-</div>
-<div class="qr-actions" id="pixActions" hidden>
-<button class="btn" id="pixDownloadBtn" type="button">PNGを保存</button>
-<button class="btn secondary" id="pixCopyHashBtn" type="button">ハッシュをコピー</button>
-<button class="btn secondary" id="pixRegisterBtn" type="button">DBへ登録</button>
 </div>
 </section>
 </div>
@@ -735,61 +679,12 @@
   const downloadBtn = document.getElementById('downloadBtn');
   const copyBtn = document.getElementById('copyDataBtn');
   const qrActions = document.getElementById('qrActions');
-  const pixActions = document.getElementById('pixActions');
-  const pixCanvas = document.getElementById('pixCanvas');
-  const pixCanvasNote = document.getElementById('pixCanvasNote');
-  const pixInput = document.getElementById('pixInput');
-  const pixPayloadType = document.getElementById('pixPayloadType');
-  const pixPayload = document.getElementById('pixPayload');
-  const pixStatus = document.getElementById('pixStatus');
-  const pixHash = document.getElementById('pixHash');
-  const pixSize = document.getElementById('pixSize');
-  const pixSizeValue = document.getElementById('pixSizeValue');
-  const pixDownloadBtn = document.getElementById('pixDownloadBtn');
-  const pixCopyHashBtn = document.getElementById('pixCopyHashBtn');
-  const pixRegisterBtn = document.getElementById('pixRegisterBtn');
-  const modeButtons = document.querySelectorAll('.mode-btn');
   const qrControls = document.getElementById('qrControls');
-  const pixControls = document.getElementById('pixControls');
 
   const DEFAULT_TEXT = 'https://pixieed.jp/';
   const TEXT_LIMIT = 900;
-  const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
-  const PIXCODE_TABLE = 'pixfind_codes';
-  const PIX_CLIENT_KEY = 'pixfind_client_id';
-  const PIX_ART_SIZE = 16;
-  const FINDER_SIZE = 7; // 1:1:3:1:1 finder
-  const FINDER_GAP = 3;
-  const PIX_FRAME_OFFSET = FINDER_SIZE + FINDER_GAP;
-  const PIX_FRAME_SIZE = PIX_ART_SIZE + (PIX_FRAME_OFFSET * 2);
-  const PIX_QUIET_ZONE = 6;
-  const PIX_RENDER_SIZE = PIX_FRAME_SIZE + PIX_QUIET_ZONE * 2;
-  const PIX_TIMING_ROW = FINDER_SIZE + 1;
-  const PIX_TIMING_COL = FINDER_SIZE + 1;
-  const PIX_TIMING_START = FINDER_SIZE + 1;
-  const PIX_TIMING_END = PIX_FRAME_SIZE - FINDER_SIZE - 2;
-  const PIX_FORMAT_ROW = FINDER_SIZE + 2;
-  const PIX_FORMAT_COL = FINDER_SIZE + 2;
-  const PIX_FORMAT_START = PIX_TIMING_START;
-  const PIX_FORMAT_END = PIX_TIMING_END;
-  const PIX_FORMAT_LENGTH = PIX_FORMAT_END - PIX_FORMAT_START + 1;
-  const PIX_FORMAT_PATTERN = '10100111001011011001011100101101';
-  const PIX_FORMAT_BITS = Array.from({ length: PIX_FORMAT_LENGTH }, (_, i) => PIX_FORMAT_PATTERN[i % PIX_FORMAT_PATTERN.length] === '1');
-  const PIX_ALIGN_SIZE = 3;
-  const PIX_ALIGN_START = PIX_FRAME_OFFSET + PIX_ART_SIZE;
-  const PIX_ALIGN_POINTS = [
-    { x: PIX_ALIGN_START, y: PIX_ALIGN_START }
-  ];
-  const PIX_ALIGN_COLOR = '#000000';
-  const PIX_ALIGN_INNER_COLOR = '#ffffff';
-  const FINDER_INNER_COLOR = '#000000';
 
   const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
-  let currentMode = 'qr';
-  let pixQuantized = null;
-  let pixHashValue = '';
-  let supportsPixClientId = true;
 
   function syncLabels() {
     charCount.textContent = input.value.length;
@@ -826,386 +721,6 @@
     }
   }
 
-  function syncPixLabels() {
-    if (!pixSizeValue || !pixSize) return;
-    pixSizeValue.textContent = pixSize.value + 'px';
-  }
-
-  function setPixStatus(message, color) {
-    if (!pixStatus) return;
-    pixStatus.textContent = message;
-    pixStatus.style.color = color || '#7bcfff';
-  }
-
-  function setMode(mode) {
-    currentMode = mode;
-    modeButtons.forEach(btn => {
-      const isActive = btn.dataset.mode === mode;
-      btn.classList.toggle('is-active', isActive);
-      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
-    });
-    if (qrControls) qrControls.hidden = mode !== 'qr';
-    if (pixControls) pixControls.hidden = mode !== 'pix';
-    if (qrCanvas) qrCanvas.hidden = mode !== 'qr';
-    if (pixCanvas) pixCanvas.hidden = mode !== 'pix';
-    if (pixCanvasNote) pixCanvasNote.hidden = mode !== 'pix';
-    if (qrActions) qrActions.hidden = mode !== 'qr';
-    if (pixActions) pixActions.hidden = mode !== 'pix';
-    if (mode === 'qr') {
-      syncLabels();
-      renderQRCode();
-    } else if (pixQuantized) {
-      renderPixCode();
-    }
-  }
-
-  function computeLuma(r, g, b) {
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  }
-
-  function buildQuantizedArt(imageData) {
-    const total = PIX_ART_SIZE * PIX_ART_SIZE;
-    const quantized = new Uint8Array(total);
-    let min = 255;
-    let max = 0;
-    for (let i = 0; i < total; i++) {
-      const idx = i * 4;
-      const alpha = imageData[idx + 3];
-      const r = alpha < 128 ? 255 : imageData[idx];
-      const g = alpha < 128 ? 255 : imageData[idx + 1];
-      const b = alpha < 128 ? 255 : imageData[idx + 2];
-      const lum = computeLuma(r, g, b);
-      if (lum < min) {
-        min = lum;
-      }
-      if (lum > max) {
-        max = lum;
-      }
-    }
-    const threshold = (min + max) / 2;
-    for (let i = 0; i < total; i++) {
-      const idx = i * 4;
-      const alpha = imageData[idx + 3];
-      const r = alpha < 128 ? 255 : imageData[idx];
-      const g = alpha < 128 ? 255 : imageData[idx + 1];
-      const b = alpha < 128 ? 255 : imageData[idx + 2];
-      const lum = computeLuma(r, g, b);
-      quantized[i] = lum < threshold ? 0 : 1;
-    }
-    return quantized;
-  }
-
-  async function hashQuantized(quantized) {
-    if (!crypto?.subtle?.digest) return '';
-    const digest = await crypto.subtle.digest('SHA-256', quantized);
-    return Array.from(new Uint8Array(digest))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-  }
-
-  async function loadPixImage(file) {
-    if (!file) return null;
-    const blobUrl = URL.createObjectURL(file);
-    try {
-      const img = new Image();
-      img.decoding = 'sync';
-      img.src = blobUrl;
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-      });
-      const temp = document.createElement('canvas');
-      temp.width = PIX_ART_SIZE;
-      temp.height = PIX_ART_SIZE;
-      const ctx = temp.getContext('2d');
-      if (!ctx) return null;
-      ctx.imageSmoothingEnabled = false;
-      ctx.clearRect(0, 0, temp.width, temp.height);
-      ctx.drawImage(img, 0, 0, PIX_ART_SIZE, PIX_ART_SIZE);
-      const data = ctx.getImageData(0, 0, PIX_ART_SIZE, PIX_ART_SIZE).data;
-      return { data, width: img.naturalWidth || img.width, height: img.naturalHeight || img.height };
-    } finally {
-      URL.revokeObjectURL(blobUrl);
-    }
-  }
-
-  function drawFrameCell(ctx, x, y, cellSize, color) {
-    ctx.fillStyle = color;
-    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-  }
-
-  function drawFinderBlock(ctx, startX, startY, cellSize) {
-    const edge = FINDER_SIZE - 1;
-    for (let y = 0; y < FINDER_SIZE; y++) {
-      for (let x = 0; x < FINDER_SIZE; x++) {
-        let color = '#ffffff';
-        if (x === 0 || y === 0 || x === edge || y === edge) {
-          color = '#000000';
-        } else if (x === 1 || y === 1 || x === edge - 1 || y === edge - 1) {
-          color = '#ffffff';
-        } else {
-          color = FINDER_INNER_COLOR;
-        }
-        drawFrameCell(ctx, startX + x, startY + y, cellSize, color);
-      }
-    }
-  }
-
-  function drawFinderSeparator(ctx, startX, startY, cellSize, frameOffset) {
-    const sepStartX = startX - 1;
-    const sepStartY = startY - 1;
-    const sepEndX = startX + FINDER_SIZE;
-    const sepEndY = startY + FINDER_SIZE;
-    for (let y = sepStartY; y <= sepEndY; y++) {
-      for (let x = sepStartX; x <= sepEndX; x++) {
-        if (x < 0 || y < 0 || x >= PIX_FRAME_SIZE || y >= PIX_FRAME_SIZE) {
-          continue;
-        }
-        if (x >= startX && x < startX + FINDER_SIZE && y >= startY && y < startY + FINDER_SIZE) {
-          continue;
-        }
-        drawFrameCell(ctx, frameOffset + x, frameOffset + y, cellSize, '#ffffff');
-      }
-    }
-  }
-
-  function drawTimingPatterns(ctx, cellSize, frameOffset) {
-    for (let x = PIX_TIMING_START; x <= PIX_TIMING_END; x++) {
-      const isDark = (x - PIX_TIMING_START) % 2 === 0;
-      drawFrameCell(ctx, frameOffset + x, frameOffset + PIX_TIMING_ROW, cellSize, isDark ? '#000000' : '#ffffff');
-    }
-    for (let y = PIX_TIMING_START; y <= PIX_TIMING_END; y++) {
-      const isDark = (y - PIX_TIMING_START) % 2 === 0;
-      drawFrameCell(ctx, frameOffset + PIX_TIMING_COL, frameOffset + y, cellSize, isDark ? '#000000' : '#ffffff');
-    }
-  }
-
-  function drawFormatBand(ctx, cellSize, frameOffset) {
-    for (let x = PIX_FORMAT_START; x <= PIX_FORMAT_END; x++) {
-      const idx = x - PIX_FORMAT_START;
-      const isDark = PIX_FORMAT_BITS[idx];
-      drawFrameCell(ctx, frameOffset + x, frameOffset + PIX_FORMAT_ROW, cellSize, isDark ? '#000000' : '#ffffff');
-      drawFrameCell(ctx, frameOffset + PIX_FORMAT_COL, frameOffset + PIX_FORMAT_START + idx, cellSize, isDark ? '#000000' : '#ffffff');
-    }
-  }
-
-  function drawAlignmentMarker(ctx, cellSize, frameOffset) {
-    PIX_ALIGN_POINTS.forEach((point) => {
-      for (let y = 0; y < PIX_ALIGN_SIZE; y++) {
-        for (let x = 0; x < PIX_ALIGN_SIZE; x++) {
-          const isCenter = x === Math.floor(PIX_ALIGN_SIZE / 2) && y === Math.floor(PIX_ALIGN_SIZE / 2);
-          drawFrameCell(
-            ctx,
-            frameOffset + point.x + x,
-            frameOffset + point.y + y,
-            cellSize,
-            isCenter ? PIX_ALIGN_INNER_COLOR : PIX_ALIGN_COLOR
-          );
-        }
-      }
-    });
-  }
-
-  function drawPixCode() {
-    if (!pixCanvas || !pixQuantized) return;
-    const targetSize = clamp(parseInt(pixSize.value || '320', 10), 200, 640);
-    const cellSize = Math.max(1, Math.floor(targetSize / PIX_RENDER_SIZE));
-    const canvasSize = cellSize * PIX_RENDER_SIZE;
-    pixCanvas.width = canvasSize;
-    pixCanvas.height = canvasSize;
-    pixCanvas.style.width = `${canvasSize}px`;
-    pixCanvas.style.height = `${canvasSize}px`;
-    pixCanvas.style.maxWidth = 'none';
-    const ctx = pixCanvas.getContext('2d');
-    if (!ctx) return;
-    ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvasSize, canvasSize);
-    const frameOffset = PIX_QUIET_ZONE;
-    const tlStartX = 0;
-    const tlStartY = 0;
-    const trStartX = PIX_FRAME_SIZE - FINDER_SIZE;
-    const trStartY = 0;
-    const blStartX = 0;
-    const blStartY = PIX_FRAME_SIZE - FINDER_SIZE;
-    const tlX = frameOffset;
-    const tlY = frameOffset;
-    const trX = frameOffset + trStartX;
-    const trY = frameOffset + trStartY;
-    const blX = frameOffset + blStartX;
-    const blY = frameOffset + blStartY;
-    drawFinderBlock(ctx, tlX, tlY, cellSize);
-    drawFinderBlock(ctx, trX, trY, cellSize);
-    drawFinderBlock(ctx, blX, blY, cellSize);
-    drawFinderSeparator(ctx, tlStartX, tlStartY, cellSize, frameOffset);
-    drawFinderSeparator(ctx, trStartX, trStartY, cellSize, frameOffset);
-    drawFinderSeparator(ctx, blStartX, blStartY, cellSize, frameOffset);
-    drawTimingPatterns(ctx, cellSize, frameOffset);
-    drawFormatBand(ctx, cellSize, frameOffset);
-    drawAlignmentMarker(ctx, cellSize, frameOffset);
-    for (let y = 0; y < PIX_ART_SIZE; y++) {
-      for (let x = 0; x < PIX_ART_SIZE; x++) {
-        const idx = y * PIX_ART_SIZE + x;
-        ctx.fillStyle = pixQuantized[idx] ? '#ffffff' : '#000000';
-        ctx.fillRect(
-          (x + PIX_FRAME_OFFSET + frameOffset) * cellSize,
-          (y + PIX_FRAME_OFFSET + frameOffset) * cellSize,
-          cellSize,
-          cellSize
-        );
-      }
-    }
-  }
-
-  async function renderPixCode() {
-    if (!pixQuantized) return;
-    drawPixCode();
-    if (pixHash) pixHash.textContent = pixHashValue || '--';
-    setPixStatus('更新しました', '#7bcfff');
-  }
-
-  function ensurePixClientId() {
-    try {
-      let id = localStorage.getItem(PIX_CLIENT_KEY);
-      if (!id) {
-        id = `pix-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
-        localStorage.setItem(PIX_CLIENT_KEY, id);
-      }
-      return id;
-    } catch {
-      return null;
-    }
-  }
-
-  async function fetchPixCodeByHash(hash) {
-    if (!hash) {
-      return null;
-    }
-    try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/${PIXCODE_TABLE}?hash=eq.${hash}&select=hash,client_id&limit=1`, {
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`
-        }
-      });
-      if (!res.ok) {
-        return null;
-      }
-      const data = await res.json();
-      return Array.isArray(data) && data[0] ? data[0] : null;
-    } catch {
-      return null;
-    }
-  }
-
-  async function registerPixCode() {
-    if (!pixHashValue) {
-      setPixStatus('先に画像を読み込んでください', '#ffa95c');
-      return;
-    }
-    const payload = (pixPayload?.value || '').trim();
-    if (!payload) {
-      setPixStatus('内容を入力してください', '#ffa95c');
-      return;
-    }
-    const clientId = ensurePixClientId();
-    if (supportsPixClientId && !clientId) {
-      setPixStatus('この環境では登録できません', '#ffa95c');
-      return;
-    }
-    const existing = await fetchPixCodeByHash(pixHashValue);
-    if (existing) {
-      const existingClientId = typeof existing.client_id === 'string' ? existing.client_id : '';
-      const canClaim = supportsPixClientId && clientId && !existingClientId;
-      const canOverwrite = supportsPixClientId && clientId && existingClientId && existingClientId === clientId;
-      if (!canOverwrite && !canClaim) {
-        setPixStatus('このコードはすでに登録されています', '#ffa95c');
-        return;
-      }
-      try {
-        const updatePayload = {
-          payload_type: pixPayloadType?.value || 'url',
-          payload_value: payload,
-          updated_at: new Date().toISOString()
-        };
-        if (canClaim) {
-          updatePayload.client_id = clientId;
-        }
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/${PIXCODE_TABLE}?hash=eq.${pixHashValue}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            Prefer: 'return=representation'
-          },
-          body: JSON.stringify(updatePayload)
-        });
-        if (!res.ok) {
-          throw new Error(await res.text());
-        }
-        setPixStatus('更新しました', '#7bcfff');
-        return;
-      } catch (err) {
-        console.warn(err);
-        setPixStatus('更新に失敗しました', '#ffa95c');
-        return;
-      }
-    }
-    const basePayload = {
-      hash: pixHashValue,
-      payload_type: pixPayloadType?.value || 'url',
-      payload_value: payload,
-      updated_at: new Date().toISOString()
-    };
-    if (supportsPixClientId && clientId) {
-      basePayload.client_id = clientId;
-    }
-    const registerUrl = supportsPixClientId && clientId
-      ? `${SUPABASE_URL}/rest/v1/${PIXCODE_TABLE}?on_conflict=client_id`
-      : `${SUPABASE_URL}/rest/v1/${PIXCODE_TABLE}`;
-    try {
-      const res = await fetch(registerUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          Prefer: 'resolution=merge-duplicates'
-        },
-        body: JSON.stringify(basePayload)
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        if (res.status === 409 || text.includes('duplicate key') || text.includes('pixfind_codes_pkey')) {
-          setPixStatus('このコードはすでに登録されています', '#ffa95c');
-          return;
-        }
-        if (supportsPixClientId && text.includes('client_id')) {
-          supportsPixClientId = false;
-          delete basePayload.client_id;
-          const retry = await fetch(`${SUPABASE_URL}/rest/v1/${PIXCODE_TABLE}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              apikey: SUPABASE_ANON_KEY,
-              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-              Prefer: 'resolution=merge-duplicates'
-            },
-            body: JSON.stringify(basePayload)
-          });
-          if (!retry.ok) throw new Error(await retry.text());
-        } else {
-          throw new Error(text);
-        }
-      }
-      setPixStatus('登録しました', '#7bcfff');
-    } catch (err) {
-      console.warn(err);
-      setPixStatus('登録に失敗しました', '#ffa95c');
-    }
-  }
-
   function downloadPNG() {
     const link = document.createElement('a');
     link.download = 'pixieed-qr.png';
@@ -1231,94 +746,12 @@
 
   input.addEventListener('input', () => {
     syncLabels();
-    if (currentMode === 'qr') {
-      renderQRCode();
-    }
+    renderQRCode();
   });
   [sizeInput, marginInput, levelSelect, colorDark, colorLight].forEach(el => {
     el.addEventListener('input', () => {
       syncLabels();
-      if (currentMode === 'qr') {
-        renderQRCode();
-      }
-    });
-  });
-  if (pixInput) {
-    pixInput.addEventListener('change', async () => {
-      const file = pixInput.files?.[0];
-      if (!file) {
-        pixQuantized = null;
-        pixHashValue = '';
-        if (pixHash) pixHash.textContent = '--';
-        setPixStatus('未生成', '#7bcfff');
-        return;
-      }
-      setPixStatus('読み込み中...', '#ffa95c');
-      try {
-        const info = await loadPixImage(file);
-        if (!info) throw new Error('画像を読み込めませんでした');
-        if (info.width !== PIX_ART_SIZE || info.height !== PIX_ART_SIZE) {
-          setPixStatus('16×16に近似しました', '#ffa95c');
-        }
-        pixQuantized = buildQuantizedArt(info.data);
-        pixHashValue = await hashQuantized(pixQuantized);
-        if (pixHash) pixHash.textContent = pixHashValue || '--';
-        drawPixCode();
-        setPixStatus('更新しました', '#7bcfff');
-      } catch (err) {
-        console.error(err);
-        pixQuantized = null;
-        pixHashValue = '';
-        if (pixHash) pixHash.textContent = '--';
-        setPixStatus('画像の読み込みに失敗しました', '#ffa95c');
-      }
-    });
-  }
-  if (pixSize) {
-    pixSize.addEventListener('input', () => {
-      syncPixLabels();
-      if (currentMode === 'pix' && pixQuantized) {
-        drawPixCode();
-      }
-    });
-  }
-  if (pixDownloadBtn) {
-    pixDownloadBtn.addEventListener('click', () => {
-      if (!pixCanvas || !pixQuantized) {
-        setPixStatus('画像を読み込んでください', '#ffa95c');
-        return;
-      }
-      const link = document.createElement('a');
-      link.download = 'pixfind-code.png';
-      link.href = pixCanvas.toDataURL('image/png');
-      link.click();
-    });
-  }
-  if (pixCopyHashBtn) {
-    pixCopyHashBtn.addEventListener('click', () => {
-      if (!pixHashValue) {
-        setPixStatus('ハッシュがありません', '#ffa95c');
-        return;
-      }
-      if (!navigator.clipboard || !navigator.clipboard.writeText) {
-        setPixStatus('クリップボード非対応です', '#ffa95c');
-        return;
-      }
-      navigator.clipboard.writeText(pixHashValue).then(() => {
-        setPixStatus('ハッシュをコピーしました', '#7bcfff');
-      }).catch(() => {
-        setPixStatus('コピーに失敗しました', '#ffa95c');
-      });
-    });
-  }
-  if (pixRegisterBtn) {
-    pixRegisterBtn.addEventListener('click', () => {
-      registerPixCode();
-    });
-  }
-  modeButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      setMode(btn.dataset.mode || 'qr');
+      renderQRCode();
     });
   });
   // 初期描画
@@ -1326,9 +759,7 @@
   copyBtn.addEventListener('click', copyData);
 
   syncLabels();
-  syncPixLabels();
   renderQRCode();
-  setMode(currentMode);
 </script>
 </body>
 </html>
