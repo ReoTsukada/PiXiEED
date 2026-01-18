@@ -2592,8 +2592,7 @@
     const PIXCODE_TABLE = 'pixfind_codes';
     const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
-    const PIX_ART_SIZE = 32;
-    const PIX_COLOR_LEVELS = 32;
+    const PIX_ART_SIZE = 16;
     const PIX_FINDER_SIZE = 7;
     const PIX_FINDER_GAP = 3;
     const PIX_FRAME_OFFSET = PIX_FINDER_SIZE + PIX_FINDER_GAP;
@@ -2601,23 +2600,17 @@
     const PIX_QUIET_ZONE = 4;
     const PIX_FINDER_CENTER_OFFSET = 3;
     const PIX_AXIS_CELLS = PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET * 2;
-    const PIX_TIMING_ROW = PIX_FINDER_SIZE + 1;
-    const PIX_TIMING_COL = PIX_FINDER_SIZE + 1;
+    const PIX_TIMING_ROW = 1;
+    const PIX_TIMING_COL = 1;
     const PIX_TIMING_START = PIX_FINDER_SIZE + 1;
     const PIX_TIMING_END = PIX_FRAME_SIZE - PIX_FINDER_SIZE - 2;
-    const PIX_FORMAT_ROW = PIX_FINDER_SIZE + 2;
-    const PIX_FORMAT_COL = PIX_FINDER_SIZE + 2;
-    const PIX_FORMAT_START = PIX_FRAME_OFFSET;
-    const PIX_FORMAT_END = PIX_FRAME_OFFSET + PIX_ART_SIZE - 1;
+    const PIX_FORMAT_ROW = 2;
+    const PIX_FORMAT_COL = 2;
+    const PIX_FORMAT_START = PIX_TIMING_START;
+    const PIX_FORMAT_END = PIX_TIMING_END;
+    const PIX_FORMAT_LENGTH = PIX_FORMAT_END - PIX_FORMAT_START + 1;
     const PIX_FORMAT_PATTERN = '10100111001011011001011100101101';
-    const PIX_FORMAT_BITS = Array.from({ length: PIX_ART_SIZE }, (_, i) => PIX_FORMAT_PATTERN[i % PIX_FORMAT_PATTERN.length] === '1');
-    const PIX_RGB_PATCH_SIZE = 3;
-    const PIX_RGB_PATCH_GAP = 2;
-    const PIX_RGB_PATCH_MARGIN = 1;
-    const PIX_RGB_PATCH_COUNT = 3;
-    const PIX_RGB_PATCH_TOTAL_HEIGHT = (PIX_RGB_PATCH_SIZE * PIX_RGB_PATCH_COUNT) + (PIX_RGB_PATCH_GAP * (PIX_RGB_PATCH_COUNT - 1));
-    const PIX_RGB_PATCH_X = PIX_RGB_PATCH_MARGIN;
-    const PIX_RGB_PATCH_Y = Math.floor(PIX_FRAME_SIZE / 2) - Math.floor(PIX_RGB_PATCH_TOTAL_HEIGHT / 2);
+    const PIX_FORMAT_BITS = Array.from({ length: PIX_FORMAT_LENGTH }, (_, i) => PIX_FORMAT_PATTERN[i % PIX_FORMAT_PATTERN.length] === '1');
     const PIX_ALIGN_SIZE = 2;
     const PIX_ALIGN_START = PIX_FRAME_OFFSET + PIX_ART_SIZE;
     const PIX_ALIGN_CENTER_OFFSET = (PIX_ALIGN_SIZE - 1) / 2;
@@ -2628,6 +2621,7 @@
       x: pt.x + PIX_ALIGN_CENTER_OFFSET,
       y: pt.y + PIX_ALIGN_CENTER_OFFSET
     }));
+    const PIX_SAMPLE_OFFSETS = [-0.2, 0, 0.2];
     const COLOR_SIMPLIFY_MAX_COLORS = 24;
     const COLOR_SIMPLIFY_BUCKET = 18;
     const AUTO_ADJUST_SAMPLE_SIZE = Object.freeze({ width: 180, height: 120 });
@@ -2721,6 +2715,12 @@
     const qrScanCtx = qrScanCanvas.getContext ? qrScanCanvas.getContext('2d', { willReadFrequently: true }) : null;
     let pixLastHash = '';
     let pixLastDetectedAt = 0;
+    const PIX_DETECT_REQUIRED = 2;
+    const PIX_DETECT_TIMEOUT_MS = 1200;
+    let pixCandidateHash = '';
+    let pixCandidateCount = 0;
+    let pixCandidateAt = 0;
+    let pixCandidatePayload = null;
     const pixLookupCache = new Map();
     const pixLookupPromises = new Map();
 
@@ -4360,12 +4360,6 @@
       return 0.2126 * r + 0.7152 * g + 0.0722 * b;
     }
 
-    function quantizeChannel(value) {
-      const normalized = Math.max(0, Math.min(255, value));
-      const level = Math.round((normalized / 255) * (PIX_COLOR_LEVELS - 1));
-      return Math.max(0, Math.min(PIX_COLOR_LEVELS - 1, level));
-    }
-
     function estimateBinaryThreshold(imageData, width, height) {
       const data = imageData.data;
       const stride = 4;
@@ -4387,32 +4381,13 @@
       return { threshold, min, max };
     }
 
-    function isCmykPrimary(r, g, b) {
-      const max = Math.max(r, g, b);
-      const min = Math.min(r, g, b);
-      if (max < 140 || (max - min) < 90) {
-        return false;
-      }
-      const isCyan = r < 110 && g > 150 && b > 150;
-      const isMagenta = g < 110 && r > 150 && b > 150;
-      const isYellow = b < 110 && r > 150 && g > 150;
-      return isCyan || isMagenta || isYellow;
-    }
-
     function getLumaAt(data, width, x, y) {
       const idx = (y * width + x) * 4;
       return computeLuma(data[idx], data[idx + 1], data[idx + 2]);
     }
 
     function isDarkAt(data, width, x, y, threshold) {
-      const idx = (y * width + x) * 4;
-      const r = data[idx];
-      const g = data[idx + 1];
-      const b = data[idx + 2];
-      if (isCmykPrimary(r, g, b)) {
-        return true;
-      }
-      return computeLuma(r, g, b) < threshold;
+      return getLumaAt(data, width, x, y) < threshold;
     }
 
     function matchFinderPattern(runs) {
@@ -4812,29 +4787,31 @@
         if (!pt) {
           return null;
         }
-        return { x: pt.x + alignOffset.x, y: pt.y + alignOffset.y };
+        const weightX = clampValue(gx / (PIX_FRAME_SIZE - 1), 0, 1);
+        const weightY = clampValue(gy / (PIX_FRAME_SIZE - 1), 0, 1);
+        return {
+          x: pt.x + alignOffset.x * weightX,
+          y: pt.y + alignOffset.y * weightY
+        };
       };
       const sampleAt = (gx, gy) => {
-        const offsets = [
-          [0, 0],
-          [0.25, 0],
-          [-0.25, 0],
-          [0, 0.25],
-          [0, -0.25]
-        ];
         const reds = [];
         const greens = [];
         const blues = [];
-        offsets.forEach(([ox, oy]) => {
-          const pt = mapGridPoint(gx + ox, gy + oy);
-          if (!pt) {
-            return;
+        for (let oyIndex = 0; oyIndex < PIX_SAMPLE_OFFSETS.length; oyIndex += 1) {
+          const oy = PIX_SAMPLE_OFFSETS[oyIndex];
+          for (let oxIndex = 0; oxIndex < PIX_SAMPLE_OFFSETS.length; oxIndex += 1) {
+            const ox = PIX_SAMPLE_OFFSETS[oxIndex];
+            const pt = mapGridPoint(gx + ox, gy + oy);
+            if (!pt) {
+              continue;
+            }
+            const color = samplePixel(imageData.data, width, height, pt.x, pt.y, sampleRadius);
+            reds.push(color.r);
+            greens.push(color.g);
+            blues.push(color.b);
           }
-          const color = samplePixel(imageData.data, width, height, pt.x, pt.y, sampleRadius);
-          reds.push(color.r);
-          greens.push(color.g);
-          blues.push(color.b);
-        });
+        }
         if (!reds.length) {
           return { r: 255, g: 255, b: 255 };
         }
@@ -4843,14 +4820,6 @@
           return sorted[Math.floor(sorted.length / 2)];
         };
         return { r: median(reds), g: median(greens), b: median(blues) };
-      };
-      const calibrationRadius = clampValue(Math.round(avgCell * 0.15), 0, 1);
-      const sampleAtExact = (gx, gy, radius = calibrationRadius) => {
-        const pt = mapGridPoint(gx, gy);
-        if (!pt) {
-          return { r: 255, g: 255, b: 255 };
-        }
-        return samplePixel(imageData.data, width, height, pt.x, pt.y, radius);
       };
 
       const timingSamples = () => {
@@ -4904,119 +4873,7 @@
 
       const timing = timingSamples();
       const timingThreshold = timing ? (timing.darkLum + timing.lightLum) / 2 : threshold;
-      const averageColors = (colors) => {
-        if (!colors.length) return null;
-        const sum = colors.reduce((acc, cur) => ({
-          r: acc.r + cur.r,
-          g: acc.g + cur.g,
-          b: acc.b + cur.b
-        }), { r: 0, g: 0, b: 0 });
-        return {
-          r: sum.r / colors.length,
-          g: sum.g / colors.length,
-          b: sum.b / colors.length
-        };
-      };
-      const samplePatchAverage = (startX, startY, size) => {
-        const colors = [];
-        for (let y = 0; y < size; y += 1) {
-          for (let x = 0; x < size; x += 1) {
-            colors.push(sampleAtExact(startX + x, startY + y));
-          }
-        }
-        return averageColors(colors);
-      };
-      const sampleAreaAverage = (startX, startY, width, height) => {
-        const colors = [];
-        for (let y = 0; y < height; y += 1) {
-          for (let x = 0; x < width; x += 1) {
-            colors.push(sampleAtExact(startX + x, startY + y));
-          }
-        }
-        return averageColors(colors);
-      };
-      const samplePointsAverage = (points) => {
-        const colors = points.map((point) => sampleAtExact(point.x, point.y));
-        return averageColors(colors);
-      };
-      const isNearWhite = (color) => {
-        if (!color) return true;
-        return color.r > 230 && color.g > 230 && color.b > 230;
-      };
-      const sanitizeRef = (color) => (isNearWhite(color) ? null : color);
-      const cyanRef = samplePatchAverage(2, 2, 3);
-      const yellowRef = samplePatchAverage(PIX_FRAME_SIZE - PIX_FINDER_SIZE + 2, 2, 3);
-      const magentaRef = samplePatchAverage(2, PIX_FRAME_SIZE - PIX_FINDER_SIZE + 2, 3);
-      const blackRef = samplePatchAverage(PIX_ALIGN_START, PIX_ALIGN_START, PIX_ALIGN_SIZE);
-      const whiteRef = samplePointsAverage([
-        { x: PIX_FINDER_SIZE, y: 1 },
-        { x: 1, y: PIX_FINDER_SIZE },
-        { x: PIX_FINDER_SIZE, y: PIX_FINDER_SIZE }
-      ]);
-      const redRef = sampleAtExact(PIX_RGB_PATCH_X + 1, PIX_RGB_PATCH_Y + 1);
-      const greenRef = sampleAtExact(PIX_RGB_PATCH_X + 1, PIX_RGB_PATCH_Y + 1 + (PIX_RGB_PATCH_SIZE + PIX_RGB_PATCH_GAP));
-      const blueRef = sampleAtExact(PIX_RGB_PATCH_X + 1, PIX_RGB_PATCH_Y + 1 + (PIX_RGB_PATCH_SIZE + PIX_RGB_PATCH_GAP) * 2);
-      const fallbackBlack = timing?.darkColor ? timing.darkColor : { r: 0, g: 0, b: 0 };
-      const fallbackWhite = timing?.lightColor ? timing.lightColor : { r: 255, g: 255, b: 255 };
-      const refBlack = blackRef || fallbackBlack;
-      const refWhite = whiteRef || fallbackWhite;
-      const refCyan = cyanRef || { r: 0, g: 255, b: 255 };
-      const refMagenta = magentaRef || { r: 255, g: 0, b: 255 };
-      const refYellow = yellowRef || { r: 255, g: 255, b: 0 };
-      const refRed = sanitizeRef(redRef);
-      const refGreen = sanitizeRef(greenRef);
-      const refBlue = sanitizeRef(blueRef);
-      const avg = (...values) => values.reduce((sum, value) => sum + value, 0) / values.length;
-      const avgChannel = (colors, key, fallback) => {
-        const values = colors
-          .map((color) => (color ? color[key] : null))
-          .filter((value) => Number.isFinite(value));
-        if (!values.length) return fallback;
-        return values.reduce((sum, value) => sum + value, 0) / values.length;
-      };
-      const channelRefs = {
-        r: {
-          low: avgChannel([refBlack, refCyan, refGreen, refBlue], 'r', fallbackBlack.r),
-          high: avgChannel([refWhite, refMagenta, refYellow, refRed], 'r', fallbackWhite.r)
-        },
-        g: {
-          low: avgChannel([refBlack, refMagenta, refRed, refBlue], 'g', fallbackBlack.g),
-          high: avgChannel([refWhite, refCyan, refYellow, refGreen], 'g', fallbackWhite.g)
-        },
-        b: {
-          low: avgChannel([refBlack, refYellow, refRed, refGreen], 'b', fallbackBlack.b),
-          high: avgChannel([refWhite, refCyan, refMagenta, refBlue], 'b', fallbackWhite.b)
-        }
-      };
-      const fallbackChannelRefs = {
-        r: { low: fallbackBlack.r, high: fallbackWhite.r },
-        g: { low: fallbackBlack.g, high: fallbackWhite.g },
-        b: { low: fallbackBlack.b, high: fallbackWhite.b }
-      };
-      const sanitizeChannelRange = (ref, fallback) => {
-        const range = ref.high - ref.low;
-        if (!Number.isFinite(range) || range < 8) {
-          return fallback;
-        }
-        return ref;
-      };
-      const safeChannelRefs = {
-        r: sanitizeChannelRange(channelRefs.r, fallbackChannelRefs.r),
-        g: sanitizeChannelRange(channelRefs.g, fallbackChannelRefs.g),
-        b: sanitizeChannelRange(channelRefs.b, fallbackChannelRefs.b)
-      };
-      const normalizeChannel = (value, black, white) => {
-        const range = white - black;
-        if (!Number.isFinite(range) || range < 8) {
-          return clampValue(Math.round(value), 0, 255);
-        }
-        return clampValue(Math.round(((value - black) * 255) / range), 0, 255);
-      };
-      const normalizeColor = (color) => ({
-        r: normalizeChannel(color.r, safeChannelRefs.r.low, safeChannelRefs.r.high),
-        g: normalizeChannel(color.g, safeChannelRefs.g.low, safeChannelRefs.g.high),
-        b: normalizeChannel(color.b, safeChannelRefs.b.low, safeChannelRefs.b.high)
-      });
+      const baseThreshold = timingThreshold ?? threshold;
       const checkTiming = () => {
         let matches = 0;
         let total = 0;
@@ -5048,41 +4905,57 @@
       }
 
       const checkFormatBand = () => {
-        let matches = 0;
+        let rowMatches = 0;
+        let colMatches = 0;
+        let agreeMatches = 0;
         let total = 0;
         for (let x = PIX_FORMAT_START; x <= PIX_FORMAT_END; x += 1) {
           const idx = x - PIX_FORMAT_START;
           const expectDark = PIX_FORMAT_BITS[idx];
           const rowColor = sampleAt(x, PIX_FORMAT_ROW);
           const rowLum = computeLuma(rowColor.r, rowColor.g, rowColor.b);
-          if ((rowLum < timingThreshold) === expectDark) {
-            matches += 1;
-          }
-          total += 1;
+          const rowIsDark = rowLum < timingThreshold;
           const colColor = sampleAt(PIX_FORMAT_COL, PIX_FORMAT_START + idx);
           const colLum = computeLuma(colColor.r, colColor.g, colColor.b);
-          if ((colLum < timingThreshold) === expectDark) {
-            matches += 1;
+          const colIsDark = colLum < timingThreshold;
+          if (rowIsDark === expectDark) {
+            rowMatches += 1;
+          }
+          if (colIsDark === expectDark) {
+            colMatches += 1;
+          }
+          if (rowIsDark === colIsDark) {
+            agreeMatches += 1;
           }
           total += 1;
         }
-        return total ? matches / total : 0;
+        if (!total) {
+          return null;
+        }
+        const rowScore = rowMatches / total;
+        const colScore = colMatches / total;
+        const agreeScore = agreeMatches / total;
+        return {
+          rowScore,
+          colScore,
+          agreeScore,
+          score: (rowScore + colScore + agreeScore) / 3
+        };
       };
 
-      if (checkFormatBand() < 0.6) {
+      const formatCheck = checkFormatBand();
+      if (!formatCheck || formatCheck.rowScore < 0.6 || formatCheck.colScore < 0.6 || formatCheck.agreeScore < 0.65) {
         return null;
       }
 
       const buildQuantized = () => {
-        const quantized = new Uint8Array(PIX_ART_SIZE * PIX_ART_SIZE * 3);
+        const quantized = new Uint8Array(PIX_ART_SIZE * PIX_ART_SIZE);
         let writeIndex = 0;
         for (let y = 0; y < PIX_ART_SIZE; y++) {
           for (let x = 0; x < PIX_ART_SIZE; x++) {
             const color = sampleAt(PIX_FRAME_OFFSET + x, PIX_FRAME_OFFSET + y);
-            const normalized = normalizeColor(color);
-            quantized[writeIndex++] = quantizeChannel(normalized.r);
-            quantized[writeIndex++] = quantizeChannel(normalized.g);
-            quantized[writeIndex++] = quantizeChannel(normalized.b);
+            const lum = computeLuma(color.r, color.g, color.b);
+            quantized[writeIndex++] = lum < baseThreshold ? 0 : 1;
           }
         }
         return quantized;
@@ -5331,6 +5204,30 @@
       }
     }
 
+    function confirmPixCandidate(payload) {
+      if (!payload || !payload.hash) {
+        return null;
+      }
+      const now = Date.now();
+      if (payload.hash !== pixCandidateHash || now - pixCandidateAt > PIX_DETECT_TIMEOUT_MS) {
+        pixCandidateHash = payload.hash;
+        pixCandidateCount = 1;
+      } else {
+        pixCandidateCount += 1;
+      }
+      pixCandidateAt = now;
+      pixCandidatePayload = payload;
+      if (pixCandidateCount >= PIX_DETECT_REQUIRED) {
+        const confirmed = pixCandidatePayload;
+        pixCandidateHash = '';
+        pixCandidateCount = 0;
+        pixCandidateAt = 0;
+        pixCandidatePayload = null;
+        return confirmed;
+      }
+      return null;
+    }
+
     async function handlePixDetection(payload) {
       if (!payload || !payload.hash) {
         return false;
@@ -5408,8 +5305,13 @@
           return;
         }
         if (result && result.pix) {
-          await handlePixDetection(result.pix);
-          scheduleQrScanLoop(700);
+          const confirmed = confirmPixCandidate(result.pix);
+          if (confirmed) {
+            await handlePixDetection(confirmed);
+            scheduleQrScanLoop(700);
+            return;
+          }
+          scheduleQrScanLoop(240);
           return;
         }
         scheduleQrScanLoop(QR_SCAN_DEFAULT_INTERVAL_MS);
