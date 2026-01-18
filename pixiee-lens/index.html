@@ -4742,7 +4742,7 @@
         return null;
       }
       const avgCell = (vxLen + vyLen) / 2;
-      const sampleRadius = clampValue(Math.round(avgCell * 0.35), 1, 4);
+      const sampleRadius = clampValue(Math.round(avgCell * 0.2), 1, 2);
       const predictedBr = {
         x: tl.x + vx.x * PIX_AXIS_CELLS + vy.x * PIX_AXIS_CELLS,
         y: tl.y + vx.y * PIX_AXIS_CELLS + vy.y * PIX_AXIS_CELLS
@@ -4787,12 +4787,7 @@
         if (!pt) {
           return null;
         }
-        const weightX = clampValue(gx / (PIX_FRAME_SIZE - 1), 0, 1);
-        const weightY = clampValue(gy / (PIX_FRAME_SIZE - 1), 0, 1);
-        return {
-          x: pt.x + alignOffset.x * weightX,
-          y: pt.y + alignOffset.y * weightY
-        };
+        return { x: pt.x + alignOffset.x, y: pt.y + alignOffset.y };
       };
       const sampleAt = (gx, gy) => {
         const reds = [];
@@ -4900,7 +4895,7 @@
         }
         return matches / total;
       };
-      if (checkTiming() < 0.6) {
+      if (checkTiming() < 0.5) {
         return null;
       }
 
@@ -4944,7 +4939,7 @@
       };
 
       const formatCheck = checkFormatBand();
-      if (!formatCheck || formatCheck.rowScore < 0.6 || formatCheck.colScore < 0.6 || formatCheck.agreeScore < 0.65) {
+      if (!formatCheck || formatCheck.rowScore < 0.55 || formatCheck.colScore < 0.55 || formatCheck.agreeScore < 0.55) {
         return null;
       }
 
