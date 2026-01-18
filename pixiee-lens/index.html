@@ -2185,7 +2185,7 @@
 <span class="qr-readout__state" id="qrReadoutState">停止中</span>
 <button aria-label="閉じる" class="qr-readout__close" id="qrCloseBtn" type="button"></button>
 </div>
-<p class="qr-readout__message" id="qrReadoutMessage">QR / PiXiEEDコードのスキャンを開始します。</p>
+<p class="qr-readout__message" id="qrReadoutMessage">QRコードのスキャンを開始します。</p>
 <div class="qr-readout__result" hidden="" id="qrReadoutResult">
 <p class="qr-readout__label">検出された内容</p>
 <div class="qr-readout__preview" hidden="" id="qrPreviewWrap">
@@ -2587,41 +2587,12 @@
       { id: 'wst-kurabu', label: 'クラブ（カラー）', src: './stamps/wst-kurabu.png', hueAdjustable: true }
     ]);
     const QR_SCAN_BASE_SIZE = 640;
+    const QR_SCAN_MAX_SIZE = 960;
     const QR_SCAN_MIN_SIZE = 320;
+    const QR_SCAN_BOOST_AFTER = 6;
+    const QR_SCAN_BOOST_MS = 1800;
+    const QR_SCAN_ENHANCE_MIN_RANGE = 24;
     const QR_SCAN_DEFAULT_INTERVAL_MS = 260;
-    const PIXCODE_TABLE = 'pixfind_codes';
-    const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
-    const PIX_ART_SIZE = 16;
-    const PIX_FINDER_SIZE = 7;
-    const PIX_FINDER_GAP = 3;
-    const PIX_FRAME_OFFSET = PIX_FINDER_SIZE + PIX_FINDER_GAP;
-    const PIX_FRAME_SIZE = PIX_ART_SIZE + PIX_FRAME_OFFSET * 2;
-    const PIX_QUIET_ZONE = 6;
-    const PIX_FINDER_CENTER_OFFSET = 3;
-    const PIX_AXIS_CELLS = PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET * 2;
-    const PIX_TIMING_ROW = PIX_FINDER_SIZE + 1;
-    const PIX_TIMING_COL = PIX_FINDER_SIZE + 1;
-    const PIX_TIMING_START = PIX_FINDER_SIZE + 1;
-    const PIX_TIMING_END = PIX_FRAME_SIZE - PIX_FINDER_SIZE - 2;
-    const PIX_FORMAT_ROW = PIX_FINDER_SIZE + 2;
-    const PIX_FORMAT_COL = PIX_FINDER_SIZE + 2;
-    const PIX_FORMAT_START = PIX_TIMING_START;
-    const PIX_FORMAT_END = PIX_TIMING_END;
-    const PIX_FORMAT_LENGTH = PIX_FORMAT_END - PIX_FORMAT_START + 1;
-    const PIX_FORMAT_PATTERN = '10100111001011011001011100101101';
-    const PIX_FORMAT_BITS = Array.from({ length: PIX_FORMAT_LENGTH }, (_, i) => PIX_FORMAT_PATTERN[i % PIX_FORMAT_PATTERN.length] === '1');
-    const PIX_ALIGN_SIZE = 3;
-    const PIX_ALIGN_START = PIX_FRAME_OFFSET + PIX_ART_SIZE;
-    const PIX_ALIGN_CENTER_OFFSET = (PIX_ALIGN_SIZE - 1) / 2;
-    const PIX_ALIGN_POINTS = [
-      { x: PIX_ALIGN_START, y: PIX_ALIGN_START }
-    ];
-    const PIX_ALIGN_CENTERS = PIX_ALIGN_POINTS.map((pt) => ({
-      x: pt.x + PIX_ALIGN_CENTER_OFFSET,
-      y: pt.y + PIX_ALIGN_CENTER_OFFSET
-    }));
-    const PIX_SAMPLE_OFFSETS = [-0.2, 0, 0.2];
     const COLOR_SIMPLIFY_MAX_COLORS = 24;
     const COLOR_SIMPLIFY_BUCKET = 18;
     const AUTO_ADJUST_SAMPLE_SIZE = Object.freeze({ width: 180, height: 120 });
@@ -2706,22 +2677,16 @@
     let captureInProgress = false;
     let qrScanEnabled = true;
     let qrSupportAvailable = null;
-    let qrSupportWarningShown = false;
     let qrDetector = null;
     let qrScanLoopHandle = null;
     let qrLastValue = '';
     let qrOpenTarget = '';
     const qrScanCanvas = document.createElement('canvas');
     const qrScanCtx = qrScanCanvas.getContext ? qrScanCanvas.getContext('2d', { willReadFrequently: true }) : null;
-    let pixLastHash = '';
-    let pixLastDetectedAt = 0;
-    const PIX_STABLE_FRAMES = 3;
-    const PIX_STABLE_TIMEOUT_MS = 1200;
-    const PIX_STABLE_MAX_DIFF = Math.round(PIX_ART_SIZE * PIX_ART_SIZE * 0.15);
-    let pixQuantizedHistory = [];
-    let pixQuantizedAt = 0;
-    const pixLookupCache = new Map();
-    const pixLookupPromises = new Map();
+    const qrEnhanceCanvas = document.createElement('canvas');
+    const qrEnhanceCtx = qrEnhanceCanvas.getContext ? qrEnhanceCanvas.getContext('2d', { willReadFrequently: true }) : null;
+    let qrScanMisses = 0;
+    let qrScanBoostUntil = 0;
 
     const menus = {
       aspect: { button: aspectMenuBtn, panel: aspectMenu },
@@ -4355,740 +4320,6 @@
       return Math.min(max, Math.max(min, value));
     }
 
-    function computeLuma(r, g, b) {
-      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    }
-
-    function estimateBinaryThreshold(imageData, width, height) {
-      const data = imageData.data;
-      const stride = 4;
-      const hist = new Array(256).fill(0);
-      let min = 255;
-      let max = 0;
-      let total = 0;
-      let sum = 0;
-      for (let y = 0; y < height; y += stride) {
-        for (let x = 0; x < width; x += stride) {
-          const idx = (y * width + x) * 4;
-          const lum = Math.max(0, Math.min(255, Math.round(computeLuma(data[idx], data[idx + 1], data[idx + 2]))));
-          hist[lum] += 1;
-          total += 1;
-          sum += lum;
-          if (lum < min) {
-            min = lum;
-          }
-          if (lum > max) {
-            max = lum;
-          }
-        }
-      }
-      if (!total) {
-        return { threshold: 128, min: 0, max: 255 };
-      }
-      let sumB = 0;
-      let wB = 0;
-      let varMax = -1;
-      let threshold = (min + max) / 2;
-      for (let t = 0; t < 256; t += 1) {
-        wB += hist[t];
-        if (!wB) {
-          continue;
-        }
-        const wF = total - wB;
-        if (!wF) {
-          break;
-        }
-        sumB += t * hist[t];
-        const mB = sumB / wB;
-        const mF = (sum - sumB) / wF;
-        const diff = mB - mF;
-        const varBetween = wB * wF * diff * diff;
-        if (varBetween > varMax) {
-          varMax = varBetween;
-          threshold = t;
-        }
-      }
-      if (max - min < 40) {
-        threshold = (min + max) / 2;
-      }
-      return { threshold, min, max };
-    }
-
-    function getLumaAt(data, width, x, y) {
-      const idx = (y * width + x) * 4;
-      return computeLuma(data[idx], data[idx + 1], data[idx + 2]);
-    }
-
-    function isDarkAt(data, width, x, y, threshold) {
-      return getLumaAt(data, width, x, y) < threshold;
-    }
-
-    function matchFinderPattern(runs) {
-      if (!runs || runs.length !== 5) {
-        return null;
-      }
-      const total = runs.reduce((sum, value) => sum + value, 0);
-      if (total < 7) {
-        return null;
-      }
-      const module = total / 7;
-      const tolerance = module * (module < 6 ? 0.9 : 0.7);
-      if (Math.abs(runs[0] - module) > tolerance) return null;
-      if (Math.abs(runs[1] - module) > tolerance) return null;
-      if (Math.abs(runs[2] - module * 3) > module * (module < 6 ? 2.6 : 2.2)) return null;
-      if (Math.abs(runs[3] - module) > tolerance) return null;
-      if (Math.abs(runs[4] - module) > tolerance) return null;
-      return module;
-    }
-
-    function crossCheckVertical(data, width, height, centerX, centerY, threshold, expectedModule) {
-      const x = clampValue(Math.round(centerX), 0, width - 1);
-      let y = clampValue(Math.round(centerY), 0, height - 1);
-      const run = [0, 0, 0, 0, 0];
-      while (y >= 0 && isDarkAt(data, width, x, y, threshold)) {
-        run[2] += 1;
-        y -= 1;
-      }
-      while (y >= 0 && !isDarkAt(data, width, x, y, threshold)) {
-        run[1] += 1;
-        y -= 1;
-      }
-      while (y >= 0 && isDarkAt(data, width, x, y, threshold)) {
-        run[0] += 1;
-        y -= 1;
-      }
-      y = clampValue(Math.round(centerY) + 1, 0, height - 1);
-      while (y < height && isDarkAt(data, width, x, y, threshold)) {
-        run[2] += 1;
-        y += 1;
-      }
-      while (y < height && !isDarkAt(data, width, x, y, threshold)) {
-        run[3] += 1;
-        y += 1;
-      }
-      while (y < height && isDarkAt(data, width, x, y, threshold)) {
-        run[4] += 1;
-        y += 1;
-      }
-      const module = matchFinderPattern(run);
-      if (!module) {
-        return null;
-      }
-      if (expectedModule && Math.abs(module - expectedModule) / expectedModule > 0.8) {
-        return null;
-      }
-      return module;
-    }
-
-    function crossCheckHorizontal(data, width, height, centerX, centerY, threshold, expectedModule) {
-      let x = clampValue(Math.round(centerX), 0, width - 1);
-      const y = clampValue(Math.round(centerY), 0, height - 1);
-      const run = [0, 0, 0, 0, 0];
-      while (x >= 0 && isDarkAt(data, width, x, y, threshold)) {
-        run[2] += 1;
-        x -= 1;
-      }
-      while (x >= 0 && !isDarkAt(data, width, x, y, threshold)) {
-        run[1] += 1;
-        x -= 1;
-      }
-      while (x >= 0 && isDarkAt(data, width, x, y, threshold)) {
-        run[0] += 1;
-        x -= 1;
-      }
-      x = clampValue(Math.round(centerX) + 1, 0, width - 1);
-      while (x < width && isDarkAt(data, width, x, y, threshold)) {
-        run[2] += 1;
-        x += 1;
-      }
-      while (x < width && !isDarkAt(data, width, x, y, threshold)) {
-        run[3] += 1;
-        x += 1;
-      }
-      while (x < width && isDarkAt(data, width, x, y, threshold)) {
-        run[4] += 1;
-        x += 1;
-      }
-      const module = matchFinderPattern(run);
-      if (!module) {
-        return null;
-      }
-      if (expectedModule && Math.abs(module - expectedModule) / expectedModule > 0.8) {
-        return null;
-      }
-      return module;
-    }
-
-    function findFinderCandidates(imageData, width, height, threshold) {
-      const data = imageData.data;
-      const stride = Math.min(2, Math.max(1, Math.round(Math.min(width, height) / 520)));
-      const candidates = [];
-      for (let y = 0; y < height; y += stride) {
-        let runLengths = [];
-        let runColors = [];
-        let current = isDarkAt(data, width, 0, y, threshold);
-        let length = 1;
-        for (let x = 1; x < width; x += 1) {
-          const color = isDarkAt(data, width, x, y, threshold);
-          if (color === current) {
-            length += 1;
-            continue;
-          }
-          runLengths.push(length);
-          runColors.push(current);
-          if (runLengths.length > 5) {
-            runLengths.shift();
-            runColors.shift();
-          }
-          if (
-            runLengths.length === 5 &&
-            runColors[0] &&
-            !runColors[1] &&
-            runColors[2] &&
-            !runColors[3] &&
-            runColors[4]
-          ) {
-            const module = matchFinderPattern(runLengths);
-            if (module) {
-              const centerX = x - (runLengths[4] + runLengths[3] + runLengths[2] / 2);
-              const centerY = y;
-              const verticalModule = crossCheckVertical(data, width, height, centerX, centerY, threshold, module);
-              const horizontalModule = verticalModule
-                ? crossCheckHorizontal(data, width, height, centerX, centerY, threshold, module)
-                : null;
-              if (verticalModule && horizontalModule) {
-                candidates.push({
-                  x: centerX,
-                  y: centerY,
-                  module: (module + verticalModule + horizontalModule) / 3
-                });
-              }
-            }
-          }
-          current = color;
-          length = 1;
-        }
-      }
-      return candidates;
-    }
-
-    function clusterFinderCandidates(candidates) {
-      const clusters = [];
-      candidates.forEach((candidate) => {
-        let matched = false;
-        clusters.forEach((cluster) => {
-          const distance = Math.hypot(cluster.x - candidate.x, cluster.y - candidate.y);
-          if (distance < candidate.module * 2) {
-            const count = cluster.count + 1;
-            cluster.x = (cluster.x * cluster.count + candidate.x) / count;
-            cluster.y = (cluster.y * cluster.count + candidate.y) / count;
-            cluster.module = (cluster.module * cluster.count + candidate.module) / count;
-            cluster.count = count;
-            matched = true;
-          }
-        });
-        if (!matched) {
-          clusters.push({ ...candidate, count: 1 });
-        }
-      });
-      return clusters;
-    }
-
-    function scoreTriplet(tl, tr, bl) {
-      const v1x = tr.x - tl.x;
-      const v1y = tr.y - tl.y;
-      const v2x = bl.x - tl.x;
-      const v2y = bl.y - tl.y;
-      const len1 = Math.hypot(v1x, v1y);
-      const len2 = Math.hypot(v2x, v2y);
-      if (len1 < 8 || len2 < 8) {
-        return -Infinity;
-      }
-      const dot = Math.abs((v1x * v2x + v1y * v2y) / (len1 * len2));
-      const angleScore = 1 - clampValue(dot, 0, 1);
-      const ratio = Math.min(len1, len2) / Math.max(len1, len2);
-      return angleScore * 0.7 + ratio * 0.3;
-    }
-
-    function selectFinderTriplet(candidates) {
-      if (!candidates || candidates.length < 3) {
-        return null;
-      }
-      let best = null;
-      let bestScore = -Infinity;
-      for (let i = 0; i < candidates.length - 2; i += 1) {
-        for (let j = i + 1; j < candidates.length - 1; j += 1) {
-          for (let k = j + 1; k < candidates.length; k += 1) {
-            const points = [candidates[i], candidates[j], candidates[k]];
-            points.sort((a, b) => (a.x + a.y) - (b.x + b.y));
-            const tl = points[0];
-            const p1 = points[1];
-            const p2 = points[2];
-            let tr = p1;
-            let bl = p2;
-            const score1 = scoreTriplet(tl, tr, bl);
-            const score2 = scoreTriplet(tl, p2, p1);
-            if (score2 > score1) {
-              tr = p2;
-              bl = p1;
-            }
-            const score = Math.max(score1, score2);
-            if (score > bestScore) {
-              bestScore = score;
-              best = { tl, tr, bl };
-            }
-          }
-        }
-      }
-      return best;
-    }
-
-    function samplePixel(data, width, height, x, y, radius = 1) {
-      let r = 0;
-      let g = 0;
-      let b = 0;
-      let count = 0;
-      const cx = Math.round(x);
-      const cy = Math.round(y);
-      for (let dy = -radius; dy <= radius; dy++) {
-        for (let dx = -radius; dx <= radius; dx++) {
-          const px = cx + dx;
-          const py = cy + dy;
-          if (px < 0 || py < 0 || px >= width || py >= height) continue;
-          const idx = (py * width + px) * 4;
-          r += data[idx];
-          g += data[idx + 1];
-          b += data[idx + 2];
-          count += 1;
-        }
-      }
-      if (!count) {
-        return { r: 255, g: 255, b: 255 };
-      }
-      return { r: r / count, g: g / count, b: b / count };
-    }
-
-    function findAlignmentCenter(imageData, width, height, target, searchRadius, threshold) {
-      const data = imageData.data;
-      if (!target || !Number.isFinite(target.x) || !Number.isFinite(target.y)) {
-        return null;
-      }
-      const radius = clampValue(Math.round(searchRadius), 6, 36);
-      const startX = Math.max(0, Math.floor(target.x - radius));
-      const endX = Math.min(width - 1, Math.ceil(target.x + radius));
-      const startY = Math.max(0, Math.floor(target.y - radius));
-      const endY = Math.min(height - 1, Math.ceil(target.y + radius));
-      let sumX = 0;
-      let sumY = 0;
-      let count = 0;
-      for (let y = startY; y <= endY; y += 2) {
-        for (let x = startX; x <= endX; x += 2) {
-          if (!isDarkAt(data, width, x, y, threshold)) {
-            continue;
-          }
-          sumX += x;
-          sumY += y;
-          count += 1;
-        }
-      }
-      if (count < 6) {
-        return null;
-      }
-      return { x: sumX / count, y: sumY / count };
-    }
-
-    // Solve homography from grid to image for perspective correction.
-    function computeHomography(srcPoints, dstPoints) {
-      if (!Array.isArray(srcPoints) || srcPoints.length !== 4 || !Array.isArray(dstPoints) || dstPoints.length !== 4) {
-        return null;
-      }
-      const A = [];
-      const b = [];
-      for (let i = 0; i < 4; i += 1) {
-        const src = srcPoints[i];
-        const dst = dstPoints[i];
-        if (!src || !dst) {
-          return null;
-        }
-        const x = src.x;
-        const y = src.y;
-        const X = dst.x;
-        const Y = dst.y;
-        if (![x, y, X, Y].every((value) => Number.isFinite(value))) {
-          return null;
-        }
-        A.push([x, y, 1, 0, 0, 0, -x * X, -y * X]);
-        b.push(X);
-        A.push([0, 0, 0, x, y, 1, -x * Y, -y * Y]);
-        b.push(Y);
-      }
-      const n = 8;
-      for (let col = 0; col < n; col += 1) {
-        let pivotRow = col;
-        let max = Math.abs(A[col][col]);
-        for (let row = col + 1; row < n; row += 1) {
-          const value = Math.abs(A[row][col]);
-          if (value > max) {
-            max = value;
-            pivotRow = row;
-          }
-        }
-        if (max < 1e-9) {
-          return null;
-        }
-        if (pivotRow !== col) {
-          const tmpRow = A[col];
-          A[col] = A[pivotRow];
-          A[pivotRow] = tmpRow;
-          const tmpB = b[col];
-          b[col] = b[pivotRow];
-          b[pivotRow] = tmpB;
-        }
-        const pivot = A[col][col];
-        for (let c = col; c < n; c += 1) {
-          A[col][c] /= pivot;
-        }
-        b[col] /= pivot;
-        for (let row = 0; row < n; row += 1) {
-          if (row === col) continue;
-          const factor = A[row][col];
-          if (Math.abs(factor) < 1e-9) continue;
-          for (let c = col; c < n; c += 1) {
-            A[row][c] -= factor * A[col][c];
-          }
-          b[row] -= factor * b[col];
-        }
-      }
-      const h = b;
-      return [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1];
-    }
-
-    function applyHomography(matrix, x, y) {
-      const denom = matrix[6] * x + matrix[7] * y + matrix[8];
-      if (!Number.isFinite(denom) || Math.abs(denom) < 1e-6) {
-        return null;
-      }
-      return {
-        x: (matrix[0] * x + matrix[1] * y + matrix[2]) / denom,
-        y: (matrix[3] * x + matrix[4] * y + matrix[5]) / denom
-      };
-    }
-
-    function gridToImagePoint(origin, vx, vy, gx, gy) {
-      return {
-        x: origin.x + (gx - PIX_FINDER_CENTER_OFFSET) * vx.x + (gy - PIX_FINDER_CENTER_OFFSET) * vy.x,
-        y: origin.y + (gx - PIX_FINDER_CENTER_OFFSET) * vx.y + (gy - PIX_FINDER_CENTER_OFFSET) * vy.y
-      };
-    }
-
-    async function hashPixQuantized(quantized) {
-      if (!crypto?.subtle?.digest) return '';
-      const digest = await crypto.subtle.digest('SHA-256', quantized);
-      return Array.from(new Uint8Array(digest))
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('');
-    }
-
-    async function detectPixieeCode(imageData, width, height) {
-      const { threshold, min, max } = estimateBinaryThreshold(imageData, width, height);
-      const candidates = clusterFinderCandidates(findFinderCandidates(imageData, width, height, threshold));
-      const triplet = selectFinderTriplet(candidates);
-      if (!triplet) {
-        return null;
-      }
-      const tl = triplet.tl;
-      const tr = triplet.tr;
-      const bl = triplet.bl;
-      const vx = {
-        x: (tr.x - tl.x) / PIX_AXIS_CELLS,
-        y: (tr.y - tl.y) / PIX_AXIS_CELLS
-      };
-      const vy = {
-        x: (bl.x - tl.x) / PIX_AXIS_CELLS,
-        y: (bl.y - tl.y) / PIX_AXIS_CELLS
-      };
-      const vxLen = Math.hypot(vx.x, vx.y);
-      const vyLen = Math.hypot(vy.x, vy.y);
-      if (vxLen < 1 || vyLen < 1) {
-        return null;
-      }
-      const dot = (vx.x * vy.x + vx.y * vy.y) / (vxLen * vyLen);
-      if (Math.abs(dot) > 0.6) {
-        return null;
-      }
-      const avgCell = (vxLen + vyLen) / 2;
-      const sampleRadius = clampValue(Math.round(avgCell * 0.2), 1, 2);
-      const predictedBr = {
-        x: tl.x + vx.x * PIX_AXIS_CELLS + vy.x * PIX_AXIS_CELLS,
-        y: tl.y + vx.y * PIX_AXIS_CELLS + vy.y * PIX_AXIS_CELLS
-      };
-      const matrix = computeHomography(
-        [
-          { x: PIX_FINDER_CENTER_OFFSET, y: PIX_FINDER_CENTER_OFFSET },
-          { x: PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET, y: PIX_FINDER_CENTER_OFFSET },
-          { x: PIX_FINDER_CENTER_OFFSET, y: PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET },
-          { x: PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET, y: PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET }
-        ],
-        [tl, tr, bl, predictedBr]
-      );
-      if (!matrix) {
-        return null;
-      }
-      let alignOffset = { x: 0, y: 0 };
-      const alignOffsets = [];
-      PIX_ALIGN_CENTERS.forEach((center) => {
-        const predictedAlign = applyHomography(matrix, center.x, center.y);
-        if (!predictedAlign) {
-          return;
-        }
-        const alignCenter = findAlignmentCenter(
-          imageData,
-          width,
-          height,
-          predictedAlign,
-          avgCell * 6,
-          threshold
-        );
-        if (alignCenter) {
-          alignOffsets.push({ x: alignCenter.x - predictedAlign.x, y: alignCenter.y - predictedAlign.y });
-        }
-      });
-      if (alignOffsets.length) {
-        const sum = alignOffsets.reduce((acc, cur) => ({ x: acc.x + cur.x, y: acc.y + cur.y }), { x: 0, y: 0 });
-        alignOffset = { x: sum.x / alignOffsets.length, y: sum.y / alignOffsets.length };
-      }
-      const mapGridPoint = (gx, gy) => {
-        const pt = applyHomography(matrix, gx, gy);
-        if (!pt) {
-          return null;
-        }
-        return { x: pt.x + alignOffset.x, y: pt.y + alignOffset.y };
-      };
-      const sampleAt = (gx, gy) => {
-        const reds = [];
-        const greens = [];
-        const blues = [];
-        for (let oyIndex = 0; oyIndex < PIX_SAMPLE_OFFSETS.length; oyIndex += 1) {
-          const oy = PIX_SAMPLE_OFFSETS[oyIndex];
-          for (let oxIndex = 0; oxIndex < PIX_SAMPLE_OFFSETS.length; oxIndex += 1) {
-            const ox = PIX_SAMPLE_OFFSETS[oxIndex];
-            const pt = mapGridPoint(gx + ox, gy + oy);
-            if (!pt) {
-              continue;
-            }
-            const color = samplePixel(imageData.data, width, height, pt.x, pt.y, sampleRadius);
-            reds.push(color.r);
-            greens.push(color.g);
-            blues.push(color.b);
-          }
-        }
-        if (!reds.length) {
-          return { r: 255, g: 255, b: 255 };
-        }
-        const median = (values) => {
-          const sorted = values.slice().sort((a, b) => a - b);
-          return sorted[Math.floor(sorted.length / 2)];
-        };
-        return { r: median(reds), g: median(greens), b: median(blues) };
-      };
-
-      const timingSamples = () => {
-        const darkLuma = [];
-        const lightLuma = [];
-        const darkColors = { r: [], g: [], b: [] };
-        const lightColors = { r: [], g: [], b: [] };
-        const pushColor = (bucket, color) => {
-          bucket.r.push(color.r);
-          bucket.g.push(color.g);
-          bucket.b.push(color.b);
-        };
-        for (let x = PIX_TIMING_START; x <= PIX_TIMING_END; x += 1) {
-          const color = sampleAt(x, PIX_TIMING_ROW);
-          const lum = computeLuma(color.r, color.g, color.b);
-          if ((x - PIX_TIMING_START) % 2 === 0) {
-            darkLuma.push(lum);
-            pushColor(darkColors, color);
-          } else {
-            lightLuma.push(lum);
-            pushColor(lightColors, color);
-          }
-        }
-        for (let y = PIX_TIMING_START; y <= PIX_TIMING_END; y += 1) {
-          const color = sampleAt(PIX_TIMING_COL, y);
-          const lum = computeLuma(color.r, color.g, color.b);
-          if ((y - PIX_TIMING_START) % 2 === 0) {
-            darkLuma.push(lum);
-            pushColor(darkColors, color);
-          } else {
-            lightLuma.push(lum);
-            pushColor(lightColors, color);
-          }
-        }
-        if (!darkLuma.length || !lightLuma.length) {
-          return null;
-        }
-        const avg = (values) => values.reduce((sum, v) => sum + v, 0) / values.length;
-        const avgColor = (bucket) => ({
-          r: avg(bucket.r),
-          g: avg(bucket.g),
-          b: avg(bucket.b)
-        });
-        return {
-          darkLum: avg(darkLuma),
-          lightLum: avg(lightLuma),
-          darkColor: avgColor(darkColors),
-          lightColor: avgColor(lightColors)
-        };
-      };
-
-      const timing = timingSamples();
-      const timingThreshold = timing ? (timing.darkLum + timing.lightLum) / 2 : threshold;
-      const baseThreshold = timingThreshold ?? threshold;
-      const checkTiming = () => {
-        let matches = 0;
-        let total = 0;
-        for (let x = PIX_TIMING_START; x <= PIX_TIMING_END; x += 1) {
-          const color = sampleAt(x, PIX_TIMING_ROW);
-          const lum = computeLuma(color.r, color.g, color.b);
-          const expectDark = (x - PIX_TIMING_START) % 2 === 0;
-          if ((lum < timingThreshold) === expectDark) {
-            matches += 1;
-          }
-          total += 1;
-        }
-        for (let y = PIX_TIMING_START; y <= PIX_TIMING_END; y += 1) {
-          const color = sampleAt(PIX_TIMING_COL, y);
-          const lum = computeLuma(color.r, color.g, color.b);
-          const expectDark = (y - PIX_TIMING_START) % 2 === 0;
-          if ((lum < timingThreshold) === expectDark) {
-            matches += 1;
-          }
-          total += 1;
-        }
-        if (!total) {
-          return 0;
-        }
-        return matches / total;
-      };
-      if (checkTiming() < 0.5) {
-        return null;
-      }
-
-      const checkFormatBand = () => {
-        let rowMatches = 0;
-        let colMatches = 0;
-        let agreeMatches = 0;
-        let total = 0;
-        for (let x = PIX_FORMAT_START; x <= PIX_FORMAT_END; x += 1) {
-          const idx = x - PIX_FORMAT_START;
-          const expectDark = PIX_FORMAT_BITS[idx];
-          const rowColor = sampleAt(x, PIX_FORMAT_ROW);
-          const rowLum = computeLuma(rowColor.r, rowColor.g, rowColor.b);
-          const rowIsDark = rowLum < timingThreshold;
-          const colColor = sampleAt(PIX_FORMAT_COL, PIX_FORMAT_START + idx);
-          const colLum = computeLuma(colColor.r, colColor.g, colColor.b);
-          const colIsDark = colLum < timingThreshold;
-          if (rowIsDark === expectDark) {
-            rowMatches += 1;
-          }
-          if (colIsDark === expectDark) {
-            colMatches += 1;
-          }
-          if (rowIsDark === colIsDark) {
-            agreeMatches += 1;
-          }
-          total += 1;
-        }
-        if (!total) {
-          return null;
-        }
-        const rowScore = rowMatches / total;
-        const colScore = colMatches / total;
-        const agreeScore = agreeMatches / total;
-        return {
-          rowScore,
-          colScore,
-          agreeScore,
-          score: (rowScore + colScore + agreeScore) / 3
-        };
-      };
-
-      const formatCheck = checkFormatBand();
-      if (!formatCheck || formatCheck.rowScore < 0.55 || formatCheck.colScore < 0.55 || formatCheck.agreeScore < 0.55) {
-        return null;
-      }
-
-      const buildQuantized = () => {
-        const quantized = new Uint8Array(PIX_ART_SIZE * PIX_ART_SIZE);
-        let writeIndex = 0;
-        for (let y = 0; y < PIX_ART_SIZE; y++) {
-          for (let x = 0; x < PIX_ART_SIZE; x++) {
-            const color = sampleAt(PIX_FRAME_OFFSET + x, PIX_FRAME_OFFSET + y);
-            const lum = computeLuma(color.r, color.g, color.b);
-            quantized[writeIndex++] = lum < baseThreshold ? 0 : 1;
-          }
-        }
-        return quantized;
-      };
-
-      const primaryQuantized = buildQuantized();
-      const hash = await hashPixQuantized(primaryQuantized);
-      if (!hash) return null;
-
-      const cornerPoints = [
-        mapGridPoint(0, 0),
-        mapGridPoint(PIX_FRAME_SIZE - 1, 0),
-        mapGridPoint(0, PIX_FRAME_SIZE - 1),
-        mapGridPoint(PIX_FRAME_SIZE - 1, PIX_FRAME_SIZE - 1)
-      ].filter(Boolean);
-      if (cornerPoints.length < 4) {
-        return null;
-      }
-      const xs = cornerPoints.map((p) => p.x);
-      const ys = cornerPoints.map((p) => p.y);
-      const previewBox = {
-        x: clampValue(Math.min(...xs), 0, width - 1),
-        y: clampValue(Math.min(...ys), 0, height - 1),
-        width: clampValue(Math.max(...xs) - Math.min(...xs), 1, width),
-        height: clampValue(Math.max(...ys) - Math.min(...ys), 1, height)
-      };
-      const hashes = [hash];
-      return { hash, hashes, previewBox, quantized: primaryQuantized };
-    }
-
-    async function fetchPixCodePayload(hashes) {
-      const list = Array.isArray(hashes) ? hashes.filter(Boolean) : [hashes].filter(Boolean);
-      if (!list.length) return null;
-      const cacheHit = list.find((item) => pixLookupCache.has(item));
-      if (cacheHit) {
-        return { hash: cacheHit, payload: pixLookupCache.get(cacheHit) };
-      }
-      const cacheKey = list.join(',');
-      if (pixLookupPromises.has(cacheKey)) {
-        return pixLookupPromises.get(cacheKey);
-      }
-      const filter = list.length === 1 ? `hash=eq.${list[0]}` : `hash=in.(${list.join(',')})`;
-      const promise = fetch(`${SUPABASE_URL}/rest/v1/${PIXCODE_TABLE}?${filter}&select=hash,payload_type,payload_value&limit=1`, {
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`
-        }
-      }).then(async (res) => {
-        if (!res.ok) return null;
-        const data = await res.json();
-        const payload = Array.isArray(data) && data[0] ? data[0] : null;
-        if (payload && payload.hash) {
-          pixLookupCache.set(payload.hash, payload);
-          return { hash: payload.hash, payload };
-        }
-        return null;
-      }).catch(() => null).finally(() => {
-        pixLookupPromises.delete(cacheKey);
-      });
-      pixLookupPromises.set(cacheKey, promise);
-      return promise;
-    }
-
     async function ensureQrDetector() {
       if (qrDetector) {
         qrSupportAvailable = true;
@@ -5178,10 +4409,13 @@
       if (!qrScanCanvas || !qrScanCtx || !video || video.readyState < 2) {
         return null;
       }
-      const viewportWidth = Math.max(1, Math.round(window.innerWidth || video.videoWidth || QR_SCAN_BASE_SIZE));
-      const viewportHeight = Math.max(1, Math.round(window.innerHeight || video.videoHeight || QR_SCAN_MIN_SIZE));
-      const targetWidth = Math.max(QR_SCAN_MIN_SIZE, Math.min(QR_SCAN_BASE_SIZE, viewportWidth));
-      const targetHeight = Math.max(QR_SCAN_MIN_SIZE, Math.min(QR_SCAN_BASE_SIZE, viewportHeight));
+      const viewportWidth = Math.max(1, Math.round(window.innerWidth || QR_SCAN_BASE_SIZE));
+      const viewportHeight = Math.max(1, Math.round(window.innerHeight || QR_SCAN_MIN_SIZE));
+      const videoWidth = Math.max(1, Math.round(video.videoWidth || viewportWidth));
+      const videoHeight = Math.max(1, Math.round(video.videoHeight || viewportHeight));
+      const maxSize = Date.now() < qrScanBoostUntil ? QR_SCAN_MAX_SIZE : QR_SCAN_BASE_SIZE;
+      const targetWidth = Math.max(QR_SCAN_MIN_SIZE, Math.min(maxSize, videoWidth));
+      const targetHeight = Math.max(QR_SCAN_MIN_SIZE, Math.min(maxSize, videoHeight));
       qrScanCanvas.width = targetWidth;
       qrScanCanvas.height = targetHeight;
       qrScanCtx.imageSmoothingEnabled = false;
@@ -5201,52 +4435,65 @@
         targetWidth,
         targetHeight
       );
-      let imageData;
-      try {
-        imageData = qrScanCtx.getImageData(0, 0, targetWidth, targetHeight);
-      } catch (error) {
-        imageData = null;
-      }
-      let pixResult = null;
-      if (imageData && imageData.data) {
-        try {
-          pixResult = await detectPixieeCode(imageData, targetWidth, targetHeight);
-        } catch (error) {
-          pixResult = null;
-        }
-      }
-      if (imageData && imageData.data) {
-        const { data } = imageData;
-        let sum = 0;
-        const total = data.length / 4;
-        for (let i = 0; i < data.length; i += 4) {
-          const l = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
-          sum += l;
-        }
-        const avg = total ? sum / total : 128;
-        const threshold = Math.min(240, Math.max(48, avg * 0.94));
-        for (let i = 0; i < data.length; i += 4) {
-          const l = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
-          const v = l >= threshold ? 255 : 0;
-          data[i] = v;
-          data[i + 1] = v;
-          data[i + 2] = v;
-        }
-        qrScanCtx.putImageData(imageData, 0, 0);
-      }
       const detector = await ensureQrDetector();
       if (!detector) {
-        return { qr: null, pix: pixResult };
+        return { qr: null };
       }
-      const barcodes = await detector.detect(qrScanCanvas);
+      let barcodes = await detector.detect(qrScanCanvas);
       if (Array.isArray(barcodes) && barcodes.length) {
         const code = barcodes.find((entry) => normalizeQrValue(entry.rawValue)) || barcodes[0];
         if (code && typeof code.rawValue === 'string') {
           const previewGenerated = updateQrPreviewFromDetection(code.boundingBox || null);
-          return { qr: { value: code.rawValue.trim(), previewGenerated }, pix: pixResult };
+          return { qr: { value: code.rawValue.trim(), previewGenerated } };
         }
       }
-      return { qr: null, pix: pixResult };
+      if (qrEnhanceCtx) {
+        let imageData;
+        try {
+          imageData = qrScanCtx.getImageData(0, 0, targetWidth, targetHeight);
+        } catch (error) {
+          imageData = null;
+        }
+        if (imageData && imageData.data) {
+          const data = imageData.data;
+          let min = 255;
+          let max = 0;
+          for (let i = 0; i < data.length; i += 16) {
+            const l = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+            if (l < min) {
+              min = l;
+            }
+            if (l > max) {
+              max = l;
+            }
+          }
+          if (max - min >= QR_SCAN_ENHANCE_MIN_RANGE) {
+            const scale = 255 / (max - min);
+            const enhanced = new ImageData(new Uint8ClampedArray(data), imageData.width, imageData.height);
+            const out = enhanced.data;
+            for (let i = 0; i < out.length; i += 4) {
+              const l = 0.2126 * out[i] + 0.7152 * out[i + 1] + 0.0722 * out[i + 2];
+              const v = Math.max(0, Math.min(255, Math.round((l - min) * scale)));
+              out[i] = v;
+              out[i + 1] = v;
+              out[i + 2] = v;
+            }
+            qrEnhanceCanvas.width = targetWidth;
+            qrEnhanceCanvas.height = targetHeight;
+            qrEnhanceCtx.imageSmoothingEnabled = false;
+            qrEnhanceCtx.putImageData(enhanced, 0, 0);
+            barcodes = await detector.detect(qrEnhanceCanvas);
+            if (Array.isArray(barcodes) && barcodes.length) {
+              const code = barcodes.find((entry) => normalizeQrValue(entry.rawValue)) || barcodes[0];
+              if (code && typeof code.rawValue === 'string') {
+                const previewGenerated = updateQrPreviewFromDetection(code.boundingBox || null);
+                return { qr: { value: code.rawValue.trim(), previewGenerated } };
+              }
+            }
+          }
+        }
+      }
+      return { qr: null };
     }
 
     function handleQrDetection(payload) {
@@ -5274,105 +4521,6 @@
       }
     }
 
-    function confirmPixCandidate(payload) {
-      if (!payload || !payload.quantized) {
-        return null;
-      }
-      const now = Date.now();
-      const total = PIX_ART_SIZE * PIX_ART_SIZE;
-      const last = pixQuantizedHistory[pixQuantizedHistory.length - 1] || null;
-      if (!pixQuantizedHistory.length || now - pixQuantizedAt > PIX_STABLE_TIMEOUT_MS) {
-        pixQuantizedHistory = [payload.quantized];
-        pixQuantizedAt = now;
-        return null;
-      }
-      let diff = 0;
-      if (last) {
-        for (let i = 0; i < total; i += 1) {
-          if (payload.quantized[i] !== last[i]) {
-            diff += 1;
-            if (diff > PIX_STABLE_MAX_DIFF) {
-              break;
-            }
-          }
-        }
-      }
-      if (diff > PIX_STABLE_MAX_DIFF) {
-        pixQuantizedHistory = [payload.quantized];
-        pixQuantizedAt = now;
-        return null;
-      }
-      pixQuantizedHistory.push(payload.quantized);
-      pixQuantizedAt = now;
-      if (pixQuantizedHistory.length < PIX_STABLE_FRAMES) {
-        return null;
-      }
-      const counts = new Array(total).fill(0);
-      pixQuantizedHistory.forEach((frame) => {
-        for (let i = 0; i < total; i += 1) {
-          counts[i] += frame[i] ? 1 : 0;
-        }
-      });
-      const majority = Math.ceil(pixQuantizedHistory.length / 2);
-      const stableQuantized = new Uint8Array(total);
-      for (let i = 0; i < total; i += 1) {
-        stableQuantized[i] = counts[i] >= majority ? 1 : 0;
-      }
-      pixQuantizedHistory = [];
-      pixQuantizedAt = 0;
-      return { ...payload, quantized: stableQuantized };
-    }
-
-    async function handlePixDetection(payload) {
-      if (!payload || !payload.hash) {
-        return false;
-      }
-      const now = Date.now();
-      if (payload.hash === pixLastHash && now - pixLastDetectedAt < 2000) {
-        return true;
-      }
-      pixLastHash = payload.hash;
-      pixLastDetectedAt = now;
-      setQrReadoutTitle('PiXiEEDコード');
-      let previewGenerated = false;
-      if (payload.previewBox) {
-        previewGenerated = updateQrPreviewFromDetection(payload.previewBox);
-      }
-      updateQrReadout('PiXiEEDコードを検出しました。照会中...', '検出中', {
-        resultText: payload.hash.slice(0, 16),
-        forceShow: true,
-        showPreview: previewGenerated,
-        allowAutoOpen: false
-      });
-      const lookup = await fetchPixCodePayload(payload.hashes || payload.hash);
-      const record = lookup && lookup.payload ? lookup.payload : null;
-      if (lookup && lookup.hash) {
-        pixLastHash = lookup.hash;
-      }
-      if (record && record.payload_value) {
-        qrLastValue = record.payload_value;
-        const openUrl = record.payload_type === 'url' ? record.payload_value : '';
-        updateQrReadout('PiXiEEDコードを読み取りました。', '検出', {
-          resultText: record.payload_value,
-          openUrl,
-          forceShow: true,
-          showPreview: previewGenerated,
-          allowAutoOpen: record.payload_type === 'url'
-        });
-        setStatus(`PiXiEEDコード検出: ${truncateQrValue(record.payload_value, 64)}`);
-      } else {
-        qrLastValue = '';
-        updateQrReadout('PiXiEEDコードは未登録です。', '未登録', {
-          resultText: payload.hash,
-          forceShow: true,
-          showPreview: previewGenerated,
-          allowAutoOpen: false
-        });
-        setStatus('PiXiEEDコードは未登録です');
-      }
-      return true;
-    }
-
     async function handleQrScanTick() {
       if (!qrScanEnabled) {
         stopQrScanLoop();
@@ -5390,31 +4538,17 @@
       }
       try {
         const result = await scanQrFrame();
-        if (qrSupportAvailable === false && !qrSupportWarningShown) {
-          setStatus('QRスキャン非対応のため、PiXiEEDコードのみ検出します。');
-          qrSupportWarningShown = true;
-        }
         if (result && result.qr) {
+          qrScanMisses = 0;
+          qrScanBoostUntil = 0;
           handleQrDetection(result.qr);
           scheduleQrScanLoop(700);
           return;
         }
-        if (result && result.pix) {
-          const confirmed = confirmPixCandidate(result.pix);
-          if (confirmed) {
-            const stableHash = await hashPixQuantized(confirmed.quantized);
-            if (stableHash) {
-              await handlePixDetection({
-                ...confirmed,
-                hash: stableHash,
-                hashes: [stableHash]
-              });
-            }
-            scheduleQrScanLoop(700);
-            return;
-          }
-          scheduleQrScanLoop(240);
-          return;
+        qrScanMisses += 1;
+        if (qrScanMisses >= QR_SCAN_BOOST_AFTER) {
+          qrScanBoostUntil = Math.max(qrScanBoostUntil, Date.now() + QR_SCAN_BOOST_MS);
+          qrScanMisses = 0;
         }
         scheduleQrScanLoop(QR_SCAN_DEFAULT_INTERVAL_MS);
       } catch (error) {
