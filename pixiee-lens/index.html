@@ -2592,20 +2592,42 @@
     const PIXCODE_TABLE = 'pixfind_codes';
     const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
-    const PIX_ART_SIZE = 16;
+    const PIX_ART_SIZE = 32;
+    const PIX_COLOR_LEVELS = 32;
     const PIX_FINDER_SIZE = 7;
-    const PIX_FINDER_GAP = 2;
+    const PIX_FINDER_GAP = 3;
     const PIX_FRAME_OFFSET = PIX_FINDER_SIZE + PIX_FINDER_GAP;
     const PIX_FRAME_SIZE = PIX_ART_SIZE + PIX_FRAME_OFFSET * 2;
+    const PIX_QUIET_ZONE = 4;
     const PIX_FINDER_CENTER_OFFSET = 3;
     const PIX_AXIS_CELLS = PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET * 2;
-    const PIX_TIMING_ROW = PIX_FINDER_SIZE;
-    const PIX_TIMING_COL = PIX_FINDER_SIZE;
-    const PIX_TIMING_START = PIX_FINDER_SIZE;
-    const PIX_TIMING_END = PIX_FRAME_SIZE - PIX_FINDER_SIZE - 1;
+    const PIX_TIMING_ROW = PIX_FINDER_SIZE + 1;
+    const PIX_TIMING_COL = PIX_FINDER_SIZE + 1;
+    const PIX_TIMING_START = PIX_FINDER_SIZE + 1;
+    const PIX_TIMING_END = PIX_FRAME_SIZE - PIX_FINDER_SIZE - 2;
+    const PIX_FORMAT_ROW = PIX_FINDER_SIZE + 2;
+    const PIX_FORMAT_COL = PIX_FINDER_SIZE + 2;
+    const PIX_FORMAT_START = PIX_FRAME_OFFSET;
+    const PIX_FORMAT_END = PIX_FRAME_OFFSET + PIX_ART_SIZE - 1;
+    const PIX_FORMAT_PATTERN = '10100111001011011001011100101101';
+    const PIX_FORMAT_BITS = Array.from({ length: PIX_ART_SIZE }, (_, i) => PIX_FORMAT_PATTERN[i % PIX_FORMAT_PATTERN.length] === '1');
+    const PIX_RGB_PATCH_SIZE = 3;
+    const PIX_RGB_PATCH_GAP = 2;
+    const PIX_RGB_PATCH_MARGIN = 1;
+    const PIX_RGB_PATCH_COUNT = 3;
+    const PIX_RGB_PATCH_TOTAL_HEIGHT = (PIX_RGB_PATCH_SIZE * PIX_RGB_PATCH_COUNT) + (PIX_RGB_PATCH_GAP * (PIX_RGB_PATCH_COUNT - 1));
+    const PIX_RGB_PATCH_X = PIX_RGB_PATCH_MARGIN;
+    const PIX_RGB_PATCH_Y = Math.floor(PIX_FRAME_SIZE / 2) - Math.floor(PIX_RGB_PATCH_TOTAL_HEIGHT / 2);
     const PIX_ALIGN_SIZE = 2;
     const PIX_ALIGN_START = PIX_FRAME_OFFSET + PIX_ART_SIZE;
-    const PIX_ALIGN_CENTER = PIX_ALIGN_START + (PIX_ALIGN_SIZE - 1) / 2;
+    const PIX_ALIGN_CENTER_OFFSET = (PIX_ALIGN_SIZE - 1) / 2;
+    const PIX_ALIGN_POINTS = [
+      { x: PIX_ALIGN_START, y: PIX_ALIGN_START }
+    ];
+    const PIX_ALIGN_CENTERS = PIX_ALIGN_POINTS.map((pt) => ({
+      x: pt.x + PIX_ALIGN_CENTER_OFFSET,
+      y: pt.y + PIX_ALIGN_CENTER_OFFSET
+    }));
     const COLOR_SIMPLIFY_MAX_COLORS = 24;
     const COLOR_SIMPLIFY_BUCKET = 18;
     const AUTO_ADJUST_SAMPLE_SIZE = Object.freeze({ width: 180, height: 120 });
@@ -4334,52 +4356,236 @@
       return Math.min(max, Math.max(min, value));
     }
 
-    function isRedSample({ r, g, b }) {
-      return r > 120 && r - g > 40 && r - b > 40;
+    function computeLuma(r, g, b) {
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
     }
 
-    function isGreenSample({ r, g, b }) {
-      return g > 120 && g - r > 40 && g - b > 40;
+    function quantizeChannel(value) {
+      const normalized = Math.max(0, Math.min(255, value));
+      const level = Math.round((normalized / 255) * (PIX_COLOR_LEVELS - 1));
+      return Math.max(0, Math.min(PIX_COLOR_LEVELS - 1, level));
     }
 
-    function isBlueSample({ r, g, b }) {
-      return b > 120 && b - r > 40 && b - g > 40;
-    }
-
-    function isBlackSample({ r, g, b }) {
-      return r < 100 && g < 100 && b < 100;
-    }
-
-    function isYellowSample({ r, g, b }) {
-      return r > 140 && g > 140 && Math.abs(r - g) < 45 && b < 120;
-    }
-
-    function sampleTimingWhites(sampleAt) {
-      const reds = [];
-      const greens = [];
-      const blues = [];
-      for (let x = PIX_TIMING_START; x <= PIX_TIMING_END; x += 1) {
-        if ((x - PIX_TIMING_START) % 2 === 0) continue;
-        const color = sampleAt(x, PIX_TIMING_ROW);
-        reds.push(color.r);
-        greens.push(color.g);
-        blues.push(color.b);
+    function estimateBinaryThreshold(imageData, width, height) {
+      const data = imageData.data;
+      const stride = 4;
+      let min = 255;
+      let max = 0;
+      for (let y = 0; y < height; y += stride) {
+        for (let x = 0; x < width; x += stride) {
+          const idx = (y * width + x) * 4;
+          const lum = computeLuma(data[idx], data[idx + 1], data[idx + 2]);
+          if (lum < min) {
+            min = lum;
+          }
+          if (lum > max) {
+            max = lum;
+          }
+        }
       }
-      for (let y = PIX_TIMING_START; y <= PIX_TIMING_END; y += 1) {
-        if ((y - PIX_TIMING_START) % 2 === 0) continue;
-        const color = sampleAt(PIX_TIMING_COL, y);
-        reds.push(color.r);
-        greens.push(color.g);
-        blues.push(color.b);
+      const threshold = (min + max) / 2;
+      return { threshold, min, max };
+    }
+
+    function isCmykPrimary(r, g, b) {
+      const isCyan = r < 60 && g > 200 && b > 200;
+      const isMagenta = g < 60 && r > 200 && b > 200;
+      const isYellow = b < 60 && r > 200 && g > 200;
+      return isCyan || isMagenta || isYellow;
+    }
+
+    function getLumaAt(data, width, x, y) {
+      const idx = (y * width + x) * 4;
+      return computeLuma(data[idx], data[idx + 1], data[idx + 2]);
+    }
+
+    function isDarkAt(data, width, x, y, threshold) {
+      const idx = (y * width + x) * 4;
+      const r = data[idx];
+      const g = data[idx + 1];
+      const b = data[idx + 2];
+      if (isCmykPrimary(r, g, b)) {
+        return true;
       }
-      if (!reds.length) {
+      return computeLuma(r, g, b) < threshold;
+    }
+
+    function matchFinderPattern(runs) {
+      if (!runs || runs.length !== 5) {
         return null;
       }
-      const median = (values) => {
-        const sorted = values.slice().sort((a, b) => a - b);
-        return sorted[Math.floor(sorted.length / 2)];
-      };
-      return { r: median(reds), g: median(greens), b: median(blues) };
+      const total = runs.reduce((sum, value) => sum + value, 0);
+      if (total < 7) {
+        return null;
+      }
+      const module = total / 7;
+      const tolerance = module * 0.7;
+      if (Math.abs(runs[0] - module) > tolerance) return null;
+      if (Math.abs(runs[1] - module) > tolerance) return null;
+      if (Math.abs(runs[2] - module * 3) > module * 2.2) return null;
+      if (Math.abs(runs[3] - module) > tolerance) return null;
+      if (Math.abs(runs[4] - module) > tolerance) return null;
+      return module;
+    }
+
+    function crossCheckVertical(data, width, height, centerX, centerY, threshold, expectedModule) {
+      const x = clampValue(Math.round(centerX), 0, width - 1);
+      let y = clampValue(Math.round(centerY), 0, height - 1);
+      const run = [0, 0, 0, 0, 0];
+      while (y >= 0 && isDarkAt(data, width, x, y, threshold)) {
+        run[2] += 1;
+        y -= 1;
+      }
+      while (y >= 0 && !isDarkAt(data, width, x, y, threshold)) {
+        run[1] += 1;
+        y -= 1;
+      }
+      while (y >= 0 && isDarkAt(data, width, x, y, threshold)) {
+        run[0] += 1;
+        y -= 1;
+      }
+      y = clampValue(Math.round(centerY) + 1, 0, height - 1);
+      while (y < height && isDarkAt(data, width, x, y, threshold)) {
+        run[2] += 1;
+        y += 1;
+      }
+      while (y < height && !isDarkAt(data, width, x, y, threshold)) {
+        run[3] += 1;
+        y += 1;
+      }
+      while (y < height && isDarkAt(data, width, x, y, threshold)) {
+        run[4] += 1;
+        y += 1;
+      }
+      const module = matchFinderPattern(run);
+      if (!module) {
+        return null;
+      }
+      if (expectedModule && Math.abs(module - expectedModule) / expectedModule > 0.6) {
+        return null;
+      }
+      return module;
+    }
+
+    function findFinderCandidates(imageData, width, height, threshold) {
+      const data = imageData.data;
+      const stride = 2;
+      const candidates = [];
+      for (let y = 0; y < height; y += stride) {
+        let runLengths = [];
+        let runColors = [];
+        let current = isDarkAt(data, width, 0, y, threshold);
+        let length = 1;
+        for (let x = 1; x < width; x += 1) {
+          const color = isDarkAt(data, width, x, y, threshold);
+          if (color === current) {
+            length += 1;
+            continue;
+          }
+          runLengths.push(length);
+          runColors.push(current);
+          if (runLengths.length > 5) {
+            runLengths.shift();
+            runColors.shift();
+          }
+          if (
+            runLengths.length === 5 &&
+            runColors[0] &&
+            !runColors[1] &&
+            runColors[2] &&
+            !runColors[3] &&
+            runColors[4]
+          ) {
+            const module = matchFinderPattern(runLengths);
+            if (module) {
+              const centerX = x - (runLengths[4] + runLengths[3] + runLengths[2] / 2);
+              const centerY = y;
+              const verticalModule = crossCheckVertical(data, width, height, centerX, centerY, threshold, module);
+              if (verticalModule) {
+                candidates.push({
+                  x: centerX,
+                  y: centerY,
+                  module: (module + verticalModule) / 2
+                });
+              }
+            }
+          }
+          current = color;
+          length = 1;
+        }
+      }
+      return candidates;
+    }
+
+    function clusterFinderCandidates(candidates) {
+      const clusters = [];
+      candidates.forEach((candidate) => {
+        let matched = false;
+        clusters.forEach((cluster) => {
+          const distance = Math.hypot(cluster.x - candidate.x, cluster.y - candidate.y);
+          if (distance < candidate.module * 2) {
+            const count = cluster.count + 1;
+            cluster.x = (cluster.x * cluster.count + candidate.x) / count;
+            cluster.y = (cluster.y * cluster.count + candidate.y) / count;
+            cluster.module = (cluster.module * cluster.count + candidate.module) / count;
+            cluster.count = count;
+            matched = true;
+          }
+        });
+        if (!matched) {
+          clusters.push({ ...candidate, count: 1 });
+        }
+      });
+      return clusters;
+    }
+
+    function scoreTriplet(tl, tr, bl) {
+      const v1x = tr.x - tl.x;
+      const v1y = tr.y - tl.y;
+      const v2x = bl.x - tl.x;
+      const v2y = bl.y - tl.y;
+      const len1 = Math.hypot(v1x, v1y);
+      const len2 = Math.hypot(v2x, v2y);
+      if (len1 < 8 || len2 < 8) {
+        return -Infinity;
+      }
+      const dot = Math.abs((v1x * v2x + v1y * v2y) / (len1 * len2));
+      const angleScore = 1 - clampValue(dot, 0, 1);
+      const ratio = Math.min(len1, len2) / Math.max(len1, len2);
+      return angleScore * 0.7 + ratio * 0.3;
+    }
+
+    function selectFinderTriplet(candidates) {
+      if (!candidates || candidates.length < 3) {
+        return null;
+      }
+      let best = null;
+      let bestScore = -Infinity;
+      for (let i = 0; i < candidates.length - 2; i += 1) {
+        for (let j = i + 1; j < candidates.length - 1; j += 1) {
+          for (let k = j + 1; k < candidates.length; k += 1) {
+            const points = [candidates[i], candidates[j], candidates[k]];
+            points.sort((a, b) => (a.x + a.y) - (b.x + b.y));
+            const tl = points[0];
+            const p1 = points[1];
+            const p2 = points[2];
+            let tr = p1;
+            let bl = p2;
+            const score1 = scoreTriplet(tl, tr, bl);
+            const score2 = scoreTriplet(tl, p2, p1);
+            if (score2 > score1) {
+              tr = p2;
+              bl = p1;
+            }
+            const score = Math.max(score1, score2);
+            if (score > bestScore) {
+              bestScore = score;
+              best = { tl, tr, bl };
+            }
+          }
+        }
+      }
+      return best;
     }
 
     function samplePixel(data, width, height, x, y, radius = 1) {
@@ -4407,124 +4613,7 @@
       return { r: r / count, g: g / count, b: b / count };
     }
 
-    function findColorCenters(imageData, width, height) {
-      const data = imageData.data;
-      const stride = 2;
-      const candidates = {
-        red: { score: -Infinity, x: 0, y: 0 },
-        green: { score: -Infinity, x: 0, y: 0 },
-        blue: { score: -Infinity, x: 0, y: 0 }
-      };
-      const centerX = width / 2;
-      const centerY = height / 2;
-      const maxDist = Math.hypot(centerX, centerY) || 1;
-      for (let y = 0; y < height; y += stride) {
-        for (let x = 0; x < width; x += stride) {
-          const idx = (y * width + x) * 4;
-          const r = data[idx];
-          const g = data[idx + 1];
-          const b = data[idx + 2];
-          const max = Math.max(r, g, b);
-          const min = Math.min(r, g, b);
-          if (max < 120 || max - min < 50) {
-            continue;
-          }
-          const edgeBias = (Math.hypot(x - centerX, y - centerY) / maxDist) * 80;
-          const redScore = r - (g + b) / 2;
-          if (redScore > 60 && r - g > 40 && r - b > 40) {
-            const score = redScore + edgeBias;
-            if (score > candidates.red.score) {
-              candidates.red = { score, x, y };
-            }
-          }
-          const greenScore = g - (r + b) / 2;
-          if (greenScore > 60 && g - r > 40 && g - b > 40) {
-            const score = greenScore + edgeBias;
-            if (score > candidates.green.score) {
-              candidates.green = { score, x, y };
-            }
-          }
-          const blueScore = b - (r + g) / 2;
-          if (blueScore > 60 && b - r > 40 && b - g > 40) {
-            const score = blueScore + edgeBias;
-            if (score > candidates.blue.score) {
-              candidates.blue = { score, x, y };
-            }
-          }
-        }
-      }
-      if (!Number.isFinite(candidates.red.score) || !Number.isFinite(candidates.green.score) || !Number.isFinite(candidates.blue.score)) {
-        return null;
-      }
-      const refineRadius = clampValue(Math.round(Math.min(width, height) * 0.04), 4, 18);
-      const refineCenter = (candidate, testFn) => {
-        let sumX = 0;
-        let sumY = 0;
-        let count = 0;
-        const startX = Math.max(0, Math.floor(candidate.x - refineRadius));
-        const endX = Math.min(width - 1, Math.ceil(candidate.x + refineRadius));
-        const startY = Math.max(0, Math.floor(candidate.y - refineRadius));
-        const endY = Math.min(height - 1, Math.ceil(candidate.y + refineRadius));
-        for (let y = startY; y <= endY; y += 1) {
-          for (let x = startX; x <= endX; x += 1) {
-            const idx = (y * width + x) * 4;
-            const r = data[idx];
-            const g = data[idx + 1];
-            const b = data[idx + 2];
-            if (testFn({ r, g, b })) {
-              sumX += x;
-              sumY += y;
-              count += 1;
-            }
-          }
-        }
-        if (!count) {
-          return { x: candidate.x, y: candidate.y };
-        }
-        return { x: sumX / count, y: sumY / count };
-      };
-      return {
-        red: refineCenter(candidates.red, isRedSample),
-        green: refineCenter(candidates.green, isGreenSample),
-        blue: refineCenter(candidates.blue, isBlueSample)
-      };
-    }
-
-    function findBlackCenterNear(imageData, width, height, target, searchRadius, sampleRadius) {
-      const data = imageData.data;
-      if (!target || !Number.isFinite(target.x) || !Number.isFinite(target.y)) {
-        return null;
-      }
-      const radius = clampValue(Math.round(searchRadius), 6, 32);
-      let best = null;
-      let bestScore = -Infinity;
-      const startX = Math.max(0, Math.floor(target.x - radius));
-      const endX = Math.min(width - 1, Math.ceil(target.x + radius));
-      const startY = Math.max(0, Math.floor(target.y - radius));
-      const endY = Math.min(height - 1, Math.ceil(target.y + radius));
-      for (let y = startY; y <= endY; y += 2) {
-        for (let x = startX; x <= endX; x += 2) {
-          const color = samplePixel(data, width, height, x, y, sampleRadius);
-          const darkness = 255 - (color.r + color.g + color.b) / 3;
-          const dist = Math.hypot(x - target.x, y - target.y);
-          const score = darkness - dist * 1.4;
-          if (score > bestScore) {
-            bestScore = score;
-            best = { x, y };
-          }
-        }
-      }
-      if (!best) {
-        return null;
-      }
-      const sample = samplePixel(data, width, height, best.x, best.y, sampleRadius);
-      if (!isBlackSample(sample)) {
-        return null;
-      }
-      return best;
-    }
-
-    function findAlignmentCenter(imageData, width, height, target, searchRadius, sampleRadius) {
+    function findAlignmentCenter(imageData, width, height, target, searchRadius, threshold) {
       const data = imageData.data;
       if (!target || !Number.isFinite(target.x) || !Number.isFinite(target.y)) {
         return null;
@@ -4539,8 +4628,7 @@
       let count = 0;
       for (let y = startY; y <= endY; y += 2) {
         for (let x = startX; x <= endX; x += 2) {
-          const color = samplePixel(data, width, height, x, y, sampleRadius);
-          if (!isYellowSample(color)) {
+          if (!isDarkAt(data, width, x, y, threshold)) {
             continue;
           }
           sumX += x;
@@ -4647,15 +4735,22 @@
     }
 
     async function detectPixieeCode(imageData, width, height) {
-      const centers = findColorCenters(imageData, width, height);
-      if (!centers) return null;
+      const { threshold, min, max } = estimateBinaryThreshold(imageData, width, height);
+      const candidates = clusterFinderCandidates(findFinderCandidates(imageData, width, height, threshold));
+      const triplet = selectFinderTriplet(candidates);
+      if (!triplet) {
+        return null;
+      }
+      const tl = triplet.tl;
+      const tr = triplet.tr;
+      const bl = triplet.bl;
       const vx = {
-        x: (centers.green.x - centers.red.x) / PIX_AXIS_CELLS,
-        y: (centers.green.y - centers.red.y) / PIX_AXIS_CELLS
+        x: (tr.x - tl.x) / PIX_AXIS_CELLS,
+        y: (tr.y - tl.y) / PIX_AXIS_CELLS
       };
       const vy = {
-        x: (centers.blue.x - centers.red.x) / PIX_AXIS_CELLS,
-        y: (centers.blue.y - centers.red.y) / PIX_AXIS_CELLS
+        x: (bl.x - tl.x) / PIX_AXIS_CELLS,
+        y: (bl.y - tl.y) / PIX_AXIS_CELLS
       };
       const vxLen = Math.hypot(vx.x, vx.y);
       const vyLen = Math.hypot(vy.x, vy.y);
@@ -4663,19 +4758,15 @@
         return null;
       }
       const dot = (vx.x * vy.x + vx.y * vy.y) / (vxLen * vyLen);
-      if (Math.abs(dot) > 0.5) {
+      if (Math.abs(dot) > 0.6) {
         return null;
       }
       const avgCell = (vxLen + vyLen) / 2;
       const sampleRadius = clampValue(Math.round(avgCell * 0.35), 1, 4);
-      const predictedBlack = gridToImagePoint(
-        centers.red,
-        vx,
-        vy,
-        PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET,
-        PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET
-      );
-      const blackCenter = findBlackCenterNear(imageData, width, height, predictedBlack, avgCell * 6, sampleRadius) || predictedBlack;
+      const predictedBr = {
+        x: tl.x + vx.x * PIX_AXIS_CELLS + vy.x * PIX_AXIS_CELLS,
+        y: tl.y + vx.y * PIX_AXIS_CELLS + vy.y * PIX_AXIS_CELLS
+      };
       const matrix = computeHomography(
         [
           { x: PIX_FINDER_CENTER_OFFSET, y: PIX_FINDER_CENTER_OFFSET },
@@ -4683,25 +4774,33 @@
           { x: PIX_FINDER_CENTER_OFFSET, y: PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET },
           { x: PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET, y: PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET }
         ],
-        [centers.red, centers.green, centers.blue, blackCenter]
+        [tl, tr, bl, predictedBr]
       );
       if (!matrix) {
         return null;
       }
-      const predictedAlign = applyHomography(matrix, PIX_ALIGN_CENTER, PIX_ALIGN_CENTER);
       let alignOffset = { x: 0, y: 0 };
-      if (predictedAlign) {
+      const alignOffsets = [];
+      PIX_ALIGN_CENTERS.forEach((center) => {
+        const predictedAlign = applyHomography(matrix, center.x, center.y);
+        if (!predictedAlign) {
+          return;
+        }
         const alignCenter = findAlignmentCenter(
           imageData,
           width,
           height,
           predictedAlign,
           avgCell * 6,
-          sampleRadius
+          threshold
         );
         if (alignCenter) {
-          alignOffset = { x: alignCenter.x - predictedAlign.x, y: alignCenter.y - predictedAlign.y };
+          alignOffsets.push({ x: alignCenter.x - predictedAlign.x, y: alignCenter.y - predictedAlign.y });
         }
+      });
+      if (alignOffsets.length) {
+        const sum = alignOffsets.reduce((acc, cur) => ({ x: acc.x + cur.x, y: acc.y + cur.y }), { x: 0, y: 0 });
+        alignOffset = { x: sum.x / alignOffsets.length, y: sum.y / alignOffsets.length };
       }
       const mapGridPoint = (gx, gy) => {
         const pt = applyHomography(matrix, gx, gy);
@@ -4740,34 +4839,188 @@
         };
         return { r: median(reds), g: median(greens), b: median(blues) };
       };
-      const sampleRed = sampleAt(PIX_FINDER_CENTER_OFFSET, PIX_FINDER_CENTER_OFFSET);
-      const sampleGreen = sampleAt(PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET, PIX_FINDER_CENTER_OFFSET);
-      const sampleBlue = sampleAt(PIX_FINDER_CENTER_OFFSET, PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET);
-      const sampleBlack = sampleAt(
-        PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET,
-        PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET
-      );
-      if (!isRedSample(sampleRed) || !isGreenSample(sampleGreen) || !isBlueSample(sampleBlue) || !isBlackSample(sampleBlack)) {
-        return null;
-      }
+
+      const timingSamples = () => {
+        const darkLuma = [];
+        const lightLuma = [];
+        const darkColors = { r: [], g: [], b: [] };
+        const lightColors = { r: [], g: [], b: [] };
+        const pushColor = (bucket, color) => {
+          bucket.r.push(color.r);
+          bucket.g.push(color.g);
+          bucket.b.push(color.b);
+        };
+        for (let x = PIX_TIMING_START; x <= PIX_TIMING_END; x += 1) {
+          const color = sampleAt(x, PIX_TIMING_ROW);
+          const lum = computeLuma(color.r, color.g, color.b);
+          if ((x - PIX_TIMING_START) % 2 === 0) {
+            darkLuma.push(lum);
+            pushColor(darkColors, color);
+          } else {
+            lightLuma.push(lum);
+            pushColor(lightColors, color);
+          }
+        }
+        for (let y = PIX_TIMING_START; y <= PIX_TIMING_END; y += 1) {
+          const color = sampleAt(PIX_TIMING_COL, y);
+          const lum = computeLuma(color.r, color.g, color.b);
+          if ((y - PIX_TIMING_START) % 2 === 0) {
+            darkLuma.push(lum);
+            pushColor(darkColors, color);
+          } else {
+            lightLuma.push(lum);
+            pushColor(lightColors, color);
+          }
+        }
+        if (!darkLuma.length || !lightLuma.length) {
+          return null;
+        }
+        const avg = (values) => values.reduce((sum, v) => sum + v, 0) / values.length;
+        const avgColor = (bucket) => ({
+          r: avg(bucket.r),
+          g: avg(bucket.g),
+          b: avg(bucket.b)
+        });
+        return {
+          darkLum: avg(darkLuma),
+          lightLum: avg(lightLuma),
+          darkColor: avgColor(darkColors),
+          lightColor: avgColor(lightColors)
+        };
+      };
+
+      const timing = timingSamples();
+      const timingThreshold = timing ? (timing.darkLum + timing.lightLum) / 2 : threshold;
+      const averageColors = (colors) => {
+        if (!colors.length) return null;
+        const sum = colors.reduce((acc, cur) => ({
+          r: acc.r + cur.r,
+          g: acc.g + cur.g,
+          b: acc.b + cur.b
+        }), { r: 0, g: 0, b: 0 });
+        return {
+          r: sum.r / colors.length,
+          g: sum.g / colors.length,
+          b: sum.b / colors.length
+        };
+      };
+      const samplePatchAverage = (startX, startY, size) => {
+        const colors = [];
+        for (let y = 0; y < size; y += 1) {
+          for (let x = 0; x < size; x += 1) {
+            colors.push(sampleAt(startX + x, startY + y));
+          }
+        }
+        return averageColors(colors);
+      };
+      const sampleAreaAverage = (startX, startY, width, height) => {
+        const colors = [];
+        for (let y = 0; y < height; y += 1) {
+          for (let x = 0; x < width; x += 1) {
+            colors.push(sampleAt(startX + x, startY + y));
+          }
+        }
+        return averageColors(colors);
+      };
+      const samplePointsAverage = (points) => {
+        const colors = points.map((point) => sampleAt(point.x, point.y));
+        return averageColors(colors);
+      };
+      const isNearWhite = (color) => {
+        if (!color) return true;
+        return color.r > 230 && color.g > 230 && color.b > 230;
+      };
+      const sanitizeRef = (color) => (isNearWhite(color) ? null : color);
+      const cyanRef = samplePatchAverage(2, 2, 3);
+      const yellowRef = samplePatchAverage(PIX_FRAME_SIZE - PIX_FINDER_SIZE + 2, 2, 3);
+      const magentaRef = samplePatchAverage(2, PIX_FRAME_SIZE - PIX_FINDER_SIZE + 2, 3);
+      const blackRef = samplePatchAverage(PIX_ALIGN_START, PIX_ALIGN_START, PIX_ALIGN_SIZE);
+      const whiteRef = samplePointsAverage([
+        { x: PIX_FINDER_SIZE, y: 1 },
+        { x: 1, y: PIX_FINDER_SIZE },
+        { x: PIX_FINDER_SIZE, y: PIX_FINDER_SIZE }
+      ]);
+      const redRef = sampleAt(PIX_RGB_PATCH_X + 1, PIX_RGB_PATCH_Y + 1);
+      const greenRef = sampleAt(PIX_RGB_PATCH_X + 1, PIX_RGB_PATCH_Y + 1 + (PIX_RGB_PATCH_SIZE + PIX_RGB_PATCH_GAP));
+      const blueRef = sampleAt(PIX_RGB_PATCH_X + 1, PIX_RGB_PATCH_Y + 1 + (PIX_RGB_PATCH_SIZE + PIX_RGB_PATCH_GAP) * 2);
+      const fallbackBlack = timing?.darkColor ? timing.darkColor : { r: 0, g: 0, b: 0 };
+      const fallbackWhite = timing?.lightColor ? timing.lightColor : { r: 255, g: 255, b: 255 };
+      const refBlack = blackRef || fallbackBlack;
+      const refWhite = whiteRef || fallbackWhite;
+      const refCyan = cyanRef || { r: 0, g: 255, b: 255 };
+      const refMagenta = magentaRef || { r: 255, g: 0, b: 255 };
+      const refYellow = yellowRef || { r: 255, g: 255, b: 0 };
+      const refRed = sanitizeRef(redRef);
+      const refGreen = sanitizeRef(greenRef);
+      const refBlue = sanitizeRef(blueRef);
+      const avg = (...values) => values.reduce((sum, value) => sum + value, 0) / values.length;
+      const avgChannel = (colors, key, fallback) => {
+        const values = colors
+          .map((color) => (color ? color[key] : null))
+          .filter((value) => Number.isFinite(value));
+        if (!values.length) return fallback;
+        return values.reduce((sum, value) => sum + value, 0) / values.length;
+      };
+      const channelRefs = {
+        r: {
+          low: avgChannel([refBlack, refCyan, refGreen, refBlue], 'r', fallbackBlack.r),
+          high: avgChannel([refWhite, refMagenta, refYellow, refRed], 'r', fallbackWhite.r)
+        },
+        g: {
+          low: avgChannel([refBlack, refMagenta, refRed, refBlue], 'g', fallbackBlack.g),
+          high: avgChannel([refWhite, refCyan, refYellow, refGreen], 'g', fallbackWhite.g)
+        },
+        b: {
+          low: avgChannel([refBlack, refYellow, refRed, refGreen], 'b', fallbackBlack.b),
+          high: avgChannel([refWhite, refCyan, refMagenta, refBlue], 'b', fallbackWhite.b)
+        }
+      };
+      const fallbackChannelRefs = {
+        r: { low: fallbackBlack.r, high: fallbackWhite.r },
+        g: { low: fallbackBlack.g, high: fallbackWhite.g },
+        b: { low: fallbackBlack.b, high: fallbackWhite.b }
+      };
+      const sanitizeChannelRange = (ref, fallback) => {
+        const range = ref.high - ref.low;
+        if (!Number.isFinite(range) || range < 8) {
+          return fallback;
+        }
+        return ref;
+      };
+      const safeChannelRefs = {
+        r: sanitizeChannelRange(channelRefs.r, fallbackChannelRefs.r),
+        g: sanitizeChannelRange(channelRefs.g, fallbackChannelRefs.g),
+        b: sanitizeChannelRange(channelRefs.b, fallbackChannelRefs.b)
+      };
+      const normalizeChannel = (value, black, white) => {
+        const range = white - black;
+        if (!Number.isFinite(range) || range < 8) {
+          return clampValue(Math.round(value), 0, 255);
+        }
+        return clampValue(Math.round(((value - black) * 255) / range), 0, 255);
+      };
+      const normalizeColor = (color) => ({
+        r: normalizeChannel(color.r, safeChannelRefs.r.low, safeChannelRefs.r.high),
+        g: normalizeChannel(color.g, safeChannelRefs.g.low, safeChannelRefs.g.high),
+        b: normalizeChannel(color.b, safeChannelRefs.b.low, safeChannelRefs.b.high)
+      });
       const checkTiming = () => {
         let matches = 0;
         let total = 0;
-        const threshold = 140;
         for (let x = PIX_TIMING_START; x <= PIX_TIMING_END; x += 1) {
           const color = sampleAt(x, PIX_TIMING_ROW);
-          const lum = (color.r + color.g + color.b) / 3;
+          const lum = computeLuma(color.r, color.g, color.b);
           const expectDark = (x - PIX_TIMING_START) % 2 === 0;
-          if ((lum < threshold) === expectDark) {
+          if ((lum < timingThreshold) === expectDark) {
             matches += 1;
           }
           total += 1;
         }
         for (let y = PIX_TIMING_START; y <= PIX_TIMING_END; y += 1) {
           const color = sampleAt(PIX_TIMING_COL, y);
-          const lum = (color.r + color.g + color.b) / 3;
+          const lum = computeLuma(color.r, color.g, color.b);
           const expectDark = (y - PIX_TIMING_START) % 2 === 0;
-          if ((lum < threshold) === expectDark) {
+          if ((lum < timingThreshold) === expectDark) {
             matches += 1;
           }
           total += 1;
@@ -4780,42 +5033,52 @@
       if (checkTiming() < 0.6) {
         return null;
       }
-      const biasR = sampleBlack.r;
-      const biasG = sampleBlack.g;
-      const biasB = sampleBlack.b;
-      const colorGainR = clampValue(255 / Math.max(8, sampleRed.r - biasR), 0.6, 3.2);
-      const colorGainG = clampValue(255 / Math.max(8, sampleGreen.g - biasG), 0.6, 3.2);
-      const colorGainB = clampValue(255 / Math.max(8, sampleBlue.b - biasB), 0.6, 3.2);
-      const whiteSample = sampleTimingWhites(sampleAt);
-      const whiteGainR = whiteSample ? clampValue(255 / Math.max(8, whiteSample.r - biasR), 0.6, 3.2) : null;
-      const whiteGainG = whiteSample ? clampValue(255 / Math.max(8, whiteSample.g - biasG), 0.6, 3.2) : null;
-      const whiteGainB = whiteSample ? clampValue(255 / Math.max(8, whiteSample.b - biasB), 0.6, 3.2) : null;
 
-      const buildQuantized = (gainR, gainG, gainB) => {
+      const checkFormatBand = () => {
+        let matches = 0;
+        let total = 0;
+        for (let x = PIX_FORMAT_START; x <= PIX_FORMAT_END; x += 1) {
+          const idx = x - PIX_FORMAT_START;
+          const expectDark = PIX_FORMAT_BITS[idx];
+          const rowColor = sampleAt(x, PIX_FORMAT_ROW);
+          const rowLum = computeLuma(rowColor.r, rowColor.g, rowColor.b);
+          if ((rowLum < timingThreshold) === expectDark) {
+            matches += 1;
+          }
+          total += 1;
+          const colColor = sampleAt(PIX_FORMAT_COL, PIX_FORMAT_START + idx);
+          const colLum = computeLuma(colColor.r, colColor.g, colColor.b);
+          if ((colLum < timingThreshold) === expectDark) {
+            matches += 1;
+          }
+          total += 1;
+        }
+        return total ? matches / total : 0;
+      };
+
+      if (checkFormatBand() < 0.6) {
+        return null;
+      }
+
+      const buildQuantized = () => {
         const quantized = new Uint8Array(PIX_ART_SIZE * PIX_ART_SIZE * 3);
         let writeIndex = 0;
         for (let y = 0; y < PIX_ART_SIZE; y++) {
           for (let x = 0; x < PIX_ART_SIZE; x++) {
             const color = sampleAt(PIX_FRAME_OFFSET + x, PIX_FRAME_OFFSET + y);
-            const r = clampValue((color.r - biasR) * gainR, 0, 255);
-            const g = clampValue((color.g - biasG) * gainG, 0, 255);
-            const b = clampValue((color.b - biasB) * gainB, 0, 255);
-            quantized[writeIndex++] = Math.round(r / 17);
-            quantized[writeIndex++] = Math.round(g / 17);
-            quantized[writeIndex++] = Math.round(b / 17);
+            const normalized = normalizeColor(color);
+            quantized[writeIndex++] = quantizeChannel(normalized.r);
+            quantized[writeIndex++] = quantizeChannel(normalized.g);
+            quantized[writeIndex++] = quantizeChannel(normalized.b);
           }
         }
         return quantized;
       };
 
-      const primaryQuantized = buildQuantized(colorGainR, colorGainG, colorGainB);
+      const primaryQuantized = buildQuantized();
       const hash = await hashPixQuantized(primaryQuantized);
       if (!hash) return null;
-      let altHash = '';
-      if (whiteGainR && whiteGainG && whiteGainB) {
-        const whiteQuantized = buildQuantized(whiteGainR, whiteGainG, whiteGainB);
-        altHash = await hashPixQuantized(whiteQuantized);
-      }
+
       const cornerPoints = [
         mapGridPoint(0, 0),
         mapGridPoint(PIX_FRAME_SIZE - 1, 0),
@@ -4834,9 +5097,6 @@
         height: clampValue(Math.max(...ys) - Math.min(...ys), 1, height)
       };
       const hashes = [hash];
-      if (altHash && altHash !== hash) {
-        hashes.push(altHash);
-      }
       return { hash, hashes, previewBox };
     }
 
