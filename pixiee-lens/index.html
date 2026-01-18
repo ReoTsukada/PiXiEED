@@ -2594,10 +2594,10 @@
     const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
     const PIX_ART_SIZE = 16;
     const PIX_FINDER_SIZE = 7;
-    const PIX_FINDER_GAP = 3;
+    const PIX_FINDER_GAP = 2;
     const PIX_FRAME_OFFSET = PIX_FINDER_SIZE + PIX_FINDER_GAP;
     const PIX_FRAME_SIZE = PIX_ART_SIZE + PIX_FRAME_OFFSET * 2;
-    const PIX_QUIET_ZONE = 4;
+    const PIX_QUIET_ZONE = 6;
     const PIX_FINDER_CENTER_OFFSET = 3;
     const PIX_AXIS_CELLS = PIX_FRAME_SIZE - 1 - PIX_FINDER_CENTER_OFFSET * 2;
     const PIX_TIMING_ROW = PIX_FINDER_SIZE - 1;
@@ -2715,7 +2715,7 @@
     const qrScanCtx = qrScanCanvas.getContext ? qrScanCanvas.getContext('2d', { willReadFrequently: true }) : null;
     let pixLastHash = '';
     let pixLastDetectedAt = 0;
-    const PIX_DETECT_REQUIRED = 2;
+    const PIX_DETECT_REQUIRED = 1;
     const PIX_DETECT_TIMEOUT_MS = 1200;
     let pixCandidateHash = '';
     let pixCandidateCount = 0;
@@ -4363,12 +4363,18 @@
     function estimateBinaryThreshold(imageData, width, height) {
       const data = imageData.data;
       const stride = 4;
+      const hist = new Array(256).fill(0);
       let min = 255;
       let max = 0;
+      let total = 0;
+      let sum = 0;
       for (let y = 0; y < height; y += stride) {
         for (let x = 0; x < width; x += stride) {
           const idx = (y * width + x) * 4;
-          const lum = computeLuma(data[idx], data[idx + 1], data[idx + 2]);
+          const lum = Math.max(0, Math.min(255, Math.round(computeLuma(data[idx], data[idx + 1], data[idx + 2]))));
+          hist[lum] += 1;
+          total += 1;
+          sum += lum;
           if (lum < min) {
             min = lum;
           }
@@ -4377,7 +4383,35 @@
           }
         }
       }
-      const threshold = (min + max) / 2;
+      if (!total) {
+        return { threshold: 128, min: 0, max: 255 };
+      }
+      let sumB = 0;
+      let wB = 0;
+      let varMax = -1;
+      let threshold = (min + max) / 2;
+      for (let t = 0; t < 256; t += 1) {
+        wB += hist[t];
+        if (!wB) {
+          continue;
+        }
+        const wF = total - wB;
+        if (!wF) {
+          break;
+        }
+        sumB += t * hist[t];
+        const mB = sumB / wB;
+        const mF = (sum - sumB) / wF;
+        const diff = mB - mF;
+        const varBetween = wB * wF * diff * diff;
+        if (varBetween > varMax) {
+          varMax = varBetween;
+          threshold = t;
+        }
+      }
+      if (max - min < 40) {
+        threshold = (min + max) / 2;
+      }
       return { threshold, min, max };
     }
 
@@ -4399,10 +4433,10 @@
         return null;
       }
       const module = total / 7;
-      const tolerance = module * 0.7;
+      const tolerance = module * (module < 6 ? 0.9 : 0.7);
       if (Math.abs(runs[0] - module) > tolerance) return null;
       if (Math.abs(runs[1] - module) > tolerance) return null;
-      if (Math.abs(runs[2] - module * 3) > module * 2.2) return null;
+      if (Math.abs(runs[2] - module * 3) > module * (module < 6 ? 2.6 : 2.2)) return null;
       if (Math.abs(runs[3] - module) > tolerance) return null;
       if (Math.abs(runs[4] - module) > tolerance) return null;
       return module;
@@ -4441,7 +4475,46 @@
       if (!module) {
         return null;
       }
-      if (expectedModule && Math.abs(module - expectedModule) / expectedModule > 0.6) {
+      if (expectedModule && Math.abs(module - expectedModule) / expectedModule > 0.8) {
+        return null;
+      }
+      return module;
+    }
+
+    function crossCheckHorizontal(data, width, height, centerX, centerY, threshold, expectedModule) {
+      let x = clampValue(Math.round(centerX), 0, width - 1);
+      const y = clampValue(Math.round(centerY), 0, height - 1);
+      const run = [0, 0, 0, 0, 0];
+      while (x >= 0 && isDarkAt(data, width, x, y, threshold)) {
+        run[2] += 1;
+        x -= 1;
+      }
+      while (x >= 0 && !isDarkAt(data, width, x, y, threshold)) {
+        run[1] += 1;
+        x -= 1;
+      }
+      while (x >= 0 && isDarkAt(data, width, x, y, threshold)) {
+        run[0] += 1;
+        x -= 1;
+      }
+      x = clampValue(Math.round(centerX) + 1, 0, width - 1);
+      while (x < width && isDarkAt(data, width, x, y, threshold)) {
+        run[2] += 1;
+        x += 1;
+      }
+      while (x < width && !isDarkAt(data, width, x, y, threshold)) {
+        run[3] += 1;
+        x += 1;
+      }
+      while (x < width && isDarkAt(data, width, x, y, threshold)) {
+        run[4] += 1;
+        x += 1;
+      }
+      const module = matchFinderPattern(run);
+      if (!module) {
+        return null;
+      }
+      if (expectedModule && Math.abs(module - expectedModule) / expectedModule > 0.8) {
         return null;
       }
       return module;
@@ -4449,7 +4522,7 @@
 
     function findFinderCandidates(imageData, width, height, threshold) {
       const data = imageData.data;
-      const stride = 2;
+      const stride = Math.min(2, Math.max(1, Math.round(Math.min(width, height) / 520)));
       const candidates = [];
       for (let y = 0; y < height; y += stride) {
         let runLengths = [];
@@ -4481,11 +4554,14 @@
               const centerX = x - (runLengths[4] + runLengths[3] + runLengths[2] / 2);
               const centerY = y;
               const verticalModule = crossCheckVertical(data, width, height, centerX, centerY, threshold, module);
-              if (verticalModule) {
+              const horizontalModule = verticalModule
+                ? crossCheckHorizontal(data, width, height, centerX, centerY, threshold, module)
+                : null;
+              if (verticalModule && horizontalModule) {
                 candidates.push({
                   x: centerX,
                   y: centerY,
-                  module: (module + verticalModule) / 2
+                  module: (module + verticalModule + horizontalModule) / 3
                 });
               }
             }
