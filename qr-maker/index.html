@@ -765,23 +765,24 @@
   const PIX_FRAME_SIZE = PIX_ART_SIZE + (PIX_FRAME_OFFSET * 2);
   const PIX_QUIET_ZONE = 6;
   const PIX_RENDER_SIZE = PIX_FRAME_SIZE + PIX_QUIET_ZONE * 2;
-  const PIX_TIMING_ROW = FINDER_SIZE - 1;
-  const PIX_TIMING_COL = FINDER_SIZE - 1;
+  const PIX_TIMING_ROW = FINDER_SIZE + 1;
+  const PIX_TIMING_COL = FINDER_SIZE + 1;
   const PIX_TIMING_START = FINDER_SIZE + 1;
   const PIX_TIMING_END = PIX_FRAME_SIZE - FINDER_SIZE - 2;
-  const PIX_FORMAT_ROW = FINDER_SIZE + 1;
-  const PIX_FORMAT_COL = FINDER_SIZE + 1;
+  const PIX_FORMAT_ROW = FINDER_SIZE + 2;
+  const PIX_FORMAT_COL = FINDER_SIZE + 2;
   const PIX_FORMAT_START = PIX_TIMING_START;
   const PIX_FORMAT_END = PIX_TIMING_END;
   const PIX_FORMAT_LENGTH = PIX_FORMAT_END - PIX_FORMAT_START + 1;
   const PIX_FORMAT_PATTERN = '10100111001011011001011100101101';
   const PIX_FORMAT_BITS = Array.from({ length: PIX_FORMAT_LENGTH }, (_, i) => PIX_FORMAT_PATTERN[i % PIX_FORMAT_PATTERN.length] === '1');
-  const PIX_ALIGN_SIZE = 2;
+  const PIX_ALIGN_SIZE = 3;
   const PIX_ALIGN_START = PIX_FRAME_OFFSET + PIX_ART_SIZE;
   const PIX_ALIGN_POINTS = [
     { x: PIX_ALIGN_START, y: PIX_ALIGN_START }
   ];
   const PIX_ALIGN_COLOR = '#000000';
+  const PIX_ALIGN_INNER_COLOR = '#ffffff';
   const FINDER_INNER_COLOR = '#000000';
 
   const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
@@ -992,12 +993,13 @@
     PIX_ALIGN_POINTS.forEach((point) => {
       for (let y = 0; y < PIX_ALIGN_SIZE; y++) {
         for (let x = 0; x < PIX_ALIGN_SIZE; x++) {
+          const isCenter = x === Math.floor(PIX_ALIGN_SIZE / 2) && y === Math.floor(PIX_ALIGN_SIZE / 2);
           drawFrameCell(
             ctx,
             frameOffset + point.x + x,
             frameOffset + point.y + y,
             cellSize,
-            PIX_ALIGN_COLOR
+            isCenter ? PIX_ALIGN_INNER_COLOR : PIX_ALIGN_COLOR
           );
         }
       }
