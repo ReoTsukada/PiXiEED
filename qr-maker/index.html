@@ -377,6 +377,13 @@
     image-rendering: pixelated;
     image-rendering: crisp-edges;
   }
+  .pix-code-canvas {
+    width: auto;
+    height: auto;
+    max-width: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
   .qr-actions {
     display: flex;
     flex-wrap: wrap;
@@ -666,8 +673,8 @@
 <div>
 <label for="pixSize">出力サイズ</label>
 <div class="range-wrap">
-<input id="pixSize" max="640" min="200" step="20" type="range" value="320"/>
-<span class="range-value" id="pixSizeValue">320px</span>
+<input id="pixSize" max="640" min="360" step="20" type="range" value="360"/>
+<span class="range-value" id="pixSizeValue">360px</span>
 </div>
 </div>
 </div>
@@ -686,7 +693,7 @@
 </div>
 <div class="qr-canvas">
 <canvas height="280" id="qrCanvas" width="280"></canvas>
-<canvas height="280" id="pixCanvas" width="280" hidden></canvas>
+<canvas height="280" id="pixCanvas" class="pix-code-canvas" width="280" hidden></canvas>
 <div class="pix-canvas-note" id="pixCanvasNote" hidden>このコードはPiXiEELENSでのみ読み取り可能です</div>
 </div>
 <div class="qr-actions" id="qrActions">
@@ -758,12 +765,12 @@
   const PIX_FRAME_SIZE = PIX_ART_SIZE + (PIX_FRAME_OFFSET * 2);
   const PIX_QUIET_ZONE = 4;
   const PIX_RENDER_SIZE = PIX_FRAME_SIZE + PIX_QUIET_ZONE * 2;
-  const PIX_TIMING_ROW = 1;
-  const PIX_TIMING_COL = 1;
+  const PIX_TIMING_ROW = FINDER_SIZE - 1;
+  const PIX_TIMING_COL = FINDER_SIZE - 1;
   const PIX_TIMING_START = FINDER_SIZE + 1;
   const PIX_TIMING_END = PIX_FRAME_SIZE - FINDER_SIZE - 2;
-  const PIX_FORMAT_ROW = 2;
-  const PIX_FORMAT_COL = 2;
+  const PIX_FORMAT_ROW = FINDER_SIZE + 1;
+  const PIX_FORMAT_COL = FINDER_SIZE + 1;
   const PIX_FORMAT_START = PIX_TIMING_START;
   const PIX_FORMAT_END = PIX_TIMING_END;
   const PIX_FORMAT_LENGTH = PIX_FORMAT_END - PIX_FORMAT_START + 1;
@@ -1005,8 +1012,8 @@
     pixCanvas.width = canvasSize;
     pixCanvas.height = canvasSize;
     pixCanvas.style.width = `${canvasSize}px`;
-    pixCanvas.style.height = 'auto';
-    pixCanvas.style.maxWidth = '100%';
+    pixCanvas.style.height = `${canvasSize}px`;
+    pixCanvas.style.maxWidth = 'none';
     const ctx = pixCanvas.getContext('2d');
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
