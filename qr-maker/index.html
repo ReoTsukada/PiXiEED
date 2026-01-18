@@ -673,8 +673,8 @@
 <div>
 <label for="pixSize">出力サイズ</label>
 <div class="range-wrap">
-<input id="pixSize" max="640" min="360" step="20" type="range" value="360"/>
-<span class="range-value" id="pixSizeValue">360px</span>
+<input id="pixSize" max="640" min="480" step="20" type="range" value="520"/>
+<span class="range-value" id="pixSizeValue">520px</span>
 </div>
 </div>
 </div>
@@ -760,10 +760,10 @@
   const PIX_CLIENT_KEY = 'pixfind_client_id';
   const PIX_ART_SIZE = 16;
   const FINDER_SIZE = 7; // 1:1:3:1:1 finder
-  const FINDER_GAP = 3;
+  const FINDER_GAP = 2;
   const PIX_FRAME_OFFSET = FINDER_SIZE + FINDER_GAP;
   const PIX_FRAME_SIZE = PIX_ART_SIZE + (PIX_FRAME_OFFSET * 2);
-  const PIX_QUIET_ZONE = 4;
+  const PIX_QUIET_ZONE = 6;
   const PIX_RENDER_SIZE = PIX_FRAME_SIZE + PIX_QUIET_ZONE * 2;
   const PIX_TIMING_ROW = FINDER_SIZE - 1;
   const PIX_TIMING_COL = FINDER_SIZE - 1;
