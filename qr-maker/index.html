@@ -652,9 +652,9 @@
 </div>
 </div>
 <div class="mode-section" id="pixControls" hidden>
-<label for="pixInput">32×32 フルカラー ドット絵（PNG / GIF）</label>
+<label for="pixInput">16×16 白黒ドット絵（PNG / GIF）</label>
 <input id="pixInput" type="file" accept="image/png,image/gif"/>
-<p class="small">32×32推奨。色はそのまま保持されます。</p>
+<p class="small">16×16推奨。色は白黒に変換されます。</p>
 <div class="field-row">
 <div>
 <label for="pixPayloadType">返す内容</label>
@@ -751,31 +751,24 @@
   const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
   const PIXCODE_TABLE = 'pixfind_codes';
   const PIX_CLIENT_KEY = 'pixfind_client_id';
-  const PIX_ART_SIZE = 32;
-  const PIX_COLOR_LEVELS = 32;
+  const PIX_ART_SIZE = 16;
   const FINDER_SIZE = 7; // 1:1:3:1:1 finder
   const FINDER_GAP = 3;
   const PIX_FRAME_OFFSET = FINDER_SIZE + FINDER_GAP;
   const PIX_FRAME_SIZE = PIX_ART_SIZE + (PIX_FRAME_OFFSET * 2);
   const PIX_QUIET_ZONE = 4;
   const PIX_RENDER_SIZE = PIX_FRAME_SIZE + PIX_QUIET_ZONE * 2;
-  const PIX_TIMING_ROW = FINDER_SIZE + 1;
-  const PIX_TIMING_COL = FINDER_SIZE + 1;
+  const PIX_TIMING_ROW = 1;
+  const PIX_TIMING_COL = 1;
   const PIX_TIMING_START = FINDER_SIZE + 1;
   const PIX_TIMING_END = PIX_FRAME_SIZE - FINDER_SIZE - 2;
-  const PIX_FORMAT_ROW = FINDER_SIZE + 2;
-  const PIX_FORMAT_COL = FINDER_SIZE + 2;
-  const PIX_FORMAT_START = PIX_FRAME_OFFSET;
-  const PIX_FORMAT_END = PIX_FRAME_OFFSET + PIX_ART_SIZE - 1;
+  const PIX_FORMAT_ROW = 2;
+  const PIX_FORMAT_COL = 2;
+  const PIX_FORMAT_START = PIX_TIMING_START;
+  const PIX_FORMAT_END = PIX_TIMING_END;
+  const PIX_FORMAT_LENGTH = PIX_FORMAT_END - PIX_FORMAT_START + 1;
   const PIX_FORMAT_PATTERN = '10100111001011011001011100101101';
-  const PIX_FORMAT_BITS = Array.from({ length: PIX_ART_SIZE }, (_, i) => PIX_FORMAT_PATTERN[i % PIX_FORMAT_PATTERN.length] === '1');
-  const PIX_RGB_PATCH_SIZE = 3;
-  const PIX_RGB_PATCH_GAP = 2;
-  const PIX_RGB_PATCH_MARGIN = 1;
-  const PIX_RGB_PATCH_COUNT = 3;
-  const PIX_RGB_PATCH_TOTAL_HEIGHT = (PIX_RGB_PATCH_SIZE * PIX_RGB_PATCH_COUNT) + (PIX_RGB_PATCH_GAP * (PIX_RGB_PATCH_COUNT - 1));
-  const PIX_RGB_PATCH_X = PIX_RGB_PATCH_MARGIN;
-  const PIX_RGB_PATCH_Y = Math.floor(PIX_FRAME_SIZE / 2) - Math.floor(PIX_RGB_PATCH_TOTAL_HEIGHT / 2);
+  const PIX_FORMAT_BITS = Array.from({ length: PIX_FORMAT_LENGTH }, (_, i) => PIX_FORMAT_PATTERN[i % PIX_FORMAT_PATTERN.length] === '1');
   const PIX_ALIGN_SIZE = 2;
   const PIX_ALIGN_START = PIX_FRAME_OFFSET + PIX_ART_SIZE;
   const PIX_ALIGN_POINTS = [
@@ -783,54 +776,10 @@
   ];
   const PIX_ALIGN_COLOR = '#000000';
   const FINDER_INNER_COLOR = '#000000';
-  const FINDER_ACCENT_COLORS = {
-    cyan: '#00ffff',
-    magenta: '#ff00ff',
-    yellow: '#ffff00',
-    red: '#ff0000',
-    green: '#00ff00',
-    blue: '#0000ff'
-  };
-  const FINDER_ACCENTS = {
-    tl: [
-      { x: 2, y: 2, color: FINDER_ACCENT_COLORS.cyan },
-      { x: 3, y: 2, color: FINDER_ACCENT_COLORS.cyan },
-      { x: 4, y: 2, color: FINDER_ACCENT_COLORS.cyan },
-      { x: 2, y: 3, color: FINDER_ACCENT_COLORS.cyan },
-      { x: 3, y: 3, color: FINDER_ACCENT_COLORS.cyan },
-      { x: 4, y: 3, color: FINDER_ACCENT_COLORS.cyan },
-      { x: 2, y: 4, color: FINDER_ACCENT_COLORS.cyan },
-      { x: 3, y: 4, color: FINDER_ACCENT_COLORS.cyan },
-      { x: 4, y: 4, color: FINDER_ACCENT_COLORS.cyan }
-    ],
-    tr: [
-      { x: 2, y: 2, color: FINDER_ACCENT_COLORS.yellow },
-      { x: 3, y: 2, color: FINDER_ACCENT_COLORS.yellow },
-      { x: 4, y: 2, color: FINDER_ACCENT_COLORS.yellow },
-      { x: 2, y: 3, color: FINDER_ACCENT_COLORS.yellow },
-      { x: 3, y: 3, color: FINDER_ACCENT_COLORS.yellow },
-      { x: 4, y: 3, color: FINDER_ACCENT_COLORS.yellow },
-      { x: 2, y: 4, color: FINDER_ACCENT_COLORS.yellow },
-      { x: 3, y: 4, color: FINDER_ACCENT_COLORS.yellow },
-      { x: 4, y: 4, color: FINDER_ACCENT_COLORS.yellow }
-    ],
-    bl: [
-      { x: 2, y: 2, color: FINDER_ACCENT_COLORS.magenta },
-      { x: 3, y: 2, color: FINDER_ACCENT_COLORS.magenta },
-      { x: 4, y: 2, color: FINDER_ACCENT_COLORS.magenta },
-      { x: 2, y: 3, color: FINDER_ACCENT_COLORS.magenta },
-      { x: 3, y: 3, color: FINDER_ACCENT_COLORS.magenta },
-      { x: 4, y: 3, color: FINDER_ACCENT_COLORS.magenta },
-      { x: 2, y: 4, color: FINDER_ACCENT_COLORS.magenta },
-      { x: 3, y: 4, color: FINDER_ACCENT_COLORS.magenta },
-      { x: 4, y: 4, color: FINDER_ACCENT_COLORS.magenta }
-    ]
-  };
 
   const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
   let currentMode = 'qr';
-  let pixPixels = null;
-  let pixHashBytes = null;
+  let pixQuantized = null;
   let pixHashValue = '';
   let supportsPixClientId = true;
 
@@ -897,7 +846,7 @@
     if (mode === 'qr') {
       syncLabels();
       renderQRCode();
-    } else if (pixPixels) {
+    } else if (pixQuantized) {
       renderPixCode();
     }
   }
@@ -906,32 +855,36 @@
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
   }
 
-  function quantizeChannel(value) {
-    const normalized = Math.max(0, Math.min(255, value));
-    const level = Math.round((normalized / 255) * (PIX_COLOR_LEVELS - 1));
-    return Math.max(0, Math.min(PIX_COLOR_LEVELS - 1, level));
-  }
-
-  function buildPixArt(imageData) {
+  function buildQuantizedArt(imageData) {
     const total = PIX_ART_SIZE * PIX_ART_SIZE;
-    const pixels = new Uint8Array(total * 3);
-    const hashBytes = new Uint8Array(total * 3);
-    let pixelIndex = 0;
-    let hashIndex = 0;
+    const quantized = new Uint8Array(total);
+    let min = 255;
+    let max = 0;
     for (let i = 0; i < total; i++) {
       const idx = i * 4;
       const alpha = imageData[idx + 3];
       const r = alpha < 128 ? 255 : imageData[idx];
       const g = alpha < 128 ? 255 : imageData[idx + 1];
       const b = alpha < 128 ? 255 : imageData[idx + 2];
-      pixels[pixelIndex++] = r;
-      pixels[pixelIndex++] = g;
-      pixels[pixelIndex++] = b;
-      hashBytes[hashIndex++] = quantizeChannel(r);
-      hashBytes[hashIndex++] = quantizeChannel(g);
-      hashBytes[hashIndex++] = quantizeChannel(b);
+      const lum = computeLuma(r, g, b);
+      if (lum < min) {
+        min = lum;
+      }
+      if (lum > max) {
+        max = lum;
+      }
     }
-    return { pixels, hashBytes };
+    const threshold = (min + max) / 2;
+    for (let i = 0; i < total; i++) {
+      const idx = i * 4;
+      const alpha = imageData[idx + 3];
+      const r = alpha < 128 ? 255 : imageData[idx];
+      const g = alpha < 128 ? 255 : imageData[idx + 1];
+      const b = alpha < 128 ? 255 : imageData[idx + 2];
+      const lum = computeLuma(r, g, b);
+      quantized[i] = lum < threshold ? 0 : 1;
+    }
+    return quantized;
   }
 
   async function hashQuantized(quantized) {
@@ -990,13 +943,6 @@
     }
   }
 
-  function drawFinderAccents(ctx, startX, startY, cellSize, accents) {
-    if (!accents || !accents.length) return;
-    accents.forEach((accent) => {
-      drawFrameCell(ctx, startX + accent.x, startY + accent.y, cellSize, accent.color);
-    });
-  }
-
   function drawFinderSeparator(ctx, startX, startY, cellSize, frameOffset) {
     const sepStartX = startX - 1;
     const sepStartY = startY - 1;
@@ -1035,22 +981,6 @@
     }
   }
 
-  function drawRgbPatch(ctx, cellSize, frameOffset) {
-    const startX = frameOffset + PIX_RGB_PATCH_X;
-    const colors = [FINDER_ACCENT_COLORS.red, FINDER_ACCENT_COLORS.green, FINDER_ACCENT_COLORS.blue];
-    for (let i = 0; i < PIX_RGB_PATCH_COUNT; i++) {
-      const startY = frameOffset + PIX_RGB_PATCH_Y + i * (PIX_RGB_PATCH_SIZE + PIX_RGB_PATCH_GAP);
-      const fillColor = colors[i];
-      for (let y = 0; y < PIX_RGB_PATCH_SIZE; y++) {
-        for (let x = 0; x < PIX_RGB_PATCH_SIZE; x++) {
-          const isBorder = x === 0 || y === 0 || x === PIX_RGB_PATCH_SIZE - 1 || y === PIX_RGB_PATCH_SIZE - 1;
-          const color = isBorder ? '#000000' : fillColor;
-          drawFrameCell(ctx, startX + x, startY + y, cellSize, color);
-        }
-      }
-    }
-  }
-
   function drawAlignmentMarker(ctx, cellSize, frameOffset) {
     PIX_ALIGN_POINTS.forEach((point) => {
       for (let y = 0; y < PIX_ALIGN_SIZE; y++) {
@@ -1068,7 +998,7 @@
   }
 
   function drawPixCode() {
-    if (!pixCanvas || !pixPixels) return;
+    if (!pixCanvas || !pixQuantized) return;
     const targetSize = clamp(parseInt(pixSize.value || '320', 10), 200, 640);
     const cellSize = Math.max(1, Math.floor(targetSize / PIX_RENDER_SIZE));
     const canvasSize = cellSize * PIX_RENDER_SIZE;
@@ -1098,23 +1028,16 @@
     drawFinderBlock(ctx, tlX, tlY, cellSize);
     drawFinderBlock(ctx, trX, trY, cellSize);
     drawFinderBlock(ctx, blX, blY, cellSize);
-    drawFinderAccents(ctx, tlX, tlY, cellSize, FINDER_ACCENTS.tl);
-    drawFinderAccents(ctx, trX, trY, cellSize, FINDER_ACCENTS.tr);
-    drawFinderAccents(ctx, blX, blY, cellSize, FINDER_ACCENTS.bl);
     drawFinderSeparator(ctx, tlStartX, tlStartY, cellSize, frameOffset);
     drawFinderSeparator(ctx, trStartX, trStartY, cellSize, frameOffset);
     drawFinderSeparator(ctx, blStartX, blStartY, cellSize, frameOffset);
     drawTimingPatterns(ctx, cellSize, frameOffset);
     drawFormatBand(ctx, cellSize, frameOffset);
     drawAlignmentMarker(ctx, cellSize, frameOffset);
-    drawRgbPatch(ctx, cellSize, frameOffset);
     for (let y = 0; y < PIX_ART_SIZE; y++) {
       for (let x = 0; x < PIX_ART_SIZE; x++) {
-        const idx = (y * PIX_ART_SIZE + x) * 3;
-        const r = pixPixels[idx];
-        const g = pixPixels[idx + 1];
-        const b = pixPixels[idx + 2];
-        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+        const idx = y * PIX_ART_SIZE + x;
+        ctx.fillStyle = pixQuantized[idx] ? '#ffffff' : '#000000';
         ctx.fillRect(
           (x + PIX_FRAME_OFFSET + frameOffset) * cellSize,
           (y + PIX_FRAME_OFFSET + frameOffset) * cellSize,
@@ -1126,7 +1049,7 @@
   }
 
   async function renderPixCode() {
-    if (!pixPixels) return;
+    if (!pixQuantized) return;
     drawPixCode();
     if (pixHash) pixHash.textContent = pixHashValue || '--';
     setPixStatus('更新しました', '#7bcfff');
@@ -1315,8 +1238,7 @@
     pixInput.addEventListener('change', async () => {
       const file = pixInput.files?.[0];
       if (!file) {
-        pixPixels = null;
-        pixHashBytes = null;
+        pixQuantized = null;
         pixHashValue = '';
         if (pixHash) pixHash.textContent = '--';
         setPixStatus('未生成', '#7bcfff');
@@ -1327,19 +1249,16 @@
         const info = await loadPixImage(file);
         if (!info) throw new Error('画像を読み込めませんでした');
         if (info.width !== PIX_ART_SIZE || info.height !== PIX_ART_SIZE) {
-          setPixStatus('32×32に近似しました', '#ffa95c');
+          setPixStatus('16×16に近似しました', '#ffa95c');
         }
-        const pixData = buildPixArt(info.data);
-        pixPixels = pixData.pixels;
-        pixHashBytes = pixData.hashBytes;
-        pixHashValue = await hashQuantized(pixHashBytes);
+        pixQuantized = buildQuantizedArt(info.data);
+        pixHashValue = await hashQuantized(pixQuantized);
         if (pixHash) pixHash.textContent = pixHashValue || '--';
         drawPixCode();
         setPixStatus('更新しました', '#7bcfff');
       } catch (err) {
         console.error(err);
-        pixPixels = null;
-        pixHashBytes = null;
+        pixQuantized = null;
         pixHashValue = '';
         if (pixHash) pixHash.textContent = '--';
         setPixStatus('画像の読み込みに失敗しました', '#ffa95c');
@@ -1349,14 +1268,14 @@
   if (pixSize) {
     pixSize.addEventListener('input', () => {
       syncPixLabels();
-      if (currentMode === 'pix' && pixPixels) {
+      if (currentMode === 'pix' && pixQuantized) {
         drawPixCode();
       }
     });
   }
   if (pixDownloadBtn) {
     pixDownloadBtn.addEventListener('click', () => {
-      if (!pixCanvas || !pixPixels) {
+      if (!pixCanvas || !pixQuantized) {
         setPixStatus('画像を読み込んでください', '#ffa95c');
         return;
       }
