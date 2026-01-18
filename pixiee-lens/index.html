@@ -2594,7 +2594,7 @@
     const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
     const PIX_ART_SIZE = 16;
     const PIX_FINDER_SIZE = 7;
-    const PIX_FINDER_GAP = 2;
+    const PIX_FINDER_GAP = 3;
     const PIX_FRAME_OFFSET = PIX_FINDER_SIZE + PIX_FINDER_GAP;
     const PIX_FRAME_SIZE = PIX_ART_SIZE + PIX_FRAME_OFFSET * 2;
     const PIX_QUIET_ZONE = 6;
@@ -2715,12 +2715,11 @@
     const qrScanCtx = qrScanCanvas.getContext ? qrScanCanvas.getContext('2d', { willReadFrequently: true }) : null;
     let pixLastHash = '';
     let pixLastDetectedAt = 0;
-    const PIX_DETECT_REQUIRED = 1;
-    const PIX_DETECT_TIMEOUT_MS = 1200;
-    let pixCandidateHash = '';
-    let pixCandidateCount = 0;
-    let pixCandidateAt = 0;
-    let pixCandidatePayload = null;
+    const PIX_STABLE_FRAMES = 3;
+    const PIX_STABLE_TIMEOUT_MS = 1200;
+    const PIX_STABLE_MAX_DIFF = Math.round(PIX_ART_SIZE * PIX_ART_SIZE * 0.15);
+    let pixQuantizedHistory = [];
+    let pixQuantizedAt = 0;
     const pixLookupCache = new Map();
     const pixLookupPromises = new Map();
 
@@ -5054,7 +5053,7 @@
         height: clampValue(Math.max(...ys) - Math.min(...ys), 1, height)
       };
       const hashes = [hash];
-      return { hash, hashes, previewBox };
+      return { hash, hashes, previewBox, quantized: primaryQuantized };
     }
 
     async function fetchPixCodePayload(hashes) {
@@ -5276,27 +5275,52 @@
     }
 
     function confirmPixCandidate(payload) {
-      if (!payload || !payload.hash) {
+      if (!payload || !payload.quantized) {
         return null;
       }
       const now = Date.now();
-      if (payload.hash !== pixCandidateHash || now - pixCandidateAt > PIX_DETECT_TIMEOUT_MS) {
-        pixCandidateHash = payload.hash;
-        pixCandidateCount = 1;
-      } else {
-        pixCandidateCount += 1;
+      const total = PIX_ART_SIZE * PIX_ART_SIZE;
+      const last = pixQuantizedHistory[pixQuantizedHistory.length - 1] || null;
+      if (!pixQuantizedHistory.length || now - pixQuantizedAt > PIX_STABLE_TIMEOUT_MS) {
+        pixQuantizedHistory = [payload.quantized];
+        pixQuantizedAt = now;
+        return null;
       }
-      pixCandidateAt = now;
-      pixCandidatePayload = payload;
-      if (pixCandidateCount >= PIX_DETECT_REQUIRED) {
-        const confirmed = pixCandidatePayload;
-        pixCandidateHash = '';
-        pixCandidateCount = 0;
-        pixCandidateAt = 0;
-        pixCandidatePayload = null;
-        return confirmed;
+      let diff = 0;
+      if (last) {
+        for (let i = 0; i < total; i += 1) {
+          if (payload.quantized[i] !== last[i]) {
+            diff += 1;
+            if (diff > PIX_STABLE_MAX_DIFF) {
+              break;
+            }
+          }
+        }
       }
-      return null;
+      if (diff > PIX_STABLE_MAX_DIFF) {
+        pixQuantizedHistory = [payload.quantized];
+        pixQuantizedAt = now;
+        return null;
+      }
+      pixQuantizedHistory.push(payload.quantized);
+      pixQuantizedAt = now;
+      if (pixQuantizedHistory.length < PIX_STABLE_FRAMES) {
+        return null;
+      }
+      const counts = new Array(total).fill(0);
+      pixQuantizedHistory.forEach((frame) => {
+        for (let i = 0; i < total; i += 1) {
+          counts[i] += frame[i] ? 1 : 0;
+        }
+      });
+      const majority = Math.ceil(pixQuantizedHistory.length / 2);
+      const stableQuantized = new Uint8Array(total);
+      for (let i = 0; i < total; i += 1) {
+        stableQuantized[i] = counts[i] >= majority ? 1 : 0;
+      }
+      pixQuantizedHistory = [];
+      pixQuantizedAt = 0;
+      return { ...payload, quantized: stableQuantized };
     }
 
     async function handlePixDetection(payload) {
@@ -5378,7 +5402,14 @@
         if (result && result.pix) {
           const confirmed = confirmPixCandidate(result.pix);
           if (confirmed) {
-            await handlePixDetection(confirmed);
+            const stableHash = await hashPixQuantized(confirmed.quantized);
+            if (stableHash) {
+              await handlePixDetection({
+                ...confirmed,
+                hash: stableHash,
+                hashes: [stableHash]
+              });
+            }
             scheduleQrScanLoop(700);
             return;
           }
