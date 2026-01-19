@@ -4,16 +4,17 @@ const RANKING_LIMIT = 100;
 const PAGE_SIZE = 500;
 const MAX_PAGES = 10;
 const NAME_STORAGE_KEY = 'maoitu_rank_name';
-
-function accountKey(name) {
-  return (name || '').trim().toLowerCase() || 'guest';
+function accountKey(row) {
+  const clientId = row && row.client_id ? String(row.client_id).trim() : '';
+  if (clientId) return `client:${clientId}`;
+  return (row?.name || '').trim().toLowerCase() || 'guest';
 }
 
 function uniqueByAccount(rows, limit = Infinity) {
   const seen = new Set();
   const unique = [];
   for (const row of rows) {
-    const key = accountKey(row.name);
+    const key = accountKey(row);
     if (seen.has(key)) continue;
     seen.add(key);
     unique.push(row);
@@ -22,18 +23,29 @@ function uniqueByAccount(rows, limit = Infinity) {
   return unique;
 }
 
-async function fetchTopScores() {
+function isMissingClientId(error) {
+  const msg = String(error?.message || '');
+  return msg.includes('client_id');
+}
+
+async function fetchTopScores(includeClientId = true) {
   const collected = [];
   let from = 0;
   for (let page = 0; page < MAX_PAGES; page++) {
     const to = from + PAGE_SIZE - 1;
+    const selectColumns = includeClientId ? 'name, score, created_at, client_id' : 'name, score, created_at';
     const { data, error } = await supabase
       .from('scores')
-      .select('name, score, created_at')
+      .select(selectColumns)
       .order('score', { ascending: false })
       .order('created_at', { ascending: true })
       .range(from, to);
-    if (error) throw error;
+    if (error) {
+      if (includeClientId && isMissingClientId(error)) {
+        return fetchTopScores(false);
+      }
+      throw error;
+    }
     const rows = data || [];
     if (rows.length) {
       collected.push(...rows);
