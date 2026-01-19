@@ -15,7 +15,7 @@
 <meta content="#080d1f" name="theme-color"/>
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Noto+Sans+JP:wght@400;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet"/>
 <link href="../character-dots/mao1.png" rel="icon" type="image/png"/>
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
 <script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
@@ -39,171 +39,160 @@
 <style>
   :root {
     color-scheme: dark;
-    --bg: radial-gradient(circle at 18% 16%, rgba(123, 207, 255, 0.18), transparent 40%), radial-gradient(circle at 82% 10%, rgba(255, 170, 118, 0.14), transparent 38%), #080d1f;
-    --panel: rgba(7, 11, 24, 0.82);
-    --panel-strong: rgba(10, 16, 32, 0.94);
-    --border: rgba(126, 154, 255, 0.28);
-    --accent: #7bcfff;
-    --accent-2: #ffa95c;
-    --text: #eaf1ff;
-    --muted: #98a7c7;
-    --input: rgba(11, 17, 32, 0.9);
-    --shadow: 0 20px 70px rgba(0, 0, 0, 0.45);
-    --radius: 18px;
-    --gap: clamp(16px, 2vw, 22px);
-    font-family: "Montserrat", "Noto Sans JP", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --bg: radial-gradient(circle at 20% 20%, rgba(59,130,246,0.22), rgba(15,23,42,1)),
+           radial-gradient(circle at 80% 0%, rgba(236,72,153,0.18), rgba(15,23,42,1)),
+           #0b1224;
+    --panel: rgba(255,255,255,0.05);
+    --panel-strong: rgba(255,255,255,0.06);
+    --border: rgba(255,255,255,0.12);
+    --accent: #ff9f43;
+    --accent-2: #ff719a;
+    --text: #e5e7eb;
+    --muted: #cbd5e1;
+    --input: rgba(0,0,0,0.35);
+    --shadow: 0 10px 30px rgba(0,0,0,0.3);
+    --radius: 12px;
+    --gap: 14px;
+    font-family: 'Fredoka', 'DotGothic16', system-ui, sans-serif;
   }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; overflow: hidden; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    display: flex;
-    justify-content: center;
-    align-items: stretch;
-    padding: clamp(8px, 2.5vw, 18px);
+  * {
+    box-sizing: border-box;
     user-select: none;
     -webkit-user-select: none;
+    -ms-user-select: none;
+  }
+  html, body {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  body {
+    margin: 0 auto;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0 14px 120px;
+    width: 100%;
+    display: block;
   }
   textarea, input, select { user-select: text; -webkit-user-select: text; }
   a { color: var(--accent); text-decoration: none; }
   a:hover { text-decoration: underline; }
-  .qr-shell {
-    width: min(1100px, 100%);
-    background: linear-gradient(145deg, rgba(10, 18, 36, 0.9), rgba(8, 14, 30, 0.92));
-    border: 1px solid rgba(255, 255, 255, 0.04);
-    border-radius: 26px;
-    box-shadow: var(--shadow);
-    padding: clamp(14px, 2vw, 22px);
-    backdrop-filter: blur(8px);
-    height: calc(100vh - 2 * clamp(12px, 3vw, 24px));
-    max-height: 100%;
+  .page {
+    width: 100%;
+    max-width: min(1200px, 100vw);
     display: grid;
-    grid-template-rows: auto auto 1fr auto;
-    gap: 12px;
-    overflow: hidden;
+    gap: 14px;
+    margin: 0 auto;
+    position: relative;
   }
   header {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 10px;
-    min-width: 0;
+    position: sticky;
+    top: 0;
+    z-index: 70;
+    background: rgba(11,18,36,0.94);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    margin: -20px -14px 8px;
+    padding: 10px 14px;
+  }
+  .header-inner {
     width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
   }
   .brand {
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-width: 0;
+    gap: 10px;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    color: #f9fafb;
+    text-decoration: none;
   }
-  .brand__logo {
+  .brand-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.12);
+    padding: 4px;
+    border: 1px solid rgba(255,255,255,0.2);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, rgba(123, 207, 255, 0.4), rgba(123, 207, 255, 0.16)), #0c142d;
-    color: #0c142d;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    font-weight: 700;
-    font-size: 0.9rem;
+    overflow: hidden;
   }
-  .brand__name {
+  .brand-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  .brand-text {
     display: flex;
     flex-direction: column;
     gap: 2px;
   }
-  .brand__name small {
-    color: var(--muted);
-    font-weight: 600;
-    letter-spacing: 0.04em;
-  }
-  .brand__name strong {
-    font-size: 1.02rem;
-    letter-spacing: 0.02em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  h1 {
-    font-size: clamp(1.3rem, 3.4vw, 1.8rem);
-    margin: 6px 0 4px;
-    letter-spacing: 0.01em;
-  }
-  .lead {
-    margin: 0 0 10px;
-    color: var(--muted);
-    line-height: 1.5;
-    font-weight: 500;
-  }
-  .hero-actions {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin: 2px 0 4px;
-    padding-right: 4px;
-  }
+  .brand-title { margin: 0; font-size: 16px; color: #f9fafb; }
+  .brand-sub { margin: 0; font-size: 12px; color: #9ca3af; }
+  h1 { margin: 0; font-size: 22px; letter-spacing: 0.02em; color: #f9fafb; }
+  .subtitle { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
   .header-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-    min-width: max-content;
-    justify-content: flex-end;
+    gap: 10px;
   }
   .header-actions .btn {
     white-space: nowrap;
-    padding: 7px 9px;
-    font-size: 0.9rem;
-  }
-  .hero-heading {
-    display: block;
-    min-width: 0;
-  }
-  .hero-heading h1 {
-    margin: 8px 0 6px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    padding: 8px 12px;
+    font-size: 0.88rem;
   }
   .btn {
     appearance: none;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 12px 14px;
-    font-weight: 700;
-    background: linear-gradient(135deg, rgba(123, 207, 255, 0.3), rgba(90, 125, 255, 0.24));
-    color: var(--text);
+    border: 0;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font: 700 14px/1.2 'Fredoka', system-ui, sans-serif;
     cursor: pointer;
-    transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+    color: #ffffff;
+    background: linear-gradient(135deg, #ff719a, #ff9f43);
+    box-shadow: 0 4px 0 #e35c82, 0 8px 16px rgba(255,113,154,0.35);
+    transition: transform 0.1s ease, filter 0.1s ease;
   }
-  .btn:hover, .btn:focus-visible {
+  .btn:hover,
+  .btn:focus-visible {
     transform: translateY(-1px);
-    border-color: rgba(123, 207, 255, 0.65);
+    filter: brightness(1.05);
     outline: none;
-    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.35);
   }
   .btn.secondary {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.12);
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.18);
+    color: #e5e7eb;
+    box-shadow: none;
   }
   .qr-grid {
     display: grid;
-    grid-template-columns: 1.05fr 0.95fr;
-    gap: clamp(12px, 2vw, 18px);
-    margin-top: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
     min-height: 0;
   }
+  .card,
   .panel {
     background: var(--panel);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: var(--radius);
-    padding: clamp(16px, 2vw, 20px);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
   }
   [hidden] {
     display: none !important;
@@ -234,8 +223,8 @@
     cursor: pointer;
   }
   .mode-btn.is-active {
-    background: linear-gradient(135deg, rgba(123, 207, 255, 0.6), rgba(255, 169, 92, 0.5));
-    color: #0b1022;
+    background: linear-gradient(135deg, rgba(255, 113, 154, 0.6), rgba(255, 159, 67, 0.5));
+    color: #0b1224;
     border-color: transparent;
   }
   .mode-section {
@@ -248,12 +237,15 @@
     font-size: 0.85rem;
     word-break: break-all;
   }
-  .panel h2 {
+  .panel h2,
+  .card h2 {
     margin: 0 0 8px;
-    font-size: 1.15rem;
+    font-size: 18px;
     letter-spacing: 0.02em;
+    color: #f9fafb;
   }
-  .panel p {
+  .panel p,
+  .card p {
     margin: 0 0 14px;
     color: var(--muted);
     line-height: 1.6;
@@ -270,8 +262,8 @@
   }
   textarea, select {
     background: var(--input);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: var(--text);
+    border: 1px solid rgba(255,255,255,0.18);
+    color: #f9fafb;
     border-radius: 12px;
     padding: 12px;
     font-size: 1rem;
@@ -279,8 +271,8 @@
   }
   textarea:focus, select:focus {
     outline: none;
-    border-color: rgba(123, 207, 255, 0.6);
-    box-shadow: 0 0 0 3px rgba(123, 207, 255, 0.16);
+    border-color: rgba(255,159,67,0.6);
+    box-shadow: 0 0 0 3px rgba(255,159,67,0.18);
   }
   textarea {
     resize: vertical;
@@ -291,6 +283,13 @@
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 12px;
     margin: 12px 0;
+  }
+  .range-stack {
+    display: grid;
+    gap: 8px;
+  }
+  .range-stack label {
+    margin-bottom: 0;
   }
   .range-wrap {
     display: grid;
@@ -345,23 +344,22 @@
     gap: 14px;
   }
   .qr-canvas {
-    background: var(--panel-strong);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: var(--radius);
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 10px;
     padding: clamp(10px, 1.5vw, 14px);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
     min-height: 260px;
   }
   canvas {
     width: min(100%, 300px);
     height: auto;
     background: #fff;
-    border-radius: 10px;
+    border-radius: 8px;
     box-shadow: 0 14px 30px rgba(0, 0, 0, 0.3);
     image-rendering: pixelated;
     image-rendering: crisp-edges;
@@ -375,43 +373,49 @@
     font-size: 0.9rem;
     color: var(--muted);
   }
-  .ad-slot {
-    width: 100%;
-    max-width: 960px;
-    min-height: 60px;
-    padding: 6px 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.04);
-    border-radius: 14px;
+  .ad-block {
+    border: 1px dashed rgba(255,255,255,0.2);
+    border-radius: 12px;
+    background: linear-gradient(150deg, rgba(255,255,255,0.04), rgba(15,23,42,0.9));
+    padding: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.28);
+    overflow: hidden;
+    max-width: 100%;
+    min-width: 0;
+    position: relative;
   }
-  .ad-slot ins {
+  .ad-slot {
     display: block;
     width: 100%;
-    max-width: 900px;
-    height: 60px;
+    height: 90px;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .ad-label {
+    position: absolute;
+    top: 6px;
+    left: 10px;
+    background: rgba(0,0,0,0.6);
+    color: #cbd5e1;
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    letter-spacing: 0.04em;
+  }
+  @media (max-width: 640px) {
+    .ad-slot { height: 60px; }
   }
   @media (max-width: 940px) {
     .qr-grid {
       grid-template-columns: 1fr;
-    }
-    .qr-shell {
-      grid-template-rows: auto auto 1fr auto;
     }
     .qr-canvas {
       min-height: 260px;
     }
   }
   @media (max-width: 540px) {
-    header { grid-template-columns: auto 1fr auto; }
-    body { padding: 10px; }
-    .qr-shell { padding: 14px; }
-    .hero-actions { flex-direction: column; }
-    .hero-heading { gap: 4px; }
-    .hero-heading h1 { font-size: 1.2rem; }
-    .header-actions .btn { padding: 7px 9px; font-size: 0.88rem; }
+    .header-actions .btn { padding: 8px 10px; font-size: 0.85rem; }
   }
 </style>
   <style id="ads-safe">
@@ -555,36 +559,42 @@
   </script>
 </head>
 <body>
-<div class="qr-shell">
-<header>
-<div class="brand">
-<div aria-hidden="true" class="brand__logo">QR</div>
-<div class="brand__name">
-<small>PiXiEED Tool</small>
-<strong>QRコードメーカー</strong>
-</div>
-</div>
-<div class="header-actions">
-<a class="btn secondary" href="../projects/qr-maker/index.html">一覧へ戻る</a>
-</div>
+<div class="page">
+<header aria-label="top-nav">
+  <div class="header-inner">
+    <a class="brand" href="../index.html">
+      <span class="brand-icon"><img src="../character-dots/mao1.png" alt="logo"></span>
+      <div class="brand-text">
+        <p class="brand-title">PiXiEED</p>
+        <p class="brand-sub">QRコードメーカー</p>
+      </div>
+    </a>
+    <div class="header-actions">
+      <a class="btn secondary" href="../projects/qr-maker/index.html">一覧へ戻る</a>
+    </div>
+  </div>
 </header>
-<div class="ad-slot">
-<ins class="adsbygoogle"
-     style="display:block"
-     data-ad-client="ca-pub-9801602250480253"
-     data-ad-slot="2141591954"></ins>
-<script>
-  if (window.pixieedObserveAds) {
-    window.pixieedObserveAds();
-  }
-</script>
-</div>
-<main style="overflow:auto; min-height:0; padding-bottom:6px;">
-<div class="hero-heading" aria-hidden="true">
-<h1 style="visibility:hidden;height:0;margin:0;padding:0;">&nbsp;</h1>
-</div>
-<div class="qr-grid">
-<section class="panel">
+<section class="card">
+  <h1>QRコードメーカー</h1>
+  <p class="subtitle">URLやテキストを即座にQR化してPNG保存できます。</p>
+</section>
+<section class="card" aria-label="広告">
+  <div class="ad-block">
+    <ins class="adsbygoogle ad-slot"
+         style="display:block"
+         data-ad-client="ca-pub-9801602250480253"
+         data-ad-slot="2141591954"></ins>
+    <small class="ad-label">広告</small>
+  </div>
+  <script>
+    if (window.pixieedObserveAds) {
+      window.pixieedObserveAds();
+    }
+  </script>
+</section>
+<main>
+<section class="qr-grid">
+<section class="card">
 <div class="panel-head">
 <h2>1. 内容を設定</h2>
 </div>
@@ -605,20 +615,18 @@
 <option value="H">H（最高耐性）</option>
 </select>
 </div>
-<div>
-<label for="qrSize">サイズ</label>
-<div class="range-wrap">
-<input id="qrSize" max="640" min="180" step="10" type="range" value="320"/>
-<span class="range-value" id="qrSizeValue">320px</span>
-</div>
-</div>
 </div>
 <div class="field-row">
-<div>
+<div class="range-stack">
 <label for="qrMargin">余白（クワイエットゾーン）</label>
 <div class="range-wrap">
 <input id="qrMargin" max="12" min="0" step="1" type="range" value="4"/>
 <span class="range-value" id="qrMarginValue">4px</span>
+</div>
+<label for="qrSize">保存サイズ</label>
+<div class="range-wrap">
+<input id="qrSize" max="640" min="180" step="10" type="range" value="320"/>
+<span class="range-value" id="qrSizeValue">320px</span>
 </div>
 </div>
 <div>
@@ -637,7 +645,7 @@
 </div>
 </div>
 </section>
-<section class="panel qr-preview">
+<section class="card qr-preview">
 <div>
 <h2>2. プレビュー</h2>
 <p class="small">QRコードのプレビューです。</p>
@@ -650,18 +658,21 @@
 <button class="btn secondary" id="copyDataBtn" type="button">テキストをコピー</button>
 </div>
 </section>
-</div>
-<div class="ad-slot">
-<ins class="adsbygoogle"
-     style="display:block"
-     data-ad-client="ca-pub-9801602250480253"
-     data-ad-slot="2141591954"></ins>
-<script>
-  if (window.pixieedObserveAds) {
-    window.pixieedObserveAds();
-  }
-</script>
-</div>
+</main>
+<section class="card" aria-label="広告">
+  <div class="ad-block">
+    <ins class="adsbygoogle ad-slot"
+         style="display:block"
+         data-ad-client="ca-pub-9801602250480253"
+         data-ad-slot="2141591954"></ins>
+    <small class="ad-label">広告</small>
+  </div>
+  <script>
+    if (window.pixieedObserveAds) {
+      window.pixieedObserveAds();
+    }
+  </script>
+</section>
 </div>
 <script src="./qrcode.min.js"></script>
 <script>
@@ -683,6 +694,8 @@
 
   const DEFAULT_TEXT = 'https://pixieed.jp/';
   const TEXT_LIMIT = 900;
+  const DISPLAY_SIZE = qrCanvas.width || 280;
+  let downloadCanvas = null;
 
   const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
 
@@ -711,7 +724,11 @@
       }
     };
     try {
-      await QRCode.toCanvas(qrCanvas, text, options);
+      const displayOptions = { ...options, width: DISPLAY_SIZE };
+      await QRCode.toCanvas(qrCanvas, text, displayOptions);
+      const renderCanvas = document.createElement('canvas');
+      await QRCode.toCanvas(renderCanvas, text, options);
+      downloadCanvas = renderCanvas;
       qrStatus.textContent = '更新しました';
       qrStatus.style.color = '#7bcfff';
     } catch (err) {
@@ -724,7 +741,8 @@
   function downloadPNG() {
     const link = document.createElement('a');
     link.download = 'pixieed-qr.png';
-    link.href = qrCanvas.toDataURL('image/png');
+    const sourceCanvas = downloadCanvas || qrCanvas;
+    link.href = sourceCanvas.toDataURL('image/png');
     link.click();
   }
 
