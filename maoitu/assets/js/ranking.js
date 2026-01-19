@@ -4,7 +4,13 @@ const RANKING_LIMIT = 100;
 const PAGE_SIZE = 500;
 const MAX_PAGES = 10;
 const NAME_STORAGE_KEY = 'maoitu_rank_name';
+let profileSynced = false;
+let cachedUserId = null;
+let checkedAuth = false;
+
 function accountKey(row) {
+  const userId = row && row.user_id ? String(row.user_id).trim() : '';
+  if (userId) return `user:${userId}`;
   const clientId = row && row.client_id ? String(row.client_id).trim() : '';
   if (clientId) return `client:${clientId}`;
   return (row?.name || '').trim().toLowerCase() || 'guest';
@@ -28,21 +34,62 @@ function isMissingClientId(error) {
   return msg.includes('client_id');
 }
 
-async function fetchTopScores(includeClientId = true) {
+function isMissingUserId(error) {
+  const msg = String(error?.message || '');
+  return msg.includes('user_id');
+}
+
+async function getUserId() {
+  if (checkedAuth) return cachedUserId;
+  checkedAuth = true;
+  try {
+    const { data } = await supabase.auth.getSession();
+    cachedUserId = data?.session?.user?.id || null;
+  } catch (_) {
+    cachedUserId = null;
+  }
+  return cachedUserId;
+}
+
+async function syncProfileFromServer() {
+  if (profileSynced) return;
+  profileSynced = true;
+  const userId = await getUserId();
+  if (!userId) return;
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('nickname')
+      .eq('id', userId)
+      .maybeSingle();
+    if (!error && data?.nickname) {
+      localStorage.setItem('pixieed_nickname', data.nickname);
+    }
+  } catch (_) {
+    // ignore
+  }
+}
+
+async function fetchTopScores(includeUserId = true, includeClientId = true) {
   const collected = [];
   let from = 0;
   for (let page = 0; page < MAX_PAGES; page++) {
     const to = from + PAGE_SIZE - 1;
-    const selectColumns = includeClientId ? 'name, score, created_at, client_id' : 'name, score, created_at';
+    const selectColumns = ['name', 'score', 'created_at'];
+    if (includeUserId) selectColumns.push('user_id');
+    if (includeClientId) selectColumns.push('client_id');
     const { data, error } = await supabase
       .from('scores')
-      .select(selectColumns)
+      .select(selectColumns.join(', '))
       .order('score', { ascending: false })
       .order('created_at', { ascending: true })
       .range(from, to);
     if (error) {
+      if (includeUserId && isMissingUserId(error)) {
+        return fetchTopScores(false, includeClientId);
+      }
       if (includeClientId && isMissingClientId(error)) {
-        return fetchTopScores(false);
+        return fetchTopScores(includeUserId, false);
       }
       throw error;
     }
@@ -68,6 +115,8 @@ export async function initRankingUI({ formSelector, listSelector, statusSelector
 
   const baseStatus = 'スコアはゲーム終了時に自動送信されます';
   const renderStatus = msg => { if (statusEl) statusEl.textContent = msg || ''; };
+
+  await syncProfileFromServer();
 
   // プロフィール名を反映（編集はプロフィールパネルのみ）
   try {
