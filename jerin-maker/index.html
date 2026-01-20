@@ -47,6 +47,8 @@
   html, body {
     overscroll-behavior: none;
     touch-action: none;
+    height: 100%;
+    overflow: hidden;
   }
   body {
     margin: 0;
@@ -81,6 +83,9 @@
     padding-bottom: calc(40px + var(--footer-height));
   }
   @supports (height: 100dvh) {
+    html, body {
+      height: 100dvh;
+    }
     body {
       min-height: 100dvh;
     }
