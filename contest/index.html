@@ -457,6 +457,22 @@
       gap:4px;
       width:100%;
     }
+    .quick-tools{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top:8px;
+    }
+    .quick-tools .button{
+      padding:8px 12px;
+      font-size:13px;
+    }
+    .button.secondary{
+      background:transparent;
+      border:1px solid rgba(255,255,255,0.2);
+      color:#e5e7eb;
+      box-shadow:none;
+    }
     .auth-chip{
       display:flex;
       align-items:center;
@@ -948,6 +964,10 @@
         <h1>ドットギャラリー</h1>
         <p class="subtitle">みんなのドットを眺めよう。512x512以内 / 256色以内のPNGを投稿もできます。</p>
         <p class="feed-subtitle">最新→いいね順で並びます</p>
+        <div class="quick-tools">
+          <a class="button" href="../pixiedraw/index.html" rel="noopener" target="_blank">PiXiEEDraw</a>
+          <a class="button secondary" href="../jerin-maker/index.html" rel="noopener" target="_blank">PiXiEEDraw Lite</a>
+        </div>
       </div>
     </section>
     <section class="card">
