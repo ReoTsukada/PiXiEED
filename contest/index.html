@@ -1076,35 +1076,20 @@
       <div class="profile-block">
         <details class="auth-details" id="authDetails">
           <summary>
-            <span>メールでアカウントを紐付け（長期保存）</span>
+            <span>アカウントの保存（メール）</span>
             <span class="auth-details__status" id="linkedEmail" style="display:none;"></span>
           </summary>
           <div class="auth-details__body">
+            <p class="helper" style="margin:0;">長期保存 / 自動で引き継ぎ / 復旧可</p>
             <div id="authInputs" style="display:grid; gap:8px;">
               <input class="auth-input" id="authEmail" type="email" placeholder="メールアドレス" autocomplete="email">
               <input class="auth-input" id="authPasscode" type="password" placeholder="パスコード（6〜20文字）" autocomplete="current-password">
             </div>
             <button class="auth-btn" id="authBtn" type="button">メール＋パスコードでログイン</button>
             <button class="auth-btn logout" id="logoutBtn" type="button" style="display:none;">ログアウト</button>
-            <p class="helper" style="margin:0;">ログイン後に引き継ぎコードを発行できます。</p>
+            <p class="helper" style="margin:0;">別端末でも同じアカウントで利用できます。</p>
           </div>
         </details>
-      </div>
-      <div class="profile-block" id="linkCodeBlock" hidden>
-        <p class="helper" style="margin:0 0 6px;">ブラウザ引き継ぎコード</p>
-        <p class="helper" style="margin:0 0 6px;">メール紐付け後に発行すると、別ブラウザでも同じアカウントになります。</p>
-        <div style="display:grid; gap:10px;">
-          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            <button class="auth-btn" id="linkCodeCreateBtn" type="button">コード発行</button>
-            <input class="auth-input" id="linkCodeOutput" type="text" placeholder="発行されたコード" readonly style="flex:1; min-width:160px;">
-            <button class="auth-btn" id="linkCodeCopy" type="button">コピー</button>
-          </div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            <input class="auth-input" id="linkCodeInput" type="text" placeholder="コードを入力" inputmode="numeric" maxlength="9" style="flex:1; min-width:160px;">
-            <button class="auth-btn" id="linkCodeUseBtn" type="button">引き継ぎ</button>
-          </div>
-        </div>
-        <p class="helper" id="linkCodeStatus" style="margin-top:6px;"></p>
       </div>
       <p class="auth-status" id="authStatus"></p>
     </div>
@@ -2255,9 +2240,7 @@
       const passInput = document.getElementById('authPasscode');
       const authInputs = document.getElementById('authInputs');
       const linkedEmail = document.getElementById('linkedEmail');
-      const linkCodeBlock = document.getElementById('linkCodeBlock');
       const nick = loadNickname();
-      const emailLabel = supabaseUser?.email ? supabaseUser.email : '未ログイン';
       if(!btn) return;
       if(supabaseUser){
         btn.textContent = 'ログインリンクを再送';
@@ -2276,7 +2259,6 @@
           linkedEmail.style.display = 'inline-flex';
           linkedEmail.textContent = supabaseUser.email ? `紐付け済み: ${supabaseUser.email}` : '紐付け済み';
         }
-        if(linkCodeBlock) linkCodeBlock.hidden = clientLinkConflict;
       }else{
         btn.textContent = 'メールでログイン';
         if(logoutBtn) logoutBtn.style.display = 'none';
@@ -2292,11 +2274,9 @@
           linkedEmail.style.display = 'none';
           linkedEmail.textContent = '';
         }
-        if(linkCodeBlock) linkCodeBlock.hidden = true;
       }
       if(clientLinkConflict){
         setAuthStatus('別アカウントに紐付け済みのため、ゲスト投稿の移行を停止しました');
-        if(linkCodeBlock) linkCodeBlock.hidden = true;
       }
       applyAvatarToBrand();
     }
@@ -2522,6 +2502,5 @@
 
     window.addEventListener('DOMContentLoaded', init);
   </script>
-  <script src="../scripts/link-code.js"></script>
 </body>
 </html>
