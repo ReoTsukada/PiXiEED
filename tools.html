@@ -641,24 +641,10 @@
         <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
       </div>
       <div class="profile-block">
-        <p class="helper" style="margin:0 0 6px;">アカウント紐付け</p>
-        <p class="helper" id="linkedEmail" style="margin:0 0 6px; display:block;">紐付け・ログインはギャラリーで行ってください</p>
+        <p class="helper" style="margin:0 0 6px;">アカウントの保存（メール）</p>
+        <p class="helper" style="margin:0 0 6px;">長期保存 / 自動で引き継ぎ / 復旧可</p>
+        <p class="helper" id="linkedEmail" style="margin:0 0 6px; display:block;">ログインはギャラリーで行ってください</p>
         <button class="auth-btn" id="authBtn" type="button">ギャラリーでログイン</button>
-      </div>
-      <div class="profile-block" id="linkCodeBlock" hidden>
-        <p class="helper" style="margin:0 0 6px;">ブラウザ引き継ぎコード</p>
-        <div style="display:grid; gap:10px;">
-          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            <button class="auth-btn" id="linkCodeCreateBtn" type="button">コード発行</button>
-            <input class="auth-input" id="linkCodeOutput" type="text" placeholder="発行されたコード" readonly style="flex:1; min-width:160px;">
-            <button class="auth-btn" id="linkCodeCopy" type="button">コピー</button>
-          </div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            <input class="auth-input" id="linkCodeInput" type="text" placeholder="コードを入力" inputmode="numeric" maxlength="9" style="flex:1; min-width:160px;">
-            <button class="auth-btn" id="linkCodeUseBtn" type="button">引き継ぎ</button>
-          </div>
-        </div>
-        <p class="helper" id="linkCodeStatus" style="margin-top:6px;"></p>
       </div>
       <p class="helper" id="authStatus"></p>
     </div>
@@ -974,6 +960,5 @@
       });
     })();
   </script>
-  <script src="scripts/link-code.js"></script>
 </body>
 </html>
