@@ -1,0 +1,3137 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+<meta name="theme-color" content="#0b1224"/>
+<title>魔王奪還戦 | PiXiEED</title>
+<meta name="description" content="魔王様が奪われた領地を取り返し、勇者を倒すまで進軍するグリッド戦略RPG。"/>
+<meta property="og:type" content="website"/>
+<meta property="og:title" content="魔王奪還戦 | PiXiEED"/>
+<meta property="og:description" content="魔王様が奪われた領地を取り返し、勇者を倒すまで進軍するグリッド戦略RPG。"/>
+<meta property="og:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
+<meta property="og:url" content="https://pixieed.jp/maou-war/"/>
+<link rel="icon" type="image/png" href="../character-dots/mao1.png"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet"/>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
+<script>
+  const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
+  const GA_PAGE_PATH = '/maou-war/';
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', GA_MEASUREMENT_ID, {
+    page_path: GA_PAGE_PATH,
+    page_title: document.title
+  });
+  gtag('event', 'project_open', {
+    project_slug: 'maou-war',
+    project_type: 'game',
+    project_name: '魔王奪還戦'
+  });
+</script>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: radial-gradient(circle at 20% 20%, rgba(59,130,246,0.2), rgba(15,23,42,1)),
+          radial-gradient(circle at 80% 0%, rgba(236,72,153,0.18), rgba(15,23,42,1)),
+          #0b1224;
+    --panel: rgba(255,255,255,0.06);
+    --panel-strong: rgba(255,255,255,0.12);
+    --border: rgba(255,255,255,0.16);
+    --text: #e5e7eb;
+    --muted: #cbd5e1;
+    --accent: #ff9f43;
+    --accent-2: #ff719a;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    font-family: 'Fredoka','DotGothic16',system-ui,sans-serif;
+  }
+  * {
+    box-sizing: border-box;
+    user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    width: 100%;
+    max-width: 100vw;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    touch-action: none;
+    overscroll-behavior: none;
+  }
+  @supports (height: 100dvh) {
+    html, body {
+      height: 100dvh;
+    }
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: calc(10px + var(--safe-top)) calc(12px + var(--safe-right)) calc(14px + var(--safe-bottom)) calc(12px + var(--safe-left));
+  }
+  a { color: inherit; text-decoration: none; }
+  .game-shell {
+    width: min(1200px, 100%);
+    height: 100%;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: rgba(10,18,36,0.9);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px 12px;
+    min-width: 0;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    min-width: 0;
+  }
+  .brand img {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 4px;
+    background: rgba(255,255,255,0.12);
+    image-rendering: pixelated;
+  }
+  .brand small {
+    display: block;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .top-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    appearance: none;
+    border: 0;
+    border-radius: 10px;
+    padding: 8px 12px;
+    font: 700 13px/1.2 'Fredoka', system-ui, sans-serif;
+    cursor: pointer;
+    color: #fff;
+    background: linear-gradient(135deg, #ff719a, #ff9f43);
+    box-shadow: 0 4px 0 #e35c82, 0 8px 16px rgba(255,113,154,0.35);
+  }
+  .btn.secondary {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.2);
+    color: var(--text);
+    box-shadow: none;
+  }
+  .main {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(240px, 0.9fr);
+    gap: 12px;
+    min-height: 0;
+    height: 100%;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+    min-height: 0;
+  }
+  .map-panel {
+    display: grid;
+    grid-template-rows: auto auto 1fr auto;
+    gap: 8px;
+  }
+  .map-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+  .map-title h1 {
+    margin: 0;
+    font-size: 18px;
+  }
+  .map-title span {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .map-meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+  }
+  .hud {
+    display: grid;
+    gap: 8px;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    padding: 8px;
+  }
+  .hud-bars {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .hud-bar {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .hud-meter {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.14);
+    overflow: hidden;
+  }
+  .hud-meter__fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #22c55e, #86efac);
+  }
+  .hud-meter--mp .hud-meter__fill {
+    background: linear-gradient(90deg, #38bdf8, #a5f3fc);
+  }
+  .hud-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  .hud-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(0,0,0,0.35);
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .hud-chip strong { color: #fff; font-size: 12px; }
+  .hud-btn {
+    margin-left: auto;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(0,0,0,0.5);
+    color: #fff;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .map-frame {
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    min-height: 0;
+    width: min(100%, 60vh);
+    aspect-ratio: 1 / 1;
+    max-height: min(60vh, 540px);
+    justify-self: center;
+    align-self: center;
+    max-width: 100%;
+  }
+  canvas {
+    display: block;
+    image-rendering: pixelated;
+    max-width: 100%;
+    max-height: 100%;
+    cursor: pointer;
+    touch-action: none;
+  }
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend-chip {
+    width: 12px;
+    height: 12px;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  .status-panel h2 {
+    margin: 0;
+    font-size: 16px;
+  }
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .stat {
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+  }
+  .stat span { color: var(--muted); }
+  .stat strong { font-size: 15px; }
+  .status-log {
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    padding: 8px;
+    font-size: 12px;
+    color: var(--muted);
+    min-height: 120px;
+    overflow: hidden;
+  }
+  .status-log p { margin: 0 0 6px; }
+  .status-log p:last-child { margin-bottom: 0; }
+  .footer-log {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  .footer-log__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .footer-log__title {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+  .footer-log__actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .footer-log .btn {
+    padding: 6px 10px;
+    font-size: 12px;
+    box-shadow: 0 3px 0 #e35c82, 0 6px 12px rgba(255,113,154,0.25);
+  }
+  .footer-log .btn.secondary {
+    box-shadow: none;
+  }
+  .footer-log .status-log {
+    min-height: 0;
+    height: clamp(60px, 10vh, 110px);
+  }
+  .sheet-overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    background: rgba(6, 8, 16, 0.72);
+    backdrop-filter: blur(6px);
+    padding: calc(12px + var(--safe-top)) calc(12px + var(--safe-right)) calc(12px + var(--safe-bottom)) calc(12px + var(--safe-left));
+    z-index: 65;
+  }
+  .sheet-overlay.is-open { display: flex; }
+  .sheet {
+    width: min(520px, 100%);
+    max-height: min(70vh, 560px);
+    background: rgba(12, 18, 40, 0.95);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 16px 16px 12px 12px;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.45);
+    overflow: hidden;
+  }
+  .sheet-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.12);
+  }
+  .sheet-tabs {
+    display: flex;
+    gap: 6px;
+  }
+  .sheet-tab {
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: transparent;
+    color: #cbd5e1;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .sheet-tab.is-active {
+    background: linear-gradient(135deg, #ff719a, #ff9f43);
+    color: #0b1224;
+    border-color: transparent;
+  }
+  .sheet-close {
+    margin-left: auto;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(0,0,0,0.45);
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .sheet-body {
+    padding: 12px;
+    overflow: hidden auto;
+    display: grid;
+    gap: 12px;
+  }
+  .sheet-panel { display: none; }
+  .sheet-panel.is-active { display: grid; gap: 10px; }
+  .sheet-panel .status-log { min-height: 0; max-height: 220px; overflow: hidden auto; }
+  .legend--sheet {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+  }
+  .legend--sheet .legend-item {
+    font-size: 12px;
+  }
+  .skill-panel {
+    display: grid;
+    gap: 10px;
+  }
+  .icon-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .icon-item {
+    display: grid;
+    place-items: center;
+    padding: 0;
+    appearance: none;
+    -webkit-appearance: none;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.2), rgba(0,0,0,0.35)),
+      var(--icon-color, rgba(255,255,255,0.08));
+    cursor: pointer;
+    position: relative;
+  }
+  .icon-item.is-unlocked {
+    border-color: rgba(34,197,94,0.6);
+    box-shadow: 0 0 0 1px rgba(34,197,94,0.35) inset;
+  }
+  .icon-item.is-selected {
+    outline: 2px solid rgba(56,189,248,0.8);
+    outline-offset: 2px;
+  }
+  .skill-detail {
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.16);
+    background: rgba(0,0,0,0.35);
+    padding: 10px;
+    display: grid;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .skill-detail strong {
+    color: var(--text);
+  }
+  .skill-reqs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .skill-req {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--req-color, rgba(255,255,255,0.08));
+    color: #0b1224;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15);
+    opacity: 0.6;
+  }
+  .skill-req.is-met {
+    opacity: 1;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.25), 0 0 0 1px rgba(34,197,94,0.35);
+  }
+  .battle-overlay,
+  .result-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(6, 8, 16, 0.78);
+    backdrop-filter: blur(6px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 60;
+  }
+  .battle-overlay.is-open,
+  .result-overlay.is-open {
+    display: flex;
+  }
+  .battle-panel,
+  .result-panel {
+    width: min(760px, 100%);
+    background: rgba(12, 18, 40, 0.95);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 14px;
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+  }
+  .battle-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .battle-header h2 { margin: 0; font-size: 18px; }
+  .battle-actors {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+  }
+  .actor {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    padding: 10px;
+    display: grid;
+    gap: 8px;
+    transition: transform 0.12s ease;
+  }
+  .actor.is-hit { transform: translateX(4px) translateY(-2px); }
+  .actor-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+  }
+  .actor-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+  }
+  .hp-bar {
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.12);
+    overflow: hidden;
+  }
+  .hp-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #22c55e, #86efac);
+  }
+  .battle-log {
+    max-height: 180px;
+    overflow: hidden;
+    font-size: 12px;
+    color: var(--muted);
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    padding: 10px;
+  }
+  .battle-log p { margin: 0 0 6px; }
+  .battle-log p:last-child { margin-bottom: 0; }
+  .result-title { margin: 0; font-size: 20px; }
+  .result-stats { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+  .rank-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+  .rank-item { display: grid; grid-template-columns: 1fr auto; gap: 4px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 8px 10px; font-size: 12px; }
+  .rank-item small { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
+  .rank-status { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
+  .result-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .result-actions .btn { flex: 1 1 140px; }
+  @media (max-width: 900px) {
+    .main { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr); }
+    .map-panel { overflow: hidden; grid-template-rows: auto auto 1fr; }
+    .map-frame { width: auto; height: 100%; max-height: none; }
+    .status-panel { display: none; }
+    .sheet-overlay { padding: calc(10px + var(--safe-top)) calc(10px + var(--safe-right)) calc(10px + var(--safe-bottom)) calc(10px + var(--safe-left)); }
+    .legend { display: none; }
+    .hud { gap: 6px; padding: 6px; }
+    .hud-bars { grid-template-columns: 1fr; }
+    .hud-row { gap: 4px; }
+    .hud-chip { font-size: 10px; padding: 3px 6px; }
+    .top-bar { flex-direction: column; align-items: stretch; }
+    .top-actions { width: 100%; justify-content: flex-end; }
+    .footer-log .status-log { height: clamp(54px, 8vh, 90px); }
+  }
+</style>
+<style id="interaction-guard">
+  * { -webkit-touch-callout: none; -webkit-user-drag: none; -webkit-user-select: none; -ms-user-select: none; user-select: none; }
+  input, textarea, [contenteditable] { -webkit-user-select: none; -ms-user-select: none; user-select: none; }
+</style>
+<script id="interaction-guard-js">
+  document.addEventListener('contextmenu', (event) => { event.preventDefault(); });
+  document.addEventListener('dragstart', (event) => { event.preventDefault(); });
+</script>
+</head>
+<body>
+  <div class="game-shell">
+    <div class="main">
+      <section class="panel map-panel">
+        <div class="map-title">
+          <h1>戦略MAP</h1>
+          <div class="map-meta">
+            <span id="mapStatus">歩数: --</span>
+            <span id="baseDirection">勇者方向: --</span>
+          </div>
+        </div>
+        <div class="hud">
+          <div class="hud-bars">
+            <div class="hud-bar">
+              <span>HP</span>
+              <div class="hud-meter"><div class="hud-meter__fill" id="hpBar"></div></div>
+              <strong id="hpShort">--</strong>
+            </div>
+            <div class="hud-bar">
+              <span>MP</span>
+              <div class="hud-meter hud-meter--mp"><div class="hud-meter__fill" id="mpBar"></div></div>
+              <strong id="mpShort">--</strong>
+            </div>
+          </div>
+          <div class="hud-row">
+            <span class="hud-chip">ATK <strong id="atkShort">--</strong></span>
+            <span class="hud-chip">SPD <strong id="spdShort">--</strong></span>
+            <span class="hud-chip">DEF <strong id="defShort">--</strong></span>
+            <span class="hud-chip">LUC <strong id="lucShort">--</strong></span>
+            <span class="hud-chip">LV <strong id="levelShort">--</strong></span>
+            <button class="hud-btn" id="openStatus" type="button">ステータス</button>
+            <button class="hud-btn" id="toggleView" type="button">全体表示</button>
+          </div>
+          <div class="hud-row">
+            <span class="hud-chip">EXP <strong id="expShort">--</strong></span>
+            <span class="hud-chip">アイテム <strong id="itemShort">--</strong></span>
+            <span class="hud-chip">歩数 <strong id="stepShort">--</strong></span>
+            <span class="hud-chip">討伐 <strong id="killShort">--</strong></span>
+            <span class="hud-chip">毒 <strong id="poisonShort">--</strong></span>
+          </div>
+        </div>
+        <div class="map-frame">
+          <canvas id="mapCanvas" width="480" height="480"></canvas>
+        </div>
+        <div class="legend">
+          <div class="legend-item"><span class="legend-chip" style="background:#ef4444"></span>モンスター</div>
+          <div class="legend-item"><span class="legend-chip" style="background:#f59e0b"></span>アイテム</div>
+          <div class="legend-item"><span class="legend-chip" style="background:#22c55e"></span>回復</div>
+          <div class="legend-item"><span class="legend-chip" style="background:#f97316"></span>罠</div>
+          <div class="legend-item"><span class="legend-chip" style="background:#a855f7"></span>毒</div>
+        <div class="legend-item"><span class="legend-chip" style="background:#60a5fa"></span>氷</div>
+        </div>
+      </section>
+
+      <aside class="panel status-panel">
+        <h2>魔王様ステータス</h2>
+        <div class="stat-grid">
+          <div class="stat"><span>HP</span><strong id="hpStat">--</strong></div>
+          <div class="stat"><span>MP</span><strong id="mpStat">--</strong></div>
+          <div class="stat"><span>ATK</span><strong id="atkStat">--</strong></div>
+          <div class="stat"><span>SPD</span><strong id="spdStat">--</strong></div>
+          <div class="stat"><span>DEF</span><strong id="defStat">--</strong></div>
+          <div class="stat"><span>LUC</span><strong id="lucStat">--</strong></div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat"><span>LV</span><strong id="levelStat">--</strong></div>
+          <div class="stat"><span>EXP</span><strong id="expStat">--</strong></div>
+          <div class="stat"><span>アイテム</span><strong id="itemStat">--</strong></div>
+          <div class="stat"><span>歩数</span><strong id="stepStat">--</strong></div>
+          <div class="stat"><span>討伐数</span><strong id="killStat">--</strong></div>
+          <div class="stat"><span>毒</span><strong id="poisonStat">--</strong></div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="panel footer-log">
+      <div class="footer-log__head">
+        <div class="footer-log__title">ログ</div>
+        <div class="footer-log__actions">
+          <button class="btn" id="resetRun">最初から</button>
+        </div>
+      </div>
+      <div class="status-log" id="footerLog"></div>
+    </div>
+
+  </div>
+
+  <div class="sheet-overlay" id="statusSheet" aria-hidden="true">
+    <div class="sheet">
+      <div class="sheet-header">
+        <div class="sheet-tabs">
+          <button class="sheet-tab is-active" data-tab="stats" type="button">ステータス</button>
+          <button class="sheet-tab" data-tab="log" type="button">ログ</button>
+          <button class="sheet-tab" data-tab="gear" type="button">装備</button>
+        </div>
+        <button class="sheet-close" id="closeStatus" type="button">閉じる</button>
+      </div>
+      <div class="sheet-body">
+        <div class="sheet-panel is-active" data-panel="stats">
+          <div class="stat-grid">
+            <div class="stat"><span>HP</span><strong id="hpStatSheet">--</strong></div>
+            <div class="stat"><span>MP</span><strong id="mpStatSheet">--</strong></div>
+            <div class="stat"><span>ATK</span><strong id="atkStatSheet">--</strong></div>
+            <div class="stat"><span>SPD</span><strong id="spdStatSheet">--</strong></div>
+            <div class="stat"><span>DEF</span><strong id="defStatSheet">--</strong></div>
+            <div class="stat"><span>LUC</span><strong id="lucStatSheet">--</strong></div>
+          </div>
+          <div class="stat-grid">
+            <div class="stat"><span>LV</span><strong id="levelStatSheet">--</strong></div>
+            <div class="stat"><span>EXP</span><strong id="expStatSheet">--</strong></div>
+            <div class="stat"><span>アイテム</span><strong id="itemStatSheet">--</strong></div>
+            <div class="stat"><span>歩数</span><strong id="stepStatSheet">--</strong></div>
+            <div class="stat"><span>討伐数</span><strong id="killStatSheet">--</strong></div>
+            <div class="stat"><span>毒</span><strong id="poisonStatSheet">--</strong></div>
+          </div>
+        </div>
+        <div class="sheet-panel" data-panel="log">
+          <div class="status-log" id="sheetLog"></div>
+        </div>
+        <div class="sheet-panel" data-panel="gear">
+          <div class="skill-panel">
+            <div class="icon-grid" id="gearList"></div>
+            <div class="skill-detail" id="gearDetail">装備はまだありません。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="battle-overlay" id="battleOverlay" aria-hidden="true">
+    <div class="battle-panel">
+      <div class="battle-header">
+        <h2 id="battleTitle">戦闘開始</h2>
+        <span id="battleSub">--</span>
+      </div>
+      <div class="battle-actors">
+        <div class="actor" id="playerActor">
+          <div class="actor-head"><div class="actor-icon" id="playerIcon">魔</div><div id="playerName">魔王様</div></div>
+          <div class="hp-bar"><div class="hp-fill" id="playerHpFill"></div></div>
+          <div id="playerHpText">--</div>
+        </div>
+        <div class="actor" id="enemyActor">
+          <div class="actor-head"><div class="actor-icon" id="enemyIcon">敵</div><div id="enemyName">--</div></div>
+          <div class="hp-bar"><div class="hp-fill" id="enemyHpFill"></div></div>
+          <div id="enemyHpText">--</div>
+        </div>
+      </div>
+      <div class="battle-log" id="battleLog"></div>
+    </div>
+  </div>
+
+  <div class="result-overlay" id="resultOverlay" aria-hidden="true">
+    <div class="result-panel">
+      <h2 class="result-title" id="resultTitle">--</h2>
+      <p id="resultSummary">--</p>
+      <div class="result-stats" id="resultStats"></div>
+      <div class="status-log">
+        <p>ランキング</p>
+        <ul class="rank-list" id="rankList"></ul>
+        <p id="rankStatus" class="rank-status">スコア送信中...</p>
+      </div>
+      <div class="result-actions">
+        <button class="btn" id="retryBtn">もう一度</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const MAP_SIZE = 9;
+  const NORMAL_VIEW_TILES = 9;
+  const STEP_LEVEL_INTERVAL = 5;
+  const HEAL_RATE = 0.2;
+  const TRAP_DAMAGE = 6;
+  const MIN_HP = 10;
+  const MIN_STAT = 1;
+  const POISON_STEPS = 5;
+  const POISON_DAMAGE_PER_STACK = 1;
+  const POISON_TILE_COUNT = 8;
+  const ICE_TILE_COUNT = 13;
+  const MONSTER_TILE_COUNT = 5;
+  const ITEM_TILE_COUNT = 6;
+  const WALL_TILE_COUNT = 5;
+  const TRAP_TILE_COUNT = 0;
+  const HEAL_TILE_COUNT = 0;
+  const ENEMY_ORDER = ['slime', 'bat', 'golem', 'mage', 'assassin'];
+  const ITEM_SEQUENCE = [
+    { id: 'antidote', label: '解毒のお守り' },
+    { id: 'autoHeal', label: '応急回復薬' },
+    { id: 'autoHeal', label: '応急回復薬' },
+    { id: 'revive', label: '復活薬' },
+    { id: 'key', label: '鍵' },
+    { id: 'mimic', label: '怪しい宝箱' }
+  ];
+  const LEVEL_GROWTH_SEQUENCE = [
+    { hp: 1, atk: 1 },
+    { hp: 1, def: 1 },
+    { hp: 1, spd: 1 },
+    { hp: 1, luc: 1 },
+    { mp: 1 }
+  ];
+  let fullMapView = true;
+  let viewTiles = fullMapView ? MAP_SIZE : NORMAL_VIEW_TILES;
+
+  const TILE_TYPES = {
+    empty: { id: 'empty', color: '#1f2538', name: '平地' },
+    monster: { id: 'monster', color: '#22293d', name: 'モンスター' },
+    item: { id: 'item', color: '#22293d', name: 'アイテム' },
+    heal: { id: 'heal', color: '#22293d', name: '回復' },
+    trap: { id: 'trap', color: '#22293d', name: '罠' },
+    poison: { id: 'poison', color: '#22293d', name: '毒' },
+    ice: { id: 'ice', color: '#22293d', name: '氷' },
+    start: { id: 'start', color: '#1e3a8a', name: '拠点' },
+    boss: { id: 'boss', color: '#3b0a0a', name: '勇者' },
+    wall: { id: 'wall', color: '#0b0f1d', name: '岩壁' }
+  };
+  const TILE_WEIGHTS = [
+    { id: 'monster', weight: 0.42 },
+    { id: 'item', weight: 0.16 },
+    { id: 'heal', weight: 0.12 },
+    { id: 'trap', weight: 0.1 },
+    { id: 'ice', weight: 0.08 },
+    { id: 'empty', weight: 0.2 }
+  ];
+
+  const tileSpritePaths = {
+    base: './じめんSprite9.png',
+    start: './じめんSprite10.png',
+    boss: './じめんSprite10.png',
+    poison: './じめんSprite7.png',
+    item: './じめんSprite12.png',
+    heal: './じめんSprite13.png',
+    ice: './じめんSprite1.png',
+    trap: './じめんSprite15.png'
+  };
+  const tileSprites = {};
+  Object.entries(tileSpritePaths).forEach(([id, src]) => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = src;
+    img.onload = () => {
+      if (tileSize) renderMap();
+    };
+    tileSprites[id] = img;
+  });
+
+  const FIXED_LAYOUT = [
+    'WRIIBWKWW',
+    'YWWWYKWPP',
+    'WIIIWWWWW',
+    'WIRIWWRWW',
+    'WIIYWWIWY',
+    'WYWPPWIWW',
+    'WPWPRWIWW',
+    'KRIKWKWWW',
+    'WWWPBPYWW'
+  ];
+  const ENEMY_TIER_ORDER = [5, 4, 2, 3, 1];
+  const ITEM_ASSIGNMENTS = {
+    '0,1': { id: 'autoHeal', label: '応急回復薬' },
+    '4,1': { id: 'revive', label: '復活薬' },
+    '3,4': { id: 'key', label: '鍵' },
+    '8,4': { id: 'autoHeal', label: '応急回復薬' },
+    '1,5': { id: 'antidote', label: '解毒のお守り' },
+    '6,8': { id: 'mimic', label: '怪しい宝箱', requiresKey: true }
+  };
+
+  const playerSpritePaths = {
+    down: './バブリン1.png',
+    right: './バブリン2.png',
+    up: './バブリン3.png',
+    left: './バブリン4.png'
+  };
+  const playerSprites = {};
+  Object.entries(playerSpritePaths).forEach(([dir, src]) => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = src;
+    img.onload = () => {
+      if (tileSize) renderMap();
+    };
+    playerSprites[dir] = img;
+  });
+
+  const ENEMY_TYPES = [
+    {
+      id: 'slime',
+      name: 'スライム兵',
+      color: '#7dd3fc',
+      exp: 6,
+      stats: { hp: 10, atk: 3, spd: 2, def: 1, luc: 1, mp: 1 },
+      growth: { hp: 0.35, mp: 0.05, atk: 0.18, spd: 0.16, def: 0.16, luc: 0.1 },
+      ai: (state) => (Math.random() < 0.25 ? { type: 'guard', label: 'ぷるるガード', guard: 2 } : { type: 'attack', label: '体当たり', power: 1 })
+    },
+    {
+      id: 'bat',
+      name: '影コウモリ',
+      color: '#c4b5fd',
+      exp: 7,
+      stats: { hp: 10, atk: 3, spd: 5, def: 1, luc: 3, mp: 1 },
+      growth: { hp: 0.28, mp: 0.05, atk: 0.2, spd: 0.3, def: 0.12, luc: 0.22 },
+      ai: () => (Math.random() < 0.3 ? { type: 'multi', label: '連続噛み', power: 0.7, hits: 2 } : { type: 'attack', label: '噛みつき', power: 1 })
+    },
+    {
+      id: 'golem',
+      name: '土塊ゴーレム',
+      color: '#fca5a5',
+      exp: 10,
+      stats: { hp: 14, atk: 4, spd: 1, def: 2, luc: 1, mp: 1 },
+      growth: { hp: 0.45, mp: 0.03, atk: 0.16, spd: 0.08, def: 0.26, luc: 0.05 },
+      ai: () => (Math.random() < 0.25 ? { type: 'heavy', label: '大地の一撃', power: 1.4 } : { type: 'attack', label: '拳打', power: 1 })
+    },
+    {
+      id: 'mage',
+      name: '黒魔導士',
+      color: '#f9a8d4',
+      exp: 9,
+      stats: { hp: 12, atk: 4, spd: 4, def: 2, luc: 2, mp: 8 },
+      growth: { hp: 0.34, mp: 0.34, atk: 0.22, spd: 0.18, def: 0.12, luc: 0.18 },
+      ai: (state) => (state.mp >= 2 && Math.random() < 0.3 ? { type: 'magic', label: '闇の魔法', power: 1.2, ignoreDef: true, mpCost: 2 } : { type: 'attack', label: '杖撃', power: 1 })
+    },
+    {
+      id: 'assassin',
+      name: '夜襲アサシン',
+      color: '#fcd34d',
+      exp: 8,
+      stats: { hp: 12, atk: 5, spd: 7, def: 2, luc: 5, mp: 1 },
+      growth: { hp: 0.32, mp: 0.05, atk: 0.28, spd: 0.36, def: 0.14, luc: 0.28 },
+      ai: () => (Math.random() < 0.25 ? { type: 'crit', label: '影縫い', power: 1.1, critBonus: 0.2 } : { type: 'attack', label: '斬撃', power: 1 })
+    },
+    {
+      id: 'mimic',
+      name: 'ミミック',
+      color: '#fb7185',
+      exp: 10,
+      stats: { hp: 14, atk: 5, spd: 3, def: 2, luc: 2, mp: 1 },
+      growth: { hp: 0.3, mp: 0.05, atk: 0.22, spd: 0.18, def: 0.18, luc: 0.12 },
+      noScale: true,
+      ai: () => (Math.random() < 0.3 ? { type: 'heavy', label: '噛み砕き', power: 1.2 } : { type: 'attack', label: '宝箱バイト', power: 1 })
+    }
+  ];
+
+  const ENEMY_TIERS = [
+    { tier: 1, count: 1, type: 'slime' },
+    { tier: 2, count: 1, type: 'bat' },
+    { tier: 3, count: 1, type: 'golem' },
+    { tier: 4, count: 1, type: 'mage' },
+    { tier: 5, count: 1, type: 'assassin' }
+  ];
+
+  const HERO_BOSS = {
+    id: 'hero',
+    name: '勇者',
+    color: '#f97316',
+    level: 5,
+    exp: 24,
+    stats: { hp: 28, atk: 7, spd: 5, def: 3, luc: 5, mp: 4 },
+    growth: { hp: 0.4, mp: 0.2, atk: 0.22, spd: 0.2, def: 0.18, luc: 0.18 },
+    ai: (state) => (state.mp >= 2 && Math.random() < 0.4 ? { type: 'heavy', label: '聖剣斬り', power: 1.4, mpCost: 2 } : { type: 'attack', label: '勇者の一撃', power: 1 })
+  };
+
+  const GEAR_RARITIES = [
+    { id: 'N', label: 'N', color: '#94a3b8', factor: 0.02, min: 0 },
+    { id: 'R', label: 'R', color: '#60a5fa', factor: 0.06, min: 1 },
+    { id: 'SR', label: 'SR', color: '#a78bfa', factor: 0.1, min: 1 },
+    { id: 'UR', label: 'UR', color: '#f97316', factor: 0.18, min: 2 },
+    { id: 'L', label: 'L', color: '#facc15', factor: 0.3, min: 2 }
+  ];
+  const GEAR_RARITY_ORDER = GEAR_RARITIES.map(r => r.id);
+
+  const mapCanvas = document.getElementById('mapCanvas');
+  const ctx = mapCanvas.getContext('2d');
+  const mapStatus = document.getElementById('mapStatus');
+  const baseDirection = document.getElementById('baseDirection');
+  const footerLog = document.getElementById('footerLog');
+  const sheetLog = document.getElementById('sheetLog');
+  const hpBar = document.getElementById('hpBar');
+  const mpBar = document.getElementById('mpBar');
+  const statsEl = {
+    hp: document.getElementById('hpStat'),
+    mp: document.getElementById('mpStat'),
+    atk: document.getElementById('atkStat'),
+    spd: document.getElementById('spdStat'),
+    def: document.getElementById('defStat'),
+    luc: document.getElementById('lucStat'),
+    level: document.getElementById('levelStat'),
+    exp: document.getElementById('expStat'),
+    items: document.getElementById('itemStat'),
+    steps: document.getElementById('stepStat'),
+    kills: document.getElementById('killStat'),
+    poison: document.getElementById('poisonStat')
+  };
+  const sheetStatsEl = {
+    hp: document.getElementById('hpStatSheet'),
+    mp: document.getElementById('mpStatSheet'),
+    atk: document.getElementById('atkStatSheet'),
+    spd: document.getElementById('spdStatSheet'),
+    def: document.getElementById('defStatSheet'),
+    luc: document.getElementById('lucStatSheet'),
+    level: document.getElementById('levelStatSheet'),
+    exp: document.getElementById('expStatSheet'),
+    items: document.getElementById('itemStatSheet'),
+    steps: document.getElementById('stepStatSheet'),
+    kills: document.getElementById('killStatSheet'),
+    poison: document.getElementById('poisonStatSheet')
+  };
+  const hudStatsEl = {
+    hp: document.getElementById('hpShort'),
+    mp: document.getElementById('mpShort'),
+    atk: document.getElementById('atkShort'),
+    spd: document.getElementById('spdShort'),
+    def: document.getElementById('defShort'),
+    luc: document.getElementById('lucShort'),
+    level: document.getElementById('levelShort'),
+    exp: document.getElementById('expShort'),
+    items: document.getElementById('itemShort'),
+    steps: document.getElementById('stepShort'),
+    kills: document.getElementById('killShort'),
+    poison: document.getElementById('poisonShort')
+  };
+
+  const gearListEl = document.getElementById('gearList');
+  const gearDetailEl = document.getElementById('gearDetail');
+
+  const statusSheet = document.getElementById('statusSheet');
+  const openStatusBtn = document.getElementById('openStatus');
+  const closeStatusBtn = document.getElementById('closeStatus');
+  const toggleViewBtn = document.getElementById('toggleView');
+
+  const battleOverlay = document.getElementById('battleOverlay');
+  const battleTitle = document.getElementById('battleTitle');
+  const battleSub = document.getElementById('battleSub');
+  const battleLog = document.getElementById('battleLog');
+  const playerActor = document.getElementById('playerActor');
+  const enemyActor = document.getElementById('enemyActor');
+  const playerHpFill = document.getElementById('playerHpFill');
+  const enemyHpFill = document.getElementById('enemyHpFill');
+  const playerHpText = document.getElementById('playerHpText');
+  const enemyHpText = document.getElementById('enemyHpText');
+  const enemyNameEl = document.getElementById('enemyName');
+  const enemyIcon = document.getElementById('enemyIcon');
+  const playerNameEl = document.getElementById('playerName');
+  const playerIcon = document.getElementById('playerIcon');
+
+  const resultOverlay = document.getElementById('resultOverlay');
+  const resultTitle = document.getElementById('resultTitle');
+  const resultSummary = document.getElementById('resultSummary');
+  const resultStats = document.getElementById('resultStats');
+  const rankList = document.getElementById('rankList');
+  const rankStatus = document.getElementById('rankStatus');
+
+  let spawn = { x: 0, y: 0 };
+  let bossPos = { x: 0, y: 0 };
+  let tiles = [];
+  let enemies = [];
+  let visited = [];
+  let itemMap = new Map();
+  let enemyCount = 0;
+  let tileSize = 0;
+  let viewSizePx = 0;
+  let battleActive = false;
+  let gameOver = false;
+  let isMoving = false;
+  let moveAnim = null;
+  let playerFacing = 'down';
+  const MOVE_ANIM_MS = 180;
+
+  const BASE_STATS = { hp: 24, mp: 10, atk: 5, spd: 4, def: 3, luc: 2 };
+
+  const player = {
+    x: 0,
+    y: 0,
+    level: 1,
+    exp: 0,
+    itemsCollected: 0,
+    hasKey: false,
+    antidoteReady: false,
+    autoHealCharges: 0,
+    reviveCharges: 0,
+    baseStats: { ...BASE_STATS },
+    hp: BASE_STATS.hp,
+    maxHp: BASE_STATS.hp,
+    mp: BASE_STATS.mp,
+    maxMp: BASE_STATS.mp,
+    atk: BASE_STATS.atk,
+    spd: BASE_STATS.spd,
+    def: BASE_STATS.def,
+    luc: BASE_STATS.luc,
+    kills: 0,
+    steps: 0,
+    gear: { accessory: null },
+    gearBonus: { atk: 0, spd: 0, def: 0, luc: 0 },
+    gearInventory: [],
+    poisonStacks: 0,
+    poisonSteps: 0,
+    killByTier: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+  };
+
+  let rngSeed = Date.now() % 2147483647;
+  function rand() {
+    rngSeed = rngSeed * 16807 % 2147483647;
+    return (rngSeed - 1) / 2147483646;
+  }
+  function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+  const DEFAULT_GROWTH = { hp: 0.32, mp: 0.1, atk: 0.2, spd: 0.18, def: 0.16, luc: 0.1 };
+  function getStepTier() {
+    return Math.max(0, Math.floor(player.steps / STEP_LEVEL_INTERVAL));
+  }
+
+  function scaleEnemyStats(stats, level, growth = DEFAULT_GROWTH) {
+    if (!level) return { ...stats };
+    return {
+      hp: Math.max(MIN_HP, stats.hp + Math.round(level * growth.hp)),
+      mp: Math.max(MIN_STAT, stats.mp + Math.floor(level * growth.mp)),
+      atk: Math.max(MIN_STAT, stats.atk + Math.round(level * growth.atk)),
+      spd: Math.max(MIN_STAT, stats.spd + Math.round(level * growth.spd)),
+      def: Math.max(MIN_STAT, stats.def + Math.round(level * growth.def)),
+      luc: Math.max(MIN_STAT, stats.luc + Math.round(level * growth.luc))
+    };
+  }
+
+  function resolveEnemyStats(enemy) {
+    const baseStats = enemy.baseStats || enemy.stats;
+    if (enemy.noScale) return { ...baseStats };
+    const level = Math.max(0, enemy.level || 0);
+    return scaleEnemyStats(baseStats, level, enemy.growth);
+  }
+
+  function generateNoiseField(scale) {
+    const gridW = Math.ceil(MAP_SIZE / scale) + 2;
+    const gridH = Math.ceil(MAP_SIZE / scale) + 2;
+    const grid = Array.from({ length: gridH }, () =>
+      Array.from({ length: gridW }, () => rand())
+    );
+    const lerp = (a, b, t) => a + (b - a) * t;
+    return (x, y) => {
+      const gx = x / scale;
+      const gy = y / scale;
+      const x0 = Math.floor(gx);
+      const y0 = Math.floor(gy);
+      const tx = gx - x0;
+      const ty = gy - y0;
+      const v00 = grid[y0]?.[x0] ?? 0;
+      const v10 = grid[y0]?.[x0 + 1] ?? v00;
+      const v01 = grid[y0 + 1]?.[x0] ?? v00;
+      const v11 = grid[y0 + 1]?.[x0 + 1] ?? v00;
+      const v0 = lerp(v00, v10, tx);
+      const v1 = lerp(v01, v11, tx);
+      return lerp(v0, v1, ty);
+    };
+  }
+
+  function buildIslandMask() {
+    if (MAP_SIZE <= 9) {
+      return Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(true));
+    }
+    const land = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(false));
+    const noise = generateNoiseField(7);
+    const normX = (x) => x / (MAP_SIZE - 1);
+    const normY = (y) => y / (MAP_SIZE - 1);
+    const addEllipse = (cx, cy, rx, ry, rough = 0.2) => {
+      const minX = Math.max(0, Math.floor((cx - rx - 0.06) * (MAP_SIZE - 1)));
+      const maxX = Math.min(MAP_SIZE - 1, Math.ceil((cx + rx + 0.06) * (MAP_SIZE - 1)));
+      const minY = Math.max(0, Math.floor((cy - ry - 0.06) * (MAP_SIZE - 1)));
+      const maxY = Math.min(MAP_SIZE - 1, Math.ceil((cy + ry + 0.06) * (MAP_SIZE - 1)));
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          const dx = (normX(x) - cx) / rx;
+          const dy = (normY(y) - cy) / ry;
+          const dist = dx * dx + dy * dy;
+          const jitter = (noise(x, y) - 0.5) * rough;
+          if (dist <= 1 + jitter) land[y][x] = true;
+        }
+      }
+    };
+    const carveEllipse = (cx, cy, rx, ry, rough = 0.15) => {
+      const minX = Math.max(0, Math.floor((cx - rx - 0.04) * (MAP_SIZE - 1)));
+      const maxX = Math.min(MAP_SIZE - 1, Math.ceil((cx + rx + 0.04) * (MAP_SIZE - 1)));
+      const minY = Math.max(0, Math.floor((cy - ry - 0.04) * (MAP_SIZE - 1)));
+      const maxY = Math.min(MAP_SIZE - 1, Math.ceil((cy + ry + 0.04) * (MAP_SIZE - 1)));
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          const dx = (normX(x) - cx) / rx;
+          const dy = (normY(y) - cy) / ry;
+          const dist = dx * dx + dy * dy;
+          const jitter = (noise(x, y) - 0.5) * rough;
+          if (dist <= 1 + jitter) land[y][x] = false;
+        }
+      }
+    };
+    const drawBridge = (x1, y1, x2, y2, width = 1) => {
+      const ax = Math.round(x1 * (MAP_SIZE - 1));
+      const ay = Math.round(y1 * (MAP_SIZE - 1));
+      const bx = Math.round(x2 * (MAP_SIZE - 1));
+      const by = Math.round(y2 * (MAP_SIZE - 1));
+      const dx = Math.abs(bx - ax);
+      const dy = Math.abs(by - ay);
+      const sx = ax < bx ? 1 : -1;
+      const sy = ay < by ? 1 : -1;
+      let err = dx - dy;
+      let x = ax;
+      let y = ay;
+      while (true) {
+        for (let oy = -width; oy <= width; oy++) {
+          for (let ox = -width; ox <= width; ox++) {
+            const nx = x + ox;
+            const ny = y + oy;
+            if (nx >= 0 && ny >= 0 && nx < MAP_SIZE && ny < MAP_SIZE) {
+              land[ny][nx] = true;
+            }
+          }
+        }
+        if (x === bx && y === by) break;
+        const e2 = 2 * err;
+        if (e2 > -dy) { err -= dy; x += sx; }
+        if (e2 < dx) { err += dx; y += sy; }
+      }
+    };
+
+    addEllipse(0.18, 0.28, 0.17, 0.12, 0.3);
+    addEllipse(0.12, 0.18, 0.08, 0.06, 0.28);
+    addEllipse(0.25, 0.42, 0.07, 0.06, 0.26);
+    addEllipse(0.28, 0.35, 0.06, 0.08, 0.22);
+    addEllipse(0.32, 0.12, 0.05, 0.03, 0.2);
+
+    addEllipse(0.28, 0.63, 0.07, 0.18, 0.28);
+    addEllipse(0.30, 0.80, 0.04, 0.10, 0.24);
+
+    addEllipse(0.47, 0.28, 0.07, 0.05, 0.26);
+    addEllipse(0.43, 0.24, 0.03, 0.03, 0.2);
+    addEllipse(0.52, 0.20, 0.04, 0.06, 0.22);
+    addEllipse(0.50, 0.34, 0.05, 0.03, 0.2);
+
+    addEllipse(0.52, 0.58, 0.12, 0.22, 0.3);
+    addEllipse(0.56, 0.72, 0.06, 0.12, 0.24);
+
+    addEllipse(0.62, 0.46, 0.05, 0.07, 0.22);
+    addEllipse(0.67, 0.52, 0.05, 0.08, 0.22);
+
+    addEllipse(0.73, 0.30, 0.20, 0.12, 0.3);
+    addEllipse(0.80, 0.38, 0.12, 0.07, 0.26);
+    addEllipse(0.86, 0.32, 0.04, 0.05, 0.18);
+    addEllipse(0.88, 0.34, 0.03, 0.05, 0.18);
+
+    addEllipse(0.76, 0.56, 0.08, 0.06, 0.24);
+    addEllipse(0.82, 0.60, 0.06, 0.04, 0.22);
+
+    addEllipse(0.82, 0.76, 0.10, 0.07, 0.22);
+
+    addEllipse(0.45, 0.12, 0.18, 0.03, 0.18);
+    addEllipse(0.62, 0.14, 0.10, 0.03, 0.16);
+
+    carveEllipse(0.25, 0.40, 0.05, 0.04, 0.16);
+    carveEllipse(0.50, 0.32, 0.06, 0.03, 0.14);
+    carveEllipse(0.58, 0.45, 0.03, 0.06, 0.14);
+    carveEllipse(0.70, 0.45, 0.05, 0.03, 0.14);
+    carveEllipse(0.62, 0.25, 0.05, 0.03, 0.12);
+
+    drawBridge(0.26, 0.48, 0.28, 0.52, 1);
+    drawBridge(0.56, 0.46, 0.60, 0.46, 1);
+    drawBridge(0.78, 0.62, 0.82, 0.70, 1);
+    drawBridge(0.86, 0.34, 0.84, 0.33, 1);
+
+    let seed = null;
+    for (let y = 0; y < MAP_SIZE && !seed; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        if (land[y][x]) { seed = { x, y }; break; }
+      }
+    }
+    if (!seed) return land;
+
+    const dirs = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1]
+    ];
+    const floodMain = () => {
+      const main = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(false));
+      const queue = [{ x: seed.x, y: seed.y }];
+      main[seed.y][seed.x] = true;
+      while (queue.length) {
+        const current = queue.shift();
+        for (const [dx, dy] of dirs) {
+          const nx = current.x + dx;
+          const ny = current.y + dy;
+          if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
+          if (main[ny][nx] || !land[ny][nx]) continue;
+          main[ny][nx] = true;
+          queue.push({ x: nx, y: ny });
+        }
+      }
+      return main;
+    };
+    const connectAllLand = () => {
+      while (true) {
+        const main = floodMain();
+        let hasOther = false;
+        for (let y = 0; y < MAP_SIZE && !hasOther; y++) {
+          for (let x = 0; x < MAP_SIZE; x++) {
+            if (land[y][x] && !main[y][x]) { hasOther = true; break; }
+          }
+        }
+        if (!hasOther) break;
+
+        const size = MAP_SIZE * MAP_SIZE;
+        const parent = new Int32Array(size);
+        const visited = new Uint8Array(size);
+        parent.fill(-1);
+        const queue = [];
+        for (let y = 0; y < MAP_SIZE; y++) {
+          for (let x = 0; x < MAP_SIZE; x++) {
+            if (main[y][x]) {
+              const key = x + y * MAP_SIZE;
+              visited[key] = 1;
+              parent[key] = key;
+              queue.push({ x, y });
+            }
+          }
+        }
+        let target = null;
+        while (queue.length && !target) {
+          const current = queue.shift();
+          for (const [dx, dy] of dirs) {
+            const nx = current.x + dx;
+            const ny = current.y + dy;
+            if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
+            const key = nx + ny * MAP_SIZE;
+            if (visited[key]) continue;
+            visited[key] = 1;
+            parent[key] = current.x + current.y * MAP_SIZE;
+            if (land[ny][nx] && !main[ny][nx]) {
+              target = { x: nx, y: ny };
+              break;
+            }
+            queue.push({ x: nx, y: ny });
+          }
+        }
+        if (!target) break;
+        let currentKey = target.x + target.y * MAP_SIZE;
+        while (parent[currentKey] !== currentKey && parent[currentKey] !== -1) {
+          const cx = currentKey % MAP_SIZE;
+          const cy = Math.floor(currentKey / MAP_SIZE);
+          land[cy][cx] = true;
+          currentKey = parent[currentKey];
+        }
+      }
+    };
+    connectAllLand();
+    return land;
+  }
+
+  function buildDistanceMap(start, landMask) {
+    const size = MAP_SIZE * MAP_SIZE;
+    const dist = new Int32Array(size);
+    dist.fill(-1);
+    const queue = new Int32Array(size);
+    let head = 0;
+    let tail = 0;
+    const startKey = start.x + start.y * MAP_SIZE;
+    dist[startKey] = 0;
+    queue[tail++] = startKey;
+    const neighbors = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1]
+    ];
+    while (head < tail) {
+      const key = queue[head++];
+      const cx = key % MAP_SIZE;
+      const cy = Math.floor(key / MAP_SIZE);
+      const nextDist = dist[key] + 1;
+      for (const [dx, dy] of neighbors) {
+        const nx = cx + dx;
+        const ny = cy + dy;
+        if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
+        if (!landMask[ny][nx]) continue;
+        const nKey = nx + ny * MAP_SIZE;
+        if (dist[nKey] !== -1) continue;
+        dist[nKey] = nextDist;
+        queue[tail++] = nKey;
+      }
+    }
+    return dist;
+  }
+
+  function placeSpawnAndBase(landMask) {
+    const candidates = [];
+    const fallback = [];
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        if (!landMask[y][x]) continue;
+        const entry = { x, y, key: x + y * MAP_SIZE };
+        fallback.push(entry);
+        if (x < EDGE_MARGIN || y < EDGE_MARGIN || x >= MAP_SIZE - EDGE_MARGIN || y >= MAP_SIZE - EDGE_MARGIN) continue;
+        candidates.push(entry);
+      }
+    }
+    const pool = candidates.length ? candidates : fallback;
+    if (!pool.length) return;
+    const inSpawnRegion = (x, y) => {
+      const nx = x / (MAP_SIZE - 1);
+      const ny = y / (MAP_SIZE - 1);
+      return nx >= SPAWN_REGION.xMin && nx <= SPAWN_REGION.xMax &&
+        ny >= SPAWN_REGION.yMin && ny <= SPAWN_REGION.yMax;
+    };
+    const inBaseRegion = (x, y) => {
+      const nx = x / (MAP_SIZE - 1);
+      const ny = y / (MAP_SIZE - 1);
+      return nx >= BASE_REGION.xMin && nx <= BASE_REGION.xMax &&
+        ny >= BASE_REGION.yMin && ny <= BASE_REGION.yMax;
+    };
+    const spawnPool = pool.filter(entry => inSpawnRegion(entry.x, entry.y));
+    const startPool = spawnPool.length ? spawnPool : pool;
+    const basePool = pool.filter(entry => inBaseRegion(entry.x, entry.y));
+    const targetPool = basePool.length ? basePool : pool;
+
+    const size = MAP_SIZE * MAP_SIZE;
+    const dist = new Int32Array(size);
+    const queue = new Int32Array(size);
+    const neighbors = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1]
+    ];
+
+    let bestSpawn = startPool[0];
+    let bestBase = targetPool[0];
+    let bestDelta = Infinity;
+    let bestDist = -1;
+
+    for (const start of startPool) {
+      dist.fill(-1);
+      let head = 0;
+      let tail = 0;
+      dist[start.key] = 0;
+      queue[tail++] = start.key;
+      while (head < tail) {
+        const key = queue[head++];
+        const cx = key % MAP_SIZE;
+        const cy = Math.floor(key / MAP_SIZE);
+        const nextDist = dist[key] + 1;
+        for (const [dx, dy] of neighbors) {
+          const nx = cx + dx;
+          const ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
+          if (!landMask[ny][nx]) continue;
+          const nKey = nx + ny * MAP_SIZE;
+          if (dist[nKey] !== -1) continue;
+          dist[nKey] = nextDist;
+          queue[tail++] = nKey;
+        }
+      }
+
+      let foundExact = null;
+      for (const end of targetPool) {
+        const d = dist[end.key];
+        if (d < 0) continue;
+        if (d === TARGET_BASE_DISTANCE) {
+          foundExact = end;
+          break;
+        }
+        const delta = Math.abs(d - TARGET_BASE_DISTANCE);
+        if (delta < bestDelta || (delta === bestDelta && d > bestDist)) {
+          bestDelta = delta;
+          bestDist = d;
+          bestSpawn = start;
+          bestBase = end;
+        }
+      }
+      if (foundExact) {
+        spawn = { x: start.x, y: start.y };
+        heroBase = { x: foundExact.x, y: foundExact.y };
+        return;
+      }
+    }
+
+    spawn = { x: bestSpawn.x, y: bestSpawn.y };
+    heroBase = { x: bestBase.x, y: bestBase.y };
+  }
+
+  function findPath(start, goal) {
+    if (start.x === goal.x && start.y === goal.y) return [start];
+    const size = MAP_SIZE * MAP_SIZE;
+    const startKey = start.x + start.y * MAP_SIZE;
+    const goalKey = goal.x + goal.y * MAP_SIZE;
+    const cameFrom = new Int32Array(size);
+    const gScore = new Float32Array(size);
+    const fScore = new Float32Array(size);
+    const inOpen = new Uint8Array(size);
+    cameFrom.fill(-1);
+    gScore.fill(Infinity);
+    fScore.fill(Infinity);
+
+    const heuristic = (x, y) => Math.abs(x - goal.x) + Math.abs(y - goal.y);
+    gScore[startKey] = 0;
+    fScore[startKey] = heuristic(start.x, start.y);
+    const open = [startKey];
+    inOpen[startKey] = 1;
+
+    const neighbors = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1]
+    ];
+
+    while (open.length) {
+      let bestIndex = 0;
+      let bestKey = open[0];
+      let bestScore = fScore[bestKey];
+      for (let i = 1; i < open.length; i++) {
+        const key = open[i];
+        const score = fScore[key];
+        if (score < bestScore) {
+          bestScore = score;
+          bestKey = key;
+          bestIndex = i;
+        }
+      }
+
+      open.splice(bestIndex, 1);
+      inOpen[bestKey] = 0;
+
+      if (bestKey === goalKey) {
+        const path = [];
+        let current = bestKey;
+        while (current !== -1) {
+          const x = current % MAP_SIZE;
+          const y = Math.floor(current / MAP_SIZE);
+          path.push({ x, y });
+          if (current === startKey) break;
+          current = cameFrom[current];
+        }
+        path.reverse();
+        return path;
+      }
+
+      const cx = bestKey % MAP_SIZE;
+      const cy = Math.floor(bestKey / MAP_SIZE);
+      for (const [dx, dy] of neighbors) {
+        const nx = cx + dx;
+        const ny = cy + dy;
+        if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
+        if (tiles[ny]?.[nx] === 'sea') continue;
+        const nKey = nx + ny * MAP_SIZE;
+        const tentative = gScore[bestKey] + 1;
+        if (tentative < gScore[nKey]) {
+          cameFrom[nKey] = bestKey;
+          gScore[nKey] = tentative;
+          fScore[nKey] = tentative + heuristic(nx, ny);
+          if (!inOpen[nKey]) {
+            inOpen[nKey] = 1;
+            open.push(nKey);
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  function pickTileType() {
+    const roll = rand();
+    let acc = 0;
+    for (const entry of TILE_WEIGHTS) {
+      acc += entry.weight;
+      if (roll <= acc) return entry.id;
+    }
+    return 'neutral';
+  }
+
+  function shuffleList(list) {
+    for (let i = list.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [list[i], list[j]] = [list[j], list[i]];
+    }
+    return list;
+  }
+
+  function getSideGroups(centerX, centerY) {
+    const positions = [];
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        if (x === centerX && y === centerY) continue;
+        positions.push({ x, y });
+      }
+    }
+    positions.sort((a, b) => (a.y - b.y) || (a.x - b.x));
+    const half = Math.floor(positions.length / 2);
+    return {
+      top: positions.slice(0, half),
+      bottom: positions.slice(half)
+    };
+  }
+
+  function buildBalancedTiles(landMask, centerX, centerY) {
+    const tilesOut = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill('sea'));
+    const { top, bottom } = getSideGroups(centerX, centerY);
+    const counts = {};
+    COUNTABLE_TILE_IDS.forEach((id) => { counts[id] = 0; });
+
+    const isSpecial = (x, y) =>
+      (x === spawn.x && y === spawn.y) || (x === heroBase.x && y === heroBase.y);
+
+    if (landMask[centerY]?.[centerX]) {
+      tilesOut[centerY][centerX] = 'neutral';
+    }
+
+    top.forEach(({ x, y }) => {
+      if (!landMask[y]?.[x]) {
+        tilesOut[y][x] = 'sea';
+        return;
+      }
+      if (isSpecial(x, y)) {
+        tilesOut[y][x] = (x === spawn.x && y === spawn.y) ? 'spawn' : 'base';
+        return;
+      }
+      const tileId = pickTileType();
+      tilesOut[y][x] = tileId;
+      if (counts[tileId] != null) counts[tileId] += 1;
+    });
+
+    const bottomTiles = [];
+    COUNTABLE_TILE_IDS.forEach((id) => {
+      for (let i = 0; i < counts[id]; i++) bottomTiles.push(id);
+    });
+    shuffleList(bottomTiles);
+    let idx = 0;
+    bottom.forEach(({ x, y }) => {
+      if (!landMask[y]?.[x]) {
+        tilesOut[y][x] = 'sea';
+        return;
+      }
+      if (isSpecial(x, y)) {
+        tilesOut[y][x] = (x === spawn.x && y === spawn.y) ? 'spawn' : 'base';
+        return;
+      }
+      tilesOut[y][x] = bottomTiles[idx] || 'neutral';
+      idx += 1;
+    });
+
+    return tilesOut;
+  }
+
+  function buildMainPath() {
+    const path = [];
+    let x = spawn.x;
+    let y = spawn.y;
+    path.push({ x, y });
+    const leftBound = 1;
+    const rightBound = MAP_SIZE - 2;
+    let goRight = false;
+    for (let row = spawn.y; row > 1; row--) {
+      const targetX = goRight ? rightBound : leftBound;
+      while (x !== targetX) {
+        x += x < targetX ? 1 : -1;
+        path.push({ x, y });
+      }
+      y -= 1;
+      path.push({ x, y });
+      goRight = !goRight;
+    }
+    while (x !== bossPos.x) {
+      x += x < bossPos.x ? 1 : -1;
+      path.push({ x, y });
+    }
+    y -= 1;
+    path.push({ x, y });
+    return path;
+  }
+
+  function pickEvenly(list, count) {
+    if (!list.length || count <= 0) return [];
+    const result = [];
+    const step = Math.max(1, Math.floor(list.length / (count + 1)));
+    let index = step;
+    while (result.length < count && index < list.length) {
+      result.push(list[index]);
+      index += step;
+    }
+    let cursor = list.length - 1;
+    while (result.length < count && cursor >= 0) {
+      const candidate = list[cursor];
+      if (!result.includes(candidate)) result.push(candidate);
+      cursor -= 1;
+    }
+    return result.slice(0, count);
+  }
+
+  function buildDistanceFromSpawn() {
+    const size = MAP_SIZE * MAP_SIZE;
+    const dist = new Int32Array(size);
+    dist.fill(-1);
+    const queue = new Int32Array(size);
+    let head = 0;
+    let tail = 0;
+    const startKey = spawn.x + spawn.y * MAP_SIZE;
+    dist[startKey] = 0;
+    queue[tail++] = startKey;
+    const neighbors = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1]
+    ];
+    while (head < tail) {
+      const key = queue[head++];
+      const cx = key % MAP_SIZE;
+      const cy = Math.floor(key / MAP_SIZE);
+      const nextDist = dist[key] + 1;
+      for (const [dx, dy] of neighbors) {
+        const nx = cx + dx;
+        const ny = cy + dy;
+        if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
+        if (tiles[ny]?.[nx] === 'wall') continue;
+        const nKey = nx + ny * MAP_SIZE;
+        if (dist[nKey] !== -1) continue;
+        dist[nKey] = nextDist;
+        queue[tail++] = nKey;
+      }
+    }
+    return dist;
+  }
+
+  function assignEnemyOrder() {
+    const dist = buildDistanceFromSpawn();
+    const list = [];
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        const enemy = enemies[y]?.[x];
+        if (!enemy) continue;
+        const key = x + y * MAP_SIZE;
+        const d = dist[key] < 0 ? 999 : dist[key];
+        list.push({ x, y, d });
+      }
+    }
+    list.sort((a, b) => (a.d - b.d) || (a.y - b.y) || (a.x - b.x));
+    list.forEach((entry, idx) => {
+      const order = idx + 1;
+      const typeId = ENEMY_ORDER[idx] || ENEMY_TYPES[Math.floor(rand() * ENEMY_TYPES.length)].id;
+      const baseEnemy = ENEMY_TYPES.find(enemy => enemy.id === typeId) || ENEMY_TYPES[0];
+      enemies[entry.y][entry.x] = {
+        ...baseEnemy,
+        order,
+        level: Math.max(0, order - 1),
+        baseStats: { ...baseEnemy.stats }
+      };
+    });
+  }
+
+  function buildMap() {
+    tiles = [];
+    enemies = [];
+    visited = [];
+    enemyCount = 0;
+    itemMap = new Map();
+    const enemySpots = [];
+    let foundSpawn = null;
+    let foundBoss = null;
+    let itemCursor = 0;
+
+    for (let y = 0; y < MAP_SIZE; y++) {
+      const row = [];
+      const enemyRow = [];
+      const visitRow = [];
+      const tokens = FIXED_LAYOUT[y] ? [...FIXED_LAYOUT[y]] : [];
+      for (let x = 0; x < MAP_SIZE; x++) {
+        const token = tokens[x] || 'W';
+        let tileId = 'empty';
+        switch (token) {
+          case 'K':
+            tileId = 'wall';
+            break;
+          case 'I':
+            tileId = 'ice';
+            break;
+          case 'Y':
+            tileId = 'item';
+            {
+              const key = `${x},${y}`;
+              const assigned = ITEM_ASSIGNMENTS[key];
+              const fallback = ITEM_SEQUENCE[itemCursor % ITEM_SEQUENCE.length];
+              const item = assigned ? { ...assigned } : { ...fallback };
+              itemMap.set(key, item);
+              itemCursor += 1;
+            }
+            break;
+          case 'P':
+            tileId = 'poison';
+            break;
+          case 'R':
+            tileId = 'monster';
+            enemySpots.push({ x, y });
+            break;
+          case 'B':
+            if (!foundBoss) {
+              foundBoss = { x, y };
+              tileId = 'boss';
+            } else if (!foundSpawn) {
+              foundSpawn = { x, y };
+              tileId = 'start';
+            }
+            break;
+          default:
+            tileId = 'empty';
+        }
+        row.push(tileId);
+        enemyRow.push(null);
+        visitRow.push(false);
+      }
+      tiles.push(row);
+      enemies.push(enemyRow);
+      visited.push(visitRow);
+    }
+
+    spawn = foundSpawn || { x: 4, y: 8 };
+    bossPos = foundBoss || { x: 4, y: 0 };
+    if (tiles[bossPos.y]?.[bossPos.x]) tiles[bossPos.y][bossPos.x] = 'boss';
+    if (tiles[spawn.y]?.[spawn.x]) tiles[spawn.y][spawn.x] = 'start';
+    visited[spawn.y][spawn.x] = true;
+    player.x = spawn.x;
+    player.y = spawn.y;
+    HERO_BOSS.baseStats = { ...HERO_BOSS.stats };
+
+    enemySpots.forEach((spot, index) => {
+      const tier = ENEMY_TIER_ORDER[index] || (index + 1);
+      const typeId = ENEMY_ORDER[tier - 1] || ENEMY_ORDER[ENEMY_ORDER.length - 1];
+      const baseEnemy = ENEMY_TYPES.find(enemy => enemy.id === typeId) || ENEMY_TYPES[0];
+      tiles[spot.y][spot.x] = 'monster';
+      enemies[spot.y][spot.x] = {
+        ...baseEnemy,
+        order: tier,
+        tier,
+        level: Math.max(0, tier - 1),
+        baseStats: { ...baseEnemy.stats }
+      };
+      enemyCount += 1;
+    });
+  }
+
+  function resizeCanvas() {
+    const frame = mapCanvas.parentElement;
+    if (!frame) return;
+    const width = Math.max(0, frame.clientWidth - 16);
+    const height = Math.max(0, frame.clientHeight - 16);
+    const minSide = Math.max(0, Math.min(width, height));
+    if (!minSide) return;
+    const minTileSize = fullMapView ? 2 : 12;
+    tileSize = Math.max(minTileSize, Math.floor(minSide / viewTiles));
+    viewSizePx = tileSize * viewTiles;
+    const dpr = window.devicePixelRatio || 1;
+    mapCanvas.width = viewSizePx * dpr;
+    mapCanvas.height = viewSizePx * dpr;
+    mapCanvas.style.width = `${viewSizePx}px`;
+    mapCanvas.style.height = `${viewSizePx}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    renderMap();
+  }
+
+  function getCamera() {
+    const half = Math.floor(viewTiles / 2);
+    const maxX = MAP_SIZE - viewTiles;
+    const maxY = MAP_SIZE - viewTiles;
+    return {
+      x: clamp(player.x - half, 0, maxX),
+      y: clamp(player.y - half, 0, maxY)
+    };
+  }
+
+  function getCameraInfo(posX, posY) {
+    const half = Math.floor(viewTiles / 2);
+    const maxX = MAP_SIZE - viewTiles;
+    const maxY = MAP_SIZE - viewTiles;
+    const topLeftX = clamp(posX - half, 0, maxX);
+    const topLeftY = clamp(posY - half, 0, maxY);
+    const baseX = Math.floor(topLeftX);
+    const baseY = Math.floor(topLeftY);
+    const offsetX = Math.round((topLeftX - baseX) * tileSize);
+    const offsetY = Math.round((topLeftY - baseY) * tileSize);
+    return { baseX, baseY, offsetX, offsetY };
+  }
+
+  function drawTileIcon(tileId, x, y) {
+    const cx = x + tileSize / 2;
+    const cy = y + tileSize / 2;
+    const size = Math.max(6, Math.floor(tileSize * 0.38));
+    switch (tileId) {
+      case 'monster':
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(cx, cy, size * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#0b1224';
+        ctx.fillRect(cx - size * 0.3, cy - size * 0.1, size * 0.6, size * 0.2);
+        break;
+      case 'item':
+      case 'heal':
+        break;
+      case 'trap':
+        break;
+      case 'poison':
+        break;
+      default:
+        break;
+    }
+  }
+
+  function drawTile(x, y, tileId, isVisited, enemy) {
+    const tile = TILE_TYPES[tileId] || TILE_TYPES.empty;
+    const baseSprite = tileId === 'wall' ? null : tileSprites.base;
+    const overlayKey = tileId === 'start'
+      ? 'start'
+      : tileId === 'boss'
+        ? 'boss'
+      : tileId === 'poison'
+        ? 'poison'
+        : tileId === 'item'
+          ? 'item'
+          : tileId === 'heal'
+            ? 'heal'
+            : tileId === 'ice'
+              ? 'ice'
+              : tileId === 'trap'
+                ? 'trap'
+              : null;
+    const overlaySprite = overlayKey ? tileSprites[overlayKey] : null;
+    ctx.fillStyle = tile.color;
+    ctx.fillRect(x, y, tileSize, tileSize);
+    if (baseSprite && baseSprite.complete && baseSprite.naturalWidth) {
+      ctx.drawImage(baseSprite, x, y, tileSize, tileSize);
+    }
+    if (overlaySprite && overlaySprite.complete && overlaySprite.naturalWidth) {
+      ctx.drawImage(overlaySprite, x, y, tileSize, tileSize);
+    }
+    if (isVisited) {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(x, y, tileSize, tileSize);
+    }
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, tileSize - 1, tileSize - 1);
+    if (!isVisited && tileId === 'monster' && enemy && enemy.order) {
+      ctx.fillStyle = '#0b1224';
+      ctx.font = `${Math.max(10, tileSize * 0.4)}px 'Fredoka'`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(enemy.order), x + tileSize / 2, y + tileSize / 2 + 1);
+    } else if (tileId !== 'empty' && tileId !== 'poison' && tileId !== 'start' && tileId !== 'boss') {
+      drawTileIcon(tileId, x, y);
+    }
+  }
+
+  function drawMarker(x, y, color, label) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x + tileSize / 2, y + tileSize / 2, Math.max(6, tileSize * 0.28), 0, Math.PI * 2);
+    ctx.fill();
+    if (label) {
+      ctx.fillStyle = '#0b1224';
+      ctx.font = `${Math.max(10, tileSize * 0.4)}px 'Fredoka'`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, x + tileSize / 2, y + tileSize / 2 + 1);
+    }
+  }
+
+  function setPlayerFacing(dx, dy) {
+    if (dx > 0) playerFacing = 'right';
+    else if (dx < 0) playerFacing = 'left';
+    else if (dy > 0) playerFacing = 'down';
+    else if (dy < 0) playerFacing = 'up';
+  }
+
+  function drawPlayer(x, y) {
+    const sprite = playerSprites[playerFacing];
+    if (sprite && sprite.complete && sprite.naturalWidth) {
+      ctx.drawImage(sprite, Math.round(x), Math.round(y), tileSize, tileSize);
+      return;
+    }
+    drawMarker(x, y, '#60a5fa', '魔');
+  }
+
+  function renderMap(offsets = null) {
+    if (!tileSize) return;
+    ctx.clearRect(0, 0, viewSizePx, viewSizePx);
+    let offsetX = 0;
+    let offsetY = 0;
+    if (offsets && offsets.player) {
+      offsetX = offsets.player.x || 0;
+      offsetY = offsets.player.y || 0;
+    } else if (isMoving && moveAnim && moveAnim.player) {
+      offsetX = moveAnim.player.dx * moveAnim.progress;
+      offsetY = moveAnim.player.dy * moveAnim.progress;
+    }
+    const posX = player.x + offsetX;
+    const posY = player.y + offsetY;
+    const camera = getCameraInfo(posX, posY);
+    const drawCount = viewTiles + 1;
+    for (let vy = 0; vy < drawCount; vy++) {
+      const mapY = camera.baseY + vy;
+      if (mapY < 0 || mapY >= MAP_SIZE) continue;
+      const screenY = vy * tileSize - camera.offsetY;
+      for (let vx = 0; vx < drawCount; vx++) {
+        const mapX = camera.baseX + vx;
+        if (mapX < 0 || mapX >= MAP_SIZE) continue;
+        const tileId = tiles[mapY]?.[mapX] || 'empty';
+        const enemy = enemies[mapY]?.[mapX];
+        const screenX = vx * tileSize - camera.offsetX;
+        const isVisited = visited[mapY]?.[mapX];
+        drawTile(screenX, screenY, tileId, isVisited, enemy);
+      }
+    }
+    const px = (posX - camera.baseX) * tileSize - camera.offsetX;
+    const py = (posY - camera.baseY) * tileSize - camera.offsetY;
+    drawPlayer(px, py);
+  }
+
+  function addLog(text) {
+    [footerLog, sheetLog].forEach((log) => {
+      if (!log) return;
+      const p = document.createElement('p');
+      p.textContent = text;
+      log.prepend(p);
+      while (log.children.length > 6) {
+        log.removeChild(log.lastChild);
+      }
+    });
+  }
+
+  let selectedGearId = null;
+
+  function getBaseStats() {
+    const base = player.baseStats || BASE_STATS;
+    return {
+      atk: base.atk,
+      spd: base.spd,
+      def: base.def,
+      luc: base.luc
+    };
+  }
+
+  function getGearRarity(id) {
+    return GEAR_RARITIES.find(rarity => rarity.id === id) || GEAR_RARITIES[0];
+  }
+
+  function getRarityWeights(luc) {
+    const base = { N: 55, R: 25, SR: 12, UR: 6, L: 2 };
+    const boost = Math.min(30, Math.floor(luc * 1.2));
+    const addR = Math.floor(boost * 0.45);
+    const addSR = Math.floor(boost * 0.3);
+    const addUR = Math.floor(boost * 0.18);
+    const addL = boost - addR - addSR - addUR;
+    base.N = Math.max(5, base.N - (addR + addSR + addUR + addL));
+    base.R += addR;
+    base.SR += addSR;
+    base.UR += addUR;
+    base.L += addL;
+    return base;
+  }
+
+  function rollGearRarity(luc) {
+    const weights = getRarityWeights(luc);
+    let roll = Math.random() * 100;
+    for (const rarityId of GEAR_RARITY_ORDER) {
+      roll -= weights[rarityId];
+      if (roll <= 0) return rarityId;
+    }
+    return 'N';
+  }
+
+  function calcAccessoryBonus(baseStats, rarity) {
+    const calc = (value) => Math.round(value * rarity.factor);
+    return {
+      atk: Math.max(rarity.min, calc(baseStats.atk)),
+      spd: Math.max(rarity.min, calc(baseStats.spd)),
+      def: Math.max(rarity.min, calc(baseStats.def)),
+      luc: Math.max(rarity.min, calc(baseStats.luc))
+    };
+  }
+
+  function buildAccessory(rarityId) {
+    const rarity = getGearRarity(rarityId);
+    const baseStats = getBaseStats();
+    const bonus = calcAccessoryBonus(baseStats, rarity);
+    return {
+      id: `acc-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+      name: `${rarity.label}装飾品`,
+      rarity: rarity.id,
+      color: rarity.color,
+      bonus
+    };
+  }
+
+  function getGearScore(gear) {
+    if (!gear) return 0;
+    return gear.bonus.atk + gear.bonus.spd + gear.bonus.def + gear.bonus.luc;
+  }
+
+  function equipAccessory(gear) {
+    if (!gear) return;
+    player.gearBonus = { ...gear.bonus };
+    player.gear.accessory = gear;
+    updateUnitStats(player);
+  }
+
+  function showGearDetail(gear) {
+    if (!gearDetailEl) return;
+    if (!gear) {
+      gearDetailEl.textContent = '装備はまだありません。';
+      return;
+    }
+    const equipped = player.gear.accessory && player.gear.accessory.id === gear.id;
+    gearDetailEl.innerHTML = `
+      <strong>${gear.name}</strong>
+      <div>レアリティ: ${gear.rarity}</div>
+      <div>効果: ATK+${gear.bonus.atk} / SPD+${gear.bonus.spd} / DEF+${gear.bonus.def} / LUC+${gear.bonus.luc}</div>
+      <div>状態: ${equipped ? '装備中' : '未装備'}</div>
+      <div>所持数: ${player.gearInventory.length}</div>
+    `;
+  }
+
+  function renderGearList() {
+    if (!gearListEl || !gearDetailEl) return;
+    gearListEl.innerHTML = '';
+    const items = [...player.gearInventory].sort((a, b) => {
+      const rankA = GEAR_RARITY_ORDER.indexOf(a.rarity);
+      const rankB = GEAR_RARITY_ORDER.indexOf(b.rarity);
+      if (rankA !== rankB) return rankB - rankA;
+      return a.id.localeCompare(b.id);
+    });
+    if (!items.length) {
+      showGearDetail(null);
+      return;
+    }
+    if (!selectedGearId || !items.find(item => item.id === selectedGearId)) {
+      selectedGearId = (player.gear.accessory && player.gear.accessory.id) || items[0].id;
+    }
+    const fragment = document.createDocumentFragment();
+    items.forEach((gear) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `icon-item${selectedGearId === gear.id ? ' is-selected' : ''}`;
+      btn.style.setProperty('--icon-color', gear.color);
+      btn.setAttribute('aria-label', gear.name);
+      btn.title = gear.name;
+      btn.addEventListener('click', () => {
+        equipAccessory(gear);
+        selectedGearId = gear.id;
+        updateStats();
+      });
+      fragment.appendChild(btn);
+    });
+    gearListEl.appendChild(fragment);
+    const selected = items.find(item => item.id === selectedGearId) || items[0];
+    showGearDetail(selected);
+  }
+
+  function handleEnemyDrop(enemyState) {
+    const rarityId = rollGearRarity(player.luc);
+    const gear = buildAccessory(rarityId);
+    player.gearInventory.push(gear);
+    addLog(`ドロップ: ${gear.name}`);
+    if (!player.gear.accessory) {
+      equipAccessory(gear);
+      selectedGearId = gear.id;
+      addLog(`初期装備: ${gear.name}`);
+    }
+  }
+
+  function updateStats() {
+    updateUnitStats(player);
+    const hpText = `${player.hp} / ${player.maxHp}`;
+    const mpText = `${player.mp} / ${player.maxMp}`;
+    const expNext = getExpForNext(player.level);
+    const expText = `${player.exp}/${expNext}`;
+    const poisonText = player.poisonStacks > 0 ? `${player.poisonStacks}(${player.poisonSteps}歩)` : 'なし';
+    const setText = (el, value) => { if (el) el.textContent = value; };
+
+    setText(statsEl.hp, hpText);
+    setText(statsEl.mp, mpText);
+    setText(statsEl.atk, `${player.atk}`);
+    setText(statsEl.spd, `${player.spd}`);
+    setText(statsEl.def, `${player.def}`);
+    setText(statsEl.luc, `${player.luc}`);
+    setText(statsEl.level, `${player.level}`);
+    setText(statsEl.exp, expText);
+    setText(statsEl.items, `${player.itemsCollected}/${ITEM_TILE_COUNT}`);
+    setText(statsEl.steps, `${player.steps}`);
+    setText(statsEl.kills, `${player.kills}`);
+    setText(statsEl.poison, poisonText);
+
+    setText(sheetStatsEl.hp, hpText);
+    setText(sheetStatsEl.mp, mpText);
+    setText(sheetStatsEl.atk, `${player.atk}`);
+    setText(sheetStatsEl.spd, `${player.spd}`);
+    setText(sheetStatsEl.def, `${player.def}`);
+    setText(sheetStatsEl.luc, `${player.luc}`);
+    setText(sheetStatsEl.level, `${player.level}`);
+    setText(sheetStatsEl.exp, expText);
+    setText(sheetStatsEl.items, `${player.itemsCollected}/${ITEM_TILE_COUNT}`);
+    setText(sheetStatsEl.steps, `${player.steps}`);
+    setText(sheetStatsEl.kills, `${player.kills}`);
+    setText(sheetStatsEl.poison, poisonText);
+
+    setText(hudStatsEl.hp, hpText);
+    setText(hudStatsEl.mp, mpText);
+    setText(hudStatsEl.atk, `${player.atk}`);
+    setText(hudStatsEl.spd, `${player.spd}`);
+    setText(hudStatsEl.def, `${player.def}`);
+    setText(hudStatsEl.luc, `${player.luc}`);
+    setText(hudStatsEl.level, `${player.level}`);
+    setText(hudStatsEl.exp, expText);
+    setText(hudStatsEl.items, `${player.itemsCollected}/${ITEM_TILE_COUNT}`);
+    setText(hudStatsEl.steps, `${player.steps}`);
+    setText(hudStatsEl.kills, `${player.kills}`);
+    setText(hudStatsEl.poison, poisonText);
+
+    if (hpBar) {
+      const hpRate = player.maxHp ? (player.hp / player.maxHp) * 100 : 0;
+      hpBar.style.width = `${clamp(hpRate, 0, 100)}%`;
+    }
+    if (mpBar) {
+      const mpRate = player.maxMp ? (player.mp / player.maxMp) * 100 : 0;
+      mpBar.style.width = `${clamp(mpRate, 0, 100)}%`;
+    }
+    const dist = Math.abs(player.x - bossPos.x) + Math.abs(player.y - bossPos.y);
+    mapStatus.textContent = `歩数: ${player.steps} / 残り敵: ${enemyCount}`;
+    if (baseDirection) {
+      const dir = getDirectionInfo(bossPos.x - player.x, bossPos.y - player.y);
+      baseDirection.textContent = `勇者方向: ${dir.arrow} ${dir.label} (${dist}マス)`;
+    }
+    renderGearList();
+  }
+
+  function getDirectionInfo(dx, dy) {
+    if (dx === 0 && dy === 0) {
+      return { label: '到達', arrow: '◎' };
+    }
+    const angle = Math.atan2(dy, dx);
+    const steps = [
+      { label: '東', arrow: '→' },
+      { label: '南東', arrow: '↘' },
+      { label: '南', arrow: '↓' },
+      { label: '南西', arrow: '↙' },
+      { label: '西', arrow: '←' },
+      { label: '北西', arrow: '↖' },
+      { label: '北', arrow: '↑' },
+      { label: '北東', arrow: '↗' }
+    ];
+    const index = (Math.round(angle / (Math.PI / 4)) + steps.length) % steps.length;
+    return steps[index];
+  }
+
+  function updateViewToggleLabel() {
+    if (!toggleViewBtn) return;
+    toggleViewBtn.textContent = fullMapView ? '通常表示' : '全体表示';
+  }
+
+  function setViewMode(isFull) {
+    fullMapView = Boolean(isFull);
+    viewTiles = fullMapView ? MAP_SIZE : NORMAL_VIEW_TILES;
+    updateViewToggleLabel();
+    resizeCanvas();
+    renderMap();
+  }
+
+  function updateUnitStats(unit) {
+    const base = unit.baseStats || BASE_STATS;
+    const gearBonus = unit === player ? unit.gearBonus : { atk: 0, spd: 0, def: 0, luc: 0 };
+    unit.atk = Math.max(MIN_STAT, base.atk + gearBonus.atk);
+    unit.spd = Math.max(MIN_STAT, base.spd + gearBonus.spd);
+    unit.def = Math.max(MIN_STAT, base.def + gearBonus.def);
+    unit.luc = Math.max(MIN_STAT, base.luc + gearBonus.luc);
+    unit.maxHp = Math.max(MIN_HP, base.hp);
+    unit.hp = clamp(unit.hp ?? unit.maxHp, 0, unit.maxHp);
+    unit.maxMp = Math.max(MIN_STAT, base.mp);
+    unit.mp = clamp(unit.mp ?? unit.maxMp, 0, unit.maxMp);
+  }
+
+  function getExpForNext(level) {
+    return 20 + Math.max(0, level - 1) * 8;
+  }
+
+  function formatGrowth(gain) {
+    const labels = { hp: 'HP', mp: 'MP', atk: 'ATK', spd: 'SPD', def: 'DEF', luc: 'LUC' };
+    return Object.entries(gain)
+      .map(([key, value]) => `${labels[key] ?? key.toUpperCase()}+${value}`)
+      .join(' / ');
+  }
+
+  function applyGrowth(gain, sourceLabel) {
+    if (!gain) return;
+    Object.entries(gain).forEach(([key, value]) => {
+      player.baseStats[key] = (player.baseStats[key] || 0) + value;
+      if (key === 'hp') player.hp += value;
+      if (key === 'mp') player.mp += value;
+    });
+    updateUnitStats(player);
+    if (sourceLabel) {
+      addLog(`${sourceLabel}: ${formatGrowth(gain)}`);
+    }
+  }
+
+  function gainExp(amount) {
+    player.exp += amount;
+    while (player.exp >= getExpForNext(player.level)) {
+      player.exp -= getExpForNext(player.level);
+      player.level += 1;
+      const growth = LEVEL_GROWTH_SEQUENCE[(player.level - 2) % LEVEL_GROWTH_SEQUENCE.length];
+      applyGrowth(growth, `レベルアップ ${player.level}`);
+    }
+  }
+
+  function getProgressStage() {
+    let stage = 1;
+    if ((player.killByTier?.[1] || 0) >= 1) stage = 2;
+    if (stage >= 2 && (player.killByTier?.[2] || 0) >= 1) stage = 3;
+    if (stage >= 3 && (player.killByTier?.[3] || 0) >= 1) stage = 4;
+    if (stage >= 4 && (player.killByTier?.[4] || 0) >= 1) stage = 5;
+    if (stage >= 5 && (player.killByTier?.[5] || 0) >= 1) stage = 6;
+    return stage;
+  }
+  
+  function getEnemyExp(enemyTemplate, enemyState) {
+    const base = enemyTemplate.exp ?? 6;
+    const statWeight = Math.floor((enemyState.maxHp + enemyState.atk + enemyState.def + enemyState.spd + enemyState.luc) / 20);
+    const normalExp = enemyTemplate.order
+      ? Math.max(1, getExpForNext(player.level) - player.exp)
+      : Math.max(4, base + statWeight);
+    return normalExp;
+  }
+
+  function logItem(message, options = {}) {
+    if (options.battle && battleActive) {
+      appendBattleLog(message);
+      return;
+    }
+    addLog(message);
+  }
+
+  function triggerAntidote() {
+    if (!player.antidoteReady) return false;
+    player.antidoteReady = false;
+    player.poisonStacks = 0;
+    player.poisonSteps = 0;
+    addLog('解毒のお守りが発動した');
+    return true;
+  }
+
+  function triggerAutoHeal(target, options = {}) {
+    if (player.autoHealCharges <= 0) return false;
+    if (target.hp > target.maxHp * 0.5) return false;
+    const heal = Math.max(1, Math.floor(target.maxHp * 0.2));
+    player.autoHealCharges -= 1;
+    target.hp = clamp(target.hp + heal, 0, target.maxHp);
+    logItem(`応急回復薬 +${heal}`, options);
+    return true;
+  }
+
+  function triggerRevive(target, options = {}) {
+    if (player.reviveCharges <= 0 || target.hp > 0) return false;
+    const heal = Math.max(1, Math.floor(target.maxHp * 0.5));
+    player.reviveCharges -= 1;
+    target.hp = heal;
+    logItem('復活薬で復活', options);
+    return true;
+  }
+
+  function createMimicEnemy() {
+    const baseEnemy = ENEMY_TYPES.find(enemy => enemy.id === 'mimic') || ENEMY_TYPES[0];
+    return {
+      ...baseEnemy,
+      order: 0,
+      tier: 0,
+      level: 0,
+      baseStats: { ...baseEnemy.stats }
+    };
+  }
+
+  async function handleItemPickup(item) {
+    if (!item) return;
+    if (item.id === 'mimic') {
+      addLog('怪しい宝箱を拾った...');
+      addLog('ミミックが現れた！');
+      await runBattle(createMimicEnemy(), { actor: player, actorLabel: '魔王様', allowDefeat: true });
+      return;
+    }
+    switch (item.id) {
+      case 'antidote':
+        player.antidoteReady = true;
+        addLog('解毒のお守りを手に入れた');
+        if (player.poisonStacks > 0) {
+          triggerAntidote();
+        }
+        break;
+      case 'autoHeal':
+        player.autoHealCharges += 1;
+        addLog('応急回復薬を手に入れた');
+        break;
+      case 'revive':
+        player.reviveCharges += 1;
+        addLog('復活薬を手に入れた');
+        break;
+      case 'key':
+        player.hasKey = true;
+        addLog('鍵を手に入れた');
+        break;
+      default:
+        addLog(`${item.label}を手に入れた`);
+        break;
+    }
+  }
+
+  async function resolveBossBattle() {
+    const boss = {
+      ...HERO_BOSS,
+      level: HERO_BOSS.level || (MONSTER_TILE_COUNT + 1),
+      order: MONSTER_TILE_COUNT + 1,
+      baseStats: { ...HERO_BOSS.stats }
+    };
+    await runBattle(boss, { actor: player, actorLabel: '魔王様', allowDefeat: true, isBoss: true });
+  }
+
+  async function resolveTileEvent(x, y) {
+    const tileId = tiles[y]?.[x];
+    if (!tileId) return;
+    if (tileId === 'monster') {
+      const enemy = enemies[y][x];
+      if (enemy) {
+        const result = await runBattle(enemy, { actor: player, actorLabel: '魔王様', allowDefeat: true });
+        if (gameOver) return;
+        if (result?.winner === 'player') {
+          if (enemy.tier) {
+            player.killByTier[enemy.tier] = (player.killByTier[enemy.tier] || 0) + 1;
+          }
+          enemies[y][x] = null;
+          enemyCount = Math.max(0, enemyCount - 1);
+          tiles[y][x] = 'empty';
+        }
+      }
+    } else if (tileId === 'item') {
+      const index = player.itemsCollected;
+      player.itemsCollected += 1;
+      const item = ITEM_SEQUENCE[index % ITEM_SEQUENCE.length];
+      await handleItemPickup(item);
+      if (gameOver) return;
+      tiles[y][x] = 'empty';
+    } else if (tileId === 'heal') {
+      const heal = Math.max(1, Math.floor(player.maxHp * HEAL_RATE));
+      player.hp = clamp(player.hp + heal, 0, player.maxHp);
+      addLog(`回復 +${heal}`);
+      tiles[y][x] = 'empty';
+    } else if (tileId === 'trap') {
+      player.hp = clamp(player.hp - TRAP_DAMAGE, 0, player.maxHp);
+      addLog(`罠ダメージ -${TRAP_DAMAGE}`);
+      triggerAutoHeal(player);
+      tiles[y][x] = 'empty';
+      if (player.hp <= 0) {
+        if (!triggerRevive(player)) {
+          endGame(false);
+        }
+        return;
+      }
+    } else if (tileId === 'poison') {
+      player.poisonStacks += 1;
+      player.poisonSteps = POISON_STEPS;
+      addLog(`毒を受けた +1 (合計${player.poisonStacks} / ${player.poisonSteps}歩)`);
+      triggerAntidote();
+    } else if (tileId === 'boss') {
+      if (!player.hasKey) {
+        addLog('鍵が必要だ');
+        return;
+      }
+      await resolveBossBattle();
+      return;
+    }
+  }
+
+  function applyPoisonTick() {
+    if (player.poisonStacks <= 0 || player.poisonSteps <= 0) return false;
+    const damage = Math.max(1, player.poisonStacks * POISON_DAMAGE_PER_STACK);
+    player.hp = clamp(player.hp - damage, 0, player.maxHp);
+    player.poisonSteps -= 1;
+    addLog(`毒ダメージ -${damage}`);
+    triggerAutoHeal(player);
+    if (player.poisonSteps <= 0) {
+      player.poisonStacks = 0;
+      addLog('毒が回復した');
+    }
+    if (player.hp <= 0) {
+      if (!triggerRevive(player)) {
+        endGame(false);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function canMoveTo(x, y) {
+    if (x < 0 || y < 0 || x >= MAP_SIZE || y >= MAP_SIZE) return false;
+    const tileId = tiles[y]?.[x];
+    if (!tileId) return false;
+    if (tileId === 'wall') return false;
+    if (tileId === 'boss' && !player.hasKey) return false;
+    if (visited[y]?.[x]) return false;
+    return true;
+  }
+
+  async function movePlayerTo(targetX, targetY) {
+    if (battleActive || gameOver || isMoving) return;
+    const dirX = Math.sign(targetX - player.x);
+    const dirY = Math.sign(targetY - player.y);
+    let nextX = targetX;
+    let nextY = targetY;
+    while (true) {
+      await animateMove(nextX, nextY);
+      if (visited[nextY]) visited[nextY][nextX] = true;
+      await resolveTileEvent(nextX, nextY);
+      if (gameOver) return;
+      if (applyPoisonTick()) return;
+      updateStats();
+      renderMap();
+      const tileId = tiles[nextY]?.[nextX];
+      if (tileId !== 'ice') break;
+      const slideX = nextX + dirX;
+      const slideY = nextY + dirY;
+      if (!canMoveTo(slideX, slideY)) break;
+      nextX = slideX;
+      nextY = slideY;
+    }
+  }
+
+  function animateMove(nextX, nextY) {
+    return new Promise((resolve) => {
+      const dx = nextX - player.x;
+      const dy = nextY - player.y;
+      if (!dx && !dy) {
+        resolve();
+        return;
+      }
+      setPlayerFacing(dx, dy);
+      const startTime = performance.now();
+      isMoving = true;
+      moveAnim = { player: { dx, dy }, progress: 0 };
+      const tick = (now) => {
+        const elapsed = now - startTime;
+        const t = clamp(elapsed / MOVE_ANIM_MS, 0, 1);
+        moveAnim.progress = t;
+        renderMap();
+        if (t < 1) {
+          requestAnimationFrame(tick);
+        } else {
+          isMoving = false;
+          moveAnim = null;
+          player.x = nextX;
+          player.y = nextY;
+          player.steps += 1;
+          resolve();
+        }
+      };
+      requestAnimationFrame(tick);
+    });
+  }
+
+  function handleMapClick(event) {
+    event.preventDefault();
+    if (battleActive || gameOver || isMoving) return;
+    const rect = mapCanvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    if (x < 0 || y < 0 || x > rect.width || y > rect.height) return;
+    const cellSize = rect.width / viewTiles;
+    if (!cellSize) return;
+    const tx = Math.min(viewTiles - 1, Math.max(0, Math.floor(x / cellSize)));
+    const ty = Math.min(viewTiles - 1, Math.max(0, Math.floor(y / cellSize)));
+    const camera = getCamera();
+    const targetX = clamp(camera.x + tx, 0, MAP_SIZE - 1);
+    const targetY = clamp(camera.y + ty, 0, MAP_SIZE - 1);
+    const dist = Math.abs(targetX - player.x) + Math.abs(targetY - player.y);
+    if (dist !== 1) return;
+    if (!canMoveTo(targetX, targetY)) return;
+    movePlayerTo(targetX, targetY);
+  }
+
+  function calcDamage(attacker, defender, opts = {}) {
+    const power = opts.power || 1;
+    const ignoreDef = opts.ignoreDef || false;
+    const bonusCrit = opts.critBonus || 0;
+    const baseAtk = attacker.atk || 0;
+    const def = ignoreDef ? 0 : (defender.def || 0);
+    const base = Math.max(1, baseAtk - def);
+    const variance = Math.floor(Math.random() * 3);
+    const critChance = Math.min(0.3, 0.02 * (attacker.luc || 0) + bonusCrit);
+    const isCrit = Math.random() < critChance;
+    const raw = (base + variance) * power * (isCrit ? 1.5 : 1);
+    const reduction = clamp(opts.damageReduction || 0, 0, 0.8);
+    const reduced = raw * (1 - reduction);
+    return { damage: Math.max(1, Math.floor(reduced)), isCrit };
+  }
+
+  function getEvasionChance(attacker, defender) {
+    const spdRate = Math.min(15, Math.floor((defender.spd || 0) / 5));
+    const lucRate = Math.min(15, Math.floor((defender.luc || 0) / 5));
+    const base = clamp(spdRate + lucRate, 0, 30);
+    return base;
+  }
+
+  function checkEvasion(attacker, defender) {
+    const chance = getEvasionChance(attacker, defender);
+    return Math.random() * 100 < chance;
+  }
+
+  function getUnitAction(unitState) {
+    return { label: '攻撃', power: 1, hits: 1 };
+  }
+
+  function pickNextActor(playerState, enemyState) {
+    if (playerState.gauge < 100 && enemyState.gauge < 100) {
+      const pTime = playerState.spd > 0 ? (100 - playerState.gauge) / playerState.spd : Infinity;
+      const eTime = enemyState.spd > 0 ? (100 - enemyState.gauge) / enemyState.spd : Infinity;
+      const time = Math.min(pTime, eTime);
+      if (Number.isFinite(time)) {
+        playerState.gauge += playerState.spd * time;
+        enemyState.gauge += enemyState.spd * time;
+      }
+    }
+    const pReady = playerState.gauge >= 100;
+    const eReady = enemyState.gauge >= 100;
+    if (pReady && eReady) {
+      if (playerState.gauge === enemyState.gauge) return 'player';
+      return playerState.gauge > enemyState.gauge ? 'player' : 'enemy';
+    }
+    return pReady ? 'player' : 'enemy';
+  }
+
+  function updateBattleBars(playerState, enemyState) {
+    playerHpFill.style.width = `${Math.max(0, (playerState.hp / playerState.maxHp) * 100)}%`;
+    enemyHpFill.style.width = `${Math.max(0, (enemyState.hp / enemyState.maxHp) * 100)}%`;
+    playerHpText.textContent = `${playerState.hp} / ${playerState.maxHp}`;
+    enemyHpText.textContent = `${enemyState.hp} / ${enemyState.maxHp}`;
+  }
+
+  function appendBattleLog(text) {
+    const p = document.createElement('p');
+    p.textContent = text;
+    battleLog.appendChild(p);
+    while (battleLog.children.length > 6) {
+      battleLog.removeChild(battleLog.firstChild);
+    }
+  }
+
+  function flashActor(el) {
+    el.classList.remove('is-hit');
+    void el.offsetWidth;
+    el.classList.add('is-hit');
+  }
+
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+  async function runBattle(enemyTemplate, options = {}) {
+    const isBoss = options.isBoss || false;
+    const allowDefeat = options.allowDefeat !== false;
+    const actor = options.actor || player;
+    const actorLabel = options.actorLabel || '魔王様';
+    const maxActions = Number.isFinite(options.maxActions) ? options.maxActions : Infinity;
+
+    battleActive = true;
+    battleOverlay.classList.add('is-open');
+    if (isBoss) {
+      battleTitle.textContent = '勇者との決戦';
+      battleSub.textContent = '最終戦闘';
+    } else {
+      battleTitle.textContent = '敵との遭遇';
+      battleSub.textContent = '自動戦闘中';
+    }
+    battleLog.innerHTML = '';
+
+    const scaledStats = resolveEnemyStats(enemyTemplate);
+    const enemyState = {
+      ...scaledStats,
+      maxHp: scaledStats.hp,
+      name: enemyTemplate.name,
+      color: enemyTemplate.color,
+      mp: scaledStats.mp,
+      guard: 0,
+      guardTurns: 0,
+      gauge: 0
+    };
+    if (enemyTemplate.currentHp != null) {
+      enemyState.hp = clamp(enemyTemplate.currentHp, 0, enemyState.maxHp);
+    }
+    const playerState = {
+      hp: actor.hp,
+      maxHp: actor.maxHp,
+      atk: actor.atk,
+      spd: actor.spd,
+      def: actor.def,
+      luc: actor.luc,
+      mp: actor.mp,
+      gauge: 0
+    };
+    const requiredStage = isBoss ? 6 : (enemyTemplate.tier || enemyTemplate.order || 1);
+    const progressStage = getProgressStage();
+    if (requiredStage > progressStage) {
+      const ratio = progressStage / requiredStage;
+      const penalty = Math.max(0.1, Math.pow(ratio, 2.2));
+      playerState.atk = Math.max(1, Math.floor(playerState.atk * penalty));
+      playerState.def = Math.max(1, Math.floor(playerState.def * penalty));
+      playerState.spd = Math.max(1, Math.floor(playerState.spd * penalty));
+      playerState.luc = Math.max(1, Math.floor(playerState.luc * penalty));
+      playerState.maxHp = Math.max(MIN_HP, Math.floor(playerState.maxHp * penalty));
+      playerState.hp = Math.min(playerState.hp, playerState.maxHp);
+      battleSub.textContent = '条件未達';
+    }
+
+    if (playerNameEl) playerNameEl.textContent = actorLabel;
+    if (playerIcon) playerIcon.textContent = actorLabel.slice(0, 1);
+    enemyNameEl.textContent = enemyState.name;
+    enemyIcon.textContent = enemyState.name.slice(0, 1);
+    enemyIcon.style.background = enemyTemplate.color;
+
+    updateBattleBars(playerState, enemyState);
+
+    let actionCount = 0;
+    let safety = 0;
+    while (playerState.hp > 0 && enemyState.hp > 0 && safety < 600) {
+      const actorTurn = pickNextActor(playerState, enemyState);
+      actionCount += 1;
+      appendBattleLog(`行動 ${actionCount}`);
+      if (actorTurn === 'player') {
+        playerState.gauge = Math.max(0, playerState.gauge - 100);
+        const action = getUnitAction(playerState);
+        if (action.mpCost) playerState.mp = Math.max(0, playerState.mp - action.mpCost);
+        const hits = action.hits || 1;
+        for (let i = 0; i < hits; i++) {
+          if (checkEvasion(playerState, enemyState)) {
+            appendBattleLog(`${enemyState.name}は回避した`);
+          } else {
+            const result = calcDamage(playerState, { def: enemyState.def + enemyState.guard }, action);
+            enemyState.hp = clamp(enemyState.hp - result.damage, 0, enemyState.maxHp);
+            appendBattleLog(`${actorLabel}の${action.label}！ ${result.damage}ダメージ${result.isCrit ? ' (クリティカル)' : ''}`);
+            flashActor(enemyActor);
+            updateBattleBars(playerState, enemyState);
+          }
+          if (enemyState.hp <= 0) break;
+          if (hits > 1) await sleep(220);
+        }
+      } else {
+        enemyState.gauge = Math.max(0, enemyState.gauge - 100);
+        const action = enemyTemplate.ai ? enemyTemplate.ai(enemyState) : getUnitAction(enemyState);
+        if (action.type === 'guard') {
+          enemyState.guard = action.guard || 2;
+          enemyState.guardTurns = 2;
+          appendBattleLog(`${enemyState.name}は守りを固めた`);
+        } else {
+          if (action.mpCost) enemyState.mp = Math.max(0, enemyState.mp - action.mpCost);
+          const hits = action.hits || 1;
+          for (let i = 0; i < hits; i++) {
+            if (checkEvasion(enemyState, playerState)) {
+              appendBattleLog(`${actorLabel}は回避した`);
+            } else {
+              const result = calcDamage(enemyState, playerState, action);
+              playerState.hp = clamp(playerState.hp - result.damage, 0, playerState.maxHp);
+              appendBattleLog(`${enemyState.name}の${action.label}！ ${result.damage}ダメージ${result.isCrit ? ' (クリティカル)' : ''}`);
+              flashActor(playerActor);
+              updateBattleBars(playerState, enemyState);
+              if (triggerAutoHeal(playerState, { battle: true })) {
+                updateBattleBars(playerState, enemyState);
+              }
+              if (playerState.hp <= 0) {
+                if (triggerRevive(playerState, { battle: true })) {
+                  updateBattleBars(playerState, enemyState);
+                } else {
+                  break;
+                }
+              }
+            }
+            await sleep(250);
+          }
+        }
+        if (enemyState.guardTurns > 0) {
+          enemyState.guardTurns -= 1;
+          if (enemyState.guardTurns <= 0) enemyState.guard = 0;
+        }
+      }
+      safety += 1;
+      if (actionCount >= maxActions) break;
+      await sleep(200);
+    }
+
+    battleActive = false;
+    battleOverlay.classList.remove('is-open');
+
+    actor.hp = playerState.hp;
+    actor.mp = playerState.mp;
+    let winner = null;
+    if (playerState.hp <= 0) winner = 'enemy';
+    if (enemyState.hp <= 0) winner = 'player';
+
+    if (!allowDefeat) {
+      if (actor.hp <= 0) actor.hp = 1;
+      updateStats();
+      renderMap();
+      return { winner, actorState: playerState, enemyState };
+    }
+
+    if (actor === player && playerState.hp <= 0) {
+      endGame(false);
+      return { winner };
+    }
+    if (allowDefeat && isBoss && enemyState.hp <= 0 && actor === player) {
+      endGame(true);
+      return { winner };
+    }
+
+    if (!isBoss && enemyState.hp <= 0 && actor === player) {
+      player.kills += 1;
+      const expGain = getEnemyExp(enemyTemplate, enemyState);
+      if (expGain > 0) {
+        gainExp(expGain);
+        addLog(`${enemyState.name}を倒した +${expGain}EXP`);
+      } else {
+        addLog(`${enemyState.name}を倒した`);
+      }
+      handleEnemyDrop(enemyState);
+    }
+    updateStats();
+    renderMap();
+    return { winner, actorState: playerState, enemyState };
+  }
+
+  function computeScore(cleared) {
+    const base = player.kills * 12 + player.steps;
+    const statTotal = player.atk + player.spd + player.def + player.luc + player.maxHp + player.mp;
+    const hpBonus = Math.max(0, player.hp);
+    const clearBonus = cleared ? 300 : 0;
+    return Math.max(0, Math.floor(base + statTotal * 4 + hpBonus * 3 + clearBonus));
+  }
+
+  function getNickname() {
+    try {
+      const nick = localStorage.getItem('pixieed_nickname');
+      if (nick && nick.trim()) return nick.trim().slice(0, 24);
+    } catch (_) {}
+    return '名無し';
+  }
+
+  const CLIENT_ID_KEY = 'pixieed_client_id';
+  function getClientId() {
+    try {
+      const saved = localStorage.getItem(CLIENT_ID_KEY);
+      if (saved) return saved;
+      const id = crypto.randomUUID ? crypto.randomUUID() : `guest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      localStorage.setItem(CLIENT_ID_KEY, id);
+      return id;
+    } catch (_) {
+      return `guest-${Math.random().toString(36).slice(2, 8)}`;
+    }
+  }
+
+  function isMissingColumn(error, name) {
+    const msg = String(error?.message || '');
+    return msg.includes(`\"${name}\"`);
+  }
+
+  function parseMissingColumn(error) {
+    const msg = String(error?.message || '');
+    const match = msg.match(/column \"([^\"]+)\"/);
+    return match ? match[1] : null;
+  }
+
+  async function getUserId(supabase) {
+    try {
+      const { data } = await supabase.auth.getSession();
+      return data?.session?.user?.id || null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function submitScore(score, cleared) {
+    rankStatus.textContent = 'スコア送信中...';
+    rankList.innerHTML = '';
+    try {
+      const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.46.1/+esm');
+      const supabase = createClient('https://kyyiuakrqomzlikfaire.supabase.co', 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4');
+      const name = getNickname();
+      const clientId = getClientId();
+      const userId = await getUserId(supabase);
+      const statTotal = player.atk + player.spd + player.def + player.luc + player.maxHp + player.mp;
+      const payload = {
+        name,
+        score,
+        result: cleared ? 'clear' : 'over',
+        game: 'maou-war',
+        stat_total: statTotal,
+        hp_end: player.hp,
+        kills: player.kills,
+        steps: player.steps
+      };
+      if (clientId) payload.client_id = clientId;
+      if (userId) payload.user_id = userId;
+      let { error } = await supabase.from('scores').insert(payload);
+      if (error && isMissingColumn(error, 'game')) {
+        delete payload.game;
+        const retry = await supabase.from('scores').insert(payload);
+        error = retry.error;
+      }
+      if (error && isMissingColumn(error, 'result')) {
+        delete payload.result;
+        const retry = await supabase.from('scores').insert(payload);
+        error = retry.error;
+      }
+      if (error && payload.user_id && isMissingColumn(error, 'user_id')) {
+        delete payload.user_id;
+        const retry = await supabase.from('scores').insert(payload);
+        error = retry.error;
+      }
+      if (error && payload.client_id && isMissingColumn(error, 'client_id')) {
+        delete payload.client_id;
+        const retry = await supabase.from('scores').insert(payload);
+        error = retry.error;
+      }
+      if (error && isMissingColumn(error, 'stat_total')) {
+        delete payload.stat_total;
+        const retry = await supabase.from('scores').insert(payload);
+        error = retry.error;
+      }
+      if (error && isMissingColumn(error, 'hp_end')) {
+        delete payload.hp_end;
+        const retry = await supabase.from('scores').insert(payload);
+        error = retry.error;
+      }
+      if (error && isMissingColumn(error, 'kills')) {
+        delete payload.kills;
+        const retry = await supabase.from('scores').insert(payload);
+        error = retry.error;
+      }
+      if (error && isMissingColumn(error, 'steps')) {
+        delete payload.steps;
+        const retry = await supabase.from('scores').insert(payload);
+        error = retry.error;
+      }
+      if (error) {
+        console.warn('score submit failed', error);
+        rankStatus.textContent = 'スコア送信に失敗しました';
+        return;
+      }
+      rankStatus.textContent = 'ランキング更新中...';
+      await loadRanking(supabase);
+      rankStatus.textContent = 'スコア送信完了';
+    } catch (err) {
+      console.warn('score submit failed', err);
+      rankStatus.textContent = 'ランキングを取得できませんでした';
+    }
+  }
+
+  async function fetchRankingRows(supabase, columns, filterGame) {
+    const baseQuery = supabase.from('scores')
+      .select(columns.join(', '))
+      .order('score', { ascending: false })
+      .order('created_at', { ascending: true })
+      .limit(12);
+    const query = filterGame ? baseQuery.eq('game', 'maou-war') : baseQuery;
+    const { data, error } = await query;
+    if (!error) return { data, columns, filterGame };
+    const missing = parseMissingColumn(error);
+    if (missing && columns.includes(missing)) {
+      const nextColumns = columns.filter(col => col !== missing);
+      return fetchRankingRows(supabase, nextColumns, filterGame);
+    }
+    if (missing === 'game' && filterGame) {
+      return fetchRankingRows(supabase, columns, false);
+    }
+    return { data: null, error };
+  }
+
+  async function loadRanking(supabase) {
+    const columns = ['name', 'score', 'created_at', 'result', 'stat_total', 'hp_end', 'kills', 'steps'];
+    const { data, columns: usedColumns, error } = await fetchRankingRows(supabase, columns, true);
+    if (error) {
+      rankStatus.textContent = 'ランキング取得に失敗しました';
+      return;
+    }
+    rankList.innerHTML = '';
+    if (!data || !data.length) {
+      rankList.innerHTML = '<li class="rank-item">まだスコアがありません。</li>';
+      return;
+    }
+    data.forEach((row, idx) => {
+      const meta = [];
+      if (usedColumns.includes('result') && row.result) {
+        meta.push(row.result === 'clear' ? 'CLEAR' : 'OVER');
+      }
+      if (usedColumns.includes('stat_total') && row.stat_total != null) {
+        meta.push(`総力:${row.stat_total}`);
+      }
+      if (usedColumns.includes('hp_end') && row.hp_end != null) {
+        meta.push(`HP:${row.hp_end}`);
+      }
+      if (usedColumns.includes('kills') && row.kills != null) {
+        meta.push(`討伐:${row.kills}`);
+      }
+      const li = document.createElement('li');
+      li.className = 'rank-item';
+      li.innerHTML = `<span>${idx + 1}. ${row.name}</span><span>${row.score}</span>${meta.length ? `<small>${meta.join(' / ')}</small>` : ''}`;
+      rankList.appendChild(li);
+    });
+  }
+
+  function endGame(cleared) {
+    if (gameOver) return;
+    gameOver = true;
+    const score = computeScore(cleared);
+    resultOverlay.classList.add('is-open');
+    resultTitle.textContent = cleared ? '勇者を倒した！' : '魔王様が倒れた...';
+    resultSummary.textContent = `スコア: ${score}`;
+    resultStats.innerHTML = `
+      <div class="stat"><span>HP</span><strong>${player.hp}/${player.maxHp}</strong></div>
+      <div class="stat"><span>歩数</span><strong>${player.steps}</strong></div>
+      <div class="stat"><span>討伐数</span><strong>${player.kills}</strong></div>
+      <div class="stat"><span>ATK/SPD/DEF</span><strong>${player.atk}/${player.spd}/${player.def}</strong></div>
+      <div class="stat"><span>LUC</span><strong>${player.luc}</strong></div>
+      <div class="stat"><span>結果</span><strong>${cleared ? 'クリア' : 'ゲームオーバー'}</strong></div>
+    `;
+    submitScore(score, cleared);
+  }
+
+  function resetGame() {
+    player.baseStats = { ...BASE_STATS };
+    player.level = 1;
+    player.exp = 0;
+    player.itemsCollected = 0;
+    player.hasKey = false;
+    player.antidoteReady = false;
+    player.autoHealCharges = 0;
+    player.reviveCharges = 0;
+    player.hp = BASE_STATS.hp;
+    player.maxHp = BASE_STATS.hp;
+    player.mp = BASE_STATS.mp;
+    player.maxMp = BASE_STATS.mp;
+    player.kills = 0;
+    player.steps = 0;
+    player.gear.accessory = null;
+    player.gearBonus = { atk: 0, spd: 0, def: 0, luc: 0 };
+    player.gearInventory = [];
+    player.poisonStacks = 0;
+    player.poisonSteps = 0;
+    player.killByTier = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    selectedGearId = null;
+    gameOver = false;
+    battleActive = false;
+    isMoving = false;
+    moveAnim = null;
+    playerFacing = 'down';
+    resultOverlay.classList.remove('is-open');
+    battleOverlay.classList.remove('is-open');
+    if (footerLog) footerLog.innerHTML = '';
+    if (sheetLog) sheetLog.innerHTML = '';
+    buildMap();
+    updateViewToggleLabel();
+    resizeCanvas();
+    updateStats();
+    renderMap();
+    addLog('冒険を開始した');
+    addLog('マップをクリックして1マス進む');
+  }
+
+  document.getElementById('resetRun').addEventListener('click', resetGame);
+  document.getElementById('retryBtn').addEventListener('click', resetGame);
+
+  function setSheetOpen(open) {
+    if (!statusSheet) return;
+    statusSheet.classList.toggle('is-open', open);
+    statusSheet.setAttribute('aria-hidden', open ? 'false' : 'true');
+  }
+  if (openStatusBtn) openStatusBtn.addEventListener('click', () => setSheetOpen(true));
+  if (closeStatusBtn) closeStatusBtn.addEventListener('click', () => setSheetOpen(false));
+  if (toggleViewBtn) {
+    toggleViewBtn.addEventListener('click', () => {
+      if (battleActive || gameOver || isMoving) return;
+      setViewMode(!fullMapView);
+    });
+  }
+  if (statusSheet) {
+    statusSheet.addEventListener('click', (event) => {
+      if (event.target === statusSheet) setSheetOpen(false);
+    });
+  }
+  const sheetTabs = Array.from(document.querySelectorAll('.sheet-tab'));
+  const sheetPanels = Array.from(document.querySelectorAll('.sheet-panel'));
+  const setSheetTab = (name) => {
+    sheetTabs.forEach(tab => tab.classList.toggle('is-active', tab.dataset.tab === name));
+    sheetPanels.forEach(panel => panel.classList.toggle('is-active', panel.dataset.panel === name));
+  };
+  sheetTabs.forEach(tab => {
+    tab.addEventListener('click', () => setSheetTab(tab.dataset.tab));
+  });
+  window.addEventListener('resize', resizeCanvas);
+  mapCanvas.addEventListener('pointerdown', handleMapClick, { passive: false });
+
+  buildMap();
+  updateViewToggleLabel();
+  resizeCanvas();
+  updateStats();
+  addLog('冒険を開始した');
+  addLog('マップをクリックして1マス進む');
+})();
+</script>
+</body>
+</html>
