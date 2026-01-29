@@ -23,7 +23,7 @@
     return;
   }
 
-  const reduceMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const reduceMotionQuery = { matches: false };
   const typingControllers = new Map();
   const DEFAULT_IMAGE_SCALE = 0.7;
   const CHARACTER_SEEN_STORAGE_KEY = 'pixieed:characterGallerySeen';
