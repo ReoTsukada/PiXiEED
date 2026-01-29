@@ -3,7 +3,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
 <title>PiXFiND</title>
 <meta content="PiXFiNDはドット絵に特化したブラウザ向けの間違い探しゲーム。公式パズルを難易度別に収録し、イベントや配信でも使いやすいUIを備えています。" name="description"/>
 <meta content="PiXFiND" property="og:title"/>
@@ -185,13 +185,13 @@
 <time class="project-update__value" datetime="">--</time>
 </p>
 <div class="hero-cta">
-<a class="cta-primary" data-project-gate="project" href="../../pixfind/index.html">プレイする</a>
-<a class="cta-secondary" href="../../index.html#projects">プロジェクト一覧</a>
+<a class="cta-primary" href="../../pixfind/index.html">プレイする</a>
+<a class="cta-secondary" href="../../tools.html">プロジェクト一覧</a>
 </div>
 <h1>PiXFiND</h1>
 <p>PiXFiNDは「ドット絵で間違い探しを楽しむ」という一点に特化したブラウザゲームです。正解画像と間違い画像の差分をエンジンが自動抽出し、難易度別にパズルを選んで遊べます。</p>
 <p>ホーム画面に追加すればフルスクリーンで起動でき、タッチ・クリックいずれの操作にも対応。展示会や配信でもシンプルな導線で利用できます。</p>
-<p class="project-status">現在調整中のため、アクセスコードをお持ちの方のみプレイできます。</p>
+<p class="project-status">現在は公開中のため、どなたでもプレイできます。</p>
 </div>
 </section>
 <section class="section" id="howto">
@@ -203,7 +203,7 @@
 <li>残りの間違い数と制限時間は画面下部のHUDで確認できます。ミスできる回数にも限りがあるので注意してください。</li>
 <li>クリア後はリプレイ、別難易度への挑戦、スコアの共有カード作成がワンタップで行えます。</li>
 </ol>
-<p class="project-howto__note">アクセスコードを入力すると限定パズルが開放されます。イベント利用時は端末内のブラウザにコードを保存しておくと再入力の手間を省けます。</p>
+<p class="project-howto__note">イベントや配信で使う場合は、ホーム画面に追加してフルスクリーンで起動するとより快適です。</p>
 </div>
 </section>
 <section class="section section--accent" id="features">
@@ -265,7 +265,7 @@
 <h2>楽しんでいただけたら</h2>
 <p>クリアタイムや発見数はワンクリックで共有リンクに変換できます。ハッシュタグ <code>#PiXiEED</code> を付けて感想やスクリーンショットを拡散していただけると制作の励みになります。</p>
 <div class="project-actions">
-<a class="cta-primary" data-project-gate="project" href="../../pixfind/index.html">プレイする</a>
+<a class="cta-primary" href="../../pixfind/index.html">プレイする</a>
 <a class="cta-secondary" href="https://x.com/PiXiEED_arta" rel="noopener" target="_blank">公式X (旧Twitter)</a>
 </div>
 </div>
@@ -295,22 +295,6 @@
     <span class="icon"><img src="../../FooterIcon4.png" alt=""/></span><span>企業向け</span>
   </a>
 </nav>
-<div aria-hidden="true" class="contact-overlay project-gate-overlay" hidden="" id="projectGateOverlay">
-<div aria-labelledby="projectGateTitle" aria-modal="true" class="contact-panel project-gate-panel" role="dialog">
-<button aria-label="閉じる" class="contact-close project-gate__close" type="button">×</button>
-<h2 id="projectGateTitle">プロジェクトアクセス</h2>
-<p class="project-gate__description">プロジェクトページを表示するにはアクセスコードが必要です。</p>
-<form class="project-gate__form" id="projectGateForm" novalidate="">
-<label class="project-gate__label" for="projectGateInput">アクセスコード</label>
-<input aria-required="true" autocomplete="off" class="project-gate__input" id="projectGateInput" inputmode="numeric" type="password"/>
-<p aria-live="polite" class="project-gate__error" hidden="" id="projectGateError">コードが一致しません。</p>
-<div class="project-gate__actions">
-<button class="project-gate__submit" type="submit">確認</button>
-<button class="project-gate__cancel" type="button">キャンセル</button>
-</div>
-</form>
-</div>
-</div>
 <script src="../../scripts.js"></script>
 </body>
 </html>
