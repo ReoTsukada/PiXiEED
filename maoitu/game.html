@@ -502,7 +502,6 @@ gtag('event', 'project_open_maoitu');
 </head>
 <body>
 <div class="game-area">
-  <a class="back-link" href="./index.html" id="backLink">← スタート画面に戻る</a>
   <audio autoplay="" hidden="" id="bgm" loop="" src="bgm.mp3" volume="0.5"></audio>
   <canvas id="c"></canvas>
   <button class="tutorial-open-btn" id="tutorialOpenBtn" type="button">?</button>
@@ -812,10 +811,12 @@ if(nextDifficultyBtn){
 }
 
 function showBackLink(){
+  if(!backLink) return;
   backLink.style.display = 'inline-flex';
 }
 
 function hideBackLink(){
+  if(!backLink) return;
   backLink.style.display = 'none';
 }
 
