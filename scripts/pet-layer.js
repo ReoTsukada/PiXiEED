@@ -60,9 +60,7 @@ const PET_EXTERNAL_ACTIONS = {
   }
 };
 
-const motionQuery = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-  ? window.matchMedia('(prefers-reduced-motion: reduce)')
-  : null;
+const motionQuery = null;
 
 const PET_HATCHED_STAGE_MS = 60 * 60 * 1000;
 const PET_HATCHED_SPRITES = [
