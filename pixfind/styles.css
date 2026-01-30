@@ -466,8 +466,17 @@ body.is-playing {
 
 .game-controls {
   display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  gap: clamp(0.35rem, 1.2vmin, 0.6rem);
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.game-controls .button {
+  padding: clamp(0.35rem, 1.2vmin, 0.55rem) clamp(0.7rem, 2.4vmin, 1.1rem);
+  font-size: clamp(0.75rem, 1.6vmin, 0.9rem);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .game-metrics {
@@ -977,14 +986,13 @@ body.is-playing {
   }
 
   .game-controls {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 0.35rem;
     justify-content: flex-start;
   }
 
   .game-controls .button {
-    flex: 1 1 auto;
-    white-space: nowrap;
+    flex: 0 1 auto;
   }
 
   .creator-panel {
