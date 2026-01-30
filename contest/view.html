@@ -440,6 +440,31 @@
     .entry-author{ margin:0; color:#cbd5e1; font-size:12px; }
     .empty{ color:#cbd5e1; text-align:center; margin:8px 0 0; }
     .status{ color:#fef3c7; font-size:12px; min-height:18px; }
+    .pixfind-link{
+      display:flex;
+      justify-content:flex-end;
+      margin-top:6px;
+    }
+    .pixfind-play{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      padding:10px 14px;
+      border-radius:12px;
+      border:1px solid rgba(255,111,141,0.6);
+      background:linear-gradient(135deg, rgba(255,111,141,0.25), rgba(255,159,67,0.25));
+      color:#ffe4ec;
+      font-weight:800;
+      text-decoration:none;
+      box-shadow:0 6px 16px rgba(255,111,141,0.25);
+      transition:transform 0.1s ease, filter 0.1s ease;
+    }
+    .pixfind-play:hover,
+    .pixfind-play:focus-visible{
+      transform:translateY(-1px);
+      filter:brightness(1.05);
+    }
     .danger-btn{
       border:1px solid rgba(248,113,113,0.5);
       background:rgba(248,113,113,0.12);
@@ -570,6 +595,9 @@
           <p class="status" id="tagStatus"></p>
         </div>
       </div>
+      <div class="pixfind-link" id="pixfindLink" hidden>
+        <a class="pixfind-play" id="pixfindPlay" href="../pixfind/index.html">PiXFiNDで遊ぶ</a>
+      </div>
       <p class="status" id="viewStatus"></p>
       <button class="danger-btn" id="deleteEntry" style="display:none;">この作品を削除する</button>
       <p class="status" id="deleteNotice"></p>
@@ -644,6 +672,8 @@
     const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
     const SUPABASE_REST = `${SUPABASE_URL}/rest/v1`;
     const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
+    const PIXFIND_PROMPT_PREFIX = 'pixfind:';
+    const PIXFIND_PATH = '../pixfind/index.html';
     const MAX_TAGS = 5;
     const TAG_INPUT_ID = 'tagEditInput';
     const TAG_LIST_ID = 'tagEditList';
@@ -974,6 +1004,30 @@
       if(el) el.textContent = msg || '';
     }
 
+    function resolvePixfindPuzzleId(value){
+      if(!value) return null;
+      const raw = String(value).trim();
+      if(!raw) return null;
+      if(raw.startsWith(PIXFIND_PROMPT_PREFIX)){
+        return raw.slice(PIXFIND_PROMPT_PREFIX.length).trim();
+      }
+      if(raw.startsWith('pixfind://')){
+        return raw.slice('pixfind://'.length).trim();
+      }
+      if(raw.startsWith('http://') || raw.startsWith('https://')){
+        return raw;
+      }
+      return null;
+    }
+
+    function buildPixfindUrl(target){
+      if(!target) return null;
+      if(target.startsWith('http://') || target.startsWith('https://')){
+        return target;
+      }
+      return `${PIXFIND_PATH}?puzzle=${encodeURIComponent(target)}`;
+    }
+
     function ensureClientId(){
       const KEY = 'pixieed_client_id';
       try{
@@ -1288,12 +1342,15 @@
       const likesEl = $('heroLikes');
       const likeIcon = $('heroLikeIcon');
       const delBtn = $('deleteEntry');
+      const playWrap = $('pixfindLink');
+      const playBtn = $('pixfindPlay');
       if(!entry){
         img.src = '';
         titleEl.textContent = '読み込めませんでした';
         authorEl.textContent = '';
         likesEl.textContent = '';
         if(delBtn) delBtn.style.display = 'none';
+        if(playWrap) playWrap.hidden = true;
         return;
       }
       img.src = entry.image_base64;
@@ -1307,6 +1364,17 @@
       if(delBtn){
         delBtn.style.display = canDelete ? 'inline-block' : 'none';
         delBtn.disabled = !canDelete;
+      }
+      if(playWrap && playBtn){
+        const puzzleRef = resolvePixfindPuzzleId(entry.prompt || '');
+        const playUrl = buildPixfindUrl(puzzleRef);
+        if(playUrl){
+          playWrap.hidden = false;
+          playBtn.href = playUrl;
+        }else{
+          playWrap.hidden = true;
+          playBtn.removeAttribute('href');
+        }
       }
       editTags = parseTags(entry.tags);
       renderTagView(editTags);
