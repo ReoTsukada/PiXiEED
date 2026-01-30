@@ -195,6 +195,32 @@ body.is-playing {
   min-height: 0;
 }
 
+.difficulty-ad {
+  background: var(--panel);
+  border-radius: 18px;
+  border: 1px solid rgba(40, 50, 80, 0.12);
+  box-shadow: var(--panel-shadow);
+  padding: 0.6rem;
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.difficulty-ad ins {
+  display: block;
+  width: 100%;
+  min-height: clamp(60px, 10vh, 90px);
+  overflow: hidden;
+}
+
+.difficulty-ad__label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
 .puzzle-list {
   display: flex;
   flex-wrap: wrap;
