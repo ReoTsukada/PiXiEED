@@ -22,6 +22,22 @@ const dom = {
   completionOverlay: document.getElementById('completionOverlay'),
   failureOverlay: document.getElementById('failureOverlay'),
   hintMessage: document.getElementById('hintMessage'),
+  creatorOverlay: document.getElementById('creatorOverlay'),
+  creatorOpenButton: document.getElementById('createButton'),
+  creatorCloseButton: document.getElementById('creatorClose'),
+  creatorForm: document.getElementById('creatorForm'),
+  creatorTitleInput: document.getElementById('creatorTitleInput'),
+  creatorSlugInput: document.getElementById('creatorSlugInput'),
+  creatorDifficultyButtons: Array.from(document.querySelectorAll('[data-creator-difficulty]')),
+  creatorOriginalInput: document.getElementById('creatorOriginalInput'),
+  creatorDiffInput: document.getElementById('creatorDiffInput'),
+  creatorPreviewOriginal: document.getElementById('creatorPreviewOriginal'),
+  creatorPreviewDiff: document.getElementById('creatorPreviewDiff'),
+  creatorExportButton: document.getElementById('creatorExport'),
+  creatorStatus: document.getElementById('creatorStatus'),
+  creatorSummary: document.getElementById('creatorSummary'),
+  creatorDiffCount: document.getElementById('creatorDiffCount'),
+  creatorSize: document.getElementById('creatorSize'),
 };
 
 const ctx = {
@@ -35,6 +51,17 @@ const ctx = {
   }
 });
 
+const creatorCtx = {
+  original: dom.creatorPreviewOriginal?.getContext('2d') ?? null,
+  diff: dom.creatorPreviewDiff?.getContext('2d') ?? null,
+};
+
+[creatorCtx.original, creatorCtx.diff].forEach(context => {
+  if (context) {
+    context.imageSmoothingEnabled = false;
+  }
+});
+
 const MIN_CLUSTER_PIXELS = 1;
 const MARKER_PADDING = 1;
 const REGION_MERGE_DISTANCE_BY_DIFFICULTY = {
@@ -42,6 +69,10 @@ const REGION_MERGE_DISTANCE_BY_DIFFICULTY = {
   2: 4,
   3: 8,
 }; // Manhattan merge distance (px) per difficulty level
+const CREATOR_MERGE_DISTANCE = REGION_MERGE_DISTANCE_BY_DIFFICULTY[2];
+const MERGE_DISTANCE_REFERENCE = 96;
+const MERGE_DISTANCE_MAX_SCALE = 3;
+const MERGE_DISTANCE_MAX_ABS = 16;
 const MAX_MISTAKES = 3;
 const TAP_MAX_MOVEMENT_PX = 8;
 const TAP_MAX_DURATION_MS = 320;
@@ -107,6 +138,32 @@ const state = {
   officialPuzzles: [],
 };
 
+const creatorState = {
+  autoDifficulty: true,
+  difficulty: 1,
+  title: '',
+  slug: '',
+  originalFile: null,
+  diffFile: null,
+  originalImage: null,
+  diffImage: null,
+  originalDataUrl: null,
+  diffDataUrl: null,
+  diffResult: null,
+  size: { width: 0, height: 0 },
+};
+
+let creatorLastFocused = null;
+let creatorAnalysisToken = 0;
+
+const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
+const SUPABASE_BUCKET = 'pixfind-puzzles';
+const SUPABASE_TABLE = 'pixfind_puzzles';
+const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
+const SUPABASE_STORAGE_URL = `${SUPABASE_URL}/storage/v1/object`;
+const SUPABASE_PUBLIC_BASE = `${SUPABASE_STORAGE_URL}/public/${SUPABASE_BUCKET}`;
+
 async function init() {
   setActiveScreen('start');
   updateProgressLabel();
@@ -137,6 +194,7 @@ async function init() {
   });
 
   initializeCanvasInteractions();
+  setupCreator();
 
   dom.difficultyChips.forEach(chip => {
     chip.addEventListener('click', () => {
@@ -147,6 +205,11 @@ async function init() {
 
   window.addEventListener('keydown', event => {
     if (event.key === 'Escape') {
+      if (isCreatorOverlayOpen()) {
+        event.preventDefault();
+        closeCreatorOverlay();
+        return;
+      }
       if (dom.gameScreen && !dom.gameScreen.hidden) {
         leaveGame('difficulty');
       } else {
@@ -158,28 +221,557 @@ async function init() {
   selectDifficulty(1);
 }
 
+function setupCreator() {
+  if (!dom.creatorOverlay || !dom.creatorOpenButton) {
+    return;
+  }
+
+  dom.creatorOpenButton.addEventListener('click', () => {
+    openCreatorOverlay();
+  });
+
+  dom.creatorCloseButton?.addEventListener('click', () => {
+    closeCreatorOverlay();
+  });
+
+  dom.creatorOverlay.addEventListener('click', event => {
+    if (event.target === dom.creatorOverlay) {
+      closeCreatorOverlay();
+    }
+  });
+
+  dom.creatorForm?.addEventListener('submit', event => {
+    event.preventDefault();
+    handleCreatorAnalyze();
+  });
+
+  dom.creatorExportButton?.addEventListener('click', event => {
+    event.preventDefault();
+    handleCreatorPublish();
+  });
+
+  dom.creatorOriginalInput?.addEventListener('change', handleCreatorFileChange);
+  dom.creatorDiffInput?.addEventListener('change', handleCreatorFileChange);
+
+  setCreatorDifficultyLocked(creatorState.autoDifficulty);
+  dom.creatorDifficultyButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      if (creatorState.autoDifficulty) return;
+      const level = Number(button.dataset.creatorDifficulty);
+      setCreatorDifficulty(level);
+    });
+  });
+
+  resetCreatorForm();
+}
+
+function isCreatorOverlayOpen() {
+  return Boolean(dom.creatorOverlay && !dom.creatorOverlay.hidden);
+}
+
+function openCreatorOverlay() {
+  if (!dom.creatorOverlay) return;
+  creatorLastFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  dom.creatorOverlay.hidden = false;
+  dom.creatorOverlay.setAttribute('aria-hidden', 'false');
+  if (dom.creatorTitleInput) {
+    dom.creatorTitleInput.focus();
+  }
+}
+
+function closeCreatorOverlay() {
+  if (!dom.creatorOverlay) return;
+  dom.creatorOverlay.hidden = true;
+  dom.creatorOverlay.setAttribute('aria-hidden', 'true');
+  resetCreatorForm();
+  if (creatorLastFocused) {
+    creatorLastFocused.focus();
+  }
+  creatorLastFocused = null;
+}
+
+function resetCreatorForm() {
+  creatorAnalysisToken += 1;
+  if (dom.creatorForm) {
+    dom.creatorForm.reset();
+  }
+  creatorState.difficulty = 1;
+  creatorState.title = '';
+  creatorState.slug = '';
+  creatorState.originalFile = null;
+  creatorState.diffFile = null;
+  creatorState.originalImage = null;
+  creatorState.diffImage = null;
+  creatorState.originalDataUrl = null;
+  creatorState.diffDataUrl = null;
+  creatorState.diffResult = null;
+  creatorState.size = { width: 0, height: 0 };
+  setCreatorActionsEnabled(false);
+  clearCreatorPreview();
+  if (dom.creatorSummary) {
+    dom.creatorSummary.hidden = true;
+  }
+  setCreatorStatus('お手本画像と間違い画像を選択してください。');
+  setCreatorDifficulty(creatorState.difficulty, true);
+}
+
+function handleCreatorFileChange() {
+  creatorState.originalFile = dom.creatorOriginalInput?.files?.[0] ?? null;
+  creatorState.diffFile = dom.creatorDiffInput?.files?.[0] ?? null;
+  creatorAnalysisToken += 1;
+  creatorState.originalImage = null;
+  creatorState.diffImage = null;
+  creatorState.originalDataUrl = null;
+  creatorState.diffDataUrl = null;
+  creatorState.diffResult = null;
+  creatorState.size = { width: 0, height: 0 };
+  setCreatorActionsEnabled(false);
+  if (dom.creatorSummary) {
+    dom.creatorSummary.hidden = true;
+  }
+  clearCreatorPreview();
+  if (!creatorState.originalFile || !creatorState.diffFile) {
+    setCreatorStatus('お手本画像と間違い画像を選択してください。', 'error');
+    return;
+  }
+  handleCreatorAnalyze();
+}
+
+function setCreatorDifficulty(level, silent = false) {
+  const normalized = normalizeDifficulty(level);
+  creatorState.difficulty = normalized;
+  dom.creatorDifficultyButtons.forEach(button => {
+    const isActive = Number(button.dataset.creatorDifficulty) === normalized;
+    button.classList.toggle('is-active', isActive);
+  });
+  if (!silent) {
+    setCreatorActionsEnabled(false);
+    if (dom.creatorSummary) {
+      dom.creatorSummary.hidden = true;
+    }
+    clearCreatorPreview();
+    setCreatorStatus('難易度を変更しました。差分を再判定してください。');
+  }
+}
+
+function setCreatorDifficultyLocked(locked) {
+  dom.creatorDifficultyButtons.forEach(button => {
+    button.disabled = locked;
+    if (locked) {
+      button.setAttribute('aria-disabled', 'true');
+    } else {
+      button.removeAttribute('aria-disabled');
+    }
+  });
+}
+
+function setCreatorStatus(message, tone = 'info') {
+  if (!dom.creatorStatus) return;
+  dom.creatorStatus.textContent = message;
+  if (tone === 'error') {
+    dom.creatorStatus.dataset.tone = 'error';
+  } else {
+    delete dom.creatorStatus.dataset.tone;
+  }
+}
+
+function setCreatorActionsEnabled(enabled) {
+  if (dom.creatorExportButton) dom.creatorExportButton.disabled = !enabled;
+}
+
+function updateCreatorSummary(diffResult, width, height) {
+  if (!dom.creatorSummary || !dom.creatorDiffCount || !dom.creatorSize) return;
+  if (!diffResult) {
+    dom.creatorSummary.hidden = true;
+    return;
+  }
+  dom.creatorDiffCount.textContent = String(diffResult.regions.length);
+  dom.creatorSize.textContent = `${width}×${height}px`;
+  dom.creatorSummary.hidden = false;
+}
+
+function clearCreatorPreview() {
+  clearCanvas(creatorCtx.original, dom.creatorPreviewOriginal);
+  clearCanvas(creatorCtx.diff, dom.creatorPreviewDiff);
+}
+
+function drawCreatorPreview() {
+  if (!creatorState.originalImage || !creatorState.diffImage) return;
+  drawCreatorPreviewCanvas(creatorCtx.original, dom.creatorPreviewOriginal, creatorState.originalImage, creatorState.diffResult);
+  drawCreatorPreviewCanvas(creatorCtx.diff, dom.creatorPreviewDiff, creatorState.diffImage, creatorState.diffResult);
+}
+
+function drawCreatorPreviewCanvas(context, canvas, image, diffResult) {
+  if (!context || !canvas || !image) return;
+  canvas.width = image.width;
+  canvas.height = image.height;
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(image, 0, 0);
+  if (!diffResult || !diffResult.regions.length) return;
+
+  const strokeWidth = Math.max(2, Math.round(Math.min(image.width, image.height) / 160));
+  context.lineWidth = strokeWidth;
+  context.strokeStyle = 'rgba(255, 111, 141, 0.85)';
+  context.fillStyle = 'rgba(255, 111, 141, 0.18)';
+
+  diffResult.regions.forEach(region => {
+    const width = region.maxX - region.minX + 1;
+    const height = region.maxY - region.minY + 1;
+    context.fillRect(region.minX, region.minY, width, height);
+    context.strokeRect(region.minX, region.minY, width, height);
+  });
+}
+
+async function handleCreatorAnalyze() {
+  const originalFile = dom.creatorOriginalInput?.files?.[0] ?? null;
+  const diffFile = dom.creatorDiffInput?.files?.[0] ?? null;
+  if (!originalFile || !diffFile) {
+    setCreatorStatus('お手本画像と間違い画像を選択してください。', 'error');
+    return;
+  }
+
+  const token = ++creatorAnalysisToken;
+  setCreatorStatus('画像を解析しています…');
+  setCreatorActionsEnabled(false);
+
+  try {
+    const [rawOriginal, rawDiff] = await Promise.all([
+      loadImageFromFile(originalFile),
+      loadImageFromFile(diffFile),
+    ]);
+    if (token !== creatorAnalysisToken) return;
+
+    const [normalizedOriginal, normalizedDiff] = await Promise.all([
+      normalizePixelImage(rawOriginal.image, rawOriginal.dataUrl),
+      normalizePixelImage(rawDiff.image, rawDiff.dataUrl),
+    ]);
+    if (token !== creatorAnalysisToken) return;
+
+    if (normalizedOriginal.width !== normalizedDiff.width || normalizedOriginal.height !== normalizedDiff.height) {
+      setCreatorStatus('画像サイズが一致しません。同じサイズの画像を選んでください。', 'error');
+      creatorState.diffResult = null;
+      creatorState.size = { width: 0, height: 0 };
+      clearCreatorPreview();
+      updateCreatorSummary(null);
+      return;
+    }
+
+    const mergeDistance = resolveMergeDistanceForSize(CREATOR_MERGE_DISTANCE, {
+      width: normalizedOriginal.width,
+      height: normalizedOriginal.height,
+    });
+    const diffResult = computeDifferenceRegions(normalizedOriginal.image, normalizedDiff.image, {
+      mergeDistance,
+    });
+    if (!diffResult || !diffResult.regions.length) {
+      setCreatorStatus('差分が見つかりませんでした。画像を確認してください。', 'error');
+      creatorState.diffResult = null;
+      creatorState.size = { width: 0, height: 0 };
+      clearCreatorPreview();
+      updateCreatorSummary(null);
+      return;
+    }
+
+    creatorState.originalFile = originalFile;
+    creatorState.diffFile = diffFile;
+    creatorState.originalImage = normalizedOriginal.image;
+    creatorState.diffImage = normalizedDiff.image;
+    creatorState.originalDataUrl = normalizedOriginal.dataUrl;
+    creatorState.diffDataUrl = normalizedDiff.dataUrl;
+    creatorState.diffResult = diffResult;
+    creatorState.size = { width: normalizedOriginal.width, height: normalizedOriginal.height };
+    creatorState.title = dom.creatorTitleInput?.value.trim() ?? '';
+    creatorState.slug = dom.creatorSlugInput?.value.trim() ?? '';
+
+    const estimatedDifficulty = estimatePuzzleDifficulty(diffResult);
+    setCreatorDifficulty(estimatedDifficulty, true);
+
+    drawCreatorPreview();
+    updateCreatorSummary(diffResult, normalizedOriginal.width, normalizedOriginal.height);
+    setCreatorStatus(`差分を${diffResult.regions.length}箇所検出しました。難易度は${createStarLabel(estimatedDifficulty)}です。`);
+    setCreatorActionsEnabled(true);
+  } catch (error) {
+    console.error(error);
+    setCreatorStatus('画像の読み込みに失敗しました。', 'error');
+  }
+}
+
+async function handleCreatorPublish() {
+  if (!creatorState.diffResult || !creatorState.originalFile || !creatorState.diffFile) {
+    setCreatorStatus('公開には差分の自動判定が必要です。', 'error');
+    return;
+  }
+
+  const title = dom.creatorTitleInput?.value.trim() || 'カスタムパズル';
+  const slug = getCreatorSlug();
+  const difficulty = creatorState.difficulty;
+  const puzzleId = createPuzzleId();
+
+  if (dom.creatorExportButton) dom.creatorExportButton.disabled = true;
+  setCreatorStatus('アップロード中です…');
+
+  try {
+    const [originalUpload, diffUpload] = await Promise.all([
+      buildUploadPayload(creatorState.originalDataUrl, creatorState.originalFile),
+      buildUploadPayload(creatorState.diffDataUrl, creatorState.diffFile),
+    ]);
+    if (!originalUpload || !diffUpload) {
+      throw new Error('upload payload missing');
+    }
+    const originalPath = `puzzles/${puzzleId}/original.${originalUpload.extension}`;
+    const diffPath = `puzzles/${puzzleId}/diff.${diffUpload.extension}`;
+
+    const [originalUrl, diffUrl] = await Promise.all([
+      uploadPuzzleFile(originalPath, originalUpload.blob, originalUpload.mimeType),
+      uploadPuzzleFile(diffPath, diffUpload.blob, diffUpload.mimeType),
+    ]);
+
+    const payload = {
+      id: puzzleId,
+      slug,
+      label: title,
+      description: '',
+      difficulty,
+      original_url: originalUrl,
+      diff_url: diffUrl,
+      thumbnail_url: diffUrl,
+    };
+
+    const inserted = await insertPublishedPuzzle(payload);
+    const normalized = normalizePublishedPuzzleEntry(inserted ?? payload);
+    if (normalized) {
+      state.officialPuzzles = mergePuzzles(state.officialPuzzles, normalized);
+      renderPuzzles(state.currentDifficulty);
+    }
+
+    const shareUrl = createShareUrl(normalized ?? { id: puzzleId, source: 'published' });
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(shareUrl);
+      setCreatorStatus('公開しました。共有リンクをコピーしました。');
+    } else {
+      window.prompt('公開しました。共有リンクをコピーしてください。', shareUrl);
+      setCreatorStatus('公開しました。');
+    }
+  } catch (error) {
+    console.error(error);
+    setCreatorStatus('公開に失敗しました。時間を置いて再試行してください。', 'error');
+  } finally {
+    if (dom.creatorExportButton) dom.creatorExportButton.disabled = false;
+  }
+}
+
+function getCreatorSlug() {
+  const rawSlug = dom.creatorSlugInput?.value ?? '';
+  const rawTitle = dom.creatorTitleInput?.value ?? '';
+  const fromSlug = sanitizeSlug(rawSlug);
+  if (fromSlug) return fromSlug;
+  const fromTitle = sanitizeSlug(rawTitle);
+  if (fromTitle) return fromTitle;
+  return `custom-${Date.now().toString(36)}`;
+}
+
+function createPuzzleId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `pixfind-${crypto.randomUUID()}`;
+  }
+  return `pixfind-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getFileExtension(file) {
+  if (!file) return 'png';
+  const name = file.name || '';
+  const dot = name.lastIndexOf('.');
+  if (dot !== -1 && dot < name.length - 1) {
+    const ext = name.slice(dot + 1).toLowerCase();
+    if (/^[a-z0-9]+$/.test(ext)) {
+      return ext;
+    }
+  }
+  const type = (file.type || '').toLowerCase();
+  if (type.includes('png')) return 'png';
+  if (type.includes('jpeg') || type.includes('jpg')) return 'jpg';
+  if (type.includes('webp')) return 'webp';
+  return 'png';
+}
+
+function getDataUrlMimeType(dataUrl) {
+  if (!dataUrl || !dataUrl.startsWith('data:')) return null;
+  const match = dataUrl.match(/^data:([^;,]+)[;,]/);
+  return match ? match[1] : null;
+}
+
+function getExtensionFromMimeType(mimeType) {
+  if (!mimeType) return null;
+  const lowered = mimeType.toLowerCase();
+  if (lowered.includes('png')) return 'png';
+  if (lowered.includes('jpeg') || lowered.includes('jpg')) return 'jpg';
+  if (lowered.includes('webp')) return 'webp';
+  return null;
+}
+
+async function dataUrlToBlob(dataUrl) {
+  const response = await fetch(dataUrl);
+  if (!response.ok) {
+    throw new Error('data url parse failed');
+  }
+  return await response.blob();
+}
+
+async function buildUploadPayload(dataUrl, fallbackFile) {
+  if (dataUrl) {
+    const blob = await dataUrlToBlob(dataUrl);
+    const mimeType = getDataUrlMimeType(dataUrl) || blob.type || fallbackFile?.type || 'image/png';
+    const extension = getExtensionFromMimeType(mimeType) || getFileExtension(fallbackFile) || 'png';
+    return { blob, mimeType, extension };
+  }
+  if (fallbackFile) {
+    return {
+      blob: fallbackFile,
+      mimeType: fallbackFile.type || 'application/octet-stream',
+      extension: getFileExtension(fallbackFile),
+    };
+  }
+  return null;
+}
+
+function encodeStoragePath(path) {
+  return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+}
+
+async function uploadPuzzleFile(path, body, contentType = null) {
+  if (!body) {
+    throw new Error('upload body is missing');
+  }
+  const safePath = encodeStoragePath(path);
+  const url = `${SUPABASE_STORAGE_URL}/${SUPABASE_BUCKET}/${safePath}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      ...supabaseHeaders(),
+      'Content-Type': contentType || body.type || 'application/octet-stream',
+    },
+    body,
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`upload failed: ${response.status} ${detail}`);
+  }
+  return getSupabasePublicUrl(path);
+}
+
+async function insertPublishedPuzzle(payload) {
+  const response = await fetch(`${SUPABASE_REST_URL}/${SUPABASE_TABLE}`, {
+    method: 'POST',
+    headers: {
+      ...supabaseHeaders(),
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`insert failed: ${response.status} ${detail}`);
+  }
+  const data = await response.json();
+  return Array.isArray(data) ? data[0] : null;
+}
+
+function mergePuzzles(list, puzzle) {
+  const next = Array.isArray(list) ? [...list] : [];
+  const index = next.findIndex(item => item.id === puzzle.id);
+  if (index >= 0) {
+    next[index] = puzzle;
+    return next;
+  }
+  return [puzzle, ...next];
+}
+
+function sanitizeSlug(value) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function supabaseHeaders() {
+  return {
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+  };
+}
+
+function getSupabasePublicUrl(path) {
+  return `${SUPABASE_PUBLIC_BASE}/${path}`;
+}
+
+function normalizePublishedPuzzleEntry(entry) {
+  if (!entry) return null;
+  const identifier = entry.id ?? entry.slug;
+  if (!identifier) return null;
+  const original = entry.original_url ?? entry.original ?? null;
+  const diff = entry.diff_url ?? entry.diff ?? null;
+  if (!original || !diff) return null;
+  return {
+    id: entry.id ?? identifier,
+    slug: entry.slug ?? identifier,
+    label: entry.label ?? entry.slug ?? entry.id ?? 'PiXFiND Puzzle',
+    description: entry.description ?? '',
+    difficulty: normalizeDifficulty(entry.difficulty),
+    original,
+    diff,
+    thumbnail: entry.thumbnail_url ?? entry.thumbnail ?? diff ?? original,
+    source: 'published',
+    badge: '公開',
+  };
+}
+
+async function loadPublishedPuzzles() {
+  const params = new URLSearchParams({
+    select: 'id,slug,label,description,difficulty,original_url,diff_url,thumbnail_url,created_at',
+    order: 'created_at.desc',
+  });
+  try {
+    const response = await fetch(`${SUPABASE_REST_URL}/${SUPABASE_TABLE}?${params.toString()}`, {
+      headers: supabaseHeaders(),
+    });
+    if (!response.ok) {
+      console.warn('Failed to load published puzzles', response.status);
+      return [];
+    }
+    const data = await response.json();
+    if (!Array.isArray(data)) return [];
+    return data.map(normalizePublishedPuzzleEntry).filter(Boolean);
+  } catch (error) {
+    console.warn('Failed to load published puzzles', error);
+    return [];
+  }
+}
+
 async function loadOfficialPuzzles() {
+  let basePuzzles = [];
   try {
     const response = await fetch('assets/puzzles/manifest.json', { cache: 'no-store' });
     if (!response.ok) {
       console.warn('Could not load puzzles manifest');
-      state.officialPuzzles = FALLBACK_OFFICIAL_PUZZLES.map(normalizePuzzleEntry);
-      renderPuzzles(state.currentDifficulty);
-      return;
+      basePuzzles = FALLBACK_OFFICIAL_PUZZLES.map(normalizePuzzleEntry);
+    } else {
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        basePuzzles = data.map(normalizePuzzleEntry).filter(Boolean);
+      }
+      if (!basePuzzles.length) {
+        basePuzzles = FALLBACK_OFFICIAL_PUZZLES.map(normalizePuzzleEntry);
+      }
     }
-    const data = await response.json();
-    if (Array.isArray(data)) {
-      state.officialPuzzles = data.map(normalizePuzzleEntry).filter(Boolean);
-    }
-    if (!state.officialPuzzles.length) {
-      state.officialPuzzles = FALLBACK_OFFICIAL_PUZZLES.map(normalizePuzzleEntry);
-    }
-    renderPuzzles(state.currentDifficulty);
   } catch (error) {
     console.warn('Failed to load puzzles manifest', error);
-    state.officialPuzzles = FALLBACK_OFFICIAL_PUZZLES.map(normalizePuzzleEntry);
-    renderPuzzles(state.currentDifficulty);
+    basePuzzles = FALLBACK_OFFICIAL_PUZZLES.map(normalizePuzzleEntry);
   }
+  const publishedPuzzles = await loadPublishedPuzzles();
+  state.officialPuzzles = [...basePuzzles, ...publishedPuzzles].filter(Boolean);
+  renderPuzzles(state.currentDifficulty);
 }
 
 function getPuzzleIdFromLocation() {
@@ -220,6 +812,39 @@ function normalizeDifficulty(rawValue) {
   return Math.min(Math.max(rounded, 1), 3);
 }
 
+function estimatePuzzleDifficulty(diffResult) {
+  if (!diffResult || !diffResult.regions?.length) return 1;
+  const totalPixels = diffResult.width * diffResult.height;
+  if (!Number.isFinite(totalPixels) || totalPixels <= 0) return 1;
+
+  const regionCount = diffResult.regions.length;
+  const diffPixels = diffResult.regions.reduce((sum, region) => sum + (region.count ?? 0), 0);
+  const diffRatio = diffPixels / totalPixels;
+  const avgRegionRatio = diffPixels / regionCount / totalPixels;
+
+  // Heuristic: fewer and smaller differences are harder.
+  let score = 0;
+  if (regionCount <= 3) {
+    score += 2;
+  } else if (regionCount <= 6) {
+    score += 1;
+  }
+
+  if (diffRatio <= 0.004) {
+    score += 2;
+  } else if (diffRatio <= 0.012) {
+    score += 1;
+  }
+
+  if (avgRegionRatio <= 0.0012) {
+    score += 1;
+  }
+
+  if (score >= 4) return 3;
+  if (score >= 2) return 2;
+  return 1;
+}
+
 function normalizePuzzleEntry(entry) {
   if (!entry) return null;
   const identifier = entry.id ?? entry.slug;
@@ -236,12 +861,17 @@ function normalizePuzzleEntry(entry) {
     original,
     diff,
     thumbnail: entry.thumbnail ?? original ?? diff,
+    source: 'official',
+    badge: '公式',
   };
 }
 
 function createShareUrl(puzzle) {
   const url = new URL(window.location.href);
-  url.searchParams.set('puzzle', puzzle.slug ?? puzzle.id);
+  const shareId = puzzle?.source === 'published' ? puzzle.id : (puzzle.slug ?? puzzle.id);
+  if (shareId) {
+    url.searchParams.set('puzzle', shareId);
+  }
   url.hash = '';
   return url.toString();
 }
@@ -279,11 +909,25 @@ async function sharePuzzle(puzzle) {
   window.prompt('共有リンクをコピーしてください。', shareUrl);
 }
 
-function resolveRegionMergeDistance(difficultyOverride = null) {
+function resolveMergeDistanceForSize(baseDistance, size) {
+  const width = size?.width ?? 0;
+  const height = size?.height ?? 0;
+  if (!width || !height) {
+    return baseDistance;
+  }
+  const minDim = Math.min(width, height);
+  const scale = Math.max(1, Math.round(minDim / MERGE_DISTANCE_REFERENCE));
+  const boundedScale = Math.min(scale, MERGE_DISTANCE_MAX_SCALE);
+  const scaledDistance = Math.round(baseDistance * boundedScale);
+  return Math.max(1, Math.min(scaledDistance, MERGE_DISTANCE_MAX_ABS));
+}
+
+function resolveRegionMergeDistance(difficultyOverride = null, size = null) {
   const normalized = normalizeDifficulty(
     difficultyOverride ?? state.currentPuzzle?.difficulty ?? state.currentDifficulty ?? 1,
   );
-  return REGION_MERGE_DISTANCE_BY_DIFFICULTY[normalized] ?? REGION_MERGE_DISTANCE_BY_DIFFICULTY[1];
+  const base = REGION_MERGE_DISTANCE_BY_DIFFICULTY[normalized] ?? REGION_MERGE_DISTANCE_BY_DIFFICULTY[1];
+  return resolveMergeDistanceForSize(base, size);
 }
 
 function resolveBuildVersionToken() {
@@ -354,12 +998,14 @@ function renderPuzzles(level) {
 
 function createOfficialCard(puzzle) {
   const card = document.createElement('article');
-  card.className = 'puzzle-card puzzle-card--official';
+  const badgeText = puzzle.badge ?? '公式';
+  const badgeClass = puzzle.source === 'published' ? 'puzzle-card__badge puzzle-card__badge--published' : 'puzzle-card__badge';
+  card.className = `puzzle-card puzzle-card--official${puzzle.source === 'published' ? ' puzzle-card--published' : ''}`;
   card.role = 'button';
   card.tabIndex = 0;
   card.dataset.puzzleId = puzzle.id;
   card.innerHTML = `
-    <span class="puzzle-card__badge" aria-hidden="true">公式</span>
+    <span class="${badgeClass}" aria-hidden="true">${badgeText}</span>
     <div class="puzzle-card__thumb puzzle-card__thumb--image">
       <img src="${puzzle.thumbnail}" alt="${puzzle.label} のプレビュー" />
     </div>
@@ -834,7 +1480,12 @@ function computeDifferenceRegions(originalImage, challengeImage, options = {}) {
   const regions = [];
   const queue = [];
   const requestedMerge = Number.isFinite(options.mergeDistance) ? options.mergeDistance : null;
-  const mergeDistance = Math.max(1, Math.floor(requestedMerge ?? resolveRegionMergeDistance(options.difficulty ?? null)));
+  const mergeDistance = Math.max(
+    1,
+    Math.floor(
+      requestedMerge ?? resolveRegionMergeDistance(options.difficulty ?? null, { width, height }),
+    ),
+  );
   const neighborOffsets = [];
 
   for (let offsetY = -mergeDistance; offsetY <= mergeDistance; offsetY += 1) {
@@ -1238,6 +1889,43 @@ function loadImageFromDataUrl(dataUrl) {
     img.onerror = error => reject(error);
     img.src = dataUrl;
   });
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      reject(new Error('No file provided'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = error => reject(error);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function loadImageFromFile(file) {
+  const dataUrl = await readFileAsDataUrl(file);
+  const image = await loadImageFromDataUrl(dataUrl);
+  return { image, dataUrl };
+}
+
+function downloadDataUrl(dataUrl, filename) {
+  if (!dataUrl) return;
+  const link = document.createElement('a');
+  link.href = dataUrl;
+  link.download = filename;
+  link.click();
+}
+
+function downloadTextFile(text, filename) {
+  const blob = new Blob([text], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 async function normalizePixelImage(image, fallbackDataUrl) {
