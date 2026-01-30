@@ -73,6 +73,8 @@ const CREATOR_MERGE_DISTANCE = REGION_MERGE_DISTANCE_BY_DIFFICULTY[2];
 const MERGE_DISTANCE_REFERENCE = 96;
 const MERGE_DISTANCE_MAX_SCALE = 3;
 const MERGE_DISTANCE_MAX_ABS = 16;
+const NORMALIZE_COLOR_TOLERANCE = 12;
+const NORMALIZE_MATCH_RATIO = 0.985;
 const MAX_MISTAKES = 3;
 const TAP_MAX_MOVEMENT_PX = 8;
 const TAP_MAX_DURATION_MS = 320;
@@ -1950,7 +1952,11 @@ async function normalizePixelImage(image, fallbackDataUrl) {
   }
   const scaleX = detectScaleFactor(imageData, width, height, 'x');
   const scaleY = detectScaleFactor(imageData, width, height, 'y');
-  const scale = Math.max(1, Math.min(scaleX, scaleY));
+  let scale = Math.max(1, Math.min(scaleX, scaleY));
+  const blockScale = detectScaleFactorByBlocks(imageData, width, height);
+  if (blockScale > scale) {
+    scale = blockScale;
+  }
 
   if (scale <= 1) {
     let dataUrl = fallbackDataUrl ?? null;
@@ -2022,6 +2028,70 @@ function detectScaleFactor(imageData, width, height, axis) {
   }
   best = best ? gcd(best, run) : run;
   return Math.max(1, best);
+}
+
+function detectScaleFactorByBlocks(imageData, width, height) {
+  const common = gcd(width, height);
+  if (common <= 1) return 1;
+  const candidates = getDivisors(common).filter(value => value > 1).sort((a, b) => b - a);
+  for (const factor of candidates) {
+    if (isLikelyUpscaledByFactor(imageData.data, width, height, factor)) {
+      return factor;
+    }
+  }
+  return 1;
+}
+
+function isLikelyUpscaledByFactor(data, width, height, factor) {
+  const totalPixels = width * height;
+  const allowedMismatch = Math.floor(totalPixels * (1 - NORMALIZE_MATCH_RATIO));
+  let mismatches = 0;
+
+  for (let blockY = 0; blockY < height; blockY += factor) {
+    for (let blockX = 0; blockX < width; blockX += factor) {
+      const baseIndex = (blockY * width + blockX) * 4;
+      const baseR = data[baseIndex];
+      const baseG = data[baseIndex + 1];
+      const baseB = data[baseIndex + 2];
+      const baseA = data[baseIndex + 3];
+
+      for (let y = 0; y < factor; y++) {
+        const rowStart = (blockY + y) * width;
+        for (let x = 0; x < factor; x++) {
+          const idx = (rowStart + blockX + x) * 4;
+          if (!isColorNear(data, idx, baseR, baseG, baseB, baseA)) {
+            mismatches += 1;
+            if (mismatches > allowedMismatch) {
+              return false;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+function isColorNear(data, idx, r, g, b, a) {
+  return (
+    Math.abs(data[idx] - r) <= NORMALIZE_COLOR_TOLERANCE &&
+    Math.abs(data[idx + 1] - g) <= NORMALIZE_COLOR_TOLERANCE &&
+    Math.abs(data[idx + 2] - b) <= NORMALIZE_COLOR_TOLERANCE &&
+    Math.abs(data[idx + 3] - a) <= NORMALIZE_COLOR_TOLERANCE
+  );
+}
+
+function getDivisors(value) {
+  const divisors = new Set();
+  for (let i = 2; i <= Math.sqrt(value); i += 1) {
+    if (value % i === 0) {
+      divisors.add(i);
+      divisors.add(value / i);
+    }
+  }
+  divisors.add(value);
+  return Array.from(divisors);
 }
 
 function columnsMatch(data, width, height, a, b) {
