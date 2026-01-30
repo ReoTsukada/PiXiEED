@@ -2971,9 +2971,17 @@ body.project-page .project-ad ins.adsbygoogle{
   max-width:100%;
   overflow:hidden;
 }
+body.project-page .project-ad--mid ins.adsbygoogle{
+  height:250px;
+  min-height:250px;
+}
 @media(max-width:640px){
   body.project-page .project-ad ins.adsbygoogle{
     height:60px;
+  }
+  body.project-page .project-ad--mid ins.adsbygoogle{
+    height:200px;
+    min-height:200px;
   }
 }
 body.project-page .project-ad__label{
