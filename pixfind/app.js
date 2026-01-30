@@ -86,6 +86,7 @@ const zoomControllers = {
   original: null,
   challenge: null,
 };
+let zoomSyncLock = false;
 
 const FALLBACK_OFFICIAL_PUZZLES = [
   {
@@ -162,6 +163,9 @@ const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
 const SUPABASE_BUCKET = 'pixfind-puzzles';
 const SUPABASE_TABLE = 'pixfind_puzzles';
+const CONTEST_TABLE = 'contest_entries';
+const CONTEST_PROMPT_PREFIX = 'pixfind:';
+const CONTEST_AUTHOR_NAME = 'PiXFiND';
 const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
 const SUPABASE_STORAGE_URL = `${SUPABASE_URL}/storage/v1/object`;
 const SUPABASE_PUBLIC_BASE = `${SUPABASE_STORAGE_URL}/public/${SUPABASE_BUCKET}`;
@@ -526,13 +530,31 @@ async function handleCreatorPublish() {
       renderPuzzles(state.currentDifficulty);
     }
 
+    let contestPosted = false;
+    try {
+      const contestDataUrl = creatorState.originalDataUrl || await readFileAsDataUrl(creatorState.originalFile);
+      const colors = countUniqueColors(creatorState.originalImage);
+      const contestPayload = createContestPayload({
+        puzzleId,
+        title,
+        dataUrl: contestDataUrl,
+        width: creatorState.size.width,
+        height: creatorState.size.height,
+        colors,
+      });
+      await insertContestEntry(contestPayload);
+      contestPosted = true;
+    } catch (error) {
+      console.warn('Contest post failed', error);
+    }
+
     const shareUrl = createShareUrl(normalized ?? { id: puzzleId, source: 'published' });
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(shareUrl);
-      setCreatorStatus('公開しました。共有リンクをコピーしました。');
+      setCreatorStatus(`公開しました。共有リンクをコピーしました。${contestPosted ? 'コンテストにも投稿しました。' : 'コンテスト投稿は失敗しました。'}`);
     } else {
-      window.prompt('公開しました。共有リンクをコピーしてください。', shareUrl);
-      setCreatorStatus('公開しました。');
+      window.prompt(`公開しました。${contestPosted ? 'コンテストにも投稿しました。' : 'コンテスト投稿は失敗しました。'}共有リンクをコピーしてください。`, shareUrl);
+      setCreatorStatus(`公開しました。${contestPosted ? 'コンテストにも投稿しました。' : 'コンテスト投稿は失敗しました。'}`);
     }
   } catch (error) {
     console.error(error);
@@ -659,6 +681,24 @@ async function insertPublishedPuzzle(payload) {
   return Array.isArray(data) ? data[0] : null;
 }
 
+async function insertContestEntry(payload) {
+  const response = await fetch(`${SUPABASE_REST_URL}/${CONTEST_TABLE}`, {
+    method: 'POST',
+    headers: {
+      ...supabaseHeaders(),
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`contest insert failed: ${response.status} ${detail}`);
+  }
+  const data = await response.json();
+  return Array.isArray(data) ? data[0] : null;
+}
+
 function mergePuzzles(list, puzzle) {
   const next = Array.isArray(list) ? [...list] : [];
   const index = next.findIndex(item => item.id === puzzle.id);
@@ -686,6 +726,55 @@ function supabaseHeaders() {
 
 function getSupabasePublicUrl(path) {
   return `${SUPABASE_PUBLIC_BASE}/${path}`;
+}
+
+function createContestPayload({
+  puzzleId,
+  title,
+  dataUrl,
+  width,
+  height,
+  colors,
+}) {
+  return {
+    name: CONTEST_AUTHOR_NAME,
+    title: title || 'PiXFiND Puzzle',
+    prompt: `${CONTEST_PROMPT_PREFIX}${puzzleId}`,
+    mode: 'pixfind',
+    started_at: null,
+    submitted_at: new Date().toISOString(),
+    width,
+    height,
+    colors: Number.isFinite(colors) ? colors : null,
+    image_base64: dataUrl,
+    client_id: `pixfind-${puzzleId}`,
+  };
+}
+
+function countUniqueColors(image) {
+  if (!image) return null;
+  const width = image.naturalWidth || image.width || 0;
+  const height = image.naturalHeight || image.height || 0;
+  if (!width || !height) return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  context.imageSmoothingEnabled = false;
+  context.drawImage(image, 0, 0);
+  let data;
+  try {
+    data = context.getImageData(0, 0, width, height).data;
+  } catch (error) {
+    console.warn('Unable to count colors', error);
+    return null;
+  }
+  const colors = new Set();
+  for (let i = 0; i < data.length; i += 4) {
+    colors.add(`${data[i]}-${data[i + 1]}-${data[i + 2]}-${data[i + 3]}`);
+  }
+  return colors.size;
 }
 
 function normalizePublishedPuzzleEntry(entry) {
@@ -1564,13 +1653,30 @@ function initializeCanvasInteractions() {
     const { x, y } = getImageCoordinates(dom.canvasOriginal, event);
     if (Number.isNaN(x) || Number.isNaN(y)) return;
     processCanvasSelection(dom.canvasOriginal, x, y);
+  }, transform => {
+    syncZoomControllers('original', transform);
   });
   zoomControllers.challenge = createCanvasInteractionController(dom.canvasChallenge, dom.overlayChallenge, event => {
     if (!dom.canvasChallenge) return;
     const { x, y } = getImageCoordinates(dom.canvasChallenge, event);
     if (Number.isNaN(x) || Number.isNaN(y)) return;
     processCanvasSelection(dom.canvasChallenge, x, y);
+  }, transform => {
+    syncZoomControllers('challenge', transform);
   });
+}
+
+function syncZoomControllers(sourceKey, transform) {
+  if (zoomSyncLock || !transform) return;
+  const targetKey = sourceKey === 'original' ? 'challenge' : 'original';
+  const target = zoomControllers[targetKey];
+  if (!target?.setTransform) return;
+  zoomSyncLock = true;
+  try {
+    target.setTransform(transform, { sync: false });
+  } finally {
+    zoomSyncLock = false;
+  }
 }
 
 function resetAllZoomTransforms() {
@@ -1589,7 +1695,7 @@ function refreshZoomBounds() {
   });
 }
 
-function createCanvasInteractionController(canvas, overlay, onTap) {
+function createCanvasInteractionController(canvas, overlay, onTap, onTransform) {
   if (!canvas) return null;
   const frame = canvas.parentElement;
   if (!frame) return null;
@@ -1613,11 +1719,20 @@ function createCanvasInteractionController(canvas, overlay, onTap) {
     maxScale: ZOOM_MAX_SCALE,
   };
 
-  function applyTransform() {
+  function applyTransform({ sync = true } = {}) {
     const transform = `translate3d(${controllerState.offsetX}px, ${controllerState.offsetY}px, 0) scale(${controllerState.scale})`;
     canvas.style.transform = transform;
     if (overlay) {
       overlay.style.transform = transform;
+    }
+    if (sync && typeof onTransform === 'function') {
+      onTransform({
+        scale: controllerState.scale,
+        offsetX: controllerState.offsetX,
+        offsetY: controllerState.offsetY,
+        frameWidth: frame.clientWidth || canvas.clientWidth || 0,
+        frameHeight: frame.clientHeight || canvas.clientHeight || 0,
+      });
     }
   }
 
@@ -1648,6 +1763,26 @@ function createCanvasInteractionController(canvas, overlay, onTap) {
     controllerState.offsetY += deltaY;
     clampOffsets();
     applyTransform();
+  }
+
+  function setTransform(next, options = {}) {
+    if (!next) return;
+    const frameWidth = frame.clientWidth || canvas.clientWidth || 0;
+    const frameHeight = frame.clientHeight || canvas.clientHeight || 0;
+    let nextScale = Number.isFinite(next.scale) ? next.scale : controllerState.scale;
+    let nextOffsetX = Number.isFinite(next.offsetX) ? next.offsetX : controllerState.offsetX;
+    let nextOffsetY = Number.isFinite(next.offsetY) ? next.offsetY : controllerState.offsetY;
+    if (Number.isFinite(next.frameWidth) && next.frameWidth > 0 && frameWidth > 0) {
+      nextOffsetX *= frameWidth / next.frameWidth;
+    }
+    if (Number.isFinite(next.frameHeight) && next.frameHeight > 0 && frameHeight > 0) {
+      nextOffsetY *= frameHeight / next.frameHeight;
+    }
+    controllerState.scale = clamp(nextScale, config.minScale, config.maxScale);
+    controllerState.offsetX = nextOffsetX;
+    controllerState.offsetY = nextOffsetY;
+    clampOffsets();
+    applyTransform({ sync: options.sync ?? false });
   }
 
   function handlePointerDown(event) {
@@ -1822,6 +1957,7 @@ function createCanvasInteractionController(canvas, overlay, onTap) {
       clampOffsets();
       applyTransform();
     },
+    setTransform,
   };
 }
 
