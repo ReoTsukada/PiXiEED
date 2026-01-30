@@ -9,7 +9,15 @@
   --text-muted: #5b6374;
   --border: rgba(40, 50, 80, 0.16);
   --app-height: 100vh;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
   --screen-padding: clamp(0.75rem, 2.4vmin, 2.2rem);
+  --screen-padding-top: calc(var(--screen-padding) + var(--safe-top));
+  --screen-padding-right: calc(var(--screen-padding) + var(--safe-right));
+  --screen-padding-bottom: calc(var(--screen-padding) + var(--safe-bottom));
+  --screen-padding-left: calc(var(--screen-padding) + var(--safe-left));
   --screen-gap: clamp(0.5rem, 1.6vmin, 1.2rem);
   font-family: "M PLUS Rounded 1c", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
   font-size: 16px;
@@ -69,7 +77,7 @@ body.is-playing {
   inset: 0;
   height: 100%;
   min-height: 0;
-  padding: var(--screen-padding);
+  padding: var(--screen-padding-top) var(--screen-padding-right) var(--screen-padding-bottom) var(--screen-padding-left);
   display: grid;
   gap: var(--screen-gap);
   overflow: hidden;
@@ -94,7 +102,8 @@ body.is-playing {
   align-content: center;
   justify-items: center;
   text-align: center;
-  padding-block: clamp(1.2rem, 5vh, 3.5rem);
+  padding-top: calc(clamp(1.2rem, 5vh, 3.5rem) + var(--safe-top));
+  padding-bottom: calc(clamp(1.2rem, 5vh, 3.5rem) + var(--safe-bottom));
 }
 
 .screen--difficulty {
@@ -647,7 +656,7 @@ body.is-playing {
   inset: 0;
   display: grid;
   place-items: center;
-  padding: var(--screen-padding);
+  padding: var(--screen-padding-top) var(--screen-padding-right) var(--screen-padding-bottom) var(--screen-padding-left);
   background: rgba(18, 22, 38, 0.65);
   backdrop-filter: blur(6px);
   z-index: 950;
@@ -656,7 +665,7 @@ body.is-playing {
 .creator-panel {
   position: relative;
   width: min(980px, 100%);
-  max-height: calc(var(--app-height) - (var(--screen-padding) * 2));
+  max-height: calc(var(--app-height) - var(--screen-padding-top) - var(--screen-padding-bottom));
   background: var(--panel);
   border-radius: 28px;
   box-shadow: var(--panel-shadow);
@@ -891,7 +900,7 @@ body.is-playing {
 
   .creator-panel {
     padding: clamp(1rem, 4vmin, 1.6rem);
-    height: calc(var(--app-height) - (var(--screen-padding) * 2));
+    height: calc(var(--app-height) - var(--screen-padding-top) - var(--screen-padding-bottom));
     grid-template-rows: auto minmax(0, 1fr);
     gap: 0.6rem;
   }
