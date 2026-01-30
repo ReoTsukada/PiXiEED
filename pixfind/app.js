@@ -532,7 +532,14 @@ async function handleCreatorPublish() {
 
     let contestPosted = false;
     try {
-      const contestDataUrl = creatorState.originalDataUrl || await readFileAsDataUrl(creatorState.originalFile);
+      const contestDataUrl = await buildNormalizedDataUrl(
+        creatorState.originalImage,
+        creatorState.originalDataUrl,
+        creatorState.originalFile,
+      );
+      if (!contestDataUrl) {
+        throw new Error('contest data missing');
+      }
       const colors = countUniqueColors(creatorState.originalImage);
       const contestPayload = createContestPayload({
         puzzleId,
@@ -2044,6 +2051,22 @@ function downloadTextFile(text, filename) {
   link.download = filename;
   link.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function buildNormalizedDataUrl(image, fallbackDataUrl, fallbackFile) {
+  if (image) {
+    try {
+      const normalized = await normalizePixelImage(image, fallbackDataUrl ?? null);
+      if (normalized?.dataUrl) {
+        return normalized.dataUrl;
+      }
+    } catch (error) {
+      console.warn('normalize failed for contest payload', error);
+    }
+  }
+  if (fallbackDataUrl) return fallbackDataUrl;
+  if (fallbackFile) return await readFileAsDataUrl(fallbackFile);
+  return null;
 }
 
 async function normalizePixelImage(image, fallbackDataUrl) {
