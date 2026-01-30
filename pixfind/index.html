@@ -234,13 +234,10 @@
 </section>
 <section aria-hidden="true" class="screen screen--game" hidden="" id="gameScreen">
 <header class="game-header">
+<div class="game-header-slot game-header-slot--left">
 <h2 class="game-title" id="gameTitle">PiXFiND</h2>
-<div class="game-controls">
-<button class="button button--ghost button--compact" id="gameBackButton" type="button">難易度選択に戻る</button>
-<button class="button button--ghost button--compact" id="backButton" type="button">タイトルへ</button>
-<button class="button button--primary button--compact" id="resetButton" type="button">もう一度遊ぶ</button>
 </div>
-</header>
+<div class="game-header-slot game-header-slot--center">
 <div aria-live="polite" class="game-metrics" role="status">
 <div aria-labelledby="foundLabel" class="status-card">
 <div class="status-row">
@@ -261,6 +258,15 @@
 </div>
 </div>
 </div>
+</div>
+<div class="game-header-slot game-header-slot--right">
+<div class="game-controls">
+<button class="button button--ghost button--compact" id="gameBackButton" type="button">難易度選択に戻る</button>
+<button class="button button--ghost button--compact" id="backButton" type="button">タイトルへ</button>
+<button class="button button--primary button--compact" id="resetButton" type="button">もう一度遊ぶ</button>
+</div>
+</div>
+</header>
 <div class="game-layout">
 <div aria-live="polite" class="stage">
 <div class="canvas-frame">
