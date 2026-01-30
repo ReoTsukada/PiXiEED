@@ -199,7 +199,8 @@
 <p class="description">PiXFiNDはドット絵に特化した「間違い探し」専用ゲーム。解析エンジンが差分を検出した公式パズルを難易度別に収録しました。ブラウザからすぐに遊べて、イベントや配信でも活用できます。</p>
 </div>
 <div class="panel-actions">
-<button class="button button--primary button--wide" id="startButton" type="button">ゲームを始める</button>
+<button class="button button--primary button--wide" id="startButton" type="button">始める</button>
+<button class="button button--outline button--wide" id="createButton" type="button">作る</button>
 </div>
 <p class="start-footer">公式パズルは随時追加予定。難易度は★1〜★3まで用意しています。</p>
 </div>
@@ -278,6 +279,60 @@
 <p id="hintMessage">星を選んで、挑戦したい難易度を選んでください。</p>
 </div>
 </section>
+</div>
+<div aria-hidden="true" class="creator-overlay" hidden="" id="creatorOverlay">
+<div aria-labelledby="creatorTitle" aria-modal="true" class="creator-panel" role="dialog">
+<button aria-label="閉じる" class="creator-close" id="creatorClose" type="button">×</button>
+<header class="creator-header">
+<h2 id="creatorTitle">間違い探しを作る</h2>
+<p class="creator-description">同じサイズの2枚の画像を選ぶと差分を自動検出します。</p>
+</header>
+<form class="creator-form" id="creatorForm" novalidate="">
+<div class="creator-fields">
+<label class="creator-label">タイトル
+<input autocomplete="off" class="creator-input" id="creatorTitleInput" maxlength="40" placeholder="例: 夕暮れの街" type="text"/>
+</label>
+<label class="creator-label">スラッグ（公開用・任意）
+<input autocomplete="off" class="creator-input" id="creatorSlugInput" inputmode="url" placeholder="例: sunset-town" type="text"/>
+</label>
+<div class="creator-difficulty">
+<span class="creator-label">難易度（自動）</span>
+<div class="creator-chip-group">
+<button class="creator-chip is-active" data-creator-difficulty="1" type="button">★☆☆</button>
+<button class="creator-chip" data-creator-difficulty="2" type="button">★★☆</button>
+<button class="creator-chip" data-creator-difficulty="3" type="button">★★★</button>
+</div>
+</div>
+<div class="creator-files">
+<label class="creator-file">お手本画像
+<input accept="image/png,image/jpeg,image/webp" id="creatorOriginalInput" type="file"/>
+</label>
+<label class="creator-file">間違い画像
+<input accept="image/png,image/jpeg,image/webp" id="creatorDiffInput" type="file"/>
+</label>
+</div>
+</div>
+<div class="creator-preview">
+<figure class="creator-preview-frame">
+<canvas aria-label="お手本画像のプレビュー" id="creatorPreviewOriginal"></canvas>
+<figcaption class="creator-preview-label">お手本</figcaption>
+</figure>
+<figure class="creator-preview-frame">
+<canvas aria-label="間違い画像のプレビュー" id="creatorPreviewDiff"></canvas>
+<figcaption class="creator-preview-label">間違い</figcaption>
+</figure>
+</div>
+<div class="creator-summary" hidden="" id="creatorSummary">
+<span>検出: <strong id="creatorDiffCount">0</strong> 箇所</span>
+<span>サイズ: <strong id="creatorSize">-</strong></span>
+</div>
+<p class="creator-status" id="creatorStatus">お手本画像と間違い画像を選択してください。</p>
+<div class="creator-actions">
+<button class="button button--outline" disabled="" id="creatorExport" type="button">公開する</button>
+</div>
+<p class="creator-note">公開すると自動でオンライン公開され、難易度一覧に追加されます。</p>
+</form>
+</div>
 </div>
 <div aria-hidden="true" class="completion-overlay" id="completionOverlay">
 <span>Great!</span>
