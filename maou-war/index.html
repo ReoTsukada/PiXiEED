@@ -983,11 +983,12 @@
   };
 
   const GEAR_RARITIES = [
-    { id: 'N', label: 'N', color: '#94a3b8', factor: 0.02, min: 0 },
-    { id: 'R', label: 'R', color: '#60a5fa', factor: 0.06, min: 1 },
-    { id: 'SR', label: 'SR', color: '#a78bfa', factor: 0.1, min: 1 },
-    { id: 'UR', label: 'UR', color: '#f97316', factor: 0.18, min: 2 },
-    { id: 'L', label: 'L', color: '#facc15', factor: 0.3, min: 2 }
+    { id: 'N', label: 'N', color: '#94a3b8', factor: 0.05, min: 0 },
+    { id: 'HR', label: 'HR', color: '#34d399', factor: 0.12, min: 1 },
+    { id: 'SR', label: 'SR', color: '#a78bfa', factor: 0.2, min: 2 },
+    { id: 'SSR', label: 'SSR', color: '#f472b6', factor: 0.28, min: 3 },
+    { id: 'UR', label: 'UR', color: '#f97316', factor: 0.36, min: 4 },
+    { id: 'L', label: 'L', color: '#facc15', factor: 0.44, min: 5 }
   ];
   const GEAR_RARITY_ORDER = GEAR_RARITIES.map(r => r.id);
 
@@ -2070,15 +2071,17 @@
   }
 
   function getRarityWeights(luc) {
-    const base = { N: 55, R: 25, SR: 12, UR: 6, L: 2 };
+    const base = { N: 50, HR: 25, SR: 12, SSR: 7, UR: 4, L: 2 };
     const boost = Math.min(30, Math.floor(luc * 1.2));
-    const addR = Math.floor(boost * 0.45);
+    const addHR = Math.floor(boost * 0.4);
     const addSR = Math.floor(boost * 0.3);
-    const addUR = Math.floor(boost * 0.18);
-    const addL = boost - addR - addSR - addUR;
-    base.N = Math.max(5, base.N - (addR + addSR + addUR + addL));
-    base.R += addR;
+    const addSSR = Math.floor(boost * 0.18);
+    const addUR = Math.floor(boost * 0.08);
+    const addL = boost - addHR - addSR - addSSR - addUR;
+    base.N = Math.max(5, base.N - (addHR + addSR + addSSR + addUR + addL));
+    base.HR += addHR;
     base.SR += addSR;
+    base.SSR += addSSR;
     base.UR += addUR;
     base.L += addL;
     return base;
@@ -2092,6 +2095,58 @@
       if (roll <= 0) return rarityId;
     }
     return 'N';
+  }
+
+  function getFixedRarityForTier(tier) {
+    switch (tier) {
+      case 1:
+        return 'N';
+      case 2:
+        return 'HR';
+      case 3:
+        return 'SR';
+      case 4:
+        return 'SSR';
+      case 5:
+        return 'UR';
+      default:
+        return 'N';
+    }
+  }
+
+  function getGearRank(rarityId) {
+    return Math.max(0, GEAR_RARITY_ORDER.indexOf(rarityId));
+  }
+
+  function getRequiredGearForTier(tier, isBoss) {
+    if (isBoss) return 'UR';
+    switch (tier) {
+      case 2:
+        return 'N';
+      case 3:
+        return 'HR';
+      case 4:
+        return 'SR';
+      case 5:
+        return 'SSR';
+      default:
+        return null;
+    }
+  }
+
+  function applyGearGate(playerState, tier, isBoss) {
+    const required = getRequiredGearForTier(tier, isBoss);
+    if (!required) return;
+    const equipped = player.gear.accessory?.rarity || 'N';
+    const diff = getGearRank(required) - getGearRank(equipped);
+    if (diff <= 0) return;
+    const penalty = Math.max(0.12, Math.pow(0.35, diff));
+    playerState.atk = Math.max(1, Math.floor(playerState.atk * penalty));
+    playerState.def = Math.max(1, Math.floor(playerState.def * penalty));
+    playerState.spd = Math.max(1, Math.floor(playerState.spd * penalty));
+    playerState.luc = Math.max(1, Math.floor(playerState.luc * penalty));
+    playerState.maxHp = Math.max(MIN_HP, Math.floor(playerState.maxHp * penalty));
+    playerState.hp = Math.min(playerState.hp, playerState.maxHp);
   }
 
   function calcAccessoryBonus(baseStats, rarity) {
@@ -2117,9 +2172,32 @@
     };
   }
 
+  function buildHeroGear() {
+    const rarity = getGearRarity('L');
+    const baseStats = getBaseStats();
+    const bonus = calcAccessoryBonus(baseStats, rarity);
+    return {
+      id: `hero-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+      name: '対勇者装備',
+      rarity: rarity.id,
+      color: HERO_BOSS.color,
+      bonus
+    };
+  }
+
   function getGearScore(gear) {
     if (!gear) return 0;
     return gear.bonus.atk + gear.bonus.spd + gear.bonus.def + gear.bonus.luc;
+  }
+
+  function shouldAutoEquip(gear) {
+    if (!gear) return false;
+    if (!player.gear.accessory) return true;
+    const current = player.gear.accessory;
+    const rankNew = GEAR_RARITY_ORDER.indexOf(gear.rarity);
+    const rankOld = GEAR_RARITY_ORDER.indexOf(current.rarity);
+    if (rankNew !== rankOld) return rankNew > rankOld;
+    return getGearScore(gear) > getGearScore(current);
   }
 
   function equipAccessory(gear) {
@@ -2182,14 +2260,16 @@
   }
 
   function handleEnemyDrop(enemyState) {
-    const rarityId = rollGearRarity(player.luc);
-    const gear = buildAccessory(rarityId);
+    const fixedRarity = enemyState.tier ? getFixedRarityForTier(enemyState.tier) : null;
+    const gear = enemyState.id === 'mimic'
+      ? buildHeroGear()
+      : buildAccessory(fixedRarity || rollGearRarity(player.luc));
     player.gearInventory.push(gear);
     addLog(`ドロップ: ${gear.name}`);
-    if (!player.gear.accessory) {
+    if (shouldAutoEquip(gear)) {
       equipAccessory(gear);
       selectedGearId = gear.id;
-      addLog(`初期装備: ${gear.name}`);
+      addLog(`自動装備: ${gear.name}`);
     }
   }
 
@@ -2347,13 +2427,8 @@
     return stage;
   }
   
-  function getEnemyExp(enemyTemplate, enemyState) {
-    const base = enemyTemplate.exp ?? 6;
-    const statWeight = Math.floor((enemyState.maxHp + enemyState.atk + enemyState.def + enemyState.spd + enemyState.luc) / 20);
-    const normalExp = enemyTemplate.order
-      ? Math.max(1, getExpForNext(player.level) - player.exp)
-      : Math.max(4, base + statWeight);
-    return normalExp;
+  function getEnemyExp() {
+    return 0;
   }
 
   function logItem(message, options = {}) {
@@ -2406,10 +2481,14 @@
   async function handleItemPickup(item) {
     if (!item) return;
     if (item.id === 'mimic') {
+      if (item.requiresKey && !player.hasKey) {
+        addLog('鍵が必要だ');
+        return { consumed: false };
+      }
       addLog('怪しい宝箱を拾った...');
       addLog('ミミックが現れた！');
       await runBattle(createMimicEnemy(), { actor: player, actorLabel: '魔王様', allowDefeat: true });
-      return;
+      return { consumed: true };
     }
     switch (item.id) {
       case 'antidote':
@@ -2422,6 +2501,7 @@
       case 'autoHeal':
         player.autoHealCharges += 1;
         addLog('応急回復薬を手に入れた');
+        triggerAutoHeal(player);
         break;
       case 'revive':
         player.reviveCharges += 1;
@@ -2435,6 +2515,7 @@
         addLog(`${item.label}を手に入れた`);
         break;
     }
+    return { consumed: true };
   }
 
   async function resolveBossBattle() {
@@ -2448,8 +2529,9 @@
   }
 
   async function resolveTileEvent(x, y) {
+    let markVisited = true;
     const tileId = tiles[y]?.[x];
-    if (!tileId) return;
+    if (!tileId) return { markVisited };
     if (tileId === 'monster') {
       const enemy = enemies[y][x];
       if (enemy) {
@@ -2465,12 +2547,22 @@
         }
       }
     } else if (tileId === 'item') {
-      const index = player.itemsCollected;
-      player.itemsCollected += 1;
-      const item = ITEM_SEQUENCE[index % ITEM_SEQUENCE.length];
-      await handleItemPickup(item);
+      const key = `${x},${y}`;
+      const item = itemMap.get(key);
+      if (!item) {
+        addLog('空の宝箱だった');
+        tiles[y][x] = 'empty';
+        return;
+      }
+      const result = await handleItemPickup(item);
       if (gameOver) return;
-      tiles[y][x] = 'empty';
+      if (result?.consumed) {
+        player.itemsCollected += 1;
+        itemMap.delete(key);
+        tiles[y][x] = 'empty';
+      } else {
+        markVisited = false;
+      }
     } else if (tileId === 'heal') {
       const heal = Math.max(1, Math.floor(player.maxHp * HEAL_RATE));
       player.hp = clamp(player.hp + heal, 0, player.maxHp);
@@ -2495,11 +2587,12 @@
     } else if (tileId === 'boss') {
       if (!player.hasKey) {
         addLog('鍵が必要だ');
-        return;
+        return { markVisited: false };
       }
       await resolveBossBattle();
-      return;
+      return { markVisited };
     }
+    return { markVisited };
   }
 
   function applyPoisonTick() {
@@ -2540,8 +2633,10 @@
     let nextY = targetY;
     while (true) {
       await animateMove(nextX, nextY);
-      if (visited[nextY]) visited[nextY][nextX] = true;
-      await resolveTileEvent(nextX, nextY);
+      const eventResult = await resolveTileEvent(nextX, nextY);
+      if (eventResult?.markVisited !== false) {
+        if (visited[nextY]) visited[nextY][nextX] = true;
+      }
       if (gameOver) return;
       if (applyPoisonTick()) return;
       updateStats();
@@ -2703,6 +2798,7 @@
 
     const scaledStats = resolveEnemyStats(enemyTemplate);
     const enemyState = {
+      id: enemyTemplate.id,
       ...scaledStats,
       maxHp: scaledStats.hp,
       name: enemyTemplate.name,
@@ -2738,6 +2834,7 @@
       playerState.hp = Math.min(playerState.hp, playerState.maxHp);
       battleSub.textContent = '条件未達';
     }
+    applyGearGate(playerState, enemyTemplate.tier || enemyTemplate.order || 1, isBoss);
 
     if (playerNameEl) playerNameEl.textContent = actorLabel;
     if (playerIcon) playerIcon.textContent = actorLabel.slice(0, 1);
@@ -2769,7 +2866,7 @@
             updateBattleBars(playerState, enemyState);
           }
           if (enemyState.hp <= 0) break;
-          if (hits > 1) await sleep(220);
+          if (hits > 1) await sleep(380);
         }
       } else {
         enemyState.gauge = Math.max(0, enemyState.gauge - 100);
@@ -2801,7 +2898,7 @@
                 }
               }
             }
-            await sleep(250);
+            await sleep(420);
           }
         }
         if (enemyState.guardTurns > 0) {
@@ -2811,7 +2908,7 @@
       }
       safety += 1;
       if (actionCount >= maxActions) break;
-      await sleep(200);
+      await sleep(350);
     }
 
     battleActive = false;
