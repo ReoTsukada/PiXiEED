@@ -28,7 +28,7 @@ const dom = {
   creatorForm: document.getElementById('creatorForm'),
   creatorTitleInput: document.getElementById('creatorTitleInput'),
   creatorSlugInput: document.getElementById('creatorSlugInput'),
-  creatorDifficultyButtons: Array.from(document.querySelectorAll('[data-creator-difficulty]')),
+  creatorDifficultyButtons: [],
   creatorOriginalInput: document.getElementById('creatorOriginalInput'),
   creatorDiffInput: document.getElementById('creatorDiffInput'),
   creatorPreviewOriginal: document.getElementById('creatorPreviewOriginal'),
@@ -255,15 +255,6 @@ function setupCreator() {
   dom.creatorOriginalInput?.addEventListener('change', handleCreatorFileChange);
   dom.creatorDiffInput?.addEventListener('change', handleCreatorFileChange);
 
-  setCreatorDifficultyLocked(creatorState.autoDifficulty);
-  dom.creatorDifficultyButtons.forEach(button => {
-    button.addEventListener('click', () => {
-      if (creatorState.autoDifficulty) return;
-      const level = Number(button.dataset.creatorDifficulty);
-      setCreatorDifficulty(level);
-    });
-  });
-
   resetCreatorForm();
 }
 
@@ -354,17 +345,6 @@ function setCreatorDifficulty(level, silent = false) {
     clearCreatorPreview();
     setCreatorStatus('難易度を変更しました。差分を再判定してください。');
   }
-}
-
-function setCreatorDifficultyLocked(locked) {
-  dom.creatorDifficultyButtons.forEach(button => {
-    button.disabled = locked;
-    if (locked) {
-      button.setAttribute('aria-disabled', 'true');
-    } else {
-      button.removeAttribute('aria-disabled');
-    }
-  });
 }
 
 function setCreatorStatus(message, tone = 'info') {
@@ -490,7 +470,7 @@ async function handleCreatorAnalyze() {
 
     drawCreatorPreview();
     updateCreatorSummary(diffResult, normalizedOriginal.width, normalizedOriginal.height);
-    setCreatorStatus(`差分を${diffResult.regions.length}箇所検出しました。難易度は${createStarLabel(estimatedDifficulty)}です。`);
+    setCreatorStatus(`差分を${diffResult.regions.length}箇所検出しました。内容を確認してください。`);
     setCreatorActionsEnabled(true);
   } catch (error) {
     console.error(error);
