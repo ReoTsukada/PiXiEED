@@ -465,6 +465,37 @@
       transform:translateY(-1px);
       filter:brightness(1.05);
     }
+    .download-link{
+      display:flex;
+      justify-content:flex-end;
+      gap:8px;
+      margin-top:6px;
+      flex-wrap:wrap;
+    }
+    .download-btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      padding:10px 14px;
+      border-radius:12px;
+      border:1px solid rgba(96,165,250,0.55);
+      background:linear-gradient(135deg, rgba(96,165,250,0.2), rgba(52,211,153,0.18));
+      color:#e0f2fe;
+      font-weight:800;
+      cursor:pointer;
+      box-shadow:0 6px 16px rgba(96,165,250,0.2);
+      transition:transform 0.1s ease, filter 0.1s ease;
+    }
+    .download-btn:hover,
+    .download-btn:focus-visible{
+      transform:translateY(-1px);
+      filter:brightness(1.05);
+    }
+    .download-btn:disabled{
+      opacity:0.6;
+      cursor:not-allowed;
+    }
     .danger-btn{
       border:1px solid rgba(248,113,113,0.5);
       background:rgba(248,113,113,0.12);
@@ -597,6 +628,9 @@
       </div>
       <div class="pixfind-link" id="pixfindLink" hidden>
         <a class="pixfind-play" id="pixfindPlay" href="../pixfind/index.html">PiXFiNDで遊ぶ</a>
+      </div>
+      <div class="download-link" id="downloadLink" hidden>
+        <button class="download-btn" id="downloadButton" type="button">ダウンロード</button>
       </div>
       <p class="status" id="viewStatus"></p>
       <button class="danger-btn" id="deleteEntry" style="display:none;">この作品を削除する</button>
@@ -1014,18 +1048,59 @@
       if(raw.startsWith('pixfind://')){
         return raw.slice('pixfind://'.length).trim();
       }
-      if(raw.startsWith('http://') || raw.startsWith('https://')){
-        return raw;
-      }
       return null;
     }
 
     function buildPixfindUrl(target){
       if(!target) return null;
-      if(target.startsWith('http://') || target.startsWith('https://')){
-        return target;
-      }
       return `${PIXFIND_PATH}?puzzle=${encodeURIComponent(target)}`;
+    }
+
+    function isDownloadAllowed(value){
+      return value === true || value === 'true' || value === 1 || value === '1';
+    }
+
+    function getDownloadExtension(dataUrl){
+      if(typeof dataUrl !== 'string') return 'png';
+      if(dataUrl.startsWith('data:image/gif')) return 'gif';
+      if(dataUrl.startsWith('data:image/jpeg')) return 'jpg';
+      if(dataUrl.startsWith('data:image/webp')) return 'webp';
+      return 'png';
+    }
+
+    function handleDownload(){
+      if(!entry) return;
+      if(!isDownloadAllowed(entry.allow_download)){
+        setStatus('この作品はダウンロード不可です');
+        return;
+      }
+      const passcode = String(entry.download_passcode || '').trim();
+      if(passcode){
+        const input = window.prompt('ダウンロードパスコードを入力してください') || '';
+        if(!input){
+          setStatus('パスコードを入力してください');
+          return;
+        }
+        if(input !== passcode){
+          setStatus('パスコードが違います');
+          return;
+        }
+      }
+      const dataUrl = entry.image_base64;
+      if(!dataUrl){
+        setStatus('画像が見つかりません');
+        return;
+      }
+      const ext = getDownloadExtension(dataUrl);
+      const safeTitle = (entry.title || 'pixieed').replace(/[^\w\-]+/g, '-');
+      const filename = `${safeTitle || 'pixieed'}-${entry.id}.${ext}`;
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setStatus('ダウンロードしました');
     }
 
     function ensureClientId(){
@@ -1344,6 +1419,8 @@
       const delBtn = $('deleteEntry');
       const playWrap = $('pixfindLink');
       const playBtn = $('pixfindPlay');
+      const downloadWrap = $('downloadLink');
+      const downloadBtn = $('downloadButton');
       if(!entry){
         img.src = '';
         titleEl.textContent = '読み込めませんでした';
@@ -1375,6 +1452,11 @@
           playWrap.hidden = true;
           playBtn.removeAttribute('href');
         }
+      }
+      if(downloadWrap && downloadBtn){
+        const allowDownload = isDownloadAllowed(entry.allow_download);
+        downloadWrap.hidden = !allowDownload;
+        downloadBtn.disabled = !allowDownload;
       }
       editTags = parseTags(entry.tags);
       renderTagView(editTags);
@@ -1673,6 +1755,10 @@
       const delBtn = $('deleteEntry');
       if(delBtn){
         delBtn.addEventListener('click', deleteEntry);
+      }
+      const downloadBtn = $('downloadButton');
+      if(downloadBtn){
+        downloadBtn.addEventListener('click', handleDownload);
       }
     }
     window.addEventListener('DOMContentLoaded', init);
