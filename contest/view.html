@@ -379,15 +379,77 @@
       cursor:pointer;
       white-space:nowrap;
     }
+    .download-editor{
+      display:grid;
+      gap:8px;
+      margin-top:10px;
+      padding-top:10px;
+      border-top:1px solid rgba(255,255,255,0.08);
+      justify-items:start;
+    }
+    .download-editor .toggle{
+      display:grid;
+      grid-template-columns: 20px minmax(0, 1fr);
+      align-items:start;
+      column-gap:8px;
+      row-gap:4px;
+      font-size:13px;
+      color:#cbd5e1;
+      font-weight:700;
+      width:100%;
+      justify-content:flex-start;
+    }
+    .download-editor .toggle input{
+      margin:2px 0 0;
+    }
+    .download-editor .toggle span{
+      line-height:1.4;
+    }
+    .download-passcode{
+      display:grid;
+      gap:6px;
+      justify-items:start;
+    }
+    .download-passcode .toggle{
+      width:100%;
+      justify-content:flex-start;
+    }
+    .download-passcode input{
+      width:100%;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(0,0,0,0.25);
+      color:#f9fafb;
+      padding:8px 10px;
+      font-size:13px;
+      font-family:inherit;
+    }
+    .download-helper{
+      margin:0;
+      font-size:11px;
+      color:#94a3b8;
+    }
     .gallery{
       display:grid;
       gap:12px;
-      grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
+    }
+    .user-gallery{
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+    }
+    .user-gallery .entry-card{
+      background:transparent;
+      border:none;
+      padding:0;
+    }
+    .user-gallery .entry-card--ad{
+      background:rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.12);
+      padding:10px;
     }
     .entry-card{
       background:rgba(255,255,255,0.05);
       border:1px solid rgba(255,255,255,0.12);
-      border-radius:0 0 10px 10px;
+      border-radius:12px;
       overflow:hidden;
       display:flex;
       flex-direction:column;
@@ -401,6 +463,8 @@
       display:block;
       position:relative;
       aspect-ratio:1/1;
+      border-radius:12px;
+      overflow:hidden;
     }
     .entry-imgwrap img{
       width:100%;
@@ -440,6 +504,52 @@
     .entry-author{ margin:0; color:#cbd5e1; font-size:12px; }
     .empty{ color:#cbd5e1; text-align:center; margin:8px 0 0; }
     .status{ color:#fef3c7; font-size:12px; min-height:18px; }
+    .entry-card--ad{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      flex-direction:column;
+      aspect-ratio:1/1;
+      gap:6px;
+    }
+    .entry-ad-slot{
+      width:100%;
+      max-width:100%;
+      min-width:0;
+    }
+    .entry-ad-slot ins{
+      display:block;
+      width:100%;
+      height:90px;
+      overflow:hidden;
+    }
+    .entry-ad-note{
+      margin:0;
+      color:#cbd5e1;
+      font-size:11px;
+    }
+    @media(max-width:640px){
+      .entry-ad-slot ins{ height:60px; }
+    }
+    .load-more{
+      display:flex;
+      justify-content:center;
+      margin-top:12px;
+    }
+    .load-more-btn{
+      border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.08);
+      color:#e5e7eb;
+      border-radius:10px;
+      padding:10px 16px;
+      font-weight:800;
+      cursor:pointer;
+    }
+    .load-more-btn:disabled{
+      opacity:0.6;
+      cursor:not-allowed;
+    }
     .action-links{
       display:flex;
       gap:8px;
@@ -471,6 +581,13 @@
       background:linear-gradient(135deg, rgba(96,165,250,0.2), rgba(52,211,153,0.18));
       color:#e0f2fe;
       box-shadow:0 6px 16px rgba(96,165,250,0.2);
+      cursor:pointer;
+    }
+    .action-btn--share{
+      border:1px solid rgba(56,189,248,0.55);
+      background:linear-gradient(135deg, rgba(56,189,248,0.2), rgba(59,130,246,0.18));
+      color:#e0f2fe;
+      box-shadow:0 6px 16px rgba(56,189,248,0.2);
       cursor:pointer;
     }
     .action-btn:hover,
@@ -588,7 +705,7 @@
     </header>
     <section class="card">
       <div class="entry-hero" id="hero">
-        <img id="heroImg" alt="dot work" draggable="false"/>
+        <img id="heroImg" alt="dot work" draggable="false" decoding="async"/>
         <span class="entry-watermark" style="top:6px; left:6px;">PiXiEED</span>
         <span class="entry-watermark" style="top:6px; right:6px;">PiXiEED</span>
         <span class="entry-watermark" style="right:6px; bottom:6px;">PiXiEED</span>
@@ -610,27 +727,48 @@
       <div class="tag-block">
         <p class="tag-label">タグ</p>
         <div class="tag-view" id="tagView"></div>
-        <div class="tag-editor" id="tagEditor" style="display:none;">
-          <div class="tag-input">
-            <input id="tagEditInput" type="text" placeholder="タグを追加（例: 花, 草）" maxlength="24"/>
-            <button class="tag-add-btn" id="tagAddBtn" type="button">追加</button>
-          </div>
-          <div class="tag-view" id="tagEditList"></div>
-          <button class="tag-save" id="tagSaveBtn" type="button">タグを保存</button>
-          <p class="status" id="tagStatus"></p>
+      <div class="tag-editor" id="tagEditor" style="display:none;">
+        <div class="tag-input">
+          <input id="tagEditInput" type="text" placeholder="タグを追加（例: 花, 草）" maxlength="24"/>
+          <button class="tag-add-btn" id="tagAddBtn" type="button">追加</button>
         </div>
+        <div class="tag-view" id="tagEditList"></div>
+        <button class="tag-save" id="tagSaveBtn" type="button">タグを保存</button>
+        <p class="status" id="tagStatus"></p>
       </div>
+      <div class="download-editor" id="downloadEditor" style="display:none;">
+        <p class="tag-label">ダウンロード設定</p>
+        <label class="toggle">
+          <input id="downloadAllowToggle" type="checkbox"/>
+          <span>ダウンロードを許可</span>
+        </label>
+        <div class="download-passcode" id="downloadPassWrap" hidden>
+          <label class="toggle">
+            <input id="downloadPassToggle" type="checkbox"/>
+            <span>パスコードを設定</span>
+          </label>
+          <input id="downloadPassInput" type="text" placeholder="パスコード（4〜12文字）" maxlength="12"/>
+          <p class="download-helper">英数字のみ</p>
+        </div>
+        <button class="tag-save" id="downloadSaveBtn" type="button">保存</button>
+        <p class="status" id="downloadStatus"></p>
+      </div>
+    </div>
       <div class="action-links" id="actionLinks">
         <a class="action-btn action-btn--play is-disabled" id="pixfindPlay" aria-disabled="true" role="button">PiXFiNDで遊ぶ</a>
         <button class="action-btn action-btn--download is-disabled" id="downloadButton" type="button" disabled>ダウンロード</button>
+        <button class="action-btn action-btn--share" id="shareButton" type="button">共有</button>
       </div>
       <p class="status" id="viewStatus"></p>
       <button class="danger-btn" id="deleteEntry" style="display:none;">この作品を削除する</button>
       <p class="status" id="deleteNotice"></p>
     </section>
     <section class="card">
-      <h2 style="margin:0 0 8px;font-size:16px;">ほかの作品</h2>
-      <div id="relatedGallery" class="gallery"></div>
+      <h2 style="margin:0 0 8px;font-size:16px;">このユーザーの作品</h2>
+      <div id="relatedGallery" class="gallery user-gallery"></div>
+      <div class="load-more" id="relatedLoadMoreWrap" hidden>
+        <button class="load-more-btn" id="relatedLoadMoreBtn" type="button">続きを見る</button>
+      </div>
     </section>
   </div>
   <nav class="bottom-nav">
@@ -644,7 +782,7 @@
       <span class="icon"><img src="../FooterIcon3.png" alt=""/></span><span>ツール/ゲーム</span>
     </a>
     <a class="bottom-nav__item" data-tab="lens" href="../pixiee-lens/index.html">
-      <span class="icon"><img src="../pixiee-lens/icon-192.png" alt=""/></span><span>PiXiEELENS</span>
+      <span class="icon"><img src="../FooterIcon5.png" alt=""/></span><span>PiXiEELENS</span>
     </a>
     <a class="bottom-nav__item" data-tab="portfolio" href="../portfolio/index.html">
       <span class="icon"><img src="../FooterIcon4.png" alt=""/></span><span>企業向け</span>
@@ -698,6 +836,12 @@
     const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
     const SUPABASE_REST = `${SUPABASE_URL}/rest/v1`;
     const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
+    const STORAGE_BUCKET = 'pixieed-contest';
+    const CONTEST_SHARE_BASE_URL = 'https://pixieed.jp/contest/view.html';
+    const CONTEST_SHARE_OGP_WIDTH = 1200;
+    const CONTEST_SHARE_OGP_HEIGHT = 630;
+    const CONTEST_SHARE_PADDING = 60;
+    const CONTEST_SHARE_TITLE_SIZE = 32;
     const PIXFIND_PROMPT_PREFIX = 'pixfind:';
     const PIXFIND_PATH = '../pixfind/index.html';
     const MAX_TAGS = 5;
@@ -707,6 +851,12 @@
     const TAG_ADD_BTN_ID = 'tagAddBtn';
     const TAG_SAVE_BTN_ID = 'tagSaveBtn';
     const TAG_STATUS_ID = 'tagStatus';
+    const DOWNLOAD_ALLOW_ID = 'downloadAllowToggle';
+    const DOWNLOAD_PASS_TOGGLE_ID = 'downloadPassToggle';
+    const DOWNLOAD_PASS_INPUT_ID = 'downloadPassInput';
+    const DOWNLOAD_PASS_WRAP_ID = 'downloadPassWrap';
+    const DOWNLOAD_SAVE_BTN_ID = 'downloadSaveBtn';
+    const DOWNLOAD_STATUS_ID = 'downloadStatus';
     const SAMPLE_COLORS = ['#7dd3fc','#f472b6','#facc15','#34d399','#c084fc','#60a5fa','#f59e0b','#a3e635','#f43f5e','#38bdf8'];
     let clientLinkConflict = false;
     let clientLinkChecked = false;
@@ -751,6 +901,19 @@
     let cachedEntries = [];
     let currentEntryId = 0;
     let editTags = [];
+    let supportsDownloadSettings = true;
+    let supportsImageUrls = true;
+    let supportsStorageUploads = true;
+    let relatedOffset = 0;
+    let relatedHasMore = false;
+    let relatedLoading = false;
+    let entryLoaded = false;
+    const ENTRY_SELECT_WITH_URL = 'id,client_id,user_id,name,title,width,height,colors,image_url,thumb_url,image_base64,submitted_at,mode,tags,prompt,allow_download,download_passcode';
+    const ENTRY_SELECT_BASE = 'id,client_id,user_id,name,title,width,height,colors,image_base64,submitted_at,mode,tags,prompt,allow_download,download_passcode';
+    const RELATED_SELECT_WITH_URL = 'id,name,title,submitted_at,mode,image_url,thumb_url';
+    const RELATED_SELECT_BASE = 'id,name,title,submitted_at,mode,image_base64';
+    const LIKE_SELECT = 'entry_id,user_id,client_id';
+    const RELATED_FETCH_LIMIT = 12;
 
     function $(id){ return document.getElementById(id); }
 
@@ -766,6 +929,11 @@
 
     function setTagStatus(msg){
       const el = $(TAG_STATUS_ID);
+      if(el) el.textContent = msg || '';
+    }
+
+    function setDownloadStatus(msg){
+      const el = $(DOWNLOAD_STATUS_ID);
       if(el) el.textContent = msg || '';
     }
 
@@ -843,6 +1011,98 @@
       });
     }
 
+    function updateDownloadEditorUI(){
+      const allowToggle = $(DOWNLOAD_ALLOW_ID);
+      const passToggle = $(DOWNLOAD_PASS_TOGGLE_ID);
+      const passWrap = $(DOWNLOAD_PASS_WRAP_ID);
+      if(!allowToggle || !passToggle || !passWrap) return;
+      const allow = allowToggle.checked;
+      const requirePass = passToggle.checked;
+      passWrap.hidden = !(allow && requirePass);
+    }
+
+    function renderDownloadEditor(){
+      const editor = $('downloadEditor');
+      if(!editor) return;
+      const editable = canEditEntry() && supportsDownloadSettings;
+      editor.style.display = editable ? 'grid' : 'none';
+      if(!editable || !entry) return;
+      const allowToggle = $(DOWNLOAD_ALLOW_ID);
+      const passToggle = $(DOWNLOAD_PASS_TOGGLE_ID);
+      const passInput = $(DOWNLOAD_PASS_INPUT_ID);
+      const allow = isDownloadAllowed(entry.allow_download);
+      const passcode = String(entry.download_passcode || '');
+      if(allowToggle) allowToggle.checked = allow;
+      if(passToggle) passToggle.checked = Boolean(passcode);
+      if(passInput) passInput.value = passcode;
+      updateDownloadEditorUI();
+    }
+
+    function normalizeDownloadPasscode(value){
+      return String(value || '').trim();
+    }
+
+    async function saveDownloadSettings(){
+      if(!entry){
+        setDownloadStatus('作品が読み込まれていません');
+        return;
+      }
+      if(!canEditEntry()){
+        setDownloadStatus('この作品は編集できません');
+        return;
+      }
+      const allowToggle = $(DOWNLOAD_ALLOW_ID);
+      const passToggle = $(DOWNLOAD_PASS_TOGGLE_ID);
+      const passInput = $(DOWNLOAD_PASS_INPUT_ID);
+      if(!allowToggle || !passToggle || !passInput){
+        setDownloadStatus('設定項目が見つかりません');
+        return;
+      }
+      const allow = allowToggle.checked;
+      const requirePass = passToggle.checked;
+      let passcode = null;
+      if(allow && requirePass){
+        const raw = normalizeDownloadPasscode(passInput.value);
+        if(raw.length < 4 || raw.length > 12){
+          setDownloadStatus('パスコードは4〜12文字で入力してください');
+          return;
+        }
+        if(!/^[a-zA-Z0-9]+$/.test(raw)){
+          setDownloadStatus('パスコードは英数字のみです');
+          return;
+        }
+        passcode = raw;
+      }
+      const payload = { allow_download: allow, download_passcode: passcode };
+      const eq = { id: entry.id };
+      if(entry.user_id && supabaseUser?.id){
+        eq.user_id = supabaseUser.id;
+      }else if(entry.client_id){
+        eq.client_id = entry.client_id;
+      }
+      if(!eq.user_id && !eq.client_id){
+        setDownloadStatus('編集権限が確認できません');
+        return;
+      }
+      setDownloadStatus('保存中...');
+      try{
+        await supabaseUpdate('contest_entries', payload, { eq });
+        entry.allow_download = allow;
+        entry.download_passcode = passcode;
+        setDownloadStatus('保存しました');
+        render();
+      }catch(err){
+        console.error(err);
+        if(isMissingColumn(err, 'allow_download') || isMissingColumn(err, 'download_passcode')){
+          supportsDownloadSettings = false;
+          renderDownloadEditor();
+          setDownloadStatus('ダウンロード設定は未対応です');
+          return;
+        }
+        setDownloadStatus('保存に失敗しました');
+      }
+    }
+
     function addTag(tag){
       const normalized = normalizeTag(tag);
       if(!normalized) return;
@@ -910,6 +1170,19 @@
       }
       if(addBtn) addBtn.addEventListener('click', addTagsFromInput);
       if(saveBtn) saveBtn.addEventListener('click', saveTags);
+    }
+
+    function setupDownloadEditor(){
+      const allowToggle = $(DOWNLOAD_ALLOW_ID);
+      const passToggle = $(DOWNLOAD_PASS_TOGGLE_ID);
+      const saveBtn = $(DOWNLOAD_SAVE_BTN_ID);
+      if(allowToggle){
+        allowToggle.addEventListener('change', updateDownloadEditorUI);
+      }
+      if(passToggle){
+        passToggle.addEventListener('change', updateDownloadEditorUI);
+      }
+      if(saveBtn) saveBtn.addEventListener('click', saveDownloadSettings);
     }
 
     function loadNickname(){
@@ -1048,6 +1321,54 @@
       return `${PIXFIND_PATH}?puzzle=${encodeURIComponent(target)}`;
     }
 
+    function resolveEntryImage(entry, { preferThumb = false } = {}){
+      if(!entry) return '';
+      const thumb = entry.thumb_url || '';
+      const full = entry.image_url || '';
+      const base = entry.image_base64 || '';
+      return preferThumb ? (thumb || full || base || '') : (full || base || thumb || '');
+    }
+
+    function getRelatedFilter(){
+      if(!entry) return null;
+      if(entry.user_id) return { key: 'user_id', value: entry.user_id };
+      if(entry.client_id) return { key: 'client_id', value: entry.client_id };
+      if(entry.name) return { key: 'name', value: entry.name };
+      return null;
+    }
+
+    function updateRelatedLoadMore(){
+      const wrap = $('relatedLoadMoreWrap');
+      const btn = $('relatedLoadMoreBtn');
+      if(!wrap || !btn) return;
+      wrap.hidden = !relatedHasMore;
+      btn.disabled = relatedLoading;
+    }
+
+    function createRelatedAdCard(slotId){
+      const card = document.createElement('div');
+      card.className = 'entry-card entry-card--ad';
+      card.innerHTML = `
+        <div class="entry-ad-slot">
+          <ins class="adsbygoogle"
+               style="display:block"
+               data-ad-client="ca-pub-9801602250480253"
+               data-ad-slot="${slotId}"
+               data-ad-format="auto"></ins>
+        </div>
+        <p class="entry-ad-note">広告</p>
+      `;
+      return card;
+    }
+
+    function getEntrySelect(){
+      return supportsImageUrls ? ENTRY_SELECT_WITH_URL : ENTRY_SELECT_BASE;
+    }
+
+    function getRelatedSelect(){
+      return supportsImageUrls ? RELATED_SELECT_WITH_URL : RELATED_SELECT_BASE;
+    }
+
     function isDownloadAllowed(value){
       return value === true || value === 'true' || value === 1 || value === '1';
     }
@@ -1057,10 +1378,15 @@
       if(dataUrl.startsWith('data:image/gif')) return 'gif';
       if(dataUrl.startsWith('data:image/jpeg')) return 'jpg';
       if(dataUrl.startsWith('data:image/webp')) return 'webp';
+      const clean = dataUrl.split('?')[0];
+      const match = clean.match(/\.([a-z0-9]+)$/i);
+      if(match && match[1]){
+        return match[1].toLowerCase();
+      }
       return 'png';
     }
 
-    function handleDownload(){
+    async function handleDownload(){
       if(!entry) return;
       if(!isDownloadAllowed(entry.allow_download)){
         setStatus('この作品はダウンロード不可です');
@@ -1078,21 +1404,43 @@
           return;
         }
       }
-      const dataUrl = entry.image_base64;
-      if(!dataUrl){
+      const source = resolveEntryImage(entry);
+      if(!source){
         setStatus('画像が見つかりません');
         return;
       }
-      const ext = getDownloadExtension(dataUrl);
+      const ext = getDownloadExtension(source);
       const safeTitle = (entry.title || 'pixieed').replace(/[^\w\-]+/g, '-');
       const filename = `${safeTitle || 'pixieed'}-${entry.id}.${ext}`;
       const link = document.createElement('a');
-      link.href = dataUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setStatus('ダウンロードしました');
+      if(source.startsWith('data:')){
+        link.href = source;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setStatus('ダウンロードしました');
+        return;
+      }
+      setStatus('ダウンロード中...');
+      try{
+        const res = await fetch(source);
+        if(!res.ok){
+          throw new Error(`download failed: ${res.status}`);
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setStatus('ダウンロードしました');
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }catch(err){
+        console.error(err);
+        setStatus('ダウンロードに失敗しました');
+      }
     }
 
     function ensureClientId(){
@@ -1284,7 +1632,7 @@
           updateAuthUI();
           if(currentEntryId){
             await fetchEntry(currentEntryId);
-            await fetchRelated(currentEntryId);
+            scheduleRelatedFetch(currentEntryId);
           }
         });
         clientLinkChecked = false;
@@ -1362,7 +1710,7 @@
           try{ localStorage.removeItem('pixieed_link_conflict'); }catch(_){}
           updateAuthUI();
           await fetchEntry(currentEntryId);
-          await fetchRelated(currentEntryId);
+          scheduleRelatedFetch(currentEntryId);
           togglePanel(false);
           return;
         }
@@ -1411,6 +1759,7 @@
       const delBtn = $('deleteEntry');
       const playBtn = $('pixfindPlay');
       const downloadBtn = $('downloadButton');
+      const shareBtn = $('shareButton');
       if(!entry){
         img.src = '';
         titleEl.textContent = '読み込めませんでした';
@@ -1426,9 +1775,13 @@
           downloadBtn.disabled = true;
           downloadBtn.classList.add('is-disabled');
         }
+        if(shareBtn){
+          shareBtn.disabled = true;
+          shareBtn.classList.add('is-disabled');
+        }
         return;
       }
-      img.src = entry.image_base64;
+      img.src = resolveEntryImage(entry);
       img.alt = entry.title || 'dot work';
       titleEl.textContent = entry.title || '無題';
       authorEl.textContent = `by ${entry.name || '名無し'}`;
@@ -1459,10 +1812,17 @@
         downloadBtn.disabled = !allowDownload;
         downloadBtn.classList.toggle('is-disabled', !allowDownload);
       }
+      if(shareBtn){
+        const canShare = entryLoaded && Boolean(supabaseAuth?.storage) && supportsStorageUploads;
+        shareBtn.disabled = !canShare;
+        shareBtn.classList.toggle('is-disabled', !canShare);
+      }
       editTags = parseTags(entry.tags);
       renderTagView(editTags);
       renderTagEditor();
+      renderDownloadEditor();
       setTagStatus('');
+      setDownloadStatus('');
       setDeleteNotice(canDelete ? '' : '※この端末から投稿した作品のみ削除できます');
     }
 
@@ -1525,6 +1885,7 @@
 
     async function fetchEntry(id){
       setStatus('読み込み中...');
+      entryLoaded = false;
       entry = {
         id,
         name: 'サンプル',
@@ -1540,112 +1901,365 @@
         user_id: null,
         tags: ''
       };
+      render();
+      let loaded = false;
       try{
-        const res = await supabaseSelect('contest_entries', { eq: { id }, limit: 1 });
+        const res = await supabaseSelect('contest_entries', { eq: { id }, limit: 1, select: getEntrySelect() });
         if(res.length){
-          entry = res[0];
+          entry = { ...res[0], likeCount: entry.likeCount || 0 };
+          loaded = true;
+          setStatus('');
         }else{
           setStatus('ネットワークエラーまたは作品が見つかりません');
         }
-        const likeRes = await supabaseSelect('contest_likes', { eq: { entry_id: id }, limit: 2000 });
+      }catch(err){
+        console.error(err);
+        if(supportsImageUrls && (isMissingColumn(err, 'image_url') || isMissingColumn(err, 'thumb_url'))){
+          supportsImageUrls = false;
+          await fetchEntry(id);
+          return;
+        }
+        setStatus('ネットワークエラーが発生しています');
+      }
+      render();
+      entryLoaded = loaded;
+      if(loaded){
+        fetchEntryLikes(id);
+      }
+    }
+
+    async function fetchEntryLikes(id){
+      try{
+        const likeRes = await supabaseSelect('contest_likes', { eq: { entry_id: id }, select: LIKE_SELECT });
+        if(!entry || entry.id !== id) return;
         entry.likeCount = likeRes.length;
         likeRes.forEach(l => {
           if((supabaseUser?.id && l.user_id === supabaseUser.id) || l.client_id === clientId) likedEntries.add(id);
         });
+        render();
       }catch(err){
         console.error(err);
-        setStatus('ネットワークエラーが発生しています');
       }
-      render();
+    }
+
+    function scheduleRelatedFetch(id){
+      if(!id) return;
+      if(typeof requestIdleCallback === 'function'){
+        requestIdleCallback(() => fetchRelated(id), { timeout: 1200 });
+      }else{
+        setTimeout(() => fetchRelated(id), 200);
+      }
     }
 
     function renderRelated(entries){
       const wrap = document.getElementById('relatedGallery');
       if(!wrap) return;
       if(!entries.length){
-        wrap.innerHTML = '<p class="empty">まだ投稿がありません。</p>';
+        wrap.innerHTML = '<p class="empty">このユーザーの作品はまだありません。</p>';
         return;
       }
       wrap.innerHTML = '';
-      entries.slice(0,9).forEach(e => {
+      const AD_SLOTS = ['2141591954','9073878884','2261515379'];
+      entries.forEach((e, idx) => {
         const item = document.createElement('a');
         item.className = 'entry-card';
         item.href = `view.html?id=${e.id}`;
         item.innerHTML = `
           <div class="entry-imgwrap">
-            <img src="${e.image_base64}" alt="${e.title}" draggable="false">
-            <span class="entry-watermark" style="top:6px; left:6px;">PiXiEED</span>
-            <span class="entry-watermark" style="top:6px; right:6px;">PiXiEED</span>
-            <span class="entry-watermark" style="right:6px; bottom:6px;">PiXiEED</span>
-            <span class="entry-watermark" style="left:6px; bottom:6px;">PiXiEED</span>
-            <span class="entry-watermark" style="left:50%; top:50%; transform:translate(-50%,-50%);">PiXiEED</span>
-            <span class="entry-watermark" style="left:50%; top:25%; transform:translate(-50%,-50%);">PiXiEED</span>
-            <span class="entry-watermark" style="left:50%; top:75%; transform:translate(-50%,-50%);">PiXiEED</span>
-            <span class="entry-watermark" style="left:25%; top:50%; transform:translate(-50%,-50%);">PiXiEED</span>
-            <span class="entry-watermark" style="left:75%; top:50%; transform:translate(-50%,-50%);">PiXiEED</span>
-            <button class="heart-btn" data-id="${e.id}" aria-label="いいね">
-              <img src="${likedEntries.has(e.id) ? FAV_SRC : NFAV_SRC}" alt="like icon">
-            </button>
-          </div>
-          <div class="entry-meta">
-            <div class="entry-meta__top">
-              <span class="entry-title">${escapeHtml(e.title || '無題')}</span>
-              <span class="entry-like">${e.likeCount || 0}</span>
-            </div>
-            <p class="entry-author">by ${escapeHtml(e.name || '名無し')}</p>
+            <img src="${resolveEntryImage(e, { preferThumb: true })}" alt="${e.title}" draggable="false" loading="lazy" decoding="async">
           </div>
         `;
         wrap.appendChild(item);
+        if((idx + 1) % 6 === 0){
+          const slotId = AD_SLOTS[Math.floor(idx / 6) % AD_SLOTS.length];
+          wrap.appendChild(createRelatedAdCard(slotId));
+        }
       });
-      wrap.querySelectorAll('.heart-btn').forEach(btn => {
-        btn.addEventListener('click', (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          likeEntry(Number(btn.dataset.id));
-        });
-      });
+      try{
+        if(window.pixieedObserveAds){
+          window.pixieedObserveAds();
+        }
+      }catch(e){
+        console.warn('ads render skipped', e);
+      }
     }
 
-    async function fetchRelated(currentId){
-      cachedEntries = [];
+    async function fetchRelated(currentId, { append = false } = {}){
+      if(relatedLoading) return;
+      relatedLoading = true;
+      updateRelatedLoadMore();
+      if(!append){
+        cachedEntries = [];
+        relatedOffset = 0;
+      }
       try{
-        cachedEntries = await supabaseSelect('contest_entries', { order: 'submitted_at.desc', limit: 30 });
-        const likeRes = await supabaseSelect('contest_likes', { limit: 2000 });
-        const likeCounts = {};
-        likeRes.forEach(l => {
-          likeCounts[l.entry_id] = (likeCounts[l.entry_id] || 0) + 1;
-          if((supabaseUser?.id && l.user_id === supabaseUser.id) || l.client_id === clientId){
-            likedEntries.add(l.entry_id);
-          }
+        const filter = getRelatedFilter();
+        if(!filter || !filter.value){
+          cachedEntries = [];
+          relatedHasMore = false;
+          renderRelated([]);
+          relatedLoading = false;
+          updateRelatedLoadMore();
+          return;
+        }
+        const requestSize = RELATED_FETCH_LIMIT + 1;
+        const batch = await supabaseSelect('contest_entries', {
+          order: 'submitted_at.desc',
+          limit: requestSize,
+          select: getRelatedSelect(),
+          offset: relatedOffset,
+          eq: { [filter.key]: filter.value }
         });
-        cachedEntries = cachedEntries.map(e => ({
-          ...e,
-          likeCount: likeCounts[e.id] || e.likeCount || 0
-        }));
+        relatedOffset += batch.length;
+        let filtered = batch.filter(e => e.id !== currentId);
+        relatedHasMore = batch.length > RELATED_FETCH_LIMIT;
+        if(filtered.length > RELATED_FETCH_LIMIT){
+          filtered = filtered.slice(0, RELATED_FETCH_LIMIT);
+          relatedHasMore = true;
+        }
+        const missingIds = supportsImageUrls
+          ? filtered.filter(e => !e.thumb_url && !e.image_url).map(e => e.id)
+          : [];
+        if(missingIds.length){
+          const legacy = await supabaseSelect('contest_entries', { select: 'id,image_base64', in: { id: missingIds } });
+          const legacyMap = new Map(legacy.map(row => [row.id, row.image_base64]));
+          filtered = filtered.map(e => (
+            legacyMap.has(e.id) ? { ...e, image_base64: legacyMap.get(e.id) } : e
+          ));
+        }
+        cachedEntries = append ? cachedEntries.concat(filtered) : filtered;
       }catch(err){
         console.error(err);
+        if(supportsImageUrls && (isMissingColumn(err, 'image_url') || isMissingColumn(err, 'thumb_url'))){
+          supportsImageUrls = false;
+          relatedLoading = false;
+          updateRelatedLoadMore();
+          await fetchRelated(currentId, { append });
+          return;
+        }
       }
-      if(cachedEntries.length === 0){
-        cachedEntries = Array.from({ length: 9 }, (_, i) => ({
-          id: 500000 + i,
-          name: `サンプル${i+1}`,
-          title: `サンプル${i+1}`,
-          width: 512,
-          height: 512,
-          colors: 256,
-          image_base64: makePlaceholder(SAMPLE_COLORS[i % SAMPLE_COLORS.length]),
-          submitted_at: new Date().toISOString(),
-          likeCount: 0,
-          mode: i % 2 === 0 ? 'timed10' : 'free'
-        }));
-      }
-      renderRelated(cachedEntries.filter(e => e.id !== currentId));
+      renderRelated(cachedEntries);
+      relatedLoading = false;
+      updateRelatedLoadMore();
     }
 
     function escapeHtml(str){
       return str.replace(/[&<>"']/g, s => (
         { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s] || s
       ));
+    }
+
+    function truncateText(ctx, text, maxWidth){
+      let output = String(text ?? '');
+      if(!output) return '';
+      if(ctx.measureText(output).width <= maxWidth) return output;
+      while(output.length > 1 && ctx.measureText(`${output}…`).width > maxWidth){
+        output = output.slice(0, -1);
+      }
+      return output.length > 1 ? `${output}…` : output;
+    }
+
+    function loadImageFromSource(src){
+      return new Promise((resolve, reject) => {
+        if(!src){
+          reject(new Error('source missing'));
+          return;
+        }
+        const img = new Image();
+        try{
+          const resolved = new URL(src, window.location.href);
+          const isSameOrigin = resolved.origin === window.location.origin;
+          const isHttp = resolved.protocol === 'http:' || resolved.protocol === 'https:';
+          if(!isSameOrigin && isHttp){
+            img.crossOrigin = 'anonymous';
+          }
+          img.src = resolved.toString();
+        }catch(_){
+          img.src = src;
+        }
+        img.onload = () => resolve(img);
+        img.onerror = error => reject(error);
+      });
+    }
+
+    function canvasToBlob(canvas, type = 'image/png'){
+      return new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if(blob) resolve(blob);
+          else reject(new Error('blob create failed'));
+        }, type);
+      });
+    }
+
+    function getContestPublicUrl(path){
+      if(!supabaseAuth?.storage) return '';
+      return supabaseAuth.storage.from(STORAGE_BUCKET).getPublicUrl(path).data.publicUrl;
+    }
+
+    function buildShareHtml({ title, description, imageUrl, shareUrl, targetUrl }){
+      const safeTitle = escapeHtml(title);
+      const safeDescription = escapeHtml(description);
+      const safeImage = escapeHtml(imageUrl);
+      const safeShareUrl = escapeHtml(shareUrl);
+      const safeTargetUrl = escapeHtml(targetUrl);
+      return `<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>${safeTitle}</title>
+  <meta name="description" content="${safeDescription}"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:title" content="${safeTitle}"/>
+  <meta property="og:description" content="${safeDescription}"/>
+  <meta property="og:image" content="${safeImage}"/>
+  <meta property="og:image:width" content="${CONTEST_SHARE_OGP_WIDTH}"/>
+  <meta property="og:image:height" content="${CONTEST_SHARE_OGP_HEIGHT}"/>
+  <meta property="og:url" content="${safeShareUrl}"/>
+  <meta property="og:site_name" content="PiXiEED"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="${safeTitle}"/>
+  <meta name="twitter:description" content="${safeDescription}"/>
+  <meta name="twitter:image" content="${safeImage}"/>
+  <meta http-equiv="refresh" content="0; url=${safeTargetUrl}"/>
+  <link rel="canonical" href="${safeTargetUrl}"/>
+  <style>body{margin:0;font-family:sans-serif;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh}</style>
+</head>
+<body>
+  <p>Redirecting...</p>
+  <script>window.location.replace('${safeTargetUrl}');</script>
+</body>
+</html>`;
+    }
+
+    function drawContainImage(ctx, image, x, y, width, height){
+      if(!ctx || !image) return;
+      const iw = image.naturalWidth || image.width || 1;
+      const ih = image.naturalHeight || image.height || 1;
+      const scale = Math.min(width / iw, height / ih);
+      const dw = Math.max(1, Math.round(iw * scale));
+      const dh = Math.max(1, Math.round(ih * scale));
+      const dx = Math.round(x + (width - dw) / 2);
+      const dy = Math.round(y + (height - dh) / 2);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(image, dx, dy, dw, dh);
+    }
+
+    async function createContestOgpBlob({ title, image }){
+      if(!image) return null;
+      const canvas = document.createElement('canvas');
+      canvas.width = CONTEST_SHARE_OGP_WIDTH;
+      canvas.height = CONTEST_SHARE_OGP_HEIGHT;
+      const ctx = canvas.getContext('2d');
+      if(!ctx) return null;
+
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, '#0f172a');
+      gradient.addColorStop(1, '#1e293b');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = `600 ${CONTEST_SHARE_TITLE_SIZE}px 'DotGothic16', sans-serif`;
+      ctx.textBaseline = 'top';
+      const maxTitleWidth = canvas.width - CONTEST_SHARE_PADDING * 2;
+      const titleText = truncateText(ctx, title || '作品', maxTitleWidth);
+      ctx.fillText(titleText, CONTEST_SHARE_PADDING, CONTEST_SHARE_PADDING);
+
+      const top = CONTEST_SHARE_PADDING + CONTEST_SHARE_TITLE_SIZE + 20;
+      const availableHeight = canvas.height - top - CONTEST_SHARE_PADDING;
+      const availableWidth = canvas.width - CONTEST_SHARE_PADDING * 2;
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+      ctx.lineWidth = 2;
+      ctx.fillRect(CONTEST_SHARE_PADDING, top, availableWidth, availableHeight);
+      ctx.strokeRect(CONTEST_SHARE_PADDING, top, availableWidth, availableHeight);
+      drawContainImage(ctx, image, CONTEST_SHARE_PADDING, top, availableWidth, availableHeight);
+      return await canvasToBlob(canvas, 'image/png');
+    }
+
+    async function uploadContestShareAssets({ entryId, title, image }){
+      if(!supabaseAuth?.storage || !supportsStorageUploads || !entryId || !image) return null;
+      const ogpBlob = await createContestOgpBlob({ title, image });
+      if(!ogpBlob) return null;
+      const ogpPath = `share/${entryId}.png`;
+      const sharePath = `share/${entryId}.html`;
+      const ogpUrl = getContestPublicUrl(ogpPath);
+      const shareUrl = getContestPublicUrl(sharePath);
+      const targetUrl = `${CONTEST_SHARE_BASE_URL}?id=${entryId}`;
+      const html = buildShareHtml({
+        title: `PiXiEED | ${title || '作品'}`,
+        description: 'PiXiEEDのドット作品',
+        imageUrl: ogpUrl,
+        shareUrl,
+        targetUrl,
+      });
+      const htmlBlob = new Blob([html], { type: 'text/html' });
+      try{
+        const bucket = supabaseAuth.storage.from(STORAGE_BUCKET);
+        const { error: ogpError } = await bucket.upload(ogpPath, ogpBlob, {
+          contentType: 'image/png',
+          cacheControl: '31536000',
+          upsert: false
+        });
+        if(ogpError && !String(ogpError.message || '').toLowerCase().includes('exists')){
+          throw ogpError;
+        }
+        const { error: htmlError } = await bucket.upload(sharePath, htmlBlob, {
+          contentType: 'text/html',
+          cacheControl: '31536000',
+          upsert: false
+        });
+        if(htmlError && !String(htmlError.message || '').toLowerCase().includes('exists')){
+          throw htmlError;
+        }
+        return { shareUrl, ogpUrl };
+      }catch(err){
+        console.warn('share upload failed', err);
+        const msg = String(err?.message || '').toLowerCase();
+        if(msg.includes('bucket') || msg.includes('storage') || msg.includes('not found')){
+          supportsStorageUploads = false;
+        }
+        return null;
+      }
+    }
+
+    async function handleShare(){
+      if(!entry || !entryLoaded){
+        setStatus('作品が読み込まれていません');
+        return;
+      }
+      const shareBtn = $('shareButton');
+      if(shareBtn){
+        shareBtn.disabled = true;
+        shareBtn.classList.add('is-disabled');
+      }
+      setStatus('共有リンクを作成しています...');
+      try{
+        const imageSrc = resolveEntryImage(entry);
+        const image = await loadImageFromSource(imageSrc);
+        const shareResult = await uploadContestShareAssets({ entryId: entry.id, title: entry.title, image });
+        const shareUrl = shareResult?.shareUrl;
+        if(!shareUrl){
+          throw new Error('share url missing');
+        }
+        if(navigator.clipboard?.writeText){
+          await navigator.clipboard.writeText(shareUrl);
+          setStatus('共有リンクをコピーしました');
+        }else{
+          window.prompt('共有リンクをコピーしてください。', shareUrl);
+          setStatus('共有リンクをコピーしてください');
+        }
+      }catch(err){
+        console.error(err);
+        setStatus('共有リンクの作成に失敗しました');
+      }finally{
+        if(shareBtn){
+          const canShare = entryLoaded && Boolean(supabaseAuth?.storage) && supportsStorageUploads;
+          shareBtn.disabled = !canShare;
+          shareBtn.classList.toggle('is-disabled', !canShare);
+        }
+      }
     }
 
     function makePlaceholder(color){
@@ -1663,10 +2277,19 @@
       };
     }
 
-    async function supabaseSelect(table, { eq = {}, order, limit } = {}){
+    async function supabaseSelect(table, { eq = {}, order, limit, offset, select = '*', in: inFilter = {} } = {}){
       const params = new URLSearchParams();
-      params.set('select','*');
+      params.set('select', select);
       Object.entries(eq).forEach(([k,v]) => params.set(k, `eq.${v}`));
+      Object.entries(inFilter).forEach(([k,v]) => {
+        if(!Array.isArray(v) || v.length === 0) return;
+        const values = v.map((item) => {
+          if(typeof item === 'number') return String(item);
+          const raw = String(item).replace(/"/g, '\\"');
+          return `"${raw}"`;
+        });
+        params.set(k, `in.(${values.join(',')})`);
+      });
       if(order){
         const [col, dir] = order.split('.');
         params.set('order', col);
@@ -1677,10 +2300,16 @@
       if(limit){
         params.set('limit', String(limit));
       }
+      if(offset){
+        params.set('offset', String(offset));
+      }
       const res = await fetch(`${SUPABASE_REST}/${table}?${params.toString()}`, {
         headers: supabaseHeaders()
       });
-      if(!res.ok) throw new Error(`supabase select failed: ${res.status}`);
+      if(!res.ok){
+        const detail = await res.text();
+        throw new Error(`supabase select failed: ${res.status} ${detail}`);
+      }
       return res.json();
     }
 
@@ -1730,6 +2359,7 @@
       setupAuthButton();
       setupAvatarToggle();
       setupTagEditor();
+      setupDownloadEditor();
       await initSupabaseAuth();
       document.addEventListener('contextmenu', (e) => {
         if(e.target && e.target.tagName === 'IMG'){
@@ -1744,7 +2374,7 @@
       const params = new URLSearchParams(location.search);
       currentEntryId = Number(params.get('id')) || 0;
       await fetchEntry(currentEntryId);
-      await fetchRelated(currentEntryId);
+      scheduleRelatedFetch(currentEntryId);
       render();
       applyAvatarToBrand();
       renderAvatarChoices();
@@ -1760,6 +2390,16 @@
       const downloadBtn = $('downloadButton');
       if(downloadBtn){
         downloadBtn.addEventListener('click', handleDownload);
+      }
+      const shareBtn = $('shareButton');
+      if(shareBtn){
+        shareBtn.addEventListener('click', handleShare);
+      }
+      const relatedLoadMoreBtn = $('relatedLoadMoreBtn');
+      if(relatedLoadMoreBtn){
+        relatedLoadMoreBtn.addEventListener('click', () => {
+          fetchRelated(currentEntryId, { append: true });
+        });
       }
     }
     window.addEventListener('DOMContentLoaded', init);
