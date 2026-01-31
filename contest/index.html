@@ -962,7 +962,7 @@
     <section class="card">
       <div class="top-bar">
         <h1>ドットギャラリー</h1>
-        <p class="subtitle">みんなのドットを眺めよう。512x512以内 / 256色以内のPNGを投稿もできます。</p>
+        <p class="subtitle">みんなのドットを眺めよう。元サイズ512x512以内 / 256色以内のPNGを投稿もできます。</p>
         <p class="feed-subtitle">最新→いいね順で並びます</p>
         <div class="quick-tools">
           <a class="button" href="../pixiedraw/index.html" rel="noopener" target="_blank">PiXiEEDraw</a>
@@ -1048,7 +1048,7 @@
         <div class="field">
           <label for="contestFile">PNG / GIF</label>
           <input id="contestFile" name="contestFile" type="file" accept="image/png,image/gif"/>
-          <p class="helper">PNG または GIF（サムネは1フレーム表示） / 512x512以内 / 256色以内</p>
+          <p class="helper">PNG または GIF（サムネは1フレーム表示） / 元サイズ512x512以内 / 256色以内</p>
         </div>
         <button class="button" type="submit">投稿する</button>
         <p class="status" id="contestStatus"></p>
@@ -1066,7 +1066,7 @@
       <span class="icon"><img src="../FooterIcon3.png" alt=""/></span><span>ツール/ゲーム</span>
     </a>
     <a class="bottom-nav__item" data-tab="lens" href="../pixiee-lens/index.html">
-      <span class="icon"><img src="../pixiee-lens/icon-192.png" alt=""/></span><span>PiXiEELENS</span>
+      <span class="icon"><img src="../FooterIcon5.png" alt=""/></span><span>PiXiEELENS</span>
     </a>
     <a class="bottom-nav__item" data-tab="portfolio" href="../portfolio/index.html">
       <span class="icon"><img src="../FooterIcon4.png" alt=""/></span><span>企業向け</span>
@@ -1134,12 +1134,23 @@
     const PASSCODE_WRAP_ID = 'downloadPasscodeWrap';
     const MAX_SIZE = 512;
     const MAX_COLORS = 256;
+    const NORMALIZE_COLOR_TOLERANCE = 12;
+    const NORMALIZE_MATCH_RATIO = 0.985;
     const MAX_TAGS = 5;
     const PAGE_SIZE = 12;
     const PENDING_UPLOAD_KEY = 'pixieed_contest_upload_v1';
+    const STORAGE_BUCKET = 'pixieed-contest';
+    const THUMB_SIZE = 256;
+    const CONTEST_SHARE_BASE_URL = 'https://pixieed.jp/contest/view.html';
+    const CONTEST_SHARE_OGP_WIDTH = 1200;
+    const CONTEST_SHARE_OGP_HEIGHT = 630;
+    const CONTEST_SHARE_PADDING = 60;
+    const CONTEST_SHARE_TITLE_SIZE = 32;
     let supportsClientId = true;
     let supportsTags = true;
     let supportsDownloadSettings = true;
+    let supportsImageUrls = true;
+    let supportsStorageUploads = true;
     let supabaseUser = null;
     let supabaseSession = null;
     let migrationDone = false;
@@ -1167,6 +1178,8 @@
       width: 512,
       height: 512,
       colors: 256,
+      image_url: '',
+      thumb_url: '',
       image_base64: makePlaceholder(SAMPLE_COLORS[i % SAMPLE_COLORS.length]),
       submitted_at: new Date().toISOString(),
       likeCount: 0,
@@ -1279,6 +1292,16 @@
         img.removeAttribute('src');
         wrap.classList.remove('is-filled');
       }
+    }
+
+    function resolveEntryThumb(entry){
+      if(!entry) return '';
+      return entry.thumb_url || entry.image_url || entry.image_base64 || '';
+    }
+
+    function resolveEntryImage(entry){
+      if(!entry) return '';
+      return entry.image_url || entry.image_base64 || entry.thumb_url || '';
     }
 
     function dataUrlToFile(dataUrl, filename){
@@ -1570,24 +1593,419 @@
       updateDownloadSettingsUI();
     }
 
+    function createStorageKey(prefix){
+      const seed = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+      const date = new Date().toISOString().slice(0,10).replace(/-/g, '');
+      return `${prefix}/${date}/${seed}`;
+    }
+
+    function canvasToBlob(canvas, type = 'image/png'){
+      return new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if(blob) resolve(blob);
+          else reject(new Error('blob create failed'));
+        }, type);
+      });
+    }
+
+    function createThumbnailCanvas(source){
+      const max = Math.max(source.width, source.height);
+      const scale = Math.min(1, THUMB_SIZE / max);
+      if(scale >= 1){
+        return source;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(source.width * scale));
+      canvas.height = Math.max(1, Math.round(source.height * scale));
+      const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+      return canvas;
+    }
+
+    function normalizePixelCanvas(sourceCanvas){
+      const width = sourceCanvas.width;
+      const height = sourceCanvas.height;
+      const sourceCtx = sourceCanvas.getContext('2d');
+      if(!sourceCtx) return { canvas: sourceCanvas, ctx: sourceCtx, width, height };
+      let imageData;
+      try{
+        imageData = sourceCtx.getImageData(0, 0, width, height);
+      }catch(_){
+        return { canvas: sourceCanvas, ctx: sourceCtx, width, height };
+      }
+      const scaleX = detectScaleFactor(imageData, width, height, 'x');
+      const scaleY = detectScaleFactor(imageData, width, height, 'y');
+      let scale = Math.max(1, Math.min(scaleX, scaleY));
+      const blockScale = detectScaleFactorByBlocks(imageData, width, height);
+      if(blockScale > scale){
+        scale = blockScale;
+      }
+      if(scale <= 1){
+        return { canvas: sourceCanvas, ctx: sourceCtx, width, height };
+      }
+      const targetWidth = Math.max(1, Math.round(width / scale));
+      const targetHeight = Math.max(1, Math.round(height / scale));
+      const targetCanvas = document.createElement('canvas');
+      targetCanvas.width = targetWidth;
+      targetCanvas.height = targetHeight;
+      const targetCtx = targetCanvas.getContext('2d');
+      if(!targetCtx) return { canvas: sourceCanvas, ctx: sourceCtx, width, height };
+      const targetData = targetCtx.createImageData(targetWidth, targetHeight);
+      const src = imageData.data;
+      const dest = targetData.data;
+      for(let y=0; y<targetHeight; y++){
+        for(let x=0; x<targetWidth; x++){
+          const srcIndex = ((y * scale) * width + (x * scale)) * 4;
+          const destIndex = (y * targetWidth + x) * 4;
+          dest[destIndex] = src[srcIndex];
+          dest[destIndex + 1] = src[srcIndex + 1];
+          dest[destIndex + 2] = src[srcIndex + 2];
+          dest[destIndex + 3] = src[srcIndex + 3];
+        }
+      }
+      targetCtx.putImageData(targetData, 0, 0);
+      return { canvas: targetCanvas, ctx: targetCtx, width: targetWidth, height: targetHeight };
+    }
+
+    function detectScaleFactor(imageData, width, height, axis){
+      const { data } = imageData;
+      const length = axis === 'x' ? width : height;
+      const compare = axis === 'x'
+        ? (indexA, indexB) => columnsMatch(data, width, height, indexA, indexB)
+        : (indexA, indexB) => rowsMatch(data, width, height, indexA, indexB);
+
+      let run = 1;
+      let best = 0;
+      for(let i=1; i<length; i++){
+        if(compare(i, i - 1)){
+          run += 1;
+        }else{
+          best = best ? gcd(best, run) : run;
+          run = 1;
+        }
+      }
+      best = best ? gcd(best, run) : run;
+      return Math.max(1, best);
+    }
+
+    function detectScaleFactorByBlocks(imageData, width, height){
+      const common = gcd(width, height);
+      if(common <= 1) return 1;
+      const candidates = getDivisors(common).filter(value => value > 1).sort((a, b) => b - a);
+      for(const factor of candidates){
+        if(isLikelyUpscaledByFactor(imageData.data, width, height, factor)){
+          return factor;
+        }
+      }
+      return 1;
+    }
+
+    function isLikelyUpscaledByFactor(data, width, height, factor){
+      const totalPixels = width * height;
+      const allowedMismatch = Math.floor(totalPixels * (1 - NORMALIZE_MATCH_RATIO));
+      let mismatches = 0;
+      for(let blockY=0; blockY<height; blockY+=factor){
+        for(let blockX=0; blockX<width; blockX+=factor){
+          const baseIndex = (blockY * width + blockX) * 4;
+          const baseR = data[baseIndex];
+          const baseG = data[baseIndex + 1];
+          const baseB = data[baseIndex + 2];
+          const baseA = data[baseIndex + 3];
+          for(let y=0; y<factor; y++){
+            const rowStart = (blockY + y) * width;
+            for(let x=0; x<factor; x++){
+              const idx = (rowStart + blockX + x) * 4;
+              if(!isColorNear(data, idx, baseR, baseG, baseB, baseA)){
+                mismatches += 1;
+                if(mismatches > allowedMismatch){
+                  return false;
+                }
+              }
+            }
+          }
+        }
+      }
+      return true;
+    }
+
+    function isColorNear(data, idx, r, g, b, a){
+      return (
+        Math.abs(data[idx] - r) <= NORMALIZE_COLOR_TOLERANCE &&
+        Math.abs(data[idx + 1] - g) <= NORMALIZE_COLOR_TOLERANCE &&
+        Math.abs(data[idx + 2] - b) <= NORMALIZE_COLOR_TOLERANCE &&
+        Math.abs(data[idx + 3] - a) <= NORMALIZE_COLOR_TOLERANCE
+      );
+    }
+
+    function getDivisors(value){
+      const divisors = new Set();
+      for(let i=2; i<=Math.sqrt(value); i+=1){
+        if(value % i === 0){
+          divisors.add(i);
+          divisors.add(value / i);
+        }
+      }
+      divisors.add(value);
+      return Array.from(divisors);
+    }
+
+    function columnsMatch(data, width, height, a, b){
+      for(let y=0; y<height; y++){
+        const idxA = (y * width + a) * 4;
+        const idxB = (y * width + b) * 4;
+        if(
+          data[idxA] !== data[idxB] ||
+          data[idxA + 1] !== data[idxB + 1] ||
+          data[idxA + 2] !== data[idxB + 2] ||
+          data[idxA + 3] !== data[idxB + 3]
+        ){
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function rowsMatch(data, width, height, a, b){
+      const rowLength = width * 4;
+      const startA = a * rowLength;
+      const startB = b * rowLength;
+      for(let offset=0; offset<rowLength; offset++){
+        if(data[startA + offset] !== data[startB + offset]){
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function gcd(a, b){
+      while(b !== 0){
+        const temp = b;
+        b = a % b;
+        a = temp;
+      }
+      return a;
+    }
+
+    async function uploadContestImages(imageInfo){
+      if(!supabase || !supportsStorageUploads || !imageInfo?.imageBlob || !imageInfo?.thumbBlob) return null;
+      const baseKey = createStorageKey('entries');
+      const imagePath = `${baseKey}.png`;
+      const thumbPath = `${baseKey}_thumb.png`;
+      try{
+        const { error: imageError } = await supabase
+          .storage
+          .from(STORAGE_BUCKET)
+          .upload(imagePath, imageInfo.imageBlob, {
+            contentType: 'image/png',
+            cacheControl: '31536000',
+            upsert: false
+          });
+        if(imageError) throw imageError;
+        const { error: thumbError } = await supabase
+          .storage
+          .from(STORAGE_BUCKET)
+          .upload(thumbPath, imageInfo.thumbBlob, {
+            contentType: 'image/png',
+            cacheControl: '31536000',
+            upsert: false
+          });
+        if(thumbError) throw thumbError;
+        const imageUrl = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(imagePath).data.publicUrl;
+        const thumbUrl = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(thumbPath).data.publicUrl;
+        return { imageUrl, thumbUrl };
+      }catch(err){
+        console.warn('storage upload failed', err);
+        const msg = String(err?.message || '').toLowerCase();
+        if(msg.includes('bucket') || msg.includes('storage') || msg.includes('not found')){
+          supportsStorageUploads = false;
+        }
+        return null;
+      }
+    }
+
+    function escapeHtml(value){
+      return String(value ?? '').replace(/[&<>"']/g, (ch) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] || ch
+      ));
+    }
+
+    function truncateText(ctx, text, maxWidth){
+      let output = String(text ?? '');
+      if(!output) return '';
+      if(ctx.measureText(output).width <= maxWidth) return output;
+      while(output.length > 1 && ctx.measureText(`${output}…`).width > maxWidth){
+        output = output.slice(0, -1);
+      }
+      return output.length > 1 ? `${output}…` : output;
+    }
+
+    function encodeStoragePath(path){
+      return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+    }
+
+    function getContestPublicUrl(path){
+      if(supabase?.storage){
+        return supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path).data.publicUrl;
+      }
+      return `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${encodeStoragePath(path)}`;
+    }
+
+    function buildShareHtml({ title, description, imageUrl, shareUrl, targetUrl }){
+      const safeTitle = escapeHtml(title);
+      const safeDescription = escapeHtml(description);
+      const safeImage = escapeHtml(imageUrl);
+      const safeShareUrl = escapeHtml(shareUrl);
+      const safeTargetUrl = escapeHtml(targetUrl);
+      return `<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>${safeTitle}</title>
+  <meta name="description" content="${safeDescription}"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:title" content="${safeTitle}"/>
+  <meta property="og:description" content="${safeDescription}"/>
+  <meta property="og:image" content="${safeImage}"/>
+  <meta property="og:image:width" content="${CONTEST_SHARE_OGP_WIDTH}"/>
+  <meta property="og:image:height" content="${CONTEST_SHARE_OGP_HEIGHT}"/>
+  <meta property="og:url" content="${safeShareUrl}"/>
+  <meta property="og:site_name" content="PiXiEED"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="${safeTitle}"/>
+  <meta name="twitter:description" content="${safeDescription}"/>
+  <meta name="twitter:image" content="${safeImage}"/>
+  <meta http-equiv="refresh" content="0; url=${safeTargetUrl}"/>
+  <link rel="canonical" href="${safeTargetUrl}"/>
+  <style>body{margin:0;font-family:sans-serif;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh}</style>
+</head>
+<body>
+  <p>Redirecting...</p>
+  <script>window.location.replace('${safeTargetUrl}');</script>
+</body>
+</html>`;
+    }
+
+    function drawContainImage(ctx, image, x, y, width, height){
+      if(!ctx || !image) return;
+      const iw = image.width || 1;
+      const ih = image.height || 1;
+      const scale = Math.min(width / iw, height / ih);
+      const dw = Math.max(1, Math.round(iw * scale));
+      const dh = Math.max(1, Math.round(ih * scale));
+      const dx = Math.round(x + (width - dw) / 2);
+      const dy = Math.round(y + (height - dh) / 2);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(image, dx, dy, dw, dh);
+    }
+
+    async function createContestOgpBlob({ title, imageBlob }){
+      if(!imageBlob) return null;
+      let bitmap = null;
+      try{
+        bitmap = await createImageBitmap(imageBlob);
+      }catch(_){
+        return null;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = CONTEST_SHARE_OGP_WIDTH;
+      canvas.height = CONTEST_SHARE_OGP_HEIGHT;
+      const ctx = canvas.getContext('2d');
+      if(!ctx) return null;
+
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, '#0f172a');
+      gradient.addColorStop(1, '#1e293b');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = `600 ${CONTEST_SHARE_TITLE_SIZE}px 'DotGothic16', sans-serif`;
+      ctx.textBaseline = 'top';
+      const maxTitleWidth = canvas.width - CONTEST_SHARE_PADDING * 2;
+      const titleText = truncateText(ctx, title || '作品', maxTitleWidth);
+      ctx.fillText(titleText, CONTEST_SHARE_PADDING, CONTEST_SHARE_PADDING);
+
+      const top = CONTEST_SHARE_PADDING + CONTEST_SHARE_TITLE_SIZE + 20;
+      const availableHeight = canvas.height - top - CONTEST_SHARE_PADDING;
+      const availableWidth = canvas.width - CONTEST_SHARE_PADDING * 2;
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+      ctx.lineWidth = 2;
+      ctx.fillRect(CONTEST_SHARE_PADDING, top, availableWidth, availableHeight);
+      ctx.strokeRect(CONTEST_SHARE_PADDING, top, availableWidth, availableHeight);
+      drawContainImage(ctx, bitmap, CONTEST_SHARE_PADDING, top, availableWidth, availableHeight);
+      return await canvasToBlob(canvas, 'image/png');
+    }
+
+    async function uploadContestShareAssets({ entryId, title, imageInfo }){
+      if(!supabase || !supportsStorageUploads || !entryId || !imageInfo?.imageBlob) return null;
+      const ogpBlob = await createContestOgpBlob({ title, imageBlob: imageInfo.imageBlob });
+      if(!ogpBlob) return null;
+      const ogpPath = `share/${entryId}.png`;
+      const sharePath = `share/${entryId}.html`;
+      const ogpUrl = getContestPublicUrl(ogpPath);
+      const shareUrl = getContestPublicUrl(sharePath);
+      const targetUrl = `${CONTEST_SHARE_BASE_URL}?id=${entryId}`;
+      const html = buildShareHtml({
+        title: `PiXiEED | ${title || '作品'}`,
+        description: 'PiXiEEDのドット作品',
+        imageUrl: ogpUrl,
+        shareUrl,
+        targetUrl,
+      });
+      const htmlBlob = new Blob([html], { type: 'text/html' });
+      try{
+        const bucket = supabase.storage.from(STORAGE_BUCKET);
+        const { error: ogpError } = await bucket.upload(ogpPath, ogpBlob, {
+          contentType: 'image/png',
+          cacheControl: '31536000',
+          upsert: false
+        });
+        if(ogpError) throw ogpError;
+        const { error: htmlError } = await bucket.upload(sharePath, htmlBlob, {
+          contentType: 'text/html',
+          cacheControl: '31536000',
+          upsert: false
+        });
+        if(htmlError) throw htmlError;
+        return { shareUrl, ogpUrl };
+      }catch(err){
+        console.warn('share upload failed', err);
+        const msg = String(err?.message || '').toLowerCase();
+        if(msg.includes('bucket') || msg.includes('storage') || msg.includes('not found')){
+          supportsStorageUploads = false;
+        }
+        return null;
+      }
+    }
+
     async function fileToImageInfo(file){
       const type = (file.type || '').toLowerCase();
       if(type !== 'image/png' && type !== 'image/gif'){
         throw new Error('PNGまたはGIFのみ投稿できます');
       }
       const img = await createImageBitmap(file);
-      const { width, height } = img;
-      if(width > MAX_SIZE || height > MAX_SIZE){
-        throw new Error(`画像サイズは${MAX_SIZE}x${MAX_SIZE}以内にしてください`);
-      }
       const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
+      canvas.width = img.width;
+      canvas.height = img.height;
       const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
       ctx.drawImage(img, 0, 0);
 
+      const normalized = normalizePixelCanvas(canvas);
+      const nCanvas = normalized.canvas;
+      const nWidth = normalized.width;
+      const nHeight = normalized.height;
+      if(nWidth > MAX_SIZE || nHeight > MAX_SIZE){
+        throw new Error(`元サイズは${MAX_SIZE}x${MAX_SIZE}以内にしてください`);
+      }
+
       // 余白をトリミング
-      const trimmed = trimTransparent(canvas);
+      const trimmed = trimTransparent(nCanvas);
       const tCanvas = trimmed.canvas;
       const tCtx = trimmed.ctx;
       const tWidth = tCanvas.width;
@@ -1609,7 +2027,10 @@
 
       // GIFもPNGサムネに変換して保存（トリミング後のキャンバスを使用）
       const dataUrl = tCanvas.toDataURL('image/png');
-      return { width: tWidth, height: tHeight, colors: colors.size, dataUrl, hash, phash };
+      const thumbCanvas = createThumbnailCanvas(tCanvas);
+      const imageBlob = await canvasToBlob(tCanvas, 'image/png');
+      const thumbBlob = await canvasToBlob(thumbCanvas, 'image/png');
+      return { width: tWidth, height: tHeight, colors: colors.size, dataUrl, hash, phash, imageBlob, thumbBlob };
     }
 
     function drawWatermark(ctx, width, height){
@@ -1813,6 +2234,11 @@
       }catch(err){
         console.warn('duplicate check skipped', err);
       }
+      let uploadResult = null;
+      if(supabase && supportsImageUrls){
+        setStatus('アップロード中...');
+        uploadResult = await uploadContestImages(imageInfo);
+      }
       setStatus('投稿しています...');
       try{
         const payload = {
@@ -1825,10 +2251,15 @@
           width: imageInfo.width,
           height: imageInfo.height,
           colors: imageInfo.colors,
-          image_base64: imageInfo.dataUrl,
           image_hash: imageInfo.hash,
           phash: imageInfo.phash
         };
+        if(supportsImageUrls && uploadResult){
+          payload.image_url = uploadResult.imageUrl;
+          payload.thumb_url = uploadResult.thumbUrl;
+        }else{
+          payload.image_base64 = imageInfo.dataUrl;
+        }
         if(supportsTags && tags.length){
           payload.tags = tags.join(',');
         }
@@ -1844,7 +2275,7 @@
         }
         let res = null;
         for(let attempt = 0; attempt < 3; attempt++){
-          res = await supabase.from('contest_entries').insert(payload);
+          res = await supabase.from('contest_entries').insert(payload).select('id');
           if(!res.error) break;
           const msg = String(res.error.message || '').toLowerCase();
           if(supportsTags && msg.includes('tags')){
@@ -1858,6 +2289,15 @@
             delete payload.download_passcode;
             continue;
           }
+          if(supportsImageUrls && (msg.includes('image_url') || msg.includes('thumb_url'))){
+            supportsImageUrls = false;
+            delete payload.image_url;
+            delete payload.thumb_url;
+            if(!payload.image_base64){
+              payload.image_base64 = imageInfo.dataUrl;
+            }
+            continue;
+          }
           if(supportsClientId && msg.includes('client_id')){
             supportsClientId = false;
             delete payload.client_id;
@@ -1868,12 +2308,28 @@
         if(res?.error){
           throw res.error;
         }
+        const entryId = Array.isArray(res?.data) ? res.data[0]?.id : null;
+        let shareUrl = null;
+        if(entryId){
+          const shareResult = await uploadContestShareAssets({ entryId, title, imageInfo });
+          shareUrl = shareResult?.shareUrl || null;
+        }
         form.reset();
         setPostPreview('');
         postTags = [];
         renderPostTags();
         updateDownloadSettingsUI();
-        setStatus('投稿しました！');
+        if(shareUrl){
+          if(navigator.clipboard?.writeText){
+            await navigator.clipboard.writeText(shareUrl);
+            setStatus('投稿しました！共有リンクをコピーしました。');
+          }else{
+            window.prompt('共有リンクをコピーしてください。', shareUrl);
+            setStatus('投稿しました！');
+          }
+        }else{
+          setStatus('投稿しました！');
+        }
       }catch(err){
         setStatus('投稿に失敗しました');
         console.error(err);
@@ -1912,7 +2368,7 @@
         item.href = `view.html?id=${entry.id}`;
         item.innerHTML = `
           <div class="entry-imgwrap">
-            <img src="${entry.image_base64}" alt="${entry.title}" draggable="false">
+            <img src="${resolveEntryThumb(entry)}" alt="${entry.title}" draggable="false" loading="lazy" decoding="async">
             <span class="entry-watermark" style="top:6px; left:6px;">PiXiEED</span>
             <span class="entry-watermark" style="top:6px; right:6px;">PiXiEED</span>
             <span class="entry-watermark" style="right:6px; bottom:6px;">PiXiEED</span>
@@ -1951,6 +2407,21 @@
       }
     }
 
+    async function hydrateLegacyImages(entries){
+      if(!supportsImageUrls || !supabase) return entries;
+      const missingIds = entries.filter(e => !e.thumb_url && !e.image_url).map(e => e.id);
+      if(!missingIds.length) return entries;
+      const { data, error } = await supabase
+        .from('contest_entries')
+        .select('id,image_base64')
+        .in('id', missingIds);
+      if(error || !Array.isArray(data)) return entries;
+      const legacyMap = new Map(data.map(row => [row.id, row.image_base64]));
+      return entries.map(e => (
+        legacyMap.has(e.id) ? { ...e, image_base64: legacyMap.get(e.id) } : e
+      ));
+    }
+
     async function fetchAndRender({ append = false } = {}){
       if(isLoadingEntries) return;
       if(!append){
@@ -1968,23 +2439,40 @@
       let networkError = false;
       if(supabase){
         try{
-          const baseSelect = 'id,name,title,prompt,mode,submitted_at,width,height,colors,image_base64';
-          const selectColumns = supportsTags ? `${baseSelect},tags` : baseSelect;
+          const buildBaseSelect = () => (
+            supportsImageUrls
+              ? 'id,name,title,prompt,mode,submitted_at,width,height,colors,image_url,thumb_url'
+              : 'id,name,title,prompt,mode,submitted_at,width,height,colors,image_base64'
+          );
+          const buildSelectColumns = () => {
+            const baseSelect = buildBaseSelect();
+            return supportsTags ? `${baseSelect},tags` : baseSelect;
+          };
           let res = await supabase
             .from('contest_entries')
-            .select(selectColumns)
+            .select(buildSelectColumns())
             .order('submitted_at', { ascending:false })
             .range(currentOffset, currentOffset + PAGE_SIZE - 1);
-          if(res.error && supportsTags && String(res.error.message || '').toLowerCase().includes('tags')){
+          let errorMsg = String(res.error?.message || '').toLowerCase();
+          if(res.error && supportsTags && errorMsg.includes('tags')){
             supportsTags = false;
             res = await supabase
               .from('contest_entries')
-              .select(baseSelect)
+              .select(buildSelectColumns())
+              .order('submitted_at', { ascending:false })
+              .range(currentOffset, currentOffset + PAGE_SIZE - 1);
+            errorMsg = String(res.error?.message || '').toLowerCase();
+          }
+          if(res.error && supportsImageUrls && (errorMsg.includes('image_url') || errorMsg.includes('thumb_url'))){
+            supportsImageUrls = false;
+            res = await supabase
+              .from('contest_entries')
+              .select(buildSelectColumns())
               .order('submitted_at', { ascending:false })
               .range(currentOffset, currentOffset + PAGE_SIZE - 1);
           }
           if(!res.error && Array.isArray(res.data)){
-            entries = res.data;
+            entries = await hydrateLegacyImages(res.data);
           }
           if(!append){
             const likeRes = await supabase
@@ -2110,12 +2598,6 @@
       }
     }
   }
-
-    function escapeHtml(str){
-      return str.replace(/[&<>"']/g, s => (
-        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s] || s
-      ));
-    }
 
     function makePlaceholder(color){
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="${color}"/></svg>`;
