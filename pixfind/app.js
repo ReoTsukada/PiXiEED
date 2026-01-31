@@ -33,6 +33,7 @@ const dom = {
   creatorDiffInput: document.getElementById('creatorDiffInput'),
   creatorPreviewOriginal: document.getElementById('creatorPreviewOriginal'),
   creatorPreviewDiff: document.getElementById('creatorPreviewDiff'),
+  creatorContestToggle: document.getElementById('creatorContestToggle'),
   creatorExportButton: document.getElementById('creatorExport'),
   creatorStatus: document.getElementById('creatorStatus'),
   creatorSummary: document.getElementById('creatorSummary'),
@@ -162,6 +163,8 @@ let creatorAnalysisToken = 0;
 const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
 const SUPABASE_BUCKET = 'pixfind-puzzles';
+const CONTEST_BUCKET = 'pixieed-contest';
+const CONTEST_THUMB_SIZE = 256;
 const SUPABASE_TABLE = 'pixfind_puzzles';
 const CONTEST_TABLE = 'contest_entries';
 const CONTEST_PROMPT_PREFIX = 'pixfind:';
@@ -169,6 +172,18 @@ const CONTEST_AUTHOR_NAME = 'PiXFiND';
 const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
 const SUPABASE_STORAGE_URL = `${SUPABASE_URL}/storage/v1/object`;
 const SUPABASE_PUBLIC_BASE = `${SUPABASE_STORAGE_URL}/public/${SUPABASE_BUCKET}`;
+const CONTEST_PUBLIC_BASE = `${SUPABASE_STORAGE_URL}/public/${CONTEST_BUCKET}`;
+const PIXFIND_SHARE_BASE_URL = 'https://pixieed.jp/pixfind/';
+const PIXFIND_SHARE_OGP_WIDTH = 1200;
+const PIXFIND_SHARE_OGP_HEIGHT = 630;
+const PIXFIND_SHARE_PADDING = 56;
+const PIXFIND_SHARE_GAP = 36;
+const PIXFIND_SHARE_TITLE_SIZE = 32;
+const CONTEST_SHARE_BASE_URL = 'https://pixieed.jp/contest/view.html';
+const CONTEST_SHARE_OGP_WIDTH = 1200;
+const CONTEST_SHARE_OGP_HEIGHT = 630;
+const CONTEST_SHARE_PADDING = 60;
+const CONTEST_SHARE_TITLE_SIZE = 32;
 
 async function init() {
   setActiveScreen('start');
@@ -308,7 +323,7 @@ function resetCreatorForm() {
   if (dom.creatorSummary) {
     dom.creatorSummary.hidden = true;
   }
-  setCreatorStatus('お手本画像と間違い画像を選択してください。');
+  setCreatorStatus('');
   setCreatorDifficulty(creatorState.difficulty, true);
 }
 
@@ -328,7 +343,7 @@ function handleCreatorFileChange() {
   }
   clearCreatorPreview();
   if (!creatorState.originalFile || !creatorState.diffFile) {
-    setCreatorStatus('お手本画像と間違い画像を選択してください。', 'error');
+    setCreatorStatus('');
     return;
   }
   handleCreatorAnalyze();
@@ -353,7 +368,13 @@ function setCreatorDifficulty(level, silent = false) {
 
 function setCreatorStatus(message, tone = 'info') {
   if (!dom.creatorStatus) return;
-  dom.creatorStatus.textContent = message;
+  const text = String(message ?? '');
+  dom.creatorStatus.textContent = text;
+  dom.creatorStatus.hidden = !text;
+  if (!text) {
+    delete dom.creatorStatus.dataset.tone;
+    return;
+  }
   if (tone === 'error') {
     dom.creatorStatus.dataset.tone = 'error';
   } else {
@@ -412,7 +433,7 @@ async function handleCreatorAnalyze() {
   const originalFile = dom.creatorOriginalInput?.files?.[0] ?? null;
   const diffFile = dom.creatorDiffInput?.files?.[0] ?? null;
   if (!originalFile || !diffFile) {
-    setCreatorStatus('お手本画像と間違い画像を選択してください。', 'error');
+    setCreatorStatus('画像を選択してください。', 'error');
     return;
   }
 
@@ -492,6 +513,7 @@ async function handleCreatorPublish() {
   const slug = getCreatorSlug();
   const difficulty = creatorState.difficulty;
   const puzzleId = createPuzzleId();
+  const postToContest = dom.creatorContestToggle ? dom.creatorContestToggle.checked : true;
 
   if (dom.creatorExportButton) dom.creatorExportButton.disabled = true;
   setCreatorStatus('アップロード中です…');
@@ -531,37 +553,100 @@ async function handleCreatorPublish() {
     }
 
     let contestPosted = false;
-    try {
-      const contestDataUrl = await buildNormalizedDataUrl(
-        creatorState.originalImage,
-        creatorState.originalDataUrl,
-        creatorState.originalFile,
-      );
-      if (!contestDataUrl) {
-        throw new Error('contest data missing');
+    if (postToContest) {
+      try {
+        const contestDataUrl = await buildNormalizedDataUrl(
+          creatorState.originalImage,
+          creatorState.originalDataUrl,
+          creatorState.originalFile,
+        );
+        if (!contestDataUrl) {
+          throw new Error('contest data missing');
+        }
+        const colors = countUniqueColors(creatorState.originalImage);
+        let contestUpload = null;
+        try {
+          contestUpload = await uploadContestImages({
+            puzzleId,
+            image: creatorState.originalImage,
+            dataUrl: contestDataUrl,
+          });
+        } catch (error) {
+          console.warn('contest image upload failed', error);
+        }
+        let contestPayload = createContestPayload({
+          puzzleId,
+          title,
+          imageUrl: contestUpload?.imageUrl,
+          thumbUrl: contestUpload?.thumbUrl,
+          dataUrl: contestUpload ? null : contestDataUrl,
+          width: creatorState.size.width,
+          height: creatorState.size.height,
+          colors,
+        });
+        let contestEntry = null;
+        try {
+          contestEntry = await insertContestEntry(contestPayload);
+          contestPosted = true;
+        } catch (error) {
+          const msg = String(error?.message || '').toLowerCase();
+          if (contestUpload && (msg.includes('image_url') || msg.includes('thumb_url'))) {
+            contestPayload = createContestPayload({
+              puzzleId,
+              title,
+              dataUrl: contestDataUrl,
+              width: creatorState.size.width,
+              height: creatorState.size.height,
+              colors,
+            });
+            contestEntry = await insertContestEntry(contestPayload);
+            contestPosted = true;
+          } else {
+            throw error;
+          }
+        }
+        if (contestEntry?.id) {
+          try {
+            await uploadContestShareAssets({
+              entryId: contestEntry.id,
+              title,
+              image: creatorState.originalImage,
+            });
+          } catch (error) {
+            console.warn('contest share asset creation failed', error);
+          }
+        }
+      } catch (error) {
+        console.warn('Contest post failed', error);
       }
-      const colors = countUniqueColors(creatorState.originalImage);
-      const contestPayload = createContestPayload({
-        puzzleId,
-        title,
-        dataUrl: contestDataUrl,
-        width: creatorState.size.width,
-        height: creatorState.size.height,
-        colors,
-      });
-      await insertContestEntry(contestPayload);
-      contestPosted = true;
-    } catch (error) {
-      console.warn('Contest post failed', error);
     }
 
-    const shareUrl = createShareUrl(normalized ?? { id: puzzleId, source: 'published' });
+    let shareUrl = createShareUrl(normalized ?? { id: puzzleId, source: 'published' });
+    try {
+      const shareAssets = await uploadPuzzleShareAssets({
+        puzzleId,
+        title,
+        originalImage: creatorState.originalImage,
+        diffImage: creatorState.diffImage,
+      });
+      if (shareAssets?.shareUrl) {
+        shareUrl = shareAssets.shareUrl;
+        if (normalized) {
+          normalized.shareUrl = shareAssets.shareUrl;
+        }
+      }
+    } catch (error) {
+      console.warn('share asset creation failed', error);
+    }
+    const contestMessage = postToContest
+      ? (contestPosted ? 'コンテストにも投稿しました。' : 'コンテスト投稿は失敗しました。')
+      : 'コンテスト投稿はオフです。';
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(shareUrl);
-      setCreatorStatus(`公開しました。共有リンクをコピーしました。${contestPosted ? 'コンテストにも投稿しました。' : 'コンテスト投稿は失敗しました。'}`);
+      setCreatorStatus(`公開しました。共有リンクをコピーしました。${contestMessage}`);
     } else {
-      window.prompt(`公開しました。${contestPosted ? 'コンテストにも投稿しました。' : 'コンテスト投稿は失敗しました。'}共有リンクをコピーしてください。`, shareUrl);
-      setCreatorStatus(`公開しました。${contestPosted ? 'コンテストにも投稿しました。' : 'コンテスト投稿は失敗しました。'}`);
+      window.prompt(`公開しました。${contestMessage}共有リンクをコピーしてください。`, shareUrl);
+      setCreatorStatus(`公開しました。${contestMessage}`);
     }
   } catch (error) {
     console.error(error);
@@ -670,6 +755,27 @@ async function uploadPuzzleFile(path, body, contentType = null) {
   return getSupabasePublicUrl(path);
 }
 
+async function uploadContestFile(path, body, contentType = null) {
+  if (!body) {
+    throw new Error('upload body is missing');
+  }
+  const safePath = encodeStoragePath(path);
+  const url = `${SUPABASE_STORAGE_URL}/${CONTEST_BUCKET}/${safePath}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      ...supabaseHeaders(),
+      'Content-Type': contentType || body.type || 'application/octet-stream',
+    },
+    body,
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`upload failed: ${response.status} ${detail}`);
+  }
+  return getContestPublicUrl(path);
+}
+
 async function insertPublishedPuzzle(payload) {
   const response = await fetch(`${SUPABASE_REST_URL}/${SUPABASE_TABLE}`, {
     method: 'POST',
@@ -735,15 +841,21 @@ function getSupabasePublicUrl(path) {
   return `${SUPABASE_PUBLIC_BASE}/${path}`;
 }
 
+function getContestPublicUrl(path) {
+  return `${CONTEST_PUBLIC_BASE}/${path}`;
+}
+
 function createContestPayload({
   puzzleId,
   title,
+  imageUrl,
+  thumbUrl,
   dataUrl,
   width,
   height,
   colors,
 }) {
-  return {
+  const payload = {
     name: CONTEST_AUTHOR_NAME,
     title: title || 'PiXFiND Puzzle',
     prompt: `${CONTEST_PROMPT_PREFIX}${puzzleId}`,
@@ -753,9 +865,18 @@ function createContestPayload({
     width,
     height,
     colors: Number.isFinite(colors) ? colors : null,
-    image_base64: dataUrl,
     client_id: `pixfind-${puzzleId}`,
   };
+  if (imageUrl) {
+    payload.image_url = imageUrl;
+  }
+  if (thumbUrl) {
+    payload.thumb_url = thumbUrl;
+  }
+  if (!imageUrl && dataUrl) {
+    payload.image_base64 = dataUrl;
+  }
+  return payload;
 }
 
 function countUniqueColors(image) {
@@ -800,6 +921,7 @@ function normalizePublishedPuzzleEntry(entry) {
     original,
     diff,
     thumbnail: entry.thumbnail_url ?? entry.thumbnail ?? diff ?? original,
+    shareUrl: entry.share_url ?? entry.shareUrl ?? null,
     source: 'published',
     badge: '公開',
   };
@@ -945,6 +1067,7 @@ function normalizePuzzleEntry(entry) {
 }
 
 function createShareUrl(puzzle) {
+  if (puzzle?.shareUrl) return puzzle.shareUrl;
   const url = new URL(window.location.href);
   const shareId = puzzle?.source === 'published' ? puzzle.id : (puzzle.slug ?? puzzle.id);
   if (shareId) {
@@ -955,7 +1078,27 @@ function createShareUrl(puzzle) {
 }
 
 async function sharePuzzle(puzzle) {
-  const shareUrl = createShareUrl(puzzle);
+  let shareUrl = createShareUrl(puzzle);
+  if (puzzle?.source === 'published' && !puzzle?.shareUrl && puzzle.original && puzzle.diff) {
+    try {
+      const [originalImage, diffImage] = await Promise.all([
+        loadImageFromUrl(puzzle.original),
+        loadImageFromUrl(puzzle.diff),
+      ]);
+      const shareAssets = await uploadPuzzleShareAssets({
+        puzzleId: puzzle.id,
+        title: puzzle.label,
+        originalImage,
+        diffImage,
+      });
+      if (shareAssets?.shareUrl) {
+        puzzle.shareUrl = shareAssets.shareUrl;
+        shareUrl = shareAssets.shareUrl;
+      }
+    } catch (error) {
+      console.warn('share asset creation failed', error);
+    }
+  }
   const shareData = {
     title: `PiXFiND | ${puzzle.label}`,
     text: `${puzzle.label}（${createStarLabel(puzzle.difficulty)}）に挑戦してみてください。`,
@@ -1062,8 +1205,13 @@ function renderPuzzles(level) {
   dom.puzzleList.innerHTML = '';
 
   const official = state.officialPuzzles.filter(puzzle => puzzle.difficulty === level);
-  official.forEach(puzzle => {
+  const AD_SLOTS = ['2141591954', '9073878884', '2261515379'];
+  official.forEach((puzzle, idx) => {
     dom.puzzleList.append(createOfficialCard(puzzle));
+    if ((idx + 1) % 6 === 0) {
+      const slotId = AD_SLOTS[Math.floor(idx / 6) % AD_SLOTS.length];
+      dom.puzzleList.append(createPuzzleAdCard(slotId));
+    }
   });
 
   if (!official.length) {
@@ -1072,6 +1220,31 @@ function renderPuzzles(level) {
     info.textContent = '公式パズルはまだありません。';
     dom.puzzleList.append(info);
   }
+
+  try {
+    if (window.pixieedObserveAds) {
+      window.pixieedObserveAds(dom.puzzleList);
+    }
+  } catch (error) {
+    console.warn('ads render skipped', error);
+  }
+}
+
+function createPuzzleAdCard(slotId) {
+  const card = document.createElement('div');
+  card.className = 'puzzle-card puzzle-card--ad';
+  card.innerHTML = `
+    <div class="puzzle-ad-slot">
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="ca-pub-9801602250480253"
+           data-ad-slot="${slotId}"
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
+    </div>
+    <small class="puzzle-ad-note">広告</small>
+  `;
+  return card;
 }
 
 function createOfficialCard(puzzle) {
@@ -2067,6 +2240,266 @@ async function buildNormalizedDataUrl(image, fallbackDataUrl, fallbackFile) {
   if (fallbackDataUrl) return fallbackDataUrl;
   if (fallbackFile) return await readFileAsDataUrl(fallbackFile);
   return null;
+}
+
+async function createThumbnailDataUrl(image, fallbackDataUrl) {
+  const source = image || (fallbackDataUrl ? await loadImageFromDataUrl(fallbackDataUrl) : null);
+  if (!source) return null;
+  const width = source.naturalWidth || source.width;
+  const height = source.naturalHeight || source.height;
+  const scale = Math.min(1, CONTEST_THUMB_SIZE / Math.max(width, height));
+  const targetWidth = Math.max(1, Math.round(width * scale));
+  const targetHeight = Math.max(1, Math.round(height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return fallbackDataUrl ?? null;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(source, 0, 0, targetWidth, targetHeight);
+  return canvas.toDataURL('image/png');
+}
+
+async function uploadContestImages({ puzzleId, image, dataUrl }) {
+  if (!puzzleId || !dataUrl) return null;
+  const imageBlob = await dataUrlToBlob(dataUrl);
+  const thumbDataUrl = await createThumbnailDataUrl(image, dataUrl);
+  const thumbBlob = thumbDataUrl ? await dataUrlToBlob(thumbDataUrl) : imageBlob;
+  const imagePath = `contest/${puzzleId}.png`;
+  const thumbPath = `contest/${puzzleId}_thumb.png`;
+  const [imageUrl, thumbUrl] = await Promise.all([
+    uploadContestFile(imagePath, imageBlob, 'image/png'),
+    uploadContestFile(thumbPath, thumbBlob, 'image/png'),
+  ]);
+  return { imageUrl, thumbUrl };
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (ch) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] || ch
+  ));
+}
+
+function truncateText(ctx, text, maxWidth) {
+  let output = String(text ?? '');
+  if (!output) return '';
+  if (ctx.measureText(output).width <= maxWidth) return output;
+  while (output.length > 1 && ctx.measureText(`${output}…`).width > maxWidth) {
+    output = output.slice(0, -1);
+  }
+  return output.length > 1 ? `${output}…` : output;
+}
+
+function getPixfindShareTargetUrl(puzzleId) {
+  if (!puzzleId) return PIXFIND_SHARE_BASE_URL;
+  const url = new URL(PIXFIND_SHARE_BASE_URL);
+  url.searchParams.set('puzzle', puzzleId);
+  return url.toString();
+}
+
+function getPixfindShareHtmlUrl(puzzleId) {
+  if (!puzzleId) return null;
+  return getSupabasePublicUrl(`puzzles/${puzzleId}/share.html`);
+}
+
+function getPixfindOgpImageUrl(puzzleId) {
+  if (!puzzleId) return null;
+  return getSupabasePublicUrl(`puzzles/${puzzleId}/ogp.png`);
+}
+
+function buildShareHtml({
+  title,
+  description,
+  imageUrl,
+  shareUrl,
+  targetUrl,
+  siteName = 'PiXFiND',
+  ogWidth = PIXFIND_SHARE_OGP_WIDTH,
+  ogHeight = PIXFIND_SHARE_OGP_HEIGHT,
+}) {
+  const safeTitle = escapeHtml(title);
+  const safeDescription = escapeHtml(description);
+  const safeImage = escapeHtml(imageUrl);
+  const safeShareUrl = escapeHtml(shareUrl);
+  const safeTargetUrl = escapeHtml(targetUrl);
+  return `<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>${safeTitle}</title>
+  <meta name="description" content="${safeDescription}"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:title" content="${safeTitle}"/>
+  <meta property="og:description" content="${safeDescription}"/>
+  <meta property="og:image" content="${safeImage}"/>
+  <meta property="og:image:width" content="${ogWidth}"/>
+  <meta property="og:image:height" content="${ogHeight}"/>
+  <meta property="og:url" content="${safeShareUrl}"/>
+  <meta property="og:site_name" content="${escapeHtml(siteName)}"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="${safeTitle}"/>
+  <meta name="twitter:description" content="${safeDescription}"/>
+  <meta name="twitter:image" content="${safeImage}"/>
+  <meta http-equiv="refresh" content="0; url=${safeTargetUrl}"/>
+  <link rel="canonical" href="${safeTargetUrl}"/>
+  <style>body{margin:0;font-family:sans-serif;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh}</style>
+</head>
+<body>
+  <p>Redirecting...</p>
+  <script>window.location.replace('${safeTargetUrl}');</script>
+</body>
+</html>`;
+}
+
+function drawContainImage(ctx, image, x, y, width, height) {
+  if (!ctx || !image) return;
+  const iw = image.naturalWidth || image.width || 1;
+  const ih = image.naturalHeight || image.height || 1;
+  const scale = Math.min(width / iw, height / ih);
+  const dw = Math.max(1, Math.round(iw * scale));
+  const dh = Math.max(1, Math.round(ih * scale));
+  const dx = Math.round(x + (width - dw) / 2);
+  const dy = Math.round(y + (height - dh) / 2);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(image, dx, dy, dw, dh);
+}
+
+function canvasToBlob(canvas, type = 'image/png') {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error('blob create failed'));
+    }, type);
+  });
+}
+
+async function createPuzzleOgpBlob({ title, originalImage, diffImage }) {
+  if (!originalImage || !diffImage) return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = PIXFIND_SHARE_OGP_WIDTH;
+  canvas.height = PIXFIND_SHARE_OGP_HEIGHT;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  gradient.addColorStop(0, '#111827');
+  gradient.addColorStop(1, '#1f2937');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = '#f8fafc';
+  ctx.font = `600 ${PIXFIND_SHARE_TITLE_SIZE}px "M PLUS Rounded 1c", sans-serif`;
+  ctx.textBaseline = 'top';
+  const maxTitleWidth = canvas.width - PIXFIND_SHARE_PADDING * 2;
+  const titleText = truncateText(ctx, title || 'PiXFiND', maxTitleWidth);
+  ctx.fillText(titleText, PIXFIND_SHARE_PADDING, PIXFIND_SHARE_PADDING);
+
+  const top = PIXFIND_SHARE_PADDING + PIXFIND_SHARE_TITLE_SIZE + 20;
+  const availableHeight = canvas.height - top - PIXFIND_SHARE_PADDING;
+  const availableWidth = canvas.width - PIXFIND_SHARE_PADDING * 2 - PIXFIND_SHARE_GAP;
+  const slotWidth = availableWidth / 2;
+
+  const leftX = PIXFIND_SHARE_PADDING;
+  const rightX = PIXFIND_SHARE_PADDING + slotWidth + PIXFIND_SHARE_GAP;
+  const slotY = top;
+
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 2;
+  ctx.fillRect(leftX, slotY, slotWidth, availableHeight);
+  ctx.strokeRect(leftX, slotY, slotWidth, availableHeight);
+  ctx.fillRect(rightX, slotY, slotWidth, availableHeight);
+  ctx.strokeRect(rightX, slotY, slotWidth, availableHeight);
+
+  drawContainImage(ctx, originalImage, leftX, slotY, slotWidth, availableHeight);
+  drawContainImage(ctx, diffImage, rightX, slotY, slotWidth, availableHeight);
+
+  return await canvasToBlob(canvas, 'image/png');
+}
+
+async function uploadPuzzleShareAssets({ puzzleId, title, originalImage, diffImage }) {
+  if (!puzzleId || !originalImage || !diffImage) return null;
+  const ogpBlob = await createPuzzleOgpBlob({ title, originalImage, diffImage });
+  if (!ogpBlob) return null;
+
+  const ogpPath = `puzzles/${puzzleId}/ogp.png`;
+  const sharePath = `puzzles/${puzzleId}/share.html`;
+  const ogpUrl = getPixfindOgpImageUrl(puzzleId);
+  const shareUrl = getPixfindShareHtmlUrl(puzzleId);
+  const targetUrl = getPixfindShareTargetUrl(puzzleId);
+  const description = '2枚の画像を見比べて、間違いを探そう。';
+
+  await uploadPuzzleFile(ogpPath, ogpBlob, 'image/png');
+  const html = buildShareHtml({
+    title: `PiXFiND | ${title || 'パズル'}`,
+    description,
+    imageUrl: ogpUrl,
+    shareUrl,
+    targetUrl,
+  });
+  const htmlBlob = new Blob([html], { type: 'text/html' });
+  await uploadPuzzleFile(sharePath, htmlBlob, 'text/html');
+  return { shareUrl, ogpUrl };
+}
+
+async function createContestOgpBlob({ title, image }) {
+  if (!image) return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = CONTEST_SHARE_OGP_WIDTH;
+  canvas.height = CONTEST_SHARE_OGP_HEIGHT;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  gradient.addColorStop(0, '#0f172a');
+  gradient.addColorStop(1, '#1e293b');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = '#f8fafc';
+  ctx.font = `600 ${CONTEST_SHARE_TITLE_SIZE}px "M PLUS Rounded 1c", sans-serif`;
+  ctx.textBaseline = 'top';
+  const maxTitleWidth = canvas.width - CONTEST_SHARE_PADDING * 2;
+  const titleText = truncateText(ctx, title || '作品', maxTitleWidth);
+  ctx.fillText(titleText, CONTEST_SHARE_PADDING, CONTEST_SHARE_PADDING);
+
+  const top = CONTEST_SHARE_PADDING + CONTEST_SHARE_TITLE_SIZE + 20;
+  const availableHeight = canvas.height - top - CONTEST_SHARE_PADDING;
+  const availableWidth = canvas.width - CONTEST_SHARE_PADDING * 2;
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 2;
+  ctx.fillRect(CONTEST_SHARE_PADDING, top, availableWidth, availableHeight);
+  ctx.strokeRect(CONTEST_SHARE_PADDING, top, availableWidth, availableHeight);
+  drawContainImage(ctx, image, CONTEST_SHARE_PADDING, top, availableWidth, availableHeight);
+
+  return await canvasToBlob(canvas, 'image/png');
+}
+
+async function uploadContestShareAssets({ entryId, title, image }) {
+  if (!entryId || !image) return null;
+  const ogpBlob = await createContestOgpBlob({ title, image });
+  if (!ogpBlob) return null;
+  const ogpPath = `share/${entryId}.png`;
+  const sharePath = `share/${entryId}.html`;
+  const ogpUrl = getContestPublicUrl(ogpPath);
+  const shareUrl = getContestPublicUrl(sharePath);
+  const targetUrl = `${CONTEST_SHARE_BASE_URL}?id=${entryId}`;
+  const html = buildShareHtml({
+    title: `PiXiEED | ${title || '作品'}`,
+    description: 'PiXiEEDのドット作品',
+    imageUrl: ogpUrl,
+    shareUrl,
+    targetUrl,
+    siteName: 'PiXiEED',
+    ogWidth: CONTEST_SHARE_OGP_WIDTH,
+    ogHeight: CONTEST_SHARE_OGP_HEIGHT,
+  });
+  const htmlBlob = new Blob([html], { type: 'text/html' });
+  await uploadContestFile(ogpPath, ogpBlob, 'image/png');
+  await uploadContestFile(sharePath, htmlBlob, 'text/html');
+  return { shareUrl, ogpUrl };
 }
 
 async function normalizePixelImage(image, fallbackDataUrl) {
