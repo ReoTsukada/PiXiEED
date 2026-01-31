@@ -440,61 +440,55 @@
     .entry-author{ margin:0; color:#cbd5e1; font-size:12px; }
     .empty{ color:#cbd5e1; text-align:center; margin:8px 0 0; }
     .status{ color:#fef3c7; font-size:12px; min-height:18px; }
-    .pixfind-link{
+    .action-links{
       display:flex;
-      justify-content:flex-end;
+      gap:8px;
       margin-top:6px;
+      flex-wrap:nowrap;
     }
-    .pixfind-play{
+    .action-btn{
+      flex:1 1 0;
       display:inline-flex;
       align-items:center;
       justify-content:center;
       gap:6px;
       padding:10px 14px;
       border-radius:12px;
+      font-weight:800;
+      text-decoration:none;
+      white-space:nowrap;
+      min-width:0;
+      transition:transform 0.1s ease, filter 0.1s ease;
+    }
+    .action-btn--play{
       border:1px solid rgba(255,111,141,0.6);
       background:linear-gradient(135deg, rgba(255,111,141,0.25), rgba(255,159,67,0.25));
       color:#ffe4ec;
-      font-weight:800;
-      text-decoration:none;
       box-shadow:0 6px 16px rgba(255,111,141,0.25);
-      transition:transform 0.1s ease, filter 0.1s ease;
     }
-    .pixfind-play:hover,
-    .pixfind-play:focus-visible{
-      transform:translateY(-1px);
-      filter:brightness(1.05);
-    }
-    .download-link{
-      display:flex;
-      justify-content:flex-end;
-      gap:8px;
-      margin-top:6px;
-      flex-wrap:wrap;
-    }
-    .download-btn{
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      gap:6px;
-      padding:10px 14px;
-      border-radius:12px;
+    .action-btn--download{
       border:1px solid rgba(96,165,250,0.55);
       background:linear-gradient(135deg, rgba(96,165,250,0.2), rgba(52,211,153,0.18));
       color:#e0f2fe;
-      font-weight:800;
-      cursor:pointer;
       box-shadow:0 6px 16px rgba(96,165,250,0.2);
-      transition:transform 0.1s ease, filter 0.1s ease;
+      cursor:pointer;
     }
-    .download-btn:hover,
-    .download-btn:focus-visible{
+    .action-btn:hover,
+    .action-btn:focus-visible{
       transform:translateY(-1px);
       filter:brightness(1.05);
     }
-    .download-btn:disabled{
-      opacity:0.6;
+    .action-btn.is-disabled,
+    .action-btn:disabled,
+    .action-btn[aria-disabled="true"]{
+      border:1px solid rgba(148,163,184,0.5);
+      background:rgba(148,163,184,0.18);
+      color:#cbd5e1;
+      box-shadow:none;
+      pointer-events:none;
       cursor:not-allowed;
+      filter:none;
+      transform:none;
     }
     .danger-btn{
       border:1px solid rgba(248,113,113,0.5);
@@ -626,11 +620,9 @@
           <p class="status" id="tagStatus"></p>
         </div>
       </div>
-      <div class="pixfind-link" id="pixfindLink" hidden>
-        <a class="pixfind-play" id="pixfindPlay" href="../pixfind/index.html">PiXFiNDで遊ぶ</a>
-      </div>
-      <div class="download-link" id="downloadLink" hidden>
-        <button class="download-btn" id="downloadButton" type="button">ダウンロード</button>
+      <div class="action-links" id="actionLinks">
+        <a class="action-btn action-btn--play is-disabled" id="pixfindPlay" aria-disabled="true" role="button">PiXFiNDで遊ぶ</a>
+        <button class="action-btn action-btn--download is-disabled" id="downloadButton" type="button" disabled>ダウンロード</button>
       </div>
       <p class="status" id="viewStatus"></p>
       <button class="danger-btn" id="deleteEntry" style="display:none;">この作品を削除する</button>
@@ -1417,9 +1409,7 @@
       const likesEl = $('heroLikes');
       const likeIcon = $('heroLikeIcon');
       const delBtn = $('deleteEntry');
-      const playWrap = $('pixfindLink');
       const playBtn = $('pixfindPlay');
-      const downloadWrap = $('downloadLink');
       const downloadBtn = $('downloadButton');
       if(!entry){
         img.src = '';
@@ -1427,7 +1417,15 @@
         authorEl.textContent = '';
         likesEl.textContent = '';
         if(delBtn) delBtn.style.display = 'none';
-        if(playWrap) playWrap.hidden = true;
+        if(playBtn){
+          playBtn.classList.add('is-disabled');
+          playBtn.setAttribute('aria-disabled','true');
+          playBtn.removeAttribute('href');
+        }
+        if(downloadBtn){
+          downloadBtn.disabled = true;
+          downloadBtn.classList.add('is-disabled');
+        }
         return;
       }
       img.src = entry.image_base64;
@@ -1442,21 +1440,24 @@
         delBtn.style.display = canDelete ? 'inline-block' : 'none';
         delBtn.disabled = !canDelete;
       }
-      if(playWrap && playBtn){
+      if(playBtn){
         const puzzleRef = resolvePixfindPuzzleId(entry.prompt || '');
-        const playUrl = buildPixfindUrl(puzzleRef);
+        const isPixfindEntry = entry.mode === 'pixfind' && Boolean(puzzleRef);
+        const playUrl = isPixfindEntry ? buildPixfindUrl(puzzleRef) : null;
         if(playUrl){
-          playWrap.hidden = false;
+          playBtn.classList.remove('is-disabled');
+          playBtn.setAttribute('aria-disabled','false');
           playBtn.href = playUrl;
         }else{
-          playWrap.hidden = true;
+          playBtn.classList.add('is-disabled');
+          playBtn.setAttribute('aria-disabled','true');
           playBtn.removeAttribute('href');
         }
       }
-      if(downloadWrap && downloadBtn){
+      if(downloadBtn){
         const allowDownload = isDownloadAllowed(entry.allow_download);
-        downloadWrap.hidden = !allowDownload;
         downloadBtn.disabled = !allowDownload;
+        downloadBtn.classList.toggle('is-disabled', !allowDownload);
       }
       editTags = parseTags(entry.tags);
       renderTagView(editTags);
