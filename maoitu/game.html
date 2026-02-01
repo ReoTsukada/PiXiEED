@@ -217,125 +217,6 @@ gtag('event', 'project_open_maoitu');
     user-select:none;
     pointer-events:none;
   }
-  .tutorial-overlay{
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,0.6);
-    pointer-events:auto;
-    backdrop-filter:blur(2px);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding:calc(16px + var(--safe-top)) 16px calc(16px + var(--safe-bottom));
-    box-sizing:border-box;
-    z-index:120;
-  }
-  .tutorial-overlay[hidden]{ display:none !important; }
-  .tutorial-card{
-    width:min(360px, 92vw);
-    height:440px;
-    background:rgba(0,0,0,0.86);
-    border:1px solid rgba(255,255,255,0.25);
-    border-radius:14px;
-    color:#fff;
-    padding:16px;
-    box-sizing:border-box;
-    font:14px/1.6 system-ui;
-    display:flex;
-    flex-direction:column;
-    gap:12px;
-    overflow:hidden;
-  }
-  .tutorial-header{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:12px;
-  }
-  .tutorial-card h3{
-    margin:0;
-    font-size:16px;
-    letter-spacing:0.04em;
-  }
-  .tutorial-pages{
-    display:flex;
-    align-items:center;
-    gap:6px;
-    font:12px/1 system-ui;
-    color:#cbd5e1;
-  }
-  .tutorial-figure{
-    width:100%;
-    height:180px;
-    background:rgba(255,255,255,0.04);
-    border:1px solid rgba(255,255,255,0.12);
-    border-radius:10px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    overflow:hidden;
-  }
-  .tutorial-figure img{
-    max-width:100%;
-    max-height:100%;
-    object-fit:contain;
-    image-rendering:pixelated;
-    display:block;
-  }
-  .tutorial-text{
-    flex:1;
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-    overflow:hidden;
-    font-size:13px;
-    line-height:1.6;
-  }
-  .tutorial-text p+p{
-    margin-top:2px;
-  }
-  .tutorial-text p{
-    margin:0;
-  }
-  .tutorial-actions{
-    display:flex;
-    gap:10px;
-    flex-wrap:wrap;
-    justify-content:flex-end;
-  }
-  .tutorial-actions button{
-    padding:10px 14px;
-    border-radius:10px;
-    border:1px solid rgba(255,255,255,0.25);
-    background:rgba(255,255,255,0.08);
-    color:#fff;
-    font:13px/1.2 system-ui;
-    cursor:pointer;
-  }
-  .tutorial-actions button.primary{
-    background:#22c55e;
-    color:#000;
-    border:none;
-    font-weight:700;
-  }
-  .tutorial-actions button:disabled{
-    opacity:0.5;
-    cursor:not-allowed;
-  }
-  .tutorial-open-btn{
-    position:absolute;
-    top:calc(var(--safe-top) + 12px);
-    right:20px;
-    display:block;
-    padding:8px 12px;
-    background:rgba(0,0,0,0.7);
-    border:1px solid rgba(255,255,255,0.3);
-    border-radius:999px;
-    color:#fff;
-    font:14px/1 system-ui;
-    cursor:pointer;
-    z-index:5;
-  }
   .ad-footer{
     position:fixed;
     left:0;
@@ -504,7 +385,6 @@ gtag('event', 'project_open_maoitu');
 <div class="game-area">
   <audio autoplay="" hidden="" id="bgm" loop="" src="bgm.mp3" volume="0.5"></audio>
   <canvas id="c"></canvas>
-  <button class="tutorial-open-btn" id="tutorialOpenBtn" type="button">?</button>
   <div id="gameOverUi">
   <div id="gameOverPanel">
   <div class="gameover-title" id="gameoverTitle">GAME OVER</div>
@@ -515,28 +395,9 @@ gtag('event', 'project_open_maoitu');
 <div id="sharePanel">
   <button id="shareActionBtn" style="background:#22c55e;color:#000;">シェアする</button>
   <button id="restartActionBtn" style="background:#3b82f6;color:#fff;">もう一度遊ぶ</button>
-  <button id="tutorialAgainBtn" style="background:#6b7280;color:#fff;">チュートリアル</button>
   <button id="nextDifficultyBtn" style="background:#f97316;color:#fff;display:none;">次の難易度へ</button>
 </div>
 </div>
-</div>
-<div class="tutorial-overlay" hidden id="tutorialOverlay">
-  <div class="tutorial-card">
-    <div class="tutorial-header">
-      <h3>チュートリアル</h3>
-      <div class="tutorial-pages" id="tutorialPages"></div>
-    </div>
-    <div class="tutorial-figure">
-      <img alt="ゲームプレイの参考画像" id="tutorialImg" src="./ogp.png"/>
-    </div>
-    <div class="tutorial-text" id="tutorialText">
-      <p></p>
-    </div>
-    <div class="tutorial-actions">
-      <button id="tutorialPrev" type="button">← 戻る</button>
-      <button class="primary" id="tutorialNext" type="button">次へ →</button>
-    </div>
-  </div>
 </div>
 <div class="ad-footer">
 <ins class="adsbygoogle"
@@ -615,114 +476,15 @@ const shareScoreLabel = document.getElementById('shareScoreLabel');
 const rankPercentLabel = document.getElementById('rankPercentLabel');
 const shareActionBtn = document.getElementById('shareActionBtn');
 const restartActionBtn = document.getElementById('restartActionBtn');
-const tutorialAgainBtn = document.getElementById('tutorialAgainBtn');
 const nextDifficultyBtn = document.getElementById('nextDifficultyBtn');
-const tutorialOpenBtn = document.getElementById('tutorialOpenBtn');
 const backLink = document.getElementById('backLink');
 const gameOverPanel = document.getElementById('gameOverPanel');
 const clearBadge = document.getElementById('clearBadge');
-const tutorialOverlay = document.getElementById('tutorialOverlay');
-const tutorialPagesEl = document.getElementById('tutorialPages');
-const tutorialImgEl = document.getElementById('tutorialImg');
-const tutorialTextEl = document.getElementById('tutorialText');
-const tutorialPrevBtn = document.getElementById('tutorialPrev');
-const tutorialNextBtn = document.getElementById('tutorialNext');
-// v2: チュートリアルを新規表示するためキーを更新
-const TUTORIAL_KEY = 'maoitu_tutorial_seen_v2';
-let tutorialPage = 0;
-let tutorialActive = false;
-const tutorialSlides = [
-  {
-    img: './assets/1.png',
-    alt: '操作方法の例',
-    lines: [
-      '操作は左右のみ：タップ/ドラッグ、または ←→ キーで移動。',
-      '敵に触れると即アウト。まずは動かすだけでOK。'
-    ]
-  },
-  {
-    img: './assets/2.png',
-    alt: 'エンジェリンとシールド',
-    lines: [
-      '緑のエンジェリンを取ると盾1回分＋フィーバーゲージが増える。',
-      '盾は1回だけ身代わり。なくなったら再び拾って補充しよう。'
-    ]
-  },
-  {
-    img: './assets/3.png',
-    alt: 'フィーバーの説明',
-    lines: [
-      'ゲージ満タンでフィーバー発動：加速＋無敵、敵に触れると消して少し延命＆スコア2倍。',
-      'ボムリンだけはフィーバーでも即アウトなので必ず避ける。'
-    ]
-  },
-  {
-    img: './ogp.png',
-    alt: '攻め方の例',
-    lines: [
-      'フィーバー中に敵に触れて延命しつつ稼ぎ、終わる前に次のエンジェリンを狙うとループしやすい。',
-      'まずは30秒生存を目標に、慣れたらフィーバー連鎖でハイスコアを狙おう。'
-    ]
-  }
-];
 let shareScore = 0;
 let runCleared = false;
 
 const HUD_FONT = '12px "Press Start 2P", monospace';
 const HUD_FONT_SMALL = '9px "Press Start 2P", monospace';
-
-function openTutorial(){
-  if(!tutorialOverlay) return;
-  tutorialActive = true;
-  tutorialOverlay.hidden = false;
-  tutorialOverlay.removeAttribute('hidden');
-  tutorialOverlay.style.display = 'flex';
-  tutorialPage = 0;
-  renderTutorial();
-  if(typeof tutorialOverlay.focus === 'function'){
-    try{ tutorialOverlay.focus(); }catch(_){}
-  }
-}
-
-function closeTutorial(markSeen = false){
-  if(!tutorialOverlay) return;
-  tutorialActive = false;
-  tutorialOverlay.hidden = true;
-  tutorialOverlay.setAttribute('hidden','hidden');
-  tutorialOverlay.style.display = 'none';
-  if(markSeen){
-    lsSet(TUTORIAL_KEY, '1');
-  }
-}
-
-function renderTutorial(){
-  if(!tutorialOverlay) return;
-  const slide = tutorialSlides[tutorialPage] || tutorialSlides[0];
-  if(tutorialImgEl && slide.img){
-    tutorialImgEl.src = slide.img;
-    tutorialImgEl.alt = slide.alt || 'チュートリアル画像';
-  }
-  if(tutorialTextEl){
-    tutorialTextEl.innerHTML = '';
-    slide.lines.forEach(line=>{
-      const p = document.createElement('p');
-      p.textContent = line;
-      tutorialTextEl.appendChild(p);
-    });
-  }
-  const total = tutorialSlides.length;
-  if(tutorialPagesEl){
-    tutorialPagesEl.textContent = `${tutorialPage + 1} / ${total}`;
-  }
-  const isFirst = tutorialPage === 0;
-  const isLast = tutorialPage === total - 1;
-  if(tutorialPrevBtn){
-    tutorialPrevBtn.disabled = isFirst;
-  }
-  if(tutorialNextBtn){
-    tutorialNextBtn.textContent = isLast ? 'ゲーム開始' : '次へ →';
-  }
-}
 
 function logPlayEvent(eventName, params={}){
   if(typeof window.gtag === 'function' && GA_MEASUREMENT_ID){
@@ -756,49 +518,6 @@ restartActionBtn.addEventListener('click', () => {
   hideSharePanel();
   reset();
 });
-
-if(tutorialPrevBtn){
-  tutorialPrevBtn.addEventListener('click', () => {
-    if(tutorialPage > 0){
-      tutorialPage -= 1;
-      renderTutorial();
-    }
-  });
-}
-
-if(tutorialNextBtn){
-  tutorialNextBtn.addEventListener('click', () => {
-    const isLast = tutorialPage === tutorialSlides.length - 1;
-    if(isLast){
-      closeTutorial(true);
-    }else{
-      tutorialPage = Math.min(tutorialSlides.length - 1, tutorialPage + 1);
-      renderTutorial();
-    }
-  });
-}
-
-if(tutorialOverlay){
-  tutorialOverlay.addEventListener('click', (e) => {
-    // 背景クリックで閉じる
-    const isLast = tutorialPage === tutorialSlides.length - 1;
-    if(isLast && e.target === tutorialOverlay){
-      closeTutorial(true);
-    }
-  });
-}
-
-if(tutorialAgainBtn){
-  tutorialAgainBtn.addEventListener('click', () => {
-    openTutorial();
-  });
-}
-
-if(tutorialOpenBtn){
-  tutorialOpenBtn.addEventListener('click', () => {
-    openTutorial();
-  });
-}
 
 if(nextDifficultyBtn){
   nextDifficultyBtn.addEventListener('click', () => {
@@ -860,13 +579,6 @@ function hideSharePanel(){
   gameOverUi.style.display = 'none';
 }
 hideSharePanel();
-function showTutorialIfNeeded(){
-  const seen = lsGet(TUTORIAL_KEY) === '1';
-  if(!seen){
-    openTutorial();
-  }
-}
-showTutorialIfNeeded();
 function isOnSharePanel(target){
   return gameOverUi.style.display !== 'none' && gameOverUi.contains(target);
 }
@@ -956,14 +668,15 @@ const SHAKE_INTENSITY_SHIELD = 1.0;
 const SHAKE_INTENSITY_FATAL = 1.4;
 const SHIELD_FLASH_FRAMES = 14;
 const FEVER_THRESHOLD_FRAMES = 900; // 約15秒
-const FEVER_DURATION_FRAMES = 240; // 4秒
-const FEVER_SPEED_SCALE = 1.25; // フィーバー中はむしろ加速
+const FEVER_DURATION_FRAMES = 300; // 5秒
+const FEVER_SPEED_SCALE = 2; // フィーバー中の敵スピード倍率
 const FEVER_PLAYER_SPEED_MULT = 1.2;
 const FEVER_SCORE_MULT = 2;
-const FEVER_HIT_BONUS_FRAMES = 15; // フィーバー中に敵に触れたときの延命量（短め）
+const FEVER_HIT_BONUS_FRAMES = 10; // フィーバー中に敵に触れたときの延命量（短め）
 const FEVER_GAUGE_BOOST_ON_PICKUP = 120;
 let P={x:PLAYER_START_X,y:PLAYER_START_Y,w:16,h:16,v:4,skin:PLAYER};
 let E=[], angels=[], o=0, tx=PLAYER_START_TX, S=0, alive=true, shieldCharges=0;
+let scoreCarry = 0;
 let hitstopFrames=0;
 let shieldFlashFrames=0;
 let shakeFrames=0;
@@ -1069,6 +782,7 @@ let difficultyLevel = 1;
 const DIFFICULTY_STEP_SEC = 10;
 let lastDifficultyUpdateSec = 0;
 let elapsedFrames = 0;
+const ENEMY_GRACE_FRAMES = 60;
 let slowDecreaseToggle = false;
 let difficultyLabel = DIFFICULTY_PRESETS.endless.label;
 
@@ -1165,7 +879,7 @@ document.onpointermove = e => {
 };
 addEventListener('keydown',e=>{ if(!alive) return; if(e.key==='ArrowLeft')tx-=20; else if(e.key==='ArrowRight')tx+=20; });
 
-function reset(countPlay = true){ alive=true; E.length=0; angels.length=0; o=0; S=0; shieldCharges=startShieldCharges||0; P.x=PLAYER_START_X; P.y=PLAYER_START_Y; tx=PLAYER_START_TX; P.skin=PLAYER;
+function reset(countPlay = true){ alive=true; E.length=0; angels.length=0; o=0; S=0; scoreCarry=0; shieldCharges=startShieldCharges||0; P.x=PLAYER_START_X; P.y=PLAYER_START_Y; tx=PLAYER_START_TX; P.skin=PLAYER;
   hitstopFrames = 0;
   shieldFlashFrames = 0;
   shakeFrames = 0;
@@ -1245,19 +959,12 @@ function clearRun(){
 
 // ====== 1フレーム ======
 function step(){
-  if(tutorialActive){
-    if(tutorialOverlay && tutorialOverlay.hidden){
-      // もし何らかの理由でオーバーレイが見えない場合は進行を止めない
-      tutorialActive = false;
-    }else{
-      return;
-    }
-  }
   if(hitstopFrames > 0){
     hitstopFrames--;
     return;
   }
-  if(o % enemySpawnIntervalFrames === 0){
+  const enemySpawnEnabled = elapsedFrames >= ENEMY_GRACE_FRAMES;
+  if(enemySpawnEnabled && o % enemySpawnIntervalFrames === 0){
     for(let i=0;i<enemiesPerSpawn;i++) spawnEnemy();
   }
   if(o % ANGEL_BASE_INTERVAL === 0 && Math.random() < ANGEL_SPAWN_PROB) spawnAngel();
@@ -1333,7 +1040,7 @@ function step(){
     }
     e.y+=e.v * speedScale;
   });
-  angels.forEach(a=>a.y+=a.v * speedScale);
+  angels.forEach(a=>a.y+=a.v);
 
   const dx=tx-P.x; P.x+=Math.sign(dx)*Math.min(Math.abs(dx),playerSpeed);
   P.x=Math.max(0,Math.min(W-P.w,P.x));
@@ -1418,7 +1125,12 @@ function step(){
     }
   }
   const scoreGain = feverFrames > 0 ? FEVER_SCORE_MULT : 1;
-  S+=scoreGain;
+  scoreCarry += scoreGain;
+  const scoreAdd = Math.floor(scoreCarry);
+  if(scoreAdd > 0){
+    S += scoreAdd;
+    scoreCarry -= scoreAdd;
+  }
   starOffset = (starOffset + STAR_SCROLL_SPEED * speedScale);
   starOffsetNear = (starOffsetNear + STAR_SCROLL_SPEED_NEAR * speedScale);
 
@@ -1612,7 +1324,7 @@ function loop(now){
   const MAX_STEPS = 5;
   let steps = 0;
   while (acc >= FIXED_DT_MS && steps < MAX_STEPS){
-    if (alive && !tutorialActive) step();
+    if (alive) step();
     acc -= FIXED_DT_MS;
     steps++;
   }
