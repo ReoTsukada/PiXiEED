@@ -842,6 +842,9 @@
     const CONTEST_SHARE_OGP_HEIGHT = 630;
     const CONTEST_SHARE_PADDING = 60;
     const CONTEST_SHARE_TITLE_SIZE = 32;
+    const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
+    const CONTEST_SHARE_QUEUE_KEY = 'contest_share_queue';
+    const CONTEST_SHARE_QUEUE_LIMIT = 20;
     const PIXFIND_PROMPT_PREFIX = 'pixfind:';
     const PIXFIND_PATH = '../pixfind/index.html';
     const MAX_TAGS = 5;
@@ -892,6 +895,7 @@
       { id:'baburin', type:'img', src:'../character-dots/baburinpng.png' }
     ];
     let clientId = null;
+    let supabaseMaintenance = Boolean(readSupabaseMaintenance());
     let supabaseAuth = null;
     let supabaseSession = null;
     let supabaseUser = null;
@@ -920,6 +924,83 @@
     function setStatus(msg){
       const el = $('viewStatus');
       if(el) el.textContent = msg || '';
+    }
+
+    function readSupabaseMaintenance(){
+      try{
+        const raw = localStorage.getItem(SUPABASE_MAINTENANCE_KEY);
+        if(!raw) return null;
+        const data = JSON.parse(raw);
+        if(data && data.active) return data;
+      }catch(_){
+        // ignore
+      }
+      return null;
+    }
+
+    function isSupabaseMaintenance(){
+      return supabaseMaintenance;
+    }
+
+    function setSupabaseMaintenance(active, reason = ''){
+      supabaseMaintenance = active;
+      try{
+        if(active){
+          localStorage.setItem(SUPABASE_MAINTENANCE_KEY, JSON.stringify({ active: true, reason, ts: Date.now() }));
+        }else{
+          localStorage.removeItem(SUPABASE_MAINTENANCE_KEY);
+        }
+      }catch(_){
+        // ignore
+      }
+      if(active){
+        setStatus('メンテナンス中のため投稿・共有は一時停止しています');
+      }
+    }
+
+    function noteSupabaseSuccess(){
+      if(supabaseMaintenance){
+        setSupabaseMaintenance(false);
+      }
+    }
+
+    function shouldMarkSupabaseMaintenance(error, status){
+      if(status && status >= 500) return true;
+      const msg = String(error?.message || '').toLowerCase();
+      return msg.includes('failed to fetch') || msg.includes('network') || msg.includes('fetch failed') || msg.includes('503') || msg.includes('502') || msg.includes('504');
+    }
+
+    function markSupabaseMaintenanceFromError(error, status){
+      if(shouldMarkSupabaseMaintenance(error, status)){
+        setSupabaseMaintenance(true, 'network');
+      }
+    }
+
+    function loadShareQueue(){
+      try{
+        const raw = localStorage.getItem(CONTEST_SHARE_QUEUE_KEY);
+        if(!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      }catch(_){
+        return [];
+      }
+    }
+
+    function saveShareQueue(queue){
+      try{
+        localStorage.setItem(CONTEST_SHARE_QUEUE_KEY, JSON.stringify(queue.slice(0, CONTEST_SHARE_QUEUE_LIMIT)));
+      }catch(_){
+        // ignore
+      }
+    }
+
+    function queueShareTask(task){
+      if(!task?.entryId) return;
+      const queue = loadShareQueue();
+      const next = queue.filter(item => item.entryId !== task.entryId);
+      next.unshift(task);
+      saveShareQueue(next);
     }
 
     function setAuthStatus(msg){
@@ -1782,6 +1863,9 @@
         return;
       }
       img.src = resolveEntryImage(entry);
+      img.onerror = () => {
+        img.src = makePlaceholder('#334155');
+      };
       img.alt = entry.title || 'dot work';
       titleEl.textContent = entry.title || '無題';
       authorEl.textContent = `by ${entry.name || '名無し'}`;
@@ -1828,6 +1912,10 @@
 
     async function likeEntry(){
       if(!entry) return;
+      if(isSupabaseMaintenance()){
+        setStatus('メンテナンス中のためいいねできません');
+        return;
+      }
       ensureClientId();
       const already = likedEntries.has(entry.id);
       if(already){
@@ -1849,6 +1937,7 @@
         }
       }catch(err){
         console.error(err);
+        markSupabaseMaintenanceFromError(err);
       }
     }
 
@@ -1919,7 +2008,11 @@
           await fetchEntry(id);
           return;
         }
-        setStatus('ネットワークエラーが発生しています');
+        if(isSupabaseMaintenance()){
+          setStatus('メンテナンス中のため作品を読み込めません');
+        }else{
+          setStatus('ネットワークエラーが発生しています');
+        }
       }
       render();
       entryLoaded = loaded;
@@ -1959,6 +2052,7 @@
         return;
       }
       wrap.innerHTML = '';
+      const placeholderSrc = makePlaceholder('#334155');
       const AD_SLOTS = ['2141591954','9073878884','2261515379'];
       entries.forEach((e, idx) => {
         const item = document.createElement('a');
@@ -1974,6 +2068,11 @@
           const slotId = AD_SLOTS[Math.floor(idx / 6) % AD_SLOTS.length];
           wrap.appendChild(createRelatedAdCard(slotId));
         }
+      });
+      wrap.querySelectorAll('.entry-imgwrap img').forEach(img => {
+        img.addEventListener('error', () => {
+          img.src = placeholderSrc;
+        });
       });
       try{
         if(window.pixieedObserveAds){
@@ -2216,6 +2315,7 @@
         return { shareUrl, ogpUrl };
       }catch(err){
         console.warn('share upload failed', err);
+        markSupabaseMaintenanceFromError(err);
         const msg = String(err?.message || '').toLowerCase();
         if(msg.includes('bucket') || msg.includes('storage') || msg.includes('not found')){
           supportsStorageUploads = false;
@@ -2227,6 +2327,11 @@
     async function handleShare(){
       if(!entry || !entryLoaded){
         setStatus('作品が読み込まれていません');
+        return;
+      }
+      if(isSupabaseMaintenance()){
+        queueShareTask({ entryId: entry.id, title: entry.title });
+        setStatus('メンテナンス中のため共有リンクは後で生成されます');
         return;
       }
       const shareBtn = $('shareButton');
@@ -2252,7 +2357,13 @@
         }
       }catch(err){
         console.error(err);
+        markSupabaseMaintenanceFromError(err);
+        if(isSupabaseMaintenance()){
+          queueShareTask({ entryId: entry?.id, title: entry?.title });
+          setStatus('共有リンクはメンテナンス復旧後に生成されます');
+        }else{
         setStatus('共有リンクの作成に失敗しました');
+        }
       }finally{
         if(shareBtn){
           const canShare = entryLoaded && Boolean(supabaseAuth?.storage) && supportsStorageUploads;
@@ -2303,46 +2414,84 @@
       if(offset){
         params.set('offset', String(offset));
       }
-      const res = await fetch(`${SUPABASE_REST}/${table}?${params.toString()}`, {
-        headers: supabaseHeaders()
-      });
+      let res;
+      try{
+        res = await fetch(`${SUPABASE_REST}/${table}?${params.toString()}`, {
+          headers: supabaseHeaders()
+        });
+      }catch(err){
+        markSupabaseMaintenanceFromError(err);
+        throw err;
+      }
       if(!res.ok){
         const detail = await res.text();
+        markSupabaseMaintenanceFromError(null, res.status);
         throw new Error(`supabase select failed: ${res.status} ${detail}`);
       }
+      noteSupabaseSuccess();
       return res.json();
     }
 
     async function supabaseInsert(table, payload){
-      const res = await fetch(`${SUPABASE_REST}/${table}`, {
-        method:'POST',
-        headers: supabaseHeaders(),
-        body: JSON.stringify(payload)
-      });
-      if(!res.ok) throw new Error(`supabase insert failed: ${res.status}`);
+      let res;
+      try{
+        res = await fetch(`${SUPABASE_REST}/${table}`, {
+          method:'POST',
+          headers: supabaseHeaders(),
+          body: JSON.stringify(payload)
+        });
+      }catch(err){
+        markSupabaseMaintenanceFromError(err);
+        throw err;
+      }
+      if(!res.ok){
+        markSupabaseMaintenanceFromError(null, res.status);
+        throw new Error(`supabase insert failed: ${res.status}`);
+      }
+      noteSupabaseSuccess();
       return res.json();
     }
 
     async function supabaseDelete(table, { eq = {} } = {}){
       const params = new URLSearchParams();
       Object.entries(eq).forEach(([k,v]) => params.set(k, `eq.${v}`));
-      const res = await fetch(`${SUPABASE_REST}/${table}?${params.toString()}`, {
-        method:'DELETE',
-        headers: supabaseHeaders()
-      });
-      if(!res.ok) throw new Error(`supabase delete failed: ${res.status}`);
+      let res;
+      try{
+        res = await fetch(`${SUPABASE_REST}/${table}?${params.toString()}`, {
+          method:'DELETE',
+          headers: supabaseHeaders()
+        });
+      }catch(err){
+        markSupabaseMaintenanceFromError(err);
+        throw err;
+      }
+      if(!res.ok){
+        markSupabaseMaintenanceFromError(null, res.status);
+        throw new Error(`supabase delete failed: ${res.status}`);
+      }
+      noteSupabaseSuccess();
       return res.json();
     }
 
     async function supabaseUpdate(table, payload, { eq = {} } = {}){
       const params = new URLSearchParams();
       Object.entries(eq).forEach(([k,v]) => params.set(k, `eq.${v}`));
-      const res = await fetch(`${SUPABASE_REST}/${table}?${params.toString()}`, {
-        method:'PATCH',
-        headers: { ...supabaseHeaders(), Prefer: 'return=representation' },
-        body: JSON.stringify(payload)
-      });
-      if(!res.ok) throw new Error(`supabase update failed: ${res.status}`);
+      let res;
+      try{
+        res = await fetch(`${SUPABASE_REST}/${table}?${params.toString()}`, {
+          method:'PATCH',
+          headers: { ...supabaseHeaders(), Prefer: 'return=representation' },
+          body: JSON.stringify(payload)
+        });
+      }catch(err){
+        markSupabaseMaintenanceFromError(err);
+        throw err;
+      }
+      if(!res.ok){
+        markSupabaseMaintenanceFromError(null, res.status);
+        throw new Error(`supabase update failed: ${res.status}`);
+      }
+      noteSupabaseSuccess();
       return res.json();
     }
 
@@ -2356,6 +2505,9 @@
 
     async function init(){
       ensureClientId();
+      if(supabaseMaintenance){
+        setSupabaseMaintenance(true, 'cached');
+      }
       setupAuthButton();
       setupAvatarToggle();
       setupTagEditor();
