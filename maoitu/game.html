@@ -483,6 +483,12 @@ const clearBadge = document.getElementById('clearBadge');
 let shareScore = 0;
 let runCleared = false;
 
+window.addEventListener('pixieed:score-queued', () => {
+  if(rankPercentLabel){
+    rankPercentLabel.textContent = 'メンテ中のためキューに保存しました';
+  }
+});
+
 const HUD_FONT = '12px "Press Start 2P", monospace';
 const HUD_FONT_SMALL = '9px "Press Start 2P", monospace';
 
