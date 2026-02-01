@@ -184,13 +184,29 @@ const CONTEST_SHARE_OGP_WIDTH = 1200;
 const CONTEST_SHARE_OGP_HEIGHT = 630;
 const CONTEST_SHARE_PADDING = 60;
 const CONTEST_SHARE_TITLE_SIZE = 32;
+const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
+const PUBLISHED_CACHE_KEY = 'pixfind_published_cache';
+const SHARE_QUEUE_KEY = 'pixfind_share_queue';
+const SHARE_QUEUE_LIMIT = 20;
+const CONTEST_SHARE_QUEUE_KEY = 'contest_share_queue';
+const CONTEST_SHARE_QUEUE_LIMIT = 20;
+const PUBLISHED_CACHE_LIMIT = 60;
+const PUZZLE_PLACEHOLDER_DATA_URL = `data:image/svg+xml;utf8,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="180"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#111827"/><stop offset="1" stop-color="#1f2937"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/><rect x="18" y="18" width="204" height="144" rx="16" ry="16" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.2)"/><text x="50%" y="54%" text-anchor="middle" font-family="M PLUS Rounded 1c, sans-serif" font-size="18" fill="#e5e7eb">PiXFiND</text></svg>'
+)}`;
+
+let supabaseMaintenance = Boolean(readSupabaseMaintenance());
 
 async function init() {
   setActiveScreen('start');
   updateProgressLabel();
   setHint('星を選んで、挑戦したい難易度を選んでください。');
+  if (supabaseMaintenance) {
+    setSupabaseMaintenance(true, 'cached');
+  }
 
   await loadOfficialPuzzles();
+  flushShareQueue().catch(error => console.warn('share queue flush failed', error));
   await handleInitialPuzzleFromUrl();
 
   dom.startButton?.addEventListener('click', () => {
@@ -289,6 +305,9 @@ function openCreatorOverlay() {
   if (dom.creatorTitleInput) {
     dom.creatorTitleInput.focus();
   }
+  if (isSupabaseMaintenance()) {
+    setCreatorStatus('現在メンテナンス中のため公開できません。', 'error');
+  }
 }
 
 function closeCreatorOverlay() {
@@ -383,7 +402,8 @@ function setCreatorStatus(message, tone = 'info') {
 }
 
 function setCreatorActionsEnabled(enabled) {
-  if (dom.creatorExportButton) dom.creatorExportButton.disabled = !enabled;
+  const canPublish = enabled && !isSupabaseMaintenance();
+  if (dom.creatorExportButton) dom.creatorExportButton.disabled = !canPublish;
 }
 
 function updateCreatorSummary(diffResult, width, height) {
@@ -504,6 +524,10 @@ async function handleCreatorAnalyze() {
 }
 
 async function handleCreatorPublish() {
+  if (isSupabaseMaintenance()) {
+    setCreatorStatus('現在メンテナンス中のため公開できません。', 'error');
+    return;
+  }
   if (!creatorState.diffResult || !creatorState.originalFile || !creatorState.diffFile) {
     setCreatorStatus('公開には差分の自動判定が必要です。', 'error');
     return;
@@ -613,6 +637,8 @@ async function handleCreatorPublish() {
               image: creatorState.originalImage,
             });
           } catch (error) {
+            queueContestShareTask({ entryId: contestEntry.id, title });
+            markSupabaseMaintenanceFromError(error);
             console.warn('contest share asset creation failed', error);
           }
         }
@@ -636,12 +662,21 @@ async function handleCreatorPublish() {
         }
       }
     } catch (error) {
+      queueShareTask({
+        puzzleId,
+        title,
+        originalUrl: normalized?.original || originalUrl || null,
+        diffUrl: normalized?.diff || diffUrl || null,
+      });
+      markSupabaseMaintenanceFromError(error);
       console.warn('share asset creation failed', error);
     }
     const contestMessage = postToContest
       ? (contestPosted ? 'コンテストにも投稿しました。' : 'コンテスト投稿は失敗しました。')
       : 'コンテスト投稿はオフです。';
-    if (navigator.clipboard?.writeText) {
+    if (isSupabaseMaintenance()) {
+      setCreatorStatus(`公開しました。共有リンクはメンテナンス復旧後に生成されます。${contestMessage}`);
+    } else if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(shareUrl);
       setCreatorStatus(`公開しました。共有リンクをコピーしました。${contestMessage}`);
     } else {
@@ -740,18 +775,26 @@ async function uploadPuzzleFile(path, body, contentType = null) {
   }
   const safePath = encodeStoragePath(path);
   const url = `${SUPABASE_STORAGE_URL}/${SUPABASE_BUCKET}/${safePath}`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      ...supabaseHeaders(),
-      'Content-Type': contentType || body.type || 'application/octet-stream',
-    },
-    body,
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        ...supabaseHeaders(),
+        'Content-Type': contentType || body.type || 'application/octet-stream',
+      },
+      body,
+    });
+  } catch (error) {
+    markSupabaseMaintenanceFromError(error);
+    throw error;
+  }
   if (!response.ok) {
     const detail = await response.text();
+    markSupabaseMaintenanceFromError(null, response.status);
     throw new Error(`upload failed: ${response.status} ${detail}`);
   }
+  noteSupabaseSuccess();
   return getSupabasePublicUrl(path);
 }
 
@@ -761,54 +804,78 @@ async function uploadContestFile(path, body, contentType = null) {
   }
   const safePath = encodeStoragePath(path);
   const url = `${SUPABASE_STORAGE_URL}/${CONTEST_BUCKET}/${safePath}`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      ...supabaseHeaders(),
-      'Content-Type': contentType || body.type || 'application/octet-stream',
-    },
-    body,
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        ...supabaseHeaders(),
+        'Content-Type': contentType || body.type || 'application/octet-stream',
+      },
+      body,
+    });
+  } catch (error) {
+    markSupabaseMaintenanceFromError(error);
+    throw error;
+  }
   if (!response.ok) {
     const detail = await response.text();
+    markSupabaseMaintenanceFromError(null, response.status);
     throw new Error(`upload failed: ${response.status} ${detail}`);
   }
+  noteSupabaseSuccess();
   return getContestPublicUrl(path);
 }
 
 async function insertPublishedPuzzle(payload) {
-  const response = await fetch(`${SUPABASE_REST_URL}/${SUPABASE_TABLE}`, {
-    method: 'POST',
-    headers: {
-      ...supabaseHeaders(),
-      'Content-Type': 'application/json',
-      Prefer: 'return=representation',
-    },
-    body: JSON.stringify(payload),
-  });
+  let response;
+  try {
+    response = await fetch(`${SUPABASE_REST_URL}/${SUPABASE_TABLE}`, {
+      method: 'POST',
+      headers: {
+        ...supabaseHeaders(),
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    markSupabaseMaintenanceFromError(error);
+    throw error;
+  }
   if (!response.ok) {
     const detail = await response.text();
+    markSupabaseMaintenanceFromError(null, response.status);
     throw new Error(`insert failed: ${response.status} ${detail}`);
   }
   const data = await response.json();
+  noteSupabaseSuccess();
   return Array.isArray(data) ? data[0] : null;
 }
 
 async function insertContestEntry(payload) {
-  const response = await fetch(`${SUPABASE_REST_URL}/${CONTEST_TABLE}`, {
-    method: 'POST',
-    headers: {
-      ...supabaseHeaders(),
-      'Content-Type': 'application/json',
-      Prefer: 'return=representation',
-    },
-    body: JSON.stringify(payload),
-  });
+  let response;
+  try {
+    response = await fetch(`${SUPABASE_REST_URL}/${CONTEST_TABLE}`, {
+      method: 'POST',
+      headers: {
+        ...supabaseHeaders(),
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    markSupabaseMaintenanceFromError(error);
+    throw error;
+  }
   if (!response.ok) {
     const detail = await response.text();
+    markSupabaseMaintenanceFromError(null, response.status);
     throw new Error(`contest insert failed: ${response.status} ${detail}`);
   }
   const data = await response.json();
+  noteSupabaseSuccess();
   return Array.isArray(data) ? data[0] : null;
 }
 
@@ -835,6 +902,166 @@ function supabaseHeaders() {
     apikey: SUPABASE_ANON_KEY,
     Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
   };
+}
+
+function readSupabaseMaintenance() {
+  try {
+    const raw = localStorage.getItem(SUPABASE_MAINTENANCE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (data && data.active) return data;
+  } catch (_) {
+    // ignore
+  }
+  return null;
+}
+
+function isSupabaseMaintenance() {
+  return supabaseMaintenance;
+}
+
+function setSupabaseMaintenance(active, reason = '') {
+  supabaseMaintenance = active;
+  try {
+    if (active) {
+      localStorage.setItem(SUPABASE_MAINTENANCE_KEY, JSON.stringify({ active: true, reason, ts: Date.now() }));
+    } else {
+      localStorage.removeItem(SUPABASE_MAINTENANCE_KEY);
+    }
+  } catch (_) {
+    // ignore
+  }
+  if (active) {
+    if (!dom.app?.classList.contains('is-playing')) {
+      setHint('現在メンテナンス中です。公開・共有は復旧後に再開されます。');
+    }
+    if (isCreatorOverlayOpen()) {
+      setCreatorStatus('現在メンテナンス中のため公開できません。', 'error');
+    }
+  }
+  const canPublish = Boolean(creatorState.diffResult && creatorState.originalFile && creatorState.diffFile);
+  setCreatorActionsEnabled(canPublish);
+}
+
+function noteSupabaseSuccess() {
+  if (supabaseMaintenance) {
+    setSupabaseMaintenance(false);
+  }
+}
+
+function shouldMarkSupabaseMaintenance(error, status) {
+  if (status && status >= 500) return true;
+  const msg = String(error?.message || '').toLowerCase();
+  return msg.includes('failed to fetch') || msg.includes('network') || msg.includes('fetch failed') || msg.includes('503') || msg.includes('502') || msg.includes('504');
+}
+
+function markSupabaseMaintenanceFromError(error, status) {
+  if (shouldMarkSupabaseMaintenance(error, status)) {
+    setSupabaseMaintenance(true, 'network');
+  }
+}
+
+function loadPublishedCache() {
+  try {
+    const raw = localStorage.getItem(PUBLISHED_CACHE_KEY);
+    if (!raw) return [];
+    const data = JSON.parse(raw);
+    const items = Array.isArray(data?.items) ? data.items : [];
+    return items.map(normalizePublishedPuzzleEntry).filter(Boolean);
+  } catch (_) {
+    return [];
+  }
+}
+
+function savePublishedCache(items) {
+  try {
+    const trimmed = Array.isArray(items) ? items.slice(0, PUBLISHED_CACHE_LIMIT) : [];
+    localStorage.setItem(PUBLISHED_CACHE_KEY, JSON.stringify({ ts: Date.now(), items: trimmed }));
+  } catch (_) {
+    // ignore
+  }
+}
+
+function loadShareQueue() {
+  try {
+    const raw = localStorage.getItem(SHARE_QUEUE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveShareQueue(queue) {
+  try {
+    localStorage.setItem(SHARE_QUEUE_KEY, JSON.stringify(queue.slice(0, SHARE_QUEUE_LIMIT)));
+  } catch (_) {
+    // ignore
+  }
+}
+
+function queueShareTask(task) {
+  if (!task?.puzzleId) return;
+  const queue = loadShareQueue();
+  const next = queue.filter(item => item.puzzleId !== task.puzzleId);
+  next.unshift(task);
+  saveShareQueue(next);
+}
+
+function loadContestShareQueue() {
+  try {
+    const raw = localStorage.getItem(CONTEST_SHARE_QUEUE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveContestShareQueue(queue) {
+  try {
+    localStorage.setItem(CONTEST_SHARE_QUEUE_KEY, JSON.stringify(queue.slice(0, CONTEST_SHARE_QUEUE_LIMIT)));
+  } catch (_) {
+    // ignore
+  }
+}
+
+function queueContestShareTask(task) {
+  if (!task?.entryId) return;
+  const queue = loadContestShareQueue();
+  const next = queue.filter(item => item.entryId !== task.entryId);
+  next.unshift(task);
+  saveContestShareQueue(next);
+}
+
+async function flushShareQueue() {
+  if (isSupabaseMaintenance()) return;
+  const queue = loadShareQueue();
+  if (!queue.length) return;
+  const remaining = [];
+  for (const task of queue) {
+    if (!task?.puzzleId || !task?.originalUrl || !task?.diffUrl) {
+      continue;
+    }
+    try {
+      const [originalImage, diffImage] = await Promise.all([
+        loadImageFromUrl(task.originalUrl),
+        loadImageFromUrl(task.diffUrl),
+      ]);
+      await uploadPuzzleShareAssets({
+        puzzleId: task.puzzleId,
+        title: task.title,
+        originalImage,
+        diffImage,
+      });
+    } catch (error) {
+      remaining.push(task);
+      markSupabaseMaintenanceFromError(error);
+    }
+  }
+  saveShareQueue(remaining);
 }
 
 function getSupabasePublicUrl(path) {
@@ -938,14 +1165,21 @@ async function loadPublishedPuzzles() {
     });
     if (!response.ok) {
       console.warn('Failed to load published puzzles', response.status);
-      return [];
+      markSupabaseMaintenanceFromError(null, response.status);
+      const cached = loadPublishedCache();
+      return cached.length ? cached : [];
     }
     const data = await response.json();
     if (!Array.isArray(data)) return [];
-    return data.map(normalizePublishedPuzzleEntry).filter(Boolean);
+    const normalized = data.map(normalizePublishedPuzzleEntry).filter(Boolean);
+    savePublishedCache(normalized);
+    noteSupabaseSuccess();
+    return normalized;
   } catch (error) {
     console.warn('Failed to load published puzzles', error);
-    return [];
+    markSupabaseMaintenanceFromError(error);
+    const cached = loadPublishedCache();
+    return cached.length ? cached : [];
   }
 }
 
@@ -1080,6 +1314,16 @@ function createShareUrl(puzzle) {
 async function sharePuzzle(puzzle) {
   let shareUrl = createShareUrl(puzzle);
   if (puzzle?.source === 'published' && !puzzle?.shareUrl && puzzle.original && puzzle.diff) {
+    if (isSupabaseMaintenance()) {
+      queueShareTask({
+        puzzleId: puzzle.id,
+        title: puzzle.label,
+        originalUrl: puzzle.original,
+        diffUrl: puzzle.diff,
+      });
+      window.alert('現在メンテナンス中のため共有リンクは後で生成されます。復旧後に再度共有してください。');
+      return;
+    }
     try {
       const [originalImage, diffImage] = await Promise.all([
         loadImageFromUrl(puzzle.original),
@@ -1096,6 +1340,13 @@ async function sharePuzzle(puzzle) {
         shareUrl = shareAssets.shareUrl;
       }
     } catch (error) {
+      queueShareTask({
+        puzzleId: puzzle.id,
+        title: puzzle.label,
+        originalUrl: puzzle.original,
+        diffUrl: puzzle.diff,
+      });
+      markSupabaseMaintenanceFromError(error);
       console.warn('share asset creation failed', error);
     }
   }
@@ -1279,6 +1530,12 @@ function createOfficialCard(puzzle) {
   if (thumbImage) {
     thumbImage.setAttribute('draggable', 'false');
     thumbImage.setAttribute('aria-hidden', 'true');
+    if (!puzzle.thumbnail) {
+      thumbImage.src = PUZZLE_PLACEHOLDER_DATA_URL;
+    }
+    thumbImage.addEventListener('error', () => {
+      thumbImage.src = PUZZLE_PLACEHOLDER_DATA_URL;
+    });
     ['pointerdown', 'touchstart', 'mousedown', 'contextmenu'].forEach((type) => {
       thumbImage.addEventListener(type, (event) => {
         event.preventDefault();
