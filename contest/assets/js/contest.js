@@ -21,6 +21,9 @@ const CONTEST_CACHE_KEY = 'pixieed_contest_cache';
 const CONTEST_CACHE_LIMIT = 60;
 const CONTEST_SHARE_QUEUE_KEY = 'contest_share_queue';
 const CONTEST_SHARE_QUEUE_LIMIT = 20;
+const POST_QUEUE_KEY = 'contest_post_queue';
+const POST_QUEUE_LIMIT = 20;
+const POST_QUEUE_RETRY_MS = 60000;
 
 let clientId = null;
 let likedEntries = new Set();
@@ -31,6 +34,7 @@ let placeholderCache = null;
 let supportsImageUrls = true;
 let supportsStorageUploads = true;
 let supabaseMaintenance = Boolean(readSupabaseMaintenance());
+let postQueueBusy = false;
 
 const PLACEHOLDERS = new Array(10).fill(0).map((_, i) => ({
   title: `サンプル${i + 1}`,
@@ -93,7 +97,7 @@ function setSupabaseMaintenance(active, reason = ''){
     // ignore
   }
   if(active){
-    setStatus('メンテナンス中のため投稿・共有は一時停止しています');
+    setStatus('メンテ中のため投稿はキューに保存されます');
   }
   updatePostControls();
 }
@@ -101,6 +105,12 @@ function setSupabaseMaintenance(active, reason = ''){
 function noteSupabaseSuccess(){
   if(supabaseMaintenance){
     setSupabaseMaintenance(false);
+  }
+  if(!supabaseMaintenance && loadPostQueue().length){
+    flushPostQueue().catch(err => console.warn('post queue flush failed', err));
+  }
+  if(!supabaseMaintenance && loadShareQueue().length){
+    flushShareQueue().catch(err => console.warn('share queue flush failed', err));
   }
 }
 
@@ -114,6 +124,24 @@ function shouldMarkSupabaseMaintenance(error){
 function markSupabaseMaintenanceFromError(error){
   if(shouldMarkSupabaseMaintenance(error)){
     setSupabaseMaintenance(true, 'network');
+  }
+}
+
+async function probeSupabaseAvailability(){
+  try{
+    const { error } = await supabase
+      .from('contest_entries')
+      .select('id')
+      .limit(1);
+    if(error){
+      markSupabaseMaintenanceFromError(error);
+      return false;
+    }
+    noteSupabaseSuccess();
+    return true;
+  }catch(err){
+    markSupabaseMaintenanceFromError(err);
+    return false;
   }
 }
 
@@ -168,10 +196,10 @@ function updatePostControls(){
   const form = $(FORM_ID);
   if(form){
     const submit = form.querySelector('button[type="submit"]');
-    if(submit) submit.disabled = isSupabaseMaintenance();
+    if(submit) submit.disabled = false;
   }
   const openBtn = document.getElementById('openPostPanel');
-  if(openBtn) openBtn.disabled = isSupabaseMaintenance();
+  if(openBtn) openBtn.disabled = false;
 }
 
 async function resolveEntryImageBlob(entry){
@@ -265,6 +293,168 @@ function createThumbnailCanvas(source){
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
   return canvas;
+}
+
+async function dataUrlToBlob(dataUrl){
+  const response = await fetch(dataUrl);
+  if(!response.ok) throw new Error('data url parse failed');
+  return await response.blob();
+}
+
+function loadPostQueue(){
+  try{
+    const raw = localStorage.getItem(POST_QUEUE_KEY);
+    if(!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  }catch(_){
+    return [];
+  }
+}
+
+function savePostQueue(queue){
+  try{
+    localStorage.setItem(POST_QUEUE_KEY, JSON.stringify(queue.slice(0, POST_QUEUE_LIMIT)));
+  }catch(_){
+    // ignore
+  }
+}
+
+function normalizePostTask(task){
+  if(!task) return null;
+  const dataUrl = typeof task.dataUrl === 'string' ? task.dataUrl : '';
+  if(!dataUrl) return null;
+  const queueId = task.queueId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2,8)}`);
+  return {
+    queueId,
+    name: task.name || '名無し',
+    title: task.title || '無題',
+    prompt: task.prompt || PROMPT_TEXT,
+    mode: task.mode || 'free',
+    submitted_at: task.submitted_at || new Date().toISOString(),
+    width: Number.isFinite(task.width) ? task.width : null,
+    height: Number.isFinite(task.height) ? task.height : null,
+    colors: Number.isFinite(task.colors) ? task.colors : null,
+    dataUrl,
+  };
+}
+
+function queuePostTask(task){
+  const normalized = normalizePostTask(task);
+  if(!normalized) return false;
+  const queue = loadPostQueue();
+  const next = queue.filter(item => item.queueId !== normalized.queueId);
+  next.unshift(normalized);
+  savePostQueue(next);
+  return true;
+}
+
+async function buildImageInfoFromTask(task){
+  const imageBlob = await dataUrlToBlob(task.dataUrl);
+  const img = await createImageBitmap(imageBlob);
+  const canvas = document.createElement('canvas');
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext('2d');
+  if(!ctx) throw new Error('canvas init failed');
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(img, 0, 0);
+  const thumbCanvas = createThumbnailCanvas(canvas);
+  const thumbBlob = await canvasToBlob(thumbCanvas, 'image/png');
+  return {
+    width: Number.isFinite(task.width) ? task.width : img.width,
+    height: Number.isFinite(task.height) ? task.height : img.height,
+    colors: Number.isFinite(task.colors) ? task.colors : null,
+    dataUrl: task.dataUrl,
+    imageBlob,
+    thumbBlob,
+  };
+}
+
+async function flushPostQueue(){
+  if(postQueueBusy) return;
+  const queue = loadPostQueue();
+  if(!queue.length) return;
+  if(isSupabaseMaintenance()){
+    const recovered = await probeSupabaseAvailability();
+    if(!recovered) return;
+  }
+  postQueueBusy = true;
+  const remaining = [];
+  let posted = false;
+  for(const task of queue){
+    try{
+      const normalized = normalizePostTask(task);
+      if(!normalized) continue;
+      const imageInfo = await buildImageInfoFromTask(normalized);
+      let uploadResult = null;
+      if(supportsImageUrls){
+        uploadResult = await uploadContestImages(imageInfo);
+      }
+      const payload = {
+        name: normalized.name,
+        title: normalized.title,
+        prompt: normalized.prompt,
+        mode: normalized.mode,
+        started_at: null,
+        submitted_at: normalized.submitted_at,
+        width: imageInfo.width,
+        height: imageInfo.height,
+        colors: imageInfo.colors
+      };
+      if(supportsImageUrls && uploadResult){
+        payload.image_url = uploadResult.imageUrl;
+        payload.thumb_url = uploadResult.thumbUrl;
+      }else{
+        payload.image_base64 = imageInfo.dataUrl;
+      }
+      let { data, error } = await supabase.from('contest_entries').insert(payload).select('id');
+      if(error){
+        const msg = String(error.message || '').toLowerCase();
+        if(supportsImageUrls && (msg.includes('image_url') || msg.includes('thumb_url'))){
+          supportsImageUrls = false;
+          delete payload.image_url;
+          delete payload.thumb_url;
+          payload.image_base64 = imageInfo.dataUrl;
+          ({ data, error } = await supabase.from('contest_entries').insert(payload).select('id'));
+        }
+      }
+      if(error){
+        throw error;
+      }
+      noteSupabaseSuccess();
+      const entryId = Array.isArray(data) ? data[0]?.id : null;
+      if(entryId){
+        const shareResult = await uploadContestShareAssets({ entryId, title: normalized.title, imageInfo });
+        if(!shareResult?.shareUrl && isSupabaseMaintenance()){
+          queueShareTask({ entryId, title: normalized.title });
+        }
+      }
+      posted = true;
+    }catch(err){
+      remaining.push(task);
+      markSupabaseMaintenanceFromError(err);
+      if(isSupabaseMaintenance()) break;
+    }
+  }
+  savePostQueue(remaining);
+  postQueueBusy = false;
+  if(posted){
+    setStatus('キューに保存した投稿を自動送信しました。');
+    await fetchAndRender();
+  }
+}
+
+function schedulePostQueueFlush(){
+  if(typeof window === 'undefined') return;
+  window.addEventListener('online', () => {
+    flushPostQueue().catch(err => console.warn('post queue flush failed', err));
+  });
+  window.setInterval(() => {
+    if(isSupabaseMaintenance() || loadPostQueue().length){
+      flushPostQueue().catch(err => console.warn('post queue flush failed', err));
+    }
+  }, POST_QUEUE_RETRY_MS);
 }
 
 function escapeHtml(value){
@@ -675,10 +865,6 @@ async function fileToImageInfo(file){
 
 async function handleSubmit(e){
   e.preventDefault();
-  if(isSupabaseMaintenance()){
-    setStatus('メンテナンス中のため投稿できません');
-    return;
-  }
   const form = e.currentTarget;
   const name = form.name.value.trim() || '名無し';
   const title = form.title.value.trim() || '無題';
@@ -695,6 +881,27 @@ async function handleSubmit(e){
     setStatus(err.message || '画像の解析に失敗しました');
     return;
   }
+  const submittedAt = new Date().toISOString();
+  if(isSupabaseMaintenance()){
+    const queued = queuePostTask({
+      name,
+      title,
+      prompt: PROMPT_TEXT,
+      mode: 'free',
+      submitted_at: submittedAt,
+      width: imageInfo.width,
+      height: imageInfo.height,
+      colors: imageInfo.colors,
+      dataUrl: imageInfo.dataUrl,
+    });
+    if(queued){
+      setStatus('メンテ中のためキューに保存しました。復旧後に自動投稿します。');
+      form.reset();
+    }else{
+      setStatus('キューへの保存に失敗しました。時間を置いて再試行してください。');
+    }
+    return;
+  }
   let uploadResult = null;
   if(supportsImageUrls){
     setStatus('アップロード中...');
@@ -707,7 +914,7 @@ async function handleSubmit(e){
     prompt: PROMPT_TEXT,
     mode: 'free',
     started_at: null,
-    submitted_at: new Date().toISOString(),
+    submitted_at: submittedAt,
     width: imageInfo.width,
     height: imageInfo.height,
     colors: imageInfo.colors
@@ -730,9 +937,29 @@ async function handleSubmit(e){
     }
   }
   if(error){
-    setStatus('投稿に失敗しました');
     console.error(error);
     markSupabaseMaintenanceFromError(error);
+    if(isSupabaseMaintenance()){
+      const queued = queuePostTask({
+        name,
+        title,
+        prompt: PROMPT_TEXT,
+        mode: 'free',
+        submitted_at: submittedAt,
+        width: imageInfo.width,
+        height: imageInfo.height,
+        colors: imageInfo.colors,
+        dataUrl: imageInfo.dataUrl,
+      });
+      if(queued){
+        setStatus('メンテ中のためキューに保存しました。復旧後に自動投稿します。');
+        form.reset();
+      }else{
+        setStatus('投稿に失敗しました。キュー保存にも失敗しました。');
+      }
+    }else{
+      setStatus('投稿に失敗しました');
+    }
     return;
   }
   noteSupabaseSuccess();
@@ -983,7 +1210,9 @@ function initUI(){
   }
   updatePostControls();
   fetchAndRender();
+  flushPostQueue().catch(err => console.warn('post queue flush failed', err));
   flushShareQueue().catch(err => console.warn('share queue flush failed', err));
+  schedulePostQueueFlush();
   setupPostPanel();
   setupTabs();
 }
