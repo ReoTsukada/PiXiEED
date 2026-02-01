@@ -648,7 +648,7 @@
           <div class="hud-row">
             <span class="hud-chip">ATK <strong id="atkShort">--</strong></span>
             <span class="hud-chip">SPD <strong id="spdShort">--</strong></span>
-            <span class="hud-chip">DEF <strong id="defShort">--</strong></span>
+            <span class="hud-chip">質量 <strong id="defShort">--</strong></span>
             <span class="hud-chip">LUC <strong id="lucShort">--</strong></span>
             <span class="hud-chip">LV <strong id="levelShort">--</strong></span>
             <button class="hud-btn" id="openStatus" type="button">ステータス</button>
@@ -674,7 +674,7 @@
           <div class="stat"><span>MP</span><strong id="mpStat">--</strong></div>
           <div class="stat"><span>ATK</span><strong id="atkStat">--</strong></div>
           <div class="stat"><span>SPD</span><strong id="spdStat">--</strong></div>
-          <div class="stat"><span>DEF</span><strong id="defStat">--</strong></div>
+          <div class="stat"><span>質量</span><strong id="defStat">--</strong></div>
           <div class="stat"><span>LUC</span><strong id="lucStat">--</strong></div>
         </div>
         <div class="stat-grid">
@@ -717,7 +717,7 @@
             <div class="stat"><span>MP</span><strong id="mpStatSheet">--</strong></div>
             <div class="stat"><span>ATK</span><strong id="atkStatSheet">--</strong></div>
             <div class="stat"><span>SPD</span><strong id="spdStatSheet">--</strong></div>
-            <div class="stat"><span>DEF</span><strong id="defStatSheet">--</strong></div>
+            <div class="stat"><span>質量</span><strong id="defStatSheet">--</strong></div>
             <div class="stat"><span>LUC</span><strong id="lucStatSheet">--</strong></div>
           </div>
           <div class="stat-grid">
@@ -805,6 +805,13 @@
   const MONSTER_TILE_COUNT = ENEMY_ORDER.length;
   const ITEM_TILE_COUNT = TREASURE_TILE_COUNT + MIMIC_TILE_COUNT;
   const WALL_TILE_COUNT = 0;
+  const MASS_START_SLOW = 0.01;
+  const MASS_ACCEL_RATE = 0.004;
+  const MASS_MAX_BONUS = 0.6;
+  const MASS_MIN_RATE = 0.55;
+  const MASS_MAX_RATE = 1.6;
+  const MASS_DAMAGE_RATE = 0.004;
+  const MASS_DAMAGE_MAX = 0.25;
   const LEVEL_GROWTH_SEQUENCE = [
     { hp: 1, atk: 1 },
     { hp: 1, def: 1 },
@@ -819,7 +826,7 @@
     empty: { id: 'empty', color: '#1f2538', name: '平地' },
     atk: { id: 'atk', color: '#ef4444', name: '攻撃' },
     spd: { id: 'spd', color: '#60a5fa', name: '速さ' },
-    def: { id: 'def', color: '#22c55e', name: '防御' },
+    def: { id: 'def', color: '#22c55e', name: '質量' },
     hp: { id: 'hp', color: '#f472b6', name: '体力' },
     heal: { id: 'heal', color: '#10b981', name: '回復' },
     poison: { id: 'poison', color: '#a855f7', name: '毒' },
@@ -2174,7 +2181,7 @@
     gearDetailEl.innerHTML = `
       <strong>${gear.name}</strong>
       <div>レアリティ: ${gear.rarity}</div>
-      <div>効果: ATK+${gear.bonus.atk} / SPD+${gear.bonus.spd} / DEF+${gear.bonus.def} / LUC+${gear.bonus.luc}</div>
+      <div>効果: ATK+${gear.bonus.atk} / SPD+${gear.bonus.spd} / 質量+${gear.bonus.def} / LUC+${gear.bonus.luc}</div>
       <div>状態: ${equipped ? '装備中' : '未装備'}</div>
       <div>所持数: ${player.gearInventory.length}</div>
     `;
@@ -2338,7 +2345,7 @@
   }
 
   function formatGrowth(gain) {
-    const labels = { hp: 'HP', mp: 'MP', atk: 'ATK', spd: 'SPD', def: 'DEF', luc: 'LUC' };
+    const labels = { hp: 'HP', mp: 'MP', atk: 'ATK', spd: 'SPD', def: '質量', luc: 'LUC' };
     return Object.entries(gain)
       .map(([key, value]) => `${labels[key] ?? key.toUpperCase()}+${value}`)
       .join(' / ');
@@ -2403,19 +2410,20 @@
   }
 
   function applyStatBoost(statKey, label) {
-    player.baseStats[statKey] = (player.baseStats[statKey] || 0) + 1;
+    const amount = statKey === 'hp' ? 2 : 1;
+    player.baseStats[statKey] = (player.baseStats[statKey] || 0) + amount;
     if (statKey === 'hp') {
-      player.hp += 1;
+      player.hp += amount;
     }
     updateUnitStats(player);
     updatePlayerLevel();
-    addLog(`${label} +1`);
+    addLog(`${label} +${amount}`);
   }
 
   function applyTreasureReward() {
     const stats = [
       { key: 'atk', label: '攻撃' },
-      { key: 'def', label: '防御' },
+      { key: 'def', label: '質量' },
       { key: 'spd', label: '速さ' },
       { key: 'luc', label: '運' },
       { key: 'hp', label: '体力' }
@@ -2453,7 +2461,7 @@
     } else if (tileId === 'atk') {
       applyStatBoost('atk', '攻撃');
     } else if (tileId === 'def') {
-      applyStatBoost('def', '防御');
+      applyStatBoost('def', '質量');
     } else if (tileId === 'spd') {
       applyStatBoost('spd', '速さ');
     } else if (tileId === 'hp') {
@@ -2603,12 +2611,14 @@
     const ignoreDef = opts.ignoreDef || false;
     const bonusCrit = opts.critBonus || 0;
     const baseAtk = attacker.atk || 0;
+    const mass = attacker.def || 0;
+    const massBonus = 1 + Math.min(MASS_DAMAGE_MAX, mass * MASS_DAMAGE_RATE);
     const def = ignoreDef ? 0 : (defender.def || 0);
     const base = Math.max(1, Math.floor((baseAtk * baseAtk) / Math.max(1, baseAtk + def)));
     const variance = Math.floor(Math.random() * 3);
     const critChance = Math.min(0.3, 0.02 * (attacker.luc || 0) + bonusCrit);
     const isCrit = Math.random() < critChance;
-    let raw = (base + variance) * power * (isCrit ? 1.5 : 1);
+    let raw = (base + variance) * power * (isCrit ? 1.5 : 1) * massBonus;
     const levelGap = (attacker.level || 1) - (defender.level || 1);
     const levelMult = clamp(1 + levelGap * 0.03, 0.6, 1.6);
     raw *= levelMult;
@@ -2633,14 +2643,33 @@
     return { label: '攻撃', power: 1, hits: 1 };
   }
 
+  function getMassRate(state) {
+    const mass = state.def || 0;
+    const slow = mass * MASS_START_SLOW;
+    const startRate = clamp(1 - slow, MASS_MIN_RATE, 1);
+    const momentum = clamp(state.momentum || 0, 0, MASS_MAX_BONUS);
+    return clamp(startRate + momentum, MASS_MIN_RATE, MASS_MAX_RATE);
+  }
+
+  function getEffectiveSpeed(state) {
+    return (state.spd || 0) * getMassRate(state);
+  }
+
+  function applyMomentum(state) {
+    const mass = state.def || 0;
+    state.momentum = clamp((state.momentum || 0) + mass * MASS_ACCEL_RATE, 0, MASS_MAX_BONUS);
+  }
+
   function pickNextActor(playerState, enemyState) {
     if (playerState.gauge < 100 && enemyState.gauge < 100) {
-      const pTime = playerState.spd > 0 ? (100 - playerState.gauge) / playerState.spd : Infinity;
-      const eTime = enemyState.spd > 0 ? (100 - enemyState.gauge) / enemyState.spd : Infinity;
+      const pSpeed = getEffectiveSpeed(playerState);
+      const eSpeed = getEffectiveSpeed(enemyState);
+      const pTime = pSpeed > 0 ? (100 - playerState.gauge) / pSpeed : Infinity;
+      const eTime = eSpeed > 0 ? (100 - enemyState.gauge) / eSpeed : Infinity;
       const time = Math.min(pTime, eTime);
       if (Number.isFinite(time)) {
-        playerState.gauge += playerState.spd * time;
-        enemyState.gauge += enemyState.spd * time;
+        playerState.gauge += pSpeed * time;
+        enemyState.gauge += eSpeed * time;
       }
     }
     const pReady = playerState.gauge >= 100;
@@ -2703,7 +2732,8 @@
       level: getEnemyLevel(enemyTemplate),
       guard: 0,
       guardTurns: 0,
-      gauge: 0
+      gauge: 0,
+      momentum: 0
     };
     if (enemyTemplate.currentHp != null) {
       enemyState.hp = clamp(enemyTemplate.currentHp, 0, enemyState.maxHp);
@@ -2717,7 +2747,8 @@
       luc: actor.luc,
       mp: actor.mp,
       level: actor.level || 1,
-      gauge: 0
+      gauge: 0,
+      momentum: 0
     };
     const enemyLevel = getEnemyLevel(isBoss ? HERO_BOSS : enemyTemplate);
     if (enemyLevel) {
@@ -2758,6 +2789,7 @@
           if (enemyState.hp <= 0) break;
           if (hits > 1) await sleep(380);
         }
+        applyMomentum(playerState);
       } else {
         enemyState.gauge = Math.max(0, enemyState.gauge - 100);
         const action = enemyTemplate.ai ? enemyTemplate.ai(enemyState) : getUnitAction(enemyState);
@@ -2786,6 +2818,7 @@
           enemyState.guardTurns -= 1;
           if (enemyState.guardTurns <= 0) enemyState.guard = 0;
         }
+        applyMomentum(enemyState);
       }
       safety += 1;
       if (actionCount >= maxActions) break;
@@ -3019,7 +3052,7 @@
       <div class="stat"><span>HP</span><strong>${player.hp}/${player.maxHp}</strong></div>
       <div class="stat"><span>ターン</span><strong>${player.steps}</strong></div>
       <div class="stat"><span>討伐数</span><strong>${player.kills}</strong></div>
-      <div class="stat"><span>ATK/SPD/DEF</span><strong>${player.atk}/${player.spd}/${player.def}</strong></div>
+      <div class="stat"><span>ATK/SPD/質量</span><strong>${player.atk}/${player.spd}/${player.def}</strong></div>
       <div class="stat"><span>LUC</span><strong>${player.luc}</strong></div>
       <div class="stat"><span>結果</span><strong>${cleared ? 'クリア' : 'ゲームオーバー'}</strong></div>
     `;
