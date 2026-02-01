@@ -8,6 +8,7 @@ const MAX_PAGES = 20;
 const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
 const SCORE_QUEUE_KEY = 'maoitu_score_queue';
 const SCORE_QUEUE_LIMIT = 20;
+const SCORE_QUEUE_RETRY_MS = 60000;
 let cachedUserId = null;
 let checkedAuth = false;
 let profileSynced = false;
@@ -95,6 +96,24 @@ function markSupabaseMaintenanceFromError(error) {
   }
 }
 
+async function probeSupabaseAvailability() {
+  try {
+    const { error } = await supabase
+      .from('scores')
+      .select('id')
+      .limit(1);
+    if (error) {
+      markSupabaseMaintenanceFromError(error);
+      return false;
+    }
+    noteSupabaseSuccess();
+    return true;
+  } catch (err) {
+    markSupabaseMaintenanceFromError(err);
+    return false;
+  }
+}
+
 function loadScoreQueue() {
   try {
     const raw = localStorage.getItem(SCORE_QUEUE_KEY);
@@ -119,6 +138,14 @@ function enqueueScore(score) {
   const queue = loadScoreQueue();
   queue.push({ score, ts: Date.now() });
   saveScoreQueue(queue);
+}
+
+function notifyScoreQueued(score) {
+  try {
+    window.dispatchEvent(new CustomEvent('pixieed:score-queued', { detail: { score } }));
+  } catch (_) {
+    // ignore
+  }
 }
 
 function isMissingClientId(error) {
@@ -248,7 +275,10 @@ async function submitScoreToSupabase(score) {
 }
 
 export async function flushScoreQueue() {
-  if (isSupabaseMaintenance()) return;
+  if (isSupabaseMaintenance()) {
+    const recovered = await probeSupabaseAvailability();
+    if (!recovered) return;
+  }
   const queue = loadScoreQueue();
   if (!queue.length) return;
   const remaining = [];
@@ -268,6 +298,7 @@ export async function submitScoreAuto(score) {
   const safeScore = Math.max(0, Math.floor(Number(score) || 0));
   if (isSupabaseMaintenance()) {
     enqueueScore(safeScore);
+    notifyScoreQueued(safeScore);
     return;
   }
   await flushScoreQueue();
@@ -277,6 +308,22 @@ export async function submitScoreAuto(score) {
     console.error('score submit failed', error);
     markSupabaseMaintenanceFromError(error);
     enqueueScore(safeScore);
+    notifyScoreQueued(safeScore);
+  }
+}
+
+function scheduleScoreQueueFlush() {
+  try {
+    window.addEventListener('online', () => {
+      flushScoreQueue().catch(error => console.warn('score queue flush failed', error));
+    });
+    window.setInterval(() => {
+      if (isSupabaseMaintenance() || loadScoreQueue().length) {
+        flushScoreQueue().catch(error => console.warn('score queue flush failed', error));
+      }
+    }, SCORE_QUEUE_RETRY_MS);
+  } catch (_) {
+    // ignore
   }
 }
 
@@ -354,9 +401,8 @@ async function fetchRankInfoWithColumns(score, includeUserId, includeClientId) {
 
 try {
   window.pixieedFlushMaoituScoreQueue = flushScoreQueue;
-  if (!isSupabaseMaintenance()) {
-    flushScoreQueue();
-  }
+  flushScoreQueue().catch(error => console.warn('score queue flush failed', error));
+  scheduleScoreQueueFlush();
 } catch (_) {
   // ignore
 }
