@@ -190,12 +190,16 @@ const SHARE_QUEUE_KEY = 'pixfind_share_queue';
 const SHARE_QUEUE_LIMIT = 20;
 const CONTEST_SHARE_QUEUE_KEY = 'contest_share_queue';
 const CONTEST_SHARE_QUEUE_LIMIT = 20;
+const PUBLISH_QUEUE_KEY = 'pixfind_publish_queue';
+const PUBLISH_QUEUE_LIMIT = 10;
+const PUBLISH_QUEUE_RETRY_MS = 60000;
 const PUBLISHED_CACHE_LIMIT = 60;
 const PUZZLE_PLACEHOLDER_DATA_URL = `data:image/svg+xml;utf8,${encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="180"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#111827"/><stop offset="1" stop-color="#1f2937"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/><rect x="18" y="18" width="204" height="144" rx="16" ry="16" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.2)"/><text x="50%" y="54%" text-anchor="middle" font-family="M PLUS Rounded 1c, sans-serif" font-size="18" fill="#e5e7eb">PiXFiND</text></svg>'
 )}`;
 
 let supabaseMaintenance = Boolean(readSupabaseMaintenance());
+let publishQueueBusy = false;
 
 async function init() {
   setActiveScreen('start');
@@ -206,7 +210,9 @@ async function init() {
   }
 
   await loadOfficialPuzzles();
+  flushPublishQueue().catch(error => console.warn('publish queue flush failed', error));
   flushShareQueue().catch(error => console.warn('share queue flush failed', error));
+  schedulePublishQueueFlush();
   await handleInitialPuzzleFromUrl();
 
   dom.startButton?.addEventListener('click', () => {
@@ -306,7 +312,7 @@ function openCreatorOverlay() {
     dom.creatorTitleInput.focus();
   }
   if (isSupabaseMaintenance()) {
-    setCreatorStatus('現在メンテナンス中のため公開できません。', 'error');
+    setCreatorStatus('メンテナンス中のため公開はキューに保存されます。');
   }
 }
 
@@ -402,7 +408,7 @@ function setCreatorStatus(message, tone = 'info') {
 }
 
 function setCreatorActionsEnabled(enabled) {
-  const canPublish = enabled && !isSupabaseMaintenance();
+  const canPublish = enabled;
   if (dom.creatorExportButton) dom.creatorExportButton.disabled = !canPublish;
 }
 
@@ -524,10 +530,6 @@ async function handleCreatorAnalyze() {
 }
 
 async function handleCreatorPublish() {
-  if (isSupabaseMaintenance()) {
-    setCreatorStatus('現在メンテナンス中のため公開できません。', 'error');
-    return;
-  }
   if (!creatorState.diffResult || !creatorState.originalFile || !creatorState.diffFile) {
     setCreatorStatus('公開には差分の自動判定が必要です。', 'error');
     return;
@@ -538,6 +540,28 @@ async function handleCreatorPublish() {
   const difficulty = creatorState.difficulty;
   const puzzleId = createPuzzleId();
   const postToContest = dom.creatorContestToggle ? dom.creatorContestToggle.checked : true;
+  const authorName = getCreatorNickname();
+  const publishTask = {
+    puzzleId,
+    title,
+    slug,
+    difficulty,
+    postToContest,
+    authorName,
+    originalDataUrl: creatorState.originalDataUrl,
+    diffDataUrl: creatorState.diffDataUrl,
+    size: { ...creatorState.size },
+  };
+
+  if (isSupabaseMaintenance()) {
+    const queued = queuePublishTask(publishTask);
+    if (queued) {
+      setCreatorStatus('メンテ中のためキューに保存しました。復旧後に自動投稿します。');
+    } else {
+      setCreatorStatus('キューへの保存に失敗しました。時間を置いて再試行してください。', 'error');
+    }
+    return;
+  }
 
   if (dom.creatorExportButton) dom.creatorExportButton.disabled = true;
   setCreatorStatus('アップロード中です…');
@@ -564,6 +588,7 @@ async function handleCreatorPublish() {
       label: title,
       description: '',
       difficulty,
+      author_name: authorName,
       original_url: originalUrl,
       diff_url: diffUrl,
       thumbnail_url: diffUrl,
@@ -685,7 +710,18 @@ async function handleCreatorPublish() {
     }
   } catch (error) {
     console.error(error);
-    setCreatorStatus('公開に失敗しました。時間を置いて再試行してください。', 'error');
+    const shouldQueue = isSupabaseMaintenance() || shouldMarkSupabaseMaintenance(error);
+    if (shouldQueue) {
+      markSupabaseMaintenanceFromError(error);
+      const queued = queuePublishTask(publishTask);
+      if (queued) {
+        setCreatorStatus('メンテ中のためキューに保存しました。復旧後に自動投稿します。');
+      } else {
+        setCreatorStatus('公開に失敗しました。キュー保存にも失敗しました。', 'error');
+      }
+    } else {
+      setCreatorStatus('公開に失敗しました。時間を置いて再試行してください。', 'error');
+    }
   } finally {
     if (dom.creatorExportButton) dom.creatorExportButton.disabled = false;
   }
@@ -827,7 +863,7 @@ async function uploadContestFile(path, body, contentType = null) {
   return getContestPublicUrl(path);
 }
 
-async function insertPublishedPuzzle(payload) {
+async function insertPublishedPuzzle(payload, { allowRetry = true } = {}) {
   let response;
   try {
     response = await fetch(`${SUPABASE_REST_URL}/${SUPABASE_TABLE}`, {
@@ -845,6 +881,11 @@ async function insertPublishedPuzzle(payload) {
   }
   if (!response.ok) {
     const detail = await response.text();
+    if (allowRetry && payload?.author_name && detail.includes('author_name')) {
+      const fallbackPayload = { ...payload };
+      delete fallbackPayload.author_name;
+      return insertPublishedPuzzle(fallbackPayload, { allowRetry: false });
+    }
     markSupabaseMaintenanceFromError(null, response.status);
     throw new Error(`insert failed: ${response.status} ${detail}`);
   }
@@ -897,6 +938,28 @@ function sanitizeSlug(value) {
     .replace(/^-+|-+$/g, '');
 }
 
+function resolveAuthorName(entry, fallback = '名無し') {
+  const candidate = entry?.author_name
+    ?? entry?.author
+    ?? entry?.nickname
+    ?? entry?.name
+    ?? entry?.authorName
+    ?? '';
+  const trimmed = String(candidate ?? '').trim();
+  return trimmed || fallback;
+}
+
+function getCreatorNickname() {
+  try {
+    const raw = localStorage.getItem('pixieed_nickname') || '';
+    const trimmed = raw.trim();
+    if (trimmed) return trimmed.slice(0, 24);
+  } catch (_) {
+    // ignore
+  }
+  return '名無し';
+}
+
 function supabaseHeaders() {
   return {
     apikey: SUPABASE_ANON_KEY,
@@ -933,10 +996,10 @@ function setSupabaseMaintenance(active, reason = '') {
   }
   if (active) {
     if (!dom.app?.classList.contains('is-playing')) {
-      setHint('現在メンテナンス中です。公開・共有は復旧後に再開されます。');
+      setHint('現在メンテナンス中です。公開はキューに保存され、復旧後に自動投稿されます。');
     }
     if (isCreatorOverlayOpen()) {
-      setCreatorStatus('現在メンテナンス中のため公開できません。', 'error');
+      setCreatorStatus('メンテナンス中のため公開はキューに保存されます。');
     }
   }
   const canPublish = Boolean(creatorState.diffResult && creatorState.originalFile && creatorState.diffFile);
@@ -946,6 +1009,14 @@ function setSupabaseMaintenance(active, reason = '') {
 function noteSupabaseSuccess() {
   if (supabaseMaintenance) {
     setSupabaseMaintenance(false);
+  }
+  if (!supabaseMaintenance) {
+    if (loadPublishQueue().length) {
+      flushPublishQueue().catch(error => console.warn('publish queue flush failed', error));
+    }
+    if (loadShareQueue().length) {
+      flushShareQueue().catch(error => console.warn('share queue flush failed', error));
+    }
   }
 }
 
@@ -959,6 +1030,22 @@ function markSupabaseMaintenanceFromError(error, status) {
   if (shouldMarkSupabaseMaintenance(error, status)) {
     setSupabaseMaintenance(true, 'network');
   }
+}
+
+async function probeSupabaseAvailability() {
+  try {
+    const response = await fetch(`${SUPABASE_REST_URL}/${SUPABASE_TABLE}?select=id&limit=1`, {
+      headers: supabaseHeaders(),
+    });
+    if (response.ok) {
+      noteSupabaseSuccess();
+      return true;
+    }
+    markSupabaseMaintenanceFromError(null, response.status);
+  } catch (error) {
+    markSupabaseMaintenanceFromError(error);
+  }
+  return !isSupabaseMaintenance();
 }
 
 function loadPublishedCache() {
@@ -980,6 +1067,272 @@ function savePublishedCache(items) {
   } catch (_) {
     // ignore
   }
+}
+
+function loadPublishQueue() {
+  try {
+    const raw = localStorage.getItem(PUBLISH_QUEUE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function savePublishQueue(queue) {
+  try {
+    localStorage.setItem(PUBLISH_QUEUE_KEY, JSON.stringify(queue.slice(0, PUBLISH_QUEUE_LIMIT)));
+  } catch (_) {
+    // ignore
+  }
+}
+
+function normalizePublishTask(task) {
+  if (!task) return null;
+  const originalDataUrl = typeof task.originalDataUrl === 'string' ? task.originalDataUrl : '';
+  const diffDataUrl = typeof task.diffDataUrl === 'string' ? task.diffDataUrl : '';
+  if (!originalDataUrl || !diffDataUrl) return null;
+  const puzzleId = task.puzzleId || createPuzzleId();
+  const title = task.title || 'カスタムパズル';
+  const slug = task.slug || sanitizeSlug(title) || `custom-${puzzleId.slice(-6)}`;
+  const difficulty = normalizeDifficulty(task.difficulty);
+  const authorName = task.authorName || getCreatorNickname();
+  const size = task.size && Number.isFinite(task.size.width) && Number.isFinite(task.size.height)
+    ? task.size
+    : { width: 0, height: 0 };
+  return {
+    puzzleId,
+    title,
+    slug,
+    difficulty,
+    authorName,
+    postToContest: task.postToContest !== false,
+    originalDataUrl,
+    diffDataUrl,
+    size,
+  };
+}
+
+function queuePublishTask(task) {
+  const normalized = normalizePublishTask(task);
+  if (!normalized) return false;
+  const queue = loadPublishQueue();
+  const next = queue.filter(item => item.puzzleId !== normalized.puzzleId);
+  next.unshift({ ...normalized, queuedAt: Date.now() });
+  savePublishQueue(next);
+  return true;
+}
+
+async function fetchPublishedPuzzleById(puzzleId) {
+  const url = `${SUPABASE_REST_URL}/${SUPABASE_TABLE}?select=*&id=eq.${encodeURIComponent(puzzleId)}`;
+  const response = await fetch(url, { headers: supabaseHeaders() });
+  if (!response.ok) {
+    throw new Error(`fetch failed: ${response.status}`);
+  }
+  const data = await response.json();
+  noteSupabaseSuccess();
+  return Array.isArray(data) ? data[0] : null;
+}
+
+async function publishQueuedTask(task) {
+  const normalized = normalizePublishTask(task);
+  if (!normalized) return null;
+  const {
+    puzzleId,
+    title,
+    slug,
+    difficulty,
+    authorName,
+    postToContest,
+    originalDataUrl,
+    diffDataUrl,
+    size,
+  } = normalized;
+
+  const [originalUpload, diffUpload] = await Promise.all([
+    buildUploadPayload(originalDataUrl, null),
+    buildUploadPayload(diffDataUrl, null),
+  ]);
+  if (!originalUpload || !diffUpload) {
+    throw new Error('upload payload missing');
+  }
+  const originalPath = `puzzles/${puzzleId}/original.${originalUpload.extension}`;
+  const diffPath = `puzzles/${puzzleId}/diff.${diffUpload.extension}`;
+  const [originalUrl, diffUrl] = await Promise.all([
+    uploadPuzzleFile(originalPath, originalUpload.blob, originalUpload.mimeType),
+    uploadPuzzleFile(diffPath, diffUpload.blob, diffUpload.mimeType),
+  ]);
+
+  const payload = {
+    id: puzzleId,
+    slug,
+    label: title,
+    description: '',
+    difficulty,
+    author_name: authorName,
+    original_url: originalUrl,
+    diff_url: diffUrl,
+    thumbnail_url: diffUrl,
+  };
+
+  let inserted = null;
+  try {
+    inserted = await insertPublishedPuzzle(payload);
+  } catch (error) {
+    const msg = String(error?.message || '').toLowerCase();
+    if (msg.includes('duplicate') || msg.includes('already exists') || msg.includes('409')) {
+      inserted = await fetchPublishedPuzzleById(puzzleId);
+    } else {
+      throw error;
+    }
+  }
+  const normalizedEntry = normalizePublishedPuzzleEntry(inserted ?? payload);
+  if (normalizedEntry) {
+    state.officialPuzzles = mergePuzzles(state.officialPuzzles, normalizedEntry);
+    renderPuzzles(state.currentDifficulty);
+  }
+
+  const [originalImage, diffImage] = await Promise.all([
+    loadImageFromDataUrl(originalDataUrl),
+    loadImageFromDataUrl(diffDataUrl),
+  ]);
+  const width = size.width || originalImage.width;
+  const height = size.height || originalImage.height;
+
+  if (postToContest) {
+    try {
+      const contestDataUrl = await buildNormalizedDataUrl(
+        originalImage,
+        originalDataUrl,
+        null,
+      );
+      if (!contestDataUrl) {
+        throw new Error('contest data missing');
+      }
+      const colors = countUniqueColors(originalImage);
+      let contestUpload = null;
+      try {
+        contestUpload = await uploadContestImages({
+          puzzleId,
+          image: originalImage,
+          dataUrl: contestDataUrl,
+        });
+      } catch (error) {
+        console.warn('contest image upload failed', error);
+      }
+      let contestPayload = createContestPayload({
+        puzzleId,
+        title,
+        imageUrl: contestUpload?.imageUrl,
+        thumbUrl: contestUpload?.thumbUrl,
+        dataUrl: contestUpload ? null : contestDataUrl,
+        width,
+        height,
+        colors,
+      });
+      let contestEntry = null;
+      try {
+        contestEntry = await insertContestEntry(contestPayload);
+      } catch (error) {
+        const msg = String(error?.message || '').toLowerCase();
+        if (contestUpload && (msg.includes('image_url') || msg.includes('thumb_url'))) {
+          contestPayload = createContestPayload({
+            puzzleId,
+            title,
+            dataUrl: contestDataUrl,
+            width,
+            height,
+            colors,
+          });
+          contestEntry = await insertContestEntry(contestPayload);
+        } else {
+          throw error;
+        }
+      }
+      if (contestEntry?.id) {
+        try {
+          await uploadContestShareAssets({
+            entryId: contestEntry.id,
+            title,
+            image: originalImage,
+          });
+        } catch (error) {
+          queueContestShareTask({ entryId: contestEntry.id, title });
+          markSupabaseMaintenanceFromError(error);
+          console.warn('contest share asset creation failed', error);
+        }
+      }
+    } catch (error) {
+      console.warn('Contest post failed', error);
+    }
+  }
+
+  try {
+    const shareAssets = await uploadPuzzleShareAssets({
+      puzzleId,
+      title,
+      originalImage,
+      diffImage,
+    });
+    if (shareAssets?.shareUrl && normalizedEntry) {
+      normalizedEntry.shareUrl = shareAssets.shareUrl;
+    }
+  } catch (error) {
+    queueShareTask({
+      puzzleId,
+      title,
+      originalUrl,
+      diffUrl,
+    });
+    markSupabaseMaintenanceFromError(error);
+    console.warn('share asset creation failed', error);
+  }
+  return normalizedEntry;
+}
+
+async function flushPublishQueue() {
+  if (publishQueueBusy) return;
+  const queue = loadPublishQueue();
+  if (!queue.length) return;
+  if (isSupabaseMaintenance()) {
+    const recovered = await probeSupabaseAvailability();
+    if (!recovered) return;
+  }
+  publishQueueBusy = true;
+  const remaining = [];
+  let postedCount = 0;
+  for (const task of queue) {
+    try {
+      const result = await publishQueuedTask(task);
+      if (result) postedCount += 1;
+    } catch (error) {
+      remaining.push(task);
+      markSupabaseMaintenanceFromError(error);
+      if (isSupabaseMaintenance()) break;
+    }
+  }
+  savePublishQueue(remaining);
+  publishQueueBusy = false;
+  if (postedCount && isCreatorOverlayOpen()) {
+    setCreatorStatus('キューに保存した投稿を自動公開しました。');
+  }
+}
+
+function schedulePublishQueueFlush() {
+  if (typeof window === 'undefined') return;
+  window.addEventListener('online', () => {
+    flushPublishQueue().catch(error => console.warn('publish queue flush failed', error));
+    flushShareQueue().catch(error => console.warn('share queue flush failed', error));
+  });
+  window.setInterval(() => {
+    const hasPublishQueue = loadPublishQueue().length > 0;
+    const hasShareQueue = loadShareQueue().length > 0;
+    if (isSupabaseMaintenance() || hasPublishQueue || hasShareQueue) {
+      flushPublishQueue().catch(error => console.warn('publish queue flush failed', error));
+      flushShareQueue().catch(error => console.warn('share queue flush failed', error));
+    }
+  }, PUBLISH_QUEUE_RETRY_MS);
 }
 
 function loadShareQueue() {
@@ -1037,7 +1390,10 @@ function queueContestShareTask(task) {
 }
 
 async function flushShareQueue() {
-  if (isSupabaseMaintenance()) return;
+  if (isSupabaseMaintenance()) {
+    const recovered = await probeSupabaseAvailability();
+    if (!recovered) return;
+  }
   const queue = loadShareQueue();
   if (!queue.length) return;
   const remaining = [];
@@ -1145,6 +1501,7 @@ function normalizePublishedPuzzleEntry(entry) {
     label: entry.label ?? entry.slug ?? entry.id ?? 'PiXFiND Puzzle',
     description: entry.description ?? '',
     difficulty: normalizeDifficulty(entry.difficulty),
+    author: resolveAuthorName(entry, '名無し'),
     original,
     diff,
     thumbnail: entry.thumbnail_url ?? entry.thumbnail ?? diff ?? original,
@@ -1156,7 +1513,7 @@ function normalizePublishedPuzzleEntry(entry) {
 
 async function loadPublishedPuzzles() {
   const params = new URLSearchParams({
-    select: 'id,slug,label,description,difficulty,original_url,diff_url,thumbnail_url,created_at',
+    select: '*',
     order: 'created_at.desc',
   });
   try {
@@ -1292,6 +1649,7 @@ function normalizePuzzleEntry(entry) {
     label: entry.label ?? entry.slug ?? entry.id ?? 'PiXFiND Puzzle',
     description: entry.description ?? '',
     difficulty: normalizeDifficulty(entry.difficulty),
+    author: resolveAuthorName(entry, '公式'),
     original,
     diff,
     thumbnail: entry.thumbnail ?? original ?? diff,
@@ -1514,7 +1872,7 @@ function createOfficialCard(puzzle) {
     <div class="puzzle-card__meta">
       <h4 class="puzzle-card__title">${puzzle.label}</h4>
       ${puzzle.description ? `<p class="puzzle-card__description">${puzzle.description}</p>` : ''}
-      <span>${createStarLabel(puzzle.difficulty)}</span>
+      <span class="puzzle-card__author">${puzzle.author || '名無し'}</span>
     </div>
     <div class="puzzle-card__actions">
       <button type="button" class="button button--primary button--compact puzzle-card__play" aria-label="${puzzle.label} をプレイする">
