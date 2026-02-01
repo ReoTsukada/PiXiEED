@@ -5,10 +5,14 @@ const LAST_SCORE_KEY = 'maoitu_last_score';
 const CLIENT_ID_KEY = 'pixieed_client_id';
 const PAGE_SIZE = 500;
 const MAX_PAGES = 20;
+const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
+const SCORE_QUEUE_KEY = 'maoitu_score_queue';
+const SCORE_QUEUE_LIMIT = 20;
 let cachedUserId = null;
 let checkedAuth = false;
 let profileSynced = false;
 let scoreMigrated = false;
+let supabaseMaintenance = Boolean(readSupabaseMaintenance());
 
 function accountKey(row) {
   const userId = row && row.user_id ? String(row.user_id).trim() : '';
@@ -41,6 +45,80 @@ function getClientId() {
   } catch (_) {
     return `guest-${Math.random().toString(36).slice(2, 8)}`;
   }
+}
+
+function readSupabaseMaintenance() {
+  try {
+    const raw = localStorage.getItem(SUPABASE_MAINTENANCE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (data && data.active) return data;
+  } catch (_) {
+    // ignore
+  }
+  return null;
+}
+
+function isSupabaseMaintenance() {
+  return supabaseMaintenance;
+}
+
+function setSupabaseMaintenance(active, reason = '') {
+  supabaseMaintenance = active;
+  try {
+    if (active) {
+      localStorage.setItem(SUPABASE_MAINTENANCE_KEY, JSON.stringify({ active: true, reason, ts: Date.now() }));
+    } else {
+      localStorage.removeItem(SUPABASE_MAINTENANCE_KEY);
+    }
+  } catch (_) {
+    // ignore
+  }
+}
+
+function noteSupabaseSuccess() {
+  if (supabaseMaintenance) {
+    setSupabaseMaintenance(false);
+  }
+}
+
+function shouldMarkSupabaseMaintenance(error) {
+  const status = Number(error?.status || error?.statusCode || 0);
+  if (status >= 500) return true;
+  const msg = String(error?.message || '').toLowerCase();
+  return msg.includes('failed to fetch') || msg.includes('network') || msg.includes('fetch failed') || msg.includes('503') || msg.includes('502') || msg.includes('504');
+}
+
+function markSupabaseMaintenanceFromError(error) {
+  if (shouldMarkSupabaseMaintenance(error)) {
+    setSupabaseMaintenance(true, 'network');
+  }
+}
+
+function loadScoreQueue() {
+  try {
+    const raw = localStorage.getItem(SCORE_QUEUE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveScoreQueue(queue) {
+  try {
+    localStorage.setItem(SCORE_QUEUE_KEY, JSON.stringify(queue.slice(0, SCORE_QUEUE_LIMIT)));
+  } catch (_) {
+    // ignore
+  }
+}
+
+function enqueueScore(score) {
+  if (!Number.isFinite(score)) return;
+  const queue = loadScoreQueue();
+  queue.push({ score, ts: Date.now() });
+  saveScoreQueue(queue);
 }
 
 function isMissingClientId(error) {
@@ -138,7 +216,7 @@ async function prepareAuthContext() {
   await migrateGuestScores();
 }
 
-export async function submitScoreAuto(score) {
+async function submitScoreToSupabase(score) {
   const safeScore = Math.max(0, Math.floor(Number(score) || 0));
   await prepareAuthContext();
   const name = getName();
@@ -158,12 +236,47 @@ export async function submitScoreAuto(score) {
     error = retry.error;
   }
   if (error) {
-    console.error('score submit failed', error);
+    throw error;
   }
   try {
     localStorage.setItem(LAST_SCORE_KEY, String(safeScore));
   } catch (_) {
     // ignore
+  }
+  noteSupabaseSuccess();
+  return true;
+}
+
+export async function flushScoreQueue() {
+  if (isSupabaseMaintenance()) return;
+  const queue = loadScoreQueue();
+  if (!queue.length) return;
+  const remaining = [];
+  for (const item of queue) {
+    try {
+      await submitScoreToSupabase(item.score);
+    } catch (error) {
+      remaining.push(item);
+      markSupabaseMaintenanceFromError(error);
+      if (isSupabaseMaintenance()) break;
+    }
+  }
+  saveScoreQueue(remaining);
+}
+
+export async function submitScoreAuto(score) {
+  const safeScore = Math.max(0, Math.floor(Number(score) || 0));
+  if (isSupabaseMaintenance()) {
+    enqueueScore(safeScore);
+    return;
+  }
+  await flushScoreQueue();
+  try {
+    await submitScoreToSupabase(safeScore);
+  } catch (error) {
+    console.error('score submit failed', error);
+    markSupabaseMaintenanceFromError(error);
+    enqueueScore(safeScore);
   }
 }
 
@@ -204,6 +317,7 @@ async function fetchRankInfoWithColumns(score, includeUserId, includeClientId) {
       .order('created_at', { ascending: true })
       .range(from, to);
     if (error) {
+      markSupabaseMaintenanceFromError(error);
       if (includeUserId && isMissingUserId(error)) {
         return fetchRankInfoWithColumns(score, false, includeClientId);
       }
@@ -212,6 +326,7 @@ async function fetchRankInfoWithColumns(score, includeUserId, includeClientId) {
       }
       throw error;
     }
+    noteSupabaseSuccess();
     const rows = data || [];
     if (rows.length) {
       collected.push(...rows);
@@ -235,4 +350,13 @@ async function fetchRankInfoWithColumns(score, includeUserId, includeClientId) {
   const rank = total > 0 ? greater + 1 : 0;
   const percentile = total > 0 ? Math.min(100, Math.max(0, (rank / total) * 100)) : 100;
   return { total, rank, percentile };
+}
+
+try {
+  window.pixieedFlushMaoituScoreQueue = flushScoreQueue;
+  if (!isSupabaseMaintenance()) {
+    flushScoreQueue();
+  }
+} catch (_) {
+  // ignore
 }
