@@ -4,9 +4,13 @@ const RANKING_LIMIT = 100;
 const PAGE_SIZE = 500;
 const MAX_PAGES = 10;
 const NAME_STORAGE_KEY = 'maoitu_rank_name';
+const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
+const RANKING_CACHE_KEY = 'maoitu_rank_cache';
+const RANKING_CACHE_LIMIT = 100;
 let profileSynced = false;
 let cachedUserId = null;
 let checkedAuth = false;
+let supabaseMaintenance = Boolean(readSupabaseMaintenance());
 
 function accountKey(row) {
   const userId = row && row.user_id ? String(row.user_id).trim() : '';
@@ -27,6 +31,74 @@ function uniqueByAccount(rows, limit = Infinity) {
     if (unique.length >= limit) break;
   }
   return unique;
+}
+
+function readSupabaseMaintenance() {
+  try {
+    const raw = localStorage.getItem(SUPABASE_MAINTENANCE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (data && data.active) return data;
+  } catch (_) {
+    // ignore
+  }
+  return null;
+}
+
+function isSupabaseMaintenance() {
+  return supabaseMaintenance;
+}
+
+function setSupabaseMaintenance(active, reason = '') {
+  supabaseMaintenance = active;
+  try {
+    if (active) {
+      localStorage.setItem(SUPABASE_MAINTENANCE_KEY, JSON.stringify({ active: true, reason, ts: Date.now() }));
+    } else {
+      localStorage.removeItem(SUPABASE_MAINTENANCE_KEY);
+    }
+  } catch (_) {
+    // ignore
+  }
+}
+
+function noteSupabaseSuccess() {
+  if (supabaseMaintenance) {
+    setSupabaseMaintenance(false);
+  }
+}
+
+function shouldMarkSupabaseMaintenance(error) {
+  const status = Number(error?.status || error?.statusCode || 0);
+  if (status >= 500) return true;
+  const msg = String(error?.message || '').toLowerCase();
+  return msg.includes('failed to fetch') || msg.includes('network') || msg.includes('fetch failed') || msg.includes('503') || msg.includes('502') || msg.includes('504');
+}
+
+function markSupabaseMaintenanceFromError(error) {
+  if (shouldMarkSupabaseMaintenance(error)) {
+    setSupabaseMaintenance(true, 'network');
+  }
+}
+
+function loadRankingCache() {
+  try {
+    const raw = localStorage.getItem(RANKING_CACHE_KEY);
+    if (!raw) return [];
+    const data = JSON.parse(raw);
+    return Array.isArray(data?.items) ? data.items : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveRankingCache(items) {
+  try {
+    const trimmed = Array.isArray(items) ? items.slice(0, RANKING_CACHE_LIMIT) : [];
+    localStorage.setItem(RANKING_CACHE_KEY, JSON.stringify({ ts: Date.now(), items: trimmed }));
+  } catch (_) {
+    // ignore
+  }
 }
 
 function isMissingClientId(error) {
@@ -85,6 +157,7 @@ async function fetchTopScores(includeUserId = true, includeClientId = true) {
       .order('created_at', { ascending: true })
       .range(from, to);
     if (error) {
+      markSupabaseMaintenanceFromError(error);
       if (includeUserId && isMissingUserId(error)) {
         return fetchTopScores(false, includeClientId);
       }
@@ -93,6 +166,7 @@ async function fetchTopScores(includeUserId = true, includeClientId = true) {
       }
       throw error;
     }
+    noteSupabaseSuccess();
     const rows = data || [];
     if (rows.length) {
       collected.push(...rows);
@@ -115,6 +189,13 @@ export async function initRankingUI({ formSelector, listSelector, statusSelector
 
   const baseStatus = 'スコアはゲーム終了時に自動送信されます';
   const renderStatus = msg => { if (statusEl) statusEl.textContent = msg || ''; };
+
+  if (supabaseMaintenance) {
+    setSupabaseMaintenance(true, 'cached');
+  }
+  if (typeof window !== 'undefined' && window.pixieedFlushMaoituScoreQueue) {
+    window.pixieedFlushMaoituScoreQueue();
+  }
 
   await syncProfileFromServer();
 
@@ -139,6 +220,7 @@ export async function initRankingUI({ formSelector, listSelector, statusSelector
         list.innerHTML = '<li class="rank-item">まだスコアがありません。</li>';
         return;
       }
+      saveRankingCache(rows);
       rows.forEach((row, idx) => {
         const li = document.createElement('li');
         li.className = 'rank-item';
@@ -151,7 +233,25 @@ export async function initRankingUI({ formSelector, listSelector, statusSelector
         list.appendChild(li);
       });
     } catch (e) {
-      renderStatus('ランキングの取得に失敗しました');
+      markSupabaseMaintenanceFromError(e);
+      const cached = loadRankingCache();
+      if (cached.length) {
+        renderStatus('メンテナンス中のため前回のランキングを表示しています');
+        list.innerHTML = '';
+        cached.forEach((row, idx) => {
+          const li = document.createElement('li');
+          li.className = 'rank-item';
+          li.dataset.rank = String(idx + 1);
+          const medal = idx === 0 ? '<span class="rank-medal rank-medal--1">1st</span>'
+            : idx === 1 ? '<span class="rank-medal rank-medal--2">2nd</span>'
+            : idx === 2 ? '<span class="rank-medal rank-medal--3">3rd</span>'
+            : '';
+          li.innerHTML = `<div class="rank-left"><span class="rank-index">${idx + 1}.</span>${medal}<span class="rank-name">${escapeHtml(row.name)}</span></div><span class="rank-score">${row.score}</span>`;
+          list.appendChild(li);
+        });
+        return;
+      }
+      renderStatus('メンテナンス中です');
     }
   }
 
