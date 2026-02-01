@@ -45,9 +45,8 @@ html,body {
 }
 body {
   margin:0;
-  height:100dvh;
-  min-height:100vh;
-  background:#000;
+  min-height:100dvh;
+  background:radial-gradient(120% 140% at 50% 0%, #1f2a44 0%, #0b1020 52%, #06070d 100%);
   display:flex;
   flex-direction:column;
   align-items:center;
@@ -55,12 +54,16 @@ body {
   font-family:'Noto Sans JP', system-ui, sans-serif;
   text-align:center;
   box-sizing:border-box;
-  padding:48px 16px calc(56px + env(safe-area-inset-bottom, 0px));
-  gap:12px;
+  padding:calc(24px + env(safe-area-inset-top, 0px)) 16px 16px;
+  gap:16px;
   overflow:hidden;
   --kago-icon: url('assets/kago.png');
 }
-h1 { font-size:22px; margin:32px 0 8px; }
+h1 {
+  font-size:24px;
+  margin:0;
+  line-height:1.2;
+}
 button {
   font:700 16px system-ui;
   padding:10px 20px;
@@ -70,11 +73,12 @@ button {
 }
 a { color:#7dd3fc; }
 .control-bar {
-  display:flex;
-  flex-wrap:wrap;
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
   align-items:center;
-  justify-content:center;
-  gap:16px;
+  justify-content:stretch;
+  gap:12px;
+  width:100%;
 }
 .control-bar__btn {
   font:700 16px system-ui;
@@ -83,6 +87,19 @@ a { color:#7dd3fc; }
   border:0;
   cursor:pointer;
   transition:transform 0.15s ease, filter 0.15s ease;
+  width:100%;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none;
+  min-height:44px;
+  line-height:1.2;
+  white-space:nowrap;
+  box-sizing:border-box;
+}
+.control-bar__btn--compact {
+  font-size:13px;
+  letter-spacing:-0.01em;
 }
 .control-bar__btn:hover,
 .control-bar__btn:focus-visible {
@@ -104,12 +121,15 @@ a { color:#7dd3fc; }
   display:flex;
   align-items:center;
   gap:8px;
+  width:100%;
+  justify-content:flex-start;
 }
 .difficulty-toggle{
   display:flex;
   gap:8px;
   flex-wrap:wrap;
-  justify-content:center;
+  justify-content:flex-start;
+  width:100%;
 }
 .difficulty-btn{
   font:900 15px system-ui;
@@ -143,10 +163,10 @@ a { color:#7dd3fc; }
   color:#fed7aa;
 }
 .instructions-card {
-  max-width:320px;
-  padding:16px 20px;
-  background:rgba(255,255,255,0.08);
-  border:1px solid rgba(255,255,255,0.15);
+  width:100%;
+  padding:16px 18px;
+  background:transparent;
+  border:1px solid transparent;
   border-radius:16px;
   color:#f3f4f6;
   font-size:14px;
@@ -154,17 +174,12 @@ a { color:#7dd3fc; }
   text-align:left;
 }
 .start-content {
-  flex:1 1 auto;
   display:flex;
   flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  gap:20px;
+  align-items:stretch;
+  gap:18px;
   width:100%;
-  max-width:360px;
   min-height:0;
-  overflow:auto;
-  padding-bottom:8px;
 }
 .instructions-card h2 {
   margin:0 0 8px;
@@ -379,9 +394,10 @@ a { color:#7dd3fc; }
   outline:none;
 }
 .developer-credit {
-  font-size:14px;
+  font-size:13px;
   color:#9ca3af;
-  margin:0 0 12px;
+  margin:0;
+  text-align:left;
 }
 .developer-credit a {
   color:#1DA1F2;
@@ -393,7 +409,7 @@ a { color:#7dd3fc; }
 }
 .ad-footer{
   width:100%;
-  max-width:360px;
+  max-width:520px;
   padding:0 0 calc(12px + env(safe-area-inset-bottom, 0px));
   box-sizing:border-box;
   display:flex;
@@ -410,13 +426,60 @@ a { color:#7dd3fc; }
 }
 .control-bar-wrapper {
   width:100%;
-  max-width:360px;
   display:flex;
   flex-direction:column;
-  align-items:center;
-  gap:16px;
-  padding:0 16px;
+  align-items:flex-start;
+  gap:14px;
+  padding:0;
   box-sizing:border-box;
+}
+.start-screen {
+  width:100%;
+  flex:1 1 auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:0;
+}
+.start-panel {
+  width:100%;
+  max-width:520px;
+  background:rgba(15,23,42,0.88);
+  border:1px solid rgba(148,163,184,0.22);
+  border-radius:24px;
+  padding:24px 22px 26px;
+  box-shadow:0 24px 50px rgba(0,0,0,0.45);
+  display:flex;
+  flex-direction:column;
+  gap:18px;
+  text-align:left;
+  max-height:100%;
+  overflow:auto;
+}
+.start-header {
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+@media (max-width: 480px) {
+  body {
+    padding:calc(16px + env(safe-area-inset-top, 0px)) 12px 12px;
+  }
+  .start-panel {
+    padding:20px 18px 22px;
+    border-radius:20px;
+  }
+  h1 {
+    font-size:22px;
+  }
+  .control-bar__btn {
+    padding:10px 16px;
+  }
+}
+@media (max-width: 340px) {
+  .control-bar {
+    grid-template-columns:1fr;
+  }
 }
 </style>
 <link href="../character-dots/mao1.png" rel="icon" type="image/png"/>  <style id="ads-safe">
@@ -560,37 +623,44 @@ a { color:#7dd3fc; }
   </script>
 </head>
 <body>
-<h1>魔王様！！いつまでよければいいですか！？</h1>
-<p class="developer-credit">開発者: <a href="https://x.com/PiXiEED_arta" rel="noopener" target="_blank">@PiXiEED_arta</a></p>
-<div class="start-content">
-<div class="instructions-card">
-<h2>遊び方</h2>
-<ul>
-<li>操作：画面をタップ / マウスドラッグ、または ←→ キーで移動します。</li>
-<li>敵にぶつかると即ゲームオーバーです。</li>
-<li>エンジェリンを取ると一度だけ身代わりが発動し、次の衝突を防ぎます。</li>
-</ul>
-</div>
-<div aria-label="ゲーム操作" class="control-bar-wrapper" role="region">
-<div class="control-bar__audio">
-<label class="switch">
-<input id="audioToggle" type="checkbox"/>
-<span class="slider"></span>
-</label>
-<span class="volume-label" id="audioToggleLabel"></span>
-</div>
-<div class="difficulty-toggle" id="difficultyToggle">
-<button class="difficulty-btn" data-mode="easy" type="button">簡単</button>
-<button class="difficulty-btn" data-mode="normal" type="button">普通</button>
-<button class="difficulty-btn is-active" data-mode="endless" type="button">無限</button>
-</div>
-<div class="control-bar">
-<button class="control-bar__btn control-bar__btn--primary" id="playBtn">▶ プレイ</button>
-<button class="control-bar__btn control-bar__btn--secondary" id="titleShareBtn">シェアする</button>
-<button class="control-bar__btn control-bar__btn--secondary" id="openRankingBtn">ランキング</button>
-</div>
-</div>
-</div>
+<main class="start-screen">
+  <section class="start-panel" aria-labelledby="startTitle">
+    <header class="start-header">
+      <h1 id="startTitle">魔王様！！いつまでよければいいですか！？</h1>
+      <p class="developer-credit">開発者: <a href="https://x.com/PiXiEED_arta" rel="noopener" target="_blank">@PiXiEED_arta</a></p>
+    </header>
+    <div class="start-content">
+      <div class="instructions-card">
+        <h2>遊び方</h2>
+        <ul>
+          <li>操作：画面をタップ / マウスドラッグ、または ←→ キーで移動します。</li>
+          <li>敵にぶつかると即ゲームオーバーです。</li>
+          <li>エンジェリンを取ると一度だけ身代わりが発動し、次の衝突を防ぎます。</li>
+        </ul>
+      </div>
+      <div aria-label="ゲーム操作" class="control-bar-wrapper" role="region">
+        <div class="control-bar__audio">
+          <label class="switch">
+            <input id="audioToggle" type="checkbox"/>
+            <span class="slider"></span>
+          </label>
+          <span class="volume-label" id="audioToggleLabel"></span>
+        </div>
+        <div class="difficulty-toggle" id="difficultyToggle">
+          <button class="difficulty-btn" data-mode="easy" type="button">簡単</button>
+          <button class="difficulty-btn" data-mode="normal" type="button">普通</button>
+          <button class="difficulty-btn is-active" data-mode="endless" type="button">無限</button>
+        </div>
+        <div class="control-bar">
+          <button class="control-bar__btn control-bar__btn--primary" id="playBtn">▶ プレイ</button>
+          <button class="control-bar__btn control-bar__btn--secondary" id="titleShareBtn">シェアする</button>
+          <button class="control-bar__btn control-bar__btn--secondary" id="openRankingBtn">ランキング</button>
+          <a class="control-bar__btn control-bar__btn--secondary control-bar__btn--compact" href="../tools.html">プロジェクト一覧</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
 <div class="ranking-modal" id="rankingModal" aria-hidden="true" role="dialog" aria-modal="true">
   <div class="ranking-modal__dialog">
     <div class="ranking-modal__header">
