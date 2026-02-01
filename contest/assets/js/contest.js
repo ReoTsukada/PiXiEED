@@ -16,6 +16,11 @@ const CONTEST_SHARE_OGP_WIDTH = 1200;
 const CONTEST_SHARE_OGP_HEIGHT = 630;
 const CONTEST_SHARE_PADDING = 60;
 const CONTEST_SHARE_TITLE_SIZE = 32;
+const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
+const CONTEST_CACHE_KEY = 'pixieed_contest_cache';
+const CONTEST_CACHE_LIMIT = 60;
+const CONTEST_SHARE_QUEUE_KEY = 'contest_share_queue';
+const CONTEST_SHARE_QUEUE_LIMIT = 20;
 
 let clientId = null;
 let likedEntries = new Set();
@@ -25,6 +30,7 @@ let cachedEntries = [];
 let placeholderCache = null;
 let supportsImageUrls = true;
 let supportsStorageUploads = true;
+let supabaseMaintenance = Boolean(readSupabaseMaintenance());
 
 const PLACEHOLDERS = new Array(10).fill(0).map((_, i) => ({
   title: `サンプル${i + 1}`,
@@ -57,6 +63,163 @@ function ensureClientId(){
   }catch(_){
     clientId = `guest-${Math.random().toString(36).slice(2,8)}`;
   }
+}
+
+function readSupabaseMaintenance(){
+  try{
+    const raw = localStorage.getItem(SUPABASE_MAINTENANCE_KEY);
+    if(!raw) return null;
+    const data = JSON.parse(raw);
+    if(data && data.active) return data;
+  }catch(_){
+    // ignore
+  }
+  return null;
+}
+
+function isSupabaseMaintenance(){
+  return supabaseMaintenance;
+}
+
+function setSupabaseMaintenance(active, reason = ''){
+  supabaseMaintenance = active;
+  try{
+    if(active){
+      localStorage.setItem(SUPABASE_MAINTENANCE_KEY, JSON.stringify({ active: true, reason, ts: Date.now() }));
+    }else{
+      localStorage.removeItem(SUPABASE_MAINTENANCE_KEY);
+    }
+  }catch(_){
+    // ignore
+  }
+  if(active){
+    setStatus('メンテナンス中のため投稿・共有は一時停止しています');
+  }
+  updatePostControls();
+}
+
+function noteSupabaseSuccess(){
+  if(supabaseMaintenance){
+    setSupabaseMaintenance(false);
+  }
+}
+
+function shouldMarkSupabaseMaintenance(error){
+  const status = Number(error?.status || error?.statusCode || 0);
+  if(status >= 500) return true;
+  const msg = String(error?.message || '').toLowerCase();
+  return msg.includes('failed to fetch') || msg.includes('network') || msg.includes('fetch failed') || msg.includes('503') || msg.includes('502') || msg.includes('504');
+}
+
+function markSupabaseMaintenanceFromError(error){
+  if(shouldMarkSupabaseMaintenance(error)){
+    setSupabaseMaintenance(true, 'network');
+  }
+}
+
+function loadContestCache(){
+  try{
+    const raw = localStorage.getItem(CONTEST_CACHE_KEY);
+    if(!raw) return [];
+    const data = JSON.parse(raw);
+    return Array.isArray(data?.items) ? data.items : [];
+  }catch(_){
+    return [];
+  }
+}
+
+function saveContestCache(items){
+  try{
+    const trimmed = Array.isArray(items) ? items.slice(0, CONTEST_CACHE_LIMIT) : [];
+    localStorage.setItem(CONTEST_CACHE_KEY, JSON.stringify({ ts: Date.now(), items: trimmed }));
+  }catch(_){
+    // ignore
+  }
+}
+
+function loadShareQueue(){
+  try{
+    const raw = localStorage.getItem(CONTEST_SHARE_QUEUE_KEY);
+    if(!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  }catch(_){
+    return [];
+  }
+}
+
+function saveShareQueue(queue){
+  try{
+    localStorage.setItem(CONTEST_SHARE_QUEUE_KEY, JSON.stringify(queue.slice(0, CONTEST_SHARE_QUEUE_LIMIT)));
+  }catch(_){
+    // ignore
+  }
+}
+
+function queueShareTask(task){
+  if(!task?.entryId) return;
+  const queue = loadShareQueue();
+  const next = queue.filter(item => item.entryId !== task.entryId);
+  next.unshift(task);
+  saveShareQueue(next);
+}
+
+function updatePostControls(){
+  const form = $(FORM_ID);
+  if(form){
+    const submit = form.querySelector('button[type="submit"]');
+    if(submit) submit.disabled = isSupabaseMaintenance();
+  }
+  const openBtn = document.getElementById('openPostPanel');
+  if(openBtn) openBtn.disabled = isSupabaseMaintenance();
+}
+
+async function resolveEntryImageBlob(entry){
+  const src = entry?.image_url || entry?.image_base64 || entry?.thumb_url || '';
+  if(!src) return null;
+  try{
+    const res = await fetch(src);
+    if(!res.ok) throw new Error(`image fetch failed: ${res.status}`);
+    return await res.blob();
+  }catch(err){
+    markSupabaseMaintenanceFromError(err);
+    return null;
+  }
+}
+
+async function flushShareQueue(){
+  if(isSupabaseMaintenance() || !supabase?.storage || !supportsStorageUploads) return;
+  const queue = loadShareQueue();
+  if(!queue.length) return;
+  const remaining = [];
+  for(const task of queue){
+    try{
+      const { data, error } = await supabase
+        .from('contest_entries')
+        .select('id,title,image_url,thumb_url,image_base64')
+        .eq('id', task.entryId)
+        .maybeSingle();
+      if(error || !data){
+        if(error) throw error;
+        continue;
+      }
+      const imageBlob = await resolveEntryImageBlob(data);
+      if(!imageBlob) throw new Error('image missing');
+      const shareResult = await uploadContestShareAssets({
+        entryId: data.id,
+        title: data.title || task.title,
+        imageInfo: { imageBlob }
+      });
+      if(!shareResult?.shareUrl){
+        throw new Error('share upload failed');
+      }
+      noteSupabaseSuccess();
+    }catch(err){
+      remaining.push(task);
+      markSupabaseMaintenanceFromError(err);
+    }
+  }
+  saveShareQueue(remaining);
 }
 
 function setStatus(msg){
@@ -244,6 +407,7 @@ async function uploadContestShareAssets({ entryId, title, imageInfo }){
     return { shareUrl, ogpUrl };
   }catch(err){
     console.warn('share upload failed', err);
+    markSupabaseMaintenanceFromError(err);
     const msg = String(err?.message || '').toLowerCase();
     if(msg.includes('bucket') || msg.includes('storage') || msg.includes('not found')){
       supportsStorageUploads = false;
@@ -445,6 +609,7 @@ async function uploadContestImages(imageInfo){
     return { imageUrl, thumbUrl };
   }catch(err){
     console.warn('storage upload failed', err);
+    markSupabaseMaintenanceFromError(err);
     const msg = String(err?.message || '').toLowerCase();
     if(msg.includes('bucket') || msg.includes('storage') || msg.includes('not found')){
       supportsStorageUploads = false;
@@ -510,6 +675,10 @@ async function fileToImageInfo(file){
 
 async function handleSubmit(e){
   e.preventDefault();
+  if(isSupabaseMaintenance()){
+    setStatus('メンテナンス中のため投稿できません');
+    return;
+  }
   const form = e.currentTarget;
   const name = form.name.value.trim() || '名無し';
   const title = form.title.value.trim() || '無題';
@@ -563,13 +732,18 @@ async function handleSubmit(e){
   if(error){
     setStatus('投稿に失敗しました');
     console.error(error);
+    markSupabaseMaintenanceFromError(error);
     return;
   }
+  noteSupabaseSuccess();
   const entryId = Array.isArray(data) ? data[0]?.id : null;
   let shareUrl = null;
   if(entryId){
     const shareResult = await uploadContestShareAssets({ entryId, title, imageInfo });
     shareUrl = shareResult?.shareUrl || null;
+    if(!shareUrl && isSupabaseMaintenance()){
+      queueShareTask({ entryId, title });
+    }
   }
   form.reset();
   if(shareUrl){
@@ -580,6 +754,8 @@ async function handleSubmit(e){
       window.prompt('共有リンクをコピーしてください。', shareUrl);
       setStatus('投稿しました！');
     }
+  }else if(isSupabaseMaintenance()){
+    setStatus('投稿しました！共有リンクはメンテナンス復旧後に生成されます。');
   }else{
     setStatus('投稿しました！');
   }
@@ -594,6 +770,7 @@ function renderEntries(entries){
     return;
   }
   gallery.innerHTML = '';
+    const placeholderSrc = makePlaceholder('#334155');
     entries.forEach(entry => {
       const item = document.createElement('div');
       item.className = 'entry-card';
@@ -613,6 +790,11 @@ function renderEntries(entries){
         </div>
       `;
       gallery.appendChild(item);
+    });
+    gallery.querySelectorAll('.entry-imgwrap img').forEach(img => {
+      img.addEventListener('error', () => {
+        img.src = placeholderSrc;
+      });
     });
     gallery.querySelectorAll('.heart-btn').forEach(btn => {
       btn.addEventListener('click', () => likeEntry(Number(btn.dataset.id)));
@@ -640,20 +822,30 @@ async function fetchAndRender(){
   const baseSelect = supportsImageUrls
     ? 'id,name,title,prompt,mode,submitted_at,width,height,colors,image_url,thumb_url'
     : 'id,name,title,prompt,mode,submitted_at,width,height,colors,image_base64';
-  let { data: entries, error } = await supabase
-    .from('contest_entries')
-    .select(baseSelect)
-    .order('submitted_at', { ascending:false })
-    .limit(100);
+  let entries = null;
+  let error = null;
+  try{
+    ({ data: entries, error } = await supabase
+      .from('contest_entries')
+      .select(baseSelect)
+      .order('submitted_at', { ascending:false })
+      .limit(100));
+  }catch(err){
+    error = err;
+  }
   if(error && supportsImageUrls){
     const msg = String(error.message || '').toLowerCase();
     if(msg.includes('image_url') || msg.includes('thumb_url')){
       supportsImageUrls = false;
-      ({ data: entries, error } = await supabase
-        .from('contest_entries')
-        .select('id,name,title,prompt,mode,submitted_at,width,height,colors,image_base64')
-        .order('submitted_at', { ascending:false })
-        .limit(100));
+      try{
+        ({ data: entries, error } = await supabase
+          .from('contest_entries')
+          .select('id,name,title,prompt,mode,submitted_at,width,height,colors,image_base64')
+          .order('submitted_at', { ascending:false })
+          .limit(100));
+      }catch(err){
+        error = err;
+      }
     }
   }
   if(!error && Array.isArray(entries)){
@@ -662,15 +854,23 @@ async function fetchAndRender(){
   if(error){
     setStatus('投稿の取得に失敗しました');
     console.error(error);
+    markSupabaseMaintenanceFromError(error);
     // 失敗時もダミーを表示して静かに続行
   }
-  const { data: likes, error: likeError } = await supabase
-    .from('contest_likes')
-    .select('entry_id, client_id')
-    .limit(1000);
+  let likes = null;
+  let likeError = null;
+  try{
+    ({ data: likes, error: likeError } = await supabase
+      .from('contest_likes')
+      .select('entry_id, client_id')
+      .limit(1000));
+  }catch(err){
+    likeError = err;
+  }
   if(likeError){
     setStatus('いいね取得に失敗しました');
     console.error(likeError);
+    markSupabaseMaintenanceFromError(likeError);
     // 失敗時はlikeなしで進む
   }
   const likeCounts = {};
@@ -683,7 +883,8 @@ async function fetchAndRender(){
   });
   let useEntries = Array.isArray(entries) ? entries : [];
   if(useEntries.length === 0){
-    useEntries = await buildPlaceholders();
+    const cached = loadContestCache();
+    useEntries = cached.length ? cached : await buildPlaceholders();
   }
   const enriched = useEntries.map(e => ({
     ...e,
@@ -691,7 +892,11 @@ async function fetchAndRender(){
   }));
   cachedEntries = enriched;
   renderEntries(applyFilterAndSort(cachedEntries));
-  setStatus('');
+  if(!error && !likeError){
+    saveContestCache(enriched);
+    noteSupabaseSuccess();
+    setStatus('');
+  }
 }
 
 async function buildPlaceholders(){
@@ -735,6 +940,10 @@ function applyFilterAndSort(entries){
 
 async function likeEntry(id){
   if(!clientId) ensureClientId();
+  if(isSupabaseMaintenance()){
+    setStatus('メンテナンス中のためいいねできません');
+    return;
+  }
   if(likedEntries.has(id)){
     setStatus('既にいいね済みです');
     return;
@@ -746,9 +955,11 @@ async function likeEntry(id){
     }else{
       setStatus('いいねに失敗しました');
       console.error(error);
+      markSupabaseMaintenanceFromError(error);
     }
     return;
   }
+  noteSupabaseSuccess();
   setStatus('いいねしました');
   await fetchAndRender();
 }
@@ -767,7 +978,12 @@ function initUI(){
   if(promptEl){
     promptEl.textContent = PROMPT_TEXT;
   }
+  if(supabaseMaintenance){
+    setSupabaseMaintenance(true, 'cached');
+  }
+  updatePostControls();
   fetchAndRender();
+  flushShareQueue().catch(err => console.warn('share queue flush failed', err));
   setupPostPanel();
   setupTabs();
 }
