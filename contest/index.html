@@ -1139,6 +1139,10 @@
     const MAX_TAGS = 5;
     const PAGE_SIZE = 12;
     const PENDING_UPLOAD_KEY = 'pixieed_contest_upload_v1';
+    const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
+    const POST_QUEUE_KEY = 'contest_post_queue';
+    const POST_QUEUE_LIMIT = 20;
+    const POST_QUEUE_RETRY_MS = 60000;
     const STORAGE_BUCKET = 'pixieed-contest';
     const THUMB_SIZE = 256;
     const CONTEST_SHARE_BASE_URL = 'https://pixieed.jp/contest/view.html';
@@ -1170,6 +1174,9 @@
     let isLoadingEntries = false;
     let postTags = [];
     let supabase = null;
+    let supabaseMaintenance = Boolean(readSupabaseMaintenance());
+    let postQueueBusy = false;
+    let supabaseInitPromise = null;
     const SAMPLE_COLORS = ['#7dd3fc','#f472b6','#facc15','#34d399','#c084fc','#60a5fa','#f59e0b','#a3e635','#f43f5e','#38bdf8'];
     const PLACEHOLDERS = Array.from({ length: 10 }, (_, i) => ({
       id: 100000 + i,
@@ -1281,6 +1288,57 @@
       if(el) el.textContent = msg || '';
     }
 
+    function readSupabaseMaintenance(){
+      try{
+        const raw = localStorage.getItem(SUPABASE_MAINTENANCE_KEY);
+        if(!raw) return null;
+        const data = JSON.parse(raw);
+        if(data && data.active) return data;
+      }catch(_){
+        // ignore
+      }
+      return null;
+    }
+
+    function isSupabaseMaintenance(){
+      return supabaseMaintenance;
+    }
+
+    function setSupabaseMaintenance(active, reason = ''){
+      supabaseMaintenance = active;
+      try{
+        if(active){
+          localStorage.setItem(SUPABASE_MAINTENANCE_KEY, JSON.stringify({ active: true, reason, ts: Date.now() }));
+        }else{
+          localStorage.removeItem(SUPABASE_MAINTENANCE_KEY);
+        }
+      }catch(_){
+        // ignore
+      }
+      if(active){
+        setStatus('メンテ中のため投稿はキューに保存されます');
+      }
+    }
+
+    function noteSupabaseSuccess(){
+      if(supabaseMaintenance){
+        setSupabaseMaintenance(false);
+      }
+    }
+
+    function shouldMarkSupabaseMaintenance(error){
+      const status = Number(error?.status || error?.statusCode || 0);
+      if(status >= 500) return true;
+      const msg = String(error?.message || '').toLowerCase();
+      return msg.includes('failed to fetch') || msg.includes('network') || msg.includes('fetch failed') || msg.includes('503') || msg.includes('502') || msg.includes('504');
+    }
+
+    function markSupabaseMaintenanceFromError(error){
+      if(shouldMarkSupabaseMaintenance(error)){
+        setSupabaseMaintenance(true, 'network');
+      }
+    }
+
     function setPostPreview(dataUrl){
       const wrap = document.getElementById('postPreview');
       const img = document.getElementById('postPreviewImage');
@@ -1316,6 +1374,231 @@
         bytes[i] = binary.charCodeAt(i);
       }
       return new File([bytes], filename, { type: mime });
+    }
+
+    async function dataUrlToBlob(dataUrl){
+      const response = await fetch(dataUrl);
+      if(!response.ok) throw new Error('data url parse failed');
+      return await response.blob();
+    }
+
+    function loadPostQueue(){
+      try{
+        const raw = localStorage.getItem(POST_QUEUE_KEY);
+        if(!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      }catch(_){
+        return [];
+      }
+    }
+
+    function savePostQueue(queue){
+      try{
+        localStorage.setItem(POST_QUEUE_KEY, JSON.stringify(queue.slice(0, POST_QUEUE_LIMIT)));
+      }catch(_){
+        // ignore
+      }
+    }
+
+    function normalizePostTask(task){
+      if(!task) return null;
+      const dataUrl = typeof task.dataUrl === 'string' ? task.dataUrl : '';
+      if(!dataUrl) return null;
+      const queueId = task.queueId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2,8)}`);
+      return {
+        queueId,
+        name: task.name || '名無し',
+        title: task.title || '無題',
+        tags: Array.isArray(task.tags) ? task.tags.slice(0, MAX_TAGS) : [],
+        allowDownload: !!task.allowDownload,
+        requirePasscode: !!task.requirePasscode,
+        passcode: task.passcode || '',
+        prompt: task.prompt || '自由投稿',
+        mode: task.mode || 'free',
+        submitted_at: task.submitted_at || new Date().toISOString(),
+        width: Number.isFinite(task.width) ? task.width : null,
+        height: Number.isFinite(task.height) ? task.height : null,
+        colors: Number.isFinite(task.colors) ? task.colors : null,
+        hash: task.hash || null,
+        phash: task.phash || null,
+        userId: task.userId || null,
+        clientId: task.clientId || null,
+        dataUrl,
+      };
+    }
+
+    function queuePostTask(task){
+      const normalized = normalizePostTask(task);
+      if(!normalized) return false;
+      const queue = loadPostQueue();
+      const next = queue.filter(item => item.queueId !== normalized.queueId);
+      next.unshift(normalized);
+      savePostQueue(next);
+      return true;
+    }
+
+    async function ensureSupabaseReady(){
+      if(supabase){
+        if(!isSupabaseMaintenance()) return true;
+        try{
+          const { error } = await supabase
+            .from('contest_entries')
+            .select('id')
+            .limit(1);
+          if(error){
+            markSupabaseMaintenanceFromError(error);
+            return false;
+          }
+          noteSupabaseSuccess();
+          return true;
+        }catch(err){
+          markSupabaseMaintenanceFromError(err);
+          return false;
+        }
+      }
+      await initSupabase();
+      return !!supabase;
+    }
+
+    async function buildImageInfoFromTask(task){
+      const imageBlob = await dataUrlToBlob(task.dataUrl);
+      const img = await createImageBitmap(imageBlob);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if(!ctx) throw new Error('canvas init failed');
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, 0, 0);
+      const thumbCanvas = createThumbnailCanvas(canvas);
+      const thumbBlob = await canvasToBlob(thumbCanvas, 'image/png');
+      return {
+        width: Number.isFinite(task.width) ? task.width : img.width,
+        height: Number.isFinite(task.height) ? task.height : img.height,
+        colors: Number.isFinite(task.colors) ? task.colors : null,
+        dataUrl: task.dataUrl,
+        hash: task.hash,
+        phash: task.phash,
+        imageBlob,
+        thumbBlob,
+      };
+    }
+
+    async function flushPostQueue(){
+      if(postQueueBusy) return;
+      const queue = loadPostQueue();
+      if(!queue.length) return;
+      const ready = await ensureSupabaseReady();
+      if(!ready) return;
+      postQueueBusy = true;
+      const remaining = [];
+      let posted = false;
+      for(const task of queue){
+        try{
+          const normalized = normalizePostTask(task);
+          if(!normalized) continue;
+          const imageInfo = await buildImageInfoFromTask(normalized);
+          let uploadResult = null;
+          if(supabase && supportsImageUrls){
+            uploadResult = await uploadContestImages(imageInfo);
+          }
+          const payload = {
+            name: normalized.name,
+            title: normalized.title,
+            prompt: normalized.prompt,
+            mode: normalized.mode,
+            started_at: null,
+            submitted_at: normalized.submitted_at,
+            width: imageInfo.width,
+            height: imageInfo.height,
+            colors: imageInfo.colors,
+            image_hash: imageInfo.hash,
+            phash: imageInfo.phash
+          };
+          if(supportsImageUrls && uploadResult){
+            payload.image_url = uploadResult.imageUrl;
+            payload.thumb_url = uploadResult.thumbUrl;
+          }else{
+            payload.image_base64 = imageInfo.dataUrl;
+          }
+          if(supportsTags && normalized.tags.length){
+            payload.tags = normalized.tags.join(',');
+          }
+          if(supportsDownloadSettings){
+            payload.allow_download = normalized.allowDownload;
+            payload.download_passcode = normalized.allowDownload && normalized.requirePasscode ? normalized.passcode : null;
+          }
+          if(normalized.userId){
+            payload.user_id = normalized.userId;
+          }
+          if(supportsClientId && normalized.clientId){
+            payload.client_id = normalized.clientId;
+          }
+          let res = null;
+          for(let attempt = 0; attempt < 3; attempt++){
+            res = await supabase.from('contest_entries').insert(payload).select('id');
+            if(!res.error) break;
+            const msg = String(res.error.message || '').toLowerCase();
+            if(supportsTags && msg.includes('tags')){
+              supportsTags = false;
+              delete payload.tags;
+              continue;
+            }
+            if(supportsDownloadSettings && (msg.includes('allow_download') || msg.includes('download_passcode'))){
+              supportsDownloadSettings = false;
+              delete payload.allow_download;
+              delete payload.download_passcode;
+              continue;
+            }
+            if(supportsImageUrls && (msg.includes('image_url') || msg.includes('thumb_url'))){
+              supportsImageUrls = false;
+              delete payload.image_url;
+              delete payload.thumb_url;
+              if(!payload.image_base64){
+                payload.image_base64 = imageInfo.dataUrl;
+              }
+              continue;
+            }
+            if(supportsClientId && msg.includes('client_id')){
+              supportsClientId = false;
+              delete payload.client_id;
+              continue;
+            }
+            break;
+          }
+          if(res?.error){
+            throw res.error;
+          }
+          noteSupabaseSuccess();
+          const entryId = Array.isArray(res?.data) ? res.data[0]?.id : null;
+          if(entryId){
+            await uploadContestShareAssets({ entryId, title: normalized.title, imageInfo });
+          }
+          posted = true;
+        }catch(err){
+          remaining.push(task);
+          markSupabaseMaintenanceFromError(err);
+          if(isSupabaseMaintenance()) break;
+        }
+      }
+      savePostQueue(remaining);
+      postQueueBusy = false;
+      if(posted){
+        setStatus('キューに保存した投稿を自動送信しました。');
+        await fetchAndRender();
+      }
+    }
+
+    function schedulePostQueueFlush(){
+      window.addEventListener('online', () => {
+        flushPostQueue().catch(err => console.warn('post queue flush failed', err));
+      });
+      window.setInterval(() => {
+        if(isSupabaseMaintenance() || loadPostQueue().length){
+          flushPostQueue().catch(err => console.warn('post queue flush failed', err));
+        }
+      }, POST_QUEUE_RETRY_MS);
     }
 
     function restorePendingUpload(){
@@ -1818,6 +2101,7 @@
         return { imageUrl, thumbUrl };
       }catch(err){
         console.warn('storage upload failed', err);
+        markSupabaseMaintenanceFromError(err);
         const msg = String(err?.message || '').toLowerCase();
         if(msg.includes('bucket') || msg.includes('storage') || msg.includes('not found')){
           supportsStorageUploads = false;
@@ -1975,6 +2259,7 @@
         return { shareUrl, ogpUrl };
       }catch(err){
         console.warn('share upload failed', err);
+        markSupabaseMaintenanceFromError(err);
         const msg = String(err?.message || '').toLowerCase();
         if(msg.includes('bucket') || msg.includes('storage') || msg.includes('not found')){
           supportsStorageUploads = false;
@@ -2168,6 +2453,7 @@
     async function handleSubmit(e){
       e.preventDefault();
       const form = e.currentTarget;
+      ensureClientId();
       const name = loadNickname() || '名無し';
       const title = form.title.value.trim() || '無題';
       const tags = postTags.slice(0, MAX_TAGS);
@@ -2197,8 +2483,35 @@
         setStatus(err.message || '画像の解析に失敗しました');
         return;
       }
-      if(!supabase){
-        setStatus('オンライン投稿は無効です（プレース表示のみ）');
+      const submittedAt = new Date().toISOString();
+      if(!supabase || isSupabaseMaintenance()){
+        const queued = queuePostTask({
+          name,
+          title,
+          tags,
+          allowDownload,
+          requirePasscode,
+          passcode,
+          submitted_at: submittedAt,
+          width: imageInfo.width,
+          height: imageInfo.height,
+          colors: imageInfo.colors,
+          hash: imageInfo.hash,
+          phash: imageInfo.phash,
+          userId: supabaseUser?.id || null,
+          clientId,
+          dataUrl: imageInfo.dataUrl,
+        });
+        if(queued){
+          setStatus('メンテ中のためキューに保存しました。復旧後に自動投稿します。');
+          form.reset();
+          setPostPreview('');
+          postTags = [];
+          renderPostTags();
+          updateDownloadSettingsUI();
+        }else{
+          setStatus('キューへの保存に失敗しました。時間を置いて再試行してください。');
+        }
         return;
       }
       // 重複画像チェック（完全一致 + 類似）
@@ -2247,7 +2560,7 @@
           prompt: '自由投稿',
           mode: 'free',
           started_at: null,
-          submitted_at: new Date().toISOString(),
+          submitted_at: submittedAt,
           width: imageInfo.width,
           height: imageInfo.height,
           colors: imageInfo.colors,
@@ -2314,6 +2627,7 @@
           const shareResult = await uploadContestShareAssets({ entryId, title, imageInfo });
           shareUrl = shareResult?.shareUrl || null;
         }
+        noteSupabaseSuccess();
         form.reset();
         setPostPreview('');
         postTags = [];
@@ -2331,8 +2645,39 @@
           setStatus('投稿しました！');
         }
       }catch(err){
-        setStatus('投稿に失敗しました');
         console.error(err);
+        markSupabaseMaintenanceFromError(err);
+        if(isSupabaseMaintenance()){
+          const queued = queuePostTask({
+            name,
+            title,
+            tags,
+            allowDownload,
+            requirePasscode,
+            passcode,
+            submitted_at: submittedAt,
+            width: imageInfo.width,
+            height: imageInfo.height,
+            colors: imageInfo.colors,
+            hash: imageInfo.hash,
+            phash: imageInfo.phash,
+            userId: supabaseUser?.id || null,
+            clientId,
+            dataUrl: imageInfo.dataUrl,
+          });
+          if(queued){
+            setStatus('メンテ中のためキューに保存しました。復旧後に自動投稿します。');
+            form.reset();
+            setPostPreview('');
+            postTags = [];
+            renderPostTags();
+            updateDownloadSettingsUI();
+          }else{
+            setStatus('投稿に失敗しました。キュー保存にも失敗しました。');
+          }
+        }else{
+          setStatus('投稿に失敗しました');
+        }
       }
       await fetchAndRender();
     }
@@ -2784,35 +3129,46 @@
     }
 
     async function initSupabase(){
-      try{
-        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.46.1/+esm');
-        supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-          global:{ headers:{ 'x-client-id': clientId || '' } }
-        });
-        window.__pixieedSupabase = supabase;
-        const { data } = await supabase.auth.getSession();
-        supabaseSession = data?.session || null;
-        supabaseUser = supabaseSession?.user || null;
-        supabase.auth.onAuthStateChange((_event, session) => {
-          supabaseSession = session || null;
-          supabaseUser = session?.user || null;
+      if(supabaseInitPromise) return supabaseInitPromise;
+      supabaseInitPromise = (async () => {
+        try{
+          const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.46.1?bundle');
+          supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            global:{ headers:{ 'x-client-id': clientId || '' } }
+          });
+          window.__pixieedSupabase = supabase;
+          const { data } = await supabase.auth.getSession();
+          supabaseSession = data?.session || null;
+          supabaseUser = supabaseSession?.user || null;
+          supabase.auth.onAuthStateChange((_event, session) => {
+            supabaseSession = session || null;
+            supabaseUser = session?.user || null;
+            clientLinkChecked = false;
+            clientLinkConflict = false;
+            migrateGuestData();
+            syncProfileFromServer();
+            updateAuthUI();
+            fetchAndRender();
+          });
           clientLinkChecked = false;
           clientLinkConflict = false;
-          migrateGuestData();
-          syncProfileFromServer();
+          await checkClientLinkConflict();
+          await migrateGuestData();
+          await syncProfileFromServer();
           updateAuthUI();
-          fetchAndRender();
-        });
-        clientLinkChecked = false;
-        clientLinkConflict = false;
-        await checkClientLinkConflict();
-        await migrateGuestData();
-        await syncProfileFromServer();
-        updateAuthUI();
-      }catch(err){
-        console.warn('Supabase初期化に失敗: オフラインプレース表示のみ', err);
-        supabase = null;
+          noteSupabaseSuccess();
+        }catch(err){
+          console.warn('Supabase初期化に失敗: オフラインプレース表示のみ', err);
+          supabase = null;
+          setSupabaseMaintenance(true, 'init');
+        }
+      })();
+      try{
+        await supabaseInitPromise;
+      }finally{
+        supabaseInitPromise = null;
       }
+      return supabase;
     }
 
     function setupAuthButton(){
@@ -2988,6 +3344,11 @@
         profileNick.value = loadNickname();
       }
       await initSupabase();
+      if(supabaseMaintenance){
+        setSupabaseMaintenance(true, 'cached');
+      }
+      flushPostQueue().catch(err => console.warn('post queue flush failed', err));
+      schedulePostQueueFlush();
       updateAuthUI();
       renderAvatarChoices();
       applyAvatarToBrand();
