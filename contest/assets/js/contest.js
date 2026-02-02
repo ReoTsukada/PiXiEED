@@ -402,11 +402,10 @@ async function flushPostQueue(){
         height: imageInfo.height,
         colors: imageInfo.colors
       };
+      payload.image_base64 = imageInfo.dataUrl;
       if(supportsImageUrls && uploadResult){
         payload.image_url = uploadResult.imageUrl;
         payload.thumb_url = uploadResult.thumbUrl;
-      }else{
-        payload.image_base64 = imageInfo.dataUrl;
       }
       let { data, error } = await supabase.from('contest_entries').insert(payload).select('id');
       if(error){
@@ -919,11 +918,10 @@ async function handleSubmit(e){
     height: imageInfo.height,
     colors: imageInfo.colors
   };
+  payload.image_base64 = imageInfo.dataUrl;
   if(supportsImageUrls && uploadResult){
     payload.image_url = uploadResult.imageUrl;
     payload.thumb_url = uploadResult.thumbUrl;
-  }else{
-    payload.image_base64 = imageInfo.dataUrl;
   }
   let { data, error } = await supabase.from('contest_entries').insert(payload).select('id');
   if(error){
