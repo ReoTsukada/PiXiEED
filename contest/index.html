@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no, viewport-fit=cover"/>
   <meta name="robots" content="noai,noimageai,nosnippet,noarchive"/>
   <title>PiXiEED ドットギャラリー</title>
+  <meta name="description" content="ドット絵制作・pixel art commission、ブラウザゲーム用アセット、ツールとゲームをまとめたPiXiEED公式サイト。"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:site_name" content="PiXiEED"/>
+  <meta property="og:title" content="PiXiEED | ドット絵専用総合サイト"/>
+  <meta property="og:description" content="ドット絵制作の外注・pixel art commission、ブラウザゲーム用アセット制作、ツールとゲームを紹介するPiXiEED公式サイト。"/>
+  <meta property="og:url" content="https://pixieed.jp/contest/index.html"/>
+  <meta property="og:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
+  <meta name="twitter:card" content="summary_large_image"/>
   <link rel="icon" type="image/png" href="../character-dots/mao1.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1613,10 +1621,6 @@
             throw res.error;
           }
           noteSupabaseSuccess();
-          const entryId = Array.isArray(res?.data) ? res.data[0]?.id : null;
-          if(entryId){
-            await uploadContestShareAssets({ entryId, title: normalized.title, imageInfo });
-          }
           posted = true;
         }catch(err){
           if(isPermissionError(err)){
@@ -2163,6 +2167,13 @@
       ));
     }
 
+    function isStorageExistsError(error){
+      const status = Number(error?.status || error?.statusCode || 0);
+      if(status === 409) return true;
+      const msg = String(error?.message || '').toLowerCase();
+      return msg.includes('exists');
+    }
+
     function truncateText(ctx, text, maxWidth){
       let output = String(text ?? '');
       if(!output) return '';
@@ -2288,7 +2299,7 @@
         shareUrl,
         targetUrl,
       });
-      const htmlBlob = new Blob([html], { type: 'text/html' });
+      const htmlBlob = new Blob([html], { type: 'text/html; charset=utf-8' });
       try{
         const bucket = supabase.storage.from(STORAGE_BUCKET);
         const { error: ogpError } = await bucket.upload(ogpPath, ogpBlob, {
@@ -2296,13 +2307,41 @@
           cacheControl: '31536000',
           upsert: false
         });
-        if(ogpError) throw ogpError;
+        if(ogpError){
+          if(isStorageExistsError(ogpError)){
+            if(typeof bucket.update === 'function'){
+              const { error: ogpUpdateError } = await bucket.update(ogpPath, ogpBlob, {
+                contentType: 'image/png',
+                cacheControl: '31536000'
+              });
+              if(ogpUpdateError){
+                console.warn('share ogp overwrite failed', ogpUpdateError);
+              }
+            }
+          }else{
+            throw ogpError;
+          }
+        }
         const { error: htmlError } = await bucket.upload(sharePath, htmlBlob, {
-          contentType: 'text/html',
-          cacheControl: '31536000',
+          contentType: 'text/html; charset=utf-8',
+          cacheControl: '3600',
           upsert: false
         });
-        if(htmlError) throw htmlError;
+        if(htmlError){
+          if(isStorageExistsError(htmlError)){
+            if(typeof bucket.update === 'function'){
+              const { error: htmlUpdateError } = await bucket.update(sharePath, htmlBlob, {
+                contentType: 'text/html; charset=utf-8',
+                cacheControl: '3600'
+              });
+              if(htmlUpdateError){
+                console.warn('share html overwrite failed', htmlUpdateError);
+              }
+            }
+          }else{
+            throw htmlError;
+          }
+        }
         return { shareUrl, ogpUrl };
       }catch(err){
         console.warn('share upload failed', err);
@@ -2659,11 +2698,7 @@
           throw res.error;
         }
         const entryId = Array.isArray(res?.data) ? res.data[0]?.id : null;
-        let shareUrl = null;
-        if(entryId){
-          const shareResult = await uploadContestShareAssets({ entryId, title, imageInfo });
-          shareUrl = shareResult?.shareUrl || null;
-        }
+        const shareUrl = entryId ? `${CONTEST_SHARE_BASE_URL}?id=${entryId}` : null;
         noteSupabaseSuccess();
         form.reset();
         setPostPreview('');
