@@ -710,6 +710,10 @@ async function handleCreatorPublish() {
     }
   } catch (error) {
     console.error(error);
+    if (isPermissionError(error)) {
+      setCreatorStatus('投稿権限がありません。ログインまたは権限設定をご確認ください。', 'error');
+      return;
+    }
     const shouldQueue = isSupabaseMaintenance() || shouldMarkSupabaseMaintenance(error);
     if (shouldQueue) {
       markSupabaseMaintenanceFromError(error);
@@ -828,7 +832,7 @@ async function uploadPuzzleFile(path, body, contentType = null) {
   if (!response.ok) {
     const detail = await response.text();
     markSupabaseMaintenanceFromError(null, response.status);
-    throw new Error(`upload failed: ${response.status} ${detail}`);
+    throw buildSupabaseError(`upload failed: ${response.status} ${detail}`, response.status, detail);
   }
   noteSupabaseSuccess();
   return getSupabasePublicUrl(path);
@@ -857,13 +861,13 @@ async function uploadContestFile(path, body, contentType = null) {
   if (!response.ok) {
     const detail = await response.text();
     markSupabaseMaintenanceFromError(null, response.status);
-    throw new Error(`upload failed: ${response.status} ${detail}`);
+    throw buildSupabaseError(`upload failed: ${response.status} ${detail}`, response.status, detail);
   }
   noteSupabaseSuccess();
   return getContestPublicUrl(path);
 }
 
-async function insertPublishedPuzzle(payload, { allowRetry = true } = {}) {
+async function insertPublishedPuzzle(payload, { removedColumns = [] } = {}) {
   let response;
   try {
     response = await fetch(`${SUPABASE_REST_URL}/${SUPABASE_TABLE}`, {
@@ -881,20 +885,21 @@ async function insertPublishedPuzzle(payload, { allowRetry = true } = {}) {
   }
   if (!response.ok) {
     const detail = await response.text();
-    if (allowRetry && payload?.author_name && detail.includes('author_name')) {
+    const missing = parseMissingColumn(detail);
+    if (missing && Object.prototype.hasOwnProperty.call(payload, missing) && !removedColumns.includes(missing)) {
       const fallbackPayload = { ...payload };
-      delete fallbackPayload.author_name;
-      return insertPublishedPuzzle(fallbackPayload, { allowRetry: false });
+      delete fallbackPayload[missing];
+      return insertPublishedPuzzle(fallbackPayload, { removedColumns: [...removedColumns, missing] });
     }
     markSupabaseMaintenanceFromError(null, response.status);
-    throw new Error(`insert failed: ${response.status} ${detail}`);
+    throw buildSupabaseError(`insert failed: ${response.status} ${detail}`, response.status, detail);
   }
   const data = await response.json();
   noteSupabaseSuccess();
   return Array.isArray(data) ? data[0] : null;
 }
 
-async function insertContestEntry(payload) {
+async function insertContestEntry(payload, { removedColumns = [] } = {}) {
   let response;
   try {
     response = await fetch(`${SUPABASE_REST_URL}/${CONTEST_TABLE}`, {
@@ -912,8 +917,14 @@ async function insertContestEntry(payload) {
   }
   if (!response.ok) {
     const detail = await response.text();
+    const missing = parseMissingColumn(detail);
+    if (missing && Object.prototype.hasOwnProperty.call(payload, missing) && !removedColumns.includes(missing)) {
+      const fallbackPayload = { ...payload };
+      delete fallbackPayload[missing];
+      return insertContestEntry(fallbackPayload, { removedColumns: [...removedColumns, missing] });
+    }
     markSupabaseMaintenanceFromError(null, response.status);
-    throw new Error(`contest insert failed: ${response.status} ${detail}`);
+    throw buildSupabaseError(`contest insert failed: ${response.status} ${detail}`, response.status, detail);
   }
   const data = await response.json();
   noteSupabaseSuccess();
@@ -965,6 +976,37 @@ function supabaseHeaders() {
     apikey: SUPABASE_ANON_KEY,
     Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
   };
+}
+
+function parseMissingColumn(detail) {
+  if (!detail) return null;
+  let message = String(detail);
+  try {
+    const parsed = JSON.parse(detail);
+    if (parsed?.message) message = String(parsed.message);
+  } catch (_) {
+    // ignore
+  }
+  const match = message.match(/column \"([^\"]+)\"/) || message.match(/'([a-z0-9_]+)' column/i);
+  return match ? match[1] : null;
+}
+
+function isPermissionError(error, status) {
+  const code = Number(status ?? error?.status ?? error?.statusCode ?? 0);
+  if (code === 401 || code === 403) return true;
+  const msg = String(error?.message || '').toLowerCase();
+  return msg.includes('permission') || msg.includes('not authorized') || msg.includes('row-level security');
+}
+
+function buildSupabaseError(message, status, detail) {
+  const err = new Error(message);
+  if (typeof status !== 'undefined') {
+    err.status = status;
+  }
+  if (detail) {
+    err.detail = detail;
+  }
+  return err;
 }
 
 function readSupabaseMaintenance() {
