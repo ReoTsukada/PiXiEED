@@ -136,6 +136,7 @@
       form: document.getElementById('exportDialogForm'),
       confirmPng: document.getElementById('confirmExportPng'),
       confirmGif: document.getElementById('confirmExportGif'),
+      confirmContest: document.getElementById('confirmExportContest'),
       cancel: document.getElementById('cancelExport'),
       scaleSlider: document.getElementById('exportScaleSlider'),
       scaleInput: document.getElementById('exportScaleInput'),
@@ -3863,6 +3864,10 @@
       exportProjectAsGif();
       closeExportDialog();
     });
+    bind(config.confirmContest, () => {
+      exportProjectToContest();
+      closeExportDialog();
+    });
     bind(config.cancel, () => {
       closeExportDialog();
     });
@@ -4834,6 +4839,41 @@
   // -------------------------------------------------------------------------
   // Export helpers
   // -------------------------------------------------------------------------
+
+  function exportProjectToContest() {
+    const frameCount = state.frames.length;
+    if (!frameCount) {
+      updateAutosaveStatus('投稿するフレームがありません', 'warn');
+      return;
+    }
+    try {
+      const { width, height } = state;
+      const activeIndex = clamp(state.activeFrame, 0, frameCount - 1);
+      const frame = state.frames[activeIndex];
+      const pixels = compositeFramePixels(frame, width, height, state.palette);
+      const baseCanvas = createFrameCanvas(pixels, width, height);
+      const dataUrl = baseCanvas.toDataURL('image/png');
+      if (!dataUrl) {
+        throw new Error('Missing contest data URL');
+      }
+      try {
+        const payload = {
+          dataUrl,
+          canvasSize: width === height ? width : `${width}x${height}`,
+          width,
+          height,
+          createdAt: new Date().toISOString(),
+        };
+        localStorage.setItem('pixieed_contest_upload_v1', JSON.stringify(payload));
+      } catch (error) {
+        console.warn('contest upload store failed', error);
+      }
+      window.location.href = '../contest/index.html#post';
+    } catch (error) {
+      console.error('Contest export failed', error);
+      updateAutosaveStatus('コンテスト投稿用の画像を作成できませんでした', 'error');
+    }
+  }
 
   async function exportProjectAsPng() {
     const frameCount = state.frames.length;
