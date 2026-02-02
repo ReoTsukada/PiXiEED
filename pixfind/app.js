@@ -689,6 +689,13 @@ async function handleCreatorPublish() {
         if (normalized) {
           normalized.shareUrl = shareAssets.shareUrl;
         }
+        try {
+          await updatePublishedPuzzle(puzzleId, { share_url: shareAssets.shareUrl });
+        } catch (error) {
+          if (!isPermissionError(error)) {
+            console.warn('share url update failed', error);
+          }
+        }
       }
     } catch (error) {
       queueShareTask({
@@ -913,6 +920,43 @@ async function insertPublishedPuzzle(payload, { removedColumns = [] } = {}) {
     }
     markSupabaseMaintenanceFromError(null, response.status);
     throw buildSupabaseError(`insert failed: ${response.status} ${detail}`, response.status, detail);
+  }
+  const data = await response.json();
+  noteSupabaseSuccess();
+  return Array.isArray(data) ? data[0] : null;
+}
+
+async function updatePublishedPuzzle(id, patch, { removedColumns = [] } = {}) {
+  if (!id || !patch || Object.keys(patch).length === 0) return null;
+  const params = new URLSearchParams({
+    id: `eq.${id}`,
+  });
+  let response;
+  try {
+    response = await fetch(`${SUPABASE_REST_URL}/${SUPABASE_TABLE}?${params.toString()}`, {
+      method: 'PATCH',
+      headers: {
+        ...supabaseHeaders(),
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify(patch),
+    });
+  } catch (error) {
+    markSupabaseMaintenanceFromError(error);
+    throw error;
+  }
+  if (!response.ok) {
+    const detail = await response.text();
+    const missing = parseMissingColumn(detail);
+    if (missing && Object.prototype.hasOwnProperty.call(patch, missing) && !removedColumns.includes(missing)) {
+      const nextPatch = { ...patch };
+      delete nextPatch[missing];
+      if (!Object.keys(nextPatch).length) return null;
+      return updatePublishedPuzzle(id, nextPatch, { removedColumns: [...removedColumns, missing] });
+    }
+    markSupabaseMaintenanceFromError(null, response.status);
+    throw buildSupabaseError(`update failed: ${response.status} ${detail}`, response.status, detail);
   }
   const data = await response.json();
   noteSupabaseSuccess();
@@ -1381,6 +1425,13 @@ async function publishQueuedTask(task) {
     });
     if (shareAssets?.shareUrl && normalizedEntry) {
       normalizedEntry.shareUrl = shareAssets.shareUrl;
+      try {
+        await updatePublishedPuzzle(puzzleId, { share_url: shareAssets.shareUrl });
+      } catch (error) {
+        if (!isPermissionError(error)) {
+          console.warn('share url update failed', error);
+        }
+      }
     }
   } catch (error) {
     queueShareTask({
@@ -1516,6 +1567,16 @@ async function flushShareQueue() {
         originalImage,
         diffImage,
       });
+      try {
+        const shareUrl = getPixfindShareHtmlUrl(task.puzzleId);
+        if (shareUrl) {
+          await updatePublishedPuzzle(task.puzzleId, { share_url: shareUrl });
+        }
+      } catch (error) {
+        if (!isPermissionError(error)) {
+          console.warn('share url update failed', error);
+        }
+      }
     } catch (error) {
       remaining.push(task);
       markSupabaseMaintenanceFromError(error);
@@ -1800,6 +1861,13 @@ async function sharePuzzle(puzzle) {
       if (shareAssets?.shareUrl) {
         puzzle.shareUrl = shareAssets.shareUrl;
         shareUrl = shareAssets.shareUrl;
+        try {
+          await updatePublishedPuzzle(puzzle.id, { share_url: shareAssets.shareUrl });
+        } catch (error) {
+          if (!isPermissionError(error)) {
+            console.warn('share url update failed', error);
+          }
+        }
       }
     } catch (error) {
       queueShareTask({
