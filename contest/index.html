@@ -711,10 +711,15 @@
       border-color:#7c3aed;
       transform:translateY(-1px);
     }
-    .fab{
+    .fab-menu{
       position:fixed;
       right:18px;
       bottom:86px;
+      width:56px;
+      height:56px;
+      z-index:60;
+    }
+    .fab-toggle{
       width:56px;
       height:56px;
       border-radius:50%;
@@ -724,9 +729,69 @@
       border:0;
       box-shadow:0 8px 20px rgba(0,0,0,0.25);
       cursor:pointer;
-      z-index:60;
+      transition:transform 0.18s ease, box-shadow 0.18s ease;
     }
-    .fab:focus-visible{ outline:3px solid rgba(255,255,255,0.4); }
+    .fab-toggle:focus-visible{ outline:3px solid rgba(255,255,255,0.4); }
+    .fab-menu.is-open .fab-toggle{
+      transform:rotate(45deg);
+    }
+    .fab-actions{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+    }
+    .fab-menu.is-open .fab-actions{
+      pointer-events:auto;
+    }
+    .fab-action{
+      position:absolute;
+      left:50%;
+      top:50%;
+      width:46px;
+      height:46px;
+      padding:0;
+      border-radius:50%;
+      border:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font:800 12px/1 'Fredoka', system-ui, sans-serif;
+      color:#fff;
+      text-decoration:none;
+      box-shadow:0 6px 16px rgba(0,0,0,0.25);
+      opacity:0;
+      pointer-events:none;
+      transform:translate(-50%, -50%) scale(0.86);
+      transition:transform 0.18s ease, opacity 0.18s ease;
+    }
+    .fab-action__icon{
+      width:70%;
+      height:70%;
+      object-fit:contain;
+      display:block;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .fab-action__text{
+      position:absolute;
+      width:1px;
+      height:1px;
+      padding:0;
+      margin:-1px;
+      overflow:hidden;
+      clip:rect(0, 0, 0, 0);
+      white-space:nowrap;
+      border:0;
+    }
+    .fab-action:focus-visible{ outline:3px solid rgba(255,255,255,0.4); }
+    .fab-menu.is-open .fab-action{
+      opacity:1;
+      pointer-events:auto;
+      transform:translate(calc(-50% + var(--fab-x)), calc(-50% + var(--fab-y))) scale(1);
+    }
+    .fab-action--post{ background:linear-gradient(135deg, #34d399, #22c55e); }
+    .fab-action--draw{ background:linear-gradient(135deg, #60a5fa, #3b82f6); }
+    .fab-action--lite{ background:linear-gradient(135deg, #f472b6, #fb7185); }
     .post-panel{
       position:fixed;
       inset:0;
@@ -1004,7 +1069,23 @@
     <div class="grid">
     </div>
   </div>
-  <button class="fab" id="openPostPanel">＋</button>
+  <div class="fab-menu" id="fabMenu">
+    <button class="fab-toggle" id="fabToggle" type="button" aria-label="作成メニューを開く" aria-expanded="false">＋</button>
+    <div class="fab-actions" id="fabActions" aria-hidden="true">
+      <button class="fab-action fab-action--post" id="openPostPanel" type="button" style="--fab-x:-4px; --fab-y:-84px;" aria-label="投稿する">
+        <img class="fab-action__icon" src="../おうぎ１3.png" alt=""/>
+        <span class="fab-action__text">投稿</span>
+      </button>
+      <a class="fab-action fab-action--draw" href="../pixiedraw/index.html" rel="noopener" target="_blank" style="--fab-x:-68px; --fab-y:-58px;" aria-label="PiXiEEDrawで描く">
+        <img class="fab-action__icon" src="../おうぎ１2.png" alt=""/>
+        <span class="fab-action__text">PiXiEEDraw</span>
+      </a>
+      <a class="fab-action fab-action--lite" href="../jerin-maker/index.html" rel="noopener" target="_blank" style="--fab-x:-92px; --fab-y:-6px;" aria-label="PiXiEEDraw Liteで描く">
+        <img class="fab-action__icon" src="../おうぎ１1.png" alt=""/>
+        <span class="fab-action__text">PiXiEEDraw Lite</span>
+      </a>
+    </div>
+  </div>
   <div class="post-panel" id="postPanel" aria-hidden="true">
     <div class="post-card">
       <div class="post-header">
@@ -3047,6 +3128,39 @@
       });
     }
 
+    function setupFabMenu(){
+      const menu = document.getElementById('fabMenu');
+      const toggle = document.getElementById('fabToggle');
+      const actions = document.getElementById('fabActions');
+      if(!menu || !toggle) return;
+      const closeMenu = () => {
+        menu.classList.remove('is-open');
+        toggle.setAttribute('aria-expanded', 'false');
+        if(actions) actions.setAttribute('aria-hidden', 'true');
+      };
+      const openMenu = () => {
+        menu.classList.add('is-open');
+        toggle.setAttribute('aria-expanded', 'true');
+        if(actions) actions.setAttribute('aria-hidden', 'false');
+      };
+      toggle.addEventListener('click', () => {
+        if(menu.classList.contains('is-open')){
+          closeMenu();
+        }else{
+          openMenu();
+        }
+      });
+      document.addEventListener('click', (event) => {
+        if(!menu.contains(event.target)) closeMenu();
+      });
+      document.addEventListener('keydown', (event) => {
+        if(event.key === 'Escape') closeMenu();
+      });
+      menu.querySelectorAll('.fab-action').forEach(action => {
+        action.addEventListener('click', closeMenu);
+      });
+    }
+
     function isMissingColumn(error, column){
       return String(error?.message || '').includes(column);
     }
@@ -3377,6 +3491,7 @@
       setupTagSearch();
       setupLoadMore();
       setupPostPanel();
+      setupFabMenu();
       setupTagInput();
       setupDownloadSettings();
       setupAuthButton();
