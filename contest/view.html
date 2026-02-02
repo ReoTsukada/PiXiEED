@@ -1694,7 +1694,7 @@
 
     async function initSupabaseAuth(){
       try{
-        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.46.1/+esm');
+        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.46.1?bundle');
         supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
           global:{ headers:{ 'x-client-id': clientId || '' } }
         });
