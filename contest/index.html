@@ -1155,6 +1155,9 @@
     let supportsDownloadSettings = true;
     let supportsImageUrls = true;
     let supportsStorageUploads = true;
+    let supportsImageHash = true;
+    let supportsPhash = true;
+    let supportsUserId = true;
     let supabaseUser = null;
     let supabaseSession = null;
     let migrationDone = false;
@@ -1333,6 +1336,19 @@
       return msg.includes('failed to fetch') || msg.includes('network') || msg.includes('fetch failed') || msg.includes('503') || msg.includes('502') || msg.includes('504');
     }
 
+    function isPermissionError(error){
+      const status = Number(error?.status || error?.statusCode || 0);
+      if(status === 401 || status === 403) return true;
+      const msg = String(error?.message || '').toLowerCase();
+      return msg.includes('permission') || msg.includes('not authorized') || msg.includes('row-level security');
+    }
+
+    function parseMissingColumn(error){
+      const msg = String(error?.message || error || '');
+      const match = msg.match(/column \"([^\"]+)\"/) || msg.match(/'([a-z0-9_]+)' column/i);
+      return match ? match[1] : null;
+    }
+
     function markSupabaseMaintenanceFromError(error){
       if(shouldMarkSupabaseMaintenance(error)){
         setSupabaseMaintenance(true, 'network');
@@ -1438,6 +1454,52 @@
       return true;
     }
 
+    function applyInsertFallback(payload, error, imageInfo){
+      const missing = parseMissingColumn(error);
+      if(!missing) return false;
+      if(supportsTags && missing === 'tags'){
+        supportsTags = false;
+        delete payload.tags;
+        return true;
+      }
+      if(supportsDownloadSettings && (missing === 'allow_download' || missing === 'download_passcode')){
+        supportsDownloadSettings = false;
+        delete payload.allow_download;
+        delete payload.download_passcode;
+        return true;
+      }
+      if(supportsImageUrls && (missing === 'image_url' || missing === 'thumb_url')){
+        supportsImageUrls = false;
+        delete payload.image_url;
+        delete payload.thumb_url;
+        if(!payload.image_base64 && imageInfo?.dataUrl){
+          payload.image_base64 = imageInfo.dataUrl;
+        }
+        return true;
+      }
+      if(supportsClientId && missing === 'client_id'){
+        supportsClientId = false;
+        delete payload.client_id;
+        return true;
+      }
+      if(supportsUserId && missing === 'user_id'){
+        supportsUserId = false;
+        delete payload.user_id;
+        return true;
+      }
+      if(supportsImageHash && missing === 'image_hash'){
+        supportsImageHash = false;
+        delete payload.image_hash;
+        return true;
+      }
+      if(supportsPhash && missing === 'phash'){
+        supportsPhash = false;
+        delete payload.phash;
+        return true;
+      }
+      return false;
+    }
+
     async function ensureSupabaseReady(){
       if(supabase){
         if(!isSupabaseMaintenance()) return true;
@@ -1512,10 +1574,14 @@
             submitted_at: normalized.submitted_at,
             width: imageInfo.width,
             height: imageInfo.height,
-            colors: imageInfo.colors,
-            image_hash: imageInfo.hash,
-            phash: imageInfo.phash
+            colors: imageInfo.colors
           };
+          if(supportsImageHash){
+            payload.image_hash = imageInfo.hash;
+          }
+          if(supportsPhash){
+            payload.phash = imageInfo.phash;
+          }
           if(supportsImageUrls && uploadResult){
             payload.image_url = uploadResult.imageUrl;
             payload.thumb_url = uploadResult.thumbUrl;
@@ -1529,7 +1595,7 @@
             payload.allow_download = normalized.allowDownload;
             payload.download_passcode = normalized.allowDownload && normalized.requirePasscode ? normalized.passcode : null;
           }
-          if(normalized.userId){
+          if(normalized.userId && supportsUserId){
             payload.user_id = normalized.userId;
           }
           if(supportsClientId && normalized.clientId){
@@ -1539,30 +1605,7 @@
           for(let attempt = 0; attempt < 3; attempt++){
             res = await supabase.from('contest_entries').insert(payload).select('id');
             if(!res.error) break;
-            const msg = String(res.error.message || '').toLowerCase();
-            if(supportsTags && msg.includes('tags')){
-              supportsTags = false;
-              delete payload.tags;
-              continue;
-            }
-            if(supportsDownloadSettings && (msg.includes('allow_download') || msg.includes('download_passcode'))){
-              supportsDownloadSettings = false;
-              delete payload.allow_download;
-              delete payload.download_passcode;
-              continue;
-            }
-            if(supportsImageUrls && (msg.includes('image_url') || msg.includes('thumb_url'))){
-              supportsImageUrls = false;
-              delete payload.image_url;
-              delete payload.thumb_url;
-              if(!payload.image_base64){
-                payload.image_base64 = imageInfo.dataUrl;
-              }
-              continue;
-            }
-            if(supportsClientId && msg.includes('client_id')){
-              supportsClientId = false;
-              delete payload.client_id;
+            if(applyInsertFallback(payload, res.error, imageInfo)){
               continue;
             }
             break;
@@ -1577,6 +1620,11 @@
           }
           posted = true;
         }catch(err){
+          if(isPermissionError(err)){
+            setStatus('投稿権限がありません。ログインまたは権限設定をご確認ください。');
+            remaining.push(task);
+            break;
+          }
           remaining.push(task);
           markSupabaseMaintenanceFromError(err);
           if(isSupabaseMaintenance()) break;
@@ -2485,67 +2533,77 @@
       }
       const submittedAt = new Date().toISOString();
       if(!supabase || isSupabaseMaintenance()){
-        const queued = queuePostTask({
-          name,
-          title,
-          tags,
-          allowDownload,
-          requirePasscode,
-          passcode,
-          submitted_at: submittedAt,
-          width: imageInfo.width,
-          height: imageInfo.height,
-          colors: imageInfo.colors,
-          hash: imageInfo.hash,
-          phash: imageInfo.phash,
-          userId: supabaseUser?.id || null,
-          clientId,
-          dataUrl: imageInfo.dataUrl,
-        });
-        if(queued){
-          setStatus('メンテ中のためキューに保存しました。復旧後に自動投稿します。');
-          form.reset();
-          setPostPreview('');
-          postTags = [];
-          renderPostTags();
-          updateDownloadSettingsUI();
-        }else{
-          setStatus('キューへの保存に失敗しました。時間を置いて再試行してください。');
+        const ready = await ensureSupabaseReady();
+        if(!ready || isSupabaseMaintenance()){
+          const queued = queuePostTask({
+            name,
+            title,
+            tags,
+            allowDownload,
+            requirePasscode,
+            passcode,
+            submitted_at: submittedAt,
+            width: imageInfo.width,
+            height: imageInfo.height,
+            colors: imageInfo.colors,
+            hash: imageInfo.hash,
+            phash: imageInfo.phash,
+            userId: supabaseUser?.id || null,
+            clientId,
+            dataUrl: imageInfo.dataUrl,
+          });
+          if(queued){
+            setStatus('メンテ中のためキューに保存しました。復旧後に自動投稿します。');
+            form.reset();
+            setPostPreview('');
+            postTags = [];
+            renderPostTags();
+            updateDownloadSettingsUI();
+          }else{
+            setStatus('キューへの保存に失敗しました。時間を置いて再試行してください。');
+          }
+          return;
         }
-        return;
       }
       // 重複画像チェック（完全一致 + 類似）
       try{
-        const dupHash = await supabase
-          .from('contest_entries')
-          .select('id')
-          .eq('image_hash', imageInfo.hash)
-          .limit(1);
-        if(!dupHash.error && dupHash.data && dupHash.data.length){
-          setStatus('同じ画像が既に投稿されています');
-          return;
-        }
-        const dupP = await supabase
-          .from('contest_entries')
-          .select('id,phash,user_id,client_id')
-          .not('phash','is',null)
-          .limit(200);
-        if(!dupP.error && Array.isArray(dupP.data)){
-          const isSimilar = dupP.data.some(row => {
-            if((supabaseUser?.id && row.user_id === supabaseUser.id) || row.client_id === clientId){
-              return false; // 自分の投稿は許可
-            }
-            if(!row.phash || row.phash.length !== imageInfo.phash.length) return false;
-            const dist = hammingDistance(row.phash, imageInfo.phash);
-            return dist <= 5; // 閾値
-          });
-          if(isSimilar){
-            setStatus('類似した画像が既に投稿されています');
+        if(supportsImageHash){
+          const dupHash = await supabase
+            .from('contest_entries')
+            .select('id')
+            .eq('image_hash', imageInfo.hash)
+            .limit(1);
+          if(!dupHash.error && dupHash.data && dupHash.data.length){
+            setStatus('同じ画像が既に投稿されています');
             return;
+          }
+        }
+        if(supportsPhash){
+          const dupP = await supabase
+            .from('contest_entries')
+            .select('id,phash,user_id,client_id')
+            .not('phash','is',null)
+            .limit(200);
+          if(!dupP.error && Array.isArray(dupP.data)){
+            const isSimilar = dupP.data.some(row => {
+              if((supabaseUser?.id && row.user_id === supabaseUser.id) || row.client_id === clientId){
+                return false; // 自分の投稿は許可
+              }
+              if(!row.phash || row.phash.length !== imageInfo.phash.length) return false;
+              const dist = hammingDistance(row.phash, imageInfo.phash);
+              return dist <= 5; // 閾値
+            });
+            if(isSimilar){
+              setStatus('類似した画像が既に投稿されています');
+              return;
+            }
           }
         }
       }catch(err){
         console.warn('duplicate check skipped', err);
+        const missing = parseMissingColumn(err);
+        if(missing === 'image_hash') supportsImageHash = false;
+        if(missing === 'phash') supportsPhash = false;
       }
       let uploadResult = null;
       if(supabase && supportsImageUrls){
@@ -2563,10 +2621,14 @@
           submitted_at: submittedAt,
           width: imageInfo.width,
           height: imageInfo.height,
-          colors: imageInfo.colors,
-          image_hash: imageInfo.hash,
-          phash: imageInfo.phash
+          colors: imageInfo.colors
         };
+        if(supportsImageHash){
+          payload.image_hash = imageInfo.hash;
+        }
+        if(supportsPhash){
+          payload.phash = imageInfo.phash;
+        }
         if(supportsImageUrls && uploadResult){
           payload.image_url = uploadResult.imageUrl;
           payload.thumb_url = uploadResult.thumbUrl;
@@ -2580,7 +2642,7 @@
           payload.allow_download = allowDownload;
           payload.download_passcode = allowDownload && requirePasscode ? passcode : null;
         }
-        if(supabaseUser?.id){
+        if(supabaseUser?.id && supportsUserId){
           payload.user_id = supabaseUser.id;
         }
         if(supportsClientId){
@@ -2590,30 +2652,7 @@
         for(let attempt = 0; attempt < 3; attempt++){
           res = await supabase.from('contest_entries').insert(payload).select('id');
           if(!res.error) break;
-          const msg = String(res.error.message || '').toLowerCase();
-          if(supportsTags && msg.includes('tags')){
-            supportsTags = false;
-            delete payload.tags;
-            continue;
-          }
-          if(supportsDownloadSettings && (msg.includes('allow_download') || msg.includes('download_passcode'))){
-            supportsDownloadSettings = false;
-            delete payload.allow_download;
-            delete payload.download_passcode;
-            continue;
-          }
-          if(supportsImageUrls && (msg.includes('image_url') || msg.includes('thumb_url'))){
-            supportsImageUrls = false;
-            delete payload.image_url;
-            delete payload.thumb_url;
-            if(!payload.image_base64){
-              payload.image_base64 = imageInfo.dataUrl;
-            }
-            continue;
-          }
-          if(supportsClientId && msg.includes('client_id')){
-            supportsClientId = false;
-            delete payload.client_id;
+          if(applyInsertFallback(payload, res.error, imageInfo)){
             continue;
           }
           break;
@@ -2646,6 +2685,10 @@
         }
       }catch(err){
         console.error(err);
+        if(isPermissionError(err)){
+          setStatus('投稿権限がありません。ログインまたは権限設定をご確認ください。');
+          return;
+        }
         markSupabaseMaintenanceFromError(err);
         if(isSupabaseMaintenance()){
           const queued = queuePostTask({
