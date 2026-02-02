@@ -4,11 +4,11 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="theme-color" content="#0b1224"/>
-<title>魔王奪還戦 | PiXiEED</title>
-<meta name="description" content="魔王様が奪われた領地を取り返し、勇者を倒すまで進軍するグリッド戦略RPG。"/>
+<title>魔王様の10歩 | PiXiEED</title>
+<meta name="description" content="10歩で挑み、素材で強化して魔王城を奪還するリトライ型RPG。"/>
 <meta property="og:type" content="website"/>
-<meta property="og:title" content="魔王奪還戦 | PiXiEED"/>
-<meta property="og:description" content="魔王様が奪われた領地を取り返し、勇者を倒すまで進軍するグリッド戦略RPG。"/>
+<meta property="og:title" content="魔王様の10歩 | PiXiEED"/>
+<meta property="og:description" content="10歩で挑み、素材で強化して魔王城を奪還するリトライ型RPG。"/>
 <meta property="og:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
 <meta property="og:url" content="https://pixieed.jp/maou-war/"/>
 <link rel="icon" type="image/png" href="../character-dots/mao1.png"/>
@@ -29,7 +29,7 @@
   gtag('event', 'project_open', {
     project_slug: 'maou-war',
     project_type: 'game',
-    project_name: '魔王奪還戦'
+    project_name: '魔王様の10歩'
   });
 </script>
 <style>
@@ -626,9 +626,9 @@
     <div class="main">
       <section class="panel map-panel">
         <div class="map-title">
-          <h1>戦略MAP</h1>
+          <h1>魔王様の10歩</h1>
           <div class="map-meta">
-            <span id="mapStatus">ターン: --</span>
+            <span id="mapStatus">歩数: --</span>
             <span id="baseDirection">勇者方向: --</span>
           </div>
         </div>
@@ -655,9 +655,9 @@
             <button class="hud-btn" id="toggleView" type="button">全体表示</button>
           </div>
           <div class="hud-row">
-            <span class="hud-chip">EXP <strong id="expShort">--</strong></span>
-            <span class="hud-chip">アイテム <strong id="itemShort">--</strong></span>
-            <span class="hud-chip">ターン <strong id="stepShort">--</strong></span>
+            <span class="hud-chip">素材 <strong id="expShort">--</strong></span>
+            <span class="hud-chip">獲得 <strong id="itemShort">--</strong></span>
+            <span class="hud-chip">歩数 <strong id="stepShort">--</strong></span>
             <span class="hud-chip">討伐 <strong id="killShort">--</strong></span>
             <span class="hud-chip">毒 <strong id="poisonShort">--</strong></span>
           </div>
@@ -679,9 +679,9 @@
         </div>
         <div class="stat-grid">
           <div class="stat"><span>LV</span><strong id="levelStat">--</strong></div>
-          <div class="stat"><span>EXP</span><strong id="expStat">--</strong></div>
-          <div class="stat"><span>アイテム</span><strong id="itemStat">--</strong></div>
-          <div class="stat"><span>ターン</span><strong id="stepStat">--</strong></div>
+          <div class="stat"><span>素材</span><strong id="expStat">--</strong></div>
+          <div class="stat"><span>獲得</span><strong id="itemStat">--</strong></div>
+          <div class="stat"><span>歩数</span><strong id="stepStat">--</strong></div>
           <div class="stat"><span>討伐数</span><strong id="killStat">--</strong></div>
           <div class="stat"><span>毒</span><strong id="poisonStat">--</strong></div>
         </div>
@@ -706,7 +706,7 @@
         <div class="sheet-tabs">
           <button class="sheet-tab is-active" data-tab="stats" type="button">ステータス</button>
           <button class="sheet-tab" data-tab="log" type="button">ログ</button>
-          <button class="sheet-tab" data-tab="gear" type="button">装備</button>
+          <button class="sheet-tab" data-tab="base" type="button">拠点</button>
         </div>
         <button class="sheet-close" id="closeStatus" type="button">閉じる</button>
       </div>
@@ -722,9 +722,9 @@
           </div>
           <div class="stat-grid">
             <div class="stat"><span>LV</span><strong id="levelStatSheet">--</strong></div>
-            <div class="stat"><span>EXP</span><strong id="expStatSheet">--</strong></div>
-            <div class="stat"><span>アイテム</span><strong id="itemStatSheet">--</strong></div>
-            <div class="stat"><span>ターン</span><strong id="stepStatSheet">--</strong></div>
+            <div class="stat"><span>素材</span><strong id="expStatSheet">--</strong></div>
+            <div class="stat"><span>獲得</span><strong id="itemStatSheet">--</strong></div>
+            <div class="stat"><span>歩数</span><strong id="stepStatSheet">--</strong></div>
             <div class="stat"><span>討伐数</span><strong id="killStatSheet">--</strong></div>
             <div class="stat"><span>毒</span><strong id="poisonStatSheet">--</strong></div>
           </div>
@@ -732,10 +732,32 @@
         <div class="sheet-panel" data-panel="log">
           <div class="status-log" id="sheetLog"></div>
         </div>
-        <div class="sheet-panel" data-panel="gear">
-          <div class="skill-panel">
-            <div class="icon-grid" id="gearList"></div>
-            <div class="skill-detail" id="gearDetail">装備はまだありません。</div>
+        <div class="sheet-panel" data-panel="base">
+          <div class="base-panel">
+            <div class="base-card">
+              <div class="base-row"><span>所持素材</span><strong id="metaMaterials">0</strong></div>
+              <div class="base-row"><span>歩数上限</span><strong id="metaStepLimit">10</strong></div>
+              <button class="btn" id="upgradeStepBtn" type="button">歩数上限+1 (素材--)</button>
+              <p class="base-note">※強化は次のランから反映</p>
+            </div>
+            <div class="base-card">
+              <h3>装備強化</h3>
+              <div class="upgrade-grid">
+                <button class="upgrade-btn" data-upgrade="atk" type="button">ATK +1 (素材--)</button>
+                <button class="upgrade-btn" data-upgrade="spd" type="button">SPD +1 (素材--)</button>
+                <button class="upgrade-btn" data-upgrade="def" type="button">質量 +1 (素材--)</button>
+                <button class="upgrade-btn" data-upgrade="luc" type="button">LUC +1 (素材--)</button>
+                <button class="upgrade-btn" data-upgrade="hp" type="button">HP +1 (素材--)</button>
+              </div>
+            </div>
+            <div class="base-card">
+              <h3>パッシブ</h3>
+              <div class="upgrade-grid">
+                <button class="upgrade-btn" data-skill="healBoost" type="button">回復床+10% (素材--)</button>
+                <button class="upgrade-btn" data-skill="trapGuard" type="button">トラップ軽減 (素材--)</button>
+                <button class="upgrade-btn" data-skill="lootBoost" type="button">素材+1 (素材--)</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -772,7 +794,7 @@
       <div class="status-log">
         <p>ランキング</p>
         <ul class="rank-list" id="rankList"></ul>
-        <p id="rankStatus" class="rank-status">ターン送信中...</p>
+        <p id="rankStatus" class="rank-status">歩数送信中...</p>
       </div>
       <div class="result-actions">
         <button class="btn" id="retryBtn">もう一度</button>
@@ -792,6 +814,8 @@
   const POISON_STEPS = 5;
   const POISON_DAMAGE_PER_STACK = 1;
   const ENEMY_RESPAWN_STEPS = 5;
+  const MAX_TURNS = 100;
+  const LOSE_TURN_PENALTY = 3;
   const ATK_TILE_COUNT = 10;
   const SPD_TILE_COUNT = 10;
   const DEF_TILE_COUNT = 10;
@@ -2287,12 +2311,34 @@
       mpBar.style.width = `${clamp(mpRate, 0, 100)}%`;
     }
     const dist = Math.abs(player.x - bossPos.x) + Math.abs(player.y - bossPos.y);
-    mapStatus.textContent = `ターン: ${player.steps} / 残り敵: ${enemyCount}`;
+    mapStatus.textContent = `日数: ${player.steps}/${MAX_TURNS} / 残り敵: ${enemyCount}`;
     if (baseDirection) {
       const dir = getDirectionInfo(bossPos.x - player.x, bossPos.y - player.y);
       baseDirection.textContent = `勇者方向: ${dir.arrow} ${dir.label} (${dist}マス)`;
     }
     renderGearList();
+  }
+
+  function checkTurnLimit() {
+    if (player.steps >= MAX_TURNS) {
+      endGame(false);
+      return true;
+    }
+    return false;
+  }
+
+  function respawnPlayerFromBattle() {
+    player.steps = Math.min(MAX_TURNS, player.steps + LOSE_TURN_PENALTY);
+    if (checkTurnLimit()) return;
+    player.hp = player.maxHp;
+    player.mp = player.maxMp;
+    player.poisonStacks = 0;
+    player.poisonSteps = 0;
+    player.x = spawn.x;
+    player.y = spawn.y;
+    addLog(`戦闘に敗北...拠点へ戻された (-${LOSE_TURN_PENALTY}日)`);
+    updateStats();
+    renderMap();
   }
 
   function getDirectionInfo(dx, dy) {
@@ -2550,6 +2596,7 @@
     if (gameOver) return;
     if (applyPoisonTick()) return;
     processEnemyRespawns();
+    if (checkTurnLimit()) return;
     updateStats();
     renderMap();
   }
@@ -2842,7 +2889,7 @@
     }
 
     if (actor === player && playerState.hp <= 0) {
-      endGame(false);
+      respawnPlayerFromBattle();
       return { winner };
     }
     if (allowDefeat && isBoss && enemyState.hp <= 0 && actor === player) {
@@ -3102,7 +3149,7 @@
   }
 
   async function submitScore(score, cleared) {
-    rankStatus.textContent = 'ターン送信中...';
+    rankStatus.textContent = '日数送信中...';
     rankList.innerHTML = '';
     try {
       const supabase = await getSupabaseClient();
@@ -3134,13 +3181,13 @@
           queueScorePayload({ ...payload });
           rankStatus.textContent = 'メンテ中のためキューに保存しました';
         } else {
-          rankStatus.textContent = 'ターン送信に失敗しました';
+          rankStatus.textContent = '日数送信に失敗しました';
         }
         return;
       }
       rankStatus.textContent = 'ランキング更新中...';
       await loadRanking(supabase);
-      rankStatus.textContent = 'ターン送信完了';
+      rankStatus.textContent = '日数送信完了';
     } catch (err) {
       console.warn('score submit failed', err);
       markSupabaseMaintenanceFromError(err);
@@ -3192,7 +3239,7 @@
     }
     rankList.innerHTML = '';
     if (!data || !data.length) {
-      rankList.innerHTML = '<li class="rank-item">まだターンがありません。</li>';
+      rankList.innerHTML = '<li class="rank-item">まだ記録がありません。</li>';
       return;
     }
     data.forEach((row, idx) => {
@@ -3211,7 +3258,7 @@
       }
       const li = document.createElement('li');
       li.className = 'rank-item';
-      li.innerHTML = `<span>${idx + 1}. ${row.name}</span><span>${row.score}ターン</span>${meta.length ? `<small>${meta.join(' / ')}</small>` : ''}`;
+      li.innerHTML = `<span>${idx + 1}. ${row.name}</span><span>${row.score}日</span>${meta.length ? `<small>${meta.join(' / ')}</small>` : ''}`;
       rankList.appendChild(li);
     });
   }
@@ -3221,11 +3268,11 @@
     gameOver = true;
     const score = computeScore(cleared);
     resultOverlay.classList.add('is-open');
-    resultTitle.textContent = cleared ? '勇者を倒した！' : '魔王様が倒れた...';
-    resultSummary.textContent = `ターン: ${player.steps}`;
+    resultTitle.textContent = cleared ? '魔王城を奪還した！' : '奪還失敗...';
+    resultSummary.textContent = `日数: ${player.steps}`;
     resultStats.innerHTML = `
       <div class="stat"><span>HP</span><strong>${player.hp}/${player.maxHp}</strong></div>
-      <div class="stat"><span>ターン</span><strong>${player.steps}</strong></div>
+      <div class="stat"><span>日数</span><strong>${player.steps}</strong></div>
       <div class="stat"><span>討伐数</span><strong>${player.kills}</strong></div>
       <div class="stat"><span>ATK/SPD/質量</span><strong>${player.atk}/${player.spd}/${player.def}</strong></div>
       <div class="stat"><span>LUC</span><strong>${player.luc}</strong></div>
