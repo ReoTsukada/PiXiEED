@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no, viewport-fit=cover"/>
   <meta name="robots" content="noai,noimageai,nosnippet,noarchive"/>
   <title>ドット作品</title>
+  <meta name="description" content="ドット絵制作・pixel art commission、ブラウザゲーム用アセット、ツールとゲームをまとめたPiXiEED公式サイト。"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:site_name" content="PiXiEED"/>
+  <meta property="og:title" content="PiXiEED | ドット絵専用総合サイト"/>
+  <meta property="og:description" content="ドット絵制作の外注・pixel art commission、ブラウザゲーム用アセット制作、ツールとゲームを紹介するPiXiEED公式サイト。"/>
+  <meta property="og:url" content="https://pixieed.jp/contest/view.html"/>
+  <meta property="og:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
+  <meta name="twitter:card" content="summary_large_image"/>
   <link rel="icon" type="image/png" href="../character-dots/mao1.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1897,7 +1905,7 @@
         downloadBtn.classList.toggle('is-disabled', !allowDownload);
       }
       if(shareBtn){
-        const canShare = entryLoaded && Boolean(supabaseAuth?.storage) && supportsStorageUploads;
+        const canShare = entryLoaded;
         shareBtn.disabled = !canShare;
         shareBtn.classList.toggle('is-disabled', !canShare);
       }
@@ -2148,6 +2156,13 @@
       ));
     }
 
+    function isStorageExistsError(error){
+      const status = Number(error?.status || error?.statusCode || 0);
+      if(status === 409) return true;
+      const msg = String(error?.message || '').toLowerCase();
+      return msg.includes('exists');
+    }
+
     function truncateText(ctx, text, maxWidth){
       let output = String(text ?? '');
       if(!output) return '';
@@ -2293,7 +2308,7 @@
         shareUrl,
         targetUrl,
       });
-      const htmlBlob = new Blob([html], { type: 'text/html' });
+      const htmlBlob = new Blob([html], { type: 'text/html; charset=utf-8' });
       try{
         const bucket = supabaseAuth.storage.from(STORAGE_BUCKET);
         const { error: ogpError } = await bucket.upload(ogpPath, ogpBlob, {
@@ -2301,16 +2316,40 @@
           cacheControl: '31536000',
           upsert: false
         });
-        if(ogpError && !String(ogpError.message || '').toLowerCase().includes('exists')){
-          throw ogpError;
+        if(ogpError){
+          if(isStorageExistsError(ogpError)){
+            if(typeof bucket.update === 'function'){
+              const { error: ogpUpdateError } = await bucket.update(ogpPath, ogpBlob, {
+                contentType: 'image/png',
+                cacheControl: '31536000'
+              });
+              if(ogpUpdateError){
+                console.warn('share ogp overwrite failed', ogpUpdateError);
+              }
+            }
+          }else{
+            throw ogpError;
+          }
         }
         const { error: htmlError } = await bucket.upload(sharePath, htmlBlob, {
-          contentType: 'text/html',
-          cacheControl: '31536000',
+          contentType: 'text/html; charset=utf-8',
+          cacheControl: '3600',
           upsert: false
         });
-        if(htmlError && !String(htmlError.message || '').toLowerCase().includes('exists')){
-          throw htmlError;
+        if(htmlError){
+          if(isStorageExistsError(htmlError)){
+            if(typeof bucket.update === 'function'){
+              const { error: htmlUpdateError } = await bucket.update(sharePath, htmlBlob, {
+                contentType: 'text/html; charset=utf-8',
+                cacheControl: '3600'
+              });
+              if(htmlUpdateError){
+                console.warn('share html overwrite failed', htmlUpdateError);
+              }
+            }
+          }else{
+            throw htmlError;
+          }
         }
         return { shareUrl, ogpUrl };
       }catch(err){
@@ -2329,25 +2368,13 @@
         setStatus('作品が読み込まれていません');
         return;
       }
-      if(isSupabaseMaintenance()){
-        queueShareTask({ entryId: entry.id, title: entry.title });
-        setStatus('メンテナンス中のため共有リンクは後で生成されます');
-        return;
-      }
       const shareBtn = $('shareButton');
       if(shareBtn){
         shareBtn.disabled = true;
         shareBtn.classList.add('is-disabled');
       }
-      setStatus('共有リンクを作成しています...');
+      const shareUrl = `${CONTEST_SHARE_BASE_URL}?id=${entry.id}`;
       try{
-        const imageSrc = resolveEntryImage(entry);
-        const image = await loadImageFromSource(imageSrc);
-        const shareResult = await uploadContestShareAssets({ entryId: entry.id, title: entry.title, image });
-        const shareUrl = shareResult?.shareUrl;
-        if(!shareUrl){
-          throw new Error('share url missing');
-        }
         if(navigator.clipboard?.writeText){
           await navigator.clipboard.writeText(shareUrl);
           setStatus('共有リンクをコピーしました');
@@ -2357,16 +2384,10 @@
         }
       }catch(err){
         console.error(err);
-        markSupabaseMaintenanceFromError(err);
-        if(isSupabaseMaintenance()){
-          queueShareTask({ entryId: entry?.id, title: entry?.title });
-          setStatus('共有リンクはメンテナンス復旧後に生成されます');
-        }else{
         setStatus('共有リンクの作成に失敗しました');
-        }
       }finally{
         if(shareBtn){
-          const canShare = entryLoaded && Boolean(supabaseAuth?.storage) && supportsStorageUploads;
+          const canShare = entryLoaded;
           shareBtn.disabled = !canShare;
           shareBtn.classList.toggle('is-disabled', !canShare);
         }
