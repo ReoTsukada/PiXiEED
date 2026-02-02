@@ -2879,6 +2879,14 @@
   }
 
   const CLIENT_ID_KEY = 'pixieed_client_id';
+  const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
+  const SCORE_QUEUE_KEY = 'maou-war_score_queue';
+  const SCORE_QUEUE_LIMIT = 20;
+  const SCORE_QUEUE_RETRY_MS = 60000;
+  let supabaseMaintenance = Boolean(readSupabaseMaintenance());
+  let scoreQueueBusy = false;
+  let supabaseClient = null;
+  let supabaseInitPromise = null;
   function getClientId() {
     try {
       const saved = localStorage.getItem(CLIENT_ID_KEY);
@@ -2889,6 +2897,188 @@
     } catch (_) {
       return `guest-${Math.random().toString(36).slice(2, 8)}`;
     }
+  }
+
+  function readSupabaseMaintenance() {
+    try {
+      const raw = localStorage.getItem(SUPABASE_MAINTENANCE_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (data && data.active) return data;
+    } catch (_) {
+      // ignore
+    }
+    return null;
+  }
+
+  function isSupabaseMaintenance() {
+    return supabaseMaintenance;
+  }
+
+  function setSupabaseMaintenance(active, reason = '') {
+    supabaseMaintenance = active;
+    try {
+      if (active) {
+        localStorage.setItem(SUPABASE_MAINTENANCE_KEY, JSON.stringify({ active: true, reason, ts: Date.now() }));
+      } else {
+        localStorage.removeItem(SUPABASE_MAINTENANCE_KEY);
+      }
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  function noteSupabaseSuccess() {
+    if (supabaseMaintenance) {
+      setSupabaseMaintenance(false);
+    }
+  }
+
+  function shouldMarkSupabaseMaintenance(error) {
+    const status = Number(error?.status || error?.statusCode || 0);
+    if (status >= 500) return true;
+    const msg = String(error?.message || '').toLowerCase();
+    return msg.includes('failed to fetch') || msg.includes('network') || msg.includes('fetch failed') || msg.includes('503') || msg.includes('502') || msg.includes('504');
+  }
+
+  function markSupabaseMaintenanceFromError(error) {
+    if (shouldMarkSupabaseMaintenance(error)) {
+      setSupabaseMaintenance(true, 'network');
+    }
+  }
+
+  function loadScoreQueue() {
+    try {
+      const raw = localStorage.getItem(SCORE_QUEUE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function saveScoreQueue(queue) {
+    try {
+      localStorage.setItem(SCORE_QUEUE_KEY, JSON.stringify(queue.slice(0, SCORE_QUEUE_LIMIT)));
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  function queueScorePayload(payload) {
+    if (!payload) return false;
+    const queue = loadScoreQueue();
+    queue.push({ payload, ts: Date.now() });
+    saveScoreQueue(queue);
+    return true;
+  }
+
+  async function getSupabaseClient() {
+    if (supabaseClient) return supabaseClient;
+    if (supabaseInitPromise) return supabaseInitPromise;
+    supabaseInitPromise = (async () => {
+      const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.46.1?bundle');
+      supabaseClient = createClient('https://kyyiuakrqomzlikfaire.supabase.co', 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4');
+      return supabaseClient;
+    })();
+    try {
+      return await supabaseInitPromise;
+    } finally {
+      supabaseInitPromise = null;
+    }
+  }
+
+  async function sendScorePayload(supabase, payload) {
+    let { error } = await supabase.from('scores').insert(payload);
+    if (error && isMissingColumn(error, 'game')) {
+      delete payload.game;
+      const retry = await supabase.from('scores').insert(payload);
+      error = retry.error;
+    }
+    if (error && isMissingColumn(error, 'result')) {
+      delete payload.result;
+      const retry = await supabase.from('scores').insert(payload);
+      error = retry.error;
+    }
+    if (error && payload.user_id && isMissingColumn(error, 'user_id')) {
+      delete payload.user_id;
+      const retry = await supabase.from('scores').insert(payload);
+      error = retry.error;
+    }
+    if (error && payload.client_id && isMissingColumn(error, 'client_id')) {
+      delete payload.client_id;
+      const retry = await supabase.from('scores').insert(payload);
+      error = retry.error;
+    }
+    if (error && isMissingColumn(error, 'stat_total')) {
+      delete payload.stat_total;
+      const retry = await supabase.from('scores').insert(payload);
+      error = retry.error;
+    }
+    if (error && isMissingColumn(error, 'hp_end')) {
+      delete payload.hp_end;
+      const retry = await supabase.from('scores').insert(payload);
+      error = retry.error;
+    }
+    if (error && isMissingColumn(error, 'kills')) {
+      delete payload.kills;
+      const retry = await supabase.from('scores').insert(payload);
+      error = retry.error;
+    }
+    if (error && isMissingColumn(error, 'steps')) {
+      delete payload.steps;
+      const retry = await supabase.from('scores').insert(payload);
+      error = retry.error;
+    }
+    if (error) {
+      markSupabaseMaintenanceFromError(error);
+      return false;
+    }
+    noteSupabaseSuccess();
+    return true;
+  }
+
+  async function flushScoreQueue() {
+    if (scoreQueueBusy) return;
+    const queue = loadScoreQueue();
+    if (!queue.length) return;
+    scoreQueueBusy = true;
+    const remaining = [];
+    let posted = false;
+    try {
+      const supabase = await getSupabaseClient();
+      for (const entry of queue) {
+        const payload = entry?.payload;
+        if (!payload) continue;
+        const ok = await sendScorePayload(supabase, { ...payload });
+        if (!ok) {
+          remaining.push(entry);
+          if (isSupabaseMaintenance()) break;
+        } else {
+          posted = true;
+        }
+      }
+    } catch (err) {
+      markSupabaseMaintenanceFromError(err);
+      remaining.push(...queue);
+    }
+    saveScoreQueue(remaining);
+    scoreQueueBusy = false;
+    if (posted) {
+      rankStatus.textContent = 'キューに保存したスコアを送信しました';
+    }
+  }
+
+  function scheduleScoreQueueFlush() {
+    window.addEventListener('online', () => {
+      flushScoreQueue().catch(err => console.warn('score queue flush failed', err));
+    });
+    window.setInterval(() => {
+      if (isSupabaseMaintenance() || loadScoreQueue().length) {
+        flushScoreQueue().catch(err => console.warn('score queue flush failed', err));
+      }
+    }, SCORE_QUEUE_RETRY_MS);
   }
 
   function isMissingColumn(error, name) {
@@ -2915,8 +3105,7 @@
     rankStatus.textContent = 'ターン送信中...';
     rankList.innerHTML = '';
     try {
-      const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.46.1/+esm');
-      const supabase = createClient('https://kyyiuakrqomzlikfaire.supabase.co', 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4');
+      const supabase = await getSupabaseClient();
       const name = getNickname();
       const clientId = getClientId();
       const userId = await getUserId(supabase);
@@ -2933,50 +3122,20 @@
       };
       if (clientId) payload.client_id = clientId;
       if (userId) payload.user_id = userId;
-      let { error } = await supabase.from('scores').insert(payload);
-      if (error && isMissingColumn(error, 'game')) {
-        delete payload.game;
-        const retry = await supabase.from('scores').insert(payload);
-        error = retry.error;
+      if (isSupabaseMaintenance()) {
+        queueScorePayload({ ...payload });
+        rankStatus.textContent = 'メンテ中のためキューに保存しました';
+        return;
       }
-      if (error && isMissingColumn(error, 'result')) {
-        delete payload.result;
-        const retry = await supabase.from('scores').insert(payload);
-        error = retry.error;
-      }
-      if (error && payload.user_id && isMissingColumn(error, 'user_id')) {
-        delete payload.user_id;
-        const retry = await supabase.from('scores').insert(payload);
-        error = retry.error;
-      }
-      if (error && payload.client_id && isMissingColumn(error, 'client_id')) {
-        delete payload.client_id;
-        const retry = await supabase.from('scores').insert(payload);
-        error = retry.error;
-      }
-      if (error && isMissingColumn(error, 'stat_total')) {
-        delete payload.stat_total;
-        const retry = await supabase.from('scores').insert(payload);
-        error = retry.error;
-      }
-      if (error && isMissingColumn(error, 'hp_end')) {
-        delete payload.hp_end;
-        const retry = await supabase.from('scores').insert(payload);
-        error = retry.error;
-      }
-      if (error && isMissingColumn(error, 'kills')) {
-        delete payload.kills;
-        const retry = await supabase.from('scores').insert(payload);
-        error = retry.error;
-      }
-      if (error && isMissingColumn(error, 'steps')) {
-        delete payload.steps;
-        const retry = await supabase.from('scores').insert(payload);
-        error = retry.error;
-      }
-      if (error) {
-        console.warn('score submit failed', error);
-        rankStatus.textContent = 'ターン送信に失敗しました';
+      await flushScoreQueue();
+      const ok = await sendScorePayload(supabase, { ...payload });
+      if (!ok) {
+        if (isSupabaseMaintenance()) {
+          queueScorePayload({ ...payload });
+          rankStatus.textContent = 'メンテ中のためキューに保存しました';
+        } else {
+          rankStatus.textContent = 'ターン送信に失敗しました';
+        }
         return;
       }
       rankStatus.textContent = 'ランキング更新中...';
@@ -2984,7 +3143,23 @@
       rankStatus.textContent = 'ターン送信完了';
     } catch (err) {
       console.warn('score submit failed', err);
-      rankStatus.textContent = 'ランキングを取得できませんでした';
+      markSupabaseMaintenanceFromError(err);
+      if (isSupabaseMaintenance()) {
+        queueScorePayload({
+          name: getNickname(),
+          score,
+          result: cleared ? 'clear' : 'over',
+          game: 'maou-war',
+          stat_total: player.atk + player.spd + player.def + player.luc + player.maxHp + player.mp,
+          hp_end: player.hp,
+          kills: player.kills,
+          steps: player.steps,
+          client_id: getClientId()
+        });
+        rankStatus.textContent = 'メンテ中のためキューに保存しました';
+      } else {
+        rankStatus.textContent = 'ランキングを取得できませんでした';
+      }
     }
   }
 
@@ -3126,6 +3301,8 @@
   });
   window.addEventListener('resize', resizeCanvas);
   mapCanvas.addEventListener('pointerdown', handleMapClick, { passive: false });
+  scheduleScoreQueueFlush();
+  flushScoreQueue().catch(err => console.warn('score queue flush failed', err));
 
   buildMap();
   updateViewToggleLabel();
