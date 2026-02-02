@@ -162,8 +162,9 @@ let creatorAnalysisToken = 0;
 
 const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
-const SUPABASE_BUCKET = 'pixfind-puzzles';
+const DEFAULT_PUZZLE_BUCKET = 'pixfind-puzzles';
 const CONTEST_BUCKET = 'pixieed-contest';
+const FALLBACK_PUZZLE_BUCKET = CONTEST_BUCKET;
 const CONTEST_THUMB_SIZE = 256;
 const SUPABASE_TABLE = 'pixfind_puzzles';
 const CONTEST_TABLE = 'contest_entries';
@@ -171,7 +172,6 @@ const CONTEST_PROMPT_PREFIX = 'pixfind:';
 const CONTEST_AUTHOR_NAME = 'PiXFiND';
 const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
 const SUPABASE_STORAGE_URL = `${SUPABASE_URL}/storage/v1/object`;
-const SUPABASE_PUBLIC_BASE = `${SUPABASE_STORAGE_URL}/public/${SUPABASE_BUCKET}`;
 const CONTEST_PUBLIC_BASE = `${SUPABASE_STORAGE_URL}/public/${CONTEST_BUCKET}`;
 const PIXFIND_SHARE_BASE_URL = 'https://pixieed.jp/pixfind/';
 const PIXFIND_SHARE_OGP_WIDTH = 1200;
@@ -200,6 +200,10 @@ const PUZZLE_PLACEHOLDER_DATA_URL = `data:image/svg+xml;utf8,${encodeURIComponen
 
 let supabaseMaintenance = Boolean(readSupabaseMaintenance());
 let publishQueueBusy = false;
+let puzzleBucket = (typeof window !== 'undefined' && window.PIXFIND_STORAGE_BUCKET)
+  ? window.PIXFIND_STORAGE_BUCKET
+  : DEFAULT_PUZZLE_BUCKET;
+let puzzleBucketFallbackUsed = false;
 
 async function init() {
   setActiveScreen('start');
@@ -699,19 +703,27 @@ async function handleCreatorPublish() {
     const contestMessage = postToContest
       ? (contestPosted ? 'コンテストにも投稿しました。' : 'コンテスト投稿は失敗しました。')
       : 'コンテスト投稿はオフです。';
+    const bucketNote = puzzleBucketFallbackUsed
+      ? `pixfind-puzzles バケットが見つからないため ${FALLBACK_PUZZLE_BUCKET} に保存しています。`
+      : '';
+    const statusSuffix = bucketNote ? ` ${bucketNote}` : '';
     if (isSupabaseMaintenance()) {
-      setCreatorStatus(`公開しました。共有リンクはメンテナンス復旧後に生成されます。${contestMessage}`);
+      setCreatorStatus(`公開しました。共有リンクはメンテナンス復旧後に生成されます。${contestMessage}${statusSuffix}`);
     } else if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(shareUrl);
-      setCreatorStatus(`公開しました。共有リンクをコピーしました。${contestMessage}`);
+      setCreatorStatus(`公開しました。共有リンクをコピーしました。${contestMessage}${statusSuffix}`);
     } else {
       window.prompt(`公開しました。${contestMessage}共有リンクをコピーしてください。`, shareUrl);
-      setCreatorStatus(`公開しました。${contestMessage}`);
+      setCreatorStatus(`公開しました。${contestMessage}${statusSuffix}`);
     }
   } catch (error) {
     console.error(error);
     if (isPermissionError(error)) {
       setCreatorStatus('投稿権限がありません。ログインまたは権限設定をご確認ください。', 'error');
+      return;
+    }
+    if (isBucketNotFoundError(error)) {
+      setCreatorStatus(`ストレージバケットが見つかりません。Supabaseに ${DEFAULT_PUZZLE_BUCKET} を作成してください。`, 'error');
       return;
     }
     const shouldQueue = isSupabaseMaintenance() || shouldMarkSupabaseMaintenance(error);
@@ -809,12 +821,13 @@ function encodeStoragePath(path) {
   return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
 }
 
-async function uploadPuzzleFile(path, body, contentType = null) {
+async function uploadPuzzleFile(path, body, contentType = null, allowFallback = true) {
   if (!body) {
     throw new Error('upload body is missing');
   }
   const safePath = encodeStoragePath(path);
-  const url = `${SUPABASE_STORAGE_URL}/${SUPABASE_BUCKET}/${safePath}`;
+  const bucket = getPuzzleBucket();
+  const url = `${SUPABASE_STORAGE_URL}/${bucket}/${safePath}`;
   let response;
   try {
     response = await fetch(url, {
@@ -832,7 +845,14 @@ async function uploadPuzzleFile(path, body, contentType = null) {
   if (!response.ok) {
     const detail = await response.text();
     markSupabaseMaintenanceFromError(null, response.status);
-    throw buildSupabaseError(`upload failed: ${response.status} ${detail}`, response.status, detail);
+    const error = buildSupabaseError(`upload failed: ${response.status} ${detail}`, response.status, detail);
+    if (allowFallback && shouldFallbackPuzzleBucket(error, bucket)) {
+      setPuzzleBucket(FALLBACK_PUZZLE_BUCKET);
+      puzzleBucketFallbackUsed = true;
+      console.warn(`PiXFiND bucket missing. Falling back to ${FALLBACK_PUZZLE_BUCKET}.`);
+      return await uploadPuzzleFile(path, body, contentType, false);
+    }
+    throw error;
   }
   noteSupabaseSuccess();
   return getSupabasePublicUrl(path);
@@ -996,6 +1016,48 @@ function isPermissionError(error, status) {
   if (code === 401 || code === 403) return true;
   const msg = String(error?.message || '').toLowerCase();
   return msg.includes('permission') || msg.includes('not authorized') || msg.includes('row-level security');
+}
+
+function getPuzzleBucket() {
+  return puzzleBucket;
+}
+
+function setPuzzleBucket(bucket) {
+  if (!bucket) return;
+  puzzleBucket = bucket;
+}
+
+function getSupabasePublicBase() {
+  return `${SUPABASE_STORAGE_URL}/public/${getPuzzleBucket()}`;
+}
+
+function getSupabaseDetailMessage(detail) {
+  if (!detail) return '';
+  if (typeof detail === 'string') {
+    try {
+      const parsed = JSON.parse(detail);
+      return String(parsed?.message || parsed?.error || detail);
+    } catch (_) {
+      return detail;
+    }
+  }
+  return String(detail);
+}
+
+function isBucketNotFoundError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  if (message.includes('bucket not found') || (message.includes('bucket') && message.includes('not found'))) {
+    return true;
+  }
+  const detailMessage = getSupabaseDetailMessage(error?.detail).toLowerCase();
+  return detailMessage.includes('bucket not found') || (detailMessage.includes('bucket') && detailMessage.includes('not found'));
+}
+
+function shouldFallbackPuzzleBucket(error, bucket) {
+  if (!isBucketNotFoundError(error)) return false;
+  if (bucket !== DEFAULT_PUZZLE_BUCKET) return false;
+  if (!FALLBACK_PUZZLE_BUCKET || FALLBACK_PUZZLE_BUCKET === bucket) return false;
+  return true;
 }
 
 function buildSupabaseError(message, status, detail) {
@@ -1463,7 +1525,7 @@ async function flushShareQueue() {
 }
 
 function getSupabasePublicUrl(path) {
-  return `${SUPABASE_PUBLIC_BASE}/${path}`;
+  return `${getSupabasePublicBase()}/${path}`;
 }
 
 function getContestPublicUrl(path) {
