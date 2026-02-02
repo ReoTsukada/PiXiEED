@@ -1576,6 +1576,7 @@
             height: imageInfo.height,
             colors: imageInfo.colors
           };
+          payload.image_base64 = imageInfo.dataUrl;
           if(supportsImageHash){
             payload.image_hash = imageInfo.hash;
           }
@@ -1585,8 +1586,6 @@
           if(supportsImageUrls && uploadResult){
             payload.image_url = uploadResult.imageUrl;
             payload.thumb_url = uploadResult.thumbUrl;
-          }else{
-            payload.image_base64 = imageInfo.dataUrl;
           }
           if(supportsTags && normalized.tags.length){
             payload.tags = normalized.tags.join(',');
@@ -2623,6 +2622,7 @@
           height: imageInfo.height,
           colors: imageInfo.colors
         };
+        payload.image_base64 = imageInfo.dataUrl;
         if(supportsImageHash){
           payload.image_hash = imageInfo.hash;
         }
@@ -2632,8 +2632,6 @@
         if(supportsImageUrls && uploadResult){
           payload.image_url = uploadResult.imageUrl;
           payload.thumb_url = uploadResult.thumbUrl;
-        }else{
-          payload.image_base64 = imageInfo.dataUrl;
         }
         if(supportsTags && tags.length){
           payload.tags = tags.join(',');
