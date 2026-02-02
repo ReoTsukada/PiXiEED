@@ -628,7 +628,7 @@ async function handleCreatorPublish() {
           title,
           imageUrl: contestUpload?.imageUrl,
           thumbUrl: contestUpload?.thumbUrl,
-          dataUrl: contestUpload ? null : contestDataUrl,
+          dataUrl: contestDataUrl,
           width: creatorState.size.width,
           height: creatorState.size.height,
           colors,
@@ -1268,7 +1268,7 @@ async function publishQueuedTask(task) {
         title,
         imageUrl: contestUpload?.imageUrl,
         thumbUrl: contestUpload?.thumbUrl,
-        dataUrl: contestUpload ? null : contestDataUrl,
+        dataUrl: contestDataUrl,
         width,
         height,
         colors,
@@ -1498,7 +1498,7 @@ function createContestPayload({
   if (thumbUrl) {
     payload.thumb_url = thumbUrl;
   }
-  if (!imageUrl && dataUrl) {
+  if (dataUrl) {
     payload.image_base64 = dataUrl;
   }
   return payload;
