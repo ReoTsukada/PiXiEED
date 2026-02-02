@@ -63,6 +63,16 @@ const creatorCtx = {
   }
 });
 
+function setAppHeight() {
+  const height = window.visualViewport?.height || window.innerHeight;
+  if (!height) return;
+  document.documentElement.style.setProperty('--app-height', `${Math.round(height)}px`);
+}
+
+setAppHeight();
+window.visualViewport?.addEventListener('resize', setAppHeight);
+window.addEventListener('orientationchange', setAppHeight);
+
 const MIN_CLUSTER_PIXELS = 1;
 const MARKER_PADDING = 1;
 const REGION_MERGE_DISTANCE_BY_DIFFICULTY = {
@@ -2212,6 +2222,7 @@ function fitCanvasesToFrame() {
 }
 
 window.addEventListener('resize', () => {
+  setAppHeight();
   fitCanvasesToFrame();
   clearMarkers();
   state.differences.filter(region => region.found).forEach(region => renderMarker(region));
