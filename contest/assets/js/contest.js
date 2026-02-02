@@ -19,8 +19,6 @@ const CONTEST_SHARE_TITLE_SIZE = 32;
 const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
 const CONTEST_CACHE_KEY = 'pixieed_contest_cache';
 const CONTEST_CACHE_LIMIT = 60;
-const CONTEST_SHARE_QUEUE_KEY = 'contest_share_queue';
-const CONTEST_SHARE_QUEUE_LIMIT = 20;
 const POST_QUEUE_KEY = 'contest_post_queue';
 const POST_QUEUE_LIMIT = 20;
 const POST_QUEUE_RETRY_MS = 60000;
@@ -109,9 +107,6 @@ function noteSupabaseSuccess(){
   if(!supabaseMaintenance && loadPostQueue().length){
     flushPostQueue().catch(err => console.warn('post queue flush failed', err));
   }
-  if(!supabaseMaintenance && loadShareQueue().length){
-    flushShareQueue().catch(err => console.warn('share queue flush failed', err));
-  }
 }
 
 function shouldMarkSupabaseMaintenance(error){
@@ -165,33 +160,6 @@ function saveContestCache(items){
   }
 }
 
-function loadShareQueue(){
-  try{
-    const raw = localStorage.getItem(CONTEST_SHARE_QUEUE_KEY);
-    if(!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  }catch(_){
-    return [];
-  }
-}
-
-function saveShareQueue(queue){
-  try{
-    localStorage.setItem(CONTEST_SHARE_QUEUE_KEY, JSON.stringify(queue.slice(0, CONTEST_SHARE_QUEUE_LIMIT)));
-  }catch(_){
-    // ignore
-  }
-}
-
-function queueShareTask(task){
-  if(!task?.entryId) return;
-  const queue = loadShareQueue();
-  const next = queue.filter(item => item.entryId !== task.entryId);
-  next.unshift(task);
-  saveShareQueue(next);
-}
-
 function updatePostControls(){
   const form = $(FORM_ID);
   if(form){
@@ -200,54 +168,6 @@ function updatePostControls(){
   }
   const openBtn = document.getElementById('openPostPanel');
   if(openBtn) openBtn.disabled = false;
-}
-
-async function resolveEntryImageBlob(entry){
-  const src = entry?.image_url || entry?.image_base64 || entry?.thumb_url || '';
-  if(!src) return null;
-  try{
-    const res = await fetch(src);
-    if(!res.ok) throw new Error(`image fetch failed: ${res.status}`);
-    return await res.blob();
-  }catch(err){
-    markSupabaseMaintenanceFromError(err);
-    return null;
-  }
-}
-
-async function flushShareQueue(){
-  if(isSupabaseMaintenance() || !supabase?.storage || !supportsStorageUploads) return;
-  const queue = loadShareQueue();
-  if(!queue.length) return;
-  const remaining = [];
-  for(const task of queue){
-    try{
-      const { data, error } = await supabase
-        .from('contest_entries')
-        .select('id,title,image_url,thumb_url,image_base64')
-        .eq('id', task.entryId)
-        .maybeSingle();
-      if(error || !data){
-        if(error) throw error;
-        continue;
-      }
-      const imageBlob = await resolveEntryImageBlob(data);
-      if(!imageBlob) throw new Error('image missing');
-      const shareResult = await uploadContestShareAssets({
-        entryId: data.id,
-        title: data.title || task.title,
-        imageInfo: { imageBlob }
-      });
-      if(!shareResult?.shareUrl){
-        throw new Error('share upload failed');
-      }
-      noteSupabaseSuccess();
-    }catch(err){
-      remaining.push(task);
-      markSupabaseMaintenanceFromError(err);
-    }
-  }
-  saveShareQueue(remaining);
 }
 
 function setStatus(msg){
@@ -422,13 +342,6 @@ async function flushPostQueue(){
         throw error;
       }
       noteSupabaseSuccess();
-      const entryId = Array.isArray(data) ? data[0]?.id : null;
-      if(entryId){
-        const shareResult = await uploadContestShareAssets({ entryId, title: normalized.title, imageInfo });
-        if(!shareResult?.shareUrl && isSupabaseMaintenance()){
-          queueShareTask({ entryId, title: normalized.title });
-        }
-      }
       posted = true;
     }catch(err){
       remaining.push(task);
@@ -460,6 +373,13 @@ function escapeHtml(value){
   return String(value ?? '').replace(/[&<>"']/g, (ch) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch] || ch
   ));
+}
+
+function isStorageExistsError(error){
+  const status = Number(error?.status || error?.statusCode || 0);
+  if(status === 409) return true;
+  const msg = String(error?.message || '').toLowerCase();
+  return msg.includes('exists');
 }
 
 function truncateText(ctx, text, maxWidth){
@@ -578,7 +498,7 @@ async function uploadContestShareAssets({ entryId, title, imageInfo }){
     shareUrl,
     targetUrl,
   });
-  const htmlBlob = new Blob([html], { type: 'text/html' });
+  const htmlBlob = new Blob([html], { type: 'text/html; charset=utf-8' });
   try{
     const bucket = supabase.storage.from(STORAGE_BUCKET);
     const { error: ogpError } = await bucket.upload(ogpPath, ogpBlob, {
@@ -586,13 +506,41 @@ async function uploadContestShareAssets({ entryId, title, imageInfo }){
       cacheControl: '31536000',
       upsert: false
     });
-    if(ogpError) throw ogpError;
+    if(ogpError){
+      if(isStorageExistsError(ogpError)){
+        if(typeof bucket.update === 'function'){
+          const { error: ogpUpdateError } = await bucket.update(ogpPath, ogpBlob, {
+            contentType: 'image/png',
+            cacheControl: '31536000'
+          });
+          if(ogpUpdateError){
+            console.warn('share ogp overwrite failed', ogpUpdateError);
+          }
+        }
+      }else{
+        throw ogpError;
+      }
+    }
     const { error: htmlError } = await bucket.upload(sharePath, htmlBlob, {
-      contentType: 'text/html',
-      cacheControl: '31536000',
+      contentType: 'text/html; charset=utf-8',
+      cacheControl: '3600',
       upsert: false
     });
-    if(htmlError) throw htmlError;
+    if(htmlError){
+      if(isStorageExistsError(htmlError)){
+        if(typeof bucket.update === 'function'){
+          const { error: htmlUpdateError } = await bucket.update(sharePath, htmlBlob, {
+            contentType: 'text/html; charset=utf-8',
+            cacheControl: '3600'
+          });
+          if(htmlUpdateError){
+            console.warn('share html overwrite failed', htmlUpdateError);
+          }
+        }
+      }else{
+        throw htmlError;
+      }
+    }
     return { shareUrl, ogpUrl };
   }catch(err){
     console.warn('share upload failed', err);
@@ -962,14 +910,7 @@ async function handleSubmit(e){
   }
   noteSupabaseSuccess();
   const entryId = Array.isArray(data) ? data[0]?.id : null;
-  let shareUrl = null;
-  if(entryId){
-    const shareResult = await uploadContestShareAssets({ entryId, title, imageInfo });
-    shareUrl = shareResult?.shareUrl || null;
-    if(!shareUrl && isSupabaseMaintenance()){
-      queueShareTask({ entryId, title });
-    }
-  }
+  const shareUrl = entryId ? `${CONTEST_SHARE_BASE_URL}?id=${entryId}` : null;
   form.reset();
   if(shareUrl){
     if(navigator.clipboard?.writeText){
@@ -979,8 +920,6 @@ async function handleSubmit(e){
       window.prompt('共有リンクをコピーしてください。', shareUrl);
       setStatus('投稿しました！');
     }
-  }else if(isSupabaseMaintenance()){
-    setStatus('投稿しました！共有リンクはメンテナンス復旧後に生成されます。');
   }else{
     setStatus('投稿しました！');
   }
@@ -1209,7 +1148,6 @@ function initUI(){
   updatePostControls();
   fetchAndRender();
   flushPostQueue().catch(err => console.warn('post queue flush failed', err));
-  flushShareQueue().catch(err => console.warn('share queue flush failed', err));
   schedulePostQueueFlush();
   setupPostPanel();
   setupTabs();
