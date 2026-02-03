@@ -27,7 +27,8 @@
 <meta content="PiXiEEDrawのライト版（通称ピクドラ）。16×16固定の超シンプルなブラウザ向けドットツールで、ジェリンプレビューや日替わりお題で気軽にドット練習ができます。" name="twitter:description"/>
 <meta content="https://pixieed.jp/jerin-maker/ogp-app.png" name="twitter:image"/>
 <meta content="PiXiEEDraw Lite（ピクドラ）" name="twitter:image:alt"/>
-<link href="../character-dots/mao1.png" rel="icon" type="image/png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-5.png"/>
+<link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-5.png"/>
 <script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
 <style>
   :root {
@@ -136,6 +137,7 @@
     display: flex;
     flex-direction: column;
     gap: clamp(10px, 2vw, 14px);
+    flex: 1 1 auto;
     min-height: 0;
   }
   @media (min-width: 960px), (orientation: landscape) {
@@ -145,6 +147,18 @@
     }
     .workspace > .canvas-wrap { flex: 1 1 0; }
     .workspace > aside.panel { width: min(340px, 32vw); max-width: 360px; }
+  }
+  @media (max-width: 959px) and (orientation: portrait) {
+    .shell > .app {
+      grid-row: 1 / -1;
+    }
+    .workspace {
+      flex: 1 1 auto;
+    }
+    aside.panel {
+      margin-top: auto;
+      margin-bottom: auto;
+    }
   }
   aside.panel { position: relative; }
   .canvas-wrap {
@@ -159,6 +173,8 @@
     display: flex;
     justify-content: center;
     align-items: center;
+    flex: 1 1 auto;
+    min-height: 0;
     border: 0;
     border-radius: 12px;
     overflow: hidden;
@@ -295,6 +311,9 @@
   html[data-compact="true"] .palette {
     gap: 5px;
   }
+  html[data-compact="true"] .palette-wrap {
+    margin-top: 4px;
+  }
   html[data-compact="true"] .viewport-controls {
     gap: 6px;
     padding: 4px 6px;
@@ -307,6 +326,12 @@
   }
   html[data-compact="true"] .ad-slot {
     height: 44px;
+  }
+  @media (max-width: 959px) and (orientation: portrait) {
+    html[data-compact="true"] .panel {
+      margin-top: auto;
+      margin-bottom: auto;
+    }
   }
   .maou-dialog {
     position: fixed;
@@ -402,7 +427,10 @@
     gap: 2px;
     margin: 0;
   }
-.palette-wrap { position: relative; }
+.palette-wrap {
+  position: relative;
+  margin-top: 6px;
+}
   .lite-color-picker-overlay {
     position: absolute;
     inset: 0;
@@ -1272,27 +1300,30 @@
   const workspaceEl = document.querySelector('.workspace');
   const appEl = document.querySelector('.app');
   const panelEl = document.querySelector('aside.panel');
+  const shellEl = document.querySelector('.shell');
   function getIdealCanvasSize() {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    const isPortrait = window.matchMedia('(orientation: portrait)').matches;
-    let size = Math.min(w * 0.82, Math.min(h * 0.56, 520));
-    if (h <= 720) {
-      size = Math.min(w * 0.78, Math.min(h * 0.46, 460));
-    }
-    if (h <= 620) {
-      size = Math.min(w * 0.7, Math.min(h * 0.38, 340));
-    }
-    if (h >= 900 && isPortrait) {
-      size = Math.min(w * 0.86, Math.min(h * 0.64, 560));
-    }
-    return size;
+    const frameWidth = getCanvasFrameWidth();
+    const heightLimit = getCanvasHeightLimit();
+    const widthLimit = Number.isFinite(frameWidth) && frameWidth > 0 ? frameWidth : window.innerWidth;
+    const heightSafe = Number.isFinite(heightLimit) && heightLimit > 0 ? heightLimit : window.innerHeight;
+    return Math.min(widthLimit, heightSafe);
   }
   function getGapSize(el) {
     if (!el) return 0;
+    const childCount = el.children?.length || 0;
+    if (childCount <= 1) return 0;
     const style = window.getComputedStyle(el);
     const gap = parseFloat(style.rowGap || style.gap || '0');
     return Number.isFinite(gap) ? gap : 0;
+  }
+  function getElementPaddingY(el) {
+    if (!el) return 0;
+    const style = window.getComputedStyle(el);
+    const padTop = parseFloat(style.paddingTop || '0');
+    const padBottom = parseFloat(style.paddingBottom || '0');
+    const safeTop = Number.isFinite(padTop) ? padTop : 0;
+    const safeBottom = Number.isFinite(padBottom) ? padBottom : 0;
+    return safeTop + safeBottom;
   }
   function getCanvasFrameWidth() {
     if (!canvasFrame) return null;
@@ -1302,13 +1333,22 @@
     return Math.max(0, frameWidth - padX);
   }
   function getCanvasHeightLimit() {
+    if (canvasWrap) {
+      const wrapHeight = canvasWrap.getBoundingClientRect().height;
+      if (Number.isFinite(wrapHeight) && wrapHeight > 0) {
+        const framePadding = getElementPaddingY(canvasFrame);
+        return Math.max(wrapHeight - framePadding, canvasSize);
+      }
+    }
     const bodyStyle = window.getComputedStyle(document.body);
     const padTop = parseFloat(bodyStyle.paddingTop || '0');
     const padBottom = parseFloat(bodyStyle.paddingBottom || '0');
+    const shellPadding = getElementPaddingY(shellEl);
+    const framePadding = getElementPaddingY(canvasFrame);
     const promptHeight = dailyPromptEl?.getBoundingClientRect().height || 0;
     const appGap = getGapSize(appEl);
     const wrapGap = getGapSize(canvasWrap);
-    let height = window.innerHeight - padTop - padBottom - promptHeight - appGap - wrapGap;
+    let height = window.innerHeight - padTop - padBottom - shellPadding - framePadding - promptHeight - appGap - wrapGap;
     const isSideBySide = window.matchMedia('(min-width: 960px), (orientation: landscape)').matches;
     if (!isSideBySide) {
       const workspaceGap = getGapSize(workspaceEl);
@@ -1319,11 +1359,9 @@
   }
   function snapCanvasStackSize() {
     if (!canvasStack) return;
-    const ideal = getIdealCanvasSize();
-    const frameWidth = getCanvasFrameWidth();
-    const heightLimit = getCanvasHeightLimit();
-    const limit = Math.min(ideal, frameWidth || ideal, heightLimit);
-    const unit = Math.max(1, Math.floor(limit / canvasSize));
+    const limit = getIdealCanvasSize();
+    const safeLimit = Number.isFinite(limit) && limit > 0 ? limit : canvasSize;
+    const unit = Math.max(1, Math.floor(safeLimit / canvasSize));
     const snapped = Math.max(canvasSize, unit * canvasSize);
     const sizePx = `${snapped}px`;
     canvasStack.style.setProperty('--canvas-size', sizePx);
