@@ -459,6 +459,17 @@
     cursor: pointer;
     position: relative;
   }
+  .icon-item::after {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    background: var(--icon-image) center / contain no-repeat;
+    image-rendering: pixelated;
+    pointer-events: none;
+  }
+  .icon-item.is-locked {
+    opacity: 0.45;
+  }
   .icon-item.is-unlocked {
     border-color: rgba(34,197,94,0.6);
     box-shadow: 0 0 0 1px rgba(34,197,94,0.35) inset;
@@ -629,7 +640,7 @@
           <h1>魔王様の一筆</h1>
           <div class="map-meta">
             <span id="mapStatus">歩数: --</span>
-            <span id="baseDirection">勇者方向: --</span>
+            <span id="baseDirection">ボス方向: --</span>
           </div>
         </div>
         <div class="hud">
@@ -706,6 +717,7 @@
         <div class="sheet-tabs">
           <button class="sheet-tab is-active" data-tab="stats" type="button">ステータス</button>
           <button class="sheet-tab" data-tab="log" type="button">ログ</button>
+          <button class="sheet-tab" data-tab="skills" type="button">スキル</button>
           <button class="sheet-tab" data-tab="gear" type="button">装備</button>
         </div>
         <button class="sheet-close" id="closeStatus" type="button">閉じる</button>
@@ -731,6 +743,12 @@
         </div>
         <div class="sheet-panel" data-panel="log">
           <div class="status-log" id="sheetLog"></div>
+        </div>
+        <div class="sheet-panel" data-panel="skills">
+          <div class="skill-panel">
+            <div class="icon-grid" id="skillList"></div>
+            <div class="skill-detail" id="skillDetail">スキルはまだありません。</div>
+          </div>
         </div>
         <div class="sheet-panel" data-panel="gear">
           <div class="skill-panel">
@@ -790,18 +808,38 @@
   const MIN_STAT = 1;
   const POISON_STEPS = 5;
   const POISON_DAMAGE_PER_STACK = 1;
+  const FIRE_MAX_STACKS = 3;
+  const FIRE_DAMAGE_RATE = 0.01;
+  const RANDOM_WALL_COUNT = 5;
+  const RANDOM_WALL_ATTEMPTS = 40;
   const ENEMY_ORDER = ['slime', 'bat', 'golem', 'mage', 'assassin'];
+  const SKILL_DEFS = [
+    { id: 'critRate', name: '会心率+10%', desc: '会心率が10%上がる' },
+    { id: 'critDamage', name: '会心ダメ+20%', desc: '会心ダメージ20%アップ' },
+    { id: 'critLifesteal', name: '会心回復', desc: '会心時にダメージの10%回復' },
+    { id: 'overhealDamage', name: 'オーバー回復反撃', desc: '回復超過分を敵に与える' },
+    { id: 'overhealShield', name: 'オーバー回復シールド', desc: '回復超過分がシールドになる' },
+    { id: 'stepHeal', name: '歩行回復', desc: '歩くたび最大HP10%回復' },
+    { id: 'tripleStrike', name: '三連撃', desc: '10%で3連撃' },
+    { id: 'poisonStrike', name: '毒付与', desc: '会心時に毒付与(1歩)' },
+    { id: 'fireStrike', name: '炎付与', desc: '会心時に炎スタック/攻撃時1%' },
+    { id: 'reflect', name: '反射', desc: '被ダメの10%反射' }
+  ];
+  const SKILL_SPRITE_KEYS = SKILL_DEFS.reduce((acc, skill, index) => {
+    acc[skill.id] = `tile${16 + index}`;
+    return acc;
+  }, {});
 
   const FIXED_MAP = [
-    ['empty', 'spd', 'poison', 'empty', 'atk', 'empty', 'treasure', 'empty', 'boss'],
-    ['empty', 'def', 'empty', 'heal', 'empty', 'poison', 'empty', 'empty', 'empty'],
-    ['treasure', 'empty', 'empty', 'empty', 'hp', 'empty', 'mimic', 'empty', 'empty'],
-    ['empty', 'empty', 'empty', 'trap', 'empty', 'empty', 'empty', 'empty', 'empty'],
-    ['empty', 'poison', 'empty', 'empty', 'empty', 'empty', 'spd', 'empty', 'heal'],
-    ['empty', 'empty', 'empty', 'empty', 'def', 'empty', 'empty', 'empty', 'empty'],
-    ['empty', 'empty', 'empty', 'atk', 'empty', 'empty', 'empty', 'empty', 'empty'],
-    ['poison', 'empty', 'empty', 'empty', 'hp', 'empty', 'empty', 'empty', 'empty'],
-    ['start', 'empty', 'empty', 'def', 'empty', 'empty', 'empty', 'empty', 'empty']
+    ['skill', 'spd', 'poison', 'luc', 'atk', 'skill', 'treasure', 'skill', 'boss'],
+    ['skill', 'def', 'atk', 'heal', 'empty', 'poison', 'skill', 'empty', 'hp'],
+    ['treasure', 'spd', 'skill', 'skill', 'hp', 'empty', 'mimic', 'empty', 'luc'],
+    ['spd', 'luc', 'empty', 'trap', 'skill', 'empty', 'empty', 'atk', 'empty'],
+    ['skill', 'poison', 'def', 'empty', 'empty', 'empty', 'spd', 'empty', 'heal'],
+    ['luc', 'hp', 'empty', 'empty', 'def', 'empty', 'empty', 'empty', 'empty'],
+    ['empty', 'skill', 'empty', 'atk', 'empty', 'hp', 'empty', 'empty', 'atk'],
+    ['poison', 'empty', 'empty', 'empty', 'hp', 'empty', 'spd', 'empty', 'empty'],
+    ['start', 'empty', 'empty', 'def', 'empty', 'luc', 'empty', 'empty', 'def']
   ];
 
   const FIXED_ENEMIES = [
@@ -818,31 +856,35 @@
 
   const TILE_TYPES = {
     empty: { id: 'empty', color: '#1f2538', name: '平地' },
-    atk: { id: 'atk', color: '#ef4444', name: '攻撃' },
-    spd: { id: 'spd', color: '#60a5fa', name: '速さ' },
+    atk: { id: 'atk', color: '#ef4444', name: 'こうげき' },
+    spd: { id: 'spd', color: '#60a5fa', name: 'はやさ' },
     def: { id: 'def', color: '#22c55e', name: 'ぼうぎょ' },
-    hp: { id: 'hp', color: '#f472b6', name: '体力' },
+    hp: { id: 'hp', color: '#f472b6', name: 'たいりょく' },
+    luc: { id: 'luc', color: '#facc15', name: 'うん' },
     heal: { id: 'heal', color: '#10b981', name: '回復' },
     poison: { id: 'poison', color: '#a855f7', name: '毒' },
+    skill: { id: 'skill', color: '#f59e0b', name: 'スキル' },
     treasure: { id: 'treasure', color: '#facc15', name: '宝箱' },
     mimic: { id: 'mimic', color: '#f97316', name: '偽宝箱' },
     trap: { id: 'trap', color: '#9ca3af', name: 'トラップ' },
     monster: { id: 'monster', color: '#111827', name: '敵' },
     start: { id: 'start', color: '#2563eb', name: '拠点' },
-    boss: { id: 'boss', color: '#1e3a8a', name: '勇者' },
+    boss: { id: 'boss', color: '#1e3a8a', name: 'ボス' },
     wall: { id: 'wall', color: '#0b0f1d', name: '岩壁' }
   };
   const TILE_WEIGHTS = [
-    { id: 'atk', weight: 0.14 },
-    { id: 'spd', weight: 0.14 },
-    { id: 'def', weight: 0.14 },
-    { id: 'hp', weight: 0.14 },
+    { id: 'atk', weight: 0.13 },
+    { id: 'spd', weight: 0.13 },
+    { id: 'def', weight: 0.13 },
+    { id: 'hp', weight: 0.13 },
+    { id: 'luc', weight: 0.08 },
     { id: 'heal', weight: 0.08 },
     { id: 'poison', weight: 0.08 },
+    { id: 'skill', weight: 0.03 },
     { id: 'treasure', weight: 0.05 },
     { id: 'mimic', weight: 0.02 },
     { id: 'monster', weight: 0.08 },
-    { id: 'empty', weight: 0.13 }
+    { id: 'empty', weight: 0.06 }
   ];
 
   const tileSpritePaths = {
@@ -860,8 +902,22 @@
     tile12: './じめんSprite12.png',
     tile13: './じめんSprite13.png',
     tile14: './じめんSprite14.png',
-    tile15: './じめんSprite15.png'
+    tile15: './じめんSprite15.png',
+    tile16: './じめんSprite16.png',
+    tile17: './じめんSprite17.png',
+    tile18: './じめんSprite18.png',
+    tile19: './じめんSprite19.png',
+    tile20: './じめんSprite20.png',
+    tile21: './じめんSprite21.png',
+    tile22: './じめんSprite22.png',
+    tile23: './じめんSprite23.png',
+    tile24: './じめんSprite24.png',
+    tile25: './じめんSprite25.png'
   };
+  const SKILL_SPRITE_PATHS = Object.entries(SKILL_SPRITE_KEYS).reduce((acc, [id, key]) => {
+    acc[id] = tileSpritePaths[key];
+    return acc;
+  }, {});
   const tileSprites = {};
   Object.entries(tileSpritePaths).forEach(([id, src]) => {
     const img = new Image();
@@ -879,12 +935,14 @@
     spd: 'tile1',
     def: 'tile2',
     hp: 'tile3',
-    heal: 'tile5',
+    luc: 'tile6',
+    heal: 'tile9',
     poison: 'tile7',
-    treasure: 'tile6',
-    mimic: 'tile6',
-    trap: 'tile8',
-    monster: 'tile8',
+    skill: 'tile9',
+    treasure: 'tile9',
+    mimic: 'tile9',
+    trap: 'tile9',
+    monster: 'tile9',
     start: 'tile9',
     boss: 'tile9',
     wall: null
@@ -1074,6 +1132,8 @@
     poison: document.getElementById('poisonShort')
   };
 
+  const skillListEl = document.getElementById('skillList');
+  const skillDetailEl = document.getElementById('skillDetail');
   const gearListEl = document.getElementById('gearList');
   const gearDetailEl = document.getElementById('gearDetail');
 
@@ -1109,6 +1169,7 @@
   let tiles = [];
   let enemies = [];
   let visited = [];
+  let skillTiles = [];
   let enemyCount = 0;
   let tileSize = 0;
   let viewSizePx = 0;
@@ -1141,6 +1202,8 @@
     gear: { accessory: null },
     gearBonus: { atk: 0, spd: 0, def: 0, luc: 0 },
     gearInventory: [],
+    skills: {},
+    shield: 0,
     poisonStacks: 0,
     poisonSteps: 0
   };
@@ -1820,15 +1883,24 @@
     tiles = FIXED_MAP.map(row => row.slice());
     enemies = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(null));
     visited = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(false));
+    skillTiles = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(null));
     enemyCount = 0;
     itemTileTotal = 0;
 
     spawn = { x: 0, y: MAP_SIZE - 1 };
     bossPos = { x: MAP_SIZE - 1, y: 0 };
+    let skillIndex = 0;
     for (let y = 0; y < MAP_SIZE; y++) {
       for (let x = 0; x < MAP_SIZE; x++) {
         if (tiles[y][x] === 'start') spawn = { x, y };
         if (tiles[y][x] === 'boss') bossPos = { x, y };
+        if (tiles[y][x] === 'skill') {
+          const skill = SKILL_DEFS[skillIndex % SKILL_DEFS.length];
+          if (skill) {
+            skillTiles[y][x] = skill.id;
+          }
+          skillIndex += 1;
+        }
       }
     }
     player.x = spawn.x;
@@ -1924,18 +1996,33 @@
         ctx.fillText(label, cx, cy + 1);
         break;
       }
+      case 'skill': {
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+        ctx.beginPath();
+        ctx.arc(cx, cy, size * 0.62, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = `${Math.max(10, Math.floor(tileSize * 0.45))}px 'Fredoka'`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('技', cx, cy + 1);
+        break;
+      }
       default:
         break;
     }
   }
 
-  function drawTile(x, y, tileId, isVisited, enemy) {
+  function drawTile(x, y, tileId, isVisited, enemy, skillId) {
     const tile = TILE_TYPES[tileId] || TILE_TYPES.empty;
     const baseSpriteKey = Object.prototype.hasOwnProperty.call(tileBaseSpriteMap, tileId)
       ? tileBaseSpriteMap[tileId]
       : tileBaseSpriteMap.empty;
     const baseSprite = baseSpriteKey ? tileSprites[baseSpriteKey] : null;
-    const overlayKey = tileOverlaySpriteMap[tileId];
+    let overlayKey = tileOverlaySpriteMap[tileId];
+    if (tileId === 'skill' && skillId) {
+      overlayKey = SKILL_SPRITE_KEYS[skillId] || overlayKey;
+    }
     const overlaySprite = overlayKey ? tileSprites[overlayKey] : null;
     ctx.fillStyle = tile.color;
     ctx.fillRect(x, y, tileSize, tileSize);
@@ -1948,7 +2035,7 @@
     ctx.strokeStyle = 'rgba(0,0,0,0.35)';
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 0.5, y + 0.5, tileSize - 1, tileSize - 1);
-    if (tileId === 'monster') {
+    if (tileId === 'monster' || (tileId === 'skill' && !overlaySprite)) {
       drawTileIcon(tileId, x, y, enemy);
     }
   }
@@ -2008,9 +2095,10 @@
         if (mapX < 0 || mapX >= MAP_SIZE) continue;
         const tileId = tiles[mapY]?.[mapX] || 'empty';
         const enemy = enemies[mapY]?.[mapX];
+        const skillId = skillTiles?.[mapY]?.[mapX] || null;
         const screenX = vx * tileSize - camera.offsetX;
         const isVisited = visited[mapY]?.[mapX];
-        drawTile(screenX, screenY, tileId, isVisited, enemy);
+        drawTile(screenX, screenY, tileId, isVisited, enemy, skillId);
       }
     }
     const px = (posX - camera.baseX) * tileSize - camera.offsetX;
@@ -2030,7 +2118,55 @@
     });
   }
 
+  let selectedSkillId = null;
   let selectedGearId = null;
+
+  function showSkillDetail(skill) {
+    if (!skillDetailEl) return;
+    if (!skill) {
+      skillDetailEl.innerHTML = 'スキルはまだありません。';
+      return;
+    }
+    const owned = player.skills?.[skill.id];
+    skillDetailEl.innerHTML = `
+      <strong>${skill.name}</strong>
+      <div>${skill.desc}</div>
+      <div>${owned ? '習得済み' : '未習得'}</div>
+    `;
+  }
+
+  function renderSkillList() {
+    if (!skillListEl || !skillDetailEl) return;
+    skillListEl.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+    SKILL_DEFS.forEach((skill) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const unlocked = !!player.skills?.[skill.id];
+      btn.className = `icon-item${unlocked ? ' is-unlocked' : ' is-locked'}${selectedSkillId === skill.id ? ' is-selected' : ''}`;
+      const spritePath = SKILL_SPRITE_PATHS[skill.id];
+      if (spritePath) btn.style.setProperty('--icon-image', `url(${spritePath})`);
+      btn.setAttribute('aria-label', skill.name);
+      btn.title = skill.name;
+      btn.addEventListener('click', () => {
+        selectedSkillId = skill.id;
+        showSkillDetail(skill);
+        renderSkillList();
+      });
+      fragment.appendChild(btn);
+    });
+    skillListEl.appendChild(fragment);
+    const fallback = SKILL_DEFS.find(skill => player.skills?.[skill.id]) || SKILL_DEFS[0];
+    if (!selectedSkillId) {
+      selectedSkillId = fallback?.id || null;
+    }
+    if (selectedSkillId) {
+      const selected = SKILL_DEFS.find(skill => skill.id === selectedSkillId) || fallback;
+      if (selected) showSkillDetail(selected);
+    } else {
+      showSkillDetail(null);
+    }
+  }
 
   function getBaseStats() {
     const base = player.baseStats || BASE_STATS;
@@ -2251,8 +2387,9 @@
     mapStatus.textContent = `歩数: ${player.steps} / 残り敵: ${enemyCount}`;
     if (baseDirection) {
       const dir = getDirectionInfo(bossPos.x - player.x, bossPos.y - player.y);
-      baseDirection.textContent = `勇者方向: ${dir.arrow} ${dir.label} (${dist}マス)`;
+      baseDirection.textContent = `ボス方向: ${dir.arrow} ${dir.label} (${dist}マス)`;
     }
+    renderSkillList();
     renderGearList();
   }
 
@@ -2376,6 +2513,97 @@
     applyStatBoost(pick.key, `宝箱: ${pick.label}`);
   }
 
+  function grantRandomSkill() {
+    const available = SKILL_DEFS.filter(skill => !player.skills[skill.id]);
+    if (!available.length) {
+      addLog('スキルはもう習得できない');
+      return null;
+    }
+    const pick = available[Math.floor(rand() * available.length)];
+    player.skills[pick.id] = true;
+    addLog(`スキル獲得: ${pick.name}`);
+    return pick;
+  }
+
+  function grantSkillById(skillId) {
+    if (!skillId) return grantRandomSkill();
+    const skill = SKILL_DEFS.find(entry => entry.id === skillId);
+    if (!skill) return grantRandomSkill();
+    if (player.skills[skillId]) {
+      addLog(`スキルは習得済み: ${skill.name}`);
+      return skill;
+    }
+    player.skills[skillId] = true;
+    addLog(`スキル獲得: ${skill.name}`);
+    return skill;
+  }
+
+  function applyDamageToEnemy(enemyState, damage, isBoss) {
+    if (!enemyState || damage <= 0) return;
+    if (isBoss) {
+      applyBossDamage(enemyState, damage);
+    } else {
+      enemyState.hp = clamp(enemyState.hp - damage, 0, enemyState.maxHp);
+    }
+  }
+
+  function applyHeal(target, amount, opts = {}) {
+    if (!target || amount <= 0) {
+      return { actual: 0, overflow: 0, shieldAdded: 0, overflowDamage: 0 };
+    }
+    const missing = target.maxHp - target.hp;
+    const actual = Math.min(missing, amount);
+    target.hp = clamp(target.hp + actual, 0, target.maxHp);
+    const overflow = Math.max(0, amount - actual);
+    let shieldAdded = 0;
+    if (overflow > 0 && target.skills?.overhealShield) {
+      target.shield = (target.shield || 0) + overflow;
+      shieldAdded = overflow;
+    }
+    let overflowDamage = 0;
+    if (overflow > 0 && target.skills?.overhealDamage && opts.enemyState) {
+      overflowDamage = overflow;
+      applyDamageToEnemy(opts.enemyState, overflowDamage, opts.isBoss);
+    }
+    return { actual, overflow, shieldAdded, overflowDamage };
+  }
+
+  function applyEnemyPoisonTick(enemyState, isBoss, critMultiplier = 1) {
+    if (!enemyState || enemyState.poisonStacks <= 0 || enemyState.poisonSteps <= 0) return false;
+    const baseDamage = Math.max(1, enemyState.poisonStacks * POISON_DAMAGE_PER_STACK);
+    const damage = Math.max(1, Math.floor(baseDamage * critMultiplier));
+    applyDamageToEnemy(enemyState, damage, isBoss);
+    enemyState.poisonSteps -= 1;
+    appendBattleLog(`${enemyState.name}に毒 ${damage}ダメージ`);
+    if (enemyState.poisonSteps <= 0) {
+      enemyState.poisonStacks = 0;
+      appendBattleLog(`${enemyState.name}の毒が切れた`);
+    }
+    return enemyState.hp <= 0;
+  }
+
+  function applyDamageToPlayer(playerState, damage) {
+    let remaining = damage;
+    let absorbed = 0;
+    if (playerState.shield > 0) {
+      absorbed = Math.min(playerState.shield, remaining);
+      playerState.shield -= absorbed;
+      remaining -= absorbed;
+    }
+    if (remaining > 0) {
+      playerState.hp = clamp(playerState.hp - remaining, 0, playerState.maxHp);
+    }
+    return { absorbed, taken: remaining };
+  }
+
+  function applyStepHeal() {
+    if (!player.skills.stepHeal) return;
+    const amount = Math.max(1, Math.floor(player.maxHp * 0.1));
+    const result = applyHeal(player, amount);
+    if (result.actual > 0) addLog(`歩行回復 +${result.actual}`);
+    if (result.shieldAdded > 0) addLog(`シールド +${result.shieldAdded}`);
+  }
+
   async function resolveTileEvent(x, y) {
     const tileId = tiles[y]?.[x];
     if (!tileId) return;
@@ -2401,6 +2629,11 @@
       if (gameOver) return;
       player.itemsCollected += 1;
       tiles[y][x] = 'empty';
+    } else if (tileId === 'skill') {
+      const skillId = skillTiles?.[y]?.[x];
+      grantSkillById(skillId);
+      tiles[y][x] = 'empty';
+      if (skillTiles?.[y]) skillTiles[y][x] = null;
     } else if (tileId === 'atk') {
       applyStatBoost('atk', 'こうげき');
     } else if (tileId === 'def') {
@@ -2409,10 +2642,13 @@
       applyStatBoost('spd', 'はやさ');
     } else if (tileId === 'hp') {
       applyStatBoost('hp', 'たいりょく');
+    } else if (tileId === 'luc') {
+      applyStatBoost('luc', 'うん');
     } else if (tileId === 'heal') {
       const heal = Math.max(1, Math.floor(player.maxHp * HEAL_RATE));
-      player.hp = clamp(player.hp + heal, 0, player.maxHp);
-      addLog(`回復 +${heal}`);
+      const result = applyHeal(player, heal);
+      if (result.actual > 0) addLog(`回復 +${result.actual}`);
+      if (result.shieldAdded > 0) addLog(`シールド +${result.shieldAdded}`);
     } else if (tileId === 'poison') {
       player.poisonStacks += 1;
       player.poisonSteps = POISON_STEPS;
@@ -2448,6 +2684,21 @@
     return false;
   }
 
+  function hasAvailableMoveAt(x, y) {
+    const dirs = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1]
+    ];
+    for (const [dx, dy] of dirs) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (canMoveTo(nx, ny)) return true;
+    }
+    return false;
+  }
+
   function canMoveTo(x, y) {
     if (x < 0 || y < 0 || x >= MAP_SIZE || y >= MAP_SIZE) return false;
     const tileId = tiles[y]?.[x];
@@ -2461,22 +2712,12 @@
     if (tiles[y]?.[x] && tiles[y][x] !== 'wall') {
       tiles[y][x] = 'wall';
       visited[y][x] = true;
+      if (skillTiles?.[y]) skillTiles[y][x] = null;
     }
   }
 
   function hasAvailableMove() {
-    const dirs = [
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1]
-    ];
-    for (const [dx, dy] of dirs) {
-      const nx = player.x + dx;
-      const ny = player.y + dy;
-      if (canMoveTo(nx, ny)) return true;
-    }
-    return false;
+    return hasAvailableMoveAt(player.x, player.y);
   }
 
   async function movePlayerTo(targetX, targetY) {
@@ -2487,6 +2728,7 @@
     markTileGone(prevX, prevY);
     await resolveTileEvent(targetX, targetY);
     if (gameOver) return;
+    applyStepHeal();
     if (applyPoisonTick()) return;
     updateStats();
     renderMap();
@@ -2555,15 +2797,18 @@
     const def = ignoreDef ? 0 : (defender.def || 0);
     const base = Math.max(1, Math.floor((baseAtk * baseAtk) / Math.max(1, baseAtk + def)));
     const variance = Math.floor(Math.random() * 3);
-    const critChance = Math.min(0.3, 0.02 * (attacker.luc || 0) + bonusCrit);
+    const skillCritBonus = attacker.skills?.critRate ? 0.1 : 0;
+    const critCap = 0.3 + skillCritBonus;
+    const critChance = Math.min(critCap, 0.02 * (attacker.luc || 0) + bonusCrit + skillCritBonus);
     const isCrit = Math.random() < critChance;
-    let raw = (base + variance) * power * (isCrit ? 1.5 : 1);
+    const critMultiplier = isCrit ? (attacker.skills?.critDamage ? 1.8 : 1.5) : 1;
+    let raw = (base + variance) * power * critMultiplier;
     const levelGap = (attacker.level || 1) - (defender.level || 1);
     const levelMult = clamp(1 + levelGap * 0.03, 0.6, 1.6);
     raw *= levelMult;
     const reduction = clamp(opts.damageReduction || 0, 0, 0.8);
     const reduced = raw * (1 - reduction);
-    return { damage: Math.max(1, Math.floor(reduced)), isCrit };
+    return { damage: Math.max(1, Math.floor(reduced)), isCrit, critMultiplier };
   }
 
   function getEvasionChance(attacker, defender) {
@@ -2579,7 +2824,10 @@
   }
 
   function getUnitAction(unitState) {
-    return { label: '攻撃', power: 1, hits: 1 };
+    if (unitState?.skills?.tripleStrike && Math.random() < 0.1) {
+      return { label: '3連撃', power: 1, hits: 3 };
+    }
+    return { label: 'こうげき', power: 1, hits: 1 };
   }
 
   function getEffectiveSpeed(state) {
@@ -2663,7 +2911,10 @@
         hp: 1,
         guard: 0,
         guardTurns: 0,
-        gauge: 0
+        gauge: 0,
+        poisonStacks: 0,
+        poisonSteps: 0,
+        fireStacks: 0
       };
     } else {
       const scaledStats = resolveEnemyStats(enemyTemplate);
@@ -2677,7 +2928,10 @@
         level: getEnemyLevel(enemyTemplate),
         guard: 0,
         guardTurns: 0,
-        gauge: 0
+        gauge: 0,
+        poisonStacks: 0,
+        poisonSteps: 0,
+        fireStacks: 0
       };
       if (enemyTemplate.currentHp != null) {
         enemyState.hp = clamp(enemyTemplate.currentHp, 0, enemyState.maxHp);
@@ -2692,7 +2946,9 @@
       luc: actor.luc,
       mp: actor.mp,
       level: actor.level || 1,
-      gauge: 0
+      gauge: 0,
+      skills: actor.skills || {},
+      shield: actor.shield || 0
     };
     if (isBoss) {
       updateBossBattleLabel(enemyState);
@@ -2715,7 +2971,7 @@
 
     let actionCount = 0;
     let safety = 0;
-    const safetyLimit = isBoss ? 5000 : 600;
+    const safetyLimit = isBoss ? 20000 : 600;
     while (playerState.hp > 0 && enemyState.hp > 0 && safety < safetyLimit) {
       const actorTurn = pickNextActor(playerState, enemyState);
       actionCount += 1;
@@ -2725,22 +2981,47 @@
         const action = getUnitAction(playerState);
         if (action.mpCost) playerState.mp = Math.max(0, playerState.mp - action.mpCost);
         const hits = action.hits || 1;
+        let poisonCritMultiplier = 1;
         for (let i = 0; i < hits; i++) {
           if (checkEvasion(playerState, enemyState)) {
             appendBattleLog(`${enemyState.name}は回避した`);
           } else {
             const result = calcDamage(playerState, { def: enemyState.def + enemyState.guard }, action);
             appendBattleLog(`${actorLabel}の${action.label}！ ${result.damage}ダメージ${result.isCrit ? ' (クリティカル)' : ''}`);
-            if (isBoss) {
-              applyBossDamage(enemyState, result.damage);
-            } else {
-              enemyState.hp = clamp(enemyState.hp - result.damage, 0, enemyState.maxHp);
+            const maxHpSnapshot = enemyState.maxHp;
+            applyDamageToEnemy(enemyState, result.damage, isBoss);
+            if (result.isCrit) poisonCritMultiplier = result.critMultiplier;
+            if (result.isCrit && playerState.skills?.poisonStrike) {
+              enemyState.poisonStacks = (enemyState.poisonStacks || 0) + 1;
+              enemyState.poisonSteps = 1;
+              appendBattleLog(`${enemyState.name}に毒 +1`);
+            }
+            if (playerState.skills?.fireStrike && result.isCrit) {
+              enemyState.fireStacks = Math.min(FIRE_MAX_STACKS, (enemyState.fireStacks || 0) + 1);
+            }
+            if (playerState.skills?.fireStrike && enemyState.fireStacks > 0) {
+              const fireBase = Math.max(1, Math.floor(maxHpSnapshot * FIRE_DAMAGE_RATE * enemyState.fireStacks));
+              const fireDamage = Math.max(1, Math.floor(fireBase * (result.isCrit ? result.critMultiplier : 1)));
+              applyDamageToEnemy(enemyState, fireDamage, isBoss);
+              appendBattleLog(`炎 +${fireDamage}ダメージ (累計${enemyState.fireStacks})`);
+            }
+            if (result.isCrit && playerState.skills?.critLifesteal) {
+              const heal = Math.max(1, Math.floor(result.damage * 0.1));
+              const healed = applyHeal(playerState, heal, { enemyState, isBoss });
+              if (healed.actual > 0) appendBattleLog(`会心回復 +${healed.actual}`);
+              if (healed.shieldAdded > 0) appendBattleLog(`シールド +${healed.shieldAdded}`);
+              if (healed.overflowDamage > 0) appendBattleLog(`オーバー回復 ${healed.overflowDamage}ダメージ`);
             }
             flashActor(enemyActor);
             updateBattleBars(playerState, enemyState);
           }
           if (enemyState.hp <= 0) break;
           if (hits > 1) await sleep(380);
+        }
+        if (enemyState.hp > 0 && enemyState.poisonStacks > 0) {
+          const poisonDead = applyEnemyPoisonTick(enemyState, isBoss, poisonCritMultiplier);
+          updateBattleBars(playerState, enemyState);
+          if (poisonDead || enemyState.hp <= 0) break;
         }
       } else {
         enemyState.gauge = Math.max(0, enemyState.gauge - 100);
@@ -2752,19 +3033,40 @@
         } else {
           if (action.mpCost) enemyState.mp = Math.max(0, enemyState.mp - action.mpCost);
           const hits = action.hits || 1;
+          let poisonCritMultiplier = 1;
           for (let i = 0; i < hits; i++) {
             if (checkEvasion(enemyState, playerState)) {
               appendBattleLog(`${actorLabel}は回避した`);
             } else {
               const result = calcDamage(enemyState, playerState, action);
-              playerState.hp = clamp(playerState.hp - result.damage, 0, playerState.maxHp);
               appendBattleLog(`${enemyState.name}の${action.label}！ ${result.damage}ダメージ${result.isCrit ? ' (クリティカル)' : ''}`);
+              if (result.isCrit) poisonCritMultiplier = result.critMultiplier;
+              const damageResult = applyDamageToPlayer(playerState, result.damage);
+              if (damageResult.absorbed > 0) {
+                appendBattleLog(`シールドが${damageResult.absorbed}防いだ`);
+              }
+              if (damageResult.taken > 0 && playerState.skills?.reflect) {
+                const reflectDamage = Math.max(1, Math.floor(damageResult.taken * 0.1));
+                applyDamageToEnemy(enemyState, reflectDamage, isBoss);
+                appendBattleLog(`反射 ${reflectDamage}ダメージ`);
+              }
               flashActor(playerActor);
               updateBattleBars(playerState, enemyState);
               if (playerState.hp <= 0) break;
+              if (enemyState.hp <= 0) break;
             }
             await sleep(420);
           }
+          if (enemyState.hp > 0 && enemyState.poisonStacks > 0) {
+            const poisonDead = applyEnemyPoisonTick(enemyState, isBoss, poisonCritMultiplier);
+            updateBattleBars(playerState, enemyState);
+            if (poisonDead || enemyState.hp <= 0) break;
+          }
+        }
+        if (action.type === 'guard' && enemyState.hp > 0 && enemyState.poisonStacks > 0) {
+          const poisonDead = applyEnemyPoisonTick(enemyState, isBoss, 1);
+          updateBattleBars(playerState, enemyState);
+          if (poisonDead || enemyState.hp <= 0) break;
         }
         if (enemyState.guardTurns > 0) {
           enemyState.guardTurns -= 1;
@@ -2781,6 +3083,7 @@
 
     actor.hp = playerState.hp;
     actor.mp = playerState.mp;
+    actor.shield = playerState.shield;
     let winner = null;
     if (playerState.hp <= 0) winner = 'enemy';
     if (enemyState.hp <= 0) winner = 'player';
@@ -3189,9 +3492,12 @@
     player.gear.accessory = null;
     player.gearBonus = { atk: 0, spd: 0, def: 0, luc: 0 };
     player.gearInventory = [];
+    player.skills = {};
+    player.shield = 0;
     player.poisonStacks = 0;
     player.poisonSteps = 0;
     selectedGearId = null;
+    selectedSkillId = null;
     gameOver = false;
     battleActive = false;
     isMoving = false;
@@ -3208,6 +3514,7 @@
     renderMap();
     addLog('冒険を開始した');
     addLog('マップをクリックして1マス進む');
+    addLog('通ったタイルは消滅する');
   }
 
   document.getElementById('resetRun').addEventListener('click', resetGame);
