@@ -38,6 +38,11 @@
     --accent: #58c4ff;
     --text: #eaf1ff;
     --pad: clamp(12px, 3vw, 20px);
+    --lite-bottom-control-size: 48px;
+    --lite-bottom-control-radius: 12px;
+    --lite-bottom-control-padding: 6px;
+    --lite-bottom-control-icon-size: 24px;
+    --lite-bottom-control-font-size: 1rem;
     --footer-height: 68px;
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-right: env(safe-area-inset-right, 0px);
@@ -826,6 +831,15 @@
     column-gap: 6px;
     align-items: center;
   }
+  .inline-buttons__history {
+    grid-column: 1;
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 6px;
+    row-gap: 10px;
+    align-items: center;
+    justify-content: flex-start;
+  }
   .inline-buttons__vp {
     grid-column: 2;
     display: flex;
@@ -835,9 +849,16 @@
     align-items: center;
     justify-content: center;
   }
-  .inline-buttons__row--top #btnUpload {
-    grid-column: 3;
-    justify-self: end;
+  .inline-buttons__row--bottom .icon-btn {
+    width: var(--lite-bottom-control-size);
+    height: var(--lite-bottom-control-size);
+    padding: var(--lite-bottom-control-padding);
+    border-radius: var(--lite-bottom-control-radius);
+    font-size: var(--lite-bottom-control-font-size);
+  }
+  .inline-buttons__row--bottom .icon-btn img {
+    width: var(--lite-bottom-control-icon-size);
+    height: var(--lite-bottom-control-icon-size);
   }
   .inline-buttons .icon-btn[aria-hidden="true"] {
     opacity: 0;
@@ -849,7 +870,7 @@
     min-width: 8px;
     padding: 0;
   }
-  #btnExport { margin-left: auto; }
+  #btnUpload { margin-left: auto; }
   @media (orientation: landscape) {
     .inline-buttons {
       row-gap: 8px;
@@ -861,21 +882,25 @@
     .inline-buttons__row--top {
       column-gap: 4px;
     }
+    .inline-buttons__history {
+      column-gap: 4px;
+      row-gap: 8px;
+    }
     .inline-buttons__vp {
       column-gap: 4px;
       row-gap: 8px;
     }
-    .icon-btn {
+    .inline-buttons__row--top .icon-btn {
       width: 36px;
       height: 36px;
       padding: 4px;
       border-radius: 8px;
     }
-    .icon-btn img {
+    .inline-buttons__row--top .icon-btn img {
       width: 20px;
       height: 20px;
     }
-    #btnExport { margin-left: auto; }
+    #btnUpload { margin-left: auto; }
     .palette {
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
@@ -1108,6 +1133,14 @@
     <div class="row">
         <div class="inline-buttons">
           <div class="inline-buttons__row inline-buttons__row--top">
+            <div class="inline-buttons__history">
+              <button class="icon-btn" id="btnUndo" title="一つ戻す" type="button">
+                <img alt="元に戻す" src="../pixiedraw/assets/icons/action-undo.svg"/>
+              </button>
+              <button class="icon-btn" id="btnRedo" title="やり直す" type="button">
+                <img alt="やり直す" src="../pixiedraw/assets/icons/action-redo.svg"/>
+              </button>
+            </div>
             <div class="inline-buttons__vp">
               <button type="button" class="vp-btn" id="zoomOut" aria-label="縮小">−</button>
               <button type="button" class="vp-btn" id="panLeft" aria-label="左に移動">←</button>
@@ -1116,9 +1149,6 @@
               <button type="button" class="vp-btn" id="panRight" aria-label="右に移動">→</button>
               <button type="button" class="vp-btn" id="zoomIn" aria-label="拡大">＋</button>
             </div>
-            <button class="icon-btn" id="btnUpload" title="コンテストへ送る" type="button">
-              <img alt="アップロード" src="../pixiedraw/assets/icons/action-open.svg"/>
-            </button>
           </div>
           <div class="inline-buttons__row inline-buttons__row--bottom">
             <button class="icon-btn color-open-btn" id="btnOpenColorPanel" title="色を編集する" type="button">
@@ -1128,15 +1158,12 @@
             <button class="icon-btn" id="btnJelinMode" title="スカイジェリンをプレビューする" type="button">
               <img alt="ジェリンモード" src="./JELLNALL1.svg"/>
             </button>
-            <button class="icon-btn" id="btnUndo" title="一つ戻す" type="button">
-              <img alt="元に戻す" src="../pixiedraw/assets/icons/action-undo.svg"/>
-            </button>
-            <button class="icon-btn" id="btnRedo" title="やり直す" type="button">
-              <img alt="やり直す" src="../pixiedraw/assets/icons/action-redo.svg"/>
-            </button>
             <button class="icon-btn" id="btnTutorialSpacerLeft" title="" type="button" aria-hidden="true"></button>
             <button class="icon-btn" id="btnTutorialRestart" title="チュートリアルを最初から (ハテナ)" type="button" aria-hidden="true">?</button>
             <button class="icon-btn" id="btnTutorialSpacerRight" title="" type="button" aria-hidden="true"></button>
+            <button class="icon-btn" id="btnUpload" title="コンテストへ送る" type="button">
+              <img alt="アップロード" src="../pixiedraw/assets/icons/action-open.svg"/>
+            </button>
             <button class="icon-btn" id="btnExport" title="PNGを書き出す" type="button">
               <img alt="書き出し" src="../pixiedraw/assets/icons/action-export.svg"/>
             </button>
@@ -1236,6 +1263,25 @@
     } else {
       root.removeAttribute('data-compact');
     }
+    syncBottomControlSize();
+  }
+
+  function syncBottomControlSize() {
+    const swatch = paletteEl?.querySelector('.swatch');
+    if (!swatch) return;
+    const rect = swatch.getBoundingClientRect();
+    if (!rect.width) return;
+    const size = Math.round(rect.width);
+    const root = document.documentElement;
+    const radius = Math.max(6, Math.round(size * 0.25));
+    const padding = Math.max(2, Math.round(size * 0.15));
+    const iconSize = Math.max(14, Math.round(size * 0.55));
+    const fontSize = Math.max(12, Math.round(size * 0.42));
+    root.style.setProperty('--lite-bottom-control-size', `${size}px`);
+    root.style.setProperty('--lite-bottom-control-radius', `${radius}px`);
+    root.style.setProperty('--lite-bottom-control-padding', `${padding}px`);
+    root.style.setProperty('--lite-bottom-control-icon-size', `${iconSize}px`);
+    root.style.setProperty('--lite-bottom-control-font-size', `${fontSize}px`);
   }
 
   const PALETTE_KEY = 'pixieedrawlite_palette_v1';
@@ -3688,6 +3734,7 @@
       btn.addEventListener('pointercancel', clearHold);
       paletteEl.appendChild(btn);
     });
+    syncBottomControlSize();
   }
 
   canvas.addEventListener('pointerdown', onPointerDown);
