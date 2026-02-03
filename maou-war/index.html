@@ -4,11 +4,11 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="theme-color" content="#0b1224"/>
-<title>魔王様の10歩 | PiXiEED</title>
-<meta name="description" content="10歩で挑み、素材で強化して魔王城を奪還するリトライ型RPG。"/>
+<title>魔王様の一筆 | PiXiEED</title>
+<meta name="description" content="1タイル1回の一筆書きで強化し、ボスに与えた総ダメージを競う探索RPG。"/>
 <meta property="og:type" content="website"/>
-<meta property="og:title" content="魔王様の10歩 | PiXiEED"/>
-<meta property="og:description" content="10歩で挑み、素材で強化して魔王城を奪還するリトライ型RPG。"/>
+<meta property="og:title" content="魔王様の一筆 | PiXiEED"/>
+<meta property="og:description" content="1タイル1回の一筆書きで強化し、ボスに与えた総ダメージを競う探索RPG。"/>
 <meta property="og:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
 <meta property="og:url" content="https://pixieed.jp/maou-war/"/>
 <link rel="icon" type="image/png" href="../character-dots/mao1.png"/>
@@ -29,7 +29,7 @@
   gtag('event', 'project_open', {
     project_slug: 'maou-war',
     project_type: 'game',
-    project_name: '魔王様の10歩'
+    project_name: '魔王様の一筆'
   });
 </script>
 <style>
@@ -626,7 +626,7 @@
     <div class="main">
       <section class="panel map-panel">
         <div class="map-title">
-          <h1>魔王様の10歩</h1>
+          <h1>魔王様の一筆</h1>
           <div class="map-meta">
             <span id="mapStatus">歩数: --</span>
             <span id="baseDirection">勇者方向: --</span>
@@ -635,31 +635,31 @@
         <div class="hud">
           <div class="hud-bars">
             <div class="hud-bar">
-              <span>HP</span>
+              <span>たいりょく</span>
               <div class="hud-meter"><div class="hud-meter__fill" id="hpBar"></div></div>
               <strong id="hpShort">--</strong>
             </div>
             <div class="hud-bar">
-              <span>MP</span>
+              <span>まりょく</span>
               <div class="hud-meter hud-meter--mp"><div class="hud-meter__fill" id="mpBar"></div></div>
               <strong id="mpShort">--</strong>
             </div>
           </div>
           <div class="hud-row">
-            <span class="hud-chip">ATK <strong id="atkShort">--</strong></span>
-            <span class="hud-chip">SPD <strong id="spdShort">--</strong></span>
-            <span class="hud-chip">質量 <strong id="defShort">--</strong></span>
-            <span class="hud-chip">LUC <strong id="lucShort">--</strong></span>
-            <span class="hud-chip">LV <strong id="levelShort">--</strong></span>
+            <span class="hud-chip">こうげき <strong id="atkShort">--</strong></span>
+            <span class="hud-chip">はやさ <strong id="spdShort">--</strong></span>
+            <span class="hud-chip">ぼうぎょ <strong id="defShort">--</strong></span>
+            <span class="hud-chip">うん <strong id="lucShort">--</strong></span>
+            <span class="hud-chip">れべる <strong id="levelShort">--</strong></span>
             <button class="hud-btn" id="openStatus" type="button">ステータス</button>
             <button class="hud-btn" id="toggleView" type="button">全体表示</button>
           </div>
           <div class="hud-row">
-            <span class="hud-chip">素材 <strong id="expShort">--</strong></span>
-            <span class="hud-chip">獲得 <strong id="itemShort">--</strong></span>
-            <span class="hud-chip">歩数 <strong id="stepShort">--</strong></span>
-            <span class="hud-chip">討伐 <strong id="killShort">--</strong></span>
-            <span class="hud-chip">毒 <strong id="poisonShort">--</strong></span>
+            <span class="hud-chip">ぼすだめーじ <strong id="expShort">--</strong></span>
+            <span class="hud-chip">たから <strong id="itemShort">--</strong></span>
+            <span class="hud-chip">ほすう <strong id="stepShort">--</strong></span>
+            <span class="hud-chip">とうばつ <strong id="killShort">--</strong></span>
+            <span class="hud-chip">どく <strong id="poisonShort">--</strong></span>
           </div>
         </div>
         <div class="map-frame">
@@ -668,22 +668,22 @@
       </section>
 
       <aside class="panel status-panel">
-        <h2>魔王様ステータス</h2>
+        <h2>まおうさま すてーたす</h2>
         <div class="stat-grid">
-          <div class="stat"><span>HP</span><strong id="hpStat">--</strong></div>
-          <div class="stat"><span>MP</span><strong id="mpStat">--</strong></div>
-          <div class="stat"><span>ATK</span><strong id="atkStat">--</strong></div>
-          <div class="stat"><span>SPD</span><strong id="spdStat">--</strong></div>
-          <div class="stat"><span>質量</span><strong id="defStat">--</strong></div>
-          <div class="stat"><span>LUC</span><strong id="lucStat">--</strong></div>
+          <div class="stat"><span>たいりょく</span><strong id="hpStat">--</strong></div>
+          <div class="stat"><span>まりょく</span><strong id="mpStat">--</strong></div>
+          <div class="stat"><span>こうげき</span><strong id="atkStat">--</strong></div>
+          <div class="stat"><span>はやさ</span><strong id="spdStat">--</strong></div>
+          <div class="stat"><span>ぼうぎょ</span><strong id="defStat">--</strong></div>
+          <div class="stat"><span>うん</span><strong id="lucStat">--</strong></div>
         </div>
         <div class="stat-grid">
-          <div class="stat"><span>LV</span><strong id="levelStat">--</strong></div>
-          <div class="stat"><span>素材</span><strong id="expStat">--</strong></div>
-          <div class="stat"><span>獲得</span><strong id="itemStat">--</strong></div>
-          <div class="stat"><span>歩数</span><strong id="stepStat">--</strong></div>
-          <div class="stat"><span>討伐数</span><strong id="killStat">--</strong></div>
-          <div class="stat"><span>毒</span><strong id="poisonStat">--</strong></div>
+          <div class="stat"><span>れべる</span><strong id="levelStat">--</strong></div>
+          <div class="stat"><span>ぼすだめーじ</span><strong id="expStat">--</strong></div>
+          <div class="stat"><span>たから</span><strong id="itemStat">--</strong></div>
+          <div class="stat"><span>ほすう</span><strong id="stepStat">--</strong></div>
+          <div class="stat"><span>とうばつ</span><strong id="killStat">--</strong></div>
+          <div class="stat"><span>どく</span><strong id="poisonStat">--</strong></div>
         </div>
       </aside>
     </div>
@@ -706,58 +706,36 @@
         <div class="sheet-tabs">
           <button class="sheet-tab is-active" data-tab="stats" type="button">ステータス</button>
           <button class="sheet-tab" data-tab="log" type="button">ログ</button>
-          <button class="sheet-tab" data-tab="base" type="button">拠点</button>
+          <button class="sheet-tab" data-tab="gear" type="button">装備</button>
         </div>
         <button class="sheet-close" id="closeStatus" type="button">閉じる</button>
       </div>
       <div class="sheet-body">
         <div class="sheet-panel is-active" data-panel="stats">
           <div class="stat-grid">
-            <div class="stat"><span>HP</span><strong id="hpStatSheet">--</strong></div>
-            <div class="stat"><span>MP</span><strong id="mpStatSheet">--</strong></div>
-            <div class="stat"><span>ATK</span><strong id="atkStatSheet">--</strong></div>
-            <div class="stat"><span>SPD</span><strong id="spdStatSheet">--</strong></div>
-            <div class="stat"><span>質量</span><strong id="defStatSheet">--</strong></div>
-            <div class="stat"><span>LUC</span><strong id="lucStatSheet">--</strong></div>
+            <div class="stat"><span>たいりょく</span><strong id="hpStatSheet">--</strong></div>
+            <div class="stat"><span>まりょく</span><strong id="mpStatSheet">--</strong></div>
+            <div class="stat"><span>こうげき</span><strong id="atkStatSheet">--</strong></div>
+            <div class="stat"><span>はやさ</span><strong id="spdStatSheet">--</strong></div>
+            <div class="stat"><span>ぼうぎょ</span><strong id="defStatSheet">--</strong></div>
+            <div class="stat"><span>うん</span><strong id="lucStatSheet">--</strong></div>
           </div>
           <div class="stat-grid">
-            <div class="stat"><span>LV</span><strong id="levelStatSheet">--</strong></div>
-            <div class="stat"><span>素材</span><strong id="expStatSheet">--</strong></div>
-            <div class="stat"><span>獲得</span><strong id="itemStatSheet">--</strong></div>
-            <div class="stat"><span>歩数</span><strong id="stepStatSheet">--</strong></div>
-            <div class="stat"><span>討伐数</span><strong id="killStatSheet">--</strong></div>
-            <div class="stat"><span>毒</span><strong id="poisonStatSheet">--</strong></div>
+            <div class="stat"><span>れべる</span><strong id="levelStatSheet">--</strong></div>
+            <div class="stat"><span>ぼすだめーじ</span><strong id="expStatSheet">--</strong></div>
+            <div class="stat"><span>たから</span><strong id="itemStatSheet">--</strong></div>
+            <div class="stat"><span>ほすう</span><strong id="stepStatSheet">--</strong></div>
+            <div class="stat"><span>とうばつ</span><strong id="killStatSheet">--</strong></div>
+            <div class="stat"><span>どく</span><strong id="poisonStatSheet">--</strong></div>
           </div>
         </div>
         <div class="sheet-panel" data-panel="log">
           <div class="status-log" id="sheetLog"></div>
         </div>
-        <div class="sheet-panel" data-panel="base">
-          <div class="base-panel">
-            <div class="base-card">
-              <div class="base-row"><span>所持素材</span><strong id="metaMaterials">0</strong></div>
-              <div class="base-row"><span>歩数上限</span><strong id="metaStepLimit">10</strong></div>
-              <button class="btn" id="upgradeStepBtn" type="button">歩数上限+1 (素材--)</button>
-              <p class="base-note">※強化は次のランから反映</p>
-            </div>
-            <div class="base-card">
-              <h3>装備強化</h3>
-              <div class="upgrade-grid">
-                <button class="upgrade-btn" data-upgrade="atk" type="button">ATK +1 (素材--)</button>
-                <button class="upgrade-btn" data-upgrade="spd" type="button">SPD +1 (素材--)</button>
-                <button class="upgrade-btn" data-upgrade="def" type="button">質量 +1 (素材--)</button>
-                <button class="upgrade-btn" data-upgrade="luc" type="button">LUC +1 (素材--)</button>
-                <button class="upgrade-btn" data-upgrade="hp" type="button">HP +1 (素材--)</button>
-              </div>
-            </div>
-            <div class="base-card">
-              <h3>パッシブ</h3>
-              <div class="upgrade-grid">
-                <button class="upgrade-btn" data-skill="healBoost" type="button">回復床+10% (素材--)</button>
-                <button class="upgrade-btn" data-skill="trapGuard" type="button">トラップ軽減 (素材--)</button>
-                <button class="upgrade-btn" data-skill="lootBoost" type="button">素材+1 (素材--)</button>
-              </div>
-            </div>
+        <div class="sheet-panel" data-panel="gear">
+          <div class="skill-panel">
+            <div class="icon-grid" id="gearList"></div>
+            <div class="skill-detail" id="gearDetail">装備はまだありません。</div>
           </div>
         </div>
       </div>
@@ -794,7 +772,7 @@
       <div class="status-log">
         <p>ランキング</p>
         <ul class="rank-list" id="rankList"></ul>
-        <p id="rankStatus" class="rank-status">歩数送信中...</p>
+        <p id="rankStatus" class="rank-status">ダメージ送信中...</p>
       </div>
       <div class="result-actions">
         <button class="btn" id="retryBtn">もう一度</button>
@@ -806,51 +784,43 @@
 (() => {
   const MAP_SIZE = 9;
   const NORMAL_VIEW_TILES = 9;
-  const STEP_LEVEL_INTERVAL = 5;
   const HEAL_RATE = 0.2;
   const TRAP_DAMAGE = 6;
   const MIN_HP = 10;
   const MIN_STAT = 1;
   const POISON_STEPS = 5;
   const POISON_DAMAGE_PER_STACK = 1;
-  const ENEMY_RESPAWN_STEPS = 5;
-  const MAX_TURNS = 100;
-  const LOSE_TURN_PENALTY = 3;
-  const ATK_TILE_COUNT = 10;
-  const SPD_TILE_COUNT = 10;
-  const DEF_TILE_COUNT = 10;
-  const HP_TILE_COUNT = 10;
-  const HEAL_TILE_COUNT = 6;
-  const POISON_TILE_COUNT = 6;
-  const TREASURE_TILE_COUNT = 4;
-  const MIMIC_TILE_COUNT = 1;
-  const TRAP_TILE_COUNT = 4;
   const ENEMY_ORDER = ['slime', 'bat', 'golem', 'mage', 'assassin'];
-  const MONSTER_TILE_COUNT = ENEMY_ORDER.length;
-  const ITEM_TILE_COUNT = TREASURE_TILE_COUNT + MIMIC_TILE_COUNT;
-  const WALL_TILE_COUNT = 0;
-  const MASS_START_SLOW = 0.01;
-  const MASS_ACCEL_RATE = 0.004;
-  const MASS_MAX_BONUS = 0.6;
-  const MASS_MIN_RATE = 0.55;
-  const MASS_MAX_RATE = 1.6;
-  const MASS_DAMAGE_RATE = 0.004;
-  const MASS_DAMAGE_MAX = 0.25;
-  const LEVEL_GROWTH_SEQUENCE = [
-    { hp: 1, atk: 1 },
-    { hp: 1, def: 1 },
-    { hp: 1, spd: 1 },
-    { hp: 1, luc: 1 },
-    { mp: 1 }
+
+  const FIXED_MAP = [
+    ['empty', 'spd', 'poison', 'empty', 'atk', 'empty', 'treasure', 'empty', 'boss'],
+    ['empty', 'def', 'empty', 'heal', 'empty', 'poison', 'empty', 'empty', 'empty'],
+    ['treasure', 'empty', 'empty', 'empty', 'hp', 'empty', 'mimic', 'empty', 'empty'],
+    ['empty', 'empty', 'empty', 'trap', 'empty', 'empty', 'empty', 'empty', 'empty'],
+    ['empty', 'poison', 'empty', 'empty', 'empty', 'empty', 'spd', 'empty', 'heal'],
+    ['empty', 'empty', 'empty', 'empty', 'def', 'empty', 'empty', 'empty', 'empty'],
+    ['empty', 'empty', 'empty', 'atk', 'empty', 'empty', 'empty', 'empty', 'empty'],
+    ['poison', 'empty', 'empty', 'empty', 'hp', 'empty', 'empty', 'empty', 'empty'],
+    ['start', 'empty', 'empty', 'def', 'empty', 'empty', 'empty', 'empty', 'empty']
   ];
+
+  const FIXED_ENEMIES = [
+    { x: 1, y: 7, id: 'slime' },
+    { x: 2, y: 5, id: 'bat' },
+    { x: 4, y: 4, id: 'golem' },
+    { x: 6, y: 3, id: 'mage' },
+    { x: 7, y: 1, id: 'assassin' }
+  ];
+
   let fullMapView = true;
   let viewTiles = fullMapView ? MAP_SIZE : NORMAL_VIEW_TILES;
+  let itemTileTotal = 0;
 
   const TILE_TYPES = {
     empty: { id: 'empty', color: '#1f2538', name: '平地' },
     atk: { id: 'atk', color: '#ef4444', name: '攻撃' },
     spd: { id: 'spd', color: '#60a5fa', name: '速さ' },
-    def: { id: 'def', color: '#22c55e', name: '質量' },
+    def: { id: 'def', color: '#22c55e', name: 'ぼうぎょ' },
     hp: { id: 'hp', color: '#f472b6', name: '体力' },
     heal: { id: 'heal', color: '#10b981', name: '回復' },
     poison: { id: 'poison', color: '#a855f7', name: '毒' },
@@ -932,8 +902,9 @@
     slime: '1',
     bat: '2',
     golem: '3',
-    mage: '2',
-    assassin: '3'
+    mage: '4',
+    assassin: '5',
+    mimic: 'M'
   };
 
   const playerSpritePaths = {
@@ -1138,7 +1109,6 @@
   let tiles = [];
   let enemies = [];
   let visited = [];
-  let enemyRespawns = [];
   let enemyCount = 0;
   let tileSize = 0;
   let viewSizePx = 0;
@@ -1155,7 +1125,7 @@
     x: 0,
     y: 0,
     level: 1,
-    exp: 0,
+    bossDamage: 0,
     itemsCollected: 0,
     baseStats: { ...BASE_STATS },
     hp: BASE_STATS.hp,
@@ -1192,10 +1162,6 @@
     mimic: { hp: 1.1, atk: 1.05, def: 1.0, spd: 0.9, luc: 1.0, mp: 0.8 },
     hero: { hp: 1.05, atk: 1.05, def: 1.05, spd: 1.05, luc: 1.05, mp: 1.0 }
   };
-  function getStepTier() {
-    return Math.max(0, Math.floor(player.steps / STEP_LEVEL_INTERVAL));
-  }
-
   function buildStatsFromLevel(level, profile = ENEMY_ARCHETYPES.default) {
     const stats = {
       hp: 10 + 0.5 * level,
@@ -1851,75 +1817,46 @@
   }
 
   function buildMap() {
-    tiles = [];
-    enemies = [];
-    visited = [];
-    enemyRespawns = [];
+    tiles = FIXED_MAP.map(row => row.slice());
+    enemies = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(null));
+    visited = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(false));
     enemyCount = 0;
-    spawn = { x: 4, y: 8 };
-    bossPos = { x: 4, y: 0 };
+    itemTileTotal = 0;
+
+    spawn = { x: 0, y: MAP_SIZE - 1 };
+    bossPos = { x: MAP_SIZE - 1, y: 0 };
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        if (tiles[y][x] === 'start') spawn = { x, y };
+        if (tiles[y][x] === 'boss') bossPos = { x, y };
+      }
+    }
     player.x = spawn.x;
     player.y = spawn.y;
     HERO_BOSS.baseStats = { ...HERO_BOSS.stats };
 
-    const positions = [];
-    for (let y = 0; y < MAP_SIZE; y++) {
-      const row = [];
-      const enemyRow = [];
-      const visitRow = [];
-      for (let x = 0; x < MAP_SIZE; x++) {
-        row.push('empty');
-        enemyRow.push(null);
-        visitRow.push(false);
-        if (x === spawn.x && y === spawn.y) continue;
-        if (x === bossPos.x && y === bossPos.y) continue;
-        positions.push({ x, y });
-      }
-      tiles.push(row);
-      enemies.push(enemyRow);
-      visited.push(visitRow);
-    }
-
-    const tilePool = [];
-    tilePool.push(...Array(ATK_TILE_COUNT).fill('atk'));
-    tilePool.push(...Array(SPD_TILE_COUNT).fill('spd'));
-    tilePool.push(...Array(DEF_TILE_COUNT).fill('def'));
-    tilePool.push(...Array(HP_TILE_COUNT).fill('hp'));
-    tilePool.push(...Array(HEAL_TILE_COUNT).fill('heal'));
-    tilePool.push(...Array(POISON_TILE_COUNT).fill('poison'));
-    tilePool.push(...Array(TREASURE_TILE_COUNT).fill('treasure'));
-    tilePool.push(...Array(MIMIC_TILE_COUNT).fill('mimic'));
-    tilePool.push(...Array(TRAP_TILE_COUNT).fill('trap'));
-    tilePool.push(...Array(MONSTER_TILE_COUNT).fill('monster'));
-    if (tilePool.length > positions.length) {
-      tilePool.length = positions.length;
-    }
-    while (tilePool.length < positions.length) {
-      tilePool.push('empty');
-    }
-    shuffleList(tilePool);
-    shuffleList(positions);
-
-    const enemyPool = ENEMY_TYPES.filter(enemy => enemy.id !== 'mimic');
-    const enemySpawnTypes = ENEMY_ORDER.length ? [...ENEMY_ORDER] : enemyPool.map(enemy => enemy.id);
-    let enemyIndex = 0;
-    positions.forEach((pos, idx) => {
-      const tileId = tilePool[idx] || 'empty';
-      tiles[pos.y][pos.x] = tileId;
-      if (tileId === 'monster') {
-        const typeId = enemySpawnTypes[enemyIndex] || enemyPool[enemyIndex % enemyPool.length]?.id || enemyPool[0]?.id;
-        const baseEnemy = enemyPool.find(enemy => enemy.id === typeId) || enemyPool[0] || ENEMY_TYPES[0];
-        enemyIndex = Math.min(enemyIndex + 1, enemySpawnTypes.length);
-        enemies[pos.y][pos.x] = {
-          ...baseEnemy,
-          order: 0,
-          tier: 0,
-          level: 0,
-          baseStats: { ...baseEnemy.stats }
-        };
-        enemyCount += 1;
-      }
+    FIXED_ENEMIES.forEach((entry, idx) => {
+      const baseEnemy = ENEMY_TYPES.find(enemy => enemy.id === entry.id) || ENEMY_TYPES[0];
+      if (!baseEnemy) return;
+      tiles[entry.y][entry.x] = 'monster';
+      enemies[entry.y][entry.x] = {
+        ...baseEnemy,
+        order: idx + 1,
+        tier: 0,
+        level: baseEnemy.level,
+        baseStats: { ...baseEnemy.stats }
+      };
+      enemyCount += 1;
     });
+
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        const tileId = tiles[y][x];
+        if (tileId === 'treasure' || tileId === 'mimic') {
+          itemTileTotal += 1;
+        }
+      }
+    }
 
     tiles[spawn.y][spawn.x] = 'start';
     tiles[bossPos.y][bossPos.x] = 'boss';
@@ -2205,7 +2142,7 @@
     gearDetailEl.innerHTML = `
       <strong>${gear.name}</strong>
       <div>レアリティ: ${gear.rarity}</div>
-      <div>効果: ATK+${gear.bonus.atk} / SPD+${gear.bonus.spd} / 質量+${gear.bonus.def} / LUC+${gear.bonus.luc}</div>
+      <div>効果: こうげき+${gear.bonus.atk} / はやさ+${gear.bonus.spd} / ぼうぎょ+${gear.bonus.def} / うん+${gear.bonus.luc}</div>
       <div>状態: ${equipped ? '装備中' : '未装備'}</div>
       <div>所持数: ${player.gearInventory.length}</div>
     `;
@@ -2258,8 +2195,8 @@
     updatePlayerLevel();
     const hpText = `${player.hp} / ${player.maxHp}`;
     const mpText = `${player.mp} / ${player.maxMp}`;
-    const expNext = getExpForNext(player.level);
-    const expText = expNext > 0 ? `${player.exp}/${expNext}` : '--';
+    const damageText = `${player.bossDamage}`;
+    const itemText = itemTileTotal > 0 ? `${player.itemsCollected}/${itemTileTotal}` : `${player.itemsCollected}`;
     const poisonText = player.poisonStacks > 0 ? `${player.poisonStacks}(${player.poisonSteps}歩)` : 'なし';
     const setText = (el, value) => { if (el) el.textContent = value; };
 
@@ -2270,8 +2207,8 @@
     setText(statsEl.def, `${player.def}`);
     setText(statsEl.luc, `${player.luc}`);
     setText(statsEl.level, `${player.level}`);
-    setText(statsEl.exp, expText);
-    setText(statsEl.items, `${player.itemsCollected}/${ITEM_TILE_COUNT}`);
+    setText(statsEl.exp, damageText);
+    setText(statsEl.items, itemText);
     setText(statsEl.steps, `${player.steps}`);
     setText(statsEl.kills, `${player.kills}`);
     setText(statsEl.poison, poisonText);
@@ -2283,8 +2220,8 @@
     setText(sheetStatsEl.def, `${player.def}`);
     setText(sheetStatsEl.luc, `${player.luc}`);
     setText(sheetStatsEl.level, `${player.level}`);
-    setText(sheetStatsEl.exp, expText);
-    setText(sheetStatsEl.items, `${player.itemsCollected}/${ITEM_TILE_COUNT}`);
+    setText(sheetStatsEl.exp, damageText);
+    setText(sheetStatsEl.items, itemText);
     setText(sheetStatsEl.steps, `${player.steps}`);
     setText(sheetStatsEl.kills, `${player.kills}`);
     setText(sheetStatsEl.poison, poisonText);
@@ -2296,8 +2233,8 @@
     setText(hudStatsEl.def, `${player.def}`);
     setText(hudStatsEl.luc, `${player.luc}`);
     setText(hudStatsEl.level, `${player.level}`);
-    setText(hudStatsEl.exp, expText);
-    setText(hudStatsEl.items, `${player.itemsCollected}/${ITEM_TILE_COUNT}`);
+    setText(hudStatsEl.exp, damageText);
+    setText(hudStatsEl.items, itemText);
     setText(hudStatsEl.steps, `${player.steps}`);
     setText(hudStatsEl.kills, `${player.kills}`);
     setText(hudStatsEl.poison, poisonText);
@@ -2311,34 +2248,12 @@
       mpBar.style.width = `${clamp(mpRate, 0, 100)}%`;
     }
     const dist = Math.abs(player.x - bossPos.x) + Math.abs(player.y - bossPos.y);
-    mapStatus.textContent = `日数: ${player.steps}/${MAX_TURNS} / 残り敵: ${enemyCount}`;
+    mapStatus.textContent = `歩数: ${player.steps} / 残り敵: ${enemyCount}`;
     if (baseDirection) {
       const dir = getDirectionInfo(bossPos.x - player.x, bossPos.y - player.y);
       baseDirection.textContent = `勇者方向: ${dir.arrow} ${dir.label} (${dist}マス)`;
     }
     renderGearList();
-  }
-
-  function checkTurnLimit() {
-    if (player.steps >= MAX_TURNS) {
-      endGame(false);
-      return true;
-    }
-    return false;
-  }
-
-  function respawnPlayerFromBattle() {
-    player.steps = Math.min(MAX_TURNS, player.steps + LOSE_TURN_PENALTY);
-    if (checkTurnLimit()) return;
-    player.hp = player.maxHp;
-    player.mp = player.maxMp;
-    player.poisonStacks = 0;
-    player.poisonSteps = 0;
-    player.x = spawn.x;
-    player.y = spawn.y;
-    addLog(`戦闘に敗北...拠点へ戻された (-${LOSE_TURN_PENALTY}日)`);
-    updateStats();
-    renderMap();
   }
 
   function getDirectionInfo(dx, dy) {
@@ -2386,44 +2301,6 @@
     unit.mp = clamp(unit.mp ?? unit.maxMp, 0, unit.maxMp);
   }
 
-  function getExpForNext(level) {
-    return 20 + Math.max(0, level - 1) * 8;
-  }
-
-  function formatGrowth(gain) {
-    const labels = { hp: 'HP', mp: 'MP', atk: 'ATK', spd: 'SPD', def: '質量', luc: 'LUC' };
-    return Object.entries(gain)
-      .map(([key, value]) => `${labels[key] ?? key.toUpperCase()}+${value}`)
-      .join(' / ');
-  }
-
-  function applyGrowth(gain, sourceLabel) {
-    if (!gain) return;
-    Object.entries(gain).forEach(([key, value]) => {
-      player.baseStats[key] = (player.baseStats[key] || 0) + value;
-      if (key === 'hp') player.hp += value;
-      if (key === 'mp') player.mp += value;
-    });
-    updateUnitStats(player);
-    if (sourceLabel) {
-      addLog(`${sourceLabel}: ${formatGrowth(gain)}`);
-    }
-  }
-
-  function gainExp(amount) {
-    player.exp += amount;
-    while (player.exp >= getExpForNext(player.level)) {
-      player.exp -= getExpForNext(player.level);
-      player.level += 1;
-      const growth = LEVEL_GROWTH_SEQUENCE[(player.level - 2) % LEVEL_GROWTH_SEQUENCE.length];
-      applyGrowth(growth, `レベルアップ ${player.level}`);
-    }
-  }
-
-  function getEnemyExp() {
-    return 0;
-  }
-
   function createMimicEnemy() {
     const baseEnemy = ENEMY_TYPES.find(enemy => enemy.id === 'mimic') || ENEMY_TYPES[0];
     return {
@@ -2435,11 +2312,32 @@
     };
   }
 
+  function updateBossBattleLabel(enemyState) {
+    battleSub.textContent = `Lv ${enemyState.level} / 現在 ${player.level}`;
+  }
+
+  function applyBossDamage(enemyState, damage) {
+    let remaining = damage;
+    while (remaining > 0) {
+      const chunk = Math.min(remaining, enemyState.hp);
+      enemyState.hp -= chunk;
+      player.bossDamage += chunk;
+      remaining -= chunk;
+      if (enemyState.hp <= 0) {
+        enemyState.level += 1;
+        enemyState.maxHp = enemyState.level;
+        enemyState.hp = enemyState.maxHp;
+        appendBattleLog(`勇者がLv${enemyState.level}に強化された`);
+      }
+    }
+    updateBossBattleLabel(enemyState);
+  }
+
   async function resolveBossBattle() {
     const boss = {
       ...HERO_BOSS,
-      level: HERO_BOSS.level || (MONSTER_TILE_COUNT + 1),
-      order: MONSTER_TILE_COUNT + 1,
+      level: 1,
+      order: 0,
       baseStats: { ...HERO_BOSS.stats }
     };
     await runBattle(boss, { actor: player, actorLabel: '魔王様', allowDefeat: true, isBoss: true });
@@ -2468,11 +2366,11 @@
 
   function applyTreasureReward() {
     const stats = [
-      { key: 'atk', label: '攻撃' },
-      { key: 'def', label: '質量' },
-      { key: 'spd', label: '速さ' },
-      { key: 'luc', label: '運' },
-      { key: 'hp', label: '体力' }
+      { key: 'atk', label: 'こうげき' },
+      { key: 'def', label: 'ぼうぎょ' },
+      { key: 'spd', label: 'はやさ' },
+      { key: 'luc', label: 'うん' },
+      { key: 'hp', label: 'たいりょく' }
     ];
     const pick = stats[Math.floor(rand() * stats.length)];
     applyStatBoost(pick.key, `宝箱: ${pick.label}`);
@@ -2490,7 +2388,6 @@
           enemies[y][x] = null;
           enemyCount = Math.max(0, enemyCount - 1);
           tiles[y][x] = 'empty';
-          scheduleEnemyRespawn(x, y, enemy);
         }
       }
     } else if (tileId === 'treasure') {
@@ -2505,13 +2402,13 @@
       player.itemsCollected += 1;
       tiles[y][x] = 'empty';
     } else if (tileId === 'atk') {
-      applyStatBoost('atk', '攻撃');
+      applyStatBoost('atk', 'こうげき');
     } else if (tileId === 'def') {
-      applyStatBoost('def', '質量');
+      applyStatBoost('def', 'ぼうぎょ');
     } else if (tileId === 'spd') {
-      applyStatBoost('spd', '速さ');
+      applyStatBoost('spd', 'はやさ');
     } else if (tileId === 'hp') {
-      applyStatBoost('hp', '体力');
+      applyStatBoost('hp', 'たいりょく');
     } else if (tileId === 'heal') {
       const heal = Math.max(1, Math.floor(player.maxHp * HEAL_RATE));
       player.hp = clamp(player.hp + heal, 0, player.maxHp);
@@ -2551,36 +2448,6 @@
     return false;
   }
 
-  function scheduleEnemyRespawn(x, y, enemy) {
-    if (!enemy) return;
-    enemyRespawns.push({
-      x,
-      y,
-      id: enemy.id,
-      respawnStep: player.steps + ENEMY_RESPAWN_STEPS
-    });
-  }
-
-  function processEnemyRespawns() {
-    if (!enemyRespawns.length) return;
-    enemyRespawns = enemyRespawns.filter((entry) => {
-      if (player.steps < entry.respawnStep) return true;
-      if (player.x === entry.x && player.y === entry.y) return true;
-      const baseEnemy = ENEMY_TYPES.find(enemy => enemy.id === entry.id);
-      if (!baseEnemy) return false;
-      enemies[entry.y][entry.x] = {
-        ...baseEnemy,
-        order: 0,
-        tier: 0,
-        level: 0,
-        baseStats: { ...baseEnemy.stats }
-      };
-      tiles[entry.y][entry.x] = 'monster';
-      enemyCount += 1;
-      return false;
-    });
-  }
-
   function canMoveTo(x, y) {
     if (x < 0 || y < 0 || x >= MAP_SIZE || y >= MAP_SIZE) return false;
     const tileId = tiles[y]?.[x];
@@ -2589,16 +2456,43 @@
     return true;
   }
 
+  function markTileGone(x, y) {
+    if (x < 0 || y < 0 || x >= MAP_SIZE || y >= MAP_SIZE) return;
+    if (tiles[y]?.[x] && tiles[y][x] !== 'wall') {
+      tiles[y][x] = 'wall';
+      visited[y][x] = true;
+    }
+  }
+
+  function hasAvailableMove() {
+    const dirs = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1]
+    ];
+    for (const [dx, dy] of dirs) {
+      const nx = player.x + dx;
+      const ny = player.y + dy;
+      if (canMoveTo(nx, ny)) return true;
+    }
+    return false;
+  }
+
   async function movePlayerTo(targetX, targetY) {
     if (battleActive || gameOver || isMoving) return;
+    const prevX = player.x;
+    const prevY = player.y;
     await animateMove(targetX, targetY);
+    markTileGone(prevX, prevY);
     await resolveTileEvent(targetX, targetY);
     if (gameOver) return;
     if (applyPoisonTick()) return;
-    processEnemyRespawns();
-    if (checkTurnLimit()) return;
     updateStats();
     renderMap();
+    if (tiles[player.y]?.[player.x] !== 'boss' && !hasAvailableMove()) {
+      endGame(false);
+    }
   }
 
   function animateMove(nextX, nextY) {
@@ -2658,14 +2552,12 @@
     const ignoreDef = opts.ignoreDef || false;
     const bonusCrit = opts.critBonus || 0;
     const baseAtk = attacker.atk || 0;
-    const mass = attacker.def || 0;
-    const massBonus = 1 + Math.min(MASS_DAMAGE_MAX, mass * MASS_DAMAGE_RATE);
     const def = ignoreDef ? 0 : (defender.def || 0);
     const base = Math.max(1, Math.floor((baseAtk * baseAtk) / Math.max(1, baseAtk + def)));
     const variance = Math.floor(Math.random() * 3);
     const critChance = Math.min(0.3, 0.02 * (attacker.luc || 0) + bonusCrit);
     const isCrit = Math.random() < critChance;
-    let raw = (base + variance) * power * (isCrit ? 1.5 : 1) * massBonus;
+    let raw = (base + variance) * power * (isCrit ? 1.5 : 1);
     const levelGap = (attacker.level || 1) - (defender.level || 1);
     const levelMult = clamp(1 + levelGap * 0.03, 0.6, 1.6);
     raw *= levelMult;
@@ -2690,21 +2582,8 @@
     return { label: '攻撃', power: 1, hits: 1 };
   }
 
-  function getMassRate(state) {
-    const mass = state.def || 0;
-    const slow = mass * MASS_START_SLOW;
-    const startRate = clamp(1 - slow, MASS_MIN_RATE, 1);
-    const momentum = clamp(state.momentum || 0, 0, MASS_MAX_BONUS);
-    return clamp(startRate + momentum, MASS_MIN_RATE, MASS_MAX_RATE);
-  }
-
   function getEffectiveSpeed(state) {
-    return (state.spd || 0) * getMassRate(state);
-  }
-
-  function applyMomentum(state) {
-    const mass = state.def || 0;
-    state.momentum = clamp((state.momentum || 0) + mass * MASS_ACCEL_RATE, 0, MASS_MAX_BONUS);
+    return state.spd || 0;
   }
 
   function pickNextActor(playerState, enemyState) {
@@ -2768,22 +2647,41 @@
     }
     battleLog.innerHTML = '';
 
-    const scaledStats = resolveEnemyStats(enemyTemplate);
-    const enemyState = {
-      id: enemyTemplate.id,
-      ...scaledStats,
-      maxHp: scaledStats.hp,
-      name: enemyTemplate.name,
-      color: enemyTemplate.color,
-      mp: scaledStats.mp,
-      level: getEnemyLevel(enemyTemplate),
-      guard: 0,
-      guardTurns: 0,
-      gauge: 0,
-      momentum: 0
-    };
-    if (enemyTemplate.currentHp != null) {
-      enemyState.hp = clamp(enemyTemplate.currentHp, 0, enemyState.maxHp);
+    let enemyState = null;
+    if (isBoss) {
+      enemyState = {
+        id: enemyTemplate.id,
+        name: enemyTemplate.name,
+        color: enemyTemplate.color,
+        atk: HERO_BOSS.stats.atk,
+        spd: HERO_BOSS.stats.spd,
+        def: HERO_BOSS.stats.def,
+        luc: HERO_BOSS.stats.luc,
+        mp: HERO_BOSS.stats.mp,
+        level: 1,
+        maxHp: 1,
+        hp: 1,
+        guard: 0,
+        guardTurns: 0,
+        gauge: 0
+      };
+    } else {
+      const scaledStats = resolveEnemyStats(enemyTemplate);
+      enemyState = {
+        id: enemyTemplate.id,
+        ...scaledStats,
+        maxHp: scaledStats.hp,
+        name: enemyTemplate.name,
+        color: enemyTemplate.color,
+        mp: scaledStats.mp,
+        level: getEnemyLevel(enemyTemplate),
+        guard: 0,
+        guardTurns: 0,
+        gauge: 0
+      };
+      if (enemyTemplate.currentHp != null) {
+        enemyState.hp = clamp(enemyTemplate.currentHp, 0, enemyState.maxHp);
+      }
     }
     const playerState = {
       hp: actor.hp,
@@ -2794,14 +2692,17 @@
       luc: actor.luc,
       mp: actor.mp,
       level: actor.level || 1,
-      gauge: 0,
-      momentum: 0
+      gauge: 0
     };
-    const enemyLevel = getEnemyLevel(isBoss ? HERO_BOSS : enemyTemplate);
-    if (enemyLevel) {
-      battleSub.textContent = `Lv ${enemyLevel} / 現在 ${player.level}`;
+    if (isBoss) {
+      updateBossBattleLabel(enemyState);
     } else {
-      battleSub.textContent = '戦闘開始';
+      const enemyLevel = getEnemyLevel(enemyTemplate);
+      if (enemyLevel) {
+        battleSub.textContent = `Lv ${enemyLevel} / 現在 ${player.level}`;
+      } else {
+        battleSub.textContent = '戦闘開始';
+      }
     }
 
     if (playerNameEl) playerNameEl.textContent = actorLabel;
@@ -2828,15 +2729,18 @@
             appendBattleLog(`${enemyState.name}は回避した`);
           } else {
             const result = calcDamage(playerState, { def: enemyState.def + enemyState.guard }, action);
-            enemyState.hp = clamp(enemyState.hp - result.damage, 0, enemyState.maxHp);
             appendBattleLog(`${actorLabel}の${action.label}！ ${result.damage}ダメージ${result.isCrit ? ' (クリティカル)' : ''}`);
+            if (isBoss) {
+              applyBossDamage(enemyState, result.damage);
+            } else {
+              enemyState.hp = clamp(enemyState.hp - result.damage, 0, enemyState.maxHp);
+            }
             flashActor(enemyActor);
             updateBattleBars(playerState, enemyState);
           }
           if (enemyState.hp <= 0) break;
           if (hits > 1) await sleep(380);
         }
-        applyMomentum(playerState);
       } else {
         enemyState.gauge = Math.max(0, enemyState.gauge - 100);
         const action = enemyTemplate.ai ? enemyTemplate.ai(enemyState) : getUnitAction(enemyState);
@@ -2865,7 +2769,6 @@
           enemyState.guardTurns -= 1;
           if (enemyState.guardTurns <= 0) enemyState.guard = 0;
         }
-        applyMomentum(enemyState);
       }
       safety += 1;
       if (actionCount >= maxActions) break;
@@ -2889,23 +2792,13 @@
     }
 
     if (actor === player && playerState.hp <= 0) {
-      respawnPlayerFromBattle();
-      return { winner };
-    }
-    if (allowDefeat && isBoss && enemyState.hp <= 0 && actor === player) {
-      endGame(true);
+      endGame(false);
       return { winner };
     }
 
     if (!isBoss && enemyState.hp <= 0 && actor === player) {
       player.kills += 1;
-      const expGain = getEnemyExp(enemyTemplate, enemyState);
-      if (expGain > 0) {
-        gainExp(expGain);
-        addLog(`${enemyState.name}を倒した +${expGain}EXP`);
-      } else {
-        addLog(`${enemyState.name}を倒した`);
-      }
+      addLog(`${enemyState.name}を倒した`);
       handleEnemyDrop(enemyState);
     }
     updateStats();
@@ -2914,7 +2807,7 @@
   }
 
   function computeScore(cleared) {
-    return Math.max(0, player.steps);
+    return Math.max(0, player.bossDamage);
   }
 
   function getNickname() {
@@ -3149,7 +3042,7 @@
   }
 
   async function submitScore(score, cleared) {
-    rankStatus.textContent = '日数送信中...';
+    rankStatus.textContent = 'ダメージ送信中...';
     rankList.innerHTML = '';
     try {
       const supabase = await getSupabaseClient();
@@ -3181,13 +3074,13 @@
           queueScorePayload({ ...payload });
           rankStatus.textContent = 'メンテ中のためキューに保存しました';
         } else {
-          rankStatus.textContent = '日数送信に失敗しました';
+          rankStatus.textContent = 'ダメージ送信に失敗しました';
         }
         return;
       }
       rankStatus.textContent = 'ランキング更新中...';
       await loadRanking(supabase);
-      rankStatus.textContent = '日数送信完了';
+      rankStatus.textContent = 'ダメージ送信完了';
     } catch (err) {
       console.warn('score submit failed', err);
       markSupabaseMaintenanceFromError(err);
@@ -3213,7 +3106,7 @@
   async function fetchRankingRows(supabase, columns, filterGame) {
     const baseQuery = supabase.from('scores')
       .select(columns.join(', '))
-      .order('score', { ascending: true })
+      .order('score', { ascending: false })
       .order('created_at', { ascending: true })
       .limit(12);
     const query = filterGame ? baseQuery.eq('game', 'maou-war') : baseQuery;
@@ -3258,7 +3151,7 @@
       }
       const li = document.createElement('li');
       li.className = 'rank-item';
-      li.innerHTML = `<span>${idx + 1}. ${row.name}</span><span>${row.score}日</span>${meta.length ? `<small>${meta.join(' / ')}</small>` : ''}`;
+      li.innerHTML = `<span>${idx + 1}. ${row.name}</span><span>${row.score}ダメージ</span>${meta.length ? `<small>${meta.join(' / ')}</small>` : ''}`;
       rankList.appendChild(li);
     });
   }
@@ -3268,15 +3161,15 @@
     gameOver = true;
     const score = computeScore(cleared);
     resultOverlay.classList.add('is-open');
-    resultTitle.textContent = cleared ? '魔王城を奪還した！' : '奪還失敗...';
-    resultSummary.textContent = `日数: ${player.steps}`;
+    resultTitle.textContent = '戦い終了';
+    resultSummary.textContent = `ボスダメージ: ${player.bossDamage}`;
     resultStats.innerHTML = `
-      <div class="stat"><span>HP</span><strong>${player.hp}/${player.maxHp}</strong></div>
-      <div class="stat"><span>日数</span><strong>${player.steps}</strong></div>
-      <div class="stat"><span>討伐数</span><strong>${player.kills}</strong></div>
-      <div class="stat"><span>ATK/SPD/質量</span><strong>${player.atk}/${player.spd}/${player.def}</strong></div>
-      <div class="stat"><span>LUC</span><strong>${player.luc}</strong></div>
-      <div class="stat"><span>結果</span><strong>${cleared ? 'クリア' : 'ゲームオーバー'}</strong></div>
+      <div class="stat"><span>たいりょく</span><strong>${player.hp}/${player.maxHp}</strong></div>
+      <div class="stat"><span>ぼすだめーじ</span><strong>${player.bossDamage}</strong></div>
+      <div class="stat"><span>ほすう</span><strong>${player.steps}</strong></div>
+      <div class="stat"><span>とうばつ</span><strong>${player.kills}</strong></div>
+      <div class="stat"><span>こうげき/はやさ/ぼうぎょ</span><strong>${player.atk}/${player.spd}/${player.def}</strong></div>
+      <div class="stat"><span>うん</span><strong>${player.luc}</strong></div>
     `;
     submitScore(score, cleared);
   }
@@ -3284,7 +3177,7 @@
   function resetGame() {
     player.baseStats = { ...BASE_STATS };
     player.level = 1;
-    player.exp = 0;
+    player.bossDamage = 0;
     player.itemsCollected = 0;
     player.hp = BASE_STATS.hp;
     player.maxHp = BASE_STATS.hp;
