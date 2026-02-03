@@ -81,7 +81,8 @@ const REGION_MERGE_DISTANCE_BY_DIFFICULTY = {
   3: 8,
 }; // Manhattan merge distance (px) per difficulty level
 const CREATOR_MERGE_DISTANCE = REGION_MERGE_DISTANCE_BY_DIFFICULTY[2];
-const MERGE_DISTANCE_REFERENCE = 96;
+const MERGE_DISTANCE_SIZE_TIER_1 = 64;
+const MERGE_DISTANCE_SIZE_TIER_2 = 256;
 const MERGE_DISTANCE_MAX_SCALE = 3;
 const MERGE_DISTANCE_MAX_ABS = 16;
 const NORMALIZE_COLOR_TOLERANCE = 12;
@@ -200,6 +201,7 @@ const SHARE_QUEUE_KEY = 'pixfind_share_queue';
 const SHARE_QUEUE_LIMIT = 20;
 const CONTEST_SHARE_QUEUE_KEY = 'contest_share_queue';
 const CONTEST_SHARE_QUEUE_LIMIT = 20;
+const PENDING_CREATOR_UPLOAD_KEY = 'pixfind_creator_upload_v1';
 const PUBLISH_QUEUE_KEY = 'pixfind_publish_queue';
 const PUBLISH_QUEUE_LIMIT = 10;
 const PUBLISH_QUEUE_RETRY_MS = 60000;
@@ -252,6 +254,7 @@ async function init() {
 
   initializeCanvasInteractions();
   setupCreator();
+  await restorePendingCreatorUpload();
 
   dom.difficultyChips.forEach(chip => {
     chip.addEventListener('click', () => {
@@ -364,6 +367,45 @@ function resetCreatorForm() {
   }
   setCreatorStatus('');
   setCreatorDifficulty(creatorState.difficulty, true);
+}
+
+async function restorePendingCreatorUpload() {
+  let payload;
+  try {
+    const raw = localStorage.getItem(PENDING_CREATOR_UPLOAD_KEY);
+    if (!raw) return;
+    localStorage.removeItem(PENDING_CREATOR_UPLOAD_KEY);
+    payload = JSON.parse(raw);
+  } catch (error) {
+    console.warn('pending creator upload parse failed', error);
+    return;
+  }
+  const originalDataUrl = payload?.originalDataUrl;
+  const diffDataUrl = payload?.diffDataUrl;
+  if (!originalDataUrl || !diffDataUrl) return;
+  const suffix = payload?.canvasSize ? `${payload.canvasSize}px` : 'image';
+  const [originalFile, diffFile] = await Promise.all([
+    dataUrlToFile(originalDataUrl, `pixfind-${suffix}-original.png`),
+    dataUrlToFile(diffDataUrl, `pixfind-${suffix}-diff.png`),
+  ]);
+  if (!originalFile || !diffFile) return;
+  resetCreatorForm();
+  openCreatorOverlay();
+  const originalInput = dom.creatorOriginalInput;
+  const diffInput = dom.creatorDiffInput;
+  if (!originalInput || !diffInput) return;
+  try {
+    const originalTransfer = new DataTransfer();
+    originalTransfer.items.add(originalFile);
+    originalInput.files = originalTransfer.files;
+    const diffTransfer = new DataTransfer();
+    diffTransfer.items.add(diffFile);
+    diffInput.files = diffTransfer.files;
+  } catch (error) {
+    console.warn('creator file inject failed', error);
+    return;
+  }
+  handleCreatorFileChange();
 }
 
 function handleCreatorFileChange() {
@@ -1928,7 +1970,12 @@ function resolveMergeDistanceForSize(baseDistance, size) {
     return baseDistance;
   }
   const minDim = Math.min(width, height);
-  const scale = Math.max(1, Math.round(minDim / MERGE_DISTANCE_REFERENCE));
+  let scale = 1;
+  if (minDim > MERGE_DISTANCE_SIZE_TIER_2) {
+    scale = 3;
+  } else if (minDim > MERGE_DISTANCE_SIZE_TIER_1) {
+    scale = 2;
+  }
   const boundedScale = Math.min(scale, MERGE_DISTANCE_MAX_SCALE);
   const scaledDistance = Math.round(baseDistance * boundedScale);
   return Math.max(1, Math.min(scaledDistance, MERGE_DISTANCE_MAX_ABS));
@@ -2998,6 +3045,18 @@ function readFileAsDataUrl(file) {
     reader.onerror = error => reject(error);
     reader.readAsDataURL(file);
   });
+}
+
+async function dataUrlToFile(dataUrl, filename) {
+  if (!dataUrl) return null;
+  try {
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+    return new File([blob], filename, { type: blob.type || 'image/png' });
+  } catch (error) {
+    console.warn('data url convert failed', error);
+    return null;
+  }
 }
 
 async function loadImageFromFile(file) {
