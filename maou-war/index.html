@@ -2715,7 +2715,8 @@
 
     let actionCount = 0;
     let safety = 0;
-    while (playerState.hp > 0 && enemyState.hp > 0 && safety < 600) {
+    const safetyLimit = isBoss ? 5000 : 600;
+    while (playerState.hp > 0 && enemyState.hp > 0 && safety < safetyLimit) {
       const actorTurn = pickNextActor(playerState, enemyState);
       actionCount += 1;
       appendBattleLog(`行動 ${actionCount}`);
