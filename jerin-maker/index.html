@@ -1158,6 +1158,9 @@
             <button class="icon-btn" id="btnJelinMode" title="スカイジェリンをプレビューする" type="button">
               <img alt="ジェリンモード" src="./JELLNALL1.svg"/>
             </button>
+            <button aria-pressed="false" class="icon-btn" id="btnDiffMode" title="間違い探しモード" type="button">
+              <img alt="PiXFiND" src="../icon/icon-192-2.png"/>
+            </button>
             <button class="icon-btn" id="btnTutorialSpacerLeft" title="" type="button" aria-hidden="true"></button>
             <button class="icon-btn" id="btnTutorialRestart" title="チュートリアルを最初から (ハテナ)" type="button" aria-hidden="true">?</button>
             <button class="icon-btn" id="btnTutorialSpacerRight" title="" type="button" aria-hidden="true"></button>
@@ -1490,6 +1493,14 @@
   let lastDrawCell = null;
   let eraseMode = false;
   let showGrid = true;
+  let diffMode = false;
+  let diffBasePixels = null;
+  const diffDifficulty = 1;
+  const LAYER_BASE = 'base';
+  const LAYER_DIFF = 'diff';
+  let activeLayerKey = LAYER_BASE;
+  let diffLayer = null;
+  let compositeImageData = null;
   let lastTouchEnd = 0;
   let jelinMode = false;
   let cutsceneActive = false;
@@ -1499,9 +1510,18 @@
   let liteCanvasSnapshot = null;
   let litePreviewUndoState = null;
   let liteLastPreviewHex = null;
-  const undoStack = [];
-  const redoStack = [];
   const MAX_UNDO = 30;
+  const MIN_CLUSTER_PIXELS = 1;
+  const REGION_MERGE_DISTANCE_BY_DIFFICULTY = {
+    1: 2,
+    2: 4,
+    3: 8,
+  };
+  const DIFF_CREATOR_MERGE_DISTANCE = REGION_MERGE_DISTANCE_BY_DIFFICULTY[2];
+  const MERGE_DISTANCE_SIZE_TIER_1 = 64;
+  const MERGE_DISTANCE_SIZE_TIER_2 = 256;
+  const MERGE_DISTANCE_MAX_SCALE = 3;
+  const MERGE_DISTANCE_MAX_ABS = 16;
   let tutorialOverlayCanvas = null;
   let tutorialOverlayCtx = null;
   let tutorialOverlayAlpha = 0.7;
@@ -2033,6 +2053,7 @@
   const btnExport = document.getElementById('btnExport');
   const btnCycleSize = document.getElementById('btnCycleSize');
   const btnJelinMode = document.getElementById('btnJelinMode');
+  const btnDiffMode = document.getElementById('btnDiffMode');
   const btnUndo = document.getElementById('btnUndo');
   const btnRedo = document.getElementById('btnRedo');
   const btnOpenColorPanel = document.getElementById('btnOpenColorPanel');
@@ -2106,6 +2127,13 @@
 
   let imageData = ctx.createImageData(canvasSize, canvasSize);
   let data = imageData.data;
+  const baseLayer = {
+    imageData,
+    undoStack: [],
+    redoStack: [],
+  };
+  let undoStack = baseLayer.undoStack;
+  let redoStack = baseLayer.redoStack;
   ctx.imageSmoothingEnabled = false;
   // ブラウザのページズームを抑止してキャンバス座標のずれを防ぐ
   function preventBrowserZoom() {
@@ -2434,14 +2462,14 @@
     }
   }
 
-  function applyCanvasSize(nextSize) {
-    const target = CANVAS_SIZES.includes(nextSize) ? nextSize : CANVAS_SIZES[1];
+  function resampleImageData(source, target) {
+    if (!source) return ctx.createImageData(target, target);
     const sourceCanvas = document.createElement('canvas');
-    sourceCanvas.width = canvasSize;
-    sourceCanvas.height = canvasSize;
+    sourceCanvas.width = source.width;
+    sourceCanvas.height = source.height;
     const sourceCtx = sourceCanvas.getContext('2d', { willReadFrequently: true });
     if (sourceCtx) {
-      sourceCtx.putImageData(imageData, 0, 0);
+      sourceCtx.putImageData(source, 0, 0);
     }
 
     const scaledCanvas = document.createElement('canvas');
@@ -2451,10 +2479,44 @@
     if (scaledCtx && sourceCtx) {
       scaledCtx.imageSmoothingEnabled = false;
       scaledCtx.drawImage(sourceCanvas, 0, 0, target, target);
+      return scaledCtx.getImageData(0, 0, target, target);
     }
+    return ctx.createImageData(target, target);
+  }
 
-    imageData = scaledCtx ? scaledCtx.getImageData(0, 0, target, target) : ctx.createImageData(target, target);
-    data = imageData.data;
+  function resampleMask(sourceMask, sourceSize, targetSize) {
+    const total = targetSize * targetSize;
+    if (!sourceMask || !sourceMask.length || sourceSize <= 0 || targetSize <= 0) {
+      return new Uint8Array(total);
+    }
+    if (sourceSize === targetSize && sourceMask.length === total) {
+      return new Uint8Array(sourceMask);
+    }
+    const out = new Uint8Array(total);
+    for (let y = 0; y < targetSize; y += 1) {
+      const srcY = Math.min(sourceSize - 1, Math.floor((y * sourceSize) / targetSize));
+      const rowOffset = y * targetSize;
+      const srcRow = srcY * sourceSize;
+      for (let x = 0; x < targetSize; x += 1) {
+        const srcX = Math.min(sourceSize - 1, Math.floor((x * sourceSize) / targetSize));
+        out[rowOffset + x] = sourceMask[srcRow + srcX] ? 1 : 0;
+      }
+    }
+    return out;
+  }
+
+  function applyCanvasSize(nextSize) {
+    const target = CANVAS_SIZES.includes(nextSize) ? nextSize : CANVAS_SIZES[1];
+    const sourceSize = canvasSize;
+    baseLayer.imageData = resampleImageData(baseLayer.imageData, target);
+    if (diffLayer?.imageData) {
+      diffLayer.imageData = resampleImageData(diffLayer.imageData, target);
+    }
+    if (diffLayer?.mask) {
+      diffLayer.mask = resampleMask(diffLayer.mask, sourceSize, target);
+    } else if (diffLayer) {
+      diffLayer.mask = new Uint8Array(target * target);
+    }
     canvasSize = target;
     canvasSizeIndex = CANVAS_SIZES.indexOf(target);
     canvas.width = target;
@@ -2472,7 +2534,13 @@
       jelinCanvas.height = target;
     }
     maxZoomStep = calcMaxZoomStep(canvasSize);
+    compositeImageData = null;
     resetViewport();
+    if (diffMode) {
+      ensureDiffLayer();
+      captureDiffBase();
+    }
+    setActiveLayer(diffMode && diffLayer ? LAYER_DIFF : LAYER_BASE);
     resizeGridCanvas();
     render();
     updateSizeButton();
@@ -2506,6 +2574,120 @@
     }
   }
 
+  function syncActiveLayer() {
+    const layer = activeLayerKey === LAYER_DIFF ? diffLayer : baseLayer;
+    if (!layer) {
+      activeLayerKey = LAYER_BASE;
+      imageData = baseLayer.imageData;
+      data = imageData.data;
+      undoStack = baseLayer.undoStack;
+      redoStack = baseLayer.redoStack;
+      return;
+    }
+    imageData = layer.imageData;
+    data = imageData.data;
+    undoStack = layer.undoStack;
+    redoStack = layer.redoStack;
+  }
+
+  function setActiveLayer(key) {
+    activeLayerKey = key;
+    syncActiveLayer();
+    updateUndoRedoUI();
+  }
+
+  function cloneImageData(source) {
+    if (!source) return ctx.createImageData(canvasSize, canvasSize);
+    return new ImageData(new Uint8ClampedArray(source.data), source.width, source.height);
+  }
+
+  function ensureDiffLayer() {
+    if (diffLayer && diffLayer.imageData.width === canvasSize && diffLayer.imageData.height === canvasSize) {
+      return;
+    }
+    diffLayer = {
+      imageData: cloneImageData(baseLayer.imageData),
+      undoStack: [],
+      redoStack: [],
+      mask: new Uint8Array(canvasSize * canvasSize),
+    };
+  }
+
+  function syncDiffLayerFromBase() {
+    if (!diffLayer) return;
+    const baseData = baseLayer.imageData.data;
+    const diffData = diffLayer.imageData.data;
+    if (baseData.length !== diffData.length) return;
+    const total = baseData.length / 4;
+    if (!diffLayer.mask || diffLayer.mask.length !== total) {
+      diffLayer.mask = new Uint8Array(total);
+    }
+    const mask = diffLayer.mask;
+    for (let i = 0, p = 0; p < total; p += 1, i += 4) {
+      if (mask[p]) continue;
+      diffData[i] = baseData[i];
+      diffData[i + 1] = baseData[i + 1];
+      diffData[i + 2] = baseData[i + 2];
+      diffData[i + 3] = baseData[i + 3];
+    }
+  }
+
+  function getCompositeImageData() {
+    if (!diffLayer?.mask) return imageData;
+    const baseImg = baseLayer.imageData;
+    const diffImg = diffLayer.imageData;
+    if (baseImg.width !== diffImg.width || baseImg.height !== diffImg.height) {
+      return diffImg;
+    }
+    const total = baseImg.width * baseImg.height;
+    if (!compositeImageData || compositeImageData.width !== baseImg.width || compositeImageData.height !== baseImg.height) {
+      compositeImageData = ctx.createImageData(baseImg.width, baseImg.height);
+    }
+    const out = compositeImageData.data;
+    const baseData = baseImg.data;
+    const diffData = diffImg.data;
+    const mask = diffLayer.mask;
+    const useMask = mask && mask.length === total;
+    for (let i = 0, p = 0; p < total; p += 1, i += 4) {
+      const useDiff = useMask ? mask[p] === 1 : true;
+      if (useDiff) {
+        out[i] = diffData[i];
+        out[i + 1] = diffData[i + 1];
+        out[i + 2] = diffData[i + 2];
+        out[i + 3] = diffData[i + 3];
+      } else {
+        out[i] = baseData[i];
+        out[i + 1] = baseData[i + 1];
+        out[i + 2] = baseData[i + 2];
+        out[i + 3] = baseData[i + 3];
+      }
+    }
+    return compositeImageData;
+  }
+
+  function captureDiffBase() {
+    if (!baseLayer?.imageData) return;
+    diffBasePixels = new Uint8ClampedArray(baseLayer.imageData.data);
+  }
+
+  function setDiffMode(enabled) {
+    diffMode = enabled;
+    if (btnDiffMode) {
+      btnDiffMode.classList.toggle('is-active', enabled);
+      btnDiffMode.setAttribute('aria-pressed', String(enabled));
+    }
+    if (enabled) {
+      ensureDiffLayer();
+      syncDiffLayerFromBase();
+      captureDiffBase();
+      setActiveLayer(LAYER_DIFF);
+    } else {
+      diffBasePixels = null;
+      setActiveLayer(LAYER_BASE);
+    }
+    render();
+  }
+
   function setCurrentColor(hex, options = {}) {
     const { updatePalette = true } = options;
     if (activeSwatchIndex === 0) {
@@ -2531,11 +2713,15 @@
 
   function captureUndoState() {
     if (!imageData || !data) return null;
-    return {
+    const state = {
       pixels: new Uint8ClampedArray(data),
       palette: [...palette],
       activeIndex: activeSwatchIndex,
     };
+    if (activeLayerKey === LAYER_DIFF && diffLayer?.mask) {
+      state.mask = new Uint8Array(diffLayer.mask);
+    }
+    return state;
   }
   function updateUndoRedoUI() {
     if (btnUndo) btnUndo.disabled = undoStack.length === 0;
@@ -2576,6 +2762,9 @@
   function applyState(state) {
     if (!state) return;
     data.set(state.pixels);
+    if (activeLayerKey === LAYER_DIFF && diffLayer && state.mask && state.mask.length) {
+      diffLayer.mask = new Uint8Array(state.mask);
+    }
     render();
     palette = state.palette.slice(0, MAX_COLORS);
     updateSwatchColors();
@@ -2693,12 +2882,13 @@
     if (!imageData || !data) return;
     if (liteColorPickerState.index === null) return;
     const newHex = getLiteHexFromState();
+    const mask = activeLayerKey === LAYER_DIFF ? diffLayer?.mask : null;
     // 直前のプレビュー色を最新色に置き換え
     if (liteLastPreviewHex) {
-      replaceColorInBuffer(data, liteLastPreviewHex, newHex);
+      replaceColorInBuffer(data, liteLastPreviewHex, newHex, mask);
     }
     // 元色も最新色に置き換え
-    replaceColorInBuffer(data, liteColorPickerState.originalHex, newHex);
+    replaceColorInBuffer(data, liteColorPickerState.originalHex, newHex, mask);
     liteLastPreviewHex = newHex;
     currentColor = newHex;
     updateColorOpenButton();
@@ -2998,7 +3188,16 @@
   }
 
   function clearCanvas() {
-    imageData = ctx.createImageData(canvasSize, canvasSize);
+    const blank = ctx.createImageData(canvasSize, canvasSize);
+    if (activeLayerKey === LAYER_DIFF && diffLayer) {
+      diffLayer.imageData = blank;
+      if (diffLayer.mask) {
+        diffLayer.mask.fill(1);
+      }
+    } else {
+      baseLayer.imageData = blank;
+    }
+    imageData = blank;
     data = imageData.data;
     render();
   }
@@ -3123,8 +3322,12 @@
   function disableNonTutorialControls(disabled) {
     if (btnCycleSize) btnCycleSize.disabled = disabled;
     if (btnJelinMode) btnJelinMode.disabled = disabled;
+    if (btnDiffMode) btnDiffMode.disabled = disabled;
     if (btnOpenColorPanel) btnOpenColorPanel.disabled = disabled;
     if (btnExport) btnExport.disabled = disabled;
+    if (disabled && diffMode) {
+      setDiffMode(false);
+    }
     if (btnTutorialRestart) {
       btnTutorialRestart.style.opacity = disabled ? '0' : '0';
       btnTutorialRestart.style.pointerEvents = 'none';
@@ -3486,6 +3689,9 @@
       data[idx + 2] = rgba.b;
       data[idx + 3] = rgba.a;
     }
+    if (activeLayerKey === LAYER_DIFF && diffLayer?.mask) {
+      diffLayer.mask[y * canvasSize + x] = 1;
+    }
     render();
     if (tutorialState.active) {
       checkTutorialProgress(x, y);
@@ -3496,33 +3702,43 @@
     if (!oldHex || !newHex || oldHex.toLowerCase() === newHex.toLowerCase()) return;
     const from = hexToRgba(oldHex);
     const to = hexToRgba(newHex);
-    for (let i = 0; i < data.length; i += 4) {
+    const mask = activeLayerKey === LAYER_DIFF ? diffLayer?.mask : null;
+    const useMask = mask && mask.length * 4 === data.length;
+    for (let i = 0, p = 0; i < data.length; i += 4, p += 1) {
       if (data[i] === from.r && data[i + 1] === from.g && data[i + 2] === from.b && data[i + 3] === from.a) {
         data[i] = to.r;
         data[i + 1] = to.g;
         data[i + 2] = to.b;
         data[i + 3] = to.a;
+        if (useMask) {
+          mask[p] = 1;
+        }
       }
     }
     render();
   }
-  function replaceColorInBuffer(buffer, oldHex, newHex) {
+  function replaceColorInBuffer(buffer, oldHex, newHex, mask = null) {
     if (!buffer || !oldHex || !newHex || oldHex.toLowerCase() === newHex.toLowerCase()) return buffer;
     const from = hexToRgba(oldHex);
     const to = hexToRgba(newHex);
-    for (let i = 0; i < buffer.length; i += 4) {
+    const useMask = mask && mask.length * 4 === buffer.length;
+    for (let i = 0, p = 0; i < buffer.length; i += 4, p += 1) {
       if (buffer[i] === from.r && buffer[i + 1] === from.g && buffer[i + 2] === from.b && buffer[i + 3] === from.a) {
         buffer[i] = to.r;
         buffer[i + 1] = to.g;
         buffer[i + 2] = to.b;
         buffer[i + 3] = to.a;
+        if (useMask) {
+          mask[p] = 1;
+        }
       }
     }
     return buffer;
   }
 
   function render() {
-    ctx.putImageData(imageData, 0, 0);
+    const drawData = diffMode && diffLayer?.mask ? getCompositeImageData() : imageData;
+    ctx.putImageData(drawData, 0, 0);
     drawGrid();
     drawJelinOverlay();
     if (tutorialState.active && (tutorialState.currentOverlay || tutorialState.currentSprite)) {
@@ -3537,9 +3753,147 @@
     }
   }
 
+  function normalizeDifficulty(rawValue) {
+    const numeric = Number(rawValue);
+    if (!Number.isFinite(numeric)) {
+      return 1;
+    }
+    const rounded = Math.round(numeric);
+    return Math.min(Math.max(rounded, 1), 3);
+  }
+
+  function resolveMergeDistanceForSize(baseDistance, size) {
+    const width = size?.width ?? 0;
+    const height = size?.height ?? 0;
+    if (!width || !height) {
+      return baseDistance;
+    }
+    const minDim = Math.min(width, height);
+    let scale = 1;
+    if (minDim > MERGE_DISTANCE_SIZE_TIER_2) {
+      scale = 3;
+    } else if (minDim > MERGE_DISTANCE_SIZE_TIER_1) {
+      scale = 2;
+    }
+    const boundedScale = Math.min(scale, MERGE_DISTANCE_MAX_SCALE);
+    const scaledDistance = Math.round(baseDistance * boundedScale);
+    return Math.max(1, Math.min(scaledDistance, MERGE_DISTANCE_MAX_ABS));
+  }
+
+  function resolveRegionMergeDistance(difficultyOverride = null, size = null) {
+    const normalized = normalizeDifficulty(difficultyOverride ?? 1);
+    const base = REGION_MERGE_DISTANCE_BY_DIFFICULTY[normalized] ?? REGION_MERGE_DISTANCE_BY_DIFFICULTY[1];
+    return resolveMergeDistanceForSize(base, size);
+  }
+
+  function computeDiffRegions() {
+    const compareData = diffLayer?.imageData?.data || data;
+    if (!diffBasePixels || !compareData || diffBasePixels.length !== compareData.length) return [];
+    const width = canvasSize;
+    const height = canvasSize;
+    const total = width * height;
+    const diffMask = new Uint8Array(total);
+    const mask = diffLayer?.mask;
+    const useMask = mask && mask.length === total;
+    for (let i = 0, j = 0; i < total; i += 1, j += 4) {
+      if (useMask && !mask[i]) {
+        continue;
+      }
+      if (
+        diffBasePixels[j] !== compareData[j] ||
+        diffBasePixels[j + 1] !== compareData[j + 1] ||
+        diffBasePixels[j + 2] !== compareData[j + 2] ||
+        diffBasePixels[j + 3] !== compareData[j + 3]
+      ) {
+        diffMask[i] = 1;
+      }
+    }
+    const visited = new Uint8Array(total);
+    const regions = [];
+    const queue = [];
+    const mergeDistance = Math.max(
+      1,
+      Math.floor(resolveMergeDistanceForSize(DIFF_CREATOR_MERGE_DISTANCE, { width, height })),
+    );
+    const neighborOffsets = [];
+    for (let offsetY = -mergeDistance; offsetY <= mergeDistance; offsetY += 1) {
+      for (let offsetX = -mergeDistance; offsetX <= mergeDistance; offsetX += 1) {
+        const distance = Math.abs(offsetX) + Math.abs(offsetY);
+        if (distance === 0 || distance > mergeDistance) {
+          continue;
+        }
+        neighborOffsets.push({ x: offsetX, y: offsetY });
+      }
+    }
+
+    for (let index = 0; index < total; index += 1) {
+      if (!diffMask[index] || visited[index]) continue;
+      let count = 0;
+      let minX = width;
+      let maxX = 0;
+      let minY = height;
+      let maxY = 0;
+      queue.push(index);
+      visited[index] = 1;
+
+      while (queue.length) {
+        const idx = queue.pop();
+        const x = idx % width;
+        const y = Math.floor(idx / width);
+        count += 1;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+
+        for (const { x: offsetX, y: offsetY } of neighborOffsets) {
+          const nx = x + offsetX;
+          const ny = y + offsetY;
+          if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+          const neighborIndex = ny * width + nx;
+          if (!diffMask[neighborIndex] || visited[neighborIndex]) continue;
+          visited[neighborIndex] = 1;
+          queue.push(neighborIndex);
+        }
+      }
+
+      if (count < MIN_CLUSTER_PIXELS) {
+        continue;
+      }
+
+      regions.push({ minX, maxX, minY, maxY });
+    }
+    return regions;
+  }
+
+  function drawDiffHighlights(positions) {
+    if (!gridCtx || !positions.length) return;
+    const regions = computeDiffRegions();
+    if (!regions.length) return;
+    const cellSize = positions[1] - positions[0] || 1;
+    const lineWidth = Math.max(1, Math.round(cellSize * 0.12));
+    gridCtx.save();
+    gridCtx.strokeStyle = 'rgba(255, 111, 141, 0.85)';
+    gridCtx.fillStyle = 'rgba(255, 111, 141, 0.18)';
+    gridCtx.lineWidth = lineWidth;
+    regions.forEach(region => {
+      const x0 = positions[region.minX];
+      const y0 = positions[region.minY];
+      const x1 = positions[region.maxX + 1];
+      const y1 = positions[region.maxY + 1];
+      const width = x1 - x0;
+      const height = y1 - y0;
+      if (width <= 0 || height <= 0) return;
+      gridCtx.fillRect(x0, y0, width, height);
+      gridCtx.strokeRect(x0, y0, width, height);
+    });
+    gridCtx.restore();
+  }
+
   function drawGrid() {
     if (!gridCtx || !gridCanvas) return;
-    gridCanvas.style.display = showGrid ? 'block' : 'none';
+    const showDiff = diffMode && diffBasePixels && diffBasePixels.length === data.length;
+    gridCanvas.style.display = showGrid || showDiff ? 'block' : 'none';
     const dpr = window.devicePixelRatio || 1;
     const baseSize = (canvasStack?.getBoundingClientRect().width) || canvasSize;
     const scale = currentScale || 1;
@@ -3556,22 +3910,26 @@
     gridCanvas.style.height = `${scaledSize}px`;
     gridCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     gridCtx.clearRect(0, 0, scaledSize, scaledSize);
-    if (!showGrid) return;
-    gridCtx.save();
-    gridCtx.strokeStyle = 'rgba(0, 0, 0, 0.6)'; // 黒系のグリッド
-    gridCtx.lineWidth = 0.8;
-    gridCtx.setLineDash([]);
     const positions = [];
     for (let i = 0; i <= canvasSize; i++) {
       positions.push(Math.round((i * scaledSize) / canvasSize));
     }
-    for (const x of positions) {
-      gridCtx.beginPath(); gridCtx.moveTo(x, 0); gridCtx.lineTo(x, scaledSize); gridCtx.stroke();
+    if (showGrid) {
+      gridCtx.save();
+      gridCtx.strokeStyle = 'rgba(0, 0, 0, 0.6)'; // 黒系のグリッド
+      gridCtx.lineWidth = 0.8;
+      gridCtx.setLineDash([]);
+      for (const x of positions) {
+        gridCtx.beginPath(); gridCtx.moveTo(x, 0); gridCtx.lineTo(x, scaledSize); gridCtx.stroke();
+      }
+      for (const y of positions) {
+        gridCtx.beginPath(); gridCtx.moveTo(0, y); gridCtx.lineTo(scaledSize, y); gridCtx.stroke();
+      }
+      gridCtx.restore();
     }
-    for (const y of positions) {
-      gridCtx.beginPath(); gridCtx.moveTo(0, y); gridCtx.lineTo(scaledSize, y); gridCtx.stroke();
+    if (showDiff) {
+      drawDiffHighlights(positions);
     }
-    gridCtx.restore();
   }
 
   function drawTutorialOverlay(image) {
@@ -3674,7 +4032,6 @@
     drawing = true;
     setPixel(x, y);
     lastDrawCell = { x, y };
-    updateColorOpenButton();
   }
   function onPointerMove(event) {
     if (!drawing) return;
@@ -3712,6 +4069,7 @@
         Array.from(paletteEl.children).forEach(el => el.classList.remove('is-active'));
         btn.classList.add('is-active');
         eraseMode = false;
+        updateColorOpenButton();
       };
       btn.addEventListener('click', handleSelect);
       let holdTimer = null;
@@ -3757,6 +4115,10 @@
   btnCycleSize?.addEventListener('click', cycleCanvasSize);
   btnJelinMode?.addEventListener('click', () => {
     setJelinMode(!jelinMode);
+  });
+  btnDiffMode?.addEventListener('click', () => {
+    if (tutorialState.active) return;
+    setDiffMode(!diffMode);
   });
   function highlightAllowedPalette(colors) {
     if (!paletteEl) return;
@@ -3816,7 +4178,13 @@
     resetTutorial();
   });
 
-  function buildCompositeCanvas() {
+  function getExportImagePair() {
+    const baseImage = baseLayer.imageData;
+    const diffImage = diffMode && diffLayer?.mask ? getCompositeImageData() : baseLayer.imageData;
+    return { baseImage, diffImage };
+  }
+
+  function buildCompositeCanvas(sourceImageData = null) {
     const composite = document.createElement('canvas');
     composite.width = canvasSize;
     composite.height = canvasSize;
@@ -3834,12 +4202,13 @@
     srcCanvas.height = canvasSize;
     const sctx = srcCanvas.getContext('2d', { willReadFrequently: true });
     if (!sctx) return null;
-    sctx.putImageData(imageData, 0, 0);
+    const sourceImage = sourceImageData || (diffMode && diffLayer?.mask ? getCompositeImageData() : baseLayer.imageData);
+    sctx.putImageData(sourceImage, 0, 0);
     cctx.drawImage(srcCanvas, 0, 0, canvasSize, canvasSize);
     return composite;
   }
-  function exportCompositeToDataUrl(targetSize) {
-    const composite = buildCompositeCanvas();
+  function exportCompositeToDataUrl(targetSize, sourceImageData = null) {
+    const composite = buildCompositeCanvas(sourceImageData);
     if (!composite) return null;
     const temp = document.createElement('canvas');
     temp.width = targetSize;
@@ -3850,12 +4219,13 @@
     tctx.drawImage(composite, 0, 0, targetSize, targetSize);
     return temp.toDataURL('image/png');
   }
-  function exportCompositeToDataUrlRaw() {
-    const composite = buildCompositeCanvas();
+  function exportCompositeToDataUrlRaw(sourceImageData = null) {
+    const composite = buildCompositeCanvas(sourceImageData);
     if (!composite) return null;
     return composite.toDataURL('image/png');
   }
   const DOWNLOAD_GUARD_KEY = 'pixieedrawlite_download_guard_v1';
+  const PIXFIND_UPLOAD_KEY = 'pixfind_creator_upload_v1';
   function getCompositeSignature() {
     const composite = buildCompositeCanvas();
     if (!composite) return null;
@@ -3891,14 +4261,23 @@
     }
   }
   btnExport?.addEventListener('click', () => {
-    const baseUrl = exportCompositeToDataUrl(640);
-    if (!baseUrl) return;
+    const { baseImage, diffImage } = getExportImagePair();
+    const baseUrl = exportCompositeToDataUrl(640, baseImage);
+    const diffUrl = exportCompositeToDataUrl(640, diffImage);
+    if (!baseUrl || !diffUrl) return;
     const meta = JSON.stringify({ palette });
-    const url = injectTextChunk(baseUrl, 'palette', meta);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `pixieedrawlite-${canvasSize}px@640.png`;
-    link.click();
+    const baseOut = injectTextChunk(baseUrl, 'palette', meta);
+    const diffOut = injectTextChunk(diffUrl, 'palette', meta);
+    const download = (url, filename) => {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+    };
+    download(baseOut, `pixieedrawlite-${canvasSize}px@640-original.png`);
+    window.setTimeout(() => {
+      download(diffOut, `pixieedrawlite-${canvasSize}px@640-diff.png`);
+    }, 120);
     markDownloaded();
   });
   btnUpload?.addEventListener('click', () => {
@@ -3906,7 +4285,28 @@
       alert('先にダウンロードしてください。');
       return;
     }
-    const dataUrl = exportCompositeToDataUrlRaw();
+    if (diffMode) {
+      const { baseImage, diffImage } = getExportImagePair();
+      const originalDataUrl = exportCompositeToDataUrlRaw(baseImage);
+      const diffDataUrl = exportCompositeToDataUrlRaw(diffImage);
+      if (!originalDataUrl || !diffDataUrl) return;
+      try {
+        const payload = {
+          originalDataUrl,
+          diffDataUrl,
+          canvasSize,
+          width: canvasSize,
+          height: canvasSize,
+          createdAt: new Date().toISOString(),
+        };
+        localStorage.setItem(PIXFIND_UPLOAD_KEY, JSON.stringify(payload));
+      } catch (err) {
+        console.warn('pixfind upload store failed', err);
+      }
+      window.location.href = '../pixfind/index.html#creator';
+      return;
+    }
+    const dataUrl = exportCompositeToDataUrlRaw(baseLayer.imageData);
     if (!dataUrl) return;
     try {
       const payload = {
