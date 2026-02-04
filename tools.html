@@ -4,7 +4,21 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no, viewport-fit=cover"/>
   <title>PiXiEED | ツール & ゲーム</title>
-  <meta name="description" content="PiXiEEDのツールとゲームを一覧表示。ドット絵エディターや実験的なラボ作品までまとめてチェックできます。"/>
+  <meta name="description" content="PiXiEEDのツールとゲームを一覧表示。ドット絵エディターやドット絵変換ツール、実験的なラボ作品までまとめてチェックできます。"/>
+  <link rel="canonical" href="https://pixieed.jp/tools.html"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:site_name" content="PiXiEED"/>
+  <meta property="og:title" content="PiXiEED | ツール &amp; ゲーム"/>
+  <meta property="og:description" content="PiXiEEDのツールとゲームを一覧表示。ドット絵エディターやドット絵変換ツール、実験的なラボ作品までまとめてチェックできます。"/>
+  <meta property="og:url" content="https://pixieed.jp/tools.html"/>
+  <meta property="og:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
+  <meta property="og:locale" content="ja_JP"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:site" content="@PiXiEED_arta"/>
+  <meta name="twitter:url" content="https://pixieed.jp/tools.html"/>
+  <meta name="twitter:title" content="PiXiEED | ツール &amp; ゲーム"/>
+  <meta name="twitter:description" content="PiXiEEDのツールとゲームを一覧表示。ドット絵エディターやドット絵変換ツール、実験的なラボ作品までまとめてチェックできます。"/>
+  <meta name="twitter:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
   <link rel="icon" type="image/png" href="character-dots/mao1.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -105,6 +119,21 @@
     .brand-sub{ margin:0; font-size:12px; color:#9ca3af; }
     h1{ margin:0; font-size:22px; }
     .subtitle{ margin:0; color:#cbd5e1; font-size:12px; }
+    .seo-links{
+      margin:8px 0 0;
+      color:#cbd5e1;
+      font-size:12px;
+      line-height:1.6;
+    }
+    .seo-links a{
+      color:#93c5fd;
+      text-decoration:none;
+      font-weight:700;
+    }
+    .seo-links a:hover,
+    .seo-links a:focus{
+      color:#f9fafb;
+    }
     .card{
       background:rgba(255,255,255,0.05);
       border:1px solid rgba(255,255,255,0.12);
@@ -235,6 +264,36 @@
       font-weight:800;
       color:#0b1224;
       background:rgba(255,255,255,0.9);
+    }
+    .badge{
+      position:absolute;
+      top:8px;
+      right:8px;
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:0.08em;
+      color:#0b1224;
+      background:linear-gradient(135deg,#fff1a6 0%, #ffb459 55%, #ff7a45 100%);
+      box-shadow:0 8px 18px rgba(255,122,69,0.35);
+      text-transform:uppercase;
+      pointer-events:none;
+      z-index:2;
+    }
+    .badge--new{
+      animation:newPulse 1.6s ease-in-out infinite;
+    }
+    .item.is-new{
+      border-color:rgba(255,176,90,0.55);
+      box-shadow:0 12px 28px rgba(255,152,70,0.2);
+    }
+    @keyframes newPulse{
+      0%, 100%{ transform:translateY(0) scale(1); box-shadow:0 8px 18px rgba(255,122,69,0.35); }
+      50%{ transform:translateY(-1px) scale(1.03); box-shadow:0 12px 24px rgba(255,122,69,0.45); }
+    }
+    @media (prefers-reduced-motion: reduce){
+      .badge--new{ animation:none; }
     }
     .body{
       padding:10px 12px 12px;
@@ -578,6 +637,9 @@
     <section class="card">
       <h1>ツール & ゲーム</h1>
       <p class="subtitle">ドット絵制作向けのツールとゲームをまとめました。検索やカテゴリで絞り込めます。</p>
+      <p class="seo-links">ドット絵エディターを探している方は <a href="projects/pixiedraw/index.html">ドット絵エディター PiXiEEDraw</a> と <a href="projects/jerin-maker/index.html">16×16ドット絵ツール PiXiEEDraw Lite</a> の紹介ページへ。</p>
+      <p class="seo-links">QRコードを作るなら <a href="projects/qr-maker/index.html">登録不要・無料のQRコードメーカー</a> をチェック。</p>
+      <p class="seo-links">カメラで身の回りのものをドット絵変換するなら <a href="projects/pixiee-lens/index.html">ドット絵カメラ PiXiEELENS</a>。</p>
     </section>
     <section class="card">
       <div class="filters">
@@ -598,7 +660,79 @@
       </div>
     </section>
     <section class="card">
-      <div class="grid" id="toolsGrid"></div>
+      <div class="grid" id="toolsGrid">
+        <a class="item" href="projects/maoitu/index.html">
+          <div class="thumb">
+            <img src="maoitu/ogp.png" alt="魔王様!!いつまでよければいいですか!?" draggable="false">
+            <span class="tag">Game</span>
+          </div>
+          <div class="body">
+            <p class="title">魔王様!!いつまでよければいいですか!?</p>
+            <p class="desc">避け続けるスリルをブラウザで楽しめる人気No.1アクション。</p>
+          </div>
+        </a>
+        <a class="item" href="projects/maou-war/index.html">
+          <div class="thumb">
+            <img src="PiXiEEDogp.png" alt="魔王奪還戦（現在開発中）" draggable="false">
+            <span class="tag">Game</span>
+          </div>
+          <div class="body">
+            <p class="title">魔王奪還戦（現在開発中）</p>
+            <p class="desc">タイルを進んで成長し、勇者の拠点を奪い返すグリッド戦略RPG。</p>
+          </div>
+        </a>
+        <a class="item" href="projects/pixfind/index.html">
+          <div class="thumb">
+            <img src="pixfind/ogp.png" alt="PiXFiND" draggable="false">
+            <span class="tag">Game</span>
+          </div>
+          <div class="body">
+            <p class="title">PiXFiND</p>
+            <p class="desc">ドット絵に特化した間違い探し。アクセスコードが必要です。</p>
+          </div>
+        </a>
+        <a class="item" href="projects/pixiedraw/index.html">
+          <div class="thumb">
+            <img src="pixiedraw/ogp-app.png" alt="PiXiEEDraw" draggable="false">
+            <span class="tag">Tool</span>
+          </div>
+          <div class="body">
+            <p class="title">PiXiEEDraw</p>
+            <p class="desc">ブラウザだけで動く本格ドットエディター。配色・保存・公開に対応。</p>
+          </div>
+        </a>
+        <a class="item" href="projects/jerin-maker/index.html">
+          <div class="thumb">
+            <img src="jerin-maker/ogp-app.png" alt="PiXiEEDraw Lite（ピクドラ）" draggable="false">
+            <span class="tag">Tool</span>
+          </div>
+          <div class="body">
+            <p class="title">PiXiEEDraw Lite（ピクドラ）</p>
+            <p class="desc">16×16固定のライト版ドットツール。ジェリンの下絵付きでサクッと描けます。</p>
+          </div>
+        </a>
+        <a class="item" href="projects/pixiee-lens/index.html">
+          <div class="thumb">
+            <img src="pixiee-lens/ogp.png" alt="PiXiEELENS" draggable="false">
+            <span class="tag">Tool</span>
+          </div>
+          <div class="body">
+            <p class="title">PiXiEELENS</p>
+            <p class="desc">カメラをドット絵変換してレトロ写真が撮れるドット絵カメラ。パレット適用で演出。</p>
+          </div>
+        </a>
+        <a class="item is-new" href="projects/qr-maker/index.html">
+          <div class="thumb">
+            <img src="qr-maker/qrogp.png" alt="QRコードメーカー" draggable="false">
+            <span class="tag">Tool</span>
+            <span class="badge badge--new">NEW</span>
+          </div>
+          <div class="body">
+            <p class="title">QRコードメーカー</p>
+            <p class="desc">登録不要・無料でQR化。色・余白・誤り訂正を調整してPNG保存できます。</p>
+          </div>
+        </a>
+      </div>
     </section>
   </div>
   <nav class="bottom-nav">
@@ -696,25 +830,29 @@
           tag:'Game',
           category:'game',
           href:'projects/maoitu/index.html',
-          image:'maoitu/ogp.png'
+          image:'maoitu/ogp.png',
+          updated:'2025-10-10'
         },
         {
           id:'maou-war',
-          title:'魔王奪還戦',
+          title:'魔王奪還戦（現在開発中）',
           desc:'タイルを進んで成長し、勇者の拠点を奪い返すグリッド戦略RPG。',
           tag:'Game',
           category:'game',
           href:'projects/maou-war/index.html',
-          image:'PiXiEEDogp.png'
+          image:'PiXiEEDogp.png',
+          updated:'2025-10-15'
         },
         {
           id:'pixfind',
-          title:'PiXFiND（調整中）',
+          title:'PiXFiND',
           desc:'ドット絵に特化した間違い探し。アクセスコードが必要です。',
           tag:'Game',
           category:'game',
           href:'projects/pixfind/index.html',
-          image:'pixfind/ogp.png'
+          image:'pixfind/ogp.png',
+          updated:'2025-10-21',
+          readme:'pixfind/README.md'
         },
         {
           id:'pixiedraw',
@@ -723,7 +861,9 @@
           tag:'Tool',
           category:'tool',
           href:'projects/pixiedraw/index.html',
-          image:'pixiedraw/ogp-app.png'
+          image:'pixiedraw/ogp-app.png',
+          updated:'2025-10-30',
+          readme:'pixiedraw/README.md'
         },
         {
           id:'jerin-maker',
@@ -732,27 +872,101 @@
           tag:'Tool',
           category:'tool',
           href:'projects/jerin-maker/index.html',
-          image:'jerin-maker/ogp-app.png'
+          image:'jerin-maker/ogp-app.png',
+          updated:'2025-12-13',
+          readme:'jerin-maker/README.md'
         },
         {
           id:'pixiee-lens',
           title:'PiXiEELENS',
-          desc:'全画面カメラのラボ版。ドットモードとパレット読込で配色を遊べます。',
+          desc:'カメラをドット絵変換してレトロ写真が撮れるドット絵カメラ。パレット適用で演出。',
           tag:'Tool',
           category:'tool',
           href:'projects/pixiee-lens/index.html',
-          image:'pixiee-lens/ogp.png'
+          image:'pixiee-lens/ogp.png',
+          updated:'2025-10-25',
+          readme:'pixiee-lens/README.md'
         },
         {
           id:'qr-maker',
           title:'QRコードメーカー',
-          desc:'色・余白・誤り訂正を指定してQR化。ブラウザ内で即座にPNG保存できます。',
+          desc:'登録不要・無料でQR化。色・余白・誤り訂正を調整してPNG保存できます。',
           tag:'Tool',
           category:'tool',
           href:'projects/qr-maker/index.html',
-          image:'qr-maker/qrogp.png'
+          image:'qr-maker/qrogp.png',
+          updated:'2025-12-18',
+          readme:'qr-maker/README.md'
         }
       ];
+      const BASE_ORDER = new Map(ITEMS.map((item, index) => [item.id, index]));
+      let newestItemId = '';
+
+      function parseUpdatedTimestamp(value){
+        const ts = Date.parse(value || '');
+        return Number.isFinite(ts) ? ts : 0;
+      }
+
+      function updateNewestItemId(items){
+        let bestId = '';
+        let bestTs = 0;
+        items.forEach(item => {
+          const ts = parseUpdatedTimestamp(item.updated);
+          if(ts > bestTs){
+            bestTs = ts;
+            bestId = item.id;
+          }else if(ts === bestTs && ts > 0 && bestId){
+            const aOrder = BASE_ORDER.get(item.id) ?? Number.MAX_SAFE_INTEGER;
+            const bOrder = BASE_ORDER.get(bestId) ?? Number.MAX_SAFE_INTEGER;
+            if(aOrder < bOrder){
+              bestId = item.id;
+            }
+          }
+        });
+        newestItemId = bestId;
+      }
+
+      function isNewItem(item){
+        return Boolean(newestItemId && item?.id === newestItemId);
+      }
+
+      function parseReadmeUpdate(text){
+        if(!text) return null;
+        const lines = text.split(/\r?\n/);
+        for(const line of lines){
+          const trimmed = line.trim();
+          const match = trimmed.match(/^[-*]\s+(\d{4}-\d{2}-\d{2})\s*[:\\-]\\s*(.+)$/);
+          if(match){
+            return { updated: match[1] };
+          }
+        }
+        return null;
+      }
+
+      function hydrateNewestFromReadmes(){
+        updateNewestItemId(ITEMS);
+        const canFetch = typeof window.fetch === 'function';
+        if(!canFetch) return Promise.resolve();
+        const loadReadme = (item) => {
+          if(!item.readme) return Promise.resolve(item);
+          return fetch(item.readme)
+            .then(response => (response.ok ? response.text() : Promise.reject(new Error('readme fetch failed'))))
+            .then(text => {
+              const parsed = parseReadmeUpdate(text);
+              if(!parsed?.updated) return item;
+              return { ...item, updated: parsed.updated };
+            })
+            .catch(() => item);
+        };
+        return Promise.all(ITEMS.map(loadReadme)).then(loadedItems => {
+          loadedItems.forEach((item, index) => {
+            if(item.updated){
+              ITEMS[index].updated = item.updated;
+            }
+          });
+          updateNewestItemId(ITEMS);
+        });
+      }
 
       function applyAvatar(){
         const brand = document.getElementById('brandAvatar');
@@ -868,6 +1082,13 @@
           const matchFilter = filter === 'all' || item.category === filter;
           const matchKw = !kw || item.title.toLowerCase().includes(kw) || item.desc.toLowerCase().includes(kw) || item.tag.toLowerCase().includes(kw);
           return matchFilter && matchKw;
+        }).sort((a, b) => {
+          const aNew = isNewItem(a);
+          const bNew = isNewItem(b);
+          if(aNew !== bNew) return aNew ? -1 : 1;
+          const aOrder = BASE_ORDER.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+          const bOrder = BASE_ORDER.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+          return aOrder - bOrder;
         });
         if(!list.length){
           wrap.innerHTML = '<p class="helper" style="text-align:center;">該当する作品がありません</p>';
@@ -889,12 +1110,15 @@
         };
         list.forEach((item, idx) => {
           const card = document.createElement('a');
-          card.className = 'item';
+          const isNew = isNewItem(item);
+          card.className = `item${isNew ? ' is-new' : ''}`;
           card.href = item.href;
+          const badge = isNew ? '<span class="badge badge--new">NEW</span>' : '';
           card.innerHTML = `
             <div class="thumb">
               <img src="${item.image}" alt="${item.title}" draggable="false">
               <span class="tag">${item.tag}</span>
+              ${badge}
             </div>
             <div class="body">
               <p class="title">${item.title}</p>
@@ -934,7 +1158,9 @@
             renderList(currentFilter, currentKw);
           });
         }
-        renderList(currentFilter, currentKw);
+        const render = () => renderList(currentFilter, currentKw);
+        render();
+        hydrateNewestFromReadmes().then(render);
       }
 
       function setActiveNav(){
