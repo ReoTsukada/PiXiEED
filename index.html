@@ -4,14 +4,20 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no, viewport-fit=cover"/>
   <title>PiXiEED | ドット絵専用総合サイト</title>
-  <meta name="description" content="ドット絵制作・pixel art commission、ブラウザゲーム用アセット、ツールとゲームをまとめたPiXiEED公式サイト。"/>
+  <meta name="description" content="ドット絵制作・pixel art commission、ブラウザゲーム用アセット、ドット絵変換ツールやゲームをまとめたPiXiEED公式サイト。"/>
+  <link rel="canonical" href="https://pixieed.jp/"/>
   <meta property="og:type" content="website"/>
   <meta property="og:site_name" content="PiXiEED"/>
   <meta property="og:title" content="PiXiEED | ドット絵専用総合サイト"/>
-  <meta property="og:description" content="ドット絵制作の外注・pixel art commission、ブラウザゲーム用アセット制作、ツールとゲームを紹介するPiXiEED公式サイト。"/>
+  <meta property="og:description" content="ドット絵制作の外注・pixel art commission、ブラウザゲーム用アセット制作、ドット絵変換ツールやゲームを紹介するPiXiEED公式サイト。"/>
   <meta property="og:url" content="https://pixieed.jp/"/>
   <meta property="og:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
   <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:site" content="@PiXiEED_arta"/>
+  <meta name="twitter:url" content="https://pixieed.jp/"/>
+  <meta name="twitter:title" content="PiXiEED | ドット絵専用総合サイト"/>
+  <meta name="twitter:description" content="ドット絵制作の外注・pixel art commission、ブラウザゲーム用アセット制作、ドット絵変換ツールやゲームを紹介するPiXiEED公式サイト。"/>
+  <meta name="twitter:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
   <link rel="icon" type="image/png" href="character-dots/mao1.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -111,6 +117,21 @@
     h2{ margin:0; font-size:18px; color:#f9fafb; letter-spacing:0.01em; }
     p{ margin:0; }
     .subtitle{ margin:0; color:#cbd5e1; font-size:13px; line-height:1.6; }
+    .seo-links{
+      margin:6px 0 0;
+      color:#cbd5e1;
+      font-size:13px;
+      line-height:1.6;
+    }
+    .seo-links a{
+      color:#93c5fd;
+      text-decoration:none;
+      font-weight:700;
+    }
+    .seo-links a:hover,
+    .seo-links a:focus{
+      color:#f9fafb;
+    }
 
     .card,
     .section{
@@ -260,6 +281,158 @@
     }
     .link-title{ margin:0; font-size:15px; color:#f9fafb; }
     .link-desc{ margin:0; font-size:12px; color:#cbd5e1; line-height:1.5; }
+    .project-place{
+      display:block;
+      text-decoration:none;
+      color:inherit;
+      position:relative;
+      cursor:pointer;
+      transition:border-color 0.12s ease, box-shadow 0.12s ease;
+    }
+    .project-place:hover,
+    .project-place:focus-visible{
+      border-color:rgba(255,255,255,0.2);
+      box-shadow:0 12px 32px rgba(0,0,0,0.35);
+    }
+    .project-place__header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:12px;
+    }
+    .project-place__copy{
+      display:grid;
+      gap:6px;
+    }
+    .project-place__cta{
+      font-size:12px;
+      font-weight:700;
+      padding:8px 12px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.08);
+      color:#f9fafb;
+      white-space:nowrap;
+    }
+    .project-place__body{
+      display:grid;
+      gap:14px;
+      grid-template-columns:minmax(0, 1.2fr) minmax(0, 1fr);
+      align-items:start;
+    }
+    .project-place__image{
+      border-radius:12px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(0,0,0,0.25);
+      box-shadow:0 10px 26px rgba(0,0,0,0.28);
+    }
+    .project-place__image.is-ready .project-place__fallback{
+      display:none;
+    }
+    .project-place__image img{
+      width:100%;
+      height:auto;
+      display:block;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .project-place__canvas{
+      width:100%;
+      height:auto;
+      display:block;
+      background:transparent;
+    }
+    .project-place__fallback{
+      width:100%;
+      height:auto;
+      display:block;
+    }
+    .project-place__detail{
+      display:grid;
+      gap:12px;
+    }
+    .project-place__group{
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:10px;
+      padding:10px 12px;
+      display:grid;
+      gap:8px;
+    }
+    .project-place__label{
+      margin:0;
+      font-size:11px;
+      letter-spacing:0.14em;
+      text-transform:uppercase;
+      color:#cbd5e1;
+    }
+    .project-place__title{
+      margin:0;
+      font-size:14px;
+      color:#f9fafb;
+    }
+    .project-place__list{
+      margin:0;
+      padding:0;
+      list-style:none;
+      display:grid;
+      gap:6px;
+      color:#cbd5e1;
+      font-size:12px;
+      line-height:1.5;
+    }
+    .project-place__list li{
+      position:relative;
+      padding-left:14px;
+    }
+    .project-place__list li::before{
+      content:"";
+      width:6px;
+      height:6px;
+      border-radius:50%;
+      background:linear-gradient(135deg, #ff719a, #ff9f43);
+      position:absolute;
+      left:0;
+      top:6px;
+    }
+    .project-place__updates{
+      margin:0;
+      padding:0;
+      list-style:none;
+      display:grid;
+      gap:8px;
+      font-size:12px;
+      color:#cbd5e1;
+    }
+    .project-place__update{
+      display:grid;
+      gap:4px;
+      padding:8px 10px;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(0,0,0,0.28);
+    }
+    .project-place__update time{
+      font-size:11px;
+      color:#9ca3af;
+    }
+    .project-place__update strong{
+      font-size:12px;
+      color:#f9fafb;
+    }
+    .project-place__update--empty{
+      border-style:dashed;
+      color:#9ca3af;
+      background:rgba(255,255,255,0.04);
+    }
+    @media(max-width:640px){
+      .project-place__header{ flex-direction:column; align-items:flex-start; }
+    }
+    @media(max-width:900px){
+      .project-place__body{ grid-template-columns:1fr; }
+    }
 
     /* Dot gallery */
     .dot-hero{
@@ -872,50 +1045,56 @@
     </section>
 
     <section class="card">
-      <h2>プロジェクト</h2>
-      <div class="grid">
-        <a class="link-card" href="projects/maoitu/index.html">
-          <div class="link-thumb">
-            <img src="maoitu/ogp.png" alt="魔王様!!いつまでよければいいですか!?">
-            <span class="link-tag">Game</span>
-          </div>
-          <h3 class="link-title">魔王様!!いつまでよければいいですか!?</h3>
-          <p class="link-desc">ひたすら避け続けるアクション。短時間で遊べる人気タイトルです。</p>
-        </a>
-        <a class="link-card" href="projects/pixfind/index.html">
-          <div class="link-thumb">
-            <img src="pixfind/ogp.png" alt="PiXFiND">
-            <span class="link-tag">Game</span>
-          </div>
-          <h3 class="link-title">PiXFiND（調整中）</h3>
-          <p class="link-desc">ドット絵特化の間違い探し。現在クローズド調整中です。</p>
-        </a>
-        <a class="link-card" href="projects/jerin-maker/index.html">
-          <div class="link-thumb">
-            <img src="jerin-maker/ogp-app.png" alt="PiXiEEDraw Lite">
-            <span class="link-tag">Tool</span>
-          </div>
-          <h3 class="link-title">PiXiEEDraw Lite</h3>
-          <p class="link-desc">16×16固定のライト版ドットツール。ブラウザですぐ描いてPNG保存。</p>
-        </a>
-        <a class="link-card" href="projects/pixiee-lens/index.html">
-          <div class="link-thumb">
-            <img src="pixiee-lens/ogp.png" alt="PiXiEELENS">
-            <span class="link-tag">Lab</span>
-          </div>
-          <h3 class="link-title">PiXiEELENS</h3>
-          <p class="link-desc">全画面カメラのラボ版。ドットモードとパレット読み込みで配色を試せます。</p>
-        </a>
-        <a class="link-card" href="projects/qr-maker/index.html">
-          <div class="link-thumb">
-            <img src="qr-maker/qrogp.png" alt="QRコードメーカー">
-            <span class="link-tag">Tool</span>
-          </div>
-          <h3 class="link-title">QRコードメーカー</h3>
-          <p class="link-desc">色や余白を指定してQRを生成し、即座にPNG保存できます。</p>
-        </a>
-      </div>
+      <h2>ドット絵エディター</h2>
+      <p class="seo-links">ブラウザで描ける <a href="projects/pixiedraw/index.html">ドット絵エディター PiXiEEDraw</a> と、16×16練習向けの <a href="projects/jerin-maker/index.html">16×16ドット絵ツール PiXiEEDraw Lite</a> を紹介しています。</p>
     </section>
+
+    <a class="card project-place" href="tools.html">
+      <div class="project-place__header">
+        <div class="project-place__copy">
+          <h2>プロジェクト</h2>
+          <p class="subtitle">ゲーム・ツール・ラボ作品などをダイジェストで紹介。OGPは最近更新順に左上から並びます。タップでツール/ゲーム一覧へ。</p>
+        </div>
+        <span class="project-place__cta">ツール/ゲーム一覧へ</span>
+      </div>
+      <div class="project-place__body">
+        <div class="project-place__image" data-project-place data-columns="3" data-tile-width="420" data-tile-height="280">
+          <canvas class="project-place__canvas" id="projectPlaceCanvas" width="1260" height="560" role="img" aria-label="PiXiEEDのプロジェクトOGPを最近更新順にまとめたグリッド画像"></canvas>
+          <img class="project-place__fallback" src="images/project-grid.png" alt="PiXiEEDのプロジェクトOGPをグリッドにまとめた画像" loading="lazy">
+          <ul class="project-place__source" id="projectPlaceItems" hidden>
+            <li data-title="魔王様!!いつまでよければいいですか!?" data-image="maoitu/ogp.png" data-updated="2025-10-10" data-update=""></li>
+            <li data-title="PiXFiND" data-image="pixfind/ogp.png" data-updated="2025-10-21" data-update=""></li>
+            <li data-title="PiXiEEDraw Lite" data-image="jerin-maker/ogp-app.png" data-updated="2025-12-13" data-update="" data-readme="jerin-maker/README.md"></li>
+            <li data-title="PiXiEELENS" data-image="pixiee-lens/ogp.png" data-updated="2025-10-25" data-update="" data-readme="pixiee-lens/README.md"></li>
+            <li data-title="QRコードメーカー" data-image="qr-maker/qrogp.png" data-updated="2025-12-18" data-update="" data-readme="qr-maker/README.md"></li>
+          </ul>
+        </div>
+        <div class="project-place__detail">
+          <div class="project-place__group">
+            <p class="project-place__label">Games</p>
+            <h3 class="project-place__title">遊べるゲーム</h3>
+            <ul class="project-place__list">
+              <li><strong>魔王様!!いつまでよければいいですか!?</strong> ひたすら避け続けるアクション。</li>
+              <li><strong>PiXFiND</strong> ドット絵特化の間違い探し。</li>
+            </ul>
+          </div>
+          <div class="project-place__group">
+            <p class="project-place__label">Tools &amp; Lab</p>
+            <h3 class="project-place__title">作れるツール</h3>
+            <ul class="project-place__list">
+              <li><strong>PiXiEEDraw Lite</strong> 16×16ドットの制作とPNG保存。</li>
+              <li><strong>PiXiEELENS</strong> カメラをドット絵変換してレトロ写真が撮れるドット絵カメラ。</li>
+              <li><strong>QRコードメーカー</strong> 色や余白を指定してQR生成。</li>
+            </ul>
+          </div>
+          <div class="project-place__group">
+            <p class="project-place__label">Updates</p>
+            <h3 class="project-place__title">最近の更新</h3>
+            <ul class="project-place__updates" id="projectPlaceUpdates" aria-live="polite"></ul>
+          </div>
+        </div>
+      </div>
+    </a>
 
     <section class="card" aria-label="広告">
       <div class="ad-block">
