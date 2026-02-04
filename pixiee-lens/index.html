@@ -5,16 +5,17 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <title>PiXiEELENS</title>
-<meta content="PiXiEELENS は全画面カメラとドットモードを備えた実験ページです。" name="description"/>
+<meta content="カメラで身の回りのものをドット絵変換。ブラウザでドット化・ピクセル化してレトロ写真が撮れるドット絵カメラです。PiXiEEDrawで編集も可能。" name="description"/>
+<meta content="noindex,follow" name="robots"/>
 <meta content="#0b1224" name="theme-color"/>
 <meta content="website" property="og:type"/>
 <meta content="PiXiEELENS" property="og:title"/>
-<meta content="PiXiEELENS は全画面カメラとドットモードを備えた実験ページです。" property="og:description"/>
+<meta content="カメラで身の回りのものをドット絵変換。ブラウザでドット化・ピクセル化してレトロ写真が撮れるドット絵カメラです。PiXiEEDrawで編集も可能。" property="og:description"/>
 <meta content="https://pixieed.jp/pixiee-lens/ogp.png" property="og:image"/>
-<meta content="https://pixieed.jp//pixiee-lens/" property="og:url"/>
+<meta content="https://pixieed.jp/pixiee-lens/" property="og:url"/>
 <meta content="summary_large_image" name="twitter:card"/>
 <meta content="PiXiEELENS" name="twitter:title"/>
-<meta content="PiXiEELENS は全画面カメラとドットモードを備えた実験ページです。" name="twitter:description"/>
+<meta content="カメラで身の回りのものをドット絵変換。ブラウザでドット化・ピクセル化してレトロ写真が撮れるドット絵カメラです。PiXiEEDrawで編集も可能。" name="twitter:description"/>
 <meta content="https://pixieed.jp/pixiee-lens/ogp.png" name="twitter:image"/>
 <meta content="20241102-01" name="build-version"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1326,6 +1327,11 @@
       white-space: nowrap;
       padding: 8px 14px;
     }
+    .dot-settings-panel__row .gradient-toggle {
+      flex: 1 1 100%;
+      width: 100%;
+      text-align: center;
+    }
     .camera-settings-panel {
       gap: 12px;
     }
@@ -2128,10 +2134,20 @@
 </div>
 <div class="hud-bottom">
 <div class="hud-bottom__menus">
-<div class="menu-panel" hidden="" id="aspectMenu">
-<div aria-label="アスペクト比" class="controls controls--aspect" role="group">
-<button aria-pressed="true" class="option-button is-active" data-aspect="1:1" type="button">1:1</button>
+<div class="menu-panel dot-settings-panel" hidden="" id="paletteMenu">
+<div class="dot-settings-panel__row">
+<label class="select-control" for="colorDepthSelect">
+<span class="select-control__label">色数</span>
+<select id="colorDepthSelect" name="colorDepth">
+<option value="full">８BIT（カラー）</option>
+<option value="gray">８BIT（グレー）</option>
+<option selected="" value="4">2BIT</option>
+<option value="2">1BIT</option>
+</select>
+</label>
+<button aria-label="パレットを表示" aria-pressed="false" class="option-button palette-toggle" id="paletteToggleBtn" type="button">パレット</button>
 </div>
+<div aria-hidden="true" class="palette-display" id="paletteDisplay"></div>
 </div>
 <div class="menu-panel dot-settings-panel" hidden="" id="dotSettingsPanel">
 <div class="dot-settings-panel__row">
@@ -2145,18 +2161,10 @@
 <option value="5">x5</option>
 </select>
 </label>
-<label class="select-control" for="colorDepthSelect">
-<span class="select-control__label">色数</span>
-<select id="colorDepthSelect" name="colorDepth">
-<option value="full">８BIT（カラー）</option>
-<option value="gray">８BIT（グレー）</option>
-<option selected="" value="4">2BIT</option>
-<option value="2">1BIT</option>
-</select>
-</label>
-<button aria-label="パレットを表示" aria-pressed="false" class="option-button palette-toggle" id="paletteToggleBtn" type="button">パレット</button>
 </div>
-<div aria-hidden="true" class="palette-display" id="paletteDisplay"></div>
+<div class="dot-settings-panel__row">
+<button aria-label="グラデーション方法を切り替え" aria-pressed="false" class="option-button gradient-toggle" id="gradientToggleBtn" type="button">グラデーション: なし</button>
+</div>
 </div>
 </div>
 <div aria-label="操作" class="hud-bottom__actions" role="group">
@@ -2199,9 +2207,9 @@
 </div>
 </div>
 <div class="hud-bottom__actions-group hud-bottom__actions-group--right">
-<button aria-controls="aspectMenu" aria-expanded="false" aria-label="キャンバスサイズを選択" class="icon-button" id="aspectMenuBtn" type="button">
-<img alt="" aria-hidden="true" class="control-icon" src="./icon-aspect.svg"/>
-<span class="icon-button__label visually-hidden">キャンバスサイズ</span>
+<button aria-controls="paletteMenu" aria-expanded="false" aria-label="パレット設定を開く" class="icon-button" id="paletteMenuBtn" type="button">
+<img alt="" aria-hidden="true" class="control-icon" src="./icon-palette.svg"/>
+<span class="icon-button__label visually-hidden">パレット設定</span>
 </button>
 </div>
 </div>
@@ -2283,7 +2291,7 @@
     const clearPixelBtn = document.getElementById('clearPixelBtn');
     const dotModeBtn = document.getElementById('dotModeBtn');
     const captureBtn = document.getElementById('captureBtn');
-    const aspectMenuBtn = document.getElementById('aspectMenuBtn');
+    const paletteMenuBtn = document.getElementById('paletteMenuBtn');
     const pixelArtInput = document.getElementById('pixelArtInput');
     const pixelPreview = document.getElementById('pixelPreview');
     const qrReadout = document.getElementById('qrReadout');
@@ -2512,13 +2520,14 @@
     const aspectShadeBottom = document.getElementById('aspectShadeBottom');
     const aspectShadeLeft = document.getElementById('aspectShadeLeft');
     const aspectShadeRight = document.getElementById('aspectShadeRight');
-    const aspectMenu = document.getElementById('aspectMenu');
+    const paletteMenu = document.getElementById('paletteMenu');
     const hudTopBar = document.querySelector('.hud-top__bar');
     const aspectButtons = Array.from(document.querySelectorAll('.option-button[data-aspect]'));
     const dotSettingsPanel = document.getElementById('dotSettingsPanel');
     const paletteToggleBtn = document.getElementById('paletteToggleBtn');
     const paletteDisplay = document.getElementById('paletteDisplay');
     const dotScaleSelect = document.getElementById('dotScaleSelect');
+    const gradientToggleBtn = document.getElementById('gradientToggleBtn');
     const colorDepthSelect = document.getElementById('colorDepthSelect');
 
     if (paletteDisplay) {
@@ -2554,8 +2563,17 @@
         dotModeBtn.setAttribute('aria-disabled', 'true');
         dotModeBtn.title = 'ドット設定はこのブラウザで利用できません';
       }
+      if (paletteMenuBtn) {
+        paletteMenuBtn.disabled = true;
+        paletteMenuBtn.setAttribute('aria-disabled', 'true');
+        paletteMenuBtn.title = 'パレット設定はこのブラウザで利用できません';
+      }
       setSelectEnabled(dotScaleSelect, false);
       setSelectEnabled(colorDepthSelect, false);
+      if (gradientToggleBtn) {
+        gradientToggleBtn.disabled = true;
+        gradientToggleBtn.setAttribute('aria-disabled', 'true');
+      }
       if (paletteToggleBtn) {
         paletteToggleBtn.disabled = true;
         paletteToggleBtn.setAttribute('aria-disabled', 'true');
@@ -2563,10 +2581,19 @@
     } else {
       setSelectEnabled(dotScaleSelect, true);
       setSelectEnabled(colorDepthSelect, true);
+      if (gradientToggleBtn) {
+        gradientToggleBtn.disabled = false;
+        gradientToggleBtn.removeAttribute('aria-disabled');
+      }
       if (dotModeBtn) {
         dotModeBtn.disabled = false;
         dotModeBtn.removeAttribute('aria-disabled');
         dotModeBtn.removeAttribute('title');
+      }
+      if (paletteMenuBtn) {
+        paletteMenuBtn.disabled = false;
+        paletteMenuBtn.removeAttribute('aria-disabled');
+        paletteMenuBtn.removeAttribute('title');
       }
       if (paletteToggleBtn) {
         paletteToggleBtn.disabled = false;
@@ -2640,6 +2667,7 @@
       dotMode: true,
       dotScale: 1,
       colorDepth: '4',
+      gradientMode: 'none',
       cameraSettings: { ...CAMERA_SETTING_DEFAULTS }
     };
 
@@ -2718,7 +2746,7 @@
     let qrScanBoostUntil = 0;
 
     const menus = {
-      aspect: { button: aspectMenuBtn, panel: aspectMenu },
+      palette: { button: paletteMenuBtn, panel: paletteMenu },
       stamps: { button: stampBtn, panel: stampPanel },
       cameraSettings: { button: cameraSettingsBtn, panel: cameraSettingsPanel }
     };
@@ -4105,9 +4133,6 @@
       if (dotModeBtn) {
         dotModeBtn.setAttribute('aria-expanded', desired ? 'true' : 'false');
       }
-      if (!desired && paletteDisplayEnabled) {
-        setPaletteDisplayEnabled(false);
-      }
       if (desired) {
         openMenuKey = 'dotScale';
       } else if (openMenuKey === 'dotScale') {
@@ -4134,6 +4159,9 @@
         entry.panel.classList.remove('is-open');
         entry.panel.hidden = true;
         entry.button.setAttribute('aria-expanded', 'false');
+        if (key === 'palette' && paletteDisplayEnabled) {
+          setPaletteDisplayEnabled(false);
+        }
         if (openMenuKey === key) {
           openMenuKey = null;
         }
@@ -4984,6 +5012,10 @@
     };
 
     const COLOR_DEPTHS = ['full', 'gray', '4', '2'];
+    const GRADIENT_MODE_LABELS = {
+      none: 'なし',
+      dither: 'ディザリング'
+    };
     const BLACK_COLOR = { r: 0, g: 0, b: 0 };
     const WHITE_COLOR = { r: 255, g: 255, b: 255 };
     const GRAY_TINT_DEFAULT_COLOR = { r: 192, g: 192, b: 192 };
@@ -5253,12 +5285,18 @@
     const COLOR_BIN_SIZE = 16;
     const COLOR_BIN_INTERVAL = 256 / COLOR_BIN_SIZE;
     const PRE_AVERAGE_RADIUS = 0;
-    const SATURATION_BOOST = 1.22;
-    const CONTRAST_STRENGTH = 1.35;
-    const SHADOW_LIFT_THRESHOLD = 82;
-    const SHADOW_LIFT_AMOUNT = 10;
+    const SATURATION_BOOST = 1.08;
+    const CONTRAST_STRENGTH = 1.12;
+    const SHADOW_LIFT_THRESHOLD = 60;
+    const SHADOW_LIFT_AMOUNT = 4;
     const PALETTE_HOLD_MS = 5000;
     const DOT_SMOOTHING_BLUR = 0.45;
+    const DITHER_MATRIX_4X4 = [
+      0, 8, 2, 10,
+      12, 4, 14, 6,
+      3, 11, 1, 9,
+      15, 7, 13, 5
+    ];
 
     const paletteState = {
       depth: null,
@@ -5611,6 +5649,18 @@
       if (!canShow && paletteDisplayEnabled) {
         setPaletteDisplayEnabled(false);
       }
+    }
+
+    function updateGradientToggleUI() {
+      if (!gradientToggleBtn) {
+        return;
+      }
+      const mode = state.gradientMode || 'none';
+      const label = GRADIENT_MODE_LABELS[mode] || GRADIENT_MODE_LABELS.none;
+      gradientToggleBtn.textContent = `グラデーション: ${label}`;
+      const isActive = mode !== 'none';
+      gradientToggleBtn.classList.toggle('is-active', isActive);
+      gradientToggleBtn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
     }
 
     function ensurePaletteColor(palette, target) {
@@ -5993,6 +6043,10 @@
       }
       const data = imageData.data;
       const cache = paletteState.cache;
+      const width = imageData.width || 0;
+      const useDither = state.gradientMode === 'dither' && width > 0;
+      const ditherStrength = useDither ? (depth === '2' ? 48 : 32) : 0;
+      const ditherScale = useDither ? ditherStrength / 16 : 0;
 
       const findNearestColor = (r, g, b, key) => {
         const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -6032,11 +6086,24 @@
       };
 
       for (let i = 0; i < data.length; i += 4) {
-        const rIndex = getColorBinIndex(data[i]);
-        const gIndex = getColorBinIndex(data[i + 1]);
-        const bIndex = getColorBinIndex(data[i + 2]);
+        let r = data[i];
+        let g = data[i + 1];
+        let b = data[i + 2];
+        if (useDither) {
+          const pixelIndex = i >> 2;
+          const x = pixelIndex % width;
+          const y = (pixelIndex / width) | 0;
+          const threshold = DITHER_MATRIX_4X4[((y & 3) << 2) | (x & 3)];
+          const offset = (threshold - 7.5) * ditherScale;
+          r = clampByte(r + offset);
+          g = clampByte(g + offset);
+          b = clampByte(b + offset);
+        }
+        const rIndex = getColorBinIndex(r);
+        const gIndex = getColorBinIndex(g);
+        const bIndex = getColorBinIndex(b);
         const key = (rIndex << 8) | (gIndex << 4) | bIndex;
-        const nearest = findNearestColor(data[i], data[i + 1], data[i + 2], key);
+        const nearest = findNearestColor(r, g, b, key);
         data[i] = nearest.r;
         data[i + 1] = nearest.g;
         data[i + 2] = nearest.b;
@@ -6139,6 +6206,7 @@
         }
       }
       updatePaletteToggleAvailability();
+      updateGradientToggleUI();
       if (paletteDisplayEnabled) {
         updatePaletteDisplay(true);
       } else {
@@ -7437,10 +7505,10 @@
       });
     }
 
-    if (aspectMenuBtn) {
-      aspectMenuBtn.addEventListener('click', (event) => {
+    if (paletteMenuBtn) {
+      paletteMenuBtn.addEventListener('click', (event) => {
         event.stopPropagation();
-        toggleMenu('aspect');
+        toggleMenu('palette');
       });
     }
 
@@ -7528,10 +7596,23 @@
           return;
         }
         const nextState = !paletteDisplayEnabled;
-        if (nextState && !dotScalePanelOpen) {
-          openMenuExclusive('dotScale');
-        }
         setPaletteDisplayEnabled(nextState);
+      });
+    }
+
+    if (gradientToggleBtn) {
+      gradientToggleBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (gradientToggleBtn.disabled) {
+          return;
+        }
+        const nextMode = state.gradientMode === 'dither' ? 'none' : 'dither';
+        if (nextMode === state.gradientMode) {
+          return;
+        }
+        state.gradientMode = nextMode;
+        paletteState.cache = new Map();
+        updateGradientToggleUI();
       });
     }
 
