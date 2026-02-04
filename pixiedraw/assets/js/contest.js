@@ -19,6 +19,7 @@ const CONTEST_SHARE_OGP_WIDTH = 1200;
 const CONTEST_SHARE_OGP_HEIGHT = 630;
 const CONTEST_SHARE_PADDING = 60;
 const CONTEST_SHARE_TITLE_SIZE = 32;
+const SHARE_HASHTAG = '#PiXiEED';
 const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
 const CONTEST_CACHE_KEY = 'pixiedraw_contest_cache';
 const CONTEST_CACHE_LIMIT = 60;
@@ -1004,11 +1005,12 @@ async function handleSubmit(e){
   }
   form.reset();
   if(shareUrl){
+    const shareMessage = `${shareUrl}\n${SHARE_HASHTAG}`;
     if(navigator.clipboard?.writeText){
-      await navigator.clipboard.writeText(shareUrl);
+      await navigator.clipboard.writeText(shareMessage);
       setStatus('投稿しました！共有リンクをコピーしました。');
     }else{
-      window.prompt('共有リンクをコピーしてください。', shareUrl);
+      window.prompt('共有リンクをコピーしてください。', shareMessage);
       setStatus('投稿しました！');
     }
   }else if(isSupabaseMaintenance()){
