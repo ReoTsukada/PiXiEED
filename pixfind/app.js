@@ -75,6 +75,7 @@ window.addEventListener('orientationchange', setAppHeight);
 
 const MIN_CLUSTER_PIXELS = 1;
 const MARKER_PADDING = 1;
+const TAP_HIT_PADDING = 1;
 const REGION_MERGE_DISTANCE_BY_DIFFICULTY = {
   1: 2,
   2: 4,
@@ -2656,7 +2657,7 @@ function computeDifferenceRegions(originalImage, challengeImage, options = {}) {
 }
 
 function isPointInsideRegion(region, x, y) {
-  const tolerance = MARKER_PADDING;
+  const tolerance = MARKER_PADDING + TAP_HIT_PADDING;
   return x >= region.minX - tolerance && x <= region.maxX + tolerance && y >= region.minY - tolerance && y <= region.maxY + tolerance;
 }
 
