@@ -379,20 +379,30 @@
     border: 1px dashed rgba(255,255,255,0.2);
     border-radius: 12px;
     background: linear-gradient(150deg, rgba(255,255,255,0.04), rgba(15,23,42,0.9));
-    padding: 12px;
+    padding: 8px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.28);
     overflow: hidden;
     max-width: 100%;
     min-width: 0;
     position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .ad-slot {
     display: block;
-    width: 100%;
-    height: 90px;
-    max-width: 100%;
+    width: min(320px, 100%);
+    height: 40px;
+    max-width: 320px;
     min-width: 0;
     overflow: hidden;
+  }
+  .ad-slot.adsbygoogle {
+    width: min(320px, 100%) !important;
+    max-width: 320px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    margin: 0 auto;
   }
   .ad-label {
     position: absolute;
@@ -406,7 +416,11 @@
     letter-spacing: 0.04em;
   }
   @media (max-width: 640px) {
-    .ad-slot { height: 60px; }
+    .ad-slot { height: 40px; }
+    .ad-slot.adsbygoogle {
+      height: 40px !important;
+      min-height: 40px !important;
+    }
   }
   @media (max-width: 940px) {
     .qr-grid {
