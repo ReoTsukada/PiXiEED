@@ -76,6 +76,7 @@ window.addEventListener('orientationchange', setAppHeight);
 const MIN_CLUSTER_PIXELS = 1;
 const MARKER_PADDING = 1;
 const TAP_HIT_PADDING = 1;
+const SHARE_HASHTAG = '#PiXiEED';
 const REGION_MERGE_DISTANCE_BY_DIFFICULTY = {
   1: 2,
   2: 4,
@@ -1933,9 +1934,11 @@ async function sharePuzzle(puzzle) {
       console.warn('share asset creation failed', error);
     }
   }
+  const shareText = `${puzzle.label}（${createStarLabel(puzzle.difficulty)}）に挑戦してみてください。\n${SHARE_HASHTAG}`;
+  const shareMessage = `${shareText}\n${shareUrl}`;
   const shareData = {
     title: `PiXFiND | ${puzzle.label}`,
-    text: `${puzzle.label}（${createStarLabel(puzzle.difficulty)}）に挑戦してみてください。`,
+    text: shareText,
     url: shareUrl,
   };
 
@@ -1953,7 +1956,7 @@ async function sharePuzzle(puzzle) {
 
   if (navigator.clipboard?.writeText) {
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      await navigator.clipboard.writeText(shareMessage);
       window.alert('共有リンクをコピーしました。');
       return;
     } catch (error) {
@@ -1961,7 +1964,7 @@ async function sharePuzzle(puzzle) {
     }
   }
 
-  window.prompt('共有リンクをコピーしてください。', shareUrl);
+  window.prompt('共有リンクをコピーしてください。', shareMessage);
 }
 
 function resolveMergeDistanceForSize(baseDistance, size) {
