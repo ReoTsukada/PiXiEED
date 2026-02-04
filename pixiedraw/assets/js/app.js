@@ -399,6 +399,7 @@
     typeof navigator.share === 'function' &&
     typeof navigator.canShare === 'function' &&
     typeof File === 'function';
+  const SHARE_HASHTAG = '#PiXiEED';
   const IS_IOS_DEVICE =
     typeof navigator !== 'undefined' && /iphone|ipod|ipad/i.test((navigator.userAgent || '').toLowerCase());
   const IOS_SNAPSHOT_SUPPORTED =
@@ -5331,13 +5332,18 @@
     });
   }
 
+  function appendShareHashtag(text) {
+    if (!text) return SHARE_HASHTAG;
+    return text.includes(SHARE_HASHTAG) ? text : `${text}\n${SHARE_HASHTAG}`;
+  }
+
   async function triggerDownloadFromBlob(blob, filename, options = {}) {
     if (!blob) {
       throw new Error('Cannot download an empty blob');
     }
     const mimeType = options.mimeType || blob.type || 'application/octet-stream';
     const shareTitle = options.shareTitle || filename;
-    const shareText = options.shareText || '';
+    const shareText = appendShareHashtag(options.shareText || '');
     const fileExtensions = Array.isArray(options.fileExtensions) && options.fileExtensions.length
       ? options.fileExtensions
       : (() => {
