@@ -2081,9 +2081,7 @@ function createPuzzleAdCard(slotId) {
       <ins class="adsbygoogle"
            style="display:block"
            data-ad-client="ca-pub-9801602250480253"
-           data-ad-slot="${slotId}"
-           data-ad-format="auto"
-           data-full-width-responsive="true"></ins>
+           data-ad-slot="${slotId}"></ins>
     </div>
     <small class="puzzle-ad-note">広告</small>
   `;
