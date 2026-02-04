@@ -768,13 +768,14 @@ async function handleCreatorPublish() {
       ? `pixfind-puzzles バケットが見つからないため ${FALLBACK_PUZZLE_BUCKET} に保存しています。`
       : '';
     const statusSuffix = bucketNote ? ` ${bucketNote}` : '';
+    const shareMessage = `${shareUrl}\n${SHARE_HASHTAG}`;
     if (isSupabaseMaintenance()) {
       setCreatorStatus(`公開しました。共有リンクはメンテナンス復旧後に生成されます。${contestMessage}${statusSuffix}`);
     } else if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(shareUrl);
+      await navigator.clipboard.writeText(shareMessage);
       setCreatorStatus(`公開しました。共有リンクをコピーしました。${contestMessage}${statusSuffix}`);
     } else {
-      window.prompt(`公開しました。${contestMessage}共有リンクをコピーしてください。`, shareUrl);
+      window.prompt(`公開しました。${contestMessage}共有リンクをコピーしてください。`, shareMessage);
       setCreatorStatus(`公開しました。${contestMessage}${statusSuffix}`);
     }
   } catch (error) {
