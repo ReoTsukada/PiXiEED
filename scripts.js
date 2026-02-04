@@ -10,6 +10,7 @@
     setupShowcaseFilter();
     setupProjectBadges();
     setupRecentUpdates();
+    setupProjectPlaceGrid();
     disableImageInteractions();
     injectFooterAd();
   }
@@ -327,6 +328,161 @@
       const day = String(d.getDate()).padStart(2, '0');
       return `${y}/${m}/${day}`;
     }
+  }
+
+  function setupProjectPlaceGrid() {
+    const container = document.querySelector('[data-project-place]');
+    if (!container) return;
+    const canvas = container.querySelector('.project-place__canvas');
+    const fallback = container.querySelector('.project-place__fallback');
+    const source = container.querySelector('.project-place__source');
+    if (!(canvas instanceof HTMLCanvasElement) || !(source instanceof HTMLElement)) {
+      return;
+    }
+
+    const items = Array.from(source.querySelectorAll('[data-image]')).map((node) => ({
+      title: node.getAttribute('data-title') || '',
+      image: node.getAttribute('data-image') || '',
+      updated: node.getAttribute('data-updated') || '',
+      update: node.getAttribute('data-update') || '',
+      readme: node.getAttribute('data-readme') || ''
+    })).filter(item => item.image);
+
+    if (!items.length) return;
+
+    const formatDate = (timestamp, fallback) => {
+      if (!Number.isFinite(timestamp)) return fallback || '';
+      const d = new Date(timestamp);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}/${m}/${day}`;
+    };
+
+    const parseReadmeUpdate = (text) => {
+      if (!text) return null;
+      const lines = text.split(/\r?\n/);
+      for (const line of lines) {
+        const trimmed = line.trim();
+        const match = trimmed.match(/^[-*]\s+(\d{4}-\d{2}-\d{2})\s*[:\\-–]\\s*(.+)$/);
+        if (match) {
+          return {
+            updated: match[1],
+            update: match[2].trim()
+          };
+        }
+      }
+      return null;
+    };
+
+    const canFetch = typeof window.fetch === 'function';
+    const loadReadme = (item) => {
+      if (!item.readme || !canFetch) return Promise.resolve(item);
+      return fetch(item.readme)
+        .then(response => (response.ok ? response.text() : Promise.reject(new Error('readme fetch failed'))))
+        .then(text => {
+          const parsed = parseReadmeUpdate(text);
+          if (!parsed) return item;
+          return {
+            ...item,
+            updated: parsed.updated || item.updated,
+            update: parsed.update || item.update
+          };
+        })
+        .catch(() => item);
+    };
+
+    Promise.all(items.map(loadReadme)).then(loadedItems => {
+      const sorted = loadedItems
+        .map(item => {
+          const timestamp = Date.parse(item.updated);
+          return {
+            ...item,
+            timestamp: Number.isFinite(timestamp) ? timestamp : 0
+          };
+        })
+        .sort((a, b) => b.timestamp - a.timestamp);
+
+      const updatesList = document.getElementById('projectPlaceUpdates');
+      if (updatesList) {
+        updatesList.innerHTML = '';
+        const withUpdates = sorted.filter(item => item.update);
+        if (!withUpdates.length) {
+          const emptyItem = document.createElement('li');
+          emptyItem.className = 'project-place__update project-place__update--empty';
+          emptyItem.textContent = '更新内容は準備中です。';
+          updatesList.appendChild(emptyItem);
+        } else {
+          withUpdates.forEach(item => {
+            const row = document.createElement('li');
+            row.className = 'project-place__update';
+
+            const time = document.createElement('time');
+            if (item.updated) {
+              time.dateTime = item.updated;
+            }
+            const formatted = formatDate(item.timestamp, item.updated);
+            time.textContent = formatted || item.updated || '';
+
+            const title = document.createElement('strong');
+            title.textContent = item.title || 'プロジェクト';
+
+            const desc = document.createElement('span');
+            desc.textContent = item.update;
+
+            row.append(time, title, desc);
+            updatesList.appendChild(row);
+          });
+        }
+      }
+
+      const columns = Number(container.getAttribute('data-columns') || '3') || 3;
+      const tileWidth = Number(container.getAttribute('data-tile-width') || '420') || 420;
+      const tileHeight = Number(container.getAttribute('data-tile-height') || '280') || 280;
+      const rows = Math.ceil(sorted.length / columns);
+      const width = columns * tileWidth;
+      const height = rows * tileHeight;
+
+      const context = canvas.getContext('2d');
+      if (!context) return;
+      canvas.width = width;
+      canvas.height = height;
+      context.fillStyle = '#0b1224';
+      context.fillRect(0, 0, width, height);
+      context.imageSmoothingEnabled = true;
+      if ('imageSmoothingQuality' in context) {
+        context.imageSmoothingQuality = 'high';
+      }
+
+      const entries = sorted.map((item, index) => ({ ...item, index }));
+      const loadImage = (src) => new Promise((resolve, reject) => {
+        const img = new Image();
+        img.decoding = 'async';
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error(`failed to load ${src}`));
+        img.src = src;
+      });
+
+      Promise.allSettled(entries.map(entry => (
+        loadImage(entry.image).then(img => ({ entry, img }))
+      ))).then(results => {
+        let hasDrawn = false;
+        results.forEach(result => {
+          if (result.status !== 'fulfilled') return;
+          const { entry, img } = result.value;
+          const x = (entry.index % columns) * tileWidth;
+          const y = Math.floor(entry.index / columns) * tileHeight;
+          context.drawImage(img, x, y, tileWidth, tileHeight);
+          hasDrawn = true;
+        });
+        if (hasDrawn) {
+          container.classList.add('is-ready');
+          if (fallback instanceof HTMLElement) {
+            fallback.hidden = true;
+          }
+        }
+      });
+    });
   }
 
   function getRecentUpdatesData() {
