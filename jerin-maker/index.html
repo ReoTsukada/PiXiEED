@@ -7,6 +7,7 @@
 <title>PiXiEEDraw Lite</title>
 <meta content="PiXiEEDrawのライト版（通称ピクドラ）。16×16固定の超シンプルなブラウザ向けドットツールで、ジェリンプレビューや日替わりお題で気軽にドット練習ができます。" name="description"/>
 <meta content="PiXiEEDraw Lite,ピクドラ,ピクセル,ドット絵,ジェリン,ブラウザお絵描き,16x16ドット,ドットツール" name="keywords"/>
+<meta content="noindex,follow" name="robots"/>
 <meta content="#0b0f1f" name="theme-color"/>
 <meta content="website" property="og:type"/>
 <meta content="PiXiEEDraw Lite（ピクドラ）" property="og:title"/>
@@ -849,6 +850,15 @@
     align-items: center;
     justify-content: center;
   }
+  .inline-buttons__tools {
+    grid-column: 3;
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 6px;
+    row-gap: 10px;
+    align-items: center;
+    justify-content: flex-end;
+  }
   .inline-buttons__row--bottom .icon-btn {
     width: var(--lite-bottom-control-size);
     height: var(--lite-bottom-control-size);
@@ -890,6 +900,10 @@
       column-gap: 4px;
       row-gap: 8px;
     }
+    .inline-buttons__tools {
+      column-gap: 4px;
+      row-gap: 8px;
+    }
     .inline-buttons__row--top .icon-btn {
       width: 36px;
       height: 36px;
@@ -905,7 +919,8 @@
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
   }
-  .swatch-editor {
+  .swatch-editor,
+  .file-input {
     position: absolute;
     opacity: 0;
     pointer-events: none;
@@ -1149,6 +1164,11 @@
               <button type="button" class="vp-btn" id="panRight" aria-label="右に移動">→</button>
               <button type="button" class="vp-btn" id="zoomIn" aria-label="拡大">＋</button>
             </div>
+            <div class="inline-buttons__tools">
+              <button class="icon-btn" id="btnImport" title="画像を読み込む" type="button">
+                <img alt="読み込み" src="../pixiedraw/assets/icons/menu-file.svg"/>
+              </button>
+            </div>
           </div>
           <div class="inline-buttons__row inline-buttons__row--bottom">
             <button class="icon-btn color-open-btn" id="btnOpenColorPanel" title="色を編集する" type="button">
@@ -1177,6 +1197,7 @@
         <div class="palette" id="palette"></div>
       </div>
       <input aria-hidden="true" class="swatch-editor" id="swatchEditor" tabindex="-1" type="color" />
+      <input aria-hidden="true" class="file-input" id="importInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
       <div class="lite-color-picker-overlay" id="liteColorPicker" aria-hidden="true">
         <div class="lite-color-picker-card">
           <div class="lite-color-content">
@@ -1306,6 +1327,10 @@
     '#00d4aa',
     '#4fd1c5',
   ];
+  const MAX_IMPORT_SOURCE_SIZE = 1000;
+  const MAX_IMPORT_TARGET_SIZE = 128;
+  const NORMALIZE_COLOR_TOLERANCE = 12;
+  const NORMALIZE_MATCH_RATIO = 0.985;
   let palette = [...DEFAULT_PALETTE];
   const TUTORIAL_RED = '#ff2c00';
   const TUTORIAL_COLORS = [
@@ -1492,6 +1517,12 @@
   let drawing = false;
   let lastDrawCell = null;
   let eraseMode = false;
+  const activePointers = new Map();
+  let pinchActive = false;
+  let pinchStartDistance = 0;
+  let pinchStartZoomStep = 0;
+  let pinchAnchor = null;
+  let pinchBase = null;
   let showGrid = true;
   let diffMode = false;
   let diffBasePixels = null;
@@ -2060,8 +2091,10 @@
   const btnColorChip = document.getElementById('btnColorChip');
   const btnTutorialSpacerLeft = document.getElementById('btnTutorialSpacerLeft');
   const btnTutorialSpacerRight = document.getElementById('btnTutorialSpacerRight');
+  const btnImport = document.getElementById('btnImport');
   const btnUpload = document.getElementById('btnUpload');
   const swatchEditor = /** @type {HTMLInputElement|null} */ (document.getElementById('swatchEditor'));
+  const importInput = /** @type {HTMLInputElement|null} */ (document.getElementById('importInput'));
   const liteColorPicker = document.getElementById('liteColorPicker');
   const liteColorWheel = /** @type {HTMLCanvasElement|null} */ (document.getElementById('liteColorWheel'));
   const liteColorWheelCursor = document.getElementById('liteColorWheelCursor');
@@ -2456,6 +2489,360 @@
     return (crc ^ 0xffffffff) >>> 0;
   }
 
+  function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      if (!file) {
+        resolve(null);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        resolve(typeof reader.result === 'string' ? reader.result : null);
+      };
+      reader.onerror = () => {
+        reject(reader.error || new Error('read failed'));
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function loadImageFromDataUrl(dataUrl) {
+    return new Promise((resolve, reject) => {
+      if (!dataUrl) {
+        reject(new Error('invalid data url'));
+        return;
+      }
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('image load failed'));
+      img.src = dataUrl;
+    });
+  }
+
+  async function normalizePixelImage(image, fallbackDataUrl) {
+    const width = image.naturalWidth || image.width;
+    const height = image.naturalHeight || image.height;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    if (!context) {
+      return { image, dataUrl: fallbackDataUrl ?? null, width, height };
+    }
+    context.imageSmoothingEnabled = false;
+    context.drawImage(image, 0, 0);
+
+    let imageData;
+    try {
+      imageData = context.getImageData(0, 0, width, height);
+    } catch (error) {
+      console.warn('Canvas access blocked, using original image', error);
+      return { image, dataUrl: fallbackDataUrl ?? null, width, height };
+    }
+    const scaleX = detectScaleFactor(imageData, width, height, 'x');
+    const scaleY = detectScaleFactor(imageData, width, height, 'y');
+    let scale = Math.max(1, Math.min(scaleX, scaleY));
+    const blockScale = detectScaleFactorByBlocks(imageData, width, height);
+    if (blockScale > scale) {
+      scale = blockScale;
+    }
+
+    if (scale <= 1) {
+      let dataUrl = fallbackDataUrl ?? null;
+      if (!dataUrl) {
+        try {
+          dataUrl = canvas.toDataURL();
+        } catch (error) {
+          console.warn('toDataURL blocked, falling back to original image', error);
+          return { image, dataUrl: fallbackDataUrl ?? null, width, height };
+        }
+      }
+      if (dataUrl) {
+        const normalizedImage = await loadImageFromDataUrl(dataUrl);
+        return { image: normalizedImage, dataUrl, width, height };
+      }
+      return { image, dataUrl: fallbackDataUrl ?? null, width, height };
+    }
+
+    const targetWidth = Math.round(width / scale);
+    const targetHeight = Math.round(height / scale);
+    const targetCanvas = document.createElement('canvas');
+    targetCanvas.width = targetWidth;
+    targetCanvas.height = targetHeight;
+    const targetContext = targetCanvas.getContext('2d');
+    const targetData = targetContext.createImageData(targetWidth, targetHeight);
+    const src = imageData.data;
+    const dest = targetData.data;
+
+    for (let y = 0; y < targetHeight; y++) {
+      for (let x = 0; x < targetWidth; x++) {
+        const srcIndex = ((y * scale) * width + (x * scale)) * 4;
+        const destIndex = (y * targetWidth + x) * 4;
+        dest[destIndex] = src[srcIndex];
+        dest[destIndex + 1] = src[srcIndex + 1];
+        dest[destIndex + 2] = src[srcIndex + 2];
+        dest[destIndex + 3] = src[srcIndex + 3];
+      }
+    }
+
+    targetContext.putImageData(targetData, 0, 0);
+    let dataUrl;
+    try {
+      dataUrl = targetCanvas.toDataURL();
+    } catch (error) {
+      console.warn('toDataURL failed during normalization', error);
+      dataUrl = fallbackDataUrl ?? null;
+    }
+    if (dataUrl) {
+      const normalizedImage = await loadImageFromDataUrl(dataUrl);
+      return { image: normalizedImage, dataUrl, width: targetWidth, height: targetHeight };
+    }
+    return { image, dataUrl: fallbackDataUrl ?? null, width: targetWidth, height: targetHeight };
+  }
+
+  function detectScaleFactor(imageData, width, height, axis) {
+    const { data } = imageData;
+    const length = axis === 'x' ? width : height;
+    const compare = axis === 'x'
+      ? (indexA, indexB) => columnsMatch(data, width, height, indexA, indexB)
+      : (indexA, indexB) => rowsMatch(data, width, height, indexA, indexB);
+
+    let run = 1;
+    let best = 0;
+    for (let i = 1; i < length; i++) {
+      if (compare(i, i - 1)) {
+        run += 1;
+      } else {
+        best = best ? gcd(best, run) : run;
+        run = 1;
+      }
+    }
+    best = best ? gcd(best, run) : run;
+    return Math.max(1, best);
+  }
+
+  function detectScaleFactorByBlocks(imageData, width, height) {
+    const common = gcd(width, height);
+    if (common <= 1) return 1;
+    const candidates = getDivisors(common).filter(value => value > 1).sort((a, b) => b - a);
+    for (const factor of candidates) {
+      if (isLikelyUpscaledByFactor(imageData.data, width, height, factor)) {
+        return factor;
+      }
+    }
+    return 1;
+  }
+
+  function isLikelyUpscaledByFactor(data, width, height, factor) {
+    const totalPixels = width * height;
+    const allowedMismatch = Math.floor(totalPixels * (1 - NORMALIZE_MATCH_RATIO));
+    let mismatches = 0;
+
+    for (let blockY = 0; blockY < height; blockY += factor) {
+      for (let blockX = 0; blockX < width; blockX += factor) {
+        const baseIndex = (blockY * width + blockX) * 4;
+        const baseR = data[baseIndex];
+        const baseG = data[baseIndex + 1];
+        const baseB = data[baseIndex + 2];
+        const baseA = data[baseIndex + 3];
+
+        for (let y = 0; y < factor; y++) {
+          const rowStart = (blockY + y) * width;
+          for (let x = 0; x < factor; x++) {
+            const idx = (rowStart + blockX + x) * 4;
+            if (!isColorNear(data, idx, baseR, baseG, baseB, baseA)) {
+              mismatches += 1;
+              if (mismatches > allowedMismatch) {
+                return false;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return true;
+  }
+
+  function isColorNear(data, idx, r, g, b, a) {
+    return (
+      Math.abs(data[idx] - r) <= NORMALIZE_COLOR_TOLERANCE &&
+      Math.abs(data[idx + 1] - g) <= NORMALIZE_COLOR_TOLERANCE &&
+      Math.abs(data[idx + 2] - b) <= NORMALIZE_COLOR_TOLERANCE &&
+      Math.abs(data[idx + 3] - a) <= NORMALIZE_COLOR_TOLERANCE
+    );
+  }
+
+  function getDivisors(value) {
+    const divisors = new Set();
+    for (let i = 2; i <= Math.sqrt(value); i += 1) {
+      if (value % i === 0) {
+        divisors.add(i);
+        divisors.add(value / i);
+      }
+    }
+    divisors.add(value);
+    return Array.from(divisors);
+  }
+
+  function columnsMatch(data, width, height, a, b) {
+    for (let y = 0; y < height; y++) {
+      const idxA = (y * width + a) * 4;
+      const idxB = (y * width + b) * 4;
+      if (
+        data[idxA] !== data[idxB] ||
+        data[idxA + 1] !== data[idxB + 1] ||
+        data[idxA + 2] !== data[idxB + 2] ||
+        data[idxA + 3] !== data[idxB + 3]
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function rowsMatch(data, width, height, a, b) {
+    const rowLength = width * 4;
+    const startA = a * rowLength;
+    const startB = b * rowLength;
+    for (let offset = 0; offset < rowLength; offset++) {
+      if (data[startA + offset] !== data[startB + offset]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function gcd(a, b) {
+    while (b !== 0) {
+      const temp = b;
+      b = a % b;
+      a = temp;
+    }
+    return a;
+  }
+
+  function getImageDataFromImage(image, width, height) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) return null;
+    context.imageSmoothingEnabled = false;
+    context.clearRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+    try {
+      return context.getImageData(0, 0, width, height);
+    } catch {
+      return null;
+    }
+  }
+
+  async function loadImportImage(file, label) {
+    const dataUrl = await readFileAsDataUrl(file);
+    if (!dataUrl) {
+      throw new Error(`${label}の読み込みに失敗しました。`);
+    }
+    const rawImage = await loadImageFromDataUrl(dataUrl);
+    const rawWidth = rawImage.naturalWidth || rawImage.width;
+    const rawHeight = rawImage.naturalHeight || rawImage.height;
+    if (!rawWidth || !rawHeight) {
+      throw new Error(`${label}の読み込みに失敗しました。`);
+    }
+    if (rawWidth > MAX_IMPORT_SOURCE_SIZE || rawHeight > MAX_IMPORT_SOURCE_SIZE) {
+      throw new Error(`読み込み元の画像は${MAX_IMPORT_SOURCE_SIZE}px以内にしてください。`);
+    }
+    const normalized = await normalizePixelImage(rawImage, dataUrl);
+    const width = normalized.width || rawWidth;
+    const height = normalized.height || rawHeight;
+    if (width > MAX_IMPORT_TARGET_SIZE || height > MAX_IMPORT_TARGET_SIZE) {
+      throw new Error(`読み込み後の画像は${MAX_IMPORT_TARGET_SIZE}px以内にしてください。`);
+    }
+    if (width !== height) {
+      throw new Error('正方形の画像のみ読み込めます。');
+    }
+    return { image: normalized.image || rawImage, width, height };
+  }
+
+  function buildDiffMask(baseImageData, diffImageData) {
+    const total = baseImageData.width * baseImageData.height;
+    const mask = new Uint8Array(total);
+    const base = baseImageData.data;
+    const diff = diffImageData.data;
+    for (let i = 0, p = 0; p < total; p += 1, i += 4) {
+      if (
+        base[i] !== diff[i] ||
+        base[i + 1] !== diff[i + 1] ||
+        base[i + 2] !== diff[i + 2] ||
+        base[i + 3] !== diff[i + 3]
+      ) {
+        mask[p] = 1;
+      }
+    }
+    return mask;
+  }
+
+  async function handleImportSelection(fileList) {
+    const files = Array.isArray(fileList) ? fileList : Array.from(fileList || []);
+    if (!files.length) return;
+    const needsDiff = diffMode;
+    if (needsDiff && files.length < 2) {
+      alert('PiXFiNDモードでは2枚の画像を選択してください。');
+      return;
+    }
+    const baseFile = files[0];
+    const diffFile = needsDiff ? files[1] : null;
+    let baseResult;
+    let diffResult;
+    try {
+      baseResult = await loadImportImage(baseFile, 'ベース画像');
+    } catch (err) {
+      alert(err?.message || '画像の読み込みに失敗しました。');
+      return;
+    }
+    if (needsDiff && diffFile) {
+      try {
+        diffResult = await loadImportImage(diffFile, '差分画像');
+      } catch (err) {
+        alert(err?.message || '差分画像の読み込みに失敗しました。');
+        return;
+      }
+      if (baseResult.width !== diffResult.width || baseResult.height !== diffResult.height) {
+        alert('ベース画像と差分画像のPX数が一致しません。');
+        return;
+      }
+    }
+    const targetSize = baseResult.width;
+    applyCanvasSize(targetSize, { allowCustom: true });
+    const baseImageData = getImageDataFromImage(baseResult.image, targetSize, targetSize);
+    if (!baseImageData) {
+      alert('画像の読み込みに失敗しました。');
+      return;
+    }
+    baseLayer.imageData = baseImageData;
+    baseLayer.undoStack.length = 0;
+    baseLayer.redoStack.length = 0;
+    if (needsDiff && diffResult) {
+      ensureDiffLayer();
+      const diffImageData = getImageDataFromImage(diffResult.image, targetSize, targetSize);
+      if (!diffImageData) {
+        alert('差分画像の読み込みに失敗しました。');
+        return;
+      }
+      diffLayer.imageData = diffImageData;
+      diffLayer.mask = buildDiffMask(baseImageData, diffImageData);
+      diffLayer.undoStack.length = 0;
+      diffLayer.redoStack.length = 0;
+      captureDiffBase();
+    }
+    compositeImageData = null;
+    showGrid = false;
+    setActiveLayer(needsDiff && diffLayer ? LAYER_DIFF : LAYER_BASE);
+    render();
+    drawGrid();
+  }
+
   function updateSizeButton() {
     if (btnCycleSize) {
       btnCycleSize.textContent = `${canvasSize}px`;
@@ -2505,8 +2892,13 @@
     return out;
   }
 
-  function applyCanvasSize(nextSize) {
-    const target = CANVAS_SIZES.includes(nextSize) ? nextSize : CANVAS_SIZES[1];
+  function applyCanvasSize(nextSize, options = {}) {
+    const { allowCustom = false } = options;
+    const isValidSize = Number.isFinite(nextSize) && nextSize > 0;
+    const fallback = CANVAS_SIZES[1];
+    const target = allowCustom && isValidSize
+      ? Math.max(1, Math.round(nextSize))
+      : (CANVAS_SIZES.includes(nextSize) ? nextSize : fallback);
     const sourceSize = canvasSize;
     baseLayer.imageData = resampleImageData(baseLayer.imageData, target);
     if (diffLayer?.imageData) {
@@ -2519,6 +2911,9 @@
     }
     canvasSize = target;
     canvasSizeIndex = CANVAS_SIZES.indexOf(target);
+    if (canvasSizeIndex < 0) {
+      canvasSizeIndex = 0;
+    }
     canvas.width = target;
     canvas.height = target;
     if (tutorialOverlayCanvas) {
@@ -2548,6 +2943,10 @@
 
   function cycleCanvasSize() {
     const nextIndex = (canvasSizeIndex + 1) % CANVAS_SIZES.length;
+    const snapshot = captureCanvasState();
+    if (snapshot) {
+      pushUndoState(snapshot);
+    }
     applyCanvasSize(CANVAS_SIZES[nextIndex]);
   }
   function setJelinMode(enabled) {
@@ -2717,9 +3116,22 @@
       pixels: new Uint8ClampedArray(data),
       palette: [...palette],
       activeIndex: activeSwatchIndex,
+      size: canvasSize,
     };
     if (activeLayerKey === LAYER_DIFF && diffLayer?.mask) {
       state.mask = new Uint8Array(diffLayer.mask);
+    }
+    return state;
+  }
+  function captureCanvasState() {
+    const state = captureUndoState();
+    if (!state) return null;
+    state.basePixels = new Uint8ClampedArray(baseLayer.imageData.data);
+    if (diffLayer?.imageData) {
+      state.diffPixels = new Uint8ClampedArray(diffLayer.imageData.data);
+    }
+    if (diffLayer?.mask) {
+      state.diffMask = new Uint8Array(diffLayer.mask);
     }
     return state;
   }
@@ -2761,9 +3173,42 @@
   }
   function applyState(state) {
     if (!state) return;
-    data.set(state.pixels);
-    if (activeLayerKey === LAYER_DIFF && diffLayer && state.mask && state.mask.length) {
+    const targetSize = Number.isFinite(state.size) ? state.size : canvasSize;
+    if (targetSize !== canvasSize) {
+      applyCanvasSize(targetSize, { allowCustom: true });
+    }
+    const hasBase = state.basePixels && state.basePixels.length;
+    const hasDiff = state.diffPixels && state.diffPixels.length;
+    if (hasBase) {
+      baseLayer.imageData = new ImageData(new Uint8ClampedArray(state.basePixels), targetSize, targetSize);
+    }
+    if (hasDiff) {
+      ensureDiffLayer();
+      diffLayer.imageData = new ImageData(new Uint8ClampedArray(state.diffPixels), targetSize, targetSize);
+    }
+    if (state.diffMask && diffLayer) {
+      diffLayer.mask = new Uint8Array(state.diffMask);
+    } else if (activeLayerKey === LAYER_DIFF && diffLayer && state.mask && state.mask.length) {
       diffLayer.mask = new Uint8Array(state.mask);
+    }
+    if (hasBase || hasDiff) {
+      syncActiveLayer();
+      compositeImageData = null;
+    } else if (state.pixels) {
+      if (imageData.width !== targetSize || imageData.height !== targetSize) {
+        const restored = new ImageData(new Uint8ClampedArray(state.pixels), targetSize, targetSize);
+        if (activeLayerKey === LAYER_DIFF && diffLayer) {
+          diffLayer.imageData = restored;
+        } else {
+          baseLayer.imageData = restored;
+        }
+        syncActiveLayer();
+      } else {
+        data.set(state.pixels);
+      }
+    }
+    if (diffMode) {
+      captureDiffBase();
     }
     render();
     palette = state.palette.slice(0, MAX_COLORS);
@@ -4005,22 +4450,99 @@
     return off;
   }
 
-  function canvasPosToCell(event) {
+  function screenPointToCanvasCoord(pointX, pointY) {
     const stackRect = canvasStack?.getBoundingClientRect() || canvas.getBoundingClientRect();
-    const px = event.clientX - stackRect.left;
-    const py = event.clientY - stackRect.top;
     const scale = currentScale || 1;
-    const unit = (stackRect.width / scale) / canvasSize || 1;
-    const localX = (px / scale);
-    const localY = (py / scale);
+    const baseSize = canvasStack?.clientWidth || canvasSize;
+    const unit = baseSize / canvasSize || 1;
+    const localX = (pointX - stackRect.left) / scale;
+    const localY = (pointY - stackRect.top) / scale;
     return {
-      x: clamp(Math.floor(localX / unit), 0, canvasSize - 1),
-      y: clamp(Math.floor(localY / unit), 0, canvasSize - 1),
+      x: clamp(localX / unit, 0, canvasSize),
+      y: clamp(localY / unit, 0, canvasSize),
+    };
+  }
+
+  function getPointerPairInfo() {
+    if (activePointers.size < 2) return null;
+    const points = Array.from(activePointers.values());
+    const a = points[0];
+    const b = points[1];
+    const centerX = (a.x + b.x) / 2;
+    const centerY = (a.y + b.y) / 2;
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return {
+      centerX,
+      centerY,
+      distance: Math.hypot(dx, dy),
+    };
+  }
+
+  function startPinchGesture() {
+    const info = getPointerPairInfo();
+    if (!info) return;
+    pinchActive = true;
+    pinchStartDistance = info.distance || 1;
+    pinchStartZoomStep = zoomStep;
+    pinchAnchor = screenPointToCanvasCoord(info.centerX, info.centerY);
+    const baseSize = canvasStack?.clientWidth || canvasSize;
+    const unit = baseSize / canvasSize || 1;
+    const rect = canvasStack?.getBoundingClientRect() || canvas.getBoundingClientRect();
+    pinchBase = {
+      left: rect.left + viewOffsetX * unit * currentScale,
+      top: rect.top + viewOffsetY * unit * currentScale,
+      unit,
+    };
+    drawing = false;
+    lastDrawCell = null;
+  }
+
+  function updatePinchGesture() {
+    if (!pinchActive || !pinchAnchor || !pinchBase) return;
+    const info = getPointerPairInfo();
+    if (!info) return;
+    const ratio = info.distance / (pinchStartDistance || 1);
+    const delta = Math.log2(Math.max(ratio, 0.01));
+    const nextZoomStep = clamp(Math.round(pinchStartZoomStep + delta), 0, maxZoomStep);
+    zoomStep = nextZoomStep;
+    const nextViewSize = getViewSizeForStep(canvasSize, zoomStep);
+    const nextScale = canvasSize / nextViewSize;
+    let nextOffsetX = pinchAnchor.x - (info.centerX - pinchBase.left) / (pinchBase.unit * nextScale);
+    let nextOffsetY = pinchAnchor.y - (info.centerY - pinchBase.top) / (pinchBase.unit * nextScale);
+    const maxOffset = Math.max(0, canvasSize - nextViewSize);
+    viewOffsetX = clamp(Math.round(nextOffsetX), 0, maxOffset);
+    viewOffsetY = clamp(Math.round(nextOffsetY), 0, maxOffset);
+    applyViewportTransform();
+    drawGrid();
+  }
+
+  function endPinchGesture() {
+    pinchActive = false;
+    pinchStartDistance = 0;
+    pinchStartZoomStep = 0;
+    pinchAnchor = null;
+    pinchBase = null;
+  }
+
+  function canvasPosToCell(event) {
+    const point = screenPointToCanvasCoord(event.clientX, event.clientY);
+    return {
+      x: clamp(Math.floor(point.x), 0, canvasSize - 1),
+      y: clamp(Math.floor(point.y), 0, canvasSize - 1),
     };
   }
 
   function onPointerDown(event) {
     event.preventDefault();
+    if (event.pointerType === 'touch') {
+      activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (activePointers.size >= 2) {
+        startPinchGesture();
+        return;
+      }
+    }
+    if (pinchActive) return;
     const { x, y } = canvasPosToCell(event);
     if (tutorialState.active && !canDrawInTutorial(x, y)) {
       drawing = false;
@@ -4034,6 +4556,16 @@
     lastDrawCell = { x, y };
   }
   function onPointerMove(event) {
+    if (event.pointerType === 'touch') {
+      if (activePointers.has(event.pointerId)) {
+        activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      }
+      if (pinchActive) {
+        updatePinchGesture();
+        return;
+      }
+      if (activePointers.size >= 2) return;
+    }
     if (!drawing) return;
     const { x, y } = canvasPosToCell(event);
     if (!lastDrawCell) {
@@ -4045,7 +4577,13 @@
     drawLineCells(lastDrawCell.x, lastDrawCell.y, x, y);
     lastDrawCell = { x, y };
   }
-  function onPointerUp() {
+  function onPointerUp(event) {
+    if (event?.pointerType === 'touch') {
+      activePointers.delete(event.pointerId);
+      if (activePointers.size < 2) {
+        endPinchGesture();
+      }
+    }
     drawing = false;
     lastDrawCell = null;
   }
@@ -4098,6 +4636,7 @@
   canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('pointercancel', onPointerUp);
   canvas.addEventListener('contextmenu', event => event.preventDefault());
   zoomInBtn?.addEventListener('click', () => changeZoom(1));
   zoomOutBtn?.addEventListener('click', () => changeZoom(-1));
@@ -4119,6 +4658,19 @@
   btnDiffMode?.addEventListener('click', () => {
     if (tutorialState.active) return;
     setDiffMode(!diffMode);
+  });
+  btnImport?.addEventListener('click', () => {
+    if (!importInput) return;
+    importInput.value = '';
+    importInput.multiple = diffMode;
+    importInput.click();
+  });
+  importInput?.addEventListener('change', event => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    const files = Array.from(input.files || []);
+    input.value = '';
+    void handleImportSelection(files);
   });
   function highlightAllowedPalette(colors) {
     if (!paletteEl) return;
