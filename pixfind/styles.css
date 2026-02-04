@@ -122,6 +122,10 @@ body.is-playing {
   gap: 1rem;
 }
 
+#difficultyBackButton {
+  margin-left: auto;
+}
+
 .section-title {
   margin: 0;
   font-size: clamp(1.9rem, 4vw, 2.6rem);
@@ -191,24 +195,29 @@ body.is-playing {
   min-height: 0;
 }
 
-.difficulty-ad {
+.difficulty-ad,
+.start-ad {
   background: var(--panel);
-  border-radius: 18px;
+  border-radius: 14px;
   border: 1px solid rgba(40, 50, 80, 0.12);
   box-shadow: var(--panel-shadow);
-  padding: 0.6rem;
-  display: grid;
-  gap: 0.35rem;
-  justify-items: center;
+  padding: 0.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
-  max-width: 860px;
+  max-width: 520px;
   margin: 0 auto;
+  flex: 1 1 100%;
 }
 
-.difficulty-ad ins {
+.difficulty-ad ins.adsbygoogle,
+.start-ad ins.adsbygoogle {
   display: block;
-  width: 100%;
-  min-height: clamp(60px, 10vh, 90px);
+  width: min(320px, 100%) !important;
+  max-width: 320px !important;
+  height: 40px;
+  min-height: 40px;
   overflow: hidden;
 }
 
@@ -356,7 +365,7 @@ body.is-playing {
   align-items: center;
   justify-content: center;
   padding: 0.8rem;
-  min-height: 160px;
+  min-height: 110px;
   cursor: default;
 }
 
@@ -364,12 +373,16 @@ body.is-playing {
   width: 100%;
   max-width: 100%;
   min-width: 0;
+  display: flex;
+  justify-content: center;
 }
 
-.puzzle-ad-slot ins {
+.puzzle-ad-slot ins.adsbygoogle {
   display: block;
-  width: 100%;
-  height: 90px;
+  width: min(320px, 100%) !important;
+  max-width: 320px !important;
+  height: 40px;
+  min-height: 40px;
   overflow: hidden;
 }
 
@@ -1036,8 +1049,15 @@ body.is-playing {
     width: min(112px, 100%);
   }
 
-  .puzzle-ad-slot ins {
-    height: 60px;
+  .puzzle-ad-slot ins.adsbygoogle {
+    height: 40px;
+    min-height: 40px;
+  }
+
+  .difficulty-ad ins.adsbygoogle,
+  .start-ad ins.adsbygoogle {
+    height: 40px;
+    min-height: 40px;
   }
 
   .puzzle-card__description {
