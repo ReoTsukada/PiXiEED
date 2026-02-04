@@ -2969,12 +2969,26 @@ body.project-page .project-ad{
   position: relative;
   overflow: hidden;
 }
+body.project-page .project-ad--top{
+  max-width:520px;
+  padding:8px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
 body.project-page .project-ad ins.adsbygoogle{
   display:block;
   width:100%;
   height:90px;
   max-width:100%;
   overflow:hidden;
+}
+body.project-page .project-ad--top ins.adsbygoogle{
+  width:min(320px, 100%) !important;
+  max-width:320px !important;
+  height:40px;
+  min-height:40px;
+  margin:0 auto;
 }
 body.project-page .project-ad--mid ins.adsbygoogle{
   height:250px;
@@ -2983,6 +2997,10 @@ body.project-page .project-ad--mid ins.adsbygoogle{
 @media(max-width:640px){
   body.project-page .project-ad ins.adsbygoogle{
     height:60px;
+  }
+  body.project-page .project-ad--top ins.adsbygoogle{
+    height:40px;
+    min-height:40px;
   }
   body.project-page .project-ad--mid ins.adsbygoogle{
     height:200px;
