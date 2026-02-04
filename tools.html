@@ -183,19 +183,30 @@
       border:1px dashed rgba(255,255,255,0.2);
       border-radius:12px;
       background:linear-gradient(150deg, rgba(255,255,255,0.04), rgba(15,23,42,0.9));
-      padding:12px;
+      padding:8px;
       box-shadow:0 10px 30px rgba(0,0,0,0.28);
       overflow:hidden;
       max-width:100%;
       min-width:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      position:relative;
     }
     .ad-slot{
       display:block;
-      width:100%;
-      height:90px;
-      max-width:100%;
+      width:min(320px, 100%);
+      height:40px;
+      max-width:320px;
       min-width:0;
       overflow:hidden;
+    }
+    .ad-slot.adsbygoogle{
+      width:min(320px, 100%) !important;
+      max-width:320px !important;
+      height:40px !important;
+      min-height:40px !important;
+      margin:0 auto;
     }
     .adsbygoogle{
       display:block;
@@ -222,7 +233,11 @@
       align-items:center;
     }
     @media(max-width:640px){
-      .ad-slot{ height:60px; }
+      .ad-slot{ height:40px; }
+      .ad-slot.adsbygoogle{
+        height:40px !important;
+        min-height:40px !important;
+      }
     }
     .item{
       background:rgba(255,255,255,0.05);
@@ -654,8 +669,7 @@
         <ins class="adsbygoogle ad-slot"
              style="display:block"
              data-ad-client="ca-pub-9801602250480253"
-             data-ad-slot="2141591954"
-             data-ad-format="horizontal"></ins>
+             data-ad-slot="2141591954"></ins>
         <small class="ad-label">広告</small>
       </div>
     </section>
@@ -745,9 +759,7 @@
     <a class="bottom-nav__item is-active" data-tab="tools" href="tools.html">
       <span class="icon"><img src="FooterIcon3.png" alt=""/></span><span>ツール/ゲーム</span>
     </a>
-    <a class="bottom-nav__item" data-tab="lens" href="pixiee-lens/index.html">
-      <span class="icon"><img src="FooterIcon5.png" alt=""/></span><span>PiXiEELENS</span>
-    </a>
+    <span class="bottom-nav__item bottom-nav__item--empty" aria-hidden="true"></span>
     <a class="bottom-nav__item" data-tab="portfolio" href="portfolio/index.html">
       <span class="icon"><img src="FooterIcon4.png" alt=""/></span><span>企業向け</span>
     </a>
@@ -1103,8 +1115,7 @@
             <ins class="adsbygoogle ad-slot"
                  style="display:block"
                  data-ad-client="ca-pub-9801602250480253"
-                 data-ad-slot="${slotId}"
-                 data-ad-format="horizontal"></ins>
+                 data-ad-slot="${slotId}"></ins>
           `;
           return ad;
         };
