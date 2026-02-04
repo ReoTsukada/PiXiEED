@@ -227,13 +227,15 @@ body.is-playing {
   gap: 0.9rem;
   align-content: flex-start;
   justify-items: stretch;
+  grid-auto-rows: max-content;
   flex: 1;
   min-height: 0;
 }
 
 .puzzle-card {
   position: relative;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 0.6rem;
   padding: 0.9rem 1rem;
   border-radius: 18px;
@@ -279,9 +281,11 @@ body.is-playing {
 
 .puzzle-card__actions {
   display: flex;
+  position: static;
   justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
+  margin-top: auto;
 }
 
 .puzzle-card__thumb {
