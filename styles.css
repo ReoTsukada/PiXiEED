@@ -2564,6 +2564,11 @@ body.portfolio-page main > .section > .section-inner {
   font-weight: 600;
 }
 
+.project-faq-grid .project-meta dd {
+  font-weight: 500;
+  line-height: 1.6;
+}
+
 .project-note {
   background: rgba(20, 24, 52, 0.78);
   border: 1px solid rgba(140, 140, 255, 0.2);
