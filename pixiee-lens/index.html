@@ -2477,6 +2477,8 @@
         }
       });
     }
+    const SHARE_HASHTAG = '#PiXiEED';
+    const CAPTURE_SHARE_TEXT = `撮影した画像\n${SHARE_HASHTAG}`;
     if (capturePreviewShareBtn) {
       capturePreviewShareBtn.addEventListener('click', async () => {
         if (!capturePreviewSharePayload || !capturePreviewSharePayload.file || typeof navigator.share !== 'function') {
@@ -2486,7 +2488,7 @@
           await navigator.share({
             files: [capturePreviewSharePayload.file],
             title: 'PiXiEELENS',
-            text: '撮影した画像'
+            text: CAPTURE_SHARE_TEXT
           });
           setStatus('共有しました');
           closeCapturePreview();
@@ -7972,7 +7974,7 @@
             await navigator.share({
               files: [shareFile],
               title: 'PiXiEELENS',
-              text: '撮影した画像'
+              text: CAPTURE_SHARE_TEXT
             });
           } catch (error) {
             if (error && error.name !== 'AbortError') {
