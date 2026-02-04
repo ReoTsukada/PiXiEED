@@ -116,8 +116,8 @@
   }
   .ad-slot {
     flex: 0 0 auto;
-    width: min(900px, 100%);
-    height: 60px;
+    width: min(320px, 100%);
+    height: 40px;
     border-radius: 10px;
     overflow: hidden;
     background: transparent;
@@ -331,7 +331,7 @@
     font-size: 0.92rem;
   }
   html[data-compact="true"] .ad-slot {
-    height: 44px;
+    height: 40px;
   }
   @media (max-width: 959px) and (orientation: portrait) {
     html[data-compact="true"] .panel {
@@ -936,7 +936,7 @@
   @media (max-width: 960px) {
     .app { grid-template-columns: 1fr; }
     .topbar { flex-direction: column; align-items: flex-start; }
-    .ad-slot { width: 100%; }
+    .ad-slot { width: min(320px, 100%); }
     .panel { max-height: none; }
   }
   @media (max-height: 720px) {
@@ -967,9 +967,9 @@
   }
   .ad-slot {
     flex: 0 0 auto;
-    width: 100%;
-    max-width: 900px;
-    height: 60px;
+    width: min(320px, 100%);
+    max-width: 320px;
+    height: 40px;
     border-radius: 10px;
     overflow: hidden;
     background: transparent;
