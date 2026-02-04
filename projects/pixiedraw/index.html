@@ -4,16 +4,89 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
-<title>PiXiEEDraw</title>
-<meta content="PiXiEEDが開発するブラウザ向けドット絵エディター『PiXiEEDraw』の紹介ページ。特徴や公開予定、アップデート情報をまとめています。" name="description"/>
-<meta content="PiXiEEDraw" property="og:title"/>
-<meta content="ブラウザ完結のドット絵エディター PiXiEEDraw の開発状況と特徴をまとめた公式紹介ページ。" property="og:description"/>
+<title>PiXiEEDraw | ブラウザで使えるドット絵エディター</title>
+<meta content="ブラウザで動く無料のドット絵・ピクセルアートエディター。レイヤー/タイルセット/自動保存に対応し、PC・スマホで編集からPNG書き出しまで完結。" name="description"/>
+<link href="https://pixieed.jp/projects/pixiedraw/" rel="canonical"/>
+<meta content="PiXiEEDraw | ブラウザで使えるドット絵エディター" property="og:title"/>
+<meta content="ブラウザで動く無料のドット絵・ピクセルアートエディター。レイヤー/タイルセット/自動保存に対応し、PC・スマホで編集からPNG書き出しまで完結。" property="og:description"/>
 <meta content="website" property="og:type"/>
 <meta content="https://pixieed.jp/projects/pixiedraw/" property="og:url"/>
 <meta content="https://pixieed.jp/pixiedraw/ogp-app.png" property="og:image"/>
+<meta content="PiXiEEDraw のUIプレビューイメージ" property="og:image:alt"/>
+<meta content="PiXiEED" property="og:site_name"/>
+<meta content="ja_JP" property="og:locale"/>
 <meta content="summary_large_image" name="twitter:card"/>
 <meta content="@PiXiEED_arta" name="twitter:site"/>
+<meta content="https://pixieed.jp/projects/pixiedraw/" name="twitter:url"/>
+<meta content="PiXiEEDraw | ブラウザで使えるドット絵エディター" name="twitter:title"/>
+<meta content="ブラウザで動く無料のドット絵・ピクセルアートエディター。レイヤー/タイルセット/自動保存に対応し、PC・スマホで編集からPNG書き出しまで完結。" name="twitter:description"/>
+<meta content="https://pixieed.jp/pixiedraw/ogp-app.png" name="twitter:image"/>
+<meta content="PiXiEEDraw のUIプレビューイメージ" name="twitter:image:alt"/>
 <meta content="#0b1224" name="theme-color"/>
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "name": "PiXiEEDraw",
+        "applicationCategory": "DesignApplication",
+        "operatingSystem": "Web",
+        "url": "https://pixieed.jp/projects/pixiedraw/",
+        "image": "https://pixieed.jp/pixiedraw/ogp-app.png",
+        "description": "ブラウザで動く無料のドット絵・ピクセルアートエディター。レイヤー/タイルセット/自動保存に対応し、PC・スマホで編集からPNG書き出しまで完結。",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "JPY",
+          "availability": "https://schema.org/InStock"
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "PiXiEED",
+          "url": "https://pixieed.jp/"
+        }
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "PCとスマホで続きを描けますか？",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "PiXiEEDrawファイルやPNGを書き出してGoogle Driveなどのクラウドに保存すれば、家のPCで作業した続きがスマホでも開けます。"
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "インストールは必要ですか？",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "ブラウザで動作するため、インストール不要でURLを開けばすぐに使えます。"
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "保存はどうなりますか？",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "編集中はローカルに自動保存され、PNGやスプライトシート、タイルセットとして書き出しできます。"
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "対応端末は？",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "PC・タブレット・スマホに対応し、Chromeでの利用を推奨しています。"
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
 <script async crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
 <!-- Google tag (gtag.js) -->
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
@@ -234,6 +307,10 @@
             描いている最中でも数秒ごとにローカルへスナップショットを保存。ブラウザを閉じても直前の状態を復元でき、保存忘れのストレスを軽減します。
           </li>
 <li>
+<strong>PC/スマホで引き継ぎ</strong>
+            PiXiEEDrawファイルやPNGを書き出してGoogle Driveなどのクラウドに保存すれば、家のPCと外出先のスマホで同じ作品を続けて描けます。
+          </li>
+<li>
 <strong>リビルド不要のタイルプレビュー</strong>
             タイルセットを描いた瞬間に、同じパレットを使うシーン全体へライブ反映。配置済みマップを壊さず配色チェックができます。
           </li>
@@ -269,6 +346,29 @@
 <dl class="project-meta">
 <dt>推奨入力</dt>
 <dd>マウス・ペンタブレット・マルチタッチ</dd>
+</dl>
+</div>
+</div>
+</section>
+<section class="section" id="faq">
+<div class="section-inner">
+<h2>よくある質問</h2>
+<div class="project-meta-grid project-faq-grid">
+<dl class="project-meta">
+<dt>PCとスマホで続きを描けますか？</dt>
+<dd>PiXiEEDrawファイルやPNGを書き出してGoogle Driveなどのクラウドに保存すれば、家のPCで作業した続きがスマホでも開けます。</dd>
+</dl>
+<dl class="project-meta">
+<dt>インストールは必要ですか？</dt>
+<dd>ブラウザで動作するため、インストール不要でURLを開けばすぐに使えます。</dd>
+</dl>
+<dl class="project-meta">
+<dt>保存はどうなりますか？</dt>
+<dd>編集中はローカルに自動保存され、PNGやスプライトシート、タイルセットとして書き出しできます。</dd>
+</dl>
+<dl class="project-meta">
+<dt>対応端末は？</dt>
+<dd>PC・タブレット・スマホに対応し、Chromeでの利用を推奨しています。</dd>
 </dl>
 </div>
 </div>
