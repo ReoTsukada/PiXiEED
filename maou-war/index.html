@@ -4,13 +4,20 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
 <meta name="theme-color" content="#0b1224"/>
-<title>魔王様の一筆 | PiXiEED</title>
-<meta name="description" content="1タイル1回の一筆書きで強化し、ボスに与えた総ダメージを競う探索RPG。"/>
+<title>魔王奪還戦 | PiXiEED</title>
+<meta name="description" content="タイルを進んで成長し、勇者の拠点を奪い返すグリッド戦略RPG。"/>
+<link rel="canonical" href="https://pixieed.jp/maou-war/"/>
 <meta property="og:type" content="website"/>
-<meta property="og:title" content="魔王様の一筆 | PiXiEED"/>
-<meta property="og:description" content="1タイル1回の一筆書きで強化し、ボスに与えた総ダメージを競う探索RPG。"/>
+<meta property="og:title" content="魔王奪還戦 | PiXiEED"/>
+<meta property="og:description" content="タイルを進んで成長し、勇者の拠点を奪い返すグリッド戦略RPG。"/>
 <meta property="og:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
 <meta property="og:url" content="https://pixieed.jp/maou-war/"/>
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:site" content="@PiXiEED_arta"/>
+<meta name="twitter:url" content="https://pixieed.jp/maou-war/"/>
+<meta name="twitter:title" content="魔王奪還戦 | PiXiEED"/>
+<meta name="twitter:description" content="タイルを進んで成長し、勇者の拠点を奪い返すグリッド戦略RPG。"/>
+<meta name="twitter:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
 <link rel="icon" type="image/png" href="../character-dots/mao1.png"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -29,7 +36,7 @@
   gtag('event', 'project_open', {
     project_slug: 'maou-war',
     project_type: 'game',
-    project_name: '魔王様の一筆'
+    project_name: '魔王奪還戦'
   });
 </script>
 <style>
@@ -313,6 +320,16 @@
     flex-direction: column;
     gap: 4px;
     font-size: 12px;
+  }
+  .stat-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .stat-icon {
+    width: 16px;
+    height: 16px;
+    image-rendering: pixelated;
   }
   .stat span { color: var(--muted); }
   .stat strong { font-size: 15px; }
@@ -637,7 +654,7 @@
     <div class="main">
       <section class="panel map-panel">
         <div class="map-title">
-          <h1>魔王様の一筆</h1>
+          <h1>魔王奪還戦</h1>
           <div class="map-meta">
             <span id="mapStatus">歩数: --</span>
             <span id="baseDirection">ボス方向: --</span>
@@ -804,6 +821,7 @@
   const NORMAL_VIEW_TILES = 9;
   const HEAL_RATE = 0.2;
   const TRAP_DAMAGE = 6;
+  const MIMIC_DAMAGE_RATE = 0.1;
   const MIN_HP = 10;
   const MIN_STAT = 1;
   const POISON_STEPS = 5;
@@ -813,6 +831,16 @@
   const RANDOM_WALL_COUNT = 5;
   const RANDOM_WALL_ATTEMPTS = 40;
   const ENEMY_ORDER = ['slime', 'bat', 'golem', 'mage', 'assassin'];
+  const STAT_TILE_IDS = ['atk', 'spd', 'def', 'hp', 'luc'];
+  const CHUNK_SIZE = 3;
+  const ATTACK_TILE_MAX = 13;
+  const BOSS_GROWTH = { atk: 0.2, def: 0.15, spd: 0.15, luc: 0.05, mp: 0.05 };
+  const BOSS_HP_PER_LEVEL = 1;
+  const COIN_STORAGE_KEY = 'maou-war_coins';
+  const BATTLE_FAST_HIT_DELAY = 120;
+  const BATTLE_FAST_TURN_DELAY = 160;
+  const BATTLE_SLOW_HIT_DELAY = 620;
+  const BATTLE_SLOW_TURN_DELAY = 520;
   const SKILL_DEFS = [
     { id: 'critRate', name: '会心率+10%', desc: '会心率が10%上がる' },
     { id: 'critDamage', name: '会心ダメ+20%', desc: '会心ダメージ20%アップ' },
@@ -823,8 +851,21 @@
     { id: 'tripleStrike', name: '三連撃', desc: '10%で3連撃' },
     { id: 'poisonStrike', name: '毒付与', desc: '会心時に毒付与(1歩)' },
     { id: 'fireStrike', name: '炎付与', desc: '会心時に炎スタック/攻撃時1%' },
-    { id: 'reflect', name: '反射', desc: '被ダメの10%反射' }
+    { id: 'reflect', name: '反射', desc: '被ダメの10%反射' },
+    { id: 'doubleStats', name: '倍化', desc: '現在のパラメータ分を加算' }
   ];
+  const SKILL_TILE_COUNTS = {
+    doubleStats: 2
+  };
+  const FIXED_SKILL_TILES = [
+    { id: 'doubleStats', x: 1, y: 1 },
+    { id: 'doubleStats', x: CHUNK_SIZE * 2 + 1, y: CHUNK_SIZE * 2 + 1 }
+  ];
+  const FIXED_WALLS = [
+    { x: CHUNK_SIZE * 2 + 1, y: 1 },
+    { x: CHUNK_SIZE + 1, y: CHUNK_SIZE + 1 }
+  ];
+  const SKILL_TILE_TOTAL = SKILL_DEFS.reduce((sum, skill) => sum + (SKILL_TILE_COUNTS[skill.id] || 1), 0);
   const SKILL_SPRITE_KEYS = SKILL_DEFS.reduce((acc, skill, index) => {
     acc[skill.id] = `tile${16 + index}`;
     return acc;
@@ -842,13 +883,7 @@
     ['start', 'empty', 'empty', 'def', 'empty', 'luc', 'empty', 'empty', 'def']
   ];
 
-  const FIXED_ENEMIES = [
-    { x: 1, y: 7, id: 'slime' },
-    { x: 2, y: 5, id: 'bat' },
-    { x: 4, y: 4, id: 'golem' },
-    { x: 6, y: 3, id: 'mage' },
-    { x: 7, y: 1, id: 'assassin' }
-  ];
+  const FIXED_ENEMIES = [];
 
   let fullMapView = true;
   let viewTiles = fullMapView ? MAP_SIZE : NORMAL_VIEW_TILES;
@@ -912,7 +947,8 @@
     tile22: './じめんSprite22.png',
     tile23: './じめんSprite23.png',
     tile24: './じめんSprite24.png',
-    tile25: './じめんSprite25.png'
+    tile25: './じめんSprite25.png',
+    tile26: './じめんSprite26.png'
   };
   const SKILL_SPRITE_PATHS = Object.entries(SKILL_SPRITE_KEYS).reduce((acc, [id, key]) => {
     acc[id] = tileSpritePaths[key];
@@ -1171,6 +1207,12 @@
   let visited = [];
   let skillTiles = [];
   let enemyCount = 0;
+  let healTileCount = 0;
+  let trapTileCount = 0;
+  let poisonTileCount = 0;
+  let treasureTileCount = 0;
+  let mimicTileCount = 0;
+  let revealedMimics = new Set();
   let tileSize = 0;
   let viewSizePx = 0;
   let battleActive = false;
@@ -1178,6 +1220,7 @@
   let isMoving = false;
   let moveAnim = null;
   let playerFacing = 'down';
+  let lastBossLevel = 0;
   const MOVE_ANIM_MS = 180;
 
   const BASE_STATS = { hp: 10, mp: 1, atk: 1, spd: 1, def: 1, luc: 1 };
@@ -1187,6 +1230,7 @@
     y: 0,
     level: 1,
     bossDamage: 0,
+    coins: loadStoredCoins(),
     itemsCollected: 0,
     baseStats: { ...BASE_STATS },
     hp: BASE_STATS.hp,
@@ -1204,6 +1248,7 @@
     gearInventory: [],
     skills: {},
     shield: 0,
+    doubleStatsCount: 0,
     poisonStacks: 0,
     poisonSteps: 0
   };
@@ -1214,6 +1259,21 @@
     return (rngSeed - 1) / 2147483646;
   }
   function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+  function loadStoredCoins() {
+    try {
+      const raw = localStorage.getItem(COIN_STORAGE_KEY);
+      const value = parseInt(raw, 10);
+      return Number.isFinite(value) && value >= 0 ? value : 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  function saveStoredCoins(value) {
+    try {
+      localStorage.setItem(COIN_STORAGE_KEY, String(Math.max(0, Math.floor(value))));
+    } catch (_) {}
+  }
   const DEFAULT_GROWTH = { hp: 0.32, mp: 0.1, atk: 0.2, spd: 0.18, def: 0.16, luc: 0.1 };
   const ENEMY_ARCHETYPES = {
     default: { hp: 1, atk: 1, def: 1, spd: 1, luc: 1, mp: 1 },
@@ -1884,25 +1944,62 @@
     enemies = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(null));
     visited = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(false));
     skillTiles = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(null));
+    revealedMimics = new Set();
     enemyCount = 0;
     itemTileTotal = 0;
 
     spawn = { x: 0, y: MAP_SIZE - 1 };
     bossPos = { x: MAP_SIZE - 1, y: 0 };
-    let skillIndex = 0;
     for (let y = 0; y < MAP_SIZE; y++) {
       for (let x = 0; x < MAP_SIZE; x++) {
         if (tiles[y][x] === 'start') spawn = { x, y };
         if (tiles[y][x] === 'boss') bossPos = { x, y };
-        if (tiles[y][x] === 'skill') {
-          const skill = SKILL_DEFS[skillIndex % SKILL_DEFS.length];
-          if (skill) {
-            skillTiles[y][x] = skill.id;
-          }
-          skillIndex += 1;
+      }
+    }
+    healTileCount = 0;
+    trapTileCount = 0;
+    poisonTileCount = 0;
+    treasureTileCount = 0;
+    mimicTileCount = 0;
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        const tileId = tiles[y][x];
+        if (tileId === 'heal') {
+          healTileCount += 1;
+          tiles[y][x] = 'empty';
+          continue;
+        }
+        if (tileId === 'trap') {
+          trapTileCount += 1;
+          tiles[y][x] = 'empty';
+          continue;
+        }
+        if (tileId === 'poison') {
+          poisonTileCount += 1;
+          tiles[y][x] = 'empty';
+          continue;
+        }
+        if (tileId === 'treasure') {
+          treasureTileCount += 1;
+          tiles[y][x] = 'empty';
+          continue;
+        }
+        if (tileId === 'mimic') {
+          mimicTileCount += 1;
+          tiles[y][x] = 'empty';
+          continue;
+        }
+        if (tileId === 'skill' || STAT_TILE_IDS.includes(tileId)) {
+          tiles[y][x] = 'empty';
         }
       }
     }
+    FIXED_WALLS.forEach((entry) => {
+      if (!tiles[entry.y]?.[entry.x]) return;
+      if (entry.x === spawn.x && entry.y === spawn.y) return;
+      if (entry.x === bossPos.x && entry.y === bossPos.y) return;
+      tiles[entry.y][entry.x] = 'wall';
+    });
     player.x = spawn.x;
     player.y = spawn.y;
     HERO_BOSS.baseStats = { ...HERO_BOSS.stats };
@@ -1921,6 +2018,15 @@
       enemyCount += 1;
     });
 
+    applyRandomWalls();
+    placeSkillTiles();
+    placeOddTiles('heal', healTileCount);
+    placeOddTiles('trap', trapTileCount);
+    placeOddTiles('poison', poisonTileCount);
+    placeOddTiles('treasure', treasureTileCount);
+    placeOddTiles('mimic', mimicTileCount);
+    placeStatTiles();
+
     for (let y = 0; y < MAP_SIZE; y++) {
       for (let x = 0; x < MAP_SIZE; x++) {
         const tileId = tiles[y][x];
@@ -1933,6 +2039,172 @@
     tiles[spawn.y][spawn.x] = 'start';
     tiles[bossPos.y][bossPos.x] = 'boss';
     updatePlayerLevel();
+  }
+
+  function placeSkillTiles() {
+    const dist = buildDistanceFromSpawn();
+    const fixedCounts = FIXED_SKILL_TILES.reduce((acc, entry) => {
+      acc[entry.id] = (acc[entry.id] || 0) + 1;
+      return acc;
+    }, {});
+    FIXED_SKILL_TILES.forEach((entry) => {
+      if (!tiles[entry.y]?.[entry.x]) return;
+      if (entry.x === spawn.x && entry.y === spawn.y) return;
+      if (entry.x === bossPos.x && entry.y === bossPos.y) return;
+      if (tiles[entry.y][entry.x] !== 'empty') return;
+      tiles[entry.y][entry.x] = 'skill';
+      skillTiles[entry.y][entry.x] = entry.id;
+    });
+    const candidates = [];
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        if (tiles[y][x] !== 'empty') continue;
+        if (x === spawn.x && y === spawn.y) continue;
+        if (x === bossPos.x && y === bossPos.y) continue;
+        const d = dist[x + y * MAP_SIZE];
+        if (d < 0 || d % 2 !== 0) continue;
+        candidates.push({ x, y });
+      }
+    }
+    if (!candidates.length) return;
+    shuffleList(candidates);
+    const skillIds = [];
+    SKILL_DEFS.forEach((skill) => {
+      const baseCount = SKILL_TILE_COUNTS[skill.id] || 1;
+      const count = Math.max(0, baseCount - (fixedCounts[skill.id] || 0));
+      for (let i = 0; i < count; i++) skillIds.push(skill.id);
+    });
+    shuffleList(skillIds);
+    const count = Math.min(skillIds.length, candidates.length);
+    for (let i = 0; i < count; i++) {
+      const pos = candidates[i];
+      const skillId = skillIds[i];
+      tiles[pos.y][pos.x] = 'skill';
+      skillTiles[pos.y][pos.x] = skillId;
+    }
+  }
+
+  function placeOddTiles(tileId, count) {
+    if (!count) return;
+    const dist = buildDistanceFromSpawn();
+    const candidates = [];
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        if (tiles[y][x] !== 'empty') continue;
+        if (x === spawn.x && y === spawn.y) continue;
+        if (x === bossPos.x && y === bossPos.y) continue;
+        const d = dist[x + y * MAP_SIZE];
+        if (d < 0 || d % 2 !== 0) continue;
+        candidates.push({ x, y });
+      }
+    }
+    if (!candidates.length) return;
+    shuffleList(candidates);
+    const placeCount = Math.min(count, candidates.length);
+    for (let i = 0; i < placeCount; i++) {
+      const pos = candidates[i];
+      tiles[pos.y][pos.x] = tileId;
+    }
+  }
+
+  function placeStatTiles() {
+    const dist = buildDistanceFromSpawn();
+    const atkCandidates = [];
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        if (tiles[y][x] !== 'empty') continue;
+        if (x === spawn.x && y === spawn.y) continue;
+        if (x === bossPos.x && y === bossPos.y) continue;
+        const d = dist[x + y * MAP_SIZE];
+        if (d < 0 || d % 2 !== 1) continue;
+        const chunkType = getChunkType(x, y);
+        if (!chunkType) continue;
+        if (chunkType === 'atk') {
+          atkCandidates.push({ x, y });
+        } else {
+          tiles[y][x] = chunkType;
+        }
+      }
+    }
+    if (!atkCandidates.length) return;
+    shuffleList(atkCandidates);
+    const count = Math.min(ATTACK_TILE_MAX, atkCandidates.length);
+    for (let i = 0; i < count; i++) {
+      const pos = atkCandidates[i];
+      tiles[pos.y][pos.x] = 'atk';
+    }
+  }
+
+  function applyRandomWalls() {
+    const distBase = buildDistanceFromSpawn();
+    const candidates = [];
+    let baseAtkSlots = 0;
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        if (x === 0 || y === 0 || x === MAP_SIZE - 1 || y === MAP_SIZE - 1) continue;
+        if (tiles[y][x] !== 'empty') continue;
+        if (x === spawn.x && y === spawn.y) continue;
+        if (x === bossPos.x && y === bossPos.y) continue;
+        const d = distBase[x + y * MAP_SIZE];
+        if (d < 0 || d % 2 !== 0) continue;
+        if (FIXED_SKILL_TILES.some(entry => entry.x === x && entry.y === y)) continue;
+        candidates.push({ x, y });
+      }
+    }
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        if (tiles[y][x] !== 'empty') continue;
+        const d = distBase[x + y * MAP_SIZE];
+        if (d < 0 || d % 2 !== 1) continue;
+        if (getChunkType(x, y) === 'atk') baseAtkSlots += 1;
+      }
+    }
+    if (!candidates.length) return;
+    const requiredAtkSlots = Math.min(ATTACK_TILE_MAX, baseAtkSlots);
+    const maxWalls = Math.min(RANDOM_WALL_COUNT, candidates.length);
+    const baseTiles = candidates.map(({ x, y }) => ({ x, y, tile: tiles[y][x] }));
+    for (let attempt = 0; attempt < RANDOM_WALL_ATTEMPTS; attempt++) {
+      shuffleList(candidates);
+      const placed = [];
+      for (let i = 0; i < maxWalls; i++) {
+        const { x, y } = candidates[i];
+        tiles[y][x] = 'wall';
+        placed.push({ x, y });
+      }
+      const dist = buildDistanceFromSpawn();
+      const bossKey = bossPos.x + bossPos.y * MAP_SIZE;
+      const hasPath = dist[bossKey] >= 0;
+      const hasMove = hasAvailableMoveAt(spawn.x, spawn.y);
+      let evenSlots = 0;
+      let atkSlots = 0;
+      for (let y = 0; y < MAP_SIZE; y++) {
+        for (let x = 0; x < MAP_SIZE; x++) {
+          if (tiles[y][x] !== 'empty') continue;
+          const d = dist[x + y * MAP_SIZE];
+          if (d >= 0 && d % 2 === 0) evenSlots += 1;
+          if (d >= 0 && d % 2 === 1 && getChunkType(x, y) === 'atk') atkSlots += 1;
+        }
+      }
+      const evenNeeded = SKILL_TILE_TOTAL + healTileCount + trapTileCount + poisonTileCount + treasureTileCount + mimicTileCount;
+      if (hasPath && hasMove && evenSlots >= evenNeeded && atkSlots >= requiredAtkSlots) return;
+      placed.forEach(({ x, y }) => { tiles[y][x] = 'empty'; });
+    }
+    baseTiles.forEach(({ x, y, tile }) => { tiles[y][x] = tile; });
+  }
+
+  function getChunkType(x, y) {
+    const col = Math.floor(x / CHUNK_SIZE);
+    const row = Math.floor(y / CHUNK_SIZE);
+    if (row === 0 && col === 2) return 'atk'; // 3A
+    if (row === 1 && col === 1) return 'atk'; // 2B
+    if (row === 2 && col === 0) return 'atk'; // 1C
+    if (row === 0 && col === 0) return 'luc'; // 1A
+    if (row === 2 && col === 2) return 'spd'; // 3C
+    if (row === 1 && col === 0) return 'hp'; // 1B
+    if (row === 1 && col === 2) return 'hp'; // 3B
+    if (row === 0 && col === 1) return 'def'; // 2A
+    if (row === 2 && col === 1) return 'def'; // 2C
+    return null;
   }
 
   function resizeCanvas() {
@@ -2013,7 +2285,7 @@
     }
   }
 
-  function drawTile(x, y, tileId, isVisited, enemy, skillId) {
+  function drawTile(x, y, tileId, isVisited, enemy, skillId, mimicRevealed) {
     const tile = TILE_TYPES[tileId] || TILE_TYPES.empty;
     const baseSpriteKey = Object.prototype.hasOwnProperty.call(tileBaseSpriteMap, tileId)
       ? tileBaseSpriteMap[tileId]
@@ -2022,6 +2294,9 @@
     let overlayKey = tileOverlaySpriteMap[tileId];
     if (tileId === 'skill' && skillId) {
       overlayKey = SKILL_SPRITE_KEYS[skillId] || overlayKey;
+    }
+    if (tileId === 'mimic' && !mimicRevealed) {
+      overlayKey = tileOverlaySpriteMap.treasure || overlayKey;
     }
     const overlaySprite = overlayKey ? tileSprites[overlayKey] : null;
     ctx.fillStyle = tile.color;
@@ -2098,7 +2373,10 @@
         const skillId = skillTiles?.[mapY]?.[mapX] || null;
         const screenX = vx * tileSize - camera.offsetX;
         const isVisited = visited[mapY]?.[mapX];
-        drawTile(screenX, screenY, tileId, isVisited, enemy, skillId);
+        const mimicRevealed = tileId === 'mimic'
+          ? revealedMimics.has(mapX + mapY * MAP_SIZE)
+          : false;
+        drawTile(screenX, screenY, tileId, isVisited, enemy, skillId, mimicRevealed);
       }
     }
     const px = (posX - camera.baseX) * tileSize - camera.offsetX;
@@ -2116,6 +2394,15 @@
         log.removeChild(log.lastChild);
       }
     });
+  }
+
+  function addCoins(amount, reason = '') {
+    const gain = Math.max(0, Math.floor(amount));
+    if (!gain) return;
+    player.coins = (player.coins || 0) + gain;
+    saveStoredCoins(player.coins);
+    const suffix = reason ? `(${reason})` : '';
+    addLog(`チャリン +${gain}${suffix}`);
   }
 
   let selectedSkillId = null;
@@ -2453,8 +2740,18 @@
     battleSub.textContent = `Lv ${enemyState.level} / 現在 ${player.level}`;
   }
 
+  function syncBossStats(enemyState) {
+    const level = Math.max(1, enemyState.level || 1);
+    enemyState.atk = Math.max(MIN_STAT, Math.round(HERO_BOSS.stats.atk + (level - 1) * BOSS_GROWTH.atk));
+    enemyState.def = Math.max(MIN_STAT, Math.round(HERO_BOSS.stats.def + (level - 1) * BOSS_GROWTH.def));
+    enemyState.spd = Math.max(MIN_STAT, Math.round(HERO_BOSS.stats.spd + (level - 1) * BOSS_GROWTH.spd));
+    enemyState.luc = Math.max(MIN_STAT, Math.round(HERO_BOSS.stats.luc + (level - 1) * BOSS_GROWTH.luc));
+    enemyState.mp = Math.max(MIN_STAT, Math.round(HERO_BOSS.stats.mp + (level - 1) * BOSS_GROWTH.mp));
+  }
+
   function applyBossDamage(enemyState, damage) {
     let remaining = damage;
+    let leveledUp = false;
     while (remaining > 0) {
       const chunk = Math.min(remaining, enemyState.hp);
       enemyState.hp -= chunk;
@@ -2462,11 +2759,14 @@
       remaining -= chunk;
       if (enemyState.hp <= 0) {
         enemyState.level += 1;
-        enemyState.maxHp = enemyState.level;
+        enemyState.maxHp = enemyState.level * BOSS_HP_PER_LEVEL;
         enemyState.hp = enemyState.maxHp;
+        syncBossStats(enemyState);
+        leveledUp = true;
         appendBattleLog(`勇者がLv${enemyState.level}に強化された`);
       }
     }
+    if (leveledUp) enemyState.bossLevelUp = true;
     updateBossBattleLabel(enemyState);
   }
 
@@ -2529,6 +2829,33 @@
     if (!skillId) return grantRandomSkill();
     const skill = SKILL_DEFS.find(entry => entry.id === skillId);
     if (!skill) return grantRandomSkill();
+    if (skillId === 'doubleStats') {
+      const maxCount = SKILL_TILE_COUNTS.doubleStats || 1;
+      if (player.doubleStatsCount >= maxCount) {
+        addLog('倍化は上限に達している');
+        return skill;
+      }
+      player.doubleStatsCount += 1;
+      if (!player.skills.doubleStats) player.skills.doubleStats = true;
+      const currentAtk = player.atk;
+      const currentSpd = player.spd;
+      const currentDef = player.def;
+      const currentLuc = player.luc;
+      const currentHp = player.maxHp;
+      const currentMp = player.maxMp;
+      player.baseStats.atk = Math.max(MIN_STAT, currentAtk * 2 - player.gearBonus.atk);
+      player.baseStats.spd = Math.max(MIN_STAT, currentSpd * 2 - player.gearBonus.spd);
+      player.baseStats.def = Math.max(MIN_STAT, currentDef * 2 - player.gearBonus.def);
+      player.baseStats.luc = Math.max(MIN_STAT, currentLuc * 2 - player.gearBonus.luc);
+      player.baseStats.hp = Math.max(MIN_HP, currentHp * 2);
+      player.baseStats.mp = Math.max(MIN_STAT, currentMp * 2);
+      player.hp = Math.min(player.hp * 2, player.baseStats.hp);
+      player.mp = Math.min(player.mp * 2, player.baseStats.mp);
+      updateUnitStats(player);
+      updatePlayerLevel();
+      addLog(`倍化 ${player.doubleStatsCount}/${maxCount}`);
+      return skill;
+    }
     if (player.skills[skillId]) {
       addLog(`スキルは習得済み: ${skill.name}`);
       return skill;
@@ -2545,6 +2872,12 @@
     } else {
       enemyState.hp = clamp(enemyState.hp - damage, 0, enemyState.maxHp);
     }
+  }
+
+  function takeBossSlow(enemyState, isBoss) {
+    if (!isBoss || !enemyState?.bossLevelUp) return false;
+    enemyState.bossLevelUp = false;
+    return true;
   }
 
   function applyHeal(target, amount, opts = {}) {
@@ -2604,6 +2937,22 @@
     if (result.shieldAdded > 0) addLog(`シールド +${result.shieldAdded}`);
   }
 
+  function handleMimicBump(x, y) {
+    const key = x + y * MAP_SIZE;
+    if (!revealedMimics.has(key)) {
+      revealedMimics.add(key);
+      addLog('ミミックが現れた！');
+    }
+    const damage = Math.max(1, Math.floor(player.maxHp * MIMIC_DAMAGE_RATE));
+    player.hp = clamp(player.hp - damage, 0, player.maxHp);
+    addLog(`ミミックに噛まれた -${damage}`);
+    updateStats();
+    renderMap();
+    if (player.hp <= 0) {
+      endGame(false);
+    }
+  }
+
   async function resolveTileEvent(x, y) {
     const tileId = tiles[y]?.[x];
     if (!tileId) return;
@@ -2620,15 +2969,12 @@
       }
     } else if (tileId === 'treasure') {
       applyTreasureReward();
+      addCoins(1, '宝箱');
       player.itemsCollected += 1;
       tiles[y][x] = 'empty';
     } else if (tileId === 'mimic') {
-      addLog('怪しい宝箱を開けた...');
-      addLog('ミミックが現れた！');
-      await runBattle(createMimicEnemy(), { actor: player, actorLabel: '魔王様', allowDefeat: true });
+      handleMimicBump(x, y);
       if (gameOver) return;
-      player.itemsCollected += 1;
-      tiles[y][x] = 'empty';
     } else if (tileId === 'skill') {
       const skillId = skillTiles?.[y]?.[x];
       grantSkillById(skillId);
@@ -2704,6 +3050,7 @@
     const tileId = tiles[y]?.[x];
     if (!tileId) return false;
     if (tileId === 'wall') return false;
+    if (tileId === 'mimic') return false;
     return true;
   }
 
@@ -2713,6 +3060,81 @@
       tiles[y][x] = 'wall';
       visited[y][x] = true;
       if (skillTiles?.[y]) skillTiles[y][x] = null;
+    }
+  }
+
+  function wallifyTile(x, y) {
+    if (x < 0 || y < 0 || x >= MAP_SIZE || y >= MAP_SIZE) return;
+    if (x === player.x && y === player.y) return;
+    if (x === bossPos.x && y === bossPos.y) return;
+    const tileId = tiles[y]?.[x];
+    if (!tileId || tileId === 'wall') return;
+    tiles[y][x] = 'wall';
+    visited[y][x] = true;
+    if (skillTiles?.[y]) skillTiles[y][x] = null;
+    if (enemies?.[y]?.[x]) {
+      enemies[y][x] = null;
+      enemyCount = Math.max(0, enemyCount - 1);
+    }
+    revealedMimics.delete(x + y * MAP_SIZE);
+  }
+
+  function buildReachableGrid(startX, startY, blockX = null, blockY = null) {
+    const reachable = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(false));
+    if (startX < 0 || startY < 0 || startX >= MAP_SIZE || startY >= MAP_SIZE) return reachable;
+    if (blockX === startX && blockY === startY) return reachable;
+    const startTile = tiles[startY]?.[startX];
+    if (!startTile || startTile === 'wall' || startTile === 'mimic') return reachable;
+    const queue = [{ x: startX, y: startY }];
+    let head = 0;
+    reachable[startY][startX] = true;
+    const dirs = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1]
+    ];
+    while (head < queue.length) {
+      const current = queue[head++];
+      for (const [dx, dy] of dirs) {
+        const nx = current.x + dx;
+        const ny = current.y + dy;
+        if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
+        if (reachable[ny][nx]) continue;
+        if (blockX === nx && blockY === ny) continue;
+        if (!canMoveTo(nx, ny)) continue;
+        reachable[ny][nx] = true;
+        queue.push({ x: nx, y: ny });
+      }
+    }
+    return reachable;
+  }
+
+  function pruneUnreachableTiles() {
+    const dirs = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1]
+    ];
+    for (const [dx, dy] of dirs) {
+      const nx = player.x + dx;
+      const ny = player.y + dy;
+      if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
+      if (!canMoveTo(nx, ny)) continue;
+      const reachableFromNext = buildReachableGrid(nx, ny, player.x, player.y);
+      if (!reachableFromNext[bossPos.y]?.[bossPos.x]) {
+        wallifyTile(nx, ny);
+      }
+    }
+
+    const reachableFromPlayer = buildReachableGrid(player.x, player.y);
+    const reachableFromBoss = buildReachableGrid(bossPos.x, bossPos.y);
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        if (reachableFromPlayer[y][x] && reachableFromBoss[y][x]) continue;
+        wallifyTile(x, y);
+      }
     }
   }
 
@@ -2728,6 +3150,7 @@
     markTileGone(prevX, prevY);
     await resolveTileEvent(targetX, targetY);
     if (gameOver) return;
+    pruneUnreachableTiles();
     applyStepHeal();
     if (applyPoisonTick()) return;
     updateStats();
@@ -2785,6 +3208,11 @@
     const targetY = clamp(camera.y + ty, 0, MAP_SIZE - 1);
     const dist = Math.abs(targetX - player.x) + Math.abs(targetY - player.y);
     if (dist !== 1) return;
+    const targetTile = tiles[targetY]?.[targetX];
+    if (targetTile === 'mimic') {
+      handleMimicBump(targetX, targetY);
+      return;
+    }
     if (!canMoveTo(targetX, targetY)) return;
     movePlayerTo(targetX, targetY);
   }
@@ -2901,21 +3329,18 @@
         id: enemyTemplate.id,
         name: enemyTemplate.name,
         color: enemyTemplate.color,
-        atk: HERO_BOSS.stats.atk,
-        spd: HERO_BOSS.stats.spd,
-        def: HERO_BOSS.stats.def,
-        luc: HERO_BOSS.stats.luc,
-        mp: HERO_BOSS.stats.mp,
         level: 1,
-        maxHp: 1,
-        hp: 1,
+        maxHp: BOSS_HP_PER_LEVEL,
+        hp: BOSS_HP_PER_LEVEL,
         guard: 0,
         guardTurns: 0,
         gauge: 0,
         poisonStacks: 0,
         poisonSteps: 0,
-        fireStacks: 0
+        fireStacks: 0,
+        bossLevelUp: false
       };
+      syncBossStats(enemyState);
     } else {
       const scaledStats = resolveEnemyStats(enemyTemplate);
       enemyState = {
@@ -3016,7 +3441,10 @@
             updateBattleBars(playerState, enemyState);
           }
           if (enemyState.hp <= 0) break;
-          if (hits > 1) await sleep(380);
+          if (hits > 1) {
+            const slow = takeBossSlow(enemyState, isBoss);
+            await sleep(slow ? BATTLE_SLOW_HIT_DELAY : BATTLE_FAST_HIT_DELAY);
+          }
         }
         if (enemyState.hp > 0 && enemyState.poisonStacks > 0) {
           const poisonDead = applyEnemyPoisonTick(enemyState, isBoss, poisonCritMultiplier);
@@ -3055,7 +3483,10 @@
               if (playerState.hp <= 0) break;
               if (enemyState.hp <= 0) break;
             }
-            await sleep(420);
+            {
+              const slow = takeBossSlow(enemyState, isBoss);
+              await sleep(slow ? BATTLE_SLOW_HIT_DELAY : BATTLE_FAST_HIT_DELAY);
+            }
           }
           if (enemyState.hp > 0 && enemyState.poisonStacks > 0) {
             const poisonDead = applyEnemyPoisonTick(enemyState, isBoss, poisonCritMultiplier);
@@ -3075,11 +3506,17 @@
       }
       safety += 1;
       if (actionCount >= maxActions) break;
-      await sleep(350);
+      {
+        const slow = takeBossSlow(enemyState, isBoss);
+        await sleep(slow ? BATTLE_SLOW_TURN_DELAY : BATTLE_FAST_TURN_DELAY);
+      }
     }
 
     battleActive = false;
     battleOverlay.classList.remove('is-open');
+    if (isBoss) {
+      lastBossLevel = enemyState.level || lastBossLevel;
+    }
 
     actor.hp = playerState.hp;
     actor.mp = playerState.mp;
@@ -3464,6 +3901,8 @@
     if (gameOver) return;
     gameOver = true;
     const score = computeScore(cleared);
+    const bossCoins = Math.max(0, lastBossLevel);
+    if (bossCoins) addCoins(bossCoins, `勇者Lv${bossCoins}`);
     resultOverlay.classList.add('is-open');
     resultTitle.textContent = '戦い終了';
     resultSummary.textContent = `ボスダメージ: ${player.bossDamage}`;
@@ -3472,6 +3911,7 @@
       <div class="stat"><span>ぼすだめーじ</span><strong>${player.bossDamage}</strong></div>
       <div class="stat"><span>ほすう</span><strong>${player.steps}</strong></div>
       <div class="stat"><span>とうばつ</span><strong>${player.kills}</strong></div>
+      <div class="stat"><span class="stat-label"><img class="stat-icon" src="../character-dots/tyarin.png" alt="チャリン">チャリン</span><strong>${player.coins}</strong></div>
       <div class="stat"><span>こうげき/はやさ/ぼうぎょ</span><strong>${player.atk}/${player.spd}/${player.def}</strong></div>
       <div class="stat"><span>うん</span><strong>${player.luc}</strong></div>
     `;
@@ -3494,6 +3934,7 @@
     player.gearInventory = [];
     player.skills = {};
     player.shield = 0;
+    player.doubleStatsCount = 0;
     player.poisonStacks = 0;
     player.poisonSteps = 0;
     selectedGearId = null;
@@ -3503,6 +3944,7 @@
     isMoving = false;
     moveAnim = null;
     playerFacing = 'down';
+    lastBossLevel = 0;
     resultOverlay.classList.remove('is-open');
     battleOverlay.classList.remove('is-open');
     if (footerLog) footerLog.innerHTML = '';
