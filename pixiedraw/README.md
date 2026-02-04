@@ -13,3 +13,7 @@ PiXiEEDraw をブラウザから直接操作できるピクセルアートエデ
 ## 開発時の補足
 
 - オフラインキャッシュ機構を廃止したため、更新は通常のブラウザリロードだけで反映されます。
+
+## Recent Updates (Major only)
+
+- (Add entries here, newest first. Format: YYYY-MM-DD: Summary)
