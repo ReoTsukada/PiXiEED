@@ -4,16 +4,89 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
-<title>PiXiEELENS</title>
-<meta content="PiXiEELENS はブラウザ上で全画面カメラとドットモードを切り替えられる実験的ツール。イベント演出や配信の合成用に設計しています。" name="description"/>
-<meta content="PiXiEELENS" property="og:title"/>
-<meta content="フルスクリーンカメラとドットモードを備えたPiXiEELENSの紹介ページ。特徴や使い方、ブラウザからの起動手順をまとめています。" property="og:description"/>
+<title>PiXiEELENS | ドット絵カメラでレトロ写真が撮れる</title>
+<meta content="カメラで身の回りのものをドット絵変換。ブラウザでドット化・ピクセル化してレトロ写真が撮れるドット絵カメラ。パレット/グリッド、PNG保存、PiXiEEDraw編集に対応。" name="description"/>
+<link href="https://pixieed.jp/projects/pixiee-lens/" rel="canonical"/>
+<meta content="PiXiEELENS | ドット絵カメラでレトロ写真が撮れる" property="og:title"/>
+<meta content="カメラで身の回りのものをドット絵変換。ブラウザでドット化・ピクセル化してレトロ写真が撮れるドット絵カメラ。パレット/グリッド、PNG保存、PiXiEEDraw編集に対応。" property="og:description"/>
 <meta content="website" property="og:type"/>
 <meta content="https://pixieed.jp/projects/pixiee-lens/" property="og:url"/>
 <meta content="https://pixieed.jp/pixiee-lens/ogp.png" property="og:image"/>
+<meta content="PiXiEELENS のプレビューイメージ" property="og:image:alt"/>
+<meta content="PiXiEED" property="og:site_name"/>
+<meta content="ja_JP" property="og:locale"/>
 <meta content="summary_large_image" name="twitter:card"/>
 <meta content="@PiXiEED_arta" name="twitter:site"/>
+<meta content="https://pixieed.jp/projects/pixiee-lens/" name="twitter:url"/>
+<meta content="PiXiEELENS | ドット絵カメラでレトロ写真が撮れる" name="twitter:title"/>
+<meta content="カメラで身の回りのものをドット絵変換。ブラウザでドット化・ピクセル化してレトロ写真が撮れるドット絵カメラ。パレット/グリッド、PNG保存、PiXiEEDraw編集に対応。" name="twitter:description"/>
+<meta content="https://pixieed.jp/pixiee-lens/ogp.png" name="twitter:image"/>
+<meta content="PiXiEELENS のプレビューイメージ" name="twitter:image:alt"/>
 <meta content="#0b1224" name="theme-color"/>
+<script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "name": "PiXiEELENS",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "Web",
+        "url": "https://pixieed.jp/projects/pixiee-lens/",
+        "image": "https://pixieed.jp/pixiee-lens/ogp.png",
+        "description": "カメラで身の回りのものをドット絵変換。ブラウザでドット化・ピクセル化してレトロ写真が撮れるドット絵カメラ。パレット/グリッド、PNG保存、PiXiEEDraw編集に対応。",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "JPY",
+          "availability": "https://schema.org/InStock"
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "PiXiEED",
+          "url": "https://pixieed.jp/"
+        }
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "PiXiEEDrawで編集できますか？",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "撮影結果のプレビューからPiXiEEDrawで編集できます。PNGで保存して編集することも可能です。"
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "レトロなドット写真は撮れますか？",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "カメラ映像をドット化・ピクセル化し、レトロなパレットで雰囲気を調整できます。"
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "スマホでも使えますか？",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "PC/モバイルに対応し、Chrome/Edge/Safariの最新版を推奨しています。"
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "カメラが起動しない場合は？",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "ブラウザのサイト設定からカメラ権限を許可してください。"
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
 <!-- Google tag (gtag.js) -->
 <script async crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
@@ -204,25 +277,26 @@
 <a class="cta-secondary" href="../../tools.html">プロジェクト一覧</a>
 </div>
 <h1>PiXiEELENS</h1>
-<p>ブラウザだけで全画面カメラを起動し、ピクセル化・パレット適用・グリッド表示などを即座に切り替えられる実験的ツールです。ライブ配信のワンポイント演出や、展示会のフォトブースとして使えるよう軽量化しています。</p>
-<p class="project-status">ラボ版として公開中です。PC/モバイルともに Chrome 最新版でのご利用を推奨します。</p>
+<p>カメラで身の回りのものをドット絵変換しよう。PiXiEELENSはブラウザで全画面カメラを起動し、ドット化・ピクセル化でレトロな写真が撮れるドット絵カメラです。撮影後はドット絵エディター <a href="../pixiedraw/index.html">PiXiEEDraw</a> で編集して仕上げられます。</p>
+<p class="project-status">ラボ版として公開中です。PC/モバイルともに Chrome/Edge/Safari 最新版でのご利用を推奨します。</p>
 </div>
 </section>
 <section class="section section--accent" id="features">
 <div class="section-inner">
-<h2>PiXiEELENS の特徴</h2>
+<h2>ドット絵カメラの特徴</h2>
+<p>カメラとドット絵でレトロ写真を作りやすいポイントをまとめました。</p>
 <ul class="project-feature-list">
 <li>
-<strong>全画面カメラ + ドットモード</strong>
-            任意の倍率で映像をピクセル化し、観測用のグリッドやアスペクトガイドをワンタップで重ねられます。
+<strong>カメラでドット化</strong>
+            全画面カメラをドット化・ピクセル化して、粒度を調整しながらレトロ写真が撮れます。グリッドやアスペクトガイドもワンタップで重ねられます。
           </li>
 <li>
-<strong>色パレットの即時適用</strong>
-            GBC風やCPC風などプリセットに加え、カスタムパレットJSONも読み込めます。配信やイベントで特定の色味を維持するのに便利です。
+<strong>レトロ写真のパレット</strong>
+            GBC風やCPC風などのプリセットに加え、カスタムパレットJSONも読み込めます。配信やイベントで色味を統一できます。
           </li>
 <li>
-<strong>オフラインでも動作</strong>
-            通信が不安定な会場でも各種設定は端末内に保存され、再訪時に前回の構成をそのまま復元して起動できます。
+<strong>PiXiEEDrawで編集</strong>
+            撮影したドット写真は <a href="../pixiedraw/index.html">PiXiEEDraw</a> で編集して仕上げられます。PNG保存にも対応しています。
           </li>
 </ul>
 </div>
@@ -242,8 +316,8 @@
 <h2>使い方</h2>
 <ol class="project-howto">
 <li>起動後、ブラウザから表示されるカメラ利用許可に「許可」を選択します。</li>
-<li>右下の HUD からドットモード・パレット・アスペクト比・HUD 表示のオン/オフを切り替えます。</li>
-<li>ピクセル化の粒度はスライダーで変更可能です。必要に応じてスクリーンショットボタンから PNG を保存できます。</li>
+<li>右下の HUD からドットモード・パレット・HUD 表示のオン/オフを切り替えます。</li>
+<li>ピクセル化の粒度はスライダーで変更可能です。スクリーンショットでPNG保存、またはプレビューから <a href="../pixiedraw/index.html">PiXiEEDraw</a> で編集できます。</li>
 <li>必要に応じて画面右下の「設定」からHUD配置やタッチ操作ガイドを切り替え、利用シーンに合わせた表示に調整してください。</li>
 </ol>
 <p class="project-howto__note">カメラが起動しない場合は、ブラウザのサイト設定からカメラ権限を再度許可してください。外部ディスプレイにミラーリングすればフォトブースとしても利用できます。</p>
@@ -255,7 +329,7 @@
 <div class="project-meta-grid">
 <dl class="project-meta">
 <dt>カテゴリ</dt>
-<dd>ブラウザカメラ / ピクセルラボ</dd>
+<dd>ドット絵カメラ / ピクセルラボ</dd>
 </dl>
 <dl class="project-meta">
 <dt>対応ブラウザ</dt>
@@ -263,11 +337,34 @@
 </dl>
 <dl class="project-meta">
 <dt>推奨デバイス</dt>
-<dd>Webカメラ搭載 PC / USB カメラ対応端末</dd>
+<dd>スマホ / タブレット / Webカメラ搭載PC</dd>
 </dl>
 <dl class="project-meta">
 <dt>リリース</dt>
 <dd>2024年 ラボ公開</dd>
+</dl>
+</div>
+</div>
+</section>
+<section class="section" id="faq">
+<div class="section-inner">
+<h2>よくある質問</h2>
+<div class="project-meta-grid project-faq-grid">
+<dl class="project-meta">
+<dt>PiXiEEDrawで編集できますか？</dt>
+<dd>撮影結果のプレビューからPiXiEEDrawで編集できます。PNGで保存して編集することも可能です。</dd>
+</dl>
+<dl class="project-meta">
+<dt>レトロなドット写真は撮れますか？</dt>
+<dd>カメラ映像をドット化・ピクセル化し、レトロなパレットで雰囲気を調整できます。</dd>
+</dl>
+<dl class="project-meta">
+<dt>スマホでも使えますか？</dt>
+<dd>PC/モバイルに対応し、Chrome/Edge/Safariの最新版を推奨しています。</dd>
+</dl>
+<dl class="project-meta">
+<dt>カメラが起動しない場合は？</dt>
+<dd>ブラウザのサイト設定からカメラ権限を許可してください。</dd>
 </dl>
 </div>
 </div>
