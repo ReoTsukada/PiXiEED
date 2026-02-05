@@ -176,9 +176,20 @@ const creatorState = {
 let creatorLastFocused = null;
 let creatorAnalysisToken = 0;
 let clientId = null;
+let cachedAuthRaw = null;
+let cachedAuthSession = null;
 
 const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
+const SUPABASE_AUTH_STORAGE_KEY = (() => {
+  try {
+    const hostname = new URL(SUPABASE_URL).hostname;
+    const ref = hostname.split('.')[0] || '';
+    return ref ? `sb-${ref}-auth-token` : null;
+  } catch (_) {
+    return null;
+  }
+})();
 const DEFAULT_PUZZLE_BUCKET = 'pixfind-puzzles';
 const CONTEST_BUCKET = 'pixieed-contest';
 const FALLBACK_PUZZLE_BUCKET = CONTEST_BUCKET;
@@ -603,6 +614,7 @@ async function handleCreatorPublish() {
   }
 
   ensureClientId();
+  const authContext = getSupabaseAuthContext();
   const title = dom.creatorTitleInput?.value.trim() || 'カスタムパズル';
   const slug = getCreatorSlug();
   const difficulty = creatorState.difficulty;
@@ -611,6 +623,7 @@ async function handleCreatorPublish() {
   const authorName = getCreatorNickname();
   const authorXUrl = getCreatorXUrl();
   const clientIdValue = clientId;
+  const userId = authContext.userId;
   const publishTask = {
     puzzleId,
     title,
@@ -620,6 +633,7 @@ async function handleCreatorPublish() {
     authorName,
     authorXUrl,
     clientId: clientIdValue,
+    userId,
     originalDataUrl: creatorState.originalDataUrl,
     diffDataUrl: creatorState.diffDataUrl,
     size: { ...creatorState.size },
@@ -671,6 +685,9 @@ async function handleCreatorPublish() {
     if (authorXUrl) {
       payload.author_x_url = authorXUrl;
     }
+    if (userId) {
+      payload.user_id = userId;
+    }
 
     const inserted = await insertPublishedPuzzle(payload);
     const normalized = normalizePublishedPuzzleEntry(inserted ?? payload);
@@ -710,6 +727,8 @@ async function handleCreatorPublish() {
           width: creatorState.size.width,
           height: creatorState.size.height,
           colors,
+          userId,
+          clientId: clientIdValue,
         });
         let contestEntry = null;
         try {
@@ -725,6 +744,8 @@ async function handleCreatorPublish() {
               width: creatorState.size.width,
               height: creatorState.size.height,
               colors,
+              userId,
+              clientId: clientIdValue,
             });
             contestEntry = await insertContestEntry(contestPayload);
             contestPosted = true;
@@ -1040,12 +1061,14 @@ async function updatePublishedPuzzle(id, patch, { removedColumns = [] } = {}) {
   return Array.isArray(data) ? data[0] : null;
 }
 
-async function deletePublishedPuzzle(id, clientIdValue) {
+async function deletePublishedPuzzle(id, { userId = null, clientIdValue = null } = {}) {
   if (!id) return null;
   const params = new URLSearchParams({
     id: `eq.${id}`,
   });
-  if (clientIdValue) {
+  if (userId) {
+    params.set('user_id', `eq.${userId}`);
+  } else if (clientIdValue) {
     params.set('client_id', `eq.${clientIdValue}`);
   }
   let response;
@@ -1214,10 +1237,50 @@ function ensureClientId() {
   }
 }
 
+function readSupabaseSession() {
+  if (!SUPABASE_AUTH_STORAGE_KEY) return null;
+  try {
+    const raw = localStorage.getItem(SUPABASE_AUTH_STORAGE_KEY);
+    if (!raw) {
+      cachedAuthRaw = null;
+      cachedAuthSession = null;
+      return null;
+    }
+    if (raw === cachedAuthRaw) {
+      return cachedAuthSession;
+    }
+    const parsed = JSON.parse(raw);
+    cachedAuthRaw = raw;
+    cachedAuthSession = parsed && typeof parsed === 'object' ? parsed : null;
+    return cachedAuthSession;
+  } catch (_) {
+    cachedAuthRaw = null;
+    cachedAuthSession = null;
+    return null;
+  }
+}
+
+function getSupabaseAuthContext() {
+  const session = readSupabaseSession();
+  if (!session || !session.access_token) {
+    return { userId: null, accessToken: '' };
+  }
+  const expiresAt = Number(session.expires_at || 0);
+  if (expiresAt && Date.now() >= (expiresAt * 1000) - 30000) {
+    return { userId: null, accessToken: '' };
+  }
+  return {
+    userId: session.user?.id || null,
+    accessToken: session.access_token || '',
+  };
+}
+
 function supabaseHeaders() {
+  const { accessToken } = getSupabaseAuthContext();
+  const bearer = accessToken || SUPABASE_ANON_KEY;
   return {
     apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    Authorization: `Bearer ${bearer}`,
     'x-client-id': clientId || '',
   };
 }
@@ -1427,6 +1490,8 @@ function normalizePublishTask(task) {
   const difficulty = normalizeDifficulty(task.difficulty);
   const authorName = task.authorName || getCreatorNickname();
   const authorXUrl = task.authorXUrl || getCreatorXUrl();
+  const authContext = getSupabaseAuthContext();
+  const userId = task.userId || authContext.userId || null;
   const clientIdValue = task.clientId || clientId || null;
   const size = task.size && Number.isFinite(task.size.width) && Number.isFinite(task.size.height)
     ? task.size
@@ -1439,6 +1504,7 @@ function normalizePublishTask(task) {
     authorName,
     authorXUrl,
     clientId: clientIdValue,
+    userId,
     postToContest: task.postToContest !== false,
     originalDataUrl,
     diffDataUrl,
@@ -1478,6 +1544,7 @@ async function publishQueuedTask(task) {
     authorName,
     authorXUrl,
     clientId: clientIdValue,
+    userId,
     postToContest,
     originalDataUrl,
     diffDataUrl,
@@ -1514,6 +1581,9 @@ async function publishQueuedTask(task) {
   }
   if (authorXUrl) {
     payload.author_x_url = authorXUrl;
+  }
+  if (userId) {
+    payload.user_id = userId;
   }
 
   let inserted = null;
@@ -1570,6 +1640,8 @@ async function publishQueuedTask(task) {
         width,
         height,
         colors,
+        userId,
+        clientId: clientIdValue,
       });
       let contestEntry = null;
       try {
@@ -1584,6 +1656,8 @@ async function publishQueuedTask(task) {
             width,
             height,
             colors,
+            userId,
+            clientId: clientIdValue,
           });
           contestEntry = await insertContestEntry(contestPayload);
         } else {
@@ -1794,6 +1868,8 @@ function createContestPayload({
   width,
   height,
   colors,
+  userId,
+  clientId: clientIdValue,
 }) {
   const payload = {
     name: getCreatorNickname(),
@@ -1805,8 +1881,14 @@ function createContestPayload({
     width,
     height,
     colors: Number.isFinite(colors) ? colors : null,
-    client_id: `pixfind-${puzzleId}`,
   };
+  const clientValue = clientIdValue || clientId || '';
+  if (clientValue) {
+    payload.client_id = clientValue;
+  }
+  if (userId) {
+    payload.user_id = userId;
+  }
   if (imageUrl) {
     payload.image_url = imageUrl;
   }
@@ -1861,6 +1943,7 @@ function normalizePublishedPuzzleEntry(entry) {
     author: resolveAuthorName(entry, '名無し'),
     authorUrl: resolveAuthorUrl(entry),
     clientId: entry.client_id ?? entry.clientId ?? null,
+    userId: entry.user_id ?? entry.userId ?? null,
     original,
     diff,
     thumbnail: entry.thumbnail_url ?? entry.thumbnail ?? diff ?? original,
@@ -2260,6 +2343,11 @@ function renderGameAuthor(puzzle) {
 function canDeletePuzzle(puzzle) {
   if (!puzzle) return false;
   if (puzzle.source !== 'published') return false;
+  const authContext = getSupabaseAuthContext();
+  if (puzzle.userId && authContext.userId && puzzle.userId === authContext.userId) {
+    return true;
+  }
+  ensureClientId();
   if (!puzzle.clientId || !clientId) return false;
   return puzzle.clientId === clientId;
 }
@@ -2412,6 +2500,7 @@ async function startOfficialPuzzle(puzzle) {
       author: puzzle.author || '',
       authorUrl: puzzle.authorUrl || '',
       clientId: puzzle.clientId || null,
+      userId: puzzle.userId || null,
     };
     prepareGameBoard(originalImage, challengeImage, diffResult, metadata);
     dom.gameTitle.textContent = metadata.name;
@@ -2439,7 +2528,14 @@ async function handleDeleteCurrentPuzzle() {
   }
   setHint('削除しています...');
   try {
-    await deletePublishedPuzzle(puzzle.id, puzzle.clientId);
+    const authContext = getSupabaseAuthContext();
+    ensureClientId();
+    const canDeleteByUser = puzzle.userId && authContext.userId && puzzle.userId === authContext.userId;
+    const canDeleteByClient = puzzle.clientId && clientId && puzzle.clientId === clientId;
+    await deletePublishedPuzzle(puzzle.id, {
+      userId: canDeleteByUser ? authContext.userId : null,
+      clientIdValue: !canDeleteByUser && canDeleteByClient ? clientId : null,
+    });
     state.officialPuzzles = state.officialPuzzles.filter(entry => entry.id !== puzzle.id);
     const published = state.officialPuzzles.filter(entry => entry.source === 'published');
     savePublishedCache(published);
