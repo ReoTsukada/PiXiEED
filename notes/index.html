@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no, viewport-fit=cover"/>
+  <title>PiXiEED | 開発ノート</title>
+  <meta name="description" content="PiXiEEDの開発ノートまとめ。各ツール・ゲームごとの更新履歴を日付順に確認できます。"/>
+  <link rel="canonical" href="https://pixieed.jp/notes/index.html"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:site_name" content="PiXiEED"/>
+  <meta property="og:title" content="PiXiEED | 開発ノート"/>
+  <meta property="og:description" content="PiXiEEDの開発ノートまとめ。各ツール・ゲームごとの更新履歴を日付順に確認できます。"/>
+  <meta property="og:url" content="https://pixieed.jp/notes/index.html"/>
+  <meta property="og:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
+  <meta property="og:locale" content="ja_JP"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:site" content="@PiXiEED_arta"/>
+  <meta name="twitter:url" content="https://pixieed.jp/notes/index.html"/>
+  <meta name="twitter:title" content="PiXiEED | 開発ノート"/>
+  <meta name="twitter:description" content="PiXiEEDの開発ノートまとめ。各ツール・ゲームごとの更新履歴を日付順に確認できます。"/>
+  <meta name="twitter:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
+  <link rel="icon" type="image/png" href="../character-dots/mao1.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
+  <style>
+    :root{ color-scheme: dark; }
+    *{
+      box-sizing:border-box;
+      user-select:none;
+      -webkit-user-select:none;
+      -ms-user-select:none;
+    }
+    html,body{
+      overflow-x:hidden;
+      max-width:100vw;
+    }
+    body{
+      margin:0 auto;
+      font-family:'Fredoka','DotGothic16',system-ui,sans-serif;
+      background:radial-gradient(circle at 20% 20%, rgba(59,130,246,0.22), rgba(15,23,42,1)),
+                 radial-gradient(circle at 80% 0%, rgba(236,72,153,0.18), rgba(15,23,42,1)),
+                 #0b1224;
+      color:#e5e7eb;
+      min-height:100vh;
+      padding:0 14px 120px;
+      width:100%;
+      display:block;
+      max-width:100vw;
+      box-sizing:border-box;
+    }
+    .page{
+      width:100%;
+      max-width:min(1100px, 100vw);
+      min-width:0;
+      display:grid;
+      gap:14px;
+      position:relative;
+      margin:0 auto;
+      box-sizing:border-box;
+    }
+    header{
+      position:sticky;
+      top:0;
+      z-index:70;
+      background:rgba(11,18,36,0.94);
+      backdrop-filter:blur(8px);
+      border-bottom:1px solid rgba(255,255,255,0.08);
+      margin:-20px -14px 8px;
+      padding:10px 14px;
+      box-sizing:border-box;
+    }
+    .header-inner{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      width:100%;
+      max-width:1100px;
+      margin:0 auto;
+      box-sizing:border-box;
+    }
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-weight:800;
+      letter-spacing:0.01em;
+      background:none;
+      border:0;
+      padding:0;
+      cursor:pointer;
+      color:#f9fafb;
+      text-decoration:none;
+    }
+    .brand-icon{
+      width:34px;
+      height:34px;
+      border-radius:10px;
+      background:rgba(255,255,255,0.12);
+      padding:4px;
+      border:1px solid rgba(255,255,255,0.2);
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+    }
+    .brand-icon img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      display:block;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .brand-text{ display:flex; flex-direction:column; gap:2px; }
+    .brand-title{ margin:0; font-size:16px; color:#f9fafb; }
+    .brand-sub{ margin:0; font-size:12px; color:#9ca3af; }
+    h1{ margin:0; font-size:22px; }
+    .subtitle{ margin:0; color:#cbd5e1; font-size:12px; line-height:1.6; }
+    .card{
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:12px;
+      padding:16px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.3);
+    }
+    .note-chips{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top:10px;
+    }
+    .note-chip{
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(0,0,0,0.2);
+      color:#e5e7eb;
+      border-radius:999px;
+      padding:6px 12px;
+      text-decoration:none;
+      font-weight:700;
+      font-size:12px;
+    }
+    .note-chip:hover,
+    .note-chip:focus{
+      color:#0b1224;
+      background:linear-gradient(135deg,#ff719a,#ff9f43);
+      border-color:transparent;
+    }
+    .note-section{
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:12px;
+      padding:16px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.3);
+      display:grid;
+      gap:12px;
+    }
+    .note-section__head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .note-section__head h2{
+      margin:0;
+      font-size:18px;
+      color:#f9fafb;
+    }
+    .note-section__link{
+      border:1px solid rgba(255,255,255,0.18);
+      border-radius:999px;
+      padding:6px 12px;
+      text-decoration:none;
+      font-weight:700;
+      font-size:12px;
+      color:#e5e7eb;
+      background:rgba(255,255,255,0.06);
+    }
+    .note-section__link:hover,
+    .note-section__link:focus{
+      color:#0b1224;
+      background:linear-gradient(135deg,#93c5fd,#38bdf8);
+      border-color:transparent;
+    }
+    .note-entry-list{
+      display:grid;
+      gap:10px;
+    }
+    .note-entry{
+      background:rgba(0,0,0,0.25);
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:12px;
+      padding:12px;
+      display:grid;
+      gap:8px;
+    }
+    .note-date{
+      font-size:12px;
+      color:#93c5fd;
+      font-weight:700;
+      letter-spacing:0.04em;
+    }
+    .note-items{
+      margin:0;
+      padding-left:18px;
+      color:#e5e7eb;
+      font-size:12px;
+      line-height:1.6;
+    }
+    .note-items li{ margin-bottom:4px; }
+    .note-items li:last-child{ margin-bottom:0; }
+    .note-empty{
+      margin:0;
+      color:#9ca3af;
+      font-size:12px;
+    }
+    .bottom-nav{
+      position:fixed;
+      bottom:0;
+      left:0;
+      right:0;
+      height:68px;
+      background:rgba(11,18,36,0.96);
+      border-top:1px solid rgba(255,255,255,0.08);
+      display:flex;
+      justify-content:space-around;
+      align-items:center;
+      z-index:80;
+      backdrop-filter:blur(8px);
+    }
+    .bottom-nav__item{
+      flex:1;
+      text-align:center;
+      color:#cbd5e1;
+      text-decoration:none;
+      font-weight:700;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:4px;
+      font-size:12px;
+      padding:8px 0;
+    }
+    .bottom-nav__item .icon{
+      width:22px;
+      height:22px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .bottom-nav__item .icon img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      image-rendering:pixelated;
+    }
+    .bottom-nav__item.is-active{ color:#f9fafb; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header aria-label="top-nav">
+      <div class="header-inner">
+        <a class="brand" href="../index.html">
+          <span class="brand-icon"><img src="../character-dots/mao1.png" alt="logo"></span>
+          <span class="brand-text">
+            <span class="brand-title">PiXiEED</span>
+            <span class="brand-sub">開発ノート</span>
+          </span>
+        </a>
+        <div></div>
+      </div>
+    </header>
+
+    <section class="card">
+      <h1>開発ノート</h1>
+      <p class="subtitle">各プロジェクトの実装内容を日付ごとに整理しています。チップをタップすると該当セクションに移動します。</p>
+      <div class="note-chips" id="devNotesNav"></div>
+    </section>
+
+    <div id="devNotes"></div>
+  </div>
+
+  <nav class="bottom-nav">
+    <a class="bottom-nav__item" data-tab="home" href="../index.html">
+      <span class="icon"><img src="../FooterIcon1.png" alt=""/></span><span>ホーム</span>
+    </a>
+    <a class="bottom-nav__item" data-tab="contest" href="../contest/index.html">
+      <span class="icon"><img src="../FooterIcon2.png" alt=""/></span><span>コンテスト</span>
+    </a>
+    <a class="bottom-nav__item" data-tab="tools" href="../tools.html">
+      <span class="icon"><img src="../FooterIcon3.png" alt=""/></span><span>ツール/ゲーム</span>
+    </a>
+    <a class="bottom-nav__item is-active" data-tab="notes" href="./index.html">
+      <span class="icon"><img src="../FooterIcon5.png" alt=""/></span><span>開発ノート</span>
+    </a>
+    <a class="bottom-nav__item" data-tab="portfolio" href="../portfolio/index.html">
+      <span class="icon"><img src="../FooterIcon4.png" alt=""/></span><span>企業向け</span>
+    </a>
+  </nav>
+
+  <script src="../scripts/dev-notes.js"></script>
+</body>
+</html>
