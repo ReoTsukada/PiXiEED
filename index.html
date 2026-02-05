@@ -292,10 +292,8 @@
     .link-desc{ margin:0; font-size:12px; color:#cbd5e1; line-height:1.5; }
     .project-place{
       display:block;
-      text-decoration:none;
       color:inherit;
       position:relative;
-      cursor:pointer;
       transition:border-color 0.12s ease, box-shadow 0.12s ease;
     }
     .project-place:hover,
@@ -323,6 +321,20 @@
       background:rgba(255,255,255,0.08);
       color:#f9fafb;
       white-space:nowrap;
+      text-decoration:none;
+    }
+    .project-place__link{
+      display:inline-flex;
+      align-items:center;
+      margin-top:8px;
+      font-size:12px;
+      font-weight:700;
+      color:#93c5fd;
+      text-decoration:none;
+    }
+    .project-place__link:hover,
+    .project-place__link:focus{
+      color:#f9fafb;
     }
     .project-place__body{
       display:grid;
@@ -1058,19 +1070,20 @@
       <p class="seo-links">ブラウザで描ける <a href="projects/pixiedraw/index.html">ドット絵エディター PiXiEEDraw</a> と、16×16練習向けの <a href="projects/jerin-maker/index.html">16×16ドット絵ツール PiXiEEDraw Lite</a> を紹介しています。</p>
     </section>
 
-    <a class="card project-place" href="tools.html">
+    <section class="card project-place">
       <div class="project-place__header">
         <div class="project-place__copy">
           <h2>プロジェクト</h2>
-          <p class="subtitle">ゲーム・ツール・ラボ作品などをダイジェストで紹介。OGPは最近更新順に左上から並びます。タップでツール/ゲーム一覧へ。</p>
+          <p class="subtitle">ゲーム・ツール・ラボ作品などをダイジェストで紹介。OGPは最近更新順に左上から並びます。リンクからツール/ゲーム一覧へ。</p>
         </div>
-        <span class="project-place__cta">ツール/ゲーム一覧へ</span>
+        <a class="project-place__cta" href="tools.html">ツール/ゲーム一覧へ</a>
       </div>
       <div class="project-place__body">
         <div class="project-place__image" data-project-place data-columns="3" data-tile-width="420" data-tile-height="280">
           <canvas class="project-place__canvas" id="projectPlaceCanvas" width="1260" height="560" role="img" aria-label="PiXiEEDのプロジェクトOGPを最近更新順にまとめたグリッド画像"></canvas>
           <img class="project-place__fallback" src="images/project-grid.png" alt="PiXiEEDのプロジェクトOGPをグリッドにまとめた画像" loading="lazy">
           <ul class="project-place__source" id="projectPlaceItems" hidden>
+            <li data-title="魔王奪還戦" data-image="PiXiEEDogp.png" data-updated="2026-02-05" data-update="宝箱チャリン調整 / 地面スプライト修正"></li>
             <li data-title="魔王様!!いつまでよければいいですか!?" data-image="maoitu/ogp.png" data-updated="2025-10-10" data-update=""></li>
             <li data-title="PiXFiND" data-image="pixfind/ogp.png" data-updated="2025-10-21" data-update=""></li>
             <li data-title="PiXiEEDraw Lite" data-image="jerin-maker/ogp-app.png" data-updated="2025-12-13" data-update="" data-readme="jerin-maker/README.md"></li>
@@ -1100,10 +1113,11 @@
             <p class="project-place__label">Updates</p>
             <h3 class="project-place__title">最近の更新</h3>
             <ul class="project-place__updates" id="projectPlaceUpdates" aria-live="polite"></ul>
+            <a class="project-place__link" href="notes/index.html">開発ノートまとめへ</a>
           </div>
         </div>
       </div>
-    </a>
+    </section>
 
     <section class="card" aria-label="広告">
       <div class="ad-block ad-block--home">
@@ -1144,9 +1158,7 @@
     <a class="bottom-nav__item" data-tab="tools" href="tools.html">
       <span class="icon"><img src="FooterIcon3.png" alt=""/></span><span>ツール/ゲーム</span>
     </a>
-    <a class="bottom-nav__item" data-tab="notes" href="notes/index.html">
-      <span class="icon"><img src="FooterIcon5.png" alt=""/></span><span>開発ノート</span>
-    </a>
+    <span class="bottom-nav__item bottom-nav__item--empty" aria-hidden="true"></span>
     <a class="bottom-nav__item" data-tab="portfolio" href="portfolio/index.html">
       <span class="icon"><img src="FooterIcon4.png" alt=""/></span><span>企業向け</span>
     </a>
