@@ -327,6 +327,11 @@
     }
     .title{ font-size:18px; font-weight:800; margin:0; }
     .author{ margin:0; color:#cbd5e1; font-size:13px; }
+    .author a{
+      color:inherit;
+      text-decoration:underline;
+      text-underline-offset:2px;
+    }
     .likes{ color:#fbbf24; font-weight:800; }
     .tag-block{
       display:grid;
@@ -813,6 +818,10 @@
         <div class="avatar-panel" id="avatarPanel" hidden>
           <div class="avatar-grid" id="avatarGrid"></div>
         </div>
+        <label class="profile-name">
+          <span style="font-weight:700; color:#e5e7eb;">X (旧Twitter)</span>
+          <input class="auth-input" id="profileX" type="url" placeholder="https://x.com/username" maxlength="200" inputmode="url">
+        </label>
         <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
       </div>
       <div class="profile-block">
@@ -915,6 +924,8 @@
     let supportsDownloadSettings = true;
     let supportsImageUrls = true;
     let supportsStorageUploads = true;
+    let supportsXUrl = true;
+    let supportsProfileXUrl = true;
     let relatedOffset = 0;
     let relatedHasMore = false;
     let relatedLoading = false;
@@ -1286,6 +1297,53 @@
       }catch(_){}
     }
 
+    function loadXUrl(){
+      try{
+        return localStorage.getItem('pixieed_x_url') || '';
+      }catch(_){
+        return '';
+      }
+    }
+
+    function normalizeXUrl(value){
+      const raw = String(value || '').trim();
+      if(!raw) return '';
+      if(/^https?:\/\//i.test(raw)){
+        try{
+          const url = new URL(raw);
+          const host = url.hostname.replace(/^www\./, '');
+          if(host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com' || host.endsWith('.twitter.com')){
+            return url.toString();
+          }
+        }catch(_){}
+        return '';
+      }
+      const handle = raw.replace(/^@+/, '').trim();
+      if(!handle) return '';
+      const candidate = /^(x\.com|twitter\.com)\//i.test(handle)
+        ? `https://${handle}`
+        : `https://x.com/${handle}`;
+      try{
+        const url = new URL(candidate);
+        const host = url.hostname.replace(/^www\./, '');
+        if(host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com' || host.endsWith('.twitter.com')){
+          return url.toString();
+        }
+      }catch(_){}
+      return '';
+    }
+
+    function saveXUrl(value){
+      try{
+        const normalized = normalizeXUrl(value);
+        if(normalized){
+          localStorage.setItem('pixieed_x_url', normalized);
+        }else{
+          localStorage.removeItem('pixieed_x_url');
+        }
+      }catch(_){}
+    }
+
     function loadAvatar(){
       try{
         return localStorage.getItem('pixieed_avatar') || 'mao';
@@ -1417,6 +1475,36 @@
       return preferThumb ? (thumb || full || base || '') : (full || base || thumb || '');
     }
 
+    function resolveAuthorUrl(entry){
+      const fromEntry = normalizeXUrl(entry?.x_url || '');
+      if(fromEntry) return fromEntry;
+      const local = normalizeXUrl(loadXUrl());
+      const isOwner = entry && ((entry.user_id && supabaseUser?.id === entry.user_id) || (!entry.user_id && entry.client_id === clientId));
+      return isOwner ? local : '';
+    }
+
+    function renderAuthor(authorEl, entryData){
+      if(!authorEl) return;
+      authorEl.textContent = '';
+      const name = entryData?.name || '名無し';
+      const prefix = document.createElement('span');
+      prefix.textContent = 'by ';
+      authorEl.appendChild(prefix);
+      const url = resolveAuthorUrl(entryData);
+      if(url){
+        const link = document.createElement('a');
+        link.href = url;
+        link.textContent = name;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        authorEl.appendChild(link);
+      }else{
+        const label = document.createElement('span');
+        label.textContent = name;
+        authorEl.appendChild(label);
+      }
+    }
+
     function getRelatedFilter(){
       if(!entry) return null;
       if(entry.user_id) return { key: 'user_id', value: entry.user_id };
@@ -1450,7 +1538,8 @@
     }
 
     function getEntrySelect(){
-      return supportsImageUrls ? ENTRY_SELECT_WITH_URL : ENTRY_SELECT_BASE;
+      const base = supportsImageUrls ? ENTRY_SELECT_WITH_URL : ENTRY_SELECT_BASE;
+      return supportsXUrl ? `${base},x_url` : base;
     }
 
     function getRelatedSelect(){
@@ -1628,25 +1717,54 @@
       if(!supabaseAuth || !supabaseUser?.id) return;
       const localNick = loadNickname();
       const localAvatar = loadAvatar();
+      const localXUrl = normalizeXUrl(loadXUrl());
       try{
-        const { data, error } = await supabaseAuth
+        let selectColumns = supportsProfileXUrl ? 'nickname, avatar, x_url' : 'nickname, avatar';
+        let { data, error } = await supabaseAuth
           .from('user_profiles')
-          .select('nickname, avatar')
+          .select(selectColumns)
           .eq('id', supabaseUser.id)
           .maybeSingle();
+        if(error && supportsProfileXUrl && isMissingColumn(error, 'x_url')){
+          supportsProfileXUrl = false;
+          selectColumns = 'nickname, avatar';
+          ({ data, error } = await supabaseAuth
+            .from('user_profiles')
+            .select(selectColumns)
+            .eq('id', supabaseUser.id)
+            .maybeSingle());
+        }
         if(error) throw error;
         const serverNick = (data?.nickname || '').trim();
         const serverAvatar = data?.avatar || '';
+        const serverXUrl = normalizeXUrl(data?.x_url || '');
         if(serverNick) saveNickname(serverNick);
         if(serverAvatar) saveAvatar(serverAvatar);
-        if(!serverNick && !serverAvatar && (localNick || localAvatar)){
-          const upsert = await supabaseAuth.from('user_profiles').upsert({
-            id: supabaseUser.id,
-            nickname: localNick || null,
-            avatar: localAvatar || null
-          });
-          if(upsert.error) throw upsert.error;
+        if(serverXUrl) saveXUrl(serverXUrl);
+        const shouldUpsert = (!serverNick && localNick) || (!serverAvatar && localAvatar) || (!serverXUrl && localXUrl);
+        if(shouldUpsert){
+          const payload = { id: supabaseUser.id };
+          if(localNick && !serverNick) payload.nickname = localNick;
+          if(localAvatar && !serverAvatar) payload.avatar = localAvatar;
+          if(localXUrl && !serverXUrl && supportsProfileXUrl) payload.x_url = localXUrl;
+          if(Object.keys(payload).length > 1){
+            let upsert = await supabaseAuth.from('user_profiles').upsert(payload);
+            if(upsert.error && supportsProfileXUrl && isMissingColumn(upsert.error, 'x_url')){
+              supportsProfileXUrl = false;
+              delete payload.x_url;
+              if(Object.keys(payload).length > 1){
+                upsert = await supabaseAuth.from('user_profiles').upsert(payload);
+              }else{
+                upsert = null;
+              }
+            }
+            if(upsert?.error) throw upsert.error;
+          }
         }
+        const nickInput = document.getElementById('profileNickname');
+        if(nickInput) nickInput.value = serverNick || localNick || '';
+        const xInput = document.getElementById('profileX');
+        if(xInput) xInput.value = serverXUrl || localXUrl || '';
         updateNameDisplay();
         applyAvatarToBrand();
         renderAvatarChoices();
@@ -1744,6 +1862,7 @@
       const panel = document.getElementById('authPanel');
       const saveBtn = document.getElementById('saveProfile');
       const nicknameInput = document.getElementById('profileNickname');
+      const xInput = document.getElementById('profileX');
       const togglePanel = (open) => {
         if(!panel) return;
         if(open){
@@ -1757,6 +1876,7 @@
       };
       if(openBtn) openBtn.addEventListener('click', () => {
         if(nicknameInput) nicknameInput.value = loadNickname();
+        if(xInput) xInput.value = loadXUrl();
         renderAvatarChoices();
         togglePanel(true);
       });
@@ -1767,11 +1887,21 @@
       if(saveBtn){
         saveBtn.addEventListener('click', async () => {
           const nick = (nicknameInput?.value || '').trim();
+          const xUrl = normalizeXUrl(xInput?.value || '');
           if(nick) saveNickname(nick);
+          saveXUrl(xUrl);
           applyAvatarToBrand();
           if(supabaseAuth && supabaseUser?.id){
             try{
-              await supabaseAuth.from('user_profiles').upsert({ id: supabaseUser.id, nickname: nick || null, avatar: loadAvatar() });
+              const payload = { id: supabaseUser.id, nickname: nick || null, avatar: loadAvatar() };
+              if(supportsProfileXUrl) payload.x_url = xUrl || null;
+              let res = await supabaseAuth.from('user_profiles').upsert(payload);
+              if(res.error && supportsProfileXUrl && isMissingColumn(res.error, 'x_url')){
+                supportsProfileXUrl = false;
+                delete payload.x_url;
+                res = await supabaseAuth.from('user_profiles').upsert(payload);
+              }
+              if(res.error) throw res.error;
               setAuthStatus('プロフィールを保存しました');
             }catch(err){
               console.warn('profile save fallback', err);
@@ -1851,7 +1981,7 @@
       if(!entry){
         img.src = '';
         titleEl.textContent = '読み込めませんでした';
-        authorEl.textContent = '';
+        if(authorEl) authorEl.textContent = '';
         likesEl.textContent = '';
         if(delBtn) delBtn.style.display = 'none';
         if(playBtn){
@@ -1875,7 +2005,7 @@
       };
       img.alt = entry.title || 'dot work';
       titleEl.textContent = entry.title || '無題';
-      authorEl.textContent = `by ${entry.name || '名無し'}`;
+      renderAuthor(authorEl, entry);
       likesEl.textContent = `${entry.likeCount || 0}`;
       const isLiked = likedEntries.has(entry.id);
       likeIcon.src = isLiked ? FAV_SRC : NFAV_SRC;
@@ -2010,6 +2140,11 @@
         }
       }catch(err){
         console.error(err);
+        if(supportsXUrl && isMissingColumn(err, 'x_url')){
+          supportsXUrl = false;
+          await fetchEntry(id);
+          return;
+        }
         if(supportsImageUrls && (isMissingColumn(err, 'image_url') || isMissingColumn(err, 'thumb_url'))){
           supportsImageUrls = false;
           await fetchEntry(id);
