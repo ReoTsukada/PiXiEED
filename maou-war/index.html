@@ -2026,13 +2026,12 @@
     placeOddTiles('trap', trapTileCount);
     placeOddTiles('poison', poisonTileCount);
     placeOddTiles('treasure', treasureTileCount);
-    placeOddTiles('mimic', mimicTileCount);
     placeStatTiles();
 
     for (let y = 0; y < MAP_SIZE; y++) {
       for (let x = 0; x < MAP_SIZE; x++) {
         const tileId = tiles[y][x];
-        if (tileId === 'treasure' || tileId === 'mimic') {
+        if (tileId === 'treasure') {
           itemTileTotal += 1;
         }
       }
@@ -2806,16 +2805,23 @@
     addLog(`${label} +${amount}`);
   }
 
+  function rollTreasureCoins(lucValue) {
+    const luck = Math.max(0, lucValue || 0);
+    if (luck >= 100) return 1000;
+    const luckRate = clamp(luck / 100, 0, 1);
+    const baseChance = 0.02;
+    const maxChance = baseChance + (1 - baseChance) * luckRate;
+    if (rand() < maxChance) return 1000;
+    const min = 10;
+    const max = 999;
+    const exponent = 1.15 - 0.65 * luckRate;
+    const roll = Math.pow(rand(), exponent);
+    return Math.round(min + (max - min) * roll);
+  }
+
   function applyTreasureReward() {
-    const stats = [
-      { key: 'atk', label: 'こうげき' },
-      { key: 'def', label: 'ぼうぎょ' },
-      { key: 'spd', label: 'はやさ' },
-      { key: 'luc', label: 'うん' },
-      { key: 'hp', label: 'たいりょく' }
-    ];
-    const pick = stats[Math.floor(rand() * stats.length)];
-    applyStatBoost(pick.key, `宝箱: ${pick.label}`);
+    const coins = rollTreasureCoins(player.luc);
+    addCoins(coins, '宝箱');
   }
 
   function grantRandomSkill() {
@@ -2974,7 +2980,6 @@
       }
     } else if (tileId === 'treasure') {
       applyTreasureReward();
-      addCoins(1, '宝箱');
       player.itemsCollected += 1;
       tiles[y][x] = 'empty';
     } else if (tileId === 'mimic') {
@@ -3100,7 +3105,7 @@
     };
 
     const reachableFromPlayer = buildReachableFrom(player.x, player.y);
-    const reachableFromBoss = buildReachableFrom(bossPos.x, bossPos.y, player.x, player.y);
+    const reachableFromBoss = buildReachableFrom(bossPos.x, bossPos.y);
     for (let y = 0; y < MAP_SIZE; y++) {
       for (let x = 0; x < MAP_SIZE; x++) {
         if (x === player.x && y === player.y) continue;
@@ -3108,7 +3113,6 @@
         const tileId = tiles[y]?.[x];
         if (!tileId) continue;
         if (tileId === 'wall') continue;
-        if (tileId === 'treasure' && reachableFromPlayer[y][x]) continue;
         if (reachableFromPlayer[y][x] && reachableFromBoss[y][x]) continue;
         tiles[y][x] = 'wall';
         visited[y][x] = true;
