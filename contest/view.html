@@ -1765,7 +1765,6 @@
         if(nickInput) nickInput.value = serverNick || localNick || '';
         const xInput = document.getElementById('profileX');
         if(xInput) xInput.value = serverXUrl || localXUrl || '';
-        updateNameDisplay();
         applyAvatarToBrand();
         renderAvatarChoices();
       }catch(err){
@@ -1775,6 +1774,7 @@
 
     function updateAuthUI(){
       const btn = document.getElementById('authBtn');
+      const logoutBtn = document.getElementById('logoutBtn');
       const nick = loadNickname();
       const emailInput = document.getElementById('authEmail');
       const passInput = document.getElementById('authPasscode');
@@ -1782,7 +1782,8 @@
       const linkedEmail = document.getElementById('linkedEmail');
       if(!btn) return;
       if(supabaseUser){
-        btn.textContent = 'ログアウト';
+        if(logoutBtn) logoutBtn.style.display = 'block';
+        btn.style.display = 'none';
         setAuthStatus(`ログイン中${supabaseUser.email ? `: ${supabaseUser.email}` : ''}${nick ? ` / ${nick}` : ''}`);
         if(emailInput){
           emailInput.value = supabaseUser.email || emailInput.value;
@@ -1799,6 +1800,8 @@
         }
       }else{
         btn.textContent = 'メール＋パスコードでログイン';
+        btn.style.display = '';
+        if(logoutBtn) logoutBtn.style.display = 'none';
         setAuthStatus(nick ? `ニックネーム: ${nick}` : '');
         if(emailInput){
           emailInput.disabled = false;
@@ -1918,20 +1921,6 @@
           setAuthStatus('オンラインでログインしてください');
           return;
         }
-        if(supabaseUser){
-          await supabaseAuth.auth.signOut();
-          supabaseSession = null;
-          supabaseUser = null;
-          migrationDone = false;
-          clientLinkChecked = false;
-          clientLinkConflict = false;
-          try{ localStorage.removeItem('pixieed_link_conflict'); }catch(_){}
-          updateAuthUI();
-          await fetchEntry(currentEntryId);
-          scheduleRelatedFetch(currentEntryId);
-          togglePanel(false);
-          return;
-        }
         let email = window.prompt('メールアドレスを入力してください') || '';
         if(!email){
           setAuthStatus('メールアドレスを入力してください');
@@ -1966,6 +1955,26 @@
           setAuthStatus('ログインに失敗しました');
         }
       });
+      if(logoutBtn){
+        logoutBtn.addEventListener('click', async () => {
+          if(!supabaseAuth) return;
+          try{
+            await supabaseAuth.auth.signOut();
+          }catch(err){
+            console.warn('logout failed', err);
+          }
+          supabaseSession = null;
+          supabaseUser = null;
+          migrationDone = false;
+          clientLinkChecked = false;
+          clientLinkConflict = false;
+          try{ localStorage.removeItem('pixieed_link_conflict'); }catch(_){}
+          updateAuthUI();
+          await fetchEntry(currentEntryId);
+          scheduleRelatedFetch(currentEntryId);
+          togglePanel(false);
+        });
+      }
     }
 
     function render(){
