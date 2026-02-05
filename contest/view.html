@@ -794,7 +794,9 @@
     <a class="bottom-nav__item" data-tab="tools" href="../tools.html">
       <span class="icon"><img src="../FooterIcon3.png" alt=""/></span><span>ツール/ゲーム</span>
     </a>
-    <span class="bottom-nav__item bottom-nav__item--empty" aria-hidden="true"></span>
+    <a class="bottom-nav__item" data-tab="notes" href="../notes/index.html">
+      <span class="icon"><img src="../FooterIcon5.png" alt=""/></span><span>開発ノート</span>
+    </a>
     <a class="bottom-nav__item" data-tab="portfolio" href="../portfolio/index.html">
       <span class="icon"><img src="../FooterIcon4.png" alt=""/></span><span>企業向け</span>
     </a>
@@ -915,6 +917,7 @@
     let supabaseAuth = null;
     let supabaseSession = null;
     let supabaseUser = null;
+    let profileSyncChannel = null;
     let migrationDone = false;
     let likedEntries = new Set();
     let entry = null;
@@ -1344,6 +1347,70 @@
       }catch(_){}
     }
 
+    const PROFILE_DIRTY_FIELDS_KEY = 'pixieed_profile_dirty_fields';
+
+    function loadProfileDirtyFields(){
+      try{
+        const raw = localStorage.getItem(PROFILE_DIRTY_FIELDS_KEY);
+        if(!raw) return new Set();
+        const parsed = JSON.parse(raw);
+        if(Array.isArray(parsed)){
+          return new Set(parsed.filter(Boolean));
+        }
+      }catch(_){}
+      return new Set();
+    }
+
+    function saveProfileDirtyFields(fields){
+      try{
+        if(!fields || fields.size === 0){
+          localStorage.removeItem(PROFILE_DIRTY_FIELDS_KEY);
+          return;
+        }
+        localStorage.setItem(PROFILE_DIRTY_FIELDS_KEY, JSON.stringify(Array.from(fields)));
+      }catch(_){}
+    }
+
+    function markProfileDirty(...fields){
+      const set = loadProfileDirtyFields();
+      fields.filter(Boolean).forEach(field => set.add(field));
+      saveProfileDirtyFields(set);
+    }
+
+    function clearProfileDirty(...fields){
+      if(!fields.length){
+        try{ localStorage.removeItem(PROFILE_DIRTY_FIELDS_KEY); }catch(_){}
+        return;
+      }
+      const set = loadProfileDirtyFields();
+      fields.forEach(field => set.delete(field));
+      saveProfileDirtyFields(set);
+    }
+
+    function applyProfileFromServer(data, { force = false } = {}){
+      if(!data) return;
+      const serverNick = (data.nickname || '').trim();
+      const serverAvatar = data.avatar || '';
+      const hasXUrl = supportsProfileXUrl && Object.prototype.hasOwnProperty.call(data, 'x_url');
+      const serverXUrl = hasXUrl ? normalizeXUrl(data.x_url || '') : '';
+      if(force){
+        saveNickname(serverNick);
+        saveAvatar(serverAvatar);
+        if(hasXUrl) saveXUrl(serverXUrl);
+        clearProfileDirty('nickname', 'avatar', 'x_url');
+      }
+      const nickInput = document.getElementById('profileNickname');
+      if(nickInput){
+        nickInput.value = force ? serverNick : (nickInput.value || serverNick || '');
+      }
+      const xInput = document.getElementById('profileX');
+      if(xInput && hasXUrl){
+        xInput.value = force ? serverXUrl : (xInput.value || serverXUrl || '');
+      }
+      applyAvatarToBrand();
+      renderAvatarChoices();
+    }
+
     function loadAvatar(){
       try{
         return localStorage.getItem('pixieed_avatar') || 'mao';
@@ -1415,6 +1482,7 @@
         }
         btn.addEventListener('click', () => {
           saveAvatar(a.id);
+          markProfileDirty('avatar');
           renderAvatarChoices();
           applyAvatarToBrand();
           const panel = document.getElementById('avatarPanel');
@@ -1718,6 +1786,7 @@
       const localNick = loadNickname();
       const localAvatar = loadAvatar();
       const localXUrl = normalizeXUrl(loadXUrl());
+      const dirtyFields = loadProfileDirtyFields();
       try{
         let selectColumns = supportsProfileXUrl ? 'nickname, avatar, x_url' : 'nickname, avatar';
         let { data, error } = await supabaseAuth
@@ -1738,37 +1807,99 @@
         const serverNick = (data?.nickname || '').trim();
         const serverAvatar = data?.avatar || '';
         const serverXUrl = normalizeXUrl(data?.x_url || '');
-        if(serverNick) saveNickname(serverNick);
-        if(serverAvatar) saveAvatar(serverAvatar);
-        if(serverXUrl) saveXUrl(serverXUrl);
-        const shouldUpsert = (!serverNick && localNick) || (!serverAvatar && localAvatar) || (!serverXUrl && localXUrl);
-        if(shouldUpsert){
-          const payload = { id: supabaseUser.id };
-          if(localNick && !serverNick) payload.nickname = localNick;
-          if(localAvatar && !serverAvatar) payload.avatar = localAvatar;
-          if(localXUrl && !serverXUrl && supportsProfileXUrl) payload.x_url = localXUrl;
-          if(Object.keys(payload).length > 1){
-            let upsert = await supabaseAuth.from('user_profiles').upsert(payload);
-            if(upsert.error && supportsProfileXUrl && isMissingColumn(upsert.error, 'x_url')){
-              supportsProfileXUrl = false;
-              delete payload.x_url;
-              if(Object.keys(payload).length > 1){
-                upsert = await supabaseAuth.from('user_profiles').upsert(payload);
-              }else{
-                upsert = null;
-              }
+        if(!dirtyFields.has('nickname') && serverNick) saveNickname(serverNick);
+        if(!dirtyFields.has('avatar') && serverAvatar) saveAvatar(serverAvatar);
+        if(!dirtyFields.has('x_url') && serverXUrl) saveXUrl(serverXUrl);
+        const payload = { id: supabaseUser.id };
+        const dirtyToClear = [];
+        if(dirtyFields.has('nickname')){
+          payload.nickname = localNick || null;
+          dirtyToClear.push('nickname');
+        }else if(localNick && !serverNick){
+          payload.nickname = localNick;
+        }
+        if(dirtyFields.has('avatar')){
+          payload.avatar = localAvatar || null;
+          dirtyToClear.push('avatar');
+        }else if(localAvatar && !serverAvatar){
+          payload.avatar = localAvatar;
+        }
+        if(supportsProfileXUrl){
+          if(dirtyFields.has('x_url')){
+            payload.x_url = localXUrl || null;
+            dirtyToClear.push('x_url');
+          }else if(localXUrl && !serverXUrl){
+            payload.x_url = localXUrl;
+          }
+        }
+        if(Object.keys(payload).length > 1){
+          let upsert = await supabaseAuth.from('user_profiles').upsert(payload);
+          if(upsert.error && supportsProfileXUrl && isMissingColumn(upsert.error, 'x_url')){
+            supportsProfileXUrl = false;
+            delete payload.x_url;
+            const idx = dirtyToClear.indexOf('x_url');
+            if(idx >= 0) dirtyToClear.splice(idx, 1);
+            if(Object.keys(payload).length > 1){
+              upsert = await supabaseAuth.from('user_profiles').upsert(payload);
+            }else{
+              upsert = null;
             }
-            if(upsert?.error) throw upsert.error;
+          }
+          if(upsert?.error) throw upsert.error;
+          if(dirtyToClear.length){
+            clearProfileDirty(...dirtyToClear);
           }
         }
         const nickInput = document.getElementById('profileNickname');
-        if(nickInput) nickInput.value = serverNick || localNick || '';
+        if(nickInput){
+          const effectiveNick = dirtyFields.has('nickname') ? localNick : (serverNick || localNick);
+          nickInput.value = effectiveNick || '';
+        }
         const xInput = document.getElementById('profileX');
-        if(xInput) xInput.value = serverXUrl || localXUrl || '';
+        if(xInput){
+          const effectiveXUrl = dirtyFields.has('x_url') ? localXUrl : (serverXUrl || localXUrl);
+          xInput.value = effectiveXUrl || '';
+        }
         applyAvatarToBrand();
         renderAvatarChoices();
       }catch(err){
         console.warn('profile sync failed', err);
+      }
+    }
+
+    function clearProfileSyncChannel(){
+      if(!profileSyncChannel) return;
+      try{
+        if(supabaseAuth && typeof supabaseAuth.removeChannel === 'function'){
+          supabaseAuth.removeChannel(profileSyncChannel);
+        }
+      }catch(err){
+        console.warn('profile sync cleanup failed', err);
+      }
+      profileSyncChannel = null;
+    }
+
+    function setupProfileSyncChannel(){
+      if(!supabaseAuth || !supabaseUser?.id || typeof supabaseAuth.channel !== 'function'){
+        clearProfileSyncChannel();
+        return;
+      }
+      clearProfileSyncChannel();
+      try{
+        profileSyncChannel = supabaseAuth.channel(`profile-sync-${supabaseUser.id}`);
+        profileSyncChannel.on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'user_profiles',
+          filter: `id=eq.${supabaseUser.id}`
+        }, (payload) => {
+          const data = payload?.new || payload?.record;
+          if(!data) return;
+          applyProfileFromServer(data, { force: true });
+        });
+        profileSyncChannel.subscribe();
+      }catch(err){
+        console.warn('profile sync init failed', err);
       }
     }
 
@@ -1839,6 +1970,7 @@
           await migrateGuestData();
           await syncProfileFromServer();
           updateAuthUI();
+          setupProfileSyncChannel();
           if(currentEntryId){
             await fetchEntry(currentEntryId);
             scheduleRelatedFetch(currentEntryId);
@@ -1850,6 +1982,7 @@
         await migrateGuestData();
         await syncProfileFromServer();
         updateAuthUI();
+        setupProfileSyncChannel();
         applyAvatarToBrand();
       }catch(err){
         console.warn('Supabase auth init failed', err);
@@ -1911,6 +2044,7 @@
         saveBtn.addEventListener('click', async () => {
           const nick = (nicknameInput?.value || '').trim();
           const xUrl = normalizeXUrl(xInput?.value || '');
+          markProfileDirty('nickname', 'avatar', 'x_url');
           if(nick) saveNickname(nick);
           saveXUrl(xUrl);
           applyAvatarToBrand();
@@ -1926,6 +2060,7 @@
               }
               if(res.error) throw res.error;
               setAuthStatus('プロフィールを保存しました');
+              clearProfileDirty('nickname', 'avatar', 'x_url');
             }catch(err){
               console.warn('profile save fallback', err);
               setAuthStatus('ローカルに保存しました');
@@ -2004,6 +2139,7 @@
           clientLinkConflict = false;
           try{ localStorage.removeItem('pixieed_link_conflict'); }catch(_){}
           updateAuthUI();
+          clearProfileSyncChannel();
           await fetchEntry(currentEntryId);
           scheduleRelatedFetch(currentEntryId);
           togglePanel(false);
