@@ -2586,6 +2586,25 @@ body.portfolio-page main > .section > .section-inner {
   margin-bottom: 0.4rem;
 }
 
+.project-note__list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--fg-secondary);
+  line-height: 1.7;
+}
+
+.project-note__list li {
+  margin-bottom: 0.4rem;
+}
+
+.project-note__list li:last-child {
+  margin-bottom: 0;
+}
+
+.project-note__actions {
+  margin-top: 0.9rem;
+}
+
 .project-actions {
   display: flex;
   flex-wrap: wrap;
