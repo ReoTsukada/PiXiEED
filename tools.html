@@ -784,6 +784,10 @@
         <div class="avatar-panel" id="avatarPanel" hidden>
           <div class="avatar-grid" id="avatarGrid"></div>
         </div>
+        <label class="profile-name">
+          <span style="font-weight:700; color:#e5e7eb;">X (旧Twitter)</span>
+          <input class="auth-input" id="profileX" type="url" placeholder="https://x.com/username" maxlength="200" inputmode="url">
+        </label>
         <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
       </div>
       <div class="profile-block">
@@ -802,6 +806,44 @@
       function saveNickname(name){ try{ localStorage.setItem('pixieed_nickname', name); }catch(_){ } }
       function loadAvatar(){ try{ return localStorage.getItem('pixieed_avatar') || 'mao'; }catch(_){ return 'mao'; } }
       function saveAvatar(id){ try{ localStorage.setItem('pixieed_avatar', id); }catch(_){ } }
+      function loadXUrl(){ try{ return localStorage.getItem('pixieed_x_url') || ''; }catch(_){ return ''; } }
+      function normalizeXUrl(value){
+        const raw = String(value || '').trim();
+        if(!raw) return '';
+        if(/^https?:\/\//i.test(raw)){
+          try{
+            const url = new URL(raw);
+            const host = url.hostname.replace(/^www\./, '');
+            if(host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com' || host.endsWith('.twitter.com')){
+              return url.toString();
+            }
+          }catch(_){}
+          return '';
+        }
+        const handle = raw.replace(/^@+/, '').trim();
+        if(!handle) return '';
+        const candidate = /^(x\.com|twitter\.com)\//i.test(handle)
+          ? `https://${handle}`
+          : `https://x.com/${handle}`;
+        try{
+          const url = new URL(candidate);
+          const host = url.hostname.replace(/^www\./, '');
+          if(host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com' || host.endsWith('.twitter.com')){
+            return url.toString();
+          }
+        }catch(_){}
+        return '';
+      }
+      function saveXUrl(value){
+        try{
+          const normalized = normalizeXUrl(value);
+          if(normalized){
+            localStorage.setItem('pixieed_x_url', normalized);
+          }else{
+            localStorage.removeItem('pixieed_x_url');
+          }
+        }catch(_){ }
+      }
       const AVATARS = {
         mao:'character-dots/mao1.png',
         jerin1:'character-dots/Jerin1.png',
@@ -1054,12 +1096,14 @@
         const closeBtn = document.getElementById('closeAuthPanel');
         const saveBtn = document.getElementById('saveProfile');
         const nickInput = document.getElementById('profileNickname');
+        const xInput = document.getElementById('profileX');
         const authBtn = document.getElementById('authBtn');
         const status = document.getElementById('authStatus');
         const toggle = (open) => {
           if(!panel) return;
           if(open){
             if(nickInput) nickInput.value = loadNickname();
+            if(xInput) xInput.value = loadXUrl();
             renderAvatarChoices();
             panel.classList.add('is-open');
             panel.setAttribute('aria-hidden','false');
@@ -1074,7 +1118,9 @@
         if(saveBtn){
           saveBtn.addEventListener('click', () => {
             const nick = (nickInput?.value || '').trim();
+            const xUrl = normalizeXUrl(xInput?.value || '');
             if(nick){ saveNickname(nick); }
+            saveXUrl(xUrl);
             applyAvatar();
             if(status) status.textContent = 'プロフィールを保存しました';
           });
