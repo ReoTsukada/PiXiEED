@@ -196,7 +196,8 @@ body.is-playing {
 }
 
 .difficulty-ad,
-.start-ad {
+.start-ad,
+.game-ad {
   background: var(--panel);
   border-radius: 14px;
   border: 1px solid rgba(40, 50, 80, 0.12);
@@ -212,7 +213,8 @@ body.is-playing {
 }
 
 .difficulty-ad ins.adsbygoogle,
-.start-ad ins.adsbygoogle {
+.start-ad ins.adsbygoogle,
+.game-ad ins.adsbygoogle {
   display: block;
   width: min(320px, 100%) !important;
   max-width: 320px !important;
@@ -578,12 +580,6 @@ body.is-playing {
   text-underline-offset: 2px;
 }
 
-.game-meta {
-  margin: 0;
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  line-height: 1.2;
-}
 
 .game-controls {
   display: flex;
@@ -1092,7 +1088,8 @@ body.is-playing {
   }
 
   .difficulty-ad ins.adsbygoogle,
-  .start-ad ins.adsbygoogle {
+  .start-ad ins.adsbygoogle,
+  .game-ad ins.adsbygoogle {
     height: 40px;
     min-height: 40px;
   }
