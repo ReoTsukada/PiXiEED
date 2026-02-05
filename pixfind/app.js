@@ -8,9 +8,12 @@ const dom = {
   gameBackButton: document.getElementById('gameBackButton'),
   backToTitleButton: document.getElementById('backButton'),
   resetButton: document.getElementById('resetButton'),
+  deletePuzzleButton: document.getElementById('deletePuzzleButton'),
   difficultyChips: Array.from(document.querySelectorAll('[data-difficulty]')),
   puzzleList: document.getElementById('puzzleList'),
   gameTitle: document.getElementById('gameTitle'),
+  gameAuthor: document.getElementById('gameAuthor'),
+  gameMeta: document.getElementById('gameMeta'),
   foundCount: document.getElementById('foundCount'),
   totalCount: document.getElementById('totalCount'),
   timerLabel: document.getElementById('timerLabel'),
@@ -172,6 +175,7 @@ const creatorState = {
 
 let creatorLastFocused = null;
 let creatorAnalysisToken = 0;
+let clientId = null;
 
 const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
@@ -220,6 +224,7 @@ let puzzleBucket = (typeof window !== 'undefined' && window.PIXFIND_STORAGE_BUCK
 let puzzleBucketFallbackUsed = false;
 
 async function init() {
+  ensureClientId();
   setActiveScreen('start');
   updateProgressLabel();
   setHint('星を選んで、挑戦したい難易度を選んでください。');
@@ -252,6 +257,10 @@ async function init() {
   dom.resetButton?.addEventListener('click', () => {
     if (!state.currentPuzzle) return;
     resetRound();
+  });
+
+  dom.deletePuzzleButton?.addEventListener('click', () => {
+    handleDeleteCurrentPuzzle();
   });
 
   initializeCanvasInteractions();
@@ -593,12 +602,15 @@ async function handleCreatorPublish() {
     return;
   }
 
+  ensureClientId();
   const title = dom.creatorTitleInput?.value.trim() || 'カスタムパズル';
   const slug = getCreatorSlug();
   const difficulty = creatorState.difficulty;
   const puzzleId = createPuzzleId();
   const postToContest = dom.creatorContestToggle ? dom.creatorContestToggle.checked : true;
   const authorName = getCreatorNickname();
+  const authorXUrl = getCreatorXUrl();
+  const clientIdValue = clientId;
   const publishTask = {
     puzzleId,
     title,
@@ -606,6 +618,8 @@ async function handleCreatorPublish() {
     difficulty,
     postToContest,
     authorName,
+    authorXUrl,
+    clientId: clientIdValue,
     originalDataUrl: creatorState.originalDataUrl,
     diffDataUrl: creatorState.diffDataUrl,
     size: { ...creatorState.size },
@@ -651,6 +665,12 @@ async function handleCreatorPublish() {
       diff_url: diffUrl,
       thumbnail_url: diffUrl,
     };
+    if (clientIdValue) {
+      payload.client_id = clientIdValue;
+    }
+    if (authorXUrl) {
+      payload.author_x_url = authorXUrl;
+    }
 
     const inserted = await insertPublishedPuzzle(payload);
     const normalized = normalizePublishedPuzzleEntry(inserted ?? payload);
@@ -778,6 +798,7 @@ async function handleCreatorPublish() {
       window.prompt(`公開しました。${contestMessage}共有リンクをコピーしてください。`, shareMessage);
       setCreatorStatus(`公開しました。${contestMessage}${statusSuffix}`);
     }
+    closeCreatorOverlay();
   } catch (error) {
     console.error(error);
     if (isPermissionError(error)) {
@@ -801,7 +822,8 @@ async function handleCreatorPublish() {
       setCreatorStatus('公開に失敗しました。時間を置いて再試行してください。', 'error');
     }
   } finally {
-    if (dom.creatorExportButton) dom.creatorExportButton.disabled = false;
+    const canPublish = Boolean(creatorState.diffResult && creatorState.originalFile && creatorState.diffFile);
+    if (dom.creatorExportButton) dom.creatorExportButton.disabled = !canPublish;
   }
 }
 
@@ -1018,6 +1040,38 @@ async function updatePublishedPuzzle(id, patch, { removedColumns = [] } = {}) {
   return Array.isArray(data) ? data[0] : null;
 }
 
+async function deletePublishedPuzzle(id, clientIdValue) {
+  if (!id) return null;
+  const params = new URLSearchParams({
+    id: `eq.${id}`,
+  });
+  if (clientIdValue) {
+    params.set('client_id', `eq.${clientIdValue}`);
+  }
+  let response;
+  try {
+    response = await fetch(`${SUPABASE_REST_URL}/${SUPABASE_TABLE}?${params.toString()}`, {
+      method: 'DELETE',
+      headers: {
+        ...supabaseHeaders(),
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+    });
+  } catch (error) {
+    markSupabaseMaintenanceFromError(error);
+    throw error;
+  }
+  if (!response.ok) {
+    const detail = await response.text();
+    markSupabaseMaintenanceFromError(null, response.status);
+    throw buildSupabaseError(`delete failed: ${response.status} ${detail}`, response.status, detail);
+  }
+  const data = await response.json();
+  noteSupabaseSuccess();
+  return Array.isArray(data) ? data[0] : null;
+}
+
 async function insertContestEntry(payload, { removedColumns = [] } = {}) {
   let response;
   try {
@@ -1079,6 +1133,48 @@ function resolveAuthorName(entry, fallback = '名無し') {
   return trimmed || fallback;
 }
 
+function normalizeXUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const url = new URL(raw);
+      const host = url.hostname.replace(/^www\./, '');
+      if (host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com' || host.endsWith('.twitter.com')) {
+        return url.toString();
+      }
+    } catch (_) {
+      // ignore
+    }
+    return '';
+  }
+  const handle = raw.replace(/^@+/, '').trim();
+  if (!handle) return '';
+  const candidate = /^(x\.com|twitter\.com)\//i.test(handle)
+    ? `https://${handle}`
+    : `https://x.com/${handle}`;
+  try {
+    const url = new URL(candidate);
+    const host = url.hostname.replace(/^www\./, '');
+    if (host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com' || host.endsWith('.twitter.com')) {
+      return url.toString();
+    }
+  } catch (_) {
+    // ignore
+  }
+  return '';
+}
+
+function resolveAuthorUrl(entry) {
+  const candidate = entry?.author_x_url
+    ?? entry?.author_url
+    ?? entry?.authorUrl
+    ?? entry?.authorXUrl
+    ?? entry?.x_url
+    ?? '';
+  return normalizeXUrl(candidate);
+}
+
 function getCreatorNickname() {
   try {
     const raw = localStorage.getItem('pixieed_nickname') || '';
@@ -1090,10 +1186,39 @@ function getCreatorNickname() {
   return '名無し';
 }
 
+function getCreatorXUrl() {
+  try {
+    const raw = localStorage.getItem('pixieed_x_url') || '';
+    return normalizeXUrl(raw);
+  } catch (_) {
+    return '';
+  }
+}
+
+function ensureClientId() {
+  const KEY = 'pixieed_client_id';
+  try {
+    const saved = localStorage.getItem(KEY) || window.PIXIEED_CLIENT_ID;
+    if (saved) {
+      clientId = saved;
+      if (!localStorage.getItem(KEY)) {
+        localStorage.setItem(KEY, saved);
+      }
+      return;
+    }
+    const id = crypto.randomUUID ? crypto.randomUUID() : `guest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    localStorage.setItem(KEY, id);
+    clientId = id;
+  } catch (_) {
+    clientId = `guest-${Math.random().toString(36).slice(2, 8)}`;
+  }
+}
+
 function supabaseHeaders() {
   return {
     apikey: SUPABASE_ANON_KEY,
     Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    'x-client-id': clientId || '',
   };
 }
 
@@ -1301,6 +1426,8 @@ function normalizePublishTask(task) {
   const slug = task.slug || sanitizeSlug(title) || `custom-${puzzleId.slice(-6)}`;
   const difficulty = normalizeDifficulty(task.difficulty);
   const authorName = task.authorName || getCreatorNickname();
+  const authorXUrl = task.authorXUrl || getCreatorXUrl();
+  const clientIdValue = task.clientId || clientId || null;
   const size = task.size && Number.isFinite(task.size.width) && Number.isFinite(task.size.height)
     ? task.size
     : { width: 0, height: 0 };
@@ -1310,6 +1437,8 @@ function normalizePublishTask(task) {
     slug,
     difficulty,
     authorName,
+    authorXUrl,
+    clientId: clientIdValue,
     postToContest: task.postToContest !== false,
     originalDataUrl,
     diffDataUrl,
@@ -1347,6 +1476,8 @@ async function publishQueuedTask(task) {
     slug,
     difficulty,
     authorName,
+    authorXUrl,
+    clientId: clientIdValue,
     postToContest,
     originalDataUrl,
     diffDataUrl,
@@ -1378,6 +1509,12 @@ async function publishQueuedTask(task) {
     diff_url: diffUrl,
     thumbnail_url: diffUrl,
   };
+  if (clientIdValue) {
+    payload.client_id = clientIdValue;
+  }
+  if (authorXUrl) {
+    payload.author_x_url = authorXUrl;
+  }
 
   let inserted = null;
   try {
@@ -1659,7 +1796,7 @@ function createContestPayload({
   colors,
 }) {
   const payload = {
-    name: CONTEST_AUTHOR_NAME,
+    name: getCreatorNickname(),
     title: title || 'PiXFiND Puzzle',
     prompt: `${CONTEST_PROMPT_PREFIX}${puzzleId}`,
     mode: 'pixfind',
@@ -1722,6 +1859,8 @@ function normalizePublishedPuzzleEntry(entry) {
     description: entry.description ?? '',
     difficulty: normalizeDifficulty(entry.difficulty),
     author: resolveAuthorName(entry, '名無し'),
+    authorUrl: resolveAuthorUrl(entry),
+    clientId: entry.client_id ?? entry.clientId ?? null,
     original,
     diff,
     thumbnail: entry.thumbnail_url ?? entry.thumbnail ?? diff ?? original,
@@ -1870,6 +2009,8 @@ function normalizePuzzleEntry(entry) {
     description: entry.description ?? '',
     difficulty: normalizeDifficulty(entry.difficulty),
     author: resolveAuthorName(entry, '公式'),
+    authorUrl: resolveAuthorUrl(entry),
+    clientId: entry.client_id ?? entry.clientId ?? null,
     original,
     diff,
     thumbnail: entry.thumbnail ?? original ?? diff,
@@ -2088,6 +2229,73 @@ function createPuzzleAdCard(slotId) {
   return card;
 }
 
+function renderGameAuthor(puzzle) {
+  const authorEl = dom.gameAuthor;
+  if (!authorEl) return;
+  authorEl.textContent = '';
+  const name = puzzle?.author || '';
+  if (!name) {
+    authorEl.hidden = true;
+    return;
+  }
+  authorEl.hidden = false;
+  const prefix = document.createElement('span');
+  prefix.textContent = 'by ';
+  authorEl.appendChild(prefix);
+  const url = normalizeXUrl(puzzle?.authorUrl || '');
+  if (url) {
+    const link = document.createElement('a');
+    link.href = url;
+    link.textContent = name;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    authorEl.appendChild(link);
+  } else {
+    const label = document.createElement('span');
+    label.textContent = name;
+    authorEl.appendChild(label);
+  }
+}
+
+function canDeletePuzzle(puzzle) {
+  if (!puzzle) return false;
+  if (puzzle.source !== 'published') return false;
+  if (!puzzle.clientId || !clientId) return false;
+  return puzzle.clientId === clientId;
+}
+
+function updateDeleteButton(puzzle) {
+  const btn = dom.deletePuzzleButton;
+  if (!btn) return;
+  const show = canDeletePuzzle(puzzle);
+  btn.hidden = !show;
+}
+
+function renderGameMeta(puzzle) {
+  const metaEl = dom.gameMeta;
+  if (!metaEl) return;
+  if (!puzzle || puzzle.source !== 'published' || canDeletePuzzle(puzzle)) {
+    metaEl.hidden = true;
+    metaEl.textContent = '';
+    return;
+  }
+  ensureClientId();
+  const items = [];
+  if (puzzle.id) {
+    items.push(`ID: ${puzzle.id}`);
+  }
+  if (clientId) {
+    items.push(`端末ID: ${clientId}`);
+  }
+  if (!items.length) {
+    metaEl.hidden = true;
+    metaEl.textContent = '';
+    return;
+  }
+  metaEl.textContent = items.join(' / ');
+  metaEl.hidden = false;
+}
+
 function createOfficialCard(puzzle) {
   const card = document.createElement('article');
   const badgeText = puzzle.badge ?? '公式';
@@ -2196,13 +2404,20 @@ async function startOfficialPuzzle(puzzle) {
       return;
     }
     const metadata = {
+      id: puzzle.id,
       name: puzzle.label,
       difficulty: puzzle.difficulty,
       size: `${originalImage.width}×${originalImage.height}px`,
-      source: 'official',
+      source: puzzle.source || 'official',
+      author: puzzle.author || '',
+      authorUrl: puzzle.authorUrl || '',
+      clientId: puzzle.clientId || null,
     };
     prepareGameBoard(originalImage, challengeImage, diffResult, metadata);
     dom.gameTitle.textContent = metadata.name;
+    renderGameAuthor(metadata);
+    updateDeleteButton(metadata);
+    renderGameMeta(metadata);
     dom.totalCount.textContent = String(diffResult.regions.length);
     setHint('左右の画像を見比べて、違いをタップしてください。');
     setActiveScreen('game');
@@ -2210,6 +2425,30 @@ async function startOfficialPuzzle(puzzle) {
   } catch (error) {
     console.error(error);
     setHint('パズルの読み込みに失敗しました。');
+  }
+}
+
+async function handleDeleteCurrentPuzzle() {
+  const puzzle = state.currentPuzzle;
+  if (!canDeletePuzzle(puzzle)) {
+    setHint('このパズルは削除できません。');
+    return;
+  }
+  if (!confirm('このパズルを削除しますか？')) {
+    return;
+  }
+  setHint('削除しています...');
+  try {
+    await deletePublishedPuzzle(puzzle.id, puzzle.clientId);
+    state.officialPuzzles = state.officialPuzzles.filter(entry => entry.id !== puzzle.id);
+    const published = state.officialPuzzles.filter(entry => entry.source === 'published');
+    savePublishedCache(published);
+    renderPuzzles(state.currentDifficulty);
+    leaveGame('difficulty');
+    setHint('パズルを削除しました。');
+  } catch (error) {
+    console.warn('delete puzzle failed', error);
+    setHint('削除に失敗しました。');
   }
 }
 
@@ -2318,6 +2557,9 @@ function leaveGame(targetScreen) {
   hideCompletionOverlay();
   hideFailureOverlay();
   state.currentPuzzle = null;
+  renderGameAuthor(null);
+  updateDeleteButton(null);
+  renderGameMeta(null);
   state.differences = [];
   state.found = 0;
   state.total = 0;
