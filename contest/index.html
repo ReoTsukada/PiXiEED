@@ -3479,6 +3479,26 @@
           panel.setAttribute('aria-hidden','true');
         }
       };
+      const sendLoginLink = async (email) => {
+        if(!supabase){
+          setAuthStatus('オンラインでログインしてください');
+          return false;
+        }
+        setAuthStatus('ログインリンクを送信しています...');
+        try{
+          const { error } = await supabase.auth.signInWithOtp({
+            email,
+            options:{ emailRedirectTo: window.location.href }
+          });
+          if(error) throw error;
+          setAuthStatus('ログインリンクを送信しました。メールを確認してください');
+          return true;
+        }catch(err){
+          console.error(err);
+          setAuthStatus('ログインリンクの送信に失敗しました');
+          return false;
+        }
+      };
       if(openBtn) openBtn.addEventListener('click', () => {
         if(nicknameInput){
           nicknameInput.value = loadNickname();
@@ -3538,6 +3558,10 @@
           setAuthStatus('メールアドレスを入力してください');
           return;
         }
+        if(!passcode){
+          await sendLoginLink(email);
+          return;
+        }
         if(passcode.length < 6 || passcode.length > 20){
           setAuthStatus('パスコードは6〜20文字で入力してください');
           return;
@@ -3554,6 +3578,11 @@
             }
             const { error: signUpError } = await supabase.auth.signUp({ email, password: passcode, options:{ emailRedirectTo: window.location.href } });
             if(signUpError){
+              const msg = String(signUpError.message || '').toLowerCase();
+              if(msg.includes('already') || msg.includes('registered') || msg.includes('exists')){
+                setAuthStatus('このメールは登録済みです。パスコードを確認してください');
+                return;
+              }
               setAuthStatus('ログイン／登録に失敗しました');
               console.error(signUpError);
               return;
