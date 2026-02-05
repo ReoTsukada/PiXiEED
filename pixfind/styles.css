@@ -475,6 +475,15 @@ body.is-playing {
   background: rgba(40, 50, 80, 0.06);
 }
 
+.button--danger {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.button--danger:hover {
+  background: rgba(248, 113, 113, 0.12);
+}
+
 .puzzle-card__play {
   flex: 1;
   min-width: 90px;
@@ -546,6 +555,34 @@ body.is-playing {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.game-header-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.game-author {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+.game-author a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.game-meta {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.2;
 }
 
 .game-controls {
