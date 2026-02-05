@@ -13,6 +13,7 @@
     setupProjectPlaceGrid();
     disableImageInteractions();
     injectFooterAd();
+    scheduleProjectAds();
   }
 
   function updateCopyrightYear() {
@@ -220,6 +221,38 @@
     if (window.pixieedObserveAds) {
       window.pixieedObserveAds();
     }
+  }
+
+  function ensureProjectAds() {
+    if (!document.body || !document.body.classList.contains('project-page')) return;
+    const slots = Array.from(document.querySelectorAll('ins.adsbygoogle'));
+    if (!slots.length) return;
+
+    slots.forEach(ins => {
+      if (ins.dataset.pixieedAdInit === '1') return;
+      if (ins.dataset.adsLazyLoaded === '1') return;
+      const status = ins.getAttribute('data-ad-status');
+      const adsStatus = ins.getAttribute('data-adsbygoogle-status');
+      if (adsStatus === 'done' || status === 'filled' || status === 'unfilled') return;
+
+      ins.dataset.pixieedAdInit = '1';
+      try {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      } catch (err) {
+        ins.dataset.pixieedAdInit = '';
+      }
+    });
+  }
+
+  function scheduleProjectAds() {
+    if (!document.body || !document.body.classList.contains('project-page')) return;
+    ensureProjectAds();
+    window.setTimeout(ensureProjectAds, 1200);
+    window.setTimeout(ensureProjectAds, 3200);
+    window.addEventListener('load', () => {
+      ensureProjectAds();
+      window.setTimeout(ensureProjectAds, 1200);
+    }, { once: true });
   }
 
   function setupRecentUpdates() {
