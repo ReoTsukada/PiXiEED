@@ -321,17 +321,14 @@
     gap: 4px;
     font-size: 12px;
   }
-  .stat-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .stat-icon {
-    width: 16px;
-    height: 16px;
-    image-rendering: pixelated;
-  }
   .stat span { color: var(--muted); }
+  .hud-icon {
+    width: 14px;
+    height: 14px;
+    image-rendering: pixelated;
+    vertical-align: -2px;
+    margin-right: 4px;
+  }
   .stat strong { font-size: 15px; }
   .status-log {
     background: rgba(0,0,0,0.35);
@@ -685,6 +682,7 @@
           <div class="hud-row">
             <span class="hud-chip">ぼすだめーじ <strong id="expShort">--</strong></span>
             <span class="hud-chip">たから <strong id="itemShort">--</strong></span>
+            <span class="hud-chip"><img class="hud-icon" src="../character-dots/tyarin.png" alt="">チャリン <strong id="coinShort">--</strong></span>
             <span class="hud-chip">ほすう <strong id="stepShort">--</strong></span>
             <span class="hud-chip">とうばつ <strong id="killShort">--</strong></span>
             <span class="hud-chip">どく <strong id="poisonShort">--</strong></span>
@@ -709,6 +707,7 @@
           <div class="stat"><span>れべる</span><strong id="levelStat">--</strong></div>
           <div class="stat"><span>ぼすだめーじ</span><strong id="expStat">--</strong></div>
           <div class="stat"><span>たから</span><strong id="itemStat">--</strong></div>
+          <div class="stat"><span>チャリン</span><strong id="coinStat">--</strong></div>
           <div class="stat"><span>ほすう</span><strong id="stepStat">--</strong></div>
           <div class="stat"><span>とうばつ</span><strong id="killStat">--</strong></div>
           <div class="stat"><span>どく</span><strong id="poisonStat">--</strong></div>
@@ -753,6 +752,7 @@
             <div class="stat"><span>れべる</span><strong id="levelStatSheet">--</strong></div>
             <div class="stat"><span>ぼすだめーじ</span><strong id="expStatSheet">--</strong></div>
             <div class="stat"><span>たから</span><strong id="itemStatSheet">--</strong></div>
+            <div class="stat"><span>チャリン</span><strong id="coinStatSheet">--</strong></div>
             <div class="stat"><span>ほすう</span><strong id="stepStatSheet">--</strong></div>
             <div class="stat"><span>とうばつ</span><strong id="killStatSheet">--</strong></div>
             <div class="stat"><span>どく</span><strong id="poisonStatSheet">--</strong></div>
@@ -1135,6 +1135,7 @@
     level: document.getElementById('levelStat'),
     exp: document.getElementById('expStat'),
     items: document.getElementById('itemStat'),
+    coins: document.getElementById('coinStat'),
     steps: document.getElementById('stepStat'),
     kills: document.getElementById('killStat'),
     poison: document.getElementById('poisonStat')
@@ -1149,6 +1150,7 @@
     level: document.getElementById('levelStatSheet'),
     exp: document.getElementById('expStatSheet'),
     items: document.getElementById('itemStatSheet'),
+    coins: document.getElementById('coinStatSheet'),
     steps: document.getElementById('stepStatSheet'),
     kills: document.getElementById('killStatSheet'),
     poison: document.getElementById('poisonStatSheet')
@@ -1163,6 +1165,7 @@
     level: document.getElementById('levelShort'),
     exp: document.getElementById('expShort'),
     items: document.getElementById('itemShort'),
+    coins: document.getElementById('coinShort'),
     steps: document.getElementById('stepShort'),
     kills: document.getElementById('killShort'),
     poison: document.getElementById('poisonShort')
@@ -1985,7 +1988,6 @@
           continue;
         }
         if (tileId === 'mimic') {
-          mimicTileCount += 1;
           tiles[y][x] = 'empty';
           continue;
         }
@@ -2632,6 +2634,7 @@
     setText(statsEl.level, `${player.level}`);
     setText(statsEl.exp, damageText);
     setText(statsEl.items, itemText);
+    setText(statsEl.coins, `${player.coins ?? 0}`);
     setText(statsEl.steps, `${player.steps}`);
     setText(statsEl.kills, `${player.kills}`);
     setText(statsEl.poison, poisonText);
@@ -2645,6 +2648,7 @@
     setText(sheetStatsEl.level, `${player.level}`);
     setText(sheetStatsEl.exp, damageText);
     setText(sheetStatsEl.items, itemText);
+    setText(sheetStatsEl.coins, `${player.coins ?? 0}`);
     setText(sheetStatsEl.steps, `${player.steps}`);
     setText(sheetStatsEl.kills, `${player.kills}`);
     setText(sheetStatsEl.poison, poisonText);
@@ -2658,6 +2662,7 @@
     setText(hudStatsEl.level, `${player.level}`);
     setText(hudStatsEl.exp, damageText);
     setText(hudStatsEl.items, itemText);
+    setText(hudStatsEl.coins, `${player.coins ?? 0}`);
     setText(hudStatsEl.steps, `${player.steps}`);
     setText(hudStatsEl.kills, `${player.kills}`);
     setText(hudStatsEl.poison, poisonText);
@@ -3050,7 +3055,6 @@
     const tileId = tiles[y]?.[x];
     if (!tileId) return false;
     if (tileId === 'wall') return false;
-    if (tileId === 'mimic') return false;
     return true;
   }
 
@@ -3063,53 +3067,6 @@
     }
   }
 
-  function wallifyTile(x, y) {
-    if (x < 0 || y < 0 || x >= MAP_SIZE || y >= MAP_SIZE) return;
-    if (x === player.x && y === player.y) return;
-    if (x === bossPos.x && y === bossPos.y) return;
-    const tileId = tiles[y]?.[x];
-    if (!tileId || tileId === 'wall') return;
-    tiles[y][x] = 'wall';
-    visited[y][x] = true;
-    if (skillTiles?.[y]) skillTiles[y][x] = null;
-    if (enemies?.[y]?.[x]) {
-      enemies[y][x] = null;
-      enemyCount = Math.max(0, enemyCount - 1);
-    }
-    revealedMimics.delete(x + y * MAP_SIZE);
-  }
-
-  function buildReachableGrid(startX, startY, blockX = null, blockY = null) {
-    const reachable = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(false));
-    if (startX < 0 || startY < 0 || startX >= MAP_SIZE || startY >= MAP_SIZE) return reachable;
-    if (blockX === startX && blockY === startY) return reachable;
-    const startTile = tiles[startY]?.[startX];
-    if (!startTile || startTile === 'wall' || startTile === 'mimic') return reachable;
-    const queue = [{ x: startX, y: startY }];
-    let head = 0;
-    reachable[startY][startX] = true;
-    const dirs = [
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1]
-    ];
-    while (head < queue.length) {
-      const current = queue[head++];
-      for (const [dx, dy] of dirs) {
-        const nx = current.x + dx;
-        const ny = current.y + dy;
-        if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
-        if (reachable[ny][nx]) continue;
-        if (blockX === nx && blockY === ny) continue;
-        if (!canMoveTo(nx, ny)) continue;
-        reachable[ny][nx] = true;
-        queue.push({ x: nx, y: ny });
-      }
-    }
-    return reachable;
-  }
-
   function pruneUnreachableTiles() {
     const dirs = [
       [1, 0],
@@ -3117,23 +3074,50 @@
       [0, 1],
       [0, -1]
     ];
-    for (const [dx, dy] of dirs) {
-      const nx = player.x + dx;
-      const ny = player.y + dy;
-      if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
-      if (!canMoveTo(nx, ny)) continue;
-      const reachableFromNext = buildReachableGrid(nx, ny, player.x, player.y);
-      if (!reachableFromNext[bossPos.y]?.[bossPos.x]) {
-        wallifyTile(nx, ny);
+    const buildReachableFrom = (startX, startY, blockX = null, blockY = null) => {
+      const reachable = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(false));
+      if (startX < 0 || startY < 0 || startX >= MAP_SIZE || startY >= MAP_SIZE) return reachable;
+      if (blockX === startX && blockY === startY) return reachable;
+      const startTile = tiles[startY]?.[startX];
+      if (!startTile || startTile === 'wall') return reachable;
+      const queue = [{ x: startX, y: startY }];
+      let head = 0;
+      reachable[startY][startX] = true;
+      while (head < queue.length) {
+        const current = queue[head++];
+        for (const [dx, dy] of dirs) {
+          const nx = current.x + dx;
+          const ny = current.y + dy;
+          if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
+          if (reachable[ny][nx]) continue;
+          if (blockX === nx && blockY === ny) continue;
+          if (!canMoveTo(nx, ny)) continue;
+          reachable[ny][nx] = true;
+          queue.push({ x: nx, y: ny });
+        }
       }
-    }
+      return reachable;
+    };
 
-    const reachableFromPlayer = buildReachableGrid(player.x, player.y);
-    const reachableFromBoss = buildReachableGrid(bossPos.x, bossPos.y);
+    const reachableFromPlayer = buildReachableFrom(player.x, player.y);
+    const reachableFromBoss = buildReachableFrom(bossPos.x, bossPos.y, player.x, player.y);
     for (let y = 0; y < MAP_SIZE; y++) {
       for (let x = 0; x < MAP_SIZE; x++) {
+        if (x === player.x && y === player.y) continue;
+        if (x === bossPos.x && y === bossPos.y) continue;
+        const tileId = tiles[y]?.[x];
+        if (!tileId) continue;
+        if (tileId === 'wall') continue;
+        if (tileId === 'treasure' && reachableFromPlayer[y][x]) continue;
         if (reachableFromPlayer[y][x] && reachableFromBoss[y][x]) continue;
-        wallifyTile(x, y);
+        tiles[y][x] = 'wall';
+        visited[y][x] = true;
+        if (skillTiles?.[y]) skillTiles[y][x] = null;
+        if (enemies?.[y]?.[x]) {
+          enemies[y][x] = null;
+          enemyCount = Math.max(0, enemyCount - 1);
+        }
+        revealedMimics.delete(x + y * MAP_SIZE);
       }
     }
   }
@@ -3911,7 +3895,7 @@
       <div class="stat"><span>ぼすだめーじ</span><strong>${player.bossDamage}</strong></div>
       <div class="stat"><span>ほすう</span><strong>${player.steps}</strong></div>
       <div class="stat"><span>とうばつ</span><strong>${player.kills}</strong></div>
-      <div class="stat"><span class="stat-label"><img class="stat-icon" src="../character-dots/tyarin.png" alt="チャリン">チャリン</span><strong>${player.coins}</strong></div>
+      <div class="stat"><span>チャリン</span><strong>${player.coins}</strong></div>
       <div class="stat"><span>こうげき/はやさ/ぼうぎょ</span><strong>${player.atk}/${player.spd}/${player.def}</strong></div>
       <div class="stat"><span>うん</span><strong>${player.luc}</strong></div>
     `;
