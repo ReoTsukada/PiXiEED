@@ -13,7 +13,6 @@ const dom = {
   puzzleList: document.getElementById('puzzleList'),
   gameTitle: document.getElementById('gameTitle'),
   gameAuthor: document.getElementById('gameAuthor'),
-  gameMeta: document.getElementById('gameMeta'),
   foundCount: document.getElementById('foundCount'),
   totalCount: document.getElementById('totalCount'),
   timerLabel: document.getElementById('timerLabel'),
@@ -2359,31 +2358,6 @@ function updateDeleteButton(puzzle) {
   btn.hidden = !show;
 }
 
-function renderGameMeta(puzzle) {
-  const metaEl = dom.gameMeta;
-  if (!metaEl) return;
-  if (!puzzle || puzzle.source !== 'published' || canDeletePuzzle(puzzle)) {
-    metaEl.hidden = true;
-    metaEl.textContent = '';
-    return;
-  }
-  ensureClientId();
-  const items = [];
-  if (puzzle.id) {
-    items.push(`ID: ${puzzle.id}`);
-  }
-  if (clientId) {
-    items.push(`端末ID: ${clientId}`);
-  }
-  if (!items.length) {
-    metaEl.hidden = true;
-    metaEl.textContent = '';
-    return;
-  }
-  metaEl.textContent = items.join(' / ');
-  metaEl.hidden = false;
-}
-
 function createOfficialCard(puzzle) {
   const card = document.createElement('article');
   const badgeText = puzzle.badge ?? '公式';
@@ -2506,7 +2480,6 @@ async function startOfficialPuzzle(puzzle) {
     dom.gameTitle.textContent = metadata.name;
     renderGameAuthor(metadata);
     updateDeleteButton(metadata);
-    renderGameMeta(metadata);
     dom.totalCount.textContent = String(diffResult.regions.length);
     setHint('左右の画像を見比べて、違いをタップしてください。');
     setActiveScreen('game');
@@ -2655,7 +2628,6 @@ function leaveGame(targetScreen) {
   state.currentPuzzle = null;
   renderGameAuthor(null);
   updateDeleteButton(null);
-  renderGameMeta(null);
   state.differences = [];
   state.found = 0;
   state.total = 0;
