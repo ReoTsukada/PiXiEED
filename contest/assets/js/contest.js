@@ -32,6 +32,7 @@ let cachedEntries = [];
 let placeholderCache = null;
 let supportsImageUrls = true;
 let supportsStorageUploads = true;
+let supportsXUrl = true;
 let supabaseMaintenance = Boolean(readSupabaseMaintenance());
 let postQueueBusy = false;
 
@@ -66,6 +67,42 @@ function ensureClientId(){
   }catch(_){
     clientId = `guest-${Math.random().toString(36).slice(2,8)}`;
   }
+}
+
+function loadXUrl(){
+  try{
+    return localStorage.getItem('pixieed_x_url') || '';
+  }catch(_){
+    return '';
+  }
+}
+
+function normalizeXUrl(value){
+  const raw = String(value || '').trim();
+  if(!raw) return '';
+  if(/^https?:\/\//i.test(raw)){
+    try{
+      const url = new URL(raw);
+      const host = url.hostname.replace(/^www\./, '');
+      if(host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com' || host.endsWith('.twitter.com')){
+        return url.toString();
+      }
+    }catch(_){}
+    return '';
+  }
+  const handle = raw.replace(/^@+/, '').trim();
+  if(!handle) return '';
+  const candidate = /^(x\.com|twitter\.com)\//i.test(handle)
+    ? `https://${handle}`
+    : `https://x.com/${handle}`;
+  try{
+    const url = new URL(candidate);
+    const host = url.hostname.replace(/^www\./, '');
+    if(host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com' || host.endsWith('.twitter.com')){
+      return url.toString();
+    }
+  }catch(_){}
+  return '';
 }
 
 function readSupabaseMaintenance(){
@@ -256,6 +293,7 @@ function normalizePostTask(task){
     width: Number.isFinite(task.width) ? task.width : null,
     height: Number.isFinite(task.height) ? task.height : null,
     colors: Number.isFinite(task.colors) ? task.colors : null,
+    xUrl: normalizeXUrl(task.xUrl || ''),
     dataUrl,
   };
 }
@@ -328,14 +366,27 @@ async function flushPostQueue(){
         payload.image_url = uploadResult.imageUrl;
         payload.thumb_url = uploadResult.thumbUrl;
       }
+      if(supportsXUrl && normalized.xUrl){
+        payload.x_url = normalized.xUrl;
+      }
       let { data, error } = await supabase.from('contest_entries').insert(payload).select('id');
       if(error){
-        const msg = String(error.message || '').toLowerCase();
-        if(supportsImageUrls && (msg.includes('image_url') || msg.includes('thumb_url'))){
-          supportsImageUrls = false;
-          delete payload.image_url;
-          delete payload.thumb_url;
-          payload.image_base64 = imageInfo.dataUrl;
+        for(let attempt = 0; attempt < 2 && error; attempt++){
+          const msg = String(error.message || '').toLowerCase();
+          let retried = false;
+          if(supportsXUrl && msg.includes('x_url')){
+            supportsXUrl = false;
+            delete payload.x_url;
+            retried = true;
+          }
+          if(supportsImageUrls && (msg.includes('image_url') || msg.includes('thumb_url'))){
+            supportsImageUrls = false;
+            delete payload.image_url;
+            delete payload.thumb_url;
+            payload.image_base64 = imageInfo.dataUrl;
+            retried = true;
+          }
+          if(!retried) break;
           ({ data, error } = await supabase.from('contest_entries').insert(payload).select('id'));
         }
       }
@@ -815,6 +866,7 @@ async function handleSubmit(e){
   e.preventDefault();
   const form = e.currentTarget;
   const name = form.name.value.trim() || '名無し';
+  const xUrl = normalizeXUrl(loadXUrl());
   const title = form.title.value.trim() || '無題';
   const file = form[FILE_INPUT_ID]?.files?.[0];
   if(!file){
@@ -840,6 +892,7 @@ async function handleSubmit(e){
       width: imageInfo.width,
       height: imageInfo.height,
       colors: imageInfo.colors,
+      xUrl,
       dataUrl: imageInfo.dataUrl,
     });
     if(queued){
@@ -872,14 +925,27 @@ async function handleSubmit(e){
     payload.image_url = uploadResult.imageUrl;
     payload.thumb_url = uploadResult.thumbUrl;
   }
+  if(supportsXUrl && xUrl){
+    payload.x_url = xUrl;
+  }
   let { data, error } = await supabase.from('contest_entries').insert(payload).select('id');
   if(error){
-    const msg = String(error.message || '').toLowerCase();
-    if(supportsImageUrls && (msg.includes('image_url') || msg.includes('thumb_url'))){
-      supportsImageUrls = false;
-      delete payload.image_url;
-      delete payload.thumb_url;
-      payload.image_base64 = imageInfo.dataUrl;
+    for(let attempt = 0; attempt < 2 && error; attempt++){
+      const msg = String(error.message || '').toLowerCase();
+      let retried = false;
+      if(supportsXUrl && msg.includes('x_url')){
+        supportsXUrl = false;
+        delete payload.x_url;
+        retried = true;
+      }
+      if(supportsImageUrls && (msg.includes('image_url') || msg.includes('thumb_url'))){
+        supportsImageUrls = false;
+        delete payload.image_url;
+        delete payload.thumb_url;
+        payload.image_base64 = imageInfo.dataUrl;
+        retried = true;
+      }
+      if(!retried) break;
       ({ data, error } = await supabase.from('contest_entries').insert(payload).select('id'));
     }
   }
@@ -891,13 +957,14 @@ async function handleSubmit(e){
         name,
         title,
         prompt: PROMPT_TEXT,
-        mode: 'free',
-        submitted_at: submittedAt,
-        width: imageInfo.width,
-        height: imageInfo.height,
-        colors: imageInfo.colors,
-        dataUrl: imageInfo.dataUrl,
-      });
+      mode: 'free',
+      submitted_at: submittedAt,
+      width: imageInfo.width,
+      height: imageInfo.height,
+      colors: imageInfo.colors,
+      xUrl,
+      dataUrl: imageInfo.dataUrl,
+    });
       if(queued){
         setStatus('メンテ中のためキューに保存しました。復旧後に自動投稿します。');
         form.reset();
@@ -940,6 +1007,11 @@ function renderEntries(entries){
     entries.forEach(entry => {
       const item = document.createElement('div');
       item.className = 'entry-card';
+      const authorName = escapeHtml(entry.name || '名無し');
+      const authorUrl = normalizeXUrl(entry.x_url || '');
+      const authorHtml = authorUrl
+        ? `<a href="${authorUrl}" target="_blank" rel="noopener">${authorName}</a>`
+        : authorName;
       item.innerHTML = `
           <div class="entry-imgwrap">
             <img src="${resolveEntryThumb(entry)}" alt="${entry.title}" loading="lazy" decoding="async">
@@ -952,7 +1024,7 @@ function renderEntries(entries){
             <span class="entry-title">${escapeHtml(entry.title || '無題')}</span>
             <span class="entry-like">${entry.likeCount || 0}</span>
           </div>
-        <p class="entry-author">by ${escapeHtml(entry.name || '名無し')}</p>
+        <p class="entry-author">by ${authorHtml}</p>
         </div>
       `;
       gallery.appendChild(item);
@@ -985,28 +1057,42 @@ async function hydrateLegacyImages(entries){
 async function fetchAndRender(){
   ensureClientId();
   setStatus('読み込み中...');
-  const baseSelect = supportsImageUrls
-    ? 'id,name,title,prompt,mode,submitted_at,width,height,colors,image_url,thumb_url'
-    : 'id,name,title,prompt,mode,submitted_at,width,height,colors,image_base64';
+  const buildBaseSelect = () => (
+    supportsImageUrls
+      ? 'id,name,title,prompt,mode,submitted_at,width,height,colors,image_url,thumb_url'
+      : 'id,name,title,prompt,mode,submitted_at,width,height,colors,image_base64'
+  );
+  const buildSelectColumns = () => {
+    const base = buildBaseSelect();
+    return supportsXUrl ? `${base},x_url` : base;
+  };
   let entries = null;
   let error = null;
   try{
     ({ data: entries, error } = await supabase
       .from('contest_entries')
-      .select(baseSelect)
+      .select(buildSelectColumns())
       .order('submitted_at', { ascending:false })
       .limit(100));
   }catch(err){
     error = err;
   }
-  if(error && supportsImageUrls){
+  if(error){
     const msg = String(error.message || '').toLowerCase();
-    if(msg.includes('image_url') || msg.includes('thumb_url')){
+    let retried = false;
+    if(supportsXUrl && msg.includes('x_url')){
+      supportsXUrl = false;
+      retried = true;
+    }
+    if(supportsImageUrls && (msg.includes('image_url') || msg.includes('thumb_url'))){
       supportsImageUrls = false;
+      retried = true;
+    }
+    if(retried){
       try{
         ({ data: entries, error } = await supabase
           .from('contest_entries')
-          .select('id,name,title,prompt,mode,submitted_at,width,height,colors,image_base64')
+          .select(buildSelectColumns())
           .order('submitted_at', { ascending:false })
           .limit(100));
       }catch(err){
