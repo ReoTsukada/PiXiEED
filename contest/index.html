@@ -2864,6 +2864,7 @@
         }else{
           setStatus('投稿しました！');
         }
+        closePostPanel();
       }catch(err){
         console.error(err);
         if(isPermissionError(err)){
@@ -3174,6 +3175,13 @@
       return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
     }
 
+    function closePostPanel(){
+      const panel = document.getElementById('postPanel');
+      if(!panel) return;
+      panel.classList.remove('is-open');
+      panel.setAttribute('aria-hidden','true');
+    }
+
     function setupPostPanel(){
       const openBtn = document.getElementById('openPostPanel');
       const panel = document.getElementById('postPanel');
@@ -3183,16 +3191,12 @@
         panel.classList.add('is-open');
         panel.setAttribute('aria-hidden','false');
       };
-      const close = () => {
-        panel.classList.remove('is-open');
-        panel.setAttribute('aria-hidden','true');
-      };
       openBtn.addEventListener('click', open);
       if(closeBtn){
-        closeBtn.addEventListener('click', close);
+        closeBtn.addEventListener('click', closePostPanel);
       }
       panel.addEventListener('click', (e) => {
-        if(e.target === panel) close();
+        if(e.target === panel) closePostPanel();
       });
     }
 
