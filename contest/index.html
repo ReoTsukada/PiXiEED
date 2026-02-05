@@ -1178,6 +1178,10 @@
         <div class="avatar-panel" id="avatarPanel" hidden>
           <div class="avatar-grid" id="avatarGrid"></div>
         </div>
+        <label class="profile-name">
+          <span style="font-weight:700; color:#e5e7eb;">X (旧Twitter)</span>
+          <input class="auth-input" id="profileX" type="url" placeholder="https://x.com/username" maxlength="200" inputmode="url">
+        </label>
         <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
       </div>
       <div class="profile-block">
@@ -1246,6 +1250,8 @@
     let supportsImageHash = true;
     let supportsPhash = true;
     let supportsUserId = true;
+    let supportsXUrl = true;
+    let supportsProfileXUrl = true;
     let supabaseUser = null;
     let supabaseSession = null;
     let migrationDone = false;
@@ -1333,6 +1339,53 @@
     function saveNickname(name){
       try{
         localStorage.setItem('pixieed_nickname', name);
+      }catch(_){}
+    }
+
+    function loadXUrl(){
+      try{
+        return localStorage.getItem('pixieed_x_url') || '';
+      }catch(_){
+        return '';
+      }
+    }
+
+    function normalizeXUrl(value){
+      const raw = String(value || '').trim();
+      if(!raw) return '';
+      if(/^https?:\/\//i.test(raw)){
+        try{
+          const url = new URL(raw);
+          const host = url.hostname.replace(/^www\./, '');
+          if(host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com' || host.endsWith('.twitter.com')){
+            return url.toString();
+          }
+        }catch(_){}
+        return '';
+      }
+      const handle = raw.replace(/^@+/, '').trim();
+      if(!handle) return '';
+      const candidate = /^(x\.com|twitter\.com)\//i.test(handle)
+        ? `https://${handle}`
+        : `https://x.com/${handle}`;
+      try{
+        const url = new URL(candidate);
+        const host = url.hostname.replace(/^www\./, '');
+        if(host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com' || host.endsWith('.twitter.com')){
+          return url.toString();
+        }
+      }catch(_){}
+      return '';
+    }
+
+    function saveXUrl(value){
+      try{
+        const normalized = normalizeXUrl(value);
+        if(normalized){
+          localStorage.setItem('pixieed_x_url', normalized);
+        }else{
+          localStorage.removeItem('pixieed_x_url');
+        }
       }catch(_){}
     }
 
@@ -1528,6 +1581,7 @@
         phash: task.phash || null,
         userId: task.userId || null,
         clientId: task.clientId || null,
+        xUrl: normalizeXUrl(task.xUrl || ''),
         dataUrl,
       };
     }
@@ -1573,6 +1627,11 @@
       if(supportsUserId && missing === 'user_id'){
         supportsUserId = false;
         delete payload.user_id;
+        return true;
+      }
+      if(supportsXUrl && missing === 'x_url'){
+        supportsXUrl = false;
+        delete payload.x_url;
         return true;
       }
       if(supportsImageHash && missing === 'image_hash'){
@@ -1681,6 +1740,9 @@
           if(supportsDownloadSettings){
             payload.allow_download = normalized.allowDownload;
             payload.download_passcode = normalized.allowDownload && normalized.requirePasscode ? normalized.passcode : null;
+          }
+          if(supportsXUrl && normalized.xUrl){
+            payload.x_url = normalized.xUrl;
           }
           if(normalized.userId && supportsUserId){
             payload.user_id = normalized.userId;
@@ -2621,6 +2683,7 @@
       const form = e.currentTarget;
       ensureClientId();
       const name = loadNickname() || '名無し';
+      const xUrl = normalizeXUrl(loadXUrl());
       const title = form.title.value.trim() || '無題';
       const tags = postTags.slice(0, MAX_TAGS);
       const allowDownload = form[ALLOW_DOWNLOAD_ID]?.checked || false;
@@ -2668,6 +2731,7 @@
             phash: imageInfo.phash,
             userId: supabaseUser?.id || null,
             clientId,
+            xUrl,
             dataUrl: imageInfo.dataUrl,
           });
           if(queued){
@@ -2759,6 +2823,9 @@
           payload.allow_download = allowDownload;
           payload.download_passcode = allowDownload && requirePasscode ? passcode : null;
         }
+        if(supportsXUrl && xUrl){
+          payload.x_url = xUrl;
+        }
         if(supabaseUser?.id && supportsUserId){
           payload.user_id = supabaseUser.id;
         }
@@ -2820,6 +2887,7 @@
             phash: imageInfo.phash,
             userId: supabaseUser?.id || null,
             clientId,
+            xUrl,
             dataUrl: imageInfo.dataUrl,
           });
           if(queued){
@@ -3241,27 +3309,54 @@
       if(!supabase || !supabaseUser?.id) return;
       const localNick = loadNickname();
       const localAvatar = loadAvatar();
+      const localXUrl = normalizeXUrl(loadXUrl());
       try{
-        const { data, error } = await supabase
+        let selectColumns = supportsProfileXUrl ? 'nickname, avatar, x_url' : 'nickname, avatar';
+        let { data, error } = await supabase
           .from('user_profiles')
-          .select('nickname, avatar')
+          .select(selectColumns)
           .eq('id', supabaseUser.id)
           .maybeSingle();
+        if(error && supportsProfileXUrl && isMissingColumn(error, 'x_url')){
+          supportsProfileXUrl = false;
+          selectColumns = 'nickname, avatar';
+          ({ data, error } = await supabase
+            .from('user_profiles')
+            .select(selectColumns)
+            .eq('id', supabaseUser.id)
+            .maybeSingle());
+        }
         if(error) throw error;
         const serverNick = (data?.nickname || '').trim();
         const serverAvatar = data?.avatar || '';
+        const serverXUrl = normalizeXUrl(data?.x_url || '');
         if(serverNick) saveNickname(serverNick);
         if(serverAvatar) saveAvatar(serverAvatar);
-        if(!serverNick && !serverAvatar && (localNick || localAvatar)){
-          const upsert = await supabase.from('user_profiles').upsert({
-            id: supabaseUser.id,
-            nickname: localNick || null,
-            avatar: localAvatar || null
-          });
-          if(upsert.error) throw upsert.error;
+        if(serverXUrl) saveXUrl(serverXUrl);
+        const shouldUpsert = (!serverNick && localNick) || (!serverAvatar && localAvatar) || (!serverXUrl && localXUrl);
+        if(shouldUpsert){
+          const payload = { id: supabaseUser.id };
+          if(localNick && !serverNick) payload.nickname = localNick;
+          if(localAvatar && !serverAvatar) payload.avatar = localAvatar;
+          if(localXUrl && !serverXUrl && supportsProfileXUrl) payload.x_url = localXUrl;
+          if(Object.keys(payload).length > 1){
+            let upsert = await supabase.from('user_profiles').upsert(payload);
+            if(upsert.error && supportsProfileXUrl && isMissingColumn(upsert.error, 'x_url')){
+              supportsProfileXUrl = false;
+              delete payload.x_url;
+              if(Object.keys(payload).length > 1){
+                upsert = await supabase.from('user_profiles').upsert(payload);
+              }else{
+                upsert = null;
+              }
+            }
+            if(upsert?.error) throw upsert.error;
+          }
         }
         const nickInput = document.getElementById('profileNickname');
         if(nickInput) nickInput.value = serverNick || localNick || '';
+        const xInput = document.getElementById('profileX');
+        if(xInput) xInput.value = serverXUrl || localXUrl || '';
         updateNameDisplay();
         applyAvatarToBrand();
         renderAvatarChoices();
@@ -3369,6 +3464,7 @@
       const panel = document.getElementById('authPanel');
       const saveBtn = document.getElementById('saveProfile');
       const nicknameInput = document.getElementById('profileNickname');
+      const xInput = document.getElementById('profileX');
       const togglePanel = (open) => {
         if(!panel) return;
         if(open){
@@ -3383,6 +3479,9 @@
         if(nicknameInput){
           nicknameInput.value = loadNickname();
         }
+        if(xInput){
+          xInput.value = loadXUrl();
+        }
         togglePanel(true);
       });
       if(closeBtn) closeBtn.addEventListener('click', () => togglePanel(false));
@@ -3392,15 +3491,25 @@
       if(saveBtn){
         saveBtn.addEventListener('click', async () => {
           const nick = (nicknameInput?.value || '').trim();
+          const xUrl = normalizeXUrl(xInput?.value || '');
           if(nick){
             saveNickname(nick);
           }
+          saveXUrl(xUrl);
           updateNameDisplay();
           applyAvatarToBrand();
           renderAvatarChoices();
           if(supabase && supabaseUser?.id){
             try{
-              await supabase.from('user_profiles').upsert({ id: supabaseUser.id, nickname: nick || null, avatar: loadAvatar() });
+              const payload = { id: supabaseUser.id, nickname: nick || null, avatar: loadAvatar() };
+              if(supportsProfileXUrl) payload.x_url = xUrl || null;
+              let res = await supabase.from('user_profiles').upsert(payload);
+              if(res.error && supportsProfileXUrl && isMissingColumn(res.error, 'x_url')){
+                supportsProfileXUrl = false;
+                delete payload.x_url;
+                res = await supabase.from('user_profiles').upsert(payload);
+              }
+              if(res.error) throw res.error;
               setAuthStatus('プロフィールを保存しました');
             }catch(err){
               console.warn('profile save fallback', err);
@@ -3533,6 +3642,10 @@
       const profileNick = document.getElementById('profileNickname');
       if(profileNick){
         profileNick.value = loadNickname();
+      }
+      const profileX = document.getElementById('profileX');
+      if(profileX){
+        profileX.value = loadXUrl();
       }
       await initSupabase();
       if(supabaseMaintenance){
