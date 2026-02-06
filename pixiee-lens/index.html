@@ -2140,10 +2140,11 @@
 <label class="select-control" for="colorDepthSelect">
 <span class="select-control__label">色数</span>
 <select id="colorDepthSelect" name="colorDepth">
-<option value="full">８BIT（カラー）</option>
-<option value="gray">８BIT（グレー）</option>
-<option selected="" value="4">2BIT</option>
-<option value="2">1BIT</option>
+<option value="full">フルカラー</option>
+<option value="256">8BIT（256色）</option>
+<option value="16">4BIT（16色）</option>
+<option selected="" value="4">2BIT（4色）</option>
+<option value="2">1BIT（2色）</option>
 </select>
 </label>
 <button aria-label="パレットを表示" aria-pressed="false" class="option-button palette-toggle" id="paletteToggleBtn" type="button">パレット</button>
@@ -2655,6 +2656,9 @@
     const COLOR_SIMPLIFY_MAX_COLORS = 24;
     const COLOR_SIMPLIFY_BUCKET = 18;
     const AUTO_ADJUST_SAMPLE_SIZE = Object.freeze({ width: 180, height: 120 });
+    const AUTO_ADJUST_FOCUS_SCALE = 0.48;
+    const AUTO_ADJUST_FOCUS_BLEND = 0.7;
+    const AUTO_ADJUST_SMOOTHING = 0.65;
     const autoAdjustCanvas = document.createElement('canvas');
     autoAdjustCanvas.width = AUTO_ADJUST_SAMPLE_SIZE.width;
     autoAdjustCanvas.height = AUTO_ADJUST_SAMPLE_SIZE.height;
@@ -3049,8 +3053,8 @@
         const fy = Math.min(Math.max(focusPoint.y, 0), 1);
         const focusSourceX = sourceRect.sx + sourceRect.sw * fx;
         const focusSourceY = sourceRect.sy + sourceRect.sh * fy;
-        const cropWidth = Math.max(48, Math.min(sourceRect.sw, sourceRect.sw * 0.32));
-        const cropHeight = Math.max(48, Math.min(sourceRect.sh, sourceRect.sh * 0.32));
+        const cropWidth = Math.max(48, Math.min(sourceRect.sw, sourceRect.sw * AUTO_ADJUST_FOCUS_SCALE));
+        const cropHeight = Math.max(48, Math.min(sourceRect.sh, sourceRect.sh * AUTO_ADJUST_FOCUS_SCALE));
         const halfW = cropWidth / 2;
         const halfH = cropHeight / 2;
         const sx = Math.max(sourceRect.sx, Math.min(focusSourceX - halfW, sourceRect.sx + sourceRect.sw - cropWidth));
@@ -3185,6 +3189,54 @@
         whiteBalance: whiteBalanceValue,
         shadows: shadowsValue
       };
+    }
+
+    function blendAutoAdjustMetrics(primary, secondary, weight = AUTO_ADJUST_FOCUS_BLEND) {
+      if (!primary && !secondary) {
+        return null;
+      }
+      if (!secondary) {
+        return primary;
+      }
+      if (!primary) {
+        return secondary;
+      }
+      const w1 = Math.max(0, Math.min(1, Number(weight)));
+      const w2 = 1 - w1;
+      return {
+        avgL: primary.avgL * w1 + secondary.avgL * w2,
+        stdL: primary.stdL * w1 + secondary.stdL * w2,
+        avgR: primary.avgR * w1 + secondary.avgR * w2,
+        avgG: primary.avgG * w1 + secondary.avgG * w2,
+        avgB: primary.avgB * w1 + secondary.avgB * w2,
+        darkRatio: primary.darkRatio * w1 + secondary.darkRatio * w2,
+        brightRatio: primary.brightRatio * w1 + secondary.brightRatio * w2,
+        saturationMetric: primary.saturationMetric * w1 + secondary.saturationMetric * w2
+      };
+    }
+
+    function smoothCameraSettings(target, factor = AUTO_ADJUST_SMOOTHING) {
+      if (!target || typeof target !== 'object') {
+        return target;
+      }
+      if (!state.cameraSettings) {
+        return target;
+      }
+      const alpha = Math.max(0, Math.min(1, Number(factor)));
+      const output = {};
+      CAMERA_SETTING_KEYS.forEach((key) => {
+        if (!Object.prototype.hasOwnProperty.call(target, key)) {
+          return;
+        }
+        const current = Number(state.cameraSettings[key]);
+        const desired = Number(target[key]);
+        if (!Number.isFinite(current) || !Number.isFinite(desired)) {
+          output[key] = target[key];
+          return;
+        }
+        output[key] = current + (desired - current) * alpha;
+      });
+      return output;
     }
 
     function updateCameraFilters() {
@@ -4994,13 +5046,15 @@
         const dotCount = dotState.width * dotState.height;
         let depthLabel;
         if (state.colorDepth === 'full') {
-          depthLabel = '８BIT（カラー）';
-        } else if (state.colorDepth === 'gray') {
-          depthLabel = '８BIT（グレー）';
+          depthLabel = 'フルカラー';
+        } else if (state.colorDepth === '256') {
+          depthLabel = '8BIT（256色）';
+        } else if (state.colorDepth === '16') {
+          depthLabel = '4BIT（16色）';
         } else if (state.colorDepth === '4') {
-          depthLabel = '2BIT';
+          depthLabel = '2BIT（4色）';
         } else if (state.colorDepth === '2') {
-          depthLabel = '1BIT';
+          depthLabel = '1BIT（2色）';
         } else {
           depthLabel = `${state.colorDepth}色`;
         }
@@ -5014,11 +5068,18 @@
       '1:1': { width: 1, height: 1 }
     };
 
-    const COLOR_DEPTHS = ['full', 'gray', '4', '2'];
+    const COLOR_DEPTHS = ['full', '256', '16', '4', '2'];
+    const PALETTELESS_DEPTHS = Object.freeze({
+      full: true,
+      '256': true
+    });
     const GRADIENT_MODE_LABELS = {
       none: 'なし',
       dither: 'ディザリング'
     };
+    function depthUsesPalette(depth) {
+      return !PALETTELESS_DEPTHS[depth];
+    }
     const BLACK_COLOR = { r: 0, g: 0, b: 0 };
     const WHITE_COLOR = { r: 255, g: 255, b: 255 };
     const GRAY_TINT_DEFAULT_COLOR = { r: 192, g: 192, b: 192 };
@@ -5293,6 +5354,7 @@
     const SHADOW_LIFT_THRESHOLD = 60;
     const SHADOW_LIFT_AMOUNT = 4;
     const PALETTE_HOLD_MS = 5000;
+    const PALETTE_AUTO_UPDATE_ENABLED = false;
     const DOT_SMOOTHING_BLUR = 0.45;
     const DITHER_MATRIX_4X4 = [
       0, 8, 2, 10,
@@ -5300,6 +5362,7 @@
       3, 11, 1, 9,
       15, 7, 13, 5
     ];
+    const FIXED_8BIT_LEVELS = Object.freeze({ r: 8, g: 8, b: 4 });
 
     const paletteState = {
       depth: null,
@@ -5360,11 +5423,22 @@
       };
     }
 
+    function clearPaletteState() {
+      paletteState.colors = [];
+      paletteState.originalColors = [];
+      paletteState.cache = new Map();
+      paletteState.depth = null;
+      paletteState.desired = 0;
+      paletteState.lastUpdated = 0;
+      paletteState.userEdited = false;
+      resetPaletteDisplay();
+    }
+
     function updatePaletteDisplay(force = false) {
       if (!paletteDisplay) {
         return;
       }
-      if (!state.dotMode || state.colorDepth === 'full' || !paletteDisplayEnabled) {
+      if (!state.dotMode || !depthUsesPalette(state.colorDepth) || !paletteDisplayEnabled) {
         if (force || paletteDisplayKey) {
           resetPaletteDisplay();
         }
@@ -5415,7 +5489,7 @@
     function setPaletteDisplayEnabled(enabled) {
       const canEnable = Boolean(enabled)
         && state.dotMode
-        && state.colorDepth !== 'full';
+        && depthUsesPalette(state.colorDepth);
       paletteDisplayEnabled = canEnable;
       if (paletteToggleBtn) {
         paletteToggleBtn.classList.toggle('is-active', canEnable);
@@ -5642,7 +5716,7 @@
         return;
       }
       const canShow = state.dotMode
-        && state.colorDepth !== 'full';
+        && depthUsesPalette(state.colorDepth);
       paletteToggleBtn.disabled = !canShow;
       if (canShow) {
         paletteToggleBtn.removeAttribute('aria-disabled');
@@ -5801,6 +5875,17 @@
       return Math.max(0, Math.min(255, Math.round(value)));
     }
 
+    function quantizeChannelToLevels(value, levels) {
+      const safeLevels = Math.max(1, Number(levels) || 1);
+      if (safeLevels <= 1) {
+        return 0;
+      }
+      const maxIndex = safeLevels - 1;
+      const normalized = Math.max(0, Math.min(255, value)) / 255;
+      const index = Math.round(normalized * maxIndex);
+      return clampByte((index / maxIndex) * 255);
+    }
+
     function hslToRgb(h, s, l) {
       let hue = h;
       if (!Number.isFinite(hue)) {
@@ -5909,34 +5994,66 @@
       if (depth !== paletteState.depth || desired !== paletteState.desired) {
         return true;
       }
+      if (!paletteState.colors || !paletteState.colors.length) {
+        return true;
+      }
       if (paletteState.userEdited) {
+        return false;
+      }
+      if (!PALETTE_AUTO_UPDATE_ENABLED) {
         return false;
       }
       const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
       return now - paletteState.lastUpdated >= PALETTE_HOLD_MS;
     }
 
-    function applyColorDepth(imageData) {
-      const depth = state.colorDepth || '4';
-      if (depth === 'full') {
-        applyPreAverage(imageData);
-        boostSaturation(imageData);
-        applyContrastToImageData(imageData);
-        liftShadows(imageData);
-        paletteState.colors = [];
-        paletteState.originalColors = [];
-        paletteState.cache = new Map();
-        paletteState.depth = null;
-        paletteState.desired = 0;
-        paletteState.lastUpdated = 0;
-        paletteState.userEdited = false;
-        resetPaletteDisplay();
+    function applyFixed8Bit(imageData) {
+      if (!imageData || !imageData.data) {
         return;
       }
+      const data = imageData.data;
+      const width = imageData.width || 0;
+      const useDither = state.gradientMode === 'dither' && width > 0;
+      const ditherStrength = useDither ? 32 : 0;
+      const ditherScale = useDither ? ditherStrength / 16 : 0;
+      const rLevels = FIXED_8BIT_LEVELS.r;
+      const gLevels = FIXED_8BIT_LEVELS.g;
+      const bLevels = FIXED_8BIT_LEVELS.b;
+      for (let i = 0; i < data.length; i += 4) {
+        let r = data[i];
+        let g = data[i + 1];
+        let b = data[i + 2];
+        if (useDither) {
+          const pixelIndex = i >> 2;
+          const x = pixelIndex % width;
+          const y = (pixelIndex / width) | 0;
+          const threshold = DITHER_MATRIX_4X4[((y & 3) << 2) | (x & 3)];
+          const offset = (threshold - 7.5) * ditherScale;
+          r = clampByte(r + offset);
+          g = clampByte(g + offset);
+          b = clampByte(b + offset);
+        }
+        data[i] = quantizeChannelToLevels(r, rLevels);
+        data[i + 1] = quantizeChannelToLevels(g, gLevels);
+        data[i + 2] = quantizeChannelToLevels(b, bLevels);
+      }
+    }
+
+    function applyColorDepth(imageData) {
+      const depth = state.colorDepth || '4';
       applyPreAverage(imageData);
       boostSaturation(imageData);
       applyContrastToImageData(imageData);
       liftShadows(imageData);
+      if (depth === 'full') {
+        clearPaletteState();
+        return;
+      }
+      if (depth === '256') {
+        applyFixed8Bit(imageData);
+        clearPaletteState();
+        return;
+      }
       const timestamp = typeof performance !== 'undefined' ? performance.now() : Date.now();
       if (depth === '4') {
         const needsUpdate = paletteState.depth !== '4'
@@ -7572,9 +7689,27 @@
       if (!rect.width || !rect.height) {
         return;
       }
+      let activeRect = rect;
+      if (dotCanvas && !dotCanvas.hidden) {
+        const dotRect = dotCanvas.getBoundingClientRect();
+        if (dotRect.width && dotRect.height) {
+          activeRect = dotRect;
+        }
+      }
+      if (
+        event.clientX < activeRect.left ||
+        event.clientX > activeRect.right ||
+        event.clientY < activeRect.top ||
+        event.clientY > activeRect.bottom
+      ) {
+        setStatus('カメラ範囲内をタップしてください');
+        return;
+      }
       const x = (event.clientX - rect.left) / rect.width;
       const y = (event.clientY - rect.top) / rect.height;
-      const metrics = sampleFrameForAutoAdjust({ x, y });
+      const focusMetrics = sampleFrameForAutoAdjust({ x, y });
+      const globalMetrics = sampleFrameForAutoAdjust(null);
+      const metrics = blendAutoAdjustMetrics(focusMetrics, globalMetrics);
       if (!metrics) {
         setStatus('タップした位置の解析に失敗しました');
         return;
@@ -7584,7 +7719,8 @@
         setStatus('自動調整を適用できませんでした');
         return;
       }
-      applyCameraSettingsBatch(nextSettings);
+      const smoothedSettings = smoothCameraSettings(nextSettings);
+      applyCameraSettingsBatch(smoothedSettings);
       setStatus('タップ位置を基準に自動調整しました');
     }
 
@@ -7933,9 +8069,6 @@
         outputCanvas = croppedCanvas;
         outputWidth = sw;
         outputHeight = sh;
-      }
-      if (state.colorDepth === 'full') {
-        simplifyCanvasColors(outputCanvas);
       }
       return canvasToBlobWithFallback(outputCanvas).then((payload) => ({
         ...payload,
