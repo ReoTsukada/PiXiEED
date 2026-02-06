@@ -2147,7 +2147,6 @@
 <option value="2">1BIT（2色）</option>
 </select>
 </label>
-<button aria-label="パレットを表示" aria-pressed="false" class="option-button palette-toggle" id="paletteToggleBtn" type="button">パレット</button>
 </div>
 <div aria-hidden="true" class="palette-display" id="paletteDisplay"></div>
 </div>
@@ -2210,7 +2209,7 @@
 </div>
 <div class="hud-bottom__actions-group hud-bottom__actions-group--right">
 <button aria-controls="paletteMenu" aria-expanded="false" aria-label="パレット設定を開く" class="icon-button" id="paletteMenuBtn" type="button">
-<img alt="" aria-hidden="true" class="control-icon" src="./icon-palette.svg"/>
+<img alt="" aria-hidden="true" class="control-icon" src="../projects/pixiee-lens/palette.svg"/>
 <span class="icon-button__label visually-hidden">パレット設定</span>
 </button>
 </div>
@@ -5712,18 +5711,21 @@
       }
     }
     function updatePaletteToggleAvailability() {
-      if (!paletteToggleBtn) {
-        return;
-      }
       const canShow = state.dotMode
         && depthUsesPalette(state.colorDepth);
-      paletteToggleBtn.disabled = !canShow;
-      if (canShow) {
-        paletteToggleBtn.removeAttribute('aria-disabled');
-      } else {
-        paletteToggleBtn.setAttribute('aria-disabled', 'true');
+      if (paletteToggleBtn) {
+        paletteToggleBtn.disabled = !canShow;
+        if (canShow) {
+          paletteToggleBtn.removeAttribute('aria-disabled');
+        } else {
+          paletteToggleBtn.setAttribute('aria-disabled', 'true');
+        }
       }
-      if (!canShow && paletteDisplayEnabled) {
+      if (canShow) {
+        if (!paletteDisplayEnabled) {
+          setPaletteDisplayEnabled(true);
+        }
+      } else if (paletteDisplayEnabled) {
         setPaletteDisplayEnabled(false);
       }
     }
