@@ -199,13 +199,24 @@ gtag('event', 'project_open_maoitu');
     width:min(90vw, 336px);
     box-sizing:border-box;
   }
-  #sharePanel button{
+  #sharePanel button,
+  #sharePanel .share-link{
     font:700 12px system-ui;
     padding:10px 16px;
     border:0;
     border-radius:10px;
     cursor:pointer;
     width:100%;
+    box-sizing:border-box;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    line-height:1;
+  }
+  #sharePanel .share-link{
+    text-decoration:none;
+    background:rgba(255,255,255,0.2);
+    color:#fff;
   }
   #shareScoreLabel{font-size:16px;font-weight:700;text-align:center;}
   #footer{
@@ -397,6 +408,7 @@ gtag('event', 'project_open_maoitu');
 <div id="sharePanel">
   <button id="shareActionBtn" style="background:#22c55e;color:#000;">シェアする</button>
   <button id="restartActionBtn" style="background:#3b82f6;color:#fff;">もう一度遊ぶ</button>
+  <a class="share-link" href="../tools.html">他のゲームで遊ぶ</a>
   <button id="backToStartBtn" style="background:rgba(255,255,255,0.2);color:#fff;">スタート画面に戻る</button>
   <button id="nextDifficultyBtn" style="background:#f97316;color:#fff;display:none;">次の難易度へ</button>
 </div>
