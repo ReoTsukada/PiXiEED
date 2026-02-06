@@ -446,25 +446,26 @@
           emptyItem.textContent = '更新内容は準備中です。';
           updatesList.appendChild(emptyItem);
         } else {
-          const latest = withUpdates[0];
-          const row = document.createElement('li');
-          row.className = 'project-place__update';
+          withUpdates.slice(0, 5).forEach(item => {
+            const row = document.createElement('li');
+            row.className = 'project-place__update';
 
-          const time = document.createElement('time');
-          if (latest.updated) {
-            time.dateTime = latest.updated;
-          }
-          const formatted = formatDate(latest.timestamp, latest.updated);
-          time.textContent = formatted || latest.updated || '';
+            const time = document.createElement('time');
+            if (item.updated) {
+              time.dateTime = item.updated;
+            }
+            const formatted = formatDate(item.timestamp, item.updated);
+            time.textContent = formatted || item.updated || '';
 
-          const title = document.createElement('strong');
-          title.textContent = latest.title || 'プロジェクト';
+            const title = document.createElement('strong');
+            title.textContent = item.title || 'プロジェクト';
 
-          const desc = document.createElement('span');
-          desc.textContent = latest.update;
+            const desc = document.createElement('span');
+            desc.textContent = item.update;
 
-          row.append(time, title, desc);
-          updatesList.appendChild(row);
+            row.append(time, title, desc);
+            updatesList.appendChild(row);
+          });
         }
       }
 
