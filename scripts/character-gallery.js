@@ -130,7 +130,22 @@
         markCharacterSeen(entryId);
       }
     }
+    emitCharacterSelected(entry);
     updateHeaderIndicator();
+  }
+
+  function emitCharacterSelected(entry) {
+    if (!entry || typeof window === 'undefined') return;
+    const detail = entry.detail || entry.background || entry.description || '';
+    const payload = {
+      id: entry.id || null,
+      name: entry.name || '',
+      detail
+    };
+    window.__PIXIEED_CURRENT_CHARACTER = payload;
+    if (typeof window.CustomEvent === 'function') {
+      window.dispatchEvent(new CustomEvent('pixieed:characterSelected', { detail: payload }));
+    }
   }
 
   function createButton(entry, index) {
