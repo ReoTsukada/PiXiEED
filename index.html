@@ -168,6 +168,10 @@
       grid-template-columns:1fr;
       align-items:start;
     }
+    .hero-place{
+      display:grid;
+      gap:12px;
+    }
     .hero-copy{
       display:grid;
       gap:12px;
@@ -199,6 +203,36 @@
     }
     .button:hover,
     .button:focus-visible{ transform:translateY(-1px); filter:brightness(1.05); }
+    .button--ghost{
+      background:rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.2);
+      color:#f9fafb;
+      box-shadow:none;
+    }
+    .button--ghost:hover,
+    .button--ghost:focus-visible{
+      background:rgba(255,255,255,0.12);
+      filter:none;
+    }
+    .hero-switch:hover,
+    .hero-switch:focus-visible{
+      transform:none;
+    }
+    .hero-switch.is-active{
+      background:rgba(255,255,255,0.2);
+      border-color:rgba(255,255,255,0.35);
+    }
+    .hero-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+    }
+    .hero-actions .button{
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+    }
     .grid{
       display:grid;
       gap:14px;
@@ -520,54 +554,150 @@
     }
 
     /* Character hero */
+    .character-place{
+      display:grid;
+      gap:12px;
+    }
+    .character-place.is-hero{
+      align-items:start;
+    }
+    .character-place.is-hero .section-eyebrow{
+      display:none;
+    }
+    .character-place.is-hero .character-sprite{
+      width:96px;
+      height:96px;
+      min-height:96px;
+      padding:0;
+      border:2px solid transparent;
+      display:grid;
+      place-items:center;
+    }
+    .character-place.is-hero .character-sprite img{
+      width:100%;
+      height:100%;
+    }
+    .character-place.is-hero .character-sprite span{
+      display:none;
+    }
+    .character-place.is-hero .hero-description{
+      display:none;
+    }
+    .swap-animate{
+      animation:swapFade 240ms ease;
+    }
+    @keyframes swapFade{
+      from{ opacity:0; transform:translateY(8px) scale(0.98); }
+      to{ opacity:1; transform:translateY(0) scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce){
+      .swap-animate{ animation:none; }
+    }
     .character-preview{
       margin-top:8px;
       display:grid;
-      grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));
+      grid-template-columns:minmax(0, 1.2fr) minmax(0, 1fr);
+      align-items:start;
       border-radius:16px;
-      border:1px solid rgba(255,255,255,0.16);
+      border:0;
       overflow:hidden;
-      background:rgba(11,18,36,0.9);
-      box-shadow:0 12px 30px rgba(0,0,0,0.32);
-    }
-    .character-preview__frame,
-    .character-preview__details{
-      min-height:320px;
-      align-self:stretch;
+      background:transparent;
+      box-shadow:none;
+      height:var(--preview-height, auto);
     }
     .character-preview__frame{
+      min-height:0;
+      align-self:stretch;
+      height:100%;
       display:flex;
       align-items:center;
       justify-content:center;
-      background:rgba(15,23,42,0.9);
+      background:transparent;
       position:relative;
       padding:16px;
+      border:0;
+      box-shadow:none;
+      border-radius:0;
+      overflow:visible;
+    }
+    .character-preview__frame.dot-gallery__viewer{
+      padding:0;
+      background:transparent;
+      border:0;
+      box-shadow:none;
+      border-radius:0;
+      overflow:visible;
+    }
+    .character-preview__details{
+      min-height:0;
+      align-self:stretch;
+    }
+    .character-place:not(.is-hero) .character-preview__frame.dot-gallery__viewer{
+      height:100%;
+      box-shadow:none;
+      border:0;
+      background:transparent;
     }
     .character-preview__frame img{
-      width:min(520px,100%);
-      max-height:420px;
+      width:100%;
+      height:100%;
+      max-width:100%;
+      max-height:100%;
+      margin:0 auto;
+      display:block;
       image-rendering:pixelated;
       object-fit:contain;
+    }
+    .game-preview__frame img{
+      image-rendering:auto;
+      object-fit:cover;
+    }
+    .game-place .dot-gallery__button img{
+      image-rendering:auto;
+      object-fit:cover;
+    }
+    .game-preview__update{
+      margin:0;
+      color:#cbd5e1;
+      font-size:12px;
+      line-height:1.4;
+    }
+    .game-preview__cta{
+      align-self:flex-start;
     }
     .character-preview__placeholder{
       position:absolute;
       inset:16px;
-      border:1px dashed rgba(255,255,255,0.3);
-      border-radius:12px;
+      border:0;
+      border-radius:0;
       display:flex;
       align-items:center;
       justify-content:center;
       color:#cbd5e1;
       letter-spacing:0.12em;
       font-size:12px;
-      background:rgba(255,255,255,0.03);
+      background:transparent;
+      box-shadow:none;
     }
     .character-preview__details{
       padding:16px;
       display:flex;
       flex-direction:column;
       gap:10px;
-      background:rgba(9,12,22,0.85);
+      background:transparent;
+      height:100%;
+      overflow:auto;
+    }
+    @media (max-width:700px){
+      .character-preview{
+        grid-template-columns:minmax(0, 1fr) minmax(0, 0.85fr);
+      }
+      .character-preview__details{
+        padding:12px;
+        gap:8px;
+      }
+      .character-preview__name{ font-size:18px; }
+      .character-preview__detail p{ font-size:12px; }
     }
     .character-preview__heading h2{ margin:0; }
     .character-preview__heading p{ margin:0.5rem 0 0; color:#cbd5e1; }
@@ -1005,19 +1135,33 @@
       </div>
     </header>
 
-    <section class="card">
+    <section class="card" id="home-hero">
       <div class="hero-grid">
         <div class="hero-copy">
           <h1>PiXiEED ホーム</h1>
-        </div>
-        <div class="dot-hero">
-          <h2>ドット絵</h2>
-          <div class="dot-gallery__viewer">
-            <img alt="" id="dotGalleryMain" loading="lazy" src=""/>
+          <p class="subtitle">ブラウザでドット絵を描いて、ゲームで遊べるドット絵専用サイトです。</p>
+          <div class="hero-actions">
+            <a class="button" href="projects/pixiedraw/index.html">今すぐ描く</a>
+            <a class="button button--ghost hero-switch" href="#game-intro" id="showGamePlace" role="button" aria-pressed="false">ゲーム/ツール</a>
+            <a class="button button--ghost hero-switch" href="#character-intro" id="showCharacterPlace" role="button" aria-pressed="false">キャラクター</a>
+            <a class="button button--ghost hero-switch" href="#home-hero" id="showDotPlace" role="button" aria-pressed="true">ドット絵</a>
           </div>
-          <div class="dot-gallery__buttons" id="dotGalleryButtons" aria-label="ドット絵一覧"></div>
+        </div>
+        <div class="hero-place" id="heroPlaceSlot">
+          <div class="dot-hero" id="dotPlace">
+            <h2>ドット絵</h2>
+            <div class="dot-gallery__viewer">
+              <img alt="" id="dotGalleryMain" loading="lazy" src=""/>
+            </div>
+            <div class="dot-gallery__buttons" id="dotGalleryButtons" aria-label="ドット絵一覧"></div>
+          </div>
         </div>
       </div>
+    </section>
+
+    <section class="card">
+      <h2>ドット絵エディター</h2>
+      <p class="seo-links">ブラウザで描ける <a href="projects/pixiedraw/index.html">ドット絵エディター PiXiEEDraw</a> と、16×16練習向けの <a href="projects/jerin-maker/index.html">16×16ドット絵ツール PiXiEEDraw Lite</a> を紹介しています。</p>
     </section>
 
     <section class="card" aria-label="広告">
@@ -1031,90 +1175,44 @@
       </div>
     </section>
 
-    <section class="section section--highlight" id="character-intro">
-      <div class="section-inner">
-        <p class="section-eyebrow">Original Character Workbench</p>
-        <div class="character-preview__heading">
-          <h2>キャラクター</h2>
-          <p>ここではジェリンを中心としてオリジナルキャラクターの紹介をしています。ゲームのシリーズに登場します。</p>
-        </div>
-        <div aria-live="polite" class="character-preview">
-          <div class="character-preview__frame">
-            <img alt="" hidden id="characterGalleryMain" loading="lazy" src=""/>
-            <div class="character-preview__placeholder" id="characterGalleryPlaceholder">
-              <small id="characterPlaceholderMeta">差し替え待ち</small>
+    <section class="section section--highlight" id="game-intro">
+      <div class="section-inner" id="gamePlaceSlot">
+        <div class="character-place game-place" id="gamePlace">
+          <p class="section-eyebrow">Games &amp; Tools</p>
+          <div class="character-preview__heading">
+            <h2>ゲーム / ツール</h2>
+            <p hidden>ゲームやツールのOGPから、気になる作品をすぐチェックできます。</p>
+          </div>
+          <div aria-live="polite" class="character-preview game-preview">
+            <div class="character-preview__frame dot-gallery__viewer game-preview__frame">
+              <img alt="" hidden id="gameGalleryMain" loading="lazy" src=""/>
+              <div class="character-preview__placeholder" id="gameGalleryPlaceholder">
+                <small id="gamePlaceholderMeta">差し替え待ち</small>
+              </div>
+            </div>
+            <div class="character-preview__details game-preview__details" id="gamePreviewDetails">
+              <h3 class="character-preview__name" id="gameGalleryName">ゲーム / ツールを選択</h3>
+              <p class="character-preview__weight game-preview__meta" id="gameGalleryMeta">Games &amp; Tools</p>
+              <div class="character-preview__detail">
+                <h4>紹介</h4>
+                <p id="gameGalleryDetail">選択したゲームやツールの紹介がここに表示されます。</p>
+              </div>
+              <div class="chips">
+                <a class="button button--ghost game-preview__cta" id="gameGalleryLink" href="tools.html">この作品を見る</a>
+                <a class="button button--ghost game-preview__cta" href="tools.html">ツール/ゲーム一覧へ</a>
+              </div>
+              <p class="character-preview__weight game-preview__update" id="gameGalleryUpdate"></p>
             </div>
           </div>
-          <div class="character-preview__details" id="characterPreviewDetails">
-            <h3 class="character-preview__name" id="characterGalleryName">キャラクターA（仮）</h3>
-            <p class="character-preview__weight" id="characterGalleryWeight">Weight: 調整中</p>
-            <div class="character-preview__traits">
-              <h4>特徴</h4>
-              <ul id="characterTraits">
-                <li>特徴メモ</li>
-              </ul>
-            </div>
-            <div class="character-preview__detail">
-              <h4>詳細</h4>
-              <p id="characterGalleryDetail">選択したキャラクターの詳細がここに表示されます。</p>
-            </div>
-          </div>
-        </div>
-        <p class="character-sprites__hint">下のPNGをクリックするとプレビューと詳細が切り替わります。</p>
-        <div aria-label="キャラクター一覧" class="character-preview__buttons" id="characterGalleryButtons" role="listbox"></div>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>ドット絵エディター</h2>
-      <p class="seo-links">ブラウザで描ける <a href="projects/pixiedraw/index.html">ドット絵エディター PiXiEEDraw</a> と、16×16練習向けの <a href="projects/jerin-maker/index.html">16×16ドット絵ツール PiXiEEDraw Lite</a> を紹介しています。</p>
-    </section>
-
-    <section class="card project-place">
-      <div class="project-place__header">
-        <div class="project-place__copy">
-          <h2>プロジェクト</h2>
-          <p class="subtitle">ゲーム・ツール・ラボ作品などをダイジェストで紹介。OGPは最近更新順に左上から並びます。リンクからツール/ゲーム一覧へ。</p>
-        </div>
-        <a class="project-place__cta" href="tools.html">ツール/ゲーム一覧へ</a>
-      </div>
-      <div class="project-place__body">
-        <div class="project-place__image" data-project-place data-columns="3" data-tile-width="420" data-tile-height="280">
-          <canvas class="project-place__canvas" id="projectPlaceCanvas" width="1260" height="560" role="img" aria-label="PiXiEEDのプロジェクトOGPを最近更新順にまとめたグリッド画像"></canvas>
-          <img class="project-place__fallback" src="images/project-grid.png" alt="PiXiEEDのプロジェクトOGPをグリッドにまとめた画像" loading="lazy">
-          <ul class="project-place__source" id="projectPlaceItems" hidden>
-            <li data-title="魔王奪還戦" data-image="PiXiEEDogp.png" data-updated="2026-02-05" data-update="宝箱チャリン調整 / 地面スプライト修正"></li>
-            <li data-title="魔王様!!いつまでよければいいですか!?" data-image="maoitu/ogp.png" data-updated="2025-10-10" data-update=""></li>
-            <li data-title="PiXFiND" data-image="pixfind/ogp.png" data-updated="2025-10-21" data-update=""></li>
-            <li data-title="PiXiEEDraw Lite" data-image="jerin-maker/ogp-app.png" data-updated="2025-12-13" data-update="" data-readme="jerin-maker/README.md"></li>
-            <li data-title="PiXiEELENS" data-image="pixiee-lens/ogp.png" data-updated="2025-10-25" data-update="" data-readme="pixiee-lens/README.md"></li>
-            <li data-title="QRコードメーカー" data-image="qr-maker/qrogp.png" data-updated="2025-12-18" data-update="" data-readme="qr-maker/README.md"></li>
+          <div aria-label="ゲーム/ツール一覧" class="character-preview__buttons dot-gallery__buttons" id="gameGalleryButtons" role="listbox"></div>
+          <ul class="project-place__source" id="gameGalleryItems" hidden>
+            <li data-title="魔王奪還戦" data-image="PiXiEEDogp.png" data-type="game" data-updated="2026-02-05" data-update="宝箱チャリン調整 / 地面スプライト修正" data-desc="最新アップデート: 宝箱チャリン調整 / 地面スプライト修正" data-link="maou-war/index.html"></li>
+            <li data-title="魔王様!!いつまでよければいいですか!?" data-image="maoitu/ogp.png" data-type="game" data-updated="2025-10-10" data-desc="ひたすら避け続けるアクション。" data-link="maoitu/index.html"></li>
+            <li data-title="PiXFiND" data-image="pixfind/ogp.png" data-type="game" data-updated="2025-10-21" data-desc="ドット絵特化の間違い探し。" data-link="pixfind/index.html"></li>
+            <li data-title="PiXiEEDraw Lite" data-image="jerin-maker/ogp-app.png" data-type="tool" data-updated="2025-12-13" data-desc="16×16ドットの制作とPNG保存。" data-link="jerin-maker/index.html"></li>
+            <li data-title="PiXiEELENS" data-image="pixiee-lens/ogp.png" data-type="tool" data-updated="2025-10-25" data-desc="カメラをドット絵変換してレトロ写真が撮れるドット絵カメラ。" data-link="pixiee-lens/index.html"></li>
+            <li data-title="QRコードメーカー" data-image="qr-maker/qrogp.png" data-type="tool" data-updated="2025-12-18" data-desc="色や余白を指定してQR生成。" data-link="qr-maker/index.html"></li>
           </ul>
-        </div>
-        <div class="project-place__detail">
-          <div class="project-place__group">
-            <p class="project-place__label">Games</p>
-            <h3 class="project-place__title">遊べるゲーム</h3>
-            <ul class="project-place__list">
-              <li><strong>魔王様!!いつまでよければいいですか!?</strong> ひたすら避け続けるアクション。</li>
-              <li><strong>PiXFiND</strong> ドット絵特化の間違い探し。</li>
-            </ul>
-          </div>
-          <div class="project-place__group">
-            <p class="project-place__label">Tools &amp; Lab</p>
-            <h3 class="project-place__title">作れるツール</h3>
-            <ul class="project-place__list">
-              <li><strong>PiXiEEDraw Lite</strong> 16×16ドットの制作とPNG保存。</li>
-              <li><strong>PiXiEELENS</strong> カメラをドット絵変換してレトロ写真が撮れるドット絵カメラ。</li>
-              <li><strong>QRコードメーカー</strong> 色や余白を指定してQR生成。</li>
-            </ul>
-          </div>
-          <div class="project-place__group">
-            <p class="project-place__label">Updates</p>
-            <h3 class="project-place__title">最近の更新</h3>
-            <ul class="project-place__updates" id="projectPlaceUpdates" aria-live="polite"></ul>
-            <a class="project-place__link" href="notes/index.html">開発ノートまとめへ</a>
-          </div>
         </div>
       </div>
     </section>
@@ -1127,6 +1225,43 @@
              data-ad-slot="9073878884"
              data-ad-format="auto"
              data-full-width-responsive="true"></ins>
+      </div>
+    </section>
+
+    <section class="section section--highlight" id="character-intro">
+      <div class="section-inner" id="characterPlaceSlot">
+        <div class="character-place" id="characterPlace">
+          <p class="section-eyebrow">Original Character Workbench</p>
+          <div class="character-preview__heading">
+            <h2>キャラクター</h2>
+            <p hidden>ここではジェリンを中心としてオリジナルキャラクターの紹介をしています。ゲームのシリーズに登場します。</p>
+          </div>
+          <div aria-live="polite" class="character-preview">
+            <div class="character-preview__frame dot-gallery__viewer">
+              <img alt="" hidden id="characterGalleryMain" loading="lazy" src=""/>
+              <div class="character-preview__placeholder" id="characterGalleryPlaceholder">
+                <small id="characterPlaceholderMeta">差し替え待ち</small>
+              </div>
+            </div>
+            <div class="character-preview__details" id="characterPreviewDetails">
+              <h3 class="character-preview__name" id="characterGalleryName">キャラクターA（仮）</h3>
+              <p class="character-preview__weight" id="characterGalleryWeight">Weight: 調整中</p>
+              <div class="character-preview__traits">
+                <h4>特徴</h4>
+                <ul id="characterTraits">
+                  <li>特徴メモ</li>
+                </ul>
+              </div>
+              <div class="character-preview__detail">
+                <h4>詳細</h4>
+                <p id="characterGalleryDetail">選択したキャラクターの詳細がここに表示されます。</p>
+              </div>
+            </div>
+          </div>
+          <p class="character-sprites__hint" hidden>下のPNGをクリックするとプレビューと詳細が切り替わります。</p>
+          <div aria-label="キャラクター一覧" class="character-preview__buttons dot-gallery__buttons" id="characterGalleryButtons" role="listbox"></div>
+          <p class="hero-description" id="heroCharacterDescription" hidden></p>
+        </div>
       </div>
     </section>
 
@@ -1377,10 +1512,196 @@
           });
         }
       }
+      function setupHeroPlaceSwap(){
+        const heroSlot = document.getElementById('heroPlaceSlot');
+        const characterSlot = document.getElementById('characterPlaceSlot');
+        const gameSlot = document.getElementById('gamePlaceSlot');
+        const dotPlace = document.getElementById('dotPlace');
+        const characterPlace = document.getElementById('characterPlace');
+        const gamePlace = document.getElementById('gamePlace');
+        const showCharacterBtn = document.getElementById('showCharacterPlace');
+        const showDotBtn = document.getElementById('showDotPlace');
+        const showGameBtn = document.getElementById('showGamePlace');
+        const heroDesc = document.getElementById('heroCharacterDescription');
+        const nameEl = document.getElementById('characterGalleryName');
+        const detailEl = document.getElementById('characterGalleryDetail');
+        if(
+          !heroSlot ||
+          !characterSlot ||
+          !gameSlot ||
+          !dotPlace ||
+          !characterPlace ||
+          !gamePlace ||
+          !showCharacterBtn ||
+          !showDotBtn ||
+          !showGameBtn
+        ) return;
+
+        const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        let latestDescription = '';
+        let typeTimer = null;
+        const setActiveButtons = (mode) => {
+          const isCharacter = mode === 'character';
+          const isGame = mode === 'game';
+          const isDot = mode === 'dot';
+          showCharacterBtn.setAttribute('aria-pressed', isCharacter ? 'true' : 'false');
+          showGameBtn.setAttribute('aria-pressed', isGame ? 'true' : 'false');
+          showDotBtn.setAttribute('aria-pressed', isDot ? 'true' : 'false');
+          showCharacterBtn.classList.toggle('is-active', isCharacter);
+          showGameBtn.classList.toggle('is-active', isGame);
+          showDotBtn.classList.toggle('is-active', isDot);
+        };
+        const animateSwap = (element) => {
+          if(!element) return;
+          element.classList.remove('swap-animate');
+          void element.offsetWidth;
+          element.classList.add('swap-animate');
+          window.setTimeout(() => {
+            element.classList.remove('swap-animate');
+          }, 260);
+        };
+        const buildDescription = (data = {}) => {
+          const name = String(data.name || '').trim();
+          const detail = String(data.detail || data.description || data.background || '').trim();
+          if(name && detail) return `${name}：${detail}`;
+          return detail || name;
+        };
+        const getCurrentDescriptionFromDom = () => {
+          const name = String(nameEl?.textContent || '').trim();
+          const detail = String(detailEl?.textContent || '').trim();
+          return buildDescription({ name, detail }) || 'キャラクターの説明を準備中です。';
+        };
+        const typeHeroText = (text, options = {}) => {
+          if(!heroDesc) return;
+          const content = String(text || '').trim();
+          if(!content){
+            heroDesc.textContent = '';
+            heroDesc.hidden = true;
+            return;
+          }
+          heroDesc.hidden = false;
+          if(typeTimer){
+            clearTimeout(typeTimer);
+            typeTimer = null;
+          }
+          if(options.animate === false || prefersReducedMotion){
+            heroDesc.textContent = content;
+            return;
+          }
+          heroDesc.textContent = '';
+          let index = 0;
+          const step = () => {
+            heroDesc.textContent += content.charAt(index++);
+            if(index < content.length){
+              typeTimer = window.setTimeout(step, 18);
+            }
+          };
+          step();
+        };
+        const applyHeroDescription = (animate = true) => {
+          if(!heroDesc) return;
+          if(heroSlot.contains(characterPlace)){
+            if(!latestDescription){
+              latestDescription = getCurrentDescriptionFromDom();
+            }
+            typeHeroText(latestDescription, { animate });
+          }else{
+            heroDesc.textContent = '';
+            heroDesc.hidden = true;
+          }
+        };
+        const handleCharacterUpdate = (data = {}) => {
+          latestDescription = buildDescription(data);
+          if(!latestDescription){
+            latestDescription = getCurrentDescriptionFromDom();
+          }
+          if(heroSlot.contains(characterPlace)){
+            typeHeroText(latestDescription, { animate: true });
+          }
+        };
+        const setState = (mode, options = {}) => {
+          const { animate = true } = options;
+          if(mode === 'character'){
+            heroSlot.appendChild(characterPlace);
+            characterSlot.appendChild(dotPlace);
+            gameSlot.appendChild(gamePlace);
+            characterPlace.classList.add('is-hero');
+            gamePlace.classList.remove('is-hero');
+            setActiveButtons('character');
+            if(animate){
+              animateSwap(characterPlace);
+              animateSwap(dotPlace);
+            }
+            applyHeroDescription(animate);
+            window.requestAnimationFrame(syncHeroPreviewHeights);
+            return;
+          }
+          if(mode === 'game'){
+            heroSlot.appendChild(gamePlace);
+            gameSlot.appendChild(dotPlace);
+            characterSlot.appendChild(characterPlace);
+            gamePlace.classList.add('is-hero');
+            characterPlace.classList.remove('is-hero');
+            setActiveButtons('game');
+            if(animate){
+              animateSwap(gamePlace);
+              animateSwap(dotPlace);
+            }
+            applyHeroDescription(false);
+            window.requestAnimationFrame(syncHeroPreviewHeights);
+            return;
+          }
+          heroSlot.appendChild(dotPlace);
+          characterSlot.appendChild(characterPlace);
+          gameSlot.appendChild(gamePlace);
+          characterPlace.classList.remove('is-hero');
+          gamePlace.classList.remove('is-hero');
+          setActiveButtons('dot');
+          if(animate){
+            animateSwap(dotPlace);
+          }
+          applyHeroDescription(false);
+          window.requestAnimationFrame(syncHeroPreviewHeights);
+        };
+
+        showCharacterBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          setState('character');
+        });
+        showGameBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          setState('game');
+        });
+        showDotBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          setState('dot');
+        });
+        window.addEventListener('pixieed:characterSelected', (event) => {
+          handleCharacterUpdate(event?.detail || {});
+        });
+        if(window.__PIXIEED_CURRENT_CHARACTER){
+          latestDescription = buildDescription(window.__PIXIEED_CURRENT_CHARACTER);
+        }
+        setState('dot', { animate: false });
+      }
+      function syncHeroPreviewHeights(){
+        const previews = document.querySelectorAll('.character-place .character-preview');
+        previews.forEach((preview) => {
+          const frame = preview.querySelector('.character-preview__frame');
+          if (!frame) return;
+          const width = frame.getBoundingClientRect().width;
+          if (!width) return;
+          const height = Math.round(width * 0.75);
+          preview.style.setProperty('--preview-height', `${height}px`);
+        });
+      }
       document.addEventListener('DOMContentLoaded', () => {
         applyAvatar();
         setupAvatarToggle();
         setupProfileModal();
+        setupHeroPlaceSwap();
+        syncHeroPreviewHeights();
+        window.addEventListener('resize', syncHeroPreviewHeights);
         const y = document.getElementById('year');
         if(y) y.textContent = new Date().getFullYear();
       });
@@ -1391,5 +1712,6 @@
   <script src="scripts/gallery.js"></script>
   <script src="character-dots/manifest.js"></script>
   <script src="scripts/character-gallery.js"></script>
+  <script src="scripts/game-gallery.js"></script>
 </body>
 </html>
