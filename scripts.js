@@ -180,6 +180,7 @@
     const path = window.location.pathname || '';
     if (/\/(terms|privacy|portfolio|index\.html|\/$)/.test(path)) return; // ホームと規約/プライバシー/企業向けは除外
     if (document.querySelector('.ad-footer')) return; // 既に配置済みなら何もしない
+    if (document.querySelector('ins.adsbygoogle')) return; // 既存広告があるページは追加しない
 
     const STYLE_ID = 'pixieed-ad-footer-style';
     if (!document.getElementById(STYLE_ID)) {
@@ -188,20 +189,22 @@
       style.textContent = `
         .ad-footer{
           width:100%;
-          max-width:640px;
+          max-width:520px;
           padding:8px 0 calc(8px + env(safe-area-inset-bottom, 0px));
           box-sizing:border-box;
           display:flex;
           justify-content:center;
-          background:#000;
-          border-top:1px solid rgba(255,255,255,0.08);
           margin:0 auto;
+          align-items:center;
+          background:rgba(0,0,0,0.6);
+          border-top:1px solid rgba(255,255,255,0.08);
+          min-height:60px;
         }
         .ad-footer ins{
           display:block;
-          width:320px;
+          width:min(320px, 100%);
           max-width:320px;
-          height:40px;
+          min-height:60px;
           overflow:hidden;
         }
       `;
@@ -214,7 +217,7 @@
       <ins class="adsbygoogle"
            style="display:block"
            data-ad-client="ca-pub-9801602250480253"
-           data-ad-slot="2141591954"></ins>
+           data-ad-slot="rotate"></ins>
     `;
     document.body.appendChild(footer);
 
@@ -225,23 +228,9 @@
 
   function ensureProjectAds() {
     if (!document.body || !document.body.classList.contains('project-page')) return;
-    const slots = Array.from(document.querySelectorAll('ins.adsbygoogle'));
-    if (!slots.length) return;
-
-    slots.forEach(ins => {
-      if (ins.dataset.pixieedAdInit === '1') return;
-      if (ins.dataset.adsLazyLoaded === '1') return;
-      const status = ins.getAttribute('data-ad-status');
-      const adsStatus = ins.getAttribute('data-adsbygoogle-status');
-      if (adsStatus === 'done' || status === 'filled' || status === 'unfilled') return;
-
-      ins.dataset.pixieedAdInit = '1';
-      try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-      } catch (err) {
-        ins.dataset.pixieedAdInit = '';
-      }
-    });
+    if (window.pixieedObserveAds) {
+      window.pixieedObserveAds();
+    }
   }
 
   function scheduleProjectAds() {
