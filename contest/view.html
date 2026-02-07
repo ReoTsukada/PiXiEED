@@ -523,7 +523,8 @@
       justify-content:center;
       text-align:center;
       flex-direction:column;
-      aspect-ratio:1/1;
+      aspect-ratio:auto;
+      min-height:110px;
       gap:6px;
     }
     .entry-ad-slot{
@@ -534,7 +535,7 @@
     .entry-ad-slot ins{
       display:block;
       width:100%;
-      height:90px;
+      height:40px;
       overflow:hidden;
     }
     .entry-ad-note{
@@ -543,7 +544,7 @@
       font-size:11px;
     }
     @media(max-width:640px){
-      .entry-ad-slot ins{ height:60px; }
+      .entry-ad-slot ins{ height:40px; }
     }
     .load-more{
       display:flex;
