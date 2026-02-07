@@ -209,7 +209,7 @@
   }
   .hud-bars {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 8px;
   }
   .hud-bar {
@@ -233,6 +233,9 @@
   }
   .hud-meter--mp .hud-meter__fill {
     background: linear-gradient(90deg, #38bdf8, #a5f3fc);
+  }
+  .hud-meter--shield .hud-meter__fill {
+    background: linear-gradient(90deg, #a78bfa, #c4b5fd);
   }
   .hud-row {
     display: flex;
@@ -560,7 +563,28 @@
     align-items: center;
     gap: 8px;
   }
+  .battle-titles {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+  }
   .battle-header h2 { margin: 0; font-size: 18px; }
+  .battle-skip {
+    margin-left: auto;
+    appearance: none;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px;
+    padding: 6px 10px;
+    background: rgba(0,0,0,0.35);
+    color: var(--text);
+    font: 700 12px/1 'Fredoka', system-ui, sans-serif;
+    cursor: pointer;
+  }
+  .battle-skip:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
   .battle-actors {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -603,6 +627,21 @@
     height: 100%;
     background: linear-gradient(90deg, #22c55e, #86efac);
   }
+  .mp-bar,
+  .shield-bar {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.12);
+    overflow: hidden;
+  }
+  .mp-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #38bdf8, #a5f3fc);
+  }
+  .shield-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #a78bfa, #c4b5fd);
+  }
   .battle-log {
     max-height: 180px;
     overflow: hidden;
@@ -614,7 +653,79 @@
     padding: 10px;
   }
   .battle-log p { margin: 0 0 6px; }
+  .battle-log p.is-player { color: #7dd3fc; }
+  .battle-log p.is-enemy { color: #fca5a5; }
   .battle-log p:last-child { margin-bottom: 0; }
+  .choice-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(6, 8, 16, 0.78);
+    backdrop-filter: blur(6px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 70;
+  }
+  .choice-overlay.is-open { display: flex; }
+  .choice-panel {
+    width: min(680px, 100%);
+    background: rgba(12, 18, 40, 0.95);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 14px;
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+  }
+  .choice-sub { margin: 0; font-size: 12px; color: var(--muted); }
+  .choice-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+  }
+  .choice-card {
+    appearance: none;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 12px;
+    padding: 10px;
+    text-align: left;
+    background: rgba(0,0,0,0.35);
+    color: var(--text);
+    display: grid;
+    gap: 6px;
+    cursor: pointer;
+  }
+  .choice-card:hover { border-color: rgba(56,189,248,0.6); }
+  .choice-card strong { font-size: 13px; }
+  .choice-card span { font-size: 11px; color: var(--muted); }
+  .choice-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.15), rgba(0,0,0,0.3)),
+      var(--icon-color, rgba(255,255,255,0.08));
+    display: grid;
+    place-items: center;
+  }
+  .choice-icon::after {
+    content: '';
+    width: 20px;
+    height: 20px;
+    background: var(--icon-image) center / contain no-repeat;
+    image-rendering: pixelated;
+  }
+  .choice-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+  .choice-actions .btn {
+    background: rgba(0,0,0,0.4);
+    box-shadow: none;
+    border: 1px solid rgba(255,255,255,0.2);
+    color: var(--text);
+  }
   .result-title { margin: 0; font-size: 20px; }
   .result-stats { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
   .rank-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
@@ -670,6 +781,11 @@
               <span>まりょく</span>
               <div class="hud-meter hud-meter--mp"><div class="hud-meter__fill" id="mpBar"></div></div>
               <strong id="mpShort">--</strong>
+            </div>
+            <div class="hud-bar">
+              <span>しーるど</span>
+              <div class="hud-meter hud-meter--shield"><div class="hud-meter__fill" id="shieldBar"></div></div>
+              <strong id="shieldShort">--</strong>
             </div>
           </div>
           <div class="hud-row">
@@ -782,22 +898,44 @@
   <div class="battle-overlay" id="battleOverlay" aria-hidden="true">
     <div class="battle-panel">
       <div class="battle-header">
-        <h2 id="battleTitle">戦闘開始</h2>
-        <span id="battleSub">--</span>
+        <div class="battle-titles">
+          <h2 id="battleTitle">戦闘開始</h2>
+          <span id="battleSub">--</span>
+        </div>
+        <button class="battle-skip" id="battleSkipBtn" type="button" disabled>スキップ</button>
       </div>
       <div class="battle-actors">
         <div class="actor" id="playerActor">
           <div class="actor-head"><div class="actor-icon" id="playerIcon">魔</div><div id="playerName">魔王様</div></div>
           <div class="hp-bar"><div class="hp-fill" id="playerHpFill"></div></div>
           <div id="playerHpText">--</div>
+          <div class="mp-bar"><div class="mp-fill" id="playerMpFill"></div></div>
+          <div id="playerMpText">--</div>
+          <div class="shield-bar"><div class="shield-fill" id="playerShieldFill"></div></div>
+          <div id="playerShieldText">--</div>
         </div>
         <div class="actor" id="enemyActor">
           <div class="actor-head"><div class="actor-icon" id="enemyIcon">敵</div><div id="enemyName">--</div></div>
           <div class="hp-bar"><div class="hp-fill" id="enemyHpFill"></div></div>
           <div id="enemyHpText">--</div>
+          <div class="mp-bar"><div class="mp-fill" id="enemyMpFill"></div></div>
+          <div id="enemyMpText">--</div>
+          <div class="shield-bar"><div class="shield-fill" id="enemyShieldFill"></div></div>
+          <div id="enemyShieldText">--</div>
         </div>
       </div>
       <div class="battle-log" id="battleLog"></div>
+    </div>
+  </div>
+
+  <div class="choice-overlay" id="skillChoiceOverlay" aria-hidden="true">
+    <div class="choice-panel">
+      <h2>宝箱のスキル</h2>
+      <p class="choice-sub">1つ選んでください</p>
+      <div class="choice-grid" id="skillChoiceList"></div>
+      <div class="choice-actions">
+        <button class="btn" id="skillRerollBtn" type="button">リロール (チャリン100)</button>
+      </div>
     </div>
   </div>
 
@@ -839,10 +977,25 @@
   const BOSS_GROWTH = { atk: 0.2, def: 0.15, spd: 0.15, luc: 0.05, mp: 0.05 };
   const BOSS_HP_PER_LEVEL = 1;
   const COIN_STORAGE_KEY = 'maou-war_coins';
-  const BATTLE_FAST_HIT_DELAY = 120;
-  const BATTLE_FAST_TURN_DELAY = 160;
-  const BATTLE_SLOW_HIT_DELAY = 620;
-  const BATTLE_SLOW_TURN_DELAY = 520;
+  const BATTLE_FAST_HIT_DELAY = 40;
+  const BATTLE_FAST_TURN_DELAY = 60;
+  const BATTLE_SLOW_HIT_DELAY = 260;
+  const BATTLE_SLOW_TURN_DELAY = 220;
+  const BATTLE_SLOW_START_MS = 1800;
+  const BATTLE_SPEED_RAMP_MS = 800;
+  const BATTLE_END_SLOW_START = 0.85;
+  const BATTLE_END_SLOW_RANGE = 0.15;
+  const BATTLE_PACE_MIN_DELAY = 10;
+  const BATTLE_PACE_MAX_DELAY = 900;
+  const BATTLE_SLOW_BOOST = 1.25;
+  const BATTLE_LOG_REVEAL_MS = 80;
+  const PLAYER_ATTACK_MP_GAIN = 1;
+  const PLAYER_ACTIVE_SKILL_CHANCE = 0.35;
+  const PLAYER_ACTIVE_SKILL = { type: 'magic', label: '魔王の魔法', power: 1.25, ignoreDef: true, mpCost: 2 };
+  const TRIPLE_STRIKE_MP_COST = 2;
+  const TREASURE_TILE_COUNT = 5;
+  const MAX_SKILL_COUNT = 5;
+  const SKILL_REROLL_COST = 100;
   const SKILL_DEFS = [
     { id: 'critRate', name: '会心率+10%', desc: '会心率が10%上がる' },
     { id: 'critDamage', name: '会心ダメ+20%', desc: '会心ダメージ20%アップ' },
@@ -859,28 +1012,23 @@
   const SKILL_TILE_COUNTS = {
     doubleStats: 2
   };
-  const FIXED_SKILL_TILES = [
-    { id: 'doubleStats', x: 1, y: 1 },
-    { id: 'doubleStats', x: CHUNK_SIZE * 2 + 1, y: CHUNK_SIZE * 2 + 1 }
-  ];
   const FIXED_WALLS = [
     { x: CHUNK_SIZE * 2 + 1, y: 1 },
     { x: CHUNK_SIZE + 1, y: CHUNK_SIZE + 1 }
   ];
-  const SKILL_TILE_TOTAL = SKILL_DEFS.reduce((sum, skill) => sum + (SKILL_TILE_COUNTS[skill.id] || 1), 0);
   const SKILL_SPRITE_KEYS = SKILL_DEFS.reduce((acc, skill, index) => {
     acc[skill.id] = `tile${16 + index}`;
     return acc;
   }, {});
 
   const FIXED_MAP = [
-    ['skill', 'spd', 'poison', 'luc', 'atk', 'skill', 'treasure', 'skill', 'boss'],
-    ['skill', 'def', 'atk', 'heal', 'empty', 'poison', 'skill', 'empty', 'hp'],
-    ['treasure', 'spd', 'skill', 'skill', 'hp', 'empty', 'mimic', 'empty', 'luc'],
-    ['spd', 'luc', 'empty', 'trap', 'skill', 'empty', 'empty', 'atk', 'empty'],
-    ['skill', 'poison', 'def', 'empty', 'empty', 'empty', 'spd', 'empty', 'heal'],
+    ['treasure', 'spd', 'poison', 'luc', 'atk', 'treasure', 'empty', 'empty', 'boss'],
+    ['empty', 'def', 'atk', 'heal', 'empty', 'poison', 'empty', 'empty', 'hp'],
+    ['empty', 'spd', 'empty', 'treasure', 'hp', 'empty', 'mimic', 'empty', 'luc'],
+    ['spd', 'luc', 'empty', 'trap', 'empty', 'empty', 'empty', 'atk', 'empty'],
+    ['empty', 'poison', 'def', 'empty', 'empty', 'empty', 'spd', 'treasure', 'heal'],
     ['luc', 'hp', 'empty', 'empty', 'def', 'empty', 'empty', 'empty', 'empty'],
-    ['empty', 'skill', 'empty', 'atk', 'empty', 'hp', 'empty', 'empty', 'atk'],
+    ['empty', 'treasure', 'empty', 'atk', 'empty', 'hp', 'empty', 'empty', 'atk'],
     ['poison', 'empty', 'empty', 'empty', 'hp', 'empty', 'spd', 'empty', 'empty'],
     ['start', 'empty', 'empty', 'def', 'empty', 'luc', 'empty', 'empty', 'def']
   ];
@@ -917,7 +1065,6 @@
     { id: 'luc', weight: 0.08 },
     { id: 'heal', weight: 0.08 },
     { id: 'poison', weight: 0.08 },
-    { id: 'skill', weight: 0.03 },
     { id: 'treasure', weight: 0.05 },
     { id: 'mimic', weight: 0.02 },
     { id: 'monster', weight: 0.08 },
@@ -1127,6 +1274,7 @@
   const sheetLog = document.getElementById('sheetLog');
   const hpBar = document.getElementById('hpBar');
   const mpBar = document.getElementById('mpBar');
+  const shieldBar = document.getElementById('shieldBar');
   const statsEl = {
     hp: document.getElementById('hpStat'),
     mp: document.getElementById('mpStat'),
@@ -1160,6 +1308,7 @@
   const hudStatsEl = {
     hp: document.getElementById('hpShort'),
     mp: document.getElementById('mpShort'),
+    shield: document.getElementById('shieldShort'),
     atk: document.getElementById('atkShort'),
     spd: document.getElementById('spdShort'),
     def: document.getElementById('defShort'),
@@ -1187,12 +1336,24 @@
   const battleTitle = document.getElementById('battleTitle');
   const battleSub = document.getElementById('battleSub');
   const battleLog = document.getElementById('battleLog');
+  const battleSkipBtn = document.getElementById('battleSkipBtn');
+  const skillChoiceOverlay = document.getElementById('skillChoiceOverlay');
+  const skillChoiceList = document.getElementById('skillChoiceList');
+  const skillRerollBtn = document.getElementById('skillRerollBtn');
   const playerActor = document.getElementById('playerActor');
   const enemyActor = document.getElementById('enemyActor');
   const playerHpFill = document.getElementById('playerHpFill');
   const enemyHpFill = document.getElementById('enemyHpFill');
+  const playerMpFill = document.getElementById('playerMpFill');
+  const enemyMpFill = document.getElementById('enemyMpFill');
+  const playerShieldFill = document.getElementById('playerShieldFill');
+  const enemyShieldFill = document.getElementById('enemyShieldFill');
   const playerHpText = document.getElementById('playerHpText');
   const enemyHpText = document.getElementById('enemyHpText');
+  const playerMpText = document.getElementById('playerMpText');
+  const enemyMpText = document.getElementById('enemyMpText');
+  const playerShieldText = document.getElementById('playerShieldText');
+  const enemyShieldText = document.getElementById('enemyShieldText');
   const enemyNameEl = document.getElementById('enemyName');
   const enemyIcon = document.getElementById('enemyIcon');
   const playerNameEl = document.getElementById('playerName');
@@ -1204,6 +1365,35 @@
   const resultStats = document.getElementById('resultStats');
   const rankList = document.getElementById('rankList');
   const rankStatus = document.getElementById('rankStatus');
+
+  if (battleSkipBtn) {
+    battleSkipBtn.addEventListener('click', () => {
+      if (!battleActive || battleSkipActive) return;
+      battleSkipActive = true;
+      battleSkipBtn.disabled = true;
+      battleSkipBtn.textContent = 'スキップ中';
+      setBattleLogDelayProvider(() => 0);
+    });
+  }
+  if (skillRerollBtn) {
+    skillRerollBtn.addEventListener('click', () => {
+      if (!isChoosingSkill) return;
+      if (!spendCoins(SKILL_REROLL_COST, 'リロール')) {
+        addLog('チャリンが足りない');
+        updateSkillRerollState();
+        return;
+      }
+      updateStats();
+      const choices = buildTreasureSkillChoices();
+      if (!choices.length) {
+        addLog('習得できるスキルがない');
+        closeSkillChoice(null);
+        return;
+      }
+      renderSkillChoiceOptions(choices);
+      updateSkillRerollState();
+    });
+  }
 
   let spawn = { x: 0, y: 0 };
   let bossPos = { x: 0, y: 0 };
@@ -1221,6 +1411,7 @@
   let tileSize = 0;
   let viewSizePx = 0;
   let battleActive = false;
+  let isChoosingSkill = false;
   let gameOver = false;
   let isMoving = false;
   let moveAnim = null;
@@ -1966,38 +2157,6 @@
     poisonTileCount = 0;
     treasureTileCount = 0;
     mimicTileCount = 0;
-    for (let y = 0; y < MAP_SIZE; y++) {
-      for (let x = 0; x < MAP_SIZE; x++) {
-        const tileId = tiles[y][x];
-        if (tileId === 'heal') {
-          healTileCount += 1;
-          tiles[y][x] = 'empty';
-          continue;
-        }
-        if (tileId === 'trap') {
-          trapTileCount += 1;
-          tiles[y][x] = 'empty';
-          continue;
-        }
-        if (tileId === 'poison') {
-          poisonTileCount += 1;
-          tiles[y][x] = 'empty';
-          continue;
-        }
-        if (tileId === 'treasure') {
-          treasureTileCount += 1;
-          tiles[y][x] = 'empty';
-          continue;
-        }
-        if (tileId === 'mimic') {
-          tiles[y][x] = 'empty';
-          continue;
-        }
-        if (tileId === 'skill' || STAT_TILE_IDS.includes(tileId)) {
-          tiles[y][x] = 'empty';
-        }
-      }
-    }
     FIXED_WALLS.forEach((entry) => {
       if (!tiles[entry.y]?.[entry.x]) return;
       if (entry.x === spawn.x && entry.y === spawn.y) return;
@@ -2022,14 +2181,6 @@
       enemyCount += 1;
     });
 
-    applyRandomWalls();
-    placeSkillTiles();
-    placeOddTiles('heal', healTileCount);
-    placeOddTiles('trap', trapTileCount);
-    placeOddTiles('poison', poisonTileCount);
-    placeOddTiles('treasure', treasureTileCount);
-    placeStatTiles();
-
     for (let y = 0; y < MAP_SIZE; y++) {
       for (let x = 0; x < MAP_SIZE; x++) {
         const tileId = tiles[y][x];
@@ -2044,48 +2195,6 @@
     updatePlayerLevel();
   }
 
-  function placeSkillTiles() {
-    const dist = buildDistanceFromSpawn();
-    const fixedCounts = FIXED_SKILL_TILES.reduce((acc, entry) => {
-      acc[entry.id] = (acc[entry.id] || 0) + 1;
-      return acc;
-    }, {});
-    FIXED_SKILL_TILES.forEach((entry) => {
-      if (!tiles[entry.y]?.[entry.x]) return;
-      if (entry.x === spawn.x && entry.y === spawn.y) return;
-      if (entry.x === bossPos.x && entry.y === bossPos.y) return;
-      if (tiles[entry.y][entry.x] !== 'empty') return;
-      tiles[entry.y][entry.x] = 'skill';
-      skillTiles[entry.y][entry.x] = entry.id;
-    });
-    const candidates = [];
-    for (let y = 0; y < MAP_SIZE; y++) {
-      for (let x = 0; x < MAP_SIZE; x++) {
-        if (tiles[y][x] !== 'empty') continue;
-        if (x === spawn.x && y === spawn.y) continue;
-        if (x === bossPos.x && y === bossPos.y) continue;
-        const d = dist[x + y * MAP_SIZE];
-        if (d < 0 || d % 2 !== 0) continue;
-        candidates.push({ x, y });
-      }
-    }
-    if (!candidates.length) return;
-    shuffleList(candidates);
-    const skillIds = [];
-    SKILL_DEFS.forEach((skill) => {
-      const baseCount = SKILL_TILE_COUNTS[skill.id] || 1;
-      const count = Math.max(0, baseCount - (fixedCounts[skill.id] || 0));
-      for (let i = 0; i < count; i++) skillIds.push(skill.id);
-    });
-    shuffleList(skillIds);
-    const count = Math.min(skillIds.length, candidates.length);
-    for (let i = 0; i < count; i++) {
-      const pos = candidates[i];
-      const skillId = skillIds[i];
-      tiles[pos.y][pos.x] = 'skill';
-      skillTiles[pos.y][pos.x] = skillId;
-    }
-  }
 
   function placeOddTiles(tileId, count) {
     if (!count) return;
@@ -2150,7 +2259,6 @@
         if (x === bossPos.x && y === bossPos.y) continue;
         const d = distBase[x + y * MAP_SIZE];
         if (d < 0 || d % 2 !== 0) continue;
-        if (FIXED_SKILL_TILES.some(entry => entry.x === x && entry.y === y)) continue;
         candidates.push({ x, y });
       }
     }
@@ -2188,7 +2296,7 @@
           if (d >= 0 && d % 2 === 1 && getChunkType(x, y) === 'atk') atkSlots += 1;
         }
       }
-      const evenNeeded = SKILL_TILE_TOTAL + healTileCount + trapTileCount + poisonTileCount + treasureTileCount + mimicTileCount;
+      const evenNeeded = healTileCount + trapTileCount + poisonTileCount + treasureTileCount + mimicTileCount;
       if (hasPath && hasMove && evenSlots >= evenNeeded && atkSlots >= requiredAtkSlots) return;
       placed.forEach(({ x, y }) => { tiles[y][x] = 'empty'; });
     }
@@ -2408,6 +2516,18 @@
     addLog(`チャリン +${gain}${suffix}`);
   }
 
+  function spendCoins(amount, reason = '') {
+    const cost = Math.max(0, Math.floor(amount));
+    if (!cost) return true;
+    const current = player.coins || 0;
+    if (current < cost) return false;
+    player.coins = current - cost;
+    saveStoredCoins(player.coins);
+    const suffix = reason ? `(${reason})` : '';
+    addLog(`チャリン -${cost}${suffix}`);
+    return true;
+  }
+
   let selectedSkillId = null;
   let selectedGearId = null;
 
@@ -2621,6 +2741,7 @@
     updatePlayerLevel();
     const hpText = `${player.hp} / ${player.maxHp}`;
     const mpText = `${player.mp} / ${player.maxMp}`;
+    const shieldText = player.shield > 0 ? `+${player.shield}` : '0';
     const damageText = `${player.bossDamage}`;
     const itemText = itemTileTotal > 0 ? `${player.itemsCollected}/${itemTileTotal}` : `${player.itemsCollected}`;
     const poisonText = player.poisonStacks > 0 ? `${player.poisonStacks}(${player.poisonSteps}歩)` : 'なし';
@@ -2656,6 +2777,7 @@
 
     setText(hudStatsEl.hp, hpText);
     setText(hudStatsEl.mp, mpText);
+    setText(hudStatsEl.shield, shieldText);
     setText(hudStatsEl.atk, `${player.atk}`);
     setText(hudStatsEl.spd, `${player.spd}`);
     setText(hudStatsEl.def, `${player.def}`);
@@ -2675,6 +2797,10 @@
     if (mpBar) {
       const mpRate = player.maxMp ? (player.mp / player.maxMp) * 100 : 0;
       mpBar.style.width = `${clamp(mpRate, 0, 100)}%`;
+    }
+    if (shieldBar) {
+      const shieldRate = player.maxHp ? (player.shield / player.maxHp) * 100 : 0;
+      shieldBar.style.width = `${clamp(shieldRate, 0, 100)}%`;
     }
     const dist = Math.abs(player.x - bossPos.x) + Math.abs(player.y - bossPos.y);
     mapStatus.textContent = `歩数: ${player.steps} / 残り敵: ${enemyCount}`;
@@ -2753,6 +2879,8 @@
     enemyState.spd = Math.max(MIN_STAT, Math.round(HERO_BOSS.stats.spd + (level - 1) * BOSS_GROWTH.spd));
     enemyState.luc = Math.max(MIN_STAT, Math.round(HERO_BOSS.stats.luc + (level - 1) * BOSS_GROWTH.luc));
     enemyState.mp = Math.max(MIN_STAT, Math.round(HERO_BOSS.stats.mp + (level - 1) * BOSS_GROWTH.mp));
+    if (enemyState.maxMp == null) enemyState.maxMp = enemyState.mp;
+    if (enemyState.mp > enemyState.maxMp) enemyState.maxMp = enemyState.mp;
   }
 
   function applyBossDamage(enemyState, damage) {
@@ -2769,7 +2897,7 @@
         enemyState.hp = enemyState.maxHp;
         syncBossStats(enemyState);
         leveledUp = true;
-        appendBattleLog(`勇者がLv${enemyState.level}に強化された`);
+        appendBattleLog(`勇者がLv${enemyState.level}に強化された`, 'enemy');
       }
     }
     if (leveledUp) enemyState.bossLevelUp = true;
@@ -2807,26 +2935,20 @@
     addLog(`${label} +${amount}`);
   }
 
-  function rollTreasureCoins(lucValue) {
-    const luck = Math.max(0, lucValue || 0);
-    if (luck >= 100) return 1000;
-    const luckRate = clamp(luck / 100, 0, 1);
-    const baseChance = 0.02;
-    const maxChance = baseChance + (1 - baseChance) * luckRate;
-    if (rand() < maxChance) return 1000;
-    const min = 10;
-    const max = 999;
-    const exponent = 1.15 - 0.65 * luckRate;
-    const roll = Math.pow(rand(), exponent);
-    return Math.round(min + (max - min) * roll);
-  }
-
-  function applyTreasureReward() {
-    const coins = rollTreasureCoins(player.luc);
-    addCoins(coins, '宝箱');
+  async function handleTreasureReward() {
+    if (!canLearnMoreSkills()) {
+      addLog('スキル枠がいっぱい');
+      return;
+    }
+    const choices = buildTreasureSkillChoices();
+    await openSkillChoice(choices);
   }
 
   function grantRandomSkill() {
+    if (!canLearnMoreSkills()) {
+      addLog('スキル枠がいっぱい');
+      return null;
+    }
     const available = SKILL_DEFS.filter(skill => !player.skills[skill.id]);
     if (!available.length) {
       addLog('スキルはもう習得できない');
@@ -2842,6 +2964,10 @@
     if (!skillId) return grantRandomSkill();
     const skill = SKILL_DEFS.find(entry => entry.id === skillId);
     if (!skill) return grantRandomSkill();
+    if (!player.skills[skillId] && !canLearnMoreSkills()) {
+      addLog('スキル枠がいっぱい');
+      return skill;
+    }
     if (skillId === 'doubleStats') {
       const maxCount = SKILL_TILE_COUNTS.doubleStats || 1;
       if (player.doubleStatsCount >= maxCount) {
@@ -2920,7 +3046,7 @@
     const damage = Math.max(1, Math.floor(baseDamage * critMultiplier));
     applyDamageToEnemy(enemyState, damage, isBoss);
     enemyState.poisonSteps -= 1;
-    appendBattleLog(`${enemyState.name}に毒 ${damage}ダメージ`);
+    appendBattleLog(`${enemyState.name}に毒 ${damage}ダメージ`, 'player');
     if (enemyState.poisonSteps <= 0) {
       enemyState.poisonStacks = 0;
       appendBattleLog(`${enemyState.name}の毒が切れた`);
@@ -2981,17 +3107,12 @@
         }
       }
     } else if (tileId === 'treasure') {
-      applyTreasureReward();
+      await handleTreasureReward();
       player.itemsCollected += 1;
       tiles[y][x] = 'empty';
     } else if (tileId === 'mimic') {
       handleMimicBump(x, y);
       if (gameOver) return;
-    } else if (tileId === 'skill') {
-      const skillId = skillTiles?.[y]?.[x];
-      grantSkillById(skillId);
-      tiles[y][x] = 'empty';
-      if (skillTiles?.[y]) skillTiles[y][x] = null;
     } else if (tileId === 'atk') {
       applyStatBoost('atk', 'こうげき');
     } else if (tileId === 'def') {
@@ -3184,7 +3305,7 @@
 
   function handleMapClick(event) {
     event.preventDefault();
-    if (battleActive || gameOver || isMoving) return;
+    if (battleActive || isChoosingSkill || gameOver || isMoving) return;
     const rect = mapCanvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -3241,11 +3362,22 @@
     return Math.random() * 100 < chance;
   }
 
-  function getUnitAction(unitState) {
-    if (unitState?.skills?.tripleStrike && Math.random() < 0.1) {
-      return { label: '3連撃', power: 1, hits: 3 };
+  function getUnitAction(unitState, opts = {}) {
+    const isPlayer = !!opts.isPlayer;
+    if (isPlayer) {
+      const mp = unitState?.mp || 0;
+      if (unitState?.skills?.tripleStrike && mp >= TRIPLE_STRIKE_MP_COST && Math.random() < 0.1) {
+        return { type: 'skill', label: '3連撃', power: 1, hits: 3, mpCost: TRIPLE_STRIKE_MP_COST };
+      }
+      if (mp >= PLAYER_ACTIVE_SKILL.mpCost && Math.random() < PLAYER_ACTIVE_SKILL_CHANCE) {
+        return { ...PLAYER_ACTIVE_SKILL };
+      }
+      return { type: 'attack', label: 'こうげき', power: 1, hits: 1, mpGain: PLAYER_ATTACK_MP_GAIN };
     }
-    return { label: 'こうげき', power: 1, hits: 1 };
+    if (unitState?.skills?.tripleStrike && Math.random() < 0.1) {
+      return { type: 'attack', label: '3連撃', power: 1, hits: 3 };
+    }
+    return { type: 'attack', label: 'こうげき', power: 1, hits: 1 };
   }
 
   function getEffectiveSpeed(state) {
@@ -3278,15 +3410,154 @@
     enemyHpFill.style.width = `${Math.max(0, (enemyState.hp / enemyState.maxHp) * 100)}%`;
     playerHpText.textContent = `${playerState.hp} / ${playerState.maxHp}`;
     enemyHpText.textContent = `${enemyState.hp} / ${enemyState.maxHp}`;
+    const playerMaxMp = playerState.maxMp ?? playerState.mp ?? 0;
+    const enemyMaxMp = enemyState.maxMp ?? enemyState.mp ?? 0;
+    const playerMpRate = playerMaxMp ? (playerState.mp / playerMaxMp) * 100 : 0;
+    const enemyMpRate = enemyMaxMp ? (enemyState.mp / enemyMaxMp) * 100 : 0;
+    playerMpFill.style.width = `${Math.max(0, playerMpRate)}%`;
+    enemyMpFill.style.width = `${Math.max(0, enemyMpRate)}%`;
+    playerMpText.textContent = playerMaxMp ? `${playerState.mp} / ${playerMaxMp}` : '--';
+    enemyMpText.textContent = enemyMaxMp ? `${enemyState.mp} / ${enemyMaxMp}` : '--';
+    const playerShield = playerState.shield || 0;
+    const enemyShield = enemyState.shield || 0;
+    const playerShieldRate = playerState.maxHp ? (playerShield / playerState.maxHp) * 100 : 0;
+    const enemyShieldRate = enemyState.maxHp ? (enemyShield / enemyState.maxHp) * 100 : 0;
+    playerShieldFill.style.width = `${Math.max(0, playerShieldRate)}%`;
+    enemyShieldFill.style.width = `${Math.max(0, enemyShieldRate)}%`;
+    playerShieldText.textContent = playerShield > 0 ? `+${playerShield}` : '0';
+    enemyShieldText.textContent = enemyShield > 0 ? `+${enemyShield}` : '0';
   }
 
-  function appendBattleLog(text) {
+  let battleLogQueue = [];
+  let battleLogBusy = false;
+  let battleLogTimer = null;
+  let battleLogDelayProvider = () => BATTLE_LOG_REVEAL_MS;
+  let battleSkipActive = false;
+  let skillChoiceResolver = null;
+
+  function setBattleLogDelayProvider(fn) {
+    battleLogDelayProvider = typeof fn === 'function' ? fn : () => BATTLE_LOG_REVEAL_MS;
+  }
+
+  function resetBattleLogQueue() {
+    battleLogQueue = [];
+    battleLogBusy = false;
+    if (battleLogTimer) {
+      clearTimeout(battleLogTimer);
+      battleLogTimer = null;
+    }
+    setBattleLogDelayProvider();
+  }
+
+  function processBattleLogQueue() {
+    if (!battleLogQueue.length) {
+      battleLogBusy = false;
+      return;
+    }
+    battleLogBusy = true;
+    const { text, role } = battleLogQueue.shift();
     const p = document.createElement('p');
     p.textContent = text;
+    if (role === 'player') p.classList.add('is-player');
+    if (role === 'enemy') p.classList.add('is-enemy');
     battleLog.appendChild(p);
     while (battleLog.children.length > 6) {
       battleLog.removeChild(battleLog.firstChild);
     }
+    if (battleLogQueue.length) {
+      const nextDelay = battleLogDelayProvider?.();
+      const delay = Number.isFinite(nextDelay) ? Math.max(0, nextDelay) : BATTLE_LOG_REVEAL_MS;
+      battleLogTimer = setTimeout(processBattleLogQueue, delay);
+    } else {
+      battleLogBusy = false;
+    }
+  }
+
+  function appendBattleLog(text, role = null) {
+    if (!text) return;
+    battleLogQueue.push({ text, role });
+    if (!battleLogBusy) processBattleLogQueue();
+  }
+
+  function getLearnedSkillCount() {
+    return Object.values(player.skills || {}).filter(Boolean).length;
+  }
+
+  function canLearnMoreSkills() {
+    return getLearnedSkillCount() < MAX_SKILL_COUNT;
+  }
+
+  function updateSkillRerollState() {
+    if (!skillRerollBtn) return;
+    const canPay = (player.coins || 0) >= SKILL_REROLL_COST;
+    skillRerollBtn.textContent = `リロール (チャリン${SKILL_REROLL_COST})`;
+    skillRerollBtn.disabled = !isChoosingSkill || !canPay;
+  }
+
+  function renderSkillChoiceOptions(choices) {
+    if (!skillChoiceList) return;
+    skillChoiceList.innerHTML = '';
+    choices.forEach((skill) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'choice-card';
+      const icon = document.createElement('div');
+      icon.className = 'choice-icon';
+      const spritePath = SKILL_SPRITE_PATHS[skill.id];
+      if (spritePath) icon.style.setProperty('--icon-image', `url(${spritePath})`);
+      const title = document.createElement('strong');
+      title.textContent = skill.name;
+      const desc = document.createElement('span');
+      desc.textContent = skill.desc;
+      btn.append(icon, title, desc);
+      btn.addEventListener('click', () => {
+        grantSkillById(skill.id);
+        closeSkillChoice(skill);
+      });
+      skillChoiceList.appendChild(btn);
+    });
+  }
+
+  function buildTreasureSkillChoices() {
+    if (!canLearnMoreSkills()) return [];
+    const pool = SKILL_DEFS.filter(skill => !player.skills[skill.id]);
+    if (!pool.length) return [];
+    shuffleList(pool);
+    return pool.slice(0, 4);
+  }
+
+  function closeSkillChoice(selected = null) {
+    if (skillChoiceOverlay) {
+      skillChoiceOverlay.classList.remove('is-open');
+      skillChoiceOverlay.setAttribute('aria-hidden', 'true');
+    }
+    if (skillChoiceList) skillChoiceList.innerHTML = '';
+    isChoosingSkill = false;
+    updateSkillRerollState();
+    const resolve = skillChoiceResolver;
+    skillChoiceResolver = null;
+    if (resolve) resolve(selected);
+  }
+
+  function openSkillChoice(options) {
+    if (!skillChoiceOverlay || !skillChoiceList) {
+      return Promise.resolve(null);
+    }
+    return new Promise((resolve) => {
+      skillChoiceResolver = resolve;
+      skillChoiceList.innerHTML = '';
+      const choices = options || [];
+      if (!choices.length) {
+        addLog('習得できるスキルがない');
+        closeSkillChoice(null);
+        return;
+      }
+      renderSkillChoiceOptions(choices);
+      isChoosingSkill = true;
+      skillChoiceOverlay.classList.add('is-open');
+      skillChoiceOverlay.setAttribute('aria-hidden', 'false');
+      updateSkillRerollState();
+    });
   }
 
   function flashActor(el) {
@@ -3296,6 +3567,38 @@
   }
 
   const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  const smoothStep = (t) => t * t * (3 - 2 * t);
+
+  function getBattleProgress(playerState, enemyState) {
+    const playerRate = playerState.maxHp ? playerState.hp / playerState.maxHp : 0;
+    const enemyRate = enemyState.maxHp ? enemyState.hp / enemyState.maxHp : 0;
+    return clamp(1 - Math.min(playerRate, enemyRate), 0, 1);
+  }
+
+  function createBattlePacer(playerState, enemyState) {
+    const startTime = performance.now();
+    let lastProgress = 0;
+    const getDelay = (slowMs, fastMs, extraSlow = false) => {
+      if (battleSkipActive) return 0;
+      const elapsed = performance.now() - startTime;
+      const startPhase = clamp((elapsed - BATTLE_SLOW_START_MS) / BATTLE_SPEED_RAMP_MS, 0, 1);
+      const rawProgress = getBattleProgress(playerState, enemyState);
+      const progress = Math.max(lastProgress, rawProgress);
+      lastProgress = progress;
+      const startEase = smoothStep(startPhase);
+      const endPhase = clamp((progress - BATTLE_END_SLOW_START) / BATTLE_END_SLOW_RANGE, 0, 1);
+      const endEase = 1 - smoothStep(endPhase);
+      const speedFactor = startEase * endEase;
+      let delay = slowMs + (fastMs - slowMs) * speedFactor;
+      if (extraSlow) delay *= BATTLE_SLOW_BOOST;
+      return clamp(delay, BATTLE_PACE_MIN_DELAY, BATTLE_PACE_MAX_DELAY);
+    };
+    return {
+      waitHit: (extraSlow = false) => sleep(getDelay(BATTLE_SLOW_HIT_DELAY, BATTLE_FAST_HIT_DELAY, extraSlow)),
+      waitTurn: (extraSlow = false) => sleep(getDelay(BATTLE_SLOW_TURN_DELAY, BATTLE_FAST_TURN_DELAY, extraSlow)),
+      getLogDelay: () => getDelay(BATTLE_SLOW_TURN_DELAY, BATTLE_FAST_TURN_DELAY, false)
+    };
+  }
 
   async function runBattle(enemyTemplate, options = {}) {
     const isBoss = options.isBoss || false;
@@ -3305,12 +3608,18 @@
     const maxActions = Number.isFinite(options.maxActions) ? options.maxActions : Infinity;
 
     battleActive = true;
+    battleSkipActive = false;
+    if (battleSkipBtn) {
+      battleSkipBtn.disabled = false;
+      battleSkipBtn.textContent = 'スキップ';
+    }
     battleOverlay.classList.add('is-open');
     if (isBoss) {
       battleTitle.textContent = '勇者との決戦';
     } else {
       battleTitle.textContent = '敵との遭遇';
     }
+    resetBattleLogQueue();
     battleLog.innerHTML = '';
 
     let enemyState = null;
@@ -3328,7 +3637,8 @@
         poisonStacks: 0,
         poisonSteps: 0,
         fireStacks: 0,
-        bossLevelUp: false
+        bossLevelUp: false,
+        maxMp: HERO_BOSS.stats.mp
       };
       syncBossStats(enemyState);
     } else {
@@ -3340,6 +3650,7 @@
         name: enemyTemplate.name,
         color: enemyTemplate.color,
         mp: scaledStats.mp,
+        maxMp: scaledStats.mp,
         level: getEnemyLevel(enemyTemplate),
         guard: 0,
         guardTurns: 0,
@@ -3360,6 +3671,7 @@
       def: actor.def,
       luc: actor.luc,
       mp: actor.mp,
+      maxMp: actor.maxMp,
       level: actor.level || 1,
       gauge: 0,
       skills: actor.skills || {},
@@ -3383,6 +3695,8 @@
     enemyIcon.style.background = enemyTemplate.color;
 
     updateBattleBars(playerState, enemyState);
+    const battlePacer = createBattlePacer(playerState, enemyState);
+    setBattleLogDelayProvider(() => battlePacer.getLogDelay());
 
     let actionCount = 0;
     let safety = 0;
@@ -3393,23 +3707,23 @@
       appendBattleLog(`行動 ${actionCount}`);
       if (actorTurn === 'player') {
         playerState.gauge = Math.max(0, playerState.gauge - 100);
-        const action = getUnitAction(playerState);
+        const action = getUnitAction(playerState, { isPlayer: true });
         if (action.mpCost) playerState.mp = Math.max(0, playerState.mp - action.mpCost);
         const hits = action.hits || 1;
         let poisonCritMultiplier = 1;
         for (let i = 0; i < hits; i++) {
           if (checkEvasion(playerState, enemyState)) {
-            appendBattleLog(`${enemyState.name}は回避した`);
+            appendBattleLog(`${enemyState.name}は回避した`, 'enemy');
           } else {
             const result = calcDamage(playerState, { def: enemyState.def + enemyState.guard }, action);
-            appendBattleLog(`${actorLabel}の${action.label}！ ${result.damage}ダメージ${result.isCrit ? ' (クリティカル)' : ''}`);
+            appendBattleLog(`${actorLabel}の${action.label}！ ${result.damage}ダメージ${result.isCrit ? ' (クリティカル)' : ''}`, 'player');
             const maxHpSnapshot = enemyState.maxHp;
             applyDamageToEnemy(enemyState, result.damage, isBoss);
             if (result.isCrit) poisonCritMultiplier = result.critMultiplier;
             if (result.isCrit && playerState.skills?.poisonStrike) {
               enemyState.poisonStacks = (enemyState.poisonStacks || 0) + 1;
               enemyState.poisonSteps = 1;
-              appendBattleLog(`${enemyState.name}に毒 +1`);
+              appendBattleLog(`${enemyState.name}に毒 +1`, 'player');
             }
             if (playerState.skills?.fireStrike && result.isCrit) {
               enemyState.fireStacks = Math.min(FIRE_MAX_STACKS, (enemyState.fireStacks || 0) + 1);
@@ -3418,14 +3732,14 @@
               const fireBase = Math.max(1, Math.floor(maxHpSnapshot * FIRE_DAMAGE_RATE * enemyState.fireStacks));
               const fireDamage = Math.max(1, Math.floor(fireBase * (result.isCrit ? result.critMultiplier : 1)));
               applyDamageToEnemy(enemyState, fireDamage, isBoss);
-              appendBattleLog(`炎 +${fireDamage}ダメージ (累計${enemyState.fireStacks})`);
+              appendBattleLog(`炎 +${fireDamage}ダメージ (累計${enemyState.fireStacks})`, 'player');
             }
             if (result.isCrit && playerState.skills?.critLifesteal) {
               const heal = Math.max(1, Math.floor(result.damage * 0.1));
               const healed = applyHeal(playerState, heal, { enemyState, isBoss });
-              if (healed.actual > 0) appendBattleLog(`会心回復 +${healed.actual}`);
-              if (healed.shieldAdded > 0) appendBattleLog(`シールド +${healed.shieldAdded}`);
-              if (healed.overflowDamage > 0) appendBattleLog(`オーバー回復 ${healed.overflowDamage}ダメージ`);
+              if (healed.actual > 0) appendBattleLog(`会心回復 +${healed.actual}`, 'player');
+              if (healed.shieldAdded > 0) appendBattleLog(`シールド +${healed.shieldAdded}`, 'player');
+              if (healed.overflowDamage > 0) appendBattleLog(`オーバー回復 ${healed.overflowDamage}ダメージ`, 'player');
             }
             flashActor(enemyActor);
             updateBattleBars(playerState, enemyState);
@@ -3433,8 +3747,13 @@
           if (enemyState.hp <= 0) break;
           if (hits > 1) {
             const slow = takeBossSlow(enemyState, isBoss);
-            await sleep(slow ? BATTLE_SLOW_HIT_DELAY : BATTLE_FAST_HIT_DELAY);
+            await battlePacer.waitHit(slow);
           }
+        }
+        if (action.mpGain) {
+          const beforeMp = playerState.mp;
+          playerState.mp = clamp(playerState.mp + action.mpGain, 0, playerState.maxMp || playerState.mp);
+          if (playerState.mp !== beforeMp) updateBattleBars(playerState, enemyState);
         }
         if (enemyState.hp > 0 && enemyState.poisonStacks > 0) {
           const poisonDead = applyEnemyPoisonTick(enemyState, isBoss, poisonCritMultiplier);
@@ -3447,26 +3766,26 @@
         if (action.type === 'guard') {
           enemyState.guard = action.guard || 2;
           enemyState.guardTurns = 2;
-          appendBattleLog(`${enemyState.name}は守りを固めた`);
+          appendBattleLog(`${enemyState.name}は守りを固めた`, 'enemy');
         } else {
           if (action.mpCost) enemyState.mp = Math.max(0, enemyState.mp - action.mpCost);
           const hits = action.hits || 1;
           let poisonCritMultiplier = 1;
           for (let i = 0; i < hits; i++) {
             if (checkEvasion(enemyState, playerState)) {
-              appendBattleLog(`${actorLabel}は回避した`);
+              appendBattleLog(`${actorLabel}は回避した`, 'player');
             } else {
               const result = calcDamage(enemyState, playerState, action);
-              appendBattleLog(`${enemyState.name}の${action.label}！ ${result.damage}ダメージ${result.isCrit ? ' (クリティカル)' : ''}`);
+              appendBattleLog(`${enemyState.name}の${action.label}！ ${result.damage}ダメージ${result.isCrit ? ' (クリティカル)' : ''}`, 'enemy');
               if (result.isCrit) poisonCritMultiplier = result.critMultiplier;
               const damageResult = applyDamageToPlayer(playerState, result.damage);
               if (damageResult.absorbed > 0) {
-                appendBattleLog(`シールドが${damageResult.absorbed}防いだ`);
+                appendBattleLog(`シールドが${damageResult.absorbed}防いだ`, 'player');
               }
               if (damageResult.taken > 0 && playerState.skills?.reflect) {
                 const reflectDamage = Math.max(1, Math.floor(damageResult.taken * 0.1));
                 applyDamageToEnemy(enemyState, reflectDamage, isBoss);
-                appendBattleLog(`反射 ${reflectDamage}ダメージ`);
+                appendBattleLog(`反射 ${reflectDamage}ダメージ`, 'player');
               }
               flashActor(playerActor);
               updateBattleBars(playerState, enemyState);
@@ -3475,7 +3794,7 @@
             }
             {
               const slow = takeBossSlow(enemyState, isBoss);
-              await sleep(slow ? BATTLE_SLOW_HIT_DELAY : BATTLE_FAST_HIT_DELAY);
+              await battlePacer.waitHit(slow);
             }
           }
           if (enemyState.hp > 0 && enemyState.poisonStacks > 0) {
@@ -3498,11 +3817,16 @@
       if (actionCount >= maxActions) break;
       {
         const slow = takeBossSlow(enemyState, isBoss);
-        await sleep(slow ? BATTLE_SLOW_TURN_DELAY : BATTLE_FAST_TURN_DELAY);
+        await battlePacer.waitTurn(slow);
       }
     }
 
     battleActive = false;
+    battleSkipActive = false;
+    if (battleSkipBtn) {
+      battleSkipBtn.disabled = true;
+      battleSkipBtn.textContent = 'スキップ';
+    }
     battleOverlay.classList.remove('is-open');
     if (isBoss) {
       lastBossLevel = enemyState.level || lastBossLevel;
