@@ -202,7 +202,7 @@ body.is-playing {
   border-radius: 14px;
   border: 1px solid rgba(40, 50, 80, 0.12);
   box-shadow: var(--panel-shadow);
-  padding: 0.2rem;
+  padding: 0.6rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -210,16 +210,16 @@ body.is-playing {
   max-width: 520px;
   margin: 0 auto;
   flex: 1 1 100%;
+  min-height: 90px;
 }
 
 .difficulty-ad ins.adsbygoogle,
 .start-ad ins.adsbygoogle,
 .game-ad ins.adsbygoogle {
   display: block;
-  width: min(320px, 100%) !important;
-  max-width: 320px !important;
-  height: 40px;
-  min-height: 40px;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 90px;
   overflow: hidden;
 }
 
@@ -362,7 +362,7 @@ body.is-playing {
   gap: 0.4rem;
 }
 
-.puzzle-card--ad {
+.puzzle-card.puzzle-card--ad {
   border-radius: 16px;
   align-items: center;
   justify-content: center;
@@ -381,10 +381,9 @@ body.is-playing {
 
 .puzzle-ad-slot ins.adsbygoogle {
   display: block;
-  width: min(320px, 100%) !important;
-  max-width: 320px !important;
-  height: 40px;
-  min-height: 40px;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 90px;
   overflow: hidden;
 }
 
@@ -1083,15 +1082,13 @@ body.is-playing {
   }
 
   .puzzle-ad-slot ins.adsbygoogle {
-    height: 40px;
-    min-height: 40px;
+    min-height: 90px;
   }
 
   .difficulty-ad ins.adsbygoogle,
   .start-ad ins.adsbygoogle,
   .game-ad ins.adsbygoogle {
-    height: 40px;
-    min-height: 40px;
+    min-height: 90px;
   }
 
   .puzzle-card__description {
