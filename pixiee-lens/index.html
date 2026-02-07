@@ -1796,27 +1796,34 @@
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-1.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-1.png"/>
 <style id="ads-safe">
-    html, body {
-      max-width: 100vw;
-      overflow-x: hidden;
-    }
-    .adsbygoogle,
-    ins.adsbygoogle {
-      display: block !important;
-      width: 100% !important;
-      max-width: 100% !important;
-      min-width: 0 !important;
-      box-sizing: border-box;
-      overflow: hidden;
-    }
-    .adsbygoogle iframe,
-    ins.adsbygoogle iframe {
-      display: block;
-      width: 100% !important;
-      max-width: 100% !important;
-      min-width: 0 !important;
-    }
-  </style>
+  html, body {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  .adsbygoogle,
+  ins.adsbygoogle {
+    display: block !important;
+    width: min(320px, 100%) !important;
+    max-width: 320px !important;
+    min-width: 0 !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    margin: 0 auto;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .adsbygoogle iframe,
+  ins.adsbygoogle iframe {
+    display: block;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+  }
+</style>
   <style id="interaction-guard">
     * {
       -webkit-touch-callout: none;
@@ -2271,6 +2278,20 @@
 </div>
 </div>
 </div>
+<div class="update-toast" id="updateToast" role="status" aria-live="polite" data-update-id="2026-02-06">
+  <div class="update-toast__body">
+    <p class="update-toast__message">
+      <strong>更新情報 (2026/02/06)</strong><br/>
+      ・色数モードを 1/2/4/8BIT + フルカラーに整理<br/>
+      ・8BIT/フルカラーはパレット生成なし<br/>
+      ・パレットは有効な色数のときのみ常時表示<br/>
+      ・タップ自動調整の安定化（周辺+全体ブレンド/スムージング/範囲外タップ無効）
+    </p>
+    <div class="update-toast__actions">
+      <button class="update-toast__btn update-toast__btn--primary" id="updateToastCloseBtn" type="button">閉じる</button>
+    </div>
+  </div>
+</div>
 <input accept="image/png, image/gif, image/webp, image/bmp" hidden="" id="pixelArtInput" multiple="" type="file"/>
 <script>
   if (window.pixieedObserveAds) {
@@ -2529,9 +2550,44 @@
     const dotSettingsPanel = document.getElementById('dotSettingsPanel');
     const paletteToggleBtn = document.getElementById('paletteToggleBtn');
     const paletteDisplay = document.getElementById('paletteDisplay');
+    const updateToast = document.getElementById('updateToast');
+    const updateToastCloseBtn = document.getElementById('updateToastCloseBtn');
     const dotScaleSelect = document.getElementById('dotScaleSelect');
     const gradientToggleBtn = document.getElementById('gradientToggleBtn');
     const colorDepthSelect = document.getElementById('colorDepthSelect');
+
+    if (updateToast) {
+      const updateId = updateToast.dataset.updateId || '';
+      const storageKey = 'pixiee-lens:update-toast-hidden';
+      let shouldHide = false;
+      if (updateId) {
+        try {
+          shouldHide = window.localStorage.getItem(storageKey) === updateId;
+        } catch (error) {
+          shouldHide = false;
+        }
+      }
+      if (shouldHide) {
+        updateToast.hidden = true;
+        updateToast.setAttribute('aria-hidden', 'true');
+      }
+    }
+    if (updateToastCloseBtn) {
+      updateToastCloseBtn.addEventListener('click', () => {
+        if (updateToast) {
+          updateToast.hidden = true;
+          updateToast.setAttribute('aria-hidden', 'true');
+          const updateId = updateToast.dataset.updateId || '';
+          if (updateId) {
+            try {
+              window.localStorage.setItem('pixiee-lens:update-toast-hidden', updateId);
+            } catch (error) {
+              // ignore
+            }
+          }
+        }
+      });
+    }
 
     if (paletteDisplay) {
       ['pointerdown', 'mousedown', 'touchstart', 'click'].forEach((type) => {
