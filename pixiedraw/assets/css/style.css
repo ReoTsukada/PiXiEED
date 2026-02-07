@@ -2110,9 +2110,9 @@ body.is-startup-active {
 
 .app-banner ins.adsbygoogle {
   display: block;
-  width: 320px !important;
-  max-width: 320px !important;
-  height: 40px;
+  width: min(360px, 100%) !important;
+  max-width: 360px !important;
+  min-height: 60px;
 }
 
 
