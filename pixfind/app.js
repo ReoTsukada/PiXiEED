@@ -2053,6 +2053,11 @@ function estimatePuzzleDifficulty(diffResult) {
   const diffPixels = diffResult.regions.reduce((sum, region) => sum + (region.count ?? 0), 0);
   const diffRatio = diffPixels / totalPixels;
   const avgRegionRatio = diffPixels / regionCount / totalPixels;
+  const smallRegionRatioThreshold = 0.001; // <= 0.1% of total pixels
+  const smallRegionCount = diffResult.regions.reduce((sum, region) => {
+    const ratio = (region.count ?? 0) / totalPixels;
+    return sum + (ratio <= smallRegionRatioThreshold ? 1 : 0);
+  }, 0);
 
   // Heuristic: fewer and smaller differences are harder.
   let score = 0;
@@ -2069,6 +2074,13 @@ function estimatePuzzleDifficulty(diffResult) {
   }
 
   if (avgRegionRatio <= 0.0012) {
+    score += 1;
+  }
+
+  // Heuristic: many small differences increase difficulty.
+  if (smallRegionCount >= 6) {
+    score += 2;
+  } else if (smallRegionCount >= 3) {
     score += 1;
   }
 
@@ -2271,12 +2283,10 @@ function renderPuzzles(level) {
   dom.puzzleList.innerHTML = '';
 
   const official = state.officialPuzzles.filter(puzzle => puzzle.difficulty === level);
-  const AD_SLOTS = ['2141591954', '9073878884', '2261515379'];
   official.forEach((puzzle, idx) => {
     dom.puzzleList.append(createOfficialCard(puzzle));
-    if ((idx + 1) % 6 === 0) {
-      const slotId = AD_SLOTS[Math.floor(idx / 6) % AD_SLOTS.length];
-      dom.puzzleList.append(createPuzzleAdCard(slotId));
+    if ((idx + 1) % 9 === 0) {
+      dom.puzzleList.append(createPuzzleAdCard());
     }
   });
 
@@ -2296,7 +2306,7 @@ function renderPuzzles(level) {
   }
 }
 
-function createPuzzleAdCard(slotId) {
+function createPuzzleAdCard() {
   const card = document.createElement('div');
   card.className = 'puzzle-card puzzle-card--ad';
   card.innerHTML = `
@@ -2304,7 +2314,7 @@ function createPuzzleAdCard(slotId) {
       <ins class="adsbygoogle"
            style="display:block"
            data-ad-client="ca-pub-9801602250480253"
-           data-ad-slot="${slotId}"></ins>
+           data-ad-slot="rotate"></ins>
     </div>
     <small class="puzzle-ad-note">広告</small>
   `;
