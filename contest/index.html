@@ -73,7 +73,7 @@
     .ad-banner ins{
       display:block;
       width:100%;
-      height:90px;
+      height:40px;
       max-width:100%;
       overflow:hidden;
     }
@@ -86,7 +86,7 @@
       display:block;
     }
     @media(max-width:640px){
-      .ad-banner ins{ height:60px; }
+      .ad-banner ins{ height:40px; }
     }
     .brand{
       display:flex;
@@ -351,7 +351,7 @@
       align-items:center;
       justify-content:center;
       padding:12px;
-      min-height:220px;
+      min-height:110px;
       gap:10px;
       max-width:100%;
     }
@@ -363,7 +363,7 @@
     .entry-ad-slot ins{
       display:block;
       width:100%;
-      height:90px;
+      height:40px;
       overflow:hidden;
     }
     .entry-ad-note{
@@ -373,7 +373,7 @@
       text-align:center;
     }
     @media(max-width:640px){
-      .entry-ad-slot ins{ height:60px; }
+      .entry-ad-slot ins{ height:40px; }
     }
     .entry-imgwrap{
       padding:0;
@@ -869,27 +869,34 @@
     }
   </style>
   <style id="ads-safe">
-    html, body {
-      max-width: 100vw;
-      overflow-x: hidden;
-    }
-    .adsbygoogle,
-    ins.adsbygoogle {
-      display: block !important;
-      width: 100% !important;
-      max-width: 100% !important;
-      min-width: 0 !important;
-      box-sizing: border-box;
-      overflow: hidden;
-    }
-    .adsbygoogle iframe,
-    ins.adsbygoogle iframe {
-      display: block;
-      width: 100% !important;
-      max-width: 100% !important;
-      min-width: 0 !important;
-    }
-  </style>
+  html, body {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  .adsbygoogle,
+  ins.adsbygoogle {
+    display: block !important;
+    width: min(320px, 100%) !important;
+    max-width: 320px !important;
+    min-width: 0 !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+    margin: 0 auto;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .adsbygoogle iframe,
+  ins.adsbygoogle iframe {
+    display: block;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+  }
+</style>
   <style id="interaction-guard">
     * {
       -webkit-touch-callout: none;
