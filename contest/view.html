@@ -454,10 +454,10 @@
       border:none;
       padding:0;
     }
-    .user-gallery .entry-card--ad{
+    .user-gallery .entry-card.entry-card--ad{
       background:rgba(255,255,255,0.06);
       border:1px solid rgba(255,255,255,0.12);
-      padding:10px;
+      padding:12px;
     }
     .entry-card{
       background:rgba(255,255,255,0.05);
@@ -517,7 +517,7 @@
     .entry-author{ margin:0; color:#cbd5e1; font-size:12px; }
     .empty{ color:#cbd5e1; text-align:center; margin:8px 0 0; }
     .status{ color:#fef3c7; font-size:12px; min-height:18px; }
-    .entry-card--ad{
+    .entry-card.entry-card--ad{
       display:flex;
       align-items:center;
       justify-content:center;
@@ -525,7 +525,14 @@
       flex-direction:column;
       aspect-ratio:auto;
       min-height:110px;
-      gap:6px;
+      gap:10px;
+      width:100%;
+      max-width:100%;
+      padding:12px;
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.12);
+      box-shadow:0 10px 30px rgba(0,0,0,0.28);
+      position:relative;
     }
     .entry-ad-slot{
       width:100%;
@@ -535,7 +542,7 @@
     .entry-ad-slot ins{
       display:block;
       width:100%;
-      height:40px;
+      min-height:90px;
       overflow:hidden;
     }
     .entry-ad-note{
@@ -544,7 +551,7 @@
       font-size:11px;
     }
     @media(max-width:640px){
-      .entry-ad-slot ins{ height:40px; }
+      .entry-ad-slot ins{ min-height:90px; }
     }
     .load-more{
       display:flex;
@@ -1590,7 +1597,7 @@
       btn.disabled = relatedLoading;
     }
 
-    function createRelatedAdCard(slotId){
+    function createRelatedAdCard(){
       const card = document.createElement('div');
       card.className = 'entry-card entry-card--ad';
       card.innerHTML = `
@@ -1598,7 +1605,7 @@
           <ins class="adsbygoogle"
                style="display:block"
                data-ad-client="ca-pub-9801602250480253"
-               data-ad-slot="${slotId}"
+               data-ad-slot="rotate"
                data-ad-format="auto"></ins>
         </div>
         <p class="entry-ad-note">広告</p>
@@ -2375,7 +2382,6 @@
       }
       wrap.innerHTML = '';
       const placeholderSrc = makePlaceholder('#334155');
-      const AD_SLOTS = ['2141591954','9073878884','2261515379'];
       entries.forEach((e, idx) => {
         const item = document.createElement('a');
         item.className = 'entry-card';
@@ -2386,9 +2392,8 @@
           </div>
         `;
         wrap.appendChild(item);
-        if((idx + 1) % 6 === 0){
-          const slotId = AD_SLOTS[Math.floor(idx / 6) % AD_SLOTS.length];
-          wrap.appendChild(createRelatedAdCard(slotId));
+        if((idx + 1) % 9 === 0){
+          wrap.appendChild(createRelatedAdCard());
         }
       });
       wrap.querySelectorAll('.entry-imgwrap img').forEach(img => {
