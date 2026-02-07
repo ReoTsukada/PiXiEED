@@ -725,6 +725,14 @@
     box-shadow: none;
     border: 1px solid rgba(255,255,255,0.2);
     color: var(--text);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-coin {
+    width: 14px;
+    height: 14px;
+    image-rendering: pixelated;
   }
   .result-title { margin: 0; font-size: 20px; }
   .result-stats { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
@@ -934,7 +942,9 @@
       <p class="choice-sub">1つ選んでください</p>
       <div class="choice-grid" id="skillChoiceList"></div>
       <div class="choice-actions">
-        <button class="btn" id="skillRerollBtn" type="button">リロール (チャリン100)</button>
+        <button class="btn" id="skillRerollBtn" type="button">
+          リロール (<img class="btn-coin" src="../character-dots/tyarin.png" alt="">100)
+        </button>
       </div>
     </div>
   </div>
@@ -1012,6 +1022,14 @@
   const SKILL_TILE_COUNTS = {
     doubleStats: 2
   };
+  const TREASURE_SKILL_POOLS = [
+    ['doubleStats', 'critRate', 'stepHeal', 'overhealShield', 'reflect'],
+    ['critDamage', 'poisonStrike', 'fireStrike', 'overhealDamage', 'critLifesteal'],
+    ['tripleStrike', 'critRate', 'critDamage', 'reflect', 'overhealShield'],
+    ['poisonStrike', 'fireStrike', 'critLifesteal', 'overhealDamage', 'stepHeal'],
+    ['doubleStats', 'tripleStrike', 'critDamage', 'overhealShield', 'reflect']
+  ];
+  const TREASURE_POOL_COUNT = TREASURE_SKILL_POOLS.length;
   const FIXED_WALLS = [
     { x: CHUNK_SIZE * 2 + 1, y: 1 },
     { x: CHUNK_SIZE + 1, y: CHUNK_SIZE + 1 }
@@ -1025,9 +1043,9 @@
     ['treasure', 'spd', 'poison', 'luc', 'atk', 'treasure', 'empty', 'empty', 'boss'],
     ['empty', 'def', 'atk', 'heal', 'empty', 'poison', 'empty', 'empty', 'hp'],
     ['empty', 'spd', 'empty', 'treasure', 'hp', 'empty', 'mimic', 'empty', 'luc'],
-    ['spd', 'luc', 'empty', 'trap', 'empty', 'empty', 'empty', 'atk', 'empty'],
+    ['spd', 'luc', 'empty', 'trap', 'ice', 'ice', 'ice', 'atk', 'empty'],
     ['empty', 'poison', 'def', 'empty', 'empty', 'empty', 'spd', 'treasure', 'heal'],
-    ['luc', 'hp', 'empty', 'empty', 'def', 'empty', 'empty', 'empty', 'empty'],
+    ['luc', 'hp', 'key', 'empty', 'def', 'empty', 'empty', 'empty', 'empty'],
     ['empty', 'treasure', 'empty', 'atk', 'empty', 'hp', 'empty', 'empty', 'atk'],
     ['poison', 'empty', 'empty', 'empty', 'hp', 'empty', 'spd', 'empty', 'empty'],
     ['start', 'empty', 'empty', 'def', 'empty', 'luc', 'empty', 'empty', 'def']
@@ -1048,6 +1066,8 @@
     luc: { id: 'luc', color: '#facc15', name: 'うん' },
     heal: { id: 'heal', color: '#10b981', name: '回復' },
     poison: { id: 'poison', color: '#a855f7', name: '毒' },
+    ice: { id: 'ice', color: '#93c5fd', name: '氷' },
+    key: { id: 'key', color: '#fbbf24', name: '鍵' },
     skill: { id: 'skill', color: '#f59e0b', name: 'スキル' },
     treasure: { id: 'treasure', color: '#facc15', name: '宝箱' },
     mimic: { id: 'mimic', color: '#f97316', name: '偽宝箱' },
@@ -1123,6 +1143,8 @@
     luc: 'tile6',
     heal: 'tile9',
     poison: 'tile7',
+    ice: 'tile9',
+    key: 'tile9',
     skill: 'tile9',
     treasure: 'tile9',
     mimic: 'tile9',
@@ -1417,6 +1439,7 @@
   let moveAnim = null;
   let playerFacing = 'down';
   let lastBossLevel = 0;
+  let treasureOpenedCount = 0;
   const MOVE_ANIM_MS = 180;
 
   const BASE_STATS = { hp: 10, mp: 1, atk: 1, spd: 1, def: 1, luc: 1 };
@@ -1443,6 +1466,7 @@
     gearBonus: { atk: 0, spd: 0, def: 0, luc: 0 },
     gearInventory: [],
     skills: {},
+    hasKey: false,
     shield: 0,
     doubleStatsCount: 0,
     poisonStacks: 0,
@@ -2391,6 +2415,30 @@
         ctx.fillText('技', cx, cy + 1);
         break;
       }
+      case 'ice': {
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+        ctx.beginPath();
+        ctx.arc(cx, cy, size * 0.62, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = `${Math.max(10, Math.floor(tileSize * 0.45))}px 'Fredoka'`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('氷', cx, cy + 1);
+        break;
+      }
+      case 'key': {
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+        ctx.beginPath();
+        ctx.arc(cx, cy, size * 0.62, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = `${Math.max(10, Math.floor(tileSize * 0.45))}px 'Fredoka'`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('鍵', cx, cy + 1);
+        break;
+      }
       default:
         break;
     }
@@ -2421,7 +2469,7 @@
     ctx.strokeStyle = 'rgba(0,0,0,0.35)';
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 0.5, y + 0.5, tileSize - 1, tileSize - 1);
-    if (tileId === 'monster' || (tileId === 'skill' && !overlaySprite)) {
+    if (tileId === 'monster' || tileId === 'ice' || tileId === 'key' || (tileId === 'skill' && !overlaySprite)) {
       drawTileIcon(tileId, x, y, enemy);
     }
   }
@@ -2942,6 +2990,7 @@
     }
     const choices = buildTreasureSkillChoices();
     await openSkillChoice(choices);
+    treasureOpenedCount += 1;
   }
 
   function grantRandomSkill() {
@@ -3111,8 +3160,24 @@
       player.itemsCollected += 1;
       tiles[y][x] = 'empty';
     } else if (tileId === 'mimic') {
-      handleMimicBump(x, y);
-      if (gameOver) return;
+      if (player.hasKey) {
+        player.hasKey = false;
+        addLog('鍵で宝箱を開けた');
+        await handleTreasureReward();
+        player.itemsCollected += 1;
+        tiles[y][x] = 'empty';
+      } else {
+        handleMimicBump(x, y);
+        if (gameOver) return;
+      }
+    } else if (tileId === 'key') {
+      if (player.hasKey) {
+        addLog('鍵はもう持っている');
+      } else {
+        player.hasKey = true;
+        addLog('鍵を手に入れた');
+      }
+      tiles[y][x] = 'empty';
     } else if (tileId === 'atk') {
       applyStatBoost('atk', 'こうげき');
     } else if (tileId === 'def') {
@@ -3253,10 +3318,14 @@
     return hasAvailableMoveAt(player.x, player.y);
   }
 
-  async function movePlayerTo(targetX, targetY) {
-    if (battleActive || gameOver || isMoving) return;
+  async function movePlayerTo(targetX, targetY, slideDir = null) {
+    if (battleActive || isChoosingSkill || gameOver || isMoving) return;
     const prevX = player.x;
     const prevY = player.y;
+    const dx = targetX - prevX;
+    const dy = targetY - prevY;
+    const dirX = slideDir?.dx ?? Math.sign(dx);
+    const dirY = slideDir?.dy ?? Math.sign(dy);
     await animateMove(targetX, targetY);
     markTileGone(prevX, prevY);
     await resolveTileEvent(targetX, targetY);
@@ -3268,6 +3337,15 @@
     renderMap();
     if (tiles[player.y]?.[player.x] !== 'boss' && !hasAvailableMove()) {
       endGame(false);
+      return;
+    }
+    const currentTile = tiles[player.y]?.[player.x];
+    if (currentTile === 'ice' && (dirX || dirY)) {
+      const nextX = player.x + dirX;
+      const nextY = player.y + dirY;
+      if (canMoveTo(nextX, nextY)) {
+        await movePlayerTo(nextX, nextY, { dx: dirX, dy: dirY });
+      }
     }
   }
 
@@ -3319,11 +3397,6 @@
     const targetY = clamp(camera.y + ty, 0, MAP_SIZE - 1);
     const dist = Math.abs(targetX - player.x) + Math.abs(targetY - player.y);
     if (dist !== 1) return;
-    const targetTile = tiles[targetY]?.[targetX];
-    if (targetTile === 'mimic') {
-      handleMimicBump(targetX, targetY);
-      return;
-    }
     if (!canMoveTo(targetX, targetY)) return;
     movePlayerTo(targetX, targetY);
   }
@@ -3490,7 +3563,7 @@
   function updateSkillRerollState() {
     if (!skillRerollBtn) return;
     const canPay = (player.coins || 0) >= SKILL_REROLL_COST;
-    skillRerollBtn.textContent = `リロール (チャリン${SKILL_REROLL_COST})`;
+    skillRerollBtn.innerHTML = `リロール (<img class="btn-coin" src="../character-dots/tyarin.png" alt="">${SKILL_REROLL_COST})`;
     skillRerollBtn.disabled = !isChoosingSkill || !canPay;
   }
 
@@ -3520,7 +3593,10 @@
 
   function buildTreasureSkillChoices() {
     if (!canLearnMoreSkills()) return [];
-    const pool = SKILL_DEFS.filter(skill => !player.skills[skill.id]);
+    const poolIds = TREASURE_SKILL_POOLS[treasureOpenedCount % TREASURE_POOL_COUNT] || [];
+    const pool = poolIds
+      .map((id) => SKILL_DEFS.find(skill => skill.id === id))
+      .filter((skill) => skill && !player.skills[skill.id]);
     if (!pool.length) return [];
     shuffleList(pool);
     return pool.slice(0, 4);
@@ -4249,6 +4325,8 @@
     player.skills = {};
     player.shield = 0;
     player.doubleStatsCount = 0;
+    player.hasKey = false;
+    treasureOpenedCount = 0;
     player.poisonStacks = 0;
     player.poisonSteps = 0;
     selectedGearId = null;
