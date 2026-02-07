@@ -201,7 +201,7 @@
           display:block;
           width:320px;
           max-width:320px;
-          height:50px;
+          height:40px;
           overflow:hidden;
         }
       `;
