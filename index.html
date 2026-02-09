@@ -1228,8 +1228,7 @@
           <div class="hero-actions">
             <a class="button" href="projects/pixiedraw/index.html">今すぐ描く</a>
             <a class="button button--ghost" href="#hub-intro">ゲーム/ツール</a>
-            <a class="button button--ghost hero-switch" href="#character-intro" id="showCharacterPlace" role="button" aria-pressed="false">キャラクター</a>
-            <a class="button button--ghost hero-switch" href="#home-hero" id="showDotPlace" role="button" aria-pressed="true">ドット絵</a>
+            <a class="button button--ghost hero-switch" href="#home-hero" id="toggleHeroPlace" role="button" aria-pressed="false">キャラクター</a>
           </div>
         </div>
         <div class="hero-place" id="heroPlaceSlot">
@@ -1650,8 +1649,7 @@
         const characterSlot = document.getElementById('characterPlaceSlot');
         const dotPlace = document.getElementById('dotPlace');
         const characterPlace = document.getElementById('characterPlace');
-        const showCharacterBtn = document.getElementById('showCharacterPlace');
-        const showDotBtn = document.getElementById('showDotPlace');
+        const toggleBtn = document.getElementById('toggleHeroPlace');
         const heroDesc = document.getElementById('heroCharacterDescription');
         const nameEl = document.getElementById('characterGalleryName');
         const detailEl = document.getElementById('characterGalleryDetail');
@@ -1660,18 +1658,18 @@
           !characterSlot ||
           !dotPlace ||
           !characterPlace ||
-          !showCharacterBtn ||
-          !showDotBtn
+          !toggleBtn
         ) return;
 
         const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         let latestDescription = '';
         let typeTimer = null;
         const setActiveButtons = (showCharacter) => {
-          showCharacterBtn.setAttribute('aria-pressed', showCharacter ? 'true' : 'false');
-          showDotBtn.setAttribute('aria-pressed', showCharacter ? 'false' : 'true');
-          showCharacterBtn.classList.toggle('is-active', showCharacter);
-          showDotBtn.classList.toggle('is-active', !showCharacter);
+          toggleBtn.setAttribute('aria-pressed', showCharacter ? 'true' : 'false');
+          toggleBtn.classList.toggle('is-active', showCharacter);
+          toggleBtn.textContent = showCharacter ? 'ドット絵' : 'キャラクター';
+          // When showing character in hero, the toggle should jump to character section.
+          toggleBtn.setAttribute('href', showCharacter ? '#character-intro' : '#home-hero');
         };
         const animateSwap = (element) => {
           if(!element) return;
@@ -1767,13 +1765,10 @@
           window.requestAnimationFrame(syncHeroPreviewHeights);
         };
 
-        showCharacterBtn.addEventListener('click', (event) => {
+        toggleBtn.addEventListener('click', (event) => {
           event.preventDefault();
-          setState(true);
-        });
-        showDotBtn.addEventListener('click', (event) => {
-          event.preventDefault();
-          setState(false);
+          const isShowingCharacter = heroSlot.contains(characterPlace);
+          setState(!isShowingCharacter);
         });
         window.addEventListener('pixieed:characterSelected', (event) => {
           handleCharacterUpdate(event?.detail || {});
