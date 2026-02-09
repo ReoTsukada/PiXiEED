@@ -530,6 +530,39 @@
     opacity: 1;
     box-shadow: inset 0 0 0 1px rgba(255,255,255,0.25), 0 0 0 1px rgba(34,197,94,0.35);
   }
+  .tag-progress {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .tag-progress-item {
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.16);
+    background: rgba(255,255,255,0.04);
+    padding: 6px 8px;
+    display: grid;
+    gap: 2px;
+  }
+  .tag-progress-item strong {
+    font-size: 11px;
+    color: #dbeafe;
+  }
+  .tag-progress-item small {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .tag-progress-item.is-awakened {
+    border-color: rgba(34,197,94,0.6);
+    box-shadow: 0 0 0 1px rgba(34,197,94,0.3) inset;
+  }
+  .tag-progress-item.is-ready {
+    border-color: rgba(250,204,21,0.65);
+    box-shadow: 0 0 0 1px rgba(250,204,21,0.3) inset;
+  }
+  .skill-meta-line {
+    font-size: 11px;
+    color: #c7d2fe;
+  }
   .battle-overlay,
   .result-overlay {
     position: fixed;
@@ -699,6 +732,7 @@
   .choice-card:hover { border-color: rgba(56,189,248,0.6); }
   .choice-card strong { font-size: 13px; }
   .choice-card span { font-size: 11px; color: var(--muted); }
+  .choice-card small { font-size: 10px; color: #bfdbfe; }
   .choice-icon {
     width: 32px;
     height: 32px;
@@ -975,12 +1009,34 @@
   const MIN_HP = 10;
   const MIN_STAT = 1;
   const POISON_STEPS = 5;
+  const ENEMY_BASE_POISON_STEPS = 1;
   const POISON_DAMAGE_PER_STACK = 1;
-  const FIRE_MAX_STACKS = 3;
+  const MAX_POISON_STACKS = 9;
+  const BASE_FIRE_MAX_STACKS = 3;
+  const AWAKEN_FIRE_MAX_STACKS = 6;
   const FIRE_DAMAGE_RATE = 0.01;
   const RANDOM_WALL_COUNT = 5;
   const RANDOM_WALL_ATTEMPTS = 40;
   const ENEMY_ORDER = ['slime', 'bat', 'golem', 'mage', 'assassin'];
+  const TAG_IDS = ['crit', 'dot', 'multi', 'guard', 'stat'];
+  const TAG_LABELS = {
+    crit: '会心',
+    dot: '継続',
+    multi: '連撃',
+    guard: '防御',
+    stat: '成長'
+  };
+  const AWAKEN_THRESHOLD = 3;
+  const MAX_EXTRA_HITS_PER_ACTION = 2;
+  const MAX_HITS_PER_ACTION = 5;
+  const MAX_REFLECT_RATE = 0.3;
+  const AWAKEN_DOT_STACK_CHANCE = 0.5;
+  const AWAKEN_GUARD_SHIELD_RATE = 0.35;
+  const AWAKEN_GUARD_REFLECT_BONUS = 0.08;
+  const AWAKEN_STAT_DAMAGE_PER_TILE = 0.03;
+  const AWAKEN_STAT_DAMAGE_CAP = 0.6;
+  const AWAKEN_STAT_TURN_GAIN_CAP = 6;
+  const BASE_ACTION_CHAIN_RATE = 0.06;
   const STAT_TILE_IDS = ['atk', 'spd', 'def', 'hp', 'luc'];
   const CHUNK_SIZE = 3;
   const ATTACK_TILE_MAX = 13;
@@ -1004,38 +1060,75 @@
   const PLAYER_ACTIVE_SKILL = { type: 'magic', label: '魔王の魔法', power: 1.25, ignoreDef: true, mpCost: 2 };
   const TRIPLE_STRIKE_MP_COST = 2;
   const TREASURE_TILE_COUNT = 5;
-  const MAX_SKILL_COUNT = 5;
+  const MAX_SKILL_COUNT = 8;
   const SKILL_REROLL_COST = 100;
   const SKILL_DEFS = [
-    { id: 'critRate', name: '会心率+10%', desc: '会心率が10%上がる' },
-    { id: 'critDamage', name: '会心ダメ+20%', desc: '会心ダメージ20%アップ' },
-    { id: 'critLifesteal', name: '会心回復', desc: '会心時にダメージの10%回復' },
-    { id: 'overhealDamage', name: 'オーバー回復反撃', desc: '回復超過分を敵に与える' },
-    { id: 'overhealShield', name: 'オーバー回復シールド', desc: '回復超過分がシールドになる' },
-    { id: 'stepHeal', name: '歩行回復', desc: '歩くたび最大HP10%回復' },
-    { id: 'tripleStrike', name: '三連撃', desc: '10%で3連撃' },
-    { id: 'poisonStrike', name: '毒付与', desc: '会心時に毒付与(1歩)' },
-    { id: 'fireStrike', name: '炎付与', desc: '会心時に炎スタック/攻撃時1%' },
-    { id: 'reflect', name: '反射', desc: '被ダメの10%反射' },
-    { id: 'doubleStats', name: '倍化', desc: '現在のパラメータ分を加算' }
+    { id: 'critRate', name: '狙撃眼', desc: '会心率+10%', tags: ['crit'], subTags: ['multi'] },
+    { id: 'critCap', name: '臨戦感覚', desc: '会心率の上限+20%', tags: ['crit'], subTags: ['stat'] },
+    { id: 'critDamage', name: '急所破壊', desc: '会心ダメージ+30%', tags: ['crit'], subTags: ['dot'] },
+    { id: 'critLifesteal', name: '吸命刃', desc: '会心時に与ダメの10%回復', tags: ['crit'], subTags: ['guard'] },
+    { id: 'dotCrit', name: '弱点穿ち', desc: 'DoT中の敵への会心率+20%', tags: ['crit'], subTags: ['dot'] },
+
+    { id: 'poisonStrike', name: '毒牙', desc: '会心時に毒スタック+1', tags: ['dot'], subTags: ['crit'] },
+    { id: 'fireStrike', name: '炎爪', desc: '会心時に炎スタック+1 / 攻撃時に炎ダメージ', tags: ['dot'], subTags: ['multi'] },
+    { id: 'toxicLength', name: '腐蝕延長', desc: '敵毒の持続歩数+2', tags: ['dot'], subTags: ['guard'] },
+    { id: 'dotAmp', name: '侵食加速', desc: '毒/炎ダメージ+40%', tags: ['dot'], subTags: ['stat'] },
+    { id: 'dotRend', name: '蝕み追撃', desc: 'DoT中の敵へ与ダメ+15%', tags: ['dot'], subTags: ['multi'] },
+
+    { id: 'tripleStrike', name: '三連撃', desc: '10%で3連撃', tags: ['multi'], subTags: ['crit'] },
+    { id: 'chainChance', name: '連刃', desc: '連撃発生率+12%', tags: ['multi'], subTags: ['dot'] },
+    { id: 'multiMp', name: '連撃充填', desc: '追加ヒット時にMP+1', tags: ['multi'], subTags: ['stat'] },
+    { id: 'comboPower', name: 'コンボ倍率', desc: '同一行動の後段ほど与ダメ増加', tags: ['multi'], subTags: ['crit'] },
+    { id: 'lastCrit', name: '終段会心', desc: '連撃の最終段で会心率+30%', tags: ['multi'], subTags: ['guard'] },
+
+    { id: 'stepHeal', name: '歩行回復', desc: '歩くたび最大HP10%回復', tags: ['guard'], subTags: ['dot'] },
+    { id: 'overhealShield', name: '過剰装甲', desc: '回復超過分がシールドになる', tags: ['guard'], subTags: ['stat'] },
+    { id: 'overhealDamage', name: '過剰反撃', desc: '回復超過分を敵へ与える', tags: ['guard'], subTags: ['dot'] },
+    { id: 'reflect', name: '反射', desc: '被ダメージの10%を反射', tags: ['guard'], subTags: ['crit'] },
+    { id: 'damageCut', name: '防御姿勢', desc: '被ダメージ-12%', tags: ['guard'], subTags: ['stat'] },
+
+    { id: 'statAtk', name: '剛力結晶', desc: '習得時にこうげき+2', tags: ['stat'], subTags: ['crit'] },
+    { id: 'statSpd', name: '疾風結晶', desc: '習得時にはやさ+2', tags: ['stat'], subTags: ['multi'] },
+    { id: 'statDef', name: '鉄壁結晶', desc: '習得時にぼうぎょ+2', tags: ['stat'], subTags: ['guard'] },
+    { id: 'statLuc', name: '幸運結晶', desc: '習得時にうん+2', tags: ['stat'], subTags: ['crit'] },
+    { id: 'statHp', name: '生命結晶', desc: '習得時にたいりょく+6', tags: ['stat'], subTags: ['guard'] }
   ];
-  const SKILL_TILE_COUNTS = {
-    doubleStats: 2
-  };
-  const TREASURE_SKILL_POOLS = [
-    ['doubleStats', 'critRate', 'stepHeal', 'overhealShield', 'reflect'],
-    ['critDamage', 'poisonStrike', 'fireStrike', 'overhealDamage', 'critLifesteal'],
-    ['tripleStrike', 'critRate', 'critDamage', 'reflect', 'overhealShield'],
-    ['poisonStrike', 'fireStrike', 'critLifesteal', 'overhealDamage', 'stepHeal'],
-    ['doubleStats', 'tripleStrike', 'critDamage', 'overhealShield', 'reflect']
+  const SYNERGY_DEFS = [
+    {
+      id: 'crit_stat',
+      name: '会心 x 成長',
+      requires: ['crit', 'stat'],
+      rewards: [
+        { id: 'critStatCapBreak', name: '臨界会心', desc: '会心率上限90%、会心率+5%' },
+        { id: 'lucidCrit', name: '幸運増幅', desc: '会心ダメージがうんに応じて上昇' }
+      ]
+    },
+    {
+      id: 'dot_multi',
+      name: '継続 x 連撃',
+      requires: ['dot', 'multi'],
+      rewards: [
+        { id: 'dotMultiSpread', name: '連鎖侵食', desc: '追加ヒット時に毒/炎を追加しやすくなる' },
+        { id: 'dotMultiTick', name: '追撃燃焼', desc: '連撃後に毒と炎で追加ダメージ' }
+      ]
+    },
+    {
+      id: 'guard_dot',
+      name: '防御 x 継続',
+      requires: ['guard', 'dot'],
+      rewards: [
+        { id: 'guardDotThorn', name: '毒棘反射', desc: '反射時に毒スタック+1を付与' },
+        { id: 'guardDotPurge', name: '燃える再生', desc: '回復時に敵へ炎スタック+1' }
+      ]
+    }
   ];
-  const TREASURE_POOL_COUNT = TREASURE_SKILL_POOLS.length;
+  const SKILL_ICON_KEYS = ['tile16', 'tile17', 'tile18', 'tile19', 'tile20', 'tile21', 'tile22', 'tile23', 'tile24', 'tile25', 'tile26'];
   const FIXED_WALLS = [
     { x: CHUNK_SIZE * 2 + 1, y: 1 },
     { x: CHUNK_SIZE + 1, y: CHUNK_SIZE + 1 }
   ];
   const SKILL_SPRITE_KEYS = SKILL_DEFS.reduce((acc, skill, index) => {
-    acc[skill.id] = `tile${16 + index}`;
+    acc[skill.id] = SKILL_ICON_KEYS[index % SKILL_ICON_KEYS.length];
     return acc;
   }, {});
 
@@ -1362,6 +1455,8 @@
   const skillChoiceOverlay = document.getElementById('skillChoiceOverlay');
   const skillChoiceList = document.getElementById('skillChoiceList');
   const skillRerollBtn = document.getElementById('skillRerollBtn');
+  const skillChoiceTitleEl = skillChoiceOverlay?.querySelector('h2') || null;
+  const skillChoiceSubEl = skillChoiceOverlay?.querySelector('.choice-sub') || null;
   const playerActor = document.getElementById('playerActor');
   const enemyActor = document.getElementById('enemyActor');
   const playerHpFill = document.getElementById('playerHpFill');
@@ -1400,19 +1495,20 @@
   if (skillRerollBtn) {
     skillRerollBtn.addEventListener('click', () => {
       if (!isChoosingSkill) return;
+      if (!activeChoiceContext?.allowReroll) return;
       if (!spendCoins(SKILL_REROLL_COST, 'リロール')) {
         addLog('チャリンが足りない');
         updateSkillRerollState();
         return;
       }
       updateStats();
-      const choices = buildTreasureSkillChoices();
+      const choices = activeChoiceContext.buildOptions?.() || [];
       if (!choices.length) {
-        addLog('習得できるスキルがない');
+        addLog(activeChoiceContext.emptyLog || '習得できるスキルがない');
         closeSkillChoice(null);
         return;
       }
-      renderSkillChoiceOptions(choices);
+      renderSkillChoiceOptions(choices, activeChoiceContext.onPick);
       updateSkillRerollState();
     });
   }
@@ -1443,6 +1539,15 @@
   const MOVE_ANIM_MS = 180;
 
   const BASE_STATS = { hp: 10, mp: 1, atk: 1, spd: 1, def: 1, luc: 1 };
+  const DEFAULT_CHOICE_TITLE = '宝箱のスキル';
+  const DEFAULT_CHOICE_SUBTITLE = '1つ選んでください';
+
+  function createTagCounter() {
+    return TAG_IDS.reduce((acc, tag) => {
+      acc[tag] = 0;
+      return acc;
+    }, {});
+  }
 
   const player = {
     x: 0,
@@ -1468,7 +1573,11 @@
     skills: {},
     hasKey: false,
     shield: 0,
-    doubleStatsCount: 0,
+    tagCounts: createTagCounter(),
+    awakenedTags: {},
+    synergyTaken: {},
+    synergyPerks: {},
+    statTilesCollected: 0,
     poisonStacks: 0,
     poisonSteps: 0
   };
@@ -2579,6 +2688,12 @@
   let selectedSkillId = null;
   let selectedGearId = null;
 
+  function formatSkillTags(skill) {
+    const tags = skill?.tags || [];
+    if (!tags.length) return 'タグなし';
+    return tags.map(tag => TAG_LABELS[tag] || tag).join(' / ');
+  }
+
   function showSkillDetail(skill) {
     if (!skillDetailEl) return;
     if (!skill) {
@@ -2589,6 +2704,7 @@
     skillDetailEl.innerHTML = `
       <strong>${skill.name}</strong>
       <div>${skill.desc}</div>
+      <div>タグ: ${formatSkillTags(skill)}</div>
       <div>${owned ? '習得済み' : '未習得'}</div>
     `;
   }
@@ -2974,6 +3090,7 @@
 
   function applyStatBoost(statKey, label) {
     const amount = statKey === 'hp' ? 2 : 1;
+    player.statTilesCollected = (player.statTilesCollected || 0) + 1;
     player.baseStats[statKey] = (player.baseStats[statKey] || 0) + amount;
     if (statKey === 'hp') {
       player.hp += amount;
@@ -2983,17 +3100,153 @@
     addLog(`${label} +${amount}`);
   }
 
+  function ensurePlayerProgressState() {
+    if (!player.tagCounts) player.tagCounts = createTagCounter();
+    TAG_IDS.forEach((tag) => {
+      if (!Number.isFinite(player.tagCounts[tag])) player.tagCounts[tag] = 0;
+    });
+    if (!player.awakenedTags) player.awakenedTags = {};
+    if (!player.synergyTaken) player.synergyTaken = {};
+    if (!player.synergyPerks) player.synergyPerks = {};
+    if (!Number.isFinite(player.statTilesCollected)) player.statTilesCollected = 0;
+  }
+
+  function getAwakenDescription(tag) {
+    const descriptions = {
+      crit: '会心時に追撃+MP+DoT付与が発動',
+      dot: '毒/炎の上限が伸び、DoT中の敵へ追加入れ直し',
+      multi: '連撃中に会心再抽選、ヒットごとに連撃率上昇',
+      guard: '被弾時シールド+反射強化、超過回復を装甲化',
+      stat: 'ステタイル累計で与ダメ増幅、戦闘中に能力成長'
+    };
+    return descriptions[tag] || '';
+  }
+
+  function applyImmediateSkillEffects(skillId) {
+    let changed = false;
+    if (skillId === 'statAtk') {
+      player.baseStats.atk += 2;
+      addLog('こうげき +2');
+      changed = true;
+    } else if (skillId === 'statSpd') {
+      player.baseStats.spd += 2;
+      addLog('はやさ +2');
+      changed = true;
+    } else if (skillId === 'statDef') {
+      player.baseStats.def += 2;
+      addLog('ぼうぎょ +2');
+      changed = true;
+    } else if (skillId === 'statLuc') {
+      player.baseStats.luc += 2;
+      addLog('うん +2');
+      changed = true;
+    } else if (skillId === 'statHp') {
+      player.baseStats.hp += 6;
+      player.hp += 6;
+      addLog('たいりょく +6');
+      changed = true;
+    }
+    if (changed) {
+      updateUnitStats(player);
+      updatePlayerLevel();
+    }
+    return changed;
+  }
+
+  function queueUnlockedSynergies() {
+    ensurePlayerProgressState();
+    SYNERGY_DEFS.forEach((def) => {
+      if (player.synergyTaken[def.id]) return;
+      const unlocked = def.requires.every(tag => (player.tagCounts[tag] || 0) >= 1);
+      if (!unlocked) return;
+      if (!pendingSynergyQueue.includes(def.id)) pendingSynergyQueue.push(def.id);
+    });
+  }
+
+  function applySynergyReward(synergyId, reward) {
+    if (!reward) return null;
+    ensurePlayerProgressState();
+    player.synergyPerks[reward.id] = true;
+    player.synergyTaken[synergyId] = true;
+    addLog(`シナジー獲得: ${reward.name}`);
+    return reward;
+  }
+
+  async function resolvePendingSynergyChoices() {
+    ensurePlayerProgressState();
+    while (pendingSynergyQueue.length) {
+      const synergyId = pendingSynergyQueue.shift();
+      const synergy = SYNERGY_DEFS.find(def => def.id === synergyId);
+      if (!synergy) continue;
+      if (player.synergyTaken[synergy.id]) continue;
+      const ready = synergy.requires.every(tag => (player.tagCounts[tag] || 0) >= 1);
+      if (!ready) continue;
+      const options = synergy.rewards.map(reward => ({ ...reward, tags: synergy.requires }));
+      addLog(`シナジー成立: ${synergy.name}`);
+      await openSkillChoice(options, {
+        title: `シナジー報酬: ${synergy.name}`,
+        subtitle: '1つ選択 (各組み合わせ1回)',
+        allowReroll: false,
+        buildOptions: () => options,
+        onPick: (reward) => applySynergyReward(synergy.id, reward),
+        emptyLog: '選べるシナジーがない'
+      });
+    }
+  }
+
+  function learnSkill(skill) {
+    if (!skill) return false;
+    ensurePlayerProgressState();
+    if (player.skills[skill.id]) {
+      addLog(`スキルは習得済み: ${skill.name}`);
+      return false;
+    }
+    if (!canLearnMoreSkills()) {
+      addLog('スキル枠がいっぱい');
+      return false;
+    }
+    player.skills[skill.id] = true;
+    addLog(`スキル獲得: ${skill.name}`);
+    const tags = Array.isArray(skill.tags) ? skill.tags : [];
+    tags.forEach((tag) => {
+      const nextCount = (player.tagCounts[tag] || 0) + 1;
+      player.tagCounts[tag] = nextCount;
+      if (!player.awakenedTags[tag] && nextCount >= AWAKEN_THRESHOLD) {
+        player.awakenedTags[tag] = true;
+        addLog(`【覚醒】${TAG_LABELS[tag]}: ${getAwakenDescription(tag)}`);
+      }
+    });
+    applyImmediateSkillEffects(skill.id);
+    queueUnlockedSynergies();
+    if (!isChoosingSkill) {
+      void resolvePendingSynergyChoices();
+    }
+    return true;
+  }
+
   async function handleTreasureReward() {
+    ensurePlayerProgressState();
     if (!canLearnMoreSkills()) {
       addLog('スキル枠がいっぱい');
       return;
     }
     const choices = buildTreasureSkillChoices();
-    await openSkillChoice(choices);
+    const picked = await openSkillChoice(choices, {
+      title: DEFAULT_CHOICE_TITLE,
+      subtitle: DEFAULT_CHOICE_SUBTITLE,
+      allowReroll: true,
+      buildOptions: buildTreasureSkillChoices,
+      onPick: (skill) => grantSkillById(skill.id),
+      emptyLog: '習得できるスキルがない'
+    });
     treasureOpenedCount += 1;
+    if (picked) {
+      await resolvePendingSynergyChoices();
+    }
   }
 
   function grantRandomSkill() {
+    ensurePlayerProgressState();
     if (!canLearnMoreSkills()) {
       addLog('スキル枠がいっぱい');
       return null;
@@ -3003,53 +3256,18 @@
       addLog('スキルはもう習得できない');
       return null;
     }
-    const pick = available[Math.floor(rand() * available.length)];
-    player.skills[pick.id] = true;
-    addLog(`スキル獲得: ${pick.name}`);
+    const pick = available[Math.floor(rand() * available.length)] || null;
+    if (!pick) return null;
+    grantSkillById(pick.id);
     return pick;
   }
 
   function grantSkillById(skillId) {
+    ensurePlayerProgressState();
     if (!skillId) return grantRandomSkill();
     const skill = SKILL_DEFS.find(entry => entry.id === skillId);
     if (!skill) return grantRandomSkill();
-    if (!player.skills[skillId] && !canLearnMoreSkills()) {
-      addLog('スキル枠がいっぱい');
-      return skill;
-    }
-    if (skillId === 'doubleStats') {
-      const maxCount = SKILL_TILE_COUNTS.doubleStats || 1;
-      if (player.doubleStatsCount >= maxCount) {
-        addLog('倍化は上限に達している');
-        return skill;
-      }
-      player.doubleStatsCount += 1;
-      if (!player.skills.doubleStats) player.skills.doubleStats = true;
-      const currentAtk = player.atk;
-      const currentSpd = player.spd;
-      const currentDef = player.def;
-      const currentLuc = player.luc;
-      const currentHp = player.maxHp;
-      const currentMp = player.maxMp;
-      player.baseStats.atk = Math.max(MIN_STAT, currentAtk * 2 - player.gearBonus.atk);
-      player.baseStats.spd = Math.max(MIN_STAT, currentSpd * 2 - player.gearBonus.spd);
-      player.baseStats.def = Math.max(MIN_STAT, currentDef * 2 - player.gearBonus.def);
-      player.baseStats.luc = Math.max(MIN_STAT, currentLuc * 2 - player.gearBonus.luc);
-      player.baseStats.hp = Math.max(MIN_HP, currentHp * 2);
-      player.baseStats.mp = Math.max(MIN_STAT, currentMp * 2);
-      player.hp = Math.min(player.hp * 2, player.baseStats.hp);
-      player.mp = Math.min(player.mp * 2, player.baseStats.mp);
-      updateUnitStats(player);
-      updatePlayerLevel();
-      addLog(`倍化 ${player.doubleStatsCount}/${maxCount}`);
-      return skill;
-    }
-    if (player.skills[skillId]) {
-      addLog(`スキルは習得済み: ${skill.name}`);
-      return skill;
-    }
-    player.skills[skillId] = true;
-    addLog(`スキル獲得: ${skill.name}`);
+    learnSkill(skill);
     return skill;
   }
 
@@ -3068,6 +3286,48 @@
     return true;
   }
 
+  function hasDotStatus(target) {
+    if (!target) return false;
+    return (target.poisonStacks || 0) > 0 || (target.fireStacks || 0) > 0;
+  }
+
+  function getFireStackCap(attackerState) {
+    return attackerState?.awakenedTags?.dot ? AWAKEN_FIRE_MAX_STACKS : BASE_FIRE_MAX_STACKS;
+  }
+
+  function getEnemyPoisonStepGain(attackerState) {
+    let steps = ENEMY_BASE_POISON_STEPS;
+    if (attackerState?.skills?.toxicLength) steps += 2;
+    if (attackerState?.awakenedTags?.dot) steps += 2;
+    return steps;
+  }
+
+  function applyPoisonToEnemy(enemyState, attackerState, amount = 1) {
+    if (!enemyState || amount <= 0) return 0;
+    const next = Math.min(MAX_POISON_STACKS, (enemyState.poisonStacks || 0) + amount);
+    const gained = Math.max(0, next - (enemyState.poisonStacks || 0));
+    enemyState.poisonStacks = next;
+    enemyState.poisonSteps = Math.max(enemyState.poisonSteps || 0, getEnemyPoisonStepGain(attackerState));
+    return gained;
+  }
+
+  function applyFireToEnemy(enemyState, attackerState, amount = 1) {
+    if (!enemyState || amount <= 0) return 0;
+    const cap = getFireStackCap(attackerState);
+    const next = Math.min(cap, (enemyState.fireStacks || 0) + amount);
+    const gained = Math.max(0, next - (enemyState.fireStacks || 0));
+    enemyState.fireStacks = next;
+    return gained;
+  }
+
+  function getReflectRate(unitState) {
+    let rate = 0;
+    if (unitState?.skills?.reflect) rate += 0.1;
+    if (unitState?.awakenedTags?.guard) rate += AWAKEN_GUARD_REFLECT_BONUS;
+    if (unitState?.synergyPerks?.guardDotThorn) rate += 0.07;
+    return clamp(rate, 0, MAX_REFLECT_RATE);
+  }
+
   function applyHeal(target, amount, opts = {}) {
     if (!target || amount <= 0) {
       return { actual: 0, overflow: 0, shieldAdded: 0, overflowDamage: 0 };
@@ -3077,7 +3337,7 @@
     target.hp = clamp(target.hp + actual, 0, target.maxHp);
     const overflow = Math.max(0, amount - actual);
     let shieldAdded = 0;
-    if (overflow > 0 && target.skills?.overhealShield) {
+    if (overflow > 0 && (target.skills?.overhealShield || target.awakenedTags?.guard)) {
       target.shield = (target.shield || 0) + overflow;
       shieldAdded = overflow;
     }
@@ -3086,12 +3346,18 @@
       overflowDamage = overflow;
       applyDamageToEnemy(opts.enemyState, overflowDamage, opts.isBoss);
     }
+    if (actual > 0 && target.synergyPerks?.guardDotPurge && opts.enemyState) {
+      const gained = applyFireToEnemy(opts.enemyState, target, 1);
+      if (gained > 0) appendBattleLog(`${opts.enemyState.name}に炎 +${gained}`, 'player');
+    }
     return { actual, overflow, shieldAdded, overflowDamage };
   }
 
-  function applyEnemyPoisonTick(enemyState, isBoss, critMultiplier = 1) {
+  function applyEnemyPoisonTick(enemyState, isBoss, attackerState, critMultiplier = 1) {
     if (!enemyState || enemyState.poisonStacks <= 0 || enemyState.poisonSteps <= 0) return false;
-    const baseDamage = Math.max(1, enemyState.poisonStacks * POISON_DAMAGE_PER_STACK);
+    let baseDamage = Math.max(1, enemyState.poisonStacks * POISON_DAMAGE_PER_STACK);
+    if (attackerState?.skills?.dotAmp) baseDamage = Math.max(1, Math.floor(baseDamage * 1.4));
+    if (attackerState?.awakenedTags?.dot) baseDamage = Math.max(1, Math.floor(baseDamage * 1.2));
     const damage = Math.max(1, Math.floor(baseDamage * critMultiplier));
     applyDamageToEnemy(enemyState, damage, isBoss);
     enemyState.poisonSteps -= 1;
@@ -3401,6 +3667,57 @@
     movePlayerTo(targetX, targetY);
   }
 
+  function getCritCap(attacker) {
+    let cap = 0.3;
+    if (attacker?.skills?.critCap) cap += 0.2;
+    if (attacker?.synergyPerks?.critStatCapBreak) cap = 0.9;
+    return clamp(cap, 0.05, 0.9);
+  }
+
+  function getCritChance(attacker, defender, bonusCrit = 0) {
+    let chance = 0.02 * (attacker?.luc || 0) + bonusCrit;
+    if (attacker?.skills?.critRate) chance += 0.1;
+    if (attacker?.skills?.dotCrit && hasDotStatus(defender)) chance += 0.2;
+    if (attacker?.synergyPerks?.critStatCapBreak) chance += 0.05;
+    return clamp(chance, 0, getCritCap(attacker));
+  }
+
+  function getDamageReductionFromSkills(defender) {
+    let reduction = 0;
+    if (defender?.skills?.damageCut) reduction += 0.12;
+    return clamp(reduction, 0, 0.8);
+  }
+
+  function getChainTriggerRate(unitState, comboIndex = 0) {
+    let chance = BASE_ACTION_CHAIN_RATE;
+    if (unitState?.skills?.chainChance) chance += 0.12;
+    if (unitState?.awakenedTags?.multi) chance += comboIndex * 0.06;
+    return clamp(chance, 0, 0.75);
+  }
+
+  function rollActionHits(unitState, baseHits = 1) {
+    let hits = Math.max(1, baseHits);
+    let comboIndex = Math.max(0, hits - 1);
+    while (hits < MAX_HITS_PER_ACTION) {
+      if (Math.random() >= getChainTriggerRate(unitState, comboIndex)) break;
+      hits += 1;
+      comboIndex += 1;
+    }
+    return Math.min(MAX_HITS_PER_ACTION, hits);
+  }
+
+  function applyStatAwakenTurnGrowth(unitState) {
+    if (!unitState?.awakenedTags?.stat) return false;
+    const current = unitState.statAwakenGainTurns || 0;
+    if (current >= AWAKEN_STAT_TURN_GAIN_CAP) return false;
+    const turns = current + 1;
+    unitState.statAwakenGainTurns = turns;
+    unitState.atk += 1;
+    unitState.spd += 1;
+    unitState.luc += 1;
+    return true;
+  }
+
   function calcDamage(attacker, defender, opts = {}) {
     const power = opts.power || 1;
     const ignoreDef = opts.ignoreDef || false;
@@ -3409,18 +3726,43 @@
     const def = ignoreDef ? 0 : (defender.def || 0);
     const base = Math.max(1, Math.floor((baseAtk * baseAtk) / Math.max(1, baseAtk + def)));
     const variance = Math.floor(Math.random() * 3);
-    const skillCritBonus = attacker.skills?.critRate ? 0.1 : 0;
-    const critCap = 0.3 + skillCritBonus;
-    const critChance = Math.min(critCap, 0.02 * (attacker.luc || 0) + bonusCrit + skillCritBonus);
-    const isCrit = Math.random() < critChance;
-    const critMultiplier = isCrit ? (attacker.skills?.critDamage ? 1.8 : 1.5) : 1;
+    const critChance = getCritChance(attacker, defender, bonusCrit);
+    const critCap = getCritCap(attacker);
+    const canCrit = opts.canCrit !== false;
+    let isCrit = canCrit && (opts.forceCrit || Math.random() < critChance);
+    if (canCrit && !isCrit && opts.extraCritRoll) {
+      const extraChance = clamp(critChance + (opts.extraCritBonus || 0.12), 0, critCap);
+      isCrit = Math.random() < extraChance;
+    }
+    let critMultiplier = 1;
+    if (isCrit) {
+      critMultiplier = 1.5;
+      if (attacker.skills?.critDamage) critMultiplier += 0.3;
+      if (attacker.synergyPerks?.lucidCrit) {
+        critMultiplier += Math.min(0.9, (attacker.luc || 0) * 0.03);
+      }
+    }
     let raw = (base + variance) * power * critMultiplier;
+    const comboIndex = opts.comboIndex || 0;
+    if (attacker.skills?.comboPower && comboIndex > 0) {
+      raw *= 1 + Math.min(0.4, comboIndex * 0.08);
+    }
+    if (attacker.skills?.dotRend && hasDotStatus(defender)) {
+      raw *= 1.15;
+    }
+    if (attacker.awakenedTags?.stat) {
+      const tileBonus = Math.min(AWAKEN_STAT_DAMAGE_CAP, (attacker.statTilesCollected || 0) * AWAKEN_STAT_DAMAGE_PER_TILE);
+      raw *= 1 + tileBonus;
+    }
+    if (attacker.synergyPerks?.dotMultiSpread && comboIndex > 0 && hasDotStatus(defender)) {
+      raw *= 1.08;
+    }
     const levelGap = (attacker.level || 1) - (defender.level || 1);
     const levelMult = clamp(1 + levelGap * 0.03, 0.6, 1.6);
     raw *= levelMult;
-    const reduction = clamp(opts.damageReduction || 0, 0, 0.8);
+    const reduction = clamp((opts.damageReduction || 0) + getDamageReductionFromSkills(defender), 0, 0.8);
     const reduced = raw * (1 - reduction);
-    return { damage: Math.max(1, Math.floor(reduced)), isCrit, critMultiplier };
+    return { damage: Math.max(1, Math.floor(reduced)), isCrit, critMultiplier, critChance };
   }
 
   function getEvasionChance(attacker, defender) {
@@ -3439,18 +3781,25 @@
     const isPlayer = !!opts.isPlayer;
     if (isPlayer) {
       const mp = unitState?.mp || 0;
+      let action = null;
       if (unitState?.skills?.tripleStrike && mp >= TRIPLE_STRIKE_MP_COST && Math.random() < 0.1) {
-        return { type: 'skill', label: '3連撃', power: 1, hits: 3, mpCost: TRIPLE_STRIKE_MP_COST };
+        action = { type: 'skill', label: '3連撃', power: 1, hits: 3, mpCost: TRIPLE_STRIKE_MP_COST };
+      } else if (mp >= PLAYER_ACTIVE_SKILL.mpCost && Math.random() < PLAYER_ACTIVE_SKILL_CHANCE) {
+        action = { ...PLAYER_ACTIVE_SKILL };
+      } else {
+        action = { type: 'attack', label: 'こうげき', power: 1, hits: 1, mpGain: PLAYER_ATTACK_MP_GAIN };
       }
-      if (mp >= PLAYER_ACTIVE_SKILL.mpCost && Math.random() < PLAYER_ACTIVE_SKILL_CHANCE) {
-        return { ...PLAYER_ACTIVE_SKILL };
+      const finalHits = rollActionHits(unitState, action.hits || 1);
+      action.hits = finalHits;
+      if (finalHits > 1 && action.label === 'こうげき') {
+        action.label = `${finalHits}連撃`;
       }
-      return { type: 'attack', label: 'こうげき', power: 1, hits: 1, mpGain: PLAYER_ATTACK_MP_GAIN };
+      return action;
     }
     if (unitState?.skills?.tripleStrike && Math.random() < 0.1) {
-      return { type: 'attack', label: '3連撃', power: 1, hits: 3 };
+      return { type: 'attack', label: '3連撃', power: 1, hits: rollActionHits(unitState, 3) };
     }
-    return { type: 'attack', label: 'こうげき', power: 1, hits: 1 };
+    return { type: 'attack', label: 'こうげき', power: 1, hits: rollActionHits(unitState, 1) };
   }
 
   function getEffectiveSpeed(state) {
@@ -3507,6 +3856,8 @@
   let battleLogDelayProvider = () => BATTLE_LOG_REVEAL_MS;
   let battleSkipActive = false;
   let skillChoiceResolver = null;
+  let activeChoiceContext = null;
+  let pendingSynergyQueue = [];
 
   function setBattleLogDelayProvider(fn) {
     battleLogDelayProvider = typeof fn === 'function' ? fn : () => BATTLE_LOG_REVEAL_MS;
@@ -3560,14 +3911,95 @@
     return getLearnedSkillCount() < MAX_SKILL_COUNT;
   }
 
+  function setChoiceOverlayText(title, subtitle) {
+    if (skillChoiceTitleEl) skillChoiceTitleEl.textContent = title || DEFAULT_CHOICE_TITLE;
+    if (skillChoiceSubEl) skillChoiceSubEl.textContent = subtitle || DEFAULT_CHOICE_SUBTITLE;
+  }
+
+  function pickWeightedOne(list, weightFn = () => 1) {
+    if (!Array.isArray(list) || !list.length) return null;
+    const weights = list.map((item) => Math.max(0, Number(weightFn(item)) || 0));
+    const total = weights.reduce((sum, value) => sum + value, 0);
+    if (total <= 0) {
+      return list[Math.floor(rand() * list.length)] || null;
+    }
+    let roll = rand() * total;
+    for (let i = 0; i < list.length; i++) {
+      roll -= weights[i];
+      if (roll <= 0) return list[i];
+    }
+    return list[list.length - 1] || null;
+  }
+
+  function pickWeightedMany(list, count, weightFn = () => 1) {
+    const pool = Array.isArray(list) ? [...list] : [];
+    const picked = [];
+    while (pool.length && picked.length < count) {
+      const next = pickWeightedOne(pool, weightFn);
+      if (!next) break;
+      picked.push(next);
+      const index = pool.findIndex(entry => entry.id === next.id);
+      if (index >= 0) pool.splice(index, 1);
+    }
+    return picked;
+  }
+
+  function getDominantTagForTreasure(availableSkills) {
+    const tagPool = TAG_IDS.filter(tag => availableSkills.some(skill => (skill.tags || []).includes(tag)));
+    if (!tagPool.length) return TAG_IDS[0];
+    let bestTag = tagPool[0];
+    let bestScore = -Infinity;
+    tagPool.forEach((tag) => {
+      const count = player.tagCounts?.[tag] || 0;
+      const awakenPenalty = player.awakenedTags?.[tag] ? 0.35 : 0;
+      const score = count - awakenPenalty + rand() * 0.01;
+      if (score > bestScore) {
+        bestScore = score;
+        bestTag = tag;
+      }
+    });
+    return bestTag;
+  }
+
+  function getEscapeTags(focusTag) {
+    const tags = [];
+    SYNERGY_DEFS.forEach((def) => {
+      if (player.synergyTaken?.[def.id]) return;
+      if (!def.requires.includes(focusTag)) return;
+      const others = def.requires.filter(tag => tag !== focusTag);
+      others.forEach((tag) => {
+        if (!tags.includes(tag)) tags.push(tag);
+      });
+    });
+    if (!tags.length) {
+      TAG_IDS.forEach((tag) => {
+        if (tag === focusTag) return;
+        if (!player.awakenedTags?.[tag]) tags.push(tag);
+      });
+    }
+    if (!tags.length) {
+      TAG_IDS.forEach((tag) => {
+        if (tag !== focusTag) tags.push(tag);
+      });
+    }
+    tags.sort((a, b) => (player.tagCounts?.[a] || 0) - (player.tagCounts?.[b] || 0));
+    return tags;
+  }
+
   function updateSkillRerollState() {
     if (!skillRerollBtn) return;
+    const allowReroll = Boolean(activeChoiceContext?.allowReroll);
+    skillRerollBtn.hidden = !allowReroll;
+    if (!allowReroll) {
+      skillRerollBtn.disabled = true;
+      return;
+    }
     const canPay = (player.coins || 0) >= SKILL_REROLL_COST;
     skillRerollBtn.innerHTML = `リロール (<img class="btn-coin" src="../character-dots/tyarin.png" alt="">${SKILL_REROLL_COST})`;
     skillRerollBtn.disabled = !isChoosingSkill || !canPay;
   }
 
-  function renderSkillChoiceOptions(choices) {
+  function renderSkillChoiceOptions(choices, onPick) {
     if (!skillChoiceList) return;
     skillChoiceList.innerHTML = '';
     choices.forEach((skill) => {
@@ -3581,10 +4013,11 @@
       const title = document.createElement('strong');
       title.textContent = skill.name;
       const desc = document.createElement('span');
-      desc.textContent = skill.desc;
+      const tagText = skill.tags?.length ? ` [${formatSkillTags(skill)}]` : '';
+      desc.textContent = `${skill.desc || ''}${tagText}`;
       btn.append(icon, title, desc);
       btn.addEventListener('click', () => {
-        grantSkillById(skill.id);
+        if (typeof onPick === 'function') onPick(skill);
         closeSkillChoice(skill);
       });
       skillChoiceList.appendChild(btn);
@@ -3592,14 +4025,69 @@
   }
 
   function buildTreasureSkillChoices() {
+    ensurePlayerProgressState();
     if (!canLearnMoreSkills()) return [];
-    const poolIds = TREASURE_SKILL_POOLS[treasureOpenedCount % TREASURE_POOL_COUNT] || [];
-    const pool = poolIds
-      .map((id) => SKILL_DEFS.find(skill => skill.id === id))
-      .filter((skill) => skill && !player.skills[skill.id]);
-    if (!pool.length) return [];
-    shuffleList(pool);
-    return pool.slice(0, 4);
+    const available = SKILL_DEFS.filter(skill => !player.skills[skill.id]);
+    if (!available.length) return [];
+    if (available.length <= 3) {
+      const quick = [...available];
+      shuffleList(quick);
+      return quick;
+    }
+
+    const focusTag = getDominantTagForTreasure(available);
+    const escapeTags = getEscapeTags(focusTag);
+    const selected = [];
+    const pickUnique = (skill) => {
+      if (!skill) return false;
+      if (selected.some(entry => entry.id === skill.id)) return false;
+      selected.push(skill);
+      return true;
+    };
+    const remaining = () => available.filter(skill => !selected.some(entry => entry.id === skill.id));
+
+    const focusPenalty = player.awakenedTags?.[focusTag] ? 0.7 : 1;
+    const focusPool = available.filter(skill => (skill.tags || []).includes(focusTag));
+    pickWeightedMany(focusPool, 2, () => focusPenalty).forEach(pickUnique);
+
+    while (selected.length < 2) {
+      const fill = pickWeightedOne(remaining(), (skill) => (skill.tags || []).includes(focusTag) ? 2 * focusPenalty : 1);
+      if (!fill) break;
+      pickUnique(fill);
+    }
+
+    let escapePool = remaining().filter((skill) => {
+      const tags = skill.tags || [];
+      return !tags.includes(focusTag) && tags.some(tag => escapeTags.includes(tag));
+    });
+    if (!escapePool.length) {
+      escapePool = remaining().filter(skill => !(skill.tags || []).includes(focusTag));
+    }
+    const escapePick = pickWeightedOne(escapePool, (skill) => {
+      const tags = skill.tags || [];
+      let weight = 1;
+      tags.forEach((tag) => {
+        if (escapeTags.includes(tag)) weight += 2;
+        if (player.awakenedTags?.[tag]) weight *= 0.85;
+      });
+      return weight;
+    });
+    pickUnique(escapePick);
+
+    while (selected.length < 3) {
+      const fill = pickWeightedOne(remaining(), (skill) => {
+        const tags = skill.tags || [];
+        let weight = 1;
+        if (tags.includes(focusTag)) weight += 1.2 * focusPenalty;
+        if (tags.some(tag => escapeTags.includes(tag))) weight += 0.9;
+        return weight;
+      });
+      if (!fill) break;
+      pickUnique(fill);
+    }
+
+    shuffleList(selected);
+    return selected.slice(0, 3);
   }
 
   function closeSkillChoice(selected = null) {
@@ -3609,26 +4097,38 @@
     }
     if (skillChoiceList) skillChoiceList.innerHTML = '';
     isChoosingSkill = false;
+    activeChoiceContext = null;
+    setChoiceOverlayText(DEFAULT_CHOICE_TITLE, DEFAULT_CHOICE_SUBTITLE);
     updateSkillRerollState();
     const resolve = skillChoiceResolver;
     skillChoiceResolver = null;
     if (resolve) resolve(selected);
   }
 
-  function openSkillChoice(options) {
+  function openSkillChoice(options, config = {}) {
     if (!skillChoiceOverlay || !skillChoiceList) {
       return Promise.resolve(null);
     }
     return new Promise((resolve) => {
       skillChoiceResolver = resolve;
       skillChoiceList.innerHTML = '';
-      const choices = options || [];
+      const context = {
+        title: config.title || DEFAULT_CHOICE_TITLE,
+        subtitle: config.subtitle || DEFAULT_CHOICE_SUBTITLE,
+        allowReroll: !!config.allowReroll,
+        buildOptions: typeof config.buildOptions === 'function' ? config.buildOptions : () => options || [],
+        onPick: typeof config.onPick === 'function' ? config.onPick : (skill) => grantSkillById(skill.id),
+        emptyLog: config.emptyLog || '習得できるスキルがない'
+      };
+      activeChoiceContext = context;
+      setChoiceOverlayText(context.title, context.subtitle);
+      const choices = options || context.buildOptions() || [];
       if (!choices.length) {
-        addLog('習得できるスキルがない');
+        addLog(context.emptyLog);
         closeSkillChoice(null);
         return;
       }
-      renderSkillChoiceOptions(choices);
+      renderSkillChoiceOptions(choices, context.onPick);
       isChoosingSkill = true;
       skillChoiceOverlay.classList.add('is-open');
       skillChoiceOverlay.setAttribute('aria-hidden', 'false');
@@ -3750,8 +4250,13 @@
       maxMp: actor.maxMp,
       level: actor.level || 1,
       gauge: 0,
-      skills: actor.skills || {},
-      shield: actor.shield || 0
+      skills: { ...(actor.skills || {}) },
+      shield: actor.shield || 0,
+      tagCounts: { ...(actor.tagCounts || createTagCounter()) },
+      awakenedTags: { ...(actor.awakenedTags || {}) },
+      synergyPerks: { ...(actor.synergyPerks || {}) },
+      statTilesCollected: actor.statTilesCollected || 0,
+      statAwakenGainTurns: 0
     };
     if (isBoss) {
       updateBossBattleLabel(enemyState);
@@ -3783,29 +4288,68 @@
       appendBattleLog(`行動 ${actionCount}`);
       if (actorTurn === 'player') {
         playerState.gauge = Math.max(0, playerState.gauge - 100);
+        if (applyStatAwakenTurnGrowth(playerState)) {
+          appendBattleLog('成長覚醒で能力上昇', 'player');
+        }
         const action = getUnitAction(playerState, { isPlayer: true });
         if (action.mpCost) playerState.mp = Math.max(0, playerState.mp - action.mpCost);
-        const hits = action.hits || 1;
+        let plannedHits = Math.min(MAX_HITS_PER_ACTION, action.hits || 1);
+        let performedHits = 0;
+        let extraHitsFromAwaken = 0;
         let poisonCritMultiplier = 1;
-        for (let i = 0; i < hits; i++) {
+        for (let i = 0; i < plannedHits; i++) {
+          performedHits += 1;
+          const isFinalHit = i === plannedHits - 1;
+          const critBonus = playerState.skills?.lastCrit && plannedHits > 1 && isFinalHit ? 0.3 : 0;
+          const forceCrit = Boolean(
+            (playerState.synergyPerks?.critStatCapBreak && i === 0)
+            || (playerState.awakenedTags?.crit && plannedHits > 1 && isFinalHit && hasDotStatus(enemyState))
+          );
           if (checkEvasion(playerState, enemyState)) {
             appendBattleLog(`${enemyState.name}は回避した`, 'enemy');
           } else {
-            const result = calcDamage(playerState, { def: enemyState.def + enemyState.guard }, action);
+            const defenderState = { ...enemyState, def: enemyState.def + enemyState.guard };
+            const result = calcDamage(playerState, defenderState, {
+              ...action,
+              comboIndex: i,
+              critBonus,
+              forceCrit,
+              extraCritRoll: playerState.awakenedTags?.multi && i > 0
+            });
             appendBattleLog(`${actorLabel}の${action.label}！ ${result.damage}ダメージ${result.isCrit ? ' (クリティカル)' : ''}`, 'player');
             const maxHpSnapshot = enemyState.maxHp;
             applyDamageToEnemy(enemyState, result.damage, isBoss);
             if (result.isCrit) poisonCritMultiplier = result.critMultiplier;
             if (result.isCrit && playerState.skills?.poisonStrike) {
-              enemyState.poisonStacks = (enemyState.poisonStacks || 0) + 1;
-              enemyState.poisonSteps = 1;
-              appendBattleLog(`${enemyState.name}に毒 +1`, 'player');
+              const gained = applyPoisonToEnemy(enemyState, playerState, 1);
+              if (gained > 0) appendBattleLog(`${enemyState.name}に毒 +${gained}`, 'player');
             }
             if (playerState.skills?.fireStrike && result.isCrit) {
-              enemyState.fireStacks = Math.min(FIRE_MAX_STACKS, (enemyState.fireStacks || 0) + 1);
+              const gained = applyFireToEnemy(enemyState, playerState, 1);
+              if (gained > 0) appendBattleLog(`${enemyState.name}に炎 +${gained}`, 'player');
+            }
+            if (playerState.awakenedTags?.dot && hasDotStatus(enemyState) && Math.random() < AWAKEN_DOT_STACK_CHANCE) {
+              if (Math.random() < 0.5) {
+                const gained = applyPoisonToEnemy(enemyState, playerState, 1);
+                if (gained > 0) appendBattleLog(`${enemyState.name}に毒 +${gained} (覚醒)`, 'player');
+              } else {
+                const gained = applyFireToEnemy(enemyState, playerState, 1);
+                if (gained > 0) appendBattleLog(`${enemyState.name}に炎 +${gained} (覚醒)`, 'player');
+              }
+            }
+            if (playerState.synergyPerks?.dotMultiSpread && i > 0 && Math.random() < 0.5) {
+              if (Math.random() < 0.5) {
+                const gained = applyPoisonToEnemy(enemyState, playerState, 1);
+                if (gained > 0) appendBattleLog(`${enemyState.name}に毒 +${gained} (連鎖侵食)`, 'player');
+              } else {
+                const gained = applyFireToEnemy(enemyState, playerState, 1);
+                if (gained > 0) appendBattleLog(`${enemyState.name}に炎 +${gained} (連鎖侵食)`, 'player');
+              }
             }
             if (playerState.skills?.fireStrike && enemyState.fireStacks > 0) {
-              const fireBase = Math.max(1, Math.floor(maxHpSnapshot * FIRE_DAMAGE_RATE * enemyState.fireStacks));
+              let fireBase = Math.max(1, Math.floor(maxHpSnapshot * FIRE_DAMAGE_RATE * enemyState.fireStacks));
+              if (playerState.skills?.dotAmp) fireBase = Math.max(1, Math.floor(fireBase * 1.4));
+              if (playerState.awakenedTags?.dot) fireBase = Math.max(1, Math.floor(fireBase * 1.2));
               const fireDamage = Math.max(1, Math.floor(fireBase * (result.isCrit ? result.critMultiplier : 1)));
               applyDamageToEnemy(enemyState, fireDamage, isBoss);
               appendBattleLog(`炎 +${fireDamage}ダメージ (累計${enemyState.fireStacks})`, 'player');
@@ -3817,11 +4361,33 @@
               if (healed.shieldAdded > 0) appendBattleLog(`シールド +${healed.shieldAdded}`, 'player');
               if (healed.overflowDamage > 0) appendBattleLog(`オーバー回復 ${healed.overflowDamage}ダメージ`, 'player');
             }
+            if (i > 0 && playerState.skills?.multiMp) {
+              const beforeMp = playerState.mp;
+              playerState.mp = clamp(playerState.mp + 1, 0, playerState.maxMp || playerState.mp);
+              if (playerState.mp > beforeMp) appendBattleLog('連撃充填 MP+1', 'player');
+            }
+            if (result.isCrit && playerState.awakenedTags?.crit) {
+              const beforeMp = playerState.mp;
+              playerState.mp = clamp(playerState.mp + 1, 0, playerState.maxMp || playerState.mp);
+              if (playerState.mp > beforeMp) appendBattleLog('会心覚醒 MP+1', 'player');
+              if (extraHitsFromAwaken < MAX_EXTRA_HITS_PER_ACTION && plannedHits < MAX_HITS_PER_ACTION) {
+                plannedHits += 1;
+                extraHitsFromAwaken += 1;
+                appendBattleLog('会心連鎖で追撃 +1', 'player');
+              }
+              if (Math.random() < 0.5) {
+                const gained = applyPoisonToEnemy(enemyState, playerState, 1);
+                if (gained > 0) appendBattleLog(`${enemyState.name}に毒 +${gained} (会心覚醒)`, 'player');
+              } else {
+                const gained = applyFireToEnemy(enemyState, playerState, 1);
+                if (gained > 0) appendBattleLog(`${enemyState.name}に炎 +${gained} (会心覚醒)`, 'player');
+              }
+            }
             flashActor(enemyActor);
             updateBattleBars(playerState, enemyState);
           }
           if (enemyState.hp <= 0) break;
-          if (hits > 1) {
+          if (plannedHits > 1) {
             const slow = takeBossSlow(enemyState, isBoss);
             await battlePacer.waitHit(slow);
           }
@@ -3831,8 +4397,15 @@
           playerState.mp = clamp(playerState.mp + action.mpGain, 0, playerState.maxMp || playerState.mp);
           if (playerState.mp !== beforeMp) updateBattleBars(playerState, enemyState);
         }
+        if (enemyState.hp > 0 && playerState.synergyPerks?.dotMultiTick && performedHits > 1 && hasDotStatus(enemyState)) {
+          const tickDamage = Math.max(1, Math.floor(((enemyState.poisonStacks || 0) + (enemyState.fireStacks || 0)) * 2));
+          applyDamageToEnemy(enemyState, tickDamage, isBoss);
+          appendBattleLog(`追撃燃焼 ${tickDamage}ダメージ`, 'player');
+          updateBattleBars(playerState, enemyState);
+          if (enemyState.hp <= 0) break;
+        }
         if (enemyState.hp > 0 && enemyState.poisonStacks > 0) {
-          const poisonDead = applyEnemyPoisonTick(enemyState, isBoss, poisonCritMultiplier);
+          const poisonDead = applyEnemyPoisonTick(enemyState, isBoss, playerState, poisonCritMultiplier);
           updateBattleBars(playerState, enemyState);
           if (poisonDead || enemyState.hp <= 0) break;
         }
@@ -3845,23 +4418,33 @@
           appendBattleLog(`${enemyState.name}は守りを固めた`, 'enemy');
         } else {
           if (action.mpCost) enemyState.mp = Math.max(0, enemyState.mp - action.mpCost);
-          const hits = action.hits || 1;
+          const hits = Math.min(MAX_HITS_PER_ACTION, action.hits || 1);
           let poisonCritMultiplier = 1;
           for (let i = 0; i < hits; i++) {
             if (checkEvasion(enemyState, playerState)) {
               appendBattleLog(`${actorLabel}は回避した`, 'player');
             } else {
-              const result = calcDamage(enemyState, playerState, action);
+              const result = calcDamage(enemyState, playerState, { ...action, comboIndex: i });
               appendBattleLog(`${enemyState.name}の${action.label}！ ${result.damage}ダメージ${result.isCrit ? ' (クリティカル)' : ''}`, 'enemy');
               if (result.isCrit) poisonCritMultiplier = result.critMultiplier;
               const damageResult = applyDamageToPlayer(playerState, result.damage);
               if (damageResult.absorbed > 0) {
                 appendBattleLog(`シールドが${damageResult.absorbed}防いだ`, 'player');
               }
-              if (damageResult.taken > 0 && playerState.skills?.reflect) {
-                const reflectDamage = Math.max(1, Math.floor(damageResult.taken * 0.1));
+              if (damageResult.taken > 0 && playerState.awakenedTags?.guard) {
+                const shieldGain = Math.max(1, Math.floor(damageResult.taken * AWAKEN_GUARD_SHIELD_RATE));
+                playerState.shield = (playerState.shield || 0) + shieldGain;
+                appendBattleLog(`防御覚醒 シールド +${shieldGain}`, 'player');
+              }
+              const reflectRate = getReflectRate(playerState);
+              if (damageResult.taken > 0 && reflectRate > 0) {
+                const reflectDamage = Math.max(1, Math.floor(damageResult.taken * reflectRate));
                 applyDamageToEnemy(enemyState, reflectDamage, isBoss);
                 appendBattleLog(`反射 ${reflectDamage}ダメージ`, 'player');
+                if (playerState.synergyPerks?.guardDotThorn) {
+                  const gained = applyPoisonToEnemy(enemyState, playerState, 1);
+                  if (gained > 0) appendBattleLog(`${enemyState.name}に毒 +${gained} (毒棘反射)`, 'player');
+                }
               }
               flashActor(playerActor);
               updateBattleBars(playerState, enemyState);
@@ -3874,13 +4457,13 @@
             }
           }
           if (enemyState.hp > 0 && enemyState.poisonStacks > 0) {
-            const poisonDead = applyEnemyPoisonTick(enemyState, isBoss, poisonCritMultiplier);
+            const poisonDead = applyEnemyPoisonTick(enemyState, isBoss, playerState, poisonCritMultiplier);
             updateBattleBars(playerState, enemyState);
             if (poisonDead || enemyState.hp <= 0) break;
           }
         }
         if (action.type === 'guard' && enemyState.hp > 0 && enemyState.poisonStacks > 0) {
-          const poisonDead = applyEnemyPoisonTick(enemyState, isBoss, 1);
+          const poisonDead = applyEnemyPoisonTick(enemyState, isBoss, playerState, 1);
           updateBattleBars(playerState, enemyState);
           if (poisonDead || enemyState.hp <= 0) break;
         }
@@ -4324,21 +4907,35 @@
     player.gearInventory = [];
     player.skills = {};
     player.shield = 0;
-    player.doubleStatsCount = 0;
+    player.tagCounts = createTagCounter();
+    player.awakenedTags = {};
+    player.synergyTaken = {};
+    player.synergyPerks = {};
+    player.statTilesCollected = 0;
     player.hasKey = false;
     treasureOpenedCount = 0;
+    pendingSynergyQueue = [];
+    activeChoiceContext = null;
+    skillChoiceResolver = null;
     player.poisonStacks = 0;
     player.poisonSteps = 0;
     selectedGearId = null;
     selectedSkillId = null;
     gameOver = false;
     battleActive = false;
+    isChoosingSkill = false;
     isMoving = false;
     moveAnim = null;
     playerFacing = 'down';
     lastBossLevel = 0;
     resultOverlay.classList.remove('is-open');
     battleOverlay.classList.remove('is-open');
+    if (skillChoiceOverlay) {
+      skillChoiceOverlay.classList.remove('is-open');
+      skillChoiceOverlay.setAttribute('aria-hidden', 'true');
+    }
+    setChoiceOverlayText(DEFAULT_CHOICE_TITLE, DEFAULT_CHOICE_SUBTITLE);
+    updateSkillRerollState();
     if (footerLog) footerLog.innerHTML = '';
     if (sheetLog) sheetLog.innerHTML = '';
     buildMap();
