@@ -210,7 +210,8 @@ body.is-playing {
   max-width: 520px;
   margin: 0 auto;
   flex: 1 1 100%;
-  min-height: 90px;
+  min-height: clamp(48px, 9vw, 60px);
+  height: clamp(48px, 9vw, 60px);
 }
 
 .difficulty-ad ins.adsbygoogle,
@@ -219,19 +220,22 @@ body.is-playing {
   display: block;
   width: 100% !important;
   max-width: 100% !important;
-  min-height: 90px;
+  min-height: clamp(48px, 9vw, 60px);
+  height: clamp(48px, 9vw, 60px);
   overflow: hidden;
 }
 
 .game-ad {
-  width: min(720px, calc(100vw - var(--safe-left) - var(--safe-right) - 16px));
+  width: min(100%, 720px);
   max-width: 100%;
   min-height: clamp(48px, 9vw, 60px);
+  height: clamp(48px, 9vw, 60px);
   padding: 0.35rem 0.5rem;
 }
 
 .game-ad ins.adsbygoogle {
   min-height: clamp(48px, 9vw, 60px);
+  height: clamp(48px, 9vw, 60px);
 }
 
 .difficulty-ad__label {
@@ -378,7 +382,7 @@ body.is-playing {
   align-items: center;
   justify-content: center;
   padding: 0.8rem;
-  min-height: 110px;
+  min-height: clamp(48px, 9vw, 60px);
   cursor: default;
 }
 
@@ -394,7 +398,8 @@ body.is-playing {
   display: block;
   width: 100% !important;
   max-width: 100% !important;
-  min-height: 90px;
+  min-height: clamp(48px, 9vw, 60px);
+  height: clamp(48px, 9vw, 60px);
   overflow: hidden;
 }
 
@@ -1093,12 +1098,14 @@ body.is-playing {
   }
 
   .puzzle-ad-slot ins.adsbygoogle {
-    min-height: 90px;
+    min-height: clamp(48px, 9vw, 60px);
+    height: clamp(48px, 9vw, 60px);
   }
 
   .difficulty-ad ins.adsbygoogle,
   .start-ad ins.adsbygoogle {
-    min-height: 90px;
+    min-height: clamp(48px, 9vw, 60px);
+    height: clamp(48px, 9vw, 60px);
   }
 
   .game-ad ins.adsbygoogle {
