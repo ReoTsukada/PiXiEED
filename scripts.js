@@ -188,8 +188,8 @@
       style.id = STYLE_ID;
       style.textContent = `
         .ad-footer{
-          width:100%;
-          max-width:520px;
+          width:min(720px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 16px));
+          max-width:100%;
           padding:8px 0 calc(8px + env(safe-area-inset-bottom, 0px));
           box-sizing:border-box;
           display:flex;
@@ -198,13 +198,13 @@
           align-items:center;
           background:rgba(0,0,0,0.6);
           border-top:1px solid rgba(255,255,255,0.08);
-          min-height:60px;
+          min-height:clamp(48px, 9vw, 60px);
         }
         .ad-footer ins{
           display:block;
-          width:min(320px, 100%);
-          max-width:320px;
-          min-height:60px;
+          width:100%;
+          max-width:100%;
+          min-height:clamp(48px, 9vw, 60px);
           overflow:hidden;
         }
       `;
