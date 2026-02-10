@@ -405,7 +405,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    width: min(720px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 16px));
+    width: min(100%, 720px);
     margin: 0 auto;
     padding: 4px 0 calc(6px + var(--safe-bottom, 0px));
     box-sizing: border-box;
@@ -421,6 +421,7 @@
     width: 100%;
     max-width: 100%;
     min-height: clamp(48px, 9vw, 60px);
+    height: clamp(48px, 9vw, 60px);
     overflow: hidden;
   }
   .adsbygoogle,
@@ -1203,6 +1204,13 @@
   const BATTLE_PACE_MAX_DELAY = 900;
   const BATTLE_SLOW_BOOST = 1.25;
   const BATTLE_LOG_REVEAL_MS = 80;
+  const MIMIC_TILE_ANIM_FRAME_MS = 180;
+  const MIMIC_TILE_ANIM_PATHS = [
+    './14animation1.png',
+    './14animation2.png',
+    './14animation3.png',
+    './14animation4.png'
+  ];
   const PLAYER_ATTACK_MP_GAIN = 1;
   const PLAYER_ACTIVE_SKILL_CHANCE = 0.35;
   const PLAYER_ACTIVE_SKILL = { type: 'magic', label: '魔王の魔法', power: 1.25, ignoreDef: true, mpCost: 2 };
@@ -1415,6 +1423,15 @@
       if (tileSize) renderMap();
     };
     tileSprites[id] = img;
+  });
+  const mimicTileAnimSprites = MIMIC_TILE_ANIM_PATHS.map((src) => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = src;
+    img.onload = () => {
+      if (tileSize) renderMap();
+    };
+    return img;
   });
 
   const tileBaseSpriteMap = {
@@ -2788,6 +2805,17 @@
     renderMap();
   }
 
+  function startMimicTileAnimationLoop() {
+    if (mimicTileAnimTimer || !mimicTileAnimSprites.length) return;
+    mimicTileAnimTimer = setInterval(() => {
+      if (document.hidden) return;
+      mimicTileAnimFrame = (mimicTileAnimFrame + 1) % mimicTileAnimSprites.length;
+      if (!tileSize) return;
+      if (isMoving || battleActive || gameOver || isChoosingSkill) return;
+      renderMap();
+    }, MIMIC_TILE_ANIM_FRAME_MS);
+  }
+
   function getCamera() {
     const half = Math.floor(viewTiles / 2);
     const maxX = MAP_SIZE - viewTiles;
@@ -2865,6 +2893,18 @@
     }
   }
 
+  function resolveOverlaySprite(overlayKey) {
+    if (!overlayKey) return null;
+    if (overlayKey === 'tile14' && mimicTileAnimSprites.length) {
+      const idx = mimicTileAnimFrame % mimicTileAnimSprites.length;
+      const frameSprite = mimicTileAnimSprites[idx];
+      if (frameSprite && frameSprite.complete && frameSprite.naturalWidth) {
+        return frameSprite;
+      }
+    }
+    return tileSprites[overlayKey] || null;
+  }
+
   function drawTile(x, y, tileId, isVisited, enemy, skillId, mimicRevealed) {
     const tile = TILE_TYPES[tileId] || TILE_TYPES.empty;
     const baseSpriteKey = Object.prototype.hasOwnProperty.call(tileBaseSpriteMap, tileId)
@@ -2878,7 +2918,7 @@
     if (tileId === 'mimic' && !mimicRevealed) {
       overlayKey = tileOverlaySpriteMap.treasure || overlayKey;
     }
-    const overlaySprite = overlayKey ? tileSprites[overlayKey] : null;
+    const overlaySprite = resolveOverlaySprite(overlayKey);
     ctx.fillStyle = tile.color;
     ctx.fillRect(x, y, tileSize, tileSize);
     if (baseSprite && baseSprite.complete && baseSprite.naturalWidth) {
@@ -3306,6 +3346,8 @@
   let routeLogQueue = [];
   let routeLogBusy = false;
   let routeLogTimer = null;
+  let mimicTileAnimFrame = 0;
+  let mimicTileAnimTimer = null;
 
   function getSkillMainTag(skill) {
     const tags = Array.isArray(skill?.tags) ? skill.tags : [];
@@ -5991,6 +6033,7 @@
   mapCanvas.addEventListener('pointerdown', handleMapClick, { passive: false });
   scheduleScoreQueueFlush();
   flushScoreQueue().catch(err => console.warn('score queue flush failed', err));
+  startMimicTileAnimationLoop();
 
   buildMap();
   updateViewToggleLabel();
