@@ -25,6 +25,11 @@
       -webkit-user-select:none;
       -ms-user-select:none;
     }
+    html,
+    body{
+      max-width:100vw;
+      overflow-x:hidden;
+    }
     body{
       margin:0;
       font-family:'Fredoka','DotGothic16',system-ui,sans-serif;
@@ -34,10 +39,18 @@
       color:#e5e7eb;
       min-height:100vh;
       padding:20px 14px 120px;
+      width:100%;
+      max-width:100vw;
       display:flex;
       justify-content:center;
     }
-    .page{ width:100%; max-width:none; display:grid; gap:16px; }
+    .page{
+      width:100%;
+      max-width:min(1200px, 100vw);
+      min-width:0;
+      display:grid;
+      gap:16px;
+    }
     header{
       position:sticky;
       top:0;
@@ -325,7 +338,19 @@
       gap:10px;
       margin-top:10px;
     }
+    .meta-main{
+      min-width:0;
+      display:grid;
+      gap:2px;
+    }
     .title{ font-size:18px; font-weight:800; margin:0; }
+    .author-row{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+      min-height:18px;
+    }
     .author{ margin:0; color:#cbd5e1; font-size:13px; }
     .author a{
       color:inherit;
@@ -349,9 +374,16 @@
       gap:6px;
       min-height:24px;
     }
-    .tag-empty{
-      font-size:12px;
-      color:#94a3b8;
+    .tag-view--inline{
+      min-height:0;
+      gap:4px;
+    }
+    .tag-view--inline:empty{
+      display:none;
+    }
+    .tag-view--inline .tag-chip{
+      padding:2px 7px;
+      font-size:10px;
     }
     .tag-chip{
       display:inline-flex;
@@ -381,7 +413,6 @@
       flex:1;
       min-width:0;
     }
-    .tag-add-btn,
     .tag-save{
       border:1px solid rgba(255,255,255,0.2);
       background:rgba(255,255,255,0.08);
@@ -398,36 +429,36 @@
       margin-top:10px;
       padding-top:10px;
       border-top:1px solid rgba(255,255,255,0.08);
-      justify-items:start;
+    }
+    .download-row{
+      width:100%;
+      display:grid;
+      grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto;
+      gap:8px;
+      align-items:center;
+    }
+    .download-options{
+      display:grid;
+      gap:6px;
+      min-width:0;
     }
     .download-editor .toggle{
       display:grid;
       grid-template-columns: 20px minmax(0, 1fr);
-      align-items:start;
+      align-items:center;
       column-gap:8px;
-      row-gap:4px;
       font-size:13px;
       color:#cbd5e1;
       font-weight:700;
       width:100%;
-      justify-content:flex-start;
     }
     .download-editor .toggle input{
-      margin:2px 0 0;
+      margin:0;
     }
     .download-editor .toggle span{
       line-height:1.4;
     }
-    .download-passcode{
-      display:grid;
-      gap:6px;
-      justify-items:start;
-    }
-    .download-passcode .toggle{
-      width:100%;
-      justify-content:flex-start;
-    }
-    .download-passcode input{
+    .download-pass-input{
       width:100%;
       border-radius:10px;
       border:1px solid rgba(255,255,255,0.18);
@@ -436,6 +467,16 @@
       padding:8px 10px;
       font-size:13px;
       font-family:inherit;
+    }
+    .download-pass-input:disabled{
+      opacity:0.6;
+      cursor:not-allowed;
+    }
+    .download-editor .toggle input:disabled + span{
+      opacity:0.6;
+    }
+    .download-row .tag-save{
+      align-self:center;
     }
     .download-helper{
       margin:0;
@@ -516,7 +557,15 @@
     .entry-like{ color:#fbbf24; font-weight:800; }
     .entry-author{ margin:0; color:#cbd5e1; font-size:12px; }
     .empty{ color:#cbd5e1; text-align:center; margin:8px 0 0; }
-    .status{ color:#fef3c7; font-size:12px; min-height:18px; }
+    .status{
+      margin:0;
+      color:#fef3c7;
+      font-size:12px;
+      min-height:18px;
+    }
+    .status:empty{
+      display:none;
+    }
     .entry-card.entry-card--ad{
       display:flex;
       align-items:center;
@@ -524,7 +573,7 @@
       text-align:center;
       flex-direction:column;
       aspect-ratio:auto;
-      min-height:110px;
+      min-height:clamp(48px, 9vw, 60px);
       gap:10px;
       width:100%;
       max-width:100%;
@@ -535,14 +584,19 @@
       position:relative;
     }
     .entry-ad-slot{
-      width:100%;
+      width:min(100%, 720px);
       max-width:100%;
       min-width:0;
+      margin:0 auto;
     }
     .entry-ad-slot ins{
       display:block;
       width:100%;
-      min-height:90px;
+      max-width:100%;
+      min-width:0;
+      min-height:clamp(48px, 9vw, 60px);
+      height:clamp(48px, 9vw, 60px);
+      margin:0 auto;
       overflow:hidden;
     }
     .entry-ad-note{
@@ -551,7 +605,10 @@
       font-size:11px;
     }
     @media(max-width:640px){
-      .entry-ad-slot ins{ min-height:90px; }
+      .entry-ad-slot ins{
+        min-height:clamp(48px, 9vw, 60px);
+        height:clamp(48px, 9vw, 60px);
+      }
     }
     .load-more{
       display:flex;
@@ -739,42 +796,44 @@
         <button class="heart-btn" id="heroLike" aria-label="いいね"><img id="heroLikeIcon" alt="like icon"/></button>
       </div>
       <div class="meta">
-        <div>
+        <div class="meta-main">
           <p class="title" id="heroTitle">タイトル</p>
-          <p class="author" id="heroAuthor">by ???</p>
+          <div class="author-row">
+            <p class="author" id="heroAuthor">by ???</p>
+            <div class="tag-view tag-view--inline" id="tagView"></div>
+          </div>
         </div>
         <span class="likes" id="heroLikes">0</span>
       </div>
       <div class="tag-block">
-        <p class="tag-label">タグ</p>
-        <div class="tag-view" id="tagView"></div>
-      <div class="tag-editor" id="tagEditor" style="display:none;">
-        <div class="tag-input">
-          <input id="tagEditInput" type="text" placeholder="タグを追加（例: 花, 草）" maxlength="24"/>
-          <button class="tag-add-btn" id="tagAddBtn" type="button">追加</button>
+        <div class="tag-editor" id="tagEditor" style="display:none;">
+          <div class="tag-input">
+            <input id="tagEditInput" type="text" placeholder="タグを追加（Enterで追加）" maxlength="24"/>
+            <button class="tag-save" id="tagSaveBtn" type="button">保存</button>
+          </div>
+          <div class="tag-view" id="tagEditList"></div>
+          <p class="status" id="tagStatus"></p>
         </div>
-        <div class="tag-view" id="tagEditList"></div>
-        <button class="tag-save" id="tagSaveBtn" type="button">タグを保存</button>
-        <p class="status" id="tagStatus"></p>
-      </div>
-      <div class="download-editor" id="downloadEditor" style="display:none;">
-        <p class="tag-label">ダウンロード設定</p>
-        <label class="toggle">
-          <input id="downloadAllowToggle" type="checkbox"/>
-          <span>ダウンロードを許可</span>
-        </label>
-        <div class="download-passcode" id="downloadPassWrap" hidden>
-          <label class="toggle">
-            <input id="downloadPassToggle" type="checkbox"/>
-            <span>パスコードを設定</span>
-          </label>
-          <input id="downloadPassInput" type="text" placeholder="パスコード（4〜12文字）" maxlength="12"/>
+        <div class="download-editor" id="downloadEditor" style="display:none;">
+          <p class="tag-label">ダウンロード設定</p>
+          <div class="download-row">
+            <div class="download-options">
+              <label class="toggle">
+                <input id="downloadAllowToggle" type="checkbox"/>
+                <span>ダウンロードを許可</span>
+              </label>
+              <label class="toggle">
+                <input id="downloadPassToggle" type="checkbox"/>
+                <span>パスコードを設定</span>
+              </label>
+            </div>
+            <input class="download-pass-input" id="downloadPassInput" type="text" placeholder="パスコード（4〜12文字）" maxlength="12"/>
+            <button class="tag-save" id="downloadSaveBtn" type="button">保存</button>
+          </div>
           <p class="download-helper">英数字のみ</p>
+          <p class="status" id="downloadStatus"></p>
         </div>
-        <button class="tag-save" id="downloadSaveBtn" type="button">保存</button>
-        <p class="status" id="downloadStatus"></p>
       </div>
-    </div>
       <div class="action-links" id="actionLinks">
         <a class="action-btn action-btn--play is-disabled" id="pixfindPlay" aria-disabled="true" role="button">PiXFiNDで遊ぶ</a>
         <button class="action-btn action-btn--download is-disabled" id="downloadButton" type="button" disabled>ダウンロード</button>
@@ -877,13 +936,11 @@
     const TAG_INPUT_ID = 'tagEditInput';
     const TAG_LIST_ID = 'tagEditList';
     const TAG_VIEW_ID = 'tagView';
-    const TAG_ADD_BTN_ID = 'tagAddBtn';
     const TAG_SAVE_BTN_ID = 'tagSaveBtn';
     const TAG_STATUS_ID = 'tagStatus';
     const DOWNLOAD_ALLOW_ID = 'downloadAllowToggle';
     const DOWNLOAD_PASS_TOGGLE_ID = 'downloadPassToggle';
     const DOWNLOAD_PASS_INPUT_ID = 'downloadPassInput';
-    const DOWNLOAD_PASS_WRAP_ID = 'downloadPassWrap';
     const DOWNLOAD_SAVE_BTN_ID = 'downloadSaveBtn';
     const DOWNLOAD_STATUS_ID = 'downloadStatus';
     const SAMPLE_COLORS = ['#7dd3fc','#f472b6','#facc15','#34d399','#c084fc','#60a5fa','#f59e0b','#a3e635','#f43f5e','#38bdf8'];
@@ -1080,13 +1137,7 @@
       const view = $(TAG_VIEW_ID);
       if(!view) return;
       view.innerHTML = '';
-      if(!tags.length){
-        const empty = document.createElement('span');
-        empty.className = 'tag-empty';
-        empty.textContent = 'タグなし';
-        view.appendChild(empty);
-        return;
-      }
+      if(!tags.length) return;
       tags.forEach(tag => {
         const chip = document.createElement('span');
         chip.className = 'tag-chip';
@@ -1124,11 +1175,14 @@
     function updateDownloadEditorUI(){
       const allowToggle = $(DOWNLOAD_ALLOW_ID);
       const passToggle = $(DOWNLOAD_PASS_TOGGLE_ID);
-      const passWrap = $(DOWNLOAD_PASS_WRAP_ID);
-      if(!allowToggle || !passToggle || !passWrap) return;
+      const passInput = $(DOWNLOAD_PASS_INPUT_ID);
+      if(!allowToggle || !passToggle || !passInput) return;
       const allow = allowToggle.checked;
-      const requirePass = passToggle.checked;
-      passWrap.hidden = !(allow && requirePass);
+      if(!allow){
+        passToggle.checked = false;
+      }
+      passToggle.disabled = !allow;
+      passInput.disabled = !(allow && passToggle.checked);
     }
 
     function renderDownloadEditor(){
@@ -1143,7 +1197,7 @@
       const allow = isDownloadAllowed(entry.allow_download);
       const passcode = String(entry.download_passcode || '');
       if(allowToggle) allowToggle.checked = allow;
-      if(passToggle) passToggle.checked = Boolean(passcode);
+      if(passToggle) passToggle.checked = allow && Boolean(passcode);
       if(passInput) passInput.value = passcode;
       updateDownloadEditorUI();
     }
@@ -1242,6 +1296,7 @@
         setTagStatus('この作品は編集できません');
         return;
       }
+      addTagsFromInput();
       const tags = editTags.slice(0, MAX_TAGS);
       const payload = { tags: tags.length ? tags.join(',') : null };
       const eq = { id: entry.id };
@@ -1268,7 +1323,6 @@
 
     function setupTagEditor(){
       const input = $(TAG_INPUT_ID);
-      const addBtn = $(TAG_ADD_BTN_ID);
       const saveBtn = $(TAG_SAVE_BTN_ID);
       if(input){
         input.addEventListener('keydown', (e) => {
@@ -1278,7 +1332,6 @@
           }
         });
       }
-      if(addBtn) addBtn.addEventListener('click', addTagsFromInput);
       if(saveBtn) saveBtn.addEventListener('click', saveTags);
     }
 
