@@ -16,6 +16,7 @@
 <meta content="PiXiEEDraw" name="twitter:title"/>
 <meta content="ブラウザから直接操作できるピクセルアートエディター PiXiEEDraw" name="twitter:description"/>
 <meta content="https://pixieed.jp/pixiedraw/ogp-app.png" name="twitter:image"/>
+<script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
 <!-- Google tag (gtag.js) -->
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
 <script>
@@ -42,32 +43,8 @@
 
 
 <link href="assets/css/style.css" rel="stylesheet"/>
-<script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
-<style id="ads-safe">
-  html, body {
-    max-width: 100vw;
-    overflow-x: hidden;
-  }
-  .adsbygoogle,
-  ins.adsbygoogle {
-    display: block !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    margin: 0 auto;
-    box-sizing: border-box;
-    overflow: hidden;
-  }
-  .adsbygoogle iframe,
-  ins.adsbygoogle iframe {
-    display: block;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-  }
-</style>
   <style id="interaction-guard">
     * {
       -webkit-touch-callout: none;
@@ -92,152 +69,6 @@
       event.preventDefault();
     });
   </script>
-  <script id="ads-lazy">
-  (function() {
-    if (window.pixieedObserveAds) return;
-
-    const SLOT_SEQUENCE = ['2141591954','9073878884','2261515379'];
-    const SLOT_KEY = 'pixieedAdSlotIndex';
-    let slotIndex = 0;
-
-    const readSlotIndex = () => {
-      try {
-        const stored = sessionStorage.getItem(SLOT_KEY);
-        if (stored !== null) slotIndex = Number(stored) || 0;
-      } catch (err) {}
-    };
-
-    const storeSlotIndex = () => {
-      try {
-        sessionStorage.setItem(SLOT_KEY, String(slotIndex));
-      } catch (err) {}
-    };
-
-    readSlotIndex();
-
-    const nextSlot = () => {
-      if (!SLOT_SEQUENCE.length) return '';
-      const slot = SLOT_SEQUENCE[slotIndex % SLOT_SEQUENCE.length];
-      slotIndex += 1;
-      storeSlotIndex();
-      return slot;
-    };
-
-    const assignSlot = (ins) => {
-      if (!ins || !(ins instanceof HTMLElement)) return;
-      if (ins.dataset.adSlotAssigned === '1') return;
-      if (ins.dataset.adStatic === '1') {
-        ins.dataset.adSlotAssigned = '1';
-        return;
-      }
-      const slot = nextSlot();
-      if (slot) {
-        ins.setAttribute('data-ad-slot', slot);
-      }
-      ins.dataset.adSlotAssigned = '1';
-    };
-
-    const pending = [];
-    const hasObserverSupport = 'IntersectionObserver' in window;
-    let observer = null;
-
-    const isLoaded = (ins) => (
-      ins.dataset.adsLazyLoaded === '1' ||
-      ins.getAttribute('data-adsbygoogle-status') === 'done' ||
-      ins.getAttribute('data-ad-status') === 'filled'
-    );
-
-    const loadAd = (ins) => {
-      if (!ins || !(ins instanceof HTMLElement)) return;
-      if (isLoaded(ins)) return;
-      assignSlot(ins);
-      ins.dataset.adsLazyLoaded = '1';
-      try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-      } catch (err) {
-        ins.dataset.adsLazyLoaded = '';
-      }
-    };
-
-    const observeAd = (ins) => {
-      if (!ins || !(ins instanceof HTMLElement)) return;
-      if (ins.dataset.adsLazyObserved === '1') return;
-      if (isLoaded(ins)) return;
-      ins.dataset.adsLazyObserved = '1';
-      if (!observer) {
-        if (!hasObserverSupport) {
-          loadAd(ins);
-        } else {
-          pending.push(ins);
-        }
-        return;
-      }
-      observer.observe(ins);
-    };
-
-    const observeAds = (root) => {
-      const scope = root && root.querySelectorAll ? root : document;
-      scope.querySelectorAll('ins.adsbygoogle').forEach(observeAd);
-    };
-
-    window.pixieedObserveAds = observeAds;
-
-    const setupObserver = () => {
-      if (hasObserverSupport) {
-        observer = new IntersectionObserver((entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting || entry.intersectionRatio > 0) {
-              const target = entry.target;
-              if (observer) observer.unobserve(target);
-              loadAd(target);
-            }
-          });
-        }, { rootMargin: '0px', threshold: 0.1 });
-      }
-      const queued = pending.splice(0);
-      queued.forEach((ins) => {
-        if (observer) {
-          observer.observe(ins);
-        } else {
-          loadAd(ins);
-        }
-      });
-      observeAds(document);
-    };
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', setupObserver);
-    } else {
-      setupObserver();
-    }
-
-    const mo = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          if (!(node instanceof HTMLElement)) return;
-          if (node.matches && node.matches('ins.adsbygoogle')) {
-            observeAd(node);
-            return;
-          }
-          if (node.querySelectorAll) {
-            node.querySelectorAll('ins.adsbygoogle').forEach(observeAd);
-          }
-        });
-      });
-    });
-
-    const startObserver = () => {
-      if (!document.body) return;
-      mo.observe(document.body, { childList: true, subtree: true });
-    };
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', startObserver);
-    } else {
-      startObserver();
-    }
-  })();
-</script>
 </head>
 <body>
 <div class="app" id="appRoot">
@@ -260,12 +91,6 @@
 </div>
 </div>
 </div>
-<header aria-label="広告バナー" class="app-banner">
-<ins class="adsbygoogle"
-     style="display:block"
-     data-ad-client="ca-pub-9801602250480253"
-     data-ad-slot="2141591954"></ins>
-</header>
 <div class="mobile-topbar" hidden="" id="mobileTopBar">
 <div class="mobile-topbar__inner">
 <div aria-label="モバイル操作パネル" class="mobile-tabs" role="tablist">
@@ -295,18 +120,19 @@
 </div>
 </div>
 <div class="layout" id="appLayout">
-<aside aria-label="ツールとカラー設定" class="rail rail--left" data-collapsed="false" id="leftRail">
+<aside aria-label="ツールとカラー設定" class="rail rail--left" data-collapsed="false" data-compact="true" id="leftRail">
 <div aria-label="左パネル切替" class="rail-tabs" id="leftRailTabs" role="tablist">
-<button aria-controls="panelTools" aria-label="ツール" aria-selected="true" class="rail-tab is-active" data-left-tab="tools" role="tab" type="button">
+<button aria-controls="panelTools" aria-label="ツール" aria-selected="true" class="rail-tab is-active" data-left-tab="tools" role="tab" title="ツール" type="button">
 <span class="tab-icon-container" id="toolTabIcon"></span>
 <span class="sr-only">ツール</span>
 </button>
-<button aria-controls="panelColor" aria-label="カラー" aria-selected="false" class="rail-tab" data-left-tab="color" id="leftTabColorButton" role="tab" tabindex="-1" type="button">
+<button aria-controls="panelColor" aria-label="カラー" aria-selected="false" class="rail-tab" data-left-tab="color" id="leftTabColorButton" role="tab" tabindex="-1" title="カラー" type="button">
 <span class="tab-swatch pixel-frame" id="colorTabSwatch"></span>
 <span class="sr-only">カラー</span>
 </button>
 </div>
 <div class="rail-tabpanes" id="leftRailPanes"></div>
+<button aria-label="左パネルの幅を変更" class="rail-resizer rail-resizer--left" id="resizeLeftRail" type="button"></button>
 </aside>
 <main aria-label="ドットキャンバス" class="stage" id="stage">
 <div class="stage__canvas" id="canvasViewport">
@@ -329,26 +155,25 @@
 </div>
 </div>
 <div aria-hidden="true" aria-live="polite" class="zoom-indicator" id="zoomIndicator" role="status"></div>
-<button aria-label="左パネルを表示" class="rail-toggle rail-toggle--left" id="openLeftRail" type="button">⟨</button>
-<button aria-label="右パネルを表示" class="rail-toggle rail-toggle--right" id="openRightRail" type="button">⟩</button>
 </div>
 </main>
-<aside aria-label="フレーム、レイヤー、設定、ファイル" class="rail rail--right" data-collapsed="false" id="rightRail">
+<aside aria-label="フレーム、レイヤー、設定、ファイル" class="rail rail--right" data-collapsed="false" data-compact="true" id="rightRail">
 <div aria-label="右パネル切り替え" class="rail-tabs" id="rightRailTabs" role="tablist">
-<button aria-controls="panelFrames" aria-label="フレームとレイヤー" aria-selected="true" class="rail-tab is-active" data-right-tab="frames" role="tab" type="button">
+<button aria-controls="panelFrames" aria-label="フレームとレイヤー" aria-selected="true" class="rail-tab is-active" data-right-tab="frames" role="tab" title="フレームとレイヤー" type="button">
 <img alt="" class="tab-icon" src="assets/icons/menu-frame.png"/>
 <span class="sr-only">フレームとレイヤー</span>
 </button>
-<button aria-controls="panelSettings" aria-label="設定" aria-selected="false" class="rail-tab" data-right-tab="settings" role="tab" tabindex="-1" type="button">
+<button aria-controls="panelSettings" aria-label="設定" aria-selected="false" class="rail-tab" data-right-tab="settings" role="tab" tabindex="-1" title="設定" type="button">
 <img alt="" class="tab-icon" src="assets/icons/menu-settings.svg"/>
 <span class="sr-only">設定</span>
 </button>
-<button aria-controls="panelFile" aria-label="ファイル" aria-selected="false" class="rail-tab" data-right-tab="file" role="tab" tabindex="-1" type="button">
+<button aria-controls="panelFile" aria-label="ファイル" aria-selected="false" class="rail-tab" data-right-tab="file" role="tab" tabindex="-1" title="ファイル" type="button">
 <img alt="" class="tab-icon" src="assets/icons/menu-file.svg"/>
 <span class="sr-only">ファイル</span>
 </button>
 </div>
 <div class="rail-tabpanes" id="rightRailPanes"></div>
+<button aria-label="右パネルの幅を変更" class="rail-resizer rail-resizer--right" id="resizeRightRail" type="button"></button>
 </aside>
 </div>
 <button aria-label="描画ボタン" class="floating-draw-button" id="floatingDrawButton" type="button">描画</button>
@@ -364,11 +189,26 @@
 <section class="panel-section" data-section="tools" id="panelTools">
 <div class="panel-section__body">
 <div aria-label="ツールカテゴリ" class="tool-group-tabs" role="tablist">
-<button aria-selected="true" class="tool-group-button is-active" data-tool-group="selection" role="tab" type="button">範囲選択</button>
-<button aria-selected="false" class="tool-group-button" data-tool-group="pen" role="tab" type="button">ペン</button>
-<button aria-selected="false" class="tool-group-button" data-tool-group="eraser" role="tab" type="button">消しゴム</button>
-<button aria-selected="false" class="tool-group-button" data-tool-group="shape" role="tab" type="button">図形</button>
-<button aria-selected="false" class="tool-group-button" data-tool-group="fill" role="tab" type="button">塗りつぶし</button>
+<button aria-selected="true" class="tool-group-button is-active" data-tool-group="selection" role="tab" title="範囲選択" type="button">
+<img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tool-select-rect.svg" width="20"/>
+<span class="tool-group-label">範囲選択</span>
+</button>
+<button aria-selected="false" class="tool-group-button" data-tool-group="pen" role="tab" title="ペン" type="button">
+<img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tool-pen-new.svg" width="20"/>
+<span class="tool-group-label">ペン</span>
+</button>
+<button aria-selected="false" class="tool-group-button" data-tool-group="eraser" role="tab" title="消しゴム" type="button">
+<img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tool-eraser.png" width="20"/>
+<span class="tool-group-label">消しゴム</span>
+</button>
+<button aria-selected="false" class="tool-group-button" data-tool-group="shape" role="tab" title="図形" type="button">
+<img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tool-rect.svg" width="20"/>
+<span class="tool-group-label">図形</span>
+</button>
+<button aria-selected="false" class="tool-group-button" data-tool-group="fill" role="tab" title="塗りつぶし" type="button">
+<img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tool-fill.png" width="20"/>
+<span class="tool-group-label">塗りつぶし</span>
+</button>
 </div>
 <div aria-label="描画ツール" class="tool-grid" id="toolGrid" role="toolbar">
 <button aria-pressed="true" class="tool-button is-active" data-tool="pen" data-tool-group="pen" type="button">
@@ -486,14 +326,14 @@
 <div class="panel-section__body">
 <div aria-label="レイヤーとフレームのタイムライン" class="timeline-card" role="group">
 <div class="timeline-toolbar">
-<div aria-label="レイヤー操作" class="timeline-toolbar__group" role="group">
+<div aria-label="レイヤー操作" class="timeline-toolbar__group timeline-toolbar__group--layer" role="group">
 <button aria-label="レイヤーを追加" class="pixel-button pixel-frame" id="addLayer" type="button">＋</button>
 <button aria-label="レイヤーを削除" class="pixel-button pixel-frame" id="removeLayer" type="button">－</button>
 <button aria-label="選択中のレイヤーを上に移動" class="pixel-button pixel-frame" id="moveLayerUp" type="button">▼</button>
 <button aria-label="選択中のレイヤーを下に移動" class="pixel-button pixel-frame" id="moveLayerDown" type="button">▲</button>
 <span class="timeline-toolbar__label">レイヤー</span>
 </div>
-<div aria-label="フレーム操作" class="timeline-toolbar__group" role="group">
+<div aria-label="フレーム操作" class="timeline-toolbar__group timeline-toolbar__group--frame" role="group">
 <button aria-label="フレームを追加" class="pixel-button pixel-frame" id="addFrame" type="button">＋</button>
 <button aria-label="フレームを削除" class="pixel-button pixel-frame" id="removeFrame" type="button">－</button>
 <button aria-label="選択中のフレームを左に移動" class="pixel-button pixel-frame" id="moveFrameUp" type="button">◀</button>
@@ -528,9 +368,11 @@
 <div class="field-group">
 <button class="button" id="newProject" type="button">新規作成</button>
 <button class="button" id="openDocument" type="button">ファイルを開く</button>
-<button class="button" id="exportProject" type="button">保存</button>
+<button class="button" id="exportProject" type="button">出力</button>
+<p class="help-text">出力: PNG/GIF/コンテスト投稿/プロジェクト保存をまとめています。</p>
 <button class="button" id="clearCanvas" type="button">キャンバスをクリア</button>
 <button class="button" id="enableAutosave" type="button">ローカルに自動保存</button>
+<p class="help-text">自動保存はこの端末内に下書きを保存します。出力は共有・配布用です。</p>
 </div>
 <p aria-live="polite" class="help-text" id="autosaveStatus"></p>
 <div aria-live="polite" class="field memory-control" role="status">
@@ -629,11 +471,11 @@
 <dialog aria-labelledby="exportDialogTitle" class="modal" id="exportDialog">
 <form class="modal__form" id="exportDialogForm" method="dialog">
 <header class="modal__header">
-<h2 class="modal__title" id="exportDialogTitle">書き出し形式</h2>
+<h2 class="modal__title" id="exportDialogTitle">出力形式</h2>
 </header>
 <div class="modal__body">
 <div class="field field--list">
-<span>書き出し倍率</span>
+<span>出力倍率</span>
 <div class="scale-controls">
 <div class="scale-control scale-control--wide">
 <label for="exportScaleSlider">倍率 (×)</label>
@@ -648,12 +490,24 @@
 <p class="help-text"><strong>iPhoneで保存</strong> 共有 → ファイルに保存</p>
 <p class="help-text"><strong>Androidで保存</strong> 保存</p>
 </div>
-<div aria-label="書き出し形式の選択" class="export-actions" role="group">
-<button class="button button--primary" id="confirmExportPng" type="button">PNG（画像）</button>
-<button class="button button--primary" id="confirmExportGif" type="button">GIF（アニメーション）</button>
-<button class="button button--primary" id="confirmExportContest" type="button">コンテストに投稿</button>
-<button class="button button--primary" id="saveProject" type="button">プロジェクトを保存</button>
+<div aria-label="出力形式の選択" class="export-actions" role="group">
+<label class="field field--compact">
+<span>形式</span>
+<select id="exportFormat">
+<option value="png">PNG（画像）</option>
+<option value="gif">GIF（アニメーション）</option>
+<option value="contest">コンテストに投稿</option>
+<option value="project">プロジェクト（.pixieedraw）</option>
+</select>
+</label>
+<button class="button button--primary" id="confirmExport" type="button">出力</button>
 </div>
+</div>
+<div aria-label="広告" class="export-ad" id="exportAdContainer">
+<div class="export-ad__slot">
+<ins class="adsbygoogle" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="exportAdSlot" style="display:block"></ins>
+</div>
+<small class="export-ad__label">広告</small>
 </div>
 </div>
 <footer class="modal__footer">
@@ -695,11 +549,6 @@
 </footer>
 </form>
 </dialog>
-<script>
-      if (window.pixieedObserveAds) {
-        window.pixieedObserveAds();
-      }
-    </script>
 <script>
       (function preventBrowserZoom() {
         const blockedKeys = new Set(['=', '+', '-', '_', '0']);
