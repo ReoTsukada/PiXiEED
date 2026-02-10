@@ -39,6 +39,7 @@
     project_name: '魔王奪還戦'
   });
 </script>
+<script async crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
 <style>
   :root {
     color-scheme: dark;
@@ -86,7 +87,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: calc(10px + var(--safe-top)) calc(12px + var(--safe-right)) calc(14px + var(--safe-bottom)) calc(12px + var(--safe-left));
+    padding: calc(10px + var(--safe-top)) calc(12px + var(--safe-right)) calc(72px + var(--safe-bottom)) calc(12px + var(--safe-left));
   }
   a { color: inherit; text-decoration: none; }
   .game-shell {
@@ -171,7 +172,7 @@
   }
   .map-panel {
     display: grid;
-    grid-template-rows: auto auto 1fr auto;
+    grid-template-rows: auto minmax(0, 1fr);
     gap: 8px;
   }
   .map-title {
@@ -229,6 +230,23 @@
     gap: 6px;
     align-items: center;
   }
+  .hud-row--stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    align-items: stretch;
+  }
+  .hud-row--stats .hud-chip {
+    width: 100%;
+    min-width: 0;
+    justify-content: space-between;
+  }
+  .hud-row--bottom {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    align-items: stretch;
+  }
   .hud-chip {
     display: inline-flex;
     align-items: center;
@@ -241,6 +259,11 @@
     color: var(--muted);
   }
   .hud-chip strong { color: #fff; font-size: 12px; }
+  .hud-chip--coin {
+    grid-column: 1 / span 3;
+    justify-content: flex-start;
+    width: 100%;
+  }
   .hud-btn {
     margin-left: auto;
     padding: 6px 10px;
@@ -251,6 +274,15 @@
     font-size: 11px;
     cursor: pointer;
   }
+  .hud-btn--status {
+    grid-column: 4;
+    margin-left: 0;
+    width: 100%;
+    min-height: 44px;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
   .map-frame {
     background: rgba(0,0,0,0.35);
     border: 1px solid rgba(255,255,255,0.18);
@@ -258,14 +290,16 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 8px;
+    padding: 6px;
     min-height: 0;
-    width: min(100%, 60vh);
-    aspect-ratio: 1 / 1;
-    max-height: min(60vh, 540px);
-    justify-self: center;
-    align-self: center;
+    min-width: 0;
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    justify-self: stretch;
+    align-self: stretch;
     max-width: 100%;
+    overflow: hidden;
   }
   canvas {
     display: block;
@@ -364,7 +398,47 @@
   }
   .footer-log .status-log {
     min-height: 0;
-    height: clamp(60px, 10vh, 110px);
+    height: clamp(96px, 14vh, 170px);
+  }
+  .ad-footer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: min(720px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 16px));
+    margin: 0 auto;
+    padding: 4px 0 calc(6px + var(--safe-bottom, 0px));
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    background: #000;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    z-index: 30;
+    min-height: clamp(48px, 9vw, 60px);
+  }
+  .ad-footer ins {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-height: clamp(48px, 9vw, 60px);
+    overflow: hidden;
+  }
+  .adsbygoogle,
+  ins.adsbygoogle {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 auto;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .adsbygoogle iframe,
+  ins.adsbygoogle iframe {
+    display: block;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
   }
   .sheet-overlay {
     position: fixed;
@@ -380,6 +454,7 @@
   .sheet-overlay.is-open { display: flex; }
   .sheet {
     width: min(520px, 100%);
+    height: min(70vh, 560px);
     max-height: min(70vh, 560px);
     background: rgba(12, 18, 40, 0.95);
     border: 1px solid rgba(255,255,255,0.18);
@@ -446,7 +521,7 @@
   }
   .icon-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 8px;
   }
   .icon-item {
@@ -764,18 +839,81 @@
   .result-actions .btn { flex: 1 1 140px; }
   @media (max-width: 900px) {
     .main { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr); }
-    .map-panel { overflow: hidden; grid-template-rows: auto auto 1fr; }
-    .map-frame { width: auto; height: 100%; max-height: none; }
+    .map-panel { overflow: hidden; grid-template-rows: auto 1fr; }
+    .map-frame { width: 100%; height: 100%; max-height: 100%; }
     .status-panel { display: none; }
     .sheet-overlay { padding: calc(10px + var(--safe-top)) calc(10px + var(--safe-right)) calc(10px + var(--safe-bottom)) calc(10px + var(--safe-left)); }
     .legend { display: none; }
     .hud { gap: 6px; padding: 6px; }
     .hud-bars { grid-template-columns: 1fr; }
     .hud-row { gap: 4px; }
+    .hud-row--stats, .hud-row--bottom { gap: 4px; }
     .hud-chip { font-size: 10px; padding: 3px 6px; }
+    .hud-btn--status {
+      min-height: 42px;
+      font-size: 15px;
+    }
     .top-bar { flex-direction: column; align-items: stretch; }
     .top-actions { width: 100%; justify-content: flex-end; }
-    .footer-log .status-log { height: clamp(54px, 8vh, 90px); }
+    .footer-log .status-log { height: clamp(96px, 16vh, 180px); }
+  }
+  @media (max-width: 900px) and (orientation: portrait) {
+    body {
+      padding-top: calc(8px + var(--safe-top));
+      padding-left: calc(8px + var(--safe-left));
+      padding-right: calc(8px + var(--safe-right));
+      padding-bottom: calc(70px + var(--safe-bottom));
+    }
+    .game-shell {
+      gap: 8px;
+    }
+    .panel {
+      padding: 8px;
+      gap: 6px;
+    }
+    .map-panel {
+      gap: 6px;
+    }
+    .hud {
+      gap: 4px;
+      padding: 4px;
+    }
+    .hud-bars {
+      gap: 4px;
+    }
+    .hud-bar {
+      gap: 4px;
+      font-size: 11px;
+    }
+    .hud-meter {
+      height: 7px;
+    }
+    .hud-row {
+      gap: 3px;
+    }
+    .hud-row--stats, .hud-row--bottom {
+      gap: 3px;
+    }
+    .hud-chip {
+      padding: 2px 5px;
+      font-size: 9px;
+    }
+    .hud-chip strong {
+      font-size: 11px;
+    }
+    .hud-btn--status {
+      min-height: 38px;
+      font-size: 14px;
+    }
+    .footer-log {
+      padding: 6px;
+      gap: 4px;
+    }
+    .footer-log .status-log {
+      height: clamp(72px, 10vh, 120px);
+      padding: 6px;
+      font-size: 11px;
+    }
   }
 </style>
 <style id="interaction-guard">
@@ -791,9 +929,6 @@
   <div class="game-shell">
     <div class="main">
       <section class="panel map-panel">
-        <div class="map-title">
-          <h1>魔王奪還戦</h1>
-        </div>
         <div class="hud">
           <div class="hud-bars">
             <div class="hud-bar">
@@ -812,22 +947,15 @@
               <strong id="shieldShort">--</strong>
             </div>
           </div>
-          <div class="hud-row">
+          <div class="hud-row hud-row--stats">
             <span class="hud-chip">こうげき <strong id="atkShort">--</strong></span>
             <span class="hud-chip">はやさ <strong id="spdShort">--</strong></span>
             <span class="hud-chip">ぼうぎょ <strong id="defShort">--</strong></span>
             <span class="hud-chip">うん <strong id="lucShort">--</strong></span>
-            <span class="hud-chip">れべる <strong id="levelShort">--</strong></span>
-            <button class="hud-btn" id="openStatus" type="button">ステータス</button>
-            <button class="hud-btn" id="toggleView" type="button">全体表示</button>
           </div>
-          <div class="hud-row">
-            <span class="hud-chip">ぼすだめーじ <strong id="expShort">--</strong></span>
-            <span class="hud-chip">たから <strong id="itemShort">--</strong></span>
-            <span class="hud-chip"><img class="hud-icon" src="../character-dots/tyarin.png" alt="">チャリン <strong id="coinShort">--</strong></span>
-            <span class="hud-chip">ほすう <strong id="stepShort">--</strong></span>
-            <span class="hud-chip">とうばつ <strong id="killShort">--</strong></span>
-            <span class="hud-chip">どく <strong id="poisonShort">--</strong></span>
+          <div class="hud-row hud-row--bottom">
+            <span class="hud-chip hud-chip--coin"><img class="hud-icon" src="../character-dots/tyarin.png" alt="">チャリン <strong id="coinShort">--</strong></span>
+            <button class="hud-btn hud-btn--status" id="openStatus" type="button">ステータス</button>
           </div>
         </div>
         <div class="map-frame">
@@ -858,12 +986,6 @@
     </div>
 
     <div class="panel footer-log">
-      <div class="footer-log__head">
-        <div class="footer-log__title">ログ</div>
-        <div class="footer-log__actions">
-          <button class="btn" id="resetRun">最初から</button>
-        </div>
-      </div>
       <div class="status-log" id="footerLog"></div>
     </div>
 
@@ -981,6 +1103,13 @@
     </div>
   </div>
 
+  <div class="ad-footer">
+    <ins class="adsbygoogle"
+         style="display:block"
+         data-ad-client="ca-pub-9801602250480253"
+         data-ad-slot="2141591954"></ins>
+  </div>
+
 <script>
 (() => {
   const MAP_SIZE = 9;
@@ -1047,11 +1176,17 @@
     monster: '敵'
   };
   const BLOCKING_TILE_IDS = new Set(['wall']);
-  const TRAIL_IMMUNE_TILE_IDS = new Set(['wall', 'start', 'boss', 'mimic', 'warp']);
+  const TRAIL_IMMUNE_TILE_IDS = new Set(['wall', 'start', 'boss', 'mimic', 'warp', 'inn', 'weaponShop', 'armorShop', 'accessoryShop']);
   const BASE_PARAM_TILE_CAPS = { atk: 2, spd: 2, hp: 2, def: 1, luc: 1 };
   const BASE_PARAM_TILE_LIMIT = Object.values(BASE_PARAM_TILE_CAPS).reduce((sum, value) => sum + value, 0);
   const STAT_TILE_IDS = ['atk', 'spd', 'def', 'hp', 'luc'];
+  const TRAIL_STAT_BASE_GAINS = { atk: 1, spd: 1, def: 1, hp: 2, luc: 1 };
   const CHUNK_SIZE = 3;
+  const POISON_FILL_CHUNKS = [
+    { col: 1, row: 0 }, // 1B
+    { col: 2, row: 0 }, // 1C (右上の敵拠点側)
+    { col: 2, row: 1 }  // 2C
+  ];
   const ATTACK_TILE_MAX = 13;
   const BOSS_GROWTH = { atk: 0.2, def: 0.15, spd: 0.15, luc: 0.05, mp: 0.05 };
   const BOSS_HP_PER_LEVEL = 1;
@@ -1075,6 +1210,32 @@
   const TREASURE_TILE_COUNT = 5;
   const MAX_SKILL_COUNT = 8;
   const SKILL_REROLL_COST = 100;
+  const INN_REST_COST = 15;
+  const SHOP_BASE_COSTS = { weapon: 35, armor: 35, accessory: 45 };
+  const SHOP_COST_GROWTH = { weapon: 25, armor: 25, accessory: 30 };
+  const SHOP_VARIANTS = {
+    weapon: [
+      { id: 'iron_blade', name: '鉄刃', bonus: { atk: 3 }, costAdd: 0, iconTileKey: 'tile4' },
+      { id: 'swift_dagger', name: '疾風短剣', bonus: { atk: 1, spd: 2 }, costAdd: 5, iconTileKey: 'tile1' },
+      { id: 'war_axe', name: '戦斧', bonus: { atk: 4, def: 1 }, costAdd: 12, iconTileKey: 'tile4' },
+      { id: 'arc_gun', name: '魔弾銃', bonus: { atk: 2, luc: 2, mp: 1 }, costAdd: 10, iconTileKey: 'tile26' },
+      { id: 'dragoon_spear', name: '竜槍', bonus: { atk: 3, spd: 1, luc: 1 }, costAdd: 14, iconTileKey: 'tile4' }
+    ],
+    armor: [
+      { id: 'leather_mail', name: '革鎧', bonus: { def: 2, hp: 4 }, costAdd: 0, iconTileKey: 'tile2' },
+      { id: 'plate_mail', name: '鋼鎧', bonus: { def: 3, hp: 6 }, costAdd: 8, iconTileKey: 'tile2' },
+      { id: 'mobile_armor', name: '機動鎧', bonus: { def: 2, hp: 3, spd: 1 }, costAdd: 6, iconTileKey: 'tile1' },
+      { id: 'barrier_cloak', name: '結界衣', bonus: { def: 2, hp: 3, mp: 1, luc: 1 }, costAdd: 10, iconTileKey: 'tile27' },
+      { id: 'fortress_guard', name: '城塞装甲', bonus: { def: 4, hp: 8 }, costAdd: 16, iconTileKey: 'tile2' }
+    ],
+    accessory: [
+      { id: 'fortune_ring', name: '幸運指輪', bonus: { luc: 3 }, costAdd: 0, iconTileKey: 'tile26' },
+      { id: 'mana_charm', name: '魔力護符', bonus: { mp: 2, luc: 1 }, costAdd: 6, iconTileKey: 'tile26' },
+      { id: 'swift_charm', name: '疾風チャーム', bonus: { spd: 2, luc: 1 }, costAdd: 6, iconTileKey: 'tile1' },
+      { id: 'power_brooch', name: '剛力ブローチ', bonus: { atk: 2, luc: 1 }, costAdd: 8, iconTileKey: 'tile4' },
+      { id: 'guardian_amulet', name: '守護アミュレット', bonus: { def: 2, hp: 4, luc: 1 }, costAdd: 10, iconTileKey: 'tile2' }
+    ]
+  };
   const SKILL_DEFS = [
     { id: 'critRate', name: '狙撃眼', desc: '会心率+10%', tags: ['crit'], subTags: ['multi'] },
     { id: 'critCap', name: '臨戦感覚', desc: '会心率の上限+25%', tags: ['crit'] },
@@ -1104,7 +1265,8 @@
     { id: 'statSpd', name: '疾風結晶', desc: '習得時にはやさ+2', tags: ['stat'], subTags: ['multi'] },
     { id: 'statDef', name: '鉄壁結晶', desc: '習得時にぼうぎょ+3', tags: ['stat'] },
     { id: 'statLuc', name: '幸運結晶', desc: '習得時にうん+3', tags: ['stat'] },
-    { id: 'statHp', name: '生命結晶', desc: '習得時にたいりょく+8', tags: ['stat'] }
+    { id: 'statHp', name: '生命結晶', desc: '習得時にたいりょく+8', tags: ['stat'] },
+    { id: 'trailDouble', name: '路線倍化', desc: '路タイルの能力上昇が2倍になる', tags: ['stat'], mapOnly: true }
   ];
   const SYNERGY_DEFS = [
     {
@@ -1144,20 +1306,25 @@
     acc[skill.id] = SKILL_ICON_KEYS[index % SKILL_ICON_KEYS.length];
     return acc;
   }, {});
+  SKILL_SPRITE_KEYS.trailDouble = 'tile26';
+  const MAP_ONLY_SKILL_IDS = new Set(SKILL_DEFS.filter(skill => skill.mapOnly).map(skill => skill.id));
 
   const FIXED_MAP = [
     ['empty', 'empty', 'poison', 'empty', 'empty', 'treasure', 'empty', 'luc', 'boss'],
-    ['treasure', 'empty', 'empty', 'heal', 'empty', 'hp', 'empty', 'empty', 'empty'],
+    ['treasure', 'empty', 'key', 'heal', 'empty', 'hp', 'empty', 'wall', 'skill'],
     ['empty', 'empty', 'empty', 'treasure', 'empty', 'empty', 'warp', 'spd', 'empty'],
     ['empty', 'empty', 'empty', 'trap', 'empty', 'empty', 'empty', 'empty', 'empty'],
     ['empty', 'poison', 'def', 'empty', 'empty', 'empty', 'treasure', 'empty', 'heal'],
-    ['empty', 'empty', 'key', 'hp', 'empty', 'empty', 'atk', 'empty', 'empty'],
+    ['empty', 'weaponShop', 'empty', 'hp', 'empty', 'empty', 'atk', 'empty', 'empty'],
     ['empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'mimic', 'empty', 'empty'],
-    ['spd', 'treasure', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty'],
-    ['start', 'empty', 'atk', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty']
+    ['spd', 'treasure', 'empty', 'empty', 'armorShop', 'empty', 'empty', 'empty', 'empty'],
+    ['start', 'empty', 'atk', 'empty', 'empty', 'empty', 'accessoryShop', 'empty', 'inn']
   ];
 
   const FIXED_ENEMIES = [];
+  const FIXED_SKILL_TILES = [
+    { x: MAP_SIZE - 1, y: 1, skillId: 'trailDouble' }  // 勇者拠点の下
+  ];
 
   let fullMapView = true;
   let viewTiles = fullMapView ? MAP_SIZE : NORMAL_VIEW_TILES;
@@ -1172,9 +1339,13 @@
     luc: { id: 'luc', color: '#facc15', name: 'うん' },
     heal: { id: 'heal', color: '#10b981', name: '回復' },
     poison: { id: 'poison', color: '#a855f7', name: '毒' },
-    warp: { id: 'warp', color: '#22d3ee', name: '魔法陣' },
+    warp: { id: 'warp', color: '#9ca3af', name: '魔法陣' },
     ice: { id: 'ice', color: '#93c5fd', name: '氷' },
     key: { id: 'key', color: '#fbbf24', name: '鍵' },
+    inn: { id: 'inn', color: '#14b8a6', name: '宿屋' },
+    weaponShop: { id: 'weaponShop', color: '#dc2626', name: 'ぶきや' },
+    armorShop: { id: 'armorShop', color: '#2563eb', name: 'ぼうぐや' },
+    accessoryShop: { id: 'accessoryShop', color: '#d97706', name: 'ほうしょくや' },
     skill: { id: 'skill', color: '#f59e0b', name: 'スキル' },
     treasure: { id: 'treasure', color: '#facc15', name: '宝箱' },
     mimic: { id: 'mimic', color: '#f97316', name: '偽宝箱' },
@@ -1224,7 +1395,12 @@
     tile23: './ground-sprite-23.png',
     tile24: './ground-sprite-24.png',
     tile25: './ground-sprite-25.png',
-    tile26: './ground-sprite-26.png'
+    tile26: './ground-sprite-26.png',
+    tile27: './ground-sprite-27.png',
+    tile28: './ground-sprite-28.png',
+    tile29: './ground-sprite-29.png',
+    tile30: './ground-sprite-30.png',
+    tile31: './ground-sprite-31.png'
   };
   const SKILL_SPRITE_PATHS = Object.entries(SKILL_SPRITE_KEYS).reduce((acc, [id, key]) => {
     acc[id] = tileSpritePaths[key];
@@ -1268,7 +1444,13 @@
     treasure: 'tile12',
     heal: 'tile13',
     mimic: 'tile14',
-    trap: 'tile15'
+    trap: 'tile15',
+    warp: 'tile15',
+    ice: 'tile27',
+    key: 'tile28',
+    weaponShop: 'tile29',
+    armorShop: 'tile30',
+    accessoryShop: 'tile31'
   };
 
   const ENEMY_TYPE_LABELS = {
@@ -1548,6 +1730,7 @@
   let isChoosingSkill = false;
   let gameOver = false;
   let isMoving = false;
+  let isAutoPathMoving = false;
   let moveAnim = null;
   let playerFacing = 'down';
   let lastBossLevel = 0;
@@ -1572,6 +1755,14 @@
       acc[stat] = 0;
       return acc;
     }, {});
+  }
+
+  function createShopCounter() {
+    return { weapon: 0, armor: 0, accessory: 0 };
+  }
+
+  function createShopPurchaseState() {
+    return { weapon: false, armor: false, accessory: false };
   }
 
   const player = {
@@ -1605,6 +1796,8 @@
     statTilesCollected: 0,
     activeStatMode: null,
     trailStatCounts: createStatCounter(),
+    shopLevels: createShopCounter(),
+    shopPurchased: createShopPurchaseState(),
     poisonStacks: 0,
     poisonSteps: 0
   };
@@ -2288,6 +2481,67 @@
     return { used, total };
   }
 
+  function fillEmptyTilesInChunks(
+    grid,
+    chunkDefs,
+    fillTileId = 'poison',
+    perChunkLimit = Infinity,
+    totalLimit = Infinity
+  ) {
+    if (!Array.isArray(chunkDefs) || !chunkDefs.length) return 0;
+    let filled = 0;
+    const canPlaceWithoutAdjacentMatch = (x, y) => {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
+          if (grid[ny]?.[nx] === fillTileId) return false;
+        }
+      }
+      return true;
+    };
+    for (const { col, row } of chunkDefs) {
+      if (filled >= totalLimit) break;
+      if (!Number.isFinite(col) || !Number.isFinite(row)) continue;
+      const minX = col * CHUNK_SIZE;
+      const maxX = Math.min(MAP_SIZE - 1, minX + CHUNK_SIZE - 1);
+      const minY = row * CHUNK_SIZE;
+      const maxY = Math.min(MAP_SIZE - 1, minY + CHUNK_SIZE - 1);
+      let chunkFilled = 0;
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          if (chunkFilled >= perChunkLimit || filled >= totalLimit) break;
+          if (grid[y]?.[x] !== 'empty') continue;
+          if (!canPlaceWithoutAdjacentMatch(x, y)) continue;
+          grid[y][x] = fillTileId;
+          filled += 1;
+          chunkFilled += 1;
+        }
+        if (chunkFilled >= perChunkLimit || filled >= totalLimit) break;
+      }
+    }
+    return filled;
+  }
+
+  function clearTileTypeInChunk(grid, col, row, tileId = 'poison') {
+    if (!Number.isFinite(col) || !Number.isFinite(row)) return 0;
+    const minX = col * CHUNK_SIZE;
+    const maxX = Math.min(MAP_SIZE - 1, minX + CHUNK_SIZE - 1);
+    const minY = row * CHUNK_SIZE;
+    const maxY = Math.min(MAP_SIZE - 1, minY + CHUNK_SIZE - 1);
+    let cleared = 0;
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        if (grid[y]?.[x] !== tileId) continue;
+        grid[y][x] = 'empty';
+        cleared += 1;
+      }
+    }
+    return cleared;
+  }
+
   function assignEnemyOrder() {
     const dist = buildDistanceFromSpawn();
     const list = [];
@@ -2345,6 +2599,20 @@
       tiles[entry.y][entry.x] = 'wall';
     });
     enforceBaseParamTileCaps(tiles);
+    const bossChunkCol = Math.floor(bossPos.x / CHUNK_SIZE);
+    const bossChunkRow = Math.floor(bossPos.y / CHUNK_SIZE);
+    clearTileTypeInChunk(tiles, bossChunkCol, bossChunkRow, 'poison');
+    const poisonChunks = POISON_FILL_CHUNKS.filter(({ col, row }) => (
+      col !== bossChunkCol || row !== bossChunkRow
+    ));
+    fillEmptyTilesInChunks(tiles, poisonChunks, 'poison', 2, 4);
+    FIXED_SKILL_TILES.forEach((entry) => {
+      if (!tiles[entry.y]?.[entry.x]) return;
+      if (entry.x === spawn.x && entry.y === spawn.y) return;
+      if (entry.x === bossPos.x && entry.y === bossPos.y) return;
+      tiles[entry.y][entry.x] = 'skill';
+      if (skillTiles[entry.y]) skillTiles[entry.y][entry.x] = entry.skillId || null;
+    });
     player.x = spawn.x;
     player.y = spawn.y;
     HERO_BOSS.baseStats = { ...HERO_BOSS.stats };
@@ -2503,8 +2771,8 @@
   function resizeCanvas() {
     const frame = mapCanvas.parentElement;
     if (!frame) return;
-    const width = Math.max(0, frame.clientWidth - 16);
-    const height = Math.max(0, frame.clientHeight - 16);
+    const width = Math.max(0, frame.clientWidth - 12);
+    const height = Math.max(0, frame.clientHeight - 12);
     const minSide = Math.max(0, Math.min(width, height));
     if (!minSide) return;
     const minTileSize = fullMapView ? 2 : 12;
@@ -2576,8 +2844,20 @@
         drawBadge('鍵');
         break;
       }
-      case 'warp': {
-        drawBadge('陣', 'rgba(8, 145, 178, 0.82)');
+      case 'inn': {
+        drawBadge('宿', 'rgba(13, 148, 136, 0.82)');
+        break;
+      }
+      case 'weaponShop': {
+        drawBadge('武', 'rgba(185, 28, 28, 0.82)');
+        break;
+      }
+      case 'armorShop': {
+        drawBadge('防', 'rgba(37, 99, 235, 0.82)');
+        break;
+      }
+      case 'accessoryShop': {
+        drawBadge('飾', 'rgba(161, 98, 7, 0.86)');
         break;
       }
       default:
@@ -2612,9 +2892,12 @@
     ctx.strokeRect(x + 0.5, y + 0.5, tileSize - 1, tileSize - 1);
     if (
       tileId === 'monster'
-      || tileId === 'ice'
-      || tileId === 'key'
-      || tileId === 'warp'
+      || (tileId === 'ice' && !overlaySprite)
+      || (tileId === 'key' && !overlaySprite)
+      || tileId === 'inn'
+      || (tileId === 'weaponShop' && !overlaySprite)
+      || (tileId === 'armorShop' && !overlaySprite)
+      || (tileId === 'accessoryShop' && !overlaySprite)
       || (tileId === 'skill' && !overlaySprite)
     ) {
       drawTileIcon(tileId, x, y, enemy);
@@ -2690,16 +2973,74 @@
     drawPlayer(px, py);
   }
 
-  function addLog(text) {
-    [footerLog, sheetLog].forEach((log) => {
-      if (!log) return;
+  function clearRouteLogTyping() {
+    routeLogQueue = [];
+    routeLogBusy = false;
+    if (routeLogTimer) {
+      clearTimeout(routeLogTimer);
+      routeLogTimer = null;
+    }
+  }
+
+  function trimRouteLogNodes(log) {
+    while (log.children.length > ROUTE_LOG_MAX_LINES) {
+      log.removeChild(log.lastChild);
+    }
+  }
+
+  function processRouteLogQueue() {
+    if (!routeLogQueue.length) {
+      routeLogBusy = false;
+      routeLogTimer = null;
+      return;
+    }
+    routeLogBusy = true;
+    const text = String(routeLogQueue.shift() ?? '');
+    const chars = Array.from(text);
+    const targets = [footerLog, sheetLog].filter(Boolean);
+    if (!targets.length) {
+      routeLogBusy = false;
+      routeLogTimer = null;
+      return;
+    }
+    const lines = targets.map((log) => {
       const p = document.createElement('p');
-      p.textContent = text;
+      p.textContent = '';
       log.prepend(p);
-      while (log.children.length > 6) {
-        log.removeChild(log.lastChild);
-      }
+      trimRouteLogNodes(log);
+      return { log, p };
     });
+    let cursor = 0;
+    const typeNext = () => {
+      if (cursor >= chars.length) {
+        routeLogBusy = false;
+        routeLogTimer = null;
+        processRouteLogQueue();
+        return;
+      }
+      const ch = chars[cursor];
+      cursor += 1;
+      lines.forEach(({ log, p }) => {
+        p.textContent += ch;
+        // prependで先頭に追加しているので先頭表示を維持する
+        log.scrollTop = 0;
+      });
+      routeLogTimer = setTimeout(typeNext, ROUTE_LOG_CHAR_DELAY_MS);
+    };
+    if (!chars.length) {
+      routeLogBusy = false;
+      routeLogTimer = null;
+      processRouteLogQueue();
+      return;
+    }
+    typeNext();
+  }
+
+  function addLog(text) {
+    const message = String(text ?? '');
+    if (!message) return;
+    routeLogQueue.push(message);
+    if (!routeLogBusy) processRouteLogQueue();
   }
 
   function addCoins(amount, reason = '') {
@@ -2723,8 +3064,248 @@
     return true;
   }
 
+  function ensurePlayerShopState() {
+    if (!player.shopLevels) player.shopLevels = createShopCounter();
+    ['weapon', 'armor', 'accessory'].forEach((key) => {
+      if (!Number.isFinite(player.shopLevels[key])) player.shopLevels[key] = 0;
+    });
+    if (!player.shopPurchased) player.shopPurchased = createShopPurchaseState();
+    ['weapon', 'armor', 'accessory'].forEach((key) => {
+      if (typeof player.shopPurchased[key] !== 'boolean') player.shopPurchased[key] = false;
+    });
+  }
+
+  function getShopCost(shopKey) {
+    ensurePlayerShopState();
+    const base = SHOP_BASE_COSTS[shopKey] || 0;
+    const growth = SHOP_COST_GROWTH[shopKey] || 0;
+    const level = player.shopLevels?.[shopKey] || 0;
+    return Math.max(0, base + growth * level);
+  }
+
+  function getShopVariantCost(shopKey, variant) {
+    const add = Math.max(0, Math.floor(variant?.costAdd || 0));
+    return getShopCost(shopKey) + add;
+  }
+
+  function formatShopBonusText(bonus = {}) {
+    const order = ['atk', 'spd', 'def', 'hp', 'luc', 'mp'];
+    const labels = {
+      atk: 'こうげき',
+      spd: 'はやさ',
+      def: 'ぼうぎょ',
+      hp: 'たいりょく',
+      luc: 'うん',
+      mp: 'まりょく'
+    };
+    const parts = [];
+    order.forEach((key) => {
+      const value = Number(bonus[key] || 0);
+      if (!value) return;
+      const label = labels[key] || key;
+      parts.push(`${label}+${value}`);
+    });
+    return parts.join(' / ') || '効果なし';
+  }
+
+  function applyPermanentStatBonus(bonus = {}) {
+    const safe = {
+      atk: Math.max(0, Number(bonus.atk || 0)),
+      spd: Math.max(0, Number(bonus.spd || 0)),
+      def: Math.max(0, Number(bonus.def || 0)),
+      hp: Math.max(0, Number(bonus.hp || 0)),
+      luc: Math.max(0, Number(bonus.luc || 0)),
+      mp: Math.max(0, Number(bonus.mp || 0))
+    };
+    player.baseStats.atk += safe.atk;
+    player.baseStats.spd += safe.spd;
+    player.baseStats.def += safe.def;
+    player.baseStats.hp += safe.hp;
+    player.baseStats.luc += safe.luc;
+    player.baseStats.mp += safe.mp;
+    if (safe.hp > 0) player.hp += safe.hp;
+    if (safe.mp > 0) player.mp += safe.mp;
+    return safe;
+  }
+
+  function buyShopVariant(shopKey, shopLabel, variant) {
+    ensurePlayerShopState();
+    if (!variant) return false;
+    if (player.shopPurchased?.[shopKey]) {
+      addLog(`${shopLabel}は売り切れ`);
+      return false;
+    }
+    const cost = getShopVariantCost(shopKey, variant);
+    if (!spendCoins(cost, shopLabel)) {
+      addLog('チャリンが足りない');
+      return false;
+    }
+    player.shopLevels[shopKey] = (player.shopLevels[shopKey] || 0) + 1;
+    player.shopPurchased[shopKey] = true;
+    const applied = applyPermanentStatBonus(variant.bonus);
+    addLog(`${shopLabel}で${variant.name}を購入: ${formatShopBonusText(applied)} (この冒険中のみ)`);
+    updateStats();
+    return true;
+  }
+
+  function makeEventChoice(id, name, desc, meta = '', apply = null, iconTileKey = null) {
+    return {
+      id,
+      name,
+      desc,
+      meta,
+      apply,
+      iconTileKey,
+      choiceType: 'event',
+      tags: [],
+      subTags: []
+    };
+  }
+
+  async function openEventChoices(title, subtitle, choices) {
+    const options = Array.isArray(choices) ? choices.filter(Boolean) : [];
+    if (!options.length) return null;
+    return openSkillChoice(options, {
+      title,
+      subtitle,
+      allowReroll: false,
+      showTagGuide: false,
+      onPick: (choice) => {
+        if (typeof choice?.apply === 'function') {
+          choice.apply();
+        }
+      },
+      emptyLog: '選択肢がない'
+    });
+  }
+
+  function applyInnRest() {
+    const cost = INN_REST_COST;
+    if (!spendCoins(cost, '宿屋')) {
+      addLog('チャリンが足りない');
+      return false;
+    }
+    const hpBefore = player.hp;
+    const mpBefore = player.mp;
+    const poisonBefore = player.poisonStacks;
+    updateUnitStats(player);
+    player.hp = player.maxHp;
+    player.mp = player.maxMp;
+    player.poisonStacks = 0;
+    player.poisonSteps = 0;
+    const hpGain = Math.max(0, player.hp - hpBefore);
+    const mpGain = Math.max(0, player.mp - mpBefore);
+    if (hpGain > 0 || mpGain > 0 || poisonBefore > 0) {
+      addLog(`宿屋で休んだ: HP+${hpGain} MP+${mpGain} 毒解除`);
+    } else {
+      addLog('宿屋で休んだ (変化なし)');
+    }
+    updateStats();
+    return true;
+  }
+
+  async function handleInnEvent() {
+    const cost = INN_REST_COST;
+    await openEventChoices('宿屋', `HP/MP全回復 + 毒解除 (${cost}チャリン)`, [
+      makeEventChoice(
+        'inn_rest',
+        `休む (${cost})`,
+        '状態異常とHP/MPを全回復する',
+        '全回復',
+        () => { applyInnRest(); },
+        'tile13'
+      ),
+      makeEventChoice('inn_skip', '見送る', '今回は立ち寄らない', 'スキップ', () => {
+        addLog('宿屋を見送った');
+      }, 'tile9')
+    ]);
+  }
+
+  async function handleWeaponShopEvent() {
+    ensurePlayerShopState();
+    if (player.shopPurchased.weapon) {
+      addLog('ぶきやは売り切れ');
+      return false;
+    }
+    const purchasedBefore = player.shopPurchased.weapon;
+    const baseCost = getShopCost('weapon');
+    const choices = SHOP_VARIANTS.weapon.map((variant) => {
+      const cost = getShopVariantCost('weapon', variant);
+      return makeEventChoice(
+        `shop_weapon_${variant.id}`,
+        `${variant.name} (${cost})`,
+        formatShopBonusText(variant.bonus),
+        'この冒険中のみ',
+        () => { buyShopVariant('weapon', 'ぶきや', variant); },
+        variant.iconTileKey || 'tile4'
+      );
+    });
+    choices.push(makeEventChoice('shop_weapon_skip', '見送る', '今回は買わない', 'スキップ', () => {
+      addLog('ぶきやを見送った');
+    }, 'tile9'));
+    await openEventChoices('ぶきや', `5種類から1つ購入 (基礎${baseCost}チャリン)`, choices);
+    return !purchasedBefore && !!player.shopPurchased.weapon;
+  }
+
+  async function handleArmorShopEvent() {
+    ensurePlayerShopState();
+    if (player.shopPurchased.armor) {
+      addLog('ぼうぐやは売り切れ');
+      return false;
+    }
+    const purchasedBefore = player.shopPurchased.armor;
+    const baseCost = getShopCost('armor');
+    const choices = SHOP_VARIANTS.armor.map((variant) => {
+      const cost = getShopVariantCost('armor', variant);
+      return makeEventChoice(
+        `shop_armor_${variant.id}`,
+        `${variant.name} (${cost})`,
+        formatShopBonusText(variant.bonus),
+        'この冒険中のみ',
+        () => { buyShopVariant('armor', 'ぼうぐや', variant); },
+        variant.iconTileKey || 'tile2'
+      );
+    });
+    choices.push(makeEventChoice('shop_armor_skip', '見送る', '今回は買わない', 'スキップ', () => {
+      addLog('ぼうぐやを見送った');
+    }, 'tile9'));
+    await openEventChoices('ぼうぐや', `5種類から1つ購入 (基礎${baseCost}チャリン)`, choices);
+    return !purchasedBefore && !!player.shopPurchased.armor;
+  }
+
+  async function handleAccessoryShopEvent() {
+    ensurePlayerShopState();
+    if (player.shopPurchased.accessory) {
+      addLog('ほうしょくやは売り切れ');
+      return false;
+    }
+    const purchasedBefore = player.shopPurchased.accessory;
+    const baseCost = getShopCost('accessory');
+    const choices = SHOP_VARIANTS.accessory.map((variant) => {
+      const cost = getShopVariantCost('accessory', variant);
+      return makeEventChoice(
+        `shop_accessory_${variant.id}`,
+        `${variant.name} (${cost})`,
+        formatShopBonusText(variant.bonus),
+        'この冒険中のみ',
+        () => { buyShopVariant('accessory', 'ほうしょくや', variant); },
+        variant.iconTileKey || 'tile26'
+      );
+    });
+    choices.push(makeEventChoice('shop_accessory_skip', '見送る', '今回は買わない', 'スキップ', () => {
+      addLog('ほうしょくやを見送った');
+    }, 'tile9'));
+    await openEventChoices('ほうしょくや', `5種類から1つ購入 (基礎${baseCost}チャリン)`, choices);
+    return !purchasedBefore && !!player.shopPurchased.accessory;
+  }
+
   let selectedSkillId = null;
   let selectedGearId = null;
+  const ROUTE_LOG_MAX_LINES = 6;
+  const ROUTE_LOG_CHAR_DELAY_MS = 18;
+  let routeLogQueue = [];
+  let routeLogBusy = false;
+  let routeLogTimer = null;
 
   function getSkillMainTag(skill) {
     const tags = Array.isArray(skill?.tags) ? skill.tags : [];
@@ -3172,35 +3753,7 @@
   }
 
   function maybeLogRouteInsight(pruneSummary = null) {
-    if (!routeInsightSeen) routeInsightSeen = new Set();
-    if (pruneSummary?.removedTotal) {
-      const lossText = formatRouteFocusCounts(pruneSummary.removedCounts);
-      if (lossText !== 'なし') {
-        const lossKey = `loss:${lossText}`;
-        if (!routeInsightSeen.has(lossKey)) {
-          routeInsightSeen.add(lossKey);
-          addLog(`閃き: この一歩で閉じた道 -> ${lossText}`);
-          return;
-        }
-      }
-    }
-    const info = buildRouteStateInfo(player.x, player.y);
-    const bossBucket = info.bossDist < 0 ? 'x' : (info.bossDist <= 3 ? 'n' : (info.bossDist <= 6 ? 'm' : 'f'));
-    const stateKey = `state:${info.branchChoices}:${Math.min(4, info.itemReachable)}:${Math.min(6, info.statReachable)}:${Math.min(4, info.monsterReachable)}:${bossBucket}`;
-    if (routeInsightSeen.has(stateKey)) return;
-    let text = '';
-    if (info.branchChoices >= 3 && info.itemReachable > 0 && info.statReachable > 0) {
-      text = `分岐${info.branchChoices}。宝箱${info.itemReachable}と強化${info.statReachable}を両取りできる局面`;
-    } else if (info.branchChoices === 1 && (info.itemReachable > 0 || info.statReachable > 0)) {
-      text = `一本道。残りは宝箱${info.itemReachable}/強化${info.statReachable}の順番勝負`;
-    } else if (info.bossReachable && info.bossDist <= 3 && info.monsterReachable <= 1) {
-      text = 'ボス圏内。寄り道1回の価値を見直す局面';
-    } else if (info.itemReachable === 0 && info.statReachable >= 2 && info.branchChoices >= 2) {
-      text = `宝箱より強化優先の盤面。分岐${info.branchChoices}で最終火力を伸ばせる`;
-    }
-    if (!text) return;
-    routeInsightSeen.add(stateKey);
-    addLog(`閃き: ${text}`);
+    return;
   }
 
   function getActiveStatModeText() {
@@ -3343,7 +3896,9 @@
 
   function getTrailStatGainPerTile(statKey) {
     if (!STAT_TILE_IDS.includes(statKey)) return 0;
-    return 1;
+    let gain = TRAIL_STAT_BASE_GAINS[statKey] || 1;
+    if (player.skills?.trailDouble) gain *= 2;
+    return gain;
   }
 
   function refreshTrailStatCollected() {
@@ -3403,7 +3958,7 @@
     tiles[y][x] = statKey;
     applyTrailStatDelta(statKey, 1);
     const label = STAT_COMBO_LABELS[statKey] || statKey;
-    addLog(`${label}路 +1 (合計${player.trailStatCounts[statKey]})`);
+    addLog(`${label}路 +${getTrailStatGainPerTile(statKey)} (合計${player.trailStatCounts[statKey]})`);
   }
 
   function applyStatBoost(statKey, label) {
@@ -3517,7 +4072,8 @@
       addLog(`スキルは習得済み: ${skill.name}`);
       return false;
     }
-    if (!canLearnMoreSkills()) {
+    const bypassSkillCap = Boolean(skill.mapOnly);
+    if (!bypassSkillCap && !canLearnMoreSkills()) {
       addLog('スキル枠がいっぱい');
       return false;
     }
@@ -3567,7 +4123,7 @@
       addLog('スキル枠がいっぱい');
       return null;
     }
-    const available = SKILL_DEFS.filter(skill => !player.skills[skill.id]);
+    const available = SKILL_DEFS.filter(skill => !skill.mapOnly && !player.skills[skill.id]);
     if (!available.length) {
       addLog('スキルはもう習得できない');
       return null;
@@ -3765,7 +4321,44 @@
       tiles[y][x] = 'empty';
     } else if (tileId === 'warp') {
       warpSelectionActive = true;
+      tiles[y][x] = 'empty';
       addLog('魔法陣が起動: 転移先をクリック (現在地クリックでキャンセル)');
+      addLog('魔法陣は崩れて消えた');
+    } else if (tileId === 'inn') {
+      await handleInnEvent();
+    } else if (tileId === 'weaponShop') {
+      const purchased = await handleWeaponShopEvent();
+      if (purchased) tiles[y][x] = 'empty';
+    } else if (tileId === 'armorShop') {
+      const purchased = await handleArmorShopEvent();
+      if (purchased) tiles[y][x] = 'empty';
+    } else if (tileId === 'accessoryShop') {
+      const purchased = await handleAccessoryShopEvent();
+      if (purchased) tiles[y][x] = 'empty';
+    } else if (tileId === 'skill') {
+      const fixedSkillId = skillTiles?.[y]?.[x] || null;
+      let grantedSkill = null;
+      let consumed = false;
+      if (fixedSkillId && !player.skills?.[fixedSkillId]) {
+        const fixedSkill = SKILL_DEFS.find(entry => entry.id === fixedSkillId);
+        if (fixedSkill && learnSkill(fixedSkill)) {
+          grantedSkill = fixedSkill;
+          consumed = true;
+        }
+      }
+      if (!grantedSkill) {
+        grantedSkill = grantRandomSkill();
+        if (grantedSkill) consumed = true;
+      }
+      if (!consumed && fixedSkillId && player.skills?.[fixedSkillId]) {
+        addLog('倍化スキルは習得済み');
+        consumed = true;
+      }
+      if (consumed) {
+        if (grantedSkill) player.itemsCollected += 1;
+        tiles[y][x] = 'empty';
+        if (skillTiles[y]) skillTiles[y][x] = null;
+      }
     } else if (tileId === 'atk') {
       applyStatBoost('atk', 'こうげき');
     } else if (tileId === 'def') {
@@ -3826,6 +4419,105 @@
     return !isTileBlocked(tileId);
   }
 
+  function findAStarPath(startX, startY, goalX, goalY) {
+    if (startX === goalX && startY === goalY) return [];
+    if (!canMoveTo(goalX, goalY)) return null;
+    const size = MAP_SIZE * MAP_SIZE;
+    const toKey = (x, y) => x + y * MAP_SIZE;
+    const startKey = toKey(startX, startY);
+    const goalKey = toKey(goalX, goalY);
+    const cameFrom = new Int32Array(size);
+    const gScore = new Float32Array(size);
+    const fScore = new Float32Array(size);
+    const inOpen = new Uint8Array(size);
+    cameFrom.fill(-1);
+    gScore.fill(Infinity);
+    fScore.fill(Infinity);
+
+    const heuristic = (x, y) => Math.abs(x - goalX) + Math.abs(y - goalY);
+    const open = [startKey];
+    gScore[startKey] = 0;
+    fScore[startKey] = heuristic(startX, startY);
+    inOpen[startKey] = 1;
+    const dirs = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1]
+    ];
+
+    while (open.length) {
+      let bestIndex = 0;
+      let currentKey = open[0];
+      let bestScore = fScore[currentKey];
+      for (let i = 1; i < open.length; i++) {
+        const key = open[i];
+        const score = fScore[key];
+        if (score < bestScore) {
+          bestScore = score;
+          currentKey = key;
+          bestIndex = i;
+        }
+      }
+      open.splice(bestIndex, 1);
+      inOpen[currentKey] = 0;
+
+      if (currentKey === goalKey) {
+        const path = [];
+        let cursor = currentKey;
+        while (cursor !== -1) {
+          const x = cursor % MAP_SIZE;
+          const y = Math.floor(cursor / MAP_SIZE);
+          path.push({ x, y });
+          if (cursor === startKey) break;
+          cursor = cameFrom[cursor];
+        }
+        path.reverse();
+        path.shift();
+        return path;
+      }
+
+      const cx = currentKey % MAP_SIZE;
+      const cy = Math.floor(currentKey / MAP_SIZE);
+      for (const [dx, dy] of dirs) {
+        const nx = cx + dx;
+        const ny = cy + dy;
+        if (!canMoveTo(nx, ny)) continue;
+        const nextKey = toKey(nx, ny);
+        const tentative = gScore[currentKey] + 1;
+        if (tentative >= gScore[nextKey]) continue;
+        cameFrom[nextKey] = currentKey;
+        gScore[nextKey] = tentative;
+        fScore[nextKey] = tentative + heuristic(nx, ny);
+        if (!inOpen[nextKey]) {
+          inOpen[nextKey] = 1;
+          open.push(nextKey);
+        }
+      }
+    }
+    return null;
+  }
+
+  async function movePlayerByAStar(goalX, goalY) {
+    if (battleActive || isChoosingSkill || gameOver || isMoving || isAutoPathMoving) return;
+    isAutoPathMoving = true;
+    try {
+      const guardLimit = MAP_SIZE * MAP_SIZE * 4;
+      let guard = 0;
+      while (guard < guardLimit) {
+        guard += 1;
+        if (battleActive || isChoosingSkill || gameOver || isMoving || warpSelectionActive) break;
+        if (player.x === goalX && player.y === goalY) break;
+        const path = findAStarPath(player.x, player.y, goalX, goalY);
+        if (!path || !path.length) break;
+        const next = path[0];
+        await movePlayerTo(next.x, next.y);
+      }
+    } finally {
+      isAutoPathMoving = false;
+    }
+  }
+
   function hasAvailableMove() {
     return hasAvailableMoveAt(player.x, player.y);
   }
@@ -3871,6 +4563,7 @@
     await animateMove(targetX, targetY);
     await resolveTileEvent(targetX, targetY);
     await resolveMovementAfterLanding(0, 0, false);
+    warpSelectionActive = false;
   }
 
   function animateMove(nextX, nextY) {
@@ -3922,7 +4615,7 @@
 
   function handleMapClick(event) {
     event.preventDefault();
-    if (battleActive || isChoosingSkill || gameOver || isMoving) return;
+    if (battleActive || isChoosingSkill || gameOver || isMoving || isAutoPathMoving) return;
     const target = getMapTargetFromPointer(event);
     if (!target) return;
     const { targetX, targetY } = target;
@@ -3933,14 +4626,14 @@
         return;
       }
       if (!canMoveTo(targetX, targetY)) return;
+      warpSelectionActive = false;
       addLog(`魔法陣で転移: (${targetX + 1}, ${targetY + 1})`);
       warpPlayerTo(targetX, targetY);
       return;
     }
-    const dist = Math.abs(targetX - player.x) + Math.abs(targetY - player.y);
-    if (dist !== 1) return;
+    if (targetX === player.x && targetY === player.y) return;
     if (!canMoveTo(targetX, targetY)) return;
-    movePlayerTo(targetX, targetY);
+    movePlayerByAStar(targetX, targetY);
   }
 
   function getCritCap(attacker) {
@@ -4180,7 +4873,11 @@
   }
 
   function getLearnedSkillCount() {
-    return Object.values(player.skills || {}).filter(Boolean).length;
+    return Object.entries(player.skills || {}).reduce((count, [skillId, learned]) => {
+      if (!learned) return count;
+      if (MAP_ONLY_SKILL_IDS.has(skillId)) return count;
+      return count + 1;
+    }, 0);
   }
 
   function canLearnMoreSkills() {
@@ -4288,26 +4985,37 @@
   function renderSkillChoiceOptions(choices, onPick) {
     if (!skillChoiceList) return;
     skillChoiceList.innerHTML = '';
-    choices.forEach((skill) => {
+    choices.forEach((choice) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'choice-card';
       const icon = document.createElement('div');
       icon.className = 'choice-icon';
-      const spritePath = SKILL_SPRITE_PATHS[skill.id];
+      const spritePath = choice.iconTileKey
+        ? tileSpritePaths[choice.iconTileKey]
+        : SKILL_SPRITE_PATHS[choice.id];
       if (spritePath) icon.style.setProperty('--icon-image', `url(${spritePath})`);
       const title = document.createElement('strong');
-      title.textContent = skill.name;
+      title.textContent = choice.name;
       const desc = document.createElement('span');
-      desc.textContent = `${skill.desc || ''}`;
-      const tagMeta = document.createElement('small');
-      tagMeta.textContent = formatSkillTags(skill);
-      const gainMeta = document.createElement('small');
-      gainMeta.textContent = `取得時: ${formatSkillTagGainPreview(skill)}`;
-      btn.append(icon, title, desc, tagMeta, gainMeta);
+      desc.textContent = `${choice.desc || ''}`;
+      btn.append(icon, title, desc);
+      if (choice.choiceType === 'event') {
+        if (choice.meta) {
+          const meta = document.createElement('small');
+          meta.textContent = choice.meta;
+          btn.appendChild(meta);
+        }
+      } else {
+        const tagMeta = document.createElement('small');
+        tagMeta.textContent = formatSkillTags(choice);
+        const gainMeta = document.createElement('small');
+        gainMeta.textContent = `取得時: ${formatSkillTagGainPreview(choice)}`;
+        btn.append(tagMeta, gainMeta);
+      }
       btn.addEventListener('click', () => {
-        if (typeof onPick === 'function') onPick(skill);
-        closeSkillChoice(skill);
+        if (typeof onPick === 'function') onPick(choice);
+        closeSkillChoice(choice);
       });
       skillChoiceList.appendChild(btn);
     });
@@ -4316,7 +5024,7 @@
   function buildTreasureSkillChoices() {
     ensurePlayerProgressState();
     if (!canLearnMoreSkills()) return [];
-    const available = SKILL_DEFS.filter(skill => !player.skills[skill.id]);
+    const available = SKILL_DEFS.filter(skill => !skill.mapOnly && !player.skills[skill.id]);
     if (!available.length) return [];
     if (available.length <= 3) {
       const quick = [...available];
@@ -5205,6 +5913,8 @@
     player.statTilesCollected = 0;
     player.activeStatMode = null;
     player.trailStatCounts = createStatCounter();
+    player.shopLevels = createShopCounter();
+    player.shopPurchased = createShopPurchaseState();
     player.hasKey = false;
     treasureOpenedCount = 0;
     pendingSynergyQueue = [];
@@ -5216,6 +5926,7 @@
     selectedSkillId = null;
     gameOver = false;
     battleActive = false;
+    isAutoPathMoving = false;
     isChoosingSkill = false;
     isMoving = false;
     moveAnim = null;
@@ -5231,6 +5942,7 @@
     }
     setChoiceOverlayText(DEFAULT_CHOICE_TITLE, DEFAULT_CHOICE_SUBTITLE);
     updateSkillRerollState();
+    clearRouteLogTyping();
     if (footerLog) footerLog.innerHTML = '';
     if (sheetLog) sheetLog.innerHTML = '';
     buildMap();
@@ -5239,14 +5951,13 @@
     updateStats();
     renderMap();
     addLog('冒険を開始した');
-    addLog('マップをクリックして1マス進む');
+    addLog('マップをクリックするとA*で目的地まで移動する');
     addLog('基礎能力床: 攻2 / 速2 / 体2 / 防1 / 運1 (計8)');
     addLog('能力床を踏むとモード切替。以後の移動先がその能力床に塗り替わる');
     addLog('中央右上の魔法陣を踏むと転移モードになる(現在地クリックで解除)');
     maybeLogRouteInsight();
   }
 
-  document.getElementById('resetRun').addEventListener('click', resetGame);
   document.getElementById('retryBtn').addEventListener('click', resetGame);
 
   function setSheetOpen(open) {
@@ -5292,6 +6003,18 @@
   addLog('中央右上の魔法陣を踏むと転移モードになる(現在地クリックで解除)');
   maybeLogRouteInsight();
 })();
+</script>
+<script>
+  (() => {
+    const ad = document.querySelector('.ad-footer ins.adsbygoogle');
+    if (!ad) return;
+    if (ad.getAttribute('data-adsbygoogle-status') === 'done') return;
+    try {
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+    } catch (err) {
+      // no-op
+    }
+  })();
 </script>
 </body>
 </html>
