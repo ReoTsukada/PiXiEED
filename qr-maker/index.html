@@ -184,7 +184,7 @@
   }
   .qr-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
     gap: 14px;
     min-height: 0;
   }
@@ -195,6 +195,13 @@
     border-radius: 12px;
     padding: 16px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    min-width: 0;
+  }
+  .card.card--ad {
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   [hidden] {
     display: none !important;
@@ -328,13 +335,17 @@
     display: flex;
     justify-content: space-between;
     gap: 12px;
+    flex-wrap: wrap;
     color: var(--muted);
     font-size: 0.92rem;
+    min-width: 0;
   }
   .meta-row span {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .status {
     font-weight: 700;
@@ -379,10 +390,10 @@
     border: 1px solid rgba(255,255,255,0.12);
     border-radius: 12px;
     background: rgba(255,255,255,0.05);
-    padding: 10px;
+    padding: 0;
     box-shadow: 0 10px 30px rgba(0,0,0,0.28);
     overflow: hidden;
-    width: min(720px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 16px));
+    width: min(100%, 720px);
     max-width: 100%;
     min-width: 0;
     position: relative;
@@ -391,11 +402,13 @@
     justify-content: center;
     margin: 0 auto;
     min-height: clamp(48px, 9vw, 60px);
+    text-align: center;
   }
   .ad-slot {
     display: block;
     width: 100%;
     min-height: clamp(48px, 9vw, 60px);
+    height: clamp(48px, 9vw, 60px);
     max-width: 100%;
     min-width: 0;
     overflow: hidden;
@@ -404,7 +417,23 @@
     width: 100% !important;
     max-width: 100% !important;
     min-height: clamp(48px, 9vw, 60px) !important;
+    height: clamp(48px, 9vw, 60px) !important;
     margin: 0 auto;
+  }
+  .ad-block .ad-slot,
+  .ad-block ins.adsbygoogle {
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+  .ad-block .ad-slot iframe,
+  .ad-block ins.adsbygoogle iframe {
+    margin-left: auto !important;
+    margin-right: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
   }
   .ad-label {
     position: absolute;
@@ -418,9 +447,13 @@
     letter-spacing: 0.04em;
   }
   @media (max-width: 640px) {
-    .ad-slot { min-height: clamp(48px, 9vw, 60px); }
+    .ad-slot {
+      min-height: clamp(48px, 9vw, 60px);
+      height: clamp(48px, 9vw, 60px);
+    }
     .ad-slot.adsbygoogle {
       min-height: clamp(48px, 9vw, 60px) !important;
+      height: clamp(48px, 9vw, 60px) !important;
     }
   }
   @media (max-width: 940px) {
@@ -456,6 +489,51 @@
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  /* global-overflow-guard */
+  .ad-block,
+  .ad-card,
+  .ad-footer,
+  .project-ad,
+  .entry-ad-slot,
+  .puzzle-ad-slot,
+  .game-ad,
+  .card--ad {
+    width: min(100%, 720px) !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .ad-slot,
+  .ad-block ins.adsbygoogle,
+  .ad-footer ins,
+  .entry-ad-slot ins,
+  .puzzle-ad-slot ins.adsbygoogle,
+  .game-ad ins.adsbygoogle {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box;
+    min-height: clamp(48px, 9vw, 60px) !important;
+    height: clamp(48px, 9vw, 60px) !important;
+    overflow: hidden !important;
+  }
+  .page,
+  main,
+  .card,
+  .section,
+  .panel,
+  .shell {
+    min-width: 0;
+    max-width: 100%;
   }
 </style>
   <style id="interaction-guard">
@@ -516,6 +594,11 @@
     const assignSlot = (ins) => {
       if (!ins || !(ins instanceof HTMLElement)) return;
       if (ins.dataset.adSlotAssigned === '1') return;
+      const existingSlot = ins.getAttribute('data-ad-slot');
+      if (existingSlot && existingSlot !== 'rotate') {
+        ins.dataset.adSlotAssigned = '1';
+        return;
+      }
       if (ins.dataset.adStatic === '1') {
         ins.dataset.adSlotAssigned = '1';
         return;
@@ -646,7 +729,7 @@
   <h1>QRコードメーカー</h1>
   <p class="subtitle">登録不要・無料でQR作成。色・余白・誤り訂正を調整してPNG保存できます。</p>
 </section>
-<section class="card" aria-label="広告">
+<section class="card card--ad" aria-label="広告">
   <div class="ad-block">
     <ins class="adsbygoogle ad-slot"
          style="display:block"
@@ -727,7 +810,7 @@
 </div>
 </section>
 </main>
-<section class="card" aria-label="広告">
+<section class="card card--ad" aria-label="広告">
   <div class="ad-block">
     <ins class="adsbygoogle ad-slot"
          style="display:block"
