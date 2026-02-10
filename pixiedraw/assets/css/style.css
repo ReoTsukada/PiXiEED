@@ -2101,18 +2101,19 @@ body.is-startup-active {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 8px;
+  padding: 2px 8px;
   background: rgba(12, 16, 24, 0.92);
   border-bottom: 1px solid var(--border);
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.28);
   flex: 0 0 auto;
+  min-height: clamp(48px, 9vw, 60px);
 }
 
 .app-banner ins.adsbygoogle {
   display: block;
-  width: min(360px, 100%) !important;
-  max-width: 360px !important;
-  min-height: 60px;
+  width: min(720px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 16px)) !important;
+  max-width: 720px !important;
+  min-height: clamp(48px, 9vw, 60px);
 }
 
 
@@ -2223,7 +2224,7 @@ body.is-startup-active {
 
 @media (max-width: 900px) and (orientation: portrait) {
   :root {
-    --mobile-banner-height: 40px;
+    --mobile-banner-height: clamp(48px, 9vw, 60px);
     --mobile-drawer-height: 38vh;
     --mobile-stage-padding: 1px;
     --mobile-topbar-height: 110px;
