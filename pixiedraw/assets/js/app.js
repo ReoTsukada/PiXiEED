@@ -47,9 +47,9 @@
     canvasControls: document.querySelector('.canvas-controls'),
     floatingDrawButton: document.getElementById('floatingDrawButton'),
     zoomIndicator: document.getElementById('zoomIndicator'),
-    toggles: {
-      left: document.getElementById('openLeftRail'),
-      right: document.getElementById('openRightRail'),
+    resizeHandles: {
+      left: document.getElementById('resizeLeftRail'),
+      right: document.getElementById('resizeRightRail'),
     },
     toolGroupButtons: Array.from(document.querySelectorAll('.tool-group-button[data-tool-group]')),
     toolGrid: document.getElementById('toolGrid'),
@@ -102,7 +102,6 @@
       virtualCursorButtonScale: document.getElementById('virtualCursorButtonScale'),
       virtualCursorButtonScaleValue: document.getElementById('virtualCursorButtonScaleValue'),
       openDocument: document.getElementById('openDocument'),
-      saveProject: document.getElementById('saveProject'),
       exportProject: document.getElementById('exportProject'),
       clearCanvas: document.getElementById('clearCanvas'),
       enableAutosave: document.getElementById('enableAutosave'),
@@ -134,15 +133,16 @@
     exportDialog: {
       dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('exportDialog')),
       form: document.getElementById('exportDialogForm'),
-      confirmPng: document.getElementById('confirmExportPng'),
-      confirmGif: document.getElementById('confirmExportGif'),
-      confirmContest: document.getElementById('confirmExportContest'),
+      confirm: document.getElementById('confirmExport'),
+      format: document.getElementById('exportFormat'),
       cancel: document.getElementById('cancelExport'),
       scaleSlider: document.getElementById('exportScaleSlider'),
       scaleInput: document.getElementById('exportScaleInput'),
       pixelWidthInput: document.getElementById('exportPixelWidth'),
       pixelHeightInput: document.getElementById('exportPixelHeight'),
       scaleHint: document.getElementById('exportScaleHint'),
+      adContainer: document.getElementById('exportAdContainer'),
+      adSlot: document.getElementById('exportAdSlot'),
     },
   };
 
@@ -383,6 +383,7 @@
   }
 
   const SESSION_STORAGE_KEY = 'pixieedraw:sessionState';
+  const STARTUP_SCREEN_DISMISSED_KEY = 'pixieedraw:startupScreenDismissed';
   const canUseSessionStorage = (() => {
     try {
       return typeof window !== 'undefined' && 'localStorage' in window && window.localStorage !== null;
@@ -483,8 +484,21 @@
   let exportSheetInfo = null;
   let exportMaxScale = 1;
   let exportScaleUserOverride = false;
+  let exportAdRequested = false;
 
-  const rails = { leftCollapsed: false, rightCollapsed: window.innerWidth <= 900 };
+  const RAIL_DEFAULT_WIDTH = Object.freeze({ left: 78, right: 78 });
+  const RAIL_MIN_WIDTH = 68;
+  const RAIL_MAX_WIDTH = 440;
+  const RAIL_COMPACT_THRESHOLD = 108;
+  const railSizing = {
+    left: RAIL_DEFAULT_WIDTH.left,
+    right: RAIL_DEFAULT_WIDTH.right,
+    activeSide: null,
+    pointerId: null,
+    startClientX: 0,
+    startWidth: 0,
+    captureTarget: null,
+  };
   const BACKGROUND_TILE_COLORS = Object.freeze({
     dark: [
       { r: 52, g: 56, b: 68, a: 255 },
@@ -570,6 +584,10 @@
     curveStage: null,
   };
   let drawButtonResizeListenerBound = false;
+  let compactToolFlyoutDismissBound = false;
+  let compactToolFlyoutPositionBound = false;
+  let compactRightFlyoutDismissBound = false;
+  let compactRightFlyoutPositionBound = false;
   const toolIconCache = new Map();
   let startupVisible = false;
   let startupVirtualCursorState = null;
@@ -1687,8 +1705,12 @@
     if (!LEFT_TAB_KEYS.includes(tab)) return;
     if (state.activeLeftTab === tab) return;
     state.activeLeftTab = tab;
+    if (tab !== 'tools') {
+      setCompactToolFlyoutOpen(false);
+    }
     updateLeftTabUI();
     updateLeftTabVisibility();
+    updateToolVisibility();
     scheduleSessionPersist();
   }
 
@@ -1716,6 +1738,7 @@
         section.setAttribute('aria-hidden', 'false');
         section.classList.add('is-active');
       });
+      setCompactToolFlyoutOpen(false);
       return;
     }
     LEFT_TAB_KEYS.forEach(key => {
@@ -1726,6 +1749,80 @@
       section.setAttribute('aria-hidden', String(!isActive));
       section.classList.toggle('is-active', isActive);
     });
+    if (!isCompactToolRailMode()) {
+      setCompactToolFlyoutOpen(false);
+    }
+  }
+
+  function isCompactRightRailMode() {
+    if (layoutMode === 'mobilePortrait') {
+      return false;
+    }
+    return dom.rightRail instanceof HTMLElement && dom.rightRail.dataset.compact === 'true';
+  }
+
+  function isCompactRightFlyoutOpen() {
+    return dom.rightRail instanceof HTMLElement && dom.rightRail.dataset.compactFlyoutOpen === 'true';
+  }
+
+  function clearCompactRightFlyoutPosition() {
+    RIGHT_TAB_KEYS.forEach(key => {
+      const section = dom.sections[key];
+      if (!(section instanceof HTMLElement)) {
+        return;
+      }
+      section.style.removeProperty('position');
+      section.style.removeProperty('left');
+      section.style.removeProperty('top');
+      section.style.removeProperty('width');
+      section.style.removeProperty('max-height');
+      section.style.removeProperty('z-index');
+      section.style.removeProperty('overflow');
+    });
+  }
+
+  function updateCompactRightFlyoutPosition() {
+    const compactMode = isCompactRightRailMode();
+    const open = isCompactRightFlyoutOpen();
+    if (!compactMode || !open || !(dom.rightRail instanceof HTMLElement)) {
+      clearCompactRightFlyoutPosition();
+      return;
+    }
+    const section = dom.sections[state.activeRightTab];
+    if (!(section instanceof HTMLElement)) {
+      clearCompactRightFlyoutPosition();
+      return;
+    }
+    const railRect = dom.rightRail.getBoundingClientRect();
+    let width = clamp(Math.round(window.innerWidth * 0.34), 260, 460);
+    let left = Math.round(railRect.left - width - 10);
+    if (left < 8) {
+      left = 8;
+      width = Math.max(220, Math.min(width, window.innerWidth - left - 8));
+    }
+    const top = clamp(Math.round(railRect.top + 8), 8, Math.max(8, window.innerHeight - 120));
+    const maxHeight = Math.max(140, Math.round(window.innerHeight - top - 8));
+    clearCompactRightFlyoutPosition();
+    section.style.position = 'fixed';
+    section.style.left = `${left}px`;
+    section.style.top = `${top}px`;
+    section.style.width = `${width}px`;
+    section.style.maxHeight = `${maxHeight}px`;
+    section.style.zIndex = '5000';
+    section.style.overflow = 'auto';
+  }
+
+  function setCompactRightFlyoutOpen(open) {
+    if (!(dom.rightRail instanceof HTMLElement)) {
+      return;
+    }
+    const shouldOpen = Boolean(open) && isCompactRightRailMode();
+    dom.rightRail.dataset.compactFlyoutOpen = shouldOpen ? 'true' : 'false';
+    if (!shouldOpen) {
+      clearCompactRightFlyoutPosition();
+    } else {
+      updateCompactRightFlyoutPosition();
+    }
   }
 
   function setupRightTabs() {
@@ -1741,9 +1838,58 @@
         if (layoutMode === 'mobilePortrait') return;
         const target = button.dataset.rightTab;
         if (!target) return;
+        const compactMode = isCompactRightRailMode();
+        if (compactMode && state.activeRightTab === target) {
+          setCompactRightFlyoutOpen(!isCompactRightFlyoutOpen());
+          updateRightTabVisibility();
+          return;
+        }
         setRightTab(target);
+        if (compactMode) {
+          setCompactRightFlyoutOpen(true);
+          updateRightTabVisibility();
+        }
       });
     });
+    if (!compactRightFlyoutDismissBound) {
+      compactRightFlyoutDismissBound = true;
+      document.addEventListener(
+        'pointerdown',
+        event => {
+          if (!isCompactRightFlyoutOpen()) {
+            return;
+          }
+          const target = event.target;
+          if (!(target instanceof Node)) {
+            return;
+          }
+          const activeSection = dom.sections[state.activeRightTab];
+          if (activeSection instanceof HTMLElement && activeSection.contains(target)) {
+            return;
+          }
+          if (dom.rightRail instanceof HTMLElement && dom.rightRail.contains(target)) {
+            return;
+          }
+          setCompactRightFlyoutOpen(false);
+          updateRightTabVisibility();
+        },
+        true
+      );
+      document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape' || !isCompactRightFlyoutOpen()) {
+          return;
+        }
+        setCompactRightFlyoutOpen(false);
+        updateRightTabVisibility();
+      });
+    }
+    if (!compactRightFlyoutPositionBound) {
+      compactRightFlyoutPositionBound = true;
+      window.addEventListener('resize', updateCompactRightFlyoutPosition, { passive: true });
+      window.addEventListener('scroll', updateCompactRightFlyoutPosition, true);
+      dom.rightRail?.addEventListener('scroll', updateCompactRightFlyoutPosition, { passive: true });
+    }
+    setCompactRightFlyoutOpen(false);
     updateRightTabUI();
     updateRightTabVisibility();
   }
@@ -1774,6 +1920,7 @@
       dom.rightTabsBar.toggleAttribute('hidden', isMobile);
     }
     if (isMobile) {
+      setCompactRightFlyoutOpen(false);
       RIGHT_TAB_KEYS.forEach(key => {
         const section = dom.sections[key];
         if (!section) return;
@@ -1783,14 +1930,21 @@
       });
       return;
     }
+    const compactMode = isCompactRightRailMode();
+    if (!compactMode && isCompactRightFlyoutOpen()) {
+      setCompactRightFlyoutOpen(false);
+    }
+    const showCompactFlyout = compactMode && isCompactRightFlyoutOpen();
     RIGHT_TAB_KEYS.forEach(key => {
       const section = dom.sections[key];
       if (!section) return;
       const isActive = state.activeRightTab === key;
-      section.hidden = !isActive;
-      section.setAttribute('aria-hidden', String(!isActive));
-      section.classList.toggle('is-active', isActive);
+      const visible = compactMode ? (isActive && showCompactFlyout) : isActive;
+      section.hidden = !visible;
+      section.setAttribute('aria-hidden', String(!visible));
+      section.classList.toggle('is-active', visible);
     });
+    updateCompactRightFlyoutPosition();
   }
 
   function resetCurveBuilder() {
@@ -1819,10 +1973,60 @@
         button.addEventListener('click', () => {
           const target = button.dataset.toolGroup;
           if (!target) return;
+          const compactMode = isCompactToolRailMode();
+          if (!compactMode) {
+            setCompactToolFlyoutOpen(false);
+            setToolGroup(target);
+            return;
+          }
+          const wasOpen = isCompactToolFlyoutOpen();
+          const isSameGroup = state.activeToolGroup === target;
           setToolGroup(target);
+          if (isSameGroup && wasOpen) {
+            setCompactToolFlyoutOpen(false);
+          } else {
+            setCompactToolFlyoutOpen(true);
+          }
+          updateToolVisibility();
         });
       });
     }
+    if (!compactToolFlyoutDismissBound) {
+      compactToolFlyoutDismissBound = true;
+      document.addEventListener(
+        'pointerdown',
+        event => {
+          if (!isCompactToolFlyoutOpen()) {
+            return;
+          }
+          const target = event.target;
+          if (!(target instanceof Node)) {
+            return;
+          }
+          const toolsPanel = dom.sections.tools;
+          if (toolsPanel instanceof HTMLElement && toolsPanel.contains(target)) {
+            return;
+          }
+          setCompactToolFlyoutOpen(false);
+          updateToolVisibility();
+        },
+        true
+      );
+      document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape' || !isCompactToolFlyoutOpen()) {
+          return;
+        }
+        setCompactToolFlyoutOpen(false);
+        updateToolVisibility();
+      });
+    }
+    if (!compactToolFlyoutPositionBound) {
+      compactToolFlyoutPositionBound = true;
+      window.addEventListener('resize', updateCompactToolFlyoutPosition, { passive: true });
+      window.addEventListener('scroll', updateCompactToolFlyoutPosition, true);
+      dom.leftRail?.addEventListener('scroll', updateCompactToolFlyoutPosition, { passive: true });
+    }
+    setCompactToolFlyoutOpen(false);
     updateToolGroupButtons();
     updateToolVisibility();
     const activeGroupTools = TOOL_GROUPS[state.activeToolGroup]?.tools || [];
@@ -1834,6 +2038,73 @@
     } else if (activeGroupTools.includes(state.tool)) {
       state.lastGroupTool[state.activeToolGroup] = state.tool;
     }
+  }
+
+  function isCompactToolRailMode() {
+    if (layoutMode === 'mobilePortrait') {
+      return false;
+    }
+    if (!(dom.leftRail instanceof HTMLElement) || dom.leftRail.dataset.compact !== 'true') {
+      return false;
+    }
+    return state.activeLeftTab === 'tools';
+  }
+
+  function isCompactToolFlyoutOpen() {
+    return dom.sections.tools instanceof HTMLElement && dom.sections.tools.dataset.compactFlyoutOpen === 'true';
+  }
+
+  function clearCompactToolFlyoutPosition() {
+    if (!(dom.toolGrid instanceof HTMLElement)) {
+      return;
+    }
+    dom.toolGrid.style.removeProperty('position');
+    dom.toolGrid.style.removeProperty('left');
+    dom.toolGrid.style.removeProperty('top');
+    dom.toolGrid.style.removeProperty('width');
+    dom.toolGrid.style.removeProperty('max-height');
+    dom.toolGrid.style.removeProperty('z-index');
+  }
+
+  function updateCompactToolFlyoutPosition() {
+    if (!(dom.toolGrid instanceof HTMLElement)) {
+      return;
+    }
+    const shouldFloat = isCompactToolRailMode() && isCompactToolFlyoutOpen();
+    if (!shouldFloat) {
+      clearCompactToolFlyoutPosition();
+      return;
+    }
+    const toolsPanel = dom.sections.tools;
+    const anchor = toolsPanel?.querySelector('.panel-section__body') || toolsPanel;
+    if (!(anchor instanceof HTMLElement)) {
+      clearCompactToolFlyoutPosition();
+      return;
+    }
+    const anchorRect = anchor.getBoundingClientRect();
+    const railWidth = Math.max(68, dom.leftRail?.offsetWidth || 78);
+    const flyoutWidth = clamp(Math.round(railWidth - 16), 64, 96);
+    let left = Math.round(anchorRect.right + 10);
+    if (left + flyoutWidth > window.innerWidth - 8) {
+      left = Math.max(8, Math.round(anchorRect.left - 10 - flyoutWidth));
+    }
+    const top = clamp(Math.round(anchorRect.top), 8, Math.max(8, window.innerHeight - 64));
+    const maxHeight = Math.max(120, Math.round(window.innerHeight - top - 12));
+    dom.toolGrid.style.position = 'fixed';
+    dom.toolGrid.style.left = `${left}px`;
+    dom.toolGrid.style.top = `${top}px`;
+    dom.toolGrid.style.width = `${flyoutWidth}px`;
+    dom.toolGrid.style.maxHeight = `${maxHeight}px`;
+    dom.toolGrid.style.zIndex = '5000';
+  }
+
+  function setCompactToolFlyoutOpen(open) {
+    if (!(dom.sections.tools instanceof HTMLElement)) {
+      return;
+    }
+    const shouldOpen = Boolean(open) && isCompactToolRailMode();
+    dom.sections.tools.dataset.compactFlyoutOpen = shouldOpen ? 'true' : 'false';
+    updateCompactToolFlyoutPosition();
   }
 
   function setToolGroup(group, { persist = true } = {}) {
@@ -1874,9 +2145,11 @@
   function updateToolVisibility() {
     if (!toolButtons || !toolButtons.length) return;
     const activeGroup = state.activeToolGroup || TOOL_TO_GROUP[state.tool] || 'pen';
+    const compactMode = isCompactToolRailMode();
+    const compactFlyoutOpen = compactMode && isCompactToolFlyoutOpen();
     toolButtons.forEach(button => {
       const group = button.dataset.toolGroup || TOOL_TO_GROUP[button.dataset.tool];
-      const show = !group || group === activeGroup;
+      const show = compactMode ? (compactFlyoutOpen && (!group || group === activeGroup)) : (!group || group === activeGroup);
       button.hidden = !show;
       button.setAttribute('aria-hidden', String(!show));
     });
@@ -1887,6 +2160,7 @@
         dom.toolGrid.removeAttribute('data-active-group');
       }
     }
+    updateCompactToolFlyoutPosition();
   }
 
   function handleCurvePointerDown(event, position, layer) {
@@ -3672,8 +3946,32 @@
     if (dialog && typeof dialog.showModal === 'function') {
       refreshExportScaleControls();
       dialog.showModal();
+      window.requestAnimationFrame(() => {
+        queueExportAdRender();
+      });
     } else {
       exportProjectWithFallback();
+    }
+  }
+
+  function queueExportAdRender() {
+    const adSlot = dom.exportDialog?.adSlot;
+    if (!(adSlot instanceof HTMLElement)) {
+      return;
+    }
+    if (exportAdRequested) {
+      return;
+    }
+    if (adSlot.dataset.loaded === '1' || adSlot.getAttribute('data-adsbygoogle-status') === 'done') {
+      exportAdRequested = true;
+      return;
+    }
+    exportAdRequested = true;
+    try {
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+      adSlot.dataset.loaded = '1';
+    } catch (error) {
+      exportAdRequested = false;
     }
   }
 
@@ -3685,7 +3983,7 @@
   }
 
   function exportProjectWithFallback() {
-    const choice = window.prompt('書き出し形式を入力してください (png / gif)', 'png');
+    const choice = window.prompt('出力形式を入力してください (png / gif / contest / project)', 'png');
     if (!choice) {
       return;
     }
@@ -3713,8 +4011,12 @@
       exportProjectAsPng();
     } else if (normalized === 'gif') {
       exportProjectAsGif();
+    } else if (normalized === 'contest') {
+      exportProjectToContest();
+    } else if (normalized === 'project') {
+      saveProjectAsPixieedraw();
     } else {
-      window.alert('png か gif を入力してください。');
+      window.alert('png / gif / contest / project のいずれかを入力してください。');
     }
   }
 
@@ -3857,16 +4159,17 @@
         element.addEventListener('click', handler);
       }
     };
-    bind(config.confirmPng, () => {
-      exportProjectAsPng();
-      closeExportDialog();
-    });
-    bind(config.confirmGif, () => {
-      exportProjectAsGif();
-      closeExportDialog();
-    });
-    bind(config.confirmContest, () => {
-      exportProjectToContest();
+    bind(config.confirm, () => {
+      const mode = String(config.format?.value || 'png').trim().toLowerCase();
+      if (mode === 'gif') {
+        exportProjectAsGif();
+      } else if (mode === 'contest') {
+        exportProjectToContest();
+      } else if (mode === 'project') {
+        saveProjectAsPixieedraw();
+      } else {
+        exportProjectAsPng();
+      }
       closeExportDialog();
     });
     bind(config.cancel, () => {
@@ -3879,6 +4182,9 @@
       });
     } else if (dialog) {
       dialog.hidden = true;
+    }
+    if (!supportsDialog && config.adContainer) {
+      config.adContainer.hidden = true;
     }
 
     const slider = config.scaleSlider;
@@ -4029,6 +4335,28 @@
     return true;
   }
 
+  function hasDismissedStartupScreen() {
+    if (!canUseSessionStorage) {
+      return false;
+    }
+    try {
+      return window.localStorage.getItem(STARTUP_SCREEN_DISMISSED_KEY) === '1';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function markStartupScreenDismissed() {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(STARTUP_SCREEN_DISMISSED_KEY, '1');
+    } catch (error) {
+      // Ignore storage errors (private mode or quota exceeded)
+    }
+  }
+
   function showStartupScreen() {
     const container = dom.startup?.screen;
     if (!container) {
@@ -4064,6 +4392,7 @@
     if (!container || !startupVisible) {
       return;
     }
+    markStartupScreenDismissed();
     startupVisible = false;
     container.hidden = true;
     container.setAttribute('aria-hidden', 'true');
@@ -7136,13 +7465,179 @@
     }
     const importedFromLens = await maybeImportLensCapture();
     renderEverything();
-    if (!lensImportRequested && !importedFromLens && !skipStartup) {
+    if (!lensImportRequested && !importedFromLens && !skipStartup && !hasDismissedStartupScreen()) {
       showStartupScreen();
     }
   }
 
   function getActiveTool() {
     return pointerState.tool || state.tool;
+  }
+
+  function getRailNode(side) {
+    return side === 'right' ? dom.rightRail : dom.leftRail;
+  }
+
+  function getRailCssVarName(side) {
+    return side === 'right' ? '--right-width' : '--left-width';
+  }
+
+  function normalizeRailWidth(side, value) {
+    const fallback = Number(railSizing[side]) || RAIL_DEFAULT_WIDTH[side];
+    const numeric = Math.round(Number(value));
+    const base = Number.isFinite(numeric) ? numeric : fallback;
+    const viewportLimit = Math.max(RAIL_MIN_WIDTH, Math.floor((window.innerWidth || 0) * 0.45));
+    const maxWidth = Math.max(RAIL_MIN_WIDTH, Math.min(RAIL_MAX_WIDTH, viewportLimit));
+    return clamp(base, RAIL_MIN_WIDTH, maxWidth);
+  }
+
+  function updateRailCompactState(targetSide = null) {
+    const isMobile = layoutMode === 'mobilePortrait';
+    const apply = side => {
+      const railNode = getRailNode(side);
+      if (!railNode) return;
+      const compact = !isMobile && Number(railSizing[side]) <= RAIL_COMPACT_THRESHOLD;
+      railNode.dataset.compact = compact ? 'true' : 'false';
+    };
+    if (targetSide === 'left' || targetSide === 'right') {
+      apply(targetSide);
+      return;
+    }
+    apply('left');
+    apply('right');
+  }
+
+  function setRailWidth(side, width, { persist = true } = {}) {
+    if (side !== 'left' && side !== 'right') {
+      return;
+    }
+    const normalized = normalizeRailWidth(side, width);
+    railSizing[side] = normalized;
+    const cssVar = getRailCssVarName(side);
+    if (dom.layout) {
+      dom.layout.style.setProperty(cssVar, `${normalized}px`);
+    } else {
+      document.documentElement.style.setProperty(cssVar, `${normalized}px`);
+    }
+    updateRailCompactState(side);
+    if (side === 'left') {
+      if (!isCompactToolRailMode()) {
+        setCompactToolFlyoutOpen(false);
+      }
+      updateToolVisibility();
+    } else {
+      if (!isCompactRightRailMode() && isCompactRightFlyoutOpen()) {
+        setCompactRightFlyoutOpen(false);
+      }
+      updateRightTabVisibility();
+    }
+    updateRailMetrics();
+    if (persist) {
+      scheduleSessionPersist();
+    }
+  }
+
+  function beginRailResize(side, event) {
+    if (layoutMode === 'mobilePortrait') {
+      return;
+    }
+    const handle = side === 'right' ? dom.resizeHandles.right : dom.resizeHandles.left;
+    if (!handle) {
+      return;
+    }
+    event.preventDefault();
+    if (side === 'left') {
+      setCompactToolFlyoutOpen(false);
+      updateToolVisibility();
+    } else {
+      setCompactRightFlyoutOpen(false);
+      updateRightTabVisibility();
+    }
+    railSizing.activeSide = side;
+    railSizing.pointerId = Number.isFinite(event.pointerId) ? event.pointerId : null;
+    railSizing.startClientX = Number(event.clientX) || 0;
+    railSizing.startWidth = Number(railSizing[side]) || RAIL_DEFAULT_WIDTH[side];
+    railSizing.captureTarget = handle;
+    handle.classList.add('is-active');
+    document.body.classList.add('is-rail-resizing');
+    if (railSizing.pointerId !== null && typeof handle.setPointerCapture === 'function') {
+      try {
+        handle.setPointerCapture(railSizing.pointerId);
+      } catch (error) {
+        // Ignore pointer capture failures.
+      }
+    }
+    window.addEventListener('pointermove', handleRailResizePointerMove);
+    window.addEventListener('pointerup', handleRailResizePointerUp);
+    window.addEventListener('pointercancel', handleRailResizePointerUp);
+  }
+
+  function handleRailResizePointerMove(event) {
+    const side = railSizing.activeSide;
+    if (!side) {
+      return;
+    }
+    if (railSizing.pointerId !== null && event.pointerId !== railSizing.pointerId) {
+      return;
+    }
+    const deltaX = (Number(event.clientX) || 0) - railSizing.startClientX;
+    const width = side === 'left' ? railSizing.startWidth + deltaX : railSizing.startWidth - deltaX;
+    setRailWidth(side, width, { persist: false });
+  }
+
+  function endRailResize({ persist = false } = {}) {
+    const handle = railSizing.captureTarget;
+    if (handle) {
+      handle.classList.remove('is-active');
+      if (railSizing.pointerId !== null && typeof handle.releasePointerCapture === 'function') {
+        try {
+          handle.releasePointerCapture(railSizing.pointerId);
+        } catch (error) {
+          // Ignore pointer release failures.
+        }
+      }
+    }
+    railSizing.activeSide = null;
+    railSizing.pointerId = null;
+    railSizing.captureTarget = null;
+    railSizing.startClientX = 0;
+    railSizing.startWidth = 0;
+    document.body.classList.remove('is-rail-resizing');
+    window.removeEventListener('pointermove', handleRailResizePointerMove);
+    window.removeEventListener('pointerup', handleRailResizePointerUp);
+    window.removeEventListener('pointercancel', handleRailResizePointerUp);
+    if (persist) {
+      scheduleSessionPersist();
+    }
+  }
+
+  function handleRailResizePointerUp(event) {
+    if (!railSizing.activeSide) {
+      return;
+    }
+    if (railSizing.pointerId !== null && event.pointerId !== railSizing.pointerId) {
+      return;
+    }
+    endRailResize({ persist: true });
+  }
+
+  function setupRailResizers() {
+    const bind = (side, handle) => {
+      if (!handle || handle.dataset.bound === 'true') {
+        return;
+      }
+      handle.dataset.bound = 'true';
+      handle.addEventListener('pointerdown', event => {
+        const isPrimaryPointer =
+          event.button === 0 || event.pointerType === 'touch' || event.pointerType === 'pen';
+        if (!isPrimaryPointer) {
+          return;
+        }
+        beginRailResize(side, event);
+      });
+    };
+    bind('left', dom.resizeHandles.left);
+    bind('right', dom.resizeHandles.right);
   }
 
   function setupLayout() {
@@ -7169,42 +7664,8 @@
         });
       });
     });
+    setupRailResizers();
 
-    dom.toggles.left?.addEventListener('click', () => {
-      if (layoutMode === 'mobilePortrait') {
-        return;
-      }
-      toggleRailCollapsed('left');
-    });
-
-    dom.toggles.right?.addEventListener('click', () => {
-      if (layoutMode === 'mobilePortrait') {
-        return;
-      }
-      toggleRailCollapsed('right');
-    });
-
-    updateRailToggleVisibility();
-  }
-
-  function setRailCollapsed(side, collapsed) {
-    const isLeft = side === 'left';
-    const railNode = isLeft ? dom.leftRail : dom.rightRail;
-    if (!railNode) return;
-    if (isLeft) {
-      rails.leftCollapsed = collapsed;
-    } else {
-      rails.rightCollapsed = collapsed;
-    }
-    railNode.dataset.collapsed = collapsed ? 'true' : 'false';
-  }
-
-  function toggleRailCollapsed(side) {
-    const isLeft = side === 'left';
-    const railNode = isLeft ? dom.leftRail : dom.rightRail;
-    if (!railNode) return;
-    const collapsed = railNode.dataset.collapsed === 'true';
-    setRailCollapsed(side, !collapsed);
     updateRailToggleVisibility();
   }
 
@@ -7212,28 +7673,72 @@
     const layoutNode = dom.layout;
     if (!layoutNode) return;
     const isMobile = layoutMode === 'mobilePortrait';
-    const leftCollapsed = isMobile || dom.leftRail?.dataset.collapsed === 'true';
-    const rightCollapsed = isMobile || dom.rightRail?.dataset.collapsed === 'true';
-    const leftWidth = !leftCollapsed && dom.leftRail ? dom.leftRail.offsetWidth : 0;
-    const rightWidth = !rightCollapsed && dom.rightRail ? dom.rightRail.offsetWidth : 0;
+    const leftWidth = isMobile ? 0 : (dom.leftRail ? dom.leftRail.offsetWidth : 0);
+    const rightWidth = isMobile ? 0 : (dom.rightRail ? dom.rightRail.offsetWidth : 0);
     const toggleMargin = 12;
     layoutNode.style.setProperty('--left-toggle-offset', `${leftWidth ? leftWidth + toggleMargin : toggleMargin}px`);
     layoutNode.style.setProperty('--right-toggle-offset', `${rightWidth ? rightWidth + toggleMargin : toggleMargin}px`);
+  }
+
+  function isCoarsePointerDevice() {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return false;
+    }
+    try {
+      return window.matchMedia('(pointer: coarse)').matches || window.matchMedia('(hover: none)').matches;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function updateAdaptiveMobileLayoutVars() {
+    const root = dom.appRoot || document.documentElement;
+    if (!(root instanceof HTMLElement)) {
+      return;
+    }
+    if (layoutMode !== 'mobilePortrait') {
+      root.style.removeProperty('--mobile-drawer-height');
+      root.style.removeProperty('--mobile-topbar-height');
+      return;
+    }
+    const width = Math.max(0, Number(window.innerWidth) || 0);
+    const height = Math.max(0, Number(window.innerHeight) || 0);
+    const portrait = height >= width;
+    const topbar = clamp(
+      Math.round(height * (portrait ? 0.12 : 0.18)),
+      portrait ? 82 : 72,
+      portrait ? 122 : 96
+    );
+    const drawerBase = Math.round(height * (portrait ? 0.36 : 0.48));
+    const drawerMin = portrait ? 188 : 150;
+    const drawerMaxRatio = Math.round(height * (portrait ? 0.46 : 0.58));
+    const drawerMaxCap = portrait ? 420 : 260;
+    const drawerMax = Math.max(drawerMin, Math.min(drawerMaxRatio, drawerMaxCap));
+    const drawer = clamp(drawerBase, drawerMin, drawerMax);
+    root.style.setProperty('--mobile-topbar-height', `${topbar}px`);
+    root.style.setProperty('--mobile-drawer-height', `${drawer}px`);
   }
 
   function updateLayoutMode() {
     const width = window.innerWidth;
     const height = window.innerHeight;
     const portrait = height >= width;
+    const coarsePointer = isCoarsePointerDevice();
+    const shouldUseMobilePortrait = width <= 900 && portrait;
     let nextMode = 'desktop';
 
-    if (width <= 900 && portrait) {
+    if (shouldUseMobilePortrait) {
       nextMode = 'mobilePortrait';
-    } else if (width <= 900) {
+    } else if (width <= 1100 || (coarsePointer && width <= 1366 && height <= 900)) {
       nextMode = 'narrow';
     }
 
     if (layoutMode === nextMode) {
+      updateAdaptiveMobileLayoutVars();
+      if (nextMode !== 'mobilePortrait') {
+        setRailWidth('left', railSizing.left, { persist: false });
+        setRailWidth('right', railSizing.right, { persist: false });
+      }
       updateRailToggleVisibility();
       return;
     }
@@ -7244,6 +7749,7 @@
 
   function applyLayoutMode() {
     const isMobile = layoutMode === 'mobilePortrait';
+    updateAdaptiveMobileLayoutVars();
     dom.mobileDrawer.hidden = !isMobile;
     if (dom.mobileTopBar) {
       dom.mobileTopBar.hidden = !isMobile;
@@ -7262,11 +7768,14 @@
       }
     }
     if (isMobile) {
+      endRailResize({ persist: false });
       dom.leftRail.dataset.collapsed = 'true';
       dom.rightRail.dataset.collapsed = 'true';
     } else {
-      dom.leftRail.dataset.collapsed = rails.leftCollapsed ? 'true' : 'false';
-      dom.rightRail.dataset.collapsed = rails.rightCollapsed ? 'true' : 'false';
+      dom.leftRail.dataset.collapsed = 'false';
+      dom.rightRail.dataset.collapsed = 'false';
+      setRailWidth('left', railSizing.left, { persist: false });
+      setRailWidth('right', railSizing.right, { persist: false });
     }
 
     Object.entries(layoutMap).forEach(([key, placement]) => {
@@ -7298,22 +7807,13 @@
 
   function updateRailToggleVisibility() {
     const isMobile = layoutMode === 'mobilePortrait';
-    const leftCollapsed = dom.leftRail?.dataset.collapsed === 'true';
-    const rightCollapsed = dom.rightRail?.dataset.collapsed === 'true';
+    updateRailCompactState();
     updateRailMetrics();
-    if (dom.toggles.left) {
-      const showToggle = !isMobile;
-      dom.toggles.left.classList.toggle('is-visible', showToggle);
-      dom.toggles.left.textContent = leftCollapsed ? '⟨' : '⟩';
-      dom.toggles.left.setAttribute('aria-label', leftCollapsed ? '左パネルを表示' : '左パネルを隠す');
-      dom.toggles.left.setAttribute('aria-pressed', leftCollapsed ? 'false' : 'true');
+    if (dom.resizeHandles.left) {
+      dom.resizeHandles.left.hidden = isMobile;
     }
-    if (dom.toggles.right) {
-      const showToggle = !isMobile;
-      dom.toggles.right.classList.toggle('is-visible', showToggle);
-      dom.toggles.right.textContent = rightCollapsed ? '⟩' : '⟨';
-      dom.toggles.right.setAttribute('aria-label', rightCollapsed ? '右パネルを表示' : '右パネルを隠す');
-      dom.toggles.right.setAttribute('aria-pressed', rightCollapsed ? 'false' : 'true');
+    if (dom.resizeHandles.right) {
+      dom.resizeHandles.right.hidden = isMobile;
     }
   }
 
@@ -7461,10 +7961,6 @@
 
     dom.controls.openDocument?.addEventListener('click', () => {
       openDocumentDialog();
-    });
-
-    dom.controls.saveProject?.addEventListener('click', () => {
-      saveProjectAsPixieedraw();
     });
 
     dom.controls.exportProject?.addEventListener('click', () => {
@@ -7933,6 +8429,10 @@
       }
     }
     updateToolTabIcon();
+    if (isCompactToolRailMode() && isCompactToolFlyoutOpen()) {
+      setCompactToolFlyoutOpen(false);
+      updateToolVisibility();
+    }
     if (persist) {
       scheduleSessionPersist();
     }
@@ -13379,6 +13879,8 @@
         backgroundMode: state.backgroundMode,
         toolGroup: state.activeToolGroup,
         lastGroupTool: { ...(state.lastGroupTool || DEFAULT_GROUP_TOOL) },
+        leftRailWidth: Math.round(Number(railSizing.left) || RAIL_DEFAULT_WIDTH.left),
+        rightRailWidth: Math.round(Number(railSizing.right) || RAIL_DEFAULT_WIDTH.right),
         documentName: state.documentName,
       };
       window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(snapshot));
@@ -13434,6 +13936,12 @@
     }
     if (payload.lastGroupTool && typeof payload.lastGroupTool === 'object') {
       state.lastGroupTool = { ...DEFAULT_GROUP_TOOL, ...payload.lastGroupTool };
+    }
+    if (Number.isFinite(payload.leftRailWidth)) {
+      railSizing.left = normalizeRailWidth('left', payload.leftRailWidth);
+    }
+    if (Number.isFinite(payload.rightRailWidth)) {
+      railSizing.right = normalizeRailWidth('right', payload.rightRailWidth);
     }
     if (payload.leftTab && LEFT_TAB_KEYS.includes(payload.leftTab)) {
       state.activeLeftTab = payload.leftTab;
