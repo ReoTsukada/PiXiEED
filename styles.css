@@ -2689,22 +2689,22 @@ body.portfolio-page ins.adsbygoogle {
 .ad-footer {
   background: rgba(0, 0, 0, 0.6) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  width: 100%;
-  max-width: 520px;
+  width: min(720px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 16px));
+  max-width: 100%;
   padding: 6px 0 calc(6px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto;
-  min-height: 90px;
+  min-height: clamp(48px, 9vw, 60px);
 }
 
 .ad-footer ins {
   display: block !important;
-  width: min(320px, 100%) !important;
-  max-width: 320px !important;
-  min-height: 60px;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: clamp(48px, 9vw, 60px);
   background: transparent;
   outline: none;
 }
