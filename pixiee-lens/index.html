@@ -286,7 +286,7 @@
       top: 0;
       left: 50%;
       transform: translateX(-50%);
-      width: min(720px, calc(100vw - var(--safe-left) - var(--safe-right) - 16px));
+      width: min(100%, 720px);
       padding-top: calc(var(--safe-top) + 6px);
       box-sizing: border-box;
       z-index: 75;
@@ -324,6 +324,7 @@
       width:100% !important;
       max-width:100% !important;
       min-height:clamp(48px, 9vw, 60px);
+      height:clamp(48px, 9vw, 60px);
       overflow:hidden;
     }
     .capture-preview__ad{
@@ -334,9 +335,10 @@
     }
     .capture-preview__ad ins.adsbygoogle{
       display:block;
-      width: min(720px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 16px)) !important;
+      width: min(100%, 720px) !important;
       max-width: 720px !important;
       min-height: clamp(48px, 9vw, 60px);
+      height: clamp(48px, 9vw, 60px);
       overflow:hidden;
     }
     @media (max-width: 520px) {
@@ -1819,6 +1821,49 @@
     max-width: 100% !important;
     min-width: 0 !important;
   }
+
+  /* global-overflow-guard */
+  .ad-block,
+  .ad-card,
+  .ad-footer,
+  .project-ad,
+  .entry-ad-slot,
+  .puzzle-ad-slot,
+  .game-ad,
+  .card--ad {
+    width: min(100%, 720px) !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .ad-slot,
+  .ad-block ins.adsbygoogle,
+  .ad-footer ins,
+  .entry-ad-slot ins,
+  .puzzle-ad-slot ins.adsbygoogle,
+  .game-ad ins.adsbygoogle {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box;
+    min-height: clamp(48px, 9vw, 60px) !important;
+    height: clamp(48px, 9vw, 60px) !important;
+    overflow: hidden !important;
+  }
+  .page,
+  main,
+  .card,
+  .section,
+  .panel,
+  .shell {
+    min-width: 0;
+    max-width: 100%;
+  }
 </style>
   <style id="interaction-guard">
     * {
@@ -1878,6 +1923,11 @@
     const assignSlot = (ins) => {
       if (!ins || !(ins instanceof HTMLElement)) return;
       if (ins.dataset.adSlotAssigned === '1') return;
+      const existingSlot = ins.getAttribute('data-ad-slot');
+      if (existingSlot && existingSlot !== 'rotate') {
+        ins.dataset.adSlotAssigned = '1';
+        return;
+      }
       if (ins.dataset.adStatic === '1') {
         ins.dataset.adSlotAssigned = '1';
         return;
@@ -2220,7 +2270,7 @@
 </label>
 </div>
 <div class="dot-settings-panel__row">
-<button aria-label="グラデーション方法を切り替え" aria-pressed="false" class="option-button gradient-toggle" id="gradientToggleBtn" type="button">グラデーション: なし</button>
+<button aria-label="グラデーション方法を切り替え" aria-pressed="true" class="option-button gradient-toggle is-active" id="gradientToggleBtn" type="button">グラデーション: ディザリング</button>
 </div>
 </div>
 </div>
@@ -2778,7 +2828,7 @@
       dotMode: true,
       dotScale: 1,
       colorDepth: '4',
-      gradientMode: 'none',
+      gradientMode: 'dither',
       cameraSettings: { ...CAMERA_SETTING_DEFAULTS }
     };
 
