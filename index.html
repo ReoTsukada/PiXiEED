@@ -261,10 +261,13 @@
       border-color:rgba(255,255,255,0.18);
     }
     .card.ad-strip{
-      padding:12px;
+      padding:8px;
       background:rgba(255,255,255,0.05);
       border:1px solid rgba(255,255,255,0.12);
       box-shadow:0 10px 30px rgba(0,0,0,0.28);
+      display:flex;
+      align-items:center;
+      justify-content:center;
     }
     .ad-block{
       margin:0 auto;
@@ -278,6 +281,7 @@
       display:flex;
       justify-content:center;
       align-items:center;
+      text-align:center;
       width:100%;
       max-width:min(720px, 100%);
     }
@@ -285,20 +289,40 @@
       padding:0;
     }
     .ad-block--home .ad-slot{
-      min-height:90px;
+      min-height:clamp(48px, 9vw, 60px);
+      height:clamp(48px, 9vw, 60px);
     }
     .ad-slot{
       display:block;
       width:100%;
       max-width:100%;
-      min-height:90px;
+      min-height:clamp(48px, 9vw, 60px);
+      height:clamp(48px, 9vw, 60px);
       margin:0 auto;
       overflow:hidden;
       line-height:0;
     }
+    .ad-block .ad-slot,
+    .ad-block ins.adsbygoogle{
+      margin-left:auto !important;
+      margin-right:auto !important;
+    }
+    .ad-block .ad-slot iframe,
+    .ad-block ins.adsbygoogle iframe{
+      margin-left:auto !important;
+      margin-right:auto !important;
+      height:100% !important;
+      max-height:100% !important;
+    }
     @media(max-width:640px){
-      .ad-slot{ min-height:90px; }
-      .ad-block--home .ad-slot{ min-height:90px; }
+      .ad-slot{
+        min-height:clamp(48px, 9vw, 60px);
+        height:clamp(48px, 9vw, 60px);
+      }
+      .ad-block--home .ad-slot{
+        min-height:clamp(48px, 9vw, 60px);
+        height:clamp(48px, 9vw, 60px);
+      }
     }
     .link-thumb{
       position:relative;
@@ -1030,6 +1054,51 @@
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  /* global-overflow-guard */
+  .ad-block,
+  .ad-card,
+  .ad-footer,
+  .project-ad,
+  .entry-ad-slot,
+  .puzzle-ad-slot,
+  .game-ad,
+  .card--ad {
+    width: min(100%, 720px) !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .ad-slot,
+  .ad-block ins.adsbygoogle,
+  .ad-footer ins,
+  .entry-ad-slot ins,
+  .puzzle-ad-slot ins.adsbygoogle,
+  .game-ad ins.adsbygoogle {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box;
+    min-height: clamp(48px, 9vw, 60px) !important;
+    height: clamp(48px, 9vw, 60px) !important;
+    overflow: hidden !important;
+  }
+  .page,
+  main,
+  .card,
+  .section,
+  .panel,
+  .shell {
+    min-width: 0;
+    max-width: 100%;
   }
 </style>
   <style id="interaction-guard">
@@ -1090,6 +1159,11 @@
     const assignSlot = (ins) => {
       if (!ins || !(ins instanceof HTMLElement)) return;
       if (ins.dataset.adSlotAssigned === '1') return;
+      const existingSlot = ins.getAttribute('data-ad-slot');
+      if (existingSlot && existingSlot !== 'rotate') {
+        ins.dataset.adSlotAssigned = '1';
+        return;
+      }
       if (ins.dataset.adStatic === '1') {
         ins.dataset.adSlotAssigned = '1';
         return;
