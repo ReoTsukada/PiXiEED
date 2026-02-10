@@ -116,7 +116,7 @@
   }
   .ad-slot {
     flex: 0 0 auto;
-    width: min(720px, calc(100vw - var(--safe-left) - var(--safe-right) - 16px));
+    width: min(100%, 720px);
     max-width: 100%;
     min-height: clamp(48px, 9vw, 60px);
     height: clamp(48px, 9vw, 60px);
@@ -939,7 +939,7 @@
   @media (max-width: 960px) {
     .app { grid-template-columns: 1fr; }
     .topbar { flex-direction: column; align-items: flex-start; }
-    .ad-slot { width: min(720px, calc(100vw - var(--safe-left) - var(--safe-right) - 16px)); }
+    .ad-slot { width: min(100%, 720px); }
     .panel { max-height: none; }
   }
   @media (max-height: 720px) {
@@ -970,7 +970,7 @@
   }
   .ad-slot {
     flex: 0 0 auto;
-    width: min(720px, calc(100vw - var(--safe-left) - var(--safe-right) - 16px));
+    width: min(100%, 720px);
     max-width: 100%;
     min-height: clamp(48px, 9vw, 60px);
     height: clamp(48px, 9vw, 60px);
@@ -1005,6 +1005,49 @@
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
+  }
+
+  /* global-overflow-guard */
+  .ad-block,
+  .ad-card,
+  .ad-footer,
+  .project-ad,
+  .entry-ad-slot,
+  .puzzle-ad-slot,
+  .game-ad,
+  .card--ad {
+    width: min(100%, 720px) !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .ad-slot,
+  .ad-block ins.adsbygoogle,
+  .ad-footer ins,
+  .entry-ad-slot ins,
+  .puzzle-ad-slot ins.adsbygoogle,
+  .game-ad ins.adsbygoogle {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box;
+    min-height: clamp(48px, 9vw, 60px) !important;
+    height: clamp(48px, 9vw, 60px) !important;
+    overflow: hidden !important;
+  }
+  .page,
+  main,
+  .card,
+  .section,
+  .panel,
+  .shell {
+    min-width: 0;
+    max-width: 100%;
   }
 </style>
   <style id="interaction-guard">
@@ -1065,6 +1108,11 @@
     const assignSlot = (ins) => {
       if (!ins || !(ins instanceof HTMLElement)) return;
       if (ins.dataset.adSlotAssigned === '1') return;
+      const existingSlot = ins.getAttribute('data-ad-slot');
+      if (existingSlot && existingSlot !== 'rotate') {
+        ins.dataset.adSlotAssigned = '1';
+        return;
+      }
       if (ins.dataset.adStatic === '1') {
         ins.dataset.adSlotAssigned = '1';
         return;
