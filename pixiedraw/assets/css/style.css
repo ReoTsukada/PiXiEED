@@ -2292,8 +2292,18 @@ body.is-startup-active {
   background: var(--bg-panel);
   color: inherit;
   box-shadow: var(--shadow);
-  min-width: 320px;
-  max-width: min(420px, 90vw);
+  width: min(420px, calc(100vw - 24px));
+  min-width: min(320px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+}
+
+.modal[open] {
+  position: fixed;
+  inset: 0;
+  margin: auto;
 }
 
 .modal::backdrop {
@@ -2303,6 +2313,7 @@ body.is-startup-active {
 .modal__form {
   display: flex;
   flex-direction: column;
+  max-height: inherit;
 }
 
 .modal__header,
@@ -2315,6 +2326,9 @@ body.is-startup-active {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .modal__footer {
@@ -2419,6 +2433,9 @@ body.is-startup-active {
 .export-ad {
   margin-top: 8px;
   padding: 10px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border: 1px solid rgba(112, 246, 255, 0.24);
   background:
     linear-gradient(0deg, rgba(112, 246, 255, 0.08) 1px, transparent 1px),
@@ -2428,7 +2445,10 @@ body.is-startup-active {
 }
 
 .export-ad__slot {
-  min-height: 64px;
+  min-height: clamp(48px, 9vw, 60px);
+  height: clamp(48px, 9vw, 60px);
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .export-ad__slot .adsbygoogle,
@@ -2436,8 +2456,20 @@ body.is-startup-active {
   display: block !important;
   width: 100% !important;
   max-width: 100% !important;
-  min-height: 64px;
+  min-width: 0 !important;
+  min-height: clamp(48px, 9vw, 60px);
+  height: clamp(48px, 9vw, 60px);
+  margin: 0 auto;
+  box-sizing: border-box;
   overflow: hidden;
+}
+
+.export-ad__slot .adsbygoogle iframe,
+.export-ad__slot ins.adsbygoogle iframe {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
 }
 
 .export-ad__label {
