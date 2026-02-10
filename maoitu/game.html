@@ -233,23 +233,22 @@ gtag('event', 'project_open_maoitu');
     left:0;
     right:0;
     bottom:0;
-    width:100%;
-    max-width:520px;
+    width:min(720px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 16px));
     margin:0 auto;
-    padding:6px 0 calc(10px + var(--safe-bottom, 0px));
+    padding:4px 0 calc(6px + var(--safe-bottom, 0px));
     box-sizing:border-box;
     display:flex;
     justify-content:center;
     background:#000;
     border-top:1px solid rgba(255,255,255,0.08);
     z-index:30;
-    min-height:60px;
+    min-height:clamp(48px, 9vw, 60px);
   }
   .ad-footer ins{
     display:block;
-    width:min(320px, 100%);
-    max-width:320px;
-    min-height:60px;
+    width:100%;
+    max-width:100%;
+    min-height:clamp(48px, 9vw, 60px);
     overflow:hidden;
   }
 </style>
