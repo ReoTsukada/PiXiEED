@@ -116,8 +116,10 @@
   }
   .ad-slot {
     flex: 0 0 auto;
-    width: min(320px, 100%);
-    height: 40px;
+    width: min(720px, calc(100vw - var(--safe-left) - var(--safe-right) - 16px));
+    max-width: 100%;
+    min-height: clamp(48px, 9vw, 60px);
+    height: clamp(48px, 9vw, 60px);
     border-radius: 10px;
     overflow: hidden;
     background: transparent;
@@ -331,7 +333,8 @@
     font-size: 0.92rem;
   }
   html[data-compact="true"] .ad-slot {
-    height: 40px;
+    min-height: clamp(48px, 9vw, 60px);
+    height: clamp(48px, 9vw, 60px);
   }
   @media (max-width: 959px) and (orientation: portrait) {
     html[data-compact="true"] .panel {
@@ -936,7 +939,7 @@
   @media (max-width: 960px) {
     .app { grid-template-columns: 1fr; }
     .topbar { flex-direction: column; align-items: flex-start; }
-    .ad-slot { width: min(320px, 100%); }
+    .ad-slot { width: min(720px, calc(100vw - var(--safe-left) - var(--safe-right) - 16px)); }
     .panel { max-height: none; }
   }
   @media (max-height: 720px) {
@@ -967,9 +970,10 @@
   }
   .ad-slot {
     flex: 0 0 auto;
-    width: min(320px, 100%);
-    max-width: 320px;
-    height: 40px;
+    width: min(720px, calc(100vw - var(--safe-left) - var(--safe-right) - 16px));
+    max-width: 100%;
+    min-height: clamp(48px, 9vw, 60px);
+    height: clamp(48px, 9vw, 60px);
     border-radius: 10px;
     overflow: hidden;
     background: transparent;
