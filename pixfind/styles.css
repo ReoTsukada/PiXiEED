@@ -223,6 +223,17 @@ body.is-playing {
   overflow: hidden;
 }
 
+.game-ad {
+  width: min(720px, calc(100vw - var(--safe-left) - var(--safe-right) - 16px));
+  max-width: 100%;
+  min-height: clamp(48px, 9vw, 60px);
+  padding: 0.35rem 0.5rem;
+}
+
+.game-ad ins.adsbygoogle {
+  min-height: clamp(48px, 9vw, 60px);
+}
+
 .difficulty-ad__label {
   font-size: 0.72rem;
   color: var(--text-muted);
@@ -1086,9 +1097,12 @@ body.is-playing {
   }
 
   .difficulty-ad ins.adsbygoogle,
-  .start-ad ins.adsbygoogle,
-  .game-ad ins.adsbygoogle {
+  .start-ad ins.adsbygoogle {
     min-height: 90px;
+  }
+
+  .game-ad ins.adsbygoogle {
+    min-height: clamp(48px, 9vw, 60px);
   }
 
   .puzzle-card__description {
