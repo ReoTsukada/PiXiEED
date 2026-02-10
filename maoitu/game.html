@@ -87,7 +87,8 @@ gtag('event', 'project_open_maoitu');
     display:block;
     width:320px;
     max-width:320px;
-    height:50px;
+    min-height:clamp(48px, 9vw, 60px);
+    height:clamp(48px, 9vw, 60px);
     overflow:hidden;
   }
   .game-area{
@@ -233,7 +234,7 @@ gtag('event', 'project_open_maoitu');
     left:0;
     right:0;
     bottom:0;
-    width:min(720px, calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 16px));
+    width:min(100%, 720px);
     margin:0 auto;
     padding:4px 0 calc(6px + var(--safe-bottom, 0px));
     box-sizing:border-box;
@@ -249,6 +250,7 @@ gtag('event', 'project_open_maoitu');
     width:100%;
     max-width:100%;
     min-height:clamp(48px, 9vw, 60px);
+    height:clamp(48px, 9vw, 60px);
     overflow:hidden;
   }
 </style>
@@ -275,6 +277,49 @@ gtag('event', 'project_open_maoitu');
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
+  }
+
+  /* global-overflow-guard */
+  .ad-block,
+  .ad-card,
+  .ad-footer,
+  .project-ad,
+  .entry-ad-slot,
+  .puzzle-ad-slot,
+  .game-ad,
+  .card--ad {
+    width: min(100%, 720px) !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .ad-slot,
+  .ad-block ins.adsbygoogle,
+  .ad-footer ins,
+  .entry-ad-slot ins,
+  .puzzle-ad-slot ins.adsbygoogle,
+  .game-ad ins.adsbygoogle {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box;
+    min-height: clamp(48px, 9vw, 60px) !important;
+    height: clamp(48px, 9vw, 60px) !important;
+    overflow: hidden !important;
+  }
+  .page,
+  main,
+  .card,
+  .section,
+  .panel,
+  .shell {
+    min-width: 0;
+    max-width: 100%;
   }
 </style>
   <style id="interaction-guard">
@@ -335,6 +380,11 @@ gtag('event', 'project_open_maoitu');
     const assignSlot = (ins) => {
       if (!ins || !(ins instanceof HTMLElement)) return;
       if (ins.dataset.adSlotAssigned === '1') return;
+      const existingSlot = ins.getAttribute('data-ad-slot');
+      if (existingSlot && existingSlot !== 'rotate') {
+        ins.dataset.adSlotAssigned = '1';
+        return;
+      }
       if (ins.dataset.adStatic === '1') {
         ins.dataset.adSlotAssigned = '1';
         return;
