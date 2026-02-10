@@ -185,20 +185,6 @@
     margin: 0;
     font-size: 18px;
   }
-  .map-title span {
-    font-size: 12px;
-    color: var(--muted);
-  }
-  .map-meta {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 10px;
-    flex-wrap: wrap;
-    font-size: 12px;
-    color: var(--muted);
-    text-align: right;
-  }
   .hud {
     display: grid;
     gap: 8px;
@@ -807,10 +793,6 @@
       <section class="panel map-panel">
         <div class="map-title">
           <h1>魔王奪還戦</h1>
-          <div class="map-meta">
-            <span id="mapStatus">歩数: --</span>
-            <span id="baseDirection">ボス方向: --</span>
-          </div>
         </div>
         <div class="hud">
           <div class="hud-bars">
@@ -1037,6 +1019,37 @@
   const AWAKEN_STAT_DAMAGE_CAP = 0.6;
   const AWAKEN_STAT_TURN_GAIN_CAP = 6;
   const BASE_ACTION_CHAIN_RATE = 0.06;
+  const NO_SUB_CRIT_CAP_BONUS = 0.25;
+  const NO_SUB_DOT_CRIT_BONUS = 0.3;
+  const NO_SUB_TOXIC_LENGTH_BONUS = 3;
+  const NO_SUB_DOT_REND_MULT = 1.22;
+  const NO_SUB_CHAIN_CHANCE_BONUS = 0.16;
+  const NO_SUB_COMBO_POWER_STEP = 0.12;
+  const NO_SUB_COMBO_POWER_CAP = 0.6;
+  const NO_SUB_LAST_CRIT_BONUS = 0.45;
+  const NO_SUB_OVERHEAL_SHIELD_MULT = 1.35;
+  const NO_SUB_OVERHEAL_DAMAGE_MULT = 1.35;
+  const NO_SUB_DAMAGE_CUT_RATE = 0.18;
+  const NO_SUB_STAT_DEF_GAIN = 3;
+  const NO_SUB_STAT_LUC_GAIN = 3;
+  const NO_SUB_STAT_HP_GAIN = 8;
+  const STAT_COMBO_LABELS = { atk: '攻', spd: '速', def: '防', hp: 'HP', luc: '運' };
+  const ROUTE_FOCUS_TILE_ORDER = ['treasure', 'mimic', 'key', 'atk', 'spd', 'def', 'hp', 'luc', 'monster'];
+  const ROUTE_FOCUS_TILE_LABELS = {
+    treasure: '宝箱',
+    mimic: '偽宝箱',
+    key: '鍵',
+    atk: '攻',
+    spd: '速',
+    def: '防',
+    hp: 'HP',
+    luc: '運',
+    monster: '敵'
+  };
+  const BLOCKING_TILE_IDS = new Set(['wall']);
+  const TRAIL_IMMUNE_TILE_IDS = new Set(['wall', 'start', 'boss', 'mimic', 'warp']);
+  const BASE_PARAM_TILE_CAPS = { atk: 2, spd: 2, hp: 2, def: 1, luc: 1 };
+  const BASE_PARAM_TILE_LIMIT = Object.values(BASE_PARAM_TILE_CAPS).reduce((sum, value) => sum + value, 0);
   const STAT_TILE_IDS = ['atk', 'spd', 'def', 'hp', 'luc'];
   const CHUNK_SIZE = 3;
   const ATTACK_TILE_MAX = 13;
@@ -1064,34 +1077,34 @@
   const SKILL_REROLL_COST = 100;
   const SKILL_DEFS = [
     { id: 'critRate', name: '狙撃眼', desc: '会心率+10%', tags: ['crit'], subTags: ['multi'] },
-    { id: 'critCap', name: '臨戦感覚', desc: '会心率の上限+20%', tags: ['crit'], subTags: ['stat'] },
+    { id: 'critCap', name: '臨戦感覚', desc: '会心率の上限+25%', tags: ['crit'] },
     { id: 'critDamage', name: '急所破壊', desc: '会心ダメージ+30%', tags: ['crit'], subTags: ['dot'] },
     { id: 'critLifesteal', name: '吸命刃', desc: '会心時に与ダメの10%回復', tags: ['crit'], subTags: ['guard'] },
-    { id: 'dotCrit', name: '弱点穿ち', desc: 'DoT中の敵への会心率+20%', tags: ['crit'], subTags: ['dot'] },
+    { id: 'dotCrit', name: '弱点穿ち', desc: 'DoT中の敵への会心率+30%', tags: ['crit'] },
 
     { id: 'poisonStrike', name: '毒牙', desc: '会心時に毒スタック+1', tags: ['dot'], subTags: ['crit'] },
     { id: 'fireStrike', name: '炎爪', desc: '会心時に炎スタック+1 / 攻撃時に炎ダメージ', tags: ['dot'], subTags: ['multi'] },
-    { id: 'toxicLength', name: '腐蝕延長', desc: '敵毒の持続歩数+2', tags: ['dot'], subTags: ['guard'] },
+    { id: 'toxicLength', name: '腐蝕延長', desc: '敵毒の持続歩数+3', tags: ['dot'] },
     { id: 'dotAmp', name: '侵食加速', desc: '毒/炎ダメージ+40%', tags: ['dot'], subTags: ['stat'] },
-    { id: 'dotRend', name: '蝕み追撃', desc: 'DoT中の敵へ与ダメ+15%', tags: ['dot'], subTags: ['multi'] },
+    { id: 'dotRend', name: '蝕み追撃', desc: 'DoT中の敵へ与ダメ+22%', tags: ['dot'] },
 
     { id: 'tripleStrike', name: '三連撃', desc: '10%で3連撃', tags: ['multi'], subTags: ['crit'] },
-    { id: 'chainChance', name: '連刃', desc: '連撃発生率+12%', tags: ['multi'], subTags: ['dot'] },
+    { id: 'chainChance', name: '連刃', desc: '連撃発生率+16%', tags: ['multi'] },
     { id: 'multiMp', name: '連撃充填', desc: '追加ヒット時にMP+1', tags: ['multi'], subTags: ['stat'] },
-    { id: 'comboPower', name: 'コンボ倍率', desc: '同一行動の後段ほど与ダメ増加', tags: ['multi'], subTags: ['crit'] },
-    { id: 'lastCrit', name: '終段会心', desc: '連撃の最終段で会心率+30%', tags: ['multi'], subTags: ['guard'] },
+    { id: 'comboPower', name: 'コンボ倍率', desc: '同一行動の後段ほど与ダメ増加(最大+60%)', tags: ['multi'] },
+    { id: 'lastCrit', name: '終段会心', desc: '連撃の最終段で会心率+45%', tags: ['multi'] },
 
     { id: 'stepHeal', name: '歩行回復', desc: '歩くたび最大HP10%回復', tags: ['guard'], subTags: ['dot'] },
-    { id: 'overhealShield', name: '過剰装甲', desc: '回復超過分がシールドになる', tags: ['guard'], subTags: ['stat'] },
-    { id: 'overhealDamage', name: '過剰反撃', desc: '回復超過分を敵へ与える', tags: ['guard'], subTags: ['dot'] },
+    { id: 'overhealShield', name: '過剰装甲', desc: '回復超過分の135%がシールドになる', tags: ['guard'] },
+    { id: 'overhealDamage', name: '過剰反撃', desc: '回復超過分の135%を敵へ与える', tags: ['guard'] },
     { id: 'reflect', name: '反射', desc: '被ダメージの10%を反射', tags: ['guard'], subTags: ['crit'] },
-    { id: 'damageCut', name: '防御姿勢', desc: '被ダメージ-12%', tags: ['guard'], subTags: ['stat'] },
+    { id: 'damageCut', name: '防御姿勢', desc: '被ダメージ-18%', tags: ['guard'] },
 
     { id: 'statAtk', name: '剛力結晶', desc: '習得時にこうげき+2', tags: ['stat'], subTags: ['crit'] },
     { id: 'statSpd', name: '疾風結晶', desc: '習得時にはやさ+2', tags: ['stat'], subTags: ['multi'] },
-    { id: 'statDef', name: '鉄壁結晶', desc: '習得時にぼうぎょ+2', tags: ['stat'], subTags: ['guard'] },
-    { id: 'statLuc', name: '幸運結晶', desc: '習得時にうん+2', tags: ['stat'], subTags: ['crit'] },
-    { id: 'statHp', name: '生命結晶', desc: '習得時にたいりょく+6', tags: ['stat'], subTags: ['guard'] }
+    { id: 'statDef', name: '鉄壁結晶', desc: '習得時にぼうぎょ+3', tags: ['stat'] },
+    { id: 'statLuc', name: '幸運結晶', desc: '習得時にうん+3', tags: ['stat'] },
+    { id: 'statHp', name: '生命結晶', desc: '習得時にたいりょく+8', tags: ['stat'] }
   ];
   const SYNERGY_DEFS = [
     {
@@ -1133,15 +1146,15 @@
   }, {});
 
   const FIXED_MAP = [
-    ['treasure', 'spd', 'poison', 'luc', 'atk', 'treasure', 'empty', 'empty', 'boss'],
-    ['empty', 'def', 'atk', 'heal', 'empty', 'poison', 'empty', 'empty', 'hp'],
-    ['empty', 'spd', 'empty', 'treasure', 'hp', 'empty', 'mimic', 'empty', 'luc'],
-    ['spd', 'luc', 'empty', 'trap', 'ice', 'ice', 'ice', 'atk', 'empty'],
-    ['empty', 'poison', 'def', 'empty', 'empty', 'empty', 'spd', 'treasure', 'heal'],
-    ['luc', 'hp', 'key', 'empty', 'def', 'empty', 'empty', 'empty', 'empty'],
-    ['empty', 'treasure', 'empty', 'atk', 'empty', 'hp', 'empty', 'empty', 'atk'],
-    ['poison', 'empty', 'empty', 'empty', 'hp', 'empty', 'spd', 'empty', 'empty'],
-    ['start', 'empty', 'empty', 'def', 'empty', 'luc', 'empty', 'empty', 'def']
+    ['empty', 'empty', 'poison', 'empty', 'empty', 'treasure', 'empty', 'luc', 'boss'],
+    ['treasure', 'empty', 'empty', 'heal', 'empty', 'hp', 'empty', 'empty', 'empty'],
+    ['empty', 'empty', 'empty', 'treasure', 'empty', 'empty', 'warp', 'spd', 'empty'],
+    ['empty', 'empty', 'empty', 'trap', 'empty', 'empty', 'empty', 'empty', 'empty'],
+    ['empty', 'poison', 'def', 'empty', 'empty', 'empty', 'treasure', 'empty', 'heal'],
+    ['empty', 'empty', 'key', 'hp', 'empty', 'empty', 'atk', 'empty', 'empty'],
+    ['empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'mimic', 'empty', 'empty'],
+    ['spd', 'treasure', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty'],
+    ['start', 'empty', 'atk', 'empty', 'empty', 'empty', 'empty', 'empty', 'empty']
   ];
 
   const FIXED_ENEMIES = [];
@@ -1159,6 +1172,7 @@
     luc: { id: 'luc', color: '#facc15', name: 'うん' },
     heal: { id: 'heal', color: '#10b981', name: '回復' },
     poison: { id: 'poison', color: '#a855f7', name: '毒' },
+    warp: { id: 'warp', color: '#22d3ee', name: '魔法陣' },
     ice: { id: 'ice', color: '#93c5fd', name: '氷' },
     key: { id: 'key', color: '#fbbf24', name: '鍵' },
     skill: { id: 'skill', color: '#f59e0b', name: 'スキル' },
@@ -1236,6 +1250,7 @@
     luc: 'tile6',
     heal: 'tile9',
     poison: 'tile7',
+    warp: 'tile9',
     ice: 'tile9',
     key: 'tile9',
     skill: 'tile9',
@@ -1516,6 +1531,7 @@
   let spawn = { x: 0, y: 0 };
   let bossPos = { x: 0, y: 0 };
   let tiles = [];
+  let trailTileOwners = [];
   let enemies = [];
   let visited = [];
   let skillTiles = [];
@@ -1536,6 +1552,8 @@
   let playerFacing = 'down';
   let lastBossLevel = 0;
   let treasureOpenedCount = 0;
+  let warpSelectionActive = false;
+  let routeInsightSeen = new Set();
   const MOVE_ANIM_MS = 180;
 
   const BASE_STATS = { hp: 10, mp: 1, atk: 1, spd: 1, def: 1, luc: 1 };
@@ -1545,6 +1563,13 @@
   function createTagCounter() {
     return TAG_IDS.reduce((acc, tag) => {
       acc[tag] = 0;
+      return acc;
+    }, {});
+  }
+
+  function createStatCounter() {
+    return STAT_TILE_IDS.reduce((acc, stat) => {
+      acc[stat] = 0;
       return acc;
     }, {});
   }
@@ -1578,6 +1603,8 @@
     synergyTaken: {},
     synergyPerks: {},
     statTilesCollected: 0,
+    activeStatMode: null,
+    trailStatCounts: createStatCounter(),
     poisonStacks: 0,
     poisonSteps: 0
   };
@@ -2242,6 +2269,25 @@
     return dist;
   }
 
+  function enforceBaseParamTileCaps(grid) {
+    const used = { atk: 0, spd: 0, def: 0, hp: 0, luc: 0 };
+    let total = 0;
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        const tileId = grid[y]?.[x];
+        if (!STAT_TILE_IDS.includes(tileId)) continue;
+        const typeCap = BASE_PARAM_TILE_CAPS[tileId] || 0;
+        if (used[tileId] >= typeCap || total >= BASE_PARAM_TILE_LIMIT) {
+          grid[y][x] = 'empty';
+          continue;
+        }
+        used[tileId] += 1;
+        total += 1;
+      }
+    }
+    return { used, total };
+  }
+
   function assignEnemyOrder() {
     const dist = buildDistanceFromSpawn();
     const list = [];
@@ -2270,10 +2316,12 @@
 
   function buildMap() {
     tiles = FIXED_MAP.map(row => row.slice());
+    trailTileOwners = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(null));
     enemies = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(null));
     visited = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(false));
     skillTiles = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(null));
     revealedMimics = new Set();
+    warpSelectionActive = false;
     enemyCount = 0;
     itemTileTotal = 0;
 
@@ -2296,6 +2344,7 @@
       if (entry.x === bossPos.x && entry.y === bossPos.y) return;
       tiles[entry.y][entry.x] = 'wall';
     });
+    enforceBaseParamTileCaps(tiles);
     player.x = spawn.x;
     player.y = spawn.y;
     HERO_BOSS.baseStats = { ...HERO_BOSS.stats };
@@ -2498,54 +2547,37 @@
     const cx = x + tileSize / 2;
     const cy = y + tileSize / 2;
     const size = Math.max(6, Math.floor(tileSize * 0.38));
+    const drawBadge = (label, bg = 'rgba(15, 23, 42, 0.75)') => {
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.arc(cx, cy, size * 0.62, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = `${Math.max(10, Math.floor(tileSize * 0.45))}px 'Fredoka'`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, cx, cy + 1);
+    };
     switch (tileId) {
       case 'monster': {
         const label = ENEMY_TYPE_LABELS[enemy?.id] || '1';
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
-        ctx.beginPath();
-        ctx.arc(cx, cy, size * 0.62, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#f8fafc';
-        ctx.font = `${Math.max(10, Math.floor(tileSize * 0.45))}px 'Fredoka'`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(label, cx, cy + 1);
+        drawBadge(label);
         break;
       }
       case 'skill': {
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
-        ctx.beginPath();
-        ctx.arc(cx, cy, size * 0.62, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#f8fafc';
-        ctx.font = `${Math.max(10, Math.floor(tileSize * 0.45))}px 'Fredoka'`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('技', cx, cy + 1);
+        drawBadge('技');
         break;
       }
       case 'ice': {
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
-        ctx.beginPath();
-        ctx.arc(cx, cy, size * 0.62, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#f8fafc';
-        ctx.font = `${Math.max(10, Math.floor(tileSize * 0.45))}px 'Fredoka'`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('氷', cx, cy + 1);
+        drawBadge('氷');
         break;
       }
       case 'key': {
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
-        ctx.beginPath();
-        ctx.arc(cx, cy, size * 0.62, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#f8fafc';
-        ctx.font = `${Math.max(10, Math.floor(tileSize * 0.45))}px 'Fredoka'`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('鍵', cx, cy + 1);
+        drawBadge('鍵');
+        break;
+      }
+      case 'warp': {
+        drawBadge('陣', 'rgba(8, 145, 178, 0.82)');
         break;
       }
       default:
@@ -2578,7 +2610,13 @@
     ctx.strokeStyle = 'rgba(0,0,0,0.35)';
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 0.5, y + 0.5, tileSize - 1, tileSize - 1);
-    if (tileId === 'monster' || tileId === 'ice' || tileId === 'key' || (tileId === 'skill' && !overlaySprite)) {
+    if (
+      tileId === 'monster'
+      || tileId === 'ice'
+      || tileId === 'key'
+      || tileId === 'warp'
+      || (tileId === 'skill' && !overlaySprite)
+    ) {
       drawTileIcon(tileId, x, y, enemy);
     }
   }
@@ -2688,24 +2726,94 @@
   let selectedSkillId = null;
   let selectedGearId = null;
 
+  function getSkillMainTag(skill) {
+    const tags = Array.isArray(skill?.tags) ? skill.tags : [];
+    const tag = tags[0] || null;
+    return TAG_IDS.includes(tag) ? tag : null;
+  }
+
+  function getSkillSubTags(skill) {
+    const main = getSkillMainTag(skill);
+    const subs = Array.isArray(skill?.subTags) ? skill.subTags : [];
+    return Array.from(new Set(subs.filter(tag => TAG_IDS.includes(tag) && tag !== main)));
+  }
+
+  function getSkillAllTags(skill) {
+    const list = [];
+    const main = getSkillMainTag(skill);
+    if (main) list.push(main);
+    getSkillSubTags(skill).forEach((tag) => {
+      if (!list.includes(tag)) list.push(tag);
+    });
+    return list;
+  }
+
+  function formatTagLabel(tag) {
+    return TAG_LABELS[tag] || tag;
+  }
+
   function formatSkillTags(skill) {
-    const tags = skill?.tags || [];
-    if (!tags.length) return 'タグなし';
-    return tags.map(tag => TAG_LABELS[tag] || tag).join(' / ');
+    const main = getSkillMainTag(skill);
+    const sub = getSkillSubTags(skill);
+    if (!main) return 'タグなし';
+    if (!sub.length) return `主: ${formatTagLabel(main)}`;
+    return `主: ${formatTagLabel(main)} / 副: ${sub.map(formatTagLabel).join(', ')}`;
+  }
+
+  function formatSkillTagGainPreview(skill) {
+    ensurePlayerProgressState();
+    const tags = getSkillAllTags(skill);
+    if (!tags.length) return 'タグ加算なし';
+    return tags.map((tag) => {
+      const current = player.tagCounts?.[tag] || 0;
+      const next = current + 1;
+      if (player.awakenedTags?.[tag]) return `${formatTagLabel(tag)} +1`;
+      if (next >= AWAKEN_THRESHOLD) return `${formatTagLabel(tag)} ${current}->${next} (覚醒)`;
+      return `${formatTagLabel(tag)} ${current}->${next}`;
+    }).join(' / ');
+  }
+
+  function renderTagProgressHtml(previewSkill = null) {
+    ensurePlayerProgressState();
+    const previewTags = previewSkill ? getSkillAllTags(previewSkill) : [];
+    const cards = TAG_IDS.map((tag) => {
+      const current = player.tagCounts?.[tag] || 0;
+      const willGain = previewTags.includes(tag) ? 1 : 0;
+      const next = current + willGain;
+      const awakened = !!player.awakenedTags?.[tag];
+      const willAwaken = !awakened && next >= AWAKEN_THRESHOLD;
+      const cls = `tag-progress-item${awakened ? ' is-awakened' : ''}${willAwaken ? ' is-ready' : ''}`;
+      const progressText = awakened
+        ? '覚醒済み'
+        : `${current}/${AWAKEN_THRESHOLD}${willGain ? ` -> ${next}/${AWAKEN_THRESHOLD}` : ''}`;
+      const effectText = getAwakenDescription(tag);
+      return `<div class="${cls}"><strong>${formatTagLabel(tag)}</strong><small>${progressText}</small><small>${effectText}</small></div>`;
+    }).join('');
+    return `<div class="tag-progress">${cards}</div>`;
   }
 
   function showSkillDetail(skill) {
     if (!skillDetailEl) return;
     if (!skill) {
-      skillDetailEl.innerHTML = 'スキルはまだありません。';
+      skillDetailEl.innerHTML = `
+        <strong>タグ進行</strong>
+        <div class="skill-meta-line">同タグを3つ集めると覚醒します</div>
+        ${renderTagProgressHtml(null)}
+      `;
       return;
     }
     const owned = player.skills?.[skill.id];
+    const mainTag = getSkillMainTag(skill);
+    const subTags = getSkillSubTags(skill);
     skillDetailEl.innerHTML = `
       <strong>${skill.name}</strong>
       <div>${skill.desc}</div>
-      <div>タグ: ${formatSkillTags(skill)}</div>
+      <div class="skill-meta-line">タグ: ${formatSkillTags(skill)}</div>
+      <div class="skill-meta-line">取得時: ${formatSkillTagGainPreview(skill)}</div>
+      <div class="skill-meta-line">主タグ効果: ${mainTag ? getAwakenDescription(mainTag) : 'なし'}</div>
+      ${subTags.length ? `<div class="skill-meta-line">副タグ効果: ${subTags.map(tag => getAwakenDescription(tag)).join(' / ')}</div>` : ''}
       <div>${owned ? '習得済み' : '未習得'}</div>
+      ${renderTagProgressHtml(skill)}
     `;
   }
 
@@ -2966,14 +3074,159 @@
       const shieldRate = player.maxHp ? (player.shield / player.maxHp) * 100 : 0;
       shieldBar.style.width = `${clamp(shieldRate, 0, 100)}%`;
     }
+    updateMapReadouts();
+    renderSkillList();
+    renderGearList();
+  }
+
+  function isTileBlocked(tileId) {
+    return !tileId || BLOCKING_TILE_IDS.has(tileId);
+  }
+
+  function countAvailableMovesAt(x, y, grid = tiles) {
+    const dirs = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1]
+    ];
+    let count = 0;
+    for (const [dx, dy] of dirs) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
+      const tileId = grid[ny]?.[nx];
+      if (isTileBlocked(tileId)) continue;
+      count += 1;
+    }
+    return count;
+  }
+
+  function buildRouteStateInfo(startX = player.x, startY = player.y) {
+    const counts = {};
+    ROUTE_FOCUS_TILE_ORDER.forEach((tileId) => { counts[tileId] = 0; });
+    const distMap = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(-1));
+    const startTile = tiles[startY]?.[startX];
+    if (isTileBlocked(startTile)) {
+      return {
+        counts,
+        branchChoices: 0,
+        bossReachable: false,
+        bossDist: -1,
+        itemReachable: 0,
+        statReachable: 0,
+        monsterReachable: 0
+      };
+    }
+    const queue = [{ x: startX, y: startY }];
+    let head = 0;
+    distMap[startY][startX] = 0;
+    const dirs = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1]
+    ];
+    while (head < queue.length) {
+      const current = queue[head++];
+      const currentDist = distMap[current.y][current.x];
+      const tileId = tiles[current.y]?.[current.x];
+      if (Object.prototype.hasOwnProperty.call(counts, tileId)) {
+        counts[tileId] += 1;
+      }
+      for (const [dx, dy] of dirs) {
+        const nx = current.x + dx;
+        const ny = current.y + dy;
+        if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
+        if (distMap[ny][nx] !== -1) continue;
+        const nextTile = tiles[ny]?.[nx];
+        if (isTileBlocked(nextTile)) continue;
+        distMap[ny][nx] = currentDist + 1;
+        queue.push({ x: nx, y: ny });
+      }
+    }
+    const bossDist = distMap[bossPos.y]?.[bossPos.x] ?? -1;
+    const itemReachable = (counts.treasure || 0) + (counts.mimic || 0) + (counts.key || 0);
+    const statReachable = (counts.atk || 0) + (counts.spd || 0) + (counts.def || 0) + (counts.hp || 0) + (counts.luc || 0);
+    const monsterReachable = counts.monster || 0;
+    return {
+      counts,
+      branchChoices: countAvailableMovesAt(startX, startY),
+      bossReachable: bossDist >= 0,
+      bossDist,
+      itemReachable,
+      statReachable,
+      monsterReachable
+    };
+  }
+
+  function formatRouteFocusCounts(counts) {
+    const parts = [];
+    ROUTE_FOCUS_TILE_ORDER.forEach((tileId) => {
+      const value = counts?.[tileId] || 0;
+      if (value <= 0) return;
+      const label = ROUTE_FOCUS_TILE_LABELS[tileId] || tileId;
+      parts.push(`${label}${value > 1 ? `x${value}` : ''}`);
+    });
+    return parts.length ? parts.join(' ') : 'なし';
+  }
+
+  function maybeLogRouteInsight(pruneSummary = null) {
+    if (!routeInsightSeen) routeInsightSeen = new Set();
+    if (pruneSummary?.removedTotal) {
+      const lossText = formatRouteFocusCounts(pruneSummary.removedCounts);
+      if (lossText !== 'なし') {
+        const lossKey = `loss:${lossText}`;
+        if (!routeInsightSeen.has(lossKey)) {
+          routeInsightSeen.add(lossKey);
+          addLog(`閃き: この一歩で閉じた道 -> ${lossText}`);
+          return;
+        }
+      }
+    }
+    const info = buildRouteStateInfo(player.x, player.y);
+    const bossBucket = info.bossDist < 0 ? 'x' : (info.bossDist <= 3 ? 'n' : (info.bossDist <= 6 ? 'm' : 'f'));
+    const stateKey = `state:${info.branchChoices}:${Math.min(4, info.itemReachable)}:${Math.min(6, info.statReachable)}:${Math.min(4, info.monsterReachable)}:${bossBucket}`;
+    if (routeInsightSeen.has(stateKey)) return;
+    let text = '';
+    if (info.branchChoices >= 3 && info.itemReachable > 0 && info.statReachable > 0) {
+      text = `分岐${info.branchChoices}。宝箱${info.itemReachable}と強化${info.statReachable}を両取りできる局面`;
+    } else if (info.branchChoices === 1 && (info.itemReachable > 0 || info.statReachable > 0)) {
+      text = `一本道。残りは宝箱${info.itemReachable}/強化${info.statReachable}の順番勝負`;
+    } else if (info.bossReachable && info.bossDist <= 3 && info.monsterReachable <= 1) {
+      text = 'ボス圏内。寄り道1回の価値を見直す局面';
+    } else if (info.itemReachable === 0 && info.statReachable >= 2 && info.branchChoices >= 2) {
+      text = `宝箱より強化優先の盤面。分岐${info.branchChoices}で最終火力を伸ばせる`;
+    }
+    if (!text) return;
+    routeInsightSeen.add(stateKey);
+    addLog(`閃き: ${text}`);
+  }
+
+  function getActiveStatModeText() {
+    if (!STAT_TILE_IDS.includes(player.activeStatMode)) return 'なし';
+    return STAT_COMBO_LABELS[player.activeStatMode] || player.activeStatMode;
+  }
+
+  function getTrailStatSummaryText() {
+    const parts = STAT_TILE_IDS.map((stat) => {
+      const label = STAT_COMBO_LABELS[stat] || stat;
+      const count = player.trailStatCounts?.[stat] || 0;
+      return `${label}${count}`;
+    });
+    return parts.join(' ');
+  }
+
+  function updateMapReadouts() {
+    if (!mapStatus && !baseDirection) return;
+    const info = buildRouteStateInfo(player.x, player.y);
     const dist = Math.abs(player.x - bossPos.x) + Math.abs(player.y - bossPos.y);
-    mapStatus.textContent = `歩数: ${player.steps} / 残り敵: ${enemyCount}`;
+    const statusText = `歩数: ${player.steps} / 残り敵: ${enemyCount} / 分岐: ${info.branchChoices} / 到達: 宝${info.itemReachable} 強${info.statReachable} / モード:${getActiveStatModeText()} / 路:${getTrailStatSummaryText()}`;
+    if (mapStatus) mapStatus.textContent = statusText;
     if (baseDirection) {
       const dir = getDirectionInfo(bossPos.x - player.x, bossPos.y - player.y);
       baseDirection.textContent = `ボス方向: ${dir.arrow} ${dir.label} (${dist}マス)`;
     }
-    renderSkillList();
-    renderGearList();
   }
 
   function getDirectionInfo(dx, dy) {
@@ -3088,16 +3341,73 @@
     player.level = Math.max(1, levelFromStats);
   }
 
-  function applyStatBoost(statKey, label) {
-    const amount = statKey === 'hp' ? 2 : 1;
-    player.statTilesCollected = (player.statTilesCollected || 0) + 1;
-    player.baseStats[statKey] = (player.baseStats[statKey] || 0) + amount;
-    if (statKey === 'hp') {
-      player.hp += amount;
+  function getTrailStatGainPerTile(statKey) {
+    if (!STAT_TILE_IDS.includes(statKey)) return 0;
+    return 1;
+  }
+
+  function refreshTrailStatCollected() {
+    player.statTilesCollected = STAT_TILE_IDS.reduce((sum, stat) => {
+      return sum + Math.max(0, player.trailStatCounts?.[stat] || 0);
+    }, 0);
+  }
+
+  function applyTrailStatDelta(statKey, tileDelta) {
+    if (!STAT_TILE_IDS.includes(statKey)) return;
+    if (!Number.isFinite(tileDelta) || tileDelta === 0) return;
+    const perTile = getTrailStatGainPerTile(statKey);
+    if (perTile <= 0) return;
+    const current = player.trailStatCounts?.[statKey] || 0;
+    const next = Math.max(0, current + tileDelta);
+    const appliedDelta = next - current;
+    if (!appliedDelta) return;
+    player.trailStatCounts[statKey] = next;
+    player.baseStats[statKey] = (player.baseStats[statKey] || 0) + appliedDelta * perTile;
+    if (statKey === 'hp' && appliedDelta > 0) {
+      player.hp += appliedDelta * perTile;
     }
+    refreshTrailStatCollected();
     updateUnitStats(player);
     updatePlayerLevel();
-    addLog(`${label} +${amount}`);
+  }
+
+  function setActiveStatMode(statKey, label) {
+    if (!STAT_TILE_IDS.includes(statKey)) return;
+    const switched = player.activeStatMode !== statKey;
+    player.activeStatMode = statKey;
+    if (switched) {
+      addLog(`${label}モードに切替`);
+    }
+  }
+
+  function canPaintTrailTile(tileId) {
+    return Boolean(tileId) && !TRAIL_IMMUNE_TILE_IDS.has(tileId);
+  }
+
+  function applyTrailModeToTile(x, y) {
+    const statKey = player.activeStatMode;
+    if (!STAT_TILE_IDS.includes(statKey)) return;
+    if (x < 0 || y < 0 || x >= MAP_SIZE || y >= MAP_SIZE) return;
+    const tileId = tiles[y]?.[x];
+    if (!canPaintTrailTile(tileId)) return;
+    if (!trailTileOwners[y]) return;
+    const previousOwner = trailTileOwners[y][x];
+    if (previousOwner && previousOwner === statKey) {
+      tiles[y][x] = statKey;
+      return;
+    }
+    if (STAT_TILE_IDS.includes(previousOwner)) {
+      applyTrailStatDelta(previousOwner, -1);
+    }
+    trailTileOwners[y][x] = statKey;
+    tiles[y][x] = statKey;
+    applyTrailStatDelta(statKey, 1);
+    const label = STAT_COMBO_LABELS[statKey] || statKey;
+    addLog(`${label}路 +1 (合計${player.trailStatCounts[statKey]})`);
+  }
+
+  function applyStatBoost(statKey, label) {
+    setActiveStatMode(statKey, label);
   }
 
   function ensurePlayerProgressState() {
@@ -3109,6 +3419,11 @@
     if (!player.synergyTaken) player.synergyTaken = {};
     if (!player.synergyPerks) player.synergyPerks = {};
     if (!Number.isFinite(player.statTilesCollected)) player.statTilesCollected = 0;
+    if (!player.trailStatCounts) player.trailStatCounts = createStatCounter();
+    STAT_TILE_IDS.forEach((stat) => {
+      if (!Number.isFinite(player.trailStatCounts[stat])) player.trailStatCounts[stat] = 0;
+    });
+    if (!STAT_TILE_IDS.includes(player.activeStatMode)) player.activeStatMode = null;
   }
 
   function getAwakenDescription(tag) {
@@ -3133,17 +3448,17 @@
       addLog('はやさ +2');
       changed = true;
     } else if (skillId === 'statDef') {
-      player.baseStats.def += 2;
-      addLog('ぼうぎょ +2');
+      player.baseStats.def += NO_SUB_STAT_DEF_GAIN;
+      addLog(`ぼうぎょ +${NO_SUB_STAT_DEF_GAIN}`);
       changed = true;
     } else if (skillId === 'statLuc') {
-      player.baseStats.luc += 2;
-      addLog('うん +2');
+      player.baseStats.luc += NO_SUB_STAT_LUC_GAIN;
+      addLog(`うん +${NO_SUB_STAT_LUC_GAIN}`);
       changed = true;
     } else if (skillId === 'statHp') {
-      player.baseStats.hp += 6;
-      player.hp += 6;
-      addLog('たいりょく +6');
+      player.baseStats.hp += NO_SUB_STAT_HP_GAIN;
+      player.hp += NO_SUB_STAT_HP_GAIN;
+      addLog(`たいりょく +${NO_SUB_STAT_HP_GAIN}`);
       changed = true;
     }
     if (changed) {
@@ -3187,6 +3502,7 @@
         title: `シナジー報酬: ${synergy.name}`,
         subtitle: '1つ選択 (各組み合わせ1回)',
         allowReroll: false,
+        showTagGuide: false,
         buildOptions: () => options,
         onPick: (reward) => applySynergyReward(synergy.id, reward),
         emptyLog: '選べるシナジーがない'
@@ -3207,7 +3523,7 @@
     }
     player.skills[skill.id] = true;
     addLog(`スキル獲得: ${skill.name}`);
-    const tags = Array.isArray(skill.tags) ? skill.tags : [];
+    const tags = getSkillAllTags(skill);
     tags.forEach((tag) => {
       const nextCount = (player.tagCounts[tag] || 0) + 1;
       player.tagCounts[tag] = nextCount;
@@ -3297,7 +3613,7 @@
 
   function getEnemyPoisonStepGain(attackerState) {
     let steps = ENEMY_BASE_POISON_STEPS;
-    if (attackerState?.skills?.toxicLength) steps += 2;
+    if (attackerState?.skills?.toxicLength) steps += NO_SUB_TOXIC_LENGTH_BONUS;
     if (attackerState?.awakenedTags?.dot) steps += 2;
     return steps;
   }
@@ -3338,12 +3654,15 @@
     const overflow = Math.max(0, amount - actual);
     let shieldAdded = 0;
     if (overflow > 0 && (target.skills?.overhealShield || target.awakenedTags?.guard)) {
-      target.shield = (target.shield || 0) + overflow;
-      shieldAdded = overflow;
+      const shieldGain = target.skills?.overhealShield
+        ? Math.max(1, Math.floor(overflow * NO_SUB_OVERHEAL_SHIELD_MULT))
+        : overflow;
+      target.shield = (target.shield || 0) + shieldGain;
+      shieldAdded = shieldGain;
     }
     let overflowDamage = 0;
     if (overflow > 0 && target.skills?.overhealDamage && opts.enemyState) {
-      overflowDamage = overflow;
+      overflowDamage = Math.max(1, Math.floor(overflow * NO_SUB_OVERHEAL_DAMAGE_MULT));
       applyDamageToEnemy(opts.enemyState, overflowDamage, opts.isBoss);
     }
     if (actual > 0 && target.synergyPerks?.guardDotPurge && opts.enemyState) {
@@ -3444,6 +3763,9 @@
         addLog('鍵を手に入れた');
       }
       tiles[y][x] = 'empty';
+    } else if (tileId === 'warp') {
+      warpSelectionActive = true;
+      addLog('魔法陣が起動: 転移先をクリック (現在地クリックでキャンセル)');
     } else if (tileId === 'atk') {
       applyStatBoost('atk', 'こうげき');
     } else if (tileId === 'def') {
@@ -3495,93 +3817,40 @@
   }
 
   function hasAvailableMoveAt(x, y) {
-    const dirs = [
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1]
-    ];
-    for (const [dx, dy] of dirs) {
-      const nx = x + dx;
-      const ny = y + dy;
-      if (canMoveTo(nx, ny)) return true;
-    }
-    return false;
+    return countAvailableMovesAt(x, y) > 0;
   }
 
   function canMoveTo(x, y) {
     if (x < 0 || y < 0 || x >= MAP_SIZE || y >= MAP_SIZE) return false;
     const tileId = tiles[y]?.[x];
-    if (!tileId) return false;
-    if (tileId === 'wall') return false;
-    return true;
-  }
-
-  function markTileGone(x, y) {
-    if (x < 0 || y < 0 || x >= MAP_SIZE || y >= MAP_SIZE) return;
-    if (tiles[y]?.[x] && tiles[y][x] !== 'wall') {
-      tiles[y][x] = 'wall';
-      visited[y][x] = true;
-      if (skillTiles?.[y]) skillTiles[y][x] = null;
-    }
-  }
-
-  function pruneUnreachableTiles() {
-    const dirs = [
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1]
-    ];
-    const buildReachableFrom = (startX, startY, blockX = null, blockY = null) => {
-      const reachable = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(false));
-      if (startX < 0 || startY < 0 || startX >= MAP_SIZE || startY >= MAP_SIZE) return reachable;
-      if (blockX === startX && blockY === startY) return reachable;
-      const startTile = tiles[startY]?.[startX];
-      if (!startTile || startTile === 'wall') return reachable;
-      const queue = [{ x: startX, y: startY }];
-      let head = 0;
-      reachable[startY][startX] = true;
-      while (head < queue.length) {
-        const current = queue[head++];
-        for (const [dx, dy] of dirs) {
-          const nx = current.x + dx;
-          const ny = current.y + dy;
-          if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
-          if (reachable[ny][nx]) continue;
-          if (blockX === nx && blockY === ny) continue;
-          if (!canMoveTo(nx, ny)) continue;
-          reachable[ny][nx] = true;
-          queue.push({ x: nx, y: ny });
-        }
-      }
-      return reachable;
-    };
-
-    const reachableFromPlayer = buildReachableFrom(player.x, player.y);
-    const reachableFromBoss = buildReachableFrom(bossPos.x, bossPos.y);
-    for (let y = 0; y < MAP_SIZE; y++) {
-      for (let x = 0; x < MAP_SIZE; x++) {
-        if (x === player.x && y === player.y) continue;
-        if (x === bossPos.x && y === bossPos.y) continue;
-        const tileId = tiles[y]?.[x];
-        if (!tileId) continue;
-        if (tileId === 'wall') continue;
-        if (reachableFromPlayer[y][x] && reachableFromBoss[y][x]) continue;
-        tiles[y][x] = 'wall';
-        visited[y][x] = true;
-        if (skillTiles?.[y]) skillTiles[y][x] = null;
-        if (enemies?.[y]?.[x]) {
-          enemies[y][x] = null;
-          enemyCount = Math.max(0, enemyCount - 1);
-        }
-        revealedMimics.delete(x + y * MAP_SIZE);
-      }
-    }
+    return !isTileBlocked(tileId);
   }
 
   function hasAvailableMove() {
     return hasAvailableMoveAt(player.x, player.y);
+  }
+
+  async function resolveMovementAfterLanding(dirX, dirY, allowIceSlide = true) {
+    if (gameOver) return;
+    applyTrailModeToTile(player.x, player.y);
+    maybeLogRouteInsight();
+    applyStepHeal();
+    if (applyPoisonTick()) return;
+    updateStats();
+    renderMap();
+    if (!warpSelectionActive && tiles[player.y]?.[player.x] !== 'boss' && !hasAvailableMove()) {
+      endGame(false);
+      return;
+    }
+    const currentTile = tiles[player.y]?.[player.x];
+    if (!allowIceSlide) return;
+    if (currentTile === 'ice' && (dirX || dirY)) {
+      const nextX = player.x + dirX;
+      const nextY = player.y + dirY;
+      if (canMoveTo(nextX, nextY)) {
+        await movePlayerTo(nextX, nextY, { dx: dirX, dy: dirY });
+      }
+    }
   }
 
   async function movePlayerTo(targetX, targetY, slideDir = null) {
@@ -3593,26 +3862,15 @@
     const dirX = slideDir?.dx ?? Math.sign(dx);
     const dirY = slideDir?.dy ?? Math.sign(dy);
     await animateMove(targetX, targetY);
-    markTileGone(prevX, prevY);
     await resolveTileEvent(targetX, targetY);
-    if (gameOver) return;
-    pruneUnreachableTiles();
-    applyStepHeal();
-    if (applyPoisonTick()) return;
-    updateStats();
-    renderMap();
-    if (tiles[player.y]?.[player.x] !== 'boss' && !hasAvailableMove()) {
-      endGame(false);
-      return;
-    }
-    const currentTile = tiles[player.y]?.[player.x];
-    if (currentTile === 'ice' && (dirX || dirY)) {
-      const nextX = player.x + dirX;
-      const nextY = player.y + dirY;
-      if (canMoveTo(nextX, nextY)) {
-        await movePlayerTo(nextX, nextY, { dx: dirX, dy: dirY });
-      }
-    }
+    await resolveMovementAfterLanding(dirX, dirY, true);
+  }
+
+  async function warpPlayerTo(targetX, targetY) {
+    if (battleActive || isChoosingSkill || gameOver || isMoving) return;
+    await animateMove(targetX, targetY);
+    await resolveTileEvent(targetX, targetY);
+    await resolveMovementAfterLanding(0, 0, false);
   }
 
   function animateMove(nextX, nextY) {
@@ -3647,20 +3905,38 @@
     });
   }
 
-  function handleMapClick(event) {
-    event.preventDefault();
-    if (battleActive || isChoosingSkill || gameOver || isMoving) return;
+  function getMapTargetFromPointer(event) {
     const rect = mapCanvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
-    if (x < 0 || y < 0 || x > rect.width || y > rect.height) return;
+    if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null;
     const cellSize = rect.width / viewTiles;
-    if (!cellSize) return;
+    if (!cellSize) return null;
     const tx = Math.min(viewTiles - 1, Math.max(0, Math.floor(x / cellSize)));
     const ty = Math.min(viewTiles - 1, Math.max(0, Math.floor(y / cellSize)));
     const camera = getCamera();
     const targetX = clamp(camera.x + tx, 0, MAP_SIZE - 1);
     const targetY = clamp(camera.y + ty, 0, MAP_SIZE - 1);
+    return { targetX, targetY };
+  }
+
+  function handleMapClick(event) {
+    event.preventDefault();
+    if (battleActive || isChoosingSkill || gameOver || isMoving) return;
+    const target = getMapTargetFromPointer(event);
+    if (!target) return;
+    const { targetX, targetY } = target;
+    if (warpSelectionActive) {
+      if (targetX === player.x && targetY === player.y) {
+        warpSelectionActive = false;
+        addLog('転移をキャンセルした');
+        return;
+      }
+      if (!canMoveTo(targetX, targetY)) return;
+      addLog(`魔法陣で転移: (${targetX + 1}, ${targetY + 1})`);
+      warpPlayerTo(targetX, targetY);
+      return;
+    }
     const dist = Math.abs(targetX - player.x) + Math.abs(targetY - player.y);
     if (dist !== 1) return;
     if (!canMoveTo(targetX, targetY)) return;
@@ -3669,7 +3945,7 @@
 
   function getCritCap(attacker) {
     let cap = 0.3;
-    if (attacker?.skills?.critCap) cap += 0.2;
+    if (attacker?.skills?.critCap) cap += NO_SUB_CRIT_CAP_BONUS;
     if (attacker?.synergyPerks?.critStatCapBreak) cap = 0.9;
     return clamp(cap, 0.05, 0.9);
   }
@@ -3677,20 +3953,20 @@
   function getCritChance(attacker, defender, bonusCrit = 0) {
     let chance = 0.02 * (attacker?.luc || 0) + bonusCrit;
     if (attacker?.skills?.critRate) chance += 0.1;
-    if (attacker?.skills?.dotCrit && hasDotStatus(defender)) chance += 0.2;
+    if (attacker?.skills?.dotCrit && hasDotStatus(defender)) chance += NO_SUB_DOT_CRIT_BONUS;
     if (attacker?.synergyPerks?.critStatCapBreak) chance += 0.05;
     return clamp(chance, 0, getCritCap(attacker));
   }
 
   function getDamageReductionFromSkills(defender) {
     let reduction = 0;
-    if (defender?.skills?.damageCut) reduction += 0.12;
+    if (defender?.skills?.damageCut) reduction += NO_SUB_DAMAGE_CUT_RATE;
     return clamp(reduction, 0, 0.8);
   }
 
   function getChainTriggerRate(unitState, comboIndex = 0) {
     let chance = BASE_ACTION_CHAIN_RATE;
-    if (unitState?.skills?.chainChance) chance += 0.12;
+    if (unitState?.skills?.chainChance) chance += NO_SUB_CHAIN_CHANCE_BONUS;
     if (unitState?.awakenedTags?.multi) chance += comboIndex * 0.06;
     return clamp(chance, 0, 0.75);
   }
@@ -3745,10 +4021,10 @@
     let raw = (base + variance) * power * critMultiplier;
     const comboIndex = opts.comboIndex || 0;
     if (attacker.skills?.comboPower && comboIndex > 0) {
-      raw *= 1 + Math.min(0.4, comboIndex * 0.08);
+      raw *= 1 + Math.min(NO_SUB_COMBO_POWER_CAP, comboIndex * NO_SUB_COMBO_POWER_STEP);
     }
     if (attacker.skills?.dotRend && hasDotStatus(defender)) {
-      raw *= 1.15;
+      raw *= NO_SUB_DOT_REND_MULT;
     }
     if (attacker.awakenedTags?.stat) {
       const tileBonus = Math.min(AWAKEN_STAT_DAMAGE_CAP, (attacker.statTilesCollected || 0) * AWAKEN_STAT_DAMAGE_PER_TILE);
@@ -3916,6 +4192,16 @@
     if (skillChoiceSubEl) skillChoiceSubEl.textContent = subtitle || DEFAULT_CHOICE_SUBTITLE;
   }
 
+  function getTagGuideText() {
+    ensurePlayerProgressState();
+    return TAG_IDS.map((tag) => {
+      const count = player.tagCounts?.[tag] || 0;
+      return player.awakenedTags?.[tag]
+        ? `${formatTagLabel(tag)}:覚醒`
+        : `${formatTagLabel(tag)}:${count}/${AWAKEN_THRESHOLD}`;
+    }).join(' / ');
+  }
+
   function pickWeightedOne(list, weightFn = () => 1) {
     if (!Array.isArray(list) || !list.length) return null;
     const weights = list.map((item) => Math.max(0, Number(weightFn(item)) || 0));
@@ -3945,7 +4231,7 @@
   }
 
   function getDominantTagForTreasure(availableSkills) {
-    const tagPool = TAG_IDS.filter(tag => availableSkills.some(skill => (skill.tags || []).includes(tag)));
+    const tagPool = TAG_IDS.filter(tag => availableSkills.some(skill => getSkillAllTags(skill).includes(tag)));
     if (!tagPool.length) return TAG_IDS[0];
     let bestTag = tagPool[0];
     let bestScore = -Infinity;
@@ -4013,9 +4299,12 @@
       const title = document.createElement('strong');
       title.textContent = skill.name;
       const desc = document.createElement('span');
-      const tagText = skill.tags?.length ? ` [${formatSkillTags(skill)}]` : '';
-      desc.textContent = `${skill.desc || ''}${tagText}`;
-      btn.append(icon, title, desc);
+      desc.textContent = `${skill.desc || ''}`;
+      const tagMeta = document.createElement('small');
+      tagMeta.textContent = formatSkillTags(skill);
+      const gainMeta = document.createElement('small');
+      gainMeta.textContent = `取得時: ${formatSkillTagGainPreview(skill)}`;
+      btn.append(icon, title, desc, tagMeta, gainMeta);
       btn.addEventListener('click', () => {
         if (typeof onPick === 'function') onPick(skill);
         closeSkillChoice(skill);
@@ -4047,24 +4336,24 @@
     const remaining = () => available.filter(skill => !selected.some(entry => entry.id === skill.id));
 
     const focusPenalty = player.awakenedTags?.[focusTag] ? 0.7 : 1;
-    const focusPool = available.filter(skill => (skill.tags || []).includes(focusTag));
+    const focusPool = available.filter(skill => getSkillAllTags(skill).includes(focusTag));
     pickWeightedMany(focusPool, 2, () => focusPenalty).forEach(pickUnique);
 
     while (selected.length < 2) {
-      const fill = pickWeightedOne(remaining(), (skill) => (skill.tags || []).includes(focusTag) ? 2 * focusPenalty : 1);
+      const fill = pickWeightedOne(remaining(), (skill) => getSkillAllTags(skill).includes(focusTag) ? 2 * focusPenalty : 1);
       if (!fill) break;
       pickUnique(fill);
     }
 
     let escapePool = remaining().filter((skill) => {
-      const tags = skill.tags || [];
+      const tags = getSkillAllTags(skill);
       return !tags.includes(focusTag) && tags.some(tag => escapeTags.includes(tag));
     });
     if (!escapePool.length) {
-      escapePool = remaining().filter(skill => !(skill.tags || []).includes(focusTag));
+      escapePool = remaining().filter(skill => !getSkillAllTags(skill).includes(focusTag));
     }
     const escapePick = pickWeightedOne(escapePool, (skill) => {
-      const tags = skill.tags || [];
+      const tags = getSkillAllTags(skill);
       let weight = 1;
       tags.forEach((tag) => {
         if (escapeTags.includes(tag)) weight += 2;
@@ -4076,7 +4365,7 @@
 
     while (selected.length < 3) {
       const fill = pickWeightedOne(remaining(), (skill) => {
-        const tags = skill.tags || [];
+        const tags = getSkillAllTags(skill);
         let weight = 1;
         if (tags.includes(focusTag)) weight += 1.2 * focusPenalty;
         if (tags.some(tag => escapeTags.includes(tag))) weight += 0.9;
@@ -4116,12 +4405,14 @@
         title: config.title || DEFAULT_CHOICE_TITLE,
         subtitle: config.subtitle || DEFAULT_CHOICE_SUBTITLE,
         allowReroll: !!config.allowReroll,
+        showTagGuide: config.showTagGuide !== false,
         buildOptions: typeof config.buildOptions === 'function' ? config.buildOptions : () => options || [],
         onPick: typeof config.onPick === 'function' ? config.onPick : (skill) => grantSkillById(skill.id),
         emptyLog: config.emptyLog || '習得できるスキルがない'
       };
       activeChoiceContext = context;
-      setChoiceOverlayText(context.title, context.subtitle);
+      const subtitle = context.showTagGuide ? `${context.subtitle} / ${getTagGuideText()}` : context.subtitle;
+      setChoiceOverlayText(context.title, subtitle);
       const choices = options || context.buildOptions() || [];
       if (!choices.length) {
         addLog(context.emptyLog);
@@ -4300,7 +4591,7 @@
         for (let i = 0; i < plannedHits; i++) {
           performedHits += 1;
           const isFinalHit = i === plannedHits - 1;
-          const critBonus = playerState.skills?.lastCrit && plannedHits > 1 && isFinalHit ? 0.3 : 0;
+          const critBonus = playerState.skills?.lastCrit && plannedHits > 1 && isFinalHit ? NO_SUB_LAST_CRIT_BONUS : 0;
           const forceCrit = Boolean(
             (playerState.synergyPerks?.critStatCapBreak && i === 0)
             || (playerState.awakenedTags?.crit && plannedHits > 1 && isFinalHit && hasDotStatus(enemyState))
@@ -4912,6 +5203,8 @@
     player.synergyTaken = {};
     player.synergyPerks = {};
     player.statTilesCollected = 0;
+    player.activeStatMode = null;
+    player.trailStatCounts = createStatCounter();
     player.hasKey = false;
     treasureOpenedCount = 0;
     pendingSynergyQueue = [];
@@ -4926,8 +5219,10 @@
     isChoosingSkill = false;
     isMoving = false;
     moveAnim = null;
+    warpSelectionActive = false;
     playerFacing = 'down';
     lastBossLevel = 0;
+    routeInsightSeen = new Set();
     resultOverlay.classList.remove('is-open');
     battleOverlay.classList.remove('is-open');
     if (skillChoiceOverlay) {
@@ -4945,7 +5240,10 @@
     renderMap();
     addLog('冒険を開始した');
     addLog('マップをクリックして1マス進む');
-    addLog('通ったタイルは消滅する');
+    addLog('基礎能力床: 攻2 / 速2 / 体2 / 防1 / 運1 (計8)');
+    addLog('能力床を踏むとモード切替。以後の移動先がその能力床に塗り替わる');
+    addLog('中央右上の魔法陣を踏むと転移モードになる(現在地クリックで解除)');
+    maybeLogRouteInsight();
   }
 
   document.getElementById('resetRun').addEventListener('click', resetGame);
@@ -4989,6 +5287,10 @@
   updateStats();
   addLog('冒険を開始した');
   addLog('マップをクリックして1マス進む');
+  addLog('基礎能力床: 攻2 / 速2 / 体2 / 防1 / 運1 (計8)');
+  addLog('能力床を踏むとモード切替。以後の移動先がその能力床に塗り替わる');
+  addLog('中央右上の魔法陣を踏むと転移モードになる(現在地クリックで解除)');
+  maybeLogRouteInsight();
 })();
 </script>
 </body>
