@@ -419,13 +419,14 @@ a { color:#7dd3fc; }
   background:#000;
   border-top:1px solid rgba(255,255,255,0.08);
   margin:0 auto;
-  min-height:60px;
+  min-height:clamp(48px, 9vw, 60px);
 }
 .ad-footer ins{
   display:block;
   width:min(320px, 100%);
   max-width:320px;
-  min-height:60px;
+  min-height:clamp(48px, 9vw, 60px);
+  height:clamp(48px, 9vw, 60px);
   overflow:hidden;
 }
 .control-bar-wrapper {
@@ -510,6 +511,49 @@ a { color:#7dd3fc; }
     max-width: 100% !important;
     min-width: 0 !important;
   }
+
+  /* global-overflow-guard */
+  .ad-block,
+  .ad-card,
+  .ad-footer,
+  .project-ad,
+  .entry-ad-slot,
+  .puzzle-ad-slot,
+  .game-ad,
+  .card--ad {
+    width: min(100%, 720px) !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .ad-slot,
+  .ad-block ins.adsbygoogle,
+  .ad-footer ins,
+  .entry-ad-slot ins,
+  .puzzle-ad-slot ins.adsbygoogle,
+  .game-ad ins.adsbygoogle {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box;
+    min-height: clamp(48px, 9vw, 60px) !important;
+    height: clamp(48px, 9vw, 60px) !important;
+    overflow: hidden !important;
+  }
+  .page,
+  main,
+  .card,
+  .section,
+  .panel,
+  .shell {
+    min-width: 0;
+    max-width: 100%;
+  }
 </style>
   <style id="interaction-guard">
     * {
@@ -569,6 +613,11 @@ a { color:#7dd3fc; }
     const assignSlot = (ins) => {
       if (!ins || !(ins instanceof HTMLElement)) return;
       if (ins.dataset.adSlotAssigned === '1') return;
+      const existingSlot = ins.getAttribute('data-ad-slot');
+      if (existingSlot && existingSlot !== 'rotate') {
+        ins.dataset.adSlotAssigned = '1';
+        return;
+      }
       if (ins.dataset.adStatic === '1') {
         ins.dataset.adSlotAssigned = '1';
         return;
