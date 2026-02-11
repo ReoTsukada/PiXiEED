@@ -205,6 +205,12 @@
 
   const LEFT_TAB_KEYS = ['tools', 'color'];
   const RIGHT_TAB_KEYS = ['frames', 'settings', 'file'];
+  const TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE = 'virtualCursorToggle';
+  const TOOL_ACTION_VIRTUAL_CURSOR_CENTER = 'virtualCursorCenter';
+  const TOOL_ACTIONS = new Set([
+    TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE,
+    TOOL_ACTION_VIRTUAL_CURSOR_CENTER,
+  ]);
   const TOOL_GROUPS = {
     selection: { label: '範囲選択', tools: ['move', 'selectRect', 'selectLasso', 'selectSame'] },
     pen: { label: 'ペン', tools: ['pen', 'eyedropper'] },
@@ -1676,6 +1682,43 @@
     if (dom.controls.redoAction) {
       dom.controls.redoAction.disabled = history.future.length === 0;
     }
+  }
+
+  function updateVirtualCursorActionToolButtons() {
+    const enabled = Boolean(state.showVirtualCursor);
+    const toggleButtons = Array.from(document.querySelectorAll(`.tool-button[data-tool="${TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE}"]`));
+    toggleButtons.forEach(button => {
+      const icon = button.querySelector('img');
+      const label = button.querySelector('span');
+      button.setAttribute('aria-label', enabled ? '仮想カーソルを非表示' : '仮想カーソルを表示');
+      if (icon instanceof HTMLImageElement) {
+        icon.src = 'assets/icons/tool-cursor.png';
+        icon.alt = '仮想カーソル';
+      }
+      if (label) {
+        label.textContent = enabled ? '仮想OFF' : '仮想ON';
+      }
+    });
+  }
+
+  function runToolAction(tool) {
+    if (tool === TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE) {
+      setVirtualCursorEnabled(!state.showVirtualCursor);
+      updateVirtualCursorActionToolButtons();
+      return true;
+    }
+    if (tool === TOOL_ACTION_VIRTUAL_CURSOR_CENTER) {
+      if (!state.showVirtualCursor) {
+        setVirtualCursorEnabled(true);
+      }
+      const centered = createInitialVirtualCursor(state);
+      setVirtualCursor(centered);
+      requestOverlayRender();
+      scheduleSessionPersist();
+      updateVirtualCursorActionToolButtons();
+      return true;
+    }
+    return false;
   }
 
   function updateCanvasControlButtons() {
@@ -8226,9 +8269,9 @@
     const { width, height } = getViewportSize();
     const portrait = height >= width;
     const topbar = clamp(
-      Math.round(height * (portrait ? 0.105 : 0.14)),
-      portrait ? 72 : 64,
-      portrait ? 108 : 90
+      Math.round(height * (portrait ? 0.12 : 0.15)),
+      portrait ? 84 : 72,
+      portrait ? 124 : 102
     );
     const peek = clamp(
       Math.round(height * (portrait ? 0.19 : 0.22)),
@@ -8398,6 +8441,8 @@
     }
     updateFloatingDrawButtonEnabledState();
     refreshViewportCursorStyle();
+    updateVirtualCursorActionToolButtons();
+    updateCanvasControlButtons();
   }
 
   function setupControls() {
@@ -8843,10 +8888,15 @@
       button.addEventListener('click', () => {
         const tool = button.dataset.tool;
         if (!tool) return;
+        if (TOOL_ACTIONS.has(tool)) {
+          runToolAction(tool);
+          return;
+        }
         setActiveTool(tool);
       });
     });
     setActiveTool(state.tool, toolButtons, { persist: false });
+    updateVirtualCursorActionToolButtons();
 
     dom.canvases.drawing.addEventListener('pointerdown', handlePointerDown);
     dom.canvases.drawing.addEventListener('pointercancel', handlePointerCancel);
@@ -8941,6 +8991,21 @@
   function setActiveTool(tool, buttons = toolButtons, options = {}) {
     const { persist = true, skipGroupUpdate = false } = options;
     if (!tool) return;
+    if (TOOL_ACTIONS.has(tool)) {
+      runToolAction(tool);
+      if (TOOL_ACTIONS.has(state.tool)) {
+        const group = TOOL_GROUPS[state.activeToolGroup] ? state.activeToolGroup : 'pen';
+        const groupTools = TOOL_GROUPS[group]?.tools || [];
+        const candidate = state.lastGroupTool?.[group];
+        const fallback = (typeof candidate === 'string' && groupTools.includes(candidate))
+          ? candidate
+          : (DEFAULT_GROUP_TOOL[group] || 'pen');
+        state.tool = fallback;
+      }
+      updateToolGroupButtons();
+      updateToolVisibility();
+      return;
+    }
     state.tool = tool;
     buttons.forEach(btn => {
       const isActive = btn.dataset.tool === tool;
