@@ -1426,6 +1426,14 @@ body.portfolio-page main > .section > .section-inner {
   object-fit: cover;
 }
 
+.ogp-card img[data-media="icon"] {
+  object-fit: contain;
+  padding: clamp(0.45rem, 1.6vw, 0.8rem);
+  background: rgba(2, 6, 18, 0.82);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
 .ogp-card__meta {
   display: grid;
   gap: 0.5rem;
@@ -2488,6 +2496,15 @@ body.portfolio-page main > .section > .section-inner {
   display: block;
   width: 100%;
   height: auto;
+}
+
+.project-visual img[data-media="icon"] {
+  width: min(100%, 280px);
+  margin: 0 auto;
+  padding: clamp(0.4rem, 1.4vw, 0.7rem);
+  background: rgba(2, 6, 18, 0.82);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 .project-feature-list {
