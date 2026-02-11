@@ -42,7 +42,22 @@
     { id: 'pixfind', name: 'PiXFiND', url: '../pixfind/index.html', entries: [] },
     { id: 'qr-maker', name: 'QRコードメーカー', url: '../qr-maker/index.html', entries: [] },
     { id: 'maoitu', name: 'maoitu', url: '../maoitu/index.html', entries: [] },
-    { id: 'contest', name: 'コンテスト', url: '../contest/index.html', entries: [] }
+    {
+      id: 'contest',
+      name: 'コンテスト',
+      url: '../contest/index.html',
+      entries: [
+        {
+          date: '2026-02-11',
+          items: [
+            '作品ページの縦余白を調整し、情報ブロックをコンパクト化',
+            '表示タグを作者名の右に移動',
+            'タグ編集を Enter 追加 + 保存ボタン構成に整理',
+            'ダウンロード設定を「チェック2項目 + パスコード入力 + 保存」横並びに変更'
+          ]
+        }
+      ]
+    }
   ];
 
   const fragment = document.createDocumentFragment();
