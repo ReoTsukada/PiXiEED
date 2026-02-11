@@ -116,13 +116,20 @@
       event.preventDefault();
     });
   </script>
-  <script id="ads-lazy">
+  
+<script id="ads-lazy">
   (function() {
     if (window.pixieedObserveAds) return;
 
     const SLOT_SEQUENCE = ['2141591954','9073878884','2261515379'];
     const SLOT_KEY = 'pixieedAdSlotIndex';
+    const LOAD_TIMEOUT_MS = 10000;
+    const READY_POLL_MS = 250;
+
     let slotIndex = 0;
+    let activeAd = null;
+    let readyTimer = null;
+    const queue = [];
 
     const readSlotIndex = () => {
       try {
@@ -147,6 +154,15 @@
       return slot;
     };
 
+    const isReady = (ins) => (
+      ins.getAttribute('data-adsbygoogle-status') === 'done' ||
+      ins.getAttribute('data-ad-status') === 'filled'
+    );
+
+    const isEnqueued = (ins) => ins.dataset.adsQueueEnqueued === '1';
+    const isLoading = (ins) => ins.dataset.adsQueueLoading === '1';
+    const isLoaded = (ins) => ins.dataset.adsLazyLoaded === '1' || isReady(ins);
+
     const assignSlot = (ins) => {
       if (!ins || !(ins instanceof HTMLElement)) return;
       if (ins.dataset.adSlotAssigned === '1') return;
@@ -166,78 +182,98 @@
       ins.dataset.adSlotAssigned = '1';
     };
 
-    const pending = [];
-    const hasObserverSupport = 'IntersectionObserver' in window;
-    let observer = null;
+    const clearReadyTimer = () => {
+      if (!readyTimer) return;
+      clearTimeout(readyTimer);
+      readyTimer = null;
+    };
 
-    const isLoaded = (ins) => (
-      ins.dataset.adsLazyLoaded === '1' ||
-      ins.getAttribute('data-adsbygoogle-status') === 'done' ||
-      ins.getAttribute('data-ad-status') === 'filled'
-    );
+    const releaseActiveAd = () => {
+      clearReadyTimer();
+      if (!activeAd) return;
+      activeAd.dataset.adsQueueLoading = '';
+      activeAd.dataset.adsQueueEnqueued = '';
+      activeAd.dataset.adsLazyLoaded = '1';
+      activeAd = null;
+      processQueue();
+    };
+
+    const waitUntilReady = (ins, startedAt) => {
+      if (!activeAd || activeAd !== ins) return;
+      if (!document.contains(ins) || isReady(ins) || (Date.now() - startedAt) >= LOAD_TIMEOUT_MS) {
+        releaseActiveAd();
+        return;
+      }
+      readyTimer = setTimeout(() => waitUntilReady(ins, startedAt), READY_POLL_MS);
+    };
 
     const loadAd = (ins) => {
-      if (!ins || !(ins instanceof HTMLElement)) return;
-      if (isLoaded(ins)) return;
+      if (!ins || !(ins instanceof HTMLElement)) return false;
+      if (isLoaded(ins) || isLoading(ins)) return true;
       assignSlot(ins);
+      ins.dataset.adsQueueLoading = '1';
       ins.dataset.adsLazyLoaded = '1';
       try {
         (window.adsbygoogle = window.adsbygoogle || []).push({});
       } catch (err) {
+        ins.dataset.adsQueueLoading = '';
         ins.dataset.adsLazyLoaded = '';
+        return false;
       }
+      return true;
     };
 
-    const observeAd = (ins) => {
+    const enqueueAd = (ins) => {
       if (!ins || !(ins instanceof HTMLElement)) return;
-      if (ins.dataset.adsLazyObserved === '1') return;
-      if (isLoaded(ins)) return;
-      ins.dataset.adsLazyObserved = '1';
-      if (!observer) {
-        if (!hasObserverSupport) {
-          loadAd(ins);
-        } else {
-          pending.push(ins);
+      if (isLoaded(ins) || isLoading(ins) || isEnqueued(ins)) return;
+      assignSlot(ins);
+      ins.dataset.adsQueueEnqueued = '1';
+      queue.push(ins);
+    };
+
+    function processQueue() {
+      if (activeAd) return;
+      while (queue.length) {
+        const ins = queue.shift();
+        if (!ins || !(ins instanceof HTMLElement)) continue;
+        if (!document.contains(ins)) continue;
+        ins.dataset.adsQueueEnqueued = '';
+        if (isLoaded(ins)) {
+          ins.dataset.adsLazyLoaded = '1';
+          continue;
         }
+        activeAd = ins;
+        const startedAt = Date.now();
+        if (!loadAd(ins)) {
+          activeAd = null;
+          setTimeout(() => {
+            if (!document.contains(ins) || isLoaded(ins)) return;
+            enqueueAd(ins);
+            processQueue();
+          }, 1200);
+          return;
+        }
+        waitUntilReady(ins, startedAt);
         return;
       }
-      observer.observe(ins);
-    };
+    }
 
     const observeAds = (root) => {
       const scope = root && root.querySelectorAll ? root : document;
-      scope.querySelectorAll('ins.adsbygoogle').forEach(observeAd);
+      scope.querySelectorAll('ins.adsbygoogle').forEach(enqueueAd);
+      processQueue();
     };
 
     window.pixieedObserveAds = observeAds;
 
-    const setupObserver = () => {
-      if (hasObserverSupport) {
-        observer = new IntersectionObserver((entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting || entry.intersectionRatio > 0) {
-              const target = entry.target;
-              if (observer) observer.unobserve(target);
-              loadAd(target);
-            }
-          });
-        }, { rootMargin: '0px', threshold: 0.1 });
-      }
-      const queued = pending.splice(0);
-      queued.forEach((ins) => {
-        if (observer) {
-          observer.observe(ins);
-        } else {
-          loadAd(ins);
-        }
-      });
+    const setupQueue = () => {
       observeAds(document);
     };
 
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', setupObserver);
+      document.addEventListener('DOMContentLoaded', setupQueue);
     } else {
-      setupObserver();
+      setupQueue();
     }
 
     const mo = new MutationObserver((mutations) => {
@@ -245,14 +281,15 @@
         mutation.addedNodes.forEach((node) => {
           if (!(node instanceof HTMLElement)) return;
           if (node.matches && node.matches('ins.adsbygoogle')) {
-            observeAd(node);
+            enqueueAd(node);
             return;
           }
           if (node.querySelectorAll) {
-            node.querySelectorAll('ins.adsbygoogle').forEach(observeAd);
+            node.querySelectorAll('ins.adsbygoogle').forEach(enqueueAd);
           }
         });
       });
+      processQueue();
     });
 
     const startObserver = () => {
@@ -343,7 +380,7 @@
 </div>
 <div class="game-grid">
 <a class="ogp-card" data-description="ひたすら避け続けるシンプルなアクション。" data-difficulty="1" data-title="魔王様!!いつまでよければいいですか!?" href="projects//maoitu/">
-<img alt="魔王様!!いつまでよければいいですか!? のスクリーンショット" src="maoitu/ogp.png"/>
+<img alt="魔王様!!いつまでよければいいですか!? のスクリーンショット" src="icon/icon-192-3.png" data-media="icon"/>
 <div class="ogp-card__meta">
 <span class="ogp-card__tag">Game</span>
 <h3 class="ogp-card__title">魔王様!!いつまでよければいいですか!?</h3>
@@ -362,7 +399,7 @@
 </div>
 </a>
 <a class="ogp-card" data-description="ドット絵に特化した間違い探しゲーム。" data-difficulty="2" data-title="PiXFiND" href="projects//pixfind/">
-<img alt="PiXFiND のスクリーンショット" loading="lazy" src="pixfind/ogp.png"/>
+<img alt="PiXFiND のスクリーンショット" loading="lazy" src="icon/icon-192-2.png" data-media="icon"/>
 <div class="ogp-card__meta">
 <span class="ogp-card__tag">Game</span>
 <h3 class="ogp-card__title">PiXFiND</h3>
@@ -396,7 +433,7 @@
 <p class="section-lead">公開中・準備中のツールを掲載しています。</p>
 <div class="ogp-grid">
 <a class="ogp-card" href="projects//pixiedraw/">
-<img alt="PiXiEEDraw プレビューイメージ" loading="lazy" src="pixiedraw/ogp-app.png"/>
+<img alt="PiXiEEDraw プレビューイメージ" loading="lazy" src="icon/icon-192-4.png" data-media="icon"/>
 <div class="ogp-card__meta">
 <span class="ogp-card__tag">Tool</span>
 <h3 class="ogp-card__title">PiXiEEDraw</h3>
@@ -408,7 +445,7 @@
 </div>
 </a>
 <a class="ogp-card" href="/pixiee-lens/">
-<img alt="PiXiEELENS のプレビューイメージ" loading="lazy" src="pixiee-lens/ogp.png"/>
+<img alt="PiXiEELENS のプレビューイメージ" loading="lazy" src="icon/icon-192-1.png" data-media="icon"/>
 <div class="ogp-card__meta">
 <span class="ogp-card__tag">Tool</span>
 <h3 class="ogp-card__title">PiXiEELENS</h3>
