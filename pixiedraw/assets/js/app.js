@@ -600,6 +600,11 @@
   let compactToolFlyoutPositionBound = false;
   let compactRightFlyoutDismissBound = false;
   let compactRightFlyoutPositionBound = false;
+  const mobileToolGridPortal = {
+    active: false,
+    parent: null,
+    nextSibling: null,
+  };
   const mobileDrawerState = {
     mode: MOBILE_DRAWER_DEFAULT_MODE,
     heights: {
@@ -2013,7 +2018,8 @@
         button.addEventListener('click', () => {
           const target = button.dataset.toolGroup;
           if (!target) return;
-          const compactMode = isCompactToolRailMode();
+          const mobilePeekMode = isMobilePeekToolFlyoutMode();
+          const compactMode = isCompactToolRailMode() || mobilePeekMode;
           if (!compactMode) {
             setCompactToolFlyoutOpen(false);
             setToolGroup(target);
@@ -2023,9 +2029,9 @@
           const isSameGroup = state.activeToolGroup === target;
           setToolGroup(target);
           if (isSameGroup && wasOpen) {
-            setCompactToolFlyoutOpen(false);
+            setCompactToolFlyoutOpen(false, { force: mobilePeekMode });
           } else {
-            setCompactToolFlyoutOpen(true);
+            setCompactToolFlyoutOpen(true, { force: mobilePeekMode });
           }
           updateToolVisibility();
         });
@@ -2045,6 +2051,9 @@
           }
           const toolsPanel = dom.sections.tools;
           if (toolsPanel instanceof HTMLElement && toolsPanel.contains(target)) {
+            return;
+          }
+          if (dom.toolGrid instanceof HTMLElement && dom.toolGrid.contains(target)) {
             return;
           }
           setCompactToolFlyoutOpen(false);
@@ -2082,12 +2091,59 @@
 
   function isCompactToolRailMode() {
     if (layoutMode === 'mobilePortrait') {
-      return normalizeMobileDrawerMode(mobileDrawerState.mode) === 'peek';
+      const isPeek = dom.mobileDrawer instanceof HTMLElement
+        ? dom.mobileDrawer.dataset.mode === 'peek'
+        : normalizeMobileDrawerMode(mobileDrawerState.mode) === 'peek';
+      const toolsPanel = dom.mobilePanels.tools;
+      const toolsTabActive = toolsPanel instanceof HTMLElement && toolsPanel.classList.contains('is-active') && !toolsPanel.hidden;
+      return isPeek && toolsTabActive;
     }
     if (!(dom.leftRail instanceof HTMLElement) || dom.leftRail.dataset.compact !== 'true') {
       return false;
     }
     return state.activeLeftTab === 'tools';
+  }
+
+  function isMobilePeekToolFlyoutMode() {
+    if (layoutMode !== 'mobilePortrait') {
+      return false;
+    }
+    return dom.mobileDrawer?.dataset.mode === 'peek'
+      || normalizeMobileDrawerMode(mobileDrawerState.mode) === 'peek';
+  }
+
+  function ensureMobileToolGridPortal(open) {
+    if (!(dom.toolGrid instanceof HTMLElement)) {
+      return;
+    }
+    if (!open) {
+      if (!mobileToolGridPortal.active) {
+        dom.toolGrid.classList.remove('is-mobile-peek-flyout');
+        return;
+      }
+      const { parent, nextSibling } = mobileToolGridPortal;
+      if (parent instanceof Node && parent.isConnected) {
+        if (nextSibling instanceof Node && nextSibling.parentNode === parent) {
+          parent.insertBefore(dom.toolGrid, nextSibling);
+        } else {
+          parent.appendChild(dom.toolGrid);
+        }
+      }
+      mobileToolGridPortal.active = false;
+      mobileToolGridPortal.parent = null;
+      mobileToolGridPortal.nextSibling = null;
+      dom.toolGrid.classList.remove('is-mobile-peek-flyout');
+      return;
+    }
+    if (mobileToolGridPortal.active) {
+      dom.toolGrid.classList.add('is-mobile-peek-flyout');
+      return;
+    }
+    mobileToolGridPortal.parent = dom.toolGrid.parentNode;
+    mobileToolGridPortal.nextSibling = dom.toolGrid.nextSibling;
+    document.body.appendChild(dom.toolGrid);
+    mobileToolGridPortal.active = true;
+    dom.toolGrid.classList.add('is-mobile-peek-flyout');
   }
 
   function isCompactToolFlyoutOpen() {
@@ -2104,13 +2160,16 @@
     dom.toolGrid.style.removeProperty('width');
     dom.toolGrid.style.removeProperty('max-height');
     dom.toolGrid.style.removeProperty('z-index');
+    dom.toolGrid.style.removeProperty('display');
+    ensureMobileToolGridPortal(false);
   }
 
   function updateCompactToolFlyoutPosition() {
     if (!(dom.toolGrid instanceof HTMLElement)) {
       return;
     }
-    const shouldFloat = isCompactToolRailMode() && isCompactToolFlyoutOpen();
+    const mobilePeekMode = isMobilePeekToolFlyoutMode();
+    const shouldFloat = (isCompactToolRailMode() || mobilePeekMode) && isCompactToolFlyoutOpen();
     if (!shouldFloat) {
       clearCompactToolFlyoutPosition();
       return;
@@ -2130,6 +2189,7 @@
     let maxHeight;
 
     if (isMobileCompact) {
+      ensureMobileToolGridPortal(true);
       const activeTools = TOOL_GROUPS[state.activeToolGroup]?.tools || [];
       const toolCount = Math.max(1, activeTools.length);
       const itemSize = 56;
@@ -2143,6 +2203,7 @@
       top = Math.max(8, Math.round(anchorRect.top - flyoutHeight - 8));
       maxHeight = flyoutHeight;
     } else {
+      ensureMobileToolGridPortal(false);
       const railWidth = Math.max(68, dom.leftRail?.offsetWidth || 78);
       flyoutWidth = clamp(Math.round(railWidth - 16), 64, 96);
       left = Math.round(anchorRect.right + 10);
@@ -2161,12 +2222,21 @@
     dom.toolGrid.style.zIndex = '12000';
   }
 
-  function setCompactToolFlyoutOpen(open) {
+  function setCompactToolFlyoutOpen(open, { force = false } = {}) {
     if (!(dom.sections.tools instanceof HTMLElement)) {
       return;
     }
-    const shouldOpen = Boolean(open) && isCompactToolRailMode();
+    const shouldOpen = Boolean(open) && (Boolean(force) || isCompactToolRailMode() || isMobilePeekToolFlyoutMode());
     dom.sections.tools.dataset.compactFlyoutOpen = shouldOpen ? 'true' : 'false';
+    if (dom.toolGrid instanceof HTMLElement && layoutMode === 'mobilePortrait') {
+      if (shouldOpen) {
+        ensureMobileToolGridPortal(true);
+        dom.toolGrid.style.display = 'grid';
+      } else {
+        dom.toolGrid.style.removeProperty('display');
+        ensureMobileToolGridPortal(false);
+      }
+    }
     updateCompactToolFlyoutPosition();
   }
 
@@ -2208,7 +2278,8 @@
   function updateToolVisibility() {
     if (!toolButtons || !toolButtons.length) return;
     const activeGroup = state.activeToolGroup || TOOL_TO_GROUP[state.tool] || 'pen';
-    const compactMode = isCompactToolRailMode();
+    const mobilePeekMode = isMobilePeekToolFlyoutMode();
+    const compactMode = isCompactToolRailMode() || mobilePeekMode;
     const compactFlyoutOpen = compactMode && isCompactToolFlyoutOpen();
     toolButtons.forEach(button => {
       const group = button.dataset.toolGroup || TOOL_TO_GROUP[button.dataset.tool];
@@ -8911,7 +8982,8 @@
       }
     }
     updateToolTabIcon();
-    if (isCompactToolRailMode() && isCompactToolFlyoutOpen()) {
+    const mobilePeekMode = isMobilePeekToolFlyoutMode();
+    if ((isCompactToolRailMode() || mobilePeekMode) && isCompactToolFlyoutOpen()) {
       setCompactToolFlyoutOpen(false);
       updateToolVisibility();
     }
