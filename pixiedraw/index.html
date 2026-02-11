@@ -143,8 +143,10 @@
 </div>
 <canvas aria-hidden="true" class="virtual-cursor-canvas" height="0" id="virtualCursorCanvas" width="0"></canvas>
 <div class="canvas-controls">
+<div aria-label="履歴操作" class="canvas-controls__history" role="group">
 <button aria-label="元に戻す" class="chip" disabled="" id="undoAction" type="button"></button>
 <button aria-label="やり直す" class="chip" disabled="" id="redoAction" type="button"></button>
+</div>
 <div aria-label="ズーム" class="canvas-control-buttons" id="canvasControlButtons" role="group">
 <button aria-label="ズームアウト" class="chip" data-action="zoomOut" id="canvasControlPrimary" type="button">
 <img alt="ズームアウト" height="24" src="assets/icons/zoomdown.svg" width="24"/>
@@ -178,6 +180,9 @@
 </div>
 <button aria-label="描画ボタン" class="floating-draw-button" id="floatingDrawButton" type="button">描画</button>
 <div class="mobile-drawer" hidden="" id="mobileDrawer">
+<button aria-label="モバイルパネルの高さを調整" aria-controls="mobilePanels" class="mobile-drawer__handle" id="mobileDrawerHandle" type="button">
+<span aria-hidden="true" class="mobile-drawer__grip"></span>
+</button>
 <div class="mobile-panels" id="mobilePanels">
 <div aria-labelledby="mobileTabTools" class="mobile-panel is-active" id="mobilePanelTools" role="tabpanel"></div>
 <div aria-labelledby="mobileTabColor" class="mobile-panel" hidden="" id="mobilePanelColor" role="tabpanel"></div>
