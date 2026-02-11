@@ -113,7 +113,7 @@
     .brand-title{ margin:0; font-size:16px; color:#f9fafb; }
     .brand-sub{ margin:0; font-size:12px; color:#9ca3af; }
 
-    h1{ margin:0; font-size:24px; letter-spacing:0.02em; color:#f9fafb; }
+    h1{ margin:0; font-size:clamp(20px, 5.3vw, 30px); line-height:1.35; letter-spacing:0.02em; color:#f9fafb; }
     h2{ margin:0; font-size:18px; color:#f9fafb; letter-spacing:0.01em; }
     p{ margin:0; }
     .subtitle{ margin:0; color:#cbd5e1; font-size:13px; line-height:1.6; }
@@ -224,19 +224,97 @@
       border-color:rgba(255,255,255,0.35);
     }
     .hero-actions{
-      display:flex;
-      flex-wrap:nowrap;
-      overflow-x:auto;
-      -webkit-overflow-scrolling:touch;
-      gap:10px;
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:8px;
     }
     .hero-actions .button{
       text-decoration:none;
       display:inline-flex;
       align-items:center;
       justify-content:center;
-      flex:0 0 auto;
-      white-space:nowrap;
+      width:100%;
+      min-width:0;
+      text-align:center;
+    }
+    .hero-draw-guide{
+      display:grid;
+      gap:8px;
+      padding:10px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(15,23,42,0.4);
+    }
+    .hero-draw-guide[hidden]{
+      display:none;
+    }
+    .hero-draw-guide__title{
+      margin:0;
+      font-size:12px;
+      letter-spacing:0.08em;
+      color:#cbd5e1;
+    }
+    .hero-draw-guide__actions{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:8px;
+    }
+    .hero-draw-guide__link{
+      text-decoration:none;
+      color:#e5e7eb;
+      border:1px solid rgba(255,255,255,0.16);
+      border-radius:10px;
+      background:rgba(255,255,255,0.05);
+      padding:8px 10px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      transition:background 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
+    }
+    .hero-draw-guide__icon{
+      width:38px;
+      height:38px;
+      flex:0 0 38px;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,0.2);
+      background:rgba(2,6,18,0.85);
+      padding:4px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .hero-draw-guide__icon img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .hero-draw-guide__text{
+      font-size:12px;
+      color:#cbd5e1;
+      line-height:1.45;
+    }
+    .hero-draw-guide__link:hover,
+    .hero-draw-guide__link:focus-visible{
+      background:rgba(255,255,255,0.1);
+      border-color:rgba(255,255,255,0.26);
+      transform:translateY(-1px);
+    }
+    @media (max-width:700px){
+      .hero-actions{
+        gap:6px;
+      }
+      .hero-actions .button{
+        padding:10px 8px;
+        font-size:13px;
+      }
+      .hero-draw-guide{
+        padding:8px;
+      }
+      .hero-draw-guide__actions{
+        grid-template-columns:1fr;
+      }
     }
     .grid{
       display:grid;
@@ -335,15 +413,19 @@
       justify-content:center;
     }
     .link-thumb--grid{
+      aspect-ratio:3/2;
       padding:0;
     }
     .link-thumb__grid{
       width:100%;
       height:100%;
       display:grid;
-      grid-template-columns:repeat(2, 1fr);
-      grid-template-rows:repeat(2, 1fr);
+      grid-template-columns:repeat(3, 1fr);
+      grid-auto-rows:1fr;
       gap:2px;
+    }
+    .link-thumb__grid > :last-child:nth-child(4){
+      grid-column:2;
     }
     .link-thumb__grid img{
       width:100%;
@@ -351,14 +433,29 @@
       object-fit:cover;
       display:block;
     }
+    .link-thumb__grid img[data-media="icon"]{
+      object-fit:contain;
+      padding:6px;
+      background:rgba(2,6,18,0.8);
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
     .link-thumb__empty{
       display:flex;
       align-items:center;
       justify-content:center;
       font-size:11px;
       color:#cbd5e1;
-      background:rgba(0,0,0,0.35);
+      background:#000;
       letter-spacing:0.08em;
+      text-align:center;
+    }
+    .link-thumb__empty--dev{
+      color:#f9fafb;
+      font-weight:700;
+      letter-spacing:0.12em;
+      border:1px dashed rgba(255,255,255,0.24);
+      background:#000;
     }
     .link-thumb img{
       width:100%;
@@ -368,7 +465,13 @@
       image-rendering:pixelated;
       image-rendering:crisp-edges;
     }
-    .link-thumb img[data-ogp="true"]{
+    .link-thumb img[data-media="icon"]{
+      padding:10px;
+      background:rgba(2,6,18,0.82);
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .link-thumb img[data-media="ogp"]{
       image-rendering:auto;
       object-fit:cover;
     }
@@ -668,7 +771,7 @@
     .character-preview{
       margin-top:8px;
       display:grid;
-      grid-template-columns:minmax(0, 1.2fr) minmax(0, 1fr);
+      grid-template-columns:minmax(0, 1.05fr) minmax(0, 1.15fr);
       align-items:start;
       border-radius:16px;
       border:0;
@@ -686,7 +789,7 @@
       justify-content:center;
       background:transparent;
       position:relative;
-      padding:16px;
+      padding:12px;
       border:0;
       box-shadow:none;
       border-radius:0;
@@ -718,7 +821,14 @@
       margin:0 auto;
       display:block;
       image-rendering:pixelated;
+      image-rendering:crisp-edges;
       object-fit:contain;
+      box-sizing:border-box;
+      padding:1px;
+      background:transparent;
+    }
+    .character-preview__frame img[data-trim-edge="true"]{
+      clip-path:inset(0 1px);
     }
     .character-preview__placeholder{
       position:absolute;
@@ -735,24 +845,42 @@
       box-shadow:none;
     }
     .character-preview__details{
-      padding:16px;
+      padding:14px;
       display:flex;
       flex-direction:column;
-      gap:10px;
+      gap:8px;
       background:transparent;
       height:100%;
       overflow:auto;
     }
     @media (max-width:700px){
-      .character-preview{
-        grid-template-columns:minmax(0, 1fr) minmax(0, 0.85fr);
+      body{
+        padding:0 10px 110px;
       }
-      .character-preview__details{
+      .page{
+        gap:10px;
+      }
+      .card,
+      .section{
         padding:12px;
+      }
+      .section-inner{
         gap:8px;
       }
-      .character-preview__name{ font-size:18px; }
-      .character-preview__detail p{ font-size:12px; }
+      .character-preview{
+        grid-template-columns:minmax(0, 0.9fr) minmax(0, 1.1fr);
+      }
+      .character-preview__details{
+        padding:10px;
+        gap:6px;
+      }
+      .character-preview__frame{
+        padding:8px;
+      }
+      .character-preview__name{ font-size:20px; }
+      .character-preview__weight{ font-size:14px; }
+      .character-preview__traits ul{ font-size:14px; }
+      .character-preview__detail p{ font-size:14px; }
     }
     .character-preview__heading h2{ margin:0; }
     .character-preview__heading p{ margin:0.5rem 0 0; color:#cbd5e1; }
@@ -802,6 +930,12 @@
       height:74px;
       object-fit:contain;
       image-rendering:pixelated;
+      image-rendering:crisp-edges;
+      box-sizing:border-box;
+      padding:1px;
+    }
+    .character-sprite img[data-trim-edge="true"]{
+      clip-path:inset(0 1px);
     }
     .character-sprite span{
       font-size:11px;
@@ -1125,13 +1259,20 @@
       event.preventDefault();
     });
   </script>
-  <script id="ads-lazy">
+  
+<script id="ads-lazy">
   (function() {
     if (window.pixieedObserveAds) return;
 
     const SLOT_SEQUENCE = ['2141591954','9073878884','2261515379'];
     const SLOT_KEY = 'pixieedAdSlotIndex';
+    const LOAD_TIMEOUT_MS = 10000;
+    const READY_POLL_MS = 250;
+
     let slotIndex = 0;
+    let activeAd = null;
+    let readyTimer = null;
+    const queue = [];
 
     const readSlotIndex = () => {
       try {
@@ -1156,6 +1297,15 @@
       return slot;
     };
 
+    const isReady = (ins) => (
+      ins.getAttribute('data-adsbygoogle-status') === 'done' ||
+      ins.getAttribute('data-ad-status') === 'filled'
+    );
+
+    const isEnqueued = (ins) => ins.dataset.adsQueueEnqueued === '1';
+    const isLoading = (ins) => ins.dataset.adsQueueLoading === '1';
+    const isLoaded = (ins) => ins.dataset.adsLazyLoaded === '1' || isReady(ins);
+
     const assignSlot = (ins) => {
       if (!ins || !(ins instanceof HTMLElement)) return;
       if (ins.dataset.adSlotAssigned === '1') return;
@@ -1175,78 +1325,98 @@
       ins.dataset.adSlotAssigned = '1';
     };
 
-    const pending = [];
-    const hasObserverSupport = 'IntersectionObserver' in window;
-    let observer = null;
+    const clearReadyTimer = () => {
+      if (!readyTimer) return;
+      clearTimeout(readyTimer);
+      readyTimer = null;
+    };
 
-    const isLoaded = (ins) => (
-      ins.dataset.adsLazyLoaded === '1' ||
-      ins.getAttribute('data-adsbygoogle-status') === 'done' ||
-      ins.getAttribute('data-ad-status') === 'filled'
-    );
+    const releaseActiveAd = () => {
+      clearReadyTimer();
+      if (!activeAd) return;
+      activeAd.dataset.adsQueueLoading = '';
+      activeAd.dataset.adsQueueEnqueued = '';
+      activeAd.dataset.adsLazyLoaded = '1';
+      activeAd = null;
+      processQueue();
+    };
+
+    const waitUntilReady = (ins, startedAt) => {
+      if (!activeAd || activeAd !== ins) return;
+      if (!document.contains(ins) || isReady(ins) || (Date.now() - startedAt) >= LOAD_TIMEOUT_MS) {
+        releaseActiveAd();
+        return;
+      }
+      readyTimer = setTimeout(() => waitUntilReady(ins, startedAt), READY_POLL_MS);
+    };
 
     const loadAd = (ins) => {
-      if (!ins || !(ins instanceof HTMLElement)) return;
-      if (isLoaded(ins)) return;
+      if (!ins || !(ins instanceof HTMLElement)) return false;
+      if (isLoaded(ins) || isLoading(ins)) return true;
       assignSlot(ins);
+      ins.dataset.adsQueueLoading = '1';
       ins.dataset.adsLazyLoaded = '1';
       try {
         (window.adsbygoogle = window.adsbygoogle || []).push({});
       } catch (err) {
+        ins.dataset.adsQueueLoading = '';
         ins.dataset.adsLazyLoaded = '';
+        return false;
       }
+      return true;
     };
 
-    const observeAd = (ins) => {
+    const enqueueAd = (ins) => {
       if (!ins || !(ins instanceof HTMLElement)) return;
-      if (ins.dataset.adsLazyObserved === '1') return;
-      if (isLoaded(ins)) return;
-      ins.dataset.adsLazyObserved = '1';
-      if (!observer) {
-        if (!hasObserverSupport) {
-          loadAd(ins);
-        } else {
-          pending.push(ins);
+      if (isLoaded(ins) || isLoading(ins) || isEnqueued(ins)) return;
+      assignSlot(ins);
+      ins.dataset.adsQueueEnqueued = '1';
+      queue.push(ins);
+    };
+
+    function processQueue() {
+      if (activeAd) return;
+      while (queue.length) {
+        const ins = queue.shift();
+        if (!ins || !(ins instanceof HTMLElement)) continue;
+        if (!document.contains(ins)) continue;
+        ins.dataset.adsQueueEnqueued = '';
+        if (isLoaded(ins)) {
+          ins.dataset.adsLazyLoaded = '1';
+          continue;
         }
+        activeAd = ins;
+        const startedAt = Date.now();
+        if (!loadAd(ins)) {
+          activeAd = null;
+          setTimeout(() => {
+            if (!document.contains(ins) || isLoaded(ins)) return;
+            enqueueAd(ins);
+            processQueue();
+          }, 1200);
+          return;
+        }
+        waitUntilReady(ins, startedAt);
         return;
       }
-      observer.observe(ins);
-    };
+    }
 
     const observeAds = (root) => {
       const scope = root && root.querySelectorAll ? root : document;
-      scope.querySelectorAll('ins.adsbygoogle').forEach(observeAd);
+      scope.querySelectorAll('ins.adsbygoogle').forEach(enqueueAd);
+      processQueue();
     };
 
     window.pixieedObserveAds = observeAds;
 
-    const setupObserver = () => {
-      if (hasObserverSupport) {
-        observer = new IntersectionObserver((entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting || entry.intersectionRatio > 0) {
-              const target = entry.target;
-              if (observer) observer.unobserve(target);
-              loadAd(target);
-            }
-          });
-        }, { rootMargin: '0px', threshold: 0.1 });
-      }
-      const queued = pending.splice(0);
-      queued.forEach((ins) => {
-        if (observer) {
-          observer.observe(ins);
-        } else {
-          loadAd(ins);
-        }
-      });
+    const setupQueue = () => {
       observeAds(document);
     };
 
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', setupObserver);
+      document.addEventListener('DOMContentLoaded', setupQueue);
     } else {
-      setupObserver();
+      setupQueue();
     }
 
     const mo = new MutationObserver((mutations) => {
@@ -1254,14 +1424,15 @@
         mutation.addedNodes.forEach((node) => {
           if (!(node instanceof HTMLElement)) return;
           if (node.matches && node.matches('ins.adsbygoogle')) {
-            observeAd(node);
+            enqueueAd(node);
             return;
           }
           if (node.querySelectorAll) {
-            node.querySelectorAll('ins.adsbygoogle').forEach(observeAd);
+            node.querySelectorAll('ins.adsbygoogle').forEach(enqueueAd);
           }
         });
       });
+      processQueue();
     });
 
     const startObserver = () => {
@@ -1297,12 +1468,42 @@
     <section class="card" id="home-hero">
       <div class="hero-grid">
         <div class="hero-copy">
-          <h1>PiXiEED ホーム</h1>
-          <p class="subtitle">ブラウザでドット絵を描いて、ゲームで遊べるドット絵専用サイトです。</p>
+          <h1>描いて!!遊んで!!公開して!!ドット絵専用総合サイト!!</h1>
+          <p class="subtitle">PiXiEEDは、ドット絵制作からゲーム体験、コンテスト公開までブラウザで完結できるサイトです。</p>
           <div class="hero-actions">
-            <a class="button" href="projects/pixiedraw/index.html">今すぐ描く</a>
-            <a class="button button--ghost" href="#hub-intro">ゲーム/ツール</a>
-            <a class="button button--ghost hero-switch" href="#home-hero" id="toggleHeroPlace" role="button" aria-pressed="false">キャラクター</a>
+            <button class="button" id="toggleDrawGuide" type="button" aria-controls="draw-guide" aria-expanded="false">描く</button>
+            <button class="button button--ghost" id="togglePlayGuide" type="button" aria-controls="play-guide" aria-expanded="false">遊ぶ</button>
+            <a class="button button--ghost" href="contest/index.html">公開して</a>
+          </div>
+          <div class="hero-draw-guide" id="draw-guide" hidden>
+            <p class="hero-draw-guide__title">描く: レベルに合わせて選択</p>
+            <div class="hero-draw-guide__actions">
+              <a class="hero-draw-guide__link" href="projects/jerin-maker/index.html">
+                <span class="hero-draw-guide__icon"><img src="icon/icon-192-5.png" alt=""></span>
+                <span class="hero-draw-guide__text">PiXiEEDraw Lite（初心者向けチュートリアルでドット絵を学ぼう！！）</span>
+              </a>
+              <a class="hero-draw-guide__link" href="projects/pixiedraw/index.html">
+                <span class="hero-draw-guide__icon"><img src="icon/icon-192-4.png" alt=""></span>
+                <span class="hero-draw-guide__text">PiXiEEDraw（アニメ対応の本格ドット絵エディターを使おう！！）</span>
+              </a>
+            </div>
+          </div>
+          <div class="hero-draw-guide" id="play-guide" hidden>
+            <p class="hero-draw-guide__title">遊ぶ: タイトルを選択</p>
+            <div class="hero-draw-guide__actions">
+              <a class="hero-draw-guide__link" href="maoitu/index.html">
+                <span class="hero-draw-guide__icon"><img src="icon/icon-192-3.png" alt=""></span>
+                <span class="hero-draw-guide__text">まおいつ（避け続けるアクションでハイスコアを目指そう！！）</span>
+              </a>
+              <a class="hero-draw-guide__link" href="pixfind/index.html">
+                <span class="hero-draw-guide__icon"><img src="icon/icon-192-2.png" alt=""></span>
+                <span class="hero-draw-guide__text">PiXFiND（ドット絵まちがい探しに挑戦しよう！！）</span>
+              </a>
+              <a class="hero-draw-guide__link" href="pixiee-lens/index.html">
+                <span class="hero-draw-guide__icon"><img src="icon/icon-192-1.png" alt=""></span>
+                <span class="hero-draw-guide__text">PiXiEELENS（ドット絵変換カメラでレトロ写真を撮ろう！！）</span>
+              </a>
+            </div>
           </div>
         </div>
         <div class="hero-place" id="heroPlaceSlot">
@@ -1327,7 +1528,8 @@
             <a class="chip" href="projects/jerin-maker/index.html">16×16練習</a>
             <a class="chip" href="tools.html">ツールを探す</a>
             <a class="chip" href="games.html">ゲームで遊ぶ</a>
-            <a class="chip" href="portfolio/index.html">ギャラリー</a>
+            <a class="chip" href="contest/index.html">公開してみる</a>
+            <a class="chip" href="portfolio/index.html">作品を見る</a>
             <a class="chip" href="#character-intro">キャラクター図鑑</a>
           </div>
         </div>
@@ -1336,10 +1538,12 @@
           <a class="link-card" href="tools.html">
             <div class="link-thumb link-thumb--grid">
               <div class="link-thumb__grid">
-                <img src="pixiedraw/ogp-app.png" alt="" data-ogp="true">
-                <img src="jerin-maker/ogp-app.png" alt="" data-ogp="true">
-                <img src="pixiee-lens/ogp.png" alt="" data-ogp="true">
-                <img src="qr-maker/qrogp.png" alt="" data-ogp="true">
+                <img src="icon/icon-192-4.png" alt="" data-media="icon">
+                <img src="icon/icon-192-5.png" alt="" data-media="icon">
+                <img src="icon/icon-192-1.png" alt="" data-media="icon">
+                <img src="icon/icon-192-6.png" alt="" data-media="icon">
+                <span class="link-thumb__empty">追加予定</span>
+                <span class="link-thumb__empty">追加予定</span>
               </div>
               <span class="link-tag">Tools</span>
             </div>
@@ -1349,47 +1553,17 @@
           <a class="link-card" href="games.html">
             <div class="link-thumb link-thumb--grid">
               <div class="link-thumb__grid">
-                <img src="PiXiEEDogp.png" alt="" data-ogp="true">
-                <img src="maoitu/ogp.png" alt="" data-ogp="true">
-                <img src="pixfind/ogp.png" alt="" data-ogp="true">
+                <img src="icon/icon-192-3.png" alt="" data-media="icon">
+                <span class="link-thumb__empty link-thumb__empty--dev">開発中</span>
+                <img src="icon/icon-192-2.png" alt="" data-media="icon">
+                <span class="link-thumb__empty">追加予定</span>
+                <span class="link-thumb__empty">追加予定</span>
                 <span class="link-thumb__empty">追加予定</span>
               </div>
               <span class="link-tag">Games</span>
             </div>
             <h3 class="link-title">ドット絵ゲーム一覧</h3>
             <p class="link-desc">短い時間で遊べるブラウザゲームをピックアップ。</p>
-          </a>
-          <a class="link-card" href="projects/pixiedraw/index.html">
-            <div class="link-thumb">
-              <img src="pixiedraw/ogp-app.png" alt="" data-ogp="true">
-              <span class="link-tag">Create</span>
-            </div>
-            <h3 class="link-title">PiXiEEDraw</h3>
-            <p class="link-desc">ブラウザでドット絵を描けるメイン制作ツール。</p>
-          </a>
-          <a class="link-card" href="projects/jerin-maker/index.html">
-            <div class="link-thumb">
-              <img src="jerin-maker/ogp-app.png" alt="" data-ogp="true">
-              <span class="link-tag">16×16</span>
-            </div>
-            <h3 class="link-title">16×16ドット絵練習</h3>
-            <p class="link-desc">ミニサイズで練習できるドット絵トレーニング。</p>
-          </a>
-          <a class="link-card" href="pixiee-lens/index.html">
-            <div class="link-thumb">
-              <img src="pixiee-lens/ogp.png" alt="" data-ogp="true">
-              <span class="link-tag">Camera</span>
-            </div>
-            <h3 class="link-title">PiXiEELENS</h3>
-            <p class="link-desc">写真をドット絵に変換して遊べるレトロカメラ。</p>
-          </a>
-          <a class="link-card" href="#character-intro">
-            <div class="link-thumb">
-              <img src="character-dots/mao1.png" alt="">
-              <span class="link-tag">Character</span>
-            </div>
-            <h3 class="link-title">キャラクター図鑑</h3>
-            <p class="link-desc">ジェリンたちの設定やドット絵をまとめてチェック。</p>
           </a>
         </div>
 
@@ -1408,12 +1582,12 @@
           </div>
         </div>
         <ul class="project-place__source" id="gameGalleryItems" hidden>
-          <li data-title="魔王奪還戦" data-image="PiXiEEDogp.png" data-type="game" data-updated="2026-02-05" data-update="宝箱チャリン調整 / 地面スプライト修正" data-desc="最新アップデート: 宝箱チャリン調整 / 地面スプライト修正" data-link="maou-war/index.html"></li>
-          <li data-title="魔王様!!いつまでよければいいですか!?" data-image="maoitu/ogp.png" data-type="game" data-updated="2025-10-10" data-desc="ひたすら避け続けるアクション。" data-link="maoitu/index.html"></li>
-          <li data-title="PiXFiND" data-image="pixfind/ogp.png" data-type="game" data-updated="2025-10-21" data-desc="ドット絵特化の間違い探し。" data-link="pixfind/index.html"></li>
-          <li data-title="PiXiEEDraw Lite" data-image="jerin-maker/ogp-app.png" data-type="tool" data-updated="2025-12-13" data-desc="16×16ドットの制作とPNG保存。" data-link="jerin-maker/index.html"></li>
-          <li data-title="PiXiEELENS" data-image="pixiee-lens/ogp.png" data-type="tool" data-updated="2025-10-25" data-desc="カメラをドット絵変換してレトロ写真が撮れるドット絵カメラ。" data-link="pixiee-lens/index.html"></li>
-          <li data-title="QRコードメーカー" data-image="qr-maker/qrogp.png" data-type="tool" data-updated="2025-12-18" data-desc="色や余白を指定してQR生成。" data-link="qr-maker/index.html"></li>
+          <li data-title="PiXiEED ホーム" data-image="character-dots/mao1.png" data-type="project" data-updated="2026-02-11" data-update="見出しを『描いて!!遊んで!!公開して!!ドット絵専用総合サイト!!』へ更新 / ホーム導線を再設計" data-desc="ホーム導線と見出しを分かりやすく刷新。" data-link="index.html"></li>
+          <li data-title="描く / 遊ぶ 導線" data-image="icon/icon-192-4.png" data-type="project" data-updated="2026-02-11" data-update="『描く』で PiXiEEDraw Lite / PiXiEEDraw を選択可能にし、『遊ぶ』へ まおいつ・PiXFiND・PiXiEELENS を追加" data-desc="1タップで目的のツール・ゲームへ遷移できる導線に改善。" data-link="index.html"></li>
+          <li data-title="ツール一覧 / ゲーム一覧" data-image="icon/icon-192-6.png" data-type="project" data-updated="2026-02-11" data-update="ホーム中段を2カード構成に整理し、各カードを6枠グリッド化（開発中 / 追加予定表示を追加）" data-desc="一覧UIを整理し、今後の追加枠も見える構成に変更。" data-link="tools.html"></li>
+          <li data-title="キャラクター図鑑" data-image="character-dots/pikarin1.png" data-type="project" data-updated="2026-02-11" data-update="新キャラ追加（チカリン / キラリン / ピカリン / チャリン） / ピカリンをフレーム切替アニメ表示に対応" data-desc="キャラクター情報と表示演出を強化。" data-link="#character-intro"></li>
+          <li data-title="PiXiEEDraw Lite" data-image="icon/icon-192-5.png" data-type="tool" data-updated="2026-02-11" data-update="『描く』導線の初心者向けとして案内を強化" data-desc="16×16ドットの制作とPNG保存。" data-link="jerin-maker/index.html"></li>
+          <li data-title="PiXiEELENS" data-image="icon/icon-192-1.png" data-type="tool" data-updated="2026-02-11" data-update="『遊ぶ』導線へ追加し、紹介文を最適化" data-desc="ドット絵変換カメラでレトロ写真を撮ろう！！" data-link="pixiee-lens/index.html"></li>
         </ul>
       </div>
     </section>
@@ -1852,6 +2026,41 @@
         }
         setState(false, { animate: false });
       }
+      function setupHeroGuideToggles(){
+        const pairs = [
+          {
+            button: document.getElementById('toggleDrawGuide'),
+            guide: document.getElementById('draw-guide')
+          },
+          {
+            button: document.getElementById('togglePlayGuide'),
+            guide: document.getElementById('play-guide')
+          }
+        ].filter((pair) => pair.button && pair.guide);
+        if(!pairs.length) return;
+
+        const setOpen = (targetPair, open, options = {}) => {
+          pairs.forEach((pair) => {
+            const isTarget = pair === targetPair;
+            const shouldOpen = isTarget ? open : false;
+            pair.guide.hidden = !shouldOpen;
+            pair.button.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+          });
+          if(open && options.scroll){
+            window.requestAnimationFrame(() => {
+              targetPair.guide.scrollIntoView({ behavior:'smooth', block:'nearest' });
+            });
+          }
+        };
+
+        pairs.forEach((pair) => {
+          setOpen(pair, false);
+          pair.button.addEventListener('click', () => {
+            const nextOpen = pair.guide.hidden;
+            setOpen(pair, nextOpen, { scroll:true });
+          });
+        });
+      }
       function syncHeroPreviewHeights(){
         const previews = document.querySelectorAll('.character-place .character-preview');
         previews.forEach((preview) => {
@@ -1867,6 +2076,7 @@
         applyAvatar();
         setupAvatarToggle();
         setupProfileModal();
+        setupHeroGuideToggles();
         setupHeroPlaceSwap();
         syncHeroPreviewHeights();
         window.addEventListener('resize', syncHeroPreviewHeights);
