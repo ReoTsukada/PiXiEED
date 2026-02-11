@@ -20,7 +20,7 @@
     if (!entries.length) {
       entries = [
         {
-          file: 'maoitu/ogp.png',
+          file: 'icon/icon-192-3.png',
           label: 'Maoitu',
           date: new Date().toISOString().slice(0, 10),
           alt: '魔王様!!いつまでよければいいですか!? のタイトル背景'
