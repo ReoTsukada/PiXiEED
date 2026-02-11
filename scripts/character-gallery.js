@@ -26,10 +26,14 @@
   const reduceMotionQuery = { matches: false };
   const typingControllers = new Map();
   const DEFAULT_IMAGE_SCALE = 0.7;
+  const DEFAULT_ANIMATION_INTERVAL_MS = 180;
+  const EDGE_TRIM_CHARACTER_IDS = new Set(['sky-burin', 'ocean-burin', 'abyss-burin']);
   const CHARACTER_SEEN_STORAGE_KEY = 'pixieed:characterGallerySeen';
   const SECRET_UNLOCK_STORAGE_KEY = 'pixieed:secret-unlocks';
   const SECRET_UNLOCK_EVENT_NAME = 'pixiePet:secretUnlocked';
   const PLACEHOLDER_IMG = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+  let viewerAnimationTimer = null;
+  let viewerAnimationFrameIndex = 0;
 
   const manifestEntries = getManifest();
   if (!manifestEntries.length) {
@@ -70,11 +74,17 @@
     if (!entry) return;
     currentCharacterId = entry.id || null;
     const src = normalizePath(entry.file);
+    const animation = getEntryAnimation(entry);
     const isSilhouette = isSilhouetteEntry(entry);
     if (src) {
       viewer.hidden = false;
       viewer.src = src;
       viewer.alt = `${entry.name || 'キャラクター'}のドットプレビュー`;
+      if (shouldTrimEdge(entry)) {
+        viewer.dataset.trimEdge = 'true';
+      } else {
+        delete viewer.dataset.trimEdge;
+      }
       if (isSilhouette) {
         viewer.dataset.silhouette = 'true';
       } else {
@@ -84,9 +94,12 @@
       if (placeholderMeta) {
         placeholderMeta.textContent = '';
       }
+      startViewerAnimation(animation);
     } else {
+      stopViewerAnimation();
       viewer.hidden = true;
       viewer.removeAttribute('src');
+      delete viewer.dataset.trimEdge;
       delete viewer.dataset.silhouette;
       placeholder.hidden = false;
       if (placeholderMeta) {
@@ -187,6 +200,11 @@
       img.src = src || PLACEHOLDER_IMG;
       img.alt = `${entry.name || 'キャラクター'}のドット絵`;
       img.loading = 'lazy';
+      if (shouldTrimEdge(entry)) {
+        img.dataset.trimEdge = 'true';
+      } else {
+        delete img.dataset.trimEdge;
+      }
       if (isSilhouetteEntry(entry)) {
         img.dataset.silhouette = 'true';
       } else {
@@ -213,6 +231,51 @@
     if (frame) {
       frame.style.setProperty('--character-image-scale', scale);
     }
+  }
+
+  function getEntryAnimation(entry) {
+    if (!entry) {
+      return { frames: [], interval: DEFAULT_ANIMATION_INTERVAL_MS };
+    }
+    const interval = Number(entry.animationInterval) > 0
+      ? Number(entry.animationInterval)
+      : DEFAULT_ANIMATION_INTERVAL_MS;
+    const baseSrc = normalizePath(entry.file);
+    const frameSources = Array.isArray(entry.animationFrames) ? entry.animationFrames : [];
+    const frames = frameSources
+      .map(normalizePath)
+      .filter(Boolean);
+    if (baseSrc && !frames.includes(baseSrc)) {
+      frames.unshift(baseSrc);
+    }
+    return { frames, interval };
+  }
+
+  function startViewerAnimation(animation) {
+    stopViewerAnimation();
+    if (!viewer || !animation || !Array.isArray(animation.frames)) {
+      return;
+    }
+    if (reduceMotionQuery.matches || animation.frames.length <= 1) {
+      return;
+    }
+    viewerAnimationFrameIndex = 0;
+    viewer.src = animation.frames[0];
+    viewerAnimationTimer = window.setInterval(() => {
+      if (!viewer || viewer.hidden) {
+        return;
+      }
+      viewerAnimationFrameIndex = (viewerAnimationFrameIndex + 1) % animation.frames.length;
+      viewer.src = animation.frames[viewerAnimationFrameIndex];
+    }, animation.interval);
+  }
+
+  function stopViewerAnimation() {
+    if (viewerAnimationTimer) {
+      clearInterval(viewerAnimationTimer);
+      viewerAnimationTimer = null;
+    }
+    viewerAnimationFrameIndex = 0;
   }
 
   function typeText(element, text) {
@@ -308,6 +371,10 @@
 
   function isSilhouetteEntry(entry) {
     return Boolean(entry?.isSecretPlaceholder);
+  }
+
+  function shouldTrimEdge(entry) {
+    return Boolean(entry && EDGE_TRIM_CHARACTER_IDS.has(entry.id));
   }
 
   function getDisplayEntry(entry) {
