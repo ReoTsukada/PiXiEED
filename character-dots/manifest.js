@@ -40,6 +40,99 @@ window.CHARACTER_GALLERY_MANIFEST = [
     ]
   },
   {
+    "id": "chikarin",
+    "name": "チカリン",
+    "role": "TINKRIN",
+    "tagline": "天界の光を蓄えるティンクリン族のジェリン。",
+    "description": "ティンクリン族として天界の光を蓄光し、闇エネルギーへ変換して地上を照らします。",
+    "detail": "チカリンはティンクリン族の安定型。天界の光を体に蓄え、闇エネルギーへ変換して地上を明るく照らす役目です。",
+    "weight": "0.32 kg",
+    "sprite": "16×16 px",
+    "palette": "8 colors",
+    "pose": "Idle",
+    "status": "Release",
+    "file": "tikakirarin1.png",
+    "buttonLabel": "チカリン",
+    "buttonStatus": "Tinkrin",
+    "background": "夜間の巡回照明として活躍。蓄光したエネルギーをゆっくり解放して周囲を照らします。",
+    "traits": [
+      "ティンクリン族として天界の光で蓄光できる。",
+      "光を闇エネルギーへ変換し、地上を照らす。"
+    ]
+  },
+  {
+    "id": "kirarin",
+    "name": "キラリン",
+    "role": "TINKRIN",
+    "tagline": "ティンクリン族の中でも発光が強い個体。",
+    "description": "チカリンと同じく、天界の光を蓄光して闇エネルギーへ変換し、地上を照らします。",
+    "detail": "キラリンはティンクリン族の高出力型。光の蓄積と変換効率が高く、広い範囲を照らせます。",
+    "weight": "0.35 kg",
+    "sprite": "16×16 px",
+    "palette": "8 colors",
+    "pose": "Idle",
+    "status": "Release",
+    "file": "tikakirarin2.png",
+    "buttonLabel": "キラリン",
+    "buttonStatus": "Tinkrin",
+    "background": "発光範囲が広く、地上の暗所を一気に照らすサポート役として運用されています。",
+    "traits": [
+      "ティンクリン族の一体で、蓄光性能が高い。",
+      "闇エネルギーへの変換効率が高く照射範囲が広い。"
+    ]
+  },
+  {
+    "id": "pikarin",
+    "name": "ピカリン",
+    "role": "TINKRIN",
+    "tagline": "明滅しながら地上を照らすティンクリン族。",
+    "description": "天界の光を蓄光し、闇エネルギーへ変換して地上を照らすティンクリン族。複数フレームで表情が切り替わります。",
+    "detail": "ピカリンはティンクリン族の変動型。天界の光を蓄えて地上を照らす一方、たまに闇の力が強くなり、天界の光を飲み込み尽くそうとしてしまいます。",
+    "weight": "0.34 kg",
+    "sprite": "16×16 px",
+    "palette": "8 colors",
+    "pose": "Animated",
+    "status": "Release",
+    "file": "pikarin1.png",
+    "animationFrames": [
+      "pikarin1.png",
+      "pikarin2.png",
+      "pikarin3.png",
+      "pikarin4.png",
+      "pikarin5.png",
+      "pikarin6.png"
+    ],
+    "animationInterval": 180,
+    "buttonLabel": "ピカリン",
+    "buttonStatus": "Tinkrin",
+    "background": "普段は照明役として穏やかですが、闇の力が増す周期では光を過剰に吸収する危険な挙動を見せます。",
+    "traits": [
+      "ティンクリン族として天界の光を蓄光し、地上を照らす。",
+      "闇の力が強まると、天界の光を飲み込み尽くそうとする。"
+    ]
+  },
+  {
+    "id": "charin",
+    "name": "チャリン",
+    "role": "CURRENCY",
+    "tagline": "魔王様の世界で流通する通貨ジェリン。",
+    "description": "チャリンは魔王様が収める世界の通貨として利用されます。",
+    "detail": "チャリンは魔王様が収める世界の通貨として利用される存在。取引や報酬、宝箱の中身まで幅広く使われています。",
+    "weight": "0.08 kg",
+    "sprite": "16×16 px",
+    "palette": "6 colors",
+    "pose": "Idle",
+    "status": "Release",
+    "file": "tyarin.png",
+    "buttonLabel": "チャリン",
+    "buttonStatus": "Coin",
+    "background": "街からダンジョンまで共通で使える基軸通貨。磨くと少しだけ輝きが増します。",
+    "traits": [
+      "魔王様の世界で公式通貨として流通する。",
+      "報酬や商取引に使われる日常インフラ。"
+    ]
+  },
+  {
     "id": "sky-jellnall",
     "name": "スカイジェリン",
     "role": "JELLNALL",
