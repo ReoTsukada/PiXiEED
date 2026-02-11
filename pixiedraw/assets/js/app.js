@@ -6,6 +6,7 @@
   const dom = {
     appRoot: document.getElementById('appRoot'),
     layout: document.getElementById('appLayout'),
+    stage: document.getElementById('stage'),
     leftRail: document.getElementById('leftRail'),
     rightRail: document.getElementById('rightRail'),
     leftTabsBar: document.getElementById('leftRailTabs'),
@@ -15,6 +16,7 @@
     rightTabButtons: Array.from(document.querySelectorAll('[data-right-tab]')),
     rightTabPanes: document.getElementById('rightRailPanes'),
     mobileDrawer: document.getElementById('mobileDrawer'),
+    mobileDrawerHandle: document.getElementById('mobileDrawerHandle'),
     mobileTopBar: document.getElementById('mobileTopBar'),
     mobileShortcutsMount: document.getElementById('mobileShortcutsMount'),
     mobileTabs: Array.from(document.querySelectorAll('.mobile-tab')),
@@ -223,6 +225,15 @@
     });
     return acc;
   }, {});
+  const MOBILE_DRAWER_MODE_ORDER = Object.freeze(['peek', 'half', 'full']);
+  const MOBILE_DRAWER_DEFAULT_MODE = 'half';
+  const MOBILE_TAB_DRAWER_MODE = Object.freeze({
+    tools: 'full',
+    color: 'half',
+    frames: 'full',
+    settings: 'half',
+    file: 'half',
+  });
 
   const ZOOM_STEPS = Object.freeze([
     1,
@@ -259,6 +270,7 @@
   const DEFAULT_CANVAS_SIZE = 32;
   const MIN_CANVAS_SIZE = 1;
   const MAX_CANVAS_SIZE = 512;
+  const MAX_IMAGE_IMPORT_SOURCE_SIZE = 2000;
   const PROJECT_FILE_EXTENSION = '.pixieedraw';
   const EMBED_CONFIG = parseEmbedConfig();
   const DEFAULT_DOCUMENT_BASENAME = EMBED_CONFIG.documentName
@@ -588,6 +600,22 @@
   let compactToolFlyoutPositionBound = false;
   let compactRightFlyoutDismissBound = false;
   let compactRightFlyoutPositionBound = false;
+  const mobileDrawerState = {
+    mode: MOBILE_DRAWER_DEFAULT_MODE,
+    heights: {
+      peek: 124,
+      half: 248,
+      full: 320,
+    },
+    drag: {
+      active: false,
+      pointerId: null,
+      startY: 0,
+      startHeight: 0,
+      currentHeight: 0,
+      moved: false,
+    },
+  };
   const toolIconCache = new Map();
   let startupVisible = false;
   let startupVirtualCursorState = null;
@@ -799,14 +827,16 @@
       preview: null,
       selectionPreview: null,
       selectionMove: null,
-    selectionClearedOnDown: false,
-    startClient: null,
-    panOrigin: { x: 0, y: 0 },
-    panMode: null,
-    touchPanStart: null,
-    curveHandle: null,
-    panCaptureElement: null,
-  };
+      selectionClearedOnDown: false,
+      startClient: null,
+      panOrigin: { x: 0, y: 0 },
+      panMode: null,
+      touchPanStart: null,
+      touchPinchStartDistance: null,
+      touchPinchStartScale: null,
+      curveHandle: null,
+      panCaptureElement: null,
+    };
   }
 
   const internalClipboard = {
@@ -815,6 +845,16 @@
 
   const TOUCH_PAN_MIN_POINTERS = 2;
   const activeTouchPointers = new Map();
+  const keyboardState = {
+    spacePanActive: false,
+  };
+
+  function isEditableTarget(target) {
+    return Boolean(
+      target &&
+      (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)
+    );
+  }
 
   function makeHistorySnapshot({ includeUiState = true, includeSelection = true, clonePixelData = true } = {}) {
     const snapshot = {
@@ -2042,7 +2082,7 @@
 
   function isCompactToolRailMode() {
     if (layoutMode === 'mobilePortrait') {
-      return false;
+      return normalizeMobileDrawerMode(mobileDrawerState.mode) === 'peek';
     }
     if (!(dom.leftRail instanceof HTMLElement) || dom.leftRail.dataset.compact !== 'true') {
       return false;
@@ -2076,26 +2116,49 @@
       return;
     }
     const toolsPanel = dom.sections.tools;
-    const anchor = toolsPanel?.querySelector('.panel-section__body') || toolsPanel;
+    const activeGroupButton = toolsPanel?.querySelector(`.tool-group-button[data-tool-group="${state.activeToolGroup}"]`);
+    const anchor = activeGroupButton instanceof HTMLElement ? activeGroupButton : (toolsPanel?.querySelector('.panel-section__body') || toolsPanel);
     if (!(anchor instanceof HTMLElement)) {
       clearCompactToolFlyoutPosition();
       return;
     }
+    const isMobileCompact = layoutMode === 'mobilePortrait';
     const anchorRect = anchor.getBoundingClientRect();
-    const railWidth = Math.max(68, dom.leftRail?.offsetWidth || 78);
-    const flyoutWidth = clamp(Math.round(railWidth - 16), 64, 96);
-    let left = Math.round(anchorRect.right + 10);
-    if (left + flyoutWidth > window.innerWidth - 8) {
-      left = Math.max(8, Math.round(anchorRect.left - 10 - flyoutWidth));
+    let flyoutWidth;
+    let left;
+    let top;
+    let maxHeight;
+
+    if (isMobileCompact) {
+      const activeTools = TOOL_GROUPS[state.activeToolGroup]?.tools || [];
+      const toolCount = Math.max(1, activeTools.length);
+      const itemSize = 56;
+      const gap = 8;
+      const padding = 16;
+      const desiredWidth = (toolCount * itemSize) + (Math.max(0, toolCount - 1) * gap) + padding;
+      flyoutWidth = clamp(Math.round(desiredWidth), 72, Math.max(72, window.innerWidth - 16));
+      const maxLeft = Math.max(8, Math.round(window.innerWidth - flyoutWidth - 8));
+      left = clamp(Math.round(anchorRect.left + ((anchorRect.width - flyoutWidth) * 0.5)), 8, maxLeft);
+      const flyoutHeight = 80;
+      top = Math.max(8, Math.round(anchorRect.top - flyoutHeight - 8));
+      maxHeight = flyoutHeight;
+    } else {
+      const railWidth = Math.max(68, dom.leftRail?.offsetWidth || 78);
+      flyoutWidth = clamp(Math.round(railWidth - 16), 64, 96);
+      left = Math.round(anchorRect.right + 10);
+      if (left + flyoutWidth > window.innerWidth - 8) {
+        left = Math.max(8, Math.round(anchorRect.left - 10 - flyoutWidth));
+      }
+      top = clamp(Math.round(anchorRect.top), 8, Math.max(8, window.innerHeight - 64));
+      maxHeight = Math.max(120, Math.round(window.innerHeight - top - 12));
     }
-    const top = clamp(Math.round(anchorRect.top), 8, Math.max(8, window.innerHeight - 64));
-    const maxHeight = Math.max(120, Math.round(window.innerHeight - top - 12));
+
     dom.toolGrid.style.position = 'fixed';
     dom.toolGrid.style.left = `${left}px`;
     dom.toolGrid.style.top = `${top}px`;
     dom.toolGrid.style.width = `${flyoutWidth}px`;
     dom.toolGrid.style.maxHeight = `${maxHeight}px`;
-    dom.toolGrid.style.zIndex = '5000';
+    dom.toolGrid.style.zIndex = '12000';
   }
 
   function setCompactToolFlyoutOpen(open) {
@@ -3241,6 +3304,109 @@
     return clamp(Math.round(numeric), IMPORT_FRAME_DURATION_MIN_MS, IMPORT_FRAME_DURATION_MAX_MS);
   }
 
+  function resolveImageImportTargetSize(width, height) {
+    const sourceWidth = Math.max(1, Math.floor(Number(width) || 0));
+    const sourceHeight = Math.max(1, Math.floor(Number(height) || 0));
+    if (!sourceWidth || !sourceHeight) {
+      throw createImageImportError('画像サイズが不正です');
+    }
+    if (sourceWidth > MAX_IMAGE_IMPORT_SOURCE_SIZE || sourceHeight > MAX_IMAGE_IMPORT_SOURCE_SIZE) {
+      throw createImageImportError(`読み込み元画像は最大 ${MAX_IMAGE_IMPORT_SOURCE_SIZE}px までです`);
+    }
+    if (sourceWidth <= MAX_CANVAS_SIZE && sourceHeight <= MAX_CANVAS_SIZE) {
+      return {
+        sourceWidth,
+        sourceHeight,
+        width: sourceWidth,
+        height: sourceHeight,
+        scaled: false,
+      };
+    }
+    const ratio = Math.min(MAX_CANVAS_SIZE / sourceWidth, MAX_CANVAS_SIZE / sourceHeight);
+    const widthScaled = clamp(Math.floor(sourceWidth * ratio), 1, MAX_CANVAS_SIZE);
+    const heightScaled = clamp(Math.floor(sourceHeight * ratio), 1, MAX_CANVAS_SIZE);
+    return {
+      sourceWidth,
+      sourceHeight,
+      width: widthScaled,
+      height: heightScaled,
+      scaled: widthScaled !== sourceWidth || heightScaled !== sourceHeight,
+    };
+  }
+
+  function createImageDataFromPixels(pixels, width, height) {
+    if (typeof ImageData === 'function') {
+      try {
+        return new ImageData(pixels, width, height);
+      } catch (error) {
+        // Fall through to canvas-based creation.
+      }
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx2d = canvas.getContext('2d');
+    if (!ctx2d || typeof ctx2d.createImageData !== 'function') {
+      throw createImageImportError('画像を処理できませんでした');
+    }
+    const imageData = ctx2d.createImageData(width, height);
+    imageData.data.set(pixels);
+    return imageData;
+  }
+
+  function resizeImageDataNearest(imageData, targetWidth, targetHeight) {
+    if (!imageData || !Number.isFinite(imageData.width) || !Number.isFinite(imageData.height)) {
+      throw createImageImportError('画像を処理できませんでした');
+    }
+    const sourceWidth = Math.max(1, Math.floor(imageData.width));
+    const sourceHeight = Math.max(1, Math.floor(imageData.height));
+    const width = Math.max(1, Math.floor(targetWidth));
+    const height = Math.max(1, Math.floor(targetHeight));
+    if (sourceWidth === width && sourceHeight === height) {
+      return imageData;
+    }
+    const source = imageData.data instanceof Uint8ClampedArray ? imageData.data : null;
+    if (!source || source.length < sourceWidth * sourceHeight * 4) {
+      throw createImageImportError('画像を処理できませんでした');
+    }
+    const output = new Uint8ClampedArray(width * height * 4);
+    for (let y = 0; y < height; y += 1) {
+      const srcY = Math.min(sourceHeight - 1, Math.floor(y * sourceHeight / height));
+      const srcRow = srcY * sourceWidth;
+      const dstRow = y * width;
+      for (let x = 0; x < width; x += 1) {
+        const srcX = Math.min(sourceWidth - 1, Math.floor(x * sourceWidth / width));
+        const srcBase = (srcRow + srcX) * 4;
+        const dstBase = (dstRow + x) * 4;
+        output[dstBase] = source[srcBase];
+        output[dstBase + 1] = source[srcBase + 1];
+        output[dstBase + 2] = source[srcBase + 2];
+        output[dstBase + 3] = source[srcBase + 3];
+      }
+    }
+    return createImageDataFromPixels(output, width, height);
+  }
+
+  function resizeImportFrames(frames, targetWidth, targetHeight) {
+    if (!Array.isArray(frames) || !frames.length) {
+      return [];
+    }
+    return frames.map((frameInfo) => {
+      const imageData = frameInfo?.imageData;
+      if (!imageData || !Number.isFinite(imageData.width) || !Number.isFinite(imageData.height)) {
+        return {
+          ...frameInfo,
+          imageData: null,
+        };
+      }
+      const resized = resizeImageDataNearest(imageData, targetWidth, targetHeight);
+      return {
+        ...frameInfo,
+        imageData: resized,
+      };
+    });
+  }
+
   function buildIndexedPaletteFromImageData(data, maxColors = MAX_IMPORTED_PALETTE_COLORS) {
     if (!(data instanceof Uint8ClampedArray)) {
       return { palette: [], indices: new Int16Array(0), overflow: false };
@@ -3337,11 +3503,12 @@
       throw createImageImportError('画像サイズが不正です');
     }
 
-    const width = Math.max(1, Math.floor(inferredWidth));
-    const height = Math.max(1, Math.floor(inferredHeight));
-    if (width > MAX_CANVAS_SIZE || height > MAX_CANVAS_SIZE) {
-      throw createImageImportError(`画像のサイズが大きすぎます (最大 ${MAX_CANVAS_SIZE}px)`);
-    }
+    const importSize = resolveImageImportTargetSize(inferredWidth, inferredHeight);
+    const width = importSize.width;
+    const height = importSize.height;
+    const normalizedFramesData = importSize.scaled
+      ? resizeImportFrames(framesData, width, height)
+      : framesData;
 
     const paletteSource = state.palette && state.palette.length
       ? state.palette
@@ -3352,8 +3519,8 @@
     let activePaletteIndex = 0;
     let activeRgb = { r: 255, g: 255, b: 255, a: 255 };
 
-    if (framesData.length === 1) {
-      const frameInfo = framesData[0];
+    if (normalizedFramesData.length === 1) {
+      const frameInfo = normalizedFramesData[0];
       const imageData = frameInfo?.imageData;
       if (!imageData || !Number.isFinite(imageData.width) || !Number.isFinite(imageData.height)) {
         throw createImageImportError('画像を読み込めませんでした');
@@ -3392,7 +3559,7 @@
         ? { ...state.activeRgb }
         : (palette[activePaletteIndex] ? { ...palette[activePaletteIndex] } : { r: 255, g: 255, b: 255, a: 255 });
 
-      framesData.forEach((frameInfo, index) => {
+      normalizedFramesData.forEach((frameInfo, index) => {
         const layer = createLayer('画像レイヤー', width, height);
         layer.indices.fill(-1);
         const direct = ensureLayerDirect(layer, width, height);
@@ -3475,7 +3642,14 @@
         updateAutosaveStatus('自動保存: 保存先を設定できませんでした', 'error');
       });
     } else {
-      updateAutosaveStatus('画像を読み込みました', 'success');
+      if (importSize.scaled) {
+        updateAutosaveStatus(
+          `画像を読み込みました (${importSize.sourceWidth}x${importSize.sourceHeight} → ${width}x${height})`,
+          'success'
+        );
+      } else {
+        updateAutosaveStatus('画像を読み込みました', 'success');
+      }
     }
     scheduleSessionPersist();
   }
@@ -3678,17 +3852,31 @@
     if (typeof window !== 'undefined' && typeof window.ImageDecoder === 'function') {
       try {
         const decoded = await decodeGifWithImageDecoder(bytes, mimeType);
-        if (decoded && Array.isArray(decoded.frames) && decoded.frames.length > 1) {
+        if (decoded && Array.isArray(decoded.frames) && decoded.frames.length >= 1) {
           return decoded;
-        }
-        if (decoded && decoded.frames?.length === 1) {
-          console.warn('ImageDecoder GIF decode returned single frame; falling back to JavaScript decoder');
         }
       } catch (error) {
         console.warn('ImageDecoder GIF decode failed, falling back to JavaScript decoder', error);
       }
     }
-    return decodeGifWithReader(bytes);
+    const decodedByReader = decodeGifWithReader(bytes);
+    // If a static GIF decodes oddly in the JS reader path, fall back to browser image decode.
+    if (decodedByReader && Array.isArray(decodedByReader.frames) && decodedByReader.frames.length === 1) {
+      try {
+        const fallbackImageData = await decodeImageFileToImageData(file);
+        if (fallbackImageData
+          && fallbackImageData.width === decodedByReader.width
+          && fallbackImageData.height === decodedByReader.height) {
+          decodedByReader.frames[0] = {
+            imageData: fallbackImageData,
+            duration: decodedByReader.frames[0]?.duration ?? DEFAULT_IMPORT_FRAME_DURATION,
+          };
+        }
+      } catch (error) {
+        console.warn('Static GIF fallback decode failed', error);
+      }
+    }
+    return decodedByReader;
   }
 
   async function decodeGifWithImageDecoder(buffer, mimeType) {
@@ -6428,6 +6616,10 @@
             delay,
             disposal,
           });
+          // Graphic Control Extension applies only to the immediately following image block.
+          delay = 0;
+          transparentIndex = null;
+          disposal = 0;
           break;
         }
 
@@ -6448,6 +6640,33 @@
       return loopCount;
     };
 
+    this.getBackgroundIndex = function getBackgroundIndexFn() {
+      if (!globalPaletteFlag) {
+        return null;
+      }
+      if (background < 0 || background >= numGlobalColors) {
+        return null;
+      }
+      return background;
+    };
+
+    this.getBackgroundColor = function getBackgroundColorFn() {
+      const bgIndex = this.getBackgroundIndex();
+      if (bgIndex === null || globalPaletteOffset === null) {
+        return null;
+      }
+      const colorOffset = globalPaletteOffset + bgIndex * 3;
+      if (colorOffset + 2 >= buf.length) {
+        return null;
+      }
+      return {
+        r: buf[colorOffset],
+        g: buf[colorOffset + 1],
+        b: buf[colorOffset + 2],
+        a: 255,
+      };
+    };
+
     this.frameInfo = function frameInfo(frameNum) {
       if (frameNum < 0 || frameNum >= frames.length) {
         throw new Error('Frame index out of range.');
@@ -6466,36 +6685,19 @@
       if (trans === null) trans = 256;
 
       const frameWidth = frame.width;
-      const frameStride = width - frameWidth;
-      let xLeft = frameWidth;
-
-      const opBeg = ((frame.y * width) + frame.x) * 4;
-      const opEnd = ((frame.y + frame.height) * width + frame.x) * 4;
-      let op = opBeg;
-
-      let scanStride = frameStride * 4;
-      if (frame.interlaced === true) {
-        scanStride += width * 4 * 7;
-      }
-
-      let interlaceSkip = 8;
-
-      for (let i = 0, il = indexStream.length; i < il; ++i) {
-        const index = indexStream[i];
-
-        if (xLeft === 0) {
-          op += scanStride;
-          xLeft = frameWidth;
-          if (op >= opEnd) {
-            scanStride = frameStride * 4 + width * 4 * (interlaceSkip - 1);
-            op = opBeg + (frameWidth + frameStride) * (interlaceSkip << 1);
-            interlaceSkip >>= 1;
+      const frameHeight = frame.height;
+      let streamIndex = 0;
+      const writeRow = localY => {
+        let op = ((frame.y + localY) * width + frame.x) * 4;
+        for (let localX = 0; localX < frameWidth; localX += 1) {
+          if (streamIndex >= indexStream.length) {
+            return false;
           }
-        }
-
-        if (index === trans) {
-          op += 4;
-        } else {
+          const index = indexStream[streamIndex++];
+          if (index === trans) {
+            op += 4;
+            continue;
+          }
           const r = buf[paletteOffset + index * 3];
           const g = buf[paletteOffset + index * 3 + 1];
           const b = buf[paletteOffset + index * 3 + 2];
@@ -6504,7 +6706,31 @@
           pixels[op++] = b;
           pixels[op++] = 255;
         }
-        --xLeft;
+        return true;
+      };
+
+      if (frame.interlaced === true) {
+        const passes = [
+          { start: 0, step: 8 },
+          { start: 4, step: 8 },
+          { start: 2, step: 4 },
+          { start: 1, step: 2 },
+        ];
+        for (let passIndex = 0; passIndex < passes.length; passIndex += 1) {
+          const pass = passes[passIndex];
+          for (let localY = pass.start; localY < frameHeight; localY += pass.step) {
+            if (!writeRow(localY)) {
+              return;
+            }
+          }
+        }
+        return;
+      }
+
+      for (let localY = 0; localY < frameHeight; localY += 1) {
+        if (!writeRow(localY)) {
+          return;
+        }
       }
     };
   }
@@ -6514,100 +6740,91 @@
 
     const clearCode = 1 << minCodeSize;
     const eoiCode = clearCode + 1;
+    let codeSize = minCodeSize + 1;
+    let codeMask = (1 << codeSize) - 1;
     let nextCode = eoiCode + 1;
-
-    let curCodeSize = minCodeSize + 1;
-    let codeMask = (1 << curCodeSize) - 1;
-    let curShift = 0;
-    let cur = 0;
-
-    let op = 0;
-
+    let bitBuffer = 0;
+    let bitCount = 0;
     let subblockSize = codeStream[p++];
 
-    const codeTable = new Int32Array(4096);
+    const prefix = new Int16Array(4096);
+    const suffix = new Uint8Array(4096);
+    const stack = new Uint8Array(4096);
 
-    let prevCode = null;
+    let outPos = 0;
+    let prevCode = -1;
+    let firstByte = 0;
+
+    const readCode = () => {
+      while (bitCount < codeSize) {
+        if (subblockSize === 0) {
+          return null;
+        }
+        bitBuffer |= codeStream[p++] << bitCount;
+        bitCount += 8;
+        subblockSize -= 1;
+        if (subblockSize === 0) {
+          subblockSize = codeStream[p++];
+        }
+      }
+      const code = bitBuffer & codeMask;
+      bitBuffer >>= codeSize;
+      bitCount -= codeSize;
+      return code;
+    };
 
     while (true) {
-      while (curShift < 16) {
-        if (subblockSize === 0) break;
-
-        cur |= codeStream[p++] << curShift;
-        curShift += 8;
-
-        if (subblockSize === 1) {
-          subblockSize = codeStream[p++];
-        } else {
-          --subblockSize;
-        }
-      }
-
-      if (curShift < curCodeSize) {
+      const code = readCode();
+      if (code === null) {
         break;
       }
-
-      const code = cur & codeMask;
-      cur >>= curCodeSize;
-      curShift -= curCodeSize;
 
       if (code === clearCode) {
+        codeSize = minCodeSize + 1;
+        codeMask = (1 << codeSize) - 1;
         nextCode = eoiCode + 1;
-        curCodeSize = minCodeSize + 1;
-        codeMask = (1 << curCodeSize) - 1;
-        prevCode = null;
+        prevCode = -1;
         continue;
-      } else if (code === eoiCode) {
+      }
+      if (code === eoiCode) {
         break;
       }
 
-      const chaseCode = code < nextCode ? code : prevCode;
+      let current = code;
+      let stackTop = 0;
 
-      let chaseLength = 0;
-      let chase = chaseCode;
-      while (chase > clearCode) {
-        chase = codeTable[chase] >> 8;
-        ++chaseLength;
-      }
-
-      const k = chase;
-
-      const opEnd = op + chaseLength + (chaseCode !== code ? 1 : 0);
-      if (opEnd > outputLength) {
-        console.warn('Warning, gif stream longer than expected.');
-        return;
-      }
-
-      output[op++] = k;
-
-      op += chaseLength;
-      let b = op;
-
-      chase = chaseCode;
-      while (chase > clearCode) {
-        chase = codeTable[chase];
-        output[--b] = chase & 0xff;
-        chase >>= 8;
-      }
-
-      if (opEnd === outputLength) {
-        continue;
-      }
-
-      output[op++] = k;
-
-      if (prevCode !== null) {
-        if (nextCode === 4096) {
-          break;
+      if (current >= nextCode) {
+        if (prevCode < 0) {
+          continue;
         }
-        codeTable[nextCode++] = prevCode << 8 | k;
+        stack[stackTop++] = firstByte;
+        current = prevCode;
+      }
 
-        if (nextCode === 1 << curCodeSize && curCodeSize < 12) {
-          ++curCodeSize;
-          codeMask = (1 << curCodeSize) - 1;
+      while (current > clearCode) {
+        stack[stackTop++] = suffix[current];
+        current = prefix[current];
+      }
+
+      firstByte = current & 0xff;
+      stack[stackTop++] = firstByte;
+
+      while (stackTop > 0) {
+        if (outPos >= outputLength) {
+          return;
+        }
+        output[outPos++] = stack[--stackTop];
+      }
+
+      if (prevCode >= 0 && nextCode < 4096) {
+        prefix[nextCode] = prevCode;
+        suffix[nextCode] = firstByte;
+        nextCode += 1;
+        if (nextCode === (1 << codeSize) && codeSize < 12) {
+          codeSize += 1;
+          codeMask = (1 << codeSize) - 1;
         }
       }
-
       prevCode = code;
     }
   }
@@ -7640,32 +7857,262 @@
     bind('right', dom.resizeHandles.right);
   }
 
+  function normalizeMobileDrawerMode(mode) {
+    return MOBILE_DRAWER_MODE_ORDER.includes(mode) ? mode : MOBILE_DRAWER_DEFAULT_MODE;
+  }
+
+  function getMobileDrawerModeRank(mode) {
+    return MOBILE_DRAWER_MODE_ORDER.indexOf(normalizeMobileDrawerMode(mode));
+  }
+
+  function getViewportSize() {
+    const viewport = window.visualViewport;
+    const width = Math.max(0, Math.round(Number(viewport?.width) || Number(window.innerWidth) || 0));
+    const height = Math.max(0, Math.round(Number(viewport?.height) || Number(window.innerHeight) || 0));
+    return { width, height };
+  }
+
+  function updateMobileViewportHeightVar() {
+    const root = document.documentElement;
+    if (!(root instanceof HTMLElement)) {
+      return;
+    }
+    const { height } = getViewportSize();
+    if (height > 0) {
+      root.style.setProperty('--mobile-viewport-height', `${height}px`);
+    }
+  }
+
+  function applyMobileDrawerHeight(height) {
+    const root = document.documentElement;
+    if (!(root instanceof HTMLElement)) {
+      return;
+    }
+    const minHeight = Math.min(mobileDrawerState.heights.peek, mobileDrawerState.heights.full);
+    const maxHeight = Math.max(mobileDrawerState.heights.peek, mobileDrawerState.heights.full);
+    const clampedHeight = clamp(Math.round(Number(height) || 0), minHeight, maxHeight);
+    mobileDrawerState.drag.currentHeight = clampedHeight;
+    root.style.setProperty('--mobile-drawer-height', `${clampedHeight}px`);
+  }
+
+  function getClosestMobileDrawerMode(height) {
+    let closest = MOBILE_DRAWER_DEFAULT_MODE;
+    let minDistance = Number.POSITIVE_INFINITY;
+    MOBILE_DRAWER_MODE_ORDER.forEach(mode => {
+      const candidate = mobileDrawerState.heights[mode];
+      if (!Number.isFinite(candidate)) {
+        return;
+      }
+      const distance = Math.abs(candidate - height);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closest = mode;
+      }
+    });
+    return closest;
+  }
+
+  function setMobileDrawerMode(mode, { persist = false } = {}) {
+    const normalizedMode = normalizeMobileDrawerMode(mode);
+    mobileDrawerState.mode = normalizedMode;
+    if (dom.mobileDrawer) {
+      dom.mobileDrawer.dataset.mode = normalizedMode;
+    }
+    applyMobileDrawerHeight(mobileDrawerState.heights[normalizedMode]);
+    if (!isCompactToolRailMode() && isCompactToolFlyoutOpen()) {
+      setCompactToolFlyoutOpen(false);
+    }
+    updateToolVisibility();
+    if (persist) {
+      scheduleSessionPersist();
+    }
+  }
+
+  function activateMobileTab(target, { ensureDrawer = false } = {}) {
+    if (!target || !dom.mobilePanels[target]) {
+      return false;
+    }
+    let activated = false;
+    dom.mobileTabs.forEach(btn => {
+      const key = btn.dataset.mobileTab;
+      const panel = key ? dom.mobilePanels[key] : null;
+      if (!panel) {
+        return;
+      }
+      const isActive = key === target;
+      if (isActive) {
+        activated = true;
+      }
+      btn.classList.toggle('is-active', isActive);
+      btn.setAttribute('aria-selected', String(isActive));
+      if (isActive) {
+        btn.removeAttribute('tabindex');
+      } else {
+        btn.setAttribute('tabindex', '-1');
+      }
+      panel.classList.toggle('is-active', isActive);
+      panel.toggleAttribute('hidden', !isActive);
+    });
+
+    if (activated && ensureDrawer && layoutMode === 'mobilePortrait') {
+      const requiredMode = MOBILE_TAB_DRAWER_MODE[target] || MOBILE_DRAWER_DEFAULT_MODE;
+      if (getMobileDrawerModeRank(mobileDrawerState.mode) < getMobileDrawerModeRank(requiredMode)) {
+        setMobileDrawerMode(requiredMode, { persist: false });
+      }
+    }
+    if (activated && target !== 'tools' && isCompactToolFlyoutOpen()) {
+      setCompactToolFlyoutOpen(false);
+    }
+    if (activated) {
+      updateToolVisibility();
+    }
+    return activated;
+  }
+
+  function endMobileDrawerDrag({ persist = false, snap = true } = {}) {
+    if (!mobileDrawerState.drag.active) {
+      return;
+    }
+    const { pointerId } = mobileDrawerState.drag;
+    mobileDrawerState.drag.active = false;
+    window.removeEventListener('pointermove', handleMobileDrawerPointerMove);
+    window.removeEventListener('pointerup', handleMobileDrawerPointerUp);
+    window.removeEventListener('pointercancel', handleMobileDrawerPointerUp);
+    if (dom.mobileDrawerHandle && pointerId !== null && typeof dom.mobileDrawerHandle.releasePointerCapture === 'function') {
+      try {
+        dom.mobileDrawerHandle.releasePointerCapture(pointerId);
+      } catch (error) {
+        // Ignore pointer release failures.
+      }
+    }
+    dom.mobileDrawer?.classList.remove('is-dragging');
+    const fallbackHeight = mobileDrawerState.heights[mobileDrawerState.mode] || mobileDrawerState.heights.half;
+    const snapHeight = mobileDrawerState.drag.currentHeight || mobileDrawerState.drag.startHeight || fallbackHeight;
+    const resolvedMode = getClosestMobileDrawerMode(snapHeight);
+    mobileDrawerState.mode = resolvedMode;
+    if (snap) {
+      setMobileDrawerMode(resolvedMode, { persist });
+    }
+    mobileDrawerState.drag.pointerId = null;
+    mobileDrawerState.drag.startY = 0;
+    mobileDrawerState.drag.startHeight = 0;
+    mobileDrawerState.drag.currentHeight = 0;
+    mobileDrawerState.drag.moved = false;
+  }
+
+  function handleMobileDrawerPointerMove(event) {
+    if (!mobileDrawerState.drag.active) {
+      return;
+    }
+    if (mobileDrawerState.drag.pointerId !== null && event.pointerId !== mobileDrawerState.drag.pointerId) {
+      return;
+    }
+    const deltaY = mobileDrawerState.drag.startY - (Number(event.clientY) || 0);
+    const nextHeight = mobileDrawerState.drag.startHeight + deltaY;
+    const minHeight = Math.min(mobileDrawerState.heights.peek, mobileDrawerState.heights.full);
+    const maxHeight = Math.max(mobileDrawerState.heights.peek, mobileDrawerState.heights.full);
+    const clampedHeight = clamp(Math.round(nextHeight), minHeight, maxHeight);
+    mobileDrawerState.drag.currentHeight = clampedHeight;
+    if (Math.abs(deltaY) >= 4) {
+      mobileDrawerState.drag.moved = true;
+    }
+    applyMobileDrawerHeight(clampedHeight);
+    event.preventDefault();
+  }
+
+  function handleMobileDrawerPointerUp(event) {
+    if (!mobileDrawerState.drag.active) {
+      return;
+    }
+    if (mobileDrawerState.drag.pointerId !== null && event.pointerId !== mobileDrawerState.drag.pointerId) {
+      return;
+    }
+    endMobileDrawerDrag({ persist: true });
+  }
+
+  function beginMobileDrawerDrag(event) {
+    if (layoutMode !== 'mobilePortrait' || !dom.mobileDrawer) {
+      return;
+    }
+    const isPrimaryPointer =
+      event.button === 0 || event.pointerType === 'touch' || event.pointerType === 'pen';
+    if (!isPrimaryPointer) {
+      return;
+    }
+    if (mobileDrawerState.drag.active) {
+      endMobileDrawerDrag({ persist: false, snap: false });
+    }
+    const pointerId = Number.isFinite(event.pointerId) ? event.pointerId : null;
+    mobileDrawerState.drag.active = true;
+    mobileDrawerState.drag.pointerId = pointerId;
+    mobileDrawerState.drag.startY = Number(event.clientY) || 0;
+    mobileDrawerState.drag.startHeight =
+      Math.round(dom.mobileDrawer.getBoundingClientRect().height) || mobileDrawerState.heights[mobileDrawerState.mode];
+    mobileDrawerState.drag.currentHeight = mobileDrawerState.drag.startHeight;
+    mobileDrawerState.drag.moved = false;
+    dom.mobileDrawer.classList.add('is-dragging');
+    if (dom.mobileDrawerHandle && pointerId !== null && typeof dom.mobileDrawerHandle.setPointerCapture === 'function') {
+      try {
+        dom.mobileDrawerHandle.setPointerCapture(pointerId);
+      } catch (error) {
+        // Ignore pointer capture failures.
+      }
+    }
+    window.addEventListener('pointermove', handleMobileDrawerPointerMove, { passive: false });
+    window.addEventListener('pointerup', handleMobileDrawerPointerUp);
+    window.addEventListener('pointercancel', handleMobileDrawerPointerUp);
+    event.preventDefault();
+  }
+
+  function setupMobileDrawerInteractions() {
+    if (!dom.mobileDrawerHandle || dom.mobileDrawerHandle.dataset.bound === 'true') {
+      return;
+    }
+    dom.mobileDrawerHandle.dataset.bound = 'true';
+    dom.mobileDrawerHandle.addEventListener('pointerdown', beginMobileDrawerDrag);
+    dom.mobileDrawerHandle.addEventListener('keydown', event => {
+      if (layoutMode !== 'mobilePortrait') {
+        return;
+      }
+      const currentIndex = getMobileDrawerModeRank(mobileDrawerState.mode);
+      let nextMode = null;
+      if (event.key === 'ArrowUp') {
+        nextMode = MOBILE_DRAWER_MODE_ORDER[clamp(currentIndex + 1, 0, MOBILE_DRAWER_MODE_ORDER.length - 1)];
+      } else if (event.key === 'ArrowDown') {
+        nextMode = MOBILE_DRAWER_MODE_ORDER[clamp(currentIndex - 1, 0, MOBILE_DRAWER_MODE_ORDER.length - 1)];
+      } else if (event.key === 'Home') {
+        nextMode = 'peek';
+      } else if (event.key === 'End') {
+        nextMode = 'full';
+      }
+      if (!nextMode) {
+        return;
+      }
+      event.preventDefault();
+      setMobileDrawerMode(nextMode, { persist: true });
+    });
+  }
+
   function setupLayout() {
-    window.addEventListener('resize', debounce(updateLayoutMode, 150));
-    updateLayoutMode();
+    const handleLayoutResize = debounce(updateLayoutMode, 120);
+    window.addEventListener('resize', handleLayoutResize);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleLayoutResize);
+      window.visualViewport.addEventListener('scroll', handleLayoutResize);
+    }
 
     dom.mobileTabs.forEach(tab => {
       tab.addEventListener('click', () => {
         const target = tab.dataset.mobileTab;
-        if (!target) return;
-        dom.mobileTabs.forEach(btn => {
-          const panel = dom.mobilePanels[btn.dataset.mobileTab];
-          if (!panel) return;
-          const isActive = btn === tab;
-          btn.classList.toggle('is-active', isActive);
-          btn.setAttribute('aria-selected', String(isActive));
-          if (isActive) {
-            btn.removeAttribute('tabindex');
-          } else {
-            btn.setAttribute('tabindex', '-1');
-          }
-          panel.classList.toggle('is-active', isActive);
-          panel.toggleAttribute('hidden', !isActive);
-        });
+        if (!target) {
+          return;
+        }
+        activateMobileTab(target, { ensureDrawer: false });
       });
     });
     setupRailResizers();
-
+    setupMobileDrawerInteractions();
+    updateLayoutMode();
     updateRailToggleVisibility();
   }
 
@@ -7692,39 +8139,65 @@
   }
 
   function updateAdaptiveMobileLayoutVars() {
-    const root = dom.appRoot || document.documentElement;
+    const root = document.documentElement;
     if (!(root instanceof HTMLElement)) {
       return;
     }
+    updateMobileViewportHeightVar();
     if (layoutMode !== 'mobilePortrait') {
       root.style.removeProperty('--mobile-drawer-height');
       root.style.removeProperty('--mobile-topbar-height');
+      root.style.removeProperty('--mobile-drawer-peek-height');
+      root.style.removeProperty('--mobile-drawer-half-height');
+      root.style.removeProperty('--mobile-drawer-full-height');
       return;
     }
-    const width = Math.max(0, Number(window.innerWidth) || 0);
-    const height = Math.max(0, Number(window.innerHeight) || 0);
+    const { width, height } = getViewportSize();
     const portrait = height >= width;
     const topbar = clamp(
-      Math.round(height * (portrait ? 0.12 : 0.18)),
-      portrait ? 82 : 72,
-      portrait ? 122 : 96
+      Math.round(height * (portrait ? 0.105 : 0.14)),
+      portrait ? 72 : 64,
+      portrait ? 108 : 90
     );
-    const drawerBase = Math.round(height * (portrait ? 0.36 : 0.48));
-    const drawerMin = portrait ? 188 : 150;
-    const drawerMaxRatio = Math.round(height * (portrait ? 0.46 : 0.58));
-    const drawerMaxCap = portrait ? 420 : 260;
-    const drawerMax = Math.max(drawerMin, Math.min(drawerMaxRatio, drawerMaxCap));
-    const drawer = clamp(drawerBase, drawerMin, drawerMax);
+    const peek = clamp(
+      Math.round(height * (portrait ? 0.19 : 0.22)),
+      104,
+      portrait ? 176 : 180
+    );
+    const halfMin = peek + 56;
+    const halfCandidate = clamp(
+      Math.round(height * (portrait ? 0.34 : 0.4)),
+      halfMin,
+      portrait ? 420 : 320
+    );
+    const fullMin = Math.max(halfCandidate + 48, portrait ? 238 : 220);
+    const fullCapByViewport = Math.round(height - topbar - 52);
+    const fullCap = Math.max(fullMin, Math.min(fullCapByViewport, portrait ? 560 : 360));
+    const full = clamp(
+      Math.round(height * (portrait ? 0.48 : 0.56)),
+      fullMin,
+      fullCap
+    );
+    const half = clamp(halfCandidate, halfMin, Math.max(halfMin, full - 44));
+    mobileDrawerState.heights.peek = peek;
+    mobileDrawerState.heights.half = half;
+    mobileDrawerState.heights.full = full;
     root.style.setProperty('--mobile-topbar-height', `${topbar}px`);
-    root.style.setProperty('--mobile-drawer-height', `${drawer}px`);
+    root.style.setProperty('--mobile-drawer-peek-height', `${peek}px`);
+    root.style.setProperty('--mobile-drawer-half-height', `${half}px`);
+    root.style.setProperty('--mobile-drawer-full-height', `${full}px`);
+    setMobileDrawerMode(mobileDrawerState.mode, { persist: false });
   }
 
   function updateLayoutMode() {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
+    const { width, height } = getViewportSize();
     const portrait = height >= width;
     const coarsePointer = isCoarsePointerDevice();
-    const shouldUseMobilePortrait = width <= 900 && portrait;
+    const shortestEdge = Math.min(width, height);
+    const longestEdge = Math.max(width, height);
+    const shouldUseMobilePortrait =
+      (coarsePointer && portrait && shortestEdge <= 980 && longestEdge <= 2200) ||
+      (!coarsePointer && portrait && width <= 680 && height <= 1280);
     let nextMode = 'desktop';
 
     if (shouldUseMobilePortrait) {
@@ -7771,7 +8244,9 @@
       endRailResize({ persist: false });
       dom.leftRail.dataset.collapsed = 'true';
       dom.rightRail.dataset.collapsed = 'true';
+      setMobileDrawerMode(mobileDrawerState.mode, { persist: false });
     } else {
+      endMobileDrawerDrag({ persist: false });
       dom.leftRail.dataset.collapsed = 'false';
       dom.rightRail.dataset.collapsed = 'false';
       setRailWidth('left', railSizing.left, { persist: false });
@@ -7794,7 +8269,14 @@
     updateRightTabVisibility();
 
     if (isMobile) {
-      dom.mobileTabs[0]?.click();
+      const preferredMobileTab =
+        (dom.mobilePanels[state.activeLeftTab] && state.activeLeftTab) ||
+        (dom.mobilePanels[state.activeRightTab] && state.activeRightTab) ||
+        dom.mobileTabs.find(tab => tab.classList.contains('is-active'))?.dataset.mobileTab ||
+        dom.mobileTabs[0]?.dataset.mobileTab;
+      if (preferredMobileTab) {
+        activateMobileTab(preferredMobileTab, { ensureDrawer: false });
+      }
     }
 
     updateRailToggleVisibility();
@@ -7910,10 +8392,10 @@
     dom.controls.canvasControlSecondary?.addEventListener('click', handleCanvasControlClick);
 
     if (dom.controls.undoAction) {
-      dom.controls.undoAction.replaceChildren(makeIcon('action-undo', '↺'));
+      dom.controls.undoAction.replaceChildren(makeIcon('action-undo', '↺', { width: 20, height: 20 }));
     }
     if (dom.controls.redoAction) {
-      dom.controls.redoAction.replaceChildren(makeIcon('action-redo', '↻'));
+      dom.controls.redoAction.replaceChildren(makeIcon('action-redo', '↻', { width: 20, height: 20 }));
     }
 
     updateCanvasControlButtons();
@@ -9393,13 +9875,16 @@
     resizeCanvases();
     ensureCanvasWheelListener();
     setupFloatingDrawButton();
+    const gestureSurface = dom.stage || dom.canvasViewport;
     if (dom.canvasViewport) {
       dom.canvasViewport.addEventListener('pointerenter', handleViewportPointerEnter);
       dom.canvasViewport.addEventListener('pointerleave', handleViewportPointerLeave);
-      dom.canvasViewport.addEventListener('pointerdown', handleViewportPointerDown, { passive: false });
-      dom.canvasViewport.addEventListener('pointermove', handleViewportPointerMove, { passive: false });
-      dom.canvasViewport.addEventListener('pointerup', handleViewportPointerUp, { passive: false });
-      dom.canvasViewport.addEventListener('pointercancel', handleViewportPointerCancel, { passive: false });
+    }
+    if (gestureSurface) {
+      gestureSurface.addEventListener('pointerdown', handleViewportPointerDown, { passive: false });
+      gestureSurface.addEventListener('pointermove', handleViewportPointerMove, { passive: false });
+      gestureSurface.addEventListener('pointerup', handleViewportPointerUp, { passive: false });
+      gestureSurface.addEventListener('pointercancel', handleViewportPointerCancel, { passive: false });
     }
     refreshViewportCursorStyle();
   }
@@ -10590,6 +11075,12 @@
 
   function setupKeyboard() {
     document.addEventListener('keydown', event => {
+      const target = event.target;
+      const editable = isEditableTarget(target);
+      if (event.code === 'Space' && !editable && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        setSpacePanActive(true);
+        event.preventDefault();
+      }
       if (event.key === 'Escape') {
         if (hasPendingSelectionMove()) {
           cancelPendingSelectionMove();
@@ -10602,8 +11093,7 @@
       if (!isModifier) {
         return;
       }
-      const target = event.target;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) {
+      if (editable) {
         return;
       }
       const key = event.key.toLowerCase();
@@ -10629,6 +11119,14 @@
           event.preventDefault();
         }
       }
+    });
+    document.addEventListener('keyup', event => {
+      if (event.code === 'Space') {
+        setSpacePanActive(false);
+      }
+    });
+    window.addEventListener('blur', () => {
+      setSpacePanActive(false);
     });
   }
 
@@ -10663,8 +11161,11 @@
     pointerState.panOrigin = { x: state.pan.x, y: state.pan.y };
     pointerState.panMode = null;
     pointerState.touchPanStart = null;
+    pointerState.touchPinchStartDistance = null;
+    pointerState.touchPinchStartScale = null;
     pointerState.curveHandle = null;
     pointerState.panCaptureElement = null;
+    document.body.classList.remove('is-pan-dragging');
     if (shouldCommit) {
       commitHistory();
     }
@@ -10686,9 +11187,12 @@
     pointerState.startClient = null;
     pointerState.panMode = null;
     pointerState.touchPanStart = null;
+    pointerState.touchPinchStartDistance = null;
+    pointerState.touchPinchStartScale = null;
     pointerState.curveHandle = null;
     pointerState.panOrigin = { x: state.pan.x, y: state.pan.y };
     pointerState.panCaptureElement = null;
+    document.body.classList.remove('is-pan-dragging');
   }
 
   function abortActivePointerInteraction({ commitHistory: shouldCommit = true } = {}) {
@@ -10737,9 +11241,24 @@
     return { x: sumX / count, y: sumY / count };
   }
 
+  function getTouchPointerDistance() {
+    if (activeTouchPointers.size < 2) {
+      return null;
+    }
+    const points = Array.from(activeTouchPointers.values());
+    const first = points[0];
+    const second = points[1];
+    if (!first || !second) {
+      return null;
+    }
+    return Math.hypot(first.x - second.x, first.y - second.y);
+  }
+
   function refreshTouchPanBaseline() {
     pointerState.touchPanStart = getTouchCentroid();
     pointerState.panOrigin = { x: state.pan.x, y: state.pan.y };
+    pointerState.touchPinchStartDistance = getTouchPointerDistance();
+    pointerState.touchPinchStartScale = Number(state.scale) || MIN_ZOOM_SCALE;
   }
 
   function startPanInteraction(event, { multiTouch = false, captureElement = dom.canvases.drawing } = {}) {
@@ -10751,15 +11270,19 @@
     if (multiTouch) {
       pointerState.pointerId = null;
       pointerState.startClient = null;
-      pointerState.touchPanStart = getTouchCentroid();
+      refreshTouchPanBaseline();
       if (!pointerState.touchPanStart) {
         pointerState.touchPanStart = { x: event.clientX, y: event.clientY };
+        pointerState.touchPinchStartDistance = null;
+        pointerState.touchPinchStartScale = Number(state.scale) || MIN_ZOOM_SCALE;
       }
       pointerState.panCaptureElement = null;
     } else {
       pointerState.pointerId = event.pointerId;
       pointerState.startClient = { x: event.clientX, y: event.clientY };
       pointerState.touchPanStart = null;
+      pointerState.touchPinchStartDistance = null;
+      pointerState.touchPinchStartScale = null;
       const captureTarget = captureElement && typeof captureElement.setPointerCapture === 'function'
         ? captureElement
         : dom.canvases.drawing;
@@ -10772,6 +11295,7 @@
         }
       }
     }
+    document.body.classList.add('is-pan-dragging');
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
   }
@@ -10793,9 +11317,12 @@
     pointerState.tool = null;
     pointerState.panMode = null;
     pointerState.touchPanStart = null;
+    pointerState.touchPinchStartDistance = null;
+    pointerState.touchPinchStartScale = null;
     pointerState.startClient = null;
     pointerState.path = [];
     pointerState.panCaptureElement = null;
+    document.body.classList.remove('is-pan-dragging');
     activeTouchPointers.clear();
     requestOverlayRender();
     scheduleSessionPersist();
@@ -10813,6 +11340,15 @@
         abortActivePointerInteraction();
       }
       startPanInteraction(event);
+      return;
+    }
+    const isPrimaryPointer = event.pointerType !== 'touch' && (event.button === 0 || event.button === undefined);
+    if (keyboardState.spacePanActive && isPrimaryPointer) {
+      event.preventDefault();
+      if (pointerState.active) {
+        abortActivePointerInteraction({ commitHistory: false });
+      }
+      startPanInteraction(event, { captureElement: dom.canvasViewport });
       return;
     }
 
@@ -11003,13 +11539,34 @@
         if (!centroid || !pointerState.touchPanStart) {
           return;
         }
-        const dx = centroid.x - pointerState.touchPanStart.x;
-        const dy = centroid.y - pointerState.touchPanStart.y;
-        const originX = pointerState.panOrigin?.x || 0;
-        const originY = pointerState.panOrigin?.y || 0;
-        state.pan.x = Math.round(originX + dx);
-        state.pan.y = Math.round(originY + dy);
+        const baselineCentroid = pointerState.touchPanStart;
+        const baselinePan = pointerState.panOrigin || { x: state.pan.x, y: state.pan.y };
+        const dx = centroid.x - baselineCentroid.x;
+        const dy = centroid.y - baselineCentroid.y;
+        let panBaseX = baselinePan.x || 0;
+        let panBaseY = baselinePan.y || 0;
+
+        const baselineDistance = Number(pointerState.touchPinchStartDistance);
+        const nextDistance = Number(getTouchPointerDistance());
+        const baselineScale = Number(pointerState.touchPinchStartScale) || Number(state.scale) || MIN_ZOOM_SCALE;
+        if (Number.isFinite(baselineDistance) && baselineDistance > 0 && Number.isFinite(nextDistance) && nextDistance > 0) {
+          const ratio = nextDistance / baselineDistance;
+          const targetScale = normalizeZoomScale(baselineScale * ratio, Number(state.scale) || baselineScale);
+          if (Math.abs(targetScale - (Number(state.scale) || MIN_ZOOM_SCALE)) >= ZOOM_EPSILON) {
+            const pinchFocus = getCanvasFocusAt(centroid.x, centroid.y);
+            setZoom(targetScale, pinchFocus || undefined);
+            panBaseX = Number(state.pan.x) || panBaseX;
+            panBaseY = Number(state.pan.y) || panBaseY;
+          }
+        }
+
+        state.pan.x = Math.round(panBaseX + dx);
+        state.pan.y = Math.round(panBaseY + dy);
         applyViewportTransform();
+        pointerState.panOrigin = { x: state.pan.x, y: state.pan.y };
+        pointerState.touchPanStart = { x: centroid.x, y: centroid.y };
+        pointerState.touchPinchStartDistance = Number.isFinite(nextDistance) && nextDistance > 0 ? nextDistance : null;
+        pointerState.touchPinchStartScale = Number(state.scale) || MIN_ZOOM_SCALE;
         updateVirtualCursorFromEvent(event);
         return;
       }
@@ -13071,6 +13628,18 @@
     dom.canvasViewport.classList.toggle('is-virtual-cursor-active', shouldHideCursor);
   }
 
+  function setSpacePanActive(active) {
+    const next = Boolean(active);
+    if (keyboardState.spacePanActive === next) {
+      return;
+    }
+    keyboardState.spacePanActive = next;
+    document.body.classList.toggle('is-space-pan-active', next);
+    if (!next && pointerState.active && pointerState.tool === 'pan' && pointerState.panMode === 'single') {
+      finishPanInteraction();
+    }
+  }
+
   function handleViewportPointerEnter(event) {
     if (event.pointerType !== 'mouse' && event.pointerType !== 'pen') {
       return;
@@ -13126,7 +13695,7 @@
 
       const isMiddleMousePan = !isTouch && event.button === 1;
       const isPrimaryButton = !isTouch && (event.button === 0 || event.button === undefined);
-      const wantsPan = !isTouch && (isMiddleMousePan || (state.tool === 'pan' && isPrimaryButton));
+      const wantsPan = !isTouch && (isMiddleMousePan || ((state.tool === 'pan' || keyboardState.spacePanActive) && isPrimaryButton));
       if (wantsPan) {
         event.preventDefault();
         if (pointerState.active) {
@@ -13881,6 +14450,7 @@
         lastGroupTool: { ...(state.lastGroupTool || DEFAULT_GROUP_TOOL) },
         leftRailWidth: Math.round(Number(railSizing.left) || RAIL_DEFAULT_WIDTH.left),
         rightRailWidth: Math.round(Number(railSizing.right) || RAIL_DEFAULT_WIDTH.right),
+        mobileDrawerMode: normalizeMobileDrawerMode(mobileDrawerState.mode),
         documentName: state.documentName,
       };
       window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(snapshot));
@@ -13942,6 +14512,9 @@
     }
     if (Number.isFinite(payload.rightRailWidth)) {
       railSizing.right = normalizeRailWidth('right', payload.rightRailWidth);
+    }
+    if (typeof payload.mobileDrawerMode === 'string') {
+      mobileDrawerState.mode = normalizeMobileDrawerMode(payload.mobileDrawerMode);
     }
     if (payload.leftTab && LEFT_TAB_KEYS.includes(payload.leftTab)) {
       state.activeLeftTab = payload.leftTab;
