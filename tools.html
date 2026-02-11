@@ -285,6 +285,9 @@
       aspect-ratio:4/3;
       background:rgba(0,0,0,0.25);
       overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
     }
     .thumb img{
       width:100%;
@@ -296,6 +299,28 @@
       background:transparent;
       -webkit-user-drag:none;
       user-select:none;
+    }
+    .thumb img[data-media="icon"]{
+      padding:10px;
+      background:rgba(2,6,18,0.82);
+      object-fit:contain;
+    }
+    .thumb--dev{
+      background:#000;
+    }
+    .thumb-dev-label{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:10px 14px;
+      border:1px dashed rgba(255,255,255,0.25);
+      border-radius:10px;
+      color:#f9fafb;
+      font-size:14px;
+      font-weight:700;
+      letter-spacing:0.12em;
+      background:rgba(255,255,255,0.04);
+      z-index:1;
     }
     .tag{
       position:absolute;
@@ -615,13 +640,20 @@
       event.preventDefault();
     });
   </script>
-  <script id="ads-lazy">
+  
+<script id="ads-lazy">
   (function() {
     if (window.pixieedObserveAds) return;
 
     const SLOT_SEQUENCE = ['2141591954','9073878884','2261515379'];
     const SLOT_KEY = 'pixieedAdSlotIndex';
+    const LOAD_TIMEOUT_MS = 10000;
+    const READY_POLL_MS = 250;
+
     let slotIndex = 0;
+    let activeAd = null;
+    let readyTimer = null;
+    const queue = [];
 
     const readSlotIndex = () => {
       try {
@@ -646,6 +678,15 @@
       return slot;
     };
 
+    const isReady = (ins) => (
+      ins.getAttribute('data-adsbygoogle-status') === 'done' ||
+      ins.getAttribute('data-ad-status') === 'filled'
+    );
+
+    const isEnqueued = (ins) => ins.dataset.adsQueueEnqueued === '1';
+    const isLoading = (ins) => ins.dataset.adsQueueLoading === '1';
+    const isLoaded = (ins) => ins.dataset.adsLazyLoaded === '1' || isReady(ins);
+
     const assignSlot = (ins) => {
       if (!ins || !(ins instanceof HTMLElement)) return;
       if (ins.dataset.adSlotAssigned === '1') return;
@@ -665,78 +706,98 @@
       ins.dataset.adSlotAssigned = '1';
     };
 
-    const pending = [];
-    const hasObserverSupport = 'IntersectionObserver' in window;
-    let observer = null;
+    const clearReadyTimer = () => {
+      if (!readyTimer) return;
+      clearTimeout(readyTimer);
+      readyTimer = null;
+    };
 
-    const isLoaded = (ins) => (
-      ins.dataset.adsLazyLoaded === '1' ||
-      ins.getAttribute('data-adsbygoogle-status') === 'done' ||
-      ins.getAttribute('data-ad-status') === 'filled'
-    );
+    const releaseActiveAd = () => {
+      clearReadyTimer();
+      if (!activeAd) return;
+      activeAd.dataset.adsQueueLoading = '';
+      activeAd.dataset.adsQueueEnqueued = '';
+      activeAd.dataset.adsLazyLoaded = '1';
+      activeAd = null;
+      processQueue();
+    };
+
+    const waitUntilReady = (ins, startedAt) => {
+      if (!activeAd || activeAd !== ins) return;
+      if (!document.contains(ins) || isReady(ins) || (Date.now() - startedAt) >= LOAD_TIMEOUT_MS) {
+        releaseActiveAd();
+        return;
+      }
+      readyTimer = setTimeout(() => waitUntilReady(ins, startedAt), READY_POLL_MS);
+    };
 
     const loadAd = (ins) => {
-      if (!ins || !(ins instanceof HTMLElement)) return;
-      if (isLoaded(ins)) return;
+      if (!ins || !(ins instanceof HTMLElement)) return false;
+      if (isLoaded(ins) || isLoading(ins)) return true;
       assignSlot(ins);
+      ins.dataset.adsQueueLoading = '1';
       ins.dataset.adsLazyLoaded = '1';
       try {
         (window.adsbygoogle = window.adsbygoogle || []).push({});
       } catch (err) {
+        ins.dataset.adsQueueLoading = '';
         ins.dataset.adsLazyLoaded = '';
+        return false;
       }
+      return true;
     };
 
-    const observeAd = (ins) => {
+    const enqueueAd = (ins) => {
       if (!ins || !(ins instanceof HTMLElement)) return;
-      if (ins.dataset.adsLazyObserved === '1') return;
-      if (isLoaded(ins)) return;
-      ins.dataset.adsLazyObserved = '1';
-      if (!observer) {
-        if (!hasObserverSupport) {
-          loadAd(ins);
-        } else {
-          pending.push(ins);
+      if (isLoaded(ins) || isLoading(ins) || isEnqueued(ins)) return;
+      assignSlot(ins);
+      ins.dataset.adsQueueEnqueued = '1';
+      queue.push(ins);
+    };
+
+    function processQueue() {
+      if (activeAd) return;
+      while (queue.length) {
+        const ins = queue.shift();
+        if (!ins || !(ins instanceof HTMLElement)) continue;
+        if (!document.contains(ins)) continue;
+        ins.dataset.adsQueueEnqueued = '';
+        if (isLoaded(ins)) {
+          ins.dataset.adsLazyLoaded = '1';
+          continue;
         }
+        activeAd = ins;
+        const startedAt = Date.now();
+        if (!loadAd(ins)) {
+          activeAd = null;
+          setTimeout(() => {
+            if (!document.contains(ins) || isLoaded(ins)) return;
+            enqueueAd(ins);
+            processQueue();
+          }, 1200);
+          return;
+        }
+        waitUntilReady(ins, startedAt);
         return;
       }
-      observer.observe(ins);
-    };
+    }
 
     const observeAds = (root) => {
       const scope = root && root.querySelectorAll ? root : document;
-      scope.querySelectorAll('ins.adsbygoogle').forEach(observeAd);
+      scope.querySelectorAll('ins.adsbygoogle').forEach(enqueueAd);
+      processQueue();
     };
 
     window.pixieedObserveAds = observeAds;
 
-    const setupObserver = () => {
-      if (hasObserverSupport) {
-        observer = new IntersectionObserver((entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting || entry.intersectionRatio > 0) {
-              const target = entry.target;
-              if (observer) observer.unobserve(target);
-              loadAd(target);
-            }
-          });
-        }, { rootMargin: '0px', threshold: 0.1 });
-      }
-      const queued = pending.splice(0);
-      queued.forEach((ins) => {
-        if (observer) {
-          observer.observe(ins);
-        } else {
-          loadAd(ins);
-        }
-      });
+    const setupQueue = () => {
       observeAds(document);
     };
 
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', setupObserver);
+      document.addEventListener('DOMContentLoaded', setupQueue);
     } else {
-      setupObserver();
+      setupQueue();
     }
 
     const mo = new MutationObserver((mutations) => {
@@ -744,14 +805,15 @@
         mutation.addedNodes.forEach((node) => {
           if (!(node instanceof HTMLElement)) return;
           if (node.matches && node.matches('ins.adsbygoogle')) {
-            observeAd(node);
+            enqueueAd(node);
             return;
           }
           if (node.querySelectorAll) {
-            node.querySelectorAll('ins.adsbygoogle').forEach(observeAd);
+            node.querySelectorAll('ins.adsbygoogle').forEach(enqueueAd);
           }
         });
       });
+      processQueue();
     });
 
     const startObserver = () => {
@@ -811,7 +873,7 @@
       <div class="grid" id="toolsGrid">
         <a class="item" href="projects/maoitu/index.html">
           <div class="thumb">
-            <img src="maoitu/ogp.png" alt="魔王様!!いつまでよければいいですか!?" draggable="false">
+            <img src="icon/icon-192-3.png" alt="魔王様!!いつまでよければいいですか!?" draggable="false" data-media="icon">
             <span class="tag">Game</span>
           </div>
           <div class="body">
@@ -820,8 +882,8 @@
           </div>
         </a>
         <a class="item" href="projects/maou-war/index.html">
-          <div class="thumb">
-            <img src="PiXiEEDogp.png" alt="魔王奪還戦（現在開発中）" draggable="false">
+          <div class="thumb thumb--dev">
+            <span class="thumb-dev-label">開発中</span>
             <span class="tag">Game</span>
           </div>
           <div class="body">
@@ -831,7 +893,7 @@
         </a>
         <a class="item" href="projects/pixfind/index.html">
           <div class="thumb">
-            <img src="pixfind/ogp.png" alt="PiXFiND" draggable="false">
+            <img src="icon/icon-192-2.png" alt="PiXFiND" draggable="false" data-media="icon">
             <span class="tag">Game</span>
           </div>
           <div class="body">
@@ -841,7 +903,7 @@
         </a>
         <a class="item" href="projects/pixiedraw/index.html">
           <div class="thumb">
-            <img src="pixiedraw/ogp-app.png" alt="PiXiEEDraw" draggable="false">
+            <img src="icon/icon-192-4.png" alt="PiXiEEDraw" draggable="false" data-media="icon">
             <span class="tag">Tool</span>
           </div>
           <div class="body">
@@ -851,7 +913,7 @@
         </a>
         <a class="item" href="projects/jerin-maker/index.html">
           <div class="thumb">
-            <img src="jerin-maker/ogp-app.png" alt="PiXiEEDraw Lite（ピクドラ）" draggable="false">
+            <img src="icon/icon-192-5.png" alt="PiXiEEDraw Lite（ピクドラ）" draggable="false" data-media="icon">
             <span class="tag">Tool</span>
           </div>
           <div class="body">
@@ -861,7 +923,7 @@
         </a>
         <a class="item" href="projects/pixiee-lens/index.html">
           <div class="thumb">
-            <img src="pixiee-lens/ogp.png" alt="PiXiEELENS" draggable="false">
+            <img src="icon/icon-192-1.png" alt="PiXiEELENS" draggable="false" data-media="icon">
             <span class="tag">Tool</span>
           </div>
           <div class="body">
@@ -871,7 +933,7 @@
         </a>
         <a class="item is-new" href="projects/qr-maker/index.html">
           <div class="thumb">
-            <img src="qr-maker/qrogp.png" alt="QRコードメーカー" draggable="false">
+            <img src="icon/icon-192-6.png" alt="QRコードメーカー" draggable="false" data-media="icon">
             <span class="tag">Tool</span>
             <span class="badge badge--new">NEW</span>
           </div>
@@ -1020,7 +1082,7 @@
           tag:'Game',
           category:'game',
           href:'projects/maoitu/index.html',
-          image:'maoitu/ogp.png',
+          image:'icon/icon-192-3.png',
           updated:'2025-10-10'
         },
         {
@@ -1029,8 +1091,9 @@
           desc:'タイルを進んで成長し、勇者の拠点を奪い返すグリッド戦略RPG。',
           tag:'Game',
           category:'game',
+          status:'dev',
           href:'projects/maou-war/index.html',
-          image:'PiXiEEDogp.png',
+          image:'icon/icon-192-3.png',
           updated:'2025-10-15'
         },
         {
@@ -1040,7 +1103,7 @@
           tag:'Game',
           category:'game',
           href:'projects/pixfind/index.html',
-          image:'pixfind/ogp.png',
+          image:'icon/icon-192-2.png',
           updated:'2025-10-21',
           readme:'pixfind/README.md'
         },
@@ -1051,7 +1114,7 @@
           tag:'Tool',
           category:'tool',
           href:'projects/pixiedraw/index.html',
-          image:'pixiedraw/ogp-app.png',
+          image:'icon/icon-192-4.png',
           updated:'2025-10-30',
           readme:'pixiedraw/README.md'
         },
@@ -1062,7 +1125,7 @@
           tag:'Tool',
           category:'tool',
           href:'projects/jerin-maker/index.html',
-          image:'jerin-maker/ogp-app.png',
+          image:'icon/icon-192-5.png',
           updated:'2025-12-13',
           readme:'jerin-maker/README.md'
         },
@@ -1073,7 +1136,7 @@
           tag:'Tool',
           category:'tool',
           href:'projects/pixiee-lens/index.html',
-          image:'pixiee-lens/ogp.png',
+          image:'icon/icon-192-1.png',
           updated:'2025-10-25',
           readme:'pixiee-lens/README.md'
         },
@@ -1084,7 +1147,7 @@
           tag:'Tool',
           category:'tool',
           href:'projects/qr-maker/index.html',
-          image:'qr-maker/qrogp.png',
+          image:'icon/icon-192-6.png',
           updated:'2025-12-18',
           readme:'qr-maker/README.md'
         }
@@ -1308,9 +1371,12 @@
           card.className = `item${isNew ? ' is-new' : ''}`;
           card.href = item.href;
           const badge = isNew ? '<span class="badge badge--new">NEW</span>' : '';
+          const media = item.status === 'dev'
+            ? '<span class="thumb-dev-label">開発中</span>'
+            : `<img src="${item.image}" alt="${item.title}" draggable="false" data-media="icon">`;
           card.innerHTML = `
-            <div class="thumb">
-              <img src="${item.image}" alt="${item.title}" draggable="false">
+            <div class="thumb${item.status === 'dev' ? ' thumb--dev' : ''}">
+              ${media}
               <span class="tag">${item.tag}</span>
               ${badge}
             </div>
