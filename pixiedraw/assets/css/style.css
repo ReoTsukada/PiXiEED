@@ -16,9 +16,14 @@
   --left-width: 78px;
   --right-width: 78px;
   --mobile-banner-height: 0px;
-  --mobile-drawer-height: clamp(188px, 36vh, 420px);
+  --mobile-drawer-peek-height: 124px;
+  --mobile-drawer-half-height: clamp(188px, 36vh, 420px);
+  --mobile-drawer-full-height: clamp(240px, 46vh, 520px);
+  --mobile-drawer-height: var(--mobile-drawer-half-height);
+  --mobile-drawer-handle-height: 24px;
   --mobile-stage-padding: 1px;
   --mobile-topbar-height: clamp(82px, 12vh, 122px);
+  --mobile-viewport-height: 100vh;
   --mobile-safe-area-bottom: env(safe-area-inset-bottom, 0px);
   font-family: "Press Start 2P", "DotGothic16", "M PLUS 1p", system-ui, sans-serif;
   font-size: 13px;
@@ -29,6 +34,15 @@
   --slider-thumb: #ffffff;
   --slider-thumb-shadow: rgba(4, 10, 18, 0.55);
   --slider-thumb-size: 16px;
+  --canvas-control-size: clamp(38px, 4.2vw, 44px);
+  --canvas-control-size-mobile: clamp(30px, 8.5vw, 36px);
+  --canvas-control-icon-size: 20px;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --mobile-viewport-height: 100dvh;
+  }
 }
 
 * {
@@ -947,6 +961,18 @@ button {
   touch-action: none;
 }
 
+body.is-space-pan-active #drawingCanvas,
+body.is-space-pan-active #overlayCanvas,
+body.is-space-pan-active #selectionCanvas {
+  cursor: grab;
+}
+
+body.is-pan-dragging #drawingCanvas,
+body.is-pan-dragging #overlayCanvas,
+body.is-pan-dragging #selectionCanvas {
+  cursor: grabbing;
+}
+
 #overlayCanvas {
   position: absolute;
   top: 0;
@@ -977,25 +1003,34 @@ body.is-startup-active #virtualCursorCanvas {
 }
 
 .canvas-controls {
+  --canvas-control-current-size: var(--canvas-control-size);
   position: absolute;
   top: 12px;
   right: var(--right-toggle-offset);
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
   background: rgba(13, 17, 24, 0.6);
-  padding: 6px 12px;
+  padding: 6px 10px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .canvas-controls[data-mobile='true'] {
+  --canvas-control-current-size: var(--canvas-control-size-mobile);
+  --canvas-control-icon-size: 18px;
   position: static;
   justify-content: center;
   background: transparent;
   border: 0;
   border-radius: 0;
   padding: 0;
+  gap: 6px;
+}
+
+.canvas-controls__history {
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
 }
 
@@ -1003,6 +1038,11 @@ body.is-startup-active #virtualCursorCanvas {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.canvas-controls[data-mobile='true'] .canvas-controls__history,
+.canvas-controls[data-mobile='true'] .canvas-control-buttons {
+  gap: 6px;
 }
 
 .zoom-indicator {
@@ -1162,12 +1202,25 @@ body.is-rail-resizing * {
 }
 
 .canvas-controls .chip {
-  width: 44px;
-  height: 44px;
+  width: var(--canvas-control-current-size);
+  height: var(--canvas-control-current-size);
+  min-width: var(--canvas-control-current-size);
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  line-height: 1;
+}
+
+.canvas-controls .chip img,
+.canvas-controls .chip svg {
+  width: var(--canvas-control-icon-size);
+  height: var(--canvas-control-icon-size);
+}
+
+.canvas-controls .chip:where([data-action='copy'], [data-action='paste'], [data-action='cancelSelectionMove'], [data-action='confirmSelectionMove']) {
+  font-size: 11px;
+  letter-spacing: 0.01em;
 }
 
 .canvas-control-buttons {
@@ -2501,6 +2554,7 @@ body.is-startup-active {
   align-items: center;
   gap: 12px;
   flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .mobile-shortcuts {
@@ -2513,10 +2567,49 @@ body.is-startup-active {
 
 .mobile-drawer {
   position: relative;
-  display: block;
+  display: flex;
+  flex-direction: column;
   background: rgba(12, 16, 24, 0.92);
   border-top: 1px solid var(--border);
   backdrop-filter: blur(18px);
+  transition: height 180ms ease;
+}
+
+.mobile-drawer.is-dragging {
+  transition: none;
+}
+
+.mobile-drawer__handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: var(--mobile-drawer-handle-height);
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid rgba(112, 246, 255, 0.2);
+  background:
+    linear-gradient(0deg, rgba(112, 246, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(112, 246, 255, 0.12) 1px, transparent 1px),
+    rgba(7, 14, 22, 0.84);
+  background-size: 6px 6px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.mobile-drawer__grip {
+  width: 54px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(176, 226, 255, 0.78);
+  box-shadow:
+    0 0 0 1px rgba(8, 18, 28, 0.74),
+    0 0 8px rgba(88, 196, 255, 0.35);
+}
+
+.mobile-drawer__handle:focus-visible {
+  outline: 1px solid rgba(112, 246, 255, 0.9);
+  outline-offset: -2px;
 }
 
 .mobile-tabs {
@@ -2525,10 +2618,12 @@ body.is-startup-active {
   gap: 6px;
   border-bottom: 1px solid var(--border);
   flex: 1 1 auto;
+  min-width: 0;
 }
 
 .mobile-tab {
   flex: 1 1 0;
+  min-width: 0;
   padding: 10px 6px;
   color: var(--fg-muted);
   border: none;
@@ -2547,6 +2642,8 @@ body.is-startup-active {
 
 .mobile-panels {
   position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px;
   scrollbar-width: none;
@@ -2579,24 +2676,34 @@ body.is-startup-active {
 @media (max-width: 900px) and (orientation: portrait) {
   :root {
     --mobile-banner-height: 0px;
-    --mobile-drawer-height: clamp(188px, 36vh, 420px);
+    --mobile-drawer-peek-height: clamp(108px, 20vh, 168px);
+    --mobile-drawer-half-height: clamp(188px, 36vh, 420px);
+    --mobile-drawer-full-height: clamp(240px, 46vh, 520px);
+    --mobile-drawer-height: var(--mobile-drawer-half-height);
     --mobile-stage-padding: 1px;
-    --mobile-topbar-height: clamp(82px, 12vh, 122px);
+    --mobile-topbar-height: clamp(74px, 11vh, 108px);
     --mobile-safe-area-bottom: env(safe-area-inset-bottom, 0px);
   }
   body {
-    min-height: 100vh;
+    min-height: var(--mobile-viewport-height);
     overflow: hidden;
     overscroll-behavior: none;
   }
   .app {
-    height: 100vh;
+    height: var(--mobile-viewport-height);
     overflow: hidden;
     display: flex;
     flex-direction: column;
   }
   .mobile-topbar {
     display: block;
+  }
+  .mobile-topbar__inner {
+    padding: 4px 8px;
+    gap: 8px;
+  }
+  .mobile-shortcuts {
+    gap: 4px;
   }
   .mobile-tab .tab-icon-container,
   .mobile-tab .tab-icon-container img,
@@ -2609,6 +2716,8 @@ body.is-startup-active {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 6px;
     margin-bottom: 12px;
+    width: 100%;
+    min-width: 0;
   }
   .panel-section[data-section='tools'] .tool-group-button {
     padding: 6px 8px;
@@ -2617,10 +2726,107 @@ body.is-startup-active {
     min-width: 0;
     gap: 4px;
     white-space: nowrap;
+    overflow: hidden;
+    width: 100%;
+    max-width: 100%;
+  }
+  .panel-section[data-section='tools'] .tool-group-label {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .panel-section[data-section='tools'] .tool-group-button .tool-group-icon {
     width: 14px;
     height: 14px;
+  }
+  .mobile-drawer[data-mode='peek'] .panel-section[data-section='tools'] .tool-group-button {
+    width: 52px;
+    min-width: 52px;
+    max-width: 52px;
+    height: 52px;
+    min-height: 52px;
+    padding: 0;
+    aspect-ratio: auto;
+  }
+  .mobile-drawer[data-mode='peek'] .panel-section[data-section='tools'] .tool-group-tabs {
+    display: grid;
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 52px;
+    justify-content: start;
+    gap: 6px;
+    margin-bottom: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .mobile-drawer[data-mode='peek'] .panel-section[data-section='tools'] .tool-group-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .mobile-drawer[data-mode='peek'] .panel-section[data-section='tools'] .tool-group-button .tool-group-label {
+    display: none;
+  }
+  .mobile-drawer[data-mode='peek'] .panel-section[data-section='tools'] .tool-group-button .tool-group-icon {
+    width: 18px;
+    height: 18px;
+  }
+  .mobile-drawer[data-mode='peek'] #panelTools .field-group {
+    display: none;
+  }
+  .mobile-drawer[data-mode='peek'] #panelTools .tool-grid,
+  .mobile-drawer[data-mode='peek'] #panelTools .tool-grid[data-active-group] {
+    display: none;
+  }
+  .mobile-drawer[data-mode='peek'] #panelTools[data-compact-flyout-open='true'] .tool-grid,
+  .mobile-drawer[data-mode='peek'] #panelTools[data-compact-flyout-open='true'] .tool-grid[data-active-group] {
+    display: grid;
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 56px;
+    gap: 8px;
+    min-width: 0;
+    width: auto;
+    justify-items: stretch;
+    justify-content: start;
+    position: fixed;
+    top: 0;
+    left: 0;
+    padding: 8px;
+    border: 2px solid var(--border);
+    background:
+      linear-gradient(0deg, rgba(112, 246, 255, 0.12) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(112, 246, 255, 0.12) 1px, transparent 1px),
+      rgba(7, 16, 24, 0.96);
+    background-size: 6px 6px;
+    box-shadow:
+      0 0 0 2px rgba(4, 12, 20, 0.85),
+      0 8px 18px rgba(0, 0, 0, 0.45);
+    z-index: 12000;
+    max-width: calc(100vw - 16px);
+    max-height: 80px;
+    overflow-y: hidden;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+  .mobile-drawer[data-mode='peek'] #panelTools[data-compact-flyout-open='true'] .tool-button {
+    width: 56px;
+    min-width: 56px;
+    max-width: 56px;
+    min-height: 0;
+    height: 56px;
+    aspect-ratio: 1 / 1;
+    gap: 0;
+    padding: 0;
+    place-items: center;
+  }
+  .mobile-drawer[data-mode='peek'] #panelTools[data-compact-flyout-open='true'] .tool-button span {
+    display: none;
+  }
+  .mobile-drawer[data-mode='peek'] #panelTools[data-compact-flyout-open='true'] .tool-icon,
+  .mobile-drawer[data-mode='peek'] #panelTools[data-compact-flyout-open='true'] .tool-button img {
+    width: 24px;
+    height: 24px;
   }
   .layout {
     display: flex;
@@ -2651,11 +2857,11 @@ body.is-startup-active {
     position: relative;
     width: min(
       calc(100vw - (var(--mobile-stage-padding) * 2)),
-      calc(100vh - var(--mobile-banner-height) - var(--mobile-topbar-height) - var(--mobile-drawer-height))
+      calc(var(--mobile-viewport-height) - var(--mobile-banner-height) - var(--mobile-topbar-height) - var(--mobile-drawer-height))
     );
     height: min(
       calc(100vw - (var(--mobile-stage-padding) * 2)),
-      calc(100vh - var(--mobile-banner-height) - var(--mobile-topbar-height) - var(--mobile-drawer-height))
+      calc(var(--mobile-viewport-height) - var(--mobile-banner-height) - var(--mobile-topbar-height) - var(--mobile-drawer-height))
     );
     display: flex;
     align-items: center;
@@ -2666,17 +2872,32 @@ body.is-startup-active {
     max-height: none;
   }
   .mobile-drawer {
-    display: block !important;
+    display: flex !important;
+    flex-direction: column;
     flex: none;
     height: var(--mobile-drawer-height);
-    max-height: var(--mobile-drawer-height);
-    min-height: 0;
+    min-height: var(--mobile-drawer-peek-height);
+    max-height: var(--mobile-drawer-full-height);
     overflow: hidden;
     border-radius: 0;
-    contain: layout paint size;
+    contain: layout size;
+  }
+  .mobile-drawer[data-mode='peek'] {
+    overflow: visible;
+  }
+  .mobile-drawer[data-mode='peek'] .mobile-panels {
+    overflow: visible;
+  }
+  .mobile-drawer[data-mode='peek'] .mobile-panel.is-active > .panel-section {
+    overflow: visible;
+  }
+  .mobile-drawer[data-mode='peek'] .mobile-panel.is-active > .panel-section .panel-section__body {
+    overflow: visible;
+    padding-bottom: 0;
   }
   .mobile-panels {
-    height: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-x: hidden;
     overflow-y: auto;
     padding: 10px;
@@ -2697,6 +2918,7 @@ body.is-startup-active {
   .mobile-panel.is-active > .panel-section .panel-section__body {
     flex: 1 1 auto;
     overflow-y: auto;
+    overflow-x: hidden;
     scrollbar-width: none;
     padding-bottom: max(24px, var(--mobile-safe-area-bottom));
   }
