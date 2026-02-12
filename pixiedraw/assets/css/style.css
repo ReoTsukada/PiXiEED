@@ -16,7 +16,7 @@
   --left-width: 78px;
   --right-width: 78px;
   --mobile-banner-height: 0px;
-  --mobile-drawer-peek-height: 124px;
+  --mobile-drawer-peek-height: 127px;
   --mobile-drawer-half-height: clamp(188px, 36vh, 420px);
   --mobile-drawer-full-height: clamp(240px, 46vh, 520px);
   --mobile-drawer-height: var(--mobile-drawer-full-height);
@@ -25,8 +25,16 @@
   --mobile-topbar-height: clamp(82px, 12vh, 122px);
   --mobile-top-control-size: clamp(36px, 10vw, 44px);
   --mobile-top-control-icon-size: 22px;
+  --mobile-viewport-width: 100vw;
   --mobile-viewport-height: 100vh;
-  --mobile-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --mobile-safe-area-top: var(--safe-area-top);
+  --mobile-safe-area-right: var(--safe-area-right);
+  --mobile-safe-area-bottom: var(--safe-area-bottom);
+  --mobile-safe-area-left: var(--safe-area-left);
   font-family: "Press Start 2P", "DotGothic16", "M PLUS 1p", system-ui, sans-serif;
   font-size: 13px;
   --slider-track: rgba(18, 26, 38, 0.92);
@@ -44,6 +52,12 @@
 @supports (height: 100dvh) {
   :root {
     --mobile-viewport-height: 100dvh;
+  }
+}
+
+@supports (width: 100dvw) {
+  :root {
+    --mobile-viewport-width: 100dvw;
   }
 }
 
@@ -72,7 +86,7 @@ body {
 
 body {
   display: flex;
-  min-height: 100vh;
+  min-height: var(--mobile-viewport-height);
   text-rendering: optimizeLegibility;
   image-rendering: pixelated;
 }
@@ -128,8 +142,8 @@ img,
 
 .update-toast {
   position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
+  bottom: max(1.5rem, calc(var(--safe-area-bottom) + 1rem));
+  right: max(1.5rem, calc(var(--safe-area-right) + 1rem));
   z-index: 9999;
   max-width: min(320px, 90vw);
   background: rgba(12, 20, 32, 0.94);
@@ -194,9 +208,9 @@ img,
 
 @media (max-width: 640px) {
   .update-toast {
-    left: 1rem;
-    right: 1rem;
-    bottom: env(safe-area-inset-bottom, 1rem);
+    left: max(1rem, calc(var(--safe-area-left) + 0.75rem));
+    right: max(1rem, calc(var(--safe-area-right) + 0.75rem));
+    bottom: max(1rem, calc(var(--safe-area-bottom) + 0.75rem));
   }
   .update-toast__actions {
     flex-direction: column;
@@ -1588,15 +1602,28 @@ input[type='range']::-moz-focus-outer {
 .palette-header {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   margin-bottom: 10px;
-  gap: 12px;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .palette-actions {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.palette-actions .chip {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0;
+  flex: 0 0 34px;
 }
 
 .palette-grid {
@@ -1605,6 +1632,8 @@ input[type='range']::-moz-focus-outer {
   gap: 8px;
   margin-bottom: 12px;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
 }
 
@@ -2210,7 +2239,11 @@ body.is-startup-active {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding:
+    calc(24px + var(--safe-area-top))
+    calc(24px + var(--safe-area-right))
+    calc(24px + var(--safe-area-bottom))
+    calc(24px + var(--safe-area-left));
   z-index: 520;
 }
 
@@ -2417,17 +2450,16 @@ body.is-startup-active {
   background: var(--bg-panel);
   color: inherit;
   box-shadow: var(--shadow);
-  width: min(420px, calc(100vw - 24px));
-  min-width: min(320px, calc(100vw - 24px));
-  max-width: calc(100vw - 24px);
-  max-height: calc(100vh - 24px);
-  max-height: calc(100dvh - 24px);
+  width: min(420px, calc(var(--mobile-viewport-width) - var(--safe-area-left) - var(--safe-area-right) - 24px));
+  min-width: min(320px, calc(var(--mobile-viewport-width) - var(--safe-area-left) - var(--safe-area-right) - 24px));
+  max-width: calc(var(--mobile-viewport-width) - var(--safe-area-left) - var(--safe-area-right) - 24px);
+  max-height: calc(var(--mobile-viewport-height) - var(--safe-area-top) - var(--safe-area-bottom) - 24px);
   overflow: hidden;
 }
 
 .modal[open] {
   position: fixed;
-  inset: 0;
+  inset: var(--safe-area-top) var(--safe-area-right) var(--safe-area-bottom) var(--safe-area-left);
   margin: auto;
 }
 
@@ -2785,7 +2817,10 @@ body.is-startup-active {
     --mobile-topbar-height: clamp(84px, 12vh, 116px);
     --mobile-top-control-size: clamp(38px, 10.5vw, 46px);
     --mobile-top-control-icon-size: 23px;
+    --mobile-safe-area-top: env(safe-area-inset-top, 0px);
+    --mobile-safe-area-right: env(safe-area-inset-right, 0px);
     --mobile-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --mobile-safe-area-left: env(safe-area-inset-left, 0px);
   }
   body {
     min-height: var(--mobile-viewport-height);
@@ -2891,11 +2926,12 @@ body.is-startup-active {
     grid-auto-columns: 48px;
     justify-content: start;
     gap: 8px;
-    width: auto;
+    width: 100%;
     min-width: 0;
-    max-width: calc(100vw - 20px);
+    max-width: 100%;
     margin-bottom: 0;
     padding-bottom: 2px;
+    box-sizing: border-box;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
@@ -2944,7 +2980,7 @@ body.is-startup-active {
       0 0 0 2px rgba(4, 12, 20, 0.9),
       0 14px 36px rgba(0, 0, 0, 0.62);
     z-index: 14000;
-    max-width: calc(100vw - 16px);
+    max-width: calc(var(--mobile-viewport-width) - var(--mobile-safe-area-left) - var(--mobile-safe-area-right) - 16px);
     max-height: min(72vh, 420px);
     overflow-y: auto;
     overflow-x: hidden;
@@ -2974,7 +3010,7 @@ body.is-startup-active {
       0 0 0 2px rgba(4, 12, 20, 0.9),
       0 14px 36px rgba(0, 0, 0, 0.62);
     z-index: 14000;
-    max-width: calc(100vw - 16px);
+    max-width: calc(var(--mobile-viewport-width) - var(--mobile-safe-area-left) - var(--mobile-safe-area-right) - 16px);
     max-height: min(72vh, 420px);
     overflow-y: auto;
     overflow-x: hidden;
@@ -3054,12 +3090,12 @@ body.is-startup-active {
   .stage__canvas {
     position: relative;
     width: min(
-      calc(100vw - (var(--mobile-stage-padding) * 2)),
-      calc(var(--mobile-viewport-height) - var(--mobile-banner-height) - var(--mobile-topbar-height) - var(--mobile-drawer-height))
+      calc(100% - (var(--mobile-stage-padding) * 2)),
+      calc(var(--mobile-viewport-height) - var(--mobile-safe-area-top) - var(--mobile-banner-height) - var(--mobile-topbar-height) - var(--mobile-drawer-height))
     );
     height: min(
-      calc(100vw - (var(--mobile-stage-padding) * 2)),
-      calc(var(--mobile-viewport-height) - var(--mobile-banner-height) - var(--mobile-topbar-height) - var(--mobile-drawer-height))
+      calc(100% - (var(--mobile-stage-padding) * 2)),
+      calc(var(--mobile-viewport-height) - var(--mobile-safe-area-top) - var(--mobile-banner-height) - var(--mobile-topbar-height) - var(--mobile-drawer-height))
     );
     display: flex;
     align-items: center;
@@ -3207,5 +3243,10 @@ body.is-startup-active {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  min-height: var(--mobile-viewport-height);
+  width: 100%;
+  box-sizing: border-box;
+  padding-top: var(--safe-area-top);
+  padding-left: var(--safe-area-left);
+  padding-right: var(--safe-area-right);
 }
