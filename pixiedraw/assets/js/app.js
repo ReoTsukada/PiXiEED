@@ -3228,7 +3228,29 @@
     if (dom.controls.enableAutosave) {
       dom.controls.enableAutosave.textContent = '自動保存を再許可';
     }
-    const listener = () => {
+    const listener = (event) => {
+      const target = event?.target instanceof Element ? event.target : null;
+      if (!target) {
+        schedulePendingAutosavePermission(handle);
+        return;
+      }
+      const isEditable = Boolean(target.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]'));
+      if (isEditable) {
+        schedulePendingAutosavePermission(handle);
+        return;
+      }
+      const isAutosaveButton = Boolean(
+        dom.controls.enableAutosave
+          && (target === dom.controls.enableAutosave || target.closest('#enableAutosave') === dom.controls.enableAutosave)
+      );
+      const isCanvasTap = Boolean(
+        (dom.canvasViewport && dom.canvasViewport.contains(target))
+          || isCanvasSurfaceTarget(target)
+      );
+      if (!isAutosaveButton && !isCanvasTap) {
+        schedulePendingAutosavePermission(handle);
+        return;
+      }
       attemptAutosaveReauthorization().catch(error => {
         console.warn('Autosave reauthorization failed', error);
         updateAutosaveStatus('自動保存: 権限を付与できませんでした', 'error');
@@ -15582,7 +15604,7 @@
     document.addEventListener(
       'pointerdown',
       (event) => {
-        const isTouchPointer = event.pointerType === 'touch';
+        const isMouseLikePointer = event.pointerType === 'mouse' && !isCoarsePointerDevice();
         const targetElement = event.target instanceof Element ? event.target : null;
         if (hasPendingSelectionMove()) {
           const keepCanvasFlow = Boolean(targetElement && isCanvasSurfaceTarget(targetElement));
@@ -15590,7 +15612,7 @@
             confirmPendingSelectionMove();
           }
         }
-        if (isTouchPointer) {
+        if (!isMouseLikePointer) {
           return;
         }
         const active = document.activeElement;
