@@ -867,10 +867,25 @@
   };
 
   const TOUCH_PAN_MIN_POINTERS = 2;
+  const TOUCH_PINCH_SENSITIVITY = 1.25;
+  const TOUCH_PINCH_DEADZONE_RATIO = 0.008;
   const activeTouchPointers = new Map();
   const keyboardState = {
     spacePanActive: false,
   };
+
+  function handleGlobalTouchPointerEnd(event) {
+    if (event.pointerType !== 'touch') {
+      return;
+    }
+    activeTouchPointers.delete(event.pointerId);
+  }
+
+  window.addEventListener('pointerup', handleGlobalTouchPointerEnd, { passive: true });
+  window.addEventListener('pointercancel', handleGlobalTouchPointerEnd, { passive: true });
+  window.addEventListener('blur', () => {
+    activeTouchPointers.clear();
+  });
 
   function isEditableTarget(target) {
     return Boolean(
@@ -12091,6 +12106,9 @@
     if (!pointerState.active) return;
     if (pointerState.tool === 'pan') {
       if (pointerState.panMode === 'multiTouch') {
+        if (activeTouchPointers.size < TOUCH_PAN_MIN_POINTERS) {
+          return;
+        }
         if (!activeTouchPointers.has(event.pointerId)) {
           return;
         }
@@ -12112,9 +12130,11 @@
         const nextDistance = Number(getTouchPointerDistance());
         const baselineScale = Number(pointerState.touchPinchStartScale) || Number(state.scale) || MIN_ZOOM_SCALE;
         if (Number.isFinite(baselineDistance) && baselineDistance > 0 && Number.isFinite(nextDistance) && nextDistance > 0) {
-          const ratio = nextDistance / baselineDistance;
-          const targetScale = normalizeZoomScale(baselineScale * ratio, Number(state.scale) || baselineScale);
-          if (Math.abs(targetScale - (Number(state.scale) || MIN_ZOOM_SCALE)) >= ZOOM_EPSILON) {
+          const rawRatio = nextDistance / baselineDistance;
+          const ratioDelta = Math.abs(rawRatio - 1);
+          const amplifiedRatio = Math.pow(rawRatio, TOUCH_PINCH_SENSITIVITY);
+          const targetScale = normalizeZoomScale(baselineScale * amplifiedRatio, Number(state.scale) || baselineScale);
+          if (ratioDelta >= TOUCH_PINCH_DEADZONE_RATIO && Math.abs(targetScale - (Number(state.scale) || MIN_ZOOM_SCALE)) >= ZOOM_EPSILON) {
             const pinchFocus = state.showVirtualCursor
               ? (getVirtualCursorZoomFocus() || getCanvasFocusAt(centroid.x, centroid.y))
               : getCanvasFocusAt(centroid.x, centroid.y);
@@ -12127,10 +12147,6 @@
         state.pan.x = Math.round(panBaseX + dx);
         state.pan.y = Math.round(panBaseY + dy);
         applyViewportTransform();
-        pointerState.panOrigin = { x: state.pan.x, y: state.pan.y };
-        pointerState.touchPanStart = { x: centroid.x, y: centroid.y };
-        pointerState.touchPinchStartDistance = Number.isFinite(nextDistance) && nextDistance > 0 ? nextDistance : null;
-        pointerState.touchPinchStartScale = Number(state.scale) || MIN_ZOOM_SCALE;
         updateVirtualCursorFromEvent(event);
         return;
       }
