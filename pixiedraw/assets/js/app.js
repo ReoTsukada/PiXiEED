@@ -105,6 +105,9 @@
       virtualCursorButtonScaleValue: document.getElementById('virtualCursorButtonScaleValue'),
       openDocument: document.getElementById('openDocument'),
       exportProject: document.getElementById('exportProject'),
+      togglePixfindMode: document.getElementById('togglePixfindMode'),
+      refreshPixfindBase: document.getElementById('refreshPixfindBase'),
+      sendToPixfind: document.getElementById('sendToPixfind'),
       clearCanvas: document.getElementById('clearCanvas'),
       enableAutosave: document.getElementById('enableAutosave'),
       autosaveStatus: document.getElementById('autosaveStatus'),
@@ -217,6 +220,7 @@
     eraser: { label: '消しゴム', tools: ['eraser'] },
     shape: { label: '図形', tools: ['line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill'] },
     fill: { label: '塗りつぶし', tools: ['fill'] },
+    virtualCursor: { label: '仮想カーソル', tools: [TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE, TOOL_ACTION_VIRTUAL_CURSOR_CENTER] },
   };
   const DEFAULT_GROUP_TOOL = {
     selection: 'selectRect',
@@ -224,6 +228,7 @@
     eraser: 'eraser',
     shape: 'line',
     fill: 'fill',
+    virtualCursor: TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE,
   };
   const TOOL_TO_GROUP = Object.keys(TOOL_GROUPS).reduce((acc, key) => {
     TOOL_GROUPS[key].tools.forEach(tool => {
@@ -231,14 +236,14 @@
     });
     return acc;
   }, {});
-  const MOBILE_DRAWER_MODE_ORDER = Object.freeze(['peek', 'half', 'full']);
-  const MOBILE_DRAWER_DEFAULT_MODE = 'half';
+  const MOBILE_DRAWER_MODE_ORDER = Object.freeze(['peek', 'full']);
+  const MOBILE_DRAWER_DEFAULT_MODE = 'full';
   const MOBILE_TAB_DRAWER_MODE = Object.freeze({
     tools: 'full',
-    color: 'half',
+    color: 'full',
     frames: 'full',
-    settings: 'half',
-    file: 'half',
+    settings: 'full',
+    file: 'full',
   });
 
   const ZOOM_STEPS = Object.freeze([
@@ -464,6 +469,7 @@
   const THUMBNAIL_CANVAS_SIZE = 160;
   const DOCUMENT_FILE_VERSION = 1;
   const LENS_IMPORT_STORAGE_KEY = 'pixiee-lens:pending-draw-import';
+  const PIXFIND_UPLOAD_KEY = 'pixfind_creator_upload_v1';
   function upgradeAutosaveDatabase(db) {
     if (!db) return;
     if (!db.objectStoreNames.contains(AUTOSAVE_STORE_NAME)) {
@@ -503,6 +509,9 @@
   let exportMaxScale = 1;
   let exportScaleUserOverride = false;
   let exportAdRequested = false;
+  let pixfindModeEnabled = false;
+  let pixfindModeFirstEnableConfirmed = false;
+  let pixfindBaseSnapshot = null;
 
   const RAIL_DEFAULT_WIDTH = Object.freeze({ left: 78, right: 78 });
   const RAIL_MIN_WIDTH = 68;
@@ -615,7 +624,7 @@
     mode: MOBILE_DRAWER_DEFAULT_MODE,
     heights: {
       peek: 124,
-      half: 248,
+      half: 320,
       full: 320,
     },
     drag: {
@@ -648,6 +657,8 @@
   let historyTrimmedRecently = false;
   let historyTrimmedAt = 0;
   const fillPreviewCache = { key: null, pixels: null };
+  const selectionMaskCacheIds = new WeakMap();
+  let selectionMaskCacheIdCounter = 1;
   const HISTORY_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', 'fill']);
   const MEMORY_MONITOR_INTERVAL = 2000;
   const MEMORY_WARNING_DEFAULT = 250 * 1024 * 1024;
@@ -2202,6 +2213,7 @@
     dom.toolGrid.style.removeProperty('top');
     dom.toolGrid.style.removeProperty('width');
     dom.toolGrid.style.removeProperty('max-height');
+    dom.toolGrid.style.removeProperty('grid-template-columns');
     dom.toolGrid.style.removeProperty('z-index');
     dom.toolGrid.style.removeProperty('display');
     ensureMobileToolGridPortal(false);
@@ -2235,18 +2247,35 @@
       ensureMobileToolGridPortal(true);
       const activeTools = TOOL_GROUPS[state.activeToolGroup]?.tools || [];
       const toolCount = Math.max(1, activeTools.length);
-      const itemSize = 56;
+      const itemSize = 64;
       const gap = 8;
       const padding = 16;
-      const desiredWidth = (toolCount * itemSize) + (Math.max(0, toolCount - 1) * gap) + padding;
+      const availableWidth = Math.max(72, window.innerWidth - 16);
+      const maxColumns = Math.max(1, Math.min(4, Math.floor((availableWidth - padding + gap) / (itemSize + gap))));
+      const columns = Math.max(1, Math.min(toolCount, maxColumns));
+      const rows = Math.max(1, Math.ceil(toolCount / columns));
+      const desiredWidth = (columns * itemSize) + (Math.max(0, columns - 1) * gap) + padding;
+      const desiredHeight = (rows * itemSize) + (Math.max(0, rows - 1) * gap) + padding;
       flyoutWidth = clamp(Math.round(desiredWidth), 72, Math.max(72, window.innerWidth - 16));
       const maxLeft = Math.max(8, Math.round(window.innerWidth - flyoutWidth - 8));
       left = clamp(Math.round(anchorRect.left + ((anchorRect.width - flyoutWidth) * 0.5)), 8, maxLeft);
-      const flyoutHeight = 80;
-      top = Math.max(8, Math.round(anchorRect.top - flyoutHeight - 8));
+      const maxFlyoutHeight = Math.max(96, Math.round(window.innerHeight * 0.68));
+      const flyoutHeight = clamp(Math.round(desiredHeight), 88, maxFlyoutHeight);
+      const preferredTop = Math.round(anchorRect.top - flyoutHeight - 10);
+      const fallbackTop = Math.round(anchorRect.bottom + 10);
+      if (preferredTop >= 8) {
+        top = preferredTop;
+      } else if (fallbackTop + flyoutHeight <= window.innerHeight - 8) {
+        top = fallbackTop;
+      } else {
+        const maxTop = Math.max(8, Math.round(window.innerHeight - flyoutHeight - 8));
+        top = clamp(preferredTop, 8, maxTop);
+      }
       maxHeight = flyoutHeight;
+      dom.toolGrid.style.gridTemplateColumns = `repeat(${columns}, ${itemSize}px)`;
     } else {
       ensureMobileToolGridPortal(false);
+      dom.toolGrid.style.removeProperty('grid-template-columns');
       const railWidth = Math.max(68, dom.leftRail?.offsetWidth || 78);
       flyoutWidth = clamp(Math.round(railWidth - 16), 64, 96);
       left = Math.round(anchorRect.right + 10);
@@ -2262,7 +2291,7 @@
     dom.toolGrid.style.top = `${top}px`;
     dom.toolGrid.style.width = `${flyoutWidth}px`;
     dom.toolGrid.style.maxHeight = `${maxHeight}px`;
-    dom.toolGrid.style.zIndex = '12000';
+    dom.toolGrid.style.zIndex = '14000';
   }
 
   function setCompactToolFlyoutOpen(open, { force = false } = {}) {
@@ -2295,6 +2324,11 @@
     updateToolGroupButtons();
     updateToolVisibility();
     const tools = TOOL_GROUPS[group].tools;
+    const hasSelectableTool = tools.some(tool => !TOOL_ACTIONS.has(tool));
+    if (!hasSelectableTool) {
+      if (persist) scheduleSessionPersist();
+      return;
+    }
     const desired = state.lastGroupTool[group] && tools.includes(state.lastGroupTool[group])
       ? state.lastGroupTool[group]
       : tools[0];
@@ -2306,6 +2340,41 @@
     }
   }
 
+  function getPreferredToolForGroup(group) {
+    const config = group ? TOOL_GROUPS[group] : null;
+    if (!config || !Array.isArray(config.tools) || config.tools.length === 0) {
+      return null;
+    }
+    const tools = config.tools;
+    if (tools.includes(state.tool)) {
+      return state.tool;
+    }
+    const remembered = state.lastGroupTool?.[group];
+    if (typeof remembered === 'string' && tools.includes(remembered)) {
+      return remembered;
+    }
+    const fallback = DEFAULT_GROUP_TOOL[group];
+    if (typeof fallback === 'string' && tools.includes(fallback)) {
+      return fallback;
+    }
+    return tools[0];
+  }
+
+  function getToolIconSource(tool) {
+    if (!tool || !toolButtons || !toolButtons.length) {
+      return null;
+    }
+    const button = toolButtons.find(btn => btn.dataset.tool === tool);
+    if (!(button instanceof HTMLElement)) {
+      return null;
+    }
+    const image = button.querySelector('img');
+    if (!(image instanceof HTMLImageElement)) {
+      return null;
+    }
+    return image.getAttribute('src') || image.src || null;
+  }
+
   function updateToolGroupButtons() {
     if (!dom.toolGroupButtons) return;
     dom.toolGroupButtons.forEach(button => {
@@ -2315,6 +2384,22 @@
       button.setAttribute('aria-pressed', String(isActive));
       button.setAttribute('aria-selected', String(isActive));
       button.setAttribute('tabindex', isActive ? '0' : '-1');
+      const icon = button.querySelector('.tool-group-icon');
+      if (!(icon instanceof HTMLImageElement) || !group || !TOOL_GROUPS[group]) {
+        return;
+      }
+      if (!button.dataset.defaultIconSrc) {
+        const current = icon.getAttribute('src');
+        if (current) {
+          button.dataset.defaultIconSrc = current;
+        }
+      }
+      const preferredTool = getPreferredToolForGroup(group);
+      const preferredIconSrc = getToolIconSource(preferredTool);
+      const nextSrc = preferredIconSrc || button.dataset.defaultIconSrc;
+      if (nextSrc && icon.getAttribute('src') !== nextSrc) {
+        icon.setAttribute('src', nextSrc);
+      }
     });
   }
 
@@ -2511,14 +2596,13 @@
     ctx.overlay.lineTo(end.x + 0.5, end.y + 0.5);
     ctx.overlay.stroke();
 
-    const handleColor = 'rgba(255,200,120,0.8)';
     if (control1) {
       ctx.overlay.strokeStyle = 'rgba(255,255,255,0.25)';
       ctx.overlay.beginPath();
       ctx.overlay.moveTo(start.x + 0.5, start.y + 0.5);
       ctx.overlay.lineTo(control1.x + 0.5, control1.y + 0.5);
       ctx.overlay.stroke();
-      drawHandle(control1, pointerState.curveHandle === 'control1', handleColor);
+      drawHandle(control1);
     }
     if (control2) {
       ctx.overlay.strokeStyle = 'rgba(255,255,255,0.25)';
@@ -2526,7 +2610,7 @@
       ctx.overlay.moveTo(end.x + 0.5, end.y + 0.5);
       ctx.overlay.lineTo(control2.x + 0.5, control2.y + 0.5);
       ctx.overlay.stroke();
-      drawHandle(control2, pointerState.curveHandle === 'control2', handleColor);
+      drawHandle(control2);
     }
 
     if (builder.stage !== 'line') {
@@ -2554,15 +2638,21 @@
     ctx.overlay.restore();
   }
 
-  function drawHandle(point, isActive, color) {
+  function drawHandle(point) {
+    if (!ctx.overlay || !point) {
+      return;
+    }
+    const px = clamp(Math.round(point.x), 0, Math.max(0, state.width - 1));
+    const py = clamp(Math.round(point.y), 0, Math.max(0, state.height - 1));
+    const sample = sampleCompositeColor(px, py);
+    let sampledColor = resolveSampledColor(sample);
+    if (!sampledColor) {
+      sampledColor = getBackgroundTileColor(px, py);
+    }
+    const markerColor = invertPreviewColor(sampledColor);
     ctx.overlay.save();
-    ctx.overlay.fillStyle = color;
-    ctx.overlay.strokeStyle = isActive ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.6)';
-    ctx.overlay.lineWidth = 0.5;
-    const size = isActive ? 3 : 2;
-    const offset = (size - 1) / 2;
-    ctx.overlay.fillRect(point.x - offset, point.y - offset, size, size);
-    ctx.overlay.strokeRect(point.x - offset, point.y - offset, size, size);
+    ctx.overlay.fillStyle = rgbaToCss(markerColor);
+    ctx.overlay.fillRect(px, py, 1, 1);
     ctx.overlay.restore();
   }
 
@@ -2737,6 +2827,7 @@
     updateGridDecorations();
     updateHistoryButtons();
     updateCanvasControlButtons();
+    updatePixfindModeUI();
   }
 
   function getMaxSpriteMultiplier() {
@@ -2905,6 +2996,7 @@
       history.pending = null;
       autosaveRestoring = false;
       autosaveDirty = false;
+      syncPixfindSnapshotAfterDocumentReset();
       updateMemoryStatus();
       return true;
     } catch (error) {
@@ -3737,6 +3829,7 @@
     history.pending = null;
     updateHistoryButtons();
     resetExportScaleDefaults();
+    syncPixfindSnapshotAfterDocumentReset();
 
     autosaveHandle = null;
     pendingAutosaveHandle = null;
@@ -4285,7 +4378,7 @@
   }
 
   function exportProjectWithFallback() {
-    const choice = window.prompt('出力形式を入力してください (png / gif / contest / project)', 'png');
+    const choice = window.prompt('出力形式を入力してください (png / gif / contest / pixfind / project)', 'png');
     if (!choice) {
       return;
     }
@@ -4315,10 +4408,12 @@
       exportProjectAsGif();
     } else if (normalized === 'contest') {
       exportProjectToContest();
+    } else if (normalized === 'pixfind') {
+      exportProjectToPixfind();
     } else if (normalized === 'project') {
       saveProjectAsPixieedraw();
     } else {
-      window.alert('png / gif / contest / project のいずれかを入力してください。');
+      window.alert('png / gif / contest / pixfind / project のいずれかを入力してください。');
     }
   }
 
@@ -4406,6 +4501,7 @@
         syncAnimationFpsDisplayFromState();
       }
     }
+    updatePixfindModeUI();
     return frame;
   }
 
@@ -4467,6 +4563,8 @@
         exportProjectAsGif();
       } else if (mode === 'contest') {
         exportProjectToContest();
+      } else if (mode === 'pixfind') {
+        exportProjectToPixfind();
       } else if (mode === 'project') {
         saveProjectAsPixieedraw();
       } else {
@@ -4613,6 +4711,7 @@
     history.pending = null;
     updateHistoryButtons();
     resetExportScaleDefaults();
+    syncPixfindSnapshotAfterDocumentReset();
 
     if (AUTOSAVE_SUPPORTED) {
       autosaveHandle = null;
@@ -4835,6 +4934,7 @@
     history.pending = null;
     autosaveRestoring = false;
     resetExportScaleDefaults();
+    syncPixfindSnapshotAfterDocumentReset();
 
     if (handle) {
       const granted = await ensureHandlePermission(handle, { request: true });
@@ -5471,6 +5571,165 @@
   // -------------------------------------------------------------------------
   // Export helpers
   // -------------------------------------------------------------------------
+
+  function getActiveFrameCompositePixels() {
+    const frame = getActiveFrame();
+    if (!frame) {
+      return null;
+    }
+    const pixels = compositeFramePixels(frame, state.width, state.height, state.palette);
+    return { frame, pixels };
+  }
+
+  function hasValidPixfindBaseSnapshotForActiveFrame() {
+    const frame = getActiveFrame();
+    if (!frame || !pixfindBaseSnapshot) {
+      return false;
+    }
+    const expectedLength = Math.max(1, state.width * state.height * 4);
+    return (
+      pixfindBaseSnapshot.frameId === frame.id
+      && pixfindBaseSnapshot.width === state.width
+      && pixfindBaseSnapshot.height === state.height
+      && pixfindBaseSnapshot.pixels instanceof Uint8ClampedArray
+      && pixfindBaseSnapshot.pixels.length === expectedLength
+    );
+  }
+
+  function updatePixfindModeUI() {
+    const modeButton = dom.controls.togglePixfindMode;
+    if (modeButton) {
+      modeButton.classList.toggle('is-active', pixfindModeEnabled);
+      modeButton.setAttribute('aria-pressed', String(pixfindModeEnabled));
+      modeButton.textContent = pixfindModeEnabled ? 'PiXFiNDモード: ON' : 'PiXFiNDモード: OFF';
+    }
+    if (dom.controls.refreshPixfindBase) {
+      dom.controls.refreshPixfindBase.disabled = !pixfindModeEnabled;
+    }
+    if (dom.controls.sendToPixfind) {
+      dom.controls.sendToPixfind.disabled = !(pixfindModeEnabled && hasValidPixfindBaseSnapshotForActiveFrame());
+    }
+  }
+
+  function clearPixfindBaseSnapshot() {
+    pixfindBaseSnapshot = null;
+    updatePixfindModeUI();
+  }
+
+  function capturePixfindBaseSnapshot({ quiet = false } = {}) {
+    const composite = getActiveFrameCompositePixels();
+    if (!composite) {
+      if (!quiet) {
+        updateAutosaveStatus('PiXFiND原本を作成できませんでした', 'warn');
+      }
+      return false;
+    }
+    pixfindBaseSnapshot = {
+      frameId: composite.frame.id,
+      width: state.width,
+      height: state.height,
+      pixels: new Uint8ClampedArray(composite.pixels),
+      createdAt: new Date().toISOString(),
+    };
+    updatePixfindModeUI();
+    if (!quiet) {
+      updateAutosaveStatus('PiXFiND原本を更新しました', 'success');
+    }
+    return true;
+  }
+
+  function setPixfindModeEnabled(enabled, { confirmFirst = true, quiet = false } = {}) {
+    const next = Boolean(enabled);
+    if (next === pixfindModeEnabled) {
+      updatePixfindModeUI();
+      return true;
+    }
+    if (next && confirmFirst && !pixfindModeFirstEnableConfirmed) {
+      const accepted = window.confirm('PiXFiNDモードを初めてONにします。現在のフレームを原本として保存します。続けますか？');
+      if (!accepted) {
+        return false;
+      }
+      pixfindModeFirstEnableConfirmed = true;
+    }
+    pixfindModeEnabled = next;
+    if (next) {
+      const captured = capturePixfindBaseSnapshot({ quiet: true });
+      if (!captured) {
+        pixfindModeEnabled = false;
+        clearPixfindBaseSnapshot();
+        if (!quiet) {
+          updateAutosaveStatus('PiXFiNDモードを開始できませんでした', 'warn');
+        }
+        return false;
+      }
+      if (!quiet) {
+        updateAutosaveStatus('PiXFiNDモードをONにしました', 'info');
+      }
+    } else {
+      clearPixfindBaseSnapshot();
+      if (!quiet) {
+        updateAutosaveStatus('PiXFiNDモードをOFFにしました', 'info');
+      }
+    }
+    updatePixfindModeUI();
+    scheduleSessionPersist();
+    return true;
+  }
+
+  function syncPixfindSnapshotAfterDocumentReset() {
+    if (pixfindModeEnabled) {
+      capturePixfindBaseSnapshot({ quiet: true });
+    } else {
+      clearPixfindBaseSnapshot();
+    }
+    updatePixfindModeUI();
+  }
+
+  function exportProjectToPixfind() {
+    if (!pixfindModeEnabled) {
+      updateAutosaveStatus('PiXFiNDモードをONにしてください', 'warn');
+      return;
+    }
+    if (!hasValidPixfindBaseSnapshotForActiveFrame()) {
+      updateAutosaveStatus('PiXFiND原本が未設定です。「原本を更新」を押してください', 'warn');
+      return;
+    }
+    const composite = getActiveFrameCompositePixels();
+    if (!composite) {
+      updateAutosaveStatus('PiXFiND出力に必要なフレームがありません', 'warn');
+      return;
+    }
+    try {
+      const baseCanvas = createFrameCanvas(
+        new Uint8ClampedArray(pixfindBaseSnapshot.pixels),
+        pixfindBaseSnapshot.width,
+        pixfindBaseSnapshot.height
+      );
+      const diffCanvas = createFrameCanvas(composite.pixels, state.width, state.height);
+      const originalDataUrl = baseCanvas.toDataURL('image/png');
+      const diffDataUrl = diffCanvas.toDataURL('image/png');
+      if (!originalDataUrl || !diffDataUrl) {
+        throw new Error('Missing PiXFiND data URL');
+      }
+      try {
+        const payload = {
+          originalDataUrl,
+          diffDataUrl,
+          canvasSize: state.width === state.height ? state.width : `${state.width}x${state.height}`,
+          width: state.width,
+          height: state.height,
+          createdAt: new Date().toISOString(),
+        };
+        localStorage.setItem(PIXFIND_UPLOAD_KEY, JSON.stringify(payload));
+      } catch (error) {
+        console.warn('pixfind upload store failed', error);
+      }
+      window.location.href = '../pixfind/index.html#creator';
+    } catch (error) {
+      console.error('PiXFiND export failed', error);
+      updateAutosaveStatus('PiXFiND出力に失敗しました', 'error');
+    }
+  }
 
   function exportProjectToContest() {
     const frameCount = state.frames.length;
@@ -7802,6 +8061,10 @@
   }
 
   function getActiveTool() {
+    // When idle, always reflect the selected tool to avoid stale pointer tool previews.
+    if (!pointerState.active) {
+      return state.tool;
+    }
     return pointerState.tool || state.tool;
   }
 
@@ -8278,13 +8541,7 @@
       104,
       portrait ? 176 : 180
     );
-    const halfMin = peek + 56;
-    const halfCandidate = clamp(
-      Math.round(height * (portrait ? 0.34 : 0.4)),
-      halfMin,
-      portrait ? 420 : 320
-    );
-    const fullMin = Math.max(halfCandidate + 48, portrait ? 238 : 220);
+    const fullMin = Math.max(peek + 84, portrait ? 238 : 220);
     const fullCapByViewport = Math.round(height - topbar - 52);
     const fullCap = Math.max(fullMin, Math.min(fullCapByViewport, portrait ? 560 : 360));
     const full = clamp(
@@ -8292,7 +8549,7 @@
       fullMin,
       fullCap
     );
-    const half = clamp(halfCandidate, halfMin, Math.max(halfMin, full - 44));
+    const half = full;
     mobileDrawerState.heights.peek = peek;
     mobileDrawerState.heights.half = half;
     mobileDrawerState.heights.full = full;
@@ -8563,6 +8820,22 @@
 
     dom.controls.exportProject?.addEventListener('click', () => {
       openExportDialog();
+    });
+
+    dom.controls.togglePixfindMode?.addEventListener('click', () => {
+      setPixfindModeEnabled(!pixfindModeEnabled);
+    });
+
+    dom.controls.refreshPixfindBase?.addEventListener('click', () => {
+      if (!pixfindModeEnabled) {
+        updateAutosaveStatus('先にPiXFiNDモードをONにしてください', 'warn');
+        return;
+      }
+      capturePixfindBaseSnapshot();
+    });
+
+    dom.controls.sendToPixfind?.addEventListener('click', () => {
+      exportProjectToPixfind();
     });
 
 
@@ -8997,9 +9270,15 @@
         const group = TOOL_GROUPS[state.activeToolGroup] ? state.activeToolGroup : 'pen';
         const groupTools = TOOL_GROUPS[group]?.tools || [];
         const candidate = state.lastGroupTool?.[group];
-        const fallback = (typeof candidate === 'string' && groupTools.includes(candidate))
+        let fallback = (typeof candidate === 'string' && groupTools.includes(candidate))
           ? candidate
           : (DEFAULT_GROUP_TOOL[group] || 'pen');
+        if (TOOL_ACTIONS.has(fallback)) {
+          const firstNonAction = groupTools.find(item => !TOOL_ACTIONS.has(item));
+          const penFallback = state.lastGroupTool?.pen;
+          fallback = firstNonAction
+            || (typeof penFallback === 'string' && !TOOL_ACTIONS.has(penFallback) ? penFallback : 'pen');
+        }
         state.tool = fallback;
       }
       updateToolGroupButtons();
@@ -11116,6 +11395,35 @@
     }, ZOOM_INDICATOR_TIMEOUT);
   }
 
+  function getVirtualCursorZoomFocus() {
+    if (!state.showVirtualCursor || !virtualCursor) {
+      return null;
+    }
+    const width = Math.max(1, Number(state.width) || 1);
+    const height = Math.max(1, Number(state.height) || 1);
+    const worldX = clamp(Number(virtualCursor.x), 0, width - 1);
+    const worldY = clamp(Number(virtualCursor.y), 0, height - 1);
+    const scale = Number(state.scale) || MIN_ZOOM_SCALE;
+    const drawing = dom.canvases.drawing;
+    if (!drawing) {
+      return {
+        worldX,
+        worldY,
+        cellX: Math.floor(worldX),
+        cellY: Math.floor(worldY),
+      };
+    }
+    const rect = drawing.getBoundingClientRect();
+    return {
+      clientX: rect.left + worldX * scale,
+      clientY: rect.top + worldY * scale,
+      worldX,
+      worldY,
+      cellX: Math.floor(worldX),
+      cellY: Math.floor(worldY),
+    };
+  }
+
   function setZoom(nextScale, focus) {
     const prevScale = Number(state.scale) || MIN_ZOOM_SCALE;
     const targetScale = normalizeZoomScale(nextScale, prevScale);
@@ -11130,9 +11438,12 @@
     };
     const stack = dom.canvases.stack;
     const stackRectBefore = stack ? stack.getBoundingClientRect() : null;
-    const zoomFocus = focus && Number.isFinite(focus.worldX) && Number.isFinite(focus.worldY)
+    let zoomFocus = focus && Number.isFinite(focus.worldX) && Number.isFinite(focus.worldY)
       ? focus
       : null;
+    if (!zoomFocus && state.showVirtualCursor) {
+      zoomFocus = getVirtualCursorZoomFocus();
+    }
 
     state.scale = targetScale;
     resizeCanvases();
@@ -11193,7 +11504,10 @@
   }
 
   function handleCanvasWheel(event) {
-    const focus = getCanvasFocusAt(event.clientX, event.clientY);
+    const pointerFocus = getCanvasFocusAt(event.clientX, event.clientY);
+    const focus = state.showVirtualCursor
+      ? (getVirtualCursorZoomFocus() || pointerFocus)
+      : pointerFocus;
     if (!focus) {
       return;
     }
@@ -11399,6 +11713,10 @@
   }
 
   function startPanInteraction(event, { multiTouch = false, captureElement = dom.canvases.drawing } = {}) {
+    // Touch pan/zoom is handled only with two-finger gestures.
+    if (event?.pointerType === 'touch' && !multiTouch) {
+      return;
+    }
     pointerState.active = true;
     pointerState.tool = 'pan';
     pointerState.panMode = multiTouch ? 'multiTouch' : 'single';
@@ -11519,7 +11837,11 @@
     }
 
     if (activeTool === 'pan') {
-      startPanInteraction(event, { multiTouch: isTouch && hasActiveMultiTouch() });
+      if (isTouch) {
+        // On mobile, one-finger pan is disabled; wait for two-finger gesture.
+        return;
+      }
+      startPanInteraction(event, { multiTouch: false });
       return;
     }
 
@@ -11566,11 +11888,37 @@
     pointerState.selectionMove = null;
 
     const selectionMask = state.selectionMask;
+    const hasSelection = Boolean(selectionMask && selectionMaskHasPixels(selectionMask));
+    const selectionHit = hasSelection && isPositionInCurrentSelection(position);
     const isSelectionTool = activeTool === 'selectRect' || activeTool === 'selectLasso' || activeTool === 'selectSame' || activeTool === 'move';
-    if (isSelectionTool && selectionMask) {
-      if (pointerState.selectionMove && pointerState.selectionMove.hasCleared) {
-        state.pendingPasteMoveState = pointerState.selectionMove;
+    const pendingMoveState = !pointerState.active ? getPendingSelectionMoveState() : null;
+    const pendingSelectionHit = Boolean(pendingMoveState && isPositionInMoveState(position, pendingMoveState));
+
+    if (pendingMoveState) {
+      // Keep dragging when touching the moved selection preview; confirm only when touching outside.
+      if (isSelectionTool && (selectionHit || pendingSelectionHit)) {
+        const moved = beginSelectionMove(event, position, { reuseOffset: true });
+        if (moved) {
+          updateCanvasControlButtons();
+          return;
+        }
       }
+      confirmPendingSelectionMove();
+      pointerState.active = false;
+      pointerState.pointerId = null;
+      pointerState.tool = null;
+      pointerState.start = null;
+      pointerState.current = null;
+      pointerState.last = null;
+      pointerState.path = [];
+      pointerState.preview = null;
+      pointerState.selectionPreview = null;
+      pointerState.selectionMove = null;
+      pointerState.selectionClearedOnDown = false;
+      return;
+    }
+
+    if (isSelectionTool && hasSelection && selectionHit) {
       const moved = beginSelectionMove(event, position, { reuseOffset: Boolean(state.pendingPasteMoveState) });
       if (moved) {
         updateCanvasControlButtons();
@@ -11579,8 +11927,11 @@
     }
 
     if (activeTool === 'move') {
-      const hasSelection = Boolean(state.selectionMask && selectionMaskHasPixels(state.selectionMask));
-      if (!hasSelection) {
+      if (hasSelection && !selectionHit) {
+        clearSelection();
+      }
+      const hasSelectionAfterClear = Boolean(state.selectionMask && selectionMaskHasPixels(state.selectionMask));
+      if (!hasSelectionAfterClear) {
         const movedWholeLayer = beginLayerMove(event, position, layer);
         if (movedWholeLayer) {
           return;
@@ -11588,6 +11939,11 @@
       }
       pointerState.active = false;
       return;
+    }
+
+    if ((activeTool === 'selectRect' || activeTool === 'selectLasso') && hasSelection && !selectionHit) {
+      clearSelection();
+      pointerState.selectionClearedOnDown = true;
     }
 
     if (activeTool === 'curve') {
@@ -11690,7 +12046,9 @@
           const ratio = nextDistance / baselineDistance;
           const targetScale = normalizeZoomScale(baselineScale * ratio, Number(state.scale) || baselineScale);
           if (Math.abs(targetScale - (Number(state.scale) || MIN_ZOOM_SCALE)) >= ZOOM_EPSILON) {
-            const pinchFocus = getCanvasFocusAt(centroid.x, centroid.y);
+            const pinchFocus = state.showVirtualCursor
+              ? (getVirtualCursorZoomFocus() || getCanvasFocusAt(centroid.x, centroid.y))
+              : getCanvasFocusAt(centroid.x, centroid.y);
             setZoom(targetScale, pinchFocus || undefined);
             panBaseX = Number(state.pan.x) || panBaseX;
             panBaseY = Number(state.pan.y) || panBaseY;
@@ -11987,6 +12345,51 @@
     window.addEventListener('pointerup', handlePointerUp);
     updateCanvasControlButtons();
     return true;
+  }
+
+  function isPositionInCurrentSelection(position) {
+    if (!position) {
+      return false;
+    }
+    const mask = state.selectionMask;
+    const bounds = state.selectionBounds;
+    if (!mask || !bounds) {
+      return false;
+    }
+    const x = Math.floor(position.x);
+    const y = Math.floor(position.y);
+    if (x < bounds.x0 || x > bounds.x1 || y < bounds.y0 || y > bounds.y1) {
+      return false;
+    }
+    if (x < 0 || y < 0 || x >= state.width || y >= state.height) {
+      return false;
+    }
+    const idx = y * state.width + x;
+    return mask[idx] === 1;
+  }
+
+  function isPositionInMoveState(position, moveState) {
+    if (!position || !moveState || !moveState.bounds || !moveState.mask) {
+      return false;
+    }
+    const x = Math.floor(position.x);
+    const y = Math.floor(position.y);
+    const width = Math.max(0, Number(moveState.width) || 0);
+    const height = Math.max(0, Number(moveState.height) || 0);
+    if (width <= 0 || height <= 0) {
+      return false;
+    }
+    const offsetX = Number(moveState.offset?.x) || 0;
+    const offsetY = Number(moveState.offset?.y) || 0;
+    const originX = (Number(moveState.bounds.x0) || 0) + offsetX;
+    const originY = (Number(moveState.bounds.y0) || 0) + offsetY;
+    const localX = x - originX;
+    const localY = y - originY;
+    if (localX < 0 || localY < 0 || localX >= width || localY >= height) {
+      return false;
+    }
+    const localIndex = localY * width + localX;
+    return moveState.mask[localIndex] === 1;
   }
 
   function createSelectionMoveState(layer, bounds, mask) {
@@ -12633,7 +13036,7 @@
   }
 
   function finalizeSelectionMove() {
-    const moveState = pointerState.selectionMove;
+    const moveState = pointerState.selectionMove || state.pendingPasteMoveState;
     if (!moveState) {
       pointerState.tool = state.tool;
       return;
@@ -12641,6 +13044,7 @@
     if (!moveState.hasCleared) {
       pointerState.tool = state.tool;
       pointerState.selectionMove = null;
+      state.pendingPasteMoveState = null;
       return;
     }
 
@@ -12682,24 +13086,36 @@
   }
 
   function hasPendingSelectionMove() {
-    return Boolean(pointerState.selectionMove && pointerState.selectionMove.hasCleared);
+    return Boolean(getPendingSelectionMoveState());
+  }
+
+  function getPendingSelectionMoveState() {
+    if (pointerState.selectionMove && pointerState.selectionMove.hasCleared) {
+      return pointerState.selectionMove;
+    }
+    if (state.pendingPasteMoveState && state.pendingPasteMoveState.hasCleared) {
+      return state.pendingPasteMoveState;
+    }
+    return null;
   }
 
   function confirmPendingSelectionMove() {
-    const moveState = pointerState.selectionMove;
-    if (!moveState || !moveState.hasCleared) {
+    const moveState = getPendingSelectionMoveState();
+    if (!moveState) {
       return;
     }
+    pointerState.selectionMove = moveState;
     finalizeSelectionMove();
     clearSelection();
     updateCanvasControlButtons();
   }
 
   function cancelPendingSelectionMove() {
-    const moveState = pointerState.selectionMove;
-    if (!moveState || !moveState.hasCleared) {
+    const moveState = getPendingSelectionMoveState();
+    if (!moveState) {
       return;
     }
+    pointerState.selectionMove = moveState;
     pointerState.selectionMove = null;
     pointerState.tool = state.tool;
     state.pendingPasteMoveState = null;
@@ -13403,6 +13819,12 @@
   }
 
   function clearSelection() {
+    const pendingMoveState = getPendingSelectionMoveState();
+    if (pendingMoveState) {
+      // Avoid data loss: commit pending moved pixels before clearing the selection state.
+      pointerState.selectionMove = pendingMoveState;
+      finalizeSelectionMove();
+    }
     state.selectionMask = null;
     state.selectionBounds = null;
     state.pendingPasteMoveState = null;
@@ -14027,6 +14449,21 @@
     return { r: 255, g: 255, b: 255, a: 255 };
   }
 
+  function invertPreviewColor(color) {
+    if (!color) {
+      return { r: 255, g: 255, b: 255, a: 255 };
+    }
+    const r = clamp(Math.round(Number(color.r) || 0), 0, 255);
+    const g = clamp(Math.round(Number(color.g) || 0), 0, 255);
+    const b = clamp(Math.round(Number(color.b) || 0), 0, 255);
+    return {
+      r: 255 - r,
+      g: 255 - g,
+      b: 255 - b,
+      a: 255,
+    };
+  }
+
   function updateColorTabSwatch() {
     const color = getActiveSwatchColor();
     if (!color) return;
@@ -14086,15 +14523,28 @@
       return;
     }
     const sample = sampleCompositeColor(center.x, center.y);
-    let color = resolveSampledColor(sample);
-    if (!color) {
-      color = getBackgroundTileColor(center.x, center.y);
+    let sampledColor = resolveSampledColor(sample);
+    if (!sampledColor) {
+      sampledColor = getBackgroundTileColor(center.x, center.y);
     }
-    ctx.overlay.fillStyle = rgbaToCss(color);
+    const previewColor = invertPreviewColor(sampledColor);
+    ctx.overlay.fillStyle = rgbaToCss(previewColor);
     ctx.overlay.fillRect(center.x, center.y, 1, 1);
-    ctx.overlay.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-    ctx.overlay.lineWidth = 1;
-    ctx.overlay.strokeRect(center.x - 0.5, center.y - 0.5, 1, 1);
+    // Keep the outline inside the sampled pixel so eyedropper preview stays visually 1x1.
+    const scale = Math.max(Number(state.scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE);
+    const inset = clamp(1 / scale, 0.06, 0.22);
+    const innerSize = Math.max(0, 1 - (inset * 2));
+    if (innerSize > 0) {
+      const outlineAlpha = clamp(Math.round(Number(sampledColor.a) || 255), 128, 255);
+      ctx.overlay.strokeStyle = rgbaToCss({
+        r: sampledColor.r,
+        g: sampledColor.g,
+        b: sampledColor.b,
+        a: outlineAlpha,
+      });
+      ctx.overlay.lineWidth = inset;
+      ctx.overlay.strokeRect(center.x + (inset * 0.5), center.y + (inset * 0.5), innerSize, innerSize);
+    }
   }
 
   function drawBrushPreview(center, tool = getActiveTool(), sizeOverride) {
@@ -14235,14 +14685,17 @@
     const frame = getActiveFrame();
     const layer = getActiveLayer();
     if (!frame || !layer) return null;
+    const selectionMask = state.selectionMask;
+    const selectionMaskId = getSelectionMaskCacheId(selectionMask);
+    const selectionBounds = state.selectionBounds;
+    const selectionKey = selectionMask
+      ? `${selectionMaskId}:${selectionBounds?.x0 ?? ''},${selectionBounds?.y0 ?? ''},${selectionBounds?.x1 ?? ''},${selectionBounds?.y1 ?? ''}`
+      : 'none';
     const colorKey = `index-${state.activePaletteIndex}-${JSON.stringify(state.palette[state.activePaletteIndex] || {})}`;
-    return `${frame.id}|${layer.id}|${state.width}x${state.height}|${x},${y}|${colorKey}`;
+    return `${frame.id}|${layer.id}|${state.width}x${state.height}|${x},${y}|${selectionKey}|${colorKey}`;
   }
 
   function getFillPreviewPixels(x, y) {
-    if (state.selectionMask) {
-      return computeFillPreview(x, y);
-    }
     const key = getFillPreviewKey(x, y);
     if (key && fillPreviewCache.key === key) {
       return fillPreviewCache.pixels;
@@ -14253,6 +14706,19 @@
       fillPreviewCache.pixels = pixels;
     }
     return pixels;
+  }
+
+  function getSelectionMaskCacheId(mask) {
+    if (!mask) {
+      return 'none';
+    }
+    let id = selectionMaskCacheIds.get(mask);
+    if (!id) {
+      id = `sel-${selectionMaskCacheIdCounter}`;
+      selectionMaskCacheIdCounter += 1;
+      selectionMaskCacheIds.set(mask, id);
+    }
+    return id;
   }
 
   function drawSelectionOverlay() {
@@ -14589,6 +15055,8 @@
         rightRailWidth: Math.round(Number(railSizing.right) || RAIL_DEFAULT_WIDTH.right),
         mobileDrawerMode: normalizeMobileDrawerMode(mobileDrawerState.mode),
         documentName: state.documentName,
+        pixfindMode: Boolean(pixfindModeEnabled),
+        pixfindModeFirstEnableConfirmed: Boolean(pixfindModeFirstEnableConfirmed),
       };
       window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(snapshot));
     } catch (error) {
@@ -14692,11 +15160,24 @@
     if (typeof payload.documentName === 'string') {
       state.documentName = normalizeDocumentName(payload.documentName);
     }
+    if (typeof payload.pixfindMode === 'boolean') {
+      pixfindModeEnabled = payload.pixfindMode;
+    }
+    if (typeof payload.pixfindModeFirstEnableConfirmed === 'boolean') {
+      pixfindModeFirstEnableConfirmed = payload.pixfindModeFirstEnableConfirmed;
+    } else if (pixfindModeEnabled) {
+      pixfindModeFirstEnableConfirmed = true;
+    }
     if (state.showVirtualCursor && !virtualCursor) {
       virtualCursor = createInitialVirtualCursor();
     }
     if (!state.showVirtualCursor) {
       releaseVirtualCursorPointer();
+    }
+    if (pixfindModeEnabled) {
+      capturePixfindBaseSnapshot({ quiet: true });
+    } else {
+      clearPixfindBaseSnapshot();
     }
     updateFloatingDrawButtonEnabledState();
     refreshViewportCursorStyle();
@@ -14935,6 +15416,13 @@
     document.addEventListener(
       'pointerdown',
       (event) => {
+        if (hasPendingSelectionMove()) {
+          const targetElement = event.target instanceof Element ? event.target : null;
+          const keepCanvasFlow = Boolean(targetElement && isCanvasSurfaceTarget(targetElement));
+          if (!keepCanvasFlow) {
+            confirmPendingSelectionMove();
+          }
+        }
         const active = document.activeElement;
         if (!isInputControlElement(active)) {
           return;
