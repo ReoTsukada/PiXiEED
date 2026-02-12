@@ -23,7 +23,7 @@
     },
     {
       id: 'maou-war',
-      name: '魔王様の100日',
+      name: '魔王様奪還',
       url: '../maou-war/index.html',
       entries: [
         {
