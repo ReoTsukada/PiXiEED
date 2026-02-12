@@ -65,15 +65,23 @@ const creatorCtx = {
   }
 });
 
-function setAppHeight() {
-  const height = window.visualViewport?.height || window.innerHeight;
-  if (!height) return;
-  document.documentElement.style.setProperty('--app-height', `${Math.round(height)}px`);
+function setViewportVars() {
+  const vv = window.visualViewport;
+  const width = Math.round(vv?.width || window.innerWidth || document.documentElement.clientWidth || 0);
+  const height = Math.round(vv?.height || window.innerHeight || document.documentElement.clientHeight || 0);
+  if (width > 0) {
+    document.documentElement.style.setProperty('--app-width', `${width}px`);
+  }
+  if (height > 0) {
+    document.documentElement.style.setProperty('--app-height', `${height}px`);
+  }
 }
 
-setAppHeight();
-window.visualViewport?.addEventListener('resize', setAppHeight);
-window.addEventListener('orientationchange', setAppHeight);
+setViewportVars();
+window.addEventListener('resize', setViewportVars, { passive: true });
+window.addEventListener('orientationchange', setViewportVars, { passive: true });
+window.visualViewport?.addEventListener('resize', setViewportVars, { passive: true });
+window.visualViewport?.addEventListener('scroll', setViewportVars, { passive: true });
 
 const MIN_CLUSTER_PIXELS = 1;
 const MARKER_PADDING = 1;
@@ -3523,7 +3531,7 @@ function buildShareHtml({
   <meta name="twitter:image" content="${safeImage}"/>
   <meta http-equiv="refresh" content="0; url=${safeTargetUrl}"/>
   <link rel="canonical" href="${safeTargetUrl}"/>
-  <style>body{margin:0;font-family:sans-serif;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh}</style>
+  <style>body{margin:0;font-family:sans-serif;background:#0f172a;color:#e2e8f0;display:flex;align-items:center;justify-content:center;min-height:100vh;min-height:100dvh}</style>
 </head>
 <body>
   <p>Redirecting...</p>
