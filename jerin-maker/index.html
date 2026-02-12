@@ -31,6 +31,29 @@
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-5.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-5.png"/>
 <script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
+<script>
+  (function syncViewportVars() {
+    const root = document.documentElement;
+    const updateViewportVars = () => {
+      const vv = window.visualViewport;
+      const width = Math.round(vv?.width || window.innerWidth || root.clientWidth || 0);
+      const height = Math.round(vv?.height || window.innerHeight || root.clientHeight || 0);
+      if (width > 0) {
+        root.style.setProperty('--app-width', `${width}px`);
+      }
+      if (height > 0) {
+        root.style.setProperty('--app-height', `${height}px`);
+      }
+    };
+    updateViewportVars();
+    window.addEventListener('resize', updateViewportVars, { passive: true });
+    window.addEventListener('orientationchange', updateViewportVars, { passive: true });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateViewportVars, { passive: true });
+      window.visualViewport.addEventListener('scroll', updateViewportVars, { passive: true });
+    }
+  })();
+</script>
 <style>
   :root {
     color-scheme: dark;
@@ -45,21 +68,34 @@
     --lite-bottom-control-icon-size: 24px;
     --lite-bottom-control-font-size: 1rem;
     --footer-height: 68px;
+    --app-width: 100vw;
+    --app-height: 100vh;
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-right: env(safe-area-inset-right, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
     --safe-left: env(safe-area-inset-left, 0px);
   }
+  @supports (width: 100dvw) {
+    :root {
+      --app-width: 100dvw;
+    }
+  }
+  @supports (height: 100dvh) {
+    :root {
+      --app-height: 100dvh;
+    }
+  }
   * { box-sizing: border-box; }
   html, body {
     overscroll-behavior: none;
     touch-action: none;
-    height: 100%;
+    width: 100%;
+    height: var(--app-height);
     overflow: hidden;
   }
   body {
     margin: 0;
-    min-height: 100vh;
+    min-height: var(--app-height);
     background: var(--bg);
     color: var(--text);
     font-family: 'Noto Sans JP', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
@@ -83,22 +119,11 @@
   }
   .shell {
     width: min(1200px, 100%);
-    min-height: calc(100vh - (var(--pad) + var(--safe-top)) - (var(--pad) + var(--safe-bottom)));
+    min-height: calc(var(--app-height) - (var(--pad) + var(--safe-top)) - (var(--pad) + var(--safe-bottom)));
     display: grid;
     grid-template-rows: auto 1fr;
     gap: clamp(10px, 2vw, 14px);
     padding-bottom: calc(40px + var(--footer-height));
-  }
-  @supports (height: 100dvh) {
-    html, body {
-      height: 100dvh;
-    }
-    body {
-      min-height: 100dvh;
-    }
-    .shell {
-      min-height: calc(100dvh - (var(--pad) + var(--safe-top)) - (var(--pad) + var(--safe-bottom)));
-    }
   }
   .topbar { display: none; }
   .footer {
@@ -289,7 +314,7 @@
     display: grid;
     grid-template-rows: repeat(4, auto);
     gap: 6px;
-    max-height: calc(100vh - 160px);
+    max-height: calc(var(--app-height) - 160px);
     overflow: hidden auto;
     flex-shrink: 0;
     position: relative;
@@ -639,7 +664,7 @@
     .panel {
       padding: 4px;
       gap: 4px;
-      max-height: calc(100vh - 150px);
+      max-height: calc(var(--app-height) - 150px);
     }
     .row { gap: 6px; }
     .palette { gap: 1px; }
@@ -945,21 +970,21 @@
   @media (max-height: 720px) {
     .canvas-stack { --canvas-size: min(78vw, min(46vh, 460px)); }
     .canvas-frame { padding: 8px; }
-    .panel { max-height: calc(100vh - 140px); gap: 8px; }
+    .panel { max-height: calc(var(--app-height) - 140px); gap: 8px; }
     .app { gap: clamp(8px, 2vw, 12px); }
     .prompt { font-size: 0.9rem; padding: 10px 10px; }
   }
   @media (max-height: 620px) {
     :root { --pad: clamp(6px, 1.5vw, 10px); }
     .canvas-stack { --canvas-size: min(70vw, min(38vh, 340px)); }
-    .panel { max-height: calc(100vh - 170px); gap: 6px; }
+    .panel { max-height: calc(var(--app-height) - 170px); gap: 6px; }
     .prompt { font-size: 0.86rem; padding: 8px 8px; }
     .footer { padding: 4px 0; }
   }
   @media (min-height: 900px) and (orientation: portrait) {
     .canvas-stack { --canvas-size: min(86vw, min(64vh, 560px)); }
     .app { gap: clamp(12px, 2.5vw, 18px); }
-    .panel { max-height: calc(100vh - 180px); }
+    .panel { max-height: calc(var(--app-height) - 180px); }
   }
   .topbar {
     display: flex;
