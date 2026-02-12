@@ -1669,6 +1669,8 @@
   let showGrid = true;
   let diffMode = false;
   let diffBasePixels = null;
+  let diffLayerInitialized = false;
+  let diffModeFirstEnableConfirmed = false;
   const diffDifficulty = 1;
   const LAYER_BASE = 'base';
   const LAYER_DIFF = 'diff';
@@ -2977,7 +2979,11 @@
       diffLayer.mask = buildDiffMask(baseImageData, diffImageData);
       diffLayer.undoStack.length = 0;
       diffLayer.redoStack.length = 0;
+      diffLayerInitialized = true;
       captureDiffBase();
+    } else {
+      diffLayer = null;
+      diffLayerInitialized = false;
     }
     compositeImageData = null;
     showGrid = false;
@@ -3213,6 +3219,13 @@
   }
 
   function setDiffMode(enabled) {
+    if (enabled && !diffModeFirstEnableConfirmed) {
+      const accepted = window.confirm('PiXFiNDモードを初めてONにします。現在の画像を1回だけ間違いレイヤーへコピーします。続けますか？');
+      if (!accepted) {
+        return false;
+      }
+      diffModeFirstEnableConfirmed = true;
+    }
     diffMode = enabled;
     if (btnDiffMode) {
       btnDiffMode.classList.toggle('is-active', enabled);
@@ -3220,7 +3233,10 @@
     }
     if (enabled) {
       ensureDiffLayer();
-      syncDiffLayerFromBase();
+      if (!diffLayerInitialized) {
+        syncDiffLayerFromBase();
+        diffLayerInitialized = true;
+      }
       captureDiffBase();
       setActiveLayer(LAYER_DIFF);
     } else {
@@ -3228,6 +3244,7 @@
       setActiveLayer(LAYER_BASE);
     }
     render();
+    return true;
   }
 
   function setCurrentColor(hex, options = {}) {
@@ -3328,6 +3345,7 @@
     if (hasDiff) {
       ensureDiffLayer();
       diffLayer.imageData = new ImageData(new Uint8ClampedArray(state.diffPixels), targetSize, targetSize);
+      diffLayerInitialized = true;
     }
     if (state.diffMask && diffLayer) {
       diffLayer.mask = new Uint8Array(state.diffMask);
