@@ -873,6 +873,7 @@
   const keyboardState = {
     spacePanActive: false,
   };
+  let lastSingleTouchClientY = null;
 
   function handleGlobalTouchPointerEnd(event) {
     if (event.pointerType !== 'touch') {
@@ -885,7 +886,87 @@
   window.addEventListener('pointercancel', handleGlobalTouchPointerEnd, { passive: true });
   window.addEventListener('blur', () => {
     activeTouchPointers.clear();
+    lastSingleTouchClientY = null;
   });
+
+  function getScrollableAncestor(node) {
+    let current = node instanceof Element ? node : null;
+    while (current && current !== document.body) {
+      const style = window.getComputedStyle(current);
+      const canScrollY = (style.overflowY === 'auto' || style.overflowY === 'scroll') && current.scrollHeight > current.clientHeight + 1;
+      if (canScrollY) {
+        return current;
+      }
+      current = current.parentElement;
+    }
+    return null;
+  }
+
+  function shouldAllowNativeTouchMove(event) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) {
+      return false;
+    }
+    if (target.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""], input[type="range"]')) {
+      return true;
+    }
+    const scrollable = getScrollableAncestor(target);
+    if (!scrollable) {
+      return false;
+    }
+    if (!event.touches || event.touches.length !== 1) {
+      return false;
+    }
+    const touch = event.touches[0];
+    if (!touch) {
+      return false;
+    }
+    const currentY = touch.clientY;
+    if (!Number.isFinite(currentY) || !Number.isFinite(lastSingleTouchClientY)) {
+      lastSingleTouchClientY = currentY;
+      return true;
+    }
+    const deltaY = currentY - lastSingleTouchClientY;
+    const atTop = scrollable.scrollTop <= 0;
+    const atBottom = scrollable.scrollTop + scrollable.clientHeight >= scrollable.scrollHeight - 1;
+    // Block rubber-band overscroll at boundaries to avoid browser pull/close gestures.
+    if ((atTop && deltaY > 0) || (atBottom && deltaY < 0)) {
+      return false;
+    }
+    return true;
+  }
+
+  window.addEventListener('touchstart', (event) => {
+    if (!event.touches || event.touches.length !== 1) {
+      lastSingleTouchClientY = null;
+      return;
+    }
+    const touch = event.touches[0];
+    lastSingleTouchClientY = touch ? touch.clientY : null;
+  }, { passive: true });
+
+  window.addEventListener('touchmove', (event) => {
+    if (shouldAllowNativeTouchMove(event)) {
+      if (event.touches && event.touches.length === 1) {
+        const touch = event.touches[0];
+        lastSingleTouchClientY = touch ? touch.clientY : lastSingleTouchClientY;
+      } else {
+        lastSingleTouchClientY = null;
+      }
+      return;
+    }
+    event.preventDefault();
+  }, { passive: false });
+
+  window.addEventListener('touchend', () => {
+    if (activeTouchPointers.size === 0) {
+      lastSingleTouchClientY = null;
+    }
+  }, { passive: true });
+
+  window.addEventListener('touchcancel', () => {
+    lastSingleTouchClientY = null;
+  }, { passive: true });
 
   function isEditableTarget(target) {
     return Boolean(
@@ -15501,12 +15582,16 @@
     document.addEventListener(
       'pointerdown',
       (event) => {
+        const isTouchPointer = event.pointerType === 'touch';
+        const targetElement = event.target instanceof Element ? event.target : null;
         if (hasPendingSelectionMove()) {
-          const targetElement = event.target instanceof Element ? event.target : null;
           const keepCanvasFlow = Boolean(targetElement && isCanvasSurfaceTarget(targetElement));
           if (!keepCanvasFlow) {
             confirmPendingSelectionMove();
           }
+        }
+        if (isTouchPointer) {
+          return;
         }
         const active = document.activeElement;
         if (!isInputControlElement(active)) {
