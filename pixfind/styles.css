@@ -8,6 +8,7 @@
   --text: #1f2430;
   --text-muted: #5b6374;
   --border: rgba(40, 50, 80, 0.16);
+  --app-width: 100vw;
   --app-height: 100vh;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
@@ -23,6 +24,12 @@
   font-size: 16px;
 }
 
+@supports (width: 100dvw) {
+  :root {
+    --app-width: 100dvw;
+  }
+}
+
 @supports (height: 100dvh) {
   :root {
     --app-height: 100dvh;
@@ -34,18 +41,20 @@
 }
 
 html {
-  width: 100%;
-  height: 100%;
+  width: var(--app-width);
+  height: var(--app-height);
+  max-width: var(--app-width);
   max-height: var(--app-height);
   overflow: hidden;
 }
 
 body {
   margin: 0;
-  width: 100%;
+  width: var(--app-width);
   height: var(--app-height);
   min-height: var(--app-height);
   max-height: var(--app-height);
+  max-width: var(--app-width);
   background: var(--bg);
   color: var(--text);
   font-weight: 700;
