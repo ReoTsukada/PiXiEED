@@ -238,6 +238,7 @@
   }, {});
   const MOBILE_DRAWER_MODE_ORDER = Object.freeze(['peek', 'full']);
   const MOBILE_DRAWER_DEFAULT_MODE = 'full';
+  const MOBILE_DRAWER_PEEK_HEIGHT_OFFSET = 3;
   const MOBILE_TAB_DRAWER_MODE = Object.freeze({
     tools: 'full',
     color: 'full',
@@ -623,7 +624,7 @@
   const mobileDrawerState = {
     mode: MOBILE_DRAWER_DEFAULT_MODE,
     heights: {
-      peek: 124,
+      peek: 127,
       half: 320,
       full: 320,
     },
@@ -1893,14 +1894,26 @@
       return;
     }
     const railRect = dom.rightRail.getBoundingClientRect();
-    let width = clamp(Math.round(window.innerWidth * 0.34), 260, 460);
+    const viewportBounds = getViewportBounds();
+    const safeArea = getSafeAreaInsets();
+    const edgePadding = 8;
+    const safeLeft = viewportBounds.left + safeArea.left;
+    const safeTop = viewportBounds.top + safeArea.top;
+    const safeRight = viewportBounds.right - safeArea.right;
+    const safeBottom = viewportBounds.bottom - safeArea.bottom;
+    const safeWidth = Math.max(1, safeRight - safeLeft);
+    let width = clamp(Math.round(safeWidth * 0.34), 260, 460);
     let left = Math.round(railRect.left - width - 10);
-    if (left < 8) {
-      left = 8;
-      width = Math.max(220, Math.min(width, window.innerWidth - left - 8));
+    if (left < safeLeft + edgePadding) {
+      left = safeLeft + edgePadding;
+      width = Math.max(220, Math.min(width, safeRight - left - edgePadding));
     }
-    const top = clamp(Math.round(railRect.top + 8), 8, Math.max(8, window.innerHeight - 120));
-    const maxHeight = Math.max(140, Math.round(window.innerHeight - top - 8));
+    const top = clamp(
+      Math.round(railRect.top + 8),
+      safeTop + edgePadding,
+      Math.max(safeTop + edgePadding, safeBottom - 120)
+    );
+    const maxHeight = Math.max(140, Math.round(safeBottom - top - edgePadding));
     clearCompactRightFlyoutPosition();
     section.style.position = 'fixed';
     section.style.left = `${left}px`;
@@ -2238,6 +2251,13 @@
     }
     const isMobileCompact = layoutMode === 'mobilePortrait';
     const anchorRect = anchor.getBoundingClientRect();
+    const viewportBounds = getViewportBounds();
+    const safeArea = getSafeAreaInsets();
+    const edgePadding = 8;
+    const safeLeft = viewportBounds.left + safeArea.left;
+    const safeTop = viewportBounds.top + safeArea.top;
+    const safeRight = viewportBounds.right - safeArea.right;
+    const safeBottom = viewportBounds.bottom - safeArea.bottom;
     let flyoutWidth;
     let left;
     let top;
@@ -2250,26 +2270,29 @@
       const itemSize = 64;
       const gap = 8;
       const padding = 16;
-      const availableWidth = Math.max(72, window.innerWidth - 16);
+      const availableWidth = Math.max(72, safeRight - safeLeft - (edgePadding * 2));
       const maxColumns = Math.max(1, Math.min(4, Math.floor((availableWidth - padding + gap) / (itemSize + gap))));
       const columns = Math.max(1, Math.min(toolCount, maxColumns));
       const rows = Math.max(1, Math.ceil(toolCount / columns));
       const desiredWidth = (columns * itemSize) + (Math.max(0, columns - 1) * gap) + padding;
       const desiredHeight = (rows * itemSize) + (Math.max(0, rows - 1) * gap) + padding;
-      flyoutWidth = clamp(Math.round(desiredWidth), 72, Math.max(72, window.innerWidth - 16));
-      const maxLeft = Math.max(8, Math.round(window.innerWidth - flyoutWidth - 8));
-      left = clamp(Math.round(anchorRect.left + ((anchorRect.width - flyoutWidth) * 0.5)), 8, maxLeft);
-      const maxFlyoutHeight = Math.max(96, Math.round(window.innerHeight * 0.68));
+      flyoutWidth = clamp(Math.round(desiredWidth), 72, Math.max(72, availableWidth));
+      const minLeft = Math.round(safeLeft + edgePadding);
+      const maxLeft = Math.max(minLeft, Math.round(safeRight - flyoutWidth - edgePadding));
+      left = clamp(Math.round(anchorRect.left + ((anchorRect.width - flyoutWidth) * 0.5)), minLeft, maxLeft);
+      const maxFlyoutHeight = Math.max(96, Math.round((safeBottom - safeTop) * 0.68));
       const flyoutHeight = clamp(Math.round(desiredHeight), 88, maxFlyoutHeight);
       const preferredTop = Math.round(anchorRect.top - flyoutHeight - 10);
       const fallbackTop = Math.round(anchorRect.bottom + 10);
-      if (preferredTop >= 8) {
+      const minTop = Math.round(safeTop + edgePadding);
+      const maxBottom = Math.round(safeBottom - edgePadding);
+      if (preferredTop >= minTop) {
         top = preferredTop;
-      } else if (fallbackTop + flyoutHeight <= window.innerHeight - 8) {
+      } else if (fallbackTop + flyoutHeight <= maxBottom) {
         top = fallbackTop;
       } else {
-        const maxTop = Math.max(8, Math.round(window.innerHeight - flyoutHeight - 8));
-        top = clamp(preferredTop, 8, maxTop);
+        const maxTop = Math.max(minTop, Math.round(maxBottom - flyoutHeight));
+        top = clamp(preferredTop, minTop, maxTop);
       }
       maxHeight = flyoutHeight;
       dom.toolGrid.style.gridTemplateColumns = `repeat(${columns}, ${itemSize}px)`;
@@ -2279,11 +2302,17 @@
       const railWidth = Math.max(68, dom.leftRail?.offsetWidth || 78);
       flyoutWidth = clamp(Math.round(railWidth - 16), 64, 96);
       left = Math.round(anchorRect.right + 10);
-      if (left + flyoutWidth > window.innerWidth - 8) {
-        left = Math.max(8, Math.round(anchorRect.left - 10 - flyoutWidth));
+      const minLeft = Math.round(safeLeft + edgePadding);
+      const maxRight = Math.round(safeRight - edgePadding);
+      if (left + flyoutWidth > maxRight) {
+        left = Math.max(minLeft, Math.round(anchorRect.left - 10 - flyoutWidth));
       }
-      top = clamp(Math.round(anchorRect.top), 8, Math.max(8, window.innerHeight - 64));
-      maxHeight = Math.max(120, Math.round(window.innerHeight - top - 12));
+      top = clamp(
+        Math.round(anchorRect.top),
+        Math.round(safeTop + edgePadding),
+        Math.max(Math.round(safeTop + edgePadding), Math.round(safeBottom - 64))
+      );
+      maxHeight = Math.max(120, Math.round(safeBottom - top - 12));
     }
 
     dom.toolGrid.style.position = 'fixed';
@@ -8249,12 +8278,50 @@
     return { width, height };
   }
 
+  function getViewportBounds() {
+    const viewport = window.visualViewport;
+    const left = Math.round(Number(viewport?.offsetLeft) || 0);
+    const top = Math.round(Number(viewport?.offsetTop) || 0);
+    const width = Math.max(0, Math.round(Number(viewport?.width) || Number(window.innerWidth) || 0));
+    const height = Math.max(0, Math.round(Number(viewport?.height) || Number(window.innerHeight) || 0));
+    return {
+      left,
+      top,
+      width,
+      height,
+      right: left + width,
+      bottom: top + height,
+    };
+  }
+
+  function getSafeAreaInsets() {
+    const root = document.documentElement;
+    if (!(root instanceof HTMLElement) || typeof window.getComputedStyle !== 'function') {
+      return { top: 0, right: 0, bottom: 0, left: 0 };
+    }
+    const styles = window.getComputedStyle(root);
+    const read = key => {
+      const raw = styles.getPropertyValue(key);
+      const parsed = Number.parseFloat(raw);
+      return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : 0;
+    };
+    return {
+      top: read('--safe-area-top'),
+      right: read('--safe-area-right'),
+      bottom: read('--safe-area-bottom'),
+      left: read('--safe-area-left'),
+    };
+  }
+
   function updateMobileViewportHeightVar() {
     const root = document.documentElement;
     if (!(root instanceof HTMLElement)) {
       return;
     }
-    const { height } = getViewportSize();
+    const { width, height } = getViewportSize();
+    if (width > 0) {
+      root.style.setProperty('--mobile-viewport-width', `${width}px`);
+    }
     if (height > 0) {
       root.style.setProperty('--mobile-viewport-height', `${height}px`);
     }
@@ -8537,9 +8604,9 @@
       portrait ? 124 : 102
     );
     const peek = clamp(
-      Math.round(height * (portrait ? 0.19 : 0.22)),
-      104,
-      portrait ? 176 : 180
+      Math.round(height * (portrait ? 0.19 : 0.22)) + MOBILE_DRAWER_PEEK_HEIGHT_OFFSET,
+      104 + MOBILE_DRAWER_PEEK_HEIGHT_OFFSET,
+      (portrait ? 176 : 180) + MOBILE_DRAWER_PEEK_HEIGHT_OFFSET
     );
     const fullMin = Math.max(peek + 84, portrait ? 238 : 220);
     const fullCapByViewport = Math.round(height - topbar - 52);
@@ -10943,14 +11010,16 @@
     const margin = 8;
     const buttonWidth = button.offsetWidth || button.clientWidth || 0;
     const buttonHeight = button.offsetHeight || button.clientHeight || 0;
-    const viewportWidth = window.innerWidth || document.documentElement?.clientWidth || 0;
-    const viewportHeight = window.innerHeight || document.documentElement?.clientHeight || 0;
+    const viewportBounds = getViewportBounds();
+    const safeArea = getSafeAreaInsets();
     const scaledWidth = Math.max(0, buttonWidth * scale);
     const scaledHeight = Math.max(0, buttonHeight * scale);
-    const maxX = Math.max(margin, (viewportWidth || 0) - scaledWidth - margin);
-    const maxY = Math.max(margin, (viewportHeight || 0) - scaledHeight - margin);
-    const clampedX = clamp(rawX, margin, maxX);
-    const clampedY = clamp(rawY, margin, maxY);
+    const minX = Math.round(viewportBounds.left + safeArea.left + margin);
+    const minY = Math.round(viewportBounds.top + safeArea.top + margin);
+    const maxX = Math.max(minX, Math.round(viewportBounds.right - safeArea.right - scaledWidth - margin));
+    const maxY = Math.max(minY, Math.round(viewportBounds.bottom - safeArea.bottom - scaledHeight - margin));
+    const clampedX = clamp(rawX, minX, maxX);
+    const clampedY = clamp(rawY, minY, maxY);
     floatingDrawButtonState.position.x = clampedX;
     floatingDrawButtonState.position.y = clampedY;
     button.style.setProperty('--floating-draw-button-x', `${clampedX}px`);
