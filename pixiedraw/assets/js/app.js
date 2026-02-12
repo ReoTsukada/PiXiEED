@@ -874,6 +874,7 @@
     spacePanActive: false,
   };
   let lastSingleTouchClientY = null;
+  let editableTouchSession = false;
 
   function handleGlobalTouchPointerEnd(event) {
     if (event.pointerType !== 'touch') {
@@ -902,12 +903,29 @@
     return null;
   }
 
+  function isEditableTouchTarget(target) {
+    if (!(target instanceof Element)) {
+      return false;
+    }
+    return Boolean(
+      target.closest(
+        'input, textarea, select, [contenteditable="true"], [contenteditable=""], [contenteditable]'
+      )
+    );
+  }
+
   function shouldAllowNativeTouchMove(event) {
+    if (editableTouchSession) {
+      return true;
+    }
+    if (isEditableTouchTarget(document.activeElement)) {
+      return true;
+    }
     const target = event.target instanceof Element ? event.target : null;
     if (!target) {
       return false;
     }
-    if (target.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""], input[type="range"]')) {
+    if (isEditableTouchTarget(target) || target.closest('input[type="range"]')) {
       return true;
     }
     const scrollable = getScrollableAncestor(target);
@@ -937,6 +955,8 @@
   }
 
   window.addEventListener('touchstart', (event) => {
+    const startTarget = event.target instanceof Element ? event.target : null;
+    editableTouchSession = Boolean(startTarget && isEditableTouchTarget(startTarget));
     if (!event.touches || event.touches.length !== 1) {
       lastSingleTouchClientY = null;
       return;
@@ -955,10 +975,25 @@
       }
       return;
     }
+    const target = event.target instanceof Element ? event.target : null;
+    const shouldGuardCanvasGesture = Boolean(
+      target
+      && (
+        (dom.canvasViewport && dom.canvasViewport.contains(target))
+        || (dom.stage && dom.stage.contains(target))
+        || (dom.mobileDrawerHandle && dom.mobileDrawerHandle.contains(target))
+      )
+    );
+    if (!shouldGuardCanvasGesture) {
+      return;
+    }
     event.preventDefault();
   }, { passive: false });
 
   window.addEventListener('touchend', () => {
+    if (!document.activeElement || !isEditableTouchTarget(document.activeElement)) {
+      editableTouchSession = false;
+    }
     if (activeTouchPointers.size === 0) {
       lastSingleTouchClientY = null;
     }
@@ -966,6 +1001,7 @@
 
   window.addEventListener('touchcancel', () => {
     lastSingleTouchClientY = null;
+    editableTouchSession = false;
   }, { passive: true });
 
   function isEditableTarget(target) {
@@ -3231,12 +3267,10 @@
     const listener = (event) => {
       const target = event?.target instanceof Element ? event.target : null;
       if (!target) {
-        schedulePendingAutosavePermission(handle);
         return;
       }
       const isEditable = Boolean(target.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]'));
       if (isEditable) {
-        schedulePendingAutosavePermission(handle);
         return;
       }
       const isAutosaveButton = Boolean(
@@ -3248,21 +3282,21 @@
           || isCanvasSurfaceTarget(target)
       );
       if (!isAutosaveButton && !isCanvasTap) {
-        schedulePendingAutosavePermission(handle);
         return;
       }
+      clearPendingPermissionListener();
       attemptAutosaveReauthorization().catch(error => {
         console.warn('Autosave reauthorization failed', error);
         updateAutosaveStatus('自動保存: 権限を付与できませんでした', 'error');
       });
     };
     autosavePermissionListener = listener;
-    window.addEventListener('pointerdown', listener, { once: true });
+    window.addEventListener('pointerdown', listener, true);
   }
 
   function clearPendingPermissionListener() {
     if (!autosavePermissionListener) return;
-    window.removeEventListener('pointerdown', autosavePermissionListener);
+    window.removeEventListener('pointerdown', autosavePermissionListener, true);
     autosavePermissionListener = null;
   }
 
@@ -8656,7 +8690,12 @@
   }
 
   function setupLayout() {
-    const handleLayoutResize = debounce(updateLayoutMode, 120);
+    const handleLayoutResize = debounce(() => {
+      if (isVirtualKeyboardLikelyOpen()) {
+        return;
+      }
+      updateLayoutMode();
+    }, 120);
     window.addEventListener('resize', handleLayoutResize);
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', handleLayoutResize);
@@ -8676,6 +8715,24 @@
     setupMobileDrawerInteractions();
     updateLayoutMode();
     updateRailToggleVisibility();
+  }
+
+  function isVirtualKeyboardLikelyOpen() {
+    const active = document.activeElement;
+    if (!isInputControlElement(active)) {
+      return false;
+    }
+    const viewport = window.visualViewport;
+    if (!viewport) {
+      return false;
+    }
+    const viewportHeight = Math.max(0, Math.round(Number(viewport.height) || 0));
+    const innerHeight = Math.max(0, Math.round(Number(window.innerHeight) || 0));
+    if (viewportHeight <= 0 || innerHeight <= 0) {
+      return false;
+    }
+    const heightLoss = innerHeight - viewportHeight;
+    return heightLoss > 120 && viewportHeight < innerHeight * 0.88;
   }
 
   function updateRailMetrics() {
