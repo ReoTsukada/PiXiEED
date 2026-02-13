@@ -97,6 +97,10 @@ window.addEventListener('orientationchange', setViewportVars, { passive: true })
 window.visualViewport?.addEventListener('resize', setViewportVars, { passive: true });
 window.visualViewport?.addEventListener('scroll', setViewportVars, { passive: true });
 
+function isLocalFileProtocol() {
+  return typeof window !== 'undefined' && window.location?.protocol === 'file:';
+}
+
 const MIN_CLUSTER_PIXELS = 1;
 const MARKER_PADDING = 1;
 const TAP_HIT_PADDING = 1;
@@ -109,6 +113,9 @@ const REGION_MERGE_DISTANCE_BY_DIFFICULTY = {
 const CREATOR_MERGE_DISTANCE = REGION_MERGE_DISTANCE_BY_DIFFICULTY[2];
 const CREATOR_HIDDEN_OBJECT_MIN_DISTANCE = 2; // Require at least 2 empty pixels between objects.
 const HIDDEN_OBJECT_HIT_PADDING = 1;
+const HIDDEN_OBJECT_LAYER_ALPHA_THRESHOLD = 12;
+const HIDDEN_OBJECT_LAYER_BLACK_THRESHOLD = 72;
+const HIDDEN_OBJECT_ALPHA_FALLBACK_MAX_COVERAGE = 0.95;
 const MERGE_DISTANCE_SIZE_TIER_1 = 64;
 const MERGE_DISTANCE_SIZE_TIER_2 = 256;
 const MERGE_DISTANCE_MAX_SCALE = 3;
@@ -214,6 +221,7 @@ const creatorState = {
   diffResult: null,
   size: { width: 0, height: 0 },
   targetLabels: [],
+  activeTargetIndex: -1,
 };
 
 let creatorLastFocused = null;
@@ -301,6 +309,24 @@ function normalizeTargetLabel(value, index = 0) {
   return raw || `アイテム ${index + 1}`;
 }
 
+function resolvePuzzleMode(rawMode, targets = []) {
+  if (typeof rawMode === 'string' && rawMode.trim()) {
+    return normalizeGameMode(rawMode);
+  }
+  if (Array.isArray(targets) && targets.length > 0) {
+    return GAME_MODE_HIDDEN_OBJECT;
+  }
+  return GAME_MODE_SPOT_DIFFERENCE;
+}
+
+function resolvePuzzleThumbnail(mode, original, diff, explicitThumbnail = null) {
+  const normalizedMode = normalizeGameMode(mode);
+  if (normalizedMode === GAME_MODE_HIDDEN_OBJECT) {
+    return original || diff || explicitThumbnail || null;
+  }
+  return explicitThumbnail || diff || original || null;
+}
+
 function normalizePuzzleTargets(rawTargets) {
   let source = rawTargets;
   if (typeof source === 'string') {
@@ -362,9 +388,11 @@ async function init() {
   await loadOfficialPuzzles();
   selectGameMode(DEFAULT_GAME_MODE);
   selectDifficulty(1);
-  flushPublishQueue().catch(error => console.warn('publish queue flush failed', error));
-  flushShareQueue().catch(error => console.warn('share queue flush failed', error));
-  schedulePublishQueueFlush();
+  if (!isLocalFileProtocol()) {
+    flushPublishQueue().catch(error => console.warn('publish queue flush failed', error));
+    flushShareQueue().catch(error => console.warn('share queue flush failed', error));
+    schedulePublishQueueFlush();
+  }
   await handleInitialPuzzleFromUrl();
 
   dom.startButton?.addEventListener('click', () => {
@@ -513,6 +541,7 @@ function resetCreatorForm() {
   creatorState.diffResult = null;
   creatorState.size = { width: 0, height: 0 };
   creatorState.targetLabels = [];
+  creatorState.activeTargetIndex = -1;
   setCreatorMode(creatorState.mode, true);
   clearCreatorPreview();
   renderCreatorTargetFields(0);
@@ -574,6 +603,7 @@ function handleCreatorFileChange() {
   creatorState.diffResult = null;
   creatorState.size = { width: 0, height: 0 };
   creatorState.targetLabels = [];
+  creatorState.activeTargetIndex = -1;
   updateCreatorPublishAvailability();
   renderCreatorTargetFields(0);
   if (dom.creatorSummary) {
@@ -598,6 +628,7 @@ function setCreatorDifficulty(level, silent = false) {
     creatorState.diffResult = null;
     creatorState.size = { width: 0, height: 0 };
     creatorState.targetLabels = [];
+    creatorState.activeTargetIndex = -1;
     updateCreatorPublishAvailability();
     renderCreatorTargetFields(0);
     updateCreatorSummary(null);
@@ -633,6 +664,7 @@ function setCreatorActionsEnabled(enabled) {
 function setCreatorMode(mode, silent = false) {
   const normalizedMode = normalizeGameMode(mode);
   creatorState.mode = normalizedMode;
+  creatorState.activeTargetIndex = -1;
   const isHiddenMode = isHiddenObjectMode(normalizedMode);
 
   dom.creatorModeButtons.forEach(button => {
@@ -642,7 +674,7 @@ function setCreatorMode(mode, silent = false) {
 
   if (dom.creatorDescription) {
     dom.creatorDescription.textContent = isHiddenMode
-      ? '元画像と探し物レイヤー（探し物だけ描いた透明画像）から探し物を自動検出します。'
+      ? '元画像と探し物レイヤー（白地に黒で探し物を塗った2値画像）から探し物を自動検出します。'
       : '同じサイズの2枚の画像を選ぶと差分を自動検出します。';
   }
   if (dom.creatorDiffLabelText) {
@@ -653,7 +685,7 @@ function setCreatorMode(mode, silent = false) {
   }
   if (dom.creatorModeNote) {
     dom.creatorModeNote.textContent = isHiddenMode
-      ? '探し物レイヤーから検出した番号ごとに、探し物の名前を入力してください。'
+      ? '探し物レイヤーは白地に黒で作成してください。検出した番号ごとに探し物の名前を入力してください。'
       : '公開するとオンライン公開され、難易度一覧に追加されます。';
   }
 
@@ -681,10 +713,23 @@ function setCreatorMode(mode, silent = false) {
   }
 }
 
+function setCreatorActiveTarget(index = -1) {
+  const next = Number.isFinite(index) ? Math.floor(index) : -1;
+  if (creatorState.activeTargetIndex === next) return;
+  creatorState.activeTargetIndex = next;
+  drawCreatorPreview();
+  if (!dom.creatorTargetFields) return;
+  const rows = Array.from(dom.creatorTargetFields.querySelectorAll('.creator-target-row'));
+  rows.forEach((row, rowIndex) => {
+    row.classList.toggle('is-active', rowIndex === next);
+  });
+}
+
 function renderCreatorTargetFields(count) {
   if (!dom.creatorTargets || !dom.creatorTargetFields) return;
   const normalizedCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
   const isHiddenMode = isHiddenObjectMode(creatorState.mode);
+  setCreatorActiveTarget(-1);
   dom.creatorTargetFields.innerHTML = '';
   if (!isHiddenMode || normalizedCount <= 0) {
     dom.creatorTargets.hidden = true;
@@ -700,6 +745,9 @@ function renderCreatorTargetFields(count) {
   for (let index = 0; index < normalizedCount; index += 1) {
     const label = document.createElement('label');
     label.className = 'creator-target-row';
+    label.dataset.targetIndex = String(index);
+    label.addEventListener('mouseenter', () => setCreatorActiveTarget(index));
+    label.addEventListener('mouseleave', () => setCreatorActiveTarget(-1));
 
     const heading = document.createElement('span');
     heading.className = 'creator-target-index';
@@ -716,6 +764,13 @@ function renderCreatorTargetFields(count) {
       const targetIndex = Number(input.dataset.targetIndex);
       creatorState.targetLabels[targetIndex] = input.value.trim();
       updateCreatorPublishAvailability();
+    });
+    input.addEventListener('focus', () => {
+      const targetIndex = Number(input.dataset.targetIndex);
+      setCreatorActiveTarget(targetIndex);
+    });
+    input.addEventListener('blur', () => {
+      setCreatorActiveTarget(-1);
     });
 
     label.append(heading, input);
@@ -783,17 +838,52 @@ function drawCreatorPreviewCanvas(context, canvas, image, diffResult) {
   context.drawImage(image, 0, 0);
   if (!diffResult || !diffResult.regions.length) return;
 
+  const hiddenMode = isHiddenObjectMode(creatorState.mode);
+  const activeIndex = creatorState.activeTargetIndex;
   const strokeWidth = Math.max(2, Math.round(Math.min(image.width, image.height) / 160));
-  context.lineWidth = strokeWidth;
-  context.strokeStyle = 'rgba(255, 111, 141, 0.85)';
-  context.fillStyle = 'rgba(255, 111, 141, 0.18)';
-
-  diffResult.regions.forEach(region => {
+  diffResult.regions.forEach((region, index) => {
     const width = region.maxX - region.minX + 1;
     const height = region.maxY - region.minY + 1;
+    const isActive = hiddenMode && index === activeIndex;
+    context.lineWidth = isActive ? strokeWidth + 1 : strokeWidth;
+    context.strokeStyle = isActive ? 'rgba(227, 70, 111, 0.98)' : 'rgba(255, 111, 141, 0.88)';
+    context.fillStyle = isActive ? 'rgba(255, 111, 141, 0.34)' : 'rgba(255, 111, 141, 0.2)';
     context.fillRect(region.minX, region.minY, width, height);
     context.strokeRect(region.minX, region.minY, width, height);
+
+    if (hiddenMode) {
+      drawCreatorRegionIndexBadge(context, region, index, isActive, canvas.width, canvas.height);
+    }
   });
+}
+
+function drawCreatorRegionIndexBadge(context, region, index, isActive, canvasWidth, canvasHeight) {
+  const label = `#${index + 1}`;
+  const centerX = Number.isFinite(region.centerX) ? region.centerX : (region.minX + region.maxX) / 2;
+  const centerY = Number.isFinite(region.centerY) ? region.centerY : (region.minY + region.maxY) / 2;
+  const fontSize = Math.max(10, Math.round(Math.min(canvasWidth, canvasHeight) / 17));
+  const padX = Math.max(4, Math.round(fontSize * 0.34));
+  const padY = Math.max(2, Math.round(fontSize * 0.24));
+
+  context.save();
+  context.font = `700 ${fontSize}px "M PLUS Rounded 1c", sans-serif`;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  const textWidth = context.measureText(label).width;
+  const badgeWidth = Math.ceil(textWidth + padX * 2);
+  const badgeHeight = Math.ceil(fontSize + padY * 2);
+  const drawX = clamp(Math.round(centerX - badgeWidth / 2), 1, Math.max(1, canvasWidth - badgeWidth - 1));
+  const drawY = clamp(Math.round(centerY - badgeHeight / 2), 1, Math.max(1, canvasHeight - badgeHeight - 1));
+
+  context.fillStyle = isActive ? 'rgba(227, 70, 111, 0.94)' : 'rgba(36, 43, 73, 0.9)';
+  context.strokeStyle = 'rgba(255,255,255,0.92)';
+  context.lineWidth = 1;
+  context.fillRect(drawX, drawY, badgeWidth, badgeHeight);
+  context.strokeRect(drawX, drawY, badgeWidth, badgeHeight);
+
+  context.fillStyle = '#ffffff';
+  context.fillText(label, drawX + badgeWidth / 2, drawY + badgeHeight / 2 + 0.5);
+  context.restore();
 }
 
 async function handleCreatorAnalyze() {
@@ -815,14 +905,41 @@ async function handleCreatorAnalyze() {
     ]);
     if (token !== creatorAnalysisToken) return;
 
-    const [normalizedOriginal, normalizedDiff] = await Promise.all([
-      normalizePixelImage(rawOriginal.image, rawOriginal.dataUrl),
-      normalizePixelImage(rawDiff.image, rawDiff.dataUrl),
-    ]);
+    const isHiddenMode = isHiddenObjectMode(creatorState.mode);
+    let normalizedOriginal;
+    let normalizedDiff;
+    let hiddenPairInfo = null;
+    if (isHiddenMode) {
+      hiddenPairInfo = await normalizeHiddenModePair({
+        originalImage: rawOriginal.image,
+        originalDataUrl: rawOriginal.dataUrl,
+        layerImage: rawDiff.image,
+        layerDataUrl: rawDiff.dataUrl,
+      });
+      if (token !== creatorAnalysisToken) return;
+      if (!hiddenPairInfo) {
+        throw new Error('hidden mode normalize failed');
+      }
+      normalizedOriginal = hiddenPairInfo.normalizedOriginal;
+      normalizedDiff = hiddenPairInfo.normalizedLayer;
+    } else {
+      [normalizedOriginal, normalizedDiff] = await Promise.all([
+        normalizePixelImage(rawOriginal.image, rawOriginal.dataUrl),
+        normalizePixelImage(rawDiff.image, rawDiff.dataUrl),
+      ]);
+    }
     if (token !== creatorAnalysisToken) return;
 
     if (normalizedOriginal.width !== normalizedDiff.width || normalizedOriginal.height !== normalizedDiff.height) {
-      setCreatorStatus('画像サイズが一致しません。同じサイズの画像を選んでください。', 'error');
+      const sizeHint = hiddenPairInfo
+        ? `（元画像 ${formatPixelSize(hiddenPairInfo.originalRawSize)} / レイヤー ${formatPixelSize(hiddenPairInfo.layerRawSize)}）`
+        : '';
+      setCreatorStatus(
+        isHiddenMode
+          ? `画像サイズが一致しません。2値レイヤーを元画像と同じサイズで書き出してください。${sizeHint}`
+          : '画像サイズが一致しません。同じサイズの画像を選んでください。',
+        'error',
+      );
       creatorState.diffResult = null;
       creatorState.size = { width: 0, height: 0 };
       creatorState.targetLabels = [];
@@ -833,7 +950,6 @@ async function handleCreatorAnalyze() {
       return;
     }
 
-    const isHiddenMode = isHiddenObjectMode(creatorState.mode);
     const diffResult = isHiddenMode
       ? computeHiddenObjectRegions(normalizedDiff.image, {
         minDistance: CREATOR_HIDDEN_OBJECT_MIN_DISTANCE,
@@ -862,7 +978,7 @@ async function handleCreatorAnalyze() {
     if (!diffResult || !diffResult.regions.length) {
       setCreatorStatus(
         isHiddenMode
-          ? '探し物レイヤーからアイテムが検出できませんでした。'
+          ? '探し物レイヤーの黒塗り部分からアイテムが検出できませんでした。'
           : '差分が見つかりませんでした。画像を確認してください。',
         'error',
       );
@@ -991,7 +1107,7 @@ async function handleCreatorPublish() {
       author_name: authorName,
       original_url: originalUrl,
       diff_url: diffUrl,
-      thumbnail_url: diffUrl,
+      thumbnail_url: resolvePuzzleThumbnail(mode, originalUrl, diffUrl) || diffUrl || originalUrl,
     };
     if (mode === GAME_MODE_HIDDEN_OBJECT && targets.length) {
       payload.targets = targets;
@@ -1007,30 +1123,23 @@ async function handleCreatorPublish() {
     }
 
     const inserted = await insertPublishedPuzzle(payload);
-    const normalized = normalizePublishedPuzzleEntry(inserted ?? payload);
+    const normalized = normalizePublishedPuzzleEntry(inserted ?? payload, payload);
     if (normalized) {
       state.officialPuzzles = mergePuzzles(state.officialPuzzles, normalized);
+      const published = state.officialPuzzles.filter(entry => entry.source === 'published');
+      savePublishedCache(published);
       renderPuzzles(state.currentDifficulty, state.currentMode);
     }
 
     let contestPosted = false;
     if (postToContest) {
       try {
-        let contestImage = creatorState.originalImage;
-        let contestDataUrl = await buildNormalizedDataUrl(
+        const contestImage = creatorState.originalImage;
+        const contestDataUrl = await buildNormalizedDataUrl(
           creatorState.originalImage,
           creatorState.originalDataUrl,
           creatorState.originalFile,
         );
-        if (mode === GAME_MODE_HIDDEN_OBJECT) {
-          const mergedLayer = buildMergedLayerAsset(creatorState.originalImage, creatorState.diffImage);
-          if (mergedLayer?.dataUrl) {
-            contestImage = mergedLayer.image;
-            contestDataUrl = mergedLayer.dataUrl;
-          } else {
-            console.warn('hidden-object contest merge failed, fallback to original image');
-          }
-        }
         if (!contestDataUrl || !contestImage) {
           throw new Error('contest data missing');
         }
@@ -1908,7 +2017,7 @@ async function publishQueuedTask(task) {
     author_name: authorName,
     original_url: originalUrl,
     diff_url: diffUrl,
-    thumbnail_url: diffUrl,
+    thumbnail_url: resolvePuzzleThumbnail(mode, originalUrl, diffUrl) || diffUrl || originalUrl,
   };
   if (mode === GAME_MODE_HIDDEN_OBJECT && targets.length) {
     payload.targets = targets;
@@ -1934,9 +2043,11 @@ async function publishQueuedTask(task) {
       throw error;
     }
   }
-  const normalizedEntry = normalizePublishedPuzzleEntry(inserted ?? payload);
+  const normalizedEntry = normalizePublishedPuzzleEntry(inserted ?? payload, payload);
   if (normalizedEntry) {
     state.officialPuzzles = mergePuzzles(state.officialPuzzles, normalizedEntry);
+    const published = state.officialPuzzles.filter(entry => entry.source === 'published');
+    savePublishedCache(published);
     renderPuzzles(state.currentDifficulty, state.currentMode);
   }
 
@@ -1947,21 +2058,12 @@ async function publishQueuedTask(task) {
 
   if (postToContest) {
     try {
-      let contestImage = originalImage;
-      let contestDataUrl = await buildNormalizedDataUrl(
+      const contestImage = originalImage;
+      const contestDataUrl = await buildNormalizedDataUrl(
         originalImage,
         originalDataUrl,
         null,
       );
-      if (mode === GAME_MODE_HIDDEN_OBJECT) {
-        const mergedLayer = buildMergedLayerAsset(originalImage, diffImage);
-        if (mergedLayer?.dataUrl) {
-          contestImage = mergedLayer.image;
-          contestDataUrl = mergedLayer.dataUrl;
-        } else {
-          console.warn('hidden-object contest merge failed, fallback to original image');
-        }
-      }
       if (!contestDataUrl || !contestImage) {
         throw new Error('contest data missing');
       }
@@ -2274,37 +2376,56 @@ function countUniqueColors(image) {
   return colors.size;
 }
 
-function normalizePublishedPuzzleEntry(entry) {
-  if (!entry) return null;
-  const identifier = entry.id ?? entry.slug;
+function normalizePublishedPuzzleEntry(entry, fallback = null) {
+  if (!entry && !fallback) return null;
+  const primary = entry && typeof entry === 'object' ? entry : {};
+  const secondary = fallback && typeof fallback === 'object' ? fallback : {};
+  const source = { ...secondary, ...primary };
+  const identifier = source.id ?? source.slug;
   if (!identifier) return null;
-  const original = entry.original_url ?? entry.original ?? null;
-  const diff = entry.diff_url ?? entry.diff ?? null;
+  const original = source.original_url ?? source.original ?? null;
+  const diff = source.diff_url ?? source.diff ?? null;
   if (!original || !diff) return null;
-  const mode = normalizeGameMode(entry.mode ?? entry.game_mode ?? entry.play_mode);
-  const targets = normalizePuzzleTargets(entry.targets ?? entry.target_items ?? entry.targetItems ?? entry.items);
+  const targets = normalizePuzzleTargets(
+    source.targets ?? source.target_items ?? source.targetItems ?? source.items,
+  );
+  const mode = resolvePuzzleMode(
+    source.mode ?? source.game_mode ?? source.play_mode,
+    targets,
+  );
+  const explicitThumbnail = source.thumbnail_url ?? source.thumbnail ?? null;
   return {
-    id: entry.id ?? identifier,
-    slug: entry.slug ?? identifier,
-    label: entry.label ?? entry.slug ?? entry.id ?? 'PiXFiND Puzzle',
-    description: entry.description ?? '',
-    difficulty: normalizeDifficulty(entry.difficulty),
-    author: resolveAuthorName(entry, '名無し'),
-    authorUrl: resolveAuthorUrl(entry),
-    clientId: entry.client_id ?? entry.clientId ?? null,
-    userId: entry.user_id ?? entry.userId ?? null,
+    id: source.id ?? identifier,
+    slug: source.slug ?? identifier,
+    label: source.label ?? source.slug ?? source.id ?? 'PiXFiND Puzzle',
+    description: source.description ?? '',
+    difficulty: normalizeDifficulty(source.difficulty),
+    author: resolveAuthorName(source, '名無し'),
+    authorUrl: resolveAuthorUrl(source),
+    clientId: source.client_id ?? source.clientId ?? null,
+    userId: source.user_id ?? source.userId ?? null,
     original,
     diff,
     mode,
     targets,
-    thumbnail: entry.thumbnail_url ?? entry.thumbnail ?? diff ?? original,
-    shareUrl: entry.share_url ?? entry.shareUrl ?? null,
+    thumbnail: resolvePuzzleThumbnail(mode, original, diff, explicitThumbnail),
+    shareUrl: source.share_url ?? source.shareUrl ?? null,
     source: 'published',
     badge: '公開',
   };
 }
 
 async function loadPublishedPuzzles() {
+  if (isLocalFileProtocol()) {
+    return [];
+  }
+  const cached = loadPublishedCache();
+  const cachedByKey = new Map();
+  cached.forEach((entry) => {
+    if (!entry) return;
+    if (entry.id) cachedByKey.set(entry.id, entry);
+    if (entry.slug) cachedByKey.set(entry.slug, entry);
+  });
   const params = new URLSearchParams({
     select: '*',
     order: 'created_at.desc',
@@ -2316,25 +2437,42 @@ async function loadPublishedPuzzles() {
     if (!response.ok) {
       console.warn('Failed to load published puzzles', response.status);
       markSupabaseMaintenanceFromError(null, response.status);
-      const cached = loadPublishedCache();
       return cached.length ? cached : [];
     }
     const data = await response.json();
-    if (!Array.isArray(data)) return [];
-    const normalized = data.map(normalizePublishedPuzzleEntry).filter(Boolean);
+    if (!Array.isArray(data)) return cached.length ? cached : [];
+    const normalized = data.map((entry) => {
+      const key = entry?.id ?? entry?.slug;
+      const fallback = key ? cachedByKey.get(key) : null;
+      return normalizePublishedPuzzleEntry(entry, fallback);
+    }).filter(Boolean);
     savePublishedCache(normalized);
     noteSupabaseSuccess();
     return normalized;
   } catch (error) {
     console.warn('Failed to load published puzzles', error);
     markSupabaseMaintenanceFromError(error);
-    const cached = loadPublishedCache();
     return cached.length ? cached : [];
   }
 }
 
 async function loadOfficialPuzzles() {
   let basePuzzles = [];
+  const localManifest = Array.isArray(window.PIXFIND_OFFICIAL_PUZZLES)
+    ? window.PIXFIND_OFFICIAL_PUZZLES
+    : null;
+  if (isLocalFileProtocol()) {
+    if (localManifest?.length) {
+      basePuzzles = localManifest.map(normalizePuzzleEntry).filter(Boolean);
+    }
+    if (!basePuzzles.length) {
+      basePuzzles = FALLBACK_OFFICIAL_PUZZLES.map(normalizePuzzleEntry);
+    }
+    state.officialPuzzles = [...basePuzzles].filter(Boolean);
+    renderPuzzles(state.currentDifficulty, state.currentMode);
+    return;
+  }
+
   try {
     const response = await fetch('assets/puzzles/manifest.json', { cache: 'no-store' });
     if (!response.ok) {
@@ -2351,7 +2489,12 @@ async function loadOfficialPuzzles() {
     }
   } catch (error) {
     console.warn('Failed to load puzzles manifest', error);
-    basePuzzles = FALLBACK_OFFICIAL_PUZZLES.map(normalizePuzzleEntry);
+    if (localManifest?.length) {
+      basePuzzles = localManifest.map(normalizePuzzleEntry).filter(Boolean);
+    }
+    if (!basePuzzles.length) {
+      basePuzzles = FALLBACK_OFFICIAL_PUZZLES.map(normalizePuzzleEntry);
+    }
   }
   const publishedPuzzles = await loadPublishedPuzzles();
   state.officialPuzzles = [...basePuzzles, ...publishedPuzzles].filter(Boolean);
@@ -2449,8 +2592,8 @@ function normalizePuzzleEntry(entry) {
   const original = entry.original ?? null;
   const diff = entry.diff ?? null;
   if (!original || !diff) return null;
-  const mode = normalizeGameMode(entry.mode);
   const targets = normalizePuzzleTargets(entry.targets);
+  const mode = resolvePuzzleMode(entry.mode, targets);
   return {
     id: entry.id ?? identifier,
     slug: entry.slug ?? identifier,
@@ -2464,7 +2607,7 @@ function normalizePuzzleEntry(entry) {
     diff,
     mode,
     targets,
-    thumbnail: entry.thumbnail ?? original ?? diff,
+    thumbnail: resolvePuzzleThumbnail(mode, original, diff, entry.thumbnail ?? null),
     source: 'official',
     badge: '公式',
   };
@@ -2847,10 +2990,36 @@ async function startOfficialPuzzle(puzzle) {
       setHint('画像の読み込みに失敗しました。');
       return;
     }
-    const { image: originalImage } = await normalizePixelImage(rawOriginal);
-    const { image: challengeImage } = await normalizePixelImage(rawChallenge);
+    let normalizedOriginal;
+    let normalizedChallenge;
+    let hiddenPairInfo = null;
+    if (mode === GAME_MODE_HIDDEN_OBJECT) {
+      hiddenPairInfo = await normalizeHiddenModePair({
+        originalImage: rawOriginal,
+        originalDataUrl: null,
+        layerImage: rawChallenge,
+        layerDataUrl: null,
+      });
+      if (!hiddenPairInfo) {
+        setHint('もの探し画像の読み込みに失敗しました。');
+        return;
+      }
+      normalizedOriginal = hiddenPairInfo.normalizedOriginal;
+      normalizedChallenge = hiddenPairInfo.normalizedLayer;
+    } else {
+      [normalizedOriginal, normalizedChallenge] = await Promise.all([
+        normalizePixelImage(rawOriginal, null),
+        normalizePixelImage(rawChallenge, null),
+      ]);
+    }
+    const originalImage = normalizedOriginal.image;
+    const challengeImage = normalizedChallenge.image;
     if (originalImage.width !== challengeImage.width || originalImage.height !== challengeImage.height) {
-      setHint('公式画像のサイズが一致しません。');
+      setHint(
+        mode === GAME_MODE_HIDDEN_OBJECT
+          ? `もの探し画像のサイズが一致しません。元画像 ${formatPixelSize(hiddenPairInfo?.originalRawSize)} / レイヤー ${formatPixelSize(hiddenPairInfo?.layerRawSize)}`
+          : '公式画像のサイズが一致しません。',
+      );
       return;
     }
 
@@ -3035,7 +3204,7 @@ function fitCanvasesToFrame() {
 }
 
 window.addEventListener('resize', () => {
-  setAppHeight();
+  setViewportVars();
   fitCanvasesToFrame();
   clearMarkers();
   state.differences.filter(region => region.found).forEach(region => renderMarker(region));
@@ -3492,9 +3661,33 @@ function computeHiddenObjectRegions(layerImage, options = {}) {
   const imageData = context.getImageData(0, 0, width, height);
   const { data } = imageData;
   const mask = new Uint8Array(width * height);
+  const alphaThreshold = Number.isFinite(options.alphaThreshold)
+    ? Math.max(0, Math.min(255, Math.floor(options.alphaThreshold)))
+    : HIDDEN_OBJECT_LAYER_ALPHA_THRESHOLD;
+  const blackThreshold = Number.isFinite(options.blackThreshold)
+    ? Math.max(0, Math.min(255, Math.floor(options.blackThreshold)))
+    : HIDDEN_OBJECT_LAYER_BLACK_THRESHOLD;
+
+  let blackPixels = 0;
+  let nonTransparentPixels = 0;
   for (let index = 0, offset = 0; index < mask.length; index += 1, offset += 4) {
-    if (data[offset + 3] > 0) {
+    if (data[offset + 3] <= alphaThreshold) continue;
+    nonTransparentPixels += 1;
+    if (isHiddenObjectMaskPixel(data, offset, blackThreshold)) {
       mask[index] = 1;
+      blackPixels += 1;
+    }
+  }
+
+  // Fallback for legacy transparent layers: only when coverage is sparse.
+  if (blackPixels === 0 && nonTransparentPixels > 0) {
+    const coverage = nonTransparentPixels / mask.length;
+    if (coverage <= HIDDEN_OBJECT_ALPHA_FALLBACK_MAX_COVERAGE) {
+      for (let index = 0, offset = 0; index < mask.length; index += 1, offset += 4) {
+        if (data[offset + 3] > alphaThreshold) {
+          mask[index] = 1;
+        }
+      }
     }
   }
 
@@ -3594,6 +3787,13 @@ function computeHiddenObjectRegions(layerImage, options = {}) {
     minDistance,
     tooClosePair,
   };
+}
+
+function isHiddenObjectMaskPixel(data, offset, blackThreshold) {
+  const r = data[offset];
+  const g = data[offset + 1];
+  const b = data[offset + 2];
+  return Math.max(r, g, b) <= blackThreshold;
 }
 
 function detectTooCloseHiddenObjectPair(regions, imageWidth, minDistance) {
@@ -4410,7 +4610,7 @@ async function uploadContestShareAssets({ entryId, title, image }) {
   return { shareUrl, ogpUrl };
 }
 
-async function normalizePixelImage(image, fallbackDataUrl) {
+async function normalizePixelImage(image, fallbackDataUrl, options = {}) {
   const width = image.naturalWidth || image.width;
   const height = image.naturalHeight || image.height;
   const canvas = document.createElement('canvas');
@@ -4418,7 +4618,7 @@ async function normalizePixelImage(image, fallbackDataUrl) {
   canvas.height = height;
   const context = canvas.getContext('2d');
   if (!context) {
-    return { image, dataUrl: fallbackDataUrl ?? null, width, height };
+    return { image, dataUrl: fallbackDataUrl ?? null, width, height, scale: 1 };
   }
   context.imageSmoothingEnabled = false;
   context.drawImage(image, 0, 0);
@@ -4428,14 +4628,27 @@ async function normalizePixelImage(image, fallbackDataUrl) {
     imageData = context.getImageData(0, 0, width, height);
   } catch (error) {
     console.warn('Canvas access blocked, using original image', error);
-    return { image, dataUrl: fallbackDataUrl ?? null, width, height };
+    return { image, dataUrl: fallbackDataUrl ?? null, width, height, scale: 1 };
   }
-  const scaleX = detectScaleFactor(imageData, width, height, 'x');
-  const scaleY = detectScaleFactor(imageData, width, height, 'y');
-  let scale = Math.max(1, Math.min(scaleX, scaleY));
-  const blockScale = detectScaleFactorByBlocks(imageData, width, height);
-  if (blockScale > scale) {
-    scale = blockScale;
+  const forcedScaleRaw = Number(options?.scale);
+  const forceScaleOption = options?.forceScale === true;
+  const hasForcedScale = Number.isFinite(forcedScaleRaw) && (
+    forcedScaleRaw > 1 || (forceScaleOption && forcedScaleRaw >= 1)
+  );
+  let scale = hasForcedScale ? Math.max(1, Math.floor(forcedScaleRaw)) : 1;
+
+  if (!hasForcedScale) {
+    const scaleX = detectScaleFactor(imageData, width, height, 'x');
+    const scaleY = detectScaleFactor(imageData, width, height, 'y');
+    scale = Math.max(1, Math.min(scaleX, scaleY));
+    const blockScale = detectScaleFactorByBlocks(imageData, width, height);
+    if (blockScale > scale) {
+      scale = blockScale;
+    }
+  }
+
+  if (scale > 1 && (width % scale !== 0 || height % scale !== 0)) {
+    scale = 1;
   }
 
   if (scale <= 1) {
@@ -4445,22 +4658,25 @@ async function normalizePixelImage(image, fallbackDataUrl) {
         dataUrl = canvas.toDataURL();
       } catch (error) {
         console.warn('toDataURL blocked, falling back to original image', error);
-        return { image, dataUrl: fallbackDataUrl ?? null, width, height };
+        return { image, dataUrl: fallbackDataUrl ?? null, width, height, scale: 1 };
       }
     }
     if (dataUrl) {
       const normalizedImage = await loadImageFromDataUrl(dataUrl);
-      return { image: normalizedImage, dataUrl, width, height };
+      return { image: normalizedImage, dataUrl, width, height, scale: 1 };
     }
-    return { image, dataUrl: fallbackDataUrl ?? null, width, height };
+    return { image, dataUrl: fallbackDataUrl ?? null, width, height, scale: 1 };
   }
 
-  const targetWidth = Math.round(width / scale);
-  const targetHeight = Math.round(height / scale);
+  const targetWidth = width / scale;
+  const targetHeight = height / scale;
   const targetCanvas = document.createElement('canvas');
   targetCanvas.width = targetWidth;
   targetCanvas.height = targetHeight;
   const targetContext = targetCanvas.getContext('2d');
+  if (!targetContext) {
+    return { image, dataUrl: fallbackDataUrl ?? null, width, height, scale: 1 };
+  }
   const targetData = targetContext.createImageData(targetWidth, targetHeight);
   const src = imageData.data;
   const dest = targetData.data;
@@ -4486,9 +4702,98 @@ async function normalizePixelImage(image, fallbackDataUrl) {
   }
   if (dataUrl) {
     const normalizedImage = await loadImageFromDataUrl(dataUrl);
-    return { image: normalizedImage, dataUrl, width: targetWidth, height: targetHeight };
+    return { image: normalizedImage, dataUrl, width: targetWidth, height: targetHeight, scale };
   }
-  return { image, dataUrl: fallbackDataUrl ?? null, width: targetWidth, height: targetHeight };
+  return { image, dataUrl: fallbackDataUrl ?? null, width, height, scale: 1 };
+}
+
+function getImagePixelSize(image) {
+  return {
+    width: image?.naturalWidth || image?.width || 0,
+    height: image?.naturalHeight || image?.height || 0,
+  };
+}
+
+function formatPixelSize(size) {
+  const width = size?.width ?? 0;
+  const height = size?.height ?? 0;
+  return `${width}x${height}px`;
+}
+
+function resolveHiddenModeScalePair(originalRawSize, layerRawSize) {
+  const originalWidth = originalRawSize?.width ?? 0;
+  const originalHeight = originalRawSize?.height ?? 0;
+  const layerWidth = layerRawSize?.width ?? 0;
+  const layerHeight = layerRawSize?.height ?? 0;
+  if (!originalWidth || !originalHeight || !layerWidth || !layerHeight) return null;
+
+  if (originalWidth === layerWidth && originalHeight === layerHeight) {
+    return { originalScale: null, layerScale: null };
+  }
+  if (originalWidth * layerHeight !== layerWidth * originalHeight) {
+    return null;
+  }
+
+  if (originalWidth > layerWidth && originalHeight > layerHeight) {
+    if (originalWidth % layerWidth !== 0 || originalHeight % layerHeight !== 0) return null;
+    const ratioW = originalWidth / layerWidth;
+    const ratioH = originalHeight / layerHeight;
+    if (!Number.isInteger(ratioW) || ratioW <= 1 || ratioW !== ratioH) return null;
+    return { originalScale: ratioW, layerScale: 1 };
+  }
+
+  if (layerWidth > originalWidth && layerHeight > originalHeight) {
+    if (layerWidth % originalWidth !== 0 || layerHeight % originalHeight !== 0) return null;
+    const ratioW = layerWidth / originalWidth;
+    const ratioH = layerHeight / originalHeight;
+    if (!Number.isInteger(ratioW) || ratioW <= 1 || ratioW !== ratioH) return null;
+    return { originalScale: 1, layerScale: ratioW };
+  }
+
+  return null;
+}
+
+async function normalizeHiddenModePair({
+  originalImage,
+  originalDataUrl = null,
+  layerImage,
+  layerDataUrl = null,
+}) {
+  if (!originalImage || !layerImage) return null;
+
+  const originalRawSize = getImagePixelSize(originalImage);
+  const layerRawSize = getImagePixelSize(layerImage);
+  const scalePair = resolveHiddenModeScalePair(originalRawSize, layerRawSize);
+
+  if (scalePair) {
+    const normalizedOriginal = await normalizePixelImage(
+      originalImage,
+      originalDataUrl,
+      scalePair.originalScale ? { scale: scalePair.originalScale, forceScale: true } : undefined,
+    );
+    const sharedScale = normalizedOriginal.scale && normalizedOriginal.scale > 1 ? normalizedOriginal.scale : 1;
+    let normalizedLayer;
+    if (scalePair.layerScale != null) {
+      normalizedLayer = await normalizePixelImage(layerImage, layerDataUrl, {
+        scale: scalePair.layerScale,
+        forceScale: true,
+      });
+    } else {
+      normalizedLayer = await normalizePixelImage(layerImage, layerDataUrl, {
+        scale: sharedScale,
+        forceScale: true,
+      });
+    }
+    if (normalizedOriginal.width === normalizedLayer.width && normalizedOriginal.height === normalizedLayer.height) {
+      return { normalizedOriginal, normalizedLayer, originalRawSize, layerRawSize };
+    }
+  }
+
+  const [normalizedOriginal, normalizedLayer] = await Promise.all([
+    normalizePixelImage(originalImage, originalDataUrl),
+    normalizePixelImage(layerImage, layerDataUrl),
+  ]);
+  return { normalizedOriginal, normalizedLayer, originalRawSize, layerRawSize };
 }
 
 function detectScaleFactor(imageData, width, height, axis) {
