@@ -1416,6 +1416,7 @@
     let supportsTags = true;
     let supportsDownloadSettings = true;
     let supportsImageUrls = true;
+    let supportsVideoColumns = true;
     let supportsStorageUploads = true;
     let supportsImageHash = true;
     let supportsPhash = true;
@@ -1849,6 +1850,12 @@
     function applyInsertFallback(payload, error, imageInfo){
       const missing = parseMissingColumn(error);
       if(!missing) return false;
+      if(supportsVideoColumns && (missing === 'video_url' || missing === 'video_mime')){
+        supportsVideoColumns = false;
+        delete payload.video_url;
+        delete payload.video_mime;
+        return true;
+      }
       if(supportsTags && missing === 'tags'){
         supportsTags = false;
         delete payload.tags;
@@ -1983,6 +1990,10 @@
           if(supportsImageUrls && uploadResult){
             payload.image_url = uploadResult.imageUrl;
             payload.thumb_url = uploadResult.thumbUrl;
+            if(supportsVideoColumns && uploadResult.videoUrl){
+              payload.video_url = uploadResult.videoUrl;
+              payload.video_mime = uploadResult.videoMime || null;
+            }
           }
           if(supportsTags && normalized.tags.length){
             payload.tags = normalized.tags.join(',');
@@ -2352,6 +2363,136 @@
       return canvas;
     }
 
+    function wait(ms){
+      return new Promise(resolve => window.setTimeout(resolve, Math.max(0, ms | 0)));
+    }
+
+    function getPreferredVideoMimeType(){
+      if(typeof MediaRecorder === 'undefined') return '';
+      const candidates = [
+        'video/mp4;codecs="avc1.42E01E"',
+        'video/mp4',
+        'video/webm;codecs=vp9',
+        'video/webm;codecs=vp8',
+        'video/webm',
+      ];
+      const supports = typeof MediaRecorder.isTypeSupported === 'function'
+        ? (type) => MediaRecorder.isTypeSupported(type)
+        : () => false;
+      for(const type of candidates){
+        if(supports(type)) return type;
+      }
+      return '';
+    }
+
+    function inferVideoExtension(mimeType){
+      const lower = String(mimeType || '').toLowerCase();
+      if(lower.includes('mp4')) return 'mp4';
+      if(lower.includes('webm')) return 'webm';
+      return 'mp4';
+    }
+
+    async function convertGifToVideo(file){
+      if(!file || String(file.type || '').toLowerCase() !== 'image/gif') return null;
+      if(typeof ImageDecoder === 'undefined' || typeof MediaRecorder === 'undefined') return null;
+      if(typeof HTMLCanvasElement === 'undefined' || typeof HTMLCanvasElement.prototype.captureStream !== 'function'){
+        return null;
+      }
+      const mimeType = getPreferredVideoMimeType();
+      if(!mimeType) return null;
+
+      let decoder = null;
+      let recorder = null;
+      let stream = null;
+      const frames = [];
+
+      try{
+        const data = await file.arrayBuffer();
+        decoder = new ImageDecoder({ data, type: 'image/gif' });
+        if(decoder?.tracks?.ready){
+          await decoder.tracks.ready;
+        }
+        const track = decoder?.tracks?.selectedTrack;
+        const frameCount = Number(track?.frameCount || 0);
+        if(!frameCount) return null;
+        for(let i = 0; i < frameCount; i += 1){
+          const decoded = await decoder.decode({ frameIndex: i, completeFramesOnly: true });
+          const frame = decoded?.image;
+          if(!frame) continue;
+          const durationUs = Number(frame.duration || 0);
+          const durationMs = Math.max(33, Math.min(1000, Math.round(durationUs > 0 ? durationUs / 1000 : 100)));
+          frames.push({ frame, durationMs });
+        }
+        if(!frames.length) return null;
+
+        const baseFrame = frames[0].frame;
+        const width = Math.max(1, Number(baseFrame.displayWidth || baseFrame.codedWidth || track?.codedWidth || 1));
+        const height = Math.max(1, Number(baseFrame.displayHeight || baseFrame.codedHeight || track?.codedHeight || 1));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if(!ctx) return null;
+        ctx.imageSmoothingEnabled = false;
+
+        stream = canvas.captureStream(60);
+        const chunks = [];
+        const stopped = new Promise((resolve, reject) => {
+          recorder = new MediaRecorder(stream, {
+            mimeType,
+            videoBitsPerSecond: 2_500_000,
+          });
+          recorder.ondataavailable = (event) => {
+            if(event.data?.size){
+              chunks.push(event.data);
+            }
+          };
+          recorder.onerror = () => reject(new Error('video record failed'));
+          recorder.onstop = resolve;
+        });
+
+        recorder.start(200);
+        for(const { frame, durationMs } of frames){
+          ctx.clearRect(0, 0, width, height);
+          ctx.drawImage(frame, 0, 0, width, height);
+          await wait(durationMs);
+        }
+        if(recorder.state !== 'inactive'){
+          recorder.stop();
+        }
+        await stopped;
+        const blob = new Blob(chunks, { type: mimeType });
+        if(!blob.size) return null;
+        return { videoBlob: blob, videoMime: mimeType };
+      }catch(err){
+        console.warn('gif video conversion failed', err);
+        return null;
+      }finally{
+        if(recorder && recorder.state !== 'inactive'){
+          try{
+            recorder.stop();
+          }catch(_){
+            // ignore
+          }
+        }
+        if(stream){
+          stream.getTracks().forEach(track => track.stop());
+        }
+        frames.forEach(({ frame }) => {
+          try{
+            frame.close?.();
+          }catch(_){
+            // ignore
+          }
+        });
+        try{
+          decoder?.close?.();
+        }catch(_){
+          // ignore
+        }
+      }
+    }
+
     function normalizePixelCanvas(sourceCanvas){
       const width = sourceCanvas.width;
       const height = sourceCanvas.height;
@@ -2521,6 +2662,9 @@
       const baseKey = createStorageKey('entries');
       const imagePath = `${baseKey}.png`;
       const thumbPath = `${baseKey}_thumb.png`;
+      const hasVideo = Boolean(imageInfo?.videoBlob);
+      const videoExt = inferVideoExtension(imageInfo?.videoMime);
+      const videoPath = hasVideo ? `${baseKey}_anim.${videoExt}` : '';
       try{
         const { error: imageError } = await supabase
           .storage
@@ -2542,7 +2686,27 @@
         if(thumbError) throw thumbError;
         const imageUrl = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(imagePath).data.publicUrl;
         const thumbUrl = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(thumbPath).data.publicUrl;
-        return { imageUrl, thumbUrl };
+        let videoUrl = '';
+        let videoMime = '';
+        if(hasVideo){
+          try{
+            const contentType = imageInfo?.videoMime || 'video/mp4';
+            const { error: videoError } = await supabase
+              .storage
+              .from(STORAGE_BUCKET)
+              .upload(videoPath, imageInfo.videoBlob, {
+                contentType,
+                cacheControl: '31536000',
+                upsert: false
+              });
+            if(videoError) throw videoError;
+            videoUrl = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(videoPath).data.publicUrl;
+            videoMime = contentType;
+          }catch(videoErr){
+            console.warn('video upload failed', videoErr);
+          }
+        }
+        return { imageUrl, thumbUrl, videoUrl, videoMime };
       }catch(err){
         console.warn('storage upload failed', err);
         markSupabaseMaintenanceFromError(err);
@@ -2747,11 +2911,12 @@
       }
     }
 
-    async function fileToImageInfo(file){
+    async function fileToImageInfo(file, { includeVideo = false } = {}){
       const type = (file.type || '').toLowerCase();
       if(type !== 'image/png' && type !== 'image/gif'){
         throw new Error('PNGまたはGIFのみ投稿できます');
       }
+      const isGif = type === 'image/gif';
       const img = await createImageBitmap(file);
       const canvas = document.createElement('canvas');
       canvas.width = img.width;
@@ -2794,7 +2959,28 @@
       const thumbCanvas = createThumbnailCanvas(tCanvas);
       const imageBlob = await canvasToBlob(tCanvas, 'image/png');
       const thumbBlob = await canvasToBlob(thumbCanvas, 'image/png');
-      return { width: tWidth, height: tHeight, colors: colors.size, dataUrl, hash, phash, imageBlob, thumbBlob };
+      let videoBlob = null;
+      let videoMime = '';
+      if(includeVideo && isGif){
+        const video = await convertGifToVideo(file);
+        if(video?.videoBlob){
+          videoBlob = video.videoBlob;
+          videoMime = video.videoMime || '';
+        }
+      }
+      return {
+        width: tWidth,
+        height: tHeight,
+        colors: colors.size,
+        dataUrl,
+        hash,
+        phash,
+        imageBlob,
+        thumbBlob,
+        isGif,
+        videoBlob,
+        videoMime,
+      };
     }
 
     function drawWatermark(ctx, width, height){
@@ -2955,14 +3141,16 @@
           return;
         }
       }
-      setStatus('画像を確認しています...');
+      const isGifUpload = String(file.type || '').toLowerCase() === 'image/gif';
+      setStatus(isGifUpload ? 'GIFを動画に変換しています...' : '画像を確認しています...');
       let imageInfo;
       try{
-        imageInfo = await fileToImageInfo(file);
+        imageInfo = await fileToImageInfo(file, { includeVideo: true });
       }catch(err){
         setStatus(err.message || '画像の解析に失敗しました');
         return;
       }
+      const gifSavedAsStill = imageInfo.isGif && !imageInfo.videoBlob;
       const submittedAt = new Date().toISOString();
       if(!supabase || isSupabaseMaintenance()){
         const ready = await ensureSupabaseReady();
@@ -3066,6 +3254,10 @@
         if(supportsImageUrls && uploadResult){
           payload.image_url = uploadResult.imageUrl;
           payload.thumb_url = uploadResult.thumbUrl;
+          if(supportsVideoColumns && uploadResult.videoUrl){
+            payload.video_url = uploadResult.videoUrl;
+            payload.video_mime = uploadResult.videoMime || null;
+          }
         }
         if(supportsTags && tags.length){
           payload.tags = tags.join(',');
@@ -3107,13 +3299,13 @@
           const shareMessage = `${shareUrl}\n${SHARE_HASHTAG}`;
           if(navigator.clipboard?.writeText){
             await navigator.clipboard.writeText(shareMessage);
-            setStatus('投稿しました！共有リンクをコピーしました。');
+            setStatus(`投稿しました！共有リンクをコピーしました。${gifSavedAsStill ? '（GIFは静止画として保存されました）' : ''}`);
           }else{
             window.prompt('共有リンクをコピーしてください。', shareMessage);
-            setStatus('投稿しました！');
+            setStatus(`投稿しました！${gifSavedAsStill ? '（GIFは静止画として保存されました）' : ''}`);
           }
         }else{
-          setStatus('投稿しました！');
+          setStatus(`投稿しました！${gifSavedAsStill ? '（GIFは静止画として保存されました）' : ''}`);
         }
         closePostPanel();
       }catch(err){
@@ -4025,7 +4217,7 @@
           }
           setStatus('画像を読み込み中...');
           try{
-            const info = await fileToImageInfo(file);
+            const info = await fileToImageInfo(file, { includeVideo: false });
             setPostPreview(info.dataUrl);
             setStatus('');
           }catch(err){
