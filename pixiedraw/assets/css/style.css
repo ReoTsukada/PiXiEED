@@ -94,6 +94,23 @@ body {
   image-rendering: pixelated;
 }
 
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(4, 10, 18, 0.2), rgba(4, 10, 18, 0.64)),
+    rgba(1, 4, 10, 0.38);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 13900;
+  transition: opacity 140ms ease;
+}
+
+body.is-compact-flyout-open::after {
+  opacity: 1;
+}
+
 button,
 .button,
 .button *,
@@ -511,7 +528,7 @@ button {
   left: 0;
   width: clamp(260px, 34vw, 460px);
   max-height: min(82vh, 720px);
-  z-index: 5000;
+  z-index: 14000;
   overflow: auto;
   pointer-events: auto;
 }
@@ -597,10 +614,11 @@ button {
   box-shadow:
     0 0 0 2px rgba(4, 12, 20, 0.85),
     0 8px 18px rgba(0, 0, 0, 0.45);
-  z-index: 5000;
+  z-index: 14000;
   max-height: min(72vh, 540px);
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
+  overscroll-behavior: contain;
 }
 
 .rail--left[data-compact="true"] #panelTools[data-compact-flyout-open="true"] .tool-button {
@@ -691,24 +709,27 @@ button {
   gap: 8px;
   min-height: 52px;
   padding: 10px 12px;
-  border: 1px dashed rgba(112, 246, 255, 0.5);
+  border: 2px solid rgba(112, 246, 255, 0.62);
   border-radius: 0;
-  background: linear-gradient(180deg, rgba(12, 20, 30, 0.92), rgba(8, 14, 22, 0.92));
-  color: var(--fg-muted);
+  background: linear-gradient(180deg, rgba(16, 30, 44, 0.96), rgba(10, 20, 32, 0.96));
+  color: rgba(222, 240, 248, 0.9);
   font-weight: 700;
   font-size: 0.84rem;
   letter-spacing: 0.02em;
-  transition: filter 160ms ease, color 160ms ease, border 160ms ease, box-shadow 160ms ease;
+  box-shadow:
+    inset 0 0 0 1px rgba(6, 14, 22, 0.9),
+    0 4px 10px rgba(0, 0, 0, 0.32);
+  transition: filter 160ms ease, color 160ms ease, border 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 
 .tool-group-button::after {
   content: '';
   position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 5px;
-  height: 2px;
-  background: rgba(112, 246, 255, 0.24);
+  left: 6px;
+  right: 6px;
+  bottom: 4px;
+  height: 3px;
+  background: rgba(112, 246, 255, 0.42);
   pointer-events: none;
 }
 
@@ -726,20 +747,25 @@ button {
 .tool-group-button:hover {
   filter: brightness(1.08);
   color: var(--fg);
-  border-color: rgba(112, 246, 255, 0.76);
+  border-color: rgba(112, 246, 255, 0.82);
+  box-shadow:
+    inset 0 0 0 1px rgba(112, 246, 255, 0.2),
+    0 6px 12px rgba(0, 0, 0, 0.34);
 }
 
 .tool-group-button.is-active {
   border-style: solid;
   border-width: 2px;
-  background: linear-gradient(180deg, rgba(20, 38, 52, 0.96), rgba(12, 26, 38, 0.96));
+  background: linear-gradient(180deg, rgba(24, 46, 64, 0.98), rgba(14, 30, 44, 0.98));
   border-color: var(--border-strong);
   color: var(--fg);
-  box-shadow: 0 0 0 1px rgba(112, 246, 255, 0.22) inset;
+  box-shadow:
+    0 0 0 1px rgba(112, 246, 255, 0.22) inset,
+    0 6px 14px rgba(0, 0, 0, 0.36);
 }
 
 .tool-group-button.is-active::after {
-  background: rgba(112, 246, 255, 0.86);
+  background: rgba(112, 246, 255, 0.94);
 }
 
 .tool-group-button:focus-visible {
@@ -780,6 +806,19 @@ button {
 
 .rail--right[data-collapsed="true"] {
   transform: none;
+}
+
+.panel-section.is-compact-flyout {
+  border: 2px solid var(--border);
+  background:
+    linear-gradient(0deg, rgba(112, 246, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(112, 246, 255, 0.12) 1px, transparent 1px),
+    rgba(7, 16, 24, 0.97);
+  background-size: 8px 8px;
+  box-shadow:
+    0 0 0 2px rgba(4, 12, 20, 0.88),
+    0 14px 36px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
 }
 
 .rail-resizer {
@@ -1586,13 +1625,10 @@ input[type='range']::-moz-focus-outer {
   justify-items: center;
   min-height: 96px;
   padding: 12px 8px 10px;
-  border: 2px solid var(--border);
+  border: 1px solid rgba(112, 246, 255, 0.36);
   border-radius: 0;
-  background:
-    linear-gradient(0deg, rgba(112, 246, 255, 0.16) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(112, 246, 255, 0.16) 1px, transparent 1px),
-    rgba(9, 18, 26, 0.9);
-  background-size: 4px 4px;
+  background: linear-gradient(180deg, rgba(8, 14, 22, 0.84), rgba(7, 12, 20, 0.84));
+  box-shadow: inset 0 0 0 1px rgba(5, 12, 18, 0.72);
   color: var(--fg-muted);
   transition: filter 160ms ease, color 160ms ease, border 160ms ease;
 }
@@ -1613,16 +1649,21 @@ input[type='range']::-moz-focus-outer {
 .tool-button:hover {
   filter: brightness(1.1);
   color: var(--fg);
+  border-color: rgba(112, 246, 255, 0.56);
 }
 
 .tool-button.is-active {
+  border-width: 2px;
   border-color: var(--border-strong);
   background:
-    linear-gradient(0deg, rgba(112, 246, 255, 0.28) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(112, 246, 255, 0.28) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(112, 246, 255, 0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(112, 246, 255, 0.18) 1px, transparent 1px),
     rgba(12, 26, 34, 0.95);
+  background-size: 6px 6px;
   color: var(--fg);
-  box-shadow: 0 0 0 2px rgba(112, 246, 255, 0.32) inset;
+  box-shadow:
+    0 0 0 1px rgba(112, 246, 255, 0.26) inset,
+    0 4px 10px rgba(0, 0, 0, 0.34);
 }
 
 .palette-header {
@@ -3020,7 +3061,7 @@ body.is-startup-active {
     max-width: calc(var(--mobile-viewport-width) - var(--mobile-safe-area-left) - var(--mobile-safe-area-right) - 16px);
     max-height: min(72vh, 420px);
     overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: auto;
     overscroll-behavior: contain;
   }
   .tool-grid.is-mobile-peek-flyout {
@@ -3050,7 +3091,7 @@ body.is-startup-active {
     max-width: calc(var(--mobile-viewport-width) - var(--mobile-safe-area-left) - var(--mobile-safe-area-right) - 16px);
     max-height: min(72vh, 420px);
     overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: auto;
     overscroll-behavior: contain;
   }
   .mobile-drawer[data-mode='peek'] #panelTools[data-compact-flyout-open='true'] .tool-button {
@@ -3263,10 +3304,18 @@ body.is-startup-active {
     padding: 0;
   }
 
-  .rail[data-compact="true"] .rail-tab,
-  .rail--left[data-compact="true"] #panelTools .tool-group-button,
-  .rail--left[data-compact="true"] #panelTools[data-compact-flyout-open="true"] .tool-button {
+  .rail[data-compact="true"] .rail-tab {
     background: rgba(9, 20, 30, 0.68);
+    background-image: none;
+  }
+
+  .rail--left[data-compact="true"] #panelTools .tool-group-button {
+    background: linear-gradient(180deg, rgba(16, 30, 44, 0.94), rgba(10, 20, 32, 0.94));
+    background-image: none;
+  }
+
+  .rail--left[data-compact="true"] #panelTools[data-compact-flyout-open="true"] .tool-button {
+    background: linear-gradient(180deg, rgba(8, 14, 22, 0.86), rgba(7, 12, 20, 0.86));
     background-image: none;
   }
 
