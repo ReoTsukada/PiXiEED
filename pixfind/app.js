@@ -1209,37 +1209,7 @@ async function handleCreatorPublish() {
       }
     }
 
-    let shareUrl = createShareUrl(normalized ?? { id: puzzleId, source: 'published' });
-    try {
-      const shareAssets = await uploadPuzzleShareAssets({
-        puzzleId,
-        title,
-        originalImage: creatorState.originalImage,
-        diffImage: creatorState.diffImage,
-      });
-      if (shareAssets?.shareUrl) {
-        shareUrl = shareAssets.shareUrl;
-        if (normalized) {
-          normalized.shareUrl = shareAssets.shareUrl;
-        }
-        try {
-          await updatePublishedPuzzle(puzzleId, { share_url: shareAssets.shareUrl });
-        } catch (error) {
-          if (!isPermissionError(error)) {
-            console.warn('share url update failed', error);
-          }
-        }
-      }
-    } catch (error) {
-      queueShareTask({
-        puzzleId,
-        title,
-        originalUrl: normalized?.original || originalUrl || null,
-        diffUrl: normalized?.diff || diffUrl || null,
-      });
-      markSupabaseMaintenanceFromError(error);
-      console.warn('share asset creation failed', error);
-    }
+    const shareUrl = createShareUrl(normalized ?? { id: puzzleId, slug, source: 'published' });
     const contestMessage = postToContest
       ? (contestPosted ? 'コンテストにも投稿しました。' : 'コンテスト投稿は失敗しました。')
       : 'コンテスト投稿はオフです。';
@@ -1248,11 +1218,14 @@ async function handleCreatorPublish() {
       : '';
     const statusSuffix = bucketNote ? ` ${bucketNote}` : '';
     const shareMessage = `${shareUrl}\n${SHARE_HASHTAG}`;
-    if (isSupabaseMaintenance()) {
-      setCreatorStatus(`公開しました。共有リンクはメンテナンス復旧後に生成されます。${contestMessage}${statusSuffix}`);
-    } else if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(shareMessage);
-      setCreatorStatus(`公開しました。共有リンクをコピーしました。${contestMessage}${statusSuffix}`);
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(shareMessage);
+        setCreatorStatus(`公開しました。共有リンクをコピーしました。${contestMessage}${statusSuffix}`);
+      } catch (_) {
+        window.prompt(`公開しました。${contestMessage}共有リンクをコピーしてください。`, shareMessage);
+        setCreatorStatus(`公開しました。${contestMessage}${statusSuffix}`);
+      }
     } else {
       window.prompt(`公開しました。${contestMessage}共有リンクをコピーしてください。`, shareMessage);
       setCreatorStatus(`公開しました。${contestMessage}${statusSuffix}`);
@@ -2051,10 +2024,7 @@ async function publishQueuedTask(task) {
     renderPuzzles(state.currentDifficulty, state.currentMode);
   }
 
-  const [originalImage, diffImage] = await Promise.all([
-    loadImageFromDataUrl(originalDataUrl),
-    loadImageFromDataUrl(diffDataUrl),
-  ]);
+  const originalImage = await loadImageFromDataUrl(originalDataUrl);
 
   if (postToContest) {
     try {
@@ -2131,33 +2101,6 @@ async function publishQueuedTask(task) {
     }
   }
 
-  try {
-    const shareAssets = await uploadPuzzleShareAssets({
-      puzzleId,
-      title,
-      originalImage,
-      diffImage,
-    });
-    if (shareAssets?.shareUrl && normalizedEntry) {
-      normalizedEntry.shareUrl = shareAssets.shareUrl;
-      try {
-        await updatePublishedPuzzle(puzzleId, { share_url: shareAssets.shareUrl });
-      } catch (error) {
-        if (!isPermissionError(error)) {
-          console.warn('share url update failed', error);
-        }
-      }
-    }
-  } catch (error) {
-    queueShareTask({
-      puzzleId,
-      title,
-      originalUrl,
-      diffUrl,
-    });
-    markSupabaseMaintenanceFromError(error);
-    console.warn('share asset creation failed', error);
-  }
   return normalizedEntry;
 }
 
@@ -2260,44 +2203,10 @@ function queueContestShareTask(task) {
 }
 
 async function flushShareQueue() {
-  if (isSupabaseMaintenance()) {
-    const recovered = await probeSupabaseAvailability();
-    if (!recovered) return;
-  }
   const queue = loadShareQueue();
   if (!queue.length) return;
-  const remaining = [];
-  for (const task of queue) {
-    if (!task?.puzzleId || !task?.originalUrl || !task?.diffUrl) {
-      continue;
-    }
-    try {
-      const [originalImage, diffImage] = await Promise.all([
-        loadImageFromUrl(task.originalUrl),
-        loadImageFromUrl(task.diffUrl),
-      ]);
-      await uploadPuzzleShareAssets({
-        puzzleId: task.puzzleId,
-        title: task.title,
-        originalImage,
-        diffImage,
-      });
-      try {
-        const shareUrl = getPixfindShareHtmlUrl(task.puzzleId);
-        if (shareUrl) {
-          await updatePublishedPuzzle(task.puzzleId, { share_url: shareUrl });
-        }
-      } catch (error) {
-        if (!isPermissionError(error)) {
-          console.warn('share url update failed', error);
-        }
-      }
-    } catch (error) {
-      remaining.push(task);
-      markSupabaseMaintenanceFromError(error);
-    }
-  }
-  saveShareQueue(remaining);
+  // Puzzle share URLs are now always `?puzzle=...`; legacy queued OGP jobs can be discarded.
+  saveShareQueue([]);
 }
 
 function getSupabasePublicUrl(path) {
@@ -2614,7 +2523,6 @@ function normalizePuzzleEntry(entry) {
 }
 
 function createShareUrl(puzzle) {
-  if (puzzle?.shareUrl) return puzzle.shareUrl;
   const url = new URL(window.location.href);
   const shareId = puzzle?.source === 'published' ? puzzle.id : (puzzle.slug ?? puzzle.id);
   if (shareId) {
@@ -2625,51 +2533,7 @@ function createShareUrl(puzzle) {
 }
 
 async function sharePuzzle(puzzle) {
-  let shareUrl = createShareUrl(puzzle);
-  if (puzzle?.source === 'published' && !puzzle?.shareUrl && puzzle.original && puzzle.diff) {
-    if (isSupabaseMaintenance()) {
-      queueShareTask({
-        puzzleId: puzzle.id,
-        title: puzzle.label,
-        originalUrl: puzzle.original,
-        diffUrl: puzzle.diff,
-      });
-      window.alert('現在メンテナンス中のため共有リンクは後で生成されます。復旧後に再度共有してください。');
-      return;
-    }
-    try {
-      const [originalImage, diffImage] = await Promise.all([
-        loadImageFromUrl(puzzle.original),
-        loadImageFromUrl(puzzle.diff),
-      ]);
-      const shareAssets = await uploadPuzzleShareAssets({
-        puzzleId: puzzle.id,
-        title: puzzle.label,
-        originalImage,
-        diffImage,
-      });
-      if (shareAssets?.shareUrl) {
-        puzzle.shareUrl = shareAssets.shareUrl;
-        shareUrl = shareAssets.shareUrl;
-        try {
-          await updatePublishedPuzzle(puzzle.id, { share_url: shareAssets.shareUrl });
-        } catch (error) {
-          if (!isPermissionError(error)) {
-            console.warn('share url update failed', error);
-          }
-        }
-      }
-    } catch (error) {
-      queueShareTask({
-        puzzleId: puzzle.id,
-        title: puzzle.label,
-        originalUrl: puzzle.original,
-        diffUrl: puzzle.diff,
-      });
-      markSupabaseMaintenanceFromError(error);
-      console.warn('share asset creation failed', error);
-    }
-  }
+  const shareUrl = createShareUrl(puzzle);
   const modeLabel = getGameModeMeta(puzzle?.mode).label;
   const shareText = `${modeLabel} | ${puzzle.label}（${createStarLabel(puzzle.difficulty)}）に挑戦してみてください。\n${SHARE_HASHTAG}`;
   const shareMessage = `${shareText}\n${shareUrl}`;
