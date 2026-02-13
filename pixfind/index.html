@@ -338,7 +338,7 @@
 <div>
 <p class="tagline">Dot Spot the Difference</p>
 <h1 class="app-title" id="introHeading">PiXFiND</h1>
-<p class="description">PiXFiNDはドット絵に特化した「間違い探し」専用ゲーム。解析エンジンが差分を検出した公式パズルを難易度別に収録しました。ブラウザからすぐに遊べて、イベントや配信でも活用できます。</p>
+<p class="description">PiXFiNDはドット絵に特化したブラウザゲーム。2枚を見比べる「間違い探し」と、指定アイテムを探す「もの探し」の2モードを楽しめます。</p>
 </div>
 <div aria-label="広告バナー" class="start-ad">
 <ins class="adsbygoogle"
@@ -351,7 +351,7 @@
 <button class="button button--outline button--wide" id="createButton" type="button">作る</button>
 <a class="button button--ghost button--wide" href="../tools.html">他のゲーム・ツール</a>
 </div>
-<p class="start-footer">公式パズルは随時追加予定。難易度は★1〜★3まで用意しています。</p>
+<p class="start-footer">公式パズルは随時追加予定。難易度は★1〜★3、モードは2種類から選べます。</p>
 </div>
 </section>
 <section aria-hidden="true" class="screen screen--difficulty" hidden="" id="difficultyScreen">
@@ -364,6 +364,17 @@
 </div>
 <button class="button button--ghost button--compact" id="difficultyBackButton" type="button">タイトルにもどる</button>
 </header>
+<div aria-label="ゲームモードの選択" class="mode-selector" role="tablist">
+<button aria-pressed="true" class="mode-chip" data-game-mode="spot-difference" type="button">
+<strong>間違い探し</strong>
+<span>2枚を見比べて違いを探す</span>
+</button>
+<button aria-pressed="false" class="mode-chip" data-game-mode="hidden-object" type="button">
+<strong>もの探し</strong>
+<span>指定アイテムを探す</span>
+</button>
+</div>
+<p class="section-subtitle mode-description" id="modeDescription">2枚の画像の違いをすべて探してください。</p>
 <div aria-label="難易度の選択" class="difficulty-selector" role="tablist">
 <button aria-pressed="true" class="difficulty-chip" data-difficulty="1" type="button">
 <strong>★☆☆</strong>
@@ -388,6 +399,7 @@
 <div class="game-header-slot game-header-slot--left">
 <div class="game-header-title">
 <h2 class="game-title" id="gameTitle">PiXFiND</h2>
+<p class="game-mode-label" id="gameModeLabel">間違い探しモード</p>
 <p class="game-author" id="gameAuthor" hidden="">by ???</p>
 </div>
 </div>
@@ -423,18 +435,26 @@
 </div>
 </header>
 <div class="game-layout">
-<div aria-live="polite" class="stage">
+<div aria-live="polite" class="stage stage--original">
 <div class="canvas-frame">
 <canvas aria-label="お手本画像" class="spot-canvas" height="0" id="canvasOriginal" width="0"></canvas>
 <div aria-hidden="true" class="canvas-overlay" id="overlayOriginal"></div>
 </div>
 </div>
-<div aria-live="polite" class="stage">
+<div aria-live="polite" class="stage stage--challenge">
 <div class="canvas-frame">
 <canvas aria-label="間違いを探す画像" class="spot-canvas" height="0" id="canvasChallenge" width="0"></canvas>
 <div aria-hidden="true" class="canvas-overlay" id="overlayChallenge"></div>
 </div>
 </div>
+</div>
+<section aria-live="polite" class="target-panel" hidden="" id="targetPanel">
+<p class="target-panel__lead">見つけるお題</p>
+<p class="target-panel__current" id="targetCurrent">-</p>
+<ul class="target-list" id="targetList"></ul>
+</section>
+<div class="hint-card">
+<p id="hintMessage"></p>
 </div>
 <div aria-label="広告バナー" class="game-ad">
 <ins class="adsbygoogle"
@@ -448,8 +468,18 @@
 <div aria-labelledby="creatorTitle" aria-modal="true" class="creator-panel" role="dialog">
 <button aria-label="閉じる" class="creator-close" id="creatorClose" type="button">×</button>
 <header class="creator-header">
-<h2 id="creatorTitle">間違い探しを作る</h2>
-<p class="creator-description">同じサイズの2枚の画像を選ぶと差分を自動検出します。</p>
+<h2 id="creatorTitle">問題を作る</h2>
+<p class="creator-description" id="creatorDescription">同じサイズの2枚の画像を選ぶと差分を自動検出します。</p>
+<div aria-label="作成モードの選択" class="creator-mode-selector" role="tablist">
+<button aria-pressed="true" class="creator-mode-chip" data-creator-mode="spot-difference" type="button">
+<strong>間違い探し</strong>
+<span>2枚を見比べる形式</span>
+</button>
+<button aria-pressed="false" class="creator-mode-chip" data-creator-mode="hidden-object" type="button">
+<strong>もの探し</strong>
+<span>元画像 + 探し物レイヤー</span>
+</button>
+</div>
 <div class="creator-draw-links">
 <p class="creator-draw-links__label">画像をこれから作る場合（初心者 / 上級者で選択）</p>
 <div class="creator-draw-links__actions">
@@ -478,7 +508,7 @@
 <label class="creator-file">お手本画像
 <input accept="image/png,image/jpeg,image/webp" id="creatorOriginalInput" type="file"/>
 </label>
-<label class="creator-file">間違い画像
+<label class="creator-file"><span id="creatorDiffLabelText">間違い画像</span>
 <input accept="image/png,image/jpeg,image/webp" id="creatorDiffInput" type="file"/>
 </label>
 </div>
@@ -490,9 +520,13 @@
 </figure>
 <figure class="creator-preview-frame">
 <canvas aria-label="間違い画像のプレビュー" id="creatorPreviewDiff"></canvas>
-<figcaption class="creator-preview-label">間違い</figcaption>
+<figcaption class="creator-preview-label" id="creatorPreviewDiffCaption">間違い</figcaption>
 </figure>
 </div>
+<section class="creator-targets" hidden="" id="creatorTargets">
+<p class="creator-targets__title">探し物の名前（番号に対応）</p>
+<div class="creator-target-fields" id="creatorTargetFields"></div>
+</section>
 <div class="creator-summary" hidden="" id="creatorSummary">
 <span>検出: <strong id="creatorDiffCount">0</strong> 箇所</span>
 <span>サイズ: <strong id="creatorSize">-</strong></span>
@@ -505,7 +539,7 @@
 <input checked="" id="creatorContestToggle" type="checkbox"/>
 <span>コンテストにも投稿する</span>
 </label>
-<p class="creator-note">公開するとオンライン公開され、難易度一覧に追加されます。</p>
+<p class="creator-note" id="creatorModeNote">公開するとオンライン公開され、難易度一覧に追加されます。</p>
 </form>
 </div>
 </div>
