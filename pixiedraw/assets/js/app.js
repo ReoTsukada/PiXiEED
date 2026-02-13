@@ -875,6 +875,9 @@
   };
   let lastSingleTouchClientY = null;
   let editableTouchSession = false;
+  let softKeyboardBaselineViewportHeight = 0;
+  let lastSoftKeyboardFocusAt = 0;
+  let softKeyboardFocusGuardBound = false;
 
   function handleGlobalTouchPointerEnd(event) {
     if (event.pointerType !== 'touch') {
@@ -912,6 +915,20 @@
         'input, textarea, select, [contenteditable="true"], [contenteditable=""], [contenteditable]'
       )
     );
+  }
+
+  function isSoftKeyboardInputTarget(target) {
+    if (!(target instanceof Element)) {
+      return false;
+    }
+    if (target instanceof HTMLTextAreaElement) {
+      return true;
+    }
+    if (target instanceof HTMLInputElement) {
+      const type = String(target.type || 'text').toLowerCase();
+      return !['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'range', 'reset', 'submit'].includes(type);
+    }
+    return Boolean(target.isContentEditable);
   }
 
   function shouldAllowNativeTouchMove(event) {
@@ -8476,6 +8493,9 @@
     }
     if (height > 0) {
       root.style.setProperty('--mobile-viewport-height', `${height}px`);
+      if (!isSoftKeyboardInputTarget(document.activeElement)) {
+        softKeyboardBaselineViewportHeight = height;
+      }
     }
   }
 
@@ -8690,6 +8710,39 @@
   }
 
   function setupLayout() {
+    if (!softKeyboardFocusGuardBound) {
+      softKeyboardFocusGuardBound = true;
+      document.addEventListener(
+        'focusin',
+        event => {
+          if (!isCoarsePointerDevice()) {
+            return;
+          }
+          if (isSoftKeyboardInputTarget(event.target)) {
+            lastSoftKeyboardFocusAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+          }
+        },
+        true
+      );
+      document.addEventListener(
+        'focusout',
+        event => {
+          if (!isCoarsePointerDevice()) {
+            return;
+          }
+          if (!isSoftKeyboardInputTarget(event.target)) {
+            return;
+          }
+          setTimeout(() => {
+            if (!isSoftKeyboardInputTarget(document.activeElement)) {
+              updateLayoutMode();
+            }
+          }, 160);
+        },
+        true
+      );
+    }
+
     const handleLayoutResize = debounce(() => {
       if (isVirtualKeyboardLikelyOpen()) {
         return;
@@ -8719,7 +8772,7 @@
 
   function isVirtualKeyboardLikelyOpen() {
     const active = document.activeElement;
-    if (!isInputControlElement(active)) {
+    if (!isCoarsePointerDevice() || !isInputControlElement(active) || !isSoftKeyboardInputTarget(active)) {
       return false;
     }
     const viewport = window.visualViewport;
@@ -8731,8 +8784,18 @@
     if (viewportHeight <= 0 || innerHeight <= 0) {
       return false;
     }
-    const heightLoss = innerHeight - viewportHeight;
-    return heightLoss > 120 && viewportHeight < innerHeight * 0.88;
+    const baseline = Math.max(softKeyboardBaselineViewportHeight || 0, innerHeight);
+    const baselineLoss = baseline - viewportHeight;
+    const innerLoss = innerHeight - viewportHeight;
+    if (baselineLoss > 96 && viewportHeight < baseline * 0.92) {
+      return true;
+    }
+    if (innerLoss > 120 && viewportHeight < innerHeight * 0.88) {
+      return true;
+    }
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const elapsedSinceFocus = now - lastSoftKeyboardFocusAt;
+    return elapsedSinceFocus >= 0 && elapsedSinceFocus < 700 && baselineLoss > 36;
   }
 
   function updateRailMetrics() {
