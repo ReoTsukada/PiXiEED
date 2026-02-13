@@ -273,6 +273,8 @@
     40,
   ]);
   const MIN_ZOOM_SCALE = ZOOM_STEPS[0];
+  const MAX_ZOOM_SCALE = ZOOM_STEPS[ZOOM_STEPS.length - 1];
+  const ZOOM_WHEEL_STEP_BASE = 1.25;
   const ZOOM_EPSILON = 1e-6;
   const ZOOM_INDICATOR_TIMEOUT = 1800;
   const DEFAULT_IMPORT_FRAME_DURATION = 1000 / 12;
@@ -658,7 +660,8 @@
   const history = { past: [], future: [], pending: null, limit: 20 };
   let historyTrimmedRecently = false;
   let historyTrimmedAt = 0;
-  const fillPreviewCache = { key: null, pixels: null };
+  const EMPTY_FILL_PREVIEW_PIXELS = Object.freeze([]);
+  const fillPreviewCache = { contextKey: null, byPixel: null };
   const selectionMaskCacheIds = new WeakMap();
   let selectionMaskCacheIdCounter = 1;
   const HISTORY_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', 'fill']);
@@ -869,8 +872,9 @@
   };
 
   const TOUCH_PAN_MIN_POINTERS = 2;
-  const TOUCH_PINCH_SENSITIVITY = 1.25;
-  const TOUCH_PINCH_DEADZONE_RATIO = 0.008;
+  const TOUCH_PINCH_SENSITIVITY = 1.9;
+  const TOUCH_PINCH_DEADZONE_RATIO = 0.004;
+  const TOUCH_PINCH_MIN_RATIO = 0.05;
   const activeTouchPointers = new Map();
   const keyboardState = {
     spacePanActive: false,
@@ -1550,8 +1554,8 @@
     history.past = [];
     history.future = [];
     history.pending = null;
-    fillPreviewCache.key = null;
-    fillPreviewCache.pixels = null;
+    fillPreviewCache.contextKey = null;
+    fillPreviewCache.byPixel = null;
     updateHistoryButtons();
     autosaveDirty = true;
     updateMemoryStatus();
@@ -1759,8 +1763,8 @@
   }
 
   function invalidateFillPreviewCache() {
-    fillPreviewCache.key = null;
-    fillPreviewCache.pixels = null;
+    fillPreviewCache.contextKey = null;
+    fillPreviewCache.byPixel = null;
   }
 
   function markHistoryDirty() {
@@ -2016,12 +2020,18 @@
     return dom.rightRail instanceof HTMLElement && dom.rightRail.dataset.compactFlyoutOpen === 'true';
   }
 
+  function updateCompactFlyoutBackdropState() {
+    const visible = isCompactToolFlyoutOpen() || isCompactRightFlyoutOpen();
+    document.body.classList.toggle('is-compact-flyout-open', visible);
+  }
+
   function clearCompactRightFlyoutPosition() {
     RIGHT_TAB_KEYS.forEach(key => {
       const section = dom.sections[key];
       if (!(section instanceof HTMLElement)) {
         return;
       }
+      section.classList.remove('is-compact-flyout');
       section.style.removeProperty('position');
       section.style.removeProperty('left');
       section.style.removeProperty('top');
@@ -2059,19 +2069,24 @@
       left = safeLeft + edgePadding;
       width = Math.max(220, Math.min(width, safeRight - left - edgePadding));
     }
-    const top = clamp(
+    let top = clamp(
       Math.round(railRect.top + 8),
       safeTop + edgePadding,
       Math.max(safeTop + edgePadding, safeBottom - 120)
     );
-    const maxHeight = Math.max(140, Math.round(safeBottom - top - edgePadding));
+    let maxHeight = Math.max(140, Math.round(safeBottom - top - edgePadding));
+    if (maxHeight < 220) {
+      top = Math.max(safeTop + edgePadding, Math.round(safeBottom - 220 - edgePadding));
+      maxHeight = Math.max(140, Math.round(safeBottom - top - edgePadding));
+    }
     clearCompactRightFlyoutPosition();
+    section.classList.add('is-compact-flyout');
     section.style.position = 'fixed';
     section.style.left = `${left}px`;
     section.style.top = `${top}px`;
     section.style.width = `${width}px`;
     section.style.maxHeight = `${maxHeight}px`;
-    section.style.zIndex = '5000';
+    section.style.zIndex = '14000';
     section.style.overflow = 'auto';
   }
 
@@ -2086,6 +2101,7 @@
     } else {
       updateCompactRightFlyoutPosition();
     }
+    updateCompactFlyoutBackdropState();
   }
 
   function setupRightTabs() {
@@ -2458,12 +2474,17 @@
       if (left + flyoutWidth > maxRight) {
         left = Math.max(minLeft, Math.round(anchorRect.left - 10 - flyoutWidth));
       }
+      left = clamp(left, minLeft, Math.max(minLeft, maxRight - flyoutWidth));
       top = clamp(
         Math.round(anchorRect.top),
         Math.round(safeTop + edgePadding),
         Math.max(Math.round(safeTop + edgePadding), Math.round(safeBottom - 64))
       );
       maxHeight = Math.max(120, Math.round(safeBottom - top - 12));
+      if (maxHeight < 220) {
+        top = Math.max(Math.round(safeTop + edgePadding), Math.round(safeBottom - 220 - edgePadding));
+        maxHeight = Math.max(120, Math.round(safeBottom - top - edgePadding));
+      }
     }
 
     dom.toolGrid.style.position = 'fixed';
@@ -2490,6 +2511,7 @@
       }
     }
     updateCompactToolFlyoutPosition();
+    updateCompactFlyoutBackdropState();
   }
 
   function setToolGroup(group, { persist = true } = {}) {
@@ -11839,12 +11861,24 @@
       return;
     }
     event.preventDefault();
-    const normalizer = event.deltaMode === 0 ? 100 : 3;
-    const stepMagnitude = clamp(Math.ceil(Math.abs(deltaY) / normalizer), 1, 4);
-    const direction = deltaY < 0 ? 1 : -1;
+    const deltaModeScale = event.deltaMode === 1 ? 16 : (event.deltaMode === 2 ? 180 : 1);
+    const normalizedDelta = clamp(deltaY * deltaModeScale, -600, 600);
+    const wheelSteps = normalizedDelta / 100;
+    if (!Number.isFinite(wheelSteps) || Math.abs(wheelSteps) < 0.001) {
+      return;
+    }
+    const zoomFactor = Math.pow(ZOOM_WHEEL_STEP_BASE, -wheelSteps);
+    if (!Number.isFinite(zoomFactor) || zoomFactor <= 0) {
+      return;
+    }
     focus.cellX = clamp(focus.cellX, 0, state.width - 1);
     focus.cellY = clamp(focus.cellY, 0, state.height - 1);
-    adjustZoomBySteps(direction * stepMagnitude, focus);
+    const currentScale = Number(state.scale) || MIN_ZOOM_SCALE;
+    const targetScale = normalizeZoomScale(currentScale * zoomFactor, currentScale);
+    if (Math.abs(targetScale - currentScale) < ZOOM_EPSILON) {
+      return;
+    }
+    setZoom(targetScale, focus);
   }
 
   function setupKeyboard() {
@@ -12371,8 +12405,11 @@
         if (Number.isFinite(baselineDistance) && baselineDistance > 0 && Number.isFinite(nextDistance) && nextDistance > 0) {
           const rawRatio = nextDistance / baselineDistance;
           const ratioDelta = Math.abs(rawRatio - 1);
-          const amplifiedRatio = Math.pow(rawRatio, TOUCH_PINCH_SENSITIVITY);
-          const targetScale = normalizeZoomScale(baselineScale * amplifiedRatio, Number(state.scale) || baselineScale);
+          const amplifiedRatio = 1 + ((rawRatio - 1) * TOUCH_PINCH_SENSITIVITY);
+          const targetScale = normalizeZoomScale(
+            baselineScale * Math.max(TOUCH_PINCH_MIN_RATIO, amplifiedRatio),
+            Number(state.scale) || baselineScale
+          );
           if (ratioDelta >= TOUCH_PINCH_DEADZONE_RATIO && Math.abs(targetScale - (Number(state.scale) || MIN_ZOOM_SCALE)) >= ZOOM_EPSILON) {
             const pinchFocus = state.showVirtualCursor
               ? (getVirtualCursorZoomFocus() || getCanvasFocusAt(centroid.x, centroid.y))
@@ -14386,8 +14423,10 @@
     const unitY = rect.height / Math.max(1, state.height);
     const deltaX = unitX ? dx / unitX : 0;
     const deltaY = unitY ? dy / unitY : 0;
-    const nextX = clamp(base.x + deltaX, 0, state.width - 1);
-    const nextY = clamp(base.y + deltaY, 0, state.height - 1);
+    // Allow the virtual cursor to reach the right/bottom edge while keeping
+    // actual drawing cell resolution unchanged via getVirtualCursorCellPosition().
+    const nextX = clamp(base.x + deltaX, 0, state.width);
+    const nextY = clamp(base.y + deltaY, 0, state.height);
     updateVirtualCursorPosition(nextX, nextY);
   }
 
@@ -15006,7 +15045,7 @@
     return pixels;
   }
 
-  function getFillPreviewKey(x, y) {
+  function getFillPreviewContextKey() {
     const frame = getActiveFrame();
     const layer = getActiveLayer();
     if (!frame || !layer) return null;
@@ -15017,19 +15056,43 @@
       ? `${selectionMaskId}:${selectionBounds?.x0 ?? ''},${selectionBounds?.y0 ?? ''},${selectionBounds?.x1 ?? ''},${selectionBounds?.y1 ?? ''}`
       : 'none';
     const colorKey = `index-${state.activePaletteIndex}-${JSON.stringify(state.palette[state.activePaletteIndex] || {})}`;
-    return `${frame.id}|${layer.id}|${state.width}x${state.height}|${x},${y}|${selectionKey}|${colorKey}`;
+    return `${frame.id}|${layer.id}|${state.width}x${state.height}|${selectionKey}|${colorKey}`;
+  }
+
+  function ensureFillPreviewLookup(contextKey) {
+    const totalPixels = Math.max(1, state.width * state.height);
+    if (fillPreviewCache.contextKey !== contextKey
+      || !Array.isArray(fillPreviewCache.byPixel)
+      || fillPreviewCache.byPixel.length !== totalPixels) {
+      fillPreviewCache.contextKey = contextKey;
+      fillPreviewCache.byPixel = new Array(totalPixels);
+    }
+    return fillPreviewCache.byPixel;
   }
 
   function getFillPreviewPixels(x, y) {
-    const key = getFillPreviewKey(x, y);
-    if (key && fillPreviewCache.key === key) {
-      return fillPreviewCache.pixels;
+    const contextKey = getFillPreviewContextKey();
+    if (!contextKey) {
+      return null;
     }
-    const pixels = computeFillPreview(x, y);
-    if (key) {
-      fillPreviewCache.key = key;
-      fillPreviewCache.pixels = pixels;
+    const width = Math.max(1, state.width);
+    const cacheIndex = clamp(y, 0, Math.max(0, state.height - 1)) * width + clamp(x, 0, width - 1);
+    const lookup = ensureFillPreviewLookup(contextKey);
+    const cached = lookup[cacheIndex];
+    if (cached !== undefined) {
+      return cached;
     }
+    const pixels = computeFillPreview(x, y) || EMPTY_FILL_PREVIEW_PIXELS;
+    if (!pixels.length) {
+      lookup[cacheIndex] = EMPTY_FILL_PREVIEW_PIXELS;
+      return EMPTY_FILL_PREVIEW_PIXELS;
+    }
+    pixels.forEach(idx => {
+      if (idx >= 0 && idx < lookup.length) {
+        lookup[idx] = pixels;
+      }
+    });
+    lookup[cacheIndex] = pixels;
     return pixels;
   }
 
@@ -15691,7 +15754,7 @@
   function normalizeZoomScale(value, fallback = MIN_ZOOM_SCALE) {
     const base = Number.isFinite(value) ? Number(value) : Number(fallback);
     const effective = Number.isFinite(base) ? base : MIN_ZOOM_SCALE;
-    return ZOOM_STEPS[getZoomStepIndex(effective)];
+    return clamp(effective, MIN_ZOOM_SCALE, MAX_ZOOM_SCALE);
   }
 
   function formatZoomLabel(scale) {
