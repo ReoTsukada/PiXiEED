@@ -984,7 +984,9 @@ body.is-playing {
   padding: clamp(1.1rem, 2.8vmin, 2rem);
   display: grid;
   gap: var(--screen-gap);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .creator-close {
@@ -1297,6 +1299,21 @@ body.is-playing {
   display: grid;
   gap: 0.25rem;
   min-width: 0;
+  padding: 0.35rem 0.4rem;
+  border-radius: 10px;
+  border: 1px solid rgba(40, 50, 80, 0.15);
+  background: rgba(255, 255, 255, 0.76);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.creator-target-row:hover {
+  border-color: rgba(255, 111, 141, 0.45);
+}
+
+.creator-target-row.is-active {
+  border-color: rgba(227, 70, 111, 0.62);
+  background: rgba(255, 240, 245, 0.9);
+  box-shadow: 0 10px 16px -14px rgba(227, 70, 111, 0.55);
 }
 
 .creator-target-index {
@@ -1519,8 +1536,8 @@ body.is-playing {
   }
 
   .creator-form {
-    min-height: 0;
-    grid-template-rows: auto minmax(0, 1fr) auto auto auto auto;
+    min-height: auto;
+    grid-template-rows: none;
     gap: 0.5rem;
   }
 
@@ -1562,21 +1579,21 @@ body.is-playing {
 
   .creator-preview {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: 1fr;
+    grid-template-rows: none;
     gap: 0;
-    min-height: 0;
-    height: 100%;
+    min-height: auto;
+    height: auto;
     margin-inline: -0.2rem;
   }
 
   .creator-preview-frame {
-    min-height: 0;
-    height: 100%;
+    min-height: clamp(120px, 25vh, 220px);
+    height: auto;
     aspect-ratio: auto;
   }
 
   .creator-preview-frame canvas {
-    height: 100%;
+    height: auto;
   }
 
   .creator-actions {
