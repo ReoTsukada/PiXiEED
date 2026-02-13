@@ -8097,7 +8097,7 @@
       }
     }
     if (panAdjusted) {
-      scheduleSessionPersist();
+      scheduleSessionPersist({ includeSnapshots: false });
     }
   }
 
@@ -11875,15 +11875,35 @@
     }
   }
 
-  function resizeCanvases() {
+  function resizeCanvases({
+    forceRender = true,
+    applyTransform = true,
+    syncControls = true,
+    updateScaleLimits = true,
+  } = {}) {
     const { width, height, scale } = state;
-    dom.canvases.drawing.width = width;
-    dom.canvases.drawing.height = height;
-    dom.canvases.overlay.width = width;
-    dom.canvases.overlay.height = height;
-    if (dom.canvases.selection) {
-      dom.canvases.selection.width = width * scale;
-      dom.canvases.selection.height = height * scale;
+    const drawingCanvas = dom.canvases.drawing;
+    const overlayCanvas = dom.canvases.overlay;
+    const selectionCanvas = dom.canvases.selection || null;
+
+    let drawingReset = false;
+    let overlayReset = false;
+
+    if (drawingCanvas.width !== width) {
+      drawingCanvas.width = width;
+      drawingReset = true;
+    }
+    if (drawingCanvas.height !== height) {
+      drawingCanvas.height = height;
+      drawingReset = true;
+    }
+    if (overlayCanvas.width !== width) {
+      overlayCanvas.width = width;
+      overlayReset = true;
+    }
+    if (overlayCanvas.height !== height) {
+      overlayCanvas.height = height;
+      overlayReset = true;
     }
     if (ctx.drawing) {
       ctx.drawing.imageSmoothingEnabled = false;
@@ -11894,21 +11914,44 @@
     if (ctx.selection) {
       ctx.selection.imageSmoothingEnabled = false;
     }
-    dom.canvases.drawing.style.width = `${width * scale}px`;
-    dom.canvases.drawing.style.height = `${height * scale}px`;
-    dom.canvases.overlay.style.width = `${width * scale}px`;
-    dom.canvases.overlay.style.height = `${height * scale}px`;
-    if (dom.canvases.selection) {
-      dom.canvases.selection.style.width = `${width * scale}px`;
-      dom.canvases.selection.style.height = `${height * scale}px`;
+
+    const cssWidth = `${width * scale}px`;
+    const cssHeight = `${height * scale}px`;
+    if (drawingCanvas.style.width !== cssWidth) {
+      drawingCanvas.style.width = cssWidth;
+    }
+    if (drawingCanvas.style.height !== cssHeight) {
+      drawingCanvas.style.height = cssHeight;
+    }
+    if (overlayCanvas.style.width !== cssWidth) {
+      overlayCanvas.style.width = cssWidth;
+    }
+    if (overlayCanvas.style.height !== cssHeight) {
+      overlayCanvas.style.height = cssHeight;
+    }
+    if (selectionCanvas) {
+      if (selectionCanvas.style.width !== cssWidth) {
+        selectionCanvas.style.width = cssWidth;
+      }
+      if (selectionCanvas.style.height !== cssHeight) {
+        selectionCanvas.style.height = cssHeight;
+      }
     }
     resizeVirtualCursorCanvas();
-    applyViewportTransform();
+    if (applyTransform) {
+      applyViewportTransform();
+    }
     clampFloatingDrawButtonPosition();
-    updateSpriteScaleControlLimits();
-    syncControlsWithState();
-    markCanvasDirty();
-    renderCanvas();
+    if (updateScaleLimits) {
+      updateSpriteScaleControlLimits();
+    }
+    if (syncControls) {
+      syncControlsWithState();
+    }
+    if (forceRender || drawingReset || overlayReset) {
+      markCanvasDirty();
+      renderCanvas();
+    }
     requestOverlayRender();
   }
 
@@ -11981,7 +12024,12 @@
     }
 
     state.scale = targetScale;
-    resizeCanvases();
+    resizeCanvases({
+      forceRender: false,
+      applyTransform: false,
+      syncControls: false,
+      updateScaleLimits: false,
+    });
 
     if (zoomFocus && stack && stackRectBefore) {
       const stackRectAfter = stack.getBoundingClientRect();
@@ -11999,8 +12047,14 @@
     }
 
     applyViewportTransform();
+    if (dom.controls.zoomSlider) {
+      dom.controls.zoomSlider.value = String(getZoomStepIndex(targetScale));
+    }
+    if (dom.controls.zoomLevel) {
+      dom.controls.zoomLevel.textContent = formatZoomLabel(targetScale);
+    }
     showZoomIndicator(targetScale);
-    scheduleSessionPersist();
+    scheduleSessionPersist({ includeSnapshots: false });
   }
 
   function adjustZoomBySteps(delta, focus) {
@@ -12331,7 +12385,7 @@
     document.body.classList.remove('is-pan-dragging');
     activeTouchPointers.clear();
     requestOverlayRender();
-    scheduleSessionPersist();
+    scheduleSessionPersist({ includeSnapshots: false });
   }
 
   function handlePointerDown(event) {
@@ -14924,8 +14978,11 @@
 
     const virtualFocusPixel = state.showVirtualCursor ? getVirtualCursorCellPosition() : null;
     const focusPixel = pointerState.active ? pointerState.current : (virtualFocusPixel || hoverPixel);
-    const activeTool = getActiveTool();
-    if (state.showPixelGuides && focusPixel) {
+    const activeTool = (virtualCursorDrawState.active && virtualCursorDrawState.tool)
+      ? virtualCursorDrawState.tool
+      : getActiveTool();
+    const shouldShowGuidePreview = state.showPixelGuides || state.showVirtualCursor;
+    if (shouldShowGuidePreview && focusPixel) {
       const overrideSize = activeTool === 'fill' ? 1 : undefined;
       drawBrushPreview(focusPixel, activeTool, overrideSize);
     }
@@ -14944,11 +15001,21 @@
       }
     }
 
-    if (state.showPixelGuides && pointerState.preview && ctx.overlay && (pointerState.tool === 'line' || pointerState.tool === 'rect' || pointerState.tool === 'rectFill' || pointerState.tool === 'ellipse' || pointerState.tool === 'ellipseFill' || pointerState.tool === 'curve')) {
+    if (
+      (state.showPixelGuides || virtualCursorDrawState.active)
+      && pointerState.preview
+      && ctx.overlay
+      && (pointerState.tool === 'line'
+        || pointerState.tool === 'rect'
+        || pointerState.tool === 'rectFill'
+        || pointerState.tool === 'ellipse'
+        || pointerState.tool === 'ellipseFill'
+        || pointerState.tool === 'curve')
+    ) {
       drawPreviewShape(pointerState);
     }
 
-    if (state.showPixelGuides && ctx.overlay && state.tool === 'curve' && curveBuilder) {
+    if ((state.showPixelGuides || state.showVirtualCursor) && ctx.overlay && state.tool === 'curve' && curveBuilder) {
       drawCurveGuides(curveBuilder);
     }
 
@@ -15600,9 +15667,11 @@
     return inside;
   }
 
-  function scheduleSessionPersist() {
-    scheduleAutosaveSnapshot();
-    scheduleIosSnapshotPersist();
+  function scheduleSessionPersist({ includeSnapshots = true } = {}) {
+    if (includeSnapshots) {
+      scheduleAutosaveSnapshot();
+      scheduleIosSnapshotPersist();
+    }
     if (!canUseSessionStorage) return;
     if (sessionPersistHandle !== null) return;
     sessionPersistHandle = window.setTimeout(() => {
