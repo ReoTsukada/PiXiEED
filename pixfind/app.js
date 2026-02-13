@@ -10,9 +10,13 @@ const dom = {
   resetButton: document.getElementById('resetButton'),
   deletePuzzleButton: document.getElementById('deletePuzzleButton'),
   difficultyChips: Array.from(document.querySelectorAll('[data-difficulty]')),
+  modeChips: Array.from(document.querySelectorAll('[data-game-mode]')),
+  modeDescription: document.getElementById('modeDescription'),
   puzzleList: document.getElementById('puzzleList'),
   gameTitle: document.getElementById('gameTitle'),
+  gameModeLabel: document.getElementById('gameModeLabel'),
   gameAuthor: document.getElementById('gameAuthor'),
+  foundLabel: document.getElementById('foundLabel'),
   foundCount: document.getElementById('foundCount'),
   totalCount: document.getElementById('totalCount'),
   timerLabel: document.getElementById('timerLabel'),
@@ -23,11 +27,19 @@ const dom = {
   overlayChallenge: document.getElementById('overlayChallenge'),
   completionOverlay: document.getElementById('completionOverlay'),
   failureOverlay: document.getElementById('failureOverlay'),
+  targetPanel: document.getElementById('targetPanel'),
+  targetCurrent: document.getElementById('targetCurrent'),
+  targetList: document.getElementById('targetList'),
   hintMessage: document.getElementById('hintMessage'),
   creatorOverlay: document.getElementById('creatorOverlay'),
   creatorOpenButton: document.getElementById('createButton'),
   creatorCloseButton: document.getElementById('creatorClose'),
   creatorForm: document.getElementById('creatorForm'),
+  creatorDescription: document.getElementById('creatorDescription'),
+  creatorModeButtons: Array.from(document.querySelectorAll('[data-creator-mode]')),
+  creatorDiffLabelText: document.getElementById('creatorDiffLabelText'),
+  creatorPreviewDiffCaption: document.getElementById('creatorPreviewDiffCaption'),
+  creatorModeNote: document.getElementById('creatorModeNote'),
   creatorTitleInput: document.getElementById('creatorTitleInput'),
   creatorSlugInput: document.getElementById('creatorSlugInput'),
   creatorDifficultyButtons: [],
@@ -41,6 +53,8 @@ const dom = {
   creatorSummary: document.getElementById('creatorSummary'),
   creatorDiffCount: document.getElementById('creatorDiffCount'),
   creatorSize: document.getElementById('creatorSize'),
+  creatorTargets: document.getElementById('creatorTargets'),
+  creatorTargetFields: document.getElementById('creatorTargetFields'),
 };
 
 const ctx = {
@@ -93,6 +107,8 @@ const REGION_MERGE_DISTANCE_BY_DIFFICULTY = {
   3: 8,
 }; // Manhattan merge distance (px) per difficulty level
 const CREATOR_MERGE_DISTANCE = REGION_MERGE_DISTANCE_BY_DIFFICULTY[2];
+const CREATOR_HIDDEN_OBJECT_MIN_DISTANCE = 2; // Require at least 2 empty pixels between objects.
+const HIDDEN_OBJECT_HIT_PADDING = 1;
 const MERGE_DISTANCE_SIZE_TIER_1 = 64;
 const MERGE_DISTANCE_SIZE_TIER_2 = 256;
 const MERGE_DISTANCE_MAX_SCALE = 3;
@@ -105,6 +121,21 @@ const TAP_MAX_DURATION_MS = 320;
 const ZOOM_MIN_SCALE = 1;
 const ZOOM_MAX_SCALE = 3.2;
 const ZOOM_WHEEL_STEP = 0.12;
+const GAME_MODE_SPOT_DIFFERENCE = 'spot-difference';
+const GAME_MODE_HIDDEN_OBJECT = 'hidden-object';
+const DEFAULT_GAME_MODE = GAME_MODE_SPOT_DIFFERENCE;
+const GAME_MODE_METADATA = {
+  [GAME_MODE_SPOT_DIFFERENCE]: {
+    label: '間違い探し',
+    description: '2枚の画像の違いをすべて探してください。',
+    gameLabel: '間違い探しモード',
+  },
+  [GAME_MODE_HIDDEN_OBJECT]: {
+    label: 'もの探し',
+    description: '指定されたアイテムを見つけてください。',
+    gameLabel: 'もの探しモード',
+  },
+};
 
 const zoomControllers = {
   original: null,
@@ -147,8 +178,11 @@ const FALLBACK_OFFICIAL_PUZZLES = [
 
 const state = {
   currentDifficulty: 1,
+  currentMode: DEFAULT_GAME_MODE,
+  activeMode: DEFAULT_GAME_MODE,
   currentPuzzle: null,
   differences: [],
+  hiddenTargets: [],
   found: 0,
   total: 0,
   mistakes: 0,
@@ -166,6 +200,7 @@ const state = {
 };
 
 const creatorState = {
+  mode: GAME_MODE_SPOT_DIFFERENCE,
   autoDifficulty: true,
   difficulty: 1,
   title: '',
@@ -178,6 +213,7 @@ const creatorState = {
   diffDataUrl: null,
   diffResult: null,
   size: { width: 0, height: 0 },
+  targetLabels: [],
 };
 
 let creatorLastFocused = null;
@@ -241,16 +277,91 @@ let puzzleBucket = (typeof window !== 'undefined' && window.PIXFIND_STORAGE_BUCK
   : DEFAULT_PUZZLE_BUCKET;
 let puzzleBucketFallbackUsed = false;
 
+function normalizeGameMode(rawMode) {
+  if (typeof rawMode !== 'string') return DEFAULT_GAME_MODE;
+  const normalized = rawMode.trim().toLowerCase();
+  if (normalized === GAME_MODE_HIDDEN_OBJECT) return GAME_MODE_HIDDEN_OBJECT;
+  if (normalized === 'hidden' || normalized === 'hiddenobject' || normalized === 'object-find' || normalized === 'object-search') {
+    return GAME_MODE_HIDDEN_OBJECT;
+  }
+  return GAME_MODE_SPOT_DIFFERENCE;
+}
+
+function getGameModeMeta(mode) {
+  const normalized = normalizeGameMode(mode);
+  return GAME_MODE_METADATA[normalized] ?? GAME_MODE_METADATA[DEFAULT_GAME_MODE];
+}
+
+function isHiddenObjectMode(mode = state.activeMode) {
+  return normalizeGameMode(mode) === GAME_MODE_HIDDEN_OBJECT;
+}
+
+function normalizeTargetLabel(value, index = 0) {
+  const raw = String(value ?? '').trim();
+  return raw || `アイテム ${index + 1}`;
+}
+
+function normalizePuzzleTargets(rawTargets) {
+  let source = rawTargets;
+  if (typeof source === 'string') {
+    try {
+      const parsed = JSON.parse(source);
+      source = parsed;
+    } catch (_) {
+      source = source.split(',').map(part => part.trim()).filter(Boolean);
+    }
+  }
+  if (!Array.isArray(source)) return [];
+  return source
+    .map((target, index) => {
+      if (typeof target === 'string') {
+        return normalizeTargetLabel(target, index);
+      }
+      if (target && typeof target === 'object') {
+        return normalizeTargetLabel(target.label ?? target.name ?? target.title ?? '', index);
+      }
+      return '';
+    })
+    .filter(Boolean);
+}
+
+function buildHiddenTargets(regions, labels = []) {
+  return regions.map((region, index) => ({
+    id: `target-${index + 1}`,
+    regionId: region.id,
+    label: normalizeTargetLabel(labels[index], index),
+    found: false,
+  }));
+}
+
+function getDifficultySelectionHint(mode = state.currentMode) {
+  const modeMeta = getGameModeMeta(mode);
+  return `${modeMeta.label}モードで遊ぶ難易度を選んでください。`;
+}
+
+function getRoundStartHint() {
+  if (isHiddenObjectMode()) {
+    const remaining = state.hiddenTargets.filter(target => !target.found).length;
+    if (remaining > 0) {
+      return `右の絵から指定アイテムを探してください（残り${remaining}個）。`;
+    }
+    return '右の絵から指定されたアイテムを探してください。';
+  }
+  return '左右の画像を見比べて、違いをタップしてください。';
+}
+
 async function init() {
   ensureClientId();
   setActiveScreen('start');
   updateProgressLabel();
-  setHint('星を選んで、挑戦したい難易度を選んでください。');
+  setHint(getDifficultySelectionHint());
   if (supabaseMaintenance) {
     setSupabaseMaintenance(true, 'cached');
   }
 
   await loadOfficialPuzzles();
+  selectGameMode(DEFAULT_GAME_MODE);
+  selectDifficulty(1);
   flushPublishQueue().catch(error => console.warn('publish queue flush failed', error));
   flushShareQueue().catch(error => console.warn('share queue flush failed', error));
   schedulePublishQueueFlush();
@@ -291,6 +402,12 @@ async function init() {
       selectDifficulty(level);
     });
   });
+  dom.modeChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      const mode = chip.dataset.gameMode;
+      selectGameMode(mode);
+    });
+  });
 
   window.addEventListener('keydown', event => {
     if (event.key === 'Escape') {
@@ -307,7 +424,6 @@ async function init() {
     }
   });
 
-  selectDifficulty(1);
 }
 
 function setupCreator() {
@@ -337,6 +453,12 @@ function setupCreator() {
   dom.creatorExportButton?.addEventListener('click', event => {
     event.preventDefault();
     handleCreatorPublish();
+  });
+
+  dom.creatorModeButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      setCreatorMode(button.dataset.creatorMode || GAME_MODE_SPOT_DIFFERENCE);
+    });
   });
 
   dom.creatorOriginalInput?.addEventListener('change', handleCreatorFileChange);
@@ -378,6 +500,7 @@ function resetCreatorForm() {
   if (dom.creatorForm) {
     dom.creatorForm.reset();
   }
+  creatorState.mode = GAME_MODE_SPOT_DIFFERENCE;
   creatorState.difficulty = 1;
   creatorState.title = '';
   creatorState.slug = '';
@@ -389,13 +512,16 @@ function resetCreatorForm() {
   creatorState.diffDataUrl = null;
   creatorState.diffResult = null;
   creatorState.size = { width: 0, height: 0 };
-  setCreatorActionsEnabled(false);
+  creatorState.targetLabels = [];
+  setCreatorMode(creatorState.mode, true);
   clearCreatorPreview();
+  renderCreatorTargetFields(0);
   if (dom.creatorSummary) {
     dom.creatorSummary.hidden = true;
   }
   setCreatorStatus('');
   setCreatorDifficulty(creatorState.difficulty, true);
+  updateCreatorPublishAvailability();
 }
 
 async function restorePendingCreatorUpload() {
@@ -447,7 +573,9 @@ function handleCreatorFileChange() {
   creatorState.diffDataUrl = null;
   creatorState.diffResult = null;
   creatorState.size = { width: 0, height: 0 };
-  setCreatorActionsEnabled(false);
+  creatorState.targetLabels = [];
+  updateCreatorPublishAvailability();
+  renderCreatorTargetFields(0);
   if (dom.creatorSummary) {
     dom.creatorSummary.hidden = true;
   }
@@ -467,7 +595,12 @@ function setCreatorDifficulty(level, silent = false) {
     button.classList.toggle('is-active', isActive);
   });
   if (!silent) {
-    setCreatorActionsEnabled(false);
+    creatorState.diffResult = null;
+    creatorState.size = { width: 0, height: 0 };
+    creatorState.targetLabels = [];
+    updateCreatorPublishAvailability();
+    renderCreatorTargetFields(0);
+    updateCreatorSummary(null);
     if (dom.creatorSummary) {
       dom.creatorSummary.hidden = true;
     }
@@ -495,6 +628,129 @@ function setCreatorStatus(message, tone = 'info') {
 function setCreatorActionsEnabled(enabled) {
   const canPublish = enabled;
   if (dom.creatorExportButton) dom.creatorExportButton.disabled = !canPublish;
+}
+
+function setCreatorMode(mode, silent = false) {
+  const normalizedMode = normalizeGameMode(mode);
+  creatorState.mode = normalizedMode;
+  const isHiddenMode = isHiddenObjectMode(normalizedMode);
+
+  dom.creatorModeButtons.forEach(button => {
+    const active = normalizeGameMode(button.dataset.creatorMode) === normalizedMode;
+    button.setAttribute('aria-pressed', String(active));
+  });
+
+  if (dom.creatorDescription) {
+    dom.creatorDescription.textContent = isHiddenMode
+      ? '元画像と探し物レイヤー（探し物だけ描いた透明画像）から探し物を自動検出します。'
+      : '同じサイズの2枚の画像を選ぶと差分を自動検出します。';
+  }
+  if (dom.creatorDiffLabelText) {
+    dom.creatorDiffLabelText.textContent = isHiddenMode ? '探し物レイヤー' : '間違い画像';
+  }
+  if (dom.creatorPreviewDiffCaption) {
+    dom.creatorPreviewDiffCaption.textContent = isHiddenMode ? '探し物レイヤー' : '間違い';
+  }
+  if (dom.creatorModeNote) {
+    dom.creatorModeNote.textContent = isHiddenMode
+      ? '探し物レイヤーから検出した番号ごとに、探し物の名前を入力してください。'
+      : '公開するとオンライン公開され、難易度一覧に追加されます。';
+  }
+
+  if (!isHiddenMode) {
+    creatorState.targetLabels = [];
+    renderCreatorTargetFields(0);
+  }
+
+  if (silent) {
+    return;
+  }
+
+  creatorState.diffResult = null;
+  creatorState.size = { width: 0, height: 0 };
+  if (dom.creatorSummary) {
+    dom.creatorSummary.hidden = true;
+  }
+  clearCreatorPreview();
+  updateCreatorPublishAvailability();
+
+  if (creatorState.originalFile && creatorState.diffFile) {
+    handleCreatorAnalyze();
+  } else {
+    setCreatorStatus('');
+  }
+}
+
+function renderCreatorTargetFields(count) {
+  if (!dom.creatorTargets || !dom.creatorTargetFields) return;
+  const normalizedCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+  const isHiddenMode = isHiddenObjectMode(creatorState.mode);
+  dom.creatorTargetFields.innerHTML = '';
+  if (!isHiddenMode || normalizedCount <= 0) {
+    dom.creatorTargets.hidden = true;
+    return;
+  }
+
+  creatorState.targetLabels = Array.from({ length: normalizedCount }, (_, index) => {
+    const existing = creatorState.targetLabels[index];
+    return typeof existing === 'string' ? existing : '';
+  });
+
+  const fragment = document.createDocumentFragment();
+  for (let index = 0; index < normalizedCount; index += 1) {
+    const label = document.createElement('label');
+    label.className = 'creator-target-row';
+
+    const heading = document.createElement('span');
+    heading.className = 'creator-target-index';
+    heading.textContent = `#${index + 1}`;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'creator-target-input';
+    input.maxLength = 24;
+    input.placeholder = `探し物 ${index + 1}`;
+    input.value = creatorState.targetLabels[index] || '';
+    input.dataset.targetIndex = String(index);
+    input.addEventListener('input', () => {
+      const targetIndex = Number(input.dataset.targetIndex);
+      creatorState.targetLabels[targetIndex] = input.value.trim();
+      updateCreatorPublishAvailability();
+    });
+
+    label.append(heading, input);
+    fragment.append(label);
+  }
+
+  dom.creatorTargetFields.append(fragment);
+  dom.creatorTargets.hidden = false;
+}
+
+function areCreatorTargetLabelsComplete() {
+  if (!isHiddenObjectMode(creatorState.mode)) return true;
+  const required = creatorState.diffResult?.regions?.length ?? 0;
+  if (!required) return false;
+  if (!Array.isArray(creatorState.targetLabels) || creatorState.targetLabels.length !== required) {
+    return false;
+  }
+  return creatorState.targetLabels.every(label => String(label || '').trim().length > 0);
+}
+
+function getCreatorTargetLabels() {
+  if (!isHiddenObjectMode(creatorState.mode)) return [];
+  return (creatorState.targetLabels || []).map((label, index) => normalizeTargetLabel(label, index));
+}
+
+function updateCreatorPublishAvailability() {
+  const hasAnalysis = Boolean(
+    creatorState.diffResult &&
+    creatorState.originalFile &&
+    creatorState.diffFile &&
+    creatorState.originalDataUrl &&
+    creatorState.diffDataUrl,
+  );
+  const canPublish = hasAnalysis && areCreatorTargetLabelsComplete();
+  setCreatorActionsEnabled(canPublish);
 }
 
 function updateCreatorSummary(diffResult, width, height) {
@@ -569,24 +825,54 @@ async function handleCreatorAnalyze() {
       setCreatorStatus('画像サイズが一致しません。同じサイズの画像を選んでください。', 'error');
       creatorState.diffResult = null;
       creatorState.size = { width: 0, height: 0 };
+      creatorState.targetLabels = [];
       clearCreatorPreview();
+      renderCreatorTargetFields(0);
       updateCreatorSummary(null);
+      updateCreatorPublishAvailability();
       return;
     }
 
-    const mergeDistance = resolveMergeDistanceForSize(CREATOR_MERGE_DISTANCE, {
-      width: normalizedOriginal.width,
-      height: normalizedOriginal.height,
-    });
-    const diffResult = computeDifferenceRegions(normalizedOriginal.image, normalizedDiff.image, {
-      mergeDistance,
-    });
-    if (!diffResult || !diffResult.regions.length) {
-      setCreatorStatus('差分が見つかりませんでした。画像を確認してください。', 'error');
+    const isHiddenMode = isHiddenObjectMode(creatorState.mode);
+    const diffResult = isHiddenMode
+      ? computeHiddenObjectRegions(normalizedDiff.image, {
+        minDistance: CREATOR_HIDDEN_OBJECT_MIN_DISTANCE,
+      })
+      : computeDifferenceRegions(normalizedOriginal.image, normalizedDiff.image, {
+        mergeDistance: resolveMergeDistanceForSize(CREATOR_MERGE_DISTANCE, {
+          width: normalizedOriginal.width,
+          height: normalizedOriginal.height,
+        }),
+      });
+
+    if (isHiddenMode && diffResult?.tooClosePair) {
+      const left = diffResult.tooClosePair[0] + 1;
+      const right = diffResult.tooClosePair[1] + 1;
+      setCreatorStatus(`探し物 #${left} と #${right} が近すぎます。少なくとも2px以上離してください。`, 'error');
       creatorState.diffResult = null;
       creatorState.size = { width: 0, height: 0 };
+      creatorState.targetLabels = [];
       clearCreatorPreview();
+      renderCreatorTargetFields(0);
       updateCreatorSummary(null);
+      updateCreatorPublishAvailability();
+      return;
+    }
+
+    if (!diffResult || !diffResult.regions.length) {
+      setCreatorStatus(
+        isHiddenMode
+          ? '探し物レイヤーからアイテムが検出できませんでした。'
+          : '差分が見つかりませんでした。画像を確認してください。',
+        'error',
+      );
+      creatorState.diffResult = null;
+      creatorState.size = { width: 0, height: 0 };
+      creatorState.targetLabels = [];
+      clearCreatorPreview();
+      renderCreatorTargetFields(0);
+      updateCreatorSummary(null);
+      updateCreatorPublishAvailability();
       return;
     }
 
@@ -598,6 +884,9 @@ async function handleCreatorAnalyze() {
     creatorState.diffDataUrl = normalizedDiff.dataUrl;
     creatorState.diffResult = diffResult;
     creatorState.size = { width: normalizedOriginal.width, height: normalizedOriginal.height };
+    creatorState.targetLabels = isHiddenMode
+      ? Array.from({ length: diffResult.regions.length }, (_, index) => creatorState.targetLabels[index] || '')
+      : [];
     creatorState.title = dom.creatorTitleInput?.value.trim() ?? '';
     creatorState.slug = dom.creatorSlugInput?.value.trim() ?? '';
 
@@ -605,11 +894,20 @@ async function handleCreatorAnalyze() {
     setCreatorDifficulty(estimatedDifficulty, true);
 
     drawCreatorPreview();
+    renderCreatorTargetFields(isHiddenMode ? diffResult.regions.length : 0);
     updateCreatorSummary(diffResult, normalizedOriginal.width, normalizedOriginal.height);
-    setCreatorStatus(`差分を${diffResult.regions.length}箇所検出しました。内容を確認してください。`);
-    setCreatorActionsEnabled(true);
+    setCreatorStatus(
+      isHiddenMode
+        ? `探し物を${diffResult.regions.length}件検出しました。番号ごとに名前を入力してください。`
+        : `差分を${diffResult.regions.length}箇所検出しました。内容を確認してください。`,
+    );
+    updateCreatorPublishAvailability();
   } catch (error) {
     console.error(error);
+    creatorState.diffResult = null;
+    creatorState.targetLabels = [];
+    renderCreatorTargetFields(0);
+    updateCreatorPublishAvailability();
     setCreatorStatus('画像の読み込みに失敗しました。', 'error');
   }
 }
@@ -619,8 +917,14 @@ async function handleCreatorPublish() {
     setCreatorStatus('公開には差分の自動判定が必要です。', 'error');
     return;
   }
+  if (!areCreatorTargetLabelsComplete()) {
+    setCreatorStatus('すべての探し物名を入力してください。', 'error');
+    return;
+  }
 
   ensureClientId();
+  const mode = normalizeGameMode(creatorState.mode);
+  const targets = getCreatorTargetLabels();
   const authContext = getSupabaseAuthContext();
   const title = dom.creatorTitleInput?.value.trim() || 'カスタムパズル';
   const slug = getCreatorSlug();
@@ -637,6 +941,8 @@ async function handleCreatorPublish() {
     slug,
     difficulty,
     postToContest,
+    mode,
+    targets,
     authorName,
     authorXUrl,
     clientId: clientIdValue,
@@ -681,11 +987,15 @@ async function handleCreatorPublish() {
       label: title,
       description: '',
       difficulty,
+      mode,
       author_name: authorName,
       original_url: originalUrl,
       diff_url: diffUrl,
       thumbnail_url: diffUrl,
     };
+    if (mode === GAME_MODE_HIDDEN_OBJECT && targets.length) {
+      payload.targets = targets;
+    }
     if (clientIdValue) {
       payload.client_id = clientIdValue;
     }
@@ -700,7 +1010,7 @@ async function handleCreatorPublish() {
     const normalized = normalizePublishedPuzzleEntry(inserted ?? payload);
     if (normalized) {
       state.officialPuzzles = mergePuzzles(state.officialPuzzles, normalized);
-      renderPuzzles(state.currentDifficulty);
+      renderPuzzles(state.currentDifficulty, state.currentMode);
     }
 
     let contestPosted = false;
@@ -850,8 +1160,7 @@ async function handleCreatorPublish() {
       setCreatorStatus('公開に失敗しました。時間を置いて再試行してください。', 'error');
     }
   } finally {
-    const canPublish = Boolean(creatorState.diffResult && creatorState.originalFile && creatorState.diffFile);
-    if (dom.creatorExportButton) dom.creatorExportButton.disabled = !canPublish;
+    updateCreatorPublishAvailability();
   }
 }
 
@@ -1400,8 +1709,7 @@ function setSupabaseMaintenance(active, reason = '') {
       setCreatorStatus('メンテナンス中のため公開はキューに保存されます。');
     }
   }
-  const canPublish = Boolean(creatorState.diffResult && creatorState.originalFile && creatorState.diffFile);
-  setCreatorActionsEnabled(canPublish);
+  updateCreatorPublishAvailability();
 }
 
 function noteSupabaseSuccess() {
@@ -1497,6 +1805,8 @@ function normalizePublishTask(task) {
   const difficulty = normalizeDifficulty(task.difficulty);
   const authorName = task.authorName || getCreatorNickname();
   const authorXUrl = task.authorXUrl || getCreatorXUrl();
+  const mode = normalizeGameMode(task.mode);
+  const targets = normalizePuzzleTargets(task.targets);
   const authContext = getSupabaseAuthContext();
   const userId = task.userId || authContext.userId || null;
   const clientIdValue = task.clientId || clientId || null;
@@ -1513,6 +1823,8 @@ function normalizePublishTask(task) {
     clientId: clientIdValue,
     userId,
     postToContest: task.postToContest !== false,
+    mode,
+    targets,
     originalDataUrl,
     diffDataUrl,
     size,
@@ -1553,6 +1865,8 @@ async function publishQueuedTask(task) {
     clientId: clientIdValue,
     userId,
     postToContest,
+    mode,
+    targets,
     originalDataUrl,
     diffDataUrl,
     size,
@@ -1578,11 +1892,15 @@ async function publishQueuedTask(task) {
     label: title,
     description: '',
     difficulty,
+    mode,
     author_name: authorName,
     original_url: originalUrl,
     diff_url: diffUrl,
     thumbnail_url: diffUrl,
   };
+  if (mode === GAME_MODE_HIDDEN_OBJECT && targets.length) {
+    payload.targets = targets;
+  }
   if (clientIdValue) {
     payload.client_id = clientIdValue;
   }
@@ -1607,7 +1925,7 @@ async function publishQueuedTask(task) {
   const normalizedEntry = normalizePublishedPuzzleEntry(inserted ?? payload);
   if (normalizedEntry) {
     state.officialPuzzles = mergePuzzles(state.officialPuzzles, normalizedEntry);
-    renderPuzzles(state.currentDifficulty);
+    renderPuzzles(state.currentDifficulty, state.currentMode);
   }
 
   const [originalImage, diffImage] = await Promise.all([
@@ -1941,6 +2259,8 @@ function normalizePublishedPuzzleEntry(entry) {
   const original = entry.original_url ?? entry.original ?? null;
   const diff = entry.diff_url ?? entry.diff ?? null;
   if (!original || !diff) return null;
+  const mode = normalizeGameMode(entry.mode ?? entry.game_mode ?? entry.play_mode);
+  const targets = normalizePuzzleTargets(entry.targets ?? entry.target_items ?? entry.targetItems ?? entry.items);
   return {
     id: entry.id ?? identifier,
     slug: entry.slug ?? identifier,
@@ -1953,6 +2273,8 @@ function normalizePublishedPuzzleEntry(entry) {
     userId: entry.user_id ?? entry.userId ?? null,
     original,
     diff,
+    mode,
+    targets,
     thumbnail: entry.thumbnail_url ?? entry.thumbnail ?? diff ?? original,
     shareUrl: entry.share_url ?? entry.shareUrl ?? null,
     source: 'published',
@@ -2011,7 +2333,7 @@ async function loadOfficialPuzzles() {
   }
   const publishedPuzzles = await loadPublishedPuzzles();
   state.officialPuzzles = [...basePuzzles, ...publishedPuzzles].filter(Boolean);
-  renderPuzzles(state.currentDifficulty);
+  renderPuzzles(state.currentDifficulty, state.currentMode);
 }
 
 function getPuzzleIdFromLocation() {
@@ -2039,6 +2361,7 @@ async function handleInitialPuzzleFromUrl() {
     return;
   }
 
+  selectGameMode(puzzle.mode);
   selectDifficulty(puzzle.difficulty);
   await startOfficialPuzzle(puzzle);
 }
@@ -2104,6 +2427,8 @@ function normalizePuzzleEntry(entry) {
   const original = entry.original ?? null;
   const diff = entry.diff ?? null;
   if (!original || !diff) return null;
+  const mode = normalizeGameMode(entry.mode);
+  const targets = normalizePuzzleTargets(entry.targets);
   return {
     id: entry.id ?? identifier,
     slug: entry.slug ?? identifier,
@@ -2115,6 +2440,8 @@ function normalizePuzzleEntry(entry) {
     clientId: entry.client_id ?? entry.clientId ?? null,
     original,
     diff,
+    mode,
+    targets,
     thumbnail: entry.thumbnail ?? original ?? diff,
     source: 'official',
     badge: '公式',
@@ -2178,7 +2505,8 @@ async function sharePuzzle(puzzle) {
       console.warn('share asset creation failed', error);
     }
   }
-  const shareText = `${puzzle.label}（${createStarLabel(puzzle.difficulty)}）に挑戦してみてください。\n${SHARE_HASHTAG}`;
+  const modeLabel = getGameModeMeta(puzzle?.mode).label;
+  const shareText = `${modeLabel} | ${puzzle.label}（${createStarLabel(puzzle.difficulty)}）に挑戦してみてください。\n${SHARE_HASHTAG}`;
   const shareMessage = `${shareText}\n${shareUrl}`;
   const shareData = {
     title: `PiXFiND | ${puzzle.label}`,
@@ -2264,6 +2592,7 @@ function setActiveScreen(target) {
 
   if (target === 'game') {
     dom.app?.classList.add('is-playing');
+    dom.app?.classList.toggle('is-hidden-object-mode', isHiddenObjectMode());
     document.body.classList.add('is-playing');
     requestAnimationFrame(() => {
       fitCanvasesToFrame();
@@ -2273,7 +2602,25 @@ function setActiveScreen(target) {
     });
   } else {
     dom.app?.classList.remove('is-playing');
+    dom.app?.classList.remove('is-hidden-object-mode');
     document.body.classList.remove('is-playing');
+  }
+}
+
+function selectGameMode(mode) {
+  const normalizedMode = normalizeGameMode(mode);
+  state.currentMode = normalizedMode;
+  const modeMeta = getGameModeMeta(normalizedMode);
+  dom.modeChips.forEach(chip => {
+    const isActive = normalizeGameMode(chip.dataset.gameMode) === normalizedMode;
+    chip.setAttribute('aria-pressed', String(isActive));
+  });
+  if (dom.modeDescription) {
+    dom.modeDescription.textContent = modeMeta.description;
+  }
+  renderPuzzles(state.currentDifficulty, normalizedMode);
+  if (!state.currentPuzzle) {
+    setHint(getDifficultySelectionHint(normalizedMode));
   }
 }
 
@@ -2283,14 +2630,17 @@ function selectDifficulty(level) {
     const isActive = Number(chip.dataset.difficulty) === level;
     chip.setAttribute('aria-pressed', String(isActive));
   });
-  renderPuzzles(level);
+  renderPuzzles(level, state.currentMode);
 }
 
-function renderPuzzles(level) {
+function renderPuzzles(level, mode = state.currentMode) {
   if (!dom.puzzleList) return;
   dom.puzzleList.innerHTML = '';
 
-  const official = state.officialPuzzles.filter(puzzle => puzzle.difficulty === level);
+  const normalizedMode = normalizeGameMode(mode);
+  const official = state.officialPuzzles.filter(puzzle => (
+    puzzle.difficulty === level && normalizeGameMode(puzzle.mode) === normalizedMode
+  ));
   official.forEach((puzzle, idx) => {
     dom.puzzleList.append(createOfficialCard(puzzle));
     if ((idx + 1) % 9 === 0) {
@@ -2301,7 +2651,7 @@ function renderPuzzles(level) {
   if (!official.length) {
     const info = document.createElement('p');
     info.className = 'section-subtitle';
-    info.textContent = '公式パズルはまだありません。';
+    info.textContent = `${getGameModeMeta(normalizedMode).label}の公式パズルはまだありません。`;
     dom.puzzleList.append(info);
   }
 
@@ -2379,6 +2729,7 @@ function updateDeleteButton(puzzle) {
 function createOfficialCard(puzzle) {
   const card = document.createElement('article');
   const badgeText = puzzle.badge ?? '公式';
+  const modeMeta = getGameModeMeta(puzzle.mode);
   const badgeClass = puzzle.source === 'published' ? 'puzzle-card__badge puzzle-card__badge--published' : 'puzzle-card__badge';
   card.className = `puzzle-card puzzle-card--official${puzzle.source === 'published' ? ' puzzle-card--published' : ''}`;
   card.role = 'button';
@@ -2392,6 +2743,7 @@ function createOfficialCard(puzzle) {
     <div class="puzzle-card__meta">
       <h4 class="puzzle-card__title">${puzzle.label}</h4>
       ${puzzle.description ? `<p class="puzzle-card__description">${puzzle.description}</p>` : ''}
+      <span class="puzzle-card__mode">${modeMeta.label}</span>
       <span class="puzzle-card__author">${puzzle.author || '名無し'}</span>
     </div>
     <div class="puzzle-card__actions">
@@ -2463,6 +2815,7 @@ async function startOfficialPuzzle(puzzle) {
     return;
   }
   try {
+    const mode = normalizeGameMode(puzzle.mode);
     setHint('画像を読み込んでいます…');
     const [rawOriginal, rawChallenge] = await Promise.all([
       loadImageFromUrl(puzzle.original),
@@ -2478,28 +2831,41 @@ async function startOfficialPuzzle(puzzle) {
       setHint('公式画像のサイズが一致しません。');
       return;
     }
-    const diffResult = computeDifferenceRegions(originalImage, challengeImage, { difficulty: puzzle.difficulty });
+
+    const diffResult = mode === GAME_MODE_HIDDEN_OBJECT
+      ? computeHiddenObjectRegions(challengeImage, { minDistance: CREATOR_HIDDEN_OBJECT_MIN_DISTANCE })
+      : computeDifferenceRegions(originalImage, challengeImage, { difficulty: puzzle.difficulty });
     if (!diffResult || !diffResult.regions.length) {
-      setHint('差分が見つかりませんでした。');
+      setHint(mode === GAME_MODE_HIDDEN_OBJECT ? '探し物が見つかりませんでした。' : '差分が見つかりませんでした。');
       return;
     }
+    if (mode === GAME_MODE_HIDDEN_OBJECT && diffResult.tooClosePair) {
+      setHint('探し物の配置が近すぎるため、この問題は読み込めません。');
+      return;
+    }
+
     const metadata = {
       id: puzzle.id,
       name: puzzle.label,
       difficulty: puzzle.difficulty,
       size: `${originalImage.width}×${originalImage.height}px`,
       source: puzzle.source || 'official',
+      mode,
+      targets: normalizePuzzleTargets(puzzle.targets),
       author: puzzle.author || '',
       authorUrl: puzzle.authorUrl || '',
       clientId: puzzle.clientId || null,
       userId: puzzle.userId || null,
     };
-    prepareGameBoard(originalImage, challengeImage, diffResult, metadata);
+    prepareGameBoard(
+      originalImage,
+      mode === GAME_MODE_HIDDEN_OBJECT ? originalImage : challengeImage,
+      diffResult,
+      metadata,
+    );
     dom.gameTitle.textContent = metadata.name;
     renderGameAuthor(metadata);
     updateDeleteButton(metadata);
-    dom.totalCount.textContent = String(diffResult.regions.length);
-    setHint('左右の画像を見比べて、違いをタップしてください。');
     setActiveScreen('game');
     resetRound();
   } catch (error) {
@@ -2530,7 +2896,7 @@ async function handleDeleteCurrentPuzzle() {
     state.officialPuzzles = state.officialPuzzles.filter(entry => entry.id !== puzzle.id);
     const published = state.officialPuzzles.filter(entry => entry.source === 'published');
     savePublishedCache(published);
-    renderPuzzles(state.currentDifficulty);
+    renderPuzzles(state.currentDifficulty, state.currentMode);
     leaveGame('difficulty');
     setHint('パズルを削除しました。');
   } catch (error) {
@@ -2540,16 +2906,26 @@ async function handleDeleteCurrentPuzzle() {
 }
 
 function prepareGameBoard(originalImage, challengeImage, diffResult, metadata = null) {
+  const activeMode = normalizeGameMode(metadata?.mode ?? state.currentMode);
   state.imageSize = { width: originalImage.width, height: originalImage.height };
-  state.differences = diffResult.regions.map((region, index) => ({
+  const orderedRegions = [...diffResult.regions].sort((a, b) => (
+    a.minY - b.minY || a.minX - b.minX
+  ));
+  state.differences = orderedRegions.map((region, index) => ({
     ...region,
     id: `region-${index}`,
     found: false,
     markers: {},
   }));
+  state.activeMode = activeMode;
+  state.hiddenTargets = isHiddenObjectMode(activeMode)
+    ? buildHiddenTargets(state.differences, metadata?.targets ?? [])
+    : [];
   state.currentPuzzle = metadata || {
     name: 'PiXFiND Puzzle',
     difficulty: state.currentDifficulty,
+    mode: activeMode,
+    targets: [],
     size: `${originalImage.width}×${originalImage.height}px`,
   };
   state.total = state.differences.length;
@@ -2577,7 +2953,46 @@ function prepareGameBoard(originalImage, challengeImage, diffResult, metadata = 
   fitCanvasesToFrame();
   resetAllZoomTransforms();
   clearMarkers();
+  updateGameModePresentation();
   updateProgressLabel();
+}
+
+function updateGameModePresentation() {
+  const modeMeta = getGameModeMeta(state.activeMode);
+  if (dom.gameModeLabel) {
+    dom.gameModeLabel.textContent = modeMeta.gameLabel;
+  }
+  if (dom.foundLabel) {
+    dom.foundLabel.textContent = 'FOUND';
+  }
+  if (dom.canvasOriginal) {
+    dom.canvasOriginal.setAttribute('aria-label', isHiddenObjectMode() ? '参照画像' : 'お手本画像');
+  }
+  if (dom.canvasChallenge) {
+    dom.canvasChallenge.setAttribute('aria-label', isHiddenObjectMode() ? 'もの探し画像' : '間違いを探す画像');
+  }
+  renderTargetPanel();
+}
+
+function renderTargetPanel() {
+  if (!dom.targetPanel || !dom.targetCurrent || !dom.targetList) return;
+  const enabled = isHiddenObjectMode() && state.hiddenTargets.length > 0;
+  dom.targetPanel.hidden = !enabled;
+  dom.targetList.innerHTML = '';
+  if (!enabled) {
+    dom.targetCurrent.textContent = '-';
+    return;
+  }
+  const remaining = state.hiddenTargets.filter(target => !target.found).length;
+  dom.targetCurrent.textContent = remaining > 0
+    ? `残り ${remaining} 個`
+    : 'コンプリート！';
+  state.hiddenTargets.forEach(target => {
+    const item = document.createElement('li');
+    item.className = `target-list__item${target.found ? ' is-found' : ''}`;
+    item.textContent = target.label;
+    dom.targetList.append(item);
+  });
 }
 
 function fitCanvasesToFrame() {
@@ -2613,26 +3028,36 @@ function resetRound() {
     state.resetTimeout = null;
   }
   if (!state.differences.length) {
+    state.hiddenTargets.forEach(target => {
+      target.found = false;
+    });
     state.mistakes = 0;
     state.missMarkers = [];
     state.roundCompleted = false;
+    updateGameModePresentation();
     updateProgressLabel();
     dom.timerLabel.textContent = formatTime(0);
     clearMarkers();
+    setHint(getRoundStartHint());
     return;
   }
   state.differences.forEach(region => {
     region.found = false;
     region.markers = {};
   });
+  state.hiddenTargets.forEach(target => {
+    target.found = false;
+  });
   state.found = 0;
   state.mistakes = 0;
   state.missMarkers = [];
   state.roundCompleted = false;
+  updateGameModePresentation();
   updateProgressLabel();
   dom.timerLabel.textContent = formatTime(0);
   clearMarkers();
   startTimer();
+  setHint(getRoundStartHint());
 }
 
 function leaveGame(targetScreen) {
@@ -2646,7 +3071,9 @@ function leaveGame(targetScreen) {
   state.currentPuzzle = null;
   renderGameAuthor(null);
   updateDeleteButton(null);
+  state.activeMode = state.currentMode;
   state.differences = [];
+  state.hiddenTargets = [];
   state.found = 0;
   state.total = 0;
   state.mistakes = 0;
@@ -2656,7 +3083,8 @@ function leaveGame(targetScreen) {
     clearTimeout(state.resetTimeout);
     state.resetTimeout = null;
   }
-  setHint('星を選んで、挑戦したい難易度を選んでください。');
+  updateGameModePresentation();
+  setHint(getDifficultySelectionHint(state.currentMode));
   updateProgressLabel();
   setActiveScreen(targetScreen);
 }
@@ -2666,42 +3094,85 @@ function processCanvasSelection(targetCanvas, x, y) {
     return;
   }
 
-  const region = state.differences.find(diff => !diff.found && isPointInsideRegion(diff, x, y));
+  if (isHiddenObjectMode() && targetCanvas === dom.canvasOriginal) {
+    setHint('もの探しモードは右側の絵から探してください。');
+    return;
+  }
+
+  const region = state.differences.find(diff => (
+    !diff.found && (
+      isHiddenObjectMode()
+        ? isPointInsideHiddenObjectRegion(diff, x, y, HIDDEN_OBJECT_HIT_PADDING)
+        : isPointInsideRegion(diff, x, y)
+    )
+  ));
   if (!region) {
-    addMissMarker(targetCanvas, x, y);
-    state.mistakes = Math.min(state.mistakes + 1, MAX_MISTAKES);
-    updateMistakeLabel();
-    if (state.mistakes >= MAX_MISTAKES) {
-      setHint('ミスが3回に達したためラウンドをリセットします。');
-      state.roundCompleted = true;
-      showFailureOverlay();
-      if (state.resetTimeout != null) {
-        clearTimeout(state.resetTimeout);
-      }
-      state.resetTimeout = window.setTimeout(() => {
-        resetRound();
-      }, 1700);
+    const message = isHiddenObjectMode()
+      ? '指定されたアイテムではありません。'
+      : 'まだ間違いが隠れています。落ち着いて探し続けましょう。';
+    registerMiss(targetCanvas, x, y, message);
+    return;
+  }
+
+  if (isHiddenObjectMode()) {
+    const targetForRegion = state.hiddenTargets.find(target => target.regionId === region.id && !target.found);
+    if (!targetForRegion) {
+      registerMiss(targetCanvas, x, y, '指定されたアイテムを探してください。');
+      return;
+    }
+    targetForRegion.found = true;
+    registerFound(region);
+    renderTargetPanel();
+    if (state.found >= state.total) {
+      completeRound('すべてのアイテムを見つけました！');
     } else {
-      setHint('まだ間違いが隠れています。落ち着いて探し続けましょう。');
+      const remaining = state.hiddenTargets.filter(target => !target.found).length;
+      setHint(`ナイス！残り${remaining}個です。`);
     }
     return;
   }
 
+  registerFound(region);
+  if (state.found >= state.total) {
+    completeRound('全ての間違いを発見しました！おめでとうございます。');
+  } else {
+    setHint('ナイス！まだ他にも間違いが潜んでいます。');
+  }
+}
+
+function registerFound(region) {
   region.found = true;
   state.found += 1;
   updateProgressLabel();
   renderMarker(region);
   renderGlobalFlash();
   playSuccessSound();
+}
 
-  if (state.found >= state.total) {
+function registerMiss(targetCanvas, x, y, message) {
+  addMissMarker(targetCanvas, x, y);
+  state.mistakes = Math.min(state.mistakes + 1, MAX_MISTAKES);
+  updateMistakeLabel();
+  if (state.mistakes >= MAX_MISTAKES) {
+    setHint('ミスが3回に達したためラウンドをリセットします。');
     state.roundCompleted = true;
-    stopTimer();
-    setHint('全ての間違いを発見しました！おめでとうございます。');
-    showCompletionOverlay();
-  } else {
-    setHint('ナイス！まだ他にも間違いが潜んでいます。');
+    showFailureOverlay();
+    if (state.resetTimeout != null) {
+      clearTimeout(state.resetTimeout);
+    }
+    state.resetTimeout = window.setTimeout(() => {
+      resetRound();
+    }, 1700);
+    return;
   }
+  setHint(message || 'ミスです。');
+}
+
+function completeRound(message) {
+  state.roundCompleted = true;
+  stopTimer();
+  setHint(message);
+  showCompletionOverlay();
 }
 
 function renderMarker(region) {
@@ -2984,6 +3455,203 @@ function computeDifferenceRegions(originalImage, challengeImage, options = {}) {
   }
 
   return { regions, width, height };
+}
+
+function computeHiddenObjectRegions(layerImage, options = {}) {
+  const width = layerImage.width;
+  const height = layerImage.height;
+  const offscreen = document.createElement('canvas');
+  offscreen.width = width;
+  offscreen.height = height;
+  const context = offscreen.getContext('2d');
+  if (!context) return null;
+
+  context.drawImage(layerImage, 0, 0);
+  const imageData = context.getImageData(0, 0, width, height);
+  const { data } = imageData;
+  const mask = new Uint8Array(width * height);
+  for (let index = 0, offset = 0; index < mask.length; index += 1, offset += 4) {
+    if (data[offset + 3] > 0) {
+      mask[index] = 1;
+    }
+  }
+
+  const visited = new Uint8Array(width * height);
+  const regions = [];
+  const queue = [];
+  const neighborOffsets = [
+    { x: -1, y: -1 },
+    { x: 0, y: -1 },
+    { x: 1, y: -1 },
+    { x: -1, y: 0 },
+    { x: 1, y: 0 },
+    { x: -1, y: 1 },
+    { x: 0, y: 1 },
+    { x: 1, y: 1 },
+  ];
+
+  for (let index = 0; index < mask.length; index += 1) {
+    if (!mask[index] || visited[index]) continue;
+
+    let count = 0;
+    let minX = width;
+    let maxX = 0;
+    let minY = height;
+    let maxY = 0;
+    let sumX = 0;
+    let sumY = 0;
+    const pixels = [];
+
+    queue.push(index);
+    visited[index] = 1;
+
+    while (queue.length) {
+      const idx = queue.pop();
+      const x = idx % width;
+      const y = Math.floor(idx / width);
+      pixels.push(idx);
+      count += 1;
+      sumX += x;
+      sumY += y;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+
+      for (const neighbor of neighborOffsets) {
+        const nx = x + neighbor.x;
+        const ny = y + neighbor.y;
+        if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+        const nIndex = ny * width + nx;
+        if (!mask[nIndex] || visited[nIndex]) continue;
+        visited[nIndex] = 1;
+        queue.push(nIndex);
+      }
+    }
+
+    if (count < MIN_CLUSTER_PIXELS) continue;
+
+    const maskWidth = maxX - minX + 1;
+    const maskHeight = maxY - minY + 1;
+    const localMask = new Uint8Array(maskWidth * maskHeight);
+    pixels.forEach(pixelIndex => {
+      const px = pixelIndex % width;
+      const py = Math.floor(pixelIndex / width);
+      localMask[(py - minY) * maskWidth + (px - minX)] = 1;
+    });
+
+    regions.push({
+      minX,
+      maxX,
+      minY,
+      maxY,
+      centerX: sumX / count,
+      centerY: sumY / count,
+      count,
+      maskWidth,
+      maskHeight,
+      mask: localMask,
+      pixels,
+    });
+  }
+
+  regions.sort((a, b) => a.minY - b.minY || a.minX - b.minX);
+
+  const minDistance = Number.isFinite(options.minDistance)
+    ? Math.max(0, Math.floor(options.minDistance))
+    : 0;
+  const tooClosePair = minDistance > 0
+    ? detectTooCloseHiddenObjectPair(regions, width, minDistance)
+    : null;
+
+  const normalizedRegions = regions.map(({ pixels, ...region }) => region);
+  return {
+    regions: normalizedRegions,
+    width,
+    height,
+    minDistance,
+    tooClosePair,
+  };
+}
+
+function detectTooCloseHiddenObjectPair(regions, imageWidth, minDistance) {
+  for (let left = 0; left < regions.length; left += 1) {
+    for (let right = left + 1; right < regions.length; right += 1) {
+      const first = regions[left];
+      const second = regions[right];
+      if (!couldRegionsBeNear(first, second, minDistance)) {
+        continue;
+      }
+      if (areHiddenRegionsTooClose(first, second, imageWidth, minDistance)) {
+        return [left, right];
+      }
+    }
+  }
+  return null;
+}
+
+function couldRegionsBeNear(a, b, distance) {
+  const gapX = a.maxX < b.minX
+    ? b.minX - a.maxX
+    : b.maxX < a.minX
+      ? a.minX - b.maxX
+      : 0;
+  const gapY = a.maxY < b.minY
+    ? b.minY - a.maxY
+    : b.maxY < a.minY
+      ? a.minY - b.maxY
+      : 0;
+  return Math.max(gapX, gapY) <= distance;
+}
+
+function areHiddenRegionsTooClose(a, b, imageWidth, distance) {
+  const first = (a.pixels?.length ?? 0) <= (b.pixels?.length ?? 0) ? a : b;
+  const second = first === a ? b : a;
+  const pixels = first.pixels || [];
+  for (let i = 0; i < pixels.length; i += 1) {
+    const index = pixels[i];
+    const x = index % imageWidth;
+    const y = Math.floor(index / imageWidth);
+    for (let offsetY = -distance; offsetY <= distance; offsetY += 1) {
+      for (let offsetX = -distance; offsetX <= distance; offsetX += 1) {
+        if (Math.max(Math.abs(offsetX), Math.abs(offsetY)) > distance) continue;
+        if (hasPixelInHiddenRegion(second, x + offsetX, y + offsetY)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function hasPixelInHiddenRegion(region, x, y) {
+  const px = Math.round(x);
+  const py = Math.round(y);
+  if (!region || !region.mask || !Number.isFinite(region.maskWidth) || !Number.isFinite(region.maskHeight)) {
+    return false;
+  }
+  if (px < region.minX || px > region.maxX || py < region.minY || py > region.maxY) {
+    return false;
+  }
+  const localX = px - region.minX;
+  const localY = py - region.minY;
+  return region.mask[(localY * region.maskWidth) + localX] === 1;
+}
+
+function isPointInsideHiddenObjectRegion(region, x, y, padding = HIDDEN_OBJECT_HIT_PADDING) {
+  if (!region || !region.mask) return false;
+  const px = Math.round(x);
+  const py = Math.round(y);
+  const span = Math.max(0, Math.floor(padding));
+  for (let offsetY = -span; offsetY <= span; offsetY += 1) {
+    for (let offsetX = -span; offsetX <= span; offsetX += 1) {
+      if (Math.max(Math.abs(offsetX), Math.abs(offsetY)) > span) continue;
+      if (hasPixelInHiddenRegion(region, px + offsetX, py + offsetY)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 function isPointInsideRegion(region, x, y) {
