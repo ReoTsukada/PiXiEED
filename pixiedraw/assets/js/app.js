@@ -875,8 +875,9 @@
   };
 
   const TOUCH_PAN_MIN_POINTERS = 2;
-  const TOUCH_PINCH_SENSITIVITY = 1.9;
-  const TOUCH_PINCH_DEADZONE_RATIO = 0.004;
+  const TOUCH_PINCH_SENSITIVITY = 1.45;
+  const TOUCH_PINCH_DEADZONE_RATIO = 0.008;
+  const TOUCH_PINCH_MAX_STEP_RATIO = 1.18;
   const TOUCH_PINCH_MIN_RATIO = 0.05;
   const activeTouchPointers = new Map();
   const keyboardState = {
@@ -12012,7 +12013,7 @@
     setZoom(getZoomScaleAtIndex(nextIndex), focus);
   }
 
-  function getCanvasFocusAt(clientX, clientY) {
+  function getCanvasFocusAt(clientX, clientY, { clampToCanvas = false } = {}) {
     const drawing = dom.canvases.drawing;
     if (!drawing) {
       return null;
@@ -12021,15 +12022,19 @@
     if (rect.width === 0 || rect.height === 0) {
       return null;
     }
-    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
+    const outsideX = clientX < rect.left || clientX > rect.right;
+    const outsideY = clientY < rect.top || clientY > rect.bottom;
+    if ((outsideX || outsideY) && !clampToCanvas) {
       return null;
     }
+    const clampedClientX = clampToCanvas ? clamp(clientX, rect.left, rect.right) : clientX;
+    const clampedClientY = clampToCanvas ? clamp(clientY, rect.top, rect.bottom) : clientY;
     const scale = Number(state.scale) || MIN_ZOOM_SCALE;
-    const worldX = (clientX - rect.left) / scale;
-    const worldY = (clientY - rect.top) / scale;
+    const worldX = (clampedClientX - rect.left) / scale;
+    const worldY = (clampedClientY - rect.top) / scale;
     return {
-      clientX,
-      clientY,
+      clientX: clampedClientX,
+      clientY: clampedClientY,
       worldX,
       worldY,
       cellX: Math.floor(worldX),
@@ -12593,16 +12598,21 @@
         const baselineScale = Number(pointerState.touchPinchStartScale) || Number(state.scale) || MIN_ZOOM_SCALE;
         if (Number.isFinite(baselineDistance) && baselineDistance > 0 && Number.isFinite(nextDistance) && nextDistance > 0) {
           const rawRatio = nextDistance / baselineDistance;
-          const ratioDelta = Math.abs(rawRatio - 1);
-          const amplifiedRatio = 1 + ((rawRatio - 1) * TOUCH_PINCH_SENSITIVITY);
+          const cappedRatio = clamp(
+            rawRatio,
+            1 / TOUCH_PINCH_MAX_STEP_RATIO,
+            TOUCH_PINCH_MAX_STEP_RATIO
+          );
+          const ratioDelta = Math.abs(cappedRatio - 1);
+          const amplifiedRatio = 1 + ((cappedRatio - 1) * TOUCH_PINCH_SENSITIVITY);
           const targetScale = normalizeZoomScale(
             baselineScale * Math.max(TOUCH_PINCH_MIN_RATIO, amplifiedRatio),
             Number(state.scale) || baselineScale
           );
           if (ratioDelta >= TOUCH_PINCH_DEADZONE_RATIO && Math.abs(targetScale - (Number(state.scale) || MIN_ZOOM_SCALE)) >= ZOOM_EPSILON) {
             const pinchFocus = state.showVirtualCursor
-              ? (getVirtualCursorZoomFocus() || getCanvasFocusAt(centroid.x, centroid.y))
-              : getCanvasFocusAt(centroid.x, centroid.y);
+              ? (getVirtualCursorZoomFocus() || getCanvasFocusAt(centroid.x, centroid.y, { clampToCanvas: true }))
+              : getCanvasFocusAt(centroid.x, centroid.y, { clampToCanvas: true });
             setZoom(targetScale, pinchFocus || undefined);
             panBaseX = Number(state.pan.x) || panBaseX;
             panBaseY = Number(state.pan.y) || panBaseY;
@@ -12613,6 +12623,7 @@
         state.pan.y = Math.round(panBaseY + dy);
         applyViewportTransform();
         updateVirtualCursorFromEvent(event);
+        refreshTouchPanBaseline();
         return;
       }
       if (event.pointerId !== pointerState.pointerId) return;
