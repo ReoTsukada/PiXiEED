@@ -14683,7 +14683,8 @@
       drawSelectionOverlay();
     }
 
-    const focusPixel = pointerState.active ? pointerState.current : hoverPixel;
+    const virtualFocusPixel = state.showVirtualCursor ? getVirtualCursorCellPosition() : null;
+    const focusPixel = pointerState.active ? pointerState.current : (virtualFocusPixel || hoverPixel);
     const activeTool = getActiveTool();
     if (state.showPixelGuides && focusPixel) {
       const overrideSize = activeTool === 'fill' ? 1 : undefined;
