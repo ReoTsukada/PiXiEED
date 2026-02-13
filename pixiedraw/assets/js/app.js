@@ -599,6 +599,9 @@
     dragging: false,
     startPointer: null,
     startPosition: null,
+    startCursorCell: null,
+    drawSessionStarted: false,
+    drawMoved: false,
     initialized: false,
     scale: DEFAULT_FLOATING_DRAW_BUTTON_SCALE,
   };
@@ -1091,7 +1094,163 @@
       snapshot.playback = { ...state.playback };
     }
 
+    applyPendingSelectionMoveToSnapshot(snapshot, { includeSelection, clonePixelData });
     return snapshot;
+  }
+
+  function applyPendingSelectionMoveToSnapshot(snapshot, { includeSelection = true, clonePixelData = true } = {}) {
+    if (!snapshot || !clonePixelData) {
+      return;
+    }
+    const moveState = getPendingSelectionMoveState();
+    if (!moveState || !moveState.hasCleared || !moveState.bounds || !Array.isArray(snapshot.frames) || !snapshot.frames.length) {
+      return;
+    }
+    const width = Math.max(1, Number(snapshot.width) || 0);
+    const height = Math.max(1, Number(snapshot.height) || 0);
+    const pixelCount = width * height;
+    if (!pixelCount) {
+      return;
+    }
+
+    const moveLayerId = typeof moveState.layerId === 'string' && moveState.layerId
+      ? moveState.layerId
+      : (typeof moveState.layer?.id === 'string' ? moveState.layer.id : null);
+
+    const frameCount = snapshot.frames.length;
+    const activeFrameIndex = clamp(Math.round(Number(snapshot.activeFrame) || 0), 0, frameCount - 1);
+    const candidateFrameIndexes = [activeFrameIndex];
+    for (let i = 0; i < frameCount; i += 1) {
+      if (i !== activeFrameIndex) {
+        candidateFrameIndexes.push(i);
+      }
+    }
+
+    let targetFrameIndex = -1;
+    let targetLayer = null;
+    for (let i = 0; i < candidateFrameIndexes.length; i += 1) {
+      const frameIndex = candidateFrameIndexes[i];
+      const frame = snapshot.frames[frameIndex];
+      if (!frame || !Array.isArray(frame.layers) || !frame.layers.length) {
+        continue;
+      }
+      if (moveLayerId) {
+        const matched = frame.layers.find(layer => layer?.id === moveLayerId);
+        if (matched) {
+          targetFrameIndex = frameIndex;
+          targetLayer = matched;
+          break;
+        }
+      }
+      if (frameIndex === activeFrameIndex) {
+        const activeLayerId = typeof snapshot.activeLayer === 'string' ? snapshot.activeLayer : null;
+        const fallback = (activeLayerId && frame.layers.find(layer => layer?.id === activeLayerId))
+          || frame.layers[frame.layers.length - 1];
+        if (fallback) {
+          targetFrameIndex = frameIndex;
+          targetLayer = fallback;
+          if (!moveLayerId) {
+            break;
+          }
+        }
+      }
+    }
+
+    if (!targetLayer || targetFrameIndex < 0) {
+      return;
+    }
+
+    const sourceMask = moveState.mask instanceof Uint8Array ? moveState.mask : null;
+    const sourceIndices = moveState.indices instanceof Int16Array ? moveState.indices : null;
+    const sourceDirect = moveState.direct instanceof Uint8ClampedArray ? moveState.direct : null;
+    const moveWidth = Math.max(0, Number(moveState.width) || 0);
+    const moveHeight = Math.max(0, Number(moveState.height) || 0);
+    if (!sourceMask || !sourceIndices || moveWidth <= 0 || moveHeight <= 0) {
+      return;
+    }
+    if (sourceMask.length !== moveWidth * moveHeight || sourceIndices.length !== moveWidth * moveHeight) {
+      return;
+    }
+
+    let targetIndices = targetLayer.indices instanceof Int16Array ? targetLayer.indices : null;
+    if (!targetIndices || targetIndices.length !== pixelCount) {
+      targetIndices = new Int16Array(pixelCount);
+      if (targetLayer.indices && targetLayer.indices.length === pixelCount) {
+        targetIndices.set(targetLayer.indices);
+      }
+      targetLayer.indices = targetIndices;
+    }
+
+    let targetDirect = targetLayer.direct instanceof Uint8ClampedArray ? targetLayer.direct : null;
+    if (sourceDirect && (!targetDirect || targetDirect.length !== pixelCount * 4)) {
+      const nextDirect = new Uint8ClampedArray(pixelCount * 4);
+      if (targetDirect && targetDirect.length === pixelCount * 4) {
+        nextDirect.set(targetDirect);
+      }
+      targetDirect = nextDirect;
+      targetLayer.direct = targetDirect;
+    }
+
+    const offsetX = Math.round(Number(moveState.offset?.x) || 0);
+    const offsetY = Math.round(Number(moveState.offset?.y) || 0);
+    const originX = Math.round(Number(moveState.bounds.x0) || 0);
+    const originY = Math.round(Number(moveState.bounds.y0) || 0);
+    const newMask = new Uint8Array(pixelCount);
+    const newBounds = { x0: width, y0: height, x1: -1, y1: -1 };
+    let placed = false;
+
+    for (let y = 0; y < moveHeight; y += 1) {
+      for (let x = 0; x < moveWidth; x += 1) {
+        const localIndex = y * moveWidth + x;
+        if (sourceMask[localIndex] !== 1) {
+          continue;
+        }
+        const targetX = originX + x + offsetX;
+        const targetY = originY + y + offsetY;
+        if (targetX < 0 || targetY < 0 || targetX >= width || targetY >= height) {
+          continue;
+        }
+        const targetIndex = targetY * width + targetX;
+        targetIndices[targetIndex] = sourceIndices[localIndex];
+        if (targetDirect) {
+          const targetBase = targetIndex * 4;
+          if (sourceDirect && sourceDirect.length >= (localIndex * 4) + 4) {
+            const localBase = localIndex * 4;
+            targetDirect[targetBase] = sourceDirect[localBase];
+            targetDirect[targetBase + 1] = sourceDirect[localBase + 1];
+            targetDirect[targetBase + 2] = sourceDirect[localBase + 2];
+            targetDirect[targetBase + 3] = sourceDirect[localBase + 3];
+          } else {
+            targetDirect[targetBase] = 0;
+            targetDirect[targetBase + 1] = 0;
+            targetDirect[targetBase + 2] = 0;
+            targetDirect[targetBase + 3] = 0;
+          }
+        }
+        newMask[targetIndex] = 1;
+        if (!placed) {
+          placed = true;
+        }
+        if (targetX < newBounds.x0) newBounds.x0 = targetX;
+        if (targetY < newBounds.y0) newBounds.y0 = targetY;
+        if (targetX > newBounds.x1) newBounds.x1 = targetX;
+        if (targetY > newBounds.y1) newBounds.y1 = targetY;
+      }
+    }
+
+    if (!includeSelection) {
+      return;
+    }
+
+    if (placed && moveState.applySelectionOnFinalize !== false) {
+      snapshot.selectionMask = newMask;
+      snapshot.selectionBounds = newBounds;
+      snapshot.activeFrame = targetFrameIndex;
+      snapshot.activeLayer = targetLayer.id || snapshot.activeLayer;
+    } else {
+      snapshot.selectionMask = null;
+      snapshot.selectionBounds = null;
+    }
   }
 
   function encodeInt16Rle(view) {
@@ -10709,6 +10868,18 @@
         requestOverlayRender();
       }
     }
+    if (
+      floatingDrawButtonState.pointerId !== null
+      && floatingDrawButtonState.drawSessionStarted
+      && !floatingDrawButtonState.dragging
+      && floatingDrawButtonState.startCursorCell
+      && (
+        floatingDrawButtonState.startCursorCell.x !== currentCell.x
+        || floatingDrawButtonState.startCursorCell.y !== currentCell.y
+      )
+    ) {
+      floatingDrawButtonState.drawMoved = true;
+    }
 
     const tool = virtualCursorDrawState.tool;
     if (!virtualCursorDrawState.active || !tool) {
@@ -11495,6 +11666,9 @@
     floatingDrawButtonState.dragging = false;
     floatingDrawButtonState.startPointer = { x: event.clientX, y: event.clientY };
     floatingDrawButtonState.startPosition = { ...floatingDrawButtonState.position };
+    floatingDrawButtonState.startCursorCell = getVirtualCursorCellPosition();
+    floatingDrawButtonState.drawMoved = false;
+    floatingDrawButtonState.drawSessionStarted = startVirtualCursorDrawSession();
     try {
       button.setPointerCapture?.(event.pointerId);
     } catch (error) {
@@ -11518,10 +11692,16 @@
         ? DRAW_BUTTON_DRAG_THRESHOLD_TOUCH
         : DRAW_BUTTON_DRAG_THRESHOLD;
       if (distance >= dragThreshold) {
+        const isActiveDrawingHold = floatingDrawButtonState.drawSessionStarted && floatingDrawButtonState.drawMoved;
+        if (isActiveDrawingHold) {
+          return;
+        }
         floatingDrawButtonState.dragging = true;
         if (virtualCursorDrawState.active) {
           cancelVirtualCursorDrawSession();
         }
+        floatingDrawButtonState.drawSessionStarted = false;
+        floatingDrawButtonState.drawMoved = false;
       }
     }
     if (floatingDrawButtonState.dragging) {
@@ -11551,6 +11731,9 @@
     floatingDrawButtonState.dragging = false;
     floatingDrawButtonState.startPointer = null;
     floatingDrawButtonState.startPosition = null;
+    floatingDrawButtonState.startCursorCell = null;
+    floatingDrawButtonState.drawMoved = false;
+    floatingDrawButtonState.drawSessionStarted = false;
     if (wasDrawing) {
       if (wasDragging) {
         cancelVirtualCursorDrawSession();
@@ -11583,6 +11766,9 @@
     floatingDrawButtonState.dragging = false;
     floatingDrawButtonState.startPointer = null;
     floatingDrawButtonState.startPosition = null;
+    floatingDrawButtonState.startCursorCell = null;
+    floatingDrawButtonState.drawMoved = false;
+    floatingDrawButtonState.drawSessionStarted = false;
   }
 
   function updateFloatingDrawButtonEnabledState() {
@@ -11611,6 +11797,9 @@
       floatingDrawButtonState.dragging = false;
       floatingDrawButtonState.startPointer = null;
       floatingDrawButtonState.startPosition = null;
+      floatingDrawButtonState.startCursorCell = null;
+      floatingDrawButtonState.drawMoved = false;
+      floatingDrawButtonState.drawSessionStarted = false;
     } else {
       button.classList.remove('is-hidden');
       button.classList.remove('is-disabled');
@@ -14705,7 +14894,7 @@
       ctx.selection.clearRect(0, 0, clearWidth, clearHeight);
     }
 
-    const moveState = pointerState.selectionMove;
+    const moveState = getPendingSelectionMoveState();
     const hasSelectionPreview = Boolean(pointerState.selectionPreview
       && (pointerState.tool === 'selectLasso' || pointerState.tool === 'selectRect'));
     const hasSelectionOutline = Boolean(state.selectionMask)
