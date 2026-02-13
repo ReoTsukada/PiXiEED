@@ -593,6 +593,7 @@
   const floatingDrawButtonState = {
     position: { x: 16, y: 16 },
     pointerId: null,
+    pointerType: null,
     dragging: false,
     startPointer: null,
     startPosition: null,
@@ -664,6 +665,7 @@
   const MEMORY_MONITOR_INTERVAL = 2000;
   const MEMORY_WARNING_DEFAULT = 250 * 1024 * 1024;
   const DRAW_BUTTON_DRAG_THRESHOLD = 6;
+  const DRAW_BUTTON_DRAG_THRESHOLD_TOUCH = 12;
   const TIMELINE_CELL_SIZE = 32;
   const TIMELINE_CELL_VARIANTS = {
     corner: { fill: 'rgba(16, 22, 32, 0.94)', border: 'rgba(210, 220, 240, 0.45)' },
@@ -11467,6 +11469,7 @@
       return;
     }
     floatingDrawButtonState.pointerId = event.pointerId ?? -1;
+    floatingDrawButtonState.pointerType = typeof event.pointerType === 'string' ? event.pointerType : null;
     floatingDrawButtonState.dragging = false;
     floatingDrawButtonState.startPointer = { x: event.clientX, y: event.clientY };
     floatingDrawButtonState.startPosition = { ...floatingDrawButtonState.position };
@@ -11478,7 +11481,6 @@
     window.addEventListener('pointermove', handleFloatingDrawButtonPointerMove);
     window.addEventListener('pointerup', handleFloatingDrawButtonPointerUp);
     window.addEventListener('pointercancel', handleFloatingDrawButtonPointerCancel);
-    startVirtualCursorDrawSession();
   }
 
   function handleFloatingDrawButtonPointerMove(event) {
@@ -11489,8 +11491,15 @@
     const dy = event.clientY - (floatingDrawButtonState.startPointer?.y || 0);
     if (!floatingDrawButtonState.dragging) {
       const distance = Math.hypot(dx, dy);
-      if (distance >= DRAW_BUTTON_DRAG_THRESHOLD) {
+      const pointerType = floatingDrawButtonState.pointerType;
+      const dragThreshold = (pointerType === 'touch' || pointerType === 'pen')
+        ? DRAW_BUTTON_DRAG_THRESHOLD_TOUCH
+        : DRAW_BUTTON_DRAG_THRESHOLD;
+      if (distance >= dragThreshold) {
         floatingDrawButtonState.dragging = true;
+        if (virtualCursorDrawState.active) {
+          cancelVirtualCursorDrawSession();
+        }
       }
     }
     if (floatingDrawButtonState.dragging) {
@@ -11516,11 +11525,16 @@
     const wasDragging = floatingDrawButtonState.dragging;
     const wasDrawing = virtualCursorDrawState.active;
     floatingDrawButtonState.pointerId = null;
+    floatingDrawButtonState.pointerType = null;
     floatingDrawButtonState.dragging = false;
     floatingDrawButtonState.startPointer = null;
     floatingDrawButtonState.startPosition = null;
     if (wasDrawing) {
-      finishVirtualCursorDrawSession({ commit: true });
+      if (wasDragging) {
+        cancelVirtualCursorDrawSession();
+      } else {
+        finishVirtualCursorDrawSession({ commit: true });
+      }
       return;
     }
     if (!wasDragging) {
@@ -11543,6 +11557,7 @@
     }
     cancelVirtualCursorDrawSession();
     floatingDrawButtonState.pointerId = null;
+    floatingDrawButtonState.pointerType = null;
     floatingDrawButtonState.dragging = false;
     floatingDrawButtonState.startPointer = null;
     floatingDrawButtonState.startPosition = null;
@@ -11570,6 +11585,7 @@
       }
       cancelVirtualCursorDrawSession();
       floatingDrawButtonState.pointerId = null;
+      floatingDrawButtonState.pointerType = null;
       floatingDrawButtonState.dragging = false;
       floatingDrawButtonState.startPointer = null;
       floatingDrawButtonState.startPosition = null;
