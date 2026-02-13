@@ -89,6 +89,8 @@ async function buildManifest() {
         label: previous.label ?? entry.label,
         description: previous.description ?? entry.description ?? '',
         thumbnail: previous.thumbnail ?? entry.thumbnail,
+        mode: previous.mode ?? entry.mode,
+        targets: Array.isArray(previous.targets) ? previous.targets : entry.targets,
       };
     }
   }
