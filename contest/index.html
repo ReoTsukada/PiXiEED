@@ -2367,6 +2367,10 @@
       return new Promise(resolve => window.setTimeout(resolve, Math.max(0, ms | 0)));
     }
 
+    function clamp(value, min, max){
+      return Math.max(min, Math.min(max, value));
+    }
+
     function getPreferredVideoMimeType(){
       if(typeof MediaRecorder === 'undefined') return '';
       const candidates = [
@@ -2390,6 +2394,23 @@
       if(lower.includes('mp4')) return 'mp4';
       if(lower.includes('webm')) return 'webm';
       return 'mp4';
+    }
+
+    function estimateVideoBitrate(width, height, fps){
+      const area = width * height;
+      let base;
+      if(area >= 512 * 512){
+        base = 1_150_000;
+      }else if(area >= 384 * 384){
+        base = 900_000;
+      }else if(area >= 256 * 256){
+        base = 700_000;
+      }else{
+        base = 500_000;
+      }
+      const fpsScale = clamp(fps / 18, 0.75, 1.25);
+      const bitrate = base * fpsScale;
+      return Math.round(clamp(bitrate, 400_000, 1_400_000));
     }
 
     async function convertGifToVideo(file){
@@ -2420,14 +2441,21 @@
           const frame = decoded?.image;
           if(!frame) continue;
           const durationUs = Number(frame.duration || 0);
-          const durationMs = Math.max(33, Math.min(1000, Math.round(durationUs > 0 ? durationUs / 1000 : 100)));
+          const durationMs = Math.max(10, Math.min(5000, Math.round(durationUs > 0 ? durationUs / 1000 : 100)));
           frames.push({ frame, durationMs });
         }
         if(!frames.length) return null;
 
         const baseFrame = frames[0].frame;
-        const width = Math.max(1, Number(baseFrame.displayWidth || baseFrame.codedWidth || track?.codedWidth || 1));
-        const height = Math.max(1, Number(baseFrame.displayHeight || baseFrame.codedHeight || track?.codedHeight || 1));
+        const sourceWidth = Math.max(1, Number(baseFrame.displayWidth || baseFrame.codedWidth || track?.codedWidth || 1));
+        const sourceHeight = Math.max(1, Number(baseFrame.displayHeight || baseFrame.codedHeight || track?.codedHeight || 1));
+        const longestEdge = Math.max(sourceWidth, sourceHeight);
+        const resizeScale = longestEdge > MAX_SIZE ? (MAX_SIZE / longestEdge) : 1;
+        const width = Math.max(1, Math.round(sourceWidth * resizeScale));
+        const height = Math.max(1, Math.round(sourceHeight * resizeScale));
+        const minFrameMs = frames.reduce((min, item) => Math.min(min, item.durationMs), 100);
+        const targetFps = Math.round(clamp(1000 / Math.max(10, minFrameMs), 12, 60));
+        const videoBitsPerSecond = estimateVideoBitrate(width, height, targetFps);
         const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
@@ -2435,12 +2463,12 @@
         if(!ctx) return null;
         ctx.imageSmoothingEnabled = false;
 
-        stream = canvas.captureStream(60);
+        stream = canvas.captureStream(targetFps);
         const chunks = [];
         const stopped = new Promise((resolve, reject) => {
           recorder = new MediaRecorder(stream, {
             mimeType,
-            videoBitsPerSecond: 2_500_000,
+            videoBitsPerSecond,
           });
           recorder.ondataavailable = (event) => {
             if(event.data?.size){
@@ -2452,10 +2480,17 @@
         });
 
         recorder.start(200);
+        const startedAt = performance.now();
+        let elapsedTargetMs = 0;
         for(const { frame, durationMs } of frames){
           ctx.clearRect(0, 0, width, height);
           ctx.drawImage(frame, 0, 0, width, height);
-          await wait(durationMs);
+          elapsedTargetMs += durationMs;
+          const elapsedActualMs = performance.now() - startedAt;
+          const delayMs = elapsedTargetMs - elapsedActualMs;
+          if(delayMs > 0){
+            await wait(delayMs);
+          }
         }
         if(recorder.state !== 'inactive'){
           recorder.stop();
@@ -3142,7 +3177,7 @@
         }
       }
       const isGifUpload = String(file.type || '').toLowerCase() === 'image/gif';
-      setStatus(isGifUpload ? 'GIFを動画に変換しています...' : '画像を確認しています...');
+      setStatus(isGifUpload ? 'GIFを最適化して動画化しています...' : '画像を確認しています...');
       let imageInfo;
       try{
         imageInfo = await fileToImageInfo(file, { includeVideo: true });
