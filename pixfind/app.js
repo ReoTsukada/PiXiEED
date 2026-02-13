@@ -1016,20 +1016,32 @@ async function handleCreatorPublish() {
     let contestPosted = false;
     if (postToContest) {
       try {
-        const contestDataUrl = await buildNormalizedDataUrl(
+        let contestImage = creatorState.originalImage;
+        let contestDataUrl = await buildNormalizedDataUrl(
           creatorState.originalImage,
           creatorState.originalDataUrl,
           creatorState.originalFile,
         );
-        if (!contestDataUrl) {
+        if (mode === GAME_MODE_HIDDEN_OBJECT) {
+          const mergedLayer = buildMergedLayerAsset(creatorState.originalImage, creatorState.diffImage);
+          if (mergedLayer?.dataUrl) {
+            contestImage = mergedLayer.image;
+            contestDataUrl = mergedLayer.dataUrl;
+          } else {
+            console.warn('hidden-object contest merge failed, fallback to original image');
+          }
+        }
+        if (!contestDataUrl || !contestImage) {
           throw new Error('contest data missing');
         }
-        const colors = countUniqueColors(creatorState.originalImage);
+        const contestWidth = contestImage.naturalWidth || contestImage.width || creatorState.size.width;
+        const contestHeight = contestImage.naturalHeight || contestImage.height || creatorState.size.height;
+        const colors = countUniqueColors(contestImage);
         let contestUpload = null;
         try {
           contestUpload = await uploadContestImages({
             puzzleId,
-            image: creatorState.originalImage,
+            image: contestImage,
             dataUrl: contestDataUrl,
           });
         } catch (error) {
@@ -1041,8 +1053,8 @@ async function handleCreatorPublish() {
           imageUrl: contestUpload?.imageUrl,
           thumbUrl: contestUpload?.thumbUrl,
           dataUrl: contestDataUrl,
-          width: creatorState.size.width,
-          height: creatorState.size.height,
+          width: contestWidth,
+          height: contestHeight,
           colors,
           userId,
           clientId: clientIdValue,
@@ -1058,8 +1070,8 @@ async function handleCreatorPublish() {
               puzzleId,
               title,
               dataUrl: contestDataUrl,
-              width: creatorState.size.width,
-              height: creatorState.size.height,
+              width: contestWidth,
+              height: contestHeight,
               colors,
               userId,
               clientId: clientIdValue,
@@ -1075,7 +1087,7 @@ async function handleCreatorPublish() {
             await uploadContestShareAssets({
               entryId: contestEntry.id,
               title,
-              image: creatorState.originalImage,
+              image: contestImage,
             });
           } catch (error) {
             queueContestShareTask({ entryId: contestEntry.id, title });
@@ -1932,25 +1944,35 @@ async function publishQueuedTask(task) {
     loadImageFromDataUrl(originalDataUrl),
     loadImageFromDataUrl(diffDataUrl),
   ]);
-  const width = size.width || originalImage.width;
-  const height = size.height || originalImage.height;
 
   if (postToContest) {
     try {
-      const contestDataUrl = await buildNormalizedDataUrl(
+      let contestImage = originalImage;
+      let contestDataUrl = await buildNormalizedDataUrl(
         originalImage,
         originalDataUrl,
         null,
       );
-      if (!contestDataUrl) {
+      if (mode === GAME_MODE_HIDDEN_OBJECT) {
+        const mergedLayer = buildMergedLayerAsset(originalImage, diffImage);
+        if (mergedLayer?.dataUrl) {
+          contestImage = mergedLayer.image;
+          contestDataUrl = mergedLayer.dataUrl;
+        } else {
+          console.warn('hidden-object contest merge failed, fallback to original image');
+        }
+      }
+      if (!contestDataUrl || !contestImage) {
         throw new Error('contest data missing');
       }
-      const colors = countUniqueColors(originalImage);
+      const contestWidth = contestImage.naturalWidth || contestImage.width || size.width || originalImage.width;
+      const contestHeight = contestImage.naturalHeight || contestImage.height || size.height || originalImage.height;
+      const colors = countUniqueColors(contestImage);
       let contestUpload = null;
       try {
         contestUpload = await uploadContestImages({
           puzzleId,
-          image: originalImage,
+          image: contestImage,
           dataUrl: contestDataUrl,
         });
       } catch (error) {
@@ -1962,8 +1984,8 @@ async function publishQueuedTask(task) {
         imageUrl: contestUpload?.imageUrl,
         thumbUrl: contestUpload?.thumbUrl,
         dataUrl: contestDataUrl,
-        width,
-        height,
+        width: contestWidth,
+        height: contestHeight,
         colors,
         userId,
         clientId: clientIdValue,
@@ -1978,8 +2000,8 @@ async function publishQueuedTask(task) {
             puzzleId,
             title,
             dataUrl: contestDataUrl,
-            width,
-            height,
+            width: contestWidth,
+            height: contestHeight,
             colors,
             userId,
             clientId: clientIdValue,
@@ -1994,7 +2016,7 @@ async function publishQueuedTask(task) {
           await uploadContestShareAssets({
             entryId: contestEntry.id,
             title,
-            image: originalImage,
+            image: contestImage,
           });
         } catch (error) {
           queueContestShareTask({ entryId: contestEntry.id, title });
@@ -4062,6 +4084,36 @@ async function loadImageFromFile(file) {
   const dataUrl = await readFileAsDataUrl(file);
   const image = await loadImageFromDataUrl(dataUrl);
   return { image, dataUrl };
+}
+
+function buildMergedLayerAsset(baseImage, overlayImage) {
+  if (!baseImage || !overlayImage) return null;
+  const baseWidth = baseImage.naturalWidth || baseImage.width || 0;
+  const baseHeight = baseImage.naturalHeight || baseImage.height || 0;
+  const overlayWidth = overlayImage.naturalWidth || overlayImage.width || 0;
+  const overlayHeight = overlayImage.naturalHeight || overlayImage.height || 0;
+  if (!baseWidth || !baseHeight || baseWidth !== overlayWidth || baseHeight !== overlayHeight) {
+    return null;
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = baseWidth;
+  canvas.height = baseHeight;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  context.imageSmoothingEnabled = false;
+  context.drawImage(baseImage, 0, 0, baseWidth, baseHeight);
+  context.drawImage(overlayImage, 0, 0, baseWidth, baseHeight);
+  try {
+    return {
+      image: canvas,
+      dataUrl: canvas.toDataURL('image/png'),
+      width: baseWidth,
+      height: baseHeight,
+    };
+  } catch (error) {
+    console.warn('merged layer serialization failed', error);
+    return null;
+  }
 }
 
 function downloadDataUrl(dataUrl, filename) {
