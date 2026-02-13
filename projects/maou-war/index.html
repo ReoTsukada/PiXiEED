@@ -1237,10 +1237,10 @@
   const BATTLE_LOG_REVEAL_MS = 80;
   const MIMIC_TILE_ANIM_FRAME_MS = 180;
   const MIMIC_TILE_ANIM_PATHS = [
-    './14animation1.png',
-    './14animation2.png',
-    './14animation3.png',
-    './14animation4.png'
+    '14animation1.png',
+    '14animation2.png',
+    '14animation3.png',
+    '14animation4.png'
   ];
   const PLAYER_ATTACK_MP_GAIN = 1;
   const PLAYER_ACTIVE_SKILL_CHANCE = 0.35;
@@ -1408,39 +1408,46 @@
     { id: 'empty', weight: 0.06 }
   ];
 
-  const tileSpritePaths = {
-    tile1: './ground-sprite-01.png',
-    tile2: './ground-sprite-02.png',
-    tile3: './ground-sprite-03.png',
-    tile4: './ground-sprite-04.png',
-    tile5: './ground-sprite-05.png',
-    tile6: './ground-sprite-06.png',
-    tile7: './ground-sprite-07.png',
-    tile8: './ground-sprite-08.png',
-    tile9: './ground-sprite-09.png',
-    tile10: './ground-sprite-10.png',
-    tile11: './ground-sprite-11.png',
-    tile12: './ground-sprite-12.png',
-    tile13: './ground-sprite-13.png',
-    tile14: './ground-sprite-14.png',
-    tile15: './ground-sprite-15.png',
-    tile16: './ground-sprite-16.png',
-    tile17: './ground-sprite-17.png',
-    tile18: './ground-sprite-18.png',
-    tile19: './ground-sprite-19.png',
-    tile20: './ground-sprite-20.png',
-    tile21: './ground-sprite-21.png',
-    tile22: './ground-sprite-22.png',
-    tile23: './ground-sprite-23.png',
-    tile24: './ground-sprite-24.png',
-    tile25: './ground-sprite-25.png',
-    tile26: './ground-sprite-26.png',
-    tile27: './ground-sprite-27.png',
-    tile28: './ground-sprite-28.png',
-    tile29: './ground-sprite-29.png',
-    tile30: './ground-sprite-30.png',
-    tile31: './ground-sprite-31.png'
+  const isProjectsPath = /\/projects\/maou-war(\/|$)/.test(window.location.pathname.replace(/\\/g, '/'));
+  const GAME_ASSET_BASE = isProjectsPath ? '../../maou-war/' : './';
+  const CHARACTER_DOTS_BASE = isProjectsPath ? '../../character-dots/' : '../character-dots/';
+  const toGameAssetPath = (fileName) => `${GAME_ASSET_BASE}${fileName}`;
+  const tileSpriteFiles = {
+    tile1: 'ground-sprite-01.png',
+    tile2: 'ground-sprite-02.png',
+    tile3: 'ground-sprite-03.png',
+    tile4: 'ground-sprite-04.png',
+    tile5: 'ground-sprite-05.png',
+    tile6: 'ground-sprite-06.png',
+    tile7: 'ground-sprite-07.png',
+    tile8: 'ground-sprite-08.png',
+    tile9: 'ground-sprite-09.png',
+    tile10: 'ground-sprite-10.png',
+    tile11: 'ground-sprite-11.png',
+    tile12: 'ground-sprite-12.png',
+    tile13: 'ground-sprite-13.png',
+    tile14: 'ground-sprite-14.png',
+    tile15: 'ground-sprite-15.png',
+    tile16: 'ground-sprite-16.png',
+    tile17: 'ground-sprite-17.png',
+    tile18: 'ground-sprite-18.png',
+    tile19: 'ground-sprite-19.png',
+    tile20: 'ground-sprite-20.png',
+    tile21: 'ground-sprite-21.png',
+    tile22: 'ground-sprite-22.png',
+    tile23: 'ground-sprite-23.png',
+    tile24: 'ground-sprite-24.png',
+    tile25: 'ground-sprite-25.png',
+    tile26: 'ground-sprite-26.png',
+    tile27: 'ground-sprite-27.png',
+    tile28: 'ground-sprite-28.png',
+    tile29: 'ground-sprite-29.png',
+    tile30: 'ground-sprite-30.png',
+    tile31: 'ground-sprite-31.png'
   };
+  const tileSpritePaths = Object.fromEntries(
+    Object.entries(tileSpriteFiles).map(([id, fileName]) => [id, toGameAssetPath(fileName)])
+  );
   const SKILL_SPRITE_PATHS = Object.entries(SKILL_SPRITE_KEYS).reduce((acc, [id, key]) => {
     acc[id] = tileSpritePaths[key];
     return acc;
@@ -1458,7 +1465,7 @@
   const mimicTileAnimSprites = MIMIC_TILE_ANIM_PATHS.map((src) => {
     const img = new Image();
     img.decoding = 'async';
-    img.src = src;
+    img.src = toGameAssetPath(src);
     img.onload = () => {
       if (tileSize) renderMap();
     };
@@ -1511,10 +1518,10 @@
   };
 
   const playerSpritePaths = {
-    down: './buburin-1.png',
-    right: './buburin-2.png',
-    up: './buburin-3.png',
-    left: './buburin-4.png'
+    down: toGameAssetPath('buburin-1.png'),
+    right: toGameAssetPath('buburin-2.png'),
+    up: toGameAssetPath('buburin-3.png'),
+    left: toGameAssetPath('buburin-4.png')
   };
   const playerSprites = {};
   Object.entries(playerSpritePaths).forEach(([dir, src]) => {
@@ -1727,6 +1734,12 @@
   const resultStats = document.getElementById('resultStats');
   const rankList = document.getElementById('rankList');
   const rankStatus = document.getElementById('rankStatus');
+  const coinIconPath = `${CHARACTER_DOTS_BASE}tyarin.png`;
+  document.querySelectorAll('img.hud-icon, img.btn-coin').forEach((img) => {
+    img.src = coinIconPath;
+  });
+  const favicon = document.querySelector('link[rel="icon"]');
+  if (favicon) favicon.setAttribute('href', `${CHARACTER_DOTS_BASE}mao1.png`);
 
   if (battleSkipBtn) {
     battleSkipBtn.addEventListener('click', () => {
@@ -5051,7 +5064,7 @@
       return;
     }
     const canPay = (player.coins || 0) >= SKILL_REROLL_COST;
-    skillRerollBtn.innerHTML = `リロール (<img class="btn-coin" src="../character-dots/tyarin.png" alt="">${SKILL_REROLL_COST})`;
+    skillRerollBtn.innerHTML = `リロール (<img class="btn-coin" src="${coinIconPath}" alt="">${SKILL_REROLL_COST})`;
     skillRerollBtn.disabled = !isChoosingSkill || !canPay;
   }
 
