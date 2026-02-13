@@ -315,6 +315,16 @@
       image-rendering:pixelated;
       background:transparent;
     }
+    .entry-hero video{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      background:transparent;
+      display:block;
+    }
+    .entry-hero video[hidden]{
+      display:none;
+    }
     .heart-btn{
       position:absolute;
       right:8px;
@@ -784,6 +794,7 @@
     <section class="card">
       <div class="entry-hero" id="hero">
         <img id="heroImg" alt="dot work" draggable="false" decoding="async"/>
+        <video id="heroVideo" autoplay loop muted playsinline controls hidden></video>
         <span class="entry-watermark" style="top:6px; left:6px;">PiXiEED</span>
         <span class="entry-watermark" style="top:6px; right:6px;">PiXiEED</span>
         <span class="entry-watermark" style="right:6px; bottom:6px;">PiXiEED</span>
@@ -991,6 +1002,7 @@
     let editTags = [];
     let supportsDownloadSettings = true;
     let supportsImageUrls = true;
+    let supportsVideoColumns = true;
     let supportsStorageUploads = true;
     let supportsXUrl = true;
     let supportsProfileXUrl = true;
@@ -1002,6 +1014,7 @@
     const ENTRY_SELECT_BASE = 'id,client_id,user_id,name,title,width,height,colors,image_base64,submitted_at,mode,tags,prompt,allow_download,download_passcode';
     const RELATED_SELECT_WITH_URL = 'id,name,title,submitted_at,mode,image_url,thumb_url';
     const RELATED_SELECT_BASE = 'id,name,title,submitted_at,mode,image_base64';
+    const VIDEO_SELECT_COLUMNS = 'video_url,video_mime';
     const LIKE_SELECT = 'entry_id,user_id,client_id';
     const RELATED_FETCH_LIMIT = 12;
 
@@ -1604,6 +1617,12 @@
       return preferThumb ? (thumb || full || base || '') : (full || base || thumb || '');
     }
 
+    function resolveEntryVideo(entry){
+      if(!entry) return '';
+      const value = String(entry.video_url || '').trim();
+      return value || '';
+    }
+
     function resolveAuthorUrl(entry){
       const fromEntry = normalizeXUrl(entry?.x_url || '');
       if(fromEntry) return fromEntry;
@@ -1667,12 +1686,19 @@
     }
 
     function getEntrySelect(){
-      const base = supportsImageUrls ? ENTRY_SELECT_WITH_URL : ENTRY_SELECT_BASE;
+      let base = supportsImageUrls ? ENTRY_SELECT_WITH_URL : ENTRY_SELECT_BASE;
+      if(supportsVideoColumns){
+        base = `${base},${VIDEO_SELECT_COLUMNS}`;
+      }
       return supportsXUrl ? `${base},x_url` : base;
     }
 
     function getRelatedSelect(){
-      return supportsImageUrls ? RELATED_SELECT_WITH_URL : RELATED_SELECT_BASE;
+      let base = supportsImageUrls ? RELATED_SELECT_WITH_URL : RELATED_SELECT_BASE;
+      if(supportsVideoColumns){
+        base = `${base},video_url`;
+      }
+      return base;
     }
 
     function isDownloadAllowed(value){
@@ -1684,6 +1710,8 @@
       if(dataUrl.startsWith('data:image/gif')) return 'gif';
       if(dataUrl.startsWith('data:image/jpeg')) return 'jpg';
       if(dataUrl.startsWith('data:image/webp')) return 'webp';
+      if(dataUrl.startsWith('data:video/mp4')) return 'mp4';
+      if(dataUrl.startsWith('data:video/webm')) return 'webm';
       const clean = dataUrl.split('?')[0];
       const match = clean.match(/\.([a-z0-9]+)$/i);
       if(match && match[1]){
@@ -1710,7 +1738,7 @@
           return;
         }
       }
-      const source = resolveEntryImage(entry);
+      const source = resolveEntryVideo(entry) || resolveEntryImage(entry);
       if(!source){
         setStatus('画像が見つかりません');
         return;
@@ -2210,6 +2238,7 @@
 
     function render(){
       const img = $('heroImg');
+      const video = $('heroVideo');
       const titleEl = $('heroTitle');
       const authorEl = $('heroAuthor');
       const likesEl = $('heroLikes');
@@ -2220,6 +2249,15 @@
       const shareBtn = $('shareButton');
       if(!entry){
         img.src = '';
+        if(video){
+          video.pause();
+          video.removeAttribute('src');
+          video.removeAttribute('poster');
+          delete video.dataset.src;
+          video.hidden = true;
+          video.load();
+        }
+        img.hidden = false;
         titleEl.textContent = '読み込めませんでした';
         if(authorEl) authorEl.textContent = '';
         likesEl.textContent = '';
@@ -2239,7 +2277,45 @@
         }
         return;
       }
-      img.src = resolveEntryImage(entry);
+      const fallbackImgSrc = resolveEntryImage(entry) || makePlaceholder('#334155');
+      const videoSrc = resolveEntryVideo(entry);
+      const posterSrc = resolveEntryImage(entry, { preferThumb: true }) || fallbackImgSrc;
+      const showVideo = Boolean(videoSrc && video);
+      if(showVideo){
+        img.hidden = true;
+        img.removeAttribute('src');
+        if(video){
+          video.hidden = false;
+          if(video.poster !== posterSrc){
+            video.poster = posterSrc;
+          }
+          if(video.dataset.src !== videoSrc){
+            video.src = videoSrc;
+            video.dataset.src = videoSrc;
+          }
+          video.onerror = () => {
+            video.pause();
+            video.hidden = true;
+            img.hidden = false;
+            img.src = fallbackImgSrc;
+          };
+          const playPromise = video.play();
+          if(playPromise && typeof playPromise.catch === 'function'){
+            playPromise.catch(() => {});
+          }
+        }
+      }else{
+        if(video){
+          video.pause();
+          video.hidden = true;
+          video.removeAttribute('src');
+          video.removeAttribute('poster');
+          delete video.dataset.src;
+          video.load();
+        }
+        img.hidden = false;
+        img.src = fallbackImgSrc;
+      }
       img.onerror = () => {
         img.src = makePlaceholder('#334155');
       };
@@ -2390,6 +2466,11 @@
           await fetchEntry(id);
           return;
         }
+        if(supportsVideoColumns && (isMissingColumn(err, 'video_url') || isMissingColumn(err, 'video_mime'))){
+          supportsVideoColumns = false;
+          await fetchEntry(id);
+          return;
+        }
         if(isSupabaseMaintenance()){
           setStatus('メンテナンス中のため作品を読み込めません');
         }else{
@@ -2511,6 +2592,13 @@
         console.error(err);
         if(supportsImageUrls && (isMissingColumn(err, 'image_url') || isMissingColumn(err, 'thumb_url'))){
           supportsImageUrls = false;
+          relatedLoading = false;
+          updateRelatedLoadMore();
+          await fetchRelated(currentId, { append });
+          return;
+        }
+        if(supportsVideoColumns && (isMissingColumn(err, 'video_url') || isMissingColumn(err, 'video_mime'))){
+          supportsVideoColumns = false;
           relatedLoading = false;
           updateRelatedLoadMore();
           await fetchRelated(currentId, { append });
