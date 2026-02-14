@@ -14,6 +14,44 @@
     disableImageInteractions();
     injectFooterAd();
     scheduleProjectAds();
+    // Prevent accidental pull-to-refresh / browser close on iOS across the site
+    enableSitePreventPullToClose();
+  }
+
+  // ----- Site-wide iOS pull-to-refresh / close prevention -----
+  let __pixieedSiteTouchHandler = null;
+  function isIosBrowser() {
+    if (typeof navigator === 'undefined' || !navigator.userAgent) return false;
+    const ua = navigator.userAgent || '';
+    return /iP(ad|hone|od)/.test(ua) && /WebKit/.test(ua) && !/CriOS|FxiOS|OPiOS/.test(ua);
+  }
+
+  function enableSitePreventPullToClose() {
+    if (!isIosBrowser()) return;
+    if (__pixieedSiteTouchHandler) return;
+    __pixieedSiteTouchHandler = function (e) {
+      if (e.touches && e.touches.length > 1) return; // allow pinch
+      // Allow native scrolling within scrollable elements
+      let node = e.target;
+      while (node && node !== document.body) {
+        try {
+          const style = window.getComputedStyle(node);
+          const overflowY = style && style.overflowY;
+          if (overflowY === 'auto' || overflowY === 'scroll') return;
+        } catch (_) {
+          // ignore cross-origin or other issues
+        }
+        node = node.parentElement;
+      }
+      e.preventDefault();
+    };
+    window.addEventListener('touchmove', __pixieedSiteTouchHandler, { passive: false });
+  }
+
+  function disableSitePreventPullToClose() {
+    if (!__pixieedSiteTouchHandler) return;
+    window.removeEventListener('touchmove', __pixieedSiteTouchHandler, { passive: false });
+    __pixieedSiteTouchHandler = null;
   }
 
   function updateCopyrightYear() {
