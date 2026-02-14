@@ -2338,10 +2338,9 @@ input[type='range']::-moz-focus-outer {
   /* hide rail ads and per-panel ads on small/portrait screens and show a single top ad */
   .rail-ad { display: none !important; }
   .panel-ad { display: none !important; }
-  #mobileBottomAd { display: none !important; }
-  #mobileTopAd { display: flex !important; }
-  /* when JS marks the top ad active, push the main app down so UI is not covered */
-  body.top-ad-active .app { padding-top: calc(40px + env(safe-area-inset-top, 0px)); }
+  #mobileBottomAd { display: flex !important; }
+  /* when JS marks the bottom ad active, push the main app up so UI is not covered */
+  body.bottom-ad-active .app { padding-bottom: calc(var(--mobile-bottom-ad-height, 56px) + env(safe-area-inset-bottom, 0px)); }
 }
 
 /* Landscape and wider screens: allow larger ad but keep within rail */
@@ -2390,48 +2389,39 @@ input[type='range']::-moz-focus-outer {
   #mobileBottomAd { padding-bottom: calc(env(safe-area-inset-bottom) + 8px); }
 }
 
-/* Mobile top ad (portrait) */
-#mobileTopAd {
-  display: none;
-  position: fixed;
-  left: 0;
-  right: 0;
-  top: 0;
-  z-index: 14060;
-  justify-content: center;
-  align-items: center;
-  pointer-events: auto;
-  transform: translateY(-100%);
-  transition: transform 200ms ease, opacity 160ms ease;
-  opacity: 0;
-}
-#mobileTopAd.visible {
+/* Mobile bottom ad: visible with slide-up animation */
+#mobileBottomAd.visible {
   transform: translateY(0);
   opacity: 1;
+  pointer-events: auto;
 }
-#mobileTopAd .mobile-ad-box {
+
+/* mobile bottom ad box styling (compact on mobile) */
+#mobileBottomAd .mobile-ad-box {
   background: #ffffff;
   color: #111111;
-  width: calc(100% - 24px);
-  max-width: 640px;
-  height: 40px;
+  width: 100%;
+  max-width: min(92vw, 420px); /* compact on mobile */
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid rgba(0,0,0,0.06);
   box-shadow: 0 6px 18px rgba(0,0,0,0.18);
-  padding: calc(env(safe-area-inset-top, 0px) + 6px) 12px 6px;
+  padding: calc(env(safe-area-inset-bottom, 0px) + 6px) 12px 6px;
+  box-sizing: border-box;
+  margin: 6px auto;
 }
 
-/* PiXiEEDrawLite-style compact banner inside the mobile top ad box */
-#mobileTopAd .mobile-ad-box .ad-lite {
+/* PiXiEEDrawLite-style compact banner inside the mobile bottom ad box */
+#mobileBottomAd .mobile-ad-box .ad-lite {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
 }
-#mobileTopAd .mobile-ad-box .ad-lite .logo {
+#mobileBottomAd .mobile-ad-box .ad-lite .logo {
   width: 28px;
   height: 28px;
   border-radius: 6px;
@@ -2443,7 +2433,7 @@ input[type='range']::-moz-focus-outer {
   font-weight:700;
   font-size:14px;
 }
-#mobileTopAd .mobile-ad-box .ad-lite .text {
+#mobileBottomAd .mobile-ad-box .ad-lite .text {
   flex:1;
   font-size:14px;
   color:#111;
@@ -2452,7 +2442,7 @@ input[type='range']::-moz-focus-outer {
   overflow:hidden;
   text-overflow:ellipsis;
 }
-#mobileTopAd .mobile-ad-box .ad-lite .ad-close {
+#mobileBottomAd .mobile-ad-box .ad-lite .ad-close {
   margin-left:8px;
   width:28px;
   height:28px;
@@ -2468,7 +2458,7 @@ input[type='range']::-moz-focus-outer {
 
 /* When the lite ad is visible, reduce the height slightly for a compact look */
 @media (orientation: portrait) {
-  #mobileTopAd .mobile-ad-box { height: 48px; padding: calc(env(safe-area-inset-top, 0px) + 6px) 10px 6px; }
+  #mobileBottomAd .mobile-ad-box { height: 48px; padding: calc(env(safe-area-inset-bottom, 0px) + 6px) 10px 6px; }
 }
 
 /* Panel-embedded banner ad
