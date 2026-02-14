@@ -72,6 +72,10 @@
   </script>
 </head>
 <body>
+<!-- Mobile top ad placeholder (shown on portrait / small screens instead of per-panel/bottom ads) -->
+<div id="mobileTopAd" aria-hidden="true">
+  <div class="mobile-ad-box">バナー広告</div>
+</div>
 <div class="app" id="appRoot">
 <div aria-labelledby="startupScreenTitle" aria-modal="true" class="startup-screen" hidden="" id="startupScreen" role="dialog" tabindex="-1">
 <div class="startup-screen__backdrop"></div>
@@ -137,6 +141,10 @@
 </button>
 </div>
 <div class="rail-tabpanes" id="leftRailPanes"></div>
+  <div class="rail-ad" id="leftRailAd" aria-hidden="false">
+    <!-- ad placeholder: replace with ad code (ins / iframe) -->
+    <div class="ad-box">バナー広告</div>
+  </div>
 <button aria-label="左パネルの幅を変更" class="rail-resizer rail-resizer--left" id="resizeLeftRail" type="button"></button>
 </aside>
 <main aria-label="ドットキャンバス" class="stage" id="stage">
@@ -176,6 +184,10 @@
 </button>
 </div>
 <div class="rail-tabpanes" id="rightRailPanes"></div>
+  <div class="rail-ad" id="rightRailAd" aria-hidden="false">
+    <!-- ad placeholder: replace with ad code (ins / iframe) -->
+    <div class="ad-box">バナー広告</div>
+  </div>
 <button aria-label="右パネルの幅を変更" class="rail-resizer rail-resizer--right" id="resizeRightRail" type="button"></button>
 </aside>
 </div>
@@ -412,6 +424,9 @@
 </section>
 <section class="panel-section" data-section="settings" id="panelSettings">
 <div class="panel-section__body">
+  <div class="settings-nav">
+    <a class="button" href="/index.html" id="goHomeButton">PiXiEEDホームへ戻る</a>
+  </div>
 <label class="field settings-size-row settings-size-row--canvas">
 <span>キャンバスサイズ</span>
 <div class="field field--inline settings-size-controls">
@@ -618,5 +633,232 @@
       })();
     </script>
 <script defer="" src="assets/js/app.js"></script>
+</script>
+  <!-- Mobile bottom ad placeholder (visible in portrait / small screens) -->
+  <div id="mobileBottomAd" aria-hidden="false">
+    <div class="mobile-ad-box">バナー広告</div>
+  </div>
+  <script>
+    (function () {
+      // Show mobile bottom ad when the active tool/settings panel (mobile or rail) is scrolled to bottom.
+      const mobileAd = document.getElementById('mobileBottomAd');
+      const mobilePanels = document.getElementById('mobilePanels');
+      if (!mobileAd) return;
+
+  const mql = window.matchMedia('(orientation: portrait)');
+  const mobileTopAd = document.getElementById('mobileTopAd');
+      let raf = null;
+      const listeners = new Map();
+
+      function isAtBottom(el) {
+        if (!el) return false;
+        if (el.scrollHeight <= el.clientHeight + 8) return false;
+        const threshold = 24;
+        return el.scrollTop + el.clientHeight >= el.scrollHeight - threshold;
+      }
+
+      function showAd() {
+        mobileAd.classList.add('visible');
+        mobileAd.setAttribute('aria-hidden', 'false');
+      }
+
+      function hideAd() {
+        mobileAd.classList.remove('visible');
+        mobileAd.setAttribute('aria-hidden', 'true');
+      }
+
+      function getActiveScrollableContainers() {
+        const set = new Set();
+        // mobile drawer active panel body
+        if (mobilePanels) {
+          const mobileBody = mobilePanels.querySelector('.mobile-panel.is-active .panel-section__body') || mobilePanels.querySelector('.mobile-panel.is-active');
+          if (mobileBody) set.add(mobileBody);
+        }
+        // any active panel-section bodies (used in left/right rails)
+        document.querySelectorAll('.panel-section.is-active .panel-section__body').forEach((el) => set.add(el));
+        return set;
+      }
+
+      function onScrollDebounced() {
+        if (raf) cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(function () {
+          const containers = getActiveScrollableContainers();
+          const anyAtBottom = Array.from(containers).some(isAtBottom);
+
+          // Top ad: show in portrait as overlay and mark body so CSS can push UI down
+          if (mobileTopAd) {
+            if (mql.matches) {
+              mobileTopAd.classList.add('visible');
+              mobileTopAd.setAttribute('aria-hidden', 'false');
+              document.body.classList.add('top-ad-active');
+            } else {
+              mobileTopAd.classList.remove('visible');
+              mobileTopAd.setAttribute('aria-hidden', 'true');
+              document.body.classList.remove('top-ad-active');
+            }
+          }
+
+          // Bottom ad: show only on non-portrait when panel is at bottom
+          if (mql.matches) {
+            // in portrait, ensure bottom ad is hidden (CSS also hides it)
+            hideAd();
+          } else {
+            if (anyAtBottom) {
+              showAd();
+            } else {
+              hideAd();
+            }
+          }
+
+          raf = null;
+        });
+      }
+
+      function refreshListeners() {
+        // remove previous
+        listeners.forEach((fn, el) => el.removeEventListener('scroll', fn));
+        listeners.clear();
+        // add new listeners
+        const containers = getActiveScrollableContainers();
+        containers.forEach((el) => {
+          const fn = onScrollDebounced;
+          el.addEventListener('scroll', fn, { passive: true });
+          listeners.set(el, fn);
+        });
+        // immediate check
+        onScrollDebounced();
+      }
+
+      // observe body for active-panel changes and refresh listeners
+      const mo = new MutationObserver(refreshListeners);
+      mo.observe(document.body, { attributes: true, subtree: true, childList: true });
+
+      if (mql && typeof mql.addEventListener === 'function') {
+        mql.addEventListener('change', refreshListeners);
+      } else if (mql && typeof mql.addListener === 'function') {
+        mql.addListener(refreshListeners);
+      }
+      window.addEventListener('resize', refreshListeners);
+      document.addEventListener('readystatechange', function () { if (document.readyState === 'complete') refreshListeners(); });
+
+      // inject panel-embedded ad placeholders inside every panel-section__body
+      function initPanelEmbeddedAds() {
+        document.querySelectorAll('.panel-section__body').forEach((body) => {
+          if (body.querySelector('.panel-ad')) return; // already added
+          const adWrap = document.createElement('div');
+          adWrap.className = 'panel-ad';
+          adWrap.setAttribute('aria-hidden', 'true');
+          const box = document.createElement('div');
+          box.className = 'ad-box';
+          box.textContent = 'バナー広告';
+          adWrap.appendChild(box);
+          // append as last child so it sits visually after content but is sticky
+          body.appendChild(adWrap);
+        });
+      }
+
+      // initial setup
+      initPanelEmbeddedAds();
+      refreshListeners();
+    })();
+  </script>
+  <script>
+    // AdSense injector: insert real AdSense slots into known containers and trigger rendering.
+    (function initAds() {
+      if (!document || !window) return;
+      // If the global adsbygoogle script is not present yet, it will still be available when loaded in <head>.
+      const ADS_CLIENT = 'ca-pub-9801602250480253';
+      const SLOTS = [
+        { containerId: 'leftRailAd', slot: '2141591954' },
+        { containerId: 'rightRailAd', slot: '9073878884' },
+        { containerId: 'mobileTopAd', slot: '2261515379' }
+      ];
+
+      function ensureIns(container, slot) {
+        if (!container) return false;
+        // if a real ins already exists, keep it
+        if (container.querySelector && container.querySelector('ins.adsbygoogle')) return true;
+        // create ins element
+        const ins = document.createElement('ins');
+        ins.className = 'adsbygoogle';
+        ins.style.display = 'block';
+        ins.setAttribute('data-ad-client', ADS_CLIENT);
+        ins.setAttribute('data-ad-slot', slot);
+        ins.setAttribute('data-ad-format', 'auto');
+        ins.setAttribute('data-full-width-responsive', 'true');
+        // clear placeholder and insert
+        container.innerHTML = '';
+        container.appendChild(ins);
+        return true;
+      }
+
+      function tryRender() {
+        try {
+          (window.adsbygoogle = window.adsbygoogle || []).push({});
+        } catch (e) {
+          // ignore; fallback renderer will show placeholders
+        }
+      }
+
+      // Insert ins elements where needed
+      SLOTS.forEach(({ containerId, slot }) => {
+        const container = document.getElementById(containerId);
+        if (ensureIns(container, slot)) {
+          // attempt to render newly added slot
+          tryRender();
+        }
+      });
+
+      // Ensure export ad slot (exists in the export dialog) is rendered as well
+      const exportSlot = document.getElementById('exportAdSlot');
+      if (exportSlot) {
+        tryRender();
+      }
+    })();
+  </script>
+
+  <script>
+    // Fallback ad renderer: when AdSense isn't available, render rotating placeholder banners in .ad-box elements.
+    (function renderFallbackAds() {
+      const adBoxes = Array.from(document.querySelectorAll('.ad-box, .mobile-ad-box'));
+      if (!adBoxes.length) return;
+
+      // If adsbygoogle exists and ins.adsbygoogle are present, do not override
+      if (window.adsbygoogle) {
+        // let real ads initialize if ins elements already present
+        const hasIns = adBoxes.some(b => !!b.querySelector('ins'));
+        if (hasIns) return;
+      }
+
+      const samples = [
+        { bg: '#ffd18c', text: '広告サンプルA' },
+        { bg: '#b6e3ff', text: '広告サンプルB' },
+        { bg: '#d3f8d3', text: '広告サンプルC' }
+      ];
+
+      adBoxes.forEach((box, idx) => {
+        let i = idx % samples.length;
+        box.style.overflow = 'hidden';
+        function render() {
+          const s = samples[i % samples.length];
+          box.innerHTML = '';
+          const el = document.createElement('div');
+          el.style.width = '100%';
+          el.style.height = '100%';
+          el.style.display = 'flex';
+          el.style.alignItems = 'center';
+          el.style.justifyContent = 'center';
+          el.style.background = s.bg;
+          el.style.color = '#111';
+          el.style.fontWeight = '700';
+          el.textContent = s.text;
+          box.appendChild(el);
+          i++;
+        }
+        render();
+        setInterval(render, 5000 + (idx * 1000));
+      });
+    })();
+  </script>
 </body>
 </html>
