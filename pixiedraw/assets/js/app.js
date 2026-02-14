@@ -30,6 +30,7 @@
       frames: document.getElementById('mobilePanelFrames'),
       settings: document.getElementById('mobilePanelSettings'),
       file: document.getElementById('mobilePanelFile'),
+      pixfind: document.getElementById('mobilePanelPixfind'),
     },
     sections: {
       tools: document.getElementById('panelTools'),
@@ -37,6 +38,7 @@
       frames: document.getElementById('panelFrames'),
       settings: document.getElementById('panelSettings'),
       file: document.getElementById('panelFile'),
+      pixfind: document.getElementById('panelPixfind'),
     },
     canvases: {
       stack: document.getElementById('canvasStack'),
@@ -143,6 +145,7 @@
       cancel: document.getElementById('cancelExport'),
       scaleSlider: document.getElementById('exportScaleSlider'),
       scaleInput: document.getElementById('exportScaleInput'),
+      includeOriginalToggle: document.getElementById('exportIncludeOriginalToggle'),
       pixelWidthInput: document.getElementById('exportPixelWidth'),
       pixelHeightInput: document.getElementById('exportPixelHeight'),
       scaleHint: document.getElementById('exportScaleHint'),
@@ -207,7 +210,7 @@
   };
 
   const LEFT_TAB_KEYS = ['tools', 'color'];
-  const RIGHT_TAB_KEYS = ['frames', 'settings', 'file'];
+  const RIGHT_TAB_KEYS = ['frames', 'settings', 'file', 'pixfind'];
   const TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE = 'virtualCursorToggle';
   const TOOL_ACTION_VIRTUAL_CURSOR_CENTER = 'virtualCursorCenter';
   const TOOL_ACTIONS = new Set([
@@ -245,6 +248,7 @@
     frames: 'full',
     settings: 'full',
     file: 'full',
+    pixfind: 'full',
   });
 
   const ZOOM_STEPS = Object.freeze([
@@ -380,6 +384,7 @@
     frames: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.frames },
     settings: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.settings },
     file: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.file },
+    pixfind: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.pixfind },
   };
 
   const canvasControlsDefaultParent = dom.canvasControls?.parentElement || null;
@@ -511,6 +516,7 @@
   let exportSheetInfo = null;
   let exportMaxScale = 1;
   let exportScaleUserOverride = false;
+  let exportIncludeOriginalSize = false;
   let exportAdRequested = false;
   let pixfindModeEnabled = false;
   let pixfindModeFirstEnableConfirmed = false;
@@ -519,7 +525,7 @@
   const RAIL_DEFAULT_WIDTH = Object.freeze({ left: 78, right: 78 });
   const RAIL_MIN_WIDTH = 68;
   const RAIL_MAX_WIDTH = 440;
-  const RAIL_COMPACT_THRESHOLD = 108;
+  const RAIL_COMPACT_THRESHOLD = Object.freeze({ left: 132, right: 168 });
   const railSizing = {
     left: RAIL_DEFAULT_WIDTH.left,
     right: RAIL_DEFAULT_WIDTH.right,
@@ -624,6 +630,12 @@
   let compactRightFlyoutPositionBound = false;
   const mobileToolGridPortal = {
     active: false,
+    parent: null,
+    nextSibling: null,
+  };
+  const compactRightFlyoutPortal = {
+    active: false,
+    section: null,
     parent: null,
     nextSibling: null,
   };
@@ -2185,7 +2197,42 @@
     document.body.classList.toggle('is-compact-flyout-open', visible);
   }
 
-  function clearCompactRightFlyoutPosition() {
+  function ensureCompactRightFlyoutPortal(open, section = null) {
+    if (!open) {
+      if (!compactRightFlyoutPortal.active || !(compactRightFlyoutPortal.section instanceof HTMLElement)) {
+        return;
+      }
+      const activeSection = compactRightFlyoutPortal.section;
+      const { parent, nextSibling } = compactRightFlyoutPortal;
+      if (parent instanceof Node && parent.isConnected) {
+        if (nextSibling instanceof Node && nextSibling.parentNode === parent) {
+          parent.insertBefore(activeSection, nextSibling);
+        } else {
+          parent.appendChild(activeSection);
+        }
+      }
+      compactRightFlyoutPortal.active = false;
+      compactRightFlyoutPortal.section = null;
+      compactRightFlyoutPortal.parent = null;
+      compactRightFlyoutPortal.nextSibling = null;
+      return;
+    }
+    if (!(section instanceof HTMLElement)) {
+      ensureCompactRightFlyoutPortal(false);
+      return;
+    }
+    if (compactRightFlyoutPortal.active && compactRightFlyoutPortal.section === section) {
+      return;
+    }
+    ensureCompactRightFlyoutPortal(false);
+    compactRightFlyoutPortal.parent = section.parentNode;
+    compactRightFlyoutPortal.nextSibling = section.nextSibling;
+    document.body.appendChild(section);
+    compactRightFlyoutPortal.section = section;
+    compactRightFlyoutPortal.active = true;
+  }
+
+  function clearCompactRightFlyoutStyles() {
     RIGHT_TAB_KEYS.forEach(key => {
       const section = dom.sections[key];
       if (!(section instanceof HTMLElement)) {
@@ -2200,6 +2247,11 @@
       section.style.removeProperty('z-index');
       section.style.removeProperty('overflow');
     });
+  }
+
+  function clearCompactRightFlyoutPosition() {
+    clearCompactRightFlyoutStyles();
+    ensureCompactRightFlyoutPortal(false);
   }
 
   function updateCompactRightFlyoutPosition() {
@@ -2239,7 +2291,8 @@
       top = Math.max(safeTop + edgePadding, Math.round(safeBottom - 220 - edgePadding));
       maxHeight = Math.max(140, Math.round(safeBottom - top - edgePadding));
     }
-    clearCompactRightFlyoutPosition();
+    clearCompactRightFlyoutStyles();
+    ensureCompactRightFlyoutPortal(true, section);
     section.classList.add('is-compact-flyout');
     section.style.position = 'fixed';
     section.style.left = `${left}px`;
@@ -2506,12 +2559,13 @@
       || normalizeMobileDrawerMode(mobileDrawerState.mode) === 'peek';
   }
 
-  function ensureMobileToolGridPortal(open) {
+  function ensureMobileToolGridPortal(open, { mobilePeek = false } = {}) {
     if (!(dom.toolGrid instanceof HTMLElement)) {
       return;
     }
     if (!open) {
       if (!mobileToolGridPortal.active) {
+        dom.toolGrid.classList.remove('is-compact-flyout-portal');
         dom.toolGrid.classList.remove('is-mobile-peek-flyout');
         return;
       }
@@ -2526,18 +2580,19 @@
       mobileToolGridPortal.active = false;
       mobileToolGridPortal.parent = null;
       mobileToolGridPortal.nextSibling = null;
+      dom.toolGrid.classList.remove('is-compact-flyout-portal');
       dom.toolGrid.classList.remove('is-mobile-peek-flyout');
       return;
     }
+    dom.toolGrid.classList.toggle('is-compact-flyout-portal', !mobilePeek);
+    dom.toolGrid.classList.toggle('is-mobile-peek-flyout', mobilePeek);
     if (mobileToolGridPortal.active) {
-      dom.toolGrid.classList.add('is-mobile-peek-flyout');
       return;
     }
     mobileToolGridPortal.parent = dom.toolGrid.parentNode;
     mobileToolGridPortal.nextSibling = dom.toolGrid.nextSibling;
     document.body.appendChild(dom.toolGrid);
     mobileToolGridPortal.active = true;
-    dom.toolGrid.classList.add('is-mobile-peek-flyout');
   }
 
   function isCompactToolFlyoutOpen() {
@@ -2591,7 +2646,7 @@
     let maxHeight;
 
     if (isMobileCompact) {
-      ensureMobileToolGridPortal(true);
+      ensureMobileToolGridPortal(true, { mobilePeek: true });
       const activeTools = TOOL_GROUPS[state.activeToolGroup]?.tools || [];
       const toolCount = Math.max(1, activeTools.length);
       const itemSize = 64;
@@ -2624,7 +2679,7 @@
       maxHeight = flyoutHeight;
       dom.toolGrid.style.gridTemplateColumns = `repeat(${columns}, ${itemSize}px)`;
     } else {
-      ensureMobileToolGridPortal(false);
+      ensureMobileToolGridPortal(true, { mobilePeek: false });
       dom.toolGrid.style.removeProperty('grid-template-columns');
       const railWidth = Math.max(68, dom.leftRail?.offsetWidth || 78);
       flyoutWidth = clamp(Math.round(railWidth - 16), 64, 96);
@@ -2661,15 +2716,6 @@
     }
     const shouldOpen = Boolean(open) && (Boolean(force) || isCompactToolRailMode() || isMobilePeekToolFlyoutMode());
     dom.sections.tools.dataset.compactFlyoutOpen = shouldOpen ? 'true' : 'false';
-    if (dom.toolGrid instanceof HTMLElement && layoutMode === 'mobilePortrait') {
-      if (shouldOpen) {
-        ensureMobileToolGridPortal(true);
-        dom.toolGrid.style.display = 'grid';
-      } else {
-        dom.toolGrid.style.removeProperty('display');
-        ensureMobileToolGridPortal(false);
-      }
-    }
     updateCompactToolFlyoutPosition();
     updateCompactFlyoutBackdropState();
   }
@@ -3190,6 +3236,7 @@
     updateHistoryButtons();
     updateCanvasControlButtons();
     updatePixfindModeUI();
+    updateExportOriginalToggleUI();
   }
 
   function getMaxSpriteMultiplier() {
@@ -4722,6 +4769,7 @@
     const dialog = config.dialog;
     if (dialog && typeof dialog.showModal === 'function') {
       refreshExportScaleControls();
+      updateExportOriginalToggleUI();
       dialog.showModal();
       window.requestAnimationFrame(() => {
         queueExportAdRender();
@@ -4940,7 +4988,7 @@
       }
     };
     bind(config.confirm, () => {
-      const mode = String(config.format?.value || 'png').trim().toLowerCase();
+      const mode = normalizeExportFormat(config.format?.value || 'png');
       if (mode === 'gif') {
         exportProjectAsGif();
       } else if (mode === 'contest') {
@@ -4967,6 +5015,21 @@
     }
     if (!supportsDialog && config.adContainer) {
       config.adContainer.hidden = true;
+    }
+    if (config.format && config.format.dataset.bound !== 'true') {
+      config.format.dataset.bound = 'true';
+      config.format.addEventListener('change', () => {
+        updateExportOriginalToggleUI();
+      });
+    }
+    if (config.includeOriginalToggle instanceof HTMLInputElement && config.includeOriginalToggle.dataset.bound !== 'true') {
+      config.includeOriginalToggle.dataset.bound = 'true';
+      config.includeOriginalToggle.checked = exportIncludeOriginalSize;
+      config.includeOriginalToggle.addEventListener('change', event => {
+        exportIncludeOriginalSize = Boolean(event.target.checked);
+        scheduleSessionPersist({ includeSnapshots: false });
+        updateExportOriginalToggleUI();
+      });
     }
 
     const slider = config.scaleSlider;
@@ -5026,6 +5089,8 @@
         setExportScale(targetScale);
       });
     }
+
+    updateExportOriginalToggleUI();
   }
 
   function closeNewProjectDialog() {
@@ -6160,99 +6225,63 @@
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
-      if (frameCount > 1) {
-        let exportedCount = 0;
-        let wasCancelled = false;
-        let hadFailure = false;
-        const scaleLabel = selectedScale > 1 ? ` ×${selectedScale}` : '';
-        for (let index = 0; index < frameCount; index += 1) {
-          const baseCanvas = createFrameCanvas(framePixels[index], width, height);
-          const outputCanvas = scaleCanvasNearestNeighbor(baseCanvas, selectedScale);
+      const includeOriginal = shouldExportOriginalCompanion('png', selectedScale);
+      const tasks = [];
+      for (let index = 0; index < frameCount; index += 1) {
+        const frameNumber = String(index + 1).padStart(2, '0');
+        const baseCanvas = createFrameCanvas(framePixels[index], width, height);
+        const variants = [{ scale: selectedScale, isOriginal: false }];
+        if (includeOriginal) {
+          variants.push({ scale: 1, isOriginal: true });
+        }
+        for (let variantIndex = 0; variantIndex < variants.length; variantIndex += 1) {
+          const variant = variants[variantIndex];
+          const outputCanvas = scaleCanvasNearestNeighbor(baseCanvas, variant.scale);
           const blob = await canvasToBlob(outputCanvas, 'image/png');
           if (!blob) {
-            hadFailure = true;
-            break;
+            throw new Error('Failed to create PNG blob');
           }
-          const suffixParts = [`frame_${String(index + 1).padStart(2, '0')}`];
-          if (selectedScale > 1) {
-            suffixParts.push(`x${selectedScale}`);
+          let suffix = `frame_${frameNumber}`;
+          if (variant.scale > 1 || includeOriginal) {
+            suffix += `_x${variant.scale}`;
           }
-          const filename = createExportFileName('png', suffixParts.join('_'));
-          const deliveryResult = await triggerDownloadFromBlob(blob, filename, {
-            mimeType: 'image/png',
-            fileExtensions: ['.png'],
-            shareTitle: state.documentName || 'PiXiEEDraw',
-            shareText: `フレーム${index + 1}のPNGを書き出しました`,
-            allowFilePicker: index === 0,
+          tasks.push({
+            blob,
+            filename: createExportFileName('png', suffix),
+            shareText: `フレーム${index + 1}のPNGを書き出しました${variant.scale > 1 ? ` (×${variant.scale})` : ''}`,
           });
-          switch (deliveryResult) {
-            case 'picker':
-            case 'download':
-            case 'share':
-            case 'window':
-              exportedCount += 1;
-              break;
-            case 'picker-cancel':
-            case 'share-cancel':
-              wasCancelled = true;
-              break;
-            default:
-              hadFailure = true;
-              break;
-          }
-          if (wasCancelled || hadFailure) {
-            break;
-          }
         }
-        if (exportedCount === frameCount) {
-          updateAutosaveStatus(`PNGを書き出しました (全${frameCount}フレーム${scaleLabel})`, 'success');
-        } else if (wasCancelled) {
-          const remaining = frameCount - exportedCount;
-          updateAutosaveStatus(remaining === frameCount
-            ? 'PNGの書き出しをキャンセルしました'
-            : `PNGを書き出しましたが ${remaining} 件はキャンセルされました`, 'warn');
-        } else if (exportedCount > 0 && hadFailure) {
-          updateAutosaveStatus(`PNGを書き出しましたが ${frameCount - exportedCount} 件エクスポートできませんでした`, 'warn');
-        } else {
-          updateAutosaveStatus('PNGの書き出しに失敗しました', 'error');
-        }
-        return;
       }
 
-      const baseCanvas = createFrameCanvas(framePixels[0], width, height);
-      const outputCanvas = scaleCanvasNearestNeighbor(baseCanvas, selectedScale);
-      const blob = await canvasToBlob(outputCanvas, 'image/png');
-      if (!blob) {
-        throw new Error('Failed to create PNG blob');
-      }
-      const scaleSuffix = selectedScale > 1 ? `_x${selectedScale}` : '';
-      const scaleDisplay = selectedScale > 1 ? `×${selectedScale}` : '';
-      const suffix = `frame_${String(state.activeFrame + 1).padStart(2, '0')}${scaleSuffix}`;
-      const filename = createExportFileName('png', suffix);
-      const deliveryResult = await triggerDownloadFromBlob(blob, filename, {
+      const result = await deliverExportTasks(tasks, {
         mimeType: 'image/png',
         fileExtensions: ['.png'],
         shareTitle: state.documentName || 'PiXiEEDraw',
         shareText: 'PNGを書き出しました',
       });
-      switch (deliveryResult) {
-        case 'picker':
-        case 'download':
-          updateAutosaveStatus(`PNGを書き出しました${scaleDisplay ? ` (${scaleDisplay})` : ''}`, 'success');
-          break;
-        case 'share':
-          updateAutosaveStatus('PNGを書き出しました。共有メニューから「ファイルに保存」または「画像を保存」を選択してください。', 'info');
-          break;
-        case 'window':
-          updateAutosaveStatus('PNGを新しいタブで開きました。ブラウザの共有メニューから保存してください。', 'info');
-          break;
-        case 'picker-cancel':
-        case 'share-cancel':
-          updateAutosaveStatus('PNGの書き出しをキャンセルしました', 'warn');
-          break;
-        default:
-          updateAutosaveStatus('PNGの書き出しに失敗しました', 'error');
-          break;
+      const detailParts = [];
+      if (frameCount > 1) {
+        detailParts.push(`全${frameCount}フレーム`);
+      }
+      if (selectedScale > 1) {
+        detailParts.push(`×${selectedScale}`);
+      }
+      if (includeOriginal) {
+        detailParts.push('原寸も追加');
+      }
+      const detail = detailParts.length ? ` (${detailParts.join(' / ')})` : '';
+
+      if (result.exportedCount === result.total) {
+        updateAutosaveStatus(`PNGを書き出しました${detail}`, 'success');
+      } else if (result.wasCancelled) {
+        const remaining = result.total - result.exportedCount;
+        updateAutosaveStatus(remaining === result.total
+          ? 'PNGの書き出しをキャンセルしました'
+          : `PNGを書き出しましたが ${remaining} 件はキャンセルされました`, 'warn');
+      } else if (result.exportedCount > 0 && result.hadFailure) {
+        updateAutosaveStatus(`PNGを書き出しましたが ${result.total - result.exportedCount} 件エクスポートできませんでした`, 'warn');
+      } else {
+        updateAutosaveStatus('PNGの書き出しに失敗しました', 'error');
       }
     } catch (error) {
       console.error('PNG export failed', error);
@@ -6268,35 +6297,59 @@
     }
     try {
       const { width, height } = state;
+      const candidates = getExportScaleCandidates();
+      const selectedScale = applyExportScaleConstraints(candidates);
+      syncExportScaleInputs();
+      const includeOriginal = shouldExportOriginalCompanion('gif', selectedScale);
       const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
       const frameDurations = state.frames.map(frame => clamp(Math.round(Number(frame.duration) || 0), 16, 2000));
-      const gifBytes = buildGifFromPixels(framePixels, frameDurations, width, height);
-      const blob = new Blob([gifBytes], { type: 'image/gif' });
-      const filename = createExportFileName('gif', 'animation');
-      const deliveryResult = await triggerDownloadFromBlob(blob, filename, {
+      const scaledSet = scaleFrameSetNearestNeighbor(framePixels, width, height, selectedScale);
+      const tasks = [];
+      const scaledGifBytes = buildGifFromPixels(
+        scaledSet.framePixels,
+        frameDurations,
+        scaledSet.width,
+        scaledSet.height
+      );
+      tasks.push({
+        blob: new Blob([scaledGifBytes], { type: 'image/gif' }),
+        filename: createExportFileName('gif', selectedScale > 1 ? `animation_x${selectedScale}` : 'animation'),
+        shareText: `GIFを書き出しました${selectedScale > 1 ? ` (×${selectedScale})` : ''}`,
+      });
+      if (includeOriginal) {
+        const originalGifBytes = buildGifFromPixels(framePixels, frameDurations, width, height);
+        tasks.push({
+          blob: new Blob([originalGifBytes], { type: 'image/gif' }),
+          filename: createExportFileName('gif', 'animation_x1'),
+          shareText: 'GIFを書き出しました (原寸)',
+        });
+      }
+
+      const result = await deliverExportTasks(tasks, {
         mimeType: 'image/gif',
         fileExtensions: ['.gif'],
         shareTitle: state.documentName || 'PiXiEEDraw',
         shareText: 'GIFを書き出しました',
       });
-      switch (deliveryResult) {
-        case 'picker':
-        case 'download':
-          updateAutosaveStatus('GIFを書き出しました', 'success');
-          break;
-        case 'share':
-          updateAutosaveStatus('GIFを書き出しました。共有メニューから「ファイルに保存」などを選択してください。', 'info');
-          break;
-        case 'window':
-          updateAutosaveStatus('GIFを新しいタブで開きました。ブラウザの共有メニューから保存してください。', 'info');
-          break;
-        case 'picker-cancel':
-        case 'share-cancel':
-          updateAutosaveStatus('GIFの書き出しをキャンセルしました', 'warn');
-          break;
-        default:
-          updateAutosaveStatus('GIFの書き出しに失敗しました', 'error');
-          break;
+      const detailParts = [];
+      if (selectedScale > 1) {
+        detailParts.push(`×${selectedScale}`);
+      }
+      if (includeOriginal) {
+        detailParts.push('原寸も追加');
+      }
+      const detail = detailParts.length ? ` (${detailParts.join(' / ')})` : '';
+      if (result.exportedCount === result.total) {
+        updateAutosaveStatus(`GIFを書き出しました${detail}`, 'success');
+      } else if (result.wasCancelled) {
+        const remaining = result.total - result.exportedCount;
+        updateAutosaveStatus(remaining === result.total
+          ? 'GIFの書き出しをキャンセルしました'
+          : `GIFを書き出しましたが ${remaining} 件はキャンセルされました`, 'warn');
+      } else if (result.exportedCount > 0 && result.hadFailure) {
+        updateAutosaveStatus(`GIFを書き出しましたが ${result.total - result.exportedCount} 件エクスポートできませんでした`, 'warn');
+      } else {
+        updateAutosaveStatus('GIFの書き出しに失敗しました', 'error');
       }
     } catch (error) {
       console.error('GIF export failed', error);
@@ -6411,6 +6464,37 @@
     exportScaleUserOverride = false;
   }
 
+  function normalizeExportFormat(mode) {
+    const normalized = String(mode || '').trim().toLowerCase();
+    if (normalized === 'gif') return 'gif';
+    if (normalized === 'png') return 'png';
+    if (normalized === 'contest') return 'contest';
+    if (normalized === 'pixfind') return 'pixfind';
+    if (normalized === 'project') return 'project';
+    return 'png';
+  }
+
+  function canOfferOriginalCompanionExport(mode, scale = exportScale) {
+    const format = normalizeExportFormat(mode);
+    const normalizedScale = Math.max(1, Math.floor(Number(scale) || 1));
+    return normalizedScale > 1 && (format === 'png' || format === 'gif');
+  }
+
+  function shouldExportOriginalCompanion(mode, scale = exportScale) {
+    return exportIncludeOriginalSize && canOfferOriginalCompanionExport(mode, scale);
+  }
+
+  function updateExportOriginalToggleUI() {
+    const toggle = dom.exportDialog?.includeOriginalToggle;
+    if (!(toggle instanceof HTMLInputElement)) {
+      return;
+    }
+    const mode = normalizeExportFormat(dom.exportDialog?.format?.value || 'png');
+    const canOffer = canOfferOriginalCompanionExport(mode, exportScale);
+    toggle.checked = exportIncludeOriginalSize;
+    toggle.disabled = !canOffer;
+  }
+
   function applyExportScaleConstraints(candidates) {
     exportSheetInfo = {
       sheetWidth: candidates.sheetWidth,
@@ -6504,6 +6588,7 @@
     }
 
     updateExportScaleHint();
+    updateExportOriginalToggleUI();
   }
 
   function setExportScale(value) {
@@ -6548,6 +6633,85 @@
     ctx.webkitImageSmoothingEnabled = false;
     ctx.drawImage(sourceCanvas, 0, 0, output.width, output.height);
     return output;
+  }
+
+  function scaleFramePixelsNearestNeighbor(pixels, width, height, scale) {
+    const numericScale = Math.max(1, Math.floor(Number(scale) || 1));
+    if (numericScale <= 1) {
+      return {
+        width,
+        height,
+        pixels: pixels instanceof Uint8ClampedArray ? pixels : new Uint8ClampedArray(pixels),
+      };
+    }
+    const targetWidth = width * numericScale;
+    const targetHeight = height * numericScale;
+    const output = new Uint8ClampedArray(targetWidth * targetHeight * 4);
+    for (let y = 0; y < targetHeight; y += 1) {
+      const sourceY = Math.floor(y / numericScale);
+      const sourceRow = sourceY * width;
+      const targetRow = y * targetWidth;
+      for (let x = 0; x < targetWidth; x += 1) {
+        const sourceX = Math.floor(x / numericScale);
+        const sourceIndex = (sourceRow + sourceX) * 4;
+        const targetIndex = (targetRow + x) * 4;
+        output[targetIndex] = pixels[sourceIndex];
+        output[targetIndex + 1] = pixels[sourceIndex + 1];
+        output[targetIndex + 2] = pixels[sourceIndex + 2];
+        output[targetIndex + 3] = pixels[sourceIndex + 3];
+      }
+    }
+    return { width: targetWidth, height: targetHeight, pixels: output };
+  }
+
+  function scaleFrameSetNearestNeighbor(framePixels, width, height, scale) {
+    const numericScale = Math.max(1, Math.floor(Number(scale) || 1));
+    if (numericScale <= 1) {
+      return { width, height, framePixels };
+    }
+    const targetWidth = width * numericScale;
+    const targetHeight = height * numericScale;
+    const scaledFrames = framePixels.map(pixels => scaleFramePixelsNearestNeighbor(pixels, width, height, numericScale).pixels);
+    return { width: targetWidth, height: targetHeight, framePixels: scaledFrames };
+  }
+
+  async function deliverExportTasks(tasks, options = {}) {
+    const total = Array.isArray(tasks) ? tasks.length : 0;
+    if (!total) {
+      return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: false };
+    }
+    let exportedCount = 0;
+    let wasCancelled = false;
+    let hadFailure = false;
+    for (let index = 0; index < tasks.length; index += 1) {
+      const task = tasks[index];
+      const deliveryResult = await triggerDownloadFromBlob(task.blob, task.filename, {
+        mimeType: options.mimeType,
+        fileExtensions: options.fileExtensions,
+        shareTitle: options.shareTitle,
+        shareText: task.shareText || options.shareText,
+        allowFilePicker: index === 0,
+      });
+      switch (deliveryResult) {
+        case 'picker':
+        case 'download':
+        case 'share':
+        case 'window':
+          exportedCount += 1;
+          break;
+        case 'picker-cancel':
+        case 'share-cancel':
+          wasCancelled = true;
+          break;
+        default:
+          hadFailure = true;
+          break;
+      }
+      if (wasCancelled || hadFailure) {
+        break;
+      }
+    }
+    return { exportedCount, total, wasCancelled, hadFailure };
   }
 
   function canvasToBlob(canvas, mimeType) {
@@ -8472,7 +8636,8 @@
     const apply = side => {
       const railNode = getRailNode(side);
       if (!railNode) return;
-      const compact = !isMobile && Number(railSizing[side]) <= RAIL_COMPACT_THRESHOLD;
+      const threshold = side === 'right' ? RAIL_COMPACT_THRESHOLD.right : RAIL_COMPACT_THRESHOLD.left;
+      const compact = !isMobile && Number(railSizing[side]) <= threshold;
       railNode.dataset.compact = compact ? 'true' : 'false';
     };
     if (targetSide === 'left' || targetSide === 'right') {
@@ -15714,6 +15879,7 @@
         documentName: state.documentName,
         pixfindMode: Boolean(pixfindModeEnabled),
         pixfindModeFirstEnableConfirmed: Boolean(pixfindModeFirstEnableConfirmed),
+        exportIncludeOriginalSize: Boolean(exportIncludeOriginalSize),
       };
       window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(snapshot));
     } catch (error) {
@@ -15824,6 +15990,9 @@
       pixfindModeFirstEnableConfirmed = payload.pixfindModeFirstEnableConfirmed;
     } else if (pixfindModeEnabled) {
       pixfindModeFirstEnableConfirmed = true;
+    }
+    if (typeof payload.exportIncludeOriginalSize === 'boolean') {
+      exportIncludeOriginalSize = payload.exportIncludeOriginalSize;
     }
     if (state.showVirtualCursor && !virtualCursor) {
       virtualCursor = createInitialVirtualCursor();
