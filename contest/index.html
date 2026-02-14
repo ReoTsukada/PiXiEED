@@ -2413,6 +2413,27 @@
       return Math.round(clamp(bitrate, 400_000, 1_400_000));
     }
 
+    function chooseCaptureFps(frames){
+      if(!Array.isArray(frames) || !frames.length) return 24;
+      const candidates = [60, 50, 40, 30, 25, 24, 20, 15, 12];
+      let bestFps = 24;
+      let bestError = Number.POSITIVE_INFINITY;
+      for(const fps of candidates){
+        const step = 1000 / fps;
+        let errorSum = 0;
+        for(const frame of frames){
+          const durationMs = Math.max(10, Number(frame?.durationMs || 0));
+          const snapped = Math.max(1, Math.round(durationMs / step)) * step;
+          errorSum += Math.abs(snapped - durationMs);
+        }
+        if(errorSum < bestError - 0.0001 || (Math.abs(errorSum - bestError) <= 0.0001 && fps > bestFps)){
+          bestError = errorSum;
+          bestFps = fps;
+        }
+      }
+      return bestFps;
+    }
+
     async function convertGifToVideo(file){
       if(!file || String(file.type || '').toLowerCase() !== 'image/gif') return null;
       if(typeof ImageDecoder === 'undefined' || typeof MediaRecorder === 'undefined') return null;
@@ -2453,8 +2474,7 @@
         const resizeScale = longestEdge > MAX_SIZE ? (MAX_SIZE / longestEdge) : 1;
         const width = Math.max(1, Math.round(sourceWidth * resizeScale));
         const height = Math.max(1, Math.round(sourceHeight * resizeScale));
-        const minFrameMs = frames.reduce((min, item) => Math.min(min, item.durationMs), 100);
-        const targetFps = Math.round(clamp(1000 / Math.max(10, minFrameMs), 12, 60));
+        const targetFps = chooseCaptureFps(frames);
         const videoBitsPerSecond = estimateVideoBitrate(width, height, targetFps);
         const canvas = document.createElement('canvas');
         canvas.width = width;
@@ -2463,7 +2483,15 @@
         if(!ctx) return null;
         ctx.imageSmoothingEnabled = false;
 
-        stream = canvas.captureStream(targetFps);
+        stream = canvas.captureStream(0);
+        let videoTrack = stream.getVideoTracks()[0] || null;
+        let useManualFrame = Boolean(videoTrack && typeof videoTrack.requestFrame === 'function');
+        if(!useManualFrame){
+          stream.getTracks().forEach(trackItem => trackItem.stop());
+          stream = canvas.captureStream(targetFps);
+          videoTrack = stream.getVideoTracks()[0] || null;
+          useManualFrame = false;
+        }
         const chunks = [];
         const stopped = new Promise((resolve, reject) => {
           recorder = new MediaRecorder(stream, {
@@ -2485,6 +2513,9 @@
         for(const { frame, durationMs } of frames){
           ctx.clearRect(0, 0, width, height);
           ctx.drawImage(frame, 0, 0, width, height);
+          if(useManualFrame){
+            videoTrack.requestFrame();
+          }
           elapsedTargetMs += durationMs;
           const elapsedActualMs = performance.now() - startedAt;
           const delayMs = elapsedTargetMs - elapsedActualMs;
