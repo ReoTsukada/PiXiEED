@@ -12,6 +12,7 @@ const dom = {
   difficultyChips: Array.from(document.querySelectorAll('[data-difficulty]')),
   modeChips: Array.from(document.querySelectorAll('[data-game-mode]')),
   modeDescription: document.getElementById('modeDescription'),
+  hintCard: document.querySelector('.hint-card'),
   puzzleList: document.getElementById('puzzleList'),
   gameTitle: document.getElementById('gameTitle'),
   gameModeLabel: document.getElementById('gameModeLabel'),
@@ -414,11 +415,9 @@ function getRoundStartHint() {
   if (isHiddenObjectMode()) {
     const remaining = state.hiddenTargets.filter(target => !target.found).length;
     if (remaining > 0) {
-      // For hidden-object mode we prefer to maximize the image area and
-      // avoid a redundant hint text. The target panel already lists items.
-      return '';
+      return `右の絵から指定アイテムを探してください（残り${remaining}個）。`;
     }
-    return '';
+    return '右の絵から指定されたアイテムを探してください。';
   }
   return '左右の画像を見比べて、違いをタップしてください。';
 }
@@ -2677,8 +2676,6 @@ function setActiveScreen(target) {
     dom.app?.classList.add('is-playing');
     dom.app?.classList.toggle('is-hidden-object-mode', isHiddenObjectMode());
     document.body.classList.add('is-playing');
-    // Prevent iOS pull-to-refresh / browser-close when entering game
-    enablePreventPullToClose();
     requestAnimationFrame(() => {
       fitCanvasesToFrame();
       clearMarkers();
@@ -2689,39 +2686,7 @@ function setActiveScreen(target) {
     dom.app?.classList.remove('is-playing');
     dom.app?.classList.remove('is-hidden-object-mode');
     document.body.classList.remove('is-playing');
-    // Restore default touch handling when leaving game
-    disablePreventPullToClose();
   }
-}
-
-// ----- Prevent accidental browser close on iOS while playing -----
-let _pixfindPreventTouchMoveHandler = null;
-function enablePreventPullToClose() {
-  if (typeof window === 'undefined') return;
-  if (_pixfindPreventTouchMoveHandler) return;
-  // Block global touchmove to avoid overscroll behaviors (passive:false required)
-  _pixfindPreventTouchMoveHandler = function (e) {
-    // Allow multi-touch gestures (pinch) to pass through
-    if (e.touches && e.touches.length > 1) return;
-    // Allow interactions that originate inside elements that explicitly allow scrolling
-    // If the touch target is inside a scrollable element, do not block to allow inner scroll.
-    const el = e.target;
-    let node = el;
-    while (node && node !== document.body) {
-      const style = window.getComputedStyle(node);
-      const overflowY = style?.overflowY || '';
-      if (overflowY === 'auto' || overflowY === 'scroll') return;
-      node = node.parentElement;
-    }
-    e.preventDefault();
-  };
-  window.addEventListener('touchmove', _pixfindPreventTouchMoveHandler, { passive: false });
-}
-
-function disablePreventPullToClose() {
-  if (!_pixfindPreventTouchMoveHandler) return;
-  window.removeEventListener('touchmove', _pixfindPreventTouchMoveHandler, { passive: false });
-  _pixfindPreventTouchMoveHandler = null;
 }
 
 function selectGameMode(mode) {
@@ -3115,6 +3080,17 @@ function updateGameModePresentation() {
     dom.canvasChallenge.setAttribute('aria-label', isHiddenObjectMode() ? 'もの探し画像' : '間違いを探す画像');
   }
   renderTargetPanel();
+  // If we're in hidden-object mode, hide the target/hint placeholders so the image can take more space.
+  try {
+    if (dom.hintCard) dom.hintCard.hidden = isHiddenObjectMode();
+    if (dom.targetPanel) dom.targetPanel.hidden = isHiddenObjectMode() || dom.targetPanel.hidden;
+  } catch (_) {
+    // ignore if DOM not ready
+  }
+  // Refit canvases to account for the removed placeholders
+  if (isHiddenObjectMode()) {
+    fitCanvasesToFrame();
+  }
 }
 
 function renderTargetPanel() {
@@ -3140,27 +3116,6 @@ function renderTargetPanel() {
 
 function fitCanvasesToFrame() {
   if (!state.imageSize.width) return;
-  // In hidden-object mode we want the challenge image to fill the frame as
-  // much as possible (not forced to a square). For spot-difference mode we
-  // keep the previous square-fitting behavior to maintain parity between
-  // original and challenge images.
-  if (isHiddenObjectMode()) {
-    const challenge = dom.canvasChallenge;
-    if (challenge) {
-      const frame = challenge.parentElement;
-      if (frame) {
-        const frameWidth = frame.clientWidth;
-        const frameHeight = frame.clientHeight;
-        if (frameWidth && frameHeight) {
-          // Fill available frame area
-          challenge.style.width = `${frameWidth}px`;
-          challenge.style.height = `${frameHeight}px`;
-        }
-      }
-    }
-    return refreshZoomBounds();
-  }
-
   const canvases = [dom.canvasOriginal, dom.canvasChallenge];
   canvases.forEach(canvas => {
     if (!canvas) return;
