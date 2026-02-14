@@ -72,10 +72,7 @@
   </script>
 </head>
 <body>
-<!-- Mobile top ad placeholder (shown on portrait / small screens instead of per-panel/bottom ads) -->
-<div id="mobileTopAd" aria-hidden="true">
-  <div class="mobile-ad-box">バナー広告</div>
-</div>
+<!-- Mobile ad placeholder: using bottom banner (mobileBottomAd) for PiXiEEDraw lite behavior -->
 <div class="app" id="appRoot">
 <div aria-labelledby="startupScreenTitle" aria-modal="true" class="startup-screen" hidden="" id="startupScreen" role="dialog" tabindex="-1">
 <div class="startup-screen__backdrop"></div>
@@ -646,7 +643,7 @@
       if (!mobileAd) return;
 
   const mql = window.matchMedia('(orientation: portrait)');
-  const mobileTopAd = document.getElementById('mobileTopAd');
+  const mobileBottomAd = document.getElementById('mobileBottomAd');
       let raf = null;
       const listeners = new Map();
 
@@ -685,16 +682,23 @@
           const containers = getActiveScrollableContainers();
           const anyAtBottom = Array.from(containers).some(isAtBottom);
 
-          // Top ad: show in portrait as overlay and mark body so CSS can push UI down
-          if (mobileTopAd) {
+          // Bottom ad: show in portrait as overlay at the bottom and mark body so CSS can add padding
+          if (mobileBottomAd) {
             if (mql.matches) {
-              mobileTopAd.classList.add('visible');
-              mobileTopAd.setAttribute('aria-hidden', 'false');
-              document.body.classList.add('top-ad-active');
+              mobileBottomAd.classList.add('visible');
+              mobileBottomAd.setAttribute('aria-hidden', 'false');
+              // compute current ad height and expose as CSS var so layout can adjust
+              try {
+                const box = mobileBottomAd.querySelector('.mobile-ad-box');
+                const h = box ? box.offsetHeight + 12 : 56; // add small margin
+                document.documentElement.style.setProperty('--mobile-bottom-ad-height', h + 'px');
+              } catch (e) {}
+              document.body.classList.add('bottom-ad-active');
             } else {
-              mobileTopAd.classList.remove('visible');
-              mobileTopAd.setAttribute('aria-hidden', 'true');
-              document.body.classList.remove('top-ad-active');
+              mobileBottomAd.classList.remove('visible');
+              mobileBottomAd.setAttribute('aria-hidden', 'true');
+              document.documentElement.style.setProperty('--mobile-bottom-ad-height', '0px');
+              document.body.classList.remove('bottom-ad-active');
             }
           }
 
@@ -771,21 +775,21 @@
       const SLOTS = [
         { containerId: 'leftRailAd', slot: '2141591954' },
         { containerId: 'rightRailAd', slot: '9073878884' },
-        { containerId: 'mobileTopAd', slot: '2261515379' }
+        { containerId: 'mobileBottomAd', slot: '2261515379' }
       ];
 
-      // localStorage key to remember when the user closed the mobile top lite banner
-      const MOBILE_TOP_CLOSED_KEY = 'pixiedraw_mobile_top_ad_closed_v1';
+  // localStorage key to remember when the user closed the mobile bottom lite banner
+  const MOBILE_BOTTOM_CLOSED_KEY = 'pixiedraw_mobile_bottom_ad_closed_v1';
 
       function ensureIns(container, slot) {
         if (!container) return false;
         // if a real ins already exists, keep it
         if (container.querySelector && container.querySelector('ins.adsbygoogle')) return true;
         if (container._pixieed_pendingIns) return true;
-        // If mobile top ad has been closed by user, do not insert real ad/ins
+        // If mobile bottom ad has been closed by user, do not insert real ad/ins
         try {
-          if (container.id === 'mobileTopAd' && localStorage.getItem(MOBILE_TOP_CLOSED_KEY) === '1') {
-            console.debug('[pixiedraw] mobile top ad closed by user; skipping ins insertion');
+          if (container.id === 'mobileBottomAd' && localStorage.getItem(MOBILE_BOTTOM_CLOSED_KEY) === '1') {
+            console.debug('[pixiedraw] mobile bottom ad closed by user; skipping ins insertion');
             return false;
           }
         } catch (e) {}
@@ -856,11 +860,11 @@
           }
         };
 
-        if (container && container.id === 'mobileTopAd') {
-          // Do not show mobile top lite banner if user previously closed it
+        if (container && container.id === 'mobileBottomAd') {
+          // Do not show mobile bottom lite banner if user previously closed it
           try {
-            if (localStorage.getItem(MOBILE_TOP_CLOSED_KEY) === '1') {
-              console.debug('[pixiedraw] mobile top ad closed; skipping rendering');
+            if (localStorage.getItem(MOBILE_BOTTOM_CLOSED_KEY) === '1') {
+              console.debug('[pixiedraw] mobile bottom ad closed; skipping rendering');
               return;
             }
           } catch (e) {}
@@ -870,8 +874,25 @@
           // If there is a pending ins element, append it now so pixieedObserveAds / adsbygoogle can measure it.
           try {
             if (container._pixieed_pendingIns) {
-              const ins = container._pixieed_pendingIns;
+              const ins = container._pixied_pendingIns || container._pixieed_pendingIns;
               container._pixieed_pendingIns = null;
+              // ensure the ins has a measurable width before appending
+              try {
+                const w = (container.getBoundingClientRect && container.getBoundingClientRect().width) || (container.clientWidth || container.offsetWidth) || 0;
+                if (w > 0) {
+                  // constrain width for mobile bottom to avoid covering UI
+                  if ((container.id || '') === 'mobileBottomAd') {
+                    const safe = Math.max(0, w - 24);
+                    const cap = 420; // px
+                    const use = Math.min(safe, cap);
+                    ins.style.width = use + 'px';
+                    ins.style.maxWidth = '100%';
+                  } else {
+                    ins.style.width = w + 'px';
+                    ins.style.maxWidth = '100%';
+                  }
+                }
+              } catch (e) {}
               container.innerHTML = '';
               container.appendChild(ins);
               console.debug('[pixiedraw] appended pending ins into', container.id || container);
@@ -912,9 +933,49 @@
               for (const entry of entries) {
                 if ((entry.contentRect && entry.contentRect.width) || hasWidth()) {
                   try {
-                    if (container._pixieed_pendingIns) {
-                      const ins = container._pixieed_pendingIns;
-                      container._pixieed_pendingIns = null;
+                    if (container._pixied_pendingIns || container._pixied_pendingIns === null) {
+                      // use either possible pending property name
+                    }
+                    if (container._pixied_pendingIns || container._pixied_pendingIns === null) {}
+                    if (container._pixied_pendingIns) {
+                      const ins = container._pixied_pendingIns || container._pixied_pendingIns;
+                      container._pixied_pendingIns = null;
+                      try {
+                        const w = (container.getBoundingClientRect && container.getBoundingClientRect().width) || (container.clientWidth || container.offsetWidth) || 0;
+                        if (w > 0) {
+                          if ((container.id || '') === 'mobileBottomAd') {
+                            const safe = Math.max(0, w - 24);
+                            const cap = 420;
+                            const use = Math.min(safe, cap);
+                            ins.style.width = use + 'px';
+                            ins.style.maxWidth = '100%';
+                          } else {
+                            ins.style.width = w + 'px';
+                            ins.style.maxWidth = '100%';
+                          }
+                        }
+                      } catch (e) {}
+                      container.innerHTML = '';
+                      container.appendChild(ins);
+                      console.debug('[pixiedraw] ResizeObserver appended pending ins into', container.id || container);
+                    } else if (container._pixieed_pendingIns) {
+                      const ins = container._pixied_pendingIns;
+                      container._pixied_pendingIns = null;
+                      try {
+                        const w = (container.getBoundingClientRect && container.getBoundingClientRect().width) || (container.clientWidth || container.offsetWidth) || 0;
+                        if (w > 0) {
+                          if ((container.id || '') === 'mobileBottomAd') {
+                            const safe = Math.max(0, w - 24);
+                            const cap = 420;
+                            const use = Math.min(safe, cap);
+                            ins.style.width = use + 'px';
+                            ins.style.maxWidth = '100%';
+                          } else {
+                            ins.style.width = w + 'px';
+                            ins.style.maxWidth = '100%';
+                          }
+                        }
+                      } catch (e) {}
                       container.innerHTML = '';
                       container.appendChild(ins);
                       console.debug('[pixiedraw] ResizeObserver appended pending ins into', container.id || container);
@@ -937,6 +998,71 @@
           window.addEventListener('resize', onResize);
           document.addEventListener('visibilitychange', onVisibility);
         }
+
+  // Fallback: if the container remains width=0 after a short delay, apply a
+        // temporary safe min-width and append the pending ins so ads can load.
+        // This is conservative and will try to revert the styling shortly after.
+        const RETRY_DELAY = 2000; // ms
+        const REVERT_DELAY = 6000; // ms after applying temp styles
+        let retryTimer = setTimeout(() => {
+          try {
+            if (hasWidth()) return; // already sized
+            // if user closed mobile bottom, skip
+            if (container.id === 'mobileBottomAd') {
+              try { if (localStorage.getItem(MOBILE_BOTTOM_CLOSED_KEY) === '1') return; } catch (e) {}
+            }
+            // append pending ins if present
+            try {
+              if (container._pixied_pendingIns) {
+                const ins = container._pixied_pendingIns;
+                container._pixied_pendingIns = null;
+                // apply temporary non-invasive sizing to allow ad to measure
+                container._pixied_prevMinWidth = container.style.minWidth;
+                // smaller temp for mobileBottomAd so it doesn't force huge width
+                const tempMin = (container.id === 'mobileBottomAd') ? '260px' : (container.style.minWidth || '320px');
+                container.style.minWidth = tempMin;
+                // before appending, try to set pixel width on the ins so adsbygoogle can measure
+                try {
+                  const w = (container.getBoundingClientRect && container.getBoundingClientRect().width) || (container.clientWidth || container.offsetWidth) || 0;
+                  if (w > 0) {
+                    if (container.id === 'mobileBottomAd') {
+                        const safe = Math.max(0, w - 24);
+                        const cap = 420;
+                        const use = Math.min(safe, cap);
+                        ins.style.width = use + 'px';
+                        ins.style.maxWidth = '100%';
+                      } else {
+                        ins.style.width = w + 'px';
+                        ins.style.maxWidth = '100%';
+                      }
+                  }
+                } catch (e) {}
+                // append and render
+                container.innerHTML = '';
+                container.appendChild(ins);
+                console.debug('[pixiedraw] retry: appended pending ins with temporary minWidth into', container.id || container);
+                tryRender(container);
+                container._pixied_tempApplied = true;
+                // revert temporary styling after REVERT_DELAY
+                setTimeout(() => {
+                  try {
+                    if (container._pixied_tempApplied) {
+                      container.style.minWidth = container._pixieed_prevMinWidth || '';
+                      container._pixied_tempApplied = false;
+                      console.debug('[pixiedraw] reverted temporary minWidth for', container.id || container);
+                    }
+                  } catch (e) {}
+                }, REVERT_DELAY);
+              } else {
+                // no pending ins; still attempt to render (pixieedObserveAds may inspect)
+                console.debug('[pixiedraw] retry: no pending ins but attempting to render for', container.id || container);
+                tryRender(container);
+              }
+            } catch (e) {
+              console.warn('[pixiedraw] retry attempt failed', e && e.message);
+            }
+          } catch (e) {}
+        }, RETRY_DELAY);
       }
 
       // Insert ins elements and schedule rendering only when the container is sized.
@@ -981,17 +1107,17 @@
       ];
 
       adBoxes.forEach((box, idx) => {
-        // Respect mobile-top-closed state for mobileTopAd
+        // Respect mobile-bottom-closed state for mobileBottomAd
         try {
-          if (box.closest && box.closest('#mobileTopAd') && localStorage.getItem('pixiedraw_mobile_top_ad_closed_v1') === '1') {
+          if (box.closest && box.closest('#mobileBottomAd') && localStorage.getItem('pixiedraw_mobile_bottom_ad_closed_v1') === '1') {
             // leave placeholder empty
             box.innerHTML = '';
             return;
           }
         } catch (e) {}
 
-        // If this box is the mobile top ad, render PiXiEEDrawLite-style compact banner
-        if (box.closest && box.closest('#mobileTopAd')) {
+        // If this box is the mobile bottom ad, render PiXiEEDrawLite-style compact banner
+        if (box.closest && box.closest('#mobileBottomAd')) {
           box.style.overflow = 'hidden';
           box.innerHTML = '';
           const wrapper = document.createElement('div');
@@ -1007,12 +1133,12 @@
           close.setAttribute('aria-label', '広告を閉じる');
           close.textContent = '×';
           close.addEventListener('click', () => {
-            try { localStorage.setItem('pixiedraw_mobile_top_ad_closed_v1', '1'); } catch (e) {}
-            const top = document.getElementById('mobileTopAd');
+            try { localStorage.setItem('pixiedraw_mobile_bottom_ad_closed_v1', '1'); } catch (e) {}
+            const top = document.getElementById('mobileBottomAd');
             if (top) {
               top.classList.remove('visible');
               top.setAttribute('aria-hidden', 'true');
-              document.body.classList.remove('top-ad-active');
+              document.body.classList.remove('bottom-ad-active');
             }
           });
           wrapper.appendChild(logo);
