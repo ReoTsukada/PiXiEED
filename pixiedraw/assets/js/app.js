@@ -250,6 +250,7 @@
     file: 'full',
     pixfind: 'full',
   });
+  const PIXFIND_REQUIRED_LAYER_COUNT = 2;
 
   const ZOOM_STEPS = Object.freeze([
     1,
@@ -6031,7 +6032,26 @@
     return { frame, pixels };
   }
 
+  function getActiveFrameLayerCount() {
+    const frame = getActiveFrame();
+    if (!frame || !Array.isArray(frame.layers)) {
+      return 0;
+    }
+    return frame.layers.length;
+  }
+
+  function hasValidPixfindLayerCount() {
+    return getActiveFrameLayerCount() === PIXFIND_REQUIRED_LAYER_COUNT;
+  }
+
+  function getPixfindLayerCountWarning() {
+    return `PiXFiND出力はレイヤー${PIXFIND_REQUIRED_LAYER_COUNT}枚のときのみ利用できます（現在: ${getActiveFrameLayerCount()}枚）`;
+  }
+
   function hasValidPixfindBaseSnapshotForActiveFrame() {
+    if (!hasValidPixfindLayerCount()) {
+      return false;
+    }
     const frame = getActiveFrame();
     if (!frame || !pixfindBaseSnapshot) {
       return false;
@@ -6048,16 +6068,17 @@
 
   function updatePixfindModeUI() {
     const modeButton = dom.controls.togglePixfindMode;
+    const hasValidLayerCount = hasValidPixfindLayerCount();
     if (modeButton) {
       modeButton.classList.toggle('is-active', pixfindModeEnabled);
       modeButton.setAttribute('aria-pressed', String(pixfindModeEnabled));
       modeButton.textContent = pixfindModeEnabled ? 'PiXFiNDモード: ON' : 'PiXFiNDモード: OFF';
     }
     if (dom.controls.refreshPixfindBase) {
-      dom.controls.refreshPixfindBase.disabled = !pixfindModeEnabled;
+      dom.controls.refreshPixfindBase.disabled = !(pixfindModeEnabled && hasValidLayerCount);
     }
     if (dom.controls.sendToPixfind) {
-      dom.controls.sendToPixfind.disabled = !(pixfindModeEnabled && hasValidPixfindBaseSnapshotForActiveFrame());
+      dom.controls.sendToPixfind.disabled = !(pixfindModeEnabled && hasValidLayerCount && hasValidPixfindBaseSnapshotForActiveFrame());
     }
   }
 
@@ -6067,6 +6088,13 @@
   }
 
   function capturePixfindBaseSnapshot({ quiet = false } = {}) {
+    if (!hasValidPixfindLayerCount()) {
+      if (!quiet) {
+        updateAutosaveStatus(getPixfindLayerCountWarning(), 'warn');
+      }
+      updatePixfindModeUI();
+      return false;
+    }
     const composite = getActiveFrameCompositePixels();
     if (!composite) {
       if (!quiet) {
@@ -6103,17 +6131,17 @@
     }
     pixfindModeEnabled = next;
     if (next) {
-      const captured = capturePixfindBaseSnapshot({ quiet: true });
-      if (!captured) {
-        pixfindModeEnabled = false;
-        clearPixfindBaseSnapshot();
+      if (hasValidPixfindLayerCount()) {
+        const captured = capturePixfindBaseSnapshot({ quiet: true });
         if (!quiet) {
-          updateAutosaveStatus('PiXFiNDモードを開始できませんでした', 'warn');
+          if (captured) {
+            updateAutosaveStatus('PiXFiNDモードをONにしました', 'info');
+          } else {
+            updateAutosaveStatus('PiXFiNDモードをONにしましたが原本を作成できませんでした', 'warn');
+          }
         }
-        return false;
-      }
-      if (!quiet) {
-        updateAutosaveStatus('PiXFiNDモードをONにしました', 'info');
+      } else if (!quiet) {
+        updateAutosaveStatus(`PiXFiNDモードをONにしました。${getPixfindLayerCountWarning()}`, 'warn');
       }
     } else {
       clearPixfindBaseSnapshot();
@@ -6138,6 +6166,10 @@
   function exportProjectToPixfind() {
     if (!pixfindModeEnabled) {
       updateAutosaveStatus('PiXFiNDモードをONにしてください', 'warn');
+      return;
+    }
+    if (!hasValidPixfindLayerCount()) {
+      updateAutosaveStatus(getPixfindLayerCountWarning(), 'warn');
       return;
     }
     if (!hasValidPixfindBaseSnapshotForActiveFrame()) {
@@ -10942,6 +10974,7 @@
 
   function renderLayerList() {
     renderTimelineMatrix();
+    updatePixfindModeUI();
   }
 
   function setupCanvas() {
