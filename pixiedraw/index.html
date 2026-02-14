@@ -114,6 +114,10 @@
 <img alt="" class="tab-icon" src="assets/icons/menu-file.svg"/>
 <span class="sr-only">ファイル</span>
 </button>
+<button aria-controls="mobilePanelPixfind" aria-label="PiXFiND" aria-selected="false" class="mobile-tab" data-mobile-tab="pixfind" id="mobileTabPixfind" role="tab" tabindex="-1" type="button">
+<img alt="" class="tab-icon" src="assets/icons/menu-pixfind.png"/>
+<span class="sr-only">PiXFiND</span>
+</button>
 </div>
 <div aria-label="モバイルショートカット" class="mobile-shortcuts" id="mobileShortcutsMount">
 </div>
@@ -151,7 +155,7 @@
 <div aria-hidden="true" aria-live="polite" class="zoom-indicator" id="zoomIndicator" role="status"></div>
 </div>
 </main>
-<aside aria-label="フレーム、レイヤー、設定、ファイル" class="rail rail--right" data-collapsed="false" data-compact="true" id="rightRail">
+<aside aria-label="フレーム、レイヤー、設定、ファイル、PiXFiND" class="rail rail--right" data-collapsed="false" data-compact="true" id="rightRail">
 <div aria-label="右パネル切り替え" class="rail-tabs" id="rightRailTabs" role="tablist">
 <button aria-controls="panelFrames" aria-label="フレームとレイヤー" aria-selected="true" class="rail-tab is-active" data-right-tab="frames" role="tab" title="フレームとレイヤー" type="button">
 <img alt="" class="tab-icon" src="assets/icons/menu-frame.png"/>
@@ -164,6 +168,10 @@
 <button aria-controls="panelFile" aria-label="ファイル" aria-selected="false" class="rail-tab" data-right-tab="file" role="tab" tabindex="-1" title="ファイル" type="button">
 <img alt="" class="tab-icon" src="assets/icons/menu-file.svg"/>
 <span class="sr-only">ファイル</span>
+</button>
+<button aria-controls="panelPixfind" aria-label="PiXFiND" aria-selected="false" class="rail-tab" data-right-tab="pixfind" role="tab" tabindex="-1" title="PiXFiND" type="button">
+<img alt="" class="tab-icon" src="assets/icons/menu-pixfind.png"/>
+<span class="sr-only">PiXFiND</span>
 </button>
 </div>
 <div class="rail-tabpanes" id="rightRailPanes"></div>
@@ -181,6 +189,7 @@
 <div aria-labelledby="mobileTabFrames" class="mobile-panel" hidden="" id="mobilePanelFrames" role="tabpanel"></div>
 <div aria-labelledby="mobileTabSettings" class="mobile-panel" hidden="" id="mobilePanelSettings" role="tabpanel"></div>
 <div aria-labelledby="mobileTabFile" class="mobile-panel" hidden="" id="mobilePanelFile" role="tabpanel"></div>
+<div aria-labelledby="mobileTabPixfind" class="mobile-panel" hidden="" id="mobilePanelPixfind" role="tabpanel"></div>
 </div>
 </div>
 <section class="panel-section" data-section="tools" id="panelTools">
@@ -378,11 +387,7 @@
 <button class="button" id="newProject" type="button">新規作成</button>
 <button class="button" id="openDocument" type="button">ファイルを開く</button>
 <button class="button" id="exportProject" type="button">出力</button>
-<p class="help-text">出力: PNG/GIF/コンテスト投稿/PiXFiND送信/プロジェクト保存をまとめています。</p>
-<button aria-pressed="false" class="button" id="togglePixfindMode" type="button">PiXFiNDモード: OFF</button>
-<button class="button" disabled="" id="refreshPixfindBase" type="button">原本を更新</button>
-<button class="button" disabled="" id="sendToPixfind" type="button">PiXFiNDへ送る</button>
-<p class="help-text">PiXFiNDモードでは「原本」と「差分」をペアで出力してPiXFiNDに送れます。</p>
+<p class="help-text">出力: PNG/GIF/コンテスト投稿/プロジェクト保存をまとめています。</p>
 <button class="button" id="clearCanvas" type="button">キャンバスをクリア</button>
 <button class="button" id="enableAutosave" type="button">ローカルに自動保存</button>
 <p class="help-text">自動保存はこの端末内に下書きを保存します。出力は共有・配布用です。</p>
@@ -391,6 +396,16 @@
 <div aria-live="polite" class="field memory-control" role="status">
 <span id="memoryUsage">メモリ: 計測中…</span>
 <button class="chip" id="memoryClear" type="button">メモリ削除</button>
+</div>
+</div>
+</section>
+<section class="panel-section" data-section="pixfind" id="panelPixfind">
+<div class="panel-section__body">
+<div class="field-group">
+<button aria-pressed="false" class="button" id="togglePixfindMode" type="button">PiXFiNDモード: OFF</button>
+<button class="button" disabled="" id="refreshPixfindBase" type="button">原本を更新</button>
+<button class="button" disabled="" id="sendToPixfind" type="button">PiXFiNDへ送る</button>
+<p class="help-text">PiXFiNDモードでは「原本」と「差分」をペアで出力してPiXFiNDに送れます。</p>
 </div>
 </div>
 </section>
@@ -497,6 +512,10 @@
 </div>
 </div>
 <p class="help-text" id="exportScaleHint"></p>
+<label class="toggle-option export-original-toggle" for="exportIncludeOriginalToggle">
+<input id="exportIncludeOriginalToggle" type="checkbox"/>
+<span>拡大出力時に原寸も追加で出力する</span>
+</label>
 </div>
 <div class="field field--list">
 <div aria-live="polite" class="export-guidance">
