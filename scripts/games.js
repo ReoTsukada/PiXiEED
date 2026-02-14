@@ -14,7 +14,8 @@
     const title = normalize(card.dataset.title);
     const description = normalize(card.dataset.description);
     const difficulty = normalize(card.dataset.difficulty);
-    return `${title} ${description} ${difficulty}`;
+    const aliases = normalize(card.dataset.keywords);
+    return `${title} ${description} ${difficulty} ${aliases}`;
   }
 
   const keywords = new Map(playable.map(card => [card, getKeywords(card)]));
