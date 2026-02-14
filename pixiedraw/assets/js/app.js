@@ -434,6 +434,10 @@
   const SHARE_HASHTAG = '#PiXiEED';
   const IS_IOS_DEVICE =
     typeof navigator !== 'undefined' && /iphone|ipod|ipad/i.test((navigator.userAgent || '').toLowerCase());
+  const IS_ANDROID_LINE_BROWSER =
+    typeof navigator !== 'undefined'
+    && /android/i.test(navigator.userAgent || '')
+    && /line\//i.test(navigator.userAgent || '');
   const IOS_SNAPSHOT_SUPPORTED =
     IS_IOS_DEVICE && typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined' && window.indexedDB !== null;
   const IOS_SNAPSHOT_DB_NAME = 'pixieedraw-ios-snapshots';
@@ -2345,28 +2349,27 @@
     });
     if (!compactRightFlyoutDismissBound) {
       compactRightFlyoutDismissBound = true;
-      document.addEventListener(
-        'pointerdown',
-        event => {
-          if (!isCompactRightFlyoutOpen()) {
-            return;
-          }
-          const target = event.target;
-          if (!(target instanceof Node)) {
-            return;
-          }
-          const activeSection = dom.sections[state.activeRightTab];
-          if (activeSection instanceof HTMLElement && activeSection.contains(target)) {
-            return;
-          }
-          if (dom.rightRail instanceof HTMLElement && dom.rightRail.contains(target)) {
-            return;
-          }
-          setCompactRightFlyoutOpen(false);
-          updateRightTabVisibility();
-        },
-        true
-      );
+      const dismissCompactRightFlyout = event => {
+        if (!isCompactRightFlyoutOpen()) {
+          return;
+        }
+        const target = event.target;
+        if (!(target instanceof Node)) {
+          return;
+        }
+        const activeSection = dom.sections[state.activeRightTab];
+        if (activeSection instanceof HTMLElement && activeSection.contains(target)) {
+          return;
+        }
+        if (dom.rightRail instanceof HTMLElement && dom.rightRail.contains(target)) {
+          return;
+        }
+        setCompactRightFlyoutOpen(false);
+        updateRightTabVisibility();
+      };
+      document.addEventListener('pointerdown', dismissCompactRightFlyout, true);
+      document.addEventListener('click', dismissCompactRightFlyout, true);
+      document.addEventListener('touchstart', dismissCompactRightFlyout, { capture: true, passive: true });
       document.addEventListener('keydown', event => {
         if (event.key !== 'Escape' || !isCompactRightFlyoutOpen()) {
           return;
@@ -8790,14 +8793,14 @@
   }
 
   function getViewportSize() {
-    const viewport = window.visualViewport;
+    const viewport = IS_ANDROID_LINE_BROWSER ? null : window.visualViewport;
     const width = Math.max(0, Math.round(Number(viewport?.width) || Number(window.innerWidth) || 0));
     const height = Math.max(0, Math.round(Number(viewport?.height) || Number(window.innerHeight) || 0));
     return { width, height };
   }
 
   function getViewportBounds() {
-    const viewport = window.visualViewport;
+    const viewport = IS_ANDROID_LINE_BROWSER ? null : window.visualViewport;
     const left = Math.round(Number(viewport?.offsetLeft) || 0);
     const top = Math.round(Number(viewport?.offsetTop) || 0);
     const width = Math.max(0, Math.round(Number(viewport?.width) || Number(window.innerWidth) || 0));
