@@ -774,10 +774,20 @@
         { containerId: 'mobileTopAd', slot: '2261515379' }
       ];
 
+      // localStorage key to remember when the user closed the mobile top lite banner
+      const MOBILE_TOP_CLOSED_KEY = 'pixiedraw_mobile_top_ad_closed_v1';
+
       function ensureIns(container, slot) {
         if (!container) return false;
         // if a real ins already exists, keep it
         if (container.querySelector && container.querySelector('ins.adsbygoogle')) return true;
+        // If mobile top ad has been closed by user, do not insert real ad/ins
+        try {
+          if (container.id === 'mobileTopAd' && localStorage.getItem(MOBILE_TOP_CLOSED_KEY) === '1') {
+            console.debug('[pixiedraw] mobile top ad closed by user; skipping ins insertion');
+            return false;
+          }
+        } catch (e) {}
         // create ins element
         const ins = document.createElement('ins');
         ins.className = 'adsbygoogle';
@@ -803,9 +813,20 @@
         return true;
       }
 
-      function tryRender() {
+      function tryRender(container) {
         try {
-          console.debug('[pixiedraw] calling (adsbygoogle).push for rendering');
+          // Prefer the site's global lazy ad queue if present (pixieedObserveAds),
+          // which handles slot assignment, queuing, and ready polling consistently across pages.
+          if (window.pixieedObserveAds && typeof window.pixieedObserveAds === 'function') {
+            try {
+              window.pixieedObserveAds(container || document);
+              console.debug('[pixiedraw] handed ad container to pixieedObserveAds', container || document);
+              return;
+            } catch (e) {
+              console.warn('[pixiedraw] pixieedObserveAds call failed', e && e.message);
+            }
+          }
+          console.debug('[pixiedraw] calling (adsbygoogle).push for rendering (fallback)');
           (window.adsbygoogle = window.adsbygoogle || []).push({});
         } catch (e) {
           console.warn('[pixiedraw] adsbygoogle push failed', e && e.message);
@@ -826,6 +847,16 @@
             return (container.clientWidth || container.offsetWidth) > 0;
           }
         };
+
+        if (container && container.id === 'mobileTopAd') {
+          // Do not show mobile top lite banner if user previously closed it
+          try {
+            if (localStorage.getItem(MOBILE_TOP_CLOSED_KEY) === '1') {
+              console.debug('[pixiedraw] mobile top ad closed; skipping rendering');
+              return;
+            }
+          } catch (e) {}
+        }
 
         if (hasWidth()) {
           console.debug('[pixiedraw] container has width, rendering ads now for', container.id || container);
@@ -923,6 +954,47 @@
       ];
 
       adBoxes.forEach((box, idx) => {
+        // Respect mobile-top-closed state for mobileTopAd
+        try {
+          if (box.closest && box.closest('#mobileTopAd') && localStorage.getItem('pixiedraw_mobile_top_ad_closed_v1') === '1') {
+            // leave placeholder empty
+            box.innerHTML = '';
+            return;
+          }
+        } catch (e) {}
+
+        // If this box is the mobile top ad, render PiXiEEDrawLite-style compact banner
+        if (box.closest && box.closest('#mobileTopAd')) {
+          box.style.overflow = 'hidden';
+          box.innerHTML = '';
+          const wrapper = document.createElement('div');
+          wrapper.className = 'ad-lite';
+          const logo = document.createElement('div');
+          logo.className = 'logo';
+          logo.textContent = 'PX';
+          const text = document.createElement('div');
+          text.className = 'text';
+          text.textContent = 'PiXiEEDraw Lite — より軽く、すぐ遊べる';
+          const close = document.createElement('button');
+          close.className = 'ad-close';
+          close.setAttribute('aria-label', '広告を閉じる');
+          close.textContent = '×';
+          close.addEventListener('click', () => {
+            try { localStorage.setItem('pixiedraw_mobile_top_ad_closed_v1', '1'); } catch (e) {}
+            const top = document.getElementById('mobileTopAd');
+            if (top) {
+              top.classList.remove('visible');
+              top.setAttribute('aria-hidden', 'true');
+              document.body.classList.remove('top-ad-active');
+            }
+          });
+          wrapper.appendChild(logo);
+          wrapper.appendChild(text);
+          wrapper.appendChild(close);
+          box.appendChild(wrapper);
+          return;
+        }
+
         let i = idx % samples.length;
         box.style.overflow = 'hidden';
         function render() {
