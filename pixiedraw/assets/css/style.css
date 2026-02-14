@@ -2273,6 +2273,16 @@ input[type='range']::-moz-focus-outer {
   margin-top: 8px;
 }
 
+/* Home button in settings */
+.settings-nav {
+  margin-bottom: 10px;
+}
+.settings-nav .button {
+  display: inline-flex;
+  width: auto;
+  padding: 8px 12px;
+}
+
 #panelSettings .settings-size-row {
   gap: 4px;
   margin-bottom: 6px;
@@ -2298,6 +2308,171 @@ input[type='range']::-moz-focus-outer {
   width: 62px;
   padding: 4px 8px;
 }
+
+/* Rail ad placeholder styles: place at bottom of left/right rails and keep responsive */
+.rail-ad {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  width: 100%;
+  margin-top: auto; /* push to bottom of rail */
+}
+.rail-ad .ad-box {
+  display: block;
+  width: 100%;
+  max-width: 180px; /* will be constrained by rail width */
+  background: #ffffff; /* temporary white placeholder */
+  color: #111111;
+  font-size: 12px;
+  text-align: center;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+/* Portrait narrower rails: ensure ad fits into compact rails */
+@media (orientation: portrait) {
+  .rail-ad .ad-box { max-width: calc(var(--left-width,78px)); font-size: 11px; padding: 4px; }
+  /* hide rail ads and per-panel ads on small/portrait screens and show a single top ad */
+  .rail-ad { display: none !important; }
+  .panel-ad { display: none !important; }
+  #mobileBottomAd { display: none !important; }
+  #mobileTopAd { display: flex !important; }
+  /* when JS marks the top ad active, push the main app down so UI is not covered */
+  body.top-ad-active .app { padding-top: calc(40px + env(safe-area-inset-top, 0px)); }
+}
+
+/* Landscape and wider screens: allow larger ad but keep within rail */
+@media (min-width: 900px) and (orientation: landscape) {
+  .rail-ad .ad-box { max-width: 220px; }
+}
+
+/* Mobile bottom ad placeholder */
+#mobileBottomAd {
+  display: none; /* shown only on portrait/small screens via media query */
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 14050;
+  justify-content: center;
+  align-items: center;
+  padding: 8px 12px;
+  /* start visually hidden and out of the viewport; JS toggles .visible */
+  opacity: 0;
+  transform: translateY(100%);
+  transition: transform 180ms cubic-bezier(.2,.9,.2,1), opacity 160ms ease;
+  pointer-events: none;
+}
+#mobileBottomAd.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+#mobileBottomAd .mobile-ad-box {
+  background: #ffffff;
+  color: #111111;
+  width: calc(100% - 24px);
+  max-width: 640px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px 8px 0 0;
+  box-shadow: 0 -6px 20px rgba(0,0,0,0.2);
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+/* If safe-area inset is present (iPhone notch), add padding */
+@supports (padding: env(safe-area-inset-bottom)) {
+  #mobileBottomAd { padding-bottom: calc(env(safe-area-inset-bottom) + 8px); }
+}
+
+/* Mobile top ad (portrait) */
+#mobileTopAd {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 14060;
+  justify-content: center;
+  align-items: center;
+  pointer-events: auto;
+  transform: translateY(-100%);
+  transition: transform 200ms ease, opacity 160ms ease;
+  opacity: 0;
+}
+#mobileTopAd.visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+#mobileTopAd .mobile-ad-box {
+  background: #ffffff;
+  color: #111111;
+  width: calc(100% - 24px);
+  max-width: 640px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+  padding: calc(env(safe-area-inset-top, 0px) + 6px) 12px 6px;
+}
+
+/* Panel-embedded banner ad
+   - Reserve space at the bottom of panel bodies so the ad doesn't cover content
+   - Place a sticky ad container inside each panel body so it stays pinned to the panel bottom
+*/
+.panel-section__body {
+  /* ensure the body can position sticky children and reserve room for ad */
+  position: relative;
+  padding-bottom: max(72px, calc(var(--mobile-top-control-size, 40px) + 24px));
+}
+.panel-section__body .panel-ad {
+  position: sticky;
+  bottom: 8px; /* slightly above the inner edge */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 6px 8px;
+  pointer-events: auto;
+  z-index: 10;
+}
+.panel-section__body .panel-ad .ad-box {
+  background: #ffffff;
+  color: #111111;
+  width: calc(100% - 24px);
+  max-width: 560px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.16);
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+/* Small panels like side rails should keep the ad compact */
+.rail--left .panel-section__body .panel-ad .ad-box,
+.rail--right .panel-section__body .panel-ad .ad-box {
+  width: calc(var(--left-width, 78px));
+  max-width: none;
+  height: 48px;
+  border-radius: 4px;
+}
+
+@media (max-width: 900px) and (orientation: portrait) {
+  /* in mobile portrait, panel-embedded ads remain but mobileBottomAd is primary */
+  .panel-section__body { padding-bottom: 84px; }
+}
+
+/* We do not use per-tool embedded ads; keep panel-ad hidden globally. */
+.panel-ad { display: none !important; }
 
 #panelSettings .settings-size-controls .number-stepper__btn {
   width: 26px;
