@@ -786,33 +786,119 @@
         ins.setAttribute('data-ad-slot', slot);
         ins.setAttribute('data-ad-format', 'auto');
         ins.setAttribute('data-full-width-responsive', 'true');
+        // enable AdSense test mode on localhost/dev so test ads can appear
+        try {
+          const host = (location && location.hostname) ? location.hostname : '';
+          if (host === 'localhost' || host === '127.0.0.1' || host === '::1') {
+            ins.setAttribute('data-adtest', 'on');
+            console.info('[pixiedraw] AdSense: enabling data-adtest=on for local dev');
+          }
+        } catch (err) {
+          // ignore
+        }
         // clear placeholder and insert
         container.innerHTML = '';
         container.appendChild(ins);
+        console.debug('[pixiedraw] inserted ins.adsbygoogle into', container.id || container);
         return true;
       }
 
       function tryRender() {
         try {
+          console.debug('[pixiedraw] calling (adsbygoogle).push for rendering');
           (window.adsbygoogle = window.adsbygoogle || []).push({});
         } catch (e) {
+          console.warn('[pixiedraw] adsbygoogle push failed', e && e.message);
           // ignore; fallback renderer will show placeholders
         }
       }
 
-      // Insert ins elements where needed
+      // Insert ins elements where needed, but only call adsbygoogle.push() when the
+      // container has a measurable width. Ads will fail with "No slot size for availableWidth=0"
+      // if push() is called while the container is hidden or has 0 width.
+      function scheduleRenderForContainer(container) {
+        if (!container) return;
+        const hasWidth = () => {
+          try {
+            const r = container.getBoundingClientRect();
+            return (r && r.width) > 0;
+          } catch (e) {
+            return (container.clientWidth || container.offsetWidth) > 0;
+          }
+        };
+
+        if (hasWidth()) {
+          console.debug('[pixiedraw] container has width, rendering ads now for', container.id || container);
+          tryRender();
+          return;
+        }
+
+        // Use ResizeObserver when available to detect when the container becomes visible / sized.
+        let ro = null;
+        const cleanup = () => {
+          try { if (ro) ro.disconnect(); } catch (e) {}
+          window.removeEventListener('resize', onResize);
+          document.removeEventListener('visibilitychange', onVisibility);
+        };
+
+        const onResize = () => {
+          if (hasWidth()) {
+            console.debug('[pixiedraw] resize observed, container sized for', container.id || container);
+            tryRender();
+            cleanup();
+          }
+        };
+
+        const onVisibility = () => {
+          if (document.visibilityState === 'visible' && hasWidth()) {
+            console.debug('[pixiedraw] visibilitychange -> visible and container sized for', container.id || container);
+            tryRender();
+            cleanup();
+          }
+        };
+
+        if (window.ResizeObserver) {
+          try {
+            ro = new ResizeObserver((entries) => {
+              for (const entry of entries) {
+                if ((entry.contentRect && entry.contentRect.width) || hasWidth()) {
+                  console.debug('[pixiedraw] ResizeObserver: container now has width for', container.id || container);
+                  tryRender();
+                  cleanup();
+                  return;
+                }
+              }
+            });
+            ro.observe(container);
+          } catch (e) {
+            // fallthrough to window resize listener
+            window.addEventListener('resize', onResize);
+            document.addEventListener('visibilitychange', onVisibility);
+          }
+        } else {
+          window.addEventListener('resize', onResize);
+          document.addEventListener('visibilitychange', onVisibility);
+        }
+      }
+
+      // Insert ins elements and schedule rendering only when the container is sized.
       SLOTS.forEach(({ containerId, slot }) => {
         const container = document.getElementById(containerId);
         if (ensureIns(container, slot)) {
-          // attempt to render newly added slot
-          tryRender();
+          scheduleRenderForContainer(container);
         }
       });
 
-      // Ensure export ad slot (exists in the export dialog) is rendered as well
+      // Ensure export ad slot (exists in the export dialog) is rendered when visible/sized
       const exportSlot = document.getElementById('exportAdSlot');
       if (exportSlot) {
-        tryRender();
+        // exportSlot is the ins itself in this case; ensure it's assigned a slot if needed
+        try {
+          if (!exportSlot.getAttribute('data-ad-slot') || exportSlot.getAttribute('data-ad-slot') === 'rotate') {
+            exportSlot.setAttribute('data-ad-slot', '2141591954');
+          }
+        } catch (e) {}
+        scheduleRenderForContainer(exportSlot.parentElement || exportSlot);
       }
     })();
   </script>
