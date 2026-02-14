@@ -781,6 +781,7 @@
         if (!container) return false;
         // if a real ins already exists, keep it
         if (container.querySelector && container.querySelector('ins.adsbygoogle')) return true;
+        if (container._pixieed_pendingIns) return true;
         // If mobile top ad has been closed by user, do not insert real ad/ins
         try {
           if (container.id === 'mobileTopAd' && localStorage.getItem(MOBILE_TOP_CLOSED_KEY) === '1') {
@@ -806,10 +807,17 @@
         } catch (err) {
           // ignore
         }
-        // clear placeholder and insert
-        container.innerHTML = '';
-        container.appendChild(ins);
-        console.debug('[pixiedraw] inserted ins.adsbygoogle into', container.id || container);
+        // Do not append ins immediately if the container may have zero width.
+        // Store it as a pending element and append later when the container is sized.
+        try {
+          container._pixieed_pendingIns = ins;
+          console.debug('[pixiedraw] created pending ins.adsbygoogle for', container.id || container);
+        } catch (e) {
+          // fallback: append immediately if we can't attach property
+          container.innerHTML = '';
+          container.appendChild(ins);
+          console.debug('[pixiedraw] inserted ins.adsbygoogle into (fallback)', container.id || container);
+        }
         return true;
       }
 
@@ -859,8 +867,18 @@
         }
 
         if (hasWidth()) {
+          // If there is a pending ins element, append it now so pixieedObserveAds / adsbygoogle can measure it.
+          try {
+            if (container._pixieed_pendingIns) {
+              const ins = container._pixieed_pendingIns;
+              container._pixieed_pendingIns = null;
+              container.innerHTML = '';
+              container.appendChild(ins);
+              console.debug('[pixiedraw] appended pending ins into', container.id || container);
+            }
+          } catch (e) {}
           console.debug('[pixiedraw] container has width, rendering ads now for', container.id || container);
-          tryRender();
+          tryRender(container);
           return;
         }
 
@@ -893,8 +911,17 @@
             ro = new ResizeObserver((entries) => {
               for (const entry of entries) {
                 if ((entry.contentRect && entry.contentRect.width) || hasWidth()) {
+                  try {
+                    if (container._pixieed_pendingIns) {
+                      const ins = container._pixieed_pendingIns;
+                      container._pixieed_pendingIns = null;
+                      container.innerHTML = '';
+                      container.appendChild(ins);
+                      console.debug('[pixiedraw] ResizeObserver appended pending ins into', container.id || container);
+                    }
+                  } catch (e) {}
                   console.debug('[pixiedraw] ResizeObserver: container now has width for', container.id || container);
-                  tryRender();
+                  tryRender(container);
                   cleanup();
                   return;
                 }
