@@ -797,6 +797,8 @@
         const ins = document.createElement('ins');
         ins.className = 'adsbygoogle';
         ins.style.display = 'block';
+  // mark as not-yet-rendered by our injector; allows tryRender to avoid duplicate pushes
+  try { ins.dataset.pixiedRendered = '0'; } catch (e) {}
         ins.setAttribute('data-ad-client', ADS_CLIENT);
         ins.setAttribute('data-ad-slot', slot);
         ins.setAttribute('data-ad-format', 'auto');
@@ -838,8 +840,18 @@
               console.warn('[pixiedraw] pixieedObserveAds call failed', e && e.message);
             }
           }
-          console.debug('[pixiedraw] calling (adsbygoogle).push for rendering (fallback)');
+          // Only call adsbygoogle.push if there are ins elements that haven't been marked as rendered.
+          const scope = container || document;
+          const insList = Array.from(scope.querySelectorAll && scope.querySelectorAll('ins.adsbygoogle') || []);
+          const unrendered = insList.filter(i => !(i.dataset && i.dataset.pixiedRendered === '1'));
+          if (!unrendered.length) {
+            console.debug('[pixiedraw] no unrendered ins.adsbygoogle found; skipping adsbygoogle.push');
+            return;
+          }
+          console.debug('[pixiedraw] calling (adsbygoogle).push for rendering (fallback) —', unrendered.length, 'ins');
           (window.adsbygoogle = window.adsbygoogle || []).push({});
+          // mark them as attempted so future pushes don't error
+          try { unrendered.forEach(i => { i.dataset.pixiedRendered = '1'; }); } catch (e) {}
         } catch (e) {
           console.warn('[pixiedraw] adsbygoogle push failed', e && e.message);
           // ignore; fallback renderer will show placeholders
@@ -914,7 +926,7 @@
         const onResize = () => {
           if (hasWidth()) {
             console.debug('[pixiedraw] resize observed, container sized for', container.id || container);
-            tryRender();
+            tryRender(container);
             cleanup();
           }
         };
@@ -922,7 +934,7 @@
         const onVisibility = () => {
           if (document.visibilityState === 'visible' && hasWidth()) {
             console.debug('[pixiedraw] visibilitychange -> visible and container sized for', container.id || container);
-            tryRender();
+            tryRender(container);
             cleanup();
           }
         };
