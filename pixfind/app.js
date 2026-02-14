@@ -414,9 +414,11 @@ function getRoundStartHint() {
   if (isHiddenObjectMode()) {
     const remaining = state.hiddenTargets.filter(target => !target.found).length;
     if (remaining > 0) {
-      return `右の絵から指定アイテムを探してください（残り${remaining}個）。`;
+      // For hidden-object mode we prefer to maximize the image area and
+      // avoid a redundant hint text. The target panel already lists items.
+      return '';
     }
-    return '右の絵から指定されたアイテムを探してください。';
+    return '';
   }
   return '左右の画像を見比べて、違いをタップしてください。';
 }
@@ -2675,6 +2677,8 @@ function setActiveScreen(target) {
     dom.app?.classList.add('is-playing');
     dom.app?.classList.toggle('is-hidden-object-mode', isHiddenObjectMode());
     document.body.classList.add('is-playing');
+    // Prevent iOS pull-to-refresh / browser-close when entering game
+    enablePreventPullToClose();
     requestAnimationFrame(() => {
       fitCanvasesToFrame();
       clearMarkers();
@@ -2685,7 +2689,39 @@ function setActiveScreen(target) {
     dom.app?.classList.remove('is-playing');
     dom.app?.classList.remove('is-hidden-object-mode');
     document.body.classList.remove('is-playing');
+    // Restore default touch handling when leaving game
+    disablePreventPullToClose();
   }
+}
+
+// ----- Prevent accidental browser close on iOS while playing -----
+let _pixfindPreventTouchMoveHandler = null;
+function enablePreventPullToClose() {
+  if (typeof window === 'undefined') return;
+  if (_pixfindPreventTouchMoveHandler) return;
+  // Block global touchmove to avoid overscroll behaviors (passive:false required)
+  _pixfindPreventTouchMoveHandler = function (e) {
+    // Allow multi-touch gestures (pinch) to pass through
+    if (e.touches && e.touches.length > 1) return;
+    // Allow interactions that originate inside elements that explicitly allow scrolling
+    // If the touch target is inside a scrollable element, do not block to allow inner scroll.
+    const el = e.target;
+    let node = el;
+    while (node && node !== document.body) {
+      const style = window.getComputedStyle(node);
+      const overflowY = style?.overflowY || '';
+      if (overflowY === 'auto' || overflowY === 'scroll') return;
+      node = node.parentElement;
+    }
+    e.preventDefault();
+  };
+  window.addEventListener('touchmove', _pixfindPreventTouchMoveHandler, { passive: false });
+}
+
+function disablePreventPullToClose() {
+  if (!_pixfindPreventTouchMoveHandler) return;
+  window.removeEventListener('touchmove', _pixfindPreventTouchMoveHandler, { passive: false });
+  _pixfindPreventTouchMoveHandler = null;
 }
 
 function selectGameMode(mode) {
@@ -3104,6 +3140,27 @@ function renderTargetPanel() {
 
 function fitCanvasesToFrame() {
   if (!state.imageSize.width) return;
+  // In hidden-object mode we want the challenge image to fill the frame as
+  // much as possible (not forced to a square). For spot-difference mode we
+  // keep the previous square-fitting behavior to maintain parity between
+  // original and challenge images.
+  if (isHiddenObjectMode()) {
+    const challenge = dom.canvasChallenge;
+    if (challenge) {
+      const frame = challenge.parentElement;
+      if (frame) {
+        const frameWidth = frame.clientWidth;
+        const frameHeight = frame.clientHeight;
+        if (frameWidth && frameHeight) {
+          // Fill available frame area
+          challenge.style.width = `${frameWidth}px`;
+          challenge.style.height = `${frameHeight}px`;
+        }
+      }
+    }
+    return refreshZoomBounds();
+  }
+
   const canvases = [dom.canvasOriginal, dom.canvasChallenge];
   canvases.forEach(canvas => {
     if (!canvas) return;
