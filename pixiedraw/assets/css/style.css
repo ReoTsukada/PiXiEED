@@ -593,7 +593,9 @@ button {
 }
 
 .rail--left[data-compact="true"] #panelTools[data-compact-flyout-open="true"] .tool-grid,
-.rail--left[data-compact="true"] #panelTools[data-compact-flyout-open="true"] .tool-grid[data-active-group] {
+.rail--left[data-compact="true"] #panelTools[data-compact-flyout-open="true"] .tool-grid[data-active-group],
+.tool-grid.is-compact-flyout-portal,
+.tool-grid.is-compact-flyout-portal[data-active-group] {
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
@@ -632,13 +634,32 @@ button {
   max-width: 100%;
   place-items: center;
 }
+.tool-grid.is-compact-flyout-portal .tool-button {
+  width: 100%;
+  min-height: 0;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  gap: 0;
+  padding: 0;
+  min-width: 0;
+  max-width: 100%;
+  place-items: center;
+}
 
 .rail--left[data-compact="true"] #panelTools .tool-button span {
+  display: none;
+}
+.tool-grid.is-compact-flyout-portal .tool-button span {
   display: none;
 }
 
 .rail--left[data-compact="true"] #panelTools .tool-icon,
 .rail--left[data-compact="true"] #panelTools .tool-button img {
+  width: 24px;
+  height: 24px;
+}
+.tool-grid.is-compact-flyout-portal .tool-icon,
+.tool-grid.is-compact-flyout-portal .tool-button img {
   width: 24px;
   height: 24px;
 }
@@ -2652,6 +2673,14 @@ body.is-startup-active {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.export-original-toggle {
+  margin-top: 4px;
+}
+
+.export-original-toggle input[type='checkbox']:disabled + span {
+  opacity: 0.6;
 }
 
 .export-ad {
