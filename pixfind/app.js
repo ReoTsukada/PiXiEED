@@ -309,13 +309,58 @@ function normalizeTargetLabel(value, index = 0) {
   return raw || `アイテム ${index + 1}`;
 }
 
-function resolvePuzzleMode(rawMode, targets = []) {
+function normalizeComparableUrl(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  try {
+    const base = (typeof window !== 'undefined' && window.location?.href) ? window.location.href : 'https://pixieed.jp/pixfind/';
+    const url = new URL(raw, base);
+    url.hash = '';
+    return url.toString();
+  } catch (_) {
+    return raw;
+  }
+}
+
+function inferPuzzleModeFromHints(hints = null) {
+  if (!hints || typeof hints !== 'object') return null;
+  const id = String(hints.id ?? '').trim().toLowerCase();
+  if (id.startsWith('pixfind-ho-') || id.startsWith('pixfind-hidden-')) {
+    return GAME_MODE_HIDDEN_OBJECT;
+  }
+  if (id.startsWith('pixfind-sd-')) {
+    return GAME_MODE_SPOT_DIFFERENCE;
+  }
+
+  const slug = String(hints.slug ?? '').trim().toLowerCase();
+  if (slug.startsWith('ho-') || slug.startsWith('hidden-') || slug.startsWith('object-')) {
+    return GAME_MODE_HIDDEN_OBJECT;
+  }
+  if (slug.startsWith('sd-') || slug.startsWith('spot-')) {
+    return GAME_MODE_SPOT_DIFFERENCE;
+  }
+
+  const original = normalizeComparableUrl(hints.original_url ?? hints.original);
+  const diff = normalizeComparableUrl(hints.diff_url ?? hints.diff);
+  const thumbnail = normalizeComparableUrl(hints.thumbnail_url ?? hints.thumbnail);
+  if (thumbnail && original && thumbnail === original && (!diff || thumbnail !== diff)) {
+    return GAME_MODE_HIDDEN_OBJECT;
+  }
+  if (thumbnail && diff && thumbnail === diff && (!original || thumbnail !== original)) {
+    return GAME_MODE_SPOT_DIFFERENCE;
+  }
+  return null;
+}
+
+function resolvePuzzleMode(rawMode, targets = [], hints = null) {
   if (typeof rawMode === 'string' && rawMode.trim()) {
     return normalizeGameMode(rawMode);
   }
   if (Array.isArray(targets) && targets.length > 0) {
     return GAME_MODE_HIDDEN_OBJECT;
   }
+  const inferred = inferPuzzleModeFromHints(hints);
+  if (inferred) return inferred;
   return GAME_MODE_SPOT_DIFFERENCE;
 }
 
@@ -1045,7 +1090,7 @@ async function handleCreatorPublish() {
   const title = dom.creatorTitleInput?.value.trim() || 'カスタムパズル';
   const slug = getCreatorSlug();
   const difficulty = creatorState.difficulty;
-  const puzzleId = createPuzzleId();
+  const puzzleId = createPuzzleId(mode);
   const postToContest = dom.creatorContestToggle ? dom.creatorContestToggle.checked : true;
   const authorName = getCreatorNickname();
   const authorXUrl = getCreatorXUrl();
@@ -1109,6 +1154,9 @@ async function handleCreatorPublish() {
       diff_url: diffUrl,
       thumbnail_url: resolvePuzzleThumbnail(mode, originalUrl, diffUrl) || diffUrl || originalUrl,
     };
+    // Also include snake_case aliases to increase chance the DB schema accepts the mode column
+    payload.game_mode = mode;
+    payload.play_mode = mode;
     if (mode === GAME_MODE_HIDDEN_OBJECT && targets.length) {
       payload.targets = targets;
     }
@@ -1268,11 +1316,12 @@ function getCreatorSlug() {
   return `custom-${Date.now().toString(36)}`;
 }
 
-function createPuzzleId() {
+function createPuzzleId(mode = DEFAULT_GAME_MODE) {
+  const modePrefix = normalizeGameMode(mode) === GAME_MODE_HIDDEN_OBJECT ? 'ho' : 'sd';
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `pixfind-${crypto.randomUUID()}`;
+    return `pixfind-${modePrefix}-${crypto.randomUUID()}`;
   }
-  return `pixfind-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  return `pixfind-${modePrefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function getFileExtension(file) {
@@ -1893,13 +1942,13 @@ function normalizePublishTask(task) {
   const originalDataUrl = typeof task.originalDataUrl === 'string' ? task.originalDataUrl : '';
   const diffDataUrl = typeof task.diffDataUrl === 'string' ? task.diffDataUrl : '';
   if (!originalDataUrl || !diffDataUrl) return null;
-  const puzzleId = task.puzzleId || createPuzzleId();
+  const mode = normalizeGameMode(task.mode);
+  const puzzleId = task.puzzleId || createPuzzleId(mode);
   const title = task.title || 'カスタムパズル';
   const slug = task.slug || sanitizeSlug(title) || `custom-${puzzleId.slice(-6)}`;
   const difficulty = normalizeDifficulty(task.difficulty);
   const authorName = task.authorName || getCreatorNickname();
   const authorXUrl = task.authorXUrl || getCreatorXUrl();
-  const mode = normalizeGameMode(task.mode);
   const targets = normalizePuzzleTargets(task.targets);
   const authContext = getSupabaseAuthContext();
   const userId = task.userId || authContext.userId || null;
@@ -1992,6 +2041,9 @@ async function publishQueuedTask(task) {
     diff_url: diffUrl,
     thumbnail_url: resolvePuzzleThumbnail(mode, originalUrl, diffUrl) || diffUrl || originalUrl,
   };
+  // Also include snake_case aliases to increase chance the DB schema accepts the mode column
+  payload.game_mode = mode;
+  payload.play_mode = mode;
   if (mode === GAME_MODE_HIDDEN_OBJECT && targets.length) {
     payload.targets = targets;
   }
