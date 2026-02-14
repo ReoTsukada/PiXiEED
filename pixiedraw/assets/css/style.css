@@ -2424,6 +2424,53 @@ input[type='range']::-moz-focus-outer {
   padding: calc(env(safe-area-inset-top, 0px) + 6px) 12px 6px;
 }
 
+/* PiXiEEDrawLite-style compact banner inside the mobile top ad box */
+#mobileTopAd .mobile-ad-box .ad-lite {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+#mobileTopAd .mobile-ad-box .ad-lite .logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: linear-gradient(135deg,#ff6f8d 0%,#ffb199 100%);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:white;
+  font-weight:700;
+  font-size:14px;
+}
+#mobileTopAd .mobile-ad-box .ad-lite .text {
+  flex:1;
+  font-size:14px;
+  color:#111;
+  font-weight:600;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+#mobileTopAd .mobile-ad-box .ad-lite .ad-close {
+  margin-left:8px;
+  width:28px;
+  height:28px;
+  border-radius:6px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,0.06);
+  color:#111;
+  font-weight:700;
+  cursor:pointer;
+}
+
+/* When the lite ad is visible, reduce the height slightly for a compact look */
+@media (orientation: portrait) {
+  #mobileTopAd .mobile-ad-box { height: 48px; padding: calc(env(safe-area-inset-top, 0px) + 6px) 10px 6px; }
+}
+
 /* Panel-embedded banner ad
    - Reserve space at the bottom of panel bodies so the ad doesn't cover content
    - Place a sticky ad container inside each panel body so it stays pinned to the panel bottom
