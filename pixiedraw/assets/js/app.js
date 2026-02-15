@@ -4782,8 +4782,9 @@
   }
 
   function queueExportAdRender() {
+    const dialog = dom.exportDialog?.dialog;
     const adSlot = dom.exportDialog?.adSlot;
-    if (!(adSlot instanceof HTMLElement)) {
+    if (!(dialog instanceof HTMLDialogElement) || !dialog.open || !(adSlot instanceof HTMLElement)) {
       return;
     }
     if (exportAdRequested) {
@@ -4793,13 +4794,47 @@
       exportAdRequested = true;
       return;
     }
-    exportAdRequested = true;
-    try {
-      (window.adsbygoogle = window.adsbygoogle || []).push({});
-      adSlot.dataset.loaded = '1';
-    } catch (error) {
-      exportAdRequested = false;
+    // Keep export slot out of global AdSense queue until dialog is open and width is measurable.
+    if (!adSlot.classList.contains('adsbygoogle')) {
+      adSlot.classList.add('adsbygoogle');
     }
+
+    const getWidth = () => {
+      try {
+        const rect = adSlot.getBoundingClientRect();
+        return (rect && rect.width) || adSlot.clientWidth || adSlot.offsetWidth || 0;
+      } catch (error) {
+        return adSlot.clientWidth || adSlot.offsetWidth || 0;
+      }
+    };
+
+    let attempts = 0;
+    const MAX_ATTEMPTS = 24;
+    const renderWhenReady = () => {
+      if (!(dialog instanceof HTMLDialogElement) || !dialog.open) {
+        exportAdRequested = false;
+        return;
+      }
+      const width = getWidth();
+      if (width <= 0) {
+        attempts += 1;
+        if (attempts < MAX_ATTEMPTS) {
+          window.requestAnimationFrame(renderWhenReady);
+          return;
+        }
+        exportAdRequested = false;
+        return;
+      }
+      exportAdRequested = true;
+      try {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        adSlot.dataset.loaded = '1';
+      } catch (error) {
+        exportAdRequested = false;
+      }
+    };
+
+    window.requestAnimationFrame(renderWhenReady);
   }
 
   function closeExportDialog() {
