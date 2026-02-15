@@ -140,7 +140,7 @@
   <div class="rail-tabpanes" id="leftRailPanes"></div>
   <div class="rail-ad" id="leftRailAd" aria-hidden="false">
     <div class="ad-box" id="leftRailAdSlot">
-      <ins class="adsbygoogle"
+      <ins class="ad-seed"
            style="display:block"
            data-ad-client="ca-pub-9801602250480253"
            data-ad-slot="3806415737"
@@ -189,7 +189,7 @@
   <div class="rail-tabpanes" id="rightRailPanes"></div>
   <div class="rail-ad" id="rightRailAd" aria-hidden="false">
     <div class="ad-box" id="rightRailAdSlot">
-      <ins class="adsbygoogle"
+      <ins class="ad-seed"
            style="display:block"
            data-ad-client="ca-pub-9801602250480253"
            data-ad-slot="1180252398"
@@ -646,7 +646,7 @@
   <!-- Mobile bottom ad placeholder (visible in portrait / small screens) -->
   <div id="mobileBottomAd" aria-hidden="false">
     <div class="mobile-ad-box" id="mobileBottomAdSlot">
-      <ins class="adsbygoogle"
+      <ins class="ad-seed"
            style="display:block"
            data-ad-client="ca-pub-9801602250480253"
            data-ad-slot="6568310446"
@@ -875,18 +875,34 @@
       }
 
       function tryRender(container) {
-        try {
-          // Prefer the site's global lazy ad queue if present (pixieedObserveAds),
-          // which handles slot assignment, queuing, and ready polling consistently across pages.
-          if (window.pixieedObserveAds && typeof window.pixieedObserveAds === 'function') {
-            try {
-              window.pixieedObserveAds(container || document);
-              console.debug('[pixiedraw] handed ad container to pixieedObserveAds', container || document);
-              return;
-            } catch (e) {
-              console.warn('[pixiedraw] pixieedObserveAds call failed', e && e.message);
-            }
+        // Guard against timing races where a container was measurable a moment ago
+        // but became hidden/collapsed before adsbygoogle.push() runs.
+        if (container && container instanceof HTMLElement) {
+          let width = 0;
+          try {
+            const rect = container.getBoundingClientRect();
+            width = (rect && rect.width) || container.clientWidth || container.offsetWidth || 0;
+          } catch (e) {
+            width = container.clientWidth || container.offsetWidth || 0;
           }
+          const isRailSlot = container.id === 'leftRailAdSlot' || container.id === 'rightRailAdSlot';
+          const minWidth = isRailSlot ? MIN_RAIL_AD_WIDTH : 1;
+          if (width < minWidth) {
+            console.debug('[pixiedraw] skip ads push: container width not ready', container.id || container, width, 'required', minWidth);
+            try {
+              if (!container._pixieed_retryQueued) {
+                container._pixieed_retryQueued = '1';
+                window.requestAnimationFrame(() => {
+                  try { container._pixieed_retryQueued = ''; } catch (err) {}
+                  scheduleRenderForContainer(container);
+                });
+              }
+            } catch (e) {}
+            return;
+          }
+        }
+
+        try {
           // Only call adsbygoogle.push if there are ins elements that haven't been marked as rendered.
           const scope = container || document;
           const insList = Array.from(scope.querySelectorAll && scope.querySelectorAll('ins.adsbygoogle') || []);
