@@ -518,7 +518,12 @@ button {
   padding: 8px 6px;
 }
 
-/* In compact rails, let bottom ads use the full rail width (ignore inner side padding). */
+/* Let bottom ads use full rail width by canceling rail inner side padding. */
+.rail .rail-ad {
+  width: calc(100% + 32px);
+  margin-left: -16px;
+  margin-right: -16px;
+}
 .rail[data-compact="true"] .rail-ad {
   width: calc(100% + 16px);
   margin-left: -8px;
@@ -2345,8 +2350,8 @@ input[type='range']::-moz-focus-outer {
   font-size: 12px;
   text-align: center;
   padding: 0;
-  border-radius: 8px;
-  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 0;
+  border: 0;
   overflow: hidden;
   box-sizing: border-box;
 }
