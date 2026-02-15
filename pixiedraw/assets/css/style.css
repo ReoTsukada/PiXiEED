@@ -69,6 +69,8 @@ html,
 body {
   margin: 0;
   height: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
   background-color: var(--bg);
   background-image:
     linear-gradient(0deg, rgba(112, 246, 255, 0.04) 1px, transparent 1px),
@@ -2447,6 +2449,9 @@ input[type='range']::-moz-focus-outer {
 
 /* Force the dedicated mobile-bottom slot to stay compact even if inline styles are injected. */
 #mobileBottomAdSlot.mobile-ad-box {
+  width: min(100%, 720px) !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
   min-height: clamp(48px, 9vw, 60px) !important;
   height: clamp(48px, 9vw, 60px) !important;
   max-height: clamp(48px, 9vw, 60px) !important;
@@ -2458,22 +2463,29 @@ input[type='range']::-moz-focus-outer {
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
   min-height: clamp(48px, 9vw, 60px) !important;
   height: clamp(48px, 9vw, 60px) !important;
   max-height: clamp(48px, 9vw, 60px) !important;
-  margin: 0 auto !important;
   box-sizing: border-box !important;
+  overflow: hidden !important;
+  border: 0 !important;
 }
 
 #mobileBottomAd .mobile-ad-box ins.adsbygoogle iframe,
 #mobileBottomAd .mobile-ad-box .adsbygoogle iframe {
-  display: block;
+  display: block !important;
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
   min-height: clamp(48px, 9vw, 60px) !important;
   height: clamp(48px, 9vw, 60px) !important;
   max-height: clamp(48px, 9vw, 60px) !important;
+  border: 0 !important;
+  overflow: hidden !important;
 }
 
 /* fallback project promo links shown when ad inventory is unavailable */
