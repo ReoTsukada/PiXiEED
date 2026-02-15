@@ -139,8 +139,14 @@
 </div>
   <div class="rail-tabpanes" id="leftRailPanes"></div>
   <div class="rail-ad" id="leftRailAd" aria-hidden="false">
-    <!-- ad placeholder: replace with ad code (ins / iframe) -->
-    <div class="ad-box" id="leftRailAdSlot">バナー広告</div>
+    <div class="ad-box" id="leftRailAdSlot">
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="ca-pub-9801602250480253"
+           data-ad-slot="2141591954"
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
+    </div>
   </div>
 <button aria-label="左パネルの幅を変更" class="rail-resizer rail-resizer--left" id="resizeLeftRail" type="button"></button>
 </aside>
@@ -182,8 +188,14 @@
 </div>
   <div class="rail-tabpanes" id="rightRailPanes"></div>
   <div class="rail-ad" id="rightRailAd" aria-hidden="false">
-    <!-- ad placeholder: replace with ad code (ins / iframe) -->
-    <div class="ad-box" id="rightRailAdSlot">バナー広告</div>
+    <div class="ad-box" id="rightRailAdSlot">
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="ca-pub-9801602250480253"
+           data-ad-slot="9073878884"
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
+    </div>
   </div>
 <button aria-label="右パネルの幅を変更" class="rail-resizer rail-resizer--right" id="resizeRightRail" type="button"></button>
 </aside>
@@ -811,24 +823,7 @@
       window.addEventListener('resize', refreshListeners);
       document.addEventListener('readystatechange', function () { if (document.readyState === 'complete') refreshListeners(); });
 
-      // inject panel-embedded ad placeholders inside every panel-section__body
-      function initPanelEmbeddedAds() {
-        document.querySelectorAll('.panel-section__body').forEach((body) => {
-          if (body.querySelector('.panel-ad')) return; // already added
-          const adWrap = document.createElement('div');
-          adWrap.className = 'panel-ad';
-          adWrap.setAttribute('aria-hidden', 'true');
-          const box = document.createElement('div');
-          box.className = 'ad-box';
-          box.textContent = 'バナー広告';
-          adWrap.appendChild(box);
-          // append as last child so it sits visually after content but is sticky
-          body.appendChild(adWrap);
-        });
-      }
-
       // initial setup
-      initPanelEmbeddedAds();
       refreshListeners();
     })();
   </script>
@@ -913,13 +908,12 @@
             console.debug('[pixiedraw] no unrendered ins.adsbygoogle found; skipping adsbygoogle.push');
             return;
           }
-          console.debug('[pixiedraw] calling (adsbygoogle).push for rendering (fallback) —', unrendered.length, 'ins');
+          console.debug('[pixiedraw] calling (adsbygoogle).push for rendering —', unrendered.length, 'ins');
           (window.adsbygoogle = window.adsbygoogle || []).push({});
           // mark them as attempted so future pushes don't error
           try { unrendered.forEach(i => { i.dataset.pixiedRendered = '1'; }); } catch (e) {}
         } catch (e) {
           console.warn('[pixiedraw] adsbygoogle push failed', e && e.message);
-          // ignore; fallback renderer will show placeholders
         }
       }
 
@@ -1107,194 +1101,5 @@
     })();
   </script>
 
-  <script>
-    // Fallback ad renderer:
-    // when AdSense can't fill, show internal project links instead of sample banners.
-    (function renderFallbackAds() {
-      const adBoxes = Array.from(document.querySelectorAll('.ad-box, .mobile-ad-box'));
-      if (!adBoxes.length) return;
-
-      const PROJECT_PROMOS = [
-        {
-          id: 'pixieedraw-lite',
-          name: 'PiXiEEDraw Lite',
-          href: '../projects/jerin-maker/index.html',
-          icon: '../icon/icon-192-5.png'
-        },
-        {
-          id: 'maoitu',
-          name: 'maoitu',
-          href: '../projects/maoitu/index.html',
-          icon: '../icon/icon-192-3.png'
-        },
-        {
-          id: 'pixfind',
-          name: 'PiXFiND',
-          href: '../projects/pixfind/index.html',
-          icon: '../icon/icon-192-2.png'
-        }
-      ];
-
-      const pendingSince = new WeakMap();
-      const PENDING_TIMEOUT_MS = 9000;
-
-      function isDone(ins) {
-        if (!ins) return false;
-        return ins.getAttribute('data-adsbygoogle-status') === 'done';
-      }
-
-      function hasFilledAd(box) {
-        if (!box) return false;
-        const ins = box.querySelector('ins.adsbygoogle');
-        if (!ins) return false;
-        const status = ins.getAttribute('data-ad-status');
-        if (status === 'filled') return true;
-        // In some browsers/ad environments, only "done" is exposed.
-        // Treat done + not-unfilled as rendered so fallback won't cover live ads.
-        if (status !== 'unfilled' && isDone(ins)) return true;
-        return Boolean(box.querySelector('iframe'));
-      }
-
-      function isAdPending(box) {
-        if (!box) return false;
-        const ins = box.querySelector('ins.adsbygoogle');
-        if (!ins) return false;
-        if (hasFilledAd(box)) return false;
-        const status = ins.getAttribute('data-ad-status');
-        if (status === 'unfilled') return false;
-        const done = isDone(ins);
-        return !done;
-      }
-
-      function shouldShowFallback(box, now) {
-        if (!box) return false;
-        if (hasFilledAd(box)) return false;
-
-        const ins = box.querySelector('ins.adsbygoogle');
-        if (!ins) return true;
-
-        if (!isAdPending(box)) return true;
-
-        const firstSeen = pendingSince.get(box) || now;
-        if (!pendingSince.has(box)) pendingSince.set(box, firstSeen);
-        return now - firstSeen >= PENDING_TIMEOUT_MS;
-      }
-
-      function removeFallback(box) {
-        if (!box) return;
-        const fallback = box.querySelector('.ad-fallback-promo');
-        if (fallback) fallback.remove();
-        box.classList.remove('has-fallback-promo');
-      }
-
-      function createPromoElement() {
-        const fallback = document.createElement('div');
-        fallback.className = 'ad-fallback-promo';
-        fallback.setAttribute('role', 'group');
-        fallback.setAttribute('aria-label', 'おすすめツール');
-
-        PROJECT_PROMOS.forEach((promo) => {
-          const link = document.createElement('a');
-          link.className = 'ad-fallback-promo__link';
-          link.href = promo.href;
-          link.target = '_blank';
-          link.rel = 'noopener';
-          link.setAttribute('data-project', promo.id);
-          link.setAttribute('aria-label', `${promo.name} の紹介ページを開く`);
-
-          const icon = document.createElement('img');
-          icon.className = 'ad-fallback-promo__icon';
-          icon.src = promo.icon;
-          icon.alt = '';
-          icon.loading = 'lazy';
-          icon.decoding = 'async';
-
-          const label = document.createElement('span');
-          label.className = 'ad-fallback-promo__name';
-          label.textContent = promo.name;
-
-          link.appendChild(icon);
-          link.appendChild(label);
-          fallback.appendChild(link);
-        });
-
-        return fallback;
-      }
-
-      function ensureFallback(box) {
-        if (!box) return;
-        if (hasFilledAd(box)) return;
-        if (box.querySelector('.ad-fallback-promo')) return;
-        if (!box.querySelector('ins.adsbygoogle')) box.textContent = '';
-        box.classList.add('has-fallback-promo');
-        box.appendChild(createPromoElement());
-      }
-
-      function refreshFallbacks() {
-        const now = Date.now();
-        adBoxes.forEach((box) => {
-          if (!(box instanceof HTMLElement)) return;
-          if (hasFilledAd(box)) {
-            pendingSince.delete(box);
-            removeFallback(box);
-            return;
-          }
-          if (!isAdPending(box)) pendingSince.delete(box);
-          if (shouldShowFallback(box, now)) {
-            ensureFallback(box);
-          } else {
-            removeFallback(box);
-          }
-        });
-      }
-
-      [0, 1200, 2600, 4200, 7000].forEach((delay) => {
-        setTimeout(refreshFallbacks, delay);
-      });
-      const periodicRefreshId = setInterval(refreshFallbacks, 15000);
-      let refreshRaf = null;
-      const queueRefresh = () => {
-        if (refreshRaf !== null) return;
-        refreshRaf = requestAnimationFrame(() => {
-          refreshRaf = null;
-          refreshFallbacks();
-        });
-      };
-
-      // Prioritize real ads: as soon as ad status/DOM changes, remove fallback immediately.
-      const adMutationObserver = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-          if (mutation.type === 'childList') {
-            queueRefresh();
-            return;
-          }
-          if (mutation.type === 'attributes') {
-            const name = mutation.attributeName || '';
-            if (name === 'data-ad-status' || name === 'data-adsbygoogle-status' || name === 'style' || name === 'class') {
-              queueRefresh();
-              return;
-            }
-          }
-        }
-      });
-      adBoxes.forEach((box) => {
-        if (!(box instanceof HTMLElement)) return;
-        adMutationObserver.observe(box, {
-          childList: true,
-          subtree: true,
-          attributes: true,
-          attributeFilter: ['data-ad-status', 'data-adsbygoogle-status', 'style', 'class']
-        });
-      });
-
-      window.addEventListener('beforeunload', () => clearInterval(periodicRefreshId), { once: true });
-      window.addEventListener('beforeunload', () => adMutationObserver.disconnect(), { once: true });
-      document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) refreshFallbacks();
-      });
-      window.addEventListener('resize', refreshFallbacks);
-      refreshFallbacks();
-    })();
-  </script>
 </body>
 </html>
