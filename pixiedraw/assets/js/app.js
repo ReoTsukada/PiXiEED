@@ -130,6 +130,8 @@
       hint: document.getElementById('startupScreenHint'),
       recentSection: document.getElementById('startupRecentProjects'),
       recentList: document.getElementById('startupRecentList'),
+      updateToast: document.getElementById('updateToast'),
+      updateToastCloseButton: document.getElementById('updateToastCloseBtn'),
     },
     newProject: {
       button: document.getElementById('newProject'),
@@ -419,6 +421,7 @@
 
   const SESSION_STORAGE_KEY = 'pixieedraw:sessionState';
   const STARTUP_SCREEN_DISMISSED_KEY = 'pixieedraw:startupScreenDismissed';
+  const STARTUP_UPDATE_TOAST_HIDDEN_KEY = 'pixieedraw:update-toast-hidden';
   const canUseSessionStorage = (() => {
     try {
       return typeof window !== 'undefined' && 'localStorage' in window && window.localStorage !== null;
@@ -5383,6 +5386,36 @@
         ? 'ファイルを開くと既存の自動保存先を引き継ぎます。'
         : 'このブラウザでは自動保存が利用できません。エクスポートをお忘れなく。';
     }
+    const updateToast = dom.startup?.updateToast;
+    if (updateToast) {
+      const updateId = updateToast.dataset.updateId || '';
+      let shouldHide = false;
+      if (updateId) {
+        try {
+          shouldHide = window.localStorage.getItem(STARTUP_UPDATE_TOAST_HIDDEN_KEY) === updateId;
+        } catch (error) {
+          shouldHide = false;
+        }
+      }
+      updateToast.hidden = shouldHide;
+      updateToast.setAttribute('aria-hidden', shouldHide ? 'true' : 'false');
+    }
+    dom.startup?.updateToastCloseButton?.addEventListener('click', () => {
+      if (!updateToast) {
+        return;
+      }
+      updateToast.hidden = true;
+      updateToast.setAttribute('aria-hidden', 'true');
+      const updateId = updateToast.dataset.updateId || '';
+      if (!updateId) {
+        return;
+      }
+      try {
+        window.localStorage.setItem(STARTUP_UPDATE_TOAST_HIDDEN_KEY, updateId);
+      } catch (error) {
+        // Ignore localStorage errors.
+      }
+    });
     container.addEventListener('keydown', event => {
       if (!startupVisible) {
         return;
