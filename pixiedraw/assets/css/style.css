@@ -2315,14 +2315,17 @@ input[type='range']::-moz-focus-outer {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
+  padding: 0;
   width: 100%;
   margin-top: auto; /* push to bottom of rail */
 }
 .rail-ad .ad-box {
   display: block;
   width: 100%;
-  max-width: 180px; /* will be constrained by rail width */
+  max-width: none;
+  min-height: clamp(48px, 9vw, 60px);
+  height: clamp(48px, 9vw, 60px);
+  max-height: clamp(48px, 9vw, 60px);
   background: #ffffff; /* temporary white placeholder */
   color: #111111;
   font-size: 12px;
@@ -2330,6 +2333,27 @@ input[type='range']::-moz-focus-outer {
   padding: 6px 8px;
   border-radius: 8px;
   border: 1px solid rgba(0,0,0,0.06);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.rail-ad .ad-box ins.adsbygoogle {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: clamp(48px, 9vw, 60px) !important;
+  max-height: clamp(48px, 9vw, 60px) !important;
+  margin: 0 auto !important;
+  box-sizing: border-box !important;
+}
+
+.rail-ad .ad-box ins.adsbygoogle iframe,
+.rail-ad .ad-box .adsbygoogle iframe {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: clamp(48px, 9vw, 60px) !important;
+  max-height: clamp(48px, 9vw, 60px) !important;
 }
 
 /* Portrait narrower rails: ensure ad fits into compact rails */
@@ -2345,7 +2369,7 @@ input[type='range']::-moz-focus-outer {
 
 /* Landscape and wider screens: allow larger ad but keep within rail */
 @media (min-width: 900px) and (orientation: landscape) {
-  .rail-ad .ad-box { max-width: 220px; }
+  .rail-ad .ad-box { max-width: none; }
 }
 
 /* Mobile bottom ad placeholder */
@@ -2357,13 +2381,15 @@ input[type='range']::-moz-focus-outer {
   bottom: 0;
   z-index: 14050;
   justify-content: center;
-  align-items: center;
-  padding: 8px 12px;
+  align-items: flex-end;
+  padding: 0 12px calc(8px + env(safe-area-inset-bottom, 0px));
   /* start visually hidden and out of the viewport; JS toggles .visible */
   opacity: 0;
   transform: translateY(100%);
   transition: transform 180ms cubic-bezier(.2,.9,.2,1), opacity 160ms ease;
   pointer-events: none;
+  overflow: hidden;
+  max-height: calc(76px + env(safe-area-inset-bottom, 0px));
 }
 #mobileBottomAd.visible {
   opacity: 1;
@@ -2373,14 +2399,16 @@ input[type='range']::-moz-focus-outer {
 #mobileBottomAd .mobile-ad-box {
   background: #ffffff;
   color: #111111;
-  width: calc(100% - 24px);
-  max-width: 640px;
-  height: 56px;
+  width: min(100%, 720px);
+  max-width: min(100%, 720px);
+  min-height: clamp(48px, 9vw, 60px);
+  height: clamp(48px, 9vw, 60px);
+  max-height: clamp(48px, 9vw, 60px);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px 8px 0 0;
-  box-shadow: 0 -6px 20px rgba(0,0,0,0.2);
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
   border: 1px solid rgba(0,0,0,0.06);
 }
 
@@ -2400,65 +2428,127 @@ input[type='range']::-moz-focus-outer {
 #mobileBottomAd .mobile-ad-box {
   background: #ffffff;
   color: #111111;
-  width: 100%;
-  max-width: min(92vw, 420px); /* compact on mobile */
-  height: 48px;
+  width: min(100%, 720px);
+  max-width: min(100%, 720px); /* Lite ad-slot ratio */
+  min-height: clamp(48px, 9vw, 60px);
+  height: clamp(48px, 9vw, 60px);
+  max-height: clamp(48px, 9vw, 60px);
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 10px;
   border: 1px solid rgba(0,0,0,0.06);
   box-shadow: 0 6px 18px rgba(0,0,0,0.18);
-  padding: calc(env(safe-area-inset-bottom, 0px) + 6px) 12px 6px;
+  padding: 0;
   box-sizing: border-box;
-  margin: 6px auto;
+  margin: 0 auto;
+  overflow: hidden;
 }
 
-/* PiXiEEDrawLite-style compact banner inside the mobile bottom ad box */
-#mobileBottomAd .mobile-ad-box .ad-lite {
+/* Force the dedicated mobile-bottom slot to stay compact even if inline styles are injected. */
+#mobileBottomAdSlot.mobile-ad-box {
+  min-height: clamp(48px, 9vw, 60px) !important;
+  height: clamp(48px, 9vw, 60px) !important;
+  max-height: clamp(48px, 9vw, 60px) !important;
+}
+
+/* Keep mobile bottom ad slot compact like PiXiEEDraw Lite */
+#mobileBottomAd .mobile-ad-box ins.adsbygoogle {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: clamp(48px, 9vw, 60px) !important;
+  height: clamp(48px, 9vw, 60px) !important;
+  max-height: clamp(48px, 9vw, 60px) !important;
+  margin: 0 auto !important;
+  box-sizing: border-box !important;
+}
+
+#mobileBottomAd .mobile-ad-box ins.adsbygoogle iframe,
+#mobileBottomAd .mobile-ad-box .adsbygoogle iframe {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: clamp(48px, 9vw, 60px) !important;
+  height: clamp(48px, 9vw, 60px) !important;
+  max-height: clamp(48px, 9vw, 60px) !important;
+}
+
+/* fallback project promo links shown when ad inventory is unavailable */
+.ad-box,
+.mobile-ad-box {
+  position: relative;
+}
+
+.ad-fallback-promo {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  gap: 4px;
+  padding: 3px;
+  box-sizing: border-box;
+  background: #ffffff;
+}
+
+.ad-fallback-promo__link {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 6px;
+  border: 1px solid rgba(19, 27, 48, 0.14);
+  background: linear-gradient(180deg, #f8fbff 0%, #edf4ff 100%);
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
+  justify-content: center;
+  gap: 4px;
+  padding: 2px 4px;
+  color: #0f172a;
+  text-decoration: none;
+  transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
 }
-#mobileBottomAd .mobile-ad-box .ad-lite .logo {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  background: linear-gradient(135deg,#ff6f8d 0%,#ffb199 100%);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  color:white;
-  font-weight:700;
-  font-size:14px;
+
+.ad-fallback-promo__link:hover,
+.ad-fallback-promo__link:focus-visible {
+  border-color: rgba(37, 99, 235, 0.45);
+  background: linear-gradient(180deg, #e7f0ff 0%, #dce8ff 100%);
+  transform: translateY(-1px);
 }
-#mobileBottomAd .mobile-ad-box .ad-lite .text {
-  flex:1;
-  font-size:14px;
-  color:#111;
-  font-weight:600;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
+
+.ad-fallback-promo__icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  flex: 0 0 auto;
 }
-#mobileBottomAd .mobile-ad-box .ad-lite .ad-close {
-  margin-left:8px;
-  width:28px;
-  height:28px;
-  border-radius:6px;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  background:rgba(0,0,0,0.06);
-  color:#111;
-  font-weight:700;
-  cursor:pointer;
+
+.ad-fallback-promo__name {
+  min-width: 0;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* When the lite ad is visible, reduce the height slightly for a compact look */
 @media (orientation: portrait) {
-  #mobileBottomAd .mobile-ad-box { height: 48px; padding: calc(env(safe-area-inset-bottom, 0px) + 6px) 10px 6px; }
+  #mobileBottomAd .mobile-ad-box {
+    min-height: clamp(48px, 9vw, 60px);
+    height: clamp(48px, 9vw, 60px);
+    max-height: clamp(48px, 9vw, 60px);
+    padding: 0;
+  }
+  #mobileBottomAdSlot.mobile-ad-box {
+    min-height: clamp(48px, 9vw, 60px) !important;
+    height: clamp(48px, 9vw, 60px) !important;
+    max-height: clamp(48px, 9vw, 60px) !important;
+  }
 }
 
 /* Panel-embedded banner ad
