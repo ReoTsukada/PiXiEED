@@ -82,8 +82,10 @@
       paletteValueValue: document.getElementById('paletteValueValue'),
       paletteAlphaSlider: document.getElementById('paletteAlphaSlider'),
       paletteAlphaValue: document.getElementById('paletteAlphaValue'),
+      paletteWheelWrapper: document.getElementById('paletteWheelWrapper'),
       paletteWheel: /** @type {HTMLCanvasElement|null} */ (document.getElementById('paletteColorWheel')),
       paletteWheelCursor: document.getElementById('paletteWheelCursor'),
+      paletteSvCursor: document.getElementById('paletteSvCursor'),
       timelineMatrix: document.getElementById('timelineMatrix'),
       addLayer: document.getElementById('addLayer'),
       removeLayer: document.getElementById('removeLayer'),
@@ -729,10 +731,11 @@
   let lastFrameTime = 0;
   let curveBuilder = null;
   let paletteWheelCtx = null;
+  let paletteWheelResizeObserver = null;
   let canvasWheelListenerBound = false;
   const paletteEditorState = {
     hsv: { h: 0, s: 0, v: 1, a: 255 },
-    wheelPointer: { active: false, pointerId: null, upHandler: null },
+    wheelPointer: { active: false, pointerId: null, upHandler: null, mode: null, captureTarget: null },
   };
   let dirtyRegion = null;
   let canvasControlMode = 'zoom';
@@ -10174,15 +10177,19 @@
     });
 
     const wheel = dom.controls.paletteWheel;
+    const wheelSurface = dom.controls.paletteWheelWrapper || wheel;
     if (wheel && typeof wheel.getContext === 'function') {
       paletteWheelCtx = wheel.getContext('2d', { willReadFrequently: true }) || null;
-      wheel.addEventListener('pointerdown', handlePaletteWheelPointerDown);
-      wheel.addEventListener('pointercancel', handlePaletteWheelPointerUp);
-      window.addEventListener('resize', debounce(() => {
-        drawPaletteWheel();
-        updatePaletteWheelCursor();
-      }, 160));
+      if (wheelSurface) {
+        wheelSurface.addEventListener('pointerdown', handlePaletteWheelPointerDown);
+        wheelSurface.addEventListener('pointercancel', handlePaletteWheelPointerUp);
+      }
     }
+    setupPaletteWheelResizeObserver();
+    window.addEventListener('resize', debounce(() => {
+      drawPaletteWheel();
+      updatePaletteWheelCursor();
+    }, 160));
 
     renderPalette();
     syncPaletteInputs();
@@ -10317,7 +10324,7 @@
     paletteEditorState.hsv.s = saturationValue;
     paletteEditorState.hsv.v = valueValue;
     paletteEditorState.hsv.a = alphaValue;
-    if (source === 'value') {
+    if (source === 'hue' || source === 'saturation' || source === 'value') {
       drawPaletteWheel();
     }
     updatePaletteWheelCursor();
@@ -10368,43 +10375,136 @@
     updateColorTabSwatch();
   }
 
-  function configurePaletteWheelCanvas() {
-    const canvas = dom.controls.paletteWheel;
+  function getPaletteWheelSurface() {
+    return dom.controls.paletteWheelWrapper || dom.controls.paletteWheel;
+  }
+
+  function getPaletteWheelDisplaySize() {
+    const surface = getPaletteWheelSurface();
+    if (!surface) return 0;
+    const rect = surface.getBoundingClientRect();
+    return Math.max(0, Math.min(rect.width, rect.height));
+  }
+
+  function configurePaletteCanvas(canvas, displaySize = 0) {
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
+    const measuredSize = displaySize > 0
+      ? displaySize
+      : Math.max(0, Math.min(canvas.getBoundingClientRect().width, canvas.getBoundingClientRect().height));
+    if (!measuredSize) return;
     const dpr = window.devicePixelRatio || 1;
-    const size = Math.round(Math.max(rect.width, rect.height) * dpr);
+    const size = Math.max(1, Math.round(measuredSize * dpr));
     if (canvas.width !== size || canvas.height !== size) {
       canvas.width = size;
       canvas.height = size;
     }
   }
 
+  function setupPaletteWheelResizeObserver() {
+    if (paletteWheelResizeObserver) {
+      paletteWheelResizeObserver.disconnect();
+      paletteWheelResizeObserver = null;
+    }
+    const surface = getPaletteWheelSurface();
+    if (!surface || typeof ResizeObserver !== 'function') {
+      return;
+    }
+    let frame = 0;
+    paletteWheelResizeObserver = new ResizeObserver(() => {
+      if (frame) {
+        cancelAnimationFrame(frame);
+      }
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        drawPaletteWheel();
+        updatePaletteWheelCursor();
+      });
+    });
+    paletteWheelResizeObserver.observe(surface);
+  }
+
+  function getPaletteWheelMetrics(size) {
+    const center = size / 2;
+    const outerRadius = Math.max(2, (size / 2) - 0.5);
+    const ringThickness = clamp(size * 0.14, 14, 26);
+    const innerRadius = Math.max(8, outerRadius - ringThickness);
+    const svHalf = Math.max(6, innerRadius / Math.SQRT2);
+    const svLeft = center - svHalf;
+    const svTop = center - svHalf;
+    const svRight = center + svHalf;
+    const svBottom = center + svHalf;
+    const hueCursorRadius = innerRadius + ((outerRadius - innerRadius) * 0.5);
+    const svSpan = Math.max(1, svRight - svLeft);
+    return {
+      center,
+      outerRadius,
+      innerRadius,
+      hueCursorRadius,
+      svLeft,
+      svTop,
+      svRight,
+      svBottom,
+      svSpan,
+    };
+  }
+
+  function scalePaletteWheelMetrics(metrics, scale) {
+    return {
+      center: metrics.center * scale,
+      outerRadius: metrics.outerRadius * scale,
+      innerRadius: metrics.innerRadius * scale,
+      hueCursorRadius: metrics.hueCursorRadius * scale,
+      svLeft: metrics.svLeft * scale,
+      svTop: metrics.svTop * scale,
+      svRight: metrics.svRight * scale,
+      svBottom: metrics.svBottom * scale,
+      svSpan: metrics.svSpan * scale,
+    };
+  }
+
+  function isPointInsideSvArea(x, y, metrics) {
+    return x >= metrics.svLeft
+      && x <= metrics.svRight
+      && y >= metrics.svTop
+      && y <= metrics.svBottom;
+  }
+
   function drawPaletteWheel() {
     const canvas = dom.controls.paletteWheel;
     if (!canvas || !paletteWheelCtx) return;
-    configurePaletteWheelCanvas();
+    const displaySize = getPaletteWheelDisplaySize();
+    if (!displaySize) return;
+    configurePaletteCanvas(canvas, displaySize);
     const size = canvas.width;
     if (!size) return;
-    const value = clamp(paletteEditorState.hsv.v, 0, 1);
+    const scale = size / displaySize;
+    const displayMetrics = getPaletteWheelMetrics(displaySize);
+    const metrics = scalePaletteWheelMetrics(displayMetrics, scale);
+    const selectedHue = clamp(paletteEditorState.hsv.h, 0, 360);
     const imageData = paletteWheelCtx.createImageData(size, size);
     const data = imageData.data;
-    const radius = size / 2;
     for (let y = 0; y < size; y += 1) {
       for (let x = 0; x < size; x += 1) {
-        const dx = x + 0.5 - radius;
-        const dy = y + 0.5 - radius;
+        const dx = x + 0.5 - metrics.center;
+        const dy = y + 0.5 - metrics.center;
         const distance = Math.sqrt(dx * dx + dy * dy);
         const index = (y * size + x) * 4;
-        if (distance > radius) {
+        if (distance > metrics.outerRadius) {
           data[index + 3] = 0;
           continue;
         }
-        const saturation = clamp(distance / radius, 0, 1);
-        let hue = Math.atan2(dy, dx) * (180 / Math.PI);
-        if (hue < 0) hue += 360;
-        const rgba = hsvToRgba(hue, saturation, value);
+        let rgba;
+        if (distance >= metrics.innerRadius) {
+          let ringHue = Math.atan2(dy, dx) * (180 / Math.PI);
+          if (ringHue < 0) ringHue += 360;
+          rgba = hsvToRgba(ringHue, 1, 1);
+        } else if (isPointInsideSvArea(x + 0.5, y + 0.5, metrics)) {
+          const saturation = clamp((x + 0.5 - metrics.svLeft) / metrics.svSpan, 0, 1);
+          const value = 1 - clamp((y + 0.5 - metrics.svTop) / metrics.svSpan, 0, 1);
+          rgba = hsvToRgba(selectedHue, saturation, value);
+        } else {
+          rgba = { r: 16, g: 24, b: 36, a: 255 };
+        }
         data[index] = rgba.r;
         data[index + 1] = rgba.g;
         data[index + 2] = rgba.b;
@@ -10415,18 +10515,35 @@
   }
 
   function updatePaletteWheelCursor() {
-    const cursor = dom.controls.paletteWheelCursor;
-    const canvas = dom.controls.paletteWheel;
-    if (!cursor || !canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-    const radius = rect.width / 2;
-    const angle = (paletteEditorState.hsv.h * Math.PI) / 180;
-    const distance = clamp(paletteEditorState.hsv.s, 0, 1) * radius;
-    const x = radius + Math.cos(angle) * distance;
-    const y = radius + Math.sin(angle) * distance;
-    cursor.style.left = `${x}px`;
-    cursor.style.top = `${y}px`;
+    const hueCursor = dom.controls.paletteWheelCursor;
+    const svCursor = dom.controls.paletteSvCursor;
+    if (!hueCursor || !svCursor) return;
+    const size = getPaletteWheelDisplaySize();
+    if (!size) return;
+    const metrics = getPaletteWheelMetrics(size);
+
+    const hueSliderValue = Number(dom.controls.paletteHue?.value);
+    const hue = Number.isFinite(hueSliderValue)
+      ? clamp(hueSliderValue, 0, 360)
+      : clamp(paletteEditorState.hsv.h, 0, 360);
+    const hueAngle = (hue * Math.PI) / 180;
+    const hx = metrics.center + Math.cos(hueAngle) * metrics.hueCursorRadius;
+    const hy = metrics.center + Math.sin(hueAngle) * metrics.hueCursorRadius;
+    hueCursor.style.left = `${hx}px`;
+    hueCursor.style.top = `${hy}px`;
+
+    const saturationSliderValue = Number(dom.controls.paletteSaturation?.value);
+    const valueSliderValue = Number(dom.controls.paletteValue?.value);
+    const saturation = Number.isFinite(saturationSliderValue)
+      ? clamp(saturationSliderValue / 100, 0, 1)
+      : clamp(paletteEditorState.hsv.s, 0, 1);
+    const value = Number.isFinite(valueSliderValue)
+      ? clamp(valueSliderValue / 100, 0, 1)
+      : clamp(paletteEditorState.hsv.v, 0, 1);
+    const sx = metrics.svLeft + (saturation * metrics.svSpan);
+    const sy = metrics.svTop + ((1 - value) * metrics.svSpan);
+    svCursor.style.left = `${sx}px`;
+    svCursor.style.top = `${sy}px`;
   }
 
   function writePaletteColorFromHsv() {
@@ -10442,8 +10559,8 @@
   }
 
   function handlePaletteWheelPointerDown(event) {
-    const wheel = dom.controls.paletteWheel;
-    if (!wheel) return;
+    const wheelSurface = getPaletteWheelSurface();
+    if (!wheelSurface) return;
     event.preventDefault();
     if (paletteEditorState.wheelPointer.upHandler) {
       window.removeEventListener('pointerup', paletteEditorState.wheelPointer.upHandler);
@@ -10451,7 +10568,9 @@
     }
     paletteEditorState.wheelPointer.active = true;
     paletteEditorState.wheelPointer.pointerId = event.pointerId;
-    wheel.setPointerCapture?.(event.pointerId);
+    paletteEditorState.wheelPointer.mode = null;
+    paletteEditorState.wheelPointer.captureTarget = wheelSurface;
+    wheelSurface.setPointerCapture?.(event.pointerId);
     updatePaletteFromWheelEvent(event);
     window.addEventListener('pointermove', handlePaletteWheelPointerMove);
     const pointerUpHandler = evt => handlePaletteWheelPointerUp(evt);
@@ -10467,15 +10586,17 @@
   }
 
   function handlePaletteWheelPointerUp(event) {
-    const wheel = dom.controls.paletteWheel;
     if (!paletteEditorState.wheelPointer.active || (paletteEditorState.wheelPointer.pointerId !== null && event.pointerId !== paletteEditorState.wheelPointer.pointerId)) {
       return;
     }
-    if (wheel && wheel.hasPointerCapture?.(event.pointerId)) {
-      wheel.releasePointerCapture(event.pointerId);
+    const captureTarget = paletteEditorState.wheelPointer.captureTarget;
+    if (captureTarget && captureTarget.hasPointerCapture?.(event.pointerId)) {
+      captureTarget.releasePointerCapture(event.pointerId);
     }
     paletteEditorState.wheelPointer.active = false;
     paletteEditorState.wheelPointer.pointerId = null;
+    paletteEditorState.wheelPointer.mode = null;
+    paletteEditorState.wheelPointer.captureTarget = null;
     if (paletteEditorState.wheelPointer.upHandler) {
       window.removeEventListener('pointerup', paletteEditorState.wheelPointer.upHandler);
       paletteEditorState.wheelPointer.upHandler = null;
@@ -10484,29 +10605,42 @@
   }
 
   function updatePaletteFromWheelEvent(event) {
-    const wheel = dom.controls.paletteWheel;
-    if (!wheel) return;
-    const rect = wheel.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-    const scale = wheel.width / rect.width;
-    const x = (event.clientX - rect.left) * scale;
-    const y = (event.clientY - rect.top) * scale;
-    const radius = wheel.width / 2;
-    const dx = x - radius;
-    const dy = y - radius;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    const maxRadius = radius;
-    const clampedDistance = Math.min(distance, maxRadius);
-    let hue = Math.atan2(dy, dx) * (180 / Math.PI);
-    if (hue < 0) hue += 360;
-    const saturation = clamp(clampedDistance / maxRadius, 0, 1);
-    paletteEditorState.hsv.h = hue;
-    paletteEditorState.hsv.s = saturation;
-    if (dom.controls.paletteHue) {
-      dom.controls.paletteHue.value = String(Math.round(hue));
-    }
-    if (dom.controls.paletteSaturation) {
-      dom.controls.paletteSaturation.value = String(Math.round(saturation * 100));
+    const wheelSurface = getPaletteWheelSurface();
+    if (!wheelSurface) return;
+    const rect = wheelSurface.getBoundingClientRect();
+    const size = Math.max(0, Math.min(rect.width, rect.height));
+    if (!size) return;
+    const x = clamp(event.clientX - rect.left, 0, size);
+    const y = clamp(event.clientY - rect.top, 0, size);
+    const metrics = getPaletteWheelMetrics(size);
+    const dx = x - metrics.center;
+    const dy = y - metrics.center;
+    const inSvArea = isPointInsideSvArea(x, y, metrics);
+    const mode = paletteEditorState.wheelPointer.mode
+      || (inSvArea ? 'sv' : 'hue');
+    paletteEditorState.wheelPointer.mode = mode;
+
+    if (mode === 'hue') {
+      let hue = Math.atan2(dy, dx) * (180 / Math.PI);
+      if (hue < 0) hue += 360;
+      paletteEditorState.hsv.h = hue;
+      if (dom.controls.paletteHue) {
+        dom.controls.paletteHue.value = String(Math.round(hue));
+      }
+      drawPaletteWheel();
+    } else {
+      const clampedX = clamp(x, metrics.svLeft, metrics.svRight);
+      const clampedY = clamp(y, metrics.svTop, metrics.svBottom);
+      const saturation = clamp((clampedX - metrics.svLeft) / metrics.svSpan, 0, 1);
+      const value = 1 - clamp((clampedY - metrics.svTop) / metrics.svSpan, 0, 1);
+      paletteEditorState.hsv.s = saturation;
+      paletteEditorState.hsv.v = value;
+      if (dom.controls.paletteSaturation) {
+        dom.controls.paletteSaturation.value = String(Math.round(saturation * 100));
+      }
+      if (dom.controls.paletteValue) {
+        dom.controls.paletteValue.value = String(Math.round(value * 100));
+      }
     }
     updatePaletteWheelCursor();
     updatePalettePreview();
@@ -14306,102 +14440,106 @@
   function drawEllipse(start, end, filled) {
     const layer = getActiveLayer();
     if (!layer) return;
-    const cx = Math.round((start.x + end.x) / 2);
-    const cy = Math.round((start.y + end.y) / 2);
-    const rx = Math.round(Math.abs(end.x - start.x) / 2);
-    const ry = Math.round(Math.abs(end.y - start.y) / 2);
-    if (rx === 0 && ry === 0) {
-      stampBrush(layer, cx, cy);
+    const x0 = Math.min(start.x, end.x);
+    const x1 = Math.max(start.x, end.x);
+    const y0 = Math.min(start.y, end.y);
+    const y1 = Math.max(start.y, end.y);
+    if (x0 === x1 && y0 === y1) {
+      stampBrush(layer, x0, y0);
       requestRender();
       return;
     }
-    drawEllipsePixels(cx, cy, rx, ry, filled, (x, y) => stampBrush(layer, x, y));
+    drawEllipsePixels(x0, y0, x1, y1, filled, (x, y) => stampBrush(layer, x, y));
     requestRender();
   }
 
-  function drawEllipsePixels(cx, cy, rx, ry, filled, plotPixel) {
-    if (rx < 0 || ry < 0) return;
-    if (rx === 0 && ry === 0) {
-      plotPixel(cx, cy);
+  function drawEllipsePixels(x0, y0, x1, y1, filled, plotPixel) {
+    const minX = Math.min(x0, x1);
+    const maxX = Math.max(x0, x1);
+    const minY = Math.min(y0, y1);
+    const maxY = Math.max(y0, y1);
+    if (maxX < minX || maxY < minY) return;
+    const width = (maxX - minX) + 1;
+    const height = (maxY - minY) + 1;
+    const diameter = Math.max(1, Math.min(width, height));
+    const circleMinX = minX + Math.floor((width - diameter) * 0.5);
+    const circleMinY = minY + Math.floor((height - diameter) * 0.5);
+    const circleMaxX = circleMinX + diameter - 1;
+    const circleMaxY = circleMinY + diameter - 1;
+
+    if (diameter === 1) {
+      plotPixel(circleMinX, circleMinY);
       return;
     }
-    if (rx === 0) {
-      for (let y = cy - ry; y <= cy + ry; y += 1) {
-        plotPixel(cx, y);
-      }
-      return;
-    }
-    if (ry === 0) {
-      for (let x = cx - rx; x <= cx + rx; x += 1) {
-        plotPixel(x, cy);
-      }
-      return;
+
+    const centerX2 = circleMinX + circleMaxX;
+    const centerY2 = circleMinY + circleMaxY;
+    const parity = Math.abs(centerX2) % 2;
+    let radius2 = circleMaxX - circleMinX;
+    if ((Math.abs(radius2) % 2) !== parity) {
+      radius2 -= 1;
     }
 
     const fillRanges = filled ? new Map() : null;
-    const rxSq = rx * rx;
-    const rySq = ry * ry;
-    let x = 0;
-    let y = ry;
-    let px = 0;
-    let py = 2 * rxSq * y;
-
-    const recordFillRange = (yRow, xValue) => {
-      if (!fillRanges) return;
-      const entry = fillRanges.get(yRow);
-      if (entry) {
-        entry.min = Math.min(entry.min, xValue);
-        entry.max = Math.max(entry.max, xValue);
+    const recordPoint = (x, y) => {
+      if (x < circleMinX || x > circleMaxX || y < circleMinY || y > circleMaxY) {
+        return;
+      }
+      if (fillRanges) {
+        const existing = fillRanges.get(y);
+        if (existing) {
+          existing.min = Math.min(existing.min, x);
+          existing.max = Math.max(existing.max, x);
+        } else {
+          fillRanges.set(y, { min: x, max: x });
+        }
       } else {
-        fillRanges.set(yRow, { min: xValue, max: xValue });
+        plotPixel(x, y);
       }
     };
 
-    const plotSymmetric = (offsetX, offsetY) => {
-      const coords = [
-        { x: cx + offsetX, y: cy + offsetY },
-        { x: cx - offsetX, y: cy + offsetY },
-        { x: cx + offsetX, y: cy - offsetY },
-        { x: cx - offsetX, y: cy - offsetY },
+    const plotSymmetricOffset2 = (dx2, dy2) => {
+      const pairs = [
+        [dx2, dy2],
+        [-dx2, dy2],
+        [dx2, -dy2],
+        [-dx2, -dy2],
+        [dy2, dx2],
+        [-dy2, dx2],
+        [dy2, -dx2],
+        [-dy2, -dx2],
       ];
-      coords.forEach(point => {
-        plotPixel(point.x, point.y);
-        recordFillRange(point.y, point.x);
-      });
+      for (let i = 0; i < pairs.length; i += 1) {
+        const [ox2, oy2] = pairs[i];
+        const px2 = centerX2 + ox2;
+        const py2 = centerY2 + oy2;
+        if ((px2 & 1) !== 0 || (py2 & 1) !== 0) {
+          continue;
+        }
+        recordPoint(px2 / 2, py2 / 2);
+      }
     };
 
-    let p1 = rySq - (rxSq * ry) + (0.25 * rxSq);
-    while (px < py) {
-      plotSymmetric(x, y);
-      x += 1;
-      px += 2 * rySq;
-      if (p1 < 0) {
-        p1 += rySq + px;
-      } else {
-        y -= 1;
-        py -= 2 * rxSq;
-        p1 += rySq + px - py;
+    let dx2 = parity;
+    let dy2 = radius2;
+    while (dx2 <= dy2) {
+      plotSymmetricOffset2(dx2, dy2);
+      const nextDx2 = dx2 + 2;
+      const errEast = Math.abs((nextDx2 * nextDx2) + (dy2 * dy2) - (radius2 * radius2));
+      const nextDy2 = dy2 - 2;
+      const errSouthEast = nextDy2 >= parity
+        ? Math.abs((nextDx2 * nextDx2) + (nextDy2 * nextDy2) - (radius2 * radius2))
+        : Number.POSITIVE_INFINITY;
+      if (errSouthEast <= errEast) {
+        dy2 = nextDy2;
       }
-    }
-
-    let p2 = (rySq * (x + 0.5) ** 2) + (rxSq * (y - 1) ** 2) - (rxSq * rySq);
-    while (y >= 0) {
-      plotSymmetric(x, y);
-      y -= 1;
-      py -= 2 * rxSq;
-      if (p2 > 0) {
-        p2 += rxSq - py;
-      } else {
-        x += 1;
-        px += 2 * rySq;
-        p2 += rxSq - py + px;
-      }
+      dx2 = nextDx2;
     }
 
     if (fillRanges) {
-      fillRanges.forEach((range, row) => {
-        for (let col = range.min; col <= range.max; col += 1) {
-          plotPixel(col, row);
+      fillRanges.forEach((range, y) => {
+        for (let x = range.min; x <= range.max; x += 1) {
+          plotPixel(x, y);
         }
       });
     }
@@ -15882,12 +16020,12 @@
         }
       }
     } else if (tool === 'ellipse' || tool === 'ellipseFill') {
-      const cx = Math.round((start.x + end.x) / 2);
-      const cy = Math.round((start.y + end.y) / 2);
-      const rx = Math.round(Math.abs(end.x - start.x) / 2);
-      const ry = Math.round(Math.abs(end.y - start.y) / 2);
+      const x0 = Math.min(start.x, end.x);
+      const x1 = Math.max(start.x, end.x);
+      const y0 = Math.min(start.y, end.y);
+      const y1 = Math.max(start.y, end.y);
       const filled = tool === 'ellipseFill';
-      drawEllipsePixels(cx, cy, rx, ry, filled, (x, y) => stamp(x, y));
+      drawEllipsePixels(x0, y0, x1, y1, filled, (x, y) => stamp(x, y));
     }
 
     ctx.overlay.restore();
