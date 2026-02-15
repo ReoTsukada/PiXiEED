@@ -143,7 +143,7 @@
       <ins class="adsbygoogle"
            style="display:block"
            data-ad-client="ca-pub-9801602250480253"
-           data-ad-slot="2141591954"
+           data-ad-slot="3806415737"
            data-ad-format="auto"
            data-full-width-responsive="true"></ins>
     </div>
@@ -192,7 +192,7 @@
       <ins class="adsbygoogle"
            style="display:block"
            data-ad-client="ca-pub-9801602250480253"
-           data-ad-slot="9073878884"
+           data-ad-slot="1180252398"
            data-ad-format="auto"
            data-full-width-responsive="true"></ins>
     </div>
@@ -563,7 +563,7 @@
 </div>
 <div aria-label="広告" class="export-ad" id="exportAdContainer">
 <div class="export-ad__slot">
-<ins class="adsbygoogle" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="exportAdSlot" style="display:block"></ins>
+<ins class="export-ad-ins" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="exportAdSlot" style="display:block"></ins>
 </div>
 <small class="export-ad__label">広告</small>
 </div>
@@ -649,7 +649,9 @@
       <ins class="adsbygoogle"
            style="display:block"
            data-ad-client="ca-pub-9801602250480253"
-           data-ad-slot="2141591954"></ins>
+           data-ad-slot="6568310446"
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
     </div>
   </div>
   <script>
@@ -819,10 +821,9 @@
       // If the global adsbygoogle script is not present yet, it will still be available when loaded in <head>.
       const ADS_CLIENT = 'ca-pub-9801602250480253';
       const baseSlots = [
-        { containerId: 'leftRailAdSlot', slot: '2141591954' },
-        { containerId: 'rightRailAdSlot', slot: '9073878884' },
-        // Match PiXiEEDraw Lite footer ad slot for the same visual ratio/behavior.
-        { containerId: 'mobileBottomAdSlot', slot: '2141591954' }
+        { containerId: 'leftRailAdSlot', slot: '3806415737' },
+        { containerId: 'rightRailAdSlot', slot: '1180252398' },
+        { containerId: 'mobileBottomAdSlot', slot: '6568310446' }
       ];
       const SLOTS = baseSlots;
       const MIN_RAIL_AD_WIDTH = 120;
@@ -900,7 +901,7 @@
           // mark them as attempted so future pushes don't error
           try { unrendered.forEach(i => { i.dataset.pixiedRendered = '1'; }); } catch (e) {}
         } catch (e) {
-          console.warn('[pixiedraw] adsbygoogle push failed', e && e.message);
+          console.warn('[pixiedraw] adsbygoogle push failed', (container && container.id) || '(unknown-container)', e && e.message);
         }
       }
 
@@ -1028,17 +1029,7 @@
         }
       });
 
-      // Ensure export ad slot (exists in the export dialog) is rendered when visible/sized
-      const exportSlot = document.getElementById('exportAdSlot');
-      if (exportSlot) {
-        // exportSlot is the ins itself in this case; ensure it's assigned a slot if needed
-        try {
-          if (!exportSlot.getAttribute('data-ad-slot') || exportSlot.getAttribute('data-ad-slot') === 'rotate') {
-            exportSlot.setAttribute('data-ad-slot', '2141591954');
-          }
-        } catch (e) {}
-        scheduleRenderForContainer(exportSlot.parentElement || exportSlot);
-      }
+      // Export dialog ad is rendered on-demand in app.js when the dialog opens.
     })();
   </script>
 
