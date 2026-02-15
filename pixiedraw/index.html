@@ -721,6 +721,7 @@
         if (!(leftRail instanceof HTMLElement) || !(leftRailAd instanceof HTMLElement)) return false;
         if (mql.matches) return false;
         if (leftRail.dataset.collapsed === 'true') return false;
+        if (leftRail.dataset.compact === 'true') return false;
         // In landscape / non-portrait, keep rail ads visible whenever the rail is not collapsed.
         return true;
       }
@@ -729,6 +730,7 @@
         if (!(rightRail instanceof HTMLElement) || !(rightRailAd instanceof HTMLElement)) return false;
         if (mql.matches) return false;
         if (rightRail.dataset.collapsed === 'true') return false;
+        if (rightRail.dataset.compact === 'true') return false;
         // In landscape / non-portrait, keep rail ads visible whenever the rail is not collapsed.
         return true;
       }
@@ -816,12 +818,14 @@
       if (!document || !window) return;
       // If the global adsbygoogle script is not present yet, it will still be available when loaded in <head>.
       const ADS_CLIENT = 'ca-pub-9801602250480253';
-      const SLOTS = [
+      const baseSlots = [
         { containerId: 'leftRailAdSlot', slot: '2141591954' },
         { containerId: 'rightRailAdSlot', slot: '9073878884' },
         // Match PiXiEEDraw Lite footer ad slot for the same visual ratio/behavior.
         { containerId: 'mobileBottomAdSlot', slot: '2141591954' }
       ];
+      const SLOTS = baseSlots;
+      const MIN_RAIL_AD_WIDTH = 120;
 
       function isMobileBottomSlot(container) {
         if (!container) return false;
@@ -905,12 +909,22 @@
       // if push() is called while the container is hidden or has 0 width.
       function scheduleRenderForContainer(container) {
         if (!container) return;
-        const hasWidth = () => {
+        const getWidth = () => {
           try {
             const r = container.getBoundingClientRect();
-            return (r && r.width) > 0;
+            return (r && r.width) || 0;
           } catch (e) {
-            return (container.clientWidth || container.offsetWidth) > 0;
+            return (container.clientWidth || container.offsetWidth || 0);
+          }
+        };
+        const hasWidth = () => {
+          const w = getWidth();
+          const isRailSlot = container.id === 'leftRailAdSlot' || container.id === 'rightRailAdSlot';
+          if (isRailSlot) return w >= MIN_RAIL_AD_WIDTH;
+          try {
+            return w > 0;
+          } catch (e) {
+            return false;
           }
         };
 
@@ -922,7 +936,7 @@
               container._pixieed_pendingIns = null;
               // ensure the ins has a measurable width before appending
               try {
-                const w = (container.getBoundingClientRect && container.getBoundingClientRect().width) || (container.clientWidth || container.offsetWidth) || 0;
+                const w = getWidth();
                 if (w > 0) {
                   if (!isMobileBottomSlot(container)) {
                     ins.style.width = w + 'px';
@@ -968,13 +982,13 @@
           try {
             ro = new ResizeObserver((entries) => {
               for (const entry of entries) {
-                if ((entry.contentRect && entry.contentRect.width) || hasWidth()) {
+                if (hasWidth()) {
                   try {
                     if (container._pixieed_pendingIns) {
                       const ins = container._pixieed_pendingIns;
                       container._pixieed_pendingIns = null;
                       try {
-                        const w = (container.getBoundingClientRect && container.getBoundingClientRect().width) || (container.clientWidth || container.offsetWidth) || 0;
+                        const w = getWidth();
                         if (w > 0) {
                           if (!isMobileBottomSlot(container)) {
                             ins.style.width = w + 'px';
@@ -1004,62 +1018,6 @@
           window.addEventListener('resize', onResize);
           document.addEventListener('visibilitychange', onVisibility);
         }
-
-  // Fallback: if the container remains width=0 after a short delay, apply a
-        // temporary safe min-width and append the pending ins so ads can load.
-        // This is conservative and will try to revert the styling shortly after.
-        const RETRY_DELAY = 2000; // ms
-        const REVERT_DELAY = 6000; // ms after applying temp styles
-        let retryTimer = setTimeout(() => {
-          try {
-            // Mobile bottom ad should stay stable; avoid delayed retry mutations that can enlarge it.
-            if (isMobileBottomSlot(container)) return;
-            if (hasWidth()) return; // already sized
-            // append pending ins if present
-            try {
-              if (container._pixieed_pendingIns) {
-                const ins = container._pixieed_pendingIns;
-                container._pixieed_pendingIns = null;
-                // apply temporary non-invasive sizing to allow ad to measure
-                container._pixieed_prevMinWidth = container.style.minWidth;
-                const tempMin = container.style.minWidth || '320px';
-                container.style.minWidth = tempMin;
-                // before appending, try to set pixel width on the ins so adsbygoogle can measure
-                try {
-                  const w = (container.getBoundingClientRect && container.getBoundingClientRect().width) || (container.clientWidth || container.offsetWidth) || 0;
-                  if (w > 0) {
-                    if (!isMobileBottomSlot(container)) {
-                        ins.style.width = w + 'px';
-                        ins.style.maxWidth = '100%';
-                    }
-                  }
-                } catch (e) {}
-                // append and render
-                container.innerHTML = '';
-                container.appendChild(ins);
-                console.debug('[pixiedraw] retry: appended pending ins with temporary minWidth into', container.id || container);
-                tryRender(container);
-                container._pixieed_tempApplied = true;
-                // revert temporary styling after REVERT_DELAY
-                setTimeout(() => {
-                  try {
-                    if (container._pixieed_tempApplied) {
-                      container.style.minWidth = container._pixieed_prevMinWidth || '';
-                      container._pixieed_tempApplied = false;
-                      console.debug('[pixiedraw] reverted temporary minWidth for', container.id || container);
-                    }
-                  } catch (e) {}
-                }, REVERT_DELAY);
-              } else {
-                // no pending ins; still attempt to render (pixieedObserveAds may inspect)
-                console.debug('[pixiedraw] retry: no pending ins but attempting to render for', container.id || container);
-                tryRender(container);
-              }
-            } catch (e) {
-              console.warn('[pixiedraw] retry attempt failed', e && e.message);
-            }
-          } catch (e) {}
-        }, RETRY_DELAY);
       }
 
       // Insert ins elements and schedule rendering only when the container is sized.
