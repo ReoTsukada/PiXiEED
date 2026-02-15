@@ -2320,19 +2320,24 @@ input[type='range']::-moz-focus-outer {
   padding: 0;
   width: 100%;
   margin-top: auto; /* push to bottom of rail */
+  min-height: clamp(48px, 8vw, 60px);
+  height: clamp(48px, 8vw, 60px);
+  max-height: clamp(48px, 8vw, 60px);
+  flex: 0 0 clamp(48px, 8vw, 60px);
+  overflow: hidden;
 }
 .rail-ad .ad-box {
   display: block;
   width: 100%;
   max-width: none;
-  min-height: clamp(48px, 9vw, 60px);
-  height: clamp(48px, 9vw, 60px);
-  max-height: clamp(48px, 9vw, 60px);
+  min-height: 100%;
+  height: 100%;
+  max-height: 100%;
   background: #ffffff; /* temporary white placeholder */
   color: #111111;
   font-size: 12px;
   text-align: center;
-  padding: 6px 8px;
+  padding: 0;
   border-radius: 8px;
   border: 1px solid rgba(0,0,0,0.06);
   overflow: hidden;
@@ -2343,10 +2348,11 @@ input[type='range']::-moz-focus-outer {
   display: block !important;
   width: 100% !important;
   height: 100% !important;
-  min-height: clamp(48px, 9vw, 60px) !important;
-  max-height: clamp(48px, 9vw, 60px) !important;
+  min-height: 100% !important;
+  max-height: 100% !important;
   margin: 0 auto !important;
   box-sizing: border-box !important;
+  overflow: hidden !important;
 }
 
 .rail-ad .ad-box ins.adsbygoogle iframe,
@@ -2354,8 +2360,9 @@ input[type='range']::-moz-focus-outer {
   display: block;
   width: 100% !important;
   height: 100% !important;
-  min-height: clamp(48px, 9vw, 60px) !important;
-  max-height: clamp(48px, 9vw, 60px) !important;
+  min-height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
 }
 
 /* Portrait narrower rails: ensure ad fits into compact rails */
