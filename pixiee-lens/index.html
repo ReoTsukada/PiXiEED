@@ -1065,6 +1065,40 @@
       outline: 2px solid rgba(123, 207, 255, 0.9);
       outline-offset: 4px;
     }
+    .capture-button.is-recording {
+      border-color: rgba(255, 94, 94, 0.95);
+      background: rgba(42, 8, 12, 0.9);
+      box-shadow: 0 24px 44px rgba(0, 0, 0, 0.5), inset 0 0 18px rgba(255, 94, 94, 0.4);
+    }
+    .capture-button.is-recording .capture-button__icon {
+      opacity: 0.25;
+    }
+    .capture-button.is-recording::after {
+      content: '';
+      position: absolute;
+      width: 34%;
+      height: 34%;
+      min-width: 14px;
+      min-height: 14px;
+      border-radius: 8px;
+      background: #ff5566;
+      box-shadow: 0 0 0 0 rgba(255, 85, 102, 0.68);
+      animation: capture-recording-pulse 1s ease-in-out infinite;
+    }
+    @keyframes capture-recording-pulse {
+      0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(255, 85, 102, 0.62);
+      }
+      70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 12px rgba(255, 85, 102, 0);
+      }
+      100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(255, 85, 102, 0);
+      }
+    }
     .capture-button__icon {
       width: 64%;
       max-width: 72px;
@@ -2345,7 +2379,7 @@
 </div>
 </div>
 <div class="hud-bottom__capture-slot">
-<button aria-label="撮影" class="capture-button" id="captureBtn" type="button">
+<button aria-label="撮影（長押しでGIF）" class="capture-button" id="captureBtn" type="button">
 <img alt="" aria-hidden="true" class="capture-button__icon" draggable="false" src="./icon-capture.svg"/>
 </button>
 </div>
@@ -2504,6 +2538,15 @@
     const ZOOM_FALLBACK_MAX = 8;
     const ZOOM_MAJOR_EPSILON = 1e-3;
     const CAMERA_READY_TIMEOUT_MS = 5000;
+    const CAPTURE_LONG_PRESS_MS = 360;
+    const GIF_CAPTURE_FPS = 6;
+    const GIF_CAPTURE_FRAME_INTERVAL_MS = Math.max(80, Math.round(1000 / GIF_CAPTURE_FPS));
+    const GIF_CAPTURE_MAX_DURATION_MS = 3200;
+    const GIF_CAPTURE_MIN_FRAMES = 2;
+    const GIF_CAPTURE_MAX_DIMENSION = 360;
+    const GIF_CAPTURE_MAX_PIXELS = 360 * 360;
+    const GIF_CAPTURE_PIXEL_RATIO_CAP = 1;
+    const GIF_332_PALETTE = createGif332Palette();
     let zoomScaleItems = [];
     let zoomScaleMarks = [];
     let zoomScaleTranslate = 0;
@@ -2930,6 +2973,14 @@
     let cameraPermissionDenied = false;
     let cameraReady = false;
     let captureInProgress = false;
+    let captureLongPressTimer = null;
+    let capturePressPointerId = null;
+    let capturePressActive = false;
+    let capturePressTriggered = false;
+    let suppressCaptureClickOnce = false;
+    let gifCaptureSession = null;
+    let gifScratchCanvas = null;
+    let gifScratchCtx = null;
     let qrScanEnabled = true;
     let qrSupportAvailable = null;
     let qrDetector = null;
@@ -8204,18 +8255,23 @@
       closeCapturePreview();
     }
 
-    function composeCaptureFrame() {
+    function composeCaptureFrameCanvas(options = {}) {
       const viewportWidth = Math.max(1, Math.round(window.innerWidth || 0));
       const viewportHeight = Math.max(1, Math.round(window.innerHeight || 0));
       if (!viewportWidth || !viewportHeight) {
-        return Promise.resolve(null);
+        return null;
       }
       const deviceRatio = window.devicePixelRatio || 1;
-      const pixelRatio = Math.min(Math.max(deviceRatio, 1), 2.5);
+      const optionCap = Number(options.pixelRatioCap);
+      const maxPixelRatio = Number.isFinite(optionCap) && optionCap > 0 ? optionCap : 2.5;
+      const pixelRatio = Math.min(Math.max(deviceRatio, 1), maxPixelRatio);
       const viewportCanvas = document.createElement('canvas');
       viewportCanvas.width = Math.max(1, Math.round(viewportWidth * pixelRatio));
       viewportCanvas.height = Math.max(1, Math.round(viewportHeight * pixelRatio));
       const ctx = viewportCanvas.getContext('2d', { willReadFrequently: false });
+      if (!ctx) {
+        return null;
+      }
       ctx.imageSmoothingEnabled = false;
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, viewportCanvas.width, viewportCanvas.height);
@@ -8224,7 +8280,7 @@
       const hasContent = drawCaptureLayers(ctx, viewportWidth, viewportHeight);
       ctx.restore();
       if (!hasContent) {
-        return Promise.resolve(null);
+        return null;
       }
       const captureRect = getCaptureViewportRect(viewportWidth, viewportHeight);
       const cropX = Math.max(0, Math.min(viewportWidth, captureRect.x));
@@ -8248,6 +8304,9 @@
         croppedCanvas.width = sw;
         croppedCanvas.height = sh;
         const croppedCtx = croppedCanvas.getContext('2d', { willReadFrequently: false });
+        if (!croppedCtx) {
+          return null;
+        }
         croppedCtx.imageSmoothingEnabled = false;
         croppedCtx.drawImage(
           viewportCanvas,
@@ -8264,28 +8323,53 @@
         outputWidth = sw;
         outputHeight = sh;
       }
-      return canvasToBlobWithFallback(outputCanvas).then((payload) => ({
-        ...payload,
+      return {
+        canvas: outputCanvas,
         width: outputWidth,
         height: outputHeight,
         cssWidth: Math.round(outputWidth / pixelRatio),
         cssHeight: Math.round(outputHeight / pixelRatio)
+      };
+    }
+
+    function composeCaptureFrame(options = {}) {
+      const composed = composeCaptureFrameCanvas(options);
+      if (!composed || !composed.canvas) {
+        return Promise.resolve(null);
+      }
+      return canvasToBlobWithFallback(composed.canvas).then((payload) => ({
+        ...payload,
+        width: composed.width,
+        height: composed.height,
+        cssWidth: composed.cssWidth,
+        cssHeight: composed.cssHeight
       }));
     }
 
-    function getCaptureFilename() {
+    function getCaptureFilename(extension = 'png') {
+      const ext = typeof extension === 'string' && extension
+        ? extension.replace(/^\./, '').toLowerCase()
+        : 'png';
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      return `pixiee-lens-${timestamp}.png`;
+      return `pixiee-lens-${timestamp}.${ext}`;
     }
 
-    async function deliverCaptureResult(result, filename) {
+    async function deliverCaptureResult(result, filename, options = {}) {
       if (!result) {
         return false;
       }
-      const { blob, dataUrl, cssWidth, cssHeight } = result;
+      const formatLabel = typeof options.formatLabel === 'string' && options.formatLabel
+        ? options.formatLabel
+        : '画像';
+      const mimeType = typeof options.mimeType === 'string' && options.mimeType
+        ? options.mimeType
+        : 'image/png';
+      const enableDrawImport = options.enableDrawImport !== false;
+      const autoShareOnIOS = options.autoShareOnIOS !== false;
+      const { blob, dataUrl, cssWidth, cssHeight, width, height } = result;
       const supportsDownloadAttr = 'download' in HTMLAnchorElement.prototype;
       const isIOS = /iP(hone|ad|od)/i.test(navigator.userAgent);
-      const drawPayload = await createDrawImportPayload(result, filename);
+      const drawPayload = enableDrawImport ? await createDrawImportPayload(result, filename) : null;
       let previewUrl = drawPayload && typeof drawPayload.dataUrl === 'string' ? drawPayload.dataUrl : null;
       if (!previewUrl && typeof dataUrl === 'string' && dataUrl) {
         previewUrl = dataUrl;
@@ -8293,11 +8377,12 @@
       let sharePayload = null;
       let infoMessage = drawPayload
         ? 'PiXiEEDrawで編集するか、画像を保存してご利用ください。'
-        : '画像を保存してご利用ください。';
+        : `${formatLabel}を保存してご利用ください。`;
       if (blob instanceof Blob) {
-        const shareFile = new File([blob], filename, { type: 'image/png' });
-        const canShareFiles = isIOS && typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare({ files: [shareFile] }));
-        if (isIOS && canShareFiles) {
+        const shareFile = new File([blob], filename, { type: mimeType });
+        const canShareFiles = typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare({ files: [shareFile] }));
+        const shouldAutoShare = autoShareOnIOS && isIOS && canShareFiles;
+        if (shouldAutoShare) {
           try {
             await navigator.share({
               files: [shareFile],
@@ -8325,15 +8410,15 @@
           setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
           infoMessage = drawPayload
             ? '画像を自動的に保存しました。「PiXiEEDrawで編集」で続けて編集できます。'
-            : '画像を自動的に保存しました。';
+            : `${formatLabel}を自動的に保存しました。`;
         } else if (canShareFiles) {
           infoMessage = drawPayload
             ? '「共有する」ボタンで保存するか、「PiXiEEDrawで編集」で編集できます。'
-            : '「共有する」ボタンから保存してください。';
+            : `「共有する」ボタンから${formatLabel}を保存してください。`;
         } else {
           infoMessage = drawPayload
             ? '画像を長押しして保存するか、「PiXiEEDrawで編集」で編集できます。'
-            : '画像を長押しして写真に保存してください。';
+            : `${formatLabel}を長押しして保存してください。`;
         }
         if (canShareFiles) {
           const shareUrl = previewUrl && previewUrl.startsWith('blob:')
@@ -8354,8 +8439,12 @@
       if (!previewUrl) {
         return false;
       }
-      const previewWidth = drawPayload ? drawPayload.width : cssWidth;
-      const previewHeight = drawPayload ? drawPayload.height : cssHeight;
+      const previewWidth = drawPayload
+        ? drawPayload.width
+        : (Number.isFinite(cssWidth) ? cssWidth : width);
+      const previewHeight = drawPayload
+        ? drawPayload.height
+        : (Number.isFinite(cssHeight) ? cssHeight : height);
       showCapturePreview({
         url: previewUrl,
         filename,
@@ -8368,6 +8457,600 @@
       return true;
     }
 
+    function setCaptureButtonRecording(isRecording) {
+      if (!captureBtn) {
+        return;
+      }
+      const active = Boolean(isRecording);
+      captureBtn.classList.toggle('is-recording', active);
+      captureBtn.setAttribute('aria-label', active ? 'GIF撮影中（ボタンを離すと保存）' : '撮影（長押しでGIF）');
+    }
+
+    function clearCaptureLongPressTimer() {
+      if (captureLongPressTimer !== null) {
+        clearTimeout(captureLongPressTimer);
+        captureLongPressTimer = null;
+      }
+    }
+
+    function releaseCapturePointer(pointerId) {
+      if (!captureBtn || pointerId === null || pointerId === undefined) {
+        return;
+      }
+      if (typeof captureBtn.hasPointerCapture !== 'function' || typeof captureBtn.releasePointerCapture !== 'function') {
+        return;
+      }
+      try {
+        if (captureBtn.hasPointerCapture(pointerId)) {
+          captureBtn.releasePointerCapture(pointerId);
+        }
+      } catch (error) {
+        console.debug('capture pointer release failed', error);
+      }
+    }
+
+    function getGifCaptureFrameSize(sourceWidth, sourceHeight) {
+      const width = Math.max(1, Math.round(Number(sourceWidth) || 0));
+      const height = Math.max(1, Math.round(Number(sourceHeight) || 0));
+      const byDimension = GIF_CAPTURE_MAX_DIMENSION / Math.max(width, height);
+      const byPixels = Math.sqrt(GIF_CAPTURE_MAX_PIXELS / (width * height));
+      const scale = Math.min(1, byDimension, byPixels);
+      return {
+        width: Math.max(1, Math.round(width * scale)),
+        height: Math.max(1, Math.round(height * scale))
+      };
+    }
+
+    function ensureGifScratchCanvas(width, height) {
+      if (!gifScratchCanvas) {
+        gifScratchCanvas = document.createElement('canvas');
+      }
+      if (gifScratchCanvas.width !== width || gifScratchCanvas.height !== height) {
+        gifScratchCanvas.width = width;
+        gifScratchCanvas.height = height;
+      }
+      if (!gifScratchCtx) {
+        gifScratchCtx = gifScratchCanvas.getContext('2d', { willReadFrequently: true });
+      }
+      return Boolean(gifScratchCtx);
+    }
+
+    function rgbaToGif332Indices(rgbaPixels, outputIndices) {
+      const pixelCount = outputIndices.length;
+      for (let i = 0, offset = 0; i < pixelCount; i += 1, offset += 4) {
+        const alpha = rgbaPixels[offset + 3];
+        if (alpha < 16) {
+          outputIndices[i] = 0;
+          continue;
+        }
+        outputIndices[i] =
+          (rgbaPixels[offset] & 0xe0) |
+          ((rgbaPixels[offset + 1] & 0xe0) >> 3) |
+          ((rgbaPixels[offset + 2] & 0xc0) >> 6);
+      }
+    }
+
+    function convertComposedFrameToGifIndices(composedFrame, targetWidth, targetHeight) {
+      if (!composedFrame || !composedFrame.canvas || !ensureGifScratchCanvas(targetWidth, targetHeight)) {
+        return null;
+      }
+      gifScratchCtx.clearRect(0, 0, targetWidth, targetHeight);
+      gifScratchCtx.imageSmoothingEnabled = false;
+      gifScratchCtx.drawImage(
+        composedFrame.canvas,
+        0,
+        0,
+        composedFrame.width,
+        composedFrame.height,
+        0,
+        0,
+        targetWidth,
+        targetHeight
+      );
+      const imageData = gifScratchCtx.getImageData(0, 0, targetWidth, targetHeight);
+      const indexed = new Uint8Array(targetWidth * targetHeight);
+      rgbaToGif332Indices(imageData.data, indexed);
+      return indexed;
+    }
+
+    function captureGifIndexedFrame(session) {
+      if (!session || !session.width || !session.height) {
+        return null;
+      }
+      const composed = composeCaptureFrameCanvas({ pixelRatioCap: GIF_CAPTURE_PIXEL_RATIO_CAP });
+      if (!composed) {
+        return null;
+      }
+      return convertComposedFrameToGifIndices(composed, session.width, session.height);
+    }
+
+    function createGif332Palette() {
+      const palette = new Array(256);
+      let index = 0;
+      for (let r = 0; r < 8; r += 1) {
+        for (let g = 0; g < 8; g += 1) {
+          for (let b = 0; b < 4; b += 1) {
+            const rr = Math.round((r * 255) / 7);
+            const gg = Math.round((g * 255) / 7);
+            const bb = Math.round((b * 255) / 3);
+            palette[index++] = (rr << 16) | (gg << 8) | bb;
+          }
+        }
+      }
+      return palette;
+    }
+
+    function buildGifFromIndexedFrames(indexedFrames, width, height, frameDelayMs) {
+      if (!Array.isArray(indexedFrames) || !indexedFrames.length) {
+        throw new Error('No GIF frames');
+      }
+      const gifWidth = Math.max(1, Math.round(Number(width) || 0));
+      const gifHeight = Math.max(1, Math.round(Number(height) || 0));
+      if (!gifWidth || !gifHeight) {
+        throw new Error('Invalid GIF size');
+      }
+      const delayHundredths = Math.max(2, Math.round(Math.max(20, Number(frameDelayMs) || 0) / 10));
+      const writerBaseOptions = {
+        loop: 0,
+        palette: GIF_332_PALETTE
+      };
+      let bufferSize = Math.max(gifWidth * gifHeight * indexedFrames.length * 5 + 8192, 32768);
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const buffer = new Uint8Array(bufferSize);
+        try {
+          const writer = new GifWriter(buffer, gifWidth, gifHeight, writerBaseOptions);
+          indexedFrames.forEach((indexedPixels) => {
+            if (!(indexedPixels instanceof Uint8Array) || indexedPixels.length < gifWidth * gifHeight) {
+              throw new Error('Invalid GIF frame buffer');
+            }
+            writer.addFrame(0, 0, gifWidth, gifHeight, indexedPixels, {
+              delay: delayHundredths,
+              disposal: 0
+            });
+          });
+          const size = writer.end();
+          return buffer.slice(0, size);
+        } catch (error) {
+          if (attempt >= 4) {
+            throw error;
+          }
+          bufferSize *= 2;
+        }
+      }
+      throw new Error('Unable to encode GIF');
+    }
+
+    // GifWriter implementation adapted from https://github.com/deanm/omggif (MIT License).
+    function GifWriter(buf, width, height, gopts) {
+      let p = 0;
+
+      gopts = gopts === undefined ? {} : gopts;
+      const loopCount = gopts.loop === undefined ? null : gopts.loop;
+      const globalPalette = gopts.palette === undefined ? null : gopts.palette;
+
+      if (width <= 0 || height <= 0 || width > 65535 || height > 65535) {
+        throw new Error('Width/Height invalid.');
+      }
+
+      function checkPaletteAndNumColors(palette) {
+        let numColors = palette.length;
+        if (numColors < 2 || numColors > 256 || (numColors & (numColors - 1))) {
+          throw new Error('Invalid code/color length, must be power of 2 and 2 .. 256.');
+        }
+        return numColors;
+      }
+
+      buf[p++] = 0x47; buf[p++] = 0x49; buf[p++] = 0x46;
+      buf[p++] = 0x38; buf[p++] = 0x39; buf[p++] = 0x61;
+
+      let gpNumColorsPow2 = 0;
+      let background = 0;
+      if (globalPalette !== null) {
+        let gpNumColors = checkPaletteAndNumColors(globalPalette);
+        while (gpNumColors >>= 1) gpNumColorsPow2 += 1;
+        gpNumColors = 1 << gpNumColorsPow2;
+        gpNumColorsPow2 -= 1;
+        if (gopts.background !== undefined) {
+          background = gopts.background;
+          if (background >= gpNumColors) {
+            throw new Error('Background index out of range.');
+          }
+          if (background === 0) {
+            throw new Error('Background index explicitly passed as 0.');
+          }
+        }
+      }
+
+      buf[p++] = width & 0xff; buf[p++] = (width >> 8) & 0xff;
+      buf[p++] = height & 0xff; buf[p++] = (height >> 8) & 0xff;
+      buf[p++] = (globalPalette !== null ? 0x80 : 0) | gpNumColorsPow2;
+      buf[p++] = background;
+      buf[p++] = 0;
+
+      if (globalPalette !== null) {
+        for (let i = 0, il = globalPalette.length; i < il; ++i) {
+          const rgb = globalPalette[i];
+          buf[p++] = (rgb >> 16) & 0xff;
+          buf[p++] = (rgb >> 8) & 0xff;
+          buf[p++] = rgb & 0xff;
+        }
+      }
+
+      if (loopCount !== null) {
+        if (loopCount < 0 || loopCount > 65535) {
+          throw new Error('Loop count invalid.');
+        }
+        buf[p++] = 0x21; buf[p++] = 0xff; buf[p++] = 0x0b;
+        buf[p++] = 0x4e; buf[p++] = 0x45; buf[p++] = 0x54; buf[p++] = 0x53;
+        buf[p++] = 0x43; buf[p++] = 0x41; buf[p++] = 0x50; buf[p++] = 0x45;
+        buf[p++] = 0x32; buf[p++] = 0x2e; buf[p++] = 0x30;
+        buf[p++] = 0x03; buf[p++] = 0x01;
+        buf[p++] = loopCount & 0xff; buf[p++] = (loopCount >> 8) & 0xff;
+        buf[p++] = 0x00;
+      }
+
+      let ended = false;
+
+      this.addFrame = function addFrame(x, y, w, h, indexedPixels, opts) {
+        if (ended === true) {
+          p -= 1;
+          ended = false;
+        }
+
+        opts = opts === undefined ? {} : opts;
+
+        if (x < 0 || y < 0 || x > 65535 || y > 65535) {
+          throw new Error('x/y invalid.');
+        }
+        if (w <= 0 || h <= 0 || w > 65535 || h > 65535) {
+          throw new Error('Width/Height invalid.');
+        }
+        if (indexedPixels.length < w * h) {
+          throw new Error('Not enough pixels for the frame size.');
+        }
+
+        let usingLocalPalette = true;
+        let palette = opts.palette;
+        if (palette === undefined || palette === null) {
+          usingLocalPalette = false;
+          palette = globalPalette;
+        }
+        if (palette === undefined || palette === null) {
+          throw new Error('Must supply either a local or global palette.');
+        }
+
+        let numColors = checkPaletteAndNumColors(palette);
+        let minCodeSize = 0;
+        while (numColors >>= 1) minCodeSize += 1;
+        numColors = 1 << minCodeSize;
+
+        const delay = opts.delay === undefined ? 0 : opts.delay;
+        const disposal = opts.disposal === undefined ? 0 : opts.disposal;
+        if (disposal < 0 || disposal > 3) {
+          throw new Error('Disposal out of range.');
+        }
+
+        let useTransparency = false;
+        let transparentIndex = 0;
+        if (opts.transparent !== undefined && opts.transparent !== null) {
+          useTransparency = true;
+          transparentIndex = opts.transparent;
+          if (transparentIndex < 0 || transparentIndex >= numColors) {
+            throw new Error('Transparent color index.');
+          }
+        }
+
+        if (disposal !== 0 || useTransparency || delay !== 0) {
+          buf[p++] = 0x21; buf[p++] = 0xf9;
+          buf[p++] = 4;
+          buf[p++] = (disposal << 2) | (useTransparency === true ? 1 : 0);
+          buf[p++] = delay & 0xff; buf[p++] = (delay >> 8) & 0xff;
+          buf[p++] = transparentIndex;
+          buf[p++] = 0;
+        }
+
+        buf[p++] = 0x2c;
+        buf[p++] = x & 0xff; buf[p++] = (x >> 8) & 0xff;
+        buf[p++] = y & 0xff; buf[p++] = (y >> 8) & 0xff;
+        buf[p++] = w & 0xff; buf[p++] = (w >> 8) & 0xff;
+        buf[p++] = h & 0xff; buf[p++] = (h >> 8) & 0xff;
+        buf[p++] = usingLocalPalette === true ? (0x80 | (minCodeSize - 1)) : 0;
+
+        if (usingLocalPalette === true) {
+          for (let i = 0, il = palette.length; i < il; ++i) {
+            const rgb = palette[i];
+            buf[p++] = (rgb >> 16) & 0xff;
+            buf[p++] = (rgb >> 8) & 0xff;
+            buf[p++] = rgb & 0xff;
+          }
+        }
+
+        p = GifWriterOutputLZWCodeStream(buf, p, minCodeSize < 2 ? 2 : minCodeSize, indexedPixels);
+        return p;
+      };
+
+      this.end = function end() {
+        if (ended === false) {
+          buf[p++] = 0x3b;
+          ended = true;
+        }
+        return p;
+      };
+    }
+
+    function GifWriterOutputLZWCodeStream(buf, p, minCodeSize, indexStream) {
+      buf[p++] = minCodeSize;
+      let curSubblock = p++;
+
+      const clearCode = 1 << minCodeSize;
+      const codeMask = clearCode - 1;
+      const eoiCode = clearCode + 1;
+      let nextCode = eoiCode + 1;
+
+      let curCodeSize = minCodeSize + 1;
+      let curShift = 0;
+      let cur = 0;
+
+      function emitBytesToBuffer(bitBlockSize) {
+        while (curShift >= bitBlockSize) {
+          buf[p++] = cur & 0xff;
+          cur >>= 8;
+          curShift -= 8;
+          if (p === curSubblock + 256) {
+            buf[curSubblock] = 255;
+            curSubblock = p++;
+          }
+        }
+      }
+
+      function emitCode(c) {
+        cur |= c << curShift;
+        curShift += curCodeSize;
+        emitBytesToBuffer(8);
+      }
+
+      let ibCode = indexStream[0] & codeMask;
+      let codeTable = {};
+
+      emitCode(clearCode);
+
+      for (let i = 1, il = indexStream.length; i < il; ++i) {
+        const k = indexStream[i] & codeMask;
+        const curKey = (ibCode << 8) | k;
+        const curCode = codeTable[curKey];
+
+        if (curCode === undefined) {
+          cur |= ibCode << curShift;
+          curShift += curCodeSize;
+          while (curShift >= 8) {
+            buf[p++] = cur & 0xff;
+            cur >>= 8;
+            curShift -= 8;
+            if (p === curSubblock + 256) {
+              buf[curSubblock] = 255;
+              curSubblock = p++;
+            }
+          }
+
+          if (nextCode === 4096) {
+            emitCode(clearCode);
+            nextCode = eoiCode + 1;
+            curCodeSize = minCodeSize + 1;
+            codeTable = {};
+          } else {
+            if (nextCode >= (1 << curCodeSize)) {
+              curCodeSize += 1;
+            }
+            codeTable[curKey] = nextCode++;
+          }
+
+          ibCode = k;
+        } else {
+          ibCode = curCode;
+        }
+      }
+
+      emitCode(ibCode);
+      emitCode(eoiCode);
+      emitBytesToBuffer(1);
+
+      if (curSubblock + 1 === p) {
+        buf[curSubblock] = 0;
+      } else {
+        buf[curSubblock] = p - curSubblock - 1;
+        buf[p++] = 0;
+      }
+      return p;
+    }
+
+    function startGifCaptureSession() {
+      if (captureInProgress || (gifCaptureSession && gifCaptureSession.active)) {
+        return false;
+      }
+      if (!cameraReady || !state.stream || !video || video.readyState < 2) {
+        setStatus('カメラの準備が完了してからGIF撮影してください');
+        return false;
+      }
+      const firstComposed = composeCaptureFrameCanvas({ pixelRatioCap: GIF_CAPTURE_PIXEL_RATIO_CAP });
+      if (!firstComposed) {
+        setStatus('GIF撮影を開始できませんでした');
+        return false;
+      }
+      const frameSize = getGifCaptureFrameSize(firstComposed.width, firstComposed.height);
+      const firstFrame = convertComposedFrameToGifIndices(firstComposed, frameSize.width, frameSize.height);
+      if (!firstFrame) {
+        setStatus('GIF撮影を開始できませんでした');
+        return false;
+      }
+      captureInProgress = true;
+      const now = performance.now();
+      const session = {
+        active: true,
+        startedAt: now,
+        lastFrameAt: now,
+        frameDelayMs: GIF_CAPTURE_FRAME_INTERVAL_MS,
+        width: frameSize.width,
+        height: frameSize.height,
+        frames: [firstFrame],
+        rafId: 0
+      };
+      gifCaptureSession = session;
+      if (captureBtn) {
+        captureBtn.setAttribute('aria-busy', 'true');
+      }
+      setCaptureButtonRecording(true);
+      const maxSeconds = (GIF_CAPTURE_MAX_DURATION_MS / 1000).toFixed(1);
+      setStatus(`GIF撮影中… ボタンを離すと保存（最大${maxSeconds}秒）`);
+
+      const tick = (timestamp) => {
+        if (!session.active) {
+          return;
+        }
+        if (timestamp - session.startedAt >= GIF_CAPTURE_MAX_DURATION_MS) {
+          suppressCaptureClickOnce = true;
+          void stopGifCaptureSession({ reason: 'timeout' });
+          return;
+        }
+        if (timestamp - session.lastFrameAt >= session.frameDelayMs) {
+          const frame = captureGifIndexedFrame(session);
+          session.lastFrameAt = timestamp;
+          if (!frame) {
+            void stopGifCaptureSession({ cancelled: true, reason: 'capture-error' });
+            return;
+          }
+          session.frames.push(frame);
+        }
+        session.rafId = window.requestAnimationFrame(tick);
+      };
+      session.rafId = window.requestAnimationFrame(tick);
+      return true;
+    }
+
+    async function stopGifCaptureSession({ cancelled = false, reason = 'release' } = {}) {
+      const session = gifCaptureSession;
+      if (!session || !session.active) {
+        return false;
+      }
+      session.active = false;
+      if (session.rafId) {
+        window.cancelAnimationFrame(session.rafId);
+      }
+      gifCaptureSession = null;
+      setCaptureButtonRecording(false);
+      if (captureBtn) {
+        captureBtn.disabled = true;
+        captureBtn.setAttribute('aria-busy', 'true');
+      }
+      try {
+        if (cancelled) {
+          setStatus('GIF撮影をキャンセルしました');
+          return false;
+        }
+        if (!Array.isArray(session.frames) || session.frames.length < GIF_CAPTURE_MIN_FRAMES) {
+          setStatus('長押し時間が短いためGIFを保存しませんでした');
+          return false;
+        }
+        const gifBytes = buildGifFromIndexedFrames(session.frames, session.width, session.height, session.frameDelayMs);
+        const gifBlob = new Blob([gifBytes], { type: 'image/gif' });
+        const result = {
+          blob: gifBlob,
+          dataUrl: null,
+          width: session.width,
+          height: session.height,
+          cssWidth: session.width,
+          cssHeight: session.height
+        };
+        const filename = getCaptureFilename('gif');
+        const saved = await deliverCaptureResult(result, filename, {
+          formatLabel: 'GIF',
+          mimeType: 'image/gif',
+          enableDrawImport: false,
+          autoShareOnIOS: false
+        });
+        if (!saved) {
+          setStatus('GIFを保存できませんでした');
+          return false;
+        }
+        const durationSeconds = (session.frames.length * session.frameDelayMs / 1000).toFixed(1);
+        if (reason === 'timeout') {
+          setStatus(`GIFを保存しました: ${session.width}×${session.height}px / ${durationSeconds}s（上限で自動停止）`);
+        } else {
+          setStatus(`GIFを保存しました: ${session.width}×${session.height}px / ${durationSeconds}s`);
+        }
+        return true;
+      } catch (error) {
+        console.error(error);
+        setStatus('GIF撮影に失敗しました');
+        return false;
+      } finally {
+        captureInProgress = false;
+        if (captureBtn) {
+          captureBtn.disabled = false;
+          captureBtn.removeAttribute('aria-busy');
+        }
+      }
+    }
+
+    function handleCapturePointerDown(event) {
+      if (!captureBtn) {
+        return;
+      }
+      if (event.pointerType === 'mouse' && event.button !== 0) {
+        return;
+      }
+      if (captureInProgress) {
+        return;
+      }
+      const pointerId = event.pointerId;
+      capturePressActive = true;
+      capturePressTriggered = false;
+      capturePressPointerId = pointerId;
+      clearCaptureLongPressTimer();
+      if (typeof captureBtn.setPointerCapture === 'function') {
+        try {
+          captureBtn.setPointerCapture(pointerId);
+        } catch (error) {
+          console.debug('capture pointer lock failed', error);
+        }
+      }
+      captureLongPressTimer = window.setTimeout(() => {
+        captureLongPressTimer = null;
+        if (!capturePressActive || capturePressPointerId !== pointerId) {
+          return;
+        }
+        capturePressTriggered = true;
+        suppressCaptureClickOnce = true;
+        closeAllMenus();
+        const started = startGifCaptureSession();
+        if (!started) {
+          capturePressTriggered = false;
+        }
+      }, CAPTURE_LONG_PRESS_MS);
+    }
+
+    async function finishCapturePointer(event, options = {}) {
+      if (!capturePressActive) {
+        return;
+      }
+      if (event && Number.isFinite(event.pointerId) && capturePressPointerId !== null && event.pointerId !== capturePressPointerId) {
+        return;
+      }
+      const pointerId = capturePressPointerId;
+      const triggered = capturePressTriggered;
+      clearCaptureLongPressTimer();
+      capturePressActive = false;
+      capturePressTriggered = false;
+      capturePressPointerId = null;
+      releaseCapturePointer(pointerId);
+      if (triggered) {
+        suppressCaptureClickOnce = true;
+        await stopGifCaptureSession({
+          cancelled: Boolean(options.cancelled),
+          reason: typeof options.reason === 'string' ? options.reason : 'release'
+        });
+      }
+    }
+
     async function handleCaptureAction() {
       if (captureInProgress) {
         return;
@@ -8377,6 +9060,7 @@
         return;
       }
       captureInProgress = true;
+      setCaptureButtonRecording(false);
       if (captureBtn) {
         captureBtn.disabled = true;
         captureBtn.setAttribute('aria-busy', 'true');
@@ -8387,7 +9071,7 @@
           setStatus('撮影に失敗しました');
           return;
         }
-        const filename = getCaptureFilename();
+        const filename = getCaptureFilename('png');
         const saved = await deliverCaptureResult(result, filename);
         if (!saved) {
           setStatus('撮影データを保存できませんでした');
@@ -8407,12 +9091,57 @@
     }
 
     if (captureBtn) {
+      captureBtn.addEventListener('pointerdown', (event) => {
+        event.stopPropagation();
+        handleCapturePointerDown(event);
+      });
+      captureBtn.addEventListener('pointerup', (event) => {
+        event.stopPropagation();
+        void finishCapturePointer(event, { reason: 'release' });
+      });
+      captureBtn.addEventListener('pointercancel', (event) => {
+        event.stopPropagation();
+        void finishCapturePointer(event, { cancelled: true, reason: 'cancel' });
+      });
+      captureBtn.addEventListener('lostpointercapture', (event) => {
+        if (!capturePressActive) {
+          return;
+        }
+        void finishCapturePointer(event, { cancelled: Boolean(capturePressTriggered), reason: 'lost-capture' });
+      });
+      captureBtn.addEventListener('contextmenu', (event) => {
+        if (capturePressActive || (gifCaptureSession && gifCaptureSession.active)) {
+          event.preventDefault();
+        }
+      });
       captureBtn.addEventListener('click', async (event) => {
         event.stopPropagation();
+        if (suppressCaptureClickOnce) {
+          suppressCaptureClickOnce = false;
+          event.preventDefault();
+          return;
+        }
+        if (gifCaptureSession && gifCaptureSession.active) {
+          event.preventDefault();
+          return;
+        }
         closeAllMenus();
         await handleCaptureAction();
       });
     }
+
+    window.addEventListener('blur', () => {
+      clearCaptureLongPressTimer();
+      const pointerId = capturePressPointerId;
+      capturePressActive = false;
+      capturePressTriggered = false;
+      capturePressPointerId = null;
+      releaseCapturePointer(pointerId);
+      if (gifCaptureSession && gifCaptureSession.active) {
+        suppressCaptureClickOnce = true;
+        void stopGifCaptureSession({ cancelled: true, reason: 'window-blur' });
+      }
+    });
 
     aspectButtons.forEach((button) => {
       button.addEventListener('click', () => {
