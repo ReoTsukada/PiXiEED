@@ -138,16 +138,6 @@
 </button>
 </div>
   <div class="rail-tabpanes" id="leftRailPanes"></div>
-  <div class="rail-ad" id="leftRailAd" aria-hidden="false">
-    <div class="ad-box" id="leftRailAdSlot">
-      <ins class="ad-seed"
-           style="display:block"
-           data-ad-client="ca-pub-9801602250480253"
-           data-ad-slot="3806415737"
-           data-ad-format="auto"
-           data-full-width-responsive="true"></ins>
-    </div>
-  </div>
 <button aria-label="左パネルの幅を変更" class="rail-resizer rail-resizer--left" id="resizeLeftRail" type="button"></button>
 </aside>
 <main aria-label="ドットキャンバス" class="stage" id="stage">
@@ -187,16 +177,6 @@
 </button>
 </div>
   <div class="rail-tabpanes" id="rightRailPanes"></div>
-  <div class="rail-ad" id="rightRailAd" aria-hidden="false">
-    <div class="ad-box" id="rightRailAdSlot">
-      <ins class="ad-seed"
-           style="display:block"
-           data-ad-client="ca-pub-9801602250480253"
-           data-ad-slot="1180252398"
-           data-ad-format="auto"
-           data-full-width-responsive="true"></ins>
-    </div>
-  </div>
 <button aria-label="右パネルの幅を変更" class="rail-resizer rail-resizer--right" id="resizeRightRail" type="button"></button>
 </aside>
 </div>
@@ -315,6 +295,13 @@
 <output for="brushSize" id="brushSizeValue">1px</output>
 </label>
 </div>
+<div class="panel-ad-mount" data-panel-ad-mount="left">
+<div aria-label="広告" class="panel-ad" id="leftPanelAd">
+<div class="ad-box" id="leftPanelAdSlot">
+<ins class="ad-seed" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="3806415737" data-full-width-responsive="true" style="display:block"></ins>
+</div>
+</div>
+</div>
 </div>
 </section>
 <section class="panel-section" data-section="color" id="panelColor">
@@ -336,8 +323,9 @@
 </div>
 <div class="palette-hsv" id="paletteHsvControls">
 <div class="palette-wheel" id="paletteWheelWrapper">
-<canvas aria-label="色相環" height="220" id="paletteColorWheel" width="220"></canvas>
-<div class="palette-wheel__cursor" id="paletteWheelCursor"></div>
+<canvas aria-label="HueリングとSVマップ" height="220" id="paletteColorWheel" width="220"></canvas>
+<div class="palette-wheel__cursor palette-wheel__cursor--hue" id="paletteWheelCursor"></div>
+<div class="palette-wheel__cursor palette-wheel__cursor--sv" id="paletteSvCursor"></div>
 </div>
 <div class="palette-sliders">
 <label class="palette-slider-row" for="paletteHue">
@@ -364,6 +352,7 @@
 </div>
 </div>
 </div>
+<div class="panel-ad-mount" data-panel-ad-mount="left"></div>
 </div>
 </section>
 <section class="panel-section" data-section="frames" id="panelFrames">
@@ -405,6 +394,13 @@
 </div>
 </div>
 </div>
+<div class="panel-ad-mount" data-panel-ad-mount="right">
+<div aria-label="広告" class="panel-ad" id="rightPanelAd">
+<div class="ad-box" id="rightPanelAdSlot">
+<ins class="ad-seed" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="1180252398" data-full-width-responsive="true" style="display:block"></ins>
+</div>
+</div>
+</div>
 </div>
 </section>
 <section class="panel-section" data-section="file" id="panelFile">
@@ -423,6 +419,7 @@
 <span id="memoryUsage">メモリ: 計測中…</span>
 <button class="chip" id="memoryClear" type="button">メモリ削除</button>
 </div>
+<div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 </div>
 </section>
 <section class="panel-section" data-section="pixfind" id="panelPixfind">
@@ -433,6 +430,7 @@
 <p aria-live="polite" class="help-text" id="pixfindActionReason"></p>
 <p class="help-text">PiXFiNDモードON時は「フレーム1=原本」「フレーム2=差分」で送信します。ONにするたびフレーム2はフレーム1から作り直されます。</p>
 </div>
+<div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 </div>
 </section>
 <section class="panel-section" data-section="settings" id="panelSettings">
@@ -522,6 +520,7 @@
 </div>
 <button aria-pressed="false" class="chip" id="toggleBackgroundMode" type="button">背景</button>
 </div>
+<div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 </div>
 </section>
 </div>
@@ -646,7 +645,6 @@
       })();
     </script>
 <script defer="" src="assets/js/app.js"></script>
-</script>
   <!-- Mobile bottom ad placeholder (visible in portrait / small screens) -->
   <div id="mobileBottomAd" aria-hidden="false">
     <div class="mobile-ad-box" id="mobileBottomAdSlot">
@@ -663,10 +661,6 @@
       // Show mobile bottom ad when the active tool/settings panel (mobile or rail) is scrolled to bottom.
       const mobileAd = document.getElementById('mobileBottomAd');
       const mobilePanels = document.getElementById('mobilePanels');
-      const leftRail = document.getElementById('leftRail');
-      const rightRail = document.getElementById('rightRail');
-      const leftRailAd = document.getElementById('leftRailAd');
-      const rightRailAd = document.getElementById('rightRailAd');
       if (!mobileAd) return;
 
   const mql = window.matchMedia('(orientation: portrait)');
@@ -711,41 +705,6 @@
         return set;
       }
 
-      function setRailAdVisible(adEl, visible) {
-        if (!(adEl instanceof HTMLElement)) return;
-        const nextHidden = !visible;
-        const nextAria = visible ? 'false' : 'true';
-        if (adEl.hidden !== nextHidden) {
-          adEl.hidden = nextHidden;
-        }
-        if (adEl.getAttribute('aria-hidden') !== nextAria) {
-          adEl.setAttribute('aria-hidden', nextAria);
-        }
-      }
-
-      function shouldShowLeftRailAd() {
-        if (!(leftRail instanceof HTMLElement) || !(leftRailAd instanceof HTMLElement)) return false;
-        if (mql.matches) return false;
-        if (leftRail.dataset.collapsed === 'true') return false;
-        if (leftRail.dataset.compact === 'true') return false;
-        // In landscape / non-portrait, keep rail ads visible whenever the rail is not collapsed.
-        return true;
-      }
-
-      function shouldShowRightRailAd() {
-        if (!(rightRail instanceof HTMLElement) || !(rightRailAd instanceof HTMLElement)) return false;
-        if (mql.matches) return false;
-        if (rightRail.dataset.collapsed === 'true') return false;
-        if (rightRail.dataset.compact === 'true') return false;
-        // In landscape / non-portrait, keep rail ads visible whenever the rail is not collapsed.
-        return true;
-      }
-
-      function updateRailAdsVisibility() {
-        setRailAdVisible(leftRailAd, shouldShowLeftRailAd());
-        setRailAdVisible(rightRailAd, shouldShowRightRailAd());
-      }
-
       function onScrollDebounced() {
         if (raf) cancelAnimationFrame(raf);
         raf = requestAnimationFrame(function () {
@@ -779,8 +738,6 @@
             hideAd();
           }
 
-          updateRailAdsVisibility();
-
           raf = null;
         });
       }
@@ -798,7 +755,6 @@
         });
         // immediate check
         onScrollDebounced();
-        updateRailAdsVisibility();
       }
 
       // observe body for active-panel changes and refresh listeners
@@ -818,18 +774,77 @@
     })();
   </script>
   <script>
+    (function initPanelAdDocking() {
+      const ads = {
+        left: document.getElementById('leftPanelAd'),
+        right: document.getElementById('rightPanelAd'),
+      };
+      const sideSections = {
+        left: ['panelTools', 'panelColor'],
+        right: ['panelFrames', 'panelSettings', 'panelFile', 'panelPixfind'],
+      };
+      if (!(ads.left instanceof HTMLElement) && !(ads.right instanceof HTMLElement)) return;
+
+      function findMount(side) {
+        const ids = sideSections[side] || [];
+        let fallback = null;
+        for (const id of ids) {
+          const section = document.getElementById(id);
+          if (!(section instanceof HTMLElement)) continue;
+          const mount = section.querySelector(`[data-panel-ad-mount="${side}"]`);
+          if (!(mount instanceof HTMLElement)) continue;
+          if (!fallback) fallback = mount;
+          if (section.classList.contains('is-active') && !section.hidden) {
+            return mount;
+          }
+        }
+        return fallback;
+      }
+
+      function dock(side) {
+        const ad = ads[side];
+        if (!(ad instanceof HTMLElement)) return;
+        const mount = findMount(side);
+        if (!(mount instanceof HTMLElement)) return;
+        if (ad.parentElement !== mount) {
+          mount.appendChild(ad);
+        }
+      }
+
+      function refresh() {
+        dock('left');
+        dock('right');
+      }
+
+      const observer = new MutationObserver(refresh);
+      observer.observe(document.body, {
+        attributes: true,
+        attributeFilter: ['class', 'hidden'],
+        childList: true,
+        subtree: true,
+      });
+      window.addEventListener('resize', refresh);
+      if (document.readyState === 'complete') {
+        refresh();
+      } else {
+        window.addEventListener('load', refresh, { once: true });
+      }
+      refresh();
+    })();
+  </script>
+  <script>
     // AdSense injector: insert real AdSense slots into known containers and trigger rendering.
     (function initAds() {
       if (!document || !window) return;
       // If the global adsbygoogle script is not present yet, it will still be available when loaded in <head>.
       const ADS_CLIENT = 'ca-pub-9801602250480253';
       const baseSlots = [
-        { containerId: 'leftRailAdSlot', slot: '3806415737' },
-        { containerId: 'rightRailAdSlot', slot: '1180252398' },
+        { containerId: 'leftPanelAdSlot', slot: '3806415737' },
+        { containerId: 'rightPanelAdSlot', slot: '1180252398' },
         { containerId: 'mobileBottomAdSlot', slot: '6568310446' }
       ];
       const SLOTS = baseSlots;
-      const MIN_RAIL_AD_WIDTH = 120;
+      const MIN_SIDE_AD_WIDTH = 1;
 
       function isMobileBottomSlot(container) {
         if (!container) return false;
@@ -889,8 +904,8 @@
           } catch (e) {
             width = container.clientWidth || container.offsetWidth || 0;
           }
-          const isRailSlot = container.id === 'leftRailAdSlot' || container.id === 'rightRailAdSlot';
-          const minWidth = isRailSlot ? MIN_RAIL_AD_WIDTH : 1;
+          const isSideSlot = container.id !== 'mobileBottomAdSlot';
+          const minWidth = isSideSlot ? MIN_SIDE_AD_WIDTH : 1;
           if (width < minWidth) {
             console.debug('[pixiedraw] skip ads push: container width not ready', container.id || container, width, 'required', minWidth);
             try {
@@ -939,8 +954,8 @@
         };
         const hasWidth = () => {
           const w = getWidth();
-          const isRailSlot = container.id === 'leftRailAdSlot' || container.id === 'rightRailAdSlot';
-          if (isRailSlot) return w >= MIN_RAIL_AD_WIDTH;
+          const isSideSlot = container.id !== 'mobileBottomAdSlot';
+          if (isSideSlot) return w >= MIN_SIDE_AD_WIDTH;
           try {
             return w > 0;
           } catch (e) {
@@ -958,10 +973,7 @@
               try {
                 const w = getWidth();
                 if (w > 0) {
-                  if (!isMobileBottomSlot(container)) {
-                    ins.style.width = w + 'px';
-                    ins.style.maxWidth = '100%';
-                  }
+                  ins.style.maxWidth = '100%';
                 }
               } catch (e) {}
               container.innerHTML = '';
@@ -1010,10 +1022,7 @@
                       try {
                         const w = getWidth();
                         if (w > 0) {
-                          if (!isMobileBottomSlot(container)) {
-                            ins.style.width = w + 'px';
-                            ins.style.maxWidth = '100%';
-                          }
+                          ins.style.maxWidth = '100%';
                         }
                       } catch (e) {}
                       container.innerHTML = '';
