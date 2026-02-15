@@ -84,7 +84,6 @@
       paletteAlphaValue: document.getElementById('paletteAlphaValue'),
       paletteWheel: /** @type {HTMLCanvasElement|null} */ (document.getElementById('paletteColorWheel')),
       paletteWheelCursor: document.getElementById('paletteWheelCursor'),
-      palettePreview: document.getElementById('palettePreview'),
       timelineMatrix: document.getElementById('timelineMatrix'),
       addLayer: document.getElementById('addLayer'),
       removeLayer: document.getElementById('removeLayer'),
@@ -634,6 +633,8 @@
   let compactToolFlyoutPositionBound = false;
   let compactRightFlyoutDismissBound = false;
   let compactRightFlyoutPositionBound = false;
+  let compactToolFlyoutLockedLeft = null;
+  let compactRightFlyoutLockedLeft = null;
   const mobileToolGridPortal = {
     active: false,
     parent: null,
@@ -2256,6 +2257,7 @@
   }
 
   function clearCompactRightFlyoutPosition() {
+    compactRightFlyoutLockedLeft = null;
     clearCompactRightFlyoutStyles();
     ensureCompactRightFlyoutPortal(false);
   }
@@ -2273,8 +2275,13 @@
       return;
     }
     const railRect = dom.rightRail.getBoundingClientRect();
-    const viewportBounds = getViewportBounds();
-    const safeArea = getSafeAreaInsets();
+    const viewportBounds = getLayoutViewportBounds();
+    const safeArea = {
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+    };
     const edgePadding = 8;
     const safeLeft = viewportBounds.left + safeArea.left;
     const safeTop = viewportBounds.top + safeArea.top;
@@ -2282,11 +2289,18 @@
     const safeBottom = viewportBounds.bottom - safeArea.bottom;
     const safeWidth = Math.max(1, safeRight - safeLeft);
     let width = clamp(Math.round(safeWidth * 0.34), 260, 460);
-    let left = Math.round(railRect.left - width - 10);
-    if (left < safeLeft + edgePadding) {
-      left = safeLeft + edgePadding;
-      width = Math.max(220, Math.min(width, safeRight - left - edgePadding));
+    const minLeft = safeLeft + edgePadding;
+    let computedLeft = Math.round(railRect.left - width - 10);
+    if (computedLeft < minLeft) {
+      computedLeft = minLeft;
+      width = Math.max(220, Math.min(width, safeRight - computedLeft - edgePadding));
     }
+    const maxLeft = Math.max(minLeft, Math.round(safeRight - width - edgePadding));
+    const preferredLeft = Number.isFinite(compactRightFlyoutLockedLeft)
+      ? compactRightFlyoutLockedLeft
+      : computedLeft;
+    const left = clamp(Math.round(preferredLeft), minLeft, maxLeft);
+    compactRightFlyoutLockedLeft = left;
     let top = clamp(
       Math.round(railRect.top + 8),
       safeTop + edgePadding,
@@ -2385,6 +2399,19 @@
       window.addEventListener('resize', updateCompactRightFlyoutPosition, { passive: true });
       window.addEventListener('scroll', updateCompactRightFlyoutPosition, true);
       dom.rightRail?.addEventListener('scroll', updateCompactRightFlyoutPosition, { passive: true });
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', updateCompactRightFlyoutPosition, { passive: true });
+        window.visualViewport.addEventListener('scroll', updateCompactRightFlyoutPosition, { passive: true });
+      }
+      dom.rightRail?.addEventListener('transitionend', event => {
+        if (!(event instanceof TransitionEvent)) {
+          updateCompactRightFlyoutPosition();
+          return;
+        }
+        if (event.propertyName === 'width' || event.propertyName === 'padding' || event.propertyName === 'gap') {
+          updateCompactRightFlyoutPosition();
+        }
+      });
     }
     setCompactRightFlyoutOpen(false);
     updateRightTabUI();
@@ -2526,6 +2553,19 @@
       window.addEventListener('resize', updateCompactToolFlyoutPosition, { passive: true });
       window.addEventListener('scroll', updateCompactToolFlyoutPosition, true);
       dom.leftRail?.addEventListener('scroll', updateCompactToolFlyoutPosition, { passive: true });
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', updateCompactToolFlyoutPosition, { passive: true });
+        window.visualViewport.addEventListener('scroll', updateCompactToolFlyoutPosition, { passive: true });
+      }
+      dom.leftRail?.addEventListener('transitionend', event => {
+        if (!(event instanceof TransitionEvent)) {
+          updateCompactToolFlyoutPosition();
+          return;
+        }
+        if (event.propertyName === 'width' || event.propertyName === 'padding' || event.propertyName === 'gap') {
+          updateCompactToolFlyoutPosition();
+        }
+      });
     }
     setCompactToolFlyoutOpen(false);
     updateToolGroupButtons();
@@ -2608,6 +2648,7 @@
     if (!(dom.toolGrid instanceof HTMLElement)) {
       return;
     }
+    compactToolFlyoutLockedLeft = null;
     dom.toolGrid.style.removeProperty('position');
     dom.toolGrid.style.removeProperty('left');
     dom.toolGrid.style.removeProperty('top');
@@ -2638,8 +2679,15 @@
     }
     const isMobileCompact = layoutMode === 'mobilePortrait';
     const anchorRect = anchor.getBoundingClientRect();
-    const viewportBounds = getViewportBounds();
-    const safeArea = getSafeAreaInsets();
+    const viewportBounds = isMobileCompact ? getViewportBounds() : getLayoutViewportBounds();
+    const safeArea = isMobileCompact
+      ? getSafeAreaInsets()
+      : {
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+      };
     const edgePadding = 8;
     const safeLeft = viewportBounds.left + safeArea.left;
     const safeTop = viewportBounds.top + safeArea.top;
@@ -2651,6 +2699,7 @@
     let maxHeight;
 
     if (isMobileCompact) {
+      compactToolFlyoutLockedLeft = null;
       ensureMobileToolGridPortal(true, { mobilePeek: true });
       const activeTools = TOOL_GROUPS[state.activeToolGroup]?.tools || [];
       const toolCount = Math.max(1, activeTools.length);
@@ -2686,15 +2735,22 @@
     } else {
       ensureMobileToolGridPortal(true, { mobilePeek: false });
       dom.toolGrid.style.removeProperty('grid-template-columns');
+      const railRect = dom.leftRail instanceof HTMLElement ? dom.leftRail.getBoundingClientRect() : null;
       const railWidth = Math.max(68, dom.leftRail?.offsetWidth || 78);
       flyoutWidth = clamp(Math.round(railWidth - 16), 64, 96);
-      left = Math.round(anchorRect.right + 10);
+      let computedLeft = railRect ? Math.round(railRect.right + 8) : Math.round(anchorRect.right + 10);
       const minLeft = Math.round(safeLeft + edgePadding);
       const maxRight = Math.round(safeRight - edgePadding);
-      if (left + flyoutWidth > maxRight) {
-        left = Math.max(minLeft, Math.round(anchorRect.left - 10 - flyoutWidth));
+      if (computedLeft + flyoutWidth > maxRight) {
+        const fallbackAnchorLeft = railRect ? railRect.left : anchorRect.left;
+        computedLeft = Math.max(minLeft, Math.round(fallbackAnchorLeft - 10 - flyoutWidth));
       }
-      left = clamp(left, minLeft, Math.max(minLeft, maxRight - flyoutWidth));
+      const maxLeft = Math.max(minLeft, maxRight - flyoutWidth);
+      const preferredLeft = Number.isFinite(compactToolFlyoutLockedLeft)
+        ? compactToolFlyoutLockedLeft
+        : computedLeft;
+      left = clamp(Math.round(preferredLeft), minLeft, maxLeft);
+      compactToolFlyoutLockedLeft = left;
       top = clamp(
         Math.round(anchorRect.top),
         Math.round(safeTop + edgePadding),
@@ -8891,6 +8947,19 @@
     };
   }
 
+  function getLayoutViewportBounds() {
+    const width = Math.max(0, Math.round(Number(window.innerWidth) || 0));
+    const height = Math.max(0, Math.round(Number(window.innerHeight) || 0));
+    return {
+      left: 0,
+      top: 0,
+      width,
+      height,
+      right: width,
+      bottom: height,
+    };
+  }
+
   function getSafeAreaInsets() {
     const root = document.documentElement;
     if (!(root instanceof HTMLElement) || typeof window.getComputedStyle !== 'function') {
@@ -10283,12 +10352,7 @@
   }
 
   function updatePalettePreview() {
-    const preview = dom.controls.palettePreview;
-    if (!preview) return;
     const rgba = hsvToRgba(paletteEditorState.hsv.h, paletteEditorState.hsv.s, paletteEditorState.hsv.v);
-    const alpha = clamp(paletteEditorState.hsv.a, 0, 255) / 255;
-    preview.style.setProperty('--palette-preview-color', `rgba(${rgba.r}, ${rgba.g}, ${rgba.b}, ${alpha.toFixed(3)})`);
-    preview.classList.toggle('is-filled', paletteEditorState.hsv.a > 0);
     const saturationSlider = dom.controls.paletteSaturation;
     if (saturationSlider) {
       const startColor = hsvToRgba(paletteEditorState.hsv.h, 0, paletteEditorState.hsv.v);
