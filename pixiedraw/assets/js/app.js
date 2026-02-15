@@ -801,6 +801,7 @@
       colorMode: 'index',
       palette,
       activePaletteIndex: 2,
+      secondaryPaletteIndex: 3,
       activeRgb: { r: 88, g: 196, b: 255, a: 255 },
       frames,
       activeFrame: 0,
@@ -880,6 +881,7 @@
       preview: null,
       selectionPreview: null,
       selectionMove: null,
+      drawPaletteIndex: null,
       selectionClearedOnDown: false,
       startClient: null,
       panOrigin: { x: 0, y: 0 },
@@ -1068,6 +1070,7 @@
       pan: { x: state.pan.x, y: state.pan.y },
       palette: state.palette.map(color => ({ ...color })),
       activePaletteIndex: state.activePaletteIndex,
+      secondaryPaletteIndex: state.secondaryPaletteIndex,
       activeRgb: { ...state.activeRgb },
       frames: state.frames.map(frame => ({
         id: frame.id,
@@ -1456,6 +1459,7 @@
       pan: { x: snapshot.pan.x, y: snapshot.pan.y },
       palette: snapshot.palette.map(color => ({ ...color })),
       activePaletteIndex: snapshot.activePaletteIndex,
+      secondaryPaletteIndex: snapshot.secondaryPaletteIndex,
       activeRgb: { ...snapshot.activeRgb },
       frames: snapshot.frames.map(frame => ({
         id: frame.id,
@@ -1528,6 +1532,7 @@
       pan: { x: snapshot.pan.x, y: snapshot.pan.y },
       palette: snapshot.palette.map(color => ({ ...color })),
       activePaletteIndex: snapshot.activePaletteIndex,
+      secondaryPaletteIndex: snapshot.secondaryPaletteIndex,
       activeRgb: { ...snapshot.activeRgb },
       frames: snapshot.frames.map(frame => ({
         id: frame.id,
@@ -1782,7 +1787,11 @@
     }
     state.colorMode = 'index';
     state.palette = snapshot.palette.map(color => ({ ...color }));
-    state.activePaletteIndex = snapshot.activePaletteIndex;
+    state.activePaletteIndex = normalizePaletteIndex(snapshot.activePaletteIndex, 0);
+    state.secondaryPaletteIndex = normalizePaletteIndex(
+      snapshot.secondaryPaletteIndex,
+      state.activePaletteIndex
+    );
     state.activeRgb = { ...snapshot.activeRgb };
     state.frames = snapshot.frames.map(frame => ({
       id: frame.id,
@@ -2478,6 +2487,7 @@
     if (!curveBuilder) return;
     curveBuilder = null;
     pointerState.curveHandle = null;
+    pointerState.drawPaletteIndex = null;
     hoverPixel = null;
     pointerState.preview = null;
     pointerState.tool = null;
@@ -4216,6 +4226,7 @@
     const frames = [];
     let palette = [];
     let activePaletteIndex = 0;
+    let secondaryPaletteIndex = 0;
     let activeRgb = { r: 255, g: 255, b: 255, a: 255 };
 
     if (normalizedFramesData.length === 1) {
@@ -4231,6 +4242,7 @@
         layer.direct = null;
         palette = extraction.palette.map(color => ({ ...color }));
         activePaletteIndex = 0;
+        secondaryPaletteIndex = Math.min(1, Math.max(0, palette.length - 1));
         activeRgb = { ...palette[activePaletteIndex] };
       } else {
         const direct = ensureLayerDirect(layer, width, height);
@@ -4239,6 +4251,9 @@
         activePaletteIndex = palette.length
           ? clamp(state.activePaletteIndex ?? 0, 0, palette.length - 1)
           : 0;
+        secondaryPaletteIndex = palette.length
+          ? clamp(state.secondaryPaletteIndex ?? activePaletteIndex, 0, palette.length - 1)
+          : activePaletteIndex;
         activeRgb = state.activeRgb
           ? { ...state.activeRgb }
           : (palette[activePaletteIndex] ? { ...palette[activePaletteIndex] } : { r: 255, g: 255, b: 255, a: 255 });
@@ -4254,6 +4269,9 @@
       activePaletteIndex = palette.length
         ? clamp(state.activePaletteIndex ?? 0, 0, palette.length - 1)
         : 0;
+      secondaryPaletteIndex = palette.length
+        ? clamp(state.secondaryPaletteIndex ?? activePaletteIndex, 0, palette.length - 1)
+        : activePaletteIndex;
       activeRgb = state.activeRgb
         ? { ...state.activeRgb }
         : (palette[activePaletteIndex] ? { ...palette[activePaletteIndex] } : { r: 255, g: 255, b: 255, a: 255 });
@@ -4295,6 +4313,7 @@
       brushSize: state.brushSize,
       palette,
       activePaletteIndex,
+      secondaryPaletteIndex,
       activeRgb,
       frames,
       activeFrame: 0,
@@ -5953,6 +5972,7 @@
       pan: { ...snapshot.pan },
       palette,
       activePaletteIndex: snapshot.activePaletteIndex,
+      secondaryPaletteIndex: snapshot.secondaryPaletteIndex,
       activeRgb: normalizeColorValue(snapshot.activeRgb),
       frames: snapshot.frames.map(frame => ({
         id: frame.id,
@@ -6064,6 +6084,12 @@
     const activeRgb = normalizeColorValue(payload.activeRgb || state.activeRgb);
     const colorMode = 'index';
     const activePaletteIndex = clamp(Math.round(Number(payload.activePaletteIndex) || 0), 0, palette.length - 1);
+    const parsedSecondaryPaletteIndex = Number(payload.secondaryPaletteIndex);
+    const secondaryPaletteIndex = clamp(
+      Number.isFinite(parsedSecondaryPaletteIndex) ? Math.round(parsedSecondaryPaletteIndex) : activePaletteIndex,
+      0,
+      palette.length - 1
+    );
     const backgroundMode = payload.backgroundMode === 'light' || payload.backgroundMode === 'pink' ? payload.backgroundMode : 'dark';
     const activeToolGroup = TOOL_GROUPS[payload.activeToolGroup] ? payload.activeToolGroup : (TOOL_TO_GROUP[activeTool] || state.activeToolGroup);
     const lastGroupTool = normalizeLastGroupTool(payload.lastGroupTool);
@@ -6086,6 +6112,7 @@
       colorMode,
       palette,
       activePaletteIndex,
+      secondaryPaletteIndex,
       activeRgb,
       frames,
       activeFrame: activeFrameIndex,
@@ -10210,11 +10237,28 @@
     commitHistory();
   }
 
+  function normalizePaletteIndex(index, fallbackIndex = 0) {
+    const length = Math.max(1, Number(state.palette?.length) || 0);
+    const fallback = Number.isFinite(fallbackIndex) ? Math.round(fallbackIndex) : 0;
+    const raw = Number.isFinite(index) ? Math.round(index) : fallback;
+    return clamp(raw, 0, length - 1);
+  }
+
   function setActivePaletteIndex(index) {
-    state.activePaletteIndex = clamp(index, 0, state.palette.length - 1);
+    state.activePaletteIndex = normalizePaletteIndex(index, state.activePaletteIndex);
     syncPaletteInputs();
     renderPalette();
     scheduleSessionPersist();
+  }
+
+  function setSecondaryPaletteIndex(index, { render = true, persist = true } = {}) {
+    state.secondaryPaletteIndex = normalizePaletteIndex(index, state.activePaletteIndex);
+    if (render) {
+      renderPalette();
+    }
+    if (persist) {
+      scheduleSessionPersist();
+    }
   }
 
   function syncPaletteInputs() {
@@ -10258,14 +10302,16 @@
       button.className = 'palette-swatch pixel-frame';
       button.dataset.index = String(index);
       button.setAttribute('aria-label', `インデックス ${index}`);
+      const isActive = index === state.activePaletteIndex;
+      const isSecondary = index === state.secondaryPaletteIndex;
       button.title = `${index}: ${rgbaToHex(color)}`;
       button.classList.toggle('is-active', index === state.activePaletteIndex);
+      button.classList.toggle('is-secondary', index === state.secondaryPaletteIndex);
       applyPixelFrameBackground(button, color);
       button.addEventListener('click', () => setActivePaletteIndex(index));
       button.addEventListener('contextmenu', event => {
         event.preventDefault();
-        if (state.palette.length <= 1) return;
-        removePaletteColor(index);
+        setSecondaryPaletteIndex(index);
       });
       container.appendChild(button);
     });
@@ -10281,9 +10327,8 @@
     state.palette.splice(index, 1);
     const mapping = previousOrder.map(entry => state.palette.indexOf(entry));
     remapPaletteIndices(mapping);
-    if (state.activePaletteIndex >= state.palette.length) {
-      state.activePaletteIndex = Math.max(0, state.palette.length - 1);
-    }
+    state.activePaletteIndex = normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex);
+    state.secondaryPaletteIndex = normalizePaletteIndex(state.secondaryPaletteIndex, state.activePaletteIndex);
     renderPalette();
     syncPaletteInputs();
     applyPaletteChange();
@@ -10303,6 +10348,14 @@
         }
       });
     });
+    state.activePaletteIndex = normalizePaletteIndex(
+      mapping[state.activePaletteIndex],
+      state.activePaletteIndex
+    );
+    state.secondaryPaletteIndex = normalizePaletteIndex(
+      mapping[state.secondaryPaletteIndex],
+      state.activePaletteIndex
+    );
   }
 
   function applyPaletteChange() {
@@ -11485,6 +11538,7 @@
     pointerState.preview = null;
     pointerState.selectionPreview = null;
     pointerState.selectionMove = null;
+    pointerState.drawPaletteIndex = null;
     pointerState.selectionClearedOnDown = false;
     pointerState.curveHandle = null;
 
@@ -12663,6 +12717,7 @@
     pointerState.preview = null;
     pointerState.selectionPreview = null;
     pointerState.selectionMove = null;
+    pointerState.drawPaletteIndex = null;
     pointerState.selectionClearedOnDown = false;
     pointerState.startClient = null;
     pointerState.panOrigin = { x: state.pan.x, y: state.pan.y };
@@ -12690,6 +12745,7 @@
     pointerState.preview = null;
     pointerState.selectionPreview = null;
     pointerState.selectionMove = null;
+    pointerState.drawPaletteIndex = null;
     pointerState.selectionClearedOnDown = false;
     pointerState.startClient = null;
     pointerState.panMode = null;
@@ -12778,6 +12834,7 @@
     pointerState.panMode = multiTouch ? 'multiTouch' : 'single';
     pointerState.panOrigin = { x: state.pan.x, y: state.pan.y };
     pointerState.path = [];
+    pointerState.drawPaletteIndex = null;
     if (multiTouch) {
       pointerState.pointerId = null;
       pointerState.startClient = null;
@@ -12832,6 +12889,7 @@
     pointerState.touchPinchStartScale = null;
     pointerState.startClient = null;
     pointerState.path = [];
+    pointerState.drawPaletteIndex = null;
     pointerState.panCaptureElement = null;
     document.body.classList.remove('is-pan-dragging');
     activeTouchPointers.clear();
@@ -12879,7 +12937,10 @@
       return;
     }
 
-    if (event.pointerType === 'mouse' && event.button !== 0) {
+    const pointerButton = Number.isFinite(event.button) ? event.button : 0;
+    const isMousePointer = event.pointerType === 'mouse';
+    const isSecondaryMouseButton = isMousePointer && pointerButton === 2;
+    if (isMousePointer && pointerButton !== 0 && pointerButton !== 2) {
       return;
     }
 
@@ -12887,6 +12948,10 @@
     const position = getPointerPosition(event);
     const activeTool = state.tool;
     const layer = getActiveLayer();
+
+    if (isSecondaryMouseButton && !HISTORY_DRAW_TOOLS.has(activeTool)) {
+      return;
+    }
 
     if (HISTORY_DRAW_TOOLS.has(activeTool) && !layer) {
       return;
@@ -12900,6 +12965,12 @@
       startPanInteraction(event, { multiTouch: false });
       return;
     }
+
+    pointerState.drawPaletteIndex = HISTORY_DRAW_TOOLS.has(activeTool)
+      ? (isSecondaryMouseButton
+        ? normalizePaletteIndex(state.secondaryPaletteIndex, state.activePaletteIndex)
+        : normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex))
+      : null;
 
     if (!position) {
       pointerState.active = false;
@@ -12925,6 +12996,7 @@
       pointerState.preview = null;
       pointerState.selectionPreview = null;
       pointerState.selectionMove = null;
+      pointerState.drawPaletteIndex = null;
       pointerState.selectionClearedOnDown = false;
       if (isTouch) {
         hoverPixel = null;
@@ -12970,6 +13042,7 @@
       pointerState.preview = null;
       pointerState.selectionPreview = null;
       pointerState.selectionMove = null;
+      pointerState.drawPaletteIndex = null;
       pointerState.selectionClearedOnDown = false;
       return;
     }
@@ -13033,6 +13106,7 @@
     if (activeTool === 'eyedropper') {
       sampleColor(position.x, position.y);
       pointerState.active = false;
+      pointerState.drawPaletteIndex = null;
       if (dom.canvases.drawing) {
         dom.canvases.drawing.releasePointerCapture(event.pointerId);
       }
@@ -13041,12 +13115,13 @@
     }
 
     if (activeTool === 'fill') {
-      floodFill(position.x, position.y);
+      floodFill(position.x, position.y, pointerState.drawPaletteIndex);
       commitHistory();
       requestOverlayRender();
       pointerState.active = false;
       pointerState.tool = state.tool;
       pointerState.pointerId = null;
+      pointerState.drawPaletteIndex = null;
       if (dom.canvases.drawing) {
         try {
           dom.canvases.drawing.releasePointerCapture(event.pointerId);
@@ -13244,6 +13319,7 @@
         pointerState.last = pointerState.current;
         pointerState.path = [];
         pointerState.active = false;
+        pointerState.drawPaletteIndex = null;
         state.pendingPasteMoveState = moveState;
         updateCanvasControlButtons();
         requestOverlayRender();
@@ -13290,6 +13366,7 @@
     pointerState.preview = null;
     pointerState.selectionPreview = null;
     pointerState.selectionMove = null;
+    pointerState.drawPaletteIndex = null;
     pointerState.selectionClearedOnDown = false;
     pointerState.path = [];
     requestOverlayRender();
@@ -14334,7 +14411,20 @@
     requestRender();
   }
 
-  function setPixel(layer, x, y) {
+  function resolveDrawPaletteIndex(paletteIndexOverride) {
+    if (Number.isFinite(paletteIndexOverride)) {
+      return normalizePaletteIndex(paletteIndexOverride, state.activePaletteIndex);
+    }
+    if (
+      Number.isFinite(pointerState.drawPaletteIndex)
+      && (pointerState.active || HISTORY_DRAW_TOOLS.has(pointerState.tool))
+    ) {
+      return normalizePaletteIndex(pointerState.drawPaletteIndex, state.activePaletteIndex);
+    }
+    return normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex);
+  }
+
+  function setPixel(layer, x, y, paletteIndexOverride) {
     if (x < 0 || y < 0 || x >= state.width || y >= state.height) return;
     if (state.selectionMask && state.selectionMask[y * state.width + x] !== 1) return;
     const index = y * state.width + x;
@@ -14357,7 +14447,7 @@
       return;
     }
 
-    const paletteIndex = clamp(state.activePaletteIndex, 0, state.palette.length - 1);
+    const paletteIndex = resolveDrawPaletteIndex(paletteIndexOverride);
     if (layer.indices[index] === paletteIndex) {
       return;
     }
@@ -14545,11 +14635,12 @@
     }
   }
 
-  function floodFill(x, y) {
+  function floodFill(x, y, paletteIndexOverride) {
     const layer = getActiveLayer();
     if (!layer) return;
+    const paletteIndex = resolveDrawPaletteIndex(paletteIndexOverride);
     const targetColor = sampleLayerColor(layer, x, y);
-    const replacement = { type: 'index', index: state.activePaletteIndex };
+    const replacement = { type: 'index', index: paletteIndex };
 
     if (colorsEqual(targetColor, replacement)) {
       return;
@@ -14567,7 +14658,7 @@
       if (state.selectionMask && state.selectionMask[idx] !== 1) continue;
       const current = sampleLayerColor(layer, px, py);
       if (!colorMatches(current, targetColor)) continue;
-      setPixel(layer, px, py);
+      setPixel(layer, px, py, paletteIndex);
       stack.push([px + 1, py]);
       stack.push([px - 1, py]);
       stack.push([px, py + 1]);
@@ -16156,7 +16247,8 @@
         showChecker: Boolean(state.showChecker),
         activeFrame: clamp(Number(state.activeFrame) || 0, 0, state.frames.length - 1),
         activeLayer: state.activeLayer,
-        paletteIndex: clamp(Number(state.activePaletteIndex) || 0, 0, state.palette.length - 1),
+        paletteIndex: normalizePaletteIndex(state.activePaletteIndex, 0),
+        secondaryPaletteIndex: normalizePaletteIndex(state.secondaryPaletteIndex, state.activePaletteIndex),
         colorMode: state.colorMode,
         leftTab: state.activeLeftTab,
         rightTab: state.activeRightTab,
@@ -16255,7 +16347,18 @@
     setVirtualCursorButtonScale(state.virtualCursorButtonScale, { persist: false, clampPosition: false });
     state.colorMode = 'index';
     if (Number.isFinite(payload.paletteIndex)) {
-      state.activePaletteIndex = clamp(Math.round(payload.paletteIndex), 0, state.palette.length - 1);
+      state.activePaletteIndex = normalizePaletteIndex(payload.paletteIndex, state.activePaletteIndex);
+    }
+    if (Number.isFinite(payload.secondaryPaletteIndex)) {
+      state.secondaryPaletteIndex = normalizePaletteIndex(
+        payload.secondaryPaletteIndex,
+        state.activePaletteIndex
+      );
+    } else {
+      state.secondaryPaletteIndex = normalizePaletteIndex(
+        state.secondaryPaletteIndex,
+        state.activePaletteIndex
+      );
     }
     if (Number.isFinite(payload.activeFrame)) {
       state.activeFrame = clamp(Math.round(payload.activeFrame), 0, state.frames.length - 1);
@@ -16408,13 +16511,13 @@
     return { r, g, b, a: 255 };
   }
 
-  function getActiveDrawColor(opacityOverride) {
+  function getActiveDrawColor(opacityOverride, paletteIndexOverride) {
     const previewTool = pointerState.tool || state.tool;
     let baseColor;
     if (previewTool === 'eraser') {
       baseColor = { r: 255, g: 255, b: 255, a: 255 };
     } else {
-      baseColor = state.palette[state.activePaletteIndex];
+      baseColor = state.palette[resolveDrawPaletteIndex(paletteIndexOverride)];
     }
     if (!baseColor) {
       baseColor = { r: 255, g: 255, b: 255, a: 255 };
