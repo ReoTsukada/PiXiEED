@@ -705,14 +705,6 @@
         return set;
       }
 
-      function isSectionOpen(sectionId) {
-        const section = document.getElementById(sectionId);
-        if (!(section instanceof HTMLElement)) return false;
-        if (section.hidden) return false;
-        if (section.getAttribute('aria-hidden') === 'true') return false;
-        return section.classList.contains('is-active') || section.getAttribute('aria-hidden') === 'false';
-      }
-
       function setRailAdVisible(adEl, visible) {
         if (!(adEl instanceof HTMLElement)) return;
         const nextHidden = !visible;
@@ -729,25 +721,16 @@
         if (!(leftRail instanceof HTMLElement) || !(leftRailAd instanceof HTMLElement)) return false;
         if (mql.matches) return false;
         if (leftRail.dataset.collapsed === 'true') return false;
-        // Side rail opened by handle (non-compact): show bottom ad.
-        if (leftRail.dataset.compact !== 'true') return true;
-        // Compact left rail: show ad only when an actual panel/flyout is open.
-        const colorOpen = isSectionOpen('panelColor');
-        const toolsFlyoutOpen = (() => {
-          const tools = document.getElementById('panelTools');
-          return tools instanceof HTMLElement && tools.dataset.compactFlyoutOpen === 'true';
-        })();
-        return colorOpen || toolsFlyoutOpen;
+        // In landscape / non-portrait, keep rail ads visible whenever the rail is not collapsed.
+        return true;
       }
 
       function shouldShowRightRailAd() {
         if (!(rightRail instanceof HTMLElement) || !(rightRailAd instanceof HTMLElement)) return false;
         if (mql.matches) return false;
         if (rightRail.dataset.collapsed === 'true') return false;
-        // Side rail opened by handle (non-compact): show bottom ad.
-        if (rightRail.dataset.compact !== 'true') return true;
-        // Compact right rail: show ad only while the flyout panel is open.
-        return rightRail.dataset.compactFlyoutOpen === 'true';
+        // In landscape / non-portrait, keep rail ads visible whenever the rail is not collapsed.
+        return true;
       }
 
       function updateRailAdsVisibility() {
