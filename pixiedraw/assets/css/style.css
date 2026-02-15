@@ -2405,7 +2405,7 @@ input[type='range']::-moz-focus-outer {
   transition: transform 180ms cubic-bezier(.2,.9,.2,1), opacity 160ms ease;
   pointer-events: none;
   overflow: hidden;
-  max-height: calc(76px + env(safe-area-inset-bottom, 0px));
+  max-height: calc(90px + env(safe-area-inset-bottom, 0px));
 }
 #mobileBottomAd.visible {
   opacity: 1;
@@ -2417,9 +2417,9 @@ input[type='range']::-moz-focus-outer {
   color: #111111;
   width: min(100%, 720px);
   max-width: min(100%, 720px);
-  min-height: clamp(48px, 9vw, 60px);
-  height: clamp(48px, 9vw, 60px);
-  max-height: clamp(48px, 9vw, 60px);
+  min-height: clamp(56px, 11vw, 72px);
+  height: clamp(56px, 11vw, 72px);
+  max-height: clamp(56px, 11vw, 72px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2446,9 +2446,9 @@ input[type='range']::-moz-focus-outer {
   color: #111111;
   width: min(100%, 720px);
   max-width: min(100%, 720px); /* Lite ad-slot ratio */
-  min-height: clamp(48px, 9vw, 60px);
-  height: clamp(48px, 9vw, 60px);
-  max-height: clamp(48px, 9vw, 60px);
+  min-height: clamp(56px, 11vw, 72px);
+  height: clamp(56px, 11vw, 72px);
+  max-height: clamp(56px, 11vw, 72px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2466,9 +2466,9 @@ input[type='range']::-moz-focus-outer {
   width: min(100%, 720px) !important;
   max-width: 100% !important;
   min-width: 0 !important;
-  min-height: clamp(48px, 9vw, 60px) !important;
-  height: clamp(48px, 9vw, 60px) !important;
-  max-height: clamp(48px, 9vw, 60px) !important;
+  min-height: clamp(56px, 11vw, 72px) !important;
+  height: clamp(56px, 11vw, 72px) !important;
+  max-height: clamp(56px, 11vw, 72px) !important;
 }
 
 /* Keep mobile bottom ad slot compact like PiXiEEDraw Lite */
@@ -2479,9 +2479,9 @@ input[type='range']::-moz-focus-outer {
   min-width: 0 !important;
   margin-left: auto !important;
   margin-right: auto !important;
-  min-height: clamp(48px, 9vw, 60px) !important;
-  height: clamp(48px, 9vw, 60px) !important;
-  max-height: clamp(48px, 9vw, 60px) !important;
+  min-height: clamp(56px, 11vw, 72px) !important;
+  height: clamp(56px, 11vw, 72px) !important;
+  max-height: clamp(56px, 11vw, 72px) !important;
   box-sizing: border-box !important;
   overflow: hidden !important;
   border: 0 !important;
@@ -2495,25 +2495,25 @@ input[type='range']::-moz-focus-outer {
   min-width: 0 !important;
   margin-left: auto !important;
   margin-right: auto !important;
-  min-height: clamp(48px, 9vw, 60px) !important;
-  height: clamp(48px, 9vw, 60px) !important;
-  max-height: clamp(48px, 9vw, 60px) !important;
+  min-height: clamp(56px, 11vw, 72px) !important;
+  height: clamp(56px, 11vw, 72px) !important;
+  max-height: clamp(56px, 11vw, 72px) !important;
   border: 0 !important;
   overflow: hidden !important;
 }
 
-/* When the lite ad is visible, reduce the height slightly for a compact look */
+/* Keep portrait bottom ad slightly larger to improve fill opportunities. */
 @media (orientation: portrait) {
   #mobileBottomAd .mobile-ad-box {
-    min-height: clamp(48px, 9vw, 60px);
-    height: clamp(48px, 9vw, 60px);
-    max-height: clamp(48px, 9vw, 60px);
+    min-height: clamp(56px, 11vw, 72px);
+    height: clamp(56px, 11vw, 72px);
+    max-height: clamp(56px, 11vw, 72px);
     padding: 0;
   }
   #mobileBottomAdSlot.mobile-ad-box {
-    min-height: clamp(48px, 9vw, 60px) !important;
-    height: clamp(48px, 9vw, 60px) !important;
-    max-height: clamp(48px, 9vw, 60px) !important;
+    min-height: clamp(56px, 11vw, 72px) !important;
+    height: clamp(56px, 11vw, 72px) !important;
+    max-height: clamp(56px, 11vw, 72px) !important;
   }
 }
 
