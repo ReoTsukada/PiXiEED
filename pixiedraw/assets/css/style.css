@@ -2320,10 +2320,10 @@ input[type='range']::-moz-focus-outer {
   padding: 0;
   width: 100%;
   margin-top: auto; /* push to bottom of rail */
-  min-height: clamp(48px, 8vw, 60px);
-  height: clamp(48px, 8vw, 60px);
-  max-height: clamp(48px, 8vw, 60px);
-  flex: 0 0 clamp(48px, 8vw, 60px);
+  min-height: clamp(56px, 8.5vw, 72px);
+  height: clamp(56px, 8.5vw, 72px);
+  max-height: clamp(56px, 8.5vw, 72px);
+  flex: 0 0 clamp(56px, 8.5vw, 72px);
   overflow: hidden;
 }
 .rail-ad .ad-box {
