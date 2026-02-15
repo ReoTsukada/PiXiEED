@@ -518,6 +518,13 @@ button {
   padding: 8px 6px;
 }
 
+/* In compact rails, let bottom ads use the full rail width (ignore inner side padding). */
+.rail[data-compact="true"] .rail-ad {
+  width: calc(100% + 16px);
+  margin-left: -8px;
+  margin-right: -8px;
+}
+
 .rail--right[data-compact="true"] .rail-tabpanes {
   display: flex;
   flex: 0 0 auto;
