@@ -36,12 +36,6 @@ body {
   overflow-x: hidden;
 }
 
-/* Disable overscroll behavior site-wide to reduce accidental pull-to-refresh / browser close on iOS */
-html, body {
-  overscroll-behavior: none;
-  overscroll-behavior-y: none;
-}
-
 /* Clamp common containers to viewport to prevent horizontal overflow (e.g. auto ads) */
 body,
 main,
