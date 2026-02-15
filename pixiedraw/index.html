@@ -328,33 +328,38 @@
 </div>
 <div aria-label="カラーパレット" class="palette-grid" id="paletteList" role="listbox"></div>
 <div class="palette-editor" id="paletteEditor">
-<label class="field field--compact">
+<div class="palette-topline">
+<label class="field field--compact palette-index-inline">
 <span>インデックス</span>
 <input data-stepper="true" id="paletteIndex" min="0" step="1" type="number"/>
 </label>
+<div aria-hidden="true" class="palette-preview" id="palettePreview"></div>
+</div>
 <div class="palette-hsv" id="paletteHsvControls">
 <div class="palette-wheel" id="paletteWheelWrapper">
 <canvas aria-label="色相環" height="220" id="paletteColorWheel" width="220"></canvas>
 <div class="palette-wheel__cursor" id="paletteWheelCursor"></div>
 </div>
 <div class="palette-sliders">
-<div aria-hidden="true" class="palette-preview" id="palettePreview"></div>
-<label class="field field--compact">
-<span>色相</span>
+<label class="palette-slider-row" for="paletteHue">
+<span class="palette-slider-row__label">色相</span>
 <input id="paletteHue" max="360" min="0" type="range" value="0"/>
+<output class="palette-slider-row__value" for="paletteHue" id="paletteHueValue">0</output>
 </label>
-<label class="field field--compact">
-<span>彩度</span>
+<label class="palette-slider-row" for="paletteSaturation">
+<span class="palette-slider-row__label">彩度</span>
 <input id="paletteSaturation" max="100" min="0" type="range" value="0"/>
+<output class="palette-slider-row__value" for="paletteSaturation" id="paletteSaturationValue">0</output>
 </label>
-<label class="field field--compact">
-<span>明度</span>
+<label class="palette-slider-row" for="paletteValue">
+<span class="palette-slider-row__label">明度</span>
 <input id="paletteValue" max="100" min="0" type="range" value="100"/>
+<output class="palette-slider-row__value" for="paletteValue" id="paletteValueValue">100</output>
 </label>
-<label class="field field--compact palette-alpha-field">
-<span>アルファ</span>
+<label class="palette-slider-row palette-alpha-field" for="paletteAlphaSlider">
+<span class="palette-slider-row__label">アルファ</span>
 <input id="paletteAlphaSlider" max="255" min="0" type="range" value="255"/>
-<output for="paletteAlphaSlider" id="paletteAlphaValue">255</output>
+<output class="palette-slider-row__value" for="paletteAlphaSlider" id="paletteAlphaValue">255</output>
 </label>
 </div>
 </div>
