@@ -721,7 +721,6 @@
         if (!(leftRail instanceof HTMLElement) || !(leftRailAd instanceof HTMLElement)) return false;
         if (mql.matches) return false;
         if (leftRail.dataset.collapsed === 'true') return false;
-        if (leftRail.dataset.compact === 'true') return false;
         // In landscape / non-portrait, keep rail ads visible whenever the rail is not collapsed.
         return true;
       }
@@ -730,7 +729,6 @@
         if (!(rightRail instanceof HTMLElement) || !(rightRailAd instanceof HTMLElement)) return false;
         if (mql.matches) return false;
         if (rightRail.dataset.collapsed === 'true') return false;
-        if (rightRail.dataset.compact === 'true') return false;
         // In landscape / non-portrait, keep rail ads visible whenever the rail is not collapsed.
         return true;
       }
@@ -825,7 +823,7 @@
         { containerId: 'mobileBottomAdSlot', slot: '2141591954' }
       ];
       const SLOTS = baseSlots;
-      const MIN_RAIL_AD_WIDTH = 120;
+      const MIN_RAIL_AD_WIDTH = 60;
 
       function isMobileBottomSlot(container) {
         if (!container) return false;
