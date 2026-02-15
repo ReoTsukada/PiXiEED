@@ -2320,10 +2320,10 @@ input[type='range']::-moz-focus-outer {
   padding: 0;
   width: 100%;
   margin-top: auto; /* push to bottom of rail */
-  min-height: clamp(56px, 8.5vw, 72px);
-  height: clamp(56px, 8.5vw, 72px);
-  max-height: clamp(56px, 8.5vw, 72px);
-  flex: 0 0 clamp(56px, 8.5vw, 72px);
+  min-height: 56px;
+  height: 56px;
+  max-height: 56px;
+  flex: 0 0 56px;
   overflow: hidden;
 }
 .rail-ad .ad-box {
@@ -2510,54 +2510,7 @@ input[type='range']::-moz-focus-outer {
   }
 }
 
-/* Panel-embedded banner ad
-   - Reserve space at the bottom of panel bodies so the ad doesn't cover content
-   - Place a sticky ad container inside each panel body so it stays pinned to the panel bottom
-*/
-.panel-section__body {
-  /* ensure the body can position sticky children and reserve room for ad */
-  position: relative;
-  padding-bottom: max(72px, calc(var(--mobile-top-control-size, 40px) + 24px));
-}
-.panel-section__body .panel-ad {
-  position: sticky;
-  bottom: 8px; /* slightly above the inner edge */
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 6px 8px;
-  pointer-events: auto;
-  z-index: 10;
-}
-.panel-section__body .panel-ad .ad-box {
-  background: #ffffff;
-  color: #111111;
-  width: calc(100% - 24px);
-  max-width: 560px;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.16);
-  border: 1px solid rgba(0,0,0,0.06);
-}
-
-/* Small panels like side rails should keep the ad compact */
-.rail--left .panel-section__body .panel-ad .ad-box,
-.rail--right .panel-section__body .panel-ad .ad-box {
-  width: calc(var(--left-width, 78px));
-  max-width: none;
-  height: 48px;
-  border-radius: 4px;
-}
-
-@media (max-width: 900px) and (orientation: portrait) {
-  /* in mobile portrait, panel-embedded ads remain but mobileBottomAd is primary */
-  .panel-section__body { padding-bottom: 84px; }
-}
-
-/* We do not use per-tool embedded ads; keep panel-ad hidden globally. */
+/* Use only left/right rail-bottom ads (and portrait mobile bottom ad). */
 .panel-ad { display: none !important; }
 
 #panelSettings .settings-size-controls .number-stepper__btn {
