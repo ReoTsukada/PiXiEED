@@ -523,9 +523,9 @@ button {
 
 /* Let bottom ads use full rail width by canceling rail inner side padding. */
 .rail .rail-ad {
-  width: calc(100% + (var(--rail-pad-inline) * 2));
-  margin-left: calc(var(--rail-pad-inline) * -1);
-  margin-right: calc(var(--rail-pad-inline) * -1);
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 .rail--right[data-compact="true"] .rail-tabpanes {
@@ -823,6 +823,8 @@ button {
     0 0 0 1px rgba(4, 12, 20, 0.46);
   backdrop-filter: blur(2px);
   transform: none;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
 }
 
 .rail--left[data-collapsed="true"] {
@@ -913,11 +915,11 @@ button {
 }
 
 .rail-resizer--left {
-  right: -8px;
+  right: 0;
 }
 
 .rail-resizer--right {
-  left: -8px;
+  left: 0;
 }
 
 .stage {
@@ -1827,33 +1829,65 @@ input[type='range']::-moz-focus-outer {
 
 .palette-wheel {
   position: relative;
-  width: min(100%, 200px);
-  max-width: 200px;
+  width: min(100%, 280px);
+  max-width: 280px;
   aspect-ratio: 1 / 1;
   margin: 0 auto;
+  border-radius: 50%;
+  overflow: hidden;
 }
 
-.palette-wheel canvas {
-  width: 100%;
-  height: 100%;
+.palette-wheel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.palette-wheel canvas {
+  box-sizing: border-box;
+  position: relative;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 0;
+  box-shadow: none;
   cursor: crosshair;
   display: block;
 }
 
 .palette-wheel__cursor {
+  box-sizing: border-box;
   position: absolute;
+  z-index: 2;
   top: 50%;
   left: 50%;
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   border: 2px solid #fff;
   border-radius: 50%;
-  box-shadow: 0 0 6px rgba(0, 0, 0, 0.65);
+  box-shadow: none;
   pointer-events: none;
   transform: translate(-50%, -50%);
+}
+
+.palette-wheel__cursor--hue {
+  width: 10px;
+  height: 10px;
+  background: rgba(8, 12, 18, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.65);
+}
+
+.palette-wheel__cursor--sv {
+  width: 5px;
+  height: 5px;
+  border-width: 1px;
+  background: rgba(10, 14, 20, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.55);
 }
 
 .palette-sliders {
@@ -2408,6 +2442,62 @@ input[type='range']::-moz-focus-outer {
   overflow: hidden !important;
 }
 
+.panel-ad {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 14px;
+  min-height: 180px;
+  flex: 0 0 auto;
+  overflow: hidden;
+}
+
+.panel-ad-mount {
+  width: 100%;
+  min-width: 0;
+}
+
+.panel-ad .ad-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 180px;
+  background: #ffffff;
+  color: #111111;
+  text-align: center;
+  padding: 0;
+  border-radius: 0;
+  border: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.panel-ad .ad-box ins.adsbygoogle {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  min-height: 180px !important;
+  margin: 0 auto !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+.panel-ad .ad-box ins.adsbygoogle iframe,
+.panel-ad .ad-box .adsbygoogle iframe {
+  display: block;
+  width: 100% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  margin-top: auto !important;
+  margin-bottom: auto !important;
+  min-height: 180px !important;
+  overflow: hidden !important;
+}
+
 /* Portrait narrower rails: hide side ads and show one bottom banner. */
 @media (orientation: portrait) {
   .rail-ad .ad-box { max-width: calc(var(--left-width,78px)); font-size: 11px; padding: 4px; }
@@ -2421,6 +2511,15 @@ input[type='range']::-moz-focus-outer {
 /* Landscape and wider screens: allow larger ad but keep within rail */
 @media (min-width: 900px) and (orientation: landscape) {
   .rail-ad .ad-box { max-width: none; }
+  .panel-ad {
+    min-height: 220px;
+  }
+  .panel-ad .ad-box,
+  .panel-ad .ad-box ins.adsbygoogle,
+  .panel-ad .ad-box ins.adsbygoogle iframe,
+  .panel-ad .ad-box .adsbygoogle iframe {
+    min-height: 220px !important;
+  }
 }
 
 @media (orientation: landscape) {
@@ -2512,9 +2611,6 @@ input[type='range']::-moz-focus-outer {
   border: 0 !important;
   overflow: hidden !important;
 }
-
-/* Use only left/right rail-bottom ads (and portrait mobile bottom ad). */
-.panel-ad { display: none !important; }
 
 #panelSettings .settings-size-controls .number-stepper__btn {
   width: 26px;
@@ -3581,11 +3677,11 @@ body.is-startup-active {
   }
 
   .rail-resizer--left {
-    right: -12px;
+    right: 0;
   }
 
   .rail-resizer--right {
-    left: -12px;
+    left: 0;
   }
 
   .rail-resizer::before {
