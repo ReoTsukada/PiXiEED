@@ -137,10 +137,10 @@
 <span class="sr-only">カラー</span>
 </button>
 </div>
-<div class="rail-tabpanes" id="leftRailPanes"></div>
+  <div class="rail-tabpanes" id="leftRailPanes"></div>
   <div class="rail-ad" id="leftRailAd" aria-hidden="false">
     <!-- ad placeholder: replace with ad code (ins / iframe) -->
-    <div class="ad-box">バナー広告</div>
+    <div class="ad-box" id="leftRailAdSlot">バナー広告</div>
   </div>
 <button aria-label="左パネルの幅を変更" class="rail-resizer rail-resizer--left" id="resizeLeftRail" type="button"></button>
 </aside>
@@ -180,10 +180,10 @@
 <span class="sr-only">PiXFiND</span>
 </button>
 </div>
-<div class="rail-tabpanes" id="rightRailPanes"></div>
+  <div class="rail-tabpanes" id="rightRailPanes"></div>
   <div class="rail-ad" id="rightRailAd" aria-hidden="false">
     <!-- ad placeholder: replace with ad code (ins / iframe) -->
-    <div class="ad-box">バナー広告</div>
+    <div class="ad-box" id="rightRailAdSlot">バナー広告</div>
   </div>
 <button aria-label="右パネルの幅を変更" class="rail-resizer rail-resizer--right" id="resizeRightRail" type="button"></button>
 </aside>
@@ -633,13 +633,18 @@
 </script>
   <!-- Mobile bottom ad placeholder (visible in portrait / small screens) -->
   <div id="mobileBottomAd" aria-hidden="false">
-    <div class="mobile-ad-box">バナー広告</div>
+    <div class="mobile-ad-box" id="mobileBottomAdSlot">バナー広告</div>
   </div>
   <script>
     (function () {
       // Show mobile bottom ad when the active tool/settings panel (mobile or rail) is scrolled to bottom.
       const mobileAd = document.getElementById('mobileBottomAd');
       const mobilePanels = document.getElementById('mobilePanels');
+      const mobileBottomAdSlot = document.getElementById('mobileBottomAdSlot');
+      const leftRail = document.getElementById('leftRail');
+      const rightRail = document.getElementById('rightRail');
+      const leftRailAd = document.getElementById('leftRailAd');
+      const rightRailAd = document.getElementById('rightRailAd');
       if (!mobileAd) return;
 
   const mql = window.matchMedia('(orientation: portrait)');
@@ -655,13 +660,39 @@
       }
 
       function showAd() {
-        mobileAd.classList.add('visible');
-        mobileAd.setAttribute('aria-hidden', 'false');
+        if (!mobileAd.classList.contains('visible')) {
+          mobileAd.classList.add('visible');
+        }
+        if (mobileAd.getAttribute('aria-hidden') !== 'false') {
+          mobileAd.setAttribute('aria-hidden', 'false');
+        }
       }
 
       function hideAd() {
-        mobileAd.classList.remove('visible');
-        mobileAd.setAttribute('aria-hidden', 'true');
+        if (mobileAd.classList.contains('visible')) {
+          mobileAd.classList.remove('visible');
+        }
+        if (mobileAd.getAttribute('aria-hidden') !== 'true') {
+          mobileAd.setAttribute('aria-hidden', 'true');
+        }
+      }
+
+      function getLiteAdHeightPx() {
+        return Math.max(48, Math.min(Math.round(window.innerWidth * 0.09), 60));
+      }
+
+      function enforceMobileBottomAdMetrics() {
+        const h = getLiteAdHeightPx();
+        if (mobileBottomAd instanceof HTMLElement) {
+          mobileBottomAd.style.maxHeight = `calc(${h + 16}px + env(safe-area-inset-bottom, 0px))`;
+        }
+        if (mobileBottomAdSlot instanceof HTMLElement) {
+          mobileBottomAdSlot.style.minHeight = `${h}px`;
+          mobileBottomAdSlot.style.height = `${h}px`;
+          mobileBottomAdSlot.style.maxHeight = `${h}px`;
+          mobileBottomAdSlot.style.padding = '0';
+          mobileBottomAdSlot.style.overflow = 'hidden';
+        }
       }
 
       function getActiveScrollableContainers() {
@@ -676,6 +707,56 @@
         return set;
       }
 
+      function isSectionOpen(sectionId) {
+        const section = document.getElementById(sectionId);
+        if (!(section instanceof HTMLElement)) return false;
+        if (section.hidden) return false;
+        if (section.getAttribute('aria-hidden') === 'true') return false;
+        return section.classList.contains('is-active') || section.getAttribute('aria-hidden') === 'false';
+      }
+
+      function setRailAdVisible(adEl, visible) {
+        if (!(adEl instanceof HTMLElement)) return;
+        const nextHidden = !visible;
+        const nextAria = visible ? 'false' : 'true';
+        if (adEl.hidden !== nextHidden) {
+          adEl.hidden = nextHidden;
+        }
+        if (adEl.getAttribute('aria-hidden') !== nextAria) {
+          adEl.setAttribute('aria-hidden', nextAria);
+        }
+      }
+
+      function shouldShowLeftRailAd() {
+        if (!(leftRail instanceof HTMLElement) || !(leftRailAd instanceof HTMLElement)) return false;
+        if (mql.matches) return false;
+        if (leftRail.dataset.collapsed === 'true') return false;
+        // Side rail opened by handle (non-compact): show bottom ad.
+        if (leftRail.dataset.compact !== 'true') return true;
+        // Compact left rail: show ad only when an actual panel/flyout is open.
+        const colorOpen = isSectionOpen('panelColor');
+        const toolsFlyoutOpen = (() => {
+          const tools = document.getElementById('panelTools');
+          return tools instanceof HTMLElement && tools.dataset.compactFlyoutOpen === 'true';
+        })();
+        return colorOpen || toolsFlyoutOpen;
+      }
+
+      function shouldShowRightRailAd() {
+        if (!(rightRail instanceof HTMLElement) || !(rightRailAd instanceof HTMLElement)) return false;
+        if (mql.matches) return false;
+        if (rightRail.dataset.collapsed === 'true') return false;
+        // Side rail opened by handle (non-compact): show bottom ad.
+        if (rightRail.dataset.compact !== 'true') return true;
+        // Compact right rail: show ad only while the flyout panel is open.
+        return rightRail.dataset.compactFlyoutOpen === 'true';
+      }
+
+      function updateRailAdsVisibility() {
+        setRailAdVisible(leftRailAd, shouldShowLeftRailAd());
+        setRailAdVisible(rightRailAd, shouldShowRightRailAd());
+      }
+
       function onScrollDebounced() {
         if (raf) cancelAnimationFrame(raf);
         raf = requestAnimationFrame(function () {
@@ -685,34 +766,33 @@
           // Bottom ad: show in portrait as overlay at the bottom and mark body so CSS can add padding
           if (mobileBottomAd) {
             if (mql.matches) {
-              mobileBottomAd.classList.add('visible');
-              mobileBottomAd.setAttribute('aria-hidden', 'false');
+              showAd();
+              enforceMobileBottomAdMetrics();
               // compute current ad height and expose as CSS var so layout can adjust
               try {
                 const box = mobileBottomAd.querySelector('.mobile-ad-box');
-                const h = box ? box.offsetHeight + 12 : 56; // add small margin
+                const raw = box ? box.offsetHeight + 12 : 56; // add small margin
+                const h = Math.max(48, Math.min(raw, 60));
                 document.documentElement.style.setProperty('--mobile-bottom-ad-height', h + 'px');
               } catch (e) {}
               document.body.classList.add('bottom-ad-active');
             } else {
-              mobileBottomAd.classList.remove('visible');
-              mobileBottomAd.setAttribute('aria-hidden', 'true');
+              hideAd();
               document.documentElement.style.setProperty('--mobile-bottom-ad-height', '0px');
               document.body.classList.remove('bottom-ad-active');
             }
           }
 
-          // Bottom ad: show only on non-portrait when panel is at bottom
+          // In portrait, keep bottom ad visible like PiXiEEDraw Lite.
           if (mql.matches) {
-            // in portrait, ensure bottom ad is hidden (CSS also hides it)
-            hideAd();
+            showAd();
+          } else if (anyAtBottom) {
+            showAd();
           } else {
-            if (anyAtBottom) {
-              showAd();
-            } else {
-              hideAd();
-            }
+            hideAd();
           }
+
+          updateRailAdsVisibility();
 
           raf = null;
         });
@@ -731,6 +811,7 @@
         });
         // immediate check
         onScrollDebounced();
+        updateRailAdsVisibility();
       }
 
       // observe body for active-panel changes and refresh listeners
@@ -773,26 +854,45 @@
       // If the global adsbygoogle script is not present yet, it will still be available when loaded in <head>.
       const ADS_CLIENT = 'ca-pub-9801602250480253';
       const SLOTS = [
-        { containerId: 'leftRailAd', slot: '2141591954' },
-        { containerId: 'rightRailAd', slot: '9073878884' },
-        { containerId: 'mobileBottomAd', slot: '2261515379' }
+        { containerId: 'leftRailAdSlot', slot: '2141591954' },
+        { containerId: 'rightRailAdSlot', slot: '9073878884' },
+        // Match PiXiEEDraw Lite footer ad slot for the same visual ratio/behavior.
+        { containerId: 'mobileBottomAdSlot', slot: '2141591954' }
       ];
 
-  // localStorage key to remember when the user closed the mobile bottom lite banner
-  const MOBILE_BOTTOM_CLOSED_KEY = 'pixiedraw_mobile_bottom_ad_closed_v1';
+      function isMobileBottomSlot(container) {
+        if (!container) return false;
+        if (container.id === 'mobileBottomAdSlot') return true;
+        return Boolean(container.closest && container.closest('#mobileBottomAd'));
+      }
+
+      function applyMobileBottomInsSizing(ins, container) {
+        if (!ins || !container) return;
+        let width = 0;
+        try {
+          width = (container.getBoundingClientRect && container.getBoundingClientRect().width)
+            || container.clientWidth
+            || container.offsetWidth
+            || 0;
+        } catch (e) {}
+        const safe = Math.max(0, width - 24);
+        const cap = 720;
+        const use = safe > 0 ? Math.min(safe, cap) : cap;
+        ins.style.width = use + 'px';
+        ins.style.maxWidth = '100%';
+        // Match PiXiEEDraw Lite footer ad ratio (clamp(48px, 9vw, 60px)).
+        const vh = Math.max(48, Math.min(Math.round(window.innerWidth * 0.09), 60));
+        ins.style.minHeight = vh + 'px';
+        ins.style.height = vh + 'px';
+        ins.style.maxHeight = vh + 'px';
+        ins.style.overflow = 'hidden';
+      }
 
       function ensureIns(container, slot) {
         if (!container) return false;
         // if a real ins already exists, keep it
         if (container.querySelector && container.querySelector('ins.adsbygoogle')) return true;
         if (container._pixieed_pendingIns) return true;
-        // If mobile bottom ad has been closed by user, do not insert real ad/ins
-        try {
-          if (container.id === 'mobileBottomAd' && localStorage.getItem(MOBILE_BOTTOM_CLOSED_KEY) === '1') {
-            console.debug('[pixiedraw] mobile bottom ad closed by user; skipping ins insertion');
-            return false;
-          }
-        } catch (e) {}
         // create ins element
         const ins = document.createElement('ins');
         ins.className = 'adsbygoogle';
@@ -801,8 +901,15 @@
   try { ins.dataset.pixiedRendered = '0'; } catch (e) {}
         ins.setAttribute('data-ad-client', ADS_CLIENT);
         ins.setAttribute('data-ad-slot', slot);
-        ins.setAttribute('data-ad-format', 'auto');
-        ins.setAttribute('data-full-width-responsive', 'true');
+        if (isMobileBottomSlot(container)) {
+          // Keep the mobile bottom ad compact like PiXiEEDraw Lite.
+          ins.setAttribute('data-ad-format', 'horizontal');
+          ins.setAttribute('data-full-width-responsive', 'false');
+          applyMobileBottomInsSizing(ins, container);
+        } else {
+          ins.setAttribute('data-ad-format', 'auto');
+          ins.setAttribute('data-full-width-responsive', 'true');
+        }
         // enable AdSense test mode on localhost/dev so test ads can appear
         try {
           const host = (location && location.hostname) ? location.hostname : '';
@@ -872,33 +979,19 @@
           }
         };
 
-        if (container && container.id === 'mobileBottomAd') {
-          // Do not show mobile bottom lite banner if user previously closed it
-          try {
-            if (localStorage.getItem(MOBILE_BOTTOM_CLOSED_KEY) === '1') {
-              console.debug('[pixiedraw] mobile bottom ad closed; skipping rendering');
-              return;
-            }
-          } catch (e) {}
-        }
-
         if (hasWidth()) {
           // If there is a pending ins element, append it now so pixieedObserveAds / adsbygoogle can measure it.
           try {
             if (container._pixieed_pendingIns) {
-              const ins = container._pixied_pendingIns || container._pixieed_pendingIns;
+              const ins = container._pixieed_pendingIns;
               container._pixieed_pendingIns = null;
               // ensure the ins has a measurable width before appending
               try {
                 const w = (container.getBoundingClientRect && container.getBoundingClientRect().width) || (container.clientWidth || container.offsetWidth) || 0;
                 if (w > 0) {
                   // constrain width for mobile bottom to avoid covering UI
-                  if ((container.id || '') === 'mobileBottomAd') {
-                    const safe = Math.max(0, w - 24);
-                    const cap = 420; // px
-                    const use = Math.min(safe, cap);
-                    ins.style.width = use + 'px';
-                    ins.style.maxWidth = '100%';
+                  if (isMobileBottomSlot(container)) {
+                    applyMobileBottomInsSizing(ins, container);
                   } else {
                     ins.style.width = w + 'px';
                     ins.style.maxWidth = '100%';
@@ -945,43 +1038,14 @@
               for (const entry of entries) {
                 if ((entry.contentRect && entry.contentRect.width) || hasWidth()) {
                   try {
-                    if (container._pixied_pendingIns || container._pixied_pendingIns === null) {
-                      // use either possible pending property name
-                    }
-                    if (container._pixied_pendingIns || container._pixied_pendingIns === null) {}
-                    if (container._pixied_pendingIns) {
-                      const ins = container._pixied_pendingIns || container._pixied_pendingIns;
-                      container._pixied_pendingIns = null;
+                    if (container._pixieed_pendingIns) {
+                      const ins = container._pixieed_pendingIns;
+                      container._pixieed_pendingIns = null;
                       try {
                         const w = (container.getBoundingClientRect && container.getBoundingClientRect().width) || (container.clientWidth || container.offsetWidth) || 0;
                         if (w > 0) {
-                          if ((container.id || '') === 'mobileBottomAd') {
-                            const safe = Math.max(0, w - 24);
-                            const cap = 420;
-                            const use = Math.min(safe, cap);
-                            ins.style.width = use + 'px';
-                            ins.style.maxWidth = '100%';
-                          } else {
-                            ins.style.width = w + 'px';
-                            ins.style.maxWidth = '100%';
-                          }
-                        }
-                      } catch (e) {}
-                      container.innerHTML = '';
-                      container.appendChild(ins);
-                      console.debug('[pixiedraw] ResizeObserver appended pending ins into', container.id || container);
-                    } else if (container._pixieed_pendingIns) {
-                      const ins = container._pixied_pendingIns;
-                      container._pixied_pendingIns = null;
-                      try {
-                        const w = (container.getBoundingClientRect && container.getBoundingClientRect().width) || (container.clientWidth || container.offsetWidth) || 0;
-                        if (w > 0) {
-                          if ((container.id || '') === 'mobileBottomAd') {
-                            const safe = Math.max(0, w - 24);
-                            const cap = 420;
-                            const use = Math.min(safe, cap);
-                            ins.style.width = use + 'px';
-                            ins.style.maxWidth = '100%';
+                          if (isMobileBottomSlot(container)) {
+                            applyMobileBottomInsSizing(ins, container);
                           } else {
                             ins.style.width = w + 'px';
                             ins.style.maxWidth = '100%';
@@ -1018,31 +1082,25 @@
         const REVERT_DELAY = 6000; // ms after applying temp styles
         let retryTimer = setTimeout(() => {
           try {
+            // Mobile bottom ad should stay stable; avoid delayed retry mutations that can enlarge it.
+            if (isMobileBottomSlot(container)) return;
             if (hasWidth()) return; // already sized
-            // if user closed mobile bottom, skip
-            if (container.id === 'mobileBottomAd') {
-              try { if (localStorage.getItem(MOBILE_BOTTOM_CLOSED_KEY) === '1') return; } catch (e) {}
-            }
             // append pending ins if present
             try {
-              if (container._pixied_pendingIns) {
-                const ins = container._pixied_pendingIns;
-                container._pixied_pendingIns = null;
+              if (container._pixieed_pendingIns) {
+                const ins = container._pixieed_pendingIns;
+                container._pixieed_pendingIns = null;
                 // apply temporary non-invasive sizing to allow ad to measure
-                container._pixied_prevMinWidth = container.style.minWidth;
+                container._pixieed_prevMinWidth = container.style.minWidth;
                 // smaller temp for mobileBottomAd so it doesn't force huge width
-                const tempMin = (container.id === 'mobileBottomAd') ? '260px' : (container.style.minWidth || '320px');
+                const tempMin = isMobileBottomSlot(container) ? '260px' : (container.style.minWidth || '320px');
                 container.style.minWidth = tempMin;
                 // before appending, try to set pixel width on the ins so adsbygoogle can measure
                 try {
                   const w = (container.getBoundingClientRect && container.getBoundingClientRect().width) || (container.clientWidth || container.offsetWidth) || 0;
                   if (w > 0) {
-                    if (container.id === 'mobileBottomAd') {
-                        const safe = Math.max(0, w - 24);
-                        const cap = 420;
-                        const use = Math.min(safe, cap);
-                        ins.style.width = use + 'px';
-                        ins.style.maxWidth = '100%';
+                    if (isMobileBottomSlot(container)) {
+                        applyMobileBottomInsSizing(ins, container);
                       } else {
                         ins.style.width = w + 'px';
                         ins.style.maxWidth = '100%';
@@ -1054,13 +1112,13 @@
                 container.appendChild(ins);
                 console.debug('[pixiedraw] retry: appended pending ins with temporary minWidth into', container.id || container);
                 tryRender(container);
-                container._pixied_tempApplied = true;
+                container._pixieed_tempApplied = true;
                 // revert temporary styling after REVERT_DELAY
                 setTimeout(() => {
                   try {
-                    if (container._pixied_tempApplied) {
+                    if (container._pixieed_tempApplied) {
                       container.style.minWidth = container._pixieed_prevMinWidth || '';
-                      container._pixied_tempApplied = false;
+                      container._pixieed_tempApplied = false;
                       console.debug('[pixiedraw] reverted temporary minWidth for', container.id || container);
                     }
                   } catch (e) {}
@@ -1100,87 +1158,147 @@
   </script>
 
   <script>
-    // Fallback ad renderer: when AdSense isn't available, render rotating placeholder banners in .ad-box elements.
+    // Fallback ad renderer:
+    // when AdSense can't fill, show internal project links instead of sample banners.
     (function renderFallbackAds() {
       const adBoxes = Array.from(document.querySelectorAll('.ad-box, .mobile-ad-box'));
       if (!adBoxes.length) return;
 
-      // If adsbygoogle exists and ins.adsbygoogle are present, do not override
-      if (window.adsbygoogle) {
-        // let real ads initialize if ins elements already present
-        const hasIns = adBoxes.some(b => !!b.querySelector('ins'));
-        if (hasIns) return;
-      }
-
-      const samples = [
-        { bg: '#ffd18c', text: '広告サンプルA' },
-        { bg: '#b6e3ff', text: '広告サンプルB' },
-        { bg: '#d3f8d3', text: '広告サンプルC' }
+      const PROJECT_PROMOS = [
+        {
+          id: 'pixieedraw-lite',
+          name: 'PiXiEEDraw Lite',
+          href: '../projects/jerin-maker/index.html',
+          icon: '../icon/icon-192-5.png'
+        },
+        {
+          id: 'maoitu',
+          name: 'maoitu',
+          href: '../projects/maoitu/index.html',
+          icon: '../icon/icon-192-3.png'
+        },
+        {
+          id: 'pixfind',
+          name: 'PiXFiND',
+          href: '../projects/pixfind/index.html',
+          icon: '../icon/icon-192-2.png'
+        }
       ];
 
-      adBoxes.forEach((box, idx) => {
-        // Respect mobile-bottom-closed state for mobileBottomAd
-        try {
-          if (box.closest && box.closest('#mobileBottomAd') && localStorage.getItem('pixiedraw_mobile_bottom_ad_closed_v1') === '1') {
-            // leave placeholder empty
-            box.innerHTML = '';
+      const pendingSince = new WeakMap();
+      const PENDING_TIMEOUT_MS = 3600;
+
+      function hasFilledAd(box) {
+        if (!box) return false;
+        const ins = box.querySelector('ins.adsbygoogle');
+        if (!ins) return false;
+        const status = ins.getAttribute('data-ad-status');
+        if (status === 'filled') return true;
+        return Boolean(box.querySelector('iframe'));
+      }
+
+      function isAdPending(box) {
+        if (!box) return false;
+        const ins = box.querySelector('ins.adsbygoogle');
+        if (!ins) return false;
+        if (hasFilledAd(box)) return false;
+        const status = ins.getAttribute('data-ad-status');
+        if (status === 'unfilled') return false;
+        const done = ins.getAttribute('data-adsbygoogle-status') === 'done';
+        return !done;
+      }
+
+      function shouldShowFallback(box, now) {
+        if (!box) return false;
+        if (hasFilledAd(box)) return false;
+
+        const ins = box.querySelector('ins.adsbygoogle');
+        if (!ins) return true;
+
+        if (!isAdPending(box)) return true;
+
+        const firstSeen = pendingSince.get(box) || now;
+        if (!pendingSince.has(box)) pendingSince.set(box, firstSeen);
+        return now - firstSeen >= PENDING_TIMEOUT_MS;
+      }
+
+      function removeFallback(box) {
+        if (!box) return;
+        const fallback = box.querySelector('.ad-fallback-promo');
+        if (fallback) fallback.remove();
+        box.classList.remove('has-fallback-promo');
+      }
+
+      function createPromoElement() {
+        const fallback = document.createElement('div');
+        fallback.className = 'ad-fallback-promo';
+        fallback.setAttribute('role', 'group');
+        fallback.setAttribute('aria-label', 'おすすめツール');
+
+        PROJECT_PROMOS.forEach((promo) => {
+          const link = document.createElement('a');
+          link.className = 'ad-fallback-promo__link';
+          link.href = promo.href;
+          link.target = '_blank';
+          link.rel = 'noopener';
+          link.setAttribute('data-project', promo.id);
+          link.setAttribute('aria-label', `${promo.name} の紹介ページを開く`);
+
+          const icon = document.createElement('img');
+          icon.className = 'ad-fallback-promo__icon';
+          icon.src = promo.icon;
+          icon.alt = '';
+          icon.loading = 'lazy';
+          icon.decoding = 'async';
+
+          const label = document.createElement('span');
+          label.className = 'ad-fallback-promo__name';
+          label.textContent = promo.name;
+
+          link.appendChild(icon);
+          link.appendChild(label);
+          fallback.appendChild(link);
+        });
+
+        return fallback;
+      }
+
+      function ensureFallback(box) {
+        if (!box) return;
+        if (box.querySelector('.ad-fallback-promo')) return;
+        if (!box.querySelector('ins.adsbygoogle')) box.textContent = '';
+        box.classList.add('has-fallback-promo');
+        box.appendChild(createPromoElement());
+      }
+
+      function refreshFallbacks() {
+        const now = Date.now();
+        adBoxes.forEach((box) => {
+          if (!(box instanceof HTMLElement)) return;
+          if (hasFilledAd(box)) {
+            pendingSince.delete(box);
+            removeFallback(box);
             return;
           }
-        } catch (e) {}
+          if (!isAdPending(box)) pendingSince.delete(box);
+          if (shouldShowFallback(box, now)) {
+            ensureFallback(box);
+          } else {
+            removeFallback(box);
+          }
+        });
+      }
 
-        // If this box is the mobile bottom ad, render PiXiEEDrawLite-style compact banner
-        if (box.closest && box.closest('#mobileBottomAd')) {
-          box.style.overflow = 'hidden';
-          box.innerHTML = '';
-          const wrapper = document.createElement('div');
-          wrapper.className = 'ad-lite';
-          const logo = document.createElement('div');
-          logo.className = 'logo';
-          logo.textContent = 'PX';
-          const text = document.createElement('div');
-          text.className = 'text';
-          text.textContent = 'PiXiEEDraw Lite — より軽く、すぐ遊べる';
-          const close = document.createElement('button');
-          close.className = 'ad-close';
-          close.setAttribute('aria-label', '広告を閉じる');
-          close.textContent = '×';
-          close.addEventListener('click', () => {
-            try { localStorage.setItem('pixiedraw_mobile_bottom_ad_closed_v1', '1'); } catch (e) {}
-            const top = document.getElementById('mobileBottomAd');
-            if (top) {
-              top.classList.remove('visible');
-              top.setAttribute('aria-hidden', 'true');
-              document.body.classList.remove('bottom-ad-active');
-            }
-          });
-          wrapper.appendChild(logo);
-          wrapper.appendChild(text);
-          wrapper.appendChild(close);
-          box.appendChild(wrapper);
-          return;
-        }
-
-        let i = idx % samples.length;
-        box.style.overflow = 'hidden';
-        function render() {
-          const s = samples[i % samples.length];
-          box.innerHTML = '';
-          const el = document.createElement('div');
-          el.style.width = '100%';
-          el.style.height = '100%';
-          el.style.display = 'flex';
-          el.style.alignItems = 'center';
-          el.style.justifyContent = 'center';
-          el.style.background = s.bg;
-          el.style.color = '#111';
-          el.style.fontWeight = '700';
-          el.textContent = s.text;
-          box.appendChild(el);
-          i++;
-        }
-        render();
-        setInterval(render, 5000 + (idx * 1000));
+      [0, 1200, 2600, 4200, 7000].forEach((delay) => {
+        setTimeout(refreshFallbacks, delay);
       });
+      const periodicRefreshId = setInterval(refreshFallbacks, 15000);
+      window.addEventListener('beforeunload', () => clearInterval(periodicRefreshId), { once: true });
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) refreshFallbacks();
+      });
+      window.addEventListener('resize', refreshFallbacks);
+      refreshFallbacks();
     })();
   </script>
 </body>
