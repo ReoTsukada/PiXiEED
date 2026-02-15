@@ -633,14 +633,18 @@
 </script>
   <!-- Mobile bottom ad placeholder (visible in portrait / small screens) -->
   <div id="mobileBottomAd" aria-hidden="false">
-    <div class="mobile-ad-box" id="mobileBottomAdSlot">バナー広告</div>
+    <div class="mobile-ad-box" id="mobileBottomAdSlot">
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="ca-pub-9801602250480253"
+           data-ad-slot="2141591954"></ins>
+    </div>
   </div>
   <script>
     (function () {
       // Show mobile bottom ad when the active tool/settings panel (mobile or rail) is scrolled to bottom.
       const mobileAd = document.getElementById('mobileBottomAd');
       const mobilePanels = document.getElementById('mobilePanels');
-      const mobileBottomAdSlot = document.getElementById('mobileBottomAdSlot');
       const leftRail = document.getElementById('leftRail');
       const rightRail = document.getElementById('rightRail');
       const leftRailAd = document.getElementById('leftRailAd');
@@ -674,24 +678,6 @@
         }
         if (mobileAd.getAttribute('aria-hidden') !== 'true') {
           mobileAd.setAttribute('aria-hidden', 'true');
-        }
-      }
-
-      function getLiteAdHeightPx() {
-        return Math.max(48, Math.min(Math.round(window.innerWidth * 0.09), 60));
-      }
-
-      function enforceMobileBottomAdMetrics() {
-        const h = getLiteAdHeightPx();
-        if (mobileBottomAd instanceof HTMLElement) {
-          mobileBottomAd.style.maxHeight = `calc(${h + 16}px + env(safe-area-inset-bottom, 0px))`;
-        }
-        if (mobileBottomAdSlot instanceof HTMLElement) {
-          mobileBottomAdSlot.style.minHeight = `${h}px`;
-          mobileBottomAdSlot.style.height = `${h}px`;
-          mobileBottomAdSlot.style.maxHeight = `${h}px`;
-          mobileBottomAdSlot.style.padding = '0';
-          mobileBottomAdSlot.style.overflow = 'hidden';
         }
       }
 
@@ -767,7 +753,6 @@
           if (mobileBottomAd) {
             if (mql.matches) {
               showAd();
-              enforceMobileBottomAdMetrics();
               // compute current ad height and expose as CSS var so layout can adjust
               try {
                 const box = mobileBottomAd.querySelector('.mobile-ad-box');
@@ -866,28 +851,6 @@
         return Boolean(container.closest && container.closest('#mobileBottomAd'));
       }
 
-      function applyMobileBottomInsSizing(ins, container) {
-        if (!ins || !container) return;
-        let width = 0;
-        try {
-          width = (container.getBoundingClientRect && container.getBoundingClientRect().width)
-            || container.clientWidth
-            || container.offsetWidth
-            || 0;
-        } catch (e) {}
-        const safe = Math.max(0, width - 24);
-        const cap = 720;
-        const use = safe > 0 ? Math.min(safe, cap) : cap;
-        ins.style.width = use + 'px';
-        ins.style.maxWidth = '100%';
-        // Match PiXiEEDraw Lite footer ad ratio (clamp(48px, 9vw, 60px)).
-        const vh = Math.max(48, Math.min(Math.round(window.innerWidth * 0.09), 60));
-        ins.style.minHeight = vh + 'px';
-        ins.style.height = vh + 'px';
-        ins.style.maxHeight = vh + 'px';
-        ins.style.overflow = 'hidden';
-      }
-
       function ensureIns(container, slot) {
         if (!container) return false;
         // if a real ins already exists, keep it
@@ -901,12 +864,7 @@
   try { ins.dataset.pixiedRendered = '0'; } catch (e) {}
         ins.setAttribute('data-ad-client', ADS_CLIENT);
         ins.setAttribute('data-ad-slot', slot);
-        if (isMobileBottomSlot(container)) {
-          // Keep the mobile bottom ad compact like PiXiEEDraw Lite.
-          ins.setAttribute('data-ad-format', 'horizontal');
-          ins.setAttribute('data-full-width-responsive', 'false');
-          applyMobileBottomInsSizing(ins, container);
-        } else {
+        if (!isMobileBottomSlot(container)) {
           ins.setAttribute('data-ad-format', 'auto');
           ins.setAttribute('data-full-width-responsive', 'true');
         }
@@ -989,10 +947,7 @@
               try {
                 const w = (container.getBoundingClientRect && container.getBoundingClientRect().width) || (container.clientWidth || container.offsetWidth) || 0;
                 if (w > 0) {
-                  // constrain width for mobile bottom to avoid covering UI
-                  if (isMobileBottomSlot(container)) {
-                    applyMobileBottomInsSizing(ins, container);
-                  } else {
+                  if (!isMobileBottomSlot(container)) {
                     ins.style.width = w + 'px';
                     ins.style.maxWidth = '100%';
                   }
@@ -1044,9 +999,7 @@
                       try {
                         const w = (container.getBoundingClientRect && container.getBoundingClientRect().width) || (container.clientWidth || container.offsetWidth) || 0;
                         if (w > 0) {
-                          if (isMobileBottomSlot(container)) {
-                            applyMobileBottomInsSizing(ins, container);
-                          } else {
+                          if (!isMobileBottomSlot(container)) {
                             ins.style.width = w + 'px';
                             ins.style.maxWidth = '100%';
                           }
@@ -1092,19 +1045,16 @@
                 container._pixieed_pendingIns = null;
                 // apply temporary non-invasive sizing to allow ad to measure
                 container._pixieed_prevMinWidth = container.style.minWidth;
-                // smaller temp for mobileBottomAd so it doesn't force huge width
-                const tempMin = isMobileBottomSlot(container) ? '260px' : (container.style.minWidth || '320px');
+                const tempMin = container.style.minWidth || '320px';
                 container.style.minWidth = tempMin;
                 // before appending, try to set pixel width on the ins so adsbygoogle can measure
                 try {
                   const w = (container.getBoundingClientRect && container.getBoundingClientRect().width) || (container.clientWidth || container.offsetWidth) || 0;
                   if (w > 0) {
-                    if (isMobileBottomSlot(container)) {
-                        applyMobileBottomInsSizing(ins, container);
-                      } else {
+                    if (!isMobileBottomSlot(container)) {
                         ins.style.width = w + 'px';
                         ins.style.maxWidth = '100%';
-                      }
+                    }
                   }
                 } catch (e) {}
                 // append and render
@@ -1186,7 +1136,12 @@
       ];
 
       const pendingSince = new WeakMap();
-      const PENDING_TIMEOUT_MS = 3600;
+      const PENDING_TIMEOUT_MS = 9000;
+
+      function isDone(ins) {
+        if (!ins) return false;
+        return ins.getAttribute('data-adsbygoogle-status') === 'done';
+      }
 
       function hasFilledAd(box) {
         if (!box) return false;
@@ -1194,6 +1149,9 @@
         if (!ins) return false;
         const status = ins.getAttribute('data-ad-status');
         if (status === 'filled') return true;
+        // In some browsers/ad environments, only "done" is exposed.
+        // Treat done + not-unfilled as rendered so fallback won't cover live ads.
+        if (status !== 'unfilled' && isDone(ins)) return true;
         return Boolean(box.querySelector('iframe'));
       }
 
@@ -1204,7 +1162,7 @@
         if (hasFilledAd(box)) return false;
         const status = ins.getAttribute('data-ad-status');
         if (status === 'unfilled') return false;
-        const done = ins.getAttribute('data-adsbygoogle-status') === 'done';
+        const done = isDone(ins);
         return !done;
       }
 
@@ -1265,6 +1223,7 @@
 
       function ensureFallback(box) {
         if (!box) return;
+        if (hasFilledAd(box)) return;
         if (box.querySelector('.ad-fallback-promo')) return;
         if (!box.querySelector('ins.adsbygoogle')) box.textContent = '';
         box.classList.add('has-fallback-promo');
@@ -1293,7 +1252,43 @@
         setTimeout(refreshFallbacks, delay);
       });
       const periodicRefreshId = setInterval(refreshFallbacks, 15000);
+      let refreshRaf = null;
+      const queueRefresh = () => {
+        if (refreshRaf !== null) return;
+        refreshRaf = requestAnimationFrame(() => {
+          refreshRaf = null;
+          refreshFallbacks();
+        });
+      };
+
+      // Prioritize real ads: as soon as ad status/DOM changes, remove fallback immediately.
+      const adMutationObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          if (mutation.type === 'childList') {
+            queueRefresh();
+            return;
+          }
+          if (mutation.type === 'attributes') {
+            const name = mutation.attributeName || '';
+            if (name === 'data-ad-status' || name === 'data-adsbygoogle-status' || name === 'style' || name === 'class') {
+              queueRefresh();
+              return;
+            }
+          }
+        }
+      });
+      adBoxes.forEach((box) => {
+        if (!(box instanceof HTMLElement)) return;
+        adMutationObserver.observe(box, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['data-ad-status', 'data-adsbygoogle-status', 'style', 'class']
+        });
+      });
+
       window.addEventListener('beforeunload', () => clearInterval(periodicRefreshId), { once: true });
+      window.addEventListener('beforeunload', () => adMutationObserver.disconnect(), { once: true });
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) refreshFallbacks();
       });
