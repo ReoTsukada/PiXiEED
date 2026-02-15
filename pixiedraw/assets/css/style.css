@@ -2372,15 +2372,14 @@ input[type='range']::-moz-focus-outer {
   overflow: hidden !important;
 }
 
-/* Portrait narrower rails: ensure ad fits into compact rails */
+/* Portrait narrower rails: hide side ads and show one bottom banner. */
 @media (orientation: portrait) {
   .rail-ad .ad-box { max-width: calc(var(--left-width,78px)); font-size: 11px; padding: 4px; }
-  /* hide rail ads and per-panel ads on small/portrait screens and show a single top ad */
   .rail-ad { display: none !important; }
   .panel-ad { display: none !important; }
   #mobileBottomAd { display: flex !important; }
-  /* when JS marks the bottom ad active, push the main app up so UI is not covered */
-  body.bottom-ad-active .app { padding-bottom: calc(var(--mobile-bottom-ad-height, 56px) + env(safe-area-inset-bottom, 0px)); }
+  /* reserve exactly the measured banner height so UI never overlaps and no extra gap remains */
+  body.bottom-ad-active .app { padding-bottom: var(--mobile-bottom-ad-height, 0px); }
 }
 
 /* Landscape and wider screens: allow larger ad but keep within rail */
@@ -2388,9 +2387,9 @@ input[type='range']::-moz-focus-outer {
   .rail-ad .ad-box { max-width: none; }
 }
 
-/* Mobile bottom ad placeholder */
+/* Mobile bottom banner: compact horizontal slot */
 #mobileBottomAd {
-  display: none; /* shown only on portrait/small screens via media query */
+  display: none;
   position: fixed;
   left: 0;
   right: 0;
@@ -2398,14 +2397,13 @@ input[type='range']::-moz-focus-outer {
   z-index: 14050;
   justify-content: center;
   align-items: flex-end;
-  padding: 0 12px calc(8px + env(safe-area-inset-bottom, 0px));
-  /* start visually hidden and out of the viewport; JS toggles .visible */
+  padding: 0 6px calc(env(safe-area-inset-bottom, 0px) + 2px);
   opacity: 0;
   transform: translateY(100%);
-  transition: transform 180ms cubic-bezier(.2,.9,.2,1), opacity 160ms ease;
+  transition: transform 160ms cubic-bezier(.2,.9,.2,1), opacity 140ms ease;
   pointer-events: none;
   overflow: hidden;
-  max-height: calc(90px + env(safe-area-inset-bottom, 0px));
+  max-height: calc(64px + env(safe-area-inset-bottom, 0px));
 }
 #mobileBottomAd.visible {
   opacity: 1;
@@ -2416,62 +2414,33 @@ input[type='range']::-moz-focus-outer {
   background: #ffffff;
   color: #111111;
   width: min(100%, 720px);
-  max-width: min(100%, 720px);
-  min-height: clamp(56px, 11vw, 72px);
-  height: clamp(56px, 11vw, 72px);
-  max-height: clamp(56px, 11vw, 72px);
+  max-width: 100%;
+  min-width: 0;
+  min-height: clamp(48px, 8.2vw, 56px);
+  height: clamp(48px, 8.2vw, 56px);
+  max-height: clamp(48px, 8.2vw, 56px);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
-  border: 1px solid rgba(0,0,0,0.06);
-}
-
-/* If safe-area inset is present (iPhone notch), add padding */
-@supports (padding: env(safe-area-inset-bottom)) {
-  #mobileBottomAd { padding-bottom: calc(env(safe-area-inset-bottom) + 8px); }
-}
-
-/* Mobile bottom ad: visible with slide-up animation */
-#mobileBottomAd.visible {
-  transform: translateY(0);
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* mobile bottom ad box styling (compact on mobile) */
-#mobileBottomAd .mobile-ad-box {
-  background: #ffffff;
-  color: #111111;
-  width: min(100%, 720px);
-  max-width: min(100%, 720px); /* Lite ad-slot ratio */
-  min-height: clamp(56px, 11vw, 72px);
-  height: clamp(56px, 11vw, 72px);
-  max-height: clamp(56px, 11vw, 72px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  border: 1px solid rgba(0,0,0,0.06);
-  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+  border-radius: 6px;
+  border: 0;
+  box-shadow: none;
   padding: 0;
   box-sizing: border-box;
   margin: 0 auto;
   overflow: hidden;
 }
 
-/* Force the dedicated mobile-bottom slot to stay compact even if inline styles are injected. */
+/* Force dedicated mobile-bottom slot size even if inline styles are injected. */
 #mobileBottomAdSlot.mobile-ad-box {
   width: min(100%, 720px) !important;
   max-width: 100% !important;
   min-width: 0 !important;
-  min-height: clamp(56px, 11vw, 72px) !important;
-  height: clamp(56px, 11vw, 72px) !important;
-  max-height: clamp(56px, 11vw, 72px) !important;
+  min-height: clamp(48px, 8.2vw, 56px) !important;
+  height: clamp(48px, 8.2vw, 56px) !important;
+  max-height: clamp(48px, 8.2vw, 56px) !important;
 }
 
-/* Keep mobile bottom ad slot compact like PiXiEEDraw Lite */
 #mobileBottomAd .mobile-ad-box ins.adsbygoogle {
   display: block !important;
   width: 100% !important;
@@ -2479,9 +2448,9 @@ input[type='range']::-moz-focus-outer {
   min-width: 0 !important;
   margin-left: auto !important;
   margin-right: auto !important;
-  min-height: clamp(56px, 11vw, 72px) !important;
-  height: clamp(56px, 11vw, 72px) !important;
-  max-height: clamp(56px, 11vw, 72px) !important;
+  min-height: clamp(48px, 8.2vw, 56px) !important;
+  height: clamp(48px, 8.2vw, 56px) !important;
+  max-height: clamp(48px, 8.2vw, 56px) !important;
   box-sizing: border-box !important;
   overflow: hidden !important;
   border: 0 !important;
@@ -2495,26 +2464,11 @@ input[type='range']::-moz-focus-outer {
   min-width: 0 !important;
   margin-left: auto !important;
   margin-right: auto !important;
-  min-height: clamp(56px, 11vw, 72px) !important;
-  height: clamp(56px, 11vw, 72px) !important;
-  max-height: clamp(56px, 11vw, 72px) !important;
+  min-height: clamp(48px, 8.2vw, 56px) !important;
+  height: clamp(48px, 8.2vw, 56px) !important;
+  max-height: clamp(48px, 8.2vw, 56px) !important;
   border: 0 !important;
   overflow: hidden !important;
-}
-
-/* Keep portrait bottom ad slightly larger to improve fill opportunities. */
-@media (orientation: portrait) {
-  #mobileBottomAd .mobile-ad-box {
-    min-height: clamp(56px, 11vw, 72px);
-    height: clamp(56px, 11vw, 72px);
-    max-height: clamp(56px, 11vw, 72px);
-    padding: 0;
-  }
-  #mobileBottomAdSlot.mobile-ad-box {
-    min-height: clamp(56px, 11vw, 72px) !important;
-    height: clamp(56px, 11vw, 72px) !important;
-    max-height: clamp(56px, 11vw, 72px) !important;
-  }
 }
 
 /* Use only left/right rail-bottom ads (and portrait mobile bottom ad). */
