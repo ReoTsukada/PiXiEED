@@ -753,8 +753,8 @@
               // compute current ad height and expose as CSS var so layout can adjust
               try {
                 const box = mobileBottomAd.querySelector('.mobile-ad-box');
-                const raw = box ? box.offsetHeight + 12 : 56; // add small margin
-                const h = Math.max(48, Math.min(raw, 60));
+                const raw = box ? box.offsetHeight + 12 : 64; // add small margin
+                const h = Math.max(56, Math.min(raw, 72));
                 document.documentElement.style.setProperty('--mobile-bottom-ad-height', h + 'px');
               } catch (e) {}
               document.body.classList.add('bottom-ad-active');
