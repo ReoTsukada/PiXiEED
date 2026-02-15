@@ -75,8 +75,11 @@
       removePaletteColor: document.getElementById('removePaletteColor'),
       paletteIndex: document.getElementById('paletteIndex'),
       paletteHue: document.getElementById('paletteHue'),
+      paletteHueValue: document.getElementById('paletteHueValue'),
       paletteSaturation: document.getElementById('paletteSaturation'),
+      paletteSaturationValue: document.getElementById('paletteSaturationValue'),
       paletteValue: document.getElementById('paletteValue'),
+      paletteValueValue: document.getElementById('paletteValueValue'),
       paletteAlphaSlider: document.getElementById('paletteAlphaSlider'),
       paletteAlphaValue: document.getElementById('paletteAlphaValue'),
       paletteWheel: /** @type {HTMLCanvasElement|null} */ (document.getElementById('paletteColorWheel')),
@@ -10161,6 +10164,7 @@
     if (dom.controls.paletteAlphaSlider) {
       dom.controls.paletteAlphaSlider.value = String(color.a);
     }
+    updatePaletteSliderOutputs();
     updatePaletteAlphaOutput();
     updatePalettePreview();
     drawPaletteWheel();
@@ -10249,14 +10253,28 @@
     }
     updatePaletteWheelCursor();
     updatePalettePreview();
+    updatePaletteSliderOutputs();
     updatePaletteAlphaOutput();
     writePaletteColorFromHsv();
   }
 
-  function updatePaletteAlphaOutput() {
-    if (dom.controls.paletteAlphaValue) {
-      dom.controls.paletteAlphaValue.textContent = String(Math.round(paletteEditorState.hsv.a));
+  function updatePaletteSliderOutputs() {
+    if (dom.controls.paletteHueValue) {
+      dom.controls.paletteHueValue.textContent = String(Math.round(paletteEditorState.hsv.h));
     }
+    if (dom.controls.paletteSaturationValue) {
+      dom.controls.paletteSaturationValue.textContent = String(Math.round(clamp(paletteEditorState.hsv.s, 0, 1) * 100));
+    }
+    if (dom.controls.paletteValueValue) {
+      dom.controls.paletteValueValue.textContent = String(Math.round(clamp(paletteEditorState.hsv.v, 0, 1) * 100));
+    }
+    if (dom.controls.paletteAlphaValue) {
+      dom.controls.paletteAlphaValue.textContent = String(Math.round(clamp(paletteEditorState.hsv.a, 0, 255)));
+    }
+  }
+
+  function updatePaletteAlphaOutput() {
+    updatePaletteSliderOutputs();
     const alphaSlider = dom.controls.paletteAlphaSlider;
     if (alphaSlider) {
       const opaqueColor = hsvToRgba(paletteEditorState.hsv.h, paletteEditorState.hsv.s, paletteEditorState.hsv.v);
@@ -10428,6 +10446,7 @@
     }
     updatePaletteWheelCursor();
     updatePalettePreview();
+    updatePaletteSliderOutputs();
     updatePaletteAlphaOutput();
     writePaletteColorFromHsv();
   }
