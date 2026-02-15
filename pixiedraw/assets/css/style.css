@@ -2488,66 +2488,6 @@ input[type='range']::-moz-focus-outer {
   overflow: hidden !important;
 }
 
-/* fallback project promo links shown when ad inventory is unavailable */
-.ad-box,
-.mobile-ad-box {
-  position: relative;
-}
-
-.ad-fallback-promo {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: flex;
-  align-items: stretch;
-  justify-content: stretch;
-  gap: 4px;
-  padding: 3px;
-  box-sizing: border-box;
-  background: #ffffff;
-}
-
-.ad-fallback-promo__link {
-  flex: 1 1 0;
-  min-width: 0;
-  border-radius: 6px;
-  border: 1px solid rgba(19, 27, 48, 0.14);
-  background: linear-gradient(180deg, #f8fbff 0%, #edf4ff 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 2px 4px;
-  color: #0f172a;
-  text-decoration: none;
-  transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
-}
-
-.ad-fallback-promo__link:hover,
-.ad-fallback-promo__link:focus-visible {
-  border-color: rgba(37, 99, 235, 0.45);
-  background: linear-gradient(180deg, #e7f0ff 0%, #dce8ff 100%);
-  transform: translateY(-1px);
-}
-
-.ad-fallback-promo__icon {
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  flex: 0 0 auto;
-}
-
-.ad-fallback-promo__name {
-  min-width: 0;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
-  color: #0f172a;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 /* When the lite ad is visible, reduce the height slightly for a compact look */
 @media (orientation: portrait) {
   #mobileBottomAd .mobile-ad-box {
