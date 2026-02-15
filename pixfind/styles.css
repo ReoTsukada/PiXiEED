@@ -719,12 +719,6 @@ body.is-playing {
   grid-column: 1;
 }
 
-/* Prevent overscroll (pull-to-refresh / browser close) while playing on touch devices */
-.app.is-playing {
-  overscroll-behavior: none;
-  overscroll-behavior-y: none;
-}
-
 .stage {
   background: var(--panel);
   border-radius: 24px;
