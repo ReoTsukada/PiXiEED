@@ -8170,15 +8170,16 @@
       });
     }
 
-    async function createDrawImportPayload(result, filename) {
+    async function createDrawImportPayload(result, filename, options = {}) {
       if (!result) {
         return null;
       }
+      const preferDotCanvas = options.preferDotCanvas !== false;
       let width = Number(result.width);
       let height = Number(result.height);
       let dataUrl = typeof result.dataUrl === 'string' && result.dataUrl ? result.dataUrl : null;
 
-      if (state.dotMode && dotCanvas && dotCanvas.width && dotCanvas.height) {
+      if (preferDotCanvas && state.dotMode && dotCanvas && dotCanvas.width && dotCanvas.height) {
         try {
           dataUrl = dotCanvas.toDataURL('image/png');
           width = dotCanvas.width;
@@ -8369,7 +8370,9 @@
       const { blob, dataUrl, cssWidth, cssHeight, width, height } = result;
       const supportsDownloadAttr = 'download' in HTMLAnchorElement.prototype;
       const isIOS = /iP(hone|ad|od)/i.test(navigator.userAgent);
-      const drawPayload = enableDrawImport ? await createDrawImportPayload(result, filename) : null;
+      const drawPayload = enableDrawImport
+        ? await createDrawImportPayload(result, filename, options.drawPayloadOptions || {})
+        : null;
       let previewUrl = drawPayload && typeof drawPayload.dataUrl === 'string' ? drawPayload.dataUrl : null;
       if (!previewUrl && typeof dataUrl === 'string' && dataUrl) {
         previewUrl = dataUrl;
@@ -8964,7 +8967,10 @@
         const saved = await deliverCaptureResult(result, filename, {
           formatLabel: 'GIF',
           mimeType: 'image/gif',
-          enableDrawImport: false,
+          enableDrawImport: true,
+          drawPayloadOptions: {
+            preferDotCanvas: false
+          },
           autoShareOnIOS: false
         });
         if (!saved) {
