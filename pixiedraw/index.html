@@ -686,9 +686,8 @@
   </div>
   <script>
     (function () {
-      // Show mobile bottom ad when the active tool/settings panel (mobile or rail) is scrolled to bottom.
+      // Manage the mobile bottom ad visibility and geometry by orientation.
       const mobileAd = document.getElementById('mobileBottomAd');
-      const mobilePanels = document.getElementById('mobilePanels');
       if (!mobileAd) return;
 
       const mql = window.matchMedia('(orientation: portrait)');
@@ -696,7 +695,16 @@
       const mobileBottomAdSlot = document.getElementById('mobileBottomAdSlot');
       const MOBILE_AD_SLOT_HEIGHT = 56;
       let raf = null;
-      const listeners = new Map();
+
+      function notifyAdLayoutChange(reason) {
+        try {
+          document.dispatchEvent(new CustomEvent('pixiedraw:ad-layout-change', {
+            detail: { source: 'mobileBottomAd', reason: reason || 'unknown' }
+          }));
+        } catch (error) {
+          // ignore
+        }
+      }
 
       function clamp(value, min, max) {
         return Math.max(min, Math.min(max, value));
@@ -745,13 +753,6 @@
         }
       }
 
-      function isAtBottom(el) {
-        if (!el) return false;
-        if (el.scrollHeight <= el.clientHeight + 8) return false;
-        const threshold = 24;
-        return el.scrollTop + el.clientHeight >= el.scrollHeight - threshold;
-      }
-
       function showAd() {
         enforceMobileBottomAdGeometry();
         if (!mobileAd.classList.contains('visible')) {
@@ -771,24 +772,9 @@
         }
       }
 
-      function getActiveScrollableContainers() {
-        const set = new Set();
-        // mobile drawer active panel body
-        if (mobilePanels) {
-          const mobileBody = mobilePanels.querySelector('.mobile-panel.is-active .panel-section__body') || mobilePanels.querySelector('.mobile-panel.is-active');
-          if (mobileBody) set.add(mobileBody);
-        }
-        // any active panel-section bodies (used in left/right rails)
-        document.querySelectorAll('.panel-section.is-active .panel-section__body').forEach((el) => set.add(el));
-        return set;
-      }
-
-      function onScrollDebounced() {
+      function refreshMobileBottomAd() {
         if (raf) cancelAnimationFrame(raf);
         raf = requestAnimationFrame(function () {
-          const containers = getActiveScrollableContainers();
-          const anyAtBottom = Array.from(containers).some(isAtBottom);
-
           // Bottom ad: show in portrait as overlay at the bottom and mark body so CSS can add padding
           if (mobileBottomAd) {
             if (mql.matches) {
@@ -804,38 +790,15 @@
             }
           }
 
-          // In portrait, keep bottom ad visible like PiXiEEDraw Lite.
-          if (mql.matches) {
-            showAd();
-          } else if (anyAtBottom) {
-            showAd();
-          } else {
-            hideAd();
-          }
-
           raf = null;
         });
       }
 
       function refreshListeners() {
         enforceMobileBottomAdGeometry();
-        // remove previous
-        listeners.forEach((fn, el) => el.removeEventListener('scroll', fn));
-        listeners.clear();
-        // add new listeners
-        const containers = getActiveScrollableContainers();
-        containers.forEach((el) => {
-          const fn = onScrollDebounced;
-          el.addEventListener('scroll', fn, { passive: true });
-          listeners.set(el, fn);
-        });
-        // immediate check
-        onScrollDebounced();
+        refreshMobileBottomAd();
+        notifyAdLayoutChange('refreshListeners');
       }
-
-      // observe body for active-panel changes and refresh listeners
-      const mo = new MutationObserver(refreshListeners);
-      mo.observe(document.body, { attributes: true, subtree: true, childList: true });
 
       if (mobileBottomAdSlot instanceof HTMLElement) {
         if (typeof ResizeObserver === 'function') {
@@ -858,11 +821,20 @@
       }
 
       if (mql && typeof mql.addEventListener === 'function') {
-        mql.addEventListener('change', refreshListeners);
+        mql.addEventListener('change', () => {
+          refreshListeners();
+          notifyAdLayoutChange('orientation-change');
+        });
       } else if (mql && typeof mql.addListener === 'function') {
-        mql.addListener(refreshListeners);
+        mql.addListener(() => {
+          refreshListeners();
+          notifyAdLayoutChange('orientation-change');
+        });
       }
-      window.addEventListener('resize', refreshListeners);
+      window.addEventListener('resize', () => {
+        refreshListeners();
+        notifyAdLayoutChange('resize');
+      });
       document.addEventListener('readystatechange', function () { if (document.readyState === 'complete') refreshListeners(); });
 
       // initial setup
@@ -939,6 +911,7 @@
         { containerId: 'rightPanelAdSlot', slot: '1180252398' },
         { containerId: 'mobileBottomAdSlot', slot: '6568310446' }
       ];
+      const SIDE_SLOT_IDS = ['leftPanelAdSlot', 'rightPanelAdSlot'];
       const MIN_SIDE_AD_WIDTH = 120;
       const RETRY_FRAMES = 96;
       const slotByContainerId = new Map(SLOTS.map(item => [item.containerId, item]));
@@ -953,25 +926,60 @@
       })();
 
       let rerenderQueued = false;
+      let lastAdLayoutMode = null;
 
       function isPortraitBottomOnlyMode() {
         try {
-          if (document.body && document.body.classList.contains('is-mobile-layout')) {
-            return true;
-          }
           if (window.matchMedia) {
             return window.matchMedia('(orientation: portrait)').matches;
           }
+          return window.innerHeight >= window.innerWidth;
         } catch (error) {}
         return false;
       }
 
+      function getAdLayoutMode() {
+        return isPortraitBottomOnlyMode() ? 'portrait-bottom' : 'landscape-side';
+      }
+
+      function resetSlotContainer(containerId) {
+        const container = document.getElementById(containerId);
+        if (!(container instanceof HTMLElement)) return;
+        container.dataset.pixiedRetryLoop = '0';
+        container.innerHTML = '';
+      }
+
+      function handleAdLayoutTransition() {
+        const mode = getAdLayoutMode();
+        if (lastAdLayoutMode === mode) return;
+        lastAdLayoutMode = mode;
+        SIDE_SLOT_IDS.forEach(resetSlotContainer);
+
+        // Orientation switch can settle over multiple frames; queue staggered retries.
+        if (mode === 'landscape-side') {
+          [120, 320, 720].forEach((delayMs) => {
+            window.setTimeout(queueAllSlotsOnce, delayMs);
+          });
+        } else {
+          [80, 220].forEach((delayMs) => {
+            window.setTimeout(queueAllSlotsOnce, delayMs);
+          });
+        }
+      }
+
+      function getSideAdSquareSize(container) {
+        const width = getContainerWidth(container);
+        if (width >= 250) return 250;
+        if (width >= 200) return 200;
+        if (width >= 120) return 120;
+        return 0;
+      }
+
       function queueAllSlots() {
+        handleAdLayoutTransition();
         const portraitBottomOnly = isPortraitBottomOnlyMode();
-        SLOTS.forEach(({ containerId }) => {
-          if (portraitBottomOnly && containerId !== 'mobileBottomAdSlot') {
-            return;
-          }
+        const targetContainerIds = portraitBottomOnly ? ['mobileBottomAdSlot'] : SIDE_SLOT_IDS;
+        targetContainerIds.forEach((containerId) => {
           queueRenderForContainer(document.getElementById(containerId));
         });
       }
@@ -1036,11 +1044,23 @@
         ins.setAttribute('data-ad-client', ADS_CLIENT);
         ins.setAttribute('data-ad-slot', slot);
         if (isMobileBottomSlot(container)) {
+          ins.style.removeProperty('width');
+          ins.style.removeProperty('height');
+          ins.style.removeProperty('min-height');
+          ins.style.removeProperty('max-height');
           ins.setAttribute('data-ad-format', 'horizontal');
           ins.removeAttribute('data-full-width-responsive');
         } else {
-          ins.setAttribute('data-ad-format', 'auto');
-          ins.setAttribute('data-full-width-responsive', 'true');
+          const sideSize = getSideAdSquareSize(container) || MIN_SIDE_AD_WIDTH;
+          container.style.setProperty('--panel-ad-square-size', `${sideSize}px`);
+          ins.style.display = 'inline-block';
+          ins.style.width = `${sideSize}px`;
+          ins.style.height = `${sideSize}px`;
+          ins.style.minHeight = `${sideSize}px`;
+          ins.style.maxHeight = `${sideSize}px`;
+          ins.style.maxWidth = '100%';
+          ins.removeAttribute('data-ad-format');
+          ins.removeAttribute('data-full-width-responsive');
         }
 
         if (localHost) {
@@ -1090,6 +1110,9 @@
 
       function tryRender(container) {
         if (!isContainerRenderable(container)) return false;
+        if (!isMobileBottomSlot(container) && getSideAdSquareSize(container) < MIN_SIDE_AD_WIDTH) {
+          return false;
+        }
         const slotConfig = slotByContainerId.get(container.id);
         if (!slotConfig) return false;
         const ins = getOrCreateIns(container, slotConfig.slot);
@@ -1126,7 +1149,11 @@
 
       function queueRenderForContainer(container) {
         if (!(container instanceof HTMLElement)) return;
-        if (isPortraitBottomOnlyMode() && container.id !== 'mobileBottomAdSlot') {
+        const portraitBottomOnly = isPortraitBottomOnlyMode();
+        if (portraitBottomOnly && container.id !== 'mobileBottomAdSlot') {
+          return;
+        }
+        if (!portraitBottomOnly && container.id === 'mobileBottomAdSlot') {
           return;
         }
         const slotConfig = slotByContainerId.get(container.id);
@@ -1162,6 +1189,16 @@
 
       queueAllSlots();
       window.addEventListener('resize', queueAllSlotsOnce, { passive: true });
+      window.addEventListener('orientationchange', queueAllSlotsOnce, { passive: true });
+      document.addEventListener('pixiedraw:ad-layout-change', queueAllSlotsOnce);
+      if (window.matchMedia) {
+        const orientationMql = window.matchMedia('(orientation: portrait)');
+        if (typeof orientationMql.addEventListener === 'function') {
+          orientationMql.addEventListener('change', queueAllSlotsOnce);
+        } else if (typeof orientationMql.addListener === 'function') {
+          orientationMql.addListener(queueAllSlotsOnce);
+        }
+      }
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
           queueAllSlotsOnce();
