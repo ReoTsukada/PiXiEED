@@ -47,6 +47,7 @@
   --canvas-control-size: clamp(38px, 4.2vw, 44px);
   --canvas-control-size-mobile: clamp(32px, 9vw, 38px);
   --canvas-control-icon-size: 20px;
+  --mobile-bottom-ad-slot-height: clamp(48px, 8.2vw, 56px);
 }
 
 @supports (height: 100dvh) {
@@ -164,10 +165,14 @@ img,
 
 .update-toast {
   position: fixed;
-  bottom: max(1.5rem, calc(var(--safe-area-bottom) + 1rem));
-  right: max(1.5rem, calc(var(--safe-area-right) + 1rem));
+  top: calc(50% + (var(--safe-area-top) - var(--safe-area-bottom)) * 0.5);
+  left: calc(50% + (var(--safe-area-left) - var(--safe-area-right)) * 0.5);
+  right: auto;
+  bottom: auto;
+  transform: translate(-50%, -50%);
   z-index: 9999;
-  max-width: min(320px, 90vw);
+  width: min(360px, calc(100vw - var(--safe-area-left) - var(--safe-area-right) - 2rem));
+  max-width: min(360px, calc(100vw - var(--safe-area-left) - var(--safe-area-right) - 2rem));
   background: rgba(12, 20, 32, 0.94);
   border: 1px solid rgba(112, 246, 255, 0.35);
   border-radius: 18px;
@@ -230,9 +235,8 @@ img,
 
 @media (max-width: 640px) {
   .update-toast {
-    left: max(1rem, calc(var(--safe-area-left) + 0.75rem));
-    right: max(1rem, calc(var(--safe-area-right) + 0.75rem));
-    bottom: max(1rem, calc(var(--safe-area-bottom) + 0.75rem));
+    width: min(92vw, 360px);
+    max-width: min(92vw, 360px);
   }
   .update-toast__actions {
     flex-direction: column;
@@ -245,11 +249,11 @@ img,
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translate(-50%, calc(-50% + 8px));
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(-50%, -50%);
   }
 }
 
@@ -2510,8 +2514,8 @@ input[type='range']::-moz-focus-outer {
   .rail-ad { display: none !important; }
   .panel-ad { display: none !important; }
   #mobileBottomAd { display: flex !important; }
-  /* reserve exactly the measured banner height so UI never overlaps and no extra gap remains */
-  body.bottom-ad-active .app { padding-bottom: var(--mobile-bottom-ad-height, 0px); }
+  /* Always reserve banner area in portrait so UI never overlaps the fixed ad. */
+  .app { padding-bottom: calc(var(--mobile-bottom-ad-slot-height) + env(safe-area-inset-bottom, 0px) + 6px); }
 }
 
 /* Landscape and wider screens: allow larger ad but keep within rail */
@@ -2550,7 +2554,9 @@ input[type='range']::-moz-focus-outer {
   transition: transform 160ms cubic-bezier(.2,.9,.2,1), opacity 140ms ease;
   pointer-events: none;
   overflow: hidden;
-  max-height: calc(64px + env(safe-area-inset-bottom, 0px));
+  min-height: calc(var(--mobile-bottom-ad-slot-height) + env(safe-area-inset-bottom, 0px) + 2px);
+  height: calc(var(--mobile-bottom-ad-slot-height) + env(safe-area-inset-bottom, 0px) + 2px);
+  max-height: calc(var(--mobile-bottom-ad-slot-height) + env(safe-area-inset-bottom, 0px) + 2px);
 }
 #mobileBottomAd.visible {
   opacity: 1;
@@ -2563,9 +2569,9 @@ input[type='range']::-moz-focus-outer {
   width: min(100%, 720px);
   max-width: 100%;
   min-width: 0;
-  min-height: clamp(48px, 8.2vw, 56px);
-  height: clamp(48px, 8.2vw, 56px);
-  max-height: clamp(48px, 8.2vw, 56px);
+  min-height: var(--mobile-bottom-ad-slot-height);
+  height: var(--mobile-bottom-ad-slot-height);
+  max-height: var(--mobile-bottom-ad-slot-height);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2583,9 +2589,9 @@ input[type='range']::-moz-focus-outer {
   width: min(100%, 720px) !important;
   max-width: 100% !important;
   min-width: 0 !important;
-  min-height: clamp(48px, 8.2vw, 56px) !important;
-  height: clamp(48px, 8.2vw, 56px) !important;
-  max-height: clamp(48px, 8.2vw, 56px) !important;
+  min-height: var(--mobile-bottom-ad-slot-height) !important;
+  height: var(--mobile-bottom-ad-slot-height) !important;
+  max-height: var(--mobile-bottom-ad-slot-height) !important;
 }
 
 #mobileBottomAd .mobile-ad-box ins.adsbygoogle,
@@ -2596,9 +2602,9 @@ input[type='range']::-moz-focus-outer {
   min-width: 0 !important;
   margin-left: auto !important;
   margin-right: auto !important;
-  min-height: clamp(48px, 8.2vw, 56px) !important;
-  height: clamp(48px, 8.2vw, 56px) !important;
-  max-height: clamp(48px, 8.2vw, 56px) !important;
+  min-height: var(--mobile-bottom-ad-slot-height) !important;
+  height: var(--mobile-bottom-ad-slot-height) !important;
+  max-height: var(--mobile-bottom-ad-slot-height) !important;
   box-sizing: border-box !important;
   overflow: hidden !important;
   border: 0 !important;
@@ -2612,9 +2618,9 @@ input[type='range']::-moz-focus-outer {
   min-width: 0 !important;
   margin-left: auto !important;
   margin-right: auto !important;
-  min-height: clamp(48px, 8.2vw, 56px) !important;
-  height: clamp(48px, 8.2vw, 56px) !important;
-  max-height: clamp(48px, 8.2vw, 56px) !important;
+  min-height: var(--mobile-bottom-ad-slot-height) !important;
+  height: var(--mobile-bottom-ad-slot-height) !important;
+  max-height: var(--mobile-bottom-ad-slot-height) !important;
   border: 0 !important;
   overflow: hidden !important;
 }
