@@ -310,6 +310,12 @@ function normalizeTargetLabel(value, index = 0) {
   return raw || `アイテム ${index + 1}`;
 }
 
+function formatTargetDisplayLabel(value, index = 0) {
+  const base = normalizeTargetLabel(value, index);
+  const numberedPrefix = `#${index + 1}`;
+  return base.startsWith(numberedPrefix) ? base : `${numberedPrefix} ${base}`;
+}
+
 function normalizeComparableUrl(value) {
   const raw = String(value ?? '').trim();
   if (!raw) return '';
@@ -731,7 +737,7 @@ function setCreatorMode(mode, silent = false) {
   }
   if (dom.creatorModeNote) {
     dom.creatorModeNote.textContent = isHiddenMode
-      ? '探し物レイヤーは白地に黒で作成してください。検出した番号ごとに探し物の名前を入力してください。'
+      ? '探し物レイヤーは白地に黒で作成してください。検出した番号ごとに探し物名を入力すると、ゲーム画面に #番号付きで表示されます。'
       : '公開するとオンライン公開され、難易度一覧に追加されます。';
   }
 
@@ -1060,7 +1066,7 @@ async function handleCreatorAnalyze() {
     updateCreatorSummary(diffResult, normalizedOriginal.width, normalizedOriginal.height);
     setCreatorStatus(
       isHiddenMode
-        ? `探し物を${diffResult.regions.length}件検出しました。番号ごとに名前を入力してください。`
+        ? `探し物を${diffResult.regions.length}件検出しました。番号ごとに名前を入力するとゲーム画面に表示されます。`
         : `差分を${diffResult.regions.length}箇所検出しました。内容を確認してください。`,
     );
     updateCreatorPublishAvailability();
@@ -3080,10 +3086,9 @@ function updateGameModePresentation() {
     dom.canvasChallenge.setAttribute('aria-label', isHiddenObjectMode() ? 'もの探し画像' : '間違いを探す画像');
   }
   renderTargetPanel();
-  // If we're in hidden-object mode, hide the target/hint placeholders so the image can take more space.
+  // Hidden-object mode keeps the target panel visible, but the generic hint card can be hidden to save space.
   try {
     if (dom.hintCard) dom.hintCard.hidden = isHiddenObjectMode();
-    if (dom.targetPanel) dom.targetPanel.hidden = isHiddenObjectMode() || dom.targetPanel.hidden;
   } catch (_) {
     // ignore if DOM not ready
   }
@@ -3106,10 +3111,10 @@ function renderTargetPanel() {
   dom.targetCurrent.textContent = remaining > 0
     ? `残り ${remaining} 個`
     : 'コンプリート！';
-  state.hiddenTargets.forEach(target => {
+  state.hiddenTargets.forEach((target, index) => {
     const item = document.createElement('li');
     item.className = `target-list__item${target.found ? ' is-found' : ''}`;
-    item.textContent = target.label;
+    item.textContent = formatTargetDisplayLabel(target.label, index);
     dom.targetList.append(item);
   });
 }
