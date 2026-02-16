@@ -1138,14 +1138,14 @@
           const sideFrame = getSideAdFrameSize(container);
           container.style.setProperty('--panel-ad-width', `${sideFrame.width}px`);
           container.style.setProperty('--panel-ad-height', `${sideFrame.height}px`);
-          ins.style.display = 'inline-block';
-          ins.style.width = `${sideFrame.width}px`;
+          ins.style.display = 'block';
+          ins.style.width = '100%';
+          ins.style.maxWidth = '100%';
           ins.style.height = `${sideFrame.height}px`;
           ins.style.minHeight = `${sideFrame.height}px`;
           ins.style.maxHeight = `${sideFrame.height}px`;
-          ins.style.maxWidth = '100%';
-          ins.removeAttribute('data-ad-format');
-          ins.removeAttribute('data-full-width-responsive');
+          ins.setAttribute('data-ad-format', 'auto');
+          ins.setAttribute('data-full-width-responsive', 'true');
         }
 
         if (localHost) {
