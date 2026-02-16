@@ -47,8 +47,7 @@
   --canvas-control-size: clamp(38px, 4.2vw, 44px);
   --canvas-control-size-mobile: clamp(32px, 9vw, 38px);
   --canvas-control-icon-size: 20px;
-  --mobile-bottom-ad-slot-height: 50px;
-  --mobile-bottom-ad-target-width: 320px;
+  --mobile-bottom-ad-slot-height: clamp(48px, 8.2vw, 56px);
 }
 
 @supports (height: 100dvh) {
@@ -2600,7 +2599,7 @@ body.is-mobile-layout #rightPanelAdSlot {
 #mobileBottomAd .mobile-ad-box {
   background: #ffffff;
   color: #111111;
-  width: min(100%, var(--mobile-bottom-ad-target-width));
+  width: min(100%, 720px);
   max-width: 100%;
   min-width: 0;
   min-height: var(--mobile-bottom-ad-slot-height);
@@ -2620,7 +2619,7 @@ body.is-mobile-layout #rightPanelAdSlot {
 
 /* Force dedicated mobile-bottom slot size even if inline styles are injected. */
 #mobileBottomAdSlot.mobile-ad-box {
-  width: min(100%, var(--mobile-bottom-ad-target-width)) !important;
+  width: min(100%, 720px) !important;
   max-width: 100% !important;
   min-width: 0 !important;
   min-height: var(--mobile-bottom-ad-slot-height) !important;
@@ -2631,8 +2630,8 @@ body.is-mobile-layout #rightPanelAdSlot {
 #mobileBottomAd .mobile-ad-box ins.adsbygoogle,
 #mobileBottomAd .mobile-ad-box ins.ad-seed {
   display: block !important;
-  width: var(--mobile-bottom-ad-target-width) !important;
-  max-width: var(--mobile-bottom-ad-target-width) !important;
+  width: 100% !important;
+  max-width: 100% !important;
   min-width: 0 !important;
   margin-left: auto !important;
   margin-right: auto !important;
@@ -2655,8 +2654,8 @@ body.is-mobile-layout #rightPanelAdSlot {
 #mobileBottomAd .mobile-ad-box ins.adsbygoogle iframe,
 #mobileBottomAd .mobile-ad-box .adsbygoogle iframe {
   display: block !important;
-  width: var(--mobile-bottom-ad-target-width) !important;
-  max-width: var(--mobile-bottom-ad-target-width) !important;
+  width: 100% !important;
+  max-width: 100% !important;
   min-width: 0 !important;
   margin-left: auto !important;
   margin-right: auto !important;
