@@ -862,228 +862,226 @@
     })();
   </script>
   <script>
-    // AdSense injector: insert real AdSense slots into known containers and trigger rendering.
+    // AdSense injector: keep slot nodes mounted and only promote a slot to `adsbygoogle`
+    // right before push(), so 0px hidden slots never poison the global queue.
     (function initAds() {
       if (!document || !window) return;
-      // If the global adsbygoogle script is not present yet, it will still be available when loaded in <head>.
       const ADS_CLIENT = 'ca-pub-9801602250480253';
-      const baseSlots = [
+      const SLOTS = [
         { containerId: 'leftPanelAdSlot', slot: '3806415737' },
         { containerId: 'rightPanelAdSlot', slot: '1180252398' },
         { containerId: 'mobileBottomAdSlot', slot: '6568310446' }
       ];
-      const SLOTS = baseSlots;
-      const MIN_SIDE_AD_WIDTH = 1;
+      const MIN_SIDE_AD_WIDTH = 120;
+      const RETRY_FRAMES = 96;
+      const slotByContainerId = new Map(SLOTS.map(item => [item.containerId, item]));
+      const resizeObserverByContainer = new WeakMap();
+      const localHost = (() => {
+        try {
+          const host = location && location.hostname ? location.hostname : '';
+          return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+        } catch (error) {
+          return false;
+        }
+      })();
+
+      let rerenderQueued = false;
+
+      function queueAllSlots() {
+        SLOTS.forEach(({ containerId }) => {
+          queueRenderForContainer(document.getElementById(containerId));
+        });
+      }
+
+      function queueAllSlotsOnce() {
+        if (rerenderQueued) return;
+        rerenderQueued = true;
+        window.requestAnimationFrame(() => {
+          rerenderQueued = false;
+          queueAllSlots();
+        });
+      }
 
       function isMobileBottomSlot(container) {
-        if (!container) return false;
+        if (!(container instanceof HTMLElement)) return false;
         if (container.id === 'mobileBottomAdSlot') return true;
         return Boolean(container.closest && container.closest('#mobileBottomAd'));
       }
 
-      function ensureIns(container, slot) {
-        if (!container) return false;
-        // if a real ins already exists, keep it
-        if (container.querySelector && container.querySelector('ins.adsbygoogle')) return true;
-        if (container._pixieed_pendingIns) return true;
-        // create ins element
-        const ins = document.createElement('ins');
-        ins.className = 'adsbygoogle';
-        ins.style.display = 'block';
-  // mark as not-yet-rendered by our injector; allows tryRender to avoid duplicate pushes
-  try { ins.dataset.pixiedRendered = '0'; } catch (e) {}
-        ins.setAttribute('data-ad-client', ADS_CLIENT);
-        ins.setAttribute('data-ad-slot', slot);
-        if (!isMobileBottomSlot(container)) {
-          ins.setAttribute('data-ad-format', 'auto');
-          ins.setAttribute('data-full-width-responsive', 'true');
-        }
-        // enable AdSense test mode on localhost/dev so test ads can appear
+      function getContainerWidth(container) {
+        if (!(container instanceof HTMLElement)) return 0;
         try {
-          const host = (location && location.hostname) ? location.hostname : '';
-          if (host === 'localhost' || host === '127.0.0.1' || host === '::1') {
-            ins.setAttribute('data-adtest', 'on');
-            console.info('[pixiedraw] AdSense: enabling data-adtest=on for local dev');
-          }
-        } catch (err) {
-          // ignore
+          const rect = container.getBoundingClientRect();
+          return (rect && rect.width) || container.clientWidth || container.offsetWidth || 0;
+        } catch (error) {
+          return container.clientWidth || container.offsetWidth || 0;
         }
-        // Do not append ins immediately if the container may have zero width.
-        // Store it as a pending element and append later when the container is sized.
-        try {
-          container._pixieed_pendingIns = ins;
-          console.debug('[pixiedraw] created pending ins.adsbygoogle for', container.id || container);
-        } catch (e) {
-          // fallback: append immediately if we can't attach property
-          container.innerHTML = '';
-          container.appendChild(ins);
-          console.debug('[pixiedraw] inserted ins.adsbygoogle into (fallback)', container.id || container);
-        }
+      }
+
+      function getRequiredWidth(container) {
+        return isMobileBottomSlot(container) ? 1 : MIN_SIDE_AD_WIDTH;
+      }
+
+      function isContainerRenderable(container) {
+        if (!(container instanceof HTMLElement) || !container.isConnected) return false;
+        const width = getContainerWidth(container);
+        if (width < getRequiredWidth(container)) return false;
+        if (container.getClientRects && container.getClientRects().length === 0) return false;
         return true;
       }
 
-      function tryRender(container) {
-        // Guard against timing races where a container was measurable a moment ago
-        // but became hidden/collapsed before adsbygoogle.push() runs.
-        if (container && container instanceof HTMLElement) {
-          let width = 0;
-          try {
-            const rect = container.getBoundingClientRect();
-            width = (rect && rect.width) || container.clientWidth || container.offsetWidth || 0;
-          } catch (e) {
-            width = container.clientWidth || container.offsetWidth || 0;
-          }
-          const isSideSlot = container.id !== 'mobileBottomAdSlot';
-          const minWidth = isSideSlot ? MIN_SIDE_AD_WIDTH : 1;
-          if (width < minWidth) {
-            console.debug('[pixiedraw] skip ads push: container width not ready', container.id || container, width, 'required', minWidth);
-            try {
-              if (!container._pixieed_retryQueued) {
-                container._pixieed_retryQueued = '1';
-                window.requestAnimationFrame(() => {
-                  try { container._pixieed_retryQueued = ''; } catch (err) {}
-                  scheduleRenderForContainer(container);
-                });
-              }
-            } catch (e) {}
-            return;
-          }
+      function hasRendered(ins) {
+        if (!(ins instanceof HTMLElement)) return false;
+        if (ins.dataset && ins.dataset.pixiedRendered === '1') return true;
+        return ins.getAttribute('data-adsbygoogle-status') === 'done';
+      }
+
+      function getOrCreateIns(container, slot) {
+        if (!(container instanceof HTMLElement)) return null;
+        let ins = container.querySelector('ins');
+        if (!(ins instanceof HTMLElement)) {
+          ins = document.createElement('ins');
+          ins.className = 'ad-seed';
+          ins.style.display = 'block';
+          container.appendChild(ins);
         }
+
+        ins.style.display = 'block';
+        if (!ins.classList.contains('adsbygoogle') && !ins.classList.contains('ad-seed')) {
+          ins.classList.add('ad-seed');
+        }
+        ins.setAttribute('data-ad-client', ADS_CLIENT);
+        ins.setAttribute('data-ad-slot', slot);
+        ins.setAttribute('data-ad-format', 'auto');
+        ins.setAttribute('data-full-width-responsive', 'true');
+
+        if (localHost) {
+          ins.setAttribute('data-adtest', 'on');
+        } else if (ins.hasAttribute('data-adtest')) {
+          ins.removeAttribute('data-adtest');
+        }
+
+        if (hasRendered(ins)) {
+          ins.dataset.pixiedRendered = '1';
+        }
+
+        return ins;
+      }
+
+      function demoteOtherPendingIns(exceptIns) {
+        SLOTS.forEach(({ containerId }) => {
+          const container = document.getElementById(containerId);
+          if (!(container instanceof HTMLElement)) return;
+          const node = container.querySelector('ins.adsbygoogle');
+          if (!(node instanceof HTMLElement) || node === exceptIns) return;
+          if (hasRendered(node)) return;
+          node.classList.remove('adsbygoogle');
+          if (!node.classList.contains('ad-seed')) {
+            node.classList.add('ad-seed');
+          }
+        });
+      }
+
+      function promoteForRender(ins) {
+        if (!(ins instanceof HTMLElement)) return;
+        if (!ins.classList.contains('adsbygoogle')) {
+          ins.classList.add('adsbygoogle');
+        }
+        ins.classList.remove('ad-seed');
+        ins.dataset.pixiedRendered = '0';
+      }
+
+      function rollbackPending(ins) {
+        if (!(ins instanceof HTMLElement)) return;
+        if (hasRendered(ins)) return;
+        ins.classList.remove('adsbygoogle');
+        if (!ins.classList.contains('ad-seed')) {
+          ins.classList.add('ad-seed');
+        }
+      }
+
+      function tryRender(container) {
+        if (!isContainerRenderable(container)) return false;
+        const slotConfig = slotByContainerId.get(container.id);
+        if (!slotConfig) return false;
+        const ins = getOrCreateIns(container, slotConfig.slot);
+        if (!(ins instanceof HTMLElement)) return false;
+        if (hasRendered(ins)) return true;
+
+        demoteOtherPendingIns(ins);
+        promoteForRender(ins);
 
         try {
-          // Only call adsbygoogle.push if there are ins elements that haven't been marked as rendered.
-          const scope = container || document;
-          const insList = Array.from(scope.querySelectorAll && scope.querySelectorAll('ins.adsbygoogle') || []);
-          const unrendered = insList.filter(i => !(i.dataset && i.dataset.pixiedRendered === '1'));
-          if (!unrendered.length) {
-            console.debug('[pixiedraw] no unrendered ins.adsbygoogle found; skipping adsbygoogle.push');
+          console.debug('[pixiedraw] calling (adsbygoogle).push for', container.id, 'width=', Math.round(getContainerWidth(container)));
+          (window.adsbygoogle = window.adsbygoogle || []).push({});
+          ins.dataset.pixiedRendered = '1';
+          return true;
+        } catch (error) {
+          rollbackPending(ins);
+          console.warn('[pixiedraw] adsbygoogle push failed', container.id, error && error.message);
+          return false;
+        }
+      }
+
+      function ensureContainerObserver(container) {
+        if (!(container instanceof HTMLElement)) return;
+        if (resizeObserverByContainer.has(container)) return;
+        if (typeof ResizeObserver !== 'function') return;
+        const observer = new ResizeObserver(() => {
+          if (isContainerRenderable(container)) {
+            tryRender(container);
+          }
+        });
+        observer.observe(container);
+        resizeObserverByContainer.set(container, observer);
+      }
+
+      function queueRenderForContainer(container) {
+        if (!(container instanceof HTMLElement)) return;
+        const slotConfig = slotByContainerId.get(container.id);
+        if (!slotConfig) return;
+
+        getOrCreateIns(container, slotConfig.slot);
+        ensureContainerObserver(container);
+        if (tryRender(container)) return;
+
+        if (container.dataset.pixiedRetryLoop === '1') return;
+        container.dataset.pixiedRetryLoop = '1';
+        let attempts = 0;
+
+        const retry = () => {
+          if (!(container instanceof HTMLElement) || !container.isConnected) {
+            container.dataset.pixiedRetryLoop = '0';
             return;
           }
-          console.debug('[pixiedraw] calling (adsbygoogle).push for rendering —', unrendered.length, 'ins');
-          (window.adsbygoogle = window.adsbygoogle || []).push({});
-          // mark them as attempted so future pushes don't error
-          try { unrendered.forEach(i => { i.dataset.pixiedRendered = '1'; }); } catch (e) {}
-        } catch (e) {
-          console.warn('[pixiedraw] adsbygoogle push failed', (container && container.id) || '(unknown-container)', e && e.message);
-        }
+          if (tryRender(container)) {
+            container.dataset.pixiedRetryLoop = '0';
+            return;
+          }
+          attempts += 1;
+          if (attempts < RETRY_FRAMES) {
+            window.requestAnimationFrame(retry);
+            return;
+          }
+          container.dataset.pixiedRetryLoop = '0';
+        };
+
+        window.requestAnimationFrame(retry);
       }
 
-      // Insert ins elements where needed, but only call adsbygoogle.push() when the
-      // container has a measurable width. Ads will fail with "No slot size for availableWidth=0"
-      // if push() is called while the container is hidden or has 0 width.
-      function scheduleRenderForContainer(container) {
-        if (!container) return;
-        const getWidth = () => {
-          try {
-            const r = container.getBoundingClientRect();
-            return (r && r.width) || 0;
-          } catch (e) {
-            return (container.clientWidth || container.offsetWidth || 0);
-          }
-        };
-        const hasWidth = () => {
-          const w = getWidth();
-          const isSideSlot = container.id !== 'mobileBottomAdSlot';
-          if (isSideSlot) return w >= MIN_SIDE_AD_WIDTH;
-          try {
-            return w > 0;
-          } catch (e) {
-            return false;
-          }
-        };
-
-        if (hasWidth()) {
-          // If there is a pending ins element, append it now so pixieedObserveAds / adsbygoogle can measure it.
-          try {
-            if (container._pixieed_pendingIns) {
-              const ins = container._pixieed_pendingIns;
-              container._pixieed_pendingIns = null;
-              // ensure the ins has a measurable width before appending
-              try {
-                const w = getWidth();
-                if (w > 0) {
-                  ins.style.maxWidth = '100%';
-                }
-              } catch (e) {}
-              container.innerHTML = '';
-              container.appendChild(ins);
-              console.debug('[pixiedraw] appended pending ins into', container.id || container);
-            }
-          } catch (e) {}
-          console.debug('[pixiedraw] container has width, rendering ads now for', container.id || container);
-          tryRender(container);
-          return;
+      queueAllSlots();
+      window.addEventListener('resize', queueAllSlotsOnce, { passive: true });
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          queueAllSlotsOnce();
         }
+      });
 
-        // Use ResizeObserver when available to detect when the container becomes visible / sized.
-        let ro = null;
-        const cleanup = () => {
-          try { if (ro) ro.disconnect(); } catch (e) {}
-          window.removeEventListener('resize', onResize);
-          document.removeEventListener('visibilitychange', onVisibility);
-        };
-
-        const onResize = () => {
-          if (hasWidth()) {
-            console.debug('[pixiedraw] resize observed, container sized for', container.id || container);
-            tryRender(container);
-            cleanup();
-          }
-        };
-
-        const onVisibility = () => {
-          if (document.visibilityState === 'visible' && hasWidth()) {
-            console.debug('[pixiedraw] visibilitychange -> visible and container sized for', container.id || container);
-            tryRender(container);
-            cleanup();
-          }
-        };
-
-        if (window.ResizeObserver) {
-          try {
-            ro = new ResizeObserver((entries) => {
-              for (const entry of entries) {
-                if (hasWidth()) {
-                  try {
-                    if (container._pixieed_pendingIns) {
-                      const ins = container._pixieed_pendingIns;
-                      container._pixieed_pendingIns = null;
-                      try {
-                        const w = getWidth();
-                        if (w > 0) {
-                          ins.style.maxWidth = '100%';
-                        }
-                      } catch (e) {}
-                      container.innerHTML = '';
-                      container.appendChild(ins);
-                      console.debug('[pixiedraw] ResizeObserver appended pending ins into', container.id || container);
-                    }
-                  } catch (e) {}
-                  console.debug('[pixiedraw] ResizeObserver: container now has width for', container.id || container);
-                  tryRender(container);
-                  cleanup();
-                  return;
-                }
-              }
-            });
-            ro.observe(container);
-          } catch (e) {
-            // fallthrough to window resize listener
-            window.addEventListener('resize', onResize);
-            document.addEventListener('visibilitychange', onVisibility);
-          }
-        } else {
-          window.addEventListener('resize', onResize);
-          document.addEventListener('visibilitychange', onVisibility);
-        }
-      }
-
-      // Insert ins elements and schedule rendering only when the container is sized.
-      SLOTS.forEach(({ containerId, slot }) => {
-        const container = document.getElementById(containerId);
-        if (ensureIns(container, slot)) {
-          scheduleRenderForContainer(container);
-        }
+      const observer = new MutationObserver(queueAllSlotsOnce);
+      observer.observe(document.body, {
+        attributes: true,
+        attributeFilter: ['class', 'hidden', 'style', 'aria-hidden', 'data-compact', 'data-collapsed'],
+        subtree: true
       });
 
       // Export dialog ad is rendered on-demand in app.js when the dialog opens.
