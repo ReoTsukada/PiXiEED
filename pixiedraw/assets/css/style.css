@@ -20,7 +20,7 @@
   --mobile-drawer-half-height: clamp(188px, 36vh, 420px);
   --mobile-drawer-full-height: clamp(240px, 46vh, 520px);
   --mobile-drawer-height: var(--mobile-drawer-full-height);
-  --mobile-drawer-handle-height: 30px;
+  --mobile-drawer-handle-height: 38px;
   --mobile-stage-padding: 1px;
   --mobile-topbar-height: clamp(82px, 12vh, 122px);
   --mobile-top-control-size: clamp(36px, 10vw, 44px);
@@ -864,7 +864,7 @@ button {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 16px;
+  width: 22px;
   padding: 0;
   border: 0;
   background: linear-gradient(
@@ -888,8 +888,8 @@ button {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 4px;
-  height: 72px;
+  width: 6px;
+  height: 88px;
   border-radius: 999px;
   background: rgba(112, 246, 255, 0.62);
   box-shadow:
@@ -1843,6 +1843,8 @@ input[type='range']::-moz-focus-outer {
   margin: 0 auto;
   border-radius: 50%;
   overflow: hidden;
+  touch-action: none;
+  overscroll-behavior: contain;
 }
 
 .palette-wheel::after {
@@ -1866,6 +1868,7 @@ input[type='range']::-moz-focus-outer {
   box-shadow: none;
   cursor: crosshair;
   display: block;
+  touch-action: none;
 }
 
 .palette-wheel__cursor {
@@ -3272,13 +3275,13 @@ body.is-startup-active {
   position: absolute;
   left: 0;
   right: 0;
-  top: -8px;
-  bottom: -8px;
+  top: -14px;
+  bottom: -14px;
 }
 
 .mobile-drawer__grip {
-  width: 62px;
-  height: 5px;
+  width: 84px;
+  height: 7px;
   border-radius: 999px;
   background: rgba(176, 226, 255, 0.78);
   box-shadow:
@@ -3829,7 +3832,7 @@ body.is-startup-active {
 
 @media (pointer: coarse) {
   .rail-resizer {
-    width: 24px;
+    width: 32px;
   }
 
   .rail-resizer--left {
@@ -3841,8 +3844,8 @@ body.is-startup-active {
   }
 
   .rail-resizer::before {
-    width: 6px;
-    height: 96px;
+    width: 8px;
+    height: 112px;
   }
 }
 
