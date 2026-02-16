@@ -691,9 +691,10 @@
       const mobilePanels = document.getElementById('mobilePanels');
       if (!mobileAd) return;
 
-  const mql = window.matchMedia('(orientation: portrait)');
-  const mobileBottomAd = document.getElementById('mobileBottomAd');
+      const mql = window.matchMedia('(orientation: portrait)');
+      const mobileBottomAd = document.getElementById('mobileBottomAd');
       const mobileBottomAdSlot = document.getElementById('mobileBottomAdSlot');
+      const MOBILE_AD_SLOT_HEIGHT = 56;
       let raf = null;
       const listeners = new Map();
 
@@ -702,16 +703,46 @@
       }
 
       function updateMobileBottomPadding() {
-        let slotHeight = 56;
+        let slotHeight = MOBILE_AD_SLOT_HEIGHT;
         try {
           const target = (mobileBottomAdSlot instanceof HTMLElement) ? mobileBottomAdSlot : mobileBottomAd;
           const rect = target && target.getBoundingClientRect ? target.getBoundingClientRect() : null;
           const measured = Math.ceil((rect && rect.height) || slotHeight);
-          slotHeight = clamp(measured, 48, 64);
+          slotHeight = clamp(measured, MOBILE_AD_SLOT_HEIGHT - 4, MOBILE_AD_SLOT_HEIGHT + 4);
         } catch (e) {}
 
         const reserved = Math.ceil(slotHeight + 4);
         document.documentElement.style.setProperty('--mobile-bottom-ad-height', reserved + 'px');
+      }
+
+      function enforceMobileBottomAdGeometry() {
+        if (!(mobileAd instanceof HTMLElement)) return;
+        const slotHeightPx = `${MOBILE_AD_SLOT_HEIGHT}px`;
+
+        mobileAd.style.setProperty('min-height', `calc(${slotHeightPx} + env(safe-area-inset-bottom, 0px) + 2px)`, 'important');
+        mobileAd.style.setProperty('height', `calc(${slotHeightPx} + env(safe-area-inset-bottom, 0px) + 2px)`, 'important');
+        mobileAd.style.setProperty('max-height', `calc(${slotHeightPx} + env(safe-area-inset-bottom, 0px) + 2px)`, 'important');
+
+        if (mobileBottomAdSlot instanceof HTMLElement) {
+          mobileBottomAdSlot.style.setProperty('min-height', slotHeightPx, 'important');
+          mobileBottomAdSlot.style.setProperty('height', slotHeightPx, 'important');
+          mobileBottomAdSlot.style.setProperty('max-height', slotHeightPx, 'important');
+
+          const slotIns = mobileBottomAdSlot.querySelector('ins');
+          if (slotIns instanceof HTMLElement) {
+            slotIns.style.setProperty('min-height', slotHeightPx, 'important');
+            slotIns.style.setProperty('height', slotHeightPx, 'important');
+            slotIns.style.setProperty('max-height', slotHeightPx, 'important');
+            slotIns.style.setProperty('overflow', 'hidden', 'important');
+          }
+
+          mobileBottomAdSlot.querySelectorAll('iframe').forEach((frame) => {
+            if (!(frame instanceof HTMLElement)) return;
+            frame.style.setProperty('min-height', slotHeightPx, 'important');
+            frame.style.setProperty('height', slotHeightPx, 'important');
+            frame.style.setProperty('max-height', slotHeightPx, 'important');
+          });
+        }
       }
 
       function isAtBottom(el) {
@@ -722,6 +753,7 @@
       }
 
       function showAd() {
+        enforceMobileBottomAdGeometry();
         if (!mobileAd.classList.contains('visible')) {
           mobileAd.classList.add('visible');
         }
@@ -760,6 +792,7 @@
           // Bottom ad: show in portrait as overlay at the bottom and mark body so CSS can add padding
           if (mobileBottomAd) {
             if (mql.matches) {
+              enforceMobileBottomAdGeometry();
               showAd();
               // keep layout stable even if ad network injects a tall creative.
               updateMobileBottomPadding();
@@ -785,6 +818,7 @@
       }
 
       function refreshListeners() {
+        enforceMobileBottomAdGeometry();
         // remove previous
         listeners.forEach((fn, el) => el.removeEventListener('scroll', fn));
         listeners.clear();
@@ -802,6 +836,26 @@
       // observe body for active-panel changes and refresh listeners
       const mo = new MutationObserver(refreshListeners);
       mo.observe(document.body, { attributes: true, subtree: true, childList: true });
+
+      if (mobileBottomAdSlot instanceof HTMLElement) {
+        if (typeof ResizeObserver === 'function') {
+          const adResizeObserver = new ResizeObserver(() => {
+            enforceMobileBottomAdGeometry();
+            updateMobileBottomPadding();
+          });
+          adResizeObserver.observe(mobileBottomAdSlot);
+        }
+        const adMutationObserver = new MutationObserver(() => {
+          enforceMobileBottomAdGeometry();
+          updateMobileBottomPadding();
+        });
+        adMutationObserver.observe(mobileBottomAdSlot, {
+          attributes: true,
+          childList: true,
+          subtree: true,
+          attributeFilter: ['style', 'class', 'data-adsbygoogle-status']
+        });
+      }
 
       if (mql && typeof mql.addEventListener === 'function') {
         mql.addEventListener('change', refreshListeners);
@@ -900,8 +954,24 @@
 
       let rerenderQueued = false;
 
+      function isPortraitBottomOnlyMode() {
+        try {
+          if (document.body && document.body.classList.contains('is-mobile-layout')) {
+            return true;
+          }
+          if (window.matchMedia) {
+            return window.matchMedia('(orientation: portrait)').matches;
+          }
+        } catch (error) {}
+        return false;
+      }
+
       function queueAllSlots() {
+        const portraitBottomOnly = isPortraitBottomOnlyMode();
         SLOTS.forEach(({ containerId }) => {
+          if (portraitBottomOnly && containerId !== 'mobileBottomAdSlot') {
+            return;
+          }
           queueRenderForContainer(document.getElementById(containerId));
         });
       }
@@ -1056,6 +1126,9 @@
 
       function queueRenderForContainer(container) {
         if (!(container instanceof HTMLElement)) return;
+        if (isPortraitBottomOnlyMode() && container.id !== 'mobileBottomAdSlot') {
+          return;
+        }
         const slotConfig = slotByContainerId.get(container.id);
         if (!slotConfig) return;
 
