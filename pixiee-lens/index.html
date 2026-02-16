@@ -2752,7 +2752,7 @@
       <div class="capture-preview__image-wrap">
         <img alt="撮影した画像のプレビュー" id="capturePreviewImage" loading="lazy"/>
       </div>
-      <p class="capture-preview__info" id="capturePreviewInfo">画像を長押しして保存してください。</p>
+      <p class="capture-preview__info" id="capturePreviewInfo">画像は自動保存されます。保存されない場合は「共有する」または長押しで保存してください。</p>
       <div class="capture-preview__ad">
         <ins class="adsbygoogle"
              style="display:block"
@@ -7370,6 +7370,7 @@
       }
       ensureDotResolution();
       const crop = getDotSourceRect();
+      const mirrorPreview = Boolean(state.useFrontCamera);
       if (video.readyState >= 2 && crop) {
         const targetWidth = dotCanvas.width;
         const targetHeight = dotCanvas.height;
@@ -7390,6 +7391,10 @@
             : `blur(${DOT_SMOOTHING_BLUR}px)`;
           smoothingCtx.filter = smoothingFilter;
           smoothingCtx.clearRect(0, 0, targetWidth, targetHeight);
+          if (mirrorPreview) {
+            smoothingCtx.translate(targetWidth, 0);
+            smoothingCtx.scale(-1, 1);
+          }
           smoothingCtx.drawImage(
             video,
             crop.sx,
@@ -7410,6 +7415,10 @@
           dotCanvasCtx.save();
           dotCanvasCtx.imageSmoothingEnabled = false;
           dotCanvasCtx.clearRect(0, 0, targetWidth, targetHeight);
+          if (mirrorPreview) {
+            dotCanvasCtx.translate(targetWidth, 0);
+            dotCanvasCtx.scale(-1, 1);
+          }
           dotCanvasCtx.drawImage(
             video,
             crop.sx,
@@ -7421,11 +7430,11 @@
             targetWidth,
             targetHeight
           );
+          dotCanvasCtx.restore();
           const imageData = dotCanvasCtx.getImageData(0, 0, targetWidth, targetHeight);
           applyColorDepth(imageData);
           dotCanvasCtx.clearRect(0, 0, targetWidth, targetHeight);
           dotCanvasCtx.putImageData(imageData, 0, 0);
-          dotCanvasCtx.restore();
         }
       }
       dotState.frameHandle = requestAnimationFrame(renderDotFrame);
@@ -8736,7 +8745,8 @@
       }
       const x = (event.clientX - rect.left) / rect.width;
       const y = (event.clientY - rect.top) / rect.height;
-      const focusMetrics = sampleFrameForAutoAdjust({ x, y });
+      const focusX = state.useFrontCamera ? (1 - x) : x;
+      const focusMetrics = sampleFrameForAutoAdjust({ x: focusX, y });
       const globalMetrics = sampleFrameForAutoAdjust(null);
       const metrics = blendAutoAdjustMetrics(focusMetrics, globalMetrics);
       if (!metrics) {
@@ -8834,6 +8844,10 @@
       ctx.save();
       ctx.imageSmoothingEnabled = false;
       ctx.filter = currentCameraFilterString || 'none';
+      if (state.useFrontCamera) {
+        ctx.translate(viewportWidth, 0);
+        ctx.scale(-1, 1);
+      }
       ctx.drawImage(
         video,
         source.sx,
@@ -9356,10 +9370,12 @@
         ? options.mimeType
         : 'image/png';
       const enableDrawImport = options.enableDrawImport !== false;
-      const autoShareOnIOS = options.autoShareOnIOS !== false;
+      const autoShareOnMobile = options.autoShareOnMobile !== false && options.autoShareOnIOS !== false;
       const { blob, dataUrl, cssWidth, cssHeight, width, height } = result;
       const supportsDownloadAttr = 'download' in HTMLAnchorElement.prototype;
       const isIOS = /iP(hone|ad|od)/i.test(navigator.userAgent);
+      const isAndroid = /Android/i.test(navigator.userAgent);
+      const isMobile = isIOS || isAndroid;
       const drawPayload = enableDrawImport
         ? await createDrawImportPayload(result, filename, options.drawPayloadOptions || {})
         : null;
@@ -9374,7 +9390,8 @@
       if (blob instanceof Blob) {
         const shareFile = new File([blob], filename, { type: mimeType });
         const canShareFiles = typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare({ files: [shareFile] }));
-        const shouldAutoShare = autoShareOnIOS && isIOS && canShareFiles;
+        let autoShareSucceeded = false;
+        const shouldAutoShare = autoShareOnMobile && isMobile && canShareFiles;
         if (shouldAutoShare) {
           try {
             await navigator.share({
@@ -9382,6 +9399,7 @@
               title: 'PiXiEELENS',
               text: CAPTURE_SHARE_TEXT
             });
+            autoShareSucceeded = true;
           } catch (error) {
             if (error && error.name !== 'AbortError') {
               console.warn('Share failed', error);
@@ -9389,7 +9407,7 @@
             // continue to fallback preview
           }
         }
-        if (supportsDownloadAttr) {
+        if (supportsDownloadAttr && !autoShareSucceeded) {
           const downloadUrl = URL.createObjectURL(blob);
           const anchor = document.createElement('a');
           anchor.href = downloadUrl;
@@ -9405,9 +9423,15 @@
             ? '画像を自動的に保存しました。「PiXiEEDrawで編集」で続けて編集できます。'
             : `${formatLabel}を自動的に保存しました。`;
         } else if (canShareFiles) {
-          infoMessage = drawPayload
-            ? '「共有する」ボタンで保存するか、「PiXiEEDrawで編集」で編集できます。'
-            : `「共有する」ボタンから${formatLabel}を保存してください。`;
+          if (autoShareSucceeded) {
+            infoMessage = drawPayload
+              ? '共有を実行しました。必要に応じて「共有する」から端末に保存するか、「PiXiEEDrawで編集」で続けて編集できます。'
+              : `共有を実行しました。必要に応じて「共有する」から${formatLabel}を端末に保存してください。`;
+          } else {
+            infoMessage = drawPayload
+              ? '「共有する」ボタンで保存するか、「PiXiEEDrawで編集」で編集できます。'
+              : `「共有する」ボタンから${formatLabel}を保存してください。`;
+          }
         } else {
           infoMessage = drawPayload
             ? '画像を長押しして保存するか、「PiXiEEDrawで編集」で編集できます。'
@@ -10338,8 +10362,7 @@
           enableDrawImport: true,
           drawPayloadOptions: {
             preferDotCanvas: false
-          },
-          autoShareOnIOS: false
+          }
         });
         if (!saved) {
           setStatus('GIFを保存できませんでした');
@@ -10789,7 +10812,7 @@
           throw playError instanceof Error ? playError : new Error('Camera playback failed');
         }
         await waitForVideoReady();
-        video.style.transform = 'scaleX(1)';
+        video.style.transform = state.useFrontCamera ? 'scaleX(-1)' : 'scaleX(1)';
         applyCameraSettings();
         cameraPermissionDenied = false;
         cameraReady = true;
