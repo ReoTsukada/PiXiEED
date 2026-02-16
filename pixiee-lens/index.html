@@ -63,7 +63,18 @@
       --safe-right: env(safe-area-inset-right, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
       --safe-left: env(safe-area-inset-left, 0px);
-      --ad-header-offset: 60px; /* バナー+余白 */
+      --vv-offset-top: 0px;
+      --vv-offset-right: 0px;
+      --vv-offset-bottom: 0px;
+      --vv-offset-left: 0px;
+      --lens-ad-aspect-ratio: 6.4; /* 320:50 */
+      --lens-ad-inline-padding: 6px;
+      --lens-ad-banner-width: calc(100vw - var(--safe-left) - var(--safe-right) - (var(--lens-ad-inline-padding) * 2));
+      --lens-ad-banner-height: max(50px, calc(var(--lens-ad-banner-width) / var(--lens-ad-aspect-ratio)));
+      --lens-ad-banner-gap: 16px;
+      --lens-ad-banner-top: 6px;
+      --ad-header-offset: calc(var(--lens-ad-banner-height) + var(--lens-ad-banner-gap));
+      --ad-side-offset: 0px;
     }
     * {
       box-sizing: border-box;
@@ -90,7 +101,7 @@
     .update-toast {
       position: fixed;
       left: 50%;
-      bottom: calc(var(--hud-padding) + var(--safe-bottom));
+      bottom: calc(var(--hud-padding) + var(--safe-bottom) + var(--vv-offset-bottom));
       transform: translateX(-50%);
       width: min(92vw, 420px);
       background: rgba(8, 12, 24, 0.92);
@@ -153,8 +164,8 @@
     }
     .qr-readout {
       position: fixed;
-      left: calc(var(--hud-padding) + var(--safe-left));
-      bottom: calc(var(--hud-padding) + var(--safe-bottom) + 10px);
+      left: calc(var(--hud-padding) + var(--safe-left) + var(--ad-side-offset) + var(--vv-offset-left));
+      bottom: calc(var(--hud-padding) + var(--safe-bottom) + var(--vv-offset-bottom) + 10px);
       width: min(460px, 94vw);
       background: rgba(8, 12, 24, 0.9);
       border: 1px solid rgba(123, 207, 255, 0.28);
@@ -283,11 +294,11 @@
     }
     .lens-ad-banner{
       position: fixed;
-      top: 0;
+      top: calc(var(--safe-top) + var(--lens-ad-banner-top));
       left: 50%;
       transform: translateX(-50%);
-      width: min(100%, 720px);
-      padding-top: calc(var(--safe-top) + 6px);
+      width: var(--lens-ad-banner-width);
+      height: var(--lens-ad-banner-height);
       box-sizing: border-box;
       z-index: 75;
       display:flex;
@@ -297,49 +308,162 @@
     }
     .lens-ad-banner .ad-block{
       border: 1px dashed rgba(255,255,255,0.2);
-      border-radius: 12px;
+      border-radius: 8px;
       background: linear-gradient(150deg, rgba(255,255,255,0.04), rgba(15,23,42,0.9));
-      padding: 4px 8px;
+      padding: 0;
       box-shadow: 0 10px 30px rgba(0,0,0,0.28);
       position: relative;
       width: 100%;
-      max-width: 720px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      height: 100%;
+      max-width: none;
+      display: block;
+      overflow: hidden;
     }
     .lens-ad-banner .ad-label{
       position: absolute;
-      top: 4px;
-      left: 8px;
+      top: 2px;
+      left: 4px;
       background: rgba(0,0,0,0.6);
       color: #cbd5e1;
-      font-size: 11px;
-      padding: 3px 7px;
+      font-size: 9px;
+      padding: 2px 5px;
       border-radius: 999px;
       letter-spacing: 0.04em;
+      line-height: 1;
+      z-index: 1;
     }
     .lens-ad-banner ins.adsbygoogle{
       display:block;
       width:100% !important;
       max-width:100% !important;
-      min-height:clamp(48px, 9vw, 60px);
-      height:clamp(48px, 9vw, 60px);
+      min-height:100% !important;
+      height:100% !important;
+      max-height:100% !important;
       overflow:hidden;
+    }
+    .lens-ad-banner ins.adsbygoogle iframe {
+      width: 100% !important;
+      height: 100% !important;
+      max-width: 100% !important;
+      max-height: 100% !important;
     }
     .capture-preview__ad{
       margin: 12px 0 8px;
       display:flex;
       justify-content:center;
       align-items:center;
+      width: min(100%, 720px);
+      min-height: clamp(48px, 9vw, 60px);
+      border: 1px dashed rgba(123, 207, 255, 0.28);
+      border-radius: 10px;
+      background: linear-gradient(180deg, rgba(9, 14, 27, 0.72), rgba(5, 9, 18, 0.8));
+      padding: 2px;
+      position: relative;
+      overflow: hidden;
+    }
+    .capture-preview__ad::before{
+      content: '広告';
+      position: absolute;
+      top: 3px;
+      left: 6px;
+      font-size: 10px;
+      line-height: 1;
+      color: rgba(203, 213, 225, 0.9);
+      background: rgba(0, 0, 0, 0.46);
+      border-radius: 999px;
+      padding: 2px 5px;
+      pointer-events: none;
+      z-index: 1;
     }
     .capture-preview__ad ins.adsbygoogle{
       display:block;
-      width: min(100%, 720px) !important;
-      max-width: 720px !important;
+      width: 100% !important;
+      max-width: 100% !important;
       min-height: clamp(48px, 9vw, 60px);
       height: clamp(48px, 9vw, 60px);
       overflow:hidden;
+    }
+    body.is-landscape {
+      --ad-header-offset: 0px;
+      --lens-ad-banner-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - (var(--lens-ad-inline-padding) * 2));
+      --lens-ad-banner-width: max(50px, calc(var(--lens-ad-banner-height) / var(--lens-ad-aspect-ratio)));
+      --ad-side-offset: calc(var(--lens-ad-banner-width) + var(--lens-ad-banner-gap));
+    }
+    body.is-landscape .lens-ad-banner {
+      top: 50%;
+      left: calc(var(--safe-left) + var(--lens-ad-inline-padding));
+      transform: translateY(-50%);
+      width: var(--lens-ad-banner-width);
+      height: var(--lens-ad-banner-height);
+      justify-content: flex-start;
+      align-items: stretch;
+    }
+    body.is-landscape .lens-ad-banner .ad-block {
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      padding: 0;
+      border-radius: 10px;
+      display: block;
+    }
+    body.is-landscape .lens-ad-banner .ad-label {
+      top: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      font-size: 9px;
+      padding: 2px 4px;
+      border-radius: 6px;
+      letter-spacing: 0.02em;
+    }
+    body.is-landscape .lens-ad-banner ins.adsbygoogle {
+      width: 100% !important;
+      height: 100% !important;
+      min-height: 0 !important;
+      max-height: 100% !important;
+    }
+    @media (orientation: landscape) {
+      :root {
+        --ad-header-offset: 0px;
+        --lens-ad-banner-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - (var(--lens-ad-inline-padding) * 2));
+        --lens-ad-banner-width: max(50px, calc(var(--lens-ad-banner-height) / var(--lens-ad-aspect-ratio)));
+        --ad-side-offset: calc(var(--lens-ad-banner-width) + var(--lens-ad-banner-gap));
+      }
+      .lens-ad-banner {
+        top: 50%;
+        left: calc(var(--safe-left) + var(--lens-ad-inline-padding));
+        transform: translateY(-50%);
+        width: var(--lens-ad-banner-width);
+        height: var(--lens-ad-banner-height);
+        justify-content: flex-start;
+        align-items: stretch;
+      }
+      .lens-ad-banner .ad-block {
+        width: 100%;
+        height: 100%;
+        max-width: none;
+        padding: 0;
+        border-radius: 10px;
+        display: block;
+      }
+      .lens-ad-banner .ad-label {
+        top: 4px;
+        left: 50%;
+        transform: translateX(-50%);
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        font-size: 9px;
+        padding: 2px 4px;
+        border-radius: 6px;
+        letter-spacing: 0.02em;
+      }
+      .lens-ad-banner ins.adsbygoogle {
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        max-height: 100% !important;
+      }
     }
     @media (max-width: 520px) {
       .update-toast {
@@ -352,10 +476,10 @@
         width: 100%;
       }
       .qr-readout {
-        left: clamp(12px, 4vw, 18px);
+        left: calc(clamp(12px, 4vw, 18px) + var(--ad-side-offset) + var(--vv-offset-left));
         right: clamp(12px, 4vw, 18px);
         width: auto;
-        bottom: calc(var(--hud-padding) + var(--safe-bottom) + 6px);
+        bottom: calc(var(--hud-padding) + var(--safe-bottom) + var(--vv-offset-bottom) + 6px);
       }
     }
     video {
@@ -426,9 +550,9 @@
     }
     .hud-top {
       position: absolute;
-      top: calc(var(--hud-padding) + var(--safe-top) + var(--ad-header-offset));
-      left: calc(var(--hud-padding) + var(--safe-left));
-      right: calc(var(--hud-padding) + var(--safe-right));
+      top: calc(var(--hud-padding) + var(--safe-top) + var(--ad-header-offset) + var(--vv-offset-top));
+      left: calc(var(--hud-padding) + var(--safe-left) + var(--ad-side-offset) + var(--vv-offset-left));
+      right: calc(var(--hud-padding) + var(--safe-right) + var(--vv-offset-right));
       display: flex;
       flex-direction: column;
       gap: 18px;
@@ -441,6 +565,89 @@
       flex-wrap: nowrap;
       gap: 16px;
       width: 100%;
+    }
+    .gif-capture-gauge {
+      align-self: flex-end;
+      width: min(364px, 78vw);
+      display: grid;
+      gap: 6px;
+      padding: 8px 10px 10px;
+      border-radius: 0;
+      border: 2px solid #f0d186;
+      background: linear-gradient(180deg, rgba(79, 60, 33, 0.95) 0 50%, rgba(39, 27, 15, 0.96) 50% 100%);
+      box-shadow:
+        inset 0 0 0 2px rgba(27, 18, 9, 0.94),
+        0 0 0 2px rgba(0, 0, 0, 0.35),
+        0 6px 0 rgba(20, 13, 7, 0.78),
+        0 12px 20px rgba(0, 0, 0, 0.34);
+      font-family: 'DotGothic16', monospace;
+      image-rendering: pixelated;
+      pointer-events: none;
+    }
+    .gif-capture-gauge[hidden] {
+      display: none !important;
+    }
+    .gif-capture-gauge__meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.65rem;
+      letter-spacing: 0.11em;
+      color: #fbe7b4;
+      text-transform: uppercase;
+      line-height: 1;
+      text-shadow: 0 1px 0 rgba(0, 0, 0, 0.88);
+    }
+    .gif-capture-gauge__track {
+      width: 100%;
+      padding: 2px;
+      border-radius: 0;
+      border: 2px solid #8a6131;
+      background: linear-gradient(180deg, rgba(22, 15, 8, 0.98) 0 50%, rgba(12, 8, 4, 0.98) 50% 100%);
+      box-shadow: inset 0 0 0 1px rgba(51, 33, 15, 0.94);
+    }
+    .gif-capture-gauge__segments {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: repeat(10, minmax(0, 1fr));
+      gap: 2px;
+      height: 14px;
+    }
+    .gif-capture-gauge__segment {
+      border-radius: 0;
+      background: linear-gradient(180deg, rgba(43, 30, 15, 0.95) 0 50%, rgba(23, 15, 8, 0.96) 50% 100%);
+      box-shadow: inset 0 0 0 1px rgba(113, 79, 37, 0.78);
+      transition: opacity 0.1s steps(1, end), background 0.1s steps(1, end);
+      opacity: 0.34;
+    }
+    .gif-capture-gauge__segment.is-active {
+      background:
+        linear-gradient(180deg, rgba(172, 246, 132, 0.98) 0 50%, rgba(66, 156, 64, 0.96) 50% 100%);
+      box-shadow:
+        inset 0 0 0 1px rgba(227, 255, 206, 0.45),
+        0 0 0 1px rgba(65, 126, 52, 0.65);
+      opacity: 1;
+    }
+    .gif-capture-gauge.is-warning .gif-capture-gauge__segment.is-active {
+      background:
+        linear-gradient(180deg, rgba(255, 212, 123, 0.98) 0 50%, rgba(214, 130, 48, 0.96) 50% 100%);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 234, 187, 0.42),
+        0 0 0 1px rgba(152, 85, 29, 0.66);
+    }
+    .gif-capture-gauge.is-critical .gif-capture-gauge__segment.is-active {
+      background:
+        linear-gradient(180deg, rgba(255, 142, 142, 0.98) 0 50%, rgba(194, 58, 72, 0.97) 50% 100%);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 212, 212, 0.42),
+        0 0 0 1px rgba(143, 41, 52, 0.72);
+      animation: gif-hp-critical-blink 0.45s steps(2, end) infinite;
+    }
+    @keyframes gif-hp-critical-blink {
+      0% { filter: brightness(1); opacity: 1; }
+      100% { filter: brightness(1.24); opacity: 0.85; }
     }
     .hud-top__actions {
       display: inline-flex;
@@ -484,9 +691,9 @@
     }
     .hud-bottom {
       position: absolute;
-      bottom: calc(var(--hud-padding) + var(--safe-bottom));
-      left: calc(var(--hud-padding) + var(--safe-left));
-      right: calc(var(--hud-padding) + var(--safe-right));
+      bottom: calc(var(--hud-padding) + var(--safe-bottom) + var(--vv-offset-bottom));
+      left: calc(var(--hud-padding) + var(--safe-left) + var(--ad-side-offset) + var(--vv-offset-left));
+      right: calc(var(--hud-padding) + var(--safe-right) + var(--vv-offset-right));
       display: flex;
       flex-direction: column;
       gap: 16px;
@@ -537,7 +744,7 @@
     .hud-landscape-capture {
       position: fixed;
       top: 50%;
-      right: calc(var(--hud-padding) + var(--safe-right));
+      right: calc(var(--hud-padding) + var(--safe-right) + var(--vv-offset-right));
       transform: translateY(-50%);
       display: none;
       align-items: center;
@@ -801,7 +1008,7 @@
       justify-content: center;
       gap: 18px;
       position: fixed;
-      bottom: calc(var(--safe-bottom) + 12px);
+      bottom: calc(var(--safe-bottom) + var(--vv-offset-bottom) + 12px);
       left: 50%;
       transform: translateX(-50%);
       width: min(520px, 88vw);
@@ -1000,12 +1207,17 @@
       color: rgba(231, 238, 255, 0.85);
       font-size: 0.92rem;
       line-height: 1.6;
+      order: 3;
+    }
+    .capture-preview__ad {
+      order: 4;
     }
     .capture-preview__actions {
       display: flex;
       gap: 12px;
       justify-content: flex-end;
       flex-wrap: wrap;
+      order: 5;
     }
     .capture-preview__button {
       display: inline-flex;
@@ -1794,6 +2006,10 @@
       .hud-top__panel-wrap > * {
         width: 100%;
       }
+      .gif-capture-gauge {
+        width: min(360px, 100%);
+        align-self: stretch;
+      }
       .hud-bottom__actions {
         gap: clamp(10px, 5vw, 16px);
       }
@@ -1888,6 +2104,24 @@
     min-height: clamp(48px, 9vw, 60px) !important;
     height: clamp(48px, 9vw, 60px) !important;
     overflow: hidden !important;
+  }
+  .lens-ad-banner .ad-block {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+  }
+  .lens-ad-banner .ad-block ins.adsbygoogle {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    max-height: 100% !important;
+  }
+  .lens-ad-banner .ad-block ins.adsbygoogle iframe {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
   }
   .page,
   main,
@@ -2253,6 +2487,26 @@
 </button>
 </div>
 </div>
+<div aria-hidden="true" class="gif-capture-gauge" hidden="" id="gifCaptureGauge">
+<div class="gif-capture-gauge__meta">
+<span>GIF HP</span>
+<span id="gifCaptureGaugeValue">3.2s | 10/10</span>
+</div>
+<div class="gif-capture-gauge__track">
+<ol aria-hidden="true" class="gif-capture-gauge__segments" id="gifCaptureGaugeSegments">
+<li class="gif-capture-gauge__segment is-active"></li>
+<li class="gif-capture-gauge__segment is-active"></li>
+<li class="gif-capture-gauge__segment is-active"></li>
+<li class="gif-capture-gauge__segment is-active"></li>
+<li class="gif-capture-gauge__segment is-active"></li>
+<li class="gif-capture-gauge__segment is-active"></li>
+<li class="gif-capture-gauge__segment is-active"></li>
+<li class="gif-capture-gauge__segment is-active"></li>
+<li class="gif-capture-gauge__segment is-active"></li>
+<li class="gif-capture-gauge__segment is-active"></li>
+</ol>
+</div>
+</div>
 <div class="hud-top__panel-wrap hud-top__panel-wrap--left">
 <div class="menu-panel stamp-panel" hidden="" id="stampPanel">
 <p class="stamp-panel__hint">スタンプを選択すると画面に追加されます。</p>
@@ -2481,6 +2735,11 @@
     const clearPixelBtn = document.getElementById('clearPixelBtn');
     const dotModeBtn = document.getElementById('dotModeBtn');
     const captureBtn = document.getElementById('captureBtn');
+    const gifCaptureGauge = document.getElementById('gifCaptureGauge');
+    const gifCaptureGaugeSegments = gifCaptureGauge
+      ? Array.from(gifCaptureGauge.querySelectorAll('.gif-capture-gauge__segment'))
+      : [];
+    const gifCaptureGaugeValue = document.getElementById('gifCaptureGaugeValue');
     const paletteMenuBtn = document.getElementById('paletteMenuBtn');
     const pixelArtInput = document.getElementById('pixelArtInput');
     const pixelPreview = document.getElementById('pixelPreview');
@@ -2495,6 +2754,8 @@
     const qrCloseBtn = document.getElementById('qrCloseBtn');
     const qrCopyBtn = document.getElementById('qrCopyBtn');
     const qrOpenBtn = document.getElementById('qrOpenBtn');
+    const lensAdBanner = document.querySelector('.lens-ad-banner');
+    const lensAdBlock = lensAdBanner ? lensAdBanner.querySelector('.ad-block') : null;
     const landscapeCaptureSlot = document.querySelector('.hud-landscape-capture');
     const captureButtonOriginalParent = captureBtn ? captureBtn.parentElement : null;
     const cameraStartOverlay = document.getElementById('cameraStartOverlay');
@@ -2506,6 +2767,7 @@
     const capturePreviewOverlay = document.getElementById('capturePreviewOverlay');
     const capturePreviewImage = document.getElementById('capturePreviewImage');
     const capturePreviewInfo = document.getElementById('capturePreviewInfo');
+    const capturePreviewAd = capturePreviewOverlay ? capturePreviewOverlay.querySelector('.capture-preview__ad') : null;
     const capturePreviewCloseBtn = document.getElementById('capturePreviewCloseBtn');
     const capturePreviewCloseActionBtn = document.getElementById('capturePreviewCloseActionBtn');
     const capturePreviewShareBtn = document.getElementById('capturePreviewShareBtn');
@@ -2535,16 +2797,19 @@
     const ZOOM_FALLBACK_MIN = 1;
     const ZOOM_FALLBACK_MAX = 8;
     const ZOOM_MAJOR_EPSILON = 1e-3;
+    const LENS_AD_CLIENT = 'ca-pub-9801602250480253';
+    const LENS_AD_FALLBACK_SLOT = '2141591954';
     const CAMERA_READY_TIMEOUT_MS = 5000;
     const CAPTURE_LONG_PRESS_MS = 360;
-    const GIF_CAPTURE_FPS = 6;
+    const GIF_CAPTURE_FPS = 10;
     const GIF_CAPTURE_FRAME_INTERVAL_MS = Math.max(80, Math.round(1000 / GIF_CAPTURE_FPS));
     const GIF_CAPTURE_MAX_DURATION_MS = 3200;
+    const GIF_CAPTURE_GAUGE_SEGMENTS = 10;
     const GIF_CAPTURE_MIN_FRAMES = 2;
     const GIF_CAPTURE_MAX_DIMENSION = 360;
     const GIF_CAPTURE_MAX_PIXELS = 360 * 360;
     const GIF_CAPTURE_PIXEL_RATIO_CAP = 1;
-    const GIF_332_PALETTE = createGif332Palette();
+    const GIF_DEFAULT_PALETTE = createGif332Palette();
     let zoomScaleItems = [];
     let zoomScaleMarks = [];
     let zoomScaleTranslate = 0;
@@ -2563,6 +2828,8 @@
       lastTimestamp: 0
     };
     let zoomMeterCollapseTimeout = null;
+    let lensAdRefreshTimer = null;
+    let lensAdOrientationKey = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
     if (zoomSlider) {
       zoomSlider.addEventListener('focus', () => {
         setZoomMeterExpanded(true);
@@ -2722,6 +2989,9 @@
     const aspectShadeLeft = document.getElementById('aspectShadeLeft');
     const aspectShadeRight = document.getElementById('aspectShadeRight');
     const paletteMenu = document.getElementById('paletteMenu');
+    const hudTop = document.querySelector('.hud-top');
+    const hudBottom = document.querySelector('.hud-bottom');
+    const hudBottomCenter = document.querySelector('.hud-bottom__center');
     const hudTopBar = document.querySelector('.hud-top__bar');
     const aspectButtons = Array.from(document.querySelectorAll('.option-button[data-aspect]'));
     const dotSettingsPanel = document.getElementById('dotSettingsPanel');
@@ -4520,11 +4790,79 @@
       setMenuOpen(key, false);
     }
 
+    function rebuildLensBannerAd() {
+      if (!lensAdBlock) {
+        return;
+      }
+      const currentIns = lensAdBlock.querySelector('ins.adsbygoogle');
+      const adClient =
+        (currentIns && currentIns.getAttribute('data-ad-client'))
+        || lensAdBlock.dataset.adClient
+        || LENS_AD_CLIENT;
+      const adSlot =
+        (currentIns && currentIns.getAttribute('data-ad-slot'))
+        || lensAdBlock.dataset.adSlot
+        || LENS_AD_FALLBACK_SLOT;
+
+      if (adClient) {
+        lensAdBlock.dataset.adClient = adClient;
+      }
+      if (adSlot) {
+        lensAdBlock.dataset.adSlot = adSlot;
+      }
+
+      lensAdBlock.querySelectorAll('ins.adsbygoogle').forEach((node) => node.remove());
+      lensAdBlock.querySelectorAll('iframe').forEach((node) => node.remove());
+
+      const nextIns = document.createElement('ins');
+      nextIns.className = 'adsbygoogle';
+      nextIns.style.display = 'block';
+      if (adClient) {
+        nextIns.setAttribute('data-ad-client', adClient);
+      }
+      if (adSlot) {
+        nextIns.setAttribute('data-ad-slot', adSlot);
+      }
+
+      const adLabel = lensAdBlock.querySelector('.ad-label');
+      if (adLabel) {
+        lensAdBlock.insertBefore(nextIns, adLabel);
+      } else {
+        lensAdBlock.appendChild(nextIns);
+      }
+
+      if (window.pixieedObserveAds) {
+        window.pixieedObserveAds(lensAdBlock);
+      } else {
+        try {
+          (window.adsbygoogle = window.adsbygoogle || []).push({});
+        } catch (error) {
+          console.warn('Lens ad refresh failed', error);
+        }
+      }
+    }
+
+    function refreshLensBannerAdForOrientation(orientationKey) {
+      if (!lensAdBlock || !orientationKey || orientationKey === lensAdOrientationKey) {
+        return;
+      }
+      lensAdOrientationKey = orientationKey;
+      if (lensAdRefreshTimer) {
+        clearTimeout(lensAdRefreshTimer);
+      }
+      lensAdRefreshTimer = window.setTimeout(() => {
+        lensAdRefreshTimer = null;
+        rebuildLensBannerAd();
+      }, 240);
+    }
+
     function updateControlPlacement() {
+      updateViewportOffsetVariables();
       if (!captureBtn || !captureButtonOriginalParent) {
         return;
       }
       const isLandscape = window.innerWidth > window.innerHeight;
+      const orientationKey = isLandscape ? 'landscape' : 'portrait';
       if (isLandscape) {
         document.body.classList.add('is-landscape');
         if (landscapeCaptureSlot) {
@@ -4542,6 +4880,7 @@
           landscapeCaptureSlot.setAttribute('aria-hidden', 'true');
         }
       }
+      refreshLensBannerAdForOrientation(orientationKey);
       if (zoomControl && !zoomControl.hidden) {
         updateZoomScaleDisplay(state.cameraSettings.zoom ?? 0, { animate: false });
       }
@@ -4942,6 +5281,70 @@
       capturePreviewLastFocus = null;
     }
 
+    function ensureCapturePreviewAdPlacement() {
+      if (!capturePreviewInfo || !capturePreviewAd) {
+        return;
+      }
+      if (capturePreviewInfo.nextElementSibling !== capturePreviewAd) {
+        capturePreviewInfo.insertAdjacentElement('afterend', capturePreviewAd);
+      }
+    }
+
+    function rebuildCapturePreviewAd() {
+      if (!capturePreviewAd) {
+        return;
+      }
+      const currentIns = capturePreviewAd.querySelector('ins.adsbygoogle');
+      const adClient =
+        (currentIns && currentIns.getAttribute('data-ad-client'))
+        || capturePreviewAd.dataset.adClient
+        || LENS_AD_CLIENT;
+      const adSlot =
+        (currentIns && currentIns.getAttribute('data-ad-slot'))
+        || capturePreviewAd.dataset.adSlot
+        || LENS_AD_FALLBACK_SLOT;
+
+      if (adClient) {
+        capturePreviewAd.dataset.adClient = adClient;
+      }
+      if (adSlot) {
+        capturePreviewAd.dataset.adSlot = adSlot;
+      }
+
+      capturePreviewAd.querySelectorAll('ins.adsbygoogle').forEach((node) => node.remove());
+      capturePreviewAd.querySelectorAll('iframe').forEach((node) => node.remove());
+
+      const nextIns = document.createElement('ins');
+      nextIns.className = 'adsbygoogle';
+      nextIns.style.display = 'block';
+      if (adClient) {
+        nextIns.setAttribute('data-ad-client', adClient);
+      }
+      if (adSlot) {
+        nextIns.setAttribute('data-ad-slot', adSlot);
+      }
+      capturePreviewAd.appendChild(nextIns);
+    }
+
+    function requestCapturePreviewAdRender() {
+      if (!capturePreviewAd || (capturePreviewOverlay && capturePreviewOverlay.hidden)) {
+        return;
+      }
+      if (window.pixieedObserveAds) {
+        window.pixieedObserveAds(capturePreviewAd);
+        return;
+      }
+      const adIns = capturePreviewAd.querySelector('ins.adsbygoogle');
+      if (!adIns) {
+        return;
+      }
+      try {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      } catch (error) {
+        console.warn('Capture preview ad render failed', error);
+      }
+    }
+
     function registerGestureCameraStarter() {
       if (iosStandaloneUnsupported) {
         return;
@@ -5138,6 +5541,8 @@
       if (capturePreviewInfo) {
         capturePreviewInfo.textContent = infoMessage || '画像を長押しするか共有メニューから保存してください。';
       }
+      ensureCapturePreviewAdPlacement();
+      rebuildCapturePreviewAd();
       const canShare = Boolean(sharePayload && sharePayload.file) && typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare({ files: [sharePayload.file] }));
       capturePreviewSharePayload = canShare && sharePayload
         ? { file: sharePayload.file, blobUrl: sharePayload.blobUrl }
@@ -5157,6 +5562,12 @@
       capturePreviewOverlay.hidden = false;
       capturePreviewOverlay.setAttribute('aria-hidden', 'false');
       capturePreviewOverlay.classList.add('is-visible');
+      requestAnimationFrame(() => {
+        requestCapturePreviewAdRender();
+        window.setTimeout(() => {
+          requestCapturePreviewAdRender();
+        }, 280);
+      });
       if (capturePreviewCloseBtn) {
         capturePreviewCloseBtn.focus({ preventScroll: true });
       }
@@ -5307,6 +5718,8 @@
     const ASPECT_RATIOS = {
       '1:1': { width: 1, height: 1 }
     };
+    const ASPECT_LAYOUT_BUTTON_GAP = 12;
+    const ASPECT_LAYOUT_MIN_SIZE = 120;
 
     const COLOR_DEPTHS = ['full', '256', '16', '4', '2'];
     const PALETTELESS_DEPTHS = Object.freeze({
@@ -5348,8 +5761,12 @@
         return;
       }
       const metrics = getViewportMetrics();
+      const viewportLeft = metrics.offsetLeft;
+      const viewportTop = metrics.offsetTop;
       const viewportWidth = metrics.width;
       const viewportHeight = metrics.height;
+      const viewportRight = viewportLeft + viewportWidth;
+      const viewportBottom = viewportTop + viewportHeight;
       const ratioEntry = ASPECT_RATIOS[state.aspectMode];
       const ratio = typeof ratioEntry === 'function' ? ratioEntry() : ratioEntry;
       if (!ratio) {
@@ -5377,24 +5794,41 @@
       aspectOverlay.hidden = false;
       const ratioWidth = Math.max(1, ratio.width);
       const ratioHeight = Math.max(1, ratio.height);
+      const reservedInsets = getAspectReservedInsets(metrics);
+      const availableTop = Math.max(viewportTop, viewportTop + reservedInsets.topInset);
+      const availableBottom = Math.min(viewportBottom, viewportBottom - reservedInsets.bottomInset);
+      const availableHeightBase = availableBottom - availableTop;
+      const availableHeight = Math.max(
+        1,
+        Math.min(
+          viewportHeight,
+          Number.isFinite(availableHeightBase) && availableHeightBase > 0
+            ? availableHeightBase
+            : viewportHeight
+        )
+      );
       const scaleBase = Math.min(
         viewportWidth / ratioWidth,
-        viewportHeight / ratioHeight
+        availableHeight / ratioHeight
       );
       const scale = Number.isFinite(scaleBase) && scaleBase > 0 ? scaleBase : 1;
       const targetWidth = Math.max(1, Math.round(ratioWidth * scale));
       const targetHeight = Math.max(1, Math.round(ratioHeight * scale));
-      const shadeHeight = Math.max(0, (viewportHeight - targetHeight) / 2);
-      const shadeWidth = Math.max(0, (viewportWidth - targetWidth) / 2);
+      const frameLeft = Math.max(viewportLeft, Math.round(viewportLeft + (viewportWidth - targetWidth) / 2));
+      const frameTop = Math.max(availableTop, Math.round(availableTop + (availableHeight - targetHeight) / 2));
+      const shadeTop = Math.max(0, frameTop - viewportTop);
+      const shadeBottom = Math.max(0, viewportBottom - (frameTop + targetHeight));
+      const shadeLeft = Math.max(0, frameLeft - viewportLeft);
+      const shadeRight = Math.max(0, viewportRight - (frameLeft + targetWidth));
 
       aspectCenter.style.height = `${Math.round(targetHeight)}px`;
       aspectFrame.style.width = `${Math.round(targetWidth)}px`;
       aspectFrame.style.height = `${Math.round(targetHeight)}px`;
-      aspectShadeTop.style.height = `${Math.floor(shadeHeight)}px`;
-      aspectShadeBottom.style.height = `${Math.ceil(shadeHeight)}px`;
-      aspectShadeLeft.style.width = `${Math.floor(shadeWidth)}px`;
-      aspectShadeRight.style.width = `${Math.ceil(shadeWidth)}px`;
-      updateDotCanvasLayout(targetWidth, targetHeight, shadeWidth, shadeHeight);
+      aspectShadeTop.style.height = `${Math.floor(shadeTop)}px`;
+      aspectShadeBottom.style.height = `${Math.ceil(shadeBottom)}px`;
+      aspectShadeLeft.style.width = `${Math.floor(shadeLeft)}px`;
+      aspectShadeRight.style.width = `${Math.ceil(shadeRight)}px`;
+      updateDotCanvasLayout(targetWidth, targetHeight, shadeLeft, shadeTop, frameLeft, frameTop);
     }
 
     function setAspectMode(mode) {
@@ -5455,7 +5889,87 @@
       return { width, height, offsetX, offsetY };
     }
 
+    function updateViewportOffsetVariables() {
+      const rootStyle = document.documentElement ? document.documentElement.style : null;
+      if (!rootStyle) {
+        return;
+      }
+      const viewportWidth = Math.max(1, Number(window.innerWidth) || 0);
+      const viewportHeight = Math.max(1, Number(window.innerHeight) || 0);
+      let top = 0;
+      let right = 0;
+      let bottom = 0;
+      let left = 0;
+      if (window.visualViewport) {
+        const vv = window.visualViewport;
+        const vvWidth = Math.max(1, Number(vv.width) || viewportWidth);
+        const vvHeight = Math.max(1, Number(vv.height) || viewportHeight);
+        left = Math.max(0, Number(vv.offsetLeft) || 0);
+        top = Math.max(0, Number(vv.offsetTop) || 0);
+        right = Math.max(0, viewportWidth - (left + vvWidth));
+        bottom = Math.max(0, viewportHeight - (top + vvHeight));
+      }
+      rootStyle.setProperty('--vv-offset-top', `${Math.round(top)}px`);
+      rootStyle.setProperty('--vv-offset-right', `${Math.round(right)}px`);
+      rootStyle.setProperty('--vv-offset-bottom', `${Math.round(bottom)}px`);
+      rootStyle.setProperty('--vv-offset-left', `${Math.round(left)}px`);
+    }
+
+    function getElementLayoutRect(element) {
+      if (!element || element.hidden) {
+        return null;
+      }
+      const style = window.getComputedStyle(element);
+      if (style.display === 'none' || style.visibility === 'hidden') {
+        return null;
+      }
+      const rect = element.getBoundingClientRect();
+      if (!rect || !Number.isFinite(rect.width) || !Number.isFinite(rect.height) || rect.width <= 0 || rect.height <= 0) {
+        return null;
+      }
+      return rect;
+    }
+
+    function getAspectReservedInsets(metrics) {
+      const viewportTop = metrics.offsetTop;
+      const viewportBottom = metrics.offsetTop + metrics.height;
+      const topRect = getElementLayoutRect(hudTop);
+      const bottomRects = [
+        getElementLayoutRect(hudBottom),
+        getElementLayoutRect(hudBottomCenter)
+      ];
+      let topInset = 0;
+      let bottomInset = 0;
+      if (topRect) {
+        topInset = Math.max(0, Math.min(viewportBottom, topRect.bottom) - viewportTop);
+      }
+      bottomRects.forEach((rect) => {
+        if (!rect) {
+          return;
+        }
+        const inset = Math.max(0, viewportBottom - Math.max(viewportTop, rect.top));
+        if (inset > bottomInset) {
+          bottomInset = inset;
+        }
+      });
+      if (topInset > 0) {
+        topInset += ASPECT_LAYOUT_BUTTON_GAP;
+      }
+      if (bottomInset > 0) {
+        bottomInset += ASPECT_LAYOUT_BUTTON_GAP;
+      }
+      const maxInsetTotal = Math.max(0, metrics.height - ASPECT_LAYOUT_MIN_SIZE);
+      const insetTotal = topInset + bottomInset;
+      if (insetTotal > maxInsetTotal && insetTotal > 0) {
+        const ratio = maxInsetTotal / insetTotal;
+        topInset *= ratio;
+        bottomInset *= ratio;
+      }
+      return { topInset, bottomInset };
+    }
+
     function getViewportMetrics() {
+      updateViewportOffsetVariables();
       const viewportWidth = Math.max(1, Math.round(window.innerWidth || 0));
       const viewportHeight = Math.max(1, Math.round(window.innerHeight || 0));
       if (window.visualViewport) {
@@ -5479,7 +5993,7 @@
       };
     }
 
-    function updateDotCanvasLayout(targetWidth, targetHeight, shadeWidth, shadeHeight) {
+    function updateDotCanvasLayout(targetWidth, targetHeight, shadeWidth, shadeHeight, explicitOffsetX, explicitOffsetY) {
       if (!dotCanvas) {
         return;
       }
@@ -5492,8 +6006,13 @@
       if (Number.isFinite(targetWidth) && Number.isFinite(targetHeight) && Number.isFinite(shadeWidth) && Number.isFinite(shadeHeight)) {
         width = Math.max(1, Math.round(targetWidth));
         height = Math.max(1, Math.round(targetHeight));
-        offsetX = Math.round(shadeWidth) + metrics.offsetLeft;
-        offsetY = Math.round(shadeHeight) + metrics.offsetTop;
+        if (Number.isFinite(explicitOffsetX) && Number.isFinite(explicitOffsetY)) {
+          offsetX = Math.round(explicitOffsetX);
+          offsetY = Math.round(explicitOffsetY);
+        } else {
+          offsetX = Math.round(shadeWidth) + metrics.offsetLeft;
+          offsetY = Math.round(shadeHeight) + metrics.offsetTop;
+        }
       } else {
         const contain = getContainLayout();
         width = contain.width;
@@ -6471,6 +6990,108 @@
         data[i + 1] = nearest.g;
         data[i + 2] = nearest.b;
       }
+    }
+
+    function captureCurrentSourceImageData(targetWidth, targetHeight) {
+      if (!video || video.readyState < 2 || !smoothingCanvas || !smoothingCtx) {
+        return null;
+      }
+      const width = Math.max(1, Math.round(Number(targetWidth) || 0));
+      const height = Math.max(1, Math.round(Number(targetHeight) || 0));
+      if (!width || !height) {
+        return null;
+      }
+      const crop = getDotSourceRect();
+      if (!crop) {
+        return null;
+      }
+      if (smoothingCanvas.width !== width || smoothingCanvas.height !== height) {
+        smoothingCanvas.width = width;
+        smoothingCanvas.height = height;
+      }
+      smoothingCtx.save();
+      smoothingCtx.imageSmoothingEnabled = true;
+      smoothingCtx.imageSmoothingQuality = 'high';
+      const smoothingFilter = currentCameraFilterString
+        ? `blur(${DOT_SMOOTHING_BLUR}px) ${currentCameraFilterString}`
+        : `blur(${DOT_SMOOTHING_BLUR}px)`;
+      smoothingCtx.filter = smoothingFilter;
+      smoothingCtx.clearRect(0, 0, width, height);
+      smoothingCtx.drawImage(
+        video,
+        crop.sx,
+        crop.sy,
+        crop.sw,
+        crop.sh,
+        0,
+        0,
+        width,
+        height
+      );
+      smoothingCtx.restore();
+      try {
+        return smoothingCtx.getImageData(0, 0, width, height);
+      } catch (error) {
+        console.warn('Failed to capture current source image data', error);
+        return null;
+      }
+    }
+
+    function lockPaletteForDepthSelection(depthValue) {
+      const depth = typeof depthValue === 'string' && depthValue ? depthValue : (state.colorDepth || '4');
+      const timestamp = typeof performance !== 'undefined' ? performance.now() : Date.now();
+
+      if (depth === '4') {
+        applyNewPaletteColors(FIXED_FOUR_COLOR_PALETTE);
+        paletteState.depth = '4';
+        paletteState.desired = FIXED_FOUR_COLOR_PALETTE.length;
+        paletteState.lastUpdated = timestamp;
+        if (paletteDisplayEnabled) {
+          updatePaletteDisplay(true);
+        }
+        return true;
+      }
+
+      if (depth === '2') {
+        applyNewPaletteColors(FIXED_TWO_COLOR_PALETTE);
+        paletteState.depth = '2';
+        paletteState.desired = FIXED_TWO_COLOR_PALETTE.length;
+        paletteState.lastUpdated = timestamp;
+        if (paletteDisplayEnabled) {
+          updatePaletteDisplay(true);
+        }
+        return true;
+      }
+
+      if (!depthUsesPalette(depth)) {
+        clearPaletteState();
+        return true;
+      }
+
+      const desiredColors = Math.max(2, Number(depth) || 4);
+      const resolution = getDotResolution();
+      const sourceImageData = captureCurrentSourceImageData(resolution.width, resolution.height);
+      if (!sourceImageData) {
+        return false;
+      }
+
+      applyPreAverage(sourceImageData);
+      boostSaturation(sourceImageData);
+      applyContrastToImageData(sourceImageData);
+      liftShadows(sourceImageData);
+
+      const palette = buildPaletteFromImage(sourceImageData, desiredColors, depth);
+      if (!palette || !palette.length) {
+        return false;
+      }
+      applyNewPaletteColors(palette);
+      paletteState.depth = depth;
+      paletteState.desired = desiredColors;
+      paletteState.lastUpdated = timestamp;
+      if (paletteDisplayEnabled) {
+        updatePaletteDisplay(true);
+      }
+      return true;
     }
 
     function buildSimplifiedPalette(imageData, maxColors = COLOR_SIMPLIFY_MAX_COLORS, bucket = COLOR_SIMPLIFY_BUCKET) {
@@ -8063,17 +8684,52 @@
       return true;
     }
 
+    function getOverlayCaptureRenderData(overlay) {
+      if (!overlay || !overlay.elements) {
+        return null;
+      }
+      if (overlay.hueAdjustable && overlay.tintUpdateScheduled) {
+        overlay.tintUpdateScheduled = false;
+        renderOverlayTint(overlay);
+      }
+      const imageElement = overlay.elements.image || null;
+      const tintCanvas = overlay.elements.tint;
+      const tintActive = Boolean(
+        overlay.hueAdjustable
+        && tintCanvas
+        && !tintCanvas.hidden
+        && overlay.tintParams
+        && overlay.tintParams.ratio > 0.001
+      );
+      return {
+        image: imageElement,
+        tint: tintActive ? tintCanvas : null,
+        tintActive
+      };
+    }
+
     function drawDotLayer(ctx) {
       if (!state.dotMode || !dotCanvas || dotCanvas.hidden) {
         return;
       }
-      const rect = dotCanvas.getBoundingClientRect();
-      if (!rect.width || !rect.height) {
-        return;
+      const layout = dotState.layout || {};
+      let drawX = Number.isFinite(layout.offsetX) ? Math.round(layout.offsetX) : null;
+      let drawY = Number.isFinite(layout.offsetY) ? Math.round(layout.offsetY) : null;
+      let drawWidth = Number.isFinite(layout.width) ? Math.max(1, Math.round(layout.width)) : null;
+      let drawHeight = Number.isFinite(layout.height) ? Math.max(1, Math.round(layout.height)) : null;
+      if (!drawWidth || !drawHeight || drawX == null || drawY == null) {
+        const rect = dotCanvas.getBoundingClientRect();
+        if (!rect.width || !rect.height) {
+          return;
+        }
+        drawX = Math.round(rect.left);
+        drawY = Math.round(rect.top);
+        drawWidth = Math.max(1, Math.round(rect.width));
+        drawHeight = Math.max(1, Math.round(rect.height));
       }
       ctx.save();
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(dotCanvas, rect.left, rect.top, rect.width, rect.height);
+      ctx.drawImage(dotCanvas, drawX, drawY, drawWidth, drawHeight);
       ctx.restore();
     }
 
@@ -8082,19 +8738,33 @@
         return;
       }
       overlays.forEach((overlay) => {
-        if (!overlay || !overlay.hasImage || !overlay.elements || !overlay.elements.image) {
+        if (!overlay || !overlay.hasImage || !overlay.elements || !overlay.elements.wrap) {
           return;
         }
-        const width = overlay.baseWidth * overlay.scale;
-        const height = overlay.baseHeight * overlay.scale;
+        const renderData = getOverlayCaptureRenderData(overlay);
+        if (!renderData || !renderData.image) {
+          return;
+        }
+        const rect = overlay.elements.wrap.getBoundingClientRect();
+        const width = Math.max(1, Math.round(rect.width));
+        const height = Math.max(1, Math.round(rect.height));
         if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
           return;
         }
-        const x = Number.isFinite(overlay.offsetX) ? overlay.offsetX : 0;
-        const y = Number.isFinite(overlay.offsetY) ? overlay.offsetY : 0;
+        const x = Math.round(rect.left);
+        const y = Math.round(rect.top);
         ctx.save();
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(overlay.elements.image, x, y, width, height);
+        if (renderData.tintActive && renderData.tint) {
+          ctx.filter = 'saturate(0) brightness(1.05)';
+          ctx.drawImage(renderData.image, x, y, width, height);
+          ctx.filter = 'none';
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.drawImage(renderData.tint, x, y, width, height);
+          ctx.globalCompositeOperation = 'source-over';
+        } else {
+          ctx.drawImage(renderData.image, x, y, width, height);
+        }
         ctx.restore();
       });
     }
@@ -8467,6 +9137,55 @@
       captureBtn.setAttribute('aria-label', active ? 'GIF撮影中（ボタンを離すと保存）' : '撮影（長押しでGIF）');
     }
 
+    function formatGifRemainingTime(ms) {
+      const seconds = Math.max(0, Number(ms) || 0) / 1000;
+      return `${seconds.toFixed(1)}s`;
+    }
+
+    function setGifCaptureGaugeVisible(visible) {
+      if (!gifCaptureGauge) {
+        return;
+      }
+      const active = Boolean(visible);
+      gifCaptureGauge.hidden = !active;
+      gifCaptureGauge.setAttribute('aria-hidden', active ? 'false' : 'true');
+      if (!active) {
+        gifCaptureGauge.classList.remove('is-warning');
+        gifCaptureGauge.classList.remove('is-critical');
+      }
+    }
+
+    function updateGifCaptureGauge(remainingMs, totalMs = GIF_CAPTURE_MAX_DURATION_MS) {
+      if (!gifCaptureGauge) {
+        return;
+      }
+      const safeTotal = Math.max(1, Number(totalMs) || GIF_CAPTURE_MAX_DURATION_MS);
+      const totalSegments = Math.max(1, Math.round(Number(GIF_CAPTURE_GAUGE_SEGMENTS) || 10));
+      const perSegmentMs = safeTotal / totalSegments;
+      const clampedRemaining = Math.max(0, Math.min(safeTotal, Number(remainingMs) || 0));
+      const ratio = clampedRemaining / safeTotal;
+      const activeSegments = Math.max(
+        0,
+        Math.min(
+          totalSegments,
+          Math.ceil((clampedRemaining - 0.0001) / perSegmentMs)
+        )
+      );
+      gifCaptureGauge.classList.toggle('is-warning', ratio <= 0.35);
+      gifCaptureGauge.classList.toggle('is-critical', ratio <= 0.15);
+      if (gifCaptureGaugeSegments.length) {
+        gifCaptureGaugeSegments.forEach((segment, index) => {
+          const isActive = index < activeSegments;
+          segment.classList.toggle('is-active', isActive);
+        });
+      }
+      if (gifCaptureGaugeValue) {
+        gifCaptureGaugeValue.textContent = `${formatGifRemainingTime(clampedRemaining)} | ${activeSegments}/${totalSegments}`;
+      }
+    }
+    updateGifCaptureGauge(GIF_CAPTURE_MAX_DURATION_MS, GIF_CAPTURE_MAX_DURATION_MS);
+    setGifCaptureGaugeVisible(false);
+
     function clearCaptureLongPressTimer() {
       if (captureLongPressTimer !== null) {
         clearTimeout(captureLongPressTimer);
@@ -8516,22 +9235,7 @@
       return Boolean(gifScratchCtx);
     }
 
-    function rgbaToGif332Indices(rgbaPixels, outputIndices) {
-      const pixelCount = outputIndices.length;
-      for (let i = 0, offset = 0; i < pixelCount; i += 1, offset += 4) {
-        const alpha = rgbaPixels[offset + 3];
-        if (alpha < 16) {
-          outputIndices[i] = 0;
-          continue;
-        }
-        outputIndices[i] =
-          (rgbaPixels[offset] & 0xe0) |
-          ((rgbaPixels[offset + 1] & 0xe0) >> 3) |
-          ((rgbaPixels[offset + 2] & 0xc0) >> 6);
-      }
-    }
-
-    function convertComposedFrameToGifIndices(composedFrame, targetWidth, targetHeight) {
+    function getComposedFrameImageData(composedFrame, targetWidth, targetHeight) {
       if (!composedFrame || !composedFrame.canvas || !ensureGifScratchCanvas(targetWidth, targetHeight)) {
         return null;
       }
@@ -8548,21 +9252,152 @@
         targetWidth,
         targetHeight
       );
-      const imageData = gifScratchCtx.getImageData(0, 0, targetWidth, targetHeight);
+      try {
+        return gifScratchCtx.getImageData(0, 0, targetWidth, targetHeight);
+      } catch (error) {
+        console.warn('Failed to sample GIF frame image data', error);
+        return null;
+      }
+    }
+
+    function createFixed8BitGifPalette() {
+      const palette = [];
+      for (let r = 0; r < FIXED_8BIT_LEVELS.r; r += 1) {
+        for (let g = 0; g < FIXED_8BIT_LEVELS.g; g += 1) {
+          for (let b = 0; b < FIXED_8BIT_LEVELS.b; b += 1) {
+            const rr = Math.round((r * 255) / Math.max(1, FIXED_8BIT_LEVELS.r - 1));
+            const gg = Math.round((g * 255) / Math.max(1, FIXED_8BIT_LEVELS.g - 1));
+            const bb = Math.round((b * 255) / Math.max(1, FIXED_8BIT_LEVELS.b - 1));
+            palette.push((rr << 16) | (gg << 8) | bb);
+          }
+        }
+      }
+      return palette;
+    }
+
+    function normalizeGifPalette(palette) {
+      const unique = [];
+      const seen = new Set();
+      const source = Array.isArray(palette) ? palette : [];
+      source.forEach((entry) => {
+        const numeric = Number(entry);
+        if (!Number.isFinite(numeric)) {
+          return;
+        }
+        const rgb = numeric & 0xffffff;
+        if (seen.has(rgb)) {
+          return;
+        }
+        seen.add(rgb);
+        unique.push(rgb);
+      });
+
+      if (!unique.length) {
+        unique.push(0x000000, 0xffffff);
+      } else if (unique.length === 1) {
+        unique.push(unique[0] === 0x000000 ? 0xffffff : 0x000000);
+      }
+
+      if (unique.length > 256) {
+        unique.length = 256;
+      }
+
+      let targetLength = 2;
+      while (targetLength < unique.length && targetLength < 256) {
+        targetLength <<= 1;
+      }
+      if (targetLength > 256) {
+        targetLength = 256;
+      }
+      while (unique.length < targetLength) {
+        unique.push(unique[unique.length - 1]);
+      }
+      return unique;
+    }
+
+    function buildGifPaletteFromState(imageData) {
+      const depth = state.colorDepth || '4';
+      let palette = [];
+      if (depth === '256') {
+        palette = createFixed8BitGifPalette();
+      } else if (depthUsesPalette(depth)) {
+        if (Array.isArray(paletteState.colors) && paletteState.colors.length) {
+          palette = paletteState.colors.map((color) => (
+            (clampByte(color.r) << 16) | (clampByte(color.g) << 8) | clampByte(color.b)
+          ));
+        }
+      } else if (imageData && imageData.data) {
+        const simplified = buildSimplifiedPalette(imageData, 256, 12);
+        palette = simplified.map((color) => (
+          (clampByte(color.r) << 16) | (clampByte(color.g) << 8) | clampByte(color.b)
+        ));
+      }
+      if (!palette.length) {
+        palette = GIF_DEFAULT_PALETTE.slice();
+      }
+      return normalizeGifPalette(palette);
+    }
+
+    function rgbaToGifPaletteIndices(rgbaPixels, palette, outputIndices) {
+      const pixelCount = outputIndices.length;
+      const rgbPalette = palette.map((entry) => ({
+        r: (entry >> 16) & 0xff,
+        g: (entry >> 8) & 0xff,
+        b: entry & 0xff
+      }));
+      const nearestCache = new Map();
+      for (let i = 0, offset = 0; i < pixelCount; i += 1, offset += 4) {
+        const alpha = rgbaPixels[offset + 3];
+        if (alpha < 16) {
+          outputIndices[i] = 0;
+          continue;
+        }
+        const r = rgbaPixels[offset];
+        const g = rgbaPixels[offset + 1];
+        const b = rgbaPixels[offset + 2];
+        const key = (getColorBinIndex(r) << 8) | (getColorBinIndex(g) << 4) | getColorBinIndex(b);
+        if (nearestCache.has(key)) {
+          outputIndices[i] = nearestCache.get(key);
+          continue;
+        }
+        let bestIndex = 0;
+        let bestDistance = Number.POSITIVE_INFINITY;
+        for (let paletteIndex = 0; paletteIndex < rgbPalette.length; paletteIndex += 1) {
+          const color = rgbPalette[paletteIndex];
+          const dr = r - color.r;
+          const dg = g - color.g;
+          const db = b - color.b;
+          const distance = dr * dr + dg * dg + db * db;
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            bestIndex = paletteIndex;
+          }
+        }
+        nearestCache.set(key, bestIndex);
+        outputIndices[i] = bestIndex;
+      }
+    }
+
+    function convertComposedFrameToGifIndices(composedFrame, targetWidth, targetHeight, palette) {
+      const imageData = getComposedFrameImageData(composedFrame, targetWidth, targetHeight);
+      if (!imageData) {
+        return null;
+      }
+      const gifPalette = normalizeGifPalette(Array.isArray(palette) && palette.length ? palette : GIF_DEFAULT_PALETTE);
       const indexed = new Uint8Array(targetWidth * targetHeight);
-      rgbaToGif332Indices(imageData.data, indexed);
+      rgbaToGifPaletteIndices(imageData.data, gifPalette, indexed);
       return indexed;
     }
 
     function captureGifIndexedFrame(session) {
-      if (!session || !session.width || !session.height) {
+      if (!session || !session.width || !session.height || !Array.isArray(session.palette) || !session.palette.length) {
         return null;
       }
       const composed = composeCaptureFrameCanvas({ pixelRatioCap: GIF_CAPTURE_PIXEL_RATIO_CAP });
       if (!composed) {
         return null;
       }
-      return convertComposedFrameToGifIndices(composed, session.width, session.height);
+      return convertComposedFrameToGifIndices(composed, session.width, session.height, session.palette);
     }
 
     function createGif332Palette() {
@@ -8581,7 +9416,7 @@
       return palette;
     }
 
-    function buildGifFromIndexedFrames(indexedFrames, width, height, frameDelayMs) {
+    function buildGifFromIndexedFrames(indexedFrames, width, height, frameDelayMs, palette = GIF_DEFAULT_PALETTE) {
       if (!Array.isArray(indexedFrames) || !indexedFrames.length) {
         throw new Error('No GIF frames');
       }
@@ -8591,9 +9426,10 @@
         throw new Error('Invalid GIF size');
       }
       const delayHundredths = Math.max(2, Math.round(Math.max(20, Number(frameDelayMs) || 0) / 10));
+      const normalizedPalette = normalizeGifPalette(Array.isArray(palette) ? palette : GIF_DEFAULT_PALETTE);
       const writerBaseOptions = {
         loop: 0,
-        palette: GIF_332_PALETTE
+        palette: normalizedPalette
       };
       let bufferSize = Math.max(gifWidth * gifHeight * indexedFrames.length * 5 + 8192, 32768);
       for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -8872,17 +9708,34 @@
         setStatus('カメラの準備が完了してからGIF撮影してください');
         return false;
       }
+      const depth = state.colorDepth || '4';
+      if (depthUsesPalette(depth)) {
+        const hasPalette =
+          paletteState.depth === depth &&
+          Array.isArray(paletteState.colors) &&
+          paletteState.colors.length > 0;
+        if (!hasPalette) {
+          const locked = lockPaletteForDepthSelection(depth);
+          if (!locked || !Array.isArray(paletteState.colors) || !paletteState.colors.length) {
+            setStatus('GIF撮影のパレットを準備できませんでした');
+            return false;
+          }
+        }
+      }
       const firstComposed = composeCaptureFrameCanvas({ pixelRatioCap: GIF_CAPTURE_PIXEL_RATIO_CAP });
       if (!firstComposed) {
         setStatus('GIF撮影を開始できませんでした');
         return false;
       }
       const frameSize = getGifCaptureFrameSize(firstComposed.width, firstComposed.height);
-      const firstFrame = convertComposedFrameToGifIndices(firstComposed, frameSize.width, frameSize.height);
-      if (!firstFrame) {
+      const firstImageData = getComposedFrameImageData(firstComposed, frameSize.width, frameSize.height);
+      if (!firstImageData) {
         setStatus('GIF撮影を開始できませんでした');
         return false;
       }
+      const gifPalette = buildGifPaletteFromState(firstImageData);
+      const firstFrame = new Uint8Array(frameSize.width * frameSize.height);
+      rgbaToGifPaletteIndices(firstImageData.data, gifPalette, firstFrame);
       captureInProgress = true;
       const now = performance.now();
       const session = {
@@ -8892,6 +9745,7 @@
         frameDelayMs: GIF_CAPTURE_FRAME_INTERVAL_MS,
         width: frameSize.width,
         height: frameSize.height,
+        palette: gifPalette,
         frames: [firstFrame],
         rafId: 0
       };
@@ -8899,6 +9753,7 @@
       if (captureBtn) {
         captureBtn.setAttribute('aria-busy', 'true');
       }
+      updateGifCaptureGauge(GIF_CAPTURE_MAX_DURATION_MS, GIF_CAPTURE_MAX_DURATION_MS);
       setCaptureButtonRecording(true);
       const maxSeconds = (GIF_CAPTURE_MAX_DURATION_MS / 1000).toFixed(1);
       setStatus(`GIF撮影中… ボタンを離すと保存（最大${maxSeconds}秒）`);
@@ -8907,7 +9762,10 @@
         if (!session.active) {
           return;
         }
-        if (timestamp - session.startedAt >= GIF_CAPTURE_MAX_DURATION_MS) {
+        const elapsedMs = Math.max(0, timestamp - session.startedAt);
+        const remainingMs = Math.max(0, GIF_CAPTURE_MAX_DURATION_MS - elapsedMs);
+        updateGifCaptureGauge(remainingMs, GIF_CAPTURE_MAX_DURATION_MS);
+        if (elapsedMs >= GIF_CAPTURE_MAX_DURATION_MS) {
           suppressCaptureClickOnce = true;
           void stopGifCaptureSession({ reason: 'timeout' });
           return;
@@ -8937,6 +9795,8 @@
         window.cancelAnimationFrame(session.rafId);
       }
       gifCaptureSession = null;
+      updateGifCaptureGauge(GIF_CAPTURE_MAX_DURATION_MS, GIF_CAPTURE_MAX_DURATION_MS);
+      setGifCaptureGaugeVisible(false);
       setCaptureButtonRecording(false);
       if (captureBtn) {
         captureBtn.disabled = true;
@@ -8951,7 +9811,13 @@
           setStatus('長押し時間が短いためGIFを保存しませんでした');
           return false;
         }
-        const gifBytes = buildGifFromIndexedFrames(session.frames, session.width, session.height, session.frameDelayMs);
+        const gifBytes = buildGifFromIndexedFrames(
+          session.frames,
+          session.width,
+          session.height,
+          session.frameDelayMs,
+          session.palette
+        );
         const gifBlob = new Blob([gifBytes], { type: 'image/gif' });
         const result = {
           blob: gifBlob,
@@ -9025,8 +9891,11 @@
         capturePressTriggered = true;
         suppressCaptureClickOnce = true;
         closeAllMenus();
+        updateGifCaptureGauge(GIF_CAPTURE_MAX_DURATION_MS, GIF_CAPTURE_MAX_DURATION_MS);
+        setGifCaptureGaugeVisible(true);
         const started = startGifCaptureSession();
         if (!started) {
+          setGifCaptureGaugeVisible(false);
           capturePressTriggered = false;
         }
       }, CAPTURE_LONG_PRESS_MS);
@@ -9181,6 +10050,12 @@
       ['mousedown', 'touchstart', 'pointerdown', 'click'].forEach((type) => {
         colorDepthSelect.addEventListener(type, (event) => {
           event.stopPropagation();
+          if (type === 'click' && state.dotMode) {
+            const currentDepth = colorDepthSelect.value;
+            if (COLOR_DEPTHS.includes(currentDepth)) {
+              lockPaletteForDepthSelection(currentDepth);
+            }
+          }
         });
       });
       colorDepthSelect.addEventListener('change', () => {
@@ -9188,11 +10063,9 @@
         if (!COLOR_DEPTHS.includes(value)) {
           return;
         }
-        if (value === state.colorDepth) {
-          return;
-        }
         state.colorDepth = value;
         if (state.dotMode) {
+          lockPaletteForDepthSelection(value);
           refreshOverlayStatus();
         }
         updateDotModeUI();
