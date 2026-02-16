@@ -9612,6 +9612,13 @@
   function applyLayoutMode() {
     const isMobile = layoutMode === 'mobilePortrait';
     document.body.classList.toggle('is-mobile-layout', isMobile);
+    try {
+      document.dispatchEvent(new CustomEvent('pixiedraw:ad-layout-change', {
+        detail: { layoutMode, isMobileLayout: isMobile }
+      }));
+    } catch (error) {
+      // ignore
+    }
     updateAdaptiveMobileLayoutVars();
     dom.mobileDrawer.hidden = !isMobile;
     if (dom.mobileTopBar) {
