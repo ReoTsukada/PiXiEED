@@ -47,7 +47,8 @@
   --canvas-control-size: clamp(38px, 4.2vw, 44px);
   --canvas-control-size-mobile: clamp(32px, 9vw, 38px);
   --canvas-control-icon-size: 20px;
-  --mobile-bottom-ad-slot-height: clamp(48px, 8.2vw, 56px);
+  --mobile-bottom-ad-slot-height: 50px;
+  --mobile-bottom-ad-target-width: 320px;
 }
 
 @supports (height: 100dvh) {
@@ -2469,8 +2470,8 @@ input[type='range']::-moz-focus-outer {
 }
 
 .panel-ad .ad-box {
-  --panel-ad-width: 160px;
-  --panel-ad-height: 110px;
+  --panel-ad-width: 180px;
+  --panel-ad-height: 112px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2489,8 +2490,8 @@ input[type='range']::-moz-focus-outer {
 .panel-ad .ad-box ins.adsbygoogle,
 .panel-ad .ad-box ins.ad-seed {
   display: inline-block !important;
-  width: min(100%, var(--panel-ad-width)) !important;
-  max-width: min(100%, var(--panel-ad-width)) !important;
+  width: var(--panel-ad-width) !important;
+  max-width: var(--panel-ad-width) !important;
   min-width: 0 !important;
   min-height: var(--panel-ad-height) !important;
   height: var(--panel-ad-height) !important;
@@ -2503,8 +2504,8 @@ input[type='range']::-moz-focus-outer {
 .panel-ad .ad-box ins.adsbygoogle iframe,
 .panel-ad .ad-box .adsbygoogle iframe {
   display: block;
-  width: min(100%, var(--panel-ad-width)) !important;
-  max-width: min(100%, var(--panel-ad-width)) !important;
+  width: var(--panel-ad-width) !important;
+  max-width: var(--panel-ad-width) !important;
   min-height: var(--panel-ad-height) !important;
   height: var(--panel-ad-height) !important;
   max-height: var(--panel-ad-height) !important;
@@ -2559,8 +2560,8 @@ body.is-mobile-layout #rightPanelAdSlot {
 @media (min-width: 900px) and (orientation: landscape) {
   .rail-ad .ad-box { max-width: none; }
   .panel-ad .ad-box {
-    --panel-ad-width: 220px;
-    --panel-ad-height: 136px;
+    --panel-ad-width: 240px;
+    --panel-ad-height: 148px;
     min-height: var(--panel-ad-height);
   }
 }
@@ -2599,7 +2600,7 @@ body.is-mobile-layout #rightPanelAdSlot {
 #mobileBottomAd .mobile-ad-box {
   background: #ffffff;
   color: #111111;
-  width: min(100%, 720px);
+  width: min(100%, var(--mobile-bottom-ad-target-width));
   max-width: 100%;
   min-width: 0;
   min-height: var(--mobile-bottom-ad-slot-height);
@@ -2619,7 +2620,7 @@ body.is-mobile-layout #rightPanelAdSlot {
 
 /* Force dedicated mobile-bottom slot size even if inline styles are injected. */
 #mobileBottomAdSlot.mobile-ad-box {
-  width: min(100%, 720px) !important;
+  width: min(100%, var(--mobile-bottom-ad-target-width)) !important;
   max-width: 100% !important;
   min-width: 0 !important;
   min-height: var(--mobile-bottom-ad-slot-height) !important;
@@ -2630,8 +2631,8 @@ body.is-mobile-layout #rightPanelAdSlot {
 #mobileBottomAd .mobile-ad-box ins.adsbygoogle,
 #mobileBottomAd .mobile-ad-box ins.ad-seed {
   display: block !important;
-  width: 100% !important;
-  max-width: 100% !important;
+  width: var(--mobile-bottom-ad-target-width) !important;
+  max-width: var(--mobile-bottom-ad-target-width) !important;
   min-width: 0 !important;
   margin-left: auto !important;
   margin-right: auto !important;
@@ -2654,8 +2655,8 @@ body.is-mobile-layout #rightPanelAdSlot {
 #mobileBottomAd .mobile-ad-box ins.adsbygoogle iframe,
 #mobileBottomAd .mobile-ad-box .adsbygoogle iframe {
   display: block !important;
-  width: 100% !important;
-  max-width: 100% !important;
+  width: var(--mobile-bottom-ad-target-width) !important;
+  max-width: var(--mobile-bottom-ad-target-width) !important;
   min-width: 0 !important;
   margin-left: auto !important;
   margin-right: auto !important;
