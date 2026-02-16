@@ -2457,8 +2457,8 @@ input[type='range']::-moz-focus-outer {
   align-items: center;
   justify-content: center;
   width: 100%;
-  margin-top: 14px;
-  min-height: 180px;
+  margin-top: 12px;
+  min-height: var(--panel-ad-square-size, 120px);
   flex: 0 0 auto;
   overflow: hidden;
 }
@@ -2469,11 +2469,12 @@ input[type='range']::-moz-focus-outer {
 }
 
 .panel-ad .ad-box {
+  --panel-ad-square-size: 120px;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 180px;
+  min-height: var(--panel-ad-square-size);
   background: #ffffff;
   color: #111111;
   text-align: center;
@@ -2486,11 +2487,13 @@ input[type='range']::-moz-focus-outer {
 
 .panel-ad .ad-box ins.adsbygoogle,
 .panel-ad .ad-box ins.ad-seed {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 100% !important;
-  min-height: 180px !important;
+  display: inline-block !important;
+  width: min(100%, var(--panel-ad-square-size)) !important;
+  max-width: min(100%, var(--panel-ad-square-size)) !important;
+  min-width: 0 !important;
+  min-height: var(--panel-ad-square-size) !important;
+  height: var(--panel-ad-square-size) !important;
+  max-height: var(--panel-ad-square-size) !important;
   margin: 0 auto !important;
   box-sizing: border-box !important;
   overflow: hidden !important;
@@ -2499,12 +2502,15 @@ input[type='range']::-moz-focus-outer {
 .panel-ad .ad-box ins.adsbygoogle iframe,
 .panel-ad .ad-box .adsbygoogle iframe {
   display: block;
-  width: 100% !important;
+  width: min(100%, var(--panel-ad-square-size)) !important;
+  max-width: min(100%, var(--panel-ad-square-size)) !important;
+  min-height: var(--panel-ad-square-size) !important;
+  height: var(--panel-ad-square-size) !important;
+  max-height: var(--panel-ad-square-size) !important;
   margin-left: auto !important;
   margin-right: auto !important;
   margin-top: auto !important;
   margin-bottom: auto !important;
-  min-height: 180px !important;
   overflow: hidden !important;
 }
 
@@ -2551,14 +2557,9 @@ body.is-mobile-layout #rightPanelAdSlot {
 /* Landscape and wider screens: allow larger ad but keep within rail */
 @media (min-width: 900px) and (orientation: landscape) {
   .rail-ad .ad-box { max-width: none; }
-  .panel-ad {
-    min-height: 220px;
-  }
-  .panel-ad .ad-box,
-  .panel-ad .ad-box ins.adsbygoogle,
-  .panel-ad .ad-box ins.adsbygoogle iframe,
-  .panel-ad .ad-box .adsbygoogle iframe {
-    min-height: 220px !important;
+  .panel-ad .ad-box {
+    --panel-ad-square-size: 200px;
+    min-height: 200px;
   }
 }
 
@@ -3068,6 +3069,9 @@ body.is-startup-active {
 }
 
 .export-ad__slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-height: clamp(48px, 9vw, 60px);
   height: clamp(48px, 9vw, 60px);
   max-width: 100%;
@@ -3082,9 +3086,10 @@ body.is-startup-active {
   min-width: 0 !important;
   min-height: clamp(48px, 9vw, 60px);
   height: clamp(48px, 9vw, 60px);
-  margin: 0 auto;
+  margin: 0 auto !important;
   box-sizing: border-box;
   overflow: hidden;
+  text-align: center;
 }
 
 .export-ad__slot .adsbygoogle iframe,
@@ -3093,6 +3098,7 @@ body.is-startup-active {
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
+  margin: 0 auto !important;
 }
 
 .export-ad__label {
@@ -3178,9 +3184,10 @@ body.is-startup-active {
   min-width: 0 !important;
   min-height: clamp(200px, 58vh, 460px);
   height: clamp(200px, 58vh, 460px);
-  margin: 0 auto;
+  margin: 0 auto !important;
   box-sizing: border-box;
   overflow: hidden;
+  text-align: center;
 }
 
 .export-interstitial__slot .adsbygoogle iframe,
@@ -3189,6 +3196,7 @@ body.is-startup-active {
   width: 100% !important;
   max-width: 100% !important;
   min-width: 0 !important;
+  margin: 0 auto !important;
 }
 
 @media (min-width: 600px) {
