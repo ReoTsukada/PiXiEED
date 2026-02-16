@@ -2508,6 +2508,22 @@ input[type='range']::-moz-focus-outer {
   overflow: hidden !important;
 }
 
+/* In mobile layout, disable side-panel ad mounts completely. */
+body.is-mobile-layout .panel-ad-mount,
+body.is-mobile-layout .panel-ad,
+body.is-mobile-layout #leftPanelAd,
+body.is-mobile-layout #rightPanelAd,
+body.is-mobile-layout #leftPanelAdSlot,
+body.is-mobile-layout #rightPanelAdSlot {
+  display: none !important;
+  min-height: 0 !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
 /* Portrait narrower rails: hide side ads and show one bottom banner. */
 @media (orientation: portrait) {
   .rail-ad .ad-box { max-width: calc(var(--left-width,78px)); font-size: 11px; padding: 4px; }
