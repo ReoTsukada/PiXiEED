@@ -10403,6 +10403,8 @@
       paletteWheelCtx = wheel.getContext('2d', { willReadFrequently: true }) || null;
       if (wheelSurface) {
         wheelSurface.addEventListener('pointerdown', handlePaletteWheelPointerDown);
+        wheelSurface.addEventListener('pointermove', handlePaletteWheelPointerMove);
+        wheelSurface.addEventListener('pointerup', handlePaletteWheelPointerUp);
         wheelSurface.addEventListener('pointercancel', handlePaletteWheelPointerUp);
       }
     }
@@ -10808,26 +10810,37 @@
   function handlePaletteWheelPointerDown(event) {
     const wheelSurface = getPaletteWheelSurface();
     if (!wheelSurface) return;
-    event.preventDefault();
+    if (event.cancelable) {
+      event.preventDefault();
+    }
     if (paletteEditorState.wheelPointer.upHandler) {
       window.removeEventListener('pointerup', paletteEditorState.wheelPointer.upHandler);
+      window.removeEventListener('pointercancel', paletteEditorState.wheelPointer.upHandler);
       paletteEditorState.wheelPointer.upHandler = null;
     }
     paletteEditorState.wheelPointer.active = true;
     paletteEditorState.wheelPointer.pointerId = event.pointerId;
     paletteEditorState.wheelPointer.mode = null;
     paletteEditorState.wheelPointer.captureTarget = wheelSurface;
-    wheelSurface.setPointerCapture?.(event.pointerId);
+    try {
+      wheelSurface.setPointerCapture?.(event.pointerId);
+    } catch (error) {
+      // Some mobile browsers may reject pointer capture in edge cases.
+    }
     updatePaletteFromWheelEvent(event);
-    window.addEventListener('pointermove', handlePaletteWheelPointerMove);
+    window.addEventListener('pointermove', handlePaletteWheelPointerMove, { passive: false });
     const pointerUpHandler = evt => handlePaletteWheelPointerUp(evt);
     paletteEditorState.wheelPointer.upHandler = pointerUpHandler;
     window.addEventListener('pointerup', pointerUpHandler);
+    window.addEventListener('pointercancel', pointerUpHandler);
   }
 
   function handlePaletteWheelPointerMove(event) {
     if (!paletteEditorState.wheelPointer.active || event.pointerId !== paletteEditorState.wheelPointer.pointerId) {
       return;
+    }
+    if (event.cancelable) {
+      event.preventDefault();
     }
     updatePaletteFromWheelEvent(event);
   }
@@ -10846,6 +10859,7 @@
     paletteEditorState.wheelPointer.captureTarget = null;
     if (paletteEditorState.wheelPointer.upHandler) {
       window.removeEventListener('pointerup', paletteEditorState.wheelPointer.upHandler);
+      window.removeEventListener('pointercancel', paletteEditorState.wheelPointer.upHandler);
       paletteEditorState.wheelPointer.upHandler = null;
     }
     window.removeEventListener('pointermove', handlePaletteWheelPointerMove);
