@@ -2513,6 +2513,20 @@ input[type='range']::-moz-focus-outer {
   .rail-ad .ad-box { max-width: calc(var(--left-width,78px)); font-size: 11px; padding: 4px; }
   .rail-ad { display: none !important; }
   .panel-ad { display: none !important; }
+  .mobile-panel .panel-ad-mount,
+  .mobile-panel .panel-ad,
+  #leftPanelAd,
+  #rightPanelAd,
+  #leftPanelAdSlot,
+  #rightPanelAdSlot {
+    display: none !important;
+    min-height: 0 !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
   #mobileBottomAd { display: flex !important; }
   /* Always reserve banner area in portrait so UI never overlaps the fixed ad. */
   .app { padding-bottom: calc(var(--mobile-bottom-ad-slot-height) + env(safe-area-inset-bottom, 0px) + 6px); }
@@ -2610,6 +2624,14 @@ input[type='range']::-moz-focus-outer {
   border: 0 !important;
 }
 
+#mobileBottomAd .mobile-ad-box > ins,
+#mobileBottomAd .mobile-ad-box > .adsbygoogle {
+  min-height: var(--mobile-bottom-ad-slot-height) !important;
+  height: var(--mobile-bottom-ad-slot-height) !important;
+  max-height: var(--mobile-bottom-ad-slot-height) !important;
+  overflow: hidden !important;
+}
+
 #mobileBottomAd .mobile-ad-box ins.adsbygoogle iframe,
 #mobileBottomAd .mobile-ad-box .adsbygoogle iframe {
   display: block !important;
@@ -2623,6 +2645,12 @@ input[type='range']::-moz-focus-outer {
   max-height: var(--mobile-bottom-ad-slot-height) !important;
   border: 0 !important;
   overflow: hidden !important;
+}
+
+#mobileBottomAd .mobile-ad-box iframe {
+  min-height: var(--mobile-bottom-ad-slot-height) !important;
+  height: var(--mobile-bottom-ad-slot-height) !important;
+  max-height: var(--mobile-bottom-ad-slot-height) !important;
 }
 
 #panelSettings .settings-size-controls .number-stepper__btn {
