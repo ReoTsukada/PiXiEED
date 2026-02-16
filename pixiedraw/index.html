@@ -684,7 +684,8 @@
       <ins class="ad-seed"
            style="display:block"
            data-ad-client="ca-pub-9801602250480253"
-           data-ad-slot="6568310446"></ins>
+           data-ad-slot="6568310446"
+           data-ad-format="horizontal"></ins>
     </div>
   </div>
   <script>
@@ -696,15 +697,8 @@
       const mql = window.matchMedia('(orientation: portrait)');
       const mobileBottomAd = document.getElementById('mobileBottomAd');
       const mobileBottomAdSlot = document.getElementById('mobileBottomAdSlot');
-      const MOBILE_BANNER_SIZES = Object.freeze([
-        { minWidth: 728, width: 728, height: 90 },
-        { minWidth: 468, width: 468, height: 60 },
-        { minWidth: 336, width: 336, height: 50 },
-        { minWidth: 320, width: 320, height: 50 },
-        { minWidth: 300, width: 300, height: 50 }
-      ]);
+      const MOBILE_AD_SLOT_HEIGHT = 56;
       let raf = null;
-      let lastMobileBannerKey = '';
 
       function notifyAdLayoutChange(reason) {
         try {
@@ -720,88 +714,51 @@
         return Math.max(min, Math.min(max, value));
       }
 
-      function getMobileBottomBannerSize() {
-        let viewportWidth = 0;
+      function updateMobileBottomPadding() {
+        let slotHeight = MOBILE_AD_SLOT_HEIGHT;
         try {
-          viewportWidth = Math.max(
-            0,
-            Math.floor(
-              (window.visualViewport && window.visualViewport.width) ||
-              window.innerWidth ||
-              document.documentElement.clientWidth ||
-              0
-            )
-          );
-        } catch (error) {
-          viewportWidth = Math.max(0, Math.floor(window.innerWidth || 0));
-        }
-        const availableWidth = Math.max(0, viewportWidth - 12);
-        for (const size of MOBILE_BANNER_SIZES) {
-          if (availableWidth >= size.minWidth) {
-            return { width: size.width, height: size.height };
-          }
-        }
-        return { width: 300, height: 50 };
-      }
+          const target = (mobileBottomAdSlot instanceof HTMLElement) ? mobileBottomAdSlot : mobileBottomAd;
+          const rect = target && target.getBoundingClientRect ? target.getBoundingClientRect() : null;
+          const measured = Math.ceil((rect && rect.height) || slotHeight);
+          slotHeight = clamp(measured, MOBILE_AD_SLOT_HEIGHT - 4, MOBILE_AD_SLOT_HEIGHT + 4);
+        } catch (e) {}
 
-      function updateMobileBottomPadding(forcedHeight) {
-        const numericHeight = Math.round(Number(forcedHeight) || 0);
-        const slotHeight = clamp(numericHeight || 50, 50, 90);
         const reserved = Math.ceil(slotHeight + 4);
         document.documentElement.style.setProperty('--mobile-bottom-ad-height', reserved + 'px');
       }
 
       function enforceMobileBottomAdGeometry() {
-        const size = getMobileBottomBannerSize();
-        const slotWidthPx = `${size.width}px`;
-        const slotHeightPx = `${size.height}px`;
-        const bannerKey = `${size.width}x${size.height}`;
-        const bannerChanged = bannerKey !== lastMobileBannerKey;
-        lastMobileBannerKey = bannerKey;
-
-        if (!(mobileAd instanceof HTMLElement)) return { ...size, changed: bannerChanged };
-
-        document.documentElement.style.setProperty('--mobile-bottom-ad-target-width', slotWidthPx);
-        document.documentElement.style.setProperty('--mobile-bottom-ad-slot-height', slotHeightPx);
+        if (!(mobileAd instanceof HTMLElement)) return;
+        const slotHeightPx = `${MOBILE_AD_SLOT_HEIGHT}px`;
 
         mobileAd.style.setProperty('min-height', `calc(${slotHeightPx} + env(safe-area-inset-bottom, 0px) + 2px)`, 'important');
         mobileAd.style.setProperty('height', `calc(${slotHeightPx} + env(safe-area-inset-bottom, 0px) + 2px)`, 'important');
         mobileAd.style.setProperty('max-height', `calc(${slotHeightPx} + env(safe-area-inset-bottom, 0px) + 2px)`, 'important');
 
         if (mobileBottomAdSlot instanceof HTMLElement) {
-          mobileBottomAdSlot.style.setProperty('width', slotWidthPx, 'important');
-          mobileBottomAdSlot.style.setProperty('min-width', slotWidthPx, 'important');
-          mobileBottomAdSlot.style.setProperty('max-width', slotWidthPx, 'important');
           mobileBottomAdSlot.style.setProperty('min-height', slotHeightPx, 'important');
           mobileBottomAdSlot.style.setProperty('height', slotHeightPx, 'important');
           mobileBottomAdSlot.style.setProperty('max-height', slotHeightPx, 'important');
 
           const slotIns = mobileBottomAdSlot.querySelector('ins');
           if (slotIns instanceof HTMLElement) {
-            slotIns.style.setProperty('display', 'inline-block', 'important');
-            slotIns.style.setProperty('width', slotWidthPx, 'important');
-            slotIns.style.setProperty('max-width', slotWidthPx, 'important');
             slotIns.style.setProperty('min-height', slotHeightPx, 'important');
             slotIns.style.setProperty('height', slotHeightPx, 'important');
             slotIns.style.setProperty('max-height', slotHeightPx, 'important');
             slotIns.style.setProperty('overflow', 'hidden', 'important');
-            slotIns.removeAttribute('data-ad-format');
-            slotIns.removeAttribute('data-full-width-responsive');
           }
 
           mobileBottomAdSlot.querySelectorAll('iframe').forEach((frame) => {
             if (!(frame instanceof HTMLElement)) return;
-            frame.style.setProperty('width', slotWidthPx, 'important');
-            frame.style.setProperty('max-width', slotWidthPx, 'important');
             frame.style.setProperty('min-height', slotHeightPx, 'important');
             frame.style.setProperty('height', slotHeightPx, 'important');
             frame.style.setProperty('max-height', slotHeightPx, 'important');
           });
         }
-        return { ...size, changed: bannerChanged };
       }
 
       function showAd() {
+        enforceMobileBottomAdGeometry();
         if (!mobileAd.classList.contains('visible')) {
           mobileAd.classList.add('visible');
         }
@@ -825,13 +782,10 @@
           // Bottom ad: show in portrait as overlay at the bottom and mark body so CSS can add padding
           if (mobileBottomAd) {
             if (mql.matches) {
-              const geometry = enforceMobileBottomAdGeometry();
+              enforceMobileBottomAdGeometry();
               showAd();
               // keep layout stable even if ad network injects a tall creative.
-              updateMobileBottomPadding(geometry && geometry.height);
-              if (geometry && geometry.changed) {
-                notifyAdLayoutChange('mobile-banner-size-change');
-              }
+              updateMobileBottomPadding();
               document.body.classList.add('bottom-ad-active');
             } else {
               hideAd();
@@ -845,11 +799,7 @@
       }
 
       function refreshListeners() {
-        const geometry = enforceMobileBottomAdGeometry();
-        updateMobileBottomPadding(geometry && geometry.height);
-        if (geometry && geometry.changed) {
-          notifyAdLayoutChange('mobile-banner-size-change');
-        }
+        enforceMobileBottomAdGeometry();
         refreshMobileBottomAd();
         notifyAdLayoutChange('refreshListeners');
       }
@@ -857,20 +807,14 @@
       if (mobileBottomAdSlot instanceof HTMLElement) {
         if (typeof ResizeObserver === 'function') {
           const adResizeObserver = new ResizeObserver(() => {
-            const geometry = enforceMobileBottomAdGeometry();
-            updateMobileBottomPadding(geometry && geometry.height);
-            if (geometry && geometry.changed) {
-              notifyAdLayoutChange('mobile-banner-size-change');
-            }
+            enforceMobileBottomAdGeometry();
+            updateMobileBottomPadding();
           });
           adResizeObserver.observe(mobileBottomAdSlot);
         }
         const adMutationObserver = new MutationObserver(() => {
-          const geometry = enforceMobileBottomAdGeometry();
-          updateMobileBottomPadding(geometry && geometry.height);
-          if (geometry && geometry.changed) {
-            notifyAdLayoutChange('mobile-banner-size-change');
-          }
+          enforceMobileBottomAdGeometry();
+          updateMobileBottomPadding();
         });
         adMutationObserver.observe(mobileBottomAdSlot, {
           attributes: true,
@@ -1074,29 +1018,6 @@
         }, Math.max(0, Number(delayMs) || 0));
       }
 
-      function getMobileBottomFrameSize() {
-        let viewportWidth = 0;
-        try {
-          viewportWidth = Math.max(
-            0,
-            Math.floor(
-              (window.visualViewport && window.visualViewport.width) ||
-              window.innerWidth ||
-              document.documentElement.clientWidth ||
-              0
-            )
-          );
-        } catch (error) {
-          viewportWidth = Math.max(0, Math.floor(window.innerWidth || 0));
-        }
-        const availableWidth = Math.max(0, viewportWidth - 12);
-        if (availableWidth >= 728) return { width: 728, height: 90 };
-        if (availableWidth >= 468) return { width: 468, height: 60 };
-        if (availableWidth >= 336) return { width: 336, height: 50 };
-        if (availableWidth >= 320) return { width: 320, height: 50 };
-        return { width: 300, height: 50 };
-      }
-
       function getSideAdFrameSize(container) {
         if (!(container instanceof HTMLElement)) {
           return { width: 160, height: 110 };
@@ -1173,7 +1094,7 @@
       }
 
       function getRequiredWidth(container) {
-        return isMobileBottomSlot(container) ? 280 : MIN_SIDE_AD_WIDTH;
+        return isMobileBottomSlot(container) ? 1 : MIN_SIDE_AD_WIDTH;
       }
 
       function isContainerRenderable(container) {
@@ -1207,22 +1128,11 @@
         ins.setAttribute('data-ad-client', ADS_CLIENT);
         ins.setAttribute('data-ad-slot', slot);
         if (isMobileBottomSlot(container)) {
-          const mobileFrame = getMobileBottomFrameSize();
-          container.style.setProperty('--mobile-bottom-ad-target-width', `${mobileFrame.width}px`);
-          container.style.setProperty('--mobile-bottom-ad-slot-height', `${mobileFrame.height}px`);
-          container.style.width = `${mobileFrame.width}px`;
-          container.style.minWidth = `${mobileFrame.width}px`;
-          container.style.maxWidth = `${mobileFrame.width}px`;
-          container.style.height = `${mobileFrame.height}px`;
-          container.style.minHeight = `${mobileFrame.height}px`;
-          container.style.maxHeight = `${mobileFrame.height}px`;
-          ins.style.display = 'inline-block';
-          ins.style.width = `${mobileFrame.width}px`;
-          ins.style.maxWidth = `${mobileFrame.width}px`;
-          ins.style.height = `${mobileFrame.height}px`;
-          ins.style.minHeight = `${mobileFrame.height}px`;
-          ins.style.maxHeight = `${mobileFrame.height}px`;
-          ins.removeAttribute('data-ad-format');
+          ins.style.removeProperty('width');
+          ins.style.removeProperty('height');
+          ins.style.removeProperty('min-height');
+          ins.style.removeProperty('max-height');
+          ins.setAttribute('data-ad-format', 'horizontal');
           ins.removeAttribute('data-full-width-responsive');
         } else {
           const sideFrame = getSideAdFrameSize(container);
