@@ -9611,6 +9611,7 @@
 
   function applyLayoutMode() {
     const isMobile = layoutMode === 'mobilePortrait';
+    document.body.classList.toggle('is-mobile-layout', isMobile);
     updateAdaptiveMobileLayoutVars();
     dom.mobileDrawer.hidden = !isMobile;
     if (dom.mobileTopBar) {
