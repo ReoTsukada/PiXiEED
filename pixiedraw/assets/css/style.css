@@ -3049,6 +3049,95 @@ body.is-startup-active {
   color: rgba(199, 235, 248, 0.72);
 }
 
+.export-interstitial-modal {
+  width: min(960px, calc(var(--mobile-viewport-width) - var(--safe-area-left) - var(--safe-area-right) - 24px));
+  min-width: min(320px, calc(var(--mobile-viewport-width) - var(--safe-area-left) - var(--safe-area-right) - 24px));
+}
+
+.export-interstitial-modal .modal__body {
+  gap: 12px;
+}
+
+.export-interstitial-modal .modal__header {
+  padding-right: 110px;
+}
+
+.export-interstitial-modal .modal__form {
+  position: relative;
+}
+
+.export-interstitial__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  min-width: 84px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid rgba(112, 246, 255, 0.9);
+  background: rgba(8, 15, 24, 0.92);
+  color: rgba(220, 246, 255, 0.96);
+  font: inherit;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.export-interstitial__close:hover,
+.export-interstitial__close:focus-visible {
+  background: rgba(19, 34, 52, 0.95);
+  outline: none;
+}
+
+.export-interstitial__lead {
+  margin: 0;
+  text-align: center;
+}
+
+.export-interstitial__slot-wrap {
+  width: 100%;
+  min-height: clamp(220px, 62vh, 520px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  box-sizing: border-box;
+  border: 1px solid rgba(112, 246, 255, 0.24);
+  background:
+    linear-gradient(0deg, rgba(112, 246, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(112, 246, 255, 0.08) 1px, transparent 1px),
+    rgba(10, 16, 26, 0.72);
+  background-size: 12px 12px;
+}
+
+.export-interstitial__slot {
+  width: min(100%, 760px);
+  min-height: clamp(200px, 58vh, 460px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.export-interstitial__slot .adsbygoogle,
+.export-interstitial__slot ins.adsbygoogle {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: clamp(200px, 58vh, 460px);
+  height: clamp(200px, 58vh, 460px);
+  margin: 0 auto;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.export-interstitial__slot .adsbygoogle iframe,
+.export-interstitial__slot ins.adsbygoogle iframe {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
 @media (min-width: 600px) {
   .export-actions {
     flex-direction: row;
