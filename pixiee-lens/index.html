@@ -1673,6 +1673,52 @@
       font-size: 0.8rem;
       letter-spacing: 0.08em;
     }
+    .camera-settings__navigation {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .camera-settings__navigation .option-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font: 700 14px/1.2 'Fredoka', 'DotGothic16', system-ui, sans-serif;
+      color: #fff;
+      text-decoration: none;
+      text-align: center;
+      transition: transform 0.1s ease, filter 0.1s ease, box-shadow 0.1s ease;
+    }
+    .camera-settings__navigation .option-button:hover,
+    .camera-settings__navigation .option-button:focus-visible {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+      outline: none;
+    }
+    .camera-settings__link--home {
+      background: linear-gradient(135deg, #ff719a, #ff9f43);
+      box-shadow: 0 4px 0 #e35c82, 0 8px 16px rgba(255, 113, 154, 0.35);
+    }
+    .camera-settings__link--home:hover,
+    .camera-settings__link--home:focus-visible {
+      box-shadow: 0 5px 0 #e35c82, 0 10px 18px rgba(255, 113, 154, 0.4);
+    }
+    .camera-settings__link--tools {
+      background: linear-gradient(135deg, #ff8fb2, #ffb057);
+      box-shadow: 0 4px 0 #da6b8e, 0 8px 16px rgba(255, 143, 87, 0.35);
+    }
+    .camera-settings__link--tools:hover,
+    .camera-settings__link--tools:focus-visible {
+      box-shadow: 0 5px 0 #da6b8e, 0 10px 18px rgba(255, 143, 87, 0.4);
+    }
+    @media (max-width: 480px) {
+      .camera-settings__navigation {
+        grid-template-columns: 1fr;
+      }
+    }
     .control-icon {
       width: 26px;
       height: 26px;
@@ -2564,6 +2610,10 @@
 </label>
 </div>
 <button class="option-button camera-settings__reset" id="cameraSettingsResetBtn" type="button">設定をリセット</button>
+<div aria-label="ページ移動" class="camera-settings__navigation" role="group">
+<a class="option-button camera-settings__link--home" href="../index.html">ホームへ</a>
+<a class="option-button camera-settings__link--tools" href="../tools.html">他ツール一覧</a>
+</div>
 </div>
 </div>
 </div>
@@ -4787,12 +4837,19 @@
         entry.panel.classList.add('is-open');
         entry.panel.hidden = false;
         entry.button.setAttribute('aria-expanded', 'true');
+        if (key === 'palette' && !paletteToggleBtn) {
+          if (!paletteDisplayEnabled && state.dotMode && depthUsesPalette(state.colorDepth)) {
+            setPaletteDisplayEnabled(true);
+          } else if (paletteDisplayEnabled) {
+            updatePaletteDisplay(true);
+          }
+        }
         openMenuKey = key;
       } else {
         entry.panel.classList.remove('is-open');
         entry.panel.hidden = true;
         entry.button.setAttribute('aria-expanded', 'false');
-        if (key === 'palette' && paletteDisplayEnabled) {
+        if (key === 'palette' && paletteToggleBtn && paletteDisplayEnabled) {
           setPaletteDisplayEnabled(false);
         }
         if (openMenuKey === key) {
@@ -6250,6 +6307,35 @@
       };
     }
 
+    function getPaletteGrayLuminance(color) {
+      if (!color) {
+        return 0;
+      }
+      const r = Number(color.r) || 0;
+      const g = Number(color.g) || 0;
+      const b = Number(color.b) || 0;
+      // グレースケール変換で使う加重平均（知覚輝度）
+      return (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
+    }
+
+    function getPaletteDisplayEntries(colors) {
+      if (!Array.isArray(colors) || !colors.length) {
+        return [];
+      }
+      return colors
+        .map((color, index) => ({
+          color,
+          index,
+          luminance: getPaletteGrayLuminance(color)
+        }))
+        .sort((a, b) => {
+          if (b.luminance !== a.luminance) {
+            return b.luminance - a.luminance;
+          }
+          return a.index - b.index;
+        });
+    }
+
     function clearPaletteState() {
       paletteState.colors = [];
       paletteState.originalColors = [];
@@ -6281,15 +6367,20 @@
         }
         return;
       }
-      const key = colors.map((color) => `${color.r},${color.g},${color.b}`).join('|');
+      const displayEntries = getPaletteDisplayEntries(colors);
+      const key = displayEntries
+        .map((entry) => `${entry.index}:${entry.color.r},${entry.color.g},${entry.color.b}`)
+        .join('|');
       if (!force && key === paletteDisplayKey) {
         return;
       }
       paletteDisplayKey = key;
-      const swatchesHtml = colors.map((color, index) => {
+      const swatchesHtml = displayEntries.map((entry, displayIndex) => {
+        const color = entry.color;
+        const index = entry.index;
         const rgb = `rgb(${color.r}, ${color.g}, ${color.b})`;
         return `
-          <button type="button" class="palette-swatch" data-palette-index="${index}" aria-label="パレット色 ${index + 1}" aria-pressed="false">
+          <button type="button" class="palette-swatch" data-palette-index="${index}" aria-label="パレット色 ${displayIndex + 1}" aria-pressed="false">
             <span class="palette-swatch__chip" style="background:${rgb}"></span>
           </button>
         `;
