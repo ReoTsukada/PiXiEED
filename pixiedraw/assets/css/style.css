@@ -2458,7 +2458,7 @@ input[type='range']::-moz-focus-outer {
   justify-content: center;
   width: 100%;
   margin-top: 12px;
-  min-height: var(--panel-ad-square-size, 120px);
+  min-height: var(--panel-ad-height, 110px);
   flex: 0 0 auto;
   overflow: hidden;
 }
@@ -2469,12 +2469,13 @@ input[type='range']::-moz-focus-outer {
 }
 
 .panel-ad .ad-box {
-  --panel-ad-square-size: 120px;
+  --panel-ad-width: 160px;
+  --panel-ad-height: 110px;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: var(--panel-ad-square-size);
+  min-height: var(--panel-ad-height);
   background: #ffffff;
   color: #111111;
   text-align: center;
@@ -2488,12 +2489,12 @@ input[type='range']::-moz-focus-outer {
 .panel-ad .ad-box ins.adsbygoogle,
 .panel-ad .ad-box ins.ad-seed {
   display: inline-block !important;
-  width: min(100%, var(--panel-ad-square-size)) !important;
-  max-width: min(100%, var(--panel-ad-square-size)) !important;
+  width: min(100%, var(--panel-ad-width)) !important;
+  max-width: min(100%, var(--panel-ad-width)) !important;
   min-width: 0 !important;
-  min-height: var(--panel-ad-square-size) !important;
-  height: var(--panel-ad-square-size) !important;
-  max-height: var(--panel-ad-square-size) !important;
+  min-height: var(--panel-ad-height) !important;
+  height: var(--panel-ad-height) !important;
+  max-height: var(--panel-ad-height) !important;
   margin: 0 auto !important;
   box-sizing: border-box !important;
   overflow: hidden !important;
@@ -2502,11 +2503,11 @@ input[type='range']::-moz-focus-outer {
 .panel-ad .ad-box ins.adsbygoogle iframe,
 .panel-ad .ad-box .adsbygoogle iframe {
   display: block;
-  width: min(100%, var(--panel-ad-square-size)) !important;
-  max-width: min(100%, var(--panel-ad-square-size)) !important;
-  min-height: var(--panel-ad-square-size) !important;
-  height: var(--panel-ad-square-size) !important;
-  max-height: var(--panel-ad-square-size) !important;
+  width: min(100%, var(--panel-ad-width)) !important;
+  max-width: min(100%, var(--panel-ad-width)) !important;
+  min-height: var(--panel-ad-height) !important;
+  height: var(--panel-ad-height) !important;
+  max-height: var(--panel-ad-height) !important;
   margin-left: auto !important;
   margin-right: auto !important;
   margin-top: auto !important;
@@ -2558,8 +2559,9 @@ body.is-mobile-layout #rightPanelAdSlot {
 @media (min-width: 900px) and (orientation: landscape) {
   .rail-ad .ad-box { max-width: none; }
   .panel-ad .ad-box {
-    --panel-ad-square-size: 200px;
-    min-height: 200px;
+    --panel-ad-width: 220px;
+    --panel-ad-height: 136px;
+    min-height: var(--panel-ad-height);
   }
 }
 
