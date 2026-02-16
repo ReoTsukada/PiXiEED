@@ -2490,7 +2490,7 @@
 <div aria-hidden="true" class="gif-capture-gauge" hidden="" id="gifCaptureGauge">
 <div class="gif-capture-gauge__meta">
 <span>GIF HP</span>
-<span id="gifCaptureGaugeValue">3.2s | 10/10</span>
+<span id="gifCaptureGaugeValue">5.0s | 10/10</span>
 </div>
 <div class="gif-capture-gauge__track">
 <ol aria-hidden="true" class="gif-capture-gauge__segments" id="gifCaptureGaugeSegments">
@@ -2591,6 +2591,18 @@
 <option value="3">x3</option>
 <option value="4">x4</option>
 <option value="5">x5</option>
+</select>
+</label>
+</div>
+<div class="dot-settings-panel__row">
+<label class="select-control" for="gifFpsSelect">
+<span class="select-control__label">GIF FPS</span>
+<select id="gifFpsSelect" name="gifFps">
+<option value="5">5 FPS</option>
+<option value="8">8 FPS</option>
+<option selected="" value="10">10 FPS</option>
+<option value="20">20 FPS</option>
+<option value="30">30 FPS</option>
 </select>
 </label>
 </div>
@@ -2706,7 +2718,7 @@
   <div class="update-toast__body">
     <p class="update-toast__message">
       <strong>更新情報 (2026/02/15)</strong><br/>
-      ・ボタン長押しでGIF撮影を追加（最大2秒 / 6FPS）<br/>
+      ・ボタン長押しでGIF撮影を追加（最大5秒 / 10FPS 初期値・設定変更可）<br/>
       ・撮影後プレビューからPiXiEEDraw編集に対応
     </p>
     <div class="update-toast__actions">
@@ -2801,14 +2813,26 @@
     const LENS_AD_FALLBACK_SLOT = '2141591954';
     const CAMERA_READY_TIMEOUT_MS = 5000;
     const CAPTURE_LONG_PRESS_MS = 360;
-    const GIF_CAPTURE_FPS = 10;
-    const GIF_CAPTURE_FRAME_INTERVAL_MS = Math.max(80, Math.round(1000 / GIF_CAPTURE_FPS));
-    const GIF_CAPTURE_MAX_DURATION_MS = 3200;
+    const GIF_CAPTURE_DEFAULT_FPS = 10;
+    const GIF_CAPTURE_FPS_OPTIONS = Object.freeze([5, 8, 10, 20, 30]);
+    const GIF_CAPTURE_MAX_DURATION_MS = 5000;
     const GIF_CAPTURE_GAUGE_SEGMENTS = 10;
     const GIF_CAPTURE_MIN_FRAMES = 2;
-    const GIF_CAPTURE_MAX_DIMENSION = 360;
-    const GIF_CAPTURE_MAX_PIXELS = 360 * 360;
+    const GIF_CAPTURE_MAX_DIMENSION = 600;
+    const GIF_CAPTURE_MAX_PIXELS = 600 * 600;
+    const GIF_CAPTURE_MAX_BYTES = 5 * 1024 * 1024;
+    const GIF_CAPTURE_MIN_EXPORT_DIMENSION = 120;
+    const GIF_CAPTURE_MAX_FRAME_STRIDE = 8;
+    const GIF_CAPTURE_MAX_OPTIMIZE_ATTEMPTS = 14;
     const GIF_CAPTURE_PIXEL_RATIO_CAP = 1;
+    const DOT_SCALE_CAPTURE_MULTIPLIERS = Object.freeze({
+      1: 3,
+      2: 5,
+      3: 10,
+      4: 20,
+      5: 40
+    });
+    const DOT_SCALE_CAPTURE_MULTIPLIER_STEPS = Object.freeze([3, 5, 10, 20, 40]);
     const GIF_DEFAULT_PALETTE = createGif332Palette();
     let zoomScaleItems = [];
     let zoomScaleMarks = [];
@@ -3000,6 +3024,7 @@
     const updateToast = document.getElementById('updateToast');
     const updateToastCloseBtn = document.getElementById('updateToastCloseBtn');
     const dotScaleSelect = document.getElementById('dotScaleSelect');
+    const gifFpsSelect = document.getElementById('gifFpsSelect');
     const gradientToggleBtn = document.getElementById('gradientToggleBtn');
     const colorDepthSelect = document.getElementById('colorDepthSelect');
 
@@ -3075,6 +3100,7 @@
         paletteMenuBtn.title = 'パレット設定はこのブラウザで利用できません';
       }
       setSelectEnabled(dotScaleSelect, false);
+      setSelectEnabled(gifFpsSelect, false);
       setSelectEnabled(colorDepthSelect, false);
       if (gradientToggleBtn) {
         gradientToggleBtn.disabled = true;
@@ -3086,6 +3112,7 @@
       }
     } else {
       setSelectEnabled(dotScaleSelect, true);
+      setSelectEnabled(gifFpsSelect, true);
       setSelectEnabled(colorDepthSelect, true);
       if (gradientToggleBtn) {
         gradientToggleBtn.disabled = false;
@@ -3175,6 +3202,7 @@
       aspectMode: '1:1',
       dotMode: true,
       dotScale: 1,
+      gifCaptureFps: GIF_CAPTURE_DEFAULT_FPS,
       colorDepth: '4',
       gradientMode: 'dither',
       cameraSettings: { ...CAMERA_SETTING_DEFAULTS }
@@ -4684,6 +4712,39 @@
       } else {
         selectElement.setAttribute('aria-disabled', 'true');
       }
+    }
+
+    function sanitizeGifCaptureFps(value) {
+      const requested = Math.max(1, Math.round(Number(value) || GIF_CAPTURE_DEFAULT_FPS));
+      if (!Array.isArray(GIF_CAPTURE_FPS_OPTIONS) || !GIF_CAPTURE_FPS_OPTIONS.length) {
+        return GIF_CAPTURE_DEFAULT_FPS;
+      }
+      let nearest = GIF_CAPTURE_FPS_OPTIONS[0];
+      let nearestDiff = Math.abs(nearest - requested);
+      GIF_CAPTURE_FPS_OPTIONS.forEach((option) => {
+        const numeric = Math.max(1, Math.round(Number(option) || GIF_CAPTURE_DEFAULT_FPS));
+        const diff = Math.abs(numeric - requested);
+        if (diff < nearestDiff) {
+          nearest = numeric;
+          nearestDiff = diff;
+        }
+      });
+      return nearest;
+    }
+
+    function getGifCaptureFps() {
+      return sanitizeGifCaptureFps(state.gifCaptureFps);
+    }
+
+    function setGifCaptureFps(value) {
+      const next = sanitizeGifCaptureFps(value);
+      state.gifCaptureFps = next;
+      return next;
+    }
+
+    function getGifCaptureFrameIntervalMs(fps = state.gifCaptureFps) {
+      const safeFps = sanitizeGifCaptureFps(fps);
+      return Math.max(20, Math.round(1000 / safeFps));
     }
 
     function setDotScalePanelOpen(open) {
@@ -7183,6 +7244,12 @@
           dotScaleSelect.value = value;
         }
       }
+      if (gifFpsSelect) {
+        const fpsValue = String(getGifCaptureFps());
+        if (gifFpsSelect.value !== fpsValue) {
+          gifFpsSelect.value = fpsValue;
+        }
+      }
       if (colorDepthSelect) {
         const depthValue = state.colorDepth;
         if (colorDepthSelect.value !== depthValue) {
@@ -8924,7 +8991,164 @@
       closeCapturePreview();
     }
 
+    function getDotScaleCaptureMultiplier(scale = state.dotScale) {
+      const key = Math.max(1, Math.min(5, Math.round(Number(scale) || 1)));
+      const multiplier = Number(DOT_SCALE_CAPTURE_MULTIPLIERS[key]);
+      if (!Number.isFinite(multiplier) || multiplier <= 0) {
+        return 1;
+      }
+      return multiplier;
+    }
+
+    function getNextLowerDotScaleCaptureMultiplier(multiplier) {
+      const current = Math.max(1, Math.round(Number(multiplier) || 1));
+      let lower = null;
+      DOT_SCALE_CAPTURE_MULTIPLIER_STEPS.forEach((step) => {
+        if (step < current) {
+          lower = step;
+        }
+      });
+      return lower;
+    }
+
+    function estimateDataUrlByteSize(dataUrl) {
+      if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
+        return 0;
+      }
+      const commaIndex = dataUrl.indexOf(',');
+      if (commaIndex < 0) {
+        return 0;
+      }
+      const base64 = dataUrl.slice(commaIndex + 1);
+      if (!base64) {
+        return 0;
+      }
+      const padding = base64.endsWith('==') ? 2 : (base64.endsWith('=') ? 1 : 0);
+      return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
+    }
+
+    function getCaptureResultByteSize(result) {
+      if (result && result.blob instanceof Blob) {
+        return Math.max(0, Number(result.blob.size) || 0);
+      }
+      if (result && typeof result.dataUrl === 'string' && result.dataUrl) {
+        return estimateDataUrlByteSize(result.dataUrl);
+      }
+      return 0;
+    }
+
+    function getDotCaptureLayoutRect() {
+      const layout = dotState.layout || {};
+      let x = Number.isFinite(layout.offsetX) ? Number(layout.offsetX) : null;
+      let y = Number.isFinite(layout.offsetY) ? Number(layout.offsetY) : null;
+      let width = Number.isFinite(layout.width) ? Number(layout.width) : null;
+      let height = Number.isFinite(layout.height) ? Number(layout.height) : null;
+      if (!width || !height || x == null || y == null) {
+        if (!dotCanvas) {
+          return null;
+        }
+        const rect = dotCanvas.getBoundingClientRect();
+        if (!rect.width || !rect.height) {
+          return null;
+        }
+        x = rect.left;
+        y = rect.top;
+        width = rect.width;
+        height = rect.height;
+      }
+      return {
+        x: Number.isFinite(x) ? x : 0,
+        y: Number.isFinite(y) ? y : 0,
+        width: Math.max(1, Number(width) || 0),
+        height: Math.max(1, Number(height) || 0)
+      };
+    }
+
+    function drawDotCaptureOverlays(ctx, layoutRect, baseWidth, baseHeight, multiplier) {
+      if (!ctx || !layoutRect || !Array.isArray(overlays) || !overlays.length) {
+        return;
+      }
+      const layoutWidth = Math.max(1, Number(layoutRect.width) || 0);
+      const layoutHeight = Math.max(1, Number(layoutRect.height) || 0);
+      const layoutX = Number.isFinite(layoutRect.x) ? Number(layoutRect.x) : 0;
+      const layoutY = Number.isFinite(layoutRect.y) ? Number(layoutRect.y) : 0;
+      overlays.forEach((overlay) => {
+        if (!overlay || !overlay.hasImage || !overlay.elements || !overlay.elements.wrap) {
+          return;
+        }
+        const renderData = getOverlayCaptureRenderData(overlay);
+        if (!renderData || !renderData.image) {
+          return;
+        }
+        const rect = overlay.elements.wrap.getBoundingClientRect();
+        if (!rect.width || !rect.height) {
+          return;
+        }
+        const baseX = Math.round(((rect.left - layoutX) / layoutWidth) * baseWidth);
+        const baseY = Math.round(((rect.top - layoutY) / layoutHeight) * baseHeight);
+        const baseW = Math.max(1, Math.round((rect.width / layoutWidth) * baseWidth));
+        const baseH = Math.max(1, Math.round((rect.height / layoutHeight) * baseHeight));
+        const drawX = baseX * multiplier;
+        const drawY = baseY * multiplier;
+        const drawW = Math.max(1, baseW * multiplier);
+        const drawH = Math.max(1, baseH * multiplier);
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        if (renderData.tintActive && renderData.tint) {
+          ctx.filter = 'saturate(0) brightness(1.05)';
+          ctx.drawImage(renderData.image, drawX, drawY, drawW, drawH);
+          ctx.filter = 'none';
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.drawImage(renderData.tint, drawX, drawY, drawW, drawH);
+          ctx.globalCompositeOperation = 'source-over';
+        } else {
+          ctx.drawImage(renderData.image, drawX, drawY, drawW, drawH);
+        }
+        ctx.restore();
+      });
+    }
+
+    function composeDotModeCaptureCanvas(options = {}) {
+      if (!state.dotMode || !dotCanvas || dotCanvas.hidden || !dotCanvas.width || !dotCanvas.height) {
+        return null;
+      }
+      const baseWidth = Math.max(1, Math.round(dotCanvas.width));
+      const baseHeight = Math.max(1, Math.round(dotCanvas.height));
+      const applyScale = options.applyDotScaleMultiplier !== false;
+      const configuredMultiplier = getDotScaleCaptureMultiplier(state.dotScale);
+      const requestedMultiplier = Math.round(Number(options.dotScaleMultiplier) || 0);
+      const resolvedMultiplier = requestedMultiplier > 0 ? requestedMultiplier : configuredMultiplier;
+      const multiplier = applyScale ? resolvedMultiplier : 1;
+      const exportWidth = Math.max(1, baseWidth * multiplier);
+      const exportHeight = Math.max(1, baseHeight * multiplier);
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = exportWidth;
+      exportCanvas.height = exportHeight;
+      const ctx = exportCanvas.getContext('2d', { willReadFrequently: false });
+      if (!ctx) {
+        return null;
+      }
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, exportWidth, exportHeight);
+      ctx.drawImage(dotCanvas, 0, 0, baseWidth, baseHeight, 0, 0, exportWidth, exportHeight);
+      const layoutRect = getDotCaptureLayoutRect();
+      if (layoutRect) {
+        drawDotCaptureOverlays(ctx, layoutRect, baseWidth, baseHeight, multiplier);
+      }
+      return {
+        canvas: exportCanvas,
+        width: exportWidth,
+        height: exportHeight,
+        cssWidth: baseWidth,
+        cssHeight: baseHeight
+      };
+    }
+
     function composeCaptureFrameCanvas(options = {}) {
+      const dotModeCapture = composeDotModeCaptureCanvas(options);
+      if (dotModeCapture) {
+        return dotModeCapture;
+      }
       const viewportWidth = Math.max(1, Math.round(window.innerWidth || 0));
       const viewportHeight = Math.max(1, Math.round(window.innerHeight || 0));
       if (!viewportWidth || !viewportHeight) {
@@ -9214,10 +9438,181 @@
       const height = Math.max(1, Math.round(Number(sourceHeight) || 0));
       const byDimension = GIF_CAPTURE_MAX_DIMENSION / Math.max(width, height);
       const byPixels = Math.sqrt(GIF_CAPTURE_MAX_PIXELS / (width * height));
-      const scale = Math.min(1, byDimension, byPixels);
+      const scaleBase = Math.min(byDimension, byPixels);
+      const scale = Number.isFinite(scaleBase) && scaleBase > 0 ? scaleBase : 1;
       return {
         width: Math.max(1, Math.round(width * scale)),
         height: Math.max(1, Math.round(height * scale))
+      };
+    }
+
+    function sampleGifIndexedFrames(indexedFrames, stride = 1) {
+      if (!Array.isArray(indexedFrames) || !indexedFrames.length) {
+        return [];
+      }
+      const safeStride = Math.max(1, Math.round(Number(stride) || 1));
+      if (safeStride <= 1) {
+        return indexedFrames;
+      }
+      const sampled = [];
+      for (let i = 0; i < indexedFrames.length; i += safeStride) {
+        sampled.push(indexedFrames[i]);
+      }
+      const last = indexedFrames[indexedFrames.length - 1];
+      if (sampled[sampled.length - 1] !== last) {
+        sampled.push(last);
+      }
+      return sampled;
+    }
+
+    function resizeGifIndexedFramesNearest(indexedFrames, srcWidth, srcHeight, targetWidth, targetHeight) {
+      const sourceFrames = Array.isArray(indexedFrames) ? indexedFrames : [];
+      const width = Math.max(1, Math.round(Number(srcWidth) || 0));
+      const height = Math.max(1, Math.round(Number(srcHeight) || 0));
+      const nextWidth = Math.max(1, Math.round(Number(targetWidth) || 0));
+      const nextHeight = Math.max(1, Math.round(Number(targetHeight) || 0));
+      if (!sourceFrames.length || !width || !height) {
+        return [];
+      }
+      if (width === nextWidth && height === nextHeight) {
+        return sourceFrames;
+      }
+      const xMap = new Uint16Array(nextWidth);
+      const yMap = new Uint16Array(nextHeight);
+      for (let x = 0; x < nextWidth; x += 1) {
+        xMap[x] = Math.min(width - 1, Math.floor((x * width) / nextWidth));
+      }
+      for (let y = 0; y < nextHeight; y += 1) {
+        yMap[y] = Math.min(height - 1, Math.floor((y * height) / nextHeight));
+      }
+      return sourceFrames.map((frame) => {
+        if (!(frame instanceof Uint8Array) || frame.length < width * height) {
+          return new Uint8Array(nextWidth * nextHeight);
+        }
+        const resized = new Uint8Array(nextWidth * nextHeight);
+        for (let y = 0; y < nextHeight; y += 1) {
+          const srcRow = yMap[y] * width;
+          const dstRow = y * nextWidth;
+          for (let x = 0; x < nextWidth; x += 1) {
+            resized[dstRow + x] = frame[srcRow + xMap[x]];
+          }
+        }
+        return resized;
+      });
+    }
+
+    function buildGifWithinByteLimit(indexedFrames, width, height, frameDelayMs, palette, maxBytes = GIF_CAPTURE_MAX_BYTES) {
+      if (!Array.isArray(indexedFrames) || indexedFrames.length < GIF_CAPTURE_MIN_FRAMES) {
+        return null;
+      }
+      const sourceWidth = Math.max(1, Math.round(Number(width) || 0));
+      const sourceHeight = Math.max(1, Math.round(Number(height) || 0));
+      const byteLimit = Math.max(1, Math.round(Number(maxBytes) || GIF_CAPTURE_MAX_BYTES));
+      let workingWidth = sourceWidth;
+      let workingHeight = sourceHeight;
+      let workingFrames = indexedFrames;
+      let stride = 1;
+      let best = null;
+
+      for (let attempt = 0; attempt < GIF_CAPTURE_MAX_OPTIMIZE_ATTEMPTS; attempt += 1) {
+        const sampledFrames = sampleGifIndexedFrames(workingFrames, stride);
+        if (sampledFrames.length < GIF_CAPTURE_MIN_FRAMES) {
+          break;
+        }
+        const effectiveDelay = Math.max(20, Math.round((Number(frameDelayMs) || getGifCaptureFrameIntervalMs()) * stride));
+        let encoded;
+        try {
+          encoded = buildGifFromIndexedFrames(sampledFrames, workingWidth, workingHeight, effectiveDelay, palette);
+        } catch (error) {
+          console.warn('GIF encode attempt failed', error);
+          encoded = null;
+        }
+        if (encoded && encoded.length) {
+          const candidate = {
+            bytes: encoded,
+            width: workingWidth,
+            height: workingHeight,
+            frameDelayMs: effectiveDelay,
+            frameCount: sampledFrames.length,
+            stride,
+            sizeBytes: encoded.length
+          };
+          if (!best || candidate.sizeBytes < best.sizeBytes) {
+            best = candidate;
+          }
+          if (candidate.sizeBytes <= byteLimit) {
+            return {
+              ...candidate,
+              optimized: candidate.width !== sourceWidth || candidate.height !== sourceHeight || candidate.stride !== 1,
+              withinLimit: true
+            };
+          }
+        }
+
+        const canScaleDown =
+          workingWidth > GIF_CAPTURE_MIN_EXPORT_DIMENSION &&
+          workingHeight > GIF_CAPTURE_MIN_EXPORT_DIMENSION;
+        const canDropFrames = stride < GIF_CAPTURE_MAX_FRAME_STRIDE;
+        if (!canScaleDown && !canDropFrames) {
+          break;
+        }
+
+        const oversizeRatio = best && best.sizeBytes
+          ? Math.max(0.02, Math.min(0.99, byteLimit / best.sizeBytes))
+          : 0.78;
+
+        // Prefer preserving FPS until dimensions become reasonably small.
+        if (
+          canScaleDown &&
+          (
+            workingWidth >= 460 ||
+            workingHeight >= 460 ||
+            !canDropFrames ||
+            oversizeRatio < 0.9
+          )
+        ) {
+          const dynamicStep = Math.sqrt(oversizeRatio) * 0.98;
+          const scale = Math.max(0.6, Math.min(0.92, dynamicStep));
+          let nextWidth = Math.max(
+            GIF_CAPTURE_MIN_EXPORT_DIMENSION,
+            Math.round(workingWidth * scale)
+          );
+          let nextHeight = Math.max(
+            GIF_CAPTURE_MIN_EXPORT_DIMENSION,
+            Math.round(workingHeight * scale)
+          );
+          if (nextWidth === workingWidth && nextHeight === workingHeight) {
+            nextWidth = Math.max(GIF_CAPTURE_MIN_EXPORT_DIMENSION, workingWidth - 8);
+            nextHeight = Math.max(GIF_CAPTURE_MIN_EXPORT_DIMENSION, workingHeight - 8);
+          }
+          if (nextWidth !== workingWidth || nextHeight !== workingHeight) {
+            workingWidth = nextWidth;
+            workingHeight = nextHeight;
+            workingFrames = resizeGifIndexedFramesNearest(
+              indexedFrames,
+              sourceWidth,
+              sourceHeight,
+              workingWidth,
+              workingHeight
+            );
+            continue;
+          }
+        }
+
+        if (canDropFrames) {
+          stride += 1;
+          continue;
+        }
+        break;
+      }
+
+      if (!best) {
+        return null;
+      }
+      return {
+        ...best,
+        optimized: best.width !== sourceWidth || best.height !== sourceHeight || best.stride !== 1,
+        withinLimit: best.sizeBytes <= byteLimit
       };
     }
 
@@ -9742,7 +10137,7 @@
         active: true,
         startedAt: now,
         lastFrameAt: now,
-        frameDelayMs: GIF_CAPTURE_FRAME_INTERVAL_MS,
+        frameDelayMs: getGifCaptureFrameIntervalMs(),
         width: frameSize.width,
         height: frameSize.height,
         palette: gifPalette,
@@ -9756,7 +10151,8 @@
       updateGifCaptureGauge(GIF_CAPTURE_MAX_DURATION_MS, GIF_CAPTURE_MAX_DURATION_MS);
       setCaptureButtonRecording(true);
       const maxSeconds = (GIF_CAPTURE_MAX_DURATION_MS / 1000).toFixed(1);
-      setStatus(`GIF撮影中… ボタンを離すと保存（最大${maxSeconds}秒）`);
+      const captureFps = getGifCaptureFps();
+      setStatus(`GIF撮影中… ボタンを離すと保存（最大${maxSeconds}秒 / ${captureFps}FPS）`);
 
       const tick = (timestamp) => {
         if (!session.active) {
@@ -9811,21 +10207,31 @@
           setStatus('長押し時間が短いためGIFを保存しませんでした');
           return false;
         }
-        const gifBytes = buildGifFromIndexedFrames(
+        const optimizedGif = buildGifWithinByteLimit(
           session.frames,
           session.width,
           session.height,
           session.frameDelayMs,
-          session.palette
+          session.palette,
+          GIF_CAPTURE_MAX_BYTES
         );
+        if (!optimizedGif || !(optimizedGif.bytes instanceof Uint8Array) || !optimizedGif.bytes.length) {
+          setStatus('GIFの最適化に失敗しました');
+          return false;
+        }
+        if (!optimizedGif.withinLimit) {
+          setStatus('GIFが5MBを超えるため保存できませんでした。解像度や色数を下げてください');
+          return false;
+        }
+        const gifBytes = optimizedGif.bytes;
         const gifBlob = new Blob([gifBytes], { type: 'image/gif' });
         const result = {
           blob: gifBlob,
           dataUrl: null,
-          width: session.width,
-          height: session.height,
-          cssWidth: session.width,
-          cssHeight: session.height
+          width: optimizedGif.width,
+          height: optimizedGif.height,
+          cssWidth: optimizedGif.width,
+          cssHeight: optimizedGif.height
         };
         const filename = getCaptureFilename('gif');
         const saved = await deliverCaptureResult(result, filename, {
@@ -9841,11 +10247,13 @@
           setStatus('GIFを保存できませんでした');
           return false;
         }
-        const durationSeconds = (session.frames.length * session.frameDelayMs / 1000).toFixed(1);
+        const durationSeconds = (optimizedGif.frameCount * optimizedGif.frameDelayMs / 1000).toFixed(1);
+        const sizeMb = (optimizedGif.sizeBytes / (1024 * 1024)).toFixed(2);
+        const optimizeSuffix = optimizedGif.optimized ? ' / 自動最適化' : '';
         if (reason === 'timeout') {
-          setStatus(`GIFを保存しました: ${session.width}×${session.height}px / ${durationSeconds}s（上限で自動停止）`);
+          setStatus(`GIFを保存しました: ${optimizedGif.width}×${optimizedGif.height}px / ${durationSeconds}s / ${sizeMb}MB${optimizeSuffix}（上限で自動停止）`);
         } else {
-          setStatus(`GIFを保存しました: ${session.width}×${session.height}px / ${durationSeconds}s`);
+          setStatus(`GIFを保存しました: ${optimizedGif.width}×${optimizedGif.height}px / ${durationSeconds}s / ${sizeMb}MB${optimizeSuffix}`);
         }
         return true;
       } catch (error) {
@@ -9939,10 +10347,48 @@
         captureBtn.setAttribute('aria-busy', 'true');
       }
       try {
-        const result = await composeCaptureFrame();
+        const shouldManageDotSize = Boolean(state.dotMode && dotCanvas && !dotCanvas.hidden);
+        const byteLimit = Math.max(1, Math.round(Number(GIF_CAPTURE_MAX_BYTES) || 5 * 1024 * 1024));
+        const initialMultiplier = shouldManageDotSize ? getDotScaleCaptureMultiplier(state.dotScale) : 1;
+        let activeMultiplier = initialMultiplier;
+        let multiplierAdjusted = false;
+        let forcedTwoXFallback = false;
+        let result = await composeCaptureFrame(
+          shouldManageDotSize ? { dotScaleMultiplier: activeMultiplier } : {}
+        );
         if (!result || (!result.blob && !result.dataUrl)) {
           setStatus('撮影に失敗しました');
           return;
+        }
+        let sizeBytes = getCaptureResultByteSize(result);
+        if (shouldManageDotSize) {
+          while (sizeBytes > byteLimit) {
+            const nextMultiplier = getNextLowerDotScaleCaptureMultiplier(activeMultiplier);
+            if (!nextMultiplier || nextMultiplier >= activeMultiplier) {
+              break;
+            }
+            const retried = await composeCaptureFrame({ dotScaleMultiplier: nextMultiplier });
+            if (!retried || (!retried.blob && !retried.dataUrl)) {
+              break;
+            }
+            result = retried;
+            activeMultiplier = nextMultiplier;
+            multiplierAdjusted = true;
+            sizeBytes = getCaptureResultByteSize(result);
+          }
+          if (sizeBytes > byteLimit && activeMultiplier > 2) {
+            const fallbackResult = await composeCaptureFrame({ dotScaleMultiplier: 2 });
+            if (fallbackResult && (fallbackResult.blob || fallbackResult.dataUrl)) {
+              result = fallbackResult;
+              activeMultiplier = 2;
+              multiplierAdjusted = true;
+              forcedTwoXFallback = true;
+              sizeBytes = getCaptureResultByteSize(result);
+            } else {
+              setStatus('PNGの2倍保存に失敗しました');
+              return;
+            }
+          }
         }
         const filename = getCaptureFilename('png');
         const saved = await deliverCaptureResult(result, filename);
@@ -9950,7 +10396,17 @@
           setStatus('撮影データを保存できませんでした');
           return;
         }
-        setStatus(`撮影しました: ${result.width}×${result.height}px`);
+        const sizeMb = sizeBytes > 0 ? (sizeBytes / (1024 * 1024)).toFixed(2) : null;
+        const autoScaleSuffix = multiplierAdjusted
+          ? ` / 倍率自動調整 ${initialMultiplier}x→${activeMultiplier}x`
+          : '';
+        const sizeSuffix = sizeMb ? ` / ${sizeMb}MB` : '';
+        const fallbackNote = forcedTwoXFallback
+          ? (sizeBytes > byteLimit
+            ? ' / 5MB超過のため2xで保存（サイズ超過のまま）'
+            : ' / 5MB超過のため2xで保存')
+          : '';
+        setStatus(`撮影しました: ${result.width}×${result.height}px${sizeSuffix}${autoScaleSuffix}${fallbackNote}`);
       } catch (error) {
         console.error(error);
         setStatus('撮影に失敗しました');
@@ -10043,6 +10499,23 @@
           refreshOverlayStatus();
         }
         updateDotModeUI();
+      });
+    }
+
+    if (gifFpsSelect) {
+      ['mousedown', 'touchstart', 'pointerdown', 'click'].forEach((type) => {
+        gifFpsSelect.addEventListener(type, (event) => {
+          event.stopPropagation();
+        });
+      });
+      gifFpsSelect.addEventListener('change', () => {
+        const value = Number(gifFpsSelect.value);
+        if (!Number.isFinite(value)) {
+          return;
+        }
+        const nextFps = setGifCaptureFps(value);
+        updateDotModeUI();
+        setStatus(`GIF FPSを${nextFps}に変更しました`);
       });
     }
 
