@@ -193,6 +193,10 @@
 <button aria-label="右パネルの幅を変更" class="rail-resizer rail-resizer--right" id="resizeRightRail" type="button"></button>
 </aside>
 </div>
+<div aria-hidden="true" id="panelAdPreloadHost" style="position:fixed;left:-20000px;top:-20000px;width:320px;height:320px;overflow:hidden;opacity:0;pointer-events:none;z-index:-1;">
+  <div id="leftPanelAdPreloadMount" style="width:320px;min-width:320px;max-width:320px;height:320px;min-height:320px;max-height:320px;overflow:hidden;"></div>
+  <div id="rightPanelAdPreloadMount" style="width:320px;min-width:320px;max-width:320px;height:320px;min-height:320px;max-height:320px;overflow:hidden;"></div>
+</div>
 <button aria-label="描画ボタン" class="floating-draw-button" id="floatingDrawButton" type="button">描画</button>
 <div class="mobile-drawer" hidden="" id="mobileDrawer">
 <button aria-label="モバイルパネルの高さを調整" aria-controls="mobilePanels" class="mobile-drawer__handle" id="mobileDrawerHandle" type="button">
@@ -847,41 +851,70 @@
         left: document.getElementById('leftPanelAd'),
         right: document.getElementById('rightPanelAd'),
       };
+      const preloadMounts = {
+        left: document.getElementById('leftPanelAdPreloadMount'),
+        right: document.getElementById('rightPanelAdPreloadMount'),
+      };
       const sideSections = {
         left: ['panelTools', 'panelColor'],
         right: ['panelFrames', 'panelSettings', 'panelFile', 'panelPixfind'],
       };
       if (!(ads.left instanceof HTMLElement) && !(ads.right instanceof HTMLElement)) return;
 
+      function isMountRenderable(node) {
+        if (!(node instanceof HTMLElement) || !node.isConnected) return false;
+        try {
+          const style = window.getComputedStyle ? window.getComputedStyle(node) : null;
+          if (style && (style.display === 'none' || style.visibility === 'hidden')) return false;
+          const rect = node.getBoundingClientRect();
+          return rect.width > 0 && node.getClientRects().length > 0;
+        } catch (error) {
+          return false;
+        }
+      }
+
       function findMount(side) {
         const ids = sideSections[side] || [];
+        const preloadMount = preloadMounts[side] instanceof HTMLElement ? preloadMounts[side] : null;
         let fallback = null;
+        let firstMount = null;
         for (const id of ids) {
           const section = document.getElementById(id);
           if (!(section instanceof HTMLElement)) continue;
           const mount = section.querySelector(`[data-panel-ad-mount="${side}"]`);
           if (!(mount instanceof HTMLElement)) continue;
-          if (!fallback) fallback = mount;
-          if (section.classList.contains('is-active') && !section.hidden) {
+          if (!firstMount) firstMount = mount;
+          const mountRenderable = isMountRenderable(mount);
+          if (!fallback && mountRenderable) fallback = mount;
+          if (section.classList.contains('is-active') && !section.hidden && mountRenderable) {
             return mount;
           }
         }
-        return fallback;
+        return fallback || preloadMount || firstMount;
       }
 
       function dock(side) {
         const ad = ads[side];
-        if (!(ad instanceof HTMLElement)) return;
+        if (!(ad instanceof HTMLElement)) return false;
         const mount = findMount(side);
-        if (!(mount instanceof HTMLElement)) return;
+        if (!(mount instanceof HTMLElement)) return false;
         if (ad.parentElement !== mount) {
           mount.appendChild(ad);
+          return true;
         }
+        return false;
       }
 
       function refresh() {
-        dock('left');
-        dock('right');
+        const movedLeft = dock('left');
+        const movedRight = dock('right');
+        if (movedLeft || movedRight) {
+          try {
+            document.dispatchEvent(new CustomEvent('pixiedraw:panel-ad-dock-change'));
+          } catch (error) {
+            // ignore
+          }
+        }
       }
 
       const observer = new MutationObserver(refresh);
@@ -927,6 +960,7 @@
 
       let rerenderQueued = false;
       let lastAdLayoutMode = null;
+      let activeModeReloadTimer = null;
 
       function isPortraitBottomOnlyMode() {
         try {
@@ -951,32 +985,82 @@
 
       function handleAdLayoutTransition() {
         const mode = getAdLayoutMode();
-        if (lastAdLayoutMode === mode) return;
-        lastAdLayoutMode = mode;
-        SIDE_SLOT_IDS.forEach(resetSlotContainer);
-
-        // Orientation switch can settle over multiple frames; queue staggered retries.
-        if (mode === 'landscape-side') {
-          [120, 320, 720].forEach((delayMs) => {
-            window.setTimeout(queueAllSlotsOnce, delayMs);
-          });
-        } else {
-          [80, 220].forEach((delayMs) => {
-            window.setTimeout(queueAllSlotsOnce, delayMs);
-          });
+        if (lastAdLayoutMode === null) {
+          lastAdLayoutMode = mode;
+          return false;
         }
+        if (lastAdLayoutMode === mode) return false;
+        lastAdLayoutMode = mode;
+
+        scheduleActiveModeReload(0);
+        return true;
       }
 
-      function getSideAdSquareSize(container) {
-        const width = getContainerWidth(container);
-        if (width >= 250) return 250;
-        if (width >= 200) return 200;
-        if (width >= 120) return 120;
-        return 0;
+      function getCurrentModeTargetIds() {
+        return isPortraitBottomOnlyMode() ? ['mobileBottomAdSlot'] : SIDE_SLOT_IDS;
+      }
+
+      function resetCurrentModeSlots() {
+        getCurrentModeTargetIds().forEach(resetSlotContainer);
+      }
+
+      function scheduleActiveModeReload(delayMs) {
+        if (activeModeReloadTimer !== null) {
+          window.clearTimeout(activeModeReloadTimer);
+        }
+        activeModeReloadTimer = window.setTimeout(() => {
+          activeModeReloadTimer = null;
+          resetCurrentModeSlots();
+          queueAllSlotsOnce();
+          [140, 360, 760].forEach((delay) => {
+            window.setTimeout(queueAllSlotsOnce, delay);
+          });
+        }, Math.max(0, Number(delayMs) || 0));
+      }
+
+      function getSideAdFrameSize(container) {
+        if (!(container instanceof HTMLElement)) {
+          return { width: 160, height: 110 };
+        }
+        let mountWidth = 0;
+        try {
+          const host = container.closest('.panel-ad') || container.parentElement || container;
+          const hostRect = host && host.getBoundingClientRect ? host.getBoundingClientRect() : null;
+          mountWidth = Math.round((hostRect && hostRect.width) || 0);
+        } catch (error) {
+          mountWidth = 0;
+        }
+        if (!Number.isFinite(mountWidth) || mountWidth <= 0) {
+          mountWidth = Math.round(getContainerWidth(container));
+        }
+        const width = clamp(mountWidth, 120, 260);
+        const rawHeight = clamp(Math.round(width * 0.62), 84, 164);
+        // Keep ads landscape-friendly: never allow portrait/tall aspect.
+        const height = Math.min(rawHeight, Math.max(84, width - 8));
+        return { width, height };
+      }
+
+      function applySideSlotGeometry(container) {
+        if (!(container instanceof HTMLElement) || isMobileBottomSlot(container)) return;
+        const frame = getSideAdFrameSize(container);
+        const widthPx = `${frame.width}px`;
+        const heightPx = `${frame.height}px`;
+        container.style.setProperty('--panel-ad-width', widthPx);
+        container.style.setProperty('--panel-ad-height', heightPx);
+        container.style.width = widthPx;
+        container.style.minWidth = widthPx;
+        container.style.maxWidth = widthPx;
+        container.style.height = heightPx;
+        container.style.minHeight = heightPx;
+        container.style.maxHeight = heightPx;
+        container.style.marginLeft = 'auto';
+        container.style.marginRight = 'auto';
       }
 
       function queueAllSlots() {
-        handleAdLayoutTransition();
+        if (handleAdLayoutTransition()) {
+          return;
+        }
         const portraitBottomOnly = isPortraitBottomOnlyMode();
         const targetContainerIds = portraitBottomOnly ? ['mobileBottomAdSlot'] : SIDE_SLOT_IDS;
         targetContainerIds.forEach((containerId) => {
@@ -1051,13 +1135,14 @@
           ins.setAttribute('data-ad-format', 'horizontal');
           ins.removeAttribute('data-full-width-responsive');
         } else {
-          const sideSize = getSideAdSquareSize(container) || MIN_SIDE_AD_WIDTH;
-          container.style.setProperty('--panel-ad-square-size', `${sideSize}px`);
+          const sideFrame = getSideAdFrameSize(container);
+          container.style.setProperty('--panel-ad-width', `${sideFrame.width}px`);
+          container.style.setProperty('--panel-ad-height', `${sideFrame.height}px`);
           ins.style.display = 'inline-block';
-          ins.style.width = `${sideSize}px`;
-          ins.style.height = `${sideSize}px`;
-          ins.style.minHeight = `${sideSize}px`;
-          ins.style.maxHeight = `${sideSize}px`;
+          ins.style.width = `${sideFrame.width}px`;
+          ins.style.height = `${sideFrame.height}px`;
+          ins.style.minHeight = `${sideFrame.height}px`;
+          ins.style.maxHeight = `${sideFrame.height}px`;
           ins.style.maxWidth = '100%';
           ins.removeAttribute('data-ad-format');
           ins.removeAttribute('data-full-width-responsive');
@@ -1109,8 +1194,12 @@
       }
 
       function tryRender(container) {
+        const portraitBottomOnly = isPortraitBottomOnlyMode();
+        if (portraitBottomOnly && !isMobileBottomSlot(container)) return false;
+        if (!portraitBottomOnly && isMobileBottomSlot(container)) return false;
+        applySideSlotGeometry(container);
         if (!isContainerRenderable(container)) return false;
-        if (!isMobileBottomSlot(container) && getSideAdSquareSize(container) < MIN_SIDE_AD_WIDTH) {
+        if (!isMobileBottomSlot(container) && getSideAdFrameSize(container).width < MIN_SIDE_AD_WIDTH) {
           return false;
         }
         const slotConfig = slotByContainerId.get(container.id);
@@ -1139,6 +1228,7 @@
         if (resizeObserverByContainer.has(container)) return;
         if (typeof ResizeObserver !== 'function') return;
         const observer = new ResizeObserver(() => {
+          applySideSlotGeometry(container);
           if (isContainerRenderable(container)) {
             tryRender(container);
           }
@@ -1159,6 +1249,7 @@
         const slotConfig = slotByContainerId.get(container.id);
         if (!slotConfig) return;
 
+        applySideSlotGeometry(container);
         getOrCreateIns(container, slotConfig.slot);
         ensureContainerObserver(container);
         if (tryRender(container)) return;
@@ -1189,14 +1280,28 @@
 
       queueAllSlots();
       window.addEventListener('resize', queueAllSlotsOnce, { passive: true });
-      window.addEventListener('orientationchange', queueAllSlotsOnce, { passive: true });
-      document.addEventListener('pixiedraw:ad-layout-change', queueAllSlotsOnce);
+      window.addEventListener('orientationchange', () => {
+        scheduleActiveModeReload(40);
+      }, { passive: true });
+      document.addEventListener('pixiedraw:panel-ad-dock-change', queueAllSlotsOnce);
+      document.addEventListener('pixiedraw:ad-layout-change', (event) => {
+        const reason = event && event.detail ? String(event.detail.reason || '') : '';
+        if (reason === 'resize' || reason === 'refreshListeners') {
+          queueAllSlotsOnce();
+          return;
+        }
+        scheduleActiveModeReload(24);
+      });
       if (window.matchMedia) {
         const orientationMql = window.matchMedia('(orientation: portrait)');
         if (typeof orientationMql.addEventListener === 'function') {
-          orientationMql.addEventListener('change', queueAllSlotsOnce);
+          orientationMql.addEventListener('change', () => {
+            scheduleActiveModeReload(24);
+          });
         } else if (typeof orientationMql.addListener === 'function') {
-          orientationMql.addListener(queueAllSlotsOnce);
+          orientationMql.addListener(() => {
+            scheduleActiveModeReload(24);
+          });
         }
       }
       document.addEventListener('visibilitychange', () => {
