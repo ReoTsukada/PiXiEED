@@ -158,6 +158,11 @@
       adContainer: document.getElementById('exportAdContainer'),
       adSlot: document.getElementById('exportAdSlot'),
     },
+    exportInterstitial: {
+      dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('exportInterstitialDialog')),
+      close: document.getElementById('closeExportInterstitial'),
+      adSlot: document.getElementById('exportInterstitialAdSlot'),
+    },
   };
 
   const preventBrowserZoom = (event) => {
@@ -422,6 +427,8 @@
   const SESSION_STORAGE_KEY = 'pixieedraw:sessionState';
   const STARTUP_SCREEN_DISMISSED_KEY = 'pixieedraw:startupScreenDismissed';
   const STARTUP_UPDATE_TOAST_HIDDEN_KEY = 'pixieedraw:update-toast-hidden';
+  const EXPORT_INTERSTITIAL_LAST_SHOWN_KEY = 'pixieedraw:export-interstitial-last-shown-at';
+  const EXPORT_INTERSTITIAL_COOLDOWN_MS = 45 * 1000;
   const canUseSessionStorage = (() => {
     try {
       return typeof window !== 'undefined' && 'localStorage' in window && window.localStorage !== null;
@@ -529,6 +536,7 @@
   let exportScaleUserOverride = false;
   let exportIncludeOriginalSize = false;
   let exportAdRequested = false;
+  let exportInterstitialAdRequested = false;
   let pixfindModeEnabled = false;
   let pixfindModeFirstEnableConfirmed = false;
 
@@ -4928,6 +4936,123 @@
     }
   }
 
+  function canShowExportInterstitial() {
+    const dialog = dom.exportInterstitial?.dialog;
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+      return false;
+    }
+    if (!canUseSessionStorage) {
+      return true;
+    }
+    try {
+      const lastShownAt = Number(window.localStorage.getItem(EXPORT_INTERSTITIAL_LAST_SHOWN_KEY) || 0);
+      if (!Number.isFinite(lastShownAt) || lastShownAt <= 0) {
+        return true;
+      }
+      return Date.now() - lastShownAt >= EXPORT_INTERSTITIAL_COOLDOWN_MS;
+    } catch (error) {
+      return true;
+    }
+  }
+
+  function markExportInterstitialShown() {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(EXPORT_INTERSTITIAL_LAST_SHOWN_KEY, String(Date.now()));
+    } catch (error) {
+      // Ignore localStorage errors.
+    }
+  }
+
+  function queueExportInterstitialAdRender() {
+    const dialog = dom.exportInterstitial?.dialog;
+    const adSlot = dom.exportInterstitial?.adSlot;
+    if (!(dialog instanceof HTMLDialogElement) || !dialog.open || !(adSlot instanceof HTMLElement)) {
+      return;
+    }
+    if (exportInterstitialAdRequested) {
+      return;
+    }
+    if (adSlot.dataset.loaded === '1' || adSlot.getAttribute('data-adsbygoogle-status') === 'done') {
+      exportInterstitialAdRequested = true;
+      return;
+    }
+    if (!adSlot.classList.contains('adsbygoogle')) {
+      adSlot.classList.add('adsbygoogle');
+    }
+
+    const getWidth = () => {
+      try {
+        const rect = adSlot.getBoundingClientRect();
+        return (rect && rect.width) || adSlot.clientWidth || adSlot.offsetWidth || 0;
+      } catch (error) {
+        return adSlot.clientWidth || adSlot.offsetWidth || 0;
+      }
+    };
+
+    let attempts = 0;
+    const MAX_ATTEMPTS = 36;
+    const renderWhenReady = () => {
+      if (!(dialog instanceof HTMLDialogElement) || !dialog.open) {
+        exportInterstitialAdRequested = false;
+        return;
+      }
+      const width = getWidth();
+      if (width <= 0) {
+        attempts += 1;
+        if (attempts < MAX_ATTEMPTS) {
+          window.requestAnimationFrame(renderWhenReady);
+          return;
+        }
+        exportInterstitialAdRequested = false;
+        return;
+      }
+      exportInterstitialAdRequested = true;
+      try {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        adSlot.dataset.loaded = '1';
+      } catch (error) {
+        exportInterstitialAdRequested = false;
+      }
+    };
+
+    window.requestAnimationFrame(renderWhenReady);
+  }
+
+  function closeExportInterstitial() {
+    const dialog = dom.exportInterstitial?.dialog;
+    if (!(dialog instanceof HTMLDialogElement)) {
+      return;
+    }
+    if (dialog.open) {
+      dialog.close();
+    }
+    exportInterstitialAdRequested = false;
+    document.body.classList.remove('is-export-interstitial-active');
+  }
+
+  function showExportInterstitialAfterImageExport() {
+    const dialog = dom.exportInterstitial?.dialog;
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+      return;
+    }
+    if (dialog.open) {
+      return;
+    }
+    if (!canShowExportInterstitial()) {
+      return;
+    }
+    markExportInterstitialShown();
+    dialog.showModal();
+    document.body.classList.add('is-export-interstitial-active');
+    queueExportInterstitialAdRender();
+    window.requestAnimationFrame(() => {
+      dom.exportInterstitial?.close?.focus?.({ preventScroll: true });
+    });
+  }
+
   function exportProjectWithFallback() {
     const choice = window.prompt('出力形式を入力してください (png / gif / contest / pixfind / project)', 'png');
     if (!choice) {
@@ -5212,6 +5337,27 @@
     }
 
     updateExportOriginalToggleUI();
+  }
+
+  function setupExportInterstitialDialog() {
+    const dialog = dom.exportInterstitial?.dialog;
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+      if (dialog) {
+        dialog.hidden = true;
+      }
+      return;
+    }
+    dom.exportInterstitial?.close?.addEventListener('click', () => {
+      closeExportInterstitial();
+    });
+    dialog.addEventListener('cancel', event => {
+      event.preventDefault();
+      closeExportInterstitial();
+    });
+    dialog.addEventListener('close', () => {
+      exportInterstitialAdRequested = false;
+      document.body.classList.remove('is-export-interstitial-active');
+    });
   }
 
   function closeNewProjectDialog() {
@@ -6481,6 +6627,9 @@
       } else {
         updateAutosaveStatus('PNGの書き出しに失敗しました', 'error');
       }
+      if (result.exportedCount > 0) {
+        showExportInterstitialAfterImageExport();
+      }
     } catch (error) {
       console.error('PNG export failed', error);
       updateAutosaveStatus('PNGの書き出しに失敗しました', 'error');
@@ -6548,6 +6697,9 @@
         updateAutosaveStatus(`GIFを書き出しましたが ${result.total - result.exportedCount} 件エクスポートできませんでした`, 'warn');
       } else {
         updateAutosaveStatus('GIFの書き出しに失敗しました', 'error');
+      }
+      if (result.exportedCount > 0) {
+        showExportInterstitialAfterImageExport();
       }
     } catch (error) {
       console.error('GIF export failed', error);
@@ -8783,6 +8935,7 @@
     setupGlobalFocusDismiss();
     setupControls();
     setupExportDialog();
+    setupExportInterstitialDialog();
     setupTools();
     setupToolGroups();
     setupPaletteEditor();
