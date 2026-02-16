@@ -711,6 +711,9 @@ body.is-playing {
   display: grid;
   gap: 0.5rem;
   min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  justify-self: stretch;
 }
 
 .app.is-hidden-object-mode .game-layout {
@@ -913,6 +916,8 @@ body.is-playing {
   padding: 0.55rem 0.75rem;
   display: grid;
   gap: 0.4rem;
+  width: 100%;
+  max-width: 100%;
 }
 
 .target-panel__lead {
@@ -1698,6 +1703,25 @@ body.is-playing {
   .game-ad {
     grid-column: 1 / -1;
     grid-row: 3;
+  }
+
+  .app.is-hidden-object-mode .game-side-info {
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
+    height: 100%;
+  }
+
+  .app.is-hidden-object-mode .target-panel {
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  .app.is-hidden-object-mode .target-list {
+    min-height: 0;
+    overflow-y: auto;
+    align-content: flex-start;
+    scrollbar-gutter: stable;
   }
 }
 
