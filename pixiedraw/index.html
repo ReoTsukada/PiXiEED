@@ -681,8 +681,7 @@
            style="display:block"
            data-ad-client="ca-pub-9801602250480253"
            data-ad-slot="6568310446"
-           data-ad-format="auto"
-           data-full-width-responsive="true"></ins>
+           data-ad-format="horizontal"></ins>
     </div>
   </div>
   <script>
@@ -694,8 +693,26 @@
 
   const mql = window.matchMedia('(orientation: portrait)');
   const mobileBottomAd = document.getElementById('mobileBottomAd');
+      const mobileBottomAdSlot = document.getElementById('mobileBottomAdSlot');
       let raf = null;
       const listeners = new Map();
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function updateMobileBottomPadding() {
+        let slotHeight = 56;
+        try {
+          const target = (mobileBottomAdSlot instanceof HTMLElement) ? mobileBottomAdSlot : mobileBottomAd;
+          const rect = target && target.getBoundingClientRect ? target.getBoundingClientRect() : null;
+          const measured = Math.ceil((rect && rect.height) || slotHeight);
+          slotHeight = clamp(measured, 48, 64);
+        } catch (e) {}
+
+        const reserved = Math.ceil(slotHeight + 4);
+        document.documentElement.style.setProperty('--mobile-bottom-ad-height', reserved + 'px');
+      }
 
       function isAtBottom(el) {
         if (!el) return false;
@@ -744,12 +761,8 @@
           if (mobileBottomAd) {
             if (mql.matches) {
               showAd();
-              // compute current ad height and expose as CSS var so layout can adjust
-              try {
-                const rect = mobileBottomAd.getBoundingClientRect();
-                const h = Math.max(0, Math.ceil((rect && rect.height) || 0));
-                document.documentElement.style.setProperty('--mobile-bottom-ad-height', h + 'px');
-              } catch (e) {}
+              // keep layout stable even if ad network injects a tall creative.
+              updateMobileBottomPadding();
               document.body.classList.add('bottom-ad-active');
             } else {
               hideAd();
@@ -952,8 +965,13 @@
         }
         ins.setAttribute('data-ad-client', ADS_CLIENT);
         ins.setAttribute('data-ad-slot', slot);
-        ins.setAttribute('data-ad-format', 'auto');
-        ins.setAttribute('data-full-width-responsive', 'true');
+        if (isMobileBottomSlot(container)) {
+          ins.setAttribute('data-ad-format', 'horizontal');
+          ins.removeAttribute('data-full-width-responsive');
+        } else {
+          ins.setAttribute('data-ad-format', 'auto');
+          ins.setAttribute('data-full-width-responsive', 'true');
+        }
 
         if (localHost) {
           ins.setAttribute('data-adtest', 'on');
