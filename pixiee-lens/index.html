@@ -63,13 +63,15 @@
       --safe-right: env(safe-area-inset-right, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
       --safe-left: env(safe-area-inset-left, 0px);
+      --viewport-width: 100vw;
+      --viewport-height: 100vh;
       --vv-offset-top: 0px;
       --vv-offset-right: 0px;
       --vv-offset-bottom: 0px;
       --vv-offset-left: 0px;
       --lens-ad-aspect-ratio: 6.4; /* 320:50 */
       --lens-ad-inline-padding: 6px;
-      --lens-ad-banner-width: calc(100vw - var(--safe-left) - var(--safe-right) - (var(--lens-ad-inline-padding) * 2));
+      --lens-ad-banner-width: calc(var(--viewport-width) - var(--safe-left) - var(--safe-right) - (var(--lens-ad-inline-padding) * 2));
       --lens-ad-banner-height: max(50px, calc(var(--lens-ad-banner-width) / var(--lens-ad-aspect-ratio)));
       --lens-ad-banner-gap: 16px;
       --lens-ad-banner-top: 6px;
@@ -94,8 +96,8 @@
     }
     main {
       position: relative;
-      width: 100vw;
-      height: 100dvh;
+      width: var(--viewport-width);
+      height: var(--viewport-height);
       padding-top: calc(var(--safe-top) + var(--ad-header-offset));
     }
     .update-toast {
@@ -388,7 +390,7 @@
     }
     body.is-landscape {
       --ad-header-offset: 0px;
-      --lens-ad-banner-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - (var(--lens-ad-inline-padding) * 2));
+      --lens-ad-banner-height: calc(var(--viewport-height) - var(--safe-top) - var(--safe-bottom) - (var(--lens-ad-inline-padding) * 2));
       --lens-ad-banner-width: max(50px, calc(var(--lens-ad-banner-height) / var(--lens-ad-aspect-ratio)));
       --ad-side-offset: calc(var(--lens-ad-banner-width) + var(--lens-ad-banner-gap));
     }
@@ -429,7 +431,7 @@
     @media (orientation: landscape) {
       :root {
         --ad-header-offset: 0px;
-        --lens-ad-banner-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - (var(--lens-ad-inline-padding) * 2));
+        --lens-ad-banner-height: calc(var(--viewport-height) - var(--safe-top) - var(--safe-bottom) - (var(--lens-ad-inline-padding) * 2));
         --lens-ad-banner-width: max(50px, calc(var(--lens-ad-banner-height) / var(--lens-ad-aspect-ratio)));
         --ad-side-offset: calc(var(--lens-ad-banner-width) + var(--lens-ad-banner-gap));
       }
@@ -553,9 +555,9 @@
     }
     .hud-top {
       position: absolute;
-      top: calc(var(--hud-padding) + var(--safe-top) + var(--ad-header-offset) + var(--vv-offset-top));
-      left: calc(var(--hud-padding) + var(--safe-left) + var(--ad-side-offset) + var(--vv-offset-left));
-      right: calc(var(--hud-padding) + var(--safe-right) + var(--vv-offset-right));
+      top: calc(var(--hud-padding) + var(--safe-top) + var(--ad-header-offset));
+      left: calc(var(--hud-padding) + var(--safe-left) + var(--ad-side-offset));
+      right: calc(var(--hud-padding) + var(--safe-right));
       display: flex;
       flex-direction: column;
       gap: 18px;
@@ -694,9 +696,9 @@
     }
     .hud-bottom {
       position: absolute;
-      bottom: calc(var(--hud-padding) + var(--safe-bottom) + var(--vv-offset-bottom));
-      left: calc(var(--hud-padding) + var(--safe-left) + var(--ad-side-offset) + var(--vv-offset-left));
-      right: calc(var(--hud-padding) + var(--safe-right) + var(--vv-offset-right));
+      bottom: calc(var(--hud-padding) + var(--safe-bottom));
+      left: calc(var(--hud-padding) + var(--safe-left) + var(--ad-side-offset));
+      right: calc(var(--hud-padding) + var(--safe-right));
       display: flex;
       flex-direction: column;
       gap: 16px;
@@ -6032,25 +6034,34 @@
     }
 
     function updateViewportOffsetVariables() {
-      const rootStyle = document.documentElement ? document.documentElement.style : null;
+      const docEl = document.documentElement || null;
+      const rootStyle = docEl ? docEl.style : null;
       if (!rootStyle) {
         return;
       }
-      const viewportWidth = Math.max(1, Number(window.innerWidth) || 0);
-      const viewportHeight = Math.max(1, Number(window.innerHeight) || 0);
+      const fallbackWidth = Math.max(1, Number(window.innerWidth) || 0);
+      const fallbackHeight = Math.max(1, Number(window.innerHeight) || 0);
+      const layoutWidth = Math.max(fallbackWidth, Math.max(1, Number(docEl.clientWidth) || 0));
+      const layoutHeight = Math.max(fallbackHeight, Math.max(1, Number(docEl.clientHeight) || 0));
+      let viewportWidth = fallbackWidth;
+      let viewportHeight = fallbackHeight;
       let top = 0;
       let right = 0;
       let bottom = 0;
       let left = 0;
       if (window.visualViewport) {
         const vv = window.visualViewport;
-        const vvWidth = Math.max(1, Number(vv.width) || viewportWidth);
-        const vvHeight = Math.max(1, Number(vv.height) || viewportHeight);
+        const vvWidth = Math.max(1, Number(vv.width) || fallbackWidth);
+        const vvHeight = Math.max(1, Number(vv.height) || fallbackHeight);
+        viewportWidth = vvWidth;
+        viewportHeight = vvHeight;
         left = Math.max(0, Number(vv.offsetLeft) || 0);
         top = Math.max(0, Number(vv.offsetTop) || 0);
-        right = Math.max(0, viewportWidth - (left + vvWidth));
-        bottom = Math.max(0, viewportHeight - (top + vvHeight));
+        right = Math.max(0, layoutWidth - (left + vvWidth));
+        bottom = Math.max(0, layoutHeight - (top + vvHeight));
       }
+      rootStyle.setProperty('--viewport-width', `${Math.round(viewportWidth)}px`);
+      rootStyle.setProperty('--viewport-height', `${Math.round(viewportHeight)}px`);
       rootStyle.setProperty('--vv-offset-top', `${Math.round(top)}px`);
       rootStyle.setProperty('--vv-offset-right', `${Math.round(right)}px`);
       rootStyle.setProperty('--vv-offset-bottom', `${Math.round(bottom)}px`);
@@ -10979,5 +10990,6 @@
       startCamera();
     }
   </script>
+<script defer src="/scripts/pwa-install.js"></script>
 </body>
 </html>
