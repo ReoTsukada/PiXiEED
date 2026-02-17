@@ -956,6 +956,8 @@
   document.addEventListener('contextmenu', (event) => { event.preventDefault(); });
   document.addEventListener('dragstart', (event) => { event.preventDefault(); });
 </script>
+<link rel="manifest" href="/manifest.webmanifest"/>
+<link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
 </head>
 <body>
   <div class="game-shell">
@@ -6103,5 +6105,6 @@
     }
   })();
 </script>
+<script defer src="/scripts/pwa-install.js"></script>
 </body>
 </html>
