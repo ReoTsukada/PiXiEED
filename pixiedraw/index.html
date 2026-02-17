@@ -70,6 +70,8 @@
       event.preventDefault();
     });
   </script>
+<link rel="manifest" href="/manifest.webmanifest"/>
+<link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
 </head>
 <body>
 <!-- Mobile ad placeholder: using bottom banner (mobileBottomAd) for PiXiEEDraw lite behavior -->
@@ -93,13 +95,14 @@
 </div>
 </div>
 </div>
-<div class="update-toast" id="updateToast" role="status" aria-live="polite" data-update-id="2026-02-15">
+<div aria-hidden="true" class="update-toast" data-update-id="2026-02-17-draw-major" hidden="" id="updateToast" role="status" aria-live="polite">
 <div class="update-toast__body">
 <p class="update-toast__message">
-<strong>更新情報 (2026/02/15)</strong><br/>
-・2色描画を追加（左クリック=通常色 / 右クリック=サブ色）<br/>
-・Hueリング + SVマップのカラー操作を調整<br/>
-・円ツール計算と横画面レイアウトを調整
+<strong>更新情報 (2026/02/17)</strong><br/>
+・ミラーモードを強化（4対称軸・つまみ移動・同時ON）<br/>
+・モバイル/横画面UIを再調整（レール・つまみ・ギャップ統一）<br/>
+・ショートカット拡充、未保存警告、出力後ツール紹介を追加<br/>
+・詳細は設定の「更新情報」から確認できます
 </p>
 <div class="update-toast__actions">
 <button class="update-toast__btn update-toast__btn--primary" id="updateToastCloseBtn" type="button">閉じる</button>
@@ -129,10 +132,6 @@
 <img alt="" class="tab-icon" src="assets/icons/menu-file.svg"/>
 <span class="sr-only">ファイル</span>
 </button>
-<button aria-controls="mobilePanelPixfind" aria-label="PiXFiND" aria-selected="false" class="mobile-tab" data-mobile-tab="pixfind" id="mobileTabPixfind" role="tab" tabindex="-1" type="button">
-<img alt="" class="tab-icon" src="assets/icons/menu-pixfind.png"/>
-<span class="sr-only">PiXFiND</span>
-</button>
 </div>
 <div aria-label="モバイルショートカット" class="mobile-shortcuts" id="mobileShortcutsMount">
 </div>
@@ -161,6 +160,16 @@
 <canvas aria-hidden="true" height="32" id="selectionCanvas" width="32"></canvas>
 </div>
 <canvas aria-hidden="true" class="virtual-cursor-canvas" height="0" id="virtualCursorCanvas" width="0"></canvas>
+<div aria-hidden="true" class="mirror-guides" hidden="" id="mirrorGuides">
+<div class="mirror-guide mirror-guide--vertical" data-mirror-axis="vertical"></div>
+<div class="mirror-guide mirror-guide--horizontal" data-mirror-axis="horizontal"></div>
+<div class="mirror-guide mirror-guide--diagonal-a" data-mirror-axis="diagonalA"></div>
+<div class="mirror-guide mirror-guide--diagonal-b" data-mirror-axis="diagonalB"></div>
+<button aria-label="左右対称の軸を移動" class="mirror-handle mirror-handle--vertical" data-mirror-axis="vertical" type="button"></button>
+<button aria-label="上下対称の軸を移動" class="mirror-handle mirror-handle--horizontal" data-mirror-axis="horizontal" type="button"></button>
+<button aria-label="斜め対称(＼)の軸を移動" class="mirror-handle mirror-handle--diagonal-a" data-mirror-axis="diagonalA" type="button"></button>
+<button aria-label="斜め対称(/)の軸を移動" class="mirror-handle mirror-handle--diagonal-b" data-mirror-axis="diagonalB" type="button"></button>
+</div>
 <div class="canvas-controls">
 <div aria-label="履歴操作" class="canvas-controls__history" role="group">
 <button aria-label="元に戻す" class="chip" disabled="" id="undoAction" type="button"></button>
@@ -170,7 +179,7 @@
 <div aria-hidden="true" aria-live="polite" class="zoom-indicator" id="zoomIndicator" role="status"></div>
 </div>
 </main>
-<aside aria-label="フレーム、レイヤー、設定、ファイル、PiXFiND" class="rail rail--right" data-collapsed="false" data-compact="true" id="rightRail">
+<aside aria-label="フレーム、レイヤー、設定、ファイル" class="rail rail--right" data-collapsed="false" data-compact="true" id="rightRail">
 <div aria-label="右パネル切り替え" class="rail-tabs" id="rightRailTabs" role="tablist">
 <button aria-controls="panelFrames" aria-label="フレームとレイヤー" aria-selected="true" class="rail-tab is-active" data-right-tab="frames" role="tab" title="フレームとレイヤー" type="button">
 <img alt="" class="tab-icon" src="assets/icons/menu-frame.png"/>
@@ -184,10 +193,6 @@
 <img alt="" class="tab-icon" src="assets/icons/menu-file.svg"/>
 <span class="sr-only">ファイル</span>
 </button>
-<button aria-controls="panelPixfind" aria-label="PiXFiND" aria-selected="false" class="rail-tab" data-right-tab="pixfind" role="tab" tabindex="-1" title="PiXFiND" type="button">
-<img alt="" class="tab-icon" src="assets/icons/menu-pixfind.png"/>
-<span class="sr-only">PiXFiND</span>
-</button>
 </div>
   <div class="rail-tabpanes" id="rightRailPanes"></div>
 <button aria-label="右パネルの幅を変更" class="rail-resizer rail-resizer--right" id="resizeRightRail" type="button"></button>
@@ -198,6 +203,20 @@
   <div id="rightPanelAdPreloadMount" style="width:320px;min-width:320px;max-width:320px;height:320px;min-height:320px;max-height:320px;overflow:hidden;"></div>
 </div>
 <button aria-label="描画ボタン" class="floating-draw-button" id="floatingDrawButton" type="button">描画</button>
+<div aria-hidden="true" class="mirror-tool-popover" hidden="" id="mirrorToolPopover" role="dialog">
+<div class="mirror-tool-popover__header">
+<strong>対称ツール</strong>
+<button aria-label="対称ポップアップを閉じる" class="mirror-tool-popover__close" id="mirrorToolPopoverClose" type="button">閉じる</button>
+</div>
+<div class="mirror-tool-popover__body">
+<label class="toggle-option" for="mirrorToolPopupToggleMode">
+<input id="mirrorToolPopupToggleMode" type="checkbox"/>
+<span>ミラーモード</span>
+</label>
+<div class="mirror-tool-popover__items" id="mirrorToolPopoverItems"></div>
+<p class="help-text mirror-tool-popover__help" id="mirrorToolPopoverHelp">挙動は既存ミラーモードと同じです。軸位置はキャンバス外のつまみで移動できます。</p>
+</div>
+</div>
 <div class="mobile-drawer" hidden="" id="mobileDrawer">
 <button aria-label="モバイルパネルの高さを調整" aria-controls="mobilePanels" class="mobile-drawer__handle" id="mobileDrawerHandle" type="button">
 <span aria-hidden="true" class="mobile-drawer__grip"></span>
@@ -208,7 +227,6 @@
 <div aria-labelledby="mobileTabFrames" class="mobile-panel" hidden="" id="mobilePanelFrames" role="tabpanel"></div>
 <div aria-labelledby="mobileTabSettings" class="mobile-panel" hidden="" id="mobilePanelSettings" role="tabpanel"></div>
 <div aria-labelledby="mobileTabFile" class="mobile-panel" hidden="" id="mobilePanelFile" role="tabpanel"></div>
-<div aria-labelledby="mobileTabPixfind" class="mobile-panel" hidden="" id="mobilePanelPixfind" role="tabpanel"></div>
 </div>
 </div>
 <section class="panel-section" data-section="tools" id="panelTools">
@@ -222,6 +240,10 @@
 <img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tool-pen-new.svg" width="20"/>
 <span class="tool-group-label">ペン</span>
 </button>
+<button aria-selected="false" class="tool-group-button" data-tool-group="eyedropper" role="tab" title="スポイト" type="button">
+<img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tool-eyedropper.png" width="20"/>
+<span class="tool-group-label">スポイト</span>
+</button>
 <button aria-selected="false" class="tool-group-button" data-tool-group="eraser" role="tab" title="消しゴム" type="button">
 <img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tool-eraser.png" width="20"/>
 <span class="tool-group-label">消しゴム</span>
@@ -234,6 +256,10 @@
 <img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tool-fill.png" width="20"/>
 <span class="tool-group-label">塗りつぶし</span>
 </button>
+<button aria-selected="false" class="tool-group-button" data-tool-group="mirror" role="tab" title="対称" type="button">
+<img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tasyou1.svg" width="20"/>
+<span class="tool-group-label">対称</span>
+</button>
 <button aria-selected="false" class="tool-group-button" data-tool-group="virtualCursor" role="tab" title="仮想カーソル" type="button">
 <img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tool-cursor.png" width="20"/>
 <span class="tool-group-label">仮想カーソル</span>
@@ -244,7 +270,7 @@
 <img alt="ペン" height="32" src="assets/icons/tool-pen-new.svg" width="32"/>
 <span>ペン</span>
 </button>
-<button aria-pressed="false" class="tool-button" data-tool="eyedropper" data-tool-group="pen" type="button">
+<button aria-pressed="false" class="tool-button" data-tool="eyedropper" data-tool-group="eyedropper" type="button">
 <img alt="スポイト" height="32" src="assets/icons/tool-eyedropper.png" width="32"/>
 <span>スポイト</span>
 </button>
@@ -296,13 +322,13 @@
 <img alt="同色選択" height="32" src="assets/icons/tool-select-magic.svg" width="32"/>
 <span>同色</span>
 </button>
+<button aria-pressed="false" class="tool-button" data-tool="mirrorPopup" data-tool-group="mirror" type="button">
+<img alt="対称設定" height="32" src="assets/icons/tasyou1.svg" width="32"/>
+<span>対称</span>
+</button>
 <button aria-pressed="false" class="tool-button" data-tool="virtualCursorToggle" data-tool-group="virtualCursor" type="button">
 <img alt="仮想カーソル" height="32" src="assets/icons/tool-cursor.png" width="32"/>
 <span>仮想表示</span>
-</button>
-<button aria-pressed="false" class="tool-button" data-tool="virtualCursorCenter" data-tool-group="virtualCursor" type="button">
-<img alt="仮想カーソル中央" height="32" src="assets/icons/tool-pan.svg" width="32"/>
-<span>中央へ</span>
 </button>
 </div>
 <div class="field-group">
@@ -439,22 +465,14 @@
 <div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 </div>
 </section>
-<section class="panel-section" data-section="pixfind" id="panelPixfind">
-<div class="panel-section__body">
-<div class="field-group">
-<button aria-pressed="false" class="button" id="togglePixfindMode" type="button">PiXFiNDモード: OFF</button>
-<button class="button" disabled="" id="sendToPixfind" type="button">PiXFiNDへ送る</button>
-<p aria-live="polite" class="help-text" id="pixfindActionReason"></p>
-<p class="help-text">PiXFiNDモードON時は「フレーム1=原本」「フレーム2=差分」で送信します。ONにするたびフレーム2はフレーム1から作り直されます。</p>
-</div>
-<div class="panel-ad-mount" data-panel-ad-mount="right"></div>
-</div>
-</section>
 <section class="panel-section" data-section="settings" id="panelSettings">
 <div class="panel-section__body">
   <div class="settings-nav">
-    <a class="button" href="/index.html" id="goHomeButton">PiXiEEDホームへ戻る</a>
+    <a class="button" href="https://pixieed.jp/tools.html" id="goHomeButton">他のツール一覧へ</a>
+    <button aria-haspopup="dialog" class="chip settings-nav__close" id="openShortcutHelp" type="button">ショートカット一覧</button>
+    <button aria-haspopup="dialog" class="chip settings-nav__close" id="openUpdateHistory" type="button">更新情報</button>
   </div>
+<div class="settings-size-grid">
 <label class="field settings-size-row settings-size-row--canvas">
 <span>キャンバスサイズ</span>
 <div class="field field--inline settings-size-controls">
@@ -479,10 +497,7 @@
 </div>
 <p class="help-text">キャンバスと描画済みのピクセルを整数倍で拡大します。</p>
 </label>
-<label class="field">
-<span>ズーム</span>
-<input id="zoomSlider" max="40" min="1" type="range" value="8"/>
-</label>
+</div>
 <div aria-label="表示設定" class="field field--list" role="group">
 <ul class="toggle-list">
 <li>
@@ -515,8 +530,43 @@
 <span>仮想カーソル</span>
 </label>
 </li>
+<li>
+<label class="toggle-option" for="toggleMirrorMode">
+<input id="toggleMirrorMode" type="checkbox"/>
+<span>ミラーモード</span>
+</label>
+</li>
+<li>
+<label class="toggle-option" for="togglePixfindMode">
+<input id="togglePixfindMode" type="checkbox"/>
+<span>間違い探しモード</span>
+</label>
+</li>
 </ul>
-<div class="virtual-cursor-scale">
+<div class="pixfind-help">
+<button aria-controls="pixfindHelpText" aria-expanded="false" class="chip pixfind-help__toggle" id="togglePixfindHelp" type="button">間違い探しモードの説明</button>
+<p class="help-text pixfind-help__text" hidden="" id="pixfindHelpText">ON時はフレーム1を原本、フレーム2を差分としてPiXFiND出力します。ONにするたびフレーム2は作り直されます。</p>
+</div>
+<div class="mirror-axis-options" id="mirrorAxisOptions" role="group">
+<label class="toggle-option" for="mirrorAxisVertical">
+<input checked="" id="mirrorAxisVertical" type="checkbox"/>
+<span>左右対称</span>
+</label>
+<label class="toggle-option" for="mirrorAxisHorizontal">
+<input id="mirrorAxisHorizontal" type="checkbox"/>
+<span>上下対称</span>
+</label>
+<label class="toggle-option" for="mirrorAxisDiagonalA">
+<input id="mirrorAxisDiagonalA" type="checkbox"/>
+<span>斜め対称 (＼)</span>
+</label>
+<label class="toggle-option" for="mirrorAxisDiagonalB">
+<input id="mirrorAxisDiagonalB" type="checkbox"/>
+<span>斜め対称 (/)</span>
+</label>
+</div>
+<p class="help-text" id="mirrorAxisHelp">ミラーモード中は軸ライン外側のつまみをドラッグして、対称軸を移動できます。</p>
+<div class="virtual-cursor-scale" id="virtualCursorScale">
 <label class="virtual-cursor-scale__control" for="virtualCursorButtonScale">
 <span class="virtual-cursor-scale__label">仮想カーソルボタンサイズ</span>
 <input id="virtualCursorButtonScale" list="virtualCursorButtonScaleMarks" max="2" min="1" step="0.5" type="range" value="2"/>
@@ -535,6 +585,7 @@
 <option label="2×" value="2"></option>
 </datalist>
 </div>
+<p class="help-text mobile-draw-help" id="mobileDrawHelp">スマホ描画: 仮想カーソルをONにしてキャンバスをドラッグでカーソル移動、オレンジの「描画」ボタン長押しで描画します。2本指ドラッグ/ピンチで移動と拡大縮小ができます。</p>
 <button aria-pressed="false" class="chip" id="toggleBackgroundMode" type="button">背景</button>
 </div>
 <div class="panel-ad-mount" data-panel-ad-mount="right"></div>
@@ -609,6 +660,42 @@
 </div>
 </form>
 </dialog>
+<dialog aria-labelledby="toolSpotlightTitle" class="modal tool-spotlight-modal" id="toolSpotlightDialog">
+<form class="modal__form" method="dialog">
+<header class="modal__header">
+<h2 class="modal__title" id="toolSpotlightTitle">他ツールの紹介</h2>
+</header>
+<div class="modal__body tool-spotlight-modal__body">
+<p class="help-text">出力ありがとうございます。次に遊べる・使えるツールです。</p>
+<div class="tool-spotlight-list" role="list">
+<a class="tool-spotlight-card" href="../maoitu/index.html" role="listitem">
+<img alt="まおいつ" class="tool-spotlight-card__icon" src="../icon/icon-192-3.png"/>
+<div class="tool-spotlight-card__content">
+<h3 class="tool-spotlight-card__title">まおいつ</h3>
+<p class="tool-spotlight-card__description">避け続けるアクションゲーム。短時間でスコアアタックできます。</p>
+</div>
+</a>
+<a class="tool-spotlight-card" href="../pixfind/index.html" role="listitem">
+<img alt="PiXFiND" class="tool-spotlight-card__icon" src="../icon/icon-192-2.png"/>
+<div class="tool-spotlight-card__content">
+<h3 class="tool-spotlight-card__title">PiXFiND</h3>
+<p class="tool-spotlight-card__description">ドット絵専用の間違い探しゲーム。作った絵の活用にも最適です。</p>
+</div>
+</a>
+<a class="tool-spotlight-card" href="../pixiee-lens/index.html" role="listitem">
+<img alt="PiXiEELENS" class="tool-spotlight-card__icon" src="../icon/icon-192-1.png"/>
+<div class="tool-spotlight-card__content">
+<h3 class="tool-spotlight-card__title">PiXiEELENS</h3>
+<p class="tool-spotlight-card__description">カメラ画像をドット化できるツール。撮影してそのまま編集導線につなげられます。</p>
+</div>
+</a>
+</div>
+</div>
+<footer class="modal__footer">
+<button class="button button--primary" id="closeToolSpotlight" type="button">閉じる</button>
+</footer>
+</form>
+</dialog>
 <dialog aria-labelledby="newProjectTitle" class="modal" id="newProjectDialog">
 <form class="modal__form" id="newProjectForm" method="dialog">
 <header class="modal__header">
@@ -640,6 +727,67 @@
 <footer class="modal__footer">
 <button class="button button--ghost" id="cancelNewProject" type="button">キャンセル</button>
 <button class="button button--primary" id="confirmNewProject" type="submit">作成</button>
+</footer>
+</form>
+</dialog>
+<dialog aria-labelledby="shortcutHelpTitle" class="modal shortcut-help-modal" id="shortcutHelpDialog">
+<form class="modal__form" method="dialog">
+<header class="modal__header">
+<h2 class="modal__title" id="shortcutHelpTitle">ショートカット一覧</h2>
+</header>
+<div class="modal__body shortcut-help-modal__body">
+<div class="shortcut-help-section">
+<h3 class="shortcut-help-section__title">ツール</h3>
+<div class="shortcut-help-list" role="list">
+<p class="shortcut-help-row" role="listitem"><span>移動</span><span class="shortcut-help-key">V</span></p>
+<p class="shortcut-help-row" role="listitem"><span>矩形選択</span><span class="shortcut-help-key">M</span></p>
+<p class="shortcut-help-row" role="listitem"><span>なげなわ選択</span><span class="shortcut-help-key">Q</span></p>
+<p class="shortcut-help-row" role="listitem"><span>同色選択</span><span class="shortcut-help-key">W</span></p>
+<p class="shortcut-help-row" role="listitem"><span>ペン</span><span class="shortcut-help-key">B</span></p>
+<p class="shortcut-help-row" role="listitem"><span>消しゴム</span><span class="shortcut-help-key">E</span></p>
+<p class="shortcut-help-row" role="listitem"><span>スポイト</span><span class="shortcut-help-key">I</span></p>
+<p class="shortcut-help-row" role="listitem"><span>塗りつぶし</span><span class="shortcut-help-key">G</span></p>
+<p class="shortcut-help-row" role="listitem"><span>直線</span><span class="shortcut-help-key">L</span></p>
+<p class="shortcut-help-row" role="listitem"><span>曲線</span><span class="shortcut-help-key">C</span></p>
+<p class="shortcut-help-row" role="listitem"><span>矩形</span><span class="shortcut-help-key">R</span></p>
+<p class="shortcut-help-row" role="listitem"><span>塗り矩形</span><span class="shortcut-help-key">Shift + R</span></p>
+<p class="shortcut-help-row" role="listitem"><span>楕円</span><span class="shortcut-help-key">O</span></p>
+<p class="shortcut-help-row" role="listitem"><span>塗り楕円</span><span class="shortcut-help-key">Shift + O</span></p>
+<p class="shortcut-help-row" role="listitem"><span>図形グループ呼び出し</span><span class="shortcut-help-key">U</span></p>
+<p class="shortcut-help-row" role="listitem"><span>対称ポップ開閉</span><span class="shortcut-help-key">Y</span></p>
+<p class="shortcut-help-row" role="listitem"><span>仮想カーソル ON/OFF</span><span class="shortcut-help-key">K</span></p>
+</div>
+</div>
+<div class="shortcut-help-section">
+<h3 class="shortcut-help-section__title">編集</h3>
+<div class="shortcut-help-list" role="list">
+<p class="shortcut-help-row" role="listitem"><span>元に戻す</span><span class="shortcut-help-key">Ctrl/Cmd + Z</span></p>
+<p class="shortcut-help-row" role="listitem"><span>やり直し</span><span class="shortcut-help-key">Ctrl/Cmd + Y</span></p>
+<p class="shortcut-help-row" role="listitem"><span>やり直し（代替）</span><span class="shortcut-help-key">Ctrl/Cmd + Shift + Z</span></p>
+<p class="shortcut-help-row" role="listitem"><span>コピー</span><span class="shortcut-help-key">Ctrl/Cmd + C</span></p>
+<p class="shortcut-help-row" role="listitem"><span>切り取り</span><span class="shortcut-help-key">Ctrl/Cmd + X</span></p>
+<p class="shortcut-help-row" role="listitem"><span>貼り付け</span><span class="shortcut-help-key">Ctrl/Cmd + V</span></p>
+<p class="shortcut-help-row" role="listitem"><span>一時パン</span><span class="shortcut-help-key">Space 長押し</span></p>
+<p class="shortcut-help-row" role="listitem"><span>選択解除/移動キャンセル</span><span class="shortcut-help-key">Esc</span></p>
+</div>
+</div>
+</div>
+<footer class="modal__footer">
+<button class="button button--primary" id="closeShortcutHelp" type="button">閉じる</button>
+</footer>
+</form>
+</dialog>
+<dialog aria-labelledby="updateHistoryTitle" class="modal update-history-modal" id="updateHistoryDialog">
+<form class="modal__form" method="dialog">
+<header class="modal__header">
+<h2 class="modal__title" id="updateHistoryTitle">更新情報</h2>
+</header>
+<div class="modal__body update-history-modal__body">
+<p class="help-text">直近1年の更新内容を表示しています。</p>
+<div class="update-history-list" id="updateHistoryList" role="list"></div>
+</div>
+<footer class="modal__footer">
+<button class="button button--primary" id="closeUpdateHistory" type="button">閉じる</button>
 </footer>
 </form>
 </dialog>
@@ -697,7 +845,7 @@
       const mql = window.matchMedia('(orientation: portrait)');
       const mobileBottomAd = document.getElementById('mobileBottomAd');
       const mobileBottomAdSlot = document.getElementById('mobileBottomAdSlot');
-      const MOBILE_AD_SLOT_HEIGHT = 56;
+      const MOBILE_AD_SLOT_HEIGHT = 48;
       let raf = null;
 
       function notifyAdLayoutChange(reason) {
@@ -731,9 +879,9 @@
         if (!(mobileAd instanceof HTMLElement)) return;
         const slotHeightPx = `${MOBILE_AD_SLOT_HEIGHT}px`;
 
-        mobileAd.style.setProperty('min-height', `calc(${slotHeightPx} + env(safe-area-inset-bottom, 0px) + 2px)`, 'important');
-        mobileAd.style.setProperty('height', `calc(${slotHeightPx} + env(safe-area-inset-bottom, 0px) + 2px)`, 'important');
-        mobileAd.style.setProperty('max-height', `calc(${slotHeightPx} + env(safe-area-inset-bottom, 0px) + 2px)`, 'important');
+        mobileAd.style.setProperty('min-height', `calc(${slotHeightPx} + env(safe-area-inset-bottom, 0px))`, 'important');
+        mobileAd.style.setProperty('height', `calc(${slotHeightPx} + env(safe-area-inset-bottom, 0px))`, 'important');
+        mobileAd.style.setProperty('max-height', `calc(${slotHeightPx} + env(safe-area-inset-bottom, 0px))`, 'important');
 
         if (mobileBottomAdSlot instanceof HTMLElement) {
           mobileBottomAdSlot.style.setProperty('min-height', slotHeightPx, 'important');
@@ -857,7 +1005,7 @@
       };
       const sideSections = {
         left: ['panelTools', 'panelColor'],
-        right: ['panelFrames', 'panelSettings', 'panelFile', 'panelPixfind'],
+        right: ['panelFrames', 'panelSettings', 'panelFile'],
       };
       if (!(ads.left instanceof HTMLElement) && !(ads.right instanceof HTMLElement)) return;
 
@@ -1325,5 +1473,6 @@
     })();
   </script>
 
+<script defer src="/scripts/pwa-install.js"></script>
 </body>
 </html>
