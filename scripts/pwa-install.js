@@ -77,17 +77,19 @@
     style.textContent = `
       .pixieed-pwa-install-button {
         position: fixed;
-        right: 14px;
-        bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+        right: 16px;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 86px);
         z-index: 2147483640;
         border: 0;
         border-radius: 999px;
-        padding: 10px 14px;
+        padding: 14px 20px;
         background: linear-gradient(135deg, #ff719a, #ff9f43);
         color: #0b1224;
-        font: 700 13px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font: 700 16px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
         cursor: pointer;
+        min-height: 52px;
+        min-width: 188px;
       }
       .pixieed-pwa-install-button[hidden] {
         display: none !important;
@@ -147,10 +149,11 @@
       }
       @media (min-width: 768px) {
         .pixieed-pwa-install-button {
-          right: 18px;
-          bottom: 18px;
-          padding: 11px 16px;
-          font-size: 14px;
+          right: 22px;
+          bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
+          padding: 15px 22px;
+          font-size: 17px;
+          min-height: 56px;
         }
       }
     `;
