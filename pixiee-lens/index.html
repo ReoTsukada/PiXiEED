@@ -102,12 +102,12 @@
     }
     .update-toast {
       position: fixed;
-      left: 50%;
-      top: 50%;
+      left: calc(var(--vv-offset-left) + (var(--viewport-width) / 2));
+      top: calc(var(--vv-offset-top) + (var(--viewport-height) / 2));
       bottom: auto;
       transform: translate(-50%, -50%);
-      width: min(92vw, 420px);
-      max-height: min(86dvh, 680px);
+      width: min(calc(var(--viewport-width) - 20px), 420px);
+      max-height: min(calc(var(--viewport-height) - 24px), 680px);
       overflow: auto;
       background: rgba(8, 12, 24, 0.92);
       backdrop-filter: blur(18px);
@@ -171,7 +171,7 @@
       position: fixed;
       left: calc(var(--hud-padding) + var(--safe-left) + var(--ad-side-offset) + var(--vv-offset-left));
       bottom: calc(var(--hud-padding) + var(--safe-bottom) + var(--vv-offset-bottom) + 10px);
-      width: min(460px, 94vw);
+      width: min(460px, max(220px, calc(var(--viewport-width) - var(--ad-side-offset) - (var(--hud-padding) * 2) - var(--safe-left) - var(--safe-right) - 12px)));
       background: rgba(8, 12, 24, 0.9);
       border: 1px solid rgba(123, 207, 255, 0.28);
       border-radius: 16px;
@@ -180,7 +180,6 @@
       z-index: 55;
       pointer-events: auto;
       backdrop-filter: blur(10px);
-      position: fixed;
     }
     .qr-readout__header {
       display: flex;
@@ -299,8 +298,8 @@
     }
     .lens-ad-banner{
       position: fixed;
-      top: calc(var(--safe-top) + var(--lens-ad-banner-top));
-      left: 50%;
+      top: calc(var(--safe-top) + var(--vv-offset-top) + var(--lens-ad-banner-top));
+      left: calc(var(--vv-offset-left) + (var(--viewport-width) / 2));
       transform: translateX(-50%);
       width: var(--lens-ad-banner-width);
       height: var(--lens-ad-banner-height);
@@ -395,8 +394,8 @@
       --ad-side-offset: calc(var(--lens-ad-banner-width) + var(--lens-ad-banner-gap));
     }
     body.is-landscape .lens-ad-banner {
-      top: 50%;
-      left: calc(var(--safe-left) + var(--lens-ad-inline-padding));
+      top: calc(var(--vv-offset-top) + (var(--viewport-height) / 2));
+      left: calc(var(--safe-left) + var(--vv-offset-left) + var(--lens-ad-inline-padding));
       transform: translateY(-50%);
       width: var(--lens-ad-banner-width);
       height: var(--lens-ad-banner-height);
@@ -436,8 +435,8 @@
         --ad-side-offset: calc(var(--lens-ad-banner-width) + var(--lens-ad-banner-gap));
       }
       .lens-ad-banner {
-        top: 50%;
-        left: calc(var(--safe-left) + var(--lens-ad-inline-padding));
+        top: calc(var(--vv-offset-top) + (var(--viewport-height) / 2));
+        left: calc(var(--safe-left) + var(--vv-offset-left) + var(--lens-ad-inline-padding));
         transform: translateY(-50%);
         width: var(--lens-ad-banner-width);
         height: var(--lens-ad-banner-height);
@@ -482,7 +481,7 @@
       }
       .qr-readout {
         left: calc(clamp(12px, 4vw, 18px) + var(--ad-side-offset) + var(--vv-offset-left));
-        right: clamp(12px, 4vw, 18px);
+        right: calc(clamp(12px, 4vw, 18px) + var(--vv-offset-right));
         width: auto;
         bottom: calc(var(--hud-padding) + var(--safe-bottom) + var(--vv-offset-bottom) + 6px);
       }
@@ -674,7 +673,7 @@
       pointer-events: auto;
     }
     .hud-top__panel-wrap > * {
-      width: min(360px, 92vw);
+      width: min(360px, max(220px, calc(var(--viewport-width) - 20px)));
     }
     .hud-top__panel-wrap--left {
       justify-content: flex-start;
@@ -748,7 +747,7 @@
     }
     .hud-landscape-capture {
       position: fixed;
-      top: 50%;
+      top: calc(var(--vv-offset-top) + (var(--viewport-height) / 2));
       right: calc(var(--hud-padding) + var(--safe-right) + var(--vv-offset-right));
       transform: translateY(-50%);
       display: none;
@@ -1014,9 +1013,9 @@
       gap: 18px;
       position: fixed;
       bottom: calc(var(--safe-bottom) + var(--vv-offset-bottom) + 12px);
-      left: 50%;
+      left: calc(var(--vv-offset-left) + (var(--viewport-width) / 2));
       transform: translateX(-50%);
-      width: min(520px, 88vw);
+      width: min(520px, max(220px, calc(var(--viewport-width) - 20px)));
       pointer-events: none;
     }
     body.is-landscape .hud-bottom__center > * {
@@ -1038,7 +1037,7 @@
       pointer-events: auto;
     }
     .hud-bottom__menus > * {
-      width: min(420px, 92vw);
+      width: min(420px, max(220px, calc(var(--viewport-width) - 20px)));
     }
     .camera-permission {
       position: fixed;
@@ -1046,6 +1045,12 @@
       display: none;
       align-items: center;
       justify-content: center;
+      padding:
+        calc(var(--safe-top) + var(--vv-offset-top) + 12px)
+        calc(var(--safe-right) + var(--vv-offset-right) + 12px)
+        calc(var(--safe-bottom) + var(--vv-offset-bottom) + 12px)
+        calc(var(--safe-left) + var(--vv-offset-left) + 12px);
+      box-sizing: border-box;
       z-index: 1100;
     }
     .camera-permission.is-visible {
@@ -1060,7 +1065,8 @@
     }
     .camera-permission__panel {
       position: relative;
-      width: min(440px, 92vw);
+      width: min(440px, calc(var(--viewport-width) - 24px));
+      max-height: calc(var(--viewport-height) - 24px);
       background: rgba(9, 13, 28, 0.94);
       border: 1px solid rgba(123, 207, 255, 0.38);
       border-radius: 22px;
@@ -1126,6 +1132,12 @@
       display: none;
       align-items: center;
       justify-content: center;
+      padding:
+        calc(var(--safe-top) + var(--vv-offset-top) + 12px)
+        calc(var(--safe-right) + var(--vv-offset-right) + 12px)
+        calc(var(--safe-bottom) + var(--vv-offset-bottom) + 12px)
+        calc(var(--safe-left) + var(--vv-offset-left) + 12px);
+      box-sizing: border-box;
       z-index: 1200;
     }
     .capture-preview.is-visible {
@@ -1140,8 +1152,8 @@
     }
     .capture-preview__panel {
       position: relative;
-      width: min(480px, 92vw);
-      max-height: min(720px, 88vh);
+      width: min(480px, calc(var(--viewport-width) - 24px));
+      max-height: min(720px, calc(var(--viewport-height) - 24px));
       background: rgba(9, 13, 28, 0.92);
       border: 1px solid rgba(123, 207, 255, 0.35);
       border-radius: 20px;
@@ -1199,7 +1211,7 @@
       overflow: hidden;
       border: 1px solid rgba(123, 207, 255, 0.18);
       padding: 12px;
-      max-height: min(60vh, 420px);
+      max-height: min(420px, max(140px, calc(var(--viewport-height) - 200px)));
     }
     .capture-preview__image-wrap img {
       width: 100%;
@@ -1349,7 +1361,7 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
       gap: 6px;
-      max-height: min(360px, 48vh);
+      max-height: min(360px, max(120px, calc(var(--viewport-height) - 260px)));
       overflow-y: auto;
       padding-right: 4px;
       overscroll-behavior: contain;
@@ -1631,7 +1643,7 @@
     @media (orientation: landscape) and (max-height: 600px) {
       .menu-panel {
         padding: 8px 12px;
-        max-height: min(70svh, 70vh);
+        max-height: min(70svh, calc(var(--viewport-height) - 20px));
       }
       .camera-settings-panel {
         gap: 10px;
@@ -1821,8 +1833,8 @@
     .menu-panel {
       display: none;
       position: fixed;
-      top: 50%;
-      left: 50%;
+      top: calc(var(--vv-offset-top) + (var(--viewport-height) / 2));
+      left: calc(var(--vv-offset-left) + (var(--viewport-width) / 2));
       transform: translate(-50%, -50%);
       flex-direction: column;
       gap: 8px;
@@ -1832,8 +1844,8 @@
       background: rgba(5, 9, 18, 0.9);
       border: 1px solid rgba(123, 207, 255, 0.32);
       box-shadow: 0 24px 44px rgba(0, 0, 0, 0.45);
-      max-height: min(78svh, 78vh);
-      width: min(480px, 92vw);
+      max-height: min(78svh, calc(var(--viewport-height) - 24px));
+      width: min(480px, calc(var(--viewport-width) - 24px));
       overflow-y: auto;
       z-index: 20;
     }
