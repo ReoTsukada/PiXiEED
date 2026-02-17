@@ -30,7 +30,6 @@
       frames: document.getElementById('mobilePanelFrames'),
       settings: document.getElementById('mobilePanelSettings'),
       file: document.getElementById('mobilePanelFile'),
-      pixfind: document.getElementById('mobilePanelPixfind'),
     },
     sections: {
       tools: document.getElementById('panelTools'),
@@ -38,7 +37,6 @@
       frames: document.getElementById('panelFrames'),
       settings: document.getElementById('panelSettings'),
       file: document.getElementById('panelFile'),
-      pixfind: document.getElementById('panelPixfind'),
     },
     canvases: {
       stack: document.getElementById('canvasStack'),
@@ -48,6 +46,10 @@
       virtualCursor: /** @type {HTMLCanvasElement} */ (document.getElementById('virtualCursorCanvas')),
     },
     canvasViewport: document.getElementById('canvasViewport'),
+    mirrorToolPopover: document.getElementById('mirrorToolPopover'),
+    mirrorGuides: document.getElementById('mirrorGuides'),
+    mirrorGuideLines: Array.from(document.querySelectorAll('.mirror-guide[data-mirror-axis]')),
+    mirrorHandles: Array.from(document.querySelectorAll('.mirror-handle[data-mirror-axis]')),
     canvasControls: document.querySelector('.canvas-controls'),
     floatingDrawButton: document.getElementById('floatingDrawButton'),
     zoomIndicator: document.getElementById('zoomIndicator'),
@@ -107,11 +109,29 @@
       toggleChecker: document.getElementById('toggleChecker'),
       togglePixelPreview: document.getElementById('togglePixelPreview'),
       toggleVirtualCursor: document.getElementById('toggleVirtualCursor'),
+      toggleMirrorMode: document.getElementById('toggleMirrorMode'),
+      mirrorAxisVertical: document.getElementById('mirrorAxisVertical'),
+      mirrorAxisHorizontal: document.getElementById('mirrorAxisHorizontal'),
+      mirrorAxisDiagonalA: document.getElementById('mirrorAxisDiagonalA'),
+      mirrorAxisDiagonalB: document.getElementById('mirrorAxisDiagonalB'),
+      mirrorToolPopupToggleMode: document.getElementById('mirrorToolPopupToggleMode'),
+      mirrorToolPopoverItems: document.getElementById('mirrorToolPopoverItems'),
+      mirrorToolPopoverHelp: document.getElementById('mirrorToolPopoverHelp'),
+      mirrorToolPopoverClose: document.getElementById('mirrorToolPopoverClose'),
+      mirrorAxisOptions: document.getElementById('mirrorAxisOptions'),
+      mirrorAxisHelp: document.getElementById('mirrorAxisHelp'),
       virtualCursorButtonScale: document.getElementById('virtualCursorButtonScale'),
       virtualCursorButtonScaleValue: document.getElementById('virtualCursorButtonScaleValue'),
+      virtualCursorScale: document.getElementById('virtualCursorScale'),
+      mobileDrawHelp: document.getElementById('mobileDrawHelp'),
       openDocument: document.getElementById('openDocument'),
       exportProject: document.getElementById('exportProject'),
       togglePixfindMode: document.getElementById('togglePixfindMode'),
+      togglePixfindHelp: document.getElementById('togglePixfindHelp'),
+      pixfindHelpText: document.getElementById('pixfindHelpText'),
+      openShortcutHelp: document.getElementById('openShortcutHelp'),
+      openUpdateHistory: document.getElementById('openUpdateHistory'),
+      closeShortcutHelp: document.getElementById('closeShortcutHelp'),
       sendToPixfind: document.getElementById('sendToPixfind'),
       pixfindActionReason: document.getElementById('pixfindActionReason'),
       clearCanvas: document.getElementById('clearCanvas'),
@@ -162,6 +182,18 @@
       dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('exportInterstitialDialog')),
       close: document.getElementById('closeExportInterstitial'),
       adSlot: document.getElementById('exportInterstitialAdSlot'),
+    },
+    shortcutHelp: {
+      dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('shortcutHelpDialog')),
+    },
+    updateHistory: {
+      dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('updateHistoryDialog')),
+      list: document.getElementById('updateHistoryList'),
+      close: document.getElementById('closeUpdateHistory'),
+    },
+    toolSpotlight: {
+      dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('toolSpotlightDialog')),
+      close: document.getElementById('closeToolSpotlight'),
     },
   };
 
@@ -221,27 +253,31 @@
   };
 
   const LEFT_TAB_KEYS = ['tools', 'color'];
-  const RIGHT_TAB_KEYS = ['frames', 'settings', 'file', 'pixfind'];
+  const RIGHT_TAB_KEYS = ['frames', 'settings', 'file'];
   const TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE = 'virtualCursorToggle';
-  const TOOL_ACTION_VIRTUAL_CURSOR_CENTER = 'virtualCursorCenter';
+  const TOOL_ACTION_MIRROR_POPUP = 'mirrorPopup';
   const TOOL_ACTIONS = new Set([
     TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE,
-    TOOL_ACTION_VIRTUAL_CURSOR_CENTER,
+    TOOL_ACTION_MIRROR_POPUP,
   ]);
   const TOOL_GROUPS = {
     selection: { label: '範囲選択', tools: ['move', 'selectRect', 'selectLasso', 'selectSame'] },
-    pen: { label: 'ペン', tools: ['pen', 'eyedropper'] },
+    pen: { label: 'ペン', tools: ['pen'] },
+    eyedropper: { label: 'スポイト', tools: ['eyedropper'] },
     eraser: { label: '消しゴム', tools: ['eraser'] },
     shape: { label: '図形', tools: ['line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill'] },
     fill: { label: '塗りつぶし', tools: ['fill'] },
-    virtualCursor: { label: '仮想カーソル', tools: [TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE, TOOL_ACTION_VIRTUAL_CURSOR_CENTER] },
+    mirror: { label: '対称', tools: [TOOL_ACTION_MIRROR_POPUP] },
+    virtualCursor: { label: '仮想カーソル', tools: [TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE] },
   };
   const DEFAULT_GROUP_TOOL = {
     selection: 'selectRect',
     pen: 'pen',
+    eyedropper: 'eyedropper',
     eraser: 'eraser',
     shape: 'line',
     fill: 'fill',
+    mirror: TOOL_ACTION_MIRROR_POPUP,
     virtualCursor: TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE,
   };
   const TOOL_TO_GROUP = Object.keys(TOOL_GROUPS).reduce((acc, key) => {
@@ -250,6 +286,26 @@
     });
     return acc;
   }, {});
+  const LEGACY_TOOL_ALIASES = Object.freeze({
+    virtualCursorCenter: TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE,
+    pan: 'move',
+  });
+  const TOOL_SHORTCUT_SHAPE_GROUP = '__shapeGroup__';
+  const TOOL_SHORTCUT_BINDINGS = Object.freeze({
+    v: 'move',
+    m: 'selectRect',
+    q: 'selectLasso',
+    w: 'selectSame',
+    b: 'pen',
+    e: 'eraser',
+    i: 'eyedropper',
+    g: 'fill',
+    l: 'line',
+    c: 'curve',
+    u: TOOL_SHORTCUT_SHAPE_GROUP,
+    y: TOOL_ACTION_MIRROR_POPUP,
+    k: TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE,
+  });
   const MOBILE_DRAWER_MODE_ORDER = Object.freeze(['peek', 'full']);
   const MOBILE_DRAWER_DEFAULT_MODE = 'full';
   const MOBILE_DRAWER_PEEK_HEIGHT_OFFSET = 3;
@@ -259,7 +315,6 @@
     frames: 'full',
     settings: 'full',
     file: 'full',
-    pixfind: 'full',
   });
 
   const ZOOM_STEPS = Object.freeze([
@@ -395,7 +450,6 @@
     frames: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.frames },
     settings: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.settings },
     file: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.file },
-    pixfind: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.pixfind },
   };
 
   const canvasControlsDefaultParent = dom.canvasControls?.parentElement || null;
@@ -426,9 +480,48 @@
 
   const SESSION_STORAGE_KEY = 'pixieedraw:sessionState';
   const STARTUP_SCREEN_DISMISSED_KEY = 'pixieedraw:startupScreenDismissed';
+  const UPDATE_TOAST_SEEN_PREFIX = 'pixieedraw:update-toast-seen:';
   const STARTUP_UPDATE_TOAST_HIDDEN_KEY = 'pixieedraw:update-toast-hidden';
+  const UPDATE_HISTORY_STORAGE_KEY = 'pixieedraw:update-history-log-v1';
+  const UPDATE_HISTORY_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;
   const EXPORT_INTERSTITIAL_LAST_SHOWN_KEY = 'pixieedraw:export-interstitial-last-shown-at';
   const EXPORT_INTERSTITIAL_COOLDOWN_MS = 45 * 1000;
+  const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
+    Object.freeze({
+      id: '2026-02-17-draw-major',
+      at: '2026-02-17T20:00:00+09:00',
+      title: 'PiXiEEDraw 大型アップデート',
+      details: Object.freeze([
+        'ミラーモードを実装: 左右/上下/斜め2軸、同時ON、軸ラインつまみ移動、グリッド基準調整。',
+        '対称ツールUIを刷新: 親ボタンから直接操作、子ボタンはトグル化、開閉条件を整理。',
+        'ツール再編: スポイト/仮想カーソルを独立ボタン化、PixFiNDモードを設定トグルへ移動。',
+        'モバイル/横画面レイアウトを調整: ツール並び維持、レール高さ/ギャップ/つまみ位置を統一。',
+        '無駄な装飾を整理: シャドウ/余分な光/不要スクロール表示を削減。',
+        '操作性強化: ショートカット拡充、ショートカット一覧、未保存終了警告を追加。',
+        '出力後の導線を改善: 広告クローズ後に他ツール紹介ポップを表示。',
+      ]),
+    }),
+    Object.freeze({
+      id: '2026-02-17-update-panel',
+      at: '2026-02-17T21:00:00+09:00',
+      title: '更新情報パネルを追加',
+      details: Object.freeze([
+        '設定の「更新情報」ボタンから、更新内容と日時を一覧表示するパネルを開けるように変更。',
+        '更新履歴はローカルに保存し、表示は直近1年分に自動制限。',
+        '起動時のトーストは初回1回表示の案内にして、詳細は更新情報パネルへ集約。',
+      ]),
+    }),
+    Object.freeze({
+      id: '2026-02-15-color-and-layout',
+      at: '2026-02-15T12:00:00+09:00',
+      title: '2色描画とカラー操作の改善',
+      details: Object.freeze([
+        '2色描画を追加（左クリック=通常色 / 右クリック=サブ色）。',
+        'Hueリング + SVマップのカラー操作を調整。',
+        '円ツール計算と横画面レイアウトを調整。',
+      ]),
+    }),
+  ]);
   const canUseSessionStorage = (() => {
     try {
       return typeof window !== 'undefined' && 'localStorage' in window && window.localStorage !== null;
@@ -523,6 +616,8 @@
   let autosaveWriteTimer = null;
   let autosaveRestoring = false;
   let autosaveDirty = false;
+  let unsavedChangeToken = 0;
+  let durableSaveToken = 0;
   let iosSnapshotDbPromise = null;
   let iosSnapshotDirty = false;
   let iosSnapshotTimer = null;
@@ -568,6 +663,60 @@
     ],
   });
   const TRANSPARENT_TILE_SIZE = 8;
+  const MIRROR_AXIS_VERTICAL = 'vertical';
+  const MIRROR_AXIS_HORIZONTAL = 'horizontal';
+  const MIRROR_AXIS_DIAGONAL_A = 'diagonalA';
+  const MIRROR_AXIS_DIAGONAL_B = 'diagonalB';
+  const MIRROR_AXIS_KEYS = Object.freeze([
+    MIRROR_AXIS_VERTICAL,
+    MIRROR_AXIS_HORIZONTAL,
+    MIRROR_AXIS_DIAGONAL_A,
+    MIRROR_AXIS_DIAGONAL_B,
+  ]);
+  const DEFAULT_MIRROR_AXES = Object.freeze({
+    [MIRROR_AXIS_VERTICAL]: true,
+    [MIRROR_AXIS_HORIZONTAL]: false,
+    [MIRROR_AXIS_DIAGONAL_A]: false,
+    [MIRROR_AXIS_DIAGONAL_B]: false,
+  });
+  const MIRROR_HANDLE_OUTSIDE_OFFSET = 16;
+  const MIRROR_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', 'fill']);
+  const MIRROR_TOOL_SECTION_SPLIT_THRESHOLD = 8;
+  const MIRROR_TOOL_ITEMS = Object.freeze([
+    Object.freeze({
+      key: 'axisVertical',
+      type: 'axis',
+      axis: MIRROR_AXIS_VERTICAL,
+      label: 'taisyou1',
+      icon: 'assets/icons/taisyou1.svg',
+      section: '対称',
+    }),
+    Object.freeze({
+      key: 'axisHorizontal',
+      type: 'axis',
+      axis: MIRROR_AXIS_HORIZONTAL,
+      label: 'taisyou2',
+      icon: 'assets/icons/taisyou2.svg',
+      section: '対称',
+    }),
+    Object.freeze({
+      key: 'axisDiagonalA',
+      type: 'axis',
+      axis: MIRROR_AXIS_DIAGONAL_A,
+      label: 'taisyou3',
+      icon: 'assets/icons/taisyou3.svg',
+      section: '対称',
+    }),
+    Object.freeze({
+      key: 'axisDiagonalB',
+      type: 'axis',
+      axis: MIRROR_AXIS_DIAGONAL_B,
+      label: 'taisyou4',
+      icon: 'assets/icons/taisyou4.svg',
+      section: '対称',
+    }),
+  ]);
+  const MIRROR_TOOL_ITEM_BY_KEY = new Map(MIRROR_TOOL_ITEMS.map(item => [item.key, item]));
   const BRUSH_TOOLS = new Set(['pen', 'eraser']);
   const VIRTUAL_CURSOR_SUPPORTED_TOOLS = new Set([
     'pen',
@@ -641,6 +790,18 @@
     selectionClearedOnStart: false,
     curveStage: null,
   };
+  const mirrorHandleDragState = {
+    active: false,
+    pointerId: null,
+    axis: null,
+    handle: null,
+    startClientX: 0,
+    startClientY: 0,
+    startAxisX: 0,
+    startAxisY: 0,
+    startCanvasWidth: 1,
+    startCanvasHeight: 1,
+  };
   let drawButtonResizeListenerBound = false;
   let compactToolFlyoutDismissBound = false;
   let compactToolFlyoutPositionBound = false;
@@ -675,19 +836,31 @@
       moved: false,
     },
   };
+  const mirrorToolPopoverState = {
+    open: false,
+    anchor: null,
+  };
+  const mirrorToolPopoverMountState = {
+    parent: null,
+    nextSibling: null,
+  };
+  let mirrorToolPopoverListenersBound = false;
   const toolIconCache = new Map();
   let startupVisible = false;
   let startupVirtualCursorState = null;
   restoreSessionState();
   state.colorMode = 'index';
+  state.mirror = normalizeMirrorAxisState(state.mirror, state.width, state.height);
   updateGridDecorations();
   const pointerState = createPointerState();
+  window.addEventListener('beforeunload', handleUnsavedBeforeUnload);
   if (canUseSessionStorage) {
     window.addEventListener('beforeunload', persistSessionState);
   }
   let hoverPixel = null;
   let zoomIndicatorTimeoutId = null;
   let overlayNeedsRedraw = true;
+  let overlayRenderScheduled = false;
   const recentProjectsCache = new Map();
   const SELECTION_DASH_SPEED = 40;
   let selectionDashScreenOffset = 0;
@@ -700,7 +873,7 @@
   const selectionMaskCacheIds = new WeakMap();
   let selectionMaskCacheIdCounter = 1;
   const HISTORY_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', 'fill']);
-  const MEMORY_MONITOR_INTERVAL = 2000;
+  const MEMORY_MONITOR_INTERVAL = 5000;
   const MEMORY_WARNING_DEFAULT = 250 * 1024 * 1024;
   const DRAW_BUTTON_DRAG_THRESHOLD = 6;
   const DRAW_BUTTON_DRAG_THRESHOLD_TOUCH = 12;
@@ -735,6 +908,7 @@
     stop: { fill: 'rgba(255, 156, 126, 0.32)', border: 'rgba(255, 181, 152, 0.72)' },
   };
   let memoryMonitorHandle = null;
+  let timelineMatrixInteractionBound = false;
   let toolButtons = [];
   let renderScheduled = false;
   let layoutMode = null;
@@ -743,6 +917,10 @@
   let curveBuilder = null;
   let paletteWheelCtx = null;
   let paletteWheelResizeObserver = null;
+  let mirrorGuideResizeObserver = null;
+  let mirrorGuideSyncRaf = null;
+  let deferredUiSetupScheduled = false;
+  let deferredUiSetupDone = false;
   let canvasWheelListenerBound = false;
   const paletteEditorState = {
     hsv: { h: 0, s: 0, v: 1, a: 255 },
@@ -758,6 +936,70 @@
     img.width = opts.width || 24;
     img.height = opts.height || 24;
     return img;
+  }
+
+  function createInitialMirrorState(width, height) {
+    const safeWidth = Math.max(1, Math.floor(Number(width) || DEFAULT_CANVAS_SIZE));
+    const safeHeight = Math.max(1, Math.floor(Number(height) || DEFAULT_CANVAS_SIZE));
+    return {
+      enabled: false,
+      axisX: (safeWidth - 1) / 2,
+      axisY: (safeHeight - 1) / 2,
+      axes: {
+        [MIRROR_AXIS_VERTICAL]: DEFAULT_MIRROR_AXES[MIRROR_AXIS_VERTICAL],
+        [MIRROR_AXIS_HORIZONTAL]: DEFAULT_MIRROR_AXES[MIRROR_AXIS_HORIZONTAL],
+        [MIRROR_AXIS_DIAGONAL_A]: DEFAULT_MIRROR_AXES[MIRROR_AXIS_DIAGONAL_A],
+        [MIRROR_AXIS_DIAGONAL_B]: DEFAULT_MIRROR_AXES[MIRROR_AXIS_DIAGONAL_B],
+      },
+    };
+  }
+
+  function clampMirrorAxisX(value, width = state.width) {
+    const safeWidth = Math.max(1, Math.floor(Number(width) || 1));
+    const clamped = clamp(Number(value), -0.5, safeWidth - 0.5);
+    return Math.round(clamped * 2) / 2;
+  }
+
+  function clampMirrorAxisY(value, height = state.height) {
+    const safeHeight = Math.max(1, Math.floor(Number(height) || 1));
+    const clamped = clamp(Number(value), -0.5, safeHeight - 0.5);
+    return Math.round(clamped * 2) / 2;
+  }
+
+  function normalizeMirrorAxisState(mirrorState, width = state.width, height = state.height) {
+    const fallback = createInitialMirrorState(width, height);
+    const source = mirrorState && typeof mirrorState === 'object' ? mirrorState : fallback;
+    const axesSource = source.axes && typeof source.axes === 'object' ? source.axes : {};
+    const normalized = {
+      enabled: Boolean(source.enabled),
+      axisX: clampMirrorAxisX(Number.isFinite(source.axisX) ? source.axisX : fallback.axisX, width),
+      axisY: clampMirrorAxisY(Number.isFinite(source.axisY) ? source.axisY : fallback.axisY, height),
+      axes: {},
+    };
+    MIRROR_AXIS_KEYS.forEach(axis => {
+      const value = Object.prototype.hasOwnProperty.call(axesSource, axis)
+        ? axesSource[axis]
+        : fallback.axes[axis];
+      normalized.axes[axis] = Boolean(value);
+    });
+    if (!normalized.enabled) {
+      MIRROR_AXIS_KEYS.forEach(axis => {
+        normalized.axes[axis] = false;
+      });
+    }
+    return normalized;
+  }
+
+  function hasActiveMirrorAxes(mirrorState = state.mirror) {
+    if (!mirrorState || !mirrorState.axes) {
+      return false;
+    }
+    return MIRROR_AXIS_KEYS.some(axis => Boolean(mirrorState.axes[axis]));
+  }
+
+  function getNormalizedMirrorState() {
+    state.mirror = normalizeMirrorAxisState(state.mirror, state.width, state.height);
+    return state.mirror;
   }
 
   function createInitialState(options = {}) {
@@ -798,6 +1040,7 @@
       brushSize: 1,
       showGrid: true,
       showPixelGuides: true,
+      mirror: createInitialMirrorState(width, height),
       showVirtualCursor: false,
       virtualCursorButtonScale: DEFAULT_FLOATING_DRAW_BUTTON_SCALE,
       showMajorGrid: true,
@@ -923,6 +1166,7 @@
   let softKeyboardBaselineViewportHeight = 0;
   let lastSoftKeyboardFocusAt = 0;
   let softKeyboardFocusGuardBound = false;
+  let softKeyboardAlignHandle = null;
 
   function handleGlobalTouchPointerEnd(event) {
     if (event.pointerType !== 'touch') {
@@ -974,6 +1218,65 @@
       return !['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'range', 'reset', 'submit'].includes(type);
     }
     return Boolean(target.isContentEditable);
+  }
+
+  function alignFocusedInputForSoftKeyboard(options = {}) {
+    const { force = false } = options;
+    if (!isCoarsePointerDevice()) {
+      return;
+    }
+    const active = document.activeElement;
+    if (!isInputControlElement(active) || !isSoftKeyboardInputTarget(active) || !(active instanceof HTMLElement)) {
+      return;
+    }
+    if (!force && !isVirtualKeyboardLikelyOpen()) {
+      return;
+    }
+    const viewport = IS_ANDROID_LINE_BROWSER ? null : window.visualViewport;
+    const viewportTop = Math.round(Number(viewport?.offsetTop) || 0);
+    const viewportHeight = Math.max(0, Math.round(Number(viewport?.height) || Number(window.innerHeight) || 0));
+    if (viewportHeight <= 0) {
+      return;
+    }
+    const targetRect = active.getBoundingClientRect();
+    if (!Number.isFinite(targetRect.top) || !Number.isFinite(targetRect.bottom)) {
+      return;
+    }
+    const targetCenterY = targetRect.top + (targetRect.height * 0.5);
+    const desiredCenterY = viewportTop + (viewportHeight * 0.5) - Math.min(40, viewportHeight * 0.1);
+    const deltaY = Math.round(targetCenterY - desiredCenterY);
+    if (Math.abs(deltaY) <= 6) {
+      return;
+    }
+    const scrollContainer = getScrollableAncestor(active);
+    if (scrollContainer instanceof HTMLElement) {
+      const maxScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+      const nextScrollTop = clamp(scrollContainer.scrollTop + deltaY, 0, maxScrollTop);
+      if (Math.abs(nextScrollTop - scrollContainer.scrollTop) > 1) {
+        scrollContainer.scrollTop = nextScrollTop;
+      }
+      return;
+    }
+    const rootScroll = document.scrollingElement;
+    if (rootScroll) {
+      const maxScrollTop = Math.max(0, rootScroll.scrollHeight - rootScroll.clientHeight);
+      const nextScrollTop = clamp(rootScroll.scrollTop + deltaY, 0, maxScrollTop);
+      if (Math.abs(nextScrollTop - rootScroll.scrollTop) > 1) {
+        rootScroll.scrollTop = nextScrollTop;
+      }
+    }
+  }
+
+  function scheduleSoftKeyboardInputAlignment(options = {}) {
+    const { delay = 100, force = false } = options;
+    if (softKeyboardAlignHandle !== null) {
+      clearTimeout(softKeyboardAlignHandle);
+      softKeyboardAlignHandle = null;
+    }
+    softKeyboardAlignHandle = setTimeout(() => {
+      softKeyboardAlignHandle = null;
+      alignFocusedInputForSoftKeyboard({ force });
+    }, Math.max(0, Math.round(Number(delay) || 0)));
   }
 
   function shouldAllowNativeTouchMove(event) {
@@ -1104,6 +1407,7 @@
       majorGridSpacing: state.majorGridSpacing,
       backgroundMode: state.backgroundMode,
       showPixelGuides: state.showPixelGuides,
+      mirror: normalizeMirrorAxisState(state.mirror, state.width, state.height),
       showVirtualCursor: state.showVirtualCursor,
       showChecker: state.showChecker,
       documentName: state.documentName,
@@ -1491,6 +1795,7 @@
       majorGridSpacing: snapshot.majorGridSpacing,
       backgroundMode: snapshot.backgroundMode,
       showPixelGuides: snapshot.showPixelGuides,
+      mirror: normalizeMirrorAxisState(snapshot.mirror, snapshot.width, snapshot.height),
       showVirtualCursor: snapshot.showVirtualCursor,
       showChecker: snapshot.showChecker,
       documentName: snapshot.documentName,
@@ -1564,6 +1869,7 @@
       majorGridSpacing: snapshot.majorGridSpacing,
       backgroundMode: snapshot.backgroundMode,
       showPixelGuides: snapshot.showPixelGuides,
+      mirror: normalizeMirrorAxisState(snapshot.mirror, snapshot.width, snapshot.height),
       showVirtualCursor: snapshot.showVirtualCursor,
       showChecker: snapshot.showChecker,
       documentName: snapshot.documentName,
@@ -1791,7 +2097,7 @@
     state.scale = normalizeZoomScale(snapshot.scale, state.scale || MIN_ZOOM_SCALE);
     state.pan = { x: snapshot.pan.x, y: snapshot.pan.y };
     if (Object.prototype.hasOwnProperty.call(snapshot, 'tool')) {
-      state.tool = snapshot.tool;
+      state.tool = normalizeToolId(snapshot.tool, state.tool);
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'brushSize')) {
       state.brushSize = snapshot.brushSize;
@@ -1860,7 +2166,17 @@
     if (Object.prototype.hasOwnProperty.call(snapshot, 'activeRightTab')) {
       state.activeRightTab = snapshot.activeRightTab ?? state.activeRightTab ?? 'frames';
     }
+    if (!TOOL_GROUPS[state.activeToolGroup]?.tools?.includes(state.tool)) {
+      state.activeToolGroup = TOOL_TO_GROUP[state.tool] || 'pen';
+    }
+    if (!LEFT_TAB_KEYS.includes(state.activeLeftTab)) {
+      state.activeLeftTab = 'tools';
+    }
+    if (!RIGHT_TAB_KEYS.includes(state.activeRightTab)) {
+      state.activeRightTab = 'frames';
+    }
     state.showPixelGuides = snapshot.showPixelGuides;
+    state.mirror = normalizeMirrorAxisState(snapshot.mirror, snapshot.width, snapshot.height);
     state.showVirtualCursor = Boolean(snapshot.showVirtualCursor);
     state.showChecker = snapshot.showChecker;
     if (Object.prototype.hasOwnProperty.call(snapshot, 'playback')) {
@@ -1964,6 +2280,29 @@
     };
   }
 
+  function markDocumentUnsavedChange() {
+    unsavedChangeToken += 1;
+  }
+
+  function markDocumentDurablySaved() {
+    durableSaveToken = unsavedChangeToken;
+  }
+
+  function resetDocumentUnsavedChanges() {
+    unsavedChangeToken = 0;
+    durableSaveToken = 0;
+  }
+
+  function hasDocumentUnsavedChanges() {
+    return unsavedChangeToken > durableSaveToken;
+  }
+
+  function handleUnsavedBeforeUnload(event) {
+    if (!hasDocumentUnsavedChanges()) return;
+    event.preventDefault();
+    event.returnValue = '';
+  }
+
   function invalidateFillPreviewCache() {
     fillPreviewCache.contextKey = null;
     fillPreviewCache.byPixel = null;
@@ -1972,6 +2311,7 @@
   function markHistoryDirty() {
     invalidateFillPreviewCache();
     autosaveDirty = true;
+    markDocumentUnsavedChange();
     if (history.pending) {
       history.pending.dirty = true;
     }
@@ -2005,6 +2345,7 @@
     applyHistorySnapshot(decompressHistorySnapshot(previous));
     updateHistoryButtons();
     autosaveDirty = true;
+    markDocumentUnsavedChange();
     scheduleAutosaveSnapshot();
   }
 
@@ -2020,6 +2361,7 @@
     applyHistorySnapshot(decompressHistorySnapshot(next));
     updateHistoryButtons();
     autosaveDirty = true;
+    markDocumentUnsavedChange();
     scheduleAutosaveSnapshot();
   }
 
@@ -2033,6 +2375,7 @@
     applyHistorySnapshot(snapshot);
     updateHistoryButtons();
     autosaveDirty = true;
+    markDocumentUnsavedChange();
     if (reRender) {
       renderEverything();
       requestOverlayRender();
@@ -2070,24 +2413,64 @@
     });
   }
 
-  function runToolAction(tool) {
+  function runToolAction(tool, options = {}) {
+    const sourceButton = options.sourceButton instanceof HTMLElement ? options.sourceButton : null;
     if (tool === TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE) {
       setVirtualCursorEnabled(!state.showVirtualCursor);
       updateVirtualCursorActionToolButtons();
       return true;
     }
-    if (tool === TOOL_ACTION_VIRTUAL_CURSOR_CENTER) {
-      if (!state.showVirtualCursor) {
-        setVirtualCursorEnabled(true);
+    if (tool === TOOL_ACTION_MIRROR_POPUP) {
+      if (isMirrorToolPopoverOpen()) {
+        setMirrorToolPopoverOpen(false);
+        return true;
       }
-      const centered = createInitialVirtualCursor(state);
-      setVirtualCursor(centered);
-      requestOverlayRender();
-      scheduleSessionPersist();
-      updateVirtualCursorActionToolButtons();
+      const anchor = sourceButton instanceof HTMLElement
+        ? sourceButton
+        : document.querySelector('.tool-button[data-tool="mirrorPopup"]');
+      setMirrorToolPopoverOpen(true, {
+        anchor: anchor instanceof HTMLElement ? anchor : undefined,
+      });
       return true;
     }
     return false;
+  }
+
+  function openMirrorSettingsPanel(options = {}) {
+    const { sourceButton = null } = options;
+    if (isMirrorToolPopoverOpen()) {
+      setMirrorToolPopoverOpen(false);
+    }
+
+    const mobilePeekMode = isMobilePeekToolFlyoutMode();
+    if ((isCompactToolRailMode() || mobilePeekMode) && isCompactToolFlyoutOpen()) {
+      setCompactToolFlyoutOpen(false, { force: mobilePeekMode });
+      updateToolVisibility();
+    }
+
+    if (layoutMode === 'mobilePortrait') {
+      activateMobileTab('settings', { ensureDrawer: true });
+      return;
+    }
+
+    setRightTab('settings');
+    if (isCompactRightRailMode()) {
+      setCompactRightFlyoutOpen(true);
+      updateRightTabVisibility();
+    }
+
+    const mirrorAnchor = dom.controls.mirrorAxisOptions instanceof HTMLElement
+      ? dom.controls.mirrorAxisOptions
+      : (dom.controls.toggleMirrorMode instanceof HTMLElement ? dom.controls.toggleMirrorMode : null);
+    if (mirrorAnchor instanceof HTMLElement) {
+      requestAnimationFrame(() => {
+        mirrorAnchor.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      });
+    }
+
+    if (sourceButton instanceof HTMLElement) {
+      sourceButton.blur?.();
+    }
   }
 
   function updateCanvasControlButtons() {
@@ -2305,18 +2688,18 @@
       bottom: 0,
       left: 0,
     };
-    const edgePadding = 8;
+    const edgePadding = 4;
     const safeLeft = viewportBounds.left + safeArea.left;
     const safeTop = viewportBounds.top + safeArea.top;
     const safeRight = viewportBounds.right - safeArea.right;
     const safeBottom = viewportBounds.bottom - safeArea.bottom;
     const safeWidth = Math.max(1, safeRight - safeLeft);
-    let width = clamp(Math.round(safeWidth * 0.34), 260, 460);
+    let width = clamp(Math.round(safeWidth * 0.28), 220, 340);
     const minLeft = safeLeft + edgePadding;
-    let computedLeft = Math.round(railRect.left - width - 10);
+    let computedLeft = Math.round(railRect.left - width - 4);
     if (computedLeft < minLeft) {
       computedLeft = minLeft;
-      width = Math.max(220, Math.min(width, safeRight - computedLeft - edgePadding));
+      width = Math.max(200, Math.min(width, safeRight - computedLeft - edgePadding));
     }
     const maxLeft = Math.max(minLeft, Math.round(safeRight - width - edgePadding));
     const preferredLeft = Number.isFinite(compactRightFlyoutLockedLeft)
@@ -2325,7 +2708,7 @@
     const left = clamp(Math.round(preferredLeft), minLeft, maxLeft);
     compactRightFlyoutLockedLeft = left;
     let top = clamp(
-      Math.round(railRect.top + 8),
+      Math.round(railRect.top + 4),
       safeTop + edgePadding,
       Math.max(safeTop + edgePadding, safeBottom - 120)
     );
@@ -2521,11 +2904,35 @@
         button.addEventListener('click', () => {
           const target = button.dataset.toolGroup;
           if (!target) return;
+          const targetTools = TOOL_GROUPS[target]?.tools || [];
+          const hasSingleTool = targetTools.length === 1;
+          const singleTool = hasSingleTool ? targetTools[0] : null;
           const mobilePeekMode = isMobilePeekToolFlyoutMode();
           const compactMode = isCompactToolRailMode() || mobilePeekMode;
           if (!compactMode) {
             setCompactToolFlyoutOpen(false);
             setToolGroup(target);
+            if (singleTool) {
+              if (TOOL_ACTIONS.has(singleTool)) {
+                runToolAction(singleTool, { sourceButton: button });
+              } else {
+                setActiveTool(singleTool);
+              }
+            }
+            return;
+          }
+          if (singleTool) {
+            setToolGroup(target);
+            if (TOOL_ACTIONS.has(singleTool)) {
+              runToolAction(singleTool, { sourceButton: button });
+            } else {
+              setActiveTool(singleTool);
+            }
+            setCompactToolFlyoutOpen(false, {
+              force: mobilePeekMode,
+              keepMirrorPopover: singleTool === TOOL_ACTION_MIRROR_POPUP,
+            });
+            updateToolVisibility();
             return;
           }
           const wasOpen = isCompactToolFlyoutOpen();
@@ -2557,6 +2964,9 @@
             return;
           }
           if (dom.toolGrid instanceof HTMLElement && dom.toolGrid.contains(target)) {
+            return;
+          }
+          if (isMirrorToolPopoverOpen() && target instanceof Element && isMirrorPopoverPersistentTarget(target)) {
             return;
           }
           setCompactToolFlyoutOpen(false);
@@ -2793,9 +3203,12 @@
     dom.toolGrid.style.width = `${flyoutWidth}px`;
     dom.toolGrid.style.maxHeight = `${maxHeight}px`;
     dom.toolGrid.style.zIndex = '14000';
+    if (isMirrorToolPopoverOpen()) {
+      positionMirrorToolPopover();
+    }
   }
 
-  function setCompactToolFlyoutOpen(open, { force = false } = {}) {
+  function setCompactToolFlyoutOpen(open, { force = false, keepMirrorPopover = false } = {}) {
     if (!(dom.sections.tools instanceof HTMLElement)) {
       return;
     }
@@ -3262,6 +3675,135 @@
     stack.dataset.background = state.backgroundMode;
   }
 
+  function createMirrorToolPopoverButton(item) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'mirror-axis-button';
+    button.dataset.mirrorToolKey = item.key;
+    button.setAttribute('aria-pressed', 'false');
+    if (typeof item.label === 'string' && item.label) {
+      button.setAttribute('aria-label', item.label);
+    }
+    if (item.type === 'axis' && isMirrorAxisKey(item.axis)) {
+      button.dataset.mirrorAxis = item.axis;
+    }
+    const icon = document.createElement('img');
+    icon.alt = '';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.className = 'mirror-tool-popover__axis-icon';
+    icon.width = 21;
+    icon.height = 21;
+    icon.src = item.icon;
+    button.appendChild(icon);
+    return button;
+  }
+
+  function renderMirrorToolPopover() {
+    const container = dom.controls.mirrorToolPopoverItems;
+    if (!(container instanceof HTMLElement)) {
+      return;
+    }
+    container.textContent = '';
+    const splitBySection = MIRROR_TOOL_ITEMS.length > MIRROR_TOOL_SECTION_SPLIT_THRESHOLD;
+    const groupedItems = new Map();
+    MIRROR_TOOL_ITEMS.forEach(item => {
+      const sectionName = splitBySection
+        ? (typeof item.section === 'string' && item.section.trim() ? item.section.trim() : 'その他')
+        : '__single__';
+      if (!groupedItems.has(sectionName)) {
+        groupedItems.set(sectionName, []);
+      }
+      groupedItems.get(sectionName).push(item);
+    });
+    groupedItems.forEach((items, sectionName) => {
+      let buttonHost = null;
+      if (splitBySection) {
+        const section = document.createElement('section');
+        section.className = 'mirror-tool-popover__section';
+        const title = document.createElement('h4');
+        title.className = 'mirror-tool-popover__section-title';
+        title.textContent = sectionName;
+        const axes = document.createElement('div');
+        axes.className = 'mirror-tool-popover__axes';
+        axes.setAttribute('role', 'group');
+        axes.setAttribute('aria-label', `${sectionName}ツール`);
+        section.appendChild(title);
+        section.appendChild(axes);
+        container.appendChild(section);
+        buttonHost = axes;
+      } else {
+        const axes = document.createElement('div');
+        axes.className = 'mirror-tool-popover__axes';
+        axes.setAttribute('role', 'group');
+        axes.setAttribute('aria-label', '対称ツール');
+        container.appendChild(axes);
+        buttonHost = axes;
+      }
+      items.forEach(item => {
+        buttonHost.appendChild(createMirrorToolPopoverButton(item));
+      });
+    });
+  }
+
+  function onMirrorToolClick(toolKey) {
+    if (typeof toolKey !== 'string' || !toolKey) {
+      return;
+    }
+    const item = MIRROR_TOOL_ITEM_BY_KEY.get(toolKey);
+    if (!item) {
+      return;
+    }
+    if (item.type === 'axis' && isMirrorAxisKey(item.axis)) {
+      const mirrorState = getNormalizedMirrorState();
+      const nextAxisEnabled = !Boolean(mirrorState.axes[item.axis]);
+      setMirrorAxisEnabled(item.axis, nextAxisEnabled);
+    }
+  }
+
+  function syncMirrorToolPopoverControls(mirrorState = getNormalizedMirrorState()) {
+    if (dom.controls.mirrorToolPopupToggleMode instanceof HTMLInputElement) {
+      dom.controls.mirrorToolPopupToggleMode.checked = Boolean(mirrorState.enabled);
+    }
+    const showToolControls = Boolean(mirrorState.enabled);
+    if (dom.controls.mirrorToolPopoverItems instanceof HTMLElement) {
+      dom.controls.mirrorToolPopoverItems.hidden = !showToolControls;
+      dom.controls.mirrorToolPopoverItems.setAttribute('aria-hidden', String(!showToolControls));
+    }
+    if (dom.controls.mirrorToolPopoverHelp instanceof HTMLElement) {
+      dom.controls.mirrorToolPopoverHelp.hidden = !showToolControls;
+    }
+    if (!(dom.controls.mirrorToolPopoverItems instanceof HTMLElement)) {
+      return;
+    }
+    const axisButtons = Array.from(dom.controls.mirrorToolPopoverItems.querySelectorAll('.mirror-axis-button[data-mirror-axis]'));
+    axisButtons.forEach(button => {
+      const axis = button.dataset.mirrorAxis;
+      const pressed = isMirrorAxisKey(axis) ? Boolean(mirrorState.axes[axis]) : false;
+      button.classList.toggle('is-active', pressed);
+      button.setAttribute('aria-pressed', String(pressed));
+      button.setAttribute('aria-disabled', 'false');
+      if (button instanceof HTMLButtonElement) {
+        button.disabled = false;
+      }
+    });
+  }
+
+  function syncVirtualCursorControlVisibility(options = {}) {
+    const { syncToggle = true } = options;
+    const showVirtualCursorOptions = Boolean(state.showVirtualCursor);
+    if (syncToggle && dom.controls.toggleVirtualCursor instanceof HTMLInputElement) {
+      dom.controls.toggleVirtualCursor.checked = showVirtualCursorOptions;
+    }
+    if (dom.controls.virtualCursorScale instanceof HTMLElement) {
+      dom.controls.virtualCursorScale.hidden = !showVirtualCursorOptions;
+      dom.controls.virtualCursorScale.setAttribute('aria-hidden', String(!showVirtualCursorOptions));
+    }
+    if (dom.controls.mobileDrawHelp instanceof HTMLElement) {
+      dom.controls.mobileDrawHelp.hidden = !showVirtualCursorOptions;
+    }
+    updateFloatingDrawButtonScaleControl();
+  }
+
   function syncControlsWithState() {
     if (dom.controls.brushSize) {
       dom.controls.brushSize.value = String(state.brushSize);
@@ -3299,10 +3841,36 @@
     if (dom.controls.togglePixelPreview) {
       dom.controls.togglePixelPreview.checked = state.showPixelGuides;
     }
-    if (dom.controls.toggleVirtualCursor) {
-      dom.controls.toggleVirtualCursor.checked = state.showVirtualCursor;
+    const mirrorState = getNormalizedMirrorState();
+    if (dom.controls.toggleMirrorMode instanceof HTMLInputElement) {
+      dom.controls.toggleMirrorMode.checked = Boolean(mirrorState.enabled);
     }
-    updateFloatingDrawButtonScaleControl();
+    const showMirrorOptions = Boolean(mirrorState.enabled);
+    if (dom.controls.mirrorAxisOptions instanceof HTMLElement) {
+      dom.controls.mirrorAxisOptions.hidden = !showMirrorOptions;
+      dom.controls.mirrorAxisOptions.setAttribute('aria-hidden', String(!showMirrorOptions));
+    }
+    if (dom.controls.mirrorAxisHelp instanceof HTMLElement) {
+      dom.controls.mirrorAxisHelp.hidden = !showMirrorOptions;
+    }
+    if (dom.controls.mirrorAxisVertical instanceof HTMLInputElement) {
+      dom.controls.mirrorAxisVertical.checked = Boolean(mirrorState.axes[MIRROR_AXIS_VERTICAL]);
+      dom.controls.mirrorAxisVertical.disabled = false;
+    }
+    if (dom.controls.mirrorAxisHorizontal instanceof HTMLInputElement) {
+      dom.controls.mirrorAxisHorizontal.checked = Boolean(mirrorState.axes[MIRROR_AXIS_HORIZONTAL]);
+      dom.controls.mirrorAxisHorizontal.disabled = false;
+    }
+    if (dom.controls.mirrorAxisDiagonalA instanceof HTMLInputElement) {
+      dom.controls.mirrorAxisDiagonalA.checked = Boolean(mirrorState.axes[MIRROR_AXIS_DIAGONAL_A]);
+      dom.controls.mirrorAxisDiagonalA.disabled = false;
+    }
+    if (dom.controls.mirrorAxisDiagonalB instanceof HTMLInputElement) {
+      dom.controls.mirrorAxisDiagonalB.checked = Boolean(mirrorState.axes[MIRROR_AXIS_DIAGONAL_B]);
+      dom.controls.mirrorAxisDiagonalB.disabled = false;
+    }
+    syncMirrorToolPopoverControls(mirrorState);
+    syncVirtualCursorControlVisibility({ syncToggle: true });
     if (dom.controls.zoomSlider) {
       dom.controls.zoomSlider.value = String(getZoomStepIndex(state.scale));
     }
@@ -3322,6 +3890,7 @@
     updateCanvasControlButtons();
     updatePixfindModeUI();
     updateExportOriginalToggleUI();
+    updateMirrorGuideHandles();
   }
 
   function getMaxSpriteMultiplier() {
@@ -3460,6 +4029,7 @@
       await writable.write(json);
       await writable.close();
       autosaveDirty = false;
+      markDocumentDurablySaved();
       updateAutosaveStatus('自動保存: 保存済み', 'success');
       recordRecentProject(autosaveHandle, snapshot).catch(error => {
         console.warn('Failed to update recent projects snapshot', error);
@@ -3490,6 +4060,7 @@
       history.pending = null;
       autosaveRestoring = false;
       autosaveDirty = false;
+      resetDocumentUnsavedChanges();
       syncPixfindSnapshotAfterDocumentReset();
       updateMemoryStatus();
       return true;
@@ -3832,6 +4403,7 @@
       history.past = [];
       history.future = [];
       history.pending = null;
+      resetDocumentUnsavedChanges();
       updateMemoryStatus();
     } finally {
       iosSnapshotRestoring = false;
@@ -4338,6 +4910,7 @@
       backgroundMode: state.backgroundMode ?? 'dark',
       documentName,
       showPixelGuides: state.showPixelGuides ?? true,
+      mirror: normalizeMirrorAxisState(state.mirror, width, height),
       showVirtualCursor: state.showVirtualCursor ?? false,
       showChecker: state.showChecker ?? true,
       activeToolGroup,
@@ -4350,6 +4923,7 @@
     history.past = [];
     history.future = [];
     history.pending = null;
+    resetDocumentUnsavedChanges();
     updateHistoryButtons();
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
@@ -4936,6 +5510,239 @@
     }
   }
 
+  function openShortcutHelpDialog() {
+    const dialog = dom.shortcutHelp?.dialog;
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+      return;
+    }
+    if (dialog.open) {
+      return;
+    }
+    dialog.showModal();
+    window.requestAnimationFrame(() => {
+      dom.controls.closeShortcutHelp?.focus?.({ preventScroll: true });
+    });
+  }
+
+  function closeShortcutHelpDialog() {
+    const dialog = dom.shortcutHelp?.dialog;
+    if (dialog instanceof HTMLDialogElement && dialog.open) {
+      dialog.close();
+    }
+  }
+
+  function parseUpdateHistoryTimestamp(value) {
+    const timestamp = Date.parse(value);
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  }
+
+  function normalizeUpdateHistoryEntry(entry) {
+    if (!entry || typeof entry !== 'object') {
+      return null;
+    }
+    const at = typeof entry.at === 'string' ? entry.at : '';
+    const timestamp = parseUpdateHistoryTimestamp(at);
+    if (!timestamp) {
+      return null;
+    }
+    const title = typeof entry.title === 'string' ? entry.title.trim() : '';
+    if (!title) {
+      return null;
+    }
+    const detailsSource = Array.isArray(entry.details) ? entry.details : [];
+    const details = detailsSource
+      .map(detail => (typeof detail === 'string' ? detail.trim() : ''))
+      .filter(Boolean);
+    const idSource = typeof entry.id === 'string' ? entry.id.trim() : '';
+    const id = idSource || `${at}:${title}`;
+    return {
+      id,
+      at,
+      timestamp,
+      title,
+      details,
+    };
+  }
+
+  function loadStoredUpdateHistoryEntries() {
+    if (!canUseSessionStorage) {
+      return [];
+    }
+    try {
+      const raw = window.localStorage.getItem(UPDATE_HISTORY_STORAGE_KEY);
+      if (!raw) {
+        return [];
+      }
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+      return parsed;
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function saveStoredUpdateHistoryEntries(entries) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    try {
+      const payload = Array.isArray(entries)
+        ? entries.map(entry => ({
+          id: entry.id,
+          at: entry.at,
+          title: entry.title,
+          details: Array.isArray(entry.details) ? entry.details : [],
+        }))
+        : [];
+      window.localStorage.setItem(UPDATE_HISTORY_STORAGE_KEY, JSON.stringify(payload));
+    } catch (error) {
+      // Ignore localStorage errors.
+    }
+  }
+
+  function getUpdateHistoryEntries() {
+    const cutoff = Date.now() - UPDATE_HISTORY_RETENTION_MS;
+    const mergedById = new Map();
+    const source = [
+      ...loadStoredUpdateHistoryEntries(),
+      ...BUILTIN_UPDATE_HISTORY_ENTRIES,
+    ];
+    source.forEach(entry => {
+      const normalized = normalizeUpdateHistoryEntry(entry);
+      if (!normalized) {
+        return;
+      }
+      if (normalized.timestamp < cutoff) {
+        return;
+      }
+      const previous = mergedById.get(normalized.id);
+      if (!previous || normalized.timestamp >= previous.timestamp) {
+        mergedById.set(normalized.id, normalized);
+      }
+    });
+    const merged = Array.from(mergedById.values()).sort((a, b) => b.timestamp - a.timestamp);
+    saveStoredUpdateHistoryEntries(merged);
+    return merged;
+  }
+
+  function formatUpdateHistoryDate(timestamp, fallback = '') {
+    if (!Number.isFinite(timestamp) || timestamp <= 0) {
+      return fallback;
+    }
+    const d = new Date(timestamp);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${y}/${m}/${day} ${hh}:${mm}`;
+  }
+
+  function renderUpdateHistoryPanel() {
+    const list = dom.updateHistory?.list;
+    if (!(list instanceof HTMLElement)) {
+      return;
+    }
+    list.replaceChildren();
+    const entries = getUpdateHistoryEntries();
+    if (!entries.length) {
+      const empty = document.createElement('p');
+      empty.className = 'help-text';
+      empty.textContent = '更新履歴は準備中です。';
+      list.appendChild(empty);
+      return;
+    }
+    entries.forEach(entry => {
+      const item = document.createElement('article');
+      item.className = 'update-history-item';
+      item.setAttribute('role', 'listitem');
+      const head = document.createElement('div');
+      head.className = 'update-history-item__head';
+      const title = document.createElement('h3');
+      title.className = 'update-history-item__title';
+      title.textContent = entry.title;
+      const time = document.createElement('time');
+      time.className = 'update-history-item__time';
+      time.dateTime = entry.at;
+      time.textContent = formatUpdateHistoryDate(entry.timestamp, entry.at);
+      head.append(title, time);
+      item.appendChild(head);
+      if (entry.details.length) {
+        const detailList = document.createElement('ul');
+        detailList.className = 'update-history-item__details';
+        entry.details.forEach(detail => {
+          const row = document.createElement('li');
+          row.textContent = detail;
+          detailList.appendChild(row);
+        });
+        item.appendChild(detailList);
+      }
+      list.appendChild(item);
+    });
+  }
+
+  function openUpdateHistoryDialog() {
+    const dialog = dom.updateHistory?.dialog;
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+      return;
+    }
+    renderUpdateHistoryPanel();
+    if (dialog.open) {
+      return;
+    }
+    dialog.showModal();
+    window.requestAnimationFrame(() => {
+      dom.updateHistory?.close?.focus?.({ preventScroll: true });
+    });
+  }
+
+  function closeUpdateHistoryDialog() {
+    const dialog = dom.updateHistory?.dialog;
+    if (dialog instanceof HTMLDialogElement && dialog.open) {
+      dialog.close();
+    }
+  }
+
+  function setupUpdateHistoryDialog() {
+    const dialog = dom.updateHistory?.dialog;
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+      if (dialog) {
+        dialog.hidden = true;
+      }
+      return;
+    }
+    dom.updateHistory?.close?.addEventListener('click', () => {
+      closeUpdateHistoryDialog();
+    });
+    dialog.addEventListener('cancel', event => {
+      event.preventDefault();
+      closeUpdateHistoryDialog();
+    });
+  }
+
+  function openToolSpotlightDialog() {
+    const dialog = dom.toolSpotlight?.dialog;
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+      return;
+    }
+    if (dialog.open) {
+      return;
+    }
+    dialog.showModal();
+    window.requestAnimationFrame(() => {
+      dom.toolSpotlight?.close?.focus?.({ preventScroll: true });
+    });
+  }
+
+  function closeToolSpotlightDialog() {
+    const dialog = dom.toolSpotlight?.dialog;
+    if (dialog instanceof HTMLDialogElement && dialog.open) {
+      dialog.close();
+    }
+  }
+
   function canShowExportInterstitial() {
     const dialog = dom.exportInterstitial?.dialog;
     if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
@@ -5021,16 +5828,22 @@
     window.requestAnimationFrame(renderWhenReady);
   }
 
-  function closeExportInterstitial() {
+  function closeExportInterstitial({ showToolSpotlight = false } = {}) {
     const dialog = dom.exportInterstitial?.dialog;
     if (!(dialog instanceof HTMLDialogElement)) {
       return;
     }
-    if (dialog.open) {
+    const wasOpen = dialog.open;
+    if (wasOpen) {
       dialog.close();
     }
     exportInterstitialAdRequested = false;
     document.body.classList.remove('is-export-interstitial-active');
+    if (showToolSpotlight && wasOpen) {
+      window.requestAnimationFrame(() => {
+        openToolSpotlightDialog();
+      });
+    }
   }
 
   function showExportInterstitialAfterImageExport() {
@@ -5348,15 +6161,32 @@
       return;
     }
     dom.exportInterstitial?.close?.addEventListener('click', () => {
-      closeExportInterstitial();
+      closeExportInterstitial({ showToolSpotlight: true });
     });
     dialog.addEventListener('cancel', event => {
       event.preventDefault();
-      closeExportInterstitial();
+      closeExportInterstitial({ showToolSpotlight: true });
     });
     dialog.addEventListener('close', () => {
       exportInterstitialAdRequested = false;
       document.body.classList.remove('is-export-interstitial-active');
+    });
+  }
+
+  function setupToolSpotlightDialog() {
+    const dialog = dom.toolSpotlight?.dialog;
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+      if (dialog) {
+        dialog.hidden = true;
+      }
+      return;
+    }
+    dom.toolSpotlight?.close?.addEventListener('click', () => {
+      closeToolSpotlightDialog();
+    });
+    dialog.addEventListener('cancel', event => {
+      event.preventDefault();
+      closeToolSpotlightDialog();
     });
   }
 
@@ -5423,6 +6253,7 @@
     history.past = [];
     history.future = [];
     history.pending = null;
+    resetDocumentUnsavedChanges();
     updateHistoryButtons();
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
@@ -5522,11 +6353,67 @@
     }
   }
 
+  function hasSeenUpdateToast(updateId = '') {
+    if (!canUseSessionStorage) {
+      return false;
+    }
+    const normalizedUpdateId = typeof updateId === 'string' ? updateId.trim() : '';
+    if (!normalizedUpdateId) {
+      return false;
+    }
+    try {
+      if (window.localStorage.getItem(`${UPDATE_TOAST_SEEN_PREFIX}${normalizedUpdateId}`) === '1') {
+        return true;
+      }
+      return window.localStorage.getItem(STARTUP_UPDATE_TOAST_HIDDEN_KEY) === normalizedUpdateId;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function markUpdateToastSeen(updateId = '') {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    const normalizedUpdateId = typeof updateId === 'string' ? updateId.trim() : '';
+    if (!normalizedUpdateId) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(`${UPDATE_TOAST_SEEN_PREFIX}${normalizedUpdateId}`, '1');
+      window.localStorage.setItem(STARTUP_UPDATE_TOAST_HIDDEN_KEY, normalizedUpdateId);
+    } catch (error) {
+      // Ignore localStorage errors.
+    }
+  }
+
+  function setUpdateToastVisibility(visible, { markSeen = false } = {}) {
+    const updateToast = dom.startup?.updateToast;
+    if (!updateToast) {
+      return;
+    }
+    const shouldShow = Boolean(visible);
+    updateToast.hidden = !shouldShow;
+    updateToast.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+    if (shouldShow && markSeen) {
+      markUpdateToastSeen(updateToast.dataset.updateId || '');
+    }
+  }
+
+  function showUpdateToast({ manual = false } = {}) {
+    setUpdateToastVisibility(true, { markSeen: !manual });
+  }
+
+  function hideUpdateToast() {
+    setUpdateToastVisibility(false);
+  }
+
   function setupStartupScreen() {
     const container = dom.startup?.screen;
     if (!container) {
       return;
     }
+    getUpdateHistoryEntries();
     if (dom.startup?.hint) {
       dom.startup.hint.textContent = AUTOSAVE_SUPPORTED
         ? 'ファイルを開くと既存の自動保存先を引き継ぎます。'
@@ -5535,32 +6422,15 @@
     const updateToast = dom.startup?.updateToast;
     if (updateToast) {
       const updateId = updateToast.dataset.updateId || '';
-      let shouldHide = false;
-      if (updateId) {
-        try {
-          shouldHide = window.localStorage.getItem(STARTUP_UPDATE_TOAST_HIDDEN_KEY) === updateId;
-        } catch (error) {
-          shouldHide = false;
-        }
+      const seen = hasSeenUpdateToast(updateId);
+      if (seen) {
+        hideUpdateToast();
+      } else {
+        showUpdateToast();
       }
-      updateToast.hidden = shouldHide;
-      updateToast.setAttribute('aria-hidden', shouldHide ? 'true' : 'false');
     }
     dom.startup?.updateToastCloseButton?.addEventListener('click', () => {
-      if (!updateToast) {
-        return;
-      }
-      updateToast.hidden = true;
-      updateToast.setAttribute('aria-hidden', 'true');
-      const updateId = updateToast.dataset.updateId || '';
-      if (!updateId) {
-        return;
-      }
-      try {
-        window.localStorage.setItem(STARTUP_UPDATE_TOAST_HIDDEN_KEY, updateId);
-      } catch (error) {
-        // Ignore localStorage errors.
-      }
+      hideUpdateToast();
     });
     container.addEventListener('keydown', event => {
       if (!startupVisible) {
@@ -5677,6 +6547,7 @@
     history.future = [];
     history.pending = null;
     autosaveRestoring = false;
+    resetDocumentUnsavedChanges();
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
 
@@ -6173,6 +7044,7 @@
       backgroundMode: snapshot.backgroundMode,
       documentName: normalizeDocumentName(snapshot.documentName),
       showPixelGuides: snapshot.showPixelGuides,
+      mirror: normalizeMirrorAxisState(snapshot.mirror, snapshot.width, snapshot.height),
       showVirtualCursor: snapshot.showVirtualCursor,
       showChecker: snapshot.showChecker,
     };
@@ -6259,7 +7131,7 @@
     }
 
     const selectionBounds = validateBoundsObject(payload.selectionBounds);
-    const activeTool = typeof payload.tool === 'string' ? payload.tool : state.tool;
+    const activeTool = normalizeToolId(payload.tool, state.tool);
     const activeRgb = normalizeColorValue(payload.activeRgb || state.activeRgb);
     const colorMode = 'index';
     const activePaletteIndex = clamp(Math.round(Number(payload.activePaletteIndex) || 0), 0, palette.length - 1);
@@ -6270,7 +7142,10 @@
       palette.length - 1
     );
     const backgroundMode = payload.backgroundMode === 'light' || payload.backgroundMode === 'pink' ? payload.backgroundMode : 'dark';
-    const activeToolGroup = TOOL_GROUPS[payload.activeToolGroup] ? payload.activeToolGroup : (TOOL_TO_GROUP[activeTool] || state.activeToolGroup);
+    let activeToolGroup = TOOL_GROUPS[payload.activeToolGroup] ? payload.activeToolGroup : (TOOL_TO_GROUP[activeTool] || state.activeToolGroup);
+    if (!TOOL_GROUPS[activeToolGroup]?.tools?.includes(activeTool)) {
+      activeToolGroup = TOOL_TO_GROUP[activeTool] || 'pen';
+    }
     const lastGroupTool = normalizeLastGroupTool(payload.lastGroupTool);
     const activeLeftTab = LEFT_TAB_KEYS.includes(payload.activeLeftTab) ? payload.activeLeftTab : state.activeLeftTab;
     const activeRightTab = RIGHT_TAB_KEYS.includes(payload.activeRightTab) ? payload.activeRightTab : state.activeRightTab;
@@ -6308,6 +7183,7 @@
       activeLeftTab,
       activeRightTab,
       showPixelGuides: Boolean(payload.showPixelGuides ?? state.showPixelGuides),
+      mirror: normalizeMirrorAxisState(payload.mirror, width, height),
       showVirtualCursor: Boolean(payload.showVirtualCursor ?? state.showVirtualCursor),
       showChecker: Boolean(payload.showChecker ?? state.showChecker),
       playback: typeof payload.playback === 'object' && payload.playback
@@ -6347,21 +7223,34 @@
 
   function getPixfindSendDisabledReason() {
     if (!pixfindModeEnabled) {
-      return 'PiXFiNDモードをONにしてください';
+      return '間違い探しモードをONにしてください';
     }
     if (!getPixfindFramePair()) {
-      return 'フレーム2がありません。PiXFiNDモードをONにすると自動で作成されます';
+      return 'フレーム2がありません。間違い探しモードをONにすると自動で作成されます';
     }
     return '';
   }
 
+  function setPixfindHelpExpanded(expanded) {
+    const next = Boolean(expanded);
+    if (dom.controls.pixfindHelpText instanceof HTMLElement) {
+      dom.controls.pixfindHelpText.hidden = !next;
+      dom.controls.pixfindHelpText.setAttribute('aria-hidden', String(!next));
+    }
+    if (dom.controls.togglePixfindHelp instanceof HTMLButtonElement) {
+      dom.controls.togglePixfindHelp.setAttribute('aria-expanded', String(next));
+      dom.controls.togglePixfindHelp.classList.toggle('is-active', next);
+      dom.controls.togglePixfindHelp.textContent = next
+        ? '間違い探しモードの説明を閉じる'
+        : '間違い探しモードの説明';
+    }
+  }
+
   function updatePixfindModeUI() {
-    const modeButton = dom.controls.togglePixfindMode;
+    const modeControl = dom.controls.togglePixfindMode;
     const sendDisabledReason = getPixfindSendDisabledReason();
-    if (modeButton) {
-      modeButton.classList.toggle('is-active', pixfindModeEnabled);
-      modeButton.setAttribute('aria-pressed', String(pixfindModeEnabled));
-      modeButton.textContent = pixfindModeEnabled ? 'PiXFiNDモード: ON' : 'PiXFiNDモード: OFF';
+    if (modeControl instanceof HTMLInputElement) {
+      modeControl.checked = pixfindModeEnabled;
     }
     if (dom.controls.sendToPixfind) {
       dom.controls.sendToPixfind.disabled = Boolean(sendDisabledReason);
@@ -6442,14 +7331,14 @@
       return true;
     }
     if (next && confirmFirst && !pixfindModeFirstEnableConfirmed) {
-      const accepted = window.confirm('PiXFiNDモードを初めてONにします。フレーム1を原本、フレーム2を差分として使います。続けますか？');
+      const accepted = window.confirm('間違い探しモードを初めてONにします。フレーム1を原本、フレーム2を差分として使います。続けますか？');
       if (!accepted) {
         return false;
       }
       pixfindModeFirstEnableConfirmed = true;
     }
     if (next && confirmOverwrite && Array.isArray(state.frames) && state.frames.length >= 2) {
-      const acceptedOverwrite = window.confirm('PiXFiNDモードをONにすると、現在のフレーム2はフレーム1の内容で上書きされます。続けますか？');
+      const acceptedOverwrite = window.confirm('間違い探しモードをONにすると、現在のフレーム2はフレーム1の内容で上書きされます。続けますか？');
       if (!acceptedOverwrite) {
         return false;
       }
@@ -6463,14 +7352,14 @@
       }
       if (!quiet) {
         if (prepared && pair) {
-          updateAutosaveStatus('PiXFiNDモードをONにしました。フレーム1=原本、フレーム2=差分です', 'info');
+          updateAutosaveStatus('間違い探しモードをONにしました。フレーム1=原本、フレーム2=差分です', 'info');
         } else {
-          updateAutosaveStatus('PiXFiNDモードをONにしましたが、フレーム2を用意できませんでした', 'warn');
+          updateAutosaveStatus('間違い探しモードをONにしましたが、フレーム2を用意できませんでした', 'warn');
         }
       }
     } else {
       if (!quiet) {
-        updateAutosaveStatus('PiXFiNDモードをOFFにしました', 'info');
+        updateAutosaveStatus('間違い探しモードをOFFにしました', 'info');
       }
     }
     updatePixfindModeUI();
@@ -6484,7 +7373,7 @@
 
   function exportProjectToPixfind() {
     if (!pixfindModeEnabled) {
-      updateAutosaveStatus('PiXFiNDモードをONにしてください', 'warn');
+      updateAutosaveStatus('間違い探しモードをONにしてください', 'warn');
       return;
     }
     const pair = getPixfindFramePair();
@@ -6515,6 +7404,7 @@
       } catch (error) {
         console.warn('pixfind upload store failed', error);
       }
+      markDocumentDurablySaved();
       window.location.href = '../pixfind/index.html#creator';
     } catch (error) {
       console.error('PiXFiND export failed', error);
@@ -6550,6 +7440,7 @@
       } catch (error) {
         console.warn('contest upload store failed', error);
       }
+      markDocumentDurablySaved();
       window.location.href = '../contest/index.html#post';
     } catch (error) {
       console.error('Contest export failed', error);
@@ -6628,6 +7519,7 @@
         updateAutosaveStatus('PNGの書き出しに失敗しました', 'error');
       }
       if (result.exportedCount > 0) {
+        markDocumentDurablySaved();
         showExportInterstitialAfterImageExport();
       }
     } catch (error) {
@@ -6699,6 +7591,7 @@
         updateAutosaveStatus('GIFの書き出しに失敗しました', 'error');
       }
       if (result.exportedCount > 0) {
+        markDocumentDurablySaved();
         showExportInterstitialAfterImageExport();
       }
     } catch (error) {
@@ -7226,6 +8119,7 @@
         shareText: `${state.documentName} (PiXiEEDraw)`,
       });
       if (result && !String(result).endsWith('cancel')) {
+        markDocumentDurablySaved();
         updateAutosaveStatus('手動保存: ファイルを書き出しました', 'success');
       }
     } catch (error) {
@@ -8547,6 +9441,19 @@
     };
   }
 
+  function normalizeToolId(value, fallback = 'pen') {
+    const fallbackTool = typeof fallback === 'string' ? fallback : 'pen';
+    const rawTool = typeof value === 'string' ? value : fallbackTool;
+    const mappedTool = LEGACY_TOOL_ALIASES[rawTool] || rawTool;
+    if (TOOL_ACTIONS.has(mappedTool) || TOOL_TO_GROUP[mappedTool]) {
+      return mappedTool;
+    }
+    if (TOOL_ACTIONS.has(fallbackTool) || TOOL_TO_GROUP[fallbackTool]) {
+      return fallbackTool;
+    }
+    return 'pen';
+  }
+
   function normalizeLastGroupTool(value) {
     const fallback = { ...DEFAULT_GROUP_TOOL };
     if (!value || typeof value !== 'object') {
@@ -8628,6 +9535,7 @@
     }
     dom.canvases.stack.style.transform = `translate(${panX}px, ${panY}px)`;
     updateGridDecorations();
+    updateMirrorGuideHandles();
   }
 
 
@@ -8926,6 +9834,31 @@
     });
   }
 
+  function runDeferredUiSetup() {
+    if (deferredUiSetupDone) {
+      return;
+    }
+    deferredUiSetupDone = true;
+    setupReferenceOverlay();
+    initMemoryMonitor();
+  }
+
+  function scheduleDeferredUiSetup() {
+    if (deferredUiSetupDone || deferredUiSetupScheduled) {
+      return;
+    }
+    deferredUiSetupScheduled = true;
+    const run = () => {
+      deferredUiSetupScheduled = false;
+      runDeferredUiSetup();
+    };
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(run, { timeout: 600 });
+      return;
+    }
+    window.setTimeout(run, 120);
+  }
+
   async function init() {
     await initializeIosSnapshotFallback();
     await initializeAutosave();
@@ -8936,14 +9869,17 @@
     setupControls();
     setupExportDialog();
     setupExportInterstitialDialog();
+    setupUpdateHistoryDialog();
+    setupToolSpotlightDialog();
     setupTools();
     setupToolGroups();
     setupPaletteEditor();
     setupFramesAndLayers();
     setupCanvas();
-    setupReferenceOverlay();
+    setupMirrorGuides();
+    setupMirrorGuideResizeObserver();
+    setupMirrorToolPopover();
     setupKeyboard();
-    initMemoryMonitor();
     updateDocumentMetadata();
     setupStartupScreen();
     const skipStartup = EMBED_CONFIG.skipStartup === true;
@@ -8952,6 +9888,7 @@
     }
     const importedFromLens = await maybeImportLensCapture();
     renderEverything();
+    scheduleDeferredUiSetup();
     if (!lensImportRequested && !importedFromLens && !skipStartup && !hasDismissedStartupScreen()) {
       showStartupScreen();
     }
@@ -9212,6 +10149,17 @@
     }
   }
 
+  function scheduleMirrorGuideRefresh() {
+    updateMirrorGuideHandles();
+    if (mirrorGuideSyncRaf !== null) {
+      cancelAnimationFrame(mirrorGuideSyncRaf);
+    }
+    mirrorGuideSyncRaf = requestAnimationFrame(() => {
+      mirrorGuideSyncRaf = null;
+      updateMirrorGuideHandles();
+    });
+  }
+
   function applyMobileDrawerHeight(height) {
     const root = document.documentElement;
     if (!(root instanceof HTMLElement)) {
@@ -9222,6 +10170,7 @@
     const clampedHeight = clamp(Math.round(Number(height) || 0), minHeight, maxHeight);
     mobileDrawerState.drag.currentHeight = clampedHeight;
     root.style.setProperty('--mobile-drawer-height', `${clampedHeight}px`);
+    scheduleMirrorGuideRefresh();
   }
 
   function getClosestMobileDrawerMode(height) {
@@ -9293,6 +10242,19 @@
       setCompactToolFlyoutOpen(false);
     }
     if (activated) {
+      if (layoutMode === 'mobilePortrait') {
+        if (dom.mobilePanelsContainer instanceof HTMLElement) {
+          dom.mobilePanelsContainer.scrollTop = 0;
+        }
+        const activePanel = dom.mobilePanels[target];
+        if (activePanel instanceof HTMLElement) {
+          activePanel.scrollTop = 0;
+          const activeBody = activePanel.querySelector('.panel-section__body');
+          if (activeBody instanceof HTMLElement) {
+            activeBody.scrollTop = 0;
+          }
+        }
+      }
       updateToolVisibility();
     }
     return activated;
@@ -9433,6 +10395,7 @@
           }
           if (isSoftKeyboardInputTarget(event.target)) {
             lastSoftKeyboardFocusAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+            scheduleSoftKeyboardInputAlignment({ delay: 140, force: true });
           }
         },
         true
@@ -9458,6 +10421,7 @@
 
     const handleLayoutResize = debounce(() => {
       if (isVirtualKeyboardLikelyOpen()) {
+        alignFocusedInputForSoftKeyboard();
         return;
       }
       updateLayoutMode();
@@ -9681,6 +10645,10 @@
     applyViewportTransform();
     clampFloatingDrawButtonPosition();
     resizeVirtualCursorCanvas();
+    if (isMirrorToolPopoverOpen()) {
+      syncMirrorToolPopoverMount();
+      positionMirrorToolPopover();
+    }
     requestOverlayRender();
   }
 
@@ -9705,6 +10673,7 @@
       dom.controls.toggleVirtualCursor.checked = next;
     }
     if (prev === next) {
+      syncVirtualCursorControlVisibility({ syncToggle: updateControl });
       return;
     }
 
@@ -9718,6 +10687,7 @@
         hoverPixel = null;
       }
     }
+    syncVirtualCursorControlVisibility({ syncToggle: updateControl });
     requestOverlayRender();
     if (persist) {
       scheduleSessionPersist();
@@ -9726,6 +10696,859 @@
     refreshViewportCursorStyle();
     updateVirtualCursorActionToolButtons();
     updateCanvasControlButtons();
+  }
+
+  function isMirrorAxisKey(axis) {
+    return MIRROR_AXIS_KEYS.includes(axis);
+  }
+
+  function isMirrorEnabledForTool(tool = pointerState.tool || state.tool) {
+    const mirrorState = getNormalizedMirrorState();
+    if (!mirrorState.enabled) {
+      return false;
+    }
+    if (!hasActiveMirrorAxes(mirrorState)) {
+      return false;
+    }
+    return MIRROR_DRAW_TOOLS.has(tool);
+  }
+
+  function isMirrorToolPopoverOpen() {
+    return Boolean(mirrorToolPopoverState.open && dom.mirrorToolPopover instanceof HTMLElement && !dom.mirrorToolPopover.hidden);
+  }
+
+  function shouldDockMirrorToolPopover() {
+    if (layoutMode === 'mobilePortrait') {
+      return false;
+    }
+    if (!(dom.leftRail instanceof HTMLElement) || dom.leftRail.dataset.collapsed === 'true') {
+      return false;
+    }
+    if (isCompactToolRailMode()) {
+      return false;
+    }
+    return dom.sections.tools instanceof HTMLElement;
+  }
+
+  function getMirrorToolPopoverDockHost() {
+    const toolsSection = dom.sections.tools;
+    if (!(toolsSection instanceof HTMLElement)) {
+      return null;
+    }
+    const body = toolsSection.querySelector('.panel-section__body');
+    return body instanceof HTMLElement ? body : toolsSection;
+  }
+
+  function syncMirrorToolPopoverMount() {
+    const popover = dom.mirrorToolPopover;
+    if (!(popover instanceof HTMLElement)) {
+      return;
+    }
+    if (shouldDockMirrorToolPopover()) {
+      const host = getMirrorToolPopoverDockHost();
+      if (!(host instanceof HTMLElement)) {
+        return;
+      }
+      if (!mirrorToolPopoverMountState.parent) {
+        mirrorToolPopoverMountState.parent = popover.parentNode;
+        mirrorToolPopoverMountState.nextSibling = popover.nextSibling;
+      }
+      if (popover.parentNode !== host) {
+        host.appendChild(popover);
+      }
+      popover.classList.add('is-docked');
+      popover.style.removeProperty('left');
+      popover.style.removeProperty('top');
+      return;
+    }
+    const mountParent = mirrorToolPopoverMountState.parent;
+    if (mountParent instanceof Node && popover.parentNode !== mountParent) {
+      const mountSibling = mirrorToolPopoverMountState.nextSibling;
+      if (mountSibling instanceof Node && mountSibling.parentNode === mountParent) {
+        mountParent.insertBefore(popover, mountSibling);
+      } else {
+        mountParent.appendChild(popover);
+      }
+    }
+    popover.classList.remove('is-docked');
+  }
+
+  function isMirrorPopoverPersistentTarget(target) {
+    if (!(target instanceof Element)) {
+      return false;
+    }
+    if (target.closest('.tool-button[data-tool="mirrorPopup"]')) {
+      return true;
+    }
+    if (target.closest('.tool-group-button[data-tool-group="mirror"]')) {
+      return true;
+    }
+    if (dom.mirrorToolPopover instanceof HTMLElement && dom.mirrorToolPopover.contains(target)) {
+      return true;
+    }
+    return false;
+  }
+
+  function positionMirrorToolPopover() {
+    if (!isMirrorToolPopoverOpen()) {
+      return;
+    }
+    const popover = dom.mirrorToolPopover;
+    if (!(popover instanceof HTMLElement)) {
+      return;
+    }
+    if (popover.classList.contains('is-docked')) {
+      popover.style.removeProperty('left');
+      popover.style.removeProperty('top');
+      return;
+    }
+    let anchor = mirrorToolPopoverState.anchor;
+    if (!(anchor instanceof HTMLElement) || !anchor.isConnected) {
+      anchor = document.querySelector('.tool-button[data-tool="mirrorPopup"]');
+      mirrorToolPopoverState.anchor = anchor instanceof HTMLElement ? anchor : null;
+    }
+    if (!(anchor instanceof HTMLElement)) {
+      return;
+    }
+    const anchorRect = anchor.getBoundingClientRect();
+    const popoverRect = popover.getBoundingClientRect();
+    const viewportBounds = getViewportBounds();
+    const safeArea = getSafeAreaInsets();
+    const padding = 8;
+    const safeLeft = viewportBounds.left + safeArea.left + padding;
+    const safeTop = viewportBounds.top + safeArea.top + padding;
+    const safeRight = viewportBounds.right - safeArea.right - padding;
+    const safeBottom = viewportBounds.bottom - safeArea.bottom - padding;
+    const maxLeft = Math.max(safeLeft, safeRight - popoverRect.width);
+    const preferredLeft = anchorRect.left + ((anchorRect.width - popoverRect.width) * 0.5);
+    const left = clamp(Math.round(preferredLeft), Math.round(safeLeft), Math.round(maxLeft));
+    const belowTop = anchorRect.bottom + 10;
+    const aboveTop = anchorRect.top - popoverRect.height - 10;
+    let top = belowTop;
+    if ((top + popoverRect.height) > safeBottom && aboveTop >= safeTop) {
+      top = aboveTop;
+    }
+    const maxTop = Math.max(safeTop, safeBottom - popoverRect.height);
+    top = clamp(Math.round(top), Math.round(safeTop), Math.round(maxTop));
+    popover.style.left = `${left}px`;
+    popover.style.top = `${top}px`;
+  }
+
+  function setMirrorToolPopoverOpen(open, options = {}) {
+    const popover = dom.mirrorToolPopover;
+    if (!(popover instanceof HTMLElement)) {
+      return;
+    }
+    const next = Boolean(open);
+    if (!next) {
+      mirrorToolPopoverState.open = false;
+      mirrorToolPopoverState.anchor = null;
+      popover.hidden = true;
+      popover.classList.remove('is-open');
+      popover.setAttribute('aria-hidden', 'true');
+      return;
+    }
+    if (options.anchor instanceof HTMLElement) {
+      mirrorToolPopoverState.anchor = options.anchor;
+    }
+    if (!(mirrorToolPopoverState.anchor instanceof HTMLElement)) {
+      const fallback = document.querySelector('.tool-button[data-tool="mirrorPopup"]');
+      mirrorToolPopoverState.anchor = fallback instanceof HTMLElement ? fallback : null;
+    }
+    mirrorToolPopoverState.open = true;
+    syncMirrorToolPopoverControls();
+    syncMirrorToolPopoverMount();
+    popover.hidden = false;
+    popover.classList.add('is-open');
+    popover.setAttribute('aria-hidden', 'false');
+    positionMirrorToolPopover();
+    requestAnimationFrame(positionMirrorToolPopover);
+  }
+
+  function toggleMirrorToolPopover(anchor) {
+    if (isMirrorToolPopoverOpen()) {
+      setMirrorToolPopoverOpen(false);
+      return;
+    }
+    setMirrorToolPopoverOpen(true, { anchor });
+  }
+
+  function setMirrorModeEnabled(enabled, options = {}) {
+    const { persist = true, updateControl = true } = options;
+    const mirrorState = getNormalizedMirrorState();
+    const next = Boolean(enabled);
+    const needsDefaultAxis = next && !hasActiveMirrorAxes(mirrorState);
+    const needsAxisReset = !next && hasActiveMirrorAxes(mirrorState);
+    if (mirrorState.enabled === next && !needsDefaultAxis && !needsAxisReset) {
+      if (updateControl && dom.controls.toggleMirrorMode instanceof HTMLInputElement) {
+        dom.controls.toggleMirrorMode.checked = next;
+      }
+      syncControlsWithState();
+      return;
+    }
+    if (needsDefaultAxis) {
+      mirrorState.axes[MIRROR_AXIS_VERTICAL] = true;
+    }
+    if (!next) {
+      MIRROR_AXIS_KEYS.forEach(axis => {
+        mirrorState.axes[axis] = false;
+      });
+    }
+    mirrorState.enabled = next;
+    state.mirror = mirrorState;
+    if (updateControl && dom.controls.toggleMirrorMode instanceof HTMLInputElement) {
+      dom.controls.toggleMirrorMode.checked = next;
+    }
+    syncControlsWithState();
+    requestOverlayRender();
+    if (persist) {
+      scheduleSessionPersist({ includeSnapshots: false });
+    }
+  }
+
+  function setMirrorAxisEnabled(axis, enabled, options = {}) {
+    const { persist = true, syncControls = true } = options;
+    if (!isMirrorAxisKey(axis)) {
+      return;
+    }
+    const mirrorState = getNormalizedMirrorState();
+    mirrorState.axes[axis] = Boolean(enabled);
+    mirrorState.enabled = hasActiveMirrorAxes(mirrorState);
+    state.mirror = mirrorState;
+    if (syncControls) {
+      syncControlsWithState();
+    }
+    requestOverlayRender();
+    if (persist) {
+      scheduleSessionPersist({ includeSnapshots: false });
+    }
+  }
+
+  function setMirrorPivot(x, y, options = {}) {
+    const { persist = true } = options;
+    const mirrorState = getNormalizedMirrorState();
+    const nextX = clampMirrorAxisX(x, state.width);
+    const nextY = clampMirrorAxisY(y, state.height);
+    if (Math.abs((mirrorState.axisX ?? 0) - nextX) < 1e-6 && Math.abs((mirrorState.axisY ?? 0) - nextY) < 1e-6) {
+      return;
+    }
+    mirrorState.axisX = nextX;
+    mirrorState.axisY = nextY;
+    state.mirror = mirrorState;
+    requestOverlayRender();
+    updateMirrorGuideHandles();
+    if (persist) {
+      scheduleSessionPersist({ includeSnapshots: false });
+    }
+  }
+
+  function rescaleMirrorPivotForCanvas(previousWidth, previousHeight, nextWidth, nextHeight) {
+    const prevW = Math.max(1, Math.floor(Number(previousWidth) || 1));
+    const prevH = Math.max(1, Math.floor(Number(previousHeight) || 1));
+    const nextW = Math.max(1, Math.floor(Number(nextWidth) || prevW));
+    const nextH = Math.max(1, Math.floor(Number(nextHeight) || prevH));
+    const mirrorState = getNormalizedMirrorState();
+    const ratioX = (mirrorState.axisX + 0.5) / prevW;
+    const ratioY = (mirrorState.axisY + 0.5) / prevH;
+    mirrorState.axisX = clampMirrorAxisX((ratioX * nextW) - 0.5, nextW);
+    mirrorState.axisY = clampMirrorAxisY((ratioY * nextH) - 0.5, nextH);
+    state.mirror = mirrorState;
+  }
+
+  function reflectPointByMirrorAxis(point, axis, mirrorState) {
+    if (!point || !mirrorState) {
+      return null;
+    }
+    const px = Number(point.x);
+    const py = Number(point.y);
+    if (!Number.isFinite(px) || !Number.isFinite(py)) {
+      return null;
+    }
+    const axisX = Number(mirrorState.axisX);
+    const axisY = Number(mirrorState.axisY);
+    if (!Number.isFinite(axisX) || !Number.isFinite(axisY)) {
+      return null;
+    }
+    if (axis === MIRROR_AXIS_VERTICAL) {
+      return { x: Math.round((2 * axisX) - px), y: py };
+    }
+    if (axis === MIRROR_AXIS_HORIZONTAL) {
+      return { x: px, y: Math.round((2 * axisY) - py) };
+    }
+    if (axis === MIRROR_AXIS_DIAGONAL_A) {
+      const tx = px - axisX;
+      const ty = py - axisY;
+      return {
+        x: Math.round(axisX + ty),
+        y: Math.round(axisY + tx),
+      };
+    }
+    if (axis === MIRROR_AXIS_DIAGONAL_B) {
+      const tx = px - axisX;
+      const ty = py - axisY;
+      return {
+        x: Math.round(axisX - ty),
+        y: Math.round(axisY - tx),
+      };
+    }
+    return null;
+  }
+
+  function getMirroredPointSet(x, y, options = {}) {
+    const {
+      tool = pointerState.tool || state.tool,
+      includeOriginal = true,
+    } = options;
+    const width = Math.max(1, Number(state.width) || 1);
+    const height = Math.max(1, Number(state.height) || 1);
+    const result = [];
+    const queue = [];
+    const visited = new Set();
+    const mirrorState = getNormalizedMirrorState();
+    const mirrorEnabled = isMirrorEnabledForTool(tool);
+
+    const addPoint = (candidateX, candidateY) => {
+      if (!Number.isFinite(candidateX) || !Number.isFinite(candidateY)) {
+        return;
+      }
+      const ix = Math.round(candidateX);
+      const iy = Math.round(candidateY);
+      if (ix < 0 || iy < 0 || ix >= width || iy >= height) {
+        return;
+      }
+      const key = `${ix},${iy}`;
+      if (visited.has(key)) {
+        return;
+      }
+      visited.add(key);
+      result.push({ x: ix, y: iy });
+      queue.push({ x: ix, y: iy });
+    };
+
+    if (includeOriginal) {
+      addPoint(x, y);
+    } else {
+      queue.push({ x: Math.round(x), y: Math.round(y) });
+    }
+
+    if (!mirrorEnabled) {
+      return result;
+    }
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      for (let i = 0; i < MIRROR_AXIS_KEYS.length; i += 1) {
+        const axis = MIRROR_AXIS_KEYS[i];
+        if (!mirrorState.axes[axis]) {
+          continue;
+        }
+        const reflected = reflectPointByMirrorAxis(current, axis, mirrorState);
+        if (!reflected) {
+          continue;
+        }
+        addPoint(reflected.x, reflected.y);
+      }
+    }
+    return result;
+  }
+
+  function forEachMirroredPoint(x, y, tool, callback) {
+    if (typeof callback !== 'function') {
+      return;
+    }
+    const points = getMirroredPointSet(x, y, { tool, includeOriginal: true });
+    for (let i = 0; i < points.length; i += 1) {
+      callback(points[i].x, points[i].y);
+    }
+  }
+
+  function getDiagonalEndpointsInRect(slope, anchorX, anchorY, rectWidth, rectHeight) {
+    if (!Number.isFinite(anchorX) || !Number.isFinite(anchorY) || rectWidth <= 0 || rectHeight <= 0) {
+      return null;
+    }
+    const points = [];
+    const pushPoint = (x, y) => {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        return;
+      }
+      const epsilon = 1e-6;
+      if (x < -epsilon || y < -epsilon || x > rectWidth + epsilon || y > rectHeight + epsilon) {
+        return;
+      }
+      const clampedX = clamp(x, 0, rectWidth);
+      const clampedY = clamp(y, 0, rectHeight);
+      const duplicate = points.some(point => Math.abs(point.x - clampedX) < 0.25 && Math.abs(point.y - clampedY) < 0.25);
+      if (!duplicate) {
+        points.push({ x: clampedX, y: clampedY });
+      }
+    };
+
+    if (slope === 1) {
+      const b = anchorY - anchorX;
+      pushPoint(0, b);
+      pushPoint(rectWidth, rectWidth + b);
+      pushPoint(-b, 0);
+      pushPoint(rectHeight - b, rectHeight);
+    } else if (slope === -1) {
+      const c = anchorY + anchorX;
+      pushPoint(0, c);
+      pushPoint(rectWidth, -rectWidth + c);
+      pushPoint(c, 0);
+      pushPoint(c - rectHeight, rectHeight);
+    }
+
+    if (points.length < 2) {
+      return null;
+    }
+    if (points.length === 2) {
+      return [points[0], points[1]];
+    }
+    let bestA = points[0];
+    let bestB = points[1];
+    let maxDistanceSq = -1;
+    for (let i = 0; i < points.length; i += 1) {
+      for (let j = i + 1; j < points.length; j += 1) {
+        const dx = points[i].x - points[j].x;
+        const dy = points[i].y - points[j].y;
+        const distanceSq = dx * dx + dy * dy;
+        if (distanceSq > maxDistanceSq) {
+          maxDistanceSq = distanceSq;
+          bestA = points[i];
+          bestB = points[j];
+        }
+      }
+    }
+    return [bestA, bestB];
+  }
+
+  function getCanvasScreenMetrics() {
+    if (!dom.canvasViewport || !dom.canvases.drawing) {
+      return null;
+    }
+    const viewportRect = dom.canvasViewport.getBoundingClientRect();
+    const drawingRect = dom.canvases.drawing.getBoundingClientRect();
+    if (drawingRect.width <= 0 || drawingRect.height <= 0) {
+      return null;
+    }
+    return {
+      viewportRect,
+      drawingRect,
+      left: drawingRect.left - viewportRect.left,
+      top: drawingRect.top - viewportRect.top,
+      width: drawingRect.width,
+      height: drawingRect.height,
+    };
+  }
+
+  function setMirrorGuideLine(lineElement, start, end, visible) {
+    if (!(lineElement instanceof HTMLElement)) {
+      return;
+    }
+    if (!visible || !start || !end) {
+      lineElement.classList.remove('is-active');
+      lineElement.style.width = '0px';
+      return;
+    }
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const length = Math.sqrt((dx * dx) + (dy * dy));
+    if (!Number.isFinite(length) || length <= 0) {
+      lineElement.classList.remove('is-active');
+      lineElement.style.width = '0px';
+      return;
+    }
+    const angle = Math.atan2(dy, dx);
+    lineElement.classList.add('is-active');
+    lineElement.style.left = `${start.x}px`;
+    lineElement.style.top = `${start.y}px`;
+    lineElement.style.width = `${length}px`;
+    lineElement.style.transform = `rotate(${angle}rad)`;
+  }
+
+  function setMirrorHandlePosition(handle, x, y, visible = true) {
+    if (!(handle instanceof HTMLElement)) {
+      return;
+    }
+    if (!visible || !Number.isFinite(x) || !Number.isFinite(y)) {
+      handle.classList.add('is-hidden');
+      return;
+    }
+    handle.classList.remove('is-hidden');
+    handle.style.left = `${x}px`;
+    handle.style.top = `${y}px`;
+  }
+
+  function getMirrorGuideLineElement(axis) {
+    if (!Array.isArray(dom.mirrorGuideLines)) {
+      return null;
+    }
+    return dom.mirrorGuideLines.find(line => line?.dataset?.mirrorAxis === axis) || null;
+  }
+
+  function getMirrorHandleElement(axis) {
+    if (!Array.isArray(dom.mirrorHandles)) {
+      return null;
+    }
+    return dom.mirrorHandles.find(handle => handle?.dataset?.mirrorAxis === axis) || null;
+  }
+
+  function updateMirrorGuideHandles() {
+    const guideContainer = dom.mirrorGuides;
+    if (!(guideContainer instanceof HTMLElement)) {
+      return;
+    }
+    const mirrorState = getNormalizedMirrorState();
+    const metrics = getCanvasScreenMetrics();
+    const showGuides = Boolean(mirrorState.enabled && hasActiveMirrorAxes(mirrorState) && metrics);
+    guideContainer.hidden = !showGuides;
+    if (!showGuides) {
+      MIRROR_AXIS_KEYS.forEach(axis => {
+        setMirrorGuideLine(getMirrorGuideLineElement(axis), null, null, false);
+        setMirrorHandlePosition(getMirrorHandleElement(axis), NaN, NaN, false);
+      });
+      return;
+    }
+
+    const { left, top, width, height } = metrics;
+    const axisXRatio = (mirrorState.axisX + 0.5) / Math.max(1, state.width);
+    const axisYRatio = (mirrorState.axisY + 0.5) / Math.max(1, state.height);
+    const pivotX = left + (axisXRatio * width);
+    const pivotY = top + (axisYRatio * height);
+    const outside = MIRROR_HANDLE_OUTSIDE_OFFSET;
+
+    const verticalActive = Boolean(mirrorState.axes[MIRROR_AXIS_VERTICAL]);
+    const horizontalActive = Boolean(mirrorState.axes[MIRROR_AXIS_HORIZONTAL]);
+    const diagonalAActive = Boolean(mirrorState.axes[MIRROR_AXIS_DIAGONAL_A]);
+    const diagonalBActive = Boolean(mirrorState.axes[MIRROR_AXIS_DIAGONAL_B]);
+
+    setMirrorGuideLine(
+      getMirrorGuideLineElement(MIRROR_AXIS_VERTICAL),
+      { x: pivotX, y: top },
+      { x: pivotX, y: top + height },
+      verticalActive
+    );
+    setMirrorGuideLine(
+      getMirrorGuideLineElement(MIRROR_AXIS_HORIZONTAL),
+      { x: left, y: pivotY },
+      { x: left + width, y: pivotY },
+      horizontalActive
+    );
+
+    const diagonalAEndpoints = getDiagonalEndpointsInRect(1, axisXRatio * width, axisYRatio * height, width, height);
+    const diagonalAStart = diagonalAEndpoints ? { x: left + diagonalAEndpoints[0].x, y: top + diagonalAEndpoints[0].y } : null;
+    const diagonalAEnd = diagonalAEndpoints ? { x: left + diagonalAEndpoints[1].x, y: top + diagonalAEndpoints[1].y } : null;
+    setMirrorGuideLine(
+      getMirrorGuideLineElement(MIRROR_AXIS_DIAGONAL_A),
+      diagonalAStart,
+      diagonalAEnd,
+      diagonalAActive
+    );
+
+    const diagonalBEndpoints = getDiagonalEndpointsInRect(-1, axisXRatio * width, axisYRatio * height, width, height);
+    const diagonalBStart = diagonalBEndpoints ? { x: left + diagonalBEndpoints[0].x, y: top + diagonalBEndpoints[0].y } : null;
+    const diagonalBEnd = diagonalBEndpoints ? { x: left + diagonalBEndpoints[1].x, y: top + diagonalBEndpoints[1].y } : null;
+    setMirrorGuideLine(
+      getMirrorGuideLineElement(MIRROR_AXIS_DIAGONAL_B),
+      diagonalBStart,
+      diagonalBEnd,
+      diagonalBActive
+    );
+
+    setMirrorHandlePosition(
+      getMirrorHandleElement(MIRROR_AXIS_VERTICAL),
+      pivotX,
+      top - outside,
+      verticalActive
+    );
+    setMirrorHandlePosition(
+      getMirrorHandleElement(MIRROR_AXIS_HORIZONTAL),
+      left - outside,
+      pivotY,
+      horizontalActive
+    );
+
+    if (diagonalAActive && diagonalAStart && diagonalAEnd) {
+      const pickTopLeft = point => (point.x + point.y);
+      const anchor = pickTopLeft(diagonalAStart) <= pickTopLeft(diagonalAEnd) ? diagonalAStart : diagonalAEnd;
+      const vx = anchor.x - pivotX;
+      const vy = anchor.y - pivotY;
+      const norm = Math.hypot(vx, vy) || 1;
+      setMirrorHandlePosition(
+        getMirrorHandleElement(MIRROR_AXIS_DIAGONAL_A),
+        anchor.x + ((vx / norm) * outside),
+        anchor.y + ((vy / norm) * outside),
+        true
+      );
+    } else {
+      setMirrorHandlePosition(getMirrorHandleElement(MIRROR_AXIS_DIAGONAL_A), NaN, NaN, false);
+    }
+
+    if (diagonalBActive && diagonalBStart && diagonalBEnd) {
+      const pickTopRight = point => (point.x - point.y);
+      const anchor = pickTopRight(diagonalBStart) >= pickTopRight(diagonalBEnd) ? diagonalBStart : diagonalBEnd;
+      const vx = anchor.x - pivotX;
+      const vy = anchor.y - pivotY;
+      const norm = Math.hypot(vx, vy) || 1;
+      setMirrorHandlePosition(
+        getMirrorHandleElement(MIRROR_AXIS_DIAGONAL_B),
+        anchor.x + ((vx / norm) * outside),
+        anchor.y + ((vy / norm) * outside),
+        true
+      );
+    } else {
+      setMirrorHandlePosition(getMirrorHandleElement(MIRROR_AXIS_DIAGONAL_B), NaN, NaN, false);
+    }
+  }
+
+  function updateMirrorFromDragPosition(clientX, clientY, axis) {
+    if (!isMirrorAxisKey(axis)) {
+      return;
+    }
+    const startCanvasWidth = Math.max(1, Number(mirrorHandleDragState.startCanvasWidth) || 1);
+    const startCanvasHeight = Math.max(1, Number(mirrorHandleDragState.startCanvasHeight) || 1);
+    const startClientX = Number(mirrorHandleDragState.startClientX) || 0;
+    const startClientY = Number(mirrorHandleDragState.startClientY) || 0;
+    const startAxisX = Number(mirrorHandleDragState.startAxisX) || 0;
+    const startAxisY = Number(mirrorHandleDragState.startAxisY) || 0;
+    const deltaAxisX = ((Number(clientX) - startClientX) / startCanvasWidth) * state.width;
+    const deltaAxisY = ((Number(clientY) - startClientY) / startCanvasHeight) * state.height;
+    const axisX = clampMirrorAxisX(startAxisX + deltaAxisX, state.width);
+    const axisY = clampMirrorAxisY(startAxisY + deltaAxisY, state.height);
+    const mirrorState = getNormalizedMirrorState();
+    if (axis === MIRROR_AXIS_VERTICAL) {
+      setMirrorPivot(axisX, mirrorState.axisY, { persist: false });
+      return;
+    }
+    if (axis === MIRROR_AXIS_HORIZONTAL) {
+      setMirrorPivot(mirrorState.axisX, axisY, { persist: false });
+      return;
+    }
+    if (axis === MIRROR_AXIS_DIAGONAL_A || axis === MIRROR_AXIS_DIAGONAL_B) {
+      // Diagonal axes share the same pivot as vertical/horizontal axes.
+      setMirrorPivot(axisX, axisY, { persist: false });
+    }
+  }
+
+  function finishMirrorHandleDrag({ persist = true } = {}) {
+    if (!mirrorHandleDragState.active) {
+      return;
+    }
+    const handle = mirrorHandleDragState.handle;
+    const pointerId = mirrorHandleDragState.pointerId;
+    if (handle && pointerId !== null && handle.hasPointerCapture?.(pointerId)) {
+      try {
+        handle.releasePointerCapture(pointerId);
+      } catch (error) {
+        // Ignore pointer capture release issues.
+      }
+    }
+    mirrorHandleDragState.active = false;
+    mirrorHandleDragState.pointerId = null;
+    mirrorHandleDragState.axis = null;
+    mirrorHandleDragState.handle = null;
+    mirrorHandleDragState.startClientX = 0;
+    mirrorHandleDragState.startClientY = 0;
+    mirrorHandleDragState.startAxisX = 0;
+    mirrorHandleDragState.startAxisY = 0;
+    mirrorHandleDragState.startCanvasWidth = 1;
+    mirrorHandleDragState.startCanvasHeight = 1;
+    if (persist) {
+      scheduleSessionPersist({ includeSnapshots: false });
+    }
+    updateMirrorGuideHandles();
+  }
+
+  function handleMirrorHandlePointerDown(event) {
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const drawing = dom.canvases.drawing;
+    if (!(drawing instanceof HTMLCanvasElement)) {
+      return;
+    }
+    const axis = target.dataset.mirrorAxis;
+    if (!isMirrorAxisKey(axis)) {
+      return;
+    }
+    const mirrorState = getNormalizedMirrorState();
+    if (!mirrorState.enabled) {
+      return;
+    }
+    const rect = drawing.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    mirrorHandleDragState.active = true;
+    mirrorHandleDragState.pointerId = event.pointerId;
+    mirrorHandleDragState.axis = axis;
+    mirrorHandleDragState.handle = target;
+    mirrorHandleDragState.startClientX = Number(event.clientX) || 0;
+    mirrorHandleDragState.startClientY = Number(event.clientY) || 0;
+    mirrorHandleDragState.startAxisX = Number(mirrorState.axisX) || 0;
+    mirrorHandleDragState.startAxisY = Number(mirrorState.axisY) || 0;
+    mirrorHandleDragState.startCanvasWidth = Math.max(1, rect.width);
+    mirrorHandleDragState.startCanvasHeight = Math.max(1, rect.height);
+    try {
+      target.setPointerCapture?.(event.pointerId);
+    } catch (error) {
+      // Ignore pointer capture failures.
+    }
+    updateMirrorGuideHandles();
+  }
+
+  function handleMirrorHandlePointerMove(event) {
+    if (!mirrorHandleDragState.active || mirrorHandleDragState.pointerId !== event.pointerId) {
+      return;
+    }
+    const axis = mirrorHandleDragState.axis;
+    if (!axis) {
+      return;
+    }
+    event.preventDefault();
+    updateMirrorFromDragPosition(event.clientX, event.clientY, axis);
+    updateMirrorGuideHandles();
+  }
+
+  function handleMirrorHandlePointerUp(event) {
+    if (!mirrorHandleDragState.active || mirrorHandleDragState.pointerId !== event.pointerId) {
+      return;
+    }
+    event.preventDefault();
+    finishMirrorHandleDrag({ persist: true });
+  }
+
+  function setupMirrorGuides() {
+    if (!Array.isArray(dom.mirrorHandles) || !dom.mirrorHandles.length) {
+      return;
+    }
+    dom.mirrorHandles.forEach(handle => {
+      if (!(handle instanceof HTMLElement) || handle.dataset.mirrorBound === 'true') {
+        return;
+      }
+      handle.dataset.mirrorBound = 'true';
+      handle.addEventListener('pointerdown', handleMirrorHandlePointerDown);
+      handle.addEventListener('pointermove', handleMirrorHandlePointerMove);
+      handle.addEventListener('pointerup', handleMirrorHandlePointerUp);
+      handle.addEventListener('pointercancel', handleMirrorHandlePointerUp);
+      handle.addEventListener('click', event => event.preventDefault());
+    });
+    updateMirrorGuideHandles();
+  }
+
+  function setupMirrorGuideResizeObserver() {
+    if (mirrorGuideResizeObserver) {
+      mirrorGuideResizeObserver.disconnect();
+      mirrorGuideResizeObserver = null;
+    }
+    if (typeof ResizeObserver !== 'function') {
+      return;
+    }
+    const targets = [dom.canvasViewport, dom.canvases.drawing]
+      .filter(node => node instanceof HTMLElement);
+    if (!targets.length) {
+      return;
+    }
+    mirrorGuideResizeObserver = new ResizeObserver(() => {
+      scheduleMirrorGuideRefresh();
+    });
+    targets.forEach(target => {
+      mirrorGuideResizeObserver?.observe(target);
+    });
+  }
+
+  function setupMirrorToolPopover() {
+    const popover = dom.mirrorToolPopover;
+    if (!(popover instanceof HTMLElement) || popover.dataset.bound === 'true') {
+      return;
+    }
+    popover.dataset.bound = 'true';
+    popover.hidden = true;
+    popover.setAttribute('aria-hidden', 'true');
+    renderMirrorToolPopover();
+    syncMirrorToolPopoverControls();
+
+    dom.controls.mirrorToolPopupToggleMode?.addEventListener('change', event => {
+      if (!(event.target instanceof HTMLInputElement)) {
+        return;
+      }
+      setMirrorModeEnabled(Boolean(event.target.checked));
+    });
+    dom.controls.mirrorToolPopoverItems?.addEventListener('click', event => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target) {
+        return;
+      }
+      const button = target.closest('.mirror-axis-button[data-mirror-tool-key]');
+      if (!(button instanceof HTMLElement)) {
+        return;
+      }
+      const { mirrorToolKey } = button.dataset;
+      if (!mirrorToolKey) {
+        return;
+      }
+      event.preventDefault();
+      onMirrorToolClick(mirrorToolKey);
+    });
+    dom.controls.mirrorToolPopoverClose?.addEventListener('click', () => {
+      setMirrorToolPopoverOpen(false);
+    });
+
+    if (mirrorToolPopoverListenersBound) {
+      return;
+    }
+    mirrorToolPopoverListenersBound = true;
+    document.addEventListener(
+      'pointerdown',
+      event => {
+        if (!isMirrorToolPopoverOpen()) {
+          return;
+        }
+        const target = event.target instanceof Element ? event.target : null;
+        if (!target) {
+          setMirrorToolPopoverOpen(false);
+          return;
+        }
+        if (isMirrorPopoverPersistentTarget(target)) {
+          return;
+        }
+        setMirrorToolPopoverOpen(false);
+      },
+      true
+    );
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && isMirrorToolPopoverOpen()) {
+        setMirrorToolPopoverOpen(false);
+      }
+    });
+    window.addEventListener('resize', () => {
+      if (isMirrorToolPopoverOpen()) {
+        positionMirrorToolPopover();
+      }
+    });
+    window.addEventListener(
+      'scroll',
+      () => {
+        if (isMirrorToolPopoverOpen()) {
+          positionMirrorToolPopover();
+        }
+      },
+      true
+    );
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => {
+        if (isMirrorToolPopoverOpen()) {
+          positionMirrorToolPopover();
+        }
+      });
+      window.visualViewport.addEventListener('scroll', () => {
+        if (isMirrorToolPopoverOpen()) {
+          positionMirrorToolPopover();
+        }
+      });
+    }
   }
 
   function setupControls() {
@@ -9819,12 +11642,57 @@
       scheduleSessionPersist();
     });
 
-    dom.controls.toggleVirtualCursor?.addEventListener('change', event => {
+    dom.controls.toggleMirrorMode?.addEventListener('change', event => {
+      if (!(event.target instanceof HTMLInputElement)) {
+        return;
+      }
+      setMirrorModeEnabled(Boolean(event.target.checked));
+    });
+
+    if (dom.controls.mirrorAxisVertical instanceof HTMLInputElement) {
+      dom.controls.mirrorAxisVertical.addEventListener('change', event => {
+        if (!(event.target instanceof HTMLInputElement)) {
+          return;
+        }
+        setMirrorAxisEnabled(MIRROR_AXIS_VERTICAL, Boolean(event.target.checked));
+      });
+    }
+
+    if (dom.controls.mirrorAxisHorizontal instanceof HTMLInputElement) {
+      dom.controls.mirrorAxisHorizontal.addEventListener('change', event => {
+        if (!(event.target instanceof HTMLInputElement)) {
+          return;
+        }
+        setMirrorAxisEnabled(MIRROR_AXIS_HORIZONTAL, Boolean(event.target.checked));
+      });
+    }
+
+    if (dom.controls.mirrorAxisDiagonalA instanceof HTMLInputElement) {
+      dom.controls.mirrorAxisDiagonalA.addEventListener('change', event => {
+        if (!(event.target instanceof HTMLInputElement)) {
+          return;
+        }
+        setMirrorAxisEnabled(MIRROR_AXIS_DIAGONAL_A, Boolean(event.target.checked));
+      });
+    }
+
+    if (dom.controls.mirrorAxisDiagonalB instanceof HTMLInputElement) {
+      dom.controls.mirrorAxisDiagonalB.addEventListener('change', event => {
+        if (!(event.target instanceof HTMLInputElement)) {
+          return;
+        }
+        setMirrorAxisEnabled(MIRROR_AXIS_DIAGONAL_B, Boolean(event.target.checked));
+      });
+    }
+
+    const handleVirtualCursorToggleInput = event => {
       if (!(event.target instanceof HTMLInputElement)) {
         return;
       }
       setVirtualCursorEnabled(Boolean(event.target.checked));
-    });
+    };
+    dom.controls.toggleVirtualCursor?.addEventListener('change', handleVirtualCursorToggleInput);
+    dom.controls.toggleVirtualCursor?.addEventListener('input', handleVirtualCursorToggleInput);
 
     if (dom.controls.virtualCursorButtonScale instanceof HTMLInputElement) {
       const slider = dom.controls.virtualCursorButtonScale;
@@ -9848,9 +11716,40 @@
       openExportDialog();
     });
 
-    dom.controls.togglePixfindMode?.addEventListener('click', () => {
-      setPixfindModeEnabled(!pixfindModeEnabled);
+    dom.controls.togglePixfindMode?.addEventListener('change', event => {
+      if (!(event.target instanceof HTMLInputElement)) {
+        return;
+      }
+      const accepted = setPixfindModeEnabled(Boolean(event.target.checked));
+      if (!accepted) {
+        updatePixfindModeUI();
+      }
     });
+
+    dom.controls.togglePixfindHelp?.addEventListener('click', () => {
+      const expanded = dom.controls.togglePixfindHelp?.getAttribute('aria-expanded') === 'true';
+      setPixfindHelpExpanded(!expanded);
+    });
+
+    dom.controls.openShortcutHelp?.addEventListener('click', () => {
+      openShortcutHelpDialog();
+    });
+    dom.controls.openUpdateHistory?.addEventListener('click', () => {
+      openUpdateHistoryDialog();
+    });
+    dom.controls.closeShortcutHelp?.addEventListener('click', () => {
+      closeShortcutHelpDialog();
+    });
+    if (dom.shortcutHelp?.dialog instanceof HTMLDialogElement) {
+      if (typeof dom.shortcutHelp.dialog.showModal === 'function') {
+        dom.shortcutHelp.dialog.addEventListener('cancel', event => {
+          event.preventDefault();
+          closeShortcutHelpDialog();
+        });
+      } else {
+        dom.controls.openShortcutHelp?.setAttribute('disabled', 'true');
+      }
+    }
 
     dom.controls.sendToPixfind?.addEventListener('click', () => {
       exportProjectToPixfind();
@@ -9926,6 +11825,7 @@
     dom.controls.redoAction?.addEventListener('click', () => redo());
 
     setupNumberSteppers();
+    setPixfindHelpExpanded(false);
     syncControlsWithState();
     updateSpriteScaleControlLimits();
     applyEmbedGuardrails();
@@ -9976,10 +11876,13 @@
       return;
     }
 
+    const previousWidth = state.width;
+    const previousHeight = state.height;
     beginHistory('resizeCanvas');
     resizeAllLayers(width, height);
     state.width = width;
     state.height = height;
+    rescaleMirrorPivotForCanvas(previousWidth, previousHeight, width, height);
     dom.controls.canvasWidth.value = String(width);
     dom.controls.canvasHeight.value = String(height);
     markHistoryDirty();
@@ -9994,41 +11897,11 @@
   function setupNumberSteppers() {
     const inputs = document.querySelectorAll('input[type="number"][data-stepper]');
     inputs.forEach(input => {
-      if (input.dataset.stepperAttached === 'true') return;
-      const parent = input.parentElement;
-      if (!parent) return;
-      const wrapper = document.createElement('div');
-      wrapper.className = 'number-stepper';
-
-      const createButton = (label, delta) => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'number-stepper__btn';
-        btn.textContent = label;
-        btn.addEventListener('click', () => {
-          const step = Number(input.step) || 1;
-          const min = input.min !== '' ? Number(input.min) : -Infinity;
-          const max = input.max !== '' ? Number(input.max) : Infinity;
-          const current = Number(input.value);
-          const base = Number.isFinite(current) ? current : 0;
-          let next = base + delta * step;
-          if (Number.isFinite(min)) next = Math.max(min, next);
-          if (Number.isFinite(max)) next = Math.min(max, next);
-          input.value = String(next);
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-        return btn;
-      };
-
-      const minus = createButton('−', -1);
-      const plus = createButton('＋', 1);
-
-      parent.insertBefore(wrapper, input);
-      wrapper.appendChild(minus);
-      wrapper.appendChild(input);
-      wrapper.appendChild(plus);
-
+      const wrapper = input.closest('.number-stepper');
+      if (wrapper instanceof HTMLElement && wrapper.parentElement) {
+        wrapper.parentElement.insertBefore(input, wrapper);
+        wrapper.remove();
+      }
       input.dataset.stepperAttached = 'true';
     });
   }
@@ -10119,8 +11992,11 @@
       });
     });
 
+    const previousWidth = state.width;
+    const previousHeight = state.height;
     state.width = newWidth;
     state.height = newHeight;
+    rescaleMirrorPivotForCanvas(previousWidth, previousHeight, newWidth, newHeight);
     const ratio = num / den;
     state.pan.x = Math.round((state.pan.x || 0) * ratio);
     state.pan.y = Math.round((state.pan.y || 0) * ratio);
@@ -10180,7 +12056,7 @@
         const tool = button.dataset.tool;
         if (!tool) return;
         if (TOOL_ACTIONS.has(tool)) {
-          runToolAction(tool);
+          runToolAction(tool, { sourceButton: button });
           return;
         }
         setActiveTool(tool);
@@ -11243,9 +13119,79 @@
     setLayerVisibilityForRow(rowIndex, !current);
   }
 
+  function bindTimelineMatrixInteractions() {
+    const container = dom.controls.timelineMatrix;
+    if (!container || timelineMatrixInteractionBound) {
+      return;
+    }
+    timelineMatrixInteractionBound = true;
+    container.addEventListener('click', event => {
+      const target = event.target instanceof Element ? event.target.closest('button') : null;
+      if (!(target instanceof HTMLButtonElement) || !container.contains(target)) {
+        return;
+      }
+
+      if (target.classList.contains('timeline-visibility')) {
+        const rowIndex = Number.parseInt(target.dataset.layerRowIndex || '', 10);
+        if (Number.isFinite(rowIndex)) {
+          toggleLayerVisibilityForRow(rowIndex);
+        }
+        return;
+      }
+
+      if (target.classList.contains('timeline-layer-tag')) {
+        const layerId = target.dataset.timelineLayerId;
+        if (!layerId) {
+          return;
+        }
+        state.activeLayer = layerId;
+        scheduleSessionPersist();
+        renderTimelineMatrix();
+        requestOverlayRender();
+        return;
+      }
+
+      if (target.classList.contains('timeline-frame-button')) {
+        const frameIndex = Number.parseInt(target.dataset.timelineFrameIndex || '', 10);
+        if (!Number.isFinite(frameIndex) || frameIndex < 0 || frameIndex >= state.frames.length) {
+          return;
+        }
+        const currentFrame = getActiveFrame();
+        const currentLayers = currentFrame ? currentFrame.layers.slice().reverse() : [];
+        const activeLayerRow = currentLayers.findIndex(layer => layer.id === state.activeLayer);
+        state.activeFrame = frameIndex;
+        const candidateLayers = state.frames[frameIndex]?.layers?.slice().reverse() || [];
+        const nextLayer = candidateLayers[activeLayerRow] || candidateLayers[candidateLayers.length - 1] || candidateLayers[0];
+        if (nextLayer) {
+          state.activeLayer = nextLayer.id;
+        }
+        scheduleSessionPersist();
+        renderTimelineMatrix();
+        requestRender();
+        requestOverlayRender();
+        return;
+      }
+
+      if (target.classList.contains('timeline-slot')) {
+        const frameIndex = Number.parseInt(target.dataset.timelineFrameIndex || '', 10);
+        const layerId = target.dataset.timelineLayerId;
+        if (!Number.isFinite(frameIndex) || !layerId || frameIndex < 0 || frameIndex >= state.frames.length) {
+          return;
+        }
+        state.activeFrame = frameIndex;
+        state.activeLayer = layerId;
+        scheduleSessionPersist();
+        renderTimelineMatrix();
+        requestRender();
+        requestOverlayRender();
+      }
+    });
+  }
+
   function renderTimelineMatrix() {
     const container = dom.controls.timelineMatrix;
     if (!container) return;
+    bindTimelineMatrixInteractions();
 
     const frames = state.frames;
     const frameCount = frames.length;
@@ -11312,20 +13258,9 @@
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'timeline-frame-button pixel-frame';
+      button.dataset.timelineFrameIndex = String(frameIndex);
       const frameNumberMatch = String(frame.name).match(/(\d+)/);
       button.textContent = frameNumberMatch && frameNumberMatch[1] ? frameNumberMatch[1] : String(frameIndex + 1);
-      button.addEventListener('click', () => {
-        state.activeFrame = frameIndex;
-        const candidateLayers = reversedLayersByFrame[frameIndex];
-        const nextLayer = candidateLayers[activeLayerRow] || candidateLayers[candidateLayers.length - 1] || candidateLayers[0];
-        if (nextLayer) {
-          state.activeLayer = nextLayer.id;
-        }
-        scheduleSessionPersist();
-        renderTimelineMatrix();
-        requestRender();
-        requestOverlayRender();
-      });
 
       header.appendChild(button);
       applyTimelineSlotFrame(button, frameIndex === activeFrameIndex ? 'active' : 'default');
@@ -11358,21 +13293,12 @@
         visibilityToggle.setAttribute('aria-pressed', String(rowVisibility));
         visibilityToggle.setAttribute('aria-label', rowVisibility ? 'レイヤーを非表示' : 'レイヤーを表示');
         visibilityToggle.textContent = rowVisibility ? '●' : '○';
-        visibilityToggle.addEventListener('click', event => {
-          event.stopPropagation();
-          toggleLayerVisibilityForRow(rowIndex);
-        });
 
         const tag = document.createElement('button');
         tag.type = 'button';
         tag.className = 'timeline-layer-tag';
+        tag.dataset.timelineLayerId = layer.id;
         tag.textContent = labelName;
-        tag.addEventListener('click', () => {
-          state.activeLayer = layer.id;
-          scheduleSessionPersist();
-          renderTimelineMatrix();
-          requestOverlayRender();
-        });
         rowHeader.appendChild(visibilityToggle);
         rowHeader.appendChild(tag);
       } else {
@@ -11427,6 +13353,8 @@
           const slot = document.createElement('button');
           slot.type = 'button';
           slot.className = 'timeline-slot';
+          slot.dataset.timelineFrameIndex = String(frameIndex);
+          slot.dataset.timelineLayerId = targetLayer.id;
           slot.setAttribute('aria-label', `${frame.name} / ${targetLayer.name}`);
           if (!targetLayer.visible) {
             slot.classList.add('is-hidden');
@@ -11437,15 +13365,6 @@
             cell.classList.add('is-active-cell');
             isActiveCell = true;
           }
-          slot.addEventListener('click', () => {
-            state.activeFrame = frameIndex;
-            state.activeLayer = targetLayer.id;
-            scheduleSessionPersist();
-            renderTimelineMatrix();
-            requestRender();
-            requestOverlayRender();
-          });
-
           const marker = document.createElement('span');
           marker.className = 'timeline-slot__marker';
           marker.setAttribute('aria-hidden', 'true');
@@ -11484,7 +13403,6 @@
   }
 
   function renderLayerList() {
-    renderTimelineMatrix();
     updatePixfindModeUI();
   }
 
@@ -11504,6 +13422,7 @@
       gestureSurface.addEventListener('pointercancel', handleViewportPointerCancel, { passive: false });
     }
     refreshViewportCursorStyle();
+    updateMirrorGuideHandles();
   }
 
   function ensureCanvasWheelListener() {
@@ -12488,6 +14407,7 @@
   function updateFloatingDrawButtonEnabledState() {
     const button = dom.floatingDrawButton;
     if (!(button instanceof HTMLButtonElement)) {
+      syncVirtualCursorControlVisibility({ syncToggle: true });
       return;
     }
     const hidden = !state.showVirtualCursor;
@@ -12522,6 +14442,7 @@
       button.setAttribute('aria-disabled', 'false');
       clampFloatingDrawButtonPosition();
     }
+    syncVirtualCursorControlVisibility({ syncToggle: true });
   }
 
   function setupFloatingDrawButton() {
@@ -12595,6 +14516,7 @@
     updateScaleLimits = true,
   } = {}) {
     const { width, height, scale } = state;
+    state.mirror = normalizeMirrorAxisState(state.mirror, width, height);
     const drawingCanvas = dom.canvases.drawing;
     const overlayCanvas = dom.canvases.overlay;
     const selectionCanvas = dom.canvases.selection || null;
@@ -12842,6 +14764,64 @@
     setZoom(targetScale, focus);
   }
 
+  function hasOpenBlockingDialog() {
+    const dialogs = [
+      dom.newProject?.dialog,
+      dom.exportDialog?.dialog,
+      dom.exportInterstitial?.dialog,
+      dom.shortcutHelp?.dialog,
+      dom.updateHistory?.dialog,
+      dom.toolSpotlight?.dialog,
+    ];
+    return dialogs.some(dialog => dialog instanceof HTMLDialogElement && dialog.open);
+  }
+
+  function resolveToolShortcut(event) {
+    if (!event || event.isComposing || event.key === 'Process') {
+      return null;
+    }
+    const key = typeof event.key === 'string' ? event.key.toLowerCase() : '';
+    if (!key || key.length !== 1) {
+      return null;
+    }
+    if (key === 'r') {
+      return event.shiftKey ? 'rectFill' : 'rect';
+    }
+    if (key === 'o') {
+      return event.shiftKey ? 'ellipseFill' : 'ellipse';
+    }
+    const mapped = TOOL_SHORTCUT_BINDINGS[key];
+    if (!mapped) {
+      return null;
+    }
+    if (mapped === TOOL_SHORTCUT_SHAPE_GROUP) {
+      return getPreferredToolForGroup('shape') || DEFAULT_GROUP_TOOL.shape || 'line';
+    }
+    return mapped;
+  }
+
+  function handleToolShortcut(event) {
+    if (!event || event.altKey || event.ctrlKey || event.metaKey || event.repeat) {
+      return false;
+    }
+    if (pointerState.active || isEditableTarget(event.target)) {
+      return false;
+    }
+    if (startupVisible || hasOpenBlockingDialog()) {
+      return false;
+    }
+    const tool = resolveToolShortcut(event);
+    if (!tool) {
+      return false;
+    }
+    if (TOOL_ACTIONS.has(tool)) {
+      runToolAction(tool);
+    } else {
+      setActiveTool(tool);
+    }
+    return true;
+  }
+
   function setupKeyboard() {
     document.addEventListener('keydown', event => {
       const target = event.target;
@@ -12851,11 +14831,18 @@
         event.preventDefault();
       }
       if (event.key === 'Escape') {
+        if (startupVisible || hasOpenBlockingDialog()) {
+          return;
+        }
         if (hasPendingSelectionMove()) {
           cancelPendingSelectionMove();
         } else {
           clearSelection();
         }
+        return;
+      }
+      if (!editable && handleToolShortcut(event)) {
+        event.preventDefault();
         return;
       }
       const isModifier = event.metaKey || event.ctrlKey;
@@ -14633,6 +16620,25 @@
   }
 
   function setPixel(layer, x, y, paletteIndexOverride) {
+    if (!layer) {
+      return;
+    }
+    const tool = pointerState.tool || state.tool;
+    if (!isMirrorEnabledForTool(tool)) {
+      setPixelSingle(layer, x, y, paletteIndexOverride);
+      return;
+    }
+    const points = getMirroredPointSet(x, y, { tool, includeOriginal: true });
+    if (!points.length) {
+      return;
+    }
+    for (let i = 0; i < points.length; i += 1) {
+      const point = points[i];
+      setPixelSingle(layer, point.x, point.y, paletteIndexOverride);
+    }
+  }
+
+  function setPixelSingle(layer, x, y, paletteIndexOverride) {
     if (x < 0 || y < 0 || x >= state.width || y >= state.height) return;
     if (state.selectionMask && state.selectionMask[y * state.width + x] !== 1) return;
     const index = y * state.width + x;
@@ -15362,7 +17368,12 @@
 
   function requestOverlayRender() {
     overlayNeedsRedraw = true;
+    if (overlayRenderScheduled) {
+      return;
+    }
+    overlayRenderScheduled = true;
     requestAnimationFrame(timestamp => {
+      overlayRenderScheduled = false;
       if (!overlayNeedsRedraw) return;
       overlayNeedsRedraw = false;
       renderOverlay(timestamp);
@@ -15594,7 +17605,7 @@
     if (!(target instanceof Element)) {
       return false;
     }
-    return Boolean(target.closest('.canvas-controls') || target.closest('.floating-draw-button'));
+    return Boolean(target.closest('.canvas-controls') || target.closest('.floating-draw-button') || target.closest('.mirror-handle'));
   }
 
   function handleViewportPointerDown(event) {
@@ -15712,6 +17723,7 @@
       const clearHeight = selectionCanvas ? selectionCanvas.height : height * state.scale;
       ctx.selection.clearRect(0, 0, clearWidth, clearHeight);
     }
+    updateMirrorGuideHandles();
 
     const moveState = getPendingSelectionMoveState();
     const hasSelectionPreview = Boolean(pointerState.selectionPreview
@@ -15746,10 +17758,26 @@
       if (previewPixels && previewPixels.length) {
         ctx.overlay.save();
         ctx.overlay.fillStyle = rgbaToCss(getActiveDrawColor());
+        const previewSelectionMask = state.selectionMask;
+        const painted = new Set();
         previewPixels.forEach(idx => {
           const px = idx % state.width;
           const py = Math.floor(idx / state.width);
-          ctx.overlay.fillRect(px, py, 1, 1);
+          forEachMirroredPoint(px, py, activeTool, (mx, my) => {
+            if (mx < 0 || my < 0 || mx >= state.width || my >= state.height) {
+              return;
+            }
+            const maskIndex = my * state.width + mx;
+            if (previewSelectionMask && previewSelectionMask[maskIndex] !== 1) {
+              return;
+            }
+            const key = `${mx},${my}`;
+            if (painted.has(key)) {
+              return;
+            }
+            painted.add(key);
+            ctx.overlay.fillRect(mx, my, 1, 1);
+          });
         });
         ctx.overlay.restore();
       }
@@ -15963,10 +17991,25 @@
       if (pixels && pixels.length) {
         const fillColor = rgbaToCss(getActiveDrawColor());
         ctx.overlay.fillStyle = fillColor;
+        const painted = new Set();
         pixels.forEach(idx => {
           const px = idx % width;
           const py = Math.floor(idx / width);
-          ctx.overlay.fillRect(px, py, 1, 1);
+          forEachMirroredPoint(px, py, tool, (mx, my) => {
+            if (mx < 0 || my < 0 || mx >= width || my >= height) {
+              return;
+            }
+            const maskIndex = my * width + mx;
+            if (selectionMask && selectionMask[maskIndex] !== 1) {
+              return;
+            }
+            const key = `${mx},${my}`;
+            if (painted.has(key)) {
+              return;
+            }
+            painted.add(key);
+            ctx.overlay.fillRect(mx, my, 1, 1);
+          });
         });
         ctx.overlay.restore();
         return;
@@ -15979,7 +18022,7 @@
     ctx.overlay.restore();
   }
 
-  function drawFilledPreview(center, size, selectionMask, colorResolver) {
+  function drawFilledPreview(center, size, selectionMask, colorResolver, tool = pointerState.tool || state.tool) {
     const { width, height } = state;
     const halfDown = Math.floor(size / 2);
     const halfUp = Math.ceil(size / 2);
@@ -15988,20 +18031,33 @@
     const minY = clamp(center.y - halfDown, 0, height - 1);
     const maxY = clamp(center.y + halfUp - 1, 0, height - 1);
     let lastKey = null;
+    const painted = new Set();
     for (let y = minY; y <= maxY; y += 1) {
       for (let x = minX; x <= maxX; x += 1) {
-        const idx = y * width + x;
-        if (selectionMask && selectionMask[idx] !== 1) {
+        const color = colorResolver ? colorResolver(x, y) : getActiveDrawColor();
+        if (!color) {
           continue;
         }
-        const color = colorResolver ? colorResolver(x, y) : getActiveDrawColor();
-        if (!color) continue;
-        const key = `${color.r}-${color.g}-${color.b}-${color.a}`;
-        if (key !== lastKey) {
-          ctx.overlay.fillStyle = rgbaToCss(color);
-          lastKey = key;
-        }
-        ctx.overlay.fillRect(x, y, 1, 1);
+        forEachMirroredPoint(x, y, tool, (mx, my) => {
+          if (mx < 0 || my < 0 || mx >= width || my >= height) {
+            return;
+          }
+          const idx = my * width + mx;
+          if (selectionMask && selectionMask[idx] !== 1) {
+            return;
+          }
+          const paintedKey = `${mx},${my}`;
+          if (painted.has(paintedKey)) {
+            return;
+          }
+          painted.add(paintedKey);
+          const colorKey = `${color.r}-${color.g}-${color.b}-${color.a}`;
+          if (colorKey !== lastKey) {
+            ctx.overlay.fillStyle = rgbaToCss(color);
+            lastKey = colorKey;
+          }
+          ctx.overlay.fillRect(mx, my, 1, 1);
+        });
       }
     }
   }
@@ -16278,19 +18334,28 @@
     const height = state.height;
     const selectionMask = state.selectionMask;
     const color = getActiveDrawColor();
+    const previewTool = pointerState.tool || state.tool;
+    const painted = new Set();
     ctx.overlay.save();
     ctx.overlay.fillStyle = rgbaToCss(color);
     const stamp = (x, y) => {
       forEachBrushOffset((dx, dy) => {
         const px = x + dx;
         const py = y + dy;
-        if (px < 0 || py < 0 || px >= width || py >= height) {
-          return;
-        }
-        if (selectionMask && selectionMask[py * width + px] !== 1) {
-          return;
-        }
-        ctx.overlay.fillRect(px, py, 1, 1);
+        forEachMirroredPoint(px, py, previewTool, (mx, my) => {
+          if (mx < 0 || my < 0 || mx >= width || my >= height) {
+            return;
+          }
+          if (selectionMask && selectionMask[my * width + mx] !== 1) {
+            return;
+          }
+          const key = `${mx},${my}`;
+          if (painted.has(key)) {
+            return;
+          }
+          painted.add(key);
+          ctx.overlay.fillRect(mx, my, 1, 1);
+        });
       });
     };
 
@@ -16450,6 +18515,7 @@
         showMajorGrid: Boolean(state.showMajorGrid),
         majorGridSpacing: clamp(Math.round(state.majorGridSpacing || 16), 2, 512),
         showPixelGuides: Boolean(state.showPixelGuides),
+        mirror: normalizeMirrorAxisState(state.mirror, state.width, state.height),
         showVirtualCursor: Boolean(state.showVirtualCursor),
         virtualCursorButtonScale: normalizeFloatingDrawButtonScale(state.virtualCursorButtonScale),
         showChecker: Boolean(state.showChecker),
@@ -16499,7 +18565,7 @@
       state.pan.y = Math.round(payload.pan.y);
     }
     if (typeof payload.tool === 'string') {
-      state.tool = payload.tool;
+      state.tool = normalizeToolId(payload.tool, state.tool);
     }
     if (Number.isFinite(payload.brushSize)) {
       state.brushSize = clamp(Math.round(payload.brushSize), 1, 32);
@@ -16543,6 +18609,7 @@
     if (typeof payload.showPixelGuides === 'boolean') {
       state.showPixelGuides = payload.showPixelGuides;
     }
+    state.mirror = normalizeMirrorAxisState(payload.mirror, state.width, state.height);
     if (typeof payload.showVirtualCursor === 'boolean') {
       state.showVirtualCursor = payload.showVirtualCursor;
     }
@@ -16580,7 +18647,12 @@
     if (!state.lastGroupTool) {
       state.lastGroupTool = { ...DEFAULT_GROUP_TOOL };
     }
-    state.activeToolGroup = state.activeToolGroup || TOOL_TO_GROUP[state.tool] || 'pen';
+    state.tool = normalizeToolId(state.tool, 'pen');
+    if (!TOOL_GROUPS[state.activeToolGroup]?.tools?.includes(state.tool)) {
+      state.activeToolGroup = TOOL_TO_GROUP[state.tool] || 'pen';
+    } else {
+      state.activeToolGroup = state.activeToolGroup || TOOL_TO_GROUP[state.tool] || 'pen';
+    }
     if (typeof payload.documentName === 'string') {
       state.documentName = normalizeDocumentName(payload.documentName);
     }
