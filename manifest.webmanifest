@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "PiXiEED",
+  "short_name": "PiXiEED",
+  "description": "PiXiEED official tools and games for pixel art.",
+  "lang": "ja",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1224",
+  "theme_color": "#0b1224",
+  "icons": [
+    {
+      "src": "/icon/PiXiEED.icon512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon/PiXiEED.icon512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
