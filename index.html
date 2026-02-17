@@ -1448,6 +1448,8 @@
     }
   })();
 </script>
+<link rel="manifest" href="/manifest.webmanifest"/>
+<link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
 </head>
 <body class="with-bottom-nav">
   <div class="page">
@@ -1590,6 +1592,9 @@
           <li data-title="PiXiEEDraw Lite" data-image="icon/icon-192-5.png" data-type="tool" data-updated="2026-02-11" data-update="『描く』導線の初心者向けとして案内を強化" data-desc="16×16ドットの制作とPNG保存。" data-link="jerin-maker/index.html"></li>
           <li data-title="PiXiEELENS" data-image="icon/icon-192-1.png" data-type="tool" data-updated="2026-02-16" data-update="2/15: ボタン長押しGIF撮影を追加（最大2秒 / 6FPS） / 撮影後プレビューからPiXiEEDraw編集に対応 / 2/16: GIF撮影を最大5秒に拡張 / FPS設定（5・8・10・20・30）を追加 / PNG保存をドット倍率保存（x1→3倍〜x5→40倍）に対応 / 5MB超過時は倍率自動調整＋最終2倍保存に対応 / GIF保存は600x600目安・5MB制御を追加" data-desc="撮影品質・保存サイズ管理・操作性をまとめて強化し、SNS共有しやすい保存フローに改善。" data-link="pixiee-lens/index.html"></li>
           <li data-title="PiXiEEDraw" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-02-15" data-update="2色描画（左=通常色 / 右=サブ色）を追加 / Hueリング+SVマップ改善 / 円ツール計算と横画面レイアウトを調整" data-desc="描画操作とカラーピッカー精度、横画面の使い勝手を改善。" data-link="pixiedraw/index.html"></li>
+          <li data-title="PiXiEEDraw（対称モード刷新）" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-02-17" data-update="ミラーモードを実装（左右/上下/斜め2軸） / 4軸同時ON / 対称ラインつまみ移動 / グリッド基準調整 / 親子ボタン挙動を整理" data-desc="対称描画を実制作向けに強化。軸移動と同時反映に対応。" data-link="pixiedraw/index.html"></li>
+          <li data-title="PiXiEEDraw（UI/操作改善）" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-02-17" data-update="モバイル・横画面でツール並びを統一 / レール・つまみ・ギャップを統一 / 影や不要装飾を削減 / ツール再編（スポイト・仮想カーソル独立） / PixFiNDを設定トグル化" data-desc="軽量化と操作導線を優先したUIへ再調整。" data-link="pixiedraw/index.html"></li>
+          <li data-title="PiXiEEDraw（安全性と導線）" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-02-17" data-update="Aseprite系ショートカットを拡充 / ショートカット一覧を追加 / 未保存状態の離脱警告 / 出力後広告クローズ時に他ツール紹介ポップを追加 / 更新情報パネルを追加（直近1年表示）" data-desc="作業継続しやすい操作性と案内導線を強化。" data-link="pixiedraw/index.html"></li>
         </ul>
       </div>
     </section>
@@ -2093,5 +2098,6 @@
   <script src="character-dots/manifest.js"></script>
   <script src="scripts/character-gallery.js"></script>
   <script src="scripts/game-gallery.js"></script>
+<script defer src="/scripts/pwa-install.js"></script>
 </body>
 </html>
