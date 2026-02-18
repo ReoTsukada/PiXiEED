@@ -9057,6 +9057,45 @@
       });
     }
 
+    function getFilenameExtensions(filename) {
+      const match = String(filename || '').trim().match(/(\.[a-z0-9]+)$/i);
+      if (!match) {
+        return [];
+      }
+      return [match[1].toLowerCase()];
+    }
+
+    async function saveBlobWithFilePicker(blob, filename, mimeType = 'application/octet-stream') {
+      if (!(blob instanceof Blob) || typeof window.showSaveFilePicker !== 'function') {
+        return 'unsupported';
+      }
+      const fileExtensions = getFilenameExtensions(filename);
+      const pickerTypes = mimeType && fileExtensions.length
+        ? [{
+          description: `${mimeType} file`,
+          accept: {
+            [mimeType]: fileExtensions
+          }
+        }]
+        : undefined;
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: filename,
+          types: pickerTypes
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return 'saved';
+      } catch (error) {
+        if (error && error.name === 'AbortError') {
+          return 'cancel';
+        }
+        console.warn('showSaveFilePicker failed', error);
+        return 'error';
+      }
+    }
+
     async function createDrawImportPayload(result, filename, options = {}) {
       if (!result) {
         return null;
@@ -9430,8 +9469,13 @@
       if (blob instanceof Blob) {
         const shareFile = new File([blob], filename, { type: mimeType });
         const canShareFiles = typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare({ files: [shareFile] }));
+        const pickerResult = await saveBlobWithFilePicker(blob, filename, mimeType);
+        if (pickerResult === 'cancel') {
+          return false;
+        }
+        const pickerSaved = pickerResult === 'saved';
         let autoShareSucceeded = false;
-        const shouldAutoShare = autoShareOnMobile && isMobile && canShareFiles;
+        const shouldAutoShare = !pickerSaved && autoShareOnMobile && isMobile && canShareFiles;
         if (shouldAutoShare) {
           try {
             await navigator.share({
@@ -9447,7 +9491,11 @@
             // continue to fallback preview
           }
         }
-        if (supportsDownloadAttr && !autoShareSucceeded) {
+        if (pickerSaved) {
+          infoMessage = drawPayload
+            ? 'ファイルへ保存しました。「PiXiEEDrawで編集」で続けて編集できます。'
+            : `${formatLabel}をファイルへ保存しました。`;
+        } else if (supportsDownloadAttr && !autoShareSucceeded) {
           const downloadUrl = URL.createObjectURL(blob);
           const anchor = document.createElement('a');
           anchor.href = downloadUrl;
