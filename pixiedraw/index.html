@@ -99,9 +99,18 @@
 <div class="update-toast__body">
 <p class="update-toast__message">
 <strong>更新情報 (2026/02/18)</strong><br/>
-・左レーン2本化を廃止し、レイアウトをシンプル化<br/>
-・縦画面のツール親ボタンは1列スクロール表示へ統一<br/>
-・右レーンの向き変更時にパネルが消える不具合を修正<br/>
+・レイヤー編集を拡張（不透明度/合成モード）<br/>
+・フレーム設定を追加（オニオンスキンON/OFF・前後枚数・濃さ）<br/>
+・設定タブにもオニオンスキン項目を追加し同期<br/>
+・オニオンスキン表示を改善（元色半透明・参照範囲オレンジ枠）<br/>
+・タイムライン複数選択移動を強化（フレーム/レイヤー/セル）<br/>
+・再生UIと再生中表示を整理、再生キャッシュで安定化<br/>
+・塗りつぶし/プレビュー/履歴まわりを最適化<br/>
+・ブラシ拡張（四角/丸/カスタム）と Shift+B ブラシ化に対応<br/>
+・タイムラプス記録（低メモリ間引き）とGIF出力を追加<br/>
+・UIテーマ切替（緑色/ピンク/白/水色/黄色）を追加<br/>
+・右レーン向き変更時のパネル消失バグを修正<br/>
+・左レーン2本化を廃止、ズーム操作UIを非表示化<br/>
 ・詳細は設定の「更新情報」から確認できます
 </p>
 <div class="update-toast__actions">
@@ -340,7 +349,7 @@
 </button>
 </div>
 <div class="field-group">
-<label class="field">
+<label class="field" id="brushSizeField">
 <span>ブラシサイズ</span>
 <input id="brushSize" max="12" min="1" type="range" value="1"/>
 <output for="brushSize" id="brushSizeValue">1px</output>
@@ -360,6 +369,13 @@
 <canvas aria-hidden="true" class="brush-shape-button__icon" height="24" width="24"></canvas>
 <span>カスタム</span>
 </button>
+</div>
+</label>
+<label class="field" hidden id="selectSameModeField">
+<span>同色選択モード</span>
+<div aria-label="同色選択モード" class="select-same-mode-buttons" role="group">
+<button aria-pressed="true" class="chip select-same-mode-button is-active" data-select-same-mode="connected" type="button">連結のみ</button>
+<button aria-pressed="false" class="chip select-same-mode-button" data-select-same-mode="global" type="button">全体</button>
 </div>
 </label>
 <output class="brush-custom-info" id="customBrushInfo">カスタム: 未作成</output>
