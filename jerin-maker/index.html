@@ -4964,6 +4964,89 @@
     if (!composite) return null;
     return composite.toDataURL('image/png');
   }
+
+  function dataUrlToBlob(dataUrl) {
+    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
+      return null;
+    }
+    const parts = dataUrl.split(',');
+    if (parts.length < 2) {
+      return null;
+    }
+    const header = parts[0] || '';
+    const payload = parts[1] || '';
+    const mimeMatch = header.match(/data:([^;]+)/i);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+    try {
+      const binary = atob(payload);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return new Blob([bytes], { type: mimeType });
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function getFilenameExtensions(filename) {
+    const match = String(filename || '').trim().match(/(\.[a-z0-9]+)$/i);
+    if (!match) {
+      return [];
+    }
+    return [match[1].toLowerCase()];
+  }
+
+  async function saveBlobWithFilePicker(blob, filename, mimeType = 'application/octet-stream') {
+    if (!(blob instanceof Blob) || typeof window.showSaveFilePicker !== 'function') {
+      return 'unsupported';
+    }
+    const extensions = getFilenameExtensions(filename);
+    const pickerTypes = mimeType && extensions.length
+      ? [{
+        description: `${mimeType} file`,
+        accept: {
+          [mimeType]: extensions
+        }
+      }]
+      : undefined;
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: pickerTypes
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return 'saved';
+    } catch (error) {
+      if (error && error.name === 'AbortError') {
+        return 'cancel';
+      }
+      console.warn('showSaveFilePicker failed', error);
+      return 'error';
+    }
+  }
+
+  function downloadDataUrl(dataUrl, filename) {
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = filename;
+    link.click();
+    return 'download';
+  }
+
+  async function saveDataUrlWithPickerFallback(dataUrl, filename, mimeType = 'image/png') {
+    const blob = dataUrlToBlob(dataUrl);
+    if (blob) {
+      const pickerResult = await saveBlobWithFilePicker(blob, filename, mimeType);
+      if (pickerResult === 'saved' || pickerResult === 'cancel') {
+        return pickerResult;
+      }
+    }
+    return downloadDataUrl(dataUrl, filename);
+  }
+
   const DOWNLOAD_GUARD_KEY = 'pixieedrawlite_download_guard_v1';
   const PIXFIND_UPLOAD_KEY = 'pixfind_creator_upload_v1';
   function getCompositeSignature() {
@@ -5000,7 +5083,7 @@
       return false;
     }
   }
-  btnExport?.addEventListener('click', () => {
+  btnExport?.addEventListener('click', async () => {
     const { baseImage, diffImage } = getExportImagePair();
     const baseUrl = exportCompositeToDataUrl(640, baseImage);
     const diffUrl = exportCompositeToDataUrl(640, diffImage);
@@ -5008,16 +5091,16 @@
     const meta = JSON.stringify({ palette });
     const baseOut = injectTextChunk(baseUrl, 'palette', meta);
     const diffOut = injectTextChunk(diffUrl, 'palette', meta);
-    const download = (url, filename) => {
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      link.click();
-    };
-    download(baseOut, `pixieedrawlite-${canvasSize}px@640-original.png`);
-    window.setTimeout(() => {
-      download(diffOut, `pixieedrawlite-${canvasSize}px@640-diff.png`);
-    }, 120);
+    const baseFilename = `pixieedrawlite-${canvasSize}px@640-original.png`;
+    const diffFilename = `pixieedrawlite-${canvasSize}px@640-diff.png`;
+    const baseResult = await saveDataUrlWithPickerFallback(baseOut, baseFilename, 'image/png');
+    if (baseResult === 'cancel') return;
+    await new Promise(resolve => window.setTimeout(resolve, 120));
+    const diffResult = await saveDataUrlWithPickerFallback(diffOut, diffFilename, 'image/png');
+    if (diffResult === 'cancel') {
+      markDownloaded();
+      return;
+    }
     markDownloaded();
   });
   btnUpload?.addEventListener('click', () => {
