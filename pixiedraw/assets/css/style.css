@@ -1799,6 +1799,27 @@ input[type='range']::-moz-focus-outer {
   border-color: rgba(var(--ui-rgb), 0.16);
 }
 
+.select-same-mode-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.select-same-mode-button {
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 10px;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1.1;
+}
+
+#selectSameModeField {
+  order: -2;
+}
+
 .field--inline {
   flex-direction: row;
   flex-wrap: wrap;
