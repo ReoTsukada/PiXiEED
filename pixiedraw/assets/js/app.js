@@ -161,6 +161,8 @@
       clearCanvas: document.getElementById('clearCanvas'),
       enableAutosave: document.getElementById('enableAutosave'),
       autosaveStatus: document.getElementById('autosaveStatus'),
+      bindExportFolder: document.getElementById('bindExportFolder'),
+      exportFolderStatus: document.getElementById('exportFolderStatus'),
       timelapseClear: document.getElementById('timelapseClear'),
       timelapseFps: document.getElementById('timelapseFps'),
       timelapseStatus: document.getElementById('timelapseStatus'),
@@ -586,6 +588,7 @@
   })();
   let sessionPersistHandle = null;
   const AUTOSAVE_SUPPORTED = typeof window !== 'undefined' && 'showSaveFilePicker' in window && 'indexedDB' in window;
+  const EXPORT_DIRECTORY_SUPPORTED = typeof window !== 'undefined' && 'showDirectoryPicker' in window && 'indexedDB' in window;
   const SUPPORTS_ANCHOR_DOWNLOAD =
     typeof HTMLAnchorElement !== 'undefined' && 'download' in HTMLAnchorElement.prototype;
   const CAN_USE_WEB_SHARE =
@@ -637,6 +640,9 @@
   const AUTOSAVE_STORE_NAME = 'handles';
   const RECENT_PROJECTS_STORE = 'recentProjects';
   const AUTOSAVE_HANDLE_KEY = 'document';
+  const EXPORT_DIRECTORY_HANDLE_KEY = 'exportDirectory';
+  const EXPORT_WORKSPACE_DIR_NAME = 'PiXiEED';
+  const EXPORT_DIRECTORY_PICKER_ID = 'pixieed-export-directory';
   const AUTOSAVE_WRITE_DELAY = 1000;
   const RECENT_PROJECT_LIMIT = 12;
   const THUMBNAIL_MAX_EDGE = 144;
@@ -668,6 +674,9 @@
   let autosaveHandle = null;
   let pendingAutosaveHandle = null;
   let autosavePermissionListener = null;
+  let exportDirectoryHandle = null;
+  let pendingExportDirectoryHandle = null;
+  let exportDirectorySetupDismissed = false;
   let autosaveWriteTimer = null;
   let autosaveRestoring = false;
   let autosaveDirty = false;
@@ -4930,6 +4939,168 @@
     });
   }
 
+  function updateExportFolderStatus(message, tone = 'info') {
+    const statusNode = dom.controls.exportFolderStatus;
+    if (!statusNode) return;
+    statusNode.textContent = message;
+    statusNode.dataset.tone = tone;
+  }
+
+  function updateExportFolderButtonLabel() {
+    const button = dom.controls.bindExportFolder;
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    if (!EXPORT_DIRECTORY_SUPPORTED) {
+      button.disabled = true;
+      button.textContent = '出力フォルダ未対応';
+      return;
+    }
+    button.disabled = false;
+    if (exportDirectoryHandle) {
+      button.textContent = '出力フォルダを変更';
+      return;
+    }
+    if (pendingExportDirectoryHandle) {
+      button.textContent = '出力フォルダを再許可';
+      return;
+    }
+    button.textContent = '出力フォルダを設定';
+  }
+
+  async function ensureExportWorkspaceDirectory(handle) {
+    if (!handle || typeof handle.getDirectoryHandle !== 'function') {
+      return handle;
+    }
+    try {
+      return await handle.getDirectoryHandle(EXPORT_WORKSPACE_DIR_NAME, { create: true });
+    } catch (error) {
+      console.warn('Failed to create PiXiEED export workspace directory', error);
+      return handle;
+    }
+  }
+
+  function schedulePendingExportDirectoryPermission(handle) {
+    pendingExportDirectoryHandle = handle || null;
+    exportDirectoryHandle = null;
+    updateExportFolderButtonLabel();
+    updateExportFolderStatus('出力フォルダ: 権限が必要です。ボタンを押して再許可してください', 'warn');
+  }
+
+  async function attemptExportDirectoryReauthorization() {
+    if (!pendingExportDirectoryHandle) {
+      return false;
+    }
+    const handle = pendingExportDirectoryHandle;
+    const granted = await ensureHandlePermission(handle, { request: true });
+    if (!granted) {
+      schedulePendingExportDirectoryPermission(handle);
+      return false;
+    }
+    pendingExportDirectoryHandle = null;
+    exportDirectoryHandle = handle;
+    await storeExportDirectoryHandle(handle);
+    updateExportFolderButtonLabel();
+    updateExportFolderStatus(`出力フォルダ: 設定済み (${EXPORT_WORKSPACE_DIR_NAME})`, 'success');
+    return true;
+  }
+
+  async function requestExportDirectoryBinding() {
+    if (!EXPORT_DIRECTORY_SUPPORTED || typeof window.showDirectoryPicker !== 'function') {
+      updateExportFolderButtonLabel();
+      updateExportFolderStatus('出力フォルダ: このブラウザでは利用できません', 'warn');
+      return false;
+    }
+    try {
+      const rootHandle = await window.showDirectoryPicker({
+        id: EXPORT_DIRECTORY_PICKER_ID,
+        mode: 'readwrite',
+      });
+      const grantedRoot = await ensureHandlePermission(rootHandle, { request: true });
+      if (!grantedRoot) {
+        schedulePendingExportDirectoryPermission(rootHandle);
+        return false;
+      }
+      const workspaceHandle = await ensureExportWorkspaceDirectory(rootHandle);
+      const grantedWorkspace = await ensureHandlePermission(workspaceHandle, { request: true });
+      if (!grantedWorkspace) {
+        schedulePendingExportDirectoryPermission(workspaceHandle);
+        return false;
+      }
+      exportDirectoryHandle = workspaceHandle;
+      pendingExportDirectoryHandle = null;
+      exportDirectorySetupDismissed = false;
+      await storeExportDirectoryHandle(workspaceHandle);
+      updateExportFolderButtonLabel();
+      updateExportFolderStatus(`出力フォルダ: 設定済み (${EXPORT_WORKSPACE_DIR_NAME})`, 'success');
+      return true;
+    } catch (error) {
+      if (error && error.name === 'AbortError') {
+        exportDirectorySetupDismissed = true;
+        updateExportFolderStatus('出力フォルダ: キャンセルしました', 'warn');
+        return false;
+      }
+      console.warn('Export directory binding failed', error);
+      updateExportFolderStatus('出力フォルダ: フォルダを選択できませんでした', 'error');
+      return false;
+    }
+  }
+
+  function setupExportDirectoryControls() {
+    const button = dom.controls.bindExportFolder;
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    updateExportFolderButtonLabel();
+    if (!EXPORT_DIRECTORY_SUPPORTED) {
+      updateExportFolderStatus('出力フォルダ: このブラウザでは利用できません', 'warn');
+      return;
+    }
+    if (button.dataset.bound === 'true') {
+      return;
+    }
+    button.dataset.bound = 'true';
+    button.addEventListener('click', async () => {
+      exportDirectorySetupDismissed = false;
+      if (pendingExportDirectoryHandle && !exportDirectoryHandle) {
+        const restored = await attemptExportDirectoryReauthorization();
+        if (restored) {
+          return;
+        }
+      }
+      await requestExportDirectoryBinding();
+    });
+  }
+
+  async function initializeExportDirectoryBinding() {
+    setupExportDirectoryControls();
+    if (!EXPORT_DIRECTORY_SUPPORTED) {
+      return;
+    }
+    updateExportFolderStatus('出力フォルダ: 初期化中…', 'info');
+    try {
+      const handle = await loadStoredExportDirectoryHandle();
+      if (!handle) {
+        updateExportFolderButtonLabel();
+        updateExportFolderStatus('出力フォルダ: 未設定', 'info');
+        return;
+      }
+      const granted = await ensureHandlePermission(handle, { request: false });
+      if (granted) {
+        exportDirectoryHandle = handle;
+        pendingExportDirectoryHandle = null;
+        updateExportFolderButtonLabel();
+        updateExportFolderStatus(`出力フォルダ: 設定済み (${EXPORT_WORKSPACE_DIR_NAME})`, 'success');
+      } else {
+        schedulePendingExportDirectoryPermission(handle);
+      }
+    } catch (error) {
+      console.warn('Export directory initialisation failed', error);
+      updateExportFolderButtonLabel();
+      updateExportFolderStatus('出力フォルダ: 初期化でエラーが発生しました', 'error');
+    }
+  }
+
   async function initializeAutosave() {
     setupAutosaveControls();
     const button = dom.controls.enableAutosave;
@@ -5048,23 +5219,50 @@
     }
   }
 
+  async function getFileHandleInExportDirectory(filename, { create = true, requestPermission = false } = {}) {
+    if (!exportDirectoryHandle || typeof exportDirectoryHandle.getFileHandle !== 'function') {
+      return null;
+    }
+    const granted = await ensureHandlePermission(exportDirectoryHandle, { request: requestPermission });
+    if (!granted) {
+      if (requestPermission) {
+        schedulePendingExportDirectoryPermission(exportDirectoryHandle);
+      }
+      return null;
+    }
+    try {
+      return await exportDirectoryHandle.getFileHandle(filename, { create: Boolean(create) });
+    } catch (error) {
+      console.warn('Failed to create/open file in export directory', error);
+      return null;
+    }
+  }
+
   async function requestAutosaveBinding(options = {}) {
     if (!AUTOSAVE_SUPPORTED) return;
     try {
       const suggestedNameOption = typeof options.suggestedName === 'string' ? options.suggestedName.trim() : '';
       const suggestedName = suggestedNameOption || createAutosaveFileName();
-      const handle = await window.showSaveFilePicker({
-        suggestedName,
-        types: [
-          {
-            description: 'PiXiEEDraw ドキュメント',
-            accept: {
-              'application/json': ['.json', '.pxdraw', '.pixieedraw'],
-              'application/x-pixieedraw': ['.pixieedraw'],
-            },
-          },
-        ],
+      let handle = await getFileHandleInExportDirectory(suggestedName, {
+        create: true,
+        requestPermission: true,
       });
+      let boundFromExportDirectory = Boolean(handle);
+      if (!handle) {
+        handle = await window.showSaveFilePicker({
+          suggestedName,
+          types: [
+            {
+              description: 'PiXiEEDraw ドキュメント',
+              accept: {
+                'application/json': ['.json', '.pxdraw', '.pixieedraw'],
+                'application/x-pixieedraw': ['.pixieedraw'],
+              },
+            },
+          ],
+        });
+        boundFromExportDirectory = false;
+      }
       const granted = await ensureHandlePermission(handle, { request: true });
       if (!granted) {
         updateAutosaveStatus('自動保存: 権限が必要です', 'warn');
@@ -5077,7 +5275,11 @@
       if (dom.controls.enableAutosave) {
         dom.controls.enableAutosave.textContent = '自動保存先を変更';
       }
-      updateAutosaveStatus('自動保存: 保存中…');
+      updateAutosaveStatus(
+        boundFromExportDirectory
+          ? `自動保存: ${EXPORT_WORKSPACE_DIR_NAME} フォルダ内に保存中…`
+          : '自動保存: 保存中…'
+      );
       autosaveDirty = true;
       await writeAutosaveSnapshot(true);
     } catch (error) {
@@ -6409,11 +6611,18 @@
     });
   }
 
-  function openExportDialog() {
+  async function openExportDialog() {
     const config = dom.exportDialog;
     if (!config) {
       exportProjectWithFallback();
       return;
+    }
+    if (EXPORT_DIRECTORY_SUPPORTED) {
+      if (pendingExportDirectoryHandle && !exportDirectoryHandle) {
+        await attemptExportDirectoryReauthorization();
+      } else if (!exportDirectoryHandle && !exportDirectorySetupDismissed) {
+        await requestExportDirectoryBinding();
+      }
     }
     const dialog = config.dialog;
     if (dialog && typeof dialog.showModal === 'function') {
@@ -6848,7 +7057,7 @@
   }
 
   function exportProjectWithFallback() {
-    const choice = window.prompt('出力形式を入力してください (png / gif / timelapse / contest / pixfind / project)', 'png');
+    const choice = window.prompt('出力形式を入力してください (png / gif / timelapse / pixfind / project)', 'png');
     if (!choice) {
       return;
     }
@@ -6879,13 +7088,13 @@
     } else if (normalized === 'timelapse') {
       exportTimelapseGif();
     } else if (normalized === 'contest') {
-      exportProjectToContest();
+      updateAutosaveStatus('コンテスト投稿は現在停止中です', 'warn');
     } else if (normalized === 'pixfind') {
       exportProjectToPixfind();
     } else if (normalized === 'project') {
       saveProjectAsPixieedraw();
     } else {
-      window.alert('png / gif / timelapse / contest / pixfind / project のいずれかを入力してください。');
+      window.alert('png / gif / timelapse / pixfind / project のいずれかを入力してください。');
     }
   }
 
@@ -7306,7 +7515,7 @@
       } else if (mode === 'timelapse') {
         exportTimelapseGif();
       } else if (mode === 'contest') {
-        exportProjectToContest();
+        updateAutosaveStatus('コンテスト投稿は現在停止中です', 'warn');
       } else if (mode === 'pixfind') {
         exportProjectToPixfind();
       } else if (mode === 'project') {
@@ -7926,6 +8135,85 @@
       });
     } catch (error) {
       console.warn('Failed to clear autosave handle', error);
+    }
+  }
+
+  async function storeExportDirectoryHandle(handle) {
+    if (!EXPORT_DIRECTORY_SUPPORTED) return;
+    try {
+      const db = await openAutosaveDatabase();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction([AUTOSAVE_STORE_NAME], 'readwrite');
+        const store = tx.objectStore(AUTOSAVE_STORE_NAME);
+        const request = store.put(handle, EXPORT_DIRECTORY_HANDLE_KEY);
+        request.onerror = () => reject(request.error);
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+    } catch (error) {
+      console.warn('Failed to store export directory handle', error);
+    }
+  }
+
+  async function loadStoredExportDirectoryHandle() {
+    if (!EXPORT_DIRECTORY_SUPPORTED) return null;
+    try {
+      const db = await openAutosaveDatabase();
+      return await new Promise((resolve, reject) => {
+        let value = null;
+        const tx = db.transaction([AUTOSAVE_STORE_NAME], 'readonly');
+        const store = tx.objectStore(AUTOSAVE_STORE_NAME);
+        const request = store.get(EXPORT_DIRECTORY_HANDLE_KEY);
+        request.onsuccess = () => {
+          value = request.result || null;
+        };
+        request.onerror = () => {
+          reject(request.error);
+        };
+        tx.oncomplete = () => {
+          db.close();
+          resolve(value);
+        };
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+    } catch (error) {
+      console.warn('Export directory handle load failed', error);
+      return null;
+    }
+  }
+
+  async function clearStoredExportDirectoryHandle() {
+    if (!EXPORT_DIRECTORY_SUPPORTED) return;
+    try {
+      const db = await openAutosaveDatabase();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction([AUTOSAVE_STORE_NAME], 'readwrite');
+        const store = tx.objectStore(AUTOSAVE_STORE_NAME);
+        const request = store.delete(EXPORT_DIRECTORY_HANDLE_KEY);
+        request.onerror = () => reject(request.error);
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+    } catch (error) {
+      console.warn('Failed to clear export directory handle', error);
     }
   }
 
@@ -8764,42 +9052,6 @@
     }
   }
 
-  function exportProjectToContest() {
-    const frameCount = state.frames.length;
-    if (!frameCount) {
-      updateAutosaveStatus('投稿するフレームがありません', 'warn');
-      return;
-    }
-    try {
-      const { width, height } = state;
-      const activeIndex = clamp(state.activeFrame, 0, frameCount - 1);
-      const frame = state.frames[activeIndex];
-      const pixels = compositeFramePixels(frame, width, height, state.palette);
-      const baseCanvas = createFrameCanvas(pixels, width, height);
-      const dataUrl = baseCanvas.toDataURL('image/png');
-      if (!dataUrl) {
-        throw new Error('Missing contest data URL');
-      }
-      try {
-        const payload = {
-          dataUrl,
-          canvasSize: width === height ? width : `${width}x${height}`,
-          width,
-          height,
-          createdAt: new Date().toISOString(),
-        };
-        localStorage.setItem('pixieed_contest_upload_v1', JSON.stringify(payload));
-      } catch (error) {
-        console.warn('contest upload store failed', error);
-      }
-      markDocumentDurablySaved();
-      window.location.href = '../contest/index.html#post';
-    } catch (error) {
-      console.error('Contest export failed', error);
-      updateAutosaveStatus('コンテスト投稿用の画像を作成できませんでした', 'error');
-    }
-  }
-
   async function exportProjectAsPng() {
     const frameCount = state.frames.length;
     if (!frameCount) {
@@ -9051,7 +9303,6 @@
     if (normalized === 'gif') return 'gif';
     if (normalized === 'timelapse') return 'timelapse';
     if (normalized === 'png') return 'png';
-    if (normalized === 'contest') return 'contest';
     if (normalized === 'pixfind') return 'pixfind';
     if (normalized === 'project') return 'project';
     return 'png';
@@ -9274,8 +9525,10 @@
         shareTitle: options.shareTitle,
         shareText: task.shareText || options.shareText,
         allowFilePicker: true,
+        allowBoundDirectory: true,
       });
       switch (deliveryResult) {
+        case 'directory':
         case 'picker':
         case 'download':
         case 'share':
@@ -9356,6 +9609,28 @@
     return text.includes(SHARE_HASHTAG) ? text : `${text}\n${SHARE_HASHTAG}`;
   }
 
+  async function writeBlobToExportDirectory(blob, filename) {
+    if (!blob || !filename) {
+      return null;
+    }
+    const fileHandle = await getFileHandleInExportDirectory(filename, {
+      create: true,
+      requestPermission: true,
+    });
+    if (!fileHandle) {
+      return null;
+    }
+    try {
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return 'directory';
+    } catch (error) {
+      console.warn('Export directory write failed', error);
+      return null;
+    }
+  }
+
   async function triggerDownloadFromBlob(blob, filename, options = {}) {
     if (!blob) {
       throw new Error('Cannot download an empty blob');
@@ -9369,6 +9644,13 @@
           const match = filename.match(/(\.[^./]+)$/);
           return match ? [match[1].toLowerCase()] : [];
         })();
+
+    if (options.allowBoundDirectory !== false) {
+      const directoryResult = await writeBlobToExportDirectory(blob, filename);
+      if (directoryResult) {
+        return directoryResult;
+      }
+    }
 
     if (typeof window.showSaveFilePicker === 'function' && options.allowFilePicker !== false) {
       try {
@@ -11202,6 +11484,7 @@
   async function init() {
     await initializeIosSnapshotFallback();
     await initializeAutosave();
+    await initializeExportDirectoryBinding();
     setupLeftTabs();
     setupRightTabs();
     setupLayout();
