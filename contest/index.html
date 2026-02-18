@@ -1318,9 +1318,6 @@
     <a class="bottom-nav__item" data-tab="home" href="../index.html">
       <span class="icon"><img src="../FooterIcon1.png" alt=""/></span><span>ホーム</span>
     </a>
-    <a class="bottom-nav__item is-active" data-tab="contest" href="./index.html">
-      <span class="icon"><img src="../FooterIcon2.png" alt=""/></span><span>コンテスト</span>
-    </a>
     <a class="bottom-nav__item" data-tab="tools" href="../tools.html">
       <span class="icon"><img src="../FooterIcon3.png" alt=""/></span><span>ツール/ゲーム</span>
     </a>
@@ -1414,6 +1411,7 @@
     const CONTEST_SHARE_PADDING = 60;
     const CONTEST_SHARE_TITLE_SIZE = 32;
     const SHARE_HASHTAG = '#PiXiEED';
+    const CONTEST_TEMP_CLOSED = true;
     let supportsClientId = true;
     let supportsTags = true;
     let supportsDownloadSettings = true;
@@ -1472,6 +1470,31 @@
     const FAV_SRC = '../pixiedraw/assets/Fav.png';
 
     function $(id){ return document.getElementById(id); }
+
+    function applyContestTemporaryClosedMode(){
+      const page = document.querySelector('.page');
+      if(page){
+        page.innerHTML = `
+          <section class="card" style="margin-top:14px;">
+            <div class="top-bar">
+              <h1>コンテストは一時クローズ中です</h1>
+              <p class="subtitle">現在メンテナンス中のため、投稿と閲覧を停止しています。再開までお待ちください。</p>
+              <div class="quick-tools">
+                <a class="button" href="../index.html">ホームへ</a>
+                <a class="button secondary" href="../tools.html">ツール/ゲームへ</a>
+              </div>
+            </div>
+          </section>
+        `;
+      }
+      const fabMenu = document.getElementById('fabMenu');
+      if(fabMenu) fabMenu.remove();
+      const postPanel = document.getElementById('postPanel');
+      if(postPanel) postPanel.remove();
+      const authPanel = document.getElementById('authPanel');
+      if(authPanel) authPanel.remove();
+      document.title = 'PiXiEED コンテスト（一時クローズ中）';
+    }
 
     const AVATARS = [
       { id:'mao', type:'img', src:'../character-dots/mao1.png' },
@@ -4249,6 +4272,11 @@
 
     async function init(){
       ensureClientId();
+      if(CONTEST_TEMP_CLOSED){
+        applyContestTemporaryClosedMode();
+        setActiveNav();
+        return;
+      }
       if(location.hash === '#auth'){
         const openBtn = document.getElementById('openProfilePanel');
         if(openBtn){
