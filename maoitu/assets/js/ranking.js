@@ -7,14 +7,10 @@ const NAME_STORAGE_KEY = 'maoitu_rank_name';
 const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
 const RANKING_CACHE_KEY = 'maoitu_rank_cache';
 const RANKING_CACHE_LIMIT = 100;
-let profileSynced = false;
-let cachedUserId = null;
-let checkedAuth = false;
+
 let supabaseMaintenance = Boolean(readSupabaseMaintenance());
 
 function accountKey(row) {
-  const userId = row && row.user_id ? String(row.user_id).trim() : '';
-  if (userId) return `user:${userId}`;
   const clientId = row && row.client_id ? String(row.client_id).trim() : '';
   if (clientId) return `client:${clientId}`;
   return (row?.name || '').trim().toLowerCase() || 'guest';
@@ -43,10 +39,6 @@ function readSupabaseMaintenance() {
     // ignore
   }
   return null;
-}
-
-function isSupabaseMaintenance() {
-  return supabaseMaintenance;
 }
 
 function setSupabaseMaintenance(active, reason = '') {
@@ -106,49 +98,104 @@ function isMissingClientId(error) {
   return msg.includes('client_id');
 }
 
-function isMissingUserId(error) {
-  const msg = String(error?.message || '');
-  return msg.includes('user_id');
+function resolveAvatarSrcFromId(value) {
+  const id = String(value || '').trim().toLowerCase();
+  if (!id || id === 'mao') return '../character-dots/mao1.png';
+  if (/^jerin[1-8]$/.test(id)) return `../character-dots/Jerin${id.slice(5)}.png`;
+  if (/^jellnall([1-9]|1[0-9])$/.test(id)) return `../character-dots/${id.toUpperCase()}.png`;
+  if (id === 'baburin') return '../character-dots/baburinpng.png';
+  return '../character-dots/mao1.png';
 }
 
-async function getUserId() {
-  if (checkedAuth) return cachedUserId;
-  checkedAuth = true;
-  try {
-    const { data } = await supabase.auth.getSession();
-    cachedUserId = data?.session?.user?.id || null;
-  } catch (_) {
-    cachedUserId = null;
-  }
-  return cachedUserId;
-}
-
-async function syncProfileFromServer() {
-  if (profileSynced) return;
-  profileSynced = true;
-  const userId = await getUserId();
-  if (!userId) return;
-  try {
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .select('nickname')
-      .eq('id', userId)
-      .maybeSingle();
-    if (!error && data?.nickname) {
-      localStorage.setItem('pixieed_nickname', data.nickname);
+function normalizeProfileUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      return new URL(raw).toString();
+    } catch (_) {
+      return '';
     }
+  }
+  if (/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(raw)) {
+    try {
+      return new URL(`https://${raw}`).toString();
+    } catch (_) {
+      return '';
+    }
+  }
+  const handle = raw.replace(/^@+/, '').trim();
+  if (!handle) return '';
+  try {
+    return new URL(`https://x.com/${handle}`).toString();
+  } catch (_) {
+    return '';
+  }
+}
+
+function renderProfileIdentity(nameDisplay) {
+  if (!nameDisplay) return;
+  const nickname = (() => {
+    try {
+      return (localStorage.getItem('pixieed_nickname') || '').trim();
+    } catch (_) {
+      return '';
+    }
+  })();
+  const displayName = nickname || '未設定';
+  const saveName = nickname || '名無し';
+  try {
+    localStorage.setItem(NAME_STORAGE_KEY, saveName);
   } catch (_) {
     // ignore
   }
+  const avatarId = (() => {
+    try {
+      return localStorage.getItem('pixieed_avatar') || 'mao';
+    } catch (_) {
+      return 'mao';
+    }
+  })();
+  const profileUrl = (() => {
+    try {
+      return normalizeProfileUrl(localStorage.getItem('pixieed_x_url') || '');
+    } catch (_) {
+      return '';
+    }
+  })();
+
+  nameDisplay.textContent = '';
+  const wrap = document.createElement('span');
+  wrap.className = 'rank-profile';
+  const avatar = document.createElement('img');
+  avatar.className = 'rank-profile__avatar';
+  avatar.src = resolveAvatarSrcFromId(avatarId);
+  avatar.alt = '';
+  avatar.setAttribute('aria-hidden', 'true');
+  wrap.appendChild(avatar);
+  if (profileUrl) {
+    const link = document.createElement('a');
+    link.className = 'rank-profile__name';
+    link.href = profileUrl;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = displayName;
+    wrap.appendChild(link);
+  } else {
+    const label = document.createElement('span');
+    label.className = 'rank-profile__name';
+    label.textContent = displayName;
+    wrap.appendChild(label);
+  }
+  nameDisplay.appendChild(wrap);
 }
 
-async function fetchTopScores(includeUserId = true, includeClientId = true) {
+async function fetchTopScores(includeClientId = true) {
   const collected = [];
   let from = 0;
   for (let page = 0; page < MAX_PAGES; page++) {
     const to = from + PAGE_SIZE - 1;
     const selectColumns = ['name', 'score', 'created_at'];
-    if (includeUserId) selectColumns.push('user_id');
     if (includeClientId) selectColumns.push('client_id');
     const { data, error } = await supabase
       .from('scores')
@@ -158,11 +205,8 @@ async function fetchTopScores(includeUserId = true, includeClientId = true) {
       .range(from, to);
     if (error) {
       markSupabaseMaintenanceFromError(error);
-      if (includeUserId && isMissingUserId(error)) {
-        return fetchTopScores(false, includeClientId);
-      }
       if (includeClientId && isMissingClientId(error)) {
-        return fetchTopScores(includeUserId, false);
+        return fetchTopScores(false);
       }
       throw error;
     }
@@ -178,6 +222,21 @@ async function fetchTopScores(includeUserId = true, includeClientId = true) {
     from += PAGE_SIZE;
   }
   return uniqueByAccount(collected, RANKING_LIMIT);
+}
+
+function renderRankingRows(list, rows) {
+  list.innerHTML = '';
+  rows.forEach((row, idx) => {
+    const li = document.createElement('li');
+    li.className = 'rank-item';
+    li.dataset.rank = String(idx + 1);
+    const medal = idx === 0 ? '<span class="rank-medal rank-medal--1">1st</span>'
+      : idx === 1 ? '<span class="rank-medal rank-medal--2">2nd</span>'
+      : idx === 2 ? '<span class="rank-medal rank-medal--3">3rd</span>'
+      : '';
+    li.innerHTML = `<div class="rank-left"><span class="rank-index">${idx + 1}.</span>${medal}<span class="rank-name">${escapeHtml(String(row?.name || '名無し'))}</span></div><span class="rank-score">${Math.max(0, Math.floor(Number(row?.score) || 0))}</span>`;
+    list.appendChild(li);
+  });
 }
 
 export async function initRankingUI({ formSelector, listSelector, statusSelector }) {
@@ -197,74 +256,40 @@ export async function initRankingUI({ formSelector, listSelector, statusSelector
     window.pixieedFlushMaoituScoreQueue();
   }
 
-  await syncProfileFromServer();
-
-  // プロフィール名を反映（編集はプロフィールパネルのみ）
-  try {
-    const nick = localStorage.getItem('pixieed_nickname') || '';
-    const displayName = nick.trim() || '未設定';
-    const saveName = nick.trim() || '名無し';
-    if (nameDisplay) nameDisplay.textContent = displayName;
-    try { localStorage.setItem(NAME_STORAGE_KEY, saveName); } catch (_) {}
-  } catch (_) {
-    // ignore
-  }
+  renderProfileIdentity(nameDisplay);
 
   async function refreshList() {
+    renderProfileIdentity(nameDisplay);
     try {
       renderStatus('読み込み中...');
       const rows = await fetchTopScores();
       renderStatus(baseStatus);
-      list.innerHTML = '';
       if (!rows.length) {
         list.innerHTML = '<li class="rank-item">まだスコアがありません。</li>';
         return;
       }
       saveRankingCache(rows);
-      rows.forEach((row, idx) => {
-        const li = document.createElement('li');
-        li.className = 'rank-item';
-        li.dataset.rank = String(idx + 1);
-        const medal = idx === 0 ? '<span class="rank-medal rank-medal--1">1st</span>'
-          : idx === 1 ? '<span class="rank-medal rank-medal--2">2nd</span>'
-          : idx === 2 ? '<span class="rank-medal rank-medal--3">3rd</span>'
-          : '';
-        li.innerHTML = `<div class="rank-left"><span class="rank-index">${idx + 1}.</span>${medal}<span class="rank-name">${escapeHtml(row.name)}</span></div><span class="rank-score">${row.score}</span>`;
-        list.appendChild(li);
-      });
-    } catch (e) {
-      markSupabaseMaintenanceFromError(e);
+      renderRankingRows(list, rows);
+    } catch (error) {
+      markSupabaseMaintenanceFromError(error);
       const cached = loadRankingCache();
       if (cached.length) {
         renderStatus('メンテナンス中のため前回のランキングを表示しています');
-        list.innerHTML = '';
-        cached.forEach((row, idx) => {
-          const li = document.createElement('li');
-          li.className = 'rank-item';
-          li.dataset.rank = String(idx + 1);
-          const medal = idx === 0 ? '<span class="rank-medal rank-medal--1">1st</span>'
-            : idx === 1 ? '<span class="rank-medal rank-medal--2">2nd</span>'
-            : idx === 2 ? '<span class="rank-medal rank-medal--3">3rd</span>'
-            : '';
-          li.innerHTML = `<div class="rank-left"><span class="rank-index">${idx + 1}.</span>${medal}<span class="rank-name">${escapeHtml(row.name)}</span></div><span class="rank-score">${row.score}</span>`;
-          list.appendChild(li);
-        });
+        renderRankingRows(list, cached);
         return;
       }
       renderStatus('メンテナンス中です');
+      list.innerHTML = '<li class="rank-item">ランキングを取得できませんでした。</li>';
     }
   }
 
   renderStatus(baseStatus);
-
   await refreshList();
-  return {
-    refresh: refreshList
-  };
+  return { refresh: refreshList };
 }
 
 function escapeHtml(str) {
-  return str.replace(/[&<>"']/g, s => (
+  return String(str || '').replace(/[&<>"']/g, s => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[s] || s
   ));
 }
