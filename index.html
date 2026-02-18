@@ -1472,11 +1472,10 @@
       <div class="hero-grid">
         <div class="hero-copy">
           <h1>描いて!!遊んで!!公開して!!ドット絵専用総合サイト!!</h1>
-          <p class="subtitle">PiXiEED（ピクシード）は、ドット絵制作からゲーム体験、コンテスト公開までブラウザで完結できるサイトです。</p>
+          <p class="subtitle">PiXiEED（ピクシード）は、ドット絵制作からゲーム体験、作品公開までブラウザで完結できるサイトです。</p>
           <div class="hero-actions">
             <button class="button" id="toggleDrawGuide" type="button" aria-controls="draw-guide" aria-expanded="false">描く</button>
             <button class="button button--ghost" id="togglePlayGuide" type="button" aria-controls="play-guide" aria-expanded="false">遊ぶ</button>
-            <a class="button button--ghost" href="contest/index.html">公開して</a>
           </div>
           <div class="hero-draw-guide" id="draw-guide" hidden>
             <p class="hero-draw-guide__title">描く: レベルに合わせて選択</p>
@@ -1531,7 +1530,6 @@
             <a class="chip" href="projects/jerin-maker/index.html">16×16練習</a>
             <a class="chip" href="tools.html">ツールを探す</a>
             <a class="chip" href="games.html">ゲームで遊ぶ</a>
-            <a class="chip" href="contest/index.html">公開してみる</a>
             <a class="chip" href="portfolio/index.html">作品を見る</a>
             <a class="chip" href="#character-intro">キャラクター図鑑</a>
           </div>
@@ -1674,9 +1672,6 @@
     <a class="bottom-nav__item is-active" data-tab="home" href="./index.html">
       <span class="icon"><img src="FooterIcon1.png" alt=""/></span><span>ホーム</span>
     </a>
-    <a class="bottom-nav__item" data-tab="contest" href="contest/index.html">
-      <span class="icon"><img src="FooterIcon2.png" alt=""/></span><span>コンテスト</span>
-    </a>
     <a class="bottom-nav__item" data-tab="tools" href="tools.html">
       <span class="icon"><img src="FooterIcon3.png" alt=""/></span><span>ツール/ゲーム</span>
     </a>
@@ -1708,18 +1703,14 @@
           <div class="avatar-grid" id="avatarGrid"></div>
         </div>
         <label class="profile-name">
-          <span style="font-weight:700; color:#e5e7eb;">X (旧Twitter)</span>
-          <input class="auth-input" id="profileX" type="url" placeholder="https://x.com/username" maxlength="200" inputmode="url">
+          <span style="font-weight:700; color:#e5e7eb;">X / リンク</span>
+          <input class="auth-input" id="profileX" type="url" placeholder="https://x.com/username または https://example.com" maxlength="200" inputmode="url">
         </label>
         <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
       </div>
       <div class="profile-block">
-        <p class="helper" style="margin:0 0 6px;">アカウントの保存（メール）</p>
-        <p class="helper" style="margin:0 0 6px;">長期保存 / 自動で引き継ぎ / 復旧可</p>
-        <p class="helper" id="linkedEmail" style="margin:0 0 6px; display:block;">ログインはギャラリーで行ってください</p>
-        <button class="auth-btn" id="authBtn" type="button">ギャラリーでログイン</button>
+        <p class="helper" id="authStatus"></p>
       </div>
-      <p class="helper" id="authStatus"></p>
     </div>
   </div>
 
@@ -1735,11 +1726,13 @@
         if(!raw) return '';
         if(/^https?:\/\//i.test(raw)){
           try{
-            const url = new URL(raw);
-            const host = url.hostname.replace(/^www\./, '');
-            if(host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com' || host.endsWith('.twitter.com')){
-              return url.toString();
-            }
+            return new URL(raw).toString();
+          }catch(_){}
+          return '';
+        }
+        if(/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(raw)){
+          try{
+            return new URL(`https://${raw}`).toString();
           }catch(_){}
           return '';
         }
@@ -1749,11 +1742,7 @@
           ? `https://${handle}`
           : `https://x.com/${handle}`;
         try{
-          const url = new URL(candidate);
-          const host = url.hostname.replace(/^www\./, '');
-          if(host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com' || host.endsWith('.twitter.com')){
-            return url.toString();
-          }
+          return new URL(candidate).toString();
         }catch(_){}
         return '';
       }
@@ -1865,7 +1854,6 @@
         const saveBtn = document.getElementById('saveProfile');
         const nickInput = document.getElementById('profileNickname');
         const xInput = document.getElementById('profileX');
-        const authBtn = document.getElementById('authBtn');
         const status = document.getElementById('authStatus');
         const toggle = (open) => {
           if(!panel) return;
@@ -1891,11 +1879,6 @@
             saveXUrl(xUrl);
             applyAvatar();
             if(status) status.textContent = 'プロフィールを保存しました';
-          });
-        }
-        if(authBtn){
-          authBtn.addEventListener('click', () => {
-            window.location.href = 'contest/index.html#auth';
           });
         }
       }
