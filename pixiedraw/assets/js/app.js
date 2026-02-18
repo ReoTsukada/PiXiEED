@@ -55,6 +55,7 @@
     zoomIndicator: document.getElementById('zoomIndicator'),
     resizeHandles: {
       left: document.getElementById('resizeLeftRail'),
+      leftInner: document.getElementById('resizeLeftRailInner'),
       right: document.getElementById('resizeRightRail'),
     },
     toolGroupButtons: Array.from(document.querySelectorAll('.tool-group-button[data-tool-group]')),
@@ -63,14 +64,19 @@
       toggleGrid: document.getElementById('toggleGrid'),
       toggleMajorGrid: document.getElementById('toggleMajorGrid'),
       toggleBackgroundMode: document.getElementById('toggleBackgroundMode'),
+      toggleUiTheme: document.getElementById('toggleUiTheme'),
       undoAction: document.getElementById('undoAction'),
       redoAction: document.getElementById('redoAction'),
       canvasControlButtons: document.getElementById('canvasControlButtons'),
       canvasControlPrimary: document.getElementById('canvasControlPrimary'),
       canvasControlSecondary: document.getElementById('canvasControlSecondary'),
       zoomSlider: document.getElementById('zoomSlider'),
+      zoomInput: document.getElementById('zoomInput'),
+      zoomLevel: document.getElementById('zoomLevel'),
       brushSize: document.getElementById('brushSize'),
       brushSizeValue: document.getElementById('brushSizeValue'),
+      brushShapeButtons: Array.from(document.querySelectorAll('button[data-brush-shape]')),
+      customBrushInfo: document.getElementById('customBrushInfo'),
       colorMode: Array.from(document.querySelectorAll('input[name="colorMode"]')),
       paletteList: document.getElementById('paletteList'),
       addPaletteColor: document.getElementById('addPaletteColor'),
@@ -89,6 +95,19 @@
       paletteWheelCursor: document.getElementById('paletteWheelCursor'),
       paletteSvCursor: document.getElementById('paletteSvCursor'),
       timelineMatrix: document.getElementById('timelineMatrix'),
+      layerOpacity: document.getElementById('layerOpacity'),
+      layerOpacityValue: document.getElementById('layerOpacityValue'),
+      layerBlendMode: document.getElementById('layerBlendMode'),
+      layerSettingsTarget: document.getElementById('layerSettingsTarget'),
+      frameSettingsTarget: document.getElementById('frameSettingsTarget'),
+      onionSkinEnabled: document.getElementById('onionSkinEnabled'),
+      onionSkinEnabledValue: document.getElementById('onionSkinEnabledValue'),
+      onionPrevFrames: document.getElementById('onionPrevFrames'),
+      onionPrevFramesValue: document.getElementById('onionPrevFramesValue'),
+      onionNextFrames: document.getElementById('onionNextFrames'),
+      onionNextFramesValue: document.getElementById('onionNextFramesValue'),
+      onionOpacity: document.getElementById('onionOpacity'),
+      onionOpacityValue: document.getElementById('onionOpacityValue'),
       addLayer: document.getElementById('addLayer'),
       removeLayer: document.getElementById('removeLayer'),
       moveLayerUp: document.getElementById('moveLayerUp'),
@@ -109,6 +128,7 @@
       toggleChecker: document.getElementById('toggleChecker'),
       togglePixelPreview: document.getElementById('togglePixelPreview'),
       toggleVirtualCursor: document.getElementById('toggleVirtualCursor'),
+      toggleOnionSkin: document.getElementById('toggleOnionSkin'),
       toggleMirrorMode: document.getElementById('toggleMirrorMode'),
       mirrorAxisVertical: document.getElementById('mirrorAxisVertical'),
       mirrorAxisHorizontal: document.getElementById('mirrorAxisHorizontal'),
@@ -123,6 +143,7 @@
       virtualCursorButtonScale: document.getElementById('virtualCursorButtonScale'),
       virtualCursorButtonScaleValue: document.getElementById('virtualCursorButtonScaleValue'),
       virtualCursorScale: document.getElementById('virtualCursorScale'),
+      toggleTimelapse: document.getElementById('toggleTimelapse'),
       mobileDrawHelp: document.getElementById('mobileDrawHelp'),
       openDocument: document.getElementById('openDocument'),
       exportProject: document.getElementById('exportProject'),
@@ -137,9 +158,14 @@
       clearCanvas: document.getElementById('clearCanvas'),
       enableAutosave: document.getElementById('enableAutosave'),
       autosaveStatus: document.getElementById('autosaveStatus'),
+      timelapseClear: document.getElementById('timelapseClear'),
+      timelapseFps: document.getElementById('timelapseFps'),
+      timelapseStatus: document.getElementById('timelapseStatus'),
       memoryUsage: document.getElementById('memoryUsage'),
       memoryClear: document.getElementById('memoryClear'),
       spriteScaleInput: document.getElementById('spriteScaleInput'),
+      spriteScaleDecrement: document.getElementById('spriteScaleDecrement'),
+      spriteScaleIncrement: document.getElementById('spriteScaleIncrement'),
       applySpriteScale: document.getElementById('applySpriteScale'),
     },
     startup: {
@@ -291,6 +317,8 @@
     pan: 'move',
   });
   const TOOL_SHORTCUT_SHAPE_GROUP = '__shapeGroup__';
+  const TOOL_SHORTCUT_CREATE_CUSTOM_BRUSH = '__createCustomBrush__';
+  const POINTER_TOOL_CUSTOM_BRUSH_RECT = '__customBrushRect__';
   const TOOL_SHORTCUT_BINDINGS = Object.freeze({
     v: 'move',
     m: 'selectRect',
@@ -364,7 +392,7 @@
   const MAX_IMPORTED_PALETTE_COLORS = 256;
   const MAX_EXPORT_DIMENSION = 2000;
   const MAX_EXPORT_SCALE_OPTIONS = MAX_EXPORT_DIMENSION;
-  const MAX_SELECTION_CANVAS_DIMENSION = 8192;
+  const MAX_SELECTION_CANVAS_DIMENSION = 4096;
   const TARGET_EXPORT_OUTPUT_SIZE = 640;
 
   function parseEmbedConfig() {
@@ -487,6 +515,30 @@
   const EXPORT_INTERSTITIAL_LAST_SHOWN_KEY = 'pixieedraw:export-interstitial-last-shown-at';
   const EXPORT_INTERSTITIAL_COOLDOWN_MS = 45 * 1000;
   const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
+    Object.freeze({
+      id: '2026-02-18-ui-layout-stability',
+      at: '2026-02-18T12:00:00+09:00',
+      title: 'UI整理とレイアウト安定化',
+      details: Object.freeze([
+        'レイヤー編集を拡張: 不透明度スライダーと合成モード（通常/乗算/オーバーレイ/ソフトライト等）を追加。',
+        'フレーム設定を追加: オニオンスキンのON/OFF、前後参照枚数、濃さをフレーム単位で調整可能に。',
+        '設定タブにもオニオンスキンのチェック項目を追加し、タイムライン設定と同期。',
+        'オニオンスキン描画を改善: 元の色を半透明で表示し、参照中フレーム範囲をオレンジ枠で可視化。',
+        'タイムライン操作を強化: Shiftでフレーム/レイヤー/セルを複数選択し、まとめて移動できるよう改善。',
+        '再生UIを整理: 再生/停止の切替を明確化し、再生中の現在フレーム表示・マーカー同期を改善。',
+        '再生性能を最適化: 再生用フレームキャッシュ（full/lazy）を導入し、重い構成でも再生を安定化。',
+        '描画性能を最適化: 塗りつぶし/塗り矩形/プレビュー周りのキャッシュ無効化と処理経路を見直し。',
+        '履歴処理を改善: ヒストリー上限を拡張し、操作スパイクを抑える方向で最適化。',
+        'ブラシ機能を拡張: 四角/丸/カスタムの形状切替をボタン化し、範囲選択からブラシ化を実装。',
+        'ショートカットを拡張: Shift+Bで選択範囲ブラシ化（単押し/押下ドラッグ）に対応。',
+        '選択挙動を改善: 通常の範囲選択中もShift押下で連続追加選択できるよう調整。',
+        'タイムラプス機能を追加: 記録ON/OFF・FPS設定・低メモリ間引き・GIF出力を実装。',
+        'UIテーマ切替を追加: 緑色/ピンク/白/水色/黄色をワンタップ切替できるよう対応。',
+        'レイアウト不具合を修正: 右レーンポップ表示中の向き変更でパネルが消える問題を解消。',
+        '左レーン2本化は廃止し、関連トグル/内側つまみ/分割レイアウトを削除。',
+        'キャンバス上部のズーム操作UI（左右ボタンと%入力）は不要なため非表示化。',
+      ]),
+    }),
     Object.freeze({
       id: '2026-02-17-draw-major',
       at: '2026-02-17T20:00:00+09:00',
@@ -625,6 +677,7 @@
   let iosSnapshotInitialized = false;
   let iosSnapshotUnloadListenerBound = false;
   const brushOffsetCache = new Map();
+  const brushCircleOffsetCache = new Map();
   let exportScale = 1;
   let exportSheetInfo = null;
   let exportMaxScale = 1;
@@ -632,6 +685,18 @@
   let exportIncludeOriginalSize = false;
   let exportAdRequested = false;
   let exportInterstitialAdRequested = false;
+  const TIMELAPSE_DEFAULT_FPS = 12;
+  const TIMELAPSE_MIN_FPS = 1;
+  const TIMELAPSE_MAX_FPS = 60;
+  const TIMELAPSE_MAX_STEPS = 120;
+  const timelapseState = {
+    enabled: true,
+    snapshots: [],
+    fps: TIMELAPSE_DEFAULT_FPS,
+    warningShown: false,
+    sampleStep: 1,
+    lastCaptureToken: -1,
+  };
   let pixfindModeEnabled = false;
   let pixfindModeFirstEnableConfirmed = false;
 
@@ -639,6 +704,10 @@
   const RAIL_MIN_WIDTH = 68;
   const RAIL_MAX_WIDTH = 440;
   const RAIL_COMPACT_THRESHOLD = Object.freeze({ left: 132, right: 168 });
+  const RAIL_CLICK_OPEN_WIDTH = Object.freeze({ left: 220, right: 256 });
+  const RAIL_RESIZE_DRAG_THRESHOLD = 6;
+  const LEFT_DUAL_GAP = 8;
+  const LEFT_DUAL_MIN_COLUMN_WIDTH = Math.max(132, RAIL_DEFAULT_WIDTH.left, RAIL_MIN_WIDTH);
   const railSizing = {
     left: RAIL_DEFAULT_WIDTH.left,
     right: RAIL_DEFAULT_WIDTH.right,
@@ -646,6 +715,17 @@
     pointerId: null,
     startClientX: 0,
     startWidth: 0,
+    moved: false,
+    captureTarget: null,
+  };
+  const leftDualSizing = {
+    tools: LEFT_DUAL_MIN_COLUMN_WIDTH,
+    active: false,
+    pointerId: null,
+    startClientX: 0,
+    startToolsWidth: LEFT_DUAL_MIN_COLUMN_WIDTH,
+    startTotalWidth: (RAIL_DEFAULT_WIDTH.left * 2) + LEFT_DUAL_GAP,
+    moved: false,
     captureTarget: null,
   };
   const BACKGROUND_TILE_COLORS = Object.freeze({
@@ -662,6 +742,16 @@
       { r: 255, g: 213, b: 230, a: 255 },
     ],
   });
+  const UI_THEME_PRESETS = Object.freeze({
+    emerald: Object.freeze({ label: '緑色', themeColor: '#0b1415' }),
+    pink: Object.freeze({ label: 'ピンク', themeColor: '#16101b' }),
+    white: Object.freeze({ label: '白', themeColor: '#111317' }),
+    lightblue: Object.freeze({ label: '水色', themeColor: '#0b1420' }),
+    yellow: Object.freeze({ label: '黄色', themeColor: '#151207' }),
+  });
+  const DEFAULT_UI_THEME = 'emerald';
+  const UI_THEME_KEYS = Object.freeze(Object.keys(UI_THEME_PRESETS));
+  const UI_THEME_SET = new Set(UI_THEME_KEYS);
   const TRANSPARENT_TILE_SIZE = 8;
   const MIRROR_AXIS_VERTICAL = 'vertical';
   const MIRROR_AXIS_HORIZONTAL = 'horizontal';
@@ -718,6 +808,11 @@
   ]);
   const MIRROR_TOOL_ITEM_BY_KEY = new Map(MIRROR_TOOL_ITEMS.map(item => [item.key, item]));
   const BRUSH_TOOLS = new Set(['pen', 'eraser']);
+  const BRUSH_SHAPE_SQUARE = 'square';
+  const BRUSH_SHAPE_CIRCLE = 'circle';
+  const BRUSH_SHAPE_CUSTOM = 'custom';
+  const BRUSH_SHAPE_SET = new Set([BRUSH_SHAPE_SQUARE, BRUSH_SHAPE_CIRCLE, BRUSH_SHAPE_CUSTOM]);
+  const CUSTOM_BRUSH_MAX_PIXELS = 8192;
   const VIRTUAL_CURSOR_SUPPORTED_TOOLS = new Set([
     'pen',
     'eraser',
@@ -749,6 +844,31 @@
   };
   const FLOATING_DRAW_BUTTON_SCALE_VALUES = [1, 1.5, 2];
   const DEFAULT_FLOATING_DRAW_BUTTON_SCALE = 2;
+  const DEFAULT_LAYER_BLEND_MODE = 'normal';
+  const LAYER_BLEND_MODE_OPTIONS = Object.freeze([
+    Object.freeze({ value: 'normal', label: '通常' }),
+    Object.freeze({ value: 'multiply', label: '乗算' }),
+    Object.freeze({ value: 'screen', label: 'スクリーン' }),
+    Object.freeze({ value: 'overlay', label: 'オーバーレイ' }),
+    Object.freeze({ value: 'soft-light', label: 'ソフトライト' }),
+    Object.freeze({ value: 'hard-light', label: 'ハードライト' }),
+    Object.freeze({ value: 'darken', label: '比較(暗)' }),
+    Object.freeze({ value: 'lighten', label: '比較(明)' }),
+    Object.freeze({ value: 'color-dodge', label: '覆い焼きカラー' }),
+    Object.freeze({ value: 'color-burn', label: '焼き込みカラー' }),
+    Object.freeze({ value: 'difference', label: '差の絶対値' }),
+    Object.freeze({ value: 'exclusion', label: '除外' }),
+  ]);
+  const LAYER_BLEND_MODE_SET = new Set(LAYER_BLEND_MODE_OPTIONS.map(option => option.value));
+  const ONION_SKIN_MAX_FRAMES = 6;
+  const DEFAULT_ONION_SKIN = Object.freeze({
+    enabled: false,
+    prevFrames: 1,
+    nextFrames: 1,
+    opacity: 0.35,
+  });
+  const ONION_SKIN_TINT_PREV = Object.freeze({ r: 92, g: 198, b: 255 });
+  const ONION_SKIN_TINT_NEXT = Object.freeze({ r: 255, g: 170, b: 112 });
   let lockedCanvasWidth = null;
   let lockedCanvasHeight = null;
   const state = createInitialState();
@@ -848,7 +968,9 @@
   const toolIconCache = new Map();
   let startupVisible = false;
   let startupVirtualCursorState = null;
+  let layoutMode = null;
   restoreSessionState();
+  applyUiTheme(state.uiTheme, { persist: false });
   state.colorMode = 'index';
   state.mirror = normalizeMirrorAxisState(state.mirror, state.width, state.height);
   updateGridDecorations();
@@ -859,22 +981,34 @@
   }
   let hoverPixel = null;
   let zoomIndicatorTimeoutId = null;
+  let wheelZoomRaf = null;
+  let wheelZoomApplying = false;
+  let wheelZoomPendingScale = null;
+  let wheelZoomPendingFocus = null;
   let overlayNeedsRedraw = true;
   let overlayRenderScheduled = false;
+  let selectionCanvasActive = false;
   const recentProjectsCache = new Map();
   const SELECTION_DASH_SPEED = 40;
   let selectionDashScreenOffset = 0;
   let lastSelectionDashTime = 0;
-  const history = { past: [], future: [], pending: null, limit: 20 };
+  const DEFAULT_HISTORY_LIMIT = 80;
+  const history = { past: [], future: [], pending: null, limit: DEFAULT_HISTORY_LIMIT };
   let historyTrimmedRecently = false;
   let historyTrimmedAt = 0;
   const EMPTY_FILL_PREVIEW_PIXELS = Object.freeze([]);
   const fillPreviewCache = { contextKey: null, byPixel: null };
+  const onionSkinCache = {
+    revision: -1,
+    byFrame: new Map(),
+  };
+  let onionSkinCacheRevision = 0;
   const selectionMaskCacheIds = new WeakMap();
   let selectionMaskCacheIdCounter = 1;
   const HISTORY_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', 'fill']);
   const MEMORY_MONITOR_INTERVAL = 5000;
   const MEMORY_WARNING_DEFAULT = 250 * 1024 * 1024;
+  const MIN_HISTORY_LIMIT = 20;
   const DRAW_BUTTON_DRAG_THRESHOLD = 6;
   const DRAW_BUTTON_DRAG_THRESHOLD_TOUCH = 12;
   const TIMELINE_CELL_SIZE = 32;
@@ -907,13 +1041,33 @@
     playbackActive: { fill: 'rgba(88, 196, 255, 0.36)', border: 'rgba(88, 196, 255, 0.78)' },
     stop: { fill: 'rgba(255, 156, 126, 0.32)', border: 'rgba(255, 181, 152, 0.72)' },
   };
+  const TIMELINE_SELECTION_MODE_NONE = 'none';
+  const TIMELINE_SELECTION_MODE_FRAME = 'frame';
+  const TIMELINE_SELECTION_MODE_LAYER = 'layer';
+  const TIMELINE_SELECTION_MODE_SLOT = 'slot';
+  const timelineSelection = {
+    mode: TIMELINE_SELECTION_MODE_NONE,
+    frameIndexes: new Set(),
+    layerIndexes: new Set(),
+    slotKeys: new Set(),
+  };
   let memoryMonitorHandle = null;
   let timelineMatrixInteractionBound = false;
+  let timelineMatrixRenderKey = '';
   let toolButtons = [];
   let renderScheduled = false;
-  let layoutMode = null;
   let playbackHandle = null;
   let lastFrameTime = 0;
+  const PLAYBACK_MAX_CATCHUP_STEPS = 6;
+  const PLAYBACK_CACHE_PREBUILD_MAX_BYTES = 96 * 1024 * 1024;
+  const PLAYBACK_CACHE_LAZY_WINDOW_FRAMES = 8;
+  const playbackFrameCache = {
+    active: false,
+    mode: 'lazy',
+    width: 0,
+    height: 0,
+    byFrame: new Map(),
+  };
   let curveBuilder = null;
   let paletteWheelCtx = null;
   let paletteWheelResizeObserver = null;
@@ -1002,6 +1156,193 @@
     return state.mirror;
   }
 
+  function normalizeLayerBlendMode(value) {
+    if (typeof value !== 'string') {
+      return DEFAULT_LAYER_BLEND_MODE;
+    }
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'softlight') {
+      return 'soft-light';
+    }
+    if (normalized === 'hardlight') {
+      return 'hard-light';
+    }
+    if (normalized === 'colordodge') {
+      return 'color-dodge';
+    }
+    if (normalized === 'colorburn') {
+      return 'color-burn';
+    }
+    return LAYER_BLEND_MODE_SET.has(normalized) ? normalized : DEFAULT_LAYER_BLEND_MODE;
+  }
+
+  function normalizeLayerOpacity(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return 1;
+    }
+    return clamp(parsed, 0, 1);
+  }
+
+  function normalizeOnionFrameCount(value, fallback = 0) {
+    const parsed = Number(value);
+    const safeFallback = clamp(Math.round(Number(fallback) || 0), 0, ONION_SKIN_MAX_FRAMES);
+    if (!Number.isFinite(parsed)) {
+      return safeFallback;
+    }
+    return clamp(Math.round(parsed), 0, ONION_SKIN_MAX_FRAMES);
+  }
+
+  function normalizeOnionOpacity(value, fallback = DEFAULT_ONION_SKIN.opacity) {
+    const parsed = Number(value);
+    const safeFallback = clamp(Number(fallback) || 0, 0, 1);
+    if (!Number.isFinite(parsed)) {
+      return safeFallback;
+    }
+    return clamp(parsed, 0, 1);
+  }
+
+  function normalizeOnionSkinState(source) {
+    const settings = source && typeof source === 'object' ? source : {};
+    return {
+      enabled: Boolean(settings.enabled),
+      prevFrames: normalizeOnionFrameCount(settings.prevFrames, DEFAULT_ONION_SKIN.prevFrames),
+      nextFrames: normalizeOnionFrameCount(settings.nextFrames, DEFAULT_ONION_SKIN.nextFrames),
+      opacity: normalizeOnionOpacity(settings.opacity, DEFAULT_ONION_SKIN.opacity),
+    };
+  }
+
+  function normalizeUiTheme(value, fallback = DEFAULT_UI_THEME) {
+    const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (UI_THEME_SET.has(normalizedValue)) {
+      return normalizedValue;
+    }
+    const normalizedFallback = typeof fallback === 'string' ? fallback.trim().toLowerCase() : '';
+    if (UI_THEME_SET.has(normalizedFallback)) {
+      return normalizedFallback;
+    }
+    return DEFAULT_UI_THEME;
+  }
+
+  function normalizeBrushShape(value, fallback = BRUSH_SHAPE_SQUARE) {
+    const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (BRUSH_SHAPE_SET.has(normalizedValue)) {
+      return normalizedValue;
+    }
+    const normalizedFallback = typeof fallback === 'string' ? fallback.trim().toLowerCase() : '';
+    if (BRUSH_SHAPE_SET.has(normalizedFallback)) {
+      return normalizedFallback;
+    }
+    return BRUSH_SHAPE_SQUARE;
+  }
+
+  function normalizeCustomBrushData(source) {
+    if (!source || typeof source !== 'object' || !Array.isArray(source.offsets)) {
+      return null;
+    }
+    const offsets = [];
+    for (let i = 0; i < source.offsets.length; i += 1) {
+      if (offsets.length >= CUSTOM_BRUSH_MAX_PIXELS) {
+        break;
+      }
+      const entry = source.offsets[i];
+      if (!entry || typeof entry !== 'object') {
+        continue;
+      }
+      const dx = Number(entry.dx);
+      const dy = Number(entry.dy);
+      if (!Number.isFinite(dx) || !Number.isFinite(dy)) {
+        continue;
+      }
+      offsets.push({ dx: clamp(Math.round(dx), -8192, 8192), dy: clamp(Math.round(dy), -8192, 8192) });
+    }
+    if (!offsets.length) {
+      return null;
+    }
+    const width = clamp(Math.round(Number(source.width) || 1), 1, 4096);
+    const height = clamp(Math.round(Number(source.height) || 1), 1, 4096);
+    return {
+      offsets,
+      pixelCount: offsets.length,
+      width,
+      height,
+    };
+  }
+
+  function isCustomBrushData(brush) {
+    return Boolean(
+      brush
+      && typeof brush === 'object'
+      && Array.isArray(brush.offsets)
+      && brush.offsets.length > 0
+      && Number.isFinite(brush.pixelCount)
+      && brush.pixelCount > 0
+    );
+  }
+
+  function serializeCustomBrushPayload(brush) {
+    const normalized = normalizeCustomBrushData(brush);
+    if (!normalized) {
+      return null;
+    }
+    const packed = new Int16Array(normalized.offsets.length * 2);
+    for (let i = 0; i < normalized.offsets.length; i += 1) {
+      const offset = normalized.offsets[i];
+      packed[i * 2] = offset.dx;
+      packed[(i * 2) + 1] = offset.dy;
+    }
+    return {
+      width: normalized.width,
+      height: normalized.height,
+      offsets: encodeTypedArray(packed),
+    };
+  }
+
+  function deserializeCustomBrushPayload(payload) {
+    if (!payload || typeof payload !== 'object' || typeof payload.offsets !== 'string') {
+      return null;
+    }
+    const bytes = decodeBase64(payload.offsets);
+    if (!bytes.length || bytes.length % 2 !== 0) {
+      return null;
+    }
+    const source = new Int16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2);
+    if (source.length % 2 !== 0) {
+      return null;
+    }
+    const offsets = [];
+    for (let i = 0; i < source.length; i += 2) {
+      if (offsets.length >= CUSTOM_BRUSH_MAX_PIXELS) {
+        break;
+      }
+      offsets.push({ dx: source[i], dy: source[i + 1] });
+    }
+    return normalizeCustomBrushData({
+      width: payload.width,
+      height: payload.height,
+      offsets,
+    });
+  }
+
+  function getCustomBrushPixelCount(brush = state.customBrush) {
+    if (!isCustomBrushData(brush)) {
+      return 0;
+    }
+    return clamp(Math.round(Number(brush.pixelCount) || 0), 0, CUSTOM_BRUSH_MAX_PIXELS);
+  }
+
+  function hasCustomBrushData(brush = state.customBrush) {
+    return getCustomBrushPixelCount(brush) > 0;
+  }
+
+  function getEffectiveBrushShape(shape = state.brushShape) {
+    const normalized = normalizeBrushShape(shape, BRUSH_SHAPE_SQUARE);
+    if (normalized === BRUSH_SHAPE_CUSTOM && !hasCustomBrushData()) {
+      return BRUSH_SHAPE_SQUARE;
+    }
+    return normalized;
+  }
+
   function createInitialState(options = {}) {
     const preferredWidth = EMBED_CONFIG.initialWidth ?? EMBED_CONFIG.width ?? DEFAULT_CANVAS_SIZE;
     const preferredHeight =
@@ -1010,6 +1351,10 @@
       width: requestedWidth = preferredWidth,
       height: requestedHeight = preferredHeight,
       name: requestedName = DEFAULT_DOCUMENT_NAME,
+      onionSkin: requestedOnionSkin = DEFAULT_ONION_SKIN,
+      uiTheme: requestedUiTheme = DEFAULT_UI_THEME,
+      brushShape: requestedBrushShape = BRUSH_SHAPE_SQUARE,
+      customBrush: requestedCustomBrush = null,
     } = options || {};
     const width = clamp(
       Math.round(Number(requestedWidth) || preferredWidth || DEFAULT_CANVAS_SIZE),
@@ -1028,6 +1373,11 @@
       { r: 255, g: 255, b: 255, a: 255 },
       { r: 255, g: 96, b: 96, a: 255 },
     ];
+    const customBrush = normalizeCustomBrushData(requestedCustomBrush);
+    const requestedShape = normalizeBrushShape(requestedBrushShape, BRUSH_SHAPE_SQUARE);
+    const brushShape = requestedShape === BRUSH_SHAPE_CUSTOM && !customBrush
+      ? BRUSH_SHAPE_SQUARE
+      : requestedShape;
     const layers = [createLayer('レイヤー 1', width, height)];
     const frames = [createFrame('フレーム 1', layers, width, height)];
 
@@ -1038,6 +1388,8 @@
       pan: { x: 0, y: 0 },
       tool: 'pen',
       brushSize: 1,
+      brushShape,
+      customBrush,
       showGrid: true,
       showPixelGuides: true,
       mirror: createInitialMirrorState(width, height),
@@ -1047,11 +1399,14 @@
       gridScreenStep: 8,
       majorGridSpacing: 16,
       backgroundMode: 'dark',
+      uiTheme: normalizeUiTheme(requestedUiTheme, DEFAULT_UI_THEME),
       activeToolGroup: 'pen',
       lastGroupTool: { ...DEFAULT_GROUP_TOOL },
       activeLeftTab: 'tools',
+      dualLeftRail: false,
       activeRightTab: 'frames',
       showChecker: true,
+      onionSkin: normalizeOnionSkinState(requestedOnionSkin),
       colorMode: 'index',
       palette,
       activePaletteIndex: 2,
@@ -1083,6 +1438,7 @@
       name,
       visible: true,
       opacity: 1,
+      blendMode: DEFAULT_LAYER_BLEND_MODE,
       indices: new Int16Array(size).fill(-1),
       direct: null,
     };
@@ -1102,7 +1458,8 @@
       id: crypto.randomUUID ? crypto.randomUUID() : `layer-${Math.random().toString(36).slice(2)}`,
       name: baseLayer.name,
       visible: baseLayer.visible,
-      opacity: baseLayer.opacity,
+      opacity: normalizeLayerOpacity(baseLayer.opacity),
+      blendMode: normalizeLayerBlendMode(baseLayer.blendMode),
       indices: new Int16Array(size),
       direct: null,
     };
@@ -1137,6 +1494,7 @@
       selectionMove: null,
       drawPaletteIndex: null,
       selectionClearedOnDown: false,
+      selectionExtendOnDown: false,
       startClient: null,
       panOrigin: { x: 0, y: 0 },
       panMode: null,
@@ -1160,6 +1518,9 @@
   const activeTouchPointers = new Map();
   const keyboardState = {
     spacePanActive: false,
+    customBrushGestureArmed: false,
+    customBrushGestureUsed: false,
+    customBrushCreateOnPointerUp: false,
   };
   let lastSingleTouchClientY = null;
   let editableTouchSession = false;
@@ -1394,7 +1755,8 @@
             id: layer.id,
             name: layer.name,
             visible: layer.visible,
-            opacity: layer.opacity,
+            opacity: normalizeLayerOpacity(layer.opacity),
+            blendMode: normalizeLayerBlendMode(layer.blendMode),
             indices: clonePixelData ? new Int16Array(layer.indices) : layer.indices,
             direct: layer.direct instanceof Uint8ClampedArray
               ? (clonePixelData ? new Uint8ClampedArray(layer.direct) : layer.direct)
@@ -1406,10 +1768,13 @@
       gridScreenStep: state.gridScreenStep,
       majorGridSpacing: state.majorGridSpacing,
       backgroundMode: state.backgroundMode,
+      uiTheme: normalizeUiTheme(state.uiTheme, DEFAULT_UI_THEME),
       showPixelGuides: state.showPixelGuides,
       mirror: normalizeMirrorAxisState(state.mirror, state.width, state.height),
       showVirtualCursor: state.showVirtualCursor,
       showChecker: state.showChecker,
+      onionSkin: normalizeOnionSkinState(state.onionSkin),
+      dualLeftRail: false,
       documentName: state.documentName,
     };
 
@@ -1784,7 +2149,8 @@
           id: layer.id,
           name: layer.name,
           visible: layer.visible,
-          opacity: layer.opacity,
+          opacity: normalizeLayerOpacity(layer.opacity),
+          blendMode: normalizeLayerBlendMode(layer.blendMode),
           indices: compressInt16Array(layer.indices),
           direct: layer.direct ? compressUint8Array(layer.direct, { clamped: true }) : null,
         })),
@@ -1794,10 +2160,13 @@
       gridScreenStep: snapshot.gridScreenStep,
       majorGridSpacing: snapshot.majorGridSpacing,
       backgroundMode: snapshot.backgroundMode,
+      uiTheme: normalizeUiTheme(snapshot.uiTheme, DEFAULT_UI_THEME),
       showPixelGuides: snapshot.showPixelGuides,
       mirror: normalizeMirrorAxisState(snapshot.mirror, snapshot.width, snapshot.height),
       showVirtualCursor: snapshot.showVirtualCursor,
       showChecker: snapshot.showChecker,
+      onionSkin: normalizeOnionSkinState(snapshot.onionSkin),
+      dualLeftRail: false,
       documentName: snapshot.documentName,
     };
     if (Object.prototype.hasOwnProperty.call(snapshot, 'activeFrame')) {
@@ -1858,7 +2227,8 @@
           id: layer.id,
           name: layer.name,
           visible: layer.visible,
-          opacity: layer.opacity,
+          opacity: normalizeLayerOpacity(layer.opacity),
+          blendMode: normalizeLayerBlendMode(layer.blendMode),
           indices: decodeInt16Data(layer.indices),
           direct: layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null,
         })),
@@ -1868,10 +2238,13 @@
       gridScreenStep: snapshot.gridScreenStep,
       majorGridSpacing: snapshot.majorGridSpacing,
       backgroundMode: snapshot.backgroundMode,
+      uiTheme: normalizeUiTheme(snapshot.uiTheme, DEFAULT_UI_THEME),
       showPixelGuides: snapshot.showPixelGuides,
       mirror: normalizeMirrorAxisState(snapshot.mirror, snapshot.width, snapshot.height),
       showVirtualCursor: snapshot.showVirtualCursor,
       showChecker: snapshot.showChecker,
+      onionSkin: normalizeOnionSkinState(snapshot.onionSkin),
+      dualLeftRail: false,
       documentName: snapshot.documentName,
     };
     if (Object.prototype.hasOwnProperty.call(snapshot, 'activeFrame')) {
@@ -1961,12 +2334,28 @@
     return list.reduce((sum, snapshot) => sum + estimateSnapshotBytes(snapshot), 0);
   }
 
+  function estimateTimelapseBytes() {
+    if (!Array.isArray(timelapseState.snapshots) || !timelapseState.snapshots.length) {
+      return 0;
+    }
+    let total = 0;
+    timelapseState.snapshots.forEach(entry => {
+      if (!entry || typeof entry !== 'object') {
+        return;
+      }
+      total += estimateEncodedByteLength(entry.pixels, 1);
+      total += 16;
+    });
+    return total;
+  }
+
   function getMemoryUsageBreakdown() {
     const current = estimateStateBytes();
     const past = estimateHistoryBytes(history.past);
     const future = estimateHistoryBytes(history.future);
     const pending = history.pending && history.pending.before ? estimateSnapshotBytes(history.pending.before) : 0;
-    return { current, past, future, pending, total: current + past + future + pending };
+    const timelapse = estimateTimelapseBytes();
+    return { current, past, future, pending, timelapse, total: current + past + future + pending + timelapse };
   }
 
   function trimHistoryForMemoryIfNeeded(breakdown) {
@@ -1995,7 +2384,7 @@
       autosaveDirty = true;
       scheduleAutosaveSnapshot();
       usage = getMemoryUsageBreakdown();
-      history.limit = Math.max(5, Math.min(history.limit, Math.ceil(history.limit * 0.75)));
+      history.limit = Math.max(MIN_HISTORY_LIMIT, Math.min(history.limit, Math.ceil(history.limit * 0.75)));
       while (history.past.length > history.limit) {
         history.past.shift();
       }
@@ -2042,6 +2431,10 @@
     text += ` | 上限目安 ${formatBytes(memoryThresholds.maxBytes)}`;
   }
   text += ` | ヒストリー ${history.past.length}/${history.limit}`;
+  text += ` | タイムラプス ${timelapseState.snapshots.length}`;
+  if (timelapseState.sampleStep > 1) {
+    text += ` (間引きx${timelapseState.sampleStep})`;
+  }
     const now = performance && typeof performance.now === 'function' ? performance.now() : Date.now();
     if (historyTrimmedRecently) {
       if (now - historyTrimmedAt <= 6000) {
@@ -2058,6 +2451,8 @@
     history.past = [];
     history.future = [];
     history.pending = null;
+    history.limit = DEFAULT_HISTORY_LIMIT;
+    clearTimelapseRecording({ silent: true });
     fillPreviewCache.contextKey = null;
     fillPreviewCache.byPixel = null;
     updateHistoryButtons();
@@ -2102,6 +2497,15 @@
     if (Object.prototype.hasOwnProperty.call(snapshot, 'brushSize')) {
       state.brushSize = snapshot.brushSize;
     }
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'brushShape')) {
+      state.brushShape = normalizeBrushShape(snapshot.brushShape, state.brushShape);
+    }
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'customBrush')) {
+      state.customBrush = normalizeCustomBrushData(snapshot.customBrush);
+      if (state.brushShape === BRUSH_SHAPE_CUSTOM && !hasCustomBrushData()) {
+        state.brushShape = BRUSH_SHAPE_SQUARE;
+      }
+    }
     state.colorMode = 'index';
     state.palette = snapshot.palette.map(color => ({ ...color }));
     state.activePaletteIndex = normalizePaletteIndex(snapshot.activePaletteIndex, 0);
@@ -2119,7 +2523,8 @@
           id: layer.id,
           name: layer.name,
           visible: layer.visible,
-          opacity: layer.opacity,
+          opacity: normalizeLayerOpacity(layer.opacity),
+          blendMode: normalizeLayerBlendMode(layer.blendMode),
           indices: new Int16Array(layer.indices),
           direct: null,
         };
@@ -2154,6 +2559,7 @@
     state.gridScreenStep = snapshot.gridScreenStep ?? state.gridScreenStep ?? 16;
     state.majorGridSpacing = snapshot.majorGridSpacing ?? state.majorGridSpacing ?? 16;
     state.backgroundMode = snapshot.backgroundMode ?? 'dark';
+    state.uiTheme = normalizeUiTheme(snapshot.uiTheme, state.uiTheme);
     if (Object.prototype.hasOwnProperty.call(snapshot, 'activeToolGroup')) {
       state.activeToolGroup = snapshot.activeToolGroup ?? state.activeToolGroup ?? TOOL_TO_GROUP[state.tool] ?? 'pen';
     }
@@ -2179,6 +2585,8 @@
     state.mirror = normalizeMirrorAxisState(snapshot.mirror, snapshot.width, snapshot.height);
     state.showVirtualCursor = Boolean(snapshot.showVirtualCursor);
     state.showChecker = snapshot.showChecker;
+    state.onionSkin = normalizeOnionSkinState(snapshot.onionSkin);
+    state.dualLeftRail = false;
     if (Object.prototype.hasOwnProperty.call(snapshot, 'playback')) {
       state.playback = { ...snapshot.playback };
     }
@@ -2205,9 +2613,11 @@
     renderLayerList();
     renderPalette();
     syncPaletteInputs();
+    applyUiTheme(state.uiTheme, { persist: false, syncControl: false });
     syncControlsWithState();
     applyViewportTransform();
     invalidateFillPreviewCache();
+    invalidateOnionSkinCache();
     requestRender();
     requestOverlayRender();
     updateHistoryButtons();
@@ -2274,7 +2684,7 @@
   function beginHistory(label) {
     if (history.pending) return;
     history.pending = {
-      before: compressHistorySnapshot(makeHistorySnapshot()),
+      before: compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false })),
       dirty: false,
       label,
     };
@@ -2308,8 +2718,110 @@
     fillPreviewCache.byPixel = null;
   }
 
+  function invalidateOnionSkinCache() {
+    onionSkinCacheRevision += 1;
+    onionSkinCache.revision = -1;
+    onionSkinCache.byFrame.clear();
+  }
+
+  function clearPlaybackFrameCache() {
+    playbackFrameCache.active = false;
+    playbackFrameCache.mode = 'lazy';
+    playbackFrameCache.width = 0;
+    playbackFrameCache.height = 0;
+    playbackFrameCache.byFrame.clear();
+  }
+
+  function buildPlaybackFrameImageData(frameIndex) {
+    if (!ctx.drawing) {
+      return null;
+    }
+    if (!Number.isInteger(frameIndex) || frameIndex < 0 || frameIndex >= state.frames.length) {
+      return null;
+    }
+    const width = Math.max(1, Math.floor(Number(state.width) || 0));
+    const height = Math.max(1, Math.floor(Number(state.height) || 0));
+    const frame = state.frames[frameIndex];
+    if (!frame) {
+      return null;
+    }
+    const pixels = compositeFramePixels(frame, width, height, state.palette);
+    if (!(pixels instanceof Uint8ClampedArray) || pixels.length !== width * height * 4) {
+      return null;
+    }
+    const imageData = ctx.drawing.createImageData(width, height);
+    imageData.data.set(pixels);
+    return imageData;
+  }
+
+  function trimPlaybackLazyCache(centerFrameIndex) {
+    if (playbackFrameCache.mode !== 'lazy') {
+      return;
+    }
+    const center = Number.isInteger(centerFrameIndex) ? centerFrameIndex : state.activeFrame;
+    playbackFrameCache.byFrame.forEach((_, frameIndex) => {
+      if (Math.abs(frameIndex - center) > PLAYBACK_CACHE_LAZY_WINDOW_FRAMES) {
+        playbackFrameCache.byFrame.delete(frameIndex);
+      }
+    });
+  }
+
+  function preparePlaybackFrameCache() {
+    clearPlaybackFrameCache();
+    const width = Math.max(1, Math.floor(Number(state.width) || 0));
+    const height = Math.max(1, Math.floor(Number(state.height) || 0));
+    const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
+    if (!frameCount || width <= 0 || height <= 0) {
+      return;
+    }
+    playbackFrameCache.active = true;
+    playbackFrameCache.width = width;
+    playbackFrameCache.height = height;
+    const estimatedBytes = width * height * 4 * frameCount;
+    if (estimatedBytes > PLAYBACK_CACHE_PREBUILD_MAX_BYTES) {
+      playbackFrameCache.mode = 'lazy';
+      return;
+    }
+    playbackFrameCache.mode = 'full';
+    for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+      const imageData = buildPlaybackFrameImageData(frameIndex);
+      if (imageData) {
+        playbackFrameCache.byFrame.set(frameIndex, imageData);
+      }
+    }
+  }
+
+  function getPlaybackFrameImageData(frameIndex) {
+    if (!state.playback.isPlaying || !playbackFrameCache.active || !ctx.drawing) {
+      return null;
+    }
+    if (!Number.isInteger(frameIndex) || frameIndex < 0 || frameIndex >= state.frames.length) {
+      return null;
+    }
+    const width = Math.max(1, Math.floor(Number(state.width) || 0));
+    const height = Math.max(1, Math.floor(Number(state.height) || 0));
+    if (playbackFrameCache.width !== width || playbackFrameCache.height !== height) {
+      preparePlaybackFrameCache();
+    }
+    let imageData = playbackFrameCache.byFrame.get(frameIndex) || null;
+    if (!imageData) {
+      imageData = buildPlaybackFrameImageData(frameIndex);
+      if (!imageData) {
+        return null;
+      }
+      playbackFrameCache.byFrame.set(frameIndex, imageData);
+      trimPlaybackLazyCache(frameIndex);
+    }
+    return imageData;
+  }
+
   function markHistoryDirty() {
+    if (history.pending?.dirty) {
+      return;
+    }
     invalidateFillPreviewCache();
+    invalidateOnionSkinCache();
+    clearPlaybackFrameCache();
     autosaveDirty = true;
     markDocumentUnsavedChange();
     if (history.pending) {
@@ -2320,7 +2832,16 @@
   function commitHistory() {
     if (!history.pending) return;
     if (history.pending.dirty) {
-      history.past.push(history.pending.before);
+      const beforeSnapshot = history.pending.before;
+      history.past.push(beforeSnapshot);
+      if (timelapseState.enabled && timelapseState.snapshots.length === 0) {
+        const startEntry = createTimelapseFrameEntryFromSnapshot(beforeSnapshot);
+        if (startEntry) {
+          timelapseState.snapshots.push(startEntry);
+          thinTimelapseSnapshotsIfNeeded();
+        }
+      }
+      captureTimelapseFrameFromState();
       if (history.past.length > history.limit) {
         history.past.shift();
       }
@@ -2334,9 +2855,12 @@
   }
 
   function undo() {
+    if (cancelPendingCurveInteraction()) {
+      return;
+    }
     commitHistory();
     if (!history.past.length) return;
-    const snapshot = compressHistorySnapshot(makeHistorySnapshot());
+    const snapshot = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
     history.future.push(snapshot);
     if (history.future.length > history.limit) {
       history.future.shift();
@@ -2350,9 +2874,12 @@
   }
 
   function redo() {
+    if (cancelPendingCurveInteraction()) {
+      return;
+    }
     commitHistory();
     if (!history.future.length) return;
-    const snapshot = compressHistorySnapshot(makeHistorySnapshot());
+    const snapshot = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
     history.past.push(snapshot);
     if (history.past.length > history.limit) {
       history.past.shift();
@@ -2484,6 +3011,7 @@
     const hasSelection = selectionMaskHasPixels(state.selectionMask);
     const hasClipboard = Boolean(internalClipboard.selection);
     const nextMode = movePending ? 'selectionMove' : (hasSelection ? 'clipboard' : 'zoom');
+    const isZoomMode = nextMode === 'zoom';
     if (canvasControlMode !== nextMode) {
       canvasControlMode = nextMode;
       if (dom.controls.canvasControlButtons) {
@@ -2515,6 +3043,12 @@
         secondary.setAttribute('aria-label', 'ズームイン');
       }
     }
+    if (dom.controls.canvasControlButtons instanceof HTMLElement) {
+      dom.controls.canvasControlButtons.classList.toggle('is-clipboard-mode', !isZoomMode);
+    }
+    if (dom.controls.zoomInput instanceof HTMLInputElement) {
+      dom.controls.zoomInput.disabled = !isZoomMode;
+    }
     if (canvasControlMode === 'selectionMove') {
       primary.disabled = false;
       secondary.disabled = false;
@@ -2524,6 +3058,24 @@
     } else {
       primary.disabled = false;
       secondary.disabled = false;
+    }
+    syncBrushControls({ hasSelection });
+  }
+
+  function isDualLeftRailEnabled() {
+    return false;
+  }
+
+  function setDualLeftRailEnabled(enabled, { persist = true } = {}) {
+    state.dualLeftRail = false;
+    endLeftDualSplitResize({ persist: false });
+    updateRailCompactState('left');
+    clearLeftDualRailLayout();
+    updateLeftTabUI();
+    updateLeftTabVisibility();
+    updateToolVisibility();
+    if (persist) {
+      scheduleSessionPersist({ includeSnapshots: false });
     }
   }
 
@@ -2567,8 +3119,15 @@
 
   function updateLeftTabVisibility() {
     const isMobile = layoutMode === 'mobilePortrait';
+    const dualLeft = isDualLeftRailEnabled();
+    document.body.classList.toggle('is-dual-left-rail', dualLeft);
+    if (!dualLeft) {
+      clearLeftDualRailLayout();
+    } else {
+      syncLeftDualRailLayout();
+    }
     if (dom.leftTabsBar) {
-      dom.leftTabsBar.toggleAttribute('hidden', isMobile);
+      dom.leftTabsBar.toggleAttribute('hidden', isMobile || dualLeft);
     }
     if (isMobile) {
       LEFT_TAB_KEYS.forEach(key => {
@@ -2579,6 +3138,23 @@
         section.classList.add('is-active');
       });
       setCompactToolFlyoutOpen(false);
+      return;
+    }
+    if (dualLeft) {
+      LEFT_TAB_KEYS.forEach(key => {
+        const section = dom.sections[key];
+        if (!section) return;
+        section.hidden = false;
+        section.setAttribute('aria-hidden', 'false');
+        section.classList.add('is-active');
+      });
+      if (state.activeLeftTab !== 'tools') {
+        state.activeLeftTab = 'tools';
+        updateLeftTabUI();
+      }
+      if (!isCompactToolRailMode()) {
+        setCompactToolFlyoutOpen(false);
+      }
       return;
     }
     LEFT_TAB_KEYS.forEach(key => {
@@ -2694,12 +3270,18 @@
     const safeRight = viewportBounds.right - safeArea.right;
     const safeBottom = viewportBounds.bottom - safeArea.bottom;
     const safeWidth = Math.max(1, safeRight - safeLeft);
-    let width = clamp(Math.round(safeWidth * 0.28), 220, 340);
+    const isFramesFlyout = state.activeRightTab === 'frames';
+    const widthRatio = isFramesFlyout ? 0.34 : 0.28;
+    const minWidth = isFramesFlyout ? 300 : 220;
+    const maxWidth = isFramesFlyout ? 460 : 340;
     const minLeft = safeLeft + edgePadding;
+    const maxAvailableWidth = Math.max(160, Math.round(safeRight - minLeft - edgePadding));
+    let width = clamp(Math.round(safeWidth * widthRatio), minWidth, maxWidth);
+    width = Math.min(width, maxAvailableWidth);
     let computedLeft = Math.round(railRect.left - width - 4);
     if (computedLeft < minLeft) {
       computedLeft = minLeft;
-      width = Math.max(200, Math.min(width, safeRight - computedLeft - edgePadding));
+      width = Math.min(width, maxAvailableWidth);
     }
     const maxLeft = Math.max(minLeft, Math.round(safeRight - width - edgePadding));
     const preferredLeft = Number.isFinite(compactRightFlyoutLockedLeft)
@@ -2891,6 +3473,42 @@
     requestOverlayRender();
   }
 
+  function cancelPendingCurveInteraction() {
+    const hasCurveBuilder = Boolean(curveBuilder);
+    const hasCurveHistoryPending = Boolean(history.pending && history.pending.label === 'curve');
+    const isCurvePointerActive = Boolean(pointerState.active && pointerState.tool === 'curve');
+    if (!hasCurveBuilder && !hasCurveHistoryPending && !isCurvePointerActive) {
+      return false;
+    }
+
+    if (isCurvePointerActive) {
+      detachPointerListeners();
+      if (pointerState.pointerId !== null && dom.canvases.drawing) {
+        try {
+          dom.canvases.drawing.releasePointerCapture(pointerState.pointerId);
+        } catch (error) {
+          // Ignore capture release issues while cancelling unfinished curve edit.
+        }
+      }
+      pointerState.active = false;
+      pointerState.pointerId = null;
+      pointerState.path = [];
+      pointerState.preview = null;
+    }
+
+    if (hasCurveHistoryPending) {
+      history.pending = null;
+      updateHistoryButtons();
+    }
+
+    resetCurveBuilder();
+    pointerState.tool = state.tool;
+    pointerState.curveHandle = null;
+    pointerState.drawPaletteIndex = null;
+    requestOverlayRender();
+    return true;
+  }
+
   function setupToolGroups() {
     dom.toolGroupButtons = Array.from(document.querySelectorAll('.tool-group-button[data-tool-group]'));
     if (!state.lastGroupTool) {
@@ -3027,7 +3645,7 @@
     if (!(dom.leftRail instanceof HTMLElement) || dom.leftRail.dataset.compact !== 'true') {
       return false;
     }
-    return state.activeLeftTab === 'tools';
+    return state.activeLeftTab === 'tools' || isDualLeftRailEnabled();
   }
 
   function isMobilePeekToolFlyoutMode() {
@@ -3675,6 +4293,36 @@
     stack.dataset.background = state.backgroundMode;
   }
 
+  function updateThemeColorMeta(theme = state.uiTheme) {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (!(meta instanceof HTMLMetaElement)) {
+      return;
+    }
+    const normalized = normalizeUiTheme(theme, DEFAULT_UI_THEME);
+    const preset = UI_THEME_PRESETS[normalized] || UI_THEME_PRESETS[DEFAULT_UI_THEME];
+    meta.setAttribute('content', preset.themeColor);
+  }
+
+  function applyUiTheme(theme, { persist = true, syncControl = true } = {}) {
+    const normalized = normalizeUiTheme(theme, state.uiTheme || DEFAULT_UI_THEME);
+    state.uiTheme = normalized;
+    if (document.documentElement) {
+      document.documentElement.dataset.uiTheme = normalized;
+    }
+    updateThemeColorMeta(normalized);
+    if (syncControl && dom.controls.toggleUiTheme instanceof HTMLButtonElement) {
+      const preset = UI_THEME_PRESETS[normalized] || UI_THEME_PRESETS[DEFAULT_UI_THEME];
+      const label = preset?.label || UI_THEME_PRESETS[DEFAULT_UI_THEME].label;
+      dom.controls.toggleUiTheme.textContent = `UI:${label}`;
+      dom.controls.toggleUiTheme.setAttribute('aria-label', `UIカラー:${label}`);
+      dom.controls.toggleUiTheme.setAttribute('aria-pressed', String(normalized !== DEFAULT_UI_THEME));
+    }
+    renderBrushShapeButtonIcons();
+    if (persist) {
+      scheduleSessionPersist({ includeSnapshots: false });
+    }
+  }
+
   function createMirrorToolPopoverButton(item) {
     const button = document.createElement('button');
     button.type = 'button';
@@ -3804,6 +4452,238 @@
     updateFloatingDrawButtonScaleControl();
   }
 
+  function getCustomBrushStatusText() {
+    if (!isCustomBrushData(state.customBrush)) {
+      return 'カスタム: 未作成';
+    }
+    const customBrush = state.customBrush;
+    return `カスタム: ${customBrush.pixelCount}px (${customBrush.width}x${customBrush.height})`;
+  }
+
+  function getBrushShapeIconFillStyle(alpha = 0.95) {
+    const styles = document.documentElement ? window.getComputedStyle(document.documentElement) : null;
+    const rawRgb = styles ? styles.getPropertyValue('--ui-rgb-focus') : '';
+    const rgb = typeof rawRgb === 'string' && rawRgb.trim() ? rawRgb.trim() : '188, 236, 255';
+    return `rgba(${rgb}, ${clamp(Number(alpha) || 1, 0, 1)})`;
+  }
+
+  function getBrushShapeDotGlyph(shape) {
+    if (shape === BRUSH_SHAPE_SQUARE) {
+      return [
+        '0000000000000',
+        '0111111111110',
+        '0111111111110',
+        '0111111111110',
+        '0111111111110',
+        '0111111111110',
+        '0111111111110',
+        '0111111111110',
+        '0111111111110',
+        '0111111111110',
+        '0111111111110',
+        '0111111111110',
+        '0000000000000',
+      ];
+    }
+    if (shape === BRUSH_SHAPE_CIRCLE) {
+      return [
+        '0000011100000',
+        '0001111111000',
+        '0011111111100',
+        '0111111111110',
+        '0111111111110',
+        '1111111111111',
+        '1111111111111',
+        '1111111111111',
+        '0111111111110',
+        '0111111111110',
+        '0011111111100',
+        '0001111111000',
+        '0000011100000',
+      ];
+    }
+    return null;
+  }
+
+  function drawBrushShapeDotGlyph(context, iconWidth, iconHeight, glyphRows) {
+    if (!context || !Array.isArray(glyphRows) || !glyphRows.length) {
+      return false;
+    }
+    const glyphHeight = glyphRows.length;
+    const glyphWidth = typeof glyphRows[0] === 'string' ? glyphRows[0].length : 0;
+    if (!glyphWidth || glyphWidth <= 0) {
+      return false;
+    }
+    const startX = Math.floor((iconWidth - glyphWidth) / 2);
+    const startY = Math.floor((iconHeight - glyphHeight) / 2);
+    context.fillStyle = getBrushShapeIconFillStyle(0.96);
+    for (let y = 0; y < glyphHeight; y += 1) {
+      const row = glyphRows[y];
+      if (typeof row !== 'string') {
+        continue;
+      }
+      for (let x = 0; x < glyphWidth; x += 1) {
+        if (row[x] !== '1') {
+          continue;
+        }
+        context.fillRect(startX + x, startY + y, 1, 1);
+      }
+    }
+    return true;
+  }
+
+  function renderBrushShapeButtonIcon(button, shape) {
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    const canvas = button.querySelector('.brush-shape-button__icon');
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      return;
+    }
+    const iconWidth = Math.max(1, Number(canvas.width) || 18);
+    const iconHeight = Math.max(1, Number(canvas.height) || 18);
+    const context = canvas.getContext('2d', { alpha: true, desynchronized: true });
+    if (!context) {
+      return;
+    }
+    context.clearRect(0, 0, iconWidth, iconHeight);
+
+    if (shape === BRUSH_SHAPE_CUSTOM && !hasCustomBrushData()) {
+      context.strokeStyle = getBrushShapeIconFillStyle(0.6);
+      context.lineWidth = 1;
+      context.strokeRect(4.5, 4.5, iconWidth - 9, iconHeight - 9);
+      return;
+    }
+
+    const iconShape = normalizeBrushShape(shape, BRUSH_SHAPE_SQUARE);
+    const fixedGlyph = getBrushShapeDotGlyph(iconShape);
+    if (fixedGlyph && drawBrushShapeDotGlyph(context, iconWidth, iconHeight, fixedGlyph)) {
+      return;
+    }
+    const iconBrushSize = iconShape === BRUSH_SHAPE_CIRCLE || iconShape === BRUSH_SHAPE_SQUARE ? 5 : (state.brushSize || 1);
+    const offsets = getBrushOffsets(iconBrushSize, iconShape);
+    if (!offsets.length) {
+      return;
+    }
+
+    let minDx = Infinity;
+    let minDy = Infinity;
+    let maxDx = -Infinity;
+    let maxDy = -Infinity;
+    for (let i = 0; i < offsets.length; i += 1) {
+      const offset = offsets[i];
+      if (offset.dx < minDx) minDx = offset.dx;
+      if (offset.dy < minDy) minDy = offset.dy;
+      if (offset.dx > maxDx) maxDx = offset.dx;
+      if (offset.dy > maxDy) maxDy = offset.dy;
+    }
+
+    const padding = 2;
+    const innerWidth = Math.max(1, iconWidth - (padding * 2));
+    const innerHeight = Math.max(1, iconHeight - (padding * 2));
+    const shapeWidth = Math.max(1, maxDx - minDx + 1);
+    const shapeHeight = Math.max(1, maxDy - minDy + 1);
+    const scaleX = shapeWidth > 1 ? (innerWidth - 1) / (shapeWidth - 1) : 0;
+    const scaleY = shapeHeight > 1 ? (innerHeight - 1) / (shapeHeight - 1) : 0;
+    const centerX = Math.floor((innerWidth - 1) / 2);
+    const centerY = Math.floor((innerHeight - 1) / 2);
+    const raster = new Uint8Array(innerWidth * innerHeight);
+
+    for (let i = 0; i < offsets.length; i += 1) {
+      const offset = offsets[i];
+      const px = shapeWidth > 1 ? Math.round((offset.dx - minDx) * scaleX) : centerX;
+      const py = shapeHeight > 1 ? Math.round((offset.dy - minDy) * scaleY) : centerY;
+      const clampedX = clamp(px, 0, innerWidth - 1);
+      const clampedY = clamp(py, 0, innerHeight - 1);
+      raster[(clampedY * innerWidth) + clampedX] = 1;
+    }
+
+    context.fillStyle = getBrushShapeIconFillStyle(0.96);
+    for (let y = 0; y < innerHeight; y += 1) {
+      for (let x = 0; x < innerWidth; x += 1) {
+        if (raster[(y * innerWidth) + x] !== 1) {
+          continue;
+        }
+        context.fillRect(padding + x, padding + y, 1, 1);
+      }
+    }
+  }
+
+  function renderBrushShapeButtonIcons() {
+    const buttons = Array.isArray(dom.controls.brushShapeButtons) ? dom.controls.brushShapeButtons : [];
+    const custom = isCustomBrushData(state.customBrush) ? state.customBrush : null;
+    const customKey = custom
+      ? (() => {
+        const first = custom.offsets[0];
+        const last = custom.offsets[custom.offsets.length - 1];
+        return `${custom.pixelCount}:${custom.width}:${custom.height}:${first.dx},${first.dy}:${last.dx},${last.dy}`;
+      })()
+      : 'none';
+    for (let i = 0; i < buttons.length; i += 1) {
+      const button = buttons[i];
+      if (!(button instanceof HTMLButtonElement)) {
+        continue;
+      }
+      const shape = normalizeBrushShape(button.dataset.brushShape, BRUSH_SHAPE_SQUARE);
+      const canvas = button.querySelector('.brush-shape-button__icon');
+      const renderKey = `${shape}:${state.uiTheme}:${customKey}`;
+      if (canvas instanceof HTMLCanvasElement && canvas.dataset.iconKey === renderKey) {
+        continue;
+      }
+      renderBrushShapeButtonIcon(button, shape);
+      if (canvas instanceof HTMLCanvasElement) {
+        canvas.dataset.iconKey = renderKey;
+      }
+    }
+  }
+
+  function syncBrushControls(options = {}) {
+    const hasSelection = Object.prototype.hasOwnProperty.call(options, 'hasSelection')
+      ? Boolean(options.hasSelection)
+      : selectionMaskHasPixels(state.selectionMask);
+    const effectiveShape = getEffectiveBrushShape(state.brushShape);
+    if (state.brushShape !== effectiveShape) {
+      state.brushShape = effectiveShape;
+    }
+    const hasCustomBrush = hasCustomBrushData();
+    if (Array.isArray(dom.controls.brushShapeButtons)) {
+      dom.controls.brushShapeButtons.forEach(button => {
+        if (!(button instanceof HTMLButtonElement)) {
+          return;
+        }
+        const shape = normalizeBrushShape(button.dataset.brushShape, BRUSH_SHAPE_SQUARE);
+        const pressed = shape === effectiveShape;
+        button.classList.toggle('is-active', pressed);
+        button.setAttribute('aria-pressed', String(pressed));
+        if (shape === BRUSH_SHAPE_CUSTOM) {
+          button.disabled = !hasCustomBrush && !hasSelection;
+        } else {
+          button.disabled = false;
+        }
+      });
+      renderBrushShapeButtonIcons();
+    }
+    if (dom.controls.customBrushInfo instanceof HTMLOutputElement) {
+      dom.controls.customBrushInfo.textContent = getCustomBrushStatusText();
+    }
+  }
+
+  function syncZoomControls(scaleValue = state.scale) {
+    const normalizedScale = normalizeZoomScale(scaleValue, MIN_ZOOM_SCALE);
+    if (dom.controls.zoomSlider instanceof HTMLInputElement) {
+      dom.controls.zoomSlider.value = String(getZoomStepIndex(normalizedScale));
+    }
+    if (dom.controls.zoomInput instanceof HTMLInputElement) {
+      dom.controls.zoomInput.min = String(Math.round(MIN_ZOOM_SCALE * 100));
+      dom.controls.zoomInput.max = String(Math.round(MAX_ZOOM_SCALE * 100));
+      dom.controls.zoomInput.step = '1';
+      dom.controls.zoomInput.value = String(Math.round(normalizedScale * 100));
+    }
+    if (dom.controls.zoomLevel) {
+      dom.controls.zoomLevel.textContent = formatZoomLabel(normalizedScale);
+    }
+  }
+
   function syncControlsWithState() {
     if (dom.controls.brushSize) {
       dom.controls.brushSize.value = String(state.brushSize);
@@ -3811,6 +4691,7 @@
     if (dom.controls.brushSizeValue) {
       dom.controls.brushSizeValue.textContent = `${state.brushSize}px`;
     }
+    syncBrushControls();
     if (dom.controls.canvasWidth) {
       dom.controls.canvasWidth.value = String(state.width);
     }
@@ -3831,6 +4712,14 @@
       };
       dom.controls.toggleBackgroundMode.setAttribute('aria-pressed', String(state.backgroundMode !== 'dark'));
       dom.controls.toggleBackgroundMode.textContent = labelMap[state.backgroundMode] || '背景';
+    }
+    if (dom.controls.toggleUiTheme instanceof HTMLButtonElement) {
+      const normalizedTheme = normalizeUiTheme(state.uiTheme, DEFAULT_UI_THEME);
+      const preset = UI_THEME_PRESETS[normalizedTheme] || UI_THEME_PRESETS[DEFAULT_UI_THEME];
+      const label = preset?.label || UI_THEME_PRESETS[DEFAULT_UI_THEME].label;
+      dom.controls.toggleUiTheme.textContent = `UI:${label}`;
+      dom.controls.toggleUiTheme.setAttribute('aria-label', `UIカラー:${label}`);
+      dom.controls.toggleUiTheme.setAttribute('aria-pressed', String(normalizedTheme !== DEFAULT_UI_THEME));
     }
     if (dom.controls.toggleChecker) {
       dom.controls.toggleChecker.checked = state.showChecker;
@@ -3871,12 +4760,7 @@
     }
     syncMirrorToolPopoverControls(mirrorState);
     syncVirtualCursorControlVisibility({ syncToggle: true });
-    if (dom.controls.zoomSlider) {
-      dom.controls.zoomSlider.value = String(getZoomStepIndex(state.scale));
-    }
-    if (dom.controls.zoomLevel) {
-      dom.controls.zoomLevel.textContent = formatZoomLabel(state.scale);
-    }
+    syncZoomControls(state.scale);
     if (toolButtons.length) {
       setActiveTool(state.tool, toolButtons, { persist: false });
     }
@@ -3888,8 +4772,11 @@
     updateGridDecorations();
     updateHistoryButtons();
     updateCanvasControlButtons();
+    syncActiveLayerSettingsUI();
+    syncActiveFrameSettingsUI();
     updatePixfindModeUI();
     updateExportOriginalToggleUI();
+    syncTimelapseControls();
     updateMirrorGuideHandles();
   }
 
@@ -3902,6 +4789,8 @@
   function updateSpriteScaleControlLimits() {
     const input = dom.controls.spriteScaleInput;
     const button = dom.controls.applySpriteScale;
+    const decrementButton = dom.controls.spriteScaleDecrement;
+    const incrementButton = dom.controls.spriteScaleIncrement;
     if (!input) return;
     const maxMultiplier = getMaxSpriteMultiplier();
     if (maxMultiplier <= 1) {
@@ -3910,6 +4799,8 @@
       input.value = '1';
       input.disabled = true;
       if (button) button.setAttribute('disabled', 'true');
+      if (decrementButton) decrementButton.setAttribute('disabled', 'true');
+      if (incrementButton) incrementButton.setAttribute('disabled', 'true');
     } else {
       input.min = '1';
       input.max = String(maxMultiplier);
@@ -3920,7 +4811,32 @@
         if (current > 1) button.removeAttribute('disabled');
         else button.setAttribute('disabled', 'true');
       }
+      if (decrementButton) {
+        if (current <= 1) decrementButton.setAttribute('disabled', 'true');
+        else decrementButton.removeAttribute('disabled');
+      }
+      if (incrementButton) {
+        if (current >= maxMultiplier) incrementButton.setAttribute('disabled', 'true');
+        else incrementButton.removeAttribute('disabled');
+      }
     }
+  }
+
+  function adjustSpriteScaleInputBy(delta) {
+    const input = dom.controls.spriteScaleInput;
+    if (!input || input.disabled) {
+      return;
+    }
+    const min = Math.max(1, Math.floor(Number(input.min) || 1));
+    const max = Math.max(min, Math.floor(Number(input.max) || getMaxSpriteMultiplier()));
+    const current = clamp(Math.floor(Number(input.value) || min), min, max);
+    const next = clamp(current + Math.round(Number(delta) || 0), min, max);
+    if (next === current) {
+      updateSpriteScaleControlLimits();
+      return;
+    }
+    input.value = String(next);
+    updateSpriteScaleControlLimits();
   }
 
   // -------------------------------------------------------------------------
@@ -4058,6 +4974,7 @@
       history.past = [];
       history.future = [];
       history.pending = null;
+      clearTimelapseRecording({ silent: true });
       autosaveRestoring = false;
       autosaveDirty = false;
       resetDocumentUnsavedChanges();
@@ -4403,6 +5320,7 @@
       history.past = [];
       history.future = [];
       history.pending = null;
+      clearTimelapseRecording({ silent: true });
       resetDocumentUnsavedChanges();
       updateMemoryStatus();
     } finally {
@@ -4908,11 +5826,14 @@
       gridScreenStep: state.gridScreenStep ?? 8,
       majorGridSpacing: state.majorGridSpacing ?? 16,
       backgroundMode: state.backgroundMode ?? 'dark',
+      uiTheme: normalizeUiTheme(state.uiTheme, DEFAULT_UI_THEME),
       documentName,
       showPixelGuides: state.showPixelGuides ?? true,
       mirror: normalizeMirrorAxisState(state.mirror, width, height),
       showVirtualCursor: state.showVirtualCursor ?? false,
       showChecker: state.showChecker ?? true,
+      onionSkin: normalizeOnionSkinState(state.onionSkin),
+      dualLeftRail: false,
       activeToolGroup,
       lastGroupTool: { ...DEFAULT_GROUP_TOOL, ...(state.lastGroupTool || {}) },
       activeLeftTab: state.activeLeftTab ?? 'tools',
@@ -4923,6 +5844,7 @@
     history.past = [];
     history.future = [];
     history.pending = null;
+    clearTimelapseRecording({ silent: true });
     resetDocumentUnsavedChanges();
     updateHistoryButtons();
     resetExportScaleDefaults();
@@ -5867,7 +6789,7 @@
   }
 
   function exportProjectWithFallback() {
-    const choice = window.prompt('出力形式を入力してください (png / gif / contest / pixfind / project)', 'png');
+    const choice = window.prompt('出力形式を入力してください (png / gif / timelapse / contest / pixfind / project)', 'png');
     if (!choice) {
       return;
     }
@@ -5895,6 +6817,8 @@
       exportProjectAsPng();
     } else if (normalized === 'gif') {
       exportProjectAsGif();
+    } else if (normalized === 'timelapse') {
+      exportTimelapseGif();
     } else if (normalized === 'contest') {
       exportProjectToContest();
     } else if (normalized === 'pixfind') {
@@ -5902,7 +6826,268 @@
     } else if (normalized === 'project') {
       saveProjectAsPixieedraw();
     } else {
-      window.alert('png / gif / contest / pixfind / project のいずれかを入力してください。');
+      window.alert('png / gif / timelapse / contest / pixfind / project のいずれかを入力してください。');
+    }
+  }
+
+  function normalizeTimelapseFps(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return TIMELAPSE_DEFAULT_FPS;
+    }
+    return clamp(Math.round(parsed), TIMELAPSE_MIN_FPS, TIMELAPSE_MAX_FPS);
+  }
+
+  function createTimelapseFrameEntryFromState() {
+    const width = Math.max(1, Number(state.width) || 1);
+    const height = Math.max(1, Number(state.height) || 1);
+    const frames = Array.isArray(state.frames) ? state.frames : [];
+    if (!frames.length) {
+      return null;
+    }
+    const frameIndex = clamp(Math.round(Number(state.activeFrame) || 0), 0, frames.length - 1);
+    const frame = frames[frameIndex];
+    if (!frame) {
+      return null;
+    }
+    const pixels = compositeFramePixels(frame, width, height, state.palette);
+    return {
+      width,
+      height,
+      pixels: compressUint8Array(pixels, { clamped: true }),
+    };
+  }
+
+  function createTimelapseFrameEntryFromSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') {
+      return null;
+    }
+    let resolved = snapshot;
+    const sampleIndices = snapshot?.frames?.[0]?.layers?.[0]?.indices;
+    if (!(sampleIndices instanceof Int16Array)) {
+      try {
+        resolved = decompressHistorySnapshot(snapshot);
+      } catch (error) {
+        return null;
+      }
+    }
+    const width = Math.max(1, Number(resolved.width) || 1);
+    const height = Math.max(1, Number(resolved.height) || 1);
+    const frames = Array.isArray(resolved.frames) ? resolved.frames : [];
+    if (!frames.length) {
+      return null;
+    }
+    const frameIndex = clamp(Math.round(Number(resolved.activeFrame) || 0), 0, frames.length - 1);
+    const frame = frames[frameIndex] || frames[0];
+    if (!frame) {
+      return null;
+    }
+    const palette = Array.isArray(resolved.palette) ? resolved.palette : state.palette;
+    const pixels = compositeFramePixels(frame, width, height, palette);
+    return {
+      width,
+      height,
+      pixels: compressUint8Array(pixels, { clamped: true }),
+    };
+  }
+
+  function thinTimelapseSnapshotsIfNeeded() {
+    const snapshots = timelapseState.snapshots;
+    if (!Array.isArray(snapshots) || snapshots.length <= TIMELAPSE_MAX_STEPS) {
+      return false;
+    }
+    for (let index = snapshots.length - 2; index >= 1; index -= 2) {
+      snapshots.splice(index, 1);
+    }
+    timelapseState.sampleStep = Math.max(1, timelapseState.sampleStep * 2);
+    return true;
+  }
+
+  function captureTimelapseFrameFromState() {
+    if (!timelapseState.enabled) {
+      return;
+    }
+    const entry = createTimelapseFrameEntryFromState();
+    if (!entry) {
+      return;
+    }
+    timelapseState.snapshots.push(entry);
+    timelapseState.lastCaptureToken = unsavedChangeToken;
+    const thinned = thinTimelapseSnapshotsIfNeeded();
+    if (thinned && !timelapseState.warningShown) {
+      timelapseState.warningShown = true;
+      updateAutosaveStatus('タイムラプス記録が増えたため自動で間引きしました', 'warn');
+    }
+    syncTimelapseControls();
+    updateMemoryStatus();
+  }
+
+  function syncTimelapseControls() {
+    const stepCount = timelapseState.snapshots.length;
+    const fps = normalizeTimelapseFps(timelapseState.fps);
+    const sampleInfo = timelapseState.sampleStep > 1 ? ` / 間引きx${timelapseState.sampleStep}` : '';
+    timelapseState.fps = fps;
+
+    if (dom.controls.toggleTimelapse instanceof HTMLInputElement) {
+      dom.controls.toggleTimelapse.checked = Boolean(timelapseState.enabled);
+    }
+    if (dom.controls.timelapseClear instanceof HTMLButtonElement) {
+      dom.controls.timelapseClear.disabled = stepCount <= 0;
+    }
+    if (dom.controls.timelapseFps instanceof HTMLInputElement) {
+      dom.controls.timelapseFps.value = String(fps);
+    }
+    if (dom.controls.timelapseStatus) {
+      const status = timelapseState.enabled ? 'ON' : 'OFF';
+      dom.controls.timelapseStatus.textContent = `タイムラプス: ${status} (${stepCount}ステップ / ${fps}fps${sampleInfo})`;
+    }
+  }
+
+  function clearTimelapseRecording({ silent = false } = {}) {
+    timelapseState.snapshots.length = 0;
+    timelapseState.warningShown = false;
+    timelapseState.sampleStep = 1;
+    timelapseState.lastCaptureToken = -1;
+    syncTimelapseControls();
+    if (!silent) {
+      updateAutosaveStatus('タイムラプス記録をクリアしました', 'info');
+    }
+    updateMemoryStatus();
+  }
+
+  function setTimelapseEnabled(enabled, { persist = true } = {}) {
+    const next = Boolean(enabled);
+    if (timelapseState.enabled === next) {
+      syncTimelapseControls();
+      return;
+    }
+    timelapseState.enabled = next;
+    if (next) {
+      const shouldCaptureStart = timelapseState.snapshots.length === 0
+        || timelapseState.lastCaptureToken !== unsavedChangeToken;
+      if (shouldCaptureStart) {
+        captureTimelapseFrameFromState();
+      }
+    }
+    syncTimelapseControls();
+    updateAutosaveStatus(
+      next ? 'タイムラプス記録をONにしました' : 'タイムラプス記録をOFFにしました',
+      'info'
+    );
+    if (persist) {
+      scheduleSessionPersist({ includeSnapshots: false });
+    }
+  }
+
+  function resolveTimelapseFrameEntry(entry) {
+    if (!entry || typeof entry !== 'object') {
+      return null;
+    }
+    const width = Math.max(1, Number(entry.width) || 1);
+    const height = Math.max(1, Number(entry.height) || 1);
+    let pixels;
+    try {
+      pixels = decodeUint8Data(entry.pixels, { clamped: true });
+    } catch (error) {
+      return null;
+    }
+    const expectedLength = width * height * 4;
+    if (!pixels || pixels.length !== expectedLength) {
+      return null;
+    }
+    return {
+      width,
+      height,
+      pixels: pixels instanceof Uint8ClampedArray ? pixels : new Uint8ClampedArray(pixels),
+    };
+  }
+
+  function buildTimelapseExportEntries() {
+    const snapshots = timelapseState.snapshots.slice();
+    if (timelapseState.enabled && timelapseState.lastCaptureToken !== unsavedChangeToken) {
+      const current = createTimelapseFrameEntryFromState();
+      if (current) {
+        snapshots.push(current);
+      }
+    }
+    return snapshots;
+  }
+
+  async function exportTimelapseGif() {
+    if (timelapseState.snapshots.length <= 0 && timelapseState.lastCaptureToken < 0) {
+      updateAutosaveStatus('タイムラプス記録がありません。設定でONにして描画してください。', 'warn');
+      return;
+    }
+    const snapshots = buildTimelapseExportEntries();
+    if (!snapshots.length) {
+      updateAutosaveStatus('タイムラプス記録がありません', 'warn');
+      return;
+    }
+
+    try {
+      updateAutosaveStatus('タイムラプスGIFを書き出し中…', 'info');
+      const targetWidth = Math.max(1, Number(state.width) || 1);
+      const targetHeight = Math.max(1, Number(state.height) || 1);
+      const framePixels = [];
+      let skippedSizeMismatch = 0;
+      let skippedInvalid = 0;
+
+      for (let i = 0; i < snapshots.length; i += 1) {
+        const resolved = resolveTimelapseFrameEntry(snapshots[i]);
+        if (!resolved) {
+          skippedInvalid += 1;
+          continue;
+        }
+        const width = resolved.width;
+        const height = resolved.height;
+        if (width !== targetWidth || height !== targetHeight) {
+          skippedSizeMismatch += 1;
+          continue;
+        }
+        framePixels.push(resolved.pixels);
+      }
+
+      if (!framePixels.length) {
+        updateAutosaveStatus('タイムラプスGIFを書き出せませんでした', 'error');
+        return;
+      }
+
+      const fps = normalizeTimelapseFps(timelapseState.fps);
+      timelapseState.fps = fps;
+      const frameDuration = clamp(Math.round(1000 / fps), 16, 2000);
+      const frameDurations = new Array(framePixels.length).fill(frameDuration);
+      const gifBytes = buildGifFromPixels(framePixels, frameDurations, targetWidth, targetHeight);
+      const tasks = [{
+        blob: new Blob([gifBytes], { type: 'image/gif' }),
+        filename: createExportFileName('gif', 'timelapse'),
+        shareText: `タイムラプスGIFを書き出しました (${framePixels.length}ステップ)`,
+      }];
+      const result = await deliverExportTasks(tasks, {
+        mimeType: 'image/gif',
+        fileExtensions: ['.gif'],
+        shareTitle: state.documentName || 'PiXiEEDraw',
+        shareText: 'タイムラプスGIFを書き出しました',
+      });
+
+      const skipped = skippedSizeMismatch + skippedInvalid;
+      const detail = skipped > 0 ? ` / 除外 ${skipped}` : '';
+      if (result.exportedCount === result.total) {
+        updateAutosaveStatus(`タイムラプスGIFを書き出しました (${framePixels.length}ステップ${detail})`, 'success');
+      } else if (result.wasCancelled) {
+        updateAutosaveStatus('タイムラプスGIFの書き出しをキャンセルしました', 'warn');
+      } else if (result.exportedCount > 0 && result.hadFailure) {
+        updateAutosaveStatus('タイムラプスGIFを書き出しましたが一部失敗しました', 'warn');
+      } else {
+        updateAutosaveStatus('タイムラプスGIFの書き出しに失敗しました', 'error');
+      }
+      if (result.exportedCount > 0) {
+        markDocumentDurablySaved();
+        showExportInterstitialAfterImageExport();
+      }
+      syncTimelapseControls();
+    } catch (error) {
+      console.error('Timelapse export failed', error);
+      updateAutosaveStatus('タイムラプスGIFの書き出しに失敗しました', 'error');
     }
   }
 
@@ -5959,7 +7144,12 @@
     updateAnimationFpsDisplay(clampedFps, nextDuration);
   }
 
-  function setActiveFrameIndex(nextIndex, { wrap = false, persist = true, render = true } = {}) {
+  function setActiveFrameIndex(nextIndex, {
+    wrap = false,
+    persist = true,
+    render = true,
+    syncUi = true,
+  } = {}) {
     const frames = state.frames;
     if (!Array.isArray(frames) || !frames.length) {
       return null;
@@ -5988,9 +7178,12 @@
         requestOverlayRender();
       } else {
         syncAnimationFpsDisplayFromState();
+        syncActiveFrameSettingsUI();
       }
     }
-    updatePixfindModeUI();
+    if (syncUi) {
+      updatePixfindModeUI();
+    }
     return frame;
   }
 
@@ -6002,8 +7195,9 @@
     const wrap = options.wrap !== false;
     const persist = options.persist !== false;
     const render = options.render !== false;
+    const syncUi = options.syncUi !== false;
     const nextIndex = state.activeFrame + Number(offset || 0);
-    setActiveFrameIndex(nextIndex, { wrap, persist, render });
+    setActiveFrameIndex(nextIndex, { wrap, persist, render, syncUi });
   }
 
   function openNewProjectDialog() {
@@ -6050,6 +7244,8 @@
       const mode = normalizeExportFormat(config.format?.value || 'png');
       if (mode === 'gif') {
         exportProjectAsGif();
+      } else if (mode === 'timelapse') {
+        exportTimelapseGif();
       } else if (mode === 'contest') {
         exportProjectToContest();
       } else if (mode === 'pixfind') {
@@ -6247,12 +7443,14 @@
       width: clampedWidth,
       height: clampedHeight,
       name,
+      uiTheme: state.uiTheme,
     });
 
     applyHistorySnapshot(snapshot);
     history.past = [];
     history.future = [];
     history.pending = null;
+    clearTimelapseRecording({ silent: true });
     resetDocumentUnsavedChanges();
     updateHistoryButtons();
     resetExportScaleDefaults();
@@ -6546,6 +7744,7 @@
     history.past = [];
     history.future = [];
     history.pending = null;
+    clearTimelapseRecording({ silent: true });
     autosaveRestoring = false;
     resetDocumentUnsavedChanges();
     resetExportScaleDefaults();
@@ -6817,6 +8016,96 @@
     setRecentProjectsCache(entries);
   }
 
+  function blendChannelByMode(dst, src, blendMode) {
+    switch (blendMode) {
+      case 'multiply':
+        return dst * src;
+      case 'screen':
+        return dst + src - (dst * src);
+      case 'overlay':
+        return dst <= 0.5 ? (2 * dst * src) : (1 - (2 * (1 - dst) * (1 - src)));
+      case 'hard-light':
+        return src <= 0.5 ? (2 * dst * src) : (1 - (2 * (1 - dst) * (1 - src)));
+      case 'soft-light': {
+        const d = dst <= 0.25
+          ? (((16 * dst) - 12) * dst + 4) * dst
+          : Math.sqrt(dst);
+        return src <= 0.5
+          ? dst - ((1 - (2 * src)) * dst * (1 - dst))
+          : dst + (((2 * src) - 1) * (d - dst));
+      }
+      case 'darken':
+        return Math.min(dst, src);
+      case 'lighten':
+        return Math.max(dst, src);
+      case 'color-dodge':
+        return src >= 1 ? 1 : Math.min(1, dst / (1 - src));
+      case 'color-burn':
+        return src <= 0 ? 0 : 1 - Math.min(1, (1 - dst) / src);
+      case 'difference':
+        return Math.abs(dst - src);
+      case 'exclusion':
+        return dst + src - (2 * dst * src);
+      case 'normal':
+      default:
+        return src;
+    }
+  }
+
+  function compositeLayerPixelNormalized(data, destBase, srcR, srcG, srcB, srcA, opacity, normalizedBlendMode) {
+    if (opacity <= 0 || srcA <= 0) {
+      return;
+    }
+    const srcAlpha = (srcA / 255) * opacity;
+    if (srcAlpha <= 0) {
+      return;
+    }
+    const dstAlpha = data[destBase + 3] / 255;
+    const outAlpha = srcAlpha + dstAlpha * (1 - srcAlpha);
+    if (outAlpha <= 0) {
+      data[destBase] = 0;
+      data[destBase + 1] = 0;
+      data[destBase + 2] = 0;
+      data[destBase + 3] = 0;
+      return;
+    }
+
+    if (dstAlpha <= 0 || normalizedBlendMode === DEFAULT_LAYER_BLEND_MODE) {
+      const srcFactor = srcAlpha / outAlpha;
+      const dstFactor = (dstAlpha * (1 - srcAlpha)) / outAlpha;
+      data[destBase] = Math.round(srcR * srcFactor + data[destBase] * dstFactor);
+      data[destBase + 1] = Math.round(srcG * srcFactor + data[destBase + 1] * dstFactor);
+      data[destBase + 2] = Math.round(srcB * srcFactor + data[destBase + 2] * dstFactor);
+      data[destBase + 3] = Math.round(outAlpha * 255);
+      return;
+    }
+
+    const dstR = data[destBase] / 255;
+    const dstG = data[destBase + 1] / 255;
+    const dstB = data[destBase + 2] / 255;
+    const srcRNorm = srcR / 255;
+    const srcGNorm = srcG / 255;
+    const srcBNorm = srcB / 255;
+    const blendedR = blendChannelByMode(dstR, srcRNorm, normalizedBlendMode);
+    const blendedG = blendChannelByMode(dstG, srcGNorm, normalizedBlendMode);
+    const blendedB = blendChannelByMode(dstB, srcBNorm, normalizedBlendMode);
+    const dstWeight = (1 - srcAlpha) * dstAlpha;
+    const srcWeight = (1 - dstAlpha) * srcAlpha;
+    const blendWeight = srcAlpha * dstAlpha;
+
+    data[destBase] = Math.round((((dstWeight * dstR) + (srcWeight * srcRNorm) + (blendWeight * blendedR)) / outAlpha) * 255);
+    data[destBase + 1] = Math.round((((dstWeight * dstG) + (srcWeight * srcGNorm) + (blendWeight * blendedG)) / outAlpha) * 255);
+    data[destBase + 2] = Math.round((((dstWeight * dstB) + (srcWeight * srcBNorm) + (blendWeight * blendedB)) / outAlpha) * 255);
+    data[destBase + 3] = Math.round(outAlpha * 255);
+  }
+
+  function compositeLayerPixel(data, destBase, srcR, srcG, srcB, srcA, layerOpacity, blendMode) {
+    const parsedOpacity = Number(layerOpacity);
+    const opacity = Number.isFinite(parsedOpacity) ? clamp(parsedOpacity, 0, 1) : 1;
+    const normalizedBlendMode = normalizeLayerBlendMode(blendMode);
+    compositeLayerPixelNormalized(data, destBase, srcR, srcG, srcB, srcA, opacity, normalizedBlendMode);
+  }
+
   async function generateSnapshotThumbnail(snapshot) {
     if (!snapshot || !snapshot.frames || !snapshot.frames.length) {
       return null;
@@ -6842,13 +8131,14 @@
     const data = imageData.data;
     const palette = Array.isArray(snapshot.palette) ? snapshot.palette : [];
     frame.layers.forEach(layer => {
-      if (!layer || !layer.visible || !(layer.opacity > 0)) {
+      if (!layer || !layer.visible || normalizeLayerOpacity(layer.opacity) <= 0) {
         return;
       }
-      const opacity = Number.isFinite(layer.opacity) ? layer.opacity : 1;
+      const opacity = normalizeLayerOpacity(layer.opacity);
       if (opacity <= 0) {
         return;
       }
+      const blendMode = normalizeLayerBlendMode(layer.blendMode);
       const indices = layer.indices instanceof Int16Array ? layer.indices : null;
       const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
       if (!indices && !direct) {
@@ -6888,28 +8178,7 @@
             continue;
           }
           const destBase = pixelIndex * 4;
-          const destR = data[destBase];
-          const destG = data[destBase + 1];
-          const destB = data[destBase + 2];
-          const destA = data[destBase + 3] / 255;
-          const alpha = (srcA / 255) * opacity;
-          if (alpha <= 0) {
-            continue;
-          }
-          const outA = alpha + destA * (1 - alpha);
-          if (outA <= 0) {
-            data[destBase] = 0;
-            data[destBase + 1] = 0;
-            data[destBase + 2] = 0;
-            data[destBase + 3] = 0;
-            continue;
-          }
-          const srcFactor = alpha / outA;
-          const destFactor = (destA * (1 - alpha)) / outA;
-          data[destBase] = Math.round(srcR * srcFactor + destR * destFactor);
-          data[destBase + 1] = Math.round(srcG * srcFactor + destG * destFactor);
-          data[destBase + 2] = Math.round(srcB * srcFactor + destB * destFactor);
-          data[destBase + 3] = Math.round(outA * 255);
+          compositeLayerPixelNormalized(data, destBase, srcR, srcG, srcB, srcA, opacity, blendMode);
         }
       }
     });
@@ -7014,6 +8283,8 @@
 
   function serializeDocumentSnapshot(snapshot) {
     const palette = snapshot.palette.map(color => normalizeColorValue(color));
+    const brushShape = normalizeBrushShape(snapshot.brushShape ?? state.brushShape, BRUSH_SHAPE_SQUARE);
+    const customBrushPayload = serializeCustomBrushPayload(snapshot.customBrush ?? state.customBrush);
     return {
       version: DOCUMENT_FILE_VERSION,
       width: snapshot.width,
@@ -7032,7 +8303,8 @@
           id: layer.id,
           name: layer.name,
           visible: layer.visible,
-          opacity: layer.opacity,
+          opacity: normalizeLayerOpacity(layer.opacity),
+          blendMode: normalizeLayerBlendMode(layer.blendMode),
           indices: encodeTypedArray(layer.indices),
           direct: encodeTypedArray(layer.direct),
         })),
@@ -7042,11 +8314,16 @@
       gridScreenStep: snapshot.gridScreenStep,
       majorGridSpacing: snapshot.majorGridSpacing,
       backgroundMode: snapshot.backgroundMode,
+      uiTheme: normalizeUiTheme(snapshot.uiTheme, DEFAULT_UI_THEME),
       documentName: normalizeDocumentName(snapshot.documentName),
       showPixelGuides: snapshot.showPixelGuides,
       mirror: normalizeMirrorAxisState(snapshot.mirror, snapshot.width, snapshot.height),
       showVirtualCursor: snapshot.showVirtualCursor,
       showChecker: snapshot.showChecker,
+      onionSkin: normalizeOnionSkinState(snapshot.onionSkin),
+      dualLeftRail: false,
+      brushShape,
+      customBrush: customBrushPayload,
     };
   }
 
@@ -7101,7 +8378,8 @@
           id: typeof layer.id === 'string' ? layer.id : `layer-${frameIndex}-${layerIndex}`,
           name: typeof layer.name === 'string' ? layer.name : `レイヤー ${layerIndex + 1}`,
           visible: layer.visible !== false,
-          opacity: clamp(Number(layer.opacity) ?? 1, 0, 1),
+          opacity: normalizeLayerOpacity(layer.opacity),
+          blendMode: normalizeLayerBlendMode(layer.blendMode),
           indices,
           direct,
         };
@@ -7132,6 +8410,11 @@
 
     const selectionBounds = validateBoundsObject(payload.selectionBounds);
     const activeTool = normalizeToolId(payload.tool, state.tool);
+    const customBrush = deserializeCustomBrushPayload(payload.customBrush);
+    const requestedBrushShape = normalizeBrushShape(payload.brushShape, BRUSH_SHAPE_SQUARE);
+    const brushShape = requestedBrushShape === BRUSH_SHAPE_CUSTOM && !customBrush
+      ? BRUSH_SHAPE_SQUARE
+      : requestedBrushShape;
     const activeRgb = normalizeColorValue(payload.activeRgb || state.activeRgb);
     const colorMode = 'index';
     const activePaletteIndex = clamp(Math.round(Number(payload.activePaletteIndex) || 0), 0, palette.length - 1);
@@ -7142,6 +8425,7 @@
       palette.length - 1
     );
     const backgroundMode = payload.backgroundMode === 'light' || payload.backgroundMode === 'pink' ? payload.backgroundMode : 'dark';
+    const uiTheme = normalizeUiTheme(payload.uiTheme, state.uiTheme);
     let activeToolGroup = TOOL_GROUPS[payload.activeToolGroup] ? payload.activeToolGroup : (TOOL_TO_GROUP[activeTool] || state.activeToolGroup);
     if (!TOOL_GROUPS[activeToolGroup]?.tools?.includes(activeTool)) {
       activeToolGroup = TOOL_TO_GROUP[activeTool] || 'pen';
@@ -7163,6 +8447,8 @@
       },
       tool: activeTool,
       brushSize: clamp(Math.round(Number(payload.brushSize) || state.brushSize || 1), 1, 64),
+      brushShape,
+      customBrush,
       colorMode,
       palette,
       activePaletteIndex,
@@ -7178,6 +8464,7 @@
       gridScreenStep: clamp(Math.round(Number(payload.gridScreenStep) || state.gridScreenStep || 8), 1, 256),
       majorGridSpacing: clamp(Math.round(Number(payload.majorGridSpacing) || state.majorGridSpacing || 16), 2, 512),
       backgroundMode,
+      uiTheme,
       activeToolGroup,
       lastGroupTool,
       activeLeftTab,
@@ -7186,6 +8473,8 @@
       mirror: normalizeMirrorAxisState(payload.mirror, width, height),
       showVirtualCursor: Boolean(payload.showVirtualCursor ?? state.showVirtualCursor),
       showChecker: Boolean(payload.showChecker ?? state.showChecker),
+      onionSkin: normalizeOnionSkinState(payload.onionSkin ?? state.onionSkin),
+      dualLeftRail: false,
       playback: typeof payload.playback === 'object' && payload.playback
         ? {
           isPlaying: Boolean(payload.playback.isPlaying),
@@ -7611,13 +8900,14 @@
       return output;
     }
     frame.layers.forEach(layer => {
-      if (!layer || !layer.visible || layer.opacity <= 0) {
+      if (!layer || !layer.visible || normalizeLayerOpacity(layer.opacity) <= 0) {
         return;
       }
-      const layerOpacity = clamp(Number(layer.opacity) || 0, 0, 1);
+      const layerOpacity = normalizeLayerOpacity(layer.opacity);
       if (layerOpacity <= 0) {
         return;
       }
+      const layerBlendMode = normalizeLayerBlendMode(layer.blendMode);
       const indices = layer.indices instanceof Int16Array && layer.indices.length >= pixelCount ? layer.indices : null;
       const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length >= pixelCount * 4 ? layer.direct : null;
       for (let i = 0; i < pixelCount; i += 1) {
@@ -7644,22 +8934,8 @@
         if (!Number.isFinite(srcA) || srcA <= 0) {
           continue;
         }
-        const alpha = (srcA / 255) * layerOpacity;
-        if (alpha <= 0) {
-          continue;
-        }
         const destIndex = i * 4;
-        const dstA = output[destIndex + 3] / 255;
-        const outA = alpha + dstA * (1 - alpha);
-        if (outA <= 0) {
-          continue;
-        }
-        const srcFactor = alpha / outA;
-        const dstFactor = (dstA * (1 - alpha)) / outA;
-        output[destIndex] = Math.round(srcR * srcFactor + output[destIndex] * dstFactor);
-        output[destIndex + 1] = Math.round(srcG * srcFactor + output[destIndex + 1] * dstFactor);
-        output[destIndex + 2] = Math.round(srcB * srcFactor + output[destIndex + 2] * dstFactor);
-        output[destIndex + 3] = Math.round(outA * 255);
+        compositeLayerPixelNormalized(output, destIndex, srcR, srcG, srcB, srcA, layerOpacity, layerBlendMode);
       }
     });
     return output;
@@ -7710,6 +8986,7 @@
   function normalizeExportFormat(mode) {
     const normalized = String(mode || '').trim().toLowerCase();
     if (normalized === 'gif') return 'gif';
+    if (normalized === 'timelapse') return 'timelapse';
     if (normalized === 'png') return 'png';
     if (normalized === 'contest') return 'contest';
     if (normalized === 'pixfind') return 'pixfind';
@@ -7933,7 +9210,7 @@
         fileExtensions: options.fileExtensions,
         shareTitle: options.shareTitle,
         shareText: task.shareText || options.shareText,
-        allowFilePicker: index === 0,
+        allowFilePicker: true,
       });
       switch (deliveryResult) {
         case 'picker':
@@ -9902,6 +11179,48 @@
     return pointerState.tool || state.tool;
   }
 
+  function getLeftDualMinTotalWidth() {
+    return (LEFT_DUAL_MIN_COLUMN_WIDTH * 2) + LEFT_DUAL_GAP;
+  }
+
+  function normalizeLeftDualToolsWidth(value, totalWidth = railSizing.left) {
+    const safeTotal = Math.max(getLeftDualMinTotalWidth(), Math.round(Number(totalWidth) || getLeftDualMinTotalWidth()));
+    const maxTools = Math.max(LEFT_DUAL_MIN_COLUMN_WIDTH, safeTotal - LEFT_DUAL_MIN_COLUMN_WIDTH - LEFT_DUAL_GAP);
+    const fallback = clamp(Math.round(Number(leftDualSizing.tools) || LEFT_DUAL_MIN_COLUMN_WIDTH), LEFT_DUAL_MIN_COLUMN_WIDTH, maxTools);
+    const numeric = Math.round(Number(value));
+    const base = Number.isFinite(numeric) ? numeric : fallback;
+    return clamp(base, LEFT_DUAL_MIN_COLUMN_WIDTH, maxTools);
+  }
+
+  function clearLeftDualRailLayout() {
+    const rail = dom.leftRail;
+    if (!(rail instanceof HTMLElement)) {
+      return;
+    }
+    rail.style.removeProperty('--left-dual-tools-width');
+    rail.style.removeProperty('--left-dual-color-width');
+    rail.style.removeProperty('--left-dual-gap');
+  }
+
+  function syncLeftDualRailLayout() {
+    const rail = dom.leftRail;
+    if (!(rail instanceof HTMLElement)) {
+      return;
+    }
+    const totalWidth = Math.round(Number(railSizing.left) || 0);
+    if (!isDualLeftRailEnabled() || totalWidth < getLeftDualMinTotalWidth()) {
+      clearLeftDualRailLayout();
+      return;
+    }
+    const normalizedTotalWidth = Math.max(getLeftDualMinTotalWidth(), totalWidth);
+    const toolsWidth = normalizeLeftDualToolsWidth(leftDualSizing.tools, normalizedTotalWidth);
+    const colorWidth = Math.max(LEFT_DUAL_MIN_COLUMN_WIDTH, normalizedTotalWidth - toolsWidth - LEFT_DUAL_GAP);
+    leftDualSizing.tools = toolsWidth;
+    rail.style.setProperty('--left-dual-tools-width', `${toolsWidth}px`);
+    rail.style.setProperty('--left-dual-color-width', `${colorWidth}px`);
+    rail.style.setProperty('--left-dual-gap', `${LEFT_DUAL_GAP}px`);
+  }
+
   function getRailNode(side) {
     return side === 'right' ? dom.rightRail : dom.leftRail;
   }
@@ -9914,9 +11233,10 @@
     const fallback = Number(railSizing[side]) || RAIL_DEFAULT_WIDTH[side];
     const numeric = Math.round(Number(value));
     const base = Number.isFinite(numeric) ? numeric : fallback;
+    const minWidth = RAIL_MIN_WIDTH;
     const viewportLimit = Math.max(RAIL_MIN_WIDTH, Math.floor((window.innerWidth || 0) * 0.45));
-    const maxWidth = Math.max(RAIL_MIN_WIDTH, Math.min(RAIL_MAX_WIDTH, viewportLimit));
-    return clamp(base, RAIL_MIN_WIDTH, maxWidth);
+    const maxWidth = Math.max(minWidth, Math.min(RAIL_MAX_WIDTH, viewportLimit));
+    return clamp(base, minWidth, maxWidth);
   }
 
   function updateRailCompactState(targetSide = null) {
@@ -9924,7 +11244,10 @@
     const apply = side => {
       const railNode = getRailNode(side);
       if (!railNode) return;
-      const threshold = side === 'right' ? RAIL_COMPACT_THRESHOLD.right : RAIL_COMPACT_THRESHOLD.left;
+      let threshold = side === 'right' ? RAIL_COMPACT_THRESHOLD.right : RAIL_COMPACT_THRESHOLD.left;
+      if (side === 'left' && isDualLeftRailEnabled()) {
+        threshold = Math.max(RAIL_MIN_WIDTH, getLeftDualMinTotalWidth() - 1);
+      }
       const compact = !isMobile && Number(railSizing[side]) <= threshold;
       railNode.dataset.compact = compact ? 'true' : 'false';
     };
@@ -9950,6 +11273,7 @@
     }
     updateRailCompactState(side);
     if (side === 'left') {
+      syncLeftDualRailLayout();
       if (!isCompactToolRailMode()) {
         setCompactToolFlyoutOpen(false);
       }
@@ -9964,6 +11288,140 @@
     if (persist) {
       scheduleSessionPersist();
     }
+  }
+
+  function openRailFromHandle(side) {
+    if (layoutMode === 'mobilePortrait') {
+      return;
+    }
+    if (side !== 'left' && side !== 'right') {
+      return;
+    }
+
+    const compactMode = side === 'left' ? isCompactToolRailMode() : isCompactRightRailMode();
+    if (!compactMode) {
+      return;
+    }
+
+    const currentWidth = Number(railSizing[side]) || RAIL_DEFAULT_WIDTH[side];
+    const leftDualTarget = side === 'left' && isDualLeftRailEnabled()
+      ? getLeftDualMinTotalWidth()
+      : RAIL_CLICK_OPEN_WIDTH[side];
+    const targetWidth = Math.max(currentWidth, leftDualTarget);
+    setRailWidth(side, targetWidth, { persist: true });
+
+    if (side === 'left') {
+      if (!isCompactToolRailMode()) {
+        return;
+      }
+      if (state.activeLeftTab !== 'tools') {
+        setLeftTab('tools');
+      }
+      setCompactToolFlyoutOpen(true);
+      updateToolVisibility();
+      return;
+    }
+
+    if (!isCompactRightRailMode()) {
+      return;
+    }
+    setCompactRightFlyoutOpen(true);
+    updateRightTabVisibility();
+  }
+
+  function beginLeftDualSplitResize(event) {
+    if (layoutMode === 'mobilePortrait' || !isDualLeftRailEnabled()) {
+      return;
+    }
+    const handle = dom.resizeHandles.leftInner;
+    if (!(handle instanceof HTMLElement)) {
+      return;
+    }
+    event.preventDefault();
+    leftDualSizing.active = true;
+    leftDualSizing.pointerId = Number.isFinite(event.pointerId) ? event.pointerId : null;
+    leftDualSizing.startClientX = Number(event.clientX) || 0;
+    const startTotalWidth = Math.max(getLeftDualMinTotalWidth(), Math.round(Number(railSizing.left) || getLeftDualMinTotalWidth()));
+    const startToolsWidth = normalizeLeftDualToolsWidth(leftDualSizing.tools, startTotalWidth);
+    leftDualSizing.startTotalWidth = startTotalWidth;
+    leftDualSizing.startToolsWidth = startToolsWidth;
+    leftDualSizing.moved = false;
+    leftDualSizing.captureTarget = handle;
+    handle.classList.add('is-active');
+    document.body.classList.add('is-rail-resizing');
+    if (leftDualSizing.pointerId !== null && typeof handle.setPointerCapture === 'function') {
+      try {
+        handle.setPointerCapture(leftDualSizing.pointerId);
+      } catch (error) {
+        // Ignore pointer capture failures.
+      }
+    }
+    window.addEventListener('pointermove', handleLeftDualSplitPointerMove);
+    window.addEventListener('pointerup', handleLeftDualSplitPointerUp);
+    window.addEventListener('pointercancel', handleLeftDualSplitPointerUp);
+  }
+
+  function handleLeftDualSplitPointerMove(event) {
+    if (!leftDualSizing.active || !isDualLeftRailEnabled()) {
+      return;
+    }
+    if (leftDualSizing.pointerId !== null && event.pointerId !== leftDualSizing.pointerId) {
+      return;
+    }
+    const deltaX = (Number(event.clientX) || 0) - leftDualSizing.startClientX;
+    if (!leftDualSizing.moved) {
+      if (Math.abs(deltaX) < RAIL_RESIZE_DRAG_THRESHOLD) {
+        return;
+      }
+      leftDualSizing.moved = true;
+    }
+    const proposedToolsWidth = leftDualSizing.startToolsWidth + deltaX;
+    const proposedTotalWidth = leftDualSizing.startTotalWidth + deltaX;
+    const nextTotalWidth = normalizeRailWidth('left', proposedTotalWidth);
+    const nextToolsWidth = normalizeLeftDualToolsWidth(proposedToolsWidth, nextTotalWidth);
+    if (nextToolsWidth === leftDualSizing.tools && nextTotalWidth === railSizing.left) {
+      return;
+    }
+    leftDualSizing.tools = nextToolsWidth;
+    setRailWidth('left', nextTotalWidth, { persist: false });
+  }
+
+  function endLeftDualSplitResize({ persist = false } = {}) {
+    const handle = leftDualSizing.captureTarget;
+    if (handle instanceof HTMLElement) {
+      handle.classList.remove('is-active');
+      if (leftDualSizing.pointerId !== null && typeof handle.releasePointerCapture === 'function') {
+        try {
+          handle.releasePointerCapture(leftDualSizing.pointerId);
+        } catch (error) {
+          // Ignore pointer release failures.
+        }
+      }
+    }
+    leftDualSizing.active = false;
+    leftDualSizing.pointerId = null;
+    leftDualSizing.captureTarget = null;
+    leftDualSizing.startClientX = 0;
+    leftDualSizing.startToolsWidth = leftDualSizing.tools;
+    leftDualSizing.startTotalWidth = Math.max(getLeftDualMinTotalWidth(), Math.round(Number(railSizing.left) || getLeftDualMinTotalWidth()));
+    leftDualSizing.moved = false;
+    document.body.classList.remove('is-rail-resizing');
+    window.removeEventListener('pointermove', handleLeftDualSplitPointerMove);
+    window.removeEventListener('pointerup', handleLeftDualSplitPointerUp);
+    window.removeEventListener('pointercancel', handleLeftDualSplitPointerUp);
+    if (persist) {
+      scheduleSessionPersist({ includeSnapshots: false });
+    }
+  }
+
+  function handleLeftDualSplitPointerUp(event) {
+    if (!leftDualSizing.active) {
+      return;
+    }
+    if (leftDualSizing.pointerId !== null && event.pointerId !== leftDualSizing.pointerId) {
+      return;
+    }
+    endLeftDualSplitResize({ persist: Boolean(leftDualSizing.moved) });
   }
 
   function beginRailResize(side, event) {
@@ -9986,6 +11444,7 @@
     railSizing.pointerId = Number.isFinite(event.pointerId) ? event.pointerId : null;
     railSizing.startClientX = Number(event.clientX) || 0;
     railSizing.startWidth = Number(railSizing[side]) || RAIL_DEFAULT_WIDTH[side];
+    railSizing.moved = false;
     railSizing.captureTarget = handle;
     handle.classList.add('is-active');
     document.body.classList.add('is-rail-resizing');
@@ -10010,6 +11469,12 @@
       return;
     }
     const deltaX = (Number(event.clientX) || 0) - railSizing.startClientX;
+    if (!railSizing.moved) {
+      if (Math.abs(deltaX) < RAIL_RESIZE_DRAG_THRESHOLD) {
+        return;
+      }
+      railSizing.moved = true;
+    }
     const width = side === 'left' ? railSizing.startWidth + deltaX : railSizing.startWidth - deltaX;
     setRailWidth(side, width, { persist: false });
   }
@@ -10031,6 +11496,7 @@
     railSizing.captureTarget = null;
     railSizing.startClientX = 0;
     railSizing.startWidth = 0;
+    railSizing.moved = false;
     document.body.classList.remove('is-rail-resizing');
     window.removeEventListener('pointermove', handleRailResizePointerMove);
     window.removeEventListener('pointerup', handleRailResizePointerUp);
@@ -10041,13 +11507,22 @@
   }
 
   function handleRailResizePointerUp(event) {
-    if (!railSizing.activeSide) {
+    const side = railSizing.activeSide;
+    if (!side) {
       return;
     }
     if (railSizing.pointerId !== null && event.pointerId !== railSizing.pointerId) {
       return;
     }
-    endRailResize({ persist: true });
+    const moved = Boolean(railSizing.moved);
+    if (event.type === 'pointercancel') {
+      endRailResize({ persist: moved });
+      return;
+    }
+    endRailResize({ persist: moved });
+    if (!moved) {
+      openRailFromHandle(side);
+    }
   }
 
   function setupRailResizers() {
@@ -10065,8 +11540,23 @@
         beginRailResize(side, event);
       });
     };
+    const bindLeftInner = handle => {
+      if (!handle || handle.dataset.bound === 'true') {
+        return;
+      }
+      handle.dataset.bound = 'true';
+      handle.addEventListener('pointerdown', event => {
+        const isPrimaryPointer =
+          event.button === 0 || event.pointerType === 'touch' || event.pointerType === 'pen';
+        if (!isPrimaryPointer) {
+          return;
+        }
+        beginLeftDualSplitResize(event);
+      });
+    };
     bind('left', dom.resizeHandles.left);
     bind('right', dom.resizeHandles.right);
+    bindLeftInner(dom.resizeHandles.leftInner);
   }
 
   function normalizeMobileDrawerMode(mode) {
@@ -10575,6 +12065,12 @@
 
   function applyLayoutMode() {
     const isMobile = layoutMode === 'mobilePortrait';
+    if (isMobile || !isDualLeftRailEnabled()) {
+      endLeftDualSplitResize({ persist: false });
+    }
+    // Reset compact right flyout portal before sections are re-mounted by layout map.
+    // Without this, orientation changes can return the section to the old desktop parent.
+    setCompactRightFlyoutOpen(false);
     document.body.classList.toggle('is-mobile-layout', isMobile);
     try {
       document.dispatchEvent(new CustomEvent('pixiedraw:ad-layout-change', {
@@ -11016,7 +12512,7 @@
       if (ix < 0 || iy < 0 || ix >= width || iy >= height) {
         return;
       }
-      const key = `${ix},${iy}`;
+      const key = iy * width + ix;
       if (visited.has(key)) {
         return;
       }
@@ -11035,8 +12531,8 @@
       return result;
     }
 
-    while (queue.length > 0) {
-      const current = queue.shift();
+    for (let queueIndex = 0; queueIndex < queue.length; queueIndex += 1) {
+      const current = queue[queueIndex];
       for (let i = 0; i < MIRROR_AXIS_KEYS.length; i += 1) {
         const axis = MIRROR_AXIS_KEYS[i];
         if (!mirrorState.axes[axis]) {
@@ -11579,6 +13075,14 @@
       scheduleSessionPersist();
     });
 
+    dom.controls.toggleUiTheme?.addEventListener('click', () => {
+      const current = normalizeUiTheme(state.uiTheme, DEFAULT_UI_THEME);
+      const currentIndex = Math.max(0, UI_THEME_KEYS.indexOf(current));
+      const nextTheme = UI_THEME_KEYS[(currentIndex + 1) % UI_THEME_KEYS.length] || DEFAULT_UI_THEME;
+      applyUiTheme(nextTheme);
+      syncControlsWithState();
+    });
+
     const zoomSlider = dom.controls.zoomSlider;
     if (zoomSlider) {
       zoomSlider.min = '0';
@@ -11588,6 +13092,31 @@
       zoomSlider.addEventListener('input', event => {
         const index = Number(event.target.value);
         setZoom(getZoomScaleAtIndex(index));
+      });
+    }
+    const zoomInput = dom.controls.zoomInput;
+    if (zoomInput instanceof HTMLInputElement && zoomInput.dataset.bound !== 'true') {
+      zoomInput.dataset.bound = 'true';
+      const applyZoomInput = () => {
+        const parsedScale = parseZoomInputScale(zoomInput.value);
+        if (parsedScale === null) {
+          syncZoomControls(state.scale);
+          return;
+        }
+        setZoom(parsedScale);
+      };
+      zoomInput.addEventListener('change', () => {
+        applyZoomInput();
+      });
+      zoomInput.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          applyZoomInput();
+          zoomInput.blur();
+        }
+      });
+      zoomInput.addEventListener('blur', () => {
+        syncZoomControls(state.scale);
       });
     }
 
@@ -11629,6 +13158,45 @@
       }
       scheduleSessionPersist();
     });
+
+    if (Array.isArray(dom.controls.brushShapeButtons)) {
+      dom.controls.brushShapeButtons.forEach(button => {
+        if (!(button instanceof HTMLButtonElement)) {
+          return;
+        }
+        button.addEventListener('click', event => {
+          const target = event.currentTarget;
+          if (!(target instanceof HTMLButtonElement)) {
+            return;
+          }
+          const next = normalizeBrushShape(target.dataset.brushShape, state.brushShape);
+          const hasSelection = selectionMaskHasPixels(state.selectionMask);
+          const isCustomAlreadySelected = state.brushShape === BRUSH_SHAPE_CUSTOM;
+
+          // While custom is selected, clicking custom again with a selection refreshes the brush.
+          if (next === BRUSH_SHAPE_CUSTOM && isCustomAlreadySelected && hasSelection) {
+            createCustomBrushFromSelection();
+            return;
+          }
+
+          if (next === BRUSH_SHAPE_CUSTOM && !hasCustomBrushData()) {
+            if (!hasSelection) {
+              state.brushShape = BRUSH_SHAPE_SQUARE;
+              syncBrushControls();
+              updateAutosaveStatus('範囲選択中にカスタムを押すとブラシ化できます', 'info');
+              scheduleSessionPersist();
+              return;
+            }
+            createCustomBrushFromSelection();
+            return;
+          }
+          state.brushShape = next;
+          syncBrushControls();
+          requestOverlayRender();
+          scheduleSessionPersist();
+        });
+      });
+    }
 
     dom.controls.toggleChecker?.addEventListener('change', event => {
       state.showChecker = Boolean(event.target.checked);
@@ -11716,6 +13284,34 @@
       openExportDialog();
     });
 
+    if (dom.controls.timelapseClear instanceof HTMLButtonElement) {
+      dom.controls.timelapseClear.addEventListener('click', () => {
+        clearTimelapseRecording();
+      });
+    }
+    const handleTimelapseToggleInput = event => {
+      if (!(event.target instanceof HTMLInputElement)) {
+        return;
+      }
+      setTimelapseEnabled(Boolean(event.target.checked));
+    };
+    dom.controls.toggleTimelapse?.addEventListener('change', handleTimelapseToggleInput);
+    dom.controls.toggleTimelapse?.addEventListener('input', handleTimelapseToggleInput);
+    if (dom.controls.toggleTimelapse instanceof HTMLInputElement) {
+      dom.controls.toggleTimelapse.checked = Boolean(timelapseState.enabled);
+    }
+    if (dom.controls.timelapseFps instanceof HTMLInputElement) {
+      dom.controls.timelapseFps.addEventListener('input', event => {
+        timelapseState.fps = normalizeTimelapseFps(event.target.value);
+        syncTimelapseControls();
+      });
+      dom.controls.timelapseFps.addEventListener('change', event => {
+        timelapseState.fps = normalizeTimelapseFps(event.target.value);
+        syncTimelapseControls();
+        scheduleSessionPersist({ includeSnapshots: false });
+      });
+    }
+
     dom.controls.togglePixfindMode?.addEventListener('change', event => {
       if (!(event.target instanceof HTMLInputElement)) {
         return;
@@ -11796,6 +13392,12 @@
         }
       });
     }
+    dom.controls.spriteScaleDecrement?.addEventListener('click', () => {
+      adjustSpriteScaleInputBy(-1);
+    });
+    dom.controls.spriteScaleIncrement?.addEventListener('click', () => {
+      adjustSpriteScaleInputBy(1);
+    });
 
     dom.controls.canvasWidth?.addEventListener('change', handleCanvasResizeRequest);
     dom.controls.canvasHeight?.addEventListener('change', handleCanvasResizeRequest);
@@ -11827,6 +13429,7 @@
     setupNumberSteppers();
     setPixfindHelpExpanded(false);
     syncControlsWithState();
+    syncTimelapseControls();
     updateSpriteScaleControlLimits();
     applyEmbedGuardrails();
   }
@@ -11930,7 +13533,8 @@
           }
         }
         resized.visible = layer.visible;
-        resized.opacity = layer.opacity;
+        resized.opacity = normalizeLayerOpacity(layer.opacity);
+        resized.blendMode = normalizeLayerBlendMode(layer.blendMode);
         return resized;
       });
     });
@@ -11960,7 +13564,8 @@
         const scaled = createLayer(layer.name, newWidth, newHeight);
         scaled.id = layer.id;
         scaled.visible = layer.visible;
-        scaled.opacity = layer.opacity;
+        scaled.opacity = normalizeLayerOpacity(layer.opacity);
+        scaled.blendMode = normalizeLayerBlendMode(layer.blendMode);
 
         const sourceIndices = layer.indices;
         const destIndices = scaled.indices;
@@ -12786,7 +14391,602 @@
     writePaletteColorFromHsv();
   }
 
+  function createTimelineSlotKey(frameIndex, layerIndex) {
+    return `${frameIndex}:${layerIndex}`;
+  }
+
+  function parseTimelineSlotKey(key) {
+    if (typeof key !== 'string') {
+      return null;
+    }
+    const [framePart, layerPart] = key.split(':');
+    const frameIndex = Number.parseInt(framePart, 10);
+    const layerIndex = Number.parseInt(layerPart, 10);
+    if (!Number.isInteger(frameIndex) || !Number.isInteger(layerIndex)) {
+      return null;
+    }
+    return { frameIndex, layerIndex };
+  }
+
+  function hasTimelineLayerIndex(frameIndex, layerIndex) {
+    if (!Number.isInteger(frameIndex) || !Number.isInteger(layerIndex)) {
+      return false;
+    }
+    if (frameIndex < 0 || frameIndex >= state.frames.length || layerIndex < 0) {
+      return false;
+    }
+    const frame = state.frames[frameIndex];
+    return Boolean(frame && Array.isArray(frame.layers) && layerIndex < frame.layers.length);
+  }
+
+  function normalizeTimelineSelectionState() {
+    let changed = false;
+    if (timelineSelection.mode === TIMELINE_SELECTION_MODE_FRAME) {
+      const validIndexes = new Set();
+      timelineSelection.frameIndexes.forEach(index => {
+        if (Number.isInteger(index) && index >= 0 && index < state.frames.length) {
+          validIndexes.add(index);
+        }
+      });
+      if (validIndexes.size !== timelineSelection.frameIndexes.size) {
+        timelineSelection.frameIndexes = validIndexes;
+        changed = true;
+      }
+      if (!timelineSelection.frameIndexes.size) {
+        timelineSelection.mode = TIMELINE_SELECTION_MODE_NONE;
+        changed = true;
+      }
+      if (timelineSelection.slotKeys.size) {
+        timelineSelection.slotKeys.clear();
+        changed = true;
+      }
+      if (timelineSelection.layerIndexes.size) {
+        timelineSelection.layerIndexes.clear();
+        changed = true;
+      }
+      return changed;
+    }
+    if (timelineSelection.mode === TIMELINE_SELECTION_MODE_LAYER) {
+      const activeFrame = getActiveFrame();
+      const layerCount = activeFrame && Array.isArray(activeFrame.layers) ? activeFrame.layers.length : 0;
+      const validIndexes = new Set();
+      timelineSelection.layerIndexes.forEach(index => {
+        if (Number.isInteger(index) && index >= 0 && index < layerCount) {
+          validIndexes.add(index);
+        }
+      });
+      if (validIndexes.size !== timelineSelection.layerIndexes.size) {
+        timelineSelection.layerIndexes = validIndexes;
+        changed = true;
+      }
+      if (!timelineSelection.layerIndexes.size) {
+        timelineSelection.mode = TIMELINE_SELECTION_MODE_NONE;
+        changed = true;
+      }
+      if (timelineSelection.frameIndexes.size) {
+        timelineSelection.frameIndexes.clear();
+        changed = true;
+      }
+      if (timelineSelection.slotKeys.size) {
+        timelineSelection.slotKeys.clear();
+        changed = true;
+      }
+      return changed;
+    }
+    if (timelineSelection.mode === TIMELINE_SELECTION_MODE_SLOT) {
+      const validKeys = new Set();
+      timelineSelection.slotKeys.forEach(key => {
+        const parsed = parseTimelineSlotKey(key);
+        if (parsed && hasTimelineLayerIndex(parsed.frameIndex, parsed.layerIndex)) {
+          validKeys.add(createTimelineSlotKey(parsed.frameIndex, parsed.layerIndex));
+        }
+      });
+      if (validKeys.size !== timelineSelection.slotKeys.size) {
+        timelineSelection.slotKeys = validKeys;
+        changed = true;
+      }
+      if (!timelineSelection.slotKeys.size) {
+        timelineSelection.mode = TIMELINE_SELECTION_MODE_NONE;
+        changed = true;
+      }
+      if (timelineSelection.frameIndexes.size) {
+        timelineSelection.frameIndexes.clear();
+        changed = true;
+      }
+      if (timelineSelection.layerIndexes.size) {
+        timelineSelection.layerIndexes.clear();
+        changed = true;
+      }
+      return changed;
+    }
+    if (timelineSelection.frameIndexes.size || timelineSelection.layerIndexes.size || timelineSelection.slotKeys.size) {
+      timelineSelection.frameIndexes.clear();
+      timelineSelection.layerIndexes.clear();
+      timelineSelection.slotKeys.clear();
+      changed = true;
+    }
+    return changed;
+  }
+
+  function clearTimelineSelection() {
+    const hadSelection = timelineSelection.mode !== TIMELINE_SELECTION_MODE_NONE
+      || timelineSelection.frameIndexes.size > 0
+      || timelineSelection.layerIndexes.size > 0
+      || timelineSelection.slotKeys.size > 0;
+    timelineSelection.mode = TIMELINE_SELECTION_MODE_NONE;
+    timelineSelection.frameIndexes.clear();
+    timelineSelection.layerIndexes.clear();
+    timelineSelection.slotKeys.clear();
+    return hadSelection;
+  }
+
+  function setTimelineFrameSelection(frameIndex, { append = false } = {}) {
+    if (!Number.isInteger(frameIndex) || frameIndex < 0 || frameIndex >= state.frames.length) {
+      return false;
+    }
+    let changed = false;
+    if (timelineSelection.mode !== TIMELINE_SELECTION_MODE_FRAME) {
+      timelineSelection.mode = TIMELINE_SELECTION_MODE_FRAME;
+      timelineSelection.slotKeys.clear();
+      timelineSelection.layerIndexes.clear();
+      timelineSelection.frameIndexes.clear();
+      changed = true;
+    }
+    if (!append) {
+      if (timelineSelection.frameIndexes.size !== 1 || !timelineSelection.frameIndexes.has(frameIndex)) {
+        timelineSelection.frameIndexes.clear();
+        timelineSelection.frameIndexes.add(frameIndex);
+        changed = true;
+      }
+      return changed;
+    }
+    if (!timelineSelection.frameIndexes.has(frameIndex)) {
+      timelineSelection.frameIndexes.add(frameIndex);
+      changed = true;
+    }
+    if (!timelineSelection.frameIndexes.size) {
+      timelineSelection.frameIndexes.add(frameIndex);
+      changed = true;
+    }
+    return changed;
+  }
+
+  function setTimelineSlotSelection(frameIndex, layerIndex, { append = false } = {}) {
+    if (!hasTimelineLayerIndex(frameIndex, layerIndex)) {
+      return false;
+    }
+    const key = createTimelineSlotKey(frameIndex, layerIndex);
+    let changed = false;
+    if (timelineSelection.mode !== TIMELINE_SELECTION_MODE_SLOT) {
+      timelineSelection.mode = TIMELINE_SELECTION_MODE_SLOT;
+      timelineSelection.frameIndexes.clear();
+      timelineSelection.layerIndexes.clear();
+      timelineSelection.slotKeys.clear();
+      changed = true;
+    }
+    if (!append) {
+      if (timelineSelection.slotKeys.size !== 1 || !timelineSelection.slotKeys.has(key)) {
+        timelineSelection.slotKeys.clear();
+        timelineSelection.slotKeys.add(key);
+        changed = true;
+      }
+      return changed;
+    }
+    if (!timelineSelection.slotKeys.has(key)) {
+      timelineSelection.slotKeys.add(key);
+      changed = true;
+    }
+    if (!timelineSelection.slotKeys.size) {
+      timelineSelection.slotKeys.add(key);
+      changed = true;
+    }
+    return changed;
+  }
+
+  function setTimelineLayerSelection(layerIndex, { append = false } = {}) {
+    const activeFrame = getActiveFrame();
+    const layerCount = activeFrame && Array.isArray(activeFrame.layers) ? activeFrame.layers.length : 0;
+    if (!Number.isInteger(layerIndex) || layerIndex < 0 || layerIndex >= layerCount) {
+      return false;
+    }
+    let changed = false;
+    if (timelineSelection.mode !== TIMELINE_SELECTION_MODE_LAYER) {
+      timelineSelection.mode = TIMELINE_SELECTION_MODE_LAYER;
+      timelineSelection.frameIndexes.clear();
+      timelineSelection.slotKeys.clear();
+      timelineSelection.layerIndexes.clear();
+      changed = true;
+    }
+    if (!append) {
+      if (timelineSelection.layerIndexes.size !== 1 || !timelineSelection.layerIndexes.has(layerIndex)) {
+        timelineSelection.layerIndexes.clear();
+        timelineSelection.layerIndexes.add(layerIndex);
+        changed = true;
+      }
+      return changed;
+    }
+    if (!timelineSelection.layerIndexes.has(layerIndex)) {
+      timelineSelection.layerIndexes.add(layerIndex);
+      changed = true;
+    }
+    if (!timelineSelection.layerIndexes.size) {
+      timelineSelection.layerIndexes.add(layerIndex);
+      changed = true;
+    }
+    return changed;
+  }
+
+  function getTimelineSelectedFrameIndexes() {
+    normalizeTimelineSelectionState();
+    if (timelineSelection.mode !== TIMELINE_SELECTION_MODE_FRAME || !timelineSelection.frameIndexes.size) {
+      return [];
+    }
+    return Array.from(timelineSelection.frameIndexes).sort((a, b) => a - b);
+  }
+
+  function getTimelineSelectedSlotEntries() {
+    normalizeTimelineSelectionState();
+    if (timelineSelection.mode !== TIMELINE_SELECTION_MODE_SLOT || !timelineSelection.slotKeys.size) {
+      return [];
+    }
+    const entries = [];
+    timelineSelection.slotKeys.forEach(key => {
+      const parsed = parseTimelineSlotKey(key);
+      if (parsed && hasTimelineLayerIndex(parsed.frameIndex, parsed.layerIndex)) {
+        entries.push(parsed);
+      }
+    });
+    return entries;
+  }
+
+  function getTimelineSelectedLayerIndexes() {
+    normalizeTimelineSelectionState();
+    if (timelineSelection.mode !== TIMELINE_SELECTION_MODE_LAYER || !timelineSelection.layerIndexes.size) {
+      return [];
+    }
+    return Array.from(timelineSelection.layerIndexes).sort((a, b) => a - b);
+  }
+
+  function swapLayerPixelPayload(layerA, layerB) {
+    if (!layerA || !layerB) {
+      return;
+    }
+    const indices = layerA.indices;
+    layerA.indices = layerB.indices;
+    layerB.indices = indices;
+    const direct = layerA.direct;
+    layerA.direct = layerB.direct;
+    layerB.direct = direct;
+  }
+
+  function moveFrameIndexesByOffset(selectedIndexes, offset) {
+    const frameCount = state.frames.length;
+    if (!Array.isArray(selectedIndexes) || !selectedIndexes.length || frameCount <= 1 || !Number.isInteger(offset) || offset === 0) {
+      return { moved: false, selectedIndexes: [] };
+    }
+    const selectedFlags = new Array(frameCount).fill(false);
+    selectedIndexes.forEach(index => {
+      if (Number.isInteger(index) && index >= 0 && index < frameCount) {
+        selectedFlags[index] = true;
+      }
+    });
+    let moved = false;
+    if (offset < 0) {
+      for (let frameIndex = 1; frameIndex < frameCount; frameIndex += 1) {
+        if (!selectedFlags[frameIndex] || selectedFlags[frameIndex - 1]) {
+          continue;
+        }
+        const previousFrame = state.frames[frameIndex - 1];
+        state.frames[frameIndex - 1] = state.frames[frameIndex];
+        state.frames[frameIndex] = previousFrame;
+        selectedFlags[frameIndex - 1] = true;
+        selectedFlags[frameIndex] = false;
+        moved = true;
+      }
+    } else {
+      for (let frameIndex = frameCount - 2; frameIndex >= 0; frameIndex -= 1) {
+        if (!selectedFlags[frameIndex] || selectedFlags[frameIndex + 1]) {
+          continue;
+        }
+        const nextFrame = state.frames[frameIndex + 1];
+        state.frames[frameIndex + 1] = state.frames[frameIndex];
+        state.frames[frameIndex] = nextFrame;
+        selectedFlags[frameIndex + 1] = true;
+        selectedFlags[frameIndex] = false;
+        moved = true;
+      }
+    }
+    const nextSelection = [];
+    selectedFlags.forEach((isSelected, index) => {
+      if (isSelected) {
+        nextSelection.push(index);
+      }
+    });
+    return { moved, selectedIndexes: nextSelection };
+  }
+
+  function moveLayerIndexesByOffset(selectedIndexes, offset) {
+    const activeFrame = getActiveFrame();
+    const layerCount = activeFrame && Array.isArray(activeFrame.layers) ? activeFrame.layers.length : 0;
+    if (!Array.isArray(selectedIndexes) || !selectedIndexes.length || layerCount <= 1 || !Number.isInteger(offset) || offset === 0) {
+      return { moved: false, selectedIndexes: [] };
+    }
+    const selectedFlags = new Array(layerCount).fill(false);
+    selectedIndexes.forEach(index => {
+      if (Number.isInteger(index) && index >= 0 && index < layerCount) {
+        selectedFlags[index] = true;
+      }
+    });
+    let moved = false;
+    if (offset < 0) {
+      for (let layerIndex = 1; layerIndex < layerCount; layerIndex += 1) {
+        if (!selectedFlags[layerIndex] || selectedFlags[layerIndex - 1]) {
+          continue;
+        }
+        state.frames.forEach(frame => {
+          if (!frame || !Array.isArray(frame.layers) || layerIndex >= frame.layers.length) {
+            return;
+          }
+          const previousLayer = frame.layers[layerIndex - 1];
+          frame.layers[layerIndex - 1] = frame.layers[layerIndex];
+          frame.layers[layerIndex] = previousLayer;
+        });
+        selectedFlags[layerIndex - 1] = true;
+        selectedFlags[layerIndex] = false;
+        moved = true;
+      }
+    } else {
+      for (let layerIndex = layerCount - 2; layerIndex >= 0; layerIndex -= 1) {
+        if (!selectedFlags[layerIndex] || selectedFlags[layerIndex + 1]) {
+          continue;
+        }
+        state.frames.forEach(frame => {
+          if (!frame || !Array.isArray(frame.layers) || layerIndex + 1 >= frame.layers.length) {
+            return;
+          }
+          const nextLayer = frame.layers[layerIndex + 1];
+          frame.layers[layerIndex + 1] = frame.layers[layerIndex];
+          frame.layers[layerIndex] = nextLayer;
+        });
+        selectedFlags[layerIndex + 1] = true;
+        selectedFlags[layerIndex] = false;
+        moved = true;
+      }
+    }
+    const nextSelection = [];
+    selectedFlags.forEach((isSelected, index) => {
+      if (isSelected) {
+        nextSelection.push(index);
+      }
+    });
+    return { moved, selectedIndexes: nextSelection };
+  }
+
+  function moveSelectedSlotsHorizontally(offset) {
+    if (!Number.isInteger(offset) || offset === 0) {
+      return false;
+    }
+    const selectedEntries = getTimelineSelectedSlotEntries();
+    if (!selectedEntries.length) {
+      return false;
+    }
+    const frameCount = state.frames.length;
+    if (frameCount <= 1) {
+      return false;
+    }
+    const selectedKeys = new Set(timelineSelection.slotKeys);
+    const activeLayerIndex = getActiveLayerIndex();
+    let activePosition = activeLayerIndex >= 0
+      ? { frameIndex: state.activeFrame, layerIndex: activeLayerIndex }
+      : null;
+    let moved = false;
+    const maxLayerCount = state.frames.reduce((max, frame) => Math.max(max, frame?.layers?.length || 0), 0);
+    const layerStart = offset < 0 ? 0 : maxLayerCount - 1;
+    const layerEnd = offset < 0 ? maxLayerCount : -1;
+    const layerStep = offset < 0 ? 1 : -1;
+    for (let layerIndex = layerStart; layerIndex !== layerEnd; layerIndex += layerStep) {
+      if (offset < 0) {
+        for (let frameIndex = 1; frameIndex < frameCount; frameIndex += 1) {
+          const sourceKey = createTimelineSlotKey(frameIndex, layerIndex);
+          const targetKey = createTimelineSlotKey(frameIndex - 1, layerIndex);
+          if (!selectedKeys.has(sourceKey) || selectedKeys.has(targetKey)) {
+            continue;
+          }
+          if (!hasTimelineLayerIndex(frameIndex, layerIndex) || !hasTimelineLayerIndex(frameIndex - 1, layerIndex)) {
+            continue;
+          }
+          const sourceLayer = state.frames[frameIndex].layers[layerIndex];
+          const targetLayer = state.frames[frameIndex - 1].layers[layerIndex];
+          swapLayerPixelPayload(sourceLayer, targetLayer);
+          selectedKeys.delete(sourceKey);
+          selectedKeys.add(targetKey);
+          if (activePosition) {
+            if (activePosition.frameIndex === frameIndex && activePosition.layerIndex === layerIndex) {
+              activePosition = { frameIndex: frameIndex - 1, layerIndex };
+            } else if (activePosition.frameIndex === frameIndex - 1 && activePosition.layerIndex === layerIndex) {
+              activePosition = { frameIndex, layerIndex };
+            }
+          }
+          moved = true;
+        }
+      } else {
+        for (let frameIndex = frameCount - 2; frameIndex >= 0; frameIndex -= 1) {
+          const sourceKey = createTimelineSlotKey(frameIndex, layerIndex);
+          const targetKey = createTimelineSlotKey(frameIndex + 1, layerIndex);
+          if (!selectedKeys.has(sourceKey) || selectedKeys.has(targetKey)) {
+            continue;
+          }
+          if (!hasTimelineLayerIndex(frameIndex, layerIndex) || !hasTimelineLayerIndex(frameIndex + 1, layerIndex)) {
+            continue;
+          }
+          const sourceLayer = state.frames[frameIndex].layers[layerIndex];
+          const targetLayer = state.frames[frameIndex + 1].layers[layerIndex];
+          swapLayerPixelPayload(sourceLayer, targetLayer);
+          selectedKeys.delete(sourceKey);
+          selectedKeys.add(targetKey);
+          if (activePosition) {
+            if (activePosition.frameIndex === frameIndex && activePosition.layerIndex === layerIndex) {
+              activePosition = { frameIndex: frameIndex + 1, layerIndex };
+            } else if (activePosition.frameIndex === frameIndex + 1 && activePosition.layerIndex === layerIndex) {
+              activePosition = { frameIndex, layerIndex };
+            }
+          }
+          moved = true;
+        }
+      }
+    }
+    if (!moved) {
+      return false;
+    }
+    timelineSelection.mode = TIMELINE_SELECTION_MODE_SLOT;
+    timelineSelection.slotKeys = selectedKeys;
+    timelineSelection.frameIndexes.clear();
+    timelineSelection.layerIndexes.clear();
+    if (activePosition && hasTimelineLayerIndex(activePosition.frameIndex, activePosition.layerIndex)) {
+      state.activeFrame = activePosition.frameIndex;
+      const activeLayer = state.frames[activePosition.frameIndex]?.layers?.[activePosition.layerIndex];
+      if (activeLayer) {
+        state.activeLayer = activeLayer.id;
+      }
+    }
+    normalizeTimelineSelectionState();
+    return true;
+  }
+
+  function moveSelectedSlotsVertically(offset) {
+    if (!Number.isInteger(offset) || offset === 0) {
+      return false;
+    }
+    const selectedEntries = getTimelineSelectedSlotEntries();
+    if (!selectedEntries.length) {
+      return false;
+    }
+    const selectedKeys = new Set(timelineSelection.slotKeys);
+    const activeLayerIndex = getActiveLayerIndex();
+    let activePosition = activeLayerIndex >= 0
+      ? { frameIndex: state.activeFrame, layerIndex: activeLayerIndex }
+      : null;
+    let moved = false;
+    state.frames.forEach((frame, frameIndex) => {
+      if (!frame || !Array.isArray(frame.layers) || frame.layers.length <= 1) {
+        return;
+      }
+      if (offset < 0) {
+        for (let layerIndex = 1; layerIndex < frame.layers.length; layerIndex += 1) {
+          const sourceKey = createTimelineSlotKey(frameIndex, layerIndex);
+          const targetKey = createTimelineSlotKey(frameIndex, layerIndex - 1);
+          if (!selectedKeys.has(sourceKey) || selectedKeys.has(targetKey)) {
+            continue;
+          }
+          const sourceLayer = frame.layers[layerIndex];
+          const targetLayer = frame.layers[layerIndex - 1];
+          swapLayerPixelPayload(sourceLayer, targetLayer);
+          selectedKeys.delete(sourceKey);
+          selectedKeys.add(targetKey);
+          if (activePosition) {
+            if (activePosition.frameIndex === frameIndex && activePosition.layerIndex === layerIndex) {
+              activePosition = { frameIndex, layerIndex: layerIndex - 1 };
+            } else if (activePosition.frameIndex === frameIndex && activePosition.layerIndex === layerIndex - 1) {
+              activePosition = { frameIndex, layerIndex };
+            }
+          }
+          moved = true;
+        }
+      } else {
+        for (let layerIndex = frame.layers.length - 2; layerIndex >= 0; layerIndex -= 1) {
+          const sourceKey = createTimelineSlotKey(frameIndex, layerIndex);
+          const targetKey = createTimelineSlotKey(frameIndex, layerIndex + 1);
+          if (!selectedKeys.has(sourceKey) || selectedKeys.has(targetKey)) {
+            continue;
+          }
+          const sourceLayer = frame.layers[layerIndex];
+          const targetLayer = frame.layers[layerIndex + 1];
+          swapLayerPixelPayload(sourceLayer, targetLayer);
+          selectedKeys.delete(sourceKey);
+          selectedKeys.add(targetKey);
+          if (activePosition) {
+            if (activePosition.frameIndex === frameIndex && activePosition.layerIndex === layerIndex) {
+              activePosition = { frameIndex, layerIndex: layerIndex + 1 };
+            } else if (activePosition.frameIndex === frameIndex && activePosition.layerIndex === layerIndex + 1) {
+              activePosition = { frameIndex, layerIndex };
+            }
+          }
+          moved = true;
+        }
+      }
+    });
+    if (!moved) {
+      return false;
+    }
+    timelineSelection.mode = TIMELINE_SELECTION_MODE_SLOT;
+    timelineSelection.slotKeys = selectedKeys;
+    timelineSelection.frameIndexes.clear();
+    timelineSelection.layerIndexes.clear();
+    if (activePosition && hasTimelineLayerIndex(activePosition.frameIndex, activePosition.layerIndex)) {
+      state.activeFrame = activePosition.frameIndex;
+      const activeLayer = state.frames[activePosition.frameIndex]?.layers?.[activePosition.layerIndex];
+      if (activeLayer) {
+        state.activeLayer = activeLayer.id;
+      }
+    }
+    normalizeTimelineSelectionState();
+    return true;
+  }
+
   function moveActiveLayer(offset) {
+    if (!Number.isInteger(offset) || offset === 0) return;
+    if (timelineSelection.mode === TIMELINE_SELECTION_MODE_SLOT && timelineSelection.slotKeys.size > 0) {
+      beginHistory(offset < 0 ? 'moveLayerCellsUp' : 'moveLayerCellsDown');
+      const movedSelectedSlots = moveSelectedSlotsVertically(offset);
+      if (!movedSelectedSlots) {
+        history.pending = null;
+        return;
+      }
+      markHistoryDirty();
+      scheduleSessionPersist();
+      renderFrameList();
+      renderLayerList();
+      requestRender();
+      requestOverlayRender();
+      commitHistory();
+      return;
+    }
+    if (timelineSelection.mode === TIMELINE_SELECTION_MODE_LAYER && timelineSelection.layerIndexes.size > 0) {
+      const selectedLayers = getTimelineSelectedLayerIndexes();
+      const activeFrameForLayerMove = getActiveFrame();
+      const activeLayerIndex = getActiveLayerIndex();
+      const activeLayerRef = activeFrameForLayerMove && activeLayerIndex >= 0
+        ? activeFrameForLayerMove.layers[activeLayerIndex]
+        : null;
+      beginHistory(offset < 0 ? 'moveLayerGroupUp' : 'moveLayerGroupDown');
+      const moveResult = moveLayerIndexesByOffset(selectedLayers, offset);
+      if (!moveResult.moved) {
+        history.pending = null;
+        return;
+      }
+      if (activeLayerRef) {
+        const updatedFrame = getActiveFrame();
+        if (updatedFrame && Array.isArray(updatedFrame.layers)) {
+          const nextActiveLayerIndex = updatedFrame.layers.indexOf(activeLayerRef);
+          if (nextActiveLayerIndex >= 0 && updatedFrame.layers[nextActiveLayerIndex]) {
+            state.activeLayer = updatedFrame.layers[nextActiveLayerIndex].id;
+          }
+        }
+      }
+      timelineSelection.mode = TIMELINE_SELECTION_MODE_LAYER;
+      timelineSelection.layerIndexes = new Set(moveResult.selectedIndexes);
+      timelineSelection.frameIndexes.clear();
+      timelineSelection.slotKeys.clear();
+      normalizeTimelineSelectionState();
+      markHistoryDirty();
+      scheduleSessionPersist();
+      renderFrameList();
+      renderLayerList();
+      requestRender();
+      requestOverlayRender();
+      commitHistory();
+      return;
+    }
     const activeFrame = getActiveFrame();
     if (!activeFrame) return;
     const currentIndex = getActiveLayerIndex();
@@ -12813,21 +15013,49 @@
   }
 
   function moveActiveFrame(offset) {
-    if (!Number.isFinite(offset) || offset === 0) return;
+    if (!Number.isInteger(offset) || offset === 0) return;
+    if (timelineSelection.mode === TIMELINE_SELECTION_MODE_SLOT && timelineSelection.slotKeys.size > 0) {
+      beginHistory(offset < 0 ? 'moveSlotFrameLeft' : 'moveSlotFrameRight');
+      const movedSelectedSlots = moveSelectedSlotsHorizontally(offset);
+      if (!movedSelectedSlots) {
+        history.pending = null;
+        return;
+      }
+      markHistoryDirty();
+      scheduleSessionPersist();
+      renderFrameList();
+      renderLayerList();
+      requestRender();
+      requestOverlayRender();
+      commitHistory();
+      return;
+    }
     const currentIndex = state.activeFrame;
     const frameCount = state.frames.length;
     if (!Number.isFinite(currentIndex) || currentIndex < 0 || currentIndex >= frameCount || frameCount <= 1) {
       return;
     }
-    const targetIndex = clamp(currentIndex + offset, 0, frameCount - 1);
-    if (targetIndex === currentIndex) {
+    const selectedFrames = getTimelineSelectedFrameIndexes();
+    const frameIndexesToMove = selectedFrames.length ? selectedFrames : [currentIndex];
+    const activeFrameRef = state.frames[currentIndex];
+    beginHistory(offset < 0 ? 'moveFrameLeft' : 'moveFrameRight');
+    const moveResult = moveFrameIndexesByOffset(frameIndexesToMove, offset);
+    if (!moveResult.moved) {
+      history.pending = null;
       return;
     }
-    beginHistory(offset < 0 ? 'moveFrameLeft' : 'moveFrameRight');
-    const [frame] = state.frames.splice(currentIndex, 1);
-    const destinationIndex = clamp(targetIndex, 0, state.frames.length);
-    state.frames.splice(destinationIndex, 0, frame);
-    state.activeFrame = destinationIndex;
+    const nextActiveIndex = state.frames.indexOf(activeFrameRef);
+    if (nextActiveIndex >= 0) {
+      state.activeFrame = nextActiveIndex;
+    } else {
+      state.activeFrame = clamp(state.activeFrame, 0, state.frames.length - 1);
+    }
+    if (timelineSelection.mode === TIMELINE_SELECTION_MODE_FRAME) {
+      timelineSelection.frameIndexes = new Set(moveResult.selectedIndexes);
+      timelineSelection.layerIndexes.clear();
+      timelineSelection.slotKeys.clear();
+      normalizeTimelineSelectionState();
+    }
     markHistoryDirty();
     scheduleSessionPersist();
     renderFrameList();
@@ -12841,6 +15069,7 @@
     dom.controls.addLayer?.addEventListener('click', () => {
       const activeFrame = getActiveFrame();
       if (!activeFrame) return;
+      clearTimelineSelection();
       beginHistory('addLayer');
       const insertIndex = clamp(getActiveLayerIndex() + 1, 0, Number.MAX_SAFE_INTEGER);
       state.frames.forEach((frame, frameIndex) => {
@@ -12865,6 +15094,7 @@
       if (!state.frames.every(frame => frame.layers.length > 1)) {
         return;
       }
+      clearTimelineSelection();
       beginHistory('removeLayer');
       const removeIndex = clamp(getActiveLayerIndex(), 0, Number.MAX_SAFE_INTEGER);
       state.frames.forEach(frame => {
@@ -12894,6 +15124,7 @@
     dom.controls.addFrame?.addEventListener('click', () => {
       const baseFrame = getActiveFrame();
       if (!baseFrame) return;
+      clearTimelineSelection();
       beginHistory('addFrame');
       const newFrame = createFrame(`フレーム ${state.frames.length + 1}`, baseFrame.layers, state.width, state.height);
       state.frames.splice(state.activeFrame + 1, 0, newFrame);
@@ -12910,6 +15141,7 @@
 
     dom.controls.removeFrame?.addEventListener('click', () => {
       if (state.frames.length <= 1) return;
+      clearTimelineSelection();
       beginHistory('removeFrame');
       state.frames.splice(state.activeFrame, 1);
       state.activeFrame = clamp(state.activeFrame, 0, state.frames.length - 1);
@@ -12931,6 +15163,186 @@
     dom.controls.moveFrameDown?.addEventListener('click', () => {
       moveActiveFrame(1);
     });
+
+    let layerOpacityInteractionActive = false;
+    const finalizeLayerOpacityInteraction = () => {
+      if (!layerOpacityInteractionActive) {
+        return;
+      }
+      layerOpacityInteractionActive = false;
+      commitHistory();
+      renderLayerList();
+    };
+
+    if (dom.controls.layerOpacity instanceof HTMLInputElement) {
+      const opacityControl = dom.controls.layerOpacity;
+      const readOpacityPercent = () => {
+        const percent = clamp(Math.round(Number(opacityControl.value) || 0), 0, 100);
+        opacityControl.value = String(percent);
+        updateLayerOpacityOutput(percent);
+        return percent;
+      };
+
+      opacityControl.addEventListener('input', () => {
+        const opacityPercent = readOpacityPercent();
+        if (getActiveLayerTrackIndex() < 0) {
+          syncActiveLayerSettingsUI();
+          return;
+        }
+        if (!layerOpacityInteractionActive) {
+          beginHistory('setLayerOpacity');
+          layerOpacityInteractionActive = true;
+        }
+        const changed = setActiveLayerTrackOpacity(opacityPercent / 100);
+        if (!changed) {
+          return;
+        }
+        markHistoryDirty();
+        requestRender();
+        requestOverlayRender();
+        renderLayerList();
+      });
+      opacityControl.addEventListener('change', () => {
+        finalizeLayerOpacityInteraction();
+      });
+      opacityControl.addEventListener('blur', finalizeLayerOpacityInteraction);
+      opacityControl.addEventListener('pointercancel', finalizeLayerOpacityInteraction);
+    }
+
+    if (dom.controls.layerBlendMode instanceof HTMLSelectElement) {
+      const blendControl = dom.controls.layerBlendMode;
+      blendControl.addEventListener('change', () => {
+        finalizeLayerOpacityInteraction();
+        const normalizedBlendMode = normalizeLayerBlendMode(blendControl.value);
+        blendControl.value = normalizedBlendMode;
+        beginHistory('setLayerBlendMode');
+        const changed = setActiveLayerTrackBlendMode(normalizedBlendMode);
+        if (changed) {
+          markHistoryDirty();
+          requestRender();
+          requestOverlayRender();
+        }
+        commitHistory();
+        renderLayerList();
+      });
+    }
+
+    let onionSkinInteractionActive = false;
+    const finalizeOnionSkinInteraction = () => {
+      if (!onionSkinInteractionActive) {
+        return;
+      }
+      onionSkinInteractionActive = false;
+      commitHistory();
+      renderLayerList();
+    };
+
+    const applyOnionSkinEnabledChange = enabled => {
+      finalizeOnionSkinInteraction();
+      beginHistory('toggleOnionSkin');
+      const changed = setOnionSkinSettings({ enabled: Boolean(enabled) });
+      if (changed) {
+        markHistoryDirty();
+        requestOverlayRender();
+      }
+      commitHistory();
+      syncActiveFrameSettingsUI();
+    };
+
+    if (dom.controls.onionSkinEnabled instanceof HTMLInputElement) {
+      const toggle = dom.controls.onionSkinEnabled;
+      toggle.addEventListener('change', () => {
+        applyOnionSkinEnabledChange(toggle.checked);
+      });
+    }
+
+    if (dom.controls.toggleOnionSkin instanceof HTMLInputElement) {
+      const toggle = dom.controls.toggleOnionSkin;
+      toggle.addEventListener('change', () => {
+        applyOnionSkinEnabledChange(toggle.checked);
+      });
+    }
+
+    if (dom.controls.onionPrevFrames instanceof HTMLInputElement) {
+      const control = dom.controls.onionPrevFrames;
+      const readValue = () => {
+        const value = normalizeOnionFrameCount(control.value, DEFAULT_ONION_SKIN.prevFrames);
+        control.value = String(value);
+        updateOnionSkinCountOutput(dom.controls.onionPrevFramesValue, value);
+        return value;
+      };
+      control.addEventListener('input', () => {
+        const value = readValue();
+        if (!onionSkinInteractionActive) {
+          beginHistory('setOnionSkin');
+          onionSkinInteractionActive = true;
+        }
+        const changed = setOnionSkinSettings({ prevFrames: value });
+        if (!changed) {
+          return;
+        }
+        markHistoryDirty();
+        requestOverlayRender();
+        syncActiveFrameSettingsUI();
+      });
+      control.addEventListener('change', finalizeOnionSkinInteraction);
+      control.addEventListener('blur', finalizeOnionSkinInteraction);
+      control.addEventListener('pointercancel', finalizeOnionSkinInteraction);
+    }
+
+    if (dom.controls.onionNextFrames instanceof HTMLInputElement) {
+      const control = dom.controls.onionNextFrames;
+      const readValue = () => {
+        const value = normalizeOnionFrameCount(control.value, DEFAULT_ONION_SKIN.nextFrames);
+        control.value = String(value);
+        updateOnionSkinCountOutput(dom.controls.onionNextFramesValue, value);
+        return value;
+      };
+      control.addEventListener('input', () => {
+        const value = readValue();
+        if (!onionSkinInteractionActive) {
+          beginHistory('setOnionSkin');
+          onionSkinInteractionActive = true;
+        }
+        const changed = setOnionSkinSettings({ nextFrames: value });
+        if (!changed) {
+          return;
+        }
+        markHistoryDirty();
+        requestOverlayRender();
+        syncActiveFrameSettingsUI();
+      });
+      control.addEventListener('change', finalizeOnionSkinInteraction);
+      control.addEventListener('blur', finalizeOnionSkinInteraction);
+      control.addEventListener('pointercancel', finalizeOnionSkinInteraction);
+    }
+
+    if (dom.controls.onionOpacity instanceof HTMLInputElement) {
+      const control = dom.controls.onionOpacity;
+      const readValue = () => {
+        const percent = clamp(Math.round(Number(control.value) || 0), 0, 100);
+        control.value = String(percent);
+        updateOnionSkinOpacityOutput(percent);
+        return percent / 100;
+      };
+      control.addEventListener('input', () => {
+        const opacity = readValue();
+        if (!onionSkinInteractionActive) {
+          beginHistory('setOnionSkin');
+          onionSkinInteractionActive = true;
+        }
+        const changed = setOnionSkinSettings({ opacity });
+        if (!changed) {
+          return;
+        }
+        markHistoryDirty();
+        requestOverlayRender();
+        syncActiveFrameSettingsUI();
+      });
+      control.addEventListener('change', finalizeOnionSkinInteraction);
+      control.addEventListener('blur', finalizeOnionSkinInteraction);
+      control.addEventListener('pointercancel', finalizeOnionSkinInteraction);
+    }
 
     dom.controls.playAnimation?.addEventListener('click', () => {
       if (!state.playback.isPlaying) {
@@ -12978,9 +15390,21 @@
     if (!Array.isArray(state.frames) || !state.frames.length) {
       return;
     }
+    if (pointerState.active) {
+      abortActivePointerInteraction({ commitHistory: false });
+    }
+    if (virtualCursorDrawState.active) {
+      cancelVirtualCursorDrawSession();
+    }
+    releaseVirtualCursorPointer();
     state.playback.isPlaying = true;
+    preparePlaybackFrameCache();
     lastFrameTime = performance.now();
     updatePlaybackButtons();
+    syncPlaybackTimelineCursorIndicators();
+    markCanvasDirty();
+    requestRender();
+    requestOverlayRender();
     playbackHandle = requestAnimationFrame(stepPlayback);
   }
 
@@ -12990,16 +15414,38 @@
       cancelAnimationFrame(playbackHandle);
       playbackHandle = null;
     }
+    clearPlaybackFrameCache();
+    clearPlaybackTimelineCursorIndicators();
     updatePlaybackButtons();
+    renderFrameList();
+    renderLayerList();
+    requestRender();
+    requestOverlayRender();
   }
 
   function stepPlayback(timestamp) {
     if (!state.playback.isPlaying) return;
-    const frame = getActiveFrame();
-    const duration = frame && Number.isFinite(frame.duration) && frame.duration > 0 ? frame.duration : 1000 / 12;
-    const elapsed = timestamp - lastFrameTime;
-    if (elapsed >= duration) {
-      stepActiveFrame(1, { wrap: true, persist: false });
+    if (!Number.isFinite(lastFrameTime) || lastFrameTime <= 0) {
+      lastFrameTime = timestamp;
+    }
+    let stepped = 0;
+    while (stepped < PLAYBACK_MAX_CATCHUP_STEPS) {
+      const frame = getActiveFrame();
+      const duration = frame && Number.isFinite(frame.duration) && frame.duration > 0 ? frame.duration : 1000 / 12;
+      const elapsed = timestamp - lastFrameTime;
+      if (elapsed < duration) {
+        break;
+      }
+      stepActiveFrame(1, { wrap: true, persist: false, render: false, syncUi: false });
+      lastFrameTime += duration;
+      stepped += 1;
+    }
+    if (stepped > 0) {
+      syncPlaybackTimelineCursorIndicators();
+      markCanvasDirty();
+      requestRender();
+    }
+    if (stepped === PLAYBACK_MAX_CATCHUP_STEPS) {
       lastFrameTime = timestamp;
     }
     playbackHandle = requestAnimationFrame(stepPlayback);
@@ -13010,10 +15456,36 @@
     if (dom.controls.playAnimation) {
       dom.controls.playAnimation.classList.toggle('is-active', isPlaying);
       dom.controls.playAnimation.setAttribute('aria-pressed', isPlaying ? 'true' : 'false');
+      dom.controls.playAnimation.classList.toggle('is-playback-hidden', isPlaying);
+      dom.controls.playAnimation.setAttribute('aria-hidden', isPlaying ? 'true' : 'false');
+      dom.controls.playAnimation.disabled = isPlaying;
     }
     if (dom.controls.stopAnimation) {
+      dom.controls.stopAnimation.classList.toggle('is-playback-hidden', !isPlaying);
+      dom.controls.stopAnimation.setAttribute('aria-hidden', isPlaying ? 'false' : 'true');
       dom.controls.stopAnimation.disabled = !isPlaying;
     }
+    const playbackLockedControls = [
+      dom.controls.addLayer,
+      dom.controls.removeLayer,
+      dom.controls.addFrame,
+      dom.controls.removeFrame,
+      dom.controls.layerOpacity,
+      dom.controls.layerBlendMode,
+      dom.controls.onionSkinEnabled,
+      dom.controls.toggleOnionSkin,
+      dom.controls.onionPrevFrames,
+      dom.controls.onionNextFrames,
+      dom.controls.onionOpacity,
+      dom.controls.undoAction,
+      dom.controls.redoAction,
+      dom.controls.clearCanvas,
+    ];
+    playbackLockedControls.forEach(control => {
+      if (control instanceof HTMLButtonElement || control instanceof HTMLInputElement || control instanceof HTMLSelectElement) {
+        control.disabled = isPlaying;
+      }
+    });
     applyTimelineToolbarFrames();
   }
 
@@ -13119,6 +15591,211 @@
     setLayerVisibilityForRow(rowIndex, !current);
   }
 
+  function getActiveLayerTrackIndex() {
+    const frame = getActiveFrame();
+    if (!frame || !Array.isArray(frame.layers)) {
+      return -1;
+    }
+    return frame.layers.findIndex(layer => layer.id === state.activeLayer);
+  }
+
+  function forEachLayerInTrack(layerIndex, callback) {
+    if (!Number.isInteger(layerIndex) || layerIndex < 0 || typeof callback !== 'function') {
+      return;
+    }
+    state.frames.forEach((frame, frameIndex) => {
+      if (!frame || !Array.isArray(frame.layers)) {
+        return;
+      }
+      const layer = frame.layers[layerIndex];
+      if (!layer) {
+        return;
+      }
+      callback(layer, frameIndex, frame);
+    });
+  }
+
+  function setActiveLayerTrackOpacity(opacity) {
+    const layerIndex = getActiveLayerTrackIndex();
+    if (layerIndex < 0) {
+      return false;
+    }
+    const parsed = Number(opacity);
+    if (!Number.isFinite(parsed)) {
+      return false;
+    }
+    const normalizedOpacity = clamp(parsed, 0, 1);
+    let changed = false;
+    forEachLayerInTrack(layerIndex, layer => {
+      const currentOpacity = normalizeLayerOpacity(layer.opacity);
+      if (Math.abs(currentOpacity - normalizedOpacity) > 0.0001) {
+        layer.opacity = normalizedOpacity;
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
+  function setActiveLayerTrackBlendMode(blendMode) {
+    const layerIndex = getActiveLayerTrackIndex();
+    if (layerIndex < 0) {
+      return false;
+    }
+    const normalizedBlendMode = normalizeLayerBlendMode(blendMode);
+    let changed = false;
+    forEachLayerInTrack(layerIndex, layer => {
+      const currentMode = normalizeLayerBlendMode(layer.blendMode);
+      if (currentMode !== normalizedBlendMode) {
+        layer.blendMode = normalizedBlendMode;
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
+  function updateLayerOpacityOutput(percent) {
+    if (!dom.controls.layerOpacityValue) {
+      return;
+    }
+    const safePercent = clamp(Math.round(Number(percent) || 0), 0, 100);
+    dom.controls.layerOpacityValue.textContent = `${safePercent}%`;
+  }
+
+  function syncActiveLayerSettingsUI() {
+    const frame = getActiveFrame();
+    const layer = frame && Array.isArray(frame.layers)
+      ? (frame.layers.find(item => item.id === state.activeLayer) || frame.layers[frame.layers.length - 1] || null)
+      : null;
+    const hasLayer = Boolean(layer);
+    const opacityControl = dom.controls.layerOpacity;
+    const blendControl = dom.controls.layerBlendMode;
+    const targetLabel = dom.controls.layerSettingsTarget;
+    const normalizedBlendMode = hasLayer ? normalizeLayerBlendMode(layer.blendMode) : DEFAULT_LAYER_BLEND_MODE;
+    const normalizedOpacity = hasLayer ? normalizeLayerOpacity(layer.opacity) : 1;
+    const opacityPercent = clamp(Math.round(normalizedOpacity * 100), 0, 100);
+
+    if (targetLabel) {
+      targetLabel.textContent = hasLayer ? `対象: ${layer.name}` : '対象: なし';
+    }
+    if (opacityControl instanceof HTMLInputElement) {
+      opacityControl.disabled = !hasLayer;
+      opacityControl.value = String(opacityPercent);
+    }
+    updateLayerOpacityOutput(opacityPercent);
+    if (blendControl instanceof HTMLSelectElement) {
+      blendControl.disabled = !hasLayer;
+      blendControl.value = normalizedBlendMode;
+    }
+  }
+
+  function updateOnionSkinEnabledOutput(enabled) {
+    const label = dom.controls.onionSkinEnabledValue;
+    if (!label) {
+      return;
+    }
+    label.textContent = enabled ? 'ON' : 'OFF';
+  }
+
+  function updateOnionSkinCountOutput(element, value) {
+    if (!element) {
+      return;
+    }
+    element.textContent = String(normalizeOnionFrameCount(value));
+  }
+
+  function updateOnionSkinOpacityOutput(percent) {
+    const output = dom.controls.onionOpacityValue;
+    if (!output) {
+      return;
+    }
+    const safePercent = clamp(Math.round(Number(percent) || 0), 0, 100);
+    output.textContent = `${safePercent}%`;
+  }
+
+  function setOnionSkinSettings(patch = {}) {
+    const current = normalizeOnionSkinState(state.onionSkin);
+    const next = normalizeOnionSkinState({ ...current, ...(patch || {}) });
+    const changed = current.enabled !== next.enabled
+      || current.prevFrames !== next.prevFrames
+      || current.nextFrames !== next.nextFrames
+      || Math.abs(current.opacity - next.opacity) > 0.0001;
+    if (!changed) {
+      return false;
+    }
+    state.onionSkin = next;
+    return true;
+  }
+
+  function getOnionSkinFrameIndexes() {
+    const indexes = new Set();
+    const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
+    if (frameCount <= 0) {
+      return indexes;
+    }
+    const settings = normalizeOnionSkinState(state.onionSkin);
+    state.onionSkin = settings;
+    if (!settings.enabled) {
+      return indexes;
+    }
+    const activeFrameIndex = clamp(Math.round(Number(state.activeFrame) || 0), 0, frameCount - 1);
+    indexes.add(activeFrameIndex);
+    const prevFrames = normalizeOnionFrameCount(settings.prevFrames, DEFAULT_ONION_SKIN.prevFrames);
+    const nextFrames = normalizeOnionFrameCount(settings.nextFrames, DEFAULT_ONION_SKIN.nextFrames);
+    for (let offset = 1; offset <= prevFrames; offset += 1) {
+      const frameIndex = activeFrameIndex - offset;
+      if (frameIndex >= 0) {
+        indexes.add(frameIndex);
+      }
+    }
+    for (let offset = 1; offset <= nextFrames; offset += 1) {
+      const frameIndex = activeFrameIndex + offset;
+      if (frameIndex < frameCount) {
+        indexes.add(frameIndex);
+      }
+    }
+    return indexes;
+  }
+
+  function syncActiveFrameSettingsUI() {
+    const frame = getActiveFrame();
+    const hasFrame = Boolean(frame);
+    const settings = normalizeOnionSkinState(state.onionSkin);
+    state.onionSkin = settings;
+    const frameNumber = clamp(Math.round(Number(state.activeFrame) || 0) + 1, 1, Number.MAX_SAFE_INTEGER);
+    const frameLabel = hasFrame && typeof frame.name === 'string' && frame.name.trim()
+      ? frame.name.trim()
+      : `フレーム ${frameNumber}`;
+
+    if (dom.controls.frameSettingsTarget) {
+      dom.controls.frameSettingsTarget.textContent = hasFrame ? `${frameLabel} の設定` : 'フレーム設定';
+    }
+    if (dom.controls.onionSkinEnabled instanceof HTMLInputElement) {
+      dom.controls.onionSkinEnabled.disabled = !hasFrame;
+      dom.controls.onionSkinEnabled.checked = hasFrame && settings.enabled;
+    }
+    if (dom.controls.toggleOnionSkin instanceof HTMLInputElement) {
+      dom.controls.toggleOnionSkin.disabled = !hasFrame;
+      dom.controls.toggleOnionSkin.checked = hasFrame && settings.enabled;
+    }
+    updateOnionSkinEnabledOutput(hasFrame && settings.enabled);
+    if (dom.controls.onionPrevFrames instanceof HTMLInputElement) {
+      dom.controls.onionPrevFrames.disabled = !hasFrame;
+      dom.controls.onionPrevFrames.value = String(settings.prevFrames);
+    }
+    updateOnionSkinCountOutput(dom.controls.onionPrevFramesValue, settings.prevFrames);
+    if (dom.controls.onionNextFrames instanceof HTMLInputElement) {
+      dom.controls.onionNextFrames.disabled = !hasFrame;
+      dom.controls.onionNextFrames.value = String(settings.nextFrames);
+    }
+    updateOnionSkinCountOutput(dom.controls.onionNextFramesValue, settings.nextFrames);
+    const opacityPercent = clamp(Math.round(settings.opacity * 100), 0, 100);
+    if (dom.controls.onionOpacity instanceof HTMLInputElement) {
+      dom.controls.onionOpacity.disabled = !hasFrame;
+      dom.controls.onionOpacity.value = String(opacityPercent);
+    }
+    updateOnionSkinOpacityOutput(opacityPercent);
+  }
+
   function bindTimelineMatrixInteractions() {
     const container = dom.controls.timelineMatrix;
     if (!container || timelineMatrixInteractionBound) {
@@ -13141,10 +15818,16 @@
 
       if (target.classList.contains('timeline-layer-tag')) {
         const layerId = target.dataset.timelineLayerId;
+        const layerIndex = Number.parseInt(target.dataset.timelineLayerIndex || '', 10);
         if (!layerId) {
           return;
         }
         state.activeLayer = layerId;
+        if (event.shiftKey && Number.isFinite(layerIndex)) {
+          setTimelineLayerSelection(layerIndex, { append: true });
+        } else {
+          clearTimelineSelection();
+        }
         scheduleSessionPersist();
         renderTimelineMatrix();
         requestOverlayRender();
@@ -13160,6 +15843,11 @@
         const currentLayers = currentFrame ? currentFrame.layers.slice().reverse() : [];
         const activeLayerRow = currentLayers.findIndex(layer => layer.id === state.activeLayer);
         state.activeFrame = frameIndex;
+        if (event.shiftKey) {
+          setTimelineFrameSelection(frameIndex, { append: true });
+        } else {
+          clearTimelineSelection();
+        }
         const candidateLayers = state.frames[frameIndex]?.layers?.slice().reverse() || [];
         const nextLayer = candidateLayers[activeLayerRow] || candidateLayers[candidateLayers.length - 1] || candidateLayers[0];
         if (nextLayer) {
@@ -13174,18 +15862,96 @@
 
       if (target.classList.contains('timeline-slot')) {
         const frameIndex = Number.parseInt(target.dataset.timelineFrameIndex || '', 10);
+        const layerIndex = Number.parseInt(target.dataset.timelineLayerIndex || '', 10);
         const layerId = target.dataset.timelineLayerId;
-        if (!Number.isFinite(frameIndex) || !layerId || frameIndex < 0 || frameIndex >= state.frames.length) {
+        if (!Number.isFinite(frameIndex) || !Number.isFinite(layerIndex) || !layerId || frameIndex < 0 || frameIndex >= state.frames.length) {
           return;
         }
         state.activeFrame = frameIndex;
         state.activeLayer = layerId;
+        if (event.shiftKey) {
+          setTimelineSlotSelection(frameIndex, layerIndex, { append: true });
+        } else {
+          clearTimelineSelection();
+        }
         scheduleSessionPersist();
         renderTimelineMatrix();
         requestRender();
         requestOverlayRender();
       }
     });
+  }
+
+  function clearPlaybackTimelineCursorIndicators() {
+    const container = dom.controls.timelineMatrix;
+    if (!container) {
+      return;
+    }
+    container.querySelectorAll('.timeline-cell--frame-header.is-playback-active-frame').forEach(node => {
+      node.classList.remove('is-playback-active-frame');
+    });
+    container.querySelectorAll('.timeline-frame-button.is-playback-active').forEach(node => {
+      node.classList.remove('is-playback-active');
+    });
+    container.querySelectorAll('.timeline-cell--body.is-playback-active-cell').forEach(node => {
+      node.classList.remove('is-playback-active-cell');
+    });
+    container.querySelectorAll('.timeline-slot.is-playback-active').forEach(node => {
+      node.classList.remove('is-playback-active');
+    });
+    container.querySelectorAll('.timeline-slot__marker[data-playback-frame-marker="true"]').forEach(marker => {
+      marker.textContent = '';
+      marker.removeAttribute('data-playback-frame-marker');
+    });
+  }
+
+  function syncPlaybackTimelineCursorIndicators() {
+    const container = dom.controls.timelineMatrix;
+    if (!container || !container.childElementCount) {
+      return;
+    }
+    const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
+    if (!frameCount) {
+      clearPlaybackTimelineCursorIndicators();
+      return;
+    }
+    const activeFrameIndex = clamp(Math.round(Number(state.activeFrame) || 0), 0, frameCount - 1);
+    const frameNumberLabel = String(activeFrameIndex + 1);
+
+    clearPlaybackTimelineCursorIndicators();
+
+    const frameButtons = container.querySelectorAll('.timeline-frame-button[data-timeline-frame-index]');
+    frameButtons.forEach(button => {
+      const frameIndex = Number.parseInt(button.dataset.timelineFrameIndex || '', 10);
+      if (frameIndex !== activeFrameIndex) {
+        return;
+      }
+      button.classList.add('is-playback-active');
+      const header = button.closest('.timeline-cell--frame-header');
+      if (header) {
+        header.classList.add('is-playback-active-frame');
+      }
+    });
+
+    const slots = container.querySelectorAll('.timeline-slot[data-timeline-frame-index][data-timeline-layer-id]');
+    for (let i = 0; i < slots.length; i += 1) {
+      const slot = slots[i];
+      const frameIndex = Number.parseInt(slot.dataset.timelineFrameIndex || '', 10);
+      if (frameIndex !== activeFrameIndex) {
+        continue;
+      }
+      slot.classList.add('is-playback-active');
+      const cell = slot.closest('.timeline-cell--body');
+      if (cell) {
+        cell.classList.add('is-playback-active-cell');
+      }
+      const marker = slot.querySelector('.timeline-slot__marker');
+      if (marker) {
+        marker.textContent = frameNumberLabel;
+        marker.setAttribute('data-playback-frame-marker', 'true');
+      }
+      break;
+    }
   }
 
   function renderTimelineMatrix() {
@@ -13196,12 +15962,21 @@
     const frames = state.frames;
     const frameCount = frames.length;
     if (!frameCount) {
-      container.innerHTML = '';
+      if (container.childElementCount > 0) {
+        container.innerHTML = '';
+      }
+      timelineMatrixRenderKey = 'empty';
+      syncActiveLayerSettingsUI();
+      syncActiveFrameSettingsUI();
       return;
     }
 
     const activeFrameIndex = clamp(state.activeFrame, 0, frameCount - 1);
     state.activeFrame = activeFrameIndex;
+    normalizeTimelineSelectionState();
+    const onionFrameIndexes = getOnionSkinFrameIndexes();
+    const isFrameSelectionMode = timelineSelection.mode === TIMELINE_SELECTION_MODE_FRAME;
+    const isSlotSelectionMode = timelineSelection.mode === TIMELINE_SELECTION_MODE_SLOT;
 
     const reversedLayersByFrame = frames.map(frame => frame.layers.slice().reverse());
     const activeLayers = reversedLayersByFrame[activeFrameIndex];
@@ -13221,10 +15996,45 @@
       activeLayerRow = 0;
     }
 
+    const timelineKeyParts = [`f:${frameCount}`, `af:${activeFrameIndex}`, `al:${state.activeLayer || ''}`];
+    if (onionFrameIndexes.size) {
+      timelineKeyParts.push(`on:${Array.from(onionFrameIndexes).join(',')}`);
+    } else {
+      timelineKeyParts.push('on:');
+    }
+    if (isFrameSelectionMode) {
+      timelineKeyParts.push(`sel:frame:${Array.from(timelineSelection.frameIndexes).sort((a, b) => a - b).join(',')}`);
+    } else if (timelineSelection.mode === TIMELINE_SELECTION_MODE_LAYER) {
+      timelineKeyParts.push(`sel:layer:${Array.from(timelineSelection.layerIndexes).sort((a, b) => a - b).join(',')}`);
+    } else if (isSlotSelectionMode) {
+      timelineKeyParts.push(`sel:slot:${Array.from(timelineSelection.slotKeys).sort().join(',')}`);
+    } else {
+      timelineKeyParts.push('sel:none');
+    }
+    for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+      const frame = frames[frameIndex];
+      timelineKeyParts.push(`fr:${frame.id}:${frame.name}:${frame.layers.length}`);
+      const frameLayers = frame.layers;
+      for (let layerIndex = 0; layerIndex < frameLayers.length; layerIndex += 1) {
+        const layer = frameLayers[layerIndex];
+        timelineKeyParts.push(`ly:${layer.id}:${layer.name}:${layer.visible ? 1 : 0}`);
+      }
+    }
+    const nextTimelineRenderKey = timelineKeyParts.join('|');
+    if (timelineMatrixRenderKey === nextTimelineRenderKey && container.childElementCount > 0) {
+      syncAnimationFpsDisplayFromState();
+      syncActiveLayerSettingsUI();
+      syncActiveFrameSettingsUI();
+      return;
+    }
+    timelineMatrixRenderKey = nextTimelineRenderKey;
+
     container.innerHTML = '';
     const cellSizePx = `${TIMELINE_CELL_SIZE}px`;
     container.style.setProperty('--timeline-cell-size', cellSizePx);
-    const columnCount = frameCount + 1;
+    const layerHeaderColumnCount = 2;
+    const frameColumnStart = layerHeaderColumnCount + 1;
+    const columnCount = frameCount + layerHeaderColumnCount;
     const rowCount = layerCount + 1;
     container.style.gridTemplateColumns = `repeat(${columnCount}, ${cellSizePx})`;
     container.style.gridTemplateRows = `repeat(${rowCount}, ${cellSizePx})`;
@@ -13234,7 +16044,7 @@
     const corner = document.createElement('div');
     corner.className = 'timeline-cell timeline-cell--corner';
     corner.classList.add('pixel-frame');
-    corner.style.gridColumn = '1';
+    corner.style.gridColumn = `1 / span ${layerHeaderColumnCount}`;
     corner.style.gridRow = '1';
     corner.setAttribute('role', 'columnheader');
     corner.setAttribute('aria-label', 'タイムライン');
@@ -13242,7 +16052,7 @@
     fragment.appendChild(corner);
 
     frames.forEach((frame, frameIndex) => {
-      const col = frameIndex + 2;
+      const col = frameIndex + frameColumnStart;
       const header = document.createElement('div');
       header.className = 'timeline-cell timeline-cell--frame-header';
       header.classList.add('pixel-frame');
@@ -13252,6 +16062,20 @@
       if (frameIndex === activeFrameIndex) {
         header.classList.add('is-active-frame');
       }
+      const isMultiSelectedFrame = isFrameSelectionMode && timelineSelection.frameIndexes.has(frameIndex);
+      if (isMultiSelectedFrame) {
+        header.classList.add('is-multi-selected-frame');
+      }
+      const isOnionFrame = onionFrameIndexes.has(frameIndex);
+      if (isOnionFrame) {
+        header.classList.add('is-onion-frame');
+        if (!onionFrameIndexes.has(frameIndex - 1)) {
+          header.classList.add('is-onion-frame-start');
+        }
+        if (!onionFrameIndexes.has(frameIndex + 1)) {
+          header.classList.add('is-onion-frame-end');
+        }
+      }
       const headerVariant = frameIndex === activeFrameIndex ? 'frameHeaderActive' : 'frameHeader';
       applyTimelineCellFrame(header, headerVariant);
 
@@ -13259,6 +16083,9 @@
       button.type = 'button';
       button.className = 'timeline-frame-button pixel-frame';
       button.dataset.timelineFrameIndex = String(frameIndex);
+      if (isMultiSelectedFrame) {
+        button.classList.add('is-selected');
+      }
       const frameNumberMatch = String(frame.name).match(/(\d+)/);
       button.textContent = frameNumberMatch && frameNumberMatch[1] ? frameNumberMatch[1] : String(frameIndex + 1);
 
@@ -13270,21 +16097,39 @@
     for (let rowIndex = 0; rowIndex < layerCount; rowIndex += 1) {
       const row = rowIndex + 2;
       const layer = activeLayers[rowIndex];
+      const layerTrackIndex = activeLayers.length - 1 - rowIndex;
       const labelName = layerNames[rowIndex] || String(layerCount - rowIndex);
+      const rowVisibilityCell = document.createElement('div');
+      rowVisibilityCell.className = 'timeline-cell timeline-cell--layer timeline-cell--layer-visibility';
+      rowVisibilityCell.classList.add('pixel-frame');
+      rowVisibilityCell.style.gridColumn = '1';
+      rowVisibilityCell.style.gridRow = String(row);
+      rowVisibilityCell.setAttribute('role', 'gridcell');
+      rowVisibilityCell.dataset.layerRowIndex = String(rowIndex);
       const rowHeader = document.createElement('div');
-      rowHeader.className = 'timeline-cell timeline-cell--layer';
+      rowHeader.className = 'timeline-cell timeline-cell--layer timeline-cell--layer-main';
       rowHeader.classList.add('pixel-frame');
-      rowHeader.style.gridColumn = '1';
+      rowHeader.style.gridColumn = '2';
       rowHeader.style.gridRow = String(row);
       rowHeader.setAttribute('role', 'rowheader');
       rowHeader.dataset.layerRowIndex = String(rowIndex);
       const rowVisibility = getLayerVisibilityForRow(rowIndex);
 
       if (rowIndex === activeLayerRow) {
+        rowVisibilityCell.classList.add('is-active-layer');
         rowHeader.classList.add('is-active-layer');
+      }
+      const isMultiSelectedLayer = timelineSelection.mode === TIMELINE_SELECTION_MODE_LAYER
+        && Number.isInteger(layerTrackIndex)
+        && layerTrackIndex >= 0
+        && timelineSelection.layerIndexes.has(layerTrackIndex);
+      if (isMultiSelectedLayer) {
+        rowVisibilityCell.classList.add('is-multi-selected-layer');
+        rowHeader.classList.add('is-multi-selected-layer');
       }
 
       if (layer) {
+        rowVisibilityCell.dataset.layerId = layer.id;
         rowHeader.dataset.layerId = layer.id;
         const visibilityToggle = document.createElement('button');
         visibilityToggle.type = 'button';
@@ -13293,15 +16138,21 @@
         visibilityToggle.setAttribute('aria-pressed', String(rowVisibility));
         visibilityToggle.setAttribute('aria-label', rowVisibility ? 'レイヤーを非表示' : 'レイヤーを表示');
         visibilityToggle.textContent = rowVisibility ? '●' : '○';
+        rowVisibilityCell.appendChild(visibilityToggle);
 
         const tag = document.createElement('button');
         tag.type = 'button';
         tag.className = 'timeline-layer-tag';
         tag.dataset.timelineLayerId = layer.id;
+        tag.dataset.timelineLayerIndex = String(layerTrackIndex);
+        if (isMultiSelectedLayer) {
+          tag.classList.add('is-selected');
+        }
         tag.textContent = labelName;
-        rowHeader.appendChild(visibilityToggle);
         rowHeader.appendChild(tag);
       } else {
+        rowVisibilityCell.classList.add('is-placeholder');
+        rowVisibilityCell.setAttribute('aria-hidden', 'true');
         rowHeader.classList.add('is-placeholder');
         rowHeader.textContent = labelName;
         rowHeader.setAttribute('aria-hidden', 'true');
@@ -13312,12 +16163,13 @@
         : rowIndex === activeLayerRow
           ? (rowVisibility ? 'layerActive' : 'layerActiveHidden')
           : (rowVisibility ? 'layer' : 'layerHidden');
+      applyTimelineCellFrame(rowVisibilityCell, layerVariant);
       applyTimelineCellFrame(rowHeader, layerVariant);
-
+      fragment.appendChild(rowVisibilityCell);
       fragment.appendChild(rowHeader);
 
       frames.forEach((frame, frameIndex) => {
-        const col = frameIndex + 2;
+        const col = frameIndex + frameColumnStart;
         const cell = document.createElement('div');
         cell.className = 'timeline-cell timeline-cell--body';
         cell.classList.add('pixel-frame');
@@ -13331,9 +16183,26 @@
         if (frameIndex === activeFrameIndex) {
           cell.classList.add('is-active-frame-column');
         }
+        const isOnionFrame = onionFrameIndexes.has(frameIndex);
+        if (isOnionFrame) {
+          cell.classList.add('is-onion-frame');
+          if (!onionFrameIndexes.has(frameIndex - 1)) {
+            cell.classList.add('is-onion-frame-start');
+          }
+          if (!onionFrameIndexes.has(frameIndex + 1)) {
+            cell.classList.add('is-onion-frame-end');
+          }
+          if (rowIndex === layerCount - 1) {
+            cell.classList.add('is-onion-frame-bottom');
+          }
+        }
 
         const frameLayers = reversedLayersByFrame[frameIndex];
         const targetLayer = frameLayers[rowIndex];
+        const layerIndex = frame.layers.length - 1 - rowIndex;
+        const isSelectedSlot = isSlotSelectionMode
+          && hasTimelineLayerIndex(frameIndex, layerIndex)
+          && timelineSelection.slotKeys.has(createTimelineSlotKey(frameIndex, layerIndex));
         const isActiveLayerRow = rowIndex === activeLayerRow;
         const isActiveFrameColumn = frameIndex === activeFrameIndex;
         let isActiveCell = false;
@@ -13354,6 +16223,7 @@
           slot.type = 'button';
           slot.className = 'timeline-slot';
           slot.dataset.timelineFrameIndex = String(frameIndex);
+          slot.dataset.timelineLayerIndex = String(layerIndex);
           slot.dataset.timelineLayerId = targetLayer.id;
           slot.setAttribute('aria-label', `${frame.name} / ${targetLayer.name}`);
           if (!targetLayer.visible) {
@@ -13364,6 +16234,10 @@
             slot.classList.add('is-active');
             cell.classList.add('is-active-cell');
             isActiveCell = true;
+          }
+          if (isSelectedSlot) {
+            slot.classList.add('is-selected');
+            cell.classList.add('is-selected-slot-cell');
           }
           const marker = document.createElement('span');
           marker.className = 'timeline-slot__marker';
@@ -13396,6 +16270,11 @@
     container.appendChild(fragment);
 
     syncAnimationFpsDisplayFromState();
+    syncActiveLayerSettingsUI();
+    syncActiveFrameSettingsUI();
+    if (state.playback.isPlaying) {
+      syncPlaybackTimelineCursorIndicators();
+    }
   }
 
   function renderFrameList() {
@@ -13403,6 +16282,8 @@
   }
 
   function renderLayerList() {
+    syncActiveLayerSettingsUI();
+    syncActiveFrameSettingsUI();
     updatePixfindModeUI();
   }
 
@@ -13624,6 +16505,9 @@
 
   function startVirtualCursorDrawSession() {
     if (virtualCursorDrawState.active) {
+      return false;
+    }
+    if (state.playback.isPlaying) {
       return false;
     }
     if (!state.showVirtualCursor || !virtualCursor) {
@@ -14154,6 +17038,9 @@
   }
 
   function performVirtualCursorAction() {
+    if (state.playback.isPlaying) {
+      return;
+    }
     if (!state.showVirtualCursor || !virtualCursor) {
       return;
     }
@@ -14286,6 +17173,9 @@
   }
 
   function handleFloatingDrawButtonPointerDown(event) {
+    if (state.playback.isPlaying) {
+      return;
+    }
     if (event.button !== undefined && event.button !== 0) {
       return;
     }
@@ -14638,6 +17528,12 @@
   }
 
   function setZoom(nextScale, focus) {
+    if (!wheelZoomApplying && wheelZoomRaf !== null) {
+      cancelAnimationFrame(wheelZoomRaf);
+      wheelZoomRaf = null;
+      wheelZoomPendingScale = null;
+      wheelZoomPendingFocus = null;
+    }
     const prevScale = Number(state.scale) || MIN_ZOOM_SCALE;
     const targetScale = normalizeZoomScale(nextScale, prevScale);
     if (Math.abs(targetScale - prevScale) < ZOOM_EPSILON) {
@@ -14682,12 +17578,7 @@
     }
 
     applyViewportTransform();
-    if (dom.controls.zoomSlider) {
-      dom.controls.zoomSlider.value = String(getZoomStepIndex(targetScale));
-    }
-    if (dom.controls.zoomLevel) {
-      dom.controls.zoomLevel.textContent = formatZoomLabel(targetScale);
-    }
+    syncZoomControls(targetScale);
     showZoomIndicator(targetScale);
     scheduleSessionPersist({ includeSnapshots: false });
   }
@@ -14731,6 +17622,33 @@
     };
   }
 
+  function queueWheelZoom(targetScale, focus) {
+    if (!Number.isFinite(targetScale)) {
+      return;
+    }
+    wheelZoomPendingScale = targetScale;
+    wheelZoomPendingFocus = focus || null;
+    if (wheelZoomRaf !== null) {
+      return;
+    }
+    wheelZoomRaf = requestAnimationFrame(() => {
+      wheelZoomRaf = null;
+      const nextScale = wheelZoomPendingScale;
+      const nextFocus = wheelZoomPendingFocus;
+      wheelZoomPendingScale = null;
+      wheelZoomPendingFocus = null;
+      if (!Number.isFinite(nextScale)) {
+        return;
+      }
+      wheelZoomApplying = true;
+      try {
+        setZoom(nextScale, nextFocus || undefined);
+      } finally {
+        wheelZoomApplying = false;
+      }
+    });
+  }
+
   function handleCanvasWheel(event) {
     const pointerFocus = getCanvasFocusAt(event.clientX, event.clientY);
     const focus = state.showVirtualCursor
@@ -14756,12 +17674,14 @@
     }
     focus.cellX = clamp(focus.cellX, 0, state.width - 1);
     focus.cellY = clamp(focus.cellY, 0, state.height - 1);
-    const currentScale = Number(state.scale) || MIN_ZOOM_SCALE;
+    const currentScale = Number.isFinite(wheelZoomPendingScale)
+      ? wheelZoomPendingScale
+      : (Number(state.scale) || MIN_ZOOM_SCALE);
     const targetScale = normalizeZoomScale(currentScale * zoomFactor, currentScale);
     if (Math.abs(targetScale - currentScale) < ZOOM_EPSILON) {
       return;
     }
-    setZoom(targetScale, focus);
+    queueWheelZoom(targetScale, focus);
   }
 
   function hasOpenBlockingDialog() {
@@ -14790,6 +17710,9 @@
     if (key === 'o') {
       return event.shiftKey ? 'ellipseFill' : 'ellipse';
     }
+    if (key === 'b' && event.shiftKey) {
+      return TOOL_SHORTCUT_CREATE_CUSTOM_BRUSH;
+    }
     const mapped = TOOL_SHORTCUT_BINDINGS[key];
     if (!mapped) {
       return null;
@@ -14813,6 +17736,12 @@
     const tool = resolveToolShortcut(event);
     if (!tool) {
       return false;
+    }
+    if (tool === TOOL_SHORTCUT_CREATE_CUSTOM_BRUSH) {
+      keyboardState.customBrushGestureArmed = true;
+      keyboardState.customBrushGestureUsed = false;
+      keyboardState.customBrushCreateOnPointerUp = false;
+      return true;
     }
     if (TOOL_ACTIONS.has(tool)) {
       runToolAction(tool);
@@ -14839,6 +17768,9 @@
         } else {
           clearSelection();
         }
+        return;
+      }
+      if (state.playback.isPlaying) {
         return;
       }
       if (!editable && handleToolShortcut(event)) {
@@ -14880,9 +17812,35 @@
       if (event.code === 'Space') {
         setSpacePanActive(false);
       }
+      if (state.playback.isPlaying) {
+        keyboardState.customBrushGestureArmed = false;
+        keyboardState.customBrushGestureUsed = false;
+        keyboardState.customBrushCreateOnPointerUp = false;
+        return;
+      }
+      const key = typeof event.key === 'string' ? event.key.toLowerCase() : '';
+      if (key === 'b' && keyboardState.customBrushGestureArmed) {
+        const shouldCreate = !startupVisible
+          && !hasOpenBlockingDialog()
+          && !isEditableTarget(event.target);
+        const gestureActive = pointerState.active && pointerState.tool === POINTER_TOOL_CUSTOM_BRUSH_RECT;
+        keyboardState.customBrushGestureArmed = false;
+        if (gestureActive) {
+          keyboardState.customBrushCreateOnPointerUp = shouldCreate;
+          return;
+        }
+        keyboardState.customBrushGestureUsed = false;
+        keyboardState.customBrushCreateOnPointerUp = false;
+        if (shouldCreate) {
+          createCustomBrushFromSelection();
+        }
+      }
     });
     window.addEventListener('blur', () => {
       setSpacePanActive(false);
+      keyboardState.customBrushGestureArmed = false;
+      keyboardState.customBrushGestureUsed = false;
+      keyboardState.customBrushCreateOnPointerUp = false;
     });
   }
 
@@ -14914,6 +17872,7 @@
     pointerState.selectionMove = null;
     pointerState.drawPaletteIndex = null;
     pointerState.selectionClearedOnDown = false;
+    pointerState.selectionExtendOnDown = false;
     pointerState.startClient = null;
     pointerState.panOrigin = { x: state.pan.x, y: state.pan.y };
     pointerState.panMode = null;
@@ -14942,6 +17901,7 @@
     pointerState.selectionMove = null;
     pointerState.drawPaletteIndex = null;
     pointerState.selectionClearedOnDown = false;
+    pointerState.selectionExtendOnDown = false;
     pointerState.startClient = null;
     pointerState.panMode = null;
     pointerState.touchPanStart = null;
@@ -15093,6 +18053,7 @@
   }
 
   function handlePointerDown(event) {
+    pointerState.selectionExtendOnDown = false;
     const isTouch = event.pointerType === 'touch';
     if (isTouch) {
       updateTouchPointer(event);
@@ -15142,7 +18103,15 @@
     event.preventDefault();
     const position = getPointerPosition(event);
     const activeTool = state.tool;
+    if (state.playback.isPlaying && activeTool !== 'pan') {
+      return;
+    }
     const layer = getActiveLayer();
+    const shouldExtendSelection = Boolean(
+      event.shiftKey
+      && (activeTool === 'selectRect' || activeTool === 'selectLasso' || activeTool === 'selectSame')
+    );
+    pointerState.selectionExtendOnDown = shouldExtendSelection;
 
     if (isSecondaryMouseButton && !HISTORY_DRAW_TOOLS.has(activeTool)) {
       return;
@@ -15172,6 +18141,35 @@
       return;
     }
 
+    if (keyboardState.customBrushGestureArmed) {
+      if (!dom.canvases.drawing) {
+        return;
+      }
+      keyboardState.customBrushGestureUsed = true;
+      pointerState.selectionExtendOnDown = false;
+      if (state.selectionMask) {
+        clearSelection();
+      }
+      dom.canvases.drawing.setPointerCapture(event.pointerId);
+      hoverPixel = null;
+      requestOverlayRender();
+      pointerState.active = true;
+      pointerState.pointerId = event.pointerId;
+      pointerState.tool = POINTER_TOOL_CUSTOM_BRUSH_RECT;
+      pointerState.start = position;
+      pointerState.current = position;
+      pointerState.last = position;
+      pointerState.path = [position];
+      pointerState.preview = null;
+      pointerState.selectionPreview = { start: position, end: position, points: [position] };
+      pointerState.selectionMove = null;
+      pointerState.drawPaletteIndex = null;
+      pointerState.selectionClearedOnDown = false;
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
+      return;
+    }
+
     if (!(state.showVirtualCursor && event.pointerType === 'touch')) {
       setVirtualCursor(position);
     }
@@ -15193,6 +18191,7 @@
       pointerState.selectionMove = null;
       pointerState.drawPaletteIndex = null;
       pointerState.selectionClearedOnDown = false;
+      pointerState.selectionExtendOnDown = false;
       if (isTouch) {
         hoverPixel = null;
         captureVirtualCursorPointer(event.pointerId, event.pointerType, dom.canvases.drawing, event);
@@ -15242,7 +18241,7 @@
       return;
     }
 
-    if (isSelectionTool && hasSelection && selectionHit) {
+    if (isSelectionTool && hasSelection && selectionHit && !pointerState.selectionExtendOnDown) {
       const moved = beginSelectionMove(event, position, { reuseOffset: Boolean(state.pendingPasteMoveState) });
       if (moved) {
         updateCanvasControlButtons();
@@ -15265,7 +18264,12 @@
       return;
     }
 
-    if ((activeTool === 'selectRect' || activeTool === 'selectLasso') && hasSelection && !selectionHit) {
+    if (
+      (activeTool === 'selectRect' || activeTool === 'selectLasso')
+      && hasSelection
+      && !selectionHit
+      && !pointerState.selectionExtendOnDown
+    ) {
       clearSelection();
       pointerState.selectionClearedOnDown = true;
     }
@@ -15432,8 +18436,16 @@
       requestOverlayRender();
     } else if (pointerState.tool === 'selectionMove' || pointerState.tool === 'layerMove') {
       handleSelectionMoveDrag(position);
-    } else if (pointerState.tool === 'selectRect' || pointerState.tool === 'selectLasso') {
-      pointerState.selectionPreview.points.push(position);
+    } else if (
+      pointerState.tool === 'selectRect'
+      || pointerState.tool === 'selectLasso'
+      || pointerState.tool === POINTER_TOOL_CUSTOM_BRUSH_RECT
+    ) {
+      if (pointerState.tool === 'selectLasso') {
+        pointerState.selectionPreview.points.push(position);
+      } else {
+        pointerState.selectionPreview.points = [pointerState.selectionPreview.start, position];
+      }
       pointerState.selectionPreview.end = position;
       requestOverlayRender();
     }
@@ -15510,6 +18522,7 @@
         pointerState.preview = null;
         pointerState.selectionPreview = null;
         pointerState.selectionClearedOnDown = false;
+        pointerState.selectionExtendOnDown = false;
         pointerState.current = hoverPixel || pointerState.current;
         pointerState.last = pointerState.current;
         pointerState.path = [];
@@ -15538,13 +18551,29 @@
       finalizeSelectionMove();
     } else if (tool === 'selectRect') {
       if (!(pointerState.selectionClearedOnDown && pointerState.path.length <= 1)) {
-        createSelectionRect(pointerState.start, pointerState.current);
+        createSelectionRect(pointerState.start, pointerState.current, {
+          append: pointerState.selectionExtendOnDown,
+        });
       }
     } else if (tool === 'selectLasso') {
       const pointCount = pointerState.selectionPreview?.points?.length || 0;
       if (!(pointerState.selectionClearedOnDown && pointCount <= 1)) {
-        createSelectionLasso(pointerState.selectionPreview.points);
+        createSelectionLasso(pointerState.selectionPreview.points, {
+          append: pointerState.selectionExtendOnDown,
+        });
       }
+    } else if (tool === POINTER_TOOL_CUSTOM_BRUSH_RECT) {
+      const start = pointerState.start;
+      const end = pointerState.current || pointerState.start;
+      if (start && end) {
+        createSelectionRect(start, end);
+        if (keyboardState.customBrushCreateOnPointerUp) {
+          createCustomBrushFromSelection();
+        }
+      } else {
+        updateAutosaveStatus('Shift + B を押したままドラッグして範囲を選択してください', 'info');
+      }
+      keyboardState.customBrushCreateOnPointerUp = false;
     }
 
     if (HISTORY_DRAW_TOOLS.has(tool)) {
@@ -15552,7 +18581,9 @@
     } else if (tool === 'selectSame') {
       const target = pointerState.current || pointerState.start;
       if (target) {
-        createSelectionByColor(target.x, target.y);
+        createSelectionByColor(target.x, target.y, {
+          append: pointerState.selectionExtendOnDown,
+        });
       }
       commitHistory();
     }
@@ -15563,6 +18594,7 @@
     pointerState.selectionMove = null;
     pointerState.drawPaletteIndex = null;
     pointerState.selectionClearedOnDown = false;
+    pointerState.selectionExtendOnDown = false;
     pointerState.path = [];
     requestOverlayRender();
   }
@@ -15588,6 +18620,9 @@
       return;
     }
     if (pointerState.pointerId === event.pointerId) {
+      if (pointerState.tool === POINTER_TOOL_CUSTOM_BRUSH_RECT) {
+        keyboardState.customBrushCreateOnPointerUp = false;
+      }
       abortActivePointerInteraction();
     }
   }
@@ -15836,6 +18871,94 @@
       }
     }
     return false;
+  }
+
+  function buildCustomBrushFromSelection() {
+    const mask = state.selectionMask;
+    if (!selectionMaskHasPixels(mask)) {
+      return null;
+    }
+    const width = state.width;
+    const height = state.height;
+    if (width <= 0 || height <= 0) {
+      return null;
+    }
+    let bounds = state.selectionBounds
+      ? {
+        x0: clamp(Math.round(Number(state.selectionBounds.x0) || 0), 0, width - 1),
+        y0: clamp(Math.round(Number(state.selectionBounds.y0) || 0), 0, height - 1),
+        x1: clamp(Math.round(Number(state.selectionBounds.x1) || 0), 0, width - 1),
+        y1: clamp(Math.round(Number(state.selectionBounds.y1) || 0), 0, height - 1),
+      }
+      : null;
+
+    if (!bounds || bounds.x0 > bounds.x1 || bounds.y0 > bounds.y1) {
+      bounds = { x0: width, y0: height, x1: -1, y1: -1 };
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const idx = y * width + x;
+          if (mask[idx] !== 1) continue;
+          if (x < bounds.x0) bounds.x0 = x;
+          if (y < bounds.y0) bounds.y0 = y;
+          if (x > bounds.x1) bounds.x1 = x;
+          if (y > bounds.y1) bounds.y1 = y;
+        }
+      }
+      if (bounds.x0 > bounds.x1 || bounds.y0 > bounds.y1) {
+        return null;
+      }
+    }
+
+    let count = 0;
+    for (let y = bounds.y0; y <= bounds.y1; y += 1) {
+      for (let x = bounds.x0; x <= bounds.x1; x += 1) {
+        const idx = y * width + x;
+        if (mask[idx] !== 1) continue;
+        count += 1;
+        if (count > CUSTOM_BRUSH_MAX_PIXELS) {
+          return { error: 'too_many', count };
+        }
+      }
+    }
+    if (count <= 0) {
+      return null;
+    }
+
+    const anchorX = Math.floor((bounds.x0 + bounds.x1) / 2);
+    const anchorY = Math.floor((bounds.y0 + bounds.y1) / 2);
+    const offsets = [];
+    for (let y = bounds.y0; y <= bounds.y1; y += 1) {
+      for (let x = bounds.x0; x <= bounds.x1; x += 1) {
+        const idx = y * width + x;
+        if (mask[idx] !== 1) continue;
+        offsets.push({ dx: x - anchorX, dy: y - anchorY });
+      }
+    }
+
+    return normalizeCustomBrushData({
+      offsets,
+      width: bounds.x1 - bounds.x0 + 1,
+      height: bounds.y1 - bounds.y0 + 1,
+    });
+  }
+
+  function createCustomBrushFromSelection() {
+    const built = buildCustomBrushFromSelection();
+    if (!built) {
+      updateAutosaveStatus('カスタムブラシ化するには範囲選択が必要です', 'warn');
+      return false;
+    }
+    if (built.error === 'too_many') {
+      updateAutosaveStatus(`選択ピクセルが多すぎます (上限 ${CUSTOM_BRUSH_MAX_PIXELS}px)`, 'warn');
+      return false;
+    }
+    state.customBrush = built;
+    state.brushShape = BRUSH_SHAPE_CUSTOM;
+    syncBrushControls();
+    requestOverlayRender();
+    scheduleSessionPersist();
+    updateAutosaveStatus(`カスタムブラシを作成しました (${built.pixelCount}px)`, 'success');
+    return true;
   }
 
   function snapshotSelectionForClipboard() {
@@ -16529,7 +19652,7 @@
 
     strokeSelectionPath((pathCtx, scale) => {
       traceSelectionMoveOutline(pathCtx, moveState, originX, originY, scale);
-    }, { translateHalf: true });
+    }, { translateHalf: true, ensureResolution: false });
   }
 
   function traceSelectionMoveOutline(pathCtx, moveState, originX, originY, scale) {
@@ -16676,26 +19799,45 @@
     markDirtyPixel(x, y);
   }
 
-  function getBrushOffsets(size) {
+  function getBrushOffsets(size, shapeOverride = state.brushShape) {
+    const shape = getEffectiveBrushShape(shapeOverride);
+    if (shape === BRUSH_SHAPE_CUSTOM) {
+      if (isCustomBrushData(state.customBrush)) {
+        return state.customBrush.offsets;
+      }
+      return getBrushOffsets(size, BRUSH_SHAPE_SQUARE);
+    }
+
     const base = clamp(Math.round(size || 1), 1, 64);
-    let offsets = brushOffsetCache.get(base);
+    const cache = shape === BRUSH_SHAPE_CIRCLE ? brushCircleOffsetCache : brushOffsetCache;
+    let offsets = cache.get(base);
     if (!offsets) {
       const halfDown = Math.floor(base / 2);
       const halfUp = Math.ceil(base / 2);
       offsets = [];
+      const centerShift = base % 2 === 0 ? 0.5 : 0;
+      const radius = Math.max(0.5, (base / 2) - 0.25);
+      const radiusSq = radius * radius;
       for (let dy = -halfDown; dy < halfUp; dy += 1) {
         for (let dx = -halfDown; dx < halfUp; dx += 1) {
+          if (shape === BRUSH_SHAPE_CIRCLE) {
+            const cx = dx + centerShift;
+            const cy = dy + centerShift;
+            if ((cx * cx) + (cy * cy) > radiusSq) {
+              continue;
+            }
+          }
           offsets.push({ dx, dy });
         }
       }
-      brushOffsetCache.set(base, offsets);
+      cache.set(base, offsets);
     }
     return offsets;
   }
 
-  function forEachBrushOffset(callback, sizeOverride) {
+  function forEachBrushOffset(callback, sizeOverride, shapeOverride = state.brushShape) {
     const baseSize = sizeOverride ?? state.brushSize;
-    const offsets = getBrushOffsets(baseSize || 1);
+    const offsets = getBrushOffsets(baseSize || 1, shapeOverride);
     for (let i = 0; i < offsets.length; i += 1) {
       const { dx, dy } = offsets[i];
       callback(dx, dy);
@@ -16721,8 +19863,21 @@
     const x1 = Math.max(start.x, end.x);
     const y0 = Math.min(start.y, end.y);
     const y1 = Math.max(start.y, end.y);
+    const activeTool = pointerState.tool || state.tool;
+    const brushSize = clamp(Math.round(state.brushSize || 1), 1, 64);
+    const hasMirror = isMirrorEnabledForTool(activeTool);
+    const brushShape = getEffectiveBrushShape();
 
     if (filled) {
+      if (brushSize === 1 && brushShape === BRUSH_SHAPE_SQUARE && !hasMirror) {
+        for (let y = y0; y <= y1; y += 1) {
+          for (let x = x0; x <= x1; x += 1) {
+            setPixelSingle(layer, x, y);
+          }
+        }
+        requestRender();
+        return;
+      }
       for (let y = y0; y <= y1; y += 1) {
         for (let x = x0; x <= x1; x += 1) {
           stampBrush(layer, x, y);
@@ -16852,31 +20007,59 @@
   function floodFill(x, y, paletteIndexOverride) {
     const layer = getActiveLayer();
     if (!layer) return;
-    const paletteIndex = resolveDrawPaletteIndex(paletteIndexOverride);
-    const targetColor = sampleLayerColor(layer, x, y);
-    const replacement = { type: 'index', index: paletteIndex };
-
-    if (colorsEqual(targetColor, replacement)) {
+    const width = state.width;
+    const height = state.height;
+    if (x < 0 || y < 0 || x >= width || y >= height) {
       return;
     }
+    const paletteIndex = resolveDrawPaletteIndex(paletteIndexOverride);
+    const indices = layer.indices instanceof Int16Array ? layer.indices : null;
+    const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    const startIdx = y * width + x;
+    const targetIndex = indices ? indices[startIdx] : -1;
+    if (targetIndex >= 0 && targetIndex === paletteIndex) {
+      return;
+    }
+    const startBase = startIdx * 4;
+    const targetR = targetIndex < 0 ? (direct ? direct[startBase] : 0) : 0;
+    const targetG = targetIndex < 0 ? (direct ? direct[startBase + 1] : 0) : 0;
+    const targetB = targetIndex < 0 ? (direct ? direct[startBase + 2] : 0) : 0;
+    const targetA = targetIndex < 0 ? (direct ? direct[startBase + 3] : 0) : 0;
+    const selectionMask = state.selectionMask;
+    const matchesTarget = (idx) => {
+      const currentIndex = indices ? indices[idx] : -1;
+      if (targetIndex >= 0) {
+        return currentIndex === targetIndex;
+      }
+      if (currentIndex >= 0) {
+        return false;
+      }
+      const base = idx * 4;
+      const r = direct ? direct[base] : 0;
+      const g = direct ? direct[base + 1] : 0;
+      const b = direct ? direct[base + 2] : 0;
+      const a = direct ? direct[base + 3] : 0;
+      return r === targetR && g === targetG && b === targetB && a === targetA;
+    };
 
-    const visited = new Uint8Array(state.width * state.height);
-    const stack = [[x, y]];
+    const visited = new Uint8Array(width * height);
+    const stack = [x, y];
 
     while (stack.length > 0) {
-      const [px, py] = stack.pop();
-      if (px < 0 || py < 0 || px >= state.width || py >= state.height) continue;
-      const idx = py * state.width + px;
+      const py = stack.pop();
+      const px = stack.pop();
+      if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
+      if (px < 0 || py < 0 || px >= width || py >= height) continue;
+      const idx = py * width + px;
       if (visited[idx]) continue;
       visited[idx] = 1;
-      if (state.selectionMask && state.selectionMask[idx] !== 1) continue;
-      const current = sampleLayerColor(layer, px, py);
-      if (!colorMatches(current, targetColor)) continue;
+      if (selectionMask && selectionMask[idx] !== 1) continue;
+      if (!matchesTarget(idx)) continue;
       setPixel(layer, px, py, paletteIndex);
-      stack.push([px + 1, py]);
-      stack.push([px - 1, py]);
-      stack.push([px, py + 1]);
-      stack.push([px, py - 1]);
+      stack.push(px + 1, py);
+      stack.push(px - 1, py);
+      stack.push(px, py + 1);
+      stack.push(px, py - 1);
     }
     requestRender();
   }
@@ -16906,7 +20089,7 @@
     let index = -1;
     for (let i = layers.length - 1; i >= 0; i -= 1) {
       const layer = layers[i];
-      if (!layer.visible) continue;
+      if (!layer.visible || normalizeLayerOpacity(layer.opacity) <= 0) continue;
       const idx = y * state.width + x;
       if (layer.indices[idx] >= 0) {
         color = state.palette[layer.indices[idx]];
@@ -16939,7 +20122,7 @@
     const idx = y * state.width + x;
     for (let i = frame.layers.length - 1; i >= 0; i -= 1) {
       const layer = frame.layers[i];
-      if (!layer.visible || layer.id === excludedLayerId) {
+      if (!layer.visible || normalizeLayerOpacity(layer.opacity) <= 0 || layer.id === excludedLayerId) {
         continue;
       }
       if (layer.indices[idx] >= 0) {
@@ -17007,18 +20190,92 @@
     return false;
   }
 
-  function createSelectionRect(start, end) {
+  function normalizeSelectionBoundsForState(bounds) {
+    if (!bounds || typeof bounds !== 'object') {
+      return null;
+    }
+    const width = Math.max(0, Number(state.width) || 0);
+    const height = Math.max(0, Number(state.height) || 0);
+    if (width <= 0 || height <= 0) {
+      return null;
+    }
+    const x0 = clamp(Math.round(Number(bounds.x0) || 0), 0, width - 1);
+    const y0 = clamp(Math.round(Number(bounds.y0) || 0), 0, height - 1);
+    const x1 = clamp(Math.round(Number(bounds.x1) || 0), 0, width - 1);
+    const y1 = clamp(Math.round(Number(bounds.y1) || 0), 0, height - 1);
+    if (x0 > x1 || y0 > y1) {
+      return null;
+    }
+    return { x0, y0, x1, y1 };
+  }
+
+  function computeSelectionBoundsFromMask(mask) {
+    if (!(mask instanceof Uint8Array)) {
+      return null;
+    }
+    const width = Math.max(0, Number(state.width) || 0);
+    const height = Math.max(0, Number(state.height) || 0);
+    if (width <= 0 || height <= 0 || mask.length < width * height) {
+      return null;
+    }
+    const bounds = { x0: width, y0: height, x1: -1, y1: -1 };
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const idx = y * width + x;
+        if (mask[idx] !== 1) {
+          continue;
+        }
+        if (x < bounds.x0) bounds.x0 = x;
+        if (y < bounds.y0) bounds.y0 = y;
+        if (x > bounds.x1) bounds.x1 = x;
+        if (y > bounds.y1) bounds.y1 = y;
+      }
+    }
+    if (bounds.x0 > bounds.x1 || bounds.y0 > bounds.y1) {
+      return null;
+    }
+    return bounds;
+  }
+
+  function createSelectionAccumulator(options = {}) {
+    const { append = false } = options || {};
+    const pixelCount = Math.max(0, Number(state.width) || 0) * Math.max(0, Number(state.height) || 0);
+    const hasBaseSelection = Boolean(
+      append
+      && state.selectionMask instanceof Uint8Array
+      && state.selectionMask.length === pixelCount
+      && selectionMaskHasPixels(state.selectionMask)
+    );
+    const mask = hasBaseSelection ? new Uint8Array(state.selectionMask) : new Uint8Array(pixelCount);
+    let bounds = null;
+    if (hasBaseSelection) {
+      bounds = normalizeSelectionBoundsForState(state.selectionBounds) || computeSelectionBoundsFromMask(mask);
+    }
+    if (!bounds) {
+      bounds = {
+        x0: Math.max(0, Number(state.width) || 0),
+        y0: Math.max(0, Number(state.height) || 0),
+        x1: -1,
+        y1: -1,
+      };
+    }
+    return { mask, bounds, hasBaseSelection };
+  }
+
+  function createSelectionRect(start, end, options = {}) {
+    const { append = false } = options || {};
     const layer = getActiveLayer();
     if (!layer) {
-      clearSelection();
+      if (!append) {
+        clearSelection();
+      }
       return;
     }
     const x0 = clamp(Math.min(start.x, end.x), 0, state.width - 1);
     const x1 = clamp(Math.max(start.x, end.x), 0, state.width - 1);
     const y0 = clamp(Math.min(start.y, end.y), 0, state.height - 1);
     const y1 = clamp(Math.max(start.y, end.y), 0, state.height - 1);
-    const mask = new Uint8Array(state.width * state.height);
-    const bounds = { x0: state.width, y0: state.height, x1: -1, y1: -1 };
+    const { mask, bounds, hasBaseSelection } = createSelectionAccumulator({ append });
 
     for (let y = y0; y <= y1; y += 1) {
       for (let x = x0; x <= x1; x += 1) {
@@ -17033,7 +20290,9 @@
     }
 
     if (bounds.x0 > bounds.x1 || bounds.y0 > bounds.y1) {
-      clearSelection();
+      if (!hasBaseSelection) {
+        clearSelection();
+      }
       return;
     }
 
@@ -17043,14 +20302,17 @@
     requestOverlayRender();
   }
 
-  function createSelectionLasso(points) {
+  function createSelectionLasso(points, options = {}) {
     if (!points || points.length < 3) return;
+    const { append = false } = options || {};
     const layer = getActiveLayer();
     if (!layer) {
-      clearSelection();
+      if (!append) {
+        clearSelection();
+      }
       return;
     }
-    const mask = new Uint8Array(state.width * state.height);
+    const { mask, bounds, hasBaseSelection } = createSelectionAccumulator({ append });
     const searchBounds = {
       x0: state.width,
       y0: state.height,
@@ -17068,28 +20330,28 @@
     searchBounds.x1 = clamp(searchBounds.x1, 0, state.width - 1);
     searchBounds.y1 = clamp(searchBounds.y1, 0, state.height - 1);
 
-    const selectedBounds = { x0: state.width, y0: state.height, x1: -1, y1: -1 };
-
     for (let y = searchBounds.y0; y <= searchBounds.y1; y += 1) {
       for (let x = searchBounds.x0; x <= searchBounds.x1; x += 1) {
         if (!pointInPolygon({ x, y }, points)) continue;
         if (!layerHasDrawablePixel(layer, x, y)) continue;
         const idx = y * state.width + x;
         mask[idx] = 1;
-        if (x < selectedBounds.x0) selectedBounds.x0 = x;
-        if (y < selectedBounds.y0) selectedBounds.y0 = y;
-        if (x > selectedBounds.x1) selectedBounds.x1 = x;
-        if (y > selectedBounds.y1) selectedBounds.y1 = y;
+        if (x < bounds.x0) bounds.x0 = x;
+        if (y < bounds.y0) bounds.y0 = y;
+        if (x > bounds.x1) bounds.x1 = x;
+        if (y > bounds.y1) bounds.y1 = y;
       }
     }
 
-    if (selectedBounds.x0 > selectedBounds.x1 || selectedBounds.y0 > selectedBounds.y1) {
-      clearSelection();
+    if (bounds.x0 > bounds.x1 || bounds.y0 > bounds.y1) {
+      if (!hasBaseSelection) {
+        clearSelection();
+      }
       return;
     }
 
     state.selectionMask = mask;
-    state.selectionBounds = selectedBounds;
+    state.selectionBounds = bounds;
     updateCanvasControlButtons();
     requestOverlayRender();
   }
@@ -17106,19 +20368,23 @@
     return direct ? direct[base + 3] > 0 : false;
   }
 
-  function createSelectionByColor(x, y) {
+  function createSelectionByColor(x, y, options = {}) {
+    const { append = false } = options || {};
     const layer = getActiveLayer();
     if (!layer) {
-      clearSelection();
+      if (!append) {
+        clearSelection();
+      }
       return;
     }
-    const mask = new Uint8Array(state.width * state.height);
-    const bounds = { x0: state.width, y0: state.height, x1: 0, y1: 0 };
+    const { mask, bounds, hasBaseSelection } = createSelectionAccumulator({ append });
     const stack = [[x, y]];
     const visited = new Uint8Array(state.width * state.height);
     const targetSample = getLayerPixelColor(layer, x, y);
     if (!targetSample || targetSample.a === 0) {
-      clearSelection();
+      if (!hasBaseSelection) {
+        clearSelection();
+      }
       return;
     }
 
@@ -17143,7 +20409,9 @@
     }
 
     if (bounds.x0 > bounds.x1 || bounds.y0 > bounds.y1) {
-      clearSelection();
+      if (!hasBaseSelection) {
+        clearSelection();
+      }
       return;
     }
 
@@ -17277,7 +20545,9 @@
     requestAnimationFrame(() => {
       renderScheduled = false;
       renderCanvas();
-      requestOverlayRender();
+      if (!state.playback.isPlaying) {
+        requestOverlayRender();
+      }
     });
   }
 
@@ -17293,6 +20563,13 @@
     const pending = takeDirtyRegion();
     if (!pending) {
       return;
+    }
+    if (state.playback.isPlaying) {
+      const frameImage = getPlaybackFrameImageData(state.activeFrame);
+      if (frameImage) {
+        ctx.drawing.putImageData(frameImage, 0, 0);
+        return;
+      }
     }
     const x0 = clamp(pending.x0, 0, width - 1);
     const y0 = clamp(pending.y0, 0, height - 1);
@@ -17310,16 +20587,18 @@
     const palette = state.palette;
     for (let l = 0; l < layers.length; l += 1) {
       const layer = layers[l];
-      if (!layer || !layer.visible || layer.opacity <= 0) continue;
-      const opacity = layer.opacity;
-      const layerIndices = layer.indices;
+      if (!layer || !layer.visible || normalizeLayerOpacity(layer.opacity) <= 0) continue;
+      const opacity = normalizeLayerOpacity(layer.opacity);
+      if (opacity <= 0) continue;
+      const layerBlendMode = normalizeLayerBlendMode(layer.blendMode);
+      const layerIndices = layer.indices instanceof Int16Array ? layer.indices : null;
       const layerDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
       for (let py = y0; py <= y1; py += 1) {
         const rowOffset = (py - y0) * regionWidth * 4;
         const layerRow = py * width;
         for (let px = x0; px <= x1; px += 1) {
           const pixelIndex = layerRow + px;
-          const paletteIndex = layerIndices[pixelIndex];
+          const paletteIndex = layerIndices ? layerIndices[pixelIndex] : -1;
           let srcR;
           let srcG;
           let srcB;
@@ -17341,24 +20620,8 @@
           } else {
             continue;
           }
-          const alpha = (srcA / 255) * opacity;
-          if (alpha <= 0) continue;
           const destIndex = rowOffset + (px - x0) * 4;
-          const dstA = data[destIndex + 3] / 255;
-          const outA = alpha + dstA * (1 - alpha);
-          if (outA <= 0) {
-            data[destIndex] = 0;
-            data[destIndex + 1] = 0;
-            data[destIndex + 2] = 0;
-            data[destIndex + 3] = 0;
-            continue;
-          }
-          const srcFactor = alpha / outA;
-          const dstFactor = (dstA * (1 - alpha)) / outA;
-          data[destIndex] = Math.round(srcR * srcFactor + data[destIndex] * dstFactor);
-          data[destIndex + 1] = Math.round(srcG * srcFactor + data[destIndex + 1] * dstFactor);
-          data[destIndex + 2] = Math.round(srcB * srcFactor + data[destIndex + 2] * dstFactor);
-          data[destIndex + 3] = Math.round(outA * 255);
+          compositeLayerPixelNormalized(data, destIndex, srcR, srcG, srcB, srcA, opacity, layerBlendMode);
         }
       }
     }
@@ -17708,29 +20971,162 @@
     requestOverlayRender();
   }
 
+  function getOnionSkinFrameCacheEntry(frameIndex) {
+    if (!Number.isInteger(frameIndex) || frameIndex < 0) {
+      return null;
+    }
+    if (onionSkinCache.revision !== onionSkinCacheRevision) {
+      onionSkinCache.byFrame.clear();
+      onionSkinCache.revision = onionSkinCacheRevision;
+    }
+    let entry = onionSkinCache.byFrame.get(frameIndex);
+    if (!entry) {
+      entry = { prev: null, next: null };
+      onionSkinCache.byFrame.set(frameIndex, entry);
+    }
+    return entry;
+  }
+
+  function buildOnionSkinTintCanvas(frameIndex, _tintColor) {
+    const frame = Array.isArray(state.frames) ? state.frames[frameIndex] : null;
+    const width = Math.floor(Number(state.width) || 0);
+    const height = Math.floor(Number(state.height) || 0);
+    if (!frame || !Array.isArray(frame.layers) || width <= 0 || height <= 0) {
+      return null;
+    }
+    const sourcePixels = compositeFramePixels(frame, width, height, state.palette);
+    if (!(sourcePixels instanceof Uint8ClampedArray) || sourcePixels.length !== width * height * 4) {
+      return null;
+    }
+    return createFrameCanvas(sourcePixels, width, height);
+  }
+
+  function getOnionSkinTintCanvas(frameIndex, direction) {
+    const cacheEntry = getOnionSkinFrameCacheEntry(frameIndex);
+    if (!cacheEntry) {
+      return null;
+    }
+    if (direction === 'next') {
+      if (!cacheEntry.next) {
+        cacheEntry.next = buildOnionSkinTintCanvas(frameIndex, ONION_SKIN_TINT_NEXT);
+      }
+      return cacheEntry.next;
+    }
+    if (!cacheEntry.prev) {
+      cacheEntry.prev = buildOnionSkinTintCanvas(frameIndex, ONION_SKIN_TINT_PREV);
+    }
+    return cacheEntry.prev;
+  }
+
+  function renderOnionSkin() {
+    if (!ctx.overlay) {
+      return;
+    }
+    const settings = normalizeOnionSkinState(state.onionSkin);
+    state.onionSkin = settings;
+    if (!settings.enabled) {
+      return;
+    }
+    const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
+    if (frameCount <= 1) {
+      return;
+    }
+    const activeFrameIndex = clamp(Math.round(Number(state.activeFrame) || 0), 0, frameCount - 1);
+    const prevFrames = normalizeOnionFrameCount(settings.prevFrames, DEFAULT_ONION_SKIN.prevFrames);
+    const nextFrames = normalizeOnionFrameCount(settings.nextFrames, DEFAULT_ONION_SKIN.nextFrames);
+    if (prevFrames <= 0 && nextFrames <= 0) {
+      return;
+    }
+    const baseOpacity = normalizeOnionOpacity(settings.opacity, DEFAULT_ONION_SKIN.opacity);
+    if (baseOpacity <= 0.001) {
+      return;
+    }
+    const depth = Math.max(prevFrames, nextFrames);
+    ctx.overlay.save();
+    for (let offset = depth; offset >= 1; offset -= 1) {
+      const layerOpacity = clamp(baseOpacity / offset, 0, 1);
+      if (layerOpacity <= 0.001) {
+        continue;
+      }
+      if (offset <= prevFrames) {
+        const frameIndex = activeFrameIndex - offset;
+        if (frameIndex >= 0) {
+          const canvas = getOnionSkinTintCanvas(frameIndex, 'prev');
+          if (canvas) {
+            ctx.overlay.globalAlpha = layerOpacity;
+            ctx.overlay.drawImage(canvas, 0, 0, state.width, state.height);
+          }
+        }
+      }
+      if (offset <= nextFrames) {
+        const frameIndex = activeFrameIndex + offset;
+        if (frameIndex < frameCount) {
+          const canvas = getOnionSkinTintCanvas(frameIndex, 'next');
+          if (canvas) {
+            ctx.overlay.globalAlpha = layerOpacity;
+            ctx.overlay.drawImage(canvas, 0, 0, state.width, state.height);
+          }
+        }
+      }
+    }
+    ctx.overlay.restore();
+  }
+
   function renderOverlay(timestamp) {
     const { width, height } = state;
+    if (state.playback.isPlaying) {
+      resizeVirtualCursorCanvas();
+      clearVirtualCursorCanvas();
+      if (ctx.overlay) {
+        ctx.overlay.clearRect(0, 0, width, height);
+      }
+      if (ctx.selection) {
+        const selectionCanvas = dom.canvases.selection;
+        const clearWidth = selectionCanvas ? selectionCanvas.width : width;
+        const clearHeight = selectionCanvas ? selectionCanvas.height : height;
+        ctx.selection.clearRect(0, 0, clearWidth, clearHeight);
+      }
+      return;
+    }
     const now = Number.isFinite(timestamp) ? timestamp : performance.now();
+    const moveState = getPendingSelectionMoveState();
+    const hasSelectionPreview = Boolean(pointerState.selectionPreview
+      && (
+        pointerState.tool === 'selectLasso'
+        || pointerState.tool === 'selectRect'
+        || pointerState.tool === POINTER_TOOL_CUSTOM_BRUSH_RECT
+      ));
+    const hasSelectionOutline = Boolean(state.selectionMask)
+      || hasSelectionPreview
+      || Boolean(moveState && moveState.hasCleared);
+
     resizeVirtualCursorCanvas();
     clearVirtualCursorCanvas();
     if (ctx.overlay) {
       ctx.overlay.clearRect(0, 0, width, height);
     }
     if (ctx.selection) {
-      ensureSelectionCanvasResolution(Math.max(Number(state.scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE));
       const selectionCanvas = dom.canvases.selection;
-      const clearWidth = selectionCanvas ? selectionCanvas.width : width * state.scale;
-      const clearHeight = selectionCanvas ? selectionCanvas.height : height * state.scale;
-      ctx.selection.clearRect(0, 0, clearWidth, clearHeight);
+      if (hasSelectionOutline) {
+        ensureSelectionCanvasResolution(Math.max(Number(state.scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE));
+        const clearWidth = selectionCanvas ? selectionCanvas.width : width * state.scale;
+        const clearHeight = selectionCanvas ? selectionCanvas.height : height * state.scale;
+        ctx.selection.clearRect(0, 0, clearWidth, clearHeight);
+        selectionCanvasActive = true;
+      } else if (selectionCanvas && selectionCanvasActive) {
+        ctx.selection.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
+        if (selectionCanvas.width !== 1 || selectionCanvas.height !== 1) {
+          selectionCanvas.width = 1;
+          selectionCanvas.height = 1;
+          ctx.selection.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.selection.imageSmoothingEnabled = false;
+        }
+        selectionCanvasActive = false;
+      }
     }
     updateMirrorGuideHandles();
+    renderOnionSkin();
 
-    const moveState = getPendingSelectionMoveState();
-    const hasSelectionPreview = Boolean(pointerState.selectionPreview
-      && (pointerState.tool === 'selectLasso' || pointerState.tool === 'selectRect'));
-    const hasSelectionOutline = Boolean(state.selectionMask)
-      || hasSelectionPreview
-      || Boolean(moveState && moveState.hasCleared);
     if (hasSelectionOutline) {
       updateSelectionDashAnimation(now);
     } else {
@@ -17771,11 +21167,10 @@
             if (previewSelectionMask && previewSelectionMask[maskIndex] !== 1) {
               return;
             }
-            const key = `${mx},${my}`;
-            if (painted.has(key)) {
+            if (painted.has(maskIndex)) {
               return;
             }
-            painted.add(key);
+            painted.add(maskIndex);
             ctx.overlay.fillRect(mx, my, 1, 1);
           });
         });
@@ -17805,7 +21200,10 @@
       drawLassoPreview(pointerState.selectionPreview.points);
     }
 
-    if (pointerState.selectionPreview && pointerState.tool === 'selectRect') {
+    if (
+      pointerState.selectionPreview
+      && (pointerState.tool === 'selectRect' || pointerState.tool === POINTER_TOOL_CUSTOM_BRUSH_RECT)
+    ) {
       drawRectanglePreview(pointerState.selectionPreview.start, pointerState.selectionPreview.end);
     }
 
@@ -17991,6 +21389,20 @@
       if (pixels && pixels.length) {
         const fillColor = rgbaToCss(getActiveDrawColor());
         ctx.overlay.fillStyle = fillColor;
+        if (!isMirrorEnabledForTool(tool)) {
+          for (let i = 0; i < pixels.length; i += 1) {
+            const idx = pixels[i];
+            const px = idx % width;
+            const py = Math.floor(idx / width);
+            const maskIndex = py * width + px;
+            if (selectionMask && selectionMask[maskIndex] !== 1) {
+              continue;
+            }
+            ctx.overlay.fillRect(px, py, 1, 1);
+          }
+          ctx.overlay.restore();
+          return;
+        }
         const painted = new Set();
         pixels.forEach(idx => {
           const px = idx % width;
@@ -18003,11 +21415,10 @@
             if (selectionMask && selectionMask[maskIndex] !== 1) {
               return;
             }
-            const key = `${mx},${my}`;
-            if (painted.has(key)) {
+            if (painted.has(maskIndex)) {
               return;
             }
-            painted.add(key);
+            painted.add(maskIndex);
             ctx.overlay.fillRect(mx, my, 1, 1);
           });
         });
@@ -18024,41 +21435,70 @@
 
   function drawFilledPreview(center, size, selectionMask, colorResolver, tool = pointerState.tool || state.tool) {
     const { width, height } = state;
-    const halfDown = Math.floor(size / 2);
-    const halfUp = Math.ceil(size / 2);
-    const minX = clamp(center.x - halfDown, 0, width - 1);
-    const maxX = clamp(center.x + halfUp - 1, 0, width - 1);
-    const minY = clamp(center.y - halfDown, 0, height - 1);
-    const maxY = clamp(center.y + halfUp - 1, 0, height - 1);
+    const offsets = getBrushOffsets(size || 1);
+    if (!offsets.length) {
+      return;
+    }
     let lastKey = null;
-    const painted = new Set();
-    for (let y = minY; y <= maxY; y += 1) {
-      for (let x = minX; x <= maxX; x += 1) {
+    const mirrorEnabled = isMirrorEnabledForTool(tool);
+
+    if (!mirrorEnabled) {
+      for (let i = 0; i < offsets.length; i += 1) {
+        const { dx, dy } = offsets[i];
+        const x = center.x + dx;
+        const y = center.y + dy;
+        if (x < 0 || y < 0 || x >= width || y >= height) {
+          continue;
+        }
         const color = colorResolver ? colorResolver(x, y) : getActiveDrawColor();
         if (!color) {
           continue;
         }
-        forEachMirroredPoint(x, y, tool, (mx, my) => {
-          if (mx < 0 || my < 0 || mx >= width || my >= height) {
-            return;
-          }
-          const idx = my * width + mx;
-          if (selectionMask && selectionMask[idx] !== 1) {
-            return;
-          }
-          const paintedKey = `${mx},${my}`;
-          if (painted.has(paintedKey)) {
-            return;
-          }
-          painted.add(paintedKey);
-          const colorKey = `${color.r}-${color.g}-${color.b}-${color.a}`;
-          if (colorKey !== lastKey) {
-            ctx.overlay.fillStyle = rgbaToCss(color);
-            lastKey = colorKey;
-          }
-          ctx.overlay.fillRect(mx, my, 1, 1);
-        });
+        const idx = y * width + x;
+        if (selectionMask && selectionMask[idx] !== 1) {
+          continue;
+        }
+        const colorKey = `${color.r}-${color.g}-${color.b}-${color.a}`;
+        if (colorKey !== lastKey) {
+          ctx.overlay.fillStyle = rgbaToCss(color);
+          lastKey = colorKey;
+        }
+        ctx.overlay.fillRect(x, y, 1, 1);
       }
+      return;
+    }
+
+    const painted = new Set();
+    for (let i = 0; i < offsets.length; i += 1) {
+      const { dx, dy } = offsets[i];
+      const x = center.x + dx;
+      const y = center.y + dy;
+      if (x < 0 || y < 0 || x >= width || y >= height) {
+        continue;
+      }
+      const color = colorResolver ? colorResolver(x, y) : getActiveDrawColor();
+      if (!color) {
+        continue;
+      }
+      forEachMirroredPoint(x, y, tool, (mx, my) => {
+        if (mx < 0 || my < 0 || mx >= width || my >= height) {
+          return;
+        }
+        const idx = my * width + mx;
+        if (selectionMask && selectionMask[idx] !== 1) {
+          return;
+        }
+        if (painted.has(idx)) {
+          return;
+        }
+        painted.add(idx);
+        const colorKey = `${color.r}-${color.g}-${color.b}-${color.a}`;
+        if (colorKey !== lastKey) {
+          ctx.overlay.fillStyle = rgbaToCss(color);
+          lastKey = colorKey;
+        }
+        ctx.overlay.fillRect(mx, my, 1, 1);
+      });
     }
   }
 
@@ -18091,33 +21531,58 @@
     if (!layer) return null;
     const width = state.width;
     const height = state.height;
+    if (x < 0 || y < 0 || x >= width || y >= height) {
+      return [];
+    }
     const selectionMask = state.selectionMask;
     const startIdx = y * width + x;
     if (selectionMask && selectionMask[startIdx] !== 1) {
       return [];
     }
-    const targetColor = sampleLayerColor(layer, x, y);
-    const replacement = { type: 'index', index: state.activePaletteIndex };
-    if (colorsEqual(targetColor, replacement)) {
+    const indices = layer.indices instanceof Int16Array ? layer.indices : null;
+    const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    const targetIndex = indices ? indices[startIdx] : -1;
+    if (targetIndex >= 0 && targetIndex === state.activePaletteIndex) {
       return [];
     }
+    const startBase = startIdx * 4;
+    const targetR = targetIndex < 0 ? (direct ? direct[startBase] : 0) : 0;
+    const targetG = targetIndex < 0 ? (direct ? direct[startBase + 1] : 0) : 0;
+    const targetB = targetIndex < 0 ? (direct ? direct[startBase + 2] : 0) : 0;
+    const targetA = targetIndex < 0 ? (direct ? direct[startBase + 3] : 0) : 0;
+    const matchesTarget = (idx) => {
+      const currentIndex = indices ? indices[idx] : -1;
+      if (targetIndex >= 0) {
+        return currentIndex === targetIndex;
+      }
+      if (currentIndex >= 0) {
+        return false;
+      }
+      const base = idx * 4;
+      const r = direct ? direct[base] : 0;
+      const g = direct ? direct[base + 1] : 0;
+      const b = direct ? direct[base + 2] : 0;
+      const a = direct ? direct[base + 3] : 0;
+      return r === targetR && g === targetG && b === targetB && a === targetA;
+    };
     const visited = new Uint8Array(width * height);
-    const stack = [[x, y]];
+    const stack = [x, y];
     const pixels = [];
     while (stack.length > 0) {
-      const [px, py] = stack.pop();
+      const py = stack.pop();
+      const px = stack.pop();
+      if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
       if (px < 0 || py < 0 || px >= width || py >= height) continue;
       const idx = py * width + px;
       if (visited[idx]) continue;
       visited[idx] = 1;
       if (selectionMask && selectionMask[idx] !== 1) continue;
-      const current = sampleLayerColor(layer, px, py);
-      if (!colorMatches(current, targetColor)) continue;
+      if (!matchesTarget(idx)) continue;
       pixels.push(idx);
-      stack.push([px + 1, py]);
-      stack.push([px - 1, py]);
-      stack.push([px, py + 1]);
-      stack.push([px, py - 1]);
+      stack.push(px + 1, py);
+      stack.push(px - 1, py);
+      stack.push(px, py + 1);
+      stack.push(px, py - 1);
     }
     return pixels;
   }
@@ -18132,7 +21597,8 @@
     const selectionKey = selectionMask
       ? `${selectionMaskId}:${selectionBounds?.x0 ?? ''},${selectionBounds?.y0 ?? ''},${selectionBounds?.x1 ?? ''},${selectionBounds?.y1 ?? ''}`
       : 'none';
-    const colorKey = `index-${state.activePaletteIndex}-${JSON.stringify(state.palette[state.activePaletteIndex] || {})}`;
+    const activeColor = state.palette[state.activePaletteIndex] || {};
+    const colorKey = `index-${state.activePaletteIndex}-${activeColor.r ?? ''},${activeColor.g ?? ''},${activeColor.b ?? ''},${activeColor.a ?? ''}`;
     return `${frame.id}|${layer.id}|${state.width}x${state.height}|${selectionKey}|${colorKey}`;
   }
 
@@ -18192,7 +21658,7 @@
     const { width, height } = state;
     strokeSelectionPath((pathCtx, scale) => {
       traceSelectionOutline(pathCtx, mask, width, height, scale);
-    }, { translateHalf: true });
+    }, { translateHalf: true, ensureResolution: false });
   }
 
   function updateSelectionDashAnimation(timestamp) {
@@ -18218,6 +21684,7 @@
   function ensureSelectionCanvasResolution(scale) {
     const canvas = dom.canvases.selection;
     if (!canvas) return;
+    selectionCanvasActive = true;
     const displayScale = Math.max(Number(scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE);
     const maxScaleForWidth = MAX_SELECTION_CANVAS_DIMENSION / Math.max(1, state.width);
     const maxScaleForHeight = MAX_SELECTION_CANVAS_DIMENSION / Math.max(1, state.height);
@@ -18255,7 +21722,9 @@
       return;
     }
     const displayScale = Math.max(Number(state.scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE);
-    ensureSelectionCanvasResolution(displayScale);
+    if (options.ensureResolution !== false) {
+      ensureSelectionCanvasResolution(displayScale);
+    }
     const renderScale = selectionRenderScale;
     const scaleRatio = renderScale / selectionDisplayScale;
     const dashPatternScreen = options.dashPattern || [4, 4];
@@ -18335,13 +21804,33 @@
     const selectionMask = state.selectionMask;
     const color = getActiveDrawColor();
     const previewTool = pointerState.tool || state.tool;
+    const mirrorEnabled = isMirrorEnabledForTool(previewTool);
+    const offsets = getBrushOffsets(state.brushSize || 1);
     const painted = new Set();
     ctx.overlay.save();
     ctx.overlay.fillStyle = rgbaToCss(color);
     const stamp = (x, y) => {
-      forEachBrushOffset((dx, dy) => {
+      for (let offsetIndex = 0; offsetIndex < offsets.length; offsetIndex += 1) {
+        const { dx, dy } = offsets[offsetIndex];
         const px = x + dx;
         const py = y + dy;
+
+        if (!mirrorEnabled) {
+          if (px < 0 || py < 0 || px >= width || py >= height) {
+            continue;
+          }
+          const idx = py * width + px;
+          if (selectionMask && selectionMask[idx] !== 1) {
+            continue;
+          }
+          if (painted.has(idx)) {
+            continue;
+          }
+          painted.add(idx);
+          ctx.overlay.fillRect(px, py, 1, 1);
+          continue;
+        }
+
         forEachMirroredPoint(px, py, previewTool, (mx, my) => {
           if (mx < 0 || my < 0 || mx >= width || my >= height) {
             return;
@@ -18349,14 +21838,14 @@
           if (selectionMask && selectionMask[my * width + mx] !== 1) {
             return;
           }
-          const key = `${mx},${my}`;
-          if (painted.has(key)) {
+          const idx = my * width + mx;
+          if (painted.has(idx)) {
             return;
           }
-          painted.add(key);
+          painted.add(idx);
           ctx.overlay.fillRect(mx, my, 1, 1);
         });
-      });
+      }
     };
 
     if (tool === 'line' || tool === 'curve') {
@@ -18510,6 +21999,8 @@
       },
       tool: state.tool,
       brushSize: clamp(Math.round(state.brushSize || 1), 1, 32),
+      brushShape: normalizeBrushShape(state.brushShape, BRUSH_SHAPE_SQUARE),
+      customBrush: serializeCustomBrushPayload(state.customBrush),
       showGrid: Boolean(state.showGrid),
         gridScreenStep: clamp(Math.round(state.gridScreenStep || 16), 1, 256),
         showMajorGrid: Boolean(state.showMajorGrid),
@@ -18519,6 +22010,9 @@
         showVirtualCursor: Boolean(state.showVirtualCursor),
         virtualCursorButtonScale: normalizeFloatingDrawButtonScale(state.virtualCursorButtonScale),
         showChecker: Boolean(state.showChecker),
+        onionSkin: normalizeOnionSkinState(state.onionSkin),
+        dualLeftRail: false,
+        leftDualToolsWidth: normalizeLeftDualToolsWidth(leftDualSizing.tools, railSizing.left),
         activeFrame: clamp(Number(state.activeFrame) || 0, 0, state.frames.length - 1),
         activeLayer: state.activeLayer,
         paletteIndex: normalizePaletteIndex(state.activePaletteIndex, 0),
@@ -18527,6 +22021,7 @@
         leftTab: state.activeLeftTab,
         rightTab: state.activeRightTab,
         backgroundMode: state.backgroundMode,
+        uiTheme: normalizeUiTheme(state.uiTheme, DEFAULT_UI_THEME),
         toolGroup: state.activeToolGroup,
         lastGroupTool: { ...(state.lastGroupTool || DEFAULT_GROUP_TOOL) },
         leftRailWidth: Math.round(Number(railSizing.left) || RAIL_DEFAULT_WIDTH.left),
@@ -18536,6 +22031,8 @@
         pixfindMode: Boolean(pixfindModeEnabled),
         pixfindModeFirstEnableConfirmed: Boolean(pixfindModeFirstEnableConfirmed),
         exportIncludeOriginalSize: Boolean(exportIncludeOriginalSize),
+        timelapseEnabled: Boolean(timelapseState.enabled),
+        timelapseFps: normalizeTimelapseFps(timelapseState.fps),
       };
       window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(snapshot));
     } catch (error) {
@@ -18570,6 +22067,15 @@
     if (Number.isFinite(payload.brushSize)) {
       state.brushSize = clamp(Math.round(payload.brushSize), 1, 32);
     }
+    if (Object.prototype.hasOwnProperty.call(payload, 'customBrush')) {
+      state.customBrush = deserializeCustomBrushPayload(payload.customBrush);
+    }
+    if (typeof payload.brushShape === 'string') {
+      state.brushShape = normalizeBrushShape(payload.brushShape, state.brushShape);
+      if (state.brushShape === BRUSH_SHAPE_CUSTOM && !hasCustomBrushData()) {
+        state.brushShape = BRUSH_SHAPE_SQUARE;
+      }
+    }
     if (typeof payload.showGrid === 'boolean') {
       state.showGrid = payload.showGrid;
     }
@@ -18584,6 +22090,9 @@
     }
     if (payload.backgroundMode === 'light' || payload.backgroundMode === 'dark' || payload.backgroundMode === 'pink') {
       state.backgroundMode = payload.backgroundMode;
+    }
+    if (typeof payload.uiTheme === 'string') {
+      state.uiTheme = normalizeUiTheme(payload.uiTheme, state.uiTheme);
     }
     if (payload.toolGroup && TOOL_GROUPS[payload.toolGroup]) {
       state.activeToolGroup = payload.toolGroup;
@@ -18618,6 +22127,11 @@
     }
     if (typeof payload.showChecker === 'boolean') {
       state.showChecker = payload.showChecker;
+    }
+    state.dualLeftRail = false;
+    leftDualSizing.tools = LEFT_DUAL_MIN_COLUMN_WIDTH;
+    if (Object.prototype.hasOwnProperty.call(payload, 'onionSkin')) {
+      state.onionSkin = normalizeOnionSkinState(payload.onionSkin);
     }
     setVirtualCursorButtonScale(state.virtualCursorButtonScale, { persist: false, clampPosition: false });
     state.colorMode = 'index';
@@ -18666,6 +22180,14 @@
     }
     if (typeof payload.exportIncludeOriginalSize === 'boolean') {
       exportIncludeOriginalSize = payload.exportIncludeOriginalSize;
+    }
+    if (typeof payload.timelapseEnabled === 'boolean') {
+      timelapseState.enabled = payload.timelapseEnabled;
+    } else {
+      timelapseState.enabled = true;
+    }
+    if (Number.isFinite(payload.timelapseFps)) {
+      timelapseState.fps = normalizeTimelapseFps(payload.timelapseFps);
     }
     if (state.showVirtualCursor && !virtualCursor) {
       virtualCursor = createInitialVirtualCursor();
@@ -18856,6 +22378,15 @@
     const numeric = Number(index);
     const clampedIndex = Math.min(Math.max(Number.isFinite(numeric) ? Math.round(numeric) : 0, 0), ZOOM_STEPS.length - 1);
     return ZOOM_STEPS[clampedIndex];
+  }
+
+  function parseZoomInputScale(value) {
+    const percent = Number(value);
+    if (!Number.isFinite(percent)) {
+      return null;
+    }
+    const normalized = normalizeZoomScale(percent / 100, MIN_ZOOM_SCALE);
+    return getZoomScaleAtIndex(getZoomStepIndex(normalized));
   }
 
   function normalizeZoomScale(value, fallback = MIN_ZOOM_SCALE) {
