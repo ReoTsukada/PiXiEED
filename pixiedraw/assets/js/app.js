@@ -73,8 +73,11 @@
       zoomSlider: document.getElementById('zoomSlider'),
       zoomInput: document.getElementById('zoomInput'),
       zoomLevel: document.getElementById('zoomLevel'),
+      brushSizeField: document.getElementById('brushSizeField'),
       brushSize: document.getElementById('brushSize'),
       brushSizeValue: document.getElementById('brushSizeValue'),
+      selectSameModeField: document.getElementById('selectSameModeField'),
+      selectSameModeButtons: Array.from(document.querySelectorAll('button[data-select-same-mode]')),
       brushShapeButtons: Array.from(document.querySelectorAll('button[data-brush-shape]')),
       customBrushInfo: document.getElementById('customBrushInfo'),
       colorMode: Array.from(document.querySelectorAll('input[name="colorMode"]')),
@@ -812,6 +815,9 @@
   const BRUSH_SHAPE_CIRCLE = 'circle';
   const BRUSH_SHAPE_CUSTOM = 'custom';
   const BRUSH_SHAPE_SET = new Set([BRUSH_SHAPE_SQUARE, BRUSH_SHAPE_CIRCLE, BRUSH_SHAPE_CUSTOM]);
+  const SELECT_SAME_MODE_CONNECTED = 'connected';
+  const SELECT_SAME_MODE_GLOBAL = 'global';
+  const SELECT_SAME_MODE_SET = new Set([SELECT_SAME_MODE_CONNECTED, SELECT_SAME_MODE_GLOBAL]);
   const CUSTOM_BRUSH_MAX_PIXELS = 8192;
   const VIRTUAL_CURSOR_SUPPORTED_TOOLS = new Set([
     'pen',
@@ -829,6 +835,7 @@
   const VIRTUAL_CURSOR_SELECTION_TOOLS = new Set(['selectRect', 'selectLasso']);
   const FILL_TOOLS = new Set(['fill']);
   const SHAPE_TOOLS = new Set(['line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill']);
+  const BRUSH_SIZE_TOOLS = new Set([...BRUSH_TOOLS, ...SHAPE_TOOLS, ...FILL_TOOLS]);
   const SELECTION_TOOLS = new Set(['move', 'selectRect', 'selectLasso', 'selectSame', 'selectionMove', 'layerMove']);
   const TOOL_ICON_FALLBACK = {
     move: '⇕',
@@ -1236,6 +1243,18 @@
     return BRUSH_SHAPE_SQUARE;
   }
 
+  function normalizeSelectSameMode(value, fallback = SELECT_SAME_MODE_CONNECTED) {
+    const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (SELECT_SAME_MODE_SET.has(normalizedValue)) {
+      return normalizedValue;
+    }
+    const normalizedFallback = typeof fallback === 'string' ? fallback.trim().toLowerCase() : '';
+    if (SELECT_SAME_MODE_SET.has(normalizedFallback)) {
+      return normalizedFallback;
+    }
+    return SELECT_SAME_MODE_CONNECTED;
+  }
+
   function normalizeCustomBrushData(source) {
     if (!source || typeof source !== 'object' || !Array.isArray(source.offsets)) {
       return null;
@@ -1353,6 +1372,7 @@
       name: requestedName = DEFAULT_DOCUMENT_NAME,
       onionSkin: requestedOnionSkin = DEFAULT_ONION_SKIN,
       uiTheme: requestedUiTheme = DEFAULT_UI_THEME,
+      selectSameMode: requestedSelectSameMode = SELECT_SAME_MODE_CONNECTED,
       brushShape: requestedBrushShape = BRUSH_SHAPE_SQUARE,
       customBrush: requestedCustomBrush = null,
     } = options || {};
@@ -1389,6 +1409,7 @@
       tool: 'pen',
       brushSize: 1,
       brushShape,
+      selectSameMode: normalizeSelectSameMode(requestedSelectSameMode, SELECT_SAME_MODE_CONNECTED),
       customBrush,
       showGrid: true,
       showPixelGuides: true,
@@ -1792,6 +1813,7 @@
     if (includeUiState) {
       snapshot.tool = state.tool;
       snapshot.brushSize = state.brushSize;
+      snapshot.selectSameMode = normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
       snapshot.colorMode = state.colorMode;
       snapshot.activeToolGroup = state.activeToolGroup;
       snapshot.lastGroupTool = { ...(state.lastGroupTool || DEFAULT_GROUP_TOOL) };
@@ -2496,6 +2518,9 @@
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'brushSize')) {
       state.brushSize = snapshot.brushSize;
+    }
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'selectSameMode')) {
+      state.selectSameMode = normalizeSelectSameMode(snapshot.selectSameMode, state.selectSameMode);
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'brushShape')) {
       state.brushShape = normalizeBrushShape(snapshot.brushShape, state.brushShape);
@@ -4668,6 +4693,38 @@
     }
   }
 
+  function syncBrushSizeFieldVisibility() {
+    const shouldShow = BRUSH_SIZE_TOOLS.has(state.tool);
+    if (dom.controls.brushSizeField instanceof HTMLElement) {
+      dom.controls.brushSizeField.hidden = !shouldShow;
+      dom.controls.brushSizeField.setAttribute('aria-hidden', String(!shouldShow));
+    }
+  }
+
+  function syncSelectSameModeControls() {
+    const activeMode = normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
+    if (state.selectSameMode !== activeMode) {
+      state.selectSameMode = activeMode;
+    }
+    const shouldShow = state.tool === 'selectSame';
+    if (dom.controls.selectSameModeField instanceof HTMLElement) {
+      dom.controls.selectSameModeField.hidden = !shouldShow;
+      dom.controls.selectSameModeField.setAttribute('aria-hidden', String(!shouldShow));
+    }
+    if (!Array.isArray(dom.controls.selectSameModeButtons)) {
+      return;
+    }
+    dom.controls.selectSameModeButtons.forEach(button => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      const mode = normalizeSelectSameMode(button.dataset.selectSameMode, SELECT_SAME_MODE_CONNECTED);
+      const pressed = mode === activeMode;
+      button.classList.toggle('is-active', pressed);
+      button.setAttribute('aria-pressed', String(pressed));
+    });
+  }
+
   function syncZoomControls(scaleValue = state.scale) {
     const normalizedScale = normalizeZoomScale(scaleValue, MIN_ZOOM_SCALE);
     if (dom.controls.zoomSlider instanceof HTMLInputElement) {
@@ -4692,6 +4749,8 @@
       dom.controls.brushSizeValue.textContent = `${state.brushSize}px`;
     }
     syncBrushControls();
+    syncBrushSizeFieldVisibility();
+    syncSelectSameModeControls();
     if (dom.controls.canvasWidth) {
       dom.controls.canvasWidth.value = String(state.width);
     }
@@ -8284,6 +8343,7 @@
   function serializeDocumentSnapshot(snapshot) {
     const palette = snapshot.palette.map(color => normalizeColorValue(color));
     const brushShape = normalizeBrushShape(snapshot.brushShape ?? state.brushShape, BRUSH_SHAPE_SQUARE);
+    const selectSameMode = normalizeSelectSameMode(snapshot.selectSameMode ?? state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
     const customBrushPayload = serializeCustomBrushPayload(snapshot.customBrush ?? state.customBrush);
     return {
       version: DOCUMENT_FILE_VERSION,
@@ -8323,6 +8383,7 @@
       onionSkin: normalizeOnionSkinState(snapshot.onionSkin),
       dualLeftRail: false,
       brushShape,
+      selectSameMode,
       customBrush: customBrushPayload,
     };
   }
@@ -8410,6 +8471,7 @@
 
     const selectionBounds = validateBoundsObject(payload.selectionBounds);
     const activeTool = normalizeToolId(payload.tool, state.tool);
+    const selectSameMode = normalizeSelectSameMode(payload.selectSameMode, state.selectSameMode);
     const customBrush = deserializeCustomBrushPayload(payload.customBrush);
     const requestedBrushShape = normalizeBrushShape(payload.brushShape, BRUSH_SHAPE_SQUARE);
     const brushShape = requestedBrushShape === BRUSH_SHAPE_CUSTOM && !customBrush
@@ -8448,6 +8510,7 @@
       tool: activeTool,
       brushSize: clamp(Math.round(Number(payload.brushSize) || state.brushSize || 1), 1, 64),
       brushShape,
+      selectSameMode,
       customBrush,
       colorMode,
       palette,
@@ -13198,6 +13261,28 @@
       });
     }
 
+    if (Array.isArray(dom.controls.selectSameModeButtons)) {
+      dom.controls.selectSameModeButtons.forEach(button => {
+        if (!(button instanceof HTMLButtonElement)) {
+          return;
+        }
+        button.addEventListener('click', event => {
+          const target = event.currentTarget;
+          if (!(target instanceof HTMLButtonElement)) {
+            return;
+          }
+          const next = normalizeSelectSameMode(target.dataset.selectSameMode, state.selectSameMode);
+          if (next === state.selectSameMode) {
+            return;
+          }
+          state.selectSameMode = next;
+          syncSelectSameModeControls();
+          scheduleSessionPersist();
+        });
+      });
+      syncSelectSameModeControls();
+    }
+
     dom.controls.toggleChecker?.addEventListener('change', event => {
       state.showChecker = Boolean(event.target.checked);
       dom.canvases.stack.classList.toggle('is-flat', !state.showChecker);
@@ -13824,6 +13909,8 @@
         requestOverlayRender();
       }
     }
+    syncBrushSizeFieldVisibility();
+    syncSelectSameModeControls();
     updateToolTabIcon();
     const mobilePeekMode = isMobilePeekToolFlyoutMode();
     if ((isCompactToolRailMode() || mobilePeekMode) && isCompactToolFlyoutOpen()) {
@@ -20368,8 +20455,41 @@
     return direct ? direct[base + 3] > 0 : false;
   }
 
+  function layerPixelMatchesColorAtIndex(layer, idx, target) {
+    if (!layer || !target) {
+      return false;
+    }
+    const paletteIndex = layer.indices[idx];
+    if (paletteIndex >= 0) {
+      const color = state.palette[paletteIndex];
+      return Boolean(
+        color
+        && color.a > 0
+        && color.r === target.r
+        && color.g === target.g
+        && color.b === target.b
+        && color.a === target.a
+      );
+    }
+    const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    if (!direct) {
+      return false;
+    }
+    const base = idx * 4;
+    const alpha = direct[base + 3];
+    if (alpha <= 0) {
+      return false;
+    }
+    return (
+      direct[base] === target.r
+      && direct[base + 1] === target.g
+      && direct[base + 2] === target.b
+      && alpha === target.a
+    );
+  }
+
   function createSelectionByColor(x, y, options = {}) {
-    const { append = false } = options || {};
+    const { append = false, mode = state.selectSameMode } = options || {};
     const layer = getActiveLayer();
     if (!layer) {
       if (!append) {
@@ -20377,10 +20497,13 @@
       }
       return;
     }
+    const width = state.width;
+    const height = state.height;
+    const selectionMode = normalizeSelectSameMode(mode, state.selectSameMode);
+    const seedX = clamp(Math.round(Number(x) || 0), 0, width - 1);
+    const seedY = clamp(Math.round(Number(y) || 0), 0, height - 1);
     const { mask, bounds, hasBaseSelection } = createSelectionAccumulator({ append });
-    const stack = [[x, y]];
-    const visited = new Uint8Array(state.width * state.height);
-    const targetSample = getLayerPixelColor(layer, x, y);
+    const targetSample = getLayerPixelColor(layer, seedX, seedY);
     if (!targetSample || targetSample.a === 0) {
       if (!hasBaseSelection) {
         clearSelection();
@@ -20388,24 +20511,44 @@
       return;
     }
 
-    while (stack.length > 0) {
-      const [px, py] = stack.pop();
-      if (px < 0 || py < 0 || px >= state.width || py >= state.height) continue;
-      const idx = py * state.width + px;
-      if (visited[idx]) continue;
-      visited[idx] = 1;
-      const sample = getLayerPixelColor(layer, px, py);
-      if (!sample || sample.a === 0) continue;
-      if (!layerColorMatches(sample, targetSample)) continue;
-      mask[idx] = 1;
-      bounds.x0 = Math.min(bounds.x0, px);
-      bounds.y0 = Math.min(bounds.y0, py);
-      bounds.x1 = Math.max(bounds.x1, px);
-      bounds.y1 = Math.max(bounds.y1, py);
-      stack.push([px + 1, py]);
-      stack.push([px - 1, py]);
-      stack.push([px, py + 1]);
-      stack.push([px, py - 1]);
+    if (selectionMode === SELECT_SAME_MODE_GLOBAL) {
+      for (let py = 0; py < height; py += 1) {
+        const rowOffset = py * width;
+        for (let px = 0; px < width; px += 1) {
+          const idx = rowOffset + px;
+          if (!layerPixelMatchesColorAtIndex(layer, idx, targetSample)) {
+            continue;
+          }
+          mask[idx] = 1;
+          bounds.x0 = Math.min(bounds.x0, px);
+          bounds.y0 = Math.min(bounds.y0, py);
+          bounds.x1 = Math.max(bounds.x1, px);
+          bounds.y1 = Math.max(bounds.y1, py);
+        }
+      }
+    } else {
+      const stack = [seedX, seedY];
+      const visited = new Uint8Array(width * height);
+      while (stack.length > 1) {
+        const py = stack.pop();
+        const px = stack.pop();
+        if (px < 0 || py < 0 || px >= width || py >= height) continue;
+        const idx = py * width + px;
+        if (visited[idx]) continue;
+        visited[idx] = 1;
+        if (!layerPixelMatchesColorAtIndex(layer, idx, targetSample)) continue;
+        mask[idx] = 1;
+        bounds.x0 = Math.min(bounds.x0, px);
+        bounds.y0 = Math.min(bounds.y0, py);
+        bounds.x1 = Math.max(bounds.x1, px);
+        bounds.y1 = Math.max(bounds.y1, py);
+        stack.push(
+          px + 1, py,
+          px - 1, py,
+          px, py + 1,
+          px, py - 1
+        );
+      }
     }
 
     if (bounds.x0 > bounds.x1 || bounds.y0 > bounds.y1) {
@@ -20454,11 +20597,6 @@
       }
     }
     return null;
-  }
-
-  function layerColorMatches(sample, target) {
-    if (!sample || !target) return false;
-    return sample.r === target.r && sample.g === target.g && sample.b === target.b && sample.a === target.a;
   }
 
   function clearSelection() {
@@ -21999,6 +22137,7 @@
       },
       tool: state.tool,
       brushSize: clamp(Math.round(state.brushSize || 1), 1, 32),
+      selectSameMode: normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED),
       brushShape: normalizeBrushShape(state.brushShape, BRUSH_SHAPE_SQUARE),
       customBrush: serializeCustomBrushPayload(state.customBrush),
       showGrid: Boolean(state.showGrid),
@@ -22066,6 +22205,9 @@
     }
     if (Number.isFinite(payload.brushSize)) {
       state.brushSize = clamp(Math.round(payload.brushSize), 1, 32);
+    }
+    if (typeof payload.selectSameMode === 'string') {
+      state.selectSameMode = normalizeSelectSameMode(payload.selectSameMode, state.selectSameMode);
     }
     if (Object.prototype.hasOwnProperty.call(payload, 'customBrush')) {
       state.customBrush = deserializeCustomBrushPayload(payload.customBrush);
@@ -22181,11 +22323,9 @@
     if (typeof payload.exportIncludeOriginalSize === 'boolean') {
       exportIncludeOriginalSize = payload.exportIncludeOriginalSize;
     }
-    if (typeof payload.timelapseEnabled === 'boolean') {
-      timelapseState.enabled = payload.timelapseEnabled;
-    } else {
-      timelapseState.enabled = true;
-    }
+    // Keep timelapse enabled by default on startup.
+    // The toggle still works at runtime, but disabled state is not restored.
+    timelapseState.enabled = true;
     if (Number.isFinite(payload.timelapseFps)) {
       timelapseState.fps = normalizeTimelapseFps(payload.timelapseFps);
     }
