@@ -95,13 +95,13 @@
 </div>
 </div>
 </div>
-<div aria-hidden="true" class="update-toast" data-update-id="2026-02-17-draw-major" hidden="" id="updateToast" role="status" aria-live="polite">
+<div aria-hidden="true" class="update-toast" data-update-id="2026-02-18-ui-layout-stability" hidden="" id="updateToast" role="status" aria-live="polite">
 <div class="update-toast__body">
 <p class="update-toast__message">
-<strong>更新情報 (2026/02/17)</strong><br/>
-・ミラーモードを強化（4対称軸・つまみ移動・同時ON）<br/>
-・モバイル/横画面UIを再調整（レール・つまみ・ギャップ統一）<br/>
-・ショートカット拡充、未保存警告、出力後ツール紹介を追加<br/>
+<strong>更新情報 (2026/02/18)</strong><br/>
+・左レーン2本化を廃止し、レイアウトをシンプル化<br/>
+・縦画面のツール親ボタンは1列スクロール表示へ統一<br/>
+・右レーンの向き変更時にパネルが消える不具合を修正<br/>
 ・詳細は設定の「更新情報」から確認できます
 </p>
 <div class="update-toast__actions">
@@ -150,7 +150,7 @@
 </button>
 </div>
   <div class="rail-tabpanes" id="leftRailPanes"></div>
-<button aria-label="左パネルの幅を変更" class="rail-resizer rail-resizer--left" id="resizeLeftRail" type="button"></button>
+<button aria-label="左パネルを開く / 幅を変更" class="rail-resizer rail-resizer--left" id="resizeLeftRail" type="button"></button>
 </aside>
 <main aria-label="ドットキャンバス" class="stage" id="stage">
 <div class="stage__canvas" id="canvasViewport">
@@ -175,6 +175,14 @@
 <button aria-label="元に戻す" class="chip" disabled="" id="undoAction" type="button"></button>
 <button aria-label="やり直す" class="chip" disabled="" id="redoAction" type="button"></button>
 </div>
+<div aria-label="ズーム操作" class="canvas-control-buttons" id="canvasControlButtons" role="group">
+<button aria-label="ズームアウト" class="chip" id="canvasControlPrimary" type="button"></button>
+<label class="canvas-zoom-field" for="zoomInput">
+<span class="sr-only">ズーム倍率(%)</span>
+<input data-stepper="true" id="zoomInput" inputmode="numeric" min="100" step="1" type="number" value="100"/>
+</label>
+<button aria-label="ズームイン" class="chip" id="canvasControlSecondary" type="button"></button>
+</div>
 </div>
 <div aria-hidden="true" aria-live="polite" class="zoom-indicator" id="zoomIndicator" role="status"></div>
 </div>
@@ -195,7 +203,7 @@
 </button>
 </div>
   <div class="rail-tabpanes" id="rightRailPanes"></div>
-<button aria-label="右パネルの幅を変更" class="rail-resizer rail-resizer--right" id="resizeRightRail" type="button"></button>
+<button aria-label="右パネルを開く / 幅を変更" class="rail-resizer rail-resizer--right" id="resizeRightRail" type="button"></button>
 </aside>
 </div>
 <div aria-hidden="true" id="panelAdPreloadHost" style="position:fixed;left:-20000px;top:-20000px;width:320px;height:320px;overflow:hidden;opacity:0;pointer-events:none;z-index:-1;">
@@ -337,6 +345,24 @@
 <input id="brushSize" max="12" min="1" type="range" value="1"/>
 <output for="brushSize" id="brushSizeValue">1px</output>
 </label>
+<label class="field">
+<span>ブラシ形状</span>
+<div aria-label="ブラシ形状" class="brush-shape-buttons" id="brushShapeButtons" role="group">
+<button aria-pressed="true" class="chip brush-shape-button is-active" data-brush-shape="square" type="button">
+<canvas aria-hidden="true" class="brush-shape-button__icon" height="24" width="24"></canvas>
+<span>四角</span>
+</button>
+<button aria-pressed="false" class="chip brush-shape-button" data-brush-shape="circle" type="button">
+<canvas aria-hidden="true" class="brush-shape-button__icon" height="24" width="24"></canvas>
+<span>丸</span>
+</button>
+<button aria-pressed="false" class="chip brush-shape-button" data-brush-shape="custom" type="button">
+<canvas aria-hidden="true" class="brush-shape-button__icon" height="24" width="24"></canvas>
+<span>カスタム</span>
+</button>
+</div>
+</label>
+<output class="brush-custom-info" id="customBrushInfo">カスタム: 未作成</output>
 </div>
 <div class="panel-ad-mount" data-panel-ad-mount="left">
 <div aria-label="広告" class="panel-ad" id="leftPanelAd">
@@ -436,6 +462,54 @@
 <button aria-label="全フレームに現在の fps を適用" class="chip" id="applyFpsAll" type="button">全体適用</button>
 </div>
 </div>
+<div aria-label="選択中レイヤー設定" class="timeline-layer-settings" id="timelineLayerSettings" role="group">
+<p class="timeline-layer-settings__target" id="layerSettingsTarget">対象: レイヤー 1</p>
+<label class="timeline-layer-settings__row" for="layerOpacity">
+<span class="timeline-layer-settings__label">不透明度</span>
+<input id="layerOpacity" max="100" min="0" type="range" value="100"/>
+<output class="timeline-layer-settings__value" for="layerOpacity" id="layerOpacityValue">100%</output>
+</label>
+<label class="timeline-layer-settings__row timeline-layer-settings__row--blend" for="layerBlendMode">
+<span class="timeline-layer-settings__label">合成モード</span>
+<select id="layerBlendMode">
+<option value="normal">通常</option>
+<option value="multiply">乗算</option>
+<option value="screen">スクリーン</option>
+<option value="overlay">オーバーレイ</option>
+<option value="soft-light">ソフトライト</option>
+<option value="hard-light">ハードライト</option>
+<option value="darken">比較(暗)</option>
+<option value="lighten">比較(明)</option>
+<option value="color-dodge">覆い焼きカラー</option>
+<option value="color-burn">焼き込みカラー</option>
+<option value="difference">差の絶対値</option>
+<option value="exclusion">除外</option>
+</select>
+</label>
+<div aria-label="選択中フレーム設定" class="timeline-frame-settings" id="timelineFrameSettings" role="group">
+<p class="timeline-layer-settings__target" id="frameSettingsTarget">フレーム 1 の設定</p>
+<label class="timeline-layer-settings__row timeline-layer-settings__row--toggle" for="onionSkinEnabled">
+<span class="timeline-layer-settings__label">オニオンスキン</span>
+<input aria-label="オニオンスキンを有効化" id="onionSkinEnabled" type="checkbox"/>
+<span class="timeline-layer-settings__value timeline-layer-settings__value--bool" id="onionSkinEnabledValue">OFF</span>
+</label>
+<label class="timeline-layer-settings__row" for="onionPrevFrames">
+<span class="timeline-layer-settings__label">前フレーム</span>
+<input id="onionPrevFrames" max="6" min="0" type="range" value="1"/>
+<output class="timeline-layer-settings__value" for="onionPrevFrames" id="onionPrevFramesValue">1</output>
+</label>
+<label class="timeline-layer-settings__row" for="onionNextFrames">
+<span class="timeline-layer-settings__label">次フレーム</span>
+<input id="onionNextFrames" max="6" min="0" type="range" value="1"/>
+<output class="timeline-layer-settings__value" for="onionNextFrames" id="onionNextFramesValue">1</output>
+</label>
+<label class="timeline-layer-settings__row" for="onionOpacity">
+<span class="timeline-layer-settings__label">濃さ</span>
+<input id="onionOpacity" max="100" min="0" type="range" value="35"/>
+<output class="timeline-layer-settings__value" for="onionOpacity" id="onionOpacityValue">35%</output>
+</label>
+</div>
+</div>
 </div>
 <div class="panel-ad-mount" data-panel-ad-mount="right">
 <div aria-label="広告" class="panel-ad" id="rightPanelAd">
@@ -458,6 +532,18 @@
 <p class="help-text">自動保存はこの端末内に下書きを保存します。出力は共有・配布用です。</p>
 </div>
 <p aria-live="polite" class="help-text" id="autosaveStatus"></p>
+<div class="field field--list">
+<span>タイムラプス</span>
+<div class="field-group">
+<button class="button" id="timelapseClear" type="button">記録クリア</button>
+</div>
+<label class="field field--compact">
+<span>再生FPS</span>
+<input data-stepper="true" id="timelapseFps" inputmode="numeric" max="60" min="1" step="1" type="number" value="12"/>
+</label>
+<p aria-live="polite" class="help-text" id="timelapseStatus">タイムラプス: 未記録</p>
+<p class="help-text">記録ON時は描画履歴を自動記録します。出力は通常の「出力」ボタンから選択してください。</p>
+</div>
 <div aria-live="polite" class="field memory-control" role="status">
 <span id="memoryUsage">メモリ: 計測中…</span>
 <button class="chip" id="memoryClear" type="button">メモリ削除</button>
@@ -489,13 +575,16 @@
 <label class="field settings-size-row settings-size-row--sprite">
 <span>スプライト倍率</span>
 <div class="field field--inline settings-size-controls">
-<label class="field field--tiny">
+<div class="field field--tiny">
 <span>倍率</span>
+<div class="sprite-scale-stepper">
+<button aria-label="倍率を1下げる" class="number-stepper__btn" id="spriteScaleDecrement" type="button">−</button>
 <input data-stepper="true" id="spriteScaleInput" inputmode="numeric" min="1" step="1" type="number" value="1"/>
-</label>
-<button class="button" disabled="" id="applySpriteScale" type="button">倍率を適用</button>
+<button aria-label="倍率を1上げる" class="number-stepper__btn" id="spriteScaleIncrement" type="button">＋</button>
 </div>
-<p class="help-text">キャンバスと描画済みのピクセルを整数倍で拡大します。</p>
+</div>
+<button class="button" disabled="" id="applySpriteScale" type="button">適用</button>
+</div>
 </label>
 </div>
 <div aria-label="表示設定" class="field field--list" role="group">
@@ -528,6 +617,18 @@
 <label class="toggle-option" for="toggleVirtualCursor">
 <input id="toggleVirtualCursor" type="checkbox"/>
 <span>仮想カーソル</span>
+</label>
+</li>
+<li>
+<label class="toggle-option" for="toggleTimelapse">
+<input checked="" id="toggleTimelapse" type="checkbox"/>
+<span>タイムラプス記録</span>
+</label>
+</li>
+<li>
+<label class="toggle-option" for="toggleOnionSkin">
+<input id="toggleOnionSkin" type="checkbox"/>
+<span>オニオンスキン</span>
 </label>
 </li>
 <li>
@@ -586,7 +687,11 @@
 </datalist>
 </div>
 <p class="help-text mobile-draw-help" id="mobileDrawHelp">スマホ描画: 仮想カーソルをONにしてキャンバスをドラッグでカーソル移動、オレンジの「描画」ボタン長押しで描画します。2本指ドラッグ/ピンチで移動と拡大縮小ができます。</p>
-<button aria-pressed="false" class="chip" id="toggleBackgroundMode" type="button">背景</button>
+<div aria-label="背景とUIカラー" class="settings-display-buttons" role="group">
+<button aria-pressed="false" class="chip" id="toggleBackgroundMode" type="button">背景:黒</button>
+<button aria-pressed="false" class="chip" id="toggleUiTheme" type="button">UI:緑色</button>
+</div>
+<p class="help-text">背景とUI配色を切り替えます（描画色には影響しません）。</p>
 </div>
 <div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 </div>
@@ -624,6 +729,7 @@
 <select id="exportFormat">
 <option value="png">PNG（画像）</option>
 <option value="gif">GIF（アニメーション）</option>
+<option value="timelapse">タイムラプスGIF（記録）</option>
 <option value="contest">コンテストに投稿</option>
 <option value="pixfind">PiXFiNDへ送る</option>
 <option value="project">プロジェクト（.pixieedraw）</option>
@@ -743,6 +849,7 @@
 <p class="shortcut-help-row" role="listitem"><span>矩形選択</span><span class="shortcut-help-key">M</span></p>
 <p class="shortcut-help-row" role="listitem"><span>なげなわ選択</span><span class="shortcut-help-key">Q</span></p>
 <p class="shortcut-help-row" role="listitem"><span>同色選択</span><span class="shortcut-help-key">W</span></p>
+<p class="shortcut-help-row" role="listitem"><span>選択を追加</span><span class="shortcut-help-key">Shift + 選択操作</span></p>
 <p class="shortcut-help-row" role="listitem"><span>ペン</span><span class="shortcut-help-key">B</span></p>
 <p class="shortcut-help-row" role="listitem"><span>消しゴム</span><span class="shortcut-help-key">E</span></p>
 <p class="shortcut-help-row" role="listitem"><span>スポイト</span><span class="shortcut-help-key">I</span></p>
@@ -753,6 +860,8 @@
 <p class="shortcut-help-row" role="listitem"><span>塗り矩形</span><span class="shortcut-help-key">Shift + R</span></p>
 <p class="shortcut-help-row" role="listitem"><span>楕円</span><span class="shortcut-help-key">O</span></p>
 <p class="shortcut-help-row" role="listitem"><span>塗り楕円</span><span class="shortcut-help-key">Shift + O</span></p>
+<p class="shortcut-help-row" role="listitem"><span>選択範囲をカスタムブラシ化</span><span class="shortcut-help-key">Shift + B（単押し）</span></p>
+<p class="shortcut-help-row" role="listitem"><span>矩形選択してブラシ化</span><span class="shortcut-help-key">Shift + B（押しながらドラッグ → Bを離す）</span></p>
 <p class="shortcut-help-row" role="listitem"><span>図形グループ呼び出し</span><span class="shortcut-help-key">U</span></p>
 <p class="shortcut-help-row" role="listitem"><span>対称ポップ開閉</span><span class="shortcut-help-key">Y</span></p>
 <p class="shortcut-help-row" role="listitem"><span>仮想カーソル ON/OFF</span><span class="shortcut-help-key">K</span></p>
@@ -1473,6 +1582,6 @@
     })();
   </script>
 
-<script defer src="/scripts/pwa-install.js"></script>
+<script defer src="../scripts/pwa-install.js"></script>
 </body>
 </html>
