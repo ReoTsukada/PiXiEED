@@ -48,7 +48,6 @@ const dom = {
   creatorDiffInput: document.getElementById('creatorDiffInput'),
   creatorPreviewOriginal: document.getElementById('creatorPreviewOriginal'),
   creatorPreviewDiff: document.getElementById('creatorPreviewDiff'),
-  creatorContestToggle: document.getElementById('creatorContestToggle'),
   creatorExportButton: document.getElementById('creatorExport'),
   creatorStatus: document.getElementById('creatorStatus'),
   creatorSummary: document.getElementById('creatorSummary'),
@@ -228,20 +227,9 @@ const creatorState = {
 let creatorLastFocused = null;
 let creatorAnalysisToken = 0;
 let clientId = null;
-let cachedAuthRaw = null;
-let cachedAuthSession = null;
 
 const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
-const SUPABASE_AUTH_STORAGE_KEY = (() => {
-  try {
-    const hostname = new URL(SUPABASE_URL).hostname;
-    const ref = hostname.split('.')[0] || '';
-    return ref ? `sb-${ref}-auth-token` : null;
-  } catch (_) {
-    return null;
-  }
-})();
 const DEFAULT_PUZZLE_BUCKET = 'pixfind-puzzles';
 const CONTEST_BUCKET = 'pixieed-contest';
 const FALLBACK_PUZZLE_BUCKET = CONTEST_BUCKET;
@@ -1093,28 +1081,25 @@ async function handleCreatorPublish() {
   ensureClientId();
   const mode = normalizeGameMode(creatorState.mode);
   const targets = getCreatorTargetLabels();
-  const authContext = getSupabaseAuthContext();
   const title = dom.creatorTitleInput?.value.trim() || 'カスタムパズル';
   const slug = getCreatorSlug();
   const difficulty = creatorState.difficulty;
   const puzzleId = createPuzzleId(mode);
-  const postToContest = dom.creatorContestToggle ? dom.creatorContestToggle.checked : true;
   const authorName = getCreatorNickname();
   const authorXUrl = getCreatorXUrl();
+  const authorAvatar = getCreatorAvatarId();
   const clientIdValue = clientId;
-  const userId = authContext.userId;
   const publishTask = {
     puzzleId,
     title,
     slug,
     difficulty,
-    postToContest,
     mode,
     targets,
     authorName,
     authorXUrl,
+    authorAvatar,
     clientId: clientIdValue,
-    userId,
     originalDataUrl: creatorState.originalDataUrl,
     diffDataUrl: creatorState.diffDataUrl,
     size: { ...creatorState.size },
@@ -1173,8 +1158,8 @@ async function handleCreatorPublish() {
     if (authorXUrl) {
       payload.author_x_url = authorXUrl;
     }
-    if (userId) {
-      payload.user_id = userId;
+    if (authorAvatar) {
+      payload.author_avatar = authorAvatar;
     }
 
     const inserted = await insertPublishedPuzzle(payload);
@@ -1186,88 +1171,7 @@ async function handleCreatorPublish() {
       renderPuzzles(state.currentDifficulty, state.currentMode);
     }
 
-    let contestPosted = false;
-    if (postToContest) {
-      try {
-        const contestImage = creatorState.originalImage;
-        const contestDataUrl = await buildNormalizedDataUrl(
-          creatorState.originalImage,
-          creatorState.originalDataUrl,
-          creatorState.originalFile,
-        );
-        if (!contestDataUrl || !contestImage) {
-          throw new Error('contest data missing');
-        }
-        const contestWidth = contestImage.naturalWidth || contestImage.width || creatorState.size.width;
-        const contestHeight = contestImage.naturalHeight || contestImage.height || creatorState.size.height;
-        const colors = countUniqueColors(contestImage);
-        let contestUpload = null;
-        try {
-          contestUpload = await uploadContestImages({
-            puzzleId,
-            image: contestImage,
-            dataUrl: contestDataUrl,
-          });
-        } catch (error) {
-          console.warn('contest image upload failed', error);
-        }
-        let contestPayload = createContestPayload({
-          puzzleId,
-          title,
-          imageUrl: contestUpload?.imageUrl,
-          thumbUrl: contestUpload?.thumbUrl,
-          dataUrl: contestDataUrl,
-          width: contestWidth,
-          height: contestHeight,
-          colors,
-          userId,
-          clientId: clientIdValue,
-        });
-        let contestEntry = null;
-        try {
-          contestEntry = await insertContestEntry(contestPayload);
-          contestPosted = true;
-        } catch (error) {
-          const msg = String(error?.message || '').toLowerCase();
-          if (contestUpload && (msg.includes('image_url') || msg.includes('thumb_url'))) {
-            contestPayload = createContestPayload({
-              puzzleId,
-              title,
-              dataUrl: contestDataUrl,
-              width: contestWidth,
-              height: contestHeight,
-              colors,
-              userId,
-              clientId: clientIdValue,
-            });
-            contestEntry = await insertContestEntry(contestPayload);
-            contestPosted = true;
-          } else {
-            throw error;
-          }
-        }
-        if (contestEntry?.id) {
-          try {
-            await uploadContestShareAssets({
-              entryId: contestEntry.id,
-              title,
-              image: contestImage,
-            });
-          } catch (error) {
-            queueContestShareTask({ entryId: contestEntry.id, title });
-            markSupabaseMaintenanceFromError(error);
-            console.warn('contest share asset creation failed', error);
-          }
-        }
-      } catch (error) {
-        console.warn('Contest post failed', error);
-      }
-    }
-
     const shareUrl = createShareUrl(normalized ?? { id: puzzleId, slug, source: 'published' });
-    const contestMessage = postToContest
-      ? (contestPosted ? 'コンテストにも投稿しました。' : 'コンテスト投稿は失敗しました。')
-      : 'コンテスト投稿はオフです。';
     const bucketNote = puzzleBucketFallbackUsed
       ? `pixfind-puzzles バケットが見つからないため ${FALLBACK_PUZZLE_BUCKET} に保存しています。`
       : '';
@@ -1276,20 +1180,20 @@ async function handleCreatorPublish() {
     if (navigator.clipboard?.writeText) {
       try {
         await navigator.clipboard.writeText(shareMessage);
-        setCreatorStatus(`公開しました。共有リンクをコピーしました。${contestMessage}${statusSuffix}`);
+        setCreatorStatus(`公開しました。共有リンクをコピーしました。${statusSuffix}`);
       } catch (_) {
-        window.prompt(`公開しました。${contestMessage}共有リンクをコピーしてください。`, shareMessage);
-        setCreatorStatus(`公開しました。${contestMessage}${statusSuffix}`);
+        window.prompt('公開しました。共有リンクをコピーしてください。', shareMessage);
+        setCreatorStatus(`公開しました。${statusSuffix}`);
       }
     } else {
-      window.prompt(`公開しました。${contestMessage}共有リンクをコピーしてください。`, shareMessage);
-      setCreatorStatus(`公開しました。${contestMessage}${statusSuffix}`);
+      window.prompt('公開しました。共有リンクをコピーしてください。', shareMessage);
+      setCreatorStatus(`公開しました。${statusSuffix}`);
     }
     closeCreatorOverlay();
   } catch (error) {
     console.error(error);
     if (isPermissionError(error)) {
-      setCreatorStatus('投稿権限がありません。ログインまたは権限設定をご確認ください。', 'error');
+      setCreatorStatus('投稿権限がありません。権限設定をご確認ください。', 'error');
       return;
     }
     if (isBucketNotFoundError(error)) {
@@ -1527,14 +1431,12 @@ async function updatePublishedPuzzle(id, patch, { removedColumns = [] } = {}) {
   return Array.isArray(data) ? data[0] : null;
 }
 
-async function deletePublishedPuzzle(id, { userId = null, clientIdValue = null } = {}) {
+async function deletePublishedPuzzle(id, { clientIdValue = null } = {}) {
   if (!id) return null;
   const params = new URLSearchParams({
     id: `eq.${id}`,
   });
-  if (userId) {
-    params.set('user_id', `eq.${userId}`);
-  } else if (clientIdValue) {
+  if (clientIdValue) {
     params.set('client_id', `eq.${clientIdValue}`);
   }
   let response;
@@ -1628,14 +1530,18 @@ function normalizeXUrl(value) {
   if (/^https?:\/\//i.test(raw)) {
     try {
       const url = new URL(raw);
-      const host = url.hostname.replace(/^www\./, '');
-      if (host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com' || host.endsWith('.twitter.com')) {
-        return url.toString();
-      }
+      return url.toString();
     } catch (_) {
       // ignore
     }
     return '';
+  }
+  if (/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(raw)) {
+    try {
+      return new URL(`https://${raw}`).toString();
+    } catch (_) {
+      return '';
+    }
   }
   const handle = raw.replace(/^@+/, '').trim();
   if (!handle) return '';
@@ -1643,11 +1549,7 @@ function normalizeXUrl(value) {
     ? `https://${handle}`
     : `https://x.com/${handle}`;
   try {
-    const url = new URL(candidate);
-    const host = url.hostname.replace(/^www\./, '');
-    if (host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com' || host.endsWith('.twitter.com')) {
-      return url.toString();
-    }
+    return new URL(candidate).toString();
   } catch (_) {
     // ignore
   }
@@ -1664,6 +1566,28 @@ function resolveAuthorUrl(entry) {
   return normalizeXUrl(candidate);
 }
 
+function resolveAvatarSrcFromId(value) {
+  const id = String(value || '').trim().toLowerCase();
+  if (!id || id === 'mao') return '../character-dots/mao1.png';
+  if (/^jerin[1-8]$/.test(id)) return `../character-dots/Jerin${id.slice(5)}.png`;
+  if (/^jellnall([1-9]|1[0-9])$/.test(id)) return `../character-dots/${id.toUpperCase()}.png`;
+  if (id === 'baburin') return '../character-dots/baburinpng.png';
+  return '../character-dots/mao1.png';
+}
+
+function resolveAuthorAvatar(entry) {
+  const candidate = entry?.author_avatar
+    ?? entry?.avatar
+    ?? entry?.authorAvatar
+    ?? '';
+  const raw = String(candidate || '').trim();
+  if (!raw) return resolveAvatarSrcFromId('mao');
+  if (/^https?:\/\//i.test(raw) || raw.startsWith('../') || raw.startsWith('./') || raw.startsWith('/')) {
+    return raw;
+  }
+  return resolveAvatarSrcFromId(raw);
+}
+
 function getCreatorNickname() {
   try {
     const raw = localStorage.getItem('pixieed_nickname') || '';
@@ -1673,6 +1597,16 @@ function getCreatorNickname() {
     // ignore
   }
   return '名無し';
+}
+
+function getCreatorAvatarId() {
+  try {
+    const raw = localStorage.getItem('pixieed_avatar') || '';
+    const id = raw.trim().toLowerCase();
+    return id || 'mao';
+  } catch (_) {
+    return 'mao';
+  }
 }
 
 function getCreatorXUrl() {
@@ -1703,50 +1637,10 @@ function ensureClientId() {
   }
 }
 
-function readSupabaseSession() {
-  if (!SUPABASE_AUTH_STORAGE_KEY) return null;
-  try {
-    const raw = localStorage.getItem(SUPABASE_AUTH_STORAGE_KEY);
-    if (!raw) {
-      cachedAuthRaw = null;
-      cachedAuthSession = null;
-      return null;
-    }
-    if (raw === cachedAuthRaw) {
-      return cachedAuthSession;
-    }
-    const parsed = JSON.parse(raw);
-    cachedAuthRaw = raw;
-    cachedAuthSession = parsed && typeof parsed === 'object' ? parsed : null;
-    return cachedAuthSession;
-  } catch (_) {
-    cachedAuthRaw = null;
-    cachedAuthSession = null;
-    return null;
-  }
-}
-
-function getSupabaseAuthContext() {
-  const session = readSupabaseSession();
-  if (!session || !session.access_token) {
-    return { userId: null, accessToken: '' };
-  }
-  const expiresAt = Number(session.expires_at || 0);
-  if (expiresAt && Date.now() >= (expiresAt * 1000) - 30000) {
-    return { userId: null, accessToken: '' };
-  }
-  return {
-    userId: session.user?.id || null,
-    accessToken: session.access_token || '',
-  };
-}
-
 function supabaseHeaders() {
-  const { accessToken } = getSupabaseAuthContext();
-  const bearer = accessToken || SUPABASE_ANON_KEY;
   return {
     apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${bearer}`,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
     'x-client-id': clientId || '',
   };
 }
@@ -1957,9 +1851,8 @@ function normalizePublishTask(task) {
   const authorName = task.authorName || getCreatorNickname();
   const authorXUrl = task.authorXUrl || getCreatorXUrl();
   const targets = normalizePuzzleTargets(task.targets);
-  const authContext = getSupabaseAuthContext();
-  const userId = task.userId || authContext.userId || null;
   const clientIdValue = task.clientId || clientId || null;
+  const authorAvatar = task.authorAvatar || getCreatorAvatarId();
   const size = task.size && Number.isFinite(task.size.width) && Number.isFinite(task.size.height)
     ? task.size
     : { width: 0, height: 0 };
@@ -1970,9 +1863,8 @@ function normalizePublishTask(task) {
     difficulty,
     authorName,
     authorXUrl,
+    authorAvatar,
     clientId: clientIdValue,
-    userId,
-    postToContest: task.postToContest !== false,
     mode,
     targets,
     originalDataUrl,
@@ -2012,9 +1904,8 @@ async function publishQueuedTask(task) {
     difficulty,
     authorName,
     authorXUrl,
+    authorAvatar,
     clientId: clientIdValue,
-    userId,
-    postToContest,
     mode,
     targets,
     originalDataUrl,
@@ -2060,8 +1951,8 @@ async function publishQueuedTask(task) {
   if (authorXUrl) {
     payload.author_x_url = authorXUrl;
   }
-  if (userId) {
-    payload.user_id = userId;
+  if (authorAvatar) {
+    payload.author_avatar = authorAvatar;
   }
 
   let inserted = null;
@@ -2081,83 +1972,6 @@ async function publishQueuedTask(task) {
     const published = state.officialPuzzles.filter(entry => entry.source === 'published');
     savePublishedCache(published);
     renderPuzzles(state.currentDifficulty, state.currentMode);
-  }
-
-  const originalImage = await loadImageFromDataUrl(originalDataUrl);
-
-  if (postToContest) {
-    try {
-      const contestImage = originalImage;
-      const contestDataUrl = await buildNormalizedDataUrl(
-        originalImage,
-        originalDataUrl,
-        null,
-      );
-      if (!contestDataUrl || !contestImage) {
-        throw new Error('contest data missing');
-      }
-      const contestWidth = contestImage.naturalWidth || contestImage.width || size.width || originalImage.width;
-      const contestHeight = contestImage.naturalHeight || contestImage.height || size.height || originalImage.height;
-      const colors = countUniqueColors(contestImage);
-      let contestUpload = null;
-      try {
-        contestUpload = await uploadContestImages({
-          puzzleId,
-          image: contestImage,
-          dataUrl: contestDataUrl,
-        });
-      } catch (error) {
-        console.warn('contest image upload failed', error);
-      }
-      let contestPayload = createContestPayload({
-        puzzleId,
-        title,
-        imageUrl: contestUpload?.imageUrl,
-        thumbUrl: contestUpload?.thumbUrl,
-        dataUrl: contestDataUrl,
-        width: contestWidth,
-        height: contestHeight,
-        colors,
-        userId,
-        clientId: clientIdValue,
-      });
-      let contestEntry = null;
-      try {
-        contestEntry = await insertContestEntry(contestPayload);
-      } catch (error) {
-        const msg = String(error?.message || '').toLowerCase();
-        if (contestUpload && (msg.includes('image_url') || msg.includes('thumb_url'))) {
-          contestPayload = createContestPayload({
-            puzzleId,
-            title,
-            dataUrl: contestDataUrl,
-            width: contestWidth,
-            height: contestHeight,
-            colors,
-            userId,
-            clientId: clientIdValue,
-          });
-          contestEntry = await insertContestEntry(contestPayload);
-        } else {
-          throw error;
-        }
-      }
-      if (contestEntry?.id) {
-        try {
-          await uploadContestShareAssets({
-            entryId: contestEntry.id,
-            title,
-            image: contestImage,
-          });
-        } catch (error) {
-          queueContestShareTask({ entryId: contestEntry.id, title });
-          markSupabaseMaintenanceFromError(error);
-          console.warn('contest share asset creation failed', error);
-        }
-      }
-    } catch (error) {
-      console.warn('Contest post failed', error);
-    }
   }
 
   return normalizedEntry;
@@ -2285,7 +2099,6 @@ function createContestPayload({
   width,
   height,
   colors,
-  userId,
   clientId: clientIdValue,
 }) {
   const payload = {
@@ -2302,9 +2115,6 @@ function createContestPayload({
   const clientValue = clientIdValue || clientId || '';
   if (clientValue) {
     payload.client_id = clientValue;
-  }
-  if (userId) {
-    payload.user_id = userId;
   }
   if (imageUrl) {
     payload.image_url = imageUrl;
@@ -2370,8 +2180,8 @@ function normalizePublishedPuzzleEntry(entry, fallback = null) {
     difficulty: normalizeDifficulty(source.difficulty),
     author: resolveAuthorName(source, '名無し'),
     authorUrl: resolveAuthorUrl(source),
+    authorAvatar: resolveAuthorAvatar(source),
     clientId: source.client_id ?? source.clientId ?? null,
-    userId: source.user_id ?? source.userId ?? null,
     original,
     diff,
     mode,
@@ -2777,9 +2587,12 @@ function renderGameAuthor(puzzle) {
     return;
   }
   authorEl.hidden = false;
-  const prefix = document.createElement('span');
-  prefix.textContent = 'by ';
-  authorEl.appendChild(prefix);
+  const avatar = document.createElement('img');
+  avatar.className = 'author-avatar';
+  avatar.src = puzzle?.authorAvatar || resolveAvatarSrcFromId('mao');
+  avatar.alt = '';
+  avatar.setAttribute('aria-hidden', 'true');
+  authorEl.appendChild(avatar);
   const url = normalizeXUrl(puzzle?.authorUrl || '');
   if (url) {
     const link = document.createElement('a');
@@ -2798,10 +2611,6 @@ function renderGameAuthor(puzzle) {
 function canDeletePuzzle(puzzle) {
   if (!puzzle) return false;
   if (puzzle.source !== 'published') return false;
-  const authContext = getSupabaseAuthContext();
-  if (puzzle.userId && authContext.userId && puzzle.userId === authContext.userId) {
-    return true;
-  }
   ensureClientId();
   if (!puzzle.clientId || !clientId) return false;
   return puzzle.clientId === clientId;
@@ -2819,6 +2628,9 @@ function createOfficialCard(puzzle) {
   const badgeText = puzzle.badge ?? '公式';
   const modeMeta = getGameModeMeta(puzzle.mode);
   const badgeClass = puzzle.source === 'published' ? 'puzzle-card__badge puzzle-card__badge--published' : 'puzzle-card__badge';
+  const authorName = escapeHtml(puzzle.author || '名無し');
+  const authorUrl = normalizeXUrl(puzzle.authorUrl || '');
+  const authorAvatar = escapeHtml(puzzle.authorAvatar || resolveAvatarSrcFromId('mao'));
   card.className = `puzzle-card puzzle-card--official${puzzle.source === 'published' ? ' puzzle-card--published' : ''}`;
   card.role = 'button';
   card.tabIndex = 0;
@@ -2832,7 +2644,12 @@ function createOfficialCard(puzzle) {
       <h4 class="puzzle-card__title">${puzzle.label}</h4>
       ${puzzle.description ? `<p class="puzzle-card__description">${puzzle.description}</p>` : ''}
       <span class="puzzle-card__mode">${modeMeta.label}</span>
-      <span class="puzzle-card__author">${puzzle.author || '名無し'}</span>
+      <span class="puzzle-card__author">
+        <img class="author-avatar" src="${authorAvatar}" alt="" aria-hidden="true"/>
+        ${authorUrl
+          ? `<a href="${escapeHtml(authorUrl)}" target="_blank" rel="noopener">${authorName}</a>`
+          : `<span>${authorName}</span>`}
+      </span>
     </div>
     <div class="puzzle-card__actions">
       <button type="button" class="button button--primary button--compact puzzle-card__play" aria-label="${puzzle.label} をプレイする">
@@ -2892,6 +2709,14 @@ function createOfficialCard(puzzle) {
   });
   shareButton?.addEventListener('keydown', event => {
     event.stopPropagation();
+  });
+  card.querySelectorAll('.puzzle-card__author a').forEach(link => {
+    link.addEventListener('click', event => {
+      event.stopPropagation();
+    });
+    link.addEventListener('keydown', event => {
+      event.stopPropagation();
+    });
   });
 
   return card;
@@ -2968,8 +2793,8 @@ async function startOfficialPuzzle(puzzle) {
       targets: normalizePuzzleTargets(puzzle.targets),
       author: puzzle.author || '',
       authorUrl: puzzle.authorUrl || '',
+      authorAvatar: puzzle.authorAvatar || resolveAvatarSrcFromId('mao'),
       clientId: puzzle.clientId || null,
-      userId: puzzle.userId || null,
     };
     prepareGameBoard(
       originalImage,
@@ -2999,13 +2824,10 @@ async function handleDeleteCurrentPuzzle() {
   }
   setHint('削除しています...');
   try {
-    const authContext = getSupabaseAuthContext();
     ensureClientId();
-    const canDeleteByUser = puzzle.userId && authContext.userId && puzzle.userId === authContext.userId;
     const canDeleteByClient = puzzle.clientId && clientId && puzzle.clientId === clientId;
     await deletePublishedPuzzle(puzzle.id, {
-      userId: canDeleteByUser ? authContext.userId : null,
-      clientIdValue: !canDeleteByUser && canDeleteByClient ? clientId : null,
+      clientIdValue: canDeleteByClient ? clientId : null,
     });
     state.officialPuzzles = state.officialPuzzles.filter(entry => entry.id !== puzzle.id);
     const published = state.officialPuzzles.filter(entry => entry.source === 'published');
