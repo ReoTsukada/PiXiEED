@@ -546,8 +546,11 @@
 <button class="button" id="clearCanvas" type="button">キャンバスをクリア</button>
 <button class="button" id="enableAutosave" type="button">ローカルに自動保存</button>
 <p class="help-text">自動保存はこの端末内に下書きを保存します。出力は共有・配布用です。</p>
+<button class="button" id="bindExportFolder" type="button">出力フォルダを設定</button>
+<p class="help-text">一度設定すると PNG/GIF/プロジェクト を PiXiEED フォルダへ上書き保存します。</p>
 </div>
 <p aria-live="polite" class="help-text" id="autosaveStatus"></p>
+<p aria-live="polite" class="help-text" id="exportFolderStatus"></p>
 <div class="field field--list">
 <span>タイムラプス</span>
 <div class="field-group">
@@ -746,7 +749,6 @@
 <option value="png">PNG（画像）</option>
 <option value="gif">GIF（アニメーション）</option>
 <option value="timelapse">タイムラプスGIF（記録）</option>
-<option value="contest">コンテストに投稿</option>
 <option value="pixfind">PiXFiNDへ送る</option>
 <option value="project">プロジェクト（.pixieedraw）</option>
 </select>
