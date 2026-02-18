@@ -953,9 +953,6 @@
     <a class="bottom-nav__item" data-tab="home" href="./index.html">
       <span class="icon"><img src="FooterIcon1.png" alt=""/></span><span>ホーム</span>
     </a>
-    <a class="bottom-nav__item" data-tab="contest" href="contest/index.html">
-      <span class="icon"><img src="FooterIcon2.png" alt=""/></span><span>コンテスト</span>
-    </a>
     <a class="bottom-nav__item is-active" data-tab="tools" href="tools.html">
       <span class="icon"><img src="FooterIcon3.png" alt=""/></span><span>ツール/ゲーム</span>
     </a>
@@ -987,18 +984,14 @@
           <div class="avatar-grid" id="avatarGrid"></div>
         </div>
         <label class="profile-name">
-          <span style="font-weight:700; color:#e5e7eb;">X (旧Twitter)</span>
-          <input class="auth-input" id="profileX" type="url" placeholder="https://x.com/username" maxlength="200" inputmode="url">
+          <span style="font-weight:700; color:#e5e7eb;">X / リンク</span>
+          <input class="auth-input" id="profileX" type="url" placeholder="https://x.com/username または https://example.com" maxlength="200" inputmode="url">
         </label>
         <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
       </div>
       <div class="profile-block">
-        <p class="helper" style="margin:0 0 6px;">アカウントの保存（メール）</p>
-        <p class="helper" style="margin:0 0 6px;">長期保存 / 自動で引き継ぎ / 復旧可</p>
-        <p class="helper" id="linkedEmail" style="margin:0 0 6px; display:block;">ログインはギャラリーで行ってください</p>
-        <button class="auth-btn" id="authBtn" type="button">ギャラリーでログイン</button>
+        <p class="helper" id="authStatus"></p>
       </div>
-      <p class="helper" id="authStatus"></p>
     </div>
   </div>
 
@@ -1014,11 +1007,13 @@
         if(!raw) return '';
         if(/^https?:\/\//i.test(raw)){
           try{
-            const url = new URL(raw);
-            const host = url.hostname.replace(/^www\./, '');
-            if(host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com' || host.endsWith('.twitter.com')){
-              return url.toString();
-            }
+            return new URL(raw).toString();
+          }catch(_){}
+          return '';
+        }
+        if(/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(raw)){
+          try{
+            return new URL(`https://${raw}`).toString();
           }catch(_){}
           return '';
         }
@@ -1028,11 +1023,7 @@
           ? `https://${handle}`
           : `https://x.com/${handle}`;
         try{
-          const url = new URL(candidate);
-          const host = url.hostname.replace(/^www\./, '');
-          if(host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com' || host.endsWith('.twitter.com')){
-            return url.toString();
-          }
+          return new URL(candidate).toString();
         }catch(_){}
         return '';
       }
@@ -1302,7 +1293,6 @@
         const saveBtn = document.getElementById('saveProfile');
         const nickInput = document.getElementById('profileNickname');
         const xInput = document.getElementById('profileX');
-        const authBtn = document.getElementById('authBtn');
         const status = document.getElementById('authStatus');
         const toggle = (open) => {
           if(!panel) return;
@@ -1328,11 +1318,6 @@
             saveXUrl(xUrl);
             applyAvatar();
             if(status) status.textContent = 'プロフィールを保存しました';
-          });
-        }
-        if(authBtn){
-          authBtn.addEventListener('click', () => {
-            window.location.href = 'contest/index.html#auth';
           });
         }
       }
