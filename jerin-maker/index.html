@@ -908,7 +908,7 @@
     min-width: 8px;
     padding: 0;
   }
-  #btnUpload { margin-left: auto; }
+  #btnExport { margin-left: auto; }
   @media (orientation: landscape) {
     .inline-buttons {
       row-gap: 8px;
@@ -942,7 +942,7 @@
       width: 20px;
       height: 20px;
     }
-    #btnUpload { margin-left: auto; }
+    #btnExport { margin-left: auto; }
     .palette {
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
@@ -1354,9 +1354,6 @@
             <button class="icon-btn" id="btnTutorialSpacerLeft" title="" type="button" aria-hidden="true"></button>
             <button class="icon-btn" id="btnTutorialRestart" title="チュートリアルを最初から (ハテナ)" type="button" aria-hidden="true">?</button>
             <button class="icon-btn" id="btnTutorialSpacerRight" title="" type="button" aria-hidden="true"></button>
-            <button class="icon-btn" id="btnUpload" title="コンテストへ送る" type="button">
-              <img alt="アップロード" src="../pixiedraw/assets/icons/action-open.svg"/>
-            </button>
             <button class="icon-btn" id="btnExport" title="PNGを書き出す" type="button">
               <img alt="書き出し" src="../pixiedraw/assets/icons/action-export.svg"/>
             </button>
@@ -2264,7 +2261,6 @@
   const btnTutorialSpacerLeft = document.getElementById('btnTutorialSpacerLeft');
   const btnTutorialSpacerRight = document.getElementById('btnTutorialSpacerRight');
   const btnImport = document.getElementById('btnImport');
-  const btnUpload = document.getElementById('btnUpload');
   const swatchEditor = /** @type {HTMLInputElement|null} */ (document.getElementById('swatchEditor'));
   const importInput = /** @type {HTMLInputElement|null} */ (document.getElementById('importInput'));
   const liteColorPicker = document.getElementById('liteColorPicker');
@@ -5103,49 +5099,6 @@
     }
     markDownloaded();
   });
-  btnUpload?.addEventListener('click', () => {
-    if (!hasDownloadedCurrent()) {
-      alert('先にダウンロードしてください。');
-      return;
-    }
-    if (diffMode) {
-      const { baseImage, diffImage } = getExportImagePair();
-      const originalDataUrl = exportCompositeToDataUrlRaw(baseImage);
-      const diffDataUrl = exportCompositeToDataUrlRaw(diffImage);
-      if (!originalDataUrl || !diffDataUrl) return;
-      try {
-        const payload = {
-          originalDataUrl,
-          diffDataUrl,
-          canvasSize,
-          width: canvasSize,
-          height: canvasSize,
-          createdAt: new Date().toISOString(),
-        };
-        localStorage.setItem(PIXFIND_UPLOAD_KEY, JSON.stringify(payload));
-      } catch (err) {
-        console.warn('pixfind upload store failed', err);
-      }
-      window.location.href = '../pixfind/index.html#creator';
-      return;
-    }
-    const dataUrl = exportCompositeToDataUrlRaw(baseLayer.imageData);
-    if (!dataUrl) return;
-    try {
-      const payload = {
-        dataUrl,
-        canvasSize,
-        width: canvasSize,
-        height: canvasSize,
-        createdAt: new Date().toISOString(),
-      };
-      localStorage.setItem('pixieed_contest_upload_v1', JSON.stringify(payload));
-    } catch (err) {
-      console.warn('upload store failed', err);
-    }
-    window.location.href = '../contest/index.html#post';
-  });
-
   runTutorialResetMigration();
   loadPalette();
   initPalette();
