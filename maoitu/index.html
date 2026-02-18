@@ -265,6 +265,30 @@ a { color:#7dd3fc; }
   color:#fff;
   font-size:14px;
 }
+.rank-profile{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+}
+.rank-profile__avatar{
+  width:20px;
+  height:20px;
+  border-radius:6px;
+  border:1px solid rgba(255,255,255,0.2);
+  background:rgba(0,0,0,0.35);
+  image-rendering:pixelated;
+  image-rendering:crisp-edges;
+  flex-shrink:0;
+}
+.rank-profile__name{
+  color:#fff;
+  text-decoration:underline;
+  text-underline-offset:2px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
 .rank-list {
   list-style:none;
   padding:0;
