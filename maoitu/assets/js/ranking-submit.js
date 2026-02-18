@@ -9,15 +9,10 @@ const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
 const SCORE_QUEUE_KEY = 'maoitu_score_queue';
 const SCORE_QUEUE_LIMIT = 20;
 const SCORE_QUEUE_RETRY_MS = 60000;
-let cachedUserId = null;
-let checkedAuth = false;
-let profileSynced = false;
-let scoreMigrated = false;
+
 let supabaseMaintenance = Boolean(readSupabaseMaintenance());
 
 function accountKey(row) {
-  const userId = row && row.user_id ? String(row.user_id).trim() : '';
-  if (userId) return `user:${userId}`;
   const clientId = row && row.client_id ? String(row.client_id).trim() : '';
   if (clientId) return `client:${clientId}`;
   return (row?.name || '').trim().toLowerCase() || 'guest';
@@ -108,8 +103,8 @@ async function probeSupabaseAvailability() {
     }
     noteSupabaseSuccess();
     return true;
-  } catch (err) {
-    markSupabaseMaintenanceFromError(err);
+  } catch (error) {
+    markSupabaseMaintenanceFromError(error);
     return false;
   }
 }
@@ -153,110 +148,15 @@ function isMissingClientId(error) {
   return msg.includes('client_id');
 }
 
-function isMissingUserId(error) {
-  const msg = String(error?.message || '');
-  return msg.includes('user_id');
-}
-
-async function hasOtherUserLinkedScores(userId, clientId) {
-  try {
-    const { data, error } = await supabase
-      .from('scores')
-      .select('user_id')
-      .eq('client_id', clientId)
-      .not('user_id', 'is', null)
-      .limit(1);
-    if (error) {
-      if (isMissingUserId(error)) return false;
-      return false;
-    }
-    const linked = data && data[0] ? data[0].user_id : null;
-    return !!(linked && linked !== userId);
-  } catch (_) {
-    return false;
-  }
-}
-
-async function getUserId() {
-  if (checkedAuth) return cachedUserId;
-  checkedAuth = true;
-  try {
-    const { data } = await supabase.auth.getSession();
-    cachedUserId = data?.session?.user?.id || null;
-  } catch (_) {
-    cachedUserId = null;
-  }
-  return cachedUserId;
-}
-
-async function syncProfileFromServer() {
-  if (profileSynced) return;
-  profileSynced = true;
-  const userId = await getUserId();
-  if (!userId) return;
-  try {
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .select('nickname')
-      .eq('id', userId)
-      .maybeSingle();
-    if (!error && data?.nickname) {
-      localStorage.setItem('pixieed_nickname', data.nickname);
-    }
-  } catch (_) {
-    // ignore
-  }
-}
-
-async function migrateGuestScores() {
-  if (scoreMigrated) return;
-  const userId = await getUserId();
-  if (!userId) return;
-  const clientId = getClientId();
-  const conflict = await hasOtherUserLinkedScores(userId, clientId);
-  if (conflict) {
-    try { localStorage.setItem('pixieed_link_conflict', '1'); } catch (_) {}
-    return;
-  }
-  try {
-    const { error } = await supabase
-      .from('scores')
-      .update({ user_id: userId })
-      .eq('client_id', clientId)
-      .is('user_id', null);
-    if (error) {
-      if (isMissingUserId(error)) {
-        scoreMigrated = true;
-        return;
-      }
-      console.warn('score migrate failed', error);
-      return;
-    }
-    scoreMigrated = true;
-  } catch (err) {
-    console.warn('score migrate failed', err);
-  }
-}
-
-async function prepareAuthContext() {
-  await syncProfileFromServer();
-  await migrateGuestScores();
-}
-
 async function submitScoreToSupabase(score) {
   const safeScore = Math.max(0, Math.floor(Number(score) || 0));
-  await prepareAuthContext();
-  const name = getName();
-  const clientId = getClientId();
-  const userId = await getUserId();
-  const payload = { name, score: safeScore, client_id: clientId };
-  if (userId) payload.user_id = userId;
+  const payload = {
+    name: getName(),
+    score: safeScore,
+    client_id: getClientId(),
+  };
+
   let { error } = await supabase.from('scores').insert(payload);
-  if (error && payload.user_id && isMissingUserId(error)) {
-    delete payload.user_id;
-    const retry = await supabase.from('scores').insert(payload);
-    error = retry.error;
-  }
   if (error && payload.client_id && isMissingClientId(error)) {
     delete payload.client_id;
     const retry = await supabase.from('scores').insert(payload);
@@ -332,30 +232,36 @@ export function getName() {
     const profile = localStorage.getItem('pixieed_nickname');
     if (profile) {
       const normalized = profile.trim().slice(0, 24) || '名無し';
-      try { localStorage.setItem(NAME_STORAGE_KEY, normalized); } catch (_) {}
+      try {
+        localStorage.setItem(NAME_STORAGE_KEY, normalized);
+      } catch (_) {
+        // ignore
+      }
       return normalized;
     }
-  } catch (_) {}
+  } catch (_) {
+    // ignore
+  }
   try {
     const saved = localStorage.getItem(NAME_STORAGE_KEY);
     if (saved) return saved.trim().slice(0, 24) || '名無し';
-  } catch (_) {}
+  } catch (_) {
+    // ignore
+  }
   return '名無し';
 }
 
 export async function fetchRankInfo(score) {
-  const safeScore = Math.max(0, Math.floor(Number(score) || 0));
-  return fetchRankInfoWithColumns(score, true, true);
+  return fetchRankInfoWithColumns(score, true);
 }
 
-async function fetchRankInfoWithColumns(score, includeUserId, includeClientId) {
+async function fetchRankInfoWithColumns(score, includeClientId) {
   const safeScore = Math.max(0, Math.floor(Number(score) || 0));
   const collected = [];
   let from = 0;
   for (let page = 0; page < MAX_PAGES; page++) {
     const to = from + PAGE_SIZE - 1;
     const selectColumns = ['name', 'score', 'created_at'];
-    if (includeUserId) selectColumns.push('user_id');
     if (includeClientId) selectColumns.push('client_id');
     const { data, error } = await supabase
       .from('scores')
@@ -365,11 +271,8 @@ async function fetchRankInfoWithColumns(score, includeUserId, includeClientId) {
       .range(from, to);
     if (error) {
       markSupabaseMaintenanceFromError(error);
-      if (includeUserId && isMissingUserId(error)) {
-        return fetchRankInfoWithColumns(score, false, includeClientId);
-      }
       if (includeClientId && isMissingClientId(error)) {
-        return fetchRankInfoWithColumns(score, includeUserId, false);
+        return fetchRankInfoWithColumns(score, false);
       }
       throw error;
     }
