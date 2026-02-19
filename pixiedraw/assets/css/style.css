@@ -1355,6 +1355,74 @@ body.is-startup-active #virtualCursorCanvas {
   display: none !important;
 }
 
+.canvas-controls[data-mobile='true'] #canvasControlButtons.is-mobile-selection-actions-visible {
+  position: fixed;
+  left: calc(var(--mobile-safe-area-left) + 10px);
+  bottom: calc(var(--mobile-safe-area-bottom) + var(--mobile-banner-height) + var(--mobile-drawer-height) + 10px);
+  display: inline-flex !important;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 2px solid var(--border);
+  background:
+    linear-gradient(0deg, rgba(var(--ui-rgb), 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ui-rgb), 0.08) 1px, transparent 1px),
+    rgba(6, 12, 18, 0.94);
+  background-size: 4px 4px;
+  z-index: 64;
+  pointer-events: auto;
+}
+
+.canvas-controls[data-mobile='true'] #canvasControlButtons.is-mobile-selection-actions-visible[data-drawer-mode='peek'] {
+  bottom: calc(var(--mobile-safe-area-bottom) + var(--mobile-banner-height) + var(--mobile-drawer-height) + 74px);
+}
+
+.canvas-controls:not([data-mobile='true']) #canvasControlButtons.is-mobile-selection-actions-visible {
+  position: fixed;
+  left: calc(var(--left-toggle-offset) + 4px);
+  top: calc(var(--safe-area-top) + 12px);
+  display: inline-flex !important;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 2px solid var(--border);
+  background:
+    linear-gradient(0deg, rgba(var(--ui-rgb), 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ui-rgb), 0.08) 1px, transparent 1px),
+    rgba(6, 12, 18, 0.94);
+  background-size: 4px 4px;
+  z-index: 64;
+  pointer-events: auto;
+}
+
+.canvas-controls[data-mobile='true'] #canvasControlButtons.is-mobile-selection-actions-visible .canvas-zoom-field {
+  display: none;
+}
+
+.canvas-controls:not([data-mobile='true']) #canvasControlButtons.is-mobile-selection-actions-visible .canvas-zoom-field {
+  display: none;
+}
+
+.canvas-controls[data-mobile='true'] #canvasControlButtons.is-mobile-selection-actions-visible #canvasControlPrimary,
+.canvas-controls[data-mobile='true'] #canvasControlButtons.is-mobile-selection-actions-visible #canvasControlSecondary {
+  display: inline-flex;
+  width: auto;
+  min-width: 58px;
+  padding: 0 10px;
+  font-size: 0.98rem;
+  letter-spacing: 0.02em;
+}
+
+.canvas-controls:not([data-mobile='true']) #canvasControlButtons.is-mobile-selection-actions-visible #canvasControlPrimary,
+.canvas-controls:not([data-mobile='true']) #canvasControlButtons.is-mobile-selection-actions-visible #canvasControlSecondary {
+  display: inline-flex;
+  width: auto;
+  min-width: 58px;
+  padding: 0 10px;
+  font-size: 0.98rem;
+  letter-spacing: 0.02em;
+}
+
 .zoom-indicator {
   position: absolute;
   top: 16px;
@@ -2075,6 +2143,104 @@ body.is-mobile-layout .mobile-draw-help {
   max-width: 120px;
 }
 
+#panelMulti .multi-project-key-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+#panelMulti .multi-project-key-field #multiProjectKey {
+  width: 100%;
+  max-width: none;
+}
+
+#panelMulti .multi-project-key-copy {
+  min-height: 34px;
+  padding: 6px 12px;
+  white-space: nowrap;
+}
+
+#panelMulti .multi-entry-screen {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--multi-entry-gap, 12px);
+  width: var(--multi-entry-width, min(100%, 360px));
+  height: var(--multi-entry-height, auto);
+  max-height: 100%;
+  min-height: var(--multi-entry-min-height, clamp(220px, 48vh, 340px));
+  margin: 0 auto;
+  align-content: center;
+  justify-content: center;
+}
+
+#panelMulti .multi-entry-screen .button {
+  min-height: var(--multi-entry-button-height, 64px);
+  font-size: 0.94rem;
+  letter-spacing: 0.03em;
+}
+
+#panelMulti .button:disabled,
+#panelMulti .chip:disabled {
+  opacity: 1;
+  color: rgba(198, 214, 227, 0.52);
+  border-color: rgba(var(--ui-rgb), 0.24);
+  background:
+    linear-gradient(135deg, rgba(var(--ui-rgb), 0.1) 25%, transparent 25%, transparent 50%, rgba(var(--ui-rgb), 0.1) 50%, rgba(var(--ui-rgb), 0.1) 75%, transparent 75%, transparent),
+    rgba(6, 14, 20, 0.9);
+  background-size: 8px 8px;
+  cursor: not-allowed;
+}
+
+#panelMulti .button:disabled:hover,
+#panelMulti .chip:disabled:hover {
+  border-color: rgba(var(--ui-rgb), 0.24);
+}
+
+#panelMulti .multi-flow-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#panelMulti .multi-flow-header {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+#panelMulti .multi-flow-header .help-text {
+  margin: 0;
+}
+
+#panelMulti .multi-session-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+#panelMulti .multi-assignment-field {
+  gap: 10px;
+}
+
+#panelMulti .multi-assignment-field .field {
+  margin-bottom: 0;
+}
+
+#panelMulti .multi-assignment-field #multiAssignTarget {
+  width: 100%;
+}
+
+#panelMulti .multi-assignment-inputs {
+  align-items: flex-end;
+  gap: 8px;
+}
+
+#panelMulti .multi-assignment-inputs .field--tiny input {
+  width: 72px;
+}
+
 .field--tiny {
   gap: 4px;
 }
@@ -2738,6 +2904,25 @@ body.is-mobile-layout .mobile-draw-help {
   outline-offset: 2px;
 }
 
+.timeline-cell--body.is-multi-assigned-cell {
+  position: relative;
+  --multi-assignee-color: rgba(255, 196, 120, 0.95);
+}
+
+.timeline-cell--body.is-multi-assigned-cell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--multi-assignee-color);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.timeline-cell--body.is-multi-assigned-cell > * {
+  position: relative;
+  z-index: 2;
+}
+
 .timeline-cell--body.is-selected-slot-cell {
   box-shadow: inset 0 0 0 1px rgba(var(--ui-rgb-focus), 0.65);
 }
@@ -2752,6 +2937,10 @@ body.is-mobile-layout .mobile-draw-help {
 
 .timeline-slot.is-playback-active {
   box-shadow: inset 0 0 0 1px rgba(var(--ui-rgb-focus), 0.9);
+}
+
+.timeline-slot.is-multi-assigned-cell:not(.is-selected):not(.is-playback-active) {
+  box-shadow: inset 0 0 0 1px var(--multi-assignee-color);
 }
 
 .timeline-slot.is-hidden {
@@ -2794,6 +2983,10 @@ body.is-mobile-layout .mobile-draw-help {
   align-items: center;
   justify-content: center;
   transition: transform 140ms ease, background 140ms ease;
+}
+
+.timeline-slot.is-multi-assigned-cell .timeline-slot__marker {
+  background: var(--multi-assignee-color);
 }
 
 .timeline-cell.is-onion-frame {
