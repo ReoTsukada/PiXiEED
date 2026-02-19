@@ -2,50 +2,58 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://pixieed.jp/</loc>
+    <lastmod>2026-02-19</lastmod>
   </url>
   <url>
     <loc>https://pixieed.jp/tools.html</loc>
+    <lastmod>2026-02-19</lastmod>
+  </url>
+  <url>
+    <loc>https://pixieed.jp/notes/</loc>
+    <lastmod>2026-02-19</lastmod>
   </url>
   <url>
     <loc>https://pixieed.jp/portfolio/</loc>
+    <lastmod>2026-02-19</lastmod>
   </url>
   <url>
     <loc>https://pixieed.jp/contact/</loc>
+    <lastmod>2026-02-19</lastmod>
   </url>
   <url>
     <loc>https://pixieed.jp/privacy/</loc>
+    <lastmod>2026-02-19</lastmod>
   </url>
   <url>
     <loc>https://pixieed.jp/terms/</loc>
-  </url>
-  <url>
-    <loc>https://pixieed.jp/projects/maoitu/</loc>
-  </url>
-  <url>
-    <loc>https://pixieed.jp/projects/maou-war/</loc>
-  </url>
-  <url>
-    <loc>https://pixieed.jp/projects/pixfind/</loc>
+    <lastmod>2026-02-19</lastmod>
   </url>
   <url>
     <loc>https://pixieed.jp/projects/pixiedraw/</loc>
+    <lastmod>2026-02-19</lastmod>
   </url>
   <url>
     <loc>https://pixieed.jp/projects/jerin-maker/</loc>
+    <lastmod>2026-02-19</lastmod>
   </url>
   <url>
     <loc>https://pixieed.jp/projects/pixiee-lens/</loc>
+    <lastmod>2026-02-19</lastmod>
   </url>
   <url>
     <loc>https://pixieed.jp/projects/qr-maker/</loc>
+    <lastmod>2026-02-19</lastmod>
   </url>
   <url>
-    <loc>https://pixieed.jp/maoitu/</loc>
+    <loc>https://pixieed.jp/projects/pixfind/</loc>
+    <lastmod>2026-02-19</lastmod>
+  </url>
+  <url>
+    <loc>https://pixieed.jp/projects/maoitu/</loc>
+    <lastmod>2026-02-19</lastmod>
   </url>
   <url>
     <loc>https://pixieed.jp/maou-war/</loc>
-  </url>
-  <url>
-    <loc>https://pixieed.jp/pixfind/</loc>
+    <lastmod>2026-02-19</lastmod>
   </url>
 </urlset>
