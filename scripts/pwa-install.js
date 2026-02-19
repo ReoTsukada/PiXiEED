@@ -5,27 +5,32 @@
     return;
   }
 
-  const nav = window.navigator;
+  const nav = window.navigator || {};
   const ua = nav.userAgent || '';
   const platform = nav.platform || '';
+  const pathname = typeof window.location?.pathname === 'string' ? window.location.pathname : '';
+  const isPixieeDrawPath = /(?:^|\/)pixiedraw(?:\/|$)/i.test(pathname);
+
+  if (!isPixieeDrawPath) {
+    return;
+  }
 
   const isIOS = /iPad|iPhone|iPod/.test(ua) || (platform === 'MacIntel' && nav.maxTouchPoints > 1);
   const isAndroid = /Android/i.test(ua);
-  const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || nav.standalone === true;
-
-  if (!isIOS && !isAndroid) {
-    return;
-  }
+  const isStandalone = (
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+    || nav.standalone === true
+  );
 
   if (isStandalone) {
     return;
   }
 
-  const IOS_HIDE_KEY = 'pixieed_pwa_ios_hide';
+  const IOS_HIDE_KEY = 'pixieedraw_pwa_ios_hide';
 
   const canUseStorage = (() => {
     try {
-      const key = '__pixieed_test__';
+      const key = '__pixieedraw_pwa_storage_test__';
       window.localStorage.setItem(key, '1');
       window.localStorage.removeItem(key);
       return true;
@@ -75,25 +80,6 @@
     const style = document.createElement('style');
     style.id = 'pixieedPwaInstallStyles';
     style.textContent = `
-      .pixieed-pwa-install-button {
-        position: fixed;
-        right: 16px;
-        bottom: calc(env(safe-area-inset-bottom, 0px) + 86px);
-        z-index: 2147483640;
-        border: 0;
-        border-radius: 999px;
-        padding: 14px 20px;
-        background: linear-gradient(135deg, #ff719a, #ff9f43);
-        color: #0b1224;
-        font: 700 16px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
-        cursor: pointer;
-        min-height: 52px;
-        min-width: 188px;
-      }
-      .pixieed-pwa-install-button[hidden] {
-        display: none !important;
-      }
       .pixieed-pwa-install-overlay {
         position: fixed;
         inset: 0;
@@ -147,15 +133,6 @@
         background: rgba(255, 255, 255, 0.08);
         color: #f8fafc;
       }
-      @media (min-width: 768px) {
-        .pixieed-pwa-install-button {
-          right: 22px;
-          bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
-          padding: 15px 22px;
-          font-size: 17px;
-          min-height: 56px;
-        }
-      }
     `;
     document.head.appendChild(style);
   };
@@ -189,11 +166,9 @@
 
     actions.appendChild(secondaryButton);
     actions.appendChild(primaryButton);
-
     dialog.appendChild(title);
     dialog.appendChild(message);
     dialog.appendChild(actions);
-
     overlay.appendChild(dialog);
     document.body.appendChild(overlay);
 
@@ -204,11 +179,6 @@
     });
 
     return {
-      overlay,
-      title,
-      message,
-      secondaryButton,
-      primaryButton,
       open(config) {
         const {
           dialogTitle,
@@ -246,18 +216,6 @@
     };
   };
 
-  const createInstallButton = () => {
-    ensureStyles();
-
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'pixieed-pwa-install-button';
-    button.textContent = 'アプリをインストール';
-
-    document.body.appendChild(button);
-    return button;
-  };
-
   const ready = (callback) => {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', callback, { once: true });
@@ -269,62 +227,18 @@
   ready(() => {
     const dialog = createDialog();
 
-    if (isAndroid) {
-      const installButton = createInstallButton();
-      let deferredPrompt = null;
-
-      const openAndroidManualGuide = () => {
-        dialog.open({
-          dialogTitle: 'Androidでのインストール方法',
-          dialogMessage: 'Chromeのメニューを開いて「ホーム画面に追加」または「アプリをインストール」を選択してください。',
-          primaryLabel: '閉じる',
-          secondaryLabel: 'OK'
-        });
-      };
-
-      installButton.addEventListener('click', async () => {
-        if (!deferredPrompt) {
-          openAndroidManualGuide();
-          return;
-        }
-
-        deferredPrompt.prompt();
-
-        try {
-          await deferredPrompt.userChoice;
-        } catch (_error) {
-          // Ignore result errors.
-        }
-
-        deferredPrompt = null;
-      });
-
-      window.addEventListener('beforeinstallprompt', (event) => {
-        event.preventDefault();
-        deferredPrompt = event;
-      });
-
-      window.addEventListener('appinstalled', () => {
-        installButton.hidden = true;
-        dialog.close();
-      });
-
-      return;
-    }
-
     if (isIOS) {
       if (readStorage(IOS_HIDE_KEY) === '1') {
         return;
       }
-
       const isSafari = /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua);
       const message = isSafari
-        ? 'Safariの共有ボタンをタップして「ホーム画面に追加」を選ぶと、PiXiEEDをアプリのように使えます。'
-        : 'この端末ではSafariで開くと「ホーム画面に追加」できます。Safariでこのページを開いて共有メニューを使ってください。';
+        ? 'Safariの共有ボタンをタップして「ホーム画面に追加」を選ぶと、PiXiEEDrawをアプリのように使えます。'
+        : 'この端末ではSafariで開くと「ホーム画面に追加」できます。SafariでPiXiEEDrawを開いて共有メニューを使ってください。';
 
       window.setTimeout(() => {
         dialog.open({
-          dialogTitle: 'iPhoneでアプリとして追加',
+          dialogTitle: 'PiXiEEDrawをインストール',
           dialogMessage: message,
           primaryLabel: '閉じる',
           secondaryLabel: '今後表示しない',
@@ -335,6 +249,65 @@
             clearStorage(IOS_HIDE_KEY);
           }
         });
+      }, 700);
+      return;
+    }
+
+    let deferredPrompt = null;
+    let popupShown = false;
+
+    const openInstallPopup = () => {
+      popupShown = true;
+      dialog.open({
+        dialogTitle: 'PiXiEEDrawをインストール',
+        dialogMessage: 'ホーム画面やデスクトップに追加すると、PiXiEEDrawをアプリのようにすぐ開けます。',
+        primaryLabel: 'インストール',
+        secondaryLabel: '後で',
+        onPrimary: async () => {
+          const promptEvent = deferredPrompt;
+          if (!promptEvent) {
+            const fallbackMessage = isAndroid
+              ? 'Chromeのメニューを開いて「ホーム画面に追加」または「アプリをインストール」を選択してください。'
+              : 'ブラウザのメニューから「インストール」または「アプリを追加」を選択してください。';
+            dialog.open({
+              dialogTitle: 'インストール手順',
+              dialogMessage: fallbackMessage,
+              primaryLabel: '閉じる',
+              secondaryLabel: 'OK'
+            });
+            return;
+          }
+          deferredPrompt = null;
+          try {
+            promptEvent.prompt();
+            await promptEvent.userChoice;
+          } catch (_error) {
+            // Ignore prompt failures.
+          }
+        }
+      });
+    };
+
+    window.addEventListener('beforeinstallprompt', (event) => {
+      event.preventDefault();
+      deferredPrompt = event;
+      if (!popupShown) {
+        openInstallPopup();
+      }
+    });
+
+    window.addEventListener('appinstalled', () => {
+      deferredPrompt = null;
+      popupShown = true;
+      dialog.close();
+    });
+
+    if (isAndroid) {
+      window.setTimeout(() => {
+        if (popupShown || deferredPrompt) {
+          return;
+        }
+        openInstallPopup();
       }, 700);
     }
   });
