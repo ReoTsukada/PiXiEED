@@ -2808,6 +2808,7 @@
 <h2 class="camera-permission__title" id="cameraStartHeading">カメラを起動</h2>
 <p class="camera-permission__message" id="cameraStartMessage">ホーム画面から利用する場合は、下のボタンをタップしてカメラを起動してください。</p>
 <div class="camera-permission__actions">
+<button class="camera-permission__button" hidden="" id="cameraOpenBrowserButton" type="button">ブラウザで開く</button>
 <button class="camera-permission__button camera-permission__button--primary" id="cameraStartButton" type="button">カメラを起動</button>
 </div>
 </div>
@@ -2899,6 +2900,7 @@
     const cameraStartOverlay = document.getElementById('cameraStartOverlay');
     const cameraStartMessage = document.getElementById('cameraStartMessage');
     const cameraStartButton = document.getElementById('cameraStartButton');
+    const cameraOpenBrowserButton = document.getElementById('cameraOpenBrowserButton');
     const cameraStartActions = cameraStartOverlay ? cameraStartOverlay.querySelector('.camera-permission__actions') : null;
     const cameraStartBackdrop = document.getElementById('cameraStartBackdrop');
     const cameraStartButtonLabel = cameraStartButton ? (cameraStartButton.textContent || '').trim() || 'カメラを起動' : 'カメラを起動';
@@ -2937,6 +2939,7 @@
     const ZOOM_MAJOR_EPSILON = 1e-3;
     const LENS_AD_CLIENT = 'ca-pub-9801602250480253';
     const LENS_AD_FALLBACK_SLOT = '2141591954';
+    const LENS_BROWSER_FALLBACK_URL = 'https://pixieed.jp/pixiee-lens/';
     const CAMERA_READY_TIMEOUT_MS = 5000;
     const CAMERA_REQUEST_TIMEOUT_MS = 7000;
     const CAMERA_PLAY_TIMEOUT_MS = 5000;
@@ -3052,6 +3055,18 @@
       };
       cameraStartButton.addEventListener('click', triggerCameraStart);
       cameraStartButton.addEventListener('touchend', triggerCameraStart, { passive: false });
+    }
+    if (cameraOpenBrowserButton) {
+      cameraOpenBrowserButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void handleOpenBrowserRequest();
+      });
+      cameraOpenBrowserButton.addEventListener('touchend', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void handleOpenBrowserRequest();
+      }, { passive: false });
     }
     if (cameraStartBackdrop) {
       cameraStartBackdrop.addEventListener('click', (event) => {
@@ -5591,6 +5606,94 @@
       gestureStartRegistered = true;
     }
 
+    function resolveLensBrowserUrl() {
+      if (typeof window === 'undefined' || !window.location) {
+        return LENS_BROWSER_FALLBACK_URL;
+      }
+      try {
+        const currentUrl = new URL(window.location.href);
+        currentUrl.hash = '';
+        return `${currentUrl.origin}${currentUrl.pathname}${currentUrl.search || ''}`;
+      } catch (error) {
+        return LENS_BROWSER_FALLBACK_URL;
+      }
+    }
+
+    function updateOpenBrowserActionVisibility() {
+      if (!cameraOpenBrowserButton) {
+        return;
+      }
+      const showButton = Boolean(isIOSStandaloneApp);
+      cameraOpenBrowserButton.hidden = !showButton;
+      cameraOpenBrowserButton.disabled = !showButton;
+    }
+
+    function tryOpenBrowserTab(targetUrl) {
+      let opened = false;
+      if (!targetUrl || typeof targetUrl !== 'string') {
+        return opened;
+      }
+      try {
+        const anchor = document.createElement('a');
+        anchor.href = targetUrl;
+        anchor.target = '_blank';
+        anchor.rel = 'noopener noreferrer';
+        if (document.body && typeof document.body.appendChild === 'function') {
+          document.body.appendChild(anchor);
+          anchor.click();
+          anchor.remove();
+        } else {
+          anchor.click();
+        }
+        opened = true;
+      } catch (error) {
+        opened = false;
+      }
+      if (!opened) {
+        try {
+          const popup = window.open(targetUrl, '_blank', 'noopener,noreferrer');
+          opened = Boolean(popup);
+        } catch (error) {
+          opened = false;
+        }
+      }
+      return opened;
+    }
+
+    async function copyTextToClipboard(text) {
+      if (!text || !navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+        return false;
+      }
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    async function handleOpenBrowserRequest() {
+      const targetUrl = resolveLensBrowserUrl();
+      const opened = tryOpenBrowserTab(targetUrl);
+      const copied = await copyTextToClipboard(targetUrl);
+      const message = opened
+        ? 'ブラウザで開く処理を実行しました。開いたタブで利用してください。開けない場合は共有メニューから「Safariで開く」を選択してください。'
+        : copied
+          ? 'ブラウザを直接開けなかったためURLをコピーしました。Safariを開いて貼り付けてください。'
+          : `Safariで次のURLを開いてください: ${targetUrl}`;
+      if (cameraStartMessage) {
+        cameraStartMessage.textContent = message;
+      }
+      setCameraStatus(message);
+      if (opened) {
+        setStatus('ブラウザで開く処理を実行しました');
+      } else if (copied) {
+        setStatus('URLをコピーしました');
+      } else {
+        setStatus('Safariで開く手順を表示しました');
+      }
+    }
+
     function showCameraStartOverlay(message) {
       if (!cameraStartOverlay) {
         return;
@@ -5604,6 +5707,7 @@
         cameraStartButton.textContent = cameraStartButtonLabel;
         cameraStartButton.removeAttribute('aria-busy');
       }
+      updateOpenBrowserActionVisibility();
       cameraStartButtonBusy = false;
       cameraStartOverlayLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       cameraStartOverlay.hidden = false;
@@ -5627,6 +5731,10 @@
         cameraStartButton.disabled = false;
         cameraStartButton.textContent = cameraStartButtonLabel;
         cameraStartButton.removeAttribute('aria-busy');
+      }
+      if (cameraOpenBrowserButton) {
+        cameraOpenBrowserButton.hidden = true;
+        cameraOpenBrowserButton.disabled = true;
       }
       cameraStartButtonBusy = false;
       if (gestureStartHandler) {
@@ -11151,7 +11259,7 @@
     if (requiresCameraUserGesture) {
       cameraStartLocked = true;
       const startupMessage = isIOSStandaloneApp
-        ? 'ホーム画面から利用中です。「カメラを起動」をタップし、許可ダイアログで「許可」を選んでください。'
+        ? 'ホーム画面から利用中です。「カメラを起動」をタップしてください。起動しない場合は「ブラウザで開く」でSafariに開き直してください。'
         : '「カメラを起動」をタップするとカメラの許可ダイアログが表示されます。「許可」を選び、再度撮影をお試しください。';
       showCameraStartOverlay(startupMessage);
     } else {
