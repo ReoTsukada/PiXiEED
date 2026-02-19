@@ -2461,7 +2461,7 @@
     }
   })();
 </script>
-<link rel="manifest" href="/manifest.webmanifest"/>
+<link rel="manifest" href="/pixiee-lens/manifest.webmanifest"/>
 <link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
 </head>
 <body>
@@ -2808,7 +2808,7 @@
 <h2 class="camera-permission__title" id="cameraStartHeading">カメラを起動</h2>
 <p class="camera-permission__message" id="cameraStartMessage">ホーム画面から利用する場合は、下のボタンをタップしてカメラを起動してください。</p>
 <div class="camera-permission__actions">
-<button class="camera-permission__button" hidden="" id="cameraOpenBrowserButton" type="button">ブラウザで開く</button>
+<button class="camera-permission__button" hidden="" id="cameraOpenBrowserButton" type="button">共有してSafariで開く</button>
 <button class="camera-permission__button camera-permission__button--primary" id="cameraStartButton" type="button">カメラを起動</button>
 </div>
 </div>
@@ -2898,6 +2898,7 @@
     const landscapeCaptureSlot = document.querySelector('.hud-landscape-capture');
     const captureButtonOriginalParent = captureBtn ? captureBtn.parentElement : null;
     const cameraStartOverlay = document.getElementById('cameraStartOverlay');
+    const cameraStartHeading = document.getElementById('cameraStartHeading');
     const cameraStartMessage = document.getElementById('cameraStartMessage');
     const cameraStartButton = document.getElementById('cameraStartButton');
     const cameraOpenBrowserButton = document.getElementById('cameraOpenBrowserButton');
@@ -2939,7 +2940,7 @@
     const ZOOM_MAJOR_EPSILON = 1e-3;
     const LENS_AD_CLIENT = 'ca-pub-9801602250480253';
     const LENS_AD_FALLBACK_SLOT = '2141591954';
-    const LENS_BROWSER_FALLBACK_URL = 'https://pixieed.jp/pixiee-lens/';
+    const LENS_BROWSER_FALLBACK_URL = 'https://pixieed.jp/projects/pixiee-lens/?open_lens=1';
     const CAMERA_READY_TIMEOUT_MS = 5000;
     const CAMERA_REQUEST_TIMEOUT_MS = 7000;
     const CAMERA_PLAY_TIMEOUT_MS = 5000;
@@ -3398,6 +3399,7 @@
     let capturePreviewLastFocus = null;
     let cameraStartOverlayLastFocus = null;
     let cameraStartButtonBusy = false;
+    let standaloneBrowserReopenAttempted = false;
     let gestureStartRegistered = false;
     let gestureStartHandler = null;
 
@@ -5581,6 +5583,9 @@
     }
 
     function registerGestureCameraStarter() {
+      if (isIOSStandaloneApp) {
+        return;
+      }
       if (gestureStartRegistered) {
         return;
       }
@@ -5607,6 +5612,9 @@
     }
 
     function resolveLensBrowserUrl() {
+      if (isIOSStandaloneApp) {
+        return LENS_BROWSER_FALLBACK_URL;
+      }
       if (typeof window === 'undefined' || !window.location) {
         return LENS_BROWSER_FALLBACK_URL;
       }
@@ -5672,12 +5680,45 @@
       }
     }
 
+    async function openSafariViaShareSheet(targetUrl) {
+      if (!targetUrl || typeof targetUrl !== 'string') {
+        return false;
+      }
+      if (typeof navigator.share !== 'function') {
+        return false;
+      }
+      try {
+        await navigator.share({
+          title: 'PiXiEELENS',
+          text: 'Safariで開いてカメラをご利用ください。',
+          url: targetUrl
+        });
+        return true;
+      } catch (error) {
+        if (error && error.name === 'AbortError') {
+          return true;
+        }
+        return false;
+      }
+    }
+
     async function handleOpenBrowserRequest() {
       const targetUrl = resolveLensBrowserUrl();
+      const shared = await openSafariViaShareSheet(targetUrl);
+      if (shared) {
+        const message = '共有メニューを開きました。「Safariで開く」を選んで続行してください。';
+        if (cameraStartMessage) {
+          cameraStartMessage.textContent = message;
+        }
+        setCameraStatus(message);
+        setStatus('共有メニューを開きました');
+        return;
+      }
+
       const opened = tryOpenBrowserTab(targetUrl);
       const copied = await copyTextToClipboard(targetUrl);
       const message = opened
-        ? 'ブラウザで開く処理を実行しました。開いたタブで利用してください。開けない場合は共有メニューから「Safariで開く」を選択してください。'
+        ? 'ブラウザで開く処理を実行しました。開いたタブで利用してください。'
         : copied
           ? 'ブラウザを直接開けなかったためURLをコピーしました。Safariを開いて貼り付けてください。'
           : `Safariで次のURLを開いてください: ${targetUrl}`;
@@ -5694,15 +5735,66 @@
       }
     }
 
+    function showStandaloneBrowserReopenOverlay(message) {
+      if (!cameraStartOverlay) {
+        return;
+      }
+      cameraStartLocked = true;
+      if (cameraStartHeading) {
+        cameraStartHeading.textContent = 'ブラウザで開き直す';
+      }
+      if (cameraStartMessage) {
+        cameraStartMessage.textContent = message;
+      }
+      if (cameraStartButton) {
+        cameraStartButton.style.display = 'none';
+        cameraStartButton.disabled = true;
+        cameraStartButton.removeAttribute('aria-busy');
+      }
+      if (cameraOpenBrowserButton) {
+        cameraOpenBrowserButton.hidden = false;
+        cameraOpenBrowserButton.disabled = false;
+      }
+      cameraStartButtonBusy = false;
+      cameraStartOverlayLastFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      cameraStartOverlay.hidden = false;
+      cameraStartOverlay.setAttribute('aria-hidden', 'false');
+      cameraStartOverlay.classList.add('is-visible');
+      setCameraStatus(message);
+      if (cameraOpenBrowserButton) {
+        cameraOpenBrowserButton.focus({ preventScroll: true });
+      }
+    }
+
+    function attemptStandaloneBrowserReopen() {
+      if (!isIOSStandaloneApp || standaloneBrowserReopenAttempted) {
+        return;
+      }
+      standaloneBrowserReopenAttempted = true;
+      const targetUrl = resolveLensBrowserUrl();
+      const opened = tryOpenBrowserTab(targetUrl);
+      const message = opened
+        ? 'ブラウザで開き直しを試行しました。開いたタブでご利用ください。開けない場合は「共有してSafariで開く」を押してください。'
+        : '自動でブラウザを開けませんでした。「共有してSafariで開く」を押してください。';
+      if (cameraStartMessage) {
+        cameraStartMessage.textContent = message;
+      }
+      setCameraStatus(message);
+    }
+
     function showCameraStartOverlay(message) {
       if (!cameraStartOverlay) {
         return;
       }
       cameraStartLocked = true;
+      if (cameraStartHeading) {
+        cameraStartHeading.textContent = 'カメラを起動';
+      }
       if (cameraStartMessage) {
         cameraStartMessage.textContent = message;
       }
       if (cameraStartButton) {
+        cameraStartButton.style.display = '';
         cameraStartButton.disabled = false;
         cameraStartButton.textContent = cameraStartButtonLabel;
         cameraStartButton.removeAttribute('aria-busy');
@@ -5728,6 +5820,7 @@
       cameraStartOverlay.setAttribute('aria-hidden', 'true');
       cameraStartOverlay.classList.remove('is-visible');
       if (cameraStartButton) {
+        cameraStartButton.style.display = '';
         cameraStartButton.disabled = false;
         cameraStartButton.textContent = cameraStartButtonLabel;
         cameraStartButton.removeAttribute('aria-busy');
@@ -6029,6 +6122,14 @@
 
     function updateCameraActionState() {
       if (!cameraActionBtn) {
+        return;
+      }
+      if (isIOSStandaloneApp) {
+        cameraActionMode = 'browser';
+        cameraActionBtn.dataset.mode = cameraActionMode;
+        cameraActionBtn.disabled = false;
+        setCameraActionIcon('resume');
+        setIconButtonLabel(cameraActionBtn, 'ブラウザで開く');
         return;
       }
       const allowSwitch = cameraReady && !cameraPermissionDenied;
@@ -8899,6 +9000,11 @@
         if (state.restarting) {
           return;
         }
+        if (isIOSStandaloneApp || cameraActionMode === 'browser') {
+          closeAllMenus();
+          await handleOpenBrowserRequest();
+          return;
+        }
         closeAllMenus();
         if (cameraActionMode === 'switch') {
           state.useFrontCamera = !state.useFrontCamera;
@@ -11170,6 +11276,11 @@
         stopCamera();
         stopQrScanLoop();
       } else {
+        if (isIOSStandaloneApp) {
+          cameraStartLocked = true;
+          showStandaloneBrowserReopenOverlay('ホーム画面版ではブラウザで開き直してご利用ください。自動で開けない場合は「共有してSafariで開く」を押してください。');
+          return;
+        }
         if (qrScanEnabled) {
           scheduleQrScanLoop(200);
         }
@@ -11190,6 +11301,9 @@
 
     window.addEventListener('focus', () => {
       if (document.hidden) {
+        return;
+      }
+      if (isIOSStandaloneApp) {
         return;
       }
       if (cameraStartLocked) {
@@ -11256,12 +11370,15 @@
     updateControlPlacement();
     setQrReadoutVisibility(false);
 
-    if (requiresCameraUserGesture) {
+    if (isIOSStandaloneApp) {
       cameraStartLocked = true;
-      const startupMessage = isIOSStandaloneApp
-        ? 'ホーム画面から利用中です。「カメラを起動」をタップしてください。起動しない場合は「ブラウザで開く」でSafariに開き直してください。'
-        : '「カメラを起動」をタップするとカメラの許可ダイアログが表示されます。「許可」を選び、再度撮影をお試しください。';
-      showCameraStartOverlay(startupMessage);
+      showStandaloneBrowserReopenOverlay('ホーム画面版ではブラウザで開き直してご利用ください。自動で開けない場合は「共有してSafariで開く」を押してください。');
+      window.setTimeout(() => {
+        attemptStandaloneBrowserReopen();
+      }, 140);
+    } else if (requiresCameraUserGesture) {
+      cameraStartLocked = true;
+      showCameraStartOverlay('「カメラを起動」をタップするとカメラの許可ダイアログが表示されます。「許可」を選び、再度撮影をお試しください。');
     } else {
       cameraStartLocked = false;
       startCamera();
