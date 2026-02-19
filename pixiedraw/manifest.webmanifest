@@ -1,0 +1,26 @@
+{
+  "id": "/pixiedraw/",
+  "name": "PiXiEEDraw",
+  "short_name": "PiXiEEDraw",
+  "description": "PiXiEEDraw official pixel art web app.",
+  "lang": "ja",
+  "start_url": "/pixiedraw/",
+  "scope": "/pixiedraw/",
+  "display": "standalone",
+  "background_color": "#020816",
+  "theme_color": "#020816",
+  "icons": [
+    {
+      "src": "/icon/icon-192-4.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon/icon-512-4.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
