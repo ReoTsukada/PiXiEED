@@ -4,19 +4,47 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
-<title>PiXiEEDraw（ピクシードロー）</title>
+<title>PiXiEEDraw（ピクシードロー） | ブラウザで使えるドット絵エディター</title>
 <meta content="#1f1f1f" name="theme-color"/>
 <meta content="ブラウザで動作するピクセルアートエディター PiXiEEDraw（ピクシードロー）" name="description"/>
 <meta content="PiXiEEDraw,ピクシードロー,PiXiEED,ピクシード,ドット絵エディター,ピクセルアート" name="keywords"/>
-<meta content="index,follow" name="robots"/>
+<meta content="noindex,follow" name="robots"/>
+<link rel="canonical" href="https://pixieed.jp/projects/pixiedraw/"/>
 <meta content="website" property="og:type"/>
+<meta content="PiXiEED" property="og:site_name"/>
+<meta content="ja_JP" property="og:locale"/>
 <meta content="PiXiEEDraw（ピクシードロー）" property="og:title"/>
 <meta content="ブラウザから直接操作できるピクセルアートエディター PiXiEEDraw（ピクシードロー）" property="og:description"/>
+<meta content="https://pixieed.jp/pixiedraw/" property="og:url"/>
 <meta content="https://pixieed.jp/pixiedraw/ogp-app.png" property="og:image"/>
 <meta content="summary_large_image" name="twitter:card"/>
+<meta content="@PiXiEED_arta" name="twitter:site"/>
+<meta content="https://pixieed.jp/pixiedraw/" name="twitter:url"/>
 <meta content="PiXiEEDraw（ピクシードロー）" name="twitter:title"/>
 <meta content="ブラウザから直接操作できるピクセルアートエディター PiXiEEDraw（ピクシードロー）" name="twitter:description"/>
 <meta content="https://pixieed.jp/pixiedraw/ogp-app.png" name="twitter:image"/>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "PiXiEEDraw",
+  "applicationCategory": "DesignApplication",
+  "operatingSystem": "Web",
+  "url": "https://pixieed.jp/pixiedraw/",
+  "image": "https://pixieed.jp/pixiedraw/ogp-app.png",
+  "description": "ブラウザから直接操作できるピクセルアートエディター PiXiEEDraw（ピクシードロー）。",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "JPY"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "PiXiEED",
+    "url": "https://pixieed.jp/"
+  }
+}
+</script>
 <script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
 <!-- Google tag (gtag.js) -->
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
@@ -141,6 +169,10 @@
 <img alt="" class="tab-icon" src="assets/icons/menu-file.svg"/>
 <span class="sr-only">ファイル</span>
 </button>
+<button aria-controls="mobilePanelMulti" aria-label="共有モード" aria-selected="false" class="mobile-tab" data-mobile-tab="multi" id="mobileTabMulti" role="tab" tabindex="-1" type="button">
+<img alt="" class="tab-icon" src="assets/icons/maltimode.svg"/>
+<span class="sr-only">共有モード</span>
+</button>
 </div>
 <div aria-label="モバイルショートカット" class="mobile-shortcuts" id="mobileShortcutsMount">
 </div>
@@ -196,7 +228,7 @@
 <div aria-hidden="true" aria-live="polite" class="zoom-indicator" id="zoomIndicator" role="status"></div>
 </div>
 </main>
-<aside aria-label="フレーム、レイヤー、設定、ファイル" class="rail rail--right" data-collapsed="false" data-compact="true" id="rightRail">
+<aside aria-label="フレーム、レイヤー、設定、ファイル、共有" class="rail rail--right" data-collapsed="false" data-compact="true" id="rightRail">
 <div aria-label="右パネル切り替え" class="rail-tabs" id="rightRailTabs" role="tablist">
 <button aria-controls="panelFrames" aria-label="フレームとレイヤー" aria-selected="true" class="rail-tab is-active" data-right-tab="frames" role="tab" title="フレームとレイヤー" type="button">
 <img alt="" class="tab-icon" src="assets/icons/menu-frame.png"/>
@@ -209,6 +241,10 @@
 <button aria-controls="panelFile" aria-label="ファイル" aria-selected="false" class="rail-tab" data-right-tab="file" role="tab" tabindex="-1" title="ファイル" type="button">
 <img alt="" class="tab-icon" src="assets/icons/menu-file.svg"/>
 <span class="sr-only">ファイル</span>
+</button>
+<button aria-controls="panelMulti" aria-label="共有モード" aria-selected="false" class="rail-tab" data-right-tab="multi" role="tab" tabindex="-1" title="共有モード" type="button">
+<img alt="" class="tab-icon" src="assets/icons/maltimode.svg"/>
+<span class="sr-only">共有モード</span>
 </button>
 </div>
   <div class="rail-tabpanes" id="rightRailPanes"></div>
@@ -244,6 +280,7 @@
 <div aria-labelledby="mobileTabFrames" class="mobile-panel" hidden="" id="mobilePanelFrames" role="tabpanel"></div>
 <div aria-labelledby="mobileTabSettings" class="mobile-panel" hidden="" id="mobilePanelSettings" role="tabpanel"></div>
 <div aria-labelledby="mobileTabFile" class="mobile-panel" hidden="" id="mobilePanelFile" role="tabpanel"></div>
+<div aria-labelledby="mobileTabMulti" class="mobile-panel" hidden="" id="mobilePanelMulti" role="tabpanel"></div>
 </div>
 </div>
 <section class="panel-section" data-section="tools" id="panelTools">
@@ -568,6 +605,65 @@
 <button class="chip" id="memoryClear" type="button">メモリ削除</button>
 </div>
 <div class="panel-ad-mount" data-panel-ad-mount="right"></div>
+</div>
+</section>
+<section class="panel-section" data-section="multi" id="panelMulti">
+<div class="panel-section__body">
+<div class="multi-entry-screen" id="multiEntryScreen">
+<button class="button" id="multiEntryMaster" type="button">マスター</button>
+<button class="button" id="multiEntryGuest" type="button">参加者</button>
+</div>
+<div class="multi-flow-panel" hidden id="multiFlowPanel">
+<div class="multi-flow-header">
+<button class="chip" id="multiBackToEntry" type="button">戻る</button>
+<p class="help-text" id="multiRoleLabel">共有設定</p>
+</div>
+<div class="field field--compact multi-project-key-field">
+<span>プロジェクトキー</span>
+<div class="multi-project-key-row">
+<input autocomplete="off" id="multiProjectKey" inputmode="text" maxlength="40" placeholder="例: room-1234" spellcheck="false" type="text"/>
+<button aria-label="プロジェクトキーをコピー" class="chip multi-project-key-copy" id="multiCopyKey" title="プロジェクトキーをコピー" type="button">コピー</button>
+</div>
+</div>
+<div class="field-group">
+<div class="multi-session-actions">
+<button class="button" id="multiStartSession" type="button">開始</button>
+<button class="button" id="multiLeaveSession" type="button">切断</button>
+</div>
+</div>
+<div class="field-group" data-multi-master-only="true">
+<button class="chip" id="multiGenerateKey" type="button">キー生成</button>
+<button class="chip" id="multiBroadcastState" type="button">全員に同期</button>
+</div>
+<p aria-live="polite" class="help-text" id="multiStatus">共有モード: OFF</p>
+<div class="field field--list">
+<span>参加者</span>
+<ul class="toggle-list" id="multiParticipants">
+<li class="help-text">未接続</li>
+</ul>
+</div>
+<div class="field field--list multi-assignment-field" data-multi-master-only="true">
+<span>参加者セル移動 (マスター)</span>
+<label class="field field--compact">
+<span>対象参加者</span>
+<select id="multiAssignTarget"></select>
+</label>
+<div class="field field--inline multi-assignment-inputs">
+<label class="field field--tiny">
+<span>フレーム</span>
+<input data-stepper="true" id="multiAssignFrame" inputmode="numeric" min="1" step="1" type="number" value="1"/>
+</label>
+<label class="field field--tiny">
+<span>レイヤー</span>
+<input data-stepper="true" id="multiAssignLayer" inputmode="numeric" min="1" step="1" type="number" value="1"/>
+</label>
+</div>
+<button class="button" id="multiAssignApply" type="button">参加者を移動</button>
+<p class="help-text" id="multiAssignHint">参加者ごとに 1 セルだけ割り当てます。同じセルには 1 人だけ配置できます。</p>
+</div>
+<p class="help-text">マスターがキャンバス設定とレイヤー順序を管理し、参加者は割当セル(フレーム×レイヤー)のみ描画できます。</p>
+<div class="panel-ad-mount" data-panel-ad-mount="right"></div>
+</div>
 </div>
 </section>
 <section class="panel-section" data-section="settings" id="panelSettings">
@@ -1132,7 +1228,7 @@
       };
       const sideSections = {
         left: ['panelTools', 'panelColor'],
-        right: ['panelFrames', 'panelSettings', 'panelFile'],
+        right: ['panelFrames', 'panelSettings', 'panelFile', 'panelMulti'],
       };
       if (!(ads.left instanceof HTMLElement) && !(ads.right instanceof HTMLElement)) return;
 
