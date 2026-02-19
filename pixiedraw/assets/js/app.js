@@ -1658,6 +1658,7 @@
       touchPanStart: null,
       touchPinchStartDistance: null,
       touchPinchStartScale: null,
+      touchPinchFocus: null,
       curveHandle: null,
       panCaptureElement: null,
     };
@@ -1670,7 +1671,7 @@
   const TOUCH_PAN_MIN_POINTERS = 2;
   const TOUCH_PINCH_SENSITIVITY = 1.45;
   const TOUCH_PINCH_DEADZONE_RATIO = 0.008;
-  const TOUCH_PINCH_MAX_STEP_RATIO = 1.18;
+  const TOUCH_PINCH_MAX_GESTURE_RATIO = 6;
   const TOUCH_PINCH_MIN_RATIO = 0.05;
   const activeTouchPointers = new Map();
   const keyboardState = {
@@ -2775,6 +2776,10 @@
     pointerState.path = [];
     pointerState.startClient = null;
     pointerState.panOrigin = { x: 0, y: 0 };
+    pointerState.touchPanStart = null;
+    pointerState.touchPinchStartDistance = null;
+    pointerState.touchPinchStartScale = null;
+    pointerState.touchPinchFocus = null;
     hoverPixel = null;
     if (state.showVirtualCursor && !virtualCursor) {
       virtualCursor = createInitialVirtualCursor();
@@ -18829,6 +18834,7 @@
     pointerState.touchPanStart = null;
     pointerState.touchPinchStartDistance = null;
     pointerState.touchPinchStartScale = null;
+    pointerState.touchPinchFocus = null;
     pointerState.curveHandle = null;
     pointerState.panCaptureElement = null;
     document.body.classList.remove('is-pan-dragging');
@@ -18857,6 +18863,7 @@
     pointerState.touchPanStart = null;
     pointerState.touchPinchStartDistance = null;
     pointerState.touchPinchStartScale = null;
+    pointerState.touchPinchFocus = null;
     pointerState.curveHandle = null;
     pointerState.panOrigin = { x: state.pan.x, y: state.pan.y };
     pointerState.panCaptureElement = null;
@@ -18922,11 +18929,32 @@
     return Math.hypot(first.x - second.x, first.y - second.y);
   }
 
-  function refreshTouchPanBaseline() {
-    pointerState.touchPanStart = getTouchCentroid();
+  function getTouchPinchFocusForCentroid(centroid) {
+    const nextCentroid = centroid || getTouchCentroid();
+    if (!nextCentroid) {
+      return null;
+    }
+    const focus = getCanvasFocusAt(nextCentroid.x, nextCentroid.y, { clampToCanvas: true });
+    if (!focus) {
+      return null;
+    }
+    return {
+      worldX: focus.worldX,
+      worldY: focus.worldY,
+      cellX: focus.cellX,
+      cellY: focus.cellY,
+    };
+  }
+
+  function refreshTouchPanBaseline({ resetPinchFocus = true } = {}) {
+    const centroid = getTouchCentroid();
+    pointerState.touchPanStart = centroid;
     pointerState.panOrigin = { x: state.pan.x, y: state.pan.y };
     pointerState.touchPinchStartDistance = getTouchPointerDistance();
     pointerState.touchPinchStartScale = Number(state.scale) || MIN_ZOOM_SCALE;
+    if (resetPinchFocus) {
+      pointerState.touchPinchFocus = getTouchPinchFocusForCentroid(centroid);
+    }
   }
 
   function startPanInteraction(event, { multiTouch = false, captureElement = dom.canvases.drawing } = {}) {
@@ -18943,11 +18971,12 @@
     if (multiTouch) {
       pointerState.pointerId = null;
       pointerState.startClient = null;
-      refreshTouchPanBaseline();
+      refreshTouchPanBaseline({ resetPinchFocus: true });
       if (!pointerState.touchPanStart) {
         pointerState.touchPanStart = { x: event.clientX, y: event.clientY };
         pointerState.touchPinchStartDistance = null;
         pointerState.touchPinchStartScale = Number(state.scale) || MIN_ZOOM_SCALE;
+        pointerState.touchPinchFocus = getTouchPinchFocusForCentroid(pointerState.touchPanStart);
       }
       pointerState.panCaptureElement = null;
     } else {
@@ -18956,6 +18985,7 @@
       pointerState.touchPanStart = null;
       pointerState.touchPinchStartDistance = null;
       pointerState.touchPinchStartScale = null;
+      pointerState.touchPinchFocus = null;
       const captureTarget = captureElement && typeof captureElement.setPointerCapture === 'function'
         ? captureElement
         : dom.canvases.drawing;
@@ -18992,6 +19022,7 @@
     pointerState.touchPanStart = null;
     pointerState.touchPinchStartDistance = null;
     pointerState.touchPinchStartScale = null;
+    pointerState.touchPinchFocus = null;
     pointerState.startClient = null;
     pointerState.path = [];
     pointerState.drawPaletteIndex = null;
@@ -19314,7 +19345,7 @@
           return;
         }
         if (!pointerState.touchPanStart) {
-          refreshTouchPanBaseline();
+          refreshTouchPanBaseline({ resetPinchFocus: true });
         }
         const centroid = getTouchCentroid();
         if (!centroid || !pointerState.touchPanStart) {
@@ -19324,8 +19355,7 @@
         const baselinePan = pointerState.panOrigin || { x: state.pan.x, y: state.pan.y };
         const dx = centroid.x - baselineCentroid.x;
         const dy = centroid.y - baselineCentroid.y;
-        let panBaseX = baselinePan.x || 0;
-        let panBaseY = baselinePan.y || 0;
+        let pinchGestureActive = false;
 
         const baselineDistance = Number(pointerState.touchPinchStartDistance);
         const nextDistance = Number(getTouchPointerDistance());
@@ -19334,30 +19364,34 @@
           const rawRatio = nextDistance / baselineDistance;
           const cappedRatio = clamp(
             rawRatio,
-            1 / TOUCH_PINCH_MAX_STEP_RATIO,
-            TOUCH_PINCH_MAX_STEP_RATIO
+            1 / TOUCH_PINCH_MAX_GESTURE_RATIO,
+            TOUCH_PINCH_MAX_GESTURE_RATIO
           );
           const ratioDelta = Math.abs(cappedRatio - 1);
+          pinchGestureActive = ratioDelta >= TOUCH_PINCH_DEADZONE_RATIO;
           const amplifiedRatio = 1 + ((cappedRatio - 1) * TOUCH_PINCH_SENSITIVITY);
           const targetScale = normalizeZoomScale(
             baselineScale * Math.max(TOUCH_PINCH_MIN_RATIO, amplifiedRatio),
             Number(state.scale) || baselineScale
           );
-          if (ratioDelta >= TOUCH_PINCH_DEADZONE_RATIO && Math.abs(targetScale - (Number(state.scale) || MIN_ZOOM_SCALE)) >= ZOOM_EPSILON) {
-            const pinchFocus = state.showVirtualCursor
-              ? (getVirtualCursorZoomFocus() || getCanvasFocusAt(centroid.x, centroid.y, { clampToCanvas: true }))
-              : getCanvasFocusAt(centroid.x, centroid.y, { clampToCanvas: true });
+          if (pinchGestureActive && Math.abs(targetScale - (Number(state.scale) || MIN_ZOOM_SCALE)) >= ZOOM_EPSILON) {
+            const pinchFocus = pointerState.touchPinchFocus || getTouchPinchFocusForCentroid(baselineCentroid);
+            if (pinchFocus) {
+              pointerState.touchPinchFocus = pinchFocus;
+            }
             setZoom(targetScale, pinchFocus || undefined);
-            panBaseX = Number(state.pan.x) || panBaseX;
-            panBaseY = Number(state.pan.y) || panBaseY;
           }
         }
 
-        state.pan.x = Math.round(panBaseX + dx);
-        state.pan.y = Math.round(panBaseY + dy);
+        // Keep pinch-zoom stable by freezing centroid translation while scaling.
+        if (pinchGestureActive) {
+          updateVirtualCursorFromEvent(event);
+          return;
+        }
+        state.pan.x = Math.round((baselinePan.x || 0) + dx);
+        state.pan.y = Math.round((baselinePan.y || 0) + dy);
         applyViewportTransform();
         updateVirtualCursorFromEvent(event);
-        refreshTouchPanBaseline();
         return;
       }
       if (event.pointerId !== pointerState.pointerId) return;
