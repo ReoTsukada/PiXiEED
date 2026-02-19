@@ -408,6 +408,7 @@
   const DEFAULT_IMPORT_FRAME_DURATION = 1000 / 12;
   const IMPORT_FRAME_DURATION_MIN_MS = 16;
   const IMPORT_FRAME_DURATION_MAX_MS = 2000;
+  const IMPORT_INTEGER_SCALE_SAMPLE_GRID = 8;
 
   const DEFAULT_CANVAS_SIZE = 32;
   const MIN_CANVAS_SIZE = 1;
@@ -4221,7 +4222,7 @@
   }
 
   function handleCurvePointerMove(event) {
-    const position = getPointerPosition(event);
+    const position = getPointerPosition(event, { clampToCanvas: true });
     if (!position || !curveBuilder) return;
     pointerState.current = position;
     if (curveBuilder.stage === 'line') {
@@ -4244,7 +4245,7 @@
     }
     window.removeEventListener('pointermove', handlePointerMove);
     window.removeEventListener('pointerup', handlePointerUp);
-    const position = getPointerPosition(event) || pointerState.current || curveBuilder.end;
+    const position = getPointerPosition(event, { clampToCanvas: true }) || pointerState.current || curveBuilder.end;
     if (curveBuilder.stage === 'line') {
       const start = curveBuilder.start;
       curveBuilder.end = position;
@@ -5962,7 +5963,7 @@
     return clamp(Math.round(numeric), IMPORT_FRAME_DURATION_MIN_MS, IMPORT_FRAME_DURATION_MAX_MS);
   }
 
-  function resolveImageImportTargetSize(width, height) {
+  function resolveImageImportTargetSize(width, height, { integerScaleFactor = 1 } = {}) {
     const sourceWidth = Math.max(1, Math.floor(Number(width) || 0));
     const sourceHeight = Math.max(1, Math.floor(Number(height) || 0));
     if (!sourceWidth || !sourceHeight) {
@@ -5971,25 +5972,220 @@
     if (sourceWidth > MAX_IMAGE_IMPORT_SOURCE_SIZE || sourceHeight > MAX_IMAGE_IMPORT_SOURCE_SIZE) {
       throw createImageImportError(`読み込み元画像は最大 ${MAX_IMAGE_IMPORT_SOURCE_SIZE}px までです`);
     }
-    if (sourceWidth <= MAX_CANVAS_SIZE && sourceHeight <= MAX_CANVAS_SIZE) {
+    const normalizedScaleFactor = Math.max(1, Math.floor(Number(integerScaleFactor) || 1));
+    const autoIntegerScaled = normalizedScaleFactor > 1
+      && sourceWidth % normalizedScaleFactor === 0
+      && sourceHeight % normalizedScaleFactor === 0;
+    const effectiveSourceWidth = autoIntegerScaled
+      ? Math.max(1, Math.floor(sourceWidth / normalizedScaleFactor))
+      : sourceWidth;
+    const effectiveSourceHeight = autoIntegerScaled
+      ? Math.max(1, Math.floor(sourceHeight / normalizedScaleFactor))
+      : sourceHeight;
+    if (effectiveSourceWidth <= MAX_CANVAS_SIZE && effectiveSourceHeight <= MAX_CANVAS_SIZE) {
       return {
         sourceWidth,
         sourceHeight,
-        width: sourceWidth,
-        height: sourceHeight,
-        scaled: false,
+        width: effectiveSourceWidth,
+        height: effectiveSourceHeight,
+        scaled: autoIntegerScaled,
+        integerScaleFactor: autoIntegerScaled ? normalizedScaleFactor : 1,
       };
     }
-    const ratio = Math.min(MAX_CANVAS_SIZE / sourceWidth, MAX_CANVAS_SIZE / sourceHeight);
-    const widthScaled = clamp(Math.floor(sourceWidth * ratio), 1, MAX_CANVAS_SIZE);
-    const heightScaled = clamp(Math.floor(sourceHeight * ratio), 1, MAX_CANVAS_SIZE);
+    const ratio = Math.min(MAX_CANVAS_SIZE / effectiveSourceWidth, MAX_CANVAS_SIZE / effectiveSourceHeight);
+    const widthScaled = clamp(Math.floor(effectiveSourceWidth * ratio), 1, MAX_CANVAS_SIZE);
+    const heightScaled = clamp(Math.floor(effectiveSourceHeight * ratio), 1, MAX_CANVAS_SIZE);
     return {
       sourceWidth,
       sourceHeight,
       width: widthScaled,
       height: heightScaled,
-      scaled: widthScaled !== sourceWidth || heightScaled !== sourceHeight,
+      scaled: widthScaled !== sourceWidth
+        || heightScaled !== sourceHeight
+        || autoIntegerScaled,
+      integerScaleFactor: autoIntegerScaled ? normalizedScaleFactor : 1,
     };
+  }
+
+  function getImageImportCheckFrameIndexes(frameCount) {
+    const total = Math.max(0, Math.floor(Number(frameCount) || 0));
+    if (total <= 0) {
+      return [];
+    }
+    if (total === 1) {
+      return [0];
+    }
+    const indexes = [0, Math.floor((total - 1) / 2), total - 1];
+    const seen = new Set();
+    const output = [];
+    for (let i = 0; i < indexes.length; i += 1) {
+      const index = indexes[i];
+      if (seen.has(index)) {
+        continue;
+      }
+      seen.add(index);
+      output.push(index);
+    }
+    return output;
+  }
+
+  function getGreatestCommonDivisor(a, b) {
+    let x = Math.abs(Math.floor(Number(a) || 0));
+    let y = Math.abs(Math.floor(Number(b) || 0));
+    if (!x || !y) {
+      return 0;
+    }
+    while (y !== 0) {
+      const next = x % y;
+      x = y;
+      y = next;
+    }
+    return x;
+  }
+
+  function quickCheckImageDataNearestUpscale(imageData, factor) {
+    if (!imageData || !(imageData.data instanceof Uint8ClampedArray)) {
+      return false;
+    }
+    const width = Math.max(1, Math.floor(Number(imageData.width) || 0));
+    const height = Math.max(1, Math.floor(Number(imageData.height) || 0));
+    const scale = Math.max(1, Math.floor(Number(factor) || 1));
+    if (scale <= 1 || width % scale !== 0 || height % scale !== 0) {
+      return false;
+    }
+    const data = imageData.data;
+    const sampleCols = Math.max(1, Math.min(IMPORT_INTEGER_SCALE_SAMPLE_GRID, Math.floor(width / scale)));
+    const sampleRows = Math.max(1, Math.min(IMPORT_INTEGER_SCALE_SAMPLE_GRID, Math.floor(height / scale)));
+    const stepX = width / sampleCols;
+    const stepY = height / sampleRows;
+    for (let row = 0; row < sampleRows; row += 1) {
+      const sampleY = Math.min(height - 1, Math.floor((row + 0.5) * stepY));
+      const blockY = Math.floor(sampleY / scale) * scale;
+      for (let col = 0; col < sampleCols; col += 1) {
+        const sampleX = Math.min(width - 1, Math.floor((col + 0.5) * stepX));
+        const blockX = Math.floor(sampleX / scale) * scale;
+        const sampleBase = (sampleY * width + sampleX) * 4;
+        const blockBase = (blockY * width + blockX) * 4;
+        if (
+          data[sampleBase] !== data[blockBase]
+          || data[sampleBase + 1] !== data[blockBase + 1]
+          || data[sampleBase + 2] !== data[blockBase + 2]
+          || data[sampleBase + 3] !== data[blockBase + 3]
+        ) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  function isImageDataNearestNeighborUpscaled(imageData, factor) {
+    if (!imageData || !(imageData.data instanceof Uint8ClampedArray)) {
+      return false;
+    }
+    const width = Math.max(1, Math.floor(Number(imageData.width) || 0));
+    const height = Math.max(1, Math.floor(Number(imageData.height) || 0));
+    const scale = Math.max(1, Math.floor(Number(factor) || 1));
+    if (scale <= 1 || width % scale !== 0 || height % scale !== 0) {
+      return false;
+    }
+    const data = imageData.data;
+    let hasInterBlockDifference = false;
+    const stride = width * 4;
+    for (let blockY = 0; blockY < height; blockY += scale) {
+      for (let blockX = 0; blockX < width; blockX += scale) {
+        const blockBase = (blockY * width + blockX) * 4;
+        const r = data[blockBase];
+        const g = data[blockBase + 1];
+        const b = data[blockBase + 2];
+        const a = data[blockBase + 3];
+        if (!hasInterBlockDifference) {
+          if (blockX >= scale) {
+            const leftBase = blockBase - (scale * 4);
+            if (
+              data[leftBase] !== r
+              || data[leftBase + 1] !== g
+              || data[leftBase + 2] !== b
+              || data[leftBase + 3] !== a
+            ) {
+              hasInterBlockDifference = true;
+            }
+          }
+          if (!hasInterBlockDifference && blockY >= scale) {
+            const topBase = blockBase - (scale * stride);
+            if (
+              data[topBase] !== r
+              || data[topBase + 1] !== g
+              || data[topBase + 2] !== b
+              || data[topBase + 3] !== a
+            ) {
+              hasInterBlockDifference = true;
+            }
+          }
+        }
+        for (let localY = 0; localY < scale; localY += 1) {
+          let pixelBase = ((blockY + localY) * width + blockX) * 4;
+          for (let localX = 0; localX < scale; localX += 1) {
+            if (
+              data[pixelBase] !== r
+              || data[pixelBase + 1] !== g
+              || data[pixelBase + 2] !== b
+              || data[pixelBase + 3] !== a
+            ) {
+              return false;
+            }
+            pixelBase += 4;
+          }
+        }
+      }
+    }
+    return hasInterBlockDifference;
+  }
+
+  function detectNearestNeighborIntegerScaleForFrames(frames, width, height) {
+    if (!Array.isArray(frames) || !frames.length) {
+      return 1;
+    }
+    const sourceWidth = Math.max(1, Math.floor(Number(width) || 0));
+    const sourceHeight = Math.max(1, Math.floor(Number(height) || 0));
+    const gcd = getGreatestCommonDivisor(sourceWidth, sourceHeight);
+    if (gcd < 2) {
+      return 1;
+    }
+    const frameIndexes = getImageImportCheckFrameIndexes(frames.length);
+    if (!frameIndexes.length) {
+      return 1;
+    }
+    for (let factor = gcd; factor >= 2; factor -= 1) {
+      if (gcd % factor !== 0) {
+        continue;
+      }
+      let quickValid = true;
+      for (let i = 0; i < frameIndexes.length; i += 1) {
+        const frameInfo = frames[frameIndexes[i]];
+        const imageData = frameInfo?.imageData;
+        if (!quickCheckImageDataNearestUpscale(imageData, factor)) {
+          quickValid = false;
+          break;
+        }
+      }
+      if (!quickValid) {
+        continue;
+      }
+      let fullValid = true;
+      for (let i = 0; i < frameIndexes.length; i += 1) {
+        const frameInfo = frames[frameIndexes[i]];
+        const imageData = frameInfo?.imageData;
+        if (!isImageDataNearestNeighborUpscaled(imageData, factor)) {
+          fullValid = false;
+          break;
+        }
+      }
+      if (fullValid) {
+        return factor;
+      }
+    }
+    return 1;
   }
 
   function createImageDataFromPixels(pixels, width, height) {
@@ -6161,7 +6357,8 @@
       throw createImageImportError('画像サイズが不正です');
     }
 
-    const importSize = resolveImageImportTargetSize(inferredWidth, inferredHeight);
+    const integerScaleFactor = detectNearestNeighborIntegerScaleForFrames(framesData, inferredWidth, inferredHeight);
+    const importSize = resolveImageImportTargetSize(inferredWidth, inferredHeight, { integerScaleFactor });
     const width = importSize.width;
     const height = importSize.height;
     const normalizedFramesData = importSize.scaled
@@ -6317,8 +6514,11 @@
       });
     } else {
       if (importSize.scaled) {
+        const integerScaleLabel = importSize.integerScaleFactor > 1
+          ? ` / 整数倍縮小 x${importSize.integerScaleFactor}`
+          : '';
         updateAutosaveStatus(
-          `画像を読み込みました (${importSize.sourceWidth}x${importSize.sourceHeight} → ${width}x${height})`,
+          `画像を読み込みました (${importSize.sourceWidth}x${importSize.sourceHeight} → ${width}x${height}${integerScaleLabel})`,
           'success'
         );
       } else {
@@ -19178,7 +19378,7 @@
       return;
     }
 
-    const position = getPointerPosition(event);
+    const position = getPointerPosition(event, { clampToCanvas: true });
     if (!position) return;
     pointerState.current = position;
     pointerState.path.push(position);
@@ -20473,10 +20673,26 @@
     return true;
   }
 
-  function getPointerPosition(event) {
+  function getPointerPosition(event, { clampToCanvas = false } = {}) {
+    if (!dom.canvases.drawing) {
+      return null;
+    }
     const rect = dom.canvases.drawing.getBoundingClientRect();
-    const x = Math.floor(((event.clientX - rect.left) / rect.width) * state.width);
-    const y = Math.floor(((event.clientY - rect.top) / rect.height) * state.height);
+    if (!(rect.width > 0) || !(rect.height > 0)) {
+      return null;
+    }
+    const rawX = ((event.clientX - rect.left) / rect.width) * state.width;
+    const rawY = ((event.clientY - rect.top) / rect.height) * state.height;
+    if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) {
+      return null;
+    }
+    let x = Math.floor(rawX);
+    let y = Math.floor(rawY);
+    if (clampToCanvas) {
+      x = clamp(x, 0, Math.max(0, state.width - 1));
+      y = clamp(y, 0, Math.max(0, state.height - 1));
+      return { x, y };
+    }
     if (x < 0 || y < 0 || x >= state.width || y >= state.height) return null;
     return { x, y };
   }
@@ -26420,7 +26636,8 @@
   function normalizeZoomScale(value, fallback = MIN_ZOOM_SCALE) {
     const base = Number.isFinite(value) ? Number(value) : Number(fallback);
     const effective = Number.isFinite(base) ? base : MIN_ZOOM_SCALE;
-    return clamp(effective, MIN_ZOOM_SCALE, MAX_ZOOM_SCALE);
+    const clamped = clamp(effective, MIN_ZOOM_SCALE, MAX_ZOOM_SCALE);
+    return getZoomScaleAtIndex(getZoomStepIndex(clamped));
   }
 
   function formatZoomLabel(scale) {
