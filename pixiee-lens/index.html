@@ -2938,6 +2938,8 @@
     const LENS_AD_CLIENT = 'ca-pub-9801602250480253';
     const LENS_AD_FALLBACK_SLOT = '2141591954';
     const CAMERA_READY_TIMEOUT_MS = 5000;
+    const CAMERA_REQUEST_TIMEOUT_MS = 7000;
+    const CAMERA_PLAY_TIMEOUT_MS = 5000;
     const CAPTURE_LONG_PRESS_MS = 360;
     const GIF_CAPTURE_DEFAULT_FPS = 10;
     const GIF_CAPTURE_FPS_OPTIONS = Object.freeze([5, 8, 10, 20, 30]);
@@ -3032,7 +3034,9 @@
     }
     if (video) {
       video.setAttribute('playsinline', '');
+      video.setAttribute('webkit-playsinline', '');
       video.setAttribute('autoplay', '');
+      video.setAttribute('muted', '');
       video.muted = true;
       video.playsInline = true;
     }
@@ -5676,6 +5680,76 @@
         video.addEventListener('canplay', onLoaded, { once: true });
         video.addEventListener('error', onError, { once: true });
       });
+    }
+
+    function createCameraTimeoutError(name, message) {
+      const error = new Error(message);
+      error.name = name;
+      return error;
+    }
+
+    function isCameraPermissionError(error) {
+      return Boolean(error && (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError'));
+    }
+
+    function getUserMediaWithTimeout(constraints, timeout = CAMERA_REQUEST_TIMEOUT_MS) {
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+        return Promise.reject(createCameraTimeoutError('NotSupportedError', 'CameraAPINotSupported'));
+      }
+      const safeTimeout = Math.max(1200, Number(timeout) || CAMERA_REQUEST_TIMEOUT_MS);
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        const timer = window.setTimeout(() => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          reject(createCameraTimeoutError('TimeoutError', 'CameraRequestTimeout'));
+        }, safeTimeout);
+
+        navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
+          if (settled) {
+            if (stream && typeof stream.getTracks === 'function') {
+              stream.getTracks().forEach((track) => track.stop());
+            }
+            return;
+          }
+          settled = true;
+          clearTimeout(timer);
+          resolve(stream);
+        }).catch((error) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          clearTimeout(timer);
+          reject(error);
+        });
+      });
+    }
+
+    async function playVideoWithTimeout(timeout = CAMERA_PLAY_TIMEOUT_MS) {
+      if (!video || typeof video.play !== 'function') {
+        throw createCameraTimeoutError('NotSupportedError', 'VideoElementUnavailable');
+      }
+      const playPromise = video.play();
+      if (!playPromise || typeof playPromise.then !== 'function') {
+        return;
+      }
+      const safeTimeout = Math.max(1200, Number(timeout) || CAMERA_PLAY_TIMEOUT_MS);
+      let timer = null;
+      const timeoutPromise = new Promise((_, reject) => {
+        timer = window.setTimeout(() => {
+          reject(createCameraTimeoutError('TimeoutError', 'VideoPlayTimeout'));
+        }, safeTimeout);
+      });
+      try {
+        await Promise.race([playPromise, timeoutPromise]);
+      } finally {
+        if (timer !== null) {
+          clearTimeout(timer);
+        }
+      }
     }
 
     async function handleCameraStartRequest() {
@@ -10893,10 +10967,13 @@
         let lastError = null;
         for (const constraints of constraintCandidates) {
           try {
-            stream = await navigator.mediaDevices.getUserMedia(constraints);
+            stream = await getUserMediaWithTimeout(constraints);
             break;
           } catch (error) {
             lastError = error;
+            if (isCameraPermissionError(error)) {
+              break;
+            }
           }
         }
         if (!stream) {
@@ -10923,7 +11000,7 @@
         }
         updateZoomSliderAvailability();
         try {
-          await video.play();
+          await playVideoWithTimeout();
         } catch (playError) {
           throw playError instanceof Error ? playError : new Error('Camera playback failed');
         }
@@ -10946,11 +11023,14 @@
         success = true;
       } catch (error) {
         console.error(error);
-        const isPermissionError = error && (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError');
+        const isPermissionError = isCameraPermissionError(error);
+        const isTimeoutError = Boolean(error && error.name === 'TimeoutError');
         cameraPermissionDenied = Boolean(isPermissionError);
         cameraReady = false;
         const errorDetail = error && error.name ? ` (${error.name}${error.message ? `: ${error.message}` : ''})` : '';
-        failureMessage = cameraPermissionDenied
+        failureMessage = isTimeoutError
+          ? `カメラ起動がタイムアウトしました。もう一度「カメラを起動」を押してください。改善しない場合はアプリを再起動し、Safariの通常タブでもお試しください。${errorDetail}`
+          : cameraPermissionDenied
           ? `カメラへのアクセスが許可されませんでした。設定アプリで「PiXiEELENS」のカメラを有効にしてください。${errorDetail}`
           : `カメラにアクセスできませんでした。端末の設定をご確認ください。${errorDetail}`;
         setStatus(failureMessage);
