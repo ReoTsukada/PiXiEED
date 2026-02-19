@@ -4,19 +4,46 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
-<title>PiXiEELENS</title>
+<title>PiXiEELENS（ピクシーレンズ） | ドット絵カメラ</title>
 <meta content="カメラで身の回りのものをドット絵変換。ブラウザでドット化・ピクセル化してレトロ写真が撮れるドット絵カメラです。PiXiEEDrawで編集も可能。" name="description"/>
 <meta content="noindex,follow" name="robots"/>
+<link rel="canonical" href="https://pixieed.jp/projects/pixiee-lens/"/>
 <meta content="#0b1224" name="theme-color"/>
 <meta content="website" property="og:type"/>
+<meta content="PiXiEED" property="og:site_name"/>
+<meta content="ja_JP" property="og:locale"/>
 <meta content="PiXiEELENS" property="og:title"/>
 <meta content="カメラで身の回りのものをドット絵変換。ブラウザでドット化・ピクセル化してレトロ写真が撮れるドット絵カメラです。PiXiEEDrawで編集も可能。" property="og:description"/>
 <meta content="https://pixieed.jp/pixiee-lens/ogp.png" property="og:image"/>
 <meta content="https://pixieed.jp/pixiee-lens/" property="og:url"/>
 <meta content="summary_large_image" name="twitter:card"/>
+<meta content="@PiXiEED_arta" name="twitter:site"/>
+<meta content="https://pixieed.jp/pixiee-lens/" name="twitter:url"/>
 <meta content="PiXiEELENS" name="twitter:title"/>
 <meta content="カメラで身の回りのものをドット絵変換。ブラウザでドット化・ピクセル化してレトロ写真が撮れるドット絵カメラです。PiXiEEDrawで編集も可能。" name="twitter:description"/>
 <meta content="https://pixieed.jp/pixiee-lens/ogp.png" name="twitter:image"/>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "PiXiEELENS",
+  "applicationCategory": "MultimediaApplication",
+  "operatingSystem": "Web",
+  "url": "https://pixieed.jp/pixiee-lens/",
+  "image": "https://pixieed.jp/pixiee-lens/ogp.png",
+  "description": "カメラで身の回りのものをドット絵変換。ブラウザでドット化・ピクセル化してレトロ写真が撮れるドット絵カメラです。",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "JPY"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "PiXiEED",
+    "url": "https://pixieed.jp/"
+  }
+}
+</script>
 <meta content="20241102-01" name="build-version"/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -70,6 +97,9 @@
       --vv-offset-bottom: 0px;
       --vv-offset-left: 0px;
       --lens-ad-aspect-ratio: 6.4; /* 320:50 */
+      --lens-ad-landscape-aspect-ratio: 3.2; /* 320:100 */
+      --lens-ad-landscape-min-width: 96px;
+      --lens-ad-landscape-max-width: 160px;
       --lens-ad-inline-padding: 6px;
       --lens-ad-banner-width: calc(var(--viewport-width) - var(--safe-left) - var(--safe-right) - (var(--lens-ad-inline-padding) * 2));
       --lens-ad-banner-height: max(50px, calc(var(--lens-ad-banner-width) / var(--lens-ad-aspect-ratio)));
@@ -390,7 +420,11 @@
     body.is-landscape {
       --ad-header-offset: 0px;
       --lens-ad-banner-height: calc(var(--viewport-height) - var(--safe-top) - var(--safe-bottom) - (var(--lens-ad-inline-padding) * 2));
-      --lens-ad-banner-width: max(50px, calc(var(--lens-ad-banner-height) / var(--lens-ad-aspect-ratio)));
+      --lens-ad-banner-width: clamp(
+        var(--lens-ad-landscape-min-width),
+        calc(var(--lens-ad-banner-height) / var(--lens-ad-landscape-aspect-ratio)),
+        min(var(--lens-ad-landscape-max-width), calc(var(--viewport-width) * 0.34))
+      );
       --ad-side-offset: calc(var(--lens-ad-banner-width) + var(--lens-ad-banner-gap));
     }
     body.is-landscape .lens-ad-banner {
@@ -431,7 +465,11 @@
       :root {
         --ad-header-offset: 0px;
         --lens-ad-banner-height: calc(var(--viewport-height) - var(--safe-top) - var(--safe-bottom) - (var(--lens-ad-inline-padding) * 2));
-        --lens-ad-banner-width: max(50px, calc(var(--lens-ad-banner-height) / var(--lens-ad-aspect-ratio)));
+        --lens-ad-banner-width: clamp(
+          var(--lens-ad-landscape-min-width),
+          calc(var(--lens-ad-banner-height) / var(--lens-ad-landscape-aspect-ratio)),
+          min(var(--lens-ad-landscape-max-width), calc(var(--viewport-width) * 0.34))
+        );
         --ad-side-offset: calc(var(--lens-ad-banner-width) + var(--lens-ad-banner-gap));
       }
       .lens-ad-banner {
@@ -2941,7 +2979,8 @@
     };
     let zoomMeterCollapseTimeout = null;
     let lensAdRefreshTimer = null;
-    let lensAdOrientationKey = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+    let lensAdOrientationKey = getViewportOrientationKey();
+    let lensAdSizeKey = getLensAdSizeKey();
     if (zoomSlider) {
       zoomSlider.addEventListener('focus', () => {
         setZoomMeterExpanded(true);
@@ -4998,11 +5037,43 @@
       }
     }
 
+    function getViewportOrientationKey() {
+      const viewportWidth = Math.max(
+        1,
+        Number((window.visualViewport && window.visualViewport.width) || window.innerWidth || 0)
+      );
+      const viewportHeight = Math.max(
+        1,
+        Number((window.visualViewport && window.visualViewport.height) || window.innerHeight || 0)
+      );
+      return viewportWidth > viewportHeight ? 'landscape' : 'portrait';
+    }
+
+    function getLensAdSizeKey() {
+      if (!lensAdBlock) {
+        return '';
+      }
+      const rect = lensAdBlock.getBoundingClientRect();
+      const width = Number(rect && rect.width) || 0;
+      const height = Number(rect && rect.height) || 0;
+      if (width <= 0 || height <= 0) {
+        return '';
+      }
+      const widthBucket = Math.max(1, Math.round(Math.round(width) / 8) * 8);
+      const heightBucket = Math.max(1, Math.round(Math.round(height) / 8) * 8);
+      return `${widthBucket}x${heightBucket}`;
+    }
+
     function refreshLensBannerAdForOrientation(orientationKey) {
-      if (!lensAdBlock || !orientationKey || orientationKey === lensAdOrientationKey) {
+      if (!lensAdBlock || !orientationKey) {
+        return;
+      }
+      const nextSizeKey = getLensAdSizeKey();
+      if (orientationKey === lensAdOrientationKey && nextSizeKey === lensAdSizeKey) {
         return;
       }
       lensAdOrientationKey = orientationKey;
+      lensAdSizeKey = nextSizeKey;
       if (lensAdRefreshTimer) {
         clearTimeout(lensAdRefreshTimer);
       }
@@ -5017,8 +5088,8 @@
       if (!captureBtn || !captureButtonOriginalParent) {
         return;
       }
-      const isLandscape = window.innerWidth > window.innerHeight;
-      const orientationKey = isLandscape ? 'landscape' : 'portrait';
+      const orientationKey = getViewportOrientationKey();
+      const isLandscape = orientationKey === 'landscape';
       if (isLandscape) {
         document.body.classList.add('is-landscape');
         if (landscapeCaptureSlot) {
