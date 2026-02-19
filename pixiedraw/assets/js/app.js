@@ -192,6 +192,8 @@
       multiAssignFrame: document.getElementById('multiAssignFrame'),
       multiAssignLayer: document.getElementById('multiAssignLayer'),
       multiAssignApply: document.getElementById('multiAssignApply'),
+      multiAssignLockToggle: document.getElementById('multiAssignLockToggle'),
+      multiAssignKick: document.getElementById('multiAssignKick'),
       multiAssignHint: document.getElementById('multiAssignHint'),
       multiMasterOnlyGroups: Array.from(document.querySelectorAll('[data-multi-master-only]')),
     },
@@ -551,6 +553,18 @@
   const EXPORT_INTERSTITIAL_COOLDOWN_MS = 45 * 1000;
   const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
     Object.freeze({
+      id: '2026-02-19-multi-beta-and-ui',
+      at: '2026-02-19T12:00:00+09:00',
+      title: '共有モード追加とUI更新',
+      details: Object.freeze([
+        '共有モード（マルチ）を追加: マスター/参加者の役割分離、参加時のセル割当、差分パッチ同期に対応。',
+        '共有モードの導線を改善: 役割選択フロー、プロジェクトキー入力欄、キーコピー操作を調整。',
+        '共有モードタブのアイコンを更新。',
+        '範囲選択時のコピー/貼り付けボタンを、PC・横画面でも左上に表示するよう変更。',
+        '共有モード（マルチ）はテスト中のため、今後仕様を調整する場合があります。',
+      ]),
+    }),
+    Object.freeze({
       id: '2026-02-18-ui-layout-stability',
       at: '2026-02-18T12:00:00+09:00',
       title: 'UI整理とレイアウト安定化',
@@ -673,6 +687,8 @@
   const EXPORT_DIRECTORY_HANDLE_KEY = 'exportDirectory';
   const EXPORT_WORKSPACE_DIR_NAME = 'PiXiEED';
   const EXPORT_DIRECTORY_PICKER_ID = 'pixieed-export-directory';
+  const PIXIEED_NICKNAME_STORAGE_KEY = 'pixieed_nickname';
+  const DEFAULT_MULTI_PARTICIPANT_NAME = '名無し';
   const MULTI_PROJECT_KEY_STORAGE_KEY = 'pixieedraw:multi-project-key';
   const MULTI_CLIENT_ID_STORAGE_KEY = 'pixieedraw:multi-client-id';
   const MULTI_RESUME_STORAGE_KEY = 'pixieedraw:multi-resume';
@@ -788,7 +804,11 @@
     pendingSessionStateTimer: null,
     selectedAssignClientId: '',
     resumeAssignments: null,
+    resumeBlockedClientIds: null,
     layerPatchSnapshots: new Map(),
+    blockedClientIds: new Set(),
+    awaitingGuestStateRecovery: false,
+    guestStateRecoveryTimer: null,
   };
   let multiSupabaseClientPromise = null;
 
@@ -5800,6 +5820,10 @@
   }
 
   async function openDocumentDialog() {
+    if (!canCurrentClientImportExternalData()) {
+      setMultiStatus('参加モードでは読み込み/インポートはマスターのみ操作できます', 'warn');
+      return false;
+    }
     if (typeof window.showOpenFilePicker === 'function') {
       try {
         const [handle] = await window.showOpenFilePicker({
@@ -15020,6 +15044,7 @@
         role: assignment?.role === 'master' ? 'master' : 'guest',
         name: typeof assignment?.name === 'string' ? assignment.name.trim().slice(0, 32) : '',
         color: getMultiAssignmentColorForClient(clientId),
+        locked: Boolean(assignment?.locked),
       });
     });
     return map;
@@ -16706,7 +16731,7 @@
     }
     if (multiAssignmentCellMap.size) {
       const assignmentKey = Array.from(multiAssignmentCellMap.entries())
-        .map(([cellKey, value]) => `${cellKey}:${value.clientId}`)
+        .map(([cellKey, value]) => `${cellKey}:${value.clientId}:${value.locked ? 1 : 0}`)
         .sort()
         .join(',');
       timelineKeyParts.push(`as:${assignmentKey}`);
@@ -16932,8 +16957,9 @@
           const assignmentKey = createTimelineSlotKey(frameIndex, layerIndex);
           const assignedUser = multiAssignmentCellMap.get(assignmentKey) || null;
           const assignedUserName = assignedUser?.name || '';
+          const assignedUserLockLabel = assignedUser?.locked ? ' / ロック中' : '';
           const slotLabel = assignedUserName
-            ? `${frame.name} / ${targetLayer.name} / 担当: ${assignedUserName}`
+            ? `${frame.name} / ${targetLayer.name} / 担当: ${assignedUserName}${assignedUserLockLabel}`
             : `${frame.name} / ${targetLayer.name}`;
           slot.setAttribute('aria-label', slotLabel);
           if (!targetLayer.visible) {
@@ -16947,7 +16973,9 @@
             slot.classList.add('is-multi-assigned-cell');
             slot.style.setProperty('--multi-assignee-color', assignedUser.color);
             slot.dataset.multiAssigneeClientId = assignedUser.clientId;
-            slot.title = assignedUserName ? `担当: ${assignedUserName}` : '';
+            slot.title = assignedUserName
+              ? `担当: ${assignedUserName}${assignedUserLockLabel}`
+              : (assignedUser?.locked ? '担当セル: ロック中' : '');
           }
           if (frameIndex === activeFrameIndex && targetLayer.id === state.activeLayer) {
             slot.classList.add('is-active');
@@ -20067,6 +20095,11 @@
   }
 
   function pasteSelection() {
+    if (!canCurrentClientImportExternalData()) {
+      setMultiStatus('参加モードでは貼り付けインポートはマスターのみ操作できます', 'warn');
+      updateCanvasControlButtons();
+      return false;
+    }
     if (pointerState.active) {
       updateCanvasControlButtons();
       return false;
@@ -23297,6 +23330,7 @@
       role,
       at: Date.now(),
       assignments: role === 'master' ? serializeMultiAssignments() : [],
+      blockedClientIds: role === 'master' ? serializeMultiBlockedClientIds() : [],
     };
     try {
       window.sessionStorage.setItem(MULTI_RESUME_STORAGE_KEY, JSON.stringify(payload));
@@ -23335,7 +23369,10 @@
     const assignments = role === 'master' && Array.isArray(parsed.assignments)
       ? parsed.assignments
       : [];
-    return { projectKey, role, assignments };
+    const blockedClientIds = role === 'master' && Array.isArray(parsed.blockedClientIds)
+      ? parsed.blockedClientIds
+      : [];
+    return { projectKey, role, assignments, blockedClientIds };
   }
 
   function maybeAutoResumeMultiSession() {
@@ -23356,6 +23393,9 @@
     setMultiUiView(pending.role);
     multiState.resumeAssignments = pending.role === 'master' && Array.isArray(pending.assignments)
       ? pending.assignments
+      : null;
+    multiState.resumeBlockedClientIds = pending.role === 'master' && Array.isArray(pending.blockedClientIds)
+      ? pending.blockedClientIds
       : null;
     setMultiStatus(
       pending.role === 'master'
@@ -23407,17 +23447,100 @@
     return multiState.connected && multiState.role === 'guest';
   }
 
+  function isMultiMasterCurrentlyOnline() {
+    if (!multiState.connected) {
+      return false;
+    }
+    const masterClientId = typeof multiState.masterClientId === 'string'
+      ? multiState.masterClientId.trim()
+      : '';
+    if (!masterClientId) {
+      return false;
+    }
+    const participant = multiState.participants instanceof Map
+      ? multiState.participants.get(masterClientId)
+      : null;
+    return Boolean(participant && participant.role === 'master');
+  }
+
   function canCurrentClientEditProjectStructure() {
     return !isMultiGuestMode();
   }
 
-  function getLocalMultiParticipantName() {
-    const base = extractDocumentBaseName(state.documentName || '').trim();
-    if (base) {
-      return base.slice(0, 24);
+  function canCurrentClientImportExternalData() {
+    return !isMultiGuestMode();
+  }
+
+  function normalizeMultiBlockedClientIds(rawBlockedClientIds) {
+    const blocked = new Set();
+    if (!Array.isArray(rawBlockedClientIds)) {
+      return blocked;
     }
-    const suffix = String(multiState.clientId || '').slice(0, 6) || Math.random().toString(36).slice(2, 8);
-    return `user-${suffix}`;
+    rawBlockedClientIds.forEach(value => {
+      if (typeof value !== 'string') {
+        return;
+      }
+      const normalized = value.trim();
+      if (!normalized) {
+        return;
+      }
+      blocked.add(normalized);
+    });
+    return blocked;
+  }
+
+  function serializeMultiBlockedClientIds() {
+    if (!(multiState.blockedClientIds instanceof Set) || !multiState.blockedClientIds.size) {
+      return [];
+    }
+    return Array.from(multiState.blockedClientIds.values())
+      .filter(value => typeof value === 'string' && value.trim())
+      .map(value => value.trim())
+      .sort((a, b) => a.localeCompare(b));
+  }
+
+  function isMultiClientBlocked(clientId) {
+    if (!clientId || !(multiState.blockedClientIds instanceof Set) || !multiState.blockedClientIds.size) {
+      return false;
+    }
+    return multiState.blockedClientIds.has(clientId);
+  }
+
+  function normalizeMultiParticipantName(name, fallbackName = DEFAULT_MULTI_PARTICIPANT_NAME) {
+    if (typeof name === 'string') {
+      const trimmed = name.trim();
+      if (trimmed) {
+        return trimmed.slice(0, 32);
+      }
+    }
+    if (typeof fallbackName === 'string') {
+      const trimmedFallback = fallbackName.trim();
+      if (trimmedFallback) {
+        return trimmedFallback.slice(0, 32);
+      }
+    }
+    return DEFAULT_MULTI_PARTICIPANT_NAME;
+  }
+
+  function readPixieedAccountNickname() {
+    if (!canUseSessionStorage) {
+      return '';
+    }
+    try {
+      const raw = window.localStorage.getItem(PIXIEED_NICKNAME_STORAGE_KEY);
+      if (typeof raw !== 'string') {
+        return '';
+      }
+      const trimmed = raw.trim();
+      return trimmed ? trimmed.slice(0, 32) : '';
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function getLocalMultiParticipantName() {
+    const accountName = readPixieedAccountNickname();
+    return normalizeMultiParticipantName(accountName, DEFAULT_MULTI_PARTICIPANT_NAME);
   }
 
   function getMultiAssignment(clientId) {
@@ -23669,6 +23792,8 @@
     const frameInput = dom.controls.multiAssignFrame;
     const layerInput = dom.controls.multiAssignLayer;
     const applyButton = dom.controls.multiAssignApply;
+    const lockButton = dom.controls.multiAssignLockToggle;
+    const kickButton = dom.controls.multiAssignKick;
     const hint = dom.controls.multiAssignHint;
     const canControl = isMultiMasterMode();
     const rows = buildMultiParticipantRows().filter(row => row.role === 'guest');
@@ -23678,7 +23803,9 @@
       rows.forEach(row => {
         const option = document.createElement('option');
         option.value = row.clientId;
-        option.textContent = row.name + (row.online ? '' : ' (オフライン)');
+        option.textContent = row.name
+          + (row.locked ? ' [ロック中]' : '')
+          + (row.online ? '' : ' (オフライン)');
         select.appendChild(option);
       });
       if (rows.length) {
@@ -23701,6 +23828,27 @@
     if (applyButton instanceof HTMLButtonElement) {
       applyButton.disabled = !canControl || rows.length === 0;
     }
+    const targetClientId = multiState.selectedAssignClientId
+      || (select instanceof HTMLSelectElement ? select.value : '');
+    const targetAssignment = targetClientId ? getMultiAssignment(targetClientId) : null;
+    const hasTargetGuest = Boolean(targetClientId && rows.some(row => row.clientId === targetClientId));
+    const hasTargetAssignment = Boolean(targetClientId && targetAssignment);
+    if (frameInput instanceof HTMLInputElement) {
+      frameInput.disabled = !canControl || !hasTargetAssignment;
+    }
+    if (layerInput instanceof HTMLInputElement) {
+      layerInput.disabled = !canControl || !hasTargetAssignment;
+    }
+    if (applyButton instanceof HTMLButtonElement) {
+      applyButton.disabled = !canControl || !hasTargetAssignment;
+    }
+    if (lockButton instanceof HTMLButtonElement) {
+      lockButton.disabled = !canControl || !hasTargetAssignment;
+      lockButton.textContent = targetAssignment?.locked ? 'セルロック解除' : 'セルロック';
+    }
+    if (kickButton instanceof HTMLButtonElement) {
+      kickButton.disabled = !canControl || !hasTargetGuest;
+    }
     if (hint instanceof HTMLElement) {
       if (!multiState.connected) {
         hint.textContent = '接続後、マスターのみ参加者セルを移動できます。';
@@ -23708,6 +23856,8 @@
         hint.textContent = '参加者はセル移動できません。マスターのみ操作できます。';
       } else if (!rows.length) {
         hint.textContent = '参加者が接続するとセル移動が使えます。';
+      } else if (targetAssignment?.locked) {
+        hint.textContent = '選択中の参加者セルはロック中です。ロック解除で再描画を許可します。';
       } else {
         hint.textContent = '参加者ごとに 1 セルだけ割り当てます。同じセルには 1 人だけ配置できます。';
       }
@@ -23723,6 +23873,10 @@
     const targetClientId = typeof clientId === 'string' ? clientId.trim() : '';
     if (!targetClientId) {
       setMultiStatus('セル移動する参加者を選択してください', 'warn');
+      return false;
+    }
+    if (isMultiClientBlocked(targetClientId)) {
+      setMultiStatus('キック済み参加者は移動できません', 'warn');
       return false;
     }
     const assignment = getMultiAssignment(targetClientId);
@@ -23762,12 +23916,116 @@
     return true;
   }
 
+  async function sendMultiKickClientNotice(targetClientId, reason = 'kicked') {
+    if (!isMultiMasterMode()) {
+      return false;
+    }
+    const normalizedClientId = typeof targetClientId === 'string' ? targetClientId.trim() : '';
+    if (!normalizedClientId) {
+      return false;
+    }
+    return sendMultiBroadcast('kick-client', {
+      clientId: multiState.clientId,
+      projectKey: multiState.projectKey,
+      targetClientId: normalizedClientId,
+      reason: typeof reason === 'string' ? reason.trim().slice(0, 48) : '',
+      sentAt: Date.now(),
+    });
+  }
+
+  function setMultiParticipantCellLocked(clientId, lockedRaw) {
+    if (!isMultiMasterMode()) {
+      setMultiStatus('セルロックはマスターのみ操作できます', 'warn');
+      return false;
+    }
+    const targetClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    if (!targetClientId) {
+      setMultiStatus('ロック対象の参加者を選択してください', 'warn');
+      return false;
+    }
+    if (isMultiClientBlocked(targetClientId)) {
+      setMultiStatus('キック済み参加者のロックは変更できません', 'warn');
+      return false;
+    }
+    const assignment = getMultiAssignment(targetClientId);
+    if (!assignment || assignment.role === 'master') {
+      setMultiStatus('ロック対象の参加者割り当てが見つかりません', 'warn');
+      return false;
+    }
+    const nextLocked = Boolean(lockedRaw);
+    if (Boolean(assignment.locked) === nextLocked) {
+      return true;
+    }
+    assignment.locked = nextLocked;
+    multiState.assignments.set(targetClientId, assignment);
+    renderMultiParticipantsList();
+    syncMultiAssignmentControls();
+    scheduleMultiSessionStateBroadcast({ immediate: true });
+    setMultiStatus(
+      nextLocked ? '参加者セルをロックしました' : '参加者セルのロックを解除しました',
+      'success'
+    );
+    return true;
+  }
+
+  async function kickMultiParticipant(clientId) {
+    if (!isMultiMasterMode()) {
+      setMultiStatus('参加者のキックはマスターのみ操作できます', 'warn');
+      return false;
+    }
+    const targetClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    if (!targetClientId) {
+      setMultiStatus('キック対象の参加者を選択してください', 'warn');
+      return false;
+    }
+    if (targetClientId === multiState.clientId) {
+      setMultiStatus('マスター自身はキックできません', 'warn');
+      return false;
+    }
+    const assignment = getMultiAssignment(targetClientId);
+    if (assignment?.role === 'master') {
+      setMultiStatus('マスターはキック対象にできません', 'warn');
+      return false;
+    }
+    if (!(multiState.blockedClientIds instanceof Set)) {
+      multiState.blockedClientIds = new Set();
+    }
+    multiState.blockedClientIds.add(targetClientId);
+    if (assignment) {
+      multiState.assignments.delete(targetClientId);
+    }
+    multiState.participants.delete(targetClientId);
+    if (multiState.selectedAssignClientId === targetClientId) {
+      multiState.selectedAssignClientId = '';
+    }
+    normalizeMultiAssignmentsForCurrentDocument();
+    renderMultiParticipantsList();
+    syncMultiAssignmentControls();
+    scheduleMultiSessionStateBroadcast({ immediate: true });
+    await sendMultiKickClientNotice(targetClientId, 'master-kick');
+    setMultiStatus('参加者をキックしました。再参加は禁止されます', 'success');
+    return true;
+  }
+
   function enforceGuestAssignedLayerSelection({ announce = false } = {}) {
     if (!isMultiGuestMode()) {
       return true;
     }
     const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
     if (!frameCount) {
+      return false;
+    }
+    if (isMultiClientBlocked(multiState.clientId)) {
+      if (announce) {
+        setMultiStatus('このセッションでは編集権限がありません', 'warn');
+      }
+      return false;
+    }
+    const assignment = getMultiAssignment(multiState.clientId);
+    if (!assignment) {
+      if (announce) {
+        setMultiStatus('割り当てセルを待機中です。マスターの同期を待ってください。', 'warn');
+      }
       return false;
     }
     const assignedCell = getAssignedCellForClient(multiState.clientId);
@@ -23785,6 +24043,12 @@
     if (state.activeLayer !== assignedCell.layer.id) {
       state.activeLayer = assignedCell.layer.id;
       changed = true;
+    }
+    if (assignment.locked) {
+      if (announce) {
+        setMultiStatus('この参加者セルはマスターによってロックされています', 'warn');
+      }
+      return false;
     }
     if (changed && announce) {
       setMultiStatus('参加モードでは割り当てセルのみ編集できます。', 'warn');
@@ -24014,10 +24278,14 @@
       frameId: typeof entry.frameId === 'string' ? entry.frameId : '',
       frameHint: Number.isFinite(entry.frameHint) ? Math.round(entry.frameHint) : -1,
       joinedAt: Number(entry.joinedAt) || Date.now(),
+      locked: Boolean(entry.locked),
     }));
   }
 
-  function applyMultiAssignmentsFromPayload(assignments, masterClientId) {
+  function applyMultiAssignmentsFromPayload(assignments, masterClientId, blockedClientIds = undefined) {
+    if (Array.isArray(blockedClientIds)) {
+      multiState.blockedClientIds = normalizeMultiBlockedClientIds(blockedClientIds);
+    }
     multiState.assignments.clear();
     if (Array.isArray(assignments)) {
       assignments.forEach(entry => {
@@ -24029,15 +24297,19 @@
         if (!clientId || !anchorLayerId) {
           return;
         }
+        if (isMultiClientBlocked(clientId)) {
+          return;
+        }
         multiState.assignments.set(clientId, {
           clientId,
           role: entry.role === 'master' ? 'master' : 'guest',
-          name: typeof entry.name === 'string' ? entry.name.trim().slice(0, 32) : '',
+          name: normalizeMultiParticipantName(entry.name, DEFAULT_MULTI_PARTICIPANT_NAME),
           anchorLayerId,
           trackHint: Number.isFinite(entry.trackHint) ? Math.max(0, Math.round(entry.trackHint)) : null,
           frameId: typeof entry.frameId === 'string' ? entry.frameId.trim() : '',
           frameHint: Number.isFinite(entry.frameHint) ? Math.max(0, Math.round(entry.frameHint)) : null,
           joinedAt: Number(entry.joinedAt) || Date.now(),
+          locked: Boolean(entry.locked),
         });
       });
     }
@@ -24060,13 +24332,17 @@
       if (!entry || !entry.clientId) {
         return;
       }
+      if (isMultiClientBlocked(entry.clientId)) {
+        return;
+      }
       const assignment = getMultiAssignment(entry.clientId);
       rows.push({
         clientId: entry.clientId,
         role: entry.role === 'master' ? 'master' : (assignment?.role === 'master' ? 'master' : 'guest'),
-        name: entry.name || assignment?.name || `user-${entry.clientId.slice(0, 6)}`,
+        name: normalizeMultiParticipantName(entry.name || assignment?.name, DEFAULT_MULTI_PARTICIPANT_NAME),
         online: true,
         joinedAt: Number(entry.joinedAt) || now,
+        locked: Boolean(assignment?.locked),
       });
       seen.add(entry.clientId);
     });
@@ -24074,12 +24350,16 @@
       if (!assignment || !assignment.clientId || seen.has(assignment.clientId)) {
         return;
       }
+      if (isMultiClientBlocked(assignment.clientId)) {
+        return;
+      }
       rows.push({
         clientId: assignment.clientId,
         role: assignment.role === 'master' ? 'master' : 'guest',
-        name: assignment.name || `user-${assignment.clientId.slice(0, 6)}`,
+        name: normalizeMultiParticipantName(assignment.name, DEFAULT_MULTI_PARTICIPANT_NAME),
         online: false,
         joinedAt: Number(assignment.joinedAt) || now,
+        locked: Boolean(assignment.locked),
       });
     });
     rows.sort((a, b) => {
@@ -24119,8 +24399,9 @@
       const frameLabel = frameIndex >= 0 ? ` / フレーム ${frameIndex + 1}` : '';
       const layerLabel = trackIndex >= 0 ? ` / レイヤー ${trackIndex + 1}` : '';
       const onlineLabel = row.online ? '' : ' (オフライン)';
+      const lockedLabel = row.locked ? ' / ロック中' : '';
       const selfLabel = row.clientId === multiState.clientId ? ' (あなた)' : '';
-      li.textContent = `${getMultiRoleLabel(row.role)}: ${row.name}${selfLabel}${frameLabel}${layerLabel}${onlineLabel}`;
+      li.textContent = `${getMultiRoleLabel(row.role)}: ${row.name}${selfLabel}${frameLabel}${layerLabel}${lockedLabel}${onlineLabel}`;
       list.appendChild(li);
     });
     syncMultiAssignmentControls();
@@ -24232,6 +24513,8 @@
       dom.controls.multiAssignFrame,
       dom.controls.multiAssignLayer,
       dom.controls.multiAssignApply,
+      dom.controls.multiAssignLockToggle,
+      dom.controls.multiAssignKick,
     ];
     lockTargets.forEach(control => {
       if (!(control instanceof HTMLButtonElement) && !(control instanceof HTMLInputElement) && !(control instanceof HTMLSelectElement)) {
@@ -24510,6 +24793,9 @@
     if (!clientId || clientId === multiState.clientId) {
       return null;
     }
+    if (isMultiClientBlocked(clientId)) {
+      return null;
+    }
     const existing = getMultiAssignment(clientId);
     if (existing) {
       return existing;
@@ -24526,7 +24812,7 @@
     const insertIndex = clamp(masterTrack - guestCount, 0, masterTrack);
     const safeName = typeof participantName === 'string' && participantName.trim()
       ? participantName.trim().slice(0, 24)
-      : `guest-${clientId.slice(0, 6)}`;
+      : DEFAULT_MULTI_PARTICIPANT_NAME;
     const layerName = `共同 ${safeName}`;
     const anchorLayerId = insertLayerTrackForAllFrames(insertIndex, layerName);
     if (!anchorLayerId) {
@@ -24567,6 +24853,14 @@
     multiState.pendingBroadcastTargetClientId = '';
   }
 
+  function clearMultiGuestStateRecovery() {
+    if (multiState.guestStateRecoveryTimer !== null) {
+      window.clearTimeout(multiState.guestStateRecoveryTimer);
+      multiState.guestStateRecoveryTimer = null;
+    }
+    multiState.awaitingGuestStateRecovery = false;
+  }
+
   function buildMultiSessionStatePayload({ targetClientId = '' } = {}) {
     const snapshot = makeHistorySnapshot({
       includeUiState: false,
@@ -24577,9 +24871,27 @@
       projectKey: multiState.projectKey,
       masterClientId: multiState.clientId,
       assignments: serializeMultiAssignments(),
+      blockedClientIds: serializeMultiBlockedClientIds(),
       revision: (multiState.revision += 1),
       targetClientId: targetClientId || '',
       sentAt: Date.now(),
+      document: serializeDocumentSnapshot(snapshot),
+    };
+  }
+
+  function buildGuestSessionStatePayload({ targetClientId = '' } = {}) {
+    const snapshot = makeHistorySnapshot({
+      includeUiState: false,
+      includeSelection: false,
+      clonePixelData: false,
+    });
+    return {
+      projectKey: multiState.projectKey,
+      clientId: multiState.clientId,
+      targetClientId: targetClientId || '',
+      sentAt: Date.now(),
+      assignments: serializeMultiAssignments(),
+      blockedClientIds: serializeMultiBlockedClientIds(),
       document: serializeDocumentSnapshot(snapshot),
     };
   }
@@ -24614,6 +24926,29 @@
       return;
     }
     multiState.broadcastTimer = window.setTimeout(flush, MULTI_SYNC_THROTTLE_MS);
+  }
+
+  function startMultiMasterRecoveryFlow(projectKey = multiState.projectKey) {
+    if (!isMultiMasterMode()) {
+      return;
+    }
+    clearMultiGuestStateRecovery();
+    multiState.awaitingGuestStateRecovery = true;
+    setMultiStatus('共有モード: 参加者データを確認中…', 'info');
+    sendMultiBroadcast('master-state-request', {
+      clientId: multiState.clientId,
+      projectKey: multiState.projectKey,
+      targetClientId: '',
+      sentAt: Date.now(),
+    });
+    multiState.guestStateRecoveryTimer = window.setTimeout(() => {
+      if (!isMultiMasterMode() || !multiState.awaitingGuestStateRecovery) {
+        return;
+      }
+      clearMultiGuestStateRecovery();
+      scheduleMultiSessionStateBroadcast({ immediate: true });
+      setMultiStatus(`共有モード: マスター (${projectKey})`, 'success');
+    }, 1400);
   }
 
   function decodeLayerIndicesPayload(base64Value, expectedPixelCount) {
@@ -24965,6 +25300,9 @@
       activeRightTab: state.activeRightTab,
       activeFrame: state.activeFrame,
     };
+    // Keep viewport local in multi mode. Zoom/pan should never be synced from remote payload.
+    snapshot.scale = normalizeZoomScale(preserved.scale, snapshot.scale);
+    snapshot.pan = { x: preserved.pan.x, y: preserved.pan.y };
     multiState.applyRemoteInProgress = true;
     try {
       applyHistorySnapshot(snapshot);
@@ -25000,7 +25338,15 @@
     if (!payload || typeof payload !== 'object') {
       return;
     }
-    applyMultiAssignmentsFromPayload(payload.assignments, payload.masterClientId);
+    if (isMultiGuestMode()) {
+      const blockedClientIds = normalizeMultiBlockedClientIds(payload.blockedClientIds);
+      if (blockedClientIds.has(multiState.clientId)) {
+        disconnectMultiSession({ silent: true }).catch(() => {});
+        setMultiStatus('共有モード: マスターにより接続が停止されました', 'warn');
+        return;
+      }
+    }
+    applyMultiAssignmentsFromPayload(payload.assignments, payload.masterClientId, payload.blockedClientIds);
     if (payload.document && typeof payload.document === 'object') {
       applyMultiAuthoritativeDocument(payload.document);
     }
@@ -25129,6 +25475,7 @@
       renderMultiParticipantsList();
       return;
     }
+    const previousMasterClientId = multiState.masterClientId;
     const nextParticipants = new Map();
     const presenceState = multiState.channel.presenceState() || {};
     Object.keys(presenceState).forEach(key => {
@@ -25143,15 +25490,31 @@
         if (!clientId) {
           return;
         }
+        if (isMultiClientBlocked(clientId)) {
+          return;
+        }
         nextParticipants.set(clientId, {
           clientId,
           role: entry.role === 'master' ? 'master' : 'guest',
-          name: typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim().slice(0, 32) : `user-${clientId.slice(0, 6)}`,
+          name: normalizeMultiParticipantName(entry.name, DEFAULT_MULTI_PARTICIPANT_NAME),
           joinedAt: Number(entry.joinedAt) || Date.now(),
         });
       });
     });
+    const onlineMaster = Array.from(nextParticipants.values()).find(entry => entry.role === 'master') || null;
+    if (isMultiMasterMode()) {
+      multiState.masterClientId = multiState.clientId;
+    } else {
+      multiState.masterClientId = onlineMaster ? onlineMaster.clientId : null;
+    }
     multiState.participants = nextParticipants;
+    if (isMultiGuestMode()) {
+      if (onlineMaster && previousMasterClientId !== onlineMaster.clientId) {
+        setMultiStatus(`共有モード: マスター接続中 (${multiState.projectKey})`, 'info');
+      } else if (!onlineMaster && previousMasterClientId) {
+        setMultiStatus('共有モード: マスター不在。参加者同士で描画同期を継続します', 'warn');
+      }
+    }
     renderMultiParticipantsList();
   }
 
@@ -25164,6 +25527,10 @@
       return;
     }
     if (isMultiMasterMode()) {
+      if (isMultiClientBlocked(senderClientId)) {
+        await sendMultiKickClientNotice(senderClientId, 'blocked');
+        return;
+      }
       const senderRole = payload.role === 'master' ? 'master' : 'guest';
       if (senderRole === 'master') {
         setMultiStatus('共有モード: 同一キーに別マスターがいます', 'warn');
@@ -25192,6 +25559,10 @@
     if (!requesterClientId || requesterClientId === multiState.clientId) {
       return;
     }
+    if (isMultiClientBlocked(requesterClientId)) {
+      await sendMultiKickClientNotice(requesterClientId, 'blocked');
+      return;
+    }
     assignLayerToGuestClient(requesterClientId, payload.name);
     scheduleMultiSessionStateBroadcast({ targetClientId: requesterClientId, immediate: true });
   }
@@ -25218,8 +25589,84 @@
     applyMultiSessionStatePayload(payload);
   }
 
-  async function handleMultiGuestLayerPatchMessage(payload) {
+  async function handleMultiMasterStateRequestMessage(payload) {
+    if (!isMultiGuestMode()) {
+      return;
+    }
+    if (!payload || typeof payload !== 'object') {
+      return;
+    }
+    const requesterClientId = typeof payload.clientId === 'string' ? payload.clientId.trim() : '';
+    if (!requesterClientId || requesterClientId === multiState.clientId) {
+      return;
+    }
+    if (isMultiClientBlocked(requesterClientId)) {
+      return;
+    }
+    const responsePayload = buildGuestSessionStatePayload({ targetClientId: requesterClientId });
+    await sendMultiBroadcast('guest-session-state', responsePayload);
+  }
+
+  async function handleMultiGuestSessionStateMessage(payload) {
     if (!isMultiMasterMode()) {
+      return;
+    }
+    if (!payload || typeof payload !== 'object') {
+      return;
+    }
+    const targetClientId = typeof payload.targetClientId === 'string' ? payload.targetClientId.trim() : '';
+    if (targetClientId && targetClientId !== multiState.clientId) {
+      return;
+    }
+    const senderClientId = typeof payload.clientId === 'string' ? payload.clientId.trim() : '';
+    if (!senderClientId || senderClientId === multiState.clientId) {
+      return;
+    }
+    if (isMultiClientBlocked(senderClientId)) {
+      return;
+    }
+    if (!multiState.awaitingGuestStateRecovery) {
+      return;
+    }
+    const hasDocument = payload.document && typeof payload.document === 'object';
+    if (!hasDocument) {
+      return;
+    }
+    const applied = applyMultiAuthoritativeDocument(payload.document);
+    if (!applied) {
+      return;
+    }
+    applyMultiAssignmentsFromPayload(payload.assignments, multiState.clientId, payload.blockedClientIds);
+    multiState.assignments.forEach((entry, clientId) => {
+      if (!entry || typeof entry !== 'object') {
+        return;
+      }
+      entry.role = clientId === multiState.clientId ? 'master' : 'guest';
+      multiState.assignments.set(clientId, entry);
+    });
+    if (!getMultiAssignment(multiState.clientId)) {
+      ensureMasterLayerAssignment();
+    } else {
+      const currentMaster = getMultiAssignment(multiState.clientId);
+      if (currentMaster) {
+        currentMaster.role = 'master';
+        currentMaster.name = getLocalMultiParticipantName();
+        multiState.assignments.set(multiState.clientId, currentMaster);
+      }
+    }
+    normalizeMultiAssignmentsForCurrentDocument();
+    refreshMultiParticipantsFromPresence();
+    renderMultiParticipantsList();
+    syncMultiAssignmentControls();
+    clearMultiGuestStateRecovery();
+    scheduleMultiSessionStateBroadcast({ immediate: true });
+    setMultiStatus(`共有モード: マスター (${multiState.projectKey})`, 'success');
+  }
+
+  async function handleMultiGuestLayerPatchMessage(payload) {
+    const inMasterMode = isMultiMasterMode();
+    const inGuestMode = isMultiGuestMode();
+    if (!inMasterMode && !inGuestMode) {
       return;
     }
     if (!payload || typeof payload !== 'object') {
@@ -25229,9 +25676,16 @@
     if (!senderClientId || senderClientId === multiState.clientId) {
       return;
     }
+    if (isMultiClientBlocked(senderClientId)) {
+      await sendMultiKickClientNotice(senderClientId, 'blocked');
+      return;
+    }
     normalizeMultiAssignmentsForCurrentDocument();
     const assignment = getMultiAssignment(senderClientId);
     if (!assignment) {
+      return;
+    }
+    if (assignment.locked) {
       return;
     }
     if (payload.anchorLayerId !== assignment.anchorLayerId) {
@@ -25262,6 +25716,12 @@
     markRemoteMultiStateDirty();
     requestRender();
     requestOverlayRender();
+    if (!inMasterMode) {
+      if (isMultiMasterCurrentlyOnline()) {
+        return;
+      }
+      return;
+    }
     const relayMode = payload.mode === 'diff' ? 'diff' : 'full';
     const relayHasDirect = typeof payload.hasDirect === 'boolean'
       ? payload.hasDirect
@@ -25319,10 +25779,30 @@
     requestOverlayRender();
   }
 
+  async function handleMultiKickClientMessage(payload) {
+    if (!payload || typeof payload !== 'object') {
+      return;
+    }
+    if (isMultiMasterMode()) {
+      return;
+    }
+    const senderClientId = typeof payload.clientId === 'string' ? payload.clientId.trim() : '';
+    if (multiState.masterClientId && senderClientId && senderClientId !== multiState.masterClientId) {
+      return;
+    }
+    const targetClientId = typeof payload.targetClientId === 'string' ? payload.targetClientId.trim() : '';
+    if (!targetClientId || targetClientId !== multiState.clientId) {
+      return;
+    }
+    await disconnectMultiSession({ silent: true });
+    setMultiStatus('共有モード: マスターにより切断されました', 'warn');
+  }
+
   async function disconnectMultiSession({ silent = false } = {}) {
     clearMultiBroadcastTimer();
     clearPendingMultiSessionStateApply();
     clearMultiLayerPatchSnapshots();
+    clearMultiGuestStateRecovery();
     const channel = multiState.channel;
     multiState.channel = null;
     multiState.connected = false;
@@ -25331,10 +25811,12 @@
     multiState.masterClientId = null;
     multiState.assignments.clear();
     multiState.participants.clear();
+    multiState.blockedClientIds.clear();
     multiState.selectedAssignClientId = '';
     multiState.applyRemoteInProgress = false;
     multiState.uiView = 'entry';
     multiState.resumeAssignments = null;
+    multiState.resumeBlockedClientIds = null;
     clearStoredMultiResumeSession();
     if (channel) {
       try {
@@ -25406,11 +25888,20 @@
       channel.on('broadcast', { event: 'session-state' }, message => {
         handleMultiSessionStateMessage(message?.payload || {});
       });
+      channel.on('broadcast', { event: 'master-state-request' }, message => {
+        handleMultiMasterStateRequestMessage(message?.payload || {});
+      });
+      channel.on('broadcast', { event: 'guest-session-state' }, message => {
+        handleMultiGuestSessionStateMessage(message?.payload || {});
+      });
       channel.on('broadcast', { event: 'guest-layer-patch' }, message => {
         handleMultiGuestLayerPatchMessage(message?.payload || {});
       });
       channel.on('broadcast', { event: 'master-layer-patch' }, message => {
         handleMultiMasterLayerPatchMessage(message?.payload || {});
+      });
+      channel.on('broadcast', { event: 'kick-client' }, message => {
+        handleMultiKickClientMessage(message?.payload || {});
       });
 
       await waitForMultiSubscription(channel);
@@ -25424,15 +25915,26 @@
       multiState.revision = 0;
       multiState.assignments.clear();
       multiState.participants.clear();
+      multiState.blockedClientIds.clear();
       multiState.selectedAssignClientId = '';
+      multiState.awaitingGuestStateRecovery = false;
+      if (multiState.guestStateRecoveryTimer !== null) {
+        window.clearTimeout(multiState.guestStateRecoveryTimer);
+        multiState.guestStateRecoveryTimer = null;
+      }
 
       if (normalizedRole === 'master') {
         const resumeAssignments = Array.isArray(multiState.resumeAssignments)
           ? multiState.resumeAssignments
           : null;
+        const resumeBlockedClientIds = Array.isArray(multiState.resumeBlockedClientIds)
+          ? multiState.resumeBlockedClientIds
+          : [];
         multiState.resumeAssignments = null;
+        multiState.resumeBlockedClientIds = null;
+        multiState.blockedClientIds = normalizeMultiBlockedClientIds(resumeBlockedClientIds);
         if (resumeAssignments && resumeAssignments.length) {
-          applyMultiAssignmentsFromPayload(resumeAssignments, multiState.clientId);
+          applyMultiAssignmentsFromPayload(resumeAssignments, multiState.clientId, resumeBlockedClientIds);
           if (!getMultiAssignment(multiState.clientId)) {
             ensureMasterLayerAssignment();
           } else {
@@ -25445,6 +25947,7 @@
       } else {
         multiState.masterClientId = null;
         multiState.resumeAssignments = null;
+        multiState.resumeBlockedClientIds = null;
       }
 
       await channel.track({
@@ -25463,8 +25966,7 @@
       });
 
       if (normalizedRole === 'master') {
-        scheduleMultiSessionStateBroadcast({ immediate: true });
-        setMultiStatus(`共有モード: マスター (${projectKey})`, 'success');
+        startMultiMasterRecoveryFlow(projectKey);
       } else {
         await sendMultiBroadcast('sync-request', {
           clientId: multiState.clientId,
@@ -25689,6 +26191,31 @@
         if (moved) {
           updateMultiAssignmentControlsFromSelection();
         }
+      });
+    }
+    if (dom.controls.multiAssignLockToggle instanceof HTMLButtonElement && dom.controls.multiAssignLockToggle.dataset.bound !== 'true') {
+      dom.controls.multiAssignLockToggle.dataset.bound = 'true';
+      dom.controls.multiAssignLockToggle.addEventListener('click', () => {
+        const targetClientId = multiState.selectedAssignClientId
+          || (dom.controls.multiAssignTarget instanceof HTMLSelectElement ? dom.controls.multiAssignTarget.value : '');
+        const assignment = targetClientId ? getMultiAssignment(targetClientId) : null;
+        if (!assignment) {
+          setMultiStatus('ロック対象の参加者を選択してください', 'warn');
+          return;
+        }
+        setMultiParticipantCellLocked(targetClientId, !assignment.locked);
+      });
+    }
+    if (dom.controls.multiAssignKick instanceof HTMLButtonElement && dom.controls.multiAssignKick.dataset.bound !== 'true') {
+      dom.controls.multiAssignKick.dataset.bound = 'true';
+      dom.controls.multiAssignKick.addEventListener('click', async () => {
+        const targetClientId = multiState.selectedAssignClientId
+          || (dom.controls.multiAssignTarget instanceof HTMLSelectElement ? dom.controls.multiAssignTarget.value : '');
+        if (!targetClientId) {
+          setMultiStatus('キック対象の参加者を選択してください', 'warn');
+          return;
+        }
+        await kickMultiParticipant(targetClientId);
       });
     }
 
