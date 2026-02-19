@@ -1,0 +1,26 @@
+{
+  "id": "/pixiee-lens/",
+  "name": "PiXiEELENS",
+  "short_name": "PiXiEELENS",
+  "description": "PiXiEELENS official dot camera web app.",
+  "lang": "ja",
+  "start_url": "/pixiee-lens/",
+  "scope": "/pixiee-lens/",
+  "display": "standalone",
+  "background_color": "#0b1224",
+  "theme_color": "#0b1224",
+  "icons": [
+    {
+      "src": "/icon/PiXiEED.icon512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon/icon-192-1.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
