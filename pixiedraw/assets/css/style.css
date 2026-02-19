@@ -2237,6 +2237,16 @@ body.is-mobile-layout .mobile-draw-help {
   gap: 8px;
 }
 
+#panelMulti .multi-assignment-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+#panelMulti .multi-assignment-actions .chip {
+  min-height: 34px;
+}
+
 #panelMulti .multi-assignment-inputs .field--tiny input {
   width: 72px;
 }
