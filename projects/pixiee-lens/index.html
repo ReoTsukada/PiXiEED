@@ -388,7 +388,7 @@
     }
   })();
 </script>
-<link rel="manifest" href="/manifest.webmanifest"/>
+<link rel="manifest" href="/pixiee-lens/manifest.webmanifest"/>
 <link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
 </head>
 <body class="project-page">
@@ -553,6 +553,20 @@
     <span class="icon"><img src="../../FooterIcon4.png" alt=""/></span><span>企業向け</span>
   </a>
 </nav>
+<script>
+  (() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const params = new URLSearchParams(window.location.search || '');
+    if (params.get('open_lens') !== '1') {
+      return;
+    }
+    const target = new URL('../../pixiee-lens/index.html', window.location.href);
+    target.searchParams.set('from', 'browser');
+    window.location.replace(target.toString());
+  })();
+</script>
 <script src="../../scripts.js"></script>
 <script defer src="/scripts/pwa-install.js"></script>
 </body>
