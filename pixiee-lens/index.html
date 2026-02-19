@@ -3043,17 +3043,6 @@
           event.preventDefault();
           event.stopPropagation();
         }
-        if (iosStandaloneUnsupported) {
-          if (typeof window !== 'undefined' && window.location) {
-            const targetUrl = 'https://pixieed.jp/pixiee-lens/';
-            try {
-              window.location.href = targetUrl;
-            } catch (error) {
-              console.warn('Failed to redirect to Safari', error);
-            }
-          }
-          return;
-        }
         cameraStartLocked = false;
         handleCameraStartRequest();
       };
@@ -3364,9 +3353,9 @@
       return false;
     })();
     const isStandaloneApp = Boolean(window.navigator && window.navigator.standalone) || displayModeStandalone;
-    const iosStandaloneUnsupported = isIOSDevice && isStandaloneApp;
-    const requiresCameraUserGesture = !iosStandaloneUnsupported && isIOSDevice && isStandaloneApp;
-    let cameraStartLocked = requiresCameraUserGesture || iosStandaloneUnsupported;
+    const isIOSStandaloneApp = isIOSDevice && isStandaloneApp;
+    const requiresCameraUserGesture = isIOSStandaloneApp;
+    let cameraStartLocked = requiresCameraUserGesture;
 
     let cameraZoomCapability = null;
     let cameraZoomCapabilityKnown = false;
@@ -5573,9 +5562,6 @@
     }
 
     function registerGestureCameraStarter() {
-      if (iosStandaloneUnsupported) {
-        return;
-      }
       if (gestureStartRegistered) {
         return;
       }
@@ -5624,35 +5610,6 @@
         cameraStartButton.focus({ preventScroll: true });
       }
       registerGestureCameraStarter();
-    }
-
-    function showIOSStandaloneUnsupportedOverlay() {
-      if (!cameraStartOverlay) {
-        return;
-      }
-      cameraStartLocked = true;
-      const message = 'iPhone のホーム画面に追加した PiXiEELENS ではカメラが利用できません。Safari でこのページを開き直してご利用ください。（共有ボタン → “Safariで開く” を実行した後にご利用ください）';
-      if (cameraStartMessage) {
-        cameraStartMessage.textContent = message;
-      }
-      cameraStartOverlay.hidden = false;
-      cameraStartOverlay.setAttribute('aria-hidden', 'false');
-      cameraStartOverlay.classList.add('is-visible');
-      setCameraStatus(message);
-      cameraStartButtonBusy = false;
-      if (cameraStartButton) {
-        cameraStartButton.style.display = 'none';
-        cameraStartButton.disabled = true;
-      }
-      if (cameraStartActions) {
-        cameraStartActions.style.display = 'none';
-      }
-      if (gestureStartHandler) {
-        document.removeEventListener('click', gestureStartHandler, true);
-        document.removeEventListener('touchend', gestureStartHandler, true);
-        gestureStartHandler = null;
-      }
-      gestureStartRegistered = false;
     }
 
     function hideCameraStartOverlay() {
@@ -11111,11 +11068,12 @@
     updateControlPlacement();
     setQrReadoutVisibility(false);
 
-    if (iosStandaloneUnsupported) {
-      showIOSStandaloneUnsupportedOverlay();
-    } else if (requiresCameraUserGesture) {
+    if (requiresCameraUserGesture) {
       cameraStartLocked = true;
-      showCameraStartOverlay('「カメラを起動」をタップするとカメラの許可ダイアログが表示されます。「許可」を選び、再度撮影をお試しください。');
+      const startupMessage = isIOSStandaloneApp
+        ? 'ホーム画面から利用中です。「カメラを起動」をタップし、許可ダイアログで「許可」を選んでください。'
+        : '「カメラを起動」をタップするとカメラの許可ダイアログが表示されます。「許可」を選び、再度撮影をお試しください。';
+      showCameraStartOverlay(startupMessage);
     } else {
       cameraStartLocked = false;
       startCamera();
