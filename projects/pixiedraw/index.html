@@ -4,11 +4,12 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
-<title>PiXiEEDraw | ブラウザで使えるドット絵エディター</title>
-<meta content="ブラウザで動く無料のドット絵・ピクセルアートエディター。レイヤー/タイルセット/自動保存に対応し、PC・スマホで編集からPNG書き出しまで完結。" name="description"/>
+<title>PiXiEEDraw | リアルタイム共同編集・アニメ対応ドット絵エディター</title>
+<meta content="無料で使えるブラウザ版ドット絵エディター。リアルタイム共有モードでみんなで描ける。フレームアニメーション、オニオンスキン、レイヤー合成、GIF/PNG書き出しに対応。" name="description"/>
+<meta content="PiXiEEDraw,ドット絵 エディター,ドット絵 描く サイト,ピクセルアート,リアルタイム 共同編集,アニメーション GIF,オニオンスキン" name="keywords"/>
 <link href="https://pixieed.jp/projects/pixiedraw/" rel="canonical"/>
-<meta content="PiXiEEDraw | ブラウザで使えるドット絵エディター" property="og:title"/>
-<meta content="ブラウザで動く無料のドット絵・ピクセルアートエディター。レイヤー/タイルセット/自動保存に対応し、PC・スマホで編集からPNG書き出しまで完結。" property="og:description"/>
+<meta content="PiXiEEDraw | リアルタイム共同編集・アニメ対応ドット絵エディター" property="og:title"/>
+<meta content="無料で使えるブラウザ版ドット絵エディター。リアルタイム共有モードでみんなで描ける。フレームアニメーション、オニオンスキン、レイヤー合成、GIF/PNG書き出しに対応。" property="og:description"/>
 <meta content="website" property="og:type"/>
 <meta content="https://pixieed.jp/projects/pixiedraw/" property="og:url"/>
 <meta content="https://pixieed.jp/pixiedraw/ogp-app.png" property="og:image"/>
@@ -18,8 +19,8 @@
 <meta content="summary_large_image" name="twitter:card"/>
 <meta content="@PiXiEED_arta" name="twitter:site"/>
 <meta content="https://pixieed.jp/projects/pixiedraw/" name="twitter:url"/>
-<meta content="PiXiEEDraw | ブラウザで使えるドット絵エディター" name="twitter:title"/>
-<meta content="ブラウザで動く無料のドット絵・ピクセルアートエディター。レイヤー/タイルセット/自動保存に対応し、PC・スマホで編集からPNG書き出しまで完結。" name="twitter:description"/>
+<meta content="PiXiEEDraw | リアルタイム共同編集・アニメ対応ドット絵エディター" name="twitter:title"/>
+<meta content="無料で使えるブラウザ版ドット絵エディター。リアルタイム共有モードでみんなで描ける。フレームアニメーション、オニオンスキン、レイヤー合成、GIF/PNG書き出しに対応。" name="twitter:description"/>
 <meta content="https://pixieed.jp/pixiedraw/ogp-app.png" name="twitter:image"/>
 <meta content="PiXiEEDraw のUIプレビューイメージ" name="twitter:image:alt"/>
 <meta content="#0b1224" name="theme-color"/>
@@ -34,7 +35,18 @@
         "operatingSystem": "Web",
         "url": "https://pixieed.jp/projects/pixiedraw/",
         "image": "https://pixieed.jp/pixiedraw/ogp-app.png",
-        "description": "ブラウザで動く無料のドット絵・ピクセルアートエディター。レイヤー/タイルセット/自動保存に対応し、PC・スマホで編集からPNG書き出しまで完結。",
+        "description": "無料で使えるブラウザ版ドット絵エディター。リアルタイム共有モードでみんなで描ける。フレームアニメーション、オニオンスキン、レイヤー合成、GIF/PNG書き出しに対応。",
+        "featureList": [
+          "リアルタイム共有モード（マスター/参加者）",
+          "フレームアニメーション編集（FPS設定）",
+          "オニオンスキン表示",
+          "レイヤー不透明度・合成モード",
+          "GIF/PNG/プロジェクト書き出し",
+          "PC/タブレット/スマホ対応"
+        ],
+        "softwareVersion": "2026.02",
+        "dateModified": "2026-02-20",
+        "isAccessibleForFree": true,
         "offers": {
           "@type": "Offer",
           "price": "0",
@@ -50,6 +62,22 @@
       {
         "@type": "FAQPage",
         "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "リアルタイムでみんなで描けますか？",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "共有モード（マルチ）で、プロジェクトキーを使って複数人で同時に描画できます。マスター/参加者の役割とセル割当で制作を進められます。※テスト運用中。"
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "アニメーション制作に対応していますか？",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "フレーム単位の編集、FPS調整、オニオンスキン表示に対応しています。完成後はGIFとして書き出しできます。"
+            }
+          },
           {
             "@type": "Question",
             "name": "PCとスマホで続きを描けますか？",
@@ -388,7 +416,7 @@
     }
   })();
 </script>
-<link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
+<link rel="apple-touch-icon" href="/icon/icon-512-4.png"/>
 </head>
 <body class="project-page">
 <main>
@@ -406,17 +434,17 @@
 <img alt="PiXiEEDraw のUIプレビューイメージ" loading="lazy" src="../../icon/icon-192-4.png" data-media="icon"/>
 </div>
 <div class="hero-copy">
-<p class="project-update" data-last-updated="">
+<p class="project-update" data-last-updated="2026-02-20">
 <span class="project-update__label">最終更新</span>
-<time class="project-update__value" datetime="">--</time>
+<time class="project-update__value" datetime="2026-02-20">2026/02/20</time>
 </p>
 <div class="hero-cta">
 <a class="cta-primary" href="../../pixiedraw/index.html">プレイする（ツールを開く）</a>
 <a class="cta-secondary" href="../../tools.html">他のゲーム・ツール</a>
 </div>
 <h1>PiXiEEDraw</h1>
-<p>ブラウザ単体で編集から書き出しまで完結するレスポンシブなドット絵エディターです。レイヤーやタイルセットをリアルタイムにプレビューしながら制作でき、PC・タブレット・スマホで同じUI体験を提供します。</p>
-<p>アプリインストール不要で共有リンクからすぐ開ける制作環境を目指し、PiXiEED内の他コンテンツと同じ軽量なブラウザアーキテクチャで開発を進めています。</p>
+<p>ブラウザ単体で編集から書き出しまで完結するドット絵エディターです。<strong>リアルタイム共有モード</strong>でみんなで同時に描けて、<strong>フレームアニメーション制作</strong>まで1つの画面で完結します。</p>
+<p>レイヤー合成・オニオンスキン・カスタムブラシ・自動保存・GIF/PNG出力に対応。PC・タブレット・スマホのいずれでも同じ制作フローで使えます。</p>
 </div>
 </section>
 <section class="section" id="updates">
@@ -424,8 +452,10 @@
 <div class="project-note">
 <strong>更新メモ</strong>
 <ul class="project-note__list">
+<li>2026/02/20: PiXiEEDrawのみPWA対応に変更。未インストール端末向けインストールポップを最適化。</li>
 <li>2026/02/19: 共有モード（マルチ）を追加（マスター/参加者、セル割当、差分同期）。</li>
 <li>2026/02/19: 共有キー操作と役割フローを改善、共有モードアイコンを更新。</li>
+<li>2026/02/19: フレーム編集・オニオンスキン・再生同期を強化し、アニメ制作ワークフローを改善。</li>
 <li>2026/02/19: 範囲選択時のコピー/貼り付けボタンをPC・横画面でも左上表示に対応。</li>
 <li>共有モード（マルチ）は現在テスト運用中です。</li>
 </ul>
@@ -450,8 +480,16 @@
 <section class="section section--accent" id="features">
 <div class="section-inner">
 <h2>PiXiEEDraw の特徴</h2>
-<p>クラウド同期や高解像度出力に加えて「いつでも・どこでも描き続けられる」ことを最優先に開発しています。特に <strong>自動保存</strong> と <strong>スマホ縦横どちらにも最適化されたUI</strong> を中心に、公開初期から安心して使える環境を整えています。</p>
+<p>「ドット絵を描く」「アニメにする」「みんなで仕上げる」をブラウザだけで実現できる構成を目指して開発しています。特に <strong>リアルタイム共同編集</strong> と <strong>アニメーション制作</strong> を強化しています。</p>
 <ul class="project-feature-list">
+<li>
+<strong>リアルタイム共同編集（マルチ）</strong>
+            プロジェクトキーを使って参加者を接続し、同じ作品を同時進行で制作できます。マスター/参加者の役割とセル割当で分業しやすい設計です（テスト運用中）。
+          </li>
+<li>
+<strong>アニメーション制作対応</strong>
+            フレーム編集、FPS設定、オニオンスキン表示を使いながら動きの確認が可能。完成後はGIFとしてそのまま書き出せます。
+          </li>
 <li>
 <strong>モバイル最適 UI</strong>
             スマホの縦画面・横画面をどちらも想定したレスポンシブ設計。指での描画やペン操作でもメニューが邪魔にならず、ステージとツールの並びを自動で再配置します。
@@ -495,7 +533,7 @@
 </dl>
 <dl class="project-meta">
 <dt>リリース</dt>
-<dd>2025年 ベータ公開予定</dd>
+<dd>2025年 公開 / 2026年 継続アップデート中</dd>
 </dl>
 <dl class="project-meta">
 <dt>推奨入力</dt>
@@ -508,6 +546,14 @@
 <div class="section-inner">
 <h2>よくある質問</h2>
 <div class="project-meta-grid project-faq-grid">
+<dl class="project-meta">
+<dt>リアルタイムでみんなで描けますか？</dt>
+<dd>共有モード（マルチ）で、プロジェクトキーを使って複数人で同時に描画できます。マスター/参加者の役割とセル割当で制作できます（テスト運用中）。</dd>
+</dl>
+<dl class="project-meta">
+<dt>アニメーション制作に対応していますか？</dt>
+<dd>フレーム編集、FPS調整、オニオンスキン表示に対応しています。完成したデータはGIFとして書き出しできます。</dd>
+</dl>
 <dl class="project-meta">
 <dt>PCとスマホで続きを描けますか？</dt>
 <dd>PiXiEEDrawファイルやPNGを書き出してGoogle Driveなどのクラウドに保存すれば、家のPCで作業した続きがスマホでも開けます。</dd>
