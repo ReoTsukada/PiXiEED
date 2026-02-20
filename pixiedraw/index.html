@@ -4,24 +4,24 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
-<title>PiXiEEDraw（ピクシードロー） | ブラウザで使えるドット絵エディター</title>
+<title>PiXiEEDraw（ピクシードロー） | リアルタイム共同編集・アニメ対応ドット絵エディター</title>
 <meta content="#1f1f1f" name="theme-color"/>
-<meta content="ブラウザで動作するピクセルアートエディター PiXiEEDraw（ピクシードロー）" name="description"/>
-<meta content="PiXiEEDraw,ピクシードロー,PiXiEED,ピクシード,ドット絵エディター,ピクセルアート" name="keywords"/>
+<meta content="無料で使えるブラウザ版ドット絵エディター。リアルタイム共有モードでみんなで描ける。フレームアニメーション、オニオンスキン、レイヤー合成、GIF/PNG書き出しに対応。" name="description"/>
+<meta content="PiXiEEDraw,ピクシードロー,ドット絵 エディター,ドット絵 描く サイト,ピクセルアート,リアルタイム 共同編集,アニメーション GIF,オニオンスキン" name="keywords"/>
 <meta content="noindex,follow" name="robots"/>
 <link rel="canonical" href="https://pixieed.jp/projects/pixiedraw/"/>
 <meta content="website" property="og:type"/>
 <meta content="PiXiEED" property="og:site_name"/>
 <meta content="ja_JP" property="og:locale"/>
-<meta content="PiXiEEDraw（ピクシードロー）" property="og:title"/>
-<meta content="ブラウザから直接操作できるピクセルアートエディター PiXiEEDraw（ピクシードロー）" property="og:description"/>
+<meta content="PiXiEEDraw（ピクシードロー） | リアルタイム共同編集・アニメ対応" property="og:title"/>
+<meta content="無料で使えるブラウザ版ドット絵エディター。リアルタイム共有モードでみんなで描ける。フレームアニメーション、オニオンスキン、レイヤー合成、GIF/PNG書き出しに対応。" property="og:description"/>
 <meta content="https://pixieed.jp/pixiedraw/" property="og:url"/>
 <meta content="https://pixieed.jp/pixiedraw/ogp-app.png" property="og:image"/>
 <meta content="summary_large_image" name="twitter:card"/>
 <meta content="@PiXiEED_arta" name="twitter:site"/>
 <meta content="https://pixieed.jp/pixiedraw/" name="twitter:url"/>
-<meta content="PiXiEEDraw（ピクシードロー）" name="twitter:title"/>
-<meta content="ブラウザから直接操作できるピクセルアートエディター PiXiEEDraw（ピクシードロー）" name="twitter:description"/>
+<meta content="PiXiEEDraw（ピクシードロー） | リアルタイム共同編集・アニメ対応" name="twitter:title"/>
+<meta content="無料で使えるブラウザ版ドット絵エディター。リアルタイム共有モードでみんなで描ける。フレームアニメーション、オニオンスキン、レイヤー合成、GIF/PNG書き出しに対応。" name="twitter:description"/>
 <meta content="https://pixieed.jp/pixiedraw/ogp-app.png" name="twitter:image"/>
 <script type="application/ld+json">
 {
@@ -32,7 +32,18 @@
   "operatingSystem": "Web",
   "url": "https://pixieed.jp/pixiedraw/",
   "image": "https://pixieed.jp/pixiedraw/ogp-app.png",
-  "description": "ブラウザから直接操作できるピクセルアートエディター PiXiEEDraw（ピクシードロー）。",
+  "description": "無料で使えるブラウザ版ドット絵エディター。リアルタイム共有モードでみんなで描ける。フレームアニメーション、オニオンスキン、レイヤー合成、GIF/PNG書き出しに対応。",
+  "featureList": [
+    "リアルタイム共有モード（マスター/参加者）",
+    "フレームアニメーション編集（FPS設定）",
+    "オニオンスキン表示",
+    "レイヤー不透明度・合成モード",
+    "GIF/PNG/プロジェクト書き出し",
+    "PC/タブレット/スマホ対応"
+  ],
+  "softwareVersion": "2026.02",
+  "dateModified": "2026-02-20",
+  "isAccessibleForFree": true,
   "offers": {
     "@type": "Offer",
     "price": "0",
@@ -117,19 +128,21 @@
 </div>
 <button class="startup-screen__link" id="startupActionSkip" type="button">編集を続ける</button>
 <p class="startup-screen__hint" id="startupScreenHint">ファイルを開くと既存の自動保存先を引き継ぎます。</p>
-<p class="startup-screen__hint">最新更新 (2026/02/19): 共有モード（マルチ）を追加。※テスト中です。</p>
+<p class="startup-screen__hint">最新更新 (2026/02/20): 共有モード（マルチ）とアニメ制作機能を強化。※マルチはテスト中です。</p>
 <div class="startup-screen__recent" hidden="" id="startupRecentProjects">
 <h2 class="startup-screen__recent-title">最近のプロジェクト</h2>
 <div class="startup-recent-list" id="startupRecentList" role="list"></div>
 </div>
 </div>
 </div>
-<div aria-hidden="true" class="update-toast" data-update-id="2026-02-19-multi-beta-and-ui" hidden="" id="updateToast" role="status" aria-live="polite">
+<div aria-hidden="true" class="update-toast" data-update-id="2026-02-20-seo-multi-animation-pwa" hidden="" id="updateToast" role="status" aria-live="polite">
 <div class="update-toast__body">
 <p class="update-toast__message">
-<strong>更新情報 (2026/02/19)</strong><br/>
+<strong>更新情報 (2026/02/20)</strong><br/>
+・PiXiEEDraw専用PWAとして最適化（未インストール端末向けインストール案内を改善）<br/>
 ・共有モード（マルチ）を追加（マスター/参加者、セル割当、差分同期）<br/>
 ・共有モードの役割フローとプロジェクトキー操作を改善（コピー対応）<br/>
+・フレームアニメーション制作（FPS/オニオンスキン/GIF出力）の導線を改善<br/>
 ・共有モードタブのアイコンを更新<br/>
 ・範囲選択時のコピー/貼り付けボタンをPC・横画面でも左上表示に対応<br/>
 ・共有モード（マルチ）はテスト中です<br/>
