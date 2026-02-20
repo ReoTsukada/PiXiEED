@@ -403,6 +403,7 @@
   const MIN_ZOOM_SCALE = ZOOM_STEPS[0];
   const MAX_ZOOM_SCALE = ZOOM_STEPS[ZOOM_STEPS.length - 1];
   const ZOOM_WHEEL_STEP_BASE = 1.25;
+  const WHEEL_ZOOM_RAW_RESET_MS = 160;
   const ZOOM_EPSILON = 1e-6;
   const ZOOM_INDICATOR_TIMEOUT = 1800;
   const DEFAULT_IMPORT_FRAME_DURATION = 1000 / 12;
@@ -1117,6 +1118,8 @@
   let wheelZoomApplying = false;
   let wheelZoomPendingScale = null;
   let wheelZoomPendingFocus = null;
+  let wheelZoomPendingRawScale = null;
+  let wheelZoomRawResetTimer = null;
   let overlayNeedsRedraw = true;
   let overlayRenderScheduled = false;
   let selectionCanvasActive = false;
@@ -18483,6 +18486,13 @@
   }
 
   function setZoom(nextScale, focus) {
+    if (!wheelZoomApplying) {
+      wheelZoomPendingRawScale = null;
+      if (wheelZoomRawResetTimer !== null) {
+        window.clearTimeout(wheelZoomRawResetTimer);
+        wheelZoomRawResetTimer = null;
+      }
+    }
     if (!wheelZoomApplying && wheelZoomRaf !== null) {
       cancelAnimationFrame(wheelZoomRaf);
       wheelZoomRaf = null;
@@ -18604,6 +18614,16 @@
     });
   }
 
+  function scheduleWheelZoomRawReset() {
+    if (wheelZoomRawResetTimer !== null) {
+      window.clearTimeout(wheelZoomRawResetTimer);
+    }
+    wheelZoomRawResetTimer = window.setTimeout(() => {
+      wheelZoomRawResetTimer = null;
+      wheelZoomPendingRawScale = null;
+    }, WHEEL_ZOOM_RAW_RESET_MS);
+  }
+
   function handleCanvasWheel(event) {
     const pointerFocus = getCanvasFocusAt(event.clientX, event.clientY);
     const focus = state.showVirtualCursor
@@ -18632,7 +18652,16 @@
     const currentScale = Number.isFinite(wheelZoomPendingScale)
       ? wheelZoomPendingScale
       : (Number(state.scale) || MIN_ZOOM_SCALE);
-    const targetScale = normalizeZoomScale(currentScale * zoomFactor, currentScale);
+    const currentRawScale = Number.isFinite(wheelZoomPendingRawScale)
+      ? wheelZoomPendingRawScale
+      : currentScale;
+    const nextRawScale = clamp(currentRawScale * zoomFactor, MIN_ZOOM_SCALE, MAX_ZOOM_SCALE);
+    if (!Number.isFinite(nextRawScale) || nextRawScale <= 0) {
+      return;
+    }
+    wheelZoomPendingRawScale = nextRawScale;
+    scheduleWheelZoomRawReset();
+    const targetScale = normalizeZoomScale(nextRawScale, currentRawScale);
     if (Math.abs(targetScale - currentScale) < ZOOM_EPSILON) {
       return;
     }
