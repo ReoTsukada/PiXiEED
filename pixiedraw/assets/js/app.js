@@ -80,10 +80,13 @@
       brushSizeValue: document.getElementById('brushSizeValue'),
       selectSameModeField: document.getElementById('selectSameModeField'),
       selectSameModeButtons: Array.from(document.querySelectorAll('button[data-select-same-mode]')),
+      selectionOutline4Action: document.getElementById('selectionOutline4Action'),
+      selectionOutline8Action: document.getElementById('selectionOutline8Action'),
       brushShapeButtons: Array.from(document.querySelectorAll('button[data-brush-shape]')),
       customBrushInfo: document.getElementById('customBrushInfo'),
       colorMode: Array.from(document.querySelectorAll('input[name="colorMode"]')),
       paletteList: document.getElementById('paletteList'),
+      toolQuickPalette: document.getElementById('toolQuickPalette'),
       addPaletteColor: document.getElementById('addPaletteColor'),
       removePaletteColor: document.getElementById('removePaletteColor'),
       paletteIndex: document.getElementById('paletteIndex'),
@@ -208,6 +211,8 @@
       multiAssignBan: document.getElementById('multiAssignBan'),
       multiAssignmentField: document.querySelector('#panelMulti .multi-assignment-field'),
       multiMaxGuests: document.getElementById('multiMaxGuests'),
+      multiRoomVisibility: document.getElementById('multiRoomVisibility'),
+      multiRoomVisibilityHint: document.getElementById('multiRoomVisibilityHint'),
       multiExportPermission: document.getElementById('multiExportPermission'),
       multiGuestCapacityHint: document.getElementById('multiGuestCapacityHint'),
       multiInviteCopy: document.getElementById('multiInviteCopy'),
@@ -606,6 +611,8 @@
         '出力フォルダ（PiXiEED）運用を改善し、保存先の再利用と案内を強化。',
         'タッチ操作を改善: 2本指ジェスチャでパン/ズームのモードを指が離れるまで固定し、誤動作を低減。',
         '共有モードの文言/導線を整理し、参加ボタン表記を「入室」に統一。',
+        'マスター向けに部屋公開設定（公開/非公開）を追加。非公開時はホーム一覧に表示されません。',
+        'PiXiEEDホームに「公開中の部屋」グリッドを追加。サムネイルを押すと視聴者として入室できます。',
       ]),
     }),
     Object.freeze({
@@ -758,6 +765,9 @@
   const MULTI_EXPORT_PERMISSION_MASTER_AND_GUEST = 'master-guest';
   const MULTI_EXPORT_PERMISSION_ALL = 'all';
   const MULTI_DEFAULT_EXPORT_PERMISSION = MULTI_EXPORT_PERMISSION_MASTER;
+  const MULTI_ROOM_VISIBILITY_PRIVATE = 'private';
+  const MULTI_ROOM_VISIBILITY_PUBLIC = 'public';
+  const MULTI_DEFAULT_ROOM_VISIBILITY = MULTI_ROOM_VISIBILITY_PRIVATE;
   const MULTI_INVITE_QUERY_FLAG = 'multiInvite';
   const MULTI_INVITE_QUERY_KEY = 'multiKey';
   const MULTI_INVITE_QUERY_AUTO_JOIN = 'multiAutoJoin';
@@ -765,6 +775,10 @@
   const MULTI_SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
   const MULTI_SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
   const MULTI_CHANNEL_PREFIX = 'pixiedraw-room-';
+  const MULTI_PUBLIC_LOBBY_CHANNEL = 'pixiedraw-public-rooms-v1';
+  const MULTI_PUBLIC_ROOM_SYNC_THROTTLE_MS = 2400;
+  const MULTI_PUBLIC_ROOM_THUMBNAIL_MAX_EDGE = 128;
+  const MULTI_PUBLIC_ROOM_THUMBNAIL_MAX_DATA_URL_LENGTH = 180000;
   const MULTI_SYNC_THROTTLE_MS = 150;
   const MULTI_LAYER_PATCH_FULL_RATIO = 0.45;
   const MULTI_JOIN_REQUEST_COOLDOWN_MS = 6000;
@@ -870,6 +884,7 @@
     uiView: 'entry',
     desiredRole: 'master',
     maxGuests: MULTI_DEFAULT_GUEST_LIMIT,
+    roomVisibility: MULTI_DEFAULT_ROOM_VISIBILITY,
     exportPermission: MULTI_DEFAULT_EXPORT_PERMISSION,
     assignments: new Map(),
     participants: new Map(),
@@ -884,6 +899,7 @@
     resumeAssignments: null,
     resumeBlockedClientIds: null,
     resumeMaxGuests: null,
+    resumeRoomVisibility: null,
     resumeExportPermission: null,
     layerPatchSnapshots: new Map(),
     blockedClientIds: new Set(),
@@ -896,6 +912,9 @@
     commentIds: new Set(),
     localSnapshotBeforeReplica: null,
     localUnsavedBeforeReplica: false,
+    publicLobbyChannel: null,
+    publicLobbySyncTimer: null,
+    publicLobbySyncInFlight: false,
   };
   let multiSupabaseClientPromise = null;
 
@@ -1098,6 +1117,7 @@
     startPointer: null,
     startPosition: null,
     startCursorCell: null,
+    drawPaletteIndex: null,
     drawSessionStarted: false,
     drawMoved: false,
     initialized: false,
@@ -3308,6 +3328,18 @@
     const movePending = Boolean(moveState && moveState.hasCleared);
     const hasSelection = selectionMaskHasPixels(state.selectionMask);
     const hasClipboard = Boolean(internalClipboard.selection);
+    const disableOutline = (
+      !hasSelection
+      || state.playback.isPlaying
+      || !getActiveLayer()
+      || isMultiSpectatorMode()
+    );
+    if (dom.controls.selectionOutline4Action instanceof HTMLButtonElement) {
+      dom.controls.selectionOutline4Action.disabled = disableOutline;
+    }
+    if (dom.controls.selectionOutline8Action instanceof HTMLButtonElement) {
+      dom.controls.selectionOutline8Action.disabled = disableOutline;
+    }
     const nextMode = movePending ? 'selectionMove' : (hasSelection ? 'clipboard' : 'zoom');
     const isZoomMode = nextMode === 'zoom';
     if (canvasControlMode !== nextMode) {
@@ -3356,7 +3388,10 @@
       } else {
         delete dom.controls.canvasControlButtons.dataset.drawerMode;
       }
-      dom.controls.canvasControlButtons.setAttribute('aria-hidden', String(!showFloatingSelectionActions));
+      dom.controls.canvasControlButtons.setAttribute(
+        'aria-hidden',
+        String(!showFloatingSelectionActions)
+      );
     }
     if (dom.controls.zoomInput instanceof HTMLInputElement) {
       dom.controls.zoomInput.disabled = !isZoomMode;
@@ -14482,6 +14517,16 @@
       syncSelectSameModeControls();
     }
 
+    dom.controls.selectionOutline4Action?.addEventListener('click', () => {
+      applySelectionOutline({ mode: '4' });
+      updateCanvasControlButtons();
+    });
+
+    dom.controls.selectionOutline8Action?.addEventListener('click', () => {
+      applySelectionOutline({ mode: '8' });
+      updateCanvasControlButtons();
+    });
+
     dom.controls.toggleChecker?.addEventListener('change', event => {
       state.showChecker = Boolean(event.target.checked);
       dom.canvases.stack.classList.toggle('is-flat', !state.showChecker);
@@ -15238,6 +15283,40 @@
     }
   }
 
+  function renderToolQuickPalette() {
+    const container = dom.controls.toolQuickPalette;
+    if (!(container instanceof HTMLElement)) {
+      return;
+    }
+    container.innerHTML = '';
+    if (!Array.isArray(state.palette) || !state.palette.length) {
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    state.palette.forEach((color, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'tool-quick-color__swatch pixel-frame';
+      button.dataset.index = String(index);
+      button.title = `${index}: ${rgbaToHex(color)}`;
+      button.setAttribute('aria-label', `クイックカラー ${index}`);
+      button.setAttribute('role', 'option');
+      const isActive = index === state.activePaletteIndex;
+      const isSecondary = index === state.secondaryPaletteIndex;
+      button.setAttribute('aria-selected', String(isActive));
+      button.classList.toggle('is-active', isActive);
+      button.classList.toggle('is-secondary', isSecondary);
+      applyPixelFrameBackground(button, color);
+      button.addEventListener('click', () => setActivePaletteIndex(index));
+      button.addEventListener('contextmenu', event => {
+        event.preventDefault();
+        setSecondaryPaletteIndex(index);
+      });
+      fragment.appendChild(button);
+    });
+    container.appendChild(fragment);
+  }
+
   function syncPaletteInputs() {
     const color = state.palette[state.activePaletteIndex];
     if (!color) return;
@@ -15292,6 +15371,7 @@
       });
       container.appendChild(button);
     });
+    renderToolQuickPalette();
     updateColorTabSwatch();
     if (dom.controls.removePaletteColor) {
       dom.controls.removePaletteColor.disabled = state.palette.length <= 1;
@@ -17829,6 +17909,9 @@
     if (!virtualCursorDrawState.active || !tool) {
       return;
     }
+    if (pointerState.tool !== tool) {
+      pointerState.tool = tool;
+    }
 
     if (BRUSH_TOOLS.has(tool)) {
       const last = virtualCursorDrawState.lastPosition;
@@ -17934,7 +18017,7 @@
     }
   }
 
-  function startVirtualCursorDrawSession() {
+  function startVirtualCursorDrawSession({ drawPaletteIndex = null } = {}) {
     if (virtualCursorDrawState.active) {
       return false;
     }
@@ -17989,7 +18072,9 @@
     pointerState.preview = null;
     pointerState.selectionPreview = null;
     pointerState.selectionMove = null;
-    pointerState.drawPaletteIndex = null;
+    pointerState.drawPaletteIndex = HISTORY_DRAW_TOOLS.has(activeTool) && Number.isFinite(drawPaletteIndex)
+      ? normalizePaletteIndex(drawPaletteIndex, state.activePaletteIndex)
+      : null;
     pointerState.selectionClearedOnDown = false;
     pointerState.curveHandle = null;
 
@@ -18247,6 +18332,7 @@
     pointerState.selectionPreview = null;
     pointerState.selectionMove = null;
     pointerState.path = [];
+    pointerState.drawPaletteIndex = null;
     pointerState.selectionClearedOnDown = false;
     if (tool !== 'curve') {
       pointerState.tool = state.tool;
@@ -18477,7 +18563,24 @@
     return entry;
   }
 
-  function performVirtualCursorAction() {
+  function resolveFloatingDrawButtonPressTarget(event, button) {
+    const primaryPaletteIndex = normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex);
+    const secondaryPaletteIndex = normalizePaletteIndex(state.secondaryPaletteIndex, primaryPaletteIndex);
+    if (!(button instanceof HTMLElement) || !Number.isFinite(event?.clientX)) {
+      return { side: 'primary', paletteIndex: primaryPaletteIndex };
+    }
+    const rect = button.getBoundingClientRect();
+    if (!(rect.width > 0)) {
+      return { side: 'primary', paletteIndex: primaryPaletteIndex };
+    }
+    const relativeX = event.clientX - rect.left;
+    if (relativeX >= rect.width / 2) {
+      return { side: 'secondary', paletteIndex: secondaryPaletteIndex };
+    }
+    return { side: 'primary', paletteIndex: primaryPaletteIndex };
+  }
+
+  function performVirtualCursorAction({ drawPaletteIndex = null } = {}) {
     if (state.playback.isPlaying) {
       return;
     }
@@ -18552,44 +18655,53 @@
       return;
     }
 
-    beginHistoryIfNeeded();
+    const previousDrawPaletteIndex = pointerState.drawPaletteIndex;
+    pointerState.drawPaletteIndex = HISTORY_DRAW_TOOLS.has(activeTool) && Number.isFinite(drawPaletteIndex)
+      ? normalizePaletteIndex(drawPaletteIndex, state.activePaletteIndex)
+      : null;
 
-    switch (activeTool) {
-      case 'pen':
-      case 'eraser':
-        applyBrushStroke(position.x, position.y, position.x, position.y);
-        actionPerformed = true;
-        break;
-      case 'fill':
-        floodFill(position.x, position.y);
-        actionPerformed = true;
-        break;
-      case 'line':
-        drawLine(position, position);
-        actionPerformed = true;
-        break;
-      case 'rect':
-        drawRectangle(position, position, false);
-        actionPerformed = true;
-        break;
-      case 'rectFill':
-        drawRectangle(position, position, true);
-        actionPerformed = true;
-        break;
-      case 'ellipse':
-        drawEllipse(position, position, false);
-        actionPerformed = true;
-        break;
-      case 'ellipseFill':
-        drawEllipse(position, position, true);
-        actionPerformed = true;
-        break;
-      case 'curve':
-        applyBrushStroke(position.x, position.y, position.x, position.y);
-        actionPerformed = true;
-        break;
-      default:
-        break;
+    try {
+      beginHistoryIfNeeded();
+
+      switch (activeTool) {
+        case 'pen':
+        case 'eraser':
+          applyBrushStroke(position.x, position.y, position.x, position.y);
+          actionPerformed = true;
+          break;
+        case 'fill':
+          floodFill(position.x, position.y, pointerState.drawPaletteIndex);
+          actionPerformed = true;
+          break;
+        case 'line':
+          drawLine(position, position);
+          actionPerformed = true;
+          break;
+        case 'rect':
+          drawRectangle(position, position, false);
+          actionPerformed = true;
+          break;
+        case 'rectFill':
+          drawRectangle(position, position, true);
+          actionPerformed = true;
+          break;
+        case 'ellipse':
+          drawEllipse(position, position, false);
+          actionPerformed = true;
+          break;
+        case 'ellipseFill':
+          drawEllipse(position, position, true);
+          actionPerformed = true;
+          break;
+        case 'curve':
+          applyBrushStroke(position.x, position.y, position.x, position.y);
+          actionPerformed = true;
+          break;
+        default:
+          break;
+      }
+    } finally {
+      pointerState.drawPaletteIndex = previousDrawPaletteIndex;
     }
 
     if (startedHistory) {
@@ -18624,14 +18736,19 @@
     if (!button) {
       return;
     }
+    const pressTarget = resolveFloatingDrawButtonPressTarget(event, button);
     floatingDrawButtonState.pointerId = event.pointerId ?? -1;
     floatingDrawButtonState.pointerType = typeof event.pointerType === 'string' ? event.pointerType : null;
     floatingDrawButtonState.dragging = false;
     floatingDrawButtonState.startPointer = { x: event.clientX, y: event.clientY };
     floatingDrawButtonState.startPosition = { ...floatingDrawButtonState.position };
     floatingDrawButtonState.startCursorCell = getVirtualCursorCellPosition();
+    floatingDrawButtonState.drawPaletteIndex = pressTarget.paletteIndex;
     floatingDrawButtonState.drawMoved = false;
-    floatingDrawButtonState.drawSessionStarted = startVirtualCursorDrawSession();
+    floatingDrawButtonState.drawSessionStarted = startVirtualCursorDrawSession({
+      drawPaletteIndex: floatingDrawButtonState.drawPaletteIndex,
+    });
+    button.dataset.drawSide = pressTarget.side;
     try {
       button.setPointerCapture?.(event.pointerId);
     } catch (error) {
@@ -18664,7 +18781,12 @@
           cancelVirtualCursorDrawSession();
         }
         floatingDrawButtonState.drawSessionStarted = false;
+        floatingDrawButtonState.drawPaletteIndex = null;
         floatingDrawButtonState.drawMoved = false;
+        const button = dom.floatingDrawButton;
+        if (button instanceof HTMLElement) {
+          delete button.dataset.drawSide;
+        }
       }
     }
     if (floatingDrawButtonState.dragging) {
@@ -18689,14 +18811,21 @@
     }
     const wasDragging = floatingDrawButtonState.dragging;
     const wasDrawing = virtualCursorDrawState.active;
+    const drawPaletteIndex = Number.isFinite(floatingDrawButtonState.drawPaletteIndex)
+      ? floatingDrawButtonState.drawPaletteIndex
+      : null;
     floatingDrawButtonState.pointerId = null;
     floatingDrawButtonState.pointerType = null;
     floatingDrawButtonState.dragging = false;
     floatingDrawButtonState.startPointer = null;
     floatingDrawButtonState.startPosition = null;
     floatingDrawButtonState.startCursorCell = null;
+    floatingDrawButtonState.drawPaletteIndex = null;
     floatingDrawButtonState.drawMoved = false;
     floatingDrawButtonState.drawSessionStarted = false;
+    if (button instanceof HTMLElement) {
+      delete button.dataset.drawSide;
+    }
     if (wasDrawing) {
       if (wasDragging) {
         cancelVirtualCursorDrawSession();
@@ -18706,7 +18835,7 @@
       return;
     }
     if (!wasDragging) {
-      performVirtualCursorAction();
+      performVirtualCursorAction({ drawPaletteIndex });
     }
   }
 
@@ -18730,8 +18859,12 @@
     floatingDrawButtonState.startPointer = null;
     floatingDrawButtonState.startPosition = null;
     floatingDrawButtonState.startCursorCell = null;
+    floatingDrawButtonState.drawPaletteIndex = null;
     floatingDrawButtonState.drawMoved = false;
     floatingDrawButtonState.drawSessionStarted = false;
+    if (button instanceof HTMLElement) {
+      delete button.dataset.drawSide;
+    }
   }
 
   function updateFloatingDrawButtonEnabledState() {
@@ -18762,14 +18895,17 @@
       floatingDrawButtonState.startPointer = null;
       floatingDrawButtonState.startPosition = null;
       floatingDrawButtonState.startCursorCell = null;
+      floatingDrawButtonState.drawPaletteIndex = null;
       floatingDrawButtonState.drawMoved = false;
       floatingDrawButtonState.drawSessionStarted = false;
+      delete button.dataset.drawSide;
     } else {
       button.classList.remove('is-hidden');
       button.classList.remove('is-disabled');
       button.removeAttribute('hidden');
       button.setAttribute('aria-hidden', 'false');
       button.setAttribute('aria-disabled', 'false');
+      delete button.dataset.drawSide;
       clampFloatingDrawButtonPosition();
     }
     syncVirtualCursorControlVisibility({ syncToggle: true });
@@ -19838,6 +19974,13 @@
     }
 
     if (activeTool === 'fill') {
+      if (isTouch) {
+        // Touch fill commits on release; keep showing preview while holding.
+        requestOverlayRender();
+        window.addEventListener('pointermove', handlePointerMove);
+        window.addEventListener('pointerup', handlePointerUp);
+        return;
+      }
       floodFill(position.x, position.y, pointerState.drawPaletteIndex);
       commitHistory();
       requestOverlayRender();
@@ -20003,6 +20146,12 @@
     if (pointerState.tool === 'pen' || pointerState.tool === 'eraser') {
       applyBrushStroke(pointerState.last.x, pointerState.last.y, position.x, position.y);
       pointerState.last = position;
+    } else if (pointerState.tool === 'fill') {
+      const last = pointerState.last;
+      if (!last || last.x !== position.x || last.y !== position.y) {
+        pointerState.last = position;
+        requestOverlayRender();
+      }
     } else if (pointerState.tool === 'line' || pointerState.tool === 'rect' || pointerState.tool === 'rectFill' || pointerState.tool === 'ellipse' || pointerState.tool === 'ellipseFill') {
       pointerState.preview = { start: pointerState.start, end: position, points: pointerState.path.slice() };
       requestOverlayRender();
@@ -20131,6 +20280,11 @@
       drawEllipse(pointerState.start, pointerState.current, false);
     } else if (tool === 'ellipseFill') {
       drawEllipse(pointerState.start, pointerState.current, true);
+    } else if (tool === 'fill') {
+      const fillTarget = pointerState.current || pointerState.start;
+      if (fillTarget) {
+        floodFill(fillTarget.x, fillTarget.y, pointerState.drawPaletteIndex);
+      }
     } else if (tool === 'selectionMove' || tool === 'layerMove') {
       finalizeSelectionMove();
     } else if (tool === 'selectRect') {
@@ -20215,6 +20369,12 @@
     if (pointerState.pointerId === event.pointerId) {
       if (pointerState.tool === POINTER_TOOL_CUSTOM_BRUSH_RECT) {
         keyboardState.customBrushCreateOnPointerUp = false;
+      }
+      if (pointerState.tool === 'fill') {
+        abortActivePointerInteraction({ commitHistory: false });
+        rollbackPendingHistory({ reRender: false });
+        requestOverlayRender();
+        return;
       }
       abortActivePointerInteraction();
     }
@@ -20551,6 +20711,123 @@
     requestOverlayRender();
     scheduleSessionPersist();
     updateAutosaveStatus(`カスタムブラシを作成しました (${built.pixelCount}px)`, 'success');
+    return true;
+  }
+
+  function applySelectionOutline(options = {}) {
+    const outlineMode = options?.mode === '4' ? '4' : '8';
+    const modeLabel = outlineMode === '4' ? '4方向' : '8方向';
+    const mask = state.selectionMask;
+    if (!selectionMaskHasPixels(mask)) {
+      updateAutosaveStatus('アウトライン化するには範囲選択が必要です', 'warn');
+      return false;
+    }
+    if (isMultiSpectatorMode()) {
+      setMultiStatus('視聴モードでは描画できません', 'warn');
+      return false;
+    }
+    if (isMultiGuestMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
+      return false;
+    }
+    const layer = getActiveLayer();
+    if (!layer) {
+      updateAutosaveStatus('アウトラインを描画するレイヤーがありません', 'warn');
+      return false;
+    }
+    const width = Math.max(0, Number(state.width) || 0);
+    const height = Math.max(0, Number(state.height) || 0);
+    if (width <= 0 || height <= 0 || !(mask instanceof Uint8Array) || mask.length !== (width * height)) {
+      updateAutosaveStatus('選択範囲情報が不正なためアウトラインを描画できません', 'warn');
+      return false;
+    }
+    const bounds = normalizeSelectionBoundsForState(state.selectionBounds) || computeSelectionBoundsFromMask(mask);
+    if (!bounds) {
+      updateAutosaveStatus('アウトライン化するには範囲選択が必要です', 'warn');
+      return false;
+    }
+
+    const outlineMask = new Uint8Array(mask.length);
+    const neighbors = outlineMode === '4'
+      ? [
+        { x: 0, y: -1 },
+        { x: -1, y: 0 }, { x: 1, y: 0 },
+        { x: 0, y: 1 },
+      ]
+      : [
+        { x: -1, y: -1 }, { x: 0, y: -1 }, { x: 1, y: -1 },
+        { x: -1, y: 0 }, { x: 1, y: 0 },
+        { x: -1, y: 1 }, { x: 0, y: 1 }, { x: 1, y: 1 },
+      ];
+    for (let y = bounds.y0; y <= bounds.y1; y += 1) {
+      const rowOffset = y * width;
+      for (let x = bounds.x0; x <= bounds.x1; x += 1) {
+        const idx = rowOffset + x;
+        if (mask[idx] !== 1) {
+          continue;
+        }
+        for (let i = 0; i < neighbors.length; i += 1) {
+          const nextX = x + neighbors[i].x;
+          const nextY = y + neighbors[i].y;
+          if (nextX < 0 || nextY < 0 || nextX >= width || nextY >= height) {
+            continue;
+          }
+          const nextIdx = (nextY * width) + nextX;
+          if (mask[nextIdx] === 1) {
+            continue;
+          }
+          outlineMask[nextIdx] = 1;
+        }
+      }
+    }
+
+    const paletteIndex = normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex);
+    const changedIndices = [];
+    let dirtyMinX = width;
+    let dirtyMinY = height;
+    let dirtyMaxX = -1;
+    let dirtyMaxY = -1;
+    for (let idx = 0; idx < outlineMask.length; idx += 1) {
+      if (outlineMask[idx] !== 1) {
+        continue;
+      }
+      if (layer.indices[idx] === paletteIndex) {
+        continue;
+      }
+      changedIndices.push(idx);
+      const y = Math.floor(idx / width);
+      const x = idx - (y * width);
+      if (x < dirtyMinX) dirtyMinX = x;
+      if (y < dirtyMinY) dirtyMinY = y;
+      if (x > dirtyMaxX) dirtyMaxX = x;
+      if (y > dirtyMaxY) dirtyMaxY = y;
+    }
+
+    if (!changedIndices.length) {
+      updateAutosaveStatus('アウトラインの追加対象がありません', 'info');
+      return false;
+    }
+
+    beginHistory(outlineMode === '4' ? 'selectionOutline4' : 'selectionOutline8');
+    const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    changedIndices.forEach(idx => {
+      layer.indices[idx] = paletteIndex;
+      if (direct) {
+        const base = idx * 4;
+        direct[base] = 0;
+        direct[base + 1] = 0;
+        direct[base + 2] = 0;
+        direct[base + 3] = 0;
+      }
+    });
+    markHistoryDirty();
+    if (dirtyMinX <= dirtyMaxX && dirtyMinY <= dirtyMaxY) {
+      markDirtyRect(dirtyMinX, dirtyMinY, dirtyMaxX, dirtyMaxY);
+    }
+    requestRender();
+    requestOverlayRender();
+    commitHistory();
+    scheduleSessionPersist();
+    updateAutosaveStatus(`${modeLabel}アウトラインを追加しました (${changedIndices.length}px)`, 'success');
     return true;
   }
 
@@ -22331,6 +22608,9 @@
     requestAnimationFrame(() => {
       renderScheduled = false;
       renderCanvas();
+      if (shouldSyncMultiPublicLobbyRoom()) {
+        scheduleMultiPublicLobbyRoomSync({ immediate: false });
+      }
       if (!state.playback.isPlaying) {
         requestOverlayRender();
       }
@@ -22711,7 +22991,9 @@
     updateTouchPointer(event);
     event.preventDefault();
     hoverPixel = null;
-    resetPointerStateForVirtualCursor();
+    if (!virtualCursorDrawState.active) {
+      resetPointerStateForVirtualCursor();
+    }
     captureVirtualCursorPointer(event.pointerId, event.pointerType, dom.canvasViewport, event);
   }
 
@@ -22935,7 +23217,14 @@
       drawBrushPreview(focusPixel, activeTool, overrideSize);
     }
 
-    if (state.showPixelGuides && ctx.overlay && !pointerState.active && activeTool === 'fill' && focusPixel) {
+    const isTouchFillHoldPreview = pointerState.active && pointerState.tool === 'fill';
+    if (
+      ctx.overlay
+      && activeTool === 'fill'
+      && focusPixel
+      && (!pointerState.active || isTouchFillHoldPreview)
+      && (state.showPixelGuides || isTouchFillHoldPreview)
+    ) {
       const previewPixels = getFillPreviewPixels(focusPixel.x, focusPixel.y);
       if (previewPixels && previewPixels.length) {
         ctx.overlay.save();
@@ -22964,17 +23253,23 @@
       }
     }
 
+    const previewTool = (virtualCursorDrawState.active && virtualCursorDrawState.tool)
+      ? virtualCursorDrawState.tool
+      : (pointerState.tool || state.tool);
     if (
       pointerState.preview
       && ctx.overlay
-      && (pointerState.tool === 'line'
-        || pointerState.tool === 'rect'
-        || pointerState.tool === 'rectFill'
-        || pointerState.tool === 'ellipse'
-        || pointerState.tool === 'ellipseFill'
-        || pointerState.tool === 'curve')
+      && (previewTool === 'line'
+        || previewTool === 'rect'
+        || previewTool === 'rectFill'
+        || previewTool === 'ellipse'
+        || previewTool === 'ellipseFill'
+        || previewTool === 'curve')
     ) {
-      drawPreviewShape(pointerState);
+      drawPreviewShape({
+        preview: pointerState.preview,
+        tool: previewTool,
+      });
     }
 
     if ((state.showPixelGuides || state.showVirtualCursor) && ctx.overlay && state.tool === 'curve' && curveBuilder) {
@@ -23579,7 +23874,9 @@
   }
 
   function drawPreviewShape(previewState) {
-    const tool = pointerState.tool || state.tool;
+    const tool = (previewState && typeof previewState.tool === 'string')
+      ? previewState.tool
+      : (pointerState.tool || state.tool);
     const preview = previewState.preview;
     if (!preview) return;
     const { start, end, points } = preview;
@@ -23588,7 +23885,7 @@
     const height = state.height;
     const selectionMask = state.selectionMask;
     const color = getActiveDrawColor();
-    const previewTool = pointerState.tool || state.tool;
+    const previewTool = tool;
     const mirrorEnabled = isMirrorEnabledForTool(previewTool);
     const offsets = getBrushOffsets(state.brushSize || 1);
     const painted = new Set();
@@ -24074,6 +24371,10 @@
         timelapseEnabled: Boolean(timelapseState.enabled),
         timelapseFps: normalizeTimelapseFps(timelapseState.fps),
         multiMaxGuests: normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT),
+        multiRoomVisibility: normalizeMultiRoomVisibility(
+          multiState.roomVisibility,
+          MULTI_DEFAULT_ROOM_VISIBILITY
+        ),
         multiExportPermission: normalizeMultiExportPermission(
           multiState.exportPermission,
           MULTI_DEFAULT_EXPORT_PERMISSION
@@ -24244,6 +24545,12 @@
     if (Number.isFinite(payload.multiMaxGuests)) {
       multiState.maxGuests = normalizeMultiMaxGuests(payload.multiMaxGuests, multiState.maxGuests);
     }
+    if (typeof payload.multiRoomVisibility === 'string') {
+      multiState.roomVisibility = normalizeMultiRoomVisibility(
+        payload.multiRoomVisibility,
+        multiState.roomVisibility
+      );
+    }
     if (typeof payload.multiExportPermission === 'string') {
       multiState.exportPermission = normalizeMultiExportPermission(
         payload.multiExportPermission,
@@ -24298,6 +24605,245 @@
       return '全員';
     }
     return 'マスターのみ';
+  }
+
+  function normalizeMultiRoomVisibility(value, fallback = MULTI_DEFAULT_ROOM_VISIBILITY) {
+    if (value === MULTI_ROOM_VISIBILITY_PUBLIC) {
+      return MULTI_ROOM_VISIBILITY_PUBLIC;
+    }
+    if (value === MULTI_ROOM_VISIBILITY_PRIVATE) {
+      return MULTI_ROOM_VISIBILITY_PRIVATE;
+    }
+    return fallback === MULTI_ROOM_VISIBILITY_PUBLIC
+      ? MULTI_ROOM_VISIBILITY_PUBLIC
+      : MULTI_ROOM_VISIBILITY_PRIVATE;
+  }
+
+  function getMultiRoomVisibilityLabel(value = multiState.roomVisibility) {
+    return normalizeMultiRoomVisibility(value, MULTI_DEFAULT_ROOM_VISIBILITY) === MULTI_ROOM_VISIBILITY_PUBLIC
+      ? '公開'
+      : '非公開';
+  }
+
+  function isMultiRoomPublic() {
+    return normalizeMultiRoomVisibility(
+      multiState.roomVisibility,
+      MULTI_DEFAULT_ROOM_VISIBILITY
+    ) === MULTI_ROOM_VISIBILITY_PUBLIC;
+  }
+
+  function shouldSyncMultiPublicLobbyRoom() {
+    return Boolean(
+      isMultiMasterMode()
+      && multiState.connected
+      && !multiState.connecting
+      && normalizeMultiProjectKey(multiState.projectKey)
+      && isMultiRoomPublic()
+    );
+  }
+
+  function clearMultiPublicLobbySyncTimer() {
+    if (multiState.publicLobbySyncTimer !== null) {
+      window.clearTimeout(multiState.publicLobbySyncTimer);
+      multiState.publicLobbySyncTimer = null;
+    }
+  }
+
+  async function disconnectMultiPublicLobbyChannel() {
+    clearMultiPublicLobbySyncTimer();
+    const lobbyChannel = multiState.publicLobbyChannel;
+    multiState.publicLobbyChannel = null;
+    multiState.publicLobbySyncInFlight = false;
+    if (!lobbyChannel) {
+      return;
+    }
+    try {
+      if (typeof lobbyChannel.untrack === 'function') {
+        await lobbyChannel.untrack();
+      }
+    } catch (error) {
+      // Ignore untrack failures.
+    }
+    try {
+      if (typeof lobbyChannel.unsubscribe === 'function') {
+        await lobbyChannel.unsubscribe();
+      }
+    } catch (error) {
+      // Ignore unsubscribe failures.
+    }
+  }
+
+  async function ensureMultiPublicLobbyChannel() {
+    if (multiState.publicLobbyChannel) {
+      return multiState.publicLobbyChannel;
+    }
+    const supabase = await ensureMultiSupabaseClient();
+    const projectKey = normalizeMultiProjectKey(multiState.projectKey);
+    const clientId = typeof multiState.clientId === 'string' && multiState.clientId.trim()
+      ? multiState.clientId.trim()
+      : ensureMultiClientId();
+    const presenceKey = projectKey
+      ? `${projectKey}:${clientId}`
+      : clientId;
+    const channel = supabase.channel(MULTI_PUBLIC_LOBBY_CHANNEL, {
+      config: {
+        presence: { key: presenceKey },
+      },
+    });
+    await waitForMultiSubscription(channel);
+    multiState.publicLobbyChannel = channel;
+    return channel;
+  }
+
+  function getMultiPresenceParticipantCounts() {
+    let guestCount = 0;
+    let spectatorCount = 0;
+    let totalCount = 0;
+    if (multiState.participants instanceof Map && multiState.participants.size) {
+      multiState.participants.forEach(entry => {
+        if (!entry || typeof entry !== 'object') {
+          return;
+        }
+        const clientId = typeof entry.clientId === 'string' ? entry.clientId.trim() : '';
+        if (clientId && isMultiClientBlocked(clientId)) {
+          return;
+        }
+        const role = normalizeMultiRole(entry.role, 'guest');
+        totalCount += 1;
+        if (role === 'guest') {
+          guestCount += 1;
+        } else if (role === 'spectator') {
+          spectatorCount += 1;
+        }
+      });
+    }
+    if (!totalCount) {
+      guestCount = getAssignedGuestCount();
+      totalCount = Math.max(1, guestCount + 1);
+    }
+    return { guestCount, spectatorCount, totalCount };
+  }
+
+  function createMultiPublicRoomThumbnailDataUrl() {
+    const sourceCanvas = dom.canvases.drawing;
+    if (!(sourceCanvas instanceof HTMLCanvasElement)) {
+      return '';
+    }
+    const sourceWidth = Math.max(0, Math.floor(Number(sourceCanvas.width) || 0));
+    const sourceHeight = Math.max(0, Math.floor(Number(sourceCanvas.height) || 0));
+    if (!sourceWidth || !sourceHeight) {
+      return '';
+    }
+    const attemptEdges = [
+      MULTI_PUBLIC_ROOM_THUMBNAIL_MAX_EDGE,
+      96,
+      80,
+      64,
+      48,
+    ];
+    let fallbackDataUrl = '';
+    for (let i = 0; i < attemptEdges.length; i += 1) {
+      const edge = Math.max(16, Math.floor(attemptEdges[i] || 16));
+      const scale = clamp(
+        Math.min(edge / sourceWidth, edge / sourceHeight),
+        0.1,
+        4
+      );
+      const targetWidth = clamp(Math.round(sourceWidth * scale), 1, edge);
+      const targetHeight = clamp(Math.round(sourceHeight * scale), 1, edge);
+      const thumbCanvas = document.createElement('canvas');
+      thumbCanvas.width = targetWidth;
+      thumbCanvas.height = targetHeight;
+      const thumbCtx = thumbCanvas.getContext('2d');
+      if (!thumbCtx) {
+        continue;
+      }
+      thumbCtx.imageSmoothingEnabled = false;
+      thumbCtx.msImageSmoothingEnabled = false;
+      thumbCtx.webkitImageSmoothingEnabled = false;
+      thumbCtx.clearRect(0, 0, targetWidth, targetHeight);
+      thumbCtx.drawImage(sourceCanvas, 0, 0, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight);
+      const dataUrl = thumbCanvas.toDataURL('image/png');
+      if (!fallbackDataUrl) {
+        fallbackDataUrl = dataUrl;
+      }
+      if (dataUrl.length <= MULTI_PUBLIC_ROOM_THUMBNAIL_MAX_DATA_URL_LENGTH) {
+        return dataUrl;
+      }
+    }
+    return fallbackDataUrl;
+  }
+
+  function buildMultiPublicLobbyPresencePayload() {
+    if (!shouldSyncMultiPublicLobbyRoom()) {
+      return null;
+    }
+    const projectKey = normalizeMultiProjectKey(multiState.projectKey);
+    if (!projectKey) {
+      return null;
+    }
+    const counts = getMultiPresenceParticipantCounts();
+    return {
+      projectKey,
+      masterClientId: multiState.clientId,
+      masterName: getLocalMultiParticipantName(),
+      maxGuests: normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT),
+      guestCount: counts.guestCount,
+      spectatorCount: counts.spectatorCount,
+      participantCount: counts.totalCount,
+      roomVisibility: MULTI_ROOM_VISIBILITY_PUBLIC,
+      isPublic: true,
+      thumbnailDataUrl: createMultiPublicRoomThumbnailDataUrl(),
+      updatedAt: Date.now(),
+      sentAt: Date.now(),
+    };
+  }
+
+  async function syncMultiPublicLobbyRoomNow() {
+    if (multiState.publicLobbySyncInFlight) {
+      return false;
+    }
+    if (!shouldSyncMultiPublicLobbyRoom()) {
+      await disconnectMultiPublicLobbyChannel();
+      return false;
+    }
+    multiState.publicLobbySyncInFlight = true;
+    try {
+      const payload = buildMultiPublicLobbyPresencePayload();
+      if (!payload) {
+        return false;
+      }
+      const lobbyChannel = await ensureMultiPublicLobbyChannel();
+      if (!lobbyChannel || typeof lobbyChannel.track !== 'function') {
+        return false;
+      }
+      await lobbyChannel.track(payload);
+      return true;
+    } catch (error) {
+      console.warn('Failed to sync public room presence', error);
+      return false;
+    } finally {
+      multiState.publicLobbySyncInFlight = false;
+    }
+  }
+
+  function scheduleMultiPublicLobbyRoomSync({ immediate = false } = {}) {
+    if (!shouldSyncMultiPublicLobbyRoom()) {
+      disconnectMultiPublicLobbyChannel();
+      return;
+    }
+    if (immediate) {
+      clearMultiPublicLobbySyncTimer();
+      syncMultiPublicLobbyRoomNow();
+      return;
+    }
+    if (multiState.publicLobbySyncTimer !== null) {
+      return;
+    }
+    multiState.publicLobbySyncTimer = window.setTimeout(() => {
+      multiState.publicLobbySyncTimer = null;
+      syncMultiPublicLobbyRoomNow();
+    }, MULTI_PUBLIC_ROOM_SYNC_THROTTLE_MS);
   }
 
   function canCurrentClientExportProject() {
@@ -24475,6 +25021,7 @@
     multiState.resumeAssignments = null;
     multiState.resumeBlockedClientIds = null;
     multiState.resumeMaxGuests = null;
+    multiState.resumeRoomVisibility = null;
     multiState.resumeExportPermission = null;
     syncMultiControls();
     setMultiStatus(`共有モード: 招待リンクを読み込みました (${invite.projectKey})`, 'info');
@@ -24549,6 +25096,12 @@
       maxGuests: role === 'master'
         ? normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT)
         : MULTI_DEFAULT_GUEST_LIMIT,
+      roomVisibility: role === 'master'
+        ? normalizeMultiRoomVisibility(
+          multiState.roomVisibility,
+          MULTI_DEFAULT_ROOM_VISIBILITY
+        )
+        : MULTI_DEFAULT_ROOM_VISIBILITY,
       exportPermission: role === 'master'
         ? normalizeMultiExportPermission(multiState.exportPermission, MULTI_DEFAULT_EXPORT_PERMISSION)
         : MULTI_DEFAULT_EXPORT_PERMISSION,
@@ -24598,10 +25151,21 @@
     const maxGuests = role === 'master'
       ? normalizeMultiMaxGuests(parsed.maxGuests, MULTI_DEFAULT_GUEST_LIMIT)
       : MULTI_DEFAULT_GUEST_LIMIT;
+    const roomVisibility = role === 'master'
+      ? normalizeMultiRoomVisibility(parsed.roomVisibility, MULTI_DEFAULT_ROOM_VISIBILITY)
+      : MULTI_DEFAULT_ROOM_VISIBILITY;
     const exportPermission = role === 'master'
       ? normalizeMultiExportPermission(parsed.exportPermission, MULTI_DEFAULT_EXPORT_PERMISSION)
       : MULTI_DEFAULT_EXPORT_PERMISSION;
-    return { projectKey, role, assignments, blockedClientIds, maxGuests, exportPermission };
+    return {
+      projectKey,
+      role,
+      assignments,
+      blockedClientIds,
+      maxGuests,
+      roomVisibility,
+      exportPermission,
+    };
   }
 
   function maybeAutoResumeMultiSession() {
@@ -24629,11 +25193,18 @@
     multiState.resumeMaxGuests = pending.role === 'master'
       ? normalizeMultiMaxGuests(pending.maxGuests, multiState.maxGuests)
       : null;
+    multiState.resumeRoomVisibility = pending.role === 'master'
+      ? normalizeMultiRoomVisibility(pending.roomVisibility, multiState.roomVisibility)
+      : null;
     multiState.resumeExportPermission = pending.role === 'master'
       ? normalizeMultiExportPermission(pending.exportPermission, multiState.exportPermission)
       : null;
     if (pending.role === 'master') {
       multiState.maxGuests = normalizeMultiMaxGuests(pending.maxGuests, multiState.maxGuests);
+      multiState.roomVisibility = normalizeMultiRoomVisibility(
+        pending.roomVisibility,
+        multiState.roomVisibility
+      );
       multiState.exportPermission = normalizeMultiExportPermission(
         pending.exportPermission,
         multiState.exportPermission
@@ -25984,6 +26555,10 @@
       nextRole: normalizedRole,
       reason: typeof reason === 'string' ? reason.trim().slice(0, 64) : '',
       maxGuests: normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT),
+      roomVisibility: normalizeMultiRoomVisibility(
+        multiState.roomVisibility,
+        MULTI_DEFAULT_ROOM_VISIBILITY
+      ),
       sentAt: Date.now(),
     });
   }
@@ -26741,6 +27316,10 @@
 
   function syncMultiControls() {
     multiState.maxGuests = normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT);
+    multiState.roomVisibility = normalizeMultiRoomVisibility(
+      multiState.roomVisibility,
+      MULTI_DEFAULT_ROOM_VISIBILITY
+    );
     multiState.exportPermission = normalizeMultiExportPermission(
       multiState.exportPermission,
       MULTI_DEFAULT_EXPORT_PERMISSION
@@ -26813,6 +27392,10 @@
       dom.controls.multiMaxGuests.max = String(MULTI_GUEST_LIMIT_MAX);
       dom.controls.multiMaxGuests.disabled = multiState.connecting || !inMasterConfigMode;
     }
+    if (dom.controls.multiRoomVisibility instanceof HTMLSelectElement) {
+      dom.controls.multiRoomVisibility.value = multiState.roomVisibility;
+      dom.controls.multiRoomVisibility.disabled = multiState.connecting || !inMasterConfigMode;
+    }
     if (dom.controls.multiExportPermission instanceof HTMLSelectElement) {
       dom.controls.multiExportPermission.value = multiState.exportPermission;
       dom.controls.multiExportPermission.disabled = multiState.connecting || !inMasterConfigMode;
@@ -26820,6 +27403,17 @@
     if (dom.controls.multiGuestCapacityHint instanceof HTMLElement) {
       const assignedGuestCount = getAssignedGuestCount();
       dom.controls.multiGuestCapacityHint.textContent = `参加枠: ${assignedGuestCount} / ${multiState.maxGuests}`;
+    }
+    if (dom.controls.multiRoomVisibilityHint instanceof HTMLElement) {
+      if (!multiState.connected) {
+        dom.controls.multiRoomVisibilityHint.textContent = '接続後に公開設定が反映されます。';
+      } else if (!isMultiMasterMode()) {
+        dom.controls.multiRoomVisibilityHint.textContent = `部屋公開: ${getMultiRoomVisibilityLabel()}`;
+      } else if (isMultiRoomPublic()) {
+        dom.controls.multiRoomVisibilityHint.textContent = '公開: ホームの「公開中の部屋」に表示されます。';
+      } else {
+        dom.controls.multiRoomVisibilityHint.textContent = '非公開: ホームには表示されません。';
+      }
     }
     if (dom.controls.multiInviteCopy instanceof HTMLButtonElement) {
       dom.controls.multiInviteCopy.disabled = multiState.connecting || !inMasterConfigMode || !currentProjectKey;
@@ -26897,6 +27491,7 @@
       dom.controls.multiRoleTarget,
       dom.controls.multiForceGuest,
       dom.controls.multiForceSpectator,
+      dom.controls.multiRoomVisibility,
       dom.controls.multiBlockedTarget,
       dom.controls.multiBlockedRemove,
     ];
@@ -27258,6 +27853,10 @@
       projectKey: multiState.projectKey,
       masterClientId: multiState.clientId,
       maxGuests: normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT),
+      roomVisibility: normalizeMultiRoomVisibility(
+        multiState.roomVisibility,
+        MULTI_DEFAULT_ROOM_VISIBILITY
+      ),
       exportPermission: normalizeMultiExportPermission(
         multiState.exportPermission,
         MULTI_DEFAULT_EXPORT_PERMISSION
@@ -27283,6 +27882,10 @@
       targetClientId: targetClientId || '',
       sentAt: Date.now(),
       maxGuests: normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT),
+      roomVisibility: normalizeMultiRoomVisibility(
+        multiState.roomVisibility,
+        MULTI_DEFAULT_ROOM_VISIBILITY
+      ),
       exportPermission: normalizeMultiExportPermission(
         multiState.exportPermission,
         MULTI_DEFAULT_EXPORT_PERMISSION
@@ -27305,6 +27908,7 @@
     if (!isMultiMasterMode()) {
       return;
     }
+    scheduleMultiPublicLobbyRoomSync({ immediate });
     if (targetClientId) {
       multiState.pendingBroadcastTargetClientId = targetClientId;
     }
@@ -27738,6 +28342,10 @@
       return;
     }
     multiState.maxGuests = normalizeMultiMaxGuests(payload.maxGuests, multiState.maxGuests);
+    multiState.roomVisibility = normalizeMultiRoomVisibility(
+      payload.roomVisibility,
+      multiState.roomVisibility
+    );
     multiState.exportPermission = normalizeMultiExportPermission(
       payload.exportPermission,
       multiState.exportPermission
@@ -27926,6 +28534,9 @@
     }
     renderMultiParticipantsList();
     syncMultiJoinRequestControls();
+    if (isMultiMasterMode()) {
+      scheduleMultiPublicLobbyRoomSync({ immediate: false });
+    }
   }
 
   function handleMultiCommentMessage(payload) {
@@ -28042,7 +28653,12 @@
     }
     const currentRole = normalizeMultiRoleControlTargetRole(multiState.role);
     const nextMaxGuests = normalizeMultiMaxGuests(payload.maxGuests, multiState.maxGuests);
+    const nextRoomVisibility = normalizeMultiRoomVisibility(
+      payload.roomVisibility,
+      multiState.roomVisibility
+    );
     multiState.maxGuests = nextMaxGuests;
+    multiState.roomVisibility = nextRoomVisibility;
     if (currentRole === nextRole) {
       if (nextRole === 'guest') {
         multiState.joinRequestPending = false;
@@ -28188,6 +28804,10 @@
       return;
     }
     multiState.maxGuests = normalizeMultiMaxGuests(payload.maxGuests, multiState.maxGuests);
+    multiState.roomVisibility = normalizeMultiRoomVisibility(
+      payload.roomVisibility,
+      multiState.roomVisibility
+    );
     multiState.exportPermission = normalizeMultiExportPermission(
       payload.exportPermission,
       multiState.exportPermission
@@ -28417,9 +29037,12 @@
     multiState.resumeAssignments = null;
     multiState.resumeBlockedClientIds = null;
     multiState.resumeMaxGuests = null;
+    multiState.resumeRoomVisibility = null;
     multiState.resumeExportPermission = null;
+    multiState.roomVisibility = MULTI_DEFAULT_ROOM_VISIBILITY;
     multiState.exportPermission = MULTI_DEFAULT_EXPORT_PERMISSION;
     clearStoredMultiResumeSession();
+    await disconnectMultiPublicLobbyChannel();
     if (channel) {
       try {
         if (typeof channel.untrack === 'function') {
@@ -28495,6 +29118,10 @@
     clearPendingMultiSessionStateApply();
     clearMultiLayerPatchSnapshots();
     multiState.maxGuests = normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT);
+    multiState.roomVisibility = normalizeMultiRoomVisibility(
+      multiState.roomVisibility,
+      MULTI_DEFAULT_ROOM_VISIBILITY
+    );
     multiState.exportPermission = normalizeMultiExportPermission(
       multiState.exportPermission,
       MULTI_DEFAULT_EXPORT_PERMISSION
@@ -28581,6 +29208,10 @@
           ? multiState.resumeBlockedClientIds
           : [];
         const resumeMaxGuests = normalizeMultiMaxGuests(multiState.resumeMaxGuests, multiState.maxGuests);
+        const resumeRoomVisibility = normalizeMultiRoomVisibility(
+          multiState.resumeRoomVisibility,
+          multiState.roomVisibility
+        );
         const resumeExportPermission = normalizeMultiExportPermission(
           multiState.resumeExportPermission,
           multiState.exportPermission
@@ -28588,8 +29219,10 @@
         multiState.resumeAssignments = null;
         multiState.resumeBlockedClientIds = null;
         multiState.resumeMaxGuests = null;
+        multiState.resumeRoomVisibility = null;
         multiState.resumeExportPermission = null;
         multiState.maxGuests = resumeMaxGuests;
+        multiState.roomVisibility = resumeRoomVisibility;
         multiState.exportPermission = resumeExportPermission;
         multiState.blockedClientIds = normalizeMultiBlockedClientIds(resumeBlockedClientIds);
         if (resumeAssignments && resumeAssignments.length) {
@@ -28608,6 +29241,7 @@
         multiState.resumeAssignments = null;
         multiState.resumeBlockedClientIds = null;
         multiState.resumeMaxGuests = null;
+        multiState.resumeRoomVisibility = null;
         multiState.resumeExportPermission = null;
       }
 
@@ -28651,6 +29285,7 @@
       renderMultiParticipantsList();
       applyMultiRoleUiLocks();
       enforceGuestAssignedLayerSelection({ announce: false });
+      scheduleMultiPublicLobbyRoomSync({ immediate: true });
       return true;
     } catch (error) {
       console.warn('Failed to connect multi session', error);
@@ -28671,9 +29306,11 @@
     if (isMultiMasterMode()) {
       if (HISTORY_DRAW_TOOLS.has(_label)) {
         sendMasterLayerPatch();
+        scheduleMultiPublicLobbyRoomSync({ immediate: false });
         return;
       }
       scheduleMultiSessionStateBroadcast({ immediate: false });
+      scheduleMultiPublicLobbyRoomSync({ immediate: false });
       return;
     }
     if (isMultiGuestMode()) {
@@ -28758,6 +29395,43 @@
           } else {
             setMultiStatus(`参加上限を ${nextMaxGuests} 人に変更しました`, 'success');
           }
+        }
+        syncMultiControls();
+      });
+    }
+    if (dom.controls.multiRoomVisibility instanceof HTMLSelectElement && dom.controls.multiRoomVisibility.dataset.bound !== 'true') {
+      dom.controls.multiRoomVisibility.dataset.bound = 'true';
+      dom.controls.multiRoomVisibility.addEventListener('change', event => {
+        if (!(event.target instanceof HTMLSelectElement)) {
+          return;
+        }
+        if (!isMultiMasterConfigMode()) {
+          event.target.value = normalizeMultiRoomVisibility(
+            multiState.roomVisibility,
+            MULTI_DEFAULT_ROOM_VISIBILITY
+          );
+          syncMultiControls();
+          return;
+        }
+        const nextVisibility = normalizeMultiRoomVisibility(
+          event.target.value,
+          multiState.roomVisibility
+        );
+        const changed = nextVisibility !== multiState.roomVisibility;
+        multiState.roomVisibility = nextVisibility;
+        event.target.value = nextVisibility;
+        scheduleSessionPersist({ includeSnapshots: false });
+        if (isMultiMasterMode()) {
+          if (changed) {
+            setMultiStatus(
+              nextVisibility === MULTI_ROOM_VISIBILITY_PUBLIC
+                ? '共有モード: 部屋を公開しました（ホーム一覧に表示）'
+                : '共有モード: 部屋を非公開にしました',
+              'success'
+            );
+          }
+          scheduleMultiPublicLobbyRoomSync({ immediate: true });
+          scheduleMultiSessionStateBroadcast({ immediate: true });
         }
         syncMultiControls();
       });
