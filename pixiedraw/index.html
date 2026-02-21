@@ -143,6 +143,7 @@
 ・最大参加人数(1〜5)と出力権限（初期: マスターのみ）を追加<br/>
 ・コメント機能を刷新（共通名/アイコン、時刻表示、対象選択連携）<br/>
 ・マスター操作を整理（参加/視聴切替、セル移動、キック、BAN）<br/>
+・部屋公開/非公開を追加（公開部屋はPiXiEEDホームから視聴入室可能）<br/>
 ・PNGグリッド分割出力（幅/高さpx指定）を追加<br/>
 ・保存時の壊れPNG発生を軽減（出力処理を安定化）<br/>
 ・タッチのパン/ズーム誤動作を低減（ジェスチャモード固定）<br/>
@@ -262,7 +263,7 @@
   <div id="leftPanelAdPreloadMount" style="width:320px;min-width:320px;max-width:320px;height:320px;min-height:320px;max-height:320px;overflow:hidden;"></div>
   <div id="rightPanelAdPreloadMount" style="width:320px;min-width:320px;max-width:320px;height:320px;min-height:320px;max-height:320px;overflow:hidden;"></div>
 </div>
-<button aria-label="描画ボタン" class="floating-draw-button" id="floatingDrawButton" type="button">描画</button>
+<button aria-label="描画ボタン（左=主色 / 右=副色）" class="floating-draw-button" id="floatingDrawButton" type="button">描画</button>
 <div aria-hidden="true" class="mirror-tool-popover" hidden="" id="mirrorToolPopover" role="dialog">
 <div class="mirror-tool-popover__header">
 <strong>対称ツール</strong>
@@ -392,6 +393,9 @@
 <span>仮想表示</span>
 </button>
 </div>
+<div class="tool-quick-color" id="toolQuickColor">
+<div aria-label="クイックカラー" class="tool-quick-color__palette" id="toolQuickPalette" role="listbox"></div>
+</div>
 <div class="field-group">
 <label class="field" id="brushSizeField">
 <span>ブラシサイズ</span>
@@ -420,6 +424,13 @@
 <div aria-label="同色選択モード" class="select-same-mode-buttons" role="group">
 <button aria-pressed="true" class="chip select-same-mode-button is-active" data-select-same-mode="connected" type="button">連結のみ</button>
 <button aria-pressed="false" class="chip select-same-mode-button" data-select-same-mode="global" type="button">全体</button>
+</div>
+</label>
+<label class="field" id="selectionOutlineField">
+<span>選択編集</span>
+<div aria-label="選択範囲アウトライン方向" class="selection-outline-buttons" role="group">
+<button aria-label="選択範囲の外周へ4方向アウトラインを描画" class="chip selection-action-button" disabled="" id="selectionOutline4Action" type="button">4方向</button>
+<button aria-label="選択範囲の外周へ8方向アウトラインを描画" class="chip selection-action-button" disabled="" id="selectionOutline8Action" type="button">8方向</button>
 </div>
 </label>
 <output class="brush-custom-info" id="customBrushInfo">カスタム: 未作成</output>
@@ -663,6 +674,14 @@
 </label>
 <p class="help-text" id="multiGuestCapacityHint">参加枠: 0 / 5</p>
 <label class="field field--compact">
+<span>部屋公開</span>
+<select id="multiRoomVisibility">
+<option value="private">非公開</option>
+<option value="public">公開</option>
+</select>
+</label>
+<p class="help-text" id="multiRoomVisibilityHint">非公開: ホームには表示されません。</p>
+<label class="field field--compact">
 <span>出力権限</span>
 <select id="multiExportPermission">
 <option value="master">マスターのみ</option>
@@ -871,7 +890,7 @@
 <option label="2×" value="2"></option>
 </datalist>
 </div>
-<p class="help-text mobile-draw-help" id="mobileDrawHelp">スマホ描画: 仮想カーソルをONにしてキャンバスをドラッグでカーソル移動、オレンジの「描画」ボタン長押しで描画します。2本指ドラッグ/ピンチで移動と拡大縮小ができます。</p>
+<p class="help-text mobile-draw-help" id="mobileDrawHelp">スマホ描画: 仮想カーソルをONにしてキャンバスをドラッグでカーソル移動、「描画」ボタン長押しで描画します（左半分=主色 / 右半分=副色）。2本指ドラッグ/ピンチで移動と拡大縮小ができます。</p>
 <div aria-label="背景とUIカラー" class="settings-display-buttons" role="group">
 <button aria-pressed="false" class="chip" id="toggleBackgroundMode" type="button">背景:黒</button>
 <button aria-pressed="false" class="chip" id="toggleUiTheme" type="button">UI:緑色</button>
