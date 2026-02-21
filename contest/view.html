@@ -1721,10 +1721,6 @@
 
     const DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS = 10000;
 
-    function isMobileDownloadDevice(){
-      return /iP(hone|ad|od)|Android/i.test(navigator.userAgent || '');
-    }
-
     function isStandaloneAppDisplayMode(){
       let displayModeStandalone = false;
       if(window.matchMedia){
@@ -1797,9 +1793,9 @@
       if(!(blob instanceof Blob) || blob.size <= 0){
         return null;
       }
-      const isMobile = isMobileDownloadDevice();
-      const avoidAnchorDownload = isMobile && isStandaloneAppDisplayMode();
-      if(isMobile){
+      const isIOS = /iP(hone|ad|od)/i.test(navigator.userAgent || '');
+      const avoidAnchorDownload = isIOS && isStandaloneAppDisplayMode();
+      if(isIOS){
         const shareResult = await tryShareDownloadBlob(blob, filename);
         if(shareResult){
           return shareResult;
@@ -1808,11 +1804,9 @@
       if(!avoidAnchorDownload && ('download' in HTMLAnchorElement.prototype)){
         return downloadBlobViaAnchor(blob, filename);
       }
-      if(!isMobile){
-        const shareResult = await tryShareDownloadBlob(blob, filename);
-        if(shareResult){
-          return shareResult;
-        }
+      const shareResult = await tryShareDownloadBlob(blob, filename);
+      if(shareResult){
+        return shareResult;
       }
       return null;
     }
