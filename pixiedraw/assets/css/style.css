@@ -1352,14 +1352,20 @@ body.is-startup-active #virtualCursorCanvas {
 }
 
 #canvasControlButtons {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.canvas-controls:not([data-mobile='true']) #canvasControlButtons {
   display: none !important;
 }
 
-.canvas-controls[data-mobile='true'] #canvasControlButtons.is-mobile-selection-actions-visible {
+.canvas-controls[data-mobile='true'] #canvasControlButtons {
   position: fixed;
   left: calc(var(--mobile-safe-area-left) + 10px);
-  bottom: calc(var(--mobile-safe-area-bottom) + var(--mobile-banner-height) + var(--mobile-drawer-height) + 10px);
-  display: inline-flex !important;
+  top: calc(var(--mobile-safe-area-top) + var(--mobile-topbar-height) + 10px);
+  display: none !important;
   align-items: center;
   gap: 4px;
   padding: 4px;
@@ -1373,8 +1379,15 @@ body.is-startup-active #virtualCursorCanvas {
   pointer-events: auto;
 }
 
-.canvas-controls[data-mobile='true'] #canvasControlButtons.is-mobile-selection-actions-visible[data-drawer-mode='peek'] {
-  bottom: calc(var(--mobile-safe-area-bottom) + var(--mobile-banner-height) + var(--mobile-drawer-height) + 74px);
+.canvas-controls[data-mobile='true'] #canvasControlButtons .canvas-zoom-field,
+.canvas-controls[data-mobile='true'] #canvasControlButtons #canvasControlPrimary,
+.canvas-controls[data-mobile='true'] #canvasControlButtons #canvasControlSecondary {
+  display: none;
+}
+
+.canvas-controls[data-mobile='true'] #canvasControlButtons.is-mobile-selection-actions-visible {
+  display: inline-flex !important;
+  top: calc(var(--mobile-safe-area-top) + var(--mobile-topbar-height) + 10px);
 }
 
 .canvas-controls:not([data-mobile='true']) #canvasControlButtons.is-mobile-selection-actions-visible {
@@ -1458,8 +1471,16 @@ body.is-startup-active #virtualCursorCanvas {
   transform:
     translate(var(--floating-draw-button-x), var(--floating-draw-button-y))
     scale(var(--floating-draw-button-scale));
-  padding: 10px 18px;
-  background: rgba(255, 168, 82, 0.28);
+  padding: 10px 20px;
+  min-width: 86px;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 168, 82, 0.3) 0%,
+      rgba(255, 168, 82, 0.3) 50%,
+      rgba(255, 130, 130, 0.28) 50%,
+      rgba(255, 130, 130, 0.28) 100%
+    );
   color: var(--fg);
   font-weight: 600;
   border: 1px solid rgba(255, 168, 82, 0.78);
@@ -1468,7 +1489,41 @@ body.is-startup-active #virtualCursorCanvas {
   cursor: pointer;
   touch-action: none;
   user-select: none;
+  overflow: hidden;
   z-index: 2000;
+}
+
+.floating-draw-button::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 0.5px);
+  width: 1px;
+  background: rgba(255, 236, 216, 0.7);
+  pointer-events: none;
+}
+
+.floating-draw-button[data-draw-side='primary'] {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 185, 98, 0.42) 0%,
+      rgba(255, 185, 98, 0.42) 50%,
+      rgba(255, 130, 130, 0.2) 50%,
+      rgba(255, 130, 130, 0.2) 100%
+    );
+}
+
+.floating-draw-button[data-draw-side='secondary'] {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 168, 82, 0.2) 0%,
+      rgba(255, 168, 82, 0.2) 50%,
+      rgba(255, 145, 145, 0.4) 50%,
+      rgba(255, 145, 145, 0.4) 100%
+    );
 }
 
 .floating-draw-button.is-hidden {
@@ -1888,6 +1943,26 @@ input[type='range']::-moz-focus-outer {
   order: -2;
 }
 
+#selectionOutlineField {
+  order: -1;
+}
+
+.selection-outline-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.selection-action-button {
+  min-width: 0;
+  min-height: 38px;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1.1;
+}
+
 .field--inline {
   flex-direction: row;
   flex-wrap: wrap;
@@ -2272,6 +2347,11 @@ body.is-mobile-layout .mobile-draw-help {
   max-width: none;
 }
 
+#panelMulti #multiRoomVisibility {
+  width: 100%;
+  max-width: none;
+}
+
 #panelMulti .multi-status-row {
   display: flex;
   align-items: center;
@@ -2553,6 +2633,62 @@ body.is-mobile-layout .mobile-draw-help {
 #panelTools .panel-section__body {
   min-width: 0;
   overflow-x: hidden;
+}
+
+.tool-quick-color {
+  display: block;
+  margin-top: 10px;
+  min-width: 0;
+}
+
+.tool-quick-color__palette {
+  display: grid;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: 40px;
+  justify-content: start;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.tool-quick-color__palette::-webkit-scrollbar {
+  display: none;
+}
+
+.tool-quick-color__swatch {
+  position: relative;
+  display: block;
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.tool-quick-color__swatch::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(var(--ui-rgb), 0.26);
+  pointer-events: none;
+}
+
+.tool-quick-color__swatch.is-active {
+  outline: 2px solid rgba(255, 197, 96, 0.9);
+  outline-offset: 1px;
+}
+
+.tool-quick-color__swatch.is-secondary {
+  box-shadow: inset 0 0 0 2px rgba(var(--ui-rgb-focus), 0.7);
 }
 
 .tool-button {
@@ -5006,6 +5142,30 @@ body.is-startup-active {
     width: 24px;
     height: 24px;
   }
+  .panel-section[data-section='tools'] .tool-quick-color {
+    margin-top: 8px;
+  }
+  .panel-section[data-section='tools'] .tool-quick-color__palette {
+    display: grid;
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 44px;
+    justify-content: start;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .panel-section[data-section='tools'] .tool-quick-color__palette::-webkit-scrollbar {
+    display: none;
+  }
+  .panel-section[data-section='tools'] .tool-quick-color__swatch {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
   .mobile-drawer[data-mode='peek'] .panel-section[data-section='tools'] .tool-group-button {
     width: 60px;
     min-width: 60px;
@@ -5042,6 +5202,15 @@ body.is-startup-active {
   }
   .mobile-drawer[data-mode='peek'] #panelTools .field-group {
     display: none;
+  }
+  .mobile-drawer[data-mode='peek'] #panelTools .tool-quick-color__palette {
+    grid-auto-columns: 40px;
+    gap: 4px;
+  }
+  .mobile-drawer[data-mode='peek'] #panelTools .tool-quick-color__swatch {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
   }
   .mobile-drawer[data-mode='peek'] #panelColor .palette-editor {
     display: none;
