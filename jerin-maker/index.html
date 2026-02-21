@@ -5046,7 +5046,94 @@
     }
   }
 
+  const DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS = 10000;
+
+  function isMobileDownloadDevice() {
+    return /iP(hone|ad|od)|Android/i.test(navigator.userAgent || '');
+  }
+
+  function isStandaloneAppDisplayMode() {
+    let displayModeStandalone = false;
+    if (window.matchMedia) {
+      try {
+        displayModeStandalone = window.matchMedia('(display-mode: standalone)').matches;
+      } catch (error) {
+        displayModeStandalone = false;
+      }
+    }
+    return Boolean(window.navigator && window.navigator.standalone) || displayModeStandalone;
+  }
+
+  async function tryShareBlobFile(blob, filename, mimeType = 'application/octet-stream') {
+    if (!(blob instanceof Blob) || typeof navigator.share !== 'function') {
+      return null;
+    }
+    try {
+      const file = new File([blob], filename, { type: mimeType || blob.type || 'application/octet-stream' });
+      if (typeof navigator.canShare === 'function' && !navigator.canShare({ files: [file] })) {
+        return null;
+      }
+      await navigator.share({
+        files: [file],
+        title: 'PiXiEEDraw Lite',
+        text: '#PiXiEED'
+      });
+      return 'share';
+    } catch (error) {
+      if (error && error.name === 'AbortError') {
+        return 'share-cancel';
+      }
+      console.warn('share failed', error);
+      return null;
+    }
+  }
+
+  function downloadBlobViaAnchor(blob, filename) {
+    if (!(blob instanceof Blob) || blob.size <= 0 || !('download' in HTMLAnchorElement.prototype)) {
+      return false;
+    }
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS);
+    return true;
+  }
+
+  async function saveBlobWithPickerShareFallback(blob, filename, mimeType = 'application/octet-stream') {
+    if (!(blob instanceof Blob) || blob.size <= 0) {
+      return 'error';
+    }
+    const pickerResult = await saveBlobWithFilePicker(blob, filename, mimeType);
+    if (pickerResult === 'saved' || pickerResult === 'cancel') {
+      return pickerResult;
+    }
+    const isMobile = isMobileDownloadDevice();
+    const avoidAnchorDownload = isMobile && isStandaloneAppDisplayMode();
+    if (isMobile) {
+      const shareResult = await tryShareBlobFile(blob, filename, mimeType);
+      if (shareResult) {
+        return shareResult;
+      }
+    }
+    if (!avoidAnchorDownload && downloadBlobViaAnchor(blob, filename)) {
+      return 'download';
+    }
+    if (!isMobile) {
+      const shareResult = await tryShareBlobFile(blob, filename, mimeType);
+      if (shareResult) {
+        return shareResult;
+      }
+    }
+    return 'error';
+  }
+
   function downloadDataUrl(dataUrl, filename) {
+    const blob = dataUrlToBlob(dataUrl);
+    if (blob && downloadBlobViaAnchor(blob, filename)) {
+      return 'download';
+    }
     const link = document.createElement('a');
     link.href = dataUrl;
     link.download = filename;
@@ -5057,9 +5144,12 @@
   async function saveDataUrlWithPickerFallback(dataUrl, filename, mimeType = 'image/png') {
     const blob = dataUrlToBlob(dataUrl);
     if (blob) {
-      const pickerResult = await saveBlobWithFilePicker(blob, filename, mimeType);
-      if (pickerResult === 'saved' || pickerResult === 'cancel') {
-        return pickerResult;
+      const saveResult = await saveBlobWithPickerShareFallback(blob, filename, mimeType);
+      if (saveResult === 'saved' || saveResult === 'cancel' || saveResult === 'download' || saveResult === 'share') {
+        return saveResult;
+      }
+      if (saveResult === 'share-cancel') {
+        return 'cancel';
       }
     }
     return downloadDataUrl(dataUrl, filename);
