@@ -5015,8 +5015,244 @@
     return [match[1].toLowerCase()];
   }
 
+  const PIXIEED_WORKSPACE_SUPPORTED = typeof window !== 'undefined'
+    && typeof window.showDirectoryPicker === 'function'
+    && typeof window.indexedDB !== 'undefined'
+    && window.indexedDB !== null;
+  const PIXIEED_WORKSPACE_DB_NAME = 'pixieedraw-autosave';
+  const PIXIEED_WORKSPACE_STORE_NAME = 'handles';
+  const PIXIEED_WORKSPACE_HANDLE_KEY = 'exportDirectory';
+  const PIXIEED_WORKSPACE_DIR_NAME = 'PiXiEED';
+  const PIXIEED_WORKSPACE_PICKER_ID = 'pixieed-export-directory';
+  let pixieedWorkspaceHandle = null;
+  let pixieedWorkspacePendingHandle = null;
+  let pixieedWorkspaceLoaded = false;
+
+  function openPiXiEEDWorkspaceDatabase() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(PIXIEED_WORKSPACE_DB_NAME);
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains(PIXIEED_WORKSPACE_STORE_NAME)) {
+          db.createObjectStore(PIXIEED_WORKSPACE_STORE_NAME);
+        }
+      };
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+  }
+
+  async function storePiXiEEDWorkspaceHandle(handle) {
+    if (!PIXIEED_WORKSPACE_SUPPORTED || !handle) {
+      return;
+    }
+    try {
+      const db = await openPiXiEEDWorkspaceDatabase();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction([PIXIEED_WORKSPACE_STORE_NAME], 'readwrite');
+        const store = tx.objectStore(PIXIEED_WORKSPACE_STORE_NAME);
+        const request = store.put(handle, PIXIEED_WORKSPACE_HANDLE_KEY);
+        request.onerror = () => reject(request.error);
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+    } catch (error) {
+      console.warn('Failed to store PiXiEED workspace handle', error);
+    }
+  }
+
+  async function loadStoredPiXiEEDWorkspaceHandle() {
+    if (!PIXIEED_WORKSPACE_SUPPORTED) {
+      return null;
+    }
+    try {
+      const db = await openPiXiEEDWorkspaceDatabase();
+      return await new Promise((resolve, reject) => {
+        let value = null;
+        const tx = db.transaction([PIXIEED_WORKSPACE_STORE_NAME], 'readonly');
+        const store = tx.objectStore(PIXIEED_WORKSPACE_STORE_NAME);
+        const request = store.get(PIXIEED_WORKSPACE_HANDLE_KEY);
+        request.onsuccess = () => {
+          value = request.result || null;
+        };
+        request.onerror = () => reject(request.error);
+        tx.oncomplete = () => {
+          db.close();
+          resolve(value);
+        };
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+    } catch (error) {
+      console.warn('Failed to load PiXiEED workspace handle', error);
+      return null;
+    }
+  }
+
+  async function ensureWorkspaceHandlePermission(handle, { request = false } = {}) {
+    if (!handle) {
+      return false;
+    }
+    const opts = { mode: 'readwrite' };
+    const canQuery = typeof handle.queryPermission === 'function';
+    const canRequest = typeof handle.requestPermission === 'function';
+    if (!canQuery) {
+      if (!request || !canRequest) {
+        return false;
+      }
+      const result = await handle.requestPermission(opts);
+      return result === 'granted';
+    }
+    let permission = await handle.queryPermission(opts);
+    if (permission === 'granted') {
+      return true;
+    }
+    if (!request || !canRequest) {
+      return false;
+    }
+    permission = await handle.requestPermission(opts);
+    return permission === 'granted';
+  }
+
+  async function normalizePiXiEEDWorkspaceDirectory(handle) {
+    if (!handle || typeof handle.getDirectoryHandle !== 'function') {
+      return null;
+    }
+    const handleName = typeof handle.name === 'string' ? handle.name.trim() : '';
+    if (handleName.toLowerCase() === PIXIEED_WORKSPACE_DIR_NAME.toLowerCase()) {
+      return handle;
+    }
+    try {
+      return await handle.getDirectoryHandle(PIXIEED_WORKSPACE_DIR_NAME, { create: true });
+    } catch (error) {
+      console.warn('Failed to create/open PiXiEED workspace directory', error);
+      return handle;
+    }
+  }
+
+  async function hydrateStoredPiXiEEDWorkspaceHandle() {
+    if (!PIXIEED_WORKSPACE_SUPPORTED || pixieedWorkspaceLoaded) {
+      return;
+    }
+    pixieedWorkspaceLoaded = true;
+    const stored = await loadStoredPiXiEEDWorkspaceHandle();
+    if (!stored) {
+      return;
+    }
+    const workspace = await normalizePiXiEEDWorkspaceDirectory(stored);
+    if (!workspace) {
+      return;
+    }
+    const granted = await ensureWorkspaceHandlePermission(workspace, { request: false });
+    if (granted) {
+      pixieedWorkspaceHandle = workspace;
+      pixieedWorkspacePendingHandle = null;
+      await storePiXiEEDWorkspaceHandle(workspace);
+      return;
+    }
+    pixieedWorkspaceHandle = null;
+    pixieedWorkspacePendingHandle = workspace;
+  }
+
+  async function requestPiXiEEDWorkspaceBinding() {
+    if (!PIXIEED_WORKSPACE_SUPPORTED) {
+      return null;
+    }
+    try {
+      const rootHandle = await window.showDirectoryPicker({
+        id: PIXIEED_WORKSPACE_PICKER_ID,
+        mode: 'readwrite'
+      });
+      const rootGranted = await ensureWorkspaceHandlePermission(rootHandle, { request: true });
+      if (!rootGranted) {
+        pixieedWorkspacePendingHandle = rootHandle;
+        return null;
+      }
+      const workspace = await normalizePiXiEEDWorkspaceDirectory(rootHandle);
+      if (!workspace) {
+        return null;
+      }
+      const granted = await ensureWorkspaceHandlePermission(workspace, { request: true });
+      if (!granted) {
+        pixieedWorkspacePendingHandle = workspace;
+        return null;
+      }
+      pixieedWorkspaceHandle = workspace;
+      pixieedWorkspacePendingHandle = null;
+      await storePiXiEEDWorkspaceHandle(workspace);
+      return workspace;
+    } catch (error) {
+      if (!(error && error.name === 'AbortError')) {
+        console.warn('PiXiEED workspace binding failed', error);
+      }
+      return null;
+    }
+  }
+
+  async function resolvePiXiEEDWorkspaceHandleForSave() {
+    if (!PIXIEED_WORKSPACE_SUPPORTED) {
+      return null;
+    }
+    await hydrateStoredPiXiEEDWorkspaceHandle();
+    if (pixieedWorkspaceHandle) {
+      const granted = await ensureWorkspaceHandlePermission(pixieedWorkspaceHandle, { request: true });
+      if (granted) {
+        return pixieedWorkspaceHandle;
+      }
+      pixieedWorkspacePendingHandle = pixieedWorkspaceHandle;
+      pixieedWorkspaceHandle = null;
+    }
+    if (pixieedWorkspacePendingHandle) {
+      const granted = await ensureWorkspaceHandlePermission(pixieedWorkspacePendingHandle, { request: true });
+      if (granted) {
+        pixieedWorkspaceHandle = pixieedWorkspacePendingHandle;
+        pixieedWorkspacePendingHandle = null;
+        await storePiXiEEDWorkspaceHandle(pixieedWorkspaceHandle);
+        return pixieedWorkspaceHandle;
+      }
+    }
+    return requestPiXiEEDWorkspaceBinding();
+  }
+
+  async function saveBlobToPiXiEEDWorkspace(blob, filename) {
+    if (!(blob instanceof Blob) || blob.size <= 0) {
+      return 'error';
+    }
+    const directoryHandle = await resolvePiXiEEDWorkspaceHandleForSave();
+    if (!directoryHandle || typeof directoryHandle.getFileHandle !== 'function') {
+      return 'unsupported';
+    }
+    try {
+      const fileHandle = await directoryHandle.getFileHandle(filename, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return 'saved';
+    } catch (error) {
+      console.warn('Failed to save file in PiXiEED workspace', error);
+      return 'error';
+    }
+  }
+
   async function saveBlobWithFilePicker(blob, filename, mimeType = 'application/octet-stream') {
-    if (!(blob instanceof Blob) || typeof window.showSaveFilePicker !== 'function') {
+    if (!(blob instanceof Blob)) {
+      return 'unsupported';
+    }
+    const workspaceResult = await saveBlobToPiXiEEDWorkspace(blob, filename);
+    if (workspaceResult === 'saved') {
+      return 'saved';
+    }
+    if (typeof window.showSaveFilePicker !== 'function') {
       return 'unsupported';
     }
     const extensions = getFilenameExtensions(filename);
