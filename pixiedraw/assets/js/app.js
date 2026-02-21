@@ -178,23 +178,46 @@
       multiFlowPanel: document.getElementById('multiFlowPanel'),
       multiEntryMaster: document.getElementById('multiEntryMaster'),
       multiEntryGuest: document.getElementById('multiEntryGuest'),
-      multiBackToEntry: document.getElementById('multiBackToEntry'),
       multiRoleLabel: document.getElementById('multiRoleLabel'),
       multiProjectKey: document.getElementById('multiProjectKey'),
       multiStartSession: document.getElementById('multiStartSession'),
       multiLeaveSession: document.getElementById('multiLeaveSession'),
+      multiJoinRequestField: document.getElementById('multiJoinRequestField'),
+      multiRequestGuestRole: document.getElementById('multiRequestGuestRole'),
+      multiJoinRequestHint: document.getElementById('multiJoinRequestHint'),
       multiGenerateKey: document.getElementById('multiGenerateKey'),
       multiCopyKey: document.getElementById('multiCopyKey'),
       multiBroadcastState: document.getElementById('multiBroadcastState'),
       multiStatus: document.getElementById('multiStatus'),
+      multiHelpToggle: document.getElementById('multiHelpToggle'),
+      multiHelpPanel: document.getElementById('multiHelpPanel'),
+      multiHelpClose: document.getElementById('multiHelpClose'),
       multiParticipants: document.getElementById('multiParticipants'),
+      multiCommentList: document.getElementById('multiCommentList'),
+      multiCommentInput: document.getElementById('multiCommentInput'),
+      multiCommentSend: document.getElementById('multiCommentSend'),
+      multiJoinRequestTarget: document.getElementById('multiJoinRequestTarget'),
+      multiJoinRequestApprove: document.getElementById('multiJoinRequestApprove'),
+      multiJoinRequestReject: document.getElementById('multiJoinRequestReject'),
       multiAssignTarget: document.getElementById('multiAssignTarget'),
       multiAssignFrame: document.getElementById('multiAssignFrame'),
       multiAssignLayer: document.getElementById('multiAssignLayer'),
       multiAssignApply: document.getElementById('multiAssignApply'),
       multiAssignLockToggle: document.getElementById('multiAssignLockToggle'),
       multiAssignKick: document.getElementById('multiAssignKick'),
-      multiAssignHint: document.getElementById('multiAssignHint'),
+      multiAssignBan: document.getElementById('multiAssignBan'),
+      multiAssignmentField: document.querySelector('#panelMulti .multi-assignment-field'),
+      multiMaxGuests: document.getElementById('multiMaxGuests'),
+      multiExportPermission: document.getElementById('multiExportPermission'),
+      multiGuestCapacityHint: document.getElementById('multiGuestCapacityHint'),
+      multiInviteCopy: document.getElementById('multiInviteCopy'),
+      multiInviteShare: document.getElementById('multiInviteShare'),
+      multiRoleTarget: document.getElementById('multiRoleTarget') || document.getElementById('multiAssignTarget'),
+      multiForceGuest: document.getElementById('multiForceGuest'),
+      multiForceSpectator: document.getElementById('multiForceSpectator'),
+      multiBlockedTarget: document.getElementById('multiBlockedTarget'),
+      multiBlockedRemove: document.getElementById('multiBlockedRemove'),
+      multiBlockedHint: document.getElementById('multiBlockedHint'),
       multiMasterOnlyGroups: Array.from(document.querySelectorAll('[data-multi-master-only]')),
     },
     startup: {
@@ -227,6 +250,10 @@
       scaleSlider: document.getElementById('exportScaleSlider'),
       scaleInput: document.getElementById('exportScaleInput'),
       includeOriginalToggle: document.getElementById('exportIncludeOriginalToggle'),
+      gridSettings: document.getElementById('exportGridSettings'),
+      gridWidthInput: document.getElementById('exportGridWidth'),
+      gridHeightInput: document.getElementById('exportGridHeight'),
+      gridHint: document.getElementById('exportGridHint'),
       pixelWidthInput: document.getElementById('exportPixelWidth'),
       pixelHeightInput: document.getElementById('exportPixelHeight'),
       scaleHint: document.getElementById('exportScaleHint'),
@@ -555,6 +582,33 @@
   const EXPORT_INTERSTITIAL_COOLDOWN_MS = 45 * 1000;
   const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
     Object.freeze({
+      id: '2026-02-21-multi-collab-export-and-touch',
+      at: '2026-02-21T21:00:00+09:00',
+      title: '共有モード/出力/操作性を大幅改善',
+      details: Object.freeze([
+        '共有モードの参加導線を再設計: 「入室」は自由、描画参加はマスター承認制へ統一。',
+        '最大参加人数（1〜5）を追加。参加上限を超えた入室は視聴者として接続。',
+        '出力権限設定を追加（マスターのみ / マスター+参加者 / 全員）。初期値はマスターのみ。',
+        '招待機能を追加: 招待リンクのコピー/共有に対応。リンク経由でキーを自動入力して接続可能に。',
+        '参加リクエスト機能を追加: 視聴者が参加申請でき、マスターは承認/却下を即時操作可能に。',
+        '参加リクエスト送信時、コメント欄へ自動通知（参加希望コメント）を投稿する導線を追加。',
+        'コメント機能を刷新: 全員コメント可能、PiXiEED共通の名前/アイコン表示、時刻は右側に薄く表示。',
+        'コメント投稿者名をタップすると、マスター操作の対象選択へ反映できるよう改善。',
+        '参加者/視聴者一覧を開閉式+スクロール対応に変更し、人数増加時も見やすく調整。',
+        'マスター操作UIを整理: 対象選択を一本化し、参加/視聴切替・セル移動・ロック・キック・BANを集約。',
+        '切断時の挙動を改善: 参加者/視聴者接続で受信していた状態から、ローカル作業状態へ復帰。',
+        'モバイル視聴者のUIロックを追加し、不要タブ操作を抑制。',
+        'コメント入力でIME変換確定時に誤送信される問題を修正（Enter確定との競合を回避）。',
+        '範囲選択を拡張: 同一グリッド内ダブルタップで16x16セル矩形選択モードに入り、ドラッグで矩形拡張可能に。',
+        '出力形式に「PNG（グリッド分割）」を追加。幅/高さを任意px指定して分割書き出し可能に。',
+        'グリッド分割PNGの順序を明確化（右上開始、右→左、上→下）。',
+        '保存/出力の安定性を改善: 0byte出力を抑止し、Blob URLの解放タイミングを見直して壊れPNGの発生を軽減。',
+        '出力フォルダ（PiXiEED）運用を改善し、保存先の再利用と案内を強化。',
+        'タッチ操作を改善: 2本指ジェスチャでパン/ズームのモードを指が離れるまで固定し、誤動作を低減。',
+        '共有モードの文言/導線を整理し、参加ボタン表記を「入室」に統一。',
+      ]),
+    }),
+    Object.freeze({
       id: '2026-02-19-multi-beta-and-ui',
       at: '2026-02-19T12:00:00+09:00',
       title: '共有モード追加とUI更新',
@@ -691,17 +745,31 @@
   const EXPORT_WORKSPACE_DIR_NAME = 'PiXiEED';
   const EXPORT_DIRECTORY_PICKER_ID = 'pixieed-export-directory';
   const PIXIEED_NICKNAME_STORAGE_KEY = 'pixieed_nickname';
+  const PIXIEED_AVATAR_STORAGE_KEY = 'pixieed_avatar';
   const DEFAULT_MULTI_PARTICIPANT_NAME = '名無し';
   const MULTI_PROJECT_KEY_STORAGE_KEY = 'pixieedraw:multi-project-key';
   const MULTI_CLIENT_ID_STORAGE_KEY = 'pixieedraw:multi-client-id';
   const MULTI_RESUME_STORAGE_KEY = 'pixieedraw:multi-resume';
   const MULTI_RESUME_MAX_AGE_MS = 90 * 1000;
+  const MULTI_GUEST_LIMIT_MIN = 1;
+  const MULTI_GUEST_LIMIT_MAX = 5;
+  const MULTI_DEFAULT_GUEST_LIMIT = 5;
+  const MULTI_EXPORT_PERMISSION_MASTER = 'master';
+  const MULTI_EXPORT_PERMISSION_MASTER_AND_GUEST = 'master-guest';
+  const MULTI_EXPORT_PERMISSION_ALL = 'all';
+  const MULTI_DEFAULT_EXPORT_PERMISSION = MULTI_EXPORT_PERMISSION_MASTER;
+  const MULTI_INVITE_QUERY_FLAG = 'multiInvite';
+  const MULTI_INVITE_QUERY_KEY = 'multiKey';
+  const MULTI_INVITE_QUERY_AUTO_JOIN = 'multiAutoJoin';
   const MULTI_SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
   const MULTI_SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
   const MULTI_SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
   const MULTI_CHANNEL_PREFIX = 'pixiedraw-room-';
   const MULTI_SYNC_THROTTLE_MS = 150;
   const MULTI_LAYER_PATCH_FULL_RATIO = 0.45;
+  const MULTI_JOIN_REQUEST_COOLDOWN_MS = 6000;
+  const MULTI_COMMENT_MAX_LENGTH = 140;
+  const MULTI_COMMENT_MAX_ITEMS = 80;
   const MULTI_ASSIGNMENT_BORDER_COLORS = Object.freeze([
     '#ff8b8b',
     '#ffd47a',
@@ -767,6 +835,10 @@
   let exportMaxScale = 1;
   let exportScaleUserOverride = false;
   let exportIncludeOriginalSize = false;
+  const EXPORT_GRID_TILE_MIN_SIZE = 1;
+  const EXPORT_GRID_TILE_MAX_SIZE = MAX_EXPORT_DIMENSION;
+  let exportGridTileWidth = 8;
+  let exportGridTileHeight = 8;
   let exportAdRequested = false;
   let exportInterstitialAdRequested = false;
   const TIMELAPSE_DEFAULT_FPS = 12;
@@ -797,6 +869,8 @@
     applyRemoteInProgress: false,
     uiView: 'entry',
     desiredRole: 'master',
+    maxGuests: MULTI_DEFAULT_GUEST_LIMIT,
+    exportPermission: MULTI_DEFAULT_EXPORT_PERMISSION,
     assignments: new Map(),
     participants: new Map(),
     masterClientId: null,
@@ -806,12 +880,22 @@
     pendingSessionStatePayload: null,
     pendingSessionStateTimer: null,
     selectedAssignClientId: '',
+    selectedRoleControlClientId: '',
     resumeAssignments: null,
     resumeBlockedClientIds: null,
+    resumeMaxGuests: null,
+    resumeExportPermission: null,
     layerPatchSnapshots: new Map(),
     blockedClientIds: new Set(),
+    pendingJoinRequests: new Map(),
+    joinRequestCooldownUntil: 0,
+    joinRequestPending: false,
     awaitingGuestStateRecovery: false,
     guestStateRecoveryTimer: null,
+    comments: [],
+    commentIds: new Set(),
+    localSnapshotBeforeReplica: null,
+    localUnsavedBeforeReplica: false,
   };
   let multiSupabaseClientPromise = null;
 
@@ -948,6 +1032,8 @@
   const FILL_TOOLS = new Set(['fill']);
   const SHAPE_TOOLS = new Set(['line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill']);
   const BRUSH_SIZE_TOOLS = new Set([...BRUSH_TOOLS, ...SHAPE_TOOLS, ...FILL_TOOLS]);
+  const SELECT_RECT_GRID_CELL_SIZE = 16;
+  const SELECT_RECT_GRID_DOUBLE_TAP_MS = 320;
   const SELECTION_TOOLS = new Set(['move', 'selectRect', 'selectLasso', 'selectSame', 'selectionMove', 'layerMove']);
   const TOOL_ICON_FALLBACK = {
     move: '⇕',
@@ -1028,6 +1114,11 @@
     points: [],
     selectionClearedOnStart: false,
     curveStage: null,
+  };
+  const selectRectGridTapState = {
+    lastTapAt: 0,
+    lastTapCellX: -1,
+    lastTapCellY: -1,
   };
   const mirrorHandleDragState = {
     active: false,
@@ -1211,6 +1302,7 @@
   let multiEntryMetricsResizeObserver = null;
   let multiEntryMetricsRaf = null;
   let multiAutoResumeAttempted = false;
+  let multiInviteAutoJoinHandled = false;
   let mirrorGuideSyncRaf = null;
   let deferredUiSetupScheduled = false;
   let deferredUiSetupDone = false;
@@ -1663,6 +1755,7 @@
       touchPinchStartDistance: null,
       touchPinchStartScale: null,
       touchPinchFocus: null,
+      touchGestureMode: null,
       curveHandle: null,
       panCaptureElement: null,
     };
@@ -1679,6 +1772,7 @@
   const TOUCH_PINCH_DEADZONE_PX = 6;
   const TOUCH_PINCH_MAX_GESTURE_RATIO = 6;
   const TOUCH_PINCH_MIN_RATIO = 0.05;
+  const TOUCH_PINCH_MODE_PRIORITY_RATIO = 1.3;
   const activeTouchPointers = new Map();
   const keyboardState = {
     spacePanActive: false,
@@ -2786,6 +2880,7 @@
     pointerState.touchPinchStartDistance = null;
     pointerState.touchPinchStartScale = null;
     pointerState.touchPinchFocus = null;
+    pointerState.touchGestureMode = null;
     hoverPixel = null;
     if (state.showVirtualCursor && !virtualCursor) {
       virtualCursor = createInitialVirtualCursor();
@@ -3050,8 +3145,8 @@
   }
 
   function undo() {
-    if (isMultiGuestMode()) {
-      setMultiStatus('参加モードではUndo/Redoはマスター管理です', 'warn');
+    if (isMultiReadOnlyMode()) {
+      setMultiStatus('参加/視聴モードではUndo/Redoはマスター管理です', 'warn');
       return;
     }
     if (cancelPendingCurveInteraction()) {
@@ -3073,8 +3168,8 @@
   }
 
   function redo() {
-    if (isMultiGuestMode()) {
-      setMultiStatus('参加モードではUndo/Redoはマスター管理です', 'warn');
+    if (isMultiReadOnlyMode()) {
+      setMultiStatus('参加/視聴モードではUndo/Redoはマスター管理です', 'warn');
       return;
     }
     if (cancelPendingCurveInteraction()) {
@@ -5843,7 +5938,7 @@
 
   async function openDocumentDialog() {
     if (!canCurrentClientImportExternalData()) {
-      setMultiStatus('参加モードでは読み込み/インポートはマスターのみ操作できます', 'warn');
+      setMultiStatus('参加/視聴モードでは読み込み/インポートはマスターのみ操作できます', 'warn');
       return false;
     }
     if (typeof window.showOpenFilePicker === 'function') {
@@ -7020,6 +7115,9 @@
   }
 
   async function openExportDialog() {
+    if (!ensureCurrentClientCanExportProject({ announce: true })) {
+      return;
+    }
     const config = dom.exportDialog;
     if (!config) {
       exportProjectWithFallback();
@@ -7465,12 +7563,15 @@
   }
 
   function exportProjectWithFallback() {
-    const choice = window.prompt('出力形式を入力してください (png / gif / timelapse / pixfind / project)', 'png');
+    if (!ensureCurrentClientCanExportProject({ announce: true })) {
+      return;
+    }
+    const choice = window.prompt('出力形式を入力してください (png / grid / gif / timelapse / pixfind / project)', 'png');
     if (!choice) {
       return;
     }
     const normalized = choice.trim().toLowerCase();
-    if (normalized === 'png') {
+    if (normalized === 'png' || normalized === 'grid' || normalized === 'gridpng') {
       const candidates = getExportScaleCandidates();
       applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
@@ -7490,7 +7591,23 @@
         exportScaleUserOverride = true;
         setExportScale(scaleInput);
       }
-      exportProjectAsPng();
+      if (normalized === 'grid' || normalized === 'gridpng') {
+        const tileWidthInput = window.prompt('分割サイズの横幅(px)を入力してください', String(exportGridTileWidth));
+        if (tileWidthInput === null) {
+          return;
+        }
+        const tileHeightInput = window.prompt('分割サイズの高さ(px)を入力してください', String(exportGridTileHeight));
+        if (tileHeightInput === null) {
+          return;
+        }
+        exportGridTileWidth = normalizeExportGridTileSize(tileWidthInput, exportGridTileWidth);
+        exportGridTileHeight = normalizeExportGridTileSize(tileHeightInput, exportGridTileHeight);
+        syncExportGridInputs();
+        scheduleSessionPersist({ includeSnapshots: false });
+        exportProjectAsGridPng();
+      } else {
+        exportProjectAsPng();
+      }
     } else if (normalized === 'gif') {
       exportProjectAsGif();
     } else if (normalized === 'timelapse') {
@@ -7502,7 +7619,7 @@
     } else if (normalized === 'project') {
       saveProjectAsPixieedraw();
     } else {
-      window.alert('png / gif / timelapse / pixfind / project のいずれかを入力してください。');
+      window.alert('png / grid / gif / timelapse / pixfind / project のいずれかを入力してください。');
     }
   }
 
@@ -7690,6 +7807,9 @@
   }
 
   async function exportTimelapseGif() {
+    if (!ensureCurrentClientCanExportProject({ announce: true })) {
+      return;
+    }
     if (timelapseState.snapshots.length <= 0 && timelapseState.lastCaptureToken < 0) {
       updateAutosaveStatus('タイムラプス記録がありません。設定でONにして描画してください。', 'warn');
       return;
@@ -7799,7 +7919,7 @@
 
   function applyFpsToAllFrames(fpsValue) {
     if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus('参加モードではfps設定はマスターのみ変更できます', 'warn');
+      setMultiStatus('参加/視聴モードではfps設定はマスターのみ変更できます', 'warn');
       return;
     }
     const frames = state.frames;
@@ -7927,6 +8047,8 @@
       const mode = normalizeExportFormat(config.format?.value || 'png');
       if (mode === 'gif') {
         exportProjectAsGif();
+      } else if (mode === 'gridpng') {
+        exportProjectAsGridPng();
       } else if (mode === 'timelapse') {
         exportTimelapseGif();
       } else if (mode === 'contest') {
@@ -8028,6 +8150,27 @@
       });
     }
 
+    const gridWidthInput = config.gridWidthInput;
+    if (gridWidthInput instanceof HTMLInputElement && gridWidthInput.dataset.bound !== 'true') {
+      gridWidthInput.dataset.bound = 'true';
+      gridWidthInput.addEventListener('change', event => {
+        exportGridTileWidth = normalizeExportGridTileSize(event.target.value, exportGridTileWidth);
+        syncExportGridInputs();
+        scheduleSessionPersist({ includeSnapshots: false });
+      });
+    }
+
+    const gridHeightInput = config.gridHeightInput;
+    if (gridHeightInput instanceof HTMLInputElement && gridHeightInput.dataset.bound !== 'true') {
+      gridHeightInput.dataset.bound = 'true';
+      gridHeightInput.addEventListener('change', event => {
+        exportGridTileHeight = normalizeExportGridTileSize(event.target.value, exportGridTileHeight);
+        syncExportGridInputs();
+        scheduleSessionPersist({ includeSnapshots: false });
+      });
+    }
+
+    syncExportGridInputs();
     updateExportOriginalToggleUI();
   }
 
@@ -9287,6 +9430,10 @@
   }
 
   function getPixfindSendDisabledReason() {
+    const exportReason = getMultiExportDisabledReason();
+    if (exportReason) {
+      return exportReason;
+    }
     if (!pixfindModeEnabled) {
       return '間違い探しモードをONにしてください';
     }
@@ -9391,7 +9538,7 @@
 
   function setPixfindModeEnabled(enabled, { confirmFirst = true, confirmOverwrite = true, quiet = false } = {}) {
     if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus('参加モードでは間違い探し設定はマスターのみ変更できます', 'warn');
+      setMultiStatus('参加/視聴モードでは間違い探し設定はマスターのみ変更できます', 'warn');
       return false;
     }
     const next = Boolean(enabled);
@@ -9441,6 +9588,9 @@
   }
 
   function exportProjectToPixfind() {
+    if (!ensureCurrentClientCanExportProject({ announce: true })) {
+      return;
+    }
     if (!pixfindModeEnabled) {
       updateAutosaveStatus('間違い探しモードをONにしてください', 'warn');
       return;
@@ -9481,7 +9631,142 @@
     }
   }
 
+  async function exportProjectAsGridPng() {
+    if (!ensureCurrentClientCanExportProject({ announce: true })) {
+      return;
+    }
+    const frameCount = state.frames.length;
+    if (!frameCount) {
+      updateAutosaveStatus('グリッド分割で書き出すフレームがありません', 'warn');
+      return;
+    }
+    try {
+      const { width, height } = state;
+      const candidates = getExportScaleCandidates();
+      const selectedScale = applyExportScaleConstraints(candidates);
+      syncExportScaleInputs();
+      exportGridTileWidth = normalizeExportGridTileSize(exportGridTileWidth, 8);
+      exportGridTileHeight = normalizeExportGridTileSize(exportGridTileHeight, 8);
+      syncExportGridInputs();
+      const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
+      const outputWidth = Math.max(1, width * selectedScale);
+      const outputHeight = Math.max(1, height * selectedScale);
+      const rowSegments = buildGridRowSegmentsTopToBottom(outputHeight, exportGridTileHeight);
+      const columnSegments = buildGridColumnSegmentsRightToLeft(outputWidth, exportGridTileWidth);
+      const tileCountPerFrame = rowSegments.length * columnSegments.length;
+      if (!tileCountPerFrame) {
+        updateAutosaveStatus('分割サイズの設定が無効です', 'warn');
+        return;
+      }
+      const total = tileCountPerFrame * frameCount;
+      const frameDigits = Math.max(2, String(frameCount).length);
+      const rowDigits = Math.max(2, String(rowSegments.length).length);
+      const columnDigits = Math.max(2, String(columnSegments.length).length);
+      let exportedCount = 0;
+      let wasCancelled = false;
+      let hadFailure = false;
+
+      for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+        if (wasCancelled || hadFailure) {
+          break;
+        }
+        const frameCanvas = createFrameCanvas(framePixels[frameIndex], width, height);
+        const outputCanvas = scaleCanvasNearestNeighbor(frameCanvas, selectedScale);
+        const frameNumber = String(frameIndex + 1).padStart(frameDigits, '0');
+        for (let rowIndex = 0; rowIndex < rowSegments.length; rowIndex += 1) {
+          if (wasCancelled || hadFailure) {
+            break;
+          }
+          const rowSegment = rowSegments[rowIndex];
+          const rowNumber = String(rowIndex + 1).padStart(rowDigits, '0');
+          for (let columnIndex = 0; columnIndex < columnSegments.length; columnIndex += 1) {
+            const columnSegment = columnSegments[columnIndex];
+            const columnNumber = String(columnIndex + 1).padStart(columnDigits, '0');
+            const blob = await canvasRegionToBlob(
+              outputCanvas,
+              columnSegment.start,
+              rowSegment.start,
+              columnSegment.size,
+              rowSegment.size,
+              'image/png'
+            );
+            let suffix = `frame_${frameNumber}_tile_r${rowNumber}_c${columnNumber}`;
+            if (selectedScale > 1) {
+              suffix += `_x${selectedScale}`;
+            }
+            const deliveryResult = await triggerDownloadFromBlob(
+              blob,
+              createExportFileName('png', suffix),
+              {
+                mimeType: 'image/png',
+                fileExtensions: ['.png'],
+                shareTitle: state.documentName || 'PiXiEEDraw',
+                shareText: `グリッド分割PNGを書き出しました (r${rowIndex + 1}, c${columnIndex + 1})`,
+                allowFilePicker: true,
+                allowBoundDirectory: true,
+              }
+            );
+            switch (deliveryResult) {
+              case 'directory':
+              case 'picker':
+              case 'download':
+              case 'share':
+              case 'window':
+                exportedCount += 1;
+                break;
+              case 'picker-cancel':
+              case 'share-cancel':
+                wasCancelled = true;
+                break;
+              default:
+                hadFailure = true;
+                break;
+            }
+            if (wasCancelled || hadFailure) {
+              break;
+            }
+          }
+        }
+      }
+
+      const detailParts = [];
+      detailParts.push(`分割 ${exportGridTileWidth}×${exportGridTileHeight}px`);
+      if (frameCount > 1) {
+        detailParts.push(`全${frameCount}フレーム`);
+      }
+      if (selectedScale > 1) {
+        detailParts.push(`倍率 ×${selectedScale}`);
+      }
+      detailParts.push(`右上→左 / 上→下`);
+      const detail = detailParts.length ? ` (${detailParts.join(' / ')})` : '';
+
+      if (exportedCount === total) {
+        updateAutosaveStatus(`グリッド分割PNGを書き出しました${detail}`, 'success');
+      } else if (wasCancelled) {
+        const remaining = total - exportedCount;
+        updateAutosaveStatus(remaining === total
+          ? 'グリッド分割PNGの書き出しをキャンセルしました'
+          : `グリッド分割PNGを書き出しましたが ${remaining} 件はキャンセルされました`, 'warn');
+      } else if (exportedCount > 0 && hadFailure) {
+        updateAutosaveStatus(`グリッド分割PNGを書き出しましたが ${total - exportedCount} 件エクスポートできませんでした`, 'warn');
+      } else {
+        updateAutosaveStatus('グリッド分割PNGの書き出しに失敗しました', 'error');
+      }
+
+      if (exportedCount > 0) {
+        markDocumentDurablySaved();
+        showExportInterstitialAfterImageExport();
+      }
+    } catch (error) {
+      console.error('Grid PNG export failed', error);
+      updateAutosaveStatus('グリッド分割PNGの書き出しに失敗しました', 'error');
+    }
+  }
+
   async function exportProjectAsPng() {
+    if (!ensureCurrentClientCanExportProject({ announce: true })) {
+      return;
+    }
     const frameCount = state.frames.length;
     if (!frameCount) {
       updateAutosaveStatus('PNGを書き出すフレームがありません', 'warn');
@@ -9562,6 +9847,9 @@
   }
 
   async function exportProjectAsGif() {
+    if (!ensureCurrentClientCanExportProject({ announce: true })) {
+      return;
+    }
     const frameCount = state.frames.length;
     if (!frameCount) {
       updateAutosaveStatus('GIFを書き出すフレームがありません', 'warn');
@@ -9732,9 +10020,23 @@
     if (normalized === 'gif') return 'gif';
     if (normalized === 'timelapse') return 'timelapse';
     if (normalized === 'png') return 'png';
+    if (normalized === 'gridpng' || normalized === 'grid') return 'gridpng';
     if (normalized === 'pixfind') return 'pixfind';
     if (normalized === 'project') return 'project';
     return 'png';
+  }
+
+  function isGridPngExportMode(mode) {
+    return normalizeExportFormat(mode) === 'gridpng';
+  }
+
+  function normalizeExportGridTileSize(value, fallback = 8) {
+    const base = Number.isFinite(Number(fallback)) ? Number(fallback) : 8;
+    const parsed = Math.round(Number(value));
+    if (!Number.isFinite(parsed)) {
+      return clamp(Math.round(base), EXPORT_GRID_TILE_MIN_SIZE, EXPORT_GRID_TILE_MAX_SIZE);
+    }
+    return clamp(parsed, EXPORT_GRID_TILE_MIN_SIZE, EXPORT_GRID_TILE_MAX_SIZE);
   }
 
   function canOfferOriginalCompanionExport(mode, scale = exportScale) {
@@ -9749,13 +10051,24 @@
 
   function updateExportOriginalToggleUI() {
     const toggle = dom.exportDialog?.includeOriginalToggle;
-    if (!(toggle instanceof HTMLInputElement)) {
-      return;
-    }
     const mode = normalizeExportFormat(dom.exportDialog?.format?.value || 'png');
-    const canOffer = canOfferOriginalCompanionExport(mode, exportScale);
-    toggle.checked = exportIncludeOriginalSize;
-    toggle.disabled = !canOffer;
+    const isGridMode = isGridPngExportMode(mode);
+    if (toggle instanceof HTMLInputElement) {
+      const canOffer = !isGridMode && canOfferOriginalCompanionExport(mode, exportScale);
+      toggle.checked = exportIncludeOriginalSize;
+      toggle.disabled = !canOffer;
+    }
+    const gridSettings = dom.exportDialog?.gridSettings;
+    if (gridSettings instanceof HTMLElement) {
+      gridSettings.hidden = !isGridMode;
+    }
+    const gridHint = dom.exportDialog?.gridHint;
+    if (gridHint instanceof HTMLElement) {
+      gridHint.hidden = !isGridMode;
+    }
+    if (isGridMode) {
+      syncExportGridInputs();
+    }
   }
 
   function applyExportScaleConstraints(candidates) {
@@ -9854,6 +10167,25 @@
     updateExportOriginalToggleUI();
   }
 
+  function syncExportGridInputs() {
+    const widthInput = dom.exportDialog?.gridWidthInput;
+    const heightInput = dom.exportDialog?.gridHeightInput;
+    exportGridTileWidth = normalizeExportGridTileSize(exportGridTileWidth, 8);
+    exportGridTileHeight = normalizeExportGridTileSize(exportGridTileHeight, 8);
+    if (widthInput instanceof HTMLInputElement) {
+      widthInput.min = String(EXPORT_GRID_TILE_MIN_SIZE);
+      widthInput.max = String(EXPORT_GRID_TILE_MAX_SIZE);
+      widthInput.step = '1';
+      widthInput.value = String(exportGridTileWidth);
+    }
+    if (heightInput instanceof HTMLInputElement) {
+      heightInput.min = String(EXPORT_GRID_TILE_MIN_SIZE);
+      heightInput.max = String(EXPORT_GRID_TILE_MAX_SIZE);
+      heightInput.step = '1';
+      heightInput.value = String(exportGridTileHeight);
+    }
+  }
+
   function setExportScale(value) {
     const maxAllowed = exportMaxScale || 1;
     const normalized = clamp(Math.round(Number(value) || exportScale || 1), 1, maxAllowed);
@@ -9896,6 +10228,53 @@
     ctx.webkitImageSmoothingEnabled = false;
     ctx.drawImage(sourceCanvas, 0, 0, output.width, output.height);
     return output;
+  }
+
+  function buildGridRowSegmentsTopToBottom(totalHeight, tileHeight) {
+    const fullHeight = Math.max(1, Math.floor(Number(totalHeight) || 0));
+    const step = normalizeExportGridTileSize(tileHeight, exportGridTileHeight);
+    const segments = [];
+    for (let top = 0; top < fullHeight; top += step) {
+      const bottom = Math.min(fullHeight, top + step);
+      segments.push({
+        start: top,
+        size: Math.max(1, bottom - top),
+      });
+    }
+    return segments;
+  }
+
+  function buildGridColumnSegmentsRightToLeft(totalWidth, tileWidth) {
+    const fullWidth = Math.max(1, Math.floor(Number(totalWidth) || 0));
+    const step = normalizeExportGridTileSize(tileWidth, exportGridTileWidth);
+    const segments = [];
+    for (let right = fullWidth; right > 0; right -= step) {
+      const left = Math.max(0, right - step);
+      segments.push({
+        start: left,
+        size: Math.max(1, right - left),
+      });
+    }
+    return segments;
+  }
+
+  async function canvasRegionToBlob(sourceCanvas, x, y, width, height, mimeType = 'image/png') {
+    const sx = Math.max(0, Math.floor(Number(x) || 0));
+    const sy = Math.max(0, Math.floor(Number(y) || 0));
+    const sw = Math.max(1, Math.floor(Number(width) || 0));
+    const sh = Math.max(1, Math.floor(Number(height) || 0));
+    const tileCanvas = document.createElement('canvas');
+    tileCanvas.width = sw;
+    tileCanvas.height = sh;
+    const ctx = tileCanvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('分割キャンバスのコンテキストを取得できませんでした');
+    }
+    ctx.imageSmoothingEnabled = false;
+    ctx.msImageSmoothingEnabled = false;
+    ctx.webkitImageSmoothingEnabled = false;
+    ctx.drawImage(sourceCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+    return canvasToBlob(tileCanvas, mimeType);
   }
 
   function scaleFramePixelsNearestNeighbor(pixels, width, height, scale) {
@@ -10193,6 +10572,9 @@
   }
 
   async function saveProjectAsPixieedraw() {
+    if (!ensureCurrentClientCanExportProject({ announce: true })) {
+      return;
+    }
     try {
       const snapshot = makeHistorySnapshot();
       const payload = serializeDocumentSnapshot(snapshot);
@@ -12525,6 +12907,9 @@
   }
 
   function activateMobileTab(target, { ensureDrawer = false } = {}) {
+    if (isMobileSpectatorTabLockActive() && target !== 'multi') {
+      return false;
+    }
     if (!target || !dom.mobilePanels[target]) {
       return false;
     }
@@ -12579,6 +12964,38 @@
       }
     }
     return activated;
+  }
+
+  function isMobileSpectatorTabLockActive() {
+    return layoutMode === 'mobilePortrait' && isMultiSpectatorMode();
+  }
+
+  function enforceMobileSpectatorTabLock({ forceActivate = true } = {}) {
+    const locked = isMobileSpectatorTabLockActive();
+    if (Array.isArray(dom.mobileTabs)) {
+      dom.mobileTabs.forEach(tab => {
+        if (!(tab instanceof HTMLButtonElement)) {
+          return;
+        }
+        const key = tab.dataset.mobileTab || '';
+        const isMultiTab = key === 'multi';
+        if (locked) {
+          tab.disabled = !isMultiTab;
+          tab.setAttribute('aria-disabled', String(!isMultiTab));
+        } else {
+          tab.disabled = false;
+          tab.removeAttribute('aria-disabled');
+        }
+      });
+    }
+    if (locked && forceActivate) {
+      const activeKey = Array.isArray(dom.mobileTabs)
+        ? (dom.mobileTabs.find(tab => tab.classList.contains('is-active'))?.dataset.mobileTab || '')
+        : '';
+      if (activeKey !== 'multi') {
+        activateMobileTab('multi', { ensureDrawer: false });
+      }
+    }
   }
 
   function endMobileDrawerDrag({ persist = false, snap = true } = {}) {
@@ -12757,6 +13174,10 @@
       tab.addEventListener('click', () => {
         const target = tab.dataset.mobileTab;
         if (!target) {
+          return;
+        }
+        if (isMobileSpectatorTabLockActive() && target !== 'multi') {
+          activateMobileTab('multi', { ensureDrawer: false });
           return;
         }
         activateMobileTab(target, { ensureDrawer: false });
@@ -12966,6 +13387,7 @@
         activateMobileTab(preferredMobileTab, { ensureDrawer: false });
       }
     }
+    enforceMobileSpectatorTabLock({ forceActivate: true });
 
     updateRailToggleVisibility();
     updateToolVisibility();
@@ -13203,7 +13625,7 @@
 
   function setMirrorModeEnabled(enabled, options = {}) {
     if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus('参加モードではミラーモード設定はマスターのみ変更できます', 'warn');
+      setMultiStatus('参加/視聴モードではミラーモード設定はマスターのみ変更できます', 'warn');
       return;
     }
     const { persist = true, updateControl = true } = options;
@@ -13240,7 +13662,7 @@
 
   function setMirrorAxisEnabled(axis, enabled, options = {}) {
     if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus('参加モードでは対称軸設定はマスターのみ変更できます', 'warn');
+      setMultiStatus('参加/視聴モードでは対称軸設定はマスターのみ変更できます', 'warn');
       return;
     }
     const { persist = true, syncControls = true } = options;
@@ -14266,7 +14688,7 @@
 
     dom.controls.clearCanvas?.addEventListener('click', () => {
       if (!canCurrentClientEditProjectStructure()) {
-        setMultiStatus('参加モードではキャンバスクリアはマスターのみ操作できます', 'warn');
+        setMultiStatus('参加/視聴モードではキャンバスクリアはマスターのみ操作できます', 'warn');
         return;
       }
       if (!confirm('すべてのフレームをクリアしますか？')) {
@@ -14330,7 +14752,7 @@
 
   function handleCanvasResizeRequest() {
     if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus('参加モードではキャンバスサイズはマスターのみ変更できます', 'warn');
+      setMultiStatus('参加/視聴モードではキャンバスサイズはマスターのみ変更できます', 'warn');
       return;
     }
     if (lockedCanvasWidth !== null || lockedCanvasHeight !== null) {
@@ -14483,7 +14905,7 @@
 
   function applySpriteScaleMultiplier(rawValue) {
     if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus('参加モードではスプライト倍率はマスターのみ変更できます', 'warn');
+      setMultiStatus('参加/視聴モードではスプライト倍率はマスターのみ変更できます', 'warn');
       return;
     }
     const input = dom.controls.spriteScaleInput;
@@ -15852,7 +16274,7 @@
 
   function moveActiveLayer(offset) {
     if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus('参加モードではレイヤー移動はマスターのみ操作できます', 'warn');
+      setMultiStatus('参加/視聴モードではレイヤー移動はマスターのみ操作できます', 'warn');
       return;
     }
     if (!Number.isInteger(offset) || offset === 0) return;
@@ -15935,7 +16357,7 @@
 
   function moveActiveFrame(offset) {
     if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus('参加モードではフレーム移動はマスターのみ操作できます', 'warn');
+      setMultiStatus('参加/視聴モードではフレーム移動はマスターのみ操作できます', 'warn');
       return;
     }
     if (!Number.isInteger(offset) || offset === 0) return;
@@ -15993,7 +16415,7 @@
   function setupFramesAndLayers() {
     dom.controls.addLayer?.addEventListener('click', () => {
       if (!canCurrentClientEditProjectStructure()) {
-        setMultiStatus('参加モードではレイヤー追加はマスターのみ操作できます', 'warn');
+        setMultiStatus('参加/視聴モードではレイヤー追加はマスターのみ操作できます', 'warn');
         return;
       }
       const activeFrame = getActiveFrame();
@@ -16021,7 +16443,7 @@
 
     dom.controls.removeLayer?.addEventListener('click', () => {
       if (!canCurrentClientEditProjectStructure()) {
-        setMultiStatus('参加モードではレイヤー削除はマスターのみ操作できます', 'warn');
+        setMultiStatus('参加/視聴モードではレイヤー削除はマスターのみ操作できます', 'warn');
         return;
       }
       if (!state.frames.every(frame => frame.layers.length > 1)) {
@@ -16056,7 +16478,7 @@
 
     dom.controls.addFrame?.addEventListener('click', () => {
       if (!canCurrentClientEditProjectStructure()) {
-        setMultiStatus('参加モードではフレーム追加はマスターのみ操作できます', 'warn');
+        setMultiStatus('参加/視聴モードではフレーム追加はマスターのみ操作できます', 'warn');
         return;
       }
       const baseFrame = getActiveFrame();
@@ -16078,7 +16500,7 @@
 
     dom.controls.removeFrame?.addEventListener('click', () => {
       if (!canCurrentClientEditProjectStructure()) {
-        setMultiStatus('参加モードではフレーム削除はマスターのみ操作できます', 'warn');
+        setMultiStatus('参加/視聴モードではフレーム削除はマスターのみ操作できます', 'warn');
         return;
       }
       if (state.frames.length <= 1) return;
@@ -16497,7 +16919,7 @@
 
   function setLayerVisibilityForRow(rowIndex, visible) {
     if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus('参加モードではレイヤー表示切替はマスターのみ操作できます', 'warn');
+      setMultiStatus('参加/視聴モードではレイヤー表示切替はマスターのみ操作できます', 'warn');
       return;
     }
     let needsChange = false;
@@ -16764,7 +17186,7 @@
 
       if (target.classList.contains('timeline-visibility')) {
         if (!canCurrentClientEditProjectStructure()) {
-          setMultiStatus('参加モードではレイヤー表示切替はマスターのみ操作できます', 'warn');
+          setMultiStatus('参加/視聴モードではレイヤー表示切替はマスターのみ操作できます', 'warn');
           return;
         }
         const rowIndex = Number.parseInt(target.dataset.layerRowIndex || '', 10);
@@ -17531,8 +17953,14 @@
       return false;
     }
     const requiresLayer = HISTORY_DRAW_TOOLS.has(activeTool);
-    if (requiresLayer && isMultiGuestMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
-      return false;
+    if (requiresLayer) {
+      if (isMultiSpectatorMode()) {
+        setMultiStatus('視聴モードでは描画できません', 'warn');
+        return false;
+      }
+      if (isMultiGuestMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
+        return false;
+      }
     }
     const layer = getActiveLayer();
     if (requiresLayer && !layer) {
@@ -18918,6 +19346,7 @@
     pointerState.touchPinchStartDistance = null;
     pointerState.touchPinchStartScale = null;
     pointerState.touchPinchFocus = null;
+    pointerState.touchGestureMode = null;
     pointerState.curveHandle = null;
     pointerState.panCaptureElement = null;
     document.body.classList.remove('is-pan-dragging');
@@ -18947,6 +19376,7 @@
     pointerState.touchPinchStartDistance = null;
     pointerState.touchPinchStartScale = null;
     pointerState.touchPinchFocus = null;
+    pointerState.touchGestureMode = null;
     pointerState.curveHandle = null;
     pointerState.panOrigin = { x: state.pan.x, y: state.pan.y };
     pointerState.panCaptureElement = null;
@@ -19054,6 +19484,7 @@
     if (multiTouch) {
       pointerState.pointerId = null;
       pointerState.startClient = null;
+      pointerState.touchGestureMode = null;
       refreshTouchPanBaseline({ resetPinchFocus: true });
       if (!pointerState.touchPanStart) {
         pointerState.touchPanStart = { x: event.clientX, y: event.clientY };
@@ -19069,6 +19500,7 @@
       pointerState.touchPinchStartDistance = null;
       pointerState.touchPinchStartScale = null;
       pointerState.touchPinchFocus = null;
+      pointerState.touchGestureMode = null;
       const captureTarget = captureElement && typeof captureElement.setPointerCapture === 'function'
         ? captureElement
         : dom.canvases.drawing;
@@ -19106,6 +19538,7 @@
     pointerState.touchPinchStartDistance = null;
     pointerState.touchPinchStartScale = null;
     pointerState.touchPinchFocus = null;
+    pointerState.touchGestureMode = null;
     pointerState.startClient = null;
     pointerState.path = [];
     pointerState.drawPaletteIndex = null;
@@ -19170,8 +19603,12 @@
     if (state.playback.isPlaying && activeTool !== 'pan') {
       return;
     }
-    if (HISTORY_DRAW_TOOLS.has(activeTool) && isMultiGuestMode()) {
-      if (!enforceGuestAssignedLayerSelection({ announce: true })) {
+    if (HISTORY_DRAW_TOOLS.has(activeTool)) {
+      if (isMultiSpectatorMode()) {
+        setMultiStatus('視聴モードでは描画できません', 'warn');
+        return;
+      }
+      if (isMultiGuestMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
         return;
       }
     }
@@ -19209,6 +19646,9 @@
       pointerState.active = false;
       return;
     }
+    const selectRectGridGesture = activeTool === 'selectRect'
+      ? detectSelectRectGridDoubleTap(position)
+      : { enabled: false, cell: null };
 
     if (keyboardState.customBrushGestureArmed) {
       if (!dom.canvases.drawing) {
@@ -19310,7 +19750,13 @@
       return;
     }
 
-    if (isSelectionTool && hasSelection && selectionHit && !pointerState.selectionExtendOnDown) {
+    if (
+      isSelectionTool
+      && hasSelection
+      && selectionHit
+      && !pointerState.selectionExtendOnDown
+      && !(activeTool === 'selectRect' && selectRectGridGesture.enabled)
+    ) {
       const moved = beginSelectionMove(event, position, { reuseOffset: Boolean(state.pendingPasteMoveState) });
       if (moved) {
         updateCanvasControlButtons();
@@ -19337,6 +19783,15 @@
       (activeTool === 'selectRect' || activeTool === 'selectLasso')
       && hasSelection
       && !selectionHit
+      && !pointerState.selectionExtendOnDown
+    ) {
+      clearSelection();
+      pointerState.selectionClearedOnDown = true;
+    }
+    if (
+      activeTool === 'selectRect'
+      && selectRectGridGesture.enabled
+      && hasSelection
       && !pointerState.selectionExtendOnDown
     ) {
       clearSelection();
@@ -19402,6 +19857,22 @@
 
     if (activeTool === 'selectRect' || activeTool === 'selectLasso') {
       pointerState.selectionPreview = { start: position, points: [position] };
+      if (activeTool === 'selectRect' && selectRectGridGesture.enabled) {
+        const startCell = selectRectGridGesture.cell || getSelectionGridCellFromPosition(position, SELECT_RECT_GRID_CELL_SIZE);
+        if (startCell) {
+          pointerState.selectionPreview.gridCellMode = true;
+          pointerState.selectionPreview.gridCellSize = SELECT_RECT_GRID_CELL_SIZE;
+          pointerState.selectionPreview.gridAnchorCell = { ...startCell };
+          pointerState.selectionPreview.gridCurrentCell = { ...startCell };
+          updateSelectionGridRectPreview(pointerState.selectionPreview, startCell, startCell);
+          if (pointerState.selectionPreview.start) {
+            pointerState.start = { ...pointerState.selectionPreview.start };
+          }
+          if (pointerState.selectionPreview.end) {
+            pointerState.current = { ...pointerState.selectionPreview.end };
+          }
+        }
+      }
     } else if (activeTool === 'selectSame') {
       pointerState.selectionPreview = null;
     } else if (activeTool === 'line' || activeTool === 'rect' || activeTool === 'rectFill' || activeTool === 'ellipse' || activeTool === 'ellipseFill') {
@@ -19439,7 +19910,11 @@
         const dx = centroid.x - baselineCentroid.x;
         const dy = centroid.y - baselineCentroid.y;
         const panDistance = Math.hypot(dx, dy);
+        const panGestureActive = panDistance >= TOUCH_PAN_DEADZONE_PX;
         let pinchGestureActive = false;
+        let pinchTargetScale = Number(state.scale) || MIN_ZOOM_SCALE;
+        let pinchFocus = pointerState.touchPinchFocus || getTouchPinchFocusForCentroid(baselineCentroid);
+        let pinchStrength = 0;
 
         const baselineDistance = Number(pointerState.touchPinchStartDistance);
         const nextDistance = Number(getTouchPointerDistance());
@@ -19456,27 +19931,43 @@
           pinchGestureActive =
             ratioDelta >= TOUCH_PINCH_DEADZONE_RATIO &&
             distanceDelta >= TOUCH_PINCH_DEADZONE_PX;
+          pinchStrength = Math.min(
+            ratioDelta / Math.max(TOUCH_PINCH_DEADZONE_RATIO, Number.EPSILON),
+            distanceDelta / Math.max(TOUCH_PINCH_DEADZONE_PX, Number.EPSILON)
+          );
           const amplifiedRatio = 1 + ((cappedRatio - 1) * TOUCH_PINCH_SENSITIVITY);
-          const targetScale = normalizeZoomScale(
+          pinchTargetScale = normalizeZoomScale(
             baselineScale * Math.max(TOUCH_PINCH_MIN_RATIO, amplifiedRatio),
             Number(state.scale) || baselineScale
           );
-          if (pinchGestureActive && Math.abs(targetScale - (Number(state.scale) || MIN_ZOOM_SCALE)) >= ZOOM_EPSILON) {
-            const pinchFocus = pointerState.touchPinchFocus || getTouchPinchFocusForCentroid(baselineCentroid);
-            if (pinchFocus) {
-              pointerState.touchPinchFocus = pinchFocus;
-            }
-            setZoom(targetScale, pinchFocus || undefined);
+        }
+
+        if (!pointerState.touchGestureMode) {
+          const panStrength = panDistance / Math.max(TOUCH_PAN_DEADZONE_PX, Number.EPSILON);
+          if (
+            pinchGestureActive
+            && (!panGestureActive || pinchStrength >= (panStrength * TOUCH_PINCH_MODE_PRIORITY_RATIO))
+          ) {
+            pointerState.touchGestureMode = 'pinch';
+          } else if (panGestureActive) {
+            pointerState.touchGestureMode = 'pan';
+          } else if (pinchGestureActive) {
+            pointerState.touchGestureMode = 'pinch';
           }
         }
 
-        if (!pinchGestureActive && panDistance < TOUCH_PAN_DEADZONE_PX) {
+        if (!pointerState.touchGestureMode) {
           updateVirtualCursorFromEvent(event);
           return;
         }
 
-        // Keep pinch-zoom stable by freezing centroid translation while scaling.
-        if (pinchGestureActive) {
+        if (pointerState.touchGestureMode === 'pinch') {
+          if (pinchFocus) {
+            pointerState.touchPinchFocus = pinchFocus;
+          }
+          if (pinchGestureActive && Math.abs(pinchTargetScale - (Number(state.scale) || MIN_ZOOM_SCALE)) >= ZOOM_EPSILON) {
+            setZoom(pinchTargetScale, pinchFocus || undefined);
+          }
           updateVirtualCursorFromEvent(event);
           return;
         }
@@ -19524,10 +20015,22 @@
     ) {
       if (pointerState.tool === 'selectLasso') {
         pointerState.selectionPreview.points.push(position);
+      } else if (pointerState.tool === 'selectRect' && pointerState.selectionPreview?.gridCellMode) {
+        const preview = pointerState.selectionPreview;
+        const cellSize = Math.max(1, Math.floor(Number(preview.gridCellSize) || SELECT_RECT_GRID_CELL_SIZE));
+        const nextCell = getSelectionGridCellFromPosition(position, cellSize);
+        if (nextCell) {
+          const anchorCell = preview.gridAnchorCell || nextCell;
+          preview.gridCurrentCell = { ...nextCell };
+          updateSelectionGridRectPreview(preview, anchorCell, nextCell);
+          if (preview.end) {
+            pointerState.current = { ...preview.end };
+          }
+        }
       } else {
         pointerState.selectionPreview.points = [pointerState.selectionPreview.start, position];
+        pointerState.selectionPreview.end = position;
       }
-      pointerState.selectionPreview.end = position;
       requestOverlayRender();
     }
   }
@@ -19631,7 +20134,16 @@
     } else if (tool === 'selectionMove' || tool === 'layerMove') {
       finalizeSelectionMove();
     } else if (tool === 'selectRect') {
-      if (!(pointerState.selectionClearedOnDown && pointerState.path.length <= 1)) {
+      if (pointerState.selectionPreview?.gridCellMode) {
+        createSelectionByGridRect(
+          pointerState.selectionPreview.gridAnchorCell,
+          pointerState.selectionPreview.gridCurrentCell,
+          {
+            append: pointerState.selectionExtendOnDown,
+            cellSize: pointerState.selectionPreview.gridCellSize || SELECT_RECT_GRID_CELL_SIZE,
+          }
+        );
+      } else if (!(pointerState.selectionClearedOnDown && pointerState.path.length <= 1)) {
         createSelectionRect(pointerState.start, pointerState.current, {
           append: pointerState.selectionExtendOnDown,
         });
@@ -20422,7 +20934,7 @@
 
   function pasteSelection() {
     if (!canCurrentClientImportExternalData()) {
-      setMultiStatus('参加モードでは貼り付けインポートはマスターのみ操作できます', 'warn');
+      setMultiStatus('参加/視聴モードでは貼り付けインポートはマスターのみ操作できます', 'warn');
       updateCanvasControlButtons();
       return false;
     }
@@ -21362,6 +21874,127 @@
       };
     }
     return { mask, bounds, hasBaseSelection };
+  }
+
+  function getSelectionGridCellFromPosition(position, cellSize = SELECT_RECT_GRID_CELL_SIZE) {
+    if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) {
+      return null;
+    }
+    const safeCellSize = Math.max(1, Math.floor(Number(cellSize) || 1));
+    const width = Math.max(1, Number(state.width) || 1);
+    const height = Math.max(1, Number(state.height) || 1);
+    const maxCellX = Math.max(0, Math.ceil(width / safeCellSize) - 1);
+    const maxCellY = Math.max(0, Math.ceil(height / safeCellSize) - 1);
+    const x = clamp(Math.floor(position.x / safeCellSize), 0, maxCellX);
+    const y = clamp(Math.floor(position.y / safeCellSize), 0, maxCellY);
+    return { x, y };
+  }
+
+  function getSelectionGridCellBounds(cell, cellSize = SELECT_RECT_GRID_CELL_SIZE) {
+    if (!cell || !Number.isFinite(cell.x) || !Number.isFinite(cell.y)) {
+      return null;
+    }
+    const safeCellSize = Math.max(1, Math.floor(Number(cellSize) || 1));
+    const width = Math.max(1, Number(state.width) || 1);
+    const height = Math.max(1, Number(state.height) || 1);
+    const x0 = clamp(Math.floor(cell.x) * safeCellSize, 0, width - 1);
+    const y0 = clamp(Math.floor(cell.y) * safeCellSize, 0, height - 1);
+    const x1 = clamp(x0 + safeCellSize - 1, 0, width - 1);
+    const y1 = clamp(y0 + safeCellSize - 1, 0, height - 1);
+    return { x0, y0, x1, y1 };
+  }
+
+  function detectSelectRectGridDoubleTap(position) {
+    const cell = getSelectionGridCellFromPosition(position, SELECT_RECT_GRID_CELL_SIZE);
+    if (!cell) {
+      return { enabled: false, cell: null };
+    }
+    const now = performance.now();
+    const elapsed = now - (Number(selectRectGridTapState.lastTapAt) || 0);
+    const sameCell = (
+      cell.x === selectRectGridTapState.lastTapCellX
+      && cell.y === selectRectGridTapState.lastTapCellY
+    );
+    const enabled = elapsed >= 0 && elapsed <= SELECT_RECT_GRID_DOUBLE_TAP_MS && sameCell;
+    selectRectGridTapState.lastTapAt = now;
+    selectRectGridTapState.lastTapCellX = cell.x;
+    selectRectGridTapState.lastTapCellY = cell.y;
+    return { enabled, cell };
+  }
+
+  function getSelectionGridRectPixelBounds(startCell, endCell, cellSize = SELECT_RECT_GRID_CELL_SIZE) {
+    if (!startCell || !endCell) {
+      return null;
+    }
+    const startBounds = getSelectionGridCellBounds(startCell, cellSize);
+    const endBounds = getSelectionGridCellBounds(endCell, cellSize);
+    if (!startBounds || !endBounds) {
+      return null;
+    }
+    return {
+      x0: Math.min(startBounds.x0, endBounds.x0),
+      y0: Math.min(startBounds.y0, endBounds.y0),
+      x1: Math.max(startBounds.x1, endBounds.x1),
+      y1: Math.max(startBounds.y1, endBounds.y1),
+    };
+  }
+
+  function updateSelectionGridRectPreview(preview, startCell, endCell) {
+    if (!preview) {
+      return;
+    }
+    const bounds = getSelectionGridRectPixelBounds(
+      startCell,
+      endCell,
+      preview.gridCellSize || SELECT_RECT_GRID_CELL_SIZE
+    );
+    if (!bounds) {
+      return;
+    }
+    preview.start = { x: bounds.x0, y: bounds.y0 };
+    preview.end = { x: bounds.x1, y: bounds.y1 };
+  }
+
+  function createSelectionByGridRect(startCell, endCell, options = {}) {
+    const { append = false, cellSize = SELECT_RECT_GRID_CELL_SIZE } = options || {};
+    const boundsRect = getSelectionGridRectPixelBounds(startCell, endCell, cellSize);
+    if (!boundsRect) {
+      if (!append) {
+        clearSelection();
+      }
+      return;
+    }
+    const layer = getActiveLayer();
+    if (!layer) {
+      if (!append) {
+        clearSelection();
+      }
+      return;
+    }
+    const { mask, bounds, hasBaseSelection } = createSelectionAccumulator({ append });
+    for (let y = boundsRect.y0; y <= boundsRect.y1; y += 1) {
+      for (let x = boundsRect.x0; x <= boundsRect.x1; x += 1) {
+        if (!layerHasDrawablePixel(layer, x, y)) continue;
+        const idx = y * state.width + x;
+        mask[idx] = 1;
+        if (x < bounds.x0) bounds.x0 = x;
+        if (y < bounds.y0) bounds.y0 = y;
+        if (x > bounds.x1) bounds.x1 = x;
+        if (y > bounds.y1) bounds.y1 = y;
+      }
+    }
+
+    if (bounds.x0 > bounds.x1 || bounds.y0 > bounds.y1) {
+      if (!hasBaseSelection) {
+        clearSelection();
+      }
+      return;
+    }
+
+    state.selectionMask = mask;
+    state.selectionBounds = bounds;
+    updateCanvasControlButtons();
+    requestOverlayRender();
   }
 
   function createSelectionRect(start, end, options = {}) {
@@ -23436,8 +24069,15 @@
         pixfindMode: Boolean(pixfindModeEnabled),
         pixfindModeFirstEnableConfirmed: Boolean(pixfindModeFirstEnableConfirmed),
         exportIncludeOriginalSize: Boolean(exportIncludeOriginalSize),
+        exportGridTileWidth: normalizeExportGridTileSize(exportGridTileWidth, 8),
+        exportGridTileHeight: normalizeExportGridTileSize(exportGridTileHeight, 8),
         timelapseEnabled: Boolean(timelapseState.enabled),
         timelapseFps: normalizeTimelapseFps(timelapseState.fps),
+        multiMaxGuests: normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT),
+        multiExportPermission: normalizeMultiExportPermission(
+          multiState.exportPermission,
+          MULTI_DEFAULT_EXPORT_PERMISSION
+        ),
       };
       window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(snapshot));
     } catch (error) {
@@ -23589,11 +24229,26 @@
     if (typeof payload.exportIncludeOriginalSize === 'boolean') {
       exportIncludeOriginalSize = payload.exportIncludeOriginalSize;
     }
+    if (Number.isFinite(payload.exportGridTileWidth)) {
+      exportGridTileWidth = normalizeExportGridTileSize(payload.exportGridTileWidth, exportGridTileWidth);
+    }
+    if (Number.isFinite(payload.exportGridTileHeight)) {
+      exportGridTileHeight = normalizeExportGridTileSize(payload.exportGridTileHeight, exportGridTileHeight);
+    }
     // Keep timelapse enabled by default on startup.
     // The toggle still works at runtime, but disabled state is not restored.
     timelapseState.enabled = true;
     if (Number.isFinite(payload.timelapseFps)) {
       timelapseState.fps = normalizeTimelapseFps(payload.timelapseFps);
+    }
+    if (Number.isFinite(payload.multiMaxGuests)) {
+      multiState.maxGuests = normalizeMultiMaxGuests(payload.multiMaxGuests, multiState.maxGuests);
+    }
+    if (typeof payload.multiExportPermission === 'string') {
+      multiState.exportPermission = normalizeMultiExportPermission(
+        payload.multiExportPermission,
+        multiState.exportPermission
+      );
     }
     if (state.showVirtualCursor && !virtualCursor) {
       virtualCursor = createInitialVirtualCursor();
@@ -23606,6 +24261,122 @@
     refreshViewportCursorStyle();
   }
 
+  function normalizeMultiMaxGuests(value, fallback = MULTI_DEFAULT_GUEST_LIMIT) {
+    const numeric = Math.round(Number(value));
+    if (Number.isFinite(numeric)) {
+      return clamp(numeric, MULTI_GUEST_LIMIT_MIN, MULTI_GUEST_LIMIT_MAX);
+    }
+    const fallbackNumeric = Math.round(Number(fallback));
+    if (Number.isFinite(fallbackNumeric)) {
+      return clamp(fallbackNumeric, MULTI_GUEST_LIMIT_MIN, MULTI_GUEST_LIMIT_MAX);
+    }
+    return MULTI_DEFAULT_GUEST_LIMIT;
+  }
+
+  function normalizeMultiExportPermission(value, fallback = MULTI_DEFAULT_EXPORT_PERMISSION) {
+    if (value === MULTI_EXPORT_PERMISSION_MASTER) {
+      return MULTI_EXPORT_PERMISSION_MASTER;
+    }
+    if (value === MULTI_EXPORT_PERMISSION_MASTER_AND_GUEST) {
+      return MULTI_EXPORT_PERMISSION_MASTER_AND_GUEST;
+    }
+    if (value === MULTI_EXPORT_PERMISSION_ALL) {
+      return MULTI_EXPORT_PERMISSION_ALL;
+    }
+    if (fallback === MULTI_EXPORT_PERMISSION_MASTER_AND_GUEST || fallback === MULTI_EXPORT_PERMISSION_ALL) {
+      return fallback;
+    }
+    return MULTI_EXPORT_PERMISSION_MASTER;
+  }
+
+  function getMultiExportPermissionLabel(permission = multiState.exportPermission) {
+    const normalized = normalizeMultiExportPermission(permission, MULTI_DEFAULT_EXPORT_PERMISSION);
+    if (normalized === MULTI_EXPORT_PERMISSION_MASTER_AND_GUEST) {
+      return 'マスター + 参加者';
+    }
+    if (normalized === MULTI_EXPORT_PERMISSION_ALL) {
+      return '全員';
+    }
+    return 'マスターのみ';
+  }
+
+  function canCurrentClientExportProject() {
+    if (!multiState.connected) {
+      return true;
+    }
+    const permission = normalizeMultiExportPermission(
+      multiState.exportPermission,
+      MULTI_DEFAULT_EXPORT_PERMISSION
+    );
+    const role = multiState.role === 'master'
+      ? 'master'
+      : (multiState.role === 'guest'
+        ? 'guest'
+        : (multiState.role === 'spectator' ? 'spectator' : 'none'));
+    if (role === 'master') {
+      return true;
+    }
+    if (role === 'guest') {
+      return permission === MULTI_EXPORT_PERMISSION_MASTER_AND_GUEST
+        || permission === MULTI_EXPORT_PERMISSION_ALL;
+    }
+    if (role === 'spectator') {
+      return permission === MULTI_EXPORT_PERMISSION_ALL;
+    }
+    return true;
+  }
+
+  function getMultiExportDisabledReason() {
+    if (!multiState.connected || canCurrentClientExportProject()) {
+      return '';
+    }
+    return `出力は${getMultiExportPermissionLabel()}に制限されています`;
+  }
+
+  function ensureCurrentClientCanExportProject({ announce = true } = {}) {
+    const reason = getMultiExportDisabledReason();
+    if (!reason) {
+      return true;
+    }
+    if (announce) {
+      setMultiStatus(`共有モード: ${reason}`, 'warn');
+      updateAutosaveStatus(reason, 'warn');
+    }
+    return false;
+  }
+
+  function isMultiGuestLimitReached(ignoreClientId = '') {
+    const maxGuests = normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT);
+    let guestCount = 0;
+    multiState.assignments.forEach((entry, clientId) => {
+      if (!entry || entry.role !== 'guest') {
+        return;
+      }
+      if (ignoreClientId && clientId === ignoreClientId) {
+        return;
+      }
+      if (isMultiClientBlocked(clientId)) {
+        return;
+      }
+      guestCount += 1;
+    });
+    return guestCount >= maxGuests;
+  }
+
+  function getAssignedGuestCount() {
+    let guestCount = 0;
+    multiState.assignments.forEach((entry, clientId) => {
+      if (!entry || entry.role !== 'guest') {
+        return;
+      }
+      if (isMultiClientBlocked(clientId)) {
+        return;
+      }
+      guestCount += 1;
+    });
+    return guestCount;
+  }
+
   function normalizeMultiProjectKey(value) {
     if (typeof value !== 'string') {
       return '';
@@ -23615,6 +24386,107 @@
       .toLowerCase()
       .replace(/[^a-z0-9_-]/g, '')
       .slice(0, 40);
+  }
+
+  function parseMultiBooleanQueryValue(value) {
+    if (typeof value !== 'string') {
+      return false;
+    }
+    const normalized = value.trim().toLowerCase();
+    return normalized === '1' || normalized === 'true' || normalized === 'yes';
+  }
+
+  function buildMultiInviteUrl(projectKey = multiState.projectKey) {
+    const normalizedKey = normalizeMultiProjectKey(projectKey);
+    if (!normalizedKey) {
+      return '';
+    }
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set(MULTI_INVITE_QUERY_FLAG, '1');
+      url.searchParams.set(MULTI_INVITE_QUERY_KEY, normalizedKey);
+      url.searchParams.set(MULTI_INVITE_QUERY_AUTO_JOIN, '1');
+      return url.toString();
+    } catch (error) {
+      const origin = window.location.origin || '';
+      const path = window.location.pathname || '/';
+      return `${origin}${path}?${MULTI_INVITE_QUERY_FLAG}=1&${MULTI_INVITE_QUERY_KEY}=${encodeURIComponent(normalizedKey)}&${MULTI_INVITE_QUERY_AUTO_JOIN}=1`;
+    }
+  }
+
+  function clearMultiInviteQueryParamsFromUrl() {
+    try {
+      const url = new URL(window.location.href);
+      let changed = false;
+      [MULTI_INVITE_QUERY_FLAG, MULTI_INVITE_QUERY_KEY, MULTI_INVITE_QUERY_AUTO_JOIN].forEach(key => {
+        if (url.searchParams.has(key)) {
+          url.searchParams.delete(key);
+          changed = true;
+        }
+      });
+      if (!changed || typeof window.history?.replaceState !== 'function') {
+        return;
+      }
+      const search = url.searchParams.toString();
+      const next = `${url.pathname}${search ? `?${search}` : ''}${url.hash || ''}`;
+      window.history.replaceState(null, '', next);
+    } catch (error) {
+      // Ignore URL rewrite errors.
+    }
+  }
+
+  function readMultiInviteFromUrl() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (!parseMultiBooleanQueryValue(params.get(MULTI_INVITE_QUERY_FLAG) || '')) {
+        return null;
+      }
+      const projectKey = normalizeMultiProjectKey(params.get(MULTI_INVITE_QUERY_KEY) || '');
+      if (!projectKey) {
+        return null;
+      }
+      const autoJoin = parseMultiBooleanQueryValue(params.get(MULTI_INVITE_QUERY_AUTO_JOIN) || '1');
+      return {
+        projectKey,
+        autoJoin,
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function maybeApplyInviteAutoJoin() {
+    if (multiInviteAutoJoinHandled || multiState.connected || multiState.connecting) {
+      return false;
+    }
+    multiInviteAutoJoinHandled = true;
+    const invite = readMultiInviteFromUrl();
+    if (!invite) {
+      return false;
+    }
+    multiAutoResumeAttempted = true;
+    clearStoredMultiResumeSession();
+    storeMultiProjectKey(invite.projectKey);
+    if (dom.controls.multiProjectKey instanceof HTMLInputElement) {
+      dom.controls.multiProjectKey.value = invite.projectKey;
+    }
+    setMultiDesiredRole('spectator');
+    setMultiUiView('spectator');
+    multiState.resumeAssignments = null;
+    multiState.resumeBlockedClientIds = null;
+    multiState.resumeMaxGuests = null;
+    multiState.resumeExportPermission = null;
+    syncMultiControls();
+    setMultiStatus(`共有モード: 招待リンクを読み込みました (${invite.projectKey})`, 'info');
+    clearMultiInviteQueryParamsFromUrl();
+    if (invite.autoJoin) {
+      window.setTimeout(() => {
+        if (!multiState.connected && !multiState.connecting) {
+          connectMultiSessionAs('spectator');
+        }
+      }, 100);
+    }
+    return true;
   }
 
   function readStoredMultiProjectKey() {
@@ -23660,7 +24532,9 @@
     if (!canUseSessionStorage) {
       return;
     }
-    const role = multiState.role === 'master' ? 'master' : (multiState.role === 'guest' ? 'guest' : 'none');
+    const role = multiState.role === 'master'
+      ? 'master'
+      : (multiState.role === 'guest' ? 'guest' : (multiState.role === 'spectator' ? 'spectator' : 'none'));
     const projectKey = normalizeMultiProjectKey(multiState.projectKey || '');
     if (!multiState.connected || role === 'none' || !projectKey) {
       clearStoredMultiResumeSession();
@@ -23672,6 +24546,12 @@
       at: Date.now(),
       assignments: role === 'master' ? serializeMultiAssignments() : [],
       blockedClientIds: role === 'master' ? serializeMultiBlockedClientIds() : [],
+      maxGuests: role === 'master'
+        ? normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT)
+        : MULTI_DEFAULT_GUEST_LIMIT,
+      exportPermission: role === 'master'
+        ? normalizeMultiExportPermission(multiState.exportPermission, MULTI_DEFAULT_EXPORT_PERMISSION)
+        : MULTI_DEFAULT_EXPORT_PERMISSION,
     };
     try {
       window.sessionStorage.setItem(MULTI_RESUME_STORAGE_KEY, JSON.stringify(payload));
@@ -23700,7 +24580,9 @@
       return null;
     }
     const projectKey = normalizeMultiProjectKey(parsed.projectKey);
-    const role = parsed.role === 'master' ? 'master' : (parsed.role === 'guest' ? 'guest' : 'none');
+    const role = parsed.role === 'master'
+      ? 'master'
+      : (parsed.role === 'guest' ? 'guest' : (parsed.role === 'spectator' ? 'spectator' : 'none'));
     const timestamp = Number(parsed.at);
     const age = Date.now() - timestamp;
     if (!projectKey || role === 'none' || !Number.isFinite(timestamp) || age < 0 || age > MULTI_RESUME_MAX_AGE_MS) {
@@ -23713,7 +24595,13 @@
     const blockedClientIds = role === 'master' && Array.isArray(parsed.blockedClientIds)
       ? parsed.blockedClientIds
       : [];
-    return { projectKey, role, assignments, blockedClientIds };
+    const maxGuests = role === 'master'
+      ? normalizeMultiMaxGuests(parsed.maxGuests, MULTI_DEFAULT_GUEST_LIMIT)
+      : MULTI_DEFAULT_GUEST_LIMIT;
+    const exportPermission = role === 'master'
+      ? normalizeMultiExportPermission(parsed.exportPermission, MULTI_DEFAULT_EXPORT_PERMISSION)
+      : MULTI_DEFAULT_EXPORT_PERMISSION;
+    return { projectKey, role, assignments, blockedClientIds, maxGuests, exportPermission };
   }
 
   function maybeAutoResumeMultiSession() {
@@ -23738,15 +24626,30 @@
     multiState.resumeBlockedClientIds = pending.role === 'master' && Array.isArray(pending.blockedClientIds)
       ? pending.blockedClientIds
       : null;
+    multiState.resumeMaxGuests = pending.role === 'master'
+      ? normalizeMultiMaxGuests(pending.maxGuests, multiState.maxGuests)
+      : null;
+    multiState.resumeExportPermission = pending.role === 'master'
+      ? normalizeMultiExportPermission(pending.exportPermission, multiState.exportPermission)
+      : null;
+    if (pending.role === 'master') {
+      multiState.maxGuests = normalizeMultiMaxGuests(pending.maxGuests, multiState.maxGuests);
+      multiState.exportPermission = normalizeMultiExportPermission(
+        pending.exportPermission,
+        multiState.exportPermission
+      );
+    }
     setMultiStatus(
       pending.role === 'master'
         ? '共有モード: 前回のマスター接続を復元中…'
-        : '共有モード: 前回の参加接続を復元中…',
+        : (pending.role === 'spectator'
+          ? '共有モード: 前回の視聴接続を復元中…'
+          : '共有モード: 前回の参加接続を復元中…'),
       'info'
     );
     syncMultiControls();
     window.setTimeout(() => {
-      connectMultiSessionAs(pending.role);
+      connectMultiSessionAs(pending.role, { allowGuestJoin: pending.role === 'guest' });
     }, 80);
   }
 
@@ -23788,6 +24691,310 @@
     return multiState.connected && multiState.role === 'guest';
   }
 
+  function canCurrentClientRequestGuestRole() {
+    return multiState.connected && !multiState.connecting && multiState.role === 'spectator';
+  }
+
+  function clearMultiJoinRequests() {
+    if (multiState.pendingJoinRequests instanceof Map) {
+      multiState.pendingJoinRequests.clear();
+    } else {
+      multiState.pendingJoinRequests = new Map();
+    }
+  }
+
+  function removeMultiJoinRequest(clientId) {
+    if (!(multiState.pendingJoinRequests instanceof Map)) {
+      return false;
+    }
+    const normalizedClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    if (!normalizedClientId) {
+      return false;
+    }
+    return multiState.pendingJoinRequests.delete(normalizedClientId);
+  }
+
+  function upsertMultiJoinRequest(clientId, name = '', sentAt = Date.now()) {
+    const normalizedClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    if (!normalizedClientId) {
+      return false;
+    }
+    if (!(multiState.pendingJoinRequests instanceof Map)) {
+      multiState.pendingJoinRequests = new Map();
+    }
+    const next = {
+      clientId: normalizedClientId,
+      name: normalizeMultiParticipantName(name, DEFAULT_MULTI_PARTICIPANT_NAME),
+      sentAt: Number.isFinite(Number(sentAt)) ? Math.round(Number(sentAt)) : Date.now(),
+    };
+    multiState.pendingJoinRequests.set(normalizedClientId, next);
+    return true;
+  }
+
+  function pruneMultiJoinRequests() {
+    if (!(multiState.pendingJoinRequests instanceof Map) || !multiState.pendingJoinRequests.size) {
+      return;
+    }
+    const now = Date.now();
+    const onlineClientIds = multiState.participants instanceof Map
+      ? new Set(Array.from(multiState.participants.keys()))
+      : new Set();
+    multiState.pendingJoinRequests.forEach((entry, clientId) => {
+      if (!clientId || clientId === multiState.clientId) {
+        multiState.pendingJoinRequests.delete(clientId);
+        return;
+      }
+      if (isMultiClientBlocked(clientId)) {
+        multiState.pendingJoinRequests.delete(clientId);
+        return;
+      }
+      if (onlineClientIds.size && !onlineClientIds.has(clientId)) {
+        const sentAt = Number(entry?.sentAt) || 0;
+        if ((now - sentAt) > 10000) {
+          multiState.pendingJoinRequests.delete(clientId);
+        }
+        return;
+      }
+      const assignment = getMultiAssignment(clientId);
+      if (assignment?.role === 'guest' || assignment?.role === 'master') {
+        multiState.pendingJoinRequests.delete(clientId);
+      }
+    });
+  }
+
+  function getSelectedMultiJoinRequestClientId() {
+    if (!(dom.controls.multiJoinRequestTarget instanceof HTMLSelectElement)) {
+      return '';
+    }
+    return (dom.controls.multiJoinRequestTarget.value || '').trim();
+  }
+
+  function syncMultiJoinRequestControls() {
+    const requestField = dom.controls.multiJoinRequestField;
+    const requestButton = dom.controls.multiRequestGuestRole;
+    const requestHint = dom.controls.multiJoinRequestHint;
+    const isRequestAreaVisible = canCurrentClientRequestGuestRole() || multiState.joinRequestPending;
+    if (requestField instanceof HTMLElement) {
+      requestField.hidden = !isRequestAreaVisible;
+    }
+    if (requestButton instanceof HTMLButtonElement) {
+      const canRequest = canCurrentClientRequestGuestRole();
+      const disabled = !canRequest || multiState.joinRequestPending;
+      requestButton.disabled = disabled;
+      if (multiState.joinRequestPending) {
+        requestButton.textContent = 'リクエスト送信済み';
+      } else {
+        requestButton.textContent = '参加リクエストを送信';
+      }
+    }
+    if (requestHint instanceof HTMLElement) {
+      if (!multiState.connected) {
+        requestHint.textContent = '接続すると参加リクエストを送信できます。';
+      } else if (isMultiGuestMode()) {
+        requestHint.textContent = 'あなたは参加者です。';
+      } else if (multiState.joinRequestPending) {
+        requestHint.textContent = '承認待ちです。マスターの応答を待ってください。';
+      } else {
+        requestHint.textContent = '参加はマスターの承認後に有効になります。';
+      }
+    }
+
+    const requestSelect = dom.controls.multiJoinRequestTarget;
+    const approveButton = dom.controls.multiJoinRequestApprove;
+    const rejectButton = dom.controls.multiJoinRequestReject;
+    if (isMultiMasterMode()) {
+      pruneMultiJoinRequests();
+    }
+    if (requestSelect instanceof HTMLSelectElement) {
+      const previous = requestSelect.value || '';
+      const rows = isMultiMasterMode() && multiState.pendingJoinRequests instanceof Map
+        ? Array.from(multiState.pendingJoinRequests.values())
+        : [];
+      rows.sort((a, b) => (a.sentAt || 0) - (b.sentAt || 0));
+      requestSelect.innerHTML = '';
+      rows.forEach(row => {
+        const option = document.createElement('option');
+        option.value = row.clientId;
+        option.textContent = row.name || DEFAULT_MULTI_PARTICIPANT_NAME;
+        requestSelect.appendChild(option);
+      });
+      if (rows.length) {
+        requestSelect.value = rows.some(row => row.clientId === previous)
+          ? previous
+          : rows[0].clientId;
+      }
+      requestSelect.disabled = !isMultiMasterMode() || rows.length === 0;
+    }
+    const hasSelection = Boolean(getSelectedMultiJoinRequestClientId());
+    if (approveButton instanceof HTMLButtonElement) {
+      approveButton.disabled = !isMultiMasterMode() || !hasSelection;
+    }
+    if (rejectButton instanceof HTMLButtonElement) {
+      rejectButton.disabled = !isMultiMasterMode() || !hasSelection;
+    }
+  }
+
+  async function sendMultiJoinRequestResult(targetClientId, decision = 'queued') {
+    if (!isMultiMasterMode()) {
+      return false;
+    }
+    const normalizedClientId = typeof targetClientId === 'string' ? targetClientId.trim() : '';
+    if (!normalizedClientId || normalizedClientId === multiState.clientId) {
+      return false;
+    }
+    const normalizedDecision = typeof decision === 'string' ? decision.trim().slice(0, 32) : 'queued';
+    return sendMultiBroadcast('join-request-result', {
+      projectKey: multiState.projectKey,
+      clientId: multiState.clientId,
+      targetClientId: normalizedClientId,
+      decision: normalizedDecision,
+      sentAt: Date.now(),
+    });
+  }
+
+  async function sendMultiGuestJoinRequest() {
+    if (!canCurrentClientRequestGuestRole()) {
+      setMultiStatus('共有モード: 参加リクエストは視聴者のみ送信できます', 'warn');
+      return false;
+    }
+    if (multiState.joinRequestPending) {
+      setMultiStatus('共有モード: 参加リクエストは送信済みです', 'info');
+      return false;
+    }
+    const now = Date.now();
+    if (now < (multiState.joinRequestCooldownUntil || 0)) {
+      setMultiStatus('共有モード: リクエストを送信しすぎています。少し待ってください', 'warn');
+      return false;
+    }
+    const sentAt = Date.now();
+    multiState.joinRequestPending = true;
+    multiState.joinRequestCooldownUntil = sentAt + MULTI_JOIN_REQUEST_COOLDOWN_MS;
+    syncMultiJoinRequestControls();
+    const sent = await sendMultiBroadcast('join-request', {
+      projectKey: multiState.projectKey,
+      clientId: multiState.clientId,
+      name: getLocalMultiParticipantName(),
+      sentAt,
+    });
+    if (!sent) {
+      multiState.joinRequestPending = false;
+      syncMultiJoinRequestControls();
+      setMultiStatus('共有モード: 参加リクエストの送信に失敗しました', 'error');
+      return false;
+    }
+    const requestComment = {
+      projectKey: multiState.projectKey,
+      clientId: multiState.clientId,
+      role: normalizeMultiRole(multiState.role, 'spectator'),
+      name: getLocalMultiParticipantName(),
+      avatarId: getLocalMultiParticipantAvatarId(),
+      text: '参加者に上がりたいです。承認お願いします。',
+      sentAt: Date.now(),
+    };
+    appendMultiCommentEntry(requestComment);
+    renderMultiComments();
+    sendMultiBroadcast('comment', requestComment);
+    setMultiStatus('共有モード: 参加リクエストを送信しました', 'success');
+    return true;
+  }
+
+  async function approveSelectedMultiJoinRequest() {
+    if (!isMultiMasterMode()) {
+      return false;
+    }
+    const targetClientId = getSelectedMultiJoinRequestClientId();
+    if (!targetClientId) {
+      setMultiStatus('共有モード: 承認対象を選択してください', 'warn');
+      return false;
+    }
+    const promoted = await forceMultiParticipantRole(targetClientId, 'guest');
+    if (!promoted) {
+      return false;
+    }
+    removeMultiJoinRequest(targetClientId);
+    syncMultiJoinRequestControls();
+    await sendMultiJoinRequestResult(targetClientId, 'approved');
+    return true;
+  }
+
+  async function rejectSelectedMultiJoinRequest() {
+    if (!isMultiMasterMode()) {
+      return false;
+    }
+    const targetClientId = getSelectedMultiJoinRequestClientId();
+    if (!targetClientId) {
+      setMultiStatus('共有モード: 却下対象を選択してください', 'warn');
+      return false;
+    }
+    removeMultiJoinRequest(targetClientId);
+    syncMultiJoinRequestControls();
+    await sendMultiRoleChangeNotice(targetClientId, 'spectator', 'master-reject-request');
+    await sendMultiJoinRequestResult(targetClientId, 'rejected');
+    setMultiStatus('共有モード: 参加リクエストを却下しました', 'info');
+    return true;
+  }
+
+  function isMultiReplicaRole(role) {
+    return role === 'guest' || role === 'spectator';
+  }
+
+  function clearMultiLocalSnapshotBeforeReplica() {
+    multiState.localSnapshotBeforeReplica = null;
+    multiState.localUnsavedBeforeReplica = false;
+  }
+
+  function captureMultiLocalSnapshotBeforeReplica() {
+    if (multiState.localSnapshotBeforeReplica) {
+      return true;
+    }
+    if (!Array.isArray(state.frames) || !state.frames.length) {
+      return false;
+    }
+    try {
+      const snapshot = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: true }));
+      if (!snapshot) {
+        return false;
+      }
+      multiState.localSnapshotBeforeReplica = snapshot;
+      multiState.localUnsavedBeforeReplica = hasDocumentUnsavedChanges();
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function restoreMultiLocalSnapshotBeforeReplica() {
+    const compressed = multiState.localSnapshotBeforeReplica;
+    const wasUnsaved = Boolean(multiState.localUnsavedBeforeReplica);
+    clearMultiLocalSnapshotBeforeReplica();
+    if (!compressed || typeof compressed !== 'object') {
+      return false;
+    }
+    let snapshot = null;
+    try {
+      snapshot = decompressHistorySnapshot(compressed);
+    } catch (error) {
+      return false;
+    }
+    if (!snapshot || !Array.isArray(snapshot.frames) || !snapshot.frames.length) {
+      return false;
+    }
+    applyHistorySnapshot(snapshot);
+    history.past = [];
+    history.future = [];
+    history.pending = null;
+    clearTimelapseRecording({ silent: true });
+    if (wasUnsaved) {
+      markDocumentUnsavedChange();
+    } else {
+      resetDocumentUnsavedChanges();
+    }
+    updateHistoryButtons();
+    autosaveDirty = true;
+    scheduleAutosaveSnapshot();
+    return true;
+  }
+
   function isMultiMasterCurrentlyOnline() {
     if (!multiState.connected) {
       return false;
@@ -23805,11 +25012,11 @@
   }
 
   function canCurrentClientEditProjectStructure() {
-    return !isMultiGuestMode();
+    return !isMultiReadOnlyMode();
   }
 
   function canCurrentClientImportExternalData() {
-    return !isMultiGuestMode();
+    return !isMultiReadOnlyMode();
   }
 
   function normalizeMultiBlockedClientIds(rawBlockedClientIds) {
@@ -23863,6 +25070,50 @@
     return DEFAULT_MULTI_PARTICIPANT_NAME;
   }
 
+  function normalizePixieedAvatarId(value) {
+    const raw = String(value || '').trim().toLowerCase();
+    if (!raw) {
+      return 'mao';
+    }
+    if (raw === 'mao' || raw === 'baburin' || /^jerin[1-8]$/.test(raw) || /^jellnall([1-9]|1[0-9])$/.test(raw)) {
+      return raw;
+    }
+    const fileName = raw
+      .split('/')
+      .pop()
+      ?.split('?')[0]
+      ?.split('#')[0]
+      ?.replace(/\.[a-z0-9]+$/i, '')
+      || '';
+    if (fileName === 'mao' || fileName === 'mao1') {
+      return 'mao';
+    }
+    if (fileName === 'baburin' || fileName === 'baburinpng') {
+      return 'baburin';
+    }
+    if (/^jerin[1-8]$/.test(fileName) || /^jellnall([1-9]|1[0-9])$/.test(fileName)) {
+      return fileName;
+    }
+    return 'mao';
+  }
+
+  function resolvePixieedAvatarSrcFromId(value) {
+    const avatarId = normalizePixieedAvatarId(value);
+    if (avatarId === 'mao') {
+      return '../character-dots/mao1.png';
+    }
+    if (/^jerin[1-8]$/.test(avatarId)) {
+      return `../character-dots/Jerin${avatarId.slice(5)}.png`;
+    }
+    if (/^jellnall([1-9]|1[0-9])$/.test(avatarId)) {
+      return `../character-dots/${avatarId.toUpperCase()}.png`;
+    }
+    if (avatarId === 'baburin') {
+      return '../character-dots/baburinpng.png';
+    }
+    return '../character-dots/mao1.png';
+  }
+
   function readPixieedAccountNickname() {
     if (!canUseSessionStorage) {
       return '';
@@ -23879,9 +25130,25 @@
     }
   }
 
+  function readPixieedAccountAvatarId() {
+    if (!canUseSessionStorage) {
+      return 'mao';
+    }
+    try {
+      const raw = window.localStorage.getItem(PIXIEED_AVATAR_STORAGE_KEY);
+      return normalizePixieedAvatarId(raw);
+    } catch (error) {
+      return 'mao';
+    }
+  }
+
   function getLocalMultiParticipantName() {
     const accountName = readPixieedAccountNickname();
     return normalizeMultiParticipantName(accountName, DEFAULT_MULTI_PARTICIPANT_NAME);
+  }
+
+  function getLocalMultiParticipantAvatarId() {
+    return readPixieedAccountAvatarId();
   }
 
   function getMultiAssignment(clientId) {
@@ -24101,6 +25368,64 @@
     });
   }
 
+  function setMultiSelectedControlClientId(clientId) {
+    const normalizedClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    multiState.selectedAssignClientId = normalizedClientId;
+    multiState.selectedRoleControlClientId = normalizedClientId;
+    return normalizedClientId;
+  }
+
+  function selectMultiControlTarget(clientId) {
+    const normalizedClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    if (!normalizedClientId) {
+      return false;
+    }
+    if (!(dom.controls.multiAssignTarget instanceof HTMLSelectElement)) {
+      return false;
+    }
+    setMultiSelectedControlClientId(normalizedClientId);
+    syncMultiAssignmentControls();
+    const select = dom.controls.multiAssignTarget;
+    const hasOption = Array.from(select.options).some(option => option.value === normalizedClientId);
+    if (!hasOption) {
+      return false;
+    }
+    if (select.value !== normalizedClientId) {
+      select.value = normalizedClientId;
+    }
+    setMultiSelectedControlClientId(normalizedClientId);
+    updateMultiAssignmentControlsFromSelection();
+    return true;
+  }
+
+  function getMultiSelectedControlTargetInfo() {
+    const selectedClientId = setMultiSelectedControlClientId(
+      (dom.controls.multiAssignTarget instanceof HTMLSelectElement ? dom.controls.multiAssignTarget.value : '')
+      || multiState.selectedAssignClientId
+      || multiState.selectedRoleControlClientId
+      || ''
+    );
+    const participant = selectedClientId && multiState.participants instanceof Map
+      ? multiState.participants.get(selectedClientId)
+      : null;
+    const assignment = selectedClientId ? getMultiAssignment(selectedClientId) : null;
+    const role = normalizeMultiRoleControlTargetRole(
+      (participant && typeof participant === 'object' ? participant.role : '')
+      || assignment?.role
+    );
+    const name = normalizeMultiParticipantName(
+      (participant && typeof participant === 'object' ? participant.name : '') || assignment?.name,
+      DEFAULT_MULTI_PARTICIPANT_NAME
+    );
+    return {
+      clientId: selectedClientId,
+      role,
+      name,
+      participant,
+      assignment,
+    };
+  }
+
   function updateMultiAssignmentControlsFromSelection() {
     const select = dom.controls.multiAssignTarget;
     const frameInput = dom.controls.multiAssignFrame;
@@ -24108,7 +25433,9 @@
     if (!(select instanceof HTMLSelectElement) || !(frameInput instanceof HTMLInputElement) || !(layerInput instanceof HTMLInputElement)) {
       return;
     }
-    const targetClientId = select.value || multiState.selectedAssignClientId || '';
+    const targetClientId = setMultiSelectedControlClientId(
+      select.value || multiState.selectedAssignClientId || multiState.selectedRoleControlClientId || ''
+    );
     const assignment = targetClientId ? getMultiAssignment(targetClientId) : null;
     const frameCount = Math.max(1, Array.isArray(state.frames) ? state.frames.length : 1);
     const layerCount = Math.max(1, Array.isArray(state.frames?.[0]?.layers) ? state.frames[0].layers.length : 1);
@@ -24135,30 +25462,44 @@
     const applyButton = dom.controls.multiAssignApply;
     const lockButton = dom.controls.multiAssignLockToggle;
     const kickButton = dom.controls.multiAssignKick;
-    const hint = dom.controls.multiAssignHint;
+    const banButton = dom.controls.multiAssignBan;
+    const assignmentField = dom.controls.multiAssignmentField;
     const canControl = isMultiMasterMode();
     const rows = buildMultiParticipantRows().filter(row => row.role === 'guest');
+    const sharedTargetSelect = select instanceof HTMLSelectElement
+      && dom.controls.multiRoleTarget instanceof HTMLSelectElement
+      && select === dom.controls.multiRoleTarget;
     if (select instanceof HTMLSelectElement) {
-      const previous = multiState.selectedAssignClientId || select.value || '';
-      select.innerHTML = '';
-      rows.forEach(row => {
-        const option = document.createElement('option');
-        option.value = row.clientId;
-        option.textContent = row.name
-          + (row.locked ? ' [ロック中]' : '')
-          + (row.online ? '' : ' (オフライン)');
-        select.appendChild(option);
-      });
-      if (rows.length) {
-        const nextSelected = rows.some(row => row.clientId === previous)
-          ? previous
-          : rows[0].clientId;
-        select.value = nextSelected;
-        multiState.selectedAssignClientId = nextSelected;
+      if (!sharedTargetSelect) {
+        const previous = multiState.selectedAssignClientId || select.value || '';
+        select.innerHTML = '';
+        rows.forEach(row => {
+          const option = document.createElement('option');
+          option.value = row.clientId;
+          option.textContent = row.name
+            + (row.locked ? ' [ロック中]' : '')
+            + (row.online ? '' : ' (オフライン)');
+          select.appendChild(option);
+        });
+        if (rows.length) {
+          const nextSelected = rows.some(row => row.clientId === previous)
+            ? previous
+            : rows[0].clientId;
+          select.value = nextSelected;
+          setMultiSelectedControlClientId(nextSelected);
+        } else {
+          setMultiSelectedControlClientId('');
+        }
       } else {
-        multiState.selectedAssignClientId = '';
+        const selectedFromShared = select.value
+          || multiState.selectedAssignClientId
+          || multiState.selectedRoleControlClientId
+          || '';
+        setMultiSelectedControlClientId(selectedFromShared);
       }
-      select.disabled = !canControl || rows.length === 0;
+      if (!sharedTargetSelect) {
+        select.disabled = !canControl || rows.length === 0;
+      }
     }
     if (frameInput instanceof HTMLInputElement) {
       frameInput.disabled = !canControl || rows.length === 0;
@@ -24169,11 +25510,13 @@
     if (applyButton instanceof HTMLButtonElement) {
       applyButton.disabled = !canControl || rows.length === 0;
     }
-    const targetClientId = multiState.selectedAssignClientId
-      || (select instanceof HTMLSelectElement ? select.value : '');
-    const targetAssignment = targetClientId ? getMultiAssignment(targetClientId) : null;
-    const hasTargetGuest = Boolean(targetClientId && rows.some(row => row.clientId === targetClientId));
-    const hasTargetAssignment = Boolean(targetClientId && targetAssignment);
+    syncMultiRoleControlUi();
+    const targetInfo = getMultiSelectedControlTargetInfo();
+    const targetClientId = targetInfo.clientId;
+    const targetAssignment = targetInfo.assignment;
+    const targetRole = targetInfo.role;
+    const hasTargetGuest = Boolean(targetClientId && targetRole === 'guest' && rows.some(row => row.clientId === targetClientId));
+    const hasTargetAssignment = Boolean(hasTargetGuest && targetAssignment);
     if (frameInput instanceof HTMLInputElement) {
       frameInput.disabled = !canControl || !hasTargetAssignment;
     }
@@ -24190,20 +25533,86 @@
     if (kickButton instanceof HTMLButtonElement) {
       kickButton.disabled = !canControl || !hasTargetGuest;
     }
-    if (hint instanceof HTMLElement) {
-      if (!multiState.connected) {
-        hint.textContent = '接続後、マスターのみ参加者セルを移動できます。';
-      } else if (!canControl) {
-        hint.textContent = '参加者はセル移動できません。マスターのみ操作できます。';
-      } else if (!rows.length) {
-        hint.textContent = '参加者が接続するとセル移動が使えます。';
-      } else if (targetAssignment?.locked) {
-        hint.textContent = '選択中の参加者セルはロック中です。ロック解除で再描画を許可します。';
+    if (banButton instanceof HTMLButtonElement) {
+      banButton.disabled = !canControl || !hasTargetGuest;
+    }
+    if (assignmentField instanceof HTMLElement) {
+      assignmentField.hidden = !canControl || targetRole !== 'guest';
+    }
+    if (applyButton instanceof HTMLButtonElement) {
+      if (!canControl) {
+        applyButton.title = 'マスターのみ操作できます';
+      } else if (targetRole !== 'guest') {
+        applyButton.title = '参加者を選択すると使えます';
       } else {
-        hint.textContent = '参加者ごとに 1 セルだけ割り当てます。同じセルには 1 人だけ配置できます。';
+        applyButton.removeAttribute('title');
+      }
+    }
+    if (lockButton instanceof HTMLButtonElement) {
+      if (!canControl) {
+        lockButton.title = 'マスターのみ操作できます';
+      } else if (targetRole !== 'guest') {
+        lockButton.title = '参加者を選択すると使えます';
+      } else {
+        lockButton.removeAttribute('title');
+      }
+    }
+    if (kickButton instanceof HTMLButtonElement) {
+      if (!canControl) {
+        kickButton.title = 'マスターのみ操作できます';
+      } else if (targetRole !== 'guest') {
+        kickButton.title = '参加者を選択すると使えます';
+      } else {
+        kickButton.removeAttribute('title');
+      }
+    }
+    if (banButton instanceof HTMLButtonElement) {
+      if (!canControl) {
+        banButton.title = 'マスターのみ操作できます';
+      } else if (targetRole !== 'guest') {
+        banButton.title = '参加者を選択すると使えます';
+      } else {
+        banButton.removeAttribute('title');
       }
     }
     updateMultiAssignmentControlsFromSelection();
+    syncMultiBlockedControls();
+  }
+
+  function syncMultiBlockedControls() {
+    const select = dom.controls.multiBlockedTarget;
+    const removeButton = dom.controls.multiBlockedRemove;
+    const hint = dom.controls.multiBlockedHint;
+    const canControl = isMultiMasterMode();
+    const blockedClientIds = serializeMultiBlockedClientIds();
+    if (select instanceof HTMLSelectElement) {
+      const previous = select.value || '';
+      select.innerHTML = '';
+      blockedClientIds.forEach(clientId => {
+        const option = document.createElement('option');
+        option.value = clientId;
+        option.textContent = clientId;
+        select.appendChild(option);
+      });
+      if (blockedClientIds.length) {
+        select.value = blockedClientIds.includes(previous) ? previous : blockedClientIds[0];
+      }
+      select.disabled = !canControl || blockedClientIds.length === 0;
+    }
+    if (removeButton instanceof HTMLButtonElement) {
+      removeButton.disabled = !canControl || blockedClientIds.length === 0;
+    }
+    if (hint instanceof HTMLElement) {
+      if (!multiState.connected) {
+        hint.textContent = '接続後、マスターのみBAN解除できます。';
+      } else if (!canControl) {
+        hint.textContent = 'マスターのみBAN解除できます。';
+      } else if (!blockedClientIds.length) {
+        hint.textContent = 'BAN中の参加者はいません。';
+      } else {
+        hint.textContent = `${blockedClientIds.length} 件のBANがあります。選択して解除できます。`;
+      }
+    }
   }
 
   function moveMultiParticipantToCell(clientId, frameIndexRaw, trackIndexRaw) {
@@ -24217,7 +25626,7 @@
       return false;
     }
     if (isMultiClientBlocked(targetClientId)) {
-      setMultiStatus('キック済み参加者は移動できません', 'warn');
+      setMultiStatus('BAN中の参加者は移動できません', 'warn');
       return false;
     }
     const assignment = getMultiAssignment(targetClientId);
@@ -24270,6 +25679,7 @@
       projectKey: multiState.projectKey,
       targetClientId: normalizedClientId,
       reason: typeof reason === 'string' ? reason.trim().slice(0, 48) : '',
+      maxGuests: normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT),
       sentAt: Date.now(),
     });
   }
@@ -24285,7 +25695,7 @@
       return false;
     }
     if (isMultiClientBlocked(targetClientId)) {
-      setMultiStatus('キック済み参加者のロックは変更できません', 'warn');
+      setMultiStatus('BAN中の参加者のロックは変更できません', 'warn');
       return false;
     }
     const assignment = getMultiAssignment(targetClientId);
@@ -24309,6 +25719,22 @@
     return true;
   }
 
+  function removeMultiParticipantFromAssignments(clientId) {
+    const targetClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    if (!targetClientId) {
+      return false;
+    }
+    const hadAssignment = multiState.assignments.delete(targetClientId);
+    multiState.participants.delete(targetClientId);
+    if (multiState.selectedAssignClientId === targetClientId || multiState.selectedRoleControlClientId === targetClientId) {
+      setMultiSelectedControlClientId('');
+    }
+    normalizeMultiAssignmentsForCurrentDocument();
+    renderMultiParticipantsList();
+    syncMultiAssignmentControls();
+    return hadAssignment;
+  }
+
   async function kickMultiParticipant(clientId) {
     if (!isMultiMasterMode()) {
       setMultiStatus('参加者のキックはマスターのみ操作できます', 'warn');
@@ -24328,23 +25754,61 @@
       setMultiStatus('マスターはキック対象にできません', 'warn');
       return false;
     }
+    removeMultiParticipantFromAssignments(targetClientId);
+    scheduleMultiSessionStateBroadcast({ immediate: true });
+    await sendMultiKickClientNotice(targetClientId, 'master-kick');
+    setMultiStatus('参加者をキックしました（再参加可）', 'success');
+    return true;
+  }
+
+  async function banMultiParticipant(clientId) {
+    if (!isMultiMasterMode()) {
+      setMultiStatus('参加者のBANはマスターのみ操作できます', 'warn');
+      return false;
+    }
+    const targetClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    if (!targetClientId) {
+      setMultiStatus('BAN対象の参加者を選択してください', 'warn');
+      return false;
+    }
+    if (targetClientId === multiState.clientId) {
+      setMultiStatus('マスター自身はBANできません', 'warn');
+      return false;
+    }
+    const assignment = getMultiAssignment(targetClientId);
+    if (assignment?.role === 'master') {
+      setMultiStatus('マスターはBAN対象にできません', 'warn');
+      return false;
+    }
     if (!(multiState.blockedClientIds instanceof Set)) {
       multiState.blockedClientIds = new Set();
     }
     multiState.blockedClientIds.add(targetClientId);
-    if (assignment) {
-      multiState.assignments.delete(targetClientId);
+    removeMultiParticipantFromAssignments(targetClientId);
+    scheduleMultiSessionStateBroadcast({ immediate: true });
+    await sendMultiKickClientNotice(targetClientId, 'master-ban');
+    setMultiStatus('参加者をBANしました（再参加不可）', 'success');
+    return true;
+  }
+
+  function unbanMultiParticipant(clientId) {
+    if (!isMultiMasterMode()) {
+      setMultiStatus('BAN解除はマスターのみ操作できます', 'warn');
+      return false;
     }
-    multiState.participants.delete(targetClientId);
-    if (multiState.selectedAssignClientId === targetClientId) {
-      multiState.selectedAssignClientId = '';
+    const targetClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    if (!targetClientId) {
+      setMultiStatus('BAN解除対象を選択してください', 'warn');
+      return false;
     }
-    normalizeMultiAssignmentsForCurrentDocument();
-    renderMultiParticipantsList();
+    if (!(multiState.blockedClientIds instanceof Set) || !multiState.blockedClientIds.has(targetClientId)) {
+      setMultiStatus('指定された参加者はBANされていません', 'warn');
+      return false;
+    }
+    multiState.blockedClientIds.delete(targetClientId);
     syncMultiAssignmentControls();
     scheduleMultiSessionStateBroadcast({ immediate: true });
-    await sendMultiKickClientNotice(targetClientId, 'master-kick');
-    setMultiStatus('参加者をキックしました。再参加は禁止されます', 'success');
+    setMultiStatus('BANを解除しました', 'success');
     return true;
   }
 
@@ -24392,7 +25856,7 @@
       return false;
     }
     if (changed && announce) {
-      setMultiStatus('参加モードでは割り当てセルのみ編集できます。', 'warn');
+      setMultiStatus('参加/視聴モードでは割り当てセルのみ編集できます。', 'warn');
     }
     return true;
   }
@@ -24454,6 +25918,256 @@
     }
   }
 
+  async function copyMultiInviteLink() {
+    const inviteUrl = buildMultiInviteUrl(multiState.projectKey);
+    if (!inviteUrl) {
+      setMultiStatus('招待リンク作成にはプロジェクトキーが必要です', 'warn');
+      return false;
+    }
+    const copied = await writeTextToClipboard(inviteUrl);
+    if (!copied) {
+      setMultiStatus('招待リンクのコピーに失敗しました', 'error');
+      return false;
+    }
+    setMultiStatus('招待リンクをコピーしました', 'success');
+    return true;
+  }
+
+  async function shareMultiInviteLink() {
+    const inviteUrl = buildMultiInviteUrl(multiState.projectKey);
+    if (!inviteUrl) {
+      setMultiStatus('招待リンク作成にはプロジェクトキーが必要です', 'warn');
+      return false;
+    }
+    if (typeof navigator?.share === 'function') {
+      try {
+        await navigator.share({
+          title: 'PiXiEEDraw 参加招待',
+          text: 'PiXiEEDraw の参加招待リンクです',
+          url: inviteUrl,
+        });
+        setMultiStatus('招待リンクを共有しました', 'success');
+        return true;
+      } catch (error) {
+        // Fallback to clipboard below when share is canceled/failed.
+      }
+    }
+    return copyMultiInviteLink();
+  }
+
+  function normalizeMultiRoleControlTargetRole(role) {
+    if (role === 'guest') {
+      return 'guest';
+    }
+    if (role === 'spectator') {
+      return 'spectator';
+    }
+    return 'none';
+  }
+
+  async function sendMultiRoleChangeNotice(targetClientId, nextRole, reason = 'master-force') {
+    if (!isMultiMasterMode()) {
+      return false;
+    }
+    const normalizedClientId = typeof targetClientId === 'string' ? targetClientId.trim() : '';
+    if (!normalizedClientId || normalizedClientId === multiState.clientId) {
+      return false;
+    }
+    const normalizedRole = normalizeMultiRoleControlTargetRole(nextRole);
+    if (normalizedRole === 'none') {
+      return false;
+    }
+    return sendMultiBroadcast('role-change', {
+      clientId: multiState.clientId,
+      projectKey: multiState.projectKey,
+      targetClientId: normalizedClientId,
+      nextRole: normalizedRole,
+      reason: typeof reason === 'string' ? reason.trim().slice(0, 64) : '',
+      maxGuests: normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT),
+      sentAt: Date.now(),
+    });
+  }
+
+  function getRoleControlCandidateRows() {
+    const rows = [];
+    if (!(multiState.participants instanceof Map)) {
+      return rows;
+    }
+    multiState.participants.forEach(entry => {
+      if (!entry || typeof entry !== 'object') {
+        return;
+      }
+      const clientId = typeof entry.clientId === 'string' ? entry.clientId.trim() : '';
+      if (!clientId || clientId === multiState.clientId || isMultiClientBlocked(clientId)) {
+        return;
+      }
+      const role = normalizeMultiRoleControlTargetRole(entry.role);
+      if (role === 'none') {
+        return;
+      }
+      rows.push({
+        clientId,
+        role,
+        name: normalizeMultiParticipantName(entry.name, DEFAULT_MULTI_PARTICIPANT_NAME),
+        joinedAt: Number(entry.joinedAt) || 0,
+      });
+    });
+    rows.sort((a, b) => {
+      if (a.role !== b.role) {
+        return a.role === 'guest' ? -1 : 1;
+      }
+      const joinedDiff = (a.joinedAt || 0) - (b.joinedAt || 0);
+      if (joinedDiff !== 0) {
+        return joinedDiff;
+      }
+      return a.clientId.localeCompare(b.clientId);
+    });
+    return rows;
+  }
+
+  function syncMultiRoleControlUi() {
+    const select = dom.controls.multiRoleTarget;
+    const toGuestButton = dom.controls.multiForceGuest;
+    const toSpectatorButton = dom.controls.multiForceSpectator;
+    const canControl = isMultiMasterMode();
+    const rows = getRoleControlCandidateRows();
+    if (select instanceof HTMLSelectElement) {
+      const previous = multiState.selectedRoleControlClientId
+        || multiState.selectedAssignClientId
+        || select.value
+        || '';
+      select.innerHTML = '';
+      rows.forEach(row => {
+        const option = document.createElement('option');
+        option.value = row.clientId;
+        option.textContent = `${row.name} [${row.role === 'guest' ? '参加者' : '視聴者'}]`;
+        select.appendChild(option);
+      });
+      if (rows.length) {
+        const nextSelected = rows.some(row => row.clientId === previous) ? previous : rows[0].clientId;
+        select.value = nextSelected;
+        setMultiSelectedControlClientId(nextSelected);
+      } else {
+        setMultiSelectedControlClientId('');
+      }
+      select.disabled = !canControl || rows.length === 0;
+    }
+    const targetClientId = multiState.selectedRoleControlClientId
+      || multiState.selectedAssignClientId
+      || (select instanceof HTMLSelectElement ? select.value : '');
+    const target = rows.find(row => row.clientId === targetClientId) || null;
+    if (toGuestButton instanceof HTMLButtonElement) {
+      const disableGuestPromotion = !canControl
+        || !target
+        || target.role === 'guest'
+        || (target.role === 'spectator' && isMultiGuestLimitReached());
+      toGuestButton.disabled = disableGuestPromotion;
+      if (!canControl) {
+        toGuestButton.title = 'マスターのみ操作できます';
+      } else if (!target) {
+        toGuestButton.title = '対象を選択してください';
+      } else if (target.role === 'guest') {
+        toGuestButton.title = 'すでに参加者です';
+      } else if (target.role === 'spectator' && isMultiGuestLimitReached()) {
+        toGuestButton.title = `参加上限 ${multiState.maxGuests} 人に達しています`;
+      } else {
+        toGuestButton.removeAttribute('title');
+      }
+    }
+    if (toSpectatorButton instanceof HTMLButtonElement) {
+      toSpectatorButton.disabled = !canControl || !target || target.role === 'spectator';
+      if (!canControl) {
+        toSpectatorButton.title = 'マスターのみ操作できます';
+      } else if (!target) {
+        toSpectatorButton.title = '対象を選択してください';
+      } else if (target.role === 'spectator') {
+        toSpectatorButton.title = 'すでに視聴者です';
+      } else {
+        toSpectatorButton.removeAttribute('title');
+      }
+    }
+    updateMultiAssignmentControlsFromSelection();
+  }
+
+  async function forceMultiParticipantRole(clientId, nextRoleRaw) {
+    if (!isMultiMasterMode()) {
+      setMultiStatus('参加/視聴の切替はマスターのみ操作できます', 'warn');
+      return false;
+    }
+    const targetClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    if (!targetClientId) {
+      setMultiStatus('切替対象を選択してください', 'warn');
+      return false;
+    }
+    if (targetClientId === multiState.clientId) {
+      setMultiStatus('マスター自身は切替できません', 'warn');
+      return false;
+    }
+    if (isMultiClientBlocked(targetClientId)) {
+      setMultiStatus('BAN中の参加者は切替できません', 'warn');
+      return false;
+    }
+    const nextRole = normalizeMultiRoleControlTargetRole(nextRoleRaw);
+    if (nextRole === 'none') {
+      setMultiStatus('切替先ロールが不正です', 'error');
+      return false;
+    }
+    const participantEntry = multiState.participants instanceof Map
+      ? multiState.participants.get(targetClientId)
+      : null;
+    const currentRole = normalizeMultiRoleControlTargetRole(participantEntry?.role || getMultiAssignment(targetClientId)?.role);
+    if (currentRole === nextRole) {
+      setMultiStatus(`すでに${nextRole === 'guest' ? '参加者' : '視聴者'}です`, 'info');
+      return true;
+    }
+
+    if (nextRole === 'guest') {
+      if (isMultiGuestLimitReached()) {
+        setMultiStatus(`参加上限 ${multiState.maxGuests} 人のため追加できません`, 'warn');
+        return false;
+      }
+      const assignment = assignLayerToGuestClient(targetClientId, participantEntry?.name || '');
+      if (!assignment) {
+        setMultiStatus('参加者への切替に失敗しました', 'error');
+        return false;
+      }
+      removeMultiJoinRequest(targetClientId);
+    } else {
+      if (getMultiAssignment(targetClientId)) {
+        multiState.assignments.delete(targetClientId);
+      }
+      if (multiState.selectedAssignClientId === targetClientId || multiState.selectedRoleControlClientId === targetClientId) {
+        setMultiSelectedControlClientId('');
+      }
+      normalizeMultiAssignmentsForCurrentDocument();
+      renderMultiParticipantsList();
+    }
+
+    if (multiState.participants instanceof Map) {
+      const current = multiState.participants.get(targetClientId);
+      if (current && typeof current === 'object') {
+        current.role = nextRole;
+        multiState.participants.set(targetClientId, current);
+      }
+    }
+    renderMultiParticipantsList();
+    syncMultiJoinRequestControls();
+    syncMultiAssignmentControls();
+    scheduleMultiSessionStateBroadcast({ immediate: true });
+    const sent = await sendMultiRoleChangeNotice(targetClientId, nextRole, 'master-force');
+    if (!sent) {
+      setMultiStatus('役割変更通知の送信に失敗しました', 'error');
+      return false;
+    }
+    setMultiStatus(
+      nextRole === 'guest'
+        ? '視聴者を参加者に切替しました'
+        : '参加者を視聴者に切替しました',
+      'success'
+    );
+    return true;
+  }
+
   function getMultiRoleLabel(role) {
     if (role === 'master') {
       return 'マスター';
@@ -24461,15 +26175,34 @@
     if (role === 'guest') {
       return '参加者';
     }
+    if (role === 'spectator') {
+      return '視聴者';
+    }
     return '接続待機';
   }
 
+  function normalizeMultiRole(role, fallback = 'guest') {
+    if (role === 'master') {
+      return 'master';
+    }
+    if (role === 'guest') {
+      return 'guest';
+    }
+    if (role === 'spectator') {
+      return 'spectator';
+    }
+    if (fallback === 'master' || fallback === 'guest' || fallback === 'spectator') {
+      return fallback;
+    }
+    return 'guest';
+  }
+
   function normalizeMultiDesiredRole(role) {
-    return role === 'guest' ? 'guest' : 'master';
+    return normalizeMultiRole(role, 'master');
   }
 
   function normalizeMultiUiView(view) {
-    return view === 'master' || view === 'guest' ? view : 'entry';
+    return view === 'master' || view === 'guest' || view === 'spectator' ? view : 'entry';
   }
 
   function setMultiDesiredRole(role) {
@@ -24488,6 +26221,37 @@
     }
     multiState.uiView = normalized;
     return true;
+  }
+
+  function setMultiHelpPanelVisible(visible) {
+    const panel = dom.controls.multiHelpPanel;
+    const toggle = dom.controls.multiHelpToggle;
+    const nextVisible = Boolean(visible);
+    if (panel instanceof HTMLElement) {
+      panel.hidden = !nextVisible;
+    }
+    if (toggle instanceof HTMLButtonElement) {
+      toggle.setAttribute('aria-expanded', nextVisible ? 'true' : 'false');
+    }
+  }
+
+  function isMultiSpectatorMode() {
+    return multiState.connected && multiState.role === 'spectator';
+  }
+
+  function isMultiReadOnlyMode() {
+    return isMultiGuestMode() || isMultiSpectatorMode();
+  }
+
+  function isMultiMasterConfigMode() {
+    if (isMultiMasterMode()) {
+      return true;
+    }
+    if (multiState.connected || multiState.connecting) {
+      return false;
+    }
+    return normalizeMultiUiView(multiState.uiView) === 'master'
+      || normalizeMultiDesiredRole(multiState.desiredRole) === 'master';
   }
 
   function scheduleMultiEntryScreenMetricsUpdate() {
@@ -24585,15 +26349,22 @@
     if (dom.controls.multiFlowPanel instanceof HTMLElement) {
       dom.controls.multiFlowPanel.hidden = isEntry;
     }
+    if (isEntry) {
+      setMultiHelpPanelVisible(false);
+    }
     if (dom.controls.multiRoleLabel instanceof HTMLElement) {
-      dom.controls.multiRoleLabel.textContent = selectedRole === 'master' ? 'マスター設定' : '参加者設定';
+      dom.controls.multiRoleLabel.textContent = selectedRole === 'master'
+        ? 'マスター設定'
+        : (selectedRole === 'spectator' ? '視聴者設定' : '参加リクエスト設定');
     }
     if (dom.controls.multiStartSession instanceof HTMLButtonElement) {
-      let startLabel = selectedRole === 'master' ? '開始' : '参加';
+      let startLabel = selectedRole === 'master' ? '開始' : '入室';
       if (multiState.connecting) {
-        startLabel = selectedRole === 'master' ? '開始中…' : '参加中…';
+        startLabel = selectedRole === 'master' ? '開始中…' : '入室中…';
       } else if (multiState.connected) {
-        startLabel = multiState.role === 'guest' ? '参加中' : '開始済み';
+        startLabel = multiState.role === 'guest'
+          ? '参加中'
+          : (multiState.role === 'spectator' ? '視聴中' : '開始済み');
       }
       dom.controls.multiStartSession.textContent = startLabel;
     }
@@ -24666,6 +26437,12 @@
   }
 
   function buildMultiParticipantRows() {
+    const getRoleSortWeight = role => {
+      if (role === 'master') return 0;
+      if (role === 'guest') return 1;
+      if (role === 'spectator') return 2;
+      return 3;
+    };
     const rows = [];
     const now = Date.now();
     const seen = new Set();
@@ -24677,9 +26454,10 @@
         return;
       }
       const assignment = getMultiAssignment(entry.clientId);
+      const presenceRole = normalizeMultiRole(entry.role, 'guest');
       rows.push({
         clientId: entry.clientId,
-        role: entry.role === 'master' ? 'master' : (assignment?.role === 'master' ? 'master' : 'guest'),
+        role: assignment?.role === 'master' ? 'master' : presenceRole,
         name: normalizeMultiParticipantName(entry.name || assignment?.name, DEFAULT_MULTI_PARTICIPANT_NAME),
         online: true,
         joinedAt: Number(entry.joinedAt) || now,
@@ -24696,7 +26474,7 @@
       }
       rows.push({
         clientId: assignment.clientId,
-        role: assignment.role === 'master' ? 'master' : 'guest',
+        role: normalizeMultiRole(assignment.role, 'guest'),
         name: normalizeMultiParticipantName(assignment.name, DEFAULT_MULTI_PARTICIPANT_NAME),
         online: false,
         joinedAt: Number(assignment.joinedAt) || now,
@@ -24705,7 +26483,7 @@
     });
     rows.sort((a, b) => {
       if (a.role !== b.role) {
-        return a.role === 'master' ? -1 : 1;
+        return getRoleSortWeight(a.role) - getRoleSortWeight(b.role);
       }
       const joinedDiff = (a.joinedAt || 0) - (b.joinedAt || 0);
       if (joinedDiff !== 0) {
@@ -24735,20 +26513,238 @@
     rows.forEach(row => {
       const li = document.createElement('li');
       li.className = 'help-text';
+      const isSelf = row.clientId === multiState.clientId;
+      if (isSelf) {
+        li.classList.add('is-self');
+      }
       const frameIndex = getAssignedFrameIndexForClient(row.clientId);
       const trackIndex = getAssignedLayerTrackIndexForClient(row.clientId);
       const frameLabel = frameIndex >= 0 ? ` / フレーム ${frameIndex + 1}` : '';
       const layerLabel = trackIndex >= 0 ? ` / レイヤー ${trackIndex + 1}` : '';
       const onlineLabel = row.online ? '' : ' (オフライン)';
       const lockedLabel = row.locked ? ' / ロック中' : '';
-      const selfLabel = row.clientId === multiState.clientId ? ' (あなた)' : '';
-      li.textContent = `${getMultiRoleLabel(row.role)}: ${row.name}${selfLabel}${frameLabel}${layerLabel}${lockedLabel}${onlineLabel}`;
+      li.textContent = `${getMultiRoleLabel(row.role)}: ${row.name}${frameLabel}${layerLabel}${lockedLabel}${onlineLabel}`;
       list.appendChild(li);
     });
     syncMultiAssignmentControls();
   }
 
+  function normalizeMultiCommentText(value) {
+    if (typeof value !== 'string') {
+      return '';
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return '';
+    }
+    return trimmed.slice(0, MULTI_COMMENT_MAX_LENGTH);
+  }
+
+  function makeMultiCommentId({ clientId = '', sentAt = 0, text = '' } = {}) {
+    const safeClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    const safeTime = Number.isFinite(Number(sentAt)) ? Math.max(0, Math.round(Number(sentAt))) : 0;
+    const safeText = normalizeMultiCommentText(text);
+    return `${safeClientId}:${safeTime}:${safeText}`;
+  }
+
+  function resolveMultiCommentAuthorName(clientId, fallbackName = '') {
+    const normalizedClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    if (normalizedClientId && normalizedClientId === multiState.clientId) {
+      return normalizeMultiParticipantName(getLocalMultiParticipantName(), DEFAULT_MULTI_PARTICIPANT_NAME);
+    }
+    const participant = normalizedClientId && multiState.participants instanceof Map
+      ? multiState.participants.get(normalizedClientId)
+      : null;
+    if (participant?.name) {
+      return normalizeMultiParticipantName(participant.name, DEFAULT_MULTI_PARTICIPANT_NAME);
+    }
+    const assignment = normalizedClientId ? getMultiAssignment(normalizedClientId) : null;
+    if (assignment?.name) {
+      return normalizeMultiParticipantName(assignment.name, DEFAULT_MULTI_PARTICIPANT_NAME);
+    }
+    return normalizeMultiParticipantName(fallbackName, DEFAULT_MULTI_PARTICIPANT_NAME);
+  }
+
+  function clearMultiComments() {
+    multiState.comments = [];
+    multiState.commentIds = new Set();
+    renderMultiComments();
+  }
+
+  function appendMultiCommentEntry(entry) {
+    if (!entry || typeof entry !== 'object') {
+      return false;
+    }
+    const commentText = normalizeMultiCommentText(entry.text);
+    if (!commentText) {
+      return false;
+    }
+    const clientId = typeof entry.clientId === 'string' ? entry.clientId.trim() : '';
+    const sentAt = Number.isFinite(Number(entry.sentAt)) ? Math.round(Number(entry.sentAt)) : Date.now();
+    const id = makeMultiCommentId({ clientId, sentAt, text: commentText });
+    if (!id) {
+      return false;
+    }
+    if (!(multiState.commentIds instanceof Set)) {
+      multiState.commentIds = new Set();
+    }
+    if (multiState.commentIds.has(id)) {
+      return false;
+    }
+    const role = normalizeMultiRole(entry.role, 'guest');
+    const authorName = resolveMultiCommentAuthorName(clientId, entry.name);
+    const avatarId = normalizePixieedAvatarId(entry.avatarId || entry.avatar || '');
+    const next = {
+      id,
+      clientId,
+      role,
+      name: authorName,
+      avatarId,
+      avatarSrc: resolvePixieedAvatarSrcFromId(avatarId),
+      text: commentText,
+      sentAt,
+    };
+    if (!Array.isArray(multiState.comments)) {
+      multiState.comments = [];
+    }
+    multiState.comments.push(next);
+    multiState.commentIds.add(id);
+    if (multiState.comments.length > MULTI_COMMENT_MAX_ITEMS) {
+      const overflow = multiState.comments.length - MULTI_COMMENT_MAX_ITEMS;
+      const removed = multiState.comments.splice(0, overflow);
+      removed.forEach(item => {
+        if (item && item.id) {
+          multiState.commentIds.delete(item.id);
+        }
+      });
+    }
+    return true;
+  }
+
+  function formatMultiCommentTime(timestamp) {
+    const date = new Date(Number(timestamp) || Date.now());
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
+
+  function renderMultiComments() {
+    const root = dom.controls.multiCommentList;
+    if (!(root instanceof HTMLElement)) {
+      return;
+    }
+    root.innerHTML = '';
+    const entries = Array.isArray(multiState.comments) ? multiState.comments : [];
+    if (!entries.length) {
+      const empty = document.createElement('p');
+      empty.className = 'help-text';
+      empty.textContent = 'コメントはまだありません。';
+      root.appendChild(empty);
+      return;
+    }
+    const list = document.createElement('ul');
+    entries.forEach(entry => {
+      const item = document.createElement('li');
+      item.className = 'multi-comment-item';
+      const entryClientId = typeof entry.clientId === 'string' ? entry.clientId.trim() : '';
+      const isSelf = Boolean(entryClientId) && entryClientId === multiState.clientId;
+      if (isSelf) {
+        item.classList.add('is-self');
+      }
+      const avatarSrc = typeof entry.avatarSrc === 'string' && entry.avatarSrc.trim()
+        ? entry.avatarSrc.trim()
+        : resolvePixieedAvatarSrcFromId(entry.avatarId);
+      const metaRow = document.createElement('div');
+      metaRow.className = 'multi-comment-meta';
+      const authorWrap = document.createElement('span');
+      authorWrap.className = 'multi-comment-author-wrap';
+      const avatar = document.createElement('img');
+      avatar.className = 'multi-comment-avatar';
+      avatar.src = avatarSrc;
+      avatar.alt = '';
+      avatar.setAttribute('aria-hidden', 'true');
+      const author = document.createElement('span');
+      author.className = 'multi-comment-author';
+      if (isSelf) {
+        author.classList.add('is-self');
+      }
+      const canSelectTarget = isMultiMasterMode()
+        && Boolean(entryClientId)
+        && entryClientId !== multiState.clientId;
+      if (canSelectTarget) {
+        author.classList.add('is-target-selectable');
+        author.tabIndex = 0;
+        author.setAttribute('role', 'button');
+        author.setAttribute('aria-label', '操作対象に設定');
+        const selectTarget = () => {
+          selectMultiControlTarget(entryClientId);
+        };
+        author.addEventListener('click', event => {
+          event.preventDefault();
+          selectTarget();
+        });
+        author.addEventListener('keydown', event => {
+          if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+          }
+          event.preventDefault();
+          selectTarget();
+        });
+      }
+      author.textContent = normalizeMultiParticipantName(entry.name, DEFAULT_MULTI_PARTICIPANT_NAME);
+      const time = document.createElement('span');
+      time.className = 'multi-comment-time';
+      time.textContent = formatMultiCommentTime(entry.sentAt);
+      const text = document.createElement('p');
+      text.className = 'multi-comment-text';
+      text.textContent = entry.text;
+      authorWrap.append(avatar, author);
+      metaRow.append(authorWrap, time);
+      item.append(metaRow, text);
+      list.appendChild(item);
+    });
+    root.appendChild(list);
+    root.scrollTop = root.scrollHeight;
+  }
+
+  async function sendMultiComment(text) {
+    if (!multiState.connected) {
+      setMultiStatus('コメント送信には接続が必要です', 'warn');
+      return false;
+    }
+    const normalizedText = normalizeMultiCommentText(text);
+    if (!normalizedText) {
+      setMultiStatus('コメントを入力してください', 'warn');
+      return false;
+    }
+    const payload = {
+      projectKey: multiState.projectKey,
+      clientId: multiState.clientId,
+      role: normalizeMultiRole(multiState.role, 'guest'),
+      name: getLocalMultiParticipantName(),
+      avatarId: getLocalMultiParticipantAvatarId(),
+      text: normalizedText,
+      sentAt: Date.now(),
+    };
+    appendMultiCommentEntry(payload);
+    renderMultiComments();
+    const sent = await sendMultiBroadcast('comment', payload);
+    if (!sent) {
+      setMultiStatus('コメントの送信に失敗しました', 'error');
+      return false;
+    }
+    if (dom.controls.multiCommentInput instanceof HTMLInputElement) {
+      dom.controls.multiCommentInput.value = '';
+    }
+    return true;
+  }
+
   function syncMultiControls() {
+    multiState.maxGuests = normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT);
+    multiState.exportPermission = normalizeMultiExportPermission(
+      multiState.exportPermission,
+      MULTI_DEFAULT_EXPORT_PERMISSION
+    );
     const currentProjectKey = normalizeMultiProjectKey(
       (dom.controls.multiProjectKey instanceof HTMLInputElement ? dom.controls.multiProjectKey.value : '')
       || multiState.projectKey
@@ -24756,6 +26752,7 @@
     const isEntryView = normalizeMultiUiView(multiState.uiView) === 'entry'
       && !multiState.connected
       && !multiState.connecting;
+    const inMasterConfigMode = isMultiMasterConfigMode();
     syncMultiPanelFlowUi();
     if (dom.controls.multiProjectKey instanceof HTMLInputElement) {
       if (dom.controls.multiProjectKey.value !== multiState.projectKey) {
@@ -24779,30 +26776,27 @@
         dom.controls.multiEntryGuest.removeAttribute('title');
       }
     }
-    if (dom.controls.multiBackToEntry instanceof HTMLButtonElement) {
-      dom.controls.multiBackToEntry.disabled = multiState.connecting || multiState.connected;
-      if (dom.controls.multiBackToEntry.disabled) {
-        dom.controls.multiBackToEntry.title = '接続中は戻れません';
-      } else {
-        dom.controls.multiBackToEntry.removeAttribute('title');
-      }
-    }
     if (dom.controls.multiStartSession instanceof HTMLButtonElement) {
       dom.controls.multiStartSession.disabled = multiState.connecting || multiState.connected || !currentProjectKey || isEntryView;
       if (multiState.connected) {
-        dom.controls.multiStartSession.title = multiState.role === 'guest' ? 'すでに参加中です' : 'すでに開始済みです';
+        dom.controls.multiStartSession.title = multiState.role === 'guest'
+          ? 'すでに参加中です'
+          : (multiState.role === 'spectator' ? 'すでに視聴中です' : 'すでに開始済みです');
       } else if (multiState.connecting) {
         dom.controls.multiStartSession.title = '接続中です';
       } else if (!currentProjectKey) {
         dom.controls.multiStartSession.title = 'プロジェクトキーを入力してください';
       } else if (isEntryView) {
-        dom.controls.multiStartSession.title = '先にマスターまたは参加者を選択してください';
+        dom.controls.multiStartSession.title = '先にマスター または 入室 を選択してください';
       } else {
         dom.controls.multiStartSession.removeAttribute('title');
       }
     }
     if (dom.controls.multiLeaveSession instanceof HTMLButtonElement) {
-      dom.controls.multiLeaveSession.disabled = !multiState.connected && !multiState.connecting;
+      const canLeaveOrBack = multiState.connected
+        || multiState.connecting
+        || normalizeMultiUiView(multiState.uiView) !== 'entry';
+      dom.controls.multiLeaveSession.disabled = !canLeaveOrBack;
     }
     if (dom.controls.multiGenerateKey instanceof HTMLButtonElement) {
       dom.controls.multiGenerateKey.disabled = multiState.connecting || multiState.connected;
@@ -24813,11 +26807,54 @@
     if (dom.controls.multiBroadcastState instanceof HTMLButtonElement) {
       dom.controls.multiBroadcastState.disabled = !(multiState.connected && multiState.role === 'master');
     }
+    if (dom.controls.multiMaxGuests instanceof HTMLInputElement) {
+      dom.controls.multiMaxGuests.value = String(multiState.maxGuests);
+      dom.controls.multiMaxGuests.min = String(MULTI_GUEST_LIMIT_MIN);
+      dom.controls.multiMaxGuests.max = String(MULTI_GUEST_LIMIT_MAX);
+      dom.controls.multiMaxGuests.disabled = multiState.connecting || !inMasterConfigMode;
+    }
+    if (dom.controls.multiExportPermission instanceof HTMLSelectElement) {
+      dom.controls.multiExportPermission.value = multiState.exportPermission;
+      dom.controls.multiExportPermission.disabled = multiState.connecting || !inMasterConfigMode;
+    }
+    if (dom.controls.multiGuestCapacityHint instanceof HTMLElement) {
+      const assignedGuestCount = getAssignedGuestCount();
+      dom.controls.multiGuestCapacityHint.textContent = `参加枠: ${assignedGuestCount} / ${multiState.maxGuests}`;
+    }
+    if (dom.controls.multiInviteCopy instanceof HTMLButtonElement) {
+      dom.controls.multiInviteCopy.disabled = multiState.connecting || !inMasterConfigMode || !currentProjectKey;
+    }
+    if (dom.controls.multiInviteShare instanceof HTMLButtonElement) {
+      dom.controls.multiInviteShare.disabled = multiState.connecting || !inMasterConfigMode || !currentProjectKey;
+    }
+    const canSendComment = multiState.connected && !multiState.connecting;
+    if (dom.controls.multiCommentInput instanceof HTMLInputElement) {
+      dom.controls.multiCommentInput.disabled = !canSendComment;
+      dom.controls.multiCommentInput.placeholder = canSendComment
+        ? 'コメントを入力'
+        : '接続するとコメントできます';
+    }
+    if (dom.controls.multiCommentSend instanceof HTMLButtonElement) {
+      dom.controls.multiCommentSend.disabled = !canSendComment;
+    }
+    if (dom.controls.exportProject instanceof HTMLButtonElement) {
+      const canExport = !multiState.connecting && canCurrentClientExportProject();
+      dom.controls.exportProject.disabled = !canExport;
+      const exportDisabledReason = multiState.connecting ? '接続中です' : getMultiExportDisabledReason();
+      if (exportDisabledReason) {
+        dom.controls.exportProject.title = exportDisabledReason;
+      } else {
+        dom.controls.exportProject.removeAttribute('title');
+      }
+    }
+    syncMultiJoinRequestControls();
+    updatePixfindModeUI();
+    enforceMobileSpectatorTabLock({ forceActivate: true });
     syncMultiAssignmentControls();
   }
 
   function applyMultiRoleUiLocks() {
-    const isGuest = isMultiGuestMode();
+    const isReadOnly = isMultiReadOnlyMode();
     const lockTargets = [
       dom.controls.addLayer,
       dom.controls.removeLayer,
@@ -24856,12 +26893,18 @@
       dom.controls.multiAssignApply,
       dom.controls.multiAssignLockToggle,
       dom.controls.multiAssignKick,
+      dom.controls.multiAssignBan,
+      dom.controls.multiRoleTarget,
+      dom.controls.multiForceGuest,
+      dom.controls.multiForceSpectator,
+      dom.controls.multiBlockedTarget,
+      dom.controls.multiBlockedRemove,
     ];
     lockTargets.forEach(control => {
       if (!(control instanceof HTMLButtonElement) && !(control instanceof HTMLInputElement) && !(control instanceof HTMLSelectElement)) {
         return;
       }
-      if (isGuest) {
+      if (isReadOnly) {
         if (control.dataset.multiPrevDisabled === undefined) {
           control.dataset.multiPrevDisabled = control.disabled ? '1' : '0';
         }
@@ -25141,6 +27184,9 @@
     if (existing) {
       return existing;
     }
+    if (isMultiGuestLimitReached()) {
+      return null;
+    }
     const masterAssignment = ensureMasterLayerAssignment();
     if (!masterAssignment) {
       return null;
@@ -25149,7 +27195,7 @@
     if (masterTrack < 0) {
       return null;
     }
-    const guestCount = Array.from(multiState.assignments.values()).filter(entry => entry.role === 'guest').length;
+    const guestCount = getAssignedGuestCount();
     const insertIndex = clamp(masterTrack - guestCount, 0, masterTrack);
     const safeName = typeof participantName === 'string' && participantName.trim()
       ? participantName.trim().slice(0, 24)
@@ -25211,6 +27257,11 @@
     return {
       projectKey: multiState.projectKey,
       masterClientId: multiState.clientId,
+      maxGuests: normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT),
+      exportPermission: normalizeMultiExportPermission(
+        multiState.exportPermission,
+        MULTI_DEFAULT_EXPORT_PERMISSION
+      ),
       assignments: serializeMultiAssignments(),
       blockedClientIds: serializeMultiBlockedClientIds(),
       revision: (multiState.revision += 1),
@@ -25231,6 +27282,11 @@
       clientId: multiState.clientId,
       targetClientId: targetClientId || '',
       sentAt: Date.now(),
+      maxGuests: normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT),
+      exportPermission: normalizeMultiExportPermission(
+        multiState.exportPermission,
+        MULTI_DEFAULT_EXPORT_PERMISSION
+      ),
       assignments: serializeMultiAssignments(),
       blockedClientIds: serializeMultiBlockedClientIds(),
       document: serializeDocumentSnapshot(snapshot),
@@ -25603,7 +27659,7 @@
     }
     multiState.pendingSessionStateTimer = window.setTimeout(() => {
       multiState.pendingSessionStateTimer = null;
-      if (!isMultiGuestMode()) {
+      if (multiState.role !== 'guest' && multiState.role !== 'spectator') {
         clearPendingMultiSessionStateApply();
         return;
       }
@@ -25651,7 +27707,7 @@
       history.future = [];
       history.pending = null;
       updateHistoryButtons();
-      if (isMultiGuestMode()) {
+      if (isMultiGuestMode() || isMultiSpectatorMode()) {
         state.scale = normalizeZoomScale(preserved.scale, state.scale);
         state.pan = { x: preserved.pan.x, y: preserved.pan.y };
         state.tool = normalizeToolId(preserved.tool, state.tool);
@@ -25660,7 +27716,9 @@
         state.activeLeftTab = LEFT_TAB_KEYS.includes(preserved.activeLeftTab) ? preserved.activeLeftTab : state.activeLeftTab;
         state.activeRightTab = RIGHT_TAB_KEYS.includes(preserved.activeRightTab) ? preserved.activeRightTab : state.activeRightTab;
         state.activeFrame = clamp(Math.round(Number(preserved.activeFrame) || 0), 0, Math.max(0, state.frames.length - 1));
-        enforceGuestAssignedLayerSelection({ announce: false });
+        if (isMultiGuestMode()) {
+          enforceGuestAssignedLayerSelection({ announce: false });
+        }
         syncControlsWithState();
         renderFrameList();
         renderLayerList();
@@ -25679,7 +27737,12 @@
     if (!payload || typeof payload !== 'object') {
       return;
     }
-    if (isMultiGuestMode()) {
+    multiState.maxGuests = normalizeMultiMaxGuests(payload.maxGuests, multiState.maxGuests);
+    multiState.exportPermission = normalizeMultiExportPermission(
+      payload.exportPermission,
+      multiState.exportPermission
+    );
+    if (isMultiGuestMode() || isMultiSpectatorMode()) {
       const blockedClientIds = normalizeMultiBlockedClientIds(payload.blockedClientIds);
       if (blockedClientIds.has(multiState.clientId)) {
         disconnectMultiSession({ silent: true }).catch(() => {});
@@ -25696,7 +27759,12 @@
       multiState.revision = receivedRevision;
     }
     const keyText = multiState.projectKey ? ` (${multiState.projectKey})` : '';
-    setMultiStatus(`共有モード: 参加中${keyText}`, 'success');
+    if (isMultiSpectatorMode()) {
+      setMultiStatus(`共有モード: 視聴中${keyText}`, 'success');
+    } else {
+      setMultiStatus(`共有モード: 参加中${keyText}`, 'success');
+    }
+    syncMultiControls();
   }
 
   function buildGuestLayerPatchPayload() {
@@ -25836,7 +27904,7 @@
         }
         nextParticipants.set(clientId, {
           clientId,
-          role: entry.role === 'master' ? 'master' : 'guest',
+          role: normalizeMultiRole(entry.role, 'guest'),
           name: normalizeMultiParticipantName(entry.name, DEFAULT_MULTI_PARTICIPANT_NAME),
           joinedAt: Number(entry.joinedAt) || Date.now(),
         });
@@ -25849,14 +27917,147 @@
       multiState.masterClientId = onlineMaster ? onlineMaster.clientId : null;
     }
     multiState.participants = nextParticipants;
-    if (isMultiGuestMode()) {
+    if (!isMultiMasterMode()) {
       if (onlineMaster && previousMasterClientId !== onlineMaster.clientId) {
         setMultiStatus(`共有モード: マスター接続中 (${multiState.projectKey})`, 'info');
       } else if (!onlineMaster && previousMasterClientId) {
-        setMultiStatus('共有モード: マスター不在。参加者同士で描画同期を継続します', 'warn');
+        setMultiStatus('共有モード: マスター不在。更新の受信待ちです', 'warn');
       }
     }
     renderMultiParticipantsList();
+    syncMultiJoinRequestControls();
+  }
+
+  function handleMultiCommentMessage(payload) {
+    if (!payload || typeof payload !== 'object') {
+      return;
+    }
+    const clientId = typeof payload.clientId === 'string' ? payload.clientId.trim() : '';
+    if (!clientId || clientId === multiState.clientId) {
+      return;
+    }
+    const payloadProjectKey = normalizeMultiProjectKey(payload.projectKey);
+    if (payloadProjectKey && payloadProjectKey !== multiState.projectKey) {
+      return;
+    }
+    const added = appendMultiCommentEntry(payload);
+    if (!added) {
+      return;
+    }
+    renderMultiComments();
+  }
+
+  async function handleMultiJoinRequestMessage(payload) {
+    if (!isMultiMasterMode()) {
+      return;
+    }
+    if (!payload || typeof payload !== 'object') {
+      return;
+    }
+    const senderClientId = typeof payload.clientId === 'string' ? payload.clientId.trim() : '';
+    if (!senderClientId || senderClientId === multiState.clientId) {
+      return;
+    }
+    const payloadProjectKey = normalizeMultiProjectKey(payload.projectKey);
+    if (payloadProjectKey && payloadProjectKey !== multiState.projectKey) {
+      return;
+    }
+    if (isMultiClientBlocked(senderClientId)) {
+      await sendMultiJoinRequestResult(senderClientId, 'blocked');
+      return;
+    }
+    const requestName = normalizeMultiParticipantName(payload.name, DEFAULT_MULTI_PARTICIPANT_NAME);
+    const existingAssignment = getMultiAssignment(senderClientId);
+    if (existingAssignment?.role === 'guest') {
+      await sendMultiRoleChangeNotice(senderClientId, 'guest', 'master-restore');
+      removeMultiJoinRequest(senderClientId);
+      syncMultiJoinRequestControls();
+      await sendMultiJoinRequestResult(senderClientId, 'approved');
+      return;
+    }
+    upsertMultiJoinRequest(senderClientId, requestName, payload.sentAt);
+    syncMultiJoinRequestControls();
+    setMultiStatus(`共有モード: 参加リクエストを受信 (${requestName})`, 'info');
+    await sendMultiJoinRequestResult(senderClientId, 'queued');
+  }
+
+  function handleMultiJoinRequestResultMessage(payload) {
+    if (!payload || typeof payload !== 'object') {
+      return;
+    }
+    if (isMultiMasterMode()) {
+      return;
+    }
+    const senderClientId = typeof payload.clientId === 'string' ? payload.clientId.trim() : '';
+    if (multiState.masterClientId && senderClientId && senderClientId !== multiState.masterClientId) {
+      return;
+    }
+    const payloadProjectKey = normalizeMultiProjectKey(payload.projectKey);
+    if (payloadProjectKey && payloadProjectKey !== multiState.projectKey) {
+      return;
+    }
+    const targetClientId = typeof payload.targetClientId === 'string' ? payload.targetClientId.trim() : '';
+    if (!targetClientId || targetClientId !== multiState.clientId) {
+      return;
+    }
+    const decision = typeof payload.decision === 'string' ? payload.decision.trim() : '';
+    if (decision === 'queued') {
+      multiState.joinRequestPending = true;
+      setMultiStatus('共有モード: 参加リクエストは承認待ちです', 'info');
+    } else if (decision === 'approved') {
+      multiState.joinRequestPending = false;
+      setMultiStatus('共有モード: 参加リクエストが承認されました', 'success');
+    } else if (decision === 'rejected') {
+      multiState.joinRequestPending = false;
+      setMultiStatus('共有モード: 参加リクエストは却下されました', 'warn');
+    } else if (decision === 'blocked') {
+      multiState.joinRequestPending = false;
+      setMultiStatus('共有モード: リクエストできません（BAN中）', 'warn');
+    }
+    syncMultiJoinRequestControls();
+  }
+
+  async function handleMultiRoleChangeMessage(payload) {
+    if (!payload || typeof payload !== 'object') {
+      return;
+    }
+    if (isMultiMasterMode()) {
+      return;
+    }
+    const senderClientId = typeof payload.clientId === 'string' ? payload.clientId.trim() : '';
+    if (multiState.masterClientId && senderClientId && senderClientId !== multiState.masterClientId) {
+      return;
+    }
+    const targetClientId = typeof payload.targetClientId === 'string' ? payload.targetClientId.trim() : '';
+    if (!targetClientId || targetClientId !== multiState.clientId) {
+      return;
+    }
+    const payloadProjectKey = normalizeMultiProjectKey(payload.projectKey);
+    if (payloadProjectKey && payloadProjectKey !== multiState.projectKey) {
+      return;
+    }
+    const nextRole = normalizeMultiRoleControlTargetRole(payload.nextRole);
+    if (nextRole === 'none') {
+      return;
+    }
+    const currentRole = normalizeMultiRoleControlTargetRole(multiState.role);
+    const nextMaxGuests = normalizeMultiMaxGuests(payload.maxGuests, multiState.maxGuests);
+    multiState.maxGuests = nextMaxGuests;
+    if (currentRole === nextRole) {
+      if (nextRole === 'guest') {
+        multiState.joinRequestPending = false;
+      }
+      syncMultiControls();
+      return;
+    }
+    setMultiStatus(
+      nextRole === 'guest'
+        ? '共有モード: マスターにより参加者へ切替中…'
+        : '共有モード: マスターにより視聴者へ切替中…',
+      'info'
+    );
+    multiState.joinRequestPending = false;
+    await connectMultiSessionAs(nextRole, { allowGuestJoin: nextRole === 'guest' });
   }
 
   async function handleMultiHelloMessage(payload) {
@@ -25872,18 +28073,24 @@
         await sendMultiKickClientNotice(senderClientId, 'blocked');
         return;
       }
-      const senderRole = payload.role === 'master' ? 'master' : 'guest';
+      const senderRole = normalizeMultiRole(payload.role, 'guest');
       if (senderRole === 'master') {
         setMultiStatus('共有モード: 同一キーに別マスターがいます', 'warn');
         return;
       }
-      assignLayerToGuestClient(senderClientId, payload.name);
+      const hasAssignment = Boolean(getMultiAssignment(senderClientId));
+      if (hasAssignment && senderRole !== 'guest') {
+        await sendMultiRoleChangeNotice(senderClientId, 'guest', 'master-restore');
+      } else if (!hasAssignment && senderRole === 'guest') {
+        await sendMultiRoleChangeNotice(senderClientId, 'spectator', 'master-default-spectator');
+      }
       refreshMultiParticipantsFromPresence();
       renderMultiParticipantsList();
+      syncMultiJoinRequestControls();
       scheduleMultiSessionStateBroadcast({ targetClientId: senderClientId, immediate: true });
       return;
     }
-    if (isMultiGuestMode() && payload.role === 'master') {
+    if (!isMultiMasterMode() && payload.role === 'master') {
       multiState.masterClientId = senderClientId;
       renderMultiParticipantsList();
     }
@@ -25904,7 +28111,14 @@
       await sendMultiKickClientNotice(requesterClientId, 'blocked');
       return;
     }
-    assignLayerToGuestClient(requesterClientId, payload.name);
+    const requesterRole = normalizeMultiRole(payload.role, 'guest');
+    const hasAssignment = Boolean(getMultiAssignment(requesterClientId));
+    if (hasAssignment && requesterRole !== 'guest') {
+      await sendMultiRoleChangeNotice(requesterClientId, 'guest', 'master-restore');
+    } else if (!hasAssignment && requesterRole === 'guest') {
+      await sendMultiRoleChangeNotice(requesterClientId, 'spectator', 'master-default-spectator');
+    }
+    syncMultiJoinRequestControls();
     scheduleMultiSessionStateBroadcast({ targetClientId: requesterClientId, immediate: true });
   }
 
@@ -25919,7 +28133,7 @@
     if (isMultiMasterMode()) {
       return;
     }
-    if (!isMultiGuestMode()) {
+    if (multiState.role !== 'guest' && multiState.role !== 'spectator') {
       return;
     }
     if (shouldDeferMultiSessionStateApply()) {
@@ -25973,6 +28187,11 @@
     if (!hasDocument) {
       return;
     }
+    multiState.maxGuests = normalizeMultiMaxGuests(payload.maxGuests, multiState.maxGuests);
+    multiState.exportPermission = normalizeMultiExportPermission(
+      payload.exportPermission,
+      multiState.exportPermission
+    );
     const applied = applyMultiAuthoritativeDocument(payload.document);
     if (!applied) {
       return;
@@ -25999,6 +28218,7 @@
     refreshMultiParticipantsFromPresence();
     renderMultiParticipantsList();
     syncMultiAssignmentControls();
+    syncMultiControls();
     clearMultiGuestStateRecovery();
     scheduleMultiSessionStateBroadcast({ immediate: true });
     setMultiStatus(`共有モード: マスター (${multiState.projectKey})`, 'success');
@@ -26006,8 +28226,8 @@
 
   async function handleMultiGuestLayerPatchMessage(payload) {
     const inMasterMode = isMultiMasterMode();
-    const inGuestMode = isMultiGuestMode();
-    if (!inMasterMode && !inGuestMode) {
+    const inReplicaMode = isMultiGuestMode() || isMultiSpectatorMode();
+    if (!inMasterMode && !inReplicaMode) {
       return;
     }
     if (!payload || typeof payload !== 'object') {
@@ -26081,7 +28301,7 @@
   }
 
   async function handleMultiMasterLayerPatchMessage(payload) {
-    if (!isMultiGuestMode()) {
+    if (multiState.role !== 'guest' && multiState.role !== 'spectator') {
       return;
     }
     if (!payload || typeof payload !== 'object') {
@@ -26135,11 +28355,43 @@
     if (!targetClientId || targetClientId !== multiState.clientId) {
       return;
     }
-    await disconnectMultiSession({ silent: true });
-    setMultiStatus('共有モード: マスターにより切断されました', 'warn');
+    const reason = typeof payload.reason === 'string' ? payload.reason.trim() : '';
+    const roomMaxGuests = normalizeMultiMaxGuests(payload.maxGuests, multiState.maxGuests);
+    multiState.maxGuests = roomMaxGuests;
+    const shouldAutoReconnectAsSpectator = reason === 'room-full';
+    await disconnectMultiSession({
+      silent: true,
+      restoreLocalDocument: !shouldAutoReconnectAsSpectator,
+    });
+    if (reason === 'room-full') {
+      setMultiStatus(`共有モード: 参加枠が満員です（上限 ${roomMaxGuests} 人）。視聴者として接続します…`, 'warn');
+      setMultiDesiredRole('spectator');
+      setMultiUiView('spectator');
+      syncMultiControls();
+      window.setTimeout(() => {
+        if (!multiState.connected && !multiState.connecting) {
+          connectMultiSessionAs('spectator');
+        }
+      }, 120);
+    } else if (reason === 'master-ban' || reason === 'blocked') {
+      setMultiStatus('共有モード: マスターによりBANされました', 'warn');
+    } else if (reason === 'master-kick' || reason === 'kicked') {
+      setMultiStatus('共有モード: マスターによりキックされました（再参加可）', 'warn');
+    } else {
+      setMultiStatus('共有モード: マスターにより切断されました', 'warn');
+    }
   }
 
-  async function disconnectMultiSession({ silent = false } = {}) {
+  async function disconnectMultiSession({ silent = false, restoreLocalDocument = true } = {}) {
+    const disconnectedRole = multiState.role === 'master'
+      || multiState.role === 'guest'
+      || multiState.role === 'spectator'
+      ? multiState.role
+      : 'none';
+    const shouldRestoreReplicaSnapshot = Boolean(
+      restoreLocalDocument
+      && isMultiReplicaRole(disconnectedRole)
+    );
     clearMultiBroadcastTimer();
     clearPendingMultiSessionStateApply();
     clearMultiLayerPatchSnapshots();
@@ -26154,10 +28406,19 @@
     multiState.participants.clear();
     multiState.blockedClientIds.clear();
     multiState.selectedAssignClientId = '';
+    multiState.selectedRoleControlClientId = '';
+    multiState.comments = [];
+    multiState.commentIds = new Set();
+    clearMultiJoinRequests();
+    multiState.joinRequestPending = false;
+    multiState.joinRequestCooldownUntil = 0;
     multiState.applyRemoteInProgress = false;
     multiState.uiView = 'entry';
     multiState.resumeAssignments = null;
     multiState.resumeBlockedClientIds = null;
+    multiState.resumeMaxGuests = null;
+    multiState.resumeExportPermission = null;
+    multiState.exportPermission = MULTI_DEFAULT_EXPORT_PERMISSION;
     clearStoredMultiResumeSession();
     if (channel) {
       try {
@@ -26175,17 +28436,44 @@
         // Ignore unsubscribe errors.
       }
     }
+    if (shouldRestoreReplicaSnapshot) {
+      const restored = restoreMultiLocalSnapshotBeforeReplica();
+      if (!restored) {
+        const fallback = createInitialState({ width: state.width, height: state.height });
+        applyHistorySnapshot(fallback);
+        history.past = [];
+        history.future = [];
+        history.pending = null;
+        clearTimelapseRecording({ silent: true });
+        resetDocumentUnsavedChanges();
+        updateHistoryButtons();
+        autosaveDirty = true;
+        scheduleAutosaveSnapshot();
+      }
+    } else if (!isMultiReplicaRole(disconnectedRole)) {
+      clearMultiLocalSnapshotBeforeReplica();
+    }
     if (!silent) {
       setMultiStatus('共有モード: OFF', 'info');
     }
     applyMultiRoleUiLocks();
     syncMultiControls();
     renderMultiParticipantsList();
+    renderMultiComments();
     syncControlsWithState();
   }
 
-  async function connectMultiSessionAs(role) {
-    const normalizedRole = role === 'master' ? 'master' : 'guest';
+  async function connectMultiSessionAs(role, { allowGuestJoin = false } = {}) {
+    const requestedRole = normalizeMultiRole(role, 'guest');
+    const normalizedRole = requestedRole === 'guest' && !allowGuestJoin
+      ? 'spectator'
+      : requestedRole;
+    const enterReplicaMode = isMultiReplicaRole(normalizedRole);
+    if (enterReplicaMode) {
+      captureMultiLocalSnapshotBeforeReplica();
+    } else {
+      clearMultiLocalSnapshotBeforeReplica();
+    }
     multiState.desiredRole = normalizedRole;
     if (!multiState.connected && !multiState.connecting) {
       multiState.uiView = normalizedRole;
@@ -26202,10 +28490,15 @@
       return false;
     }
     if (multiState.connected) {
-      await disconnectMultiSession({ silent: true });
+      await disconnectMultiSession({ silent: true, restoreLocalDocument: false });
     }
     clearPendingMultiSessionStateApply();
     clearMultiLayerPatchSnapshots();
+    multiState.maxGuests = normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT);
+    multiState.exportPermission = normalizeMultiExportPermission(
+      multiState.exportPermission,
+      MULTI_DEFAULT_EXPORT_PERMISSION
+    );
     multiState.connecting = true;
     syncMultiControls();
     try {
@@ -26244,6 +28537,18 @@
       channel.on('broadcast', { event: 'kick-client' }, message => {
         handleMultiKickClientMessage(message?.payload || {});
       });
+      channel.on('broadcast', { event: 'comment' }, message => {
+        handleMultiCommentMessage(message?.payload || {});
+      });
+      channel.on('broadcast', { event: 'join-request' }, message => {
+        handleMultiJoinRequestMessage(message?.payload || {});
+      });
+      channel.on('broadcast', { event: 'join-request-result' }, message => {
+        handleMultiJoinRequestResultMessage(message?.payload || {});
+      });
+      channel.on('broadcast', { event: 'role-change' }, message => {
+        handleMultiRoleChangeMessage(message?.payload || {});
+      });
 
       await waitForMultiSubscription(channel);
       multiState.channel = channel;
@@ -26257,7 +28562,11 @@
       multiState.assignments.clear();
       multiState.participants.clear();
       multiState.blockedClientIds.clear();
+      clearMultiJoinRequests();
       multiState.selectedAssignClientId = '';
+      multiState.selectedRoleControlClientId = '';
+      clearMultiComments();
+      multiState.joinRequestPending = false;
       multiState.awaitingGuestStateRecovery = false;
       if (multiState.guestStateRecoveryTimer !== null) {
         window.clearTimeout(multiState.guestStateRecoveryTimer);
@@ -26271,8 +28580,17 @@
         const resumeBlockedClientIds = Array.isArray(multiState.resumeBlockedClientIds)
           ? multiState.resumeBlockedClientIds
           : [];
+        const resumeMaxGuests = normalizeMultiMaxGuests(multiState.resumeMaxGuests, multiState.maxGuests);
+        const resumeExportPermission = normalizeMultiExportPermission(
+          multiState.resumeExportPermission,
+          multiState.exportPermission
+        );
         multiState.resumeAssignments = null;
         multiState.resumeBlockedClientIds = null;
+        multiState.resumeMaxGuests = null;
+        multiState.resumeExportPermission = null;
+        multiState.maxGuests = resumeMaxGuests;
+        multiState.exportPermission = resumeExportPermission;
         multiState.blockedClientIds = normalizeMultiBlockedClientIds(resumeBlockedClientIds);
         if (resumeAssignments && resumeAssignments.length) {
           applyMultiAssignmentsFromPayload(resumeAssignments, multiState.clientId, resumeBlockedClientIds);
@@ -26289,6 +28607,8 @@
         multiState.masterClientId = null;
         multiState.resumeAssignments = null;
         multiState.resumeBlockedClientIds = null;
+        multiState.resumeMaxGuests = null;
+        multiState.resumeExportPermission = null;
       }
 
       await channel.track({
@@ -26307,6 +28627,7 @@
       });
 
       if (normalizedRole === 'master') {
+        clearMultiLocalSnapshotBeforeReplica();
         startMultiMasterRecoveryFlow(projectKey);
       } else {
         await sendMultiBroadcast('sync-request', {
@@ -26315,7 +28636,15 @@
           name: getLocalMultiParticipantName(),
           projectKey,
         });
-        setMultiStatus(`共有モード: 参加中 (${projectKey})`, 'success');
+        if (normalizedRole === 'spectator') {
+          if (requestedRole === 'guest' && !allowGuestJoin) {
+            setMultiStatus(`共有モード: 入室しました（参加はマスター承認後） (${projectKey})`, 'success');
+          } else {
+            setMultiStatus(`共有モード: 視聴中 (${projectKey})`, 'success');
+          }
+        } else {
+          setMultiStatus(`共有モード: 参加中 (${projectKey})`, 'success');
+        }
       }
       storePendingMultiResumeSession();
       refreshMultiParticipantsFromPresence();
@@ -26325,7 +28654,7 @@
       return true;
     } catch (error) {
       console.warn('Failed to connect multi session', error);
-      await disconnectMultiSession({ silent: true });
+      await disconnectMultiSession({ silent: true, restoreLocalDocument: false });
       setMultiStatus('共有モード: 接続に失敗しました', 'error');
       return false;
     } finally {
@@ -26406,6 +28735,115 @@
         syncMultiControls();
       });
     }
+    if (dom.controls.multiMaxGuests instanceof HTMLInputElement && dom.controls.multiMaxGuests.dataset.bound !== 'true') {
+      dom.controls.multiMaxGuests.dataset.bound = 'true';
+      dom.controls.multiMaxGuests.addEventListener('change', event => {
+        const nextMaxGuests = normalizeMultiMaxGuests(event.target.value, multiState.maxGuests);
+        const changed = nextMaxGuests !== multiState.maxGuests;
+        multiState.maxGuests = nextMaxGuests;
+        event.target.value = String(nextMaxGuests);
+        if (!changed) {
+          syncMultiControls();
+          return;
+        }
+        scheduleSessionPersist({ includeSnapshots: false });
+        if (isMultiMasterMode()) {
+          scheduleMultiSessionStateBroadcast({ immediate: true });
+          const assignedGuestCount = getAssignedGuestCount();
+          if (assignedGuestCount > nextMaxGuests) {
+            setMultiStatus(
+              `参加上限を ${nextMaxGuests} 人に変更しました（現在 ${assignedGuestCount} 人接続済み）`,
+              'warn'
+            );
+          } else {
+            setMultiStatus(`参加上限を ${nextMaxGuests} 人に変更しました`, 'success');
+          }
+        }
+        syncMultiControls();
+      });
+    }
+    if (dom.controls.multiExportPermission instanceof HTMLSelectElement && dom.controls.multiExportPermission.dataset.bound !== 'true') {
+      dom.controls.multiExportPermission.dataset.bound = 'true';
+      dom.controls.multiExportPermission.addEventListener('change', event => {
+        if (!(event.target instanceof HTMLSelectElement)) {
+          return;
+        }
+        if (!isMultiMasterConfigMode()) {
+          event.target.value = normalizeMultiExportPermission(
+            multiState.exportPermission,
+            MULTI_DEFAULT_EXPORT_PERMISSION
+          );
+          syncMultiControls();
+          return;
+        }
+        const nextPermission = normalizeMultiExportPermission(
+          event.target.value,
+          multiState.exportPermission
+        );
+        const changed = nextPermission !== multiState.exportPermission;
+        multiState.exportPermission = nextPermission;
+        event.target.value = nextPermission;
+        if (!changed) {
+          syncMultiControls();
+          return;
+        }
+        scheduleSessionPersist({ includeSnapshots: false });
+        if (isMultiMasterMode()) {
+          scheduleMultiSessionStateBroadcast({ immediate: true });
+          setMultiStatus(`出力権限を「${getMultiExportPermissionLabel(nextPermission)}」に変更しました`, 'success');
+        }
+        syncMultiControls();
+      });
+    }
+    if (dom.controls.multiRequestGuestRole instanceof HTMLButtonElement && dom.controls.multiRequestGuestRole.dataset.bound !== 'true') {
+      dom.controls.multiRequestGuestRole.dataset.bound = 'true';
+      dom.controls.multiRequestGuestRole.addEventListener('click', () => {
+        sendMultiGuestJoinRequest();
+      });
+    }
+    if (dom.controls.multiJoinRequestApprove instanceof HTMLButtonElement && dom.controls.multiJoinRequestApprove.dataset.bound !== 'true') {
+      dom.controls.multiJoinRequestApprove.dataset.bound = 'true';
+      dom.controls.multiJoinRequestApprove.addEventListener('click', () => {
+        approveSelectedMultiJoinRequest();
+      });
+    }
+    if (dom.controls.multiJoinRequestReject instanceof HTMLButtonElement && dom.controls.multiJoinRequestReject.dataset.bound !== 'true') {
+      dom.controls.multiJoinRequestReject.dataset.bound = 'true';
+      dom.controls.multiJoinRequestReject.addEventListener('click', () => {
+        rejectSelectedMultiJoinRequest();
+      });
+    }
+    if (dom.controls.multiJoinRequestTarget instanceof HTMLSelectElement && dom.controls.multiJoinRequestTarget.dataset.bound !== 'true') {
+      dom.controls.multiJoinRequestTarget.dataset.bound = 'true';
+      dom.controls.multiJoinRequestTarget.addEventListener('change', () => {
+        syncMultiJoinRequestControls();
+      });
+    }
+    if (dom.controls.multiInviteCopy instanceof HTMLButtonElement && dom.controls.multiInviteCopy.dataset.bound !== 'true') {
+      dom.controls.multiInviteCopy.dataset.bound = 'true';
+      dom.controls.multiInviteCopy.addEventListener('click', () => {
+        copyMultiInviteLink();
+      });
+    }
+    if (dom.controls.multiInviteShare instanceof HTMLButtonElement && dom.controls.multiInviteShare.dataset.bound !== 'true') {
+      dom.controls.multiInviteShare.dataset.bound = 'true';
+      dom.controls.multiInviteShare.addEventListener('click', () => {
+        shareMultiInviteLink();
+      });
+    }
+    if (dom.controls.multiHelpToggle instanceof HTMLButtonElement && dom.controls.multiHelpToggle.dataset.bound !== 'true') {
+      dom.controls.multiHelpToggle.dataset.bound = 'true';
+      dom.controls.multiHelpToggle.addEventListener('click', () => {
+        const isOpen = dom.controls.multiHelpPanel instanceof HTMLElement && !dom.controls.multiHelpPanel.hidden;
+        setMultiHelpPanelVisible(!isOpen);
+      });
+    }
+    if (dom.controls.multiHelpClose instanceof HTMLButtonElement && dom.controls.multiHelpClose.dataset.bound !== 'true') {
+      dom.controls.multiHelpClose.dataset.bound = 'true';
+      dom.controls.multiHelpClose.addEventListener('click', () => {
+        setMultiHelpPanelVisible(false);
+      });
+    }
     if (dom.controls.multiEntryMaster instanceof HTMLButtonElement && dom.controls.multiEntryMaster.dataset.bound !== 'true') {
       dom.controls.multiEntryMaster.dataset.bound = 'true';
       dom.controls.multiEntryMaster.addEventListener('click', () => {
@@ -26426,18 +28864,7 @@
         }
         setMultiDesiredRole('guest');
         setMultiUiView('guest');
-        setMultiStatus('参加者設定を選択しました', 'info');
-        syncMultiControls();
-      });
-    }
-    if (dom.controls.multiBackToEntry instanceof HTMLButtonElement && dom.controls.multiBackToEntry.dataset.bound !== 'true') {
-      dom.controls.multiBackToEntry.dataset.bound = 'true';
-      dom.controls.multiBackToEntry.addEventListener('click', () => {
-        if (multiState.connected || multiState.connecting) {
-          return;
-        }
-        setMultiUiView('entry');
-        setMultiStatus('マスター / 参加者 を選択してください', 'info');
+        setMultiStatus('参加リクエスト設定を選択しました', 'info');
         syncMultiControls();
       });
     }
@@ -26489,7 +28916,15 @@
     if (dom.controls.multiLeaveSession instanceof HTMLButtonElement && dom.controls.multiLeaveSession.dataset.bound !== 'true') {
       dom.controls.multiLeaveSession.dataset.bound = 'true';
       dom.controls.multiLeaveSession.addEventListener('click', () => {
-        disconnectMultiSession({ silent: false });
+        if (multiState.connected || multiState.connecting) {
+          disconnectMultiSession({ silent: false });
+          return;
+        }
+        if (normalizeMultiUiView(multiState.uiView) !== 'entry') {
+          setMultiUiView('entry');
+          setMultiStatus('マスター / 入室 を選択してください', 'info');
+          syncMultiControls();
+        }
       });
     }
     if (dom.controls.multiBroadcastState instanceof HTMLButtonElement && dom.controls.multiBroadcastState.dataset.bound !== 'true') {
@@ -26503,14 +28938,56 @@
         setMultiStatus('共有モード: 全員に最新状態を同期しました', 'success');
       });
     }
+    if (
+      dom.controls.multiRoleTarget instanceof HTMLSelectElement
+      && dom.controls.multiRoleTarget !== dom.controls.multiAssignTarget
+      && dom.controls.multiRoleTarget.dataset.bound !== 'true'
+    ) {
+      dom.controls.multiRoleTarget.dataset.bound = 'true';
+      dom.controls.multiRoleTarget.addEventListener('change', event => {
+        if (!(event.target instanceof HTMLSelectElement)) {
+          return;
+        }
+        setMultiSelectedControlClientId(event.target.value || '');
+        syncMultiAssignmentControls();
+      });
+    }
+    if (dom.controls.multiForceGuest instanceof HTMLButtonElement && dom.controls.multiForceGuest.dataset.bound !== 'true') {
+      dom.controls.multiForceGuest.dataset.bound = 'true';
+      dom.controls.multiForceGuest.addEventListener('click', async () => {
+        const targetClientId = multiState.selectedRoleControlClientId
+          || multiState.selectedAssignClientId
+          || (dom.controls.multiRoleTarget instanceof HTMLSelectElement ? dom.controls.multiRoleTarget.value : '')
+          || (dom.controls.multiAssignTarget instanceof HTMLSelectElement ? dom.controls.multiAssignTarget.value : '');
+        if (!targetClientId) {
+          setMultiStatus('切替対象を選択してください', 'warn');
+          return;
+        }
+        await forceMultiParticipantRole(targetClientId, 'guest');
+      });
+    }
+    if (dom.controls.multiForceSpectator instanceof HTMLButtonElement && dom.controls.multiForceSpectator.dataset.bound !== 'true') {
+      dom.controls.multiForceSpectator.dataset.bound = 'true';
+      dom.controls.multiForceSpectator.addEventListener('click', async () => {
+        const targetClientId = multiState.selectedRoleControlClientId
+          || multiState.selectedAssignClientId
+          || (dom.controls.multiRoleTarget instanceof HTMLSelectElement ? dom.controls.multiRoleTarget.value : '')
+          || (dom.controls.multiAssignTarget instanceof HTMLSelectElement ? dom.controls.multiAssignTarget.value : '');
+        if (!targetClientId) {
+          setMultiStatus('切替対象を選択してください', 'warn');
+          return;
+        }
+        await forceMultiParticipantRole(targetClientId, 'spectator');
+      });
+    }
     if (dom.controls.multiAssignTarget instanceof HTMLSelectElement && dom.controls.multiAssignTarget.dataset.bound !== 'true') {
       dom.controls.multiAssignTarget.dataset.bound = 'true';
       dom.controls.multiAssignTarget.addEventListener('change', event => {
         if (!(event.target instanceof HTMLSelectElement)) {
           return;
         }
-        multiState.selectedAssignClientId = event.target.value || '';
-        updateMultiAssignmentControlsFromSelection();
+        setMultiSelectedControlClientId(event.target.value || '');
+        syncMultiAssignmentControls();
       });
     }
     if (dom.controls.multiAssignApply instanceof HTMLButtonElement && dom.controls.multiAssignApply.dataset.bound !== 'true') {
@@ -26559,14 +29036,66 @@
         await kickMultiParticipant(targetClientId);
       });
     }
+    if (dom.controls.multiAssignBan instanceof HTMLButtonElement && dom.controls.multiAssignBan.dataset.bound !== 'true') {
+      dom.controls.multiAssignBan.dataset.bound = 'true';
+      dom.controls.multiAssignBan.addEventListener('click', async () => {
+        const targetClientId = multiState.selectedAssignClientId
+          || (dom.controls.multiAssignTarget instanceof HTMLSelectElement ? dom.controls.multiAssignTarget.value : '');
+        if (!targetClientId) {
+          setMultiStatus('BAN対象の参加者を選択してください', 'warn');
+          return;
+        }
+        await banMultiParticipant(targetClientId);
+      });
+    }
+    if (dom.controls.multiBlockedRemove instanceof HTMLButtonElement && dom.controls.multiBlockedRemove.dataset.bound !== 'true') {
+      dom.controls.multiBlockedRemove.dataset.bound = 'true';
+      dom.controls.multiBlockedRemove.addEventListener('click', () => {
+        if (!(dom.controls.multiBlockedTarget instanceof HTMLSelectElement)) {
+          return;
+        }
+        const targetClientId = dom.controls.multiBlockedTarget.value || '';
+        if (!targetClientId) {
+          setMultiStatus('BAN解除対象を選択してください', 'warn');
+          return;
+        }
+        unbanMultiParticipant(targetClientId);
+      });
+    }
+    if (dom.controls.multiCommentSend instanceof HTMLButtonElement && dom.controls.multiCommentSend.dataset.bound !== 'true') {
+      dom.controls.multiCommentSend.dataset.bound = 'true';
+      dom.controls.multiCommentSend.addEventListener('click', async () => {
+        const text = dom.controls.multiCommentInput instanceof HTMLInputElement
+          ? dom.controls.multiCommentInput.value
+          : '';
+        await sendMultiComment(text);
+      });
+    }
+    if (dom.controls.multiCommentInput instanceof HTMLInputElement && dom.controls.multiCommentInput.dataset.bound !== 'true') {
+      dom.controls.multiCommentInput.dataset.bound = 'true';
+      dom.controls.multiCommentInput.addEventListener('keydown', event => {
+        const isComposing = event.isComposing || event.keyCode === 229;
+        if (event.key !== 'Enter' || isComposing) {
+          return;
+        }
+        event.preventDefault();
+        const text = event.target instanceof HTMLInputElement ? event.target.value : '';
+        sendMultiComment(text);
+      });
+    }
 
     if (!multiState.connected) {
       setMultiStatus('共有モード: OFF', 'info');
     }
+    setMultiHelpPanelVisible(false);
     syncMultiControls();
     renderMultiParticipantsList();
+    renderMultiComments();
     applyMultiRoleUiLocks();
-    maybeAutoResumeMultiSession();
+    const inviteApplied = maybeApplyInviteAutoJoin();
+    if (!inviteApplied) {
+      maybeAutoResumeMultiSession();
+    }
   }
 
   function rgbaToHex({ r, g, b, a }) {
