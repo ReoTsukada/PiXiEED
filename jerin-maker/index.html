@@ -5048,10 +5048,6 @@
 
   const DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS = 10000;
 
-  function isMobileDownloadDevice() {
-    return /iP(hone|ad|od)|Android/i.test(navigator.userAgent || '');
-  }
-
   function isStandaloneAppDisplayMode() {
     let displayModeStandalone = false;
     if (window.matchMedia) {
@@ -5109,9 +5105,9 @@
     if (pickerResult === 'saved' || pickerResult === 'cancel') {
       return pickerResult;
     }
-    const isMobile = isMobileDownloadDevice();
-    const avoidAnchorDownload = isMobile && isStandaloneAppDisplayMode();
-    if (isMobile) {
+    const isIOS = /iP(hone|ad|od)/i.test(navigator.userAgent || '');
+    const avoidAnchorDownload = isIOS && isStandaloneAppDisplayMode();
+    if (isIOS) {
       const shareResult = await tryShareBlobFile(blob, filename, mimeType);
       if (shareResult) {
         return shareResult;
@@ -5120,11 +5116,9 @@
     if (!avoidAnchorDownload && downloadBlobViaAnchor(blob, filename)) {
       return 'download';
     }
-    if (!isMobile) {
-      const shareResult = await tryShareBlobFile(blob, filename, mimeType);
-      if (shareResult) {
-        return shareResult;
-      }
+    const shareResult = await tryShareBlobFile(blob, filename, mimeType);
+    if (shareResult) {
+      return shareResult;
     }
     return 'error';
   }
