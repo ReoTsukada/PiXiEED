@@ -1674,6 +1674,8 @@
   const TOUCH_PAN_MIN_POINTERS = 2;
   const TOUCH_PINCH_SENSITIVITY = 1.45;
   const TOUCH_PINCH_DEADZONE_RATIO = 0.008;
+  const TOUCH_PAN_DEADZONE_PX = 4;
+  const TOUCH_PINCH_DEADZONE_PX = 6;
   const TOUCH_PINCH_MAX_GESTURE_RATIO = 6;
   const TOUCH_PINCH_MIN_RATIO = 0.05;
   const activeTouchPointers = new Map();
@@ -19384,6 +19386,7 @@
         const baselinePan = pointerState.panOrigin || { x: state.pan.x, y: state.pan.y };
         const dx = centroid.x - baselineCentroid.x;
         const dy = centroid.y - baselineCentroid.y;
+        const panDistance = Math.hypot(dx, dy);
         let pinchGestureActive = false;
 
         const baselineDistance = Number(pointerState.touchPinchStartDistance);
@@ -19397,7 +19400,10 @@
             TOUCH_PINCH_MAX_GESTURE_RATIO
           );
           const ratioDelta = Math.abs(cappedRatio - 1);
-          pinchGestureActive = ratioDelta >= TOUCH_PINCH_DEADZONE_RATIO;
+          const distanceDelta = Math.abs(nextDistance - baselineDistance);
+          pinchGestureActive =
+            ratioDelta >= TOUCH_PINCH_DEADZONE_RATIO &&
+            distanceDelta >= TOUCH_PINCH_DEADZONE_PX;
           const amplifiedRatio = 1 + ((cappedRatio - 1) * TOUCH_PINCH_SENSITIVITY);
           const targetScale = normalizeZoomScale(
             baselineScale * Math.max(TOUCH_PINCH_MIN_RATIO, amplifiedRatio),
@@ -19410,6 +19416,11 @@
             }
             setZoom(targetScale, pinchFocus || undefined);
           }
+        }
+
+        if (!pinchGestureActive && panDistance < TOUCH_PAN_DEADZONE_PX) {
+          updateVirtualCursorFromEvent(event);
+          return;
         }
 
         // Keep pinch-zoom stable by freezing centroid translation while scaling.
@@ -22269,8 +22280,7 @@
     }
 
     if (
-      (state.showPixelGuides || virtualCursorDrawState.active)
-      && pointerState.preview
+      pointerState.preview
       && ctx.overlay
       && (pointerState.tool === 'line'
         || pointerState.tool === 'rect'
