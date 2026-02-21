@@ -11,10 +11,20 @@
     setupProjectBadges();
     setupRecentUpdates();
     setupProjectPlaceGrid();
+    setupPublicRoomsLobby();
     disableImageInteractions();
     injectFooterAd();
     scheduleProjectAds();
   }
+
+  const PUBLIC_ROOM_SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
+  const PUBLIC_ROOM_SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
+  const PUBLIC_ROOM_SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
+  const PUBLIC_ROOM_LOBBY_CHANNEL = 'pixiedraw-public-rooms-v1';
+  const PUBLIC_ROOM_SCAN_TIMEOUT_MS = 5200;
+  const PUBLIC_ROOM_MAX_ITEMS = 24;
+  const PUBLIC_ROOM_MAX_AGE_MS = 20 * 60 * 1000;
+  let publicRoomSupabaseClientPromise = null;
 
   function updateCopyrightYear() {
     const yearElement = document.getElementById('year');
@@ -56,6 +66,305 @@
       window.PIXIEED_CLIENT_ID = fallback;
       return fallback;
     }
+  }
+
+  async function ensurePublicRoomSupabaseClient() {
+    if (publicRoomSupabaseClientPromise) {
+      return publicRoomSupabaseClientPromise;
+    }
+    publicRoomSupabaseClientPromise = import(PUBLIC_ROOM_SUPABASE_MODULE_URL)
+      .then((module) => {
+        if (!module || typeof module.createClient !== 'function') {
+          throw new Error('Supabase client unavailable');
+        }
+        return module.createClient(PUBLIC_ROOM_SUPABASE_URL, PUBLIC_ROOM_SUPABASE_ANON_KEY, {
+          auth: { persistSession: false }
+        });
+      })
+      .catch((error) => {
+        publicRoomSupabaseClientPromise = null;
+        throw error;
+      });
+    return publicRoomSupabaseClientPromise;
+  }
+
+  function normalizePublicRoomKey(value) {
+    if (typeof value !== 'string') {
+      return '';
+    }
+    return value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40);
+  }
+
+  function normalizePublicRoomTimestamp(value) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return Math.round(numeric);
+    }
+    if (typeof value === 'string') {
+      const parsed = Date.parse(value);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return parsed;
+      }
+    }
+    return 0;
+  }
+
+  function normalizePublicRoomThumbnail(value) {
+    if (typeof value !== 'string') {
+      return '';
+    }
+    const trimmed = value.trim();
+    if (!/^data:image\/(png|jpeg|jpg|webp);base64,/i.test(trimmed)) {
+      return '';
+    }
+    return trimmed;
+  }
+
+  function buildPublicRoomInviteUrl(projectKey) {
+    const key = normalizePublicRoomKey(projectKey);
+    if (!key) {
+      return 'pixiedraw/index.html';
+    }
+    const params = new URLSearchParams();
+    params.set('multiInvite', '1');
+    params.set('multiKey', key);
+    params.set('multiAutoJoin', '1');
+    return `pixiedraw/index.html?${params.toString()}`;
+  }
+
+  function formatPublicRoomUpdatedAt(timestamp) {
+    if (!Number.isFinite(timestamp) || timestamp <= 0) {
+      return '';
+    }
+    const date = new Date(timestamp);
+    const now = Date.now();
+    const diff = Math.max(0, now - timestamp);
+    const min = Math.floor(diff / 60000);
+    if (min < 1) {
+      return '更新: たった今';
+    }
+    if (min < 60) {
+      return `更新: ${min}分前`;
+    }
+    const hh = String(date.getHours()).padStart(2, '0');
+    const mm = String(date.getMinutes()).padStart(2, '0');
+    return `更新: ${hh}:${mm}`;
+  }
+
+  function extractPublicRoomsFromPresence(presenceState) {
+    const now = Date.now();
+    const rows = new Map();
+    const source = presenceState && typeof presenceState === 'object' ? presenceState : {};
+    Object.keys(source).forEach((presenceKey) => {
+      const entries = Array.isArray(source[presenceKey]) ? source[presenceKey] : [];
+      entries.forEach((entry) => {
+        if (!entry || typeof entry !== 'object') {
+          return;
+        }
+        const projectKey = normalizePublicRoomKey(entry.projectKey || entry.project_key || '');
+        if (!projectKey) {
+          return;
+        }
+        const isPublic = entry.isPublic === true || entry.roomVisibility === 'public' || entry.visibility === 'public';
+        if (!isPublic) {
+          return;
+        }
+        const updatedAt = normalizePublicRoomTimestamp(entry.updatedAt || entry.updated_at || entry.sentAt || entry.sent_at) || now;
+        if ((now - updatedAt) > PUBLIC_ROOM_MAX_AGE_MS) {
+          return;
+        }
+        const next = {
+          projectKey,
+          masterName: typeof entry.masterName === 'string' && entry.masterName.trim()
+            ? entry.masterName.trim().slice(0, 32)
+            : 'マスター',
+          maxGuests: Number.isFinite(Number(entry.maxGuests)) ? Math.max(1, Math.round(Number(entry.maxGuests))) : null,
+          guestCount: Number.isFinite(Number(entry.guestCount)) ? Math.max(0, Math.round(Number(entry.guestCount))) : null,
+          spectatorCount: Number.isFinite(Number(entry.spectatorCount)) ? Math.max(0, Math.round(Number(entry.spectatorCount))) : null,
+          participantCount: Number.isFinite(Number(entry.participantCount)) ? Math.max(0, Math.round(Number(entry.participantCount))) : null,
+          thumbnailDataUrl: normalizePublicRoomThumbnail(entry.thumbnailDataUrl || entry.thumbnail || entry.thumb || ''),
+          updatedAt,
+          inviteUrl: buildPublicRoomInviteUrl(projectKey)
+        };
+        const previous = rows.get(projectKey);
+        if (!previous || next.updatedAt >= previous.updatedAt) {
+          rows.set(projectKey, next);
+        }
+      });
+    });
+    return Array.from(rows.values())
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, PUBLIC_ROOM_MAX_ITEMS);
+  }
+
+  async function fetchPublicRoomsSnapshot() {
+    const supabase = await ensurePublicRoomSupabaseClient();
+    const viewerKey = `home-scan-${ensureGlobalClientId()}-${Date.now()}`;
+    const channel = supabase.channel(PUBLIC_ROOM_LOBBY_CHANNEL, {
+      config: {
+        presence: { key: viewerKey }
+      }
+    });
+    try {
+      const presenceState = await new Promise((resolve, reject) => {
+        let settled = false;
+        const timeout = window.setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          try {
+            const fallbackState = typeof channel.presenceState === 'function' ? channel.presenceState() : {};
+            resolve(fallbackState || {});
+          } catch (error) {
+            resolve({});
+          }
+        }, PUBLIC_ROOM_SCAN_TIMEOUT_MS);
+        channel.on('presence', { event: 'sync' }, () => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(timeout);
+          try {
+            const synced = typeof channel.presenceState === 'function' ? channel.presenceState() : {};
+            resolve(synced || {});
+          } catch (error) {
+            resolve({});
+          }
+        });
+        channel.subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            try {
+              if (typeof channel.track === 'function') {
+                await channel.track({ page: 'home', joinedAt: Date.now() });
+              }
+            } catch (_error) {
+              // Ignore track errors; sync timeout will handle fallback.
+            }
+            return;
+          }
+          if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && !settled) {
+            settled = true;
+            window.clearTimeout(timeout);
+            reject(new Error(`public room subscribe failed: ${status}`));
+          }
+        });
+      });
+      return extractPublicRoomsFromPresence(presenceState);
+    } finally {
+      try {
+        if (typeof channel.untrack === 'function') {
+          await channel.untrack();
+        }
+      } catch (_error) {
+        // ignore
+      }
+      try {
+        if (typeof channel.unsubscribe === 'function') {
+          await channel.unsubscribe();
+        }
+      } catch (_error) {
+        // ignore
+      }
+    }
+  }
+
+  function setupPublicRoomsLobby() {
+    const grid = document.getElementById('publicRoomGrid');
+    if (!(grid instanceof HTMLElement)) {
+      return;
+    }
+    const refreshButton = document.getElementById('refreshPublicRooms');
+    let loading = false;
+
+    const renderMessage = (message, { isError = false } = {}) => {
+      grid.innerHTML = '';
+      const empty = document.createElement('p');
+      empty.className = `public-room-empty${isError ? ' is-error' : ''}`;
+      empty.textContent = message;
+      grid.appendChild(empty);
+    };
+
+    const renderRooms = (rooms) => {
+      grid.innerHTML = '';
+      if (!Array.isArray(rooms) || !rooms.length) {
+        renderMessage('公開中の部屋はありません。');
+        return;
+      }
+      const fragment = document.createDocumentFragment();
+      rooms.forEach((room) => {
+        const card = document.createElement('a');
+        card.className = 'public-room-card';
+        card.href = room.inviteUrl;
+        card.setAttribute('aria-label', `${room.masterName} の部屋 (${room.projectKey}) を視聴する`);
+        const thumb = document.createElement('div');
+        thumb.className = 'public-room-thumb';
+        if (room.thumbnailDataUrl) {
+          const img = document.createElement('img');
+          img.src = room.thumbnailDataUrl;
+          img.alt = '';
+          img.loading = 'lazy';
+          thumb.appendChild(img);
+        } else {
+          const fallback = document.createElement('span');
+          fallback.textContent = 'NO PREVIEW';
+          thumb.appendChild(fallback);
+        }
+        const meta = document.createElement('div');
+        meta.className = 'public-room-meta';
+        const title = document.createElement('p');
+        title.className = 'public-room-title';
+        title.textContent = room.projectKey;
+        const info = document.createElement('p');
+        info.className = 'public-room-info';
+        const stats = [];
+        if (Number.isFinite(room.guestCount) && Number.isFinite(room.maxGuests)) {
+          stats.push(`参加 ${room.guestCount}/${room.maxGuests}`);
+        }
+        if (Number.isFinite(room.spectatorCount)) {
+          stats.push(`視聴 ${room.spectatorCount}`);
+        } else if (Number.isFinite(room.participantCount)) {
+          stats.push(`接続 ${room.participantCount}`);
+        }
+        info.textContent = `${room.masterName}${stats.length ? ` ・ ${stats.join(' ・ ')}` : ''}`;
+        const time = document.createElement('p');
+        time.className = 'public-room-time';
+        time.textContent = formatPublicRoomUpdatedAt(room.updatedAt);
+        meta.append(title, info, time);
+        card.append(thumb, meta);
+        fragment.appendChild(card);
+      });
+      grid.appendChild(fragment);
+    };
+
+    const load = async ({ manual = false } = {}) => {
+      if (loading) {
+        return;
+      }
+      loading = true;
+      if (refreshButton instanceof HTMLButtonElement) {
+        refreshButton.disabled = true;
+      }
+      if (manual) {
+        renderMessage('公開中の部屋を更新中…');
+      }
+      try {
+        const rooms = await fetchPublicRoomsSnapshot();
+        renderRooms(rooms);
+      } catch (error) {
+        renderMessage('公開部屋を取得できませんでした。時間をおいて再度お試しください。', { isError: true });
+      } finally {
+        loading = false;
+        if (refreshButton instanceof HTMLButtonElement) {
+          refreshButton.disabled = false;
+        }
+      }
+    };
+
+    if (refreshButton instanceof HTMLButtonElement) {
+      refreshButton.addEventListener('click', () => {
+        load({ manual: true });
+      });
+    }
+
+    load({ manual: false });
   }
 
   function revealLastUpdated() {
