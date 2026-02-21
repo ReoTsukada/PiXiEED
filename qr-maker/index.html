@@ -998,10 +998,6 @@
     }
   }
 
-  function isMobileDownloadDevice() {
-    return /iP(hone|ad|od)|Android/i.test(navigator.userAgent || '');
-  }
-
   function isStandaloneAppDisplayMode() {
     let displayModeStandalone = false;
     if (window.matchMedia) {
@@ -1120,10 +1116,10 @@
     if (!(blob instanceof Blob) || blob.size <= 0) {
       return 'error';
     }
-    const isMobile = isMobileDownloadDevice();
-    const avoidAnchorDownload = isMobile && isStandaloneAppDisplayMode();
+    const isIOS = /iP(hone|ad|od)/i.test(navigator.userAgent || '');
+    const avoidAnchorDownload = isIOS && isStandaloneAppDisplayMode();
 
-    if (isMobile) {
+    if (isIOS) {
       const shareResult = await tryShareBlobFile(blob, filename);
       if (shareResult) {
         return shareResult;
@@ -1139,11 +1135,9 @@
       return 'download';
     }
 
-    if (!isMobile) {
-      const shareResult = await tryShareBlobFile(blob, filename);
-      if (shareResult) {
-        return shareResult;
-      }
+    const shareResult = await tryShareBlobFile(blob, filename);
+    if (shareResult) {
+      return shareResult;
     }
 
     return 'error';
