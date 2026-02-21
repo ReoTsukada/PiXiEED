@@ -105,6 +105,7 @@ const MIN_CLUSTER_PIXELS = 1;
 const MARKER_PADDING = 1;
 const TAP_HIT_PADDING = 1;
 const SHARE_HASHTAG = '#PiXiEED';
+const DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS = 10000;
 const REGION_MERGE_DISTANCE_BY_DIFFICULTY = {
   1: 2,
   2: 4,
@@ -4071,8 +4072,40 @@ function buildMergedLayerAsset(baseImage, overlayImage) {
   }
 }
 
+function downloadBlobFile(blob, filename) {
+  if (!(blob instanceof Blob) || blob.size <= 0) {
+    return false;
+  }
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS);
+  return true;
+}
+
 function downloadDataUrl(dataUrl, filename) {
   if (!dataUrl) return;
+  try {
+    const parts = String(dataUrl).split(',');
+    if (parts.length >= 2) {
+      const header = parts[0] || '';
+      const payload = parts[1] || '';
+      const mimeMatch = header.match(/data:([^;]+)/i);
+      const mimeType = mimeMatch && mimeMatch[1] ? mimeMatch[1] : 'application/octet-stream';
+      const binary = window.atob(payload);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      if (downloadBlobFile(new Blob([bytes], { type: mimeType }), filename)) {
+        return;
+      }
+    }
+  } catch (error) {
+    console.warn('data URL download fallback failed', error);
+  }
   const link = document.createElement('a');
   link.href = dataUrl;
   link.download = filename;
@@ -4081,12 +4114,12 @@ function downloadDataUrl(dataUrl, filename) {
 
 function downloadTextFile(text, filename) {
   const blob = new Blob([text], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  if (!downloadBlobFile(blob, filename)) {
+    const link = document.createElement('a');
+    link.href = `data:application/json;charset=utf-8,${encodeURIComponent(String(text ?? ''))}`;
+    link.download = filename;
+    link.click();
+  }
 }
 
 async function buildNormalizedDataUrl(image, fallbackDataUrl, fallbackFile) {
