@@ -954,6 +954,7 @@
   const DEFAULT_TEXT = 'https://pixieed.jp/';
   const TEXT_LIMIT = 900;
   const DISPLAY_SIZE = qrCanvas.width || 280;
+  const DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS = 10000;
   let downloadCanvas = null;
 
   const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
@@ -997,12 +998,173 @@
     }
   }
 
-  function downloadPNG() {
+  function isMobileDownloadDevice() {
+    return /iP(hone|ad|od)|Android/i.test(navigator.userAgent || '');
+  }
+
+  function isStandaloneAppDisplayMode() {
+    let displayModeStandalone = false;
+    if (window.matchMedia) {
+      try {
+        displayModeStandalone = window.matchMedia('(display-mode: standalone)').matches;
+      } catch (error) {
+        displayModeStandalone = false;
+      }
+    }
+    return Boolean(window.navigator && window.navigator.standalone) || displayModeStandalone;
+  }
+
+  function dataUrlToBlob(dataUrl) {
+    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return null;
+    const parts = dataUrl.split(',');
+    if (parts.length < 2) return null;
+    const header = parts[0] || '';
+    const payload = parts[1] || '';
+    const mimeMatch = header.match(/data:([^;]+)/i);
+    const mimeType = mimeMatch && mimeMatch[1] ? mimeMatch[1] : 'application/octet-stream';
+    try {
+      const binary = atob(payload);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return new Blob([bytes], { type: mimeType });
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function canvasToPngBlob(canvas) {
+    return new Promise((resolve) => {
+      if (!canvas) {
+        resolve(null);
+        return;
+      }
+      if (typeof canvas.toBlob === 'function') {
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+            return;
+          }
+          resolve(dataUrlToBlob(canvas.toDataURL('image/png')));
+        }, 'image/png');
+        return;
+      }
+      resolve(dataUrlToBlob(canvas.toDataURL('image/png')));
+    });
+  }
+
+  async function saveBlobWithFilePicker(blob, filename, mimeType = 'application/octet-stream') {
+    if (!(blob instanceof Blob) || typeof window.showSaveFilePicker !== 'function') {
+      return 'unsupported';
+    }
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{
+          description: `${mimeType} file`,
+          accept: { [mimeType]: ['.png'] }
+        }]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return 'saved';
+    } catch (error) {
+      if (error && error.name === 'AbortError') {
+        return 'cancel';
+      }
+      console.warn('showSaveFilePicker failed', error);
+      return 'error';
+    }
+  }
+
+  async function tryShareBlobFile(blob, filename) {
+    if (!(blob instanceof Blob) || typeof navigator.share !== 'function') {
+      return null;
+    }
+    try {
+      const file = new File([blob], filename, { type: 'image/png' });
+      if (typeof navigator.canShare === 'function' && !navigator.canShare({ files: [file] })) {
+        return null;
+      }
+      await navigator.share({
+        files: [file],
+        title: 'PiXiEED QR',
+        text: '#PiXiEED'
+      });
+      return 'share';
+    } catch (error) {
+      if (error && error.name === 'AbortError') {
+        return 'share-cancel';
+      }
+      console.warn('share failed', error);
+      return null;
+    }
+  }
+
+  function downloadBlobViaAnchor(blob, filename) {
+    if (!(blob instanceof Blob) || blob.size <= 0 || !('download' in HTMLAnchorElement.prototype)) {
+      return false;
+    }
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.download = 'pixieed-qr.png';
-    const sourceCanvas = downloadCanvas || qrCanvas;
-    link.href = sourceCanvas.toDataURL('image/png');
+    link.download = filename;
+    link.href = url;
     link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS);
+    return true;
+  }
+
+  async function deliverBlobDownload(blob, filename, mimeType = 'application/octet-stream') {
+    if (!(blob instanceof Blob) || blob.size <= 0) {
+      return 'error';
+    }
+    const isMobile = isMobileDownloadDevice();
+    const avoidAnchorDownload = isMobile && isStandaloneAppDisplayMode();
+
+    if (isMobile) {
+      const shareResult = await tryShareBlobFile(blob, filename);
+      if (shareResult) {
+        return shareResult;
+      }
+    }
+
+    const pickerResult = await saveBlobWithFilePicker(blob, filename, mimeType);
+    if (pickerResult === 'saved' || pickerResult === 'cancel') {
+      return pickerResult;
+    }
+
+    if (!avoidAnchorDownload && downloadBlobViaAnchor(blob, filename)) {
+      return 'download';
+    }
+
+    if (!isMobile) {
+      const shareResult = await tryShareBlobFile(blob, filename);
+      if (shareResult) {
+        return shareResult;
+      }
+    }
+
+    return 'error';
+  }
+
+  async function downloadPNG() {
+    const sourceCanvas = downloadCanvas || qrCanvas;
+    const blob = await canvasToPngBlob(sourceCanvas);
+    const result = await deliverBlobDownload(blob, 'pixieed-qr.png', 'image/png');
+    if (result === 'cancel' || result === 'share-cancel') {
+      qrStatus.textContent = '保存をキャンセルしました';
+      qrStatus.style.color = '#ffa95c';
+      return;
+    }
+    if (result === 'error') {
+      qrStatus.textContent = '保存に失敗しました';
+      qrStatus.style.color = '#ffa95c';
+      return;
+    }
+    qrStatus.textContent = '保存しました';
+    qrStatus.style.color = '#7bcfff';
   }
 
   function copyData() {
