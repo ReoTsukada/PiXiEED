@@ -1719,6 +1719,104 @@
       return 'png';
     }
 
+    const DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS = 10000;
+
+    function isMobileDownloadDevice(){
+      return /iP(hone|ad|od)|Android/i.test(navigator.userAgent || '');
+    }
+
+    function isStandaloneAppDisplayMode(){
+      let displayModeStandalone = false;
+      if(window.matchMedia){
+        try{
+          displayModeStandalone = window.matchMedia('(display-mode: standalone)').matches;
+        }catch(_){
+          displayModeStandalone = false;
+        }
+      }
+      return Boolean(window.navigator && window.navigator.standalone) || displayModeStandalone;
+    }
+
+    function dataUrlToBlob(dataUrl){
+      if(typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return null;
+      const parts = dataUrl.split(',');
+      if(parts.length < 2) return null;
+      const header = parts[0] || '';
+      const payload = parts[1] || '';
+      const mimeMatch = header.match(/data:([^;]+)/i);
+      const mimeType = mimeMatch && mimeMatch[1] ? mimeMatch[1] : 'application/octet-stream';
+      try{
+        const binary = atob(payload);
+        const bytes = new Uint8Array(binary.length);
+        for(let i = 0; i < binary.length; i += 1){
+          bytes[i] = binary.charCodeAt(i);
+        }
+        return new Blob([bytes], { type: mimeType });
+      }catch(_){
+        return null;
+      }
+    }
+
+    async function tryShareDownloadBlob(blob, filename){
+      if(!(blob instanceof Blob) || typeof navigator.share !== 'function'){
+        return null;
+      }
+      try{
+        const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
+        if(typeof navigator.canShare === 'function' && !navigator.canShare({ files: [file] })){
+          return null;
+        }
+        await navigator.share({
+          files: [file],
+          title: 'PiXiEED',
+          text: 'PiXiEED'
+        });
+        return 'share';
+      }catch(error){
+        if(error && error.name === 'AbortError'){
+          return 'share-cancel';
+        }
+        console.warn('download share failed', error);
+        return null;
+      }
+    }
+
+    function downloadBlobViaAnchor(blob, filename){
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS);
+      return 'download';
+    }
+
+    async function deliverDownloadBlob(blob, filename){
+      if(!(blob instanceof Blob) || blob.size <= 0){
+        return null;
+      }
+      const isMobile = isMobileDownloadDevice();
+      const avoidAnchorDownload = isMobile && isStandaloneAppDisplayMode();
+      if(isMobile){
+        const shareResult = await tryShareDownloadBlob(blob, filename);
+        if(shareResult){
+          return shareResult;
+        }
+      }
+      if(!avoidAnchorDownload && ('download' in HTMLAnchorElement.prototype)){
+        return downloadBlobViaAnchor(blob, filename);
+      }
+      if(!isMobile){
+        const shareResult = await tryShareDownloadBlob(blob, filename);
+        if(shareResult){
+          return shareResult;
+        }
+      }
+      return null;
+    }
+
     async function handleDownload(){
       if(!entry) return;
       if(!isDownloadAllowed(entry.allow_download)){
@@ -1745,13 +1843,30 @@
       const ext = getDownloadExtension(source);
       const safeTitle = (entry.title || 'pixieed').replace(/[^\w\-]+/g, '-');
       const filename = `${safeTitle || 'pixieed'}-${entry.id}.${ext}`;
-      const link = document.createElement('a');
       if(source.startsWith('data:')){
-        link.href = source;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
+        const dataBlob = dataUrlToBlob(source);
+        if(dataBlob && dataBlob.size > 0){
+          const result = await deliverDownloadBlob(dataBlob, filename);
+          if(result === 'share-cancel'){
+            setStatus('ダウンロードをキャンセルしました');
+            return;
+          }
+          if(!result){
+            const link = document.createElement('a');
+            link.href = source;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+          }
+        }else{
+          const link = document.createElement('a');
+          link.href = source;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+        }
         setStatus('ダウンロードしました');
         return;
       }
@@ -1762,14 +1877,15 @@
           throw new Error(`download failed: ${res.status}`);
         }
         const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
+        const result = await deliverDownloadBlob(blob, filename);
+        if(result === 'share-cancel'){
+          setStatus('ダウンロードをキャンセルしました');
+          return;
+        }
+        if(!result){
+          throw new Error('download unavailable');
+        }
         setStatus('ダウンロードしました');
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
       }catch(err){
         console.error(err);
         setStatus('ダウンロードに失敗しました');
