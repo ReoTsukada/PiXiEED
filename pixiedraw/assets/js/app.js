@@ -646,8 +646,6 @@
   const SHARE_HASHTAG = '#PiXiEED';
   const IS_IOS_DEVICE =
     typeof navigator !== 'undefined' && /iphone|ipod|ipad/i.test((navigator.userAgent || '').toLowerCase());
-  const IS_ANDROID_DEVICE =
-    typeof navigator !== 'undefined' && /android/i.test((navigator.userAgent || '').toLowerCase());
   const IS_ANDROID_LINE_BROWSER =
     typeof navigator !== 'undefined'
     && /android/i.test(navigator.userAgent || '')
@@ -10102,10 +10100,9 @@
     const mimeType = options.mimeType || blob.type || 'application/octet-stream';
     const shareTitle = options.shareTitle || filename;
     const shareText = appendShareHashtag(options.shareText || '');
-    const isMobileDevice = IS_IOS_DEVICE || IS_ANDROID_DEVICE;
-    const shouldPreferShare = options.preferShare !== false && isMobileDevice;
+    const shouldPreferShare = options.preferShare !== false && IS_IOS_DEVICE;
     const shouldAvoidAnchorDownload =
-      options.allowAnchorDownload === false || (isMobileDevice && isStandaloneAppDisplayMode());
+      options.allowAnchorDownload === false || (IS_IOS_DEVICE && isStandaloneAppDisplayMode());
     const fileExtensions = Array.isArray(options.fileExtensions) && options.fileExtensions.length
       ? options.fileExtensions
       : (() => {
