@@ -128,24 +128,24 @@
 </div>
 <button class="startup-screen__link" id="startupActionSkip" type="button">編集を続ける</button>
 <p class="startup-screen__hint" id="startupScreenHint">ファイルを開くと既存の自動保存先を引き継ぎます。</p>
-<p class="startup-screen__hint">最新更新 (2026/02/20): 共有モード（マルチ）とアニメ制作機能を強化。※マルチはテスト中です。</p>
+<p class="startup-screen__hint">最新更新 (2026/02/21): 共有モード承認フロー・コメント・出力権限・グリッド分割出力・タッチ操作を改善。</p>
 <div class="startup-screen__recent" hidden="" id="startupRecentProjects">
 <h2 class="startup-screen__recent-title">最近のプロジェクト</h2>
 <div class="startup-recent-list" id="startupRecentList" role="list"></div>
 </div>
 </div>
 </div>
-<div aria-hidden="true" class="update-toast" data-update-id="2026-02-20-seo-multi-animation-pwa" hidden="" id="updateToast" role="status" aria-live="polite">
+<div aria-hidden="true" class="update-toast" data-update-id="2026-02-21-multi-collab-export-and-touch" hidden="" id="updateToast" role="status" aria-live="polite">
 <div class="update-toast__body">
 <p class="update-toast__message">
-<strong>更新情報 (2026/02/20)</strong><br/>
-・PiXiEEDraw専用PWAとして最適化（未インストール端末向けインストール案内を改善）<br/>
-・共有モード（マルチ）を追加（マスター/参加者、セル割当、差分同期）<br/>
-・共有モードの役割フローとプロジェクトキー操作を改善（コピー対応）<br/>
-・フレームアニメーション制作（FPS/オニオンスキン/GIF出力）の導線を改善<br/>
-・共有モードタブのアイコンを更新<br/>
-・範囲選択時のコピー/貼り付けボタンをPC・横画面でも左上表示に対応<br/>
-・共有モード（マルチ）はテスト中です<br/>
+<strong>更新情報 (2026/02/21)</strong><br/>
+・共有モードを承認フロー化（入室は自由、参加はマスター承認）<br/>
+・最大参加人数(1〜5)と出力権限（初期: マスターのみ）を追加<br/>
+・コメント機能を刷新（共通名/アイコン、時刻表示、対象選択連携）<br/>
+・マスター操作を整理（参加/視聴切替、セル移動、キック、BAN）<br/>
+・PNGグリッド分割出力（幅/高さpx指定）を追加<br/>
+・保存時の壊れPNG発生を軽減（出力処理を安定化）<br/>
+・タッチのパン/ズーム誤動作を低減（ジェスチャモード固定）<br/>
 ・詳細は設定の「更新情報」から確認できます
 </p>
 <div class="update-toast__actions">
@@ -618,18 +618,16 @@
 <div class="panel-section__body">
 <div class="multi-entry-screen" id="multiEntryScreen">
 <button class="button" id="multiEntryMaster" type="button">マスター</button>
-<button class="button" id="multiEntryGuest" type="button">参加者</button>
+<button class="button" id="multiEntryGuest" type="button">入室</button>
 </div>
 <div class="multi-flow-panel" hidden id="multiFlowPanel">
-<div class="multi-flow-header">
-<button class="chip" id="multiBackToEntry" type="button">戻る</button>
-<p class="help-text" id="multiRoleLabel">共有設定</p>
+<div class="field field--list multi-comment-field">
+<div aria-live="polite" class="multi-comment-log" id="multiCommentList">
+<p class="help-text">コメントはまだありません。</p>
 </div>
-<div class="field field--compact multi-project-key-field">
-<span>プロジェクトキー</span>
-<div class="multi-project-key-row">
-<input autocomplete="off" id="multiProjectKey" inputmode="text" maxlength="40" placeholder="例: room-1234" spellcheck="false" type="text"/>
-<button aria-label="プロジェクトキーをコピー" class="chip multi-project-key-copy" id="multiCopyKey" title="プロジェクトキーをコピー" type="button">コピー</button>
+<div class="multi-comment-input-row">
+<input autocomplete="off" id="multiCommentInput" maxlength="140" placeholder="コメントを入力" type="text"/>
+<button class="chip" id="multiCommentSend" type="button">送信</button>
 </div>
 </div>
 <div class="field-group">
@@ -638,24 +636,85 @@
 <button class="button" id="multiLeaveSession" type="button">切断</button>
 </div>
 </div>
-<div class="field-group" data-multi-master-only="true">
+<div class="field field--list multi-join-request-field" hidden id="multiJoinRequestField">
+<button class="chip" id="multiRequestGuestRole" type="button">参加リクエストを送信</button>
+<p class="help-text" id="multiJoinRequestHint">参加はマスターの承認後に有効になります。</p>
+</div>
+<div class="field field--list multi-master-actions" data-multi-master-only="true">
 <button class="chip" id="multiGenerateKey" type="button">キー生成</button>
 <button class="chip" id="multiBroadcastState" type="button">全員に同期</button>
+<div class="field field--inline multi-invite-actions">
+<button class="chip" id="multiInviteCopy" type="button">招待リンクをコピー</button>
+<button class="chip" id="multiInviteShare" type="button">招待を共有</button>
 </div>
+</div>
+<div class="field field--compact multi-project-key-field">
+<span>プロジェクトキー</span>
+<div class="multi-project-key-row">
+<input autocomplete="off" id="multiProjectKey" inputmode="text" maxlength="40" placeholder="例: room-1234" spellcheck="false" type="text"/>
+<button aria-label="プロジェクトキーをコピー" class="chip multi-project-key-copy" id="multiCopyKey" title="プロジェクトキーをコピー" type="button">コピー</button>
+</div>
+</div>
+<div class="field field--list multi-capacity-field" data-multi-master-only="true">
+<span>最大参加人数</span>
+<label class="field field--compact">
+<span>参加上限 (1〜5)</span>
+<input data-stepper="true" id="multiMaxGuests" inputmode="numeric" max="5" min="1" step="1" type="number" value="5"/>
+</label>
+<p class="help-text" id="multiGuestCapacityHint">参加枠: 0 / 5</p>
+<label class="field field--compact">
+<span>出力権限</span>
+<select id="multiExportPermission">
+<option value="master">マスターのみ</option>
+<option value="master-guest">マスター + 参加者</option>
+<option value="all">全員</option>
+</select>
+</label>
+</div>
+<div class="multi-status-row">
 <p aria-live="polite" class="help-text" id="multiStatus">共有モード: OFF</p>
-<p class="help-text">※共有モード（マルチ）はテスト中です。仕様が変更される場合があります。</p>
-<div class="field field--list">
-<span>参加者</span>
-<ul class="toggle-list" id="multiParticipants">
+<button aria-controls="multiHelpPanel" aria-expanded="false" aria-label="マルチ説明を表示" class="chip multi-help-toggle" id="multiHelpToggle" type="button">?</button>
+</div>
+<div class="field field--list multi-help-panel" hidden id="multiHelpPanel">
+<span>マルチ説明</span>
+<p class="help-text">描画は参加者のみ、コメントは全員が利用できます。</p>
+<p class="help-text">参加者を選ぶと: 切替 / セル移動 / ロック / キック / BAN</p>
+<p class="help-text">視聴者を選ぶと: 切替のみ</p>
+<p class="help-text">招待リンクはプロジェクトキー付きで参加画面を開きます。</p>
+<button class="chip" id="multiHelpClose" type="button">閉じる</button>
+</div>
+<details class="field field--list multi-participants-panel" open>
+<summary>参加者/視聴者一覧</summary>
+<div class="multi-participants-scroll">
+<ul class="toggle-list multi-participants-list" id="multiParticipants">
 <li class="help-text">未接続</li>
 </ul>
 </div>
-<div class="field field--list multi-assignment-field" data-multi-master-only="true">
-<span>参加者セル移動 (マスター)</span>
+</details>
+<div class="field field--list multi-join-requests-field" data-multi-master-only="true">
+<span>参加リクエスト</span>
 <label class="field field--compact">
-<span>対象参加者</span>
+<span>対象</span>
+<select id="multiJoinRequestTarget"></select>
+</label>
+<div class="field field--inline multi-role-actions">
+<button class="chip" id="multiJoinRequestApprove" type="button">承認</button>
+<button class="chip" id="multiJoinRequestReject" type="button">却下</button>
+</div>
+</div>
+<div class="field field--list multi-role-control-field" data-multi-master-only="true">
+<span>参加/視聴の切替</span>
+<label class="field field--compact">
+<span>対象</span>
 <select id="multiAssignTarget"></select>
 </label>
+<div class="field field--inline multi-role-actions">
+<button class="chip" id="multiForceGuest" type="button">参加者にする</button>
+<button class="chip" id="multiForceSpectator" type="button">視聴者にする</button>
+</div>
+</div>
+<div class="field field--list multi-assignment-field" data-multi-master-only="true">
+<span>参加者セル移動</span>
 <div class="field field--inline multi-assignment-inputs">
 <label class="field field--tiny">
 <span>フレーム</span>
@@ -669,11 +728,10 @@
 <button class="button" id="multiAssignApply" type="button">参加者を移動</button>
 <div class="field field--inline multi-assignment-actions">
 <button class="chip" id="multiAssignLockToggle" type="button">セルロック</button>
-<button class="chip" id="multiAssignKick" type="button">参加者をキック</button>
+<button class="chip" id="multiAssignKick" type="button">キック</button>
+<button class="chip" id="multiAssignBan" type="button">BAN</button>
 </div>
-<p class="help-text" id="multiAssignHint">参加者ごとに 1 セルだけ割り当てます。同じセルには 1 人だけ配置できます。</p>
 </div>
-<p class="help-text">マスターがキャンバス設定とレイヤー順序を管理し、参加者は割当セル(フレーム×レイヤー)のみ描画できます。</p>
 <div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 </div>
 </div>
@@ -844,6 +902,18 @@
 <input id="exportIncludeOriginalToggle" type="checkbox"/>
 <span>拡大出力時に原寸も追加で出力する</span>
 </label>
+<div class="field field--inline" hidden id="exportGridSettings">
+<span>グリッド分割 (PNG)</span>
+<label class="field field--compact">
+<span>幅 (px)</span>
+<input id="exportGridWidth" inputmode="numeric" min="1" step="1" type="number" value="8"/>
+</label>
+<label class="field field--compact">
+<span>高さ (px)</span>
+<input id="exportGridHeight" inputmode="numeric" min="1" step="1" type="number" value="8"/>
+</label>
+</div>
+<p class="help-text" hidden id="exportGridHint">分割順: 右上から左へ、次の段へ進みます（右→左、上→下）。</p>
 </div>
 <div class="field field--list">
 <div aria-live="polite" class="export-guidance">
@@ -855,6 +925,7 @@
 <span>形式</span>
 <select id="exportFormat">
 <option value="png">PNG（画像）</option>
+<option value="gridpng">PNG（グリッド分割）</option>
 <option value="gif">GIF（アニメーション）</option>
 <option value="timelapse">タイムラプスGIF（記録）</option>
 <option value="pixfind">PiXFiNDへ送る</option>
