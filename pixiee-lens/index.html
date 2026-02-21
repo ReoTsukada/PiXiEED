@@ -3360,7 +3360,10 @@
       listenersAttached: false
     };
 
+    const DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS = 10000;
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isAndroidDevice = /Android/i.test(navigator.userAgent);
+    const isMobileDevice = isIOSDevice || isAndroidDevice;
     const displayModeStandalone = (() => {
       if (window.matchMedia) {
         try {
@@ -9767,9 +9770,7 @@
       const autoShareOnMobile = options.autoShareOnMobile !== false && options.autoShareOnIOS !== false;
       const { blob, dataUrl, cssWidth, cssHeight, width, height } = result;
       const supportsDownloadAttr = 'download' in HTMLAnchorElement.prototype;
-      const isIOS = /iP(hone|ad|od)/i.test(navigator.userAgent);
-      const isAndroid = /Android/i.test(navigator.userAgent);
-      const isMobile = isIOS || isAndroid;
+      const shouldAvoidAnchorDownload = isMobileDevice && isStandaloneApp;
       const drawPayload = enableDrawImport
         ? await createDrawImportPayload(result, filename, options.drawPayloadOptions || {})
         : null;
@@ -9782,6 +9783,10 @@
         ? 'PiXiEEDrawで編集するか、画像を保存してご利用ください。'
         : `${formatLabel}を保存してご利用ください。`;
       if (blob instanceof Blob) {
+        if (blob.size <= 0) {
+          setStatus('保存データの生成に失敗しました');
+          return false;
+        }
         const shareFile = new File([blob], filename, { type: mimeType });
         const canShareFiles = typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare({ files: [shareFile] }));
         const pickerResult = await saveBlobWithFilePicker(blob, filename, mimeType);
@@ -9790,7 +9795,7 @@
         }
         const pickerSaved = pickerResult === 'saved';
         let autoShareSucceeded = false;
-        const shouldAutoShare = !pickerSaved && autoShareOnMobile && isMobile && canShareFiles;
+        const shouldAutoShare = !pickerSaved && autoShareOnMobile && isMobileDevice && canShareFiles;
         if (shouldAutoShare) {
           try {
             await navigator.share({
@@ -9810,7 +9815,7 @@
           infoMessage = drawPayload
             ? 'ファイルへ保存しました。「PiXiEEDrawで編集」で続けて編集できます。'
             : `${formatLabel}をファイルへ保存しました。`;
-        } else if (supportsDownloadAttr && !autoShareSucceeded) {
+        } else if (supportsDownloadAttr && !autoShareSucceeded && !shouldAvoidAnchorDownload) {
           const downloadUrl = URL.createObjectURL(blob);
           const anchor = document.createElement('a');
           anchor.href = downloadUrl;
@@ -9821,7 +9826,7 @@
           document.body.appendChild(anchor);
           anchor.click();
           document.body.removeChild(anchor);
-          setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+          setTimeout(() => URL.revokeObjectURL(downloadUrl), DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS);
           infoMessage = drawPayload
             ? '画像を自動的に保存しました。「PiXiEEDrawで編集」で続けて編集できます。'
             : `${formatLabel}を自動的に保存しました。`;
