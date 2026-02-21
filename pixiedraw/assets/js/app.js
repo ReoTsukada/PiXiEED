@@ -5234,22 +5234,6 @@
     }
   }
 
-  async function maybePrepareExportDirectoryEarly() {
-    if (!EXPORT_DIRECTORY_SUPPORTED || exportDirectoryHandle || exportDirectorySetupDismissed) {
-      return false;
-    }
-    if (pendingExportDirectoryHandle) {
-      return await attemptExportDirectoryReauthorization();
-    }
-    const confirmed = window.confirm('初回保存をスムーズにするため、先に出力フォルダ「PiXiEED」を作成しますか？');
-    if (!confirmed) {
-      exportDirectorySetupDismissed = true;
-      updateExportFolderStatus('出力フォルダ: 後で設定できます（設定タブから変更可能）', 'info');
-      return false;
-    }
-    return await requestExportDirectoryBinding();
-  }
-
   function setupExportDirectoryControls() {
     const button = dom.controls.bindExportFolder;
     if (!(button instanceof HTMLButtonElement)) {
@@ -5456,6 +5440,16 @@
         requestPermission: true,
       });
       let boundFromExportDirectory = Boolean(handle);
+      if (!handle && EXPORT_DIRECTORY_SUPPORTED && typeof window.showDirectoryPicker === 'function' && !exportDirectorySetupDismissed) {
+        const bound = await requestExportDirectoryBinding();
+        if (bound) {
+          handle = await getFileHandleInExportDirectory(suggestedName, {
+            create: true,
+            requestPermission: true,
+          });
+          boundFromExportDirectory = Boolean(handle);
+        }
+      }
       if (!handle) {
         handle = await window.showSaveFilePicker({
           suggestedName,
@@ -8352,7 +8346,6 @@
     });
     dom.startup?.newButton?.addEventListener('click', () => {
       hideStartupScreen();
-      void maybePrepareExportDirectoryEarly();
       openNewProjectDialog();
     });
     dom.startup?.openButton?.addEventListener('click', async () => {
@@ -8363,7 +8356,6 @@
     });
     dom.startup?.skipButton?.addEventListener('click', () => {
       hideStartupScreen();
-      void maybePrepareExportDirectoryEarly();
     });
     dom.startup?.recentList?.addEventListener('click', async event => {
       const target = event.target instanceof Element ? event.target.closest('.startup-recent-card') : null;
