@@ -3362,8 +3362,6 @@
 
     const DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS = 10000;
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const isAndroidDevice = /Android/i.test(navigator.userAgent);
-    const isMobileDevice = isIOSDevice || isAndroidDevice;
     const displayModeStandalone = (() => {
       if (window.matchMedia) {
         try {
@@ -9770,7 +9768,7 @@
       const autoShareOnMobile = options.autoShareOnMobile !== false && options.autoShareOnIOS !== false;
       const { blob, dataUrl, cssWidth, cssHeight, width, height } = result;
       const supportsDownloadAttr = 'download' in HTMLAnchorElement.prototype;
-      const shouldAvoidAnchorDownload = isMobileDevice && isStandaloneApp;
+      const shouldAvoidAnchorDownload = isIOSDevice && isStandaloneApp;
       const drawPayload = enableDrawImport
         ? await createDrawImportPayload(result, filename, options.drawPayloadOptions || {})
         : null;
@@ -9795,7 +9793,7 @@
         }
         const pickerSaved = pickerResult === 'saved';
         let autoShareSucceeded = false;
-        const shouldAutoShare = !pickerSaved && autoShareOnMobile && isMobileDevice && canShareFiles;
+        const shouldAutoShare = !pickerSaved && autoShareOnMobile && isIOSDevice && canShareFiles;
         if (shouldAutoShare) {
           try {
             await navigator.share({
