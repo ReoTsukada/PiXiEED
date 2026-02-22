@@ -511,6 +511,24 @@ button {
   color: var(--fg);
 }
 
+/* Notification dot for tabs (e.g., when new comments arrive) */
+.rail-tab.has-notification,
+.mobile-tab.has-notification {
+  position: relative;
+}
+.rail-tab.has-notification::after,
+.mobile-tab.has-notification::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 10px;
+  height: 10px;
+  background: #e53e3e; /* red */
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.12);
+}
+
 .rail-tab:focus-visible {
   outline: 2px solid rgba(var(--ui-rgb-focus), 0.75);
   outline-offset: 2px;
@@ -2628,6 +2646,37 @@ body.is-mobile-layout .mobile-draw-help {
   width: 100%;
   max-width: none;
   font-size: 0.88rem;
+}
+
+/* Danmaku (コメント弾幕) overlay styles */
+.danmaku-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 999;
+}
+.danmaku-overlay .danmaku-item {
+  position: absolute;
+  white-space: nowrap;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.75);
+  will-change: transform, opacity;
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.25);
+  transform: translateX(0);
+  transition-property: transform, opacity;
+  transition-timing-function: linear;
+}
+
+/* When over the canvas, make danmaku lighter (薄く) to avoid distracting drawing */
+.stage__canvas .danmaku-overlay .danmaku-item {
+  color: rgba(255,255,255,0.85);
+  background: rgba(0,0,0,0.12);
+  font-weight: 500;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.45);
 }
 
 #panelMulti .multi-assignment-inputs {
