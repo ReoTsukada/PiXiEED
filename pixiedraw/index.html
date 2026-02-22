@@ -208,6 +208,8 @@
 <canvas aria-hidden="true" height="32" id="overlayCanvas" width="32"></canvas>
 <canvas aria-hidden="true" height="32" id="selectionCanvas" width="32"></canvas>
 </div>
+<!-- Danmaku overlay: floating comments (弾幕) -->
+<div id="danmakuOverlay" class="danmaku-overlay" aria-hidden="true"></div>
 <canvas aria-hidden="true" class="virtual-cursor-canvas" height="0" id="virtualCursorCanvas" width="0"></canvas>
 <div aria-hidden="true" class="mirror-guides" hidden="" id="mirrorGuides">
 <div class="mirror-guide mirror-guide--vertical" data-mirror-axis="vertical"></div>
@@ -643,6 +645,12 @@
 <div aria-live="polite" class="multi-comment-log" id="multiCommentList">
 <p class="help-text">コメントはまだありません。</p>
 </div>
+<div class="multi-danmaku-toggle" style="display:flex;align-items:center;gap:8px;">
+  <label class="toggle-option" for="multiDanmakuToggle">
+    <input id="multiDanmakuToggle" type="checkbox" checked />
+    <span>コメント弾幕</span>
+  </label>
+</div>
 <div class="multi-comment-input-row">
 <input autocomplete="off" id="multiCommentInput" maxlength="140" placeholder="コメントを入力" type="text"/>
 <button class="chip" id="multiCommentSend" type="button">送信</button>
@@ -817,6 +825,12 @@
 <input checked="" id="toggleChecker" type="checkbox"/>
 <span>16px グレーチェック</span>
 </label>
+</li>
+<li>
+  <label class="toggle-option" for="settingDanmakuToggle">
+    <input id="settingDanmakuToggle" type="checkbox" checked />
+    <span>コメント弾幕</span>
+  </label>
 </li>
 <li>
 <label class="toggle-option" for="togglePixelPreview">
