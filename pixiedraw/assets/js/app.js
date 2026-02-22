@@ -15153,6 +15153,16 @@
       button.addEventListener('click', () => {
         const tool = button.dataset.tool;
         if (!tool) return;
+        // Prevent tool changes for spectators: only allow pan-related interactions
+        if (isMultiSpectatorMode()) {
+          // allow switching to pan (so viewers can pan/zoom)
+          if (tool === 'pan') {
+            setActiveTool(tool);
+            return;
+          }
+          setMultiStatus('視聴モードではツールを使用できません', 'warn');
+          return;
+        }
         if (TOOL_ACTIONS.has(tool)) {
           runToolAction(tool, { sourceButton: button });
           return;
@@ -15256,6 +15266,11 @@
   function setActiveTool(tool, buttons = toolButtons, options = {}) {
     const { persist = true, skipGroupUpdate = false } = options;
     if (!tool) return;
+    // Prevent active tool changes for spectators, except allowing 'pan'
+    if (isMultiSpectatorMode() && tool !== 'pan') {
+      setMultiStatus('視聴モードではツールを切替できません', 'warn');
+      return;
+    }
     if (TOOL_ACTIONS.has(tool)) {
       runToolAction(tool);
       if (TOOL_ACTIONS.has(state.tool)) {
@@ -18894,6 +18909,11 @@
     if (state.playback.isPlaying) {
       return;
     }
+    // Spectators cannot draw using the floating draw button
+    if (isMultiSpectatorMode()) {
+      setMultiStatus('視聴モードでは描画できません', 'warn');
+      return;
+    }
     if (event.button !== undefined && event.button !== 0) {
       return;
     }
@@ -19902,16 +19922,23 @@
     event.preventDefault();
     const position = getPointerPosition(event);
     const activeTool = state.tool;
+    // If playback is active, don't allow drawing except pan
     if (state.playback.isPlaying && activeTool !== 'pan') {
       return;
     }
-    if (HISTORY_DRAW_TOOLS.has(activeTool)) {
-      if (isMultiSpectatorMode()) {
-        setMultiStatus('視聴モードでは描画できません', 'warn');
+    // Spectator (viewer) mode: only allow pan interactions
+    if (isMultiSpectatorMode()) {
+      if (activeTool !== 'pan') {
+        setMultiStatus('視聴モードでは描画や選択はできません', 'warn');
         return;
       }
-      if (isMultiGuestMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
-        return;
+      // allow pan as usual
+    } else {
+      // Non-spectator: existing restrictions for drawing guests
+      if (HISTORY_DRAW_TOOLS.has(activeTool)) {
+        if (isMultiGuestMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
+          return;
+        }
       }
     }
     const layer = getActiveLayer();
@@ -27735,6 +27762,32 @@
     updatePixfindModeUI();
     enforceMobileSpectatorTabLock({ forceActivate: true });
     syncMultiAssignmentControls();
+    // If client is a spectator, force pan tool and disable other tools
+    try {
+      if (isMultiSpectatorMode()) {
+        // Ensure pan is active so viewer can pan/zoom
+        setActiveTool('pan');
+        if (Array.isArray(toolButtons)) {
+          toolButtons.forEach(btn => {
+            try { btn.disabled = true; btn.classList.add('is-disabled'); } catch (e) { /* ignore */ }
+          });
+        }
+        if (Array.isArray(dom.toolGroupButtons)) {
+          dom.toolGroupButtons.forEach(btn => { try { btn.disabled = true; } catch (e) { /* ignore */ } });
+        }
+      } else {
+        if (Array.isArray(toolButtons)) {
+          toolButtons.forEach(btn => {
+            try { btn.disabled = false; btn.classList.remove('is-disabled'); } catch (e) { /* ignore */ }
+          });
+        }
+        if (Array.isArray(dom.toolGroupButtons)) {
+          dom.toolGroupButtons.forEach(btn => { try { btn.disabled = false; } catch (e) { /* ignore */ } });
+        }
+      }
+    } catch (e) {
+      /* ignore spectator tool sync errors */
+    }
   }
 
   function applyMultiRoleUiLocks() {
