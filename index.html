@@ -1629,9 +1629,24 @@
             </div>
             <div class="dot-gallery__buttons" id="dotGalleryButtons" aria-label="ドット絵一覧"></div>
           </div>
+          </div>
         </div>
-      </div>
     </section>
+
+    <!-- 公開中の部屋（ドット絵の下へ移動） -->
+    <div class="project-place__group public-rooms-hub" id="publicRoomsHub">
+      <div class="public-rooms-hub__head">
+        <div>
+          <p class="project-place__label">Open Rooms</p>
+          <h3 class="project-place__title">公開中の部屋</h3>
+        </div>
+        <button class="chip public-rooms-hub__refresh" id="refreshPublicRooms" type="button">更新</button>
+      </div>
+      <p class="public-rooms-hub__lead">マスターが公開設定した部屋のみ表示されます。サムネイルを押すと視聴者として入室できます。</p>
+      <div class="public-room-grid" id="publicRoomGrid" aria-live="polite">
+        <p class="public-room-empty">公開中の部屋はありません。</p>
+      </div>
+    </div>
 
     <section class="section section--highlight" id="hub-intro">
       <div class="section-inner">
@@ -1695,19 +1710,7 @@
             <a class="project-place__link" href="tools.html">ツール/ゲーム一覧へ</a>
           </div>
         </div>
-        <div class="project-place__group public-rooms-hub" id="publicRoomsHub">
-          <div class="public-rooms-hub__head">
-            <div>
-              <p class="project-place__label">Open Rooms</p>
-              <h3 class="project-place__title">公開中の部屋</h3>
-            </div>
-            <button class="chip public-rooms-hub__refresh" id="refreshPublicRooms" type="button">更新</button>
-          </div>
-          <p class="public-rooms-hub__lead">マスターが公開設定した部屋のみ表示されます。サムネイルを押すと視聴者として入室できます。</p>
-          <div class="public-room-grid" id="publicRoomGrid" aria-live="polite">
-            <p class="public-room-empty">公開中の部屋はありません。</p>
-          </div>
-        </div>
+        <!-- publicRoomsHub moved to appear under the dot-hero section -->
         <ul class="project-place__source" id="gameGalleryItems" hidden>
           <li data-title="PiXiEED ホーム" data-image="character-dots/mao1.png" data-type="project" data-updated="2026-02-11" data-update="見出しを『描いて!!遊んで!!公開して!!ドット絵専用総合サイト!!』へ更新 / ホーム導線を再設計" data-desc="ホーム導線と見出しを分かりやすく刷新。" data-link="index.html"></li>
           <li data-title="描く / 遊ぶ 導線" data-image="icon/icon-192-4.png" data-type="project" data-updated="2026-02-11" data-update="『描く』で PiXiEEDraw Lite / PiXiEEDraw を選択可能にし、『遊ぶ』へ まおいつ・PiXFiND・PiXiEELENS を追加" data-desc="1タップで目的のツール・ゲームへ遷移できる導線に改善。" data-link="index.html"></li>
