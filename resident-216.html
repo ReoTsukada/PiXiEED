@@ -1,36 +1,20 @@
 <!doctype html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>常駐ルーム 216×216</title>
-  <style>
-    body{ margin:0; background:#111; color:#fff; font-family:sans-serif; display:flex; align-items:center; justify-content:center; height:100vh; }
-    #wrap{ width:920px; display:flex; gap:16px; }
-    #canvasWrap{ background:#222; padding:12px; border-radius:8px; }
-    canvas{ image-rendering:pixelated; border:1px solid #333; display:block; }
-    #info{ width:280px; }
-    button{ padding:8px 10px; border-radius:8px; }
-  </style>
-</head>
-<body>
-  <div id="wrap">
-    <div id="canvasWrap">
-      <canvas id="resident216" width="216" height="216"></canvas>
-      <div style="margin-top:8px; display:flex; gap:8px;">
-        <button id="clearBtn">クリア(送信)</button>
-        <button id="leaveBtn">退出</button>
-      </div>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>常駐ルーム（削除済み）</title>
+    <style>
+      body{ background:#0b1224; color:#fff; font-family:system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; display:grid; place-items:center; min-height:100vh; margin:0 }
+      .card{ background:rgba(255,255,255,0.04); padding:20px; border-radius:12px; max-width:520px; text-align:center }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>常駐ルーム機能は一時的に無効化されています</h1>
+      <p>このルームページは削除され、常駐ルーム用のスクリプトも無効化されています。ホームページの部屋一覧には反映されません。</p>
+      <p>元に戻す場合はバージョン管理から復元するか、再実装を依頼してください。</p>
+      <p><a href="/">ホームへ戻る</a></p>
     </div>
-    <div id="info">
-      <h3>常駐ルーム 216×216</h3>
-      <p>最大10人。誰でも自由に描けます。既存の描画セルは他人によって上書きされません（タイル保護）。</p>
-      <p id="status">接続中…</p>
-      <div id="participants"></div>
-      <p>ブラシ: <input id="brushSize" type="range" min="1" max="8" value="2"></p>
-      <div id="palette"></div>
-    </div>
-  </div>
-  <script type="module" src="/resident-216.js"></script>
-</body>
+  </body>
 </html>
