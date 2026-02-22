@@ -278,6 +278,7 @@
 <p class="help-text mirror-tool-popover__help" id="mirrorToolPopoverHelp">挙動は既存ミラーモードと同じです。軸位置はキャンバス外のつまみで移動できます。</p>
 </div>
 </div>
+<!-- 立体ツール（solidShape）を一時的に削除しました -->
 <div class="mobile-drawer" hidden="" id="mobileDrawer">
 <button aria-label="モバイルパネルの高さを調整" aria-controls="mobilePanels" class="mobile-drawer__handle" id="mobileDrawerHandle" type="button">
 <span aria-hidden="true" class="mobile-drawer__grip"></span>
@@ -364,6 +365,7 @@
 <img alt="塗り丸" height="32" src="assets/icons/tool-ellipse-fill.svg" width="32"/>
 <span>塗り丸</span>
 </button>
+<!-- 立体ツールボタンを削除しました -->
 <button aria-pressed="false" class="tool-button" data-tool="fill" data-tool-group="fill" type="button">
 <img alt="塗りつぶし" height="32" src="assets/icons/tool-fill.png" width="32"/>
 <span>塗りつぶし</span>
@@ -396,8 +398,20 @@
 <div class="tool-quick-color" id="toolQuickColor">
 <div aria-label="クイックカラー" class="tool-quick-color__palette" id="toolQuickPalette" role="listbox"></div>
 </div>
-<div class="field-group">
-<label class="field" id="brushSizeField">
+<div class="field-group field-group--tools">
+<label class="field" id="selectionOutlineField">
+<span>選択編集</span>
+<div aria-label="選択範囲アウトライン方向" class="selection-outline-buttons" role="group">
+<button aria-label="選択範囲の外周へ4方向アウトラインを描画" class="chip selection-action-button" disabled="" id="selectionOutline4Action" type="button">4方向</button>
+<button aria-label="選択範囲の外周へ8方向アウトラインを描画" class="chip selection-action-button" disabled="" id="selectionOutline8Action" type="button">8方向</button>
+</div>
+</label>
+<label class="field field--slider-row" id="outlineSizeField" for="outlineSize">
+<span>アウトライン幅</span>
+<input id="outlineSize" max="8" min="1" type="range" value="1"/>
+<output for="outlineSize" id="outlineSizeValue">1マス</output>
+</label>
+<label class="field field--slider-row" id="brushSizeField">
 <span>ブラシサイズ</span>
 <input id="brushSize" max="12" min="1" type="range" value="1"/>
 <output for="brushSize" id="brushSizeValue">1px</output>
@@ -424,13 +438,6 @@
 <div aria-label="同色選択モード" class="select-same-mode-buttons" role="group">
 <button aria-pressed="true" class="chip select-same-mode-button is-active" data-select-same-mode="connected" type="button">連結のみ</button>
 <button aria-pressed="false" class="chip select-same-mode-button" data-select-same-mode="global" type="button">全体</button>
-</div>
-</label>
-<label class="field" id="selectionOutlineField">
-<span>選択編集</span>
-<div aria-label="選択範囲アウトライン方向" class="selection-outline-buttons" role="group">
-<button aria-label="選択範囲の外周へ4方向アウトラインを描画" class="chip selection-action-button" disabled="" id="selectionOutline4Action" type="button">4方向</button>
-<button aria-label="選択範囲の外周へ8方向アウトラインを描画" class="chip selection-action-button" disabled="" id="selectionOutline8Action" type="button">8方向</button>
 </div>
 </label>
 <output class="brush-custom-info" id="customBrushInfo">カスタム: 未作成</output>
