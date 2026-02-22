@@ -1863,7 +1863,9 @@ input[type='range']::-moz-focus-outer {
 }
 
 #brushSize::-webkit-slider-runnable-track,
-#brushSize::-moz-range-track {
+#brushSize::-moz-range-track,
+#outlineSize::-webkit-slider-runnable-track,
+#outlineSize::-moz-range-track {
   background: linear-gradient(90deg, #252d3c 0%, #58c4ff 100%);
 }
 
@@ -1940,17 +1942,62 @@ input[type='range']::-moz-focus-outer {
 }
 
 #selectSameModeField {
-  order: -2;
+  order: -4;
 }
 
 #selectionOutlineField {
+  order: -3;
+}
+
+#outlineSizeField {
+  order: -2;
+}
+
+#brushSizeField {
   order: -1;
 }
 
-.selection-outline-buttons {
+.field-group--tools {
+  gap: 8px;
+}
+
+.field-group--tools .field {
+  margin-bottom: 0;
+  gap: 4px;
+}
+
+.field-group--tools .field--slider-row {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.field-group--tools .field--slider-row > span:first-child {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.field-group--tools .field--slider-row input[type='range'] {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin: 0;
+}
+
+.field-group--tools .field--slider-row output {
+  grid-column: 3;
+  grid-row: 1;
+  font-size: 0.78rem;
+  color: var(--fg-muted);
+  text-align: right;
+}
+
+.field-group--tools .selection-outline-buttons {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .selection-action-button {
@@ -4409,10 +4456,82 @@ body.is-startup-active {
   padding-top: 0;
 }
 
+.modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .modal__title {
   margin: 0;
   font-size: 1.1rem;
   letter-spacing: 0.04em;
+}
+
+.modal__close {
+  flex-shrink: 0;
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+}
+
+.solid-shape-modal .modal__body {
+  gap: 12px;
+}
+
+.solid-shape-modal__help {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+}
+
+.solid-shape-views {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.solid-shape-view {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.solid-shape-view__label {
+  font-size: 0.78rem;
+  color: var(--fg-muted);
+  letter-spacing: 0.04em;
+}
+
+.solid-shape-canvas-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 160px;
+  aspect-ratio: 1;
+  margin: 0 auto;
+  border: 2px solid var(--border);
+  background: rgba(0, 0, 0, 0.5);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.solid-shape-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+.solid-shape-size-field {
+  max-width: 120px;
+}
+
+.solid-shape-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }
 
 .modal__form .field {
