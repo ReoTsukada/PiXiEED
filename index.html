@@ -2211,5 +2211,86 @@
   <script src="character-dots/manifest.js"></script>
   <script src="scripts/character-gallery.js"></script>
   <script src="scripts/game-gallery.js"></script>
+  <script type="module">
+    // Homepage: probe pre-defined rooms and show those that are currently active
+    const MULTI_SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
+    const MULTI_SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
+    const MULTI_SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
+
+    async function probeAndRenderRooms(){
+      const grid = document.getElementById('publicRoomGrid');
+      if (!grid) return;
+      grid.innerHTML = '<p class="public-room-empty">公開中の部屋を読み込み中…</p>';
+      try{
+        const res = await fetch('rooms.json');
+        const rooms = await res.json();
+        const mod = await import(MULTI_SUPABASE_MODULE_URL);
+        const supabase = mod.createClient(MULTI_SUPABASE_URL, MULTI_SUPABASE_ANON_KEY, { realtime: { params: { eventsPerSecond: 48 } } });
+
+        const active = [];
+        // probe each room by temporarily subscribing to its channel and sending status-request
+        await Promise.all(rooms.map(async (r) => {
+          const ch = supabase.channel(r.channel);
+          let saw = false;
+          let thumb = null;
+          ch.on('broadcast', { event: 'status-response' }, ({payload})=>{
+            try{ if (!payload) return; if (payload.room === r.channel){ saw = true; if (payload.data) thumb = payload.data; } }catch(e){}
+          });
+          try{ await ch.subscribe(); }catch(e){}
+          try{ await ch.send({ type:'broadcast', event:'status-request', payload:{ room: r.channel, ts: Date.now() } }); }catch(e){}
+          await new Promise(res=>setTimeout(res, 700));
+          try{ await ch.unsubscribe(); }catch(e){}
+          if (saw) active.push(Object.assign({}, r, { thumbnail: thumb }));
+          else if (r.type === 'resident'){
+            // resident rooms should be listed even when empty
+            active.push(Object.assign({}, r, { thumbnail: null }));
+          }
+        }));
+
+        grid.innerHTML = '';
+        if (!active.length){ grid.innerHTML = '<p class="public-room-empty">公開中の部屋はありません。</p>'; return; }
+        for (const r of active){
+          const card = document.createElement('div');
+          card.className = 'public-room-card';
+          // determine thumbnail/placeholder
+          const thumbHtml = r.thumbnail
+            ? `<div class="public-room-thumb"><img src="${r.thumbnail}" alt="${r.name} thumbnail" loading="lazy" /></div>`
+            : `<div class="public-room-thumb"><span>ROOM</span></div>`;
+
+          // action area: public rooms link to public-room, resident rooms either show 入室 if active or 建てる if empty
+          let actionHtml = '';
+          if (r.type === 'public'){
+            const href = `/public-room.html?room=${encodeURIComponent(r.channel)}`;
+            actionHtml = `<a class="public-room-action button" href="${href}">入室</a>`;
+          } else if (r.type === 'resident'){
+            const page = r.page || '/resident-216.html';
+            const roomQuery = `?room=${encodeURIComponent(r.channel)}`;
+            if (r.thumbnail){
+              // active: let user enter
+              actionHtml = `<a class="public-room-action button" href="${page}${roomQuery}">入室</a>`;
+            } else {
+              // not active: show 建てる button which opens the room page (first entrant will start it)
+              actionHtml = `<a class="public-room-action button button--ghost" href="${page}${roomQuery}">建てる</a>`;
+            }
+          }
+
+          const metaInfo = `
+            <div class="public-room-meta">
+              <div class="public-room-title">${r.name}</div>
+              <div class="public-room-info">${r.description || ''}</div>
+              <div class="public-room-meta-extra">${r.size ? r.size + ' · ' : ''}${r.maxUsers ? '最大 ' + r.maxUsers + ' 人' : ''}</div>
+              <div class="public-room-time">${new Date().toLocaleString()}</div>
+              <div style="margin-top:8px;">${actionHtml}</div>
+            </div>`;
+
+          card.innerHTML = `${thumbHtml}${metaInfo}`;
+          grid.appendChild(card);
+        }
+      }catch(e){ console.error('probe rooms failed', e); grid.innerHTML = '<p class="public-room-empty is-error">公開中の部屋の読み込みに失敗しました</p>'; }
+    }
+
+    document.getElementById('refreshPublicRooms').addEventListener('click', ()=>{ probeAndRenderRooms(); });
+    probeAndRenderRooms();
+  </script>
 </body>
 </html>
