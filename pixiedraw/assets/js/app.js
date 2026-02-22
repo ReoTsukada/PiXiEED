@@ -215,6 +215,9 @@
       multiMaxGuests: document.getElementById('multiMaxGuests'),
       multiRoomVisibility: document.getElementById('multiRoomVisibility'),
       multiRoomVisibilityHint: document.getElementById('multiRoomVisibilityHint'),
+  multiDanmakuToggle: document.getElementById('multiDanmakuToggle'),
+  settingDanmakuToggle: document.getElementById('settingDanmakuToggle'),
+  danmakuOverlay: document.getElementById('danmakuOverlay'),
       multiExportPermission: document.getElementById('multiExportPermission'),
       multiGuestCapacityHint: document.getElementById('multiGuestCapacityHint'),
       multiInviteCopy: document.getElementById('multiInviteCopy'),
@@ -919,6 +922,7 @@
     publicLobbyChannel: null,
     publicLobbySyncTimer: null,
     publicLobbySyncInFlight: false,
+  // masterForcedDanmakuOff removed: clients control danmaku locally
   };
   let multiSupabaseClientPromise = null;
 
@@ -1246,6 +1250,9 @@
   let lastSelectionDashTime = 0;
   const DEFAULT_HISTORY_LIMIT = 80;
   const history = { past: [], future: [], pending: null, limit: DEFAULT_HISTORY_LIMIT };
+  // Per-client history for multi-session participants. Keyed by clientId.
+  // Each entry: { past: [compressedSnapshots], future: [compressedSnapshots], limit }
+  const multiHistory = new Map();
   let historyTrimmedRecently = false;
   let historyTrimmedAt = 0;
   const EMPTY_FILL_PREVIEW_PIXELS = Object.freeze([]);
@@ -1673,6 +1680,7 @@
       showPixelGuides: true,
       mirror: createInitialMirrorState(initialWidth, initialHeight),
       showVirtualCursor: false,
+  danmakuEnabled: true,
       virtualCursorButtonScale: DEFAULT_FLOATING_DRAW_BUTTON_SCALE,
       showMajorGrid: true,
       gridScreenStep: 8,
@@ -3160,7 +3168,29 @@
     const pendingLabel = history.pending.label;
     if (history.pending.dirty) {
       const beforeSnapshot = history.pending.before;
-      history.past.push(beforeSnapshot);
+      // In multi-session, separate histories: master uses global history, guests use per-client history
+      if (multiState.connected && !isMultiMasterMode()) {
+        // guests/spectators: record drawing actions to their own history when applicable
+        if (HISTORY_DRAW_TOOLS.has(pendingLabel)) {
+          try {
+            const clientId = multiState.clientId || '';
+            const compressed = beforeSnapshot;
+            let ch = multiHistory.get(clientId);
+            if (!ch) {
+              ch = { past: [], future: [], limit: history.limit };
+              multiHistory.set(clientId, ch);
+            }
+            ch.past.push(compressed);
+            if (ch.past.length > ch.limit) ch.past.shift();
+            ch.future.length = 0;
+          } catch (e) {
+            // ignore per-client history errors
+          }
+        }
+      } else {
+        // master or not in multi-session: use global history
+        history.past.push(beforeSnapshot);
+      }
       if (timelapseState.enabled && timelapseState.snapshots.length === 0) {
         const startEntry = createTimelapseFrameEntryFromSnapshot(beforeSnapshot);
         if (startEntry) {
@@ -3183,49 +3213,99 @@
   }
 
   function undo() {
-    if (isMultiReadOnlyMode()) {
-      setMultiStatus('参加/視聴モードではUndo/Redoはマスター管理です', 'warn');
-      return;
-    }
+    // In multi-session, guests/spectators should be able to undo/redo their own drawing actions only.
+    // Masters keep the global undo/redo behavior and cannot undo guests.
     if (cancelPendingCurveInteraction()) {
       return;
     }
     commitHistory();
-    if (!history.past.length) return;
-    const snapshot = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
-    history.future.push(snapshot);
-    if (history.future.length > history.limit) {
-      history.future.shift();
+    // Master or not connected: behave as before (global history)
+    if (!multiState.connected || isMultiMasterMode()) {
+      if (!history.past.length) return;
+      const snapshot = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
+      history.future.push(snapshot);
+      if (history.future.length > history.limit) {
+        history.future.shift();
+      }
+      const previous = history.past.pop();
+      applyHistorySnapshot(decompressHistorySnapshot(previous), { preserveView: true });
+      updateHistoryButtons();
+      autosaveDirty = true;
+      markDocumentUnsavedChange();
+      scheduleAutosaveSnapshot();
+      return;
     }
-    const previous = history.past.pop();
-    applyHistorySnapshot(decompressHistorySnapshot(previous), { preserveView: true });
-    updateHistoryButtons();
-    autosaveDirty = true;
-    markDocumentUnsavedChange();
-    scheduleAutosaveSnapshot();
+
+    // Replica role (guest/spectator): operate on per-client history and only restore assigned cell
+    const clientId = multiState.clientId || '';
+    const ch = multiHistory.get(clientId) || { past: [], future: [], limit: history.limit };
+    if (!ch.past.length) return;
+    try {
+      const currentCompressed = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
+      ch.future.push(currentCompressed);
+      if (ch.future.length > ch.limit) ch.future.shift();
+      const prevCompressed = ch.past.pop();
+      const prev = decompressHistorySnapshot(prevCompressed);
+      const applied = applyHistorySnapshotForClient(prev, clientId, { preserveView: true });
+      // save updated ch back
+      multiHistory.set(clientId, ch);
+      if (applied) {
+        updateHistoryButtons();
+        autosaveDirty = true;
+        markDocumentUnsavedChange();
+        scheduleAutosaveSnapshot();
+        // broadcast guest layer patch so master/others receive the change
+        try { sendGuestLayerPatch(); } catch (e) { /* ignore */ }
+      }
+    } catch (e) {
+      // ignore
+    }
   }
 
   function redo() {
-    if (isMultiReadOnlyMode()) {
-      setMultiStatus('参加/視聴モードではUndo/Redoはマスター管理です', 'warn');
-      return;
-    }
     if (cancelPendingCurveInteraction()) {
       return;
     }
     commitHistory();
-    if (!history.future.length) return;
-    const snapshot = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
-    history.past.push(snapshot);
-    if (history.past.length > history.limit) {
-      history.past.shift();
+    // Master or not connected: behave as before (global history)
+    if (!multiState.connected || isMultiMasterMode()) {
+      if (!history.future.length) return;
+      const snapshot = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
+      history.past.push(snapshot);
+      if (history.past.length > history.limit) {
+        history.past.shift();
+      }
+      const next = history.future.pop();
+      applyHistorySnapshot(decompressHistorySnapshot(next), { preserveView: true });
+      updateHistoryButtons();
+      autosaveDirty = true;
+      markDocumentUnsavedChange();
+      scheduleAutosaveSnapshot();
+      return;
     }
-    const next = history.future.pop();
-    applyHistorySnapshot(decompressHistorySnapshot(next), { preserveView: true });
-    updateHistoryButtons();
-    autosaveDirty = true;
-    markDocumentUnsavedChange();
-    scheduleAutosaveSnapshot();
+
+    // Replica role (guest/spectator): operate on per-client history only
+    const clientId = multiState.clientId || '';
+    const ch = multiHistory.get(clientId) || { past: [], future: [], limit: history.limit };
+    if (!ch.future.length) return;
+    try {
+      const currentCompressed = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
+      ch.past.push(currentCompressed);
+      if (ch.past.length > ch.limit) ch.past.shift();
+      const nextCompressed = ch.future.pop();
+      const next = decompressHistorySnapshot(nextCompressed);
+      const applied = applyHistorySnapshotForClient(next, clientId, { preserveView: true });
+      multiHistory.set(clientId, ch);
+      if (applied) {
+        updateHistoryButtons();
+        autosaveDirty = true;
+        markDocumentUnsavedChange();
+        scheduleAutosaveSnapshot();
+        try { sendGuestLayerPatch(); } catch (e) { /* ignore */ }
+      }
+    } catch (e) {
+      // ignore
+    }
   }
 
   function rollbackPendingHistory({ reRender = true } = {}) {
@@ -3251,11 +3331,20 @@
   }
 
   function updateHistoryButtons() {
-    if (dom.controls.undoAction) {
-      dom.controls.undoAction.disabled = history.past.length === 0;
-    }
-    if (dom.controls.redoAction) {
-      dom.controls.redoAction.disabled = history.future.length === 0;
+    try {
+      if (!multiState.connected || isMultiMasterMode()) {
+        if (dom.controls.undoAction) dom.controls.undoAction.disabled = history.past.length === 0;
+        if (dom.controls.redoAction) dom.controls.redoAction.disabled = history.future.length === 0;
+        return;
+      }
+      // For guests/spectators, show per-client undo/redo availability
+      const clientId = multiState.clientId || '';
+      const ch = multiHistory.get(clientId) || { past: [], future: [] };
+      if (dom.controls.undoAction) dom.controls.undoAction.disabled = ch.past.length === 0;
+      if (dom.controls.redoAction) dom.controls.redoAction.disabled = ch.future.length === 0;
+    } catch (e) {
+      if (dom.controls.undoAction) dom.controls.undoAction.disabled = history.past.length === 0;
+      if (dom.controls.redoAction) dom.controls.redoAction.disabled = history.future.length === 0;
     }
   }
 
@@ -3778,6 +3867,10 @@
     state.activeRightTab = tab;
     updateRightTabUI();
     updateRightTabVisibility();
+    // Clear multi tab notification when user opens the multi tab
+    if (tab === 'multi') {
+      setMultiTabNotification(false);
+    }
     scheduleSessionPersist();
   }
 
@@ -3790,6 +3883,27 @@
       button.setAttribute('aria-selected', String(isActive));
       button.setAttribute('tabindex', isActive ? '0' : '-1');
     });
+  }
+
+  // Notification helpers for the multi tab (red dot when comments arrive and danmaku is off)
+  function setMultiTabNotification(enabled) {
+    try {
+      if (!dom.rightTabButtons || !dom.rightTabButtons.length) return;
+      const btn = dom.rightTabButtons.find(b => (b && b.dataset && b.dataset.rightTab) === 'multi');
+      if (!btn) return;
+      btn.classList.toggle('has-notification', Boolean(enabled));
+      // also toggle mobile tab indicator if present
+      try {
+        const mobileBtn = document.getElementById('mobileTabMulti');
+        if (mobileBtn instanceof HTMLElement) {
+          mobileBtn.classList.toggle('has-notification', Boolean(enabled));
+        }
+      } catch (e) {
+        /* ignore */
+      }
+    } catch (e) {
+      /* ignore */
+    }
   }
 
   function updateRightTabVisibility() {
@@ -5937,6 +6051,7 @@
     }
     iosSnapshotRestoring = true;
     try {
+      const prevFrameCount = Array.isArray(state.frames) ? state.frames.length : 0;
       applyHistorySnapshot(snapshot);
       history.past = [];
       history.future = [];
@@ -17034,10 +17149,7 @@
   }
 
   function setLayerVisibilityForRow(rowIndex, visible) {
-    if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus('参加/視聴モードではレイヤー表示切替はマスターのみ操作できます', 'warn');
-      return;
-    }
+    // If the client cannot edit project structure (guest/spectator), allow local-only visibility toggles
     let needsChange = false;
     state.frames.forEach(frame => {
       const layerIndex = frame.layers.length - 1 - rowIndex;
@@ -17048,9 +17160,27 @@
         }
       }
     });
-    if (!needsChange) {
+    if (!needsChange) return;
+
+    if (!canCurrentClientEditProjectStructure()) {
+      // Local-only toggle: do not alter shared document or broadcast; preserve local UX
+      state.frames.forEach(frame => {
+        const layerIndex = frame.layers.length - 1 - rowIndex;
+        if (layerIndex >= 0 && layerIndex < frame.layers.length) {
+          const targetLayer = frame.layers[layerIndex];
+          if (targetLayer && targetLayer.visible !== visible) {
+            targetLayer.visible = visible;
+          }
+        }
+      });
+      renderTimelineMatrix();
+      requestRender();
+      requestOverlayRender();
+      setMultiStatus('表示状態をローカルで変更しました', 'info');
       return;
     }
+
+    // Master / local edit: authoritative change (history + broadcast)
     beginHistory('layerVisibilityRow');
     state.frames.forEach(frame => {
       const layerIndex = frame.layers.length - 1 - rowIndex;
@@ -26435,7 +26565,7 @@
     return true;
   }
 
-  function enforceGuestAssignedLayerSelection({ announce = false } = {}) {
+  function enforceGuestAssignedLayerSelection({ announce = false, enforceFrame = true, enforceLayer = true } = {}) {
     if (!isMultiGuestMode()) {
       return true;
     }
@@ -26464,11 +26594,11 @@
       return false;
     }
     let changed = false;
-    if (state.activeFrame !== assignedCell.frameIndex) {
+    if (enforceFrame && state.activeFrame !== assignedCell.frameIndex) {
       state.activeFrame = assignedCell.frameIndex;
       changed = true;
     }
-    if (state.activeLayer !== assignedCell.layer.id) {
+    if (enforceLayer && state.activeLayer !== assignedCell.layer.id) {
       state.activeLayer = assignedCell.layer.id;
       changed = true;
     }
@@ -27236,6 +27366,25 @@
     }
     multiState.comments.push(next);
     multiState.commentIds.add(id);
+    // show as danmaku (floating comment) when enabled
+    try {
+      if (state.danmakuEnabled && typeof spawnDanmaku === 'function') {
+        spawnDanmaku(next);
+      }
+    } catch (e) {
+      /* ignore danmaku errors */
+    }
+    // If the client has danmaku disabled, surface a red-dot notification on the multi tab
+    try {
+      const hasDanmaku = Boolean(state.danmakuEnabled);
+      const multiPanelVisible = dom.controls.multiFlowPanel instanceof HTMLElement ? !dom.controls.multiFlowPanel.hidden : false;
+      const multiTabActive = state.activeRightTab === 'multi';
+      if (!hasDanmaku && !multiPanelVisible && !multiTabActive) {
+        setMultiTabNotification(true);
+      }
+    } catch (e) {
+      /* ignore notification errors */
+    }
     if (multiState.comments.length > MULTI_COMMENT_MAX_ITEMS) {
       const overflow = multiState.comments.length - MULTI_COMMENT_MAX_ITEMS;
       const removed = multiState.comments.splice(0, overflow);
@@ -27267,6 +27416,8 @@
       empty.className = 'help-text';
       empty.textContent = 'コメントはまだありません。';
       root.appendChild(empty);
+      // no comments to show — clear notification (user has seen there are none)
+      try { setMultiTabNotification(false); } catch (e) { /* ignore */ }
       return;
     }
     const list = document.createElement('ul');
@@ -27332,6 +27483,92 @@
     });
     root.appendChild(list);
     root.scrollTop = root.scrollHeight;
+    // comments are now visible — clear notification
+    try { setMultiTabNotification(false); } catch (e) { /* ignore */ }
+  }
+
+  // --- Danmaku (コメント弾幕) support ---
+  function syncDanmakuControls() {
+    const enabled = Boolean(state.danmakuEnabled);
+    if (dom.controls.multiDanmakuToggle instanceof HTMLInputElement) {
+      dom.controls.multiDanmakuToggle.checked = enabled;
+    }
+    if (dom.controls.settingDanmakuToggle instanceof HTMLInputElement) {
+      dom.controls.settingDanmakuToggle.checked = enabled;
+    }
+    // Danmaku toggles are client-controlled; ensure inputs are enabled for users
+    if (dom.controls.multiDanmakuToggle instanceof HTMLInputElement) {
+      dom.controls.multiDanmakuToggle.disabled = false;
+    }
+    if (dom.controls.settingDanmakuToggle instanceof HTMLInputElement) {
+      dom.controls.settingDanmakuToggle.disabled = false;
+    }
+  }
+
+  function setDanmakuEnabled(enabled, { persist = true } = {}) {
+    const next = Boolean(enabled);
+    if (state.danmakuEnabled === next) {
+      syncDanmakuControls();
+      return;
+    }
+    state.danmakuEnabled = next;
+    syncDanmakuControls();
+    if (persist) scheduleSessionPersist({ includeSnapshots: false });
+  }
+
+  const DANMAKU_MAX_ITEMS = 36; // soft cap to avoid overload
+  const DANMAKU_MIN_SIZE = 12; // px
+  const DANMAKU_MAX_SIZE = 34; // px
+  const DANMAKU_MIN_SPEED = 20; // px/s (smallest)
+  const DANMAKU_MAX_SPEED = 280; // px/s (largest)
+
+  function spawnDanmaku(entry) {
+    try {
+      if (!state.danmakuEnabled) return;
+      const overlay = dom.controls.danmakuOverlay;
+      if (!(overlay instanceof HTMLElement)) return;
+      // limit items
+      if (overlay.children.length >= DANMAKU_MAX_ITEMS) return;
+      const text = String(entry && entry.text ? entry.text : '').trim();
+      if (!text) return;
+      const item = document.createElement('span');
+      item.className = 'danmaku-item';
+      // size randomness for depth illusion
+      const size = Math.round(DANMAKU_MIN_SIZE + Math.random() * (DANMAKU_MAX_SIZE - DANMAKU_MIN_SIZE));
+      item.style.fontSize = `${size}px`;
+      // vertical position: avoid overlapping edges
+      const overlayHeight = Math.max(32, overlay.clientHeight || 200);
+      const top = Math.floor(Math.random() * Math.max(1, overlayHeight - size - 8));
+      item.style.top = `${top}px`;
+      item.textContent = text;
+      // initial transform at right outside
+      item.style.transform = `translateX(${overlay.clientWidth}px)`;
+      overlay.appendChild(item);
+      // force layout
+      // eslint-disable-next-line no-unused-expressions
+      item.offsetWidth;
+      // compute travel distance and duration: larger text -> faster (depth effect)
+      const elWidth = item.offsetWidth || 100;
+      const distance = (overlay.clientWidth || 800) + elWidth + 40;
+      const sizeNorm = (size - DANMAKU_MIN_SIZE) / (DANMAKU_MAX_SIZE - DANMAKU_MIN_SIZE);
+      const speed = DANMAKU_MIN_SPEED + sizeNorm * (DANMAKU_MAX_SPEED - DANMAKU_MIN_SPEED);
+      const duration = Math.max(0.5, distance / Math.max(1, speed));
+      item.style.transitionDuration = `${duration}s`;
+      // start animation: translate left by distance
+      requestAnimationFrame(() => {
+        item.style.transform = `translateX(-${distance}px)`;
+        item.style.opacity = '1';
+      });
+      // cleanup after animation
+      const cleanup = () => {
+        if (item && item.parentNode === overlay) overlay.removeChild(item);
+      };
+      // remove after duration + small buffer
+      window.setTimeout(cleanup, Math.ceil(duration * 1000) + 300);
+    } catch (err) {
+      // don't let danmaku errors break app
+      console.warn('danmaku spawn failed', err);
+    }
   }
 
   async function sendMultiComment(text) {
@@ -27438,6 +27675,7 @@
     if (dom.controls.multiBroadcastState instanceof HTMLButtonElement) {
       dom.controls.multiBroadcastState.disabled = !(multiState.connected && multiState.role === 'master');
     }
+    /* multiForceDanmakuToggle removed: danmaku is client-local and not master-forced */
     if (dom.controls.multiMaxGuests instanceof HTMLInputElement) {
       dom.controls.multiMaxGuests.value = String(multiState.maxGuests);
       dom.controls.multiMaxGuests.min = String(MULTI_GUEST_LIMIT_MIN);
@@ -27918,7 +28156,7 @@
       revision: (multiState.revision += 1),
       targetClientId: targetClientId || '',
       sentAt: Date.now(),
-      document: serializeDocumentSnapshot(snapshot),
+  document: serializeDocumentSnapshot(snapshot),
     };
   }
 
@@ -28356,9 +28594,41 @@
     // Keep viewport local in multi mode. Zoom/pan should never be synced from remote payload.
     snapshot.scale = normalizeZoomScale(preserved.scale, snapshot.scale);
     snapshot.pan = { x: preserved.pan.x, y: preserved.pan.y };
+    // Capture local layer visibility for guests/spectators so visibility toggles are per-client
+    let localVisibilityMap = null;
+    try {
+      if (isMultiGuestMode() || isMultiSpectatorMode()) {
+        localVisibilityMap = new Map();
+        (state.frames || []).forEach(frame => {
+          if (!frame || !Array.isArray(frame.layers)) return;
+          frame.layers.forEach(layer => {
+            if (layer && layer.id) localVisibilityMap.set(layer.id, Boolean(layer.visible));
+          });
+        });
+      }
+    } catch (e) {
+      localVisibilityMap = null;
+    }
+    const prevFrameCount = Array.isArray(state.frames) ? state.frames.length : 0;
     multiState.applyRemoteInProgress = true;
     try {
       applyHistorySnapshot(snapshot);
+      // Restore local visibility preferences for guests/spectators so master's visibility doesn't override
+      if (localVisibilityMap && localVisibilityMap instanceof Map) {
+        try {
+          (state.frames || []).forEach(frame => {
+            if (!frame || !Array.isArray(frame.layers)) return;
+            frame.layers.forEach(layer => {
+              if (!layer || !layer.id) return;
+              if (localVisibilityMap.has(layer.id)) {
+                layer.visible = Boolean(localVisibilityMap.get(layer.id));
+              }
+            });
+          });
+        } catch (e) {
+          /* ignore */
+        }
+      }
       history.past = [];
       history.future = [];
       history.pending = null;
@@ -28372,8 +28642,10 @@
         state.activeLeftTab = LEFT_TAB_KEYS.includes(preserved.activeLeftTab) ? preserved.activeLeftTab : state.activeLeftTab;
         state.activeRightTab = RIGHT_TAB_KEYS.includes(preserved.activeRightTab) ? preserved.activeRightTab : state.activeRightTab;
         state.activeFrame = clamp(Math.round(Number(preserved.activeFrame) || 0), 0, Math.max(0, state.frames.length - 1));
+        // If master added frames, allow guests to freely navigate frames for their assigned layer.
         if (isMultiGuestMode()) {
-          enforceGuestAssignedLayerSelection({ announce: false });
+          const hadFramesAdded = Array.isArray(state.frames) && state.frames.length > prevFrameCount;
+          enforceGuestAssignedLayerSelection({ announce: false, enforceFrame: !hadFramesAdded, enforceLayer: true });
         }
         syncControlsWithState();
         renderFrameList();
@@ -28387,6 +28659,48 @@
       multiState.applyRemoteInProgress = false;
     }
     return true;
+  }
+
+  // Apply a history snapshot only for the assigned cell of a given clientId.
+  // This avoids overwriting other participants' cells when guests undo/redo.
+  function applyHistorySnapshotForClient(snapshot, clientId, { preserveView = false } = {}) {
+    if (!snapshot || typeof snapshot !== 'object') return false;
+    if (!clientId) return false;
+    const assigned = getAssignedCellForClient(clientId);
+    if (!assigned) return false;
+    const frameIndex = clamp(Math.round(Number(assigned.frameIndex) || 0), 0, Math.max(0, state.frames.length - 1));
+    const trackIndex = clamp(Math.round(Number(assigned.trackIndex) || 0), 0, Math.max(0, (state.frames[frameIndex]?.layers?.length || 0) - 1));
+    const srcFrame = Array.isArray(snapshot.frames) ? snapshot.frames[frameIndex] : null;
+    if (!srcFrame || !Array.isArray(srcFrame.layers)) return false;
+    const srcLayer = srcFrame.layers[trackIndex];
+    if (!srcLayer) return false;
+    // Apply pixel data (indices/direct) to current document's corresponding layer
+    const targetFrame = state.frames[frameIndex];
+    if (!targetFrame || !Array.isArray(targetFrame.layers)) return false;
+    const targetLayer = targetFrame.layers[trackIndex];
+    if (!targetLayer) return false;
+    try {
+      if (srcLayer.indices instanceof Int16Array || Array.isArray(srcLayer.indices)) {
+        // clone to avoid shared references
+        targetLayer.indices = new Int16Array(srcLayer.indices);
+      }
+      if (srcLayer.direct instanceof Uint8ClampedArray || Array.isArray(srcLayer.direct)) {
+        targetLayer.direct = new Uint8ClampedArray(srcLayer.direct);
+      }
+      // keep other layer metadata (name/visible/opacity) as-is to avoid surprising changes
+      markRemoteMultiStateDirty();
+      requestRender();
+      requestOverlayRender();
+      if (!preserveView) {
+        // if snapshot contained UI-selected frame/layer and we are allowed to, apply them
+        if (typeof snapshot.activeFrame === 'number') state.activeFrame = clamp(Number(snapshot.activeFrame) || 0, 0, Math.max(0, state.frames.length - 1));
+        if (typeof snapshot.activeLayer === 'string') state.activeLayer = snapshot.activeLayer;
+        syncControlsWithState();
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   function applyMultiSessionStatePayload(payload) {
@@ -28425,6 +28739,12 @@
       setMultiStatus(`共有モード: 参加中${keyText}`, 'success');
     }
     syncMultiControls();
+    // Danmaku is client-local. Sync local controls to current local state.
+    try {
+      syncDanmakuControls();
+    } catch (e) {
+      /* ignore */
+    }
   }
 
   function buildGuestLayerPatchPayload() {
@@ -28576,6 +28896,34 @@
     } else {
       multiState.masterClientId = onlineMaster ? onlineMaster.clientId : null;
     }
+    // detect newly joined participants (present in nextParticipants but not in previous)
+    const prevIds = multiState.participants instanceof Map ? new Set(Array.from(multiState.participants.keys())) : new Set();
+    const addedIds = Array.from(nextParticipants.keys()).filter(id => !prevIds.has(id));
+    // post a comment for each newly joined participant (except self)
+    try {
+      addedIds.forEach(id => {
+        if (!id || id === multiState.clientId) return;
+        const p = nextParticipants.get(id);
+        if (!p) return;
+        const displayName = normalizeMultiParticipantName(p.name, DEFAULT_MULTI_PARTICIPANT_NAME);
+        const joinText = `${displayName} が入室しました`;
+        const commentPayload = {
+          projectKey: multiState.projectKey,
+          clientId: id,
+          role: p.role,
+          name: p.name,
+          avatarId: p.avatarId || '',
+          text: joinText,
+          sentAt: Date.now(),
+        };
+        appendMultiCommentEntry(commentPayload);
+      });
+      // render comments if any were added
+      if (addedIds.length) renderMultiComments();
+    } catch (e) {
+      // ignore comment posting errors
+    }
+
     multiState.participants = nextParticipants;
     if (!isMultiMasterMode()) {
       if (onlineMaster && previousMasterClientId !== onlineMaster.clientId) {
@@ -29664,6 +30012,7 @@
         setMultiStatus('共有モード: 全員に最新状態を同期しました', 'success');
       });
     }
+    /* multiForceDanmakuToggle handler removed: danmaku control is per-client */
     if (
       dom.controls.multiRoleTarget instanceof HTMLSelectElement
       && dom.controls.multiRoleTarget !== dom.controls.multiAssignTarget
@@ -29810,11 +30159,29 @@
       });
     }
 
+    // bind danmaku toggle controls
+    if (dom.controls.multiDanmakuToggle instanceof HTMLInputElement && dom.controls.multiDanmakuToggle.dataset.bound !== 'true') {
+      dom.controls.multiDanmakuToggle.dataset.bound = 'true';
+      dom.controls.multiDanmakuToggle.addEventListener('change', (ev) => {
+        const next = Boolean(ev.target && ev.target.checked);
+        setDanmakuEnabled(next);
+      });
+    }
+    if (dom.controls.settingDanmakuToggle instanceof HTMLInputElement && dom.controls.settingDanmakuToggle.dataset.bound !== 'true') {
+      dom.controls.settingDanmakuToggle.dataset.bound = 'true';
+      dom.controls.settingDanmakuToggle.addEventListener('change', (ev) => {
+        const next = Boolean(ev.target && ev.target.checked);
+        setDanmakuEnabled(next);
+      });
+    }
+
     if (!multiState.connected) {
       setMultiStatus('共有モード: OFF', 'info');
     }
     setMultiHelpPanelVisible(false);
-    syncMultiControls();
+  syncMultiControls();
+  // sync danmaku UI state
+  syncDanmakuControls();
     renderMultiParticipantsList();
     renderMultiComments();
     applyMultiRoleUiLocks();
