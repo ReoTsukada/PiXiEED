@@ -31,16 +31,6 @@ let lastPoint = null;
 let sendBuffer = [];
 let sendTimer = null;
 
-// ownership (tile) locking to avoid overwrites while someone is drawing
-const TILE_SIZE = 16; // pixels
-const TILES_X = Math.ceil(CANVAS_W / TILE_SIZE); // 16
-const TILES_Y = Math.ceil(CANVAS_H / TILE_SIZE);
-const ownerTimeoutMs = 30 * 1000; // consider owner gone after 30s of inactivity
-const tileOwners = new Map(); // tileIndex -> { clientId, lastSeen }
-const localClaimedTiles = new Set();
-let pendingClaimTiles = new Set();
-let pendingClaimTimer = null;
-
 function setStatus(text){ statusEl.textContent = text; }
 
 function initUI(){
@@ -112,18 +102,8 @@ function drawLine(p1,p2, col, size){
 }
 
 function handlePointerDown(e){
-  const pos = pointerToCanvas(e);
-  // check ownership of the tile(s) for this point
-  const tiles = tilesForPoint(pos);
-  for (const t of tiles){
-    const owner = tileOwners.get(t);
-    if (owner && owner.clientId !== clientId){
-      // someone else currently owns this tile — block drawing
-      setStatus('この領域は他の参加者が編集中です');
-      return;
-    }
-  }
   drawing = true;
+  const pos = pointerToCanvas(e);
   lastPoint = pos;
   // immediate dot
   drawLine(pos,pos,color,brushSize);
@@ -152,43 +132,7 @@ function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
 
 function bufferPoint(p){
   sendBuffer.push({x:p.x,y:p.y,c:color,s:brushSize});
-  // mark tiles for claim (batching)
-  const tiles = tilesForPoint(p);
-  for (const t of tiles) pendingClaimTiles.add(t);
-  if (!pendingClaimTimer) pendingClaimTimer = setTimeout(() => { flushPendingClaims(); }, 80);
   if (!sendTimer) sendTimer = setTimeout(() => { flushBuffer(); }, 50);
-}
-
-function tilesForPoint(p){
-  const tx = Math.floor(p.x / TILE_SIZE);
-  const ty = Math.floor(p.y / TILE_SIZE);
-  const tiles = [];
-  for (let y = Math.max(0, ty-0); y <= Math.min(TILES_Y-1, ty+0); y++){
-    for (let x = Math.max(0, tx-0); x <= Math.min(TILES_X-1, tx+0); x++){
-      tiles.push(x + y * TILES_X);
-    }
-  }
-  return tiles;
-}
-
-function flushPendingClaims(){
-  if (!pendingClaimTiles.size) { pendingClaimTimer = null; return; }
-  const toSend = Array.from(pendingClaimTiles).filter(t => !localClaimedTiles.has(t));
-  if (toSend.length){
-    // claim locally
-    toSend.forEach(t=>{ localClaimedTiles.add(t); tileOwners.set(t, {clientId, lastSeen: Date.now()}); });
-    sendClaimTiles(toSend);
-  }
-  pendingClaimTiles.clear();
-  pendingClaimTimer = null;
-}
-
-function sendClaimTiles(tiles){
-  try{ channel.send({ type:'broadcast', event:'claim-tiles', payload:{ clientId, tiles, ts: Date.now() } }); }catch(e){/*ignore*/}
-}
-
-function sendReleaseTiles(tiles){
-  try{ channel.send({ type:'broadcast', event:'release-tiles', payload:{ clientId, tiles, ts: Date.now() } }); }catch(e){/*ignore*/}
 }
 
 function flushBuffer(){
@@ -216,35 +160,9 @@ function onRemoteDraw(payload){
     let prev = pts[0];
     for (let i=1;i<pts.length;i++){
       const cur = pts[i];
-      // determine if either end is owned by someone else (active)
-      const tilesPrev = tilesForPoint(prev);
-      const tilesCur = tilesForPoint(cur);
-      let blocked = false;
-      const now = Date.now();
-      for (const t of tilesPrev.concat(tilesCur)){
-        const info = tileOwners.get(t);
-        if (info && info.clientId !== payload.clientId && (now - (info.lastSeen||0)) <= ownerTimeoutMs){ blocked = true; break; }
-      }
-      if (!blocked){
-        drawLine(prev,cur,cur.c || '#fff', cur.s || 1);
-      }
+      drawLine(prev,cur,cur.c || '#fff', cur.s || 1);
       prev = cur;
     }
-    // update ownership lastSeen for tiles touched by remote drawer
-    try{
-      const touched = new Set();
-      for (const p of pts){
-        const ts = tilesForPoint(p);
-        for (const t of ts) touched.add(t);
-      }
-      const now = Date.now();
-      for (const t of touched){
-        const cur = tileOwners.get(t);
-        if (!cur || cur.clientId === payload.clientId){
-          tileOwners.set(t, { clientId: payload.clientId, lastSeen: now });
-        }
-      }
-    }catch(e){}
   }catch(e){ console.warn('onRemoteDraw', e); }
 }
 
@@ -295,24 +213,6 @@ async function start(){
   window.addEventListener('pointerup', handlePointerUp);
   canvas.addEventListener('pointerleave', handlePointerUp);
 
-  // beforeunload: release our claimed tiles so others can draw
-  window.addEventListener('beforeunload', ()=>{
-    if (localClaimedTiles.size){
-      try{ sendReleaseTiles(Array.from(localClaimedTiles)); }catch(e){}
-      localClaimedTiles.clear();
-    }
-  });
-
-  // periodic sweep to free stale owners
-  setInterval(()=>{
-    const now = Date.now();
-    for (const [t,info] of Array.from(tileOwners.entries())){
-      if (info && (now - (info.lastSeen || 0)) > ownerTimeoutMs){
-        tileOwners.delete(t);
-      }
-    }
-  }, 10 * 1000);
-
   setStatus('接続中…');
   try{
     const mod = await import(MULTI_SUPABASE_MODULE_URL);
@@ -323,17 +223,12 @@ async function start(){
     channel.on('broadcast', { event: 'sync-request' }, ({payload})=>{ handleSyncRequest(payload); });
     channel.on('broadcast', { event: 'sync-response' }, ({payload})=>{ handleSyncResponse(payload); });
     channel.on('broadcast', { event: 'status' }, ({payload})=>{ /* ignore for now */ });
-  channel.on('broadcast', { event: 'claim-tiles' }, ({payload})=>{ try{ if (!payload) return; const now = Date.now(); for (const t of (payload.tiles||[])) tileOwners.set(t, { clientId: payload.clientId, lastSeen: now }); }catch(e){} });
-  channel.on('broadcast', { event: 'release-tiles' }, ({payload})=>{ try{ if (!payload) return; for (const t of (payload.tiles||[])) { const cur = tileOwners.get(t); if (cur && cur.clientId === payload.clientId) tileOwners.delete(t); } }catch(e){} });
-  channel.on('broadcast', { event: 'heartbeat' }, ({payload})=>{ try{ if (!payload) return; const now = Date.now(); for (const [t,info] of Array.from(tileOwners.entries())){ if (info && info.clientId === payload.clientId){ info.lastSeen = now; tileOwners.set(t, info); } } }catch(e){} });
 
     await channel.subscribe(async (status)=>{
       if (status === 'SUBSCRIBED'){
         setStatus('接続済み');
         // ask for sync
         requestSync();
-        // send periodic heartbeat so our claimed tiles remain reserved while we're present
-        setInterval(()=>{ try{ channel.send({ type:'broadcast', event:'heartbeat', payload:{ clientId, ts: Date.now() } }); }catch(e){} }, 10 * 1000);
       }
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT'){
         setStatus('接続失敗');
