@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>公開お遊びルーム — PiXiEED</title>
+  <style>
+    html,body{height:100%;margin:0;background:#0b1224;color:#f9fafb;font-family:system-ui, sans-serif}
+    .wrap{max-width:920px;margin:28px auto;padding:16px}
+    .card{background:rgba(255,255,255,0.03);padding:16px;border-radius:12px}
+    .controls{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+    .button{appearance:none;border:0;padding:8px 12px;border-radius:8px;background:#2b6cb0;color:#fff;cursor:pointer}
+    .button--muted{background:#444}
+    .canvas-wrap{width:512px;height:512px;border:1px solid rgba(255,255,255,0.08);background:#111;padding:8px}
+    canvas{width:100%;height:100%;image-rendering:pixelated;display:block;background:#000}
+    .palette{display:flex;gap:6px}
+    .sw{width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);cursor:pointer}
+    .info{margin-top:8px;color:#cbd5e1;font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>公開お遊びルーム</h1>
+    <p class="info">キャンバス: 256×256px（固定）・1レイヤー1フレーム。リアルタイム共有。</p>
+    <div class="card">
+      <div class="controls">
+        <div class="palette" id="palette"></div>
+        <label>サイズ
+          <select id="brushSize">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="6">6</option>
+          </select>
+        </label>
+        <button class="button" id="clearBtn">クリア</button>
+        <!-- 保存ボタンは公開ルームでは削除しました（画像出力不可） -->
+        <a class="button button--muted" href="/">ホームへ</a>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="publicCanvas" width="256" height="256" aria-label="公開ルームキャンバス"></canvas>
+      </div>
+      <p class="info">接続状態: <span id="status">接続中…</span></p>
+      <p class="info" id="modeInfo">注意: このページでは画像の保存（出力）を禁止しています。右クリックやページ保存、保存ボタンは無効化されています。</p>
+    </div>
+  </div>
+  <script type="module" src="/public-room.js"></script>
+</body>
+</html>
