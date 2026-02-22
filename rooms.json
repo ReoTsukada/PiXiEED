@@ -5,25 +5,5 @@
     "type": "public",
     "channel": "public-room-1",
     "description": "誰でも参加できる公開遊びルーム（256×256）。"
-  },
-  {
-    "id": "resident-216",
-    "name": "常駐ルーム 216×216",
-    "type": "resident",
-    "channel": "resident-216-room",
-    "page": "/resident-216.html",
-    "size": "216x216",
-    "maxUsers": 10,
-    "description": "誰でも自由に描ける 216×216 の常駐ルーム（タイル保護、最大10人）。"
-  },
-  {
-    "id": "resident-128",
-    "name": "常駐ルーム 128×128",
-    "type": "resident",
-    "channel": "resident-128-room",
-    "page": "/resident-128.html",
-    "size": "128x128 (32x32 slots)",
-    "maxUsers": 16,
-    "description": "32×32 のスロットを割り当てる常駐ルーム（最大16人）。"
   }
 ]
