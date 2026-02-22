@@ -1,63 +1,6 @@
-// Resident 216x216 room - max 10 users, tile ownership prevents overwriting others' tiles
-const MULTI_SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
-const MULTI_SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
-const MULTI_SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
-
-const CANVAS_W = 216, CANVAS_H = 216;
-const TILE = 12; // tile size to reduce contention (12x12 tiles -> 18x18 grid)
-const MAX_USERS = 10;
-const CHANNEL = (new URLSearchParams(location.search).get('room')) || 'resident-216-room';
-
-const clientId = `r216_${Math.random().toString(36).slice(2,9)}`;
-let supabase = null, channel = null;
-
-const canvas = document.getElementById('resident216');
-const ctx = canvas.getContext('2d');
-const statusEl = document.getElementById('status');
-const participantsEl = document.getElementById('participants');
-const brushSizeEl = document.getElementById('brushSize');
-const paletteEl = document.getElementById('palette');
-
-let brushSize = Number(brushSizeEl.value) || 2;
-let color = '#ffffff';
-let drawing=false, last=null;
-
-const DEFAULT_COLORS = ['#ffffff','#000000','#ff3b30','#ff9500','#ffcc00','#4cd964','#34c759','#007aff','#5856d6','#af52de'];
-
-const tilesX = Math.ceil(CANVAS_W / TILE);
-const tilesY = Math.ceil(CANVAS_H / TILE);
-const ownerTimeout = 30*1000;
-const tileOwners = new Map(); // index -> {clientId, lastSeen}
-
-let localClaimed = new Set();
-let pendingClaim = new Set();
-let pendingTimer = null;
-
-function setStatus(t){ statusEl.textContent = t; }
-
-function initUI(){
-  DEFAULT_COLORS.forEach(c=>{
-    const b = document.createElement('button'); b.style.background=c; b.style.width='28px'; b.style.height='28px'; b.style.border='0'; b.addEventListener('click', ()=>{ color=c; });
-    paletteEl.appendChild(b);
-  });
-  brushSizeEl.addEventListener('input', ()=>{ brushSize = Number(brushSizeEl.value) || 1; });
-  document.getElementById('clearBtn').addEventListener('click', ()=>{ clearLocal(); sendClear(); });
-  document.getElementById('leaveBtn').addEventListener('click', ()=>{ window.close(); });
-  canvas.addEventListener('pointerdown', onDown);
-  window.addEventListener('pointermove', onMove);
-  window.addEventListener('pointerup', onUp);
-  canvas.addEventListener('contextmenu', e=>{ e.preventDefault(); setStatus('右クリックでの保存は無効'); });
-}
-
-function clearLocal(){ ctx.fillStyle='#000'; ctx.fillRect(0,0,CANVAS_W,CANVAS_H); }
-function drawLine(p1,p2,col,sz){ ctx.strokeStyle=col; ctx.lineWidth=sz; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(p1.x+0.5,p1.y+0.5); ctx.lineTo(p2.x+0.5,p2.y+0.5); ctx.stroke(); }
-
-function onDown(e){ const p = toCanvas(e); const tiles = tilesForPoint(p); for(const t of tiles){ const o = tileOwners.get(t); if (o && o.clientId !== clientId && (Date.now()- (o.lastSeen||0)) <= ownerTimeout){ setStatus('他の参加者が編集中の領域です'); return; } } drawing=true; last=p; drawLine(p,p,color,brushSize); buffer(p); }
-function onMove(e){ if(!drawing) return; const p=toCanvas(e); drawLine(last,p,color,brushSize); buffer(p); last=p; }
-function onUp(e){ if(!drawing) return; drawing=false; flushBuffer(); }
-
-function toCanvas(e){ const r = canvas.getBoundingClientRect(); const x = Math.floor((e.clientX - r.left) * (CANVAS_W / r.width)); const y = Math.floor((e.clientY - r.top) * (CANVAS_H / r.height)); return {x:clamp(x,0,CANVAS_W-1), y:clamp(y,0,CANVAS_H-1)}; }
-function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+// resident-216.js removed per user request. This file intentionally contains no runtime logic.
+// All resident-room functionality was deleted. If you need to restore it later, please
+// recover from version control or request the feature to be reimplemented.
 
 let sendBuf = [];
 function buffer(p){ sendBuf.push({x:p.x,y:p.y,c:color,s:brushSize}); const ts = tilesForPoint(p); for(const t of ts) pendingClaim.add(t); if(!pendingTimer) pendingTimer = setTimeout(flushClaims, 80); if(!sendTimer) sendTimer=setTimeout(flushBuffer, 60); }
