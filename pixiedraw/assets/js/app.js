@@ -82,6 +82,8 @@
       selectSameModeButtons: Array.from(document.querySelectorAll('button[data-select-same-mode]')),
       selectionOutline4Action: document.getElementById('selectionOutline4Action'),
       selectionOutline8Action: document.getElementById('selectionOutline8Action'),
+      outlineSize: document.getElementById('outlineSize'),
+      outlineSizeValue: document.getElementById('outlineSizeValue'),
       brushShapeButtons: Array.from(document.querySelectorAll('button[data-brush-shape]')),
       customBrushInfo: document.getElementById('customBrushInfo'),
       colorMode: Array.from(document.querySelectorAll('input[name="colorMode"]')),
@@ -282,6 +284,7 @@
       dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('toolSpotlightDialog')),
       close: document.getElementById('closeToolSpotlight'),
     },
+    /* solidShape tool removed */
   };
 
   const preventBrowserZoom = (event) => {
@@ -352,7 +355,7 @@
     pen: { label: 'ペン', tools: ['pen'] },
     eyedropper: { label: 'スポイト', tools: ['eyedropper'] },
     eraser: { label: '消しゴム', tools: ['eraser'] },
-    shape: { label: '図形', tools: ['line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill'] },
+  shape: { label: '図形', tools: ['line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill'] },
     fill: { label: '塗りつぶし', tools: ['fill'] },
     mirror: { label: '対称', tools: [TOOL_ACTION_MIRROR_POPUP] },
     virtualCursor: { label: '仮想カーソル', tools: [TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE] },
@@ -767,7 +770,8 @@
   const MULTI_DEFAULT_EXPORT_PERMISSION = MULTI_EXPORT_PERMISSION_MASTER;
   const MULTI_ROOM_VISIBILITY_PRIVATE = 'private';
   const MULTI_ROOM_VISIBILITY_PUBLIC = 'public';
-  const MULTI_DEFAULT_ROOM_VISIBILITY = MULTI_ROOM_VISIBILITY_PRIVATE;
+  // Default to public rooms per request
+  const MULTI_DEFAULT_ROOM_VISIBILITY = MULTI_ROOM_VISIBILITY_PUBLIC;
   const MULTI_INVITE_QUERY_FLAG = 'multiInvite';
   const MULTI_INVITE_QUERY_KEY = 'multiKey';
   const MULTI_INVITE_QUERY_AUTO_JOIN = 'multiAutoJoin';
@@ -1195,6 +1199,7 @@
     nextSibling: null,
   };
   let mirrorToolPopoverListenersBound = false;
+  /* solidShape tool removed */
   const toolIconCache = new Map();
   let startupVisible = false;
   let startupVirtualCursorState = null;
@@ -1660,6 +1665,7 @@
       pan: { x: 0, y: 0 },
       tool: 'pen',
       brushSize: 1,
+      outlineSize: 1,
       brushShape,
       selectSameMode: normalizeSelectSameMode(requestedSelectSameMode, SELECT_SAME_MODE_CONNECTED),
       customBrush,
@@ -2070,6 +2076,7 @@
     if (includeUiState) {
       snapshot.tool = state.tool;
       snapshot.brushSize = state.brushSize;
+      snapshot.outlineSize = state.outlineSize;
       snapshot.selectSameMode = normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
       snapshot.colorMode = state.colorMode;
       snapshot.activeToolGroup = state.activeToolGroup;
@@ -2466,6 +2473,9 @@
     if (Object.prototype.hasOwnProperty.call(snapshot, 'brushSize')) {
       compressed.brushSize = snapshot.brushSize;
     }
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'outlineSize')) {
+      compressed.outlineSize = snapshot.outlineSize;
+    }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'colorMode')) {
       compressed.colorMode = snapshot.colorMode;
     }
@@ -2543,6 +2553,9 @@
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'brushSize')) {
       decompressed.brushSize = snapshot.brushSize;
+    }
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'outlineSize')) {
+      decompressed.outlineSize = snapshot.outlineSize;
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'colorMode')) {
       decompressed.colorMode = snapshot.colorMode;
@@ -2765,16 +2778,21 @@
     });
   }
 
-  function applyHistorySnapshot(snapshot) {
+  function applyHistorySnapshot(snapshot, { preserveView = false } = {}) {
     state.width = snapshot.width;
     state.height = snapshot.height;
-    state.scale = normalizeZoomScale(snapshot.scale, state.scale || MIN_ZOOM_SCALE);
-    state.pan = { x: snapshot.pan.x, y: snapshot.pan.y };
+    if (!preserveView) {
+      state.scale = normalizeZoomScale(snapshot.scale, state.scale || MIN_ZOOM_SCALE);
+      state.pan = { x: snapshot.pan.x, y: snapshot.pan.y };
+    }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'tool')) {
       state.tool = normalizeToolId(snapshot.tool, state.tool);
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'brushSize')) {
       state.brushSize = snapshot.brushSize;
+    }
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'outlineSize')) {
+      state.outlineSize = clamp(Math.round(Number(snapshot.outlineSize) || 1), 1, 8);
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'selectSameMode')) {
       state.selectSameMode = normalizeSelectSameMode(snapshot.selectSameMode, state.selectSameMode);
@@ -3180,7 +3198,7 @@
       history.future.shift();
     }
     const previous = history.past.pop();
-    applyHistorySnapshot(decompressHistorySnapshot(previous));
+    applyHistorySnapshot(decompressHistorySnapshot(previous), { preserveView: true });
     updateHistoryButtons();
     autosaveDirty = true;
     markDocumentUnsavedChange();
@@ -3203,7 +3221,7 @@
       history.past.shift();
     }
     const next = history.future.pop();
-    applyHistorySnapshot(decompressHistorySnapshot(next));
+    applyHistorySnapshot(decompressHistorySnapshot(next), { preserveView: true });
     updateHistoryButtons();
     autosaveDirty = true;
     markDocumentUnsavedChange();
@@ -3217,7 +3235,7 @@
     }
     const snapshot = decompressHistorySnapshot(history.pending.before);
     history.pending = null;
-    applyHistorySnapshot(snapshot);
+    applyHistorySnapshot(snapshot, { preserveView: true });
     updateHistoryButtons();
     autosaveDirty = true;
     markDocumentUnsavedChange();
@@ -3278,6 +3296,7 @@
       });
       return true;
     }
+    
     return false;
   }
 
@@ -5073,6 +5092,12 @@
     if (dom.controls.brushSizeValue) {
       dom.controls.brushSizeValue.textContent = `${state.brushSize}px`;
     }
+    if (dom.controls.outlineSize) {
+      dom.controls.outlineSize.value = String(state.outlineSize);
+    }
+    if (dom.controls.outlineSizeValue) {
+      dom.controls.outlineSizeValue.textContent = `${state.outlineSize}マス`;
+    }
     syncBrushControls();
     syncBrushSizeFieldVisibility();
     syncSelectSameModeControls();
@@ -6608,6 +6633,7 @@
       pan: { x: 0, y: 0 },
       tool: state.tool,
       brushSize: state.brushSize,
+      outlineSize: state.outlineSize,
       palette,
       activePaletteIndex,
       secondaryPaletteIndex,
@@ -14344,6 +14370,8 @@
     }
   }
 
+  /* solidShape tool functions removed */
+
   function setupControls() {
     if (dom.controls.toggleGrid instanceof HTMLInputElement) {
       dom.controls.toggleGrid.addEventListener('change', () => {
@@ -14525,6 +14553,14 @@
     dom.controls.selectionOutline8Action?.addEventListener('click', () => {
       applySelectionOutline({ mode: '8' });
       updateCanvasControlButtons();
+    });
+
+    dom.controls.outlineSize?.addEventListener('input', event => {
+      state.outlineSize = clamp(Math.round(Number(event.target.value)), 1, 8);
+      if (dom.controls.outlineSizeValue) {
+        dom.controls.outlineSizeValue.textContent = `${state.outlineSize}マス`;
+      }
+      scheduleSessionPersist();
     });
 
     dom.controls.toggleChecker?.addEventListener('change', event => {
@@ -20746,6 +20782,7 @@
       return false;
     }
 
+    const outlineThickness = clamp(Math.round(Number(state.outlineSize) || 1), 1, 8);
     const outlineMask = new Uint8Array(mask.length);
     const neighbors = outlineMode === '4'
       ? [
@@ -20758,24 +20795,35 @@
         { x: -1, y: 0 }, { x: 1, y: 0 },
         { x: -1, y: 1 }, { x: 0, y: 1 }, { x: 1, y: 1 },
       ];
-    for (let y = bounds.y0; y <= bounds.y1; y += 1) {
-      const rowOffset = y * width;
-      for (let x = bounds.x0; x <= bounds.x1; x += 1) {
-        const idx = rowOffset + x;
-        if (mask[idx] !== 1) {
-          continue;
+    let current = new Uint8Array(mask.length);
+    current.set(mask);
+    for (let layer = 0; layer < outlineThickness; layer += 1) {
+      const nextRing = new Uint8Array(mask.length);
+      for (let y = 0; y < height; y += 1) {
+        const rowOffset = y * width;
+        for (let x = 0; x < width; x += 1) {
+          const idx = rowOffset + x;
+          if (current[idx] !== 1) {
+            continue;
+          }
+          for (let i = 0; i < neighbors.length; i += 1) {
+            const nextX = x + neighbors[i].x;
+            const nextY = y + neighbors[i].y;
+            if (nextX < 0 || nextY < 0 || nextX >= width || nextY >= height) {
+              continue;
+            }
+            const nextIdx = (nextY * width) + nextX;
+            if (current[nextIdx] === 1) {
+              continue;
+            }
+            nextRing[nextIdx] = 1;
+          }
         }
-        for (let i = 0; i < neighbors.length; i += 1) {
-          const nextX = x + neighbors[i].x;
-          const nextY = y + neighbors[i].y;
-          if (nextX < 0 || nextY < 0 || nextX >= width || nextY >= height) {
-            continue;
-          }
-          const nextIdx = (nextY * width) + nextX;
-          if (mask[nextIdx] === 1) {
-            continue;
-          }
-          outlineMask[nextIdx] = 1;
+      }
+      for (let idx = 0; idx < outlineMask.length; idx += 1) {
+        if (nextRing[idx] === 1) {
+          outlineMask[idx] = 1;
+          current[idx] = 1;
         }
       }
     }
@@ -24333,6 +24381,7 @@
       },
       tool: state.tool,
       brushSize: clamp(Math.round(state.brushSize || 1), 1, 32),
+      outlineSize: clamp(Math.round(state.outlineSize || 1), 1, 8),
       selectSameMode: normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED),
       brushShape: normalizeBrushShape(state.brushShape, BRUSH_SHAPE_SQUARE),
       customBrush: serializeCustomBrushPayload(state.customBrush),
@@ -24412,6 +24461,9 @@
     }
     if (Number.isFinite(payload.brushSize)) {
       state.brushSize = clamp(Math.round(payload.brushSize), 1, 32);
+    }
+    if (Number.isFinite(payload.outlineSize)) {
+      state.outlineSize = clamp(Math.round(payload.outlineSize), 1, 8);
     }
     if (typeof payload.selectSameMode === 'string') {
       state.selectSameMode = normalizeSelectSameMode(payload.selectSameMode, state.selectSameMode);
