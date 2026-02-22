@@ -2263,7 +2263,8 @@
             const href = `/public-room.html?room=${encodeURIComponent(r.channel)}`;
             actionHtml = `<a class="public-room-action button" href="${href}">入室</a>`;
           } else if (r.type === 'resident'){
-            const page = r.page || '/resident-216.html';
+            // resident pages were removed; use provided page if present, otherwise fall back to homepage
+            const page = r.page || '/';
             const roomQuery = `?room=${encodeURIComponent(r.channel)}`;
             if (r.thumbnail){
               // active: let user enter
