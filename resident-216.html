@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>常駐ルーム 216×216</title>
+  <style>
+    body{ margin:0; background:#111; color:#fff; font-family:sans-serif; display:flex; align-items:center; justify-content:center; height:100vh; }
+    #wrap{ width:920px; display:flex; gap:16px; }
+    #canvasWrap{ background:#222; padding:12px; border-radius:8px; }
+    canvas{ image-rendering:pixelated; border:1px solid #333; display:block; }
+    #info{ width:280px; }
+    button{ padding:8px 10px; border-radius:8px; }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <div id="canvasWrap">
+      <canvas id="resident216" width="216" height="216"></canvas>
+      <div style="margin-top:8px; display:flex; gap:8px;">
+        <button id="clearBtn">クリア(送信)</button>
+        <button id="leaveBtn">退出</button>
+      </div>
+    </div>
+    <div id="info">
+      <h3>常駐ルーム 216×216</h3>
+      <p>最大10人。誰でも自由に描けます。既存の描画セルは他人によって上書きされません（タイル保護）。</p>
+      <p id="status">接続中…</p>
+      <div id="participants"></div>
+      <p>ブラシ: <input id="brushSize" type="range" min="1" max="8" value="2"></p>
+      <div id="palette"></div>
+    </div>
+  </div>
+  <script type="module" src="/resident-216.js"></script>
+</body>
+</html>
