@@ -25201,9 +25201,13 @@
         return null;
       }
       const autoJoin = parseMultiBooleanQueryValue(params.get(MULTI_INVITE_QUERY_AUTO_JOIN) || '1');
+      // optional: request a role via invite (master / guest / spectator)
+      const roleParam = typeof params.get(MULTI_INVITE_QUERY_ROLE) === 'string' ? String(params.get(MULTI_INVITE_QUERY_ROLE)).trim() : '';
+      const role = (roleParam === 'master' || roleParam === 'guest' || roleParam === 'spectator') ? roleParam : '';
       return {
         projectKey,
         autoJoin,
+        role,
       };
     } catch (error) {
       return null;
@@ -25225,8 +25229,10 @@
     if (dom.controls.multiProjectKey instanceof HTMLInputElement) {
       dom.controls.multiProjectKey.value = invite.projectKey;
     }
-    setMultiDesiredRole('spectator');
-    setMultiUiView('spectator');
+    // respect requested role from invite when present; default to spectator for safety
+    const requestedRole = (invite.role && (invite.role === 'master' || invite.role === 'guest' || invite.role === 'spectator')) ? invite.role : 'spectator';
+    setMultiDesiredRole(requestedRole);
+    setMultiUiView(requestedRole);
     multiState.resumeAssignments = null;
     multiState.resumeBlockedClientIds = null;
     multiState.resumeMaxGuests = null;
@@ -25238,7 +25244,7 @@
     if (invite.autoJoin) {
       window.setTimeout(() => {
         if (!multiState.connected && !multiState.connecting) {
-          connectMultiSessionAs('spectator');
+          connectMultiSessionAs(requestedRole);
         }
       }, 100);
     }
@@ -28978,6 +28984,31 @@
     }
 
     multiState.participants = nextParticipants;
+      // Auto-promotion for resident rooms: if no master and projectKey looks like resident, earliest participant auto-promotes
+      try {
+        const projectKey = String(multiState.projectKey || '');
+        const isResident = projectKey.startsWith('resident-');
+        if (!isMultiMasterMode() && !multiState.connecting && multiState.connected && isResident) {
+          const onlineMasterExists = !!onlineMaster;
+          if (!onlineMasterExists && nextParticipants.size) {
+            // pick earliest joined participant
+            let earliestId = null;
+            let earliestAt = Infinity;
+            for (const [cid, p] of nextParticipants.entries()){
+              const at = Number(p.joinedAt) || Date.now();
+              if (at < earliestAt){ earliestAt = at; earliestId = cid; }
+            }
+            if (earliestId && earliestId === (multiState.clientId || '')){
+              // try to become master shortly to avoid race
+              window.setTimeout(()=>{
+                if (!isMultiMasterMode() && !multiState.connecting){
+                  connectMultiSessionAs('master').catch(()=>{});
+                }
+              }, 200);
+            }
+          }
+        }
+      } catch(e) { /* ignore */ }
     if (!isMultiMasterMode()) {
       if (onlineMaster && previousMasterClientId !== onlineMaster.clientId) {
         setMultiStatus(`共有モード: マスター接続中 (${multiState.projectKey})`, 'info');
