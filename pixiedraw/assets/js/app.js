@@ -170,6 +170,7 @@
       autosaveStatus: document.getElementById('autosaveStatus'),
       bindExportFolder: document.getElementById('bindExportFolder'),
       exportFolderStatus: document.getElementById('exportFolderStatus'),
+      exportDestinationLabel: document.getElementById('exportDestinationLabel'),
       timelapseClear: document.getElementById('timelapseClear'),
       timelapseFps: document.getElementById('timelapseFps'),
       timelapseStatus: document.getElementById('timelapseStatus'),
@@ -201,6 +202,11 @@
       multiCommentList: document.getElementById('multiCommentList'),
       multiCommentInput: document.getElementById('multiCommentInput'),
       multiCommentSend: document.getElementById('multiCommentSend'),
+      multiPresetFriends: document.getElementById('multiPresetFriends'),
+      multiPresetStream: document.getElementById('multiPresetStream'),
+      multiPresetHint: document.getElementById('multiPresetHint'),
+      multiMasterOpsMode: document.getElementById('multiMasterOpsMode'),
+      multiMasterOpsHint: document.getElementById('multiMasterOpsHint'),
       multiJoinRequestTarget: document.getElementById('multiJoinRequestTarget'),
       multiJoinRequestApprove: document.getElementById('multiJoinRequestApprove'),
       multiJoinRequestReject: document.getElementById('multiJoinRequestReject'),
@@ -215,6 +221,8 @@
       multiMaxGuests: document.getElementById('multiMaxGuests'),
       multiRoomVisibility: document.getElementById('multiRoomVisibility'),
       multiRoomVisibilityHint: document.getElementById('multiRoomVisibilityHint'),
+      multiJoinPolicy: document.getElementById('multiJoinPolicy'),
+      multiJoinPolicyHint: document.getElementById('multiJoinPolicyHint'),
   multiDanmakuToggle: document.getElementById('multiDanmakuToggle'),
   settingDanmakuToggle: document.getElementById('settingDanmakuToggle'),
   danmakuOverlay: document.getElementById('danmakuOverlay'),
@@ -229,13 +237,16 @@
       multiBlockedRemove: document.getElementById('multiBlockedRemove'),
       multiBlockedHint: document.getElementById('multiBlockedHint'),
       multiMasterOnlyGroups: Array.from(document.querySelectorAll('[data-multi-master-only]')),
+      multiMasterOpsGroups: Array.from(document.querySelectorAll('[data-multi-master-ops]')),
     },
     startup: {
       screen: document.getElementById('startupScreen'),
       newButton: document.getElementById('startupActionNew'),
       openButton: document.getElementById('startupActionOpen'),
+      quickSetupButton: document.getElementById('startupActionQuickSetup'),
       skipButton: document.getElementById('startupActionSkip'),
       hint: document.getElementById('startupScreenHint'),
+      quickSetupStatus: document.getElementById('startupQuickSetupStatus'),
       recentSection: document.getElementById('startupRecentProjects'),
       recentList: document.getElementById('startupRecentList'),
       updateToast: document.getElementById('updateToast'),
@@ -260,6 +271,7 @@
       scaleSlider: document.getElementById('exportScaleSlider'),
       scaleInput: document.getElementById('exportScaleInput'),
       includeOriginalToggle: document.getElementById('exportIncludeOriginalToggle'),
+      saveProjectCompanionToggle: document.getElementById('exportSaveProjectCompanionToggle'),
       gridSettings: document.getElementById('exportGridSettings'),
       gridWidthInput: document.getElementById('exportGridWidth'),
       gridHeightInput: document.getElementById('exportGridHeight'),
@@ -267,6 +279,7 @@
       pixelWidthInput: document.getElementById('exportPixelWidth'),
       pixelHeightInput: document.getElementById('exportPixelHeight'),
       scaleHint: document.getElementById('exportScaleHint'),
+      destinationLabel: document.getElementById('exportDialogDestinationLabel'),
       adContainer: document.getElementById('exportAdContainer'),
       adSlot: document.getElementById('exportAdSlot'),
     },
@@ -598,8 +611,8 @@
       title: '共有モード/出力/操作性を大幅改善',
       details: Object.freeze([
         '共有モードの参加導線を再設計: 「入室」は自由、描画参加はマスター承認制へ統一。',
-        '最大参加人数（1〜5）を追加。参加上限を超えた入室は視聴者として接続。',
-        '出力権限設定を追加（マスターのみ / マスター+参加者 / 全員）。初期値はマスターのみ。',
+        '最大参加人数（1〜15）を追加。参加上限を超えた入室は視聴者として接続。',
+        '出力権限設定を追加（マスターのみ / マスター+参加者 / 全員）。初期値はマスター+参加者。',
         '招待機能を追加: 招待リンクのコピー/共有に対応。リンク経由でキーを自動入力して接続可能に。',
         '参加リクエスト機能を追加: 視聴者が参加申請でき、マスターは承認/却下を即時操作可能に。',
         '参加リクエスト送信時、コメント欄へ自動通知（参加希望コメント）を投稿する導線を追加。',
@@ -755,6 +768,7 @@
   const RECENT_PROJECTS_STORE = 'recentProjects';
   const AUTOSAVE_HANDLE_KEY = 'document';
   const EXPORT_DIRECTORY_HANDLE_KEY = 'exportDirectory';
+  const EXPORT_DIRECTORY_DISPLAY_LABEL_KEY = 'pixieedraw:export-directory-display-label';
   const EXPORT_WORKSPACE_DIR_NAME = 'PiXiEED';
   const EXPORT_DIRECTORY_PICKER_ID = 'pixieed-export-directory';
   const PIXIEED_NICKNAME_STORAGE_KEY = 'pixieed_nickname';
@@ -765,19 +779,49 @@
   const MULTI_RESUME_STORAGE_KEY = 'pixieedraw:multi-resume';
   const MULTI_RESUME_MAX_AGE_MS = 90 * 1000;
   const MULTI_GUEST_LIMIT_MIN = 1;
-  const MULTI_GUEST_LIMIT_MAX = 5;
+  const MULTI_GUEST_LIMIT_MAX = 15;
   const MULTI_DEFAULT_GUEST_LIMIT = 5;
   const MULTI_EXPORT_PERMISSION_MASTER = 'master';
   const MULTI_EXPORT_PERMISSION_MASTER_AND_GUEST = 'master-guest';
   const MULTI_EXPORT_PERMISSION_ALL = 'all';
-  const MULTI_DEFAULT_EXPORT_PERMISSION = MULTI_EXPORT_PERMISSION_MASTER;
+  const MULTI_DEFAULT_EXPORT_PERMISSION = MULTI_EXPORT_PERMISSION_MASTER_AND_GUEST;
   const MULTI_ROOM_VISIBILITY_PRIVATE = 'private';
   const MULTI_ROOM_VISIBILITY_PUBLIC = 'public';
+  const MULTI_JOIN_POLICY_APPROVAL = 'approval';
+  const MULTI_JOIN_POLICY_OPEN = 'open';
+  const MULTI_DEFAULT_JOIN_POLICY = MULTI_JOIN_POLICY_OPEN;
   // Default to public rooms per request
   const MULTI_DEFAULT_ROOM_VISIBILITY = MULTI_ROOM_VISIBILITY_PUBLIC;
   const MULTI_INVITE_QUERY_FLAG = 'multiInvite';
   const MULTI_INVITE_QUERY_KEY = 'multiKey';
   const MULTI_INVITE_QUERY_AUTO_JOIN = 'multiAutoJoin';
+  const MULTI_INVITE_QUERY_ROLE = 'multiRole';
+  const RESIDENT_MULTI_ROOM_PROFILES = Object.freeze({
+    'resident-256-main': Object.freeze({
+      width: 256,
+      height: 256,
+      maxGuests: 9,
+      slotColumns: 5,
+      slotRows: 2,
+      roomVisibility: MULTI_ROOM_VISIBILITY_PUBLIC,
+    }),
+    'resident-216-main': Object.freeze({
+      width: 256,
+      height: 256,
+      maxGuests: 9,
+      slotColumns: 5,
+      slotRows: 2,
+      roomVisibility: MULTI_ROOM_VISIBILITY_PUBLIC,
+    }),
+    'resident-128-main': Object.freeze({
+      width: 128,
+      height: 128,
+      maxGuests: 15,
+      slotColumns: 4,
+      slotRows: 4,
+      roomVisibility: MULTI_ROOM_VISIBILITY_PUBLIC,
+    }),
+  });
   const MULTI_SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
   const MULTI_SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
   const MULTI_SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
@@ -836,6 +880,7 @@
   let autosavePermissionListener = null;
   let exportDirectoryHandle = null;
   let pendingExportDirectoryHandle = null;
+  let exportDirectoryDisplayLabel = '';
   let exportDirectorySetupDismissed = false;
   let autosaveWriteTimer = null;
   let autosaveRestoring = false;
@@ -856,6 +901,7 @@
   let exportMaxScale = 1;
   let exportScaleUserOverride = false;
   let exportIncludeOriginalSize = false;
+  let exportSaveProjectCompanion = false;
   const EXPORT_GRID_TILE_MIN_SIZE = 1;
   const EXPORT_GRID_TILE_MAX_SIZE = MAX_EXPORT_DIMENSION;
   let exportGridTileWidth = 8;
@@ -892,6 +938,8 @@
     desiredRole: 'master',
     maxGuests: MULTI_DEFAULT_GUEST_LIMIT,
     roomVisibility: MULTI_DEFAULT_ROOM_VISIBILITY,
+    joinPolicy: MULTI_DEFAULT_JOIN_POLICY,
+    masterOpsMode: false,
     exportPermission: MULTI_DEFAULT_EXPORT_PERMISSION,
     assignments: new Map(),
     participants: new Map(),
@@ -907,6 +955,7 @@
     resumeBlockedClientIds: null,
     resumeMaxGuests: null,
     resumeRoomVisibility: null,
+    resumeJoinPolicy: null,
     resumeExportPermission: null,
     layerPatchSnapshots: new Map(),
     blockedClientIds: new Set(),
@@ -922,6 +971,8 @@
     publicLobbyChannel: null,
     publicLobbySyncTimer: null,
     publicLobbySyncInFlight: false,
+    residentAutoPromoteTimer: null,
+    assignmentSyncRequestAt: 0,
   // masterForcedDanmakuOff removed: clients control danmaku locally
   };
   let multiSupabaseClientPromise = null;
@@ -3169,7 +3220,7 @@
     if (history.pending.dirty) {
       const beforeSnapshot = history.pending.before;
       // In multi-session, separate histories: master uses global history, guests use per-client history
-      if (multiState.connected && !isMultiMasterMode()) {
+      if (isMultiClientScopedHistoryMode()) {
         // guests/spectators: record drawing actions to their own history when applicable
         if (HISTORY_DRAW_TOOLS.has(pendingLabel)) {
           try {
@@ -3220,7 +3271,7 @@
     }
     commitHistory();
     // Master or not connected: behave as before (global history)
-    if (!multiState.connected || isMultiMasterMode()) {
+    if (!isMultiClientScopedHistoryMode()) {
       if (!history.past.length) return;
       const snapshot = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
       history.future.push(snapshot);
@@ -3254,8 +3305,15 @@
         autosaveDirty = true;
         markDocumentUnsavedChange();
         scheduleAutosaveSnapshot();
-        // broadcast guest layer patch so master/others receive the change
-        try { sendGuestLayerPatch(); } catch (e) { /* ignore */ }
+        // propagate local-only undo result to peers
+        try {
+          if (isMultiMasterMode()) {
+            sendMasterLayerPatch();
+            scheduleMultiPublicLobbyRoomSync({ immediate: false });
+          } else {
+            sendGuestLayerPatch();
+          }
+        } catch (e) { /* ignore */ }
       }
     } catch (e) {
       // ignore
@@ -3268,7 +3326,7 @@
     }
     commitHistory();
     // Master or not connected: behave as before (global history)
-    if (!multiState.connected || isMultiMasterMode()) {
+    if (!isMultiClientScopedHistoryMode()) {
       if (!history.future.length) return;
       const snapshot = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
       history.past.push(snapshot);
@@ -3301,7 +3359,14 @@
         autosaveDirty = true;
         markDocumentUnsavedChange();
         scheduleAutosaveSnapshot();
-        try { sendGuestLayerPatch(); } catch (e) { /* ignore */ }
+        try {
+          if (isMultiMasterMode()) {
+            sendMasterLayerPatch();
+            scheduleMultiPublicLobbyRoomSync({ immediate: false });
+          } else {
+            sendGuestLayerPatch();
+          }
+        } catch (e) { /* ignore */ }
       }
     } catch (e) {
       // ignore
@@ -3332,12 +3397,12 @@
 
   function updateHistoryButtons() {
     try {
-      if (!multiState.connected || isMultiMasterMode()) {
+      if (!isMultiClientScopedHistoryMode()) {
         if (dom.controls.undoAction) dom.controls.undoAction.disabled = history.past.length === 0;
         if (dom.controls.redoAction) dom.controls.redoAction.disabled = history.future.length === 0;
         return;
       }
-      // For guests/spectators, show per-client undo/redo availability
+      // For replica-style roles (guest/spectator/resident master), show per-client undo/redo availability.
       const clientId = multiState.clientId || '';
       const ch = multiHistory.get(clientId) || { past: [], future: [] };
       if (dom.controls.undoAction) dom.controls.undoAction.disabled = ch.past.length === 0;
@@ -5396,11 +5461,108 @@
     });
   }
 
+  function sanitizeExportDirectoryDisplayLabel(value) {
+    return typeof value === 'string' ? value.trim() : '';
+  }
+
+  function buildExportDirectoryDisplayLabel({ rootHandle = null, workspaceHandle = null, fallback = '' } = {}) {
+    const rootName = sanitizeExportDirectoryDisplayLabel(rootHandle?.name || '');
+    const workspaceName = sanitizeExportDirectoryDisplayLabel(workspaceHandle?.name || '');
+    const fallbackName = sanitizeExportDirectoryDisplayLabel(fallback);
+    if (rootName && workspaceName) {
+      if (rootName === workspaceName) {
+        return workspaceName;
+      }
+      return `${rootName}/${workspaceName}`;
+    }
+    return workspaceName || rootName || fallbackName;
+  }
+
+  function loadStoredExportDirectoryDisplayLabel() {
+    if (!canUseSessionStorage) {
+      return '';
+    }
+    try {
+      return sanitizeExportDirectoryDisplayLabel(window.localStorage.getItem(EXPORT_DIRECTORY_DISPLAY_LABEL_KEY) || '');
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function storeExportDirectoryDisplayLabel(label) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    const normalized = sanitizeExportDirectoryDisplayLabel(label);
+    try {
+      if (normalized) {
+        window.localStorage.setItem(EXPORT_DIRECTORY_DISPLAY_LABEL_KEY, normalized);
+      } else {
+        window.localStorage.removeItem(EXPORT_DIRECTORY_DISPLAY_LABEL_KEY);
+      }
+    } catch (error) {
+      // Ignore localStorage errors.
+    }
+  }
+
+  function clearStoredExportDirectoryDisplayLabel() {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    try {
+      window.localStorage.removeItem(EXPORT_DIRECTORY_DISPLAY_LABEL_KEY);
+    } catch (error) {
+      // Ignore localStorage errors.
+    }
+  }
+
+  function setExportDirectoryDisplayLabel(label, { persist = true } = {}) {
+    exportDirectoryDisplayLabel = sanitizeExportDirectoryDisplayLabel(label);
+    if (persist) {
+      storeExportDirectoryDisplayLabel(exportDirectoryDisplayLabel);
+    }
+    updateExportDestinationLabel();
+  }
+
+  function getExportDestinationLabelText() {
+    if (!EXPORT_DIRECTORY_SUPPORTED) {
+      return '画像/GIF出力先: このブラウザでは固定フォルダ未対応（保存時に保存先を選択）';
+    }
+    const activeHandle = exportDirectoryHandle || pendingExportDirectoryHandle;
+    const displayLabel = sanitizeExportDirectoryDisplayLabel(exportDirectoryDisplayLabel)
+      || buildExportDirectoryDisplayLabel({
+        workspaceHandle: activeHandle,
+        fallback: EXPORT_WORKSPACE_DIR_NAME,
+      });
+    if (exportDirectoryHandle) {
+      return `画像/GIF出力先: ${displayLabel}/（フルパスはブラウザ仕様で非表示）`;
+    }
+    if (pendingExportDirectoryHandle) {
+      return `画像/GIF出力先: ${displayLabel}/（再許可が必要）`;
+    }
+    return '画像/GIF出力先: 未固定（保存時に保存先を選択）';
+  }
+
+  function updateExportDestinationLabel() {
+    const labelText = getExportDestinationLabelText();
+    const labelNodes = [
+      dom.controls.exportDestinationLabel,
+      dom.exportDialog?.destinationLabel,
+    ];
+    labelNodes.forEach(node => {
+      if (node instanceof HTMLElement) {
+        node.textContent = labelText;
+      }
+    });
+  }
+
   function updateExportFolderStatus(message, tone = 'info') {
     const statusNode = dom.controls.exportFolderStatus;
-    if (!statusNode) return;
-    statusNode.textContent = message;
-    statusNode.dataset.tone = tone;
+    if (statusNode) {
+      statusNode.textContent = message;
+      statusNode.dataset.tone = tone;
+    }
+    updateExportDestinationLabel();
   }
 
   function updateExportFolderButtonLabel() {
@@ -5440,6 +5602,15 @@
   function schedulePendingExportDirectoryPermission(handle) {
     pendingExportDirectoryHandle = handle || null;
     exportDirectoryHandle = null;
+    if (handle) {
+      const nextLabel = buildExportDirectoryDisplayLabel({
+        workspaceHandle: handle,
+        fallback: exportDirectoryDisplayLabel || EXPORT_WORKSPACE_DIR_NAME,
+      });
+      setExportDirectoryDisplayLabel(nextLabel);
+    } else {
+      updateExportDestinationLabel();
+    }
     updateExportFolderButtonLabel();
     updateExportFolderStatus('出力フォルダ: 権限が必要です。ボタンを押して再許可してください', 'warn');
   }
@@ -5456,6 +5627,11 @@
     }
     pendingExportDirectoryHandle = null;
     exportDirectoryHandle = handle;
+    const nextLabel = buildExportDirectoryDisplayLabel({
+      workspaceHandle: handle,
+      fallback: exportDirectoryDisplayLabel || EXPORT_WORKSPACE_DIR_NAME,
+    });
+    setExportDirectoryDisplayLabel(nextLabel);
     await storeExportDirectoryHandle(handle);
     updateExportFolderButtonLabel();
     updateExportFolderStatus(`出力フォルダ: 設定済み (${EXPORT_WORKSPACE_DIR_NAME})`, 'success');
@@ -5487,6 +5663,12 @@
       exportDirectoryHandle = workspaceHandle;
       pendingExportDirectoryHandle = null;
       exportDirectorySetupDismissed = false;
+      const nextLabel = buildExportDirectoryDisplayLabel({
+        rootHandle,
+        workspaceHandle,
+        fallback: EXPORT_WORKSPACE_DIR_NAME,
+      });
+      setExportDirectoryDisplayLabel(nextLabel);
       await storeExportDirectoryHandle(workspaceHandle);
       updateExportFolderButtonLabel();
       updateExportFolderStatus(`出力フォルダ: 設定済み (${EXPORT_WORKSPACE_DIR_NAME})`, 'success');
@@ -5506,9 +5688,11 @@
   function setupExportDirectoryControls() {
     const button = dom.controls.bindExportFolder;
     if (!(button instanceof HTMLButtonElement)) {
+      updateExportDestinationLabel();
       return;
     }
     updateExportFolderButtonLabel();
+    updateExportDestinationLabel();
     if (!EXPORT_DIRECTORY_SUPPORTED) {
       updateExportFolderStatus('出力フォルダ: このブラウザでは利用できません', 'warn');
       return;
@@ -5530,6 +5714,8 @@
   }
 
   async function initializeExportDirectoryBinding() {
+    const storedDisplayLabel = loadStoredExportDirectoryDisplayLabel();
+    setExportDirectoryDisplayLabel(storedDisplayLabel, { persist: false });
     setupExportDirectoryControls();
     if (!EXPORT_DIRECTORY_SUPPORTED) {
       return;
@@ -5538,6 +5724,7 @@
     try {
       const handle = await loadStoredExportDirectoryHandle();
       if (!handle) {
+        setExportDirectoryDisplayLabel('');
         updateExportFolderButtonLabel();
         updateExportFolderStatus('出力フォルダ: 未設定', 'info');
         return;
@@ -5546,6 +5733,12 @@
       if (granted) {
         exportDirectoryHandle = handle;
         pendingExportDirectoryHandle = null;
+        const nextLabel = sanitizeExportDirectoryDisplayLabel(exportDirectoryDisplayLabel)
+          || buildExportDirectoryDisplayLabel({
+            workspaceHandle: handle,
+            fallback: EXPORT_WORKSPACE_DIR_NAME,
+          });
+        setExportDirectoryDisplayLabel(nextLabel);
         updateExportFolderButtonLabel();
         updateExportFolderStatus(`出力フォルダ: 設定済み (${EXPORT_WORKSPACE_DIR_NAME})`, 'success');
       } else {
@@ -7309,6 +7502,7 @@
     const dialog = config.dialog;
     if (dialog && typeof dialog.showModal === 'function') {
       refreshExportScaleControls();
+      updateExportFormatAvailability();
       updateExportOriginalToggleUI();
       dialog.showModal();
       window.requestAnimationFrame(() => {
@@ -7742,12 +7936,38 @@
     if (!ensureCurrentClientCanExportProject({ announce: true })) {
       return;
     }
-    const choice = window.prompt('出力形式を入力してください (png / grid / gif / timelapse / pixfind / project)', 'png');
+    const residentPngOnly = isResidentMultiConnectedRoom();
+    const choice = window.prompt(
+      residentPngOnly
+        ? '出力形式を入力してください (png)'
+        : '出力形式を入力してください (png / grid / gif / timelapse / pixfind / project)',
+      'png'
+    );
     if (!choice) {
       return;
     }
-    const normalized = choice.trim().toLowerCase();
-    if (normalized === 'png' || normalized === 'grid' || normalized === 'gridpng') {
+    const inputMode = choice.trim().toLowerCase();
+    if (inputMode === 'contest') {
+      updateAutosaveStatus('コンテスト投稿は現在停止中です', 'warn');
+      return;
+    }
+    if (
+      inputMode !== 'png'
+      && inputMode !== 'grid'
+      && inputMode !== 'gridpng'
+      && inputMode !== 'gif'
+      && inputMode !== 'timelapse'
+      && inputMode !== 'pixfind'
+      && inputMode !== 'project'
+    ) {
+      window.alert('png / grid / gif / timelapse / pixfind / project のいずれかを入力してください。');
+      return;
+    }
+    const normalized = normalizeExportFormat(inputMode);
+    if (!ensureCurrentClientCanExportProject({ announce: true, format: normalized })) {
+      return;
+    }
+    if (normalized === 'png' || normalized === 'gridpng') {
       const candidates = getExportScaleCandidates();
       applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
@@ -7767,7 +7987,7 @@
         exportScaleUserOverride = true;
         setExportScale(scaleInput);
       }
-      if (normalized === 'grid' || normalized === 'gridpng') {
+      if (normalized === 'gridpng') {
         const tileWidthInput = window.prompt('分割サイズの横幅(px)を入力してください', String(exportGridTileWidth));
         if (tileWidthInput === null) {
           return;
@@ -7788,14 +8008,10 @@
       exportProjectAsGif();
     } else if (normalized === 'timelapse') {
       exportTimelapseGif();
-    } else if (normalized === 'contest') {
-      updateAutosaveStatus('コンテスト投稿は現在停止中です', 'warn');
     } else if (normalized === 'pixfind') {
       exportProjectToPixfind();
     } else if (normalized === 'project') {
       saveProjectAsPixieedraw();
-    } else {
-      window.alert('png / grid / gif / timelapse / pixfind / project のいずれかを入力してください。');
     }
   }
 
@@ -7983,7 +8199,7 @@
   }
 
   async function exportTimelapseGif() {
-    if (!ensureCurrentClientCanExportProject({ announce: true })) {
+    if (!ensureCurrentClientCanExportProject({ announce: true, format: 'timelapse' })) {
       return;
     }
     if (timelapseState.snapshots.length <= 0 && timelapseState.lastCaptureToken < 0) {
@@ -8054,6 +8270,13 @@
       }
       if (result.exportedCount > 0) {
         markDocumentDurablySaved();
+        if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
+          const companionResult = await maybeSaveProjectCompanionAfterExport('timelapse', {
+            exportedCount: result.exportedCount,
+            wasCancelled: result.wasCancelled,
+          });
+          announceProjectCompanionSaveResult('timelapse', companionResult);
+        }
         showExportInterstitialAfterImageExport();
       }
       syncTimelapseControls();
@@ -8143,7 +8366,7 @@
         state.activeLayer = lastLayer.id;
       }
     }
-    if (isMultiGuestMode()) {
+    if (isMultiAssignedCellRestrictedEditorMode()) {
       enforceGuestAssignedLayerSelection({ announce: false });
     }
     if (persist) {
@@ -8221,6 +8444,10 @@
     };
     bind(config.confirm, () => {
       const mode = normalizeExportFormat(config.format?.value || 'png');
+      if (!ensureCurrentClientCanExportProject({ announce: true, format: mode })) {
+        updateExportFormatAvailability();
+        return;
+      }
       if (mode === 'gif') {
         exportProjectAsGif();
       } else if (mode === 'gridpng') {
@@ -8255,6 +8482,7 @@
     if (config.format && config.format.dataset.bound !== 'true') {
       config.format.dataset.bound = 'true';
       config.format.addEventListener('change', () => {
+        updateExportFormatAvailability();
         updateExportOriginalToggleUI();
       });
     }
@@ -8265,6 +8493,16 @@
         exportIncludeOriginalSize = Boolean(event.target.checked);
         scheduleSessionPersist({ includeSnapshots: false });
         updateExportOriginalToggleUI();
+      });
+    }
+    if (config.saveProjectCompanionToggle instanceof HTMLInputElement
+      && config.saveProjectCompanionToggle.dataset.bound !== 'true') {
+      config.saveProjectCompanionToggle.dataset.bound = 'true';
+      config.saveProjectCompanionToggle.checked = exportSaveProjectCompanion;
+      config.saveProjectCompanionToggle.addEventListener('change', event => {
+        exportSaveProjectCompanion = Boolean(event.target.checked);
+        scheduleSessionPersist({ includeSnapshots: false });
+        updateExportProjectCompanionToggleUI();
       });
     }
 
@@ -8347,6 +8585,7 @@
     }
 
     syncExportGridInputs();
+    updateExportFormatAvailability();
     updateExportOriginalToggleUI();
   }
 
@@ -8479,6 +8718,66 @@
     }
     scheduleSessionPersist();
     return true;
+  }
+
+  function createStartupQuickProjectName() {
+    const now = new Date();
+    const yyyy = String(now.getFullYear());
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mi = String(now.getMinutes()).padStart(2, '0');
+    return normalizeDocumentName(`${DEFAULT_DOCUMENT_BASENAME}_${yyyy}${mm}${dd}_${hh}${mi}`);
+  }
+
+  function setStartupQuickSetupStatus(message, tone = 'info') {
+    const node = dom.startup?.quickSetupStatus;
+    if (!(node instanceof HTMLElement)) {
+      return;
+    }
+    node.textContent = message;
+    if (tone && tone !== 'info') {
+      node.dataset.tone = tone;
+    } else {
+      delete node.dataset.tone;
+    }
+  }
+
+  async function runStartupQuickSetup() {
+    const quickButton = dom.startup?.quickSetupButton;
+    if (!(quickButton instanceof HTMLButtonElement) || quickButton.disabled) {
+      return;
+    }
+    quickButton.disabled = true;
+    quickButton.setAttribute('aria-busy', 'true');
+    try {
+      if (EXPORT_DIRECTORY_SUPPORTED && !exportDirectoryHandle) {
+        setStartupQuickSetupStatus('かんたん初期設定: 出力フォルダを設定中…');
+        const bound = await requestExportDirectoryBinding();
+        if (!bound && !exportDirectoryHandle) {
+          setStartupQuickSetupStatus('出力フォルダ設定はスキップされました。後で「出力フォルダを設定」から変更できます。', 'warn');
+        }
+      } else {
+        setStartupQuickSetupStatus('かんたん初期設定: 新規作成を準備しています…');
+      }
+      const created = createNewProject({
+        name: createStartupQuickProjectName(),
+        width: lockedCanvasWidth !== null ? lockedCanvasWidth : DEFAULT_CANVAS_SIZE,
+        height: lockedCanvasHeight !== null ? lockedCanvasHeight : DEFAULT_CANVAS_SIZE,
+      });
+      if (!created) {
+        setStartupQuickSetupStatus('かんたん初期設定に失敗しました。通常の「新規作成」をお試しください。', 'error');
+        return;
+      }
+      setStartupQuickSetupStatus('かんたん初期設定が完了しました。', 'success');
+      hideStartupScreen();
+    } catch (error) {
+      console.warn('Startup quick setup failed', error);
+      setStartupQuickSetupStatus('かんたん初期設定に失敗しました。通常の「新規作成」をお試しください。', 'error');
+    } finally {
+      quickButton.removeAttribute('aria-busy');
+      quickButton.disabled = false;
+    }
   }
 
   function hasDismissedStartupScreen() {
@@ -8619,6 +8918,18 @@
         ? 'ファイルを開くと既存の自動保存先を引き継ぎます。'
         : 'このブラウザでは自動保存が利用できません。エクスポートをお忘れなく。';
     }
+    if (dom.startup?.quickSetupButton instanceof HTMLButtonElement) {
+      if (AUTOSAVE_SUPPORTED && EXPORT_DIRECTORY_SUPPORTED) {
+        dom.startup.quickSetupButton.textContent = '新規作成 + 保存先設定をまとめて行う';
+        setStartupQuickSetupStatus('初回だけ保存先を決めると、以後の保存/出力が楽になります。');
+      } else if (AUTOSAVE_SUPPORTED) {
+        dom.startup.quickSetupButton.textContent = '新規作成 + 保存先設定を行う';
+        setStartupQuickSetupStatus('このブラウザは固定フォルダ未対応です。保存先ファイルを選んで開始します。');
+      } else {
+        dom.startup.quickSetupButton.textContent = '新規作成（かんたん開始）';
+        setStartupQuickSetupStatus('このブラウザは自動保存未対応です。開始後は「保存/出力」から書き出してください。', 'warn');
+      }
+    }
     const updateToast = dom.startup?.updateToast;
     if (updateToast) {
       const updateId = updateToast.dataset.updateId || '';
@@ -8672,6 +8983,9 @@
       if (opened) {
         hideStartupScreen();
       }
+    });
+    dom.startup?.quickSetupButton?.addEventListener('click', async () => {
+      await runStartupQuickSetup();
     });
     dom.startup?.skipButton?.addEventListener('click', () => {
       hideStartupScreen();
@@ -8928,7 +9242,10 @@
   }
 
   async function clearStoredExportDirectoryHandle() {
-    if (!EXPORT_DIRECTORY_SUPPORTED) return;
+    if (!EXPORT_DIRECTORY_SUPPORTED) {
+      clearStoredExportDirectoryDisplayLabel();
+      return;
+    }
     try {
       const db = await openAutosaveDatabase();
       await new Promise((resolve, reject) => {
@@ -8949,6 +9266,7 @@
     } catch (error) {
       console.warn('Failed to clear export directory handle', error);
     }
+    clearStoredExportDirectoryDisplayLabel();
   }
 
   async function loadRecentProjectsMetadata() {
@@ -9606,7 +9924,7 @@
   }
 
   function getPixfindSendDisabledReason() {
-    const exportReason = getMultiExportDisabledReason();
+    const exportReason = getMultiExportDisabledReason('pixfind');
     if (exportReason) {
       return exportReason;
     }
@@ -9764,7 +10082,7 @@
   }
 
   function exportProjectToPixfind() {
-    if (!ensureCurrentClientCanExportProject({ announce: true })) {
+    if (!ensureCurrentClientCanExportProject({ announce: true, format: 'pixfind' })) {
       return;
     }
     if (!pixfindModeEnabled) {
@@ -9808,7 +10126,7 @@
   }
 
   async function exportProjectAsGridPng() {
-    if (!ensureCurrentClientCanExportProject({ announce: true })) {
+    if (!ensureCurrentClientCanExportProject({ announce: true, format: 'gridpng' })) {
       return;
     }
     const frameCount = state.frames.length;
@@ -9931,6 +10249,13 @@
 
       if (exportedCount > 0) {
         markDocumentDurablySaved();
+        if (exportedCount === total && !wasCancelled && !hadFailure) {
+          const companionResult = await maybeSaveProjectCompanionAfterExport('gridpng', {
+            exportedCount,
+            wasCancelled,
+          });
+          announceProjectCompanionSaveResult('gridpng', companionResult);
+        }
         showExportInterstitialAfterImageExport();
       }
     } catch (error) {
@@ -9940,7 +10265,7 @@
   }
 
   async function exportProjectAsPng() {
-    if (!ensureCurrentClientCanExportProject({ announce: true })) {
+    if (!ensureCurrentClientCanExportProject({ announce: true, format: 'png' })) {
       return;
     }
     const frameCount = state.frames.length;
@@ -10014,6 +10339,13 @@
       }
       if (result.exportedCount > 0) {
         markDocumentDurablySaved();
+        if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
+          const companionResult = await maybeSaveProjectCompanionAfterExport('png', {
+            exportedCount: result.exportedCount,
+            wasCancelled: result.wasCancelled,
+          });
+          announceProjectCompanionSaveResult('png', companionResult);
+        }
         showExportInterstitialAfterImageExport();
       }
     } catch (error) {
@@ -10023,7 +10355,7 @@
   }
 
   async function exportProjectAsGif() {
-    if (!ensureCurrentClientCanExportProject({ announce: true })) {
+    if (!ensureCurrentClientCanExportProject({ announce: true, format: 'gif' })) {
       return;
     }
     const frameCount = state.frames.length;
@@ -10089,6 +10421,13 @@
       }
       if (result.exportedCount > 0) {
         markDocumentDurablySaved();
+        if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
+          const companionResult = await maybeSaveProjectCompanionAfterExport('gif', {
+            exportedCount: result.exportedCount,
+            wasCancelled: result.wasCancelled,
+          });
+          announceProjectCompanionSaveResult('gif', companionResult);
+        }
         showExportInterstitialAfterImageExport();
       }
     } catch (error) {
@@ -10202,8 +10541,75 @@
     return 'png';
   }
 
+  function getExportFormatLabel(mode) {
+    const normalized = normalizeExportFormat(mode);
+    if (normalized === 'gridpng') return 'PNG（グリッド分割）';
+    if (normalized === 'gif') return 'GIF';
+    if (normalized === 'timelapse') return 'タイムラプスGIF';
+    if (normalized === 'pixfind') return 'PiXFiND送信';
+    if (normalized === 'project') return 'プロジェクト保存';
+    return 'PNG';
+  }
+
+  function updateExportFormatAvailability() {
+    const config = dom.exportDialog;
+    const select = config?.format;
+    if (!(select instanceof HTMLSelectElement)) {
+      return;
+    }
+    const options = Array.from(select.options || []);
+    let firstAllowedValue = '';
+    options.forEach(option => {
+      const mode = normalizeExportFormat(option.value || 'png');
+      const allowed = canCurrentClientExportProject(mode);
+      option.disabled = !allowed;
+      if (allowed && !firstAllowedValue) {
+        firstAllowedValue = option.value || mode;
+      }
+    });
+
+    const hasAllowedMode = Boolean(firstAllowedValue);
+    const currentMode = normalizeExportFormat(select.value || 'png');
+    if (!canCurrentClientExportProject(currentMode) && firstAllowedValue) {
+      select.value = firstAllowedValue;
+    }
+    select.disabled = !hasAllowedMode;
+
+    if (config?.confirm instanceof HTMLButtonElement) {
+      const activeMode = normalizeExportFormat(select.value || 'png');
+      const canConfirm = hasAllowedMode && canCurrentClientExportProject(activeMode);
+      config.confirm.disabled = !canConfirm;
+      const reason = canConfirm ? '' : getMultiExportDisabledReason(activeMode);
+      if (reason) {
+        config.confirm.title = reason;
+      } else {
+        config.confirm.removeAttribute('title');
+      }
+    }
+  }
+
   function isGridPngExportMode(mode) {
     return normalizeExportFormat(mode) === 'gridpng';
+  }
+
+  function canOfferProjectCompanionExport(mode) {
+    const format = normalizeExportFormat(mode);
+    return format === 'png' || format === 'gif' || format === 'gridpng' || format === 'timelapse';
+  }
+
+  function shouldSaveProjectCompanion(mode) {
+    return exportSaveProjectCompanion && canOfferProjectCompanionExport(mode);
+  }
+
+  function updateExportProjectCompanionToggleUI() {
+    const toggle = dom.exportDialog?.saveProjectCompanionToggle;
+    const mode = normalizeExportFormat(dom.exportDialog?.format?.value || 'png');
+    if (!(toggle instanceof HTMLInputElement)) {
+      return;
+    }
+    const canOffer = canOfferProjectCompanionExport(mode);
+    toggle.checked = exportSaveProjectCompanion;
+    toggle.disabled = !canOffer;
   }
 
   function normalizeExportGridTileSize(value, fallback = 8) {
@@ -10245,6 +10651,43 @@
     if (isGridMode) {
       syncExportGridInputs();
     }
+    updateExportProjectCompanionToggleUI();
+  }
+
+  async function maybeSaveProjectCompanionAfterExport(mode, { exportedCount = 0, wasCancelled = false } = {}) {
+    if (!shouldSaveProjectCompanion(mode)) {
+      return 'skipped';
+    }
+    if (!Number.isFinite(exportedCount) || exportedCount <= 0 || wasCancelled) {
+      return 'skipped';
+    }
+    const result = await saveProjectAsPixieedraw({ announceStatus: false });
+    if (result?.saved) {
+      return 'saved';
+    }
+    if (result?.cancelled) {
+      return 'cancelled';
+    }
+    return 'failed';
+  }
+
+  function announceProjectCompanionSaveResult(mode, result) {
+    if (result === 'skipped') {
+      return;
+    }
+    const format = normalizeExportFormat(mode);
+    const label = format === 'gridpng'
+      ? 'グリッド分割PNG'
+      : (format === 'timelapse' ? 'タイムラプスGIF' : String(format || '').toUpperCase());
+    if (result === 'saved') {
+      updateAutosaveStatus(`${label}出力後: PiXiEEDファイルも保存しました`, 'success');
+      return;
+    }
+    if (result === 'cancelled') {
+      updateAutosaveStatus(`${label}出力後: PiXiEEDファイルの同時保存をキャンセルしました`, 'warn');
+      return;
+    }
+    updateAutosaveStatus(`${label}出力後: PiXiEEDファイルの同時保存に失敗しました`, 'warn');
   }
 
   function applyExportScaleConstraints(candidates) {
@@ -10747,10 +11190,56 @@
     return 'window';
   }
 
-  async function saveProjectAsPixieedraw() {
-    if (!ensureCurrentClientCanExportProject({ announce: true })) {
-      return;
+  function getProjectFilePickerTypes() {
+    return [
+      {
+        description: 'PiXiEEDraw ドキュメント',
+        accept: {
+          'application/json': ['.json', '.pxdraw', '.pixieedraw'],
+          'application/x-pixieedraw': ['.pixieedraw'],
+        },
+      },
+    ];
+  }
+
+  async function saveProjectBlobToHandle(handle, blob, snapshot) {
+    if (!handle || !(blob instanceof Blob)) {
+      return false;
     }
+    try {
+      const granted = await ensureHandlePermission(handle, { request: true });
+      if (!granted) {
+        schedulePendingAutosavePermission(handle);
+        return false;
+      }
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+
+      autosaveHandle = handle;
+      pendingAutosaveHandle = null;
+      clearPendingPermissionListener();
+      if (dom.controls.enableAutosave) {
+        dom.controls.enableAutosave.textContent = '自動保存先を変更';
+      }
+      autosaveDirty = false;
+      markDocumentDurablySaved();
+      await storeAutosaveHandle(handle);
+      recordRecentProject(handle, snapshot).catch(error => {
+        console.warn('Failed to update recent projects snapshot', error);
+      });
+      return true;
+    } catch (error) {
+      console.warn('Project save via file handle failed', error);
+      return false;
+    }
+  }
+
+  async function saveProjectAsPixieedraw(options = {}) {
+    if (!ensureCurrentClientCanExportProject({ announce: true, format: 'project' })) {
+      return { saved: false, cancelled: false, skipped: true };
+    }
+    const announceStatus = options?.announceStatus !== false;
     try {
       const snapshot = makeHistorySnapshot();
       const payload = serializeDocumentSnapshot(snapshot);
@@ -10762,6 +11251,51 @@
       const json = JSON.stringify(packaged);
       const blob = new Blob([json], { type: 'application/json' });
       const filename = createAutosaveFileName();
+
+      const boundHandle = autosaveHandle || pendingAutosaveHandle;
+      if (boundHandle) {
+        const savedToBound = await saveProjectBlobToHandle(boundHandle, blob, snapshot);
+        if (savedToBound) {
+          if (announceStatus) {
+            updateAutosaveStatus('手動保存: PiXiEEDファイルへ保存しました', 'success');
+          }
+          return { saved: true, cancelled: false };
+        }
+      }
+
+      let selectedHandle = await getFileHandleInExportDirectory(filename, {
+        create: true,
+        requestPermission: true,
+      });
+      let pickerCancelled = false;
+      if (!selectedHandle && typeof window.showSaveFilePicker === 'function') {
+        try {
+          selectedHandle = await window.showSaveFilePicker({
+            suggestedName: filename,
+            types: getProjectFilePickerTypes(),
+          });
+        } catch (error) {
+          if (error && error.name === 'AbortError') {
+            pickerCancelled = true;
+          } else {
+            console.warn('Project save picker failed', error);
+          }
+          selectedHandle = null;
+        }
+      }
+      if (selectedHandle) {
+        const savedToSelected = await saveProjectBlobToHandle(selectedHandle, blob, snapshot);
+        if (savedToSelected) {
+          if (announceStatus) {
+            updateAutosaveStatus('手動保存: PiXiEEDファイルへ保存しました', 'success');
+          }
+          return { saved: true, cancelled: false };
+        }
+      }
+      if (pickerCancelled) {
+        return { saved: false, cancelled: true };
+      }
+
       const result = await triggerDownloadFromBlob(blob, filename, {
         mimeType: 'application/json',
         fileExtensions: [PROJECT_FILE_EXTENSION, '.json'],
@@ -10770,11 +11304,24 @@
       });
       if (result && !String(result).endsWith('cancel')) {
         markDocumentDurablySaved();
-        updateAutosaveStatus('手動保存: ファイルを書き出しました', 'success');
+        if (announceStatus) {
+          updateAutosaveStatus('手動保存: ファイルを書き出しました', 'success');
+        }
+        return { saved: true, cancelled: false };
       }
+      if (String(result || '').endsWith('cancel')) {
+        return { saved: false, cancelled: true };
+      }
+      if (announceStatus) {
+        updateAutosaveStatus('手動保存: ファイルを書き出せませんでした', 'error');
+      }
+      return { saved: false, cancelled: false };
     } catch (error) {
       console.error('Manual project save failed', error);
-      updateAutosaveStatus('手動保存: ファイルを書き出せませんでした', 'error');
+      if (announceStatus) {
+        updateAutosaveStatus('手動保存: ファイルを書き出せませんでした', 'error');
+      }
+      return { saved: false, cancelled: false };
     }
   }
 
@@ -17463,7 +18010,7 @@
         if (!layerId) {
           return;
         }
-        if (isMultiGuestMode()) {
+        if (isMultiAssignedCellRestrictedEditorMode()) {
           enforceGuestAssignedLayerSelection({ announce: true });
           clearTimelineSelection();
           scheduleSessionPersist();
@@ -17497,7 +18044,7 @@
         } else {
           clearTimelineSelection();
         }
-        if (isMultiGuestMode()) {
+        if (isMultiAssignedCellRestrictedEditorMode()) {
           enforceGuestAssignedLayerSelection({ announce: false });
         } else {
           const candidateLayers = state.frames[frameIndex]?.layers?.slice().reverse() || [];
@@ -17521,7 +18068,7 @@
           return;
         }
         state.activeFrame = frameIndex;
-        if (isMultiGuestMode()) {
+        if (isMultiAssignedCellRestrictedEditorMode()) {
           enforceGuestAssignedLayerSelection({ announce: true });
           clearTimelineSelection();
           scheduleSessionPersist();
@@ -17810,7 +18357,7 @@
         visibilityToggle.setAttribute('aria-pressed', String(rowVisibility));
         visibilityToggle.setAttribute('aria-label', rowVisibility ? 'レイヤーを非表示' : 'レイヤーを表示');
         visibilityToggle.textContent = rowVisibility ? '●' : '○';
-        visibilityToggle.disabled = isMultiGuestMode();
+        visibilityToggle.disabled = isMultiReadOnlyMode();
         rowVisibilityCell.appendChild(visibilityToggle);
 
         const tag = document.createElement('button');
@@ -17818,7 +18365,7 @@
         tag.className = 'timeline-layer-tag';
         tag.dataset.timelineLayerId = layer.id;
         tag.dataset.timelineLayerIndex = String(layerTrackIndex);
-        tag.disabled = isMultiGuestMode();
+        tag.disabled = isMultiReadOnlyMode();
         if (isMultiSelectedLayer) {
           tag.classList.add('is-selected');
         }
@@ -18212,6 +18759,10 @@
     if (!VIRTUAL_CURSOR_SUPPORTED_TOOLS.has(activeTool)) {
       return false;
     }
+    if (isResidentMultiToolRestrictedMode() && !isResidentMultiToolAllowed(activeTool)) {
+      setMultiStatus('この常設ルームでは範囲選択・移動系ツールは無効です', 'warn');
+      return false;
+    }
     const cell = getVirtualCursorCellPosition();
     if (!cell) {
       return false;
@@ -18222,7 +18773,7 @@
         setMultiStatus('視聴モードでは描画できません', 'warn');
         return false;
       }
-      if (isMultiGuestMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
+      if (isMultiAssignedCellRestrictedEditorMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
         return false;
       }
     }
@@ -19926,6 +20477,10 @@
     if (state.playback.isPlaying && activeTool !== 'pan') {
       return;
     }
+    if (isResidentMultiToolRestrictedMode() && !isResidentMultiToolAllowed(activeTool)) {
+      setMultiStatus('この常設ルームでは範囲選択・移動系ツールは無効です', 'warn');
+      return;
+    }
     // Spectator (viewer) mode: only allow pan interactions
     if (isMultiSpectatorMode()) {
       if (activeTool !== 'pan') {
@@ -19936,7 +20491,7 @@
     } else {
       // Non-spectator: existing restrictions for drawing guests
       if (HISTORY_DRAW_TOOLS.has(activeTool)) {
-        if (isMultiGuestMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
+        if (isMultiAssignedCellRestrictedEditorMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
           return;
         }
       }
@@ -20919,7 +21474,7 @@
       setMultiStatus('視聴モードでは描画できません', 'warn');
       return false;
     }
-    if (isMultiGuestMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
+    if (isMultiAssignedCellRestrictedEditorMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
       return false;
     }
     const layer = getActiveLayer();
@@ -21399,6 +21954,11 @@
   }
 
   function cutSelection() {
+    if (isResidentMultiToolRestrictedMode()) {
+      setMultiStatus('この常設ルームでは切り取りは使用できません', 'warn');
+      updateCanvasControlButtons();
+      return false;
+    }
     const moveState = snapshotSelectionForClipboard();
     if (!moveState) {
       updateCanvasControlButtons();
@@ -21859,6 +22419,7 @@
 
   function setPixelSingle(layer, x, y, paletteIndexOverride) {
     if (x < 0 || y < 0 || x >= state.width || y >= state.height) return;
+    if (!canCurrentClientEditResidentPoint(x, y)) return;
     if (state.selectionMask && state.selectionMask[y * state.width + x] !== 1) return;
     const index = y * state.width + x;
     const base = index * 4;
@@ -22108,6 +22669,12 @@
     if (x < 0 || y < 0 || x >= width || y >= height) {
       return;
     }
+    const residentPointEditable = isResidentMultiConnectedRoom()
+      ? buildResidentPointEditCheckerForClient(multiState.clientId, multiState.projectKey)
+      : null;
+    if (residentPointEditable && !residentPointEditable(x, y)) {
+      return;
+    }
     const paletteIndex = resolveDrawPaletteIndex(paletteIndexOverride);
     const indices = layer.indices instanceof Int16Array ? layer.indices : null;
     const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
@@ -22146,6 +22713,7 @@
       const px = stack.pop();
       if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
       if (px < 0 || py < 0 || px >= width || py >= height) continue;
+      if (residentPointEditable && !residentPointEditable(px, py)) continue;
       const idx = py * width + px;
       if (visited[idx]) continue;
       visited[idx] = 1;
@@ -23345,6 +23913,70 @@
     ctx.overlay.restore();
   }
 
+  function shouldRenderResident128SlotGuides(profile = getResidentMultiRoomProfile(multiState.projectKey)) {
+    if (!profile || typeof profile !== 'object') {
+      return false;
+    }
+    if (!isResidentMultiConnectedRoom()) {
+      return false;
+    }
+    if (profile.projectKey !== 'resident-128-main') {
+      return false;
+    }
+    const width = Math.round(Number(profile.width) || 0);
+    const height = Math.round(Number(profile.height) || 0);
+    const columns = Math.max(1, Math.round(Number(profile.slotColumns) || 1));
+    const rows = Math.max(1, Math.round(Number(profile.slotRows) || 1));
+    return width === 128 && height === 128 && columns === 4 && rows === 4;
+  }
+
+  function drawResident128SlotGuides() {
+    if (!ctx.overlay) {
+      return;
+    }
+    const profile = getResidentMultiRoomProfile(multiState.projectKey);
+    if (!shouldRenderResident128SlotGuides(profile)) {
+      return;
+    }
+    const columns = Math.max(1, Math.round(Number(profile.slotColumns) || 1));
+    const rows = Math.max(1, Math.round(Number(profile.slotRows) || 1));
+    const assignedRect = getResidentMultiAssignedRect(multiState.clientId);
+    const assignedColor = hexToRgba(getMultiAssignmentColorForClient(multiState.clientId)) || { r: 88, g: 196, b: 255, a: 255 };
+
+    ctx.overlay.save();
+    if (assignedRect && assignedRect.width > 0 && assignedRect.height > 0) {
+      const fillAlpha = isMultiReadOnlyMode() ? 0.1 : 0.16;
+      ctx.overlay.fillStyle = `rgba(${assignedColor.r}, ${assignedColor.g}, ${assignedColor.b}, ${fillAlpha})`;
+      ctx.overlay.fillRect(assignedRect.x, assignedRect.y, assignedRect.width, assignedRect.height);
+      ctx.overlay.strokeStyle = `rgba(${assignedColor.r}, ${assignedColor.g}, ${assignedColor.b}, 0.95)`;
+      ctx.overlay.lineWidth = 1;
+      ctx.overlay.strokeRect(
+        assignedRect.x + 0.5,
+        assignedRect.y + 0.5,
+        Math.max(0, assignedRect.width - 1),
+        Math.max(0, assignedRect.height - 1)
+      );
+    }
+
+    ctx.overlay.strokeStyle = 'rgba(255, 255, 255, 0.62)';
+    ctx.overlay.lineWidth = 1;
+    for (let col = 1; col < columns; col += 1) {
+      const x = getResidentMultiPartitionStart(profile.width, columns, col);
+      ctx.overlay.beginPath();
+      ctx.overlay.moveTo(x + 0.5, 0);
+      ctx.overlay.lineTo(x + 0.5, profile.height);
+      ctx.overlay.stroke();
+    }
+    for (let row = 1; row < rows; row += 1) {
+      const y = getResidentMultiPartitionStart(profile.height, rows, row);
+      ctx.overlay.beginPath();
+      ctx.overlay.moveTo(0, y + 0.5);
+      ctx.overlay.lineTo(profile.width, y + 0.5);
+      ctx.overlay.stroke();
+    }
+    ctx.overlay.restore();
+  }
+
   function renderOverlay(timestamp) {
     const { width, height } = state;
     if (state.playback.isPlaying) {
@@ -23399,6 +24031,7 @@
     }
     updateMirrorGuideHandles();
     renderOnionSkin();
+    drawResident128SlotGuides();
 
     if (hasSelectionOutline) {
       updateSelectionDashAnimation(now);
@@ -23819,6 +24452,12 @@
     if (x < 0 || y < 0 || x >= width || y >= height) {
       return [];
     }
+    const residentPointEditable = isResidentMultiConnectedRoom()
+      ? buildResidentPointEditCheckerForClient(multiState.clientId, multiState.projectKey)
+      : null;
+    if (residentPointEditable && !residentPointEditable(x, y)) {
+      return [];
+    }
     const selectionMask = state.selectionMask;
     const startIdx = y * width + x;
     if (selectionMask && selectionMask[startIdx] !== 1) {
@@ -23858,6 +24497,7 @@
       const px = stack.pop();
       if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
       if (px < 0 || py < 0 || px >= width || py >= height) continue;
+      if (residentPointEditable && !residentPointEditable(px, py)) continue;
       const idx = py * width + px;
       if (visited[idx]) continue;
       visited[idx] = 1;
@@ -23884,7 +24524,13 @@
       : 'none';
     const activeColor = state.palette[state.activePaletteIndex] || {};
     const colorKey = `index-${state.activePaletteIndex}-${activeColor.r ?? ''},${activeColor.g ?? ''},${activeColor.b ?? ''},${activeColor.a ?? ''}`;
-    return `${frame.id}|${layer.id}|${state.width}x${state.height}|${selectionKey}|${colorKey}`;
+    const residentSlotKey = isResidentMultiConnectedRoom()
+      ? `resident-slot-${Math.max(-1, getResidentMultiAssignedSlotIndex(multiState.clientId))}`
+      : 'resident-slot-none';
+    const residentOwnedKey = isResidentMultiConnectedRoom()
+      ? `resident-owned-${getResidentMultiOwnedSlotSignature(multiState.projectKey)}`
+      : 'resident-owned-none';
+    return `${frame.id}|${layer.id}|${state.width}x${state.height}|${selectionKey}|${colorKey}|${residentSlotKey}|${residentOwnedKey}`;
   }
 
   function ensureFillPreviewLookup(contextKey) {
@@ -24572,6 +25218,7 @@
         pixfindMode: Boolean(pixfindModeEnabled),
         pixfindModeFirstEnableConfirmed: Boolean(pixfindModeFirstEnableConfirmed),
         exportIncludeOriginalSize: Boolean(exportIncludeOriginalSize),
+        exportSaveProjectCompanion: Boolean(exportSaveProjectCompanion),
         exportGridTileWidth: normalizeExportGridTileSize(exportGridTileWidth, 8),
         exportGridTileHeight: normalizeExportGridTileSize(exportGridTileHeight, 8),
         timelapseEnabled: Boolean(timelapseState.enabled),
@@ -24581,6 +25228,11 @@
           multiState.roomVisibility,
           MULTI_DEFAULT_ROOM_VISIBILITY
         ),
+        multiJoinPolicy: normalizeMultiJoinPolicy(
+          multiState.joinPolicy,
+          MULTI_DEFAULT_JOIN_POLICY
+        ),
+        multiMasterOpsMode: Boolean(multiState.masterOpsMode),
         multiExportPermission: normalizeMultiExportPermission(
           multiState.exportPermission,
           MULTI_DEFAULT_EXPORT_PERMISSION
@@ -24739,6 +25391,9 @@
     if (typeof payload.exportIncludeOriginalSize === 'boolean') {
       exportIncludeOriginalSize = payload.exportIncludeOriginalSize;
     }
+    if (typeof payload.exportSaveProjectCompanion === 'boolean') {
+      exportSaveProjectCompanion = payload.exportSaveProjectCompanion;
+    }
     if (Number.isFinite(payload.exportGridTileWidth)) {
       exportGridTileWidth = normalizeExportGridTileSize(payload.exportGridTileWidth, exportGridTileWidth);
     }
@@ -24759,6 +25414,15 @@
         payload.multiRoomVisibility,
         multiState.roomVisibility
       );
+    }
+    if (typeof payload.multiJoinPolicy === 'string') {
+      multiState.joinPolicy = normalizeMultiJoinPolicy(
+        payload.multiJoinPolicy,
+        multiState.joinPolicy
+      );
+    }
+    if (typeof payload.multiMasterOpsMode === 'boolean') {
+      multiState.masterOpsMode = payload.multiMasterOpsMode;
     }
     if (typeof payload.multiExportPermission === 'string') {
       multiState.exportPermission = normalizeMultiExportPermission(
@@ -24803,6 +25467,84 @@
       return fallback;
     }
     return MULTI_EXPORT_PERMISSION_MASTER;
+  }
+
+  function normalizeMultiJoinPolicy(value, fallback = MULTI_DEFAULT_JOIN_POLICY) {
+    if (value === MULTI_JOIN_POLICY_OPEN) {
+      return MULTI_JOIN_POLICY_OPEN;
+    }
+    if (value === MULTI_JOIN_POLICY_APPROVAL) {
+      return MULTI_JOIN_POLICY_APPROVAL;
+    }
+    return fallback === MULTI_JOIN_POLICY_OPEN
+      ? MULTI_JOIN_POLICY_OPEN
+      : MULTI_JOIN_POLICY_APPROVAL;
+  }
+
+  function getMultiJoinPolicyLabel(value = multiState.joinPolicy) {
+    return normalizeMultiJoinPolicy(value, MULTI_DEFAULT_JOIN_POLICY) === MULTI_JOIN_POLICY_OPEN
+      ? '自動参加'
+      : '承認制';
+  }
+
+  function applyMultiMasterPreset(preset = 'friends') {
+    if (!isMultiMasterConfigMode()) {
+      return false;
+    }
+    const normalizedPreset = preset === 'stream' ? 'stream' : 'friends';
+    let changed = false;
+    if (normalizedPreset === 'friends') {
+      const nextJoinPolicy = MULTI_JOIN_POLICY_OPEN;
+      const nextRoomVisibility = MULTI_ROOM_VISIBILITY_PUBLIC;
+      const nextExportPermission = MULTI_EXPORT_PERMISSION_MASTER_AND_GUEST;
+      if (multiState.joinPolicy !== nextJoinPolicy) {
+        multiState.joinPolicy = nextJoinPolicy;
+        changed = true;
+      }
+      if (multiState.roomVisibility !== nextRoomVisibility) {
+        multiState.roomVisibility = nextRoomVisibility;
+        changed = true;
+      }
+      if (multiState.exportPermission !== nextExportPermission) {
+        multiState.exportPermission = nextExportPermission;
+        changed = true;
+      }
+    } else {
+      const nextJoinPolicy = MULTI_JOIN_POLICY_APPROVAL;
+      const nextRoomVisibility = MULTI_ROOM_VISIBILITY_PRIVATE;
+      const nextExportPermission = MULTI_EXPORT_PERMISSION_MASTER;
+      if (multiState.joinPolicy !== nextJoinPolicy) {
+        multiState.joinPolicy = nextJoinPolicy;
+        changed = true;
+      }
+      if (multiState.roomVisibility !== nextRoomVisibility) {
+        multiState.roomVisibility = nextRoomVisibility;
+        changed = true;
+      }
+      if (multiState.exportPermission !== nextExportPermission) {
+        multiState.exportPermission = nextExportPermission;
+        changed = true;
+      }
+      if (multiState.masterOpsMode) {
+        multiState.masterOpsMode = false;
+        changed = true;
+      }
+    }
+    if (changed) {
+      scheduleSessionPersist({ includeSnapshots: false });
+      if (isMultiMasterMode()) {
+        scheduleMultiSessionStateBroadcast({ immediate: true });
+        scheduleMultiPublicLobbyRoomSync({ immediate: true });
+      }
+    }
+    setMultiStatus(
+      normalizedPreset === 'friends'
+        ? 'クイック設定: 友達向け（自動参加）を適用しました'
+        : 'クイック設定: 配信向け（承認制）を適用しました',
+      'success'
+    );
+    syncMultiControls();
+    return true;
   }
 
   function getMultiExportPermissionLabel(permission = multiState.exportPermission) {
@@ -25055,9 +25797,13 @@
     }, MULTI_PUBLIC_ROOM_SYNC_THROTTLE_MS);
   }
 
-  function canCurrentClientExportProject() {
+  function canCurrentClientExportProject(format = 'png') {
+    const normalizedFormat = normalizeExportFormat(format);
     if (!multiState.connected) {
       return true;
+    }
+    if (isResidentMultiConnectedRoom()) {
+      return normalizedFormat === 'png';
     }
     const permission = normalizeMultiExportPermission(
       multiState.exportPermission,
@@ -25081,15 +25827,19 @@
     return true;
   }
 
-  function getMultiExportDisabledReason() {
-    if (!multiState.connected || canCurrentClientExportProject()) {
+  function getMultiExportDisabledReason(format = 'png') {
+    const normalizedFormat = normalizeExportFormat(format);
+    if (!multiState.connected || canCurrentClientExportProject(normalizedFormat)) {
       return '';
+    }
+    if (isResidentMultiConnectedRoom()) {
+      return `${getExportFormatLabel(normalizedFormat)}は常設ルームで出力できません（PNGのみ）`;
     }
     return `出力は${getMultiExportPermissionLabel()}に制限されています`;
   }
 
-  function ensureCurrentClientCanExportProject({ announce = true } = {}) {
-    const reason = getMultiExportDisabledReason();
+  function ensureCurrentClientCanExportProject({ announce = true, format = 'png' } = {}) {
+    const reason = getMultiExportDisabledReason(format);
     if (!reason) {
       return true;
     }
@@ -25143,6 +25893,475 @@
       .slice(0, 40);
   }
 
+  function getResidentMultiRoomProfile(projectKey) {
+    const normalizedKey = normalizeMultiProjectKey(projectKey);
+    if (!normalizedKey) {
+      return null;
+    }
+    const profile = RESIDENT_MULTI_ROOM_PROFILES[normalizedKey];
+    if (!profile || typeof profile !== 'object') {
+      return null;
+    }
+    const width = clamp(Math.round(Number(profile.width) || 0), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    const height = clamp(Math.round(Number(profile.height) || 0), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    const maxGuests = normalizeMultiMaxGuests(profile.maxGuests, multiState.maxGuests);
+    const roomVisibility = normalizeMultiRoomVisibility(
+      profile.roomVisibility,
+      MULTI_ROOM_VISIBILITY_PUBLIC
+    );
+    const slotColumns = clamp(
+      Math.round(Number(profile.slotColumns) || 0),
+      1,
+      Math.max(1, maxGuests + 1)
+    );
+    const slotRows = clamp(
+      Math.round(Number(profile.slotRows) || 0),
+      1,
+      Math.max(1, maxGuests + 1)
+    );
+    const slotCount = Math.max(1, Math.max(maxGuests + 1, slotColumns * slotRows));
+    return {
+      projectKey: normalizedKey,
+      width,
+      height,
+      maxGuests,
+      slotColumns,
+      slotRows,
+      slotCount,
+      roomVisibility,
+    };
+  }
+
+  function isResidentMultiProjectKey(projectKey = multiState.projectKey) {
+    return Boolean(getResidentMultiRoomProfile(projectKey));
+  }
+
+  function isResidentMultiConnectedRoom() {
+    return multiState.connected && isResidentMultiProjectKey(multiState.projectKey);
+  }
+
+  function isResidentMultiRestrictedMasterMode() {
+    return isMultiMasterMode() && isResidentMultiProjectKey(multiState.projectKey);
+  }
+
+  function isMultiAssignedCellRestrictedEditorMode() {
+    return isMultiGuestMode() || isResidentMultiRestrictedMasterMode();
+  }
+
+  function isResidentMultiToolRestrictedMode() {
+    return isResidentMultiConnectedRoom() && (isMultiGuestMode() || isResidentMultiRestrictedMasterMode());
+  }
+
+  function isResidentMultiToolAllowed(toolId) {
+    const tool = normalizeToolId(toolId, 'pen');
+    return tool === 'pan'
+      || tool === 'pen'
+      || tool === 'eraser'
+      || tool === 'line'
+      || tool === 'curve'
+      || tool === 'rect'
+      || tool === 'rectFill'
+      || tool === 'ellipse'
+      || tool === 'ellipseFill'
+      || tool === 'fill'
+      || tool === 'eyedropper';
+  }
+
+  function getResidentMultiSlotCount(profile = getResidentMultiRoomProfile(multiState.projectKey)) {
+    if (!profile || typeof profile !== 'object') {
+      return 0;
+    }
+    const slotCount = Math.round(Number(profile.slotCount) || 0);
+    return Math.max(0, slotCount);
+  }
+
+  function normalizeResidentMultiSlotIndex(slotIndex, profile = getResidentMultiRoomProfile(multiState.projectKey)) {
+    const slotCount = getResidentMultiSlotCount(profile);
+    if (!slotCount) {
+      return -1;
+    }
+    const normalized = Math.round(Number(slotIndex) || 0);
+    if (!Number.isFinite(normalized)) {
+      return -1;
+    }
+    return clamp(normalized, 0, slotCount - 1);
+  }
+
+  function getResidentMultiPrimaryLayer() {
+    const frame = Array.isArray(state.frames) && state.frames.length ? state.frames[0] : null;
+    if (!frame || !Array.isArray(frame.layers) || !frame.layers.length) {
+      return null;
+    }
+    return frame.layers[0] || null;
+  }
+
+  function createResidentFlattenedPrimaryLayer(width = state.width, height = state.height) {
+    const flattenedLayer = createLayer('常設キャンバス', width, height);
+    try {
+      const composite = buildPlaybackFrameImageData(0);
+      if (composite && composite.data instanceof Uint8ClampedArray) {
+        flattenedLayer.indices.fill(-1);
+        const direct = ensureLayerDirect(flattenedLayer, width, height);
+        direct.set(composite.data);
+      }
+    } catch (error) {
+      // If flattening fails, keep an empty layer.
+    }
+    flattenedLayer.visible = true;
+    flattenedLayer.opacity = 1;
+    flattenedLayer.blendMode = DEFAULT_LAYER_BLEND_MODE;
+    return flattenedLayer;
+  }
+
+  function ensureResidentSingleFrameSingleLayer(profile = getResidentMultiRoomProfile(multiState.projectKey)) {
+    if (!profile || typeof profile !== 'object') {
+      return false;
+    }
+    const targetWidth = clamp(Math.round(Number(profile.width) || state.width), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    const targetHeight = clamp(Math.round(Number(profile.height) || state.height), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    let changed = false;
+    if (!Array.isArray(state.frames) || !state.frames.length) {
+      state.frames = [createFrame('フレーム 1', [createLayer('常設キャンバス', targetWidth, targetHeight)], targetWidth, targetHeight)];
+      changed = true;
+    }
+    const frame0 = state.frames[0];
+    const hasSingleFrame = state.frames.length === 1;
+    const hasSingleLayer = Boolean(frame0 && Array.isArray(frame0.layers) && frame0.layers.length === 1);
+    if (!hasSingleFrame || !hasSingleLayer) {
+      const flattenedLayer = createResidentFlattenedPrimaryLayer(targetWidth, targetHeight);
+      const baseFrameName = typeof frame0?.name === 'string' && frame0.name.trim() ? frame0.name.trim() : 'フレーム 1';
+      const baseDuration = Number.isFinite(Number(frame0?.duration)) && Number(frame0.duration) > 0
+        ? Number(frame0.duration)
+        : (1000 / 12);
+      state.frames = [{
+        id: (typeof frame0?.id === 'string' && frame0.id.trim()) ? frame0.id.trim() : (crypto.randomUUID ? crypto.randomUUID() : `frame-${Math.random().toString(36).slice(2)}`),
+        name: baseFrameName,
+        duration: baseDuration,
+        layers: [flattenedLayer],
+      }];
+      changed = true;
+    }
+    const primaryLayer = getResidentMultiPrimaryLayer();
+    if (!primaryLayer) {
+      return changed;
+    }
+    if (!primaryLayer.visible) {
+      primaryLayer.visible = true;
+      changed = true;
+    }
+    if (normalizeLayerOpacity(primaryLayer.opacity) !== 1) {
+      primaryLayer.opacity = 1;
+      changed = true;
+    }
+    if (normalizeLayerBlendMode(primaryLayer.blendMode) !== DEFAULT_LAYER_BLEND_MODE) {
+      primaryLayer.blendMode = DEFAULT_LAYER_BLEND_MODE;
+      changed = true;
+    }
+    if (state.activeFrame !== 0) {
+      state.activeFrame = 0;
+      changed = true;
+    }
+    if (state.activeLayer !== primaryLayer.id) {
+      state.activeLayer = primaryLayer.id;
+      changed = true;
+    }
+    return changed;
+  }
+
+  function getResidentMultiPartitionStart(length, parts, index) {
+    const safeLength = Math.max(1, Math.floor(Number(length) || 1));
+    const safeParts = Math.max(1, Math.floor(Number(parts) || 1));
+    const safeIndex = clamp(Math.floor(Number(index) || 0), 0, safeParts - 1);
+    const base = Math.floor(safeLength / safeParts);
+    const rest = safeLength % safeParts;
+    return (safeIndex * base) + Math.min(safeIndex, rest);
+  }
+
+  function getResidentMultiPartitionSize(length, parts, index) {
+    const safeLength = Math.max(1, Math.floor(Number(length) || 1));
+    const safeParts = Math.max(1, Math.floor(Number(parts) || 1));
+    const safeIndex = clamp(Math.floor(Number(index) || 0), 0, safeParts - 1);
+    const base = Math.floor(safeLength / safeParts);
+    const rest = safeLength % safeParts;
+    return base + (safeIndex < rest ? 1 : 0);
+  }
+
+  function getResidentMultiSlotRect(slotIndex, projectKey = multiState.projectKey) {
+    const profile = getResidentMultiRoomProfile(projectKey);
+    if (!profile) {
+      return null;
+    }
+    const normalizedSlot = normalizeResidentMultiSlotIndex(slotIndex, profile);
+    if (normalizedSlot < 0) {
+      return null;
+    }
+    const columns = Math.max(1, Math.round(Number(profile.slotColumns) || 1));
+    const rows = Math.max(1, Math.round(Number(profile.slotRows) || 1));
+    const colIndex = normalizedSlot % columns;
+    const rowIndex = clamp(Math.floor(normalizedSlot / columns), 0, rows - 1);
+    const x = getResidentMultiPartitionStart(profile.width, columns, colIndex);
+    const y = getResidentMultiPartitionStart(profile.height, rows, rowIndex);
+    const width = getResidentMultiPartitionSize(profile.width, columns, colIndex);
+    const height = getResidentMultiPartitionSize(profile.height, rows, rowIndex);
+    return {
+      slotIndex: normalizedSlot,
+      x,
+      y,
+      width,
+      height,
+      xEnd: x + width,
+      yEnd: y + height,
+    };
+  }
+
+  function getResidentMultiSlotIndexFromPoint(x, y, projectKey = multiState.projectKey) {
+    const profile = getResidentMultiRoomProfile(projectKey);
+    if (!profile) {
+      return -1;
+    }
+    const px = Math.floor(Number(x) || 0);
+    const py = Math.floor(Number(y) || 0);
+    if (px < 0 || py < 0 || px >= profile.width || py >= profile.height) {
+      return -1;
+    }
+    const slotCount = getResidentMultiSlotCount(profile);
+    for (let slot = 0; slot < slotCount; slot += 1) {
+      const rect = getResidentMultiSlotRect(slot, profile.projectKey);
+      if (isResidentMultiPointInsideRect(px, py, rect)) {
+        return slot;
+      }
+    }
+    return -1;
+  }
+
+  function isResidentMultiPointInsideRect(x, y, rect) {
+    if (!rect || typeof rect !== 'object') {
+      return false;
+    }
+    const px = Math.floor(Number(x) || 0);
+    const py = Math.floor(Number(y) || 0);
+    return px >= rect.x && py >= rect.y && px < rect.xEnd && py < rect.yEnd;
+  }
+
+  function getResidentMultiAssignedSlotIndex(clientId = multiState.clientId) {
+    if (!isResidentMultiProjectKey(multiState.projectKey)) {
+      return -1;
+    }
+    const assignment = getMultiAssignment(clientId);
+    if (!assignment || typeof assignment !== 'object') {
+      return -1;
+    }
+    const role = normalizeMultiRole(assignment.role, 'guest');
+    if (role !== 'guest' && role !== 'master') {
+      return -1;
+    }
+    const profile = getResidentMultiRoomProfile(multiState.projectKey);
+    if (!profile) {
+      return -1;
+    }
+    const slotFromEntry = Number.isFinite(Number(assignment.residentSlot))
+      ? Number(assignment.residentSlot)
+      : Number(assignment.trackHint);
+    const normalizedSlot = normalizeResidentMultiSlotIndex(slotFromEntry, profile);
+    return normalizedSlot;
+  }
+
+  function getResidentMultiAssignedRect(clientId = multiState.clientId) {
+    const slotIndex = getResidentMultiAssignedSlotIndex(clientId);
+    if (slotIndex < 0) {
+      return null;
+    }
+    return getResidentMultiSlotRect(slotIndex, multiState.projectKey);
+  }
+
+  function isResidentMultiSlotOwned(slotIndex, projectKey = multiState.projectKey) {
+    const profile = getResidentMultiRoomProfile(projectKey);
+    const normalizedSlot = normalizeResidentMultiSlotIndex(slotIndex, profile);
+    if (!profile || normalizedSlot < 0) {
+      return false;
+    }
+    let owned = false;
+    multiState.assignments.forEach(entry => {
+      if (!entry || typeof entry !== 'object' || owned) {
+        return;
+      }
+      const role = normalizeMultiRole(entry.role, 'guest');
+      if (role !== 'guest' && role !== 'master') {
+        return;
+      }
+      const entrySlot = normalizeResidentMultiSlotIndex(
+        Number.isFinite(Number(entry.residentSlot)) ? Number(entry.residentSlot) : Number(entry.trackHint),
+        profile
+      );
+      if (entrySlot === normalizedSlot) {
+        owned = true;
+      }
+    });
+    return owned;
+  }
+
+  function getResidentMultiOwnedSlotSignature(projectKey = multiState.projectKey) {
+    const profile = getResidentMultiRoomProfile(projectKey);
+    if (!profile) {
+      return 'none';
+    }
+    const entries = [];
+    multiState.assignments.forEach((entry, clientId) => {
+      if (!entry || typeof entry !== 'object') {
+        return;
+      }
+      const role = normalizeMultiRole(entry.role, 'guest');
+      if (role !== 'guest' && role !== 'master') {
+        return;
+      }
+      const slot = normalizeResidentMultiSlotIndex(
+        Number.isFinite(Number(entry.residentSlot)) ? Number(entry.residentSlot) : Number(entry.trackHint),
+        profile
+      );
+      if (slot < 0) {
+        return;
+      }
+      const normalizedClientId = typeof clientId === 'string' ? clientId.trim() : '';
+      entries.push(`${slot}:${normalizedClientId}`);
+    });
+    if (!entries.length) {
+      return 'none';
+    }
+    entries.sort((a, b) => a.localeCompare(b));
+    return entries.join('|');
+  }
+
+  function buildResidentPointEditCheckerForClient(clientId = multiState.clientId, projectKey = multiState.projectKey) {
+    const profile = getResidentMultiRoomProfile(projectKey);
+    if (!profile) {
+      return null;
+    }
+    const assignment = getMultiAssignment(clientId);
+    const roleFallback = clientId === multiState.clientId
+      ? normalizeMultiRole(multiState.role, 'guest')
+      : 'guest';
+    const role = normalizeMultiRole(assignment?.role, roleFallback);
+    if (role === 'spectator') {
+      return () => false;
+    }
+    const assignedSlot = normalizeResidentMultiSlotIndex(
+      Number.isFinite(Number(assignment?.residentSlot)) ? Number(assignment.residentSlot) : Number(assignment?.trackHint),
+      profile
+    );
+    const assignedRect = assignedSlot >= 0
+      ? getResidentMultiSlotRect(assignedSlot, profile.projectKey)
+      : null;
+    const ownedSlots = new Set();
+    multiState.assignments.forEach(entry => {
+      if (!entry || typeof entry !== 'object') {
+        return;
+      }
+      const entryRole = normalizeMultiRole(entry.role, 'guest');
+      if (entryRole !== 'guest' && entryRole !== 'master') {
+        return;
+      }
+      const slot = normalizeResidentMultiSlotIndex(
+        Number.isFinite(Number(entry.residentSlot)) ? Number(entry.residentSlot) : Number(entry.trackHint),
+        profile
+      );
+      if (slot >= 0) {
+        ownedSlots.add(slot);
+      }
+    });
+    return (x, y) => {
+      if (assignedRect && isResidentMultiPointInsideRect(x, y, assignedRect)) {
+        return true;
+      }
+      const slotIndex = getResidentMultiSlotIndexFromPoint(x, y, profile.projectKey);
+      if (slotIndex < 0) {
+        return false;
+      }
+      return !ownedSlots.has(slotIndex);
+    };
+  }
+
+  function canCurrentClientEditResidentPoint(x, y) {
+    if (!isResidentMultiConnectedRoom()) {
+      return true;
+    }
+    if (isMultiSpectatorMode()) {
+      return false;
+    }
+    const assignedRect = getResidentMultiAssignedRect(multiState.clientId);
+    if (assignedRect && isResidentMultiPointInsideRect(x, y, assignedRect)) {
+      return true;
+    }
+    const slotIndex = getResidentMultiSlotIndexFromPoint(x, y, multiState.projectKey);
+    if (slotIndex < 0) {
+      return false;
+    }
+    return !isResidentMultiSlotOwned(slotIndex, multiState.projectKey);
+  }
+
+  function applyResidentMultiRoomProfile(profile, { announce = false } = {}) {
+    if (!profile || typeof profile !== 'object' || !isMultiMasterMode()) {
+      return false;
+    }
+    const targetWidth = clamp(Math.round(Number(profile.width) || state.width), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    const targetHeight = clamp(Math.round(Number(profile.height) || state.height), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    const targetMaxGuests = normalizeMultiMaxGuests(profile.maxGuests, multiState.maxGuests);
+    const targetVisibility = normalizeMultiRoomVisibility(
+      profile.roomVisibility,
+      MULTI_ROOM_VISIBILITY_PUBLIC
+    );
+
+    let updated = false;
+    if (ensureResidentSingleFrameSingleLayer(profile)) {
+      updated = true;
+    }
+    if (multiState.maxGuests !== targetMaxGuests) {
+      multiState.maxGuests = targetMaxGuests;
+      updated = true;
+    }
+    if (multiState.roomVisibility !== targetVisibility) {
+      multiState.roomVisibility = targetVisibility;
+      updated = true;
+    }
+
+    if (state.width !== targetWidth || state.height !== targetHeight) {
+      const previousWidth = state.width;
+      const previousHeight = state.height;
+      beginHistory('residentProfileResize');
+      resizeAllLayers(targetWidth, targetHeight);
+      state.width = targetWidth;
+      state.height = targetHeight;
+      rescaleMirrorPivotForCanvas(previousWidth, previousHeight, targetWidth, targetHeight);
+      if (dom.controls.canvasWidth) {
+        dom.controls.canvasWidth.value = String(targetWidth);
+      }
+      if (dom.controls.canvasHeight) {
+        dom.controls.canvasHeight.value = String(targetHeight);
+      }
+      markHistoryDirty();
+      resizeCanvases();
+      clearSelection();
+      requestRender();
+      requestOverlayRender();
+      commitHistory();
+      updated = true;
+    }
+
+    if (!updated) {
+      return false;
+    }
+    renderFrameList();
+    renderLayerList();
+    syncControlsWithState();
+    requestRender();
+    requestOverlayRender();
+    syncMultiControls();
+    scheduleSessionPersist({ includeSnapshots: false });
+    if (announce) {
+      setMultiStatus(`共有モード: 常駐ルーム設定を適用 (${profile.projectKey || multiState.projectKey})`, 'info');
+    }
+    return true;
+  }
+
   function parseMultiBooleanQueryValue(value) {
     if (typeof value !== 'string') {
       return false;
@@ -25151,21 +26370,39 @@
     return normalized === '1' || normalized === 'true' || normalized === 'yes';
   }
 
-  function buildMultiInviteUrl(projectKey = multiState.projectKey) {
+  function resolveMultiInviteDefaultRole() {
+    const joinPolicy = normalizeMultiJoinPolicy(
+      multiState.joinPolicy,
+      MULTI_DEFAULT_JOIN_POLICY
+    );
+    return joinPolicy === MULTI_JOIN_POLICY_OPEN ? 'guest' : 'spectator';
+  }
+
+  function buildMultiInviteUrl(projectKey = multiState.projectKey, options = {}) {
     const normalizedKey = normalizeMultiProjectKey(projectKey);
     if (!normalizedKey) {
       return '';
     }
+    const requestedRole = options && typeof options.role === 'string' ? options.role.trim().toLowerCase() : '';
+    const inviteRole = requestedRole === 'master' || requestedRole === 'guest' || requestedRole === 'spectator'
+      ? requestedRole
+      : '';
     try {
       const url = new URL(window.location.href);
       url.searchParams.set(MULTI_INVITE_QUERY_FLAG, '1');
       url.searchParams.set(MULTI_INVITE_QUERY_KEY, normalizedKey);
       url.searchParams.set(MULTI_INVITE_QUERY_AUTO_JOIN, '1');
+      if (inviteRole) {
+        url.searchParams.set(MULTI_INVITE_QUERY_ROLE, inviteRole);
+      } else {
+        url.searchParams.delete(MULTI_INVITE_QUERY_ROLE);
+      }
       return url.toString();
     } catch (error) {
       const origin = window.location.origin || '';
       const path = window.location.pathname || '/';
-      return `${origin}${path}?${MULTI_INVITE_QUERY_FLAG}=1&${MULTI_INVITE_QUERY_KEY}=${encodeURIComponent(normalizedKey)}&${MULTI_INVITE_QUERY_AUTO_JOIN}=1`;
+      const rolePart = inviteRole ? `&${MULTI_INVITE_QUERY_ROLE}=${encodeURIComponent(inviteRole)}` : '';
+      return `${origin}${path}?${MULTI_INVITE_QUERY_FLAG}=1&${MULTI_INVITE_QUERY_KEY}=${encodeURIComponent(normalizedKey)}&${MULTI_INVITE_QUERY_AUTO_JOIN}=1${rolePart}`;
     }
   }
 
@@ -25173,7 +26410,7 @@
     try {
       const url = new URL(window.location.href);
       let changed = false;
-      [MULTI_INVITE_QUERY_FLAG, MULTI_INVITE_QUERY_KEY, MULTI_INVITE_QUERY_AUTO_JOIN].forEach(key => {
+      [MULTI_INVITE_QUERY_FLAG, MULTI_INVITE_QUERY_KEY, MULTI_INVITE_QUERY_AUTO_JOIN, MULTI_INVITE_QUERY_ROLE].forEach(key => {
         if (url.searchParams.has(key)) {
           url.searchParams.delete(key);
           changed = true;
@@ -25237,6 +26474,7 @@
     multiState.resumeBlockedClientIds = null;
     multiState.resumeMaxGuests = null;
     multiState.resumeRoomVisibility = null;
+    multiState.resumeJoinPolicy = null;
     multiState.resumeExportPermission = null;
     syncMultiControls();
     setMultiStatus(`共有モード: 招待リンクを読み込みました (${invite.projectKey})`, 'info');
@@ -25244,7 +26482,8 @@
     if (invite.autoJoin) {
       window.setTimeout(() => {
         if (!multiState.connected && !multiState.connecting) {
-          connectMultiSessionAs(requestedRole);
+          const allowGuestJoin = requestedRole === 'guest';
+          connectMultiSessionAs(requestedRole, { allowGuestJoin });
         }
       }, 100);
     }
@@ -25317,6 +26556,12 @@
           MULTI_DEFAULT_ROOM_VISIBILITY
         )
         : MULTI_DEFAULT_ROOM_VISIBILITY,
+      joinPolicy: role === 'master'
+        ? normalizeMultiJoinPolicy(
+          multiState.joinPolicy,
+          MULTI_DEFAULT_JOIN_POLICY
+        )
+        : MULTI_DEFAULT_JOIN_POLICY,
       exportPermission: role === 'master'
         ? normalizeMultiExportPermission(multiState.exportPermission, MULTI_DEFAULT_EXPORT_PERMISSION)
         : MULTI_DEFAULT_EXPORT_PERMISSION,
@@ -25369,6 +26614,9 @@
     const roomVisibility = role === 'master'
       ? normalizeMultiRoomVisibility(parsed.roomVisibility, MULTI_DEFAULT_ROOM_VISIBILITY)
       : MULTI_DEFAULT_ROOM_VISIBILITY;
+    const joinPolicy = role === 'master'
+      ? normalizeMultiJoinPolicy(parsed.joinPolicy, MULTI_DEFAULT_JOIN_POLICY)
+      : MULTI_DEFAULT_JOIN_POLICY;
     const exportPermission = role === 'master'
       ? normalizeMultiExportPermission(parsed.exportPermission, MULTI_DEFAULT_EXPORT_PERMISSION)
       : MULTI_DEFAULT_EXPORT_PERMISSION;
@@ -25379,6 +26627,7 @@
       blockedClientIds,
       maxGuests,
       roomVisibility,
+      joinPolicy,
       exportPermission,
     };
   }
@@ -25411,6 +26660,9 @@
     multiState.resumeRoomVisibility = pending.role === 'master'
       ? normalizeMultiRoomVisibility(pending.roomVisibility, multiState.roomVisibility)
       : null;
+    multiState.resumeJoinPolicy = pending.role === 'master'
+      ? normalizeMultiJoinPolicy(pending.joinPolicy, multiState.joinPolicy)
+      : null;
     multiState.resumeExportPermission = pending.role === 'master'
       ? normalizeMultiExportPermission(pending.exportPermission, multiState.exportPermission)
       : null;
@@ -25419,6 +26671,10 @@
       multiState.roomVisibility = normalizeMultiRoomVisibility(
         pending.roomVisibility,
         multiState.roomVisibility
+      );
+      multiState.joinPolicy = normalizeMultiJoinPolicy(
+        pending.joinPolicy,
+        multiState.joinPolicy
       );
       multiState.exportPermission = normalizeMultiExportPermission(
         pending.exportPermission,
@@ -25478,7 +26734,10 @@
   }
 
   function canCurrentClientRequestGuestRole() {
-    return multiState.connected && !multiState.connecting && multiState.role === 'spectator';
+    return multiState.connected
+      && !multiState.connecting
+      && multiState.role === 'spectator'
+      && !isResidentMultiProjectKey(multiState.projectKey);
   }
 
   function clearMultiJoinRequests() {
@@ -25559,7 +26818,12 @@
     const requestField = dom.controls.multiJoinRequestField;
     const requestButton = dom.controls.multiRequestGuestRole;
     const requestHint = dom.controls.multiJoinRequestHint;
-    const isRequestAreaVisible = canCurrentClientRequestGuestRole() || multiState.joinRequestPending;
+    const isResidentRoom = isResidentMultiProjectKey(multiState.projectKey);
+    const joinPolicy = normalizeMultiJoinPolicy(
+      multiState.joinPolicy,
+      MULTI_DEFAULT_JOIN_POLICY
+    );
+    const isRequestAreaVisible = !isResidentRoom && (canCurrentClientRequestGuestRole() || multiState.joinRequestPending);
     if (requestField instanceof HTMLElement) {
       requestField.hidden = !isRequestAreaVisible;
     }
@@ -25576,10 +26840,14 @@
     if (requestHint instanceof HTMLElement) {
       if (!multiState.connected) {
         requestHint.textContent = '接続すると参加リクエストを送信できます。';
+      } else if (isResidentRoom && isMultiSpectatorMode()) {
+        requestHint.textContent = 'この常設ルームは空きが出ると自動で参加者になります。';
       } else if (isMultiGuestMode()) {
         requestHint.textContent = 'あなたは参加者です。';
       } else if (multiState.joinRequestPending) {
         requestHint.textContent = '承認待ちです。マスターの応答を待ってください。';
+      } else if (joinPolicy === MULTI_JOIN_POLICY_OPEN) {
+        requestHint.textContent = '自動参加設定です。送信すると空きがあれば参加できます。';
       } else {
         requestHint.textContent = '参加はマスターの承認後に有効になります。';
       }
@@ -26599,7 +27867,7 @@
   }
 
   function enforceGuestAssignedLayerSelection({ announce = false, enforceFrame = true, enforceLayer = true } = {}) {
-    if (!isMultiGuestMode()) {
+    if (!isMultiAssignedCellRestrictedEditorMode()) {
       return true;
     }
     const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
@@ -26612,15 +27880,28 @@
       }
       return false;
     }
-    const assignment = getMultiAssignment(multiState.clientId);
+    let assignment = getMultiAssignment(multiState.clientId);
+    if (!assignment && isResidentMultiRestrictedMasterMode()) {
+      assignment = ensureMasterLayerAssignment();
+      if (assignment) {
+        normalizeMultiAssignmentsForCurrentDocument();
+      }
+    }
     if (!assignment) {
+      maybeRequestGuestAssignmentSync();
       if (announce) {
         setMultiStatus('割り当てセルを待機中です。マスターの同期を待ってください。', 'warn');
       }
       return false;
     }
-    const assignedCell = getAssignedCellForClient(multiState.clientId);
+    let assignedCell = getAssignedCellForClient(multiState.clientId);
+    if (!assignedCell && isResidentMultiRestrictedMasterMode()) {
+      assignment = ensureMasterLayerAssignment() || assignment;
+      normalizeMultiAssignmentsForCurrentDocument();
+      assignedCell = getAssignedCellForClient(multiState.clientId);
+    }
     if (!assignedCell) {
+      maybeRequestGuestAssignmentSync();
       if (announce) {
         setMultiStatus('割り当てセルを待機中です。マスターの同期を待ってください。', 'warn');
       }
@@ -26642,7 +27923,7 @@
       return false;
     }
     if (changed && announce) {
-      setMultiStatus('参加/視聴モードでは割り当てセルのみ編集できます。', 'warn');
+      setMultiStatus('このルームでは割り当てセルのみ編集できます。', 'warn');
     }
     return true;
   }
@@ -26705,7 +27986,8 @@
   }
 
   async function copyMultiInviteLink() {
-    const inviteUrl = buildMultiInviteUrl(multiState.projectKey);
+    const inviteRole = resolveMultiInviteDefaultRole();
+    const inviteUrl = buildMultiInviteUrl(multiState.projectKey, { role: inviteRole });
     if (!inviteUrl) {
       setMultiStatus('招待リンク作成にはプロジェクトキーが必要です', 'warn');
       return false;
@@ -26720,7 +28002,8 @@
   }
 
   async function shareMultiInviteLink() {
-    const inviteUrl = buildMultiInviteUrl(multiState.projectKey);
+    const inviteRole = resolveMultiInviteDefaultRole();
+    const inviteUrl = buildMultiInviteUrl(multiState.projectKey, { role: inviteRole });
     if (!inviteUrl) {
       setMultiStatus('招待リンク作成にはプロジェクトキーが必要です', 'warn');
       return false;
@@ -26773,6 +28056,10 @@
       roomVisibility: normalizeMultiRoomVisibility(
         multiState.roomVisibility,
         MULTI_DEFAULT_ROOM_VISIBILITY
+      ),
+      joinPolicy: normalizeMultiJoinPolicy(
+        multiState.joinPolicy,
+        MULTI_DEFAULT_JOIN_POLICY
       ),
       sentAt: Date.now(),
     });
@@ -27030,7 +28317,14 @@
   }
 
   function isMultiReadOnlyMode() {
-    return isMultiGuestMode() || isMultiSpectatorMode();
+    return isMultiGuestMode() || isMultiSpectatorMode() || isResidentMultiRestrictedMasterMode();
+  }
+
+  function isMultiClientScopedHistoryMode() {
+    if (!multiState.connected) {
+      return false;
+    }
+    return isMultiGuestMode() || isMultiSpectatorMode() || isResidentMultiRestrictedMasterMode();
   }
 
   function isMultiMasterConfigMode() {
@@ -27158,7 +28452,7 @@
       }
       dom.controls.multiStartSession.textContent = startLabel;
     }
-    const showMasterOnly = selectedRole === 'master';
+    const showMasterOnly = selectedRole === 'master' && !isResidentMultiConnectedRoom();
     if (Array.isArray(dom.controls.multiMasterOnlyGroups)) {
       dom.controls.multiMasterOnlyGroups.forEach(node => {
         if (node instanceof HTMLElement) {
@@ -27177,6 +28471,7 @@
       name: typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim().slice(0, 32) : '',
       anchorLayerId: entry.anchorLayerId,
       trackHint: Number.isFinite(entry.trackHint) ? Math.round(entry.trackHint) : -1,
+      residentSlot: Number.isFinite(entry.residentSlot) ? Math.round(entry.residentSlot) : -1,
       frameId: typeof entry.frameId === 'string' ? entry.frameId : '',
       frameHint: Number.isFinite(entry.frameHint) ? Math.round(entry.frameHint) : -1,
       joinedAt: Number(entry.joinedAt) || Date.now(),
@@ -27208,6 +28503,7 @@
           name: normalizeMultiParticipantName(entry.name, DEFAULT_MULTI_PARTICIPANT_NAME),
           anchorLayerId,
           trackHint: Number.isFinite(entry.trackHint) ? Math.max(0, Math.round(entry.trackHint)) : null,
+          residentSlot: Number.isFinite(entry.residentSlot) ? Math.max(0, Math.round(entry.residentSlot)) : null,
           frameId: typeof entry.frameId === 'string' ? entry.frameId.trim() : '',
           frameHint: Number.isFinite(entry.frameHint) ? Math.max(0, Math.round(entry.frameHint)) : null,
           joinedAt: Number(entry.joinedAt) || Date.now(),
@@ -27221,7 +28517,7 @@
       : (isMultiMasterMode() ? multiState.clientId : multiState.masterClientId);
     renderMultiParticipantsList();
     applyMultiRoleUiLocks();
-    if (isMultiGuestMode()) {
+    if (isMultiGuestMode() || isResidentMultiRestrictedMasterMode()) {
       enforceGuestAssignedLayerSelection({ announce: false });
     }
   }
@@ -27309,8 +28605,12 @@
       }
       const frameIndex = getAssignedFrameIndexForClient(row.clientId);
       const trackIndex = getAssignedLayerTrackIndexForClient(row.clientId);
-      const frameLabel = frameIndex >= 0 ? ` / フレーム ${frameIndex + 1}` : '';
-      const layerLabel = trackIndex >= 0 ? ` / レイヤー ${trackIndex + 1}` : '';
+      const residentSlot = getResidentMultiAssignedSlotIndex(row.clientId);
+      const residentMode = isResidentMultiProjectKey(multiState.projectKey);
+      const frameLabel = residentMode ? '' : (frameIndex >= 0 ? ` / フレーム ${frameIndex + 1}` : '');
+      const layerLabel = residentMode
+        ? (residentSlot >= 0 ? ` / セル ${residentSlot + 1}` : '')
+        : (trackIndex >= 0 ? ` / レイヤー ${trackIndex + 1}` : '');
       const onlineLabel = row.online ? '' : ' (オフライン)';
       const lockedLabel = row.locked ? ' / ロック中' : '';
       li.textContent = `${getMultiRoleLabel(row.role)}: ${row.name}${frameLabel}${layerLabel}${lockedLabel}${onlineLabel}`;
@@ -27642,6 +28942,10 @@
       multiState.roomVisibility,
       MULTI_DEFAULT_ROOM_VISIBILITY
     );
+    multiState.joinPolicy = normalizeMultiJoinPolicy(
+      multiState.joinPolicy,
+      MULTI_DEFAULT_JOIN_POLICY
+    );
     multiState.exportPermission = normalizeMultiExportPermission(
       multiState.exportPermission,
       MULTI_DEFAULT_EXPORT_PERMISSION
@@ -27723,6 +29027,44 @@
       dom.controls.multiExportPermission.value = multiState.exportPermission;
       dom.controls.multiExportPermission.disabled = multiState.connecting || !inMasterConfigMode;
     }
+    if (dom.controls.multiJoinPolicy instanceof HTMLSelectElement) {
+      dom.controls.multiJoinPolicy.value = multiState.joinPolicy;
+      dom.controls.multiJoinPolicy.disabled = multiState.connecting || !inMasterConfigMode;
+    }
+    if (dom.controls.multiPresetFriends instanceof HTMLButtonElement) {
+      dom.controls.multiPresetFriends.disabled = multiState.connecting || !inMasterConfigMode;
+    }
+    if (dom.controls.multiPresetStream instanceof HTMLButtonElement) {
+      dom.controls.multiPresetStream.disabled = multiState.connecting || !inMasterConfigMode;
+    }
+    if (dom.controls.multiPresetHint instanceof HTMLElement) {
+      const joinPolicy = normalizeMultiJoinPolicy(multiState.joinPolicy, MULTI_DEFAULT_JOIN_POLICY);
+      const visibilityLabel = getMultiRoomVisibilityLabel();
+      const exportLabel = getMultiExportPermissionLabel();
+      dom.controls.multiPresetHint.textContent = joinPolicy === MULTI_JOIN_POLICY_OPEN
+        ? `現在: 友達向け寄り（自動参加 / ${visibilityLabel} / ${exportLabel}）`
+        : `現在: 配信向け寄り（承認制 / ${visibilityLabel} / ${exportLabel}）`;
+    }
+    const canUseMasterOpsMode = inMasterConfigMode && !isResidentMultiConnectedRoom();
+    if (!canUseMasterOpsMode && multiState.masterOpsMode) {
+      multiState.masterOpsMode = false;
+    }
+    if (dom.controls.multiMasterOpsMode instanceof HTMLInputElement) {
+      dom.controls.multiMasterOpsMode.checked = Boolean(multiState.masterOpsMode);
+      dom.controls.multiMasterOpsMode.disabled = multiState.connecting || !canUseMasterOpsMode;
+    }
+    if (dom.controls.multiMasterOpsHint instanceof HTMLElement) {
+      dom.controls.multiMasterOpsHint.textContent = multiState.masterOpsMode
+        ? '運営モードON: 強制切替 / セル移動 / キック / BAN を表示中。'
+        : '運営モードOFF: 通常運用向けに運営操作を隠しています。';
+    }
+    if (Array.isArray(dom.controls.multiMasterOpsGroups)) {
+      dom.controls.multiMasterOpsGroups.forEach(node => {
+        if (node instanceof HTMLElement) {
+          node.hidden = !canUseMasterOpsMode || !multiState.masterOpsMode;
+        }
+      });
+    }
     if (dom.controls.multiGuestCapacityHint instanceof HTMLElement) {
       const assignedGuestCount = getAssignedGuestCount();
       dom.controls.multiGuestCapacityHint.textContent = `参加枠: ${assignedGuestCount} / ${multiState.maxGuests}`;
@@ -27736,6 +29078,20 @@
         dom.controls.multiRoomVisibilityHint.textContent = '公開: ホームの「公開中の部屋」に表示されます。';
       } else {
         dom.controls.multiRoomVisibilityHint.textContent = '非公開: ホームには表示されません。';
+      }
+    }
+    if (dom.controls.multiJoinPolicyHint instanceof HTMLElement) {
+      const joinPolicy = normalizeMultiJoinPolicy(multiState.joinPolicy, MULTI_DEFAULT_JOIN_POLICY);
+      if (!multiState.connected) {
+        dom.controls.multiJoinPolicyHint.textContent = joinPolicy === MULTI_JOIN_POLICY_OPEN
+          ? '自動参加: 招待リンクは参加者入室になります。'
+          : '承認制: 招待リンクは視聴入室になります。';
+      } else if (!isMultiMasterMode()) {
+        dom.controls.multiJoinPolicyHint.textContent = `参加方式: ${getMultiJoinPolicyLabel(joinPolicy)}`;
+      } else if (joinPolicy === MULTI_JOIN_POLICY_OPEN) {
+        dom.controls.multiJoinPolicyHint.textContent = '自動参加: 招待リンクで参加者として入室します。';
+      } else {
+        dom.controls.multiJoinPolicyHint.textContent = '承認制: 参加はマスター承認が必要です。';
       }
     }
     if (dom.controls.multiInviteCopy instanceof HTMLButtonElement) {
@@ -27755,20 +29111,21 @@
       dom.controls.multiCommentSend.disabled = !canSendComment;
     }
     if (dom.controls.exportProject instanceof HTMLButtonElement) {
-      const canExport = !multiState.connecting && canCurrentClientExportProject();
+      const canExport = !multiState.connecting && canCurrentClientExportProject('png');
       dom.controls.exportProject.disabled = !canExport;
-      const exportDisabledReason = multiState.connecting ? '接続中です' : getMultiExportDisabledReason();
+      const exportDisabledReason = multiState.connecting ? '接続中です' : getMultiExportDisabledReason('png');
       if (exportDisabledReason) {
         dom.controls.exportProject.title = exportDisabledReason;
       } else {
         dom.controls.exportProject.removeAttribute('title');
       }
     }
+    updateExportFormatAvailability();
     syncMultiJoinRequestControls();
     updatePixfindModeUI();
     enforceMobileSpectatorTabLock({ forceActivate: true });
     syncMultiAssignmentControls();
-    // If client is a spectator, force pan tool and disable other tools
+    // Tool lock by role (spectator / resident room restrictions)
     try {
       if (isMultiSpectatorMode()) {
         // Ensure pan is active so viewer can pan/zoom
@@ -27780,6 +29137,28 @@
         }
         if (Array.isArray(dom.toolGroupButtons)) {
           dom.toolGroupButtons.forEach(btn => { try { btn.disabled = true; } catch (e) { /* ignore */ } });
+        }
+      } else if (isResidentMultiToolRestrictedMode()) {
+        if (!isResidentMultiToolAllowed(state.tool)) {
+          setActiveTool('pen');
+        }
+        if (Array.isArray(toolButtons)) {
+          toolButtons.forEach(btn => {
+            try {
+              const toolId = typeof btn?.dataset?.tool === 'string' ? btn.dataset.tool : '';
+              const allowed = isResidentMultiToolAllowed(toolId);
+              btn.disabled = !allowed;
+              btn.classList.toggle('is-disabled', !allowed);
+            } catch (e) { /* ignore */ }
+          });
+        }
+        if (Array.isArray(dom.toolGroupButtons)) {
+          dom.toolGroupButtons.forEach(btn => {
+            try {
+              const groupId = typeof btn?.dataset?.toolGroup === 'string' ? btn.dataset.toolGroup : '';
+              btn.disabled = groupId === 'selection';
+            } catch (e) { /* ignore */ }
+          });
         }
       } else {
         if (Array.isArray(toolButtons)) {
@@ -27828,8 +29207,6 @@
       dom.controls.clearCanvas,
       dom.controls.openDocument,
       dom.newProject?.button,
-      dom.controls.undoAction,
-      dom.controls.redoAction,
       dom.controls.multiAssignTarget,
       dom.controls.multiAssignFrame,
       dom.controls.multiAssignLayer,
@@ -27841,6 +29218,10 @@
       dom.controls.multiForceGuest,
       dom.controls.multiForceSpectator,
       dom.controls.multiRoomVisibility,
+      dom.controls.multiJoinPolicy,
+      dom.controls.multiPresetFriends,
+      dom.controls.multiPresetStream,
+      dom.controls.multiMasterOpsMode,
       dom.controls.multiBlockedTarget,
       dom.controls.multiBlockedRemove,
     ];
@@ -28012,6 +29393,37 @@
     if (!isMultiMasterMode()) {
       return null;
     }
+    const residentProfile = getResidentMultiRoomProfile(multiState.projectKey);
+    if (residentProfile) {
+      ensureResidentSingleFrameSingleLayer(residentProfile);
+      const frame0 = state.frames[0];
+      const primaryLayer = getResidentMultiPrimaryLayer();
+      if (!frame0 || !frame0.id || !primaryLayer) {
+        return null;
+      }
+      const existing = getMultiAssignment(multiState.clientId);
+      const existingSlot = normalizeResidentMultiSlotIndex(
+        Number.isFinite(Number(existing?.residentSlot)) ? Number(existing.residentSlot) : Number(existing?.trackHint),
+        residentProfile
+      );
+      const slot = existingSlot >= 0 ? existingSlot : 0;
+      const assignment = existing && typeof existing === 'object' ? existing : {};
+      assignment.clientId = multiState.clientId;
+      assignment.role = 'master';
+      assignment.name = getLocalMultiParticipantName();
+      assignment.anchorLayerId = primaryLayer.id;
+      assignment.trackHint = 0;
+      assignment.residentSlot = slot;
+      assignment.frameId = frame0.id;
+      assignment.frameHint = 0;
+      assignment.joinedAt = Number(assignment.joinedAt) || Date.now();
+      assignment.locked = false;
+      multiState.assignments.set(multiState.clientId, assignment);
+      multiState.masterClientId = multiState.clientId;
+      state.activeFrame = 0;
+      state.activeLayer = primaryLayer.id;
+      return assignment;
+    }
     const frame0 = state.frames[0];
     if (!frame0 || !Array.isArray(frame0.layers) || !frame0.layers.length) {
       return null;
@@ -28124,6 +29536,67 @@
     if (isMultiClientBlocked(clientId)) {
       return null;
     }
+    const residentProfile = getResidentMultiRoomProfile(multiState.projectKey);
+    if (residentProfile) {
+      ensureResidentSingleFrameSingleLayer(residentProfile);
+      const frame0 = state.frames[0];
+      const primaryLayer = getResidentMultiPrimaryLayer();
+      if (!frame0 || !frame0.id || !primaryLayer) {
+        return null;
+      }
+      const existing = getMultiAssignment(clientId);
+      if (existing) {
+        return existing;
+      }
+      if (isMultiGuestLimitReached()) {
+        return null;
+      }
+      const usedSlots = new Set();
+      multiState.assignments.forEach(entry => {
+        if (!entry || typeof entry !== 'object') {
+          return;
+        }
+        const slot = normalizeResidentMultiSlotIndex(
+          Number.isFinite(Number(entry.residentSlot)) ? Number(entry.residentSlot) : Number(entry.trackHint),
+          residentProfile
+        );
+        if (slot >= 0) {
+          usedSlots.add(slot);
+        }
+      });
+      let assignedSlot = -1;
+      for (let i = 0; i < getResidentMultiSlotCount(residentProfile); i += 1) {
+        if (!usedSlots.has(i)) {
+          assignedSlot = i;
+          break;
+        }
+      }
+      if (assignedSlot < 0) {
+        return null;
+      }
+      const safeName = typeof participantName === 'string' && participantName.trim()
+        ? participantName.trim().slice(0, 24)
+        : DEFAULT_MULTI_PARTICIPANT_NAME;
+      const assignment = {
+        clientId,
+        role: 'guest',
+        name: safeName,
+        anchorLayerId: primaryLayer.id,
+        trackHint: 0,
+        residentSlot: assignedSlot,
+        frameId: frame0.id,
+        frameHint: 0,
+        joinedAt: Date.now(),
+        locked: false,
+      };
+      multiState.assignments.set(clientId, assignment);
+      normalizeMultiAssignmentsForCurrentDocument();
+      renderFrameList();
+      renderLayerList();
+      requestRender();
+      requestOverlayRender();
+      return assignment;
+    }
     const existing = getMultiAssignment(clientId);
     if (existing) {
       return existing;
@@ -28192,6 +29665,56 @@
     multiState.awaitingGuestStateRecovery = false;
   }
 
+  function clearResidentAutoPromoteTimer() {
+    if (multiState.residentAutoPromoteTimer !== null) {
+      window.clearTimeout(multiState.residentAutoPromoteTimer);
+      multiState.residentAutoPromoteTimer = null;
+    }
+  }
+
+  function scheduleResidentAutoPromoteToMaster() {
+    if (multiState.residentAutoPromoteTimer !== null) {
+      return;
+    }
+    const attempt = () => {
+      if (!multiState.connected || isMultiMasterMode() || !isResidentMultiProjectKey(multiState.projectKey)) {
+        clearResidentAutoPromoteTimer();
+        return;
+      }
+      if (isMultiMasterCurrentlyOnline()) {
+        clearResidentAutoPromoteTimer();
+        return;
+      }
+      if (multiState.connecting) {
+        multiState.residentAutoPromoteTimer = window.setTimeout(attempt, 220);
+        return;
+      }
+      clearResidentAutoPromoteTimer();
+      connectMultiSessionAs('master').catch(() => {});
+    };
+    multiState.residentAutoPromoteTimer = window.setTimeout(attempt, 220);
+  }
+
+  function maybeRequestGuestAssignmentSync() {
+    if (!isMultiGuestMode() || !multiState.connected || !multiState.channel) {
+      return;
+    }
+    if (!isMultiMasterCurrentlyOnline()) {
+      return;
+    }
+    const now = Date.now();
+    if ((now - Number(multiState.assignmentSyncRequestAt || 0)) < 1200) {
+      return;
+    }
+    multiState.assignmentSyncRequestAt = now;
+    sendMultiBroadcast('sync-request', {
+      clientId: multiState.clientId,
+      role: multiState.role,
+      name: getLocalMultiParticipantName(),
+      projectKey: multiState.projectKey,
+    }).catch(() => {});
+  }
+
   function buildMultiSessionStatePayload({ targetClientId = '' } = {}) {
     const snapshot = makeHistorySnapshot({
       includeUiState: false,
@@ -28205,6 +29728,10 @@
       roomVisibility: normalizeMultiRoomVisibility(
         multiState.roomVisibility,
         MULTI_DEFAULT_ROOM_VISIBILITY
+      ),
+      joinPolicy: normalizeMultiJoinPolicy(
+        multiState.joinPolicy,
+        MULTI_DEFAULT_JOIN_POLICY
       ),
       exportPermission: normalizeMultiExportPermission(
         multiState.exportPermission,
@@ -28234,6 +29761,10 @@
       roomVisibility: normalizeMultiRoomVisibility(
         multiState.roomVisibility,
         MULTI_DEFAULT_ROOM_VISIBILITY
+      ),
+      joinPolicy: normalizeMultiJoinPolicy(
+        multiState.joinPolicy,
+        MULTI_DEFAULT_JOIN_POLICY
       ),
       exportPermission: normalizeMultiExportPermission(
         multiState.exportPermission,
@@ -28650,6 +30181,12 @@
       activeRightTab: state.activeRightTab,
       activeFrame: state.activeFrame,
     };
+    const preserveResidentPaletteLocal = isResidentMultiConnectedRoom();
+    const localPaletteSnapshot = preserveResidentPaletteLocal && Array.isArray(state.palette)
+      ? state.palette.map(color => normalizeColorValue(color))
+      : null;
+    const localPaletteIndex = state.activePaletteIndex;
+    const localSecondaryPaletteIndex = state.secondaryPaletteIndex;
     // Keep viewport local in multi mode. Zoom/pan should never be synced from remote payload.
     snapshot.scale = normalizeZoomScale(preserved.scale, snapshot.scale);
     snapshot.pan = { x: preserved.pan.x, y: preserved.pan.y };
@@ -28688,6 +30225,11 @@
           /* ignore */
         }
       }
+      if (Array.isArray(localPaletteSnapshot) && localPaletteSnapshot.length) {
+        state.palette = localPaletteSnapshot.map(color => normalizeColorValue(color));
+        state.activePaletteIndex = normalizePaletteIndex(localPaletteIndex, state.activePaletteIndex);
+        state.secondaryPaletteIndex = normalizePaletteIndex(localSecondaryPaletteIndex, state.activePaletteIndex);
+      }
       history.past = [];
       history.future = [];
       history.pending = null;
@@ -28713,6 +30255,10 @@
         requestRender();
         requestOverlayRender();
       }
+      if (Array.isArray(localPaletteSnapshot) && localPaletteSnapshot.length) {
+        renderPalette();
+        syncPaletteInputs();
+      }
       markRemoteMultiStateDirty({ clearLayerPatchSnapshots: true });
     } finally {
       multiState.applyRemoteInProgress = false;
@@ -28720,11 +30266,75 @@
     return true;
   }
 
-  // Apply a history snapshot only for the assigned cell of a given clientId.
-  // This avoids overwriting other participants' cells when guests undo/redo.
+  // Apply a history snapshot only to the cells that clientId can currently edit.
+  // In resident rooms this includes own slot + unowned slots, and excludes others' owned slots.
   function applyHistorySnapshotForClient(snapshot, clientId, { preserveView = false } = {}) {
     if (!snapshot || typeof snapshot !== 'object') return false;
     if (!clientId) return false;
+    const residentPointEditable = buildResidentPointEditCheckerForClient(clientId, multiState.projectKey);
+    if (residentPointEditable) {
+      const srcFrame = Array.isArray(snapshot.frames) ? snapshot.frames[0] : null;
+      const srcLayer = srcFrame && Array.isArray(srcFrame.layers) ? srcFrame.layers[0] : null;
+      const targetFrame = Array.isArray(state.frames) ? state.frames[0] : null;
+      const targetLayer = targetFrame && Array.isArray(targetFrame.layers) ? targetFrame.layers[0] : null;
+      if (!srcLayer || !targetLayer) return false;
+      const width = Math.max(0, Math.floor(Number(state.width) || 0));
+      const height = Math.max(0, Math.floor(Number(state.height) || 0));
+      const pixelCount = width * height;
+      if (!pixelCount) return false;
+      const srcIndices = srcLayer.indices instanceof Int16Array
+        ? srcLayer.indices
+        : (Array.isArray(srcLayer.indices) ? new Int16Array(srcLayer.indices) : null);
+      const srcDirect = srcLayer.direct instanceof Uint8ClampedArray
+        ? srcLayer.direct
+        : (Array.isArray(srcLayer.direct) ? new Uint8ClampedArray(srcLayer.direct) : null);
+      if (!(targetLayer.indices instanceof Int16Array) || targetLayer.indices.length !== pixelCount) {
+        targetLayer.indices = new Int16Array(pixelCount).fill(-1);
+      }
+      let targetDirect = targetLayer.direct instanceof Uint8ClampedArray && targetLayer.direct.length === pixelCount * 4
+        ? targetLayer.direct
+        : null;
+      if (srcDirect && !targetDirect) {
+        targetDirect = ensureLayerDirect(targetLayer, width, height);
+      }
+      let appliedAny = false;
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          if (!residentPointEditable(x, y)) {
+            continue;
+          }
+          const idx = y * width + x;
+          if (srcIndices && srcIndices.length === pixelCount) {
+            targetLayer.indices[idx] = srcIndices[idx];
+          }
+          if (targetDirect) {
+            const base = idx * 4;
+            if (srcDirect && srcDirect.length === pixelCount * 4) {
+              targetDirect[base] = srcDirect[base];
+              targetDirect[base + 1] = srcDirect[base + 1];
+              targetDirect[base + 2] = srcDirect[base + 2];
+              targetDirect[base + 3] = srcDirect[base + 3];
+            } else {
+              targetDirect[base] = 0;
+              targetDirect[base + 1] = 0;
+              targetDirect[base + 2] = 0;
+              targetDirect[base + 3] = 0;
+            }
+          }
+          appliedAny = true;
+        }
+      }
+      if (!appliedAny) return false;
+      markRemoteMultiStateDirty();
+      requestRender();
+      requestOverlayRender();
+      if (!preserveView) {
+        state.activeFrame = 0;
+        state.activeLayer = targetLayer.id;
+        syncControlsWithState();
+      }
+      return true;
+    }
     const assigned = getAssignedCellForClient(clientId);
     if (!assigned) return false;
     const frameIndex = clamp(Math.round(Number(assigned.frameIndex) || 0), 0, Math.max(0, state.frames.length - 1));
@@ -28770,6 +30380,10 @@
     multiState.roomVisibility = normalizeMultiRoomVisibility(
       payload.roomVisibility,
       multiState.roomVisibility
+    );
+    multiState.joinPolicy = normalizeMultiJoinPolicy(
+      payload.joinPolicy,
+      multiState.joinPolicy
     );
     multiState.exportPermission = normalizeMultiExportPermission(
       payload.exportPermission,
@@ -28918,6 +30532,229 @@
     return sent;
   }
 
+  function applyResidentQueueAndAssignmentsFromPresence(nextParticipants) {
+    if (!isMultiMasterMode() || !isResidentMultiProjectKey(multiState.projectKey)) {
+      return false;
+    }
+    if (!(nextParticipants instanceof Map)) {
+      return false;
+    }
+    const profile = getResidentMultiRoomProfile(multiState.projectKey);
+    if (profile) {
+      ensureResidentSingleFrameSingleLayer(profile);
+    }
+    const primaryLayer = getResidentMultiPrimaryLayer();
+    const frame0 = Array.isArray(state.frames) && state.frames.length ? state.frames[0] : null;
+    if (!profile || !primaryLayer || !frame0 || !frame0.id) {
+      return false;
+    }
+    const slotCount = getResidentMultiSlotCount(profile);
+    if (!slotCount) {
+      return false;
+    }
+    const onlineClientIds = new Set(Array.from(nextParticipants.keys()));
+    let changed = false;
+    const roleChangeNotices = [];
+    const notifyRole = (clientId, role, reason) => {
+      roleChangeNotices.push({ clientId, role, reason });
+    };
+
+    const upsertResidentAssignment = (clientId, role, name, slotIndex, joinedAt = Date.now()) => {
+      const normalizedSlot = normalizeResidentMultiSlotIndex(slotIndex, profile);
+      if (normalizedSlot < 0) {
+        return null;
+      }
+      const nextRole = role === 'master' ? 'master' : 'guest';
+      const existing = getMultiAssignment(clientId);
+      const nextEntry = existing && typeof existing === 'object' ? existing : {};
+      nextEntry.clientId = clientId;
+      nextEntry.role = nextRole;
+      nextEntry.name = normalizeMultiParticipantName(name, DEFAULT_MULTI_PARTICIPANT_NAME);
+      nextEntry.anchorLayerId = primaryLayer.id;
+      nextEntry.trackHint = 0;
+      nextEntry.residentSlot = normalizedSlot;
+      nextEntry.frameId = frame0.id;
+      nextEntry.frameHint = 0;
+      nextEntry.joinedAt = Number(joinedAt) || Date.now();
+      nextEntry.locked = false;
+      multiState.assignments.set(clientId, nextEntry);
+      return nextEntry;
+    };
+
+    const getUsedResidentSlots = () => {
+      const used = new Set();
+      multiState.assignments.forEach((entry, clientId) => {
+        if (!entry || typeof entry !== 'object') {
+          return;
+        }
+        if (!onlineClientIds.has(clientId)) {
+          return;
+        }
+        const slot = normalizeResidentMultiSlotIndex(
+          Number.isFinite(Number(entry.residentSlot)) ? Number(entry.residentSlot) : Number(entry.trackHint),
+          profile
+        );
+        if (slot >= 0) {
+          used.add(slot);
+        }
+      });
+      return used;
+    };
+
+    const findFirstAvailableResidentSlot = (preferredSlot = 0) => {
+      const used = getUsedResidentSlots();
+      const normalizedPreferred = normalizeResidentMultiSlotIndex(preferredSlot, profile);
+      if (normalizedPreferred >= 0 && !used.has(normalizedPreferred)) {
+        return normalizedPreferred;
+      }
+      for (let i = 0; i < slotCount; i += 1) {
+        if (!used.has(i)) {
+          return i;
+        }
+      }
+      return -1;
+    };
+
+    const offlineAssignedClientIds = [];
+    multiState.assignments.forEach((entry, clientId) => {
+      if (!entry || typeof entry !== 'object') {
+        return;
+      }
+      if (clientId === multiState.clientId) {
+        return;
+      }
+      if (!onlineClientIds.has(clientId)) {
+        offlineAssignedClientIds.push(clientId);
+      }
+    });
+    offlineAssignedClientIds.forEach(clientId => {
+      if (multiState.assignments.delete(clientId)) {
+        changed = true;
+      }
+      removeMultiJoinRequest(clientId);
+      if (multiState.selectedAssignClientId === clientId || multiState.selectedRoleControlClientId === clientId) {
+        setMultiSelectedControlClientId('');
+      }
+    });
+
+    const selfParticipant = nextParticipants.get(multiState.clientId) || null;
+    const selfAssignment = getMultiAssignment(multiState.clientId);
+    let selfSlot = normalizeResidentMultiSlotIndex(
+      Number.isFinite(Number(selfAssignment?.residentSlot)) ? Number(selfAssignment.residentSlot) : Number(selfAssignment?.trackHint),
+      profile
+    );
+    if (selfSlot < 0) {
+      selfSlot = findFirstAvailableResidentSlot(0);
+    }
+    if (selfSlot >= 0) {
+      const previousRole = normalizeMultiRole(selfAssignment?.role, 'guest');
+      const previousSlot = normalizeResidentMultiSlotIndex(
+        Number.isFinite(Number(selfAssignment?.residentSlot)) ? Number(selfAssignment.residentSlot) : Number(selfAssignment?.trackHint),
+        profile
+      );
+      const assignment = upsertResidentAssignment(
+        multiState.clientId,
+        'master',
+        selfParticipant?.name || getLocalMultiParticipantName(),
+        selfSlot,
+        selfParticipant?.joinedAt || Date.now()
+      );
+      if (assignment && (previousRole !== 'master' || previousSlot !== selfSlot)) {
+        changed = true;
+      }
+    }
+
+    const waitingEntries = Array.from(nextParticipants.values())
+      .filter(entry => entry && typeof entry === 'object')
+      .filter(entry => {
+        const clientId = typeof entry.clientId === 'string' ? entry.clientId.trim() : '';
+        if (!clientId || clientId === multiState.clientId) {
+          return false;
+        }
+        if (isMultiClientBlocked(clientId)) {
+          return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const joinedDiff = (Number(a.joinedAt) || 0) - (Number(b.joinedAt) || 0);
+        if (joinedDiff !== 0) {
+          return joinedDiff;
+        }
+        return String(a.clientId || '').localeCompare(String(b.clientId || ''));
+      });
+
+    waitingEntries.forEach(entry => {
+      const clientId = typeof entry.clientId === 'string' ? entry.clientId.trim() : '';
+      if (!clientId) {
+        return;
+      }
+      const normalizedRole = normalizeMultiRole(entry.role, 'spectator');
+      const existingAssignment = getMultiAssignment(clientId);
+      if (existingAssignment?.role === 'guest') {
+        removeMultiJoinRequest(clientId);
+        const normalizedExistingSlot = normalizeResidentMultiSlotIndex(
+          Number.isFinite(Number(existingAssignment.residentSlot)) ? Number(existingAssignment.residentSlot) : Number(existingAssignment.trackHint),
+          profile
+        );
+        if (normalizedExistingSlot < 0) {
+          const reassignedSlot = findFirstAvailableResidentSlot(0);
+          if (reassignedSlot >= 0) {
+            upsertResidentAssignment(clientId, 'guest', entry.name, reassignedSlot, entry.joinedAt);
+            changed = true;
+          }
+        }
+        if (normalizedRole !== 'guest') {
+          entry.role = 'guest';
+          nextParticipants.set(clientId, entry);
+          notifyRole(clientId, 'guest', 'resident-restore-guest');
+        }
+        return;
+      }
+      const availableSlot = findFirstAvailableResidentSlot(0);
+      if (availableSlot < 0) {
+        upsertMultiJoinRequest(clientId, entry.name, entry.joinedAt);
+        if (normalizedRole !== 'spectator') {
+          entry.role = 'spectator';
+          nextParticipants.set(clientId, entry);
+          notifyRole(clientId, 'spectator', 'resident-queue');
+        }
+        return;
+      }
+      const assignment = upsertResidentAssignment(
+        clientId,
+        'guest',
+        entry.name,
+        availableSlot,
+        entry.joinedAt
+      );
+      if (!assignment) {
+        upsertMultiJoinRequest(clientId, entry.name, entry.joinedAt);
+        if (normalizedRole !== 'spectator') {
+          entry.role = 'spectator';
+          nextParticipants.set(clientId, entry);
+          notifyRole(clientId, 'spectator', 'resident-queue');
+        }
+        return;
+      }
+      changed = true;
+      removeMultiJoinRequest(clientId);
+      entry.role = 'guest';
+      nextParticipants.set(clientId, entry);
+      notifyRole(clientId, 'guest', 'resident-auto-promote');
+    });
+
+    if (changed) {
+      normalizeMultiAssignmentsForCurrentDocument();
+    }
+    if (roleChangeNotices.length) {
+      roleChangeNotices.forEach(notice => {
+        sendMultiRoleChangeNotice(notice.clientId, notice.role, notice.reason).catch(() => {});
+      });
+    }
+    return changed;
+  }
+
   function refreshMultiParticipantsFromPresence() {
     if (!multiState.channel || typeof multiState.channel.presenceState !== 'function') {
       renderMultiParticipantsList();
@@ -28950,6 +30787,7 @@
       });
     });
     const onlineMaster = Array.from(nextParticipants.values()).find(entry => entry.role === 'master') || null;
+    const residentQueueChanged = applyResidentQueueAndAssignmentsFromPresence(nextParticipants);
     if (isMultiMasterMode()) {
       multiState.masterClientId = multiState.clientId;
     } else {
@@ -28984,31 +30822,34 @@
     }
 
     multiState.participants = nextParticipants;
-      // Auto-promotion for resident rooms: if no master and projectKey looks like resident, earliest participant auto-promotes
-      try {
-        const projectKey = String(multiState.projectKey || '');
-        const isResident = projectKey.startsWith('resident-');
-        if (!isMultiMasterMode() && !multiState.connecting && multiState.connected && isResident) {
-          const onlineMasterExists = !!onlineMaster;
-          if (!onlineMasterExists && nextParticipants.size) {
-            // pick earliest joined participant
-            let earliestId = null;
-            let earliestAt = Infinity;
-            for (const [cid, p] of nextParticipants.entries()){
-              const at = Number(p.joinedAt) || Date.now();
-              if (at < earliestAt){ earliestAt = at; earliestId = cid; }
-            }
-            if (earliestId && earliestId === (multiState.clientId || '')){
-              // try to become master shortly to avoid race
-              window.setTimeout(()=>{
-                if (!isMultiMasterMode() && !multiState.connecting){
-                  connectMultiSessionAs('master').catch(()=>{});
-                }
-              }, 200);
+    // Auto-promotion for resident rooms: if no master and local client is earliest, promote to master.
+    try {
+      if (!isMultiMasterMode() && multiState.connected && isResidentMultiProjectKey(multiState.projectKey)) {
+        const onlineMasterExists = !!onlineMaster;
+        if (!onlineMasterExists && nextParticipants.size) {
+          let earliestId = '';
+          let earliestAt = Infinity;
+          for (const [cid, participant] of nextParticipants.entries()) {
+            const joinedAt = Number(participant?.joinedAt) || Date.now();
+            if (joinedAt < earliestAt) {
+              earliestAt = joinedAt;
+              earliestId = cid;
             }
           }
+          if (earliestId && earliestId === (multiState.clientId || '')) {
+            scheduleResidentAutoPromoteToMaster();
+          } else {
+            clearResidentAutoPromoteTimer();
+          }
+        } else {
+          clearResidentAutoPromoteTimer();
         }
-      } catch(e) { /* ignore */ }
+      } else {
+        clearResidentAutoPromoteTimer();
+      }
+    } catch (error) {
+      clearResidentAutoPromoteTimer();
+    }
     if (!isMultiMasterMode()) {
       if (onlineMaster && previousMasterClientId !== onlineMaster.clientId) {
         setMultiStatus(`共有モード: マスター接続中 (${multiState.projectKey})`, 'info');
@@ -29019,7 +30860,11 @@
     renderMultiParticipantsList();
     syncMultiJoinRequestControls();
     if (isMultiMasterMode()) {
-      scheduleMultiPublicLobbyRoomSync({ immediate: false });
+      if (residentQueueChanged) {
+        scheduleMultiSessionStateBroadcast({ immediate: true });
+      } else {
+        scheduleMultiPublicLobbyRoomSync({ immediate: false });
+      }
     }
   }
 
@@ -29061,6 +30906,11 @@
       await sendMultiJoinRequestResult(senderClientId, 'blocked');
       return;
     }
+    if (isResidentMultiProjectKey(multiState.projectKey)) {
+      refreshMultiParticipantsFromPresence();
+      scheduleMultiSessionStateBroadcast({ targetClientId: senderClientId, immediate: true });
+      return;
+    }
     const requestName = normalizeMultiParticipantName(payload.name, DEFAULT_MULTI_PARTICIPANT_NAME);
     const existingAssignment = getMultiAssignment(senderClientId);
     if (existingAssignment?.role === 'guest') {
@@ -29068,6 +30918,29 @@
       removeMultiJoinRequest(senderClientId);
       syncMultiJoinRequestControls();
       await sendMultiJoinRequestResult(senderClientId, 'approved');
+      return;
+    }
+    const joinPolicy = normalizeMultiJoinPolicy(
+      multiState.joinPolicy,
+      MULTI_DEFAULT_JOIN_POLICY
+    );
+    if (joinPolicy === MULTI_JOIN_POLICY_OPEN) {
+      if (isMultiGuestLimitReached(senderClientId)) {
+        setMultiStatus(`共有モード: 参加上限 ${multiState.maxGuests} 人のため自動参加できません (${requestName})`, 'warn');
+        await sendMultiJoinRequestResult(senderClientId, 'rejected');
+        return;
+      }
+      const assignment = assignLayerToGuestClient(senderClientId, requestName);
+      if (!assignment) {
+        await sendMultiJoinRequestResult(senderClientId, 'rejected');
+        return;
+      }
+      removeMultiJoinRequest(senderClientId);
+      syncMultiJoinRequestControls();
+      scheduleMultiSessionStateBroadcast({ immediate: true });
+      await sendMultiRoleChangeNotice(senderClientId, 'guest', 'master-open-join');
+      await sendMultiJoinRequestResult(senderClientId, 'approved');
+      setMultiStatus(`共有モード: 自動参加を許可しました (${requestName})`, 'success');
       return;
     }
     upsertMultiJoinRequest(senderClientId, requestName, payload.sentAt);
@@ -29141,8 +31014,13 @@
       payload.roomVisibility,
       multiState.roomVisibility
     );
+    const nextJoinPolicy = normalizeMultiJoinPolicy(
+      payload.joinPolicy,
+      multiState.joinPolicy
+    );
     multiState.maxGuests = nextMaxGuests;
     multiState.roomVisibility = nextRoomVisibility;
+    multiState.joinPolicy = nextJoinPolicy;
     if (currentRole === nextRole) {
       if (nextRole === 'guest') {
         multiState.joinRequestPending = false;
@@ -29160,6 +31038,35 @@
     await connectMultiSessionAs(nextRole, { allowGuestJoin: nextRole === 'guest' });
   }
 
+  async function handleMultiUnassignedGuestJoinIntent(clientId, participantName = '') {
+    if (!isMultiMasterMode()) {
+      return false;
+    }
+    const normalizedClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    if (!normalizedClientId || normalizedClientId === multiState.clientId) {
+      return false;
+    }
+    const joinPolicy = normalizeMultiJoinPolicy(
+      multiState.joinPolicy,
+      MULTI_DEFAULT_JOIN_POLICY
+    );
+    if (joinPolicy !== MULTI_JOIN_POLICY_OPEN) {
+      await sendMultiRoleChangeNotice(normalizedClientId, 'spectator', 'master-default-spectator');
+      return true;
+    }
+    if (isMultiGuestLimitReached(normalizedClientId)) {
+      await sendMultiKickClientNotice(normalizedClientId, 'room-full');
+      return true;
+    }
+    const assignment = assignLayerToGuestClient(normalizedClientId, participantName);
+    if (!assignment) {
+      await sendMultiRoleChangeNotice(normalizedClientId, 'spectator', 'master-auto-assign-failed');
+      return true;
+    }
+    removeMultiJoinRequest(normalizedClientId);
+    return true;
+  }
+
   async function handleMultiHelloMessage(payload) {
     if (!payload || typeof payload !== 'object') {
       return;
@@ -29173,6 +31080,13 @@
         await sendMultiKickClientNotice(senderClientId, 'blocked');
         return;
       }
+      if (isResidentMultiProjectKey(multiState.projectKey)) {
+        refreshMultiParticipantsFromPresence();
+        renderMultiParticipantsList();
+        syncMultiJoinRequestControls();
+        scheduleMultiSessionStateBroadcast({ targetClientId: senderClientId, immediate: true });
+        return;
+      }
       const senderRole = normalizeMultiRole(payload.role, 'guest');
       if (senderRole === 'master') {
         setMultiStatus('共有モード: 同一キーに別マスターがいます', 'warn');
@@ -29182,7 +31096,8 @@
       if (hasAssignment && senderRole !== 'guest') {
         await sendMultiRoleChangeNotice(senderClientId, 'guest', 'master-restore');
       } else if (!hasAssignment && senderRole === 'guest') {
-        await sendMultiRoleChangeNotice(senderClientId, 'spectator', 'master-default-spectator');
+        const senderName = normalizeMultiParticipantName(payload.name, DEFAULT_MULTI_PARTICIPANT_NAME);
+        await handleMultiUnassignedGuestJoinIntent(senderClientId, senderName);
       }
       refreshMultiParticipantsFromPresence();
       renderMultiParticipantsList();
@@ -29211,12 +31126,19 @@
       await sendMultiKickClientNotice(requesterClientId, 'blocked');
       return;
     }
+    if (isResidentMultiProjectKey(multiState.projectKey)) {
+      refreshMultiParticipantsFromPresence();
+      syncMultiJoinRequestControls();
+      scheduleMultiSessionStateBroadcast({ targetClientId: requesterClientId, immediate: true });
+      return;
+    }
     const requesterRole = normalizeMultiRole(payload.role, 'guest');
     const hasAssignment = Boolean(getMultiAssignment(requesterClientId));
     if (hasAssignment && requesterRole !== 'guest') {
       await sendMultiRoleChangeNotice(requesterClientId, 'guest', 'master-restore');
     } else if (!hasAssignment && requesterRole === 'guest') {
-      await sendMultiRoleChangeNotice(requesterClientId, 'spectator', 'master-default-spectator');
+      const requesterName = normalizeMultiParticipantName(payload.name, DEFAULT_MULTI_PARTICIPANT_NAME);
+      await handleMultiUnassignedGuestJoinIntent(requesterClientId, requesterName);
     }
     syncMultiJoinRequestControls();
     scheduleMultiSessionStateBroadcast({ targetClientId: requesterClientId, immediate: true });
@@ -29291,6 +31213,10 @@
     multiState.roomVisibility = normalizeMultiRoomVisibility(
       payload.roomVisibility,
       multiState.roomVisibility
+    );
+    multiState.joinPolicy = normalizeMultiJoinPolicy(
+      payload.joinPolicy,
+      multiState.joinPolicy
     );
     multiState.exportPermission = normalizeMultiExportPermission(
       payload.exportPermission,
@@ -29500,6 +31426,7 @@
     clearPendingMultiSessionStateApply();
     clearMultiLayerPatchSnapshots();
     clearMultiGuestStateRecovery();
+    clearResidentAutoPromoteTimer();
     const channel = multiState.channel;
     multiState.channel = null;
     multiState.connected = false;
@@ -29516,14 +31443,17 @@
     clearMultiJoinRequests();
     multiState.joinRequestPending = false;
     multiState.joinRequestCooldownUntil = 0;
+    multiState.assignmentSyncRequestAt = 0;
     multiState.applyRemoteInProgress = false;
     multiState.uiView = 'entry';
     multiState.resumeAssignments = null;
     multiState.resumeBlockedClientIds = null;
     multiState.resumeMaxGuests = null;
     multiState.resumeRoomVisibility = null;
+    multiState.resumeJoinPolicy = null;
     multiState.resumeExportPermission = null;
     multiState.roomVisibility = MULTI_DEFAULT_ROOM_VISIBILITY;
+    multiState.joinPolicy = MULTI_DEFAULT_JOIN_POLICY;
     multiState.exportPermission = MULTI_DEFAULT_EXPORT_PERMISSION;
     clearStoredMultiResumeSession();
     await disconnectMultiPublicLobbyChannel();
@@ -29572,19 +31502,6 @@
 
   async function connectMultiSessionAs(role, { allowGuestJoin = false } = {}) {
     const requestedRole = normalizeMultiRole(role, 'guest');
-    const normalizedRole = requestedRole === 'guest' && !allowGuestJoin
-      ? 'spectator'
-      : requestedRole;
-    const enterReplicaMode = isMultiReplicaRole(normalizedRole);
-    if (enterReplicaMode) {
-      captureMultiLocalSnapshotBeforeReplica();
-    } else {
-      clearMultiLocalSnapshotBeforeReplica();
-    }
-    multiState.desiredRole = normalizedRole;
-    if (!multiState.connected && !multiState.connecting) {
-      multiState.uiView = normalizedRole;
-    }
     const inputProjectKey = dom.controls.multiProjectKey instanceof HTMLInputElement
       ? dom.controls.multiProjectKey.value
       : multiState.projectKey;
@@ -29593,11 +31510,27 @@
       setMultiStatus('共有モード: プロジェクトキーを入力してください', 'warn');
       return false;
     }
+    const residentProfile = getResidentMultiRoomProfile(projectKey);
+    const allowResidentGuestJoin = requestedRole === 'guest' && Boolean(residentProfile);
+    const normalizedRole = requestedRole === 'guest' && !(allowGuestJoin || allowResidentGuestJoin)
+      ? 'spectator'
+      : requestedRole;
+    const enterReplicaMode = isMultiReplicaRole(normalizedRole);
+    multiState.desiredRole = normalizedRole;
+    clearResidentAutoPromoteTimer();
+    if (!multiState.connected && !multiState.connecting) {
+      multiState.uiView = normalizedRole;
+    }
     if (multiState.connecting) {
       return false;
     }
     if (multiState.connected) {
       await disconnectMultiSession({ silent: true, restoreLocalDocument: false });
+    }
+    if (enterReplicaMode) {
+      captureMultiLocalSnapshotBeforeReplica();
+    } else {
+      clearMultiLocalSnapshotBeforeReplica();
     }
     clearPendingMultiSessionStateApply();
     clearMultiLayerPatchSnapshots();
@@ -29605,6 +31538,10 @@
     multiState.roomVisibility = normalizeMultiRoomVisibility(
       multiState.roomVisibility,
       MULTI_DEFAULT_ROOM_VISIBILITY
+    );
+    multiState.joinPolicy = normalizeMultiJoinPolicy(
+      multiState.joinPolicy,
+      MULTI_DEFAULT_JOIN_POLICY
     );
     multiState.exportPermission = normalizeMultiExportPermission(
       multiState.exportPermission,
@@ -29678,6 +31615,7 @@
       multiState.selectedRoleControlClientId = '';
       clearMultiComments();
       multiState.joinRequestPending = false;
+      multiState.assignmentSyncRequestAt = 0;
       multiState.awaitingGuestStateRecovery = false;
       if (multiState.guestStateRecoveryTimer !== null) {
         window.clearTimeout(multiState.guestStateRecoveryTimer);
@@ -29696,6 +31634,10 @@
           multiState.resumeRoomVisibility,
           multiState.roomVisibility
         );
+        const resumeJoinPolicy = normalizeMultiJoinPolicy(
+          multiState.resumeJoinPolicy,
+          multiState.joinPolicy
+        );
         const resumeExportPermission = normalizeMultiExportPermission(
           multiState.resumeExportPermission,
           multiState.exportPermission
@@ -29704,9 +31646,11 @@
         multiState.resumeBlockedClientIds = null;
         multiState.resumeMaxGuests = null;
         multiState.resumeRoomVisibility = null;
+        multiState.resumeJoinPolicy = null;
         multiState.resumeExportPermission = null;
         multiState.maxGuests = resumeMaxGuests;
         multiState.roomVisibility = resumeRoomVisibility;
+        multiState.joinPolicy = resumeJoinPolicy;
         multiState.exportPermission = resumeExportPermission;
         multiState.blockedClientIds = normalizeMultiBlockedClientIds(resumeBlockedClientIds);
         if (resumeAssignments && resumeAssignments.length) {
@@ -29719,6 +31663,10 @@
         } else {
           ensureMasterLayerAssignment();
         }
+        const residentProfile = getResidentMultiRoomProfile(projectKey);
+        if (residentProfile) {
+          applyResidentMultiRoomProfile(residentProfile);
+        }
         multiState.masterClientId = multiState.clientId;
       } else {
         multiState.masterClientId = null;
@@ -29726,6 +31674,7 @@
         multiState.resumeBlockedClientIds = null;
         multiState.resumeMaxGuests = null;
         multiState.resumeRoomVisibility = null;
+        multiState.resumeJoinPolicy = null;
         multiState.resumeExportPermission = null;
       }
 
@@ -29788,6 +31737,13 @@
       return;
     }
     if (isMultiMasterMode()) {
+      if (isResidentMultiRestrictedMasterMode()) {
+        if (HISTORY_DRAW_TOOLS.has(_label)) {
+          sendMasterLayerPatch();
+          scheduleMultiPublicLobbyRoomSync({ immediate: false });
+        }
+        return;
+      }
       if (HISTORY_DRAW_TOOLS.has(_label)) {
         sendMasterLayerPatch();
         scheduleMultiPublicLobbyRoomSync({ immediate: false });
@@ -29950,6 +31906,78 @@
           scheduleMultiSessionStateBroadcast({ immediate: true });
           setMultiStatus(`出力権限を「${getMultiExportPermissionLabel(nextPermission)}」に変更しました`, 'success');
         }
+        syncMultiControls();
+      });
+    }
+    if (dom.controls.multiJoinPolicy instanceof HTMLSelectElement && dom.controls.multiJoinPolicy.dataset.bound !== 'true') {
+      dom.controls.multiJoinPolicy.dataset.bound = 'true';
+      dom.controls.multiJoinPolicy.addEventListener('change', event => {
+        if (!(event.target instanceof HTMLSelectElement)) {
+          return;
+        }
+        if (!isMultiMasterConfigMode()) {
+          event.target.value = normalizeMultiJoinPolicy(
+            multiState.joinPolicy,
+            MULTI_DEFAULT_JOIN_POLICY
+          );
+          syncMultiControls();
+          return;
+        }
+        const nextPolicy = normalizeMultiJoinPolicy(
+          event.target.value,
+          multiState.joinPolicy
+        );
+        const changed = nextPolicy !== multiState.joinPolicy;
+        multiState.joinPolicy = nextPolicy;
+        event.target.value = nextPolicy;
+        if (!changed) {
+          syncMultiControls();
+          return;
+        }
+        scheduleSessionPersist({ includeSnapshots: false });
+        if (isMultiMasterMode()) {
+          scheduleMultiSessionStateBroadcast({ immediate: true });
+          setMultiStatus(
+            nextPolicy === MULTI_JOIN_POLICY_OPEN
+              ? '参加方式を「自動参加」に変更しました'
+              : '参加方式を「承認制」に変更しました',
+            'success'
+          );
+        }
+        syncMultiControls();
+      });
+    }
+    if (dom.controls.multiPresetFriends instanceof HTMLButtonElement && dom.controls.multiPresetFriends.dataset.bound !== 'true') {
+      dom.controls.multiPresetFriends.dataset.bound = 'true';
+      dom.controls.multiPresetFriends.addEventListener('click', () => {
+        applyMultiMasterPreset('friends');
+      });
+    }
+    if (dom.controls.multiPresetStream instanceof HTMLButtonElement && dom.controls.multiPresetStream.dataset.bound !== 'true') {
+      dom.controls.multiPresetStream.dataset.bound = 'true';
+      dom.controls.multiPresetStream.addEventListener('click', () => {
+        applyMultiMasterPreset('stream');
+      });
+    }
+    if (dom.controls.multiMasterOpsMode instanceof HTMLInputElement && dom.controls.multiMasterOpsMode.dataset.bound !== 'true') {
+      dom.controls.multiMasterOpsMode.dataset.bound = 'true';
+      dom.controls.multiMasterOpsMode.addEventListener('change', event => {
+        if (!(event.target instanceof HTMLInputElement)) {
+          return;
+        }
+        const canUseMasterOpsMode = isMultiMasterConfigMode() && !isResidentMultiConnectedRoom();
+        if (!canUseMasterOpsMode) {
+          event.target.checked = Boolean(multiState.masterOpsMode);
+          syncMultiControls();
+          return;
+        }
+        const nextValue = Boolean(event.target.checked);
+        if (multiState.masterOpsMode === nextValue) {
+          syncMultiControls();
+          return;
+        }
+        multiState.masterOpsMode = nextValue;
+        scheduleSessionPersist({ includeSnapshots: false });
         syncMultiControls();
       });
     }
