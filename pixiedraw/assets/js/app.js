@@ -467,6 +467,9 @@
   const MAX_CANVAS_SIZE = 512;
   const MAX_IMAGE_IMPORT_SOURCE_SIZE = 2000;
   const PROJECT_FILE_EXTENSION = '.pixieedraw';
+  const PROJECT_FILE_MIME_TYPE = 'application/x-pixieedraw';
+  const PROJECT_PACKAGE_TYPE = 'pixieedraw-project';
+  const PROJECT_PACKAGE_VERSION = 2;
   const EMBED_CONFIG = parseEmbedConfig();
   const DEFAULT_DOCUMENT_BASENAME = EMBED_CONFIG.documentName
     ? String(EMBED_CONFIG.documentName).trim()
@@ -713,8 +716,21 @@
     }
   })();
   let sessionPersistHandle = null;
-  const AUTOSAVE_SUPPORTED = typeof window !== 'undefined' && 'showSaveFilePicker' in window && 'indexedDB' in window;
-  const EXPORT_DIRECTORY_SUPPORTED = typeof window !== 'undefined' && 'showDirectoryPicker' in window && 'indexedDB' in window;
+  const USER_AGENT = typeof navigator !== 'undefined' ? (navigator.userAgent || '') : '';
+  const USER_AGENT_LOWER = USER_AGENT.toLowerCase();
+  const IS_IOS_DEVICE = /iphone|ipod|ipad/i.test(USER_AGENT_LOWER);
+  const IS_ANDROID_DEVICE = /android/i.test(USER_AGENT);
+  const DISABLE_FILE_SYSTEM_ACCESS_SAVE = IS_ANDROID_DEVICE || IS_IOS_DEVICE;
+  const AUTOSAVE_SUPPORTED =
+    !DISABLE_FILE_SYSTEM_ACCESS_SAVE &&
+    typeof window !== 'undefined' &&
+    'showSaveFilePicker' in window &&
+    'indexedDB' in window;
+  const EXPORT_DIRECTORY_SUPPORTED =
+    !DISABLE_FILE_SYSTEM_ACCESS_SAVE &&
+    typeof window !== 'undefined' &&
+    'showDirectoryPicker' in window &&
+    'indexedDB' in window;
   const SUPPORTS_ANCHOR_DOWNLOAD =
     typeof HTMLAnchorElement !== 'undefined' && 'download' in HTMLAnchorElement.prototype;
   const DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS = 10000;
@@ -724,12 +740,9 @@
     typeof navigator.canShare === 'function' &&
     typeof File === 'function';
   const SHARE_HASHTAG = '#PiXiEED';
-  const IS_IOS_DEVICE =
-    typeof navigator !== 'undefined' && /iphone|ipod|ipad/i.test((navigator.userAgent || '').toLowerCase());
   const IS_ANDROID_LINE_BROWSER =
-    typeof navigator !== 'undefined'
-    && /android/i.test(navigator.userAgent || '')
-    && /line\//i.test(navigator.userAgent || '');
+    IS_ANDROID_DEVICE
+    && /line\//i.test(USER_AGENT);
   const IOS_SNAPSHOT_SUPPORTED =
     IS_IOS_DEVICE && typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined' && window.indexedDB !== null;
   const IOS_SNAPSHOT_DB_NAME = 'pixieedraw-ios-snapshots';
@@ -9046,22 +9059,53 @@
   }
 
   async function loadDocumentFromText(text, handle) {
-    let snapshot;
+    let parsedDocument = null;
     try {
-      snapshot = snapshotFromDocumentText(text);
+      parsedDocument = snapshotFromDocumentText(text);
     } catch (error) {
       console.warn('Failed to parse document', error);
       updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
       return;
     }
+    const snapshot = parsedDocument?.snapshot || null;
+    const projectSession = parsedDocument?.projectSession || null;
+    if (!snapshot) {
+      updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
+      return;
+    }
 
     autosaveRestoring = true;
-    applyHistorySnapshot(snapshot);
-    history.past = [];
-    history.future = [];
-    history.pending = null;
-    clearTimelapseRecording({ silent: true });
-    autosaveRestoring = false;
+    try {
+      applyHistorySnapshot(snapshot);
+      history.pending = null;
+      if (projectSession) {
+        history.limit = projectSession.historyLimit;
+        history.past = projectSession.historyPast;
+        history.future = projectSession.historyFuture;
+
+        if (!(timelapseState.snapshots instanceof Array)) {
+          timelapseState.snapshots = [];
+        }
+        timelapseState.snapshots.length = 0;
+        projectSession.timelapse.snapshots.forEach(entry => {
+          timelapseState.snapshots.push(entry);
+        });
+        timelapseState.enabled = projectSession.timelapse.enabled;
+        timelapseState.fps = projectSession.timelapse.fps;
+        timelapseState.warningShown = projectSession.timelapse.warningShown;
+        timelapseState.sampleStep = projectSession.timelapse.sampleStep;
+        timelapseState.lastCaptureToken = projectSession.timelapse.lastCaptureToken;
+      } else {
+        history.past = [];
+        history.future = [];
+        clearTimelapseRecording({ silent: true });
+      }
+    } finally {
+      autosaveRestoring = false;
+    }
+    syncTimelapseControls();
+    updateHistoryButtons();
+    updateMemoryStatus();
     resetDocumentUnsavedChanges();
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
@@ -9098,13 +9142,192 @@
     }
   }
 
+  function normalizeProjectHistoryLimit(value, fallback = history.limit) {
+    const fallbackLimit = Math.max(
+      MIN_HISTORY_LIMIT,
+      Math.round(Number(fallback) || DEFAULT_HISTORY_LIMIT)
+    );
+    const parsed = Math.round(Number(value));
+    if (!Number.isFinite(parsed)) {
+      return fallbackLimit;
+    }
+    return Math.max(MIN_HISTORY_LIMIT, parsed);
+  }
+
+  function serializeProjectHistorySnapshot(entry) {
+    if (!entry || typeof entry !== 'object') {
+      return null;
+    }
+    let snapshot = null;
+    try {
+      snapshot = decompressHistorySnapshot(entry);
+    } catch (error) {
+      return null;
+    }
+    try {
+      return serializeDocumentSnapshot(snapshot);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function serializeProjectHistoryList(list, historyLimit) {
+    if (!Array.isArray(list) || !list.length) {
+      return [];
+    }
+    const safeLimit = normalizeProjectHistoryLimit(historyLimit, history.limit);
+    const serialized = [];
+    for (let index = 0; index < list.length; index += 1) {
+      const payload = serializeProjectHistorySnapshot(list[index]);
+      if (payload) {
+        serialized.push(payload);
+      }
+    }
+    if (serialized.length > safeLimit) {
+      return serialized.slice(serialized.length - safeLimit);
+    }
+    return serialized;
+  }
+
+  function serializeProjectTimelapseSnapshots() {
+    if (!Array.isArray(timelapseState.snapshots) || !timelapseState.snapshots.length) {
+      return [];
+    }
+    const snapshots = [];
+    timelapseState.snapshots.forEach(entry => {
+      const resolved = resolveTimelapseFrameEntry(entry);
+      if (!resolved) {
+        return;
+      }
+      snapshots.push({
+        width: resolved.width,
+        height: resolved.height,
+        pixels: encodeTypedArray(resolved.pixels),
+      });
+    });
+    return snapshots;
+  }
+
+  function buildProjectSessionPayload() {
+    const historyLimit = normalizeProjectHistoryLimit(history.limit, DEFAULT_HISTORY_LIMIT);
+    return {
+      historyLimit,
+      historyPast: serializeProjectHistoryList(history.past, historyLimit),
+      historyFuture: serializeProjectHistoryList(history.future, historyLimit),
+      timelapse: {
+        enabled: Boolean(timelapseState.enabled),
+        fps: normalizeTimelapseFps(timelapseState.fps),
+        warningShown: Boolean(timelapseState.warningShown),
+        sampleStep: Math.max(1, Math.round(Number(timelapseState.sampleStep) || 1)),
+        lastCaptureToken: Number.isFinite(Number(timelapseState.lastCaptureToken))
+          ? Math.round(Number(timelapseState.lastCaptureToken))
+          : -1,
+        snapshots: serializeProjectTimelapseSnapshots(),
+      },
+    };
+  }
+
+  function deserializeProjectHistoryList(list, historyLimit) {
+    if (!Array.isArray(list) || !list.length) {
+      return [];
+    }
+    const safeLimit = normalizeProjectHistoryLimit(historyLimit, history.limit);
+    const restored = [];
+    for (let index = 0; index < list.length; index += 1) {
+      const payload = list[index];
+      if (!payload || typeof payload !== 'object') {
+        continue;
+      }
+      try {
+        const snapshot = deserializeDocumentPayload(payload);
+        restored.push(compressHistorySnapshot(snapshot));
+      } catch (error) {
+        // Ignore invalid history entries.
+      }
+    }
+    if (restored.length > safeLimit) {
+      return restored.slice(restored.length - safeLimit);
+    }
+    return restored;
+  }
+
+  function deserializeProjectTimelapseSnapshots(list) {
+    if (!Array.isArray(list) || !list.length) {
+      return [];
+    }
+    const restored = [];
+    for (let index = 0; index < list.length; index += 1) {
+      const entry = list[index];
+      if (!entry || typeof entry !== 'object') {
+        continue;
+      }
+      const width = Math.max(1, Math.floor(Number(entry.width) || 0));
+      const height = Math.max(1, Math.floor(Number(entry.height) || 0));
+      if (!width || !height || typeof entry.pixels !== 'string' || !entry.pixels.length) {
+        continue;
+      }
+      try {
+        const raw = decodeBase64(entry.pixels);
+        if (raw.length !== width * height * 4) {
+          continue;
+        }
+        const pixels = new Uint8ClampedArray(raw.length);
+        pixels.set(raw);
+        restored.push({
+          width,
+          height,
+          pixels: compressUint8Array(pixels, { clamped: true }),
+        });
+      } catch (error) {
+        // Ignore invalid timelapse entries.
+      }
+    }
+    return restored;
+  }
+
+  function parseProjectSessionPayload(payload) {
+    if (!payload || typeof payload !== 'object') {
+      return null;
+    }
+    const historyLimit = normalizeProjectHistoryLimit(payload.historyLimit, history.limit);
+    const historyPast = deserializeProjectHistoryList(payload.historyPast, historyLimit);
+    const historyFuture = deserializeProjectHistoryList(payload.historyFuture, historyLimit);
+    const timelapsePayload = payload.timelapse && typeof payload.timelapse === 'object'
+      ? payload.timelapse
+      : {};
+    const timelapseSnapshots = deserializeProjectTimelapseSnapshots(timelapsePayload.snapshots);
+    return {
+      historyLimit,
+      historyPast,
+      historyFuture,
+      timelapse: {
+        enabled: Boolean(timelapsePayload.enabled),
+        fps: normalizeTimelapseFps(timelapsePayload.fps),
+        warningShown: Boolean(timelapsePayload.warningShown),
+        sampleStep: Math.max(1, Math.round(Number(timelapsePayload.sampleStep) || 1)),
+        lastCaptureToken: Number.isFinite(Number(timelapsePayload.lastCaptureToken))
+          ? Math.round(Number(timelapsePayload.lastCaptureToken))
+          : -1,
+        snapshots: timelapseSnapshots,
+      },
+    };
+  }
+
   function snapshotFromDocumentText(text) {
     if (!text || typeof text !== 'string') {
       throw new Error('Document text is empty');
     }
     const parsed = JSON.parse(text);
-    const payload = parsed && typeof parsed === 'object' && parsed.document ? parsed.document : parsed;
-    return deserializeDocumentPayload(payload);
+    const hasPackagedDocument = Boolean(parsed && typeof parsed === 'object' && parsed.document && typeof parsed.document === 'object');
+    const payload = hasPackagedDocument ? parsed.document : parsed;
+    const snapshot = deserializeDocumentPayload(payload);
+    const projectSession = hasPackagedDocument
+      ? parseProjectSessionPayload(parsed.session)
+      : null;
+    return {
+      snapshot,
+      projectSession,
+    };
   }
 
   async function storeAutosaveHandle(handle) {
@@ -9685,7 +9908,7 @@
     const brushShape = normalizeBrushShape(snapshot.brushShape ?? state.brushShape, BRUSH_SHAPE_SQUARE);
     const selectSameMode = normalizeSelectSameMode(snapshot.selectSameMode ?? state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
     const customBrushPayload = serializeCustomBrushPayload(snapshot.customBrush ?? state.customBrush);
-    return {
+    const serialized = {
       version: DOCUMENT_FILE_VERSION,
       width: snapshot.width,
       height: snapshot.height,
@@ -9726,6 +9949,53 @@
       selectSameMode,
       customBrush: customBrushPayload,
     };
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'activeFrame')) {
+      serialized.activeFrame = clamp(
+        Math.round(Number(snapshot.activeFrame) || 0),
+        0,
+        Math.max(0, (Array.isArray(snapshot.frames) ? snapshot.frames.length : 1) - 1)
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'activeLayer') && typeof snapshot.activeLayer === 'string') {
+      serialized.activeLayer = snapshot.activeLayer;
+    }
+    if (snapshot.selectionMask instanceof Uint8Array) {
+      serialized.selectionMask = encodeTypedArray(snapshot.selectionMask);
+    }
+    if (snapshot.selectionBounds && typeof snapshot.selectionBounds === 'object') {
+      serialized.selectionBounds = { ...snapshot.selectionBounds };
+    }
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'tool')) {
+      serialized.tool = normalizeToolId(snapshot.tool, state.tool);
+    }
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'brushSize')) {
+      serialized.brushSize = clamp(Math.round(Number(snapshot.brushSize) || state.brushSize || 1), 1, 64);
+    }
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'outlineSize')) {
+      serialized.outlineSize = clamp(Math.round(Number(snapshot.outlineSize) || state.outlineSize || 1), 1, 64);
+    }
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'colorMode')) {
+      serialized.colorMode = snapshot.colorMode;
+    }
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'activeToolGroup')) {
+      serialized.activeToolGroup = snapshot.activeToolGroup;
+    }
+    if (snapshot.lastGroupTool && typeof snapshot.lastGroupTool === 'object') {
+      serialized.lastGroupTool = { ...snapshot.lastGroupTool };
+    }
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'activeLeftTab')) {
+      serialized.activeLeftTab = snapshot.activeLeftTab;
+    }
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'activeRightTab')) {
+      serialized.activeRightTab = snapshot.activeRightTab;
+    }
+    if (snapshot.playback && typeof snapshot.playback === 'object') {
+      serialized.playback = {
+        isPlaying: Boolean(snapshot.playback.isPlaying),
+        lastFrame: Number(snapshot.playback.lastFrame) || 0,
+      };
+    }
+    return serialized;
   }
 
   function deserializeDocumentPayload(payload) {
@@ -11094,6 +11364,15 @@
       return 'directory';
     } catch (error) {
       console.warn('Export directory write failed', error);
+      // On some Android environments a zero-byte file can remain when createWritable fails.
+      // Best-effort cleanup prevents an extra "broken" file from being left behind.
+      try {
+        if (exportDirectoryHandle && typeof exportDirectoryHandle.removeEntry === 'function') {
+          await exportDirectoryHandle.removeEntry(filename, { recursive: false });
+        }
+      } catch (cleanupError) {
+        console.warn('Failed to cleanup partial export file', cleanupError);
+      }
       return null;
     }
   }
@@ -11111,12 +11390,29 @@
     const shouldPreferShare = options.preferShare !== false && IS_IOS_DEVICE;
     const shouldAvoidAnchorDownload =
       options.allowAnchorDownload === false || (IS_IOS_DEVICE && isStandaloneAppDisplayMode());
+    const forceAnchorDownload = IS_ANDROID_DEVICE || options.forceAnchorDownload === true;
     const fileExtensions = Array.isArray(options.fileExtensions) && options.fileExtensions.length
       ? options.fileExtensions
       : (() => {
           const match = filename.match(/(\.[^./]+)$/);
           return match ? [match[1].toLowerCase()] : [];
         })();
+
+    if (forceAnchorDownload && SUPPORTS_ANCHOR_DOWNLOAD && !shouldAvoidAnchorDownload) {
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.rel = 'noopener';
+      anchor.style.display = 'none';
+      document.body.appendChild(anchor);
+      anchor.click();
+      window.setTimeout(() => {
+        anchor.remove();
+        URL.revokeObjectURL(url);
+      }, DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS);
+      return 'download';
+    }
 
     if (shouldPreferShare) {
       const shareResult = await shareBlobFile(blob, filename, { mimeType, shareTitle, shareText });
@@ -11125,14 +11421,14 @@
       }
     }
 
-    if (options.allowBoundDirectory !== false) {
+    if (!DISABLE_FILE_SYSTEM_ACCESS_SAVE && options.allowBoundDirectory !== false) {
       const directoryResult = await writeBlobToExportDirectory(blob, filename);
       if (directoryResult) {
         return directoryResult;
       }
     }
 
-    if (typeof window.showSaveFilePicker === 'function' && options.allowFilePicker !== false) {
+    if (!DISABLE_FILE_SYSTEM_ACCESS_SAVE && typeof window.showSaveFilePicker === 'function' && options.allowFilePicker !== false) {
       try {
         const pickerTypes =
           mimeType && fileExtensions.length
@@ -11195,8 +11491,7 @@
       {
         description: 'PiXiEEDraw ドキュメント',
         accept: {
-          'application/json': ['.json', '.pxdraw', '.pixieedraw'],
-          'application/x-pixieedraw': ['.pixieedraw'],
+          [PROJECT_FILE_MIME_TYPE]: [PROJECT_FILE_EXTENSION],
         },
       },
     ];
@@ -11241,19 +11536,24 @@
     }
     const announceStatus = options?.announceStatus !== false;
     try {
+      commitHistory();
       const snapshot = makeHistorySnapshot();
       const payload = serializeDocumentSnapshot(snapshot);
+      const session = buildProjectSessionPayload();
       const packaged = {
+        type: PROJECT_PACKAGE_TYPE,
+        packageVersion: PROJECT_PACKAGE_VERSION,
         version: DOCUMENT_FILE_VERSION,
         document: payload,
+        session,
         updatedAt: new Date().toISOString(),
       };
       const json = JSON.stringify(packaged);
-      const blob = new Blob([json], { type: 'application/json' });
+      const blob = new Blob([json], { type: PROJECT_FILE_MIME_TYPE });
       const filename = createAutosaveFileName();
 
       const boundHandle = autosaveHandle || pendingAutosaveHandle;
-      if (boundHandle) {
+      if (!DISABLE_FILE_SYSTEM_ACCESS_SAVE && boundHandle) {
         const savedToBound = await saveProjectBlobToHandle(boundHandle, blob, snapshot);
         if (savedToBound) {
           if (announceStatus) {
@@ -11263,12 +11563,15 @@
         }
       }
 
-      let selectedHandle = await getFileHandleInExportDirectory(filename, {
-        create: true,
-        requestPermission: true,
-      });
+      let selectedHandle = null;
+      if (!DISABLE_FILE_SYSTEM_ACCESS_SAVE) {
+        selectedHandle = await getFileHandleInExportDirectory(filename, {
+          create: true,
+          requestPermission: true,
+        });
+      }
       let pickerCancelled = false;
-      if (!selectedHandle && typeof window.showSaveFilePicker === 'function') {
+      if (!DISABLE_FILE_SYSTEM_ACCESS_SAVE && !selectedHandle && typeof window.showSaveFilePicker === 'function') {
         try {
           selectedHandle = await window.showSaveFilePicker({
             suggestedName: filename,
@@ -11297,8 +11600,8 @@
       }
 
       const result = await triggerDownloadFromBlob(blob, filename, {
-        mimeType: 'application/json',
-        fileExtensions: [PROJECT_FILE_EXTENSION, '.json'],
+        mimeType: PROJECT_FILE_MIME_TYPE,
+        fileExtensions: [PROJECT_FILE_EXTENSION],
         shareTitle: state.documentName,
         shareText: `${state.documentName} (PiXiEEDraw)`,
       });
