@@ -5,5 +5,25 @@
     "type": "public",
     "channel": "public-room-1",
     "description": "誰でも参加できる公開遊びルーム（256×256）。"
+  },
+  {
+    "id": "resident-room-256",
+    "name": "常駐ルーム 256x256",
+    "type": "resident",
+    "projectKey": "resident-256-main",
+    "channel": "resident-256-main",
+    "size": "256×256",
+    "maxUsers": 10,
+    "description": "最大10人。PiXiEEDrawマルチ常設キーに接続し、先頭参加者が仮マスターになります。"
+  },
+  {
+    "id": "resident-room-128",
+    "name": "常駐ルーム 128x128",
+    "type": "resident",
+    "projectKey": "resident-128-main",
+    "channel": "resident-128-main",
+    "size": "128×128",
+    "maxUsers": 16,
+    "description": "最大16人。PiXiEEDrawマルチ常設キーに接続し、空きが出たら待機順に自動参加します。"
   }
 ]
