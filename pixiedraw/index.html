@@ -126,6 +126,11 @@
 <button class="button button--primary" id="startupActionNew" type="button">新規作成</button>
 <button class="button" id="startupActionOpen" type="button">ファイルを開く</button>
 </div>
+<div class="startup-screen__quick-setup">
+<p class="startup-screen__quick-title">かんたん初期設定</p>
+<button class="button" id="startupActionQuickSetup" type="button">新規作成 + 保存先設定をまとめて行う</button>
+<p class="startup-screen__hint" id="startupQuickSetupStatus">初回だけ保存先を決めると、以後の保存/出力が楽になります。</p>
+</div>
 <button class="startup-screen__link" id="startupActionSkip" type="button">編集を続ける</button>
 <p class="startup-screen__hint" id="startupScreenHint">ファイルを開くと既存の自動保存先を引き継ぎます。</p>
 <p class="startup-screen__hint">最新更新 (2026/02/21): 共有モード承認フロー・コメント・出力権限・グリッド分割出力・タッチ操作を改善。</p>
@@ -140,7 +145,7 @@
 <p class="update-toast__message">
 <strong>更新情報 (2026/02/21)</strong><br/>
 ・共有モードを承認フロー化（入室は自由、参加はマスター承認）<br/>
-・最大参加人数(1〜5)と出力権限（初期: マスターのみ）を追加<br/>
+・最大参加人数(1〜15)と出力権限（初期: マスターのみ）を追加<br/>
 ・コメント機能を刷新（共通名/アイコン、時刻表示、対象選択連携）<br/>
 ・マスター操作を整理（参加/視聴切替、セル移動、キック、BAN）<br/>
 ・部屋公開/非公開を追加（公開部屋はPiXiEEDホームから視聴入室可能）<br/>
@@ -605,13 +610,14 @@
 <div class="field-group">
 <button class="button" id="newProject" type="button">新規作成</button>
 <button class="button" id="openDocument" type="button">ファイルを開く</button>
-<button class="button" id="exportProject" type="button">出力</button>
-<p class="help-text">出力: PNG/GIF/コンテスト投稿/プロジェクト保存をまとめています。</p>
+<button class="button" id="exportProject" type="button">保存/出力</button>
+<p class="help-text">保存/出力: PNG/GIF書き出しと PiXiEEDファイル保存をまとめています。</p>
 <button class="button" id="clearCanvas" type="button">キャンバスをクリア</button>
 <button class="button" id="enableAutosave" type="button">ローカルに自動保存</button>
 <p class="help-text">自動保存はこの端末内に下書きを保存します。出力は共有・配布用です。</p>
 <button class="button" id="bindExportFolder" type="button">出力フォルダを設定</button>
 <p class="help-text">一度設定すると PNG/GIF/プロジェクト を PiXiEED フォルダへ上書き保存します。</p>
+<p aria-live="polite" class="help-text export-destination-label" id="exportDestinationLabel">画像/GIF出力先: 未固定（保存時に保存先を選択）</p>
 </div>
 <p aria-live="polite" class="help-text" id="autosaveStatus"></p>
 <p aria-live="polite" class="help-text" id="exportFolderStatus"></p>
@@ -662,18 +668,6 @@
 <button class="button" id="multiLeaveSession" type="button">切断</button>
 </div>
 </div>
-<div class="field field--list multi-join-request-field" hidden id="multiJoinRequestField">
-<button class="chip" id="multiRequestGuestRole" type="button">参加リクエストを送信</button>
-<p class="help-text" id="multiJoinRequestHint">参加はマスターの承認後に有効になります。</p>
-</div>
-<div class="field field--list multi-master-actions" data-multi-master-only="true">
-<button class="chip" id="multiGenerateKey" type="button">キー生成</button>
-<button class="chip" id="multiBroadcastState" type="button">全員に同期</button>
-<div class="field field--inline multi-invite-actions">
-<button class="chip" id="multiInviteCopy" type="button">招待リンクをコピー</button>
-<button class="chip" id="multiInviteShare" type="button">招待を共有</button>
-</div>
-</div>
 <div class="field field--compact multi-project-key-field">
 <span>プロジェクトキー</span>
 <div class="multi-project-key-row">
@@ -681,29 +675,18 @@
 <button aria-label="プロジェクトキーをコピー" class="chip multi-project-key-copy" id="multiCopyKey" title="プロジェクトキーをコピー" type="button">コピー</button>
 </div>
 </div>
-<div class="field field--list multi-capacity-field" data-multi-master-only="true">
-<span>最大参加人数</span>
-<label class="field field--compact">
-<span>参加上限 (1〜5)</span>
-<input data-stepper="true" id="multiMaxGuests" inputmode="numeric" max="5" min="1" step="1" type="number" value="5"/>
-</label>
-<p class="help-text" id="multiGuestCapacityHint">参加枠: 0 / 5</p>
-<label class="field field--compact">
-<span>部屋公開</span>
-<select id="multiRoomVisibility">
-<option value="private">非公開</option>
-<option value="public">公開</option>
-</select>
-</label>
-<p class="help-text" id="multiRoomVisibilityHint">非公開: ホームには表示されません。</p>
-<label class="field field--compact">
-<span>出力権限</span>
-<select id="multiExportPermission">
-<option value="master">マスターのみ</option>
-<option value="master-guest">マスター + 参加者</option>
-<option value="all">全員</option>
-</select>
-</label>
+<div class="field field--list multi-master-actions" data-multi-master-only="true">
+<span>基本</span>
+<button class="chip" id="multiGenerateKey" type="button">キー生成</button>
+<button class="chip" id="multiBroadcastState" type="button">全員に同期</button>
+<div class="field field--inline multi-invite-actions">
+<button class="chip" id="multiInviteCopy" type="button">招待リンクをコピー</button>
+<button class="chip" id="multiInviteShare" type="button">招待を共有</button>
+</div>
+</div>
+<div class="field field--list multi-join-request-field" hidden id="multiJoinRequestField">
+<button class="chip" id="multiRequestGuestRole" type="button">参加リクエストを送信</button>
+<p class="help-text" id="multiJoinRequestHint">参加はマスターの承認後に有効になります。</p>
 </div>
 <div class="multi-status-row">
 <p aria-live="polite" class="help-text" id="multiStatus">共有モード: OFF</p>
@@ -725,7 +708,54 @@
 </ul>
 </div>
 </details>
-<div class="field field--list multi-join-requests-field" data-multi-master-only="true">
+<div class="multi-master-layout" data-multi-master-only="true">
+<div class="multi-master-column">
+<div class="field field--list multi-master-preset-field">
+<span>クイック設定</span>
+<div class="field field--inline multi-master-preset-actions">
+<button class="chip" id="multiPresetFriends" type="button">友達向け</button>
+<button class="chip" id="multiPresetStream" type="button">配信向け</button>
+</div>
+<p class="help-text" id="multiPresetHint">友達向け: 自動参加 / 配信向け: 承認制</p>
+</div>
+<details class="field field--list multi-master-advanced" id="multiMasterAdvanced">
+<summary>詳細設定</summary>
+<div class="multi-master-advanced-body">
+<div class="field field--list multi-capacity-field">
+<span>参加管理</span>
+<label class="field field--compact">
+<span>参加上限 (1〜15)</span>
+<input data-stepper="true" id="multiMaxGuests" inputmode="numeric" max="15" min="1" step="1" type="number" value="5"/>
+</label>
+<p class="help-text" id="multiGuestCapacityHint">参加枠: 0 / 5</p>
+<label class="field field--compact">
+<span>部屋公開</span>
+<select id="multiRoomVisibility">
+<option value="public" selected>公開</option>
+<option value="private">非公開</option>
+</select>
+</label>
+<p class="help-text" id="multiRoomVisibilityHint">非公開: ホームには表示されません。</p>
+<label class="field field--compact">
+<span>出力権限</span>
+<select id="multiExportPermission">
+<option value="master-guest" selected>マスター + 参加者</option>
+<option value="master">マスターのみ</option>
+<option value="all">全員</option>
+</select>
+</label>
+<label class="field field--compact">
+<span>参加方式</span>
+<select id="multiJoinPolicy">
+<option value="open" selected>自動参加（友達向け）</option>
+<option value="approval">承認制（配信向け）</option>
+</select>
+</label>
+<p class="help-text" id="multiJoinPolicyHint">自動参加: 招待リンクは参加者入室になります。</p>
+</div>
+</div>
+</details>
+<div class="field field--list multi-join-requests-field">
 <span>参加リクエスト</span>
 <label class="field field--compact">
 <span>対象</span>
@@ -736,7 +766,17 @@
 <button class="chip" id="multiJoinRequestReject" type="button">却下</button>
 </div>
 </div>
-<div class="field field--list multi-role-control-field" data-multi-master-only="true">
+</div>
+<div class="multi-master-column">
+<div class="field field--list multi-master-ops-toggle-field">
+<span>運営モード</span>
+<label class="toggle-option" for="multiMasterOpsMode">
+<input id="multiMasterOpsMode" type="checkbox"/>
+<span>キック / BAN / 強制切替を表示</span>
+</label>
+<p class="help-text" id="multiMasterOpsHint">通常はOFF推奨です。</p>
+</div>
+<div class="field field--list multi-role-control-field" data-multi-master-ops="true">
 <span>参加/視聴の切替</span>
 <label class="field field--compact">
 <span>対象</span>
@@ -747,7 +787,7 @@
 <button class="chip" id="multiForceSpectator" type="button">視聴者にする</button>
 </div>
 </div>
-<div class="field field--list multi-assignment-field" data-multi-master-only="true">
+<div class="field field--list multi-assignment-field" data-multi-master-ops="true">
 <span>参加者セル移動</span>
 <div class="field field--inline multi-assignment-inputs">
 <label class="field field--tiny">
@@ -764,6 +804,8 @@
 <button class="chip" id="multiAssignLockToggle" type="button">セルロック</button>
 <button class="chip" id="multiAssignKick" type="button">キック</button>
 <button class="chip" id="multiAssignBan" type="button">BAN</button>
+</div>
+</div>
 </div>
 </div>
 <div class="panel-ad-mount" data-panel-ad-mount="right"></div>
@@ -925,7 +967,7 @@
 <dialog aria-labelledby="exportDialogTitle" class="modal" id="exportDialog">
 <form class="modal__form" id="exportDialogForm" method="dialog">
 <header class="modal__header">
-<h2 class="modal__title" id="exportDialogTitle">出力形式</h2>
+<h2 class="modal__title" id="exportDialogTitle">保存/出力形式</h2>
 </header>
 <div class="modal__body">
 <div class="field field--list">
@@ -941,6 +983,10 @@
 <label class="toggle-option export-original-toggle" for="exportIncludeOriginalToggle">
 <input id="exportIncludeOriginalToggle" type="checkbox"/>
 <span>拡大出力時に原寸も追加で出力する</span>
+</label>
+<label class="toggle-option" for="exportSaveProjectCompanionToggle">
+<input id="exportSaveProjectCompanionToggle" type="checkbox"/>
+<span>画像/GIF出力時に PiXiEEDファイルも同時保存する</span>
 </label>
 <div class="field field--inline" hidden id="exportGridSettings">
 <span>グリッド分割 (PNG)</span>
@@ -960,6 +1006,7 @@
 <p class="help-text"><strong>iPhoneで保存</strong> 共有 → ファイルに保存</p>
 <p class="help-text"><strong>Androidで保存</strong> 保存</p>
 </div>
+<p aria-live="polite" class="help-text export-destination-label" id="exportDialogDestinationLabel">画像/GIF出力先: 未固定（保存時に保存先を選択）</p>
 <div aria-label="出力形式の選択" class="export-actions" role="group">
 <label class="field field--compact">
 <span>形式</span>
@@ -972,7 +1019,7 @@
 <option value="project">プロジェクト（.pixieedraw）</option>
 </select>
 </label>
-<button class="button button--primary" id="confirmExport" type="button">出力</button>
+<button class="button button--primary" id="confirmExport" type="button">保存/出力</button>
 </div>
 </div>
 <div aria-label="広告" class="export-ad" id="exportAdContainer">
@@ -1581,6 +1628,25 @@
         return Boolean(container.closest && container.closest('#mobileBottomAd'));
       }
 
+      function getSideSlotId(container) {
+        if (!(container instanceof HTMLElement)) return '';
+        if (container.id === 'leftPanelAdSlot') return 'left';
+        if (container.id === 'rightPanelAdSlot') return 'right';
+        return '';
+      }
+
+      function isSideRailExpanded(container) {
+        const side = getSideSlotId(container);
+        if (!side) return true;
+        const railId = side === 'left' ? 'leftRail' : 'rightRail';
+        const rail = document.getElementById(railId);
+        if (!(rail instanceof HTMLElement)) return true;
+        if (rail.dataset.collapsed === 'true') return false;
+        // Match request: left side ad only starts after the rail is widened (non-compact).
+        if (side === 'left' && rail.dataset.compact === 'true') return false;
+        return true;
+      }
+
       function getContainerWidth(container) {
         if (!(container instanceof HTMLElement)) return 0;
         try {
@@ -1695,6 +1761,7 @@
         const portraitBottomOnly = isPortraitBottomOnlyMode();
         if (portraitBottomOnly && !isMobileBottomSlot(container)) return false;
         if (!portraitBottomOnly && isMobileBottomSlot(container)) return false;
+        if (!isSideRailExpanded(container)) return false;
         applySideSlotGeometry(container);
         if (!isContainerRenderable(container)) return false;
         if (!isMobileBottomSlot(container) && getSideAdFrameSize(container).width < MIN_SIDE_AD_WIDTH) {
@@ -1746,6 +1813,10 @@
         }
         const slotConfig = slotByContainerId.get(container.id);
         if (!slotConfig) return;
+        if (!isSideRailExpanded(container)) {
+          container.dataset.pixiedRetryLoop = '0';
+          return;
+        }
 
         applySideSlotGeometry(container);
         getOrCreateIns(container, slotConfig.slot);
