@@ -10,6 +10,37 @@
   const updateEl = document.getElementById('gameGalleryUpdate');
   const hubUpdates = document.getElementById('hubUpdates');
   const hubLatest = document.getElementById('hubLatest');
+  const LANG = (document.documentElement.getAttribute('lang') || 'ja').toLowerCase();
+  const IS_EN = LANG.startsWith('en');
+  const I18N = IS_EN
+    ? {
+        project: 'Project',
+        tool: 'Tool',
+        game: 'Game',
+        updatedPrefix: 'Updated',
+        updatePrefix: 'Update',
+        updatedOnPrefix: 'Updated on',
+        openProject: 'Open this project',
+        useTool: 'Use this tool',
+        playGame: 'Play this game',
+        updatesPending: 'Updates are being prepared.',
+        latestPending: 'New picks are being prepared.',
+        descPending: 'Description is being prepared.'
+      }
+    : {
+        project: 'プロジェクト',
+        tool: 'ツール',
+        game: 'ゲーム',
+        updatedPrefix: '更新',
+        updatePrefix: '更新',
+        updatedOnPrefix: '更新日',
+        openProject: 'この作品を見る',
+        useTool: 'このツールを使う',
+        playGame: 'このゲームで遊ぶ',
+        updatesPending: '更新情報は準備中です。',
+        latestPending: '新着情報は準備中です。',
+        descPending: '紹介文を準備中です。'
+      };
 
   if (!itemsSource) {
     return;
@@ -36,22 +67,30 @@
   };
 
   const buildMeta = (entry) => {
-    const typeLabel = entry.type === 'tool' ? 'ツール' : (entry.type === 'game' ? 'ゲーム' : 'プロジェクト');
-    const updated = entry.updated ? `更新: ${entry.updated}` : '';
+    const typeLabel = entry.type === 'tool' ? I18N.tool : (entry.type === 'game' ? I18N.game : I18N.project);
+    const updated = entry.updated ? `${I18N.updatedPrefix}: ${entry.updated}` : '';
     return updated ? `${typeLabel} / ${updated}` : typeLabel;
   };
 
   const updateLink = (entry) => {
     if (!linkEl) return;
     if (!entry || !entry.link) {
-      linkEl.textContent = 'この作品を見る';
+      linkEl.textContent = I18N.openProject;
       linkEl.setAttribute('href', 'tools.html');
       linkEl.hidden = false;
       return;
     }
     linkEl.hidden = false;
     linkEl.setAttribute('href', entry.link);
-    linkEl.textContent = entry.type === 'tool' ? 'このツールを使う' : 'このゲームで遊ぶ';
+    if (entry.type === 'tool') {
+      linkEl.textContent = I18N.useTool;
+      return;
+    }
+    if (entry.type === 'game') {
+      linkEl.textContent = I18N.playGame;
+      return;
+    }
+    linkEl.textContent = I18N.openProject;
   };
 
   const updateUpdateText = (entry) => {
@@ -60,11 +99,11 @@
     const updated = entry?.updated || '';
     let text = '';
     if (update && updated) {
-      text = `更新 (${updated}): ${update}`;
+      text = `${I18N.updatePrefix} (${updated}): ${update}`;
     } else if (update) {
-      text = `更新: ${update}`;
+      text = `${I18N.updatePrefix}: ${update}`;
     } else if (updated) {
-      text = `更新日: ${updated}`;
+      text = `${I18N.updatedOnPrefix}: ${updated}`;
     }
     updateEl.textContent = text;
     updateEl.hidden = !text;
@@ -85,10 +124,10 @@
   };
 
   const getTypeLabel = (entry) => {
-    if (!entry) return 'プロジェクト';
-    if (entry.type === 'tool') return 'ツール';
-    if (entry.type === 'game') return 'ゲーム';
-    return 'プロジェクト';
+    if (!entry) return I18N.project;
+    if (entry.type === 'tool') return I18N.tool;
+    if (entry.type === 'game') return I18N.game;
+    return I18N.project;
   };
 
   const buildUpdateRow = (entry, options = {}) => {
@@ -105,7 +144,7 @@
       title.href = entry.link;
       title.className = 'hub-update__link';
     }
-    title.textContent = entry.title || 'プロジェクト';
+    title.textContent = entry.title || I18N.project;
     const desc = document.createElement('span');
     desc.textContent = options.desc || '';
     row.append(time, title, desc);
@@ -124,7 +163,7 @@
       if (!updates.length) {
         const empty = document.createElement('li');
         empty.className = 'project-place__update project-place__update--empty';
-        empty.textContent = '更新情報は準備中です。';
+        empty.textContent = I18N.updatesPending;
         hubUpdates.appendChild(empty);
       } else {
         updates.slice(0, 4).forEach(entry => {
@@ -139,7 +178,7 @@
       if (!sorted.length) {
         const empty = document.createElement('li');
         empty.className = 'project-place__update project-place__update--empty';
-        empty.textContent = '新着情報は準備中です。';
+        empty.textContent = I18N.latestPending;
         hubLatest.appendChild(empty);
       } else {
         sorted.slice(0, 4).forEach(entry => {
@@ -170,7 +209,7 @@
     button.className = 'dot-gallery__button' + (index === 0 ? ' is-active' : '');
     button.setAttribute('role', 'option');
     button.setAttribute('aria-pressed', index === 0 ? 'true' : 'false');
-    button.setAttribute('aria-label', entry.title || 'プロジェクト');
+    button.setAttribute('aria-label', entry.title || I18N.project);
     button.dataset.index = String(index);
 
     const img = document.createElement('img');
@@ -191,14 +230,14 @@
     if (!entry) return;
     viewer.hidden = false;
     viewer.src = normalizePath(entry.image);
-    viewer.alt = entry.title || 'プロジェクト';
+    viewer.alt = entry.title || I18N.project;
     placeholder.hidden = true;
 
-    nameEl.textContent = entry.title || 'プロジェクト';
+    nameEl.textContent = entry.title || I18N.project;
     if (metaEl) {
       metaEl.textContent = buildMeta(entry);
     }
-    detailEl.textContent = entry.desc || entry.update || '紹介文を準備中です。';
+    detailEl.textContent = entry.desc || entry.update || I18N.descPending;
     updateLink(entry);
     updateUpdateText(entry);
 
