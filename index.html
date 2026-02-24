@@ -3,21 +3,24 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no, viewport-fit=cover"/>
-  <title>ドット絵を描くサイト | 無料ブラウザツール PiXiEED</title>
-  <meta name="description" content="ドット絵を描くサイトを探している方向けのPiXiEED公式。ブラウザで使えるドット絵エディター、16×16練習ツール、ドット絵ゲームを無料で利用できます。"/>
+  <title>ドット絵無料ツールならPiXiEED | 初心者から実務まで使えるブラウザ制作環境</title>
+  <meta name="description" content="PiXiEEDは、ドット絵初心者向けの練習ツールから、実務向け本格機能とマルチ共同制作に対応したPiXiEEDrawまで無料で使える総合サイト。ブラウザで描く・遊ぶ・連絡するを1つに。"/>
   <meta name="keywords" content="PiXiEED,ピクシード,PiXiEEDraw,ピクシードロー,PiXFiND,ピクスファインド,ドット絵,ピクセルアート"/>
   <link rel="canonical" href="https://pixieed.jp/"/>
+  <link rel="alternate" hreflang="ja" href="https://pixieed.jp/"/>
+  <link rel="alternate" hreflang="en" href="https://pixieed.jp/en/"/>
+  <link rel="alternate" hreflang="x-default" href="https://pixieed.jp/"/>
   <meta property="og:type" content="website"/>
   <meta property="og:site_name" content="PiXiEED（ピクシード）"/>
-  <meta property="og:title" content="ドット絵を描くサイト | 無料ブラウザツール PiXiEED"/>
-  <meta property="og:description" content="ブラウザで使えるドット絵エディター、16×16練習ツール、ドット絵ゲームを無料で使えるPiXiEED公式サイト。"/>
+  <meta property="og:title" content="ドット絵無料ツールならPiXiEED | 初心者から実務まで使えるブラウザ制作環境"/>
+  <meta property="og:description" content="PiXiEEDは、ドット絵初心者向けの練習ツールから、実務向け本格機能とマルチ共同制作に対応したPiXiEEDrawまで無料で使える総合サイト。ブラウザで描く・遊ぶ・連絡するを1つに。"/>
   <meta property="og:url" content="https://pixieed.jp/"/>
   <meta property="og:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
   <meta name="twitter:card" content="summary_large_image"/>
   <meta name="twitter:site" content="@PiXiEED_arta"/>
   <meta name="twitter:url" content="https://pixieed.jp/"/>
-  <meta name="twitter:title" content="ドット絵を描くサイト | 無料ブラウザツール PiXiEED"/>
-  <meta name="twitter:description" content="ブラウザで使えるドット絵エディター、16×16練習ツール、ドット絵ゲームを無料で使えるPiXiEED公式サイト。"/>
+  <meta name="twitter:title" content="ドット絵無料ツールならPiXiEED | 初心者から実務まで使えるブラウザ制作環境"/>
+  <meta name="twitter:description" content="PiXiEEDは、ドット絵初心者向けの練習ツールから、実務向け本格機能とマルチ共同制作に対応したPiXiEEDrawまで無料で使える総合サイト。ブラウザで描く・遊ぶ・連絡するを1つに。"/>
   <meta name="twitter:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
   <link rel="icon" type="image/png" href="character-dots/mao1.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -113,6 +116,32 @@
     .brand-text{ display:flex; flex-direction:column; gap:2px; }
     .brand-title{ margin:0; font-size:16px; color:#f9fafb; }
     .brand-sub{ margin:0; font-size:12px; color:#9ca3af; }
+    .header-tools{
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .lang-switch{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-width:42px;
+      min-height:32px;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.22);
+      background:rgba(255,255,255,0.06);
+      color:#f9fafb;
+      text-decoration:none;
+      font-weight:800;
+      font-size:12px;
+      letter-spacing:0.04em;
+    }
+    .lang-switch:hover,
+    .lang-switch:focus-visible{
+      background:rgba(255,255,255,0.14);
+      color:#ffffff;
+    }
 
     h1{ margin:0; font-size:clamp(20px, 5.3vw, 30px); line-height:1.35; letter-spacing:0.02em; color:#f9fafb; }
     h2{ margin:0; font-size:18px; color:#f9fafb; letter-spacing:0.01em; }
@@ -226,7 +255,7 @@
     }
     .hero-actions{
       display:grid;
-      grid-template-columns:repeat(3, minmax(0, 1fr));
+      grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));
       gap:8px;
     }
     .hero-actions .button{
@@ -236,6 +265,7 @@
       justify-content:center;
       width:100%;
       min-width:0;
+      min-height:44px;
       text-align:center;
     }
     .hero-draw-guide{
@@ -304,6 +334,7 @@
     }
     @media (max-width:700px){
       .hero-actions{
+        grid-template-columns:1fr;
         gap:6px;
       }
       .hero-actions .button{
@@ -316,6 +347,50 @@
       .hero-draw-guide__actions{
         grid-template-columns:1fr;
       }
+    }
+    .audience-grid{
+      display:grid;
+      gap:12px;
+      grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
+    }
+    .audience-card{
+      display:grid;
+      gap:10px;
+      border:1px solid rgba(255,255,255,0.16);
+      border-radius:12px;
+      padding:12px;
+      background:rgba(15,23,42,0.55);
+    }
+    .audience-card--beginner{
+      border-color:rgba(251,146,60,0.46);
+      background:linear-gradient(155deg, rgba(251,146,60,0.16), rgba(15,23,42,0.55));
+    }
+    .audience-card--pro{
+      border-color:rgba(96,165,250,0.46);
+      background:linear-gradient(155deg, rgba(59,130,246,0.16), rgba(15,23,42,0.55));
+    }
+    .audience-card__meta{
+      margin:0;
+      font-size:12px;
+      color:#e2e8f0;
+      line-height:1.6;
+      font-weight:700;
+    }
+    .audience-card .button{
+      justify-self:start;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+    }
+    .value-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+    .value-actions .button{
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
     }
     .grid{
       display:grid;
@@ -755,6 +830,32 @@
       font-size:10px;
       color:#94a3b8;
       letter-spacing:0.03em;
+    }
+    .public-room-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      margin-top:8px;
+    }
+    .public-room-action-chip{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.22);
+      background:rgba(255,255,255,0.06);
+      color:#f8fafc;
+      text-decoration:none;
+      padding:5px 10px;
+      font-size:11px;
+      font-weight:700;
+      line-height:1.2;
+      min-height:28px;
+    }
+    .public-room-action-chip--primary{
+      background:linear-gradient(135deg, #ff719a, #ff9f43);
+      border-color:rgba(255,255,255,0.12);
+      color:#ffffff;
     }
     .public-room-empty{
       margin:0;
@@ -1577,29 +1678,32 @@
             <p class="brand-sub" id="brandUser">ユーザー</p>
           </div>
         </button>
-        <div></div>
+        <div class="header-tools">
+          <a class="lang-switch" href="en/index.html" lang="en" hreflang="en" aria-label="Switch to English">EN</a>
+        </div>
       </div>
     </header>
 
     <section class="card" id="home-hero">
       <div class="hero-grid">
         <div class="hero-copy">
-          <h1>描いて!!遊んで!!公開して!!ドット絵専用総合サイト!!</h1>
-          <p class="subtitle">PiXiEED（ピクシード）は、ドット絵制作からゲーム体験、作品公開までブラウザで完結できるサイトです。</p>
+          <h1>ドット絵無料ツールなら PiXiEED</h1>
+          <p class="subtitle">PiXiEED（ピクシード）は、ブラウザだけでドット絵を描く・遊ぶ・連絡するを完結できるサイトです。</p>
           <div class="hero-actions">
             <button class="button" id="toggleDrawGuide" type="button" aria-controls="draw-guide" aria-expanded="false">描く</button>
             <button class="button button--ghost" id="togglePlayGuide" type="button" aria-controls="play-guide" aria-expanded="false">遊ぶ</button>
+            <button class="button button--ghost" id="toggleContactGuide" type="button" aria-controls="contact-guide" aria-expanded="false">連絡</button>
           </div>
           <div class="hero-draw-guide" id="draw-guide" hidden>
-            <p class="hero-draw-guide__title">描く: レベルに合わせて選択</p>
+            <p class="hero-draw-guide__title">描く: ツールを選択</p>
             <div class="hero-draw-guide__actions">
               <a class="hero-draw-guide__link" href="projects/jerin-maker/index.html">
                 <span class="hero-draw-guide__icon"><img src="icon/icon-192-5.png" alt=""></span>
-                <span class="hero-draw-guide__text">PiXiEEDraw Lite（初心者向けチュートリアルでドット絵を学ぼう！！）</span>
+                <span class="hero-draw-guide__text">PiXiEEDraw Lite（ガイド付き16×16で最初の1枚を完成）</span>
               </a>
               <a class="hero-draw-guide__link" href="projects/pixiedraw/index.html">
                 <span class="hero-draw-guide__icon"><img src="icon/icon-192-4.png" alt=""></span>
-                <span class="hero-draw-guide__text">PiXiEEDraw（ピクシードロー / アニメ対応の本格ドット絵エディターを使おう！！）</span>
+                <span class="hero-draw-guide__text">PiXiEEDraw（実務向け本格機能 + マルチ共同制作でチーム制作にも対応）</span>
               </a>
             </div>
           </div>
@@ -1608,15 +1712,28 @@
             <div class="hero-draw-guide__actions">
               <a class="hero-draw-guide__link" href="projects/maoitu/index.html">
                 <span class="hero-draw-guide__icon"><img src="icon/icon-192-3.png" alt=""></span>
-                <span class="hero-draw-guide__text">まおいつ（避け続けるアクションでハイスコアを目指そう！！）</span>
+                <span class="hero-draw-guide__text">まおいつ（避け続けるアクションでハイスコアを目指そう）</span>
               </a>
               <a class="hero-draw-guide__link" href="projects/pixfind/index.html">
                 <span class="hero-draw-guide__icon"><img src="icon/icon-192-2.png" alt=""></span>
-                <span class="hero-draw-guide__text">PiXFiND（ピクスファインド / ドット絵まちがい探しに挑戦しよう！！）</span>
+                <span class="hero-draw-guide__text">PiXFiND（ドット絵まちがい探しに挑戦）</span>
               </a>
               <a class="hero-draw-guide__link" href="projects/pixiee-lens/index.html">
                 <span class="hero-draw-guide__icon"><img src="icon/icon-192-1.png" alt=""></span>
-                <span class="hero-draw-guide__text">PiXiEELENS（ドット絵変換カメラでレトロ写真を撮ろう！！）</span>
+                <span class="hero-draw-guide__text">PiXiEELENS（ドット絵変換カメラでレトロ写真を撮ろう）</span>
+              </a>
+            </div>
+          </div>
+          <div class="hero-draw-guide" id="contact-guide" hidden>
+            <p class="hero-draw-guide__title">連絡: 連絡先を選択</p>
+            <div class="hero-draw-guide__actions">
+              <a class="hero-draw-guide__link" href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">
+                <span class="hero-draw-guide__icon"><img src="FooterIcon2.png" alt=""></span>
+                <span class="hero-draw-guide__text">Xで連絡する（@PiXiEED_arta）</span>
+              </a>
+              <a class="hero-draw-guide__link" href="mailto:pixieed.arta@gmail.com">
+                <span class="hero-draw-guide__icon"><img src="icon/icon-mail.png" alt=""></span>
+                <span class="hero-draw-guide__text">メールアドレスを開く</span>
               </a>
             </div>
           </div>
@@ -1633,6 +1750,70 @@
         </div>
     </section>
 
+    <section class="section section--highlight" id="start-guides">
+      <div class="section-inner">
+        <div>
+          <p class="section-eyebrow">Draw, Play, Contact</p>
+          <h2>描く・遊ぶ・連絡から選べる</h2>
+          <p class="subtitle">「ドット絵無料ツール」を探して来た方でも、やりたい行動からそのまま始められます。</p>
+        </div>
+        <div class="audience-grid">
+          <article class="audience-card audience-card--beginner">
+            <p class="project-place__label">Draw</p>
+            <h3 class="project-place__title">描く</h3>
+            <p class="subtitle">ガイド付きで16×16から始めるなら Lite、本格制作とマルチ共同制作まで進めるなら PiXiEEDraw を選べます。</p>
+            <p class="audience-card__meta">目安 10〜15分 / 登録不要 / 無料（Lite）</p>
+            <a class="button" href="projects/jerin-maker/index.html">PiXiEEDraw Liteを使う</a>
+          </article>
+          <article class="audience-card audience-card--pro">
+            <p class="project-place__label">Play</p>
+            <h3 class="project-place__title">遊ぶ</h3>
+            <p class="subtitle">ドット絵ゲームやカメラ変換ツールで、気軽にピクセル表現を体験できます。</p>
+            <p class="audience-card__meta">ブラウザ完結 / すぐ遊べる / 無料</p>
+            <a class="button button--ghost" href="games.html">ゲーム一覧へ</a>
+          </article>
+          <article class="audience-card audience-card--pro">
+            <p class="project-place__label">Contact</p>
+            <h3 class="project-place__title">連絡する</h3>
+            <p class="subtitle">制作相談・コラボ相談は、Xまたはメールの連絡先から選べます。</p>
+            <p class="audience-card__meta">X / メール</p>
+            <a class="button button--ghost" href="#contact">連絡先を見る</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="dot-value">
+      <div class="section-inner">
+        <div>
+          <p class="section-eyebrow">Why Pixel Art</p>
+          <h2>ドット絵は、初心者にやさしく奥が深い</h2>
+        </div>
+        <div class="grid">
+          <article class="project-place__group">
+            <h3 class="project-place__title">ドット絵の良さ</h3>
+            <ul class="project-place__list">
+              <li>小さなキャンバスだから、短時間で「完成」を体験しやすい。</li>
+              <li>色数を絞るほど、配色と設計の力が伸びる。</li>
+              <li>ゲーム素材、SNS投稿、UIアイコンなど実用に直結する。</li>
+            </ul>
+          </article>
+          <article class="project-place__group">
+            <h3 class="project-place__title">PiXiEEDrawが実務・共同制作にも向く理由</h3>
+            <ul class="project-place__list">
+              <li>反復作業を減らす描画機能（対称・選択・ショートカット）。</li>
+              <li>共有モードβで同じキャンバスをマルチ共同制作（マスター/参加者・差分同期）。</li>
+              <li>ブラウザ完結で、環境差分を減らしやすい。</li>
+            </ul>
+            <div class="value-actions">
+              <a class="button" href="projects/pixiedraw/index.html">PiXiEEDrawで本格制作を始める</a>
+              <a class="button button--ghost" href="#publicRoomsHub">共同制作ルームを見る</a>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
     <!-- 公開中の部屋（ドット絵の下へ移動） -->
     <div class="project-place__group public-rooms-hub" id="publicRoomsHub">
       <div class="public-rooms-hub__head">
@@ -1642,7 +1823,7 @@
         </div>
         <button class="chip public-rooms-hub__refresh" id="refreshPublicRooms" type="button">更新</button>
       </div>
-      <p class="public-rooms-hub__lead">マスターが公開設定した部屋のみ表示されます。サムネイルを押すと視聴者として入室できます。</p>
+      <p class="public-rooms-hub__lead">公開中の部屋と常駐ルームを表示します。サムネイルから直接入室できます。</p>
       <div class="public-room-grid" id="publicRoomGrid" aria-live="polite">
         <p class="public-room-empty">公開中の部屋はありません。</p>
       </div>
@@ -1712,14 +1893,15 @@
         </div>
         <!-- publicRoomsHub moved to appear under the dot-hero section -->
         <ul class="project-place__source" id="gameGalleryItems" hidden>
-          <li data-title="PiXiEED ホーム" data-image="character-dots/mao1.png" data-type="project" data-updated="2026-02-11" data-update="見出しを『描いて!!遊んで!!公開して!!ドット絵専用総合サイト!!』へ更新 / ホーム導線を再設計" data-desc="ホーム導線と見出しを分かりやすく刷新。" data-link="index.html"></li>
+          <li data-title="PiXiEED ホーム" data-image="character-dots/mao1.png" data-type="project" data-updated="2026-02-24" data-update="SEO見出しを『ドット絵無料ツールなら PiXiEED』へ更新 / 描く・遊ぶ・連絡導線を新設" data-desc="検索流入の意図に合わせ、導線とメッセージを再設計。" data-link="index.html"></li>
+          <li data-title="価値訴求セクション追加" data-image="icon/icon-192-4.png" data-type="project" data-updated="2026-02-24" data-update="『ドット絵の良さ』と『PiXiEEDrawが実務に向く理由』をホーム上部に追加 / CTAを新設" data-desc="未経験者への魅力訴求と実務利用導線を同時に強化。" data-link="index.html"></li>
           <li data-title="描く / 遊ぶ 導線" data-image="icon/icon-192-4.png" data-type="project" data-updated="2026-02-11" data-update="『描く』で PiXiEEDraw Lite / PiXiEEDraw を選択可能にし、『遊ぶ』へ まおいつ・PiXFiND・PiXiEELENS を追加" data-desc="1タップで目的のツール・ゲームへ遷移できる導線に改善。" data-link="index.html"></li>
           <li data-title="ツール一覧 / ゲーム一覧" data-image="icon/icon-192-6.png" data-type="project" data-updated="2026-02-11" data-update="ホーム中段を2カード構成に整理し、各カードを6枠グリッド化（開発中 / 追加予定表示を追加）" data-desc="一覧UIを整理し、今後の追加枠も見える構成に変更。" data-link="tools.html"></li>
           <li data-title="キャラクター図鑑" data-image="character-dots/pikarin1.png" data-type="project" data-updated="2026-02-11" data-update="新キャラ追加（チカリン / キラリン / ピカリン / チャリン） / ピカリンをフレーム切替アニメ表示に対応" data-desc="キャラクター情報と表示演出を強化。" data-link="#character-intro"></li>
           <li data-title="PiXiEEDraw Lite" data-image="icon/icon-192-5.png" data-type="tool" data-updated="2026-02-11" data-update="『描く』導線の初心者向けとして案内を強化" data-desc="16×16ドットの制作とPNG保存。" data-link="projects/jerin-maker/index.html"></li>
           <li data-title="PiXiEELENS" data-image="icon/icon-192-1.png" data-type="tool" data-updated="2026-02-16" data-update="2/15: ボタン長押しGIF撮影を追加（最大2秒 / 6FPS） / 撮影後プレビューからPiXiEEDraw編集に対応 / 2/16: GIF撮影を最大5秒に拡張 / FPS設定（5・8・10・20・30）を追加 / PNG保存をドット倍率保存（x1→3倍〜x5→40倍）に対応 / 5MB超過時は倍率自動調整＋最終2倍保存に対応 / GIF保存は600x600目安・5MB制御を追加" data-desc="撮影品質・保存サイズ管理・操作性をまとめて強化し、SNS共有しやすい保存フローに改善。" data-link="projects/pixiee-lens/index.html"></li>
-          <li data-title="PiXiEEDraw（共有モードβ）" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-02-19" data-update="共有モード（マルチ）を追加（マスター/参加者、セル割当、差分同期） / 共有キー操作と役割フローを改善 / 共有タブアイコン更新 / 選択時C/PボタンをPC・横画面でも左上表示に対応" data-desc="複数人での同時制作機能をベータ導入。現在はテスト運用として継続調整中です。" data-link="projects/pixiedraw/index.html"></li>
-          <li data-title="PiXiEEDraw" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-02-15" data-update="2色描画（左=通常色 / 右=サブ色）を追加 / Hueリング+SVマップ改善 / 円ツール計算と横画面レイアウトを調整" data-desc="描画操作とカラーピッカー精度、横画面の使い勝手を改善。" data-link="projects/pixiedraw/index.html"></li>
+          <li data-title="PiXiEEDraw（共有モードβ）" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-02-19" data-update="共有モード（マルチ）を強化（マスター/参加者、セル割当、差分同期） / 共有キー操作と役割フローを改善 / 共同制作ルーム導線を調整" data-desc="本格機能を維持したまま、複数人で同時編集できる共同制作フローを継続強化。" data-link="projects/pixiedraw/index.html"></li>
+          <li data-title="PiXiEEDraw" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-02-15" data-update="2色描画（左=通常色 / 右=サブ色）を追加 / Hueリング+SVマップ改善 / 円ツール計算と横画面レイアウトを調整" data-desc="本格制作向けの描画操作とカラーピッカー精度、横画面の使い勝手を改善。" data-link="projects/pixiedraw/index.html"></li>
           <li data-title="PiXiEEDraw（対称モード刷新）" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-02-17" data-update="ミラーモードを実装（左右/上下/斜め2軸） / 4軸同時ON / 対称ラインつまみ移動 / グリッド基準調整 / 親子ボタン挙動を整理" data-desc="対称描画を実制作向けに強化。軸移動と同時反映に対応。" data-link="projects/pixiedraw/index.html"></li>
           <li data-title="PiXiEEDraw（UI/操作改善）" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-02-17" data-update="モバイル・横画面でツール並びを統一 / レール・つまみ・ギャップを統一 / 影や不要装飾を削減 / ツール再編（スポイト・仮想カーソル独立） / PixFiNDを設定トグル化" data-desc="軽量化と操作導線を優先したUIへ再調整。" data-link="projects/pixiedraw/index.html"></li>
           <li data-title="PiXiEEDraw（安全性と導線）" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-02-17" data-update="Aseprite系ショートカットを拡充 / ショートカット一覧を追加 / 未保存状態の離脱警告 / 出力後広告クローズ時に他ツール紹介ポップを追加 / 更新情報パネルを追加（直近1年表示）" data-desc="作業継続しやすい操作性と案内導線を強化。" data-link="projects/pixiedraw/index.html"></li>
@@ -1728,8 +1910,8 @@
     </section>
 
     <section class="card">
-      <h2>ドット絵エディター</h2>
-      <p class="seo-links">ブラウザで描ける <a href="projects/pixiedraw/index.html">ドット絵エディター PiXiEEDraw（ピクシードロー）</a> と、16×16練習向けの <a href="projects/jerin-maker/index.html">16×16ドット絵ツール PiXiEEDraw Lite</a> を紹介しています。</p>
+      <h2>ドット絵無料ツール</h2>
+      <p class="seo-links"><a href="projects/jerin-maker/index.html">PiXiEEDraw Lite</a> は未経験向けの16×16練習ツール、<a href="projects/pixiedraw/index.html">PiXiEEDraw（ピクシードロー）</a> は実制作向けの本格機能に加えてマルチ共同制作（共有モードβ）にも対応したブラウザドット絵エディターです。</p>
     </section>
 
     <section class="card ad-strip" aria-label="広告">
@@ -1780,12 +1962,12 @@
       </div>
     </section>
 
-    <section class="card">
+    <section class="card" id="contact">
       <h2>コンタクト</h2>
       <p class="subtitle">ドット絵制作・pixel art commission、ブラウザゲーム用アセット制作、業務委託・コラボの相談はこちら。</p>
       <div class="chips">
-        <a class="button" href="mailto:pixieed.arta@gmail.com">メールで相談する</a>
         <a class="button" href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">公式X</a>
+        <a class="button" href="mailto:pixieed.arta@gmail.com">メールアドレス</a>
       </div>
     </section>
 
@@ -2155,6 +2337,10 @@
           {
             button: document.getElementById('togglePlayGuide'),
             guide: document.getElementById('play-guide')
+          },
+          {
+            button: document.getElementById('toggleContactGuide'),
+            guide: document.getElementById('contact-guide')
           }
         ].filter((pair) => pair.button && pair.guide);
         if(!pairs.length) return;
@@ -2212,10 +2398,239 @@
   <script src="scripts/character-gallery.js"></script>
   <script src="scripts/game-gallery.js"></script>
   <script type="module">
-    // Homepage: probe pre-defined rooms and show those that are currently active
     const MULTI_SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
     const MULTI_SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
     const MULTI_SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
+    const MULTI_PUBLIC_LOBBY_CHANNEL = 'pixiedraw-public-rooms-v1';
+    const RESIDENT_THUMB_CACHE_KEY = 'pixieed:resident-room-thumb-cache-v1';
+    const RESIDENT_THUMB_CACHE_LIMIT = 12;
+    const RESIDENT_BLACK_THUMBNAIL_EDGE = 96;
+    const RESIDENT_ROOM_FALLBACKS = Object.freeze([
+      Object.freeze({
+        id: 'resident-room-256',
+        name: '常駐ルーム 256x256',
+        type: 'resident',
+        projectKey: 'resident-256-main',
+        channel: 'resident-256-main',
+        size: '256×256',
+        maxUsers: 10,
+        description: '最大10人。PiXiEEDrawマルチ常設キーに接続できます。'
+      }),
+      Object.freeze({
+        id: 'resident-room-128',
+        name: '常駐ルーム 128x128',
+        type: 'resident',
+        projectKey: 'resident-128-main',
+        channel: 'resident-128-main',
+        size: '128×128',
+        maxUsers: 16,
+        description: '最大16人。PiXiEEDrawマルチ常設キーに接続できます。'
+      })
+    ]);
+
+    function normalizeProjectKey(value){
+      if (typeof value !== 'string') return '';
+      return value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40);
+    }
+
+    function wait(ms){
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function buildMultiInviteHref(projectKey, role = 'guest'){
+      const normalizedKey = normalizeProjectKey(projectKey);
+      if (!normalizedKey) return 'pixiedraw/index.html';
+      const inviteRole = (role === 'master' || role === 'guest' || role === 'spectator')
+        ? role
+        : 'guest';
+      const params = new URLSearchParams();
+      params.set('multiInvite', '1');
+      params.set('multiKey', normalizedKey);
+      params.set('multiAutoJoin', '1');
+      params.set('multiRole', inviteRole);
+      return `pixiedraw/index.html?${params.toString()}`;
+    }
+
+    function createSolidThumbnailDataUrl(color = '#000000', size = RESIDENT_BLACK_THUMBNAIL_EDGE){
+      try{
+        const edge = Math.max(16, Math.round(Number(size) || RESIDENT_BLACK_THUMBNAIL_EDGE));
+        const canvas = document.createElement('canvas');
+        canvas.width = edge;
+        canvas.height = edge;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return '';
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, edge, edge);
+        return canvas.toDataURL('image/png');
+      }catch(e){
+        return '';
+      }
+    }
+
+    const RESIDENT_BLACK_THUMBNAIL_DATA_URL = createSolidThumbnailDataUrl('#000000', RESIDENT_BLACK_THUMBNAIL_EDGE);
+
+    function readResidentThumbnailCache(){
+      try{
+        const raw = window.localStorage.getItem(RESIDENT_THUMB_CACHE_KEY);
+        if (typeof raw !== 'string' || !raw.trim()) return {};
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      }catch(e){
+        return {};
+      }
+    }
+
+    function writeResidentThumbnailCache(cache){
+      try{
+        window.localStorage.setItem(RESIDENT_THUMB_CACHE_KEY, JSON.stringify(cache || {}));
+      }catch(e){}
+    }
+
+    function getResidentThumbnailFromCache(projectKey, cache){
+      const normalizedKey = normalizeProjectKey(projectKey);
+      if (!normalizedKey || !cache || typeof cache !== 'object') return null;
+      const entry = cache[normalizedKey];
+      if (!entry || typeof entry !== 'object') return null;
+      const thumbnail = typeof entry.thumbnailDataUrl === 'string' ? entry.thumbnailDataUrl : '';
+      if (!thumbnail.startsWith('data:image/')) return null;
+      const updatedAt = Number(entry.updatedAt) || 0;
+      return { thumbnailDataUrl: thumbnail, updatedAt };
+    }
+
+    function setResidentThumbnailCache(projectKey, thumbnailDataUrl, updatedAt = Date.now(), cache = null){
+      const normalizedKey = normalizeProjectKey(projectKey);
+      if (!normalizedKey || typeof thumbnailDataUrl !== 'string' || !thumbnailDataUrl.startsWith('data:image/')) {
+        return cache || readResidentThumbnailCache();
+      }
+      const nextCache = (cache && typeof cache === 'object') ? cache : readResidentThumbnailCache();
+      nextCache[normalizedKey] = {
+        thumbnailDataUrl,
+        updatedAt: Number(updatedAt) || Date.now(),
+      };
+      const keys = Object.keys(nextCache);
+      if (keys.length > RESIDENT_THUMB_CACHE_LIMIT) {
+        keys
+          .sort((a, b) => (Number(nextCache[b]?.updatedAt) || 0) - (Number(nextCache[a]?.updatedAt) || 0))
+          .slice(RESIDENT_THUMB_CACHE_LIMIT)
+          .forEach(key => { delete nextCache[key]; });
+      }
+      writeResidentThumbnailCache(nextCache);
+      return nextCache;
+    }
+
+    function parsePublicLobbyRooms(presenceState){
+      const byKey = new Map();
+      Object.keys(presenceState || {}).forEach(key => {
+        const rows = Array.isArray(presenceState[key]) ? presenceState[key] : [];
+        rows.forEach(row => {
+          const projectKey = normalizeProjectKey(row?.projectKey || '');
+          if (!projectKey) return;
+          if (row?.roomVisibility && row.roomVisibility !== 'public') return;
+          const updatedAt = Number(row?.updatedAt) || Number(row?.sentAt) || Date.now();
+          const prev = byKey.get(projectKey);
+          if (prev && updatedAt <= prev.updatedAt) return;
+          byKey.set(projectKey, {
+            projectKey,
+            updatedAt,
+            thumbnailDataUrl: typeof row?.thumbnailDataUrl === 'string' ? row.thumbnailDataUrl : '',
+            participantCount: Math.max(0, Math.round(Number(row?.participantCount) || 0)),
+            guestCount: Math.max(0, Math.round(Number(row?.guestCount) || 0)),
+            spectatorCount: Math.max(0, Math.round(Number(row?.spectatorCount) || 0)),
+            maxGuests: Math.max(0, Math.round(Number(row?.maxGuests) || 0)),
+          });
+        });
+      });
+      return byKey;
+    }
+
+    function withResidentRooms(rooms){
+      const source = Array.isArray(rooms) ? rooms.filter(row => row && typeof row === 'object') : [];
+      const residentByKey = new Map();
+      RESIDENT_ROOM_FALLBACKS.forEach((room) => {
+        const key = normalizeProjectKey(room.projectKey || room.channel || room.id || '');
+        if (key) residentByKey.set(key, room);
+      });
+      source.forEach((room) => {
+        if (room.type !== 'resident') return;
+        const key = normalizeProjectKey(room.projectKey || room.channel || room.id || '');
+        if (!key) return;
+        const base = residentByKey.get(key) || {};
+        residentByKey.set(key, Object.assign({}, base, room, { type: 'resident' }));
+      });
+      const residentRooms = Array.from(residentByKey.values());
+      const nonResidentRooms = source.filter(room => room.type !== 'resident');
+      return residentRooms.concat(nonResidentRooms);
+    }
+
+    function renderResidentFallbackCards(grid){
+      if (!grid) return;
+      grid.innerHTML = '';
+      const residents = withResidentRooms([]).filter(room => room.type === 'resident');
+      if (!residents.length){
+        grid.innerHTML = '<p class="public-room-empty">公開中の部屋はありません。</p>';
+        return;
+      }
+      for (const r of residents){
+        const card = document.createElement('div');
+        card.className = 'public-room-card';
+        const title = r.name || r.projectKey || 'Resident Room';
+        const residentPage = buildMultiInviteHref(r.projectKey || r.channel || r.id || '', 'guest');
+        card.innerHTML = `
+          <div class="public-room-thumb"><img src="${RESIDENT_BLACK_THUMBNAIL_DATA_URL}" alt="${title} thumbnail" loading="lazy" /></div>
+          <div class="public-room-meta">
+            <div class="public-room-title">${title}</div>
+            <div class="public-room-info">${r.description || ''}</div>
+            <div class="public-room-meta-extra">${r.size ? r.size + ' · ' : ''}${r.maxUsers ? '最大 ' + r.maxUsers + ' 人' : ''} · 待機中</div>
+            <div class="public-room-time">待機中</div>
+            <div><a class="public-room-action button" href="${residentPage}">入室</a></div>
+          </div>`;
+        grid.appendChild(card);
+      }
+    }
+
+    async function fetchPublicLobbyRooms(supabase){
+      const lobby = supabase.channel(MULTI_PUBLIC_LOBBY_CHANNEL);
+      try{
+        await lobby.subscribe();
+      }catch(e){}
+      await wait(650);
+      let state = {};
+      try{
+        state = typeof lobby.presenceState === 'function' ? (lobby.presenceState() || {}) : {};
+      }catch(e){
+        state = {};
+      }
+      try{
+        await lobby.unsubscribe();
+      }catch(e){}
+      return parsePublicLobbyRooms(state);
+    }
+
+    async function probeLegacyPublicRoomThumbnail(supabase, channelName){
+      if (typeof channelName !== 'string' || !channelName.trim()) return null;
+      const roomChannel = channelName.trim();
+      const ch = supabase.channel(roomChannel);
+      let thumbnail = null;
+      ch.on('broadcast', { event: 'status-response' }, ({payload})=>{
+        try{
+          if (!payload || payload.room !== roomChannel) return;
+          if (typeof payload.data === 'string' && payload.data.startsWith('data:image/')) {
+            thumbnail = payload.data;
+          }
+        }catch(e){}
+      });
+      try{
+        await ch.subscribe();
+      }catch(e){}
+      try{
+        await ch.send({ type:'broadcast', event:'status-request', payload:{ room: roomChannel, ts: Date.now() } });
+      }catch(e){}
+      await wait(700);
+      try{
+        await ch.unsubscribe();
+      }catch(e){}
+      return thumbnail;
+    }
 
     async function probeAndRenderRooms(){
       const grid = document.getElementById('publicRoomGrid');
@@ -2227,25 +2642,41 @@
         const mod = await import(MULTI_SUPABASE_MODULE_URL);
         const supabase = mod.createClient(MULTI_SUPABASE_URL, MULTI_SUPABASE_ANON_KEY, { realtime: { params: { eventsPerSecond: 48 } } });
 
-        const active = [];
-        // probe each room by temporarily subscribing to its channel and sending status-request
-        await Promise.all(rooms.map(async (r) => {
-          const ch = supabase.channel(r.channel);
-          let saw = false;
-          let thumb = null;
-          ch.on('broadcast', { event: 'status-response' }, ({payload})=>{
-            try{ if (!payload) return; if (payload.room === r.channel){ saw = true; if (payload.data) thumb = payload.data; } }catch(e){}
-          });
-          try{ await ch.subscribe(); }catch(e){}
-          try{ await ch.send({ type:'broadcast', event:'status-request', payload:{ room: r.channel, ts: Date.now() } }); }catch(e){}
-          await new Promise(res=>setTimeout(res, 700));
-          try{ await ch.unsubscribe(); }catch(e){}
-          if (saw) active.push(Object.assign({}, r, { thumbnail: thumb }));
-          else if (r.type === 'resident'){
-            // resident rooms should be listed even when empty
-            active.push(Object.assign({}, r, { thumbnail: null }));
+        const lobbyRooms = await fetchPublicLobbyRooms(supabase);
+        let residentThumbCache = readResidentThumbnailCache();
+        const active = (await Promise.all(withResidentRooms(Array.isArray(rooms) ? rooms : []).map(async (r) => {
+          if (!r || typeof r !== 'object') return null;
+          if (r.type === 'resident'){
+            const projectKey = normalizeProjectKey(r.projectKey || r.channel || r.id || '');
+            const lobby = projectKey ? lobbyRooms.get(projectKey) : null;
+            const liveThumb = (typeof lobby?.thumbnailDataUrl === 'string' && lobby.thumbnailDataUrl.startsWith('data:image/'))
+              ? lobby.thumbnailDataUrl
+              : '';
+            if (projectKey && liveThumb) {
+              residentThumbCache = setResidentThumbnailCache(
+                projectKey,
+                liveThumb,
+                Number(lobby?.updatedAt) || Date.now(),
+                residentThumbCache
+              );
+            }
+            const cachedThumb = getResidentThumbnailFromCache(projectKey, residentThumbCache);
+            const fallbackThumb = cachedThumb?.thumbnailDataUrl || RESIDENT_BLACK_THUMBNAIL_DATA_URL || '';
+            return Object.assign({}, r, {
+              projectKey,
+              isLive: Boolean(lobby),
+              thumbnail: liveThumb || fallbackThumb || null,
+              participantCount: Number(lobby?.participantCount) || 0,
+              updatedAt: Number(lobby?.updatedAt) || Number(cachedThumb?.updatedAt) || 0,
+            });
           }
-        }));
+          if (r.type === 'public'){
+            const thumbnail = await probeLegacyPublicRoomThumbnail(supabase, r.channel);
+            if (!thumbnail) return null;
+            return Object.assign({}, r, { thumbnail, isLive: true, updatedAt: Date.now() });
+          }
+          return null;
+        }))).filter(Boolean);
 
         grid.innerHTML = '';
         if (!active.length){ grid.innerHTML = '<p class="public-room-empty">公開中の部屋はありません。</p>'; return; }
@@ -2257,37 +2688,39 @@
             ? `<div class="public-room-thumb"><img src="${r.thumbnail}" alt="${r.name} thumbnail" loading="lazy" /></div>`
             : `<div class="public-room-thumb"><span>ROOM</span></div>`;
 
-          // action area: public rooms link to public-room, resident rooms either show 入室 if active or 建てる if empty
+          // action area
           let actionHtml = '';
           if (r.type === 'public'){
-            const href = `/public-room.html?room=${encodeURIComponent(r.channel)}`;
+            const href = `public-room.html?room=${encodeURIComponent(r.channel)}`;
             actionHtml = `<a class="public-room-action button" href="${href}">入室</a>`;
           } else if (r.type === 'resident'){
-            // resident pages were removed; use provided page if present, otherwise fall back to homepage
-            const page = r.page || '/';
-            const roomQuery = `?room=${encodeURIComponent(r.channel)}`;
-            if (r.thumbnail){
-              // active: let user enter
-              actionHtml = `<a class="public-room-action button" href="${page}${roomQuery}">入室</a>`;
-            } else {
-              // not active: show 建てる button which opens the room page (first entrant will start it)
-              actionHtml = `<a class="public-room-action button button--ghost" href="${page}${roomQuery}">建てる</a>`;
-            }
+            const residentPage = buildMultiInviteHref(r.projectKey || r.channel || r.id || '', 'guest');
+            actionHtml = `<a class="public-room-action button" href="${residentPage}">入室</a>`;
           }
+
+          const residentLiveInfo = r.type === 'resident'
+            ? (r.isLive ? ` · 参加中 ${Math.max(0, Number(r.participantCount) || 0)} 人` : ' · 待機中')
+            : '';
+          const updatedLabel = r.updatedAt
+            ? new Date(r.updatedAt).toLocaleString()
+            : (r.type === 'resident' ? '待機中' : new Date().toLocaleString());
 
           const metaInfo = `
             <div class="public-room-meta">
               <div class="public-room-title">${r.name}</div>
               <div class="public-room-info">${r.description || ''}</div>
-              <div class="public-room-meta-extra">${r.size ? r.size + ' · ' : ''}${r.maxUsers ? '最大 ' + r.maxUsers + ' 人' : ''}</div>
-              <div class="public-room-time">${new Date().toLocaleString()}</div>
-              <div style="margin-top:8px;">${actionHtml}</div>
+              <div class="public-room-meta-extra">${r.size ? r.size + ' · ' : ''}${r.maxUsers ? '最大 ' + r.maxUsers + ' 人' : ''}${residentLiveInfo}</div>
+              <div class="public-room-time">${updatedLabel}</div>
+              <div>${actionHtml}</div>
             </div>`;
 
           card.innerHTML = `${thumbHtml}${metaInfo}`;
           grid.appendChild(card);
         }
-      }catch(e){ console.error('probe rooms failed', e); grid.innerHTML = '<p class="public-room-empty is-error">公開中の部屋の読み込みに失敗しました</p>'; }
+      }catch(e){
+        console.error('probe rooms failed', e);
+        renderResidentFallbackCards(grid);
+      }
     }
 
     document.getElementById('refreshPublicRooms').addEventListener('click', ()=>{ probeAndRenderRooms(); });
