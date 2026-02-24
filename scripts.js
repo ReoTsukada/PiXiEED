@@ -24,6 +24,20 @@
   const PUBLIC_ROOM_SCAN_TIMEOUT_MS = 5200;
   const PUBLIC_ROOM_MAX_ITEMS = 24;
   const PUBLIC_ROOM_MAX_AGE_MS = 20 * 60 * 1000;
+  const RESIDENT_ROOM_PRESETS = Object.freeze([
+    Object.freeze({
+      projectKey: 'resident-256-main',
+      title: '常設ルーム 256x256',
+      maxGuests: 10,
+      masterName: '待機中'
+    }),
+    Object.freeze({
+      projectKey: 'resident-128-main',
+      title: '常設ルーム 128x128',
+      maxGuests: 16,
+      masterName: '待機中'
+    })
+  ]);
   let publicRoomSupabaseClientPromise = null;
 
   function updateCopyrightYear() {
@@ -120,7 +134,27 @@
     return trimmed;
   }
 
-  function buildPublicRoomInviteUrl(projectKey) {
+  function createSolidPublicRoomThumbnailDataUrl(color = '#000000', size = 96) {
+    try {
+      const edge = Math.max(16, Math.round(Number(size) || 96));
+      const canvas = document.createElement('canvas');
+      canvas.width = edge;
+      canvas.height = edge;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        return '';
+      }
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, edge, edge);
+      return canvas.toDataURL('image/png');
+    } catch (_error) {
+      return '';
+    }
+  }
+
+  const RESIDENT_BLACK_THUMBNAIL_DATA_URL = createSolidPublicRoomThumbnailDataUrl('#000000', 96);
+
+  function buildPublicRoomInviteUrl(projectKey, { role = '' } = {}) {
     const key = normalizePublicRoomKey(projectKey);
     if (!key) {
       return 'pixiedraw/index.html';
@@ -129,7 +163,61 @@
     params.set('multiInvite', '1');
     params.set('multiKey', key);
     params.set('multiAutoJoin', '1');
+    if (role === 'master' || role === 'guest' || role === 'spectator') {
+      params.set('multiRole', role);
+    }
     return `pixiedraw/index.html?${params.toString()}`;
+  }
+
+  function mergeResidentRoomCards(liveRooms) {
+    const source = Array.isArray(liveRooms) ? liveRooms : [];
+    const byKey = new Map();
+    source.forEach((room) => {
+      if (!room || typeof room !== 'object') {
+        return;
+      }
+      const key = normalizePublicRoomKey(room.projectKey);
+      if (!key) {
+        return;
+      }
+      byKey.set(key, room);
+    });
+    const residentKeySet = new Set(RESIDENT_ROOM_PRESETS.map(preset => preset.projectKey));
+    const residentCards = RESIDENT_ROOM_PRESETS.map((preset) => {
+      const live = byKey.get(preset.projectKey) || null;
+      const maxGuests = Number.isFinite(Number(live?.maxGuests))
+        ? Math.max(1, Math.round(Number(live.maxGuests)))
+        : preset.maxGuests;
+      const guestCount = Number.isFinite(Number(live?.guestCount))
+        ? Math.max(0, Math.round(Number(live.guestCount)))
+        : 0;
+      const spectatorCount = Number.isFinite(Number(live?.spectatorCount))
+        ? Math.max(0, Math.round(Number(live.spectatorCount)))
+        : 0;
+      const participantCount = Number.isFinite(Number(live?.participantCount))
+        ? Math.max(0, Math.round(Number(live.participantCount)))
+        : guestCount;
+      return {
+        isResident: true,
+        projectKey: preset.projectKey,
+        title: preset.title,
+        masterName: (typeof live?.masterName === 'string' && live.masterName.trim())
+          ? live.masterName.trim().slice(0, 32)
+          : preset.masterName,
+        maxGuests,
+        guestCount,
+        spectatorCount,
+        participantCount,
+        thumbnailDataUrl: normalizePublicRoomThumbnail(live?.thumbnailDataUrl || '') || RESIDENT_BLACK_THUMBNAIL_DATA_URL,
+        updatedAt: Number.isFinite(Number(live?.updatedAt)) ? Number(live.updatedAt) : 0,
+        inviteUrl: buildPublicRoomInviteUrl(preset.projectKey, { role: 'guest' })
+      };
+    });
+    const liveNonResident = source.filter((room) => {
+      const key = normalizePublicRoomKey(room?.projectKey || '');
+      return key && !residentKeySet.has(key);
+    });
+    return residentCards.concat(liveNonResident);
   }
 
   function formatPublicRoomUpdatedAt(timestamp) {
@@ -293,7 +381,12 @@
         const card = document.createElement('a');
         card.className = 'public-room-card';
         card.href = room.inviteUrl;
-        card.setAttribute('aria-label', `${room.masterName} の部屋 (${room.projectKey}) を視聴する`);
+        const cardTitle = room.title || room.projectKey;
+        if (room.isResident) {
+          card.setAttribute('aria-label', `${cardTitle} に入室`);
+        } else {
+          card.setAttribute('aria-label', `${room.masterName} の部屋 (${room.projectKey}) を視聴する`);
+        }
         const thumb = document.createElement('div');
         thumb.className = 'public-room-thumb';
         if (room.thumbnailDataUrl) {
@@ -311,7 +404,7 @@
         meta.className = 'public-room-meta';
         const title = document.createElement('p');
         title.className = 'public-room-title';
-        title.textContent = room.projectKey;
+        title.textContent = cardTitle;
         const info = document.createElement('p');
         info.className = 'public-room-info';
         const stats = [];
@@ -326,7 +419,9 @@
         info.textContent = `${room.masterName}${stats.length ? ` ・ ${stats.join(' ・ ')}` : ''}`;
         const time = document.createElement('p');
         time.className = 'public-room-time';
-        time.textContent = formatPublicRoomUpdatedAt(room.updatedAt);
+        const updatedText = formatPublicRoomUpdatedAt(room.updatedAt) || (room.isResident ? '更新: 待機中' : '');
+        time.textContent = updatedText;
+        time.hidden = !updatedText;
         meta.append(title, info, time);
         card.append(thumb, meta);
         fragment.appendChild(card);
@@ -347,9 +442,9 @@
       }
       try {
         const rooms = await fetchPublicRoomsSnapshot();
-        renderRooms(rooms);
+        renderRooms(mergeResidentRoomCards(rooms));
       } catch (error) {
-        renderMessage('公開部屋を取得できませんでした。時間をおいて再度お試しください。', { isError: true });
+        renderRooms(mergeResidentRoomCards([]));
       } finally {
         loading = false;
         if (refreshButton instanceof HTMLButtonElement) {
