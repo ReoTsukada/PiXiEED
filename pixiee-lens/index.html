@@ -3362,6 +3362,8 @@
 
     const DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS = 10000;
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isAndroidDevice = /Android/i.test(navigator.userAgent || '');
+    const useFileSystemAccessSave = !isAndroidDevice && !isIOSDevice;
     const displayModeStandalone = (() => {
       if (window.matchMedia) {
         try {
@@ -9381,7 +9383,7 @@
       return [match[1].toLowerCase()];
     }
 
-    const PIXIEED_WORKSPACE_SUPPORTED = typeof window !== 'undefined'
+    const PIXIEED_WORKSPACE_SUPPORTED = useFileSystemAccessSave && typeof window !== 'undefined'
       && typeof window.showDirectoryPicker === 'function'
       && typeof window.indexedDB !== 'undefined'
       && window.indexedDB !== null;
@@ -9606,12 +9608,24 @@
         return 'saved';
       } catch (error) {
         console.warn('Failed to save file in PiXiEED workspace', error);
+        // Some Android browsers can leave a zero-byte placeholder when writable creation fails.
+        // Remove it best-effort so users don't see an extra broken file.
+        try {
+          if (directoryHandle && typeof directoryHandle.removeEntry === 'function') {
+            await directoryHandle.removeEntry(filename, { recursive: false });
+          }
+        } catch (cleanupError) {
+          console.warn('Failed to cleanup partial workspace file', cleanupError);
+        }
         return 'error';
       }
     }
 
     async function saveBlobWithFilePicker(blob, filename, mimeType = 'application/octet-stream') {
       if (!(blob instanceof Blob)) {
+        return 'unsupported';
+      }
+      if (!useFileSystemAccessSave) {
         return 'unsupported';
       }
       const workspaceResult = await saveBlobToPiXiEEDWorkspace(blob, filename);
