@@ -1,0 +1,2660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no, viewport-fit=cover"/>
+  <base href="../">
+  <title>PiXiEED | Free Pixel Art Tools for Drawing, Playing, and Contact</title>
+  <meta name="description" content="PiXiEED is a browser-based pixel art hub. From beginner tools to PiXiEEDraw with full production features and multiplayer collaboration, draw, play, and contact in one place."/>
+  <meta name="keywords" content="PiXiEED,PiXiEEDraw,PiXFiND,pixel art,pixel editor,browser pixel art tool"/>
+  <link rel="canonical" href="https://pixieed.jp/en/"/>
+  <link rel="alternate" hreflang="ja" href="https://pixieed.jp/"/>
+  <link rel="alternate" hreflang="en" href="https://pixieed.jp/en/"/>
+  <link rel="alternate" hreflang="x-default" href="https://pixieed.jp/"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:site_name" content="PiXiEED"/>
+  <meta property="og:title" content="PiXiEED | Free Pixel Art Tools for Drawing, Playing, and Contact"/>
+  <meta property="og:description" content="Draw pixel art in your browser with tools ranging from beginner mode to full-featured PiXiEEDraw multiplayer collaboration."/>
+  <meta property="og:url" content="https://pixieed.jp/en/"/>
+  <meta property="og:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:site" content="@PiXiEED_arta"/>
+  <meta name="twitter:url" content="https://pixieed.jp/en/"/>
+  <meta name="twitter:title" content="PiXiEED | Free Pixel Art Tools for Drawing, Playing, and Contact"/>
+  <meta name="twitter:description" content="Draw pixel art in your browser with tools ranging from beginner mode to full-featured PiXiEEDraw multiplayer collaboration."/>
+  <meta name="twitter:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
+  <link rel="icon" type="image/png" href="character-dots/mao1.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
+  <style>
+    :root{ color-scheme: dark; }
+    *{ box-sizing:border-box; user-select:none; -webkit-user-select:none; -ms-user-select:none; }
+    html,body{
+      overflow-x:hidden;
+      max-width:100vw;
+    }
+    body{
+      margin:0 auto;
+      font-family:'Fredoka','DotGothic16',system-ui,sans-serif;
+      background:radial-gradient(circle at 20% 20%, rgba(59,130,246,0.22), rgba(15,23,42,1)),
+                 radial-gradient(circle at 80% 0%, rgba(236,72,153,0.18), rgba(15,23,42,1)),
+                 #0b1224;
+      color:#e5e7eb;
+      min-height:100vh;
+      padding:0 14px 120px;
+      width:100%;
+      display:block;
+      max-width:100vw;
+      box-sizing:border-box;
+    }
+    .page{
+      width:100%;
+      max-width:min(1200px, 100vw);
+      display:grid;
+      gap:14px;
+      position:relative;
+      margin:0 auto;
+      box-sizing:border-box;
+    }
+    header{
+      position:sticky;
+      top:0;
+      z-index:70;
+      background:rgba(11,18,36,0.94);
+      backdrop-filter:blur(8px);
+      border-bottom:1px solid rgba(255,255,255,0.08);
+      margin:-20px -14px 8px;
+      padding:12px 14px;
+      box-sizing:border-box;
+      font-family:'Fredoka','DotGothic16',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    }
+    .header-inner{
+      width:100%;
+      max-width:1200px;
+      margin:0 auto;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      box-sizing:border-box;
+    }
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-weight:800;
+      letter-spacing:0.01em;
+      background:none;
+      border:0;
+      padding:0;
+      cursor:pointer;
+      color:#f9fafb;
+      text-decoration:none;
+      font-family:'Fredoka','DotGothic16',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    }
+    .brand-icon{
+      width:34px;
+      height:34px;
+      border-radius:10px;
+      background:rgba(255,255,255,0.12);
+      padding:4px;
+      border:1px solid rgba(255,255,255,0.2);
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+    }
+    .brand-icon img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      display:block;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .brand-text{ display:flex; flex-direction:column; gap:2px; }
+    .brand-title{ margin:0; font-size:16px; color:#f9fafb; }
+    .brand-sub{ margin:0; font-size:12px; color:#9ca3af; }
+    .header-tools{
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .lang-switch{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-width:42px;
+      min-height:32px;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.22);
+      background:rgba(255,255,255,0.06);
+      color:#f9fafb;
+      text-decoration:none;
+      font-weight:800;
+      font-size:12px;
+      letter-spacing:0.04em;
+    }
+    .lang-switch:hover,
+    .lang-switch:focus-visible{
+      background:rgba(255,255,255,0.14);
+      color:#ffffff;
+    }
+
+    h1{ margin:0; font-size:clamp(20px, 5.3vw, 30px); line-height:1.35; letter-spacing:0.02em; color:#f9fafb; }
+    h2{ margin:0; font-size:18px; color:#f9fafb; letter-spacing:0.01em; }
+    p{ margin:0; }
+    .subtitle{ margin:0; color:#cbd5e1; font-size:13px; line-height:1.6; }
+    .seo-links{
+      margin:6px 0 0;
+      color:#cbd5e1;
+      font-size:13px;
+      line-height:1.6;
+    }
+    .seo-links a{
+      color:#93c5fd;
+      text-decoration:none;
+      font-weight:700;
+    }
+    .seo-links a:hover,
+    .seo-links a:focus{
+      color:#f9fafb;
+    }
+
+    .card,
+    .section{
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:12px;
+      padding:16px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.3);
+      width:100%;
+      max-width:100%;
+      box-sizing:border-box;
+      overflow:hidden;
+    }
+    img,video,canvas,svg{
+      max-width:100%;
+      height:auto;
+      display:block;
+    }
+    .section-inner{ display:grid; gap:12px; }
+    .section--highlight{
+      background:rgba(255,255,255,0.06);
+      border-color:rgba(255,255,255,0.14);
+    }
+    .section-eyebrow{
+      margin:0;
+      font-size:12px;
+      letter-spacing:0.16em;
+      text-transform:uppercase;
+      color:#cbd5e1;
+    }
+    .hero-grid{
+      display:grid;
+      gap:16px;
+      grid-template-columns:1fr;
+      align-items:start;
+    }
+    .hero-place{
+      display:grid;
+      gap:12px;
+    }
+    .hero-copy{
+      display:grid;
+      gap:12px;
+    }
+    .chips{ display:flex; gap:8px; flex-wrap:wrap; }
+    .chip{
+      border:1px solid rgba(255,255,255,0.18);
+      background:transparent;
+      color:#e5e7eb;
+      border-radius:12px;
+      padding:8px 12px;
+      font-weight:700;
+      font-size:12px;
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      text-decoration:none;
+    }
+    .button{
+      appearance:none;
+      border:0;
+      border-radius:10px;
+      padding:10px 14px;
+      font:700 14px/1.2 'Fredoka', system-ui, sans-serif;
+      cursor:pointer;
+      color:#ffffff;
+      background:linear-gradient(135deg, #ff719a, #ff9f43);
+      box-shadow:0 4px 0 #e35c82, 0 8px 16px rgba(255,113,154,0.35);
+      transition:transform 0.1s ease, filter 0.1s ease;
+    }
+    .button:hover,
+    .button:focus-visible{ transform:translateY(-1px); filter:brightness(1.05); }
+    .button--ghost{
+      background:rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.2);
+      color:#f9fafb;
+      box-shadow:none;
+    }
+    .button--ghost:hover,
+    .button--ghost:focus-visible{
+      background:rgba(255,255,255,0.12);
+      filter:none;
+    }
+    .hero-switch:hover,
+    .hero-switch:focus-visible{
+      transform:none;
+    }
+    .hero-switch.is-active{
+      background:rgba(255,255,255,0.2);
+      border-color:rgba(255,255,255,0.35);
+    }
+    .hero-actions{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));
+      gap:8px;
+    }
+    .hero-actions .button{
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:100%;
+      min-width:0;
+      min-height:44px;
+      text-align:center;
+    }
+    .hero-draw-guide{
+      display:grid;
+      gap:8px;
+      padding:10px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(15,23,42,0.4);
+    }
+    .hero-draw-guide[hidden]{
+      display:none;
+    }
+    .hero-draw-guide__title{
+      margin:0;
+      font-size:12px;
+      letter-spacing:0.08em;
+      color:#cbd5e1;
+    }
+    .hero-draw-guide__actions{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:8px;
+    }
+    .hero-draw-guide__link{
+      text-decoration:none;
+      color:#e5e7eb;
+      border:1px solid rgba(255,255,255,0.16);
+      border-radius:10px;
+      background:rgba(255,255,255,0.05);
+      padding:8px 10px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      transition:background 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
+    }
+    .hero-draw-guide__icon{
+      width:38px;
+      height:38px;
+      flex:0 0 38px;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,0.2);
+      background:rgba(2,6,18,0.85);
+      padding:4px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .hero-draw-guide__icon img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .hero-draw-guide__text{
+      font-size:12px;
+      color:#cbd5e1;
+      line-height:1.45;
+    }
+    .hero-draw-guide__link:hover,
+    .hero-draw-guide__link:focus-visible{
+      background:rgba(255,255,255,0.1);
+      border-color:rgba(255,255,255,0.26);
+      transform:translateY(-1px);
+    }
+    @media (max-width:700px){
+      .hero-actions{
+        grid-template-columns:1fr;
+        gap:6px;
+      }
+      .hero-actions .button{
+        padding:10px 8px;
+        font-size:13px;
+      }
+      .hero-draw-guide{
+        padding:8px;
+      }
+      .hero-draw-guide__actions{
+        grid-template-columns:1fr;
+      }
+    }
+    .audience-grid{
+      display:grid;
+      gap:12px;
+      grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
+    }
+    .audience-card{
+      display:grid;
+      gap:10px;
+      border:1px solid rgba(255,255,255,0.16);
+      border-radius:12px;
+      padding:12px;
+      background:rgba(15,23,42,0.55);
+    }
+    .audience-card--beginner{
+      border-color:rgba(251,146,60,0.46);
+      background:linear-gradient(155deg, rgba(251,146,60,0.16), rgba(15,23,42,0.55));
+    }
+    .audience-card--pro{
+      border-color:rgba(96,165,250,0.46);
+      background:linear-gradient(155deg, rgba(59,130,246,0.16), rgba(15,23,42,0.55));
+    }
+    .audience-card__meta{
+      margin:0;
+      font-size:12px;
+      color:#e2e8f0;
+      line-height:1.6;
+      font-weight:700;
+    }
+    .audience-card .button{
+      justify-self:start;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+    }
+    .value-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+    .value-actions .button{
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+    }
+    .grid{
+      display:grid;
+      gap:14px;
+      grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
+    }
+    .link-card{
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:12px;
+      padding:12px;
+      text-decoration:none;
+      color:inherit;
+      display:grid;
+      gap:8px;
+      box-shadow:0 8px 24px rgba(0,0,0,0.26);
+      transition:transform 0.1s ease, box-shadow 0.1s ease, border-color 0.1s ease;
+    }
+    .link-card:hover{
+      transform:translateY(-2px);
+      box-shadow:0 12px 28px rgba(0,0,0,0.32);
+      border-color:rgba(255,255,255,0.18);
+    }
+    .card.ad-strip{
+      padding:8px;
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.12);
+      box-shadow:0 10px 30px rgba(0,0,0,0.28);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .ad-block{
+      margin:0 auto;
+      border-radius:0;
+      padding:0;
+      background:transparent;
+      border:0;
+      box-shadow:none;
+      position:relative;
+      overflow:hidden;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      text-align:center;
+      width:100%;
+      max-width:min(720px, 100%);
+    }
+    .ad-block--home{
+      padding:0;
+    }
+    .ad-block--home .ad-slot{
+      min-height:clamp(48px, 9vw, 60px);
+      height:clamp(48px, 9vw, 60px);
+    }
+    .ad-slot{
+      display:block;
+      width:100%;
+      max-width:100%;
+      min-height:clamp(48px, 9vw, 60px);
+      height:clamp(48px, 9vw, 60px);
+      margin:0 auto;
+      overflow:hidden;
+      line-height:0;
+    }
+    .ad-block .ad-slot,
+    .ad-block ins.adsbygoogle{
+      margin-left:auto !important;
+      margin-right:auto !important;
+    }
+    .ad-block .ad-slot iframe,
+    .ad-block ins.adsbygoogle iframe{
+      margin-left:auto !important;
+      margin-right:auto !important;
+      height:100% !important;
+      max-height:100% !important;
+    }
+    @media(max-width:640px){
+      .ad-slot{
+        min-height:clamp(48px, 9vw, 60px);
+        height:clamp(48px, 9vw, 60px);
+      }
+      .ad-block--home .ad-slot{
+        min-height:clamp(48px, 9vw, 60px);
+        height:clamp(48px, 9vw, 60px);
+      }
+    }
+    .link-thumb{
+      position:relative;
+      aspect-ratio:4/3;
+      background:rgba(0,0,0,0.25);
+      border-radius:10px;
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .link-thumb--grid{
+      aspect-ratio:3/2;
+      padding:0;
+    }
+    .link-thumb__grid{
+      width:100%;
+      height:100%;
+      display:grid;
+      grid-template-columns:repeat(3, 1fr);
+      grid-auto-rows:1fr;
+      gap:2px;
+    }
+    .link-thumb__grid > :last-child:nth-child(4){
+      grid-column:2;
+    }
+    .link-thumb__grid img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+    }
+    .link-thumb__grid img[data-media="icon"]{
+      object-fit:contain;
+      padding:6px;
+      background:rgba(2,6,18,0.8);
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .link-thumb__empty{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:11px;
+      color:#cbd5e1;
+      background:#000;
+      letter-spacing:0.08em;
+      text-align:center;
+    }
+    .link-thumb__empty--dev{
+      color:#f9fafb;
+      font-weight:700;
+      letter-spacing:0.12em;
+      border:1px dashed rgba(255,255,255,0.24);
+      background:#000;
+    }
+    .link-thumb img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      display:block;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .link-thumb img[data-media="icon"]{
+      padding:10px;
+      background:rgba(2,6,18,0.82);
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .link-thumb img[data-media="ogp"]{
+      image-rendering:auto;
+      object-fit:cover;
+    }
+    .link-tag{
+      position:absolute;
+      top:8px;
+      left:8px;
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:11px;
+      font-weight:800;
+      color:#0b1224;
+      background:rgba(255,255,255,0.9);
+    }
+    .link-title{ margin:0; font-size:15px; color:#f9fafb; }
+    .link-desc{ margin:0; font-size:12px; color:#cbd5e1; line-height:1.5; }
+    .project-place{
+      display:block;
+      color:inherit;
+      position:relative;
+      transition:border-color 0.12s ease, box-shadow 0.12s ease;
+    }
+    .project-place:hover,
+    .project-place:focus-visible{
+      border-color:rgba(255,255,255,0.2);
+      box-shadow:0 12px 32px rgba(0,0,0,0.35);
+    }
+    .project-place__header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:12px;
+    }
+    .project-place__copy{
+      display:grid;
+      gap:6px;
+    }
+    .project-place__cta{
+      font-size:12px;
+      font-weight:700;
+      padding:8px 12px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.08);
+      color:#f9fafb;
+      white-space:nowrap;
+      text-decoration:none;
+    }
+    .project-place__link{
+      display:inline-flex;
+      align-items:center;
+      margin-top:8px;
+      font-size:12px;
+      font-weight:700;
+      color:#93c5fd;
+      text-decoration:none;
+    }
+    .project-place__link:hover,
+    .project-place__link:focus{
+      color:#f9fafb;
+    }
+    .project-place__body{
+      display:grid;
+      gap:14px;
+      grid-template-columns:minmax(0, 1.2fr) minmax(0, 1fr);
+      align-items:start;
+    }
+    .project-place__image{
+      border-radius:12px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(0,0,0,0.25);
+      box-shadow:0 10px 26px rgba(0,0,0,0.28);
+    }
+    .project-place__image.is-ready .project-place__fallback{
+      display:none;
+    }
+    .project-place__image img{
+      width:100%;
+      height:auto;
+      display:block;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .project-place__canvas{
+      width:100%;
+      height:auto;
+      display:block;
+      background:transparent;
+    }
+    .project-place__fallback{
+      width:100%;
+      height:auto;
+      display:block;
+    }
+    .project-place__detail{
+      display:grid;
+      gap:12px;
+    }
+    .project-place__group{
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:10px;
+      padding:10px 12px;
+      display:grid;
+      gap:8px;
+    }
+    .project-place__label{
+      margin:0;
+      font-size:11px;
+      letter-spacing:0.14em;
+      text-transform:uppercase;
+      color:#cbd5e1;
+    }
+    .project-place__title{
+      margin:0;
+      font-size:14px;
+      color:#f9fafb;
+    }
+    .project-place__list{
+      margin:0;
+      padding:0;
+      list-style:none;
+      display:grid;
+      gap:6px;
+      color:#cbd5e1;
+      font-size:12px;
+      line-height:1.5;
+    }
+    .project-place__list li{
+      position:relative;
+      padding-left:14px;
+    }
+    .project-place__list li::before{
+      content:"";
+      width:6px;
+      height:6px;
+      border-radius:50%;
+      background:linear-gradient(135deg, #ff719a, #ff9f43);
+      position:absolute;
+      left:0;
+      top:6px;
+    }
+    .project-place__updates{
+      margin:0;
+      padding:0;
+      list-style:none;
+      display:grid;
+      gap:8px;
+      font-size:12px;
+      color:#cbd5e1;
+    }
+    .project-place__update{
+      display:grid;
+      gap:4px;
+      padding:8px 10px;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(0,0,0,0.28);
+    }
+    .project-place__update time{
+      font-size:11px;
+      color:#9ca3af;
+    }
+    .project-place__update strong{
+      font-size:12px;
+      color:#f9fafb;
+    }
+    .hub-update__link{
+      color:#f9fafb;
+      text-decoration:none;
+      font-weight:700;
+      font-size:12px;
+    }
+    .hub-update__link:hover,
+    .hub-update__link:focus{
+      color:#f9fafb;
+      text-decoration:underline;
+    }
+    .project-place__update--empty{
+      border-style:dashed;
+      color:#9ca3af;
+      background:rgba(255,255,255,0.04);
+    }
+    .public-rooms-hub{
+      margin-top:4px;
+    }
+    .public-rooms-hub__head{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .public-rooms-hub__refresh{
+      min-height:32px;
+      padding:4px 12px;
+      font-size:12px;
+      white-space:nowrap;
+    }
+    .public-rooms-hub__lead{
+      margin:0;
+      font-size:12px;
+      color:#cbd5e1;
+      line-height:1.6;
+    }
+    .public-room-grid{
+      display:grid;
+      gap:10px;
+      grid-template-columns:repeat(auto-fill,minmax(154px,1fr));
+    }
+    .public-room-card{
+      display:grid;
+      gap:8px;
+      padding:8px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.14);
+      background:rgba(0,0,0,0.28);
+      color:inherit;
+      text-decoration:none;
+      transition:border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+    }
+    .public-room-card:hover,
+    .public-room-card:focus-visible{
+      border-color:rgba(255,255,255,0.32);
+      box-shadow:0 8px 24px rgba(0,0,0,0.35);
+      transform:translateY(-1px);
+      outline:none;
+    }
+    .public-room-thumb{
+      width:100%;
+      aspect-ratio:1 / 1;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,0.14);
+      background:rgba(6,12,24,0.88);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+    }
+    .public-room-thumb img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      display:block;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+      background:transparent;
+    }
+    .public-room-thumb span{
+      font-size:11px;
+      color:#9ca3af;
+      letter-spacing:0.08em;
+    }
+    .public-room-meta{
+      display:grid;
+      gap:4px;
+      min-width:0;
+    }
+    .public-room-title{
+      margin:0;
+      font-size:12px;
+      font-weight:700;
+      color:#f9fafb;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .public-room-info{
+      margin:0;
+      font-size:11px;
+      color:#cbd5e1;
+      line-height:1.45;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .public-room-time{
+      margin:0;
+      font-size:10px;
+      color:#94a3b8;
+      letter-spacing:0.03em;
+    }
+    .public-room-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      margin-top:8px;
+    }
+    .public-room-action-chip{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.22);
+      background:rgba(255,255,255,0.06);
+      color:#f8fafc;
+      text-decoration:none;
+      padding:5px 10px;
+      font-size:11px;
+      font-weight:700;
+      line-height:1.2;
+      min-height:28px;
+    }
+    .public-room-action-chip--primary{
+      background:linear-gradient(135deg, #ff719a, #ff9f43);
+      border-color:rgba(255,255,255,0.12);
+      color:#ffffff;
+    }
+    .public-room-empty{
+      margin:0;
+      font-size:12px;
+      color:#94a3b8;
+      padding:10px 6px;
+      border:1px dashed rgba(255,255,255,0.2);
+      border-radius:8px;
+      background:rgba(255,255,255,0.03);
+      grid-column:1 / -1;
+    }
+    .public-room-empty.is-error{
+      color:#fecaca;
+      border-color:rgba(252,165,165,0.45);
+      background:rgba(127,29,29,0.16);
+    }
+    @media(max-width:640px){
+      .project-place__header{ flex-direction:column; align-items:flex-start; }
+      .public-rooms-hub__head{ flex-direction:column; align-items:flex-start; }
+    }
+    @media(max-width:900px){
+      .project-place__body{ grid-template-columns:1fr; }
+    }
+
+    /* Dot gallery */
+    .dot-hero{
+      display:grid;
+      gap:12px;
+    }
+    .dot-gallery__viewer{
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,0.16);
+      background:rgba(11,18,36,0.9);
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      aspect-ratio:4/3;
+      width:100%;
+      box-shadow:0 12px 30px rgba(0,0,0,0.32);
+    }
+    .dot-gallery__viewer img{
+      display:block;
+      max-width:100%;
+      max-height:100%;
+      object-fit:contain;
+      image-rendering:pixelated;
+    }
+    .dot-gallery__buttons{
+      display:flex;
+      gap:10px;
+      overflow-x:auto;
+      padding:8px 2px 10px;
+      -webkit-overflow-scrolling:touch;
+      scroll-snap-type:x proximity;
+    }
+    .dot-gallery__buttons::-webkit-scrollbar{ height:6px; }
+    .dot-gallery__buttons::-webkit-scrollbar-thumb{
+      background:rgba(255,255,255,0.35);
+      border-radius:999px;
+    }
+    .dot-gallery__button{
+      position:relative;
+      flex:0 0 auto;
+      width:96px;
+      height:96px;
+      padding:0;
+      border-radius:12px;
+      border:2px solid transparent;
+      background:rgba(15,23,42,0.85);
+      cursor:pointer;
+      display:grid;
+      place-items:center;
+      transition:border 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+      scroll-snap-align:center;
+    }
+    .dot-gallery__button.is-active{
+      border-color:rgba(255,255,255,0.5);
+      box-shadow:0 10px 20px rgba(0,0,0,0.28);
+      transform:translateY(-2px);
+    }
+    .dot-gallery__button img{
+      max-width:100%;
+      max-height:100%;
+      border-radius:9px;
+      image-rendering:pixelated;
+    }
+
+    /* Character hero */
+    .character-place{
+      display:grid;
+      gap:12px;
+    }
+    .character-place.is-hero{
+      align-items:start;
+    }
+    .character-place.is-hero .section-eyebrow{
+      display:none;
+    }
+    .character-place.is-hero .character-sprite{
+      width:96px;
+      height:96px;
+      min-height:96px;
+      padding:0;
+      border:2px solid transparent;
+      display:grid;
+      place-items:center;
+    }
+    .character-place.is-hero .character-sprite img{
+      width:100%;
+      height:100%;
+    }
+    .character-place.is-hero .character-sprite span{
+      display:none;
+    }
+    .character-place.is-hero .hero-description{
+      display:none;
+    }
+    .swap-animate{
+      animation:swapFade 240ms ease;
+    }
+    @keyframes swapFade{
+      from{ opacity:0; transform:translateY(8px) scale(0.98); }
+      to{ opacity:1; transform:translateY(0) scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce){
+      .swap-animate{ animation:none; }
+    }
+    .character-preview{
+      margin-top:8px;
+      display:grid;
+      grid-template-columns:minmax(0, 1.05fr) minmax(0, 1.15fr);
+      align-items:start;
+      border-radius:16px;
+      border:0;
+      overflow:hidden;
+      background:transparent;
+      box-shadow:none;
+      height:var(--preview-height, auto);
+    }
+    .character-preview__frame{
+      min-height:0;
+      align-self:stretch;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:transparent;
+      position:relative;
+      padding:12px;
+      border:0;
+      box-shadow:none;
+      border-radius:0;
+      overflow:visible;
+    }
+    .character-preview__frame.dot-gallery__viewer{
+      padding:0;
+      background:transparent;
+      border:0;
+      box-shadow:none;
+      border-radius:0;
+      overflow:visible;
+    }
+    .character-preview__details{
+      min-height:0;
+      align-self:stretch;
+    }
+    .character-place:not(.is-hero) .character-preview__frame.dot-gallery__viewer{
+      height:100%;
+      box-shadow:none;
+      border:0;
+      background:transparent;
+    }
+    .character-preview__frame img{
+      width:100%;
+      height:100%;
+      max-width:100%;
+      max-height:100%;
+      margin:0 auto;
+      display:block;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+      object-fit:contain;
+      box-sizing:border-box;
+      padding:1px;
+      background:transparent;
+    }
+    .character-preview__frame img[data-trim-edge="true"]{
+      clip-path:inset(0 1px);
+    }
+    .character-preview__placeholder{
+      position:absolute;
+      inset:16px;
+      border:0;
+      border-radius:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#cbd5e1;
+      letter-spacing:0.12em;
+      font-size:12px;
+      background:transparent;
+      box-shadow:none;
+    }
+    .character-preview__details{
+      padding:14px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      background:transparent;
+      height:100%;
+      overflow:auto;
+    }
+    @media (max-width:700px){
+      body{
+        padding:0 10px 110px;
+      }
+      .page{
+        gap:10px;
+      }
+      .card,
+      .section{
+        padding:12px;
+      }
+      .section-inner{
+        gap:8px;
+      }
+      .character-preview{
+        grid-template-columns:minmax(0, 0.9fr) minmax(0, 1.1fr);
+      }
+      .character-preview__details{
+        padding:10px;
+        gap:6px;
+      }
+      .character-preview__frame{
+        padding:8px;
+      }
+      .character-preview__name{ font-size:20px; }
+      .character-preview__weight{ font-size:14px; }
+      .character-preview__traits ul{ font-size:14px; }
+      .character-preview__detail p{ font-size:14px; }
+    }
+    .character-preview__heading h2{ margin:0; }
+    .character-preview__heading p{ margin:0.5rem 0 0; color:#cbd5e1; }
+    .character-preview__name{ margin:0; font-size:22px; }
+    .character-preview__weight{ margin:0; color:#cbd5e1; font-size:13px; }
+    .character-preview__traits h4,
+    .character-preview__detail h4{ margin:0 0 6px; }
+    .character-preview__traits ul{ margin:0; padding-left:18px; color:#cbd5e1; }
+    .character-preview__detail p{ margin:0; color:#cbd5e1; line-height:1.6; }
+    .character-sprites__hint{
+      margin:8px 0 4px;
+      color:#cbd5e1;
+      font-size:12px;
+      text-align:center;
+    }
+    .character-preview__buttons{
+      display:flex;
+      gap:10px;
+      overflow-x:auto;
+      padding:8px 2px 10px;
+      -webkit-overflow-scrolling:touch;
+      scroll-snap-type:x proximity;
+    }
+    .character-preview__buttons::-webkit-scrollbar{ height:6px; }
+    .character-preview__buttons::-webkit-scrollbar-thumb{
+      background:rgba(255,255,255,0.35);
+      border-radius:999px;
+    }
+    .character-sprite{
+      flex:0 0 auto;
+      width:96px;
+      min-height:120px;
+      border:1px solid rgba(255,255,255,0.2);
+      border-radius:12px;
+      background:rgba(15,23,42,0.85);
+      padding:8px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:6px;
+      cursor:pointer;
+      transition:border 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+      scroll-snap-align:center;
+    }
+    .character-sprite img{
+      width:74px;
+      height:74px;
+      object-fit:contain;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+      box-sizing:border-box;
+      padding:1px;
+    }
+    .character-sprite img[data-trim-edge="true"]{
+      clip-path:inset(0 1px);
+    }
+    .character-sprite span{
+      font-size:11px;
+      color:#cbd5e1;
+      text-align:center;
+      line-height:1.2;
+    }
+    .character-sprite.is-active{
+      border-color:rgba(255,255,255,0.5);
+      box-shadow:0 10px 20px rgba(0,0,0,0.28);
+      transform:translateY(-2px);
+    }
+
+    .bottom-nav{
+      position:fixed;
+      bottom:0;
+      left:0;
+      right:0;
+      height:68px;
+      background:rgba(11,18,36,0.96);
+      border-top:1px solid rgba(255,255,255,0.08);
+      display:flex;
+      justify-content:space-around;
+      align-items:center;
+      z-index:90;
+      backdrop-filter:blur(8px);
+    }
+    .bottom-nav__item{
+      flex:1;
+      text-align:center;
+      color:#cbd5e1;
+      text-decoration:none;
+      font-weight:700;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:4px;
+      font-size:12px;
+      padding:8px 0;
+    }
+    .bottom-nav__item .icon{
+      width:22px;
+      height:22px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .bottom-nav__item .icon img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      image-rendering:pixelated;
+    }
+    .bottom-nav__item.is-active{ color:#f9fafb; }
+    .auth-panel{
+      position:fixed;
+      inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background:rgba(0,0,0,0.65);
+      backdrop-filter:blur(4px);
+      padding:calc(12px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom) + 76px) calc(12px + env(safe-area-inset-left));
+      z-index:110;
+    }
+    .auth-panel.is-open{ display:flex; }
+    .auth-card{
+      width:100%;
+      max-width:420px;
+      max-height:calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 84px);
+      background:rgba(15,23,42,0.95);
+      border:1px solid rgba(255,255,255,0.14);
+      border-radius:16px;
+      padding:clamp(12px, 2vh, 16px);
+      box-shadow:0 18px 40px rgba(0,0,0,0.45);
+      display:grid;
+      gap:clamp(8px, 1.6vh, 12px);
+      box-sizing:border-box;
+      overflow:hidden;
+    }
+    @supports (height: 100dvh){
+      .auth-card{
+        max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 84px);
+      }
+    }
+    .auth-input{
+      width:100%;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(255,255,255,0.05);
+      color:#fff;
+      padding:clamp(8px, 1.4vh, 10px) clamp(10px, 1.6vh, 12px);
+      font-size:clamp(12px, 1.6vh, 14px);
+    }
+    .auth-btn{
+      border:1px solid rgba(255,255,255,0.2);
+      background:linear-gradient(135deg,#4f46e5,#7c3aed);
+      color:#fff;
+      border-radius:12px;
+      padding:clamp(8px, 1.4vh, 10px) clamp(12px, 1.6vh, 14px);
+      font-weight:800;
+      cursor:pointer;
+      text-align:center;
+      font-size:clamp(12px, 1.6vh, 14px);
+    }
+    .close-btn{
+      border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.08);
+      color:#fff;
+      border-radius:8px;
+      padding:6px 10px;
+      cursor:pointer;
+    }
+    .auth-panel .profile-block{
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:12px;
+      padding:clamp(8px, 1.4vh, 12px);
+      display:grid;
+      gap:clamp(8px, 1.4vh, 10px);
+    }
+    .profile-row{
+      display:flex;
+      align-items:flex-end;
+      gap:10px;
+    }
+    .profile-name{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .avatar-toggle{
+      width:48px;
+      height:48px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,0.2);
+      background:rgba(0,0,0,0.6);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+    }
+    .avatar-toggle__img{
+      width:100%;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .avatar-toggle__img img{
+      width:80%;
+      height:80%;
+      object-fit:contain;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .avatar-panel{
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:10px;
+      padding:6px;
+      background:rgba(0,0,0,0.2);
+    }
+    .avatar-grid{
+      display:grid;
+      grid-template-columns:repeat(5, minmax(0, 1fr));
+      gap:clamp(4px, 1vh, 6px);
+      max-height:clamp(120px, 20vh, 160px);
+      overflow-y:auto;
+      padding-right:4px;
+      -webkit-overflow-scrolling:touch;
+    }
+    .avatar-option{
+      border:1px solid rgba(255,255,255,0.16);
+      background:rgba(0,0,0,0.65);
+      border-radius:12px;
+      padding:10px;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      transition:transform 0.12s ease, border-color 0.12s ease;
+    }
+    .avatar-option.is-active{
+      border-color:#7c3aed;
+      transform:translateY(-1px);
+    }
+    footer{
+      color:#cbd5e1;
+      text-align:center;
+      font-size:12px;
+      display:grid;
+      gap:8px;
+    }
+    .footer-links{
+      display:flex;
+      flex-wrap:wrap;
+      justify-content:center;
+      gap:12px;
+      padding:0;
+      margin:0;
+      list-style:none;
+    }
+    .footer-links a{
+      color:#cbd5e1;
+      text-decoration:none;
+      border:1px solid rgba(255,255,255,0.16);
+      border-radius:10px;
+      padding:6px 10px;
+      background:rgba(255,255,255,0.04);
+      font-weight:700;
+      transition:transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    .footer-links a:hover,
+    .footer-links a:focus-visible{
+      transform:translateY(-1px);
+      border-color:rgba(255,255,255,0.26);
+      background:rgba(255,255,255,0.08);
+    }
+  </style>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
+  <script>
+    const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
+    const GA_PAGE_PATH = '/';
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', GA_MEASUREMENT_ID, { page_path: GA_PAGE_PATH, page_title: document.title });
+    gtag('event', 'home_visit');
+  </script>
+  <style id="ads-safe">
+  html, body {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  .adsbygoogle,
+  ins.adsbygoogle {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 auto;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .adsbygoogle iframe,
+  ins.adsbygoogle iframe {
+    display: block;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  /* global-overflow-guard */
+  .ad-block,
+  .ad-card,
+  .ad-footer,
+  .project-ad,
+  .entry-ad-slot,
+  .puzzle-ad-slot,
+  .game-ad,
+  .card--ad {
+    width: min(100%, 720px) !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .ad-slot,
+  .ad-block ins.adsbygoogle,
+  .ad-footer ins,
+  .entry-ad-slot ins,
+  .puzzle-ad-slot ins.adsbygoogle,
+  .game-ad ins.adsbygoogle {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box;
+    min-height: clamp(48px, 9vw, 60px) !important;
+    height: clamp(48px, 9vw, 60px) !important;
+    overflow: hidden !important;
+  }
+  .page,
+  main,
+  .card,
+  .section,
+  .panel,
+  .shell {
+    min-width: 0;
+    max-width: 100%;
+  }
+</style>
+  <style id="interaction-guard">
+    * {
+      -webkit-touch-callout: none;
+      -webkit-user-drag: none;
+      -webkit-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    input,
+    textarea,
+    [contenteditable] {
+      -webkit-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+  </style>
+  <script id="interaction-guard-js">
+    document.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+    });
+    document.addEventListener('dragstart', (event) => {
+      event.preventDefault();
+    });
+  </script>
+  
+<script id="ads-lazy">
+  (function() {
+    if (window.pixieedObserveAds) return;
+
+    const SLOT_SEQUENCE = ['2141591954','9073878884','2261515379'];
+    const SLOT_KEY = 'pixieedAdSlotIndex';
+    const LOAD_TIMEOUT_MS = 10000;
+    const READY_POLL_MS = 250;
+
+    let slotIndex = 0;
+    let activeAd = null;
+    let readyTimer = null;
+    const queue = [];
+
+    const readSlotIndex = () => {
+      try {
+        const stored = sessionStorage.getItem(SLOT_KEY);
+        if (stored !== null) slotIndex = Number(stored) || 0;
+      } catch (err) {}
+    };
+
+    const storeSlotIndex = () => {
+      try {
+        sessionStorage.setItem(SLOT_KEY, String(slotIndex));
+      } catch (err) {}
+    };
+
+    readSlotIndex();
+
+    const nextSlot = () => {
+      if (!SLOT_SEQUENCE.length) return '';
+      const slot = SLOT_SEQUENCE[slotIndex % SLOT_SEQUENCE.length];
+      slotIndex += 1;
+      storeSlotIndex();
+      return slot;
+    };
+
+    const isReady = (ins) => (
+      ins.getAttribute('data-adsbygoogle-status') === 'done' ||
+      ins.getAttribute('data-ad-status') === 'filled'
+    );
+
+    const isEnqueued = (ins) => ins.dataset.adsQueueEnqueued === '1';
+    const isLoading = (ins) => ins.dataset.adsQueueLoading === '1';
+    const isLoaded = (ins) => ins.dataset.adsLazyLoaded === '1' || isReady(ins);
+
+    const assignSlot = (ins) => {
+      if (!ins || !(ins instanceof HTMLElement)) return;
+      if (ins.dataset.adSlotAssigned === '1') return;
+      const existingSlot = ins.getAttribute('data-ad-slot');
+      if (existingSlot && existingSlot !== 'rotate') {
+        ins.dataset.adSlotAssigned = '1';
+        return;
+      }
+      if (ins.dataset.adStatic === '1') {
+        ins.dataset.adSlotAssigned = '1';
+        return;
+      }
+      const slot = nextSlot();
+      if (slot) {
+        ins.setAttribute('data-ad-slot', slot);
+      }
+      ins.dataset.adSlotAssigned = '1';
+    };
+
+    const clearReadyTimer = () => {
+      if (!readyTimer) return;
+      clearTimeout(readyTimer);
+      readyTimer = null;
+    };
+
+    const releaseActiveAd = () => {
+      clearReadyTimer();
+      if (!activeAd) return;
+      activeAd.dataset.adsQueueLoading = '';
+      activeAd.dataset.adsQueueEnqueued = '';
+      activeAd.dataset.adsLazyLoaded = '1';
+      activeAd = null;
+      processQueue();
+    };
+
+    const waitUntilReady = (ins, startedAt) => {
+      if (!activeAd || activeAd !== ins) return;
+      if (!document.contains(ins) || isReady(ins) || (Date.now() - startedAt) >= LOAD_TIMEOUT_MS) {
+        releaseActiveAd();
+        return;
+      }
+      readyTimer = setTimeout(() => waitUntilReady(ins, startedAt), READY_POLL_MS);
+    };
+
+    const loadAd = (ins) => {
+      if (!ins || !(ins instanceof HTMLElement)) return false;
+      if (isLoaded(ins) || isLoading(ins)) return true;
+      assignSlot(ins);
+      ins.dataset.adsQueueLoading = '1';
+      ins.dataset.adsLazyLoaded = '1';
+      try {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      } catch (err) {
+        ins.dataset.adsQueueLoading = '';
+        ins.dataset.adsLazyLoaded = '';
+        return false;
+      }
+      return true;
+    };
+
+    const enqueueAd = (ins) => {
+      if (!ins || !(ins instanceof HTMLElement)) return;
+      if (isLoaded(ins) || isLoading(ins) || isEnqueued(ins)) return;
+      assignSlot(ins);
+      ins.dataset.adsQueueEnqueued = '1';
+      queue.push(ins);
+    };
+
+    function processQueue() {
+      if (activeAd) return;
+      while (queue.length) {
+        const ins = queue.shift();
+        if (!ins || !(ins instanceof HTMLElement)) continue;
+        if (!document.contains(ins)) continue;
+        ins.dataset.adsQueueEnqueued = '';
+        if (isLoaded(ins)) {
+          ins.dataset.adsLazyLoaded = '1';
+          continue;
+        }
+        activeAd = ins;
+        const startedAt = Date.now();
+        if (!loadAd(ins)) {
+          activeAd = null;
+          setTimeout(() => {
+            if (!document.contains(ins) || isLoaded(ins)) return;
+            enqueueAd(ins);
+            processQueue();
+          }, 1200);
+          return;
+        }
+        waitUntilReady(ins, startedAt);
+        return;
+      }
+    }
+
+    const observeAds = (root) => {
+      const scope = root && root.querySelectorAll ? root : document;
+      scope.querySelectorAll('ins.adsbygoogle').forEach(enqueueAd);
+      processQueue();
+    };
+
+    window.pixieedObserveAds = observeAds;
+
+    const setupQueue = () => {
+      observeAds(document);
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', setupQueue);
+    } else {
+      setupQueue();
+    }
+
+    const mo = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (!(node instanceof HTMLElement)) return;
+          if (node.matches && node.matches('ins.adsbygoogle')) {
+            enqueueAd(node);
+            return;
+          }
+          if (node.querySelectorAll) {
+            node.querySelectorAll('ins.adsbygoogle').forEach(enqueueAd);
+          }
+        });
+      });
+      processQueue();
+    });
+
+    const startObserver = () => {
+      if (!document.body) return;
+      mo.observe(document.body, { childList: true, subtree: true });
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', startObserver);
+    } else {
+      startObserver();
+    }
+  })();
+</script>
+<link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
+</head>
+<body class="with-bottom-nav">
+  <div class="page">
+    <header aria-label="top-nav">
+      <div class="header-inner">
+        <button class="brand" id="openProfilePanel" type="button" aria-label="Open profile panel">
+          <span class="brand-icon" id="brandAvatar">
+            <img src="character-dots/mao1.png" alt="logo">
+          </span>
+          <div class="brand-text">
+            <p class="brand-title">PiXiEED</p>
+            <p class="brand-sub" id="brandUser">User</p>
+          </div>
+        </button>
+        <div class="header-tools">
+          <a class="lang-switch" href="index.html" lang="ja" hreflang="ja" aria-label="Switch to Japanese">JP</a>
+        </div>
+      </div>
+    </header>
+
+    <section class="card" id="home-hero">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <h1>Free Pixel Art Tools by PiXiEED</h1>
+          <p class="subtitle">PiXiEED is a browser-based pixel art hub for drawing, playing, and contact.</p>
+          <div class="hero-actions">
+            <button class="button" id="toggleDrawGuide" type="button" aria-controls="draw-guide" aria-expanded="false">Draw</button>
+            <button class="button button--ghost" id="togglePlayGuide" type="button" aria-controls="play-guide" aria-expanded="false">Play</button>
+            <button class="button button--ghost" id="toggleContactGuide" type="button" aria-controls="contact-guide" aria-expanded="false">Contact</button>
+          </div>
+          <div class="hero-draw-guide" id="draw-guide" hidden>
+            <p class="hero-draw-guide__title">Draw: choose your tool</p>
+            <div class="hero-draw-guide__actions">
+              <a class="hero-draw-guide__link" href="projects/jerin-maker/index.html">
+                <span class="hero-draw-guide__icon"><img src="icon/icon-192-5.png" alt=""></span>
+                <span class="hero-draw-guide__text">PiXiEEDraw Lite (guided 16x16 for your first completed piece)</span>
+              </a>
+              <a class="hero-draw-guide__link" href="projects/pixiedraw/index.html">
+                <span class="hero-draw-guide__icon"><img src="icon/icon-192-4.png" alt=""></span>
+                <span class="hero-draw-guide__text">PiXiEEDraw (full production editor with multiplayer collaboration)</span>
+              </a>
+            </div>
+          </div>
+          <div class="hero-draw-guide" id="play-guide" hidden>
+            <p class="hero-draw-guide__title">Play: pick a title</p>
+            <div class="hero-draw-guide__actions">
+              <a class="hero-draw-guide__link" href="projects/maoitu/index.html">
+                <span class="hero-draw-guide__icon"><img src="icon/icon-192-3.png" alt=""></span>
+                <span class="hero-draw-guide__text">Maoitsu (survival action game)</span>
+              </a>
+              <a class="hero-draw-guide__link" href="projects/pixfind/index.html">
+                <span class="hero-draw-guide__icon"><img src="icon/icon-192-2.png" alt=""></span>
+                <span class="hero-draw-guide__text">PiXFiND (spot-the-difference in pixel art)</span>
+              </a>
+              <a class="hero-draw-guide__link" href="projects/pixiee-lens/index.html">
+                <span class="hero-draw-guide__icon"><img src="icon/icon-192-1.png" alt=""></span>
+                <span class="hero-draw-guide__text">PiXiEELENS (pixel camera filter tool)</span>
+              </a>
+            </div>
+          </div>
+          <div class="hero-draw-guide" id="contact-guide" hidden>
+            <p class="hero-draw-guide__title">Contact: choose a channel</p>
+            <div class="hero-draw-guide__actions">
+              <a class="hero-draw-guide__link" href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">
+                <span class="hero-draw-guide__icon"><img src="FooterIcon2.png" alt=""></span>
+                <span class="hero-draw-guide__text">Contact on X (@PiXiEED_arta)</span>
+              </a>
+              <a class="hero-draw-guide__link" href="mailto:pixieed.arta@gmail.com">
+                <span class="hero-draw-guide__icon"><img src="icon/icon-mail.png" alt=""></span>
+                <span class="hero-draw-guide__text">Open email address</span>
+              </a>
+            </div>
+          </div>
+        </div>
+        <div class="hero-place" id="heroPlaceSlot">
+          <div class="dot-hero" id="dotPlace">
+            <h2>Pixel Art</h2>
+            <div class="dot-gallery__viewer">
+              <img alt="" id="dotGalleryMain" loading="lazy" src=""/>
+            </div>
+            <div class="dot-gallery__buttons" id="dotGalleryButtons" aria-label="Pixel art gallery"></div>
+          </div>
+          </div>
+        </div>
+    </section>
+
+    <section class="section section--highlight" id="start-guides">
+      <div class="section-inner">
+        <div>
+          <p class="section-eyebrow">Draw, Play, Contact</p>
+          <h2>Start from what you want to do</h2>
+          <p class="subtitle">Even if you searched for a free pixel art tool, you can jump straight into your goal.</p>
+        </div>
+        <div class="audience-grid">
+          <article class="audience-card audience-card--beginner">
+            <p class="project-place__label">Draw</p>
+            <h3 class="project-place__title">Draw</h3>
+            <p class="subtitle">Start with guided 16x16 practice in Lite, then move to PiXiEEDraw for full production features and multiplayer collaboration.</p>
+            <p class="audience-card__meta">10-15 min / No signup / Free (Lite)</p>
+            <a class="button" href="projects/jerin-maker/index.html">Open PiXiEEDraw Lite</a>
+          </article>
+          <article class="audience-card audience-card--pro">
+            <p class="project-place__label">Play</p>
+            <h3 class="project-place__title">Play</h3>
+            <p class="subtitle">Enjoy pixel games and camera tools directly in your browser.</p>
+            <p class="audience-card__meta">Browser-based / Quick start / Free</p>
+            <a class="button button--ghost" href="games.html">Open Games</a>
+          </article>
+          <article class="audience-card audience-card--pro">
+            <p class="project-place__label">Contact</p>
+            <h3 class="project-place__title">Contact</h3>
+            <p class="subtitle">For commissions and collaborations, contact us via X or email.</p>
+            <p class="audience-card__meta">X / Email</p>
+            <a class="button button--ghost" href="#contact">View Contact</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="dot-value">
+      <div class="section-inner">
+        <div>
+          <p class="section-eyebrow">Why Pixel Art</p>
+          <h2>Pixel art is beginner-friendly and deep</h2>
+        </div>
+        <div class="grid">
+          <article class="project-place__group">
+            <h3 class="project-place__title">Why pixel art works</h3>
+            <ul class="project-place__list">
+              <li>Small canvases make completion fast, even for first-time users.</li>
+              <li>Limited colors improve composition and color planning skills.</li>
+              <li>Useful for game assets, social posts, and UI icons.</li>
+            </ul>
+          </article>
+          <article class="project-place__group">
+            <h3 class="project-place__title">Why PiXiEEDraw fits production and team creation</h3>
+            <ul class="project-place__list">
+              <li>Time-saving tools: symmetry, selection, and keyboard shortcuts.</li>
+              <li>Multiplayer shared mode (beta): master/guest roles with sync for co-editing the same canvas.</li>
+              <li>Browser-based setup reduces environment mismatch.</li>
+            </ul>
+            <div class="value-actions">
+              <a class="button" href="projects/pixiedraw/index.html">Start Full Production in PiXiEEDraw</a>
+              <a class="button button--ghost" href="#publicRoomsHub">Open Collaboration Rooms</a>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Live rooms -->
+    <div class="project-place__group public-rooms-hub" id="publicRoomsHub">
+      <div class="public-rooms-hub__head">
+        <div>
+          <p class="project-place__label">Open Rooms</p>
+          <h3 class="project-place__title">Live Rooms</h3>
+        </div>
+        <button class="chip public-rooms-hub__refresh" id="refreshPublicRooms" type="button">Refresh</button>
+      </div>
+      <p class="public-rooms-hub__lead">Shows currently live rooms and resident rooms. Join from the thumbnail or action button and start co-creating immediately.</p>
+      <div class="chips" style="margin:8px 0 0;">
+        <a class="chip" href="pixiedraw/index.html?multiInvite=1&amp;multiKey=resident-256-main&amp;multiAutoJoin=1&amp;multiRole=guest">Open Resident 256</a>
+        <a class="chip" href="pixiedraw/index.html?multiInvite=1&amp;multiKey=resident-128-main&amp;multiAutoJoin=1&amp;multiRole=guest">Open Resident 128</a>
+      </div>
+      <div class="public-room-grid" id="publicRoomGrid" aria-live="polite">
+        <p class="public-room-empty">No live rooms right now.</p>
+      </div>
+    </div>
+
+    <section class="section section--highlight" id="hub-intro">
+      <div class="section-inner">
+        <div>
+          <h2>Pixel Art Hub</h2>
+          <p class="subtitle">PiXiEED is a central hub where you can find pixel art tools, games, guides, and assets.</p>
+          <div class="chips">
+            <a class="chip" href="projects/pixiedraw/index.html">Draw Pixel Art</a>
+            <a class="chip" href="projects/jerin-maker/index.html">16x16 Practice</a>
+            <a class="chip" href="tools.html">Find Tools</a>
+            <a class="chip" href="games.html">Play Games</a>
+            <a class="chip" href="portfolio/index.html">View Works</a>
+            <a class="chip" href="#character-intro">Character Index</a>
+          </div>
+        </div>
+
+        <div class="grid">
+          <a class="link-card" href="tools.html">
+            <div class="link-thumb link-thumb--grid">
+              <div class="link-thumb__grid">
+                <img src="icon/icon-192-4.png" alt="" data-media="icon">
+                <img src="icon/icon-192-5.png" alt="" data-media="icon">
+                <img src="icon/icon-192-1.png" alt="" data-media="icon">
+                <img src="icon/icon-192-6.png" alt="" data-media="icon">
+                <span class="link-thumb__empty">Coming Soon</span>
+                <span class="link-thumb__empty">Coming Soon</span>
+              </div>
+              <span class="link-tag">Tools</span>
+            </div>
+            <h3 class="link-title">Pixel Tool Collection</h3>
+            <p class="link-desc">Browse browser-based drawing and conversion tools.</p>
+          </a>
+          <a class="link-card" href="games.html">
+            <div class="link-thumb link-thumb--grid">
+              <div class="link-thumb__grid">
+                <img src="icon/icon-192-3.png" alt="" data-media="icon">
+                <span class="link-thumb__empty link-thumb__empty--dev">In Dev</span>
+                <img src="icon/icon-192-2.png" alt="" data-media="icon">
+                <span class="link-thumb__empty">Coming Soon</span>
+                <span class="link-thumb__empty">Coming Soon</span>
+                <span class="link-thumb__empty">Coming Soon</span>
+              </div>
+              <span class="link-tag">Games</span>
+            </div>
+            <h3 class="link-title">Pixel Game Collection</h3>
+            <p class="link-desc">Pick from short-session browser games.</p>
+          </a>
+        </div>
+
+        <div class="grid">
+          <div class="project-place__group">
+            <p class="project-place__label">Updates</p>
+            <h3 class="project-place__title">Recent Updates</h3>
+            <ul class="project-place__updates" id="hubUpdates" aria-live="polite"></ul>
+            <a class="project-place__link" href="notes/index.html">Open Development Notes</a>
+          </div>
+          <div class="project-place__group">
+            <p class="project-place__label">New &amp; Pick</p>
+            <h3 class="project-place__title">New Picks</h3>
+            <ul class="project-place__updates" id="hubLatest" aria-live="polite"></ul>
+            <a class="project-place__link" href="tools.html">Open Tools/Games</a>
+          </div>
+        </div>
+        <!-- publicRoomsHub moved to appear under the dot-hero section -->
+        <ul class="project-place__source" id="gameGalleryItems" hidden>
+          <li data-title="PiXiEED Home" data-image="character-dots/mao1.png" data-type="project" data-updated="2026-02-24" data-update="Updated homepage messaging and top-level action navigation (Draw / Play / Contact)." data-desc="Homepage information architecture refreshed for clarity." data-link="en/index.html"></li>
+          <li data-title="Action Navigation" data-image="icon/icon-192-4.png" data-type="project" data-updated="2026-02-24" data-update="Top CTA now opens dedicated guides for drawing, playing, and contact." data-desc="Faster one-tap access to intended actions." data-link="en/index.html"></li>
+          <li data-title="Tools & Games Cards" data-image="icon/icon-192-6.png" data-type="project" data-updated="2026-02-24" data-update="Hub cards reorganized for clearer browsing and roadmap visibility." data-desc="Collection sections improved for scanning." data-link="tools.html"></li>
+          <li data-title="Character Index" data-image="character-dots/pikarin1.png" data-type="project" data-updated="2026-02-24" data-update="Character showcase and preview transitions refined." data-desc="Improved discoverability of original characters." data-link="#character-intro"></li>
+          <li data-title="PiXiEEDraw Lite" data-image="icon/icon-192-5.png" data-type="tool" data-updated="2026-02-24" data-update="Beginner guidance strengthened for 16x16 creation and PNG export." data-desc="Great starting point for first pixel pieces." data-link="projects/jerin-maker/index.html"></li>
+          <li data-title="PiXiEELENS" data-image="icon/icon-192-1.png" data-type="tool" data-updated="2026-02-24" data-update="Capture and export flows improved for social sharing." data-desc="Pixel camera workflow tuned for fast output." data-link="projects/pixiee-lens/index.html"></li>
+          <li data-title="PiXiEEDraw (Multiplayer Beta)" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-02-24" data-update="Shared mode expanded for real-time co-creation with role flow and sync refinements." data-desc="PiXiEEDraw keeps its full production toolset while enabling multiplayer team editing." data-link="projects/pixiedraw/index.html"></li>
+          <li data-title="PiXiEEDraw Improvements" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-02-24" data-update="Symmetry, shortcuts, responsive layout, and co-edit workflow tuning improved editor usability." data-desc="Full-featured production UX and collaboration flow updates." data-link="projects/pixiedraw/index.html"></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Free Pixel Art Tools</h2>
+      <p class="seo-links"><a href="projects/jerin-maker/index.html">PiXiEEDraw Lite</a> is a 16x16 guided tool for beginners, while <a href="projects/pixiedraw/index.html">PiXiEEDraw</a> is a full browser editor for production workflows with multiplayer collaboration (shared mode beta).</p>
+    </section>
+
+    <section class="card ad-strip" aria-label="Ad">
+      <div class="ad-block ad-block--home">
+        <ins class="adsbygoogle ad-slot"
+             style="display:block"
+             data-ad-client="ca-pub-9801602250480253"
+             data-ad-slot="2141591954"
+             data-ad-format="auto"
+             data-full-width-responsive="true"></ins>
+      </div>
+    </section>
+
+    <section class="section section--highlight" id="character-intro">
+      <div class="section-inner" id="characterPlaceSlot">
+        <div class="character-place" id="characterPlace">
+          <p class="section-eyebrow">Original Character Workbench</p>
+          <div class="character-preview__heading">
+            <h2>Characters</h2>
+            <p hidden>This section introduces original characters centered around Jerin from the game series.</p>
+          </div>
+          <div aria-live="polite" class="character-preview">
+            <div class="character-preview__frame dot-gallery__viewer">
+              <img alt="" hidden id="characterGalleryMain" loading="lazy" src=""/>
+              <div class="character-preview__placeholder" id="characterGalleryPlaceholder">
+                <small id="characterPlaceholderMeta">Waiting for preview</small>
+              </div>
+            </div>
+            <div class="character-preview__details" id="characterPreviewDetails">
+              <h3 class="character-preview__name" id="characterGalleryName">Character A (Draft)</h3>
+              <p class="character-preview__weight" id="characterGalleryWeight">Weight: TBD</p>
+              <div class="character-preview__traits">
+                <h4>Traits</h4>
+                <ul id="characterTraits">
+                  <li>Trait note</li>
+                </ul>
+              </div>
+              <div class="character-preview__detail">
+                <h4>Details</h4>
+                <p id="characterGalleryDetail">Details for the selected character appear here.</p>
+              </div>
+            </div>
+          </div>
+          <p class="character-sprites__hint" hidden>Click a PNG below to switch preview and details.</p>
+          <div aria-label="Character list" class="character-preview__buttons dot-gallery__buttons" id="characterGalleryButtons" role="listbox"></div>
+          <p class="hero-description" id="heroCharacterDescription" hidden></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="contact">
+      <h2>Contact</h2>
+      <p class="subtitle">For pixel art commissions, browser game assets, and collaborations, reach us here.</p>
+      <div class="chips">
+        <a class="button" href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">X</a>
+        <a class="button" href="mailto:pixieed.arta@gmail.com">Email</a>
+      </div>
+    </section>
+
+    <footer>
+      <p>© <span id="year"></span> PiXiEED. All rights reserved.</p>
+      <div class="footer-links">
+        <a href="terms/index.html">Terms</a>
+        <a href="privacy/index.html">Privacy</a>
+      </div>
+    </footer>
+  </div>
+
+  <nav class="bottom-nav">
+    <a class="bottom-nav__item is-active" data-tab="home" href="en/index.html">
+      <span class="icon"><img src="FooterIcon1.png" alt=""/></span><span>Home</span>
+    </a>
+    <a class="bottom-nav__item" data-tab="tools" href="tools.html">
+      <span class="icon"><img src="FooterIcon3.png" alt=""/></span><span>Tools/Games</span>
+    </a>
+    <a class="bottom-nav__item" data-tab="lens" href="projects/pixiee-lens/index.html">
+      <span class="icon"><img src="FooterIcon5.png" alt=""/></span><span>PiXiEELENS</span>
+    </a>
+    <a class="bottom-nav__item" data-tab="portfolio" href="portfolio/index.html">
+      <span class="icon"><img src="FooterIcon4.png" alt=""/></span><span>Business</span>
+    </a>
+  </nav>
+
+  <div class="auth-panel" id="authPanel" aria-hidden="true">
+    <div class="auth-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <h3 style="margin:0;font-size:16px;color:#f9fafb;">Profile</h3>
+        <button class="close-btn" type="button" id="closeAuthPanel">Close</button>
+      </div>
+      <div class="profile-block">
+        <div class="profile-row">
+          <button class="avatar-toggle" id="avatarToggle" type="button" aria-label="Change avatar" aria-expanded="false" aria-controls="avatarPanel">
+            <span class="avatar-toggle__img" id="avatarPreview"></span>
+          </button>
+          <label class="profile-name">
+            <span style="font-weight:700; color:#e5e7eb;">Nickname</span>
+            <input class="auth-input" id="profileNickname" type="text" placeholder="Name" maxlength="32">
+          </label>
+        </div>
+        <div class="avatar-panel" id="avatarPanel" hidden>
+          <div class="avatar-grid" id="avatarGrid"></div>
+        </div>
+        <label class="profile-name">
+          <span style="font-weight:700; color:#e5e7eb;">X / Link</span>
+          <input class="auth-input" id="profileX" type="url" placeholder="https://x.com/username or https://example.com" maxlength="200" inputmode="url">
+        </label>
+        <button class="auth-btn" id="saveProfile" type="button">Save Profile</button>
+      </div>
+      <div class="profile-block">
+        <p class="helper" id="authStatus"></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      function loadNickname(){ try{ return localStorage.getItem('pixieed_nickname') || ''; }catch(_){ return ''; } }
+      function loadAvatar(){ try{ return localStorage.getItem('pixieed_avatar') || 'mao'; }catch(_){ return 'mao'; } }
+      function saveNickname(name){ try{ localStorage.setItem('pixieed_nickname', name); }catch(_){ } }
+      function saveAvatar(id){ try{ localStorage.setItem('pixieed_avatar', id); }catch(_){ } }
+      function loadXUrl(){ try{ return localStorage.getItem('pixieed_x_url') || ''; }catch(_){ return ''; } }
+      function normalizeXUrl(value){
+        const raw = String(value || '').trim();
+        if(!raw) return '';
+        if(/^https?:\/\//i.test(raw)){
+          try{
+            return new URL(raw).toString();
+          }catch(_){}
+          return '';
+        }
+        if(/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(raw)){
+          try{
+            return new URL(`https://${raw}`).toString();
+          }catch(_){}
+          return '';
+        }
+        const handle = raw.replace(/^@+/, '').trim();
+        if(!handle) return '';
+        const candidate = /^(x\.com|twitter\.com)\//i.test(handle)
+          ? `https://${handle}`
+          : `https://x.com/${handle}`;
+        try{
+          return new URL(candidate).toString();
+        }catch(_){}
+        return '';
+      }
+      function saveXUrl(value){
+        try{
+          const normalized = normalizeXUrl(value);
+          if(normalized){
+            localStorage.setItem('pixieed_x_url', normalized);
+          }else{
+            localStorage.removeItem('pixieed_x_url');
+          }
+        }catch(_){ }
+      }
+      const AVATARS = {
+        mao:'character-dots/mao1.png',
+        jerin1:'character-dots/Jerin1.png',
+        jerin2:'character-dots/Jerin2.png',
+        jerin3:'character-dots/Jerin3.png',
+        jerin4:'character-dots/Jerin4.png',
+        jerin5:'character-dots/Jerin5.png',
+        jerin6:'character-dots/Jerin6.png',
+        jerin7:'character-dots/Jerin7.png',
+        jerin8:'character-dots/Jerin8.png',
+        jellnall1:'character-dots/JELLNALL1.png',
+        jellnall2:'character-dots/JELLNALL2.png',
+        jellnall3:'character-dots/JELLNALL3.png',
+        jellnall4:'character-dots/JELLNALL4.png',
+        jellnall5:'character-dots/JELLNALL5.png',
+        jellnall6:'character-dots/JELLNALL6.png',
+        jellnall7:'character-dots/JELLNALL7.png',
+        jellnall8:'character-dots/JELLNALL8.png',
+        jellnall9:'character-dots/JELLNALL9.png',
+        jellnall10:'character-dots/JELLNALL10.png',
+        jellnall11:'character-dots/JELLNALL11.png',
+        jellnall12:'character-dots/JELLNALL12.png',
+        jellnall13:'character-dots/JELLNALL13.png',
+        jellnall14:'character-dots/JELLNALL14.png',
+        jellnall15:'character-dots/JELLNALL15.png',
+        jellnall16:'character-dots/JELLNALL16.png',
+        jellnall17:'character-dots/JELLNALL17.png',
+        jellnall18:'character-dots/JELLNALL18.png',
+        jellnall19:'character-dots/JELLNALL19.png',
+        baburin:'character-dots/baburinpng.png'
+      };
+      function applyAvatar(){
+        const brand = document.getElementById('brandAvatar');
+        const preview = document.getElementById('avatarPreview');
+        const avatar = loadAvatar();
+        const src = AVATARS[avatar] || AVATARS.mao;
+        if(brand){ brand.innerHTML = `<img src="${src}" alt="avatar">`; }
+        if(preview){ preview.innerHTML = `<img src="${src}" alt="avatar">`; }
+        const nick = loadNickname();
+        const sub = document.getElementById('brandUser');
+        if(sub){ sub.textContent = nick || 'User'; }
+      }
+      function renderAvatarChoices(){
+        const grid = document.getElementById('avatarGrid');
+        if(!grid) return;
+        grid.innerHTML = '';
+        const current = loadAvatar();
+        Object.entries(AVATARS).forEach(([id, src]) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = `avatar-option${current === id ? ' is-active' : ''}`;
+          btn.style.background = 'rgba(0,0,0,0.7)';
+          const im = document.createElement('img');
+          im.src = src;
+          im.alt = id;
+          im.style.width = '80%';
+          im.style.height = '80%';
+          im.style.objectFit = 'contain';
+          im.style.pointerEvents = 'none';
+          im.style.imageRendering = 'pixelated';
+          im.style.imageRendering = 'crisp-edges';
+          btn.appendChild(im);
+          btn.addEventListener('click', () => {
+            saveAvatar(id);
+            renderAvatarChoices();
+            applyAvatar();
+            const panel = document.getElementById('avatarPanel');
+            const toggle = document.getElementById('avatarToggle');
+            if(panel){
+              panel.hidden = true;
+            }
+            if(toggle){
+              toggle.setAttribute('aria-expanded','false');
+            }
+          });
+          grid.appendChild(btn);
+        });
+      }
+      function setupAvatarToggle(){
+        const toggle = document.getElementById('avatarToggle');
+        const panel = document.getElementById('avatarPanel');
+        if(!toggle || !panel) return;
+        const setOpen = (open) => {
+          panel.hidden = !open;
+          toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        };
+        setOpen(false);
+        toggle.addEventListener('click', () => {
+          setOpen(panel.hidden);
+        });
+      }
+      function setupProfileModal(){
+        const openBtn = document.getElementById('openProfilePanel');
+        const panel = document.getElementById('authPanel');
+        const closeBtn = document.getElementById('closeAuthPanel');
+        const saveBtn = document.getElementById('saveProfile');
+        const nickInput = document.getElementById('profileNickname');
+        const xInput = document.getElementById('profileX');
+        const status = document.getElementById('authStatus');
+        const toggle = (open) => {
+          if(!panel) return;
+          if(open){
+            if(nickInput) nickInput.value = loadNickname();
+            if(xInput) xInput.value = loadXUrl();
+            renderAvatarChoices();
+            panel.classList.add('is-open');
+            panel.setAttribute('aria-hidden','false');
+          }else{
+            panel.classList.remove('is-open');
+            panel.setAttribute('aria-hidden','true');
+          }
+        };
+        if(openBtn) openBtn.addEventListener('click', () => toggle(true));
+        if(closeBtn) closeBtn.addEventListener('click', () => toggle(false));
+        if(panel){ panel.addEventListener('click', (e) => { if(e.target === panel) toggle(false); }); }
+        if(saveBtn){
+          saveBtn.addEventListener('click', () => {
+            const nick = (nickInput?.value || '').trim();
+            const xUrl = normalizeXUrl(xInput?.value || '');
+            if(nick){ saveNickname(nick); }
+            saveXUrl(xUrl);
+            applyAvatar();
+            if(status) status.textContent = 'Profile saved';
+          });
+        }
+      }
+      function setupHeroPlaceSwap(){
+        const heroSlot = document.getElementById('heroPlaceSlot');
+        const characterSlot = document.getElementById('characterPlaceSlot');
+        const dotPlace = document.getElementById('dotPlace');
+        const characterPlace = document.getElementById('characterPlace');
+        const toggleBtn = document.getElementById('toggleHeroPlace');
+        const heroDesc = document.getElementById('heroCharacterDescription');
+        const nameEl = document.getElementById('characterGalleryName');
+        const detailEl = document.getElementById('characterGalleryDetail');
+        if(
+          !heroSlot ||
+          !characterSlot ||
+          !dotPlace ||
+          !characterPlace ||
+          !toggleBtn
+        ) return;
+
+        const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        let latestDescription = '';
+        let typeTimer = null;
+        const setActiveButtons = (showCharacter) => {
+          toggleBtn.setAttribute('aria-pressed', showCharacter ? 'true' : 'false');
+          toggleBtn.classList.toggle('is-active', showCharacter);
+          toggleBtn.textContent = showCharacter ? 'Pixel Art' : 'Characters';
+          // When showing character in hero, the toggle should jump to character section.
+          toggleBtn.setAttribute('href', showCharacter ? '#character-intro' : '#home-hero');
+        };
+        const animateSwap = (element) => {
+          if(!element) return;
+          element.classList.remove('swap-animate');
+          void element.offsetWidth;
+          element.classList.add('swap-animate');
+          window.setTimeout(() => {
+            element.classList.remove('swap-animate');
+          }, 260);
+        };
+        const buildDescription = (data = {}) => {
+          const name = String(data.name || '').trim();
+          const detail = String(data.detail || data.description || data.background || '').trim();
+          if(name && detail) return `${name}：${detail}`;
+          return detail || name;
+        };
+        const getCurrentDescriptionFromDom = () => {
+          const name = String(nameEl?.textContent || '').trim();
+          const detail = String(detailEl?.textContent || '').trim();
+          return buildDescription({ name, detail }) || 'Character description is being prepared.';
+        };
+        const typeHeroText = (text, options = {}) => {
+          if(!heroDesc) return;
+          const content = String(text || '').trim();
+          if(!content){
+            heroDesc.textContent = '';
+            heroDesc.hidden = true;
+            return;
+          }
+          heroDesc.hidden = false;
+          if(typeTimer){
+            clearTimeout(typeTimer);
+            typeTimer = null;
+          }
+          if(options.animate === false || prefersReducedMotion){
+            heroDesc.textContent = content;
+            return;
+          }
+          heroDesc.textContent = '';
+          let index = 0;
+          const step = () => {
+            heroDesc.textContent += content.charAt(index++);
+            if(index < content.length){
+              typeTimer = window.setTimeout(step, 18);
+            }
+          };
+          step();
+        };
+        const applyHeroDescription = (animate = true) => {
+          if(!heroDesc) return;
+          if(heroSlot.contains(characterPlace)){
+            if(!latestDescription){
+              latestDescription = getCurrentDescriptionFromDom();
+            }
+            typeHeroText(latestDescription, { animate });
+          }else{
+            heroDesc.textContent = '';
+            heroDesc.hidden = true;
+          }
+        };
+        const handleCharacterUpdate = (data = {}) => {
+          latestDescription = buildDescription(data);
+          if(!latestDescription){
+            latestDescription = getCurrentDescriptionFromDom();
+          }
+          if(heroSlot.contains(characterPlace)){
+            typeHeroText(latestDescription, { animate: true });
+          }
+        };
+        const setState = (showCharacter, options = {}) => {
+          const { animate = true } = options;
+          if(showCharacter){
+            heroSlot.appendChild(characterPlace);
+            characterSlot.appendChild(dotPlace);
+            characterPlace.classList.add('is-hero');
+            setActiveButtons(true);
+            if(animate){
+              animateSwap(characterPlace);
+              animateSwap(dotPlace);
+            }
+            applyHeroDescription(animate);
+            window.requestAnimationFrame(syncHeroPreviewHeights);
+            return;
+          }
+          heroSlot.appendChild(dotPlace);
+          characterSlot.appendChild(characterPlace);
+          characterPlace.classList.remove('is-hero');
+          setActiveButtons(false);
+          if(animate){
+            animateSwap(dotPlace);
+          }
+          applyHeroDescription(false);
+          window.requestAnimationFrame(syncHeroPreviewHeights);
+        };
+
+        toggleBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          const isShowingCharacter = heroSlot.contains(characterPlace);
+          setState(!isShowingCharacter);
+        });
+        window.addEventListener('pixieed:characterSelected', (event) => {
+          handleCharacterUpdate(event?.detail || {});
+        });
+        if(window.__PIXIEED_CURRENT_CHARACTER){
+          latestDescription = buildDescription(window.__PIXIEED_CURRENT_CHARACTER);
+        }
+        setState(false, { animate: false });
+      }
+      function setupHeroGuideToggles(){
+        const pairs = [
+          {
+            button: document.getElementById('toggleDrawGuide'),
+            guide: document.getElementById('draw-guide')
+          },
+          {
+            button: document.getElementById('togglePlayGuide'),
+            guide: document.getElementById('play-guide')
+          },
+          {
+            button: document.getElementById('toggleContactGuide'),
+            guide: document.getElementById('contact-guide')
+          }
+        ].filter((pair) => pair.button && pair.guide);
+        if(!pairs.length) return;
+
+        const setOpen = (targetPair, open, options = {}) => {
+          pairs.forEach((pair) => {
+            const isTarget = pair === targetPair;
+            const shouldOpen = isTarget ? open : false;
+            pair.guide.hidden = !shouldOpen;
+            pair.button.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+          });
+          if(open && options.scroll){
+            window.requestAnimationFrame(() => {
+              targetPair.guide.scrollIntoView({ behavior:'smooth', block:'nearest' });
+            });
+          }
+        };
+
+        pairs.forEach((pair) => {
+          setOpen(pair, false);
+          pair.button.addEventListener('click', () => {
+            const nextOpen = pair.guide.hidden;
+            setOpen(pair, nextOpen, { scroll:true });
+          });
+        });
+      }
+      function syncHeroPreviewHeights(){
+        const previews = document.querySelectorAll('.character-place .character-preview');
+        previews.forEach((preview) => {
+          const frame = preview.querySelector('.character-preview__frame');
+          if (!frame) return;
+          const width = frame.getBoundingClientRect().width;
+          if (!width) return;
+          const height = Math.round(width * 0.75);
+          preview.style.setProperty('--preview-height', `${height}px`);
+        });
+      }
+      document.addEventListener('DOMContentLoaded', () => {
+        applyAvatar();
+        setupAvatarToggle();
+        setupProfileModal();
+        setupHeroGuideToggles();
+        setupHeroPlaceSwap();
+        syncHeroPreviewHeights();
+        window.addEventListener('resize', syncHeroPreviewHeights);
+        const y = document.getElementById('year');
+        if(y) y.textContent = new Date().getFullYear();
+      });
+    })();
+  </script>
+  <script src="scripts.js"></script>
+  <script src="portfolio/dots/manifest.js"></script>
+  <script src="scripts/gallery.js"></script>
+  <script src="character-dots/manifest.js"></script>
+  <script src="scripts/character-gallery.js"></script>
+  <script src="scripts/game-gallery.js"></script>
+  <script type="module">
+    const MULTI_SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
+    const MULTI_SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
+    const MULTI_SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
+    const MULTI_PUBLIC_LOBBY_CHANNEL = 'pixiedraw-public-rooms-v1';
+    const RESIDENT_THUMB_CACHE_KEY = 'pixieed:resident-room-thumb-cache-v1';
+    const RESIDENT_THUMB_CACHE_LIMIT = 12;
+    const RESIDENT_BLACK_THUMBNAIL_EDGE = 96;
+
+    function normalizeProjectKey(value){
+      if (typeof value !== 'string') return '';
+      return value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40);
+    }
+
+    function wait(ms){
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function buildMultiInviteHref(projectKey, role = 'guest'){
+      const normalizedKey = normalizeProjectKey(projectKey);
+      if (!normalizedKey) return 'pixiedraw/index.html';
+      const inviteRole = (role === 'master' || role === 'guest' || role === 'spectator')
+        ? role
+        : 'guest';
+      const params = new URLSearchParams();
+      params.set('multiInvite', '1');
+      params.set('multiKey', normalizedKey);
+      params.set('multiAutoJoin', '1');
+      params.set('multiRole', inviteRole);
+      return `pixiedraw/index.html?${params.toString()}`;
+    }
+
+    function createSolidThumbnailDataUrl(color = '#000000', size = RESIDENT_BLACK_THUMBNAIL_EDGE){
+      try{
+        const edge = Math.max(16, Math.round(Number(size) || RESIDENT_BLACK_THUMBNAIL_EDGE));
+        const canvas = document.createElement('canvas');
+        canvas.width = edge;
+        canvas.height = edge;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return '';
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, edge, edge);
+        return canvas.toDataURL('image/png');
+      }catch(e){
+        return '';
+      }
+    }
+
+    const RESIDENT_BLACK_THUMBNAIL_DATA_URL = createSolidThumbnailDataUrl('#000000', RESIDENT_BLACK_THUMBNAIL_EDGE);
+
+    function readResidentThumbnailCache(){
+      try{
+        const raw = window.localStorage.getItem(RESIDENT_THUMB_CACHE_KEY);
+        if (typeof raw !== 'string' || !raw.trim()) return {};
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      }catch(e){
+        return {};
+      }
+    }
+
+    function writeResidentThumbnailCache(cache){
+      try{
+        window.localStorage.setItem(RESIDENT_THUMB_CACHE_KEY, JSON.stringify(cache || {}));
+      }catch(e){}
+    }
+
+    function getResidentThumbnailFromCache(projectKey, cache){
+      const normalizedKey = normalizeProjectKey(projectKey);
+      if (!normalizedKey || !cache || typeof cache !== 'object') return null;
+      const entry = cache[normalizedKey];
+      if (!entry || typeof entry !== 'object') return null;
+      const thumbnail = typeof entry.thumbnailDataUrl === 'string' ? entry.thumbnailDataUrl : '';
+      if (!thumbnail.startsWith('data:image/')) return null;
+      const updatedAt = Number(entry.updatedAt) || 0;
+      return { thumbnailDataUrl: thumbnail, updatedAt };
+    }
+
+    function setResidentThumbnailCache(projectKey, thumbnailDataUrl, updatedAt = Date.now(), cache = null){
+      const normalizedKey = normalizeProjectKey(projectKey);
+      if (!normalizedKey || typeof thumbnailDataUrl !== 'string' || !thumbnailDataUrl.startsWith('data:image/')) {
+        return cache || readResidentThumbnailCache();
+      }
+      const nextCache = (cache && typeof cache === 'object') ? cache : readResidentThumbnailCache();
+      nextCache[normalizedKey] = {
+        thumbnailDataUrl,
+        updatedAt: Number(updatedAt) || Date.now(),
+      };
+      const keys = Object.keys(nextCache);
+      if (keys.length > RESIDENT_THUMB_CACHE_LIMIT) {
+        keys
+          .sort((a, b) => (Number(nextCache[b]?.updatedAt) || 0) - (Number(nextCache[a]?.updatedAt) || 0))
+          .slice(RESIDENT_THUMB_CACHE_LIMIT)
+          .forEach(key => { delete nextCache[key]; });
+      }
+      writeResidentThumbnailCache(nextCache);
+      return nextCache;
+    }
+
+    function parsePublicLobbyRooms(presenceState){
+      const byKey = new Map();
+      Object.keys(presenceState || {}).forEach(key => {
+        const rows = Array.isArray(presenceState[key]) ? presenceState[key] : [];
+        rows.forEach(row => {
+          const projectKey = normalizeProjectKey(row?.projectKey || '');
+          if (!projectKey) return;
+          if (row?.roomVisibility && row.roomVisibility !== 'public') return;
+          const updatedAt = Number(row?.updatedAt) || Number(row?.sentAt) || Date.now();
+          const prev = byKey.get(projectKey);
+          if (prev && updatedAt <= prev.updatedAt) return;
+          byKey.set(projectKey, {
+            projectKey,
+            updatedAt,
+            thumbnailDataUrl: typeof row?.thumbnailDataUrl === 'string' ? row.thumbnailDataUrl : '',
+            participantCount: Math.max(0, Math.round(Number(row?.participantCount) || 0)),
+            guestCount: Math.max(0, Math.round(Number(row?.guestCount) || 0)),
+            spectatorCount: Math.max(0, Math.round(Number(row?.spectatorCount) || 0)),
+            maxGuests: Math.max(0, Math.round(Number(row?.maxGuests) || 0)),
+          });
+        });
+      });
+      return byKey;
+    }
+
+    async function fetchPublicLobbyRooms(supabase){
+      const lobby = supabase.channel(MULTI_PUBLIC_LOBBY_CHANNEL);
+      try{
+        await lobby.subscribe();
+      }catch(e){}
+      await wait(650);
+      let state = {};
+      try{
+        state = typeof lobby.presenceState === 'function' ? (lobby.presenceState() || {}) : {};
+      }catch(e){
+        state = {};
+      }
+      try{
+        await lobby.unsubscribe();
+      }catch(e){}
+      return parsePublicLobbyRooms(state);
+    }
+
+    async function probeLegacyPublicRoomThumbnail(supabase, channelName){
+      if (typeof channelName !== 'string' || !channelName.trim()) return null;
+      const roomChannel = channelName.trim();
+      const ch = supabase.channel(roomChannel);
+      let thumbnail = null;
+      ch.on('broadcast', { event: 'status-response' }, ({payload})=>{
+        try{
+          if (!payload || payload.room !== roomChannel) return;
+          if (typeof payload.data === 'string' && payload.data.startsWith('data:image/')) {
+            thumbnail = payload.data;
+          }
+        }catch(e){}
+      });
+      try{
+        await ch.subscribe();
+      }catch(e){}
+      try{
+        await ch.send({ type:'broadcast', event:'status-request', payload:{ room: roomChannel, ts: Date.now() } });
+      }catch(e){}
+      await wait(700);
+      try{
+        await ch.unsubscribe();
+      }catch(e){}
+      return thumbnail;
+    }
+
+    async function probeAndRenderRooms(){
+      const grid = document.getElementById('publicRoomGrid');
+      if (!grid) return;
+      grid.innerHTML = '<p class="public-room-empty">Loading live rooms...</p>';
+      try{
+        const res = await fetch('rooms.json');
+        const rooms = await res.json();
+        const mod = await import(MULTI_SUPABASE_MODULE_URL);
+        const supabase = mod.createClient(MULTI_SUPABASE_URL, MULTI_SUPABASE_ANON_KEY, { realtime: { params: { eventsPerSecond: 48 } } });
+
+        const lobbyRooms = await fetchPublicLobbyRooms(supabase);
+        let residentThumbCache = readResidentThumbnailCache();
+        const active = (await Promise.all((Array.isArray(rooms) ? rooms : []).map(async (r) => {
+          if (!r || typeof r !== 'object') return null;
+          if (r.type === 'resident'){
+            const projectKey = normalizeProjectKey(r.projectKey || r.channel || r.id || '');
+            const lobby = projectKey ? lobbyRooms.get(projectKey) : null;
+            const liveThumb = (typeof lobby?.thumbnailDataUrl === 'string' && lobby.thumbnailDataUrl.startsWith('data:image/'))
+              ? lobby.thumbnailDataUrl
+              : '';
+            if (projectKey && liveThumb) {
+              residentThumbCache = setResidentThumbnailCache(
+                projectKey,
+                liveThumb,
+                Number(lobby?.updatedAt) || Date.now(),
+                residentThumbCache
+              );
+            }
+            const cachedThumb = getResidentThumbnailFromCache(projectKey, residentThumbCache);
+            const fallbackThumb = cachedThumb?.thumbnailDataUrl || RESIDENT_BLACK_THUMBNAIL_DATA_URL || '';
+            return Object.assign({}, r, {
+              projectKey,
+              isLive: Boolean(lobby),
+              thumbnail: liveThumb || fallbackThumb || null,
+              participantCount: Number(lobby?.participantCount) || 0,
+              updatedAt: Number(lobby?.updatedAt) || Number(cachedThumb?.updatedAt) || 0,
+            });
+          }
+          if (r.type === 'public'){
+            const thumbnail = await probeLegacyPublicRoomThumbnail(supabase, r.channel);
+            if (!thumbnail) return null;
+            return Object.assign({}, r, { thumbnail, isLive: true, updatedAt: Date.now() });
+          }
+          return null;
+        }))).filter(Boolean);
+
+        grid.innerHTML = '';
+        if (!active.length){ grid.innerHTML = '<p class="public-room-empty">No live rooms right now.</p>'; return; }
+        for (const r of active){
+          const card = document.createElement('div');
+          card.className = 'public-room-card';
+          // determine thumbnail/placeholder
+          const thumbHtml = r.thumbnail
+            ? `<div class="public-room-thumb"><img src="${r.thumbnail}" alt="${r.name} thumbnail" loading="lazy" /></div>`
+            : `<div class="public-room-thumb"><span>ROOM</span></div>`;
+
+          // action area
+          let actionHtml = '';
+          if (r.type === 'public'){
+            const href = `public-room.html?room=${encodeURIComponent(r.channel)}`;
+            actionHtml = `<a class="public-room-action button" href="${href}">Join</a>`;
+          } else if (r.type === 'resident'){
+            const residentPage = buildMultiInviteHref(r.projectKey || r.channel || r.id || '', 'guest');
+            const label = r.isLive ? 'Join' : 'Open';
+            actionHtml = `<a class="public-room-action button" href="${residentPage}">${label}</a>`;
+          }
+
+          const residentLiveInfo = r.type === 'resident'
+            ? (r.isLive ? ` · ${Math.max(0, Number(r.participantCount) || 0)} active` : ' · standby')
+            : '';
+          const updatedLabel = r.updatedAt ? new Date(r.updatedAt).toLocaleString() : new Date().toLocaleString();
+
+          const metaInfo = `
+            <div class="public-room-meta">
+              <div class="public-room-title">${r.name}</div>
+              <div class="public-room-info">${r.description || ''}</div>
+              <div class="public-room-meta-extra">${r.size ? r.size + ' · ' : ''}${r.maxUsers ? 'max ' + r.maxUsers + ' users' : ''}${residentLiveInfo}</div>
+              <div class="public-room-time">${updatedLabel}</div>
+              <div>${actionHtml}</div>
+            </div>`;
+
+          card.innerHTML = `${thumbHtml}${metaInfo}`;
+          grid.appendChild(card);
+        }
+      }catch(e){ console.error('probe rooms failed', e); grid.innerHTML = '<p class="public-room-empty is-error">Failed to load live rooms.</p>'; }
+    }
+
+    document.getElementById('refreshPublicRooms').addEventListener('click', ()=>{ probeAndRenderRooms(); });
+    probeAndRenderRooms();
+  </script>
+</body>
+</html>
