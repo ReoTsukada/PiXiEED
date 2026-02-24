@@ -32,6 +32,57 @@
   const SECRET_UNLOCK_STORAGE_KEY = 'pixieed:secret-unlocks';
   const SECRET_UNLOCK_EVENT_NAME = 'pixiePet:secretUnlocked';
   const PLACEHOLDER_IMG = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+  const LANG = (document.documentElement.getAttribute('lang') || 'ja').toLowerCase();
+  const IS_EN = LANG.startsWith('en');
+  const I18N = IS_EN
+    ? {
+        viewerAltSuffix: ' pixel preview',
+        pngMissing: 'PNG missing',
+        draftName: 'Character (Draft)',
+        weightLabel: 'Weight',
+        weightPending: 'TBD',
+        detailPending: 'Details are being prepared.',
+        traitsPending: 'Trait details are being prepared.',
+        ariaView: 'View',
+        ariaNew: '(New)',
+        spriteAltSuffix: ' pixel sprite',
+        locked: 'Locked',
+        unlockOn: 'Unlock on',
+        roleUnknown: 'Unknown',
+        unseenOne: '1 new character has been added',
+        unseenManyPrefix: '',
+        unseenManySuffix: ' new characters have been added',
+        fallbackDetailPrefix: 'Details for',
+        fallbackDetailSuffix: 'are currently available in Japanese. English copy is coming soon.',
+        placeholderTagline: 'Temporary placeholder for character gallery.',
+        placeholderDesc: 'Add entries in manifest.js to switch images and notes.',
+        placeholderBackground: 'Background is not set',
+        placeholderTrait: 'Add trait points'
+      }
+    : {
+        viewerAltSuffix: 'のドットプレビュー',
+        pngMissing: 'PNG未配置',
+        draftName: 'キャラクター（仮）',
+        weightLabel: '重さ',
+        weightPending: '調整中',
+        detailPending: '詳細メモを準備中',
+        traitsPending: '特徴メモを準備中',
+        ariaView: '表示',
+        ariaNew: '（新着）',
+        spriteAltSuffix: 'のドット絵',
+        locked: '？？？',
+        unlockOn: '解放予定',
+        roleUnknown: '？？？',
+        unseenOne: '新しいキャラが1体追加されています',
+        unseenManyPrefix: '新しいキャラが',
+        unseenManySuffix: '体追加されています',
+        fallbackDetailPrefix: '',
+        fallbackDetailSuffix: '',
+        placeholderTagline: 'PNG差し替え用の仮枠です。',
+        placeholderDesc: 'manifest.js にエントリを追加するとボタンが増え、画像とメモが切り替わります。',
+        placeholderBackground: '未設定の背景情報',
+        placeholderTrait: 'ポイントを追加'
+      };
   let viewerAnimationTimer = null;
   let viewerAnimationFrameIndex = 0;
 
@@ -69,9 +120,108 @@
     refreshSecretEntry(entryId);
   });
 
+  function containsJapanese(value) {
+    return /[ぁ-んァ-ヶ一-龠]/.test(String(value || ''));
+  }
+
+  function toTitleFromId(value, index) {
+    const source = String(value || '').trim();
+    if (!source) {
+      return `Character ${Number.isFinite(index) ? index + 1 : ''}`.trim();
+    }
+    return source
+      .split(/[-_]+/)
+      .filter(Boolean)
+      .map(token => token.charAt(0).toUpperCase() + token.slice(1))
+      .join(' ');
+  }
+
+  function getEnglishCandidate(...values) {
+    for (const value of values) {
+      const text = typeof value === 'string' ? value.trim() : '';
+      if (!text) continue;
+      if (!containsJapanese(text)) return text;
+    }
+    return '';
+  }
+
+  function getEntryIndex(entry) {
+    if (!entry) return -1;
+    return manifestEntries.findIndex(item => item.id === entry.id);
+  }
+
+  function getEntryName(entry, index = -1) {
+    if (!entry) return I18N.draftName;
+    if (!IS_EN) return entry.name || I18N.draftName;
+    const english = getEnglishCandidate(entry.nameEn, entry.name_en, entry.enName, entry.en_name, entry.name);
+    if (english) return english;
+    return toTitleFromId(entry.id || entry.role || '', index);
+  }
+
+  function getEntryButtonLabel(entry, index = -1) {
+    if (!entry) return `Character ${Number.isFinite(index) ? index + 1 : ''}`.trim();
+    if (!IS_EN) return entry.buttonLabel || entry.name || `Character ${index + 1}`;
+    const english = getEnglishCandidate(
+      entry.buttonLabelEn,
+      entry.button_label_en,
+      entry.buttonLabel,
+      entry.nameEn,
+      entry.name
+    );
+    if (english) return english;
+    return getEntryName(entry, index);
+  }
+
+  function getEntryDetail(entry, index = -1) {
+    if (!entry) return I18N.detailPending;
+    if (!IS_EN) return entry.detail || entry.background || entry.description || I18N.detailPending;
+    const english = getEnglishCandidate(
+      entry.detailEn,
+      entry.detail_en,
+      entry.backgroundEn,
+      entry.background_en,
+      entry.descriptionEn,
+      entry.description_en,
+      entry.detail,
+      entry.background,
+      entry.description
+    );
+    if (english) return english;
+    const name = getEntryName(entry, index);
+    return `${I18N.fallbackDetailPrefix} ${name} ${I18N.fallbackDetailSuffix}`.trim();
+  }
+
+  function getEntryWeight(entry) {
+    if (!entry) return I18N.weightPending;
+    if (!IS_EN) return entry.weight || I18N.weightPending;
+    const english = getEnglishCandidate(entry.weightEn, entry.weight_en, entry.weight);
+    return english || I18N.weightPending;
+  }
+
+  function getEntryTraits(entry, index = -1) {
+    if (!entry) return [I18N.traitsPending];
+    if (!IS_EN) {
+      return Array.isArray(entry.traits) && entry.traits.length ? entry.traits : [I18N.traitsPending];
+    }
+    if (Array.isArray(entry.traitsEn) && entry.traitsEn.length) {
+      return entry.traitsEn.filter(Boolean);
+    }
+    const englishTraits = Array.isArray(entry.traits)
+      ? entry.traits.filter(trait => !containsJapanese(trait))
+      : [];
+    if (englishTraits.length) return englishTraits;
+    const lines = [];
+    if (entry.role && !containsJapanese(entry.role)) lines.push(`Role: ${entry.role}`);
+    if (entry.sprite && !containsJapanese(entry.sprite)) lines.push(`Sprite: ${entry.sprite}`);
+    if (!lines.length) lines.push(getEntryDetail(entry, index));
+    return lines;
+  }
+
   function selectCharacter(entry, activeButton, options = {}) {
     const { updateUrl = false, markViewed = false } = options;
     if (!entry) return;
+    const entryIndex = getEntryIndex(entry);
+    const resolvedName = getEntryName(entry, entryIndex);
     currentCharacterId = entry.id || null;
     const src = normalizePath(entry.file);
     const animation = getEntryAnimation(entry);
@@ -79,7 +229,7 @@
     if (src) {
       viewer.hidden = false;
       viewer.src = src;
-      viewer.alt = `${entry.name || 'キャラクター'}のドットプレビュー`;
+      viewer.alt = `${resolvedName}${I18N.viewerAltSuffix}`;
       if (shouldTrimEdge(entry)) {
         viewer.dataset.trimEdge = 'true';
       } else {
@@ -104,18 +254,18 @@
       placeholder.hidden = false;
       if (placeholderMeta) {
         placeholderMeta.textContent = entry.status
-          ? `${entry.status} / PNG未配置`
-          : 'PNG未配置';
+          ? `${entry.status} / ${I18N.pngMissing}`
+          : I18N.pngMissing;
       }
     }
 
-    typeText(nameEl, entry.name || 'キャラクター（仮）');
-    typeText(weightEl, `重さ: ${entry.weight || '調整中'}`);
-    typeText(detailEl, entry.detail || entry.background || entry.description || '詳細メモを準備中');
+    typeText(nameEl, resolvedName);
+    typeText(weightEl, `${I18N.weightLabel}: ${getEntryWeight(entry)}`);
+    typeText(detailEl, getEntryDetail(entry, entryIndex));
     applyScale(DEFAULT_IMAGE_SCALE);
     if (traitsEl) {
       traitsEl.innerHTML = '';
-      const traits = Array.isArray(entry.traits) && entry.traits.length ? entry.traits : ['特徴メモを準備中'];
+      const traits = getEntryTraits(entry, entryIndex);
       traits.forEach(trait => {
         const li = document.createElement('li');
         traitsEl.appendChild(li);
@@ -149,10 +299,11 @@
 
   function emitCharacterSelected(entry) {
     if (!entry || typeof window === 'undefined') return;
-    const detail = entry.detail || entry.background || entry.description || '';
+    const entryIndex = getEntryIndex(entry);
+    const detail = getEntryDetail(entry, entryIndex);
     const payload = {
       id: entry.id || null,
-      name: entry.name || '',
+      name: getEntryName(entry, entryIndex),
       detail
     };
     window.__PIXIEED_CURRENT_CHARACTER = payload;
@@ -188,17 +339,18 @@
 
   function applyEntryToButton(button, entry, index) {
     if (!button || !entry) return;
-    const labelText = entry.buttonLabel || entry.name || `Character ${index + 1}`;
+    const labelText = getEntryButtonLabel(entry, index);
+    const entryName = getEntryName(entry, index);
     const entryId = getEntryId(entry, index);
     const seen = isCharacterSeen(entryId);
     button.setAttribute('data-character-id', entryId);
-    button.setAttribute('aria-label', `${labelText} を表示${seen ? '' : '（新着）'}`);
+    button.setAttribute('aria-label', `${I18N.ariaView} ${labelText}${seen ? '' : ` ${I18N.ariaNew}`}`.trim());
 
     const img = button._pixieImageEl || button.querySelector('img');
     if (img) {
       const src = normalizePath(entry.file);
       img.src = src || PLACEHOLDER_IMG;
-      img.alt = `${entry.name || 'キャラクター'}のドット絵`;
+      img.alt = `${entryName}${I18N.spriteAltSuffix}`;
       img.loading = 'lazy';
       if (shouldTrimEdge(entry)) {
         img.dataset.trimEdge = 'true';
@@ -384,23 +536,24 @@
     const releaseLabel = formatReleaseLabel(entry.secret);
     const locked = entry.secret && !(isSecretUnlocked(secretId) || releaseUnlocked);
     if (locked) {
+      const lockedLabel = releaseLabel ? `${I18N.unlockOn}: ${releaseLabel}` : I18N.locked;
       return {
         ...entry,
-        name: releaseLabel ? `解放予定: ${releaseLabel}` : '？？？',
-        role: '？？？',
-        tagline: '？？？',
-        description: '？？？',
-        detail: '？？？',
-        weight: '？？？',
-        sprite: '？？？',
-        palette: '？？？',
-        pose: '？？？',
-        status: '？？？',
+        name: lockedLabel,
+        role: I18N.roleUnknown,
+        tagline: I18N.locked,
+        description: I18N.locked,
+        detail: I18N.locked,
+        weight: I18N.locked,
+        sprite: I18N.locked,
+        palette: I18N.locked,
+        pose: I18N.locked,
+        status: I18N.locked,
         file: entry.secret.placeholderFile || entry.file,
-        buttonLabel: releaseLabel ? `解放予定: ${releaseLabel}` : '？？？',
-        buttonStatus: '？？？',
-        background: '？？？',
-        traits: ['？？？'],
+        buttonLabel: lockedLabel,
+        buttonStatus: I18N.locked,
+        background: I18N.locked,
+        traits: [I18N.locked],
         isSecretPlaceholder: true
       };
     }
@@ -600,7 +753,9 @@
     const alertEl = document.createElement('div');
     alertEl.className = 'character-new-alert';
     alertEl.setAttribute('role', 'status');
-    alertEl.textContent = unseen.length === 1 ? '新しいキャラが1体追加されています' : `新しいキャラが${unseen.length}体追加されています`;
+    alertEl.textContent = unseen.length === 1
+      ? I18N.unseenOne
+      : `${I18N.unseenManyPrefix}${unseen.length}${I18N.unseenManySuffix}`.trim();
 
     if (target.firstChild) {
       target.insertBefore(alertEl, target.firstChild);
@@ -635,16 +790,16 @@
     return [
       {
         id: 'placeholder',
-        name: 'キャラクター（仮）',
+        name: I18N.draftName,
         role: 'Leading',
-        tagline: 'PNG差し替え用の仮枠です。',
-        description: 'manifest.js にエントリを追加するとボタンが増え、画像とメモが切り替わります。',
+        tagline: I18N.placeholderTagline,
+        description: I18N.placeholderDesc,
         weight: '???',
         file: null,
         buttonLabel: 'Placeholder',
         buttonStatus: 'WIP',
-        background: '未設定の背景情報',
-        traits: ['ポイントを追加']
+        background: I18N.placeholderBackground,
+        traits: [I18N.placeholderTrait]
       }
     ];
   }
