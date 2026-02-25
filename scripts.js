@@ -651,6 +651,13 @@
   function setupRecentUpdates() {
     const updates = [
       {
+        title: 'PiXiEEDraw 左レーンUIを統合調整',
+        summary: 'ツール/カラーの統合運用、コンパクト時の1列+フライアウト、ボタンサイズ統一（44px）を反映しました。',
+        date: '2026-02-25',
+        tag: 'Tool',
+        href: 'projects/pixiedraw/index.html'
+      },
+      {
         title: 'ヒーローカードを矢印＆ドット付きカルーセル化',
         summary: '3枚並びのヒーローを左右ナビとドットで操作できるようにし、導線を整理しました。',
         date: '2025-11-18',
