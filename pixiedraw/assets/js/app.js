@@ -80,8 +80,10 @@
       brushSizeValue: document.getElementById('brushSizeValue'),
       selectSameModeField: document.getElementById('selectSameModeField'),
       selectSameModeButtons: Array.from(document.querySelectorAll('button[data-select-same-mode]')),
+      selectionOutlineField: document.getElementById('selectionOutlineField'),
       selectionOutline4Action: document.getElementById('selectionOutline4Action'),
       selectionOutline8Action: document.getElementById('selectionOutline8Action'),
+      outlineSizeField: document.getElementById('outlineSizeField'),
       outlineSize: document.getElementById('outlineSize'),
       outlineSizeValue: document.getElementById('outlineSizeValue'),
       brushShapeButtons: Array.from(document.querySelectorAll('button[data-brush-shape]')),
@@ -425,6 +427,7 @@
     file: 'full',
     multi: 'full',
   });
+  const UNIFIED_LEFT_TOOLS_COLOR_MODE = true;
 
   const ZOOM_STEPS = Object.freeze([
     1,
@@ -560,7 +563,10 @@
 
   const layoutMap = {
     tools: { desktop: dom.leftTabPanes || dom.leftRail, mobile: dom.mobilePanels.tools },
-    color: { desktop: dom.leftTabPanes || dom.leftRail, mobile: dom.mobilePanels.color },
+    color: {
+      desktop: dom.leftTabPanes || dom.leftRail,
+      mobile: UNIFIED_LEFT_TOOLS_COLOR_MODE ? dom.mobilePanels.tools : dom.mobilePanels.color,
+    },
     frames: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.frames },
     settings: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.settings },
     file: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.file },
@@ -608,6 +614,21 @@
   const EXPORT_INTERSTITIAL_LAST_SHOWN_KEY = 'pixieedraw:export-interstitial-last-shown-at';
   const EXPORT_INTERSTITIAL_COOLDOWN_MS = 45 * 1000;
   const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
+    Object.freeze({
+      id: '2026-02-25-left-rail-unified-ui',
+      at: '2026-02-25T21:00:00+09:00',
+      title: 'ツール/カラーパネル統合と左レーンUI改善',
+      details: Object.freeze([
+        'ツールとカラーパネルの運用を統合し、同一レーンで切り替えて使えるよう調整。',
+        '左レーンのコンパクト時はツール親ボタンを1列固定にし、必要時のみフライアウトでツール選択できる構成に変更。',
+        'ツール/カラーボタンサイズを44pxで統一し、余白と間隔を調整して視認性を改善。',
+        'コンパクト時のカラーパネルは「色ボタン + 追加/削除」のみに整理し、インデックス表示と色編集パネルを非表示化。',
+        'コンパクト時の色一覧を縦スクロール対応にして、色数が多い状態でも操作しやすく改善。',
+        '選択編集（アウトライン/関連UI）は、選択範囲が存在する時のみ表示するよう変更。',
+        'PC横画面の左レーンはツール/カラーを50:50で分割し、各パネルを個別スクロールに最適化。',
+        'モバイルではカラータブを統合し、ツールタブ内で一貫して操作できるよう整理。',
+      ]),
+    }),
     Object.freeze({
       id: '2026-02-21-multi-collab-export-and-touch',
       at: '2026-02-21T21:00:00+09:00',
@@ -3626,7 +3647,11 @@
     updateLeftTabUI();
   }
 
-  function setLeftTab(tab) {
+  function isUnifiedLeftToolsColorMode() {
+    return UNIFIED_LEFT_TOOLS_COLOR_MODE;
+  }
+
+  function setLeftTab(tab, { persist = true } = {}) {
     if (!LEFT_TAB_KEYS.includes(tab)) return;
     if (state.activeLeftTab === tab) return;
     state.activeLeftTab = tab;
@@ -3636,7 +3661,20 @@
     updateLeftTabUI();
     updateLeftTabVisibility();
     updateToolVisibility();
-    scheduleSessionPersist();
+    if (persist) {
+      scheduleSessionPersist();
+    }
+  }
+
+  function focusUnifiedLeftContext(tab, { persist = false } = {}) {
+    if (!isUnifiedLeftToolsColorMode()) {
+      return;
+    }
+    const target = tab === 'color' ? 'color' : 'tools';
+    setLeftTab(target, { persist });
+    if (layoutMode === 'mobilePortrait') {
+      activateMobileTab('tools', { ensureDrawer: false });
+    }
   }
 
   function updateLeftTabUI() {
@@ -3653,14 +3691,62 @@
   function updateLeftTabVisibility() {
     const isMobile = layoutMode === 'mobilePortrait';
     const dualLeft = isDualLeftRailEnabled();
+    const unified = isUnifiedLeftToolsColorMode();
+    const colorFocused = unified && state.activeLeftTab === 'color';
     document.body.classList.toggle('is-dual-left-rail', dualLeft);
+    document.body.classList.toggle('is-unified-left-tools-color', unified);
+    document.body.classList.toggle('is-unified-left-color-focus', colorFocused);
     if (!dualLeft) {
       clearLeftDualRailLayout();
     } else {
       syncLeftDualRailLayout();
     }
+    if (Array.isArray(dom.mobileTabs)) {
+      dom.mobileTabs.forEach(button => {
+        if (!(button instanceof HTMLButtonElement)) {
+          return;
+        }
+        if (button.dataset.mobileTab === 'color') {
+          button.hidden = unified;
+          button.setAttribute('aria-hidden', String(unified));
+        }
+      });
+    }
+    if (unified && dom.mobilePanels.color instanceof HTMLElement && dom.mobilePanels.color !== dom.mobilePanels.tools) {
+      dom.mobilePanels.color.hidden = true;
+      dom.mobilePanels.color.classList.remove('is-active');
+      dom.mobilePanels.color.setAttribute('aria-hidden', 'true');
+    }
     if (dom.leftTabsBar) {
-      dom.leftTabsBar.toggleAttribute('hidden', isMobile || dualLeft);
+      dom.leftTabsBar.toggleAttribute('hidden', isMobile || dualLeft || unified);
+    }
+    if (unified) {
+      const toolsSection = dom.sections.tools;
+      const colorSection = dom.sections.color;
+      if (toolsSection) {
+        toolsSection.hidden = false;
+        toolsSection.setAttribute('aria-hidden', 'false');
+        toolsSection.classList.add('is-active');
+      }
+      const toolsFieldGroup = toolsSection?.querySelector('.field-group--tools');
+      if (toolsFieldGroup instanceof HTMLElement) {
+        toolsFieldGroup.hidden = colorFocused;
+        toolsFieldGroup.setAttribute('aria-hidden', String(colorFocused));
+      }
+      const toolsQuickPalette = toolsSection?.querySelector('.tool-quick-color');
+      if (toolsQuickPalette instanceof HTMLElement) {
+        toolsQuickPalette.hidden = true;
+        toolsQuickPalette.setAttribute('aria-hidden', 'true');
+      }
+      if (colorSection) {
+        colorSection.hidden = false;
+        colorSection.setAttribute('aria-hidden', 'false');
+        colorSection.classList.add('is-active');
+      }
+      if (colorFocused || !isCompactToolRailMode()) {
+        setCompactToolFlyoutOpen(false);
+      }
+      return;
     }
     if (isMobile) {
       LEFT_TAB_KEYS.forEach(key => {
@@ -4206,6 +4292,9 @@
     if (!(dom.leftRail instanceof HTMLElement) || dom.leftRail.dataset.compact !== 'true') {
       return false;
     }
+    if (isUnifiedLeftToolsColorMode()) {
+      return true;
+    }
     return state.activeLeftTab === 'tools' || isDualLeftRailEnabled();
   }
 
@@ -4316,7 +4405,7 @@
       ensureMobileToolGridPortal(true, { mobilePeek: true });
       const activeTools = TOOL_GROUPS[state.activeToolGroup]?.tools || [];
       const toolCount = Math.max(1, activeTools.length);
-      const itemSize = 64;
+      const itemSize = 44;
       const gap = 8;
       const padding = 16;
       const availableWidth = Math.max(72, safeRight - safeLeft - (edgePadding * 2));
@@ -4347,10 +4436,38 @@
       dom.toolGrid.style.gridTemplateColumns = `repeat(${columns}, ${itemSize}px)`;
     } else {
       ensureMobileToolGridPortal(true, { mobilePeek: false });
-      dom.toolGrid.style.removeProperty('grid-template-columns');
+      const activeTools = TOOL_GROUPS[state.activeToolGroup]?.tools || [];
+      const toolCount = Math.max(1, activeTools.length);
+      const compactItemSize = 44;
+      const compactGap = 8;
+      const compactPadding = 16;
       const railRect = dom.leftRail instanceof HTMLElement ? dom.leftRail.getBoundingClientRect() : null;
       const railWidth = Math.max(68, dom.leftRail?.offsetWidth || 78);
-      flyoutWidth = clamp(Math.round(railWidth - 16), 64, 96);
+      const maxAllowedWidth = Math.max(96, Math.round(safeRight - safeLeft - (edgePadding * 2)));
+      const compactTwoColumnMinWidth = (2 * compactItemSize) + compactGap + compactPadding;
+      const maxColumnsByWidth = Math.max(
+        1,
+        Math.floor((maxAllowedWidth - compactPadding + compactGap) / (compactItemSize + compactGap))
+      );
+      const preferSingleColumn =
+        railWidth <= (RAIL_DEFAULT_WIDTH.left + 10)
+        || maxAllowedWidth < compactTwoColumnMinWidth;
+      const requestedColumns = preferSingleColumn ? 1 : 2;
+      const compactColumns = clamp(
+        Math.min(toolCount, requestedColumns),
+        1,
+        Math.min(2, maxColumnsByWidth)
+      );
+      const compactGridWidth =
+        (compactColumns * compactItemSize)
+        + (Math.max(0, compactColumns - 1) * compactGap)
+        + compactPadding;
+      const desiredCompactWidth = Math.max(
+        Math.round(railWidth + (compactColumns === 1 ? 24 : 36)),
+        compactGridWidth
+      );
+      const minAllowedWidth = Math.min(compactColumns === 1 ? 88 : 120, maxAllowedWidth);
+      flyoutWidth = clamp(Math.round(desiredCompactWidth), minAllowedWidth, maxAllowedWidth);
       let computedLeft = railRect ? Math.round(railRect.right + 8) : Math.round(anchorRect.right + 10);
       const minLeft = Math.round(safeLeft + edgePadding);
       const maxRight = Math.round(safeRight - edgePadding);
@@ -4374,6 +4491,10 @@
         top = Math.max(Math.round(safeTop + edgePadding), Math.round(safeBottom - 220 - edgePadding));
         maxHeight = Math.max(120, Math.round(safeBottom - top - edgePadding));
       }
+      dom.toolGrid.style.gridTemplateColumns =
+        compactColumns === 1
+          ? `minmax(${compactItemSize}px, 1fr)`
+          : `repeat(${compactColumns}, minmax(${compactItemSize}px, 1fr))`;
     }
 
     dom.toolGrid.style.position = 'fixed';
@@ -4406,6 +4527,7 @@
       state.lastGroupTool[group] = DEFAULT_GROUP_TOOL[group] || TOOL_GROUPS[group].tools[0];
     }
     state.activeToolGroup = group;
+    focusUnifiedLeftContext('tools', { persist: false });
     updateToolGroupButtons();
     updateToolVisibility();
     const tools = TOOL_GROUPS[group].tools;
@@ -5202,6 +5324,14 @@
     const hasSelection = Object.prototype.hasOwnProperty.call(options, 'hasSelection')
       ? Boolean(options.hasSelection)
       : selectionMaskHasPixels(state.selectionMask);
+    if (dom.controls.selectionOutlineField instanceof HTMLElement) {
+      dom.controls.selectionOutlineField.hidden = !hasSelection;
+      dom.controls.selectionOutlineField.setAttribute('aria-hidden', String(!hasSelection));
+    }
+    if (dom.controls.outlineSizeField instanceof HTMLElement) {
+      dom.controls.outlineSizeField.hidden = !hasSelection;
+      dom.controls.outlineSizeField.setAttribute('aria-hidden', String(!hasSelection));
+    }
     const effectiveShape = getEffectiveBrushShape(state.brushShape);
     if (state.brushShape !== effectiveShape) {
       state.brushShape = effectiveShape;
@@ -13896,6 +14026,9 @@
     mobileDrawerState.drag.currentHeight = clampedHeight;
     root.style.setProperty('--mobile-drawer-height', `${clampedHeight}px`);
     scheduleMirrorGuideRefresh();
+    if (isMirrorToolPopoverOpen()) {
+      positionMirrorToolPopover();
+    }
   }
 
   function getClosestMobileDrawerMode(height) {
@@ -13933,10 +14066,13 @@
   }
 
   function activateMobileTab(target, { ensureDrawer = false } = {}) {
+    const normalizedTarget = isUnifiedLeftToolsColorMode() && target === 'color'
+      ? 'tools'
+      : target;
     if (isMobileSpectatorTabLockActive() && target !== 'multi') {
       return false;
     }
-    if (!target || !dom.mobilePanels[target]) {
+    if (!normalizedTarget || !dom.mobilePanels[normalizedTarget]) {
       return false;
     }
     let activated = false;
@@ -13946,7 +14082,7 @@
       if (!panel) {
         return;
       }
-      const isActive = key === target;
+      const isActive = key === normalizedTarget;
       if (isActive) {
         activated = true;
       }
@@ -13962,12 +14098,12 @@
     });
 
     if (activated && ensureDrawer && layoutMode === 'mobilePortrait') {
-      const requiredMode = MOBILE_TAB_DRAWER_MODE[target] || MOBILE_DRAWER_DEFAULT_MODE;
+      const requiredMode = MOBILE_TAB_DRAWER_MODE[normalizedTarget] || MOBILE_DRAWER_DEFAULT_MODE;
       if (getMobileDrawerModeRank(mobileDrawerState.mode) < getMobileDrawerModeRank(requiredMode)) {
         setMobileDrawerMode(requiredMode, { persist: false });
       }
     }
-    if (activated && target !== 'tools' && isCompactToolFlyoutOpen()) {
+    if (activated && normalizedTarget !== 'tools' && isCompactToolFlyoutOpen()) {
       setCompactToolFlyoutOpen(false);
     }
     if (activated) {
@@ -13975,7 +14111,7 @@
         if (dom.mobilePanelsContainer instanceof HTMLElement) {
           dom.mobilePanelsContainer.scrollTop = 0;
         }
-        const activePanel = dom.mobilePanels[target];
+        const activePanel = dom.mobilePanels[normalizedTarget];
         if (activePanel instanceof HTMLElement) {
           activePanel.scrollTop = 0;
           const activeBody = activePanel.querySelector('.panel-section__body');
@@ -13985,7 +14121,7 @@
         }
       }
       updateToolVisibility();
-      if (target === 'multi') {
+      if (normalizedTarget === 'multi') {
         scheduleMultiEntryScreenMetricsUpdate();
       }
     }
@@ -14565,6 +14701,36 @@
     return false;
   }
 
+  function getMirrorToolPopoverBottomBoundary(viewportBounds, safeArea, padding = 8) {
+    const defaultBottom = viewportBounds.bottom - safeArea.bottom - padding;
+    if (layoutMode !== 'mobilePortrait') {
+      return defaultBottom;
+    }
+    let boundary = defaultBottom;
+    const edgeGap = 8;
+    if (dom.mobileDrawer instanceof HTMLElement) {
+      const drawerRect = dom.mobileDrawer.getBoundingClientRect();
+      if (Number.isFinite(drawerRect.top) && drawerRect.height > 0) {
+        boundary = Math.min(boundary, drawerRect.top - edgeGap);
+      }
+    }
+    const mobileBottomAd = document.getElementById('mobileBottomAd');
+    if (mobileBottomAd instanceof HTMLElement && typeof window.getComputedStyle === 'function') {
+      const adStyle = window.getComputedStyle(mobileBottomAd);
+      const adRect = mobileBottomAd.getBoundingClientRect();
+      const adVisible =
+        adStyle.display !== 'none'
+        && adStyle.visibility !== 'hidden'
+        && adRect.height > 0
+        && adRect.bottom > viewportBounds.top
+        && adRect.top < viewportBounds.bottom;
+      if (adVisible && Number.isFinite(adRect.top)) {
+        boundary = Math.min(boundary, adRect.top - edgeGap);
+      }
+    }
+    return boundary;
+  }
+
   function positionMirrorToolPopover() {
     if (!isMirrorToolPopoverOpen()) {
       return;
@@ -14576,6 +14742,8 @@
     if (popover.classList.contains('is-docked')) {
       popover.style.removeProperty('left');
       popover.style.removeProperty('top');
+      popover.style.removeProperty('max-height');
+      popover.style.removeProperty('overflow-y');
       return;
     }
     let anchor = mirrorToolPopoverState.anchor;
@@ -14587,24 +14755,39 @@
       return;
     }
     const anchorRect = anchor.getBoundingClientRect();
-    const popoverRect = popover.getBoundingClientRect();
     const viewportBounds = getViewportBounds();
     const safeArea = getSafeAreaInsets();
     const padding = 8;
     const safeLeft = viewportBounds.left + safeArea.left + padding;
     const safeTop = viewportBounds.top + safeArea.top + padding;
     const safeRight = viewportBounds.right - safeArea.right - padding;
-    const safeBottom = viewportBounds.bottom - safeArea.bottom - padding;
-    const maxLeft = Math.max(safeLeft, safeRight - popoverRect.width);
-    const preferredLeft = anchorRect.left + ((anchorRect.width - popoverRect.width) * 0.5);
-    const left = clamp(Math.round(preferredLeft), Math.round(safeLeft), Math.round(maxLeft));
-    const belowTop = anchorRect.bottom + 10;
-    const aboveTop = anchorRect.top - popoverRect.height - 10;
-    let top = belowTop;
-    if ((top + popoverRect.height) > safeBottom && aboveTop >= safeTop) {
-      top = aboveTop;
+    const safeBottom = getMirrorToolPopoverBottomBoundary(viewportBounds, safeArea, padding);
+    if (layoutMode === 'mobilePortrait') {
+      const availableHeight = Math.max(1, Math.round(safeBottom - safeTop));
+      popover.style.maxHeight = `${availableHeight}px`;
+      popover.style.overflowY = 'auto';
+    } else {
+      popover.style.removeProperty('max-height');
+      popover.style.removeProperty('overflow-y');
     }
-    const maxTop = Math.max(safeTop, safeBottom - popoverRect.height);
+    const measuredPopoverRect = popover.getBoundingClientRect();
+    const popoverHeight = measuredPopoverRect.height;
+    const popoverWidth = measuredPopoverRect.width;
+    const maxLeft = Math.max(safeLeft, safeRight - popoverWidth);
+    const preferredLeft = anchorRect.left + ((anchorRect.width - popoverWidth) * 0.5);
+    const left = clamp(Math.round(preferredLeft), Math.round(safeLeft), Math.round(maxLeft));
+    let top;
+    if (layoutMode === 'mobilePortrait') {
+      top = Math.round(safeBottom - popoverHeight);
+    } else {
+      const belowTop = anchorRect.bottom + 10;
+      const aboveTop = anchorRect.top - popoverHeight - 10;
+      top = belowTop;
+      if ((top + popoverHeight) > safeBottom && aboveTop >= safeTop) {
+        top = aboveTop;
+      }
+    }
+    const maxTop = Math.max(safeTop, safeBottom - popoverHeight);
     top = clamp(Math.round(top), Math.round(safeTop), Math.round(maxTop));
     popover.style.left = `${left}px`;
     popover.style.top = `${top}px`;
@@ -15333,6 +15516,11 @@
         }
       });
     }
+    document.addEventListener('pixiedraw:ad-layout-change', () => {
+      if (isMirrorToolPopoverOpen()) {
+        positionMirrorToolPopover();
+      }
+    });
   }
 
   /* solidShape tool functions removed */
@@ -16014,6 +16202,7 @@
           return;
         }
         if (TOOL_ACTIONS.has(tool)) {
+          focusUnifiedLeftContext('tools', { persist: false });
           runToolAction(tool, { sourceButton: button });
           return;
         }
@@ -16186,6 +16375,7 @@
     syncSelectSameModeControls();
     updateCanvasControlButtons();
     updateToolTabIcon();
+    focusUnifiedLeftContext('tools', { persist: false });
     const mobilePeekMode = isMobilePeekToolFlyoutMode();
     if ((isCompactToolRailMode() || mobilePeekMode) && isCompactToolFlyoutOpen()) {
       setCompactToolFlyoutOpen(false);
@@ -16286,6 +16476,7 @@
     state.activePaletteIndex = normalizePaletteIndex(index, state.activePaletteIndex);
     syncPaletteInputs();
     renderPalette();
+    focusUnifiedLeftContext('color', { persist: false });
     scheduleSessionPersist();
   }
 
@@ -16297,6 +16488,7 @@
     if (persist) {
       scheduleSessionPersist();
     }
+    focusUnifiedLeftContext('color', { persist: false });
   }
 
   function renderToolQuickPalette() {
@@ -16304,6 +16496,14 @@
     if (!(container instanceof HTMLElement)) {
       return;
     }
+    if (isUnifiedLeftToolsColorMode()) {
+      container.hidden = true;
+      container.setAttribute('aria-hidden', 'true');
+      container.innerHTML = '';
+      return;
+    }
+    container.hidden = false;
+    container.setAttribute('aria-hidden', 'false');
     container.innerHTML = '';
     if (!Array.isArray(state.palette) || !state.palette.length) {
       return;
@@ -16442,6 +16642,7 @@
   function handlePaletteSliderInput({ source = 'unknown' } = {}) {
     const active = state.palette[state.activePaletteIndex];
     if (!active) return;
+    focusUnifiedLeftContext('color', { persist: false });
     const hueValue = clamp(Number(dom.controls.paletteHue?.value ?? paletteEditorState.hsv.h), 0, 360);
     const saturationValue = clamp(Number(dom.controls.paletteSaturation?.value ?? paletteEditorState.hsv.s * 100), 0, 100) / 100;
     const valueValue = clamp(Number(dom.controls.paletteValue?.value ?? paletteEditorState.hsv.v * 100), 0, 100) / 100;
@@ -28652,6 +28853,35 @@
     });
   }
 
+  function getMultiEntryScreenAdReserveHeight(host) {
+    if (!(host instanceof HTMLElement)) {
+      return 0;
+    }
+    if (layoutMode === 'mobilePortrait') {
+      return 0;
+    }
+    if (!(dom.rightRail instanceof HTMLElement)) {
+      return 0;
+    }
+    if (dom.rightRail.dataset.collapsed === 'true' || dom.rightRail.dataset.compact === 'true') {
+      return 0;
+    }
+    const mount = host.querySelector('[data-panel-ad-mount="right"]');
+    if (!(mount instanceof HTMLElement)) {
+      return 0;
+    }
+    const panelAd = mount.querySelector('.panel-ad');
+    if (!(panelAd instanceof HTMLElement)) {
+      return 0;
+    }
+    const rect = panelAd.getBoundingClientRect();
+    const rawHeight = Math.round(rect.height || panelAd.offsetHeight || panelAd.clientHeight || 0);
+    const adHeight = rawHeight > 0 ? rawHeight : 112;
+    const adStyles = window.getComputedStyle(panelAd);
+    const marginTop = Number.parseFloat(adStyles.marginTop) || 0;
+    return Math.max(0, Math.round(adHeight + marginTop + 8));
+  }
+
   function updateMultiEntryScreenMetrics() {
     const entry = dom.controls.multiEntryScreen;
     if (!(entry instanceof HTMLElement)) {
@@ -28688,10 +28918,12 @@
       0,
       Math.floor(Math.min(host.clientHeight || 0, clippedHeight || host.clientHeight || 0) - verticalPadding)
     );
-    if (!availableWidth || !availableHeight) {
+    const adReserveHeight = getMultiEntryScreenAdReserveHeight(host);
+    const availableEntryHeight = Math.max(0, availableHeight - adReserveHeight);
+    if (!availableWidth || !availableEntryHeight) {
       return;
     }
-    const shortEdge = Math.max(1, Math.min(availableWidth, availableHeight));
+    const shortEdge = Math.max(1, Math.min(availableWidth, availableEntryHeight));
     const gap = clamp(Math.round(shortEdge * 0.045), 8, 20);
     const maxWidth = Math.max(220, availableWidth - 2);
     const targetWidth = clamp(
@@ -28699,18 +28931,18 @@
       220,
       Math.min(620, maxWidth)
     );
-    const maxButtonHeightBySpace = Math.max(46, Math.floor((availableHeight - gap - 20) * 0.9));
+    const maxButtonHeightBySpace = Math.max(46, Math.floor((availableEntryHeight - gap - 20) * 0.9));
     const buttonHeight = clamp(
-      Math.round(Math.min(availableHeight * 0.28, (targetWidth - gap) * 0.42)),
+      Math.round(Math.min(availableEntryHeight * 0.28, (targetWidth - gap) * 0.42)),
       52,
       Math.min(130, maxButtonHeightBySpace)
     );
     const minHeight = clamp(
-      Math.round(availableHeight * (availableHeight < 300 ? 0.78 : 0.9)),
+      Math.round(availableEntryHeight * (availableEntryHeight < 300 ? 0.78 : 0.9)),
       buttonHeight + gap + 20,
-      availableHeight
+      availableEntryHeight
     );
-    const entryHeight = clamp(minHeight, buttonHeight + gap + 20, availableHeight);
+    const entryHeight = clamp(minHeight, buttonHeight + gap + 20, availableEntryHeight);
     entry.style.setProperty('--multi-entry-gap', `${gap}px`);
     entry.style.setProperty('--multi-entry-width', `${targetWidth}px`);
     entry.style.setProperty('--multi-entry-button-height', `${buttonHeight}px`);
@@ -32364,6 +32596,8 @@
       };
       window.addEventListener('resize', handleResize);
       window.addEventListener('orientationchange', handleResize);
+      document.addEventListener('pixiedraw:panel-ad-dock-change', handleResize);
+      document.addEventListener('pixiedraw:ad-layout-change', handleResize);
       if (window.visualViewport && typeof window.visualViewport.addEventListener === 'function') {
         window.visualViewport.addEventListener('resize', handleResize);
         window.visualViewport.addEventListener('scroll', handleResize);
