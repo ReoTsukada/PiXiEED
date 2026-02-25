@@ -50,6 +50,8 @@
   --canvas-control-size-mobile: clamp(32px, 9vw, 38px);
   --canvas-control-icon-size: 20px;
   --mobile-bottom-ad-slot-height: clamp(40px, 7vw, 48px);
+  --ui-control-tile-size: 44px;
+  --ui-compact-tool-flyout-size: var(--ui-control-tile-size);
 }
 
 :root[data-ui-theme='emerald'] {
@@ -548,6 +550,34 @@ button {
   overflow-x: hidden;
 }
 
+body.is-unified-left-tools-color #leftRailTabs {
+  display: none;
+}
+
+body.is-unified-left-tools-color #mobileTabColor {
+  display: none;
+}
+
+body.is-unified-left-tools-color #panelTools .tool-quick-color {
+  display: none;
+}
+
+body.is-unified-left-tools-color:not(.is-mobile-layout) .rail-tabpanes {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+body.is-unified-left-tools-color:not(.is-mobile-layout) .rail-tabpanes > #panelTools,
+body.is-unified-left-tools-color:not(.is-mobile-layout) .rail-tabpanes > #panelColor {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+body.is-mobile-layout.is-unified-left-tools-color:not(.is-unified-left-color-focus) #panelColor .palette-editor {
+  display: none;
+}
+
 .rail[data-compact="true"] {
   --rail-pad-inline: 8px;
   --rail-pad-block: 10px;
@@ -606,12 +636,23 @@ button {
 
 .rail--left[data-compact="true"] .rail-tabpanes {
   display: flex;
+  gap: 4px;
+}
+
+.rail--left[data-compact="true"] {
+  --rail-pad-inline: 4px;
+  --rail-pad-block: 6px;
+  gap: 6px;
+}
+
+.rail--left[data-compact="true"] .rail-tabpanes > .panel-section {
+  border-width: 1px;
 }
 
 .rail--left[data-compact="true"] #panelTools {
   position: relative;
-  gap: 8px;
-  padding: 8px 6px;
+  gap: 4px;
+  padding: 2px;
   overflow: visible;
   z-index: 60;
 }
@@ -620,7 +661,7 @@ button {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   min-width: 0;
   overflow: visible;
 }
@@ -631,22 +672,38 @@ button {
 
 .rail--left[data-compact="true"] #panelTools .tool-group-tabs {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(1, minmax(var(--ui-control-tile-size), var(--ui-control-tile-size)));
+  grid-auto-rows: var(--ui-control-tile-size);
+  grid-auto-flow: row;
+  justify-content: center;
+  align-content: start;
+  gap: 4px;
   margin-bottom: 0;
   padding: 0;
   border: 0;
   background: transparent;
+  max-height: clamp(220px, 58vh, 560px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  overscroll-behavior-y: contain;
+}
+
+.rail--left[data-compact="true"] #panelTools .tool-group-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .rail--left[data-compact="true"] #panelTools .tool-group-button {
-  width: 100%;
-  min-width: 0;
-  min-height: 0;
-  height: auto;
-  aspect-ratio: 1 / 1;
+  width: var(--ui-control-tile-size);
+  min-width: var(--ui-control-tile-size);
+  max-width: var(--ui-control-tile-size);
+  height: var(--ui-control-tile-size);
+  min-height: var(--ui-control-tile-size);
+  max-height: var(--ui-control-tile-size);
+  aspect-ratio: auto;
   padding: 0;
   border-style: solid;
+  box-sizing: border-box;
 }
 
 .rail--left[data-compact="true"] #panelTools .tool-group-button .tool-group-label {
@@ -654,8 +711,8 @@ button {
 }
 
 .rail--left[data-compact="true"] #panelTools .tool-group-icon {
-  width: 28px;
-  height: 28px;
+  width: min(26px, calc(100% - 12px));
+  height: min(26px, calc(100% - 12px));
 }
 
 .rail--left[data-compact="true"] #panelTools .tool-grid,
@@ -668,11 +725,11 @@ button {
 .tool-grid.is-compact-flyout-portal,
 .tool-grid.is-compact-flyout-portal[data-active-group] {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(1, minmax(var(--ui-compact-tool-flyout-size), 1fr));
   gap: 8px;
   min-width: 0;
   max-width: 100%;
-  width: clamp(64px, calc(var(--left-width) - 16px), 92px);
+  width: clamp(120px, calc(var(--left-width) + 24px), 188px);
   justify-items: stretch;
   position: fixed;
   top: 0;
@@ -688,30 +745,30 @@ button {
   z-index: 14000;
   max-height: min(72vh, 540px);
   overflow-y: auto;
-  overflow-x: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
 }
 
 .rail--left[data-compact="true"] #panelTools[data-compact-flyout-open="true"] .tool-button {
-  width: 100%;
+  width: var(--ui-compact-tool-flyout-size);
+  min-width: var(--ui-compact-tool-flyout-size);
+  max-width: var(--ui-compact-tool-flyout-size);
   min-height: 0;
-  height: auto;
-  aspect-ratio: 1 / 1;
+  height: var(--ui-compact-tool-flyout-size);
+  aspect-ratio: auto;
   gap: 0;
   padding: 0;
-  min-width: 0;
-  max-width: 100%;
   place-items: center;
 }
 .tool-grid.is-compact-flyout-portal .tool-button {
-  width: 100%;
+  width: var(--ui-compact-tool-flyout-size);
+  min-width: var(--ui-compact-tool-flyout-size);
+  max-width: var(--ui-compact-tool-flyout-size);
   min-height: 0;
-  height: auto;
-  aspect-ratio: 1 / 1;
+  height: var(--ui-compact-tool-flyout-size);
+  aspect-ratio: auto;
   gap: 0;
   padding: 0;
-  min-width: 0;
-  max-width: 100%;
   place-items: center;
 }
 
@@ -724,13 +781,13 @@ button {
 
 .rail--left[data-compact="true"] #panelTools .tool-icon,
 .rail--left[data-compact="true"] #panelTools .tool-button img {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
 }
 .tool-grid.is-compact-flyout-portal .tool-icon,
 .tool-grid.is-compact-flyout-portal .tool-button img {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
 }
 
 .rail--left[data-compact="true"] .rail-tabpanes > .panel-section:not(#panelTools) {
@@ -738,25 +795,35 @@ button {
 }
 
 .rail--left[data-compact="true"] #panelColor {
-  gap: 8px;
-  padding: 8px 6px;
+  gap: 4px;
+  padding: 2px;
   overflow-x: hidden;
 }
 
 .rail--left[data-compact="true"] #panelColor .panel-section__body {
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.rail--left[data-compact="true"] #panelColor .color-mode--index {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .rail--left[data-compact="true"] #panelColor .palette-header {
   justify-content: center;
-  margin-bottom: 8px;
+  margin-bottom: 2px;
   min-width: 0;
 }
 
 .rail--left[data-compact="true"] #panelColor .palette-actions {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
   min-width: 0;
 }
@@ -768,14 +835,86 @@ button {
 }
 
 .rail--left[data-compact="true"] #panelColor .palette-grid {
-  margin-bottom: 8px;
+  --panel-palette-swatch-size: var(--ui-control-tile-size);
+  grid-template-columns: repeat(1, minmax(var(--panel-palette-swatch-size), var(--panel-palette-swatch-size)));
+  grid-auto-columns: initial;
+  grid-auto-rows: var(--panel-palette-swatch-size);
+  grid-auto-flow: row;
+  justify-content: center;
+  align-content: start;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  margin-bottom: 0;
   min-width: 0;
   max-width: 100%;
+  gap: 4px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .rail--left[data-compact="true"] #panelColor .palette-editor {
-  margin: 0;
-  padding: 8px 6px;
+  display: none;
+}
+
+.rail--left[data-compact="true"] #panelColor .palette-topline,
+.rail--left[data-compact="true"] #panelColor .palette-index-inline {
+  display: none;
+}
+
+.rail--left[data-compact="true"] #panelColor .palette-swatch::after {
+  content: none;
+}
+
+.rail--left[data-compact="true"] #panelColor .palette-swatch.is-active,
+.rail--left[data-compact="true"] #panelColor .palette-swatch.is-secondary {
+  outline-offset: 0;
+}
+
+.rail--left[data-compact="true"] #panelTools .panel-ad-mount,
+.rail--left[data-compact="true"] #panelColor .panel-ad-mount,
+.rail--left[data-compact="true"] #leftPanelAd,
+.rail--left[data-compact="true"] #leftPanelAdSlot {
+  display: none !important;
+  min-height: 0 !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+/* In unified mode, compact left rail keeps tools/color split at 50:50. */
+body.is-unified-left-tools-color:not(.is-mobile-layout) .rail--left[data-compact="true"] .rail-tabpanes > #panelTools,
+body.is-unified-left-tools-color:not(.is-mobile-layout) .rail--left[data-compact="true"] .rail-tabpanes > #panelColor {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+body.is-unified-left-tools-color:not(.is-mobile-layout) .rail--left[data-compact="true"] #panelTools .panel-section__body {
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+
+body.is-unified-left-tools-color:not(.is-mobile-layout) .rail--left[data-compact="true"] #panelColor .panel-section__body {
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+body.is-unified-left-tools-color:not(.is-mobile-layout) .rail--left[data-compact="true"] #panelColor .panel-section__body::-webkit-scrollbar {
+  width: 6px;
+}
+
+body.is-unified-left-tools-color:not(.is-mobile-layout) .rail--left[data-compact="true"] #panelColor .panel-section__body::-webkit-scrollbar-track {
+  background: rgba(9, 16, 24, 0.45);
+}
+
+body.is-unified-left-tools-color:not(.is-mobile-layout) .rail--left[data-compact="true"] #panelColor .panel-section__body::-webkit-scrollbar-thumb {
+  background: rgba(var(--ui-rgb), 0.42);
 }
 
 /* Left rail spacing must stay identical regardless of width/compact state. */
@@ -2935,6 +3074,45 @@ body.is-mobile-layout .mobile-draw-help {
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
+}
+
+#panelColor .color-mode--index {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#panelColor .palette-grid {
+  --panel-palette-swatch-size: var(--ui-control-tile-size);
+  order: 1;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--panel-palette-swatch-size);
+  justify-content: start;
+  margin-bottom: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+#panelColor .palette-grid::-webkit-scrollbar {
+  display: none;
+}
+
+#panelColor .palette-header {
+  order: 2;
+  margin-bottom: 0;
+}
+
+#panelColor .palette-editor {
+  order: 3;
+}
+
+#panelColor .palette-swatch {
+  width: var(--panel-palette-swatch-size);
+  min-width: var(--panel-palette-swatch-size);
+  max-width: var(--panel-palette-swatch-size);
 }
 
 .palette-swatch {
@@ -5349,9 +5527,10 @@ body.is-startup-active {
     display: grid;
     grid-template-columns: none;
     grid-auto-flow: column;
-    grid-auto-columns: 60px;
+    grid-auto-columns: var(--ui-control-tile-size);
     justify-content: start;
-    gap: 4px;
+    column-gap: 8px;
+    row-gap: 8px;
     margin-bottom: 0;
     padding: 0;
     border: 0;
@@ -5367,11 +5546,11 @@ body.is-startup-active {
     display: none;
   }
   .panel-section[data-section='tools'] .tool-group-button {
-    width: 60px;
-    min-width: 60px;
-    max-width: 60px;
-    height: 60px;
-    min-height: 60px;
+    width: var(--ui-control-tile-size);
+    min-width: var(--ui-control-tile-size);
+    max-width: var(--ui-control-tile-size);
+    height: var(--ui-control-tile-size);
+    min-height: var(--ui-control-tile-size);
     padding: 0;
     gap: 0;
     aspect-ratio: auto;
@@ -5388,9 +5567,10 @@ body.is-startup-active {
     display: grid;
     grid-template-columns: none;
     grid-auto-flow: column;
-    grid-auto-columns: 60px;
+    grid-auto-columns: var(--ui-control-tile-size);
     justify-content: start;
-    gap: 4px;
+    column-gap: 8px;
+    row-gap: 8px;
     width: 100%;
     min-width: 0;
     padding: 0;
@@ -5404,15 +5584,17 @@ body.is-startup-active {
     display: none;
   }
   .panel-section[data-section='tools'] .tool-button {
-    width: 60px;
-    min-width: 60px;
-    max-width: 60px;
-    height: 60px;
-    min-height: 60px;
+    width: var(--ui-control-tile-size);
+    min-width: var(--ui-control-tile-size);
+    max-width: var(--ui-control-tile-size);
+    height: var(--ui-control-tile-size);
+    min-height: var(--ui-control-tile-size);
+    max-height: var(--ui-control-tile-size);
     padding: 0;
     gap: 0;
     place-items: center;
     aspect-ratio: auto;
+    box-sizing: border-box;
   }
   .panel-section[data-section='tools'] .tool-button span {
     display: none;
@@ -5429,7 +5611,7 @@ body.is-startup-active {
     display: grid;
     grid-template-columns: none;
     grid-auto-flow: column;
-    grid-auto-columns: 44px;
+    grid-auto-columns: var(--ui-control-tile-size);
     justify-content: start;
     gap: 6px;
     width: 100%;
@@ -5442,16 +5624,16 @@ body.is-startup-active {
     display: none;
   }
   .panel-section[data-section='tools'] .tool-quick-color__swatch {
-    width: 44px;
-    min-width: 44px;
-    height: 44px;
+    width: var(--ui-control-tile-size);
+    min-width: var(--ui-control-tile-size);
+    height: var(--ui-control-tile-size);
   }
   .mobile-drawer[data-mode='peek'] .panel-section[data-section='tools'] .tool-group-button {
-    width: 60px;
-    min-width: 60px;
-    max-width: 60px;
-    height: 60px;
-    min-height: 60px;
+    width: var(--ui-control-tile-size);
+    min-width: var(--ui-control-tile-size);
+    max-width: var(--ui-control-tile-size);
+    height: var(--ui-control-tile-size);
+    min-height: var(--ui-control-tile-size);
     padding: 0;
     aspect-ratio: auto;
   }
@@ -5459,9 +5641,10 @@ body.is-startup-active {
     display: grid;
     grid-template-columns: none;
     grid-auto-flow: column;
-    grid-auto-columns: 60px;
+    grid-auto-columns: var(--ui-control-tile-size);
     justify-content: start;
-    gap: 4px;
+    column-gap: 8px;
+    row-gap: 8px;
     margin-bottom: 0;
     padding: 0;
     border: 0;
@@ -5484,13 +5667,13 @@ body.is-startup-active {
     display: none;
   }
   .mobile-drawer[data-mode='peek'] #panelTools .tool-quick-color__palette {
-    grid-auto-columns: 40px;
+    grid-auto-columns: var(--ui-control-tile-size);
     gap: 4px;
   }
   .mobile-drawer[data-mode='peek'] #panelTools .tool-quick-color__swatch {
-    width: 40px;
-    min-width: 40px;
-    height: 40px;
+    width: var(--ui-control-tile-size);
+    min-width: var(--ui-control-tile-size);
+    height: var(--ui-control-tile-size);
   }
   .mobile-drawer[data-mode='peek'] #panelColor .palette-editor {
     display: none;
@@ -5499,9 +5682,9 @@ body.is-startup-active {
     display: grid;
     grid-template-columns: none;
     grid-auto-flow: column;
-    grid-auto-columns: 44px;
+    grid-auto-columns: var(--ui-control-tile-size);
     justify-content: start;
-    gap: 6px;
+    gap: 8px;
     width: 100%;
     min-width: 0;
     max-width: 100%;
@@ -5517,9 +5700,13 @@ body.is-startup-active {
     display: none;
   }
   .mobile-drawer[data-mode='peek'] #panelColor .palette-swatch {
-    width: 44px;
-    min-width: 44px;
-    max-width: 44px;
+    width: var(--ui-control-tile-size);
+    min-width: var(--ui-control-tile-size);
+    max-width: var(--ui-control-tile-size);
+    height: var(--ui-control-tile-size);
+    min-height: var(--ui-control-tile-size);
+    max-height: var(--ui-control-tile-size);
+    box-sizing: border-box;
     filter: none;
   }
   .mobile-drawer[data-mode='peek'] #panelColor .palette-swatch.is-active,
@@ -5532,6 +5719,26 @@ body.is-startup-active {
     right: 3px;
     padding: 1px 4px;
   }
+  .mobile-panel.is-active #panelTools .tool-button,
+  .mobile-panel.is-active #panelColor .palette-swatch {
+    width: var(--ui-control-tile-size);
+    min-width: var(--ui-control-tile-size);
+    max-width: var(--ui-control-tile-size);
+    height: var(--ui-control-tile-size);
+    min-height: var(--ui-control-tile-size);
+    max-height: var(--ui-control-tile-size);
+    box-sizing: border-box;
+  }
+  .mobile-panel.is-active #panelTools .tool-grid,
+  .mobile-panel.is-active #panelTools .tool-grid[data-active-group],
+  .mobile-panel.is-active #panelColor .palette-grid {
+    column-gap: 8px;
+    row-gap: 8px;
+  }
+  .mobile-panel.is-active #panelColor .palette-swatch.is-active,
+  .mobile-panel.is-active #panelColor .palette-swatch.is-secondary {
+    outline-offset: 0;
+  }
   .mobile-drawer[data-mode='peek'] #panelTools .tool-grid,
   .mobile-drawer[data-mode='peek'] #panelTools .tool-grid[data-active-group] {
     display: none;
@@ -5539,7 +5746,7 @@ body.is-startup-active {
   .mobile-drawer[data-mode='peek'] #panelTools[data-compact-flyout-open='true'] .tool-grid,
   .mobile-drawer[data-mode='peek'] #panelTools[data-compact-flyout-open='true'] .tool-grid[data-active-group] {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(64px, 64px));
+    grid-template-columns: repeat(auto-fit, minmax(var(--ui-compact-tool-flyout-size), var(--ui-compact-tool-flyout-size)));
     grid-auto-flow: row;
     gap: 8px;
     min-width: 0;
@@ -5567,7 +5774,7 @@ body.is-startup-active {
   }
   .tool-grid.is-mobile-peek-flyout {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(64px, 64px));
+    grid-template-columns: repeat(auto-fit, minmax(var(--ui-compact-tool-flyout-size), var(--ui-compact-tool-flyout-size)));
     grid-auto-flow: row;
     gap: 8px;
     min-width: 0;
@@ -5594,22 +5801,22 @@ body.is-startup-active {
     overscroll-behavior: contain;
   }
   .mobile-drawer[data-mode='peek'] #panelTools[data-compact-flyout-open='true'] .tool-button {
-    width: 64px;
-    min-width: 64px;
-    max-width: 64px;
+    width: var(--ui-compact-tool-flyout-size);
+    min-width: var(--ui-compact-tool-flyout-size);
+    max-width: var(--ui-compact-tool-flyout-size);
     min-height: 0;
-    height: 64px;
+    height: var(--ui-compact-tool-flyout-size);
     aspect-ratio: 1 / 1;
     gap: 0;
     padding: 0;
     place-items: center;
   }
   .tool-grid.is-mobile-peek-flyout .tool-button {
-    width: 64px;
-    min-width: 64px;
-    max-width: 64px;
+    width: var(--ui-compact-tool-flyout-size);
+    min-width: var(--ui-compact-tool-flyout-size);
+    max-width: var(--ui-compact-tool-flyout-size);
     min-height: 0;
-    height: 64px;
+    height: var(--ui-compact-tool-flyout-size);
     aspect-ratio: 1 / 1;
     gap: 0;
     padding: 0;
@@ -5756,6 +5963,18 @@ body.is-startup-active {
     margin-left: 0;
     margin-right: 0;
     max-width: 100%;
+  }
+  body.is-mobile-layout.is-unified-left-tools-color .mobile-panel.is-active > .panel-section[data-section='tools'],
+  body.is-mobile-layout.is-unified-left-tools-color .mobile-panel.is-active > .panel-section[data-section='color'] {
+    height: auto;
+    min-height: 0;
+  }
+  body.is-mobile-layout.is-unified-left-tools-color .mobile-panel.is-active > .panel-section[data-section='tools'] .panel-section__body,
+  body.is-mobile-layout.is-unified-left-tools-color .mobile-panel.is-active > .panel-section[data-section='color'] .panel-section__body {
+    flex: 0 0 auto;
+  }
+  body.is-mobile-layout.is-unified-left-tools-color.is-unified-left-color-focus .mobile-panel.is-active > .panel-section[data-section='tools'] .panel-section__body {
+    padding-bottom: 0;
   }
   /* Align first block gaps between tabs (tools/color/frames/settings/file). */
   .mobile-panel.is-active #panelTools .tool-group-tabs,
@@ -5998,4 +6217,143 @@ body *::-webkit-scrollbar {
   width: 0;
   height: 0;
   display: none;
+}
+
+@media (orientation: landscape) {
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] {
+    --left-palette-tile-size: var(--ui-control-tile-size);
+    --left-tool-group-tile-size: var(--left-palette-tile-size);
+    --left-tool-tile-size: var(--left-palette-tile-size);
+    --left-button-grid-gap: 8px;
+  }
+
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-group-tabs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--left-tool-group-tile-size), var(--left-tool-group-tile-size)));
+    grid-auto-rows: var(--left-tool-group-tile-size);
+    justify-content: start;
+    align-content: start;
+    gap: var(--left-button-grid-gap);
+    margin-bottom: 8px;
+    max-height: clamp(120px, 26vh, 300px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-group-button {
+    width: var(--left-tool-group-tile-size);
+    min-width: var(--left-tool-group-tile-size);
+    max-width: var(--left-tool-group-tile-size);
+    height: var(--left-tool-group-tile-size);
+    min-height: var(--left-tool-group-tile-size);
+    max-height: var(--left-tool-group-tile-size);
+    padding: 0;
+    gap: 0;
+    justify-content: center;
+  }
+
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-group-button .tool-group-label {
+    display: none;
+  }
+
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-group-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-grid,
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-grid[data-active-group] {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--left-tool-tile-size), var(--left-tool-tile-size)));
+    grid-auto-rows: var(--left-tool-tile-size);
+    justify-content: start;
+    align-content: start;
+    gap: var(--left-button-grid-gap);
+    margin-bottom: 8px;
+    max-height: clamp(120px, 30vh, 360px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-button {
+    width: var(--left-tool-tile-size);
+    min-width: var(--left-tool-tile-size);
+    max-width: var(--left-tool-tile-size);
+    height: var(--left-tool-tile-size);
+    min-height: var(--left-tool-tile-size);
+    max-height: var(--left-tool-tile-size);
+    padding: 0;
+    gap: 0;
+    aspect-ratio: auto;
+    place-items: center;
+  }
+
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-button span {
+    display: none;
+  }
+
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-icon,
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-button img {
+    width: 24px;
+    height: 24px;
+  }
+
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelColor .palette-grid {
+    --panel-palette-swatch-size: var(--left-palette-tile-size);
+    grid-template-columns: repeat(auto-fill, minmax(var(--left-palette-tile-size), var(--left-palette-tile-size)));
+    grid-auto-flow: row;
+    grid-auto-rows: var(--left-palette-tile-size);
+    justify-content: start;
+    align-content: start;
+    gap: var(--left-button-grid-gap);
+    margin-bottom: 8px;
+    max-height: clamp(96px, 24vh, 300px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelColor .palette-swatch {
+    width: var(--left-palette-tile-size);
+    min-width: var(--left-palette-tile-size);
+    max-width: var(--left-palette-tile-size);
+    height: var(--left-palette-tile-size);
+    min-height: var(--left-palette-tile-size);
+    max-height: var(--left-palette-tile-size);
+  }
+
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-group-tabs,
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-grid,
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-grid[data-active-group],
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelColor .palette-grid {
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(var(--ui-rgb), 0.5) rgba(8, 14, 22, 0.55) !important;
+    -ms-overflow-style: auto !important;
+  }
+
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-group-tabs::-webkit-scrollbar,
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-grid::-webkit-scrollbar,
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-grid[data-active-group]::-webkit-scrollbar,
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelColor .palette-grid::-webkit-scrollbar {
+    width: 8px !important;
+    height: 0 !important;
+    display: block !important;
+  }
+
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-group-tabs::-webkit-scrollbar-thumb,
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-grid::-webkit-scrollbar-thumb,
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-grid[data-active-group]::-webkit-scrollbar-thumb,
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelColor .palette-grid::-webkit-scrollbar-thumb {
+    background: rgba(var(--ui-rgb), 0.5) !important;
+    border-radius: 999px;
+  }
+
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-group-tabs::-webkit-scrollbar-track,
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-grid::-webkit-scrollbar-track,
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelTools .tool-grid[data-active-group]::-webkit-scrollbar-track,
+  body:not(.is-mobile-layout) .rail--left[data-compact="false"] #panelColor .palette-grid::-webkit-scrollbar-track {
+    background: rgba(8, 14, 22, 0.55) !important;
+  }
 }
