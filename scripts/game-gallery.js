@@ -24,7 +24,7 @@
         useTool: 'Use this tool',
         playGame: 'Play this game',
         updatesPending: 'Updates are being prepared.',
-        latestPending: 'New picks are being prepared.',
+        latestPending: 'Project introductions are being prepared.',
         descPending: 'Description is being prepared.'
       }
     : {
@@ -38,7 +38,7 @@
         useTool: 'このツールを使う',
         playGame: 'このゲームで遊ぶ',
         updatesPending: '更新情報は準備中です。',
-        latestPending: '新着情報は準備中です。',
+        latestPending: 'プロジェクト紹介は準備中です。',
         descPending: '紹介文を準備中です。'
       };
 
@@ -151,6 +151,100 @@
     return row;
   };
 
+  const buildHubUpdates = (sortedEntries) => {
+    const hasText = (entry) => Boolean(entry.update || entry.desc);
+    const primary = [];
+    const usedKeys = new Set();
+
+    sortedEntries.forEach(entry => {
+      if (entry.type !== 'tool' && entry.type !== 'game') return;
+      if (!hasText(entry)) return;
+      const key = entry.link || entry.title;
+      if (!key || usedKeys.has(key)) return;
+      usedKeys.add(key);
+      primary.push(entry);
+    });
+
+    if (primary.length >= 4) return primary.slice(0, 4);
+
+    const fallback = [];
+    sortedEntries.forEach(entry => {
+      if (!hasText(entry)) return;
+      const key = entry.link || entry.title;
+      if (!key || usedKeys.has(key)) return;
+      usedKeys.add(key);
+      fallback.push(entry);
+    });
+
+    return primary.concat(fallback).slice(0, 4);
+  };
+
+  const buildProjectIntroductions = (sortedEntries) => {
+    const latestByLink = new Map();
+    sortedEntries.forEach(entry => {
+      const key = entry.link || '';
+      if (!key || latestByLink.has(key)) return;
+      latestByLink.set(key, entry);
+    });
+
+    const blueprints = IS_EN
+      ? [
+          {
+            title: 'PiXiEEDraw',
+            link: 'pixiedraw/index.html',
+            desc: 'Full pixel editor for production workflows, from draft to finish with multiplayer collaboration.'
+          },
+          {
+            title: 'PiXiEELENS',
+            link: 'pixiee-lens/index.html',
+            desc: 'Capture and convert photos into pixel art instantly, then export PNG/GIF for sharing.'
+          },
+          {
+            title: 'PiXiEEDraw Lite',
+            link: 'jerin-maker/index.html',
+            desc: 'Guided 16x16 starter so beginners can complete their first pixel piece in minutes.'
+          },
+          {
+            title: 'Tools / Games Hub',
+            link: 'tools.html',
+            desc: 'Compare drawing tools, converters, and games in one place and jump straight into use.'
+          }
+        ]
+      : [
+          {
+            title: 'PiXiEEDraw',
+            link: 'pixiedraw/index.html',
+            desc: '本格ドット制作から共同編集まで、1つの画面で完結。下書きから仕上げまでスムーズです。'
+          },
+          {
+            title: 'PiXiEELENS',
+            link: 'pixiee-lens/index.html',
+            desc: '撮ってすぐドット化。PNG/GIFの保存と共有までブラウザだけで完了できます。'
+          },
+          {
+            title: 'PiXiEEDraw Lite',
+            link: 'jerin-maker/index.html',
+            desc: '16×16のガイド付きで迷わず開始。短時間で1枚完成しやすい入門ツールです。'
+          },
+          {
+            title: 'ツール/ゲーム一覧',
+            link: 'tools.html',
+            desc: '描く・遊ぶ・変換するを目的別に比較でき、次に使う作品をすぐ選べます。'
+          }
+        ];
+
+    return blueprints.map(item => {
+      const latest = latestByLink.get(item.link);
+      return {
+        title: item.title,
+        link: item.link,
+        updated: latest?.updated || '',
+        type: 'project',
+        desc: item.desc
+      };
+    });
+  };
+
   const renderHubLists = (sourceEntries) => {
     if (!hubUpdates && !hubLatest) return;
     const sorted = sourceEntries
@@ -159,14 +253,14 @@
 
     if (hubUpdates) {
       hubUpdates.innerHTML = '';
-      const updates = sorted.filter(entry => entry.update || entry.desc);
+      const updates = buildHubUpdates(sorted);
       if (!updates.length) {
         const empty = document.createElement('li');
         empty.className = 'project-place__update project-place__update--empty';
         empty.textContent = I18N.updatesPending;
         hubUpdates.appendChild(empty);
       } else {
-        updates.slice(0, 4).forEach(entry => {
+        updates.forEach(entry => {
           const desc = entry.update || entry.desc || '';
           hubUpdates.appendChild(buildUpdateRow(entry, { desc }));
         });
@@ -175,14 +269,15 @@
 
     if (hubLatest) {
       hubLatest.innerHTML = '';
-      if (!sorted.length) {
+      const projectIntroductions = buildProjectIntroductions(sorted);
+      if (!projectIntroductions.length) {
         const empty = document.createElement('li');
         empty.className = 'project-place__update project-place__update--empty';
         empty.textContent = I18N.latestPending;
         hubLatest.appendChild(empty);
       } else {
-        sorted.slice(0, 4).forEach(entry => {
-          const desc = entry.desc ? `${getTypeLabel(entry)} / ${entry.desc}` : getTypeLabel(entry);
+        projectIntroductions.slice(0, 4).forEach(entry => {
+          const desc = entry.desc || I18N.descPending;
           hubLatest.appendChild(buildUpdateRow(entry, { desc }));
         });
       }
