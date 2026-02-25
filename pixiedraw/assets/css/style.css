@@ -17,6 +17,8 @@
   --left-width: 78px;
   --right-width: 78px;
   --rail-resizer-offset: -11px;
+  --rail-resizer-grip-top: 74px;
+  --rail-resizer-grip-height: 92px;
   --mobile-banner-height: 0px;
   --mobile-drawer-peek-height: 127px;
   --mobile-drawer-half-height: clamp(188px, 36vh, 420px);
@@ -1125,13 +1127,13 @@ body.is-dual-left-rail:not(.is-mobile-layout) .rail--left[data-compact="false"] 
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 22px;
+  width: 26px;
   padding: 0;
   border: 0;
   background: transparent;
   cursor: col-resize;
   touch-action: none;
-  z-index: 35;
+  z-index: 90;
   opacity: 0.92;
   transition: opacity 120ms ease;
 }
@@ -1140,12 +1142,26 @@ body.is-dual-left-rail:not(.is-mobile-layout) .rail--left[data-compact="false"] 
   content: "";
   position: absolute;
   left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 6px;
-  height: 88px;
+  top: 4px;
+  bottom: 4px;
+  transform: translateX(-50%);
+  width: 2px;
   border-radius: 999px;
-  background: rgba(var(--ui-rgb), 0.62);
+  background: rgba(var(--ui-rgb), 0.26);
+  box-shadow: none;
+  transition: background-color 120ms ease;
+}
+
+.rail-resizer::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: var(--rail-resizer-grip-top);
+  transform: translateX(-50%);
+  width: 6px;
+  height: min(var(--rail-resizer-grip-height), calc(100% - 16px));
+  border-radius: 999px;
+  background: rgba(var(--ui-rgb), 0.66);
   box-shadow: none;
   transition: background-color 120ms ease;
 }
@@ -1153,6 +1169,13 @@ body.is-dual-left-rail:not(.is-mobile-layout) .rail--left[data-compact="false"] 
 .rail-resizer:hover::before,
 .rail-resizer:focus-visible::before,
 .rail-resizer.is-active::before {
+  background: rgba(var(--ui-rgb), 0.42);
+  box-shadow: none;
+}
+
+.rail-resizer:hover::after,
+.rail-resizer:focus-visible::after,
+.rail-resizer.is-active::after {
   background: rgba(var(--ui-rgb), 0.85);
   box-shadow: none;
 }
@@ -6131,10 +6154,12 @@ body.is-startup-active {
 @media (pointer: coarse) {
   :root {
     --rail-resizer-offset: -16px;
+    --rail-resizer-grip-top: 82px;
+    --rail-resizer-grip-height: 116px;
   }
 
   .rail-resizer {
-    width: 32px;
+    width: 36px;
   }
 
   .rail-resizer--left {
@@ -6146,8 +6171,11 @@ body.is-startup-active {
   }
 
   .rail-resizer::before {
+    width: 2px;
+  }
+
+  .rail-resizer::after {
     width: 8px;
-    height: 112px;
   }
 }
 
