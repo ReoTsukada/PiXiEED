@@ -775,7 +775,7 @@
   const IOS_SNAPSHOT_DB_VERSION = 1;
   const IOS_SNAPSHOT_STORE_NAME = 'snapshots';
   const IOS_SNAPSHOT_KEY = 'latest';
-  const IOS_SNAPSHOT_WRITE_DELAY = 60 * 1000;
+  const IOS_SNAPSHOT_WRITE_DELAY = 0;
   const IOS_SNAPSHOT_COMPRESSION_THRESHOLD = 32 * 1024;
   const textCompression = createTextCompression();
   const LENS_IMPORT_SESSION_FLAG = 'pixiee-lens:import-request';
@@ -886,7 +886,7 @@
     '#ffc38d',
     '#c9ff8c',
   ]);
-  const AUTOSAVE_WRITE_DELAY = 1000;
+  const AUTOSAVE_WRITE_DELAY = 0;
   const RECENT_PROJECT_LIMIT = 12;
   const THUMBNAIL_MAX_EDGE = 144;
   const THUMBNAIL_CANVAS_SIZE = 160;
@@ -5595,7 +5595,7 @@
       button.disabled = true;
       updateAutosaveStatus(
         IOS_SNAPSHOT_SUPPORTED
-          ? '自動保存: 端末内バックアップで自動復元します（ファイル固定の自動保存は未対応）'
+          ? '自動保存: 端末内バックアップへ自動保存します（再開時に復元・ファイル固定は未対応）'
           : '自動保存: このブラウザでは利用できません',
         IOS_SNAPSHOT_SUPPORTED ? 'info' : 'warn'
       );
@@ -6003,7 +6003,7 @@
       const payload = parsed && typeof parsed === 'object' && parsed.document ? parsed.document : parsed;
       const snapshot = deserializeDocumentPayload(payload);
       if (isTinyStartupSnapshot(snapshot)) {
-        updateAutosaveStatus('自動保存: 起動時の 1x1 復元をスキップしました', 'warn');
+        updateAutosaveStatus('自動保存: 起動時の 1x1 バックアップ読み込みをスキップしました', 'warn');
         return false;
       }
       autosaveRestoring = true;
@@ -6452,7 +6452,7 @@
       }
     } catch (error) {
       console.warn('Autosave restore after reauthorization failed', error);
-      updateAutosaveStatus('自動保存: 復元に失敗しました', 'error');
+      updateAutosaveStatus('自動保存: 既存バックアップの読み込みに失敗しました', 'error');
     }
     return true;
   }
@@ -9070,7 +9070,7 @@
       dom.startup.hint.textContent = AUTOSAVE_SUPPORTED
         ? 'ファイルを開くと既存の自動保存先を引き継ぎます。'
         : (IOS_SNAPSHOT_SUPPORTED
-          ? 'この端末では端末内バックアップで復元します。共有前は「保存/出力」でファイル保存してください。'
+          ? 'この端末では端末内バックアップへ自動保存します。再開時に続きから復元されます。共有前は「保存/出力」でファイル保存してください。'
           : 'このブラウザでは自動保存が利用できません。エクスポートをお忘れなく。');
     }
     if (dom.startup?.quickSetupButton instanceof HTMLButtonElement) {
