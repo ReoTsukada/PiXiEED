@@ -24,8 +24,8 @@
   --mobile-drawer-half-height: clamp(188px, 36vh, 420px);
   --mobile-drawer-full-height: clamp(240px, 46vh, 520px);
   --mobile-drawer-height: var(--mobile-drawer-full-height);
-  --mobile-drawer-handle-height: 24px;
-  --mobile-drawer-panel-gap: 4px;
+  --mobile-drawer-handle-height: 12px;
+  --mobile-drawer-panel-gap: 1px;
   --mobile-drawer-panel-padding-inline: 8px;
   --mobile-stage-padding: 1px;
   --mobile-topbar-height: clamp(82px, 12vh, 122px);
@@ -5383,28 +5383,49 @@ body.is-startup-active {
   background-size: 6px 6px;
   cursor: ns-resize;
   touch-action: none;
+  overflow: visible;
 }
 
 .mobile-drawer__handle::before {
   content: "";
   position: absolute;
-  left: 0;
-  right: 0;
-  top: -14px;
-  bottom: -14px;
+  left: -8px;
+  right: -8px;
+  top: -18px;
+  bottom: -10px;
 }
 
 .mobile-drawer__grip {
-  width: 64px;
-  height: 4px;
+  position: absolute;
+  left: 50%;
+  top: -8px;
+  transform: translateX(-50%);
+  width: 84px;
+  height: 6px;
   border-radius: 999px;
-  background: rgba(164, 214, 226, 0.62);
+  border: 1px solid rgba(var(--ui-rgb-focus), 0.55);
+  background:
+    linear-gradient(0deg, rgba(var(--ui-rgb), 0.24) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ui-rgb), 0.24) 1px, transparent 1px),
+    rgba(12, 34, 44, 0.95);
+  background-size: 4px 4px;
   box-shadow: none;
 }
 
 .mobile-drawer__handle:focus-visible {
   outline: 1px solid var(--border-strong);
   outline-offset: -2px;
+}
+
+.mobile-drawer__handle:hover .mobile-drawer__grip,
+.mobile-drawer__handle:focus-visible .mobile-drawer__grip,
+.mobile-drawer.is-dragging .mobile-drawer__grip {
+  border-color: rgba(var(--ui-rgb-focus), 0.8);
+  background:
+    linear-gradient(0deg, rgba(var(--ui-rgb-focus), 0.34) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ui-rgb-focus), 0.34) 1px, transparent 1px),
+    rgba(15, 42, 56, 0.98);
+  background-size: 4px 4px;
 }
 
 .mobile-tabs {
@@ -5510,6 +5531,8 @@ body.is-startup-active {
     --mobile-drawer-half-height: clamp(188px, 36vh, 420px);
     --mobile-drawer-full-height: clamp(240px, 46vh, 520px);
     --mobile-drawer-height: var(--mobile-drawer-full-height);
+    --mobile-drawer-handle-height: 10px;
+    --mobile-drawer-panel-gap: 0px;
     --mobile-stage-padding: 1px;
     --mobile-topbar-height: clamp(84px, 12vh, 116px);
     --mobile-top-control-size: clamp(38px, 10.5vw, 46px);
