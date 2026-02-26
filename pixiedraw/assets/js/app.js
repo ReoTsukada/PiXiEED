@@ -764,8 +764,13 @@
   const IS_ANDROID_LINE_BROWSER =
     IS_ANDROID_DEVICE
     && /line\//i.test(USER_AGENT);
+  // Fallback snapshot for platforms where File System Access based autosave is disabled.
+  // Currently used for iOS / Android so PWA users can still recover recent work locally.
   const IOS_SNAPSHOT_SUPPORTED =
-    IS_IOS_DEVICE && typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined' && window.indexedDB !== null;
+    DISABLE_FILE_SYSTEM_ACCESS_SAVE
+    && typeof window !== 'undefined'
+    && typeof window.indexedDB !== 'undefined'
+    && window.indexedDB !== null;
   const IOS_SNAPSHOT_DB_NAME = 'pixieedraw-ios-snapshots';
   const IOS_SNAPSHOT_DB_VERSION = 1;
   const IOS_SNAPSHOT_STORE_NAME = 'snapshots';
@@ -5588,7 +5593,12 @@
     if (!button) return;
     if (!AUTOSAVE_SUPPORTED) {
       button.disabled = true;
-      updateAutosaveStatus('自動保存: このブラウザでは利用できません', 'warn');
+      updateAutosaveStatus(
+        IOS_SNAPSHOT_SUPPORTED
+          ? '自動保存: 端末内バックアップで自動復元します（ファイル固定の自動保存は未対応）'
+          : '自動保存: このブラウザでは利用できません',
+        IOS_SNAPSHOT_SUPPORTED ? 'info' : 'warn'
+      );
       return;
     }
     if (button.dataset.bound === 'true') return;
@@ -9059,7 +9069,9 @@
     if (dom.startup?.hint) {
       dom.startup.hint.textContent = AUTOSAVE_SUPPORTED
         ? 'ファイルを開くと既存の自動保存先を引き継ぎます。'
-        : 'このブラウザでは自動保存が利用できません。エクスポートをお忘れなく。';
+        : (IOS_SNAPSHOT_SUPPORTED
+          ? 'この端末では端末内バックアップで復元します。共有前は「保存/出力」でファイル保存してください。'
+          : 'このブラウザでは自動保存が利用できません。エクスポートをお忘れなく。');
     }
     if (dom.startup?.quickSetupButton instanceof HTMLButtonElement) {
       if (AUTOSAVE_SUPPORTED && EXPORT_DIRECTORY_SUPPORTED) {
@@ -9070,7 +9082,12 @@
         setStartupQuickSetupStatus('このブラウザは固定フォルダ未対応です。保存先ファイルを選んで開始します。');
       } else {
         dom.startup.quickSetupButton.textContent = '新規作成（かんたん開始）';
-        setStartupQuickSetupStatus('このブラウザは自動保存未対応です。開始後は「保存/出力」から書き出してください。', 'warn');
+        setStartupQuickSetupStatus(
+          IOS_SNAPSHOT_SUPPORTED
+            ? '端末内バックアップは自動で行います。共有・配布用には「保存/出力」でファイル保存してください。'
+            : 'このブラウザは自動保存未対応です。開始後は「保存/出力」から書き出してください。',
+          IOS_SNAPSHOT_SUPPORTED ? 'info' : 'warn'
+        );
       }
     }
     const updateToast = dom.startup?.updateToast;
