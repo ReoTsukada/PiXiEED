@@ -147,22 +147,6 @@
     h2{ margin:0; font-size:18px; color:#f9fafb; letter-spacing:0.01em; }
     p{ margin:0; }
     .subtitle{ margin:0; color:#cbd5e1; font-size:13px; line-height:1.6; }
-    .seo-links{
-      margin:6px 0 0;
-      color:#cbd5e1;
-      font-size:13px;
-      line-height:1.6;
-    }
-    .seo-links a{
-      color:#93c5fd;
-      text-decoration:none;
-      font-weight:700;
-    }
-    .seo-links a:hover,
-    .seo-links a:focus{
-      color:#f9fafb;
-    }
-
     .card,
     .section{
       background:rgba(255,255,255,0.05);
@@ -353,6 +337,9 @@
       gap:12px;
       grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
     }
+    .audience-grid--draw-choice{
+      grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));
+    }
     .audience-card{
       display:grid;
       gap:10px;
@@ -381,6 +368,35 @@
       text-decoration:none;
       display:inline-flex;
       align-items:center;
+    }
+    .choice-points{
+      margin:0;
+      padding-left:18px;
+      display:grid;
+      gap:6px;
+      color:#dbeafe;
+      font-size:12px;
+      line-height:1.55;
+    }
+    .choice-points li{
+      margin:0;
+    }
+    .choice-secondary{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+    .choice-secondary .button{
+      justify-self:auto;
+    }
+    .choice-note{
+      margin:0;
+      font-size:12px;
+      color:#cbd5e1;
+      line-height:1.6;
+    }
+    .choice-note strong{
+      color:#f9fafb;
     }
     .value-actions{
       display:flex;
@@ -830,6 +846,12 @@
       font-size:10px;
       color:#94a3b8;
       letter-spacing:0.03em;
+    }
+    .public-room-action-row{
+      margin-top:auto;
+      padding-top:4px;
+      display:flex;
+      justify-content:flex-end;
     }
     .public-room-actions{
       display:flex;
@@ -1690,20 +1712,20 @@
           <h1>ドット絵を描くサイトなら PiXiEED</h1>
           <p class="subtitle">PiXiEED（ピクシード）は、ブラウザだけでドット絵作成・ツール比較まで完結できる無料サイトです。PiXiEEDrawではリアルタイム共同制作にも対応しています。</p>
           <div class="hero-actions">
-            <button class="button" id="toggleDrawGuide" type="button" aria-controls="draw-guide" aria-expanded="false">描く</button>
+            <button class="button" id="toggleDrawGuide" type="button" aria-controls="draw-guide" aria-expanded="false">描く（Liteでかんたん開始 / 本格）</button>
             <button class="button button--ghost" id="togglePlayGuide" type="button" aria-controls="play-guide" aria-expanded="false">遊ぶ</button>
             <button class="button button--ghost" id="toggleContactGuide" type="button" aria-controls="contact-guide" aria-expanded="false">連絡</button>
           </div>
           <div class="hero-draw-guide" id="draw-guide" hidden>
-            <p class="hero-draw-guide__title">描く: ツールを選択</p>
+            <p class="hero-draw-guide__title">描く: まずは手軽な Lite か、本格 PiXiEEDraw かを選択</p>
             <div class="hero-draw-guide__actions">
               <a class="hero-draw-guide__link" href="jerin-maker/index.html">
                 <span class="hero-draw-guide__icon"><img src="icon/icon-192-5.png" alt=""></span>
-                <span class="hero-draw-guide__text">PiXiEEDraw Lite（ガイド付き16×16で最初の1枚を完成）</span>
+                <span class="hero-draw-guide__text">PiXiEEDraw Lite（手軽さ重視: 初心者でもガイドに沿ってすぐ始められる）</span>
               </a>
               <a class="hero-draw-guide__link" href="pixiedraw/index.html">
                 <span class="hero-draw-guide__icon"><img src="icon/icon-192-4.png" alt=""></span>
-                <span class="hero-draw-guide__text">PiXiEEDraw（実務向け本格機能 + マルチ共同制作でチーム制作にも対応）</span>
+                <span class="hero-draw-guide__text">PiXiEEDraw（本格制作向け: 高機能エディタ + マルチ共同制作に対応）</span>
               </a>
             </div>
           </div>
@@ -1753,33 +1775,40 @@
     <section class="section section--highlight" id="start-guides">
       <div class="section-inner">
         <div>
-          <p class="section-eyebrow">Draw, Play, Contact</p>
-          <h2>描く・遊ぶ・連絡から選べる</h2>
-          <p class="subtitle">「ドット絵無料ツール」を探して来た方でも、やりたい行動からそのまま始められます。</p>
+          <p class="section-eyebrow">Lite First</p>
+          <h2>PiXiEEDraw Lite と PiXiEEDraw、どっちを使う？</h2>
+          <p class="subtitle">Lite は手軽さ重視。初心者でも簡単に始められます。必要になったら PiXiEEDraw へ切り替えできます。</p>
         </div>
-        <div class="audience-grid">
+        <div class="audience-grid audience-grid--draw-choice">
           <article class="audience-card audience-card--beginner">
-            <p class="project-place__label">Draw</p>
-            <h3 class="project-place__title">描く</h3>
-            <p class="subtitle">ガイド付きで16×16から始めるなら Lite、本格制作とマルチ共同制作まで進めるなら PiXiEEDraw を選べます。</p>
-            <p class="audience-card__meta">目安 10〜15分 / 登録不要 / 無料（Lite）</p>
-            <a class="button" href="jerin-maker/index.html">PiXiEEDraw Liteを使う</a>
+            <p class="project-place__label">Easy Start</p>
+            <h3 class="project-place__title">PiXiEEDraw Lite</h3>
+            <p class="subtitle">手軽さを最優先にした入門版。初心者でも画面の案内に沿って、迷わず最初の1枚を完成できます。</p>
+            <ul class="choice-points">
+              <li>こんな人: 初心者 / とにかく簡単に始めたい</li>
+              <li>主な特徴: 手軽な操作 / 16×16固定 / ガイド付き</li>
+              <li>向いている用途: まず試す / 短時間で1枚仕上げる</li>
+            </ul>
+            <p class="audience-card__meta">最短数分 / 登録不要 / 無料</p>
+            <a class="button" href="jerin-maker/index.html">かんたんにLiteを始める</a>
           </article>
           <article class="audience-card audience-card--pro">
-            <p class="project-place__label">Play</p>
-            <h3 class="project-place__title">遊ぶ</h3>
-            <p class="subtitle">ドット絵ゲームやカメラ変換ツールで、気軽にピクセル表現を体験できます。</p>
-            <p class="audience-card__meta">ブラウザ完結 / すぐ遊べる / 無料</p>
-            <a class="button button--ghost" href="games.html">ゲーム一覧へ</a>
-          </article>
-          <article class="audience-card audience-card--pro">
-            <p class="project-place__label">Contact</p>
-            <h3 class="project-place__title">連絡する</h3>
-            <p class="subtitle">制作相談・コラボ相談は、Xまたはメールの連絡先から選べます。</p>
-            <p class="audience-card__meta">X / メール</p>
-            <a class="button button--ghost" href="#contact">連絡先を見る</a>
+            <p class="project-place__label">Advanced</p>
+            <h3 class="project-place__title">PiXiEEDraw</h3>
+            <p class="subtitle">本格制作と共同制作を進めたい方向け。レイヤーや選択ツールを使って作品を仕上げられます。</p>
+            <ul class="choice-points">
+              <li>こんな人: 継続して作品を作りたい / チームで作りたい</li>
+              <li>主な特徴: 本格描画機能 + 共有モードβ</li>
+              <li>向いている用途: 素材制作・共同制作・実運用</li>
+            </ul>
+            <p class="audience-card__meta">ブラウザ完結 / 共有モードβ / 無料</p>
+            <div class="choice-secondary">
+              <a class="button" href="pixiedraw/index.html">PiXiEEDrawを使う</a>
+              <a class="button button--ghost" href="#publicRoomsHub">公開中の部屋を見る</a>
+            </div>
           </article>
         </div>
+        <p class="choice-note"><strong>迷ったらLite:</strong> 手軽に1枚仕上げてから、必要に応じて PiXiEEDraw へ移行する流れが最短です。</p>
       </div>
     </section>
 
@@ -1910,11 +1939,6 @@
       </div>
     </section>
 
-    <section class="card">
-      <h2>ドット絵無料ツール</h2>
-      <p class="seo-links"><a href="jerin-maker/index.html">PiXiEEDraw Lite</a> は未経験向けの16×16練習ツール、<a href="pixiedraw/index.html">PiXiEEDraw（ピクシードロー）</a> は実制作向けの本格機能に加えてマルチ共同制作（共有モードβ）にも対応したブラウザドット絵エディターです。</p>
-    </section>
-
     <section class="card ad-strip" aria-label="広告">
       <div class="ad-block ad-block--home">
         <ins class="adsbygoogle ad-slot"
@@ -1985,6 +2009,10 @@
     <a class="bottom-nav__item is-active" data-tab="home" href="./index.html">
       <span class="icon"><img src="FooterIcon1.png" alt=""/></span><span>ホーム</span>
     </a>
+    <a class="bottom-nav__item" data-tab="contest" href="contest/index.html">
+      <span class="icon"><img src="FooterIcon2.png" alt=""/></span><span>コンテスト</span>
+    </a>
+
     <a class="bottom-nav__item" data-tab="tools" href="tools.html">
       <span class="icon"><img src="FooterIcon3.png" alt=""/></span><span>ツール/ゲーム</span>
     </a>
@@ -2392,6 +2420,7 @@
       });
     })();
   </script>
+  <script>window.__PIXIEED_DISABLE_LEGACY_PUBLIC_ROOMS__ = true;</script>
   <script src="scripts.js"></script>
   <script src="portfolio/dots/manifest.js"></script>
   <script src="scripts/gallery.js"></script>
@@ -2406,6 +2435,7 @@
     const RESIDENT_THUMB_CACHE_KEY = 'pixieed:resident-room-thumb-cache-v1';
     const RESIDENT_THUMB_CACHE_LIMIT = 12;
     const RESIDENT_BLACK_THUMBNAIL_EDGE = 96;
+    const RESIDENT_PRIMARY_PROJECT_KEY = 'resident-256-main';
     const RESIDENT_ROOM_FALLBACKS = Object.freeze([
       Object.freeze({
         id: 'resident-room-256',
@@ -2416,16 +2446,6 @@
         size: '256×256',
         maxUsers: 10,
         description: '最大10人。PiXiEEDrawマルチ常設キーに接続できます。'
-      }),
-      Object.freeze({
-        id: 'resident-room-128',
-        name: '常駐ルーム 128x128',
-        type: 'resident',
-        projectKey: 'resident-128-main',
-        channel: 'resident-128-main',
-        size: '128×128',
-        maxUsers: 16,
-        description: '最大16人。PiXiEEDrawマルチ常設キーに接続できます。'
       })
     ]);
 
@@ -2554,7 +2574,7 @@
       source.forEach((room) => {
         if (room.type !== 'resident') return;
         const key = normalizeProjectKey(room.projectKey || room.channel || room.id || '');
-        if (!key) return;
+        if (!key || key !== RESIDENT_PRIMARY_PROJECT_KEY) return;
         const base = residentByKey.get(key) || {};
         residentByKey.set(key, Object.assign({}, base, room, { type: 'resident' }));
       });
@@ -2583,7 +2603,7 @@
             <div class="public-room-info">${r.description || ''}</div>
             <div class="public-room-meta-extra">${r.size ? r.size + ' · ' : ''}${r.maxUsers ? '最大 ' + r.maxUsers + ' 人' : ''} · 待機中</div>
             <div class="public-room-time">待機中</div>
-            <div><a class="public-room-action button" href="${residentPage}">入室</a></div>
+            <div class="public-room-action-row"><a class="public-room-action button" href="${residentPage}">入室</a></div>
           </div>`;
         grid.appendChild(card);
       }
@@ -2712,7 +2732,7 @@
               <div class="public-room-info">${r.description || ''}</div>
               <div class="public-room-meta-extra">${r.size ? r.size + ' · ' : ''}${r.maxUsers ? '最大 ' + r.maxUsers + ' 人' : ''}${residentLiveInfo}</div>
               <div class="public-room-time">${updatedLabel}</div>
-              <div>${actionHtml}</div>
+              <div class="public-room-action-row">${actionHtml}</div>
             </div>`;
 
           card.innerHTML = `${thumbHtml}${metaInfo}`;
