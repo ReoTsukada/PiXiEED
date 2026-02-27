@@ -158,6 +158,7 @@
       toggleTimelapse: document.getElementById('toggleTimelapse'),
       mobileDrawHelp: document.getElementById('mobileDrawHelp'),
       openDocument: document.getElementById('openDocument'),
+      showLocalProjects: document.getElementById('showLocalProjects'),
       exportProject: document.getElementById('exportProject'),
       togglePixfindMode: document.getElementById('togglePixfindMode'),
       togglePixfindHelp: document.getElementById('togglePixfindHelp'),
@@ -243,6 +244,8 @@
     },
     startup: {
       screen: document.getElementById('startupScreen'),
+      resumeButton: document.getElementById('startupActionResume'),
+      resumeHint: document.getElementById('startupResumeHint'),
       newButton: document.getElementById('startupActionNew'),
       openButton: document.getElementById('startupActionOpen'),
       quickSetupButton: document.getElementById('startupActionQuickSetup'),
@@ -743,15 +746,14 @@
   const IS_ANDROID_DEVICE = /android/i.test(USER_AGENT);
   const DISABLE_FILE_SYSTEM_ACCESS_SAVE = IS_ANDROID_DEVICE || IS_IOS_DEVICE;
   const AUTOSAVE_SUPPORTED =
+    typeof window !== 'undefined' &&
+    'indexedDB' in window;
+  const FILE_HANDLE_AUTOSAVE_SUPPORTED =
     !DISABLE_FILE_SYSTEM_ACCESS_SAVE &&
     typeof window !== 'undefined' &&
     'showSaveFilePicker' in window &&
     'indexedDB' in window;
-  const EXPORT_DIRECTORY_SUPPORTED =
-    !DISABLE_FILE_SYSTEM_ACCESS_SAVE &&
-    typeof window !== 'undefined' &&
-    'showDirectoryPicker' in window &&
-    'indexedDB' in window;
+  const EXPORT_DIRECTORY_SUPPORTED = false;
   const SUPPORTS_ANCHOR_DOWNLOAD =
     typeof HTMLAnchorElement !== 'undefined' && 'download' in HTMLAnchorElement.prototype;
   const DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS = 10000;
@@ -764,13 +766,8 @@
   const IS_ANDROID_LINE_BROWSER =
     IS_ANDROID_DEVICE
     && /line\//i.test(USER_AGENT);
-  // Fallback snapshot for platforms where File System Access based autosave is disabled.
-  // Currently used for iOS / Android so PWA users can still recover recent work locally.
-  const IOS_SNAPSHOT_SUPPORTED =
-    DISABLE_FILE_SYSTEM_ACCESS_SAVE
-    && typeof window !== 'undefined'
-    && typeof window.indexedDB !== 'undefined'
-    && window.indexedDB !== null;
+  // Legacy fallback snapshot path (disabled: autosave now uses IndexedDB project records on all devices).
+  const IOS_SNAPSHOT_SUPPORTED = false;
   const IOS_SNAPSHOT_DB_NAME = 'pixieedraw-ios-snapshots';
   const IOS_SNAPSHOT_DB_VERSION = 1;
   const IOS_SNAPSHOT_STORE_NAME = 'snapshots';
@@ -806,6 +803,7 @@
   const AUTOSAVE_STORE_NAME = 'handles';
   const RECENT_PROJECTS_STORE = 'recentProjects';
   const AUTOSAVE_HANDLE_KEY = 'document';
+  const AUTOSAVE_ACTIVE_PROJECT_KEY = 'activeProjectId';
   const EXPORT_DIRECTORY_HANDLE_KEY = 'exportDirectory';
   const EXPORT_DIRECTORY_DISPLAY_LABEL_KEY = 'pixieedraw:export-directory-display-label';
   const EXPORT_WORKSPACE_DIR_NAME = 'PiXiEED';
@@ -890,6 +888,8 @@
   const RECENT_PROJECT_LIMIT = 12;
   const THUMBNAIL_MAX_EDGE = 144;
   const THUMBNAIL_CANVAS_SIZE = 160;
+  const LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS = 1500;
+  const MULTI_REPLICA_AUTOSAVE_BLOCKED_STATUS = '自動保存: マルチ中はマスターのみ端末保存します';
   const DOCUMENT_FILE_VERSION = 1;
   const LENS_IMPORT_STORAGE_KEY = 'pixiee-lens:pending-draw-import';
   const PIXFIND_UPLOAD_KEY = 'pixfind_creator_upload_v1';
@@ -922,8 +922,11 @@
   let exportDirectoryDisplayLabel = '';
   let exportDirectorySetupDismissed = false;
   let autosaveWriteTimer = null;
+  let autosaveWriteInFlight = false;
+  let autosaveWriteQueued = false;
   let autosaveRestoring = false;
   let autosaveDirty = false;
+  let autosaveProjectId = '';
   let unsavedChangeToken = 0;
   let durableSaveToken = 0;
   let iosSnapshotDbPromise = null;
@@ -5588,30 +5591,15 @@
     statusNode.dataset.tone = tone;
   }
 
+  function isAutosaveBlockedByMultiRole() {
+    return multiState.connected && !isMultiMasterMode();
+  }
+
   function setupAutosaveControls() {
     const button = dom.controls.enableAutosave;
     if (!button) return;
-    if (!AUTOSAVE_SUPPORTED) {
-      button.disabled = true;
-      updateAutosaveStatus(
-        IOS_SNAPSHOT_SUPPORTED
-          ? '自動保存: 端末内バックアップへ自動保存します（再開時に復元・ファイル固定は未対応）'
-          : '自動保存: このブラウザでは利用できません',
-        IOS_SNAPSHOT_SUPPORTED ? 'info' : 'warn'
-      );
-      return;
-    }
-    if (button.dataset.bound === 'true') return;
-    button.dataset.bound = 'true';
-    button.addEventListener('click', async () => {
-      if (pendingAutosaveHandle && !autosaveHandle) {
-        const reauthorized = await attemptAutosaveReauthorization();
-        if (reauthorized) {
-          return;
-        }
-      }
-      requestAutosaveBinding({ suggestedName: createAutosaveFileName() });
-    });
+    button.textContent = 'ローカル自動保存（常時ON）';
+    button.disabled = true;
   }
 
   function sanitizeExportDirectoryDisplayLabel(value) {
@@ -5679,7 +5667,7 @@
 
   function getExportDestinationLabelText() {
     if (!EXPORT_DIRECTORY_SUPPORTED) {
-      return '画像/GIF出力先: このブラウザでは固定フォルダ未対応（保存時に保存先を選択）';
+      return '画像/GIF出力先: 固定出力先は使用しません（保存時に保存先を選択）';
     }
     const activeHandle = exportDirectoryHandle || pendingExportDirectoryHandle;
     const displayLabel = sanitizeExportDirectoryDisplayLabel(exportDirectoryDisplayLabel)
@@ -5712,6 +5700,13 @@
   function updateExportFolderStatus(message, tone = 'info') {
     const statusNode = dom.controls.exportFolderStatus;
     if (statusNode) {
+      statusNode.hidden = !EXPORT_DIRECTORY_SUPPORTED;
+      if (statusNode.hidden) {
+        statusNode.textContent = '';
+        delete statusNode.dataset.tone;
+        updateExportDestinationLabel();
+        return;
+      }
       statusNode.textContent = message;
       statusNode.dataset.tone = tone;
     }
@@ -5724,10 +5719,12 @@
       return;
     }
     if (!EXPORT_DIRECTORY_SUPPORTED) {
+      button.hidden = true;
       button.disabled = true;
-      button.textContent = '出力フォルダ未対応';
+      button.textContent = '出力先固定を使用しない';
       return;
     }
+    button.hidden = false;
     button.disabled = false;
     if (exportDirectoryHandle) {
       button.textContent = '出力フォルダを変更';
@@ -5847,7 +5844,7 @@
     updateExportFolderButtonLabel();
     updateExportDestinationLabel();
     if (!EXPORT_DIRECTORY_SUPPORTED) {
-      updateExportFolderStatus('出力フォルダ: このブラウザでは利用できません', 'warn');
+      updateExportFolderStatus('出力フォルダ: 固定出力先は使用しません（保存時に保存先を選択）', 'info');
       return;
     }
     if (button.dataset.bound === 'true') {
@@ -5906,36 +5903,35 @@
 
   async function initializeAutosave() {
     setupAutosaveControls();
-    const button = dom.controls.enableAutosave;
     if (!AUTOSAVE_SUPPORTED) {
+      updateAutosaveStatus('自動保存: このブラウザでは利用できません', 'warn');
       return;
     }
 
-    updateAutosaveStatus('自動保存: 初期化中…');
+    updateAutosaveStatus('自動保存: 端末内データを確認中…');
 
     try {
-      const handle = await loadStoredAutosaveHandle();
-      if (!handle) {
-        updateAutosaveStatus('自動保存: 未設定');
-        return;
+      const sanitizeResult = await sanitizeRecentProjectsStore({ announce: false });
+      const recentEntries = Array.isArray(sanitizeResult?.entries) ? sanitizeResult.entries : [];
+      const storedProjectId = await loadStoredAutosaveProjectId();
+      let targetEntry = null;
+      if (storedProjectId) {
+        targetEntry = recentEntries.find(entry => entry?.id === storedProjectId) || null;
       }
-      const granted = await ensureHandlePermission(handle, { request: false });
-      if (granted) {
-        autosaveHandle = handle;
-        if (button) {
-          button.textContent = '自動保存先を変更';
-        }
-        if (lensImportRequested) {
-          updateAutosaveStatus('自動保存: 設定済み (PiXiEELENS からの画像を読み込み中)', 'info');
-        } else {
-          const restored = await restoreAutosaveDocument(handle);
-          if (restored) {
-            updateAutosaveStatus('自動保存: 有効');
-          }
-        }
-      } else {
-        schedulePendingAutosavePermission(handle);
+      if (!targetEntry) {
+        targetEntry = recentEntries[0] || null;
       }
+      if (targetEntry) {
+        const restored = await openRecentProject(targetEntry, { hideStartup: false, silent: true });
+        if (restored) {
+          updateAutosaveStatus('自動保存: 前回の端末内データを復元しました', 'success');
+          return;
+        }
+      }
+      setActiveAutosaveProjectId(storedProjectId || createAutosaveProjectId());
+      autosaveDirty = true;
+      scheduleAutosaveSnapshot();
+      updateAutosaveStatus('自動保存: 端末内へ自動保存します', 'info');
     } catch (error) {
       console.warn('Autosave initialisation failed', error);
       updateAutosaveStatus('自動保存: 初期化でエラーが発生しました', 'error');
@@ -5944,8 +5940,15 @@
 
   function scheduleAutosaveSnapshot() {
     if (!AUTOSAVE_SUPPORTED) return;
-    if (!autosaveHandle) return;
     if (autosaveRestoring) return;
+    if (isAutosaveBlockedByMultiRole()) {
+      if (autosaveWriteTimer !== null) {
+        window.clearTimeout(autosaveWriteTimer);
+        autosaveWriteTimer = null;
+      }
+      updateAutosaveStatus(MULTI_REPLICA_AUTOSAVE_BLOCKED_STATUS, 'info');
+      return;
+    }
     if (!autosaveDirty) return;
     if (autosaveWriteTimer !== null) {
       window.clearTimeout(autosaveWriteTimer);
@@ -5961,30 +5964,41 @@
 
   async function writeAutosaveSnapshot(force = false) {
     if (!AUTOSAVE_SUPPORTED) return;
-    if (!autosaveHandle) return;
-    if (!force && !autosaveDirty) return;
-    const granted = await ensureHandlePermission(autosaveHandle, { request: false });
-    if (!granted) {
-      schedulePendingAutosavePermission(autosaveHandle);
-      autosaveHandle = null;
+    if (autosaveRestoring) return;
+    if (isAutosaveBlockedByMultiRole()) {
+      if (autosaveWriteTimer !== null) {
+        window.clearTimeout(autosaveWriteTimer);
+        autosaveWriteTimer = null;
+      }
+      autosaveWriteQueued = false;
+      updateAutosaveStatus(MULTI_REPLICA_AUTOSAVE_BLOCKED_STATUS, 'info');
       return;
     }
+    if (!force && !autosaveDirty) return;
+    if (autosaveWriteInFlight) {
+      autosaveWriteQueued = true;
+      return;
+    }
+    autosaveWriteInFlight = true;
+    autosaveWriteQueued = false;
     try {
-      updateAutosaveStatus('自動保存: 保存中…');
+      updateAutosaveStatus('自動保存: 端末内に保存中…');
       const snapshot = makeHistorySnapshot();
-      const payload = serializeDocumentSnapshot(snapshot);
-      const json = JSON.stringify({ version: DOCUMENT_FILE_VERSION, document: payload, updatedAt: new Date().toISOString() });
-      const writable = await autosaveHandle.createWritable();
-      await writable.write(json);
-      await writable.close();
+      const session = buildProjectSessionPayload();
+      const packaged = buildPackagedProjectPayload(snapshot, { session });
+      const projectId = await ensureActiveAutosaveProjectId();
+      await recordRecentProjectSnapshot(snapshot, packaged, { projectId });
       autosaveDirty = false;
       markDocumentDurablySaved();
-      updateAutosaveStatus('自動保存: 保存済み', 'success');
-      recordRecentProject(autosaveHandle, snapshot).catch(error => {
-        console.warn('Failed to update recent projects snapshot', error);
-      });
+      updateAutosaveStatus('自動保存: 端末内に保存済み', 'success');
     } catch (error) {
       throw error;
+    } finally {
+      autosaveWriteInFlight = false;
+      if (autosaveWriteQueued || autosaveDirty) {
+        autosaveWriteQueued = false;
+        scheduleAutosaveSnapshot();
+      }
     }
   }
 
@@ -6046,7 +6060,7 @@
   }
 
   async function requestAutosaveBinding(options = {}) {
-    if (!AUTOSAVE_SUPPORTED) return;
+    if (!FILE_HANDLE_AUTOSAVE_SUPPORTED) return;
     try {
       const suggestedNameOption = typeof options.suggestedName === 'string' ? options.suggestedName.trim() : '';
       const suggestedName = suggestedNameOption || createAutosaveFileName();
@@ -6090,7 +6104,7 @@
       clearPendingPermissionListener();
       await storeAutosaveHandle(handle);
       if (dom.controls.enableAutosave) {
-        dom.controls.enableAutosave.textContent = '自動保存先を変更';
+        dom.controls.enableAutosave.textContent = 'ローカル自動保存（常時ON）';
       }
       updateAutosaveStatus(
         boundFromExportDirectory
@@ -6109,25 +6123,16 @@
     }
   }
 
-  async function ensureAutosaveForLensImport(filename) {
+  async function ensureAutosaveForLensImport() {
     if (!AUTOSAVE_SUPPORTED) {
       return;
     }
-    if (autosaveHandle) {
-      autosaveDirty = true;
-      scheduleAutosaveSnapshot();
-      return;
+    if (!autosaveProjectId) {
+      setActiveAutosaveProjectId(createAutosaveProjectId());
     }
-    const baseName = typeof filename === 'string' && filename.trim()
-      ? sanitizeDocumentFileBase(filename.trim())
-      : sanitizeDocumentFileBase(state.documentName);
-    const suggestedName = `${baseName || 'pixiee-lens-import'}.pixieedraw`;
-    updateAutosaveStatus('PiXiEELENS の画像を保存するため、保存先を選択してください。', 'info');
-    try {
-      await requestAutosaveBinding({ suggestedName });
-    } catch (error) {
-      console.warn('Autosave binding after lens import failed', error);
-    }
+    autosaveDirty = true;
+    scheduleAutosaveSnapshot();
+    updateAutosaveStatus('PiXiEELENS の取り込み内容を端末内に自動保存します', 'info');
   }
 
   async function ensureHandlePermission(handle, { request = false } = {}) {
@@ -6161,7 +6166,7 @@
     clearPendingPermissionListener();
     updateAutosaveStatus('自動保存: 権限が必要です。キャンバスをクリックして再許可してください', 'warn');
     if (dom.controls.enableAutosave) {
-      dom.controls.enableAutosave.textContent = '自動保存を再許可';
+      dom.controls.enableAutosave.textContent = 'ローカル自動保存（常時ON）';
     }
     const listener = (event) => {
       const target = event?.target instanceof Element ? event.target : null;
@@ -6441,14 +6446,14 @@
     pendingAutosaveHandle = null;
     autosaveHandle = handle;
     if (dom.controls.enableAutosave) {
-      dom.controls.enableAutosave.textContent = '自動保存先を変更';
+      dom.controls.enableAutosave.textContent = 'ローカル自動保存（常時ON）';
     }
     try {
       const restored = await restoreAutosaveDocument(handle);
       if (restored) {
-        updateAutosaveStatus('自動保存: 有効', 'success');
+        updateAutosaveStatus('自動保存: 端末内データを読み込みました', 'success');
       } else {
-        updateAutosaveStatus('自動保存: 保存中…', 'info');
+        updateAutosaveStatus('自動保存: 端末内へ自動保存します', 'info');
       }
     } catch (error) {
       console.warn('Autosave restore after reauthorization failed', error);
@@ -6482,8 +6487,8 @@
         if (!handle) {
           return false;
         }
-        await loadDocumentFromHandle(handle);
-        return true;
+        const loaded = await loadDocumentFromHandle(handle);
+        return Boolean(loaded);
       } catch (error) {
         if (error && error.name === 'AbortError') {
           return false;
@@ -6539,11 +6544,12 @@
         try {
           if (isImportableImageFile(file)) {
             await loadDocumentFromImageFile(file);
+            finish(true);
           } else {
             const text = await file.text();
-            await loadDocumentFromText(text, null);
+            const loaded = await loadDocumentFromText(text, null);
+            finish(Boolean(loaded));
           }
-          finish(true);
         } catch (error) {
           console.warn('Document load failed', error);
           const message = isImportableImageFile(file) ? '画像の読み込みに失敗しました' : 'ドキュメントを開けませんでした';
@@ -7136,32 +7142,19 @@
     autosaveHandle = null;
     pendingAutosaveHandle = null;
     clearPendingPermissionListener();
-
-    if (AUTOSAVE_SUPPORTED) {
-      clearStoredAutosaveHandle().catch(error => {
-        console.warn('Failed to clear previous autosave handle', error);
-      });
-      if (dom.controls.enableAutosave) {
-        dom.controls.enableAutosave.textContent = '自動保存先を変更';
-      }
-      const suggestedName = createAutosaveFileName(documentName);
-      updateAutosaveStatus('自動保存: 保存先を選択してください', 'info');
-      requestAutosaveBinding({ suggestedName }).catch(error => {
-        console.warn('Autosave binding after image import failed', error);
-        updateAutosaveStatus('自動保存: 保存先を設定できませんでした', 'error');
-      });
+    setActiveAutosaveProjectId(createAutosaveProjectId());
+    autosaveDirty = true;
+    scheduleAutosaveSnapshot();
+    if (importSize.scaled) {
+      const integerScaleLabel = importSize.integerScaleFactor > 1
+        ? ` / 整数倍縮小 x${importSize.integerScaleFactor}`
+        : '';
+      updateAutosaveStatus(
+        `画像を読み込みました (${importSize.sourceWidth}x${importSize.sourceHeight} → ${width}x${height}${integerScaleLabel}) / 端末内へ自動保存します`,
+        'success'
+      );
     } else {
-      if (importSize.scaled) {
-        const integerScaleLabel = importSize.integerScaleFactor > 1
-          ? ` / 整数倍縮小 x${importSize.integerScaleFactor}`
-          : '';
-        updateAutosaveStatus(
-          `画像を読み込みました (${importSize.sourceWidth}x${importSize.sourceHeight} → ${width}x${height}${integerScaleLabel})`,
-          'success'
-        );
-      } else {
-        updateAutosaveStatus('画像を読み込みました', 'success');
-      }
+      updateAutosaveStatus('画像を読み込みました / 端末内へ自動保存します', 'success');
     }
     scheduleSessionPersist();
   }
@@ -7170,13 +7163,20 @@
     if (!lensImportRequested) {
       return;
     }
-    if (!autosaveHandle) {
+    if (!AUTOSAVE_SUPPORTED) {
       return;
     }
     try {
-      const restored = await restoreAutosaveDocument(autosaveHandle);
+      const entries = await loadRecentProjectsMetadata();
+      if (!entries.length) {
+        return;
+      }
+      const target = autosaveProjectId
+        ? (entries.find(entry => entry?.id === autosaveProjectId) || entries[0])
+        : entries[0];
+      const restored = await openRecentProject(target, { hideStartup: false, silent: true });
       if (restored) {
-        updateAutosaveStatus('自動保存: 有効', 'info');
+        updateAutosaveStatus('自動保存: 端末内データを復元しました', 'info');
       }
     } catch (error) {
       console.warn('Failed to restore autosave after PiXiEELENS import failure', error);
@@ -7307,7 +7307,7 @@
       hideStartupScreen();
       updateAutosaveStatus('PiXiEELENS から画像を取り込みました', 'success');
       await ensureAutosaveForLensImport(inferredName);
-      if (AUTOSAVE_SUPPORTED && autosaveHandle) {
+      if (AUTOSAVE_SUPPORTED) {
         try {
           await writeAutosaveSnapshot(true);
         } catch (error) {
@@ -8850,25 +8850,13 @@
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
 
-    if (AUTOSAVE_SUPPORTED) {
-      autosaveHandle = null;
-      pendingAutosaveHandle = null;
-      clearPendingPermissionListener();
-      clearStoredAutosaveHandle().catch(error => {
-        console.warn('Failed to forget previous autosave handle', error);
-      });
-      const suggestedName = createAutosaveFileName(name);
-      if (dom.controls.enableAutosave) {
-        dom.controls.enableAutosave.textContent = '自動保存先を変更';
-      }
-      updateAutosaveStatus('自動保存: 保存先を選択してください', 'info');
-      requestAutosaveBinding({ suggestedName }).catch(error => {
-        console.warn('Autosave binding after new project failed', error);
-        updateAutosaveStatus('自動保存: 保存先を設定できませんでした', 'error');
-      });
-    } else {
-      updateAutosaveStatus('新しいプロジェクトを作成しました', 'info');
-    }
+    autosaveHandle = null;
+    pendingAutosaveHandle = null;
+    clearPendingPermissionListener();
+    setActiveAutosaveProjectId(createAutosaveProjectId());
+    autosaveDirty = true;
+    scheduleAutosaveSnapshot();
+    updateAutosaveStatus('自動保存: 新規プロジェクトを端末内に保存します', 'success');
     scheduleSessionPersist();
     return true;
   }
@@ -8904,15 +8892,7 @@
     quickButton.disabled = true;
     quickButton.setAttribute('aria-busy', 'true');
     try {
-      if (EXPORT_DIRECTORY_SUPPORTED && !exportDirectoryHandle) {
-        setStartupQuickSetupStatus('かんたん初期設定: 出力フォルダを設定中…');
-        const bound = await requestExportDirectoryBinding();
-        if (!bound && !exportDirectoryHandle) {
-          setStartupQuickSetupStatus('出力フォルダ設定はスキップされました。後で「出力フォルダを設定」から変更できます。', 'warn');
-        }
-      } else {
-        setStartupQuickSetupStatus('かんたん初期設定: 新規作成を準備しています…');
-      }
+      setStartupQuickSetupStatus('かんたん初期設定: 新規作成を準備しています…');
       const created = createNewProject({
         name: createStartupQuickProjectName(),
         width: lockedCanvasWidth !== null ? lockedCanvasWidth : DEFAULT_CANVAS_SIZE,
@@ -8980,7 +8960,13 @@
     document.body.classList.add('is-startup-active');
     window.requestAnimationFrame(() => {
       container.focus?.({ preventScroll: true });
-      const defaultTarget = dom.startup?.newButton || dom.startup?.openButton || dom.startup?.skipButton || container;
+      const startupTargets = [
+        dom.startup?.resumeButton,
+        dom.startup?.newButton,
+        dom.startup?.openButton,
+        dom.startup?.skipButton,
+      ];
+      const defaultTarget = startupTargets.find(target => target instanceof HTMLElement && !target.hasAttribute('disabled')) || container;
       defaultTarget?.focus?.({ preventScroll: true });
     });
   }
@@ -9068,25 +9054,18 @@
     getUpdateHistoryEntries();
     if (dom.startup?.hint) {
       dom.startup.hint.textContent = AUTOSAVE_SUPPORTED
-        ? 'ファイルを開くと既存の自動保存先を引き継ぎます。'
-        : (IOS_SNAPSHOT_SUPPORTED
-          ? 'この端末では端末内バックアップへ自動保存します。再開時に続きから復元されます。共有前は「保存/出力」でファイル保存してください。'
-          : 'このブラウザでは自動保存が利用できません。エクスポートをお忘れなく。');
+        ? '描画内容はこの端末に自動保存され、起動時に前回データを復元できます。'
+        : 'このブラウザでは自動保存が利用できません。保存/出力から手動保存してください。';
     }
     if (dom.startup?.quickSetupButton instanceof HTMLButtonElement) {
-      if (AUTOSAVE_SUPPORTED && EXPORT_DIRECTORY_SUPPORTED) {
-        dom.startup.quickSetupButton.textContent = '新規作成 + 保存先設定をまとめて行う';
-        setStartupQuickSetupStatus('初回だけ保存先を決めると、以後の保存/出力が楽になります。');
-      } else if (AUTOSAVE_SUPPORTED) {
-        dom.startup.quickSetupButton.textContent = '新規作成 + 保存先設定を行う';
-        setStartupQuickSetupStatus('このブラウザは固定フォルダ未対応です。保存先ファイルを選んで開始します。');
+      if (AUTOSAVE_SUPPORTED) {
+        dom.startup.quickSetupButton.textContent = '新規作成（かんたん開始）';
+        setStartupQuickSetupStatus('新規作成すると、この端末に自動保存を開始します。');
       } else {
         dom.startup.quickSetupButton.textContent = '新規作成（かんたん開始）';
         setStartupQuickSetupStatus(
-          IOS_SNAPSHOT_SUPPORTED
-            ? '端末内バックアップは自動で行います。共有・配布用には「保存/出力」でファイル保存してください。'
-            : 'このブラウザは自動保存未対応です。開始後は「保存/出力」から書き出してください。',
-          IOS_SNAPSHOT_SUPPORTED ? 'info' : 'warn'
+          'このブラウザは自動保存未対応です。開始後は「保存/出力」から書き出してください。',
+          'warn'
         );
       }
     }
@@ -9138,6 +9117,19 @@
       hideStartupScreen();
       openNewProjectDialog();
     });
+    dom.startup?.resumeButton?.addEventListener('click', async () => {
+      const firstEntry = Array.from(recentProjectsCache.values())[0] || null;
+      if (!firstEntry) {
+        updateAutosaveStatus('端末内プロジェクトがありません。新規作成またはファイルを開いてください。', 'warn');
+        return;
+      }
+      const opened = await openRecentProject(firstEntry);
+      if (!opened) {
+        refreshRecentProjectsUI().catch(error => {
+          console.warn('Failed to refresh recent projects', error);
+        });
+      }
+    });
     dom.startup?.openButton?.addEventListener('click', async () => {
       const opened = await openDocumentDialog();
       if (opened) {
@@ -9175,50 +9167,54 @@
       refreshRecentProjectsUI().catch(error => {
         console.warn('Failed to refresh recent projects', error);
       });
+      syncStartupResumeState(Array.from(recentProjectsCache.values()));
     } else if (dom.startup?.recentSection) {
       dom.startup.recentSection.hidden = true;
+      syncStartupResumeState([]);
     }
   }
 
-  async function loadDocumentFromHandle(handle) {
+  async function loadDocumentFromHandle(handle, options = {}) {
     try {
-      const granted = await ensureHandlePermission(handle, { request: true });
-      if (!granted) {
-        updateAutosaveStatus('自動保存: 権限が必要です', 'warn');
-        return;
-      }
       const file = await handle.getFile();
       if (isImportableImageFile(file)) {
         await loadDocumentFromImageFile(file);
-        return;
+        return true;
       }
       const text = await file.text();
-      await loadDocumentFromText(text, handle);
+      return await loadDocumentFromText(text, handle, options);
     } catch (error) {
-      console.warn('Document handle load failed', error);
+      if (error?.name !== 'NotAllowedError') {
+        console.warn('Document handle load failed', error);
+      }
       const message = error && error.name === 'AbortError'
         ? null
-        : (error?.source === 'image-import' ? '画像の読み込みに失敗しました' : 'ドキュメントを開けませんでした');
+        : (
+          error?.name === 'NotAllowedError'
+            ? 'この端末では旧ファイル権限が無効です。端末内プロジェクトから開いてください。'
+            : (error?.source === 'image-import' ? '画像の読み込みに失敗しました' : 'ドキュメントを開けませんでした')
+        );
       if (message) {
         updateAutosaveStatus(message, 'error');
       }
+      return false;
     }
   }
 
-  async function loadDocumentFromText(text, handle) {
+  async function loadDocumentFromText(text, handle, options = {}) {
     let parsedDocument = null;
     try {
       parsedDocument = snapshotFromDocumentText(text);
     } catch (error) {
       console.warn('Failed to parse document', error);
       updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
-      return;
+      return false;
     }
     const snapshot = parsedDocument?.snapshot || null;
     const projectSession = parsedDocument?.projectSession || null;
     if (!snapshot) {
       updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
-      return;
+      return false;
     }
 
     autosaveRestoring = true;
@@ -9257,36 +9253,19 @@
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
 
-    if (handle) {
-      const granted = await ensureHandlePermission(handle, { request: true });
-      if (granted) {
-        autosaveHandle = handle;
-        pendingAutosaveHandle = null;
-        clearPendingPermissionListener();
-        await storeAutosaveHandle(handle);
-        if (dom.controls.enableAutosave) {
-          dom.controls.enableAutosave.textContent = '自動保存先を変更';
-        }
-        updateAutosaveStatus('自動保存: 有効', 'success');
-      } else {
-        schedulePendingAutosavePermission(handle);
-      }
-    } else {
-      autosaveHandle = null;
-      pendingAutosaveHandle = null;
-      clearPendingPermissionListener();
-      if (AUTOSAVE_SUPPORTED) {
-        updateAutosaveStatus('自動保存: 読み込み済み。保存先を設定してください', 'warn');
-      }
-    }
-
+    const requestedProjectId = normalizeAutosaveProjectId(options?.projectId || '');
+    setActiveAutosaveProjectId(requestedProjectId || createAutosaveProjectId());
+    autosaveDirty = true;
     scheduleSessionPersist();
     scheduleAutosaveSnapshot();
-    if (handle) {
-      recordRecentProject(handle, snapshot).catch(error => {
-        console.warn('Failed to register recent project', error);
-      });
+    if (!options?.suppressAutosaveStatus) {
+      if (options?.openedFromRecent) {
+        updateAutosaveStatus('自動保存: 端末内プロジェクトを読み込みました', 'success');
+      } else {
+        updateAutosaveStatus('自動保存: 読み込み内容を端末内に保存します', 'info');
+      }
     }
+    return true;
   }
 
   function normalizeProjectHistoryLimit(value, fallback = history.limit) {
@@ -9477,8 +9456,109 @@
     };
   }
 
-  async function storeAutosaveHandle(handle) {
+  function normalizeAutosaveProjectId(value) {
+    if (typeof value !== 'string') {
+      return '';
+    }
+    const trimmed = value.trim();
+    return trimmed || '';
+  }
+
+  function createAutosaveProjectId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `local-${crypto.randomUUID()}`;
+    }
+    return `local-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+  }
+
+  async function storeAutosaveProjectId(projectId) {
     if (!AUTOSAVE_SUPPORTED) return;
+    const normalizedId = normalizeAutosaveProjectId(projectId);
+    try {
+      const db = await openAutosaveDatabase();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction([AUTOSAVE_STORE_NAME], 'readwrite');
+        const store = tx.objectStore(AUTOSAVE_STORE_NAME);
+        const request = normalizedId
+          ? store.put(normalizedId, AUTOSAVE_ACTIVE_PROJECT_KEY)
+          : store.delete(AUTOSAVE_ACTIVE_PROJECT_KEY);
+        request.onerror = () => reject(request.error);
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+    } catch (error) {
+      console.warn('Failed to store autosave project id', error);
+    }
+  }
+
+  async function loadStoredAutosaveProjectId() {
+    if (!AUTOSAVE_SUPPORTED) return '';
+    try {
+      const db = await openAutosaveDatabase();
+      return await new Promise((resolve, reject) => {
+        let value = '';
+        const tx = db.transaction([AUTOSAVE_STORE_NAME], 'readonly');
+        const store = tx.objectStore(AUTOSAVE_STORE_NAME);
+        const request = store.get(AUTOSAVE_ACTIVE_PROJECT_KEY);
+        request.onsuccess = () => {
+          value = normalizeAutosaveProjectId(request.result || '');
+        };
+        request.onerror = () => {
+          reject(request.error);
+        };
+        tx.oncomplete = () => {
+          db.close();
+          resolve(value);
+        };
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+    } catch (error) {
+      console.warn('Failed to load autosave project id', error);
+      return '';
+    }
+  }
+
+  function setActiveAutosaveProjectId(projectId, { persist = true } = {}) {
+    const normalizedId = normalizeAutosaveProjectId(projectId) || createAutosaveProjectId();
+    const changed = autosaveProjectId !== normalizedId;
+    autosaveProjectId = normalizedId;
+    if (persist && changed) {
+      storeAutosaveProjectId(normalizedId).catch(error => {
+        console.warn('Failed to persist autosave project id', error);
+      });
+    }
+    return normalizedId;
+  }
+
+  async function ensureActiveAutosaveProjectId(preferredId = '') {
+    const preferred = normalizeAutosaveProjectId(preferredId);
+    if (preferred) {
+      return setActiveAutosaveProjectId(preferred);
+    }
+    if (autosaveProjectId) {
+      return autosaveProjectId;
+    }
+    const stored = await loadStoredAutosaveProjectId();
+    if (stored) {
+      autosaveProjectId = stored;
+      return stored;
+    }
+    return setActiveAutosaveProjectId(createAutosaveProjectId());
+  }
+
+  async function storeAutosaveHandle(handle) {
+    if (!FILE_HANDLE_AUTOSAVE_SUPPORTED) return;
     try {
       const db = await openAutosaveDatabase();
       await new Promise((resolve, reject) => {
@@ -9502,7 +9582,7 @@
   }
 
   async function loadStoredAutosaveHandle() {
-    if (!AUTOSAVE_SUPPORTED) return null;
+    if (!FILE_HANDLE_AUTOSAVE_SUPPORTED) return null;
     try {
       const db = await openAutosaveDatabase();
       return await new Promise((resolve, reject) => {
@@ -9533,7 +9613,7 @@
   }
 
   async function clearStoredAutosaveHandle() {
-    if (!AUTOSAVE_SUPPORTED) return;
+    if (!FILE_HANDLE_AUTOSAVE_SUPPORTED) return;
     try {
       const db = await openAutosaveDatabase();
       await new Promise((resolve, reject) => {
@@ -9710,6 +9790,139 @@
     }
   }
 
+  async function sanitizeRecentProjectsStore({ announce = false } = {}) {
+    if (!AUTOSAVE_SUPPORTED) {
+      return { entries: [], changed: false, removedCount: 0, repairedCount: 0 };
+    }
+    const existingEntries = await loadRecentProjectsMetadata();
+    const sanitizedEntries = [];
+    const seenIds = new Set();
+    let changed = false;
+    let removedCount = 0;
+    let repairedCount = 0;
+    const nowIso = new Date().toISOString();
+
+    for (let index = 0; index < existingEntries.length; index += 1) {
+      const original = existingEntries[index];
+      if (!original || typeof original !== 'object') {
+        changed = true;
+        removedCount += 1;
+        continue;
+      }
+      const normalizedId = normalizeAutosaveProjectId(original.id || '');
+      if (!normalizedId || seenIds.has(normalizedId)) {
+        changed = true;
+        removedCount += 1;
+        continue;
+      }
+
+      const hasProjectPayload = Boolean(original.project && typeof original.project === 'object');
+      if (!hasProjectPayload) {
+        changed = true;
+        removedCount += 1;
+        continue;
+      }
+
+      const nextEntry = { ...original, id: normalizedId };
+      let entryChanged = original.id !== normalizedId;
+      let parsedSnapshot = null;
+
+      try {
+        const parsed = snapshotFromDocumentText(JSON.stringify(original.project));
+        parsedSnapshot = parsed?.snapshot || null;
+        if (!parsedSnapshot) {
+          throw new Error('Snapshot missing in stored project payload');
+        }
+      } catch (error) {
+        changed = true;
+        removedCount += 1;
+        continue;
+      }
+
+      const fallbackFileName = normalizeDocumentName(
+        parsedSnapshot?.documentName
+        || original.fileName
+        || original.name
+        || DEFAULT_DOCUMENT_NAME
+      );
+      if (nextEntry.fileName !== fallbackFileName) {
+        nextEntry.fileName = fallbackFileName;
+        entryChanged = true;
+      }
+      const fallbackName = extractDocumentBaseName(fallbackFileName);
+      if (nextEntry.name !== fallbackName) {
+        nextEntry.name = fallbackName;
+        entryChanged = true;
+      }
+      const parsedUpdatedAt = Date.parse(typeof original.updatedAt === 'string' ? original.updatedAt : '');
+      if (!Number.isFinite(parsedUpdatedAt)) {
+        nextEntry.updatedAt = nowIso;
+        entryChanged = true;
+      }
+      if (typeof nextEntry.thumbnail !== 'string' || nextEntry.thumbnail.length <= 0) {
+        if (nextEntry.thumbnail !== null) {
+          nextEntry.thumbnail = null;
+          entryChanged = true;
+        }
+      }
+      if (Object.prototype.hasOwnProperty.call(nextEntry, 'handle')) {
+        delete nextEntry.handle;
+        entryChanged = true;
+      }
+      seenIds.add(normalizedId);
+      if (entryChanged) {
+        changed = true;
+        repairedCount += 1;
+      }
+      sanitizedEntries.push(nextEntry);
+    }
+
+    sanitizedEntries.sort((a, b) => {
+      const aTime = typeof a?.updatedAt === 'string' ? a.updatedAt : '';
+      const bTime = typeof b?.updatedAt === 'string' ? b.updatedAt : '';
+      return bTime.localeCompare(aTime);
+    });
+    const limitedEntries = sanitizedEntries.slice(0, RECENT_PROJECT_LIMIT);
+    if (limitedEntries.length !== existingEntries.length) {
+      changed = true;
+    }
+
+    if (changed) {
+      await saveRecentProjectsList(existingEntries, limitedEntries);
+    }
+    setRecentProjectsCache(changed ? limitedEntries : existingEntries);
+    if (announce && (removedCount > 0 || repairedCount > 0)) {
+      updateAutosaveStatus(
+        `端末内プロジェクトを整理しました（修復 ${repairedCount} / 除外 ${removedCount}）`,
+        removedCount > 0 ? 'warn' : 'info'
+      );
+    }
+    return {
+      entries: changed ? limitedEntries : existingEntries,
+      changed,
+      removedCount,
+      repairedCount,
+    };
+  }
+
+  async function removeRecentProjectEntry(projectId, { announce = false, reason = '' } = {}) {
+    if (!AUTOSAVE_SUPPORTED) return false;
+    const normalizedId = normalizeAutosaveProjectId(projectId || '');
+    if (!normalizedId) return false;
+    const existingEntries = await loadRecentProjectsMetadata();
+    const nextEntries = existingEntries.filter(entry => entry?.id !== normalizedId);
+    if (nextEntries.length === existingEntries.length) {
+      return false;
+    }
+    await saveRecentProjectsList(existingEntries, nextEntries);
+    setRecentProjectsCache(nextEntries);
+    if (announce) {
+      const reasonSuffix = reason ? `（${reason}）` : '';
+      updateAutosaveStatus(`読込できない端末内プロジェクトを除外しました${reasonSuffix}`, 'warn');
+    }
+    return true;
+  }
+
   function setRecentProjectsCache(entries) {
     recentProjectsCache.clear();
     if (Array.isArray(entries)) {
@@ -9719,7 +9932,38 @@
         }
       });
     }
+    syncStartupResumeState(entries || []);
     renderRecentProjectsList(entries || []);
+  }
+
+  function syncStartupResumeState(entries = []) {
+    const resumeButton = dom.startup?.resumeButton;
+    const resumeHint = dom.startup?.resumeHint;
+    if (!(resumeButton instanceof HTMLButtonElement)) {
+      if (resumeHint instanceof HTMLElement) {
+        resumeHint.textContent = '';
+      }
+      return;
+    }
+    const firstEntry = Array.isArray(entries) && entries.length ? entries[0] : null;
+    if (!firstEntry || !firstEntry.id) {
+      resumeButton.disabled = true;
+      if (resumeHint instanceof HTMLElement) {
+        resumeHint.textContent = 'まだ保存データがありません。まずは新規作成またはファイルを開いてください。';
+      }
+      return;
+    }
+    resumeButton.disabled = false;
+    const displayLabel = firstEntry.fileName || firstEntry.name || DEFAULT_DOCUMENT_NAME;
+    const updatedAt = Date.parse(firstEntry.updatedAt || '');
+    const atLabel = Number.isFinite(updatedAt)
+      ? formatUpdateHistoryDate(updatedAt, '')
+      : '';
+    if (resumeHint instanceof HTMLElement) {
+      resumeHint.textContent = atLabel
+        ? `最近: ${displayLabel}（${atLabel}）`
+        : `最近: ${displayLabel}`;
+    }
   }
 
   function renderRecentProjectsList(entries) {
@@ -9763,13 +10007,20 @@
       nameNode.className = 'startup-recent-card__name';
       nameNode.textContent = displayLabel;
       nameNode.title = displayLabel;
+      const metaNode = document.createElement('span');
+      metaNode.className = 'startup-recent-card__meta';
+      const updatedAt = Date.parse(entry.updatedAt || '');
+      metaNode.textContent = Number.isFinite(updatedAt)
+        ? formatUpdateHistoryDate(updatedAt, '保存時刻不明')
+        : '保存時刻不明';
       card.appendChild(thumb);
       card.appendChild(nameNode);
+      card.appendChild(metaNode);
       list.appendChild(card);
     });
   }
 
-  async function refreshRecentProjectsUI() {
+  async function refreshRecentProjectsUI(options = {}) {
     const section = dom.startup?.recentSection;
     const list = dom.startup?.recentList;
     if (!section || !list) {
@@ -9779,6 +10030,11 @@
       recentProjectsCache.clear();
       list.innerHTML = '';
       section.hidden = true;
+      return;
+    }
+    const shouldSanitize = options?.sanitize !== false;
+    if (shouldSanitize) {
+      await sanitizeRecentProjectsStore({ announce: false });
       return;
     }
     const entries = await loadRecentProjectsMetadata();
@@ -9976,75 +10232,128 @@
     return previewCanvas.toDataURL('image/png');
   }
 
-  async function recordRecentProject(handle, snapshot) {
+  function buildPackagedProjectPayload(snapshot, { session = null, updatedAt = '' } = {}) {
+    const payload = serializeDocumentSnapshot(snapshot);
+    const packagedSession = session && typeof session === 'object'
+      ? session
+      : buildProjectSessionPayload();
+    return {
+      type: PROJECT_PACKAGE_TYPE,
+      packageVersion: PROJECT_PACKAGE_VERSION,
+      version: DOCUMENT_FILE_VERSION,
+      document: payload,
+      session: packagedSession,
+      updatedAt: updatedAt || new Date().toISOString(),
+    };
+  }
+
+  async function recordRecentProjectSnapshot(snapshot, packagedPayload, { projectId = '' } = {}) {
     if (!AUTOSAVE_SUPPORTED) {
-      return;
+      return null;
     }
-    if (!handle || typeof handle !== 'object') {
-      return;
+    if (!snapshot || typeof snapshot !== 'object') {
+      return null;
     }
     try {
+      const resolvedProjectId = setActiveAutosaveProjectId(projectId || autosaveProjectId || createAutosaveProjectId());
+      const packaged = packagedPayload && typeof packagedPayload === 'object'
+        ? packagedPayload
+        : buildPackagedProjectPayload(snapshot);
       const existingEntries = await loadRecentProjectsMetadata();
-      const workingEntries = existingEntries.slice();
-      let matchedIndex = -1;
-      for (let index = 0; index < workingEntries.length; index += 1) {
-        const entry = workingEntries[index];
-        if (!entry || !entry.handle || typeof entry.handle.isSameEntry !== 'function') {
-          continue;
-        }
-        try {
-          const same = await entry.handle.isSameEntry(handle);
-          if (same) {
-            matchedIndex = index;
-            break;
-          }
-        } catch (error) {
-          // Ignore errors from isSameEntry comparisons.
-        }
-      }
-      if (matchedIndex >= 0) {
-        workingEntries.splice(matchedIndex, 1);
-      }
-      const id = matchedIndex >= 0
-        ? existingEntries[matchedIndex].id
-        : (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-          ? crypto.randomUUID()
-          : `project-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6)}`);
-      const fileName = (handle && typeof handle.name === 'string' && handle.name) || snapshot?.documentName || DEFAULT_DOCUMENT_NAME;
-      const displayName = extractDocumentBaseName(snapshot?.documentName || fileName);
-      const thumbnail = await generateSnapshotThumbnail(snapshot);
+      const previousEntry = existingEntries.find(entry => entry?.id === resolvedProjectId) || null;
+      const workingEntries = existingEntries
+        .filter(entry => entry && entry.id && entry.id !== resolvedProjectId);
+      const fileName = normalizeDocumentName(snapshot?.documentName || DEFAULT_DOCUMENT_NAME);
+      const displayName = extractDocumentBaseName(fileName);
+      const nowTs = Date.now();
+      const previousUpdatedAt = previousEntry?.updatedAt ? Date.parse(previousEntry.updatedAt) : NaN;
+      const shouldRefreshThumbnail =
+        !previousEntry?.thumbnail
+        || !Number.isFinite(previousUpdatedAt)
+        || (nowTs - previousUpdatedAt >= LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS);
+      const thumbnail = shouldRefreshThumbnail
+        ? (await generateSnapshotThumbnail(snapshot))
+        : previousEntry.thumbnail;
       const updatedEntry = {
-        id,
+        id: resolvedProjectId,
         name: displayName,
         fileName,
-        updatedAt: new Date().toISOString(),
+        updatedAt: packaged.updatedAt || new Date().toISOString(),
         thumbnail: thumbnail || null,
-        handle,
+        project: packaged,
       };
       workingEntries.unshift(updatedEntry);
       const limited = workingEntries.slice(0, RECENT_PROJECT_LIMIT);
       await saveRecentProjectsList(existingEntries, limited);
       setRecentProjectsCache(limited);
+      return updatedEntry;
     } catch (error) {
-      console.warn('Failed to record recent project', error);
+      console.warn('Failed to record recent project snapshot', error);
+      return null;
     }
   }
 
-  async function openRecentProject(entry) {
-    if (!entry || !entry.handle) {
+  async function openRecentProject(entry, options = {}) {
+    if (!entry || typeof entry !== 'object') {
       return false;
     }
+    const hideStartupOnSuccess = options.hideStartup !== false;
+    const silent = options.silent === true;
     try {
-      const granted = await ensureHandlePermission(entry.handle, { request: true });
-      if (!granted) {
-        updateAutosaveStatus('自動保存: 権限が必要です', 'warn');
-        return false;
+      if (entry.project && typeof entry.project === 'object') {
+        const loaded = await loadDocumentFromText(JSON.stringify(entry.project), null, {
+          projectId: entry.id || '',
+          suppressAutosaveStatus: true,
+          openedFromRecent: true,
+        });
+        if (!loaded) {
+          await removeRecentProjectEntry(entry.id || '', {
+            announce: !silent,
+            reason: 'データ形式が壊れていたため',
+          });
+          return false;
+        }
+        if (!silent) {
+          updateAutosaveStatus('自動保存: 端末内プロジェクトを開きました', 'success');
+        }
+        if (hideStartupOnSuccess) {
+          hideStartupScreen();
+        }
+        return true;
       }
-      await loadDocumentFromHandle(entry.handle);
-      hideStartupScreen();
-      return true;
+
+      if (entry.handle) {
+        const loaded = await loadDocumentFromHandle(entry.handle, {
+          projectId: entry.id || '',
+          suppressAutosaveStatus: true,
+          openedFromRecent: true,
+        });
+        if (!loaded) {
+          await removeRecentProjectEntry(entry.id || '', {
+            announce: !silent,
+            reason: '旧ファイル権限が無効なため',
+          });
+          return false;
+        }
+        if (!silent) {
+          updateAutosaveStatus('自動保存: プロジェクトを開きました', 'success');
+        }
+        if (hideStartupOnSuccess) {
+          hideStartupScreen();
+        }
+        return true;
+      }
+
+      updateAutosaveStatus('プロジェクトを開けませんでした', 'error');
+      return false;
     } catch (error) {
       console.warn('Failed to open recent project', error);
+      if (entry.project && typeof entry.project === 'object') {
+        await removeRecentProjectEntry(entry.id || '', {
+          announce: !silent,
+          reason: '読込時に例外が発生したため',
+        });
+      }
       updateAutosaveStatus('プロジェクトを開けませんでした', 'error');
       return false;
     }
@@ -11662,12 +11971,15 @@
       pendingAutosaveHandle = null;
       clearPendingPermissionListener();
       if (dom.controls.enableAutosave) {
-        dom.controls.enableAutosave.textContent = '自動保存先を変更';
+        dom.controls.enableAutosave.textContent = 'ローカル自動保存（常時ON）';
       }
       autosaveDirty = false;
       markDocumentDurablySaved();
       await storeAutosaveHandle(handle);
-      recordRecentProject(handle, snapshot).catch(error => {
+      const packaged = buildPackagedProjectPayload(snapshot);
+      recordRecentProjectSnapshot(snapshot, packaged, {
+        projectId: autosaveProjectId || createAutosaveProjectId(),
+      }).catch(error => {
         console.warn('Failed to update recent projects snapshot', error);
       });
       return true;
@@ -11685,16 +11997,8 @@
     try {
       commitHistory();
       const snapshot = makeHistorySnapshot();
-      const payload = serializeDocumentSnapshot(snapshot);
       const session = buildProjectSessionPayload();
-      const packaged = {
-        type: PROJECT_PACKAGE_TYPE,
-        packageVersion: PROJECT_PACKAGE_VERSION,
-        version: DOCUMENT_FILE_VERSION,
-        document: payload,
-        session,
-        updatedAt: new Date().toISOString(),
-      };
+      const packaged = buildPackagedProjectPayload(snapshot, { session });
       const json = JSON.stringify(packaged);
       const blob = new Blob([json], { type: PROJECT_FILE_MIME_TYPE });
       const filename = createAutosaveFileName();
@@ -15813,6 +16117,10 @@
 
     dom.controls.openDocument?.addEventListener('click', () => {
       openDocumentDialog();
+    });
+
+    dom.controls.showLocalProjects?.addEventListener('click', () => {
+      showStartupScreen();
     });
 
     dom.controls.exportProject?.addEventListener('click', () => {
@@ -32037,6 +32345,14 @@
         resetDocumentUnsavedChanges();
         updateHistoryButtons();
         autosaveDirty = true;
+        scheduleAutosaveSnapshot();
+      }
+      // Ensure replica-received pixels are overwritten immediately with the pre-join local document.
+      autosaveDirty = true;
+      try {
+        await writeAutosaveSnapshot(true);
+      } catch (error) {
+        console.warn('Failed to flush autosave after replica disconnect', error);
         scheduleAutosaveSnapshot();
       }
     } else if (!isMultiReplicaRole(disconnectedRole)) {
