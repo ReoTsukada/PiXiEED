@@ -138,16 +138,15 @@
 <button class="startup-screen__link" id="startupActionSkip" type="button">この画面を閉じる</button>
 </div>
 </div>
-<div aria-hidden="true" class="update-toast" data-update-id="2026-02-25-left-rail-unified-ui" hidden="" id="updateToast" role="status" aria-live="polite">
+<div aria-hidden="true" class="update-toast" data-update-id="2026-02-27-home-multi-export-i18n-input-updates" hidden="" id="updateToast" role="status" aria-live="polite">
 <div class="update-toast__body">
 <p class="update-toast__message">
-<strong>更新情報 (2026/02/25)</strong><br/>
-・ツールとカラーの操作導線を統合（同一レーン内で切替）<br/>
-・左レーンコンパクト時のツール表示を1列固定 + フライアウト化<br/>
-・ツール/カラーボタンのサイズを統一（44px）し、余白を調整<br/>
-・コンパクト時のカラーパネルを「色 + 追加/削除」に整理（縦スクロール対応）<br/>
-・選択編集UIを、選択範囲がある時だけ表示するよう改善<br/>
-・横画面の左レーンをツール/カラー 50:50 分割に調整<br/>
+<strong>更新情報 (2026/02/27)</strong><br/>
+・PiXiEEDホーム導線を再整理（PiXiEEDraw / Lite の対比を明確化）<br/>
+・常設ルーム運用を 256x256 の1部屋に統一、表示/入室UIを改善<br/>
+・保存/出力からコンテスト投稿への遷移導線を追加、投稿形式を整理<br/>
+・PiXiEEDrawに英語モードを追加し、レイヤー/マルチ文言の英訳を補完<br/>
+・モバイル入力欄のキーボード被り対策と、サイズ入力Enter挙動を改善<br/>
 ・詳細は設定の「更新情報」から確認できます
 </p>
 <div class="update-toast__actions">
@@ -814,22 +813,33 @@
 <div class="panel-section__body">
   <div class="settings-nav">
     <a class="button" href="https://pixieed.jp/tools.html" id="goHomeButton">他のツール一覧へ</a>
+    <button class="chip settings-nav__close" id="toggleLanguageMode" type="button">English</button>
     <button aria-haspopup="dialog" class="chip settings-nav__close" id="openShortcutHelp" type="button">ショートカット一覧</button>
     <button aria-haspopup="dialog" class="chip settings-nav__close" id="openUpdateHistory" type="button">更新情報</button>
   </div>
 <div class="settings-size-grid">
 <label class="field settings-size-row settings-size-row--canvas">
 <span>キャンバスサイズ</span>
-<div class="field field--inline settings-size-controls">
+<div class="field field--inline settings-size-controls settings-size-controls--canvas">
 <label class="field field--tiny">
 <span>横</span>
-<input data-stepper="true" id="canvasWidth" max="512" min="1" type="number" value="32"/>
+<div class="canvas-size-stepper">
+<button aria-label="横を1下げる" class="number-stepper__btn" id="canvasWidthDecrement" type="button">−</button>
+<input data-stepper="true" enterkeyhint="done" id="canvasWidth" inputmode="numeric" max="512" min="1" step="1" type="number" value="32"/>
+<button aria-label="横を1上げる" class="number-stepper__btn" id="canvasWidthIncrement" type="button">＋</button>
+</div>
 </label>
 <label class="field field--tiny">
 <span>縦</span>
-<input data-stepper="true" id="canvasHeight" max="512" min="1" type="number" value="32"/>
-</label>
+<div class="canvas-size-stepper">
+<button aria-label="縦を1下げる" class="number-stepper__btn" id="canvasHeightDecrement" type="button">−</button>
+<input data-stepper="true" enterkeyhint="done" id="canvasHeight" inputmode="numeric" max="512" min="1" step="1" type="number" value="32"/>
+<button aria-label="縦を1上げる" class="number-stepper__btn" id="canvasHeightIncrement" type="button">＋</button>
 </div>
+</label>
+<button class="button" id="applyCanvasResize" type="button">適用</button>
+</div>
+<p class="help-text" id="canvasSizeHint">横/縦を入力して「適用」または Enter で反映します。</p>
 </label>
 <label class="field settings-size-row settings-size-row--sprite">
 <span>スプライト倍率</span>
@@ -969,6 +979,18 @@
 </header>
 <div class="modal__body">
 <div class="field field--list">
+<label class="field field--compact" for="exportFormat">
+<span>形式</span>
+<select id="exportFormat">
+<option value="png">PNG（画像）</option>
+<option value="gridpng">PNG（グリッド分割）</option>
+<option value="gif">GIF（アニメーション）</option>
+<option value="timelapse">タイムラプスGIF（記録）</option>
+<option value="pixfind">PiXFiNDへ送る</option>
+<option value="project">プロジェクト（.pixieedraw）</option>
+</select>
+</label>
+<div id="exportScaleControls">
 <span>出力倍率</span>
 <div class="scale-controls">
 <div class="scale-control scale-control--wide">
@@ -977,14 +999,19 @@
 <input data-stepper="true" id="exportScaleInput" inputmode="numeric" min="1" type="number" value="1"/>
 </div>
 </div>
+</div>
 <p class="help-text" id="exportScaleHint"></p>
-<label class="toggle-option export-original-toggle" for="exportIncludeOriginalToggle">
+<label class="toggle-option export-original-toggle" for="exportIncludeOriginalToggle" id="exportOriginalOptionRow">
 <input id="exportIncludeOriginalToggle" type="checkbox"/>
 <span>拡大出力時に原寸も追加で出力する</span>
 </label>
-<label class="toggle-option" for="exportSaveProjectCompanionToggle">
+<label class="toggle-option" for="exportSaveProjectCompanionToggle" id="exportCompanionOptionRow">
 <input id="exportSaveProjectCompanionToggle" type="checkbox"/>
 <span>画像/GIF出力時に PiXiEEDファイルも同時保存する</span>
+</label>
+<label class="toggle-option" for="exportContestPostToggle" id="exportContestPostOptionRow">
+<input id="exportContestPostToggle" type="checkbox"/>
+<span>保存完了後にコンテスト投稿画面へ移動する</span>
 </label>
 <div class="field field--inline" hidden id="exportGridSettings">
 <span>グリッド分割 (PNG)</span>
@@ -1005,18 +1032,7 @@
 <p class="help-text"><strong>Androidで保存</strong> 保存</p>
 </div>
 <p aria-live="polite" class="help-text export-destination-label" id="exportDialogDestinationLabel">画像/GIF出力先: 未固定（保存時に保存先を選択）</p>
-<div aria-label="出力形式の選択" class="export-actions" role="group">
-<label class="field field--compact">
-<span>形式</span>
-<select id="exportFormat">
-<option value="png">PNG（画像）</option>
-<option value="gridpng">PNG（グリッド分割）</option>
-<option value="gif">GIF（アニメーション）</option>
-<option value="timelapse">タイムラプスGIF（記録）</option>
-<option value="pixfind">PiXFiNDへ送る</option>
-<option value="project">プロジェクト（.pixieedraw）</option>
-</select>
-</label>
+<div aria-label="出力操作" class="export-actions" role="group">
 <button class="button button--primary" id="confirmExport" type="button">保存/出力</button>
 </div>
 </div>
