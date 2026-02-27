@@ -122,22 +122,20 @@
 <h1 class="startup-screen__title" id="startupScreenTitle">PiXiEEDraw</h1>
 <p class="startup-screen__subtitle">PiXiEEDraw（ピクシードロー）でドット絵づくりをはじめよう</p>
 </div>
-<div class="startup-screen__actions">
-<button class="button button--primary" id="startupActionNew" type="button">新規作成</button>
+<div aria-label="起動操作" class="startup-screen__actions" role="group">
+<button class="button button--primary" id="startupActionResume" type="button">前回の続きから再開</button>
+<button class="button" id="startupActionNew" type="button">新規作成</button>
 <button class="button" id="startupActionOpen" type="button">ファイルを開く</button>
 </div>
-<div class="startup-screen__quick-setup">
-<p class="startup-screen__quick-title">かんたん初期設定</p>
-<button class="button" id="startupActionQuickSetup" type="button">新規作成 + 保存先設定をまとめて行う</button>
-<p class="startup-screen__hint" id="startupQuickSetupStatus">初回だけ保存先を決めると、以後の保存/出力が楽になります。</p>
+<div class="startup-screen__hints">
+<p class="startup-screen__hint" id="startupScreenHint">描画内容はこの端末に自動保存され、起動時に前回データを復元できます。</p>
+<p class="startup-screen__hint" id="startupResumeHint">端末内プロジェクトを確認しています…</p>
 </div>
-<button class="startup-screen__link" id="startupActionSkip" type="button">編集を続ける</button>
-<p class="startup-screen__hint" id="startupScreenHint">ファイルを開くと既存の自動保存先を引き継ぎます。</p>
-<p class="startup-screen__hint">最新更新 (2026/02/25): ツール/カラー統合UI、左レーンコンパクト表示、ボタンサイズ統一を改善。</p>
 <div class="startup-screen__recent" hidden="" id="startupRecentProjects">
-<h2 class="startup-screen__recent-title">最近のプロジェクト</h2>
+<h2 class="startup-screen__recent-title">端末内プロジェクト（自動保存）</h2>
 <div class="startup-recent-list" id="startupRecentList" role="list"></div>
 </div>
+<button class="startup-screen__link" id="startupActionSkip" type="button">この画面を閉じる</button>
 </div>
 </div>
 <div aria-hidden="true" class="update-toast" data-update-id="2026-02-25-left-rail-unified-ui" hidden="" id="updateToast" role="status" aria-live="polite">
@@ -605,18 +603,20 @@
 </section>
 <section class="panel-section" data-section="file" id="panelFile">
 <div class="panel-section__body">
-<div class="field-group">
+<div class="field-group field-group--file-actions">
 <button class="button" id="newProject" type="button">新規作成</button>
 <button class="button" id="openDocument" type="button">ファイルを開く</button>
-<button class="button" id="exportProject" type="button">保存/出力</button>
-<p class="help-text">保存/出力: PNG/GIF書き出しと PiXiEEDファイル保存をまとめています。</p>
+<button class="button" id="showLocalProjects" type="button">端末内プロジェクト</button>
+<button class="button button--primary" id="exportProject" type="button">保存/出力</button>
 <button class="button" id="clearCanvas" type="button">キャンバスをクリア</button>
-<button class="button" id="enableAutosave" type="button">ローカルに自動保存</button>
-<p class="help-text">自動保存はこの端末内に下書きを保存します。出力は共有・配布用です。</p>
-<button class="button" id="bindExportFolder" type="button">出力フォルダを設定</button>
-<p class="help-text">一度設定すると PNG/GIF/プロジェクト を PiXiEED フォルダへ上書き保存します。</p>
-<p aria-live="polite" class="help-text export-destination-label" id="exportDestinationLabel">画像/GIF出力先: 未固定（保存時に保存先を選択）</p>
 </div>
+<div class="file-panel-summary">
+<p class="help-text">自動保存: ON（この端末）</p>
+<p class="help-text">共有・配布用の保存は「保存/出力」から手動で行います。</p>
+</div>
+<button class="button" hidden id="enableAutosave" type="button">ローカル自動保存（常時ON）</button>
+<button class="button" hidden id="bindExportFolder" type="button">出力フォルダを設定</button>
+<p aria-live="polite" class="help-text export-destination-label" id="exportDestinationLabel">画像/GIF出力先: 未固定（保存時に保存先を選択）</p>
 <p aria-live="polite" class="help-text" id="autosaveStatus"></p>
 <p aria-live="polite" class="help-text" id="exportFolderStatus"></p>
 <div class="field field--list">
