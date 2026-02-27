@@ -4192,6 +4192,51 @@ body.is-mobile-layout .mobile-draw-help {
   min-width: 0;
 }
 
+#panelSettings .settings-size-controls--canvas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+#panelSettings .settings-size-controls--canvas .field--tiny {
+  width: 100%;
+}
+
+#panelSettings .canvas-size-stepper {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 30px;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+}
+
+#panelSettings .canvas-size-stepper input[type='number'] {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 6px;
+  text-align: center;
+}
+
+#panelSettings .canvas-size-stepper .number-stepper__btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+#panelSettings #applyCanvasResize {
+  width: auto;
+  min-height: 32px;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+#panelSettings #canvasSizeHint {
+  margin: 0;
+}
+
 #panelSettings .settings-size-controls .number-stepper {
   gap: 4px;
   min-width: 0;
@@ -4233,6 +4278,12 @@ body.is-mobile-layout .mobile-draw-help {
   flex: 0 0 auto;
   align-self: flex-end;
   white-space: nowrap;
+}
+
+@media (max-width: 980px) {
+  #panelSettings .settings-size-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 #panelSettings .settings-display-buttons {
@@ -4534,7 +4585,7 @@ body.is-mobile-layout #rightPanelAdSlot {
   max-height: var(--mobile-bottom-ad-slot-height) !important;
 }
 
-#panelSettings .settings-size-controls .number-stepper__btn {
+#panelSettings .settings-size-row--sprite .settings-size-controls .number-stepper__btn {
   width: 26px;
   height: 26px;
 }
@@ -4816,7 +4867,7 @@ body.is-startup-active {
 
 @media (max-width: 430px) {
   .startup-recent-list {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     max-height: min(28vh, 220px);
   }
 }
@@ -6148,6 +6199,25 @@ body.is-startup-active {
 
   #panelSettings .settings-size-controls {
     gap: 4px;
+  }
+
+  #panelSettings .settings-size-controls--canvas {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  #panelSettings .canvas-size-stepper {
+    grid-template-columns: 34px minmax(0, 1fr) 34px;
+  }
+
+  #panelSettings .canvas-size-stepper .number-stepper__btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  #panelSettings #applyCanvasResize {
+    width: 100%;
+    justify-content: center;
   }
 
   #panelSettings .settings-size-row .button {
