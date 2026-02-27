@@ -4,15 +4,15 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" name="viewport"/>
-<title>PiXiEEDraw Lite（ピクドラ） | 16×16ドット絵ツール</title>
-<meta content="PiXiEEDrawのライト版（通称ピクドラ）。16×16固定の超シンプルなブラウザ向けドットツールで、ジェリンプレビューや日替わりお題で気軽にドット練習ができます。" name="description"/>
-<meta content="PiXiEEDraw Lite,ピクドラ,ピクセル,ドット絵,ジェリン,ブラウザお絵描き,16x16ドット,ドットツール" name="keywords"/>
+<title>PiXiEEDraw Lite（ピクドラ） | 4×4〜16×16ドット絵ツール</title>
+<meta content="PiXiEEDrawのライト版（通称ピクドラ）。4×4 / 8×8 / 16×16の超シンプルなブラウザ向けドットツールで、ジェリンプレビューや日替わりお題で気軽にドット練習ができます。" name="description"/>
+<meta content="PiXiEEDraw Lite,ピクドラ,ピクセル,ドット絵,ジェリン,ブラウザお絵描き,4x4ドット,8x8ドット,16x16ドット,ドットツール" name="keywords"/>
 <meta content="noindex,follow" name="robots"/>
 <link rel="canonical" href="https://pixieed.jp/projects/jerin-maker/"/>
 <meta content="#0b0f1f" name="theme-color"/>
 <meta content="website" property="og:type"/>
 <meta content="PiXiEEDraw Lite（ピクドラ）" property="og:title"/>
-<meta content="PiXiEEDrawのライト版（通称ピクドラ）。16×16固定の超シンプルなブラウザ向けドットツールで、ジェリンプレビューや日替わりお題で気軽にドット練習ができます。" property="og:description"/>
+<meta content="PiXiEEDrawのライト版（通称ピクドラ）。4×4 / 8×8 / 16×16の超シンプルなブラウザ向けドットツールで、ジェリンプレビューや日替わりお題で気軽にドット練習ができます。" property="og:description"/>
 <meta content="https://pixieed.jp/jerin-maker/" property="og:url"/>
 <meta content="https://pixieed.jp/jerin-maker/ogp-app.png" property="og:image"/>
 <meta content="https://pixieed.jp/jerin-maker/ogp-app.png" property="og:image:secure_url"/>
@@ -26,7 +26,7 @@
 <meta content="@PiXiEED_arta" name="twitter:site"/>
 <meta content="https://pixieed.jp/jerin-maker/" name="twitter:url"/>
 <meta content="PiXiEEDraw Lite（ピクドラ）" name="twitter:title"/>
-<meta content="PiXiEEDrawのライト版（通称ピクドラ）。16×16固定の超シンプルなブラウザ向けドットツールで、ジェリンプレビューや日替わりお題で気軽にドット練習ができます。" name="twitter:description"/>
+<meta content="PiXiEEDrawのライト版（通称ピクドラ）。4×4 / 8×8 / 16×16の超シンプルなブラウザ向けドットツールで、ジェリンプレビューや日替わりお題で気軽にドット練習ができます。" name="twitter:description"/>
 <meta content="https://pixieed.jp/jerin-maker/ogp-app.png" name="twitter:image"/>
 <meta content="PiXiEEDraw Lite（ピクドラ）" name="twitter:image:alt"/>
 <script type="application/ld+json">
@@ -38,7 +38,7 @@
   "operatingSystem": "Web",
   "url": "https://pixieed.jp/jerin-maker/",
   "image": "https://pixieed.jp/jerin-maker/ogp-app.png",
-  "description": "16×16固定の超シンプルなブラウザ向けドットツールで、ジェリンプレビューや日替わりお題で気軽にドット練習ができます。",
+  "description": "4×4 / 8×8 / 16×16の超シンプルなブラウザ向けドットツールで、ジェリンプレビューや日替わりお題で気軽にドット練習ができます。",
   "offers": {
     "@type": "Offer",
     "price": "0",
@@ -188,6 +188,13 @@
     gap: clamp(10px, 2vw, 16px);
     min-height: 0;
     overflow: visible;
+  }
+  .daily-prompt-place {
+    width: 100%;
+    min-height: clamp(40px, 7vw, 52px);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
   }
   .workspace {
     display: flex;
@@ -703,51 +710,6 @@
     }
     .lite-color-actions { gap: 6px; }
   }
-  .prompt {
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 12px 10px;
-    background: rgba(255, 255, 255, 0.04);
-    font-size: 1rem;
-    line-height: 1.5;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    min-height: 0;
-    flex-shrink: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .prompt .maou-inline {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .prompt .maou-chip {
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    border: 1px solid var(--accent);
-    background: #0b0f1f;
-    display: block;
-    overflow: hidden;
-    flex-shrink: 0;
-  }
-  .prompt .maou-chip img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    display: block;
-  }
-  .prompt-title {
-    font-weight: 700;
-    color: var(--accent);
-    margin: 0;
-    padding: 0;
-    display: inline-block;
-  }
   .tutorial {
     border: 1px solid var(--line);
     border-radius: 10px;
@@ -901,15 +863,6 @@
     align-items: center;
     justify-content: center;
   }
-  .inline-buttons__tools {
-    grid-column: 3;
-    display: flex;
-    flex-wrap: wrap;
-    column-gap: 6px;
-    row-gap: 10px;
-    align-items: center;
-    justify-content: flex-end;
-  }
   .inline-buttons__row--bottom .icon-btn {
     width: var(--lite-bottom-control-size);
     height: var(--lite-bottom-control-size);
@@ -951,10 +904,6 @@
       column-gap: 4px;
       row-gap: 8px;
     }
-    .inline-buttons__tools {
-      column-gap: 4px;
-      row-gap: 8px;
-    }
     .inline-buttons__row--top .icon-btn {
       width: 36px;
       height: 36px;
@@ -970,8 +919,7 @@
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
   }
-  .swatch-editor,
-  .file-input {
+  .swatch-editor {
     position: absolute;
     opacity: 0;
     pointer-events: none;
@@ -995,13 +943,11 @@
     .canvas-frame { padding: 8px; }
     .panel { max-height: calc(var(--app-height) - 140px); gap: 8px; }
     .app { gap: clamp(8px, 2vw, 12px); }
-    .prompt { font-size: 0.9rem; padding: 10px 10px; }
   }
   @media (max-height: 620px) {
     :root { --pad: clamp(6px, 1.5vw, 10px); }
     .canvas-stack { --canvas-size: min(70vw, min(38vh, 340px)); }
     .panel { max-height: calc(var(--app-height) - 170px); gap: 6px; }
-    .prompt { font-size: 0.86rem; padding: 8px 8px; }
     .footer { padding: 4px 0; }
   }
   @media (min-height: 900px) and (orientation: portrait) {
@@ -1315,14 +1261,7 @@
 <body>
 <div class="shell">
 <div class="app">
-  <div class="prompt" id="dailyPrompt">
-    <span class="prompt-title" id="promptTitle">今日のお題：</span>
-    <span class="prompt-body" id="promptBody">読み込み中...</span>
-    <span class="maou-inline" id="maouInline" aria-live="polite" style="display:none">
-      <span class="maou-chip"><img src="./魔王1.png" alt="魔王さま"/></span>
-      <span id="maouInlineText"></span>
-    </span>
-  </div>
+  <div class="daily-prompt-place" id="dailyPrompt"></div>
   <div class="workspace">
     <div class="canvas-wrap">
     <div class="canvas-frame">
@@ -1331,7 +1270,7 @@
         <canvas aria-hidden="true" class="tutorial-overlay" height="16" id="tutorialOverlay" width="16"></canvas>
         <canvas aria-hidden="true" class="cutscene-overlay" height="16" id="cutsceneOverlay" width="16"></canvas>
         <canvas aria-hidden="true" class="jelin-overlay" height="16" id="jelinCanvas" width="16"></canvas>
-        <canvas aria-label="16×16のドットキャンバス" height="16" id="canvas" width="16"></canvas>
+        <canvas aria-label="ドットキャンバス" height="16" id="canvas" width="16"></canvas>
         <canvas aria-hidden="true" height="16" id="gridCanvas" width="16"></canvas>
       </div>
     </div>
@@ -1356,22 +1295,14 @@
               <button type="button" class="vp-btn" id="panRight" aria-label="右に移動">→</button>
               <button type="button" class="vp-btn" id="zoomIn" aria-label="拡大">＋</button>
             </div>
-            <div class="inline-buttons__tools">
-              <button class="icon-btn" id="btnImport" title="画像を読み込む" type="button">
-                <img alt="読み込み" src="../pixiedraw/assets/icons/menu-file.svg"/>
-              </button>
-            </div>
           </div>
           <div class="inline-buttons__row inline-buttons__row--bottom">
             <button class="icon-btn color-open-btn" id="btnOpenColorPanel" title="色を編集する" type="button">
               <span class="color-chip" id="btnColorChip"></span>
             </button>
-            <button class="icon-btn" id="btnCycleSize" title="キャンバスサイズを切り替え (8px / 16px / 32px)" type="button">16px</button>
+            <button class="icon-btn" id="btnCycleSize" title="キャンバスサイズを切り替え (4px / 8px / 16px)" type="button">16px</button>
             <button class="icon-btn" id="btnJelinMode" title="スカイジェリンをプレビューする" type="button">
               <img alt="ジェリンモード" src="./JELLNALL1.svg"/>
-            </button>
-            <button aria-pressed="false" class="icon-btn" id="btnDiffMode" title="間違い探しモード" type="button">
-              <img alt="PiXFiND" src="../icon/icon-192-2.png"/>
             </button>
             <button class="icon-btn" id="btnTutorialSpacerLeft" title="" type="button" aria-hidden="true"></button>
             <button class="icon-btn" id="btnTutorialRestart" title="チュートリアルを最初から (ハテナ)" type="button" aria-hidden="true">?</button>
@@ -1386,7 +1317,6 @@
         <div class="palette" id="palette"></div>
       </div>
       <input aria-hidden="true" class="swatch-editor" id="swatchEditor" tabindex="-1" type="color" />
-      <input aria-hidden="true" class="file-input" id="importInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
       <div class="lite-color-picker-overlay" id="liteColorPicker" aria-hidden="true">
         <div class="lite-color-picker-card">
           <div class="lite-color-content">
@@ -1445,8 +1375,8 @@
 </footer>
 <script>
 (() => {
-  const CANVAS_SIZES = [8, 16, 32];
-  let canvasSizeIndex = 1;
+  const CANVAS_SIZES = [4, 8, 16];
+  let canvasSizeIndex = 2;
   let canvasSize = CANVAS_SIZES[canvasSizeIndex];
   const canvas = document.getElementById('canvas');
   const ctx = canvas?.getContext('2d', { willReadFrequently: true });
@@ -1516,10 +1446,6 @@
     '#00d4aa',
     '#4fd1c5',
   ];
-  const MAX_IMPORT_SOURCE_SIZE = 2000;
-  const MAX_IMPORT_TARGET_SIZE = 120;
-  const NORMALIZE_COLOR_TOLERANCE = 12;
-  const NORMALIZE_MATCH_RATIO = 0.985;
   let palette = [...DEFAULT_PALETTE];
   const TUTORIAL_RED = '#ff2c00';
   const TUTORIAL_COLORS = [
@@ -1608,10 +1534,9 @@
     const padBottom = parseFloat(bodyStyle.paddingBottom || '0');
     const shellPadding = getElementPaddingY(shellEl);
     const framePadding = getElementPaddingY(canvasFrame);
-    const promptHeight = dailyPromptEl?.getBoundingClientRect().height || 0;
     const appGap = getGapSize(appEl);
     const wrapGap = getGapSize(canvasWrap);
-    let height = window.innerHeight - padTop - padBottom - shellPadding - framePadding - promptHeight - appGap - wrapGap;
+    let height = window.innerHeight - padTop - padBottom - shellPadding - framePadding - appGap - wrapGap;
     const isSideBySide = window.matchMedia('(min-width: 960px), (orientation: landscape)').matches;
     if (!isSideBySide) {
       const workspaceGap = getGapSize(workspaceEl);
@@ -1716,8 +1641,6 @@
   let diffMode = false;
   let diffBasePixels = null;
   let diffLayerInitialized = false;
-  let diffModeFirstEnableConfirmed = false;
-  const diffDifficulty = 1;
   const LAYER_BASE = 'base';
   const LAYER_DIFF = 'diff';
   let activeLayerKey = LAYER_BASE;
@@ -1752,539 +1675,19 @@
   let cutsceneOverlayImage = null;
   let endingCutscenePlayed = false;
   let sprite0FadeFrame = null;
-  const dailyPrompts = [
-    // 花・植物
-    'バラ',
-    'チューリップ',
-    'ラベンダー',
-    'ひまわり',
-    '桜(さくら)',
-    '梅(うめ)',
-    '藤の花(ふじのはな)',
-    '紫陽花(あじさい)',
-    'コスモス',
-    '彼岸花(ひがんばな)',
-    'スズラン',
-    'カーネーション',
-    'ガーベラ',
-    'ダリア',
-    'ポピー',
-    'パンジー',
-    'ビオラ',
-    'マーガレット',
-    'キンギョソウ',
-    'スイートピー',
-    'アイリス',
-    'アネモネ',
-    'ヒナゲシ',
-    'デイジー',
-    'ヤグルマギク',
-    'デルフィニウム',
-    'クレマチス',
-    'ジャスミン',
-    'ハイビスカス',
-    'プルメリア',
-    'マリーゴールド',
-    'ロベリア',
-    'ナデシコ',
-    'サクラソウ(さくらそう)',
-    'サボテンの花(さぼてんのはな)',
-    'エーデルワイス',
-    'リンドウ',
-    'スノードロップ',
-    'クロッカス',
-    'ジギタリス',
-    'カラーリリー',
-    'オダマキ',
-    'ミヤコワスレ',
-    '黄花コスモス(きばなコスモス)',
-    'ハーブの苗トレイ(はーぶのなえトレイ)',
-    '苔テラリウム(こけてらりうむ)',
-    'スイセン',
-    'ジニア',
-    'ロータス',
-    'ススキ',
-    '苔盆栽(こけばんさい)',
-    'アサガオ',
-    'ユリ',
-    'カトレア',
-    '蘭の花(らんのはな)',
-    'ベゴニア',
-    'アザミ',
-    'レンゲソウ',
-    'シロツメクサ',
-    'クローバー',
-    'タンポポ',
-    'ミモザ',
-    'ローズマリー',
-    'タイム',
-    'バジル',
-    'ミント',
-    'カモミール',
-    'セージ',
-    'レモンバーム',
-    'オレガノ',
-    'ユーカリ',
-    'ユーカリの枝(ゆーかりのえだ)',
-    'コニファー',
-    'モンステラ',
-    'ポトス',
-    'フィカス',
-    'シュガーバイン',
-    'アロエ',
-    'ガジュマル',
-    'パキラ',
-    'オリーブ',
-    '多肉植物(たにくしょくぶつ)',
-    'サボテン',
-    'チランジア',
-    '苔玉(こけだま)',
-    'コケ(こけ)',
-    '竹(たけ)',
-    '笹(ささ)',
-    '松ぼっくり(まつぼっくり)',
-    'ヤシの木(やしのき)',
-    'モミの木(もみのき)',
-    'クリスマスツリー',
-    '紅葉(こうよう)',
-    '銀杏の葉(いちょうのは)',
-    '柳の枝(やなぎのえだ)',
-    '枝物の花瓶(えだもののかびん)',
-    // 果物・木の実
-    'いちご',
-    'ブルーベリー',
-    'ラズベリー',
-    'チェリー',
-    'リンゴ',
-    '洋ナシ(ようなし)',
-    'プラム',
-    'もも',
-    'ぶどう',
-    'マスカット',
-    'オレンジ',
-    'レモン',
-    'ライム',
-    'グレープフルーツ',
-    'バナナ',
-    'ドラゴンフルーツ',
-    'ライチ',
-    'スターフルーツ',
-    'イチジク',
-    'メロン',
-    'スイカ',
-    'パイナップル',
-    'マンゴー',
-    'キウイ',
-    'パパイヤ',
-    'ザクロ',
-    'ココナッツ',
-    'アボカド',
-    'ドングリ',
-    '木の実のリース(きのみのリース)',
-    'アサイー',
-    'クコの実(くこのみ)',
-    'マカダミアナッツ',
-    'カカオの実(かかおのみ)',
-    // 野菜・ハーブ
-    'トマト',
-    'ミニトマト',
-    'カボチャ',
-    'ナス',
-    'ピーマン',
-    'パプリカ',
-    'トウモロコシ',
-    'ニンジン',
-    'ジャガイモ',
-    'タマネギ',
-    'ニンニク',
-    'ショウガ',
-    'ネギ',
-    'レタス',
-    'キャベツ',
-    'ホウレンソウ',
-    'アスパラガス',
-    'ブロッコリー',
-    'カリフラワー',
-    'オクラ',
-    '枝豆(えだまめ)',
-    'ゴーヤ',
-    'ヘーゼルナッツ',
-    'ピスタチオ',
-    'カシューナッツ',
-    // 宝石・鉱石
-    'ダイヤモンド',
-    'サファイア',
-    'エメラルド',
-    'ルビー',
-    'アメジスト',
-    'トパーズ',
-    'オパール',
-    'ガーネット',
-    'ターコイズ',
-    'アクアマリン',
-    'シトリン',
-    'ペリドット',
-    'スピネル',
-    'タンザナイト',
-    'モルガナイト',
-    'ラピスラズリ',
-    'ムーンストーン',
-    'ラブラドライト',
-    'ヘマタイト',
-    'ソーダライト',
-    'ピンクトルマリン',
-    'ラリマー',
-    'シュンガイト',
-    'ブラックオニキス',
-    'マラカイト',
-    'クォーツ',
-    'ローズクォーツ',
-    'スモーキークォーツ',
-    'タイガーアイ',
-    'ジャスパー',
-    'カルサイト',
-    'アゲート',
-    'アレキサンドライト',
-    'コハク',
-    'パール',
-    'サンゴ',
-    '真珠の首飾り(しんじゅのくびかざり)',
-    // 花器・アレンジ
-    '花瓶(かびん)',
-    'ガラスの一輪挿し(がらすのいちりんざし)',
-    '陶器の花瓶(とうきのかびん)',
-    'ブーケ',
-    'リース',
-    'スワッグ',
-    'ハーバリウム',
-    'ドライフラワー',
-    // 動物・自然少しだけ
-    '金魚(きんぎょ)',
-    '熱帯魚(ねったいぎょ)',
-    'イルカ',
-    'クジラ',
-    'サメ',
-    'マンタ',
-    'エイ',
-    'ウミガメ',
-    'タツノオトシゴ',
-    'タコ',
-    'イカ',
-    'クラゲ',
-    'ウミウシ',
-    'ヒトデ',
-    'マンボウ',
-    'ナポレオンフィッシュ',
-    'カクレクマノミ',
-    'チョウチョウウオ',
-    'トビウオ',
-    'カツオ',
-    'マグロ',
-    'サンマ',
-    'イワシ',
-    'アジ',
-    'フグ',
-    'アンコウ',
-    'ウツボ',
-    'ホオジロザメ',
-    'ジンベエザメ',
-    'シュモクザメ',
-    'メガマウス',
-    'リュウグウノツカイ',
-    'ダイオウイカ',
-    'マッコウクジラ',
-    'シャチ',
-    'セミクジラ',
-    'ゴマフアザラシ',
-    'トド',
-    'オットセイ',
-    'ラッコ',
-    'カワウソ',
-    'ウミヘビ',
-    'クリオネ',
-    'ニシオンデンザメ',
-    'チョウチンアンコウ',
-    'ミズダコ',
-    'ホタルイカ',
-    'サケ',
-    'ニシン',
-    'タラ',
-    'ウナギ',
-    'ハゼ',
-    'サンゴ',
-    'イソギンチャク',
-    'ヒラムシ',
-    'クラカケアザラシ',
-    'ゼニガタアザラシ',
-    'イソマグロ',
-    'カメ',
-    'カエル',
-    'シロクマ',
-    'シマリス',
-    '小鳥(ことり)',
-    'フクロウ',
-    'ペンギン',
-    // そのほかシンプル小物
-    '木の葉の標本(このはのひょうほん)',
-    '押し花(おしばな)',
-    'ハチミツの瓶(はちみつのびん)',
-    '木の枝のリース(きのえだのリース)',
-    'キャンプファイヤー',
-    '石ころ(いしころ)',
-    '苔むした石(こけむしたいし)',
-    'インク瓶(いんくびん)',
-    '鍵束(かぎたば)',
-    'ベル',
-    'ルーペ',
-    '万華鏡(まんげきょう)',
-    '砂時計(すなどけい)',
-    '羽根ペン(はねぺん)',
-    '車(くるま)',
-    'バス',
-    '列車(れっしゃ)',
-    '飛行機(ひこうき)',
-    'ヨット',
-    '気球(ききゅう)',
-    '自転車(じてんしゃ)',
-    'セスナ機(せすなき)',
-    'カヌー',
-    'カヤック',
-    'そり',
-    '換気扇(かんきせん)',
-    '煙突(えんとつ)',
-    'カラーコーン',
-    '工事用バリケード(こうじようバリケード)',
-    'ショートケーキ',
-    'チョコレートケーキ',
-    'チーズケーキ',
-    'レアチーズケーキ',
-    'ベイクドチーズケーキ',
-    'モンブラン',
-    'シフォンケーキ',
-    'ガトーショコラ',
-    'パウンドケーキ',
-    'ロールケーキ',
-    'カップケーキ',
-    'ミルフィーユ',
-    'フルーツタルト',
-    'チーズタルト',
-    'アップルパイ',
-    'パンプキンパイ',
-    'レモンタルト',
-    'バスクチーズケーキ',
-    'パンナコッタ',
-    'クレームブリュレ',
-    'バウムクーヘン',
-    'フィナンシェ',
-    'シュークリーム',
-    'わらび餅(わらびもち)',
-    'マドレーヌ',
-    'カヌレ',
-    'エクレア',
-    'ティラミス',
-    '大福(だいふく)',
-    'どら焼き(どらやき)',
-    '羊羹(ようかん)',
-    '抹茶ラテ(まっちゃラテ)',
-    'カフェラテ',
-    'ソーダフロート',
-    'フルーツティー',
-    'ハーブティー',
-    'ミルクセーキ',
-    'クラフトコーラ',
-    'ミントティー',
-    'ベリースムージー',
-    'グリーンスムージー',
-    // 料理系
-    'カレーライス',
-    'ビーフシチュー',
-    'ハヤシライス',
-    'ハンバーグ',
-    'ステーキ',
-    'ローストチキン',
-    '唐揚げ(からあげ)',
-    '焼き魚(やきざかな)',
-    'サバの味噌煮(さばのみそに)',
-    '鮭の塩焼き(さけのしおやき)',
-    '天ぷら盛り合わせ(てんぷらもりあわせ)',
-    'かき揚げ(かきあげ)',
-    'カツ丼(かつどん)',
-    '親子丼(おやこどん)',
-    '牛丼(ぎゅうどん)',
-    'オムライス',
-    'ナポリタン',
-    'カルボナーラ',
-    'ボロネーゼ',
-    'グラタン',
-    'ラザニア',
-    'ピラフ',
-    'チャーハン',
-    '焼きそば(やきそば)',
-    'たこ焼き(たこやき)',
-    'お好み焼き(おこのみやき)',
-    'ぎょうざ',
-    'シュウマイ',
-    '春巻き(はるまき)',
-    '麻婆豆腐(まーぼーどうふ)',
-    '酸辣湯(さんらーたん)',
-    'フォー',
-    'ラーメン',
-    'うどん',
-    'そば',
-    '味噌汁(みそしる)',
-    'ポトフ',
-    'ミネストローネ',
-    'シーザーサラダ',
-    'ポテトサラダ',
-    'カプレーゼ',
-    'ポキ丼(ぽきどん)',
-    // 追加分
-    'スノーフレーク',
-    'コチョウラン',
-    'ブルースター',
-    'オーニソガラム',
-    'ネモフィラ',
-    'ライム',
-    'グアバ',
-    'マンゴスチン',
-    'ピーカンナッツ',
-    'ロードナイト',
-    'プレーナイト',
-    'ブルートパーズ',
-    'ハーキマーダイヤ',
-    'オブシディアン',
-    'みたらし団子(みたらしだんご)',
-    '桜餅(さくらもち)',
-    'カッププリン',
-    'ジェラート',
-    'ベリータルト',
-    '黒糖タピオカミルク(こくとうタピオカミルク)',
-    'アイスコーヒー',
-    'ホットココア',
-    'オレンジソーダ',
-    'チャイ',
-    '折り紙の星(おりがみのほし)',
-    '鉛筆削り(えんぴつけずり)',
-    '定規(じょうぎ)',
-    '紙テープ(かみテープ)',
-    '懐中電灯(かいちゅうでんとう)',
-    '方位磁石(ほういじしゃく)',
-    'トラム',
-    '帆かけ舟(ほかけぶね)',
-    'ジェットスキー',
-    '雪上車(せつじょうしゃ)',
-    // 陸の動物・鳥・虫など
-    'トラ',
-    'ライオン',
-    'ヒョウ',
-    'チーター',
-    'ジャガー',
-    'ピューマ',
-    'ハイエナ',
-    'レッサーパンダ',
-    'フェネック',
-    'ハリネズミ',
-    'モモンガ',
-    'ナマケモノ',
-    'アリクイ',
-    'カピバラ',
-    'ビーバー',
-    'バッファロー',
-    'バイソン',
-    'イノシシ',
-    'シカ',
-    'ウサギ',
-    'ハムスター',
-    'キツネ',
-    'オオカミ',
-    'タヌキ',
-    'アライグマ',
-    'セイウチ',
-    'アシカ',
-    'リャマ',
-    'ヤギ',
-    'ヒツジ',
-    'ウシ',
-    'ウマ',
-    'ロバ',
-    'ラバ',
-    'ヤク',
-    'ミーアキャット',
-    'プレーリードッグ',
-    'コアラ',
-    'オポッサム',
-    'アルマジロ',
-    'カンガルー',
-    'エリマキトカゲ',
-    'カメレオン',
-    'イグアナ',
-    'ヘビ',
-    'トカゲ',
-    'カメレオン',
-    'カエル',
-    'サラマンダー',
-    'スズメ',
-    'ツバメ',
-    'ハト',
-    'カラス',
-    'カモメ',
-    'ペリカン',
-    'フラミンゴ',
-    'クジャク',
-    'ワシ',
-    'タカ',
-    'ミミズク',
-    'コウノトリ',
-    'ツル',
-    'カワセミ',
-    'キツツキ',
-    'インコ',
-    'オウム',
-    'オオハシ',
-    'シギ',
-    'ダチョウ',
-    'エミュー',
-    'ウズラ',
-    'ニワトリ',
-    'ヒヨコ',
-    'アヒル',
-    'ガチョウ',
-    'カナリア',
-    'ヨウム',
-    'モモイロインコ',
-    'ホタル',
-    'カブトムシ',
-    'クワガタ',
-    'ミツバチ',
-    'アリ',
-    'テントウムシ',
-    'トンボ',
-    'カマキリ',
-    'バッタ',
-    'コオロギ',
-    'アゲハチョウ',
-    'モンシロチョウ',
-    'ガ',
-    'セミ',
-    'ハエトリグモ',
-    'ジェリン',
-  ];
 
   const colorPicker = null; // 標準カラー入力は廃止
   const paletteEl = document.getElementById('palette');
   const btnExport = document.getElementById('btnExport');
   const btnCycleSize = document.getElementById('btnCycleSize');
   const btnJelinMode = document.getElementById('btnJelinMode');
-  const btnDiffMode = document.getElementById('btnDiffMode');
   const btnUndo = document.getElementById('btnUndo');
   const btnRedo = document.getElementById('btnRedo');
   const btnOpenColorPanel = document.getElementById('btnOpenColorPanel');
   const btnColorChip = document.getElementById('btnColorChip');
   const btnTutorialSpacerLeft = document.getElementById('btnTutorialSpacerLeft');
   const btnTutorialSpacerRight = document.getElementById('btnTutorialSpacerRight');
-  const btnImport = document.getElementById('btnImport');
   const swatchEditor = /** @type {HTMLInputElement|null} */ (document.getElementById('swatchEditor'));
-  const importInput = /** @type {HTMLInputElement|null} */ (document.getElementById('importInput'));
   const liteColorPicker = document.getElementById('liteColorPicker');
   const liteColorWheel = /** @type {HTMLCanvasElement|null} */ (document.getElementById('liteColorWheel'));
   const liteColorWheelCursor = document.getElementById('liteColorWheelCursor');
@@ -2297,9 +1700,6 @@
   const liteCanvasPreview = /** @type {HTMLCanvasElement|null} */ (document.getElementById('liteCanvasPreview'));
   const liteCanvasPreviewCtx = liteCanvasPreview?.getContext('2d', { willReadFrequently: true }) || null;
   const liteApplyChip = document.getElementById('liteApplyChip');
-  const dailyPromptEl = document.getElementById('dailyPrompt');
-  const dailyPromptBody = document.getElementById('promptBody');
-  const dailyPromptTitle = document.getElementById('promptTitle');
   const gridCanvas = /** @type {HTMLCanvasElement|null} */ (document.getElementById('gridCanvas'));
   const gridCtx = gridCanvas?.getContext('2d', { willReadFrequently: true }) || null;
   const bgCanvas = /** @type {HTMLCanvasElement|null} */ (document.getElementById('bgCanvas'));
@@ -2314,8 +1714,6 @@
   const tutorialModal = null;
   const maouDialog = document.getElementById('maouDialog');
   const maouText = document.getElementById('maouText');
-  const maouInline = document.getElementById('maouInline');
-  const maouInlineText = document.getElementById('maouInlineText');
   const btnMaouStart = document.getElementById('btnMaouStart');
   const tutorialDoneBtn = document.getElementById('btnTutorialDone');
   const tutorialRestartBtn = document.getElementById('btnTutorialRestart');
@@ -2530,61 +1928,6 @@
     }
   }
 
-  function setDailyPrompt() {
-    if (!dailyPromptBody || !dailyPromptTitle) return;
-    if (isTutorialPending()) {
-      dailyPromptTitle.style.display = 'none';
-      dailyPromptBody.style.display = 'none';
-      if (maouInline) maouInline.style.display = 'inline-flex';
-      return;
-    }
-    dailyPromptTitle.style.display = 'inline';
-    dailyPromptBody.style.display = 'inline';
-    if (maouInline) maouInline.style.display = 'none';
-    // 日本時間の0時基準で1日1つに固定（前日と同じインデックスなら一つ先を使う）
-    const now = Date.now();
-    const JST_OFFSET = 9 * 60 * 60 * 1000;
-    const dayId = Math.floor((now + JST_OFFSET) / (24 * 60 * 60 * 1000)); // JST日数
-    const prevDayId = dayId - 1;
-    const hashDay = d => {
-      let x = d >>> 0;
-      x ^= x << 13;
-      x ^= x >>> 17;
-      x ^= x << 5;
-      return x >>> 0;
-    };
-    const wrapDist = (a, b, len) => {
-      const d = Math.abs(a - b);
-      return Math.min(d, len - d);
-    };
-    const baseIdx = hashDay(dayId) % dailyPrompts.length;
-    const prevIdx = hashDay(prevDayId) % dailyPrompts.length;
-    let idx = baseIdx;
-    if (wrapDist(baseIdx, prevIdx, dailyPrompts.length) <= 3) {
-      idx = (baseIdx + Math.floor(dailyPrompts.length / 3) + 1) % dailyPrompts.length;
-    }
-    dailyPromptBody.textContent = dailyPrompts[idx];
-  }
-
-  let dailyPromptTimer = null;
-  function scheduleDailyPromptRefresh() {
-    if (dailyPromptTimer) {
-      clearTimeout(dailyPromptTimer);
-      dailyPromptTimer = null;
-    }
-    // 次のJST 00:00 までの残りミリ秒を計算
-    const now = Date.now();
-    const JST_OFFSET = 9 * 60 * 60 * 1000;
-    const jst = new Date(now + JST_OFFSET);
-    jst.setUTCHours(0, 0, 0, 0);
-    const nextMidnight = jst.getTime() + 24 * 60 * 60 * 1000 - JST_OFFSET;
-    const delay = Math.max(1000, nextMidnight - now + 50); // 少し余裕を持たせる
-    dailyPromptTimer = setTimeout(() => {
-      setDailyPrompt();
-      scheduleDailyPromptRefresh();
-    }, delay);
-  }
-
   function initAds() {
     if (window.pixieedObserveAds) {
       window.pixieedObserveAds();
@@ -2679,364 +2022,6 @@
     return (crc ^ 0xffffffff) >>> 0;
   }
 
-  function readFileAsDataUrl(file) {
-    return new Promise((resolve, reject) => {
-      if (!file) {
-        resolve(null);
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        resolve(typeof reader.result === 'string' ? reader.result : null);
-      };
-      reader.onerror = () => {
-        reject(reader.error || new Error('read failed'));
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function loadImageFromDataUrl(dataUrl) {
-    return new Promise((resolve, reject) => {
-      if (!dataUrl) {
-        reject(new Error('invalid data url'));
-        return;
-      }
-      const img = new Image();
-      img.decoding = 'async';
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error('image load failed'));
-      img.src = dataUrl;
-    });
-  }
-
-  async function normalizePixelImage(image, fallbackDataUrl) {
-    const width = image.naturalWidth || image.width;
-    const height = image.naturalHeight || image.height;
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const context = canvas.getContext('2d');
-    if (!context) {
-      return { image, dataUrl: fallbackDataUrl ?? null, width, height };
-    }
-    context.imageSmoothingEnabled = false;
-    context.drawImage(image, 0, 0);
-
-    let imageData;
-    try {
-      imageData = context.getImageData(0, 0, width, height);
-    } catch (error) {
-      console.warn('Canvas access blocked, using original image', error);
-      return { image, dataUrl: fallbackDataUrl ?? null, width, height };
-    }
-    const scaleX = detectScaleFactor(imageData, width, height, 'x');
-    const scaleY = detectScaleFactor(imageData, width, height, 'y');
-    let scale = Math.max(1, Math.min(scaleX, scaleY));
-    const blockScale = detectScaleFactorByBlocks(imageData, width, height);
-    if (blockScale > scale) {
-      scale = blockScale;
-    }
-
-    if (scale <= 1) {
-      let dataUrl = fallbackDataUrl ?? null;
-      if (!dataUrl) {
-        try {
-          dataUrl = canvas.toDataURL();
-        } catch (error) {
-          console.warn('toDataURL blocked, falling back to original image', error);
-          return { image, dataUrl: fallbackDataUrl ?? null, width, height };
-        }
-      }
-      if (dataUrl) {
-        const normalizedImage = await loadImageFromDataUrl(dataUrl);
-        return { image: normalizedImage, dataUrl, width, height };
-      }
-      return { image, dataUrl: fallbackDataUrl ?? null, width, height };
-    }
-
-    const targetWidth = Math.round(width / scale);
-    const targetHeight = Math.round(height / scale);
-    const targetCanvas = document.createElement('canvas');
-    targetCanvas.width = targetWidth;
-    targetCanvas.height = targetHeight;
-    const targetContext = targetCanvas.getContext('2d');
-    const targetData = targetContext.createImageData(targetWidth, targetHeight);
-    const src = imageData.data;
-    const dest = targetData.data;
-
-    for (let y = 0; y < targetHeight; y++) {
-      for (let x = 0; x < targetWidth; x++) {
-        const srcIndex = ((y * scale) * width + (x * scale)) * 4;
-        const destIndex = (y * targetWidth + x) * 4;
-        dest[destIndex] = src[srcIndex];
-        dest[destIndex + 1] = src[srcIndex + 1];
-        dest[destIndex + 2] = src[srcIndex + 2];
-        dest[destIndex + 3] = src[srcIndex + 3];
-      }
-    }
-
-    targetContext.putImageData(targetData, 0, 0);
-    let dataUrl;
-    try {
-      dataUrl = targetCanvas.toDataURL();
-    } catch (error) {
-      console.warn('toDataURL failed during normalization', error);
-      dataUrl = fallbackDataUrl ?? null;
-    }
-    if (dataUrl) {
-      const normalizedImage = await loadImageFromDataUrl(dataUrl);
-      return { image: normalizedImage, dataUrl, width: targetWidth, height: targetHeight };
-    }
-    return { image, dataUrl: fallbackDataUrl ?? null, width: targetWidth, height: targetHeight };
-  }
-
-  function detectScaleFactor(imageData, width, height, axis) {
-    const { data } = imageData;
-    const length = axis === 'x' ? width : height;
-    const compare = axis === 'x'
-      ? (indexA, indexB) => columnsMatch(data, width, height, indexA, indexB)
-      : (indexA, indexB) => rowsMatch(data, width, height, indexA, indexB);
-
-    let run = 1;
-    let best = 0;
-    for (let i = 1; i < length; i++) {
-      if (compare(i, i - 1)) {
-        run += 1;
-      } else {
-        best = best ? gcd(best, run) : run;
-        run = 1;
-      }
-    }
-    best = best ? gcd(best, run) : run;
-    return Math.max(1, best);
-  }
-
-  function detectScaleFactorByBlocks(imageData, width, height) {
-    const common = gcd(width, height);
-    if (common <= 1) return 1;
-    const candidates = getDivisors(common).filter(value => value > 1).sort((a, b) => b - a);
-    for (const factor of candidates) {
-      if (isLikelyUpscaledByFactor(imageData.data, width, height, factor)) {
-        return factor;
-      }
-    }
-    return 1;
-  }
-
-  function isLikelyUpscaledByFactor(data, width, height, factor) {
-    const totalPixels = width * height;
-    const allowedMismatch = Math.floor(totalPixels * (1 - NORMALIZE_MATCH_RATIO));
-    let mismatches = 0;
-
-    for (let blockY = 0; blockY < height; blockY += factor) {
-      for (let blockX = 0; blockX < width; blockX += factor) {
-        const baseIndex = (blockY * width + blockX) * 4;
-        const baseR = data[baseIndex];
-        const baseG = data[baseIndex + 1];
-        const baseB = data[baseIndex + 2];
-        const baseA = data[baseIndex + 3];
-
-        for (let y = 0; y < factor; y++) {
-          const rowStart = (blockY + y) * width;
-          for (let x = 0; x < factor; x++) {
-            const idx = (rowStart + blockX + x) * 4;
-            if (!isColorNear(data, idx, baseR, baseG, baseB, baseA)) {
-              mismatches += 1;
-              if (mismatches > allowedMismatch) {
-                return false;
-              }
-            }
-          }
-        }
-      }
-    }
-
-    return true;
-  }
-
-  function isColorNear(data, idx, r, g, b, a) {
-    return (
-      Math.abs(data[idx] - r) <= NORMALIZE_COLOR_TOLERANCE &&
-      Math.abs(data[idx + 1] - g) <= NORMALIZE_COLOR_TOLERANCE &&
-      Math.abs(data[idx + 2] - b) <= NORMALIZE_COLOR_TOLERANCE &&
-      Math.abs(data[idx + 3] - a) <= NORMALIZE_COLOR_TOLERANCE
-    );
-  }
-
-  function getDivisors(value) {
-    const divisors = new Set();
-    for (let i = 2; i <= Math.sqrt(value); i += 1) {
-      if (value % i === 0) {
-        divisors.add(i);
-        divisors.add(value / i);
-      }
-    }
-    divisors.add(value);
-    return Array.from(divisors);
-  }
-
-  function columnsMatch(data, width, height, a, b) {
-    for (let y = 0; y < height; y++) {
-      const idxA = (y * width + a) * 4;
-      const idxB = (y * width + b) * 4;
-      if (
-        data[idxA] !== data[idxB] ||
-        data[idxA + 1] !== data[idxB + 1] ||
-        data[idxA + 2] !== data[idxB + 2] ||
-        data[idxA + 3] !== data[idxB + 3]
-      ) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  function rowsMatch(data, width, height, a, b) {
-    const rowLength = width * 4;
-    const startA = a * rowLength;
-    const startB = b * rowLength;
-    for (let offset = 0; offset < rowLength; offset++) {
-      if (data[startA + offset] !== data[startB + offset]) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  function gcd(a, b) {
-    while (b !== 0) {
-      const temp = b;
-      b = a % b;
-      a = temp;
-    }
-    return a;
-  }
-
-  function getImageDataFromImage(image, width, height) {
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    if (!context) return null;
-    context.imageSmoothingEnabled = false;
-    context.clearRect(0, 0, width, height);
-    context.drawImage(image, 0, 0, width, height);
-    try {
-      return context.getImageData(0, 0, width, height);
-    } catch {
-      return null;
-    }
-  }
-
-  async function loadImportImage(file, label) {
-    const dataUrl = await readFileAsDataUrl(file);
-    if (!dataUrl) {
-      throw new Error(`${label}の読み込みに失敗しました。`);
-    }
-    const rawImage = await loadImageFromDataUrl(dataUrl);
-    const rawWidth = rawImage.naturalWidth || rawImage.width;
-    const rawHeight = rawImage.naturalHeight || rawImage.height;
-    if (!rawWidth || !rawHeight) {
-      throw new Error(`${label}の読み込みに失敗しました。`);
-    }
-    if (rawWidth > MAX_IMPORT_SOURCE_SIZE || rawHeight > MAX_IMPORT_SOURCE_SIZE) {
-      throw new Error(`読み込み元の画像は${MAX_IMPORT_SOURCE_SIZE}px以内にしてください。`);
-    }
-    const normalized = await normalizePixelImage(rawImage, dataUrl);
-    const width = normalized.width || rawWidth;
-    const height = normalized.height || rawHeight;
-    if (width > MAX_IMPORT_TARGET_SIZE || height > MAX_IMPORT_TARGET_SIZE) {
-      throw new Error(`読み込み後の画像は${MAX_IMPORT_TARGET_SIZE}px以内にしてください。`);
-    }
-    if (width !== height) {
-      throw new Error('正方形の画像のみ読み込めます。');
-    }
-    return { image: normalized.image || rawImage, width, height };
-  }
-
-  function buildDiffMask(baseImageData, diffImageData) {
-    const total = baseImageData.width * baseImageData.height;
-    const mask = new Uint8Array(total);
-    const base = baseImageData.data;
-    const diff = diffImageData.data;
-    for (let i = 0, p = 0; p < total; p += 1, i += 4) {
-      if (
-        base[i] !== diff[i] ||
-        base[i + 1] !== diff[i + 1] ||
-        base[i + 2] !== diff[i + 2] ||
-        base[i + 3] !== diff[i + 3]
-      ) {
-        mask[p] = 1;
-      }
-    }
-    return mask;
-  }
-
-  async function handleImportSelection(fileList) {
-    const files = Array.isArray(fileList) ? fileList : Array.from(fileList || []);
-    if (!files.length) return;
-    const needsDiff = diffMode;
-    if (needsDiff && files.length < 2) {
-      alert('PiXFiNDモードでは2枚の画像を選択してください。');
-      return;
-    }
-    const baseFile = files[0];
-    const diffFile = needsDiff ? files[1] : null;
-    let baseResult;
-    let diffResult;
-    try {
-      baseResult = await loadImportImage(baseFile, 'ベース画像');
-    } catch (err) {
-      alert(err?.message || '画像の読み込みに失敗しました。');
-      return;
-    }
-    if (needsDiff && diffFile) {
-      try {
-        diffResult = await loadImportImage(diffFile, '差分画像');
-      } catch (err) {
-        alert(err?.message || '差分画像の読み込みに失敗しました。');
-        return;
-      }
-      if (baseResult.width !== diffResult.width || baseResult.height !== diffResult.height) {
-        alert('ベース画像と差分画像のPX数が一致しません。');
-        return;
-      }
-    }
-    const targetSize = baseResult.width;
-    applyCanvasSize(targetSize, { allowCustom: true });
-    const baseImageData = getImageDataFromImage(baseResult.image, targetSize, targetSize);
-    if (!baseImageData) {
-      alert('画像の読み込みに失敗しました。');
-      return;
-    }
-    baseLayer.imageData = baseImageData;
-    baseLayer.undoStack.length = 0;
-    baseLayer.redoStack.length = 0;
-    if (needsDiff && diffResult) {
-      ensureDiffLayer();
-      const diffImageData = getImageDataFromImage(diffResult.image, targetSize, targetSize);
-      if (!diffImageData) {
-        alert('差分画像の読み込みに失敗しました。');
-        return;
-      }
-      diffLayer.imageData = diffImageData;
-      diffLayer.mask = buildDiffMask(baseImageData, diffImageData);
-      diffLayer.undoStack.length = 0;
-      diffLayer.redoStack.length = 0;
-      diffLayerInitialized = true;
-      captureDiffBase();
-    } else {
-      diffLayer = null;
-      diffLayerInitialized = false;
-    }
-    compositeImageData = null;
-    showGrid = false;
-    setActiveLayer(needsDiff && diffLayer ? LAYER_DIFF : LAYER_BASE);
-    render();
-    drawGrid();
-  }
-
   function updateSizeButton() {
     if (btnCycleSize) {
       btnCycleSize.textContent = `${canvasSize}px`;
@@ -3086,13 +2071,21 @@
     return out;
   }
 
-  function applyCanvasSize(nextSize, options = {}) {
-    const { allowCustom = false } = options;
-    const isValidSize = Number.isFinite(nextSize) && nextSize > 0;
-    const fallback = CANVAS_SIZES[1];
-    const target = allowCustom && isValidSize
-      ? Math.max(1, Math.round(nextSize))
-      : (CANVAS_SIZES.includes(nextSize) ? nextSize : fallback);
+  function normalizeCanvasSize(nextSize) {
+    if (!Number.isFinite(nextSize)) {
+      return CANVAS_SIZES[CANVAS_SIZES.length - 1];
+    }
+    const rounded = Math.max(1, Math.round(nextSize));
+    if (CANVAS_SIZES.includes(rounded)) {
+      return rounded;
+    }
+    return CANVAS_SIZES.reduce((nearest, candidate) => (
+      Math.abs(candidate - rounded) < Math.abs(nearest - rounded) ? candidate : nearest
+    ), CANVAS_SIZES[0]);
+  }
+
+  function applyCanvasSize(nextSize) {
+    const target = normalizeCanvasSize(nextSize);
     const sourceSize = canvasSize;
     baseLayer.imageData = resampleImageData(baseLayer.imageData, target);
     if (diffLayer?.imageData) {
@@ -3263,35 +2256,6 @@
     diffBasePixels = new Uint8ClampedArray(baseLayer.imageData.data);
   }
 
-  function setDiffMode(enabled) {
-    if (enabled && !diffModeFirstEnableConfirmed) {
-      const accepted = window.confirm('PiXFiNDモードを初めてONにします。現在の画像を1回だけ間違いレイヤーへコピーします。続けますか？');
-      if (!accepted) {
-        return false;
-      }
-      diffModeFirstEnableConfirmed = true;
-    }
-    diffMode = enabled;
-    if (btnDiffMode) {
-      btnDiffMode.classList.toggle('is-active', enabled);
-      btnDiffMode.setAttribute('aria-pressed', String(enabled));
-    }
-    if (enabled) {
-      ensureDiffLayer();
-      if (!diffLayerInitialized) {
-        syncDiffLayerFromBase();
-        diffLayerInitialized = true;
-      }
-      captureDiffBase();
-      setActiveLayer(LAYER_DIFF);
-    } else {
-      diffBasePixels = null;
-      setActiveLayer(LAYER_BASE);
-    }
-    render();
-    return true;
-  }
-
   function setCurrentColor(hex, options = {}) {
     const { updatePalette = true } = options;
     if (activeSwatchIndex === 0) {
@@ -3380,7 +2344,7 @@
     if (!state) return;
     const targetSize = Number.isFinite(state.size) ? state.size : canvasSize;
     if (targetSize !== canvasSize) {
-      applyCanvasSize(targetSize, { allowCustom: true });
+      applyCanvasSize(targetSize);
     }
     const hasBase = state.basePixels && state.basePixels.length;
     const hasDiff = state.diffPixels && state.diffPixels.length;
@@ -3973,12 +2937,8 @@
   function disableNonTutorialControls(disabled) {
     if (btnCycleSize) btnCycleSize.disabled = disabled;
     if (btnJelinMode) btnJelinMode.disabled = disabled;
-    if (btnDiffMode) btnDiffMode.disabled = disabled;
     if (btnOpenColorPanel) btnOpenColorPanel.disabled = disabled;
     if (btnExport) btnExport.disabled = disabled;
-    if (disabled && diffMode) {
-      setDiffMode(false);
-    }
     if (btnTutorialRestart) {
       btnTutorialRestart.style.opacity = disabled ? '0' : '0';
       btnTutorialRestart.style.pointerEvents = 'none';
@@ -4044,7 +3004,6 @@
     }
     setTutorialPalette();
     drawTutorialOverlay(tutorialState.currentOverlay || sprite.image);
-    setDailyPrompt();
     hideMaouDialog();
     showMaouDialog(stepIndexToDialogue(stepIndex));
     updateTutorialUI();
@@ -4058,7 +3017,6 @@
     tutorialState.basePalette = [...palette];
     tutorialState.currentSprite = null;
     disableNonTutorialControls(true);
-    setDailyPrompt();
     updateTutorialUI();
     ensureTutorialSprites().then(() => {
       if (!tutorialSprites.length) {
@@ -4091,7 +3049,6 @@
     if (tutorialState.prevCanvasSize) {
       applyCanvasSize(tutorialState.prevCanvasSize);
     }
-    setDailyPrompt();
     updateTutorialUI();
     render();
   }
@@ -4127,24 +3084,24 @@
   }
 
   function showMaouDialog(text) {
-    if (maouInline) {
-      maouInline.style.display = 'inline-flex';
-    }
-    if (maouInlineText) {
-      maouInlineText.textContent = text;
-    }
     if (maouDialog instanceof HTMLElement) {
-      maouDialog.classList.remove('is-active');
+      maouDialog.classList.add('is-active');
+      maouDialog.style.opacity = '1';
+      maouDialog.style.visibility = 'visible';
+    }
+    if (maouText) {
+      maouText.textContent = text;
     }
   }
 
   function hideMaouDialog() {
-    if (maouInline) maouInline.style.display = 'none';
     if (maouDialog instanceof HTMLElement) {
       maouDialog.classList.remove('is-active');
+      maouDialog.style.opacity = '1';
+      maouDialog.style.visibility = 'visible';
     }
-    if (maouInlineText) {
-      maouInlineText.textContent = '';
+    if (maouText) {
+      maouText.textContent = '';
     }
   }
 
@@ -4243,9 +3200,9 @@
       return;
     }
     cutsceneActive = true;
-    if (maouInline) {
-      maouInline.style.opacity = '0';
-      maouInline.style.visibility = 'visible';
+    if (maouDialog instanceof HTMLElement) {
+      maouDialog.style.opacity = '0';
+      maouDialog.style.visibility = 'hidden';
     }
     let idx = 0;
     const step = () => {
@@ -4253,8 +3210,9 @@
       if (idx >= lines.length) {
         cutsceneEl.classList.remove('is-active');
         cutsceneActive = false;
-        if (maouInline) {
-          maouInline.style.opacity = '1';
+        if (maouDialog instanceof HTMLElement) {
+          maouDialog.style.opacity = '1';
+          maouDialog.style.visibility = 'visible';
         }
         opts.onDone?.();
         return;
@@ -4861,23 +3819,6 @@
   btnJelinMode?.addEventListener('click', () => {
     setJelinMode(!jelinMode);
   });
-  btnDiffMode?.addEventListener('click', () => {
-    if (tutorialState.active) return;
-    setDiffMode(!diffMode);
-  });
-  btnImport?.addEventListener('click', () => {
-    if (!importInput) return;
-    importInput.value = '';
-    importInput.multiple = diffMode;
-    importInput.click();
-  });
-  importInput?.addEventListener('change', event => {
-    const input = event.target;
-    if (!(input instanceof HTMLInputElement)) return;
-    const files = Array.from(input.files || []);
-    input.value = '';
-    void handleImportSelection(files);
-  });
   function highlightAllowedPalette(colors) {
     if (!paletteEl) return;
     const normalized = new Set(colors.map(c => c.toLowerCase()));
@@ -4936,12 +3877,6 @@
     resetTutorial();
   });
 
-  function getExportImagePair() {
-    const baseImage = baseLayer.imageData;
-    const diffImage = diffMode && diffLayer?.mask ? getCompositeImageData() : baseLayer.imageData;
-    return { baseImage, diffImage };
-  }
-
   function buildCompositeCanvas(sourceImageData = null) {
     const composite = document.createElement('canvas');
     composite.width = canvasSize;
@@ -4960,7 +3895,7 @@
     srcCanvas.height = canvasSize;
     const sctx = srcCanvas.getContext('2d', { willReadFrequently: true });
     if (!sctx) return null;
-    const sourceImage = sourceImageData || (diffMode && diffLayer?.mask ? getCompositeImageData() : baseLayer.imageData);
+    const sourceImage = sourceImageData || baseLayer.imageData;
     sctx.putImageData(sourceImage, 0, 0);
     cctx.drawImage(srcCanvas, 0, 0, canvasSize, canvasSize);
     return composite;
@@ -5386,7 +4321,6 @@
   }
 
   const DOWNLOAD_GUARD_KEY = 'pixieedrawlite_download_guard_v1';
-  const PIXFIND_UPLOAD_KEY = 'pixfind_creator_upload_v1';
   function getCompositeSignature() {
     const composite = buildCompositeCanvas();
     if (!composite) return null;
@@ -5422,23 +4356,13 @@
     }
   }
   btnExport?.addEventListener('click', async () => {
-    const { baseImage, diffImage } = getExportImagePair();
-    const baseUrl = exportCompositeToDataUrl(640, baseImage);
-    const diffUrl = exportCompositeToDataUrl(640, diffImage);
-    if (!baseUrl || !diffUrl) return;
+    const imageUrl = exportCompositeToDataUrl(640);
+    if (!imageUrl) return;
     const meta = JSON.stringify({ palette });
-    const baseOut = injectTextChunk(baseUrl, 'palette', meta);
-    const diffOut = injectTextChunk(diffUrl, 'palette', meta);
-    const baseFilename = `pixieedrawlite-${canvasSize}px@640-original.png`;
-    const diffFilename = `pixieedrawlite-${canvasSize}px@640-diff.png`;
-    const baseResult = await saveDataUrlWithPickerFallback(baseOut, baseFilename, 'image/png');
-    if (baseResult === 'cancel') return;
-    await new Promise(resolve => window.setTimeout(resolve, 120));
-    const diffResult = await saveDataUrlWithPickerFallback(diffOut, diffFilename, 'image/png');
-    if (diffResult === 'cancel') {
-      markDownloaded();
-      return;
-    }
+    const output = injectTextChunk(imageUrl, 'palette', meta);
+    const filename = `pixieedrawlite-${canvasSize}px@640.png`;
+    const result = await saveDataUrlWithPickerFallback(output, filename, 'image/png');
+    if (result === 'cancel') return;
     markDownloaded();
   });
   runTutorialResetMigration();
@@ -5453,18 +4377,9 @@
   if (tutorialForceStart || isTutorialPending()) {
     startTutorial();
   } else {
-    setDailyPrompt();
-    scheduleDailyPromptRefresh();
     updateTutorialUI();
   }
   initAds();
-
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      setDailyPrompt();
-      scheduleDailyPromptRefresh();
-    }
-  });
 
   window.addEventListener('resize', () => {
     applyViewportTransform();
