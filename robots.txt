@@ -5,5 +5,4 @@ Disallow: /
 User-agent: CCBot
 Disallow: /
 User-agent: *
-Disallow: /contest/
 Sitemap: https://pixieed.jp/sitemap.xml
