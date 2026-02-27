@@ -4164,7 +4164,7 @@ body.is-mobile-layout .mobile-draw-help {
 
 #panelSettings .settings-size-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px 12px;
   align-items: start;
 }
@@ -4194,7 +4194,7 @@ body.is-mobile-layout .mobile-draw-help {
 
 #panelSettings .settings-size-controls--canvas {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
   align-items: end;
 }
@@ -4227,10 +4227,12 @@ body.is-mobile-layout .mobile-draw-help {
 }
 
 #panelSettings #applyCanvasResize {
-  width: auto;
+  grid-column: 1 / -1;
+  width: 100%;
   min-height: 32px;
   padding: 6px 10px;
   white-space: nowrap;
+  justify-content: center;
 }
 
 #panelSettings #canvasSizeHint {
