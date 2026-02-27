@@ -832,6 +832,12 @@
       color:#94a3b8;
       letter-spacing:0.03em;
     }
+    .public-room-action-row{
+      margin-top:auto;
+      padding-top:4px;
+      display:flex;
+      justify-content:flex-end;
+    }
     .public-room-actions{
       display:flex;
       flex-wrap:wrap;
@@ -1827,7 +1833,6 @@
       <p class="public-rooms-hub__lead">Shows currently live rooms and resident rooms. Join from the thumbnail or action button and start co-creating immediately.</p>
       <div class="chips" style="margin:8px 0 0;">
         <a class="chip" href="pixiedraw/index.html?multiInvite=1&amp;multiKey=resident-256-main&amp;multiAutoJoin=1&amp;multiRole=guest">Open Resident 256</a>
-        <a class="chip" href="pixiedraw/index.html?multiInvite=1&amp;multiKey=resident-128-main&amp;multiAutoJoin=1&amp;multiRole=guest">Open Resident 128</a>
       </div>
       <div class="public-room-grid" id="publicRoomGrid" aria-live="polite">
         <p class="public-room-empty">No live rooms right now.</p>
@@ -1985,6 +1990,10 @@
     <a class="bottom-nav__item is-active" data-tab="home" href="en/index.html">
       <span class="icon"><img src="FooterIcon1.png" alt=""/></span><span>Home</span>
     </a>
+    <a class="bottom-nav__item" data-tab="contest" href="contest/index.html">
+      <span class="icon"><img src="FooterIcon2.png" alt=""/></span><span>Contest</span>
+    </a>
+
     <a class="bottom-nav__item" data-tab="tools" href="tools.html">
       <span class="icon"><img src="FooterIcon3.png" alt=""/></span><span>Tools/Games</span>
     </a>
@@ -2392,6 +2401,7 @@
       });
     })();
   </script>
+  <script>window.__PIXIEED_DISABLE_LEGACY_PUBLIC_ROOMS__ = true;</script>
   <script src="scripts.js"></script>
   <script src="portfolio/dots/manifest.js"></script>
   <script src="scripts/gallery.js"></script>
@@ -2644,7 +2654,7 @@
               <div class="public-room-info">${r.description || ''}</div>
               <div class="public-room-meta-extra">${r.size ? r.size + ' · ' : ''}${r.maxUsers ? 'max ' + r.maxUsers + ' users' : ''}${residentLiveInfo}</div>
               <div class="public-room-time">${updatedLabel}</div>
-              <div>${actionHtml}</div>
+              <div class="public-room-action-row">${actionHtml}</div>
             </div>`;
 
           card.innerHTML = `${thumbHtml}${metaInfo}`;
