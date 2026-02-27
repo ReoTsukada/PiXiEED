@@ -137,6 +137,11 @@
       applyFpsAll: document.getElementById('applyFpsAll'),
       canvasWidth: document.getElementById('canvasWidth'),
       canvasHeight: document.getElementById('canvasHeight'),
+      canvasWidthDecrement: document.getElementById('canvasWidthDecrement'),
+      canvasWidthIncrement: document.getElementById('canvasWidthIncrement'),
+      canvasHeightDecrement: document.getElementById('canvasHeightDecrement'),
+      canvasHeightIncrement: document.getElementById('canvasHeightIncrement'),
+      applyCanvasResize: document.getElementById('applyCanvasResize'),
       toggleChecker: document.getElementById('toggleChecker'),
       togglePixelPreview: document.getElementById('togglePixelPreview'),
       toggleVirtualCursor: document.getElementById('toggleVirtualCursor'),
@@ -163,6 +168,7 @@
       togglePixfindMode: document.getElementById('togglePixfindMode'),
       togglePixfindHelp: document.getElementById('togglePixfindHelp'),
       pixfindHelpText: document.getElementById('pixfindHelpText'),
+      toggleLanguageMode: document.getElementById('toggleLanguageMode'),
       openShortcutHelp: document.getElementById('openShortcutHelp'),
       openUpdateHistory: document.getElementById('openUpdateHistory'),
       closeShortcutHelp: document.getElementById('closeShortcutHelp'),
@@ -273,10 +279,15 @@
       confirm: document.getElementById('confirmExport'),
       format: document.getElementById('exportFormat'),
       cancel: document.getElementById('cancelExport'),
+      scaleControls: document.getElementById('exportScaleControls'),
       scaleSlider: document.getElementById('exportScaleSlider'),
       scaleInput: document.getElementById('exportScaleInput'),
       includeOriginalToggle: document.getElementById('exportIncludeOriginalToggle'),
+      includeOriginalRow: document.getElementById('exportOriginalOptionRow'),
       saveProjectCompanionToggle: document.getElementById('exportSaveProjectCompanionToggle'),
+      saveProjectCompanionRow: document.getElementById('exportCompanionOptionRow'),
+      contestPostToggle: document.getElementById('exportContestPostToggle'),
+      contestPostRow: document.getElementById('exportContestPostOptionRow'),
       gridSettings: document.getElementById('exportGridSettings'),
       gridWidthInput: document.getElementById('exportGridWidth'),
       gridHeightInput: document.getElementById('exportGridHeight'),
@@ -618,6 +629,30 @@
   const EXPORT_INTERSTITIAL_COOLDOWN_MS = 45 * 1000;
   const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
     Object.freeze({
+      id: '2026-02-27-home-multi-export-i18n-input-updates',
+      at: '2026-02-27T21:30:00+09:00',
+      title: 'ホーム導線・共有モード・保存出力・英語化・入力操作を総合改善',
+      details: Object.freeze([
+        'PiXiEEDホームの導線を再整理し、PiXiEEDraw と Lite を迷わず選べる対比構成へ改善。',
+        'Liteの訴求を「手軽さ / 初心者 / 簡単に始められる」に統一し、不要な説明ブロックを削除。',
+        'フッターナビのコンテスト導線を調整し、ホームとの並び順を最適化。',
+        '起動画面の「端末内プロジェクト」表示を改善し、スマホでも3列で見やすく表示できるよう調整。',
+        '常設ルーム運用を見直し、常設は 256x256 の1部屋構成に統一。',
+        '常設ルームのセル運用ルールを整理し、未使用セルの扱いと参加表示を明確化。',
+        '常設ルームの入室カードUIを調整し、表示の安定性と操作導線を改善。',
+        '常設キャンバスは端末内自動保存（IndexedDB）対象外に変更し、ローカル保存挙動を整理。',
+        '保存/出力からコンテスト投稿への導線を追加し、保存完了後に投稿画面へ遷移できるよう対応。',
+        '投稿形式を整理し、複数フレームは GIF 投稿（先頭フレームPNGをサムネ）、単一フレームは PNG 投稿に対応。',
+        'タイムラプス出力サイズを出力設定に合わせて調整し、投稿連携時の扱いを最適化。',
+        '保存/出力設定のUI構成を整理し、倍率設定をスライダー化して操作性を向上。',
+        'キャンバスサイズ設定入力のUI/挙動を改善し、PC/スマホでの扱いやすさを向上。',
+        'PiXiEEDraw に英語モードを追加し、主要UIの日本語/英語切替に対応。',
+        'レイヤーパネルとマルチパネルの未翻訳文言を補完し、英語表示時の文言混在を解消。',
+        'PiXiEED全体で入力欄のキーボード被り対策を追加し、モバイルで入力欄が隠れにくい挙動に改善。',
+        'キャンバスサイズの X/Y 入力で Enter 押下時にフォーカスが飛ばないよう修正。',
+      ]),
+    }),
+    Object.freeze({
       id: '2026-02-25-left-rail-unified-ui',
       at: '2026-02-25T21:00:00+09:00',
       title: 'ツール/カラーパネル統合と左レーンUI改善',
@@ -739,6 +774,90 @@
       return false;
     }
   })();
+  const UI_LANGUAGE_STORAGE_KEY = 'pixieedraw:ui-language';
+  const UI_LANGUAGE_JA = 'ja';
+  const UI_LANGUAGE_EN = 'en';
+  const UI_LANGUAGE_SET = new Set([UI_LANGUAGE_JA, UI_LANGUAGE_EN]);
+
+  function normalizeUiLanguage(value, fallback = UI_LANGUAGE_JA) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (UI_LANGUAGE_SET.has(normalized)) {
+      return normalized;
+    }
+    return UI_LANGUAGE_SET.has(fallback) ? fallback : UI_LANGUAGE_JA;
+  }
+
+  function getUiLanguageFromQuery() {
+    if (typeof window === 'undefined') {
+      return '';
+    }
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return normalizeUiLanguage(params.get('lang') || params.get('language') || '', '');
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function loadStoredUiLanguage() {
+    if (!canUseSessionStorage) {
+      return '';
+    }
+    try {
+      return normalizeUiLanguage(window.localStorage.getItem(UI_LANGUAGE_STORAGE_KEY) || '', '');
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function resolveInitialUiLanguage() {
+    return normalizeUiLanguage(getUiLanguageFromQuery() || loadStoredUiLanguage() || UI_LANGUAGE_JA, UI_LANGUAGE_JA);
+  }
+
+  function storeUiLanguage(language) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    const normalized = normalizeUiLanguage(language, UI_LANGUAGE_JA);
+    try {
+      window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, normalized);
+    } catch (error) {
+      // Ignore localStorage errors.
+    }
+  }
+
+  let uiLanguage = resolveInitialUiLanguage();
+
+  function setDocumentLanguage() {
+    if (typeof document === 'undefined' || !document.documentElement) {
+      return;
+    }
+    document.documentElement.lang = uiLanguage === UI_LANGUAGE_EN ? 'en' : 'ja';
+  }
+
+  function isEnglishUi() {
+    return uiLanguage === UI_LANGUAGE_EN;
+  }
+
+  function localizeText(jaText, enText) {
+    return isEnglishUi() ? enText : jaText;
+  }
+
+  function localizeUiThemePresetLabel(label) {
+    if (!isEnglishUi()) {
+      return label;
+    }
+    const map = {
+      緑色: 'Green',
+      ピンク: 'Pink',
+      白色: 'White',
+      水色: 'Sky',
+      黄色: 'Yellow',
+    };
+    return map[label] || label;
+  }
+
+  setDocumentLanguage();
   let sessionPersistHandle = null;
   const USER_AGENT = typeof navigator !== 'undefined' ? (navigator.userAgent || '') : '';
   const USER_AGENT_LOWER = USER_AGENT.toLowerCase();
@@ -763,6 +882,8 @@
     typeof navigator.canShare === 'function' &&
     typeof File === 'function';
   const SHARE_HASHTAG = '#PiXiEED';
+  const CONTEST_PENDING_UPLOAD_STORAGE_KEY = 'pixieed_contest_upload_v1';
+  const CONTEST_POST_PAGE_URL = '../contest/index.html';
   const IS_ANDROID_LINE_BROWSER =
     IS_ANDROID_DEVICE
     && /line\//i.test(USER_AGENT);
@@ -842,22 +963,6 @@
       slotRows: 2,
       roomVisibility: MULTI_ROOM_VISIBILITY_PUBLIC,
     }),
-    'resident-216-main': Object.freeze({
-      width: 256,
-      height: 256,
-      maxGuests: 9,
-      slotColumns: 5,
-      slotRows: 2,
-      roomVisibility: MULTI_ROOM_VISIBILITY_PUBLIC,
-    }),
-    'resident-128-main': Object.freeze({
-      width: 128,
-      height: 128,
-      maxGuests: 15,
-      slotColumns: 4,
-      slotRows: 4,
-      roomVisibility: MULTI_ROOM_VISIBILITY_PUBLIC,
-    }),
   });
   const MULTI_SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
   const MULTI_SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
@@ -890,6 +995,7 @@
   const THUMBNAIL_CANVAS_SIZE = 160;
   const LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS = 1500;
   const MULTI_REPLICA_AUTOSAVE_BLOCKED_STATUS = '自動保存: マルチ中はマスターのみ端末保存します';
+  const RESIDENT_CANVAS_AUTOSAVE_BLOCKED_STATUS = '自動保存: 常設ルームでは端末内保存しません';
   const DOCUMENT_FILE_VERSION = 1;
   const LENS_IMPORT_STORAGE_KEY = 'pixiee-lens:pending-draw-import';
   const PIXFIND_UPLOAD_KEY = 'pixfind_creator_upload_v1';
@@ -944,6 +1050,7 @@
   let exportScaleUserOverride = false;
   let exportIncludeOriginalSize = false;
   let exportSaveProjectCompanion = false;
+  let exportContestPostAfterSave = false;
   const EXPORT_GRID_TILE_MIN_SIZE = 1;
   const EXPORT_GRID_TILE_MAX_SIZE = MAX_EXPORT_DIMENSION;
   let exportGridTileWidth = 8;
@@ -1755,8 +1862,8 @@
     const brushShape = requestedShape === BRUSH_SHAPE_CUSTOM && !customBrush
       ? BRUSH_SHAPE_SQUARE
       : requestedShape;
-    const layers = [createLayer('レイヤー 1', initialWidth, initialHeight)];
-    const frames = [createFrame('フレーム 1', layers, initialWidth, initialHeight)];
+    const layers = [createLayer(getDefaultLayerName(1), initialWidth, initialHeight)];
+    const frames = [createFrame(getDefaultFrameName(1), layers, initialWidth, initialHeight)];
 
     return {
       width: initialWidth,
@@ -1988,9 +2095,13 @@
     if (!Number.isFinite(targetRect.top) || !Number.isFinite(targetRect.bottom)) {
       return;
     }
-    const targetCenterY = targetRect.top + (targetRect.height * 0.5);
-    const desiredCenterY = viewportTop + (viewportHeight * 0.5) - Math.min(40, viewportHeight * 0.1);
-    const deltaY = Math.round(targetCenterY - desiredCenterY);
+    const margin = Math.max(14, Math.min(30, Math.round(viewportHeight * 0.08)));
+    let deltaY = 0;
+    if (targetRect.bottom > (viewportTop + viewportHeight - margin)) {
+      deltaY = Math.round(targetRect.bottom - (viewportTop + viewportHeight - margin));
+    } else if (targetRect.top < (viewportTop + margin)) {
+      deltaY = Math.round(targetRect.top - (viewportTop + margin));
+    }
     if (Math.abs(deltaY) <= 6) {
       return;
     }
@@ -2817,28 +2928,40 @@
   function updateMemoryStatus() {
     const usageNode = dom.controls.memoryUsage || document.getElementById('memoryUsage');
     if (!usageNode) return;
-  let usage = getMemoryUsageBreakdown();
-  usage = trimHistoryForMemoryIfNeeded(usage);
-  let text = `メモリ: ${formatBytes(usage.total)}`;
-  if (memoryThresholds.maxBytes) {
-    text += ` | 上限目安 ${formatBytes(memoryThresholds.maxBytes)}`;
-  }
-  text += ` | ヒストリー ${history.past.length}/${history.limit}`;
-  text += ` | タイムラプス ${timelapseState.snapshots.length}`;
-  if (timelapseState.sampleStep > 1) {
-    text += ` (間引きx${timelapseState.sampleStep})`;
-  }
+    let usage = getMemoryUsageBreakdown();
+    usage = trimHistoryForMemoryIfNeeded(usage);
+    let text = localizeText(`メモリ: ${formatBytes(usage.total)}`, `Memory: ${formatBytes(usage.total)}`);
+    if (memoryThresholds.maxBytes) {
+      text += localizeText(
+        ` | 上限目安 ${formatBytes(memoryThresholds.maxBytes)}`,
+        ` | Limit ${formatBytes(memoryThresholds.maxBytes)}`
+      );
+    }
+    text += localizeText(
+      ` | ヒストリー ${history.past.length}/${history.limit}`,
+      ` | History ${history.past.length}/${history.limit}`
+    );
+    text += localizeText(
+      ` | タイムラプス ${timelapseState.snapshots.length}`,
+      ` | Timelapse ${timelapseState.snapshots.length}`
+    );
+    if (timelapseState.sampleStep > 1) {
+      text += localizeText(
+        ` (間引きx${timelapseState.sampleStep})`,
+        ` (thinning x${timelapseState.sampleStep})`
+      );
+    }
     const now = performance && typeof performance.now === 'function' ? performance.now() : Date.now();
     if (historyTrimmedRecently) {
       if (now - historyTrimmedAt <= 6000) {
-        text += ' | ヒストリー自動整理';
+        text += localizeText(' | ヒストリー自動整理', ' | History auto-trimmed');
       } else {
         historyTrimmedRecently = false;
       }
     }
-  usageNode.textContent = text;
-  usageNode.style.color = usage.total >= memoryThresholds.warningBytes ? '#ff5c5c' : '';
-}
+    usageNode.textContent = text;
+    usageNode.style.color = usage.total >= memoryThresholds.warningBytes ? '#ff5c5c' : '';
+  }
 
   function clearMemoryUsage() {
     history.past = [];
@@ -5003,9 +5126,9 @@
     updateThemeColorMeta(normalized);
     if (syncControl && dom.controls.toggleUiTheme instanceof HTMLButtonElement) {
       const preset = UI_THEME_PRESETS[normalized] || UI_THEME_PRESETS[DEFAULT_UI_THEME];
-      const label = preset?.label || UI_THEME_PRESETS[DEFAULT_UI_THEME].label;
+      const label = localizeUiThemePresetLabel(preset?.label || UI_THEME_PRESETS[DEFAULT_UI_THEME].label);
       dom.controls.toggleUiTheme.textContent = `UI:${label}`;
-      dom.controls.toggleUiTheme.setAttribute('aria-label', `UIカラー:${label}`);
+      dom.controls.toggleUiTheme.setAttribute('aria-label', localizeText(`UIカラー:${label}`, `UI theme: ${label}`));
       dom.controls.toggleUiTheme.setAttribute('aria-pressed', String(normalized !== DEFAULT_UI_THEME));
     }
     renderBrushShapeButtonIcons();
@@ -5055,17 +5178,18 @@
       groupedItems.get(sectionName).push(item);
     });
     groupedItems.forEach((items, sectionName) => {
+      const localizedSectionName = localizeText(sectionName, sectionName === '対称' ? 'Mirror' : sectionName);
       let buttonHost = null;
       if (splitBySection) {
         const section = document.createElement('section');
         section.className = 'mirror-tool-popover__section';
         const title = document.createElement('h4');
         title.className = 'mirror-tool-popover__section-title';
-        title.textContent = sectionName;
+        title.textContent = localizedSectionName;
         const axes = document.createElement('div');
         axes.className = 'mirror-tool-popover__axes';
         axes.setAttribute('role', 'group');
-        axes.setAttribute('aria-label', `${sectionName}ツール`);
+        axes.setAttribute('aria-label', localizeText(`${sectionName}ツール`, `${localizedSectionName} tools`));
         section.appendChild(title);
         section.appendChild(axes);
         container.appendChild(section);
@@ -5074,7 +5198,7 @@
         const axes = document.createElement('div');
         axes.className = 'mirror-tool-popover__axes';
         axes.setAttribute('role', 'group');
-        axes.setAttribute('aria-label', '対称ツール');
+        axes.setAttribute('aria-label', localizeText('対称ツール', 'Mirror tools'));
         container.appendChild(axes);
         buttonHost = axes;
       }
@@ -5145,10 +5269,13 @@
 
   function getCustomBrushStatusText() {
     if (!isCustomBrushData(state.customBrush)) {
-      return 'カスタム: 未作成';
+      return localizeText('カスタム: 未作成', 'Custom: Not created');
     }
     const customBrush = state.customBrush;
-    return `カスタム: ${customBrush.pixelCount}px (${customBrush.width}x${customBrush.height})`;
+    return localizeText(
+      `カスタム: ${customBrush.pixelCount}px (${customBrush.width}x${customBrush.height})`,
+      `Custom: ${customBrush.pixelCount}px (${customBrush.width}x${customBrush.height})`
+    );
   }
 
   function getBrushShapeIconFillStyle(alpha = 0.95) {
@@ -5426,17 +5553,22 @@
       dom.controls.outlineSize.value = String(state.outlineSize);
     }
     if (dom.controls.outlineSizeValue) {
-      dom.controls.outlineSizeValue.textContent = `${state.outlineSize}マス`;
+      dom.controls.outlineSizeValue.textContent = localizeText(`${state.outlineSize}マス`, `${state.outlineSize} cells`);
     }
     syncBrushControls();
     syncBrushSizeFieldVisibility();
     syncSelectSameModeControls();
-    if (dom.controls.canvasWidth) {
-      dom.controls.canvasWidth.value = String(state.width);
+    if (dom.controls.canvasWidth instanceof HTMLInputElement) {
+      if (document.activeElement !== dom.controls.canvasWidth) {
+        dom.controls.canvasWidth.value = String(state.width);
+      }
     }
-    if (dom.controls.canvasHeight) {
-      dom.controls.canvasHeight.value = String(state.height);
+    if (dom.controls.canvasHeight instanceof HTMLInputElement) {
+      if (document.activeElement !== dom.controls.canvasHeight) {
+        dom.controls.canvasHeight.value = String(state.height);
+      }
     }
+    updateCanvasResizeControls();
     if (dom.controls.toggleGrid instanceof HTMLInputElement) {
       dom.controls.toggleGrid.checked = state.showGrid;
     }
@@ -5444,20 +5576,24 @@
       dom.controls.toggleMajorGrid.checked = state.showMajorGrid;
     }
     if (dom.controls.toggleBackgroundMode) {
-      const labelMap = {
+      const labelMap = isEnglishUi() ? {
+        dark: 'BG: Black',
+        light: 'BG: White',
+        pink: 'BG: Pink',
+      } : {
         dark: '背景:黒',
         light: '背景:白',
         pink: '背景:桃',
       };
       dom.controls.toggleBackgroundMode.setAttribute('aria-pressed', String(state.backgroundMode !== 'dark'));
-      dom.controls.toggleBackgroundMode.textContent = labelMap[state.backgroundMode] || '背景';
+      dom.controls.toggleBackgroundMode.textContent = labelMap[state.backgroundMode] || localizeText('背景', 'BG');
     }
     if (dom.controls.toggleUiTheme instanceof HTMLButtonElement) {
       const normalizedTheme = normalizeUiTheme(state.uiTheme, DEFAULT_UI_THEME);
       const preset = UI_THEME_PRESETS[normalizedTheme] || UI_THEME_PRESETS[DEFAULT_UI_THEME];
-      const label = preset?.label || UI_THEME_PRESETS[DEFAULT_UI_THEME].label;
+      const label = localizeUiThemePresetLabel(preset?.label || UI_THEME_PRESETS[DEFAULT_UI_THEME].label);
       dom.controls.toggleUiTheme.textContent = `UI:${label}`;
-      dom.controls.toggleUiTheme.setAttribute('aria-label', `UIカラー:${label}`);
+      dom.controls.toggleUiTheme.setAttribute('aria-label', localizeText(`UIカラー:${label}`, `UI theme: ${label}`));
       dom.controls.toggleUiTheme.setAttribute('aria-pressed', String(normalizedTheme !== DEFAULT_UI_THEME));
     }
     if (dom.controls.toggleChecker) {
@@ -5519,6 +5655,470 @@
     updateMirrorGuideHandles();
     syncMultiControls();
     applyMultiRoleUiLocks();
+  }
+
+  function setLocalizedTextContent(target, jaText, enText) {
+    const node = typeof target === 'string' ? document.querySelector(target) : target;
+    if (!(node instanceof HTMLElement)) {
+      return;
+    }
+    node.textContent = localizeText(jaText, enText);
+  }
+
+  function setLocalizedHtmlContent(target, jaHtml, enHtml) {
+    const node = typeof target === 'string' ? document.querySelector(target) : target;
+    if (!(node instanceof HTMLElement)) {
+      return;
+    }
+    node.innerHTML = localizeText(jaHtml, enHtml);
+  }
+
+  function setLocalizedAttribute(target, attributeName, jaText, enText) {
+    const node = typeof target === 'string' ? document.querySelector(target) : target;
+    if (!(node instanceof HTMLElement)) {
+      return;
+    }
+    node.setAttribute(attributeName, localizeText(jaText, enText));
+  }
+
+  function setLocalizedToggleLabel(controlId, jaText, enText) {
+    const label = document.querySelector(`label[for="${controlId}"] > span`);
+    if (!(label instanceof HTMLElement)) {
+      return;
+    }
+    label.textContent = localizeText(jaText, enText);
+  }
+
+  function setLocalizedControlLabel(controlId, jaText, enText) {
+    const control = document.getElementById(controlId);
+    if (!(control instanceof HTMLElement)) {
+      return;
+    }
+    const label = control.closest('label');
+    if (!(label instanceof HTMLElement)) {
+      return;
+    }
+    const span = Array.from(label.children).find(child => child instanceof HTMLElement && child.tagName === 'SPAN');
+    if (!(span instanceof HTMLElement)) {
+      return;
+    }
+    span.textContent = localizeText(jaText, enText);
+  }
+
+  function setLocalizedSelectOption(selectNode, optionValue, jaText, enText) {
+    if (!(selectNode instanceof HTMLSelectElement)) {
+      return;
+    }
+    const option = selectNode.querySelector(`option[value="${optionValue}"]`);
+    if (!(option instanceof HTMLOptionElement)) {
+      return;
+    }
+    option.textContent = localizeText(jaText, enText);
+  }
+
+  function getDefaultLayerName(layerNumber = 1) {
+    const safeNumber = Math.max(1, Math.round(Number(layerNumber) || 1));
+    return localizeText(`レイヤー ${safeNumber}`, `Layer ${safeNumber}`);
+  }
+
+  function getDefaultFrameName(frameNumber = 1) {
+    const safeNumber = Math.max(1, Math.round(Number(frameNumber) || 1));
+    return localizeText(`フレーム ${safeNumber}`, `Frame ${safeNumber}`);
+  }
+
+  function applyTabLocalization() {
+    const tabLabels = {
+      tools: { ja: 'ツール', en: 'Tools' },
+      color: { ja: 'カラー', en: 'Color' },
+      frames: { ja: 'フレームとレイヤー', en: 'Frames & Layers' },
+      settings: { ja: '設定', en: 'Settings' },
+      file: { ja: 'ファイル', en: 'File' },
+      multi: { ja: '共有モード', en: 'Collab' },
+    };
+
+    dom.mobileTabs.forEach(button => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      const key = button.dataset.mobileTab || '';
+      const entry = tabLabels[key];
+      if (!entry) {
+        return;
+      }
+      const label = localizeText(entry.ja, entry.en);
+      button.setAttribute('aria-label', label);
+      const srOnly = button.querySelector('.sr-only');
+      if (srOnly instanceof HTMLElement) {
+        srOnly.textContent = label;
+      }
+    });
+
+    const railButtons = Array.from(document.querySelectorAll('.rail-tab[data-left-tab], .rail-tab[data-right-tab]'));
+    railButtons.forEach(button => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      const key = button.dataset.leftTab || button.dataset.rightTab || '';
+      const entry = tabLabels[key];
+      if (!entry) {
+        return;
+      }
+      const label = localizeText(entry.ja, entry.en);
+      button.setAttribute('aria-label', label);
+      button.setAttribute('title', label);
+      const srOnly = button.querySelector('.sr-only');
+      if (srOnly instanceof HTMLElement) {
+        srOnly.textContent = label;
+      }
+    });
+  }
+
+  function applyToolLocalization() {
+    const toolGroupLabels = {
+      selection: { ja: '範囲選択', en: 'Selection' },
+      pen: { ja: 'ペン', en: 'Pen' },
+      eyedropper: { ja: 'スポイト', en: 'Eyedropper' },
+      eraser: { ja: '消しゴム', en: 'Eraser' },
+      shape: { ja: '図形', en: 'Shapes' },
+      fill: { ja: '塗りつぶし', en: 'Fill' },
+      mirror: { ja: '対称', en: 'Mirror' },
+      virtualCursor: { ja: '仮想カーソル', en: 'Virtual Cursor' },
+    };
+
+    dom.toolGroupButtons.forEach(button => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      const key = button.dataset.toolGroup || '';
+      const entry = toolGroupLabels[key];
+      if (!entry) {
+        return;
+      }
+      const label = localizeText(entry.ja, entry.en);
+      button.setAttribute('title', label);
+      const labelNode = button.querySelector('.tool-group-label');
+      if (labelNode instanceof HTMLElement) {
+        labelNode.textContent = label;
+      }
+    });
+
+    const toolLabels = {
+      pen: { ja: 'ペン', en: 'Pen' },
+      eyedropper: { ja: 'スポイト', en: 'Eyedropper' },
+      eraser: { ja: '消しゴム', en: 'Eraser' },
+      line: { ja: '直線', en: 'Line' },
+      curve: { ja: '曲線', en: 'Curve' },
+      rect: { ja: '四角', en: 'Rectangle' },
+      rectFill: { ja: '塗り四角', en: 'Filled Rect' },
+      ellipse: { ja: '丸', en: 'Ellipse' },
+      ellipseFill: { ja: '塗り丸', en: 'Filled Ellipse' },
+      fill: { ja: '塗りつぶし', en: 'Fill' },
+      move: { ja: '移動', en: 'Move' },
+      selectRect: { ja: '矩形選択', en: 'Rect Select' },
+      selectLasso: { ja: '投げ縄', en: 'Lasso' },
+      selectSame: { ja: '同色', en: 'Same Color' },
+      mirrorPopup: { ja: '対称', en: 'Mirror' },
+      virtualCursorToggle: { ja: '仮想表示', en: 'Virtual Cursor' },
+    };
+
+    const toolNodes = Array.from(document.querySelectorAll('.tool-button[data-tool]'));
+    toolNodes.forEach(button => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      const key = button.dataset.tool || '';
+      const entry = toolLabels[key];
+      if (!entry) {
+        return;
+      }
+      const label = localizeText(entry.ja, entry.en);
+      const span = button.querySelector('span');
+      if (span instanceof HTMLElement) {
+        span.textContent = label;
+      }
+      const icon = button.querySelector('img');
+      if (icon instanceof HTMLImageElement) {
+        icon.alt = label;
+      }
+      button.setAttribute('aria-label', label);
+      button.setAttribute('title', label);
+    });
+
+    setLocalizedTextContent('.tool-quick-color__palette + .help-text', 'クイックパレット', 'Quick Palette');
+    setLocalizedTextContent('#selectionOutlineField > span', '選択編集', 'Selection Edit');
+    setLocalizedTextContent('#selectionOutline4Action', '4方向', '4-way');
+    setLocalizedTextContent('#selectionOutline8Action', '8方向', '8-way');
+    setLocalizedTextContent('#outlineSizeField > span', 'アウトライン幅', 'Outline Width');
+    setLocalizedTextContent('#brushSizeField > span', 'ブラシサイズ', 'Brush Size');
+    setLocalizedTextContent('#brushShapeButtons [data-brush-shape="square"] span', '四角', 'Square');
+    setLocalizedTextContent('#brushShapeButtons [data-brush-shape="circle"] span', '丸', 'Circle');
+    setLocalizedTextContent('#brushShapeButtons [data-brush-shape="custom"] span', 'カスタム', 'Custom');
+    setLocalizedTextContent('#selectSameModeField > span', '同色選択モード', 'Same Color Mode');
+    setLocalizedTextContent('#selectSameModeField [data-select-same-mode="connected"]', '連結のみ', 'Connected');
+    setLocalizedTextContent('#selectSameModeField [data-select-same-mode="global"]', '全体', 'Global');
+  }
+
+  function applyUiLocalization() {
+    setDocumentLanguage();
+
+    if (dom.controls.toggleLanguageMode instanceof HTMLButtonElement) {
+      const switchLabel = isEnglishUi() ? '日本語' : 'English';
+      dom.controls.toggleLanguageMode.textContent = switchLabel;
+      dom.controls.toggleLanguageMode.setAttribute(
+        'aria-label',
+        isEnglishUi() ? '日本語に切り替え' : 'Switch to English'
+      );
+    }
+
+    setLocalizedTextContent('.startup-screen__subtitle', 'PiXiEEDraw（ピクシードロー）でドット絵づくりをはじめよう', 'Start creating pixel art with PiXiEEDraw');
+    setLocalizedTextContent('#startupActionResume', '前回の続きから再開', 'Resume Last Session');
+    setLocalizedTextContent('#startupActionNew', '新規作成', 'New Project');
+    setLocalizedTextContent('#startupActionOpen', 'ファイルを開く', 'Open File');
+    setLocalizedTextContent('#startupActionSkip', 'この画面を閉じる', 'Close');
+    setLocalizedTextContent('#startupRecentProjects .startup-screen__recent-title', '端末内プロジェクト（自動保存）', 'Local Projects (Autosave)');
+    setLocalizedTextContent(
+      '#startupScreenHint',
+      AUTOSAVE_SUPPORTED
+        ? '描画内容はこの端末に自動保存され、起動時に前回データを復元できます。'
+        : 'このブラウザでは自動保存が利用できません。保存/出力から手動保存してください。',
+      AUTOSAVE_SUPPORTED
+        ? 'Your drawing is autosaved on this device and restored when you reopen.'
+        : 'Autosave is not available in this browser. Please save manually from Save / Export.'
+    );
+    setLocalizedTextContent('#updateToastCloseBtn', '閉じる', 'Close');
+
+    applyTabLocalization();
+    applyToolLocalization();
+
+    setLocalizedAttribute('#panelFrames .timeline-card', 'aria-label', 'レイヤーとフレームのタイムライン', 'Layer/Frame Timeline');
+    setLocalizedAttribute('#panelFrames .timeline-toolbar__group--layer', 'aria-label', 'レイヤー操作', 'Layer Actions');
+    setLocalizedAttribute('#panelFrames .timeline-toolbar__group--frame', 'aria-label', 'フレーム操作', 'Frame Actions');
+    setLocalizedAttribute('#timelineMatrix', 'aria-label', 'フレームとレイヤーの一覧', 'Frame and Layer List');
+    setLocalizedAttribute('#panelFrames .timeline-playback', 'aria-label', '再生ボタン群', 'Playback Controls');
+    setLocalizedAttribute('#panelFrames .timeline-fps', 'aria-label', 'フレームレート設定', 'Frame Rate Settings');
+    setLocalizedTextContent('#panelFrames .timeline-toolbar__group--layer .timeline-toolbar__label', 'レイヤー', 'Layers');
+    setLocalizedTextContent('#panelFrames .timeline-toolbar__group--frame .timeline-toolbar__label', 'フレーム', 'Frames');
+    setLocalizedTextContent('#applyFpsAll', '全体適用', 'Apply All');
+    setLocalizedAttribute('#addLayer', 'aria-label', 'レイヤーを追加', 'Add layer');
+    setLocalizedAttribute('#removeLayer', 'aria-label', 'レイヤーを削除', 'Remove layer');
+    setLocalizedAttribute('#moveLayerUp', 'aria-label', '選択中のレイヤーを上に移動', 'Move selected layer up');
+    setLocalizedAttribute('#moveLayerDown', 'aria-label', '選択中のレイヤーを下に移動', 'Move selected layer down');
+    setLocalizedAttribute('#addFrame', 'aria-label', 'フレームを追加', 'Add frame');
+    setLocalizedAttribute('#removeFrame', 'aria-label', 'フレームを削除', 'Remove frame');
+    setLocalizedAttribute('#moveFrameUp', 'aria-label', '選択中のフレームを左に移動', 'Move selected frame left');
+    setLocalizedAttribute('#moveFrameDown', 'aria-label', '選択中のフレームを右に移動', 'Move selected frame right');
+    setLocalizedAttribute('#rewindAnimation', 'aria-label', '最初のフレームへ', 'Go to first frame');
+    setLocalizedAttribute('#playAnimation', 'aria-label', '再生', 'Play');
+    setLocalizedAttribute('#stopAnimation', 'aria-label', '停止', 'Stop');
+    setLocalizedAttribute('#forwardAnimation', 'aria-label', '次のフレームへ', 'Next frame');
+    setLocalizedAttribute('#applyFpsAll', 'aria-label', '全フレームに現在の fps を適用', 'Apply current fps to all frames');
+    setLocalizedAttribute('#timelineLayerSettings', 'aria-label', '選択中レイヤー設定', 'Selected Layer Settings');
+    setLocalizedAttribute('#timelineFrameSettings', 'aria-label', '選択中フレーム設定', 'Selected Frame Settings');
+    setLocalizedControlLabel('layerOpacity', '不透明度', 'Opacity');
+    setLocalizedControlLabel('layerBlendMode', '合成モード', 'Blend Mode');
+    setLocalizedControlLabel('onionSkinEnabled', 'オニオンスキン', 'Onion Skin');
+    setLocalizedControlLabel('onionPrevFrames', '前フレーム', 'Prev Frames');
+    setLocalizedControlLabel('onionNextFrames', '次フレーム', 'Next Frames');
+    setLocalizedControlLabel('onionOpacity', '濃さ', 'Strength');
+    setLocalizedAttribute('#onionSkinEnabled', 'aria-label', 'オニオンスキンを有効化', 'Enable onion skin');
+    setLocalizedSelectOption(dom.controls.layerBlendMode, 'normal', '通常', 'Normal');
+    setLocalizedSelectOption(dom.controls.layerBlendMode, 'multiply', '乗算', 'Multiply');
+    setLocalizedSelectOption(dom.controls.layerBlendMode, 'screen', 'スクリーン', 'Screen');
+    setLocalizedSelectOption(dom.controls.layerBlendMode, 'overlay', 'オーバーレイ', 'Overlay');
+    setLocalizedSelectOption(dom.controls.layerBlendMode, 'soft-light', 'ソフトライト', 'Soft Light');
+    setLocalizedSelectOption(dom.controls.layerBlendMode, 'hard-light', 'ハードライト', 'Hard Light');
+    setLocalizedSelectOption(dom.controls.layerBlendMode, 'darken', '比較(暗)', 'Darken');
+    setLocalizedSelectOption(dom.controls.layerBlendMode, 'lighten', '比較(明)', 'Lighten');
+    setLocalizedSelectOption(dom.controls.layerBlendMode, 'color-dodge', '覆い焼きカラー', 'Color Dodge');
+    setLocalizedSelectOption(dom.controls.layerBlendMode, 'color-burn', '焼き込みカラー', 'Color Burn');
+    setLocalizedSelectOption(dom.controls.layerBlendMode, 'difference', '差の絶対値', 'Difference');
+    setLocalizedSelectOption(dom.controls.layerBlendMode, 'exclusion', '除外', 'Exclusion');
+
+    setLocalizedTextContent('#multiEntryMaster', 'マスター', 'Master');
+    setLocalizedTextContent('#multiEntryGuest', '入室', 'Join');
+    setLocalizedToggleLabel('multiDanmakuToggle', 'コメント弾幕', 'Comment Overlay');
+    setLocalizedTextContent('#multiCommentSend', '送信', 'Send');
+    setLocalizedTextContent('#multiStartSession', '開始', 'Start');
+    setLocalizedTextContent('#multiLeaveSession', '切断', 'Disconnect');
+    setLocalizedControlLabel('multiProjectKey', 'プロジェクトキー', 'Project Key');
+    setLocalizedTextContent('#multiCopyKey', 'コピー', 'Copy');
+    setLocalizedAttribute('#multiCopyKey', 'aria-label', 'プロジェクトキーをコピー', 'Copy project key');
+    setLocalizedAttribute('#multiCopyKey', 'title', 'プロジェクトキーをコピー', 'Copy project key');
+    setLocalizedTextContent('#panelMulti .multi-master-actions > span', '基本', 'Basics');
+    setLocalizedTextContent('#multiGenerateKey', 'キー生成', 'Generate Key');
+    setLocalizedTextContent('#multiBroadcastState', '全員に同期', 'Sync to All');
+    setLocalizedTextContent('#multiInviteCopy', '招待リンクをコピー', 'Copy Invite Link');
+    setLocalizedTextContent('#multiInviteShare', '招待を共有', 'Share Invite');
+    setLocalizedTextContent('#multiRequestGuestRole', '参加リクエストを送信', 'Send Join Request');
+    setLocalizedTextContent('#multiJoinRequestHint', '参加はマスターの承認後に有効になります。', 'Joining becomes active after master approval.');
+    setLocalizedTextContent('#multiStatus', '共有モード: OFF', 'Collab mode: OFF');
+    setLocalizedAttribute('#multiHelpToggle', 'aria-label', 'マルチ説明を表示', 'Show collab help');
+    setLocalizedTextContent('#multiHelpPanel > span', 'マルチ説明', 'Collab Help');
+    setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(1)', '描画は参加者のみ、コメントは全員が利用できます。', 'Only participants can draw; everyone can comment.');
+    setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(2)', '参加者を選ぶと: 切替 / セル移動 / ロック / キック / BAN', 'Participant selected: switch / move cell / lock / kick / ban');
+    setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(3)', '視聴者を選ぶと: 切替のみ', 'Viewer selected: switch only');
+    setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(4)', '招待リンクはプロジェクトキー付きで参加画面を開きます。', 'Invite links open the join screen with project key.');
+    setLocalizedTextContent('#multiHelpClose', '閉じる', 'Close');
+    setLocalizedTextContent('#panelMulti .multi-participants-panel > summary', '参加者/視聴者一覧', 'Participants / Viewers');
+    setLocalizedTextContent('#multiParticipants .help-text', '未接続', 'Not connected');
+    setLocalizedTextContent('#panelMulti .multi-master-preset-field > span', 'クイック設定', 'Quick Presets');
+    setLocalizedTextContent('#multiPresetFriends', '友達向け', 'Friends');
+    setLocalizedTextContent('#multiPresetStream', '配信向け', 'Streaming');
+    setLocalizedTextContent('#multiPresetHint', '友達向け: 自動参加 / 配信向け: 承認制', 'Friends: auto join / Streaming: approval');
+    setLocalizedTextContent('#multiMasterAdvanced > summary', '詳細設定', 'Advanced');
+    setLocalizedTextContent('#panelMulti .multi-capacity-field > span', '参加管理', 'Participant Management');
+    setLocalizedControlLabel('multiMaxGuests', '参加上限 (1〜15)', 'Participant Limit (1-15)');
+    setLocalizedTextContent('#multiGuestCapacityHint', '参加枠: 0 / 5', 'Participant slots: 0 / 5');
+    setLocalizedControlLabel('multiRoomVisibility', '部屋公開', 'Room Visibility');
+    setLocalizedTextContent('#multiRoomVisibilityHint', '非公開: ホームには表示されません。', 'Private: hidden from Home list.');
+    setLocalizedControlLabel('multiExportPermission', '出力権限', 'Export Permission');
+    setLocalizedControlLabel('multiJoinPolicy', '参加方式', 'Join Policy');
+    setLocalizedTextContent('#multiJoinPolicyHint', '自動参加: 招待リンクは参加者入室になります。', 'Auto Join: invite link opens as participant join.');
+    setLocalizedTextContent('#panelMulti .multi-join-requests-field > span', '参加リクエスト', 'Join Requests');
+    setLocalizedControlLabel('multiJoinRequestTarget', '対象', 'Target');
+    setLocalizedTextContent('#multiJoinRequestApprove', '承認', 'Approve');
+    setLocalizedTextContent('#multiJoinRequestReject', '却下', 'Reject');
+    setLocalizedTextContent('#panelMulti .multi-master-ops-toggle-field > span', '運営モード', 'Ops Mode');
+    setLocalizedToggleLabel('multiMasterOpsMode', 'キック / BAN / 強制切替を表示', 'Show kick / ban / force role switch');
+    setLocalizedTextContent('#multiMasterOpsHint', '通常はOFF推奨です。', 'OFF is recommended for normal use.');
+    setLocalizedTextContent('#panelMulti .multi-role-control-field > span', '参加/視聴の切替', 'Participant/Viewer Switch');
+    setLocalizedControlLabel('multiAssignTarget', '対象', 'Target');
+    setLocalizedTextContent('#multiForceGuest', '参加者にする', 'Set Participant');
+    setLocalizedTextContent('#multiForceSpectator', '視聴者にする', 'Set Viewer');
+    setLocalizedTextContent('#panelMulti .multi-assignment-field > span', '参加者セル移動', 'Move Participant Cell');
+    setLocalizedControlLabel('multiAssignFrame', 'フレーム', 'Frame');
+    setLocalizedControlLabel('multiAssignLayer', 'レイヤー', 'Layer');
+    setLocalizedTextContent('#multiAssignApply', '参加者を移動', 'Move Participant');
+    setLocalizedTextContent('#multiAssignLockToggle', 'セルロック', 'Cell Lock');
+    setLocalizedTextContent('#multiAssignKick', 'キック', 'Kick');
+    setLocalizedTextContent('#multiAssignBan', 'BAN', 'Ban');
+
+    setLocalizedTextContent('#goHomeButton', '他のツール一覧へ', 'Other Tools');
+    setLocalizedTextContent('#openShortcutHelp', 'ショートカット一覧', 'Keyboard Shortcuts');
+    setLocalizedTextContent('#openUpdateHistory', '更新情報', 'Updates');
+
+    setLocalizedTextContent('#panelSettings .settings-size-row--canvas > span', 'キャンバスサイズ', 'Canvas Size');
+    setLocalizedControlLabel('canvasWidth', '横', 'W');
+    setLocalizedControlLabel('canvasHeight', '縦', 'H');
+    setLocalizedTextContent('#applyCanvasResize', '適用', 'Apply');
+    setLocalizedTextContent('#canvasSizeHint', '横/縦を入力して「適用」または Enter で反映します。', 'Enter width/height and press Apply or Enter.');
+    setLocalizedTextContent('#panelSettings .settings-size-row--sprite > span', 'スプライト倍率', 'Sprite Scale');
+    setLocalizedControlLabel('spriteScaleInput', '倍率', 'Scale');
+    setLocalizedTextContent('#applySpriteScale', '適用', 'Apply');
+    setLocalizedAttribute('#panelSettings .field.field--list[role="group"]', 'aria-label', '表示設定', 'Display Settings');
+    setLocalizedToggleLabel('toggleGrid', 'グリッド', 'Grid');
+    setLocalizedToggleLabel('toggleMajorGrid', 'メジャー', 'Major');
+    setLocalizedToggleLabel('toggleChecker', '16px グレーチェック', '16px Checker');
+    setLocalizedToggleLabel('settingDanmakuToggle', 'コメント弾幕', 'Comment Overlay');
+    setLocalizedToggleLabel('togglePixelPreview', '1px ガイド', '1px Guide');
+    setLocalizedToggleLabel('toggleVirtualCursor', '仮想カーソル', 'Virtual Cursor');
+    setLocalizedToggleLabel('toggleTimelapse', 'タイムラプス記録', 'Timelapse Recording');
+    setLocalizedToggleLabel('toggleOnionSkin', 'オニオンスキン', 'Onion Skin');
+    setLocalizedToggleLabel('toggleMirrorMode', 'ミラーモード', 'Mirror Mode');
+    setLocalizedToggleLabel('togglePixfindMode', '間違い探しモード', 'PiXFiND Mode');
+    setLocalizedTextContent('#pixfindHelpText', 'ON時はフレーム1を原本、フレーム2を差分としてPiXFiND出力します。ONにするたびフレーム2は作り直されます。', 'When enabled, Frame 1 is the original and Frame 2 is the difference for PiXFiND export. Frame 2 is recreated each time you enable this mode.');
+    setLocalizedToggleLabel('mirrorAxisVertical', '左右対称', 'Vertical Mirror');
+    setLocalizedToggleLabel('mirrorAxisHorizontal', '上下対称', 'Horizontal Mirror');
+    setLocalizedToggleLabel('mirrorAxisDiagonalA', '斜め対称 (＼)', 'Diagonal Mirror (\\)');
+    setLocalizedToggleLabel('mirrorAxisDiagonalB', '斜め対称 (/)', 'Diagonal Mirror (/)');
+    setLocalizedTextContent('#mirrorAxisHelp', 'ミラーモード中は軸ライン外側のつまみをドラッグして、対称軸を移動できます。', 'In mirror mode, drag the outside handles to move each mirror axis.');
+    setLocalizedTextContent('.virtual-cursor-scale__label', '仮想カーソルボタンサイズ', 'Virtual Cursor Button Size');
+    setLocalizedTextContent('#mobileDrawHelp', 'スマホ描画: 仮想カーソルをONにしてキャンバスをドラッグでカーソル移動、「描画」ボタン長押しで描画します（左半分=主色 / 右半分=副色）。2本指ドラッグ/ピンチで移動と拡大縮小ができます。', 'Mobile draw: turn on Virtual Cursor, drag the canvas to move the cursor, and long-press Draw to paint (left half = primary / right half = secondary). Use two fingers to pan and pinch zoom.');
+    setLocalizedTextContent('#panelSettings .settings-display-buttons + .help-text', '背景とUI配色を切り替えます（描画色には影響しません）。', 'Switch the background and UI colors (does not change drawing colors).');
+
+    setLocalizedTextContent('#floatingDrawButton', '描画', 'Draw');
+    setLocalizedAttribute('#floatingDrawButton', 'aria-label', '描画ボタン（左=主色 / 右=副色）', 'Draw button (left = primary / right = secondary)');
+    setLocalizedTextContent('#mirrorToolPopover .mirror-tool-popover__header strong', '対称ツール', 'Mirror Tools');
+    setLocalizedTextContent('#mirrorToolPopoverClose', '閉じる', 'Close');
+    setLocalizedAttribute('#mirrorToolPopoverClose', 'aria-label', '対称ポップアップを閉じる', 'Close mirror popup');
+    setLocalizedToggleLabel('mirrorToolPopupToggleMode', 'ミラーモード', 'Mirror Mode');
+    setLocalizedTextContent('#mirrorToolPopoverHelp', '挙動は既存ミラーモードと同じです。軸位置はキャンバス外のつまみで移動できます。', 'Behavior is the same as mirror mode. You can move axis handles from outside the canvas.');
+
+    setLocalizedTextContent('#newProject', '新規作成', 'New Project');
+    setLocalizedTextContent('#openDocument', 'ファイルを開く', 'Open File');
+    setLocalizedTextContent('#showLocalProjects', '端末内プロジェクト', 'Local Projects');
+    setLocalizedTextContent('#exportProject', '保存/出力', 'Save / Export');
+    setLocalizedTextContent('#clearCanvas', 'キャンバスをクリア', 'Clear Canvas');
+    setLocalizedTextContent('.file-panel-summary .help-text:nth-child(1)', '自動保存: ON（この端末）', 'Autosave: ON (this device)');
+    setLocalizedTextContent('.file-panel-summary .help-text:nth-child(2)', '共有・配布用の保存は「保存/出力」から手動で行います。', 'Use "Save / Export" for files you want to share.');
+    setLocalizedTextContent('#panelFile .field.field--list > span', 'タイムラプス', 'Timelapse');
+    setLocalizedTextContent('#timelapseClear', '記録クリア', 'Clear Record');
+    setLocalizedControlLabel('timelapseFps', '再生FPS', 'Playback FPS');
+    setLocalizedTextContent('#panelFile .field.field--list > p.help-text:last-child', '記録ON時は描画履歴を自動記録します。出力は通常の「出力」ボタンから選択してください。', 'When recording is ON, drawing history is captured automatically. Export from the regular Save / Export dialog.');
+    setLocalizedTextContent('#memoryClear', 'メモリ削除', 'Clear Memory');
+
+    setLocalizedTextContent('#exportDialogTitle', '保存/出力形式', 'Save / Export');
+    setLocalizedTextContent('label[for="exportFormat"] > span', '形式', 'Format');
+    setLocalizedSelectOption(dom.exportDialog?.format, 'png', 'PNG（画像）', 'PNG (Image)');
+    setLocalizedSelectOption(dom.exportDialog?.format, 'gridpng', 'PNG（グリッド分割）', 'PNG (Grid Split)');
+    setLocalizedSelectOption(dom.exportDialog?.format, 'gif', 'GIF（アニメーション）', 'GIF (Animation)');
+    setLocalizedSelectOption(dom.exportDialog?.format, 'timelapse', 'タイムラプスGIF（記録）', 'Timelapse GIF');
+    setLocalizedSelectOption(dom.exportDialog?.format, 'pixfind', 'PiXFiNDへ送る', 'Send to PiXFiND');
+    setLocalizedSelectOption(dom.exportDialog?.format, 'project', 'プロジェクト（.pixieedraw）', 'Project (.pixieedraw)');
+    setLocalizedTextContent('#exportScaleControls > span', '出力倍率', 'Output Scale');
+    setLocalizedTextContent('label[for="exportScaleSlider"]', '倍率 (×)', 'Scale (×)');
+    setLocalizedTextContent('#exportOriginalOptionRow span', '拡大出力時に原寸も追加で出力する', 'Also export original size when scaled');
+    setLocalizedTextContent('#exportCompanionOptionRow span', '画像/GIF出力時に PiXiEEDファイルも同時保存する', 'Save a PiXiEED project file together with image/GIF');
+    setLocalizedTextContent('#exportContestPostOptionRow span', '保存完了後にコンテスト投稿画面へ移動する', 'Go to contest post screen after save');
+    setLocalizedTextContent('#exportGridSettings > span', 'グリッド分割 (PNG)', 'Grid Split (PNG)');
+    setLocalizedControlLabel('exportGridWidth', '幅 (px)', 'Width (px)');
+    setLocalizedControlLabel('exportGridHeight', '高さ (px)', 'Height (px)');
+    setLocalizedTextContent('#exportGridHint', '分割順: 右上から左へ、次の段へ進みます（右→左、上→下）。', 'Split order: starts at top-right, moves right-to-left, then top-to-bottom.');
+    setLocalizedHtmlContent('#exportDialog .export-guidance .help-text:nth-child(1)', '<strong>iPhoneで保存</strong> 共有 → ファイルに保存', '<strong>iPhone Save</strong> Share → Save to Files');
+    setLocalizedHtmlContent('#exportDialog .export-guidance .help-text:nth-child(2)', '<strong>Androidで保存</strong> 保存', '<strong>Android Save</strong> Save');
+    setLocalizedTextContent('#confirmExport', '保存/出力', 'Save / Export');
+    setLocalizedTextContent('#cancelExport', 'キャンセル', 'Cancel');
+    setLocalizedTextContent('#exportAdContainer .export-ad__label', '広告', 'Ad');
+    setLocalizedTextContent('#exportInterstitialTitle', '広告', 'Ad');
+    setLocalizedAttribute('#closeExportInterstitial', 'aria-label', '広告を閉じる', 'Close ad');
+    setLocalizedTextContent('#closeExportInterstitial', '閉じる', 'Close');
+    setLocalizedTextContent('.export-interstitial__lead', '画像の出力が完了しました。', 'Image export is complete.');
+
+    setLocalizedTextContent('#newProjectTitle', '新規プロジェクト', 'New Project');
+    setLocalizedTextContent('.new-project__name-field > span', 'ファイル名', 'File Name');
+    setLocalizedTextContent('.new-project__name-field .help-text', 'ファイル名のみ入力してください。拡張子 .pixieedraw は自動で付きます。', 'Enter only the file name. The .pixieedraw extension is added automatically.');
+    setLocalizedTextContent('.new-project__size-fields > span', 'キャンバスサイズ', 'Canvas Size');
+    setLocalizedControlLabel('newProjectWidth', '横', 'W');
+    setLocalizedControlLabel('newProjectHeight', '縦', 'H');
+    setLocalizedTextContent('#cancelNewProject', 'キャンセル', 'Cancel');
+    setLocalizedTextContent('#confirmNewProject', '作成', 'Create');
+
+    setLocalizedTextContent('#shortcutHelpTitle', 'ショートカット一覧', 'Keyboard Shortcuts');
+    setLocalizedTextContent('#closeShortcutHelp', '閉じる', 'Close');
+    setLocalizedTextContent('#updateHistoryTitle', '更新情報', 'Updates');
+    setLocalizedTextContent('#updateHistoryDialog .help-text', '直近1年の更新内容を表示しています。', 'Shows update notes for the past year.');
+    setLocalizedTextContent('#closeUpdateHistory', '閉じる', 'Close');
+    setLocalizedTextContent('#closeToolSpotlight', '閉じる', 'Close');
+
+    renderMirrorToolPopover();
+    syncMirrorToolPopoverControls();
+    const pixfindExpanded = dom.controls.togglePixfindHelp?.getAttribute('aria-expanded') === 'true';
+    setPixfindHelpExpanded(pixfindExpanded);
+    updateExportDestinationLabel();
+    updateExportFolderButtonLabel();
+    updateExportScaleHint();
+  }
+
+  function refreshLocalizedUi() {
+    applyUiLocalization();
+    syncControlsWithState();
+    const cachedEntries = Array.from(recentProjectsCache.values());
+    syncStartupResumeState(cachedEntries);
+    renderRecentProjectsList(cachedEntries);
+  }
+
+  function setUiLanguage(nextLanguage, { persist = true } = {}) {
+    const normalized = normalizeUiLanguage(nextLanguage, uiLanguage);
+    if (normalized === uiLanguage) {
+      refreshLocalizedUi();
+      return;
+    }
+    uiLanguage = normalized;
+    setDocumentLanguage();
+    if (persist) {
+      storeUiLanguage(normalized);
+    }
+    refreshLocalizedUi();
   }
 
   function getMaxSpriteMultiplier() {
@@ -5591,14 +6191,20 @@
     statusNode.dataset.tone = tone;
   }
 
-  function isAutosaveBlockedByMultiRole() {
-    return multiState.connected && !isMultiMasterMode();
+  function getAutosaveBlockedStatusMessage() {
+    if (isResidentMultiConnectedRoom()) {
+      return RESIDENT_CANVAS_AUTOSAVE_BLOCKED_STATUS;
+    }
+    if (multiState.connected && !isMultiMasterMode()) {
+      return MULTI_REPLICA_AUTOSAVE_BLOCKED_STATUS;
+    }
+    return '';
   }
 
   function setupAutosaveControls() {
     const button = dom.controls.enableAutosave;
     if (!button) return;
-    button.textContent = 'ローカル自動保存（常時ON）';
+    button.textContent = localizeText('ローカル自動保存（常時ON）', 'Local Autosave (Always ON)');
     button.disabled = true;
   }
 
@@ -5667,7 +6273,10 @@
 
   function getExportDestinationLabelText() {
     if (!EXPORT_DIRECTORY_SUPPORTED) {
-      return '画像/GIF出力先: 固定出力先は使用しません（保存時に保存先を選択）';
+      return localizeText(
+        '画像/GIF出力先: 固定出力先は使用しません（保存時に保存先を選択）',
+        'Image/GIF destination: fixed folder is disabled (choose destination when saving)'
+      );
     }
     const activeHandle = exportDirectoryHandle || pendingExportDirectoryHandle;
     const displayLabel = sanitizeExportDirectoryDisplayLabel(exportDirectoryDisplayLabel)
@@ -5676,12 +6285,21 @@
         fallback: EXPORT_WORKSPACE_DIR_NAME,
       });
     if (exportDirectoryHandle) {
-      return `画像/GIF出力先: ${displayLabel}/（フルパスはブラウザ仕様で非表示）`;
+      return localizeText(
+        `画像/GIF出力先: ${displayLabel}/（フルパスはブラウザ仕様で非表示）`,
+        `Image/GIF destination: ${displayLabel}/ (full path hidden by browser)`
+      );
     }
     if (pendingExportDirectoryHandle) {
-      return `画像/GIF出力先: ${displayLabel}/（再許可が必要）`;
+      return localizeText(
+        `画像/GIF出力先: ${displayLabel}/（再許可が必要）`,
+        `Image/GIF destination: ${displayLabel}/ (reauthorization required)`
+      );
     }
-    return '画像/GIF出力先: 未固定（保存時に保存先を選択）';
+    return localizeText(
+      '画像/GIF出力先: 未固定（保存時に保存先を選択）',
+      'Image/GIF destination: not fixed (choose destination when saving)'
+    );
   }
 
   function updateExportDestinationLabel() {
@@ -5721,20 +6339,20 @@
     if (!EXPORT_DIRECTORY_SUPPORTED) {
       button.hidden = true;
       button.disabled = true;
-      button.textContent = '出力先固定を使用しない';
+      button.textContent = localizeText('出力先固定を使用しない', 'Disable fixed export destination');
       return;
     }
     button.hidden = false;
     button.disabled = false;
     if (exportDirectoryHandle) {
-      button.textContent = '出力フォルダを変更';
+      button.textContent = localizeText('出力フォルダを変更', 'Change export folder');
       return;
     }
     if (pendingExportDirectoryHandle) {
-      button.textContent = '出力フォルダを再許可';
+      button.textContent = localizeText('出力フォルダを再許可', 'Reauthorize export folder');
       return;
     }
-    button.textContent = '出力フォルダを設定';
+    button.textContent = localizeText('出力フォルダを設定', 'Set export folder');
   }
 
   async function ensureExportWorkspaceDirectory(handle) {
@@ -5762,7 +6380,13 @@
       updateExportDestinationLabel();
     }
     updateExportFolderButtonLabel();
-    updateExportFolderStatus('出力フォルダ: 権限が必要です。ボタンを押して再許可してください', 'warn');
+    updateExportFolderStatus(
+      localizeText(
+        '出力フォルダ: 権限が必要です。ボタンを押して再許可してください',
+        'Export folder: permission required. Press the button to reauthorize.'
+      ),
+      'warn'
+    );
   }
 
   async function attemptExportDirectoryReauthorization() {
@@ -5784,14 +6408,20 @@
     setExportDirectoryDisplayLabel(nextLabel);
     await storeExportDirectoryHandle(handle);
     updateExportFolderButtonLabel();
-    updateExportFolderStatus(`出力フォルダ: 設定済み (${EXPORT_WORKSPACE_DIR_NAME})`, 'success');
+    updateExportFolderStatus(
+      localizeText(
+        `出力フォルダ: 設定済み (${EXPORT_WORKSPACE_DIR_NAME})`,
+        `Export folder: set (${EXPORT_WORKSPACE_DIR_NAME})`
+      ),
+      'success'
+    );
     return true;
   }
 
   async function requestExportDirectoryBinding() {
     if (!EXPORT_DIRECTORY_SUPPORTED || typeof window.showDirectoryPicker !== 'function') {
       updateExportFolderButtonLabel();
-      updateExportFolderStatus('出力フォルダ: このブラウザでは利用できません', 'warn');
+      updateExportFolderStatus(localizeText('出力フォルダ: このブラウザでは利用できません', 'Export folder: unsupported in this browser'), 'warn');
       return false;
     }
     try {
@@ -5821,16 +6451,22 @@
       setExportDirectoryDisplayLabel(nextLabel);
       await storeExportDirectoryHandle(workspaceHandle);
       updateExportFolderButtonLabel();
-      updateExportFolderStatus(`出力フォルダ: 設定済み (${EXPORT_WORKSPACE_DIR_NAME})`, 'success');
+      updateExportFolderStatus(
+        localizeText(
+          `出力フォルダ: 設定済み (${EXPORT_WORKSPACE_DIR_NAME})`,
+          `Export folder: set (${EXPORT_WORKSPACE_DIR_NAME})`
+        ),
+        'success'
+      );
       return true;
     } catch (error) {
       if (error && error.name === 'AbortError') {
         exportDirectorySetupDismissed = true;
-        updateExportFolderStatus('出力フォルダ: キャンセルしました', 'warn');
+        updateExportFolderStatus(localizeText('出力フォルダ: キャンセルしました', 'Export folder: cancelled'), 'warn');
         return false;
       }
       console.warn('Export directory binding failed', error);
-      updateExportFolderStatus('出力フォルダ: フォルダを選択できませんでした', 'error');
+      updateExportFolderStatus(localizeText('出力フォルダ: フォルダを選択できませんでした', 'Export folder: failed to select folder'), 'error');
       return false;
     }
   }
@@ -5844,7 +6480,13 @@
     updateExportFolderButtonLabel();
     updateExportDestinationLabel();
     if (!EXPORT_DIRECTORY_SUPPORTED) {
-      updateExportFolderStatus('出力フォルダ: 固定出力先は使用しません（保存時に保存先を選択）', 'info');
+      updateExportFolderStatus(
+        localizeText(
+          '出力フォルダ: 固定出力先は使用しません（保存時に保存先を選択）',
+          'Export folder: fixed destination is disabled (choose destination when saving)'
+        ),
+        'info'
+      );
       return;
     }
     if (button.dataset.bound === 'true') {
@@ -5870,13 +6512,13 @@
     if (!EXPORT_DIRECTORY_SUPPORTED) {
       return;
     }
-    updateExportFolderStatus('出力フォルダ: 初期化中…', 'info');
+    updateExportFolderStatus(localizeText('出力フォルダ: 初期化中…', 'Export folder: initializing...'), 'info');
     try {
       const handle = await loadStoredExportDirectoryHandle();
       if (!handle) {
         setExportDirectoryDisplayLabel('');
         updateExportFolderButtonLabel();
-        updateExportFolderStatus('出力フォルダ: 未設定', 'info');
+        updateExportFolderStatus(localizeText('出力フォルダ: 未設定', 'Export folder: not set'), 'info');
         return;
       }
       const granted = await ensureHandlePermission(handle, { request: false });
@@ -5890,14 +6532,20 @@
           });
         setExportDirectoryDisplayLabel(nextLabel);
         updateExportFolderButtonLabel();
-        updateExportFolderStatus(`出力フォルダ: 設定済み (${EXPORT_WORKSPACE_DIR_NAME})`, 'success');
+        updateExportFolderStatus(
+          localizeText(
+            `出力フォルダ: 設定済み (${EXPORT_WORKSPACE_DIR_NAME})`,
+            `Export folder: set (${EXPORT_WORKSPACE_DIR_NAME})`
+          ),
+          'success'
+        );
       } else {
         schedulePendingExportDirectoryPermission(handle);
       }
     } catch (error) {
       console.warn('Export directory initialisation failed', error);
       updateExportFolderButtonLabel();
-      updateExportFolderStatus('出力フォルダ: 初期化でエラーが発生しました', 'error');
+      updateExportFolderStatus(localizeText('出力フォルダ: 初期化でエラーが発生しました', 'Export folder: initialization failed'), 'error');
     }
   }
 
@@ -5941,12 +6589,13 @@
   function scheduleAutosaveSnapshot() {
     if (!AUTOSAVE_SUPPORTED) return;
     if (autosaveRestoring) return;
-    if (isAutosaveBlockedByMultiRole()) {
+    const blockedStatus = getAutosaveBlockedStatusMessage();
+    if (blockedStatus) {
       if (autosaveWriteTimer !== null) {
         window.clearTimeout(autosaveWriteTimer);
         autosaveWriteTimer = null;
       }
-      updateAutosaveStatus(MULTI_REPLICA_AUTOSAVE_BLOCKED_STATUS, 'info');
+      updateAutosaveStatus(blockedStatus, 'info');
       return;
     }
     if (!autosaveDirty) return;
@@ -5965,13 +6614,14 @@
   async function writeAutosaveSnapshot(force = false) {
     if (!AUTOSAVE_SUPPORTED) return;
     if (autosaveRestoring) return;
-    if (isAutosaveBlockedByMultiRole()) {
+    const blockedStatus = getAutosaveBlockedStatusMessage();
+    if (blockedStatus) {
       if (autosaveWriteTimer !== null) {
         window.clearTimeout(autosaveWriteTimer);
         autosaveWriteTimer = null;
       }
       autosaveWriteQueued = false;
-      updateAutosaveStatus(MULTI_REPLICA_AUTOSAVE_BLOCKED_STATUS, 'info');
+      updateAutosaveStatus(blockedStatus, 'info');
       return;
     }
     if (!force && !autosaveDirty) return;
@@ -6464,7 +7114,7 @@
 
   async function openDocumentDialog() {
     if (!canCurrentClientImportExternalData()) {
-      setMultiStatus('参加/視聴モードでは読み込み/インポートはマスターのみ操作できます', 'warn');
+      setMultiStatus(localizeText('参加/視聴モードでは読み込み/インポートはマスターのみ操作できます', 'In participant/viewer mode, only the master can open/import files'), 'warn');
       return false;
     }
     if (typeof window.showOpenFilePicker === 'function') {
@@ -7024,7 +7674,7 @@
       if (!imageData || !Number.isFinite(imageData.width) || !Number.isFinite(imageData.height)) {
         throw createImageImportError('画像を読み込めませんでした');
       }
-      const layer = createLayer('画像レイヤー', width, height);
+      const layer = createLayer(localizeText('画像レイヤー', 'Image Layer'), width, height);
       const extraction = buildIndexedPaletteFromImageData(imageData.data);
       if (!extraction.overflow && extraction.palette.length > 0) {
         layer.indices = extraction.indices;
@@ -7049,7 +7699,7 @@
       }
       frames.push({
         id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}`,
-        name: 'フレーム 1',
+        name: getDefaultFrameName(1),
         duration: normalizeImportFrameDuration(frameInfo?.duration),
         layers: [layer],
       });
@@ -7066,7 +7716,7 @@
         : (palette[activePaletteIndex] ? { ...palette[activePaletteIndex] } : { r: 255, g: 255, b: 255, a: 255 });
 
       normalizedFramesData.forEach((frameInfo, index) => {
-        const layer = createLayer('画像レイヤー', width, height);
+        const layer = createLayer(localizeText('画像レイヤー', 'Image Layer'), width, height);
         layer.indices.fill(-1);
         const direct = ensureLayerDirect(layer, width, height);
         if (frameInfo?.imageData?.data instanceof Uint8ClampedArray
@@ -7078,7 +7728,7 @@
         }
         frames.push({
           id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}-${index}`,
-          name: `フレーム ${index + 1}`,
+          name: getDefaultFrameName(index + 1),
           duration: normalizeImportFrameDuration(frameInfo?.duration),
           layers: [layer],
         });
@@ -8263,7 +8913,9 @@
   function syncTimelapseControls() {
     const stepCount = timelapseState.snapshots.length;
     const fps = normalizeTimelapseFps(timelapseState.fps);
-    const sampleInfo = timelapseState.sampleStep > 1 ? ` / 間引きx${timelapseState.sampleStep}` : '';
+    const sampleInfo = timelapseState.sampleStep > 1
+      ? localizeText(` / 間引きx${timelapseState.sampleStep}`, ` / thinning x${timelapseState.sampleStep}`)
+      : '';
     timelapseState.fps = fps;
 
     if (dom.controls.toggleTimelapse instanceof HTMLInputElement) {
@@ -8277,7 +8929,10 @@
     }
     if (dom.controls.timelapseStatus) {
       const status = timelapseState.enabled ? 'ON' : 'OFF';
-      dom.controls.timelapseStatus.textContent = `タイムラプス: ${status} (${stepCount}ステップ / ${fps}fps${sampleInfo})`;
+      dom.controls.timelapseStatus.textContent = localizeText(
+        `タイムラプス: ${status} (${stepCount}ステップ / ${fps}fps${sampleInfo})`,
+        `Timelapse: ${status} (${stepCount} steps / ${fps}fps${sampleInfo})`
+      );
     }
   }
 
@@ -8367,6 +9022,9 @@
 
     try {
       updateAutosaveStatus('タイムラプスGIFを書き出し中…', 'info');
+      const candidates = getExportScaleCandidates();
+      const selectedScale = applyExportScaleConstraints(candidates);
+      syncExportScaleInputs();
       const targetWidth = Math.max(1, Number(state.width) || 1);
       const targetHeight = Math.max(1, Number(state.height) || 1);
       const framePixels = [];
@@ -8397,11 +9055,17 @@
       timelapseState.fps = fps;
       const frameDuration = clamp(Math.round(1000 / fps), 16, 2000);
       const frameDurations = new Array(framePixels.length).fill(frameDuration);
-      const gifBytes = buildGifFromPixels(framePixels, frameDurations, targetWidth, targetHeight);
+      const scaledSet = scaleFrameSetNearestNeighbor(framePixels, targetWidth, targetHeight, selectedScale);
+      const gifBytes = buildGifFromPixels(
+        scaledSet.framePixels,
+        frameDurations,
+        scaledSet.width,
+        scaledSet.height
+      );
       const tasks = [{
         blob: new Blob([gifBytes], { type: 'image/gif' }),
-        filename: createExportFileName('gif', 'timelapse'),
-        shareText: `タイムラプスGIFを書き出しました (${framePixels.length}ステップ)`,
+        filename: createExportFileName('gif', selectedScale > 1 ? `timelapse_x${selectedScale}` : 'timelapse'),
+        shareText: `タイムラプスGIFを書き出しました (${framePixels.length}ステップ${selectedScale > 1 ? ` / ×${selectedScale}` : ''})`,
       }];
       const result = await deliverExportTasks(tasks, {
         mimeType: 'image/gif',
@@ -8410,10 +9074,17 @@
         shareText: 'タイムラプスGIFを書き出しました',
       });
 
+      const detailParts = [`${framePixels.length}ステップ`];
+      if (selectedScale > 1) {
+        detailParts.push(`×${selectedScale}`);
+      }
       const skipped = skippedSizeMismatch + skippedInvalid;
-      const detail = skipped > 0 ? ` / 除外 ${skipped}` : '';
+      if (skipped > 0) {
+        detailParts.push(`除外 ${skipped}`);
+      }
+      const detail = detailParts.join(' / ');
       if (result.exportedCount === result.total) {
-        updateAutosaveStatus(`タイムラプスGIFを書き出しました (${framePixels.length}ステップ${detail})`, 'success');
+        updateAutosaveStatus(`タイムラプスGIFを書き出しました (${detail})`, 'success');
       } else if (result.wasCancelled) {
         updateAutosaveStatus('タイムラプスGIFの書き出しをキャンセルしました', 'warn');
       } else if (result.exportedCount > 0 && result.hadFailure) {
@@ -8471,7 +9142,7 @@
 
   function applyFpsToAllFrames(fpsValue) {
     if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus('参加/視聴モードではfps設定はマスターのみ変更できます', 'warn');
+      setMultiStatus(localizeText('参加/視聴モードではfps設定はマスターのみ変更できます', 'In participant/viewer mode, only the master can change FPS'), 'warn');
       return;
     }
     const frames = state.frames;
@@ -8656,6 +9327,16 @@
         exportSaveProjectCompanion = Boolean(event.target.checked);
         scheduleSessionPersist({ includeSnapshots: false });
         updateExportProjectCompanionToggleUI();
+      });
+    }
+    if (config.contestPostToggle instanceof HTMLInputElement
+      && config.contestPostToggle.dataset.bound !== 'true') {
+      config.contestPostToggle.dataset.bound = 'true';
+      config.contestPostToggle.checked = exportContestPostAfterSave;
+      config.contestPostToggle.addEventListener('change', event => {
+        exportContestPostAfterSave = Boolean(event.target.checked);
+        scheduleSessionPersist({ includeSnapshots: false });
+        updateExportContestPostToggleUI();
       });
     }
 
@@ -8892,21 +9573,21 @@
     quickButton.disabled = true;
     quickButton.setAttribute('aria-busy', 'true');
     try {
-      setStartupQuickSetupStatus('かんたん初期設定: 新規作成を準備しています…');
+      setStartupQuickSetupStatus(localizeText('かんたん初期設定: 新規作成を準備しています…', 'Quick setup: preparing a new project...'));
       const created = createNewProject({
         name: createStartupQuickProjectName(),
         width: lockedCanvasWidth !== null ? lockedCanvasWidth : DEFAULT_CANVAS_SIZE,
         height: lockedCanvasHeight !== null ? lockedCanvasHeight : DEFAULT_CANVAS_SIZE,
       });
       if (!created) {
-        setStartupQuickSetupStatus('かんたん初期設定に失敗しました。通常の「新規作成」をお試しください。', 'error');
+        setStartupQuickSetupStatus(localizeText('かんたん初期設定に失敗しました。通常の「新規作成」をお試しください。', 'Quick setup failed. Please try "New Project".'), 'error');
         return;
       }
-      setStartupQuickSetupStatus('かんたん初期設定が完了しました。', 'success');
+      setStartupQuickSetupStatus(localizeText('かんたん初期設定が完了しました。', 'Quick setup completed.'), 'success');
       hideStartupScreen();
     } catch (error) {
       console.warn('Startup quick setup failed', error);
-      setStartupQuickSetupStatus('かんたん初期設定に失敗しました。通常の「新規作成」をお試しください。', 'error');
+      setStartupQuickSetupStatus(localizeText('かんたん初期設定に失敗しました。通常の「新規作成」をお試しください。', 'Quick setup failed. Please try "New Project".'), 'error');
     } finally {
       quickButton.removeAttribute('aria-busy');
       quickButton.disabled = false;
@@ -9054,17 +9735,26 @@
     getUpdateHistoryEntries();
     if (dom.startup?.hint) {
       dom.startup.hint.textContent = AUTOSAVE_SUPPORTED
-        ? '描画内容はこの端末に自動保存され、起動時に前回データを復元できます。'
-        : 'このブラウザでは自動保存が利用できません。保存/出力から手動保存してください。';
+        ? localizeText(
+          '描画内容はこの端末に自動保存され、起動時に前回データを復元できます。',
+          'Your drawing is autosaved on this device and restored when you reopen.'
+        )
+        : localizeText(
+          'このブラウザでは自動保存が利用できません。保存/出力から手動保存してください。',
+          'Autosave is not available in this browser. Please save manually from Save / Export.'
+        );
     }
     if (dom.startup?.quickSetupButton instanceof HTMLButtonElement) {
       if (AUTOSAVE_SUPPORTED) {
-        dom.startup.quickSetupButton.textContent = '新規作成（かんたん開始）';
-        setStartupQuickSetupStatus('新規作成すると、この端末に自動保存を開始します。');
+        dom.startup.quickSetupButton.textContent = localizeText('新規作成（かんたん開始）', 'New Project (Quick Start)');
+        setStartupQuickSetupStatus(localizeText('新規作成すると、この端末に自動保存を開始します。', 'Creating a new project starts autosave on this device.'));
       } else {
-        dom.startup.quickSetupButton.textContent = '新規作成（かんたん開始）';
+        dom.startup.quickSetupButton.textContent = localizeText('新規作成（かんたん開始）', 'New Project (Quick Start)');
         setStartupQuickSetupStatus(
-          'このブラウザは自動保存未対応です。開始後は「保存/出力」から書き出してください。',
+          localizeText(
+            'このブラウザは自動保存未対応です。開始後は「保存/出力」から書き出してください。',
+            'This browser does not support autosave. Please export manually after starting.'
+          ),
           'warn'
         );
       }
@@ -9120,7 +9810,13 @@
     dom.startup?.resumeButton?.addEventListener('click', async () => {
       const firstEntry = Array.from(recentProjectsCache.values())[0] || null;
       if (!firstEntry) {
-        updateAutosaveStatus('端末内プロジェクトがありません。新規作成またはファイルを開いてください。', 'warn');
+        updateAutosaveStatus(
+          localizeText(
+            '端末内プロジェクトがありません。新規作成またはファイルを開いてください。',
+            'No local project found. Create a new one or open a file.'
+          ),
+          'warn'
+        );
         return;
       }
       const opened = await openRecentProject(firstEntry);
@@ -9949,7 +10645,10 @@
     if (!firstEntry || !firstEntry.id) {
       resumeButton.disabled = true;
       if (resumeHint instanceof HTMLElement) {
-        resumeHint.textContent = 'まだ保存データがありません。まずは新規作成またはファイルを開いてください。';
+        resumeHint.textContent = localizeText(
+          'まだ保存データがありません。まずは新規作成またはファイルを開いてください。',
+          'No saved data yet. Create a new project or open a file.'
+        );
       }
       return;
     }
@@ -9961,8 +10660,8 @@
       : '';
     if (resumeHint instanceof HTMLElement) {
       resumeHint.textContent = atLabel
-        ? `最近: ${displayLabel}（${atLabel}）`
-        : `最近: ${displayLabel}`;
+        ? localizeText(`最近: ${displayLabel}（${atLabel}）`, `Recent: ${displayLabel} (${atLabel})`)
+        : localizeText(`最近: ${displayLabel}`, `Recent: ${displayLabel}`);
     }
   }
 
@@ -9988,19 +10687,22 @@
       card.className = 'startup-recent-card';
       card.dataset.projectId = entry.id;
       card.setAttribute('role', 'listitem');
-      card.setAttribute('aria-label', `${displayLabel} を開く`);
+      card.setAttribute('aria-label', localizeText(`${displayLabel} を開く`, `Open ${displayLabel}`));
       const thumb = document.createElement('div');
       thumb.className = 'startup-recent-card__thumb';
       if (entry.thumbnail) {
         const img = new Image();
         img.src = entry.thumbnail;
-        img.alt = `${entry.fileName || entry.name || 'プロジェクト'} のプレビュー`;
+        img.alt = localizeText(
+          `${entry.fileName || entry.name || 'プロジェクト'} のプレビュー`,
+          `${entry.fileName || entry.name || 'Project'} preview`
+        );
         img.decoding = 'async';
         thumb.appendChild(img);
       } else {
         const placeholder = document.createElement('span');
         placeholder.className = 'startup-recent-card__thumb-placeholder';
-        placeholder.textContent = 'プレビューなし';
+        placeholder.textContent = localizeText('プレビューなし', 'No Preview');
         thumb.appendChild(placeholder);
       }
       const nameNode = document.createElement('span');
@@ -10011,8 +10713,8 @@
       metaNode.className = 'startup-recent-card__meta';
       const updatedAt = Date.parse(entry.updatedAt || '');
       metaNode.textContent = Number.isFinite(updatedAt)
-        ? formatUpdateHistoryDate(updatedAt, '保存時刻不明')
-        : '保存時刻不明';
+        ? formatUpdateHistoryDate(updatedAt, localizeText('保存時刻不明', 'Saved time unavailable'))
+        : localizeText('保存時刻不明', 'Saved time unavailable');
       card.appendChild(thumb);
       card.appendChild(nameNode);
       card.appendChild(metaNode);
@@ -10249,6 +10951,9 @@
 
   async function recordRecentProjectSnapshot(snapshot, packagedPayload, { projectId = '' } = {}) {
     if (!AUTOSAVE_SUPPORTED) {
+      return null;
+    }
+    if (isResidentMultiConnectedRoom()) {
       return null;
     }
     if (!snapshot || typeof snapshot !== 'object') {
@@ -10503,7 +11208,7 @@
         }
         return {
           id: typeof layer.id === 'string' ? layer.id : `layer-${frameIndex}-${layerIndex}`,
-          name: typeof layer.name === 'string' ? layer.name : `レイヤー ${layerIndex + 1}`,
+          name: typeof layer.name === 'string' ? layer.name : getDefaultLayerName(layerIndex + 1),
           visible: layer.visible !== false,
           opacity: normalizeLayerOpacity(layer.opacity),
           blendMode: normalizeLayerBlendMode(layer.blendMode),
@@ -10513,7 +11218,7 @@
       });
       return {
         id: typeof frame.id === 'string' ? frame.id : `frame-${frameIndex + 1}`,
-        name: typeof frame.name === 'string' ? frame.name : `フレーム ${frameIndex + 1}`,
+        name: typeof frame.name === 'string' ? frame.name : getDefaultFrameName(frameIndex + 1),
         duration: clamp(Number(frame.duration) || 1000 / 12, 16, 2000),
         layers,
       };
@@ -10655,10 +11360,13 @@
       return exportReason;
     }
     if (!pixfindModeEnabled) {
-      return '間違い探しモードをONにしてください';
+      return localizeText('間違い探しモードをONにしてください', 'Turn on PiXFiND mode first');
     }
     if (!getPixfindFramePair()) {
-      return 'フレーム2がありません。間違い探しモードをONにすると自動で作成されます';
+      return localizeText(
+        'フレーム2がありません。間違い探しモードをONにすると自動で作成されます',
+        'Frame 2 is missing. It is created automatically when PiXFiND mode is enabled.'
+      );
     }
     return '';
   }
@@ -10673,8 +11381,8 @@
       dom.controls.togglePixfindHelp.setAttribute('aria-expanded', String(next));
       dom.controls.togglePixfindHelp.classList.toggle('is-active', next);
       dom.controls.togglePixfindHelp.textContent = next
-        ? '間違い探しモードの説明を閉じる'
-        : '間違い探しモードの説明';
+        ? localizeText('間違い探しモードの説明を閉じる', 'Hide PiXFiND Mode Help')
+        : localizeText('間違い探しモードの説明', 'PiXFiND Mode Help');
     }
   }
 
@@ -10693,21 +11401,21 @@
       }
     }
     if (dom.controls.pixfindActionReason) {
-      dom.controls.pixfindActionReason.textContent = sendDisabledReason || 'PiXFiNDへ送信できます';
+      dom.controls.pixfindActionReason.textContent = sendDisabledReason || localizeText('PiXFiNDへ送信できます', 'Ready to send to PiXFiND');
     }
   }
 
   function ensurePixfindDiffFrame({ quiet = false, recordHistory = true, forceRecreate = false } = {}) {
     if (!Array.isArray(state.frames) || !state.frames.length) {
       if (!quiet) {
-        updateAutosaveStatus('PiXFiND用の原本フレームがありません', 'warn');
+        updateAutosaveStatus(localizeText('PiXFiND用の原本フレームがありません', 'No original frame found for PiXFiND'), 'warn');
       }
       return false;
     }
     const originalFrame = state.frames[0];
     if (!originalFrame || !Array.isArray(originalFrame.layers) || !originalFrame.layers.length) {
       if (!quiet) {
-        updateAutosaveStatus('PiXFiND用の原本フレームを作成できませんでした', 'warn');
+        updateAutosaveStatus(localizeText('PiXFiND用の原本フレームを作成できませんでした', 'Failed to prepare the original frame for PiXFiND'), 'warn');
       }
       return false;
     }
@@ -10719,7 +11427,7 @@
     if (recordHistory) {
       beginHistory(hadDiffFrame ? 'resetPixfindFrame2' : 'createPixfindFrame2');
     }
-    const diffFrame = createFrame('フレーム 2', originalFrame.layers, state.width, state.height);
+    const diffFrame = createFrame(getDefaultFrameName(2), originalFrame.layers, state.width, state.height);
     if (Number.isFinite(originalFrame.duration) && originalFrame.duration > 0) {
       diffFrame.duration = originalFrame.duration;
     }
@@ -10748,8 +11456,8 @@
     if (!quiet) {
       updateAutosaveStatus(
         hadDiffFrame
-          ? 'PiXFiND用にフレーム2をフレーム1から作り直しました'
-          : 'PiXFiND用にフレーム2を作成しました。フレーム2を編集して送信してください',
+          ? localizeText('PiXFiND用にフレーム2をフレーム1から作り直しました', 'Rebuilt Frame 2 from Frame 1 for PiXFiND')
+          : localizeText('PiXFiND用にフレーム2を作成しました。フレーム2を編集して送信してください', 'Created Frame 2 for PiXFiND. Edit Frame 2 and send it.'),
         'success'
       );
     }
@@ -10758,7 +11466,7 @@
 
   function setPixfindModeEnabled(enabled, { confirmFirst = true, confirmOverwrite = true, quiet = false } = {}) {
     if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus('参加/視聴モードでは間違い探し設定はマスターのみ変更できます', 'warn');
+      setMultiStatus(localizeText('参加/視聴モードでは間違い探し設定はマスターのみ変更できます', 'In participant/viewer mode, only the master can change PiXFiND settings'), 'warn');
       return false;
     }
     const next = Boolean(enabled);
@@ -10767,14 +11475,24 @@
       return true;
     }
     if (next && confirmFirst && !pixfindModeFirstEnableConfirmed) {
-      const accepted = window.confirm('間違い探しモードを初めてONにします。フレーム1を原本、フレーム2を差分として使います。続けますか？');
+      const accepted = window.confirm(
+        localizeText(
+          '間違い探しモードを初めてONにします。フレーム1を原本、フレーム2を差分として使います。続けますか？',
+          'Enable PiXFiND mode for the first time? Frame 1 will be original and Frame 2 will be diff. Continue?'
+        )
+      );
       if (!accepted) {
         return false;
       }
       pixfindModeFirstEnableConfirmed = true;
     }
     if (next && confirmOverwrite && Array.isArray(state.frames) && state.frames.length >= 2) {
-      const acceptedOverwrite = window.confirm('間違い探しモードをONにすると、現在のフレーム2はフレーム1の内容で上書きされます。続けますか？');
+      const acceptedOverwrite = window.confirm(
+        localizeText(
+          '間違い探しモードをONにすると、現在のフレーム2はフレーム1の内容で上書きされます。続けますか？',
+          'Enabling PiXFiND mode overwrites current Frame 2 with Frame 1 content. Continue?'
+        )
+      );
       if (!acceptedOverwrite) {
         return false;
       }
@@ -10788,14 +11506,26 @@
       }
       if (!quiet) {
         if (prepared && pair) {
-          updateAutosaveStatus('間違い探しモードをONにしました。フレーム1=原本、フレーム2=差分です', 'info');
+          updateAutosaveStatus(
+            localizeText(
+              '間違い探しモードをONにしました。フレーム1=原本、フレーム2=差分です',
+              'PiXFiND mode enabled. Frame 1 = original, Frame 2 = diff.'
+            ),
+            'info'
+          );
         } else {
-          updateAutosaveStatus('間違い探しモードをONにしましたが、フレーム2を用意できませんでした', 'warn');
+          updateAutosaveStatus(
+            localizeText(
+              '間違い探しモードをONにしましたが、フレーム2を用意できませんでした',
+              'PiXFiND mode enabled, but Frame 2 could not be prepared.'
+            ),
+            'warn'
+          );
         }
       }
     } else {
       if (!quiet) {
-        updateAutosaveStatus('間違い探しモードをOFFにしました', 'info');
+        updateAutosaveStatus(localizeText('間違い探しモードをOFFにしました', 'PiXFiND mode disabled'), 'info');
       }
     }
     updatePixfindModeUI();
@@ -10812,12 +11542,12 @@
       return;
     }
     if (!pixfindModeEnabled) {
-      updateAutosaveStatus('間違い探しモードをONにしてください', 'warn');
+      updateAutosaveStatus(localizeText('間違い探しモードをONにしてください', 'Turn on PiXFiND mode first'), 'warn');
       return;
     }
     const pair = getPixfindFramePair();
     if (!pair) {
-      updateAutosaveStatus('PiXFiND出力にはフレーム1とフレーム2が必要です', 'warn');
+      updateAutosaveStatus(localizeText('PiXFiND出力にはフレーム1とフレーム2が必要です', 'PiXFiND export requires Frame 1 and Frame 2'), 'warn');
       return;
     }
     try {
@@ -10847,7 +11577,7 @@
       window.location.href = '../pixfind/index.html#creator';
     } catch (error) {
       console.error('PiXFiND export failed', error);
-      updateAutosaveStatus('PiXFiND出力に失敗しました', 'error');
+      updateAutosaveStatus(localizeText('PiXFiND出力に失敗しました', 'PiXFiND export failed'), 'error');
     }
   }
 
@@ -11065,14 +11795,21 @@
       }
       if (result.exportedCount > 0) {
         markDocumentDurablySaved();
+        let skipInterstitial = false;
         if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
           const companionResult = await maybeSaveProjectCompanionAfterExport('png', {
             exportedCount: result.exportedCount,
             wasCancelled: result.wasCancelled,
           });
           announceProjectCompanionSaveResult('png', companionResult);
+          skipInterstitial = await maybeRedirectToContestPostAfterExport('png', {
+            primaryBlob: tasks[0]?.blob || null,
+            companionResult,
+          });
         }
-        showExportInterstitialAfterImageExport();
+        if (!skipInterstitial) {
+          showExportInterstitialAfterImageExport();
+        }
       }
     } catch (error) {
       console.error('PNG export failed', error);
@@ -11147,14 +11884,21 @@
       }
       if (result.exportedCount > 0) {
         markDocumentDurablySaved();
+        let skipInterstitial = false;
         if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
           const companionResult = await maybeSaveProjectCompanionAfterExport('gif', {
             exportedCount: result.exportedCount,
             wasCancelled: result.wasCancelled,
           });
           announceProjectCompanionSaveResult('gif', companionResult);
+          skipInterstitial = await maybeRedirectToContestPostAfterExport('gif', {
+            primaryBlob: tasks[0]?.blob || null,
+            companionResult,
+          });
         }
-        showExportInterstitialAfterImageExport();
+        if (!skipInterstitial) {
+          showExportInterstitialAfterImageExport();
+        }
       }
     } catch (error) {
       console.error('GIF export failed', error);
@@ -11269,11 +12013,11 @@
 
   function getExportFormatLabel(mode) {
     const normalized = normalizeExportFormat(mode);
-    if (normalized === 'gridpng') return 'PNG（グリッド分割）';
+    if (normalized === 'gridpng') return localizeText('PNG（グリッド分割）', 'PNG (Grid Split)');
     if (normalized === 'gif') return 'GIF';
-    if (normalized === 'timelapse') return 'タイムラプスGIF';
-    if (normalized === 'pixfind') return 'PiXFiND送信';
-    if (normalized === 'project') return 'プロジェクト保存';
+    if (normalized === 'timelapse') return localizeText('タイムラプスGIF', 'Timelapse GIF');
+    if (normalized === 'pixfind') return localizeText('PiXFiND送信', 'Send to PiXFiND');
+    if (normalized === 'project') return localizeText('プロジェクト保存', 'Project Save');
     return 'PNG';
   }
 
@@ -11320,7 +12064,14 @@
 
   function canOfferProjectCompanionExport(mode) {
     const format = normalizeExportFormat(mode);
-    return format === 'png' || format === 'gif' || format === 'gridpng' || format === 'timelapse';
+    const supportsCompanionFormat = format === 'png'
+      || format === 'gif'
+      || format === 'gridpng'
+      || format === 'timelapse';
+    if (!supportsCompanionFormat) {
+      return false;
+    }
+    return canCurrentClientExportProject('project');
   }
 
   function shouldSaveProjectCompanion(mode) {
@@ -11334,8 +12085,66 @@
       return;
     }
     const canOffer = canOfferProjectCompanionExport(mode);
-    toggle.checked = exportSaveProjectCompanion;
+    toggle.checked = canOffer ? exportSaveProjectCompanion : false;
     toggle.disabled = !canOffer;
+    const reason = canOffer ? '' : getMultiExportDisabledReason('project');
+    if (reason) {
+      toggle.title = reason;
+    } else {
+      toggle.removeAttribute('title');
+    }
+  }
+
+  function getContestPostAfterSaveDisabledReason(mode) {
+    const format = normalizeExportFormat(mode);
+    if (!canCurrentClientExportProject(format)) {
+      return getMultiExportDisabledReason(format) || localizeText(
+        `${getExportFormatLabel(format)}は現在利用できません`,
+        `${getExportFormatLabel(format)} is currently unavailable`
+      );
+    }
+    if (format === 'timelapse') {
+      return localizeText(
+        'タイムラプスGIFはコンテスト投稿への自動遷移に対応していません',
+        'Timelapse GIF does not support automatic contest redirect'
+      );
+    }
+    if (format !== 'png' && format !== 'gif') {
+      return localizeText('コンテスト自動遷移は PNG / GIF のみ対応です', 'Automatic contest redirect supports PNG/GIF only');
+    }
+    const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
+    if (frameCount <= 0) {
+      return localizeText('投稿できるフレームがありません', 'No frame available for posting');
+    }
+    return '';
+  }
+
+  function canOfferContestPostAfterSave(mode) {
+    return !getContestPostAfterSaveDisabledReason(mode);
+  }
+
+  function updateExportContestPostToggleUI() {
+    const toggle = dom.exportDialog?.contestPostToggle;
+    const mode = normalizeExportFormat(dom.exportDialog?.format?.value || 'png');
+    if (!(toggle instanceof HTMLInputElement)) {
+      return;
+    }
+    const canOffer = canOfferContestPostAfterSave(mode);
+    const reason = canOffer ? '' : getContestPostAfterSaveDisabledReason(mode);
+    const previousValue = exportContestPostAfterSave;
+    if (!canOffer) {
+      exportContestPostAfterSave = false;
+    }
+    if (previousValue !== exportContestPostAfterSave) {
+      scheduleSessionPersist({ includeSnapshots: false });
+    }
+    toggle.checked = exportContestPostAfterSave;
+    toggle.disabled = !canOffer;
+    if (reason) {
+      toggle.title = reason;
+    } else {
+      toggle.removeAttribute('title');
+    }
   }
 
   function normalizeExportGridTileSize(value, fallback = 8) {
@@ -11355,6 +12164,49 @@
 
   function shouldExportOriginalCompanion(mode, scale = exportScale) {
     return exportIncludeOriginalSize && canOfferOriginalCompanionExport(mode, scale);
+  }
+
+  function doesExportFormatUseScale(mode) {
+    const format = normalizeExportFormat(mode);
+    return format === 'png'
+      || format === 'gif'
+      || format === 'gridpng'
+      || format === 'timelapse';
+  }
+
+  function doesExportFormatSupportProjectCompanion(mode) {
+    const format = normalizeExportFormat(mode);
+    return format === 'png'
+      || format === 'gif'
+      || format === 'gridpng'
+      || format === 'timelapse';
+  }
+
+  function updateExportOptionVisibility(mode) {
+    const format = normalizeExportFormat(mode || dom.exportDialog?.format?.value || 'png');
+    const scaleControls = dom.exportDialog?.scaleControls;
+    if (scaleControls instanceof HTMLElement) {
+      scaleControls.hidden = !doesExportFormatUseScale(format);
+    }
+    const scaleHint = dom.exportDialog?.scaleHint;
+    if (scaleHint instanceof HTMLElement) {
+      scaleHint.hidden = !doesExportFormatUseScale(format);
+    }
+
+    const originalRow = dom.exportDialog?.includeOriginalRow;
+    if (originalRow instanceof HTMLElement) {
+      originalRow.hidden = !canOfferOriginalCompanionExport(format, exportScale);
+    }
+
+    const companionRow = dom.exportDialog?.saveProjectCompanionRow;
+    if (companionRow instanceof HTMLElement) {
+      companionRow.hidden = !doesExportFormatSupportProjectCompanion(format);
+    }
+
+    const contestRow = dom.exportDialog?.contestPostRow;
+    if (contestRow instanceof HTMLElement) {
+      contestRow.hidden = !(format === 'png' || format === 'gif');
+    }
   }
 
   function updateExportOriginalToggleUI() {
@@ -11377,7 +12229,9 @@
     if (isGridMode) {
       syncExportGridInputs();
     }
+    updateExportOptionVisibility(mode);
     updateExportProjectCompanionToggleUI();
+    updateExportContestPostToggleUI();
   }
 
   async function maybeSaveProjectCompanionAfterExport(mode, { exportedCount = 0, wasCancelled = false } = {}) {
@@ -11414,6 +12268,146 @@
       return;
     }
     updateAutosaveStatus(`${label}出力後: PiXiEEDファイルの同時保存に失敗しました`, 'warn');
+  }
+
+  function resolveContestUploadCanvasSizeLabel(width, height) {
+    const safeWidth = Math.max(1, Math.round(Number(width) || 1));
+    const safeHeight = Math.max(1, Math.round(Number(height) || 1));
+    if (safeWidth === safeHeight) {
+      return String(safeWidth);
+    }
+    return `${safeWidth}x${safeHeight}`;
+  }
+
+  async function buildContestUploadArtifact(mode, { primaryBlob = null } = {}) {
+    const format = normalizeExportFormat(mode);
+    if (format === 'timelapse') {
+      return null;
+    }
+    const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
+    if (frameCount <= 0) {
+      return null;
+    }
+    const width = Math.max(1, Number(state.width) || 1);
+    const height = Math.max(1, Number(state.height) || 1);
+    const selectedScale = Math.max(1, Math.floor(Number(exportScale) || 1));
+    const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
+    if (!Array.isArray(framePixels) || !framePixels.length) {
+      return null;
+    }
+    if (frameCount === 1) {
+      let pngBlob = null;
+      const primaryType = String(primaryBlob?.type || '').toLowerCase();
+      if (primaryBlob instanceof Blob && primaryType === 'image/png') {
+        pngBlob = primaryBlob;
+      }
+      const output = scaleFramePixelsNearestNeighbor(framePixels[0], width, height, selectedScale);
+      if (!(pngBlob instanceof Blob)) {
+        const outputCanvas = createFrameCanvas(output.pixels, output.width, output.height);
+        pngBlob = await canvasToBlob(outputCanvas, 'image/png');
+      }
+      const previewCanvas = createFrameCanvas(output.pixels, output.width, output.height);
+      return {
+        blob: pngBlob,
+        format: 'png',
+        previewDataUrl: previewCanvas.toDataURL('image/png'),
+        canvasSize: resolveContestUploadCanvasSizeLabel(output.width, output.height),
+      };
+    }
+
+    let gifBlob = null;
+    const primaryType = String(primaryBlob?.type || '').toLowerCase();
+    if (primaryBlob instanceof Blob && primaryType === 'image/gif') {
+      gifBlob = primaryBlob;
+    }
+    const frameDurations = state.frames.map(frame => clamp(Math.round(Number(frame.duration) || 0), 16, 2000));
+    const scaledSet = scaleFrameSetNearestNeighbor(framePixels, width, height, selectedScale);
+    if (!(gifBlob instanceof Blob)) {
+      const gifBytes = buildGifFromPixels(
+        scaledSet.framePixels,
+        frameDurations,
+        scaledSet.width,
+        scaledSet.height
+      );
+      gifBlob = new Blob([gifBytes], { type: 'image/gif' });
+    }
+    const firstFrame = scaledSet.framePixels[0];
+    if (!(firstFrame instanceof Uint8ClampedArray)) {
+      return null;
+    }
+    const previewCanvas = createFrameCanvas(firstFrame, scaledSet.width, scaledSet.height);
+    return {
+      blob: gifBlob,
+      format: 'gif',
+      previewDataUrl: previewCanvas.toDataURL('image/png'),
+      canvasSize: resolveContestUploadCanvasSizeLabel(scaledSet.width, scaledSet.height),
+    };
+  }
+
+  async function maybeRedirectToContestPostAfterExport(mode, {
+    primaryBlob = null,
+    companionResult = 'skipped',
+  } = {}) {
+    if (!exportContestPostAfterSave) {
+      return false;
+    }
+    const reason = getContestPostAfterSaveDisabledReason(mode);
+    if (reason) {
+      updateAutosaveStatus(
+        localizeText(
+          `コンテスト投稿画面への移動をスキップしました（${reason}）`,
+          `Contest redirect skipped (${reason})`
+        ),
+        'warn'
+      );
+      return false;
+    }
+    if (companionResult === 'failed' || companionResult === 'cancelled') {
+      updateAutosaveStatus(
+        localizeText(
+          'PiXiEEDファイル保存が完了しなかったため、コンテスト投稿画面への移動を中止しました',
+          'Contest redirect canceled because companion PiXiEED save did not complete'
+        ),
+        'warn'
+      );
+      return false;
+    }
+    if (!(primaryBlob instanceof Blob)) {
+      primaryBlob = null;
+    }
+    try {
+      const artifact = await buildContestUploadArtifact(mode, { primaryBlob });
+      if (!artifact || !(artifact.blob instanceof Blob)) {
+        updateAutosaveStatus(localizeText('コンテスト投稿用データの準備に失敗しました', 'Failed to prepare contest upload data'), 'warn');
+        return false;
+      }
+      const dataUrl = await blobToDataUrl(artifact.blob);
+      if (canUseSessionStorage) {
+        try {
+          window.localStorage.setItem(CONTEST_PENDING_UPLOAD_STORAGE_KEY, JSON.stringify({
+            dataUrl,
+            previewDataUrl: artifact.previewDataUrl || '',
+            canvasSize: artifact.canvasSize || resolveContestUploadCanvasSizeLabel(state.width, state.height),
+            format: artifact.format || normalizeExportFormat(mode),
+            name: normalizeDocumentName(state.documentName || DEFAULT_DOCUMENT_NAME),
+            source: 'pixieedraw',
+            createdAt: new Date().toISOString(),
+          }));
+        } catch (storageError) {
+          console.warn('Failed to store contest pending upload payload', storageError);
+        }
+      }
+      updateAutosaveStatus(
+        localizeText('保存が完了したため、コンテスト投稿画面へ移動します…', 'Save complete. Redirecting to contest post...'),
+        'success'
+      );
+      window.location.href = CONTEST_POST_PAGE_URL;
+      return true;
+    } catch (error) {
+      console.warn('Failed to prepare contest upload payload', error);
+      updateAutosaveStatus(localizeText('コンテスト投稿画面への移動準備に失敗しました', 'Failed to prepare contest redirect'), 'warn');
+      return false;
+    }
   }
 
   function applyExportScaleConstraints(candidates) {
@@ -11454,7 +12448,10 @@
     }
     const width = exportSheetInfo.sheetWidth * exportScale;
     const height = exportSheetInfo.sheetHeight * exportScale;
-    hintNode.textContent = `書き出しサイズ: ${width} × ${height}PX (倍率 ×${exportScale})`;
+    hintNode.textContent = localizeText(
+      `書き出しサイズ: ${width} × ${height}PX (倍率 ×${exportScale})`,
+      `Output size: ${width} × ${height}px (scale ×${exportScale})`
+    );
   }
 
   function syncExportScaleInputs() {
@@ -13851,6 +14848,7 @@
     }
     const importedFromLens = await maybeImportLensCapture();
     renderEverything();
+    refreshLocalizedUi();
     scheduleDeferredUiSetup();
     if (!lensImportRequested && !importedFromLens && !skipStartup && !hasDismissedStartupScreen()) {
       showStartupScreen();
@@ -15155,7 +16153,7 @@
 
   function setMirrorModeEnabled(enabled, options = {}) {
     if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus('参加/視聴モードではミラーモード設定はマスターのみ変更できます', 'warn');
+      setMultiStatus(localizeText('参加/視聴モードではミラーモード設定はマスターのみ変更できます', 'In participant/viewer mode, only the master can change mirror mode settings'), 'warn');
       return;
     }
     const { persist = true, updateControl = true } = options;
@@ -15192,7 +16190,7 @@
 
   function setMirrorAxisEnabled(axis, enabled, options = {}) {
     if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus('参加/視聴モードでは対称軸設定はマスターのみ変更できます', 'warn');
+      setMultiStatus(localizeText('参加/視聴モードでは対称軸設定はマスターのみ変更できます', 'In participant/viewer mode, only the master can change mirror axes'), 'warn');
       return;
     }
     const { persist = true, syncControls = true } = options;
@@ -15982,7 +16980,10 @@
             if (!hasSelection) {
               state.brushShape = BRUSH_SHAPE_SQUARE;
               syncBrushControls();
-              updateAutosaveStatus('範囲選択中にカスタムを押すとブラシ化できます', 'info');
+              updateAutosaveStatus(
+                localizeText('範囲選択中にカスタムを押すとブラシ化できます', 'Select an area and press Custom to create a brush'),
+                'info'
+              );
               scheduleSessionPersist();
               return;
             }
@@ -16032,7 +17033,7 @@
     dom.controls.outlineSize?.addEventListener('input', event => {
       state.outlineSize = clamp(Math.round(Number(event.target.value)), 1, 8);
       if (dom.controls.outlineSizeValue) {
-        dom.controls.outlineSizeValue.textContent = `${state.outlineSize}マス`;
+        dom.controls.outlineSizeValue.textContent = localizeText(`${state.outlineSize}マス`, `${state.outlineSize} cells`);
       }
       scheduleSessionPersist();
     });
@@ -16173,6 +17174,10 @@
     dom.controls.openShortcutHelp?.addEventListener('click', () => {
       openShortcutHelpDialog();
     });
+    dom.controls.toggleLanguageMode?.addEventListener('click', () => {
+      const nextLanguage = isEnglishUi() ? UI_LANGUAGE_JA : UI_LANGUAGE_EN;
+      setUiLanguage(nextLanguage, { persist: true });
+    });
     dom.controls.openUpdateHistory?.addEventListener('click', () => {
       openUpdateHistoryDialog();
     });
@@ -16242,15 +17247,47 @@
       adjustSpriteScaleInputBy(1);
     });
 
-    dom.controls.canvasWidth?.addEventListener('change', handleCanvasResizeRequest);
-    dom.controls.canvasHeight?.addEventListener('change', handleCanvasResizeRequest);
+    const bindCanvasSizeInput = input => {
+      if (!(input instanceof HTMLInputElement)) return;
+      input.addEventListener('input', () => {
+        updateCanvasResizeControls();
+      });
+      input.addEventListener('change', () => {
+        updateCanvasResizeControls({ normalizeValues: true });
+      });
+      input.addEventListener('keydown', event => {
+        const isComposing = event.isComposing || event.key === 'Process' || event.keyCode === 229;
+        if (event.key === 'Enter' && !isComposing) {
+          event.preventDefault();
+          event.stopPropagation();
+          handleCanvasResizeRequest({ restoreFocusInput: input });
+        }
+      });
+    };
+    bindCanvasSizeInput(dom.controls.canvasWidth);
+    bindCanvasSizeInput(dom.controls.canvasHeight);
+    dom.controls.canvasWidthDecrement?.addEventListener('click', () => {
+      adjustCanvasResizeInputBy('width', -1);
+    });
+    dom.controls.canvasWidthIncrement?.addEventListener('click', () => {
+      adjustCanvasResizeInputBy('width', 1);
+    });
+    dom.controls.canvasHeightDecrement?.addEventListener('click', () => {
+      adjustCanvasResizeInputBy('height', -1);
+    });
+    dom.controls.canvasHeightIncrement?.addEventListener('click', () => {
+      adjustCanvasResizeInputBy('height', 1);
+    });
+    dom.controls.applyCanvasResize?.addEventListener('click', () => {
+      handleCanvasResizeRequest();
+    });
 
     dom.controls.clearCanvas?.addEventListener('click', () => {
       if (!canCurrentClientEditProjectStructure()) {
-        setMultiStatus('参加/視聴モードではキャンバスクリアはマスターのみ操作できます', 'warn');
+        setMultiStatus(localizeText('参加/視聴モードではキャンバスクリアはマスターのみ操作できます', 'In participant/viewer mode, only the master can clear the canvas'), 'warn');
         return;
       }
-      if (!confirm('すべてのフレームをクリアしますか？')) {
+      if (!confirm(localizeText('すべてのフレームをクリアしますか？', 'Clear all frames?'))) {
         return;
       }
       beginHistory('clearCanvas');
@@ -16279,21 +17316,32 @@
     syncControlsWithState();
     syncTimelapseControls();
     updateSpriteScaleControlLimits();
+    updateCanvasResizeControls({ normalizeValues: true });
     applyEmbedGuardrails();
+    applyUiLocalization();
   }
 
   function applyEmbedGuardrails() {
     const lockWidth = lockedCanvasWidth !== null;
     const lockHeight = lockedCanvasHeight !== null;
-    if (lockWidth && dom.controls.canvasWidth) {
-      dom.controls.canvasWidth.value = String(lockedCanvasWidth);
-      dom.controls.canvasWidth.setAttribute('disabled', 'true');
-      dom.controls.canvasWidth.setAttribute('aria-disabled', 'true');
+    const lockAnySize = lockWidth || lockHeight;
+    if (dom.controls.canvasWidth instanceof HTMLInputElement) {
+      if (lockWidth) {
+        dom.controls.canvasWidth.value = String(lockedCanvasWidth);
+      }
+      if (lockAnySize) {
+        dom.controls.canvasWidth.setAttribute('disabled', 'true');
+        dom.controls.canvasWidth.setAttribute('aria-disabled', 'true');
+      }
     }
-    if (lockHeight && dom.controls.canvasHeight) {
-      dom.controls.canvasHeight.value = String(lockedCanvasHeight);
-      dom.controls.canvasHeight.setAttribute('disabled', 'true');
-      dom.controls.canvasHeight.setAttribute('aria-disabled', 'true');
+    if (dom.controls.canvasHeight instanceof HTMLInputElement) {
+      if (lockHeight) {
+        dom.controls.canvasHeight.value = String(lockedCanvasHeight);
+      }
+      if (lockAnySize) {
+        dom.controls.canvasHeight.setAttribute('disabled', 'true');
+        dom.controls.canvasHeight.setAttribute('aria-disabled', 'true');
+      }
     }
     if (lockWidth && dom.newProject?.widthInput) {
       dom.newProject.widthInput.value = String(lockedCanvasWidth);
@@ -16307,11 +17355,116 @@
       dom.newProject.heightInput.setAttribute('aria-readonly', 'true');
       dom.newProject.heightInput.title = 'キャンバスは固定サイズで利用中';
     }
+    updateCanvasResizeControls({ normalizeValues: true });
   }
 
-  function handleCanvasResizeRequest() {
+  function getCanvasResizeInputValue(input, fallback) {
+    const fallbackValue = clamp(Math.round(Number(fallback) || MIN_CANVAS_SIZE), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    const numeric = Math.round(Number(input?.value));
+    if (!Number.isFinite(numeric)) {
+      return fallbackValue;
+    }
+    return clamp(numeric, MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+  }
+
+  function updateCanvasResizeControls({ normalizeValues = false } = {}) {
+    const widthInput = dom.controls.canvasWidth;
+    const heightInput = dom.controls.canvasHeight;
+    if (!(widthInput instanceof HTMLInputElement) || !(heightInput instanceof HTMLInputElement)) {
+      return;
+    }
+    const canResize = canCurrentClientEditProjectStructure()
+      && lockedCanvasWidth === null
+      && lockedCanvasHeight === null;
+
+    widthInput.min = String(MIN_CANVAS_SIZE);
+    widthInput.max = String(MAX_CANVAS_SIZE);
+    widthInput.step = '1';
+    heightInput.min = String(MIN_CANVAS_SIZE);
+    heightInput.max = String(MAX_CANVAS_SIZE);
+    heightInput.step = '1';
+
+    const width = getCanvasResizeInputValue(widthInput, state.width);
+    const height = getCanvasResizeInputValue(heightInput, state.height);
+    const active = document.activeElement;
+    if (normalizeValues || active !== widthInput) {
+      widthInput.value = String(width);
+    }
+    if (normalizeValues || active !== heightInput) {
+      heightInput.value = String(height);
+    }
+
+    const sameSize = width === state.width && height === state.height;
+    const applyDisabled = !canResize || sameSize;
+    if (dom.controls.applyCanvasResize instanceof HTMLButtonElement) {
+      dom.controls.applyCanvasResize.disabled = applyDisabled;
+    }
+
+    const decWidthDisabled = !canResize || width <= MIN_CANVAS_SIZE;
+    const incWidthDisabled = !canResize || width >= MAX_CANVAS_SIZE;
+    const decHeightDisabled = !canResize || height <= MIN_CANVAS_SIZE;
+    const incHeightDisabled = !canResize || height >= MAX_CANVAS_SIZE;
+    if (dom.controls.canvasWidthDecrement instanceof HTMLButtonElement) {
+      dom.controls.canvasWidthDecrement.disabled = decWidthDisabled;
+    }
+    if (dom.controls.canvasWidthIncrement instanceof HTMLButtonElement) {
+      dom.controls.canvasWidthIncrement.disabled = incWidthDisabled;
+    }
+    if (dom.controls.canvasHeightDecrement instanceof HTMLButtonElement) {
+      dom.controls.canvasHeightDecrement.disabled = decHeightDisabled;
+    }
+    if (dom.controls.canvasHeightIncrement instanceof HTMLButtonElement) {
+      dom.controls.canvasHeightIncrement.disabled = incHeightDisabled;
+    }
+  }
+
+  function adjustCanvasResizeInputBy(target, delta) {
+    const axis = target === 'height' ? 'height' : 'width';
+    const input = axis === 'height' ? dom.controls.canvasHeight : dom.controls.canvasWidth;
+    if (!(input instanceof HTMLInputElement) || input.disabled) {
+      return;
+    }
+    const base = axis === 'height' ? state.height : state.width;
+    const current = getCanvasResizeInputValue(input, base);
+    const step = Math.max(1, Math.round(Number(delta) || 0));
+    const next = clamp(current + (delta < 0 ? -step : step), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    if (next === current) {
+      updateCanvasResizeControls();
+      return;
+    }
+    input.value = String(next);
+    updateCanvasResizeControls();
+  }
+
+  function handleCanvasResizeRequest(options = {}) {
+    const restoreFocusInput = options.restoreFocusInput instanceof HTMLInputElement
+      ? options.restoreFocusInput
+      : null;
+    const restoreFocus = () => {
+      if (!(restoreFocusInput instanceof HTMLInputElement) || restoreFocusInput.disabled || !restoreFocusInput.isConnected) {
+        return;
+      }
+      requestAnimationFrame(() => {
+        try {
+          restoreFocusInput.focus({ preventScroll: true });
+        } catch (error) {
+          restoreFocusInput.focus();
+        }
+        const valueLength = String(restoreFocusInput.value || '').length;
+        if (typeof restoreFocusInput.setSelectionRange === 'function') {
+          try {
+            restoreFocusInput.setSelectionRange(valueLength, valueLength);
+          } catch (error) {
+            // Ignore selection range errors for unsupported input types/browsers.
+          }
+        }
+      });
+    };
+
     if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus('参加/視聴モードではキャンバスサイズはマスターのみ変更できます', 'warn');
+      setMultiStatus(localizeText('参加/視聴モードではキャンバスサイズはマスターのみ変更できます', 'In participant/viewer mode, only the master can change canvas size'), 'warn');
+      updateCanvasResizeControls({ normalizeValues: true });
+      restoreFocus();
       return;
     }
     if (lockedCanvasWidth !== null || lockedCanvasHeight !== null) {
@@ -16321,13 +17474,17 @@
       if (dom.controls.canvasHeight) {
         dom.controls.canvasHeight.value = String(state.height);
       }
+      updateCanvasResizeControls({ normalizeValues: true });
+      restoreFocus();
       return;
     }
-    const width = clamp(Number(dom.controls.canvasWidth.value), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE) || state.width;
-    const height = clamp(Number(dom.controls.canvasHeight.value), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE) || state.height;
+    const width = getCanvasResizeInputValue(dom.controls.canvasWidth, state.width);
+    const height = getCanvasResizeInputValue(dom.controls.canvasHeight, state.height);
     if (width === state.width && height === state.height) {
       dom.controls.canvasWidth.value = String(state.width);
       dom.controls.canvasHeight.value = String(state.height);
+      updateCanvasResizeControls({ normalizeValues: true });
+      restoreFocus();
       return;
     }
 
@@ -16347,6 +17504,8 @@
     requestOverlayRender();
     commitHistory();
     scheduleSessionPersist();
+    updateCanvasResizeControls({ normalizeValues: true });
+    restoreFocus();
   }
 
   function setupNumberSteppers() {
@@ -16464,7 +17623,7 @@
 
   function applySpriteScaleMultiplier(rawValue) {
     if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus('参加/視聴モードではスプライト倍率はマスターのみ変更できます', 'warn');
+      setMultiStatus(localizeText('参加/視聴モードではスプライト倍率はマスターのみ変更できます', 'In participant/viewer mode, only the master can change sprite scale'), 'warn');
       return;
     }
     const input = dom.controls.spriteScaleInput;
@@ -16523,7 +17682,7 @@
             setActiveTool(tool);
             return;
           }
-          setMultiStatus('視聴モードではツールを使用できません', 'warn');
+          setMultiStatus(localizeText('視聴モードではツールを使用できません', 'Tools are disabled in viewer mode'), 'warn');
           return;
         }
         if (TOOL_ACTIONS.has(tool)) {
@@ -16632,7 +17791,7 @@
     if (!tool) return;
     // Prevent active tool changes for spectators, except allowing 'pan'
     if (isMultiSpectatorMode() && tool !== 'pan') {
-      setMultiStatus('視聴モードではツールを切替できません', 'warn');
+      setMultiStatus(localizeText('視聴モードではツールを切替できません', 'Cannot switch tools in viewer mode'), 'warn');
       return;
     }
     if (TOOL_ACTIONS.has(tool)) {
@@ -17896,7 +19055,7 @@
 
   function moveActiveLayer(offset) {
     if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus('参加/視聴モードではレイヤー移動はマスターのみ操作できます', 'warn');
+      setMultiStatus(localizeText('参加/視聴モードではレイヤー移動はマスターのみ操作できます', 'In participant/viewer mode, only the master can move layers'), 'warn');
       return;
     }
     if (!Number.isInteger(offset) || offset === 0) return;
@@ -17979,7 +19138,7 @@
 
   function moveActiveFrame(offset) {
     if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus('参加/視聴モードではフレーム移動はマスターのみ操作できます', 'warn');
+      setMultiStatus(localizeText('参加/視聴モードではフレーム移動はマスターのみ操作できます', 'In participant/viewer mode, only the master can move frames'), 'warn');
       return;
     }
     if (!Number.isInteger(offset) || offset === 0) return;
@@ -18037,7 +19196,7 @@
   function setupFramesAndLayers() {
     dom.controls.addLayer?.addEventListener('click', () => {
       if (!canCurrentClientEditProjectStructure()) {
-        setMultiStatus('参加/視聴モードではレイヤー追加はマスターのみ操作できます', 'warn');
+        setMultiStatus(localizeText('参加/視聴モードではレイヤー追加はマスターのみ操作できます', 'In participant/viewer mode, only the master can add layers'), 'warn');
         return;
       }
       const activeFrame = getActiveFrame();
@@ -18047,7 +19206,7 @@
       const insertIndex = clamp(getActiveLayerIndex() + 1, 0, Number.MAX_SAFE_INTEGER);
       state.frames.forEach((frame, frameIndex) => {
         const targetIndex = Math.min(insertIndex, frame.layers.length);
-        const name = `レイヤー ${frame.layers.length + 1}`;
+        const name = getDefaultLayerName(frame.layers.length + 1);
         const newLayer = createLayer(name, state.width, state.height);
         frame.layers.splice(targetIndex, 0, newLayer);
         if (frameIndex === state.activeFrame) {
@@ -18065,7 +19224,7 @@
 
     dom.controls.removeLayer?.addEventListener('click', () => {
       if (!canCurrentClientEditProjectStructure()) {
-        setMultiStatus('参加/視聴モードではレイヤー削除はマスターのみ操作できます', 'warn');
+        setMultiStatus(localizeText('参加/視聴モードではレイヤー削除はマスターのみ操作できます', 'In participant/viewer mode, only the master can delete layers'), 'warn');
         return;
       }
       if (!state.frames.every(frame => frame.layers.length > 1)) {
@@ -18100,14 +19259,14 @@
 
     dom.controls.addFrame?.addEventListener('click', () => {
       if (!canCurrentClientEditProjectStructure()) {
-        setMultiStatus('参加/視聴モードではフレーム追加はマスターのみ操作できます', 'warn');
+        setMultiStatus(localizeText('参加/視聴モードではフレーム追加はマスターのみ操作できます', 'In participant/viewer mode, only the master can add frames'), 'warn');
         return;
       }
       const baseFrame = getActiveFrame();
       if (!baseFrame) return;
       clearTimelineSelection();
       beginHistory('addFrame');
-      const newFrame = createFrame(`フレーム ${state.frames.length + 1}`, baseFrame.layers, state.width, state.height);
+      const newFrame = createFrame(getDefaultFrameName(state.frames.length + 1), baseFrame.layers, state.width, state.height);
       state.frames.splice(state.activeFrame + 1, 0, newFrame);
       state.activeFrame += 1;
       state.activeLayer = newFrame.layers[newFrame.layers.length - 1].id;
@@ -18122,7 +19281,7 @@
 
     dom.controls.removeFrame?.addEventListener('click', () => {
       if (!canCurrentClientEditProjectStructure()) {
-        setMultiStatus('参加/視聴モードではフレーム削除はマスターのみ操作できます', 'warn');
+        setMultiStatus(localizeText('参加/視聴モードではフレーム削除はマスターのみ操作できます', 'In participant/viewer mode, only the master can delete frames'), 'warn');
         return;
       }
       if (state.frames.length <= 1) return;
@@ -18567,7 +19726,7 @@
       renderTimelineMatrix();
       requestRender();
       requestOverlayRender();
-      setMultiStatus('表示状態をローカルで変更しました', 'info');
+      setMultiStatus(localizeText('表示状態をローカルで変更しました', 'Visibility was changed locally'), 'info');
       return;
     }
 
@@ -18685,7 +19844,9 @@
     const opacityPercent = clamp(Math.round(normalizedOpacity * 100), 0, 100);
 
     if (targetLabel) {
-      targetLabel.textContent = hasLayer ? `対象: ${layer.name}` : '対象: なし';
+      targetLabel.textContent = hasLayer
+        ? localizeText(`対象: ${layer.name}`, `Target: ${layer.name}`)
+        : localizeText('対象: なし', 'Target: None');
     }
     if (opacityControl instanceof HTMLInputElement) {
       opacityControl.disabled = !hasLayer;
@@ -18777,10 +19938,12 @@
     const frameNumber = clamp(Math.round(Number(state.activeFrame) || 0) + 1, 1, Number.MAX_SAFE_INTEGER);
     const frameLabel = hasFrame && typeof frame.name === 'string' && frame.name.trim()
       ? frame.name.trim()
-      : `フレーム ${frameNumber}`;
+      : getDefaultFrameName(frameNumber);
 
     if (dom.controls.frameSettingsTarget) {
-      dom.controls.frameSettingsTarget.textContent = hasFrame ? `${frameLabel} の設定` : 'フレーム設定';
+      dom.controls.frameSettingsTarget.textContent = hasFrame
+        ? localizeText(`${frameLabel} の設定`, `${frameLabel} Settings`)
+        : localizeText('フレーム設定', 'Frame Settings');
     }
     if (dom.controls.onionSkinEnabled instanceof HTMLInputElement) {
       dom.controls.onionSkinEnabled.disabled = !hasFrame;
@@ -18823,7 +19986,7 @@
 
       if (target.classList.contains('timeline-visibility')) {
         if (!canCurrentClientEditProjectStructure()) {
-          setMultiStatus('参加/視聴モードではレイヤー表示切替はマスターのみ操作できます', 'warn');
+          setMultiStatus(localizeText('参加/視聴モードではレイヤー表示切替はマスターのみ操作できます', 'In participant/viewer mode, only the master can toggle layer visibility'), 'warn');
           return;
         }
         const rowIndex = Number.parseInt(target.dataset.layerRowIndex || '', 10);
@@ -19095,7 +20258,7 @@
     corner.style.gridColumn = `1 / span ${layerHeaderColumnCount}`;
     corner.style.gridRow = '1';
     corner.setAttribute('role', 'columnheader');
-    corner.setAttribute('aria-label', 'タイムライン');
+    corner.setAttribute('aria-label', localizeText('タイムライン', 'Timeline'));
     applyTimelineCellFrame(corner, 'corner');
     fragment.appendChild(corner);
 
@@ -19184,7 +20347,12 @@
         visibilityToggle.className = 'timeline-visibility';
         visibilityToggle.dataset.layerRowIndex = String(rowIndex);
         visibilityToggle.setAttribute('aria-pressed', String(rowVisibility));
-        visibilityToggle.setAttribute('aria-label', rowVisibility ? 'レイヤーを非表示' : 'レイヤーを表示');
+        visibilityToggle.setAttribute(
+          'aria-label',
+          rowVisibility
+            ? localizeText('レイヤーを非表示', 'Hide layer')
+            : localizeText('レイヤーを表示', 'Show layer')
+        );
         visibilityToggle.textContent = rowVisibility ? '●' : '○';
         visibilityToggle.disabled = isMultiReadOnlyMode();
         rowVisibilityCell.appendChild(visibilityToggle);
@@ -19278,9 +20446,14 @@
           const assignmentKey = createTimelineSlotKey(frameIndex, layerIndex);
           const assignedUser = multiAssignmentCellMap.get(assignmentKey) || null;
           const assignedUserName = assignedUser?.name || '';
-          const assignedUserLockLabel = assignedUser?.locked ? ' / ロック中' : '';
+          const assignedUserLockLabel = assignedUser?.locked
+            ? localizeText(' / ロック中', ' / Locked')
+            : '';
           const slotLabel = assignedUserName
-            ? `${frame.name} / ${targetLayer.name} / 担当: ${assignedUserName}${assignedUserLockLabel}`
+            ? localizeText(
+              `${frame.name} / ${targetLayer.name} / 担当: ${assignedUserName}${assignedUserLockLabel}`,
+              `${frame.name} / ${targetLayer.name} / Assignee: ${assignedUserName}${assignedUserLockLabel}`
+            )
             : `${frame.name} / ${targetLayer.name}`;
           slot.setAttribute('aria-label', slotLabel);
           if (!targetLayer.visible) {
@@ -19295,8 +20468,8 @@
             slot.style.setProperty('--multi-assignee-color', assignedUser.color);
             slot.dataset.multiAssigneeClientId = assignedUser.clientId;
             slot.title = assignedUserName
-              ? `担当: ${assignedUserName}${assignedUserLockLabel}`
-              : (assignedUser?.locked ? '担当セル: ロック中' : '');
+              ? localizeText(`担当: ${assignedUserName}${assignedUserLockLabel}`, `Assignee: ${assignedUserName}${assignedUserLockLabel}`)
+              : (assignedUser?.locked ? localizeText('担当セル: ロック中', 'Assigned cell: Locked') : '');
           }
           if (frameIndex === activeFrameIndex && targetLayer.id === state.activeLayer) {
             slot.classList.add('is-active');
@@ -19589,7 +20762,7 @@
       return false;
     }
     if (isResidentMultiToolRestrictedMode() && !isResidentMultiToolAllowed(activeTool)) {
-      setMultiStatus('この常設ルームでは範囲選択・移動系ツールは無効です', 'warn');
+      setMultiStatus(localizeText('この常設ルームでは範囲選択・移動系ツールは無効です', 'Selection and move tools are disabled in this resident room'), 'warn');
       return false;
     }
     const cell = getVirtualCursorCellPosition();
@@ -19599,7 +20772,7 @@
     const requiresLayer = HISTORY_DRAW_TOOLS.has(activeTool);
     if (requiresLayer) {
       if (isMultiSpectatorMode()) {
-        setMultiStatus('視聴モードでは描画できません', 'warn');
+        setMultiStatus(localizeText('視聴モードでは描画できません', 'Drawing is disabled in viewer mode'), 'warn');
         return false;
       }
       if (isMultiAssignedCellRestrictedEditorMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
@@ -20291,7 +21464,7 @@
     }
     // Spectators cannot draw using the floating draw button
     if (isMultiSpectatorMode()) {
-      setMultiStatus('視聴モードでは描画できません', 'warn');
+      setMultiStatus(localizeText('視聴モードでは描画できません', 'Drawing is disabled in viewer mode'), 'warn');
       return;
     }
     if (event.button !== undefined && event.button !== 0) {
@@ -21307,13 +22480,13 @@
       return;
     }
     if (isResidentMultiToolRestrictedMode() && !isResidentMultiToolAllowed(activeTool)) {
-      setMultiStatus('この常設ルームでは範囲選択・移動系ツールは無効です', 'warn');
+      setMultiStatus(localizeText('この常設ルームでは範囲選択・移動系ツールは無効です', 'Selection and move tools are disabled in this resident room'), 'warn');
       return;
     }
     // Spectator (viewer) mode: only allow pan interactions
     if (isMultiSpectatorMode()) {
       if (activeTool !== 'pan') {
-        setMultiStatus('視聴モードでは描画や選択はできません', 'warn');
+        setMultiStatus(localizeText('視聴モードでは描画や選択はできません', 'Drawing and selection are disabled in viewer mode'), 'warn');
         return;
       }
       // allow pan as usual
@@ -22300,7 +23473,7 @@
       return false;
     }
     if (isMultiSpectatorMode()) {
-      setMultiStatus('視聴モードでは描画できません', 'warn');
+      setMultiStatus(localizeText('視聴モードでは描画できません', 'Drawing is disabled in viewer mode'), 'warn');
       return false;
     }
     if (isMultiAssignedCellRestrictedEditorMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
@@ -22784,7 +23957,7 @@
 
   function cutSelection() {
     if (isResidentMultiToolRestrictedMode()) {
-      setMultiStatus('この常設ルームでは切り取りは使用できません', 'warn');
+      setMultiStatus(localizeText('この常設ルームでは切り取りは使用できません', 'Cut is unavailable in this resident room'), 'warn');
       updateCanvasControlButtons();
       return false;
     }
@@ -22805,7 +23978,7 @@
 
   function pasteSelection() {
     if (!canCurrentClientImportExternalData()) {
-      setMultiStatus('参加/視聴モードでは貼り付けインポートはマスターのみ操作できます', 'warn');
+      setMultiStatus(localizeText('参加/視聴モードでは貼り付けインポートはマスターのみ操作できます', 'In participant/viewer mode, only the master can paste-import'), 'warn');
       updateCanvasControlButtons();
       return false;
     }
@@ -26048,6 +27221,7 @@
         pixfindModeFirstEnableConfirmed: Boolean(pixfindModeFirstEnableConfirmed),
         exportIncludeOriginalSize: Boolean(exportIncludeOriginalSize),
         exportSaveProjectCompanion: Boolean(exportSaveProjectCompanion),
+        exportContestPostAfterSave: Boolean(exportContestPostAfterSave),
         exportGridTileWidth: normalizeExportGridTileSize(exportGridTileWidth, 8),
         exportGridTileHeight: normalizeExportGridTileSize(exportGridTileHeight, 8),
         timelapseEnabled: Boolean(timelapseState.enabled),
@@ -26223,6 +27397,9 @@
     if (typeof payload.exportSaveProjectCompanion === 'boolean') {
       exportSaveProjectCompanion = payload.exportSaveProjectCompanion;
     }
+    if (typeof payload.exportContestPostAfterSave === 'boolean') {
+      exportContestPostAfterSave = payload.exportContestPostAfterSave;
+    }
     if (Number.isFinite(payload.exportGridTileWidth)) {
       exportGridTileWidth = normalizeExportGridTileSize(payload.exportGridTileWidth, exportGridTileWidth);
     }
@@ -26312,8 +27489,8 @@
 
   function getMultiJoinPolicyLabel(value = multiState.joinPolicy) {
     return normalizeMultiJoinPolicy(value, MULTI_DEFAULT_JOIN_POLICY) === MULTI_JOIN_POLICY_OPEN
-      ? '自動参加'
-      : '承認制';
+      ? localizeText('自動参加', 'Auto Join')
+      : localizeText('承認制', 'Approval');
   }
 
   function applyMultiMasterPreset(preset = 'friends') {
@@ -26379,12 +27556,12 @@
   function getMultiExportPermissionLabel(permission = multiState.exportPermission) {
     const normalized = normalizeMultiExportPermission(permission, MULTI_DEFAULT_EXPORT_PERMISSION);
     if (normalized === MULTI_EXPORT_PERMISSION_MASTER_AND_GUEST) {
-      return 'マスター + 参加者';
+      return localizeText('マスター + 参加者', 'Master + Participants');
     }
     if (normalized === MULTI_EXPORT_PERMISSION_ALL) {
-      return '全員';
+      return localizeText('全員', 'Everyone');
     }
-    return 'マスターのみ';
+    return localizeText('マスターのみ', 'Master Only');
   }
 
   function normalizeMultiRoomVisibility(value, fallback = MULTI_DEFAULT_ROOM_VISIBILITY) {
@@ -26401,8 +27578,8 @@
 
   function getMultiRoomVisibilityLabel(value = multiState.roomVisibility) {
     return normalizeMultiRoomVisibility(value, MULTI_DEFAULT_ROOM_VISIBILITY) === MULTI_ROOM_VISIBILITY_PUBLIC
-      ? '公開'
-      : '非公開';
+      ? localizeText('公開', 'Public')
+      : localizeText('非公開', 'Private');
   }
 
   function isMultiRoomPublic() {
@@ -26631,6 +27808,12 @@
     if (!multiState.connected) {
       return true;
     }
+    if (normalizedFormat === 'project') {
+      if (isResidentMultiConnectedRoom()) {
+        return false;
+      }
+      return isMultiMasterMode();
+    }
     if (isResidentMultiConnectedRoom()) {
       return normalizedFormat === 'png';
     }
@@ -26660,6 +27843,14 @@
     const normalizedFormat = normalizeExportFormat(format);
     if (!multiState.connected || canCurrentClientExportProject(normalizedFormat)) {
       return '';
+    }
+    if (normalizedFormat === 'project') {
+      if (isResidentMultiConnectedRoom()) {
+        return '常設ルームではプロジェクト保存はできません';
+      }
+      if (!isMultiMasterMode()) {
+        return 'プロジェクト保存はマスターのみ利用できます';
+      }
     }
     if (isResidentMultiConnectedRoom()) {
       return `${getExportFormatLabel(normalizedFormat)}は常設ルームで出力できません（PNGのみ）`;
@@ -26825,7 +28016,7 @@
   }
 
   function createResidentFlattenedPrimaryLayer(width = state.width, height = state.height) {
-    const flattenedLayer = createLayer('常設キャンバス', width, height);
+    const flattenedLayer = createLayer(localizeText('常設キャンバス', 'Resident Canvas'), width, height);
     try {
       const composite = buildPlaybackFrameImageData(0);
       if (composite && composite.data instanceof Uint8ClampedArray) {
@@ -26850,7 +28041,12 @@
     const targetHeight = clamp(Math.round(Number(profile.height) || state.height), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
     let changed = false;
     if (!Array.isArray(state.frames) || !state.frames.length) {
-      state.frames = [createFrame('フレーム 1', [createLayer('常設キャンバス', targetWidth, targetHeight)], targetWidth, targetHeight)];
+      state.frames = [createFrame(
+        getDefaultFrameName(1),
+        [createLayer(localizeText('常設キャンバス', 'Resident Canvas'), targetWidth, targetHeight)],
+        targetWidth,
+        targetHeight
+      )];
       changed = true;
     }
     const frame0 = state.frames[0];
@@ -26858,7 +28054,9 @@
     const hasSingleLayer = Boolean(frame0 && Array.isArray(frame0.layers) && frame0.layers.length === 1);
     if (!hasSingleFrame || !hasSingleLayer) {
       const flattenedLayer = createResidentFlattenedPrimaryLayer(targetWidth, targetHeight);
-      const baseFrameName = typeof frame0?.name === 'string' && frame0.name.trim() ? frame0.name.trim() : 'フレーム 1';
+      const baseFrameName = typeof frame0?.name === 'string' && frame0.name.trim()
+        ? frame0.name.trim()
+        : getDefaultFrameName(1);
       const baseDuration = Number.isFinite(Number(frame0?.duration)) && Number(frame0.duration) > 0
         ? Number(frame0.duration)
         : (1000 / 12);
@@ -27080,33 +28278,7 @@
     const assignedRect = assignedSlot >= 0
       ? getResidentMultiSlotRect(assignedSlot, profile.projectKey)
       : null;
-    const ownedSlots = new Set();
-    multiState.assignments.forEach(entry => {
-      if (!entry || typeof entry !== 'object') {
-        return;
-      }
-      const entryRole = normalizeMultiRole(entry.role, 'guest');
-      if (entryRole !== 'guest' && entryRole !== 'master') {
-        return;
-      }
-      const slot = normalizeResidentMultiSlotIndex(
-        Number.isFinite(Number(entry.residentSlot)) ? Number(entry.residentSlot) : Number(entry.trackHint),
-        profile
-      );
-      if (slot >= 0) {
-        ownedSlots.add(slot);
-      }
-    });
-    return (x, y) => {
-      if (assignedRect && isResidentMultiPointInsideRect(x, y, assignedRect)) {
-        return true;
-      }
-      const slotIndex = getResidentMultiSlotIndexFromPoint(x, y, profile.projectKey);
-      if (slotIndex < 0) {
-        return false;
-      }
-      return !ownedSlots.has(slotIndex);
-    };
+    return (x, y) => Boolean(assignedRect && isResidentMultiPointInsideRect(x, y, assignedRect));
   }
 
   function canCurrentClientEditResidentPoint(x, y) {
@@ -27120,11 +28292,7 @@
     if (assignedRect && isResidentMultiPointInsideRect(x, y, assignedRect)) {
       return true;
     }
-    const slotIndex = getResidentMultiSlotIndexFromPoint(x, y, multiState.projectKey);
-    if (slotIndex < 0) {
-      return false;
-    }
-    return !isResidentMultiSlotOwned(slotIndex, multiState.projectKey);
+    return false;
   }
 
   function applyResidentMultiRoomProfile(profile, { announce = false } = {}) {
@@ -27188,6 +28356,39 @@
     if (announce) {
       setMultiStatus(`共有モード: 常駐ルーム設定を適用 (${profile.projectKey || multiState.projectKey})`, 'info');
     }
+    return true;
+  }
+
+  function primeResidentMasterDocument(profile) {
+    if (!profile || typeof profile !== 'object') {
+      return false;
+    }
+    const targetWidth = clamp(Math.round(Number(profile.width) || state.width), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    const targetHeight = clamp(Math.round(Number(profile.height) || state.height), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    const snapshot = createInitialState({ width: targetWidth, height: targetHeight, name: localizeText('常設キャンバス', 'Resident Canvas') });
+    const frame = Array.isArray(snapshot.frames) && snapshot.frames.length ? snapshot.frames[0] : null;
+    const layer = frame && Array.isArray(frame.layers) && frame.layers.length ? frame.layers[0] : null;
+    if (layer) {
+      layer.name = localizeText('常設キャンバス', 'Resident Canvas');
+      layer.visible = true;
+      layer.opacity = 1;
+      layer.blendMode = DEFAULT_LAYER_BLEND_MODE;
+    }
+    applyHistorySnapshot(snapshot);
+    history.past = [];
+    history.future = [];
+    history.pending = null;
+    clearTimelapseRecording({ silent: true });
+    resetDocumentUnsavedChanges();
+    updateHistoryButtons();
+    markRemoteMultiStateDirty({ clearLayerPatchSnapshots: true });
+    syncControlsWithState();
+    renderFrameList();
+    renderLayerList();
+    requestRender();
+    requestOverlayRender();
+    autosaveDirty = true;
+    scheduleAutosaveSnapshot();
     return true;
   }
 
@@ -27661,24 +28862,39 @@
       const disabled = !canRequest || multiState.joinRequestPending;
       requestButton.disabled = disabled;
       if (multiState.joinRequestPending) {
-        requestButton.textContent = 'リクエスト送信済み';
+        requestButton.textContent = localizeText('リクエスト送信済み', 'Request Sent');
       } else {
-        requestButton.textContent = '参加リクエストを送信';
+        requestButton.textContent = localizeText('参加リクエストを送信', 'Send Join Request');
       }
     }
     if (requestHint instanceof HTMLElement) {
       if (!multiState.connected) {
-        requestHint.textContent = '接続すると参加リクエストを送信できます。';
+        requestHint.textContent = localizeText(
+          '接続すると参加リクエストを送信できます。',
+          'Connect to send a join request.'
+        );
       } else if (isResidentRoom && isMultiSpectatorMode()) {
-        requestHint.textContent = 'この常設ルームは空きが出ると自動で参加者になります。';
+        requestHint.textContent = localizeText(
+          'この常設ルームは空きが出ると自動で参加者になります。',
+          'In this resident room, you will auto-join when a slot opens.'
+        );
       } else if (isMultiGuestMode()) {
-        requestHint.textContent = 'あなたは参加者です。';
+        requestHint.textContent = localizeText('あなたは参加者です。', 'You are currently a participant.');
       } else if (multiState.joinRequestPending) {
-        requestHint.textContent = '承認待ちです。マスターの応答を待ってください。';
+        requestHint.textContent = localizeText(
+          '承認待ちです。マスターの応答を待ってください。',
+          'Pending approval. Please wait for the master response.'
+        );
       } else if (joinPolicy === MULTI_JOIN_POLICY_OPEN) {
-        requestHint.textContent = '自動参加設定です。送信すると空きがあれば参加できます。';
+        requestHint.textContent = localizeText(
+          '自動参加設定です。送信すると空きがあれば参加できます。',
+          'Auto-join room. Send request to join if a slot is available.'
+        );
       } else {
-        requestHint.textContent = '参加はマスターの承認後に有効になります。';
+        requestHint.textContent = localizeText(
+          '参加はマスターの承認後に有効になります。',
+          'Joining becomes active after master approval.'
+        );
       }
     }
 
@@ -27737,16 +28953,34 @@
 
   async function sendMultiGuestJoinRequest() {
     if (!canCurrentClientRequestGuestRole()) {
-      setMultiStatus('共有モード: 参加リクエストは視聴者のみ送信できます', 'warn');
+      setMultiStatus(
+        localizeText(
+          '共有モード: 参加リクエストは視聴者のみ送信できます',
+          'Collab mode: join requests can only be sent by viewers'
+        ),
+        'warn'
+      );
       return false;
     }
     if (multiState.joinRequestPending) {
-      setMultiStatus('共有モード: 参加リクエストは送信済みです', 'info');
+      setMultiStatus(
+        localizeText(
+          '共有モード: 参加リクエストは送信済みです',
+          'Collab mode: join request already sent'
+        ),
+        'info'
+      );
       return false;
     }
     const now = Date.now();
     if (now < (multiState.joinRequestCooldownUntil || 0)) {
-      setMultiStatus('共有モード: リクエストを送信しすぎています。少し待ってください', 'warn');
+      setMultiStatus(
+        localizeText(
+          '共有モード: リクエストを送信しすぎています。少し待ってください',
+          'Collab mode: too many requests sent. Please wait a moment.'
+        ),
+        'warn'
+      );
       return false;
     }
     const sentAt = Date.now();
@@ -27762,7 +28996,13 @@
     if (!sent) {
       multiState.joinRequestPending = false;
       syncMultiJoinRequestControls();
-      setMultiStatus('共有モード: 参加リクエストの送信に失敗しました', 'error');
+      setMultiStatus(
+        localizeText(
+          '共有モード: 参加リクエストの送信に失敗しました',
+          'Collab mode: failed to send join request'
+        ),
+        'error'
+      );
       return false;
     }
     const requestComment = {
@@ -27771,13 +29011,22 @@
       role: normalizeMultiRole(multiState.role, 'spectator'),
       name: getLocalMultiParticipantName(),
       avatarId: getLocalMultiParticipantAvatarId(),
-      text: '参加者に上がりたいです。承認お願いします。',
+      text: localizeText(
+        '参加者に上がりたいです。承認お願いします。',
+        'I want to join as a participant. Please approve.'
+      ),
       sentAt: Date.now(),
     };
     appendMultiCommentEntry(requestComment);
     renderMultiComments();
     sendMultiBroadcast('comment', requestComment);
-    setMultiStatus('共有モード: 参加リクエストを送信しました', 'success');
+    setMultiStatus(
+      localizeText(
+        '共有モード: 参加リクエストを送信しました',
+        'Collab mode: join request sent'
+      ),
+      'success'
+    );
     return true;
   }
 
@@ -27787,7 +29036,13 @@
     }
     const targetClientId = getSelectedMultiJoinRequestClientId();
     if (!targetClientId) {
-      setMultiStatus('共有モード: 承認対象を選択してください', 'warn');
+      setMultiStatus(
+        localizeText(
+          '共有モード: 承認対象を選択してください',
+          'Collab mode: select a request to approve'
+        ),
+        'warn'
+      );
       return false;
     }
     const promoted = await forceMultiParticipantRole(targetClientId, 'guest');
@@ -27806,14 +29061,26 @@
     }
     const targetClientId = getSelectedMultiJoinRequestClientId();
     if (!targetClientId) {
-      setMultiStatus('共有モード: 却下対象を選択してください', 'warn');
+      setMultiStatus(
+        localizeText(
+          '共有モード: 却下対象を選択してください',
+          'Collab mode: select a request to reject'
+        ),
+        'warn'
+      );
       return false;
     }
     removeMultiJoinRequest(targetClientId);
     syncMultiJoinRequestControls();
     await sendMultiRoleChangeNotice(targetClientId, 'spectator', 'master-reject-request');
     await sendMultiJoinRequestResult(targetClientId, 'rejected');
-    setMultiStatus('共有モード: 参加リクエストを却下しました', 'info');
+    setMultiStatus(
+      localizeText(
+        '共有モード: 参加リクエストを却下しました',
+        'Collab mode: join request rejected'
+      ),
+      'info'
+    );
     return true;
   }
 
@@ -28359,9 +29626,9 @@
         rows.forEach(row => {
           const option = document.createElement('option');
           option.value = row.clientId;
-          option.textContent = row.name
-            + (row.locked ? ' [ロック中]' : '')
-            + (row.online ? '' : ' (オフライン)');
+          const lockLabel = row.locked ? localizeText(' [ロック中]', ' [Locked]') : '';
+          const onlineLabel = row.online ? '' : localizeText(' (オフライン)', ' (offline)');
+          option.textContent = `${row.name}${lockLabel}${onlineLabel}`;
           select.appendChild(option);
         });
         if (rows.length) {
@@ -28411,7 +29678,9 @@
     }
     if (lockButton instanceof HTMLButtonElement) {
       lockButton.disabled = !canControl || !hasTargetAssignment;
-      lockButton.textContent = targetAssignment?.locked ? 'セルロック解除' : 'セルロック';
+      lockButton.textContent = targetAssignment?.locked
+        ? localizeText('セルロック解除', 'Unlock Cell')
+        : localizeText('セルロック', 'Lock Cell');
     }
     if (kickButton instanceof HTMLButtonElement) {
       kickButton.disabled = !canControl || !hasTargetGuest;
@@ -28424,36 +29693,36 @@
     }
     if (applyButton instanceof HTMLButtonElement) {
       if (!canControl) {
-        applyButton.title = 'マスターのみ操作できます';
+        applyButton.title = localizeText('マスターのみ操作できます', 'Master only');
       } else if (targetRole !== 'guest') {
-        applyButton.title = '参加者を選択すると使えます';
+        applyButton.title = localizeText('参加者を選択すると使えます', 'Select a participant to use this');
       } else {
         applyButton.removeAttribute('title');
       }
     }
     if (lockButton instanceof HTMLButtonElement) {
       if (!canControl) {
-        lockButton.title = 'マスターのみ操作できます';
+        lockButton.title = localizeText('マスターのみ操作できます', 'Master only');
       } else if (targetRole !== 'guest') {
-        lockButton.title = '参加者を選択すると使えます';
+        lockButton.title = localizeText('参加者を選択すると使えます', 'Select a participant to use this');
       } else {
         lockButton.removeAttribute('title');
       }
     }
     if (kickButton instanceof HTMLButtonElement) {
       if (!canControl) {
-        kickButton.title = 'マスターのみ操作できます';
+        kickButton.title = localizeText('マスターのみ操作できます', 'Master only');
       } else if (targetRole !== 'guest') {
-        kickButton.title = '参加者を選択すると使えます';
+        kickButton.title = localizeText('参加者を選択すると使えます', 'Select a participant to use this');
       } else {
         kickButton.removeAttribute('title');
       }
     }
     if (banButton instanceof HTMLButtonElement) {
       if (!canControl) {
-        banButton.title = 'マスターのみ操作できます';
+        banButton.title = localizeText('マスターのみ操作できます', 'Master only');
       } else if (targetRole !== 'guest') {
-        banButton.title = '参加者を選択すると使えます';
+        banButton.title = localizeText('参加者を選択すると使えます', 'Select a participant to use this');
       } else {
         banButton.removeAttribute('title');
       }
@@ -28487,54 +29756,72 @@
     }
     if (hint instanceof HTMLElement) {
       if (!multiState.connected) {
-        hint.textContent = '接続後、マスターのみBAN解除できます。';
+        hint.textContent = localizeText(
+          '接続後、マスターのみBAN解除できます。',
+          'After connecting, only the master can remove bans.'
+        );
       } else if (!canControl) {
-        hint.textContent = 'マスターのみBAN解除できます。';
+        hint.textContent = localizeText(
+          'マスターのみBAN解除できます。',
+          'Only the master can remove bans.'
+        );
       } else if (!blockedClientIds.length) {
-        hint.textContent = 'BAN中の参加者はいません。';
+        hint.textContent = localizeText(
+          'BAN中の参加者はいません。',
+          'No banned participants.'
+        );
       } else {
-        hint.textContent = `${blockedClientIds.length} 件のBANがあります。選択して解除できます。`;
+        hint.textContent = localizeText(
+          `${blockedClientIds.length} 件のBANがあります。選択して解除できます。`,
+          `${blockedClientIds.length} bans. Select one to remove.`
+        );
       }
     }
   }
 
   function moveMultiParticipantToCell(clientId, frameIndexRaw, trackIndexRaw) {
     if (!isMultiMasterMode()) {
-      setMultiStatus('参加者のセル移動はマスターのみ操作できます', 'warn');
+      setMultiStatus(localizeText('参加者のセル移動はマスターのみ操作できます', 'Only the master can move participant cells'), 'warn');
       return false;
     }
     const targetClientId = typeof clientId === 'string' ? clientId.trim() : '';
     if (!targetClientId) {
-      setMultiStatus('セル移動する参加者を選択してください', 'warn');
+      setMultiStatus(localizeText('セル移動する参加者を選択してください', 'Select a participant to move'), 'warn');
       return false;
     }
     if (isMultiClientBlocked(targetClientId)) {
-      setMultiStatus('BAN中の参加者は移動できません', 'warn');
+      setMultiStatus(localizeText('BAN中の参加者は移動できません', 'Banned participants cannot be moved'), 'warn');
       return false;
     }
     const assignment = getMultiAssignment(targetClientId);
     if (!assignment) {
-      setMultiStatus('対象参加者の割り当てが見つかりません', 'warn');
+      setMultiStatus(localizeText('対象参加者の割り当てが見つかりません', 'Selected participant assignment was not found'), 'warn');
       return false;
     }
     normalizeMultiAssignmentsForCurrentDocument();
     const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
     const layerCount = Array.isArray(state.frames?.[0]?.layers) ? state.frames[0].layers.length : 0;
     if (!frameCount || !layerCount) {
-      setMultiStatus('セル移動できるフレーム/レイヤーがありません', 'warn');
+      setMultiStatus(localizeText('セル移動できるフレーム/レイヤーがありません', 'No frame/layer is available for reassignment'), 'warn');
       return false;
     }
     const frameIndex = clamp(Math.round(Number(frameIndexRaw) || 0), 0, frameCount - 1);
     const trackIndex = clamp(Math.round(Number(trackIndexRaw) || 0), 0, layerCount - 1);
     const occupied = isMultiAssignmentCellOccupied(frameIndex, trackIndex, targetClientId);
     if (occupied) {
-      setMultiStatus(`フレーム ${frameIndex + 1} / レイヤー ${trackIndex + 1} は他の参加者が使用中です`, 'warn');
+      setMultiStatus(
+        localizeText(
+          `フレーム ${frameIndex + 1} / レイヤー ${trackIndex + 1} は他の参加者が使用中です`,
+          `Frame ${frameIndex + 1} / Layer ${trackIndex + 1} is already used by another participant`
+        ),
+        'warn'
+      );
       return false;
     }
     const anchorLayer = state.frames[0]?.layers?.[trackIndex];
     const targetFrame = state.frames[frameIndex];
     if (!anchorLayer || !anchorLayer.id || !targetFrame || !targetFrame.id) {
-      setMultiStatus('指定セルへ移動できませんでした', 'error');
+      setMultiStatus(localizeText('指定セルへ移動できませんでした', 'Failed to move to the specified cell'), 'error');
       return false;
     }
     assignment.anchorLayerId = anchorLayer.id;
@@ -28545,7 +29832,13 @@
     renderMultiParticipantsList();
     syncMultiAssignmentControls();
     scheduleMultiSessionStateBroadcast({ immediate: true });
-    setMultiStatus(`参加者を フレーム ${frameIndex + 1} / レイヤー ${trackIndex + 1} へ移動しました`, 'success');
+    setMultiStatus(
+      localizeText(
+        `参加者を フレーム ${frameIndex + 1} / レイヤー ${trackIndex + 1} へ移動しました`,
+        `Moved participant to Frame ${frameIndex + 1} / Layer ${trackIndex + 1}`
+      ),
+      'success'
+    );
     return true;
   }
 
@@ -28569,21 +29862,21 @@
 
   function setMultiParticipantCellLocked(clientId, lockedRaw) {
     if (!isMultiMasterMode()) {
-      setMultiStatus('セルロックはマスターのみ操作できます', 'warn');
+      setMultiStatus(localizeText('セルロックはマスターのみ操作できます', 'Only the master can lock cells'), 'warn');
       return false;
     }
     const targetClientId = typeof clientId === 'string' ? clientId.trim() : '';
     if (!targetClientId) {
-      setMultiStatus('ロック対象の参加者を選択してください', 'warn');
+      setMultiStatus(localizeText('ロック対象の参加者を選択してください', 'Select a participant to lock'), 'warn');
       return false;
     }
     if (isMultiClientBlocked(targetClientId)) {
-      setMultiStatus('BAN中の参加者のロックは変更できません', 'warn');
+      setMultiStatus(localizeText('BAN中の参加者のロックは変更できません', 'Cannot change lock state for banned participants'), 'warn');
       return false;
     }
     const assignment = getMultiAssignment(targetClientId);
     if (!assignment || assignment.role === 'master') {
-      setMultiStatus('ロック対象の参加者割り当てが見つかりません', 'warn');
+      setMultiStatus(localizeText('ロック対象の参加者割り当てが見つかりません', 'Lock target assignment was not found'), 'warn');
       return false;
     }
     const nextLocked = Boolean(lockedRaw);
@@ -28596,7 +29889,9 @@
     syncMultiAssignmentControls();
     scheduleMultiSessionStateBroadcast({ immediate: true });
     setMultiStatus(
-      nextLocked ? '参加者セルをロックしました' : '参加者セルのロックを解除しました',
+      nextLocked
+        ? localizeText('参加者セルをロックしました', 'Participant cell locked')
+        : localizeText('参加者セルのロックを解除しました', 'Participant cell unlocked'),
       'success'
     );
     return true;
@@ -28620,47 +29915,47 @@
 
   async function kickMultiParticipant(clientId) {
     if (!isMultiMasterMode()) {
-      setMultiStatus('参加者のキックはマスターのみ操作できます', 'warn');
+      setMultiStatus(localizeText('参加者のキックはマスターのみ操作できます', 'Only the master can kick participants'), 'warn');
       return false;
     }
     const targetClientId = typeof clientId === 'string' ? clientId.trim() : '';
     if (!targetClientId) {
-      setMultiStatus('キック対象の参加者を選択してください', 'warn');
+      setMultiStatus(localizeText('キック対象の参加者を選択してください', 'Select a participant to kick'), 'warn');
       return false;
     }
     if (targetClientId === multiState.clientId) {
-      setMultiStatus('マスター自身はキックできません', 'warn');
+      setMultiStatus(localizeText('マスター自身はキックできません', 'The master cannot kick themselves'), 'warn');
       return false;
     }
     const assignment = getMultiAssignment(targetClientId);
     if (assignment?.role === 'master') {
-      setMultiStatus('マスターはキック対象にできません', 'warn');
+      setMultiStatus(localizeText('マスターはキック対象にできません', 'The master cannot be kicked'), 'warn');
       return false;
     }
     removeMultiParticipantFromAssignments(targetClientId);
     scheduleMultiSessionStateBroadcast({ immediate: true });
     await sendMultiKickClientNotice(targetClientId, 'master-kick');
-    setMultiStatus('参加者をキックしました（再参加可）', 'success');
+    setMultiStatus(localizeText('参加者をキックしました（再参加可）', 'Participant kicked (can rejoin)'), 'success');
     return true;
   }
 
   async function banMultiParticipant(clientId) {
     if (!isMultiMasterMode()) {
-      setMultiStatus('参加者のBANはマスターのみ操作できます', 'warn');
+      setMultiStatus(localizeText('参加者のBANはマスターのみ操作できます', 'Only the master can ban participants'), 'warn');
       return false;
     }
     const targetClientId = typeof clientId === 'string' ? clientId.trim() : '';
     if (!targetClientId) {
-      setMultiStatus('BAN対象の参加者を選択してください', 'warn');
+      setMultiStatus(localizeText('BAN対象の参加者を選択してください', 'Select a participant to ban'), 'warn');
       return false;
     }
     if (targetClientId === multiState.clientId) {
-      setMultiStatus('マスター自身はBANできません', 'warn');
+      setMultiStatus(localizeText('マスター自身はBANできません', 'The master cannot ban themselves'), 'warn');
       return false;
     }
     const assignment = getMultiAssignment(targetClientId);
     if (assignment?.role === 'master') {
-      setMultiStatus('マスターはBAN対象にできません', 'warn');
+      setMultiStatus(localizeText('マスターはBAN対象にできません', 'The master cannot be banned'), 'warn');
       return false;
     }
     if (!(multiState.blockedClientIds instanceof Set)) {
@@ -28670,28 +29965,28 @@
     removeMultiParticipantFromAssignments(targetClientId);
     scheduleMultiSessionStateBroadcast({ immediate: true });
     await sendMultiKickClientNotice(targetClientId, 'master-ban');
-    setMultiStatus('参加者をBANしました（再参加不可）', 'success');
+    setMultiStatus(localizeText('参加者をBANしました（再参加不可）', 'Participant banned (cannot rejoin)'), 'success');
     return true;
   }
 
   function unbanMultiParticipant(clientId) {
     if (!isMultiMasterMode()) {
-      setMultiStatus('BAN解除はマスターのみ操作できます', 'warn');
+      setMultiStatus(localizeText('BAN解除はマスターのみ操作できます', 'Only the master can remove bans'), 'warn');
       return false;
     }
     const targetClientId = typeof clientId === 'string' ? clientId.trim() : '';
     if (!targetClientId) {
-      setMultiStatus('BAN解除対象を選択してください', 'warn');
+      setMultiStatus(localizeText('BAN解除対象を選択してください', 'Select a participant to unban'), 'warn');
       return false;
     }
     if (!(multiState.blockedClientIds instanceof Set) || !multiState.blockedClientIds.has(targetClientId)) {
-      setMultiStatus('指定された参加者はBANされていません', 'warn');
+      setMultiStatus(localizeText('指定された参加者はBANされていません', 'The selected participant is not banned'), 'warn');
       return false;
     }
     multiState.blockedClientIds.delete(targetClientId);
     syncMultiAssignmentControls();
     scheduleMultiSessionStateBroadcast({ immediate: true });
-    setMultiStatus('BANを解除しました', 'success');
+    setMultiStatus(localizeText('BANを解除しました', 'Ban removed'), 'success');
     return true;
   }
 
@@ -28705,7 +30000,7 @@
     }
     if (isMultiClientBlocked(multiState.clientId)) {
       if (announce) {
-        setMultiStatus('このセッションでは編集権限がありません', 'warn');
+        setMultiStatus(localizeText('このセッションでは編集権限がありません', 'You do not have edit permission in this session'), 'warn');
       }
       return false;
     }
@@ -28719,7 +30014,7 @@
     if (!assignment) {
       maybeRequestGuestAssignmentSync();
       if (announce) {
-        setMultiStatus('割り当てセルを待機中です。マスターの同期を待ってください。', 'warn');
+        setMultiStatus(localizeText('割り当てセルを待機中です。マスターの同期を待ってください。', 'Waiting for assigned cell. Please wait for master sync.'), 'warn');
       }
       return false;
     }
@@ -28732,7 +30027,7 @@
     if (!assignedCell) {
       maybeRequestGuestAssignmentSync();
       if (announce) {
-        setMultiStatus('割り当てセルを待機中です。マスターの同期を待ってください。', 'warn');
+        setMultiStatus(localizeText('割り当てセルを待機中です。マスターの同期を待ってください。', 'Waiting for assigned cell. Please wait for master sync.'), 'warn');
       }
       return false;
     }
@@ -28747,12 +30042,12 @@
     }
     if (assignment.locked) {
       if (announce) {
-        setMultiStatus('この参加者セルはマスターによってロックされています', 'warn');
+        setMultiStatus(localizeText('この参加者セルはマスターによってロックされています', 'This participant cell is locked by the master'), 'warn');
       }
       return false;
     }
     if (changed && announce) {
-      setMultiStatus('このルームでは割り当てセルのみ編集できます。', 'warn');
+      setMultiStatus(localizeText('このルームでは割り当てセルのみ編集できます。', 'In this room, only your assigned cell can be edited.'), 'warn');
     }
     return true;
   }
@@ -28771,7 +30066,9 @@
   }
 
   function setMultiStatus(message, tone = 'info') {
-    const text = typeof message === 'string' && message.trim() ? message.trim() : '共有モード: OFF';
+    const text = typeof message === 'string' && message.trim()
+      ? message.trim()
+      : localizeText('共有モード: OFF', 'Collab mode: OFF');
     multiState.status = text;
     const node = dom.controls.multiStatus;
     if (!(node instanceof HTMLElement)) {
@@ -28818,15 +30115,15 @@
     const inviteRole = resolveMultiInviteDefaultRole();
     const inviteUrl = buildMultiInviteUrl(multiState.projectKey, { role: inviteRole });
     if (!inviteUrl) {
-      setMultiStatus('招待リンク作成にはプロジェクトキーが必要です', 'warn');
+      setMultiStatus(localizeText('招待リンク作成にはプロジェクトキーが必要です', 'A project key is required to create an invite link'), 'warn');
       return false;
     }
     const copied = await writeTextToClipboard(inviteUrl);
     if (!copied) {
-      setMultiStatus('招待リンクのコピーに失敗しました', 'error');
+      setMultiStatus(localizeText('招待リンクのコピーに失敗しました', 'Failed to copy invite link'), 'error');
       return false;
     }
-    setMultiStatus('招待リンクをコピーしました', 'success');
+    setMultiStatus(localizeText('招待リンクをコピーしました', 'Invite link copied'), 'success');
     return true;
   }
 
@@ -28834,7 +30131,7 @@
     const inviteRole = resolveMultiInviteDefaultRole();
     const inviteUrl = buildMultiInviteUrl(multiState.projectKey, { role: inviteRole });
     if (!inviteUrl) {
-      setMultiStatus('招待リンク作成にはプロジェクトキーが必要です', 'warn');
+      setMultiStatus(localizeText('招待リンク作成にはプロジェクトキーが必要です', 'A project key is required to create an invite link'), 'warn');
       return false;
     }
     if (typeof navigator?.share === 'function') {
@@ -28844,7 +30141,7 @@
           text: 'PiXiEEDraw の参加招待リンクです',
           url: inviteUrl,
         });
-        setMultiStatus('招待リンクを共有しました', 'success');
+        setMultiStatus(localizeText('招待リンクを共有しました', 'Invite link shared'), 'success');
         return true;
       } catch (error) {
         // Fallback to clipboard below when share is canceled/failed.
@@ -28946,7 +30243,7 @@
       rows.forEach(row => {
         const option = document.createElement('option');
         option.value = row.clientId;
-        option.textContent = `${row.name} [${row.role === 'guest' ? '参加者' : '視聴者'}]`;
+        option.textContent = `${row.name} [${row.role === 'guest' ? getMultiRoleLabel('guest') : getMultiRoleLabel('spectator')}]`;
         select.appendChild(option);
       });
       if (rows.length) {
@@ -28969,13 +30266,16 @@
         || (target.role === 'spectator' && isMultiGuestLimitReached());
       toGuestButton.disabled = disableGuestPromotion;
       if (!canControl) {
-        toGuestButton.title = 'マスターのみ操作できます';
+        toGuestButton.title = localizeText('マスターのみ操作できます', 'Master only');
       } else if (!target) {
-        toGuestButton.title = '対象を選択してください';
+        toGuestButton.title = localizeText('対象を選択してください', 'Select a target');
       } else if (target.role === 'guest') {
-        toGuestButton.title = 'すでに参加者です';
+        toGuestButton.title = localizeText('すでに参加者です', 'Already a participant');
       } else if (target.role === 'spectator' && isMultiGuestLimitReached()) {
-        toGuestButton.title = `参加上限 ${multiState.maxGuests} 人に達しています`;
+        toGuestButton.title = localizeText(
+          `参加上限 ${multiState.maxGuests} 人に達しています`,
+          `Participant limit (${multiState.maxGuests}) reached`
+        );
       } else {
         toGuestButton.removeAttribute('title');
       }
@@ -28983,11 +30283,11 @@
     if (toSpectatorButton instanceof HTMLButtonElement) {
       toSpectatorButton.disabled = !canControl || !target || target.role === 'spectator';
       if (!canControl) {
-        toSpectatorButton.title = 'マスターのみ操作できます';
+        toSpectatorButton.title = localizeText('マスターのみ操作できます', 'Master only');
       } else if (!target) {
-        toSpectatorButton.title = '対象を選択してください';
+        toSpectatorButton.title = localizeText('対象を選択してください', 'Select a target');
       } else if (target.role === 'spectator') {
-        toSpectatorButton.title = 'すでに視聴者です';
+        toSpectatorButton.title = localizeText('すでに視聴者です', 'Already a viewer');
       } else {
         toSpectatorButton.removeAttribute('title');
       }
@@ -28997,25 +30297,25 @@
 
   async function forceMultiParticipantRole(clientId, nextRoleRaw) {
     if (!isMultiMasterMode()) {
-      setMultiStatus('参加/視聴の切替はマスターのみ操作できます', 'warn');
+      setMultiStatus(localizeText('参加/視聴の切替はマスターのみ操作できます', 'Only the master can switch participant/viewer roles'), 'warn');
       return false;
     }
     const targetClientId = typeof clientId === 'string' ? clientId.trim() : '';
     if (!targetClientId) {
-      setMultiStatus('切替対象を選択してください', 'warn');
+      setMultiStatus(localizeText('切替対象を選択してください', 'Select a target to switch'), 'warn');
       return false;
     }
     if (targetClientId === multiState.clientId) {
-      setMultiStatus('マスター自身は切替できません', 'warn');
+      setMultiStatus(localizeText('マスター自身は切替できません', 'The master cannot switch their own role'), 'warn');
       return false;
     }
     if (isMultiClientBlocked(targetClientId)) {
-      setMultiStatus('BAN中の参加者は切替できません', 'warn');
+      setMultiStatus(localizeText('BAN中の参加者は切替できません', 'Banned users cannot be switched'), 'warn');
       return false;
     }
     const nextRole = normalizeMultiRoleControlTargetRole(nextRoleRaw);
     if (nextRole === 'none') {
-      setMultiStatus('切替先ロールが不正です', 'error');
+      setMultiStatus(localizeText('切替先ロールが不正です', 'Invalid destination role'), 'error');
       return false;
     }
     const participantEntry = multiState.participants instanceof Map
@@ -29023,18 +30323,29 @@
       : null;
     const currentRole = normalizeMultiRoleControlTargetRole(participantEntry?.role || getMultiAssignment(targetClientId)?.role);
     if (currentRole === nextRole) {
-      setMultiStatus(`すでに${nextRole === 'guest' ? '参加者' : '視聴者'}です`, 'info');
+      setMultiStatus(
+        nextRole === 'guest'
+          ? localizeText('すでに参加者です', 'Already a participant')
+          : localizeText('すでに視聴者です', 'Already a viewer'),
+        'info'
+      );
       return true;
     }
 
     if (nextRole === 'guest') {
       if (isMultiGuestLimitReached()) {
-        setMultiStatus(`参加上限 ${multiState.maxGuests} 人のため追加できません`, 'warn');
+        setMultiStatus(
+          localizeText(
+            `参加上限 ${multiState.maxGuests} 人のため追加できません`,
+            `Cannot add more participants: limit is ${multiState.maxGuests}`
+          ),
+          'warn'
+        );
         return false;
       }
       const assignment = assignLayerToGuestClient(targetClientId, participantEntry?.name || '');
       if (!assignment) {
-        setMultiStatus('参加者への切替に失敗しました', 'error');
+        setMultiStatus(localizeText('参加者への切替に失敗しました', 'Failed to switch to participant'), 'error');
         return false;
       }
       removeMultiJoinRequest(targetClientId);
@@ -29062,13 +30373,13 @@
     scheduleMultiSessionStateBroadcast({ immediate: true });
     const sent = await sendMultiRoleChangeNotice(targetClientId, nextRole, 'master-force');
     if (!sent) {
-      setMultiStatus('役割変更通知の送信に失敗しました', 'error');
+      setMultiStatus(localizeText('役割変更通知の送信に失敗しました', 'Failed to send role change notice'), 'error');
       return false;
     }
     setMultiStatus(
       nextRole === 'guest'
-        ? '視聴者を参加者に切替しました'
-        : '参加者を視聴者に切替しました',
+        ? localizeText('視聴者を参加者に切替しました', 'Switched viewer to participant')
+        : localizeText('参加者を視聴者に切替しました', 'Switched participant to viewer'),
       'success'
     );
     return true;
@@ -29076,15 +30387,15 @@
 
   function getMultiRoleLabel(role) {
     if (role === 'master') {
-      return 'マスター';
+      return localizeText('マスター', 'Master');
     }
     if (role === 'guest') {
-      return '参加者';
+      return localizeText('参加者', 'Participant');
     }
     if (role === 'spectator') {
-      return '視聴者';
+      return localizeText('視聴者', 'Viewer');
     }
-    return '接続待機';
+    return localizeText('接続待機', 'Waiting');
   }
 
   function normalizeMultiRole(role, fallback = 'guest') {
@@ -29298,17 +30609,25 @@
     }
     if (dom.controls.multiRoleLabel instanceof HTMLElement) {
       dom.controls.multiRoleLabel.textContent = selectedRole === 'master'
-        ? 'マスター設定'
-        : (selectedRole === 'spectator' ? '視聴者設定' : '参加リクエスト設定');
+        ? localizeText('マスター設定', 'Master Setup')
+        : (selectedRole === 'spectator'
+          ? localizeText('視聴者設定', 'Viewer Setup')
+          : localizeText('参加リクエスト設定', 'Join Request Setup'));
     }
     if (dom.controls.multiStartSession instanceof HTMLButtonElement) {
-      let startLabel = selectedRole === 'master' ? '開始' : '入室';
+      let startLabel = selectedRole === 'master'
+        ? localizeText('開始', 'Start')
+        : localizeText('入室', 'Join');
       if (multiState.connecting) {
-        startLabel = selectedRole === 'master' ? '開始中…' : '入室中…';
+        startLabel = selectedRole === 'master'
+          ? localizeText('開始中…', 'Starting...')
+          : localizeText('入室中…', 'Joining...');
       } else if (multiState.connected) {
         startLabel = multiState.role === 'guest'
-          ? '参加中'
-          : (multiState.role === 'spectator' ? '視聴中' : '開始済み');
+          ? localizeText('参加中', 'Joined')
+          : (multiState.role === 'spectator'
+            ? localizeText('視聴中', 'Viewing')
+            : localizeText('開始済み', 'Started'));
       }
       dom.controls.multiStartSession.textContent = startLabel;
     }
@@ -29451,7 +30770,9 @@
     if (!rows.length) {
       const empty = document.createElement('li');
       empty.className = 'help-text';
-      empty.textContent = multiState.connected ? '接続待機中…' : '未接続';
+      empty.textContent = multiState.connected
+        ? localizeText('接続待機中…', 'Waiting for connection...')
+        : localizeText('未接続', 'Not connected');
       list.appendChild(empty);
       syncMultiAssignmentControls();
       return;
@@ -29467,12 +30788,20 @@
       const trackIndex = getAssignedLayerTrackIndexForClient(row.clientId);
       const residentSlot = getResidentMultiAssignedSlotIndex(row.clientId);
       const residentMode = isResidentMultiProjectKey(multiState.projectKey);
-      const frameLabel = residentMode ? '' : (frameIndex >= 0 ? ` / フレーム ${frameIndex + 1}` : '');
+      const frameLabel = residentMode
+        ? ''
+        : (frameIndex >= 0
+          ? localizeText(` / フレーム ${frameIndex + 1}`, ` / Frame ${frameIndex + 1}`)
+          : '');
       const layerLabel = residentMode
-        ? (residentSlot >= 0 ? ` / セル ${residentSlot + 1}` : '')
-        : (trackIndex >= 0 ? ` / レイヤー ${trackIndex + 1}` : '');
-      const onlineLabel = row.online ? '' : ' (オフライン)';
-      const lockedLabel = row.locked ? ' / ロック中' : '';
+        ? (residentSlot >= 0
+          ? localizeText(` / セル ${residentSlot + 1}`, ` / Cell ${residentSlot + 1}`)
+          : '')
+        : (trackIndex >= 0
+          ? localizeText(` / レイヤー ${trackIndex + 1}`, ` / Layer ${trackIndex + 1}`)
+          : '');
+      const onlineLabel = row.online ? '' : localizeText(' (オフライン)', ' (offline)');
+      const lockedLabel = row.locked ? localizeText(' / ロック中', ' / Locked') : '';
       li.textContent = `${getMultiRoleLabel(row.role)}: ${row.name}${frameLabel}${layerLabel}${lockedLabel}${onlineLabel}`;
       list.appendChild(li);
     });
@@ -29607,7 +30936,7 @@
     if (!entries.length) {
       const empty = document.createElement('p');
       empty.className = 'help-text';
-      empty.textContent = 'コメントはまだありません。';
+      empty.textContent = localizeText('コメントはまだありません。', 'No comments yet.');
       root.appendChild(empty);
       // no comments to show — clear notification (user has seen there are none)
       try { setMultiTabNotification(false); } catch (e) { /* ignore */ }
@@ -29646,7 +30975,7 @@
         author.classList.add('is-target-selectable');
         author.tabIndex = 0;
         author.setAttribute('role', 'button');
-        author.setAttribute('aria-label', '操作対象に設定');
+        author.setAttribute('aria-label', localizeText('操作対象に設定', 'Set as operation target'));
         const selectTarget = () => {
           selectMultiControlTarget(entryClientId);
         };
@@ -29766,12 +31095,12 @@
 
   async function sendMultiComment(text) {
     if (!multiState.connected) {
-      setMultiStatus('コメント送信には接続が必要です', 'warn');
+      setMultiStatus(localizeText('コメント送信には接続が必要です', 'Connection is required to send comments'), 'warn');
       return false;
     }
     const normalizedText = normalizeMultiCommentText(text);
     if (!normalizedText) {
-      setMultiStatus('コメントを入力してください', 'warn');
+      setMultiStatus(localizeText('コメントを入力してください', 'Enter a comment'), 'warn');
       return false;
     }
     const payload = {
@@ -29787,7 +31116,7 @@
     renderMultiComments();
     const sent = await sendMultiBroadcast('comment', payload);
     if (!sent) {
-      setMultiStatus('コメントの送信に失敗しました', 'error');
+      setMultiStatus(localizeText('コメントの送信に失敗しました', 'Failed to send comment'), 'error');
       return false;
     }
     if (dom.controls.multiCommentInput instanceof HTMLInputElement) {
@@ -29828,7 +31157,7 @@
     if (dom.controls.multiEntryMaster instanceof HTMLButtonElement) {
       dom.controls.multiEntryMaster.disabled = multiState.connecting || multiState.connected;
       if (dom.controls.multiEntryMaster.disabled) {
-        dom.controls.multiEntryMaster.title = '接続中は切替できません';
+        dom.controls.multiEntryMaster.title = localizeText('接続中は切替できません', 'Cannot switch while connected');
       } else {
         dom.controls.multiEntryMaster.removeAttribute('title');
       }
@@ -29836,7 +31165,7 @@
     if (dom.controls.multiEntryGuest instanceof HTMLButtonElement) {
       dom.controls.multiEntryGuest.disabled = multiState.connecting || multiState.connected;
       if (dom.controls.multiEntryGuest.disabled) {
-        dom.controls.multiEntryGuest.title = '接続中は切替できません';
+        dom.controls.multiEntryGuest.title = localizeText('接続中は切替できません', 'Cannot switch while connected');
       } else {
         dom.controls.multiEntryGuest.removeAttribute('title');
       }
@@ -29845,14 +31174,16 @@
       dom.controls.multiStartSession.disabled = multiState.connecting || multiState.connected || !currentProjectKey || isEntryView;
       if (multiState.connected) {
         dom.controls.multiStartSession.title = multiState.role === 'guest'
-          ? 'すでに参加中です'
-          : (multiState.role === 'spectator' ? 'すでに視聴中です' : 'すでに開始済みです');
+          ? localizeText('すでに参加中です', 'Already joined')
+          : (multiState.role === 'spectator'
+            ? localizeText('すでに視聴中です', 'Already viewing')
+            : localizeText('すでに開始済みです', 'Already started'));
       } else if (multiState.connecting) {
-        dom.controls.multiStartSession.title = '接続中です';
+        dom.controls.multiStartSession.title = localizeText('接続中です', 'Connecting...');
       } else if (!currentProjectKey) {
-        dom.controls.multiStartSession.title = 'プロジェクトキーを入力してください';
+        dom.controls.multiStartSession.title = localizeText('プロジェクトキーを入力してください', 'Enter a project key');
       } else if (isEntryView) {
-        dom.controls.multiStartSession.title = '先にマスター または 入室 を選択してください';
+        dom.controls.multiStartSession.title = localizeText('先にマスター または 入室 を選択してください', 'Select Master or Join first');
       } else {
         dom.controls.multiStartSession.removeAttribute('title');
       }
@@ -29880,14 +31211,21 @@
       dom.controls.multiMaxGuests.disabled = multiState.connecting || !inMasterConfigMode;
     }
     if (dom.controls.multiRoomVisibility instanceof HTMLSelectElement) {
+      setLocalizedSelectOption(dom.controls.multiRoomVisibility, 'public', '公開', 'Public');
+      setLocalizedSelectOption(dom.controls.multiRoomVisibility, 'private', '非公開', 'Private');
       dom.controls.multiRoomVisibility.value = multiState.roomVisibility;
       dom.controls.multiRoomVisibility.disabled = multiState.connecting || !inMasterConfigMode;
     }
     if (dom.controls.multiExportPermission instanceof HTMLSelectElement) {
+      setLocalizedSelectOption(dom.controls.multiExportPermission, 'master-guest', 'マスター + 参加者', 'Master + Participants');
+      setLocalizedSelectOption(dom.controls.multiExportPermission, 'master', 'マスターのみ', 'Master Only');
+      setLocalizedSelectOption(dom.controls.multiExportPermission, 'all', '全員', 'Everyone');
       dom.controls.multiExportPermission.value = multiState.exportPermission;
       dom.controls.multiExportPermission.disabled = multiState.connecting || !inMasterConfigMode;
     }
     if (dom.controls.multiJoinPolicy instanceof HTMLSelectElement) {
+      setLocalizedSelectOption(dom.controls.multiJoinPolicy, 'open', '自動参加（友達向け）', 'Auto Join (Friends)');
+      setLocalizedSelectOption(dom.controls.multiJoinPolicy, 'approval', '承認制（配信向け）', 'Approval (Streaming)');
       dom.controls.multiJoinPolicy.value = multiState.joinPolicy;
       dom.controls.multiJoinPolicy.disabled = multiState.connecting || !inMasterConfigMode;
     }
@@ -29902,8 +31240,14 @@
       const visibilityLabel = getMultiRoomVisibilityLabel();
       const exportLabel = getMultiExportPermissionLabel();
       dom.controls.multiPresetHint.textContent = joinPolicy === MULTI_JOIN_POLICY_OPEN
-        ? `現在: 友達向け寄り（自動参加 / ${visibilityLabel} / ${exportLabel}）`
-        : `現在: 配信向け寄り（承認制 / ${visibilityLabel} / ${exportLabel}）`;
+        ? localizeText(
+          `現在: 友達向け寄り（自動参加 / ${visibilityLabel} / ${exportLabel}）`,
+          `Current: Friends preset (Auto Join / ${visibilityLabel} / ${exportLabel})`
+        )
+        : localizeText(
+          `現在: 配信向け寄り（承認制 / ${visibilityLabel} / ${exportLabel}）`,
+          `Current: Streaming preset (Approval / ${visibilityLabel} / ${exportLabel})`
+        );
     }
     const canUseMasterOpsMode = inMasterConfigMode && !isResidentMultiConnectedRoom();
     if (!canUseMasterOpsMode && multiState.masterOpsMode) {
@@ -29915,8 +31259,14 @@
     }
     if (dom.controls.multiMasterOpsHint instanceof HTMLElement) {
       dom.controls.multiMasterOpsHint.textContent = multiState.masterOpsMode
-        ? '運営モードON: 強制切替 / セル移動 / キック / BAN を表示中。'
-        : '運営モードOFF: 通常運用向けに運営操作を隠しています。';
+        ? localizeText(
+          '運営モードON: 強制切替 / セル移動 / キック / BAN を表示中。',
+          'Ops mode ON: force role/cell controls, kick and ban are shown.'
+        )
+        : localizeText(
+          '運営モードOFF: 通常運用向けに運営操作を隠しています。',
+          'Ops mode OFF: moderation controls are hidden for normal use.'
+        );
     }
     if (Array.isArray(dom.controls.multiMasterOpsGroups)) {
       dom.controls.multiMasterOpsGroups.forEach(node => {
@@ -29927,31 +31277,61 @@
     }
     if (dom.controls.multiGuestCapacityHint instanceof HTMLElement) {
       const assignedGuestCount = getAssignedGuestCount();
-      dom.controls.multiGuestCapacityHint.textContent = `参加枠: ${assignedGuestCount} / ${multiState.maxGuests}`;
+      dom.controls.multiGuestCapacityHint.textContent = localizeText(
+        `参加枠: ${assignedGuestCount} / ${multiState.maxGuests}`,
+        `Participant slots: ${assignedGuestCount} / ${multiState.maxGuests}`
+      );
     }
     if (dom.controls.multiRoomVisibilityHint instanceof HTMLElement) {
       if (!multiState.connected) {
-        dom.controls.multiRoomVisibilityHint.textContent = '接続後に公開設定が反映されます。';
+        dom.controls.multiRoomVisibilityHint.textContent = localizeText(
+          '接続後に公開設定が反映されます。',
+          'Visibility applies after connection.'
+        );
       } else if (!isMultiMasterMode()) {
-        dom.controls.multiRoomVisibilityHint.textContent = `部屋公開: ${getMultiRoomVisibilityLabel()}`;
+        dom.controls.multiRoomVisibilityHint.textContent = localizeText(
+          `部屋公開: ${getMultiRoomVisibilityLabel()}`,
+          `Room visibility: ${getMultiRoomVisibilityLabel()}`
+        );
       } else if (isMultiRoomPublic()) {
-        dom.controls.multiRoomVisibilityHint.textContent = '公開: ホームの「公開中の部屋」に表示されます。';
+        dom.controls.multiRoomVisibilityHint.textContent = localizeText(
+          '公開: ホームの「公開中の部屋」に表示されます。',
+          'Public: shown in Home "Open Rooms".'
+        );
       } else {
-        dom.controls.multiRoomVisibilityHint.textContent = '非公開: ホームには表示されません。';
+        dom.controls.multiRoomVisibilityHint.textContent = localizeText(
+          '非公開: ホームには表示されません。',
+          'Private: hidden from Home list.'
+        );
       }
     }
     if (dom.controls.multiJoinPolicyHint instanceof HTMLElement) {
       const joinPolicy = normalizeMultiJoinPolicy(multiState.joinPolicy, MULTI_DEFAULT_JOIN_POLICY);
       if (!multiState.connected) {
         dom.controls.multiJoinPolicyHint.textContent = joinPolicy === MULTI_JOIN_POLICY_OPEN
-          ? '自動参加: 招待リンクは参加者入室になります。'
-          : '承認制: 招待リンクは視聴入室になります。';
+          ? localizeText(
+            '自動参加: 招待リンクは参加者入室になります。',
+            'Auto Join: invite link opens as participant join.'
+          )
+          : localizeText(
+            '承認制: 招待リンクは視聴入室になります。',
+            'Approval: invite link opens as viewer join.'
+          );
       } else if (!isMultiMasterMode()) {
-        dom.controls.multiJoinPolicyHint.textContent = `参加方式: ${getMultiJoinPolicyLabel(joinPolicy)}`;
+        dom.controls.multiJoinPolicyHint.textContent = localizeText(
+          `参加方式: ${getMultiJoinPolicyLabel(joinPolicy)}`,
+          `Join policy: ${getMultiJoinPolicyLabel(joinPolicy)}`
+        );
       } else if (joinPolicy === MULTI_JOIN_POLICY_OPEN) {
-        dom.controls.multiJoinPolicyHint.textContent = '自動参加: 招待リンクで参加者として入室します。';
+        dom.controls.multiJoinPolicyHint.textContent = localizeText(
+          '自動参加: 招待リンクで参加者として入室します。',
+          'Auto Join: invite link joins as participant.'
+        );
       } else {
-        dom.controls.multiJoinPolicyHint.textContent = '承認制: 参加はマスター承認が必要です。';
+        dom.controls.multiJoinPolicyHint.textContent = localizeText(
+          '承認制: 参加はマスター承認が必要です。',
+          'Approval: joining requires master approval.'
+        );
       }
     }
     if (dom.controls.multiInviteCopy instanceof HTMLButtonElement) {
@@ -29964,8 +31344,8 @@
     if (dom.controls.multiCommentInput instanceof HTMLInputElement) {
       dom.controls.multiCommentInput.disabled = !canSendComment;
       dom.controls.multiCommentInput.placeholder = canSendComment
-        ? 'コメントを入力'
-        : '接続するとコメントできます';
+        ? localizeText('コメントを入力', 'Type a comment')
+        : localizeText('接続するとコメントできます', 'Connect to comment');
     }
     if (dom.controls.multiCommentSend instanceof HTMLButtonElement) {
       dom.controls.multiCommentSend.disabled = !canSendComment;
@@ -29973,7 +31353,9 @@
     if (dom.controls.exportProject instanceof HTMLButtonElement) {
       const canExport = !multiState.connecting && canCurrentClientExportProject('png');
       dom.controls.exportProject.disabled = !canExport;
-      const exportDisabledReason = multiState.connecting ? '接続中です' : getMultiExportDisabledReason('png');
+      const exportDisabledReason = multiState.connecting
+        ? localizeText('接続中です', 'Connecting...')
+        : getMultiExportDisabledReason('png');
       if (exportDisabledReason) {
         dom.controls.exportProject.title = exportDisabledReason;
       } else {
@@ -29981,6 +31363,7 @@
       }
     }
     updateExportFormatAvailability();
+    updateExportOriginalToggleUI();
     syncMultiJoinRequestControls();
     updatePixfindModeUI();
     enforceMobileSpectatorTabLock({ forceActivate: true });
@@ -30052,6 +31435,11 @@
       dom.controls.applyFpsAll,
       dom.controls.canvasWidth,
       dom.controls.canvasHeight,
+      dom.controls.canvasWidthDecrement,
+      dom.controls.canvasWidthIncrement,
+      dom.controls.canvasHeightDecrement,
+      dom.controls.canvasHeightIncrement,
+      dom.controls.applyCanvasResize,
       dom.controls.applySpriteScale,
       dom.controls.toggleOnionSkin,
       dom.controls.onionSkinEnabled,
@@ -30099,6 +31487,7 @@
         delete control.dataset.multiPrevDisabled;
       }
     });
+    updateCanvasResizeControls();
   }
 
   function clearMultiLayerPatchSnapshots() {
@@ -30179,7 +31568,7 @@
         }
         if (status === 'CLOSED' && multiState.channel === channel) {
           disconnectMultiSession({ silent: true });
-          setMultiStatus('共有モード: 接続が終了しました', 'warn');
+          setMultiStatus(localizeText('共有モード: 接続が終了しました', 'Collab mode: connection closed'), 'warn');
         }
       });
     });
@@ -30367,7 +31756,7 @@
     if (!baseFrame || !Array.isArray(baseFrame.layers) || !baseFrame.layers.length) {
       return null;
     }
-    const newFrame = createFrame(`フレーム ${state.frames.length + 1}`, baseFrame.layers, state.width, state.height);
+    const newFrame = createFrame(getDefaultFrameName(state.frames.length + 1), baseFrame.layers, state.width, state.height);
     state.frames.push(newFrame);
     return newFrame;
   }
@@ -30675,7 +32064,7 @@
     }
     clearMultiGuestStateRecovery();
     multiState.awaitingGuestStateRecovery = true;
-    setMultiStatus('共有モード: 参加者データを確認中…', 'info');
+    setMultiStatus(localizeText('共有モード: 参加者データを確認中…', 'Collab mode: checking participant state...'), 'info');
     sendMultiBroadcast('master-state-request', {
       clientId: multiState.clientId,
       projectKey: multiState.projectKey,
@@ -31127,7 +32516,7 @@
   }
 
   // Apply a history snapshot only to the cells that clientId can currently edit.
-  // In resident rooms this includes own slot + unowned slots, and excludes others' owned slots.
+  // In resident rooms this is restricted to the client's assigned slot.
   function applyHistorySnapshotForClient(snapshot, clientId, { preserveView = false } = {}) {
     if (!snapshot || typeof snapshot !== 'object') return false;
     if (!clientId) return false;
@@ -31253,7 +32642,7 @@
       const blockedClientIds = normalizeMultiBlockedClientIds(payload.blockedClientIds);
       if (blockedClientIds.has(multiState.clientId)) {
         disconnectMultiSession({ silent: true }).catch(() => {});
-        setMultiStatus('共有モード: マスターにより接続が停止されました', 'warn');
+        setMultiStatus(localizeText('共有モード: マスターにより接続が停止されました', 'Collab mode: connection stopped by master'), 'warn');
         return;
       }
     }
@@ -31714,7 +33103,7 @@
       if (onlineMaster && previousMasterClientId !== onlineMaster.clientId) {
         setMultiStatus(`共有モード: マスター接続中 (${multiState.projectKey})`, 'info');
       } else if (!onlineMaster && previousMasterClientId) {
-        setMultiStatus('共有モード: マスター不在。更新の受信待ちです', 'warn');
+        setMultiStatus(localizeText('共有モード: マスター不在。更新の受信待ちです', 'Collab mode: master is offline. Waiting for updates.'), 'warn');
       }
     }
     renderMultiParticipantsList();
@@ -31831,16 +33220,16 @@
     const decision = typeof payload.decision === 'string' ? payload.decision.trim() : '';
     if (decision === 'queued') {
       multiState.joinRequestPending = true;
-      setMultiStatus('共有モード: 参加リクエストは承認待ちです', 'info');
+      setMultiStatus(localizeText('共有モード: 参加リクエストは承認待ちです', 'Collab mode: join request is pending approval'), 'info');
     } else if (decision === 'approved') {
       multiState.joinRequestPending = false;
-      setMultiStatus('共有モード: 参加リクエストが承認されました', 'success');
+      setMultiStatus(localizeText('共有モード: 参加リクエストが承認されました', 'Collab mode: join request approved'), 'success');
     } else if (decision === 'rejected') {
       multiState.joinRequestPending = false;
-      setMultiStatus('共有モード: 参加リクエストは却下されました', 'warn');
+      setMultiStatus(localizeText('共有モード: 参加リクエストは却下されました', 'Collab mode: join request rejected'), 'warn');
     } else if (decision === 'blocked') {
       multiState.joinRequestPending = false;
-      setMultiStatus('共有モード: リクエストできません（BAN中）', 'warn');
+      setMultiStatus(localizeText('共有モード: リクエストできません（BAN中）', 'Collab mode: request unavailable (banned)'), 'warn');
     }
     syncMultiJoinRequestControls();
   }
@@ -31949,7 +33338,7 @@
       }
       const senderRole = normalizeMultiRole(payload.role, 'guest');
       if (senderRole === 'master') {
-        setMultiStatus('共有モード: 同一キーに別マスターがいます', 'warn');
+        setMultiStatus(localizeText('共有モード: 同一キーに別マスターがいます', 'Collab mode: another master is already using this key'), 'warn');
         return;
       }
       const hasAssignment = Boolean(getMultiAssignment(senderClientId));
@@ -32254,7 +33643,13 @@
       restoreLocalDocument: !shouldAutoReconnectAsSpectator,
     });
     if (reason === 'room-full') {
-      setMultiStatus(`共有モード: 参加枠が満員です（上限 ${roomMaxGuests} 人）。視聴者として接続します…`, 'warn');
+      setMultiStatus(
+        localizeText(
+          `共有モード: 参加枠が満員です（上限 ${roomMaxGuests} 人）。視聴者として接続します…`,
+          `Collab mode: participant slots are full (limit ${roomMaxGuests}). Reconnecting as viewer...`
+        ),
+        'warn'
+      );
       setMultiDesiredRole('spectator');
       setMultiUiView('spectator');
       syncMultiControls();
@@ -32264,11 +33659,11 @@
         }
       }, 120);
     } else if (reason === 'master-ban' || reason === 'blocked') {
-      setMultiStatus('共有モード: マスターによりBANされました', 'warn');
+      setMultiStatus(localizeText('共有モード: マスターによりBANされました', 'Collab mode: banned by master'), 'warn');
     } else if (reason === 'master-kick' || reason === 'kicked') {
-      setMultiStatus('共有モード: マスターによりキックされました（再参加可）', 'warn');
+      setMultiStatus(localizeText('共有モード: マスターによりキックされました（再参加可）', 'Collab mode: kicked by master (can rejoin)'), 'warn');
     } else {
-      setMultiStatus('共有モード: マスターにより切断されました', 'warn');
+      setMultiStatus(localizeText('共有モード: マスターにより切断されました', 'Collab mode: disconnected by master'), 'warn');
     }
   }
 
@@ -32359,7 +33754,7 @@
       clearMultiLocalSnapshotBeforeReplica();
     }
     if (!silent) {
-      setMultiStatus('共有モード: OFF', 'info');
+      setMultiStatus(localizeText('共有モード: OFF', 'Collab mode: OFF'), 'info');
     }
     applyMultiRoleUiLocks();
     syncMultiControls();
@@ -32375,7 +33770,7 @@
       : multiState.projectKey;
     const projectKey = normalizeMultiProjectKey(inputProjectKey || multiState.projectKey);
     if (!projectKey) {
-      setMultiStatus('共有モード: プロジェクトキーを入力してください', 'warn');
+      setMultiStatus(localizeText('共有モード: プロジェクトキーを入力してください', 'Collab mode: enter a project key'), 'warn');
       return false;
     }
     const residentProfile = getResidentMultiRoomProfile(projectKey);
@@ -32563,6 +33958,9 @@
 
       if (normalizedRole === 'master') {
         clearMultiLocalSnapshotBeforeReplica();
+        if (residentProfile) {
+          primeResidentMasterDocument(residentProfile);
+        }
         startMultiMasterRecoveryFlow(projectKey);
       } else {
         await sendMultiBroadcast('sync-request', {
@@ -32591,7 +33989,7 @@
     } catch (error) {
       console.warn('Failed to connect multi session', error);
       await disconnectMultiSession({ silent: true, restoreLocalDocument: false });
-      setMultiStatus('共有モード: 接続に失敗しました', 'error');
+      setMultiStatus(localizeText('共有モード: 接続に失敗しました', 'Collab mode: failed to connect'), 'error');
       return false;
     } finally {
       multiState.connecting = false;
@@ -32667,7 +34065,7 @@
           || multiState.projectKey
         );
         if (!projectKey) {
-          setMultiStatus('共有キーが空です。先にキーを入力してください', 'warn');
+          setMultiStatus(localizeText('共有キーが空です。先にキーを入力してください', 'Project key is empty. Enter a key first.'), 'warn');
           syncMultiControls();
           return;
         }
@@ -32675,7 +34073,7 @@
         if (copied) {
           setMultiStatus(`共有キーをコピーしました: ${projectKey}`, 'success');
         } else {
-          setMultiStatus('共有キーのコピーに失敗しました', 'error');
+          setMultiStatus(localizeText('共有キーのコピーに失敗しました', 'Failed to copy project key'), 'error');
         }
         syncMultiControls();
       });
@@ -32906,7 +34304,7 @@
         }
         setMultiDesiredRole('master');
         setMultiUiView('master');
-        setMultiStatus('マスター設定を選択しました', 'info');
+        setMultiStatus(localizeText('マスター設定を選択しました', 'Master setup selected'), 'info');
         syncMultiControls();
       });
     }
@@ -32918,7 +34316,7 @@
         }
         setMultiDesiredRole('guest');
         setMultiUiView('guest');
-        setMultiStatus('参加リクエスト設定を選択しました', 'info');
+        setMultiStatus(localizeText('参加リクエスト設定を選択しました', 'Join request setup selected'), 'info');
         syncMultiControls();
       });
     }
@@ -32978,7 +34376,7 @@
         }
         if (normalizeMultiUiView(multiState.uiView) !== 'entry') {
           setMultiUiView('entry');
-          setMultiStatus('マスター / 入室 を選択してください', 'info');
+          setMultiStatus(localizeText('マスター / 入室 を選択してください', 'Select Master or Join'), 'info');
           syncMultiControls();
         }
       });
@@ -32987,11 +34385,11 @@
       dom.controls.multiBroadcastState.dataset.bound = 'true';
       dom.controls.multiBroadcastState.addEventListener('click', () => {
         if (!isMultiMasterMode()) {
-          setMultiStatus('全員同期はマスターのみ実行できます', 'warn');
+          setMultiStatus(localizeText('全員同期はマスターのみ実行できます', 'Only the master can sync to all'), 'warn');
           return;
         }
         scheduleMultiSessionStateBroadcast({ immediate: true });
-        setMultiStatus('共有モード: 全員に最新状態を同期しました', 'success');
+        setMultiStatus(localizeText('共有モード: 全員に最新状態を同期しました', 'Collab mode: synced latest state to everyone'), 'success');
       });
     }
     /* multiForceDanmakuToggle handler removed: danmaku control is per-client */
@@ -33017,7 +34415,7 @@
           || (dom.controls.multiRoleTarget instanceof HTMLSelectElement ? dom.controls.multiRoleTarget.value : '')
           || (dom.controls.multiAssignTarget instanceof HTMLSelectElement ? dom.controls.multiAssignTarget.value : '');
         if (!targetClientId) {
-          setMultiStatus('切替対象を選択してください', 'warn');
+          setMultiStatus(localizeText('切替対象を選択してください', 'Select a target to switch'), 'warn');
           return;
         }
         await forceMultiParticipantRole(targetClientId, 'guest');
@@ -33031,7 +34429,7 @@
           || (dom.controls.multiRoleTarget instanceof HTMLSelectElement ? dom.controls.multiRoleTarget.value : '')
           || (dom.controls.multiAssignTarget instanceof HTMLSelectElement ? dom.controls.multiAssignTarget.value : '');
         if (!targetClientId) {
-          setMultiStatus('切替対象を選択してください', 'warn');
+          setMultiStatus(localizeText('切替対象を選択してください', 'Select a target to switch'), 'warn');
           return;
         }
         await forceMultiParticipantRole(targetClientId, 'spectator');
@@ -33075,7 +34473,7 @@
           || (dom.controls.multiAssignTarget instanceof HTMLSelectElement ? dom.controls.multiAssignTarget.value : '');
         const assignment = targetClientId ? getMultiAssignment(targetClientId) : null;
         if (!assignment) {
-          setMultiStatus('ロック対象の参加者を選択してください', 'warn');
+          setMultiStatus(localizeText('ロック対象の参加者を選択してください', 'Select a participant to lock'), 'warn');
           return;
         }
         setMultiParticipantCellLocked(targetClientId, !assignment.locked);
@@ -33087,7 +34485,7 @@
         const targetClientId = multiState.selectedAssignClientId
           || (dom.controls.multiAssignTarget instanceof HTMLSelectElement ? dom.controls.multiAssignTarget.value : '');
         if (!targetClientId) {
-          setMultiStatus('キック対象の参加者を選択してください', 'warn');
+          setMultiStatus(localizeText('キック対象の参加者を選択してください', 'Select a participant to kick'), 'warn');
           return;
         }
         await kickMultiParticipant(targetClientId);
@@ -33099,7 +34497,7 @@
         const targetClientId = multiState.selectedAssignClientId
           || (dom.controls.multiAssignTarget instanceof HTMLSelectElement ? dom.controls.multiAssignTarget.value : '');
         if (!targetClientId) {
-          setMultiStatus('BAN対象の参加者を選択してください', 'warn');
+          setMultiStatus(localizeText('BAN対象の参加者を選択してください', 'Select a participant to ban'), 'warn');
           return;
         }
         await banMultiParticipant(targetClientId);
@@ -33113,7 +34511,7 @@
         }
         const targetClientId = dom.controls.multiBlockedTarget.value || '';
         if (!targetClientId) {
-          setMultiStatus('BAN解除対象を選択してください', 'warn');
+          setMultiStatus(localizeText('BAN解除対象を選択してください', 'Select a participant to unban'), 'warn');
           return;
         }
         unbanMultiParticipant(targetClientId);
@@ -33158,7 +34556,7 @@
     }
 
     if (!multiState.connected) {
-      setMultiStatus('共有モード: OFF', 'info');
+      setMultiStatus(localizeText('共有モード: OFF', 'Collab mode: OFF'), 'info');
     }
     setMultiHelpPanelVisible(false);
   syncMultiControls();
