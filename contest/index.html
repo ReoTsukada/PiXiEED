@@ -368,6 +368,7 @@
       user-select:none;
     }
     .entry-card.entry-card--ad{
+      grid-column:1 / -1;
       border-radius:10px;
       align-items:center;
       justify-content:center;
@@ -3501,8 +3502,8 @@
           </div>
         `;
         gallery.appendChild(item);
-        // 15件ごとに広告を挿入
-        if((idx + 1) % 15 === 0){
+        // 15件ごとに1行バナー広告を挿入（末尾は除外）
+        if((idx + 1) % 15 === 0 && (idx + 1) < entries.length){
           gallery.appendChild(createAdCard());
         }
       });
