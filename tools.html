@@ -144,6 +144,32 @@
     .brand-text{ display:flex; flex-direction:column; gap:2px; }
     .brand-title{ margin:0; font-size:16px; color:#f9fafb; }
     .brand-sub{ margin:0; font-size:12px; color:#9ca3af; }
+    .header-tools{
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .support-tip-link{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:32px;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255, 196, 115, 0.42);
+      background:rgba(255, 196, 115, 0.14);
+      color:#ffe2b8;
+      text-decoration:none;
+      font-weight:800;
+      font-size:12px;
+      letter-spacing:0.02em;
+    }
+    .support-tip-link:hover,
+    .support-tip-link:focus-visible{
+      background:rgba(255, 196, 115, 0.22);
+      border-color:rgba(255, 210, 148, 0.62);
+      color:#fff2dc;
+    }
     h1{ margin:0; font-size:22px; }
     .subtitle{ margin:0; color:#cbd5e1; font-size:12px; }
     .seo-links{
@@ -868,7 +894,9 @@
             <p class="brand-sub" id="brandUser">ユーザー</p>
           </div>
         </button>
-        <div></div>
+        <div class="header-tools">
+          <a class="support-tip-link" href="https://pixieed.stores.jp" target="_blank" rel="noopener noreferrer" aria-label="PiXiEEDの応援チップを購入">応援チップ</a>
+        </div>
       </div>
     </header>
     <section class="card">
