@@ -1726,6 +1726,93 @@ body.is-startup-active #virtualCursorCanvas {
   box-shadow: none;
 }
 
+.floating-move-pad {
+  --floating-move-pad-scale: 2;
+  --floating-move-pad-x: 16px;
+  --floating-move-pad-y: 16px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+  transform:
+    translate(var(--floating-move-pad-x), var(--floating-move-pad-y))
+    scale(var(--floating-move-pad-scale));
+  display: grid;
+  grid-template-columns: repeat(3, 28px);
+  grid-template-rows: repeat(3, 28px);
+  gap: 3px;
+  z-index: 2000;
+}
+
+.floating-move-pad__btn,
+.floating-move-pad__center {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 168, 82, 0.72);
+  background:
+    linear-gradient(0deg, rgba(255, 168, 82, 0.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 168, 82, 0.14) 1px, transparent 1px),
+    rgba(7, 14, 22, 0.92);
+  background-size: 4px 4px;
+  color: #ffe2c4;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+}
+
+.floating-move-pad__btn {
+  cursor: pointer;
+  touch-action: none;
+  padding: 0;
+}
+
+.floating-move-pad__btn:active,
+.floating-move-pad__btn.is-active {
+  background:
+    linear-gradient(0deg, rgba(255, 168, 82, 0.25) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 168, 82, 0.25) 1px, transparent 1px),
+    rgba(11, 20, 30, 0.95);
+}
+
+.floating-move-pad__center {
+  border-color: rgba(255, 236, 216, 0.38);
+  color: rgba(255, 236, 216, 0.75);
+  pointer-events: none;
+}
+
+.floating-move-pad__btn--up {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.floating-move-pad__btn--left {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.floating-move-pad__center {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.floating-move-pad__btn--right {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.floating-move-pad__btn--down {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.floating-move-pad.is-hidden {
+  display: none;
+}
+
 .canvas-control-buttons.is-clipboard-mode .chip {
   color: var(--fg);
 }
