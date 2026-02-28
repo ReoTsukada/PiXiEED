@@ -266,6 +266,13 @@
   <div id="rightPanelAdPreloadMount" style="width:320px;min-width:320px;max-width:320px;height:320px;min-height:320px;max-height:320px;overflow:hidden;"></div>
 </div>
 <button aria-label="描画ボタン（左=主色 / 右=副色）" class="floating-draw-button" id="floatingDrawButton" type="button">描画</button>
+<div aria-hidden="true" aria-label="選択範囲移動" class="floating-move-pad is-hidden" hidden="" id="floatingMovePad" role="group">
+<button aria-label="選択範囲を上へ移動" class="floating-move-pad__btn floating-move-pad__btn--up" data-move-pad-dir="up" type="button">▲</button>
+<button aria-label="選択範囲を左へ移動" class="floating-move-pad__btn floating-move-pad__btn--left" data-move-pad-dir="left" type="button">◀</button>
+<span aria-hidden="true" class="floating-move-pad__center">＋</span>
+<button aria-label="選択範囲を右へ移動" class="floating-move-pad__btn floating-move-pad__btn--right" data-move-pad-dir="right" type="button">▶</button>
+<button aria-label="選択範囲を下へ移動" class="floating-move-pad__btn floating-move-pad__btn--down" data-move-pad-dir="down" type="button">▼</button>
+</div>
 <div aria-hidden="true" class="mirror-tool-popover" hidden="" id="mirrorToolPopover" role="dialog">
 <div class="mirror-tool-popover__header">
 <strong>対称ツール</strong>
