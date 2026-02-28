@@ -1644,6 +1644,12 @@ body.is-startup-active #virtualCursorCanvas {
   --floating-draw-button-scale: 2;
   --floating-draw-button-x: 16px;
   --floating-draw-button-y: 16px;
+  --floating-draw-button-primary-color: rgba(255, 168, 82, 0.8);
+  --floating-draw-button-secondary-color: rgba(255, 130, 130, 0.78);
+  --floating-draw-button-primary-overlay: rgba(255, 255, 255, 0);
+  --floating-draw-button-secondary-overlay: rgba(255, 255, 255, 0);
+  --floating-draw-button-divider-color: rgba(255, 255, 255, 0.42);
+  --floating-draw-button-text-color: rgba(248, 252, 255, 0.96);
   position: fixed;
   top: 0;
   left: 0;
@@ -1656,12 +1662,19 @@ body.is-startup-active #virtualCursorCanvas {
   background:
     linear-gradient(
       90deg,
-      rgba(255, 168, 82, 0.3) 0%,
-      rgba(255, 168, 82, 0.3) 50%,
-      rgba(255, 130, 130, 0.28) 50%,
-      rgba(255, 130, 130, 0.28) 100%
+      var(--floating-draw-button-primary-overlay) 0%,
+      var(--floating-draw-button-primary-overlay) 50%,
+      var(--floating-draw-button-secondary-overlay) 50%,
+      var(--floating-draw-button-secondary-overlay) 100%
+    ),
+    linear-gradient(
+      90deg,
+      var(--floating-draw-button-primary-color) 0%,
+      var(--floating-draw-button-primary-color) 50%,
+      var(--floating-draw-button-secondary-color) 50%,
+      var(--floating-draw-button-secondary-color) 100%
     );
-  color: var(--fg);
+  color: var(--floating-draw-button-text-color);
   font-weight: 600;
   border: 1px solid rgba(255, 168, 82, 0.78);
   border-radius: 0;
@@ -1671,6 +1684,7 @@ body.is-startup-active #virtualCursorCanvas {
   user-select: none;
   overflow: hidden;
   z-index: 2000;
+  text-shadow: none;
 }
 
 .floating-draw-button::before {
@@ -1680,30 +1694,18 @@ body.is-startup-active #virtualCursorCanvas {
   bottom: 0;
   left: calc(50% - 0.5px);
   width: 1px;
-  background: rgba(255, 236, 216, 0.7);
+  background: var(--floating-draw-button-divider-color);
   pointer-events: none;
 }
 
 .floating-draw-button[data-draw-side='primary'] {
-  background:
-    linear-gradient(
-      90deg,
-      rgba(255, 185, 98, 0.42) 0%,
-      rgba(255, 185, 98, 0.42) 50%,
-      rgba(255, 130, 130, 0.2) 50%,
-      rgba(255, 130, 130, 0.2) 100%
-    );
+  --floating-draw-button-primary-overlay: rgba(255, 255, 255, 0.22);
+  --floating-draw-button-secondary-overlay: rgba(0, 0, 0, 0.08);
 }
 
 .floating-draw-button[data-draw-side='secondary'] {
-  background:
-    linear-gradient(
-      90deg,
-      rgba(255, 168, 82, 0.2) 0%,
-      rgba(255, 168, 82, 0.2) 50%,
-      rgba(255, 145, 145, 0.4) 50%,
-      rgba(255, 145, 145, 0.4) 100%
-    );
+  --floating-draw-button-primary-overlay: rgba(0, 0, 0, 0.08);
+  --floating-draw-button-secondary-overlay: rgba(255, 255, 255, 0.22);
 }
 
 .floating-draw-button.is-hidden {
@@ -1711,18 +1713,16 @@ body.is-startup-active #virtualCursorCanvas {
 }
 
 .floating-draw-button:active {
-  background: rgba(255, 168, 82, 0.4);
   box-shadow: none;
 }
 
 .floating-draw-button.is-disabled {
-  opacity: 0.55;
+  opacity: 0.62;
   cursor: default;
-  background: rgba(255, 168, 82, 0.16);
+  filter: saturate(0.52);
 }
 
 .floating-draw-button.is-disabled:active {
-  background: rgba(255, 168, 82, 0.16);
   box-shadow: none;
 }
 
@@ -1730,6 +1730,10 @@ body.is-startup-active #virtualCursorCanvas {
   --floating-move-pad-scale: 2;
   --floating-move-pad-x: 16px;
   --floating-move-pad-y: 16px;
+  --floating-move-pad-cell-size: 28px;
+  --floating-move-pad-gap: 3px;
+  --floating-move-pad-center-width: 86px;
+  --floating-move-pad-center-height: 36px;
   position: fixed;
   top: 0;
   left: 0;
@@ -1738,16 +1742,21 @@ body.is-startup-active #virtualCursorCanvas {
     translate(var(--floating-move-pad-x), var(--floating-move-pad-y))
     scale(var(--floating-move-pad-scale));
   display: grid;
-  grid-template-columns: repeat(3, 28px);
-  grid-template-rows: repeat(3, 28px);
-  gap: 3px;
+  grid-template-columns:
+    var(--floating-move-pad-cell-size)
+    var(--floating-move-pad-center-width)
+    var(--floating-move-pad-cell-size);
+  grid-template-rows:
+    var(--floating-move-pad-cell-size)
+    var(--floating-move-pad-center-height)
+    var(--floating-move-pad-cell-size);
+  gap: var(--floating-move-pad-gap);
   z-index: 2000;
+  pointer-events: none;
 }
 
 .floating-move-pad__btn,
 .floating-move-pad__center {
-  width: 28px;
-  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1765,9 +1774,13 @@ body.is-startup-active #virtualCursorCanvas {
 }
 
 .floating-move-pad__btn {
+  width: var(--floating-move-pad-cell-size);
+  height: var(--floating-move-pad-cell-size);
   cursor: pointer;
   touch-action: none;
   padding: 0;
+  pointer-events: auto;
+  place-self: center;
 }
 
 .floating-move-pad__btn:active,
@@ -1779,8 +1792,11 @@ body.is-startup-active #virtualCursorCanvas {
 }
 
 .floating-move-pad__center {
-  border-color: rgba(255, 236, 216, 0.38);
-  color: rgba(255, 236, 216, 0.75);
+  width: 100%;
+  height: 100%;
+  border-color: transparent;
+  background: transparent;
+  color: transparent;
   pointer-events: none;
 }
 
@@ -4242,6 +4258,20 @@ body.is-mobile-layout .mobile-draw-help {
 }
 .settings-nav__close {
   padding: 8px 12px;
+}
+.settings-nav a.settings-nav__support {
+  text-decoration: none;
+  border-color: rgba(255, 187, 82, 0.48);
+  color: #ffd7a5;
+}
+.settings-nav a.settings-nav__support:hover,
+.settings-nav a.settings-nav__support:focus-visible {
+  border-color: rgba(255, 214, 150, 0.7);
+  background:
+    linear-gradient(0deg, rgba(255, 187, 82, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 187, 82, 0.16) 1px, transparent 1px),
+    rgba(10, 18, 26, 0.95);
+  color: #ffebcf;
 }
 
 #panelSettings .settings-size-row {
