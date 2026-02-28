@@ -1253,6 +1253,7 @@
     'rectFill',
     'ellipse',
     'ellipseFill',
+    'move',
     'selectRect',
     'selectLasso',
     'curve',
@@ -1278,7 +1279,9 @@
     ellipse: '◯',
     ellipseFill: '⬤',
   };
-  const FLOATING_DRAW_BUTTON_SCALE_VALUES = [1, 1.5, 2];
+  const FLOATING_DRAW_BUTTON_SCALE_MIN = 1;
+  const FLOATING_DRAW_BUTTON_SCALE_MAX = 2;
+  const FLOATING_DRAW_BUTTON_SCALE_STEP = 0.01;
   const DEFAULT_FLOATING_DRAW_BUTTON_SCALE = 2;
   const DEFAULT_LAYER_BLEND_MODE = 'normal';
   const LAYER_BLEND_MODE_OPTIONS = Object.freeze([
@@ -1328,6 +1331,7 @@
     dragging: false,
     startPointer: null,
     startPosition: null,
+    startCursor: null,
     startCursorCell: null,
     drawPaletteIndex: null,
     drawSessionStarted: false,
@@ -6010,6 +6014,8 @@
     setLocalizedTextContent('#multiAssignBan', 'BAN', 'Ban');
 
     setLocalizedTextContent('#goHomeButton', '他のツール一覧へ', 'Other Tools');
+    setLocalizedTextContent('#supportTipLink', '応援チップ', 'Support Tip');
+    setLocalizedAttribute('#supportTipLink', 'aria-label', 'PiXiEEDの応援チップを購入（外部サイト）', 'Buy a PiXiEED support tip (external site)');
     setLocalizedTextContent('#openShortcutHelp', 'ショートカット一覧', 'Keyboard Shortcuts');
     setLocalizedTextContent('#openUpdateHistory', '更新情報', 'Updates');
 
@@ -6039,7 +6045,7 @@
     setLocalizedToggleLabel('mirrorAxisDiagonalB', '斜め対称 (/)', 'Diagonal Mirror (/)');
     setLocalizedTextContent('#mirrorAxisHelp', 'ミラーモード中は軸ライン外側のつまみをドラッグして、対称軸を移動できます。', 'In mirror mode, drag the outside handles to move each mirror axis.');
     setLocalizedTextContent('.virtual-cursor-scale__label', '仮想カーソルボタンサイズ', 'Virtual Cursor Button Size');
-    setLocalizedTextContent('#mobileDrawHelp', 'スマホ描画: 仮想カーソルをONにしてキャンバスをドラッグでカーソル移動、「描画」ボタン長押しで描画します（左半分=主色 / 右半分=副色）。範囲選択中は十字キーで選択範囲を移動できます。2本指ドラッグ/ピンチで移動と拡大縮小ができます。', 'Mobile draw: turn on Virtual Cursor, drag the canvas to move the cursor, and long-press Draw to paint (left half = primary / right half = secondary). When a selection exists, use the D-pad to move it. Use two fingers to pan and pinch zoom.');
+    setLocalizedTextContent('#mobileDrawHelp', 'スマホ描画: 仮想カーソルをONにしてキャンバスをドラッグでカーソル移動、「描画」ボタン長押しで描画します（左半分=主色 / 右半分=副色）。選択範囲を移動する時は「移動」ツール、または選択ツールのまま選択範囲上で描画ボタンを押したままドラッグします。2本指ドラッグ/ピンチで移動と拡大縮小ができます。', 'Mobile draw: turn on Virtual Cursor, drag the canvas to move the cursor, and long-press Draw to paint (left half = primary / right half = secondary). To move a selection, use Move, or keep a selection tool active and drag while holding Draw when the cursor is on the selected area. Use two fingers to pan and pinch zoom.');
     setLocalizedTextContent('#panelSettings .settings-display-buttons + .help-text', '背景とUI配色を切り替えます（描画色には影響しません）。', 'Switch the background and UI colors (does not change drawing colors).');
 
     setLocalizedTextContent('#floatingDrawButton', '描画', 'Draw');
@@ -9259,6 +9265,56 @@
     const syncUi = options.syncUi !== false;
     const nextIndex = state.activeFrame + Number(offset || 0);
     setActiveFrameIndex(nextIndex, { wrap, persist, render, syncUi });
+  }
+
+  function setActiveLayerTrackIndex(nextIndex, {
+    persist = true,
+    render = true,
+    syncUi = true,
+  } = {}) {
+    const frame = getActiveFrame();
+    if (!frame || !Array.isArray(frame.layers) || !frame.layers.length) {
+      return null;
+    }
+    if (isMultiAssignedCellRestrictedEditorMode()) {
+      enforceGuestAssignedLayerSelection({ announce: false });
+      return getActiveLayer();
+    }
+    const normalizedIndex = clamp(Math.round(Number(nextIndex) || 0), 0, frame.layers.length - 1);
+    const nextLayer = frame.layers[normalizedIndex];
+    if (!nextLayer) {
+      return null;
+    }
+    const previousLayerId = state.activeLayer;
+    state.activeLayer = nextLayer.id;
+    if (persist) {
+      scheduleSessionPersist();
+    }
+    if (render) {
+      if (previousLayerId !== nextLayer.id) {
+        renderFrameList();
+        renderLayerList();
+        requestRender();
+        requestOverlayRender();
+      } else {
+        syncActiveLayerSettingsUI();
+      }
+    }
+    if (syncUi) {
+      updatePixfindModeUI();
+    }
+    return nextLayer;
+  }
+
+  function stepActiveLayerTrack(offset, options = {}) {
+    const frame = getActiveFrame();
+    if (!frame || !Array.isArray(frame.layers) || !frame.layers.length) {
+      return null;
+    }
+    const currentIndex = getActiveLayerIndex();
+    const baseIndex = currentIndex >= 0 ? currentIndex : frame.layers.length - 1;
+    const nextIndex = baseIndex + Number(offset || 0);
+    return setActiveLayerTrackIndex(nextIndex, options);
   }
 
   function openNewProjectDialog() {
@@ -17139,9 +17195,9 @@
 
     if (dom.controls.virtualCursorButtonScale instanceof HTMLInputElement) {
       const slider = dom.controls.virtualCursorButtonScale;
-      slider.min = String(FLOATING_DRAW_BUTTON_SCALE_VALUES[0]);
-      slider.max = String(FLOATING_DRAW_BUTTON_SCALE_VALUES[FLOATING_DRAW_BUTTON_SCALE_VALUES.length - 1]);
-      slider.step = '0.5';
+      slider.min = String(FLOATING_DRAW_BUTTON_SCALE_MIN);
+      slider.max = String(FLOATING_DRAW_BUTTON_SCALE_MAX);
+      slider.step = String(FLOATING_DRAW_BUTTON_SCALE_STEP);
       slider.addEventListener('input', event => {
         setVirtualCursorButtonScale(event.target.value, { persist: false, updateControl: false });
         updateFloatingDrawButtonScaleControl();
@@ -18108,6 +18164,7 @@
     });
     renderToolQuickPalette();
     updateColorTabSwatch();
+    updateFloatingDrawButtonPalettePreview();
     if (dom.controls.removePaletteColor) {
       dom.controls.removePaletteColor.disabled = state.palette.length <= 1;
     }
@@ -20838,14 +20895,20 @@
     if (requiresLayer && !layer) {
       return false;
     }
+    const shouldMoveSelectionWithSelectionTool = Boolean(
+      VIRTUAL_CURSOR_SELECTION_TOOLS.has(activeTool)
+      && selectionMaskHasPixels(state.selectionMask)
+      && isPositionInCurrentSelection(cell)
+    );
+    const sessionTool = shouldMoveSelectionWithSelectionTool ? 'move' : activeTool;
 
     resetPointerStateForVirtualCursor();
     hoverPixel = null;
 
     virtualCursorDrawState.active = true;
-    virtualCursorDrawState.tool = activeTool;
+    virtualCursorDrawState.tool = sessionTool;
     virtualCursorDrawState.historyStarted = false;
-    virtualCursorDrawState.lastPosition = BRUSH_TOOLS.has(activeTool) ? { ...cell } : null;
+    virtualCursorDrawState.lastPosition = BRUSH_TOOLS.has(sessionTool) ? { ...cell } : null;
     virtualCursorDrawState.startPosition = { ...cell };
     virtualCursorDrawState.currentPosition = { ...cell };
     virtualCursorDrawState.path = [{ ...cell }];
@@ -20853,7 +20916,7 @@
     virtualCursorDrawState.selectionClearedOnStart = false;
     virtualCursorDrawState.curveStage = null;
 
-    pointerState.tool = activeTool;
+    pointerState.tool = sessionTool;
     pointerState.start = { ...cell };
     pointerState.current = { ...cell };
     pointerState.last = { ...cell };
@@ -20861,23 +20924,23 @@
     pointerState.preview = null;
     pointerState.selectionPreview = null;
     pointerState.selectionMove = null;
-    pointerState.drawPaletteIndex = HISTORY_DRAW_TOOLS.has(activeTool) && Number.isFinite(drawPaletteIndex)
+    pointerState.drawPaletteIndex = HISTORY_DRAW_TOOLS.has(sessionTool) && Number.isFinite(drawPaletteIndex)
       ? normalizePaletteIndex(drawPaletteIndex, state.activePaletteIndex)
       : null;
     pointerState.selectionClearedOnDown = false;
     pointerState.curveHandle = null;
 
-    if (HISTORY_DRAW_TOOLS.has(activeTool)) {
-      beginHistory(activeTool);
+    if (HISTORY_DRAW_TOOLS.has(sessionTool)) {
+      beginHistory(sessionTool);
       virtualCursorDrawState.historyStarted = true;
     }
-    if (BRUSH_TOOLS.has(activeTool)) {
+    if (BRUSH_TOOLS.has(sessionTool)) {
       applyBrushStroke(cell.x, cell.y, cell.x, cell.y);
       requestOverlayRender();
       return true;
     }
 
-    if (VIRTUAL_CURSOR_SHAPE_TOOLS.has(activeTool)) {
+    if (VIRTUAL_CURSOR_SHAPE_TOOLS.has(sessionTool)) {
       pointerState.preview = {
         start: { ...virtualCursorDrawState.startPosition },
         end: { ...virtualCursorDrawState.currentPosition },
@@ -20887,7 +20950,7 @@
       return true;
     }
 
-    if (VIRTUAL_CURSOR_SELECTION_TOOLS.has(activeTool)) {
+    if (VIRTUAL_CURSOR_SELECTION_TOOLS.has(sessionTool)) {
       if (state.selectionMask) {
         clearSelection();
         virtualCursorDrawState.selectionClearedOnStart = true;
@@ -20905,7 +20968,7 @@
       return true;
     }
 
-    if (VIRTUAL_CURSOR_MOVE_TOOLS.has(activeTool)) {
+    if (VIRTUAL_CURSOR_MOVE_TOOLS.has(sessionTool)) {
       if (!selectionMaskHasPixels(state.selectionMask)) {
         updateAutosaveStatus(localizeText('移動するには範囲選択が必要です', 'Selection is required to move'), 'warn');
         virtualCursorDrawState.active = false;
@@ -20947,7 +21010,7 @@
       return true;
     }
 
-    if (activeTool === 'curve') {
+    if (sessionTool === 'curve') {
       if (!curveBuilder) {
         beginHistory('curve');
         curveBuilder = {
@@ -21244,21 +21307,12 @@
     if (!Number.isFinite(numeric)) {
       return DEFAULT_FLOATING_DRAW_BUTTON_SCALE;
     }
-    let closest = FLOATING_DRAW_BUTTON_SCALE_VALUES[0] || DEFAULT_FLOATING_DRAW_BUTTON_SCALE;
-    let minDiff = Number.POSITIVE_INFINITY;
-    for (const candidate of FLOATING_DRAW_BUTTON_SCALE_VALUES) {
-      const diff = Math.abs(candidate - numeric);
-      if (diff < minDiff) {
-        minDiff = diff;
-        closest = candidate;
-      }
-    }
-    return closest;
+    return clamp(numeric, FLOATING_DRAW_BUTTON_SCALE_MIN, FLOATING_DRAW_BUTTON_SCALE_MAX);
   }
 
   function formatFloatingDrawButtonScale(value) {
     const normalized = normalizeFloatingDrawButtonScale(value);
-    return Number.isInteger(normalized) ? String(normalized) : normalized.toFixed(1);
+    return String(Number(normalized.toFixed(2)));
   }
 
   function updateFloatingDrawButtonScaleControl() {
@@ -21415,13 +21469,7 @@
   }
 
   function shouldShowFloatingMovePad() {
-    if (!state.showVirtualCursor || state.playback.isPlaying) {
-      return false;
-    }
-    if (isMultiSpectatorMode() || isResidentMultiToolRestrictedMode()) {
-      return false;
-    }
-    return selectionMaskHasPixels(state.selectionMask);
+    return false;
   }
 
   function updateFloatingMovePadPosition() {
@@ -21437,24 +21485,29 @@
     const viewportBounds = getViewportBounds();
     const safeArea = getSafeAreaInsets();
     const margin = 8;
-    const gap = 8;
     const drawWidth = drawButton.offsetWidth || drawButton.clientWidth || 0;
     const drawHeight = drawButton.offsetHeight || drawButton.clientHeight || 0;
+    const centerWidth = Math.max(1, Math.round(drawWidth));
+    const centerHeight = Math.max(1, Math.round(drawHeight));
+    pad.style.setProperty('--floating-move-pad-center-width', `${centerWidth}px`);
+    pad.style.setProperty('--floating-move-pad-center-height', `${centerHeight}px`);
     const padWidth = pad.offsetWidth || pad.clientWidth || 0;
     const padHeight = pad.offsetHeight || pad.clientHeight || 0;
     const drawLeft = floatingDrawButtonState.position.x;
     const drawTop = floatingDrawButtonState.position.y;
-    const drawRight = drawLeft + (drawWidth * scale);
-    let nextX = drawRight + gap;
-    let nextY = drawTop + Math.round(((drawHeight - padHeight) * scale) * 0.5);
+    const scaledDrawWidth = drawWidth * scale;
+    const scaledDrawHeight = drawHeight * scale;
+    const scaledPadWidth = padWidth * scale;
+    const scaledPadHeight = padHeight * scale;
+    const drawCenterX = drawLeft + Math.round(scaledDrawWidth * 0.5);
+    const drawCenterY = drawTop + Math.round(scaledDrawHeight * 0.5);
+    let nextX = drawCenterX - Math.round(scaledPadWidth * 0.5);
+    let nextY = drawCenterY - Math.round(scaledPadHeight * 0.5);
 
     const minX = Math.round(viewportBounds.left + safeArea.left + margin);
     const minY = Math.round(viewportBounds.top + safeArea.top + margin);
-    const maxX = Math.max(minX, Math.round(viewportBounds.right - safeArea.right - (padWidth * scale) - margin));
-    const maxY = Math.max(minY, Math.round(viewportBounds.bottom - safeArea.bottom - (padHeight * scale) - margin));
-    if (nextX > maxX) {
-      nextX = drawLeft - Math.round((padWidth * scale) + gap);
-    }
+    const maxX = Math.max(minX, Math.round(viewportBounds.right - safeArea.right - scaledPadWidth - margin));
+    const maxY = Math.max(minY, Math.round(viewportBounds.bottom - safeArea.bottom - scaledPadHeight - margin));
     nextX = clamp(Math.round(nextX), minX, maxX);
     nextY = clamp(Math.round(nextY), minY, maxY);
     pad.style.setProperty('--floating-move-pad-x', `${nextX}px`);
@@ -21496,6 +21549,112 @@
       default:
         return null;
     }
+  }
+
+  function getDirectionFromArrowKey(key) {
+    switch (key) {
+      case 'ArrowUp':
+        return 'up';
+      case 'ArrowDown':
+        return 'down';
+      case 'ArrowLeft':
+        return 'left';
+      case 'ArrowRight':
+        return 'right';
+      default:
+        return null;
+    }
+  }
+
+  function getKeyboardSelectionAnchorCell() {
+    return {
+      x: clamp(Math.round(Number(state.selectionBounds?.x0) || 0), 0, Math.max(0, state.width - 1)),
+      y: clamp(Math.round(Number(state.selectionBounds?.y0) || 0), 0, Math.max(0, state.height - 1)),
+    };
+  }
+
+  function nudgeSelectionByKeyboard(direction, { announce = true, step = 1 } = {}) {
+    const delta = getFloatingMovePadDelta(direction);
+    if (!delta) {
+      return false;
+    }
+    if (state.playback.isPlaying) {
+      return false;
+    }
+    if (!selectionMaskHasPixels(state.selectionMask)) {
+      return false;
+    }
+    if (isMultiSpectatorMode()) {
+      if (announce) {
+        setMultiStatus(localizeText('視聴モードでは描画できません', 'Drawing is disabled in viewer mode'), 'warn');
+      }
+      return false;
+    }
+    if (isResidentMultiToolRestrictedMode()) {
+      if (announce) {
+        setMultiStatus(localizeText('この常設ルームでは範囲選択・移動系ツールは無効です', 'Selection and move tools are disabled in this resident room'), 'warn');
+      }
+      return false;
+    }
+    if (isMultiAssignedCellRestrictedEditorMode() && !enforceGuestAssignedLayerSelection({ announce })) {
+      return false;
+    }
+
+    const moveStep = clamp(Math.round(Number(step) || 1), 1, 32);
+    if (!pointerState.selectionMove) {
+      const cursorCell = getVirtualCursorCellPosition() || getKeyboardSelectionAnchorCell();
+      const started = beginSelectionMoveFromVirtualCursor(
+        cursorCell,
+        { reuseOffset: Boolean(state.pendingPasteMoveState) }
+      );
+      if (!started) {
+        if (announce) {
+          updateAutosaveStatus(localizeText('選択範囲の移動を開始できませんでした', 'Failed to start selection move'), 'warn');
+        }
+        return false;
+      }
+    }
+
+    const moveState = pointerState.selectionMove;
+    if (!moveState) {
+      return false;
+    }
+    pointerState.tool = 'selectionMove';
+    const start = pointerState.start || getKeyboardSelectionAnchorCell();
+    const offsetX = Number(moveState.offset?.x) || 0;
+    const offsetY = Number(moveState.offset?.y) || 0;
+    const nextPosition = {
+      x: start.x + offsetX + (delta.dx * moveStep),
+      y: start.y + offsetY + (delta.dy * moveStep),
+    };
+    handleSelectionMoveDrag(nextPosition);
+    pointerState.current = nextPosition;
+    pointerState.last = nextPosition;
+    if (pointerState.selectionMove?.hasCleared) {
+      finalizeSelectionMove();
+    }
+    updateCanvasControlButtons();
+    return true;
+  }
+
+  function nudgeLayerFrameByKeyboard(direction, { step = 1 } = {}) {
+    if (state.playback.isPlaying) {
+      return false;
+    }
+    const moveStep = clamp(Math.round(Number(step) || 1), 1, 32);
+    if (direction === 'left' || direction === 'right') {
+      const previousFrame = state.activeFrame;
+      const offset = direction === 'left' ? -moveStep : moveStep;
+      setActiveFrameIndex(previousFrame + offset, { wrap: false, persist: true, render: true, syncUi: true });
+      return state.activeFrame !== previousFrame;
+    }
+    if (direction === 'up' || direction === 'down') {
+      const previousLayer = state.activeLayer;
+      const offset = direction === 'up' ? moveStep : -moveStep;
+      stepActiveLayerTrack(offset, { persist: true, render: true, syncUi: true });
+      return state.activeLayer !== previousLayer;
+    }
+    return false;
   }
 
   function nudgeSelectionByVirtualMovePad(direction, { announce = true } = {}) {
@@ -21713,6 +21872,38 @@
     return { side: 'primary', paletteIndex: primaryPaletteIndex };
   }
 
+  function getColorPerceivedLightness(value) {
+    const color = normalizeColorValue(value);
+    const alpha = clamp(color.a / 255, 0, 1);
+    const lightness = (0.299 * color.r) + (0.587 * color.g) + (0.114 * color.b);
+    return (lightness * alpha) + (22 * (1 - alpha));
+  }
+
+  function updateFloatingDrawButtonPalettePreview() {
+    const button = dom.floatingDrawButton;
+    if (!(button instanceof HTMLElement)) {
+      return;
+    }
+    const primaryPaletteIndex = normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex);
+    const secondaryPaletteIndex = normalizePaletteIndex(state.secondaryPaletteIndex, primaryPaletteIndex);
+    const primaryColor = normalizeColorValue(state.palette[primaryPaletteIndex]);
+    const secondaryColor = normalizeColorValue(state.palette[secondaryPaletteIndex]);
+    button.style.setProperty('--floating-draw-button-primary-color', toCssColor(primaryColor));
+    button.style.setProperty('--floating-draw-button-secondary-color', toCssColor(secondaryColor));
+    const averageLightness = (
+      getColorPerceivedLightness(primaryColor) + getColorPerceivedLightness(secondaryColor)
+    ) / 2;
+    const isBrightBase = averageLightness >= 152;
+    button.style.setProperty(
+      '--floating-draw-button-text-color',
+      isBrightBase ? 'rgba(16, 22, 30, 0.94)' : 'rgba(248, 252, 255, 0.96)'
+    );
+    button.style.setProperty(
+      '--floating-draw-button-divider-color',
+      isBrightBase ? 'rgba(10, 14, 20, 0.46)' : 'rgba(255, 255, 255, 0.42)'
+    );
+  }
+
   function performVirtualCursorAction({ drawPaletteIndex = null } = {}) {
     if (state.playback.isPlaying) {
       return;
@@ -21880,6 +22071,9 @@
     floatingDrawButtonState.dragging = false;
     floatingDrawButtonState.startPointer = { x: event.clientX, y: event.clientY };
     floatingDrawButtonState.startPosition = { ...floatingDrawButtonState.position };
+    floatingDrawButtonState.startCursor = virtualCursor
+      ? { x: Number(virtualCursor.x) || 0, y: Number(virtualCursor.y) || 0 }
+      : null;
     floatingDrawButtonState.startCursorCell = getVirtualCursorCellPosition();
     floatingDrawButtonState.drawPaletteIndex = pressTarget.paletteIndex;
     floatingDrawButtonState.drawMoved = false;
@@ -21899,6 +22093,16 @@
 
   function handleFloatingDrawButtonPointerMove(event) {
     if (floatingDrawButtonState.pointerId !== event.pointerId) {
+      return;
+    }
+    const drawSessionTool = virtualCursorDrawState.active ? virtualCursorDrawState.tool : null;
+    if (
+      floatingDrawButtonState.drawSessionStarted
+      && drawSessionTool
+      && VIRTUAL_CURSOR_MOVE_TOOLS.has(drawSessionTool)
+    ) {
+      event.preventDefault();
+      updateVirtualCursorFromFloatingDrawButtonDelta(event);
       return;
     }
     const dx = event.clientX - (floatingDrawButtonState.startPointer?.x || 0);
@@ -21957,6 +22161,7 @@
     floatingDrawButtonState.dragging = false;
     floatingDrawButtonState.startPointer = null;
     floatingDrawButtonState.startPosition = null;
+    floatingDrawButtonState.startCursor = null;
     floatingDrawButtonState.startCursorCell = null;
     floatingDrawButtonState.drawPaletteIndex = null;
     floatingDrawButtonState.drawMoved = false;
@@ -21996,6 +22201,7 @@
     floatingDrawButtonState.dragging = false;
     floatingDrawButtonState.startPointer = null;
     floatingDrawButtonState.startPosition = null;
+    floatingDrawButtonState.startCursor = null;
     floatingDrawButtonState.startCursorCell = null;
     floatingDrawButtonState.drawPaletteIndex = null;
     floatingDrawButtonState.drawMoved = false;
@@ -22011,6 +22217,7 @@
       syncVirtualCursorControlVisibility({ syncToggle: true });
       return;
     }
+    updateFloatingDrawButtonPalettePreview();
     const hidden = !state.showVirtualCursor;
     if (hidden) {
       button.classList.add('is-disabled');
@@ -22032,6 +22239,7 @@
       floatingDrawButtonState.dragging = false;
       floatingDrawButtonState.startPointer = null;
       floatingDrawButtonState.startPosition = null;
+      floatingDrawButtonState.startCursor = null;
       floatingDrawButtonState.startCursorCell = null;
       floatingDrawButtonState.drawPaletteIndex = null;
       floatingDrawButtonState.drawMoved = false;
@@ -22057,6 +22265,7 @@
     }
     setVirtualCursorButtonScale(state.virtualCursorButtonScale, { persist: false, clampPosition: false });
     const scale = refreshFloatingDrawButtonScale(button);
+    updateFloatingDrawButtonPalettePreview();
     button.addEventListener('pointerdown', handleFloatingDrawButtonPointerDown);
     button.addEventListener('click', event => event.preventDefault());
     if (!drawButtonResizeListenerBound) {
@@ -22513,6 +22722,30 @@
       }
       if (state.playback.isPlaying) {
         return;
+      }
+      const isPlainArrowKey = !event.metaKey && !event.ctrlKey && !event.altKey;
+      const arrowDirection = isPlainArrowKey ? getDirectionFromArrowKey(event.key) : null;
+      if (
+        !editable
+        && !pointerState.active
+        && arrowDirection
+        && !startupVisible
+        && !hasOpenBlockingDialog()
+        && !state.showVirtualCursor
+      ) {
+        const step = event.shiftKey ? 4 : 1;
+        const isDesktopArrowContext = layoutMode !== 'mobilePortrait';
+        let handled = false;
+        if (isDesktopArrowContext && selectionMaskHasPixels(state.selectionMask)) {
+          handled = nudgeSelectionByKeyboard(arrowDirection, { step, announce: true });
+        }
+        if (!handled && isDesktopArrowContext) {
+          handled = nudgeLayerFrameByKeyboard(arrowDirection, { step });
+        }
+        if (handled || isDesktopArrowContext) {
+          event.preventDefault();
+          return;
+        }
       }
       if (!editable && handleToolShortcut(event)) {
         event.preventDefault();
@@ -26021,6 +26254,30 @@
     updateVirtualCursorPosition(nextX, nextY);
   }
 
+  function updateVirtualCursorFromFloatingDrawButtonDelta(event) {
+    if (!dom.canvases.drawing || !virtualCursor) {
+      return false;
+    }
+    const start = floatingDrawButtonState.startPointer;
+    const base = floatingDrawButtonState.startCursor;
+    if (!start || !base) {
+      return false;
+    }
+    const rect = dom.canvases.drawing.getBoundingClientRect();
+    if (!rect.width || !rect.height) {
+      return false;
+    }
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    const unitX = rect.width / Math.max(1, state.width);
+    const unitY = rect.height / Math.max(1, state.height);
+    const deltaX = unitX ? dx / unitX : 0;
+    const deltaY = unitY ? dy / unitY : 0;
+    const nextX = clamp((Number(base.x) || 0) + deltaX, 0, state.width);
+    const nextY = clamp((Number(base.y) || 0) + deltaY, 0, state.height);
+    return updateVirtualCursorPosition(nextX, nextY);
+  }
+
   function clearVirtualCursorCanvas() {
     if (!ctx.virtual) {
       return;
@@ -26753,6 +27010,9 @@
     const selectionMask = state.selectionMask;
     const size = clamp(Math.round(sizeOverride || state.brushSize || 1), 1, 64);
     if (SELECTION_TOOLS.has(tool)) {
+      ctx.overlay.save();
+      drawEyedropperPreview(center, null);
+      ctx.overlay.restore();
       return;
     }
 
