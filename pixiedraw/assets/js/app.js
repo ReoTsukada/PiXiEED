@@ -54,6 +54,8 @@
     mirrorHandles: Array.from(document.querySelectorAll('.mirror-handle[data-mirror-axis]')),
     canvasControls: document.querySelector('.canvas-controls'),
     floatingDrawButton: document.getElementById('floatingDrawButton'),
+    floatingMovePad: document.getElementById('floatingMovePad'),
+    floatingMovePadButtons: Array.from(document.querySelectorAll('.floating-move-pad__btn[data-move-pad-dir]')),
     zoomIndicator: document.getElementById('zoomIndicator'),
     resizeHandles: {
       left: document.getElementById('resizeLeftRail'),
@@ -989,7 +991,8 @@
     '#ffc38d',
     '#c9ff8c',
   ]);
-  const AUTOSAVE_WRITE_DELAY = 0;
+  // Keep autosave slightly delayed so heavy serialization does not block drawing per stroke.
+  const AUTOSAVE_WRITE_DELAY = 900;
   const RECENT_PROJECT_LIMIT = 12;
   const THUMBNAIL_MAX_EDGE = 144;
   const THUMBNAIL_CANVAS_SIZE = 160;
@@ -1256,6 +1259,7 @@
   ]);
   const VIRTUAL_CURSOR_SHAPE_TOOLS = new Set(['line', 'rect', 'rectFill', 'ellipse', 'ellipseFill']);
   const VIRTUAL_CURSOR_SELECTION_TOOLS = new Set(['selectRect', 'selectLasso']);
+  const VIRTUAL_CURSOR_MOVE_TOOLS = new Set(['move']);
   const FILL_TOOLS = new Set(['fill']);
   const SHAPE_TOOLS = new Set(['line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill']);
   const BRUSH_SIZE_TOOLS = new Set([...BRUSH_TOOLS, ...SHAPE_TOOLS, ...FILL_TOOLS]);
@@ -1330,6 +1334,14 @@
     drawMoved: false,
     initialized: false,
     scale: DEFAULT_FLOATING_DRAW_BUTTON_SCALE,
+  };
+  const floatingMovePadState = {
+    pointerId: null,
+    direction: null,
+    button: null,
+    repeatDelayId: null,
+    repeatIntervalId: null,
+    moved: false,
   };
   const virtualCursorDrawState = {
     active: false,
@@ -1470,6 +1482,8 @@
   const MIN_HISTORY_LIMIT = 20;
   const DRAW_BUTTON_DRAG_THRESHOLD = 6;
   const DRAW_BUTTON_DRAG_THRESHOLD_TOUCH = 12;
+  const MOVE_PAD_REPEAT_DELAY_MS = 220;
+  const MOVE_PAD_REPEAT_INTERVAL_MS = 80;
   const TIMELINE_CELL_SIZE = 32;
   const TIMELINE_CELL_VARIANTS = {
     corner: { fill: 'rgba(16, 22, 32, 0.94)', border: 'rgba(210, 220, 240, 0.45)' },
@@ -3424,7 +3438,7 @@
     }
     history.pending = null;
     updateHistoryButtons();
-    scheduleSessionPersist();
+    scheduleSessionPersist({ includeSnapshots: false });
     updateMemoryStatus();
   }
 
@@ -3745,6 +3759,7 @@
       secondary.disabled = false;
     }
     syncBrushControls({ hasSelection });
+    updateFloatingMovePadVisibility();
   }
 
   function isDualLeftRailEnabled() {
@@ -5265,6 +5280,7 @@
       dom.controls.mobileDrawHelp.hidden = !showVirtualCursorOptions;
     }
     updateFloatingDrawButtonScaleControl();
+    updateFloatingMovePadVisibility();
   }
 
   function getCustomBrushStatusText() {
@@ -6023,11 +6039,16 @@
     setLocalizedToggleLabel('mirrorAxisDiagonalB', '斜め対称 (/)', 'Diagonal Mirror (/)');
     setLocalizedTextContent('#mirrorAxisHelp', 'ミラーモード中は軸ライン外側のつまみをドラッグして、対称軸を移動できます。', 'In mirror mode, drag the outside handles to move each mirror axis.');
     setLocalizedTextContent('.virtual-cursor-scale__label', '仮想カーソルボタンサイズ', 'Virtual Cursor Button Size');
-    setLocalizedTextContent('#mobileDrawHelp', 'スマホ描画: 仮想カーソルをONにしてキャンバスをドラッグでカーソル移動、「描画」ボタン長押しで描画します（左半分=主色 / 右半分=副色）。2本指ドラッグ/ピンチで移動と拡大縮小ができます。', 'Mobile draw: turn on Virtual Cursor, drag the canvas to move the cursor, and long-press Draw to paint (left half = primary / right half = secondary). Use two fingers to pan and pinch zoom.');
+    setLocalizedTextContent('#mobileDrawHelp', 'スマホ描画: 仮想カーソルをONにしてキャンバスをドラッグでカーソル移動、「描画」ボタン長押しで描画します（左半分=主色 / 右半分=副色）。範囲選択中は十字キーで選択範囲を移動できます。2本指ドラッグ/ピンチで移動と拡大縮小ができます。', 'Mobile draw: turn on Virtual Cursor, drag the canvas to move the cursor, and long-press Draw to paint (left half = primary / right half = secondary). When a selection exists, use the D-pad to move it. Use two fingers to pan and pinch zoom.');
     setLocalizedTextContent('#panelSettings .settings-display-buttons + .help-text', '背景とUI配色を切り替えます（描画色には影響しません）。', 'Switch the background and UI colors (does not change drawing colors).');
 
     setLocalizedTextContent('#floatingDrawButton', '描画', 'Draw');
     setLocalizedAttribute('#floatingDrawButton', 'aria-label', '描画ボタン（左=主色 / 右=副色）', 'Draw button (left = primary / right = secondary)');
+    setLocalizedAttribute('#floatingMovePad', 'aria-label', '選択範囲移動', 'Selection Move Pad');
+    setLocalizedAttribute('#floatingMovePad [data-move-pad-dir="up"]', 'aria-label', '選択範囲を上へ移動', 'Move selection up');
+    setLocalizedAttribute('#floatingMovePad [data-move-pad-dir="left"]', 'aria-label', '選択範囲を左へ移動', 'Move selection left');
+    setLocalizedAttribute('#floatingMovePad [data-move-pad-dir="right"]', 'aria-label', '選択範囲を右へ移動', 'Move selection right');
+    setLocalizedAttribute('#floatingMovePad [data-move-pad-dir="down"]', 'aria-label', '選択範囲を下へ移動', 'Move selection down');
     setLocalizedTextContent('#mirrorToolPopover .mirror-tool-popover__header strong', '対称ツール', 'Mirror Tools');
     setLocalizedTextContent('#mirrorToolPopoverClose', '閉じる', 'Close');
     setLocalizedAttribute('#mirrorToolPopoverClose', 'aria-label', '対称ポップアップを閉じる', 'Close mirror popup');
@@ -6611,6 +6632,15 @@
     }, AUTOSAVE_WRITE_DELAY);
   }
 
+  function isAutosaveInteractionBusy() {
+    return Boolean(
+      pointerState.active
+      || pointerState.selectionMove
+      || virtualCursorDrawState.active
+      || floatingDrawButtonState.drawSessionStarted
+    );
+  }
+
   async function writeAutosaveSnapshot(force = false) {
     if (!AUTOSAVE_SUPPORTED) return;
     if (autosaveRestoring) return;
@@ -6627,6 +6657,11 @@
     if (!force && !autosaveDirty) return;
     if (autosaveWriteInFlight) {
       autosaveWriteQueued = true;
+      return;
+    }
+    if (!force && isAutosaveInteractionBusy()) {
+      autosaveWriteQueued = true;
+      scheduleAutosaveSnapshot();
       return;
     }
     autosaveWriteInFlight = true;
@@ -20532,6 +20567,7 @@
     resizeCanvases();
     ensureCanvasWheelListener();
     setupFloatingDrawButton();
+    setupFloatingMovePad();
     const gestureSurface = dom.stage || dom.canvasViewport;
     if (dom.canvasViewport) {
       dom.canvasViewport.addEventListener('pointerenter', handleViewportPointerEnter);
@@ -20719,6 +20755,25 @@
       return;
     }
 
+    if (VIRTUAL_CURSOR_MOVE_TOOLS.has(tool)) {
+      const previous = virtualCursorDrawState.currentPosition;
+      if (previous && previous.x === currentCell.x && previous.y === currentCell.y) {
+        return;
+      }
+      virtualCursorDrawState.currentPosition = { ...currentCell };
+      pointerState.current = { ...currentCell };
+      pointerState.last = { ...currentCell };
+      const lastPathPoint = pointerState.path[pointerState.path.length - 1];
+      if (!lastPathPoint || lastPathPoint.x !== currentCell.x || lastPathPoint.y !== currentCell.y) {
+        pointerState.path.push({ ...currentCell });
+      }
+      if (pointerState.selectionMove) {
+        handleSelectionMoveDrag(currentCell);
+      }
+      requestOverlayRender();
+      return;
+    }
+
     if (tool === 'curve') {
       virtualCursorDrawState.currentPosition = { ...currentCell };
       pointerState.current = { ...currentCell };
@@ -20846,6 +20901,48 @@
       pointerState.selectionPreview = preview;
       pointerState.tool = activeTool;
       virtualCursorDrawState.points = preview.points.map(point => ({ ...point }));
+      requestOverlayRender();
+      return true;
+    }
+
+    if (VIRTUAL_CURSOR_MOVE_TOOLS.has(activeTool)) {
+      if (!selectionMaskHasPixels(state.selectionMask)) {
+        updateAutosaveStatus(localizeText('移動するには範囲選択が必要です', 'Selection is required to move'), 'warn');
+        virtualCursorDrawState.active = false;
+        virtualCursorDrawState.historyStarted = false;
+        virtualCursorDrawState.lastPosition = null;
+        virtualCursorDrawState.tool = null;
+        virtualCursorDrawState.startPosition = null;
+        virtualCursorDrawState.currentPosition = null;
+        virtualCursorDrawState.path = [];
+        virtualCursorDrawState.points = [];
+        virtualCursorDrawState.selectionClearedOnStart = false;
+        virtualCursorDrawState.curveStage = null;
+        pointerState.tool = state.tool;
+        return false;
+      }
+      const started = beginSelectionMoveFromVirtualCursor(
+        cell,
+        { reuseOffset: Boolean(state.pendingPasteMoveState) }
+      );
+      if (!started) {
+        updateAutosaveStatus(localizeText('選択範囲の移動を開始できませんでした', 'Failed to start selection move'), 'warn');
+        virtualCursorDrawState.active = false;
+        virtualCursorDrawState.historyStarted = false;
+        virtualCursorDrawState.lastPosition = null;
+        virtualCursorDrawState.tool = null;
+        virtualCursorDrawState.startPosition = null;
+        virtualCursorDrawState.currentPosition = null;
+        virtualCursorDrawState.path = [];
+        virtualCursorDrawState.points = [];
+        virtualCursorDrawState.selectionClearedOnStart = false;
+        virtualCursorDrawState.curveStage = null;
+        pointerState.tool = state.tool;
+        return false;
+      }
+      pointerState.tool = 'selectionMove';
+      virtualCursorDrawState.currentPosition = { ...cell };
+      virtualCursorDrawState.path = pointerState.path.slice();
       requestOverlayRender();
       return true;
     }
@@ -21022,6 +21119,29 @@
       } else if (virtualCursorDrawState.historyStarted) {
         shouldRollbackHistory = true;
       }
+    } else if (VIRTUAL_CURSOR_MOVE_TOOLS.has(tool)) {
+      const moveState = pointerState.selectionMove;
+      if (!moveState) {
+        actionPerformed = false;
+      } else if (commit) {
+        if (moveState.hasCleared) {
+          finalizeSelectionMove();
+          actionPerformed = true;
+        } else {
+          pointerState.selectionMove = null;
+          pointerState.tool = state.tool;
+        }
+      } else {
+        if (moveState.hasCleared && history.pending && history.pending.label === 'selectionMove') {
+          rollbackPendingHistory({ reRender: false });
+        }
+        pointerState.selectionMove = null;
+        pointerState.tool = state.tool;
+      }
+      updateCanvasControlButtons();
+      if (actionPerformed) {
+        scheduleSessionPersist();
+      }
     } else if (VIRTUAL_CURSOR_SELECTION_TOOLS.has(tool)) {
       if (commit) {
         const pathLength = virtualCursorDrawState.path.length;
@@ -21166,6 +21286,9 @@
     if (button) {
       button.style.setProperty('--floating-draw-button-scale', String(normalized));
     }
+    if (dom.floatingMovePad instanceof HTMLElement) {
+      dom.floatingMovePad.style.setProperty('--floating-move-pad-scale', String(normalized));
+    }
     if (
       clampPosition &&
       button &&
@@ -21182,6 +21305,7 @@
     if (persist) {
       scheduleSessionPersist();
     }
+    updateFloatingMovePadPosition();
   }
 
   function refreshFloatingDrawButtonScale(button) {
@@ -21235,6 +21359,7 @@
     button.style.setProperty('--floating-draw-button-x', `${clampedX}px`);
     button.style.setProperty('--floating-draw-button-y', `${clampedY}px`);
     floatingDrawButtonState.initialized = true;
+    updateFloatingMovePadPosition();
   }
 
   function clampFloatingDrawButtonPosition() {
@@ -21248,9 +21373,283 @@
     );
   }
 
+  function clearFloatingMovePadRepeatTimers() {
+    if (floatingMovePadState.repeatDelayId !== null) {
+      window.clearTimeout(floatingMovePadState.repeatDelayId);
+      floatingMovePadState.repeatDelayId = null;
+    }
+    if (floatingMovePadState.repeatIntervalId !== null) {
+      window.clearInterval(floatingMovePadState.repeatIntervalId);
+      floatingMovePadState.repeatIntervalId = null;
+    }
+  }
+
+  function teardownFloatingMovePadPointerHandlers() {
+    window.removeEventListener('pointerup', handleFloatingMovePadPointerUp);
+    window.removeEventListener('pointercancel', handleFloatingMovePadPointerCancel);
+  }
+
+  function stopFloatingMovePadInteraction({ commit = false } = {}) {
+    clearFloatingMovePadRepeatTimers();
+    teardownFloatingMovePadPointerHandlers();
+    const activeButton = floatingMovePadState.button;
+    const activePointerId = floatingMovePadState.pointerId;
+    if (activeButton instanceof HTMLButtonElement) {
+      activeButton.classList.remove('is-active');
+      if (Number.isFinite(activePointerId)) {
+        try {
+          activeButton.releasePointerCapture?.(activePointerId);
+        } catch (error) {
+          // ignore release errors
+        }
+      }
+    }
+    const shouldCommit = commit && floatingMovePadState.moved && Boolean(pointerState.selectionMove);
+    floatingMovePadState.pointerId = null;
+    floatingMovePadState.direction = null;
+    floatingMovePadState.button = null;
+    floatingMovePadState.moved = false;
+    if (shouldCommit) {
+      finalizeSelectionMove();
+    }
+  }
+
+  function shouldShowFloatingMovePad() {
+    if (!state.showVirtualCursor || state.playback.isPlaying) {
+      return false;
+    }
+    if (isMultiSpectatorMode() || isResidentMultiToolRestrictedMode()) {
+      return false;
+    }
+    return selectionMaskHasPixels(state.selectionMask);
+  }
+
+  function updateFloatingMovePadPosition() {
+    const pad = dom.floatingMovePad;
+    const drawButton = dom.floatingDrawButton;
+    if (!(pad instanceof HTMLElement) || !(drawButton instanceof HTMLElement) || !floatingDrawButtonState.initialized) {
+      return;
+    }
+    let scale = floatingDrawButtonState.scale;
+    if (!Number.isFinite(scale) || scale <= 0) {
+      scale = refreshFloatingDrawButtonScale(drawButton);
+    }
+    const viewportBounds = getViewportBounds();
+    const safeArea = getSafeAreaInsets();
+    const margin = 8;
+    const gap = 8;
+    const drawWidth = drawButton.offsetWidth || drawButton.clientWidth || 0;
+    const drawHeight = drawButton.offsetHeight || drawButton.clientHeight || 0;
+    const padWidth = pad.offsetWidth || pad.clientWidth || 0;
+    const padHeight = pad.offsetHeight || pad.clientHeight || 0;
+    const drawLeft = floatingDrawButtonState.position.x;
+    const drawTop = floatingDrawButtonState.position.y;
+    const drawRight = drawLeft + (drawWidth * scale);
+    let nextX = drawRight + gap;
+    let nextY = drawTop + Math.round(((drawHeight - padHeight) * scale) * 0.5);
+
+    const minX = Math.round(viewportBounds.left + safeArea.left + margin);
+    const minY = Math.round(viewportBounds.top + safeArea.top + margin);
+    const maxX = Math.max(minX, Math.round(viewportBounds.right - safeArea.right - (padWidth * scale) - margin));
+    const maxY = Math.max(minY, Math.round(viewportBounds.bottom - safeArea.bottom - (padHeight * scale) - margin));
+    if (nextX > maxX) {
+      nextX = drawLeft - Math.round((padWidth * scale) + gap);
+    }
+    nextX = clamp(Math.round(nextX), minX, maxX);
+    nextY = clamp(Math.round(nextY), minY, maxY);
+    pad.style.setProperty('--floating-move-pad-x', `${nextX}px`);
+    pad.style.setProperty('--floating-move-pad-y', `${nextY}px`);
+  }
+
+  function updateFloatingMovePadVisibility() {
+    const pad = dom.floatingMovePad;
+    if (!(pad instanceof HTMLElement)) {
+      return;
+    }
+    const visible = shouldShowFloatingMovePad();
+    if (!visible) {
+      stopFloatingMovePadInteraction({ commit: true });
+      pad.classList.add('is-hidden');
+      pad.setAttribute('hidden', '');
+      pad.setAttribute('aria-hidden', 'true');
+      return;
+    }
+    pad.classList.remove('is-hidden');
+    pad.removeAttribute('hidden');
+    pad.setAttribute('aria-hidden', 'false');
+    updateFloatingMovePadPosition();
+    requestAnimationFrame(() => {
+      updateFloatingMovePadPosition();
+    });
+  }
+
+  function getFloatingMovePadDelta(direction) {
+    switch (direction) {
+      case 'up':
+        return { dx: 0, dy: -1 };
+      case 'down':
+        return { dx: 0, dy: 1 };
+      case 'left':
+        return { dx: -1, dy: 0 };
+      case 'right':
+        return { dx: 1, dy: 0 };
+      default:
+        return null;
+    }
+  }
+
+  function nudgeSelectionByVirtualMovePad(direction, { announce = true } = {}) {
+    const delta = getFloatingMovePadDelta(direction);
+    if (!delta) {
+      return false;
+    }
+    if (!state.showVirtualCursor || state.playback.isPlaying) {
+      return false;
+    }
+    if (!selectionMaskHasPixels(state.selectionMask)) {
+      return false;
+    }
+    if (isMultiSpectatorMode()) {
+      if (announce) {
+        setMultiStatus(localizeText('視聴モードでは描画できません', 'Drawing is disabled in viewer mode'), 'warn');
+      }
+      return false;
+    }
+    if (isResidentMultiToolRestrictedMode()) {
+      if (announce) {
+        setMultiStatus(localizeText('この常設ルームでは範囲選択・移動系ツールは無効です', 'Selection and move tools are disabled in this resident room'), 'warn');
+      }
+      return false;
+    }
+    if (isMultiAssignedCellRestrictedEditorMode() && !enforceGuestAssignedLayerSelection({ announce })) {
+      return false;
+    }
+
+    if (!pointerState.selectionMove) {
+      const cursorCell = getVirtualCursorCellPosition() || {
+        x: clamp(Math.round(Number(state.selectionBounds?.x0) || 0), 0, Math.max(0, state.width - 1)),
+        y: clamp(Math.round(Number(state.selectionBounds?.y0) || 0), 0, Math.max(0, state.height - 1)),
+      };
+      const started = beginSelectionMoveFromVirtualCursor(
+        cursorCell,
+        { reuseOffset: Boolean(state.pendingPasteMoveState) }
+      );
+      if (!started) {
+        if (announce) {
+          updateAutosaveStatus(localizeText('選択範囲の移動を開始できませんでした', 'Failed to start selection move'), 'warn');
+        }
+        return false;
+      }
+    }
+
+    const moveState = pointerState.selectionMove;
+    if (!moveState) {
+      return false;
+    }
+    pointerState.tool = 'selectionMove';
+    const start = pointerState.start || getVirtualCursorCellPosition() || { x: 0, y: 0 };
+    const offsetX = Number(moveState.offset?.x) || 0;
+    const offsetY = Number(moveState.offset?.y) || 0;
+    const nextPosition = {
+      x: start.x + offsetX + delta.dx,
+      y: start.y + offsetY + delta.dy,
+    };
+    handleSelectionMoveDrag(nextPosition);
+    pointerState.current = nextPosition;
+    pointerState.last = nextPosition;
+    updateCanvasControlButtons();
+    return true;
+  }
+
+  function startFloatingMovePadRepeat(direction) {
+    clearFloatingMovePadRepeatTimers();
+    floatingMovePadState.repeatDelayId = window.setTimeout(() => {
+      floatingMovePadState.repeatDelayId = null;
+      floatingMovePadState.repeatIntervalId = window.setInterval(() => {
+        const moved = nudgeSelectionByVirtualMovePad(direction, { announce: false });
+        if (!moved) {
+          stopFloatingMovePadInteraction({ commit: true });
+        } else {
+          floatingMovePadState.moved = true;
+        }
+      }, MOVE_PAD_REPEAT_INTERVAL_MS);
+    }, MOVE_PAD_REPEAT_DELAY_MS);
+  }
+
+  function handleFloatingMovePadPointerDown(event) {
+    if (event.button !== undefined && event.button !== 0) {
+      return;
+    }
+    if (floatingMovePadState.pointerId !== null) {
+      return;
+    }
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLButtonElement)) {
+      return;
+    }
+    const direction = typeof target.dataset.movePadDir === 'string' ? target.dataset.movePadDir : '';
+    if (!direction) {
+      return;
+    }
+    event.preventDefault();
+    floatingMovePadState.pointerId = event.pointerId ?? -1;
+    floatingMovePadState.direction = direction;
+    floatingMovePadState.button = target;
+    floatingMovePadState.moved = false;
+    target.classList.add('is-active');
+    try {
+      target.setPointerCapture?.(event.pointerId);
+    } catch (error) {
+      // ignore capture errors
+    }
+    const moved = nudgeSelectionByVirtualMovePad(direction, { announce: true });
+    floatingMovePadState.moved = moved;
+    if (moved) {
+      startFloatingMovePadRepeat(direction);
+    }
+    window.addEventListener('pointerup', handleFloatingMovePadPointerUp);
+    window.addEventListener('pointercancel', handleFloatingMovePadPointerCancel);
+  }
+
+  function handleFloatingMovePadPointerUp(event) {
+    if (floatingMovePadState.pointerId !== event.pointerId) {
+      return;
+    }
+    stopFloatingMovePadInteraction({ commit: true });
+  }
+
+  function handleFloatingMovePadPointerCancel(event) {
+    if (floatingMovePadState.pointerId !== event.pointerId) {
+      return;
+    }
+    stopFloatingMovePadInteraction({ commit: true });
+  }
+
+  function setupFloatingMovePad() {
+    const pad = dom.floatingMovePad;
+    if (!(pad instanceof HTMLElement)) {
+      return;
+    }
+    pad.style.setProperty(
+      '--floating-move-pad-scale',
+      String(state.virtualCursorButtonScale || DEFAULT_FLOATING_DRAW_BUTTON_SCALE)
+    );
+    if (Array.isArray(dom.floatingMovePadButtons)) {
+      dom.floatingMovePadButtons.forEach(button => {
+        if (!(button instanceof HTMLButtonElement)) {
+          return;
+        }
+        button.addEventListener('pointerdown', handleFloatingMovePadPointerDown);
+        button.addEventListener('click', event => event.preventDefault());
+      });
+    }
+    updateFloatingMovePadVisibility();
+  }
+
   function handleFloatingDrawButtonResize() {
     resizeVirtualCursorCanvas();
     clampFloatingDrawButtonPosition();
+    updateFloatingMovePadPosition();
     requestOverlayRender();
   }
 
@@ -21674,6 +22073,7 @@
       clampFloatingDrawButtonPosition();
     }
     updateFloatingDrawButtonEnabledState();
+    updateFloatingMovePadPosition();
   }
 
   function resizeVirtualCursorCanvas() {
@@ -23219,6 +23619,74 @@
 
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
+    updateCanvasControlButtons();
+    return true;
+  }
+
+  function beginSelectionMoveFromVirtualCursor(startPosition, options = {}) {
+    const { reuseOffset = false } = options || {};
+    if (!startPosition) {
+      return false;
+    }
+    const mask = state.selectionMask;
+    const bounds = state.selectionBounds;
+    const layer = getActiveLayer();
+    if (!mask || !bounds || !layer) {
+      return false;
+    }
+
+    let moveState = null;
+    const pendingMove = state.pendingPasteMoveState;
+    if (
+      pendingMove
+      && pendingMove.layerId
+      && layer.id
+      && pendingMove.layerId === layer.id
+      && pendingMove.bounds
+      && bounds
+      && pendingMove.bounds.x0 === bounds.x0
+      && pendingMove.bounds.y0 === bounds.y0
+      && pendingMove.bounds.x1 === bounds.x1
+      && pendingMove.bounds.y1 === bounds.y1
+    ) {
+      moveState = pendingMove;
+      state.pendingPasteMoveState = null;
+    } else {
+      moveState = createSelectionMoveState(layer, bounds, mask);
+    }
+    if (!moveState) {
+      return false;
+    }
+
+    moveState.layer = layer;
+    moveState.layerId = layer?.id || moveState.layerId || null;
+    moveState.offset = moveState.offset || { x: 0, y: 0 };
+    if (!reuseOffset) {
+      moveState.offset.x = 0;
+      moveState.offset.y = 0;
+    }
+
+    hoverPixel = null;
+    requestOverlayRender();
+    pointerState.active = false;
+    pointerState.pointerId = null;
+    pointerState.tool = 'selectionMove';
+    if (reuseOffset && moveState.hasCleared) {
+      pointerState.start = {
+        x: startPosition.x - moveState.offset.x,
+        y: startPosition.y - moveState.offset.y,
+      };
+    } else {
+      pointerState.start = { ...startPosition };
+    }
+    pointerState.current = { ...startPosition };
+    pointerState.last = { ...startPosition };
+    pointerState.path = [{ ...startPosition }];
+    pointerState.preview = null;
+    pointerState.selectionPreview = null;
+    pointerState.selectionMove = moveState;
+    pointerState.selectionClearedOnDown = false;
+    pointerState.selectionExtendOnDown = false;
     updateCanvasControlButtons();
     return true;
   }
