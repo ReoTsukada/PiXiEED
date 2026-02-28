@@ -861,6 +861,8 @@
 
   setDocumentLanguage();
   let sessionPersistHandle = null;
+  let sessionPersistIdleHandle = null;
+  let lastSaveInteractionAt = 0;
   const USER_AGENT = typeof navigator !== 'undefined' ? (navigator.userAgent || '') : '';
   const USER_AGENT_LOWER = USER_AGENT.toLowerCase();
   const IS_IOS_DEVICE = /iphone|ipod|ipad/i.test(USER_AGENT_LOWER);
@@ -897,6 +899,8 @@
   const IOS_SNAPSHOT_KEY = 'latest';
   const IOS_SNAPSHOT_WRITE_DELAY = 0;
   const IOS_SNAPSHOT_COMPRESSION_THRESHOLD = 32 * 1024;
+  const SESSION_PERSIST_DELAY = 120;
+  const SAVE_INTERACTION_GRACE_MS = 1300;
   const textCompression = createTextCompression();
   const LENS_IMPORT_SESSION_FLAG = 'pixiee-lens:import-request';
   let lensImportRequested = (() => {
@@ -993,6 +997,7 @@
   ]);
   // Keep autosave slightly delayed so heavy serialization does not block drawing per stroke.
   const AUTOSAVE_WRITE_DELAY = 900;
+  const AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS = 12000;
   const RECENT_PROJECT_LIMIT = 12;
   const THUMBNAIL_MAX_EDGE = 144;
   const THUMBNAIL_CANVAS_SIZE = 160;
@@ -1331,7 +1336,6 @@
     dragging: false,
     startPointer: null,
     startPosition: null,
-    startCursor: null,
     startCursorCell: null,
     drawPaletteIndex: null,
     drawSessionStarted: false,
@@ -6045,7 +6049,7 @@
     setLocalizedToggleLabel('mirrorAxisDiagonalB', '斜め対称 (/)', 'Diagonal Mirror (/)');
     setLocalizedTextContent('#mirrorAxisHelp', 'ミラーモード中は軸ライン外側のつまみをドラッグして、対称軸を移動できます。', 'In mirror mode, drag the outside handles to move each mirror axis.');
     setLocalizedTextContent('.virtual-cursor-scale__label', '仮想カーソルボタンサイズ', 'Virtual Cursor Button Size');
-    setLocalizedTextContent('#mobileDrawHelp', 'スマホ描画: 仮想カーソルをONにしてキャンバスをドラッグでカーソル移動、「描画」ボタン長押しで描画します（左半分=主色 / 右半分=副色）。選択範囲を移動する時は「移動」ツール、または選択ツールのまま選択範囲上で描画ボタンを押したままドラッグします。2本指ドラッグ/ピンチで移動と拡大縮小ができます。', 'Mobile draw: turn on Virtual Cursor, drag the canvas to move the cursor, and long-press Draw to paint (left half = primary / right half = secondary). To move a selection, use Move, or keep a selection tool active and drag while holding Draw when the cursor is on the selected area. Use two fingers to pan and pinch zoom.');
+    setLocalizedTextContent('#mobileDrawHelp', 'スマホ描画: 仮想カーソルをONにしてキャンバスをドラッグでカーソル移動、「描画」ボタン長押しで描画します（左半分=主色 / 右半分=副色）。選択範囲を移動する時は「移動」ツール、または選択ツールのまま選択範囲上で描画ボタンを長押しし、もう1本の指でキャンバスをドラッグします。2本指ドラッグ/ピンチで移動と拡大縮小ができます。', 'Mobile draw: turn on Virtual Cursor, drag the canvas to move the cursor, and long-press Draw to paint (left half = primary / right half = secondary). To move a selection, use Move, or keep a selection tool active, hold Draw on the selected area, and drag the canvas with a second finger. Use two fingers to pan and pinch zoom.');
     setLocalizedTextContent('#panelSettings .settings-display-buttons + .help-text', '背景とUI配色を切り替えます（描画色には影響しません）。', 'Switch the background and UI colors (does not change drawing colors).');
 
     setLocalizedTextContent('#floatingDrawButton', '描画', 'Draw');
@@ -6647,6 +6651,17 @@
     );
   }
 
+  function markSaveInteractionActivity() {
+    lastSaveInteractionAt = Date.now();
+  }
+
+  function hasRecentSaveInteraction() {
+    if (!Number.isFinite(lastSaveInteractionAt) || lastSaveInteractionAt <= 0) {
+      return false;
+    }
+    return (Date.now() - lastSaveInteractionAt) < SAVE_INTERACTION_GRACE_MS;
+  }
+
   async function writeAutosaveSnapshot(force = false) {
     if (!AUTOSAVE_SUPPORTED) return;
     if (autosaveRestoring) return;
@@ -6670,15 +6685,24 @@
       scheduleAutosaveSnapshot();
       return;
     }
+    if (!force && hasRecentSaveInteraction()) {
+      autosaveWriteQueued = true;
+      scheduleAutosaveSnapshot();
+      return;
+    }
     autosaveWriteInFlight = true;
     autosaveWriteQueued = false;
     try {
       updateAutosaveStatus('自動保存: 端末内に保存中…');
-      const snapshot = makeHistorySnapshot();
-      const session = buildProjectSessionPayload();
+      const snapshot = makeHistorySnapshot({ clonePixelData: false });
+      const session = buildAutosaveSessionPayload();
       const packaged = buildPackagedProjectPayload(snapshot, { session });
       const projectId = await ensureActiveAutosaveProjectId();
-      await recordRecentProjectSnapshot(snapshot, packaged, { projectId });
+      await recordRecentProjectSnapshot(snapshot, packaged, {
+        projectId,
+        skipThumbnail: true,
+        thumbnailIntervalMs: AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS,
+      });
       autosaveDirty = false;
       markDocumentDurablySaved();
       updateAutosaveStatus('自動保存: 端末内に保存済み', 'success');
@@ -10140,6 +10164,24 @@
     };
   }
 
+  function buildAutosaveSessionPayload() {
+    return {
+      historyLimit: normalizeProjectHistoryLimit(history.limit, DEFAULT_HISTORY_LIMIT),
+      historyPast: [],
+      historyFuture: [],
+      timelapse: {
+        enabled: Boolean(timelapseState.enabled),
+        fps: normalizeTimelapseFps(timelapseState.fps),
+        warningShown: Boolean(timelapseState.warningShown),
+        sampleStep: Math.max(1, Math.round(Number(timelapseState.sampleStep) || 1)),
+        lastCaptureToken: Number.isFinite(Number(timelapseState.lastCaptureToken))
+          ? Math.round(Number(timelapseState.lastCaptureToken))
+          : -1,
+        snapshots: [],
+      },
+    };
+  }
+
   function deserializeProjectHistoryList(list, historyLimit) {
     if (!Array.isArray(list) || !list.length) {
       return [];
@@ -11040,7 +11082,15 @@
     };
   }
 
-  async function recordRecentProjectSnapshot(snapshot, packagedPayload, { projectId = '' } = {}) {
+  async function recordRecentProjectSnapshot(
+    snapshot,
+    packagedPayload,
+    {
+      projectId = '',
+      skipThumbnail = false,
+      thumbnailIntervalMs = LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS,
+    } = {}
+  ) {
     if (!AUTOSAVE_SUPPORTED) {
       return null;
     }
@@ -11063,10 +11113,17 @@
       const displayName = extractDocumentBaseName(fileName);
       const nowTs = Date.now();
       const previousUpdatedAt = previousEntry?.updatedAt ? Date.parse(previousEntry.updatedAt) : NaN;
+      const safeThumbnailInterval = Math.max(
+        0,
+        Math.round(Number(thumbnailIntervalMs) || LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS)
+      );
       const shouldRefreshThumbnail =
-        !previousEntry?.thumbnail
-        || !Number.isFinite(previousUpdatedAt)
-        || (nowTs - previousUpdatedAt >= LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS);
+        !skipThumbnail
+        && (
+          !previousEntry?.thumbnail
+          || !Number.isFinite(previousUpdatedAt)
+          || (nowTs - previousUpdatedAt >= safeThumbnailInterval)
+        );
       const thumbnail = shouldRefreshThumbnail
         ? (await generateSnapshotThumbnail(snapshot))
         : previousEntry.thumbnail;
@@ -22049,6 +22106,7 @@
   }
 
   function handleFloatingDrawButtonPointerDown(event) {
+    markSaveInteractionActivity();
     if (state.playback.isPlaying) {
       return;
     }
@@ -22071,9 +22129,6 @@
     floatingDrawButtonState.dragging = false;
     floatingDrawButtonState.startPointer = { x: event.clientX, y: event.clientY };
     floatingDrawButtonState.startPosition = { ...floatingDrawButtonState.position };
-    floatingDrawButtonState.startCursor = virtualCursor
-      ? { x: Number(virtualCursor.x) || 0, y: Number(virtualCursor.y) || 0 }
-      : null;
     floatingDrawButtonState.startCursorCell = getVirtualCursorCellPosition();
     floatingDrawButtonState.drawPaletteIndex = pressTarget.paletteIndex;
     floatingDrawButtonState.drawMoved = false;
@@ -22092,6 +22147,7 @@
   }
 
   function handleFloatingDrawButtonPointerMove(event) {
+    markSaveInteractionActivity();
     if (floatingDrawButtonState.pointerId !== event.pointerId) {
       return;
     }
@@ -22101,8 +22157,9 @@
       && drawSessionTool
       && VIRTUAL_CURSOR_MOVE_TOOLS.has(drawSessionTool)
     ) {
+      // In selection-move mode, keep this finger anchored on Draw.
+      // Virtual cursor movement should come from a second touch on the canvas.
       event.preventDefault();
-      updateVirtualCursorFromFloatingDrawButtonDelta(event);
       return;
     }
     const dx = event.clientX - (floatingDrawButtonState.startPointer?.x || 0);
@@ -22139,6 +22196,7 @@
   }
 
   function handleFloatingDrawButtonPointerUp(event) {
+    markSaveInteractionActivity();
     if (floatingDrawButtonState.pointerId !== event.pointerId) {
       return;
     }
@@ -22161,7 +22219,6 @@
     floatingDrawButtonState.dragging = false;
     floatingDrawButtonState.startPointer = null;
     floatingDrawButtonState.startPosition = null;
-    floatingDrawButtonState.startCursor = null;
     floatingDrawButtonState.startCursorCell = null;
     floatingDrawButtonState.drawPaletteIndex = null;
     floatingDrawButtonState.drawMoved = false;
@@ -22183,6 +22240,7 @@
   }
 
   function handleFloatingDrawButtonPointerCancel(event) {
+    markSaveInteractionActivity();
     if (floatingDrawButtonState.pointerId !== event.pointerId) {
       return;
     }
@@ -22201,7 +22259,6 @@
     floatingDrawButtonState.dragging = false;
     floatingDrawButtonState.startPointer = null;
     floatingDrawButtonState.startPosition = null;
-    floatingDrawButtonState.startCursor = null;
     floatingDrawButtonState.startCursorCell = null;
     floatingDrawButtonState.drawPaletteIndex = null;
     floatingDrawButtonState.drawMoved = false;
@@ -22239,7 +22296,6 @@
       floatingDrawButtonState.dragging = false;
       floatingDrawButtonState.startPointer = null;
       floatingDrawButtonState.startPosition = null;
-      floatingDrawButtonState.startCursor = null;
       floatingDrawButtonState.startCursorCell = null;
       floatingDrawButtonState.drawPaletteIndex = null;
       floatingDrawButtonState.drawMoved = false;
@@ -23058,6 +23114,7 @@
   }
 
   function handlePointerDown(event) {
+    markSaveInteractionActivity();
     pointerState.selectionExtendOnDown = false;
     const isTouch = event.pointerType === 'touch';
     if (isTouch) {
@@ -23412,6 +23469,7 @@
   }
 
   function handlePointerMove(event) {
+    markSaveInteractionActivity();
     if (event.pointerType === 'touch' && activeTouchPointers.has(event.pointerId)) {
       updateTouchPointer(event);
     }
@@ -23483,7 +23541,8 @@
         }
 
         if (!pointerState.touchGestureMode) {
-          updateVirtualCursorFromEvent(event);
+          // Keep virtual cursor stable during two-finger pan/zoom gestures.
+          // Updating from each touch move causes unexpected cursor warps.
           return;
         }
 
@@ -23494,13 +23553,11 @@
           if (pinchGestureActive && Math.abs(pinchTargetScale - (Number(state.scale) || MIN_ZOOM_SCALE)) >= ZOOM_EPSILON) {
             setZoom(pinchTargetScale, pinchFocus || undefined);
           }
-          updateVirtualCursorFromEvent(event);
           return;
         }
         state.pan.x = Math.round((baselinePan.x || 0) + dx);
         state.pan.y = Math.round((baselinePan.y || 0) + dy);
         applyViewportTransform();
-        updateVirtualCursorFromEvent(event);
         return;
       }
       if (event.pointerId !== pointerState.pointerId) return;
@@ -23568,6 +23625,7 @@
   }
 
   function handlePointerUp(event) {
+    markSaveInteractionActivity();
     if (event.pointerType === 'touch') {
       removeTouchPointer(event);
     }
@@ -23730,6 +23788,7 @@
   }
 
   function handlePointerCancel(event) {
+    markSaveInteractionActivity();
     if (event.pointerType === 'touch') {
       removeTouchPointer(event);
     }
@@ -26254,30 +26313,6 @@
     updateVirtualCursorPosition(nextX, nextY);
   }
 
-  function updateVirtualCursorFromFloatingDrawButtonDelta(event) {
-    if (!dom.canvases.drawing || !virtualCursor) {
-      return false;
-    }
-    const start = floatingDrawButtonState.startPointer;
-    const base = floatingDrawButtonState.startCursor;
-    if (!start || !base) {
-      return false;
-    }
-    const rect = dom.canvases.drawing.getBoundingClientRect();
-    if (!rect.width || !rect.height) {
-      return false;
-    }
-    const dx = event.clientX - start.x;
-    const dy = event.clientY - start.y;
-    const unitX = rect.width / Math.max(1, state.width);
-    const unitY = rect.height / Math.max(1, state.height);
-    const deltaX = unitX ? dx / unitX : 0;
-    const deltaY = unitY ? dy / unitY : 0;
-    const nextX = clamp((Number(base.x) || 0) + deltaX, 0, state.width);
-    const nextY = clamp((Number(base.y) || 0) + deltaY, 0, state.height);
-    return updateVirtualCursorPosition(nextX, nextY);
-  }
-
   function clearVirtualCursorCanvas() {
     if (!ctx.virtual) {
       return;
@@ -27896,11 +27931,23 @@
       scheduleIosSnapshotPersist();
     }
     if (!canUseSessionStorage) return;
-    if (sessionPersistHandle !== null) return;
+    if (sessionPersistHandle !== null || sessionPersistIdleHandle !== null) return;
     sessionPersistHandle = window.setTimeout(() => {
       sessionPersistHandle = null;
-      persistSessionState();
-    }, 120);
+      const runPersist = () => {
+        sessionPersistIdleHandle = null;
+        if (isAutosaveInteractionBusy() || hasRecentSaveInteraction()) {
+          scheduleSessionPersist({ includeSnapshots: false });
+          return;
+        }
+        persistSessionState();
+      };
+      if (typeof window.requestIdleCallback === 'function') {
+        sessionPersistIdleHandle = window.requestIdleCallback(runPersist, { timeout: 700 });
+      } else {
+        runPersist();
+      }
+    }, SESSION_PERSIST_DELAY);
   }
 
   function persistSessionState() {
