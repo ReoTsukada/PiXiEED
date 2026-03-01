@@ -6662,6 +6662,18 @@
     return (Date.now() - lastSaveInteractionAt) < SAVE_INTERACTION_GRACE_MS;
   }
 
+  async function waitForAutosaveWriteIdle(timeoutMs = AUTOSAVE_WRITE_DELAY * 4) {
+    const safeTimeoutMs = Math.max(250, Math.round(Number(timeoutMs) || 0));
+    const deadline = Date.now() + safeTimeoutMs;
+    while (autosaveWriteInFlight) {
+      if (Date.now() >= deadline) {
+        return false;
+      }
+      await new Promise(resolve => window.setTimeout(resolve, 16));
+    }
+    return true;
+  }
+
   async function writeAutosaveSnapshot(force = false) {
     if (!AUTOSAVE_SUPPORTED) return;
     if (autosaveRestoring) return;
@@ -6673,22 +6685,28 @@
       }
       autosaveWriteQueued = false;
       updateAutosaveStatus(blockedStatus, 'info');
-      return;
+      return false;
     }
-    if (!force && !autosaveDirty) return;
+    if (!force && !autosaveDirty) return false;
     if (autosaveWriteInFlight) {
       autosaveWriteQueued = true;
-      return;
+      if (!force) {
+        return false;
+      }
+      const idle = await waitForAutosaveWriteIdle();
+      if (!idle || autosaveWriteInFlight) {
+        return false;
+      }
     }
     if (!force && isAutosaveInteractionBusy()) {
       autosaveWriteQueued = true;
       scheduleAutosaveSnapshot();
-      return;
+      return false;
     }
     if (!force && hasRecentSaveInteraction()) {
       autosaveWriteQueued = true;
       scheduleAutosaveSnapshot();
-      return;
+      return false;
     }
     autosaveWriteInFlight = true;
     autosaveWriteQueued = false;
@@ -6706,6 +6724,7 @@
       autosaveDirty = false;
       markDocumentDurablySaved();
       updateAutosaveStatus('自動保存: 端末内に保存済み', 'success');
+      return true;
     } catch (error) {
       throw error;
     } finally {
@@ -9344,7 +9363,7 @@
   function openNewProjectDialog() {
     const config = dom.newProject;
     if (!config) {
-      promptNewProjectFallback();
+      void promptNewProjectFallback();
       return;
     }
     const dialog = config.dialog;
@@ -9366,7 +9385,7 @@
       });
       return;
     }
-    promptNewProjectFallback();
+    void promptNewProjectFallback();
   }
 
   function setupExportDialog() {
@@ -9583,7 +9602,7 @@
     }
   }
 
-  function handleNewProjectSubmit() {
+  async function handleNewProjectSubmit() {
     const config = dom.newProject;
     if (config?.form && typeof config.form.reportValidity === 'function') {
       if (!config.form.reportValidity()) {
@@ -9596,7 +9615,7 @@
     const heightValue = config?.heightInput?.value;
     const width = Number(widthValue);
     const height = Number(heightValue);
-    const created = createNewProject({ name, width, height });
+    const created = await createNewProject({ name, width, height });
     if (created) {
       if (config?.nameInput) {
         config.nameInput.value = extractDocumentBaseName(name);
@@ -9607,7 +9626,7 @@
     }
   }
 
-  function promptNewProjectFallback() {
+  async function promptNewProjectFallback() {
     const name = window.prompt('ファイル名を入力してください', state.documentName || DEFAULT_DOCUMENT_NAME);
     if (name === null) return;
     const widthRaw = window.prompt(`キャンバスの横幅 (${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE})`, String(state.width));
@@ -9616,12 +9635,12 @@
     if (heightRaw === null) return;
     const width = Number(widthRaw);
     const height = Number(heightRaw);
-    if (!createNewProject({ name, width, height })) {
+    if (!(await createNewProject({ name, width, height }))) {
       window.alert(`キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`);
     }
   }
 
-  function createNewProject({ name, width, height }) {
+  async function createNewProject({ name, width, height }) {
     const widthNumber = lockedCanvasWidth !== null ? lockedCanvasWidth : Number(width);
     const heightNumber = lockedCanvasHeight !== null ? lockedCanvasHeight : Number(height);
     if (!Number.isFinite(widthNumber) || !Number.isFinite(heightNumber)) {
@@ -9651,8 +9670,27 @@
     clearPendingPermissionListener();
     setActiveAutosaveProjectId(createAutosaveProjectId());
     autosaveDirty = true;
-    scheduleAutosaveSnapshot();
-    updateAutosaveStatus('自動保存: 新規プロジェクトを端末内に保存します', 'success');
+    if (AUTOSAVE_SUPPORTED && autosaveWriteTimer !== null) {
+      window.clearTimeout(autosaveWriteTimer);
+      autosaveWriteTimer = null;
+    }
+    let savedImmediately = false;
+    if (AUTOSAVE_SUPPORTED) {
+      try {
+        savedImmediately = await writeAutosaveSnapshot(true);
+      } catch (error) {
+        console.warn('Immediate autosave after creating a new project failed', error);
+        savedImmediately = false;
+      }
+    }
+    if (savedImmediately) {
+      updateAutosaveStatus('自動保存: 新規プロジェクトを端末内に保存しました', 'success');
+    } else if (AUTOSAVE_SUPPORTED) {
+      scheduleAutosaveSnapshot();
+      updateAutosaveStatus('自動保存: 新規プロジェクトを端末内に保存します', 'success');
+    } else {
+      updateAutosaveStatus('自動保存: このブラウザでは利用できません', 'warn');
+    }
     scheduleSessionPersist();
     return true;
   }
@@ -9689,7 +9727,7 @@
     quickButton.setAttribute('aria-busy', 'true');
     try {
       setStartupQuickSetupStatus(localizeText('かんたん初期設定: 新規作成を準備しています…', 'Quick setup: preparing a new project...'));
-      const created = createNewProject({
+      const created = await createNewProject({
         name: createStartupQuickProjectName(),
         width: lockedCanvasWidth !== null ? lockedCanvasWidth : DEFAULT_CANVAS_SIZE,
         height: lockedCanvasHeight !== null ? lockedCanvasHeight : DEFAULT_CANVAS_SIZE,
@@ -17356,7 +17394,7 @@
     if (dom.newProject?.form) {
       dom.newProject.form.addEventListener('submit', event => {
         event.preventDefault();
-        handleNewProjectSubmit();
+        void handleNewProjectSubmit();
       });
     }
     if (dom.newProject?.cancel) {
