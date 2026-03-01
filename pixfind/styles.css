@@ -1421,7 +1421,7 @@ body.is-playing {
   color: var(--text-muted);
 }
 
-@media (max-width: 720px) {
+@media (max-width: 720px) and (orientation: portrait) {
   .panel {
     padding: clamp(1.1rem, 3.5vmin, 2rem);
   }
@@ -1651,6 +1651,30 @@ body.is-playing {
   .creator-target-fields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.4rem;
+  }
+}
+
+@media (orientation: landscape) {
+  .game-layout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
+    grid-auto-rows: auto;
+    align-content: start;
+  }
+
+  .app.is-hidden-object-mode .game-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+  }
+
+  .stage {
+    height: auto;
+    align-self: start;
+  }
+
+  .canvas-frame {
+    height: auto;
+    aspect-ratio: 1 / 1;
   }
 }
 
