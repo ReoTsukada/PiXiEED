@@ -15255,6 +15255,7 @@
     if (side !== 'left' && side !== 'right') {
       return;
     }
+    const wasCompactRightRail = side === 'right' ? isCompactRightRailMode() : false;
     const normalized = normalizeRailWidth(side, width);
     railSizing[side] = normalized;
     const cssVar = getRailCssVarName(side);
@@ -15271,7 +15272,12 @@
       }
       updateToolVisibility();
     } else {
-      if (!isCompactRightRailMode() && isCompactRightFlyoutOpen()) {
+      const isCompactRightRail = isCompactRightRailMode();
+      if (isCompactRightRail && !wasCompactRightRail && state.activeRightTab !== 'frames') {
+        // Keep non-default right tabs (settings/file/multi) visible after responsive compact transition.
+        setCompactRightFlyoutOpen(true);
+      }
+      if (!isCompactRightRail && isCompactRightFlyoutOpen()) {
         setCompactRightFlyoutOpen(false);
       }
       updateRightTabVisibility();
@@ -16104,6 +16110,30 @@
     applyLayoutMode();
   }
 
+  function resolvePreferredMobileTab() {
+    const preferredLeftTab = LEFT_TAB_KEYS.includes(state.activeLeftTab)
+      ? state.activeLeftTab
+      : '';
+    const preferredRightTab = RIGHT_TAB_KEYS.includes(state.activeRightTab)
+      ? state.activeRightTab
+      : '';
+    const prioritizeRightTab = preferredRightTab && preferredRightTab !== 'frames';
+    const candidates = prioritizeRightTab
+      ? [preferredRightTab, preferredLeftTab]
+      : [preferredLeftTab, preferredRightTab];
+    for (let index = 0; index < candidates.length; index += 1) {
+      const key = candidates[index];
+      if (key && dom.mobilePanels[key]) {
+        return key;
+      }
+    }
+    return (
+      dom.mobileTabs.find(tab => tab.classList.contains('is-active'))?.dataset.mobileTab
+      || dom.mobileTabs[0]?.dataset.mobileTab
+      || ''
+    );
+  }
+
   function applyLayoutMode() {
     const isMobile = layoutMode === 'mobilePortrait';
     if (isMobile || !isDualLeftRailEnabled()) {
@@ -16167,11 +16197,7 @@
     updateRightTabVisibility();
 
     if (isMobile) {
-      const preferredMobileTab =
-        (dom.mobilePanels[state.activeLeftTab] && state.activeLeftTab) ||
-        (dom.mobilePanels[state.activeRightTab] && state.activeRightTab) ||
-        dom.mobileTabs.find(tab => tab.classList.contains('is-active'))?.dataset.mobileTab ||
-        dom.mobileTabs[0]?.dataset.mobileTab;
+      const preferredMobileTab = resolvePreferredMobileTab();
       if (preferredMobileTab) {
         activateMobileTab(preferredMobileTab, { ensureDrawer: false });
       }
