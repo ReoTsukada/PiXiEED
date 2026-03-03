@@ -904,6 +904,9 @@
   const AUTOSAVE_LIFECYCLE_FLUSH_THROTTLE_MS = 240;
   const NEW_PROJECT_IMMEDIATE_AUTOSAVE_ATTEMPTS = 2;
   const ALWAYS_CONFIRM_BEFORE_CLOSE = true;
+  const MOBILE_BACK_BUTTON_CONFIRM_ENABLED = true;
+  const MOBILE_BACK_GUARD_STATE_KEY = '__pixieed_back_guard_v1';
+  const MOBILE_BACK_GUARD_BEFOREUNLOAD_BYPASS_MS = 1500;
   const textCompression = createTextCompression();
   const LENS_IMPORT_SESSION_FLAG = 'pixiee-lens:import-request';
   let lensImportRequested = (() => {
@@ -1048,6 +1051,10 @@
   let autosaveLifecycleFlushAt = 0;
   let unsavedChangeToken = 0;
   let durableSaveToken = 0;
+  let mobileBackGuardInstalled = false;
+  let mobileBackGuardBypassOnce = false;
+  let mobileBackBeforeUnloadBypass = false;
+  let mobileBackBeforeUnloadBypassTimer = null;
   let iosSnapshotDbPromise = null;
   let iosSnapshotDirty = false;
   let iosSnapshotTimer = null;
@@ -1451,6 +1458,7 @@
   window.addEventListener('beforeunload', handleUnsavedBeforeUnload);
   window.addEventListener('pagehide', handleAutosavePageHide);
   document.addEventListener('visibilitychange', handleAutosaveVisibilityChange);
+  installMobileBackButtonGuard();
   if (RELOAD_SNAPSHOT_ENABLED) {
     window.addEventListener('beforeunload', persistReloadSessionSnapshot);
     window.addEventListener('pagehide', persistReloadSessionSnapshot);
@@ -3300,17 +3308,124 @@
     flushAutosaveSnapshotOnLifecycle({ force: true });
   }
 
-  function handleUnsavedBeforeUnload(event) {
-    flushAutosaveSnapshotOnLifecycle({ force: true });
+  function shouldWarnWhenLeavingPage() {
     const shouldWarnUnsaved = hasDocumentUnsavedChanges();
     const shouldWarnMasterReload = multiState.connected && multiState.role === 'master';
     const shouldWarnAutosavePending = hasPendingAutosaveWork();
-    if (
-      !ALWAYS_CONFIRM_BEFORE_CLOSE
-      && !shouldWarnUnsaved
-      && !shouldWarnMasterReload
-      && !shouldWarnAutosavePending
-    ) {
+    return (
+      ALWAYS_CONFIRM_BEFORE_CLOSE
+      || shouldWarnUnsaved
+      || shouldWarnMasterReload
+      || shouldWarnAutosavePending
+    );
+  }
+
+  function clearMobileBackBeforeUnloadBypassTimer() {
+    if (mobileBackBeforeUnloadBypassTimer === null) {
+      return;
+    }
+    window.clearTimeout(mobileBackBeforeUnloadBypassTimer);
+    mobileBackBeforeUnloadBypassTimer = null;
+  }
+
+  function armMobileBackBeforeUnloadBypass() {
+    mobileBackBeforeUnloadBypass = true;
+    clearMobileBackBeforeUnloadBypassTimer();
+    mobileBackBeforeUnloadBypassTimer = window.setTimeout(() => {
+      mobileBackBeforeUnloadBypass = false;
+      mobileBackBeforeUnloadBypassTimer = null;
+    }, MOBILE_BACK_GUARD_BEFOREUNLOAD_BYPASS_MS);
+  }
+
+  function consumeMobileBackBeforeUnloadBypass() {
+    if (!mobileBackBeforeUnloadBypass) {
+      return false;
+    }
+    mobileBackBeforeUnloadBypass = false;
+    clearMobileBackBeforeUnloadBypassTimer();
+    return true;
+  }
+
+  function isMobileBackButtonGuardEnabled() {
+    if (!MOBILE_BACK_BUTTON_CONFIRM_ENABLED) {
+      return false;
+    }
+    if (typeof window === 'undefined' || typeof window.history?.pushState !== 'function') {
+      return false;
+    }
+    if (IS_ANDROID_DEVICE || IS_IOS_DEVICE) {
+      return true;
+    }
+    return isCoarsePointerDevice();
+  }
+
+  function pushMobileBackGuardState() {
+    if (!isMobileBackButtonGuardEnabled()) {
+      return false;
+    }
+    try {
+      const currentState = window.history.state;
+      if (currentState && typeof currentState === 'object' && currentState[MOBILE_BACK_GUARD_STATE_KEY]) {
+        return true;
+      }
+      const baseState = currentState && typeof currentState === 'object'
+        ? currentState
+        : {};
+      window.history.pushState(
+        { ...baseState, [MOBILE_BACK_GUARD_STATE_KEY]: true },
+        document.title,
+        window.location.href
+      );
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function handleMobileBackButtonPopState() {
+    if (!mobileBackGuardInstalled || !isMobileBackButtonGuardEnabled()) {
+      return;
+    }
+    if (mobileBackGuardBypassOnce) {
+      mobileBackGuardBypassOnce = false;
+      return;
+    }
+    const shouldWarn = shouldWarnWhenLeavingPage();
+    if (shouldWarn) {
+      const accepted = window.confirm(
+        localizeText(
+          'PiXiEEDrawを閉じますか？\n作業内容は端末内に自動保存されますが、保存中の内容は失われる場合があります。',
+          'Close PiXiEEDraw?\nYour work is autosaved locally, but in-progress changes may still be lost.'
+        )
+      );
+      if (!accepted) {
+        pushMobileBackGuardState();
+        return;
+      }
+    }
+    armMobileBackBeforeUnloadBypass();
+    mobileBackGuardBypassOnce = true;
+    window.history.back();
+  }
+
+  function installMobileBackButtonGuard() {
+    if (mobileBackGuardInstalled || !isMobileBackButtonGuardEnabled()) {
+      return;
+    }
+    const armed = pushMobileBackGuardState();
+    if (!armed) {
+      return;
+    }
+    window.addEventListener('popstate', handleMobileBackButtonPopState);
+    mobileBackGuardInstalled = true;
+  }
+
+  function handleUnsavedBeforeUnload(event) {
+    flushAutosaveSnapshotOnLifecycle({ force: true });
+    if (consumeMobileBackBeforeUnloadBypass()) {
+      return;
+    }
+    if (!shouldWarnWhenLeavingPage()) {
       return;
     }
     event.preventDefault();
