@@ -901,6 +901,9 @@
   const IOS_SNAPSHOT_COMPRESSION_THRESHOLD = 32 * 1024;
   const SESSION_PERSIST_DELAY = 120;
   const SAVE_INTERACTION_GRACE_MS = 1300;
+  const AUTOSAVE_LIFECYCLE_FLUSH_THROTTLE_MS = 240;
+  const NEW_PROJECT_IMMEDIATE_AUTOSAVE_ATTEMPTS = 2;
+  const ALWAYS_CONFIRM_BEFORE_CLOSE = true;
   const textCompression = createTextCompression();
   const LENS_IMPORT_SESSION_FLAG = 'pixiee-lens:import-request';
   let lensImportRequested = (() => {
@@ -1040,7 +1043,9 @@
   let autosaveWriteQueued = false;
   let autosaveRestoring = false;
   let autosaveDirty = false;
+  let autosaveDirtyGeneration = 0;
   let autosaveProjectId = '';
+  let autosaveLifecycleFlushAt = 0;
   let unsavedChangeToken = 0;
   let durableSaveToken = 0;
   let iosSnapshotDbPromise = null;
@@ -1444,6 +1449,8 @@
   updateGridDecorations();
   const pointerState = createPointerState();
   window.addEventListener('beforeunload', handleUnsavedBeforeUnload);
+  window.addEventListener('pagehide', handleAutosavePageHide);
+  document.addEventListener('visibilitychange', handleAutosaveVisibilityChange);
   if (RELOAD_SNAPSHOT_ENABLED) {
     window.addEventListener('beforeunload', persistReloadSessionSnapshot);
     window.addEventListener('pagehide', persistReloadSessionSnapshot);
@@ -2907,7 +2914,7 @@
     }
     if (trimmed) {
       updateHistoryButtons();
-      autosaveDirty = true;
+      markAutosaveDirty();
       scheduleAutosaveSnapshot();
       usage = getMemoryUsageBreakdown();
       history.limit = Math.max(MIN_HISTORY_LIMIT, Math.min(history.limit, Math.ceil(history.limit * 0.75)));
@@ -2994,7 +3001,7 @@
     fillPreviewCache.contextKey = null;
     fillPreviewCache.byPixel = null;
     updateHistoryButtons();
-    autosaveDirty = true;
+    markAutosaveDirty();
     updateMemoryStatus();
     scheduleAutosaveSnapshot();
   }
@@ -3277,10 +3284,35 @@
     return unsavedChangeToken > durableSaveToken;
   }
 
+  function markAutosaveDirty() {
+    autosaveDirty = true;
+    autosaveDirtyGeneration += 1;
+  }
+
+  function handleAutosavePageHide() {
+    flushAutosaveSnapshotOnLifecycle({ force: true });
+  }
+
+  function handleAutosaveVisibilityChange() {
+    if (document.visibilityState !== 'hidden') {
+      return;
+    }
+    flushAutosaveSnapshotOnLifecycle({ force: true });
+  }
+
   function handleUnsavedBeforeUnload(event) {
+    flushAutosaveSnapshotOnLifecycle({ force: true });
     const shouldWarnUnsaved = hasDocumentUnsavedChanges();
     const shouldWarnMasterReload = multiState.connected && multiState.role === 'master';
-    if (!shouldWarnUnsaved && !shouldWarnMasterReload) return;
+    const shouldWarnAutosavePending = hasPendingAutosaveWork();
+    if (
+      !ALWAYS_CONFIRM_BEFORE_CLOSE
+      && !shouldWarnUnsaved
+      && !shouldWarnMasterReload
+      && !shouldWarnAutosavePending
+    ) {
+      return;
+    }
     event.preventDefault();
     event.returnValue = '';
   }
@@ -3394,7 +3426,7 @@
     invalidateFillPreviewCache();
     invalidateOnionSkinCache();
     clearPlaybackFrameCache();
-    autosaveDirty = true;
+    markAutosaveDirty();
     markDocumentUnsavedChange();
     if (history.pending) {
       history.pending.dirty = true;
@@ -3468,7 +3500,7 @@
       const previous = history.past.pop();
       applyHistorySnapshot(decompressHistorySnapshot(previous), { preserveView: true });
       updateHistoryButtons();
-      autosaveDirty = true;
+      markAutosaveDirty();
       markDocumentUnsavedChange();
       scheduleAutosaveSnapshot();
       return;
@@ -3489,7 +3521,7 @@
       multiHistory.set(clientId, ch);
       if (applied) {
         updateHistoryButtons();
-        autosaveDirty = true;
+        markAutosaveDirty();
         markDocumentUnsavedChange();
         scheduleAutosaveSnapshot();
         // propagate local-only undo result to peers
@@ -3523,7 +3555,7 @@
       const next = history.future.pop();
       applyHistorySnapshot(decompressHistorySnapshot(next), { preserveView: true });
       updateHistoryButtons();
-      autosaveDirty = true;
+      markAutosaveDirty();
       markDocumentUnsavedChange();
       scheduleAutosaveSnapshot();
       return;
@@ -3543,7 +3575,7 @@
       multiHistory.set(clientId, ch);
       if (applied) {
         updateHistoryButtons();
-        autosaveDirty = true;
+        markAutosaveDirty();
         markDocumentUnsavedChange();
         scheduleAutosaveSnapshot();
         try {
@@ -3569,7 +3601,7 @@
     history.pending = null;
     applyHistorySnapshot(snapshot, { preserveView: true });
     updateHistoryButtons();
-    autosaveDirty = true;
+    markAutosaveDirty();
     markDocumentUnsavedChange();
     if (reRender) {
       renderEverything();
@@ -6608,7 +6640,7 @@
         }
       }
       setActiveAutosaveProjectId(storedProjectId || createAutosaveProjectId());
-      autosaveDirty = true;
+      markAutosaveDirty();
       scheduleAutosaveSnapshot();
       updateAutosaveStatus('自動保存: 端末内へ自動保存します', 'info');
     } catch (error) {
@@ -6660,6 +6692,51 @@
       return false;
     }
     return (Date.now() - lastSaveInteractionAt) < SAVE_INTERACTION_GRACE_MS;
+  }
+
+  function hasPendingAutosaveWork() {
+    if (!AUTOSAVE_SUPPORTED) {
+      return false;
+    }
+    return Boolean(
+      autosaveDirty
+      || autosaveWriteQueued
+      || autosaveWriteInFlight
+      || autosaveWriteTimer !== null
+    );
+  }
+
+  function flushAutosaveSnapshotOnLifecycle({ force = false } = {}) {
+    if (!AUTOSAVE_SUPPORTED) {
+      return;
+    }
+    if (autosaveRestoring) {
+      return;
+    }
+    if (!hasPendingAutosaveWork()) {
+      return;
+    }
+    const blockedStatus = getAutosaveBlockedStatusMessage();
+    if (blockedStatus) {
+      return;
+    }
+    const now = Date.now();
+    if (!force && (now - autosaveLifecycleFlushAt) < AUTOSAVE_LIFECYCLE_FLUSH_THROTTLE_MS) {
+      return;
+    }
+    autosaveLifecycleFlushAt = now;
+    if (autosaveWriteTimer !== null) {
+      window.clearTimeout(autosaveWriteTimer);
+      autosaveWriteTimer = null;
+    }
+    if (autosaveWriteInFlight) {
+      autosaveWriteQueued = true;
+      return;
+    }
+    writeAutosaveSnapshot(true).catch(error => {
+      console.warn('Autosave lifecycle flush failed', error);
+      updateAutosaveStatus('自動保存: 保存に失敗しました', 'error');
+    });
   }
 
   async function waitForAutosaveWriteIdle(timeoutMs = AUTOSAVE_WRITE_DELAY * 4) {
@@ -6716,11 +6793,25 @@
       const session = buildAutosaveSessionPayload();
       const packaged = buildPackagedProjectPayload(snapshot, { session });
       const projectId = await ensureActiveAutosaveProjectId();
-      await recordRecentProjectSnapshot(snapshot, packaged, {
+      const dirtyGenerationAtStart = autosaveDirtyGeneration;
+      const unsavedTokenAtStart = unsavedChangeToken;
+      const savedEntry = await recordRecentProjectSnapshot(snapshot, packaged, {
         projectId,
-        skipThumbnail: true,
         thumbnailIntervalMs: AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS,
       });
+      if (!savedEntry) {
+        throw new Error('Failed to record autosave snapshot');
+      }
+      const stillCurrentWrite = (
+        autosaveProjectId === projectId
+        && autosaveDirtyGeneration === dirtyGenerationAtStart
+        && unsavedChangeToken === unsavedTokenAtStart
+      );
+      if (!stillCurrentWrite) {
+        autosaveWriteQueued = true;
+        updateAutosaveStatus('自動保存: 追加変更を保存します', 'info');
+        return false;
+      }
       autosaveDirty = false;
       markDocumentDurablySaved();
       updateAutosaveStatus('自動保存: 端末内に保存済み', 'success');
@@ -6872,7 +6963,7 @@
           ? `自動保存: ${EXPORT_WORKSPACE_DIR_NAME} フォルダ内に保存中…`
           : '自動保存: 保存中…'
       );
-      autosaveDirty = true;
+      markAutosaveDirty();
       await writeAutosaveSnapshot(true);
     } catch (error) {
       if (error && error.name === 'AbortError') {
@@ -6891,7 +6982,7 @@
     if (!autosaveProjectId) {
       setActiveAutosaveProjectId(createAutosaveProjectId());
     }
-    autosaveDirty = true;
+    markAutosaveDirty();
     scheduleAutosaveSnapshot();
     updateAutosaveStatus('PiXiEELENS の取り込み内容を端末内に自動保存します', 'info');
   }
@@ -7904,7 +7995,7 @@
     pendingAutosaveHandle = null;
     clearPendingPermissionListener();
     setActiveAutosaveProjectId(createAutosaveProjectId());
-    autosaveDirty = true;
+    markAutosaveDirty();
     scheduleAutosaveSnapshot();
     if (importSize.scaled) {
       const integerScaleLabel = importSize.integerScaleFactor > 1
@@ -9696,25 +9787,27 @@
     pendingAutosaveHandle = null;
     clearPendingPermissionListener();
     setActiveAutosaveProjectId(createAutosaveProjectId());
-    autosaveDirty = true;
+    markAutosaveDirty();
     if (AUTOSAVE_SUPPORTED && autosaveWriteTimer !== null) {
       window.clearTimeout(autosaveWriteTimer);
       autosaveWriteTimer = null;
     }
     let savedImmediately = false;
     if (AUTOSAVE_SUPPORTED) {
-      try {
-        savedImmediately = await writeAutosaveSnapshot(true);
-      } catch (error) {
-        console.warn('Immediate autosave after creating a new project failed', error);
-        savedImmediately = false;
+      for (let attempt = 0; attempt < NEW_PROJECT_IMMEDIATE_AUTOSAVE_ATTEMPTS && !savedImmediately; attempt += 1) {
+        try {
+          savedImmediately = await writeAutosaveSnapshot(true);
+        } catch (error) {
+          console.warn('Immediate autosave after creating a new project failed', error);
+          savedImmediately = false;
+        }
       }
     }
     if (savedImmediately) {
       updateAutosaveStatus('自動保存: 新規プロジェクトを端末内に保存しました', 'success');
     } else if (AUTOSAVE_SUPPORTED) {
       scheduleAutosaveSnapshot();
-      updateAutosaveStatus('自動保存: 新規プロジェクトを端末内に保存します', 'success');
+      updateAutosaveStatus('自動保存: 新規プロジェクトの即時保存に失敗したため再試行します', 'warn');
     } else {
       updateAutosaveStatus('自動保存: このブラウザでは利用できません', 'warn');
     }
@@ -10131,7 +10224,7 @@
 
     const requestedProjectId = normalizeAutosaveProjectId(options?.projectId || '');
     setActiveAutosaveProjectId(requestedProjectId || createAutosaveProjectId());
-    autosaveDirty = true;
+    markAutosaveDirty();
     scheduleSessionPersist();
     scheduleAutosaveSnapshot();
     if (!options?.suppressAutosaveStatus) {
@@ -28005,7 +28098,7 @@
       resetDocumentUnsavedChanges();
     }
     updateHistoryButtons();
-    autosaveDirty = true;
+    markAutosaveDirty();
     scheduleAutosaveSnapshot();
     updateAutosaveStatus('再読み込み復元: 直前の作業状態を復元しました', 'success');
     return true;
@@ -29248,7 +29341,7 @@
     renderLayerList();
     requestRender();
     requestOverlayRender();
-    autosaveDirty = true;
+    markAutosaveDirty();
     scheduleAutosaveSnapshot();
     return true;
   }
@@ -30001,7 +30094,7 @@
       resetDocumentUnsavedChanges();
     }
     updateHistoryButtons();
-    autosaveDirty = true;
+    markAutosaveDirty();
     scheduleAutosaveSnapshot();
     return true;
   }
@@ -32364,7 +32457,7 @@
     if (clearLayerPatchSnapshots) {
       clearMultiLayerPatchSnapshots();
     }
-    autosaveDirty = true;
+    markAutosaveDirty();
     markDocumentUnsavedChange();
     scheduleAutosaveSnapshot();
     scheduleSessionPersist({ includeSnapshots: false });
@@ -34600,11 +34693,11 @@
         clearTimelapseRecording({ silent: true });
         resetDocumentUnsavedChanges();
         updateHistoryButtons();
-        autosaveDirty = true;
+        markAutosaveDirty();
         scheduleAutosaveSnapshot();
       }
       // Ensure replica-received pixels are overwritten immediately with the pre-join local document.
-      autosaveDirty = true;
+      markAutosaveDirty();
       try {
         await writeAutosaveSnapshot(true);
       } catch (error) {
