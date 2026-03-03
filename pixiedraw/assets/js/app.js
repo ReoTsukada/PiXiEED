@@ -6026,8 +6026,8 @@
     setLocalizedTextContent('#panelSettings .settings-size-row--canvas > span', 'キャンバスサイズ', 'Canvas Size');
     setLocalizedControlLabel('canvasWidth', '横', 'W');
     setLocalizedControlLabel('canvasHeight', '縦', 'H');
-    setLocalizedTextContent('#applyCanvasResize', '適用', 'Apply');
-    setLocalizedTextContent('#canvasSizeHint', '横/縦を入力して「適用」または Enter で反映します。', 'Enter width/height and press Apply or Enter.');
+    setLocalizedTextContent('#applyCanvasResize', '確定', 'Apply');
+    setLocalizedTextContent('#canvasSizeHint', '横/縦を入力して「確定」または Enter で反映します。', 'Enter width/height and press Apply or Enter.');
     setLocalizedTextContent('#panelSettings .settings-size-row--sprite > span', 'スプライト倍率', 'Sprite Scale');
     setLocalizedControlLabel('spriteScaleInput', '倍率', 'Scale');
     setLocalizedTextContent('#applySpriteScale', '適用', 'Apply');
@@ -21283,8 +21283,11 @@
         actionPerformed = false;
       } else if (commit) {
         if (moveState.hasCleared) {
-          finalizeSelectionMove();
-          actionPerformed = true;
+          // Keep virtual-cursor move behavior aligned with pointer drag:
+          // stay in pending preview state until explicit confirm/cancel.
+          promotePendingSelectionMove(moveState, {
+            hover: virtualCursorDrawState.currentPosition || pointerState.current || getVirtualCursorCellPosition(),
+          });
         } else {
           pointerState.selectionMove = null;
           pointerState.tool = state.tool;
@@ -23729,20 +23732,9 @@
 
     if ((tool === 'selectionMove' || tool === 'layerMove') && moveState) {
       if (movePending) {
-        pointerState.tool = state.tool;
-        pointerState.pointerId = null;
-        pointerState.preview = null;
-        pointerState.selectionPreview = null;
-        pointerState.selectionClearedOnDown = false;
-        pointerState.selectionExtendOnDown = false;
-        pointerState.current = hoverPixel || pointerState.current;
-        pointerState.last = pointerState.current;
-        pointerState.path = [];
-        pointerState.active = false;
-        pointerState.drawPaletteIndex = null;
-        state.pendingPasteMoveState = moveState;
-        updateCanvasControlButtons();
-        requestOverlayRender();
+        promotePendingSelectionMove(moveState, {
+          hover: hoverPixel || pointerState.current,
+        });
         return;
       }
       finalizeSelectionMove();
@@ -24862,6 +24854,33 @@
     if (moveState.hasCleared) {
       requestOverlayRender();
     }
+  }
+
+  function promotePendingSelectionMove(moveState, options = {}) {
+    if (!moveState || !moveState.hasCleared) {
+      return false;
+    }
+    const hover = options && options.hover && Number.isFinite(options.hover.x) && Number.isFinite(options.hover.y)
+      ? { x: Math.floor(options.hover.x), y: Math.floor(options.hover.y) }
+      : null;
+    pointerState.tool = state.tool;
+    pointerState.pointerId = null;
+    pointerState.preview = null;
+    pointerState.selectionPreview = null;
+    pointerState.selectionMove = null;
+    pointerState.selectionClearedOnDown = false;
+    pointerState.selectionExtendOnDown = false;
+    const cursorCell = getVirtualCursorCellPosition();
+    const nextCurrent = hover || pointerState.current || cursorCell;
+    pointerState.current = nextCurrent ? { ...nextCurrent } : null;
+    pointerState.last = nextCurrent ? { ...nextCurrent } : null;
+    pointerState.path = [];
+    pointerState.active = false;
+    pointerState.drawPaletteIndex = null;
+    state.pendingPasteMoveState = moveState;
+    updateCanvasControlButtons();
+    requestOverlayRender();
+    return true;
   }
 
   function clearSelectionSourcePixels(moveState) {
