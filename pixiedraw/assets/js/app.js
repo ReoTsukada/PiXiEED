@@ -6747,20 +6747,47 @@
         updateAutosaveStatus('自動保存: 新しいファイルに保存します');
         return false;
       }
-      const parsed = JSON.parse(text);
-      const payload = parsed && typeof parsed === 'object' && parsed.document ? parsed.document : parsed;
-      const snapshot = deserializeDocumentPayload(payload);
+      const parsedDocument = snapshotFromDocumentText(text);
+      const snapshot = parsedDocument?.snapshot || null;
+      const projectSession = parsedDocument?.projectSession || null;
+      if (!snapshot) {
+        updateAutosaveStatus('自動保存: ファイルを読み込めませんでした', 'error');
+        return false;
+      }
       if (isTinyStartupSnapshot(snapshot)) {
         updateAutosaveStatus('自動保存: 起動時の 1x1 バックアップ読み込みをスキップしました', 'warn');
         return false;
       }
       autosaveRestoring = true;
-      applyHistorySnapshot(snapshot);
-      history.past = [];
-      history.future = [];
-      history.pending = null;
-      clearTimelapseRecording({ silent: true });
-      autosaveRestoring = false;
+      try {
+        applyHistorySnapshot(snapshot);
+        history.pending = null;
+        if (projectSession) {
+          history.limit = projectSession.historyLimit;
+          history.past = projectSession.historyPast;
+          history.future = projectSession.historyFuture;
+          if (!(timelapseState.snapshots instanceof Array)) {
+            timelapseState.snapshots = [];
+          }
+          timelapseState.snapshots.length = 0;
+          projectSession.timelapse.snapshots.forEach(entry => {
+            timelapseState.snapshots.push(entry);
+          });
+          timelapseState.enabled = projectSession.timelapse.enabled;
+          timelapseState.fps = projectSession.timelapse.fps;
+          timelapseState.warningShown = projectSession.timelapse.warningShown;
+          timelapseState.sampleStep = projectSession.timelapse.sampleStep;
+          timelapseState.lastCaptureToken = projectSession.timelapse.lastCaptureToken;
+        } else {
+          history.past = [];
+          history.future = [];
+          clearTimelapseRecording({ silent: true });
+        }
+      } finally {
+        autosaveRestoring = false;
+      }
+      syncTimelapseControls();
+      updateHistoryButtons();
       autosaveDirty = false;
       resetDocumentUnsavedChanges();
       syncPixfindSnapshotAfterDocumentReset();
@@ -10215,7 +10242,9 @@
         lastCaptureToken: Number.isFinite(Number(timelapseState.lastCaptureToken))
           ? Math.round(Number(timelapseState.lastCaptureToken))
           : -1,
-        snapshots: [],
+        // Persist timelapse frames in autosave as well so reopening can export
+        // from the original drawing start, not just after reopening.
+        snapshots: serializeProjectTimelapseSnapshots(),
       },
     };
   }
