@@ -1897,7 +1897,7 @@
         </div>
         <button class="chip public-rooms-hub__refresh" id="refreshPublicRooms" type="button">更新</button>
       </div>
-      <p class="public-rooms-hub__lead">公開中の部屋と常駐ルームを表示します。サムネイルから直接入室できます。</p>
+      <p class="public-rooms-hub__lead">公開中の部屋とフリー/64/32キャンバスを表示します。サムネイルから直接入室できます。</p>
       <div class="public-room-grid" id="publicRoomGrid" aria-live="polite">
         <p class="public-room-empty">公開中の部屋はありません。</p>
       </div>
@@ -2481,17 +2481,36 @@
     const RESIDENT_THUMB_CACHE_KEY = 'pixieed:resident-room-thumb-cache-v1';
     const RESIDENT_THUMB_CACHE_LIMIT = 12;
     const RESIDENT_BLACK_THUMBNAIL_EDGE = 96;
-    const RESIDENT_PRIMARY_PROJECT_KEY = 'resident-256-main';
     const RESIDENT_ROOM_FALLBACKS = Object.freeze([
       Object.freeze({
         id: 'resident-room-256',
-        name: '常駐ルーム 256x256',
+        name: 'フリーキャンバス 256x256',
         type: 'resident',
         projectKey: 'resident-256-main',
         channel: 'resident-256-main',
         size: '256×256',
         maxUsers: 10,
-        description: '最大10人。PiXiEEDrawマルチ常設キーに接続できます。'
+        description: '最大10人。全員が同じ256×256キャンバスへ自由に描けます。'
+      }),
+      Object.freeze({
+        id: 'resident-room-64',
+        name: '64キャンバス',
+        type: 'resident',
+        projectKey: 'resident-64-main',
+        channel: 'resident-64-main',
+        size: '512×512（1人64×64）',
+        maxUsers: 10,
+        description: '最大10人。各参加者に64×64の専用スペースが割り当てられます。'
+      }),
+      Object.freeze({
+        id: 'resident-room-32',
+        name: '32キャンバス',
+        type: 'resident',
+        projectKey: 'resident-32-main',
+        channel: 'resident-32-main',
+        size: '512×512（1人32×32）',
+        maxUsers: 10,
+        description: '最大10人。各参加者に32×32の専用スペースが割り当てられます。'
       })
     ]);
 
@@ -2620,7 +2639,7 @@
       source.forEach((room) => {
         if (room.type !== 'resident') return;
         const key = normalizeProjectKey(room.projectKey || room.channel || room.id || '');
-        if (!key || key !== RESIDENT_PRIMARY_PROJECT_KEY) return;
+        if (!key) return;
         const base = residentByKey.get(key) || {};
         residentByKey.set(key, Object.assign({}, base, room, { type: 'resident' }));
       });
