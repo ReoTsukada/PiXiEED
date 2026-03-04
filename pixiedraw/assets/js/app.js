@@ -36023,14 +36023,22 @@
       if (!isMultiMasterMode() && multiState.connected && isResidentMultiProjectKey(multiState.projectKey)) {
         const onlineMasterExists = !!onlineMaster;
         if (!onlineMasterExists && nextParticipants.size) {
+          const selfClientId = typeof multiState.clientId === 'string' ? multiState.clientId.trim() : '';
           let earliestId = '';
-          let earliestAt = Infinity;
-          for (const [cid, participant] of nextParticipants.entries()) {
-            const joinedAt = Number(participant?.joinedAt) || Date.now();
-            if (joinedAt < earliestAt) {
-              earliestAt = joinedAt;
-              earliestId = cid;
-            }
+          if (nextParticipants.size === 1 && selfClientId && nextParticipants.has(selfClientId)) {
+            earliestId = selfClientId;
+          } else {
+            const ordered = Array.from(nextParticipants.values())
+              .filter(participant => participant && typeof participant.clientId === 'string' && participant.clientId.trim())
+              .sort((left, right) => {
+                const leftAt = Number(left?.joinedAt) || 0;
+                const rightAt = Number(right?.joinedAt) || 0;
+                if (leftAt !== rightAt) {
+                  return leftAt - rightAt;
+                }
+                return String(left.clientId).localeCompare(String(right.clientId));
+              });
+            earliestId = ordered.length ? String(ordered[0].clientId || '').trim() : '';
           }
           if (earliestId && earliestId === (multiState.clientId || '')) {
             scheduleResidentAutoPromoteToMaster();
@@ -36947,6 +36955,21 @@
           }
         } else {
           setMultiStatus(`共有モード: 参加中 (${projectKey})`, 'success');
+        }
+        if (residentProfile) {
+          // Eagerly try resident auto-promotion to avoid a no-master "cannot draw" dead zone.
+          window.setTimeout(() => {
+            if (!multiState.connected || multiState.connecting || isMultiMasterMode()) {
+              return;
+            }
+            if (!isResidentMultiProjectKey(multiState.projectKey)) {
+              return;
+            }
+            if (isMultiMasterCurrentlyOnline()) {
+              return;
+            }
+            scheduleResidentAutoPromoteToMaster();
+          }, 120);
         }
       }
       storePendingMultiResumeSession();
