@@ -138,15 +138,15 @@
 <button class="startup-screen__link" id="startupActionSkip" type="button">この画面を閉じる</button>
 </div>
 </div>
-<div aria-hidden="true" class="update-toast" data-update-id="2026-02-27-home-multi-export-i18n-input-updates" hidden="" id="updateToast" role="status" aria-live="polite">
+<div aria-hidden="true" class="update-toast" data-update-id="2026-03-04-project-tabs-autosave-palette" hidden="" id="updateToast" role="status" aria-live="polite">
 <div class="update-toast__body">
 <p class="update-toast__message">
-<strong>更新情報 (2026/02/27)</strong><br/>
-・PiXiEEDホーム導線を再整理（PiXiEEDraw / Lite の対比を明確化）<br/>
-・常設ルーム運用を 256x256 の1部屋に統一、表示/入室UIを改善<br/>
-・保存/出力からコンテスト投稿への遷移導線を追加、投稿形式を整理<br/>
-・PiXiEEDrawに英語モードを追加し、レイヤー/マルチ文言の英訳を補完<br/>
-・モバイル入力欄のキーボード被り対策と、サイズ入力Enter挙動を改善<br/>
+<strong>更新情報 (2026/03/04)</strong><br/>
+・複数プロジェクトタブ（最大5件）と複数ファイル同時オープンに対応<br/>
+・新規作成時の保存先フォルダ案内と端末内プロジェクト削除確認を追加<br/>
+・左レーンのツール/カラー縦比率をドラッグ調整できるよう改善<br/>
+・ネストスクロール時の親スクロール移譲を改善<br/>
+・貼り付け時に未登録色を自動でパレット追加（失敗時はロールバック）<br/>
 ・詳細は設定の「更新情報」から確認できます
 </p>
 <div class="update-toast__actions">
@@ -202,6 +202,9 @@
 <button aria-label="左パネルを開く / 幅を変更" class="rail-resizer rail-resizer--left" id="resizeLeftRail" type="button"></button>
 </aside>
 <main aria-label="ドットキャンバス" class="stage" id="stage">
+<div aria-label="開いているプロジェクト" class="project-tabs" hidden="" id="projectTabsBar" role="region">
+<div aria-label="プロジェクトタブ" class="project-tabs__list" id="projectTabsList" role="tablist"></div>
+</div>
 <div class="stage__canvas" id="canvasViewport">
 <div aria-live="off" class="canvas-stack" id="canvasStack">
 <canvas aria-label="描画キャンバス" height="32" id="drawingCanvas" width="32"></canvas>
@@ -1135,6 +1138,7 @@
 </label>
 </div>
 </div>
+<p class="help-text" id="newProjectExportFolderGuide">作成時に画像/GIFの保存先フォルダを確認します（対応ブラウザのみ）。</p>
 </div>
 <footer class="modal__footer">
 <button class="button button--ghost" id="cancelNewProject" type="button">キャンセル</button>
