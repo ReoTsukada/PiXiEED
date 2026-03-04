@@ -2688,10 +2688,15 @@
 
         const lobbyRooms = await fetchPublicLobbyRooms(supabase);
         let residentThumbCache = readResidentThumbnailCache();
-        const active = (await Promise.all(withResidentRooms(Array.isArray(rooms) ? rooms : []).map(async (r) => {
+        const configuredRooms = withResidentRooms(Array.isArray(rooms) ? rooms : []);
+        const configuredResidentProjectKeys = new Set();
+        const active = (await Promise.all(configuredRooms.map(async (r) => {
           if (!r || typeof r !== 'object') return null;
           if (r.type === 'resident'){
             const projectKey = normalizeProjectKey(r.projectKey || r.channel || r.id || '');
+            if (projectKey) {
+              configuredResidentProjectKeys.add(projectKey);
+            }
             const lobby = projectKey ? lobbyRooms.get(projectKey) : null;
             const liveThumb = (typeof lobby?.thumbnailDataUrl === 'string' && lobby.thumbnailDataUrl.startsWith('data:image/'))
               ? lobby.thumbnailDataUrl
@@ -2721,6 +2726,48 @@
           }
           return null;
         }))).filter(Boolean);
+
+        // Add dynamically published multi rooms that are not listed in rooms.json.
+        lobbyRooms.forEach((lobby, projectKey) => {
+          const normalizedProjectKey = normalizeProjectKey(projectKey);
+          if (!normalizedProjectKey || configuredResidentProjectKeys.has(normalizedProjectKey)) {
+            return;
+          }
+          const liveThumb = (typeof lobby?.thumbnailDataUrl === 'string' && lobby.thumbnailDataUrl.startsWith('data:image/'))
+            ? lobby.thumbnailDataUrl
+            : '';
+          if (liveThumb) {
+            residentThumbCache = setResidentThumbnailCache(
+              normalizedProjectKey,
+              liveThumb,
+              Number(lobby?.updatedAt) || Date.now(),
+              residentThumbCache
+            );
+          }
+          const cachedThumb = getResidentThumbnailFromCache(normalizedProjectKey, residentThumbCache);
+          const fallbackThumb = cachedThumb?.thumbnailDataUrl || RESIDENT_BLACK_THUMBNAIL_DATA_URL || '';
+          const maxGuests = Math.max(0, Math.round(Number(lobby?.maxGuests) || 0));
+          active.push({
+            id: `resident-dynamic-${normalizedProjectKey}`,
+            name: `公開ルーム (${normalizedProjectKey})`,
+            type: 'resident',
+            projectKey: normalizedProjectKey,
+            channel: normalizedProjectKey,
+            description: 'PiXiEEDrawで公開中の共同制作ルームです。',
+            size: '',
+            maxUsers: maxGuests > 0 ? (maxGuests + 1) : 0,
+            isLive: true,
+            thumbnail: liveThumb || fallbackThumb || null,
+            participantCount: Number(lobby?.participantCount) || 0,
+            updatedAt: Number(lobby?.updatedAt) || Date.now(),
+          });
+        });
+
+        active.sort((a, b) => {
+          const left = Number(a?.updatedAt) || 0;
+          const right = Number(b?.updatedAt) || 0;
+          return right - left;
+        });
 
         grid.innerHTML = '';
         if (!active.length){ grid.innerHTML = '<p class="public-room-empty">公開中の部屋はありません。</p>'; return; }
