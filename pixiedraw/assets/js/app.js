@@ -1009,6 +1009,14 @@
   const MULTI_PUBLIC_ROOM_SYNC_THROTTLE_MS = 2400;
   const MULTI_PUBLIC_ROOM_THUMBNAIL_MAX_EDGE = 128;
   const MULTI_PUBLIC_ROOM_THUMBNAIL_MAX_DATA_URL_LENGTH = 180000;
+  const RESIDENT_ROOM_PERSIST_VERSION = 1;
+  const RESIDENT_ROOM_PERSIST_STORAGE_PREFIX = 'pixieedraw:resident-room-persist:';
+  const RESIDENT_ROOM_PERSIST_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 365 * 5;
+  const RESIDENT_ROOM_PERSIST_WRITE_DELAY = 2200;
+  const RESIDENT_ROOM_PERSIST_REMOTE_BUCKET = 'pixieed-resident-state';
+  const RESIDENT_ROOM_PERSIST_REMOTE_LEGACY_BUCKETS = Object.freeze(['pixieed-contest']);
+  const RESIDENT_ROOM_PERSIST_REMOTE_PREFIX = 'resident-room-state';
+  const RESIDENT_ROOM_PERSIST_REMOTE_MAX_BYTES = 4_500_000;
   const MULTI_SYNC_THROTTLE_MS = 150;
   const MULTI_LAYER_PATCH_FULL_RATIO = 0.45;
   const MULTI_JOIN_REQUEST_COOLDOWN_MS = 6000;
@@ -1165,6 +1173,10 @@
     publicLobbyChannel: null,
     publicLobbySyncTimer: null,
     publicLobbySyncInFlight: false,
+    residentPersistTimer: null,
+    residentPersistInFlight: false,
+    residentPersistQueued: false,
+    residentPersistSignature: '',
     residentAutoPromoteTimer: null,
     assignmentSyncRequestAt: 0,
   // masterForcedDanmakuOff removed: clients control danmaku locally
@@ -3709,6 +3721,9 @@
 
   function handleAutosavePageHide() {
     flushAutosaveSnapshotOnLifecycle({ force: true });
+    if (isResidentMultiRestrictedMasterMode()) {
+      scheduleResidentRoomPersist({ immediate: true, force: true });
+    }
   }
 
   function handleAutosaveVisibilityChange() {
@@ -3716,6 +3731,9 @@
       return;
     }
     flushAutosaveSnapshotOnLifecycle({ force: true });
+    if (isResidentMultiRestrictedMasterMode()) {
+      scheduleResidentRoomPersist({ immediate: true, force: true });
+    }
   }
 
   function shouldWarnWhenLeavingPage() {
@@ -30739,9 +30757,15 @@
     return true;
   }
 
-  function primeResidentMasterDocument(profile) {
+  async function primeResidentMasterDocument(profile) {
     if (!profile || typeof profile !== 'object') {
       return false;
+    }
+    const restored = await restoreResidentRoomPersistedState(profile);
+    if (restored) {
+      ensureResidentTimelapseCaptureStarted();
+      scheduleResidentRoomPersist({ immediate: false, projectKey: profile.projectKey || multiState.projectKey, force: false });
+      return true;
     }
     const targetWidth = clamp(Math.round(Number(profile.width) || state.width), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
     const targetHeight = clamp(Math.round(Number(profile.height) || state.height), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
@@ -30769,6 +30793,8 @@
     requestOverlayRender();
     markAutosaveDirty();
     scheduleAutosaveSnapshot();
+    ensureResidentTimelapseCaptureStarted();
+    scheduleResidentRoomPersist({ immediate: true, projectKey: profile.projectKey || multiState.projectKey, force: true });
     return true;
   }
 
@@ -30926,6 +30952,547 @@
     } catch (error) {
       // Ignore storage errors.
     }
+  }
+
+  function normalizeResidentRoomPersistProjectKey(projectKey = multiState.projectKey) {
+    const normalized = normalizeMultiProjectKey(projectKey);
+    if (!normalized) {
+      return '';
+    }
+    if (!isResidentMultiProjectKey(normalized)) {
+      return '';
+    }
+    return normalized;
+  }
+
+  function getResidentRoomPersistStorageKey(projectKey = multiState.projectKey) {
+    const normalized = normalizeResidentRoomPersistProjectKey(projectKey);
+    if (!normalized) {
+      return '';
+    }
+    return `${RESIDENT_ROOM_PERSIST_STORAGE_PREFIX}${normalized}`;
+  }
+
+  function getResidentRoomPersistRemotePath(projectKey = multiState.projectKey) {
+    const normalized = normalizeResidentRoomPersistProjectKey(projectKey);
+    if (!normalized) {
+      return '';
+    }
+    return `${RESIDENT_ROOM_PERSIST_REMOTE_PREFIX}/${normalized}.json`;
+  }
+
+  function getTextByteSize(text) {
+    if (typeof text !== 'string') {
+      return 0;
+    }
+    try {
+      return new Blob([text]).size;
+    } catch (error) {
+      return text.length;
+    }
+  }
+
+  function withTimeoutResult(promise, timeoutMs = 3000, fallback = null) {
+    const safeTimeout = Math.max(50, Math.round(Number(timeoutMs) || 0));
+    return new Promise(resolve => {
+      let settled = false;
+      const timer = window.setTimeout(() => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        resolve(fallback);
+      }, safeTimeout);
+      Promise.resolve(promise)
+        .then(value => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          window.clearTimeout(timer);
+          resolve(value);
+        })
+        .catch(() => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          window.clearTimeout(timer);
+          resolve(fallback);
+        });
+    });
+  }
+
+  function thinSerializedTimelapseSnapshotList(list) {
+    if (!Array.isArray(list) || list.length <= 2) {
+      return false;
+    }
+    for (let index = list.length - 2; index >= 1; index -= 2) {
+      list.splice(index, 1);
+    }
+    return true;
+  }
+
+  function buildResidentRoomPersistSignature(projectKey = multiState.projectKey) {
+    const normalizedProjectKey = normalizeResidentRoomPersistProjectKey(projectKey);
+    if (!normalizedProjectKey) {
+      return '';
+    }
+    return [
+      normalizedProjectKey,
+      String(Math.round(Number(state.width) || 0)),
+      String(Math.round(Number(state.height) || 0)),
+      String(Math.round(Number(unsavedChangeToken) || 0)),
+      String(Math.round(Number(timelapseState.lastCaptureToken) || 0)),
+      String(Array.isArray(timelapseState.snapshots) ? timelapseState.snapshots.length : 0),
+      timelapseState.enabled ? '1' : '0',
+    ].join('|');
+  }
+
+  function ensureResidentTimelapseCaptureStarted() {
+    if (!isResidentMultiRestrictedMasterMode()) {
+      return false;
+    }
+    if (!timelapseState.enabled) {
+      timelapseState.enabled = true;
+    }
+    if (Array.isArray(timelapseState.snapshots) && timelapseState.snapshots.length > 0) {
+      return false;
+    }
+    const startEntry = createTimelapseFrameEntryFromState();
+    if (!startEntry) {
+      return false;
+    }
+    timelapseState.snapshots.push(startEntry);
+    timelapseState.lastCaptureToken = unsavedChangeToken;
+    syncTimelapseControls();
+    updateMemoryStatus();
+    return true;
+  }
+
+  function buildResidentRoomPersistPayload(projectKey = multiState.projectKey, { maxBytes = 0 } = {}) {
+    const normalizedProjectKey = normalizeResidentRoomPersistProjectKey(projectKey);
+    if (!normalizedProjectKey) {
+      return null;
+    }
+    const snapshot = makeHistorySnapshot({
+      includeUiState: false,
+      includeSelection: false,
+      clonePixelData: false,
+    });
+    if (!snapshot || !Array.isArray(snapshot.frames) || !snapshot.frames.length) {
+      return null;
+    }
+    const sessionPayload = buildAutosaveSessionPayload();
+    const timelapsePayload = sessionPayload && typeof sessionPayload.timelapse === 'object'
+      ? {
+        enabled: Boolean(sessionPayload.timelapse.enabled),
+        fps: normalizeTimelapseFps(sessionPayload.timelapse.fps),
+        warningShown: Boolean(sessionPayload.timelapse.warningShown),
+        sampleStep: Math.max(1, Math.round(Number(sessionPayload.timelapse.sampleStep) || 1)),
+        lastCaptureToken: Number.isFinite(Number(sessionPayload.timelapse.lastCaptureToken))
+          ? Math.round(Number(sessionPayload.timelapse.lastCaptureToken))
+          : -1,
+        snapshots: Array.isArray(sessionPayload.timelapse.snapshots)
+          ? sessionPayload.timelapse.snapshots.slice()
+          : [],
+      }
+      : {
+        enabled: true,
+        fps: normalizeTimelapseFps(timelapseState.fps),
+        warningShown: false,
+        sampleStep: 1,
+        lastCaptureToken: -1,
+        snapshots: [],
+      };
+    const payload = {
+      version: RESIDENT_ROOM_PERSIST_VERSION,
+      projectKey: normalizedProjectKey,
+      updatedAt: Date.now(),
+      document: serializeDocumentSnapshot(snapshot),
+      session: {
+        historyLimit: normalizeProjectHistoryLimit(history.limit, DEFAULT_HISTORY_LIMIT),
+        historyPast: [],
+        historyFuture: [],
+        timelapse: timelapsePayload,
+      },
+    };
+
+    let encoded = encodeReloadSnapshotPayload(payload);
+    if (!encoded) {
+      return null;
+    }
+    const limit = Math.max(0, Math.floor(Number(maxBytes) || 0));
+    if (limit > 0) {
+      let safety = 0;
+      while (getTextByteSize(encoded) > limit && safety < 10) {
+        const snapshots = payload.session?.timelapse?.snapshots;
+        if (!Array.isArray(snapshots) || snapshots.length <= 12) {
+          break;
+        }
+        const thinned = thinSerializedTimelapseSnapshotList(snapshots);
+        if (!thinned) {
+          break;
+        }
+        payload.session.timelapse.sampleStep = Math.max(
+          1,
+          Math.round(Number(payload.session.timelapse.sampleStep) || 1) * 2
+        );
+        payload.session.timelapse.warningShown = true;
+        encoded = encodeReloadSnapshotPayload(payload);
+        if (!encoded) {
+          return null;
+        }
+        safety += 1;
+      }
+    }
+    return { payload, encoded };
+  }
+
+  function readResidentRoomPersistPayloadFromEncoded(encodedText, projectKey = multiState.projectKey) {
+    if (typeof encodedText !== 'string' || !encodedText.length) {
+      return null;
+    }
+    const normalizedProjectKey = normalizeResidentRoomPersistProjectKey(projectKey);
+    if (!normalizedProjectKey) {
+      return null;
+    }
+    const parsed = decodeReloadSnapshotPayload(encodedText);
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+    const version = Math.round(Number(parsed.version) || 0);
+    const payloadProjectKey = normalizeMultiProjectKey(parsed.projectKey || '');
+    if (version !== RESIDENT_ROOM_PERSIST_VERSION || payloadProjectKey !== normalizedProjectKey) {
+      return null;
+    }
+    const updatedAt = Number(parsed.updatedAt);
+    if (Number.isFinite(updatedAt)) {
+      const age = Date.now() - updatedAt;
+      if (age < 0 || age > RESIDENT_ROOM_PERSIST_MAX_AGE_MS) {
+        return null;
+      }
+    }
+    if (!parsed.document || typeof parsed.document !== 'object') {
+      return null;
+    }
+    let snapshot = null;
+    try {
+      snapshot = deserializeDocumentPayload(parsed.document);
+    } catch (error) {
+      return null;
+    }
+    if (!snapshot || !Array.isArray(snapshot.frames) || !snapshot.frames.length) {
+      return null;
+    }
+    const profile = getResidentMultiRoomProfile(normalizedProjectKey);
+    if (profile) {
+      const snapshotWidth = Math.max(1, Math.round(Number(snapshot.width) || 0));
+      const snapshotHeight = Math.max(1, Math.round(Number(snapshot.height) || 0));
+      if (snapshotWidth !== profile.width || snapshotHeight !== profile.height) {
+        return null;
+      }
+    }
+    const projectSession = parseProjectSessionPayload(parsed.session);
+    return {
+      snapshot,
+      projectSession,
+      updatedAt: Number(parsed.updatedAt) || 0,
+      payload: parsed,
+    };
+  }
+
+  function readResidentRoomPersistPayloadFromLocal(projectKey = multiState.projectKey) {
+    if (!canUseSessionStorage) {
+      return null;
+    }
+    const storageKey = getResidentRoomPersistStorageKey(projectKey);
+    if (!storageKey) {
+      return null;
+    }
+    let raw = '';
+    try {
+      raw = window.localStorage.getItem(storageKey) || '';
+    } catch (error) {
+      return null;
+    }
+    if (!raw) {
+      return null;
+    }
+    const parsed = readResidentRoomPersistPayloadFromEncoded(raw, projectKey);
+    if (!parsed) {
+      try {
+        window.localStorage.removeItem(storageKey);
+      } catch (error) {
+        // Ignore storage errors.
+      }
+    }
+    return parsed;
+  }
+
+  function writeResidentRoomPersistPayloadToLocal(encodedText, projectKey = multiState.projectKey) {
+    if (!canUseSessionStorage || typeof encodedText !== 'string' || !encodedText.length) {
+      return false;
+    }
+    const storageKey = getResidentRoomPersistStorageKey(projectKey);
+    if (!storageKey) {
+      return false;
+    }
+    try {
+      window.localStorage.setItem(storageKey, encodedText);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  async function readResidentRoomPersistPayloadFromRemote(projectKey = multiState.projectKey) {
+    const normalizedProjectKey = normalizeResidentRoomPersistProjectKey(projectKey);
+    if (!normalizedProjectKey) {
+      return null;
+    }
+    const remotePath = getResidentRoomPersistRemotePath(normalizedProjectKey);
+    if (!remotePath) {
+      return null;
+    }
+    try {
+      const supabase = await ensureMultiSupabaseClient();
+      if (!supabase?.storage?.from) {
+        return null;
+      }
+      const bucketCandidates = [RESIDENT_ROOM_PERSIST_REMOTE_BUCKET]
+        .concat(Array.isArray(RESIDENT_ROOM_PERSIST_REMOTE_LEGACY_BUCKETS) ? RESIDENT_ROOM_PERSIST_REMOTE_LEGACY_BUCKETS : []);
+      const visited = new Set();
+      for (let index = 0; index < bucketCandidates.length; index += 1) {
+        const bucket = typeof bucketCandidates[index] === 'string' ? bucketCandidates[index].trim() : '';
+        if (!bucket || visited.has(bucket)) {
+          continue;
+        }
+        visited.add(bucket);
+        const downloadResult = await withTimeoutResult(
+          supabase
+            .storage
+            .from(bucket)
+            .download(remotePath),
+          2600,
+          null
+        );
+        const data = downloadResult?.data || null;
+        const error = downloadResult?.error || null;
+        if (error || !data) {
+          continue;
+        }
+        let raw = '';
+        try {
+          raw = await data.text();
+        } catch (errorRead) {
+          raw = '';
+        }
+        if (typeof raw !== 'string' || !raw.length) {
+          continue;
+        }
+        const parsed = readResidentRoomPersistPayloadFromEncoded(raw, normalizedProjectKey);
+        if (parsed) {
+          return Object.assign({}, parsed, { sourceBucket: bucket });
+        }
+      }
+      return null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async function writeResidentRoomPersistPayloadToRemote(encodedText, projectKey = multiState.projectKey) {
+    if (typeof encodedText !== 'string' || !encodedText.length) {
+      return false;
+    }
+    const normalizedProjectKey = normalizeResidentRoomPersistProjectKey(projectKey);
+    if (!normalizedProjectKey) {
+      return false;
+    }
+    const remotePath = getResidentRoomPersistRemotePath(normalizedProjectKey);
+    if (!remotePath) {
+      return false;
+    }
+    if (getTextByteSize(encodedText) > RESIDENT_ROOM_PERSIST_REMOTE_MAX_BYTES) {
+      return false;
+    }
+    try {
+      const supabase = await ensureMultiSupabaseClient();
+      if (!supabase?.storage?.from) {
+        return false;
+      }
+      const payloadBlob = new Blob([encodedText], { type: 'text/plain;charset=utf-8' });
+      const uploadResult = await withTimeoutResult(
+        supabase
+          .storage
+          .from(RESIDENT_ROOM_PERSIST_REMOTE_BUCKET)
+          .upload(remotePath, payloadBlob, {
+            upsert: true,
+            contentType: 'text/plain;charset=utf-8',
+            cacheControl: '0',
+          }),
+        2600,
+        null
+      );
+      const error = uploadResult?.error || null;
+      return !error;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function applyResidentRoomPersistedState(restored) {
+    if (!restored || typeof restored !== 'object' || !restored.snapshot) {
+      return false;
+    }
+    const snapshot = restored.snapshot;
+    const projectSession = restored.projectSession;
+    autosaveRestoring = true;
+    try {
+      applyHistorySnapshot(snapshot);
+      history.pending = null;
+      if (projectSession) {
+        history.limit = projectSession.historyLimit;
+        history.past = projectSession.historyPast;
+        history.future = projectSession.historyFuture;
+        if (!(timelapseState.snapshots instanceof Array)) {
+          timelapseState.snapshots = [];
+        }
+        timelapseState.snapshots.length = 0;
+        projectSession.timelapse.snapshots.forEach(entry => {
+          timelapseState.snapshots.push(entry);
+        });
+        timelapseState.enabled = true;
+        timelapseState.fps = normalizeTimelapseFps(projectSession.timelapse.fps);
+        timelapseState.warningShown = Boolean(projectSession.timelapse.warningShown);
+        timelapseState.sampleStep = Math.max(1, Math.round(Number(projectSession.timelapse.sampleStep) || 1));
+        timelapseState.lastCaptureToken = Number.isFinite(Number(projectSession.timelapse.lastCaptureToken))
+          ? Math.round(Number(projectSession.timelapse.lastCaptureToken))
+          : -1;
+      } else {
+        history.past = [];
+        history.future = [];
+        clearTimelapseRecording({ silent: true });
+      }
+    } finally {
+      autosaveRestoring = false;
+    }
+    clearMultiLayerPatchSnapshots();
+    syncTimelapseControls();
+    updateHistoryButtons();
+    updateMemoryStatus();
+    resetDocumentUnsavedChanges();
+    syncControlsWithState();
+    renderFrameList();
+    renderLayerList();
+    requestRender();
+    requestOverlayRender();
+    return true;
+  }
+
+  async function restoreResidentRoomPersistedState(profile = getResidentMultiRoomProfile(multiState.projectKey)) {
+    if (!profile || typeof profile !== 'object') {
+      return false;
+    }
+    const projectKey = normalizeResidentRoomPersistProjectKey(profile.projectKey || multiState.projectKey);
+    if (!projectKey) {
+      return false;
+    }
+    const remote = await readResidentRoomPersistPayloadFromRemote(projectKey);
+    if (remote && applyResidentRoomPersistedState(remote)) {
+      const encoded = encodeReloadSnapshotPayload(remote.payload);
+      if (encoded) {
+        writeResidentRoomPersistPayloadToLocal(encoded, projectKey);
+        const sourceBucket = typeof remote.sourceBucket === 'string' ? remote.sourceBucket.trim() : '';
+        if (sourceBucket && sourceBucket !== RESIDENT_ROOM_PERSIST_REMOTE_BUCKET) {
+          writeResidentRoomPersistPayloadToRemote(encoded, projectKey).catch(() => {});
+        }
+      }
+      return true;
+    }
+    const local = readResidentRoomPersistPayloadFromLocal(projectKey);
+    if (local && applyResidentRoomPersistedState(local)) {
+      return true;
+    }
+    return false;
+  }
+
+  function clearResidentRoomPersistTimer() {
+    if (multiState.residentPersistTimer !== null) {
+      window.clearTimeout(multiState.residentPersistTimer);
+      multiState.residentPersistTimer = null;
+    }
+  }
+
+  function shouldPersistResidentRoomState(projectKey = multiState.projectKey) {
+    const normalizedProjectKey = normalizeResidentRoomPersistProjectKey(projectKey);
+    if (!normalizedProjectKey) {
+      return false;
+    }
+    return Boolean(isMultiMasterMode() && !multiState.connecting && multiState.connected);
+  }
+
+  async function flushResidentRoomPersistNow({ projectKey = multiState.projectKey, force = false } = {}) {
+    const normalizedProjectKey = normalizeResidentRoomPersistProjectKey(projectKey);
+    if (!normalizedProjectKey) {
+      return false;
+    }
+    if (!shouldPersistResidentRoomState(normalizedProjectKey)) {
+      return false;
+    }
+    if (multiState.residentPersistInFlight) {
+      multiState.residentPersistQueued = true;
+      return false;
+    }
+    ensureResidentTimelapseCaptureStarted();
+    const signature = buildResidentRoomPersistSignature(normalizedProjectKey);
+    if (!force && signature && signature === multiState.residentPersistSignature) {
+      return true;
+    }
+    multiState.residentPersistInFlight = true;
+    let persisted = false;
+    try {
+      const built = buildResidentRoomPersistPayload(normalizedProjectKey, {
+        maxBytes: RESIDENT_ROOM_PERSIST_REMOTE_MAX_BYTES,
+      });
+      if (!built || typeof built.encoded !== 'string' || !built.encoded.length) {
+        return false;
+      }
+      const localSaved = writeResidentRoomPersistPayloadToLocal(built.encoded, normalizedProjectKey);
+      const remoteSaved = await writeResidentRoomPersistPayloadToRemote(built.encoded, normalizedProjectKey);
+      persisted = Boolean(localSaved || remoteSaved);
+      if (persisted && signature) {
+        multiState.residentPersistSignature = signature;
+      }
+      return persisted;
+    } finally {
+      multiState.residentPersistInFlight = false;
+      if (multiState.residentPersistQueued) {
+        multiState.residentPersistQueued = false;
+        scheduleResidentRoomPersist({ immediate: true, projectKey: normalizedProjectKey, force: !persisted });
+      }
+    }
+  }
+
+  function scheduleResidentRoomPersist({ immediate = false, projectKey = multiState.projectKey, force = false } = {}) {
+    const normalizedProjectKey = normalizeResidentRoomPersistProjectKey(projectKey);
+    if (!normalizedProjectKey || !shouldPersistResidentRoomState(normalizedProjectKey)) {
+      clearResidentRoomPersistTimer();
+      return;
+    }
+    if (immediate) {
+      clearResidentRoomPersistTimer();
+      flushResidentRoomPersistNow({ projectKey: normalizedProjectKey, force }).catch(() => {});
+      return;
+    }
+    if (multiState.residentPersistTimer !== null) {
+      return;
+    }
+    multiState.residentPersistTimer = window.setTimeout(() => {
+      multiState.residentPersistTimer = null;
+      flushResidentRoomPersistNow({ projectKey: normalizedProjectKey, force }).catch(() => {});
+    }, RESIDENT_ROOM_PERSIST_WRITE_DELAY);
   }
 
   function clearStoredMultiResumeSession() {
@@ -35855,6 +36422,11 @@
     if (!applied) {
       return;
     }
+    if (isResidentMultiRestrictedMasterMode()) {
+      ensureResidentTimelapseCaptureStarted();
+      captureTimelapseFrameFromState();
+      scheduleResidentRoomPersist({ immediate: false, force: true });
+    }
     applyMultiAssignmentsFromPayload(payload.assignments, multiState.clientId, payload.blockedClientIds);
     multiState.assignments.forEach((entry, clientId) => {
       if (!entry || typeof entry !== 'object') {
@@ -35936,6 +36508,11 @@
     markRemoteMultiStateDirty();
     requestRender();
     requestOverlayRender();
+    if (inMasterMode && isResidentMultiRestrictedMasterMode()) {
+      ensureResidentTimelapseCaptureStarted();
+      captureTimelapseFrameFromState();
+      scheduleResidentRoomPersist({ immediate: false });
+    }
     if (!inMasterMode) {
       if (isMultiMasterCurrentlyOnline()) {
         return;
@@ -36053,10 +36630,20 @@
       || multiState.role === 'spectator'
       ? multiState.role
       : 'none';
+    const residentProjectKeyAtDisconnect = disconnectedRole === 'master'
+      ? normalizeResidentRoomPersistProjectKey(multiState.projectKey)
+      : '';
     const shouldRestoreReplicaSnapshot = Boolean(
       restoreLocalDocument
       && isMultiReplicaRole(disconnectedRole)
     );
+    clearResidentRoomPersistTimer();
+    if (residentProjectKeyAtDisconnect) {
+      await flushResidentRoomPersistNow({
+        projectKey: residentProjectKeyAtDisconnect,
+        force: true,
+      });
+    }
     clearMultiBroadcastTimer();
     clearPendingMultiSessionStateApply();
     clearMultiLayerPatchSnapshots();
@@ -36090,6 +36677,9 @@
     multiState.roomVisibility = MULTI_DEFAULT_ROOM_VISIBILITY;
     multiState.joinPolicy = MULTI_DEFAULT_JOIN_POLICY;
     multiState.exportPermission = MULTI_DEFAULT_EXPORT_PERMISSION;
+    multiState.residentPersistInFlight = false;
+    multiState.residentPersistQueued = false;
+    multiState.residentPersistSignature = '';
     clearStoredMultiResumeSession();
     await disconnectMultiPublicLobbyChannel();
     if (channel) {
@@ -36339,7 +36929,7 @@
       if (normalizedRole === 'master') {
         clearMultiLocalSnapshotBeforeReplica();
         if (residentProfile) {
-          primeResidentMasterDocument(residentProfile);
+          await primeResidentMasterDocument(residentProfile);
         }
         startMultiMasterRecoveryFlow(projectKey);
       } else {
@@ -36387,6 +36977,7 @@
         if (HISTORY_DRAW_TOOLS.has(_label)) {
           sendMasterLayerPatch();
           scheduleMultiPublicLobbyRoomSync({ immediate: false });
+          scheduleResidentRoomPersist({ immediate: false });
         }
         return;
       }
