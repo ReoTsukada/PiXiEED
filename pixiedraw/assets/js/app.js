@@ -17056,9 +17056,19 @@
     const isMobile = layoutMode === 'mobilePortrait';
     const leftWidth = isMobile ? 0 : (dom.leftRail ? dom.leftRail.offsetWidth : 0);
     const rightWidth = isMobile ? 0 : (dom.rightRail ? dom.rightRail.offsetWidth : 0);
+    const leftCompactVisible = !isMobile
+      && dom.leftRail instanceof HTMLElement
+      && dom.leftRail.dataset.compact === 'true'
+      && dom.leftRail.dataset.collapsed !== 'true';
+    const rightCompactVisible = !isMobile
+      && dom.rightRail instanceof HTMLElement
+      && dom.rightRail.dataset.compact === 'true'
+      && dom.rightRail.dataset.collapsed !== 'true';
     const toggleMargin = 12;
     layoutNode.style.setProperty('--left-toggle-offset', `${leftWidth ? leftWidth + toggleMargin : toggleMargin}px`);
     layoutNode.style.setProperty('--right-toggle-offset', `${rightWidth ? rightWidth + toggleMargin : toggleMargin}px`);
+    layoutNode.style.setProperty('--project-tabs-inset-left', `${leftCompactVisible ? leftWidth : 0}px`);
+    layoutNode.style.setProperty('--project-tabs-inset-right', `${rightCompactVisible ? rightWidth : 0}px`);
   }
 
   function isCoarsePointerDevice() {
@@ -25264,12 +25274,7 @@
     const localMask = new Uint8Array(size);
     const localIndices = new Int16Array(size);
     const localDirect = new Uint8ClampedArray(size * 4);
-    let imageData = null;
-    if (ctx.overlay && typeof ctx.overlay.createImageData === 'function') {
-      imageData = ctx.overlay.createImageData(width, height);
-    } else if (typeof ImageData === 'function') {
-      imageData = new ImageData(width, height);
-    }
+    const imageData = createBlankImageData(width, height);
 
     const layerDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
 
@@ -25331,6 +25336,8 @@
       }
     }
 
+    const previewCanvas = createMovePreviewCanvasFromImageData(imageData)
+      || createMovePreviewCanvasFromPixels(width, height, localMask, localIndices, localDirect);
     return {
       layer,
       bounds: { ...bounds },
@@ -25340,6 +25347,7 @@
       indices: localIndices,
       direct: localDirect,
       imageData,
+      previewCanvas,
       offset: { x: 0, y: 0 },
       hasCleared: false,
       applySelectionOnFinalize: true,
@@ -25638,7 +25646,11 @@
       return null;
     }
     if (ctx.overlay && typeof ctx.overlay.createImageData === 'function') {
-      return ctx.overlay.createImageData(w, h);
+      try {
+        return ctx.overlay.createImageData(w, h);
+      } catch (error) {
+        // Fall through to ImageData constructor fallback.
+      }
     }
     if (typeof ImageData === 'function') {
       try {
@@ -25652,6 +25664,145 @@
       }
     }
     return null;
+  }
+
+  function createMovePreviewCanvasFromImageData(imageData) {
+    if (!imageData || typeof document === 'undefined' || typeof document.createElement !== 'function') {
+      return null;
+    }
+    const width = Math.max(0, Math.floor(Number(imageData.width) || 0));
+    const height = Math.max(0, Math.floor(Number(imageData.height) || 0));
+    if (width <= 0 || height <= 0) {
+      return null;
+    }
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      let previewCtx = null;
+      try {
+        previewCtx = canvas.getContext('2d', { willReadFrequently: true });
+      } catch (error) {
+        previewCtx = canvas.getContext('2d');
+      }
+      if (!previewCtx) {
+        return null;
+      }
+      previewCtx.imageSmoothingEnabled = false;
+      previewCtx.putImageData(imageData, 0, 0);
+      return canvas;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function createMovePreviewCanvasFromPixels(width, height, mask, indices, direct) {
+    if (typeof document === 'undefined' || typeof document.createElement !== 'function') {
+      return null;
+    }
+    const w = Math.max(0, Math.floor(Number(width) || 0));
+    const h = Math.max(0, Math.floor(Number(height) || 0));
+    if (w <= 0 || h <= 0) {
+      return null;
+    }
+    const expectedSize = w * h;
+    if (!(mask instanceof Uint8Array) || mask.length !== expectedSize) {
+      return null;
+    }
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const previewCtx = canvas.getContext('2d');
+      if (!previewCtx) {
+        return null;
+      }
+      previewCtx.imageSmoothingEnabled = false;
+      const palette = Array.isArray(state.palette) ? state.palette : [];
+
+      let imageData = null;
+      try {
+        imageData = previewCtx.createImageData(w, h);
+      } catch (error) {
+        imageData = null;
+      }
+
+      if (imageData && imageData.data instanceof Uint8ClampedArray) {
+        const data = imageData.data;
+        for (let i = 0; i < expectedSize; i += 1) {
+          const base = i * 4;
+          if (mask[i] !== 1) {
+            data[base] = 0;
+            data[base + 1] = 0;
+            data[base + 2] = 0;
+            data[base + 3] = 0;
+            continue;
+          }
+          const paletteIndex = indices instanceof Int16Array ? indices[i] : -1;
+          if (paletteIndex >= 0 && palette[paletteIndex]) {
+            const color = palette[paletteIndex];
+            data[base] = color.r;
+            data[base + 1] = color.g;
+            data[base + 2] = color.b;
+            data[base + 3] = color.a;
+          } else if (direct instanceof Uint8ClampedArray && direct.length >= base + 4) {
+            data[base] = direct[base];
+            data[base + 1] = direct[base + 1];
+            data[base + 2] = direct[base + 2];
+            data[base + 3] = direct[base + 3];
+          } else {
+            data[base] = 0;
+            data[base + 1] = 0;
+            data[base + 2] = 0;
+            data[base + 3] = 0;
+          }
+        }
+        previewCtx.putImageData(imageData, 0, 0);
+        return canvas;
+      }
+
+      let lastFillStyle = '';
+      for (let y = 0; y < h; y += 1) {
+        for (let x = 0; x < w; x += 1) {
+          const localIndex = y * w + x;
+          if (mask[localIndex] !== 1) {
+            continue;
+          }
+          const paletteIndex = indices instanceof Int16Array ? indices[localIndex] : -1;
+          let r = 0;
+          let g = 0;
+          let b = 0;
+          let a = 0;
+          if (paletteIndex >= 0 && palette[paletteIndex]) {
+            const color = palette[paletteIndex];
+            r = color.r;
+            g = color.g;
+            b = color.b;
+            a = color.a;
+          } else if (direct instanceof Uint8ClampedArray) {
+            const base = localIndex * 4;
+            if (direct.length >= base + 4) {
+              r = direct[base];
+              g = direct[base + 1];
+              b = direct[base + 2];
+              a = direct[base + 3];
+            }
+          }
+          if (a <= 0) {
+            continue;
+          }
+          const fillStyle = `rgba(${r},${g},${b},${(a / 255).toFixed(4)})`;
+          if (fillStyle !== lastFillStyle) {
+            previewCtx.fillStyle = fillStyle;
+            lastFillStyle = fillStyle;
+          }
+          previewCtx.fillRect(x, y, 1, 1);
+        }
+      }
+      return canvas;
+    } catch (error) {
+      return null;
+    }
   }
 
   function populateImageDataFromPixels(imageData, indices, direct, mask) {
@@ -25852,6 +26003,8 @@
         populateImageDataFromPixels(imageData, indices, direct, mask);
       }
     }
+    const previewCanvas = createMovePreviewCanvasFromImageData(imageData)
+      || createMovePreviewCanvasFromPixels(width, height, mask, indices, direct);
     return {
       layer,
       layerId: layer?.id || null,
@@ -25862,6 +26015,7 @@
       indices,
       direct,
       imageData,
+      previewCanvas,
       offset: { x: 0, y: 0 },
       hasCleared: false,
       restoreIndices: null,
@@ -26019,6 +26173,8 @@
       }
     }
 
+    const previewCanvas = createMovePreviewCanvasFromImageData(imageData)
+      || createMovePreviewCanvasFromPixels(moveWidth, moveHeight, mask, indices, direct);
     return {
       layer,
       layerId: layer.id,
@@ -26029,6 +26185,7 @@
       indices,
       direct,
       imageData,
+      previewCanvas,
       offset: { x: 0, y: 0 },
       hasCleared: false,
       restoreIndices: null,
@@ -26408,8 +26565,52 @@
     const originX = moveState.bounds.x0 + moveState.offset.x;
     const originY = moveState.bounds.y0 + moveState.offset.y;
 
-    if (ctx.overlay && moveState.imageData) {
-      ctx.overlay.putImageData(moveState.imageData, originX, originY);
+    if (ctx.overlay) {
+      let rendered = false;
+      const previewCanvas = moveState.previewCanvas;
+      if (previewCanvas) {
+        try {
+          ctx.overlay.drawImage(previewCanvas, originX, originY);
+          rendered = true;
+        } catch (error) {
+          moveState.previewCanvas = null;
+        }
+      }
+      if (!rendered && moveState.imageData) {
+        try {
+          ctx.overlay.putImageData(moveState.imageData, originX, originY);
+          rendered = true;
+        } catch (error) {
+          const fallbackCanvas = createMovePreviewCanvasFromImageData(moveState.imageData);
+          if (fallbackCanvas) {
+            moveState.previewCanvas = fallbackCanvas;
+            try {
+              ctx.overlay.drawImage(fallbackCanvas, originX, originY);
+              rendered = true;
+            } catch (innerError) {
+              // Keep outline rendering even if bitmap draw fails.
+            }
+          }
+        }
+      }
+      if (!rendered) {
+        const fallbackCanvas = createMovePreviewCanvasFromPixels(
+          moveState.width,
+          moveState.height,
+          moveState.mask,
+          moveState.indices,
+          moveState.direct
+        );
+        if (fallbackCanvas) {
+          moveState.previewCanvas = fallbackCanvas;
+          try {
+            ctx.overlay.drawImage(fallbackCanvas, originX, originY);
+            rendered = true;
+          } catch (error) {
+            // Ignore and continue with outline only.
+          }
+        }
+      }
     }
 
     if (!ctx.selection) {
@@ -28918,6 +29119,29 @@
       const x1 = Math.max(start.x, end.x);
       const y0 = Math.min(start.y, end.y);
       const y1 = Math.max(start.y, end.y);
+      const brushSize = Math.max(1, Math.round(Number(state.brushSize) || 1));
+      if (!mirrorEnabled && !selectionMask && brushSize === 1) {
+        const rectWidth = Math.max(0, (x1 - x0) + 1);
+        const rectHeight = Math.max(0, (y1 - y0) + 1);
+        if (rectWidth > 0 && rectHeight > 0) {
+          if (tool === 'rectFill') {
+            ctx.overlay.fillRect(x0, y0, rectWidth, rectHeight);
+          } else {
+            ctx.overlay.fillRect(x0, y0, rectWidth, 1);
+            if (rectHeight > 1) {
+              ctx.overlay.fillRect(x0, y1, rectWidth, 1);
+            }
+            if (rectHeight > 2) {
+              ctx.overlay.fillRect(x0, y0 + 1, 1, rectHeight - 2);
+              if (rectWidth > 1) {
+                ctx.overlay.fillRect(x1, y0 + 1, 1, rectHeight - 2);
+              }
+            }
+          }
+          ctx.overlay.restore();
+          return;
+        }
+      }
       if (tool === 'rectFill') {
         for (let y = y0; y <= y1; y += 1) {
           for (let x = x0; x <= x1; x += 1) {
@@ -29890,6 +30114,11 @@
     if (!projectKey) {
       return null;
     }
+    const roomVisibility = normalizeMultiRoomVisibility(
+      multiState.roomVisibility,
+      MULTI_DEFAULT_ROOM_VISIBILITY
+    );
+    const isPublic = roomVisibility === MULTI_ROOM_VISIBILITY_PUBLIC;
     const counts = getMultiPresenceParticipantCounts();
     return {
       projectKey,
@@ -29899,9 +30128,9 @@
       guestCount: counts.guestCount,
       spectatorCount: counts.spectatorCount,
       participantCount: counts.totalCount,
-      roomVisibility: MULTI_ROOM_VISIBILITY_PUBLIC,
-      isPublic: true,
-      thumbnailDataUrl: createMultiPublicRoomThumbnailDataUrl(),
+      roomVisibility,
+      isPublic,
+      thumbnailDataUrl: isPublic ? createMultiPublicRoomThumbnailDataUrl() : '',
       updatedAt: Date.now(),
       sentAt: Date.now(),
     };
