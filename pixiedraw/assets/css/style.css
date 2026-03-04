@@ -444,6 +444,8 @@ button {
   overflow: hidden;
   --left-toggle-offset: 12px;
   --right-toggle-offset: 12px;
+  --project-tabs-inset-left: 0px;
+  --project-tabs-inset-right: 0px;
 }
 
 .rail {
@@ -1261,6 +1263,8 @@ body.is-dual-left-rail:not(.is-mobile-layout) .rail--left[data-compact="false"] 
   display: flex;
   align-items: center;
   min-height: 0;
+  margin-left: max(0px, calc(var(--project-tabs-inset-left, 0px) - 24px));
+  margin-right: max(0px, calc(var(--project-tabs-inset-right, 0px) - 24px));
   padding: 6px 8px 4px;
   border: 1px solid var(--border);
   border-bottom: 0;
