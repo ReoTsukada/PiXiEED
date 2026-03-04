@@ -662,7 +662,7 @@
         '常設ルーム運用を見直し、常設は 256x256 の1部屋構成に統一。',
         '常設ルームのセル運用ルールを整理し、未使用セルの扱いと参加表示を明確化。',
         '常設ルームの入室カードUIを調整し、表示の安定性と操作導線を改善。',
-        '常設キャンバスは端末内自動保存（IndexedDB）対象外に変更し、ローカル保存挙動を整理。',
+        'フリーキャンバスは端末内自動保存（IndexedDB）対象外に変更し、ローカル保存挙動を整理。',
         '保存/出力からコンテスト投稿への導線を追加し、保存完了後に投稿画面へ遷移できるよう対応。',
         '投稿形式を整理し、複数フレームは GIF 投稿（先頭フレームPNGをサムネ）、単一フレームは PNG 投稿に対応。',
         'タイムラプス出力サイズを出力設定に合わせて調整し、投稿連携時の扱いを最適化。',
@@ -998,6 +998,37 @@
       maxGuests: 9,
       slotColumns: 5,
       slotRows: 2,
+      slotRestriction: 'free',
+      roomNameJa: 'フリーキャンバス',
+      roomNameEn: 'Free Canvas',
+      layerNameJa: 'フリーキャンバス',
+      layerNameEn: 'Free Canvas',
+      roomVisibility: MULTI_ROOM_VISIBILITY_PUBLIC,
+    }),
+    'resident-64-main': Object.freeze({
+      width: 512,
+      height: 512,
+      maxGuests: 9,
+      slotColumns: 8,
+      slotRows: 8,
+      slotRestriction: 'partition',
+      roomNameJa: '64キャンバス',
+      roomNameEn: '64 Canvas',
+      layerNameJa: '64キャンバス',
+      layerNameEn: '64 Canvas',
+      roomVisibility: MULTI_ROOM_VISIBILITY_PUBLIC,
+    }),
+    'resident-32-main': Object.freeze({
+      width: 512,
+      height: 512,
+      maxGuests: 9,
+      slotColumns: 16,
+      slotRows: 16,
+      slotRestriction: 'partition',
+      roomNameJa: '32キャンバス',
+      roomNameEn: '32 Canvas',
+      layerNameJa: '32キャンバス',
+      layerNameEn: '32 Canvas',
       roomVisibility: MULTI_ROOM_VISIBILITY_PUBLIC,
     }),
   });
@@ -1042,7 +1073,7 @@
   const THUMBNAIL_CANVAS_SIZE = 160;
   const LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS = 1500;
   const MULTI_REPLICA_AUTOSAVE_BLOCKED_STATUS = '自動保存: マルチ中はマスターのみ端末保存します';
-  const RESIDENT_CANVAS_AUTOSAVE_BLOCKED_STATUS = '自動保存: 常設ルームでは端末内保存しません';
+  const RESIDENT_CANVAS_AUTOSAVE_BLOCKED_STATUS = '自動保存: フリー/64/32キャンバスでは端末内保存しません';
   const DOCUMENT_FILE_VERSION = 1;
   const LENS_IMPORT_STORAGE_KEY = 'pixiee-lens:pending-draw-import';
   const PIXFIND_UPLOAD_KEY = 'pixfind_creator_upload_v1';
@@ -1097,6 +1128,13 @@
   let reloadSnapshotRestored = false;
   const brushOffsetCache = new Map();
   const brushCircleOffsetCache = new Map();
+  const canvasScreenMetricsCache = {
+    key: '',
+    metrics: null,
+  };
+  const residentAssignedRangeGuideStyleCache = {
+    lineWidth: Number.NaN,
+  };
   let exportScale = 1;
   let exportSheetInfo = null;
   let exportMaxScale = 1;
@@ -1545,6 +1583,8 @@
   let historyTrimmedRecently = false;
   let historyTrimmedAt = 0;
   const EMPTY_FILL_PREVIEW_PIXELS = Object.freeze([]);
+  // Skip overly large fill preview regions to keep interaction responsive.
+  const FILL_PREVIEW_MAX_PIXELS = 32768;
   const fillPreviewCache = { contextKey: null, byPixel: null };
   const onionSkinCache = {
     revision: -1,
@@ -17814,15 +17854,35 @@
   }
 
   function getCanvasScreenMetrics() {
-    if (!dom.canvasViewport || !dom.canvases.drawing) {
+    const viewport = dom.canvasViewport;
+    const drawing = dom.canvases.drawing;
+    if (!viewport || !drawing) {
+      canvasScreenMetricsCache.key = '';
+      canvasScreenMetricsCache.metrics = null;
       return null;
     }
-    const viewportRect = dom.canvasViewport.getBoundingClientRect();
-    const drawingRect = dom.canvases.drawing.getBoundingClientRect();
-    if (drawingRect.width <= 0 || drawingRect.height <= 0) {
+    const cacheKey = [
+      Math.round(viewport.clientWidth || 0),
+      Math.round(viewport.clientHeight || 0),
+      Math.round(drawing.clientWidth || 0),
+      Math.round(drawing.clientHeight || 0),
+      Math.max(1, Math.round(Number(state.width) || 0)),
+      Math.max(1, Math.round(Number(state.height) || 0)),
+      Math.round((Number(state.scale) || 0) * 1000),
+      Math.round(Number(state.pan.x) || 0),
+      Math.round(Number(state.pan.y) || 0),
+    ].join(':');
+    if (canvasScreenMetricsCache.key === cacheKey && canvasScreenMetricsCache.metrics) {
+      return canvasScreenMetricsCache.metrics;
+    }
+    const viewportRect = viewport.getBoundingClientRect();
+    const drawingRect = drawing.getBoundingClientRect();
+    if (viewportRect.width <= 0 || viewportRect.height <= 0 || drawingRect.width <= 0 || drawingRect.height <= 0) {
+      canvasScreenMetricsCache.key = '';
+      canvasScreenMetricsCache.metrics = null;
       return null;
     }
-    return {
+    const metrics = {
       viewportRect,
       drawingRect,
       left: drawingRect.left - viewportRect.left,
@@ -17830,6 +17890,22 @@
       width: drawingRect.width,
       height: drawingRect.height,
     };
+    canvasScreenMetricsCache.key = cacheKey;
+    canvasScreenMetricsCache.metrics = metrics;
+    return metrics;
+  }
+
+  function getResidentAssignedRangeGuideLineWidth() {
+    const cachedLineWidth = Number(residentAssignedRangeGuideStyleCache.lineWidth);
+    if (Number.isFinite(cachedLineWidth) && cachedLineWidth > 0) {
+      return cachedLineWidth;
+    }
+    const stack = dom.canvases.stack;
+    const stackStyles = stack ? window.getComputedStyle(stack) : null;
+    const majorLineWidthRaw = stackStyles ? stackStyles.getPropertyValue('--grid-major-line-width') : '';
+    const lineWidth = clamp(Number.parseFloat(majorLineWidthRaw) || 1, 0.5, 2);
+    residentAssignedRangeGuideStyleCache.lineWidth = lineWidth;
+    return lineWidth;
   }
 
   function setMirrorGuideLine(lineElement, start, end, visible) {
@@ -22189,7 +22265,7 @@
       return false;
     }
     if (isResidentMultiToolRestrictedMode() && !isResidentMultiToolAllowed(activeTool)) {
-      setMultiStatus(localizeText('この常設ルームでは範囲選択・移動系ツールは無効です', 'Selection and move tools are disabled in this resident room'), 'warn');
+      setMultiStatus(localizeText('このキャンバスでは範囲選択・移動系ツールは無効です', 'Selection and move tools are disabled in this canvas'), 'warn');
       return false;
     }
     const cell = getVirtualCursorCellPosition();
@@ -22910,7 +22986,7 @@
     }
     if (isResidentMultiToolRestrictedMode()) {
       if (announce) {
-        setMultiStatus(localizeText('この常設ルームでは範囲選択・移動系ツールは無効です', 'Selection and move tools are disabled in this resident room'), 'warn');
+        setMultiStatus(localizeText('このキャンバスでは範囲選択・移動系ツールは無効です', 'Selection and move tools are disabled in this canvas'), 'warn');
       }
       return false;
     }
@@ -22994,7 +23070,7 @@
     }
     if (isResidentMultiToolRestrictedMode()) {
       if (announce) {
-        setMultiStatus(localizeText('この常設ルームでは範囲選択・移動系ツールは無効です', 'Selection and move tools are disabled in this resident room'), 'warn');
+        setMultiStatus(localizeText('このキャンバスでは範囲選択・移動系ツールは無効です', 'Selection and move tools are disabled in this canvas'), 'warn');
       }
       return false;
     }
@@ -24431,7 +24507,7 @@
       return;
     }
     if (isResidentMultiToolRestrictedMode() && !isResidentMultiToolAllowed(activeTool)) {
-      setMultiStatus(localizeText('この常設ルームでは範囲選択・移動系ツールは無効です', 'Selection and move tools are disabled in this resident room'), 'warn');
+      setMultiStatus(localizeText('このキャンバスでは範囲選択・移動系ツールは無効です', 'Selection and move tools are disabled in this canvas'), 'warn');
       return;
     }
     // Spectator (viewer) mode: only allow pan interactions
@@ -24525,19 +24601,24 @@
         mouseInsideViewport = true;
         refreshViewportCursorStyle();
       }
+      const keepVirtualDrawState = Boolean(virtualCursorDrawState.active);
       pointerState.active = false;
       pointerState.pointerId = null;
-      pointerState.tool = null;
-      pointerState.start = null;
-      pointerState.current = null;
-      pointerState.last = null;
-      pointerState.path = [];
-      pointerState.preview = null;
-      pointerState.selectionPreview = null;
-      pointerState.selectionMove = null;
-      pointerState.drawPaletteIndex = null;
-      pointerState.selectionClearedOnDown = false;
-      pointerState.selectionExtendOnDown = false;
+      if (keepVirtualDrawState) {
+        pointerState.tool = virtualCursorDrawState.tool || pointerState.tool || state.tool;
+      } else {
+        pointerState.tool = null;
+        pointerState.start = null;
+        pointerState.current = null;
+        pointerState.last = null;
+        pointerState.path = [];
+        pointerState.preview = null;
+        pointerState.selectionPreview = null;
+        pointerState.selectionMove = null;
+        pointerState.drawPaletteIndex = null;
+        pointerState.selectionClearedOnDown = false;
+        pointerState.selectionExtendOnDown = false;
+      }
       if (isTouch) {
         hoverPixel = null;
         captureVirtualCursorPointer(event.pointerId, event.pointerType, dom.canvases.drawing, event);
@@ -26214,7 +26295,7 @@
 
   function cutSelection() {
     if (isResidentMultiToolRestrictedMode()) {
-      setMultiStatus(localizeText('この常設ルームでは切り取りは使用できません', 'Cut is unavailable in this resident room'), 'warn');
+      setMultiStatus(localizeText('このキャンバスでは切り取りは使用できません', 'Cut is unavailable in this canvas'), 'warn');
       updateCanvasControlButtons();
       return false;
     }
@@ -26635,67 +26716,71 @@
       return;
     }
 
+    const outlineSegments = getSelectionMoveOutlineSegments(moveState);
+    if (!outlineSegments.length) {
+      return;
+    }
     strokeSelectionPath((pathCtx, scale) => {
-      traceSelectionMoveOutline(pathCtx, moveState, originX, originY, scale);
+      traceSelectionMoveOutline(pathCtx, outlineSegments, originX, originY, scale);
     }, { translateHalf: true, ensureResolution: false });
   }
 
-  function traceSelectionMoveOutline(pathCtx, moveState, originX, originY, scale) {
-    const { width, height, mask } = moveState;
+  function getSelectionMoveOutlineSegments(moveState) {
+    if (!moveState) {
+      return [];
+    }
+    if (!Array.isArray(moveState.outlineSegments)) {
+      const mask = moveState.mask;
+      const width = Math.max(0, Math.floor(Number(moveState.width) || 0));
+      const height = Math.max(0, Math.floor(Number(moveState.height) || 0));
+      moveState.outlineSegments = buildSelectionMoveOutlineSegments(mask, width, height);
+    }
+    return moveState.outlineSegments;
+  }
+
+  function buildSelectionMoveOutlineSegments(mask, width, height) {
+    if (!(mask instanceof Uint8Array) || width <= 0 || height <= 0 || mask.length !== width * height) {
+      return [];
+    }
+    const segments = [];
     for (let y = 0; y < height; y += 1) {
+      const rowOffset = y * width;
       for (let x = 0; x < width; x += 1) {
-        const localIndex = y * width + x;
+        const localIndex = rowOffset + x;
         if (mask[localIndex] !== 1) continue;
-        const globalX = originX + x;
-        const globalY = originY + y;
-        if (globalX < 0 || globalY < 0 || globalX >= state.width || globalY >= state.height) {
-          continue;
-        }
-
-        const topFilled = selectionMoveNeighborFilled(moveState, x, y - 1, originX, originY);
-        const bottomFilled = selectionMoveNeighborFilled(moveState, x, y + 1, originX, originY);
-        const leftFilled = selectionMoveNeighborFilled(moveState, x - 1, y, originX, originY);
-        const rightFilled = selectionMoveNeighborFilled(moveState, x + 1, y, originX, originY);
-
-        const sx = globalX * scale;
-        const sy = globalY * scale;
-        const ex = sx + scale;
-        const ey = sy + scale;
-
+        const topFilled = y > 0 && mask[localIndex - width] === 1;
+        const bottomFilled = y < height - 1 && mask[localIndex + width] === 1;
+        const leftFilled = x > 0 && mask[localIndex - 1] === 1;
+        const rightFilled = x < width - 1 && mask[localIndex + 1] === 1;
         if (!topFilled) {
-          pathCtx.moveTo(sx, sy);
-          pathCtx.lineTo(ex, sy);
+          segments.push(x, y, x + 1, y);
         }
         if (!bottomFilled) {
-          pathCtx.moveTo(sx, ey);
-          pathCtx.lineTo(ex, ey);
+          segments.push(x, y + 1, x + 1, y + 1);
         }
         if (!leftFilled) {
-          pathCtx.moveTo(sx, sy);
-          pathCtx.lineTo(sx, ey);
+          segments.push(x, y, x, y + 1);
         }
         if (!rightFilled) {
-          pathCtx.moveTo(ex, sy);
-          pathCtx.lineTo(ex, ey);
+          segments.push(x + 1, y, x + 1, y + 1);
         }
       }
     }
+    return segments;
   }
 
-  function selectionMoveNeighborFilled(moveState, localX, localY, originX, originY) {
-    if (localX < 0 || localY < 0 || localX >= moveState.width || localY >= moveState.height) {
-      return false;
+  function traceSelectionMoveOutline(pathCtx, outlineSegments, originX, originY, scale) {
+    if (!Array.isArray(outlineSegments) || !outlineSegments.length) {
+      return;
     }
-    const localIndex = localY * moveState.width + localX;
-    if (moveState.mask[localIndex] !== 1) {
-      return false;
+    for (let i = 0; i < outlineSegments.length; i += 4) {
+      const x0 = originX + outlineSegments[i];
+      const y0 = originY + outlineSegments[i + 1];
+      const x1 = originX + outlineSegments[i + 2];
+      const y1 = originY + outlineSegments[i + 3];
+      pathCtx.moveTo(x0 * scale, y0 * scale);
+      pathCtx.lineTo(x1 * scale, y1 * scale);
     }
-    const globalX = originX + localX;
-    const globalY = originY + localY;
-    if (globalX < 0 || globalY < 0 || globalX >= state.width || globalY >= state.height) {
-      return false;
-    }
-    return true;
   }
 
   function getPointerPosition(event, { clampToCanvas = false } = {}) {
@@ -28275,6 +28360,102 @@
     return width === 128 && height === 128 && columns === 4 && rows === 4;
   }
 
+  function shouldRenderResidentAssignedRangeGuide(profile = getResidentMultiRoomProfile(multiState.projectKey)) {
+    if (!profile || typeof profile !== 'object') {
+      return false;
+    }
+    if (!isResidentMultiConnectedRoom()) {
+      return false;
+    }
+    if (!isResidentMultiSlotRestricted(profile.projectKey)) {
+      return false;
+    }
+    return profile.projectKey === 'resident-64-main' || profile.projectKey === 'resident-32-main';
+  }
+
+  function drawResidentAssignedRangeGuide() {
+    if (!ctx.virtual) {
+      return;
+    }
+    const profile = getResidentMultiRoomProfile(multiState.projectKey);
+    if (!shouldRenderResidentAssignedRangeGuide(profile)) {
+      return;
+    }
+    const metrics = getCanvasScreenMetrics();
+    if (!metrics) {
+      return;
+    }
+    const unitX = metrics.width / Math.max(1, Number(state.width) || 1);
+    const unitY = metrics.height / Math.max(1, Number(state.height) || 1);
+    // Match major-grid line thickness in screen space (usually 1px).
+    const lineWidth = getResidentAssignedRangeGuideLineWidth();
+    const inset = lineWidth / 2;
+    const dpr = window.devicePixelRatio || 1;
+    const selfSlot = getResidentMultiAssignedSlotIndex(multiState.clientId);
+
+    const toScreenRect = (slotRect) => {
+      if (!slotRect || slotRect.width <= 0 || slotRect.height <= 0) {
+        return null;
+      }
+      return {
+        x: metrics.left + (slotRect.x * unitX),
+        y: metrics.top + (slotRect.y * unitY),
+        width: slotRect.width * unitX,
+        height: slotRect.height * unitY,
+      };
+    };
+
+    const drawScreenRect = (screenRect, strokeStyle) => {
+      if (!screenRect) {
+        return;
+      }
+      ctx.virtual.strokeStyle = strokeStyle;
+      ctx.virtual.strokeRect(
+        screenRect.x + inset,
+        screenRect.y + inset,
+        Math.max(0, screenRect.width - lineWidth),
+        Math.max(0, screenRect.height - lineWidth)
+      );
+    };
+
+    ctx.virtual.save();
+    ctx.virtual.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.virtual.lineWidth = lineWidth;
+    const drawnSlots = new Set();
+    multiState.assignments.forEach((entry, clientId) => {
+      if (!entry || typeof entry !== 'object') {
+        return;
+      }
+      const role = normalizeMultiRole(entry.role, 'guest');
+      if (role !== 'guest' && role !== 'master') {
+        return;
+      }
+      const slot = normalizeResidentMultiSlotIndex(
+        Number.isFinite(Number(entry.residentSlot)) ? Number(entry.residentSlot) : Number(entry.trackHint),
+        profile
+      );
+      if (slot < 0 || drawnSlots.has(slot)) {
+        return;
+      }
+      const slotRect = getResidentMultiSlotRect(slot, profile.projectKey);
+      const screenRect = toScreenRect(slotRect);
+      if (!screenRect) {
+        return;
+      }
+      const isSelf = clientId === multiState.clientId || slot === selfSlot;
+      drawScreenRect(
+        screenRect,
+        isSelf ? 'rgba(255, 32, 32, 0.95)' : 'rgba(128, 196, 255, 0.48)'
+      );
+      drawnSlots.add(slot);
+    });
+    if (selfSlot >= 0 && !drawnSlots.has(selfSlot)) {
+      const selfRect = getResidentMultiSlotRect(selfSlot, profile.projectKey);
+      drawScreenRect(toScreenRect(selfRect), 'rgba(255, 32, 32, 0.95)');
+    }
+    ctx.virtual.restore();
+  }
+
   function drawResident128SlotGuides() {
     if (!ctx.overlay) {
       return;
@@ -28374,8 +28555,8 @@
         selectionCanvasActive = false;
       }
     }
-    updateMirrorGuideHandles();
     renderOnionSkin();
+    drawResidentAssignedRangeGuide();
     drawResident128SlotGuides();
 
     if (hasSelectionOutline) {
@@ -28406,6 +28587,9 @@
       && activeTool === 'fill'
       && focusPixel
       && (!pointerState.active || isTouchFillHoldPreview)
+      // Fill preview is already rendered in drawBrushPreview when guides are visible.
+      // Keep this branch only for touch-hold preview when guides are hidden.
+      && !shouldShowGuidePreview
       && (state.showPixelGuides || isTouchFillHoldPreview)
     ) {
       const previewPixels = getFillPreviewPixels(focusPixel.x, focusPixel.y);
@@ -28852,6 +29036,9 @@
       if (selectionMask && selectionMask[idx] !== 1) continue;
       if (!matchesTarget(idx)) continue;
       pixels.push(idx);
+      if (pixels.length >= FILL_PREVIEW_MAX_PIXELS) {
+        return EMPTY_FILL_PREVIEW_PIXELS;
+      }
       stack.push(px + 1, py);
       stack.push(px - 1, py);
       stack.push(px, py + 1);
@@ -29087,7 +29274,8 @@
     const previewTool = tool;
     const mirrorEnabled = isMirrorEnabledForTool(previewTool);
     const offsets = getBrushOffsets(state.brushSize || 1);
-    const painted = new Set();
+    const usePaintDedup = mirrorEnabled || Boolean(selectionMask);
+    const painted = usePaintDedup ? new Set() : null;
     ctx.overlay.save();
     ctx.overlay.fillStyle = rgbaToCss(color);
     const stamp = (x, y) => {
@@ -29104,10 +29292,12 @@
           if (selectionMask && selectionMask[idx] !== 1) {
             continue;
           }
-          if (painted.has(idx)) {
+          if (painted && painted.has(idx)) {
             continue;
           }
-          painted.add(idx);
+          if (painted) {
+            painted.add(idx);
+          }
           ctx.overlay.fillRect(px, py, 1, 1);
           continue;
         }
@@ -29120,10 +29310,12 @@
             return;
           }
           const idx = my * width + mx;
-          if (painted.has(idx)) {
+          if (painted && painted.has(idx)) {
             return;
           }
-          painted.add(idx);
+          if (painted) {
+            painted.add(idx);
+          }
           ctx.overlay.fillRect(mx, my, 1, 1);
         });
       }
@@ -30244,14 +30436,14 @@
     }
     if (normalizedFormat === 'project') {
       if (isResidentMultiConnectedRoom()) {
-        return '常設ルームではプロジェクト保存はできません';
+        return 'フリー/64/32キャンバスではプロジェクト保存はできません';
       }
       if (!isMultiMasterMode()) {
         return 'プロジェクト保存はマスターのみ利用できます';
       }
     }
     if (isResidentMultiConnectedRoom()) {
-      return `${getExportFormatLabel(normalizedFormat)}は常設ルームで出力できません（PNGのみ）`;
+      return `${getExportFormatLabel(normalizedFormat)}はフリー/64/32キャンバスで出力できません（PNGのみ）`;
     }
     return `出力は${getMultiExportPermissionLabel()}に制限されています`;
   }
@@ -30330,13 +30522,14 @@
     const slotColumns = clamp(
       Math.round(Number(profile.slotColumns) || 0),
       1,
-      Math.max(1, maxGuests + 1)
+      Math.max(1, width)
     );
     const slotRows = clamp(
       Math.round(Number(profile.slotRows) || 0),
       1,
-      Math.max(1, maxGuests + 1)
+      Math.max(1, height)
     );
+    const slotRestriction = profile.slotRestriction === 'free' ? 'free' : 'partition';
     const slotCount = Math.max(1, Math.max(maxGuests + 1, slotColumns * slotRows));
     return {
       projectKey: normalizedKey,
@@ -30345,6 +30538,11 @@
       maxGuests,
       slotColumns,
       slotRows,
+      slotRestriction,
+      roomNameJa: typeof profile.roomNameJa === 'string' ? profile.roomNameJa.trim() : '',
+      roomNameEn: typeof profile.roomNameEn === 'string' ? profile.roomNameEn.trim() : '',
+      layerNameJa: typeof profile.layerNameJa === 'string' ? profile.layerNameJa.trim() : '',
+      layerNameEn: typeof profile.layerNameEn === 'string' ? profile.layerNameEn.trim() : '',
       slotCount,
       roomVisibility,
     };
@@ -30358,6 +30556,30 @@
     return multiState.connected && isResidentMultiProjectKey(multiState.projectKey);
   }
 
+  function isResidentMultiSlotRestricted(projectKey = multiState.projectKey) {
+    const profile = getResidentMultiRoomProfile(projectKey);
+    if (!profile || typeof profile !== 'object') {
+      return false;
+    }
+    return profile.slotRestriction !== 'free';
+  }
+
+  function getResidentMultiCanvasLabel(projectKey = multiState.projectKey, { forLayer = false } = {}) {
+    const profile = getResidentMultiRoomProfile(projectKey);
+    if (profile && typeof profile === 'object') {
+      const ja = forLayer
+        ? (profile.layerNameJa || profile.roomNameJa)
+        : (profile.roomNameJa || profile.layerNameJa);
+      const en = forLayer
+        ? (profile.layerNameEn || profile.roomNameEn)
+        : (profile.roomNameEn || profile.layerNameEn);
+      if (ja || en) {
+        return localizeText(ja || 'フリーキャンバス', en || 'Free Canvas');
+      }
+    }
+    return localizeText('フリーキャンバス', 'Free Canvas');
+  }
+
   function isResidentMultiRestrictedMasterMode() {
     return isMultiMasterMode() && isResidentMultiProjectKey(multiState.projectKey);
   }
@@ -30367,7 +30589,9 @@
   }
 
   function isResidentMultiToolRestrictedMode() {
-    return isResidentMultiConnectedRoom() && (isMultiGuestMode() || isResidentMultiRestrictedMasterMode());
+    return isResidentMultiConnectedRoom()
+      && isResidentMultiSlotRestricted(multiState.projectKey)
+      && (isMultiGuestMode() || isResidentMultiRestrictedMasterMode());
   }
 
   function isResidentMultiToolAllowed(toolId) {
@@ -30413,8 +30637,17 @@
     return frame.layers[0] || null;
   }
 
-  function createResidentFlattenedPrimaryLayer(width = state.width, height = state.height) {
-    const flattenedLayer = createLayer(localizeText('常設キャンバス', 'Resident Canvas'), width, height);
+  function createResidentFlattenedPrimaryLayer(
+    width = state.width,
+    height = state.height,
+    profile = getResidentMultiRoomProfile(multiState.projectKey)
+  ) {
+    const labelProjectKey = profile?.projectKey || multiState.projectKey;
+    const flattenedLayer = createLayer(
+      getResidentMultiCanvasLabel(labelProjectKey, { forLayer: true }),
+      width,
+      height
+    );
     try {
       const composite = buildPlaybackFrameImageData(0);
       if (composite && composite.data instanceof Uint8ClampedArray) {
@@ -30435,13 +30668,14 @@
     if (!profile || typeof profile !== 'object') {
       return false;
     }
+    const layerLabel = getResidentMultiCanvasLabel(profile.projectKey || multiState.projectKey, { forLayer: true });
     const targetWidth = clamp(Math.round(Number(profile.width) || state.width), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
     const targetHeight = clamp(Math.round(Number(profile.height) || state.height), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
     let changed = false;
     if (!Array.isArray(state.frames) || !state.frames.length) {
       state.frames = [createFrame(
         getDefaultFrameName(1),
-        [createLayer(localizeText('常設キャンバス', 'Resident Canvas'), targetWidth, targetHeight)],
+        [createLayer(layerLabel, targetWidth, targetHeight)],
         targetWidth,
         targetHeight
       )];
@@ -30451,7 +30685,7 @@
     const hasSingleFrame = state.frames.length === 1;
     const hasSingleLayer = Boolean(frame0 && Array.isArray(frame0.layers) && frame0.layers.length === 1);
     if (!hasSingleFrame || !hasSingleLayer) {
-      const flattenedLayer = createResidentFlattenedPrimaryLayer(targetWidth, targetHeight);
+      const flattenedLayer = createResidentFlattenedPrimaryLayer(targetWidth, targetHeight, profile);
       const baseFrameName = typeof frame0?.name === 'string' && frame0.name.trim()
         ? frame0.name.trim()
         : getDefaultFrameName(1);
@@ -30472,6 +30706,10 @@
     }
     if (!primaryLayer.visible) {
       primaryLayer.visible = true;
+      changed = true;
+    }
+    if ((typeof primaryLayer.name === 'string' ? primaryLayer.name : '') !== layerLabel) {
+      primaryLayer.name = layerLabel;
       changed = true;
     }
     if (normalizeLayerOpacity(primaryLayer.opacity) !== 1) {
@@ -30669,28 +30907,34 @@
     if (role === 'spectator') {
       return () => false;
     }
-    const assignedSlot = normalizeResidentMultiSlotIndex(
-      Number.isFinite(Number(assignment?.residentSlot)) ? Number(assignment.residentSlot) : Number(assignment?.trackHint),
+    if (!isResidentMultiSlotRestricted(profile.projectKey)) {
+      return () => true;
+    }
+    const normalizedSlot = normalizeResidentMultiSlotIndex(
+      Number.isFinite(Number(assignment?.residentSlot))
+        ? Number(assignment.residentSlot)
+        : Number(assignment?.trackHint),
       profile
     );
-    const assignedRect = assignedSlot >= 0
-      ? getResidentMultiSlotRect(assignedSlot, profile.projectKey)
-      : null;
-    return (x, y) => Boolean(assignedRect && isResidentMultiPointInsideRect(x, y, assignedRect));
+    if (normalizedSlot < 0) {
+      return () => false;
+    }
+    const assignedRect = getResidentMultiSlotRect(normalizedSlot, profile.projectKey);
+    if (!assignedRect) {
+      return () => false;
+    }
+    return (x, y) => isResidentMultiPointInsideRect(x, y, assignedRect);
   }
 
   function canCurrentClientEditResidentPoint(x, y) {
     if (!isResidentMultiConnectedRoom()) {
       return true;
     }
-    if (isMultiSpectatorMode()) {
-      return false;
-    }
-    const assignedRect = getResidentMultiAssignedRect(multiState.clientId);
-    if (assignedRect && isResidentMultiPointInsideRect(x, y, assignedRect)) {
+    const checker = buildResidentPointEditCheckerForClient(multiState.clientId, multiState.projectKey);
+    if (!checker) {
       return true;
     }
-    return false;
+    return checker(x, y);
   }
 
   function applyResidentMultiRoomProfile(profile, { announce = false } = {}) {
@@ -30752,7 +30996,7 @@
     syncMultiControls();
     scheduleSessionPersist({ includeSnapshots: false });
     if (announce) {
-      setMultiStatus(`共有モード: 常駐ルーム設定を適用 (${profile.projectKey || multiState.projectKey})`, 'info');
+      setMultiStatus(`共有モード: キャンバス設定を適用 (${profile.projectKey || multiState.projectKey})`, 'info');
     }
     return true;
   }
@@ -30769,11 +31013,13 @@
     }
     const targetWidth = clamp(Math.round(Number(profile.width) || state.width), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
     const targetHeight = clamp(Math.round(Number(profile.height) || state.height), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
-    const snapshot = createInitialState({ width: targetWidth, height: targetHeight, name: localizeText('常設キャンバス', 'Resident Canvas') });
+    const projectLabel = getResidentMultiCanvasLabel(profile.projectKey || multiState.projectKey);
+    const layerLabel = getResidentMultiCanvasLabel(profile.projectKey || multiState.projectKey, { forLayer: true });
+    const snapshot = createInitialState({ width: targetWidth, height: targetHeight, name: projectLabel });
     const frame = Array.isArray(snapshot.frames) && snapshot.frames.length ? snapshot.frames[0] : null;
     const layer = frame && Array.isArray(frame.layers) && frame.layers.length ? frame.layers[0] : null;
     if (layer) {
-      layer.name = localizeText('常設キャンバス', 'Resident Canvas');
+      layer.name = layerLabel;
       layer.visible = true;
       layer.opacity = 1;
       layer.blendMode = DEFAULT_LAYER_BLEND_MODE;
@@ -31822,8 +32068,8 @@
         );
       } else if (isResidentRoom && isMultiSpectatorMode()) {
         requestHint.textContent = localizeText(
-          'この常設ルームは空きが出ると自動で参加者になります。',
-          'In this resident room, you will auto-join when a slot opens.'
+          'このキャンバスは空きが出ると自動で参加者になります。',
+          'In this canvas, you will auto-join when a slot opens.'
         );
       } else if (isMultiGuestMode()) {
         requestHint.textContent = localizeText('あなたは参加者です。', 'You are currently a participant.');
@@ -35463,7 +35709,7 @@
   }
 
   // Apply a history snapshot only to the cells that clientId can currently edit.
-  // In resident rooms this is restricted to the client's assigned slot.
+  // In slot-partition resident rooms this is restricted to the client's assigned slot.
   function applyHistorySnapshotForClient(snapshot, clientId, { preserveView = false } = {}) {
     if (!snapshot || typeof snapshot !== 'object') return false;
     if (!clientId) return false;
