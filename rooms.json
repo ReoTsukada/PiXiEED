@@ -8,12 +8,32 @@
   },
   {
     "id": "resident-room-256",
-    "name": "常駐ルーム 256x256",
+    "name": "フリーキャンバス 256x256",
     "type": "resident",
     "projectKey": "resident-256-main",
     "channel": "resident-256-main",
     "size": "256×256",
     "maxUsers": 10,
-    "description": "最大10人。PiXiEEDrawマルチ常設キーに接続し、先頭参加者が仮マスターになります。"
+    "description": "最大10人。全員が同じ256×256キャンバスへ自由に描けます。"
+  },
+  {
+    "id": "resident-room-64",
+    "name": "64キャンバス",
+    "type": "resident",
+    "projectKey": "resident-64-main",
+    "channel": "resident-64-main",
+    "size": "512×512（1人64×64）",
+    "maxUsers": 10,
+    "description": "最大10人。各参加者に64×64の専用スペースが割り当てられます。"
+  },
+  {
+    "id": "resident-room-32",
+    "name": "32キャンバス",
+    "type": "resident",
+    "projectKey": "resident-32-main",
+    "channel": "resident-32-main",
+    "size": "512×512（1人32×32）",
+    "maxUsers": 10,
+    "description": "最大10人。各参加者に32×32の専用スペースが割り当てられます。"
   }
 ]
