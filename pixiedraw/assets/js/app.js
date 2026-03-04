@@ -48,6 +48,8 @@
       virtualCursor: /** @type {HTMLCanvasElement} */ (document.getElementById('virtualCursorCanvas')),
     },
     canvasViewport: document.getElementById('canvasViewport'),
+    projectTabsBar: document.getElementById('projectTabsBar'),
+    projectTabsList: document.getElementById('projectTabsList'),
     mirrorToolPopover: document.getElementById('mirrorToolPopover'),
     mirrorGuides: document.getElementById('mirrorGuides'),
     mirrorGuideLines: Array.from(document.querySelectorAll('.mirror-guide[data-mirror-axis]')),
@@ -60,6 +62,7 @@
     resizeHandles: {
       left: document.getElementById('resizeLeftRail'),
       leftInner: document.getElementById('resizeLeftRailInner'),
+      leftUnified: document.getElementById('resizeLeftUnifiedSplit'),
       right: document.getElementById('resizeRightRail'),
     },
     toolGroupButtons: Array.from(document.querySelectorAll('.tool-group-button[data-tool-group]')),
@@ -631,6 +634,23 @@
   const EXPORT_INTERSTITIAL_COOLDOWN_MS = 45 * 1000;
   const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
     Object.freeze({
+      id: '2026-03-04-project-tabs-autosave-palette',
+      at: '2026-03-04T21:30:00+09:00',
+      title: '複数プロジェクト運用・保存導線・貼り付け色管理を改善',
+      details: Object.freeze([
+        '複数プロジェクトタブを追加し、同時に最大5件まで開けるよう対応。',
+        '「ファイルを開く」で複数ファイル選択を有効化し、連続してタブ追加できるよう改善。',
+        '新規作成時に保存先フォルダ設定を案内する導線を追加。',
+        '端末内プロジェクト一覧に削除ボタンを追加し、確認ダイアログ後に削除できるよう対応。',
+        '左レーン（ツール/カラー）の縦比率をドラッグで調整できるリサイズつまみを追加。',
+        'ネストスクロール時に、子スクロール終端から親スクロールへ移譲しやすい挙動へ改善。',
+        'ミラーツールのドッキング表示位置を調整し、広告マウントより上で操作できるよう改善。',
+        'モバイル戻る時の終了導線を調整し、履歴なし起動でも即閉じできるよう対応。',
+        '貼り付け時に未登録色を自動でパレットへ追加する機能を追加。',
+        '貼り付け失敗時は、追加したパレット色も含めて履歴ロールバックするよう調整。',
+      ]),
+    }),
+    Object.freeze({
       id: '2026-02-27-home-multi-export-i18n-input-updates',
       at: '2026-02-27T21:30:00+09:00',
       title: 'ホーム導線・共有モード・保存出力・英語化・入力操作を総合改善',
@@ -876,7 +896,11 @@
     typeof window !== 'undefined' &&
     'showSaveFilePicker' in window &&
     'indexedDB' in window;
-  const EXPORT_DIRECTORY_SUPPORTED = false;
+  const EXPORT_DIRECTORY_SUPPORTED =
+    !DISABLE_FILE_SYSTEM_ACCESS_SAVE &&
+    typeof window !== 'undefined' &&
+    'showDirectoryPicker' in window &&
+    'indexedDB' in window;
   const SUPPORTS_ANCHOR_DOWNLOAD =
     typeof HTMLAnchorElement !== 'undefined' && 'download' in HTMLAnchorElement.prototype;
   const DOWNLOAD_OBJECT_URL_REVOKE_DELAY_MS = 10000;
@@ -903,6 +927,7 @@
   const SAVE_INTERACTION_GRACE_MS = 1300;
   const AUTOSAVE_LIFECYCLE_FLUSH_THROTTLE_MS = 240;
   const NEW_PROJECT_IMMEDIATE_AUTOSAVE_ATTEMPTS = 2;
+  const MAX_OPEN_PROJECT_TABS = 5;
   const ALWAYS_CONFIRM_BEFORE_CLOSE = true;
   const MOBILE_BACK_BUTTON_CONFIRM_ENABLED = true;
   const MOBILE_BACK_GUARD_STATE_KEY = '__pixieed_back_guard_v1';
@@ -1154,6 +1179,9 @@
   const RAIL_RESIZE_DRAG_THRESHOLD = 6;
   const LEFT_DUAL_GAP = 8;
   const LEFT_DUAL_MIN_COLUMN_WIDTH = Math.max(132, RAIL_DEFAULT_WIDTH.left, RAIL_MIN_WIDTH);
+  const LEFT_UNIFIED_TOOLS_RATIO_DEFAULT = 0.5;
+  const LEFT_UNIFIED_TOOLS_RATIO_MIN = 0.2;
+  const LEFT_UNIFIED_TOOLS_RATIO_MAX = 0.8;
   const railSizing = {
     left: RAIL_DEFAULT_WIDTH.left,
     right: RAIL_DEFAULT_WIDTH.right,
@@ -1171,6 +1199,16 @@
     startClientX: 0,
     startToolsWidth: LEFT_DUAL_MIN_COLUMN_WIDTH,
     startTotalWidth: (RAIL_DEFAULT_WIDTH.left * 2) + LEFT_DUAL_GAP,
+    moved: false,
+    captureTarget: null,
+  };
+  const leftUnifiedSplitSizing = {
+    ratio: LEFT_UNIFIED_TOOLS_RATIO_DEFAULT,
+    active: false,
+    pointerId: null,
+    startClientY: 0,
+    startToolsHeight: 0,
+    startColorHeight: 0,
     moved: false,
     captureTarget: null,
   };
@@ -1480,6 +1518,10 @@
   let overlayRenderScheduled = false;
   let selectionCanvasActive = false;
   const recentProjectsCache = new Map();
+  const openProjectTabs = [];
+  let activeOpenProjectTabId = '';
+  let openProjectTabSequence = 0;
+  let openProjectTabBusy = false;
   const SELECTION_DASH_SPEED = 40;
   let selectionDashScreenOffset = 0;
   let lastSelectionDashTime = 0;
@@ -2085,6 +2127,34 @@
     return null;
   }
 
+  function getDirectionalScrollableAncestor(node, deltaY = 0) {
+    let current = node instanceof Element ? node : null;
+    let fallback = null;
+    while (current && current !== document.body) {
+      const style = window.getComputedStyle(current);
+      const canScrollY = (style.overflowY === 'auto' || style.overflowY === 'scroll')
+        && current.scrollHeight > current.clientHeight + 1;
+      if (!canScrollY) {
+        current = current.parentElement;
+        continue;
+      }
+      if (!fallback) {
+        fallback = current;
+      }
+      if (!Number.isFinite(deltaY) || Math.abs(deltaY) < 0.01) {
+        return current;
+      }
+      const atTop = current.scrollTop <= 0;
+      const atBottom = current.scrollTop + current.clientHeight >= current.scrollHeight - 1;
+      const canConsumeInDirection = deltaY > 0 ? !atTop : !atBottom;
+      if (canConsumeInDirection) {
+        return current;
+      }
+      current = current.parentElement;
+    }
+    return fallback;
+  }
+
   function isEditableTouchTarget(target) {
     if (!(target instanceof Element)) {
       return false;
@@ -2187,10 +2257,6 @@
     if (isEditableTouchTarget(target) || target.closest('input[type="range"]')) {
       return true;
     }
-    const scrollable = getScrollableAncestor(target);
-    if (!scrollable) {
-      return false;
-    }
     if (!event.touches || event.touches.length !== 1) {
       return false;
     }
@@ -2201,13 +2267,11 @@
     const currentY = touch.clientY;
     if (!Number.isFinite(currentY) || !Number.isFinite(lastSingleTouchClientY)) {
       lastSingleTouchClientY = currentY;
-      return true;
+      return Boolean(getScrollableAncestor(target));
     }
     const deltaY = currentY - lastSingleTouchClientY;
-    const atTop = scrollable.scrollTop <= 0;
-    const atBottom = scrollable.scrollTop + scrollable.clientHeight >= scrollable.scrollHeight - 1;
-    // Block rubber-band overscroll at boundaries to avoid browser pull/close gestures.
-    if ((atTop && deltaY > 0) || (atBottom && deltaY < 0)) {
+    const scrollable = getDirectionalScrollableAncestor(target, deltaY);
+    if (!scrollable) {
       return false;
     }
     return true;
@@ -3241,6 +3305,7 @@
     }
     const baseTitle = 'PiXiEEDraw';
     document.title = `${name} • ${baseTitle}`;
+    renderOpenProjectTabs();
   }
 
   function sanitizeDocumentFileBase(name) {
@@ -3264,6 +3329,351 @@
     const safeSuffix = suffix ? `_${suffix}` : '';
     const normalizedExt = extension ? extension.replace(/^\.+/, '') : '';
     return normalizedExt ? `${safeBase}${safeSuffix}.${normalizedExt}` : `${safeBase}${safeSuffix}`;
+  }
+
+  function createOpenProjectTabId() {
+    openProjectTabSequence += 1;
+    return `project-tab-${Date.now().toString(36)}-${openProjectTabSequence.toString(36)}`;
+  }
+
+  function findOpenProjectTabIndex(tabId) {
+    if (!tabId) {
+      return -1;
+    }
+    return openProjectTabs.findIndex(tab => tab?.id === tabId);
+  }
+
+  function findOpenProjectTabIndexByProjectId(projectId) {
+    const normalized = normalizeAutosaveProjectId(projectId || '');
+    if (!normalized) {
+      return -1;
+    }
+    return openProjectTabs.findIndex(tab => normalizeAutosaveProjectId(tab?.projectId || '') === normalized);
+  }
+
+  function releaseAutosaveProjectId(projectId) {
+    const normalized = normalizeAutosaveProjectId(projectId || '');
+    if (!normalized) {
+      return false;
+    }
+    let changed = false;
+    openProjectTabs.forEach((tab, index) => {
+      if (!tab || normalizeAutosaveProjectId(tab.projectId || '') !== normalized) {
+        return;
+      }
+      openProjectTabs[index] = {
+        ...tab,
+        projectId: createAutosaveProjectId(),
+      };
+      changed = true;
+    });
+    if (normalizeAutosaveProjectId(autosaveProjectId || '') === normalized) {
+      setActiveAutosaveProjectId(createAutosaveProjectId());
+      changed = true;
+    }
+    if (changed) {
+      renderOpenProjectTabs();
+    }
+    return changed;
+  }
+
+  function getActiveOpenProjectTab() {
+    const index = findOpenProjectTabIndex(activeOpenProjectTabId);
+    return index >= 0 ? openProjectTabs[index] : null;
+  }
+
+  function buildOpenProjectTabPayloadFromCurrentState() {
+    const snapshot = makeHistorySnapshot();
+    const session = buildProjectSessionPayload();
+    const packaged = buildPackagedProjectPayload(snapshot, { session });
+    return {
+      fileName: normalizeDocumentName(snapshot.documentName || state.documentName || DEFAULT_DOCUMENT_NAME),
+      project: packaged,
+      unsaved: hasDocumentUnsavedChanges(),
+    };
+  }
+
+  function createOpenProjectTabFromCurrentState(options = {}) {
+    const payload = buildOpenProjectTabPayloadFromCurrentState();
+    const normalizedProjectId = normalizeAutosaveProjectId(options.projectId || autosaveProjectId)
+      || createAutosaveProjectId();
+    const fileName = normalizeDocumentName(options.fileName || payload.fileName || DEFAULT_DOCUMENT_NAME);
+    return {
+      id: options.tabId || createOpenProjectTabId(),
+      projectId: normalizedProjectId,
+      fileName,
+      label: extractDocumentBaseName(fileName),
+      project: payload.project,
+      unsaved: Boolean(payload.unsaved),
+      source: options.source || 'working',
+      updatedAt: payload.project?.updatedAt || new Date().toISOString(),
+    };
+  }
+
+  function getOpenProjectTabDisplayLabel(tab, { active = false } = {}) {
+    if (active) {
+      return extractDocumentBaseName(state.documentName || tab?.fileName || DEFAULT_DOCUMENT_NAME);
+    }
+    return extractDocumentBaseName(tab?.fileName || DEFAULT_DOCUMENT_NAME);
+  }
+
+  function renderOpenProjectTabs() {
+    const list = dom.projectTabsList;
+    const bar = dom.projectTabsBar;
+    if (!(list instanceof HTMLElement) || !(bar instanceof HTMLElement)) {
+      return;
+    }
+    if (!openProjectTabs.length) {
+      list.innerHTML = '';
+      bar.hidden = true;
+      return;
+    }
+    bar.hidden = false;
+    list.innerHTML = '';
+    openProjectTabs.forEach((tab, index) => {
+      if (!tab || !tab.id) {
+        return;
+      }
+      const isActive = tab.id === activeOpenProjectTabId;
+      const item = document.createElement('div');
+      item.className = `project-tab-item${isActive ? ' is-active' : ''}`;
+      item.dataset.projectTabItemId = tab.id;
+
+      const selectButton = document.createElement('button');
+      selectButton.type = 'button';
+      selectButton.className = 'project-tab-item__button';
+      selectButton.dataset.projectTabId = tab.id;
+      selectButton.setAttribute('role', 'tab');
+      selectButton.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      selectButton.setAttribute('tabindex', isActive ? '0' : '-1');
+      const displayLabel = getOpenProjectTabDisplayLabel(tab, { active: isActive });
+      const slotPrefix = `${index + 1}/${MAX_OPEN_PROJECT_TABS}`;
+      selectButton.setAttribute(
+        'aria-label',
+        localizeText(`プロジェクト ${slotPrefix}: ${displayLabel}`, `Project ${slotPrefix}: ${displayLabel}`)
+      );
+
+      const name = document.createElement('span');
+      name.className = 'project-tab-item__name';
+      name.textContent = displayLabel;
+      selectButton.appendChild(name);
+      item.appendChild(selectButton);
+
+      if (openProjectTabs.length > 1) {
+        const closeButton = document.createElement('button');
+        closeButton.type = 'button';
+        closeButton.className = 'project-tab-item__close';
+        closeButton.dataset.projectTabCloseId = tab.id;
+        closeButton.textContent = '×';
+        closeButton.setAttribute(
+          'aria-label',
+          localizeText(`${displayLabel} を閉じる`, `Close ${displayLabel}`)
+        );
+        item.appendChild(closeButton);
+      }
+
+      list.appendChild(item);
+    });
+  }
+
+  function ensureOpenProjectTabsInitialized() {
+    if (openProjectTabs.length > 0) {
+      if (!activeOpenProjectTabId || findOpenProjectTabIndex(activeOpenProjectTabId) < 0) {
+        activeOpenProjectTabId = openProjectTabs[0]?.id || '';
+      }
+      renderOpenProjectTabs();
+      return;
+    }
+    const normalizedProjectId = normalizeAutosaveProjectId(autosaveProjectId)
+      || setActiveAutosaveProjectId(createAutosaveProjectId(), { persist: false });
+    const initialTab = createOpenProjectTabFromCurrentState({
+      projectId: normalizedProjectId,
+      source: 'initial',
+    });
+    openProjectTabs.push(initialTab);
+    activeOpenProjectTabId = initialTab.id;
+    renderOpenProjectTabs();
+  }
+
+  function appendOpenProjectTabFromCurrentState(options = {}) {
+    ensureOpenProjectTabsInitialized();
+    if (openProjectTabs.length >= MAX_OPEN_PROJECT_TABS) {
+      return null;
+    }
+    const tab = createOpenProjectTabFromCurrentState({
+      source: options.source || 'open',
+      projectId: options.projectId,
+    });
+    openProjectTabs.push(tab);
+    if (options.activate !== false) {
+      activeOpenProjectTabId = tab.id;
+    }
+    renderOpenProjectTabs();
+    return tab;
+  }
+
+  async function persistActiveOpenProjectTab({ flushAutosave = false } = {}) {
+    ensureOpenProjectTabsInitialized();
+    const index = findOpenProjectTabIndex(activeOpenProjectTabId);
+    if (index < 0) {
+      return false;
+    }
+    if (flushAutosave && AUTOSAVE_SUPPORTED) {
+      try {
+        await writeAutosaveSnapshot(true);
+      } catch (error) {
+        console.warn('Failed to flush autosave before switching project tab', error);
+      }
+    }
+    const current = openProjectTabs[index];
+    const updated = createOpenProjectTabFromCurrentState({
+      tabId: current?.id || activeOpenProjectTabId,
+      source: current?.source || 'working',
+      projectId: normalizeAutosaveProjectId(autosaveProjectId) || current?.projectId || '',
+    });
+    openProjectTabs[index] = updated;
+    activeOpenProjectTabId = updated.id;
+    renderOpenProjectTabs();
+    return true;
+  }
+
+  async function activateOpenProjectTab(tabId, { skipPersistCurrent = false, announce = true } = {}) {
+    const targetId = typeof tabId === 'string' ? tabId : '';
+    if (!targetId) {
+      return false;
+    }
+    if (openProjectTabBusy) {
+      return false;
+    }
+    ensureOpenProjectTabsInitialized();
+    if (targetId === activeOpenProjectTabId) {
+      return true;
+    }
+    const targetIndex = findOpenProjectTabIndex(targetId);
+    if (targetIndex < 0) {
+      return false;
+    }
+    const target = openProjectTabs[targetIndex];
+    if (!target?.project || typeof target.project !== 'object') {
+      return false;
+    }
+    if (!skipPersistCurrent) {
+      await persistActiveOpenProjectTab({ flushAutosave: true });
+    }
+    const previousActiveId = activeOpenProjectTabId;
+    activeOpenProjectTabId = target.id;
+    renderOpenProjectTabs();
+    openProjectTabBusy = true;
+    try {
+      const loaded = await loadDocumentFromText(JSON.stringify(target.project), null, {
+        projectId: target.projectId || '',
+        suppressAutosaveStatus: true,
+      });
+      if (!loaded) {
+        activeOpenProjectTabId = previousActiveId;
+        renderOpenProjectTabs();
+        updateAutosaveStatus(localizeText('プロジェクトタブの切替に失敗しました', 'Failed to switch project tab'), 'error');
+        return false;
+      }
+      if (target.unsaved) {
+        markDocumentUnsavedChange();
+      } else {
+        resetDocumentUnsavedChanges();
+      }
+      renderOpenProjectTabs();
+      if (announce) {
+        updateAutosaveStatus(
+          localizeText(
+            `プロジェクトを切り替えました (${extractDocumentBaseName(state.documentName)})`,
+            `Switched project (${extractDocumentBaseName(state.documentName)})`
+          ),
+          'info'
+        );
+      }
+      return true;
+    } catch (error) {
+      console.warn('Failed to activate project tab', error);
+      activeOpenProjectTabId = previousActiveId;
+      renderOpenProjectTabs();
+      updateAutosaveStatus(localizeText('プロジェクトタブの切替に失敗しました', 'Failed to switch project tab'), 'error');
+      return false;
+    } finally {
+      openProjectTabBusy = false;
+    }
+  }
+
+  async function closeOpenProjectTab(tabId) {
+    const targetId = typeof tabId === 'string' ? tabId : '';
+    if (!targetId || openProjectTabBusy) {
+      return false;
+    }
+    ensureOpenProjectTabsInitialized();
+    if (openProjectTabs.length <= 1) {
+      updateAutosaveStatus(
+        localizeText('最後のプロジェクトタブは閉じられません', 'Cannot close the last project tab'),
+        'warn'
+      );
+      return false;
+    }
+    const index = findOpenProjectTabIndex(targetId);
+    if (index < 0) {
+      return false;
+    }
+    const target = openProjectTabs[index];
+    const wasActive = target?.id === activeOpenProjectTabId;
+    const fallback = wasActive
+      ? (openProjectTabs[index - 1] || openProjectTabs[index + 1] || null)
+      : null;
+    openProjectTabs.splice(index, 1);
+    if (!wasActive) {
+      renderOpenProjectTabs();
+      updateAutosaveStatus(localizeText('プロジェクトタブを閉じました', 'Closed project tab'), 'info');
+      return true;
+    }
+    activeOpenProjectTabId = '';
+    renderOpenProjectTabs();
+    if (fallback?.id) {
+      const switched = await activateOpenProjectTab(fallback.id, {
+        skipPersistCurrent: true,
+        announce: false,
+      });
+      if (!switched) {
+        updateAutosaveStatus(localizeText('プロジェクトタブを閉じました', 'Closed project tab'), 'warn');
+        return false;
+      }
+    }
+    updateAutosaveStatus(localizeText('プロジェクトタブを閉じました', 'Closed project tab'), 'info');
+    return true;
+  }
+
+  function setupOpenProjectTabs() {
+    const list = dom.projectTabsList;
+    if (!(list instanceof HTMLElement)) {
+      return;
+    }
+    if (list.dataset.bound === 'true') {
+      ensureOpenProjectTabsInitialized();
+      return;
+    }
+    list.dataset.bound = 'true';
+    list.addEventListener('click', event => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target) {
+        return;
+      }
+      const closeButton = target.closest('button[data-project-tab-close-id]');
+      if (closeButton instanceof HTMLButtonElement) {
+        const tabId = closeButton.dataset.projectTabCloseId || '';
+        void closeOpenProjectTab(tabId);
+        return;
+      }
+      const selectButton = target.closest('button[data-project-tab-id]');
+      if (selectButton instanceof HTMLButtonElement) {
+        const tabId = selectButton.dataset.projectTabId || '';
+        void activateOpenProjectTab(tabId);
+      }
+    });
+    ensureOpenProjectTabsInitialized();
   }
 
   function beginHistory(label) {
@@ -3404,8 +3814,18 @@
       }
     }
     armMobileBackBeforeUnloadBypass();
-    mobileBackGuardBypassOnce = true;
-    window.history.back();
+    const canNavigateBack = Number(window.history?.length) > 2;
+    if (canNavigateBack) {
+      mobileBackGuardBypassOnce = true;
+      window.history.back();
+      return;
+    }
+    // If there is no prior history entry (direct launch), leave immediately.
+    try {
+      window.location.replace('about:blank');
+    } catch (error) {
+      window.location.href = 'about:blank';
+    }
   }
 
   function installMobileBackButtonGuard() {
@@ -3772,13 +4192,24 @@
       return true;
     }
     if (tool === TOOL_ACTION_MIRROR_POPUP) {
+      const anchor = sourceButton instanceof HTMLElement
+        ? sourceButton
+        : document.querySelector('.tool-button[data-tool="mirrorPopup"]');
+      if (shouldDockMirrorToolPopover()) {
+        setMirrorToolPopoverOpen(true, {
+          anchor: anchor instanceof HTMLElement ? anchor : undefined,
+        });
+        if (dom.mirrorToolPopover instanceof HTMLElement) {
+          requestAnimationFrame(() => {
+            dom.mirrorToolPopover?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+          });
+        }
+        return true;
+      }
       if (isMirrorToolPopoverOpen()) {
         setMirrorToolPopoverOpen(false);
         return true;
       }
-      const anchor = sourceButton instanceof HTMLElement
-        ? sourceButton
-        : document.querySelector('.tool-button[data-tool="mirrorPopup"]');
       setMirrorToolPopoverOpen(true, {
         anchor: anchor instanceof HTMLElement ? anchor : undefined,
       });
@@ -3847,7 +4278,7 @@
     if (dom.controls.selectionOutline8Action instanceof HTMLButtonElement) {
       dom.controls.selectionOutline8Action.disabled = disableOutline;
     }
-    const nextMode = movePending ? 'selectionMove' : (hasSelection ? 'clipboard' : 'zoom');
+    const nextMode = movePending ? 'selectionMove' : ((hasSelection || hasClipboard) ? 'clipboard' : 'zoom');
     const isZoomMode = nextMode === 'zoom';
     if (canvasControlMode !== nextMode) {
       canvasControlMode = nextMode;
@@ -3994,6 +4425,9 @@
     const dualLeft = isDualLeftRailEnabled();
     const unified = isUnifiedLeftToolsColorMode();
     const colorFocused = unified && state.activeLeftTab === 'color';
+    if (!unified || isMobile) {
+      endLeftUnifiedSplitResize({ persist: false });
+    }
     document.body.classList.toggle('is-dual-left-rail', dualLeft);
     document.body.classList.toggle('is-unified-left-tools-color', unified);
     document.body.classList.toggle('is-unified-left-color-focus', colorFocused);
@@ -4047,6 +4481,7 @@
       if (colorFocused || !isCompactToolRailMode()) {
         setCompactToolFlyoutOpen(false);
       }
+      syncLeftUnifiedSplitLayout();
       return;
     }
     if (isMobile) {
@@ -4058,6 +4493,7 @@
         section.classList.add('is-active');
       });
       setCompactToolFlyoutOpen(false);
+      syncLeftUnifiedSplitLayout();
       return;
     }
     if (dualLeft) {
@@ -4075,6 +4511,7 @@
       if (!isCompactToolRailMode()) {
         setCompactToolFlyoutOpen(false);
       }
+      syncLeftUnifiedSplitLayout();
       return;
     }
     LEFT_TAB_KEYS.forEach(key => {
@@ -4088,6 +4525,7 @@
     if (!isCompactToolRailMode()) {
       setCompactToolFlyoutOpen(false);
     }
+    syncLeftUnifiedSplitLayout();
   }
 
   function isCompactRightRailMode() {
@@ -6046,6 +6484,8 @@
     setLocalizedTextContent('#startupActionNew', '新規作成', 'New Project');
     setLocalizedTextContent('#startupActionOpen', 'ファイルを開く', 'Open File');
     setLocalizedTextContent('#startupActionSkip', 'この画面を閉じる', 'Close');
+    setLocalizedAttribute('#projectTabsBar', 'aria-label', '開いているプロジェクト', 'Open Projects');
+    setLocalizedAttribute('#projectTabsList', 'aria-label', 'プロジェクトタブ', 'Project Tabs');
     setLocalizedTextContent('#startupRecentProjects .startup-screen__recent-title', '端末内プロジェクト（自動保存）', 'Local Projects (Autosave)');
     setLocalizedTextContent(
       '#startupScreenHint',
@@ -6206,6 +6646,7 @@
     setLocalizedAttribute('#floatingMovePad [data-move-pad-dir="left"]', 'aria-label', '選択範囲を左へ移動', 'Move selection left');
     setLocalizedAttribute('#floatingMovePad [data-move-pad-dir="right"]', 'aria-label', '選択範囲を右へ移動', 'Move selection right');
     setLocalizedAttribute('#floatingMovePad [data-move-pad-dir="down"]', 'aria-label', '選択範囲を下へ移動', 'Move selection down');
+    setLocalizedAttribute('#resizeLeftUnifiedSplit', 'aria-label', 'ツールとカラーの縦割合を変更', 'Resize tools and color split');
     setLocalizedTextContent('#mirrorToolPopover .mirror-tool-popover__header strong', '対称ツール', 'Mirror Tools');
     setLocalizedTextContent('#mirrorToolPopoverClose', '閉じる', 'Close');
     setLocalizedAttribute('#mirrorToolPopoverClose', 'aria-label', '対称ポップアップを閉じる', 'Close mirror popup');
@@ -6258,6 +6699,7 @@
     setLocalizedTextContent('.new-project__size-fields > span', 'キャンバスサイズ', 'Canvas Size');
     setLocalizedControlLabel('newProjectWidth', '横', 'W');
     setLocalizedControlLabel('newProjectHeight', '縦', 'H');
+    setLocalizedTextContent('#newProjectExportFolderGuide', '作成時に画像/GIFの保存先フォルダを確認します（対応ブラウザのみ）。', 'When creating, you can choose a fixed folder for image/GIF exports (supported browsers only).');
     setLocalizedTextContent('#cancelNewProject', 'キャンセル', 'Cancel');
     setLocalizedTextContent('#confirmNewProject', '作成', 'Create');
 
@@ -6275,6 +6717,7 @@
     updateExportDestinationLabel();
     updateExportFolderButtonLabel();
     updateExportScaleHint();
+    renderOpenProjectTabs();
   }
 
   function refreshLocalizedUi() {
@@ -7429,6 +7872,140 @@
     return true;
   }
 
+  async function openDocumentsAsProjectTabs(items, loader, { source = 'open' } = {}) {
+    if (openProjectTabBusy) {
+      return false;
+    }
+    const queue = Array.isArray(items) ? items.filter(Boolean) : [];
+    if (!queue.length || typeof loader !== 'function') {
+      return false;
+    }
+    ensureOpenProjectTabsInitialized();
+    const availableSlots = Math.max(0, MAX_OPEN_PROJECT_TABS - openProjectTabs.length);
+    if (availableSlots <= 0) {
+      updateAutosaveStatus(
+        localizeText(
+          `同時に開けるプロジェクトは最大 ${MAX_OPEN_PROJECT_TABS} 件です`,
+          `You can open up to ${MAX_OPEN_PROJECT_TABS} projects at once`
+        ),
+        'warn'
+      );
+      return false;
+    }
+    openProjectTabBusy = true;
+    try {
+      const targets = queue.slice(0, availableSlots);
+      const truncatedCount = Math.max(0, queue.length - targets.length);
+      await persistActiveOpenProjectTab({ flushAutosave: true });
+      let openedCount = 0;
+      let failedCount = 0;
+      for (let index = 0; index < targets.length; index += 1) {
+        const item = targets[index];
+        try {
+          const loaded = await loader(item);
+          if (!loaded) {
+            failedCount += 1;
+            continue;
+          }
+          const appended = appendOpenProjectTabFromCurrentState({
+            activate: true,
+            source,
+          });
+          if (!appended) {
+            failedCount += 1;
+            break;
+          }
+          openedCount += 1;
+        } catch (error) {
+          console.warn('Failed to open project as tab', error);
+          failedCount += 1;
+        }
+      }
+      if (!openedCount) {
+        if (truncatedCount > 0 || failedCount > 0) {
+          updateAutosaveStatus(
+            localizeText(
+              `複数読み込みに失敗しました（失敗 ${failedCount} / 上限で未追加 ${truncatedCount}）`,
+              `Failed to open projects (failed ${failedCount} / skipped by limit ${truncatedCount})`
+            ),
+            'warn'
+          );
+        }
+        return false;
+      }
+      const summaryJa = `複数読み込み: 開いた ${openedCount}件`
+        + (failedCount > 0 ? ` / 失敗 ${failedCount}件` : '')
+        + (truncatedCount > 0 ? ` / 上限で未追加 ${truncatedCount}件（最大${MAX_OPEN_PROJECT_TABS}）` : '');
+      const summaryEn = `Opened ${openedCount} project tab(s)`
+        + (failedCount > 0 ? ` / Failed ${failedCount}` : '')
+        + (truncatedCount > 0 ? ` / Skipped by limit ${truncatedCount} (max ${MAX_OPEN_PROJECT_TABS})` : '');
+      updateAutosaveStatus(
+        localizeText(summaryJa, summaryEn),
+        (failedCount > 0 || truncatedCount > 0) ? 'warn' : 'success'
+      );
+      renderOpenProjectTabs();
+      return true;
+    } finally {
+      openProjectTabBusy = false;
+    }
+  }
+
+  async function openRecentProjectAsTab(entry, { hideStartup = true } = {}) {
+    if (!entry || typeof entry !== 'object') {
+      return false;
+    }
+    const projectId = normalizeAutosaveProjectId(entry.id || '');
+    if (openProjectTabBusy) {
+      return false;
+    }
+    ensureOpenProjectTabsInitialized();
+    const existingIndex = projectId ? findOpenProjectTabIndexByProjectId(projectId) : -1;
+    if (existingIndex >= 0) {
+      const existingTab = openProjectTabs[existingIndex];
+      const switched = await activateOpenProjectTab(existingTab?.id || '');
+      if (switched && hideStartup) {
+        hideStartupScreen();
+      }
+      return switched;
+    }
+    if (openProjectTabs.length >= MAX_OPEN_PROJECT_TABS) {
+      updateAutosaveStatus(
+        localizeText(
+          `同時に開けるプロジェクトは最大 ${MAX_OPEN_PROJECT_TABS} 件です`,
+          `You can open up to ${MAX_OPEN_PROJECT_TABS} projects at once`
+        ),
+        'warn'
+      );
+      return false;
+    }
+    openProjectTabBusy = true;
+    try {
+      await persistActiveOpenProjectTab({ flushAutosave: true });
+      const loaded = await openRecentProject(entry, {
+        hideStartup: false,
+        silent: true,
+      });
+      if (!loaded) {
+        return false;
+      }
+      const appended = appendOpenProjectTabFromCurrentState({
+        activate: true,
+        source: 'local-recent',
+        projectId: projectId || autosaveProjectId,
+      });
+      if (!appended) {
+        return false;
+      }
+      if (hideStartup) {
+        hideStartupScreen();
+      }
+      updateAutosaveStatus('自動保存: 端末内プロジェクトを開きました', 'success');
+      return true;
+    } finally {
+      openProjectTabBusy = false;
+    }
+  }
+
   async function openDocumentDialog() {
     if (!canCurrentClientImportExternalData()) {
       setMultiStatus(localizeText('参加/視聴モードでは読み込み/インポートはマスターのみ操作できます', 'In participant/viewer mode, only the master can open/import files'), 'warn');
@@ -7436,8 +8013,8 @@
     }
     if (typeof window.showOpenFilePicker === 'function') {
       try {
-        const [handle] = await window.showOpenFilePicker({
-          multiple: false,
+        const handles = await window.showOpenFilePicker({
+          multiple: true,
           excludeAcceptAllOption: false,
           types: [
             {
@@ -7451,11 +8028,14 @@
             },
           ],
         });
-        if (!handle) {
+        if (!Array.isArray(handles) || !handles.length) {
           return false;
         }
-        const loaded = await loadDocumentFromHandle(handle);
-        return Boolean(loaded);
+        return await openDocumentsAsProjectTabs(
+          handles,
+          async handle => loadDocumentFromHandle(handle, { suppressAutosaveStatus: true }),
+          { source: 'open-picker' }
+        );
       } catch (error) {
         if (error && error.name === 'AbortError') {
           return false;
@@ -7475,6 +8055,7 @@
     return new Promise(resolve => {
       const input = document.createElement('input');
       input.type = 'file';
+      input.multiple = true;
       const acceptTypes = [
         '.json',
         '.pxdraw',
@@ -7502,25 +8083,29 @@
         input.remove();
       };
       input.addEventListener('change', async () => {
-        const file = input.files && input.files[0];
+        const files = Array.from(input.files || []);
         cleanup();
-        if (!file) {
+        if (!files.length) {
           finish(false);
           return;
         }
         try {
-          if (isImportableImageFile(file)) {
-            await loadDocumentFromImageFile(file);
-            finish(true);
-          } else {
-            const text = await file.text();
-            const loaded = await loadDocumentFromText(text, null);
-            finish(Boolean(loaded));
-          }
+          const opened = await openDocumentsAsProjectTabs(
+            files,
+            async file => {
+              if (isImportableImageFile(file)) {
+                await loadDocumentFromImageFile(file);
+                return true;
+              }
+              const text = await file.text();
+              return await loadDocumentFromText(text, null, { suppressAutosaveStatus: true });
+            },
+            { source: 'open-input' }
+          );
+          finish(opened);
         } catch (error) {
           console.warn('Document load failed', error);
-          const message = isImportableImageFile(file) ? '画像の読み込みに失敗しました' : 'ドキュメントを開けませんでした';
-          updateAutosaveStatus(message, 'error');
+          updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
           finish(false);
         }
       });
@@ -9848,7 +10433,12 @@
     const heightValue = config?.heightInput?.value;
     const width = Number(widthValue);
     const height = Number(heightValue);
-    const created = await createNewProject({ name, width, height });
+    const created = await createNewProject({
+      name,
+      width,
+      height,
+      promptExportDirectory: true,
+    });
     if (created) {
       if (config?.nameInput) {
         config.nameInput.value = extractDocumentBaseName(name);
@@ -9868,16 +10458,61 @@
     if (heightRaw === null) return;
     const width = Number(widthRaw);
     const height = Number(heightRaw);
-    if (!(await createNewProject({ name, width, height }))) {
+    if (!(await createNewProject({
+      name,
+      width,
+      height,
+      promptExportDirectory: true,
+    }))) {
       window.alert(`キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`);
     }
   }
 
-  async function createNewProject({ name, width, height }) {
+  async function ensureExportDirectoryForNewProject() {
+    if (!EXPORT_DIRECTORY_SUPPORTED || exportDirectoryHandle) {
+      return;
+    }
+    if (pendingExportDirectoryHandle) {
+      const restored = await attemptExportDirectoryReauthorization();
+      if (restored || exportDirectoryHandle) {
+        return;
+      }
+    }
+    if (typeof window.showDirectoryPicker !== 'function') {
+      return;
+    }
+    exportDirectorySetupDismissed = false;
+    updateExportFolderStatus(
+      localizeText(
+        '新規作成: 画像/GIFの保存先フォルダを選択してください',
+        'New project: choose a folder for image/GIF exports'
+      ),
+      'info'
+    );
+    const bound = await requestExportDirectoryBinding();
+    if (!bound && !exportDirectoryHandle) {
+      updateExportFolderStatus(
+        localizeText(
+          '新規作成: 保存先フォルダは未設定のまま続行します（保存時に選択可能）',
+          'New project: continuing without a fixed export folder (you can choose on each save)'
+        ),
+        'warn'
+      );
+    }
+  }
+
+  async function createNewProject({ name, width, height, promptExportDirectory = false }) {
     const widthNumber = lockedCanvasWidth !== null ? lockedCanvasWidth : Number(width);
     const heightNumber = lockedCanvasHeight !== null ? lockedCanvasHeight : Number(height);
     if (!Number.isFinite(widthNumber) || !Number.isFinite(heightNumber)) {
       return false;
+    }
+    if (promptExportDirectory) {
+      try {
+        await ensureExportDirectoryForNewProject();
+      } catch (error) {
+        console.warn('Failed to prepare export directory during new project creation', error);
+      }
     }
     const clampedWidth = clamp(Math.round(widthNumber), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
     const clampedHeight = clamp(Math.round(heightNumber), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
@@ -9966,6 +10601,7 @@
         name: createStartupQuickProjectName(),
         width: lockedCanvasWidth !== null ? lockedCanvasWidth : DEFAULT_CANVAS_SIZE,
         height: lockedCanvasHeight !== null ? lockedCanvasHeight : DEFAULT_CANVAS_SIZE,
+        promptExportDirectory: true,
       });
       if (!created) {
         setStartupQuickSetupStatus(localizeText('かんたん初期設定に失敗しました。通常の「新規作成」をお試しください。', 'Quick setup failed. Please try "New Project".'), 'error');
@@ -10207,7 +10843,7 @@
         );
         return;
       }
-      const opened = await openRecentProject(firstEntry);
+      const opened = await openRecentProjectAsTab(firstEntry, { hideStartup: true });
       if (!opened) {
         refreshRecentProjectsUI().catch(error => {
           console.warn('Failed to refresh recent projects', error);
@@ -10227,11 +10863,75 @@
       hideStartupScreen();
     });
     dom.startup?.recentList?.addEventListener('click', async event => {
-      const target = event.target instanceof Element ? event.target.closest('.startup-recent-card') : null;
+      const target = event.target instanceof Element ? event.target : null;
       if (!target) {
         return;
       }
-      const projectId = target.dataset.projectId;
+      const deleteButton = target.closest('button[data-startup-recent-delete-id]');
+      if (deleteButton instanceof HTMLButtonElement) {
+        event.preventDefault();
+        event.stopPropagation();
+        const projectId = deleteButton.dataset.startupRecentDeleteId || '';
+        if (!projectId) {
+          return;
+        }
+        const entry = recentProjectsCache.get(projectId) || null;
+        const displayLabel = extractDocumentBaseName(entry?.fileName || entry?.name || DEFAULT_DOCUMENT_NAME);
+        const accepted = window.confirm(
+          localizeText(
+            `端末内プロジェクト「${displayLabel}」を削除しますか？\nこの操作は取り消せません。`,
+            `Delete local project "${displayLabel}"?\nThis action cannot be undone.`
+          )
+        );
+        if (!accepted) {
+          return;
+        }
+        const card = deleteButton.closest('.startup-recent-card');
+        const openButton = card instanceof HTMLElement
+          ? card.querySelector('button[data-startup-recent-open-id]')
+          : null;
+        deleteButton.disabled = true;
+        if (openButton instanceof HTMLButtonElement) {
+          openButton.disabled = true;
+        }
+        try {
+          const removed = await removeRecentProjectEntry(projectId);
+          if (removed) {
+            releaseAutosaveProjectId(projectId);
+            updateAutosaveStatus(
+              localizeText(
+                `端末内プロジェクトを削除しました (${displayLabel})`,
+                `Deleted local project (${displayLabel})`
+              ),
+              'info'
+            );
+          } else if (AUTOSAVE_SUPPORTED) {
+            refreshRecentProjectsUI().catch(error => {
+              console.warn('Failed to refresh recent projects', error);
+            });
+          }
+        } catch (error) {
+          console.warn('Failed to remove recent project', error);
+          updateAutosaveStatus(
+            localizeText(
+              '端末内プロジェクトを削除できませんでした',
+              'Failed to delete local project'
+            ),
+            'error'
+          );
+          deleteButton.disabled = false;
+          if (openButton instanceof HTMLButtonElement) {
+            openButton.disabled = false;
+          }
+        }
+        return;
+      }
+
+      const openButton = target.closest('button[data-startup-recent-open-id]');
+      if (!(openButton instanceof HTMLButtonElement)) {
+        return;
+      }
+      const projectId = openButton.dataset.startupRecentOpenId || '';
       const entry = projectId ? recentProjectsCache.get(projectId) : null;
       if (!entry) {
         if (AUTOSAVE_SUPPORTED) {
@@ -10241,10 +10941,10 @@
         }
         return;
       }
-      target.disabled = true;
-      const success = await openRecentProject(entry);
+      openButton.disabled = true;
+      const success = await openRecentProjectAsTab(entry, { hideStartup: true });
       if (!success) {
-        target.disabled = false;
+        openButton.disabled = false;
       }
     });
     if (AUTOSAVE_SUPPORTED) {
@@ -11090,12 +11790,15 @@
         return;
       }
       const displayLabel = entry.fileName || entry.name || DEFAULT_DOCUMENT_NAME;
-      const card = document.createElement('button');
-      card.type = 'button';
+      const card = document.createElement('article');
       card.className = 'startup-recent-card';
       card.dataset.projectId = entry.id;
       card.setAttribute('role', 'listitem');
-      card.setAttribute('aria-label', localizeText(`${displayLabel} を開く`, `Open ${displayLabel}`));
+      const openButton = document.createElement('button');
+      openButton.type = 'button';
+      openButton.className = 'startup-recent-card__open';
+      openButton.dataset.startupRecentOpenId = entry.id;
+      openButton.setAttribute('aria-label', localizeText(`${displayLabel} を開く`, `Open ${displayLabel}`));
       const thumb = document.createElement('div');
       thumb.className = 'startup-recent-card__thumb';
       if (entry.thumbnail) {
@@ -11123,9 +11826,18 @@
       metaNode.textContent = Number.isFinite(updatedAt)
         ? formatUpdateHistoryDate(updatedAt, localizeText('保存時刻不明', 'Saved time unavailable'))
         : localizeText('保存時刻不明', 'Saved time unavailable');
-      card.appendChild(thumb);
-      card.appendChild(nameNode);
-      card.appendChild(metaNode);
+      const deleteButton = document.createElement('button');
+      deleteButton.type = 'button';
+      deleteButton.className = 'startup-recent-card__delete';
+      deleteButton.dataset.startupRecentDeleteId = entry.id;
+      deleteButton.textContent = '×';
+      deleteButton.title = localizeText('端末内プロジェクトを削除', 'Delete local project');
+      deleteButton.setAttribute('aria-label', localizeText(`${displayLabel} を削除`, `Delete ${displayLabel}`));
+      openButton.appendChild(thumb);
+      openButton.appendChild(nameNode);
+      openButton.appendChild(metaNode);
+      card.appendChild(openButton);
+      card.appendChild(deleteButton);
       list.appendChild(card);
     });
   }
@@ -15245,6 +15957,8 @@
       restoreReloadSessionSnapshot();
     }
     await initializeExportDirectoryBinding();
+    setupOpenProjectTabs();
+    ensureOpenProjectTabsInitialized();
     setupLeftTabs();
     setupRightTabs();
     setupLayout();
@@ -15297,6 +16011,93 @@
     const numeric = Math.round(Number(value));
     const base = Number.isFinite(numeric) ? numeric : fallback;
     return clamp(base, LEFT_DUAL_MIN_COLUMN_WIDTH, maxTools);
+  }
+
+  function normalizeLeftUnifiedToolsRatio(value, fallback = LEFT_UNIFIED_TOOLS_RATIO_DEFAULT) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+      return clamp(numeric, LEFT_UNIFIED_TOOLS_RATIO_MIN, LEFT_UNIFIED_TOOLS_RATIO_MAX);
+    }
+    const fallbackNumeric = Number(fallback);
+    if (Number.isFinite(fallbackNumeric)) {
+      return clamp(fallbackNumeric, LEFT_UNIFIED_TOOLS_RATIO_MIN, LEFT_UNIFIED_TOOLS_RATIO_MAX);
+    }
+    return LEFT_UNIFIED_TOOLS_RATIO_DEFAULT;
+  }
+
+  function ensureLeftUnifiedSplitHandle() {
+    if (dom.resizeHandles.leftUnified instanceof HTMLElement) {
+      return dom.resizeHandles.leftUnified;
+    }
+    if (!(dom.leftTabPanes instanceof HTMLElement)) {
+      return null;
+    }
+    const handle = document.createElement('button');
+    handle.type = 'button';
+    handle.id = 'resizeLeftUnifiedSplit';
+    handle.className = 'rail-resizer rail-resizer--left-unified-split';
+    handle.hidden = true;
+    handle.setAttribute('aria-hidden', 'true');
+    handle.setAttribute(
+      'aria-label',
+      localizeText('ツールとカラーの縦割合を変更', 'Resize tools and color split')
+    );
+    dom.leftTabPanes.appendChild(handle);
+    dom.resizeHandles.leftUnified = handle;
+    return handle;
+  }
+
+  function isLeftUnifiedSplitModeEnabled() {
+    if (layoutMode === 'mobilePortrait' || !isUnifiedLeftToolsColorMode()) {
+      return false;
+    }
+    if (!(dom.leftRail instanceof HTMLElement) || dom.leftRail.dataset.collapsed === 'true') {
+      return false;
+    }
+    if (!(dom.leftTabPanes instanceof HTMLElement)) {
+      return false;
+    }
+    const toolsSection = dom.sections.tools;
+    const colorSection = dom.sections.color;
+    if (!(toolsSection instanceof HTMLElement) || !(colorSection instanceof HTMLElement)) {
+      return false;
+    }
+    return toolsSection.parentNode === dom.leftTabPanes && colorSection.parentNode === dom.leftTabPanes;
+  }
+
+  function syncLeftUnifiedSplitLayout() {
+    const panes = dom.leftTabPanes;
+    if (!(panes instanceof HTMLElement)) {
+      return;
+    }
+    const handle = ensureLeftUnifiedSplitHandle();
+    if (!(handle instanceof HTMLElement)) {
+      return;
+    }
+    const enabled = isLeftUnifiedSplitModeEnabled();
+    if (!enabled) {
+      handle.hidden = true;
+      handle.setAttribute('aria-hidden', 'true');
+      panes.style.removeProperty('--left-unified-tools-grow');
+      panes.style.removeProperty('--left-unified-color-grow');
+      return;
+    }
+    const toolsSection = dom.sections.tools;
+    const colorSection = dom.sections.color;
+    if (!(toolsSection instanceof HTMLElement) || !(colorSection instanceof HTMLElement)) {
+      return;
+    }
+    if (colorSection.parentNode === panes) {
+      panes.insertBefore(handle, colorSection);
+    } else if (handle.parentNode !== panes) {
+      panes.appendChild(handle);
+    }
+    const ratio = normalizeLeftUnifiedToolsRatio(leftUnifiedSplitSizing.ratio, LEFT_UNIFIED_TOOLS_RATIO_DEFAULT);
+    leftUnifiedSplitSizing.ratio = ratio;
+    panes.style.setProperty('--left-unified-tools-grow', ratio.toFixed(4));
+    panes.style.setProperty('--left-unified-color-grow', (1 - ratio).toFixed(4));
+    handle.hidden = false;
+    handle.setAttribute('aria-hidden', 'false');
   }
 
   function clearLeftDualRailLayout() {
@@ -15440,6 +16241,113 @@
     }
     setCompactRightFlyoutOpen(true);
     updateRightTabVisibility();
+  }
+
+  function beginLeftUnifiedSplitResize(event) {
+    if (!isLeftUnifiedSplitModeEnabled()) {
+      return;
+    }
+    const handle = dom.resizeHandles.leftUnified;
+    const toolsSection = dom.sections.tools;
+    const colorSection = dom.sections.color;
+    if (
+      !(handle instanceof HTMLElement)
+      || !(toolsSection instanceof HTMLElement)
+      || !(colorSection instanceof HTMLElement)
+    ) {
+      return;
+    }
+    const toolsRect = toolsSection.getBoundingClientRect();
+    const colorRect = colorSection.getBoundingClientRect();
+    const totalHeight = Math.round((toolsRect.height || 0) + (colorRect.height || 0));
+    if (totalHeight <= 0) {
+      return;
+    }
+    event.preventDefault();
+    leftUnifiedSplitSizing.active = true;
+    leftUnifiedSplitSizing.pointerId = Number.isFinite(event.pointerId) ? event.pointerId : null;
+    leftUnifiedSplitSizing.startClientY = Number(event.clientY) || 0;
+    leftUnifiedSplitSizing.startToolsHeight = Math.max(1, Math.round(toolsRect.height || 0));
+    leftUnifiedSplitSizing.startColorHeight = Math.max(1, Math.round(colorRect.height || 0));
+    leftUnifiedSplitSizing.moved = false;
+    leftUnifiedSplitSizing.captureTarget = handle;
+    handle.classList.add('is-active');
+    document.body.classList.add('is-rail-resizing');
+    if (leftUnifiedSplitSizing.pointerId !== null && typeof handle.setPointerCapture === 'function') {
+      try {
+        handle.setPointerCapture(leftUnifiedSplitSizing.pointerId);
+      } catch (error) {
+        // Ignore pointer capture failures.
+      }
+    }
+    window.addEventListener('pointermove', handleLeftUnifiedSplitPointerMove);
+    window.addEventListener('pointerup', handleLeftUnifiedSplitPointerUp);
+    window.addEventListener('pointercancel', handleLeftUnifiedSplitPointerUp);
+  }
+
+  function handleLeftUnifiedSplitPointerMove(event) {
+    if (!leftUnifiedSplitSizing.active || !isLeftUnifiedSplitModeEnabled()) {
+      return;
+    }
+    if (leftUnifiedSplitSizing.pointerId !== null && event.pointerId !== leftUnifiedSplitSizing.pointerId) {
+      return;
+    }
+    const deltaY = (Number(event.clientY) || 0) - leftUnifiedSplitSizing.startClientY;
+    if (!leftUnifiedSplitSizing.moved) {
+      if (Math.abs(deltaY) < RAIL_RESIZE_DRAG_THRESHOLD) {
+        return;
+      }
+      leftUnifiedSplitSizing.moved = true;
+    }
+    const startTotal = Math.max(2, leftUnifiedSplitSizing.startToolsHeight + leftUnifiedSplitSizing.startColorHeight);
+    const nextToolsHeight = leftUnifiedSplitSizing.startToolsHeight + deltaY;
+    const nextRatio = normalizeLeftUnifiedToolsRatio(nextToolsHeight / startTotal, leftUnifiedSplitSizing.ratio);
+    if (Math.abs(nextRatio - leftUnifiedSplitSizing.ratio) < 0.0005) {
+      return;
+    }
+    leftUnifiedSplitSizing.ratio = nextRatio;
+    syncLeftUnifiedSplitLayout();
+  }
+
+  function endLeftUnifiedSplitResize({ persist = false } = {}) {
+    const wasActive = leftUnifiedSplitSizing.active;
+    const handle = leftUnifiedSplitSizing.captureTarget;
+    if (handle instanceof HTMLElement) {
+      handle.classList.remove('is-active');
+      if (leftUnifiedSplitSizing.pointerId !== null && typeof handle.releasePointerCapture === 'function') {
+        try {
+          handle.releasePointerCapture(leftUnifiedSplitSizing.pointerId);
+        } catch (error) {
+          // Ignore pointer release failures.
+        }
+      }
+    }
+    leftUnifiedSplitSizing.active = false;
+    leftUnifiedSplitSizing.pointerId = null;
+    leftUnifiedSplitSizing.captureTarget = null;
+    leftUnifiedSplitSizing.startClientY = 0;
+    leftUnifiedSplitSizing.startToolsHeight = 0;
+    leftUnifiedSplitSizing.startColorHeight = 0;
+    leftUnifiedSplitSizing.moved = false;
+    if (wasActive) {
+      document.body.classList.remove('is-rail-resizing');
+    }
+    window.removeEventListener('pointermove', handleLeftUnifiedSplitPointerMove);
+    window.removeEventListener('pointerup', handleLeftUnifiedSplitPointerUp);
+    window.removeEventListener('pointercancel', handleLeftUnifiedSplitPointerUp);
+    if (persist && wasActive) {
+      scheduleSessionPersist({ includeSnapshots: false });
+    }
+  }
+
+  function handleLeftUnifiedSplitPointerUp(event) {
+    if (!leftUnifiedSplitSizing.active) {
+      return;
+    }
+    if (leftUnifiedSplitSizing.pointerId !== null && event.pointerId !== leftUnifiedSplitSizing.pointerId) {
+      return;
+    }
+    endLeftUnifiedSplitResize({ persist: Boolean(leftUnifiedSplitSizing.moved) });
   }
 
   function beginLeftDualSplitResize(event) {
@@ -15667,9 +16575,24 @@
         beginLeftDualSplitResize(event);
       });
     };
+    const bindLeftUnified = handle => {
+      if (!handle || handle.dataset.bound === 'true') {
+        return;
+      }
+      handle.dataset.bound = 'true';
+      handle.addEventListener('pointerdown', event => {
+        const isPrimaryPointer =
+          event.button === 0 || event.pointerType === 'touch' || event.pointerType === 'pen';
+        if (!isPrimaryPointer) {
+          return;
+        }
+        beginLeftUnifiedSplitResize(event);
+      });
+    };
     bind('left', dom.resizeHandles.left);
     bind('right', dom.resizeHandles.right);
     bindLeftInner(dom.resizeHandles.leftInner);
+    bindLeftUnified(ensureLeftUnifiedSplitHandle());
   }
 
   function normalizeMobileDrawerMode(mode) {
@@ -16254,6 +17177,9 @@
     if (isMobile || !isDualLeftRailEnabled()) {
       endLeftDualSplitResize({ persist: false });
     }
+    if (isMobile || !isUnifiedLeftToolsColorMode()) {
+      endLeftUnifiedSplitResize({ persist: false });
+    }
     // Reset compact right flyout portal before sections are re-mounted by layout map.
     // Without this, orientation changes can return the section to the old desktop parent.
     setCompactRightFlyoutOpen(false);
@@ -16433,7 +17359,10 @@
         mirrorToolPopoverMountState.parent = popover.parentNode;
         mirrorToolPopoverMountState.nextSibling = popover.nextSibling;
       }
-      if (popover.parentNode !== host) {
+      const adMount = host.querySelector('.panel-ad-mount');
+      if (adMount instanceof HTMLElement && adMount.parentNode === host) {
+        host.insertBefore(popover, adMount);
+      } else if (popover.parentNode !== host) {
         host.appendChild(popover);
       }
       popover.classList.add('is-docked');
@@ -24768,6 +25697,98 @@
     }
   }
 
+  function getPaletteColorKey(color) {
+    const normalized = normalizeColorValue(color);
+    return `${normalized.r},${normalized.g},${normalized.b},${normalized.a}`;
+  }
+
+  function buildPaletteColorLookup(palette = state.palette) {
+    const lookup = new Map();
+    if (!Array.isArray(palette)) {
+      return lookup;
+    }
+    for (let i = 0; i < palette.length; i += 1) {
+      const key = getPaletteColorKey(palette[i]);
+      if (!lookup.has(key)) {
+        lookup.set(key, i);
+      }
+    }
+    return lookup;
+  }
+
+  function remapClipboardSelectionColorsToCurrentPalette(clip, indices, direct, mask) {
+    if (
+      !(indices instanceof Int16Array)
+      || !(mask instanceof Uint8Array)
+      || mask.length !== indices.length
+    ) {
+      return { indices, addedCount: 0 };
+    }
+    const sourcePalette = Array.isArray(clip?.palette) ? clip.palette : null;
+    const remappedIndices = new Int16Array(indices);
+    const paletteLookup = buildPaletteColorLookup(state.palette);
+    const sourceIndexMap = new Map();
+    let addedCount = 0;
+    for (let i = 0; i < remappedIndices.length; i += 1) {
+      if (mask[i] !== 1) {
+        continue;
+      }
+      const sourceIndex = remappedIndices[i];
+      if (sourceIndex >= 0) {
+        let mappedIndex = sourceIndexMap.get(sourceIndex);
+        if (!Number.isInteger(mappedIndex)) {
+          const sourceColor = sourcePalette && sourcePalette[sourceIndex]
+            ? normalizeColorValue(sourcePalette[sourceIndex])
+            : null;
+          if (sourceColor) {
+            const sourceKey = getPaletteColorKey(sourceColor);
+            const existingIndex = paletteLookup.get(sourceKey);
+            if (Number.isInteger(existingIndex) && existingIndex >= 0) {
+              mappedIndex = existingIndex;
+            } else {
+              mappedIndex = state.palette.length;
+              state.palette.push(sourceColor);
+              paletteLookup.set(sourceKey, mappedIndex);
+              addedCount += 1;
+            }
+          } else {
+            mappedIndex = normalizePaletteIndex(sourceIndex, state.activePaletteIndex);
+          }
+          sourceIndexMap.set(sourceIndex, mappedIndex);
+        }
+        remappedIndices[i] = mappedIndex;
+        continue;
+      }
+      if (!(direct instanceof Uint8ClampedArray)) {
+        continue;
+      }
+      const base = i * 4;
+      if (base + 3 >= direct.length || direct[base + 3] <= 0) {
+        continue;
+      }
+      const directColor = normalizeColorValue({
+        r: direct[base],
+        g: direct[base + 1],
+        b: direct[base + 2],
+        a: direct[base + 3],
+      });
+      const directKey = getPaletteColorKey(directColor);
+      let mappedIndex = paletteLookup.get(directKey);
+      if (!Number.isInteger(mappedIndex) || mappedIndex < 0) {
+        mappedIndex = state.palette.length;
+        state.palette.push(directColor);
+        paletteLookup.set(directKey, mappedIndex);
+        addedCount += 1;
+      }
+      remappedIndices[i] = mappedIndex;
+      direct[base] = 0;
+      direct[base + 1] = 0;
+      direct[base + 2] = 0;
+      direct[base + 3] = 0;
+    }
+    return { indices: remappedIndices, addedCount };
+  }
+
   function storeSelectionInClipboard(moveState) {
     if (!moveState) {
       internalClipboard.selection = null;
@@ -24779,6 +25800,7 @@
       mask: new Uint8Array(moveState.mask),
       indices: new Int16Array(moveState.indices),
       direct: new Uint8ClampedArray(moveState.direct),
+      palette: state.palette.map(color => normalizeColorValue(color)),
       bounds: { ...moveState.bounds },
       imageData: moveState.imageData ? cloneImageData(moveState.imageData) : null,
     };
@@ -24796,7 +25818,7 @@
     return true;
   }
 
-  function createMoveStateFromClipboard(clip, bounds, layer) {
+  function createMoveStateFromClipboard(clip, bounds, layer, { autoExpandPalette = false } = {}) {
     if (!clip) {
       return null;
     }
@@ -24809,12 +25831,18 @@
     const mask = clip.mask instanceof Uint8Array && clip.mask.length === size
       ? new Uint8Array(clip.mask)
       : new Uint8Array(size);
-    const indices = clip.indices instanceof Int16Array && clip.indices.length === size
+    let indices = clip.indices instanceof Int16Array && clip.indices.length === size
       ? new Int16Array(clip.indices)
       : new Int16Array(size);
     const direct = clip.direct instanceof Uint8ClampedArray && clip.direct.length === size * 4
       ? new Uint8ClampedArray(clip.direct)
       : new Uint8ClampedArray(size * 4);
+    let paletteAddedCount = 0;
+    if (autoExpandPalette) {
+      const remapResult = remapClipboardSelectionColorsToCurrentPalette(clip, indices, direct, mask);
+      indices = remapResult.indices;
+      paletteAddedCount = remapResult.addedCount;
+    }
     let imageData = null;
     if (clip.imageData) {
       imageData = cloneImageData(clip.imageData);
@@ -24839,6 +25867,7 @@
       restoreIndices: null,
       restoreDirect: null,
       applySelectionOnFinalize: true,
+      paletteAddedCount,
     };
   }
 
@@ -25062,10 +26091,24 @@
     x0 = clamp(x0, 0, maxX0);
     y0 = clamp(y0, 0, maxY0);
     const bounds = { x0, y0, x1: x0 + width - 1, y1: y0 + height - 1 };
-    const moveState = createMoveStateFromClipboard(clip, bounds, layer);
+    commitHistory();
+    beginHistory('selectionPaste');
+    const moveState = createMoveStateFromClipboard(clip, bounds, layer, { autoExpandPalette: true });
     if (!moveState) {
+      rollbackPendingHistory({ reRender: false });
       updateCanvasControlButtons();
       return false;
+    }
+    if (moveState.paletteAddedCount > 0) {
+      renderPalette();
+      syncPaletteInputs();
+      updateAutosaveStatus(
+        localizeText(
+          `貼り付け色をパレットへ追加しました (${moveState.paletteAddedCount}色)`,
+          `Added pasted colors to palette (${moveState.paletteAddedCount})`
+        ),
+        'info'
+      );
     }
     const restoreSnapshot = createPasteRestoreSnapshot(layer, bounds, width, height);
     moveState.restoreIndices = restoreSnapshot.indices;
@@ -25076,7 +26119,6 @@
     moveState.offset.y = 0;
     moveState.hasCleared = false;
     state.pendingPasteMoveState = moveState;
-    beginHistory('selectionPaste');
     const result = placeSelectionPixels(moveState, 0, 0);
     let success = false;
     if (result.placed && result.bounds) {
@@ -25089,9 +26131,11 @@
       requestOverlayRender();
       success = true;
     }
-    commitHistory();
     if (!success) {
       state.pendingPasteMoveState = null;
+      rollbackPendingHistory({ reRender: false });
+    } else {
+      commitHistory();
     }
     updateCanvasControlButtons();
     return success;
@@ -28297,6 +29341,7 @@
         onionSkin: normalizeOnionSkinState(state.onionSkin),
         dualLeftRail: false,
         leftDualToolsWidth: normalizeLeftDualToolsWidth(leftDualSizing.tools, railSizing.left),
+        leftUnifiedToolsRatio: normalizeLeftUnifiedToolsRatio(leftUnifiedSplitSizing.ratio, LEFT_UNIFIED_TOOLS_RATIO_DEFAULT),
         activeFrame: clamp(Number(state.activeFrame) || 0, 0, state.frames.length - 1),
         activeLayer: state.activeLayer,
         paletteIndex: normalizePaletteIndex(state.activePaletteIndex, 0),
@@ -28438,6 +29483,17 @@
     }
     state.dualLeftRail = false;
     leftDualSizing.tools = LEFT_DUAL_MIN_COLUMN_WIDTH;
+    if (Number.isFinite(payload.leftUnifiedToolsRatio)) {
+      leftUnifiedSplitSizing.ratio = normalizeLeftUnifiedToolsRatio(
+        payload.leftUnifiedToolsRatio,
+        leftUnifiedSplitSizing.ratio
+      );
+    } else {
+      leftUnifiedSplitSizing.ratio = normalizeLeftUnifiedToolsRatio(
+        leftUnifiedSplitSizing.ratio,
+        LEFT_UNIFIED_TOOLS_RATIO_DEFAULT
+      );
+    }
     if (Object.prototype.hasOwnProperty.call(payload, 'onionSkin')) {
       state.onionSkin = normalizeOnionSkinState(payload.onionSkin);
     }
