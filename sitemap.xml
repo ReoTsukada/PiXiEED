@@ -2,11 +2,11 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://pixieed.jp/</loc>
-    <lastmod>2026-02-24</lastmod>
+    <lastmod>2026-03-05</lastmod>
   </url>
   <url>
     <loc>https://pixieed.jp/en/</loc>
-    <lastmod>2026-02-24</lastmod>
+    <lastmod>2026-03-05</lastmod>
   </url>
   <url>
     <loc>https://pixieed.jp/tools.html</loc>
@@ -31,6 +31,14 @@
   <url>
     <loc>https://pixieed.jp/terms/</loc>
     <lastmod>2026-02-19</lastmod>
+  </url>
+  <url>
+    <loc>https://pixieed.jp/glossary/</loc>
+    <lastmod>2026-03-05</lastmod>
+  </url>
+  <url>
+    <loc>https://pixieed.jp/en/glossary/</loc>
+    <lastmod>2026-03-05</lastmod>
   </url>
   <url>
     <loc>https://pixieed.jp/projects/pixiedraw/</loc>
