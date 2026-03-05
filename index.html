@@ -248,6 +248,69 @@
       gap:6px;
       text-decoration:none;
     }
+    .seo-guides-grid{
+      display:grid;
+      gap:10px;
+      grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+    }
+    .seo-guide-card{
+      text-decoration:none;
+      color:#eaf2ff;
+      border:1px solid rgba(175, 210, 255, 0.24);
+      border-radius:12px;
+      background:linear-gradient(150deg, rgba(42, 78, 151, 0.44), rgba(10, 20, 44, 0.66));
+      padding:12px;
+      min-height:130px;
+      display:grid;
+      gap:8px;
+      transition:transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    .seo-guide-card:hover,
+    .seo-guide-card:focus-visible{
+      transform:translateY(-1px);
+      border-color:rgba(170, 230, 255, 0.58);
+      background:linear-gradient(150deg, rgba(58, 107, 196, 0.52), rgba(10, 20, 44, 0.8));
+      outline:none;
+    }
+    .seo-guide-card__head{
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+    .seo-guide-card__icon{
+      width:36px;
+      height:36px;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,0.25);
+      background:rgba(3,8,22,0.88);
+      padding:4px;
+      flex:0 0 36px;
+    }
+    .seo-guide-card__icon img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .seo-guide-card__title{
+      margin:0;
+      font-size:14px;
+      line-height:1.35;
+      color:#f6fbff;
+    }
+    .seo-guide-card__text{
+      margin:0;
+      font-size:12px;
+      line-height:1.55;
+      color:#c7dbff;
+    }
+    .seo-guide-card__meta{
+      margin-top:auto;
+      font-size:11px;
+      color:#99b9ea;
+      letter-spacing:0.02em;
+    }
     .button{
       appearance:none;
       border:0;
@@ -375,6 +438,9 @@
       .hero-draw-guide__actions{
         grid-template-columns:1fr;
       }
+      .seo-guides-grid{
+        grid-template-columns:1fr;
+      }
     }
     .audience-grid{
       display:grid;
@@ -391,6 +457,126 @@
       border-radius:12px;
       padding:12px;
       background:rgba(15,23,42,0.55);
+    }
+    .audience-card__header{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .audience-card__appicon{
+      width:38px;
+      height:38px;
+      border-radius:9px;
+      border:1px solid rgba(255,255,255,0.24);
+      background:rgba(4,8,20,0.86);
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:4px;
+      flex:0 0 38px;
+    }
+    .audience-card__appicon img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .audience-card__shot{
+      margin:0;
+      border-radius:10px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(2,6,18,0.85);
+    }
+    .audience-card__shot-switch{
+      display:grid;
+      gap:8px;
+    }
+    .audience-card__shot img{
+      width:100%;
+      display:block;
+    }
+    .audience-card__shot-note{
+      margin:6px 0 0;
+      font-size:11px;
+      color:#9cb5de;
+      line-height:1.45;
+    }
+    .audience-card__toggle{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      justify-self:start;
+      min-height:34px;
+      border-radius:999px;
+      border:1px solid rgba(176, 214, 255, 0.46);
+      background:rgba(255,255,255,0.07);
+      color:#eff6ff;
+      padding:6px 12px;
+      font:700 12px/1.2 'Fredoka', system-ui, sans-serif;
+      cursor:pointer;
+    }
+    .audience-card__toggle:hover,
+    .audience-card__toggle:focus-visible{
+      background:rgba(255,255,255,0.14);
+      border-color:rgba(202, 232, 255, 0.66);
+      outline:none;
+    }
+    .audience-card__toggle-icon{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:16px;
+      height:16px;
+      flex:0 0 16px;
+    }
+    .audience-card__toggle-icon-landscape,
+    .audience-card__toggle-icon-portrait{
+      position:relative;
+      border:1px solid rgba(223, 240, 255, 0.86);
+      border-radius:2px;
+      background:rgba(120, 188, 255, 0.16);
+      display:block;
+    }
+    .audience-card__toggle-icon-landscape{
+      width:13px;
+      height:9px;
+      display:none;
+    }
+    .audience-card__toggle-icon-portrait{
+      width:9px;
+      height:13px;
+    }
+    .audience-card__toggle.is-portrait .audience-card__toggle-icon-landscape{
+      display:block;
+    }
+    .audience-card__toggle.is-portrait .audience-card__toggle-icon-portrait{
+      display:none;
+    }
+    .audience-card__toggle:not(.is-portrait) .audience-card__toggle-icon-portrait{
+      display:block;
+    }
+    .audience-card__toggle-label{
+      display:inline-block;
+    }
+    .audience-card--beginner .audience-card__toggle{
+      border-color:rgba(164, 213, 255, 0.62);
+      background:rgba(80, 167, 255, 0.12);
+    }
+    .audience-card--beginner .audience-card__toggle-icon-landscape,
+    .audience-card--beginner .audience-card__toggle-icon-portrait{
+      border-color:rgba(195, 229, 255, 0.92);
+      background:rgba(92, 172, 255, 0.22);
+    }
+    .audience-card--pro .audience-card__toggle{
+      border-color:rgba(255, 205, 157, 0.6);
+      background:rgba(255, 157, 88, 0.12);
+    }
+    .audience-card--pro .audience-card__toggle-icon-landscape,
+    .audience-card--pro .audience-card__toggle-icon-portrait{
+      border-color:rgba(255, 212, 170, 0.92);
+      background:rgba(255, 146, 84, 0.22);
     }
     .audience-card--beginner{
       border-color:rgba(251,146,60,0.46);
@@ -1755,7 +1941,7 @@
       <div class="hero-grid">
         <div class="hero-copy">
           <h1>ドット絵を描くサイトなら PiXiEED</h1>
-          <p class="subtitle">PiXiEED（ピクシード）は、ブラウザだけでドット絵作成・ツール比較まで完結できる無料サイトです。PiXiEEDrawではリアルタイム共同制作にも対応しています。</p>
+          <p class="subtitle">無料・ブラウザ完結・PC/スマホ対応。描く、動かす、共有するを1つのサイトで始められます。</p>
           <div class="hero-actions">
             <button class="button" id="toggleDrawGuide" type="button" aria-controls="draw-guide" aria-expanded="false">描く（Liteでかんたん開始 / 本格）</button>
             <button class="button button--ghost" id="togglePlayGuide" type="button" aria-controls="play-guide" aria-expanded="false">遊ぶ</button>
@@ -1826,8 +2012,30 @@
         </div>
         <div class="audience-grid audience-grid--draw-choice">
           <article class="audience-card audience-card--beginner">
-            <p class="project-place__label">Easy Start</p>
-            <h3 class="project-place__title">PiXiEEDraw Lite</h3>
+            <div class="audience-card__header">
+              <span class="audience-card__appicon"><img src="icon/icon-192-5.png" alt=""></span>
+              <div>
+                <p class="project-place__label">Easy Start</p>
+                <h3 class="project-place__title">PiXiEEDraw Lite</h3>
+              </div>
+            </div>
+            <div class="audience-card__shot-switch" data-shot-switch>
+              <figure class="audience-card__shot" data-shot-kind="landscape">
+                <img src="assets/screenshots/pixieedraw-lite-landscape.png" alt="PiXiEEDraw Lite の実際のツール画面スクリーンショット（横画面）" loading="lazy">
+                <figcaption class="audience-card__shot-note">Lite 横画面</figcaption>
+              </figure>
+              <figure class="audience-card__shot" data-shot-kind="portrait" hidden>
+                <img src="assets/screenshots/pixieedraw-lite-portrait.png" alt="PiXiEEDraw Lite の実際のツール画面スクリーンショット（縦画面）" loading="lazy">
+                <figcaption class="audience-card__shot-note">Lite 縦画面</figcaption>
+              </figure>
+              <button class="audience-card__toggle" type="button" data-toggle-shot data-label-landscape="縦画面を見る" data-label-portrait="横画面に戻す" aria-label="PiXiEEDraw Lite の画面切り替え" aria-pressed="false">
+                <span class="audience-card__toggle-icon" aria-hidden="true">
+                  <span class="audience-card__toggle-icon-landscape"></span>
+                  <span class="audience-card__toggle-icon-portrait"></span>
+                </span>
+                <span class="audience-card__toggle-label" data-toggle-shot-label>縦画面を見る</span>
+              </button>
+            </div>
             <p class="subtitle">手軽さを最優先にした入門版。初心者でも画面の案内に沿って、迷わず最初の1枚を完成できます。</p>
             <ul class="choice-points">
               <li>こんな人: 初心者 / とにかく簡単に始めたい</li>
@@ -1838,8 +2046,30 @@
             <a class="button" href="jerin-maker/index.html">かんたんにLiteを始める</a>
           </article>
           <article class="audience-card audience-card--pro">
-            <p class="project-place__label">Advanced</p>
-            <h3 class="project-place__title">PiXiEEDraw</h3>
+            <div class="audience-card__header">
+              <span class="audience-card__appicon"><img src="icon/icon-192-4.png" alt=""></span>
+              <div>
+                <p class="project-place__label">Advanced</p>
+                <h3 class="project-place__title">PiXiEEDraw</h3>
+              </div>
+            </div>
+            <div class="audience-card__shot-switch" data-shot-switch>
+              <figure class="audience-card__shot" data-shot-kind="landscape">
+                <img src="assets/screenshots/pixieedraw-pro-landscape.png" alt="PiXiEEDraw の実際のツール画面スクリーンショット（横画面）" loading="lazy">
+                <figcaption class="audience-card__shot-note">PiXiEEDraw 横画面</figcaption>
+              </figure>
+              <figure class="audience-card__shot" data-shot-kind="portrait" hidden>
+                <img src="assets/screenshots/pixieedraw-pro-portrait.png" alt="PiXiEEDraw の実際のツール画面スクリーンショット（縦画面）" loading="lazy">
+                <figcaption class="audience-card__shot-note">PiXiEEDraw 縦画面</figcaption>
+              </figure>
+              <button class="audience-card__toggle" type="button" data-toggle-shot data-label-landscape="縦画面を見る" data-label-portrait="横画面に戻す" aria-label="PiXiEEDraw の画面切り替え" aria-pressed="false">
+                <span class="audience-card__toggle-icon" aria-hidden="true">
+                  <span class="audience-card__toggle-icon-landscape"></span>
+                  <span class="audience-card__toggle-icon-portrait"></span>
+                </span>
+                <span class="audience-card__toggle-label" data-toggle-shot-label>縦画面を見る</span>
+              </button>
+            </div>
             <p class="subtitle">本格制作と共同制作を進めたい方向け。レイヤーや選択ツールを使って作品を仕上げられます。</p>
             <ul class="choice-points">
               <li>こんな人: 継続して作品を作りたい / チームで作りたい</li>
@@ -1911,6 +2141,7 @@
           <div class="chips">
             <a class="chip" href="pixiedraw/index.html">ドット絵を描く</a>
             <a class="chip" href="jerin-maker/index.html">16×16練習</a>
+            <a class="chip" href="glossary/index.html">用語集</a>
             <a class="chip" href="tools.html">ツールを探す</a>
             <a class="chip" href="games.html">ゲームで遊ぶ</a>
             <a class="chip" href="portfolio/index.html">作品を見る</a>
@@ -1967,6 +2198,8 @@
         </div>
         <!-- publicRoomsHub moved to appear under the dot-hero section -->
         <ul class="project-place__source" id="gameGalleryItems" hidden>
+          <li data-title="ドット絵ガイドLP追加" data-image="icon/icon-192-4.png" data-type="project" data-updated="2026-03-05" data-update="検索意図別LPを追加（描く / 動かす / 作成 / オンライン）" data-desc="トップ集中だった検索導線を分散し、目的に合わせて直接PiXiEEDrawへ遷移できる構成に改善。" data-link="pixel-art-editor/index.html"></li>
+          <li data-title="ドット絵・ピクセルアート用語集" data-image="icon/icon-192-6.png" data-type="project" data-updated="2026-03-05" data-update="ドット絵の基本用語・解像度・制作機能をカテゴリ別に整理 / 用語検索を追加" data-desc="初心者から共同制作ユーザーまで使える、制作時の確認用辞典ページを新設。" data-link="glossary/index.html"></li>
           <li data-title="PiXiEEDraw（タブ/保存/操作改善）" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-03-04" data-update="複数プロジェクトタブ（最大5件） / 複数ファイル同時オープン / 新規時の保存先案内 / 端末内プロジェクト削除確認 / 左レーン縦比率リサイズ / ネストスクロール改善 / 貼り付け時の未登録色を自動追加" data-desc="制作フロー全体（開く・保存する・貼る・移動する）の操作性と安全性をまとめて改善。" data-link="pixiedraw/index.html"></li>
           <li data-title="PiXiEED ホーム" data-image="character-dots/mao1.png" data-type="project" data-updated="2026-02-24" data-update="SEO見出しを『ドット絵無料ツールなら PiXiEED』へ更新 / 描く・遊ぶ・連絡導線を新設" data-desc="検索流入の意図に合わせ、導線とメッセージを再設計。" data-link="index.html"></li>
           <li data-title="価値訴求セクション追加" data-image="icon/icon-192-4.png" data-type="project" data-updated="2026-02-24" data-update="『ドット絵の良さ』と『PiXiEEDrawが実務に向く理由』をホーム上部に追加 / CTAを新設" data-desc="未経験者への魅力訴求と実務利用導線を同時に強化。" data-link="index.html"></li>
@@ -2033,6 +2266,40 @@
       </div>
     </section>
 
+    <section class="section" id="seo-guides">
+      <div class="section-inner">
+        <div>
+          <p class="section-eyebrow">Guide</p>
+          <h2>制作ガイドは2種類</h2>
+          <p class="subtitle">PiXiEEDraw Lite（かんたん）と PiXiEEDraw（本格）から選べます。</p>
+        </div>
+        <div class="seo-guides-grid">
+          <a class="seo-guide-card" href="jerin-maker/index.html">
+            <div class="seo-guide-card__head">
+              <span class="seo-guide-card__icon"><img src="icon/icon-192-5.png" alt=""></span>
+              <h3 class="seo-guide-card__title">PiXiEEDraw Lite</h3>
+            </div>
+            <p class="seo-guide-card__text">短時間で最初の1枚を作りたい人向け。手軽に始められる入門版です。</p>
+            <p class="seo-guide-card__meta">かんたん開始 / 16×16</p>
+          </a>
+          <a class="seo-guide-card" href="pixiedraw/index.html">
+            <div class="seo-guide-card__head">
+              <span class="seo-guide-card__icon"><img src="icon/icon-192-4.png" alt=""></span>
+              <h3 class="seo-guide-card__title">PiXiEEDraw</h3>
+            </div>
+            <p class="seo-guide-card__text">継続制作や共同制作を進めたい人向け。本格編集機能を使えます。</p>
+            <p class="seo-guide-card__meta">レイヤー / 共有モード</p>
+          </a>
+        </div>
+        <div class="chips" aria-label="検索向けページ">
+          <a class="chip" href="pixel-art-editor/index.html">描く向けページ</a>
+          <a class="chip" href="pixel-art-animation/index.html">動かす向けページ</a>
+          <a class="chip" href="pixel-art-maker/index.html">作成向けページ</a>
+          <a class="chip" href="pixel-art-online/index.html">オンライン向けページ</a>
+        </div>
+      </div>
+    </section>
+
     <section class="card" id="contact">
       <h2>コンタクト</h2>
       <p class="subtitle">ドット絵制作・pixel art commission、ブラウザゲーム用アセット制作、業務委託・コラボの相談はこちら。</p>
@@ -2045,6 +2312,7 @@
     <footer>
       <p>© <span id="year"></span> PiXiEED. All rights reserved.</p>
       <div class="footer-links">
+        <a href="glossary/index.html">用語集</a>
         <a href="terms/index.html">利用規約</a>
         <a href="privacy/index.html">プライバシーポリシー</a>
       </div>
@@ -2442,6 +2710,37 @@
           });
         });
       }
+      function setupAudienceShotToggles(){
+        const switches = document.querySelectorAll('[data-shot-switch]');
+        if(!switches.length) return;
+        switches.forEach((scope) => {
+          const landscape = scope.querySelector('[data-shot-kind="landscape"]');
+          const portrait = scope.querySelector('[data-shot-kind="portrait"]');
+          const toggle = scope.querySelector('[data-toggle-shot]');
+          const toggleLabel = toggle?.querySelector('[data-toggle-shot-label]');
+          if(!landscape || !portrait || !toggle) return;
+          const labelLandscape = toggle.dataset.labelLandscape || '縦画面を見る';
+          const labelPortrait = toggle.dataset.labelPortrait || '横画面に戻す';
+          const setMode = (mode) => {
+            const portraitMode = mode === 'portrait';
+            landscape.hidden = portraitMode;
+            portrait.hidden = !portraitMode;
+            if(toggleLabel){
+              toggleLabel.textContent = portraitMode ? labelPortrait : labelLandscape;
+            }else{
+              toggle.textContent = portraitMode ? labelPortrait : labelLandscape;
+            }
+            toggle.setAttribute('aria-pressed', portraitMode ? 'true' : 'false');
+            toggle.dataset.currentShot = portraitMode ? 'portrait' : 'landscape';
+            toggle.classList.toggle('is-portrait', portraitMode);
+          };
+          setMode('landscape');
+          toggle.addEventListener('click', () => {
+            const nextMode = toggle.dataset.currentShot === 'portrait' ? 'landscape' : 'portrait';
+            setMode(nextMode);
+          });
+        });
+      }
       function syncHeroPreviewHeights(){
         const previews = document.querySelectorAll('.character-place .character-preview');
         previews.forEach((preview) => {
@@ -2458,6 +2757,7 @@
         setupAvatarToggle();
         setupProfileModal();
         setupHeroGuideToggles();
+        setupAudienceShotToggles();
         setupHeroPlaceSwap();
         syncHeroPreviewHeights();
         window.addEventListener('resize', syncHeroPreviewHeights);
