@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>ドット絵を動かすサイト | PiXiEEDrawでアニメ作成</title>
+  <meta name="description" content="ドット絵アニメをブラウザで無料作成。PC/スマホ対応、インストール不要で起動でき、フレーム編集からPNGスプライトシート・GIF出力までオンラインで完結できます。"/>
+  <meta name="robots" content="noindex,follow"/>
+  <link rel="canonical" href="https://pixieed.jp/"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:site_name" content="PiXiEED"/>
+  <meta property="og:title" content="ドット絵を動かすサイト | PiXiEEDrawでアニメ作成"/>
+  <meta property="og:description" content="無料・ブラウザ完結でドット絵アニメを作るためのガイド。PC/スマホ対応でインストール不要。"/>
+  <meta property="og:url" content="https://pixieed.jp/"/>
+  <meta property="og:image" content="https://pixieed.jp/icon/icon-512-4.png"/>
+  <meta property="og:locale" content="ja_JP"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:site" content="@PiXiEED_arta"/>
+  <meta name="twitter:title" content="ドット絵を動かすサイト | PiXiEEDrawでアニメ作成"/>
+  <meta name="twitter:description" content="無料・ブラウザ完結でドット絵アニメを作るためのガイド。PC/スマホ対応でインストール不要。"/>
+  <meta name="twitter:image" content="https://pixieed.jp/icon/icon-512-4.png"/>
+  <link rel="icon" type="image/png" href="../character-dots/mao1.png"/>
+  <link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
+  <style>
+    :root{ color-scheme:dark; }
+    *{ box-sizing:border-box; }
+    body{ margin:0; font-family:'Fredoka','DotGothic16',system-ui,sans-serif; background:radial-gradient(circle at 22% 8%, rgba(81,135,255,.23), transparent 42%), #0b1224; color:#edf3ff; line-height:1.7; padding:14px 14px 44px; }
+    .page{ width:min(980px, 100%); margin:0 auto; display:grid; gap:14px; }
+    .panel{ border:1px solid rgba(173,207,255,.24); background:rgba(16,24,48,.88); border-radius:14px; padding:16px; box-shadow:0 14px 32px rgba(3,8,24,.45); }
+    .crumbs{ font-size:12px; color:#b7c9ef; }
+    .crumbs a{ color:#9ee3ff; text-decoration:none; }
+    h1{ margin:8px 0 10px; font-size:clamp(24px, 6vw, 36px); line-height:1.25; }
+    h2{ margin:0 0 8px; font-size:clamp(19px, 4.5vw, 27px); line-height:1.35; }
+    h3{ margin:0 0 6px; font-size:17px; }
+    p{ margin:0; }
+    .lead{ color:#c9dcff; font-size:14px; }
+    .badges{ margin:12px 0 0; display:flex; flex-wrap:wrap; gap:8px; padding:0; list-style:none; }
+    .badges li{ padding:6px 10px; border-radius:999px; font-size:12px; border:1px solid rgba(166,216,255,.36); background:rgba(66,146,255,.18); color:#eef7ff; }
+    .cta-row{ margin-top:14px; display:grid; gap:8px; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); }
+    .btn{ min-height:48px; border-radius:12px; padding:11px 14px; display:inline-flex; justify-content:center; align-items:center; text-align:center; text-decoration:none; font-weight:700; font-size:14px; }
+    .btn-primary{ background:linear-gradient(135deg,#32daff,#60a6ff); color:#071126; }
+    .btn-ghost{ border:1px solid rgba(205,227,255,.38); color:#eef4ff; background:rgba(255,255,255,.06); }
+    .hero-image img{ width:min(460px,100%); margin:0 auto; border-radius:12px; border:1px solid rgba(175,209,255,.28); display:block; image-rendering:pixelated; image-rendering:crisp-edges; }
+    .hero-image figcaption{ margin-top:8px; font-size:12px; color:#afc7ec; }
+    .list{ margin:8px 0 0; padding-left:18px; color:#d7e6ff; }
+    .list li{ margin-bottom:6px; }
+    .faq{ display:grid; gap:10px; }
+    .faq-item{ border:1px solid rgba(173,207,255,.2); border-radius:10px; padding:10px; background:rgba(8,15,33,.45); }
+    .link-grid{ display:grid; gap:8px; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); }
+    .text-link{ color:#a9e9ff; text-decoration:none; font-weight:700; }
+    footer{ text-align:center; color:#aec4ea; font-size:12px; }
+    @media (max-width:375px){ body{ padding:10px 10px 36px; } .panel{ padding:13px; } .cta-row{ grid-template-columns:1fr; } }
+  </style>
+  <script type="application/ld+json">
+  {
+    "@context":"https://schema.org",
+    "@graph":[
+      {
+        "@type":"SoftwareApplication",
+        "name":"PiXiEEDraw",
+        "applicationCategory":"GraphicsApplication",
+        "operatingSystem":"Web Browser",
+        "url":"https://pixieed.jp/pixiedraw/index.html",
+        "isAccessibleForFree":true,
+        "offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"},
+        "description":"ブラウザで動く無料のドット絵エディター。フレーム編集とGIF出力に対応。"
+      },
+      {
+        "@type":"FAQPage",
+        "mainEntity":[
+          {
+            "@type":"Question",
+            "name":"ドット絵アニメはブラウザだけで作れますか？",
+            "acceptedAnswer":{"@type":"Answer","text":"はい。PiXiEEDrawはブラウザで起動し、インストールなしでフレーム編集できます。"}
+          },
+          {
+            "@type":"Question",
+            "name":"スマホからもアニメ制作できますか？",
+            "acceptedAnswer":{"@type":"Answer","text":"はい。スマホからでも同じURLで編集・出力できます。"}
+          },
+          {
+            "@type":"Question",
+            "name":"出力形式は何ですか？",
+            "acceptedAnswer":{"@type":"Answer","text":"PNGスプライトシートとアニメーションGIFの出力に対応しています。"}
+          },
+          {
+            "@type":"Question",
+            "name":"共同で作業することはできますか？",
+            "acceptedAnswer":{"@type":"Answer","text":"共有モードを使って同じキャンバスを複数人で編集できます。"}
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <main class="page">
+    <section class="panel">
+      <nav class="crumbs" aria-label="パンくず">
+        <a href="../index.html">PiXiEEDホーム</a> / ドット絵アニメ
+      </nav>
+      <h1>ドット絵を動かすサイトを探している方向け</h1>
+      <p class="lead">静止画のドット絵だけでなく、動く表現までブラウザで完結させたい人向けのページです。短いループ制作からGIF出力までスムーズに進められます。</p>
+      <ul class="badges" aria-label="主要特徴">
+        <li>無料で利用</li>
+        <li>ブラウザで即起動</li>
+        <li>PC/スマホ対応</li>
+        <li>インストール不要（PWA可）</li>
+      </ul>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="../pixiedraw/index.html">PiXiEEDrawでアニメ制作を始める</a>
+        <a class="btn btn-ghost" href="../index.html">PiXiEEDホームへ</a>
+      </div>
+    </section>
+
+    <section class="panel hero-image">
+      <img src="../icon/icon-512-4.png" alt="ドット絵を動かすサイト PiXiEEDraw のフレーム編集イメージ" loading="eager"/>
+      <figcaption>ドット絵アニメを作るためのフレーム編集・出力イメージ</figcaption>
+    </section>
+
+    <section class="panel">
+      <h2>ブラウザだけで動くドット絵を作る</h2>
+      <ul class="list">
+        <li>制作開始までの準備が少なく、作業にすぐ入れる。</li>
+        <li>短いループや表情差分など、小さなアニメ検証がしやすい。</li>
+        <li>作った内容をPNG/GIFでそのまま書き出せる。</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>アニメ制作で使う主な流れ</h2>
+      <ul class="list">
+        <li>ベースとなるドット絵を作成。</li>
+        <li>フレームを増やして動きを調整。</li>
+        <li>再生確認し、GIFまたはスプライトシートで出力。</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>FAQ</h2>
+      <div class="faq">
+        <article class="faq-item">
+          <h3>Q. ドット絵アニメはブラウザだけで作れますか？</h3>
+          <p>A. はい。PiXiEEDrawはブラウザ内でフレーム編集できます。</p>
+        </article>
+        <article class="faq-item">
+          <h3>Q. スマホからも制作できますか？</h3>
+          <p>A. はい。PCとスマホの両方に対応しています。</p>
+        </article>
+        <article class="faq-item">
+          <h3>Q. どの形式で出力できますか？</h3>
+          <p>A. PNGスプライトシートとアニメーションGIFを出力できます。</p>
+        </article>
+        <article class="faq-item">
+          <h3>Q. 複数人で制作できますか？</h3>
+          <p>A. はい。共有モードを使って共同編集が可能です。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>関連ガイド</h2>
+      <div class="link-grid">
+        <a class="text-link" href="../pixel-art-editor/index.html">無料ドット絵エディター</a>
+        <a class="text-link" href="../pixel-art-maker/index.html">初心者向けドット絵作成</a>
+        <a class="text-link" href="../pixel-art-online/index.html">オンラインで描く</a>
+        <a class="text-link" href="../pixiedraw/index.html">PiXiEEDraw本体</a>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>すぐに動かして確認する</h2>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="../pixiedraw/index.html">PiXiEEDrawでアニメ制作を始める</a>
+        <a class="btn btn-ghost" href="../index.html">トップページへ戻る</a>
+      </div>
+    </section>
+
+    <footer>© <span id="year"></span> PiXiEED</footer>
+  </main>
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>
