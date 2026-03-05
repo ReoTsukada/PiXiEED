@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>ドット絵・ピクセルアート用語集 | PiXiEED</title>
+  <meta name="description" content="ドット絵・ピクセルアート制作でよく使う基本用語、解像度、描画表現、アニメ、ゲーム素材、制作機能までまとめたPiXiEED公式用語集。"/>
+  <meta name="keywords" content="ドット絵 用語集,ピクセルアート 用語,インデックスカラー,スプライト,タイルセット"/>
+  <link rel="canonical" href="https://pixieed.jp/glossary/"/>
+  <link rel="alternate" hreflang="ja" href="https://pixieed.jp/glossary/"/>
+  <link rel="alternate" hreflang="en" href="https://pixieed.jp/en/glossary/"/>
+  <link rel="alternate" hreflang="x-default" href="https://pixieed.jp/glossary/"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:site_name" content="PiXiEED"/>
+  <meta property="og:title" content="ドット絵・ピクセルアート用語集 | PiXiEED"/>
+  <meta property="og:description" content="ドット絵制作でよく使う基本用語と意味をカテゴリ別に整理。"/>
+  <meta property="og:url" content="https://pixieed.jp/glossary/"/>
+  <meta property="og:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
+  <meta property="og:locale" content="ja_JP"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:site" content="@PiXiEED_arta"/>
+  <meta name="twitter:url" content="https://pixieed.jp/glossary/"/>
+  <meta name="twitter:title" content="ドット絵・ピクセルアート用語集 | PiXiEED"/>
+  <meta name="twitter:description" content="ドット絵制作でよく使う基本用語と意味をカテゴリ別に整理。"/>
+  <meta name="twitter:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
+  <link rel="icon" type="image/png" href="../character-dots/mao1.png"/>
+  <link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet"/>
+  <style>
+    :root{
+      color-scheme: dark;
+      --bg:#0b1224;
+      --panel:#111a33;
+      --panel-strong:#182449;
+      --text:#f8fbff;
+      --sub:#bdd3ff;
+      --line:rgba(186, 205, 255, 0.24);
+      --accent:#6dd8ff;
+      --accent-strong:#2bb5ff;
+      --ok:#a7ffd8;
+    }
+    *{ box-sizing:border-box; }
+    html, body{
+      margin:0;
+      min-height:100%;
+    }
+    body{
+      font-family:'Fredoka','DotGothic16',system-ui,sans-serif;
+      background:
+        radial-gradient(circle at 15% 5%, rgba(38, 124, 255, 0.22), transparent 40%),
+        radial-gradient(circle at 82% 0%, rgba(59, 211, 255, 0.2), transparent 42%),
+        var(--bg);
+      color:var(--text);
+      padding:20px 14px 48px;
+      line-height:1.6;
+    }
+    .page{
+      width:min(1080px, 100%);
+      margin:0 auto;
+      display:grid;
+      gap:14px;
+    }
+    .card{
+      border:1px solid var(--line);
+      background:rgba(16, 24, 48, 0.9);
+      border-radius:14px;
+      padding:16px;
+      box-shadow:0 10px 28px rgba(0, 8, 28, 0.4);
+    }
+    h1{
+      margin:0;
+      font-size:clamp(24px, 5.4vw, 36px);
+      line-height:1.2;
+      letter-spacing:0.02em;
+    }
+    .lead{
+      margin:8px 0 0;
+      color:var(--sub);
+      font-size:14px;
+    }
+    .top-links{
+      margin-top:10px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+    .chip{
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:6px 10px;
+      color:var(--text);
+      text-decoration:none;
+      background:rgba(255,255,255,0.04);
+      font-size:12px;
+    }
+    .chip:hover,
+    .chip:focus-visible{
+      border-color:rgba(148, 227, 255, 0.7);
+      background:rgba(84, 184, 255, 0.14);
+      outline:none;
+    }
+    .lang-edge{
+      position:fixed;
+      top:max(12px, env(safe-area-inset-top));
+      right:max(12px, env(safe-area-inset-right));
+      z-index:90;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-width:46px;
+      height:34px;
+      padding:0 12px;
+      border-radius:999px;
+      border:1px solid rgba(148, 227, 255, 0.6);
+      background:rgba(46, 126, 255, 0.35);
+      color:#eef8ff;
+      text-decoration:none;
+      font-size:12px;
+      font-weight:700;
+      letter-spacing:0.04em;
+      box-shadow:0 6px 18px rgba(10, 26, 72, 0.45);
+      backdrop-filter:blur(6px);
+    }
+    .lang-edge:hover,
+    .lang-edge:focus-visible{
+      background:rgba(66, 156, 255, 0.48);
+      border-color:rgba(174, 240, 255, 0.9);
+      color:#ffffff;
+      outline:none;
+    }
+    .search-wrap{
+      display:grid;
+      gap:8px;
+    }
+    .search-row{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .search-row input{
+      width:min(380px, 100%);
+      background:#0c1732;
+      border:1px solid var(--line);
+      border-radius:10px;
+      color:var(--text);
+      padding:10px 12px;
+      font:600 14px/1.2 'Fredoka',system-ui,sans-serif;
+    }
+    .search-row input:focus-visible{
+      border-color:var(--accent);
+      outline:2px solid rgba(109, 216, 255, 0.3);
+      outline-offset:1px;
+    }
+    .search-note{
+      color:var(--ok);
+      font-size:12px;
+    }
+    .section-head{
+      display:flex;
+      flex-wrap:wrap;
+      justify-content:space-between;
+      align-items:flex-end;
+      gap:8px;
+      margin-bottom:10px;
+    }
+    h2{
+      margin:0;
+      font-size:clamp(20px, 4.8vw, 28px);
+    }
+    .section-sub{
+      margin:0;
+      color:var(--sub);
+      font-size:12px;
+    }
+    .glossary-list{
+      margin:0;
+      display:grid;
+      gap:8px;
+    }
+    .term-item{
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:10px 12px;
+      background:rgba(10, 19, 38, 0.6);
+    }
+    .term-item[hidden]{
+      display:none;
+    }
+    .term-item dt{
+      margin:0;
+      font-size:15px;
+      font-weight:700;
+      color:#f2f8ff;
+    }
+    .term-item dt span{
+      margin-left:6px;
+      color:var(--accent);
+      font-size:12px;
+      font-weight:700;
+      letter-spacing:0.04em;
+    }
+    .term-item dd{
+      margin:6px 0 0;
+      color:#d7e7ff;
+      font-size:13px;
+    }
+    footer{
+      text-align:center;
+      color:var(--sub);
+      font-size:12px;
+      padding-top:6px;
+    }
+    footer a{
+      color:#9ee4ff;
+    }
+    @media (max-width:640px){
+      .card{
+        padding:14px;
+      }
+      .lang-edge{
+        top:max(8px, env(safe-area-inset-top));
+        right:max(8px, env(safe-area-inset-right));
+      }
+      .term-item{
+        padding:9px 10px;
+      }
+      .term-item dt{
+        font-size:14px;
+      }
+      .term-item dd{
+        font-size:12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="lang-edge" href="../en/glossary/index.html" lang="en" hreflang="en" aria-label="Switch to English glossary">EN</a>
+  <div class="page">
+    <section class="card">
+      <h1>ドット絵・ピクセルアート用語集</h1>
+      <p class="lead">PiXiEEDで制作する時によく使う言葉を、基本用語・解像度・表現・アニメ・制作工程までカテゴリ別に整理しました。</p>
+      <div class="top-links">
+        <a class="chip" href="#basic">基本用語</a>
+        <a class="chip" href="#size">解像度・サイズ</a>
+        <a class="chip" href="#rendering">描画表現</a>
+        <a class="chip" href="#animation">アニメーション</a>
+        <a class="chip" href="#game-assets">ゲーム素材</a>
+        <a class="chip" href="#palette-style">パレット制約</a>
+        <a class="chip" href="#hardware">ハード世代</a>
+        <a class="chip" href="#map-bg">背景・タイル</a>
+        <a class="chip" href="#production">制作工程</a>
+        <a class="chip" href="#ui-tools">UI・ツール</a>
+        <a class="chip" href="#community">コミュニティ</a>
+        <a class="chip" href="#trends">最近の用語</a>
+        <a class="chip" href="#workflow">制作・共同制作</a>
+      </div>
+    </section>
+
+    <section class="card search-wrap" aria-label="用語検索">
+      <div class="search-row">
+        <label for="termSearch">用語を検索</label>
+        <input id="termSearch" type="search" placeholder="例: スプライト / インデックス / 64×64"/>
+      </div>
+      <p class="search-note" id="termCount">表示件数: -</p>
+    </section>
+
+    <section class="card" id="basic">
+      <div class="section-head">
+        <h2>基本用語</h2>
+        <p class="section-sub">Pixel art の土台になる言葉</p>
+      </div>
+      <dl class="glossary-list">
+        <div class="term-item"><dt>ピクセル <span>Pixel</span></dt><dd>画像を構成する最小単位。ドット絵では1マス=1ピクセルとして扱います。</dd></div>
+        <div class="term-item"><dt>ドット <span>Dot</span></dt><dd>ピクセルの別称。日本では「ドット絵」の文脈でよく使われます。</dd></div>
+        <div class="term-item"><dt>ピクセルアート <span>Pixel Art</span></dt><dd>ピクセル単位で形や色を設計して作る表現手法。ドット絵とほぼ同義です。</dd></div>
+        <div class="term-item"><dt>ドット絵 <span>Dot Art</span></dt><dd>低解像度グリッドを前提に、限られた色と形で描くアート表現です。</dd></div>
+        <div class="term-item"><dt>スプライト <span>Sprite</span></dt><dd>ゲームでキャラクターやアイテムとして表示する2D画像素材です。</dd></div>
+        <div class="term-item"><dt>タイル <span>Tile</span></dt><dd>背景や地形を構成する小さな繰り返し単位画像です。</dd></div>
+        <div class="term-item"><dt>タイルセット <span>Tileset</span></dt><dd>複数のタイルを1枚にまとめた素材集。マップ制作時に使います。</dd></div>
+        <div class="term-item"><dt>スプライトシート <span>Sprite Sheet</span></dt><dd>アニメーション用に複数コマを1画像に並べたデータ形式です。</dd></div>
+        <div class="term-item"><dt>ビットマップ <span>Bitmap</span></dt><dd>ピクセルの集合として画像を保存する方式。拡大でジャギーが見えます。</dd></div>
+        <div class="term-item"><dt>ラスター画像 <span>Raster Image</span></dt><dd>ビットマップ系の総称。ベクター画像と対になる概念です。</dd></div>
+        <div class="term-item"><dt>インデックスカラー <span>Indexed Color</span></dt><dd>色番号（インデックス）で色を管理する方式。色数制限の制作と相性が良いです。</dd></div>
+        <div class="term-item"><dt>パレット <span>Palette</span></dt><dd>作品内で使う色の一覧。配色設計の基準になります。</dd></div>
+        <div class="term-item"><dt>パレット制限 <span>Palette Limit</span></dt><dd>使用色数を意図的に制限する設計。統一感と可読性を高めやすくなります。</dd></div>
+        <div class="term-item"><dt>カラーパレット <span>Color Palette</span></dt><dd>色相・明度・彩度の関係を整理した色セット。プロジェクトごとに管理します。</dd></div>
+        <div class="term-item"><dt>RGB <span>Red Green Blue</span></dt><dd>赤・緑・青の加法混色で色を表す一般的なカラー方式です。</dd></div>
+        <div class="term-item"><dt>Indexed Color <span>インデックスカラー</span></dt><dd>色番号参照型の英語表記。ドット絵制作では色管理と差分修正がしやすくなります。</dd></div>
+      </dl>
+    </section>
+
+    <section class="card" id="size">
+      <div class="section-head">
+        <h2>解像度・サイズ</h2>
+        <p class="section-sub">画面サイズと表示品質に関する言葉</p>
+      </div>
+      <dl class="glossary-list">
+        <div class="term-item"><dt>16×16</dt><dd>超小型スプライトの代表サイズ。アイコンや顔グラの最小構成で使われます。</dd></div>
+        <div class="term-item"><dt>32×32</dt><dd>小型キャラやタイルでよく使う標準サイズ。情報量と制作負荷のバランスが良いです。</dd></div>
+        <div class="term-item"><dt>64×64</dt><dd>表情差分や装飾を入れやすい中型サイズ。キャラ立ち絵にも向いています。</dd></div>
+        <div class="term-item"><dt>128×128</dt><dd>比較的情報量の多い1枚絵・UI部品向けサイズです。</dd></div>
+        <div class="term-item"><dt>256×256</dt><dd>背景素材や高密度なドット絵に使うサイズ。管理する色数と構図設計が重要です。</dd></div>
+        <div class="term-item"><dt>低解像度 <span>Low Resolution</span></dt><dd>ピクセル数が少ない状態。ドットの輪郭が見えやすく、簡略化が鍵になります。</dd></div>
+        <div class="term-item"><dt>ピクセルパーフェクト <span>Pixel Perfect</span></dt><dd>拡大時にピクセル境界が崩れず、にじみやズレがない表示状態です。</dd></div>
+        <div class="term-item"><dt>ネイティブ解像度 <span>Native Resolution</span></dt><dd>素材が本来持つ元サイズ。編集時はこの解像度を基準にします。</dd></div>
+        <div class="term-item"><dt>スケーリング <span>Scaling</span></dt><dd>画像を拡大・縮小する処理の総称。補間方法で見え方が変わります。</dd></div>
+        <div class="term-item"><dt>ニアレストネイバー <span>Nearest Neighbor</span></dt><dd>最も近いピクセルを参照して拡大する方式。ドットの輪郭を保持しやすいです。</dd></div>
+        <div class="term-item"><dt>アップスケール <span>Upscale</span></dt><dd>画像を拡大する処理。ドット絵は整数倍拡大が基本です。</dd></div>
+        <div class="term-item"><dt>ダウンサンプル <span>Downsample</span></dt><dd>画像を縮小してピクセル数を減らす処理。意図しない色混ざりに注意が必要です。</dd></div>
+      </dl>
+    </section>
+
+    <section class="card" id="workflow">
+      <div class="section-head">
+        <h2>制作・共同制作</h2>
+        <p class="section-sub">PiXiEEDraw運用でも使う機能用語</p>
+      </div>
+      <dl class="glossary-list">
+        <div class="term-item"><dt>マルチレイヤー <span>Multi Layer</span></dt><dd>線・色・影などを層で分離して編集する方式。修正時の破壊的変更を減らせます。</dd></div>
+        <div class="term-item"><dt>共同編集 <span>Collaboration</span></dt><dd>複数人が同じプロジェクトを編集する制作形態です。</dd></div>
+        <div class="term-item"><dt>リアルタイム描画 <span>Realtime Drawing</span></dt><dd>編集結果を遅延少なく参加者へ反映する描画同期方式です。</dd></div>
+        <div class="term-item"><dt>フレームアニメーション <span>Frame Animation</span></dt><dd>コマごとに絵を切り替えて動きを作る方式。スプライト制作の基本です。</dd></div>
+        <div class="term-item"><dt>タイルマップ <span>Tilemap</span></dt><dd>タイルをグリッド上へ配置して背景やステージを作るマップ形式です。</dd></div>
+        <div class="term-item"><dt>スプライト作成 <span>Sprite Authoring</span></dt><dd>キャラクター素材を描画・整理・書き出しする制作工程全体を指します。</dd></div>
+        <div class="term-item"><dt>タイムラプス <span>Timelapse</span></dt><dd>制作履歴を時系列で再生する機能。過程の記録や共有に使われます。</dd></div>
+      </dl>
+    </section>
+
+    <section class="card" id="rendering">
+      <div class="section-head">
+        <h2>描画表現・陰影</h2>
+        <p class="section-sub">見た目の質感を作るテクニック用語</p>
+      </div>
+      <dl class="glossary-list">
+        <div class="term-item"><dt>アウトライン <span>Outline</span></dt><dd>対象の外側を縁取る線。シルエットを明確にする基本手法です。</dd></div>
+        <div class="term-item"><dt>インライン <span>Inline</span></dt><dd>内側に入れる補助線や境界線。面の分割や陰影補助に使います。</dd></div>
+        <div class="term-item"><dt>セルシェーディング <span>Cel Shading</span></dt><dd>影を段階的にはっきり分ける塗り方。アニメ調の見た目を作りやすいです。</dd></div>
+        <div class="term-item"><dt>シェーディング <span>Shading</span></dt><dd>明暗差で立体感を出す処理全般です。</dd></div>
+        <div class="term-item"><dt>ハイライト <span>Highlight</span></dt><dd>最も光が当たる明るい部分。材質感を強調できます。</dd></div>
+        <div class="term-item"><dt>シャドウ <span>Shadow</span></dt><dd>光が当たりにくい暗部。形状や光源方向を伝える要素です。</dd></div>
+        <div class="term-item"><dt>ハードシャドウ <span>Hard Shadow</span></dt><dd>境界がくっきりした影。強い直射光や硬い材質の表現に使います。</dd></div>
+        <div class="term-item"><dt>ソフトシャドウ <span>Soft Shadow</span></dt><dd>境界がなだらかな影。拡散光や柔らかい雰囲気を作る時に有効です。</dd></div>
+        <div class="term-item"><dt>ライトソース <span>Light Source</span></dt><dd>光の発生源。影方向とハイライト配置の基準になります。</dd></div>
+        <div class="term-item"><dt>光源 <span>Light</span></dt><dd>ライトソースの和語表現。作品内で位置と数を先に決めると破綻しにくくなります。</dd></div>
+        <div class="term-item"><dt>コントラスト <span>Contrast</span></dt><dd>明暗差・色差の強さ。視認性と主役の見え方に直結します。</dd></div>
+        <div class="term-item"><dt>ハイコントラスト <span>High Contrast</span></dt><dd>明暗差を大きくした状態。小サイズでも情報が伝わりやすくなります。</dd></div>
+        <div class="term-item"><dt>ディザリング <span>Dithering</span></dt><dd>限られた色数で中間色を疑似表現するドット配置技法です。</dd></div>
+        <div class="term-item"><dt>チェッカーディザ <span>Checker Dither</span></dt><dd>市松模様状のディザ。最も代表的なパターンです。</dd></div>
+        <div class="term-item"><dt>パターンディザ <span>Pattern Dither</span></dt><dd>意図的な繰り返し模様で階調を作るディザ手法です。</dd></div>
+        <div class="term-item"><dt>バンディング <span>Banding</span></dt><dd>平行線や段差が不自然に連続して見える現象。立体感を損ないやすいです。</dd></div>
+        <div class="term-item"><dt>ピローバンディング <span>Pillow Banding</span></dt><dd>輪郭に沿って同心状に影を置くことで、膨らみが不自然になる配置ミスです。</dd></div>
+        <div class="term-item"><dt>クラスター <span>Cluster</span></dt><dd>同色ドットのまとまり。良いクラスターは面として読みやすくなります。</dd></div>
+        <div class="term-item"><dt>アンチエイリアス <span>Anti-Alias</span></dt><dd>輪郭のジャギーを中間色で緩和する処理です。</dd></div>
+        <div class="term-item"><dt>セレクティブアンチエイリアス <span>Selective AA</span></dt><dd>必要な境界だけに限定してAAを入れる方法。解像感を保ちやすいです。</dd></div>
+        <div class="term-item"><dt>サブピクセル <span>Subpixel</span></dt><dd>実際のピクセル間を補間的に見せる細かな位置調整の考え方です。</dd></div>
+        <div class="term-item"><dt>ドット密度 <span>Pixel Density</span></dt><dd>一定範囲に存在するドット情報量。密度差で視線誘導ができます。</dd></div>
+        <div class="term-item"><dt>ノイズ <span>Noise</span></dt><dd>意図のないバラつきドット。質感表現か不要ノイズかを切り分けるのが重要です。</dd></div>
+        <div class="term-item"><dt>ピクセルクラスター <span>Pixel Cluster</span></dt><dd>クラスターをピクセル単位で評価する見方。塗りの整理に使われます。</dd></div>
+      </dl>
+    </section>
+
+    <section class="card" id="animation">
+      <div class="section-head">
+        <h2>アニメーション</h2>
+        <p class="section-sub">フレーム設計と再生制御の用語</p>
+      </div>
+      <dl class="glossary-list">
+        <div class="term-item"><dt>フレーム <span>Frame</span></dt><dd>アニメーションを構成する1コマです。</dd></div>
+        <div class="term-item"><dt>フレームレート <span>Frame Rate</span></dt><dd>1秒間に表示するフレーム数。fpsで表記します。</dd></div>
+        <div class="term-item"><dt>ループ <span>Loop</span></dt><dd>最終コマから先頭コマへ戻って再生を繰り返す方式です。</dd></div>
+        <div class="term-item"><dt>キーフレーム <span>Keyframe</span></dt><dd>動きの要点を示す主要コマ。中間コマ作成の基準になります。</dd></div>
+        <div class="term-item"><dt>インビトゥイーン <span>In-between</span></dt><dd>キーフレーム間をつなぐ中割りコマです。</dd></div>
+        <div class="term-item"><dt>タイリングアニメ <span>Tiling Animation</span></dt><dd>同じ模様のループで流れや波を作るアニメ手法です。</dd></div>
+        <div class="term-item"><dt>スプライトアニメーション <span>Sprite Animation</span></dt><dd>スプライトのコマ差し替えで動きを作る方式です。</dd></div>
+        <div class="term-item"><dt>シートアニメーション <span>Sheet Animation</span></dt><dd>スプライトシートの座標を切り替えて再生する方式です。</dd></div>
+        <div class="term-item"><dt>タイムライン <span>Timeline</span></dt><dd>フレーム順序や長さを時系列で管理する編集領域です。</dd></div>
+        <div class="term-item"><dt>フレームステップ <span>Frame Step</span></dt><dd>1コマずつ進む・戻る確認操作。微調整時に使います。</dd></div>
+      </dl>
+    </section>
+
+    <section class="card" id="game-assets">
+      <div class="section-head">
+        <h2>ゲーム素材</h2>
+        <p class="section-sub">ゲーム制作で使うスプライト関連用語</p>
+      </div>
+      <dl class="glossary-list">
+        <div class="term-item"><dt>キャラクタースプライト <span>Character Sprite</span></dt><dd>プレイヤーや主要人物を表示するスプライトです。</dd></div>
+        <div class="term-item"><dt>敵スプライト <span>Enemy Sprite</span></dt><dd>敵キャラに使うスプライト。判定サイズと可読性が重要です。</dd></div>
+        <div class="term-item"><dt>NPC <span>Non Player Character</span></dt><dd>プレイヤー操作ではないキャラクター。会話や演出で使われます。</dd></div>
+        <div class="term-item"><dt>タイルマップ <span>Tilemap</span></dt><dd>タイルを配置して構成したマップデータです。</dd></div>
+        <div class="term-item"><dt>オートタイル <span>Autotile</span></dt><dd>隣接関係に応じて自動で適切なタイルを選ぶ仕組みです。</dd></div>
+        <div class="term-item"><dt>ウォークアニメーション <span>Walk Animation</span></dt><dd>歩行モーションの連続コマです。</dd></div>
+        <div class="term-item"><dt>攻撃アニメーション <span>Attack Animation</span></dt><dd>攻撃動作やヒット演出のアニメーションです。</dd></div>
+        <div class="term-item"><dt>エフェクトスプライト <span>Effect Sprite</span></dt><dd>爆発・煙・魔法など演出専用のスプライトです。</dd></div>
+        <div class="term-item"><dt>UIスプライト <span>UI Sprite</span></dt><dd>ボタンやゲージなどUI表示用の画像素材です。</dd></div>
+        <div class="term-item"><dt>アイコン <span>Icon</span></dt><dd>小さな記号画像。状態や機能を短時間で伝える用途に使います。</dd></div>
+      </dl>
+    </section>
+
+    <section class="card" id="palette-style">
+      <div class="section-head">
+        <h2>限定パレット・色制限</h2>
+        <p class="section-sub">色数やレトロ配色に関する用語</p>
+      </div>
+      <dl class="glossary-list">
+        <div class="term-item"><dt>限定パレット <span>Limited Palette</span></dt><dd>使う色をあらかじめ限定したパレット設計です。</dd></div>
+        <div class="term-item"><dt>NESパレット <span>NES Palette</span></dt><dd>NES風の制約や色傾向を再現した配色セットです。</dd></div>
+        <div class="term-item"><dt>GameBoyパレット <span>Game Boy Palette</span></dt><dd>Game Boy系の階調感を意識した配色セットです。</dd></div>
+        <div class="term-item"><dt>SNESパレット <span>SNES Palette</span></dt><dd>SNES風の発色傾向を再現した配色セットです。</dd></div>
+        <div class="term-item"><dt>レトロパレット <span>Retro Palette</span></dt><dd>旧世代機やCRT感を意識した色セットの総称です。</dd></div>
+        <div class="term-item"><dt>色数制限 <span>Color Limit</span></dt><dd>1枚で使う色数を制限する制作ルールです。</dd></div>
+        <div class="term-item"><dt>4色制限 <span>4 Color Limit</span></dt><dd>4色だけで構成する制限。明暗設計の練習に向いています。</dd></div>
+        <div class="term-item"><dt>16色制限 <span>16 Color Limit</span></dt><dd>16色内で制作する代表的な制限方式です。</dd></div>
+        <div class="term-item"><dt>カラーバリエーション <span>Color Variation</span></dt><dd>同形状で色違いを作る派生表現です。</dd></div>
+        <div class="term-item"><dt>パレットスワップ <span>Palette Swap</span></dt><dd>色番号を入れ替えて別バリエーションを作る手法です。</dd></div>
+        <div class="term-item"><dt>パレットアニメーション <span>Palette Animation</span></dt><dd>色値を時間で循環させて動きを作る軽量アニメ手法です。</dd></div>
+      </dl>
+    </section>
+
+    <section class="card" id="hardware">
+      <div class="section-head">
+        <h2>ハード世代・規格</h2>
+        <p class="section-sub">レトロ文脈でよく参照される用語</p>
+      </div>
+      <dl class="glossary-list">
+        <div class="term-item"><dt>NES</dt><dd>任天堂の8bit世代機。色制限やタイル制約の文脈で参照されます。</dd></div>
+        <div class="term-item"><dt>SNES</dt><dd>任天堂の16bit世代機。色数や表現幅の比較で使われます。</dd></div>
+        <div class="term-item"><dt>GameBoy</dt><dd>携帯機の代表例。限られた解像度と色数の設計指標として使われます。</dd></div>
+        <div class="term-item"><dt>GBA</dt><dd>Game Boy Advance。携帯機向けピクセル表現の比較対象です。</dd></div>
+        <div class="term-item"><dt>NeoGeo</dt><dd>高品質な2D表現で知られるアーケード/家庭用系統の文脈で参照されます。</dd></div>
+        <div class="term-item"><dt>Sega Genesis</dt><dd>メガドライブ系統を指す英語圏名称。16bitピクセル表現の比較で使われます。</dd></div>
+        <div class="term-item"><dt>PC Engine</dt><dd>PC Engine系統。時代ごとの色設計やスプライト表現比較に使われます。</dd></div>
+        <div class="term-item"><dt>8bit</dt><dd>8bit世代の制約感を指す用語。単純化された形と色の美学と結びつきます。</dd></div>
+        <div class="term-item"><dt>16bit</dt><dd>16bit世代の表現幅を示す用語。中間色や陰影の幅が広がります。</dd></div>
+      </dl>
+    </section>
+
+    <section class="card" id="map-bg">
+      <div class="section-head">
+        <h2>背景・タイルマップ</h2>
+        <p class="section-sub">背景制作とステージ構成の用語</p>
+      </div>
+      <dl class="glossary-list">
+        <div class="term-item"><dt>背景タイル <span>Background Tile</span></dt><dd>背景面を構築する反復用タイル素材です。</dd></div>
+        <div class="term-item"><dt>タイルマップ <span>Tilemap</span></dt><dd>タイルIDを並べてマップを構成したデータです。</dd></div>
+        <div class="term-item"><dt>レイヤー <span>Layer</span></dt><dd>前景・中景・背景など表示層の分離単位です。</dd></div>
+        <div class="term-item"><dt>パララックス <span>Parallax</span></dt><dd>奥行き差によって背景の移動速度を変える演出です。</dd></div>
+        <div class="term-item"><dt>パララックススクロール <span>Parallax Scroll</span></dt><dd>複数背景レイヤーを異なる速度でスクロールする方式です。</dd></div>
+        <div class="term-item"><dt>マップチップ <span>Map Chip</span></dt><dd>日本語圏で使われるタイル素材の呼称です。</dd></div>
+        <div class="term-item"><dt>チャンク <span>Chunk</span></dt><dd>タイルをまとまり単位で管理するブロックです。</dd></div>
+        <div class="term-item"><dt>グリッド <span>Grid</span></dt><dd>配置基準となる格子。整列と判定管理の基礎です。</dd></div>
+        <div class="term-item"><dt>タイルグリッド <span>Tile Grid</span></dt><dd>タイル単位に区切られたグリッド。配置誤差を防ぎます。</dd></div>
+        <div class="term-item"><dt>シームレスタイル <span>Seamless Tile</span></dt><dd>継ぎ目なく繰り返せるタイル素材です。</dd></div>
+      </dl>
+    </section>
+
+    <section class="card" id="production">
+      <div class="section-head">
+        <h2>制作工程</h2>
+        <p class="section-sub">1枚を仕上げる時の代表的なフロー</p>
+      </div>
+      <dl class="glossary-list">
+        <div class="term-item"><dt>ラフ <span>Rough</span></dt><dd>初期の当たり取り段階。構図と比率の確認を目的にします。</dd></div>
+        <div class="term-item"><dt>ブロッキング <span>Blocking</span></dt><dd>大きな面と塊を先に置いて全体バランスを作る工程です。</dd></div>
+        <div class="term-item"><dt>シルエット <span>Silhouette</span></dt><dd>輪郭だけで対象が判別できるかを見る指標です。</dd></div>
+        <div class="term-item"><dt>シェイプ <span>Shape</span></dt><dd>面の形状設計。可読性と個性を左右する要素です。</dd></div>
+        <div class="term-item"><dt>クリーンアップ <span>Cleanup</span></dt><dd>不要ドットの整理、線の修正、形状の精密化を行う工程です。</dd></div>
+        <div class="term-item"><dt>パレット整理 <span>Palette Cleanup</span></dt><dd>近似色の統合や役割分担で色設計を整える工程です。</dd></div>
+        <div class="term-item"><dt>カラーパス <span>Color Pass</span></dt><dd>配色と明暗を段階的に仕上げる色調整工程です。</dd></div>
+        <div class="term-item"><dt>リファイン <span>Refine</span></dt><dd>完成直前の細部調整。情報密度とノイズの最適化を行います。</dd></div>
+        <div class="term-item"><dt>最終仕上げ <span>Final Polish</span></dt><dd>最終確認と微修正を行い、書き出し可能な状態にする工程です。</dd></div>
+      </dl>
+    </section>
+
+    <section class="card" id="ui-tools">
+      <div class="section-head">
+        <h2>UI・制作ツール関連</h2>
+        <p class="section-sub">エディタ操作で頻出する用語</p>
+      </div>
+      <dl class="glossary-list">
+        <div class="term-item"><dt>ピクセルブラシ <span>Pixel Brush</span></dt><dd>ピクセル単位で塗るためのブラシです。</dd></div>
+        <div class="term-item"><dt>ドットペン <span>Dot Pen</span></dt><dd>1ドット単位で描画するペンツールの呼称です。</dd></div>
+        <div class="term-item"><dt>塗りつぶし <span>Fill</span></dt><dd>連続領域を一括で同色にする操作です。</dd></div>
+        <div class="term-item"><dt>ラインツール <span>Line Tool</span></dt><dd>始点と終点を指定して直線を描くツールです。</dd></div>
+        <div class="term-item"><dt>バケツツール <span>Bucket Tool</span></dt><dd>塗りつぶしツールの通称です。</dd></div>
+        <div class="term-item"><dt>スポイト <span>Eyedropper</span></dt><dd>画面上の色を取得して現在色に設定するツールです。</dd></div>
+        <div class="term-item"><dt>グリッド表示 <span>Grid Display</span></dt><dd>ピクセル境界を格子で可視化する表示機能です。</dd></div>
+        <div class="term-item"><dt>グリッドスナップ <span>Grid Snap</span></dt><dd>描画位置や移動をグリッド交点へ吸着させる機能です。</dd></div>
+        <div class="term-item"><dt>ピクセルスナップ <span>Pixel Snap</span></dt><dd>座標を整数ピクセルへ揃えてにじみを防ぐ機能です。</dd></div>
+        <div class="term-item"><dt>ミラー描画 <span>Mirror Drawing</span></dt><dd>左右または上下へ対称反映しながら描く機能です。</dd></div>
+        <div class="term-item"><dt>対称描画 <span>Symmetry Drawing</span></dt><dd>複数軸や中心基準で同時反映する描画方式です。</dd></div>
+        <div class="term-item"><dt>オニオンスキン <span>Onion Skin</span></dt><dd>前後フレームを半透明表示して中割りを補助する機能です。</dd></div>
+        <div class="term-item"><dt>レイヤー合成 <span>Layer Compositing</span></dt><dd>複数レイヤーを重ねて最終表示を作る処理です。</dd></div>
+      </dl>
+    </section>
+
+    <section class="card" id="community">
+      <div class="section-head">
+        <h2>コミュニティ用語</h2>
+        <p class="section-sub">投稿・交流シーンでよく使われる語</p>
+      </div>
+      <dl class="glossary-list">
+        <div class="term-item"><dt>ドッター <span>Dotter</span></dt><dd>ドット絵を制作する人への呼称です。</dd></div>
+        <div class="term-item"><dt>ピクセルアーティスト <span>Pixel Artist</span></dt><dd>ピクセルアート制作を主に行うクリエイターです。</dd></div>
+        <div class="term-item"><dt>パレットチャレンジ <span>Palette Challenge</span></dt><dd>指定パレットで作品を作る企画形式です。</dd></div>
+        <div class="term-item"><dt>ドット絵コンテスト <span>Pixel Art Contest</span></dt><dd>テーマや制約に沿って作品を応募するイベントです。</dd></div>
+        <div class="term-item"><dt>ドット絵チャレンジ <span>Pixel Art Challenge</span></dt><dd>日次・週次などで継続投稿する練習企画です。</dd></div>
+        <div class="term-item"><dt>ドット絵素材 <span>Pixel Assets</span></dt><dd>ゲームやUIに再利用する前提のドット絵データです。</dd></div>
+        <div class="term-item"><dt>ドット絵タイル <span>Pixel Tile</span></dt><dd>背景や床に使う繰り返し前提のドット絵タイルです。</dd></div>
+      </dl>
+    </section>
+
+    <section class="card" id="trends">
+      <div class="section-head">
+        <h2>最近増えている用語</h2>
+        <p class="section-sub">現代の表現トレンドに関する言葉</p>
+      </div>
+      <dl class="glossary-list">
+        <div class="term-item"><dt>HDピクセル <span>HD Pixel</span></dt><dd>高解像度でドット感を残す表現を指す通称です。</dd></div>
+        <div class="term-item"><dt>モダンピクセル <span>Modern Pixel</span></dt><dd>現代的な光表現や演出とドット絵を融合したスタイルです。</dd></div>
+        <div class="term-item"><dt>ピクセルパーフェクトゲーム <span>Pixel Perfect Game</span></dt><dd>拡大縮小やUIを含め、ピクセル境界を厳密に整えたゲーム表現です。</dd></div>
+        <div class="term-item"><dt>ネオレトロ <span>Neo Retro</span></dt><dd>レトロ文法を残しつつ現代的な演出を加えた表現ジャンルです。</dd></div>
+        <div class="term-item"><dt>ドット風 <span>Pixel-like</span></dt><dd>実際は高解像度でもドット絵らしさを狙った見た目を指します。</dd></div>
+        <div class="term-item"><dt>ピクセルスタイル <span>Pixel Style</span></dt><dd>ドットの輪郭や色制約を活かした視覚スタイル全般です。</dd></div>
+      </dl>
+    </section>
+
+    <footer>
+      <p><a href="../index.html">PiXiEEDホームへ戻る</a> / <a href="../pixiedraw/index.html">PiXiEEDrawを開く</a></p>
+    </footer>
+  </div>
+  <script>
+    (function () {
+      const input = document.getElementById('termSearch');
+      const items = Array.from(document.querySelectorAll('.term-item'));
+      const counter = document.getElementById('termCount');
+      if (!input || !counter || !items.length) return;
+      const update = () => {
+        const q = String(input.value || '').trim().toLowerCase();
+        let visible = 0;
+        items.forEach((item) => {
+          const hit = !q || item.textContent.toLowerCase().includes(q);
+          item.hidden = !hit;
+          if (hit) visible += 1;
+        });
+        counter.textContent = `表示件数: ${visible}`;
+      };
+      input.addEventListener('input', update);
+      update();
+    })();
+  </script>
+</body>
+</html>
