@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>初心者向けドット絵作成サイト | 無料で始めるPiXiEED</title>
+  <meta name="description" content="初心者向けのドット絵作成ページ。無料・ブラウザ完結・PC/スマホ対応で、インストール不要。最初の1枚を作る手順と、編集からPNG/GIF出力までを短く確認できます。"/>
+  <meta name="robots" content="noindex,follow"/>
+  <link rel="canonical" href="https://pixieed.jp/"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:site_name" content="PiXiEED"/>
+  <meta property="og:title" content="初心者向けドット絵作成サイト | 無料で始めるPiXiEED"/>
+  <meta property="og:description" content="ドット絵作成を始めたい人向けに、無料・ブラウザ完結で使えるPiXiEEDrawの導入ポイントを整理。"/>
+  <meta property="og:url" content="https://pixieed.jp/"/>
+  <meta property="og:image" content="https://pixieed.jp/icon/icon-512-4.png"/>
+  <meta property="og:locale" content="ja_JP"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:site" content="@PiXiEED_arta"/>
+  <meta name="twitter:title" content="初心者向けドット絵作成サイト | 無料で始めるPiXiEED"/>
+  <meta name="twitter:description" content="ドット絵作成を始めたい人向けに、無料・ブラウザ完結で使えるPiXiEEDrawの導入ポイントを整理。"/>
+  <meta name="twitter:image" content="https://pixieed.jp/icon/icon-512-4.png"/>
+  <link rel="icon" type="image/png" href="../character-dots/mao1.png"/>
+  <link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
+  <style>
+    :root{ color-scheme:dark; }
+    *{ box-sizing:border-box; }
+    body{ margin:0; font-family:'Fredoka','DotGothic16',system-ui,sans-serif; background:radial-gradient(circle at 20% 10%, rgba(75,145,255,.22), transparent 42%), #0b1224; color:#edf3ff; line-height:1.7; padding:14px 14px 44px; }
+    .page{ width:min(980px, 100%); margin:0 auto; display:grid; gap:14px; }
+    .panel{ border:1px solid rgba(173,207,255,.24); background:rgba(16,24,48,.88); border-radius:14px; padding:16px; box-shadow:0 14px 32px rgba(3,8,24,.45); }
+    .crumbs{ font-size:12px; color:#b7c9ef; }
+    .crumbs a{ color:#9ee3ff; text-decoration:none; }
+    h1{ margin:8px 0 10px; font-size:clamp(24px, 6vw, 36px); line-height:1.25; }
+    h2{ margin:0 0 8px; font-size:clamp(19px, 4.5vw, 27px); line-height:1.35; }
+    h3{ margin:0 0 6px; font-size:17px; }
+    p{ margin:0; }
+    .lead{ color:#c9dcff; font-size:14px; }
+    .badges{ margin:12px 0 0; display:flex; flex-wrap:wrap; gap:8px; padding:0; list-style:none; }
+    .badges li{ padding:6px 10px; border-radius:999px; font-size:12px; border:1px solid rgba(166,216,255,.36); background:rgba(66,146,255,.18); color:#eef7ff; }
+    .cta-row{ margin-top:14px; display:grid; gap:8px; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); }
+    .btn{ min-height:48px; border-radius:12px; padding:11px 14px; display:inline-flex; justify-content:center; align-items:center; text-align:center; text-decoration:none; font-weight:700; font-size:14px; }
+    .btn-primary{ background:linear-gradient(135deg,#30d7ff,#5ba4ff); color:#071126; }
+    .btn-ghost{ border:1px solid rgba(205,227,255,.38); color:#eef4ff; background:rgba(255,255,255,.06); }
+    .hero-image img{ width:min(460px,100%); margin:0 auto; border-radius:12px; border:1px solid rgba(175,209,255,.28); display:block; image-rendering:pixelated; image-rendering:crisp-edges; }
+    .hero-image figcaption{ margin-top:8px; font-size:12px; color:#afc7ec; }
+    .list{ margin:8px 0 0; padding-left:18px; color:#d7e6ff; }
+    .list li{ margin-bottom:6px; }
+    .faq{ display:grid; gap:10px; }
+    .faq-item{ border:1px solid rgba(173,207,255,.2); border-radius:10px; padding:10px; background:rgba(8,15,33,.45); }
+    .link-grid{ display:grid; gap:8px; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); }
+    .text-link{ color:#a9e9ff; text-decoration:none; font-weight:700; }
+    footer{ text-align:center; color:#aec4ea; font-size:12px; }
+    @media (max-width:375px){ body{ padding:10px 10px 36px; } .panel{ padding:13px; } .cta-row{ grid-template-columns:1fr; } }
+  </style>
+  <script type="application/ld+json">
+  {
+    "@context":"https://schema.org",
+    "@graph":[
+      {
+        "@type":"SoftwareApplication",
+        "name":"PiXiEEDraw",
+        "applicationCategory":"GraphicsApplication",
+        "operatingSystem":"Web Browser",
+        "url":"https://pixieed.jp/pixiedraw/index.html",
+        "isAccessibleForFree":true,
+        "offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"},
+        "description":"無料で始められるブラウザ版ドット絵作成ツール。PC/スマホ対応。"
+      },
+      {
+        "@type":"FAQPage",
+        "mainEntity":[
+          {
+            "@type":"Question",
+            "name":"初心者でも使えますか？",
+            "acceptedAnswer":{"@type":"Answer","text":"はい。ブラウザで開いてすぐ描き始められるので、初めてでも始めやすい構成です。"}
+          },
+          {
+            "@type":"Question",
+            "name":"準備するものはありますか？",
+            "acceptedAnswer":{"@type":"Answer","text":"特別な準備は不要です。対応ブラウザがあれば利用できます。"}
+          },
+          {
+            "@type":"Question",
+            "name":"スマホだけで作成できますか？",
+            "acceptedAnswer":{"@type":"Answer","text":"はい。スマホだけでもドット絵作成から出力まで行えます。"}
+          },
+          {
+            "@type":"Question",
+            "name":"作った作品は保存できますか？",
+            "acceptedAnswer":{"@type":"Answer","text":"はい。PNGスプライトシートやアニメーションGIFとして出力できます。"}
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <main class="page">
+    <section class="panel">
+      <nav class="crumbs" aria-label="パンくず">
+        <a href="../index.html">PiXiEEDホーム</a> / 初心者向けドット絵作成
+      </nav>
+      <h1>初心者向けドット絵作成サイト</h1>
+      <p class="lead">「まず1枚作ってみたい」人向けに、最低限の手順で始められる導線をまとめました。無料で、ブラウザだけで、PC/スマホどちらでも制作できます。</p>
+      <ul class="badges" aria-label="主要特徴">
+        <li>無料で利用</li>
+        <li>ブラウザで即起動</li>
+        <li>PC/スマホ対応</li>
+        <li>インストール不要（PWA可）</li>
+      </ul>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="../pixiedraw/index.html">無料でドット絵作成を始める</a>
+        <a class="btn btn-ghost" href="../index.html">PiXiEEDホームへ</a>
+      </div>
+    </section>
+
+    <section class="panel hero-image">
+      <img src="../icon/icon-512-4.png" alt="初心者向けドット絵作成サイト PiXiEED の制作画面" loading="eager"/>
+      <figcaption>初心者が迷わず始めるためのドット絵作成イメージ</figcaption>
+    </section>
+
+    <section class="panel">
+      <h2>最初の1枚を作る手順</h2>
+      <ul class="list">
+        <li>ツールを開いてキャンバスサイズを決める。</li>
+        <li>ベース色と輪郭を置き、形を整える。</li>
+        <li>必要に応じてレイヤー・選択機能で仕上げる。</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>初学者でも続けやすいポイント</h2>
+      <ul class="list">
+        <li>起動までが短く、思いついたときにすぐ描ける。</li>
+        <li>保存・出力まで一つの流れで完結できる。</li>
+        <li>慣れてきたら共有モードで共同制作にも進める。</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>FAQ</h2>
+      <div class="faq">
+        <article class="faq-item">
+          <h3>Q. 初心者でも使えますか？</h3>
+          <p>A. はい。ブラウザで開いてすぐ制作を始められます。</p>
+        </article>
+        <article class="faq-item">
+          <h3>Q. 準備するものはありますか？</h3>
+          <p>A. 対応ブラウザがあれば利用可能です。インストールは不要です。</p>
+        </article>
+        <article class="faq-item">
+          <h3>Q. スマホだけで作成できますか？</h3>
+          <p>A. はい。スマホからでも作成・保存・出力まで行えます。</p>
+        </article>
+        <article class="faq-item">
+          <h3>Q. 保存形式は何がありますか？</h3>
+          <p>A. PNGスプライトシートとアニメーションGIFを出力できます。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>関連ガイド</h2>
+      <div class="link-grid">
+        <a class="text-link" href="../pixel-art-editor/index.html">無料ドット絵エディター</a>
+        <a class="text-link" href="../pixel-art-animation/index.html">ドット絵を動かす</a>
+        <a class="text-link" href="../pixel-art-online/index.html">オンラインで描く</a>
+        <a class="text-link" href="../pixiedraw/index.html">PiXiEEDraw本体</a>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>今すぐドット絵作成を始める</h2>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="../pixiedraw/index.html">無料でドット絵作成を始める</a>
+        <a class="btn btn-ghost" href="../index.html">トップページへ戻る</a>
+      </div>
+    </section>
+
+    <footer>© <span id="year"></span> PiXiEED</footer>
+  </main>
+  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+</body>
+</html>
