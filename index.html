@@ -628,6 +628,188 @@
     .choice-note strong{
       color:#f9fafb;
     }
+    .new-tools-grid{
+      display:grid;
+      gap:10px;
+      grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .new-tool-card{
+      text-decoration:none;
+      color:inherit;
+      border:1px solid rgba(174, 211, 255, 0.24);
+      border-radius:12px;
+      background:linear-gradient(150deg, rgba(27, 51, 97, 0.6), rgba(8, 16, 33, 0.8));
+      padding:12px;
+      display:grid;
+      gap:8px;
+      min-height:142px;
+      transition:border-color 0.12s ease, transform 0.12s ease, background 0.12s ease;
+    }
+    .new-tool-card:hover,
+    .new-tool-card:focus-visible{
+      border-color:rgba(180, 226, 255, 0.58);
+      background:linear-gradient(150deg, rgba(35, 65, 122, 0.72), rgba(8, 16, 33, 0.92));
+      transform:translateY(-1px);
+      outline:none;
+    }
+    .new-tool-card__head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .new-tool-card__icon{
+      width:34px;
+      height:34px;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,0.24);
+      background:rgba(2,6,18,0.88);
+      padding:4px;
+      flex:0 0 34px;
+    }
+    .new-tool-card__icon img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .new-tool-card__title-wrap{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      min-width:0;
+      flex:1 1 auto;
+    }
+    .new-tool-card__title{
+      margin:0;
+      font-size:14px;
+      color:#f8fbff;
+      line-height:1.35;
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .new-tool-card__badge{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:3px 8px;
+      border-radius:999px;
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:0.06em;
+      border:1px solid rgba(255,255,255,0.26);
+      color:#f8fbff;
+      background:rgba(255,255,255,0.1);
+      flex:0 0 auto;
+    }
+    .new-tool-card__badge--new{
+      border-color:rgba(142, 228, 255, 0.6);
+      background:rgba(74, 197, 255, 0.2);
+    }
+    .new-tool-card__badge--update{
+      border-color:rgba(255, 212, 146, 0.62);
+      background:rgba(255, 162, 83, 0.2);
+    }
+    .new-tool-card__badge--live{
+      border-color:rgba(165, 255, 183, 0.62);
+      background:rgba(72, 199, 103, 0.2);
+    }
+    .new-tool-card__badge--next{
+      border-color:rgba(208, 211, 255, 0.5);
+      background:rgba(123, 136, 255, 0.2);
+    }
+    .new-tool-card__desc{
+      margin:0;
+      font-size:12px;
+      line-height:1.55;
+      color:#cbe0ff;
+    }
+    .new-tool-card__meta{
+      margin-top:auto;
+      font-size:11px;
+      color:#9fc3ef;
+      letter-spacing:0.01em;
+    }
+    .new-tools-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+    .new-tools-actions .button{
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+    }
+    .category-hub-grid{
+      display:grid;
+      gap:10px;
+      grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .category-hub-card{
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.14);
+      border-radius:12px;
+      padding:12px;
+      display:grid;
+      gap:9px;
+    }
+    .category-hub-card__head{
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .category-hub-card__icon{
+      width:32px;
+      height:32px;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,0.2);
+      background:rgba(2,6,18,0.86);
+      padding:4px;
+      flex:0 0 32px;
+    }
+    .category-hub-card__icon img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .category-hub-card__title{
+      margin:0;
+      font-size:14px;
+      color:#f8fbff;
+    }
+    .category-hub-card__text{
+      margin:0;
+      font-size:12px;
+      color:#c9dbf8;
+      line-height:1.55;
+    }
+    .category-hub-card__links{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+    }
+    .category-hub-card__links a{
+      text-decoration:none;
+      font-size:11px;
+      font-weight:700;
+      color:#edf5ff;
+      border:1px solid rgba(255,255,255,0.22);
+      border-radius:999px;
+      background:rgba(255,255,255,0.06);
+      padding:4px 9px;
+      line-height:1.3;
+    }
+    .category-hub-card__links a:hover,
+    .category-hub-card__links a:focus-visible{
+      background:rgba(255,255,255,0.12);
+      border-color:rgba(255,255,255,0.34);
+      outline:none;
+    }
     .value-actions{
       display:flex;
       flex-wrap:wrap;
@@ -2084,6 +2266,126 @@
           </article>
         </div>
         <p class="choice-note"><strong>迷ったらLite:</strong> 手軽に1枚仕上げてから、必要に応じて PiXiEEDraw へ移行する流れが最短です。</p>
+      </div>
+    </section>
+
+    <section class="section" id="new-tools">
+      <div class="section-inner">
+        <div>
+          <p class="section-eyebrow">おすすめ</p>
+          <h2>新着・注目ツール</h2>
+          <p class="subtitle">最近の追加機能や、よく使われる機能をここからすぐ使えます。</p>
+        </div>
+        <div class="new-tools-grid">
+          <a class="new-tool-card" href="pixiee-lens/index.html">
+            <div class="new-tool-card__head">
+              <div class="new-tool-card__title-wrap">
+                <span class="new-tool-card__icon"><img src="icon/icon-192-1.png" alt=""></span>
+                <h3 class="new-tool-card__title">PiXiEELENS</h3>
+              </div>
+              <span class="new-tool-card__badge new-tool-card__badge--new">NEW</span>
+            </div>
+            <p class="new-tool-card__desc">写真からドット絵へ変換。GIF撮影やPNG保存までスマホでも完結できます。</p>
+            <p class="new-tool-card__meta">撮る / 変換する / 保存する</p>
+          </a>
+          <a class="new-tool-card" href="glossary/index.html">
+            <div class="new-tool-card__head">
+              <div class="new-tool-card__title-wrap">
+                <span class="new-tool-card__icon"><img src="icon/icon-192-6.png" alt=""></span>
+                <h3 class="new-tool-card__title">ドット絵用語集</h3>
+              </div>
+              <span class="new-tool-card__badge new-tool-card__badge--new">NEW</span>
+            </div>
+            <p class="new-tool-card__desc">制作中に迷いやすい用語を日本語/英語で確認できます。</p>
+            <p class="new-tool-card__meta">学ぶ / 調べる / 用語確認</p>
+          </a>
+          <a class="new-tool-card" href="#publicRoomsHub">
+            <div class="new-tool-card__head">
+              <div class="new-tool-card__title-wrap">
+                <span class="new-tool-card__icon"><img src="icon/icon-192-4.png" alt=""></span>
+                <h3 class="new-tool-card__title">公開中の部屋</h3>
+              </div>
+              <span class="new-tool-card__badge new-tool-card__badge--live">LIVE</span>
+            </div>
+            <p class="new-tool-card__desc">いま公開されている共同キャンバスへすぐ参加できます。</p>
+            <p class="new-tool-card__meta">入室する / 続きから描く</p>
+          </a>
+          <a class="new-tool-card" href="notes/index.html">
+            <div class="new-tool-card__head">
+              <div class="new-tool-card__title-wrap">
+                <span class="new-tool-card__icon"><img src="character-dots/mao1.png" alt=""></span>
+                <h3 class="new-tool-card__title">更新情報を見る</h3>
+              </div>
+              <span class="new-tool-card__badge new-tool-card__badge--next">更新</span>
+            </div>
+            <p class="new-tool-card__desc">追加された機能や、これからの改善予定をまとめて確認できます。</p>
+            <p class="new-tool-card__meta">お知らせ / 更新履歴</p>
+          </a>
+        </div>
+        <div class="new-tools-actions">
+          <a class="button button--ghost" href="tools.html">全ツールを一覧で見る</a>
+          <a class="button button--ghost" href="notes/index.html">更新履歴を見る</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--highlight" id="category-hub">
+      <div class="section-inner">
+        <div>
+          <p class="section-eyebrow">目的から選ぶ</p>
+          <h2>カテゴリから探す</h2>
+          <p class="subtitle">やりたいことに合わせて、ここから選んでください。</p>
+        </div>
+        <div class="category-hub-grid">
+          <article class="category-hub-card">
+            <div class="category-hub-card__head">
+              <span class="category-hub-card__icon"><img src="icon/icon-192-5.png" alt=""></span>
+              <h3 class="category-hub-card__title">描く</h3>
+            </div>
+            <p class="category-hub-card__text">はじめての1枚から本格制作まで、描くならここ。</p>
+            <div class="category-hub-card__links">
+              <a href="jerin-maker/index.html">Lite</a>
+              <a href="pixiedraw/index.html">PiXiEEDraw</a>
+              <a href="pixel-art-editor/index.html">描き方ガイド</a>
+            </div>
+          </article>
+          <article class="category-hub-card">
+            <div class="category-hub-card__head">
+              <span class="category-hub-card__icon"><img src="icon/icon-192-4.png" alt=""></span>
+              <h3 class="category-hub-card__title">動かす・共有</h3>
+            </div>
+            <p class="category-hub-card__text">アニメを作る・みんなで描く機能をまとめています。</p>
+            <div class="category-hub-card__links">
+              <a href="pixel-art-animation/index.html">動かし方ガイド</a>
+              <a href="pixiedraw/index.html">アニメ制作</a>
+              <a href="#publicRoomsHub">公開中の部屋</a>
+            </div>
+          </article>
+          <article class="category-hub-card">
+            <div class="category-hub-card__head">
+              <span class="category-hub-card__icon"><img src="icon/icon-192-2.png" alt=""></span>
+              <h3 class="category-hub-card__title">遊ぶ</h3>
+            </div>
+            <p class="category-hub-card__text">短時間で遊べるドット絵ゲームをすぐ試せます。</p>
+            <div class="category-hub-card__links">
+              <a href="games.html">ゲーム一覧</a>
+              <a href="maoitu/index.html">まおいつ</a>
+              <a href="pixfind/index.html">PiXFiND</a>
+            </div>
+          </article>
+          <article class="category-hub-card">
+            <div class="category-hub-card__head">
+              <span class="category-hub-card__icon"><img src="icon/icon-192-6.png" alt=""></span>
+              <h3 class="category-hub-card__title">学ぶ・見る</h3>
+            </div>
+            <p class="category-hub-card__text">用語の確認や作品チェックはこちら。</p>
+            <div class="category-hub-card__links">
+              <a href="glossary/index.html">用語集</a>
+              <a href="portfolio/index.html">作品ギャラリー</a>
+              <a href="notes/index.html">更新ノート</a>
+            </div>
+          </article>
+        </div>
       </div>
     </section>
 
