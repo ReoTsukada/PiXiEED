@@ -2457,7 +2457,7 @@
         </div>
         <button class="chip public-rooms-hub__refresh" id="refreshPublicRooms" type="button">更新</button>
       </div>
-      <p class="public-rooms-hub__lead">公開中の部屋とフリー/64/32キャンバスを表示します。サムネイルから直接入室できます。</p>
+      <p class="public-rooms-hub__lead">公開中の部屋を表示します。サムネイルから直接入室できます。</p>
       <div class="public-room-grid" id="publicRoomGrid" aria-live="polite">
         <p class="public-room-empty">公開中の部屋はありません。</p>
       </div>
@@ -2529,7 +2529,7 @@
         <!-- publicRoomsHub moved to appear under the dot-hero section -->
         <ul class="project-place__source" id="gameGalleryItems" hidden>
           <li data-title="PiXiEED ホーム（案内と比較導線を調整）" data-image="character-dots/mao1.png" data-type="project" data-updated="2026-03-07" data-update="ホーム文言をユーザー向けに整理 / ガイド位置を下段へ調整 / Lite・PiXiEEDraw比較に実機スクリーンショット切替を追加" data-desc="初見ユーザーでも用途の違いを直感で選びやすいホーム構成に調整。" data-link="index.html"></li>
-          <li data-title="PiXiEEDraw（ガイド / 小窓プレビュー）" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-03-07" data-update="設定から開く使い方ヘルプを追加（検索対応） / 小窓プレビューを追加（移動・サイズ変更・再生連動） / 説明ラベルを最小化" data-desc="制作画面を広く保ちつつ、必要なときだけ操作ガイドを確認できるよう改善。" data-link="pixiedraw/index.html"></li>
+          <li data-title="PiXiEEDraw（設定UIとパレット表示を調整）" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-03-07" data-update="プリセット色プレビューを最大32色表示 / 新規作成プリセットプレビューを整理 / 設定下5ボタンをサブスタイルに統一（あ/A表示） / 設定にローカル拡張（外付け）を追加 / キャンバスサイズ枠を色付き強調 / 更新トーストは長文スクロール対応" data-desc="設定パネルの視認性を上げつつ、ボタンの主張を抑えて操作しやすく調整。" data-link="pixiedraw/index.html"></li>
           <li data-title="PiXiEEDraw（共有モード導線を簡略化）" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-03-07" data-update="マスターは「部屋を開く」でキー自動生成 / 参加はキー入力後に参加者・視聴を選択 / 新規ルームは非公開で開始" data-desc="初見でも手順を迷いにくい共有モード導線へ再設計。" data-link="pixiedraw/index.html"></li>
           <li data-title="PiXiEEDraw（出力 / カラー / 選択移動改善）" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-03-07" data-update="JPEG / SVG出力を追加 / カラーモード切替（インデックスカラー・RGBカラー）を追加 / RGB→インデックス変換時の未登録色を自動追加 / 方向キー選択移動の欠けを軽減" data-desc="仕上げと出力、色運用、選択移動の実制作フローをまとめて強化。" data-link="pixiedraw/index.html"></li>
           <li data-title="ドット絵ガイドLP追加" data-image="icon/icon-192-4.png" data-type="project" data-updated="2026-03-05" data-update="検索意図別LPを追加（描く / 動かす / 作成 / オンライン）" data-desc="トップ集中だった検索導線を分散し、目的に合わせて直接PiXiEEDrawへ遷移できる構成に改善。" data-link="pixel-art-editor/index.html"></li>
@@ -3112,6 +3112,7 @@
     const MULTI_SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
     const MULTI_SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
     const MULTI_PUBLIC_LOBBY_CHANNEL = 'pixiedraw-public-rooms-v1';
+    const RESIDENT_CANVASES_HIDDEN = true;
     const RESIDENT_THUMB_CACHE_KEY = 'pixieed:resident-room-thumb-cache-v1';
     const RESIDENT_THUMB_CACHE_LIMIT = 12;
     const RESIDENT_BLACK_THUMBNAIL_EDGE = 96;
@@ -3152,6 +3153,12 @@
       if (typeof value !== 'string') return '';
       return value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40);
     }
+
+    const RESIDENT_PROJECT_KEY_SET = new Set(
+      RESIDENT_ROOM_FALLBACKS
+        .map(room => normalizeProjectKey(room.projectKey || room.channel || room.id || ''))
+        .filter(Boolean)
+    );
 
     function wait(ms){
       return new Promise(resolve => setTimeout(resolve, ms));
@@ -3265,6 +3272,12 @@
 
     function withResidentRooms(rooms){
       const source = Array.isArray(rooms) ? rooms.filter(row => row && typeof row === 'object') : [];
+      if (RESIDENT_CANVASES_HIDDEN) {
+        return source.filter((room) => {
+          const key = normalizeProjectKey(room.projectKey || room.channel || room.id || '');
+          return !(room.type === 'resident' && RESIDENT_PROJECT_KEY_SET.has(key));
+        });
+      }
       const residentByKey = new Map();
       RESIDENT_ROOM_FALLBACKS.forEach((room) => {
         const key = normalizeProjectKey(room.projectKey || room.channel || room.id || '');
@@ -3285,6 +3298,10 @@
     function renderResidentFallbackCards(grid){
       if (!grid) return;
       grid.innerHTML = '';
+      if (RESIDENT_CANVASES_HIDDEN) {
+        grid.innerHTML = '<p class="public-room-empty">公開中の部屋はありません。</p>';
+        return;
+      }
       const residents = withResidentRooms([]).filter(room => room.type === 'resident');
       if (!residents.length){
         grid.innerHTML = '<p class="public-room-empty">公開中の部屋はありません。</p>';
@@ -3368,6 +3385,9 @@
         const configuredResidentProjectKeys = new Set();
         const active = (await Promise.all(configuredRooms.map(async (r) => {
           if (!r || typeof r !== 'object') return null;
+          if (RESIDENT_CANVASES_HIDDEN && r.type === 'resident') {
+            return null;
+          }
           if (r.type === 'resident'){
             const projectKey = normalizeProjectKey(r.projectKey || r.channel || r.id || '');
             if (projectKey) {
@@ -3406,7 +3426,11 @@
         // Add dynamically published multi rooms that are not listed in rooms.json.
         lobbyRooms.forEach((lobby, projectKey) => {
           const normalizedProjectKey = normalizeProjectKey(projectKey);
-          if (!normalizedProjectKey || configuredResidentProjectKeys.has(normalizedProjectKey)) {
+          if (
+            !normalizedProjectKey
+            || configuredResidentProjectKeys.has(normalizedProjectKey)
+            || (RESIDENT_CANVASES_HIDDEN && RESIDENT_PROJECT_KEY_SET.has(normalizedProjectKey))
+          ) {
             return;
           }
           const liveThumb = (typeof lobby?.thumbnailDataUrl === 'string' && lobby.thumbnailDataUrl.startsWith('data:image/'))
