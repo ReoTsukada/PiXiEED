@@ -27,14 +27,17 @@
   const PUBLIC_ROOM_SCAN_TIMEOUT_MS = 5200;
   const PUBLIC_ROOM_MAX_ITEMS = 24;
   const PUBLIC_ROOM_MAX_AGE_MS = 20 * 60 * 1000;
-  const RESIDENT_ROOM_PRESETS = Object.freeze([
-    Object.freeze({
-      projectKey: 'resident-256-main',
-      title: '常設ルーム 256x256',
-      maxGuests: 10,
-      masterName: '待機中'
-    })
-  ]);
+  const HIDE_RESIDENT_CANVASES = true;
+  const RESIDENT_ROOM_PRESETS = HIDE_RESIDENT_CANVASES
+    ? Object.freeze([])
+    : Object.freeze([
+      Object.freeze({
+        projectKey: 'resident-256-main',
+        title: '常設ルーム 256x256',
+        maxGuests: 10,
+        masterName: '待機中'
+      })
+    ]);
   let publicRoomSupabaseClientPromise = null;
 
   function updateCopyrightYear() {
@@ -1018,8 +1021,8 @@
   function setupRecentUpdates() {
     const updates = [
       {
-        title: 'PiXiEEDdraw 小窓プレビューとヘルプ検索を追加',
-        summary: '設定から開ける検索対応ヘルプと、移動/リサイズ可能な小窓プレビュー（再生/停止連動）を追加しました。',
+        title: 'PiXiEEDraw 設定UIとパレット表示を調整',
+        summary: 'プリセット色プレビュー最大32色、新規作成パネルの構成整理、設定下5ボタンのサブスタイル統一（あ/A）、ローカル拡張（外付け）追加、キャンバスサイズ枠強調、更新トーストのスクロール表示に対応しました。',
         date: '2026-03-07',
         tag: 'Tool',
         href: 'pixiedraw/index.html'
