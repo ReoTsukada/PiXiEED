@@ -105,6 +105,15 @@
       toolQuickPalette: document.getElementById('toolQuickPalette'),
       addPaletteColor: document.getElementById('addPaletteColor'),
       removePaletteColor: document.getElementById('removePaletteColor'),
+      sortPaletteHue: document.getElementById('sortPaletteHue'),
+      sortPaletteSaturation: document.getElementById('sortPaletteSaturation'),
+      sortPaletteValue: document.getElementById('sortPaletteValue'),
+      palettePresetSelect: document.getElementById('palettePresetSelect'),
+      palettePresetPicker: document.getElementById('palettePresetPicker'),
+      palettePresetPickerButton: document.getElementById('palettePresetPickerButton'),
+      palettePresetPickerMenu: document.getElementById('palettePresetPickerMenu'),
+      palettePresetPreview: document.getElementById('palettePresetPreview'),
+      applyPalettePreset: document.getElementById('applyPalettePreset'),
       paletteIndex: document.getElementById('paletteIndex'),
       paletteHue: document.getElementById('paletteHue'),
       paletteHueValue: document.getElementById('paletteHueValue'),
@@ -207,6 +216,9 @@
       memoryClear: document.getElementById('memoryClear'),
       floatingPreviewPlay: document.getElementById('floatingPreviewPlay'),
       floatingPreviewStop: document.getElementById('floatingPreviewStop'),
+      selectionTransformMenu: document.getElementById('selectionTransformMenu'),
+      selectionFlipHorizontal: document.getElementById('selectionFlipHorizontal'),
+      selectionFlipVertical: document.getElementById('selectionFlipVertical'),
       spriteScaleInput: document.getElementById('spriteScaleInput'),
       spriteScaleDecrement: document.getElementById('spriteScaleDecrement'),
       spriteScaleIncrement: document.getElementById('spriteScaleIncrement'),
@@ -302,6 +314,12 @@
       nameInput: document.getElementById('newProjectName'),
       widthInput: document.getElementById('newProjectWidth'),
       heightInput: document.getElementById('newProjectHeight'),
+      palettePreset: document.getElementById('newProjectPalettePreset'),
+      palettePresetPicker: document.getElementById('newProjectPalettePresetPicker'),
+      palettePresetPickerButton: document.getElementById('newProjectPalettePresetPickerButton'),
+      palettePresetPickerMenu: document.getElementById('newProjectPalettePresetPickerMenu'),
+      bindExportFolder: document.getElementById('newProjectBindExportFolder'),
+      exportDestinationLabel: document.getElementById('newProjectExportDestinationLabel'),
       cancel: document.getElementById('cancelNewProject'),
       confirm: document.getElementById('confirmNewProject'),
     },
@@ -537,12 +555,12 @@
       points: {
         ja: [
           '図形ツールはプレビュー表示後、確定で描画されます。',
-          '塗りつぶしは連結領域を対象に実行されます。',
+          '塗りつぶしは「連結のみ / 全体」の同色モードを切り替えて実行できます。',
           '広範囲操作時はプレビュー最適化が入り、描画負荷を抑えます。',
         ],
         en: [
           'Shape tools render after preview and commit.',
-          'Fill targets connected regions.',
+          'Fill supports Same Color modes: Connected / Global.',
           'Large areas use preview optimization to reduce load.',
         ],
       },
@@ -872,6 +890,20 @@
   const EXPORT_INTERSTITIAL_COOLDOWN_MS = 45 * 1000;
   const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
     Object.freeze({
+      id: '2026-03-07-palette-settings-toast-sync-v2',
+      at: '2026-03-07T23:10:00+09:00',
+      title: 'パレット表示・設定ボタン・更新トーストの表示を調整',
+      details: Object.freeze([
+        'パレットプリセットボタン内のカラープレビューを最大32色表示に対応。',
+        '新規作成パネルの独立プリセットプレビューを削除し、プリセット表示を整理。',
+        '設定パネルの下5ボタン（応援チップ/あ/A/使い方ヘルプ/ショートカット/更新情報）をサブスタイルに統一。',
+        '設定パネルにローカル拡張（外付け）欄を追加し、この端末だけで動く拡張コードの保存 / 反映 / 停止に対応。',
+        '言語切替ボタンの表示を「あ/A」に統一。',
+        'キャンバスサイズブロックに色付き枠を追加し、視認性を改善。',
+        '更新トーストの内容が長い場合でも、トースト内スクロールで読めるよう表示を調整。',
+      ]),
+    }),
+    Object.freeze({
       id: '2026-03-07-help-and-ui-cleanup',
       at: '2026-03-07T21:30:00+09:00',
       title: 'ガイド・共有導線・出力・選択移動を含む操作改善アップデート',
@@ -1127,6 +1159,700 @@
     }
   }
 
+  function toKebabCase(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  function splitPalettePresetNameTokens(value) {
+    return String(value || '')
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+  }
+
+  function localizePalettePresetNameJa(name) {
+    const tokenMap = Object.freeze({
+      Pixel: '',
+      Pixels: '',
+      Core: 'コア',
+      Retro: 'レトロ',
+      Bits: 'ビッツ',
+      Soft: 'ソフト',
+      Neon: 'ネオン',
+      Pastel: 'パステル',
+      Vintage: 'ヴィンテージ',
+      Arcade: 'アーケード',
+      Glow: 'グロー',
+      CRT: 'CRT',
+      Dream: 'ドリーム',
+      Old: 'オールド',
+      Screen: 'スクリーン',
+      Classic: 'クラシック',
+      Dawn: 'ドーン',
+      Dusk: 'ダスク',
+      Night: 'ナイト',
+      Horizon: 'ホライズン',
+      Sunrise: 'サンライズ',
+      Sunset: 'サンセット',
+      Moonlight: 'ムーンライト',
+      Galaxy: 'ギャラクシー',
+      Cosmos: 'コスモス',
+      Nebula: 'ネビュラ',
+      Aurora: 'オーロラ',
+      Ocean: 'オーシャン',
+      Lagoon: 'ラグーン',
+      Deep: 'ディープ',
+      Sea: 'シー',
+      Reef: 'リーフ',
+      Forest: 'フォレスト',
+      Meadow: 'メドウ',
+      Jungle: 'ジャングル',
+      Desert: 'デザート',
+      Canyon: 'キャニオン',
+      Mountain: 'マウンテン',
+      Snow: 'スノー',
+      Glacier: 'グレイシャー',
+      Volcano: 'ボルケーノ',
+      Storm: 'ストーム',
+      Thunder: 'サンダー',
+      Lightning: 'ライトニング',
+      Rain: 'レイン',
+      Mist: 'ミスト',
+      Fog: 'フォグ',
+      Frost: 'フロスト',
+      Ember: 'エンバー',
+      Flame: 'フレイム',
+      Lava: 'ラヴァ',
+      Sand: 'サンド',
+      Clay: 'クレイ',
+      Stone: 'ストーン',
+      Marble: 'マーブル',
+      Bronze: 'ブロンズ',
+      Copper: 'コッパー',
+      Iron: 'アイアン',
+      Silver: 'シルバー',
+      Gold: 'ゴールド',
+      Crystal: 'クリスタル',
+      Prism: 'プリズム',
+      Candy: 'キャンディ',
+      Bubblegum: 'バブルガム',
+      Cotton: 'コットン',
+      Mint: 'ミント',
+      Lemon: 'レモン',
+      Peach: 'ピーチ',
+      Berry: 'ベリー',
+      Cherry: 'チェリー',
+      Plum: 'プラム',
+      Sakura: 'サクラ',
+      Indigo: 'インディゴ',
+      Yamabuki: 'ヤマブキ',
+      Wakakusa: 'ワカクサ',
+      Shikon: 'シコン',
+      Ink: 'インク',
+      Shadow: 'シャドウ',
+      Eclipse: 'エクリプス',
+      Cyber: 'サイバー',
+      Circuit: 'サーキット',
+      Matrix: 'マトリクス',
+      Digital: 'デジタル',
+      Hologram: 'ホログラム',
+      Vapor: 'ベイパー',
+      Fantasy: 'ファンタジー',
+      Storybook: 'ストーリーブック',
+      Adventure: 'アドベンチャー',
+      Dungeon: 'ダンジョン',
+      Castle: 'キャッスル',
+      Kingdom: 'キングダム',
+      Hero: 'ヒーロー',
+      Villain: 'ヴィラン',
+      Monster: 'モンスター',
+      Slime: 'スライム',
+      Dragon: 'ドラゴン',
+      Treasure: 'トレジャー',
+      Magic: 'マジック',
+      Potion: 'ポーション',
+      Rune: 'ルーン',
+      Relic: 'レリック',
+      Artifact: 'アーティファクト',
+      Portal: 'ポータル',
+      Temple: 'テンプル',
+      Shrine: 'シュライン',
+      Arena: 'アリーナ',
+      Battle: 'バトル',
+      Victory: 'ビクトリー',
+      Quest: 'クエスト',
+      Journey: 'ジャーニー',
+      Frontier: 'フロンティア',
+      Island: 'アイランド',
+      Harbor: 'ハーバー',
+      City: 'シティ',
+      Metro: 'メトロ',
+      Skyline: 'スカイライン',
+      Alley: 'アレイ',
+      Lantern: 'ランタン',
+      Festival: 'フェスティバル',
+      Carnival: 'カーニバル',
+      Fireworks: 'ファイアワークス',
+      Stardust: 'スターダスト',
+      Comet: 'コメット',
+      Orbit: 'オービット',
+      Satellite: 'サテライト',
+      Signal: 'シグナル',
+      Spectrum: 'スペクトラム',
+      Gradient: 'グラデーション',
+      Harmony: 'ハーモニー',
+      Balance: 'バランス',
+      Contrast: 'コントラスト',
+      Echo: 'エコー',
+      Pulse: 'パルス',
+      Wave: 'ウェーブ',
+      Flux: 'フラックス',
+      Spark: 'スパーク',
+      Radiance: 'レイディアンス',
+      Bloom: 'ブルーム',
+      Garden: 'ガーデン',
+      Orchard: 'オーチャード',
+      Vineyard: 'ヴィンヤード',
+      River: 'リバー',
+      Waterfall: 'ウォーターフォール',
+      Cliff: 'クリフ',
+      Valley: 'バレー',
+      Prairie: 'プレーリー',
+      Savannah: 'サバンナ',
+      Tundra: 'ツンドラ',
+      Solar: 'ソーラー',
+      Wind: 'ウィンド',
+      Lunar: 'ルナー',
+      Dust: 'ダスト',
+      Stellar: 'ステラ',
+    });
+    const tokens = splitPalettePresetNameTokens(name);
+    if (!tokens.length) {
+      return String(name || '');
+    }
+    return tokens
+      .map(token => (Object.prototype.hasOwnProperty.call(tokenMap, token) ? tokenMap[token] : token))
+      .join('')
+      .replace(/pixel/gi, '')
+      .trim();
+  }
+
+  function normalizePalettePresetDisplayName(name) {
+    return String(name || '')
+      .replace(/\bpixel\b/gi, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
+  function resolveNewProjectPaletteColorCount(name) {
+    const normalized = String(name || '').trim().toLowerCase();
+    if (!normalized) {
+      return 16;
+    }
+    if (
+      normalized === 'pixel core'
+      || normalized === 'pixel ink'
+      || normalized === 'pixel shadow'
+      || normalized === 'old screen'
+    ) {
+      return 4;
+    }
+    if (
+      normalized.includes('bits')
+      || normalized.includes('mist')
+      || normalized.includes('fog')
+      || normalized.includes('frost')
+      || normalized.includes('stone')
+      || normalized.includes('iron')
+      || normalized.includes('slime')
+      || normalized.includes('dungeon')
+    ) {
+      return 8;
+    }
+    if (
+      normalized.includes('neon')
+      || normalized.includes('galaxy')
+      || normalized.includes('cosmos')
+      || normalized.includes('nebula')
+      || normalized.includes('aurora')
+      || normalized.includes('cyber')
+      || normalized.includes('circuit')
+      || normalized.includes('matrix')
+      || normalized.includes('digital')
+      || normalized.includes('hologram')
+      || normalized.includes('spectrum')
+      || normalized.includes('gradient')
+      || normalized.includes('fireworks')
+      || normalized.includes('stardust')
+      || normalized.includes('comet')
+      || normalized.includes('orbit')
+      || normalized.includes('satellite')
+      || normalized.includes('solarwind')
+      || normalized.includes('stellarwind')
+    ) {
+      return 32;
+    }
+    if (
+      normalized.includes('classic')
+      || normalized.includes('vintage')
+      || normalized.includes('pastel')
+      || normalized.includes('forest')
+      || normalized.includes('meadow')
+      || normalized.includes('desert')
+      || normalized.includes('mountain')
+      || normalized.includes('snow')
+      || normalized.includes('clay')
+      || normalized.includes('bronze')
+      || normalized.includes('silver')
+      || normalized.includes('gold')
+      || normalized.includes('castle')
+      || normalized.includes('kingdom')
+    ) {
+      return 16;
+    }
+    return 24;
+  }
+
+  function getNewProjectPalettePresetDefinition(presetId, fallbackPresetId = NEW_PROJECT_PALETTE_PRESET_DEFAULT) {
+    const normalized = normalizeNewProjectPalettePreset(presetId, fallbackPresetId);
+    return NEW_PROJECT_PALETTE_PRESET_MAP.get(normalized)
+      || NEW_PROJECT_PALETTE_PRESET_MAP.get(NEW_PROJECT_PALETTE_PRESET_DEFAULT)
+      || null;
+  }
+
+  function normalizeNewProjectPalettePreset(value, fallback = NEW_PROJECT_PALETTE_PRESET_DEFAULT) {
+    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (NEW_PROJECT_PALETTE_PRESET_SET.has(normalized)) {
+      return normalized;
+    }
+    return NEW_PROJECT_PALETTE_PRESET_SET.has(fallback)
+      ? fallback
+      : NEW_PROJECT_PALETTE_PRESET_DEFAULT;
+  }
+
+  function hashTextToUint32(value) {
+    const text = String(value || '');
+    let hash = 2166136261;
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  }
+
+  function hslToRgbColor(h, s, l) {
+    const hue = ((Number(h) % 360) + 360) % 360;
+    const sat = clamp(Number(s), 0, 100) / 100;
+    const lig = clamp(Number(l), 0, 100) / 100;
+    if (sat <= 0) {
+      const gray = clamp(Math.round(lig * 255), 0, 255);
+      return { r: gray, g: gray, b: gray, a: 255 };
+    }
+    const c = (1 - Math.abs(2 * lig - 1)) * sat;
+    const hPrime = hue / 60;
+    const x = c * (1 - Math.abs((hPrime % 2) - 1));
+    let r1 = 0;
+    let g1 = 0;
+    let b1 = 0;
+    if (hPrime >= 0 && hPrime < 1) {
+      r1 = c;
+      g1 = x;
+    } else if (hPrime < 2) {
+      r1 = x;
+      g1 = c;
+    } else if (hPrime < 3) {
+      g1 = c;
+      b1 = x;
+    } else if (hPrime < 4) {
+      g1 = x;
+      b1 = c;
+    } else if (hPrime < 5) {
+      r1 = x;
+      b1 = c;
+    } else {
+      r1 = c;
+      b1 = x;
+    }
+    const m = lig - (c / 2);
+    return {
+      r: clamp(Math.round((r1 + m) * 255), 0, 255),
+      g: clamp(Math.round((g1 + m) * 255), 0, 255),
+      b: clamp(Math.round((b1 + m) * 255), 0, 255),
+      a: 255,
+    };
+  }
+
+  function generateNewProjectPaletteColors(definition) {
+    const count = clamp(Math.round(Number(definition?.colorCount) || 16), 4, 32);
+    const colorSlots = Math.max(1, count - 1);
+    const seed = hashTextToUint32(definition?.id || definition?.name || 'pixel-core');
+    const baseHue = seed % 360;
+    const baseSaturation = 42 + (seed % 36);
+    const colors = [{ r: 0, g: 0, b: 0, a: 0 }];
+    for (let index = 0; index < colorSlots; index += 1) {
+      const t = colorSlots > 1 ? index / (colorSlots - 1) : 0;
+      const band = index % 4;
+      const hue = (baseHue + (t * 248) + (band * 11)) % 360;
+      const saturation = clamp(baseSaturation + ((index % 5) - 2) * 6, 30, 90);
+      const lightnessBase = 14 + (t * 72);
+      const lightness = clamp(lightnessBase + (band === 0 ? -6 : band === 3 ? 6 : 0), 8, 94);
+      colors.push(hslToRgbColor(hue, saturation, lightness));
+    }
+    return colors.map(color => normalizeColorValue(color));
+  }
+
+  function getNewProjectPalettePresetColors(presetId, fallbackPresetId = NEW_PROJECT_PALETTE_PRESET_DEFAULT) {
+    const definition = getNewProjectPalettePresetDefinition(presetId, fallbackPresetId);
+    if (!definition) {
+      return [{ r: 0, g: 0, b: 0, a: 0 }];
+    }
+    const cached = newProjectPalettePresetColorCache.get(definition.id);
+    if (Array.isArray(cached) && cached.length) {
+      return cached.map(color => normalizeColorValue(color));
+    }
+    const generated = generateNewProjectPaletteColors(definition);
+    newProjectPalettePresetColorCache.set(definition.id, generated);
+    return generated.map(color => normalizeColorValue(color));
+  }
+
+  function getPalettePresetDisplayName(definition, language = (isEnglishUi() ? UI_LANGUAGE_EN : UI_LANGUAGE_JA)) {
+    if (!definition || typeof definition !== 'object') {
+      return '';
+    }
+    const label = language === UI_LANGUAGE_EN
+      ? String(definition.name || '')
+      : String(definition.nameJa || definition.name || '');
+    return normalizePalettePresetDisplayName(label);
+  }
+
+  function renderPalettePresetSelectOptions(select, selectedPresetId = NEW_PROJECT_PALETTE_PRESET_DEFAULT) {
+    if (!(select instanceof HTMLSelectElement)) {
+      return;
+    }
+    const language = isEnglishUi() ? UI_LANGUAGE_EN : UI_LANGUAGE_JA;
+    const fragment = document.createDocumentFragment();
+    for (const definition of NEW_PROJECT_PALETTE_PRESET_DEFINITIONS) {
+      const option = document.createElement('option');
+      option.value = definition.id;
+      option.textContent = getPalettePresetDisplayName(definition, language);
+      fragment.appendChild(option);
+    }
+    select.textContent = '';
+    select.appendChild(fragment);
+    select.dataset.paletteLanguage = language;
+    select.value = normalizeNewProjectPalettePreset(selectedPresetId, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+  }
+
+  function renderNewProjectPalettePresetOptions(selectedPresetId = newProjectPalettePresetId) {
+    renderPalettePresetSelectOptions(
+      dom.newProject?.palettePreset,
+      selectedPresetId
+    );
+  }
+
+  function renderColorPanelPalettePresetOptions(selectedPresetId = newProjectPalettePresetId) {
+    renderPalettePresetSelectOptions(
+      dom.controls.palettePresetSelect,
+      selectedPresetId
+    );
+    renderPalettePresetPicker(selectedPresetId);
+  }
+
+  function renderPalettePresetPreview(
+    presetId = newProjectPalettePresetId,
+    previewNode = dom.controls.palettePresetPreview,
+    maxDots = 16
+  ) {
+    if (!(previewNode instanceof HTMLElement)) {
+      return;
+    }
+    const colors = getNewProjectPalettePresetColors(presetId, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+    previewNode.textContent = '';
+    const fragment = document.createDocumentFragment();
+    const limit = clamp(Math.round(Number(maxDots) || 16), 1, 32);
+    colors.slice(0, limit).forEach(color => {
+      const dot = document.createElement('span');
+      dot.className = 'palette-preset-preview__dot';
+      dot.style.background = rgbaToCss(normalizeColorValue(color));
+      fragment.appendChild(dot);
+    });
+    previewNode.appendChild(fragment);
+  }
+
+  function setPresetPickerOpen(button, menu, open, updatePosition) {
+    if (!(button instanceof HTMLButtonElement) || !(menu instanceof HTMLElement)) {
+      return;
+    }
+    const nextOpen = Boolean(open) && !button.disabled;
+    button.setAttribute('aria-expanded', String(nextOpen));
+    menu.hidden = !nextOpen;
+    if (nextOpen && typeof updatePosition === 'function') {
+      updatePosition();
+    }
+  }
+
+  function setPalettePresetPickerOpen(open) {
+    setPresetPickerOpen(
+      dom.controls.palettePresetPickerButton,
+      dom.controls.palettePresetPickerMenu,
+      open,
+      updatePalettePresetPickerMenuPosition
+    );
+  }
+
+  function setNewProjectPalettePresetPickerOpen(open) {
+    setPresetPickerOpen(
+      dom.newProject?.palettePresetPickerButton,
+      dom.newProject?.palettePresetPickerMenu,
+      open,
+      updateNewProjectPalettePresetPickerMenuPosition
+    );
+  }
+
+  function updatePresetPickerMenuPosition(button, menu) {
+    if (!(button instanceof HTMLButtonElement) || !(menu instanceof HTMLElement)) {
+      return;
+    }
+    const rect = button.getBoundingClientRect();
+    if (!rect.width || !rect.height) {
+      return;
+    }
+    const viewportPadding = 8;
+    const maxOptionWidth = Array.from(menu.querySelectorAll('.palette-preset-picker__option')).reduce((largest, option) => {
+      if (!(option instanceof HTMLElement)) {
+        return largest;
+      }
+      const label = option.querySelector('.palette-preset-picker__label');
+      const swatches = option.querySelector('.palette-preset-picker__swatches');
+      const style = window.getComputedStyle(option);
+      const paddingInline = (Number.parseFloat(style.paddingLeft) || 0) + (Number.parseFloat(style.paddingRight) || 0);
+      const borderInline = (Number.parseFloat(style.borderLeftWidth) || 0) + (Number.parseFloat(style.borderRightWidth) || 0);
+      const gap = Number.parseFloat(style.columnGap || style.gap || '0') || 0;
+      const labelWidth = label instanceof HTMLElement ? (label.scrollWidth || label.offsetWidth || 0) : 0;
+      const swatchWidth = swatches instanceof HTMLElement ? (swatches.scrollWidth || swatches.offsetWidth || 0) : 0;
+      const intrinsic = Math.ceil(labelWidth + swatchWidth + gap + paddingInline + borderInline);
+      return Math.max(largest, intrinsic);
+    }, 0);
+    const preferredWidth = Math.max(rect.width, maxOptionWidth + 12, 260);
+    const maxWidth = Math.max(220, window.innerWidth - (viewportPadding * 2));
+    const width = Math.min(preferredWidth, maxWidth);
+    let left = rect.left;
+    left = clamp(left, viewportPadding, Math.max(viewportPadding, window.innerWidth - width - viewportPadding));
+    const maxHeight = Math.max(160, Math.min(360, Math.floor(window.innerHeight * 0.45)));
+    menu.style.position = 'fixed';
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.width = `${Math.round(width)}px`;
+    menu.style.maxHeight = `${maxHeight}px`;
+    menu.style.zIndex = '2140';
+    menu.style.transform = 'none';
+    menu.style.bottom = 'auto';
+    menu.style.top = '0px';
+    const measuredHeight = Math.min(menu.scrollHeight || maxHeight, maxHeight);
+    const spaceBelow = window.innerHeight - rect.bottom - viewportPadding;
+    const spaceAbove = rect.top - viewportPadding;
+    const openUpward = measuredHeight > spaceBelow && spaceAbove > spaceBelow;
+    if (openUpward) {
+      const top = Math.max(viewportPadding, rect.top - measuredHeight - 4);
+      menu.style.top = `${Math.round(top)}px`;
+    } else {
+      const top = Math.min(
+        window.innerHeight - viewportPadding - measuredHeight,
+        rect.bottom + 4
+      );
+      menu.style.top = `${Math.round(Math.max(viewportPadding, top))}px`;
+    }
+  }
+
+  function updatePalettePresetPickerMenuPosition() {
+    updatePresetPickerMenuPosition(
+      dom.controls.palettePresetPickerButton,
+      dom.controls.palettePresetPickerMenu
+    );
+  }
+
+  function updateNewProjectPalettePresetPickerMenuPosition() {
+    updatePresetPickerMenuPosition(
+      dom.newProject?.palettePresetPickerButton,
+      dom.newProject?.palettePresetPickerMenu
+    );
+  }
+
+  function renderPalettePresetPicker(selectedPresetId = newProjectPalettePresetId) {
+    const button = dom.controls.palettePresetPickerButton;
+    const menu = dom.controls.palettePresetPickerMenu;
+    if (!(button instanceof HTMLButtonElement) || !(menu instanceof HTMLElement)) {
+      return;
+    }
+    const normalized = normalizeNewProjectPalettePreset(selectedPresetId, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+    const selectedDefinition = getNewProjectPalettePresetDefinition(normalized, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+    const selectedLabel = getPalettePresetDisplayName(selectedDefinition);
+    button.textContent = '';
+    button.title = selectedLabel;
+    const selectedLabelNode = document.createElement('span');
+    selectedLabelNode.className = 'palette-preset-picker__button-label';
+    selectedLabelNode.textContent = selectedLabel;
+    const selectedSwatches = document.createElement('span');
+    selectedSwatches.className = 'palette-preset-picker__swatches';
+    const selectedColors = getNewProjectPalettePresetColors(normalized, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+    selectedColors.slice(0, PALETTE_PRESET_BUTTON_SWATCH_MAX).forEach(color => {
+      const swatch = document.createElement('span');
+      swatch.className = 'palette-preset-picker__swatch';
+      swatch.style.background = rgbaToCss(normalizeColorValue(color));
+      selectedSwatches.appendChild(swatch);
+    });
+    button.appendChild(selectedLabelNode);
+    button.appendChild(selectedSwatches);
+    menu.textContent = '';
+    const fragment = document.createDocumentFragment();
+    NEW_PROJECT_PALETTE_PRESET_DEFINITIONS.forEach(definition => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'palette-preset-picker__option';
+      row.dataset.presetId = definition.id;
+      row.setAttribute('role', 'option');
+      const isActive = definition.id === normalized;
+      row.classList.toggle('is-active', isActive);
+      row.setAttribute('aria-selected', String(isActive));
+
+      const label = document.createElement('span');
+      label.className = 'palette-preset-picker__label';
+      label.textContent = getPalettePresetDisplayName(definition);
+      row.appendChild(label);
+
+      const swatches = document.createElement('span');
+      swatches.className = 'palette-preset-picker__swatches';
+      const colors = getNewProjectPalettePresetColors(definition.id, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+      colors.slice(0, PALETTE_PRESET_BUTTON_SWATCH_MAX).forEach(color => {
+        const swatch = document.createElement('span');
+        swatch.className = 'palette-preset-picker__swatch';
+        swatch.style.background = rgbaToCss(normalizeColorValue(color));
+        swatches.appendChild(swatch);
+      });
+      row.appendChild(swatches);
+
+      row.addEventListener('click', () => {
+        applyPalettePresetToCurrentPalette(definition.id, { announce: true });
+        setPalettePresetPickerOpen(false);
+      });
+      fragment.appendChild(row);
+    });
+    menu.appendChild(fragment);
+  }
+
+  function renderNewProjectPalettePresetPicker(selectedPresetId = newProjectPalettePresetId) {
+    const button = dom.newProject?.palettePresetPickerButton;
+    const menu = dom.newProject?.palettePresetPickerMenu;
+    if (!(button instanceof HTMLButtonElement) || !(menu instanceof HTMLElement)) {
+      return;
+    }
+    const normalized = normalizeNewProjectPalettePreset(selectedPresetId, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+    const selectedDefinition = getNewProjectPalettePresetDefinition(normalized, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+    const selectedLabel = getPalettePresetDisplayName(selectedDefinition);
+    button.textContent = '';
+    button.title = selectedLabel;
+    const selectedLabelNode = document.createElement('span');
+    selectedLabelNode.className = 'palette-preset-picker__button-label';
+    selectedLabelNode.textContent = selectedLabel;
+    const selectedSwatches = document.createElement('span');
+    selectedSwatches.className = 'palette-preset-picker__swatches';
+    const selectedColors = getNewProjectPalettePresetColors(normalized, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+    selectedColors.slice(0, PALETTE_PRESET_BUTTON_SWATCH_MAX).forEach(color => {
+      const swatch = document.createElement('span');
+      swatch.className = 'palette-preset-picker__swatch';
+      swatch.style.background = rgbaToCss(normalizeColorValue(color));
+      selectedSwatches.appendChild(swatch);
+    });
+    button.appendChild(selectedLabelNode);
+    button.appendChild(selectedSwatches);
+
+    menu.textContent = '';
+    const fragment = document.createDocumentFragment();
+    NEW_PROJECT_PALETTE_PRESET_DEFINITIONS.forEach(definition => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'palette-preset-picker__option';
+      row.dataset.presetId = definition.id;
+      row.setAttribute('role', 'option');
+      const isActive = definition.id === normalized;
+      row.classList.toggle('is-active', isActive);
+      row.setAttribute('aria-selected', String(isActive));
+
+      const label = document.createElement('span');
+      label.className = 'palette-preset-picker__label';
+      label.textContent = getPalettePresetDisplayName(definition);
+      row.appendChild(label);
+
+      const swatches = document.createElement('span');
+      swatches.className = 'palette-preset-picker__swatches';
+      const colors = getNewProjectPalettePresetColors(definition.id, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+      colors.slice(0, PALETTE_PRESET_BUTTON_SWATCH_MAX).forEach(color => {
+        const swatch = document.createElement('span');
+        swatch.className = 'palette-preset-picker__swatch';
+        swatch.style.background = rgbaToCss(normalizeColorValue(color));
+        swatches.appendChild(swatch);
+      });
+      row.appendChild(swatches);
+
+      row.addEventListener('click', () => {
+        setNewProjectPalettePresetId(definition.id, { persist: true, syncControl: true });
+        setNewProjectPalettePresetPickerOpen(false);
+      });
+      fragment.appendChild(row);
+    });
+    menu.appendChild(fragment);
+  }
+
+  function loadStoredNewProjectPalettePresetId() {
+    if (!canUseSessionStorage) {
+      return NEW_PROJECT_PALETTE_PRESET_DEFAULT;
+    }
+    try {
+      const stored = window.localStorage.getItem(NEW_PROJECT_PALETTE_PRESET_STORAGE_KEY) || '';
+      return normalizeNewProjectPalettePreset(stored, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+    } catch (error) {
+      return NEW_PROJECT_PALETTE_PRESET_DEFAULT;
+    }
+  }
+
+  function storeNewProjectPalettePresetId(presetId) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    const normalized = normalizeNewProjectPalettePreset(presetId, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+    try {
+      window.localStorage.setItem(NEW_PROJECT_PALETTE_PRESET_STORAGE_KEY, normalized);
+    } catch (error) {
+      // Ignore localStorage errors.
+    }
+  }
+
+  function setNewProjectPalettePresetId(presetId, { persist = true, syncControl = true } = {}) {
+    const normalized = normalizeNewProjectPalettePreset(presetId, newProjectPalettePresetId || NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+    newProjectPalettePresetId = normalized;
+    if (persist) {
+      storeNewProjectPalettePresetId(normalized);
+    }
+    if (syncControl) {
+      renderNewProjectPalettePresetOptions(normalized);
+      if (dom.newProject?.palettePreset instanceof HTMLSelectElement) {
+        dom.newProject.palettePreset.value = normalized;
+      }
+      renderNewProjectPalettePresetPicker(normalized);
+      renderColorPanelPalettePresetOptions(normalized);
+      if (dom.controls.palettePresetSelect instanceof HTMLSelectElement) {
+        dom.controls.palettePresetSelect.value = normalized;
+      }
+      renderPalettePresetPicker(normalized);
+      renderPalettePresetPreview(normalized);
+    }
+    return normalized;
+  }
+
   let uiLanguage = resolveInitialUiLanguage();
   let inlineGuidesVisible = loadInlineGuidesVisibility();
 
@@ -1242,6 +1968,11 @@
   const RECENT_PROJECTS_STORE = 'recentProjects';
   const AUTOSAVE_HANDLE_KEY = 'document';
   const AUTOSAVE_ACTIVE_PROJECT_KEY = 'activeProjectId';
+  const AUTOSAVE_TAB_LOCK_KEY = 'pixieedraw:autosave-tab-lock-v1';
+  const AUTOSAVE_TAB_LOCK_TTL_MS = 8000;
+  const AUTOSAVE_TAB_LOCK_NOTICE_THROTTLE_MS = 3000;
+  const NEW_PROJECT_PALETTE_PRESET_STORAGE_KEY = 'pixieedraw:new-project-palette-preset';
+  const PALETTE_PRESET_BUTTON_SWATCH_MAX = 32;
   const EXPORT_DIRECTORY_HANDLE_KEY = 'exportDirectory';
   const EXPORT_DIRECTORY_DISPLAY_LABEL_KEY = 'pixieedraw:export-directory-display-label';
   const EXPORT_WORKSPACE_DIR_NAME = 'PiXiEED';
@@ -1271,6 +2002,172 @@
   const MULTI_INVITE_QUERY_KEY = 'multiKey';
   const MULTI_INVITE_QUERY_AUTO_JOIN = 'multiAutoJoin';
   const MULTI_INVITE_QUERY_ROLE = 'multiRole';
+  const NEW_PROJECT_PALETTE_PRESET_NAMES = Object.freeze([
+    'Pixel Core',
+    'Retro Bits',
+    'Soft Pixels',
+    'Neon Pixels',
+    'Pastel Pixels',
+    'Vintage Pixels',
+    'Arcade Glow',
+    'CRT Dream',
+    'Old Screen',
+    'Pixel Classic',
+    'Pixel Dawn',
+    'Pixel Dusk',
+    'Pixel Night',
+    'Pixel Horizon',
+    'Pixel Sunrise',
+    'Pixel Sunset',
+    'Pixel Moonlight',
+    'Pixel Galaxy',
+    'Pixel Cosmos',
+    'Pixel Nebula',
+    'Pixel Aurora',
+    'Pixel Ocean',
+    'Pixel Lagoon',
+    'Pixel DeepSea',
+    'Pixel Reef',
+    'Pixel Forest',
+    'Pixel Meadow',
+    'Pixel Jungle',
+    'Pixel Desert',
+    'Pixel Canyon',
+    'Pixel Mountain',
+    'Pixel Snow',
+    'Pixel Glacier',
+    'Pixel Volcano',
+    'Pixel Storm',
+    'Pixel Thunder',
+    'Pixel Lightning',
+    'Pixel Rain',
+    'Pixel Mist',
+    'Pixel Fog',
+    'Pixel Frost',
+    'Pixel Ember',
+    'Pixel Flame',
+    'Pixel Lava',
+    'Pixel Sand',
+    'Pixel Clay',
+    'Pixel Stone',
+    'Pixel Marble',
+    'Pixel Bronze',
+    'Pixel Copper',
+    'Pixel Iron',
+    'Pixel Silver',
+    'Pixel Gold',
+    'Pixel Crystal',
+    'Pixel Prism',
+    'Pixel Candy',
+    'Pixel Bubblegum',
+    'Pixel Cotton',
+    'Pixel Mint',
+    'Pixel Lemon',
+    'Pixel Peach',
+    'Pixel Berry',
+    'Pixel Cherry',
+    'Pixel Plum',
+    'Pixel Sakura',
+    'Pixel Indigo',
+    'Pixel Yamabuki',
+    'Pixel Wakakusa',
+    'Pixel Shikon',
+    'Pixel Ink',
+    'Pixel Shadow',
+    'Pixel Eclipse',
+    'Pixel Cyber',
+    'Pixel Circuit',
+    'Pixel Matrix',
+    'Pixel Digital',
+    'Pixel Hologram',
+    'Pixel Vapor',
+    'Pixel Dream',
+    'Pixel Fantasy',
+    'Pixel Storybook',
+    'Pixel Adventure',
+    'Pixel Dungeon',
+    'Pixel Castle',
+    'Pixel Kingdom',
+    'Pixel Hero',
+    'Pixel Villain',
+    'Pixel Monster',
+    'Pixel Slime',
+    'Pixel Dragon',
+    'Pixel Treasure',
+    'Pixel Magic',
+    'Pixel Potion',
+    'Pixel Rune',
+    'Pixel Relic',
+    'Pixel Artifact',
+    'Pixel Portal',
+    'Pixel Temple',
+    'Pixel Shrine',
+    'Pixel Arena',
+    'Pixel Battle',
+    'Pixel Victory',
+    'Pixel Quest',
+    'Pixel Journey',
+    'Pixel Frontier',
+    'Pixel Island',
+    'Pixel Harbor',
+    'Pixel City',
+    'Pixel Metro',
+    'Pixel Skyline',
+    'Pixel Alley',
+    'Pixel Lantern',
+    'Pixel Festival',
+    'Pixel Carnival',
+    'Pixel Fireworks',
+    'Pixel Stardust',
+    'Pixel Comet',
+    'Pixel Orbit',
+    'Pixel Satellite',
+    'Pixel Signal',
+    'Pixel Spectrum',
+    'Pixel Gradient',
+    'Pixel Harmony',
+    'Pixel Balance',
+    'Pixel Contrast',
+    'Pixel Echo',
+    'Pixel Pulse',
+    'Pixel Wave',
+    'Pixel Flux',
+    'Pixel Spark',
+    'Pixel Glow',
+    'Pixel Radiance',
+    'Pixel Bloom',
+    'Pixel Garden',
+    'Pixel Orchard',
+    'Pixel Vineyard',
+    'Pixel River',
+    'Pixel Waterfall',
+    'Pixel Cliff',
+    'Pixel Valley',
+    'Pixel Prairie',
+    'Pixel Savannah',
+    'Pixel Tundra',
+    'Pixel AuroraNight',
+    'Pixel SolarWind',
+    'Pixel LunarDust',
+    'Pixel StellarWind',
+  ]);
+  const NEW_PROJECT_PALETTE_PRESET_DEFAULT_NAME = 'Pixel Core';
+  const NEW_PROJECT_PALETTE_PRESET_DEFINITIONS = Object.freeze(
+    NEW_PROJECT_PALETTE_PRESET_NAMES.map(name => Object.freeze({
+      id: `preset-${toKebabCase(name)}`,
+      name,
+      nameJa: localizePalettePresetNameJa(name),
+      colorCount: resolveNewProjectPaletteColorCount(name),
+    }))
+  );
+  const NEW_PROJECT_PALETTE_PRESET_DEFAULT = `preset-${toKebabCase(NEW_PROJECT_PALETTE_PRESET_DEFAULT_NAME)}`;
+  const NEW_PROJECT_PALETTE_PRESET_SET = new Set(
+    NEW_PROJECT_PALETTE_PRESET_DEFINITIONS.map(definition => definition.id)
+  );
+  const NEW_PROJECT_PALETTE_PRESET_MAP = new Map(
+    NEW_PROJECT_PALETTE_PRESET_DEFINITIONS.map(definition => [definition.id, definition])
+  );
+  const newProjectPalettePresetColorCache = new Map();
   const RESIDENT_MULTI_ROOM_PROFILES = Object.freeze({
     'resident-256-main': Object.freeze({
       width: 256,
@@ -1388,6 +2285,13 @@
   let autosaveWriteTimer = null;
   let autosaveWriteInFlight = false;
   let autosaveWriteQueued = false;
+  const autosaveTabInstanceId = (() => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `tab-${crypto.randomUUID()}`;
+    }
+    return `tab-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+  })();
+  let autosaveTabLockNoticeAt = 0;
   let autosaveRestoring = false;
   let autosaveDirty = false;
   let autosaveDirtyGeneration = 0;
@@ -1404,6 +2308,7 @@
   let iosSnapshotRestoring = false;
   let iosSnapshotInitialized = false;
   let iosSnapshotUnloadListenerBound = false;
+  let iosSnapshotBlockedNoticeAt = 0;
   let reloadSnapshotRestored = false;
   const brushOffsetCache = new Map();
   const brushCircleOffsetCache = new Map();
@@ -1431,6 +2336,7 @@
   const TIMELAPSE_MIN_FPS = 1;
   const TIMELAPSE_MAX_FPS = 60;
   const TIMELAPSE_MAX_STEPS = 120;
+  const TIMELAPSE_CAPTURE_DEBOUNCE_MS = 48;
   const timelapseState = {
     enabled: true,
     snapshots: [],
@@ -1439,6 +2345,8 @@
     sampleStep: 1,
     lastCaptureToken: -1,
   };
+  let timelapseCaptureTimer = null;
+  let timelapseCaptureQueued = false;
   let pixfindModeEnabled = false;
   let pixfindModeFirstEnableConfirmed = false;
   const multiState = {
@@ -1477,6 +2385,12 @@
     resumeJoinPolicy: null,
     resumeExportPermission: null,
     layerPatchSnapshots: new Map(),
+    masterLayerPatchTimer: null,
+    masterLayerPatchInFlight: false,
+    masterLayerPatchQueued: false,
+    guestLayerPatchTimer: null,
+    guestLayerPatchInFlight: false,
+    guestLayerPatchQueued: false,
     blockedClientIds: new Set(),
     pendingJoinRequests: new Map(),
     joinRequestCooldownUntil: 0,
@@ -1647,10 +2561,10 @@
   const VIRTUAL_CURSOR_MOVE_TOOLS = new Set(['move']);
   const FILL_TOOLS = new Set(['fill']);
   const SHAPE_TOOLS = new Set(['line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill']);
-  const BRUSH_SIZE_TOOLS = new Set([...BRUSH_TOOLS, ...SHAPE_TOOLS, ...FILL_TOOLS]);
+  const BRUSH_SIZE_TOOLS = new Set([...BRUSH_TOOLS, ...SHAPE_TOOLS]);
   const SELECT_RECT_GRID_CELL_SIZE = 16;
   const SELECT_RECT_GRID_DOUBLE_TAP_MS = 320;
-  const SELECTION_TOOLS = new Set(['move', 'selectRect', 'selectLasso', 'selectSame', 'selectionMove', 'layerMove']);
+  const SELECTION_TOOLS = new Set(['move', 'selectRect', 'selectLasso', 'selectSame', 'selectionMove', 'layerMove', 'selectionTransform']);
   const TOOL_ICON_FALLBACK = {
     move: '⇕',
     selectRect: '□',
@@ -1705,7 +2619,11 @@
   });
   let lockedCanvasWidth = null;
   let lockedCanvasHeight = null;
-  const state = createInitialState();
+  let palettePresetPickerPointerBound = false;
+  let palettePresetPickerEscapeBound = false;
+  let palettePresetPickerViewportBound = false;
+  let newProjectPalettePresetId = loadStoredNewProjectPalettePresetId();
+  const state = createInitialState({ palettePreset: newProjectPalettePresetId });
   if (EMBED_CONFIG.lockCanvasSize) {
     lockedCanvasWidth = state.width;
     lockedCanvasHeight = state.height;
@@ -1853,7 +2771,10 @@
   window.addEventListener('beforeunload', storePendingMultiResumeSession);
   window.addEventListener('pagehide', storePendingMultiResumeSession);
   if (canUseSessionStorage) {
+    window.addEventListener('storage', handleAutosaveStorageEvent);
     window.addEventListener('beforeunload', persistSessionState);
+    window.addEventListener('beforeunload', releaseAutosaveTabLock);
+    window.addEventListener('pagehide', releaseAutosaveTabLock);
   }
   let hoverPixel = null;
   let zoomIndicatorTimeoutId = null;
@@ -1882,8 +2803,11 @@
   let historyTrimmedRecently = false;
   let historyTrimmedAt = 0;
   const EMPTY_FILL_PREVIEW_PIXELS = Object.freeze([]);
+  const FILL_PREVIEW_TRUNCATED_FLAG = '__pixieedFillPreviewTruncated';
   // Skip overly large fill preview regions to keep interaction responsive.
   const FILL_PREVIEW_MAX_PIXELS = 32768;
+  const FILL_PREVIEW_MIRROR_DEDUP_MAX_PIXELS = 8192;
+  const FILL_PREVIEW_CACHE_BACKFILL_MAX_PIXELS = 4096;
   const fillPreviewCache = { contextKey: null, byPixel: null };
   const onionSkinCache = {
     revision: -1,
@@ -1893,7 +2817,7 @@
   const selectionMaskCacheIds = new WeakMap();
   let selectionMaskCacheIdCounter = 1;
   const HISTORY_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', 'fill']);
-  const MULTI_PALETTE_HISTORY_LABELS = new Set(['paletteAdd', 'paletteRemove', 'paletteReorder', 'paletteColor']);
+  const MULTI_PALETTE_HISTORY_LABELS = new Set(['paletteAdd', 'paletteRemove', 'paletteReorder', 'paletteColor', 'paletteApplyPreset']);
   const MEMORY_MONITOR_INTERVAL = 5000;
   const MEMORY_WARNING_DEFAULT = 250 * 1024 * 1024;
   const MIN_HISTORY_LIMIT = 20;
@@ -1901,6 +2825,12 @@
   const DRAW_BUTTON_DRAG_THRESHOLD_TOUCH = 12;
   const MOVE_PAD_REPEAT_DELAY_MS = 220;
   const MOVE_PAD_REPEAT_INTERVAL_MS = 80;
+  const SELECTION_TRANSFORM_ROTATION_STEP_DEG = 15;
+  const SELECTION_TRANSFORM_DRAG_THRESHOLD_PX = 6;
+  const SELECTION_TRANSFORM_HANDLE_HIT_RADIUS_PX = 16;
+  const SELECTION_TRANSFORM_HANDLE_DRAW_RADIUS_PX = 7;
+  const SELECTION_TRANSFORM_PREVIEW_CACHE_MAX_PIXELS = 131072;
+  const MULTI_LAYER_PATCH_DEBOUNCE_MS = 40;
   const TIMELINE_CELL_SIZE = 32;
   const TIMELINE_CELL_VARIANTS = {
     corner: { fill: 'rgba(16, 22, 32, 0.94)', border: 'rgba(210, 220, 240, 0.45)' },
@@ -1930,6 +2860,14 @@
     playback: { fill: 'rgba(120, 150, 190, 0.28)', border: 'rgba(184, 200, 224, 0.6)' },
     playbackActive: { fill: 'rgba(88, 196, 255, 0.36)', border: 'rgba(88, 196, 255, 0.78)' },
     stop: { fill: 'rgba(255, 156, 126, 0.32)', border: 'rgba(255, 181, 152, 0.72)' },
+  };
+  const selectionTransformUi = {
+    handles: [],
+    menuVisible: false,
+    menuHandleId: '',
+    menuLocalX: null,
+    menuLocalY: null,
+    interaction: null,
   };
   const TIMELINE_SELECTION_MODE_NONE = 'none';
   const TIMELINE_SELECTION_MODE_FRAME = 'frame';
@@ -2290,6 +3228,7 @@
       brushShape: requestedBrushShape = BRUSH_SHAPE_SQUARE,
       customBrush: requestedCustomBrush = null,
       floatingPreview: requestedFloatingPreview = null,
+      palettePreset: requestedPalettePreset = NEW_PROJECT_PALETTE_PRESET_DEFAULT,
     } = options || {};
     const width = clamp(
       Math.round(Number(requestedWidth) || preferredWidth || DEFAULT_CANVAS_SIZE),
@@ -2307,13 +3246,15 @@
     const initialHeight = !hasExplicitHeight && height < DEFAULT_CANVAS_SIZE
       ? DEFAULT_CANVAS_SIZE
       : height;
-    const palette = [
-      { r: 0, g: 0, b: 0, a: 0 },
-      { r: 20, g: 20, b: 20, a: 255 },
-      { r: 88, g: 196, b: 255, a: 255 },
-      { r: 255, g: 255, b: 255, a: 255 },
-      { r: 255, g: 96, b: 96, a: 255 },
-    ];
+    const palette = getNewProjectPalettePresetColors(requestedPalettePreset, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+    const maxPaletteIndex = Math.max(0, palette.length - 1);
+    const initialActivePaletteIndex = clamp(2, 0, maxPaletteIndex);
+    const initialSecondaryPaletteIndex = clamp(3, 0, maxPaletteIndex);
+    const initialActiveRgb = normalizeColorValue(
+      palette[initialActivePaletteIndex]
+      || palette[0]
+      || { r: 255, g: 255, b: 255, a: 255 }
+    );
     const customBrush = normalizeCustomBrushData(requestedCustomBrush);
     const requestedShape = normalizeBrushShape(requestedBrushShape, BRUSH_SHAPE_SQUARE);
     const brushShape = requestedShape === BRUSH_SHAPE_CUSTOM && !customBrush
@@ -2357,9 +3298,9 @@
       onionSkin: normalizeOnionSkinState(requestedOnionSkin),
       colorMode: COLOR_MODE_INDEX,
       palette,
-      activePaletteIndex: 2,
-      secondaryPaletteIndex: 3,
-      activeRgb: { r: 88, g: 196, b: 255, a: 255 },
+      activePaletteIndex: initialActivePaletteIndex,
+      secondaryPaletteIndex: initialSecondaryPaletteIndex,
+      activeRgb: initialActiveRgb,
       frames,
       activeFrame: 0,
       activeLayer: frames[0].layers[0].id,
@@ -2717,6 +3658,10 @@
   }
 
   function makeHistorySnapshot({ includeUiState = true, includeSelection = true, clonePixelData = true } = {}) {
+    // Pending selection move/transform keeps source pixels cleared until confirm.
+    // For persistence/reload snapshots we must materialize that preview placement,
+    // so force pixel cloning when a pending move exists.
+    const effectiveClonePixelData = clonePixelData || Boolean(getPendingSelectionMoveState());
     const snapshot = {
       width: state.width,
       height: state.height,
@@ -2737,9 +3682,9 @@
             visible: layer.visible,
             opacity: normalizeLayerOpacity(layer.opacity),
             blendMode: normalizeLayerBlendMode(layer.blendMode),
-            indices: clonePixelData ? new Int16Array(layer.indices) : layer.indices,
+            indices: effectiveClonePixelData ? new Int16Array(layer.indices) : layer.indices,
             direct: layer.direct instanceof Uint8ClampedArray
-              ? (clonePixelData ? new Uint8ClampedArray(layer.direct) : layer.direct)
+              ? (effectiveClonePixelData ? new Uint8ClampedArray(layer.direct) : layer.direct)
               : null,
           })),
         })),
@@ -2781,7 +3726,7 @@
       snapshot.playback = { ...state.playback };
     }
 
-    applyPendingSelectionMoveToSnapshot(snapshot, { includeSelection, clonePixelData });
+    applyPendingSelectionMoveToSnapshot(snapshot, { includeSelection, clonePixelData: effectiveClonePixelData });
     return snapshot;
   }
 
@@ -2855,7 +3800,8 @@
     if (!sourceMask || !sourceIndices || moveWidth <= 0 || moveHeight <= 0) {
       return;
     }
-    if (sourceMask.length !== moveWidth * moveHeight || sourceIndices.length !== moveWidth * moveHeight) {
+    const sourceSize = moveWidth * moveHeight;
+    if (sourceMask.length !== sourceSize || sourceIndices.length !== sourceSize) {
       return;
     }
 
@@ -2882,47 +3828,48 @@
     const offsetY = Math.round(Number(moveState.offset?.y) || 0);
     const originX = Math.round(Number(moveState.bounds.x0) || 0);
     const originY = Math.round(Number(moveState.bounds.y0) || 0);
+    const transformed = buildSelectionMoveTransformedEntries(moveState);
+    const entries = Array.isArray(transformed.entries) ? transformed.entries : [];
     const newMask = new Uint8Array(pixelCount);
     const newBounds = { x0: width, y0: height, x1: -1, y1: -1 };
     let placed = false;
 
-    for (let y = 0; y < moveHeight; y += 1) {
-      for (let x = 0; x < moveWidth; x += 1) {
-        const localIndex = y * moveWidth + x;
-        if (sourceMask[localIndex] !== 1) {
-          continue;
-        }
-        const targetX = originX + x + offsetX;
-        const targetY = originY + y + offsetY;
-        if (targetX < 0 || targetY < 0 || targetX >= width || targetY >= height) {
-          continue;
-        }
-        const targetIndex = targetY * width + targetX;
-        targetIndices[targetIndex] = sourceIndices[localIndex];
-        if (targetDirect) {
-          const targetBase = targetIndex * 4;
-          if (sourceDirect && sourceDirect.length >= (localIndex * 4) + 4) {
-            const localBase = localIndex * 4;
-            targetDirect[targetBase] = sourceDirect[localBase];
-            targetDirect[targetBase + 1] = sourceDirect[localBase + 1];
-            targetDirect[targetBase + 2] = sourceDirect[localBase + 2];
-            targetDirect[targetBase + 3] = sourceDirect[localBase + 3];
-          } else {
-            targetDirect[targetBase] = 0;
-            targetDirect[targetBase + 1] = 0;
-            targetDirect[targetBase + 2] = 0;
-            targetDirect[targetBase + 3] = 0;
-          }
-        }
-        newMask[targetIndex] = 1;
-        if (!placed) {
-          placed = true;
-        }
-        if (targetX < newBounds.x0) newBounds.x0 = targetX;
-        if (targetY < newBounds.y0) newBounds.y0 = targetY;
-        if (targetX > newBounds.x1) newBounds.x1 = targetX;
-        if (targetY > newBounds.y1) newBounds.y1 = targetY;
+    for (let i = 0; i < entries.length; i += 1) {
+      const entry = entries[i];
+      const sourceIndex = Number(entry?.sourceIndex);
+      if (!Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= sourceSize) {
+        continue;
       }
+      const targetX = originX + (Number(entry.x) || 0) + offsetX;
+      const targetY = originY + (Number(entry.y) || 0) + offsetY;
+      if (targetX < 0 || targetY < 0 || targetX >= width || targetY >= height) {
+        continue;
+      }
+      const targetIndex = (targetY * width) + targetX;
+      targetIndices[targetIndex] = sourceIndices[sourceIndex];
+      if (targetDirect) {
+        const targetBase = targetIndex * 4;
+        if (sourceDirect && sourceDirect.length >= (sourceIndex * 4) + 4) {
+          const sourceBase = sourceIndex * 4;
+          targetDirect[targetBase] = sourceDirect[sourceBase];
+          targetDirect[targetBase + 1] = sourceDirect[sourceBase + 1];
+          targetDirect[targetBase + 2] = sourceDirect[sourceBase + 2];
+          targetDirect[targetBase + 3] = sourceDirect[sourceBase + 3];
+        } else {
+          targetDirect[targetBase] = 0;
+          targetDirect[targetBase + 1] = 0;
+          targetDirect[targetBase + 2] = 0;
+          targetDirect[targetBase + 3] = 0;
+        }
+      }
+      newMask[targetIndex] = 1;
+      if (!placed) {
+        placed = true;
+      }
+      if (targetX < newBounds.x0) newBounds.x0 = targetX;
+      if (targetY < newBounds.y0) newBounds.y0 = targetY;
+      if (targetX > newBounds.x1) newBounds.x1 = targetX;
+      if (targetY > newBounds.y1) newBounds.y1 = targetY;
     }
 
     if (!includeSelection) {
@@ -4091,6 +5038,7 @@
   }
 
   function handleAutosavePageHide() {
+    flushPendingTimelapseCapture({ force: true });
     flushAutosaveSnapshotOnLifecycle({ force: true });
     if (isResidentMultiRestrictedMasterMode()) {
       scheduleResidentRoomPersist({ immediate: true, force: true });
@@ -4101,9 +5049,35 @@
     if (document.visibilityState !== 'hidden') {
       return;
     }
+    flushPendingTimelapseCapture({ force: true });
     flushAutosaveSnapshotOnLifecycle({ force: true });
     if (isResidentMultiRestrictedMasterMode()) {
       scheduleResidentRoomPersist({ immediate: true, force: true });
+    }
+  }
+
+  function persistCriticalSessionStateForNavigation() {
+    flushPendingTimelapseCapture({ force: true });
+    flushAutosaveSnapshotOnLifecycle({ force: true });
+    try {
+      persistReloadSessionSnapshot();
+    } catch (error) {
+      // Ignore reload snapshot persistence errors during navigation.
+    }
+    try {
+      persistSessionState();
+    } catch (error) {
+      // Ignore session snapshot persistence errors during navigation.
+    }
+    try {
+      storePendingMultiResumeSession();
+    } catch (error) {
+      // Ignore multi resume persistence errors during navigation.
+    }
+    if (IOS_SNAPSHOT_SUPPORTED) {
+      persistIosSnapshot(true).catch(error => {
+        console.warn('Failed to persist iOS snapshot during navigation', error);
+      });
     }
   }
 
@@ -4182,6 +5156,7 @@
   }
 
   function navigateToPixieedHomeFromBackGuard() {
+    persistCriticalSessionStateForNavigation();
     armMobileBackBeforeUnloadBypass();
     const homeUrl = '../index.html';
     try {
@@ -4224,7 +5199,7 @@
   }
 
   function handleUnsavedBeforeUnload(event) {
-    flushAutosaveSnapshotOnLifecycle({ force: true });
+    persistCriticalSessionStateForNavigation();
     if (consumeMobileBackBeforeUnloadBypass()) {
       return;
     }
@@ -4371,8 +5346,9 @@
             ch.past.push(compressed);
             if (ch.past.length > ch.limit) ch.past.shift();
             ch.future.length = 0;
-          } catch (e) {
-            // ignore per-client history errors
+          } catch (error) {
+            console.warn('Failed to record per-client history. Falling back to global history.', error);
+            history.past.push(beforeSnapshot);
           }
         }
       } else {
@@ -4386,7 +5362,7 @@
           thinTimelapseSnapshotsIfNeeded();
         }
       }
-      captureTimelapseFrameFromState();
+      scheduleTimelapseCaptureFromState();
       if (history.past.length > history.limit) {
         history.past.shift();
       }
@@ -4445,15 +5421,17 @@
         // propagate local-only undo result to peers
         try {
           if (isMultiMasterMode()) {
-            sendMasterLayerPatch();
+            scheduleMasterLayerPatchSend({ immediate: true });
             scheduleMultiPublicLobbyRoomSync({ immediate: false });
           } else {
-            sendGuestLayerPatch();
+            scheduleGuestLayerPatchSend({ immediate: true });
           }
-        } catch (e) { /* ignore */ }
+        } catch (error) {
+          console.warn('Failed to sync undo patch to peers', error);
+        }
       }
-    } catch (e) {
-      // ignore
+    } catch (error) {
+      console.warn('Undo failed in per-client history mode', error);
     }
   }
 
@@ -4498,15 +5476,17 @@
         scheduleAutosaveSnapshot();
         try {
           if (isMultiMasterMode()) {
-            sendMasterLayerPatch();
+            scheduleMasterLayerPatchSend({ immediate: true });
             scheduleMultiPublicLobbyRoomSync({ immediate: false });
           } else {
-            sendGuestLayerPatch();
+            scheduleGuestLayerPatchSend({ immediate: true });
           }
-        } catch (e) { /* ignore */ }
+        } catch (error) {
+          console.warn('Failed to sync redo patch to peers', error);
+        }
       }
-    } catch (e) {
-      // ignore
+    } catch (error) {
+      console.warn('Redo failed in per-client history mode', error);
     }
   }
 
@@ -6499,7 +7479,7 @@
     if (state.selectSameMode !== activeMode) {
       state.selectSameMode = activeMode;
     }
-    const shouldShow = state.tool === 'selectSame';
+    const shouldShow = state.tool === 'selectSame' || state.tool === 'fill';
     if (dom.controls.selectSameModeField instanceof HTMLElement) {
       dom.controls.selectSameModeField.hidden = !shouldShow;
       dom.controls.selectSameModeField.setAttribute('aria-hidden', String(!shouldShow));
@@ -7008,7 +7988,7 @@
     setLocalizedTextContent('#brushShapeButtons [data-brush-shape="square"] span', '四角', 'Square');
     setLocalizedTextContent('#brushShapeButtons [data-brush-shape="circle"] span', '丸', 'Circle');
     setLocalizedTextContent('#brushShapeButtons [data-brush-shape="custom"] span', 'カスタム', 'Custom');
-    setLocalizedTextContent('#selectSameModeField > span', '同色選択モード', 'Same Color Mode');
+    setLocalizedTextContent('#selectSameModeField > span', '同色モード', 'Same Color Mode');
     setLocalizedTextContent('#selectSameModeField [data-select-same-mode="connected"]', '連結のみ', 'Connected');
     setLocalizedTextContent('#selectSameModeField [data-select-same-mode="global"]', '全体', 'Global');
   }
@@ -7017,11 +7997,11 @@
     setDocumentLanguage();
 
     if (dom.controls.toggleLanguageMode instanceof HTMLButtonElement) {
-      const switchLabel = isEnglishUi() ? '日本語' : 'English';
+      const switchLabel = 'あ/A';
       dom.controls.toggleLanguageMode.textContent = switchLabel;
       dom.controls.toggleLanguageMode.setAttribute(
         'aria-label',
-        isEnglishUi() ? '日本語に切り替え' : 'Switch to English'
+        isEnglishUi() ? 'Switch language (A/あ)' : '言語を切り替え（A/あ）'
       );
     }
 
@@ -7068,6 +8048,11 @@
     setLocalizedAttribute('#playAnimation', 'aria-label', '再生', 'Play');
     setLocalizedAttribute('#stopAnimation', 'aria-label', '停止', 'Stop');
     setLocalizedAttribute('#forwardAnimation', 'aria-label', '次のフレームへ', 'Next frame');
+    setLocalizedAttribute('#selectionTransformMenu', 'aria-label', '範囲選択の反転メニュー', 'Selection Flip Menu');
+    setLocalizedAttribute('#selectionFlipHorizontal', 'aria-label', '選択範囲を左右反転', 'Flip selection horizontally');
+    setLocalizedAttribute('#selectionFlipVertical', 'aria-label', '選択範囲を上下反転', 'Flip selection vertically');
+    setLocalizedTextContent('#selectionFlipHorizontal', '左右反転', 'Flip H');
+    setLocalizedTextContent('#selectionFlipVertical', '上下反転', 'Flip V');
     setLocalizedAttribute('#applyFpsAll', 'aria-label', '全フレームに現在の fps を適用', 'Apply current fps to all frames');
     setLocalizedAttribute('#timelineLayerSettings', 'aria-label', '選択中レイヤー設定', 'Selected Layer Settings');
     setLocalizedAttribute('#timelineFrameSettings', 'aria-label', '選択中フレーム設定', 'Selected Frame Settings');
@@ -7177,6 +8162,19 @@
     setLocalizedTextContent('#colorModeIndexLabel', 'インデックスカラー', 'Indexed Color');
     setLocalizedTextContent('#colorModeRgbLabel', 'RGBカラー', 'RGB Color');
     setLocalizedTextContent('#settingsColorModeHint', 'インデックスカラーとRGBカラーを切り替えます。', 'Switch between Indexed Color and RGB Color.');
+    setLocalizedTextContent('#sortPaletteHue', '色相', 'Hue');
+    setLocalizedTextContent('#sortPaletteSaturation', '彩度', 'Sat');
+    setLocalizedTextContent('#sortPaletteValue', '明度', 'Value');
+    setLocalizedAttribute('#sortPaletteHue', 'aria-label', '色相順でソート', 'Sort by hue');
+    setLocalizedAttribute('#sortPaletteSaturation', 'aria-label', '彩度順でソート', 'Sort by saturation');
+    setLocalizedAttribute('#sortPaletteValue', 'aria-label', '明度順でソート', 'Sort by value');
+    setLocalizedControlLabel('palettePresetSelect', 'プリセット', 'Preset');
+    setLocalizedAttribute('#palettePresetPickerButton', 'aria-label', 'パレットプリセットを選択', 'Choose palette preset');
+    setLocalizedAttribute('#palettePresetPickerMenu', 'aria-label', 'プリセット一覧', 'Preset list');
+    setLocalizedAttribute('#newProjectPalettePresetPickerButton', 'aria-label', '新規作成のパレットプリセットを選択', 'Choose new project palette preset');
+    setLocalizedAttribute('#newProjectPalettePresetPickerMenu', 'aria-label', '新規作成プリセット一覧', 'New project preset list');
+    renderColorPanelPalettePresetOptions(dom.controls.palettePresetSelect?.value || newProjectPalettePresetId);
+    renderPalettePresetPreview(dom.controls.palettePresetSelect?.value || newProjectPalettePresetId);
     setLocalizedAttribute('#panelSettings .field.field--list[role="group"]', 'aria-label', '表示設定', 'Display Settings');
     setLocalizedToggleLabel('toggleGrid', 'グリッド', 'Grid');
     setLocalizedToggleLabel('toggleMajorGrid', 'メジャー', 'Major');
@@ -7252,7 +8250,7 @@
     setLocalizedTextContent('#exportGridSettings > span', 'グリッド分割 (PNG)', 'Grid Split (PNG)');
     setLocalizedControlLabel('exportGridWidth', '幅 (px)', 'Width (px)');
     setLocalizedControlLabel('exportGridHeight', '高さ (px)', 'Height (px)');
-    setLocalizedTextContent('#exportGridHint', '分割順: 右上から左へ、次の段へ進みます（右→左、上→下）。', 'Split order: starts at top-right, moves right-to-left, then top-to-bottom.');
+    setLocalizedTextContent('#exportGridHint', '分割順: 右上から左へ、次の段へ進みます（右→左、上→下）。分割サイズは原寸px基準です。', 'Split order: starts at top-right, moves right-to-left, then top-to-bottom. Split size uses source pixels.');
     setLocalizedTextContent('#confirmExport', '保存/出力', 'Save / Export');
     setLocalizedTextContent('#cancelExport', 'キャンセル', 'Cancel');
     setLocalizedTextContent('#exportAdContainer .export-ad__label', '広告', 'Ad');
@@ -7267,7 +8265,18 @@
     setLocalizedTextContent('.new-project__size-fields > span', 'キャンバスサイズ', 'Canvas Size');
     setLocalizedControlLabel('newProjectWidth', '横', 'W');
     setLocalizedControlLabel('newProjectHeight', '縦', 'H');
-    setLocalizedTextContent('#newProjectExportFolderGuide', '作成時に画像/GIFの保存先フォルダを確認します（対応ブラウザのみ）。', 'When creating, you can choose a fixed folder for image/GIF exports (supported browsers only).');
+    setLocalizedTextContent('.new-project__palette-field > span', 'パレットプリセット', 'Palette Preset');
+    renderNewProjectPalettePresetOptions(newProjectPalettePresetId);
+    renderNewProjectPalettePresetPicker(newProjectPalettePresetId);
+    setLocalizedTextContent('.new-project__export-folder-field > span', '画像/GIF保存先', 'Image/GIF Save Folder');
+    setLocalizedTextContent('#newProjectBindExportFolder', '保存先フォルダを設定', 'Set export folder');
+    setLocalizedAttribute('#newProjectBindExportFolder', 'aria-label', '新規プロジェクトの保存先フォルダを指定', 'Choose folder for new project exports');
+    setLocalizedAttribute('#newProjectExportDestinationLabel', 'aria-label', '新規プロジェクトの現在の保存先', 'Current destination for new project exports');
+    setLocalizedTextContent(
+      '#newProjectExportFolderGuide',
+      '必要な場合のみ保存先フォルダを指定できます。指定しない場合は現在の設定（未設定を含む）を使います。',
+      'Set an export folder only when needed. If you skip it, the current setting (including unset) will be used.'
+    );
     setLocalizedTextContent('#cancelNewProject', 'キャンセル', 'Cancel');
     setLocalizedTextContent('#confirmNewProject', '作成', 'Create');
 
@@ -7410,6 +8419,116 @@
     return '';
   }
 
+  function parseAutosaveTabLockPayload(raw) {
+    if (typeof raw !== 'string' || !raw.trim()) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') {
+        return null;
+      }
+      const owner = typeof parsed.owner === 'string' ? parsed.owner : '';
+      const expiresAt = Number(parsed.expiresAt);
+      if (!owner || !Number.isFinite(expiresAt)) {
+        return null;
+      }
+      return {
+        owner,
+        expiresAt: Math.round(expiresAt),
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function readAutosaveTabLock() {
+    if (!canUseSessionStorage) {
+      return null;
+    }
+    try {
+      return parseAutosaveTabLockPayload(window.localStorage.getItem(AUTOSAVE_TAB_LOCK_KEY) || '');
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function tryAcquireAutosaveTabLock() {
+    if (!canUseSessionStorage) {
+      return true;
+    }
+    const now = Date.now();
+    const current = readAutosaveTabLock();
+    if (
+      current
+      && current.owner !== autosaveTabInstanceId
+      && current.expiresAt > now
+    ) {
+      return false;
+    }
+    const nextLock = {
+      owner: autosaveTabInstanceId,
+      expiresAt: now + AUTOSAVE_TAB_LOCK_TTL_MS,
+    };
+    try {
+      window.localStorage.setItem(AUTOSAVE_TAB_LOCK_KEY, JSON.stringify(nextLock));
+      const verified = readAutosaveTabLock();
+      return Boolean(verified && verified.owner === autosaveTabInstanceId && verified.expiresAt === nextLock.expiresAt);
+    } catch (error) {
+      return true;
+    }
+  }
+
+  function releaseAutosaveTabLock() {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    const lock = readAutosaveTabLock();
+    if (!lock || lock.owner !== autosaveTabInstanceId) {
+      return;
+    }
+    try {
+      window.localStorage.removeItem(AUTOSAVE_TAB_LOCK_KEY);
+    } catch (error) {
+      // Ignore localStorage errors.
+    }
+  }
+
+  function shouldAnnounceAutosaveTabLockWait() {
+    const now = Date.now();
+    if ((now - autosaveTabLockNoticeAt) < AUTOSAVE_TAB_LOCK_NOTICE_THROTTLE_MS) {
+      return false;
+    }
+    autosaveTabLockNoticeAt = now;
+    return true;
+  }
+
+  function handleAutosaveStorageEvent(event) {
+    if (
+      !AUTOSAVE_SUPPORTED
+      || (typeof StorageEvent !== 'undefined' && !(event instanceof StorageEvent))
+    ) {
+      return;
+    }
+    if (event.key !== AUTOSAVE_TAB_LOCK_KEY) {
+      return;
+    }
+    if (autosaveWriteInFlight) {
+      return;
+    }
+    if (!autosaveDirty && !autosaveWriteQueued) {
+      return;
+    }
+    if (!event.newValue) {
+      scheduleAutosaveSnapshot();
+      return;
+    }
+    const nextLock = parseAutosaveTabLockPayload(event.newValue);
+    if (!nextLock || nextLock.owner === autosaveTabInstanceId || nextLock.expiresAt <= Date.now()) {
+      scheduleAutosaveSnapshot();
+    }
+  }
+
   function setupAutosaveControls() {
     const button = dom.controls.enableAutosave;
     if (!button) return;
@@ -7516,6 +8635,7 @@
     const labelNodes = [
       dom.controls.exportDestinationLabel,
       dom.exportDialog?.destinationLabel,
+      dom.newProject?.exportDestinationLabel,
     ];
     labelNodes.forEach(node => {
       if (node instanceof HTMLElement) {
@@ -7541,27 +8661,47 @@
   }
 
   function updateExportFolderButtonLabel() {
-    const button = dom.controls.bindExportFolder;
-    if (!(button instanceof HTMLButtonElement)) {
+    const buttons = [dom.controls.bindExportFolder, dom.newProject?.bindExportFolder];
+    if (!buttons.length) {
       return;
     }
     if (!EXPORT_DIRECTORY_SUPPORTED) {
-      button.hidden = true;
-      button.disabled = true;
-      button.textContent = localizeText('出力先固定を使用しない', 'Disable fixed export destination');
+      buttons.forEach(button => {
+        if (!(button instanceof HTMLButtonElement)) {
+          return;
+        }
+        const isNewProjectButton = button === dom.newProject?.bindExportFolder;
+        button.hidden = true;
+        button.disabled = true;
+        button.textContent = isNewProjectButton
+          ? localizeText('保存先固定を使用しない', 'Disable fixed save destination')
+          : localizeText('出力先固定を使用しない', 'Disable fixed export destination');
+      });
       return;
     }
-    button.hidden = false;
-    button.disabled = false;
-    if (exportDirectoryHandle) {
-      button.textContent = localizeText('出力フォルダを変更', 'Change export folder');
-      return;
-    }
-    if (pendingExportDirectoryHandle) {
-      button.textContent = localizeText('出力フォルダを再許可', 'Reauthorize export folder');
-      return;
-    }
-    button.textContent = localizeText('出力フォルダを設定', 'Set export folder');
+    buttons.forEach(button => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      const isNewProjectButton = button === dom.newProject?.bindExportFolder;
+      button.hidden = false;
+      button.disabled = false;
+      if (exportDirectoryHandle) {
+        button.textContent = isNewProjectButton
+          ? localizeText('保存先フォルダを変更', 'Change save folder')
+          : localizeText('出力フォルダを変更', 'Change export folder');
+        return;
+      }
+      if (pendingExportDirectoryHandle) {
+        button.textContent = isNewProjectButton
+          ? localizeText('保存先フォルダを再許可', 'Reauthorize save folder')
+          : localizeText('出力フォルダを再許可', 'Reauthorize export folder');
+        return;
+      }
+      button.textContent = isNewProjectButton
+        ? localizeText('保存先フォルダを指定', 'Choose save folder')
+        : localizeText('出力フォルダを設定', 'Set export folder');
+    });
   }
 
   async function ensureExportWorkspaceDirectory(handle) {
@@ -7681,8 +8821,11 @@
   }
 
   function setupExportDirectoryControls() {
-    const button = dom.controls.bindExportFolder;
-    if (!(button instanceof HTMLButtonElement)) {
+    const buttons = [
+      dom.controls.bindExportFolder,
+      dom.newProject?.bindExportFolder,
+    ].filter(button => button instanceof HTMLButtonElement);
+    if (!buttons.length) {
       updateExportDestinationLabel();
       return;
     }
@@ -7698,19 +8841,21 @@
       );
       return;
     }
-    if (button.dataset.bound === 'true') {
-      return;
-    }
-    button.dataset.bound = 'true';
-    button.addEventListener('click', async () => {
-      exportDirectorySetupDismissed = false;
-      if (pendingExportDirectoryHandle && !exportDirectoryHandle) {
-        const restored = await attemptExportDirectoryReauthorization();
-        if (restored) {
-          return;
-        }
+    buttons.forEach(button => {
+      if (button.dataset.bound === 'true') {
+        return;
       }
-      await requestExportDirectoryBinding();
+      button.dataset.bound = 'true';
+      button.addEventListener('click', async () => {
+        exportDirectorySetupDismissed = false;
+        if (pendingExportDirectoryHandle && !exportDirectoryHandle) {
+          const restored = await attemptExportDirectoryReauthorization();
+          if (restored) {
+            return;
+          }
+        }
+        await requestExportDirectoryBinding();
+      });
     });
   }
 
@@ -7931,6 +9076,20 @@
       scheduleAutosaveSnapshot();
       return false;
     }
+    if (!tryAcquireAutosaveTabLock()) {
+      autosaveWriteQueued = true;
+      scheduleAutosaveSnapshot();
+      if (shouldAnnounceAutosaveTabLockWait()) {
+        updateAutosaveStatus(
+          localizeText(
+            '自動保存: 別タブが保存中のため待機しています',
+            'Autosave: waiting while another tab is saving'
+          ),
+          'info'
+        );
+      }
+      return false;
+    }
     autosaveWriteInFlight = true;
     autosaveWriteQueued = false;
     try {
@@ -7966,6 +9125,7 @@
       throw error;
     } finally {
       autosaveWriteInFlight = false;
+      releaseAutosaveTabLock();
       if (autosaveWriteQueued || autosaveDirty) {
         autosaveWriteQueued = false;
         scheduleAutosaveSnapshot();
@@ -8221,6 +9381,21 @@
       return iosSnapshotDbPromise;
     }
     iosSnapshotDbPromise = new Promise((resolve, reject) => {
+      let settled = false;
+      const resolveOnce = (value) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        resolve(value);
+      };
+      const rejectOnce = (error) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        reject(error);
+      };
       const request = window.indexedDB.open(IOS_SNAPSHOT_DB_NAME, IOS_SNAPSHOT_DB_VERSION);
       request.onupgradeneeded = event => {
         const database = event.target.result;
@@ -8233,17 +9408,31 @@
             database.close();
           };
         }
-        resolve(database);
+        resolveOnce(database);
       };
       request.onerror = () => {
-        reject(request.error || new Error('Failed to open iOS snapshot database'));
+        rejectOnce(request.error || new Error('Failed to open iOS snapshot database'));
       };
       request.onblocked = () => {
-        console.warn('iOS snapshot database upgrade is blocked by another tab');
+        rejectOnce(new Error('iOS snapshot database is blocked by another tab'));
       };
     })
       .catch(error => {
         console.warn('Failed to initialise iOS snapshot database', error);
+        if (
+          error
+          && /blocked/i.test(String(error?.message || ''))
+          && (Date.now() - iosSnapshotBlockedNoticeAt) > 3000
+        ) {
+          iosSnapshotBlockedNoticeAt = Date.now();
+          updateAutosaveStatus(
+            localizeText(
+              'iOS復元: 別タブで同時に開かれているため一時保存を保留しています',
+              'iOS restore: snapshot save is paused because another tab is open'
+            ),
+            'warn'
+          );
+        }
         iosSnapshotDbPromise = null;
         return null;
       });
@@ -10407,6 +11596,45 @@
     updateMemoryStatus();
   }
 
+  function flushPendingTimelapseCapture({ force = false } = {}) {
+    const queued = timelapseCaptureQueued;
+    const hasMissingCapture = timelapseState.lastCaptureToken !== unsavedChangeToken;
+    if (timelapseCaptureTimer !== null) {
+      window.clearTimeout(timelapseCaptureTimer);
+      timelapseCaptureTimer = null;
+    }
+    if (!queued && !hasMissingCapture && !force) {
+      return false;
+    }
+    timelapseCaptureQueued = false;
+    if (!timelapseState.enabled) {
+      return false;
+    }
+    if (!queued && !hasMissingCapture) {
+      return false;
+    }
+    captureTimelapseFrameFromState();
+    return true;
+  }
+
+  function scheduleTimelapseCaptureFromState({ immediate = false } = {}) {
+    if (!timelapseState.enabled) {
+      return;
+    }
+    timelapseCaptureQueued = true;
+    if (immediate) {
+      flushPendingTimelapseCapture();
+      return;
+    }
+    if (timelapseCaptureTimer !== null) {
+      return;
+    }
+    timelapseCaptureTimer = window.setTimeout(() => {
+      timelapseCaptureTimer = null;
+      flushPendingTimelapseCapture();
+    }, TIMELAPSE_CAPTURE_DEBOUNCE_MS);
+  }
+
   function syncTimelapseControls() {
     const stepCount = timelapseState.snapshots.length;
     const fps = normalizeTimelapseFps(timelapseState.fps);
@@ -10434,6 +11662,11 @@
   }
 
   function clearTimelapseRecording({ silent = false } = {}) {
+    if (timelapseCaptureTimer !== null) {
+      window.clearTimeout(timelapseCaptureTimer);
+      timelapseCaptureTimer = null;
+    }
+    timelapseCaptureQueued = false;
     timelapseState.snapshots.length = 0;
     timelapseState.warningShown = false;
     timelapseState.sampleStep = 1;
@@ -10456,8 +11689,12 @@
       const shouldCaptureStart = timelapseState.snapshots.length === 0
         || timelapseState.lastCaptureToken !== unsavedChangeToken;
       if (shouldCaptureStart) {
-        captureTimelapseFrameFromState();
+        scheduleTimelapseCaptureFromState({ immediate: true });
       }
+    } else if (timelapseCaptureTimer !== null) {
+      window.clearTimeout(timelapseCaptureTimer);
+      timelapseCaptureTimer = null;
+      timelapseCaptureQueued = false;
     }
     syncTimelapseControls();
     updateAutosaveStatus(
@@ -10493,6 +11730,7 @@
   }
 
   function buildTimelapseExportEntries() {
+    flushPendingTimelapseCapture();
     const snapshots = timelapseState.snapshots.slice();
     if (timelapseState.enabled && timelapseState.lastCaptureToken !== unsavedChangeToken) {
       const current = createTimelapseFrameEntryFromState();
@@ -10791,6 +12029,16 @@
       if (config.heightInput) {
         config.heightInput.value = String(state.height);
       }
+      if (config.palettePreset) {
+        const normalizedPreset = normalizeNewProjectPalettePreset(
+          newProjectPalettePresetId,
+          NEW_PROJECT_PALETTE_PRESET_DEFAULT
+        );
+        renderNewProjectPalettePresetOptions(normalizedPreset);
+        config.palettePreset.value = normalizedPreset;
+        renderNewProjectPalettePresetPicker(normalizedPreset);
+        setNewProjectPalettePresetPickerOpen(false);
+      }
       dialog.showModal();
       window.requestAnimationFrame(() => {
         config.nameInput?.focus();
@@ -11019,6 +12267,7 @@
   }
 
   function closeNewProjectDialog() {
+    setNewProjectPalettePresetPickerOpen(false);
     const dialog = dom.newProject?.dialog;
     if (dialog && dialog.open) {
       dialog.close();
@@ -11036,13 +12285,15 @@
     const name = normalizeDocumentName(rawName);
     const widthValue = config?.widthInput?.value;
     const heightValue = config?.heightInput?.value;
+    const palettePresetValue = config?.palettePreset?.value;
     const width = Number(widthValue);
     const height = Number(heightValue);
     const created = await createNewProject({
       name,
       width,
       height,
-      promptExportDirectory: true,
+      palettePreset: palettePresetValue,
+      promptExportDirectory: false,
     });
     if (created) {
       if (config?.nameInput) {
@@ -11067,7 +12318,7 @@
       name,
       width,
       height,
-      promptExportDirectory: true,
+      promptExportDirectory: false,
     }))) {
       window.alert(`キャンバスサイズは${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE}の数値で入力してください。`);
     }
@@ -11106,7 +12357,13 @@
     }
   }
 
-  async function createNewProject({ name, width, height, promptExportDirectory = false }) {
+  async function createNewProject({
+    name,
+    width,
+    height,
+    palettePreset = newProjectPalettePresetId,
+    promptExportDirectory = false,
+  }) {
     const widthNumber = lockedCanvasWidth !== null ? lockedCanvasWidth : Number(width);
     const heightNumber = lockedCanvasHeight !== null ? lockedCanvasHeight : Number(height);
     if (!Number.isFinite(widthNumber) || !Number.isFinite(heightNumber)) {
@@ -11121,11 +12378,17 @@
     }
     const clampedWidth = clamp(Math.round(widthNumber), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
     const clampedHeight = clamp(Math.round(heightNumber), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    const normalizedPalettePreset = normalizeNewProjectPalettePreset(
+      palettePreset,
+      newProjectPalettePresetId || NEW_PROJECT_PALETTE_PRESET_DEFAULT
+    );
+    setNewProjectPalettePresetId(normalizedPalettePreset);
     const snapshot = createInitialState({
       width: clampedWidth,
       height: clampedHeight,
       name,
       uiTheme: state.uiTheme,
+      palettePreset: normalizedPalettePreset,
     });
 
     applyHistorySnapshot(snapshot);
@@ -11705,6 +12968,7 @@
   }
 
   function serializeProjectTimelapseSnapshots() {
+    flushPendingTimelapseCapture({ force: true });
     if (!Array.isArray(timelapseState.snapshots) || !timelapseState.snapshots.length) {
       return [];
     }
@@ -13340,10 +14604,10 @@
       exportGridTileHeight = normalizeExportGridTileSize(exportGridTileHeight, 8);
       syncExportGridInputs();
       const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
-      const outputWidth = Math.max(1, width * selectedScale);
-      const outputHeight = Math.max(1, height * selectedScale);
-      const rowSegments = buildGridRowSegmentsTopToBottom(outputHeight, exportGridTileHeight);
-      const columnSegments = buildGridColumnSegmentsRightToLeft(outputWidth, exportGridTileWidth);
+      // Grid split size is defined in source pixels, then mapped to export scale.
+      // This keeps tile count stable even when export scale is > 1.
+      const rowSegments = buildGridRowSegmentsTopToBottom(height, exportGridTileHeight);
+      const columnSegments = buildGridColumnSegmentsRightToLeft(width, exportGridTileWidth);
       const tileCountPerFrame = rowSegments.length * columnSegments.length;
       if (!tileCountPerFrame) {
         updateAutosaveStatus('分割サイズの設定が無効です', 'warn');
@@ -13373,12 +14637,16 @@
           for (let columnIndex = 0; columnIndex < columnSegments.length; columnIndex += 1) {
             const columnSegment = columnSegments[columnIndex];
             const columnNumber = String(columnIndex + 1).padStart(columnDigits, '0');
+            const exportX = columnSegment.start * selectedScale;
+            const exportY = rowSegment.start * selectedScale;
+            const exportWidth = columnSegment.size * selectedScale;
+            const exportHeight = rowSegment.size * selectedScale;
             const blob = await canvasRegionToBlob(
               outputCanvas,
-              columnSegment.start,
-              rowSegment.start,
-              columnSegment.size,
-              rowSegment.size,
+              exportX,
+              exportY,
+              exportWidth,
+              exportHeight,
               'image/png'
             );
             let suffix = `frame_${frameNumber}_tile_r${rowNumber}_c${columnNumber}`;
@@ -18481,7 +19749,29 @@
       return;
     }
     const mirrorState = getNormalizedMirrorState();
-    mirrorState.axes[axis] = Boolean(enabled);
+    const nextEnabled = Boolean(enabled);
+    if (!nextEnabled) {
+      const activeAxisCount = MIRROR_AXIS_KEYS.reduce(
+        (count, key) => count + (mirrorState.axes[key] ? 1 : 0),
+        0
+      );
+      const isLastActiveAxis = activeAxisCount <= 1 && Boolean(mirrorState.axes[axis]);
+      if (isLastActiveAxis) {
+        mirrorState.axes[axis] = true;
+        mirrorState.enabled = true;
+        state.mirror = mirrorState;
+        if (syncControls) {
+          syncControlsWithState();
+        }
+        updateAutosaveStatus(
+          localizeText('ミラーモードは最低1つの対称軸が必要です', 'Mirror mode requires at least one active axis'),
+          'info'
+        );
+        requestOverlayRender();
+        return;
+      }
+    }
+    mirrorState.axes[axis] = nextEnabled;
     mirrorState.enabled = hasActiveMirrorAxes(mirrorState);
     state.mirror = mirrorState;
     if (syncControls) {
@@ -20167,6 +21457,9 @@
     if (tool !== 'curve') {
       resetCurveBuilder();
     }
+    if (!(tool === 'move' || tool === 'selectRect' || tool === 'selectLasso' || tool === 'selectSame')) {
+      hideSelectionTransformMenu();
+    }
     if (!pointerState.active) {
       const toolChanged = pointerState.tool !== tool;
       const hadPreview = Boolean(pointerState.preview || pointerState.selectionPreview || pointerState.selectionMove);
@@ -20235,6 +21528,10 @@
     return !isMultiSpectatorMode();
   }
 
+  function isMultiPaletteIsolationEnabled() {
+    return Boolean(multiState.connected);
+  }
+
   function canCurrentClientReindexPalette() {
     return !isMultiGuestMode() && !isMultiSpectatorMode();
   }
@@ -20273,6 +21570,7 @@
     const allowColorPicking = canCurrentClientEditPaletteColors();
     const allowPaletteColorEditing = allowColorPicking;
     const allowPaletteReindex = isIndexMode && canCurrentClientReindexPalette();
+    const allowPaletteSorting = canCurrentClientReindexPalette();
     if (dom.controls.addPaletteColor instanceof HTMLButtonElement) {
       dom.controls.addPaletteColor.disabled = !allowPaletteColorEditing;
     }
@@ -20297,6 +21595,27 @@
     }
     if (dom.controls.paletteWheelWrapper instanceof HTMLElement) {
       dom.controls.paletteWheelWrapper.classList.toggle('is-disabled', !allowColorPicking);
+    }
+    if (dom.controls.palettePresetSelect instanceof HTMLSelectElement) {
+      dom.controls.palettePresetSelect.disabled = !allowColorPicking;
+    }
+    if (dom.controls.palettePresetPickerButton instanceof HTMLButtonElement) {
+      dom.controls.palettePresetPickerButton.disabled = !allowColorPicking;
+      if (!allowColorPicking) {
+        setPalettePresetPickerOpen(false);
+      }
+    }
+    if (dom.controls.applyPalettePreset instanceof HTMLButtonElement) {
+      dom.controls.applyPalettePreset.disabled = !allowColorPicking;
+    }
+    if (dom.controls.sortPaletteHue instanceof HTMLButtonElement) {
+      dom.controls.sortPaletteHue.disabled = !allowPaletteSorting;
+    }
+    if (dom.controls.sortPaletteSaturation instanceof HTMLButtonElement) {
+      dom.controls.sortPaletteSaturation.disabled = !allowPaletteSorting;
+    }
+    if (dom.controls.sortPaletteValue instanceof HTMLButtonElement) {
+      dom.controls.sortPaletteValue.disabled = !allowPaletteSorting;
     }
     const paletteIndexField = document.getElementById('paletteIndexField');
     if (paletteIndexField instanceof HTMLElement) {
@@ -20370,6 +21689,69 @@
     return { convertedPixels, addedCount, touchedLayers, paletteLookup };
   }
 
+  function remapDocumentIndexedPixelsToDirect() {
+    const palette = Array.isArray(state.palette) ? state.palette : [];
+    let convertedPixels = 0;
+    let touchedLayers = 0;
+    if (!Array.isArray(state.frames)) {
+      return { convertedPixels, touchedLayers };
+    }
+    state.frames.forEach(frame => {
+      const layers = Array.isArray(frame?.layers) ? frame.layers : [];
+      layers.forEach(layer => {
+        if (!(layer?.indices instanceof Int16Array)) {
+          return;
+        }
+        const indices = layer.indices;
+        if (!indices.length) {
+          return;
+        }
+        const direct = ensureLayerDirect(layer);
+        let layerTouched = false;
+        for (let i = 0; i < indices.length; i += 1) {
+          const paletteIndex = indices[i];
+          if (paletteIndex < 0) {
+            continue;
+          }
+          const base = i * 4;
+          const paletteColor = palette[paletteIndex];
+          if (paletteColor) {
+            const normalized = normalizeColorValue(paletteColor);
+            direct[base] = normalized.r;
+            direct[base + 1] = normalized.g;
+            direct[base + 2] = normalized.b;
+            direct[base + 3] = normalized.a;
+          } else {
+            direct[base] = 0;
+            direct[base + 1] = 0;
+            direct[base + 2] = 0;
+            direct[base + 3] = 0;
+          }
+          indices[i] = -1;
+          convertedPixels += 1;
+          layerTouched = true;
+        }
+        if (layerTouched) {
+          touchedLayers += 1;
+        }
+      });
+    });
+    return { convertedPixels, touchedLayers };
+  }
+
+  function convertIndexedDocumentToDirectForMultiPalette() {
+    if (!isMultiPaletteIsolationEnabled()) {
+      return { convertedPixels: 0, touchedLayers: 0 };
+    }
+    const result = remapDocumentIndexedPixelsToDirect();
+    if ((result?.convertedPixels || 0) > 0) {
+      requestRender();
+      requestOverlayRender();
+      scheduleSessionPersist();
+    }
+    return result;
+  }
+
   function mapActiveRgbToIndexedPalette(paletteLookup = null) {
     if (!Array.isArray(state.palette)) {
       state.palette = [];
@@ -20394,6 +21776,130 @@
     return { addedCount, activePaletteIndex: state.activePaletteIndex };
   }
 
+  function reserveUniquePaletteColor(baseColor, usedKeys, salt = 0, { allowTransparent = false } = {}) {
+    const keys = usedKeys instanceof Set ? usedKeys : new Set();
+    let candidate = normalizeColorValue(baseColor);
+    let attempt = 0;
+    while (attempt < 2048) {
+      const key = getPaletteColorKey(candidate);
+      if (!keys.has(key)) {
+        keys.add(key);
+        return candidate;
+      }
+      attempt += 1;
+      if (allowTransparent && candidate.a <= 0) {
+        candidate = { r: 0, g: 0, b: 0, a: 0 };
+        continue;
+      }
+      if (candidate.a <= 0) {
+        candidate.a = 255;
+      }
+      const hsv = rgbaToHsv(candidate);
+      const hue = (hsv.h + 23 + (salt * 11) + (attempt * 17)) % 360;
+      const saturation = clamp(
+        hsv.s + ((((salt + attempt) % 7) - 3) * 0.06),
+        0.2,
+        1
+      );
+      const value = clamp(
+        hsv.v + ((((salt + attempt) % 9) - 4) * 0.05),
+        0.12,
+        1
+      );
+      const shifted = hsvToRgba(hue, saturation, value);
+      shifted.a = clamp(Math.round(candidate.a), 1, 255);
+      candidate = normalizeColorValue(shifted);
+    }
+    let fallback = normalizeColorValue({
+      r: (37 * (salt + 3)) % 256,
+      g: (91 * (salt + 5)) % 256,
+      b: (157 * (salt + 7)) % 256,
+      a: allowTransparent ? 0 : 255,
+    });
+    let fallbackKey = getPaletteColorKey(fallback);
+    let fallbackAttempt = 0;
+    while (keys.has(fallbackKey) && fallbackAttempt < 4096) {
+      fallbackAttempt += 1;
+      fallback = normalizeColorValue({
+        r: (fallback.r + 37 + (fallbackAttempt % 23)) % 256,
+        g: (fallback.g + 59 + (fallbackAttempt % 29)) % 256,
+        b: (fallback.b + 83 + (fallbackAttempt % 31)) % 256,
+        a: fallback.a <= 0 ? 255 : fallback.a,
+      });
+      fallbackKey = getPaletteColorKey(fallback);
+    }
+    keys.add(fallbackKey);
+    return fallback;
+  }
+
+  function getPresetBasedPaletteAddColor(presetId = (dom.controls.palettePresetSelect?.value || newProjectPalettePresetId)) {
+    const normalizedPresetId = normalizeNewProjectPalettePreset(
+      presetId,
+      newProjectPalettePresetId || NEW_PROJECT_PALETTE_PRESET_DEFAULT
+    );
+    const presetColors = getNewProjectPalettePresetColors(normalizedPresetId, NEW_PROJECT_PALETTE_PRESET_DEFAULT)
+      .map(color => normalizeColorValue(color));
+    const usedKeys = new Set(buildPaletteColorLookup(state.palette).keys());
+    const opaquePresetColors = presetColors.filter(color => color.a > 0);
+    const paletteBase = opaquePresetColors.length ? opaquePresetColors : presetColors;
+    if (paletteBase.length) {
+      const startIndex = ((state.palette?.length || 0) % paletteBase.length + paletteBase.length) % paletteBase.length;
+      for (let offset = 0; offset < paletteBase.length; offset += 1) {
+        const candidate = normalizeColorValue(paletteBase[(startIndex + offset) % paletteBase.length]);
+        if (candidate.a <= 0) {
+          continue;
+        }
+        const key = getPaletteColorKey(candidate);
+        if (!usedKeys.has(key)) {
+          usedKeys.add(key);
+          return candidate;
+        }
+      }
+    }
+    const fallbackBase = normalizeColorValue(
+      paletteBase[0]
+      || state.palette?.[state.activePaletteIndex]
+      || state.activeRgb
+      || { r: 88, g: 196, b: 255, a: 255 }
+    );
+    return reserveUniquePaletteColor(
+      fallbackBase,
+      usedKeys,
+      (state.palette?.length || 0) + state.activePaletteIndex + 1,
+      { allowTransparent: false }
+    );
+  }
+
+  function dedupeIndexedPaletteColors() {
+    if (!Array.isArray(state.palette) || state.palette.length <= 1) {
+      return { removedCount: 0 };
+    }
+    const previousPalette = state.palette.map(color => normalizeColorValue(color));
+    const mapping = new Array(previousPalette.length).fill(-1);
+    const nextPalette = [];
+    const keyToIndex = new Map();
+    for (let oldIndex = 0; oldIndex < previousPalette.length; oldIndex += 1) {
+      const color = previousPalette[oldIndex];
+      const key = getPaletteColorKey(color);
+      let mappedIndex = keyToIndex.get(key);
+      if (!Number.isInteger(mappedIndex) || mappedIndex < 0) {
+        mappedIndex = nextPalette.length;
+        nextPalette.push(color);
+        keyToIndex.set(key, mappedIndex);
+      }
+      mapping[oldIndex] = mappedIndex;
+    }
+    const removedCount = previousPalette.length - nextPalette.length;
+    if (removedCount <= 0) {
+      return { removedCount: 0 };
+    }
+    state.palette = nextPalette;
+    remapPaletteIndices(mapping);
+    state.activePaletteIndex = normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex);
+    state.secondaryPaletteIndex = normalizePaletteIndex(state.secondaryPaletteIndex, state.activePaletteIndex);
+    return { removedCount };
+  }
+
   function setColorMode(mode, { persist = true } = {}) {
     const previousMode = normalizeColorMode(state.colorMode, COLOR_MODE_INDEX);
     const nextMode = normalizeColorMode(mode, previousMode);
@@ -20401,23 +21907,83 @@
       syncColorModeControls();
       return false;
     }
+    const multiPaletteIsolation = isMultiPaletteIsolationEnabled();
+    if (multiPaletteIsolation) {
+      state.colorMode = nextMode;
+      if (nextMode === COLOR_MODE_RGB) {
+        const paletteColor = state.palette[state.activePaletteIndex];
+        if (paletteColor) {
+          state.activeRgb = normalizeColorValue(paletteColor);
+        }
+      } else {
+        state.activePaletteIndex = normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex);
+        state.secondaryPaletteIndex = normalizePaletteIndex(state.secondaryPaletteIndex, state.activePaletteIndex);
+        const paletteColor = state.palette[state.activePaletteIndex];
+        if (paletteColor) {
+          state.activeRgb = normalizeColorValue(paletteColor);
+        }
+      }
+      syncColorModeControls();
+      syncPaletteInputs();
+      renderPalette();
+      updateColorTabSwatch();
+      focusUnifiedLeftContext('color', { persist: false });
+      if (persist) {
+        scheduleSessionPersist();
+      }
+      return true;
+    }
     const canRemapDocument = canCurrentClientReindexPalette();
+    if (!canRemapDocument) {
+      syncColorModeControls();
+      updateAutosaveStatus(
+        localizeText(
+          'このモードではカラーモード変換を実行できません',
+          'Color mode conversion is not available in this mode'
+        ),
+        'warn'
+      );
+      return false;
+    }
     const shouldRemapToIndex = (
       previousMode === COLOR_MODE_RGB
       && nextMode === COLOR_MODE_INDEX
       && canRemapDocument
     );
+    const shouldRemapToRgb = (
+      previousMode === COLOR_MODE_INDEX
+      && nextMode === COLOR_MODE_RGB
+      && canRemapDocument
+    );
     let remapResult = null;
+    let remapToRgbResult = null;
     let activeColorMapResult = null;
+    let paletteDedupeResult = null;
+    let remapMutated = false;
     if (shouldRemapToIndex) {
       beginHistory('colorModeConvert');
       remapResult = remapDocumentDirectPixelsToCurrentPalette();
       activeColorMapResult = mapActiveRgbToIndexedPalette(remapResult.paletteLookup);
+      paletteDedupeResult = dedupeIndexedPaletteColors();
+      remapMutated = (
+        (remapResult?.convertedPixels || 0) > 0
+        || (remapResult?.addedCount || 0) > 0
+        || (activeColorMapResult?.addedCount || 0) > 0
+        || (paletteDedupeResult?.removedCount || 0) > 0
+      );
       if (
         remapResult.convertedPixels > 0
         || remapResult.addedCount > 0
         || activeColorMapResult.addedCount > 0
+        || (paletteDedupeResult?.removedCount || 0) > 0
       ) {
+        applyPaletteChange();
+      }
+    } else if (shouldRemapToRgb) {
+      beginHistory('colorModeConvert');
+      remapToRgbResult = remapDocumentIndexedPixelsToDirect();
+      remapMutated = (remapToRgbResult?.convertedPixels || 0) > 0;
+      if ((remapToRgbResult?.convertedPixels || 0) > 0) {
         applyPaletteChange();
       }
     }
@@ -20440,17 +22006,39 @@
     renderPalette();
     updateColorTabSwatch();
     focusUnifiedLeftContext('color', { persist: false });
-    if (shouldRemapToIndex) {
-      commitHistory();
-      const paletteAddedCount = (remapResult?.addedCount || 0) + (activeColorMapResult?.addedCount || 0);
-      if (paletteAddedCount > 0) {
-        updateAutosaveStatus(
-          localizeText(
-            `RGB色 ${paletteAddedCount} 色をパレットに追加してインデックス化しました`,
-            `Added ${paletteAddedCount} RGB color${paletteAddedCount === 1 ? '' : 's'} to the palette while converting to indexed mode`
-          ),
-          'info'
-        );
+    if (shouldRemapToIndex || shouldRemapToRgb) {
+      if (remapMutated) {
+        commitHistory();
+        if (shouldRemapToIndex) {
+          const paletteAddedCount = (remapResult?.addedCount || 0) + (activeColorMapResult?.addedCount || 0);
+          const paletteRemovedCount = paletteDedupeResult?.removedCount || 0;
+          if (paletteAddedCount > 0 || paletteRemovedCount > 0) {
+            const messageJa = paletteAddedCount > 0 && paletteRemovedCount > 0
+              ? `RGB色 ${paletteAddedCount} 色を追加し、重複色 ${paletteRemovedCount} 色を統合してインデックス化しました`
+              : paletteAddedCount > 0
+                ? `RGB色 ${paletteAddedCount} 色をパレットに追加してインデックス化しました`
+                : `重複色 ${paletteRemovedCount} 色を統合してインデックス化しました`;
+            const messageEn = paletteAddedCount > 0 && paletteRemovedCount > 0
+              ? `Added ${paletteAddedCount} RGB color${paletteAddedCount === 1 ? '' : 's'} and merged ${paletteRemovedCount} duplicate palette color${paletteRemovedCount === 1 ? '' : 's'} while converting to indexed mode`
+              : paletteAddedCount > 0
+                ? `Added ${paletteAddedCount} RGB color${paletteAddedCount === 1 ? '' : 's'} to the palette while converting to indexed mode`
+                : `Merged ${paletteRemovedCount} duplicate palette color${paletteRemovedCount === 1 ? '' : 's'} while converting to indexed mode`;
+            updateAutosaveStatus(
+              localizeText(messageJa, messageEn),
+              'info'
+            );
+          }
+        } else if (shouldRemapToRgb && (remapToRgbResult?.convertedPixels || 0) > 0) {
+          updateAutosaveStatus(
+            localizeText(
+              `インデックス描画をRGBに変換しました (${remapToRgbResult.convertedPixels}px)`,
+              `Converted indexed pixels to RGB (${remapToRgbResult.convertedPixels}px)`
+            ),
+            'info'
+          );
+        }
+      } else {
+        history.pending = null;
       }
     }
     if (persist) {
@@ -20459,22 +22047,558 @@
     return true;
   }
 
+  function buildAppliedPaletteFromPreset(presetColors, minimumLength = 1) {
+    const source = Array.isArray(presetColors) && presetColors.length
+      ? presetColors.map(color => normalizeColorValue(color))
+      : [{ r: 0, g: 0, b: 0, a: 0 }];
+    const targetLength = clamp(
+      Math.round(Number(minimumLength) || source.length || 1),
+      1,
+      32
+    );
+    const next = new Array(targetLength);
+    const used = new Set();
+    const toKey = color => {
+      const normalized = normalizeColorValue(color);
+      return `${normalized.r},${normalized.g},${normalized.b},${normalized.a}`;
+    };
+    const reserveUniqueColor = (baseColor, salt = 0, { allowTransparent = false } = {}) => {
+      let candidate = normalizeColorValue(baseColor);
+      let attempt = 0;
+      while (attempt < 1024) {
+        const key = toKey(candidate);
+        if (!used.has(key)) {
+          used.add(key);
+          return candidate;
+        }
+        attempt += 1;
+        if (allowTransparent && candidate.a <= 0) {
+          candidate = { r: 0, g: 0, b: 0, a: 0 };
+          continue;
+        }
+        if (candidate.a <= 0) {
+          candidate.a = 255;
+        }
+        const hsv = rgbaToHsv(candidate);
+        const hue = (hsv.h + 23 + (salt * 11) + (attempt * 17)) % 360;
+        const saturation = clamp(
+          hsv.s + ((((salt + attempt) % 7) - 3) * 0.06),
+          0.2,
+          1
+        );
+        const value = clamp(
+          hsv.v + ((((salt + attempt) % 9) - 4) * 0.05),
+          0.12,
+          1
+        );
+        const shifted = hsvToRgba(hue, saturation, value);
+        shifted.a = clamp(Math.round(candidate.a), 1, 255);
+        candidate = normalizeColorValue(shifted);
+      }
+      const fallback = {
+        r: (37 * (salt + 3)) % 256,
+        g: (91 * (salt + 5)) % 256,
+        b: (157 * (salt + 7)) % 256,
+        a: 255,
+      };
+      const fallbackKey = toKey(fallback);
+      if (!used.has(fallbackKey)) {
+        used.add(fallbackKey);
+      }
+      return normalizeColorValue(fallback);
+    };
+    const cycleSource = source.length > 1 ? source.slice(1) : [source[0]];
+    for (let index = 0; index < targetLength; index += 1) {
+      const baseColor = index < source.length
+        ? source[index]
+        : (index === 0 ? source[0] : cycleSource[(index - 1) % cycleSource.length]);
+      if (index === 0) {
+        next[index] = reserveUniqueColor(baseColor, index, { allowTransparent: true });
+      } else {
+        next[index] = reserveUniqueColor(baseColor, index, { allowTransparent: false });
+      }
+    }
+    return next;
+  }
+
+  function getTransparentPaletteIndex(palette = state.palette) {
+    if (!Array.isArray(palette) || !palette.length) {
+      return -1;
+    }
+    for (let index = 0; index < palette.length; index += 1) {
+      const color = normalizeColorValue(palette[index]);
+      if (color.a <= 0) {
+        return index;
+      }
+    }
+    return -1;
+  }
+
+  function findNearestPaletteColorIndexByRgba(color, palette = state.palette, fallbackIndex = 0) {
+    if (!Array.isArray(palette) || !palette.length) {
+      return 0;
+    }
+    const source = normalizeColorValue(color);
+    if (source.a <= 0) {
+      const transparentIndex = getTransparentPaletteIndex(palette);
+      return transparentIndex >= 0
+        ? transparentIndex
+        : clamp(fallbackIndex, 0, palette.length - 1);
+    }
+    let bestIndex = clamp(fallbackIndex, 0, palette.length - 1);
+    let bestScore = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < palette.length; index += 1) {
+      const target = normalizeColorValue(palette[index]);
+      const dr = source.r - target.r;
+      const dg = source.g - target.g;
+      const db = source.b - target.b;
+      const da = source.a - target.a;
+      const alphaPenalty = target.a <= 0 ? 280000 : 0;
+      const score = (dr * dr) + (dg * dg) + (db * db) + (da * da * 2.4) + alphaPenalty;
+      if (score < bestScore) {
+        bestScore = score;
+        bestIndex = index;
+      }
+    }
+    return bestIndex;
+  }
+
+  function remapDocumentColorsToPaletteApprox(nextPalette, previousPalette, targetMode = state.colorMode) {
+    const mode = normalizeColorMode(targetMode, COLOR_MODE_INDEX);
+    const oldPalette = Array.isArray(previousPalette) ? previousPalette.map(color => normalizeColorValue(color)) : [];
+    const newPalette = Array.isArray(nextPalette) && nextPalette.length
+      ? nextPalette.map(color => normalizeColorValue(color))
+      : [{ r: 0, g: 0, b: 0, a: 0 }];
+    let remappedPixels = 0;
+    let touchedLayers = 0;
+    if (!Array.isArray(state.frames)) {
+      return { remappedPixels, touchedLayers };
+    }
+    state.frames.forEach(frame => {
+      const layers = Array.isArray(frame?.layers) ? frame.layers : [];
+      layers.forEach(layer => {
+        if (!(layer?.indices instanceof Int16Array)) {
+          return;
+        }
+        const indices = layer.indices;
+        const pixelCount = indices.length;
+        if (!pixelCount) {
+          return;
+        }
+        const hasDirect = layer.direct instanceof Uint8ClampedArray
+          && layer.direct.length === pixelCount * 4;
+        const direct = hasDirect ? layer.direct : null;
+        const nextDirect = mode === COLOR_MODE_RGB
+          ? ensureLayerDirect(layer)
+          : null;
+        let layerTouched = false;
+        for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
+          const paletteIndex = indices[pixelIndex];
+          let sourceColor = null;
+          if (paletteIndex >= 0) {
+            sourceColor = oldPalette[paletteIndex]
+              ? normalizeColorValue(oldPalette[paletteIndex])
+              : { r: 0, g: 0, b: 0, a: 0 };
+          } else if (direct) {
+            const base = pixelIndex * 4;
+            const alpha = direct[base + 3];
+            if (alpha > 0) {
+              sourceColor = {
+                r: direct[base],
+                g: direct[base + 1],
+                b: direct[base + 2],
+                a: alpha,
+              };
+            }
+          }
+          if (!sourceColor) {
+            if (mode === COLOR_MODE_INDEX) {
+              indices[pixelIndex] = -1;
+            } else if (nextDirect instanceof Uint8ClampedArray) {
+              const base = pixelIndex * 4;
+              nextDirect[base] = 0;
+              nextDirect[base + 1] = 0;
+              nextDirect[base + 2] = 0;
+              nextDirect[base + 3] = 0;
+              indices[pixelIndex] = -1;
+            }
+            continue;
+          }
+          const mappedIndex = findNearestPaletteColorIndexByRgba(sourceColor, newPalette, 0);
+          const mappedColor = normalizeColorValue(newPalette[mappedIndex] || newPalette[0]);
+          if (mode === COLOR_MODE_INDEX) {
+            if (indices[pixelIndex] !== mappedIndex) {
+              indices[pixelIndex] = mappedIndex;
+              layerTouched = true;
+            } else if (paletteIndex < 0) {
+              indices[pixelIndex] = mappedIndex;
+              layerTouched = true;
+            }
+          } else if (nextDirect instanceof Uint8ClampedArray) {
+            const base = pixelIndex * 4;
+            const same = nextDirect[base] === mappedColor.r
+              && nextDirect[base + 1] === mappedColor.g
+              && nextDirect[base + 2] === mappedColor.b
+              && nextDirect[base + 3] === mappedColor.a
+              && indices[pixelIndex] < 0;
+            if (!same) {
+              nextDirect[base] = mappedColor.r;
+              nextDirect[base + 1] = mappedColor.g;
+              nextDirect[base + 2] = mappedColor.b;
+              nextDirect[base + 3] = mappedColor.a;
+              indices[pixelIndex] = -1;
+              layerTouched = true;
+            }
+          }
+          remappedPixels += 1;
+        }
+        if (mode === COLOR_MODE_INDEX) {
+          layer.direct = null;
+        }
+        if (layerTouched) {
+          touchedLayers += 1;
+        }
+      });
+    });
+    return { remappedPixels, touchedLayers };
+  }
+
+  function palettesMatch(a, b) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
+      return false;
+    }
+    for (let index = 0; index < a.length; index += 1) {
+      if (!colorsMatchRgba(a[index], b[index])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function applyPalettePresetToCurrentPalette(presetId, { announce = true } = {}) {
+    if (!canCurrentClientEditPaletteColors()) {
+      return false;
+    }
+    const normalizedPresetId = setNewProjectPalettePresetId(presetId, { persist: true, syncControl: true });
+    const definition = getNewProjectPalettePresetDefinition(normalizedPresetId, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+    const sourceColors = getNewProjectPalettePresetColors(normalizedPresetId, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+    const targetPaletteLength = Math.max(
+      1,
+      clamp(Math.round(Number(definition?.colorCount) || sourceColors.length || 1), 1, 32)
+    );
+    const nextPalette = buildAppliedPaletteFromPreset(sourceColors, targetPaletteLength);
+    const previousPalette = Array.isArray(state.palette)
+      ? state.palette.map(color => normalizeColorValue(color))
+      : [{ r: 0, g: 0, b: 0, a: 0 }];
+    const previousActiveColor = getPaletteEditorTargetColor();
+    const previousSecondaryColor = state.palette[state.secondaryPaletteIndex]
+      ? normalizeColorValue(state.palette[state.secondaryPaletteIndex])
+      : previousActiveColor;
+    if (palettesMatch(previousPalette, nextPalette)) {
+      if (announce) {
+        const label = getPalettePresetDisplayName(definition);
+        updateAutosaveStatus(
+          localizeText(`プリセット「${label}」はすでに適用済みです`, `Preset "${label}" is already applied`),
+          'info'
+        );
+      }
+      return false;
+    }
+    if (isMultiPaletteIsolationEnabled()) {
+      state.palette = nextPalette.map(color => normalizeColorValue(color));
+      state.activePaletteIndex = findNearestPaletteColorIndexByRgba(
+        previousActiveColor || state.activeRgb || state.palette[0],
+        state.palette,
+        normalizePaletteIndex(state.activePaletteIndex, 0)
+      );
+      state.secondaryPaletteIndex = findNearestPaletteColorIndexByRgba(
+        previousSecondaryColor || previousActiveColor || state.palette[0],
+        state.palette,
+        normalizePaletteIndex(state.secondaryPaletteIndex, state.activePaletteIndex)
+      );
+      const activeColor = state.palette[state.activePaletteIndex] || state.palette[0];
+      if (activeColor) {
+        state.activeRgb = normalizeColorValue(activeColor);
+      }
+      syncPaletteInputs();
+      renderPalette();
+      requestRender();
+      requestOverlayRender();
+      scheduleSessionPersist();
+      if (announce) {
+        const label = getPalettePresetDisplayName(definition);
+        updateAutosaveStatus(
+          localizeText(
+            `プリセット「${label}」をローカルパレットへ適用しました`,
+            `Applied preset "${label}" to your local palette`
+          ),
+          'success'
+        );
+      }
+      return true;
+    }
+    beginHistory('paletteApplyPreset');
+    state.palette = nextPalette.map(color => normalizeColorValue(color));
+    const remapResult = remapDocumentColorsToPaletteApprox(
+      state.palette,
+      previousPalette,
+      state.colorMode
+    );
+    state.activePaletteIndex = findNearestPaletteColorIndexByRgba(
+      previousActiveColor || state.activeRgb || state.palette[0],
+      state.palette,
+      normalizePaletteIndex(state.activePaletteIndex, 0)
+    );
+    state.secondaryPaletteIndex = findNearestPaletteColorIndexByRgba(
+      previousSecondaryColor || previousActiveColor || state.palette[0],
+      state.palette,
+      normalizePaletteIndex(state.secondaryPaletteIndex, state.activePaletteIndex)
+    );
+    const active = state.palette[state.activePaletteIndex] || state.palette[0];
+    if (active) {
+      state.activeRgb = normalizeColorValue(active);
+    }
+    syncPaletteInputs();
+    renderPalette();
+    applyPaletteChange();
+    commitHistory();
+    if (announce) {
+      const label = getPalettePresetDisplayName(definition);
+      updateAutosaveStatus(
+        localizeText(
+          `パレットを「${label}」へ適用し、${targetPaletteLength}色へ再構成しました (${remapResult.remappedPixels}px)`,
+          `Applied "${label}" and rebuilt to ${targetPaletteLength} colors (${remapResult.remappedPixels}px)`
+        ),
+        'success'
+      );
+    }
+    return true;
+  }
+
+  function buildPaletteSortMetrics(color, index) {
+    const normalized = normalizeColorValue(color);
+    const hsv = rgbaToHsv(normalized);
+    const luma = (normalized.r * 0.2126) + (normalized.g * 0.7152) + (normalized.b * 0.0722);
+    return {
+      index,
+      color: normalized,
+      h: hsv.h,
+      s: hsv.s,
+      v: hsv.v,
+      luma,
+      alpha: normalized.a,
+    };
+  }
+
+  function comparePaletteSortMetrics(left, right, mode = 'hue') {
+    const alphaCompare = Number(right.alpha > 0) - Number(left.alpha > 0);
+    if (alphaCompare !== 0) {
+      return alphaCompare;
+    }
+    if (mode === 'saturation') {
+      if (left.s !== right.s) return left.s - right.s;
+      if (left.v !== right.v) return left.v - right.v;
+      if (left.h !== right.h) return left.h - right.h;
+      if (left.luma !== right.luma) return left.luma - right.luma;
+      return left.index - right.index;
+    }
+    if (mode === 'value') {
+      if (left.v !== right.v) return left.v - right.v;
+      if (left.luma !== right.luma) return left.luma - right.luma;
+      if (left.h !== right.h) return left.h - right.h;
+      if (left.s !== right.s) return left.s - right.s;
+      return left.index - right.index;
+    }
+    if (left.h !== right.h) return left.h - right.h;
+    if (left.s !== right.s) return left.s - right.s;
+    if (left.v !== right.v) return left.v - right.v;
+    if (left.luma !== right.luma) return left.luma - right.luma;
+    return left.index - right.index;
+  }
+
+  function sortPaletteBy(mode = 'hue') {
+    if (!canCurrentClientReindexPalette()) {
+      return false;
+    }
+    if (!Array.isArray(state.palette) || state.palette.length < 2) {
+      return false;
+    }
+    beginHistory('paletteReorder');
+    const metrics = state.palette.map((color, index) => buildPaletteSortMetrics(color, index));
+    const preserveFirstTransparent = metrics[0] && metrics[0].alpha <= 0;
+    let head = null;
+    let sortable = metrics.slice();
+    if (preserveFirstTransparent) {
+      head = sortable.shift();
+    }
+    sortable.sort((a, b) => comparePaletteSortMetrics(a, b, mode));
+    const ordered = head ? [head, ...sortable] : sortable;
+    state.palette = ordered.map(entry => ({ ...entry.color }));
+    const mapping = new Array(metrics.length).fill(-1);
+    ordered.forEach((entry, newIndex) => {
+      mapping[entry.index] = newIndex;
+    });
+    remapPaletteIndices(mapping);
+    renderPalette();
+    syncPaletteInputs();
+    applyPaletteChange();
+    commitHistory();
+    const modeLabel = mode === 'value'
+      ? localizeText('明度順', 'Value')
+      : mode === 'saturation'
+        ? localizeText('彩度順', 'Saturation')
+        : localizeText('色相順', 'Hue');
+    updateAutosaveStatus(localizeText(`パレットを${modeLabel}でソートしました`, `Palette sorted by ${modeLabel}`), 'info');
+    return true;
+  }
+
   function setupPaletteEditor() {
+    renderColorPanelPalettePresetOptions();
+    renderPalettePresetPicker(dom.controls.palettePresetSelect?.value || newProjectPalettePresetId);
+    renderNewProjectPalettePresetOptions(dom.newProject?.palettePreset?.value || newProjectPalettePresetId);
+    renderNewProjectPalettePresetPicker(dom.newProject?.palettePreset?.value || newProjectPalettePresetId);
+    if (dom.controls.palettePresetSelect instanceof HTMLSelectElement) {
+      dom.controls.palettePresetSelect.value = normalizeNewProjectPalettePreset(
+        dom.controls.palettePresetSelect.value,
+        newProjectPalettePresetId
+      );
+      renderPalettePresetPreview(dom.controls.palettePresetSelect.value);
+      if (dom.controls.palettePresetSelect.dataset.bound !== 'true') {
+        dom.controls.palettePresetSelect.dataset.bound = 'true';
+        dom.controls.palettePresetSelect.addEventListener('change', event => {
+          const nextValue = event?.target instanceof HTMLSelectElement
+            ? event.target.value
+            : (dom.controls.palettePresetSelect?.value || newProjectPalettePresetId);
+          applyPalettePresetToCurrentPalette(nextValue, { announce: true });
+        });
+      }
+    }
+    if (dom.newProject?.palettePreset instanceof HTMLSelectElement) {
+      dom.newProject.palettePreset.value = normalizeNewProjectPalettePreset(
+        dom.newProject.palettePreset.value,
+        newProjectPalettePresetId
+      );
+      if (dom.newProject.palettePreset.dataset.bound !== 'true') {
+        dom.newProject.palettePreset.dataset.bound = 'true';
+        dom.newProject.palettePreset.addEventListener('change', event => {
+          const nextValue = event?.target instanceof HTMLSelectElement
+            ? event.target.value
+            : (dom.newProject?.palettePreset?.value || newProjectPalettePresetId);
+          setNewProjectPalettePresetId(nextValue, { persist: true, syncControl: true });
+        });
+      }
+    }
+    if (dom.controls.palettePresetPickerButton instanceof HTMLButtonElement && dom.controls.palettePresetPickerButton.dataset.bound !== 'true') {
+      dom.controls.palettePresetPickerButton.dataset.bound = 'true';
+      dom.controls.palettePresetPickerButton.addEventListener('click', () => {
+        const isOpen = dom.controls.palettePresetPickerButton?.getAttribute('aria-expanded') === 'true';
+        if (!isOpen) {
+          setNewProjectPalettePresetPickerOpen(false);
+        }
+        setPalettePresetPickerOpen(!isOpen);
+      });
+    }
+    if (dom.newProject?.palettePresetPickerButton instanceof HTMLButtonElement && dom.newProject.palettePresetPickerButton.dataset.bound !== 'true') {
+      dom.newProject.palettePresetPickerButton.dataset.bound = 'true';
+      dom.newProject.palettePresetPickerButton.addEventListener('click', () => {
+        const isOpen = dom.newProject?.palettePresetPickerButton?.getAttribute('aria-expanded') === 'true';
+        if (!isOpen) {
+          setPalettePresetPickerOpen(false);
+        }
+        setNewProjectPalettePresetPickerOpen(!isOpen);
+      });
+    }
+    if (!palettePresetPickerPointerBound) {
+      palettePresetPickerPointerBound = true;
+      document.addEventListener('pointerdown', event => {
+        const targetNode = event.target instanceof Node ? event.target : null;
+        if (
+          dom.controls.palettePresetPicker instanceof HTMLElement
+          && !dom.controls.palettePresetPicker.contains(targetNode)
+        ) {
+          setPalettePresetPickerOpen(false);
+        }
+        if (
+          dom.newProject?.palettePresetPicker instanceof HTMLElement
+          && !dom.newProject.palettePresetPicker.contains(targetNode)
+        ) {
+          setNewProjectPalettePresetPickerOpen(false);
+        }
+      });
+    }
+    if (!palettePresetPickerEscapeBound) {
+      palettePresetPickerEscapeBound = true;
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+          setPalettePresetPickerOpen(false);
+          setNewProjectPalettePresetPickerOpen(false);
+        }
+      });
+    }
+    if (!palettePresetPickerViewportBound) {
+      palettePresetPickerViewportBound = true;
+      const updateWhenOpen = event => {
+        const targetNode = event?.target instanceof Node ? event.target : null;
+        if (event?.type === 'scroll' && targetNode) {
+          if (
+            dom.controls.palettePresetPickerMenu instanceof HTMLElement
+            && dom.controls.palettePresetPickerMenu.contains(targetNode)
+          ) {
+            return;
+          }
+          if (
+            dom.newProject?.palettePresetPickerMenu instanceof HTMLElement
+            && dom.newProject.palettePresetPickerMenu.contains(targetNode)
+          ) {
+            return;
+          }
+        }
+        if (dom.controls.palettePresetPickerButton?.getAttribute('aria-expanded') === 'true') {
+          updatePalettePresetPickerMenuPosition();
+        }
+        if (dom.newProject?.palettePresetPickerButton?.getAttribute('aria-expanded') === 'true') {
+          updateNewProjectPalettePresetPickerMenuPosition();
+        }
+      };
+      window.addEventListener('resize', updateWhenOpen, { passive: true });
+      window.addEventListener('scroll', updateWhenOpen, { passive: true, capture: true });
+    }
+    if (dom.controls.sortPaletteHue instanceof HTMLButtonElement && dom.controls.sortPaletteHue.dataset.bound !== 'true') {
+      dom.controls.sortPaletteHue.dataset.bound = 'true';
+      dom.controls.sortPaletteHue.addEventListener('click', () => {
+        sortPaletteBy('hue');
+      });
+    }
+    if (dom.controls.sortPaletteSaturation instanceof HTMLButtonElement && dom.controls.sortPaletteSaturation.dataset.bound !== 'true') {
+      dom.controls.sortPaletteSaturation.dataset.bound = 'true';
+      dom.controls.sortPaletteSaturation.addEventListener('click', () => {
+        sortPaletteBy('saturation');
+      });
+    }
+    if (dom.controls.sortPaletteValue instanceof HTMLButtonElement && dom.controls.sortPaletteValue.dataset.bound !== 'true') {
+      dom.controls.sortPaletteValue.dataset.bound = 'true';
+      dom.controls.sortPaletteValue.addEventListener('click', () => {
+        sortPaletteBy('value');
+      });
+    }
     dom.controls.addPaletteColor?.addEventListener('click', () => {
       if (!canCurrentClientEditPaletteColors()) {
         return;
       }
       beginHistory('paletteAdd');
       const nextIndex = state.palette.length;
-      const last = state.palette[state.palette.length - 1] || { r: 88, g: 196, b: 255, a: 255 };
       const nextColor = isRgbColorMode()
-        ? normalizeColorValue(state.activeRgb || last)
-        : normalizeColorValue(last);
+        ? normalizeColorValue(
+          getPaletteEditorTargetColor()
+          || state.activeRgb
+          || state.palette[state.activePaletteIndex]
+          || state.palette[state.palette.length - 1]
+          || { r: 88, g: 196, b: 255, a: 255 }
+        )
+        : getPresetBasedPaletteAddColor(dom.controls.palettePresetSelect?.value || newProjectPalettePresetId);
       state.palette.push({ ...nextColor });
       state.activePaletteIndex = normalizePaletteIndex(nextIndex, state.activePaletteIndex);
-      if (isRgbColorMode()) {
-        state.activeRgb = normalizeColorValue(nextColor);
-      }
+      state.activeRgb = normalizeColorValue(nextColor);
       syncPaletteInputs();
       renderPalette();
       applyPaletteChange();
@@ -20627,7 +22751,7 @@
     }
     const fragment = document.createDocumentFragment();
     const rgbMode = isRgbColorMode();
-    const activeRgb = normalizeColorValue(state.activeRgb);
+    const activePaletteIndex = normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex);
     state.palette.forEach((color, index) => {
       const button = document.createElement('button');
       button.type = 'button';
@@ -20638,7 +22762,7 @@
       button.setAttribute('role', 'option');
       const normalizedColor = normalizeColorValue(color);
       const isActive = rgbMode
-        ? colorsMatchRgba(normalizedColor, activeRgb)
+        ? index === activePaletteIndex
         : index === state.activePaletteIndex;
       const isSecondary = index === state.secondaryPaletteIndex;
       button.setAttribute('aria-selected', String(isActive));
@@ -20700,7 +22824,7 @@
     if (!container) return;
     container.innerHTML = '';
     const rgbMode = isRgbColorMode();
-    const activeRgb = normalizeColorValue(state.activeRgb);
+    const activePaletteIndex = normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex);
     state.palette.forEach((color, index) => {
       const button = document.createElement('button');
       button.type = 'button';
@@ -20709,7 +22833,7 @@
       button.setAttribute('aria-label', `インデックス ${index}`);
       const normalizedColor = normalizeColorValue(color);
       const isActive = rgbMode
-        ? colorsMatchRgba(normalizedColor, activeRgb)
+        ? index === activePaletteIndex
         : index === state.activePaletteIndex;
       const isSecondary = index === state.secondaryPaletteIndex;
       button.title = `${index}: ${rgbaToHex(color)}`;
@@ -21024,10 +23148,25 @@
     const rgba = hsvToRgba(paletteEditorState.hsv.h, paletteEditorState.hsv.s, paletteEditorState.hsv.v);
     rgba.a = Math.round(paletteEditorState.hsv.a);
     if (isRgbColorMode()) {
-      state.activeRgb = normalizeColorValue(rgba);
+      const normalized = normalizeColorValue(rgba);
+      state.activeRgb = normalized;
+      const activeIndex = normalizePaletteIndex(state.activePaletteIndex, 0);
+      const active = state.palette[activeIndex];
+      const needsPaletteSync = !active || !colorsMatchRgba(active, normalized);
+      if (needsPaletteSync) {
+        beginHistory('paletteColor');
+        if (active) {
+          Object.assign(active, normalized);
+        } else {
+          state.palette[activeIndex] = { ...normalized };
+        }
+        applyPaletteChange();
+        commitHistory();
+      } else {
+        scheduleSessionPersist();
+      }
       updateColorTabSwatch();
       updateFloatingDrawButtonPalettePreview();
-      scheduleSessionPersist();
       renderPalette();
       return;
     }
@@ -23208,6 +25347,7 @@
     ensureCanvasWheelListener();
     setupFloatingDrawButton();
     setupFloatingMovePad();
+    setupSelectionTransformMenu();
     setupFloatingPreviewPanel();
     const gestureSurface = dom.stage || dom.canvasViewport;
     if (dom.canvasViewport) {
@@ -23222,6 +25362,34 @@
     }
     refreshViewportCursorStyle();
     updateMirrorGuideHandles();
+  }
+
+  function setupSelectionTransformMenu() {
+    const menu = dom.controls.selectionTransformMenu;
+    if (menu instanceof HTMLElement && !menu.dataset.transformMenuBound) {
+      menu.dataset.transformMenuBound = 'true';
+      menu.addEventListener('pointerdown', event => {
+        event.stopPropagation();
+      });
+    }
+    const flipHorizontal = dom.controls.selectionFlipHorizontal;
+    if (flipHorizontal instanceof HTMLButtonElement && !flipHorizontal.dataset.transformFlipBound) {
+      flipHorizontal.dataset.transformFlipBound = 'true';
+      flipHorizontal.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleSelectionMoveFlip('horizontal');
+      });
+    }
+    const flipVertical = dom.controls.selectionFlipVertical;
+    if (flipVertical instanceof HTMLButtonElement && !flipVertical.dataset.transformFlipBound) {
+      flipVertical.dataset.transformFlipBound = 'true';
+      flipVertical.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleSelectionMoveFlip('vertical');
+      });
+    }
   }
 
   function ensureCanvasWheelListener() {
@@ -25825,6 +27993,10 @@
     if (!pointerState.active) {
       return;
     }
+    if (pointerState.tool === 'selectionTransform') {
+      completeSelectionTransformInteraction(null, { cancel: true });
+      return;
+    }
     if (pointerState.tool === 'selectionMove' || pointerState.tool === 'layerMove') {
       finalizeSelectionMove();
     }
@@ -26017,8 +28189,11 @@
       event.preventDefault();
       releaseVirtualCursorPointer();
       if (pointerState.active && pointerState.tool !== 'pan') {
+        const wasSelectionTransform = pointerState.tool === 'selectionTransform';
         abortActivePointerInteraction({ commitHistory: false });
-        rollbackPendingHistory();
+        if (!wasSelectionTransform) {
+          rollbackPendingHistory();
+        }
       }
       if (!pointerState.active || pointerState.tool !== 'pan' || pointerState.panMode !== 'multiTouch') {
         abortActivePointerInteraction();
@@ -26095,6 +28270,20 @@
     if (!position) {
       pointerState.active = false;
       return;
+    }
+    const isSelectionToolForTransform = activeTool === 'selectRect'
+      || activeTool === 'selectLasso'
+      || activeTool === 'selectSame'
+      || activeTool === 'move';
+    const transformHandle = !isSecondaryMouseButton && isSelectionToolForTransform
+      ? getSelectionTransformHandleHit(event.clientX, event.clientY)
+      : null;
+    if (transformHandle) {
+      const startedTransform = beginSelectionTransformInteraction(event, position, transformHandle);
+      if (startedTransform) {
+        updateCanvasControlButtons();
+        return;
+      }
     }
     const selectRectGridGesture = activeTool === 'selectRect'
       ? detectSelectRectGridDoubleTap(position)
@@ -26179,10 +28368,11 @@
     const isSelectionTool = activeTool === 'selectRect' || activeTool === 'selectLasso' || activeTool === 'selectSame' || activeTool === 'move';
     const pendingMoveState = !pointerState.active ? getPendingSelectionMoveState() : null;
     const pendingSelectionHit = Boolean(pendingMoveState && isPositionInMoveState(position, pendingMoveState));
+    const pendingSelectionBoundsHit = Boolean(pendingMoveState && isPositionInMoveVisualBounds(position, pendingMoveState));
 
     if (pendingMoveState) {
-      // Keep dragging when touching the moved selection preview; confirm only when touching outside.
-      if (isSelectionTool && (selectionHit || pendingSelectionHit)) {
+      // Keep dragging when touching the moved selection preview; confirm when touching outside.
+      if (isSelectionTool && (selectionHit || pendingSelectionHit || pendingSelectionBoundsHit)) {
         const moved = beginSelectionMove(event, position, { reuseOffset: true });
         if (moved) {
           updateCanvasControlButtons();
@@ -26474,6 +28664,8 @@
     } else if (pointerState.tool === 'line' || pointerState.tool === 'rect' || pointerState.tool === 'rectFill' || pointerState.tool === 'ellipse' || pointerState.tool === 'ellipseFill') {
       pointerState.preview = { start: pointerState.start, end: position, points: pointerState.path.slice() };
       requestOverlayRender();
+    } else if (pointerState.tool === 'selectionTransform') {
+      handleSelectionTransformDrag(event);
     } else if (pointerState.tool === 'selectionMove' || pointerState.tool === 'layerMove') {
       handleSelectionMoveDrag(position);
     } else if (
@@ -26567,6 +28759,11 @@
     let tool = pointerState.tool;
     const moveState = pointerState.selectionMove;
     const movePending = Boolean(moveState && moveState.hasCleared);
+
+    if (tool === 'selectionTransform') {
+      completeSelectionTransformInteraction(event, { cancel: false });
+      return;
+    }
 
     if ((tool === 'selectionMove' || tool === 'layerMove') && moveState) {
       if (movePending) {
@@ -26680,6 +28877,10 @@
       if (pointerState.tool === POINTER_TOOL_CUSTOM_BRUSH_RECT) {
         keyboardState.customBrushCreateOnPointerUp = false;
       }
+      if (pointerState.tool === 'selectionTransform') {
+        completeSelectionTransformInteraction(event, { cancel: true });
+        return;
+      }
       if (pointerState.tool === 'fill') {
         abortActivePointerInteraction({ commitHistory: false });
         rollbackPendingHistory({ reRender: false });
@@ -26694,6 +28895,7 @@
     if (!layer || !dom.canvases.drawing) {
       return false;
     }
+    hideSelectionTransformMenu();
     const moveState = createLayerMoveState(layer);
     if (!moveState) {
       return false;
@@ -26720,36 +28922,33 @@
 
   function beginSelectionMove(event, startPosition, options = {}) {
     const { reuseOffset = false } = options || {};
-    const mask = state.selectionMask;
-    const bounds = state.selectionBounds;
-    const layer = getActiveLayer();
-    if (!mask || !bounds || !layer) {
-      return false;
-    }
-    let moveState = null;
+    hideSelectionTransformMenu();
     const pendingMove = state.pendingPasteMoveState;
-    if (
-      pendingMove
-      && pendingMove.layerId
-      && layer.id
-      && pendingMove.layerId === layer.id
-      && pendingMove.bounds
-      && bounds
-      && pendingMove.bounds.x0 === bounds.x0
-      && pendingMove.bounds.y0 === bounds.y0
-      && pendingMove.bounds.x1 === bounds.x1
-      && pendingMove.bounds.y1 === bounds.y1
-    ) {
+    const layer = getActiveLayer();
+    let moveState = null;
+    if (pendingMove && pendingMove.hasCleared && reuseOffset) {
       moveState = pendingMove;
       state.pendingPasteMoveState = null;
     } else {
+      const mask = state.selectionMask;
+      const bounds = state.selectionBounds;
+      if (!mask || !bounds || !layer) {
+        return false;
+      }
       moveState = createSelectionMoveState(layer, bounds, mask);
     }
     if (!moveState) {
       return false;
     }
-    moveState.layer = layer;
-    moveState.layerId = layer?.id || moveState.layerId || null;
+    if (!moveState.layer && layer) {
+      moveState.layer = layer;
+    }
+    if (!moveState.layerId) {
+      moveState.layerId = moveState.layer?.id || layer?.id || null;
+    }
+    if (!moveState.layer) {
+      return false;
+    }
     moveState.offset = moveState.offset || { x: 0, y: 0 };
     if (!reuseOffset) {
       moveState.offset.x = 0;
@@ -26785,41 +28984,38 @@
 
   function beginSelectionMoveFromVirtualCursor(startPosition, options = {}) {
     const { reuseOffset = false } = options || {};
+    hideSelectionTransformMenu();
     if (!startPosition) {
       return false;
     }
-    const mask = state.selectionMask;
-    const bounds = state.selectionBounds;
+    const pendingMove = state.pendingPasteMoveState;
     const layer = getActiveLayer();
-    if (!mask || !bounds || !layer) {
-      return false;
-    }
 
     let moveState = null;
-    const pendingMove = state.pendingPasteMoveState;
-    if (
-      pendingMove
-      && pendingMove.layerId
-      && layer.id
-      && pendingMove.layerId === layer.id
-      && pendingMove.bounds
-      && bounds
-      && pendingMove.bounds.x0 === bounds.x0
-      && pendingMove.bounds.y0 === bounds.y0
-      && pendingMove.bounds.x1 === bounds.x1
-      && pendingMove.bounds.y1 === bounds.y1
-    ) {
+    if (pendingMove && pendingMove.hasCleared && reuseOffset) {
       moveState = pendingMove;
       state.pendingPasteMoveState = null;
     } else {
+      const mask = state.selectionMask;
+      const bounds = state.selectionBounds;
+      if (!mask || !bounds || !layer) {
+        return false;
+      }
       moveState = createSelectionMoveState(layer, bounds, mask);
     }
     if (!moveState) {
       return false;
     }
 
-    moveState.layer = layer;
-    moveState.layerId = layer?.id || moveState.layerId || null;
+    if (!moveState.layer && layer) {
+      moveState.layer = layer;
+    }
+    if (!moveState.layerId) {
+      moveState.layerId = moveState.layer?.id || layer?.id || null;
+    }
+    if (!moveState.layer) {
+      return false;
+    }
     moveState.offset = moveState.offset || { x: 0, y: 0 };
     if (!reuseOffset) {
       moveState.offset.x = 0;
@@ -26878,13 +29074,28 @@
     }
     const x = Math.floor(position.x);
     const y = Math.floor(position.y);
+    const offsetX = Number(moveState.offset?.x) || 0;
+    const offsetY = Number(moveState.offset?.y) || 0;
+    if (hasSelectionMoveTransform(moveState)) {
+      const transformed = buildSelectionMoveTransformedEntries(moveState);
+      if (!transformed.bounds || !(transformed.mask instanceof Uint8Array) || transformed.width <= 0 || transformed.height <= 0) {
+        return false;
+      }
+      const originX = (Number(moveState.bounds.x0) || 0) + offsetX + transformed.bounds.x0;
+      const originY = (Number(moveState.bounds.y0) || 0) + offsetY + transformed.bounds.y0;
+      const localX = x - originX;
+      const localY = y - originY;
+      if (localX < 0 || localY < 0 || localX >= transformed.width || localY >= transformed.height) {
+        return false;
+      }
+      const localIndex = (localY * transformed.width) + localX;
+      return transformed.mask[localIndex] === 1;
+    }
     const width = Math.max(0, Number(moveState.width) || 0);
     const height = Math.max(0, Number(moveState.height) || 0);
     if (width <= 0 || height <= 0) {
       return false;
     }
-    const offsetX = Number(moveState.offset?.x) || 0;
-    const offsetY = Number(moveState.offset?.y) || 0;
     const originX = (Number(moveState.bounds.x0) || 0) + offsetX;
     const originY = (Number(moveState.bounds.y0) || 0) + offsetY;
     const localX = x - originX;
@@ -26892,8 +29103,21 @@
     if (localX < 0 || localY < 0 || localX >= width || localY >= height) {
       return false;
     }
-    const localIndex = localY * width + localX;
+    const localIndex = (localY * width) + localX;
     return moveState.mask[localIndex] === 1;
+  }
+
+  function isPositionInMoveVisualBounds(position, moveState) {
+    if (!position || !moveState) {
+      return false;
+    }
+    const bounds = getSelectionMoveVisualBounds(moveState);
+    if (!bounds) {
+      return false;
+    }
+    const x = Math.floor(position.x);
+    const y = Math.floor(position.y);
+    return x >= bounds.x0 && x <= bounds.x1 && y >= bounds.y0 && y <= bounds.y1;
   }
 
   function createSelectionMoveState(layer, bounds, mask) {
@@ -26987,6 +29211,192 @@
       offset: { x: 0, y: 0 },
       hasCleared: false,
       applySelectionOnFinalize: true,
+      transformRotationDeg: 0,
+      transformFlipHorizontal: false,
+      transformFlipVertical: false,
+      transformedEntryCache: null,
+      transformedPreviewRenderCache: null,
+    };
+  }
+
+  function normalizeSelectionMoveRotationDeg(value) {
+    const step = SELECTION_TRANSFORM_ROTATION_STEP_DEG;
+    if (!Number.isFinite(value)) {
+      return 0;
+    }
+    const snapped = Math.round(Number(value) / step) * step;
+    let normalized = snapped % 360;
+    if (normalized < 0) {
+      normalized += 360;
+    }
+    return normalized;
+  }
+
+  function getSelectionMoveTransformState(moveState) {
+    if (!moveState || typeof moveState !== 'object') {
+      return {
+        rotationDeg: 0,
+        flipHorizontal: false,
+        flipVertical: false,
+      };
+    }
+    return {
+      rotationDeg: normalizeSelectionMoveRotationDeg(moveState.transformRotationDeg),
+      flipHorizontal: Boolean(moveState.transformFlipHorizontal),
+      flipVertical: Boolean(moveState.transformFlipVertical),
+    };
+  }
+
+  function hasSelectionMoveTransform(moveState) {
+    const transform = getSelectionMoveTransformState(moveState);
+    return transform.rotationDeg !== 0 || transform.flipHorizontal || transform.flipVertical;
+  }
+
+  function transformSelectionMoveLocalPixel(x, y, width, height, transform) {
+    const mappedCenter = transformSelectionMoveLocalPoint(x + 0.5, y + 0.5, width, height, transform);
+    const mappedX = Math.round(mappedCenter.x - 0.5);
+    const mappedY = Math.round(mappedCenter.y - 0.5);
+    return { x: mappedX, y: mappedY };
+  }
+
+  function transformSelectionMoveLocalPoint(x, y, width, height, transform) {
+    const cx = width / 2;
+    const cy = height / 2;
+    let dx = x - cx;
+    let dy = y - cy;
+    if (transform.flipHorizontal) {
+      dx = -dx;
+    }
+    if (transform.flipVertical) {
+      dy = -dy;
+    }
+    const rotationDeg = normalizeSelectionMoveRotationDeg(transform.rotationDeg);
+    if (rotationDeg !== 0) {
+      const rad = (rotationDeg * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      const nextDx = (dx * cos) - (dy * sin);
+      const nextDy = (dx * sin) + (dy * cos);
+      dx = nextDx;
+      dy = nextDy;
+    }
+    const mappedX = dx + cx;
+    const mappedY = dy + cy;
+    return { x: mappedX, y: mappedY };
+  }
+
+  function buildSelectionMoveTransformedEntries(moveState) {
+    if (!moveState || !(moveState.mask instanceof Uint8Array)) {
+      return {
+        entries: [],
+        bounds: null,
+        mask: null,
+        width: 0,
+        height: 0,
+      };
+    }
+    const sourceWidth = Math.max(0, Math.floor(Number(moveState.width) || 0));
+    const sourceHeight = Math.max(0, Math.floor(Number(moveState.height) || 0));
+    const sourceSize = sourceWidth * sourceHeight;
+    if (sourceWidth <= 0 || sourceHeight <= 0 || moveState.mask.length !== sourceSize) {
+      return {
+        entries: [],
+        bounds: null,
+        mask: null,
+        width: 0,
+        height: 0,
+      };
+    }
+    const transform = getSelectionMoveTransformState(moveState);
+    const key = `${transform.rotationDeg}:${transform.flipHorizontal ? 1 : 0}:${transform.flipVertical ? 1 : 0}`;
+    if (
+      moveState.transformedEntryCache
+      && moveState.transformedEntryCache.key === key
+      && Array.isArray(moveState.transformedEntryCache.entries)
+    ) {
+      return moveState.transformedEntryCache;
+    }
+
+    const entries = [];
+    const localIndexByKey = new Map();
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+
+    for (let y = 0; y < sourceHeight; y += 1) {
+      for (let x = 0; x < sourceWidth; x += 1) {
+        const sourceIndex = (y * sourceWidth) + x;
+        if (moveState.mask[sourceIndex] !== 1) {
+          continue;
+        }
+        const mapped = transformSelectionMoveLocalPixel(x, y, sourceWidth, sourceHeight, transform);
+        const mapKey = `${mapped.x},${mapped.y}`;
+        const existing = localIndexByKey.get(mapKey);
+        if (Number.isInteger(existing) && existing >= 0) {
+          entries[existing].sourceIndex = sourceIndex;
+        } else {
+          localIndexByKey.set(mapKey, entries.length);
+          entries.push({
+            x: mapped.x,
+            y: mapped.y,
+            sourceIndex,
+          });
+        }
+        if (mapped.x < minX) minX = mapped.x;
+        if (mapped.y < minY) minY = mapped.y;
+        if (mapped.x > maxX) maxX = mapped.x;
+        if (mapped.y > maxY) maxY = mapped.y;
+      }
+    }
+
+    let bounds = null;
+    let transformedMask = null;
+    let transformedWidth = 0;
+    let transformedHeight = 0;
+    if (entries.length > 0 && Number.isFinite(minX) && Number.isFinite(minY) && Number.isFinite(maxX) && Number.isFinite(maxY)) {
+      bounds = { x0: minX, y0: minY, x1: maxX, y1: maxY };
+      transformedWidth = (maxX - minX) + 1;
+      transformedHeight = (maxY - minY) + 1;
+      transformedMask = new Uint8Array(transformedWidth * transformedHeight);
+      for (let i = 0; i < entries.length; i += 1) {
+        const entry = entries[i];
+        const localX = entry.x - minX;
+        const localY = entry.y - minY;
+        const localIndex = (localY * transformedWidth) + localX;
+        transformedMask[localIndex] = 1;
+      }
+    }
+
+    const result = {
+      key,
+      entries,
+      bounds,
+      mask: transformedMask,
+      width: transformedWidth,
+      height: transformedHeight,
+    };
+    moveState.transformedEntryCache = result;
+    return result;
+  }
+
+  function getSelectionMoveVisualBounds(moveState) {
+    if (!moveState || !moveState.bounds) {
+      return null;
+    }
+    const transformed = buildSelectionMoveTransformedEntries(moveState);
+    if (!transformed.bounds) {
+      return null;
+    }
+    const offsetX = Number(moveState.offset?.x) || 0;
+    const offsetY = Number(moveState.offset?.y) || 0;
+    const originX = (Number(moveState.bounds.x0) || 0) + offsetX;
+    const originY = (Number(moveState.bounds.y0) || 0) + offsetY;
+    return {
+      x0: originX + transformed.bounds.x0,
+      y0: originY + transformed.bounds.y0,
+      x1: originX + transformed.bounds.x1,
+      y1: originY + transformed.bounds.y1,
     };
   }
 
@@ -27658,6 +30068,11 @@
       restoreDirect: null,
       applySelectionOnFinalize: true,
       paletteAddedCount,
+      transformRotationDeg: 0,
+      transformFlipHorizontal: false,
+      transformFlipVertical: false,
+      transformedEntryCache: null,
+      transformedPreviewRenderCache: null,
     };
   }
 
@@ -27827,6 +30242,11 @@
       restoreIndices: null,
       restoreDirect: null,
       applySelectionOnFinalize: true,
+      transformRotationDeg: 0,
+      transformFlipHorizontal: false,
+      transformFlipVertical: false,
+      transformedEntryCache: null,
+      transformedPreviewRenderCache: null,
     };
   }
 
@@ -28059,18 +30479,34 @@
     const moveState = pointerState.selectionMove || state.pendingPasteMoveState;
     if (!moveState) {
       pointerState.tool = state.tool;
-      return;
+      return false;
     }
     if (!moveState.hasCleared) {
       pointerState.tool = state.tool;
       pointerState.selectionMove = null;
       state.pendingPasteMoveState = null;
-      return;
+      return false;
     }
 
     const { offset } = moveState;
     const applySelection = moveState.applySelectionOnFinalize !== false;
-    const result = placeSelectionPixels(moveState, offset.x, offset.y);
+    const result = placeSelectionPixels(moveState, offset.x, offset.y, { requireFullyInBounds: true });
+
+    if (result.blockedByBounds) {
+      const hover = getVirtualCursorCellPosition() || pointerState.current || null;
+      promotePendingSelectionMove(moveState, { hover });
+      updateAutosaveStatus(
+        localizeText(
+          '選択範囲の一部がキャンバス外にあるため確定できません。内側へ戻してから確定してください。',
+          'Cannot confirm because part of the selection is outside the canvas. Move it back inside and confirm.'
+        ),
+        'warn'
+      );
+      requestOverlayRender();
+      updateCanvasControlButtons();
+      return false;
+    }
+
     pointerState.selectionMove = null;
     pointerState.tool = state.tool;
     state.pendingPasteMoveState = null;
@@ -28103,6 +30539,7 @@
     requestOverlayRender();
     commitHistory();
     updateCanvasControlButtons();
+    return true;
   }
 
   function hasPendingSelectionMove() {
@@ -28125,8 +30562,10 @@
       return;
     }
     pointerState.selectionMove = moveState;
-    finalizeSelectionMove();
-    clearSelection();
+    const finalized = finalizeSelectionMove();
+    if (finalized) {
+      clearSelection();
+    }
     updateCanvasControlButtons();
   }
 
@@ -28151,68 +30590,158 @@
     requestOverlayRender();
   }
 
-  function placeSelectionPixels(moveState, offsetX, offsetY) {
-    const { layer, bounds, mask, indices, direct, width, height } = moveState;
+  function placeSelectionPixels(moveState, offsetX, offsetY, { requireFullyInBounds = false } = {}) {
+    const { layer, bounds, indices, direct } = moveState;
+    const transformed = buildSelectionMoveTransformedEntries(moveState);
+    const entries = Array.isArray(transformed.entries) ? transformed.entries : [];
+    if (requireFullyInBounds) {
+      for (let i = 0; i < entries.length; i += 1) {
+        const entry = entries[i];
+        const targetX = (Number(bounds?.x0) || 0) + (Number(entry?.x) || 0) + offsetX;
+        const targetY = (Number(bounds?.y0) || 0) + (Number(entry?.y) || 0) + offsetY;
+        if (targetX < 0 || targetY < 0 || targetX >= state.width || targetY >= state.height) {
+          return {
+            placed: false,
+            mask: null,
+            bounds: null,
+            clippedCount: 1,
+            blockedByBounds: true,
+          };
+        }
+      }
+    }
     const newMask = new Uint8Array(state.width * state.height);
     const newBounds = { x0: state.width, y0: state.height, x1: -1, y1: -1 };
     let placed = false;
+    let clippedCount = 0;
 
     const targetDirect = direct ? ensureLayerDirect(layer) : null;
 
-    for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
-        const localIndex = y * width + x;
-        if (mask[localIndex] !== 1) continue;
-        const targetX = bounds.x0 + x + offsetX;
-        const targetY = bounds.y0 + y + offsetY;
-        if (targetX < 0 || targetY < 0 || targetX >= state.width || targetY >= state.height) {
-          continue;
-        }
-        const targetIndex = targetY * state.width + targetX;
-        const targetBase = targetIndex * 4;
-        const localBase = localIndex * 4;
-        layer.indices[targetIndex] = indices[localIndex];
-        if (targetDirect) {
-          targetDirect[targetBase] = direct[localBase];
-          targetDirect[targetBase + 1] = direct[localBase + 1];
-          targetDirect[targetBase + 2] = direct[localBase + 2];
-          targetDirect[targetBase + 3] = direct[localBase + 3];
-        }
-        newMask[targetIndex] = 1;
-        if (!placed) placed = true;
-        if (targetX < newBounds.x0) newBounds.x0 = targetX;
-        if (targetY < newBounds.y0) newBounds.y0 = targetY;
-        if (targetX > newBounds.x1) newBounds.x1 = targetX;
-        if (targetY > newBounds.y1) newBounds.y1 = targetY;
+    for (let i = 0; i < entries.length; i += 1) {
+      const entry = entries[i];
+      const sourceIndex = Number(entry?.sourceIndex);
+      if (!Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= indices.length) {
+        continue;
       }
+      const targetX = (Number(bounds?.x0) || 0) + (Number(entry.x) || 0) + offsetX;
+      const targetY = (Number(bounds?.y0) || 0) + (Number(entry.y) || 0) + offsetY;
+      if (targetX < 0 || targetY < 0 || targetX >= state.width || targetY >= state.height) {
+        clippedCount += 1;
+        continue;
+      }
+      const targetIndex = (targetY * state.width) + targetX;
+      const targetBase = targetIndex * 4;
+      const sourceBase = sourceIndex * 4;
+      layer.indices[targetIndex] = indices[sourceIndex];
+      if (targetDirect) {
+        targetDirect[targetBase] = direct[sourceBase];
+        targetDirect[targetBase + 1] = direct[sourceBase + 1];
+        targetDirect[targetBase + 2] = direct[sourceBase + 2];
+        targetDirect[targetBase + 3] = direct[sourceBase + 3];
+      }
+      newMask[targetIndex] = 1;
+      if (!placed) {
+        placed = true;
+      }
+      if (targetX < newBounds.x0) newBounds.x0 = targetX;
+      if (targetY < newBounds.y0) newBounds.y0 = targetY;
+      if (targetX > newBounds.x1) newBounds.x1 = targetX;
+      if (targetY > newBounds.y1) newBounds.y1 = targetY;
     }
 
     if (!placed) {
-      return { placed: false, mask: null, bounds: null };
+      return {
+        placed: false,
+        mask: null,
+        bounds: null,
+        clippedCount,
+        blockedByBounds: false,
+      };
     }
 
-    return { placed: true, mask: newMask, bounds: newBounds };
+    return {
+      placed: true,
+      mask: newMask,
+      bounds: newBounds,
+      clippedCount,
+      blockedByBounds: false,
+    };
   }
 
   function drawSelectionMovePreview(moveState) {
     if (!moveState || !moveState.hasCleared) {
       return;
     }
-    const originX = moveState.bounds.x0 + moveState.offset.x;
-    const originY = moveState.bounds.y0 + moveState.offset.y;
+    const transformed = hasSelectionMoveTransform(moveState);
+    const originXBase = (Number(moveState.bounds?.x0) || 0) + (Number(moveState.offset?.x) || 0);
+    const originYBase = (Number(moveState.bounds?.y0) || 0) + (Number(moveState.offset?.y) || 0);
+    let originX = originXBase;
+    let originY = originYBase;
+    let outlineSegments = null;
+    let transformedRender = null;
+
+    if (transformed) {
+      transformedRender = getSelectionMoveTransformedPreviewRenderData(moveState);
+      if (transformedRender) {
+        originX = originXBase + transformedRender.originOffsetX;
+        originY = originYBase + transformedRender.originOffsetY;
+        outlineSegments = transformedRender.outlineSegments;
+      }
+    }
 
     if (ctx.overlay) {
       let rendered = false;
-      const previewCanvas = moveState.previewCanvas;
+      const previewCanvas = transformedRender?.previewCanvas || moveState.previewCanvas;
       if (previewCanvas) {
         try {
           ctx.overlay.drawImage(previewCanvas, originX, originY);
           rendered = true;
         } catch (error) {
-          moveState.previewCanvas = null;
+          if (transformedRender) {
+            moveState.transformedPreviewRenderCache = null;
+          } else {
+            moveState.previewCanvas = null;
+          }
         }
       }
-      if (!rendered && moveState.imageData) {
+      if (!rendered && transformedRender?.imageData) {
+        try {
+          ctx.overlay.putImageData(transformedRender.imageData, originX, originY);
+          rendered = true;
+        } catch (error) {
+          // Keep fallback attempts below.
+        }
+      }
+      if (
+        !rendered
+        && transformedRender
+        && transformedRender.mask instanceof Uint8Array
+        && transformedRender.width > 0
+        && transformedRender.height > 0
+      ) {
+        const fallbackCanvas = createMovePreviewCanvasFromPixels(
+          transformedRender.width,
+          transformedRender.height,
+          transformedRender.mask,
+          null,
+          transformedRender.directPixels instanceof Uint8ClampedArray
+            ? transformedRender.directPixels
+            : null
+        );
+        if (fallbackCanvas) {
+          moveState.transformedPreviewRenderCache = {
+            ...transformedRender,
+            previewCanvas: fallbackCanvas,
+          };
+          try {
+            ctx.overlay.drawImage(fallbackCanvas, originX, originY);
+            rendered = true;
+          } catch (error) {
+            // Keep outline rendering even if bitmap draw fails.
+          }
+        }
+      }
+      if (!rendered && !transformedRender && moveState.imageData) {
         try {
           ctx.overlay.putImageData(moveState.imageData, originX, originY);
           rendered = true;
@@ -28229,7 +30758,7 @@
           }
         }
       }
-      if (!rendered) {
+      if (!rendered && !transformedRender) {
         const fallbackCanvas = createMovePreviewCanvasFromPixels(
           moveState.width,
           moveState.height,
@@ -28253,13 +30782,117 @@
       return;
     }
 
-    const outlineSegments = getSelectionMoveOutlineSegments(moveState);
+    if (!outlineSegments) {
+      outlineSegments = getSelectionMoveOutlineSegments(moveState);
+    }
     if (!outlineSegments.length) {
       return;
     }
     strokeSelectionPath((pathCtx, scale) => {
       traceSelectionMoveOutline(pathCtx, outlineSegments, originX, originY, scale);
     }, { translateHalf: true, ensureResolution: false });
+  }
+
+  function getSelectionMoveTransformedPreviewRenderData(moveState) {
+    if (!moveState) {
+      return null;
+    }
+    const transformed = buildSelectionMoveTransformedEntries(moveState);
+    if (!transformed.bounds || !transformed.width || !transformed.height || !Array.isArray(transformed.entries)) {
+      return null;
+    }
+    const cacheKey = transformed.key;
+    if (
+      moveState.transformedPreviewRenderCache
+      && moveState.transformedPreviewRenderCache.key === cacheKey
+      && moveState.transformedPreviewRenderCache.previewCanvas
+    ) {
+      return moveState.transformedPreviewRenderCache;
+    }
+
+    const outputWidth = transformed.width;
+    const outputHeight = transformed.height;
+    const imageData = createBlankImageData(outputWidth, outputHeight);
+    const sourceImageData = moveState.imageData && moveState.imageData.data instanceof Uint8ClampedArray
+      ? moveState.imageData.data
+      : null;
+    const sourceIndices = moveState.indices instanceof Int16Array ? moveState.indices : null;
+    const sourceDirect = moveState.direct instanceof Uint8ClampedArray ? moveState.direct : null;
+    const outputData = imageData && imageData.data instanceof Uint8ClampedArray ? imageData.data : null;
+
+    if (!outputData) {
+      return null;
+    }
+
+    for (let i = 0; i < transformed.entries.length; i += 1) {
+      const entry = transformed.entries[i];
+      const sourceIndex = Number(entry?.sourceIndex);
+      if (!Number.isInteger(sourceIndex) || sourceIndex < 0) {
+        continue;
+      }
+      const outX = (Number(entry.x) || 0) - transformed.bounds.x0;
+      const outY = (Number(entry.y) || 0) - transformed.bounds.y0;
+      if (outX < 0 || outY < 0 || outX >= outputWidth || outY >= outputHeight) {
+        continue;
+      }
+      const outputBase = ((outY * outputWidth) + outX) * 4;
+      const sourceBase = sourceIndex * 4;
+      if (sourceImageData && sourceBase + 3 < sourceImageData.length) {
+        outputData[outputBase] = sourceImageData[sourceBase];
+        outputData[outputBase + 1] = sourceImageData[sourceBase + 1];
+        outputData[outputBase + 2] = sourceImageData[sourceBase + 2];
+        outputData[outputBase + 3] = sourceImageData[sourceBase + 3];
+        continue;
+      }
+      if (sourceIndices && sourceIndex < sourceIndices.length) {
+        const paletteIndex = sourceIndices[sourceIndex];
+        if (paletteIndex >= 0 && state.palette[paletteIndex]) {
+          const color = state.palette[paletteIndex];
+          outputData[outputBase] = color.r;
+          outputData[outputBase + 1] = color.g;
+          outputData[outputBase + 2] = color.b;
+          outputData[outputBase + 3] = color.a;
+          continue;
+        }
+      }
+      if (sourceDirect && sourceBase + 3 < sourceDirect.length) {
+        outputData[outputBase] = sourceDirect[sourceBase];
+        outputData[outputBase + 1] = sourceDirect[sourceBase + 1];
+        outputData[outputBase + 2] = sourceDirect[sourceBase + 2];
+        outputData[outputBase + 3] = sourceDirect[sourceBase + 3];
+      }
+    }
+
+    const previewCanvas = createMovePreviewCanvasFromImageData(imageData)
+      || createMovePreviewCanvasFromPixels(
+        outputWidth,
+        outputHeight,
+        transformed.mask,
+        null,
+        outputData
+      );
+    const outlineSegments = buildSelectionMoveOutlineSegments(transformed.mask, outputWidth, outputHeight);
+    const result = {
+      key: cacheKey,
+      previewCanvas,
+      imageData,
+      directPixels: outputData,
+      mask: transformed.mask,
+      width: outputWidth,
+      height: outputHeight,
+      originOffsetX: transformed.bounds.x0,
+      originOffsetY: transformed.bounds.y0,
+      outlineSegments,
+    };
+    const pixelCount = outputWidth * outputHeight;
+    if (previewCanvas && pixelCount > SELECTION_TRANSFORM_PREVIEW_CACHE_MAX_PIXELS) {
+      // Keep only drawImage path for large transformed previews to reduce cache memory.
+      result.imageData = null;
+      result.directPixels = null;
+      result.mask = null;
+    }
+    moveState.transformedPreviewRenderCache = result;
+    return result;
   }
 
   function getSelectionMoveOutlineSegments(moveState) {
@@ -28320,7 +30953,7 @@
     }
   }
 
-  function getPointerPosition(event, { clampToCanvas = false } = {}) {
+  function getPointerPositionRaw(event, { clampToCanvas = false } = {}) {
     if (!dom.canvases.drawing) {
       return null;
     }
@@ -28333,8 +30966,22 @@
     if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) {
       return null;
     }
-    let x = Math.floor(rawX);
-    let y = Math.floor(rawY);
+    if (clampToCanvas) {
+      return {
+        x: clamp(rawX, 0, Math.max(0, state.width - 1)),
+        y: clamp(rawY, 0, Math.max(0, state.height - 1)),
+      };
+    }
+    return { x: rawX, y: rawY };
+  }
+
+  function getPointerPosition(event, { clampToCanvas = false } = {}) {
+    const raw = getPointerPositionRaw(event, { clampToCanvas });
+    if (!raw) {
+      return null;
+    }
+    let x = Math.floor(raw.x);
+    let y = Math.floor(raw.y);
     if (clampToCanvas) {
       x = clamp(x, 0, Math.max(0, state.width - 1));
       y = clamp(y, 0, Math.max(0, state.height - 1));
@@ -28342,6 +30989,586 @@
     }
     if (x < 0 || y < 0 || x >= state.width || y >= state.height) return null;
     return { x, y };
+  }
+
+  function normalizeSignedAngleDeg(value) {
+    let angle = Number(value) || 0;
+    angle %= 360;
+    if (angle > 180) angle -= 360;
+    if (angle < -180) angle += 360;
+    return angle;
+  }
+
+  function invalidateSelectionMoveTransformCache(moveState) {
+    if (!moveState || typeof moveState !== 'object') {
+      return;
+    }
+    moveState.transformedEntryCache = null;
+    moveState.transformedPreviewRenderCache = null;
+  }
+
+  function shouldRenderSelectionTransformHandles() {
+    if (state.playback.isPlaying) {
+      return false;
+    }
+    const activeTool = pointerState.active ? (pointerState.tool || state.tool) : state.tool;
+    const isSelectionContext = activeTool === 'selectionTransform'
+      || activeTool === 'selectionMove'
+      || activeTool === 'move'
+      || activeTool === 'selectRect'
+      || activeTool === 'selectLasso'
+      || activeTool === 'selectSame';
+    if (!isSelectionContext) {
+      return false;
+    }
+    if (
+      pointerState.active
+      && (
+        pointerState.tool === 'selectRect'
+        || pointerState.tool === 'selectLasso'
+        || pointerState.tool === POINTER_TOOL_CUSTOM_BRUSH_RECT
+      )
+    ) {
+      return false;
+    }
+    const pendingMove = getPendingSelectionMoveState();
+    if (pendingMove && pendingMove.hasCleared) {
+      return true;
+    }
+    return Boolean(state.selectionBounds && selectionMaskHasPixels(state.selectionMask));
+  }
+
+  function getSelectionTransformWorldCorners() {
+    const pendingMove = getPendingSelectionMoveState();
+    if (pendingMove && pendingMove.hasCleared) {
+      return getSelectionMoveTransformWorldCorners(pendingMove);
+    }
+    const bounds = state.selectionBounds;
+    if (!bounds || !selectionMaskHasPixels(state.selectionMask)) {
+      return null;
+    }
+    const x0 = clamp(Math.round(Number(bounds.x0) || 0), 0, Math.max(0, state.width - 1));
+    const y0 = clamp(Math.round(Number(bounds.y0) || 0), 0, Math.max(0, state.height - 1));
+    const x1 = clamp(Math.round(Number(bounds.x1) || 0), 0, Math.max(0, state.width - 1));
+    const y1 = clamp(Math.round(Number(bounds.y1) || 0), 0, Math.max(0, state.height - 1));
+    return [
+      { id: 'nw', worldX: x0, worldY: y0 },
+      { id: 'ne', worldX: x1 + 1, worldY: y0 },
+      { id: 'se', worldX: x1 + 1, worldY: y1 + 1 },
+      { id: 'sw', worldX: x0, worldY: y1 + 1 },
+    ];
+  }
+
+  function getSelectionMoveTransformWorldCorners(moveState) {
+    if (!moveState || !moveState.bounds) {
+      return null;
+    }
+    const width = Math.max(1, Number(moveState.width) || 1);
+    const height = Math.max(1, Number(moveState.height) || 1);
+    const originX = (Number(moveState.bounds.x0) || 0) + (Number(moveState.offset?.x) || 0);
+    const originY = (Number(moveState.bounds.y0) || 0) + (Number(moveState.offset?.y) || 0);
+    const transform = getSelectionMoveTransformState(moveState);
+    const localCorners = [
+      { id: 'nw', x: 0, y: 0 },
+      { id: 'ne', x: width, y: 0 },
+      { id: 'se', x: width, y: height },
+      { id: 'sw', x: 0, y: height },
+    ];
+    return localCorners.map(corner => {
+      const mapped = transformSelectionMoveLocalPoint(corner.x, corner.y, width, height, transform);
+      return {
+        id: corner.id,
+        worldX: originX + mapped.x,
+        worldY: originY + mapped.y,
+      };
+    });
+  }
+
+  function getWorldCornerBounds(corners) {
+    if (!Array.isArray(corners) || !corners.length) {
+      return null;
+    }
+    let x0 = Number.POSITIVE_INFINITY;
+    let y0 = Number.POSITIVE_INFINITY;
+    let x1 = Number.NEGATIVE_INFINITY;
+    let y1 = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < corners.length; i += 1) {
+      const corner = corners[i];
+      const x = Number(corner?.worldX);
+      const y = Number(corner?.worldY);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        continue;
+      }
+      if (x < x0) x0 = x;
+      if (y < y0) y0 = y;
+      if (x > x1) x1 = x;
+      if (y > y1) y1 = y;
+    }
+    if (!Number.isFinite(x0) || !Number.isFinite(y0) || !Number.isFinite(x1) || !Number.isFinite(y1)) {
+      return null;
+    }
+    return {
+      x0,
+      y0,
+      x1,
+      y1,
+    };
+  }
+
+  function hideSelectionTransformMenu() {
+    const menu = dom.controls.selectionTransformMenu;
+    if (!(menu instanceof HTMLElement)) {
+      selectionTransformUi.menuVisible = false;
+      selectionTransformUi.menuHandleId = '';
+      selectionTransformUi.menuLocalX = null;
+      selectionTransformUi.menuLocalY = null;
+      return;
+    }
+    selectionTransformUi.menuVisible = false;
+    selectionTransformUi.menuHandleId = '';
+    selectionTransformUi.menuLocalX = null;
+    selectionTransformUi.menuLocalY = null;
+    menu.classList.add('is-hidden');
+    menu.setAttribute('hidden', '');
+    menu.setAttribute('aria-hidden', 'true');
+  }
+
+  function computeSelectionTransformMenuLocalPosition(viewportRect, menuWidth, menuHeight) {
+    const handles = Array.isArray(selectionTransformUi.handles) ? selectionTransformUi.handles : [];
+    if (!handles.length) {
+      return null;
+    }
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < handles.length; i += 1) {
+      const handle = handles[i];
+      const x = Number(handle?.x);
+      const y = Number(handle?.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        continue;
+      }
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+      return null;
+    }
+    const margin = 10;
+    const gap = 12;
+    const minLocalX = margin;
+    const minLocalY = margin;
+    const maxLocalX = Math.max(minLocalX, Math.round(viewportRect.width - menuWidth - margin));
+    const maxLocalY = Math.max(minLocalY, Math.round(viewportRect.height - menuHeight - margin));
+    const centerX = (minX + maxX) * 0.5;
+    const centerY = (minY + maxY) * 0.5;
+
+    const clampCandidate = (candidate) => ({
+      x: clamp(Math.round(candidate.x), minLocalX, maxLocalX),
+      y: clamp(Math.round(candidate.y), minLocalY, maxLocalY),
+    });
+    const intersectsSelection = (candidate) => !(
+      candidate.x + menuWidth <= minX
+      || candidate.x >= maxX
+      || candidate.y + menuHeight <= minY
+      || candidate.y >= maxY
+    );
+    const candidates = [
+      { x: centerX - (menuWidth * 0.5), y: minY - menuHeight - gap },
+      { x: centerX - (menuWidth * 0.5), y: maxY + gap },
+      { x: maxX + gap, y: centerY - (menuHeight * 0.5) },
+      { x: minX - menuWidth - gap, y: centerY - (menuHeight * 0.5) },
+    ].map(clampCandidate);
+
+    let best = candidates.find(candidate => !intersectsSelection(candidate));
+    if (!best) {
+      best = candidates[0];
+    }
+    return best || null;
+  }
+
+  function showSelectionTransformMenu(handleId = '', { preservePosition = false } = {}) {
+    const menu = dom.controls.selectionTransformMenu;
+    if (!(menu instanceof HTMLElement)) {
+      selectionTransformUi.menuVisible = false;
+      selectionTransformUi.menuHandleId = '';
+      selectionTransformUi.menuLocalX = null;
+      selectionTransformUi.menuLocalY = null;
+      return;
+    }
+    selectionTransformUi.menuVisible = true;
+    selectionTransformUi.menuHandleId = typeof handleId === 'string' ? handleId : '';
+    menu.classList.remove('is-hidden');
+    menu.removeAttribute('hidden');
+    menu.setAttribute('aria-hidden', 'false');
+    if (!preservePosition) {
+      selectionTransformUi.menuLocalX = null;
+      selectionTransformUi.menuLocalY = null;
+    }
+    positionSelectionTransformMenu({ recompute: !preservePosition });
+  }
+
+  function positionSelectionTransformMenu({ recompute = false } = {}) {
+    if (!selectionTransformUi.menuVisible) {
+      return;
+    }
+    const menu = dom.controls.selectionTransformMenu;
+    const viewport = dom.canvasViewport;
+    if (!(menu instanceof HTMLElement) || !(viewport instanceof HTMLElement)) {
+      return;
+    }
+    const viewportRect = viewport.getBoundingClientRect();
+    if (!(viewportRect.width > 0) || !(viewportRect.height > 0)) {
+      return;
+    }
+    const menuWidth = menu.offsetWidth || 188;
+    const menuHeight = menu.offsetHeight || 54;
+    const margin = 10;
+    const minX = margin;
+    const minY = margin;
+    const maxX = Math.max(minX, Math.round(viewportRect.width - menuWidth - margin));
+    const maxY = Math.max(minY, Math.round(viewportRect.height - menuHeight - margin));
+    const needsCompute = recompute
+      || !Number.isFinite(selectionTransformUi.menuLocalX)
+      || !Number.isFinite(selectionTransformUi.menuLocalY);
+    if (needsCompute) {
+      const computed = computeSelectionTransformMenuLocalPosition(viewportRect, menuWidth, menuHeight);
+      if (computed) {
+        selectionTransformUi.menuLocalX = computed.x;
+        selectionTransformUi.menuLocalY = computed.y;
+      } else {
+        selectionTransformUi.menuLocalX = minX;
+        selectionTransformUi.menuLocalY = minY;
+      }
+    }
+    const x = clamp(Math.round(Number(selectionTransformUi.menuLocalX) || minX), minX, maxX);
+    const y = clamp(Math.round(Number(selectionTransformUi.menuLocalY) || minY), minY, maxY);
+    selectionTransformUi.menuLocalX = x;
+    selectionTransformUi.menuLocalY = y;
+    menu.style.setProperty('--selection-transform-menu-x', `${Math.round(viewportRect.left + x)}px`);
+    menu.style.setProperty('--selection-transform-menu-y', `${Math.round(viewportRect.top + y)}px`);
+  }
+
+  function drawSelectionTransformHandles() {
+    if (!shouldRenderSelectionTransformHandles() || !ctx.virtual) {
+      selectionTransformUi.handles = [];
+      if (!ctx.virtual || !shouldRenderSelectionTransformHandles()) {
+        hideSelectionTransformMenu();
+      }
+      return;
+    }
+    const worldCorners = getSelectionTransformWorldCorners();
+    const metrics = getCanvasScreenMetrics();
+    if (!Array.isArray(worldCorners) || worldCorners.length < 4 || !metrics) {
+      selectionTransformUi.handles = [];
+      hideSelectionTransformMenu();
+      return;
+    }
+    const unitX = metrics.width / Math.max(1, Number(state.width) || 1);
+    const unitY = metrics.height / Math.max(1, Number(state.height) || 1);
+    const bounds = getWorldCornerBounds(worldCorners);
+    if (!bounds) {
+      selectionTransformUi.handles = [];
+      hideSelectionTransformMenu();
+      return;
+    }
+    const handles = worldCorners.map(corner => ({
+      id: corner.id,
+      x: metrics.left + (corner.worldX * unitX),
+      y: metrics.top + (corner.worldY * unitY),
+      hitRadius: SELECTION_TRANSFORM_HANDLE_HIT_RADIUS_PX,
+    }));
+    selectionTransformUi.handles = handles;
+
+    const dpr = window.devicePixelRatio || 1;
+    ctx.virtual.save();
+    ctx.virtual.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (let i = 0; i < handles.length; i += 1) {
+      const handle = handles[i];
+      const isActive = selectionTransformUi.interaction?.handleId === handle.id;
+      const size = (SELECTION_TRANSFORM_HANDLE_DRAW_RADIUS_PX * 2) + (isActive ? 2 : 0);
+      const drawRect = getSelectionTransformHandleDrawRect(handle.id, handle.x, handle.y, size);
+      if (!drawRect) {
+        continue;
+      }
+      ctx.virtual.fillStyle = isActive ? 'rgba(255, 124, 124, 0.95)' : 'rgba(88, 196, 255, 0.95)';
+      ctx.virtual.fillRect(drawRect.left, drawRect.top, size, size);
+      ctx.virtual.lineWidth = 2;
+      ctx.virtual.strokeStyle = 'rgba(8, 14, 20, 0.95)';
+      ctx.virtual.strokeRect(drawRect.left, drawRect.top, size, size);
+    }
+    ctx.virtual.lineWidth = 1;
+    ctx.virtual.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+    ctx.virtual.beginPath();
+    const cornersById = new Map(worldCorners.map(corner => [corner.id, corner]));
+    const order = ['nw', 'ne', 'se', 'sw'];
+    for (let i = 0; i < order.length; i += 1) {
+      const current = cornersById.get(order[i]);
+      const next = cornersById.get(order[(i + 1) % order.length]);
+      if (!current || !next) {
+        continue;
+      }
+      const x0 = metrics.left + (current.worldX * unitX);
+      const y0 = metrics.top + (current.worldY * unitY);
+      const x1 = metrics.left + (next.worldX * unitX);
+      const y1 = metrics.top + (next.worldY * unitY);
+      ctx.virtual.moveTo(x0, y0);
+      ctx.virtual.lineTo(x1, y1);
+    }
+    ctx.virtual.stroke();
+    ctx.virtual.restore();
+    positionSelectionTransformMenu();
+  }
+
+  function getSelectionTransformHandleDrawRect(handleId, anchorX, anchorY, size) {
+    if (!Number.isFinite(anchorX) || !Number.isFinite(anchorY) || !Number.isFinite(size) || size <= 0) {
+      return null;
+    }
+    const normalizedId = String(handleId || '').toLowerCase();
+    const pxSize = Math.max(2, Math.round(size));
+    // Place handles outside the selection. The handle corner matches selection corner.
+    // nw: bottom-right, ne: bottom-left, se: top-left, sw: top-right.
+    switch (normalizedId) {
+      case 'nw':
+        return { left: anchorX - pxSize, top: anchorY - pxSize, size: pxSize };
+      case 'ne':
+        return { left: anchorX, top: anchorY - pxSize, size: pxSize };
+      case 'se':
+        return { left: anchorX, top: anchorY, size: pxSize };
+      case 'sw':
+        return { left: anchorX - pxSize, top: anchorY, size: pxSize };
+      default:
+        return {
+          left: anchorX - (pxSize / 2),
+          top: anchorY - (pxSize / 2),
+          size: pxSize,
+        };
+    }
+  }
+
+  function getSelectionTransformHandleHit(clientX, clientY) {
+    if (!Number.isFinite(clientX) || !Number.isFinite(clientY) || !Array.isArray(selectionTransformUi.handles)) {
+      return null;
+    }
+    const viewport = dom.canvasViewport;
+    if (!(viewport instanceof HTMLElement)) {
+      return null;
+    }
+    const rect = viewport.getBoundingClientRect();
+    const localX = clientX - rect.left;
+    const localY = clientY - rect.top;
+    for (let i = selectionTransformUi.handles.length - 1; i >= 0; i -= 1) {
+      const handle = selectionTransformUi.handles[i];
+      const baseSize = SELECTION_TRANSFORM_HANDLE_DRAW_RADIUS_PX * 2;
+      const drawRect = getSelectionTransformHandleDrawRect(handle.id, handle.x, handle.y, baseSize);
+      if (!drawRect) {
+        continue;
+      }
+      const radius = Math.max(8, Number(handle.hitRadius) || SELECTION_TRANSFORM_HANDLE_HIT_RADIUS_PX);
+      const hitPadding = Math.max(3, Math.round(radius - (drawRect.size * 0.5)));
+      const hitLeft = drawRect.left - hitPadding;
+      const hitTop = drawRect.top - hitPadding;
+      const hitRight = drawRect.left + drawRect.size + hitPadding;
+      const hitBottom = drawRect.top + drawRect.size + hitPadding;
+      if (localX >= hitLeft && localX <= hitRight && localY >= hitTop && localY <= hitBottom) {
+        return handle;
+      }
+    }
+    return null;
+  }
+
+  function getSelectionMoveTransformCenter(moveState) {
+    if (!moveState || !moveState.bounds) {
+      return null;
+    }
+    const offsetX = Number(moveState.offset?.x) || 0;
+    const offsetY = Number(moveState.offset?.y) || 0;
+    const width = Math.max(1, Number(moveState.width) || 1);
+    const height = Math.max(1, Number(moveState.height) || 1);
+    return {
+      x: (Number(moveState.bounds.x0) || 0) + offsetX + (width / 2),
+      y: (Number(moveState.bounds.y0) || 0) + offsetY + (height / 2),
+    };
+  }
+
+  function ensureSelectionMoveForTransform() {
+    const pendingMove = getPendingSelectionMoveState();
+    if (pendingMove && pendingMove.hasCleared) {
+      return pendingMove;
+    }
+    const mask = state.selectionMask;
+    const bounds = state.selectionBounds;
+    const layer = getActiveLayer();
+    if (!mask || !bounds || !layer || !selectionMaskHasPixels(mask)) {
+      return null;
+    }
+    const moveState = createSelectionMoveState(layer, bounds, mask);
+    if (!moveState) {
+      return null;
+    }
+    beginHistory('selectionTransform');
+    clearSelectionSourcePixels(moveState);
+    return moveState.hasCleared ? moveState : null;
+  }
+
+  function beginSelectionTransformInteraction(event, position, handle) {
+    if (!dom.canvases.drawing || !handle) {
+      return false;
+    }
+    const moveState = ensureSelectionMoveForTransform();
+    if (!moveState) {
+      return false;
+    }
+    const drawCanvas = dom.canvases.drawing;
+    const pointerId = event.pointerId;
+    try {
+      drawCanvas.setPointerCapture(pointerId);
+    } catch (error) {
+      // Ignore pointer capture errors.
+    }
+    pointerState.active = true;
+    pointerState.pointerId = pointerId;
+    pointerState.tool = 'selectionTransform';
+    pointerState.start = position ? { ...position } : null;
+    pointerState.current = position ? { ...position } : null;
+    pointerState.last = position ? { ...position } : null;
+    pointerState.path = position ? [{ ...position }] : [];
+    pointerState.preview = null;
+    pointerState.selectionPreview = null;
+    pointerState.selectionMove = moveState;
+    pointerState.drawPaletteIndex = null;
+    pointerState.selectionClearedOnDown = false;
+    pointerState.selectionExtendOnDown = false;
+
+    const raw = getPointerPositionRaw(event, { clampToCanvas: false });
+    const center = getSelectionMoveTransformCenter(moveState);
+    const transform = getSelectionMoveTransformState(moveState);
+    const startAngleDeg = raw && center
+      ? (Math.atan2(raw.y - center.y, raw.x - center.x) * 180 / Math.PI)
+      : 0;
+    selectionTransformUi.interaction = {
+      handleId: handle.id,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startRotationDeg: transform.rotationDeg,
+      accumulatedDeg: 0,
+      lastAngleDeg: startAngleDeg,
+      moved: false,
+    };
+    showSelectionTransformMenu(handle.id);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    requestOverlayRender();
+    return true;
+  }
+
+  function handleSelectionTransformDrag(event) {
+    const interaction = selectionTransformUi.interaction;
+    const moveState = pointerState.selectionMove;
+    if (!interaction || !moveState) {
+      return;
+    }
+    const raw = getPointerPositionRaw(event, { clampToCanvas: false });
+    const center = getSelectionMoveTransformCenter(moveState);
+    if (raw && center) {
+      const angleDeg = Math.atan2(raw.y - center.y, raw.x - center.x) * 180 / Math.PI;
+      const delta = normalizeSignedAngleDeg(angleDeg - interaction.lastAngleDeg);
+      interaction.accumulatedDeg += delta;
+      interaction.lastAngleDeg = angleDeg;
+      const snappedDelta = Math.round(interaction.accumulatedDeg / SELECTION_TRANSFORM_ROTATION_STEP_DEG) * SELECTION_TRANSFORM_ROTATION_STEP_DEG;
+      const nextRotation = normalizeSelectionMoveRotationDeg(interaction.startRotationDeg + snappedDelta);
+      if (nextRotation !== normalizeSelectionMoveRotationDeg(moveState.transformRotationDeg)) {
+        moveState.transformRotationDeg = nextRotation;
+        invalidateSelectionMoveTransformCache(moveState);
+        requestOverlayRender();
+      }
+      pointerState.current = { x: Math.floor(raw.x), y: Math.floor(raw.y) };
+      pointerState.last = { ...pointerState.current };
+    }
+    const dragDistance = Math.hypot(
+      event.clientX - interaction.startClientX,
+      event.clientY - interaction.startClientY
+    );
+    if (!interaction.moved && dragDistance >= SELECTION_TRANSFORM_DRAG_THRESHOLD_PX) {
+      interaction.moved = true;
+      hideSelectionTransformMenu();
+    }
+  }
+
+  function completeSelectionTransformInteraction(event, { cancel = false } = {}) {
+    const moveState = pointerState.selectionMove;
+    const interaction = selectionTransformUi.interaction;
+    selectionTransformUi.interaction = null;
+    detachPointerListeners();
+    if (dom.canvases.drawing && Number.isFinite(pointerState.pointerId)) {
+      try {
+        dom.canvases.drawing.releasePointerCapture(pointerState.pointerId);
+      } catch (error) {
+        // Ignore pointer capture release errors.
+      }
+    }
+    pointerState.active = false;
+    pointerState.pointerId = null;
+    pointerState.preview = null;
+    pointerState.selectionPreview = null;
+    pointerState.path = [];
+    pointerState.drawPaletteIndex = null;
+    pointerState.selectionClearedOnDown = false;
+    pointerState.selectionExtendOnDown = false;
+    pointerState.tool = state.tool;
+    pointerState.selectionMove = null;
+
+    if (moveState && moveState.hasCleared) {
+      const hover = event ? getPointerPosition(event, { clampToCanvas: true }) : null;
+      promotePendingSelectionMove(moveState, { hover });
+      scheduleSessionPersist();
+    }
+
+    if (cancel || !interaction || interaction.moved) {
+      hideSelectionTransformMenu();
+    } else {
+      showSelectionTransformMenu(interaction.handleId || '');
+    }
+    requestOverlayRender();
+  }
+
+  function toggleSelectionMoveFlip(axis) {
+    if (state.playback.isPlaying) {
+      return false;
+    }
+    if (isMultiSpectatorMode()) {
+      setMultiStatus(localizeText('視聴モードでは描画できません', 'Drawing is disabled in viewer mode'), 'warn');
+      return false;
+    }
+    if (isResidentMultiToolRestrictedMode()) {
+      setMultiStatus(localizeText('このキャンバスでは範囲選択・移動系ツールは無効です', 'Selection and move tools are disabled in this canvas'), 'warn');
+      return false;
+    }
+    if (isMultiAssignedCellRestrictedEditorMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
+      return false;
+    }
+    const moveState = ensureSelectionMoveForTransform();
+    if (!moveState) {
+      updateAutosaveStatus(localizeText('反転するには範囲選択が必要です', 'Selection is required to flip'), 'warn');
+      return false;
+    }
+    if (axis === 'horizontal') {
+      moveState.transformFlipHorizontal = !Boolean(moveState.transformFlipHorizontal);
+    } else if (axis === 'vertical') {
+      moveState.transformFlipVertical = !Boolean(moveState.transformFlipVertical);
+    } else {
+      return false;
+    }
+    invalidateSelectionMoveTransformCache(moveState);
+    const hover = getVirtualCursorCellPosition() || pointerState.current || null;
+    promotePendingSelectionMove(moveState, { hover });
+    showSelectionTransformMenu(selectionTransformUi.menuHandleId || 'se', { preservePosition: true });
+    requestOverlayRender();
+    scheduleSessionPersist();
+    return true;
   }
 
   function applyBrushStroke(x0, y0, x1, y1) {
@@ -28434,6 +31661,28 @@
     }
 
     const paletteIndex = resolveDrawPaletteIndex(paletteIndexOverride);
+    if (isMultiPaletteIsolationEnabled()) {
+      const drawColor = normalizeColorValue(getActiveDrawColor(undefined, paletteIndex));
+      if (!direct) {
+        direct = ensureLayerDirect(layer);
+      }
+      const sameColor = layer.indices[index] === -1
+        && direct[base] === drawColor.r
+        && direct[base + 1] === drawColor.g
+        && direct[base + 2] === drawColor.b
+        && direct[base + 3] === drawColor.a;
+      if (sameColor) {
+        return;
+      }
+      layer.indices[index] = -1;
+      direct[base] = drawColor.r;
+      direct[base + 1] = drawColor.g;
+      direct[base + 2] = drawColor.b;
+      direct[base + 3] = drawColor.a;
+      markHistoryDirty();
+      markDirtyPixel(x, y);
+      return;
+    }
     if (layer.indices[index] === paletteIndex) {
       return;
     }
@@ -28668,6 +31917,7 @@
       return;
     }
     const indexMode = isIndexColorMode();
+    const fillMode = normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
     const paletteIndex = indexMode ? resolveDrawPaletteIndex(paletteIndexOverride) : -1;
     const drawRgbColor = indexMode ? null : normalizeColorValue(getActiveDrawColor(undefined, paletteIndexOverride));
     const indices = layer.indices instanceof Int16Array ? layer.indices : null;
@@ -28717,6 +31967,21 @@
 
     const visited = new Uint8Array(width * height);
     const stack = [x, y];
+
+    if (fillMode === SELECT_SAME_MODE_GLOBAL) {
+      for (let py = 0; py < height; py += 1) {
+        const rowOffset = py * width;
+        for (let px = 0; px < width; px += 1) {
+          if (residentPointEditable && !residentPointEditable(px, py)) continue;
+          const idx = rowOffset + px;
+          if (selectionMask && selectionMask[idx] !== 1) continue;
+          if (!matchesTarget(idx)) continue;
+          setPixel(layer, px, py, indexMode ? paletteIndex : undefined);
+        }
+      }
+      requestRender();
+      return;
+    }
 
     while (stack.length > 0) {
       const py = stack.pop();
@@ -29049,6 +32314,7 @@
       return;
     }
 
+    hideSelectionTransformMenu();
     state.selectionMask = mask;
     state.selectionBounds = bounds;
     updateCanvasControlButtons();
@@ -29089,6 +32355,7 @@
       return;
     }
 
+    hideSelectionTransformMenu();
     state.selectionMask = mask;
     state.selectionBounds = bounds;
     updateCanvasControlButtons();
@@ -29143,6 +32410,7 @@
       return;
     }
 
+    hideSelectionTransformMenu();
     state.selectionMask = mask;
     state.selectionBounds = bounds;
     updateCanvasControlButtons();
@@ -29264,6 +32532,7 @@
       return;
     }
 
+    hideSelectionTransformMenu();
     state.selectionMask = mask;
     state.selectionBounds = bounds;
     updateCanvasControlButtons();
@@ -29312,6 +32581,7 @@
       pointerState.selectionMove = pendingMoveState;
       finalizeSelectionMove();
     }
+    hideSelectionTransformMenu();
     state.selectionMask = null;
     state.selectionBounds = null;
     state.pendingPasteMoveState = null;
@@ -29721,6 +32991,7 @@
       target.closest('.canvas-controls')
       || target.closest('.floating-draw-button')
       || target.closest('.floating-preview-panel')
+      || target.closest('.selection-transform-menu')
       || target.closest('.mirror-handle')
     );
   }
@@ -29738,8 +33009,11 @@
           event.preventDefault();
           releaseVirtualCursorPointer();
           if (pointerState.active && pointerState.tool !== 'pan') {
+            const wasSelectionTransform = pointerState.tool === 'selectionTransform';
             abortActivePointerInteraction({ commitHistory: false });
-            rollbackPendingHistory();
+            if (!wasSelectionTransform) {
+              rollbackPendingHistory();
+            }
           }
           if (!pointerState.active || pointerState.tool !== 'pan' || pointerState.panMode !== 'multiTouch') {
             abortActivePointerInteraction();
@@ -30154,6 +33428,7 @@
     } else if (state.selectionMask) {
       drawSelectionOverlay();
     }
+    drawSelectionTransformHandles();
 
     const virtualFocusPixel = state.showVirtualCursor ? getVirtualCursorCellPosition() : null;
     const focusPixel = pointerState.active ? pointerState.current : (virtualFocusPixel || hoverPixel);
@@ -30182,7 +33457,8 @@
         ctx.overlay.save();
         ctx.overlay.fillStyle = rgbaToCss(getActiveDrawColor());
         const previewSelectionMask = state.selectionMask;
-        const painted = new Set();
+        const useMirrorDedup = previewPixels.length <= FILL_PREVIEW_MIRROR_DEDUP_MAX_PIXELS;
+        const painted = useMirrorDedup ? new Set() : null;
         previewPixels.forEach(idx => {
           const px = idx % state.width;
           const py = Math.floor(idx / state.width);
@@ -30194,10 +33470,12 @@
             if (previewSelectionMask && previewSelectionMask[maskIndex] !== 1) {
               return;
             }
-            if (painted.has(maskIndex)) {
+            if (painted && painted.has(maskIndex)) {
               return;
             }
-            painted.add(maskIndex);
+            if (painted) {
+              painted.add(maskIndex);
+            }
             ctx.overlay.fillRect(mx, my, 1, 1);
           });
         });
@@ -30441,7 +33719,8 @@
           ctx.overlay.restore();
           return;
         }
-        const painted = new Set();
+        const useMirrorDedup = pixels.length <= FILL_PREVIEW_MIRROR_DEDUP_MAX_PIXELS;
+        const painted = useMirrorDedup ? new Set() : null;
         pixels.forEach(idx => {
           const px = idx % width;
           const py = Math.floor(idx / width);
@@ -30453,13 +33732,18 @@
             if (selectionMask && selectionMask[maskIndex] !== 1) {
               return;
             }
-            if (painted.has(maskIndex)) {
+            if (painted && painted.has(maskIndex)) {
               return;
             }
-            painted.add(maskIndex);
+            if (painted) {
+              painted.add(maskIndex);
+            }
             ctx.overlay.fillRect(mx, my, 1, 1);
           });
         });
+        if (isFillPreviewPixelsTruncated(pixels)) {
+          drawBrushCrosshair(center, 1, selectionMask);
+        }
         ctx.overlay.restore();
         return;
       }
@@ -30585,8 +33869,14 @@
     }
     const indices = layer.indices instanceof Int16Array ? layer.indices : null;
     const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    const indexMode = isIndexColorMode();
+    const fillMode = normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
+    const paletteIndex = indexMode
+      ? normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex)
+      : -1;
+    const drawRgbColor = indexMode ? null : normalizeColorValue(getActiveDrawColor());
     const targetIndex = indices ? indices[startIdx] : -1;
-    if (targetIndex >= 0 && targetIndex === state.activePaletteIndex) {
+    if (indexMode && targetIndex >= 0 && targetIndex === paletteIndex) {
       return [];
     }
     const startBase = startIdx * 4;
@@ -30594,6 +33884,22 @@
     const targetG = targetIndex < 0 ? (direct ? direct[startBase + 1] : 0) : 0;
     const targetB = targetIndex < 0 ? (direct ? direct[startBase + 2] : 0) : 0;
     const targetA = targetIndex < 0 ? (direct ? direct[startBase + 3] : 0) : 0;
+    if (!indexMode && drawRgbColor) {
+      let sourceColor = null;
+      if (targetIndex >= 0) {
+        sourceColor = normalizeColorValue(state.palette[targetIndex] || { r: 0, g: 0, b: 0, a: 0 });
+      } else {
+        sourceColor = {
+          r: targetR,
+          g: targetG,
+          b: targetB,
+          a: targetA,
+        };
+      }
+      if (colorsMatchRgba(sourceColor, drawRgbColor)) {
+        return [];
+      }
+    }
     const matchesTarget = (idx) => {
       const currentIndex = indices ? indices[idx] : -1;
       if (targetIndex >= 0) {
@@ -30612,6 +33918,23 @@
     const visited = new Uint8Array(width * height);
     const stack = [x, y];
     const pixels = [];
+    if (fillMode === SELECT_SAME_MODE_GLOBAL) {
+      for (let py = 0; py < height; py += 1) {
+        const rowOffset = py * width;
+        for (let px = 0; px < width; px += 1) {
+          if (residentPointEditable && !residentPointEditable(px, py)) continue;
+          const idx = rowOffset + px;
+          if (selectionMask && selectionMask[idx] !== 1) continue;
+          if (!matchesTarget(idx)) continue;
+          pixels.push(idx);
+          if (pixels.length >= FILL_PREVIEW_MAX_PIXELS) {
+            markFillPreviewPixelsTruncated(pixels);
+            return pixels;
+          }
+        }
+      }
+      return pixels;
+    }
     while (stack.length > 0) {
       const py = stack.pop();
       const px = stack.pop();
@@ -30625,7 +33948,8 @@
       if (!matchesTarget(idx)) continue;
       pixels.push(idx);
       if (pixels.length >= FILL_PREVIEW_MAX_PIXELS) {
-        return EMPTY_FILL_PREVIEW_PIXELS;
+        markFillPreviewPixelsTruncated(pixels);
+        return pixels;
       }
       stack.push(px + 1, py);
       stack.push(px - 1, py);
@@ -30633,6 +33957,25 @@
       stack.push(px, py - 1);
     }
     return pixels;
+  }
+
+  function markFillPreviewPixelsTruncated(pixels) {
+    if (!Array.isArray(pixels) || !pixels.length) {
+      return;
+    }
+    try {
+      pixels[FILL_PREVIEW_TRUNCATED_FLAG] = true;
+    } catch (error) {
+      // Ignore if the array cannot be flagged.
+    }
+  }
+
+  function isFillPreviewPixelsTruncated(pixels) {
+    return Boolean(
+      Array.isArray(pixels)
+      && pixels.length
+      && pixels[FILL_PREVIEW_TRUNCATED_FLAG]
+    );
   }
 
   function getFillPreviewContextKey() {
@@ -30645,15 +33988,16 @@
     const selectionKey = selectionMask
       ? `${selectionMaskId}:${selectionBounds?.x0 ?? ''},${selectionBounds?.y0 ?? ''},${selectionBounds?.x1 ?? ''},${selectionBounds?.y1 ?? ''}`
       : 'none';
-    const activeColor = state.palette[state.activePaletteIndex] || {};
-    const colorKey = `index-${state.activePaletteIndex}-${activeColor.r ?? ''},${activeColor.g ?? ''},${activeColor.b ?? ''},${activeColor.a ?? ''}`;
+    const fillMode = normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
+    const activeColor = normalizeColorValue(getActiveDrawColor());
+    const colorKey = `${normalizeColorMode(state.colorMode, COLOR_MODE_INDEX)}-${state.activePaletteIndex}-${activeColor.r},${activeColor.g},${activeColor.b},${activeColor.a}`;
     const residentSlotKey = isResidentMultiConnectedRoom()
       ? `resident-slot-${Math.max(-1, getResidentMultiAssignedSlotIndex(multiState.clientId))}`
       : 'resident-slot-none';
     const residentOwnedKey = isResidentMultiConnectedRoom()
       ? `resident-owned-${getResidentMultiOwnedSlotSignature(multiState.projectKey)}`
       : 'resident-owned-none';
-    return `${frame.id}|${layer.id}|${state.width}x${state.height}|${selectionKey}|${colorKey}|${residentSlotKey}|${residentOwnedKey}`;
+    return `${frame.id}|${layer.id}|${state.width}x${state.height}|${selectionKey}|fill-mode-${fillMode}|${colorKey}|${residentSlotKey}|${residentOwnedKey}`;
   }
 
   function ensureFillPreviewLookup(contextKey) {
@@ -30684,11 +34028,17 @@
       lookup[cacheIndex] = EMPTY_FILL_PREVIEW_PIXELS;
       return EMPTY_FILL_PREVIEW_PIXELS;
     }
-    pixels.forEach(idx => {
-      if (idx >= 0 && idx < lookup.length) {
-        lookup[idx] = pixels;
-      }
-    });
+    const canBackfill = (
+      pixels.length <= FILL_PREVIEW_CACHE_BACKFILL_MAX_PIXELS
+      && !isFillPreviewPixelsTruncated(pixels)
+    );
+    if (canBackfill) {
+      pixels.forEach(idx => {
+        if (idx >= 0 && idx < lookup.length) {
+          lookup[idx] = pixels;
+        }
+      });
+    }
     lookup[cacheIndex] = pixels;
     return pixels;
   }
@@ -36424,6 +39774,21 @@
     }
   }
 
+  function clearMultiLayerPatchSendTimers() {
+    if (multiState.masterLayerPatchTimer !== null) {
+      window.clearTimeout(multiState.masterLayerPatchTimer);
+      multiState.masterLayerPatchTimer = null;
+    }
+    if (multiState.guestLayerPatchTimer !== null) {
+      window.clearTimeout(multiState.guestLayerPatchTimer);
+      multiState.guestLayerPatchTimer = null;
+    }
+    multiState.masterLayerPatchQueued = false;
+    multiState.masterLayerPatchInFlight = false;
+    multiState.guestLayerPatchQueued = false;
+    multiState.guestLayerPatchInFlight = false;
+  }
+
   function markRemoteMultiStateDirty({ clearLayerPatchSnapshots = false } = {}) {
     invalidateFillPreviewCache();
     invalidateOnionSkinCache();
@@ -37360,8 +40725,8 @@
       colorMode: normalizeColorMode(state.colorMode, COLOR_MODE_INDEX),
       activeRgb: normalizeColorValue(state.activeRgb),
     };
-    const preserveResidentPaletteLocal = isResidentMultiConnectedRoom();
-    const localPaletteSnapshot = preserveResidentPaletteLocal && Array.isArray(state.palette)
+    const preserveLocalPalette = isMultiPaletteIsolationEnabled();
+    const localPaletteSnapshot = preserveLocalPalette && Array.isArray(state.palette)
       ? state.palette.map(color => normalizeColorValue(color))
       : null;
     const localPaletteIndex = state.activePaletteIndex;
@@ -37388,6 +40753,9 @@
     multiState.applyRemoteInProgress = true;
     try {
       applyHistorySnapshot(snapshot);
+      if (preserveLocalPalette) {
+        remapDocumentIndexedPixelsToDirect();
+      }
       // Restore local visibility preferences for guests/spectators so master's visibility doesn't override
       if (localVisibilityMap && localVisibilityMap instanceof Map) {
         try {
@@ -37599,6 +40967,96 @@
     } catch (e) {
       /* ignore */
     }
+  }
+
+  async function flushMasterLayerPatchSendQueue() {
+    if (!multiState.masterLayerPatchQueued || multiState.masterLayerPatchInFlight) {
+      return false;
+    }
+    if (!multiState.connected || !isMultiMasterMode() || multiState.applyRemoteInProgress) {
+      multiState.masterLayerPatchQueued = false;
+      return false;
+    }
+    multiState.masterLayerPatchQueued = false;
+    multiState.masterLayerPatchInFlight = true;
+    try {
+      return await sendMasterLayerPatch();
+    } finally {
+      multiState.masterLayerPatchInFlight = false;
+      if (multiState.masterLayerPatchQueued && multiState.masterLayerPatchTimer === null) {
+        multiState.masterLayerPatchTimer = window.setTimeout(() => {
+          multiState.masterLayerPatchTimer = null;
+          flushMasterLayerPatchSendQueue().catch(() => {});
+        }, MULTI_LAYER_PATCH_DEBOUNCE_MS);
+      }
+    }
+  }
+
+  function scheduleMasterLayerPatchSend({ immediate = false } = {}) {
+    if (!multiState.connected || !isMultiMasterMode() || multiState.applyRemoteInProgress) {
+      return;
+    }
+    multiState.masterLayerPatchQueued = true;
+    if (immediate) {
+      if (multiState.masterLayerPatchTimer !== null) {
+        window.clearTimeout(multiState.masterLayerPatchTimer);
+        multiState.masterLayerPatchTimer = null;
+      }
+      flushMasterLayerPatchSendQueue().catch(() => {});
+      return;
+    }
+    if (multiState.masterLayerPatchTimer !== null) {
+      return;
+    }
+    multiState.masterLayerPatchTimer = window.setTimeout(() => {
+      multiState.masterLayerPatchTimer = null;
+      flushMasterLayerPatchSendQueue().catch(() => {});
+    }, MULTI_LAYER_PATCH_DEBOUNCE_MS);
+  }
+
+  async function flushGuestLayerPatchSendQueue() {
+    if (!multiState.guestLayerPatchQueued || multiState.guestLayerPatchInFlight) {
+      return false;
+    }
+    if (!multiState.connected || !isMultiGuestMode() || multiState.applyRemoteInProgress) {
+      multiState.guestLayerPatchQueued = false;
+      return false;
+    }
+    multiState.guestLayerPatchQueued = false;
+    multiState.guestLayerPatchInFlight = true;
+    try {
+      return await sendGuestLayerPatch();
+    } finally {
+      multiState.guestLayerPatchInFlight = false;
+      if (multiState.guestLayerPatchQueued && multiState.guestLayerPatchTimer === null) {
+        multiState.guestLayerPatchTimer = window.setTimeout(() => {
+          multiState.guestLayerPatchTimer = null;
+          flushGuestLayerPatchSendQueue().catch(() => {});
+        }, MULTI_LAYER_PATCH_DEBOUNCE_MS);
+      }
+    }
+  }
+
+  function scheduleGuestLayerPatchSend({ immediate = false } = {}) {
+    if (!multiState.connected || !isMultiGuestMode() || multiState.applyRemoteInProgress) {
+      return;
+    }
+    multiState.guestLayerPatchQueued = true;
+    if (immediate) {
+      if (multiState.guestLayerPatchTimer !== null) {
+        window.clearTimeout(multiState.guestLayerPatchTimer);
+        multiState.guestLayerPatchTimer = null;
+      }
+      flushGuestLayerPatchSendQueue().catch(() => {});
+      return;
+    }
+    if (multiState.guestLayerPatchTimer !== null) {
+      return;
+    }
+    multiState.guestLayerPatchTimer = window.setTimeout(() => {
+      multiState.guestLayerPatchTimer = null;
+      flushGuestLayerPatchSendQueue().catch(() => {});
+    }, MULTI_LAYER_PATCH_DEBOUNCE_MS);
   }
 
   function buildGuestLayerPatchPayload() {
@@ -38453,7 +41911,7 @@
     }
     if (isResidentMultiRestrictedMasterMode()) {
       ensureResidentTimelapseCaptureStarted();
-      captureTimelapseFrameFromState();
+      scheduleTimelapseCaptureFromState();
       scheduleResidentRoomPersist({ immediate: false, force: true });
     }
     applyMultiAssignmentsFromPayload(payload.assignments, multiState.clientId, payload.blockedClientIds);
@@ -38485,52 +41943,9 @@
   }
 
   async function handleMultiGuestPaletteUpdateMessage(payload) {
-    if (!isMultiMasterMode()) {
-      return;
-    }
-    if (!payload || typeof payload !== 'object') {
-      return;
-    }
-    const senderClientId = typeof payload.clientId === 'string' ? payload.clientId.trim() : '';
-    if (!senderClientId || senderClientId === multiState.clientId) {
-      return;
-    }
-    if (isMultiClientBlocked(senderClientId)) {
-      return;
-    }
-    normalizeMultiAssignmentsForCurrentDocument();
-    const assignment = getMultiAssignment(senderClientId);
-    if (!assignment || assignment.role === 'spectator') {
-      return;
-    }
-    const paletteSource = Array.isArray(payload.palette) ? payload.palette : [];
-    if (!paletteSource.length) {
-      return;
-    }
-    const nextPalette = paletteSource.map(color => normalizeColorValue(color));
-    state.palette = nextPalette;
-    state.activePaletteIndex = clamp(
-      normalizePaletteIndex(state.activePaletteIndex, 0),
-      0,
-      Math.max(0, nextPalette.length - 1)
-    );
-    state.secondaryPaletteIndex = clamp(
-      normalizePaletteIndex(state.secondaryPaletteIndex, state.activePaletteIndex),
-      0,
-      Math.max(0, nextPalette.length - 1)
-    );
-    if (isIndexColorMode()) {
-      const activeColor = nextPalette[state.activePaletteIndex];
-      if (activeColor) {
-        state.activeRgb = normalizeColorValue(activeColor);
-      }
-    }
-    syncPaletteInputs();
-    renderPalette();
-    requestRender();
-    requestOverlayRender();
-    markRemoteMultiStateDirty();
-    scheduleMultiSessionStateBroadcast({ immediate: true });
+    // Palette is client-local in multiplayer mode.
+    // Keep this event for backward compatibility but intentionally ignore it.
+    void payload;
   }
 
   async function handleMultiGuestLayerPatchMessage(payload) {
@@ -38588,7 +42003,7 @@
     requestOverlayRender();
     if (inMasterMode && isResidentMultiRestrictedMasterMode()) {
       ensureResidentTimelapseCaptureStarted();
-      captureTimelapseFrameFromState();
+      scheduleTimelapseCaptureFromState();
       scheduleResidentRoomPersist({ immediate: false });
     }
     if (!inMasterMode) {
@@ -38725,6 +42140,7 @@
     clearMultiBroadcastTimer();
     clearPendingMultiSessionStateApply();
     clearMultiLayerPatchSnapshots();
+    clearMultiLayerPatchSendTimers();
     clearMultiGuestStateRecovery();
     clearResidentAutoPromoteTimer();
     const channel = multiState.channel;
@@ -38843,6 +42259,7 @@
     }
     clearPendingMultiSessionStateApply();
     clearMultiLayerPatchSnapshots();
+    clearMultiLayerPatchSendTimers();
     multiState.maxGuests = normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT);
     multiState.roomVisibility = normalizeMultiRoomVisibility(
       multiState.roomVisibility,
@@ -38932,6 +42349,10 @@
       if (multiState.guestStateRecoveryTimer !== null) {
         window.clearTimeout(multiState.guestStateRecoveryTimer);
         multiState.guestStateRecoveryTimer = null;
+      }
+      const multiPaletteConvertResult = convertIndexedDocumentToDirectForMultiPalette();
+      if ((multiPaletteConvertResult?.convertedPixels || 0) > 0) {
+        markRemoteMultiStateDirty({ clearLayerPatchSnapshots: true });
       }
 
       if (normalizedRole === 'master') {
@@ -39069,18 +42490,18 @@
     if (isMultiMasterMode()) {
       if (isResidentMultiRestrictedMasterMode()) {
         if (HISTORY_DRAW_TOOLS.has(_label)) {
-          sendMasterLayerPatch();
+          scheduleMasterLayerPatchSend();
           scheduleMultiPublicLobbyRoomSync({ immediate: false });
           scheduleResidentRoomPersist({ immediate: false });
         }
         return;
       }
       if (HISTORY_DRAW_TOOLS.has(_label)) {
-        sendMasterLayerPatch();
+        scheduleMasterLayerPatchSend();
         scheduleMultiPublicLobbyRoomSync({ immediate: false });
         return;
       }
-      if (MULTI_PALETTE_HISTORY_LABELS.has(_label) && isRgbColorMode()) {
+      if (MULTI_PALETTE_HISTORY_LABELS.has(_label)) {
         return;
       }
       scheduleMultiSessionStateBroadcast({ immediate: false });
@@ -39089,12 +42510,9 @@
     }
     if (isMultiGuestMode()) {
       if (MULTI_PALETTE_HISTORY_LABELS.has(_label)) {
-        if (isIndexColorMode()) {
-          sendGuestPaletteUpdate();
-        }
         return;
       }
-      sendGuestLayerPatch();
+      scheduleGuestLayerPatchSend();
     }
   }
 
@@ -39926,7 +43344,10 @@
         const isMouseLikePointer = event.pointerType === 'mouse' && !isCoarsePointerDevice();
         const targetElement = event.target instanceof Element ? event.target : null;
         if (hasPendingSelectionMove()) {
-          const keepCanvasFlow = Boolean(targetElement && isCanvasSurfaceTarget(targetElement));
+          const keepCanvasFlow = Boolean(
+            targetElement
+            && (isCanvasSurfaceTarget(targetElement) || isViewportControlTarget(targetElement))
+          );
           if (!keepCanvasFlow) {
             confirmPendingSelectionMove();
           }
