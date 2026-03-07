@@ -1018,11 +1018,32 @@
   function setupRecentUpdates() {
     const updates = [
       {
-        title: 'PiXiEEDraw 左レーンUIを統合調整',
-        summary: 'ツール/カラーの統合運用、コンパクト時の1列+フライアウト、ボタンサイズ統一（44px）を反映しました。',
-        date: '2026-02-25',
+        title: 'PiXiEED ホームの案内と比較導線を調整',
+        summary: 'ホーム文言をユーザー向けに整理し、Lite / PiXiEEDraw 比較カードに実機スクリーンショット切替を追加しました。',
+        date: '2026-03-07',
+        tag: 'Home',
+        href: 'index.html'
+      },
+      {
+        title: 'PiXiEEDraw 使い方ヘルプと表示整理',
+        summary: '設定から開く検索対応ヘルプを追加し、画面内説明ラベルと保存/出力説明を最小化して作業画面を整理しました。',
+        date: '2026-03-07',
         tag: 'Tool',
         href: 'pixiedraw/index.html'
+      },
+      {
+        title: 'ドット絵ガイドLPを4ページ追加',
+        summary: '検索意図に合わせた LP（描く/動かす/作成/オンライン）を追加し、目的別に遷移できるようにしました。',
+        date: '2026-03-05',
+        tag: 'SEO',
+        href: 'pixel-art-editor/index.html'
+      },
+      {
+        title: 'ドット絵・ピクセルアート用語集を公開',
+        summary: '基本用語から制作工程までをカテゴリ別に整理し、日本語/英語検索に対応しました。',
+        date: '2026-03-05',
+        tag: 'Project',
+        href: 'glossary/index.html'
       },
       {
         title: 'ヒーローカードを矢印＆ドット付きカルーセル化',
