@@ -2466,10 +2466,7 @@
         </div>
         <button class="chip public-rooms-hub__refresh" id="refreshPublicRooms" type="button">Refresh</button>
       </div>
-      <p class="public-rooms-hub__lead">Shows currently live rooms and resident rooms. Join from the thumbnail or action button and start co-creating immediately.</p>
-      <div class="chips" style="margin:8px 0 0;">
-        <a class="chip" href="pixiedraw/index.html?multiInvite=1&amp;multiKey=resident-256-main&amp;multiAutoJoin=1&amp;multiRole=guest">Open Resident 256</a>
-      </div>
+      <p class="public-rooms-hub__lead">Shows currently live rooms. Join from the thumbnail or action button and start co-creating immediately.</p>
       <div class="public-room-grid" id="publicRoomGrid" aria-live="polite">
         <p class="public-room-empty">No live rooms right now.</p>
       </div>
@@ -2541,7 +2538,7 @@
         <!-- publicRoomsHub moved to appear under the dot-hero section -->
         <ul class="project-place__source" id="gameGalleryItems" hidden>
           <li data-title="PiXiEED Home (guide flow refresh)" data-image="character-dots/mao1.png" data-type="project" data-updated="2026-03-07" data-update="Homepage copy was rewritten for user-facing clarity, guide blocks were moved lower, and Lite/PiXiEEDraw cards now include real screenshot toggles." data-desc="The top page now makes tool choice clearer for first-time visitors." data-link="en/index.html"></li>
-          <li data-title="PiXiEEDraw (help + floating preview)" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-03-07" data-update="Added a searchable help panel in Settings, added a movable/resizable floating preview panel, and reduced inline helper text." data-desc="Keeps the workspace clean while preserving quick access to guidance." data-link="pixiedraw/index.html"></li>
+          <li data-title="PiXiEEDraw (settings UI + palette polish)" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-03-07" data-update="Preset color preview now supports up to 32 swatches, the new-project preset preview was simplified, Settings now includes a local external-extension panel, the five utility buttons use a lighter sub-style (A/あ label), the canvas-size block is highlighted, and long update toasts are scrollable." data-desc="Improves readability and tap comfort in Settings without adding visual noise." data-link="pixiedraw/index.html"></li>
           <li data-title="PiXiEEDraw (simpler collab entry flow)" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-03-07" data-update="Master now opens a room with auto key generation, joiners enter a key then choose participant/viewer, and new rooms start private by default." data-desc="Collaboration setup now needs fewer steps for first-time users." data-link="pixiedraw/index.html"></li>
           <li data-title="PiXiEEDraw (export + color + selection updates)" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-03-07" data-update="Added JPEG/SVG export, added Indexed/RGB color mode switching with RGB-to-index auto palette add, and improved arrow-key selection move behavior." data-desc="Production workflow was strengthened from color handling to export and selection move." data-link="pixiedraw/index.html"></li>
           <li data-title="Pixel Art Glossary (EN)" data-image="icon/icon-192-6.png" data-type="project" data-updated="2026-03-05" data-update="Launched an English glossary with searchable terms for pixel art fundamentals, rendering, animation, and production workflow." data-desc="Improved onboarding for non-Japanese users with dedicated terminology reference." data-link="glossary/index.html"></li>
@@ -3117,6 +3114,7 @@
     const MULTI_SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
     const MULTI_SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
     const MULTI_PUBLIC_LOBBY_CHANNEL = 'pixiedraw-public-rooms-v1';
+    const RESIDENT_CANVASES_HIDDEN = true;
     const RESIDENT_THUMB_CACHE_KEY = 'pixieed:resident-room-thumb-cache-v1';
     const RESIDENT_THUMB_CACHE_LIMIT = 12;
     const RESIDENT_BLACK_THUMBNAIL_EDGE = 96;
@@ -3125,6 +3123,13 @@
       if (typeof value !== 'string') return '';
       return value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40);
     }
+
+    const RESIDENT_PROJECT_KEY_SET = new Set([
+      'resident-256-main',
+      'resident-64-main',
+      'resident-32-main',
+      'resident-128-main'
+    ]);
 
     function wait(ms){
       return new Promise(resolve => setTimeout(resolve, ms));
@@ -3294,8 +3299,11 @@
         let residentThumbCache = readResidentThumbnailCache();
         const active = (await Promise.all((Array.isArray(rooms) ? rooms : []).map(async (r) => {
           if (!r || typeof r !== 'object') return null;
+          const projectKey = normalizeProjectKey(r.projectKey || r.channel || r.id || '');
+          if (RESIDENT_CANVASES_HIDDEN && r.type === 'resident' && RESIDENT_PROJECT_KEY_SET.has(projectKey)) {
+            return null;
+          }
           if (r.type === 'resident'){
-            const projectKey = normalizeProjectKey(r.projectKey || r.channel || r.id || '');
             const lobby = projectKey ? lobbyRooms.get(projectKey) : null;
             const liveThumb = (typeof lobby?.thumbnailDataUrl === 'string' && lobby.thumbnailDataUrl.startsWith('data:image/'))
               ? lobby.thumbnailDataUrl
