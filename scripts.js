@@ -1018,18 +1018,32 @@
   function setupRecentUpdates() {
     const updates = [
       {
+        title: 'PiXiEEDdraw 小窓プレビューとヘルプ検索を追加',
+        summary: '設定から開ける検索対応ヘルプと、移動/リサイズ可能な小窓プレビュー（再生/停止連動）を追加しました。',
+        date: '2026-03-07',
+        tag: 'Tool',
+        href: 'pixiedraw/index.html'
+      },
+      {
+        title: 'PiXiEEDraw 共有モード導線を簡略化',
+        summary: '部屋を開くでキー自動生成、参加はキー入力後に参加者/視聴を選択、新規ルームは非公開開始に統一しました。',
+        date: '2026-03-07',
+        tag: 'Tool',
+        href: 'pixiedraw/index.html'
+      },
+      {
+        title: 'PiXiEEDraw 出力・カラー・選択移動を改善',
+        summary: 'JPEG/SVG出力追加、インデックス/RGB切替、RGB→インデックス時の自動パレット追加、方向キー移動の欠け軽減を反映しました。',
+        date: '2026-03-07',
+        tag: 'Tool',
+        href: 'pixiedraw/index.html'
+      },
+      {
         title: 'PiXiEED ホームの案内と比較導線を調整',
         summary: 'ホーム文言をユーザー向けに整理し、Lite / PiXiEEDraw 比較カードに実機スクリーンショット切替を追加しました。',
         date: '2026-03-07',
         tag: 'Home',
         href: 'index.html'
-      },
-      {
-        title: 'PiXiEEDraw 使い方ヘルプと表示整理',
-        summary: '設定から開く検索対応ヘルプを追加し、画面内説明ラベルと保存/出力説明を最小化して作業画面を整理しました。',
-        date: '2026-03-07',
-        tag: 'Tool',
-        href: 'pixiedraw/index.html'
       },
       {
         title: 'ドット絵ガイドLPを4ページ追加',
@@ -1044,34 +1058,6 @@
         date: '2026-03-05',
         tag: 'Project',
         href: 'glossary/index.html'
-      },
-      {
-        title: 'ヒーローカードを矢印＆ドット付きカルーセル化',
-        summary: '3枚並びのヒーローを左右ナビとドットで操作できるようにし、導線を整理しました。',
-        date: '2025-11-18',
-        tag: 'UI/UX',
-        href: '#home-hero'
-      },
-      {
-        title: 'メールアドレスをGmailに統一',
-        summary: '全ページの連絡先を pixieed.arta@gmail.com に更新し、JSON-LDにも反映しました。',
-        date: '2025-11-18',
-        tag: 'Info',
-        href: '#contact'
-      },
-      {
-        title: 'ドット絵・プロジェクトに新着バッジ追加',
-        summary: '未閲覧のドット絵サムネとプロジェクトカードに赤点を表示し、ヘッダーにも未読を連動。',
-        date: '2025-11-17',
-        tag: 'Feature',
-        href: '#dot-gallery'
-      },
-      {
-        title: 'サイトマップを追加',
-        summary: 'sitemap.xmlを配置し、サーチコンソール送信用の準備を完了しました。',
-        date: '2025-11-17',
-        tag: 'SEO',
-        href: '/sitemap.xml'
       }
     ];
 
