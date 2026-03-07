@@ -6,7 +6,7 @@
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <title>ドット絵作成ツール PiXiEEDraw | 無料ブラウザで描く・共同編集</title>
 <meta content="#1f1f1f" name="theme-color"/>
-<meta content="PiXiEEDrawは、無料で使えるブラウザのドット絵作成ツール。レイヤー、フレームアニメ、オニオンスキン、GIF/PNG書き出し、リアルタイム共同編集に対応。" name="description"/>
+<meta content="PiXiEEDrawは、無料で使えるブラウザのドット絵作成ツール。レイヤー、フレームアニメ、オニオンスキン、GIF/PNG/JPEG/SVG書き出し、リアルタイム共同編集に対応。" name="description"/>
 <meta content="PiXiEEDraw,ピクシードロー,ドット絵 エディター,ドット絵 描く サイト,ピクセルアート,リアルタイム 共同編集,アニメーション GIF,オニオンスキン" name="keywords"/>
 <meta content="noindex,follow" name="robots"/>
 <link rel="canonical" href="https://pixieed.jp/projects/pixiedraw/"/>
@@ -14,14 +14,14 @@
 <meta content="PiXiEED" property="og:site_name"/>
 <meta content="ja_JP" property="og:locale"/>
 <meta content="ドット絵作成ツール PiXiEEDraw | 無料ブラウザで描く・共同編集" property="og:title"/>
-<meta content="PiXiEEDrawは、無料で使えるブラウザのドット絵作成ツール。レイヤー、フレームアニメ、オニオンスキン、GIF/PNG書き出し、リアルタイム共同編集に対応。" property="og:description"/>
+<meta content="PiXiEEDrawは、無料で使えるブラウザのドット絵作成ツール。レイヤー、フレームアニメ、オニオンスキン、GIF/PNG/JPEG/SVG書き出し、リアルタイム共同編集に対応。" property="og:description"/>
 <meta content="https://pixieed.jp/projects/pixiedraw/" property="og:url"/>
 <meta content="https://pixieed.jp/pixiedraw/ogp-app.png" property="og:image"/>
 <meta content="summary_large_image" name="twitter:card"/>
 <meta content="@PiXiEED_arta" name="twitter:site"/>
 <meta content="https://pixieed.jp/projects/pixiedraw/" name="twitter:url"/>
 <meta content="ドット絵作成ツール PiXiEEDraw | 無料ブラウザで描く・共同編集" name="twitter:title"/>
-<meta content="PiXiEEDrawは、無料で使えるブラウザのドット絵作成ツール。レイヤー、フレームアニメ、オニオンスキン、GIF/PNG書き出し、リアルタイム共同編集に対応。" name="twitter:description"/>
+<meta content="PiXiEEDrawは、無料で使えるブラウザのドット絵作成ツール。レイヤー、フレームアニメ、オニオンスキン、GIF/PNG/JPEG/SVG書き出し、リアルタイム共同編集に対応。" name="twitter:description"/>
 <meta content="https://pixieed.jp/pixiedraw/ogp-app.png" name="twitter:image"/>
 <script type="application/ld+json">
 {
@@ -32,13 +32,13 @@
   "operatingSystem": "Web",
   "url": "https://pixieed.jp/projects/pixiedraw/",
   "image": "https://pixieed.jp/pixiedraw/ogp-app.png",
-  "description": "PiXiEEDrawは、無料で使えるブラウザのドット絵作成ツール。レイヤー、フレームアニメ、オニオンスキン、GIF/PNG書き出し、リアルタイム共同編集に対応。",
+  "description": "PiXiEEDrawは、無料で使えるブラウザのドット絵作成ツール。レイヤー、フレームアニメ、オニオンスキン、GIF/PNG/JPEG/SVG書き出し、リアルタイム共同編集に対応。",
   "featureList": [
     "リアルタイム共有モード（マスター/参加者）",
     "フレームアニメーション編集（FPS設定）",
     "オニオンスキン表示",
     "レイヤー不透明度・合成モード",
-    "GIF/PNG/プロジェクト書き出し",
+    "GIF/PNG/JPEG/SVG/プロジェクト書き出し",
     "PC/タブレット/スマホ対応"
   ],
   "softwareVersion": "2026.03",
@@ -138,15 +138,14 @@
 <button class="startup-screen__link" id="startupActionSkip" type="button">この画面を閉じる</button>
 </div>
 </div>
-<div aria-hidden="true" class="update-toast" data-update-id="2026-03-04-project-tabs-autosave-palette" hidden="" id="updateToast" role="status" aria-live="polite">
+<div aria-hidden="true" class="update-toast" data-update-id="2026-03-07-help-and-ui-cleanup" hidden="" id="updateToast" role="status" aria-live="polite">
 <div class="update-toast__body">
 <p class="update-toast__message">
-<strong>更新情報 (2026/03/04)</strong><br/>
-・複数プロジェクトタブ（最大5件）と複数ファイル同時オープンに対応<br/>
-・新規作成時の保存先フォルダ案内と端末内プロジェクト削除確認を追加<br/>
-・左レーンのツール/カラー縦比率をドラッグ調整できるよう改善<br/>
-・ネストスクロール時の親スクロール移譲を改善<br/>
-・貼り付け時に未登録色を自動でパレット追加（失敗時はロールバック）<br/>
+<strong>更新情報 (2026/03/07)</strong><br/>
+・設定パネルから開ける「使い方ヘルプ」を追加（検索対応）<br/>
+・画面内の説明ラベルを最小化し、必要なときだけヘルプで確認できるよう調整<br/>
+・レーン上のヘルプ導線と説明ボタンを整理し、作業画面をシンプル化<br/>
+・保存/出力まわりの冗長な説明文を削減し、必要な情報だけ表示<br/>
 ・詳細は設定の「更新情報」から確認できます
 </p>
 <div class="update-toast__actions">
@@ -172,6 +171,10 @@
 <button aria-controls="mobilePanelSettings" aria-label="設定" aria-selected="false" class="mobile-tab" data-mobile-tab="settings" id="mobileTabSettings" role="tab" tabindex="-1" type="button">
 <img alt="" class="tab-icon" src="assets/icons/menu-settings.svg"/>
 <span class="sr-only">設定</span>
+</button>
+<button aria-controls="mobilePanelHelp" aria-hidden="true" aria-label="使い方ヘルプ" aria-selected="false" class="mobile-tab" data-mobile-tab="help" hidden="" id="mobileTabHelp" role="tab" tabindex="-1" type="button">
+<img alt="" class="tab-icon" src="assets/icons/menu-help.svg"/>
+<span class="sr-only">使い方ヘルプ</span>
 </button>
 <button aria-controls="mobilePanelFile" aria-label="ファイル" aria-selected="false" class="mobile-tab" data-mobile-tab="file" id="mobileTabFile" role="tab" tabindex="-1" type="button">
 <img alt="" class="tab-icon" src="assets/icons/menu-file.svg"/>
@@ -239,6 +242,19 @@
 </div>
 </div>
 <div aria-hidden="true" aria-live="polite" class="zoom-indicator" id="zoomIndicator" role="status"></div>
+<div aria-label="小窓プレビュー" aria-hidden="true" class="floating-preview-panel is-hidden" hidden="" id="floatingPreviewPanel" role="region">
+<div class="floating-preview-panel__header" id="floatingPreviewHeader">
+<span class="floating-preview-panel__title" id="floatingPreviewTitle">小窓プレビュー</span>
+<div class="floating-preview-panel__actions">
+<button class="chip floating-preview-panel__btn" id="floatingPreviewPlay" type="button">再生</button>
+<button class="chip floating-preview-panel__btn" id="floatingPreviewStop" type="button">停止</button>
+</div>
+</div>
+<div class="floating-preview-panel__body" id="floatingPreviewBody">
+<canvas aria-label="小窓プレビューキャンバス" class="floating-preview-panel__canvas" height="32" id="floatingPreviewCanvas" width="32"></canvas>
+</div>
+<button aria-label="プレビューパネルのサイズを変更" class="floating-preview-panel__resize-handle" id="floatingPreviewResize" type="button"></button>
+</div>
 </div>
 </main>
 <aside aria-label="フレーム、レイヤー、設定、ファイル、共有" class="rail rail--right" data-collapsed="false" data-compact="true" id="rightRail">
@@ -250,6 +266,10 @@
 <button aria-controls="panelSettings" aria-label="設定" aria-selected="false" class="rail-tab" data-right-tab="settings" role="tab" tabindex="-1" title="設定" type="button">
 <img alt="" class="tab-icon" src="assets/icons/menu-settings.svg"/>
 <span class="sr-only">設定</span>
+</button>
+<button aria-controls="panelHelp" aria-hidden="true" aria-label="使い方ヘルプ" aria-selected="false" class="rail-tab" data-right-tab="help" hidden="" role="tab" tabindex="-1" title="使い方ヘルプ" type="button">
+<img alt="" class="tab-icon" src="assets/icons/menu-help.svg"/>
+<span class="sr-only">使い方ヘルプ</span>
 </button>
 <button aria-controls="panelFile" aria-label="ファイル" aria-selected="false" class="rail-tab" data-right-tab="file" role="tab" tabindex="-1" title="ファイル" type="button">
 <img alt="" class="tab-icon" src="assets/icons/menu-file.svg"/>
@@ -300,6 +320,7 @@
 <div aria-labelledby="mobileTabColor" class="mobile-panel" hidden="" id="mobilePanelColor" role="tabpanel"></div>
 <div aria-labelledby="mobileTabFrames" class="mobile-panel" hidden="" id="mobilePanelFrames" role="tabpanel"></div>
 <div aria-labelledby="mobileTabSettings" class="mobile-panel" hidden="" id="mobilePanelSettings" role="tabpanel"></div>
+<div aria-labelledby="mobileTabHelp" class="mobile-panel" hidden="" id="mobilePanelHelp" role="tabpanel"></div>
 <div aria-labelledby="mobileTabFile" class="mobile-panel" hidden="" id="mobilePanelFile" role="tabpanel"></div>
 <div aria-labelledby="mobileTabMulti" class="mobile-panel" hidden="" id="mobilePanelMulti" role="tabpanel"></div>
 </div>
@@ -475,7 +496,7 @@
 <div aria-label="カラーパレット" class="palette-grid" id="paletteList" role="listbox"></div>
 <div class="palette-editor" id="paletteEditor">
 <div class="palette-topline">
-<label class="field field--compact palette-index-inline">
+<label class="field field--compact palette-index-inline" id="paletteIndexField">
 <span>インデックス</span>
 <input data-stepper="true" id="paletteIndex" min="0" step="1" type="number"/>
 </label>
@@ -620,16 +641,23 @@
 <button class="button" id="clearCanvas" type="button">キャンバスをクリア</button>
 </div>
 <div class="file-panel-summary">
-<p class="help-text">自動保存: ON（この端末）</p>
-<p class="help-text">共有・配布用の保存は「保存/出力」から手動で行います。</p>
+<p class="help-text ui-guide-text">自動保存: ON（この端末）</p>
+<p class="help-text ui-guide-text">共有・配布用の保存は「保存/出力」から手動で行います。</p>
+</div>
+<div class="field field--list file-contest-promo" id="fileContestPromo">
+<span id="fileContestPromoTitle">コンテスト投稿</span>
+<p class="help-text ui-guide-text" id="fileContestPromoDescription">保存/出力の「保存完了後にコンテスト投稿画面へ移動する」をONにすると、そのまま投稿できます。</p>
+<div class="field-group file-contest-promo__actions">
+<a class="button button--primary" href="../contest/index.html" id="openContestFromFilePanel">コンテストページを見る</a>
+</div>
 </div>
 <button class="button" hidden id="enableAutosave" type="button">ローカル自動保存（常時ON）</button>
 <button class="button" hidden id="bindExportFolder" type="button">出力フォルダを設定</button>
-<p aria-live="polite" class="help-text export-destination-label" id="exportDestinationLabel">画像/GIF出力先: 未固定（保存時に保存先を選択）</p>
+<p aria-live="polite" class="help-text export-destination-label" id="exportDestinationLabel">画像/GIF/SVG出力先: 未固定（保存時に保存先を選択）</p>
 <p aria-live="polite" class="help-text" id="autosaveStatus"></p>
 <p aria-live="polite" class="help-text" id="exportFolderStatus"></p>
 <div class="field field--list">
-<span>タイムラプス</span>
+<span id="timelapseSectionTitle">タイムラプス</span>
 <div class="field-group">
 <button class="button" id="timelapseClear" type="button">記録クリア</button>
 </div>
@@ -638,7 +666,7 @@
 <input data-stepper="true" id="timelapseFps" inputmode="numeric" max="60" min="1" step="1" type="number" value="12"/>
 </label>
 <p aria-live="polite" class="help-text" id="timelapseStatus">タイムラプス: 未記録</p>
-<p class="help-text">記録ON時は描画履歴を自動記録します。出力は通常の「出力」ボタンから選択してください。</p>
+<p class="help-text ui-guide-text" id="timelapseDescription">記録ON時は描画履歴を自動記録します。出力は通常の「出力」ボタンから選択してください。</p>
 </div>
 <div aria-live="polite" class="field memory-control" role="status">
 <span id="memoryUsage">メモリ: 計測中…</span>
@@ -650,8 +678,37 @@
 <section class="panel-section" data-section="multi" id="panelMulti">
 <div class="panel-section__body">
 <div class="multi-entry-screen" id="multiEntryScreen">
-<button class="button" id="multiEntryMaster" type="button">マスター</button>
-<button class="button" id="multiEntryGuest" type="button">入室</button>
+<div class="multi-entry-actions" id="multiEntryActions">
+<button class="button multi-entry-action" id="multiEntryMaster" type="button">
+<span id="multiEntryMasterTitle">部屋を開く</span>
+<small id="multiEntryMasterMeta">キー自動生成</small>
+</button>
+<button class="button multi-entry-action" id="multiEntryGuest" type="button">
+<span id="multiEntryGuestTitle">参加する</span>
+<small id="multiEntryGuestMeta">キー入力へ進む</small>
+</button>
+</div>
+<div class="multi-entry-join-panel" hidden id="multiEntryJoinPanel">
+<div class="field field--compact multi-project-key-field" id="multiJoinProjectKeyField">
+<span>プロジェクトキー</span>
+<div class="multi-project-key-row multi-project-key-row--single">
+<input autocomplete="off" id="multiJoinProjectKey" inputmode="text" maxlength="40" placeholder="例: room-1234" spellcheck="false" type="text"/>
+</div>
+</div>
+<div class="multi-entry-role-actions">
+<button class="button multi-entry-action" id="multiEntryJoinAsGuest" type="button">
+<span id="multiEntryJoinAsGuestTitle">参加者で入る</span>
+<small id="multiEntryJoinAsGuestMeta">入室後に自動で参加申請</small>
+</button>
+<button class="button multi-entry-action" id="multiEntrySpectator" type="button">
+<span id="multiEntrySpectatorTitle">視聴で入る</span>
+<small id="multiEntrySpectatorMeta">見るだけで入室</small>
+</button>
+</div>
+<button class="chip multi-entry-join-back" id="multiEntryJoinBack" type="button">戻る</button>
+<p class="help-text ui-guide-text" id="multiEntryJoinHint">キー入力後に参加者か視聴者を選んで入室します。</p>
+</div>
+<p class="help-text ui-guide-text" id="multiEntryHint">部屋を開くとキーが発行されます。参加する場合はキー入力パネルへ進んでください。</p>
 </div>
 <div class="multi-flow-panel" hidden id="multiFlowPanel">
 <div class="field field--list multi-comment-field">
@@ -668,46 +725,35 @@
 <input autocomplete="off" id="multiCommentInput" maxlength="140" placeholder="コメントを入力" type="text"/>
 <button class="chip" id="multiCommentSend" type="button">送信</button>
 </div>
-</div>
-<div class="field-group">
-<div class="multi-session-actions">
-<button class="button" id="multiStartSession" type="button">開始</button>
-<button class="button" id="multiLeaveSession" type="button">切断</button>
-</div>
-</div>
-<div class="field field--compact multi-project-key-field">
+<div class="field field--compact multi-project-key-field" hidden id="multiProjectKeyField">
 <span>プロジェクトキー</span>
 <div class="multi-project-key-row">
-<input autocomplete="off" id="multiProjectKey" inputmode="text" maxlength="40" placeholder="例: room-1234" spellcheck="false" type="text"/>
+<input autocomplete="off" id="multiProjectKey" inputmode="text" maxlength="40" placeholder="例: room-1234" readonly spellcheck="false" type="text"/>
 <button aria-label="プロジェクトキーをコピー" class="chip multi-project-key-copy" id="multiCopyKey" title="プロジェクトキーをコピー" type="button">コピー</button>
 </div>
 </div>
+</div>
+<div class="field-group">
+<div class="multi-session-actions multi-session-actions--single">
+<button class="button" id="multiLeaveSession" type="button">切断</button>
+</div>
+</div>
 <div class="field field--list multi-master-actions" data-multi-master-only="true">
-<span>基本</span>
-<button class="chip" id="multiGenerateKey" type="button">キー生成</button>
-<button class="chip" id="multiBroadcastState" type="button">全員に同期</button>
+<span>部屋管理</span>
 <div class="field field--inline multi-invite-actions">
 <button class="chip" id="multiInviteCopy" type="button">招待リンクをコピー</button>
 <button class="chip" id="multiInviteShare" type="button">招待を共有</button>
 </div>
+<button class="chip" id="multiBroadcastState" type="button">全員に同期</button>
 </div>
 <div class="field field--list multi-join-request-field" hidden id="multiJoinRequestField">
 <button class="chip" id="multiRequestGuestRole" type="button">参加リクエストを送信</button>
-<p class="help-text" id="multiJoinRequestHint">参加はマスターの承認後に有効になります。</p>
+<p class="help-text ui-guide-text" id="multiJoinRequestHint">参加はマスターの承認後に有効になります。</p>
 </div>
 <div class="multi-status-row">
 <p aria-live="polite" class="help-text" id="multiStatus">共有モード: OFF</p>
-<button aria-controls="multiHelpPanel" aria-expanded="false" aria-label="マルチ説明を表示" class="chip multi-help-toggle" id="multiHelpToggle" type="button">?</button>
 </div>
-<div class="field field--list multi-help-panel" hidden id="multiHelpPanel">
-<span>マルチ説明</span>
-<p class="help-text">描画は参加者のみ、コメントは全員が利用できます。</p>
-<p class="help-text">参加者を選ぶと: 切替 / セル移動 / ロック / キック / BAN</p>
-<p class="help-text">視聴者を選ぶと: 切替のみ</p>
-<p class="help-text">招待リンクはプロジェクトキー付きで参加画面を開きます。</p>
-<button class="chip" id="multiHelpClose" type="button">閉じる</button>
-</div>
-<details class="field field--list multi-participants-panel" open>
+<details class="field field--list multi-participants-panel">
 <summary>参加者/視聴者一覧</summary>
 <div class="multi-participants-scroll">
 <ul class="toggle-list multi-participants-list" id="multiParticipants">
@@ -715,18 +761,8 @@
 </ul>
 </div>
 </details>
-<div class="multi-master-layout" data-multi-master-only="true">
-<div class="multi-master-column">
-<div class="field field--list multi-master-preset-field">
-<span>クイック設定</span>
-<div class="field field--inline multi-master-preset-actions">
-<button class="chip" id="multiPresetFriends" type="button">友達向け</button>
-<button class="chip" id="multiPresetStream" type="button">配信向け</button>
-</div>
-<p class="help-text" id="multiPresetHint">友達向け: 自動参加 / 配信向け: 承認制</p>
-</div>
-<details class="field field--list multi-master-advanced" id="multiMasterAdvanced">
-<summary>詳細設定</summary>
+<details class="field field--list multi-master-advanced" data-multi-master-only="true" id="multiMasterAdvanced">
+<summary>詳細設定（必要なときだけ）</summary>
 <div class="multi-master-advanced-body">
 <div class="field field--list multi-capacity-field">
 <span>参加管理</span>
@@ -734,7 +770,7 @@
 <span>参加上限 (1〜15)</span>
 <input data-stepper="true" id="multiMaxGuests" inputmode="numeric" max="15" min="1" step="1" type="number" value="5"/>
 </label>
-<p class="help-text" id="multiGuestCapacityHint">参加枠: 0 / 5</p>
+<p class="help-text ui-guide-text" id="multiGuestCapacityHint">参加枠: 0 / 5</p>
 <label class="field field--compact">
 <span>部屋公開</span>
 <select id="multiRoomVisibility">
@@ -742,7 +778,7 @@
 <option value="private">非公開</option>
 </select>
 </label>
-<p class="help-text" id="multiRoomVisibilityHint">非公開: ホームには表示されません。</p>
+<p class="help-text ui-guide-text" id="multiRoomVisibilityHint">非公開: ホームには表示されません。</p>
 <label class="field field--compact">
 <span>出力権限</span>
 <select id="multiExportPermission">
@@ -758,10 +794,8 @@
 <option value="approval">承認制（配信向け）</option>
 </select>
 </label>
-<p class="help-text" id="multiJoinPolicyHint">自動参加: 招待リンクは参加者入室になります。</p>
+<p class="help-text ui-guide-text" id="multiJoinPolicyHint">自動参加: 招待リンクは参加者入室になります。</p>
 </div>
-</div>
-</details>
 <div class="field field--list multi-join-requests-field">
 <span>参加リクエスト</span>
 <label class="field field--compact">
@@ -773,15 +807,13 @@
 <button class="chip" id="multiJoinRequestReject" type="button">却下</button>
 </div>
 </div>
-</div>
-<div class="multi-master-column">
 <div class="field field--list multi-master-ops-toggle-field">
 <span>運営モード</span>
 <label class="toggle-option" for="multiMasterOpsMode">
 <input id="multiMasterOpsMode" type="checkbox"/>
 <span>キック / BAN / 強制切替を表示</span>
 </label>
-<p class="help-text" id="multiMasterOpsHint">通常はOFF推奨です。</p>
+<p class="help-text ui-guide-text" id="multiMasterOpsHint">通常はOFF推奨です。</p>
 </div>
 <div class="field field--list multi-role-control-field" data-multi-master-ops="true">
 <span>参加/視聴の切替</span>
@@ -814,7 +846,7 @@
 </div>
 </div>
 </div>
-</div>
+</details>
 <div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 </div>
 </div>
@@ -825,6 +857,7 @@
     <a class="button" href="https://pixieed.jp/tools.html" id="goHomeButton">他のツール一覧へ</a>
     <a class="chip settings-nav__close settings-nav__support" href="https://pixieed.stores.jp" id="supportTipLink" target="_blank" rel="noopener noreferrer" aria-label="PiXiEEDの応援チップを購入">応援チップ</a>
     <button class="chip settings-nav__close" id="toggleLanguageMode" type="button">English</button>
+    <button class="chip settings-nav__close" id="openOperationHelpPanel" type="button">使い方ヘルプ</button>
     <button aria-haspopup="dialog" class="chip settings-nav__close" id="openShortcutHelp" type="button">ショートカット一覧</button>
     <button aria-haspopup="dialog" class="chip settings-nav__close" id="openUpdateHistory" type="button">更新情報</button>
   </div>
@@ -833,24 +866,20 @@
 <span>キャンバスサイズ</span>
 <div class="field field--inline settings-size-controls settings-size-controls--canvas">
 <label class="field field--tiny">
-<span>横</span>
+<span>X</span>
 <div class="canvas-size-stepper">
-<button aria-label="横を1下げる" class="number-stepper__btn" id="canvasWidthDecrement" type="button">−</button>
 <input data-stepper="true" enterkeyhint="done" id="canvasWidth" inputmode="numeric" max="512" min="1" step="1" type="number" value="32"/>
-<button aria-label="横を1上げる" class="number-stepper__btn" id="canvasWidthIncrement" type="button">＋</button>
 </div>
 </label>
 <label class="field field--tiny">
-<span>縦</span>
+<span>Y</span>
 <div class="canvas-size-stepper">
-<button aria-label="縦を1下げる" class="number-stepper__btn" id="canvasHeightDecrement" type="button">−</button>
 <input data-stepper="true" enterkeyhint="done" id="canvasHeight" inputmode="numeric" max="512" min="1" step="1" type="number" value="32"/>
-<button aria-label="縦を1上げる" class="number-stepper__btn" id="canvasHeightIncrement" type="button">＋</button>
 </div>
 </label>
 <button class="button" id="applyCanvasResize" type="button">確定</button>
 </div>
-<p class="help-text" id="canvasSizeHint">横/縦を入力して「確定」または Enter で反映します。</p>
+<p class="help-text ui-guide-text" id="canvasSizeHint">X/Y を入力して「確定」または Enter で反映します。</p>
 </div>
 <div class="field settings-size-row settings-size-row--sprite">
 <span>スプライト倍率</span>
@@ -866,6 +895,20 @@
 <button class="button" disabled="" id="applySpriteScale" type="button">適用</button>
 </div>
 </div>
+</div>
+<div class="field field--list settings-color-mode-field">
+<span>カラーモード</span>
+<div aria-label="カラーモード" class="color-mode-switch" id="settingsColorModeSwitch" role="radiogroup">
+<label class="color-mode-switch__option">
+<input checked="" name="colorMode" type="radio" value="index"/>
+<span id="colorModeIndexLabel">インデックスカラー</span>
+</label>
+<label class="color-mode-switch__option">
+<input name="colorMode" type="radio" value="rgb"/>
+<span id="colorModeRgbLabel">RGBカラー</span>
+</label>
+</div>
+<p class="help-text ui-guide-text" id="settingsColorModeHint">インデックスカラーとRGBカラーを切り替えます。</p>
 </div>
 <div aria-label="表示設定" class="field field--list" role="group">
 <ul class="toggle-list">
@@ -918,6 +961,12 @@
 </label>
 </li>
 <li>
+<label class="toggle-option" for="toggleFloatingPreview">
+<input id="toggleFloatingPreview" type="checkbox"/>
+<span>小窓プレビュー</span>
+</label>
+</li>
+<li>
 <label class="toggle-option" for="toggleMirrorMode">
 <input id="toggleMirrorMode" type="checkbox"/>
 <span>ミラーモード</span>
@@ -930,10 +979,6 @@
 </label>
 </li>
 </ul>
-<div class="pixfind-help">
-<button aria-controls="pixfindHelpText" aria-expanded="false" class="chip pixfind-help__toggle" id="togglePixfindHelp" type="button">間違い探しモードの説明</button>
-<p class="help-text pixfind-help__text" hidden="" id="pixfindHelpText">ON時はフレーム1を原本、フレーム2を差分としてPiXFiND出力します。ONにするたびフレーム2は作り直されます。</p>
-</div>
 <div class="mirror-axis-options" id="mirrorAxisOptions" role="group">
 <label class="toggle-option" for="mirrorAxisVertical">
 <input checked="" id="mirrorAxisVertical" type="checkbox"/>
@@ -952,7 +997,7 @@
 <span>斜め対称 (/)</span>
 </label>
 </div>
-<p class="help-text" id="mirrorAxisHelp">ミラーモード中は軸ライン外側のつまみをドラッグして、対称軸を移動できます。</p>
+<p class="help-text ui-guide-text" id="mirrorAxisHelp">ミラーモード中は軸ライン外側のつまみをドラッグして、対称軸を移動できます。</p>
 <div class="virtual-cursor-scale" id="virtualCursorScale">
 <label class="virtual-cursor-scale__control" for="virtualCursorButtonScale">
 <span class="virtual-cursor-scale__label">仮想カーソルボタンサイズ</span>
@@ -972,13 +1017,37 @@
 <option label="2×" value="2"></option>
 </datalist>
 </div>
-<p class="help-text mobile-draw-help" id="mobileDrawHelp">スマホ描画: 仮想カーソルをONにしてキャンバスをドラッグでカーソル移動、「描画」ボタン長押しで描画します（左半分=主色 / 右半分=副色）。2本指ドラッグ/ピンチで移動と拡大縮小ができます。</p>
+<p class="help-text ui-guide-text mobile-draw-help" id="mobileDrawHelp">スマホ描画: 仮想カーソルをONにしてキャンバスをドラッグでカーソル移動、「描画」ボタン長押しで描画します（左半分=主色 / 右半分=副色）。2本指ドラッグ/ピンチで移動と拡大縮小ができます。</p>
 <div aria-label="背景とUIカラー" class="settings-display-buttons" role="group">
 <button aria-pressed="false" class="chip" id="toggleBackgroundMode" type="button">背景:黒</button>
 <button aria-pressed="false" class="chip" id="toggleUiTheme" type="button">UI:緑色</button>
 </div>
-<p class="help-text">背景とUI配色を切り替えます（描画色には影響しません）。</p>
+<p class="help-text ui-guide-text" id="settingsDisplayHint">背景とUI配色を切り替えます（描画色には影響しません）。</p>
 </div>
+<div class="panel-ad-mount" data-panel-ad-mount="right"></div>
+</div>
+</section>
+<section class="panel-section" data-section="help" id="panelHelp">
+<div class="panel-section__body help-panel">
+<div class="field field--list">
+<span id="helpPanelTitle">使い方ヘルプ</span>
+<p class="help-text" id="helpPanelLead">操作方法を検索できます。必要なキーワードを入力してください。</p>
+<label class="field field--compact" for="helpSearchInput">
+<span id="helpSearchLabel">検索</span>
+<input autocomplete="off" id="helpSearchInput" inputmode="search" placeholder="例: 選択移動 / ミラー / GIF / マルチ" spellcheck="false" type="search"/>
+</label>
+<p class="help-text" id="helpSearchHint">検索は日本語/英語どちらでも使えます。</p>
+<label class="toggle-option help-inline-toggle" for="toggleInlineHelp">
+<input id="toggleInlineHelp" type="checkbox"/>
+<span id="toggleInlineHelpLabel">画面内の説明ラベルを表示</span>
+</label>
+<div class="field field--inline help-panel__meta">
+<span class="help-text" id="helpSearchCount">0 件</span>
+<button class="chip" id="helpClearSearch" type="button">クリア</button>
+</div>
+</div>
+<div class="help-panel__list" id="helpArticleList" role="list"></div>
+<p class="help-text" hidden="" id="helpNoResults">一致する項目はありません。</p>
 <div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 </div>
 </section>
@@ -994,6 +1063,8 @@
 <span>形式</span>
 <select id="exportFormat">
 <option value="png">PNG（画像）</option>
+<option value="jpeg">JPEG（画像）</option>
+<option value="svg">SVG（画像）</option>
 <option value="gridpng">PNG（グリッド分割）</option>
 <option value="gif">GIF（アニメーション）</option>
 <option value="timelapse">タイムラプスGIF（記録）</option>
@@ -1018,7 +1089,7 @@
 </label>
 <label class="toggle-option" for="exportSaveProjectCompanionToggle" id="exportCompanionOptionRow">
 <input id="exportSaveProjectCompanionToggle" type="checkbox"/>
-<span>画像/GIF出力時に PiXiEEDファイルも同時保存する</span>
+<span>画像/GIF/SVG出力時に PiXiEEDファイルも同時保存する</span>
 </label>
 <label class="toggle-option" for="exportContestPostToggle" id="exportContestPostOptionRow">
 <input id="exportContestPostToggle" type="checkbox"/>
@@ -1038,11 +1109,7 @@
 <p class="help-text" hidden id="exportGridHint">分割順: 右上から左へ、次の段へ進みます（右→左、上→下）。</p>
 </div>
 <div class="field field--list">
-<div aria-live="polite" class="export-guidance">
-<p class="help-text"><strong>iPhoneで保存</strong> 共有 → ファイルに保存</p>
-<p class="help-text"><strong>Androidで保存</strong> 保存</p>
-</div>
-<p aria-live="polite" class="help-text export-destination-label" id="exportDialogDestinationLabel">画像/GIF出力先: 未固定（保存時に保存先を選択）</p>
+<p aria-live="polite" class="help-text export-destination-label" id="exportDialogDestinationLabel">画像/GIF/SVG出力先: 未固定（保存時に保存先を選択）</p>
 <div aria-label="出力操作" class="export-actions" role="group">
 <button class="button button--primary" id="confirmExport" type="button">保存/出力</button>
 </div>
@@ -1081,32 +1148,41 @@
 <h2 class="modal__title" id="toolSpotlightTitle">他ツールの紹介</h2>
 </header>
 <div class="modal__body tool-spotlight-modal__body">
-<p class="help-text">出力ありがとうございます。次に遊べる・使えるツールです。</p>
+<p class="help-text" id="toolSpotlightLead">出力ありがとうございます。次に遊べる・使えるツールです。</p>
 <div class="tool-spotlight-list" role="list">
 <a class="tool-spotlight-card" href="../maoitu/index.html" role="listitem">
 <img alt="まおいつ" class="tool-spotlight-card__icon" src="../icon/icon-192-3.png"/>
 <div class="tool-spotlight-card__content">
-<h3 class="tool-spotlight-card__title">まおいつ</h3>
-<p class="tool-spotlight-card__description">避け続けるアクションゲーム。短時間でスコアアタックできます。</p>
+<h3 class="tool-spotlight-card__title" id="toolSpotlightMaoituTitle">まおいつ</h3>
+<p class="tool-spotlight-card__description" id="toolSpotlightMaoituDesc">避け続けるアクションゲーム。短時間でスコアアタックできます。</p>
 </div>
 </a>
 <a class="tool-spotlight-card" href="../pixfind/index.html" role="listitem">
 <img alt="PiXFiND" class="tool-spotlight-card__icon" src="../icon/icon-192-2.png"/>
 <div class="tool-spotlight-card__content">
-<h3 class="tool-spotlight-card__title">PiXFiND</h3>
-<p class="tool-spotlight-card__description">ドット絵専用の間違い探しゲーム。作った絵の活用にも最適です。</p>
+<h3 class="tool-spotlight-card__title" id="toolSpotlightPixfindTitle">PiXFiND</h3>
+<p class="tool-spotlight-card__description" id="toolSpotlightPixfindDesc">ドット絵専用の間違い探しゲーム。作った絵の活用にも最適です。</p>
 </div>
 </a>
 <a class="tool-spotlight-card" href="../pixiee-lens/index.html" role="listitem">
 <img alt="PiXiEELENS" class="tool-spotlight-card__icon" src="../icon/icon-192-1.png"/>
 <div class="tool-spotlight-card__content">
-<h3 class="tool-spotlight-card__title">PiXiEELENS</h3>
-<p class="tool-spotlight-card__description">カメラ画像をドット化できるツール。撮影してそのまま編集導線につなげられます。</p>
+<h3 class="tool-spotlight-card__title" id="toolSpotlightLensTitle">PiXiEELENS</h3>
+<p class="tool-spotlight-card__description" id="toolSpotlightLensDesc">カメラ画像をドット化できるツール。撮影してそのまま編集導線につなげられます。</p>
+</div>
+</a>
+<a class="tool-spotlight-card" href="../contest/index.html" role="listitem">
+<img alt="PiXiEEDコンテスト" class="tool-spotlight-card__icon" src="../icon/icon-192-6.png"/>
+<div class="tool-spotlight-card__content">
+<h3 class="tool-spotlight-card__title" id="toolSpotlightContestTitle">PiXiEEDコンテスト</h3>
+<p class="tool-spotlight-card__description" id="toolSpotlightContestDesc">保存した作品を投稿して、みんなの作品もチェックできます。</p>
 </div>
 </a>
 </div>
 </div>
-<footer class="modal__footer">
+<footer class="modal__footer tool-spotlight-modal__footer">
+<a class="button button--ghost" href="../index.html" id="toolSpotlightGoHome">ホームへ戻る</a>
+<a class="button" href="../contest/index.html" id="toolSpotlightOpenContest">コンテストを見る</a>
 <button class="button button--primary" id="closeToolSpotlight" type="button">閉じる</button>
 </footer>
 </form>
@@ -1426,7 +1502,7 @@
       };
       const sideSections = {
         left: ['panelTools', 'panelColor'],
-        right: ['panelFrames', 'panelSettings', 'panelFile', 'panelMulti'],
+        right: ['panelFrames', 'panelSettings', 'panelHelp', 'panelFile', 'panelMulti'],
       };
       if (!(ads.left instanceof HTMLElement) && !(ads.right instanceof HTMLElement)) return;
 
