@@ -369,11 +369,17 @@
       .hero-draw-guide__actions{
         grid-template-columns:1fr;
       }
+      .seo-guides-grid{
+        grid-template-columns:1fr;
+      }
     }
     .audience-grid{
       display:grid;
       gap:12px;
       grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
+    }
+    .audience-grid--draw-choice{
+      grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));
     }
     .audience-card{
       display:grid;
@@ -382,6 +388,126 @@
       border-radius:12px;
       padding:12px;
       background:rgba(15,23,42,0.55);
+    }
+    .audience-card__header{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .audience-card__appicon{
+      width:38px;
+      height:38px;
+      border-radius:9px;
+      border:1px solid rgba(255,255,255,0.24);
+      background:rgba(4,8,20,0.86);
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:4px;
+      flex:0 0 38px;
+    }
+    .audience-card__appicon img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .audience-card__shot{
+      margin:0;
+      border-radius:10px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,0.18);
+      background:rgba(2,6,18,0.85);
+    }
+    .audience-card__shot-switch{
+      display:grid;
+      gap:8px;
+    }
+    .audience-card__shot img{
+      width:100%;
+      display:block;
+    }
+    .audience-card__shot-note{
+      margin:6px 0 0;
+      font-size:11px;
+      color:#9cb5de;
+      line-height:1.45;
+    }
+    .audience-card__toggle{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      justify-self:start;
+      min-height:34px;
+      border-radius:999px;
+      border:1px solid rgba(176, 214, 255, 0.46);
+      background:rgba(255,255,255,0.07);
+      color:#eff6ff;
+      padding:6px 12px;
+      font:700 12px/1.2 'Fredoka', system-ui, sans-serif;
+      cursor:pointer;
+    }
+    .audience-card__toggle:hover,
+    .audience-card__toggle:focus-visible{
+      background:rgba(255,255,255,0.14);
+      border-color:rgba(202, 232, 255, 0.66);
+      outline:none;
+    }
+    .audience-card__toggle-icon{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:16px;
+      height:16px;
+      flex:0 0 16px;
+    }
+    .audience-card__toggle-icon-landscape,
+    .audience-card__toggle-icon-portrait{
+      position:relative;
+      border:1px solid rgba(223, 240, 255, 0.86);
+      border-radius:2px;
+      background:rgba(120, 188, 255, 0.16);
+      display:block;
+    }
+    .audience-card__toggle-icon-landscape{
+      width:13px;
+      height:9px;
+      display:none;
+    }
+    .audience-card__toggle-icon-portrait{
+      width:9px;
+      height:13px;
+    }
+    .audience-card__toggle.is-portrait .audience-card__toggle-icon-landscape{
+      display:block;
+    }
+    .audience-card__toggle.is-portrait .audience-card__toggle-icon-portrait{
+      display:none;
+    }
+    .audience-card__toggle:not(.is-portrait) .audience-card__toggle-icon-portrait{
+      display:block;
+    }
+    .audience-card__toggle-label{
+      display:inline-block;
+    }
+    .audience-card--beginner .audience-card__toggle{
+      border-color:rgba(164, 213, 255, 0.62);
+      background:rgba(80, 167, 255, 0.12);
+    }
+    .audience-card--beginner .audience-card__toggle-icon-landscape,
+    .audience-card--beginner .audience-card__toggle-icon-portrait{
+      border-color:rgba(195, 229, 255, 0.92);
+      background:rgba(92, 172, 255, 0.22);
+    }
+    .audience-card--pro .audience-card__toggle{
+      border-color:rgba(255, 205, 157, 0.6);
+      background:rgba(255, 157, 88, 0.12);
+    }
+    .audience-card--pro .audience-card__toggle-icon-landscape,
+    .audience-card--pro .audience-card__toggle-icon-portrait{
+      border-color:rgba(255, 212, 170, 0.92);
+      background:rgba(255, 146, 84, 0.22);
     }
     .audience-card--beginner{
       border-color:rgba(251,146,60,0.46);
@@ -403,6 +529,304 @@
       text-decoration:none;
       display:inline-flex;
       align-items:center;
+    }
+    .choice-points{
+      margin:0;
+      padding-left:18px;
+      display:grid;
+      gap:6px;
+      color:#dbeafe;
+      font-size:12px;
+      line-height:1.55;
+    }
+    .choice-points li{
+      margin:0;
+    }
+    .choice-secondary{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+    .choice-secondary .button{
+      justify-self:auto;
+    }
+    .choice-note{
+      margin:0;
+      font-size:12px;
+      color:#cbd5e1;
+      line-height:1.6;
+    }
+    .choice-note strong{
+      color:#f9fafb;
+    }
+    .new-tools-grid{
+      display:grid;
+      gap:10px;
+      grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .new-tool-card{
+      text-decoration:none;
+      color:inherit;
+      border:1px solid rgba(174, 211, 255, 0.24);
+      border-radius:12px;
+      background:linear-gradient(150deg, rgba(27, 51, 97, 0.6), rgba(8, 16, 33, 0.8));
+      padding:12px;
+      display:grid;
+      gap:8px;
+      min-height:142px;
+      transition:border-color 0.12s ease, transform 0.12s ease, background 0.12s ease;
+    }
+    .new-tool-card:hover,
+    .new-tool-card:focus-visible{
+      border-color:rgba(180, 226, 255, 0.58);
+      background:linear-gradient(150deg, rgba(35, 65, 122, 0.72), rgba(8, 16, 33, 0.92));
+      transform:translateY(-1px);
+      outline:none;
+    }
+    .new-tool-card__head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .new-tool-card__icon{
+      width:34px;
+      height:34px;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,0.24);
+      background:rgba(2,6,18,0.88);
+      padding:4px;
+      flex:0 0 34px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+    }
+    .new-tool-card__icon img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .new-tool-card__title-wrap{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      min-width:0;
+      flex:1 1 auto;
+    }
+    .new-tool-card__title{
+      margin:0;
+      font-size:14px;
+      color:#f8fbff;
+      line-height:1.35;
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .new-tool-card__badge{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:3px 8px;
+      border-radius:999px;
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:0.06em;
+      border:1px solid rgba(255,255,255,0.26);
+      color:#f8fbff;
+      background:rgba(255,255,255,0.1);
+      flex:0 0 auto;
+    }
+    .new-tool-card__badge--new{
+      border-color:rgba(142, 228, 255, 0.6);
+      background:rgba(74, 197, 255, 0.2);
+    }
+    .new-tool-card__badge--live{
+      border-color:rgba(165, 255, 183, 0.62);
+      background:rgba(72, 199, 103, 0.2);
+    }
+    .new-tool-card__badge--next{
+      border-color:rgba(208, 211, 255, 0.5);
+      background:rgba(123, 136, 255, 0.2);
+    }
+    .new-tool-card__desc{
+      margin:0;
+      font-size:12px;
+      line-height:1.55;
+      color:#cbe0ff;
+    }
+    .new-tool-card__meta{
+      margin-top:auto;
+      font-size:11px;
+      color:#9fc3ef;
+      letter-spacing:0.01em;
+    }
+    .new-tools-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+    .new-tools-actions .button{
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+    }
+    .category-hub-grid{
+      display:grid;
+      gap:10px;
+      grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .category-hub-card{
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.14);
+      border-radius:12px;
+      padding:12px;
+      display:grid;
+      gap:9px;
+    }
+    .category-hub-card__head{
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .category-hub-card__icon{
+      width:32px;
+      height:32px;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,0.2);
+      background:rgba(2,6,18,0.86);
+      padding:4px;
+      flex:0 0 32px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+    }
+    .category-hub-card__icon img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .glossary-mark{
+      width:100%;
+      height:100%;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:5px;
+      border:1px solid rgba(198, 238, 255, 0.72);
+      background:
+        linear-gradient(180deg, rgba(9, 36, 66, 0.96), rgba(6, 22, 40, 0.96)),
+        repeating-linear-gradient(0deg, rgba(87, 167, 225, 0.18), rgba(87, 167, 225, 0.18) 1px, transparent 1px, transparent 3px),
+        repeating-linear-gradient(90deg, rgba(87, 167, 225, 0.16), rgba(87, 167, 225, 0.16) 1px, transparent 1px, transparent 3px);
+      color:#dff4ff;
+      font-family:'DotGothic16','Fredoka',system-ui,sans-serif;
+      font-size:10px;
+      font-weight:700;
+      line-height:1;
+      letter-spacing:0.03em;
+      text-shadow:0 0 6px rgba(87, 190, 255, 0.42);
+    }
+    .category-hub-card__title{
+      margin:0;
+      font-size:14px;
+      color:#f8fbff;
+    }
+    .category-hub-card__text{
+      margin:0;
+      font-size:12px;
+      color:#c9dbf8;
+      line-height:1.55;
+    }
+    .category-hub-card__links{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+    }
+    .category-hub-card__links a{
+      text-decoration:none;
+      font-size:11px;
+      font-weight:700;
+      color:#edf5ff;
+      border:1px solid rgba(255,255,255,0.22);
+      border-radius:999px;
+      background:rgba(255,255,255,0.06);
+      padding:4px 9px;
+      line-height:1.3;
+    }
+    .category-hub-card__links a:hover,
+    .category-hub-card__links a:focus-visible{
+      background:rgba(255,255,255,0.12);
+      border-color:rgba(255,255,255,0.34);
+      outline:none;
+    }
+    .seo-guides-grid{
+      display:grid;
+      gap:10px;
+      grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+    }
+    .seo-guide-card{
+      text-decoration:none;
+      color:#eaf2ff;
+      border:1px solid rgba(175, 210, 255, 0.24);
+      border-radius:12px;
+      background:linear-gradient(150deg, rgba(42, 78, 151, 0.44), rgba(10, 20, 44, 0.66));
+      padding:12px;
+      min-height:130px;
+      display:grid;
+      gap:8px;
+      transition:transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    .seo-guide-card:hover,
+    .seo-guide-card:focus-visible{
+      transform:translateY(-1px);
+      border-color:rgba(170, 230, 255, 0.58);
+      background:linear-gradient(150deg, rgba(58, 107, 196, 0.52), rgba(10, 20, 44, 0.8));
+      outline:none;
+    }
+    .seo-guide-card__head{
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+    .seo-guide-card__icon{
+      width:36px;
+      height:36px;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,0.25);
+      background:rgba(3,8,22,0.88);
+      padding:4px;
+      flex:0 0 36px;
+    }
+    .seo-guide-card__icon img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .seo-guide-card__title{
+      margin:0;
+      font-size:14px;
+      line-height:1.35;
+      color:#f6fbff;
+    }
+    .seo-guide-card__text{
+      margin:0;
+      font-size:12px;
+      line-height:1.55;
+      color:#c7dbff;
+    }
+    .seo-guide-card__meta{
+      margin-top:auto;
+      font-size:11px;
+      color:#99b9ea;
+      letter-spacing:0.02em;
     }
     .value-actions{
       display:flex;
@@ -537,6 +961,25 @@
       background:rgba(2,6,18,0.8);
       image-rendering:pixelated;
       image-rendering:crisp-edges;
+    }
+    .link-thumb__texticon{
+      width:100%;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border:1px solid rgba(198, 238, 255, 0.72);
+      background:
+        linear-gradient(180deg, rgba(9, 36, 66, 0.96), rgba(6, 22, 40, 0.96)),
+        repeating-linear-gradient(0deg, rgba(87, 167, 225, 0.18), rgba(87, 167, 225, 0.18) 1px, transparent 1px, transparent 3px),
+        repeating-linear-gradient(90deg, rgba(87, 167, 225, 0.16), rgba(87, 167, 225, 0.16) 1px, transparent 1px, transparent 3px);
+      color:#dff4ff;
+      font-family:'DotGothic16','Fredoka',system-ui,sans-serif;
+      font-size:11px;
+      font-weight:700;
+      line-height:1;
+      letter-spacing:0.03em;
+      text-shadow:0 0 6px rgba(87, 190, 255, 0.42);
     }
     .link-thumb__empty{
       display:flex;
@@ -1782,31 +2225,202 @@
     <section class="section section--highlight" id="start-guides">
       <div class="section-inner">
         <div>
-          <p class="section-eyebrow">Draw, Play, Contact</p>
-          <h2>Start from what you want to do</h2>
-          <p class="subtitle">Even if you searched for a free pixel art tool, you can jump straight into your goal.</p>
+          <p class="section-eyebrow">Lite First</p>
+          <h2>PiXiEEDraw Lite or PiXiEEDraw?</h2>
+          <p class="subtitle">Lite is best for a quick start. Move to PiXiEEDraw when you need full production features.</p>
         </div>
-        <div class="audience-grid">
+        <div class="audience-grid audience-grid--draw-choice">
           <article class="audience-card audience-card--beginner">
-            <p class="project-place__label">Draw</p>
-            <h3 class="project-place__title">Draw</h3>
-            <p class="subtitle">Start with guided 16x16 practice in Lite, then move to PiXiEEDraw for full production features and multiplayer collaboration.</p>
-            <p class="audience-card__meta">10-15 min / No signup / Free (Lite)</p>
-            <a class="button" href="jerin-maker/index.html">Open PiXiEEDraw Lite</a>
+            <div class="audience-card__header">
+              <span class="audience-card__appicon"><img src="icon/icon-192-5.png" alt=""></span>
+              <div>
+                <p class="project-place__label">Easy Start</p>
+                <h3 class="project-place__title">PiXiEEDraw Lite</h3>
+              </div>
+            </div>
+            <div class="audience-card__shot-switch" data-shot-switch>
+              <figure class="audience-card__shot" data-shot-kind="landscape">
+                <img src="assets/screenshots/pixieedraw-lite-landscape.png" alt="PiXiEEDraw Lite tool screenshot (landscape)" loading="lazy">
+                <figcaption class="audience-card__shot-note">Lite Landscape</figcaption>
+              </figure>
+              <figure class="audience-card__shot" data-shot-kind="portrait" hidden>
+                <img src="assets/screenshots/pixieedraw-lite-portrait.png" alt="PiXiEEDraw Lite tool screenshot (portrait)" loading="lazy">
+                <figcaption class="audience-card__shot-note">Lite Portrait</figcaption>
+              </figure>
+              <button class="audience-card__toggle" type="button" data-toggle-shot data-label-landscape="View Portrait" data-label-portrait="Back to Landscape" aria-label="PiXiEEDraw Lite screenshot switch" aria-pressed="false">
+                <span class="audience-card__toggle-icon" aria-hidden="true">
+                  <span class="audience-card__toggle-icon-landscape"></span>
+                  <span class="audience-card__toggle-icon-portrait"></span>
+                </span>
+                <span class="audience-card__toggle-label" data-toggle-shot-label>View Portrait</span>
+              </button>
+            </div>
+            <p class="subtitle">A beginner-friendly entry point. Follow the on-screen flow and finish your first piece quickly.</p>
+            <ul class="choice-points">
+              <li>Best for: first-time users / quick start</li>
+              <li>Highlights: guided flow / fixed 16×16 / simple controls</li>
+              <li>Good for: trying ideas fast / finishing one piece quickly</li>
+            </ul>
+            <p class="audience-card__meta">A few minutes / No signup / Free</p>
+            <a class="button" href="jerin-maker/index.html">Start with Lite</a>
           </article>
           <article class="audience-card audience-card--pro">
-            <p class="project-place__label">Play</p>
-            <h3 class="project-place__title">Play</h3>
-            <p class="subtitle">Enjoy pixel games and camera tools directly in your browser.</p>
-            <p class="audience-card__meta">Browser-based / Quick start / Free</p>
-            <a class="button button--ghost" href="games.html">Open Games</a>
+            <div class="audience-card__header">
+              <span class="audience-card__appicon"><img src="icon/icon-192-4.png" alt=""></span>
+              <div>
+                <p class="project-place__label">Advanced</p>
+                <h3 class="project-place__title">PiXiEEDraw</h3>
+              </div>
+            </div>
+            <div class="audience-card__shot-switch" data-shot-switch>
+              <figure class="audience-card__shot" data-shot-kind="landscape">
+                <img src="assets/screenshots/pixieedraw-pro-landscape.png" alt="PiXiEEDraw tool screenshot (landscape)" loading="lazy">
+                <figcaption class="audience-card__shot-note">PiXiEEDraw Landscape</figcaption>
+              </figure>
+              <figure class="audience-card__shot" data-shot-kind="portrait" hidden>
+                <img src="assets/screenshots/pixieedraw-pro-portrait.png" alt="PiXiEEDraw tool screenshot (portrait)" loading="lazy">
+                <figcaption class="audience-card__shot-note">PiXiEEDraw Portrait</figcaption>
+              </figure>
+              <button class="audience-card__toggle" type="button" data-toggle-shot data-label-landscape="View Portrait" data-label-portrait="Back to Landscape" aria-label="PiXiEEDraw screenshot switch" aria-pressed="false">
+                <span class="audience-card__toggle-icon" aria-hidden="true">
+                  <span class="audience-card__toggle-icon-landscape"></span>
+                  <span class="audience-card__toggle-icon-portrait"></span>
+                </span>
+                <span class="audience-card__toggle-label" data-toggle-shot-label>View Portrait</span>
+              </button>
+            </div>
+            <p class="subtitle">For full production and team workflows. Use layers, selection tools, and shared mode for advanced work.</p>
+            <ul class="choice-points">
+              <li>Best for: ongoing creation / team collaboration</li>
+              <li>Highlights: full editor + shared mode (beta)</li>
+              <li>Good for: asset production / collaborative workflows</li>
+            </ul>
+            <p class="audience-card__meta">Browser-based / Shared mode beta / Free</p>
+            <div class="choice-secondary">
+              <a class="button" href="pixiedraw/index.html">Use PiXiEEDraw</a>
+              <a class="button button--ghost" href="#publicRoomsHub">Open Live Rooms</a>
+            </div>
           </article>
-          <article class="audience-card audience-card--pro">
-            <p class="project-place__label">Contact</p>
-            <h3 class="project-place__title">Contact</h3>
-            <p class="subtitle">For commissions and collaborations, contact us via X or email.</p>
-            <p class="audience-card__meta">X / Email</p>
-            <a class="button button--ghost" href="#contact">View Contact</a>
+        </div>
+        <p class="choice-note"><strong>Not sure?</strong> Start with Lite, then move to PiXiEEDraw when you need more control.</p>
+      </div>
+    </section>
+
+    <section class="section" id="new-tools">
+      <div class="section-inner">
+        <div>
+          <p class="section-eyebrow">Recommended</p>
+          <h2>New & Notable</h2>
+          <p class="subtitle">Quick access to recent updates and popular features.</p>
+        </div>
+        <div class="new-tools-grid">
+          <a class="new-tool-card" href="pixiee-lens/index.html">
+            <div class="new-tool-card__head">
+              <div class="new-tool-card__title-wrap">
+                <span class="new-tool-card__icon"><img src="icon/icon-192-1.png" alt=""></span>
+                <h3 class="new-tool-card__title">PiXiEELENS</h3>
+              </div>
+              <span class="new-tool-card__badge new-tool-card__badge--new">NEW</span>
+            </div>
+            <p class="new-tool-card__desc">Convert photos to pixel art. Capture GIF and save PNG on mobile and desktop.</p>
+            <p class="new-tool-card__meta">Capture / Convert / Save</p>
+          </a>
+          <a class="new-tool-card" href="glossary/index.html">
+            <div class="new-tool-card__head">
+              <div class="new-tool-card__title-wrap">
+                <span class="new-tool-card__icon"><span class="glossary-mark" aria-hidden="true">A/a</span></span>
+                <h3 class="new-tool-card__title">Pixel Art Glossary</h3>
+              </div>
+              <span class="new-tool-card__badge new-tool-card__badge--new">NEW</span>
+            </div>
+            <p class="new-tool-card__desc">Check key terms in English and Japanese while creating.</p>
+            <p class="new-tool-card__meta">Learn / Search / Terms</p>
+          </a>
+          <a class="new-tool-card" href="#publicRoomsHub">
+            <div class="new-tool-card__head">
+              <div class="new-tool-card__title-wrap">
+                <span class="new-tool-card__icon"><img src="icon/icon-192-4.png" alt=""></span>
+                <h3 class="new-tool-card__title">Live Rooms</h3>
+              </div>
+              <span class="new-tool-card__badge new-tool-card__badge--live">LIVE</span>
+            </div>
+            <p class="new-tool-card__desc">Join currently open shared canvases and continue drawing together.</p>
+            <p class="new-tool-card__meta">Join / Continue</p>
+          </a>
+          <a class="new-tool-card" href="notes/index.html">
+            <div class="new-tool-card__head">
+              <div class="new-tool-card__title-wrap">
+                <span class="new-tool-card__icon"><img src="character-dots/mao1.png" alt=""></span>
+                <h3 class="new-tool-card__title">See Updates</h3>
+              </div>
+              <span class="new-tool-card__badge new-tool-card__badge--next">UPDATE</span>
+            </div>
+            <p class="new-tool-card__desc">Track newly added features and upcoming improvements.</p>
+            <p class="new-tool-card__meta">News / Changelog</p>
+          </a>
+        </div>
+        <div class="new-tools-actions">
+          <a class="button button--ghost" href="tools.html">View All Tools</a>
+          <a class="button button--ghost" href="notes/index.html">Open Changelog</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--highlight" id="category-hub">
+      <div class="section-inner">
+        <div>
+          <p class="section-eyebrow">Choose by Goal</p>
+          <h2>Browse by Category</h2>
+          <p class="subtitle">Pick what you want to do and jump straight in.</p>
+        </div>
+        <div class="category-hub-grid">
+          <article class="category-hub-card">
+            <div class="category-hub-card__head">
+              <span class="category-hub-card__icon"><img src="icon/icon-192-5.png" alt=""></span>
+              <h3 class="category-hub-card__title">Draw</h3>
+            </div>
+            <p class="category-hub-card__text">From first pixel to full production workflow.</p>
+            <div class="category-hub-card__links">
+              <a href="jerin-maker/index.html">Lite</a>
+              <a href="pixiedraw/index.html">PiXiEEDraw</a>
+              <a href="pixel-art-editor/index.html">Drawing Guide</a>
+            </div>
+          </article>
+          <article class="category-hub-card">
+            <div class="category-hub-card__head">
+              <span class="category-hub-card__icon"><img src="icon/icon-192-4.png" alt=""></span>
+              <h3 class="category-hub-card__title">Animate & Share</h3>
+            </div>
+            <p class="category-hub-card__text">Animation workflows and multiplayer rooms in one place.</p>
+            <div class="category-hub-card__links">
+              <a href="pixel-art-animation/index.html">Animation Guide</a>
+              <a href="pixiedraw/index.html">Animation Editor</a>
+              <a href="#publicRoomsHub">Live Rooms</a>
+            </div>
+          </article>
+          <article class="category-hub-card">
+            <div class="category-hub-card__head">
+              <span class="category-hub-card__icon"><img src="icon/icon-192-2.png" alt=""></span>
+              <h3 class="category-hub-card__title">Play</h3>
+            </div>
+            <p class="category-hub-card__text">Try short pixel games directly in the browser.</p>
+            <div class="category-hub-card__links">
+              <a href="games.html">Game List</a>
+              <a href="maoitu/index.html">Maoitsu</a>
+              <a href="pixfind/index.html">PiXFiND</a>
+            </div>
+          </article>
+          <article class="category-hub-card">
+            <div class="category-hub-card__head">
+              <span class="category-hub-card__icon"><span class="glossary-mark" aria-hidden="true">A/a</span></span>
+              <h3 class="category-hub-card__title">Learn & View</h3>
+            </div>
+            <p class="category-hub-card__text">Glossary, gallery, and latest updates.</p>
+            <div class="category-hub-card__links">
+              <a href="glossary/index.html">Glossary</a>
+              <a href="portfolio/index.html">Portfolio</a>
+              <a href="notes/index.html">Update Notes</a>
+            </div>
           </article>
         </div>
       </div>
@@ -1869,7 +2483,7 @@
           <div class="chips">
             <a class="chip" href="pixiedraw/index.html">Draw Pixel Art</a>
             <a class="chip" href="jerin-maker/index.html">16x16 Practice</a>
-            <a class="chip" href="en/glossary/index.html">Glossary</a>
+            <a class="chip" href="glossary/index.html">Glossary</a>
             <a class="chip" href="tools.html">Find Tools</a>
             <a class="chip" href="games.html">Play Games</a>
             <a class="chip" href="portfolio/index.html">View Works</a>
@@ -1884,7 +2498,7 @@
                 <img src="icon/icon-192-4.png" alt="" data-media="icon">
                 <img src="icon/icon-192-5.png" alt="" data-media="icon">
                 <img src="icon/icon-192-1.png" alt="" data-media="icon">
-                <img src="icon/icon-192-6.png" alt="" data-media="icon">
+                <span class="link-thumb__texticon" aria-hidden="true">A/a</span>
                 <span class="link-thumb__empty">Coming Soon</span>
                 <span class="link-thumb__empty">Coming Soon</span>
               </div>
@@ -1926,7 +2540,9 @@
         </div>
         <!-- publicRoomsHub moved to appear under the dot-hero section -->
         <ul class="project-place__source" id="gameGalleryItems" hidden>
-          <li data-title="Pixel Art Glossary (EN)" data-image="icon/icon-192-6.png" data-type="project" data-updated="2026-03-05" data-update="Launched an English glossary with searchable terms for pixel art fundamentals, rendering, animation, and production workflow." data-desc="Improved onboarding for non-Japanese users with dedicated terminology reference." data-link="en/glossary/index.html"></li>
+          <li data-title="PiXiEED Home (guide flow refresh)" data-image="character-dots/mao1.png" data-type="project" data-updated="2026-03-07" data-update="Homepage copy was rewritten for user-facing clarity, guide placement was adjusted, and Lite/PiXiEEDraw cards now include real tool screenshot toggles." data-desc="The top page now makes tool choice clearer for first-time visitors." data-link="en/index.html"></li>
+          <li data-title="PiXiEEDraw (help flow + cleaner UI)" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-03-07" data-update="Added a searchable usage help panel from Settings, minimized in-canvas helper labels, and trimmed extra save/export explanation text." data-desc="Keeps the workspace clean while preserving quick access to guidance." data-link="pixiedraw/index.html"></li>
+          <li data-title="Pixel Art Glossary (EN)" data-image="icon/icon-192-6.png" data-type="project" data-updated="2026-03-05" data-update="Launched an English glossary with searchable terms for pixel art fundamentals, rendering, animation, and production workflow." data-desc="Improved onboarding for non-Japanese users with dedicated terminology reference." data-link="glossary/index.html"></li>
           <li data-title="PiXiEED Home" data-image="character-dots/mao1.png" data-type="project" data-updated="2026-02-24" data-update="Updated homepage messaging and top-level action navigation (Draw / Play / Contact)." data-desc="Homepage information architecture refreshed for clarity." data-link="en/index.html"></li>
           <li data-title="Action Navigation" data-image="icon/icon-192-4.png" data-type="project" data-updated="2026-02-24" data-update="Top CTA now opens dedicated guides for drawing, playing, and contact." data-desc="Faster one-tap access to intended actions." data-link="en/index.html"></li>
           <li data-title="Tools & Games Cards" data-image="icon/icon-192-6.png" data-type="project" data-updated="2026-02-24" data-update="Hub cards reorganized for clearer browsing and roadmap visibility." data-desc="Collection sections improved for scanning." data-link="tools.html"></li>
@@ -1937,11 +2553,6 @@
           <li data-title="PiXiEEDraw Improvements" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-02-24" data-update="Symmetry, shortcuts, responsive layout, and co-edit workflow tuning improved editor usability." data-desc="Full-featured production UX and collaboration flow updates." data-link="pixiedraw/index.html"></li>
         </ul>
       </div>
-    </section>
-
-    <section class="card">
-      <h2>Free Pixel Art Tools</h2>
-      <p class="seo-links"><a href="jerin-maker/index.html">PiXiEEDraw Lite</a> is a 16x16 guided tool for beginners, while <a href="pixiedraw/index.html">PiXiEEDraw</a> is a full browser editor for production workflows with multiplayer collaboration (shared mode beta).</p>
     </section>
 
     <section class="card ad-strip" aria-label="Ad">
@@ -1992,6 +2603,40 @@
       </div>
     </section>
 
+    <section class="section" id="seo-guides">
+      <div class="section-inner">
+        <div>
+          <p class="section-eyebrow">Guide</p>
+          <h2>Two Drawing Guides</h2>
+          <p class="subtitle">Choose PiXiEEDraw Lite for quick starts, or PiXiEEDraw for full production.</p>
+        </div>
+        <div class="seo-guides-grid">
+          <a class="seo-guide-card" href="jerin-maker/index.html">
+            <div class="seo-guide-card__head">
+              <span class="seo-guide-card__icon"><img src="icon/icon-192-5.png" alt=""></span>
+              <h3 class="seo-guide-card__title">PiXiEEDraw Lite</h3>
+            </div>
+            <p class="seo-guide-card__text">Best for first-time users who want to finish one piece quickly.</p>
+            <p class="seo-guide-card__meta">Quick Start / 16×16</p>
+          </a>
+          <a class="seo-guide-card" href="pixiedraw/index.html">
+            <div class="seo-guide-card__head">
+              <span class="seo-guide-card__icon"><img src="icon/icon-192-4.png" alt=""></span>
+              <h3 class="seo-guide-card__title">PiXiEEDraw</h3>
+            </div>
+            <p class="seo-guide-card__text">For ongoing projects and collaboration with full editor features.</p>
+            <p class="seo-guide-card__meta">Layers / Shared Mode</p>
+          </a>
+        </div>
+        <div class="chips" aria-label="search landing pages">
+          <a class="chip" href="pixel-art-editor/index.html">Drawing LP</a>
+          <a class="chip" href="pixel-art-animation/index.html">Animation LP</a>
+          <a class="chip" href="pixel-art-maker/index.html">Beginner LP</a>
+          <a class="chip" href="pixel-art-online/index.html">Online LP</a>
+        </div>
+      </div>
+    </section>
+
     <section class="card" id="contact">
       <h2>Contact</h2>
       <p class="subtitle">For pixel art commissions, browser game assets, and collaborations, reach us here.</p>
@@ -2004,7 +2649,7 @@
     <footer>
       <p>© <span id="year"></span> PiXiEED. All rights reserved.</p>
       <div class="footer-links">
-        <a href="en/glossary/index.html">Glossary</a>
+        <a href="glossary/index.html">Glossary</a>
         <a href="terms/index.html">Terms</a>
         <a href="privacy/index.html">Privacy</a>
       </div>
@@ -2402,6 +3047,37 @@
           });
         });
       }
+      function setupAudienceShotToggles(){
+        const switches = document.querySelectorAll('[data-shot-switch]');
+        if(!switches.length) return;
+        switches.forEach((scope) => {
+          const landscape = scope.querySelector('[data-shot-kind="landscape"]');
+          const portrait = scope.querySelector('[data-shot-kind="portrait"]');
+          const toggle = scope.querySelector('[data-toggle-shot]');
+          const toggleLabel = toggle?.querySelector('[data-toggle-shot-label]');
+          if(!landscape || !portrait || !toggle) return;
+          const labelLandscape = toggle.dataset.labelLandscape || 'View Portrait';
+          const labelPortrait = toggle.dataset.labelPortrait || 'Back to Landscape';
+          const setMode = (mode) => {
+            const portraitMode = mode === 'portrait';
+            landscape.hidden = portraitMode;
+            portrait.hidden = !portraitMode;
+            if(toggleLabel){
+              toggleLabel.textContent = portraitMode ? labelPortrait : labelLandscape;
+            }else{
+              toggle.textContent = portraitMode ? labelPortrait : labelLandscape;
+            }
+            toggle.setAttribute('aria-pressed', portraitMode ? 'true' : 'false');
+            toggle.dataset.currentShot = portraitMode ? 'portrait' : 'landscape';
+            toggle.classList.toggle('is-portrait', portraitMode);
+          };
+          setMode('landscape');
+          toggle.addEventListener('click', () => {
+            const nextMode = toggle.dataset.currentShot === 'portrait' ? 'landscape' : 'portrait';
+            setMode(nextMode);
+          });
+        });
+      }
       function syncHeroPreviewHeights(){
         const previews = document.querySelectorAll('.character-place .character-preview');
         previews.forEach((preview) => {
@@ -2418,6 +3094,7 @@
         setupAvatarToggle();
         setupProfileModal();
         setupHeroGuideToggles();
+        setupAudienceShotToggles();
         setupHeroPlaceSwap();
         syncHeroPreviewHeights();
         window.addEventListener('resize', syncHeroPreviewHeights);
