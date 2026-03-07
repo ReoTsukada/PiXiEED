@@ -83,6 +83,7 @@
 
 
 <link href="assets/css/style.css" rel="stylesheet"/>
+<link href="assets/css/local-extension-runtime.css" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
   <style id="interaction-guard">
@@ -138,10 +139,20 @@
 <button class="startup-screen__link" id="startupActionSkip" type="button">この画面を閉じる</button>
 </div>
 </div>
-<div aria-hidden="true" class="update-toast" data-update-id="2026-03-07-help-and-ui-cleanup" hidden="" id="updateToast" role="status" aria-live="polite">
+<div aria-hidden="true" class="update-toast" data-update-id="2026-03-07-palette-settings-toast-sync-v2" hidden="" id="updateToast" role="status" aria-live="polite">
 <div class="update-toast__body">
 <p class="update-toast__message">
 <strong>更新情報 (2026/03/07)</strong><br/>
+【今回追加】<br/>
+・パレットプリセットのボタン内カラープレビューを最大32色表示に対応<br/>
+・新規作成パネルの独立プリセットプレビューを削除して構成を整理<br/>
+・設定パネルの下5ボタン（応援チップ/あ/A/使い方ヘルプ/ショートカット/更新情報）を軽量なサブスタイルに統一<br/>
+・設定パネルにローカル拡張（外付け）欄を追加し、この端末だけで動く拡張コードの保存 / 反映 / 停止に対応<br/>
+・言語切替ボタンの表示を「あ/A」に統一<br/>
+・キャンバスサイズブロックに色付き枠を追加して視認性を改善<br/>
+・更新項目が多い時は、トースト内をスクロールして読めるように調整<br/>
+<br/>
+【前回分（継続掲載）】<br/>
 ・設定パネルから開ける「使い方ヘルプ」を追加（検索対応）<br/>
 ・小窓プレビューを追加（移動 / リサイズ / 再生・停止）<br/>
 ・JPEG / SVG 出力を追加し、出力形式を拡張<br/>
@@ -302,6 +313,10 @@
 <span aria-hidden="true" class="floating-move-pad__center">＋</span>
 <button aria-label="選択範囲を右へ移動" class="floating-move-pad__btn floating-move-pad__btn--right" data-move-pad-dir="right" type="button">▶</button>
 <button aria-label="選択範囲を下へ移動" class="floating-move-pad__btn floating-move-pad__btn--down" data-move-pad-dir="down" type="button">▼</button>
+</div>
+<div aria-hidden="true" aria-label="範囲選択の反転メニュー" class="selection-transform-menu is-hidden" hidden="" id="selectionTransformMenu" role="group">
+<button aria-label="選択範囲を左右反転" class="chip selection-transform-menu__button" id="selectionFlipHorizontal" type="button">左右反転</button>
+<button aria-label="選択範囲を上下反転" class="chip selection-transform-menu__button" id="selectionFlipVertical" type="button">上下反転</button>
 </div>
 <div aria-hidden="true" class="mirror-tool-popover" hidden="" id="mirrorToolPopover" role="dialog">
 <div class="mirror-tool-popover__header">
@@ -474,8 +489,8 @@
 </div>
 </label>
 <label class="field" hidden id="selectSameModeField">
-<span>同色選択モード</span>
-<div aria-label="同色選択モード" class="select-same-mode-buttons" role="group">
+<span>同色モード</span>
+<div aria-label="同色モード" class="select-same-mode-buttons" role="group">
 <button aria-pressed="true" class="chip select-same-mode-button is-active" data-select-same-mode="connected" type="button">連結のみ</button>
 <button aria-pressed="false" class="chip select-same-mode-button" data-select-same-mode="global" type="button">全体</button>
 </div>
@@ -496,6 +511,9 @@
 <div class="color-mode color-mode--index" id="colorModeIndex">
 <div class="palette-header">
 <div class="palette-actions">
+<button aria-label="色相順でソート" class="chip" id="sortPaletteHue" type="button">色相</button>
+<button aria-label="彩度順でソート" class="chip" id="sortPaletteSaturation" type="button">彩度</button>
+<button aria-label="明度順でソート" class="chip" id="sortPaletteValue" type="button">明度</button>
 <button aria-label="選択した色を削除" class="chip" id="removePaletteColor" type="button">-</button>
 <button aria-label="色を追加" class="chip" id="addPaletteColor" type="button">+</button>
 </div>
@@ -506,6 +524,14 @@
 <label class="field field--compact palette-index-inline" id="paletteIndexField">
 <span>インデックス</span>
 <input data-stepper="true" id="paletteIndex" min="0" step="1" type="number"/>
+</label>
+<label class="field field--compact palette-preset-inline" for="palettePresetSelect">
+<span>プリセット</span>
+<div class="palette-preset-picker" id="palettePresetPicker">
+<button aria-expanded="false" aria-haspopup="listbox" class="chip palette-preset-picker__button" id="palettePresetPickerButton" type="button"></button>
+<div aria-label="プリセット一覧" class="palette-preset-picker__menu" hidden="" id="palettePresetPickerMenu" role="listbox"></div>
+</div>
+<select aria-hidden="true" hidden="" id="palettePresetSelect" tabindex="-1"></select>
 </label>
 </div>
 <div class="palette-hsv" id="paletteHsvControls">
@@ -861,12 +887,12 @@
 <section class="panel-section" data-section="settings" id="panelSettings">
 <div class="panel-section__body">
   <div class="settings-nav">
-    <a class="button" href="https://pixieed.jp/tools.html" id="goHomeButton">他のツール一覧へ</a>
-    <a class="chip settings-nav__close settings-nav__support" href="https://pixieed.stores.jp" id="supportTipLink" target="_blank" rel="noopener noreferrer" aria-label="PiXiEEDの応援チップを購入">応援チップ</a>
-    <button class="chip settings-nav__close" id="toggleLanguageMode" type="button">English</button>
-    <button class="chip settings-nav__close" id="openOperationHelpPanel" type="button">使い方ヘルプ</button>
-    <button aria-haspopup="dialog" class="chip settings-nav__close" id="openShortcutHelp" type="button">ショートカット一覧</button>
-    <button aria-haspopup="dialog" class="chip settings-nav__close" id="openUpdateHistory" type="button">更新情報</button>
+    <a class="button settings-nav__action settings-nav__action--primary" href="https://pixieed.jp/tools.html" id="goHomeButton">他のツール一覧へ</a>
+    <a class="chip settings-nav__action settings-nav__quick settings-nav__close settings-nav__support" href="https://pixieed.stores.jp" id="supportTipLink" target="_blank" rel="noopener noreferrer" aria-label="PiXiEEDの応援チップを購入">応援チップ</a>
+    <button class="chip settings-nav__action settings-nav__quick settings-nav__close" id="toggleLanguageMode" type="button">あ/A</button>
+    <button class="chip settings-nav__action settings-nav__quick settings-nav__close" id="openOperationHelpPanel" type="button">使い方ヘルプ</button>
+    <button aria-haspopup="dialog" class="chip settings-nav__action settings-nav__quick settings-nav__close" id="openShortcutHelp" type="button">ショートカット一覧</button>
+    <button aria-haspopup="dialog" class="chip settings-nav__action settings-nav__quick settings-nav__close" id="openUpdateHistory" type="button">更新情報</button>
   </div>
 <div class="settings-size-grid">
 <div class="field settings-size-row settings-size-row--canvas">
@@ -1113,7 +1139,7 @@
 <input id="exportGridHeight" inputmode="numeric" min="1" step="1" type="number" value="8"/>
 </label>
 </div>
-<p class="help-text" hidden id="exportGridHint">分割順: 右上から左へ、次の段へ進みます（右→左、上→下）。</p>
+<p class="help-text" hidden id="exportGridHint">分割順: 右上から左へ、次の段へ進みます（右→左、上→下）。分割サイズは原寸px基準です。</p>
 </div>
 <div class="field field--list">
 <p aria-live="polite" class="help-text export-destination-label" id="exportDialogDestinationLabel">画像/GIF/SVG出力先: 未固定（保存時に保存先を選択）</p>
@@ -1221,7 +1247,24 @@
 </label>
 </div>
 </div>
-<p class="help-text" id="newProjectExportFolderGuide">作成時に画像/GIFの保存先フォルダを確認します（対応ブラウザのみ）。</p>
+<label class="field field--compact new-project__palette-field">
+<span>パレットプリセット</span>
+<div class="new-project__palette-controls">
+<div class="palette-preset-picker new-project__palette-picker" id="newProjectPalettePresetPicker">
+<button aria-expanded="false" aria-haspopup="listbox" class="chip palette-preset-picker__button" id="newProjectPalettePresetPickerButton" type="button"></button>
+<div aria-label="新規作成プリセット一覧" class="palette-preset-picker__menu" hidden="" id="newProjectPalettePresetPickerMenu" role="listbox"></div>
+</div>
+<select aria-hidden="true" hidden="" id="newProjectPalettePreset" tabindex="-1"></select>
+</div>
+</label>
+<div class="field field--compact new-project__export-folder-field">
+<span>画像/GIF保存先</span>
+<div class="new-project__export-folder-controls">
+<button class="chip" id="newProjectBindExportFolder" type="button">保存先フォルダを指定</button>
+<p aria-live="polite" class="help-text export-destination-label new-project__export-destination-label" id="newProjectExportDestinationLabel">画像/GIF/SVG出力先: 未固定（保存時に保存先を選択）</p>
+</div>
+</div>
+<p class="help-text" id="newProjectExportFolderGuide">必要な場合のみ保存先フォルダを指定できます。指定しない場合は現在の設定（未設定を含む）を使います。</p>
 </div>
 <footer class="modal__footer">
 <button class="button button--ghost" id="cancelNewProject" type="button">キャンセル</button>
@@ -1330,6 +1373,7 @@
       })();
     </script>
 <script defer="" src="assets/js/app.js"></script>
+<script defer="" src="assets/js/local-extension-runtime.js"></script>
   <!-- Mobile bottom ad placeholder (visible in portrait / small screens) -->
   <div id="mobileBottomAd" aria-hidden="false">
     <div class="mobile-ad-box" id="mobileBottomAdSlot">
