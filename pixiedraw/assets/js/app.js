@@ -29,6 +29,7 @@
       color: document.getElementById('mobilePanelColor'),
       frames: document.getElementById('mobilePanelFrames'),
       settings: document.getElementById('mobilePanelSettings'),
+      help: document.getElementById('mobilePanelHelp'),
       file: document.getElementById('mobilePanelFile'),
       multi: document.getElementById('mobilePanelMulti'),
     },
@@ -37,6 +38,7 @@
       color: document.getElementById('panelColor'),
       frames: document.getElementById('panelFrames'),
       settings: document.getElementById('panelSettings'),
+      help: document.getElementById('panelHelp'),
       file: document.getElementById('panelFile'),
       multi: document.getElementById('panelMulti'),
     },
@@ -58,6 +60,11 @@
     floatingDrawButton: document.getElementById('floatingDrawButton'),
     floatingMovePad: document.getElementById('floatingMovePad'),
     floatingMovePadButtons: Array.from(document.querySelectorAll('.floating-move-pad__btn[data-move-pad-dir]')),
+    floatingPreviewPanel: document.getElementById('floatingPreviewPanel'),
+    floatingPreviewHeader: document.getElementById('floatingPreviewHeader'),
+    floatingPreviewBody: document.getElementById('floatingPreviewBody'),
+    floatingPreviewCanvas: /** @type {HTMLCanvasElement|null} */ (document.getElementById('floatingPreviewCanvas')),
+    floatingPreviewResizeHandle: document.getElementById('floatingPreviewResize'),
     zoomIndicator: document.getElementById('zoomIndicator'),
     resizeHandles: {
       left: document.getElementById('resizeLeftRail'),
@@ -150,6 +157,7 @@
       toggleChecker: document.getElementById('toggleChecker'),
       togglePixelPreview: document.getElementById('togglePixelPreview'),
       toggleVirtualCursor: document.getElementById('toggleVirtualCursor'),
+      toggleFloatingPreview: document.getElementById('toggleFloatingPreview'),
       toggleOnionSkin: document.getElementById('toggleOnionSkin'),
       toggleMirrorMode: document.getElementById('toggleMirrorMode'),
       mirrorAxisVertical: document.getElementById('mirrorAxisVertical'),
@@ -174,8 +182,15 @@
       togglePixfindHelp: document.getElementById('togglePixfindHelp'),
       pixfindHelpText: document.getElementById('pixfindHelpText'),
       toggleLanguageMode: document.getElementById('toggleLanguageMode'),
+      openOperationHelpPanel: document.getElementById('openOperationHelpPanel'),
       openShortcutHelp: document.getElementById('openShortcutHelp'),
       openUpdateHistory: document.getElementById('openUpdateHistory'),
+      helpSearchInput: document.getElementById('helpSearchInput'),
+      helpClearSearch: document.getElementById('helpClearSearch'),
+      helpArticleList: document.getElementById('helpArticleList'),
+      helpSearchCount: document.getElementById('helpSearchCount'),
+      helpNoResults: document.getElementById('helpNoResults'),
+      toggleInlineHelp: document.getElementById('toggleInlineHelp'),
       closeShortcutHelp: document.getElementById('closeShortcutHelp'),
       sendToPixfind: document.getElementById('sendToPixfind'),
       pixfindActionReason: document.getElementById('pixfindActionReason'),
@@ -190,15 +205,27 @@
       timelapseStatus: document.getElementById('timelapseStatus'),
       memoryUsage: document.getElementById('memoryUsage'),
       memoryClear: document.getElementById('memoryClear'),
+      floatingPreviewPlay: document.getElementById('floatingPreviewPlay'),
+      floatingPreviewStop: document.getElementById('floatingPreviewStop'),
       spriteScaleInput: document.getElementById('spriteScaleInput'),
       spriteScaleDecrement: document.getElementById('spriteScaleDecrement'),
       spriteScaleIncrement: document.getElementById('spriteScaleIncrement'),
       applySpriteScale: document.getElementById('applySpriteScale'),
       multiEntryScreen: document.getElementById('multiEntryScreen'),
+      multiEntryActions: document.getElementById('multiEntryActions'),
+      multiEntryJoinPanel: document.getElementById('multiEntryJoinPanel'),
       multiFlowPanel: document.getElementById('multiFlowPanel'),
       multiEntryMaster: document.getElementById('multiEntryMaster'),
       multiEntryGuest: document.getElementById('multiEntryGuest'),
+      multiEntryJoinAsGuest: document.getElementById('multiEntryJoinAsGuest'),
+      multiEntrySpectator: document.getElementById('multiEntrySpectator'),
+      multiEntryJoinBack: document.getElementById('multiEntryJoinBack'),
+      multiEntryHint: document.getElementById('multiEntryHint'),
+      multiEntryJoinHint: document.getElementById('multiEntryJoinHint'),
       multiRoleLabel: document.getElementById('multiRoleLabel'),
+      multiJoinProjectKeyField: document.getElementById('multiJoinProjectKeyField'),
+      multiJoinProjectKey: document.getElementById('multiJoinProjectKey'),
+      multiProjectKeyField: document.getElementById('multiProjectKeyField'),
       multiProjectKey: document.getElementById('multiProjectKey'),
       multiStartSession: document.getElementById('multiStartSession'),
       multiLeaveSession: document.getElementById('multiLeaveSession'),
@@ -320,6 +347,8 @@
     toolSpotlight: {
       dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('toolSpotlightDialog')),
       close: document.getElementById('closeToolSpotlight'),
+      goHome: document.getElementById('toolSpotlightGoHome'),
+      openContest: document.getElementById('toolSpotlightOpenContest'),
     },
     /* solidShape tool removed */
   };
@@ -380,7 +409,7 @@
   };
 
   const LEFT_TAB_KEYS = ['tools', 'color'];
-  const RIGHT_TAB_KEYS = ['frames', 'settings', 'file', 'multi'];
+  const RIGHT_TAB_KEYS = ['frames', 'settings', 'help', 'file', 'multi'];
   const TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE = 'virtualCursorToggle';
   const TOOL_ACTION_MIRROR_POPUP = 'mirrorPopup';
   const TOOL_ACTIONS = new Set([
@@ -443,10 +472,218 @@
     color: 'full',
     frames: 'full',
     settings: 'full',
+    help: 'full',
     file: 'full',
     multi: 'full',
   });
   const UNIFIED_LEFT_TOOLS_COLOR_MODE = true;
+  const INLINE_GUIDES_STORAGE_KEY = 'pixieedraw:inline-guides-visible-v1';
+  const HELP_GUIDE_ITEMS = Object.freeze([
+    Object.freeze({
+      id: 'basic-draw',
+      title: { ja: '基本の描画', en: 'Basic Drawing' },
+      keywords: { ja: 'ペン 消しゴム 1px 描画', en: 'pen eraser draw 1px' },
+      points: {
+        ja: [
+          'ツールから「ペン」または「消しゴム」を選びます。',
+          '左クリック/タップで主色、右クリックで副色を使って描画できます。',
+          '拡大中でも1マス単位で描けるように補正されます。',
+        ],
+        en: [
+          'Choose Pen or Eraser from the tool panel.',
+          'Use primary color with left click/tap and secondary color with right click.',
+          'Strokes are snapped to pixel cells even when zoomed.',
+        ],
+      },
+    }),
+    Object.freeze({
+      id: 'palette-mode',
+      title: { ja: 'パレットとカラーモード', en: 'Palette & Color Mode' },
+      keywords: { ja: 'インデックス RGB パレット 色追加 色編集', en: 'indexed rgb palette add color edit' },
+      points: {
+        ja: [
+          '設定の「カラーモード」でインデックスカラー/RGBカラーを切り替えます。',
+          'どちらのモードでも「+」で色追加、「-」で削除ができます。',
+          '貼り付け時に未登録色がある場合は自動でパレットへ追加されます。',
+        ],
+        en: [
+          'Switch Indexed/RGB mode from Settings > Color Mode.',
+          'Use + to add colors and - to remove in either mode.',
+          'Missing pasted colors are auto-added to the palette.',
+        ],
+      },
+    }),
+    Object.freeze({
+      id: 'selection-move',
+      title: { ja: '範囲選択と移動', en: 'Selection & Move' },
+      keywords: { ja: '矩形 投げ縄 同色 移動 コピー 切り取り 貼り付け', en: 'selection move lasso same-color copy cut paste' },
+      points: {
+        ja: [
+          '矩形/投げ縄/同色選択で範囲を作成し、「移動」でドラッグ移動します。',
+          'コピー/切り取り後に貼り付けすると、他プロジェクトへも貼り付けできます。',
+          '方向キー移動もドラッグ移動と同じ挙動で境界外へ扱われます。',
+        ],
+        en: [
+          'Create a region using Rect/Lasso/Same Color, then move it with Move.',
+          'Copy/Cut then Paste also works across open project tabs.',
+          'Arrow-key movement follows the same out-of-bounds behavior as drag.',
+        ],
+      },
+    }),
+    Object.freeze({
+      id: 'shape-fill',
+      title: { ja: '図形・塗りつぶし', en: 'Shapes & Fill' },
+      keywords: { ja: '直線 曲線 四角 丸 塗りつぶし プレビュー', en: 'line curve rectangle ellipse fill preview' },
+      points: {
+        ja: [
+          '図形ツールはプレビュー表示後、確定で描画されます。',
+          '塗りつぶしは連結領域を対象に実行されます。',
+          '広範囲操作時はプレビュー最適化が入り、描画負荷を抑えます。',
+        ],
+        en: [
+          'Shape tools render after preview and commit.',
+          'Fill targets connected regions.',
+          'Large areas use preview optimization to reduce load.',
+        ],
+      },
+    }),
+    Object.freeze({
+      id: 'mirror',
+      title: { ja: 'ミラーモード', en: 'Mirror Mode' },
+      keywords: { ja: '左右 上下 斜め 対称 軸', en: 'mirror vertical horizontal diagonal axis' },
+      points: {
+        ja: [
+          '設定の「ミラーモード」をONにすると対称描画が有効になります。',
+          '左右/上下/斜め(\\)/( / )を個別に有効化できます。',
+          'キャンバス外側のつまみをドラッグして対称軸を動かせます。',
+        ],
+        en: [
+          'Enable Mirror Mode in Settings to draw symmetrically.',
+          'Toggle vertical/horizontal/diagonal axes independently.',
+          'Drag outside handles to reposition each axis.',
+        ],
+      },
+    }),
+    Object.freeze({
+      id: 'virtual-cursor',
+      title: { ja: '仮想カーソル（モバイル）', en: 'Virtual Cursor (Mobile)' },
+      keywords: { ja: 'スマホ 仮想カーソル 描画ボタン 長押し', en: 'mobile virtual cursor draw button long press' },
+      points: {
+        ja: [
+          '設定で「仮想カーソル」をONにすると、キャンバスドラッグでカーソル移動できます。',
+          '「描画」ボタンの長押しで連続描画できます。',
+          '2本指ドラッグ/ピンチで移動・拡大縮小ができます。',
+        ],
+        en: [
+          'Turn on Virtual Cursor in Settings to move cursor by dragging canvas.',
+          'Long-press Draw for continuous painting.',
+          'Use two fingers to pan and pinch zoom.',
+        ],
+      },
+    }),
+    Object.freeze({
+      id: 'timeline',
+      title: { ja: 'レイヤー・フレーム', en: 'Layers & Frames' },
+      keywords: { ja: 'レイヤー フレーム アニメーション FPS オニオンスキン', en: 'layer frame animation fps onion skin' },
+      points: {
+        ja: [
+          'フレーム/レイヤーパネルで追加・削除・並び替えができます。',
+          '再生FPSを調整し、再生/停止でアニメ確認できます。',
+          'オニオンスキンで前後フレーム参照ができます。',
+        ],
+        en: [
+          'Add/remove/reorder layers and frames in the timeline panel.',
+          'Adjust FPS and preview with Play/Stop.',
+          'Use onion skin to reference previous/next frames.',
+        ],
+      },
+    }),
+    Object.freeze({
+      id: 'floating-preview',
+      title: { ja: '小窓プレビュー', en: 'Floating Preview' },
+      keywords: { ja: '小窓 プレビュー 再生 停止 移動 リサイズ', en: 'floating preview play stop move resize' },
+      points: {
+        ja: [
+          '設定の「小窓プレビュー」でON/OFFできます。',
+          '小窓はドラッグ移動・右下ハンドルでサイズ変更できます。',
+          '再生/停止はタイムライン再生状態と連動します。',
+        ],
+        en: [
+          'Toggle it from Settings > Floating Preview.',
+          'Drag header to move, drag bottom-right handle to resize.',
+          'Play/Stop syncs with timeline playback state.',
+        ],
+      },
+    }),
+    Object.freeze({
+      id: 'save-export',
+      title: { ja: '保存・出力', en: 'Save & Export' },
+      keywords: { ja: 'PNG JPEG SVG GIF タイムラプス プロジェクト 保存', en: 'png jpeg svg gif timelapse project export save' },
+      points: {
+        ja: [
+          'ファイルパネルの「保存/出力」から形式を選んで保存します。',
+          'PNG/JPEG/SVG/GIF/タイムラプスGIF/.pixieedraw に対応しています。',
+          '必要なら保存後にコンテスト投稿画面へ自動遷移できます。',
+        ],
+        en: [
+          'Open Save/Export from the File panel and choose a format.',
+          'Supported: PNG/JPEG/SVG/GIF/Timelapse GIF/.pixieedraw.',
+          'Optional auto-redirect to contest posting after save.',
+        ],
+      },
+    }),
+    Object.freeze({
+      id: 'autosave-local',
+      title: { ja: '自動保存と端末内プロジェクト', en: 'Autosave & Local Projects' },
+      keywords: { ja: '自動保存 端末内プロジェクト サムネイル 削除 タブ', en: 'autosave local project thumbnail delete tabs' },
+      points: {
+        ja: [
+          '新規作成時点で端末内プロジェクトとして自動保存されます。',
+          '端末内プロジェクト一覧から再開・削除ができます（削除は確認あり）。',
+          'プロジェクトは複数タブで最大5件まで同時に開けます。',
+        ],
+        en: [
+          'Projects are autosaved locally as soon as they are created.',
+          'Resume or delete from Local Projects (deletion has confirmation).',
+          'Up to 5 projects can be opened in tabs at once.',
+        ],
+      },
+    }),
+    Object.freeze({
+      id: 'multiplayer',
+      title: { ja: '共有モード（マルチ）', en: 'Collab Mode' },
+      keywords: { ja: '共有 部屋 キー 参加者 視聴者 公開 非公開', en: 'collab room key participant viewer public private' },
+      points: {
+        ja: [
+          '「部屋を開く」でキーを発行し、参加者はキー入力で入室します。',
+          '参加者は描画可能、視聴者は閲覧中心で参加できます。',
+          '公開/非公開や参加方式はマスターの詳細設定で変更できます。',
+        ],
+        en: [
+          'Open Room issues a key; others join by entering that key.',
+          'Participants can draw; viewers can join in view mode.',
+          'Master can change visibility/join policy in advanced settings.',
+        ],
+      },
+    }),
+    Object.freeze({
+      id: 'shortcut',
+      title: { ja: 'ショートカットと履歴', en: 'Shortcuts & History' },
+      keywords: { ja: 'ショートカット 元に戻す やり直す 更新情報', en: 'shortcut undo redo updates' },
+      points: {
+        ja: [
+          '上部の戻る/進むボタンで undo/redo ができます。',
+          '設定の「ショートカット一覧」から操作キーを確認できます。',
+          '「更新情報」で直近の仕様変更を確認できます。',
+        ],
+        en: [
+          'Use top history buttons for undo/redo.',
+          'Open Keyboard Shortcuts from Settings for key references.',
+          'Check Updates for recent behavior changes.',
+        ],
+      },
+    }),
+  ]);
 
   const ZOOM_STEPS = Object.freeze([
     1,
@@ -588,6 +825,7 @@
     },
     frames: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.frames },
     settings: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.settings },
+    help: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.help },
     file: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.file },
     multi: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.multi },
   };
@@ -633,6 +871,17 @@
   const EXPORT_INTERSTITIAL_LAST_SHOWN_KEY = 'pixieedraw:export-interstitial-last-shown-at';
   const EXPORT_INTERSTITIAL_COOLDOWN_MS = 45 * 1000;
   const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
+    Object.freeze({
+      id: '2026-03-07-help-and-ui-cleanup',
+      at: '2026-03-07T21:30:00+09:00',
+      title: '使い方ヘルプ追加と説明UIの整理',
+      details: Object.freeze([
+        '設定パネルから開ける「使い方ヘルプ」パネルを追加。検索しながら操作方法を確認できるよう対応。',
+        '作業画面内の説明ラベルを最小化し、必要なときだけヘルプ経由で確認できる構成に調整。',
+        'レーン上のヘルプ導線と説明ボタンを整理し、作業中の視認性を改善。',
+        '保存/出力まわりの冗長な説明文を削減し、必要な案内のみ残すようUIを整理。',
+      ]),
+    }),
     Object.freeze({
       id: '2026-03-04-project-tabs-autosave-palette',
       at: '2026-03-04T21:30:00+09:00',
@@ -848,7 +1097,30 @@
     }
   }
 
+  function loadInlineGuidesVisibility() {
+    if (!canUseSessionStorage) {
+      return false;
+    }
+    try {
+      return window.localStorage.getItem(INLINE_GUIDES_STORAGE_KEY) === '1';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function storeInlineGuidesVisibility(visible) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(INLINE_GUIDES_STORAGE_KEY, visible ? '1' : '0');
+    } catch (error) {
+      // Ignore localStorage errors.
+    }
+  }
+
   let uiLanguage = resolveInitialUiLanguage();
+  let inlineGuidesVisible = loadInlineGuidesVisibility();
 
   function setDocumentLanguage() {
     if (typeof document === 'undefined' || !document.documentElement) {
@@ -985,8 +1257,8 @@
   const MULTI_JOIN_POLICY_APPROVAL = 'approval';
   const MULTI_JOIN_POLICY_OPEN = 'open';
   const MULTI_DEFAULT_JOIN_POLICY = MULTI_JOIN_POLICY_OPEN;
-  // Default to public rooms per request
-  const MULTI_DEFAULT_ROOM_VISIBILITY = MULTI_ROOM_VISIBILITY_PUBLIC;
+  // Start newly created rooms as private by default.
+  const MULTI_DEFAULT_ROOM_VISIBILITY = MULTI_ROOM_VISIBILITY_PRIVATE;
   const MULTI_INVITE_QUERY_FLAG = 'multiInvite';
   const MULTI_INVITE_QUERY_KEY = 'multiKey';
   const MULTI_INVITE_QUERY_AUTO_JOIN = 'multiAutoJoin';
@@ -1116,7 +1388,6 @@
   let unsavedChangeToken = 0;
   let durableSaveToken = 0;
   let mobileBackGuardInstalled = false;
-  let mobileBackGuardBypassOnce = false;
   let mobileBackBeforeUnloadBypass = false;
   let mobileBackBeforeUnloadBypassTimer = null;
   let iosSnapshotDbPromise = null;
@@ -1413,6 +1684,17 @@
   });
   const ONION_SKIN_TINT_PREV = Object.freeze({ r: 92, g: 198, b: 255 });
   const ONION_SKIN_TINT_NEXT = Object.freeze({ r: 255, g: 170, b: 112 });
+  const COLOR_MODE_INDEX = 'index';
+  const COLOR_MODE_RGB = 'rgb';
+  const FLOATING_PREVIEW_MIN_SIZE = 120;
+  const FLOATING_PREVIEW_MAX_SIZE = 640;
+  const FLOATING_PREVIEW_DEFAULT_STATE = Object.freeze({
+    enabled: false,
+    x: 16,
+    y: 72,
+    width: 220,
+    height: 220,
+  });
   let lockedCanvasWidth = null;
   let lockedCanvasHeight = null;
   const state = createInitialState();
@@ -1451,6 +1733,15 @@
     repeatIntervalId: null,
     moved: false,
   };
+  const floatingPreviewPanelState = {
+    pointerId: null,
+    mode: null,
+    target: null,
+    startClientX: 0,
+    startClientY: 0,
+    startRect: null,
+  };
+  let floatingPreviewCtx = null;
   const virtualCursorDrawState = {
     active: false,
     historyStarted: false,
@@ -1539,7 +1830,7 @@
     }
   }
   applyUiTheme(state.uiTheme, { persist: false });
-  state.colorMode = 'index';
+  state.colorMode = normalizeColorMode(state.colorMode, COLOR_MODE_INDEX);
   state.mirror = normalizeMirrorAxisState(state.mirror, state.width, state.height);
   updateGridDecorations();
   const pointerState = createPointerState();
@@ -1594,6 +1885,7 @@
   const selectionMaskCacheIds = new WeakMap();
   let selectionMaskCacheIdCounter = 1;
   const HISTORY_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', 'fill']);
+  const MULTI_PALETTE_HISTORY_LABELS = new Set(['paletteAdd', 'paletteRemove', 'paletteReorder', 'paletteColor']);
   const MEMORY_MONITOR_INTERVAL = 5000;
   const MEMORY_WARNING_DEFAULT = 250 * 1024 * 1024;
   const MIN_HISTORY_LIMIT = 20;
@@ -1666,6 +1958,7 @@
   let multiEntryMetricsRaf = null;
   let multiAutoResumeAttempted = false;
   let multiInviteAutoJoinHandled = false;
+  let multiEntryJoinPanelOpen = false;
   let mirrorGuideSyncRaf = null;
   let deferredUiSetupScheduled = false;
   let deferredUiSetupDone = false;
@@ -1818,6 +2111,30 @@
     return DEFAULT_UI_THEME;
   }
 
+  function normalizeFloatingPreviewState(source, fallback = FLOATING_PREVIEW_DEFAULT_STATE) {
+    const settings = source && typeof source === 'object' ? source : {};
+    const safeFallback = fallback && typeof fallback === 'object'
+      ? fallback
+      : FLOATING_PREVIEW_DEFAULT_STATE;
+    const width = clamp(
+      Math.round(Number(settings.width) || Number(safeFallback.width) || FLOATING_PREVIEW_DEFAULT_STATE.width),
+      FLOATING_PREVIEW_MIN_SIZE,
+      FLOATING_PREVIEW_MAX_SIZE
+    );
+    const height = clamp(
+      Math.round(Number(settings.height) || Number(safeFallback.height) || FLOATING_PREVIEW_DEFAULT_STATE.height),
+      FLOATING_PREVIEW_MIN_SIZE,
+      FLOATING_PREVIEW_MAX_SIZE
+    );
+    return {
+      enabled: Boolean(settings.enabled ?? safeFallback.enabled),
+      x: Math.round(Number(settings.x) || Number(safeFallback.x) || FLOATING_PREVIEW_DEFAULT_STATE.x),
+      y: Math.round(Number(settings.y) || Number(safeFallback.y) || FLOATING_PREVIEW_DEFAULT_STATE.y),
+      width,
+      height,
+    };
+  }
+
   function normalizeBrushShape(value, fallback = BRUSH_SHAPE_SQUARE) {
     const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
     if (BRUSH_SHAPE_SET.has(normalizedValue)) {
@@ -1964,6 +2281,7 @@
       selectSameMode: requestedSelectSameMode = SELECT_SAME_MODE_CONNECTED,
       brushShape: requestedBrushShape = BRUSH_SHAPE_SQUARE,
       customBrush: requestedCustomBrush = null,
+      floatingPreview: requestedFloatingPreview = null,
     } = options || {};
     const width = clamp(
       Math.round(Number(requestedWidth) || preferredWidth || DEFAULT_CANVAS_SIZE),
@@ -2013,6 +2331,10 @@
       showVirtualCursor: false,
   danmakuEnabled: true,
       virtualCursorButtonScale: DEFAULT_FLOATING_DRAW_BUTTON_SCALE,
+      floatingPreview: normalizeFloatingPreviewState(
+        requestedFloatingPreview,
+        FLOATING_PREVIEW_DEFAULT_STATE
+      ),
       showMajorGrid: true,
       gridScreenStep: 8,
       majorGridSpacing: 16,
@@ -2025,7 +2347,7 @@
       activeRightTab: 'frames',
       showChecker: true,
       onionSkin: normalizeOnionSkinState(requestedOnionSkin),
-      colorMode: 'index',
+      colorMode: COLOR_MODE_INDEX,
       palette,
       activePaletteIndex: 2,
       secondaryPaletteIndex: 3,
@@ -2396,6 +2718,7 @@
       activePaletteIndex: state.activePaletteIndex,
       secondaryPaletteIndex: state.secondaryPaletteIndex,
       activeRgb: normalizeColorValue(state.activeRgb),
+      colorMode: normalizeColorMode(state.colorMode, COLOR_MODE_INDEX),
       frames: state.frames.map(frame => ({
         id: frame.id,
         name: frame.name,
@@ -2443,7 +2766,6 @@
       snapshot.brushSize = state.brushSize;
       snapshot.outlineSize = state.outlineSize;
       snapshot.selectSameMode = normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
-      snapshot.colorMode = state.colorMode;
       snapshot.activeToolGroup = state.activeToolGroup;
       snapshot.lastGroupTool = { ...(state.lastGroupTool || DEFAULT_GROUP_TOOL) };
       snapshot.activeLeftTab = state.activeLeftTab;
@@ -3183,14 +3505,15 @@
         state.brushShape = BRUSH_SHAPE_SQUARE;
       }
     }
-    state.colorMode = 'index';
+    state.colorMode = normalizeColorMode(snapshot.colorMode, state.colorMode);
     state.palette = snapshot.palette.map(color => normalizeColorValue(color));
     state.activePaletteIndex = normalizePaletteIndex(snapshot.activePaletteIndex, state.activePaletteIndex);
     state.secondaryPaletteIndex = normalizePaletteIndex(
       snapshot.secondaryPaletteIndex,
       state.activePaletteIndex
     );
-    state.activeRgb = normalizeColorValue(snapshot.activeRgb);
+    const fallbackRgb = state.palette[state.activePaletteIndex] || state.activeRgb;
+    state.activeRgb = normalizeColorValue(snapshot.activeRgb || fallbackRgb);
     state.frames = snapshot.frames.map(frame => ({
       id: frame.id,
       name: frame.name,
@@ -3850,12 +4173,18 @@
     }
   }
 
+  function navigateToPixieedHomeFromBackGuard() {
+    armMobileBackBeforeUnloadBypass();
+    const homeUrl = '../index.html';
+    try {
+      window.location.replace(homeUrl);
+    } catch (error) {
+      window.location.href = homeUrl;
+    }
+  }
+
   function handleMobileBackButtonPopState() {
     if (!mobileBackGuardInstalled || !isMobileBackButtonGuardEnabled()) {
-      return;
-    }
-    if (mobileBackGuardBypassOnce) {
-      mobileBackGuardBypassOnce = false;
       return;
     }
     const shouldWarn = shouldWarnWhenLeavingPage();
@@ -3871,19 +4200,7 @@
         return;
       }
     }
-    armMobileBackBeforeUnloadBypass();
-    const canNavigateBack = Number(window.history?.length) > 2;
-    if (canNavigateBack) {
-      mobileBackGuardBypassOnce = true;
-      window.history.back();
-      return;
-    }
-    // If there is no prior history entry (direct launch), leave immediately.
-    try {
-      window.location.replace('about:blank');
-    } catch (error) {
-      window.location.href = 'about:blank';
-    }
+    navigateToPixieedHomeFromBackGuard();
   }
 
   function installMobileBackButtonGuard() {
@@ -4686,10 +5003,10 @@
     const safeRight = viewportBounds.right - safeArea.right;
     const safeBottom = viewportBounds.bottom - safeArea.bottom;
     const safeWidth = Math.max(1, safeRight - safeLeft);
-    const isFramesFlyout = state.activeRightTab === 'frames';
-    const widthRatio = isFramesFlyout ? 0.34 : 0.28;
-    const minWidth = isFramesFlyout ? 300 : 220;
-    const maxWidth = isFramesFlyout ? 460 : 340;
+    const isWideFlyout = state.activeRightTab === 'frames' || state.activeRightTab === 'help';
+    const widthRatio = isWideFlyout ? 0.34 : 0.28;
+    const minWidth = isWideFlyout ? 300 : 220;
+    const maxWidth = isWideFlyout ? 460 : 340;
     const minLeft = safeLeft + edgePadding;
     const maxAvailableWidth = Math.max(160, Math.round(safeRight - minLeft - edgePadding));
     let width = clamp(Math.round(safeWidth * widthRatio), minWidth, maxWidth);
@@ -6302,10 +6619,18 @@
     }
     syncMirrorToolPopoverControls(mirrorState);
     syncVirtualCursorControlVisibility({ syncToggle: true });
+    if (dom.controls.toggleFloatingPreview instanceof HTMLInputElement) {
+      dom.controls.toggleFloatingPreview.checked = Boolean(state.floatingPreview?.enabled);
+    }
+    if (dom.controls.toggleInlineHelp instanceof HTMLInputElement) {
+      dom.controls.toggleInlineHelp.checked = inlineGuidesVisible;
+    }
+    updateFloatingPreviewPanelPlaybackButtons();
     syncZoomControls(state.scale);
     if (toolButtons.length) {
       setActiveTool(state.tool, toolButtons, { persist: false });
     }
+    syncColorModeControls();
     updateColorTabSwatch();
     updateLeftTabUI();
     updateLeftTabVisibility();
@@ -6383,6 +6708,160 @@
     option.textContent = localizeText(jaText, enText);
   }
 
+  function setInlineGuidesVisible(visible, { persist = true } = {}) {
+    inlineGuidesVisible = Boolean(visible);
+    document.body.classList.toggle('show-inline-guides', inlineGuidesVisible);
+    if (dom.controls.toggleInlineHelp instanceof HTMLInputElement) {
+      dom.controls.toggleInlineHelp.checked = inlineGuidesVisible;
+    }
+    if (persist) {
+      storeInlineGuidesVisibility(inlineGuidesVisible);
+    }
+  }
+
+  function normalizeHelpSearchQuery(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function renderHelpGuideEntries() {
+    const container = dom.controls.helpArticleList;
+    if (!(container instanceof HTMLElement)) {
+      return;
+    }
+    const openIds = new Set(
+      Array.from(container.querySelectorAll('.help-guide-item[open]')).map(node => node.dataset.helpItemId || '')
+    );
+    container.textContent = '';
+    const fragment = document.createDocumentFragment();
+    HELP_GUIDE_ITEMS.forEach((item, index) => {
+      const details = document.createElement('details');
+      details.className = 'help-guide-item';
+      details.dataset.helpItemId = item.id;
+      if (openIds.has(item.id) || (index === 0 && openIds.size === 0)) {
+        details.open = true;
+      }
+      const searchSource = [
+        item.title.ja,
+        item.title.en,
+        item.keywords.ja,
+        item.keywords.en,
+        ...item.points.ja,
+        ...item.points.en,
+      ]
+        .join(' ')
+        .toLowerCase();
+      details.dataset.helpSearch = searchSource;
+
+      const summary = document.createElement('summary');
+      summary.textContent = localizeText(item.title.ja, item.title.en);
+      details.appendChild(summary);
+
+      const list = document.createElement('ul');
+      list.className = 'help-guide-item__list';
+      const points = isEnglishUi() ? item.points.en : item.points.ja;
+      points.forEach(point => {
+        const listItem = document.createElement('li');
+        listItem.textContent = point;
+        list.appendChild(listItem);
+      });
+      details.appendChild(list);
+      fragment.appendChild(details);
+    });
+    container.appendChild(fragment);
+  }
+
+  function applyHelpGuideSearchFilter() {
+    const container = dom.controls.helpArticleList;
+    if (!(container instanceof HTMLElement)) {
+      return;
+    }
+    const input = dom.controls.helpSearchInput;
+    const normalized = normalizeHelpSearchQuery(input instanceof HTMLInputElement ? input.value : '');
+    const tokens = normalized ? normalized.split(' ').filter(Boolean) : [];
+    const items = Array.from(container.querySelectorAll('.help-guide-item'));
+    const totalCount = items.length;
+    let visibleCount = 0;
+
+    items.forEach(item => {
+      if (!(item instanceof HTMLElement)) {
+        return;
+      }
+      const haystack = String(item.dataset.helpSearch || '').toLowerCase();
+      const visible = tokens.length === 0 || tokens.every(token => haystack.includes(token));
+      item.hidden = !visible;
+      if (visible) {
+        visibleCount += 1;
+      }
+    });
+
+    if (dom.controls.helpNoResults instanceof HTMLElement) {
+      dom.controls.helpNoResults.hidden = visibleCount > 0;
+    }
+    if (dom.controls.helpSearchCount instanceof HTMLElement) {
+      dom.controls.helpSearchCount.textContent = localizeText(
+        `${visibleCount}/${totalCount} 件`,
+        `${visibleCount}/${totalCount} items`
+      );
+    }
+  }
+
+  function openOperationHelpPanel() {
+    if (layoutMode === 'mobilePortrait') {
+      activateMobileTab('help', { ensureDrawer: true });
+      window.requestAnimationFrame(() => {
+        dom.controls.helpSearchInput?.focus?.({ preventScroll: true });
+      });
+      return;
+    }
+    const compactMode = isCompactRightRailMode();
+    if (state.activeRightTab !== 'help') {
+      setRightTab('help');
+    }
+    if (compactMode) {
+      setCompactRightFlyoutOpen(true);
+      updateRightTabVisibility();
+    }
+    window.requestAnimationFrame(() => {
+      dom.controls.helpSearchInput?.focus?.({ preventScroll: true });
+    });
+  }
+
+  function setupHelpPanel() {
+    setInlineGuidesVisible(inlineGuidesVisible, { persist: false });
+
+    if (dom.controls.helpSearchInput instanceof HTMLInputElement && dom.controls.helpSearchInput.dataset.bound !== 'true') {
+      dom.controls.helpSearchInput.dataset.bound = 'true';
+      dom.controls.helpSearchInput.addEventListener('input', () => {
+        applyHelpGuideSearchFilter();
+      });
+    }
+    if (dom.controls.helpClearSearch instanceof HTMLButtonElement && dom.controls.helpClearSearch.dataset.bound !== 'true') {
+      dom.controls.helpClearSearch.dataset.bound = 'true';
+      dom.controls.helpClearSearch.addEventListener('click', () => {
+        if (dom.controls.helpSearchInput instanceof HTMLInputElement) {
+          dom.controls.helpSearchInput.value = '';
+          dom.controls.helpSearchInput.focus({ preventScroll: true });
+        }
+        applyHelpGuideSearchFilter();
+      });
+    }
+    if (dom.controls.toggleInlineHelp instanceof HTMLInputElement && dom.controls.toggleInlineHelp.dataset.bound !== 'true') {
+      dom.controls.toggleInlineHelp.dataset.bound = 'true';
+      dom.controls.toggleInlineHelp.addEventListener('change', event => {
+        if (!(event.target instanceof HTMLInputElement)) {
+          return;
+        }
+        setInlineGuidesVisible(event.target.checked);
+      });
+    }
+
+    renderHelpGuideEntries();
+    applyHelpGuideSearchFilter();
+  }
+
   function getDefaultLayerName(layerNumber = 1) {
     const safeNumber = Math.max(1, Math.round(Number(layerNumber) || 1));
     return localizeText(`レイヤー ${safeNumber}`, `Layer ${safeNumber}`);
@@ -6399,6 +6878,7 @@
       color: { ja: 'カラー', en: 'Color' },
       frames: { ja: 'フレームとレイヤー', en: 'Frames & Layers' },
       settings: { ja: '設定', en: 'Settings' },
+      help: { ja: '使い方ヘルプ', en: 'Help' },
       file: { ja: 'ファイル', en: 'File' },
       multi: { ja: '共有モード', en: 'Collab' },
     };
@@ -6603,18 +7083,26 @@
     setLocalizedSelectOption(dom.controls.layerBlendMode, 'difference', '差の絶対値', 'Difference');
     setLocalizedSelectOption(dom.controls.layerBlendMode, 'exclusion', '除外', 'Exclusion');
 
-    setLocalizedTextContent('#multiEntryMaster', 'マスター', 'Master');
-    setLocalizedTextContent('#multiEntryGuest', '入室', 'Join');
+    setLocalizedTextContent('#multiEntryMasterTitle', '部屋を開く', 'Open Room');
+    setLocalizedTextContent('#multiEntryMasterMeta', 'キー自動生成', 'Auto-create key');
+    setLocalizedTextContent('#multiEntryGuestTitle', '参加する', 'Join Room');
+    setLocalizedTextContent('#multiEntryGuestMeta', 'キー入力へ進む', 'Open key input');
+    setLocalizedTextContent('#multiEntryJoinAsGuestTitle', '参加者で入る', 'Join as Participant');
+    setLocalizedTextContent('#multiEntryJoinAsGuestMeta', '入室後に自動で参加申請', 'Auto-send join request');
+    setLocalizedTextContent('#multiEntrySpectatorTitle', '視聴で入る', 'Join as Viewer');
+    setLocalizedTextContent('#multiEntrySpectatorMeta', '見るだけで入室', 'View-only mode');
+    setLocalizedTextContent('#multiEntryJoinBack', '戻る', 'Back');
+    setLocalizedTextContent('#multiEntryJoinHint', 'キー入力後に参加者か視聴者を選んで入室します。', 'Enter the key, then choose participant or viewer.');
+    setLocalizedTextContent('#multiEntryHint', '部屋を開くとキーが発行されます。参加する場合はキー入力パネルへ進んでください。', 'A key is issued after opening a room. To join, open the key input panel.');
     setLocalizedToggleLabel('multiDanmakuToggle', 'コメント弾幕', 'Comment Overlay');
     setLocalizedTextContent('#multiCommentSend', '送信', 'Send');
-    setLocalizedTextContent('#multiStartSession', '開始', 'Start');
     setLocalizedTextContent('#multiLeaveSession', '切断', 'Disconnect');
+    setLocalizedControlLabel('multiJoinProjectKey', 'プロジェクトキー', 'Project Key');
     setLocalizedControlLabel('multiProjectKey', 'プロジェクトキー', 'Project Key');
     setLocalizedTextContent('#multiCopyKey', 'コピー', 'Copy');
     setLocalizedAttribute('#multiCopyKey', 'aria-label', 'プロジェクトキーをコピー', 'Copy project key');
     setLocalizedAttribute('#multiCopyKey', 'title', 'プロジェクトキーをコピー', 'Copy project key');
-    setLocalizedTextContent('#panelMulti .multi-master-actions > span', '基本', 'Basics');
-    setLocalizedTextContent('#multiGenerateKey', 'キー生成', 'Generate Key');
+    setLocalizedTextContent('#panelMulti .multi-master-actions > span', '部屋管理', 'Room Controls');
     setLocalizedTextContent('#multiBroadcastState', '全員に同期', 'Sync to All');
     setLocalizedTextContent('#multiInviteCopy', '招待リンクをコピー', 'Copy Invite Link');
     setLocalizedTextContent('#multiInviteShare', '招待を共有', 'Share Invite');
@@ -6630,11 +7118,10 @@
     setLocalizedTextContent('#multiHelpClose', '閉じる', 'Close');
     setLocalizedTextContent('#panelMulti .multi-participants-panel > summary', '参加者/視聴者一覧', 'Participants / Viewers');
     setLocalizedTextContent('#multiParticipants .help-text', '未接続', 'Not connected');
-    setLocalizedTextContent('#panelMulti .multi-master-preset-field > span', 'クイック設定', 'Quick Presets');
     setLocalizedTextContent('#multiPresetFriends', '友達向け', 'Friends');
     setLocalizedTextContent('#multiPresetStream', '配信向け', 'Streaming');
     setLocalizedTextContent('#multiPresetHint', '友達向け: 自動参加 / 配信向け: 承認制', 'Friends: auto join / Streaming: approval');
-    setLocalizedTextContent('#multiMasterAdvanced > summary', '詳細設定', 'Advanced');
+    setLocalizedTextContent('#multiMasterAdvanced > summary', '詳細設定（必要なときだけ）', 'Advanced (Only When Needed)');
     setLocalizedTextContent('#panelMulti .multi-capacity-field > span', '参加管理', 'Participant Management');
     setLocalizedControlLabel('multiMaxGuests', '参加上限 (1〜15)', 'Participant Limit (1-15)');
     setLocalizedTextContent('#multiGuestCapacityHint', '参加枠: 0 / 5', 'Participant slots: 0 / 5');
@@ -6665,17 +7152,23 @@
     setLocalizedTextContent('#goHomeButton', '他のツール一覧へ', 'Other Tools');
     setLocalizedTextContent('#supportTipLink', '応援チップ', 'Support Tip');
     setLocalizedAttribute('#supportTipLink', 'aria-label', 'PiXiEEDの応援チップを購入（外部サイト）', 'Buy a PiXiEED support tip (external site)');
+    setLocalizedTextContent('#openOperationHelpPanel', '使い方ヘルプ', 'Help');
     setLocalizedTextContent('#openShortcutHelp', 'ショートカット一覧', 'Keyboard Shortcuts');
     setLocalizedTextContent('#openUpdateHistory', '更新情報', 'Updates');
 
     setLocalizedTextContent('#panelSettings .settings-size-row--canvas > span', 'キャンバスサイズ', 'Canvas Size');
-    setLocalizedControlLabel('canvasWidth', '横', 'W');
-    setLocalizedControlLabel('canvasHeight', '縦', 'H');
+    setLocalizedControlLabel('canvasWidth', 'X', 'X');
+    setLocalizedControlLabel('canvasHeight', 'Y', 'Y');
     setLocalizedTextContent('#applyCanvasResize', '確定', 'Apply');
-    setLocalizedTextContent('#canvasSizeHint', '横/縦を入力して「確定」または Enter で反映します。', 'Enter width/height and press Apply or Enter.');
+    setLocalizedTextContent('#canvasSizeHint', 'X/Y を入力して「確定」または Enter で反映します。', 'Enter X/Y and press Apply or Enter.');
     setLocalizedTextContent('#panelSettings .settings-size-row--sprite > span', 'スプライト倍率', 'Sprite Scale');
     setLocalizedControlLabel('spriteScaleInput', '倍率', 'Scale');
     setLocalizedTextContent('#applySpriteScale', '適用', 'Apply');
+    setLocalizedTextContent('#panelSettings .settings-color-mode-field > span', 'カラーモード', 'Color Mode');
+    setLocalizedAttribute('#settingsColorModeSwitch', 'aria-label', 'カラーモード', 'Color Mode');
+    setLocalizedTextContent('#colorModeIndexLabel', 'インデックスカラー', 'Indexed Color');
+    setLocalizedTextContent('#colorModeRgbLabel', 'RGBカラー', 'RGB Color');
+    setLocalizedTextContent('#settingsColorModeHint', 'インデックスカラーとRGBカラーを切り替えます。', 'Switch between Indexed Color and RGB Color.');
     setLocalizedAttribute('#panelSettings .field.field--list[role="group"]', 'aria-label', '表示設定', 'Display Settings');
     setLocalizedToggleLabel('toggleGrid', 'グリッド', 'Grid');
     setLocalizedToggleLabel('toggleMajorGrid', 'メジャー', 'Major');
@@ -6683,11 +7176,11 @@
     setLocalizedToggleLabel('settingDanmakuToggle', 'コメント弾幕', 'Comment Overlay');
     setLocalizedToggleLabel('togglePixelPreview', '1px ガイド', '1px Guide');
     setLocalizedToggleLabel('toggleVirtualCursor', '仮想カーソル', 'Virtual Cursor');
+    setLocalizedToggleLabel('toggleFloatingPreview', '小窓プレビュー', 'Floating Preview');
     setLocalizedToggleLabel('toggleTimelapse', 'タイムラプス記録', 'Timelapse Recording');
     setLocalizedToggleLabel('toggleOnionSkin', 'オニオンスキン', 'Onion Skin');
     setLocalizedToggleLabel('toggleMirrorMode', 'ミラーモード', 'Mirror Mode');
     setLocalizedToggleLabel('togglePixfindMode', '間違い探しモード', 'PiXFiND Mode');
-    setLocalizedTextContent('#pixfindHelpText', 'ON時はフレーム1を原本、フレーム2を差分としてPiXFiND出力します。ONにするたびフレーム2は作り直されます。', 'When enabled, Frame 1 is the original and Frame 2 is the difference for PiXFiND export. Frame 2 is recreated each time you enable this mode.');
     setLocalizedToggleLabel('mirrorAxisVertical', '左右対称', 'Vertical Mirror');
     setLocalizedToggleLabel('mirrorAxisHorizontal', '上下対称', 'Horizontal Mirror');
     setLocalizedToggleLabel('mirrorAxisDiagonalA', '斜め対称 (＼)', 'Diagonal Mirror (\\)');
@@ -6695,7 +7188,7 @@
     setLocalizedTextContent('#mirrorAxisHelp', 'ミラーモード中は軸ライン外側のつまみをドラッグして、対称軸を移動できます。', 'In mirror mode, drag the outside handles to move each mirror axis.');
     setLocalizedTextContent('.virtual-cursor-scale__label', '仮想カーソルボタンサイズ', 'Virtual Cursor Button Size');
     setLocalizedTextContent('#mobileDrawHelp', 'スマホ描画: 仮想カーソルをONにしてキャンバスをドラッグでカーソル移動、「描画」ボタン長押しで描画します（左半分=主色 / 右半分=副色）。選択範囲を移動する時は「移動」ツール、または選択ツールのまま選択範囲上で描画ボタンを長押しし、もう1本の指でキャンバスをドラッグします。2本指ドラッグ/ピンチで移動と拡大縮小ができます。', 'Mobile draw: turn on Virtual Cursor, drag the canvas to move the cursor, and long-press Draw to paint (left half = primary / right half = secondary). To move a selection, use Move, or keep a selection tool active, hold Draw on the selected area, and drag the canvas with a second finger. Use two fingers to pan and pinch zoom.');
-    setLocalizedTextContent('#panelSettings .settings-display-buttons + .help-text', '背景とUI配色を切り替えます（描画色には影響しません）。', 'Switch the background and UI colors (does not change drawing colors).');
+    setLocalizedTextContent('#settingsDisplayHint', '背景とUI配色を切り替えます（描画色には影響しません）。', 'Switch the background and UI colors (does not change drawing colors).');
 
     setLocalizedTextContent('#floatingDrawButton', '描画', 'Draw');
     setLocalizedAttribute('#floatingDrawButton', 'aria-label', '描画ボタン（左=主色 / 右=副色）', 'Draw button (left = primary / right = secondary)');
@@ -6704,6 +7197,12 @@
     setLocalizedAttribute('#floatingMovePad [data-move-pad-dir="left"]', 'aria-label', '選択範囲を左へ移動', 'Move selection left');
     setLocalizedAttribute('#floatingMovePad [data-move-pad-dir="right"]', 'aria-label', '選択範囲を右へ移動', 'Move selection right');
     setLocalizedAttribute('#floatingMovePad [data-move-pad-dir="down"]', 'aria-label', '選択範囲を下へ移動', 'Move selection down');
+    setLocalizedAttribute('#floatingPreviewPanel', 'aria-label', '小窓プレビュー', 'Floating Preview');
+    setLocalizedTextContent('#floatingPreviewTitle', '小窓プレビュー', 'Floating Preview');
+    setLocalizedTextContent('#floatingPreviewPlay', '再生', 'Play');
+    setLocalizedTextContent('#floatingPreviewStop', '停止', 'Stop');
+    setLocalizedAttribute('#floatingPreviewCanvas', 'aria-label', '小窓プレビューキャンバス', 'Floating preview canvas');
+    setLocalizedAttribute('#floatingPreviewResize', 'aria-label', 'プレビューパネルのサイズを変更', 'Resize preview panel');
     setLocalizedAttribute('#resizeLeftUnifiedSplit', 'aria-label', 'ツールとカラーの縦割合を変更', 'Resize tools and color split');
     setLocalizedTextContent('#mirrorToolPopover .mirror-tool-popover__header strong', '対称ツール', 'Mirror Tools');
     setLocalizedTextContent('#mirrorToolPopoverClose', '閉じる', 'Close');
@@ -6718,15 +7217,20 @@
     setLocalizedTextContent('#clearCanvas', 'キャンバスをクリア', 'Clear Canvas');
     setLocalizedTextContent('.file-panel-summary .help-text:nth-child(1)', '自動保存: ON（この端末）', 'Autosave: ON (this device)');
     setLocalizedTextContent('.file-panel-summary .help-text:nth-child(2)', '共有・配布用の保存は「保存/出力」から手動で行います。', 'Use "Save / Export" for files you want to share.');
-    setLocalizedTextContent('#panelFile .field.field--list > span', 'タイムラプス', 'Timelapse');
+    setLocalizedTextContent('#fileContestPromoTitle', 'コンテスト投稿', 'Contest Posting');
+    setLocalizedTextContent('#fileContestPromoDescription', '保存/出力の「保存完了後にコンテスト投稿画面へ移動する」をONにすると、そのまま投稿できます。', 'Turn on "Go to contest post screen after save" to move directly to contest posting.');
+    setLocalizedTextContent('#openContestFromFilePanel', 'コンテストページを見る', 'Open Contest Page');
+    setLocalizedTextContent('#timelapseSectionTitle', 'タイムラプス', 'Timelapse');
     setLocalizedTextContent('#timelapseClear', '記録クリア', 'Clear Record');
     setLocalizedControlLabel('timelapseFps', '再生FPS', 'Playback FPS');
-    setLocalizedTextContent('#panelFile .field.field--list > p.help-text:last-child', '記録ON時は描画履歴を自動記録します。出力は通常の「出力」ボタンから選択してください。', 'When recording is ON, drawing history is captured automatically. Export from the regular Save / Export dialog.');
+    setLocalizedTextContent('#timelapseDescription', '記録ON時は描画履歴を自動記録します。出力は通常の「出力」ボタンから選択してください。', 'When recording is ON, drawing history is captured automatically. Export from the regular Save / Export dialog.');
     setLocalizedTextContent('#memoryClear', 'メモリ削除', 'Clear Memory');
 
     setLocalizedTextContent('#exportDialogTitle', '保存/出力形式', 'Save / Export');
     setLocalizedTextContent('label[for="exportFormat"] > span', '形式', 'Format');
     setLocalizedSelectOption(dom.exportDialog?.format, 'png', 'PNG（画像）', 'PNG (Image)');
+    setLocalizedSelectOption(dom.exportDialog?.format, 'jpeg', 'JPEG（画像）', 'JPEG (Image)');
+    setLocalizedSelectOption(dom.exportDialog?.format, 'svg', 'SVG（画像）', 'SVG (Image)');
     setLocalizedSelectOption(dom.exportDialog?.format, 'gridpng', 'PNG（グリッド分割）', 'PNG (Grid Split)');
     setLocalizedSelectOption(dom.exportDialog?.format, 'gif', 'GIF（アニメーション）', 'GIF (Animation)');
     setLocalizedSelectOption(dom.exportDialog?.format, 'timelapse', 'タイムラプスGIF（記録）', 'Timelapse GIF');
@@ -6735,14 +7239,12 @@
     setLocalizedTextContent('#exportScaleControls > span', '出力倍率', 'Output Scale');
     setLocalizedTextContent('label[for="exportScaleSlider"]', '倍率 (×)', 'Scale (×)');
     setLocalizedTextContent('#exportOriginalOptionRow span', '拡大出力時に原寸も追加で出力する', 'Also export original size when scaled');
-    setLocalizedTextContent('#exportCompanionOptionRow span', '画像/GIF出力時に PiXiEEDファイルも同時保存する', 'Save a PiXiEED project file together with image/GIF');
+    setLocalizedTextContent('#exportCompanionOptionRow span', '画像/GIF/SVG出力時に PiXiEEDファイルも同時保存する', 'Save a PiXiEED project file together with image/GIF/SVG');
     setLocalizedTextContent('#exportContestPostOptionRow span', '保存完了後にコンテスト投稿画面へ移動する', 'Go to contest post screen after save');
     setLocalizedTextContent('#exportGridSettings > span', 'グリッド分割 (PNG)', 'Grid Split (PNG)');
     setLocalizedControlLabel('exportGridWidth', '幅 (px)', 'Width (px)');
     setLocalizedControlLabel('exportGridHeight', '高さ (px)', 'Height (px)');
     setLocalizedTextContent('#exportGridHint', '分割順: 右上から左へ、次の段へ進みます（右→左、上→下）。', 'Split order: starts at top-right, moves right-to-left, then top-to-bottom.');
-    setLocalizedHtmlContent('#exportDialog .export-guidance .help-text:nth-child(1)', '<strong>iPhoneで保存</strong> 共有 → ファイルに保存', '<strong>iPhone Save</strong> Share → Save to Files');
-    setLocalizedHtmlContent('#exportDialog .export-guidance .help-text:nth-child(2)', '<strong>Androidで保存</strong> 保存', '<strong>Android Save</strong> Save');
     setLocalizedTextContent('#confirmExport', '保存/出力', 'Save / Export');
     setLocalizedTextContent('#cancelExport', 'キャンセル', 'Cancel');
     setLocalizedTextContent('#exportAdContainer .export-ad__label', '広告', 'Ad');
@@ -6766,12 +7268,32 @@
     setLocalizedTextContent('#updateHistoryTitle', '更新情報', 'Updates');
     setLocalizedTextContent('#updateHistoryDialog .help-text', '直近1年の更新内容を表示しています。', 'Shows update notes for the past year.');
     setLocalizedTextContent('#closeUpdateHistory', '閉じる', 'Close');
+    setLocalizedTextContent('#toolSpotlightTitle', '他ツールの紹介', 'More Tools');
+    setLocalizedTextContent('#toolSpotlightLead', '出力ありがとうございます。次に遊べる・使えるツールです。', 'Thanks for exporting. Here are tools you can try next.');
+    setLocalizedTextContent('#toolSpotlightMaoituTitle', 'まおいつ', 'Maoitu');
+    setLocalizedTextContent('#toolSpotlightMaoituDesc', '避け続けるアクションゲーム。短時間でスコアアタックできます。', 'An action game focused on dodging. Great for quick score attacks.');
+    setLocalizedTextContent('#toolSpotlightPixfindTitle', 'PiXFiND', 'PiXFiND');
+    setLocalizedTextContent('#toolSpotlightPixfindDesc', 'ドット絵専用の間違い探しゲーム。作った絵の活用にも最適です。', 'A spot-the-difference game for pixel art. Great for reusing your drawings.');
+    setLocalizedTextContent('#toolSpotlightLensTitle', 'PiXiEELENS', 'PiXiEELENS');
+    setLocalizedTextContent('#toolSpotlightLensDesc', 'カメラ画像をドット化できるツール。撮影してそのまま編集導線につなげられます。', 'Turn camera images into pixel art and continue straight into editing.');
+    setLocalizedTextContent('#toolSpotlightContestTitle', 'PiXiEEDコンテスト', 'PiXiEED Contest');
+    setLocalizedTextContent('#toolSpotlightContestDesc', '保存した作品を投稿して、みんなの作品もチェックできます。', 'Post your saved artwork and browse creations from everyone.');
+    setLocalizedTextContent('#toolSpotlightGoHome', 'ホームへ戻る', 'Back to Home');
+    setLocalizedTextContent('#toolSpotlightOpenContest', 'コンテストを見る', 'View Contest');
     setLocalizedTextContent('#closeToolSpotlight', '閉じる', 'Close');
+    setLocalizedTextContent('#helpPanelTitle', '使い方ヘルプ', 'Help');
+    setLocalizedTextContent('#helpPanelLead', '操作方法を検索できます。必要なキーワードを入力してください。', 'Search operation guides by keyword.');
+    setLocalizedTextContent('#helpSearchLabel', '検索', 'Search');
+    setLocalizedAttribute('#helpSearchInput', 'placeholder', '例: 選択移動 / ミラー / GIF / マルチ', 'e.g. selection move / mirror / gif / collab');
+    setLocalizedTextContent('#helpSearchHint', '検索は日本語/英語どちらでも使えます。', 'Search works with both Japanese and English terms.');
+    setLocalizedTextContent('#toggleInlineHelpLabel', '画面内の説明ラベルを表示', 'Show inline guide labels');
+    setLocalizedTextContent('#helpClearSearch', 'クリア', 'Clear');
+    setLocalizedTextContent('#helpNoResults', '一致する項目はありません。', 'No matching guides found.');
+    renderHelpGuideEntries();
+    applyHelpGuideSearchFilter();
 
     renderMirrorToolPopover();
     syncMirrorToolPopoverControls();
-    const pixfindExpanded = dom.controls.togglePixfindHelp?.getAttribute('aria-expanded') === 'true';
-    setPixfindHelpExpanded(pixfindExpanded);
     updateExportDestinationLabel();
     updateExportFolderButtonLabel();
     updateExportScaleHint();
@@ -6953,8 +7475,8 @@
   function getExportDestinationLabelText() {
     if (!EXPORT_DIRECTORY_SUPPORTED) {
       return localizeText(
-        '画像/GIF出力先: 固定出力先は使用しません（保存時に保存先を選択）',
-        'Image/GIF destination: fixed folder is disabled (choose destination when saving)'
+        '画像/GIF/SVG出力先: 固定出力先は使用しません（保存時に保存先を選択）',
+        'Image/GIF/SVG destination: fixed folder is disabled (choose destination when saving)'
       );
     }
     const activeHandle = exportDirectoryHandle || pendingExportDirectoryHandle;
@@ -6965,19 +7487,19 @@
       });
     if (exportDirectoryHandle) {
       return localizeText(
-        `画像/GIF出力先: ${displayLabel}/（フルパスはブラウザ仕様で非表示）`,
-        `Image/GIF destination: ${displayLabel}/ (full path hidden by browser)`
+        `画像/GIF/SVG出力先: ${displayLabel}/（フルパスはブラウザ仕様で非表示）`,
+        `Image/GIF/SVG destination: ${displayLabel}/ (full path hidden by browser)`
       );
     }
     if (pendingExportDirectoryHandle) {
       return localizeText(
-        `画像/GIF出力先: ${displayLabel}/（再許可が必要）`,
-        `Image/GIF destination: ${displayLabel}/ (reauthorization required)`
+        `画像/GIF/SVG出力先: ${displayLabel}/（再許可が必要）`,
+        `Image/GIF/SVG destination: ${displayLabel}/ (reauthorization required)`
       );
     }
     return localizeText(
-      '画像/GIF出力先: 未固定（保存時に保存先を選択）',
-      'Image/GIF destination: not fixed (choose destination when saving)'
+      '画像/GIF/SVG出力先: 未固定（保存時に保存先を選択）',
+      'Image/GIF/SVG destination: not fixed (choose destination when saving)'
     );
   }
 
@@ -9703,7 +10225,7 @@
     const choice = window.prompt(
       residentPngOnly
         ? '出力形式を入力してください (png)'
-        : '出力形式を入力してください (png / grid / gif / timelapse / pixfind / project)',
+        : '出力形式を入力してください (png / jpeg / svg / grid / gif / timelapse / pixfind / project)',
       'png'
     );
     if (!choice) {
@@ -9716,6 +10238,9 @@
     }
     if (
       inputMode !== 'png'
+      && inputMode !== 'jpg'
+      && inputMode !== 'jpeg'
+      && inputMode !== 'svg'
       && inputMode !== 'grid'
       && inputMode !== 'gridpng'
       && inputMode !== 'gif'
@@ -9723,7 +10248,7 @@
       && inputMode !== 'pixfind'
       && inputMode !== 'project'
     ) {
-      window.alert('png / grid / gif / timelapse / pixfind / project のいずれかを入力してください。');
+      window.alert('png / jpeg / svg / grid / gif / timelapse / pixfind / project のいずれかを入力してください。');
       return;
     }
     const normalized = normalizeExportFormat(inputMode);
@@ -9767,6 +10292,10 @@
       } else {
         exportProjectAsPng();
       }
+    } else if (normalized === 'jpeg') {
+      exportProjectAsJpeg();
+    } else if (normalized === 'svg') {
+      exportProjectAsSvg();
     } else if (normalized === 'gif') {
       exportProjectAsGif();
     } else if (normalized === 'timelapse') {
@@ -10284,6 +10813,10 @@
       }
       if (mode === 'gif') {
         exportProjectAsGif();
+      } else if (mode === 'jpeg') {
+        exportProjectAsJpeg();
+      } else if (mode === 'svg') {
+        exportProjectAsSvg();
       } else if (mode === 'gridpng') {
         exportProjectAsGridPng();
       } else if (mode === 'timelapse') {
@@ -10463,6 +10996,12 @@
       return;
     }
     dom.toolSpotlight?.close?.addEventListener('click', () => {
+      closeToolSpotlightDialog();
+    });
+    dom.toolSpotlight?.goHome?.addEventListener('click', () => {
+      closeToolSpotlightDialog();
+    });
+    dom.toolSpotlight?.openContest?.addEventListener('click', () => {
       closeToolSpotlightDialog();
     });
     dialog.addEventListener('cancel', event => {
@@ -12272,6 +12811,7 @@
       activePaletteIndex: snapshot.activePaletteIndex,
       secondaryPaletteIndex: snapshot.secondaryPaletteIndex,
       activeRgb: normalizeColorValue(snapshot.activeRgb),
+      colorMode: normalizeColorMode(snapshot.colorMode, state.colorMode),
       frames: snapshot.frames.map(frame => ({
         id: frame.id,
         name: frame.name,
@@ -12327,9 +12867,6 @@
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'outlineSize')) {
       serialized.outlineSize = clamp(Math.round(Number(snapshot.outlineSize) || state.outlineSize || 1), 1, 64);
-    }
-    if (Object.prototype.hasOwnProperty.call(snapshot, 'colorMode')) {
-      serialized.colorMode = snapshot.colorMode;
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'activeToolGroup')) {
       serialized.activeToolGroup = snapshot.activeToolGroup;
@@ -12441,8 +12978,7 @@
     const brushShape = requestedBrushShape === BRUSH_SHAPE_CUSTOM && !customBrush
       ? BRUSH_SHAPE_SQUARE
       : requestedBrushShape;
-    const activeRgb = normalizeColorValue(payload.activeRgb || state.activeRgb);
-    const colorMode = 'index';
+    const colorMode = normalizeColorMode(payload.colorMode, state.colorMode);
     const fallbackActivePaletteIndex = clamp(
       Number.isFinite(state.activePaletteIndex) ? Math.round(state.activePaletteIndex) : 0,
       0,
@@ -12460,6 +12996,10 @@
       0,
       palette.length - 1
     );
+    const fallbackActiveRgb = palette[activePaletteIndex]
+      ? normalizeColorValue(palette[activePaletteIndex])
+      : normalizeColorValue(state.activeRgb);
+    const activeRgb = normalizeColorValue(payload.activeRgb || fallbackActiveRgb);
     const backgroundMode = payload.backgroundMode === 'light' || payload.backgroundMode === 'pink' ? payload.backgroundMode : 'dark';
     const uiTheme = normalizeUiTheme(payload.uiTheme, state.uiTheme);
     let activeToolGroup = TOOL_GROUPS[payload.activeToolGroup] ? payload.activeToolGroup : (TOOL_TO_GROUP[activeTool] || state.activeToolGroup);
@@ -13010,6 +13550,280 @@
     }
   }
 
+  function createJpegCanvasFromSourceCanvas(sourceCanvas) {
+    if (!(sourceCanvas instanceof HTMLCanvasElement)) {
+      throw new Error('JPEG変換対象キャンバスが不正です');
+    }
+    const output = document.createElement('canvas');
+    output.width = Math.max(1, sourceCanvas.width);
+    output.height = Math.max(1, sourceCanvas.height);
+    const ctx = output.getContext('2d');
+    if (!ctx) {
+      throw new Error('JPEG出力キャンバスのコンテキストを取得できませんでした');
+    }
+    ctx.imageSmoothingEnabled = false;
+    ctx.msImageSmoothingEnabled = false;
+    ctx.webkitImageSmoothingEnabled = false;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, output.width, output.height);
+    ctx.drawImage(sourceCanvas, 0, 0, output.width, output.height);
+    return output;
+  }
+
+  function toSvgColorHex(r, g, b) {
+    const toHex = value => clamp(Math.round(Number(value) || 0), 0, 255).toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  }
+
+  function toSvgOpacity(alpha) {
+    const normalized = clamp(Math.round(Number(alpha) || 0), 0, 255) / 255;
+    return Number(normalized.toFixed(4)).toString();
+  }
+
+  function buildSvgMarkupFromPixels(pixels, width, height, scale = 1) {
+    const safeWidth = Math.max(1, Math.floor(Number(width) || 0));
+    const safeHeight = Math.max(1, Math.floor(Number(height) || 0));
+    const pixelScale = Math.max(1, Math.floor(Number(scale) || 1));
+    const expectedLength = safeWidth * safeHeight * 4;
+    if (!(pixels instanceof Uint8ClampedArray) || pixels.length < expectedLength) {
+      throw new Error('SVG出力に必要なピクセルデータが不正です');
+    }
+
+    const outputWidth = safeWidth * pixelScale;
+    const outputHeight = safeHeight * pixelScale;
+    const parts = [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${outputWidth}" height="${outputHeight}" viewBox="0 0 ${outputWidth} ${outputHeight}" shape-rendering="crispEdges">`,
+    ];
+
+    for (let y = 0; y < safeHeight; y += 1) {
+      const rowBase = y * safeWidth * 4;
+      let x = 0;
+      while (x < safeWidth) {
+        const base = rowBase + x * 4;
+        const alpha = pixels[base + 3];
+        if (!alpha) {
+          x += 1;
+          continue;
+        }
+        const red = pixels[base];
+        const green = pixels[base + 1];
+        const blue = pixels[base + 2];
+        let runLength = 1;
+        while (x + runLength < safeWidth) {
+          const nextBase = rowBase + (x + runLength) * 4;
+          if (
+            pixels[nextBase] !== red
+            || pixels[nextBase + 1] !== green
+            || pixels[nextBase + 2] !== blue
+            || pixels[nextBase + 3] !== alpha
+          ) {
+            break;
+          }
+          runLength += 1;
+        }
+        const rectX = x * pixelScale;
+        const rectY = y * pixelScale;
+        const rectWidth = runLength * pixelScale;
+        const rectHeight = pixelScale;
+        const fillColor = toSvgColorHex(red, green, blue);
+        if (alpha >= 255) {
+          parts.push(`<rect x="${rectX}" y="${rectY}" width="${rectWidth}" height="${rectHeight}" fill="${fillColor}"/>`);
+        } else {
+          parts.push(
+            `<rect x="${rectX}" y="${rectY}" width="${rectWidth}" height="${rectHeight}" fill="${fillColor}" fill-opacity="${toSvgOpacity(alpha)}"/>`
+          );
+        }
+        x += runLength;
+      }
+    }
+
+    parts.push('</svg>');
+    return parts.join('');
+  }
+
+  function buildSvgBlobFromPixels(pixels, width, height, scale = 1) {
+    const svg = buildSvgMarkupFromPixels(pixels, width, height, scale);
+    return new Blob([svg], { type: 'image/svg+xml' });
+  }
+
+  async function exportProjectAsJpeg() {
+    if (!ensureCurrentClientCanExportProject({ announce: true, format: 'jpeg' })) {
+      return;
+    }
+    const frameCount = state.frames.length;
+    if (!frameCount) {
+      updateAutosaveStatus('JPEGを書き出すフレームがありません', 'warn');
+      return;
+    }
+    try {
+      const { width, height } = state;
+      const candidates = getExportScaleCandidates();
+      const selectedScale = applyExportScaleConstraints(candidates);
+      syncExportScaleInputs();
+      const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
+      const includeOriginal = shouldExportOriginalCompanion('jpeg', selectedScale);
+      const tasks = [];
+      for (let index = 0; index < frameCount; index += 1) {
+        const frameNumber = String(index + 1).padStart(2, '0');
+        const baseCanvas = createFrameCanvas(framePixels[index], width, height);
+        const variants = [{ scale: selectedScale, isOriginal: false }];
+        if (includeOriginal) {
+          variants.push({ scale: 1, isOriginal: true });
+        }
+        for (let variantIndex = 0; variantIndex < variants.length; variantIndex += 1) {
+          const variant = variants[variantIndex];
+          const scaledCanvas = scaleCanvasNearestNeighbor(baseCanvas, variant.scale);
+          const jpegCanvas = createJpegCanvasFromSourceCanvas(scaledCanvas);
+          const blob = await canvasToBlob(jpegCanvas, 'image/jpeg', 0.92);
+          if (!blob) {
+            throw new Error('Failed to create JPEG blob');
+          }
+          let suffix = `frame_${frameNumber}`;
+          if (variant.scale > 1 || includeOriginal) {
+            suffix += `_x${variant.scale}`;
+          }
+          tasks.push({
+            blob,
+            filename: createExportFileName('jpg', suffix),
+            shareText: `フレーム${index + 1}のJPEGを書き出しました${variant.scale > 1 ? ` (×${variant.scale})` : ''}`,
+          });
+        }
+      }
+
+      const result = await deliverExportTasks(tasks, {
+        mimeType: 'image/jpeg',
+        fileExtensions: ['.jpg', '.jpeg'],
+        shareTitle: state.documentName || 'PiXiEEDraw',
+        shareText: 'JPEGを書き出しました',
+      });
+      const detailParts = [];
+      if (frameCount > 1) {
+        detailParts.push(`全${frameCount}フレーム`);
+      }
+      if (selectedScale > 1) {
+        detailParts.push(`×${selectedScale}`);
+      }
+      if (includeOriginal) {
+        detailParts.push('原寸も追加');
+      }
+      detailParts.push('透明部分は白背景');
+      const detail = detailParts.length ? ` (${detailParts.join(' / ')})` : '';
+
+      if (result.exportedCount === result.total) {
+        updateAutosaveStatus(`JPEGを書き出しました${detail}`, 'success');
+      } else if (result.wasCancelled) {
+        const remaining = result.total - result.exportedCount;
+        updateAutosaveStatus(remaining === result.total
+          ? 'JPEGの書き出しをキャンセルしました'
+          : `JPEGを書き出しましたが ${remaining} 件はキャンセルされました`, 'warn');
+      } else if (result.exportedCount > 0 && result.hadFailure) {
+        updateAutosaveStatus(`JPEGを書き出しましたが ${result.total - result.exportedCount} 件エクスポートできませんでした`, 'warn');
+      } else {
+        updateAutosaveStatus('JPEGの書き出しに失敗しました', 'error');
+      }
+      if (result.exportedCount > 0) {
+        markDocumentDurablySaved();
+        if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
+          const companionResult = await maybeSaveProjectCompanionAfterExport('jpeg', {
+            exportedCount: result.exportedCount,
+            wasCancelled: result.wasCancelled,
+          });
+          announceProjectCompanionSaveResult('jpeg', companionResult);
+        }
+        showExportInterstitialAfterImageExport();
+      }
+    } catch (error) {
+      console.error('JPEG export failed', error);
+      updateAutosaveStatus('JPEGの書き出しに失敗しました', 'error');
+    }
+  }
+
+  async function exportProjectAsSvg() {
+    if (!ensureCurrentClientCanExportProject({ announce: true, format: 'svg' })) {
+      return;
+    }
+    const frameCount = state.frames.length;
+    if (!frameCount) {
+      updateAutosaveStatus('SVGを書き出すフレームがありません', 'warn');
+      return;
+    }
+    try {
+      const { width, height } = state;
+      const candidates = getExportScaleCandidates();
+      const selectedScale = applyExportScaleConstraints(candidates);
+      syncExportScaleInputs();
+      const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
+      const includeOriginal = shouldExportOriginalCompanion('svg', selectedScale);
+      const tasks = [];
+      for (let index = 0; index < frameCount; index += 1) {
+        const frameNumber = String(index + 1).padStart(2, '0');
+        const variants = [{ scale: selectedScale, isOriginal: false }];
+        if (includeOriginal) {
+          variants.push({ scale: 1, isOriginal: true });
+        }
+        for (let variantIndex = 0; variantIndex < variants.length; variantIndex += 1) {
+          const variant = variants[variantIndex];
+          const blob = buildSvgBlobFromPixels(framePixels[index], width, height, variant.scale);
+          let suffix = `frame_${frameNumber}`;
+          if (variant.scale > 1 || includeOriginal) {
+            suffix += `_x${variant.scale}`;
+          }
+          tasks.push({
+            blob,
+            filename: createExportFileName('svg', suffix),
+            shareText: `フレーム${index + 1}のSVGを書き出しました${variant.scale > 1 ? ` (×${variant.scale})` : ''}`,
+          });
+        }
+      }
+
+      const result = await deliverExportTasks(tasks, {
+        mimeType: 'image/svg+xml',
+        fileExtensions: ['.svg'],
+        shareTitle: state.documentName || 'PiXiEEDraw',
+        shareText: 'SVGを書き出しました',
+      });
+      const detailParts = [];
+      if (frameCount > 1) {
+        detailParts.push(`全${frameCount}フレーム`);
+      }
+      if (selectedScale > 1) {
+        detailParts.push(`×${selectedScale}`);
+      }
+      if (includeOriginal) {
+        detailParts.push('原寸も追加');
+      }
+      const detail = detailParts.length ? ` (${detailParts.join(' / ')})` : '';
+
+      if (result.exportedCount === result.total) {
+        updateAutosaveStatus(`SVGを書き出しました${detail}`, 'success');
+      } else if (result.wasCancelled) {
+        const remaining = result.total - result.exportedCount;
+        updateAutosaveStatus(remaining === result.total
+          ? 'SVGの書き出しをキャンセルしました'
+          : `SVGを書き出しましたが ${remaining} 件はキャンセルされました`, 'warn');
+      } else if (result.exportedCount > 0 && result.hadFailure) {
+        updateAutosaveStatus(`SVGを書き出しましたが ${result.total - result.exportedCount} 件エクスポートできませんでした`, 'warn');
+      } else {
+        updateAutosaveStatus('SVGの書き出しに失敗しました', 'error');
+      }
+      if (result.exportedCount > 0) {
+        markDocumentDurablySaved();
+        if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
+          const companionResult = await maybeSaveProjectCompanionAfterExport('svg', {
+            exportedCount: result.exportedCount,
+            wasCancelled: result.wasCancelled,
+          });
+          announceProjectCompanionSaveResult('svg', companionResult);
+        }
+        showExportInterstitialAfterImageExport();
+      }
+    } catch (error) {
+      console.error('SVG export failed', error);
+      updateAutosaveStatus('SVGの書き出しに失敗しました', 'error');
+    }
+  }
+
   async function exportProjectAsGif() {
     if (!ensureCurrentClientCanExportProject({ announce: true, format: 'gif' })) {
       return;
@@ -13103,14 +13917,15 @@
     return frames.map(frame => compositeFramePixels(frame, width, height, palette));
   }
 
-  function compositeFramePixels(frame, width, height, palette) {
+  function compositeFramePixels(frame, width, height, palette, options = {}) {
+    const includeHiddenLayers = Boolean(options && options.includeHiddenLayers);
     const pixelCount = width * height;
     const output = new Uint8ClampedArray(pixelCount * 4);
     if (!frame || !Array.isArray(frame.layers)) {
       return output;
     }
     frame.layers.forEach(layer => {
-      if (!layer || !layer.visible || normalizeLayerOpacity(layer.opacity) <= 0) {
+      if (!layer || (!includeHiddenLayers && !layer.visible) || normalizeLayerOpacity(layer.opacity) <= 0) {
         return;
       }
       const layerOpacity = normalizeLayerOpacity(layer.opacity);
@@ -13197,6 +14012,8 @@
     const normalized = String(mode || '').trim().toLowerCase();
     if (normalized === 'gif') return 'gif';
     if (normalized === 'timelapse') return 'timelapse';
+    if (normalized === 'jpeg' || normalized === 'jpg') return 'jpeg';
+    if (normalized === 'svg') return 'svg';
     if (normalized === 'png') return 'png';
     if (normalized === 'gridpng' || normalized === 'grid') return 'gridpng';
     if (normalized === 'pixfind') return 'pixfind';
@@ -13206,6 +14023,8 @@
 
   function getExportFormatLabel(mode) {
     const normalized = normalizeExportFormat(mode);
+    if (normalized === 'jpeg') return 'JPEG';
+    if (normalized === 'svg') return 'SVG';
     if (normalized === 'gridpng') return localizeText('PNG（グリッド分割）', 'PNG (Grid Split)');
     if (normalized === 'gif') return 'GIF';
     if (normalized === 'timelapse') return localizeText('タイムラプスGIF', 'Timelapse GIF');
@@ -13258,6 +14077,8 @@
   function canOfferProjectCompanionExport(mode) {
     const format = normalizeExportFormat(mode);
     const supportsCompanionFormat = format === 'png'
+      || format === 'jpeg'
+      || format === 'svg'
       || format === 'gif'
       || format === 'gridpng'
       || format === 'timelapse';
@@ -13352,7 +14173,8 @@
   function canOfferOriginalCompanionExport(mode, scale = exportScale) {
     const format = normalizeExportFormat(mode);
     const normalizedScale = Math.max(1, Math.floor(Number(scale) || 1));
-    return normalizedScale > 1 && (format === 'png' || format === 'gif');
+    return normalizedScale > 1
+      && (format === 'png' || format === 'jpeg' || format === 'svg' || format === 'gif');
   }
 
   function shouldExportOriginalCompanion(mode, scale = exportScale) {
@@ -13362,6 +14184,8 @@
   function doesExportFormatUseScale(mode) {
     const format = normalizeExportFormat(mode);
     return format === 'png'
+      || format === 'jpeg'
+      || format === 'svg'
       || format === 'gif'
       || format === 'gridpng'
       || format === 'timelapse';
@@ -13370,6 +14194,8 @@
   function doesExportFormatSupportProjectCompanion(mode) {
     const format = normalizeExportFormat(mode);
     return format === 'png'
+      || format === 'jpeg'
+      || format === 'svg'
       || format === 'gif'
       || format === 'gridpng'
       || format === 'timelapse';
@@ -13451,7 +14277,9 @@
     const format = normalizeExportFormat(mode);
     const label = format === 'gridpng'
       ? 'グリッド分割PNG'
-      : (format === 'timelapse' ? 'タイムラプスGIF' : String(format || '').toUpperCase());
+      : (format === 'timelapse'
+        ? 'タイムラプスGIF'
+        : (format === 'jpeg' ? 'JPEG' : String(format || '').toUpperCase()));
     if (result === 'saved') {
       updateAutosaveStatus(`${label}出力後: PiXiEEDファイルも保存しました`, 'success');
       return;
@@ -13893,7 +14721,7 @@
     return { exportedCount, total, wasCancelled, hadFailure };
   }
 
-  function canvasToBlob(canvas, mimeType) {
+  function canvasToBlob(canvas, mimeType, quality) {
     return new Promise((resolve, reject) => {
       if (typeof canvas.toBlob === 'function') {
         canvas.toBlob(blob => {
@@ -13902,11 +14730,11 @@
           } else {
             reject(new Error('Canvas toBlob returned null'));
           }
-        }, mimeType);
+        }, mimeType, quality);
         return;
       }
       try {
-        const dataUrl = canvas.toDataURL(mimeType);
+        const dataUrl = canvas.toDataURL(mimeType, quality);
         const blob = dataUrlToBlob(dataUrl, mimeType);
         resolve(blob);
       } catch (error) {
@@ -16026,6 +16854,7 @@
     setupExportInterstitialDialog();
     setupUpdateHistoryDialog();
     setupToolSpotlightDialog();
+    setupHelpPanel();
     setupTools();
     setupToolGroups();
     setupPaletteEditor();
@@ -18583,6 +19412,14 @@
     };
     dom.controls.toggleVirtualCursor?.addEventListener('change', handleVirtualCursorToggleInput);
     dom.controls.toggleVirtualCursor?.addEventListener('input', handleVirtualCursorToggleInput);
+    const handleFloatingPreviewToggleInput = event => {
+      if (!(event.target instanceof HTMLInputElement)) {
+        return;
+      }
+      setFloatingPreviewEnabled(Boolean(event.target.checked));
+    };
+    dom.controls.toggleFloatingPreview?.addEventListener('change', handleFloatingPreviewToggleInput);
+    dom.controls.toggleFloatingPreview?.addEventListener('input', handleFloatingPreviewToggleInput);
 
     if (dom.controls.virtualCursorButtonScale instanceof HTMLInputElement) {
       const slider = dom.controls.virtualCursorButtonScale;
@@ -18648,13 +19485,11 @@
       }
     });
 
-    dom.controls.togglePixfindHelp?.addEventListener('click', () => {
-      const expanded = dom.controls.togglePixfindHelp?.getAttribute('aria-expanded') === 'true';
-      setPixfindHelpExpanded(!expanded);
-    });
-
     dom.controls.openShortcutHelp?.addEventListener('click', () => {
       openShortcutHelpDialog();
+    });
+    dom.controls.openOperationHelpPanel?.addEventListener('click', () => {
+      openOperationHelpPanel();
     });
     dom.controls.toggleLanguageMode?.addEventListener('click', () => {
       const nextLanguage = isEnglishUi() ? UI_LANGUAGE_JA : UI_LANGUAGE_EN;
@@ -19352,28 +20187,334 @@
     }
   }
 
+  function normalizeColorMode(mode, fallback = COLOR_MODE_INDEX) {
+    if (mode === COLOR_MODE_INDEX || mode === COLOR_MODE_RGB) {
+      return mode;
+    }
+    return fallback === COLOR_MODE_RGB ? COLOR_MODE_RGB : COLOR_MODE_INDEX;
+  }
+
+  function isRgbColorMode(mode = state.colorMode) {
+    return normalizeColorMode(mode, COLOR_MODE_INDEX) === COLOR_MODE_RGB;
+  }
+
+  function isIndexColorMode(mode = state.colorMode) {
+    return !isRgbColorMode(mode);
+  }
+
+  function colorsMatchRgba(a, b) {
+    if (!a || !b) {
+      return false;
+    }
+    return Number(a.r) === Number(b.r)
+      && Number(a.g) === Number(b.g)
+      && Number(a.b) === Number(b.b)
+      && Number(a.a) === Number(b.a);
+  }
+
+  function getPaletteEditorTargetColor() {
+    if (isRgbColorMode()) {
+      return normalizeColorValue(state.activeRgb);
+    }
+    const paletteColor = state.palette[state.activePaletteIndex];
+    if (paletteColor) {
+      return normalizeColorValue(paletteColor);
+    }
+    return normalizeColorValue(state.activeRgb);
+  }
+
+  function canCurrentClientEditPaletteColors() {
+    return !isMultiSpectatorMode();
+  }
+
+  function canCurrentClientReindexPalette() {
+    return !isMultiGuestMode() && !isMultiSpectatorMode();
+  }
+
+  function setActiveRgbColor(color, { syncInputs = true, render = true, persist = true } = {}) {
+    state.activeRgb = normalizeColorValue(color);
+    if (syncInputs) {
+      syncPaletteInputs();
+    }
+    if (render) {
+      renderPalette();
+    } else {
+      updateColorTabSwatch();
+      updateFloatingDrawButtonPalettePreview();
+    }
+    if (persist) {
+      scheduleSessionPersist();
+    }
+  }
+
+  function syncColorModeControls() {
+    const currentMode = normalizeColorMode(state.colorMode, COLOR_MODE_INDEX);
+    state.colorMode = currentMode;
+    if (Array.isArray(dom.controls.colorMode)) {
+      dom.controls.colorMode.forEach(input => {
+        if (!(input instanceof HTMLInputElement)) {
+          return;
+        }
+        input.checked = input.value === currentMode;
+      });
+    }
+    if (dom.sections.color instanceof HTMLElement) {
+      dom.sections.color.dataset.colorMode = currentMode;
+    }
+    const isIndexMode = currentMode === COLOR_MODE_INDEX;
+    const allowColorPicking = canCurrentClientEditPaletteColors();
+    const allowPaletteColorEditing = allowColorPicking;
+    const allowPaletteReindex = isIndexMode && canCurrentClientReindexPalette();
+    if (dom.controls.addPaletteColor instanceof HTMLButtonElement) {
+      dom.controls.addPaletteColor.disabled = !allowPaletteColorEditing;
+    }
+    if (dom.controls.removePaletteColor instanceof HTMLButtonElement) {
+      const canRemove = state.palette.length > 1;
+      dom.controls.removePaletteColor.disabled = !allowPaletteReindex || !canRemove;
+    }
+    if (dom.controls.paletteIndex instanceof HTMLInputElement) {
+      dom.controls.paletteIndex.disabled = !allowPaletteReindex;
+    }
+    if (dom.controls.paletteHue instanceof HTMLInputElement) {
+      dom.controls.paletteHue.disabled = !allowColorPicking;
+    }
+    if (dom.controls.paletteSaturation instanceof HTMLInputElement) {
+      dom.controls.paletteSaturation.disabled = !allowColorPicking;
+    }
+    if (dom.controls.paletteValue instanceof HTMLInputElement) {
+      dom.controls.paletteValue.disabled = !allowColorPicking;
+    }
+    if (dom.controls.paletteAlphaSlider instanceof HTMLInputElement) {
+      dom.controls.paletteAlphaSlider.disabled = !allowColorPicking;
+    }
+    if (dom.controls.paletteWheelWrapper instanceof HTMLElement) {
+      dom.controls.paletteWheelWrapper.classList.toggle('is-disabled', !allowColorPicking);
+    }
+    const paletteIndexField = document.getElementById('paletteIndexField');
+    if (paletteIndexField instanceof HTMLElement) {
+      paletteIndexField.hidden = !isIndexMode;
+      paletteIndexField.setAttribute('aria-hidden', String(!isIndexMode));
+    }
+  }
+
+  function remapDocumentDirectPixelsToCurrentPalette() {
+    if (!Array.isArray(state.palette)) {
+      state.palette = [];
+    }
+    const paletteLookup = buildPaletteColorLookup(state.palette);
+    let convertedPixels = 0;
+    let addedCount = 0;
+    let touchedLayers = 0;
+    if (!Array.isArray(state.frames)) {
+      return { convertedPixels, addedCount, touchedLayers, paletteLookup };
+    }
+    state.frames.forEach(frame => {
+      const layers = Array.isArray(frame?.layers) ? frame.layers : [];
+      layers.forEach(layer => {
+        if (!(layer?.indices instanceof Int16Array)) {
+          return;
+        }
+        const indices = layer.indices;
+        const pixelCount = indices.length;
+        const expectedLength = pixelCount * 4;
+        const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length === expectedLength
+          ? layer.direct
+          : null;
+        if (!direct) {
+          layer.direct = null;
+          return;
+        }
+        let layerTouched = false;
+        for (let i = 0; i < pixelCount; i += 1) {
+          if (indices[i] >= 0) {
+            continue;
+          }
+          const base = i * 4;
+          const alpha = direct[base + 3];
+          if (alpha <= 0) {
+            continue;
+          }
+          const r = direct[base];
+          const g = direct[base + 1];
+          const b = direct[base + 2];
+          const key = `${r},${g},${b},${alpha}`;
+          let mappedIndex = paletteLookup.get(key);
+          if (!Number.isInteger(mappedIndex) || mappedIndex < 0) {
+            mappedIndex = state.palette.length;
+            state.palette.push({ r, g, b, a: alpha });
+            paletteLookup.set(key, mappedIndex);
+            addedCount += 1;
+          }
+          indices[i] = mappedIndex;
+          direct[base] = 0;
+          direct[base + 1] = 0;
+          direct[base + 2] = 0;
+          direct[base + 3] = 0;
+          convertedPixels += 1;
+          layerTouched = true;
+        }
+        if (layerTouched) {
+          touchedLayers += 1;
+        }
+        layer.direct = null;
+      });
+    });
+    return { convertedPixels, addedCount, touchedLayers, paletteLookup };
+  }
+
+  function mapActiveRgbToIndexedPalette(paletteLookup = null) {
+    if (!Array.isArray(state.palette)) {
+      state.palette = [];
+    }
+    const lookup = paletteLookup instanceof Map
+      ? paletteLookup
+      : buildPaletteColorLookup(state.palette);
+    const activeColor = normalizeColorValue(state.activeRgb);
+    const activeKey = getPaletteColorKey(activeColor);
+    let paletteIndex = lookup.get(activeKey);
+    let addedCount = 0;
+    if (!Number.isInteger(paletteIndex) || paletteIndex < 0) {
+      paletteIndex = state.palette.length;
+      state.palette.push(activeColor);
+      lookup.set(activeKey, paletteIndex);
+      addedCount += 1;
+    }
+    state.activePaletteIndex = normalizePaletteIndex(paletteIndex, state.activePaletteIndex);
+    state.secondaryPaletteIndex = normalizePaletteIndex(state.secondaryPaletteIndex, state.activePaletteIndex);
+    const mappedColor = state.palette[state.activePaletteIndex] || activeColor;
+    state.activeRgb = normalizeColorValue(mappedColor);
+    return { addedCount, activePaletteIndex: state.activePaletteIndex };
+  }
+
+  function setColorMode(mode, { persist = true } = {}) {
+    const previousMode = normalizeColorMode(state.colorMode, COLOR_MODE_INDEX);
+    const nextMode = normalizeColorMode(mode, previousMode);
+    if (nextMode === previousMode) {
+      syncColorModeControls();
+      return false;
+    }
+    const canRemapDocument = canCurrentClientReindexPalette();
+    const shouldRemapToIndex = (
+      previousMode === COLOR_MODE_RGB
+      && nextMode === COLOR_MODE_INDEX
+      && canRemapDocument
+    );
+    let remapResult = null;
+    let activeColorMapResult = null;
+    if (shouldRemapToIndex) {
+      beginHistory('colorModeConvert');
+      remapResult = remapDocumentDirectPixelsToCurrentPalette();
+      activeColorMapResult = mapActiveRgbToIndexedPalette(remapResult.paletteLookup);
+      if (
+        remapResult.convertedPixels > 0
+        || remapResult.addedCount > 0
+        || activeColorMapResult.addedCount > 0
+      ) {
+        applyPaletteChange();
+      }
+    }
+    state.colorMode = nextMode;
+    if (nextMode === COLOR_MODE_RGB) {
+      const paletteColor = state.palette[state.activePaletteIndex];
+      if (paletteColor) {
+        state.activeRgb = normalizeColorValue(paletteColor);
+      }
+    } else if (!activeColorMapResult) {
+      state.activePaletteIndex = normalizePaletteIndex(state.activePaletteIndex, state.activePaletteIndex);
+      state.secondaryPaletteIndex = normalizePaletteIndex(state.secondaryPaletteIndex, state.activePaletteIndex);
+      const paletteColor = state.palette[state.activePaletteIndex];
+      if (paletteColor) {
+        state.activeRgb = normalizeColorValue(paletteColor);
+      }
+    }
+    syncColorModeControls();
+    syncPaletteInputs();
+    renderPalette();
+    updateColorTabSwatch();
+    focusUnifiedLeftContext('color', { persist: false });
+    if (shouldRemapToIndex) {
+      commitHistory();
+      const paletteAddedCount = (remapResult?.addedCount || 0) + (activeColorMapResult?.addedCount || 0);
+      if (paletteAddedCount > 0) {
+        updateAutosaveStatus(
+          localizeText(
+            `RGB色 ${paletteAddedCount} 色をパレットに追加してインデックス化しました`,
+            `Added ${paletteAddedCount} RGB color${paletteAddedCount === 1 ? '' : 's'} to the palette while converting to indexed mode`
+          ),
+          'info'
+        );
+      }
+    }
+    if (persist) {
+      scheduleSessionPersist();
+    }
+    return true;
+  }
+
   function setupPaletteEditor() {
     dom.controls.addPaletteColor?.addEventListener('click', () => {
+      if (!canCurrentClientEditPaletteColors()) {
+        return;
+      }
       beginHistory('paletteAdd');
       const nextIndex = state.palette.length;
       const last = state.palette[state.palette.length - 1] || { r: 88, g: 196, b: 255, a: 255 };
-      state.palette.push({ ...last });
-      setActivePaletteIndex(nextIndex);
+      const nextColor = isRgbColorMode()
+        ? normalizeColorValue(state.activeRgb || last)
+        : normalizeColorValue(last);
+      state.palette.push({ ...nextColor });
+      state.activePaletteIndex = normalizePaletteIndex(nextIndex, state.activePaletteIndex);
+      if (isRgbColorMode()) {
+        state.activeRgb = normalizeColorValue(nextColor);
+      }
+      syncPaletteInputs();
+      renderPalette();
       applyPaletteChange();
       commitHistory();
     });
 
     dom.controls.removePaletteColor?.addEventListener('click', () => {
+      if (!isIndexColorMode()) {
+        return;
+      }
+      if (!canCurrentClientReindexPalette()) {
+        setMultiStatus(localizeText('パレットの削除はマスターのみ実行できます', 'Only the master can remove palette colors'), 'warn');
+        return;
+      }
       if (state.palette.length <= 1) return;
       const index = clamp(state.activePaletteIndex, 0, state.palette.length - 1);
       removePaletteColor(index);
     });
 
     dom.controls.paletteIndex?.addEventListener('change', () => {
+      if (!isIndexColorMode()) {
+        dom.controls.paletteIndex.value = String(state.activePaletteIndex);
+        return;
+      }
+      if (!canCurrentClientReindexPalette()) {
+        dom.controls.paletteIndex.value = String(state.activePaletteIndex);
+        setMultiStatus(localizeText('パレットの並び替えはマスターのみ実行できます', 'Only the master can reorder palette colors'), 'warn');
+        return;
+      }
       const target = clamp(Number(dom.controls.paletteIndex.value), 0, state.palette.length - 1);
       if (Number.isNaN(target)) return;
       reorderPalette(state.activePaletteIndex, target);
     });
+
+    if (Array.isArray(dom.controls.colorMode)) {
+      dom.controls.colorMode.forEach(input => {
+        if (!(input instanceof HTMLInputElement) || input.dataset.bound === 'true') {
+          return;
+        }
+        input.dataset.bound = 'true';
+        input.addEventListener('change', event => {
+          if (!(event.target instanceof HTMLInputElement) || !event.target.checked) {
+            return;
+          }
+          setColorMode(event.target.value, { persist: true });
+        });
+      });
+    }
 
     dom.controls.paletteHue?.addEventListener('input', () => {
       handlePaletteSliderInput({ source: 'hue' });
@@ -19412,12 +20553,14 @@
       updatePaletteWheelCursor();
     }, 160));
 
+    syncColorModeControls();
     renderPalette();
     syncPaletteInputs();
     updateToolTabIcon();
   }
 
   function reorderPalette(currentIndex, targetIndex) {
+    if (!isIndexColorMode() || !canCurrentClientReindexPalette()) return;
     if (currentIndex === targetIndex) return;
     beginHistory('paletteReorder');
     const previousOrder = state.palette.slice();
@@ -19475,6 +20618,8 @@
       return;
     }
     const fragment = document.createDocumentFragment();
+    const rgbMode = isRgbColorMode();
+    const activeRgb = normalizeColorValue(state.activeRgb);
     state.palette.forEach((color, index) => {
       const button = document.createElement('button');
       button.type = 'button';
@@ -19483,13 +20628,23 @@
       button.title = `${index}: ${rgbaToHex(color)}`;
       button.setAttribute('aria-label', `クイックカラー ${index}`);
       button.setAttribute('role', 'option');
-      const isActive = index === state.activePaletteIndex;
+      const normalizedColor = normalizeColorValue(color);
+      const isActive = rgbMode
+        ? colorsMatchRgba(normalizedColor, activeRgb)
+        : index === state.activePaletteIndex;
       const isSecondary = index === state.secondaryPaletteIndex;
       button.setAttribute('aria-selected', String(isActive));
       button.classList.toggle('is-active', isActive);
       button.classList.toggle('is-secondary', isSecondary);
       applyPixelFrameBackground(button, color);
-      button.addEventListener('click', () => setActivePaletteIndex(index));
+      button.addEventListener('click', () => {
+        if (rgbMode) {
+          state.activePaletteIndex = normalizePaletteIndex(index, state.activePaletteIndex);
+          setActiveRgbColor(normalizedColor, { syncInputs: true, render: true, persist: true });
+          return;
+        }
+        setActivePaletteIndex(index);
+      });
       button.addEventListener('contextmenu', event => {
         event.preventDefault();
         setSecondaryPaletteIndex(index);
@@ -19500,9 +20655,11 @@
   }
 
   function syncPaletteInputs() {
-    const color = state.palette[state.activePaletteIndex];
+    const color = getPaletteEditorTargetColor();
     if (!color) return;
-    dom.controls.paletteIndex.value = String(state.activePaletteIndex);
+    if (dom.controls.paletteIndex instanceof HTMLInputElement) {
+      dom.controls.paletteIndex.value = String(state.activePaletteIndex);
+    }
     const hsv = rgbaToHsv(color);
     paletteEditorState.hsv = {
       h: hsv.h,
@@ -19534,19 +20691,31 @@
     const container = dom.controls.paletteList;
     if (!container) return;
     container.innerHTML = '';
+    const rgbMode = isRgbColorMode();
+    const activeRgb = normalizeColorValue(state.activeRgb);
     state.palette.forEach((color, index) => {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'palette-swatch pixel-frame';
       button.dataset.index = String(index);
       button.setAttribute('aria-label', `インデックス ${index}`);
-      const isActive = index === state.activePaletteIndex;
+      const normalizedColor = normalizeColorValue(color);
+      const isActive = rgbMode
+        ? colorsMatchRgba(normalizedColor, activeRgb)
+        : index === state.activePaletteIndex;
       const isSecondary = index === state.secondaryPaletteIndex;
       button.title = `${index}: ${rgbaToHex(color)}`;
-      button.classList.toggle('is-active', index === state.activePaletteIndex);
-      button.classList.toggle('is-secondary', index === state.secondaryPaletteIndex);
+      button.classList.toggle('is-active', isActive);
+      button.classList.toggle('is-secondary', isSecondary);
       applyPixelFrameBackground(button, color);
-      button.addEventListener('click', () => setActivePaletteIndex(index));
+      button.addEventListener('click', () => {
+        if (rgbMode) {
+          state.activePaletteIndex = normalizePaletteIndex(index, state.activePaletteIndex);
+          setActiveRgbColor(normalizedColor, { syncInputs: true, render: true, persist: true });
+          return;
+        }
+        setActivePaletteIndex(index);
+      });
       button.addEventListener('contextmenu', event => {
         event.preventDefault();
         setSecondaryPaletteIndex(index);
@@ -19557,11 +20726,14 @@
     updateColorTabSwatch();
     updateFloatingDrawButtonPalettePreview();
     if (dom.controls.removePaletteColor) {
-      dom.controls.removePaletteColor.disabled = state.palette.length <= 1;
+      dom.controls.removePaletteColor.disabled = !isIndexColorMode()
+        || !canCurrentClientReindexPalette()
+        || state.palette.length <= 1;
     }
   }
 
   function removePaletteColor(index) {
+    if (!isIndexColorMode() || !canCurrentClientReindexPalette()) return;
     beginHistory('paletteRemove');
     const previousOrder = state.palette.slice();
     state.palette.splice(index, 1);
@@ -19607,8 +20779,8 @@
   }
 
   function handlePaletteSliderInput({ source = 'unknown' } = {}) {
-    const active = state.palette[state.activePaletteIndex];
-    if (!active) return;
+    if (!canCurrentClientEditPaletteColors()) return;
+    if (!getPaletteEditorTargetColor()) return;
     focusUnifiedLeftContext('color', { persist: false });
     const hueValue = clamp(Number(dom.controls.paletteHue?.value ?? paletteEditorState.hsv.h), 0, 360);
     const saturationValue = clamp(Number(dom.controls.paletteSaturation?.value ?? paletteEditorState.hsv.s * 100), 0, 100) / 100;
@@ -19841,11 +21013,19 @@
   }
 
   function writePaletteColorFromHsv() {
+    const rgba = hsvToRgba(paletteEditorState.hsv.h, paletteEditorState.hsv.s, paletteEditorState.hsv.v);
+    rgba.a = Math.round(paletteEditorState.hsv.a);
+    if (isRgbColorMode()) {
+      state.activeRgb = normalizeColorValue(rgba);
+      updateColorTabSwatch();
+      updateFloatingDrawButtonPalettePreview();
+      scheduleSessionPersist();
+      renderPalette();
+      return;
+    }
     const active = state.palette[state.activePaletteIndex];
     if (!active) return;
     beginHistory('paletteColor');
-    const rgba = hsvToRgba(paletteEditorState.hsv.h, paletteEditorState.hsv.s, paletteEditorState.hsv.v);
-    rgba.a = Math.round(paletteEditorState.hsv.a);
     Object.assign(active, rgba);
     applyPaletteChange();
     commitHistory();
@@ -19853,6 +21033,9 @@
   }
 
   function handlePaletteWheelPointerDown(event) {
+    if (!canCurrentClientEditPaletteColors()) {
+      return;
+    }
     const wheelSurface = getPaletteWheelSurface();
     if (!wheelSurface) return;
     if (event.cancelable) {
@@ -21113,6 +22296,7 @@
         control.disabled = isPlaying;
       }
     });
+    updateFloatingPreviewPanelPlaybackButtons();
     applyTimelineToolbarFrames();
   }
 
@@ -22016,6 +23200,7 @@
     ensureCanvasWheelListener();
     setupFloatingDrawButton();
     setupFloatingMovePad();
+    setupFloatingPreviewPanel();
     const gestureSurface = dom.stage || dom.canvasViewport;
     if (dom.canvasViewport) {
       dom.canvasViewport.addEventListener('pointerenter', handleViewportPointerEnter);
@@ -23024,9 +24209,9 @@
     handleSelectionMoveDrag(nextPosition);
     pointerState.current = nextPosition;
     pointerState.last = nextPosition;
-    if (pointerState.selectionMove?.hasCleared) {
-      finalizeSelectionMove();
-    }
+    // Keep keyboard nudge behavior consistent with drag/move-pad:
+    // do not auto-finalize on every arrow step, so out-of-canvas detours
+    // can return without destructive clipping.
     updateCanvasControlButtons();
     return true;
   }
@@ -23199,10 +24384,354 @@
     updateFloatingMovePadVisibility();
   }
 
+  function getFloatingPreviewViewportSize() {
+    const host = dom.canvasViewport;
+    if (!(host instanceof HTMLElement)) {
+      return { width: 0, height: 0 };
+    }
+    return {
+      width: Math.max(0, Math.round(host.clientWidth || host.getBoundingClientRect().width || 0)),
+      height: Math.max(0, Math.round(host.clientHeight || host.getBoundingClientRect().height || 0)),
+    };
+  }
+
+  function clampFloatingPreviewRect(rectLike) {
+    const base = normalizeFloatingPreviewState(rectLike, state.floatingPreview);
+    const viewport = getFloatingPreviewViewportSize();
+    const margin = 6;
+    const viewportWidth = Math.max(0, viewport.width);
+    const viewportHeight = Math.max(0, viewport.height);
+    const minWidth = viewportWidth > 0
+      ? Math.min(FLOATING_PREVIEW_MIN_SIZE, Math.max(80, viewportWidth - margin * 2))
+      : FLOATING_PREVIEW_MIN_SIZE;
+    const minHeight = viewportHeight > 0
+      ? Math.min(FLOATING_PREVIEW_MIN_SIZE, Math.max(80, viewportHeight - margin * 2))
+      : FLOATING_PREVIEW_MIN_SIZE;
+    const maxWidth = viewportWidth > 0
+      ? Math.max(minWidth, Math.min(FLOATING_PREVIEW_MAX_SIZE, viewportWidth - margin * 2))
+      : FLOATING_PREVIEW_MAX_SIZE;
+    const maxHeight = viewportHeight > 0
+      ? Math.max(minHeight, Math.min(FLOATING_PREVIEW_MAX_SIZE, viewportHeight - margin * 2))
+      : FLOATING_PREVIEW_MAX_SIZE;
+    const width = clamp(Math.round(base.width), minWidth, maxWidth);
+    const height = clamp(Math.round(base.height), minHeight, maxHeight);
+    const maxX = viewportWidth > 0 ? Math.max(margin, viewportWidth - width - margin) : base.x;
+    const maxY = viewportHeight > 0 ? Math.max(margin, viewportHeight - height - margin) : base.y;
+    const minX = viewportWidth > 0 ? margin : base.x;
+    const minY = viewportHeight > 0 ? margin : base.y;
+    return {
+      enabled: Boolean(base.enabled),
+      x: clamp(Math.round(base.x), minX, maxX),
+      y: clamp(Math.round(base.y), minY, maxY),
+      width,
+      height,
+    };
+  }
+
+  function fitFloatingPreviewCanvasToPanel() {
+    const body = dom.floatingPreviewBody;
+    const canvas = dom.floatingPreviewCanvas;
+    if (!(body instanceof HTMLElement) || !(canvas instanceof HTMLCanvasElement)) {
+      return;
+    }
+    const sourceWidth = Math.max(1, Math.round(Number(state.width) || 1));
+    const sourceHeight = Math.max(1, Math.round(Number(state.height) || 1));
+    const availableWidth = Math.max(1, Math.floor(body.clientWidth));
+    const availableHeight = Math.max(1, Math.floor(body.clientHeight));
+    const fitScale = Math.min(availableWidth / sourceWidth, availableHeight / sourceHeight);
+    let drawWidth = sourceWidth;
+    let drawHeight = sourceHeight;
+    if (fitScale >= 1) {
+      const integerScale = Math.max(1, Math.floor(fitScale));
+      drawWidth = sourceWidth * integerScale;
+      drawHeight = sourceHeight * integerScale;
+    } else {
+      drawWidth = Math.max(1, Math.floor(sourceWidth * fitScale));
+      drawHeight = Math.max(1, Math.floor(sourceHeight * fitScale));
+    }
+    canvas.style.width = `${drawWidth}px`;
+    canvas.style.height = `${drawHeight}px`;
+  }
+
+  function applyFloatingPreviewPanelRect({ persist = false, render = true } = {}) {
+    const panel = dom.floatingPreviewPanel;
+    if (!(panel instanceof HTMLElement)) {
+      return;
+    }
+    state.floatingPreview = clampFloatingPreviewRect(state.floatingPreview);
+    const { x, y, width, height } = state.floatingPreview;
+    panel.style.left = `${x}px`;
+    panel.style.top = `${y}px`;
+    panel.style.width = `${width}px`;
+    panel.style.height = `${height}px`;
+    fitFloatingPreviewCanvasToPanel();
+    if (render) {
+      renderFloatingPreviewPanel();
+    }
+    if (persist) {
+      scheduleSessionPersist({ includeSnapshots: false });
+    }
+  }
+
+  function updateFloatingPreviewPanelPlaybackButtons() {
+    const isPlaying = Boolean(state.playback?.isPlaying);
+    if (dom.controls.floatingPreviewPlay instanceof HTMLButtonElement) {
+      dom.controls.floatingPreviewPlay.hidden = isPlaying;
+      dom.controls.floatingPreviewPlay.disabled = isPlaying;
+      dom.controls.floatingPreviewPlay.setAttribute('aria-hidden', String(isPlaying));
+    }
+    if (dom.controls.floatingPreviewStop instanceof HTMLButtonElement) {
+      dom.controls.floatingPreviewStop.hidden = !isPlaying;
+      dom.controls.floatingPreviewStop.disabled = !isPlaying;
+      dom.controls.floatingPreviewStop.setAttribute('aria-hidden', String(!isPlaying));
+    }
+  }
+
+  function renderFloatingPreviewPanel() {
+    const panel = dom.floatingPreviewPanel;
+    const canvas = dom.floatingPreviewCanvas;
+    if (!(panel instanceof HTMLElement) || !(canvas instanceof HTMLCanvasElement)) {
+      return;
+    }
+    if (panel.hidden || !state.floatingPreview?.enabled) {
+      return;
+    }
+    const width = Math.max(1, Math.round(Number(state.width) || 1));
+    const height = Math.max(1, Math.round(Number(state.height) || 1));
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+      floatingPreviewCtx = null;
+    }
+    if (!floatingPreviewCtx) {
+      floatingPreviewCtx = canvas.getContext('2d', { willReadFrequently: true }) || canvas.getContext('2d');
+      if (!floatingPreviewCtx) {
+        return;
+      }
+      floatingPreviewCtx.imageSmoothingEnabled = false;
+    }
+    const frame = getActiveFrame();
+    const pixels = compositeFramePixels(frame, width, height, state.palette, {
+      includeHiddenLayers: true,
+    });
+    let imageData = null;
+    try {
+      imageData = new ImageData(pixels, width, height);
+    } catch (error) {
+      imageData = floatingPreviewCtx.createImageData(width, height);
+      imageData.data.set(pixels);
+    }
+    floatingPreviewCtx.putImageData(imageData, 0, 0);
+    fitFloatingPreviewCanvasToPanel();
+  }
+
+  function syncFloatingPreviewPanelVisibility({ persist = false } = {}) {
+    const panel = dom.floatingPreviewPanel;
+    const enabled = Boolean(state.floatingPreview?.enabled);
+    if (dom.controls.toggleFloatingPreview instanceof HTMLInputElement) {
+      dom.controls.toggleFloatingPreview.checked = enabled;
+    }
+    if (!(panel instanceof HTMLElement)) {
+      return;
+    }
+    if (!enabled) {
+      panel.classList.add('is-hidden');
+      panel.hidden = true;
+      panel.setAttribute('aria-hidden', 'true');
+      updateFloatingPreviewPanelPlaybackButtons();
+      if (persist) {
+        scheduleSessionPersist({ includeSnapshots: false });
+      }
+      return;
+    }
+    panel.classList.remove('is-hidden');
+    panel.hidden = false;
+    panel.setAttribute('aria-hidden', 'false');
+    applyFloatingPreviewPanelRect({ persist, render: true });
+    updateFloatingPreviewPanelPlaybackButtons();
+  }
+
+  function setFloatingPreviewEnabled(enabled, { persist = true } = {}) {
+    const next = Boolean(enabled);
+    const previous = Boolean(state.floatingPreview?.enabled);
+    state.floatingPreview = normalizeFloatingPreviewState(state.floatingPreview, FLOATING_PREVIEW_DEFAULT_STATE);
+    state.floatingPreview.enabled = next;
+    syncFloatingPreviewPanelVisibility({ persist });
+    if (next && !previous) {
+      updateAutosaveStatus(localizeText('小窓プレビューを表示しました', 'Floating preview enabled'), 'info');
+    } else if (!next && previous) {
+      updateAutosaveStatus(localizeText('小窓プレビューを非表示にしました', 'Floating preview hidden'), 'info');
+    }
+  }
+
+  function teardownFloatingPreviewPanelPointerHandlers() {
+    window.removeEventListener('pointermove', handleFloatingPreviewPanelPointerMove);
+    window.removeEventListener('pointerup', handleFloatingPreviewPanelPointerUp);
+    window.removeEventListener('pointercancel', handleFloatingPreviewPanelPointerCancel);
+  }
+
+  function stopFloatingPreviewPanelInteraction({ persist = true } = {}) {
+    if (!floatingPreviewPanelState.mode) {
+      return;
+    }
+    const panel = dom.floatingPreviewPanel;
+    if (panel instanceof HTMLElement) {
+      panel.classList.remove('is-moving');
+    }
+    const target = floatingPreviewPanelState.target;
+    if (target instanceof HTMLElement && Number.isFinite(floatingPreviewPanelState.pointerId)) {
+      try {
+        target.releasePointerCapture?.(floatingPreviewPanelState.pointerId);
+      } catch (error) {
+        // ignore pointer capture release errors
+      }
+    }
+    floatingPreviewPanelState.pointerId = null;
+    floatingPreviewPanelState.mode = null;
+    floatingPreviewPanelState.target = null;
+    floatingPreviewPanelState.startRect = null;
+    teardownFloatingPreviewPanelPointerHandlers();
+    applyFloatingPreviewPanelRect({ persist, render: true });
+  }
+
+  function beginFloatingPreviewPanelInteraction(event, mode) {
+    if (event.button !== undefined && event.button !== 0) {
+      return;
+    }
+    if (!state.floatingPreview?.enabled || floatingPreviewPanelState.mode) {
+      return;
+    }
+    const panel = dom.floatingPreviewPanel;
+    if (!(panel instanceof HTMLElement)) {
+      return;
+    }
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    state.floatingPreview = clampFloatingPreviewRect(state.floatingPreview);
+    floatingPreviewPanelState.pointerId = event.pointerId ?? -1;
+    floatingPreviewPanelState.mode = mode;
+    floatingPreviewPanelState.target = target;
+    floatingPreviewPanelState.startClientX = event.clientX;
+    floatingPreviewPanelState.startClientY = event.clientY;
+    floatingPreviewPanelState.startRect = { ...state.floatingPreview };
+    panel.classList.add('is-moving');
+    try {
+      target.setPointerCapture?.(event.pointerId);
+    } catch (error) {
+      // ignore pointer capture errors
+    }
+    window.addEventListener('pointermove', handleFloatingPreviewPanelPointerMove, { passive: false });
+    window.addEventListener('pointerup', handleFloatingPreviewPanelPointerUp);
+    window.addEventListener('pointercancel', handleFloatingPreviewPanelPointerCancel);
+  }
+
+  function handleFloatingPreviewPanelPointerMove(event) {
+    if (floatingPreviewPanelState.pointerId !== event.pointerId || !floatingPreviewPanelState.mode) {
+      return;
+    }
+    const baseRect = floatingPreviewPanelState.startRect;
+    if (!baseRect) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const dx = event.clientX - floatingPreviewPanelState.startClientX;
+    const dy = event.clientY - floatingPreviewPanelState.startClientY;
+    const next = { ...baseRect };
+    if (floatingPreviewPanelState.mode === 'drag') {
+      next.x = baseRect.x + dx;
+      next.y = baseRect.y + dy;
+    } else {
+      next.width = baseRect.width + dx;
+      next.height = baseRect.height + dy;
+    }
+    next.enabled = true;
+    state.floatingPreview = clampFloatingPreviewRect(next);
+    applyFloatingPreviewPanelRect({ persist: false, render: false });
+  }
+
+  function handleFloatingPreviewPanelPointerUp(event) {
+    if (floatingPreviewPanelState.pointerId !== event.pointerId) {
+      return;
+    }
+    stopFloatingPreviewPanelInteraction({ persist: true });
+  }
+
+  function handleFloatingPreviewPanelPointerCancel(event) {
+    if (floatingPreviewPanelState.pointerId !== event.pointerId) {
+      return;
+    }
+    stopFloatingPreviewPanelInteraction({ persist: true });
+  }
+
+  function handleFloatingPreviewPanelViewportChange() {
+    if (!state.floatingPreview?.enabled) {
+      return;
+    }
+    applyFloatingPreviewPanelRect({ persist: false, render: true });
+  }
+
+  function setupFloatingPreviewPanel() {
+    const panel = dom.floatingPreviewPanel;
+    if (!(panel instanceof HTMLElement)) {
+      return;
+    }
+    panel.addEventListener('pointerdown', event => {
+      event.stopPropagation();
+    });
+    panel.addEventListener('click', event => {
+      event.stopPropagation();
+    });
+    if (dom.floatingPreviewHeader instanceof HTMLElement) {
+      dom.floatingPreviewHeader.addEventListener('pointerdown', event => {
+        beginFloatingPreviewPanelInteraction(event, 'drag');
+      });
+    }
+    if (dom.floatingPreviewResizeHandle instanceof HTMLButtonElement) {
+      dom.floatingPreviewResizeHandle.addEventListener('pointerdown', event => {
+        beginFloatingPreviewPanelInteraction(event, 'resize');
+      });
+    }
+    if (dom.controls.floatingPreviewPlay instanceof HTMLButtonElement) {
+      dom.controls.floatingPreviewPlay.addEventListener('pointerdown', event => {
+        event.stopPropagation();
+      });
+      dom.controls.floatingPreviewPlay.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!state.playback.isPlaying) {
+          startPlayback();
+        }
+      });
+    }
+    if (dom.controls.floatingPreviewStop instanceof HTMLButtonElement) {
+      dom.controls.floatingPreviewStop.addEventListener('pointerdown', event => {
+        event.stopPropagation();
+      });
+      dom.controls.floatingPreviewStop.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        stopPlayback();
+      });
+    }
+    window.addEventListener('resize', handleFloatingPreviewPanelViewportChange);
+    window.addEventListener('orientationchange', handleFloatingPreviewPanelViewportChange);
+    if (window.visualViewport && typeof window.visualViewport.addEventListener === 'function') {
+      window.visualViewport.addEventListener('resize', handleFloatingPreviewPanelViewportChange);
+      window.visualViewport.addEventListener('scroll', handleFloatingPreviewPanelViewportChange);
+    }
+    syncFloatingPreviewPanelVisibility({ persist: false });
+  }
+
   function handleFloatingDrawButtonResize() {
     resizeVirtualCursorCanvas();
     clampFloatingDrawButtonPosition();
     updateFloatingMovePadPosition();
+    handleFloatingPreviewPanelViewportChange();
     requestOverlayRender();
   }
 
@@ -26853,7 +28382,7 @@
     if (state.selectionMask && state.selectionMask[y * state.width + x] !== 1) return;
     const index = y * state.width + x;
     const base = index * 4;
-    const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    let direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
 
     if (pointerState.tool === 'eraser') {
       if (layer.indices[index] === -1 && (!direct || direct[base + 3] === 0)) {
@@ -26866,6 +28395,31 @@
         direct[base + 2] = 0;
         direct[base + 3] = 0;
       }
+      markHistoryDirty();
+      markDirtyPixel(x, y);
+      return;
+    }
+
+    if (isRgbColorMode()) {
+      const rgbColor = normalizeColorValue(getActiveDrawColor(undefined, paletteIndexOverride));
+      const hasSameIndex = layer.indices[index] === -1;
+      if (hasSameIndex && direct) {
+        const sameColor = direct[base] === rgbColor.r
+          && direct[base + 1] === rgbColor.g
+          && direct[base + 2] === rgbColor.b
+          && direct[base + 3] === rgbColor.a;
+        if (sameColor) {
+          return;
+        }
+      }
+      if (!direct) {
+        direct = ensureLayerDirect(layer);
+      }
+      layer.indices[index] = -1;
+      direct[base] = rgbColor.r;
+      direct[base + 1] = rgbColor.g;
+      direct[base + 2] = rgbColor.b;
+      direct[base + 3] = rgbColor.a;
       markHistoryDirty();
       markDirtyPixel(x, y);
       return;
@@ -27105,12 +28659,14 @@
     if (residentPointEditable && !residentPointEditable(x, y)) {
       return;
     }
-    const paletteIndex = resolveDrawPaletteIndex(paletteIndexOverride);
+    const indexMode = isIndexColorMode();
+    const paletteIndex = indexMode ? resolveDrawPaletteIndex(paletteIndexOverride) : -1;
+    const drawRgbColor = indexMode ? null : normalizeColorValue(getActiveDrawColor(undefined, paletteIndexOverride));
     const indices = layer.indices instanceof Int16Array ? layer.indices : null;
     const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
     const startIdx = y * width + x;
     const targetIndex = indices ? indices[startIdx] : -1;
-    if (targetIndex >= 0 && targetIndex === paletteIndex) {
+    if (indexMode && targetIndex >= 0 && targetIndex === paletteIndex) {
       return;
     }
     const startBase = startIdx * 4;
@@ -27118,6 +28674,22 @@
     const targetG = targetIndex < 0 ? (direct ? direct[startBase + 1] : 0) : 0;
     const targetB = targetIndex < 0 ? (direct ? direct[startBase + 2] : 0) : 0;
     const targetA = targetIndex < 0 ? (direct ? direct[startBase + 3] : 0) : 0;
+    if (!indexMode && drawRgbColor) {
+      let sourceColor = null;
+      if (targetIndex >= 0) {
+        sourceColor = normalizeColorValue(state.palette[targetIndex] || { r: 0, g: 0, b: 0, a: 0 });
+      } else {
+        sourceColor = {
+          r: targetR,
+          g: targetG,
+          b: targetB,
+          a: targetA,
+        };
+      }
+      if (colorsMatchRgba(sourceColor, drawRgbColor)) {
+        return;
+      }
+    }
     const selectionMask = state.selectionMask;
     const matchesTarget = (idx) => {
       const currentIndex = indices ? indices[idx] : -1;
@@ -27149,7 +28721,7 @@
       visited[idx] = 1;
       if (selectionMask && selectionMask[idx] !== 1) continue;
       if (!matchesTarget(idx)) continue;
-      setPixel(layer, px, py, paletteIndex);
+      setPixel(layer, px, py, indexMode ? paletteIndex : undefined);
       stack.push(px + 1, py);
       stack.push(px - 1, py);
       stack.push(px, py + 1);
@@ -27161,18 +28733,16 @@
   function sampleColor(x, y) {
     const { color, mode, index } = sampleCompositeColor(x, y);
     if (!color) return;
-    if (mode === 'index' && typeof index === 'number' && index >= 0) {
+    const normalized = normalizeColorValue(color);
+    if (mode === 'index' && typeof index === 'number' && index >= 0 && isIndexColorMode()) {
       setActivePaletteIndex(index);
+      state.activeRgb = normalized;
     } else {
-      const normalized = normalizeColorValue(color);
-      const activeIndex = clamp(state.activePaletteIndex, 0, state.palette.length - 1);
-      if (state.palette[activeIndex]) {
-        Object.assign(state.palette[activeIndex], normalized);
-        applyPaletteChange();
-        renderPalette();
+      if (typeof index === 'number' && index >= 0) {
+        state.activePaletteIndex = normalizePaletteIndex(index, state.activePaletteIndex);
       }
+      setActiveRgbColor(normalized, { syncInputs: true, render: true, persist: true });
     }
-    state.colorMode = 'index';
     updateColorTabSwatch();
   }
 
@@ -27837,6 +29407,7 @@
       const frameImage = getPlaybackFrameImageData(state.activeFrame);
       if (frameImage) {
         ctx.drawing.putImageData(frameImage, 0, 0);
+        renderFloatingPreviewPanel();
         return;
       }
     }
@@ -27896,6 +29467,7 @@
     }
 
     ctx.drawing.putImageData(image, x0, y0);
+    renderFloatingPreviewPanel();
   }
 
   function requestOverlayRender() {
@@ -28137,7 +29709,12 @@
     if (!(target instanceof Element)) {
       return false;
     }
-    return Boolean(target.closest('.canvas-controls') || target.closest('.floating-draw-button') || target.closest('.mirror-handle'));
+    return Boolean(
+      target.closest('.canvas-controls')
+      || target.closest('.floating-draw-button')
+      || target.closest('.floating-preview-panel')
+      || target.closest('.mirror-handle')
+    );
   }
 
   function handleViewportPointerDown(event) {
@@ -28700,11 +30277,14 @@
   }
 
   function getActiveSwatchColor() {
+    if (isRgbColorMode()) {
+      return normalizeColorValue(state.activeRgb);
+    }
     const paletteColor = state.palette[state.activePaletteIndex];
     if (paletteColor) {
       return normalizeColorValue(paletteColor);
     }
-    return { r: 255, g: 255, b: 255, a: 255 };
+    return normalizeColorValue(state.activeRgb);
   }
 
   function invertPreviewColor(color) {
@@ -29771,6 +31351,10 @@
         mirror: normalizeMirrorAxisState(state.mirror, state.width, state.height),
         showVirtualCursor: Boolean(state.showVirtualCursor),
         virtualCursorButtonScale: normalizeFloatingDrawButtonScale(state.virtualCursorButtonScale),
+        floatingPreview: normalizeFloatingPreviewState(
+          state.floatingPreview,
+          FLOATING_PREVIEW_DEFAULT_STATE
+        ),
         showChecker: Boolean(state.showChecker),
         onionSkin: normalizeOnionSkinState(state.onionSkin),
         dualLeftRail: false,
@@ -29780,7 +31364,8 @@
         activeLayer: state.activeLayer,
         paletteIndex: normalizePaletteIndex(state.activePaletteIndex, 0),
         secondaryPaletteIndex: normalizePaletteIndex(state.secondaryPaletteIndex, state.activePaletteIndex),
-        colorMode: state.colorMode,
+        colorMode: normalizeColorMode(state.colorMode, COLOR_MODE_INDEX),
+        activeRgb: normalizeColorValue(state.activeRgb),
         leftTab: state.activeLeftTab,
         rightTab: state.activeRightTab,
         backgroundMode: state.backgroundMode,
@@ -29912,6 +31497,17 @@
     if (Number.isFinite(payload.virtualCursorButtonScale)) {
       state.virtualCursorButtonScale = normalizeFloatingDrawButtonScale(payload.virtualCursorButtonScale);
     }
+    if (Object.prototype.hasOwnProperty.call(payload, 'floatingPreview')) {
+      state.floatingPreview = normalizeFloatingPreviewState(
+        payload.floatingPreview,
+        state.floatingPreview
+      );
+    } else {
+      state.floatingPreview = normalizeFloatingPreviewState(
+        state.floatingPreview,
+        FLOATING_PREVIEW_DEFAULT_STATE
+      );
+    }
     if (typeof payload.showChecker === 'boolean') {
       state.showChecker = payload.showChecker;
     }
@@ -29932,7 +31528,12 @@
       state.onionSkin = normalizeOnionSkinState(payload.onionSkin);
     }
     setVirtualCursorButtonScale(state.virtualCursorButtonScale, { persist: false, clampPosition: false });
-    state.colorMode = 'index';
+    state.colorMode = normalizeColorMode(payload.colorMode, state.colorMode);
+    if (Object.prototype.hasOwnProperty.call(payload, 'activeRgb')) {
+      state.activeRgb = normalizeColorValue(payload.activeRgb);
+    } else {
+      state.activeRgb = normalizeColorValue(state.activeRgb);
+    }
     if (Number.isFinite(payload.paletteIndex)) {
       state.activePaletteIndex = normalizePaletteIndex(payload.paletteIndex, state.activePaletteIndex);
     }
@@ -29946,6 +31547,10 @@
         state.secondaryPaletteIndex,
         state.activePaletteIndex
       );
+    }
+    if (!Object.prototype.hasOwnProperty.call(payload, 'activeRgb')) {
+      const fallbackPaletteColor = state.palette[state.activePaletteIndex] || state.activeRgb;
+      state.activeRgb = normalizeColorValue(fallbackPaletteColor);
     }
     if (Number.isFinite(payload.activeFrame)) {
       state.activeFrame = clamp(Math.round(payload.activeFrame), 0, state.frames.length - 1);
@@ -30501,6 +32106,47 @@
       .toLowerCase()
       .replace(/[^a-z0-9_-]/g, '')
       .slice(0, 40);
+  }
+
+  function getMultiProjectKeyInputElements() {
+    const inputs = [];
+    if (dom.controls.multiJoinProjectKey instanceof HTMLInputElement) {
+      inputs.push(dom.controls.multiJoinProjectKey);
+    }
+    if (
+      dom.controls.multiProjectKey instanceof HTMLInputElement
+      && dom.controls.multiProjectKey !== dom.controls.multiJoinProjectKey
+    ) {
+      inputs.push(dom.controls.multiProjectKey);
+    }
+    return inputs;
+  }
+
+  function readCurrentMultiProjectKey() {
+    if (dom.controls.multiJoinProjectKey instanceof HTMLInputElement) {
+      const normalized = normalizeMultiProjectKey(dom.controls.multiJoinProjectKey.value);
+      if (normalized) {
+        return normalized;
+      }
+    }
+    if (dom.controls.multiProjectKey instanceof HTMLInputElement) {
+      const normalized = normalizeMultiProjectKey(dom.controls.multiProjectKey.value);
+      if (normalized) {
+        return normalized;
+      }
+    }
+    return normalizeMultiProjectKey(multiState.projectKey || '');
+  }
+
+  function syncMultiProjectKeyInputValues(projectKey, { preserveFocused = true } = {}) {
+    const normalized = normalizeMultiProjectKey(projectKey || '');
+    const activeElement = document.activeElement;
+    getMultiProjectKeyInputElements().forEach(input => {
+      if (preserveFocused && input === activeElement) {
+        return;
+      }
+      input.value = normalized;
+    });
   }
 
   function getResidentMultiRoomProfile(projectKey) {
@@ -31145,13 +32791,17 @@
     multiAutoResumeAttempted = true;
     clearStoredMultiResumeSession();
     storeMultiProjectKey(invite.projectKey);
-    if (dom.controls.multiProjectKey instanceof HTMLInputElement) {
-      dom.controls.multiProjectKey.value = invite.projectKey;
-    }
+    syncMultiProjectKeyInputValues(invite.projectKey, { preserveFocused: false });
     // respect requested role from invite when present; default to spectator for safety
     const requestedRole = (invite.role && (invite.role === 'master' || invite.role === 'guest' || invite.role === 'spectator')) ? invite.role : 'spectator';
     setMultiDesiredRole(requestedRole);
-    setMultiUiView(requestedRole);
+    if (invite.autoJoin) {
+      setMultiUiView(requestedRole);
+      multiEntryJoinPanelOpen = false;
+    } else {
+      setMultiUiView('entry');
+      multiEntryJoinPanelOpen = true;
+    }
     multiState.resumeAssignments = null;
     multiState.resumeBlockedClientIds = null;
     multiState.resumeMaxGuests = null;
@@ -31657,10 +33307,8 @@
       }
       return true;
     }
-    const local = readResidentRoomPersistPayloadFromLocal(projectKey);
-    if (local && applyResidentRoomPersistedState(local)) {
-      return true;
-    }
+    // Resident rooms must always restore from the shared source.
+    // Do not restore from per-device local cache to avoid per-user divergence.
     return false;
   }
 
@@ -31866,9 +33514,7 @@
     }
     clearStoredMultiResumeSession();
     storeMultiProjectKey(pending.projectKey);
-    if (dom.controls.multiProjectKey instanceof HTMLInputElement) {
-      dom.controls.multiProjectKey.value = pending.projectKey;
-    }
+    syncMultiProjectKeyInputValues(pending.projectKey, { preserveFocused: false });
     setMultiDesiredRole(pending.role);
     setMultiUiView(pending.role);
     multiState.resumeAssignments = pending.role === 'master' && Array.isArray(pending.assignments)
@@ -33633,6 +35279,25 @@
     return true;
   }
 
+  function setMultiEntryJoinPanelOpen(visible, { focusKey = false } = {}) {
+    const nextVisible = Boolean(visible);
+    const changed = multiEntryJoinPanelOpen !== nextVisible;
+    multiEntryJoinPanelOpen = nextVisible;
+    if (changed) {
+      syncMultiControls();
+    }
+    if (nextVisible && focusKey) {
+      const targetInput = dom.controls.multiJoinProjectKey instanceof HTMLInputElement
+        ? dom.controls.multiJoinProjectKey
+        : (dom.controls.multiProjectKey instanceof HTMLInputElement ? dom.controls.multiProjectKey : null);
+      if (targetInput instanceof HTMLInputElement) {
+        targetInput.focus();
+        targetInput.select();
+      }
+    }
+    return changed;
+  }
+
   function setMultiHelpPanelVisible(visible) {
     const panel = dom.controls.multiHelpPanel;
     const toggle = dom.controls.multiHelpToggle;
@@ -33783,6 +35448,12 @@
     const isEntry = !multiState.connected
       && !multiState.connecting
       && normalizeMultiUiView(multiState.uiView) === 'entry';
+    if (!isEntry && multiEntryJoinPanelOpen) {
+      multiEntryJoinPanelOpen = false;
+    }
+    const showJoinPanel = isEntry && multiEntryJoinPanelOpen;
+    const showJoinProjectKeyField = showJoinPanel;
+    const showFlowProjectKeyField = !isEntry;
     const selectedRole = normalizeMultiDesiredRole(
       multiState.connected
         ? multiState.role
@@ -33791,8 +35462,36 @@
           : normalizeMultiUiView(multiState.uiView))
     );
     multiState.desiredRole = selectedRole;
+    if (dom.controls.multiJoinProjectKeyField instanceof HTMLElement) {
+      dom.controls.multiJoinProjectKeyField.hidden = !showJoinProjectKeyField;
+      dom.controls.multiJoinProjectKeyField.setAttribute('aria-hidden', String(!showJoinProjectKeyField));
+    }
+    if (dom.controls.multiProjectKeyField instanceof HTMLElement) {
+      dom.controls.multiProjectKeyField.hidden = !showFlowProjectKeyField;
+      dom.controls.multiProjectKeyField.setAttribute('aria-hidden', String(!showFlowProjectKeyField));
+    }
     if (dom.controls.multiEntryScreen instanceof HTMLElement) {
       dom.controls.multiEntryScreen.hidden = !isEntry;
+    }
+    if (dom.controls.multiEntryActions instanceof HTMLElement) {
+      dom.controls.multiEntryActions.hidden = showJoinPanel;
+      dom.controls.multiEntryActions.setAttribute('aria-hidden', String(showJoinPanel));
+    }
+    if (dom.controls.multiEntryJoinPanel instanceof HTMLElement) {
+      dom.controls.multiEntryJoinPanel.hidden = !showJoinPanel;
+      dom.controls.multiEntryJoinPanel.setAttribute('aria-hidden', String(!showJoinPanel));
+    }
+    if (dom.controls.multiEntryHint instanceof HTMLElement) {
+      dom.controls.multiEntryHint.hidden = showJoinPanel;
+      dom.controls.multiEntryHint.setAttribute('aria-hidden', String(showJoinPanel));
+    }
+    if (dom.controls.multiEntryJoinHint instanceof HTMLElement) {
+      dom.controls.multiEntryJoinHint.hidden = !showJoinPanel;
+      dom.controls.multiEntryJoinHint.setAttribute('aria-hidden', String(!showJoinPanel));
+    }
+    if (dom.controls.multiEntryGuest instanceof HTMLButtonElement) {
+      dom.controls.multiEntryGuest.setAttribute('aria-expanded', showJoinPanel ? 'true' : 'false');
+      dom.controls.multiEntryGuest.setAttribute('aria-controls', 'multiEntryJoinPanel');
     }
     if (dom.controls.multiFlowPanel instanceof HTMLElement) {
       dom.controls.multiFlowPanel.hidden = isEntry;
@@ -34332,27 +36031,27 @@
       multiState.exportPermission,
       MULTI_DEFAULT_EXPORT_PERMISSION
     );
-    const currentProjectKey = normalizeMultiProjectKey(
-      (dom.controls.multiProjectKey instanceof HTMLInputElement ? dom.controls.multiProjectKey.value : '')
-      || multiState.projectKey
-    );
+    const currentProjectKey = readCurrentMultiProjectKey();
     const isEntryView = normalizeMultiUiView(multiState.uiView) === 'entry'
       && !multiState.connected
       && !multiState.connecting;
     const inMasterConfigMode = isMultiMasterConfigMode();
     syncMultiPanelFlowUi();
+    const isJoinPanelVisible = isEntryView && multiEntryJoinPanelOpen;
+    const isFlowKeyFieldVisible = !isEntryView;
+    syncMultiProjectKeyInputValues(multiState.projectKey, { preserveFocused: true });
+    if (dom.controls.multiJoinProjectKey instanceof HTMLInputElement) {
+      dom.controls.multiJoinProjectKey.disabled = !isJoinPanelVisible || multiState.connecting || multiState.connected;
+    }
     if (dom.controls.multiProjectKey instanceof HTMLInputElement) {
-      if (dom.controls.multiProjectKey.value !== multiState.projectKey) {
-        dom.controls.multiProjectKey.value = multiState.projectKey;
-      }
-      dom.controls.multiProjectKey.disabled = multiState.connecting || multiState.connected;
+      dom.controls.multiProjectKey.disabled = true;
     }
     if (dom.controls.multiEntryMaster instanceof HTMLButtonElement) {
       dom.controls.multiEntryMaster.disabled = multiState.connecting || multiState.connected;
       if (dom.controls.multiEntryMaster.disabled) {
         dom.controls.multiEntryMaster.title = localizeText('接続中は切替できません', 'Cannot switch while connected');
       } else {
-        dom.controls.multiEntryMaster.removeAttribute('title');
+        dom.controls.multiEntryMaster.title = localizeText('新しいキーを自動生成して部屋を開きます', 'Generates a new key and opens a room');
       }
     }
     if (dom.controls.multiEntryGuest instanceof HTMLButtonElement) {
@@ -34360,8 +36059,31 @@
       if (dom.controls.multiEntryGuest.disabled) {
         dom.controls.multiEntryGuest.title = localizeText('接続中は切替できません', 'Cannot switch while connected');
       } else {
-        dom.controls.multiEntryGuest.removeAttribute('title');
+        dom.controls.multiEntryGuest.title = localizeText('キー入力パネルを開きます', 'Open the key input panel');
       }
+    }
+    if (dom.controls.multiEntryJoinAsGuest instanceof HTMLButtonElement) {
+      dom.controls.multiEntryJoinAsGuest.disabled = !isJoinPanelVisible || multiState.connecting || multiState.connected || !currentProjectKey;
+      if (dom.controls.multiEntryJoinAsGuest.disabled) {
+        dom.controls.multiEntryJoinAsGuest.title = !currentProjectKey
+          ? localizeText('先にプロジェクトキーを入力してください', 'Enter a project key first')
+          : localizeText('接続中は切替できません', 'Cannot switch while connected');
+      } else {
+        dom.controls.multiEntryJoinAsGuest.title = localizeText('キーで入室し、参加申請を自動送信します', 'Join with key and auto-send join request');
+      }
+    }
+    if (dom.controls.multiEntrySpectator instanceof HTMLButtonElement) {
+      dom.controls.multiEntrySpectator.disabled = !isJoinPanelVisible || multiState.connecting || multiState.connected || !currentProjectKey;
+      if (dom.controls.multiEntrySpectator.disabled) {
+        dom.controls.multiEntrySpectator.title = !currentProjectKey
+          ? localizeText('先にプロジェクトキーを入力してください', 'Enter a project key first')
+          : localizeText('接続中は切替できません', 'Cannot switch while connected');
+      } else {
+        dom.controls.multiEntrySpectator.title = localizeText('キーで視聴モードに入室します', 'Join in viewer mode with key');
+      }
+    }
+    if (dom.controls.multiEntryJoinBack instanceof HTMLButtonElement) {
+      dom.controls.multiEntryJoinBack.disabled = !isJoinPanelVisible || multiState.connecting || multiState.connected;
     }
     if (dom.controls.multiStartSession instanceof HTMLButtonElement) {
       dom.controls.multiStartSession.disabled = multiState.connecting || multiState.connected || !currentProjectKey || isEntryView;
@@ -34376,7 +36098,10 @@
       } else if (!currentProjectKey) {
         dom.controls.multiStartSession.title = localizeText('プロジェクトキーを入力してください', 'Enter a project key');
       } else if (isEntryView) {
-        dom.controls.multiStartSession.title = localizeText('先にマスター または 入室 を選択してください', 'Select Master or Join first');
+        dom.controls.multiStartSession.title = localizeText(
+          '先に「部屋を開く / 参加する」を選択してください',
+          'Choose Open Room / Join Room first'
+        );
       } else {
         dom.controls.multiStartSession.removeAttribute('title');
       }
@@ -34391,7 +36116,9 @@
       dom.controls.multiGenerateKey.disabled = multiState.connecting || multiState.connected;
     }
     if (dom.controls.multiCopyKey instanceof HTMLButtonElement) {
-      dom.controls.multiCopyKey.disabled = multiState.connecting || !currentProjectKey;
+      dom.controls.multiCopyKey.disabled = multiState.connecting
+        || !currentProjectKey
+        || !isFlowKeyFieldVisible;
     }
     if (dom.controls.multiBroadcastState instanceof HTMLButtonElement) {
       dom.controls.multiBroadcastState.disabled = !(multiState.connected && multiState.role === 'master');
@@ -35622,6 +37349,8 @@
       activeLeftTab: state.activeLeftTab,
       activeRightTab: state.activeRightTab,
       activeFrame: state.activeFrame,
+      colorMode: normalizeColorMode(state.colorMode, COLOR_MODE_INDEX),
+      activeRgb: normalizeColorValue(state.activeRgb),
     };
     const preserveResidentPaletteLocal = isResidentMultiConnectedRoom();
     const localPaletteSnapshot = preserveResidentPaletteLocal && Array.isArray(state.palette)
@@ -35684,6 +37413,8 @@
         state.lastGroupTool = { ...DEFAULT_GROUP_TOOL, ...(preserved.lastGroupTool || {}) };
         state.activeLeftTab = LEFT_TAB_KEYS.includes(preserved.activeLeftTab) ? preserved.activeLeftTab : state.activeLeftTab;
         state.activeRightTab = RIGHT_TAB_KEYS.includes(preserved.activeRightTab) ? preserved.activeRightTab : state.activeRightTab;
+        state.colorMode = normalizeColorMode(preserved.colorMode, state.colorMode);
+        state.activeRgb = normalizeColorValue(preserved.activeRgb);
         state.activeFrame = clamp(Math.round(Number(preserved.activeFrame) || 0), 0, Math.max(0, state.frames.length - 1));
         // If master added frames, allow guests to freely navigate frames for their assigned layer.
         if (isMultiGuestMode()) {
@@ -35920,6 +37651,42 @@
       }
     }
     return sent;
+  }
+
+  function buildGuestPaletteUpdatePayload() {
+    if (!isMultiGuestMode()) {
+      return null;
+    }
+    const paletteSource = Array.isArray(state.palette) && state.palette.length
+      ? state.palette
+      : [{ r: 0, g: 0, b: 0, a: 0 }];
+    const palette = paletteSource.map(color => normalizeColorValue(color));
+    const activePaletteIndex = clamp(
+      normalizePaletteIndex(state.activePaletteIndex, 0),
+      0,
+      Math.max(0, palette.length - 1)
+    );
+    const secondaryPaletteIndex = clamp(
+      normalizePaletteIndex(state.secondaryPaletteIndex, activePaletteIndex),
+      0,
+      Math.max(0, palette.length - 1)
+    );
+    return {
+      clientId: multiState.clientId,
+      projectKey: multiState.projectKey,
+      palette,
+      activePaletteIndex,
+      secondaryPaletteIndex,
+      sentAt: Date.now(),
+    };
+  }
+
+  async function sendGuestPaletteUpdate() {
+    const payload = buildGuestPaletteUpdatePayload();
+    if (!payload) {
+      return false;
+    }
+    return sendMultiBroadcast('guest-palette-update', payload);
   }
 
   function buildMasterLayerPatchPayload() {
@@ -36709,6 +38476,55 @@
     setMultiStatus(`共有モード: マスター (${multiState.projectKey})`, 'success');
   }
 
+  async function handleMultiGuestPaletteUpdateMessage(payload) {
+    if (!isMultiMasterMode()) {
+      return;
+    }
+    if (!payload || typeof payload !== 'object') {
+      return;
+    }
+    const senderClientId = typeof payload.clientId === 'string' ? payload.clientId.trim() : '';
+    if (!senderClientId || senderClientId === multiState.clientId) {
+      return;
+    }
+    if (isMultiClientBlocked(senderClientId)) {
+      return;
+    }
+    normalizeMultiAssignmentsForCurrentDocument();
+    const assignment = getMultiAssignment(senderClientId);
+    if (!assignment || assignment.role === 'spectator') {
+      return;
+    }
+    const paletteSource = Array.isArray(payload.palette) ? payload.palette : [];
+    if (!paletteSource.length) {
+      return;
+    }
+    const nextPalette = paletteSource.map(color => normalizeColorValue(color));
+    state.palette = nextPalette;
+    state.activePaletteIndex = clamp(
+      normalizePaletteIndex(state.activePaletteIndex, 0),
+      0,
+      Math.max(0, nextPalette.length - 1)
+    );
+    state.secondaryPaletteIndex = clamp(
+      normalizePaletteIndex(state.secondaryPaletteIndex, state.activePaletteIndex),
+      0,
+      Math.max(0, nextPalette.length - 1)
+    );
+    if (isIndexColorMode()) {
+      const activeColor = nextPalette[state.activePaletteIndex];
+      if (activeColor) {
+        state.activeRgb = normalizeColorValue(activeColor);
+      }
+    }
+    syncPaletteInputs();
+    renderPalette();
+    requestRender();
+    requestOverlayRender();
+    markRemoteMultiStateDirty();
+    scheduleMultiSessionStateBroadcast({ immediate: true });
+  }
+
   async function handleMultiGuestLayerPatchMessage(payload) {
     const inMasterMode = isMultiMasterMode();
     const inReplicaMode = isMultiGuestMode() || isMultiSpectatorMode();
@@ -36922,6 +38738,7 @@
     multiState.assignmentSyncRequestAt = 0;
     multiState.applyRemoteInProgress = false;
     multiState.uiView = 'entry';
+    multiEntryJoinPanelOpen = false;
     multiState.resumeAssignments = null;
     multiState.resumeBlockedClientIds = null;
     multiState.resumeMaxGuests = null;
@@ -36989,10 +38806,7 @@
 
   async function connectMultiSessionAs(role, { allowGuestJoin = false } = {}) {
     const requestedRole = normalizeMultiRole(role, 'guest');
-    const inputProjectKey = dom.controls.multiProjectKey instanceof HTMLInputElement
-      ? dom.controls.multiProjectKey.value
-      : multiState.projectKey;
-    const projectKey = normalizeMultiProjectKey(inputProjectKey || multiState.projectKey);
+    const projectKey = readCurrentMultiProjectKey();
     if (!projectKey) {
       setMultiStatus(localizeText('共有モード: プロジェクトキーを入力してください', 'Collab mode: enter a project key'), 'warn');
       return false;
@@ -37065,6 +38879,9 @@
       });
       channel.on('broadcast', { event: 'guest-layer-patch' }, message => {
         handleMultiGuestLayerPatchMessage(message?.payload || {});
+      });
+      channel.on('broadcast', { event: 'guest-palette-update' }, message => {
+        handleMultiGuestPaletteUpdateMessage(message?.payload || {});
       });
       channel.on('broadcast', { event: 'master-layer-patch' }, message => {
         handleMultiMasterLayerPatchMessage(message?.payload || {});
@@ -37255,33 +39072,44 @@
         scheduleMultiPublicLobbyRoomSync({ immediate: false });
         return;
       }
+      if (MULTI_PALETTE_HISTORY_LABELS.has(_label) && isRgbColorMode()) {
+        return;
+      }
       scheduleMultiSessionStateBroadcast({ immediate: false });
       scheduleMultiPublicLobbyRoomSync({ immediate: false });
       return;
     }
     if (isMultiGuestMode()) {
+      if (MULTI_PALETTE_HISTORY_LABELS.has(_label)) {
+        if (isIndexColorMode()) {
+          sendGuestPaletteUpdate();
+        }
+        return;
+      }
       sendGuestLayerPatch();
     }
   }
 
   function setupMultiModeControls() {
-    if (dom.controls.multiProjectKey instanceof HTMLInputElement) {
-      dom.controls.multiProjectKey.value = multiState.projectKey;
-      if (dom.controls.multiProjectKey.dataset.bound !== 'true') {
-        dom.controls.multiProjectKey.dataset.bound = 'true';
-        dom.controls.multiProjectKey.addEventListener('input', event => {
-          if (!(event.target instanceof HTMLInputElement)) {
-            return;
-          }
-          const normalized = normalizeMultiProjectKey(event.target.value);
-          if (event.target.value !== normalized) {
-            event.target.value = normalized;
-          }
-          storeMultiProjectKey(normalized);
-          syncMultiControls();
-        });
+    syncMultiProjectKeyInputValues(multiState.projectKey, { preserveFocused: false });
+    getMultiProjectKeyInputElements().forEach(input => {
+      if (!(input instanceof HTMLInputElement) || input.dataset.bound === 'true') {
+        return;
       }
-    }
+      input.dataset.bound = 'true';
+      input.addEventListener('input', event => {
+        if (!(event.target instanceof HTMLInputElement)) {
+          return;
+        }
+        const normalized = normalizeMultiProjectKey(event.target.value);
+        if (event.target.value !== normalized) {
+          event.target.value = normalized;
+        }
+        storeMultiProjectKey(normalized);
+        syncMultiProjectKeyInputValues(normalized, { preserveFocused: true });
+        syncMultiControls();
+      });
+    });
     if (dom.controls.multiGenerateKey instanceof HTMLButtonElement && dom.controls.multiGenerateKey.dataset.bound !== 'true') {
       dom.controls.multiGenerateKey.dataset.bound = 'true';
       dom.controls.multiGenerateKey.addEventListener('click', () => {
@@ -37290,9 +39118,7 @@
         }
         const generated = generateMultiProjectKey();
         storeMultiProjectKey(generated);
-        if (dom.controls.multiProjectKey instanceof HTMLInputElement) {
-          dom.controls.multiProjectKey.value = generated;
-        }
+        syncMultiProjectKeyInputValues(generated, { preserveFocused: false });
         setMultiStatus(`共有キーを生成しました: ${generated}`, 'success');
         syncMultiControls();
       });
@@ -37300,10 +39126,7 @@
     if (dom.controls.multiCopyKey instanceof HTMLButtonElement && dom.controls.multiCopyKey.dataset.bound !== 'true') {
       dom.controls.multiCopyKey.dataset.bound = 'true';
       dom.controls.multiCopyKey.addEventListener('click', async () => {
-        const projectKey = normalizeMultiProjectKey(
-          (dom.controls.multiProjectKey instanceof HTMLInputElement ? dom.controls.multiProjectKey.value : '')
-          || multiState.projectKey
-        );
+        const projectKey = readCurrentMultiProjectKey();
         if (!projectKey) {
           setMultiStatus(localizeText('共有キーが空です。先にキーを入力してください', 'Project key is empty. Enter a key first.'), 'warn');
           syncMultiControls();
@@ -37538,14 +39361,21 @@
     }
     if (dom.controls.multiEntryMaster instanceof HTMLButtonElement && dom.controls.multiEntryMaster.dataset.bound !== 'true') {
       dom.controls.multiEntryMaster.dataset.bound = 'true';
-      dom.controls.multiEntryMaster.addEventListener('click', () => {
+      dom.controls.multiEntryMaster.addEventListener('click', async () => {
         if (multiState.connected || multiState.connecting) {
           return;
         }
-        setMultiDesiredRole('master');
-        setMultiUiView('master');
-        setMultiStatus(localizeText('マスター設定を選択しました', 'Master setup selected'), 'info');
+        multiEntryJoinPanelOpen = false;
+        // Always start a newly opened room as private. The master can publish it after opening.
+        multiState.roomVisibility = MULTI_DEFAULT_ROOM_VISIBILITY;
+        if (dom.controls.multiRoomVisibility instanceof HTMLSelectElement) {
+          dom.controls.multiRoomVisibility.value = multiState.roomVisibility;
+        }
+        const generated = generateMultiProjectKey();
+        storeMultiProjectKey(generated);
+        syncMultiProjectKeyInputValues(generated, { preserveFocused: false });
         syncMultiControls();
+        await connectMultiSessionAs('master');
       });
     }
     if (dom.controls.multiEntryGuest instanceof HTMLButtonElement && dom.controls.multiEntryGuest.dataset.bound !== 'true') {
@@ -37554,10 +39384,39 @@
         if (multiState.connected || multiState.connecting) {
           return;
         }
-        setMultiDesiredRole('guest');
-        setMultiUiView('guest');
-        setMultiStatus(localizeText('参加リクエスト設定を選択しました', 'Join request setup selected'), 'info');
+        setMultiEntryJoinPanelOpen(true, { focusKey: true });
+      });
+    }
+    if (dom.controls.multiEntryJoinAsGuest instanceof HTMLButtonElement && dom.controls.multiEntryJoinAsGuest.dataset.bound !== 'true') {
+      dom.controls.multiEntryJoinAsGuest.dataset.bound = 'true';
+      dom.controls.multiEntryJoinAsGuest.addEventListener('click', async () => {
+        if (multiState.connected || multiState.connecting) {
+          return;
+        }
+        const connected = await connectMultiSessionAs('guest');
+        if (connected && isMultiSpectatorMode()) {
+          await sendMultiGuestJoinRequest();
+        }
         syncMultiControls();
+      });
+    }
+    if (dom.controls.multiEntrySpectator instanceof HTMLButtonElement && dom.controls.multiEntrySpectator.dataset.bound !== 'true') {
+      dom.controls.multiEntrySpectator.dataset.bound = 'true';
+      dom.controls.multiEntrySpectator.addEventListener('click', async () => {
+        if (multiState.connected || multiState.connecting) {
+          return;
+        }
+        await connectMultiSessionAs('spectator');
+        syncMultiControls();
+      });
+    }
+    if (dom.controls.multiEntryJoinBack instanceof HTMLButtonElement && dom.controls.multiEntryJoinBack.dataset.bound !== 'true') {
+      dom.controls.multiEntryJoinBack.dataset.bound = 'true';
+      dom.controls.multiEntryJoinBack.addEventListener('click', () => {
+        if (multiState.connected || multiState.connecting) {
+          return;
+        }
+        setMultiEntryJoinPanelOpen(false);
       });
     }
     if (dom.controls.multiEntryScreen instanceof HTMLElement && dom.controls.multiEntryScreen.dataset.bound !== 'true') {
@@ -37616,7 +39475,7 @@
         }
         if (normalizeMultiUiView(multiState.uiView) !== 'entry') {
           setMultiUiView('entry');
-          setMultiStatus(localizeText('マスター / 入室 を選択してください', 'Select Master or Join'), 'info');
+          setMultiStatus(localizeText('部屋を開く / 参加する を選択してください', 'Choose Open Room / Join Room'), 'info');
           syncMultiControls();
         }
       });
@@ -37929,6 +39788,8 @@
     let baseColor;
     if (previewTool === 'eraser') {
       baseColor = { r: 255, g: 255, b: 255, a: 255 };
+    } else if (isRgbColorMode()) {
+      baseColor = normalizeColorValue(state.activeRgb);
     } else {
       baseColor = state.palette[resolveDrawPaletteIndex(paletteIndexOverride)];
     }
