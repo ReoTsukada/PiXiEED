@@ -83,6 +83,54 @@
         placeholderBackground: '未設定の背景情報',
         placeholderTrait: 'ポイントを追加'
       };
+  const EN_NAME_OVERRIDES_BY_ID = Object.freeze({
+    'mao-chill': 'Maosama',
+    'baburin': 'Baburin',
+    'chikarin': 'Chikarin',
+    'kirarin': 'Kirarin',
+    'pikarin': 'Pikarin',
+    'charin': 'Charin',
+    'sky-jellnall': 'Sky Jerin',
+    'ocean-jellnall': 'Ocean Jerin',
+    'abyss-jellnall': 'Abyss Jerin',
+    'sky-powarin': 'Sky Powalin',
+    'ocean-powarin': 'Ocean Powalin',
+    'abyss-powarin': 'Abyss Powalin',
+    'sky-burin': 'Sky Blin',
+    'ocean-burin': 'Ocean Blin',
+    'abyss-burin': 'Abyss Blin',
+    'prizlin': 'Prizlin',
+    'doprizlin': 'Doprizlin',
+    'shabolin': 'Shabolin',
+    'doshabolin': 'Doshabolin',
+    'hedolin': 'Hedolin',
+    'dohedolin': 'Dohedolin',
+    'bomlin': 'Bomblin',
+    'dobomlin': 'Dobomblin',
+    'gravilin': 'Gravilin',
+    'angelin': 'Angelin',
+    'jerin-shadow-1': 'Fealin',
+    'jerin-shadow-2': 'Tensei Jerin',
+    'jerin-shadow-3': 'Kourin',
+    'jerin-shadow-4': 'Debilin',
+    'jerin-shadow-5': 'Demolin',
+    'jerin-shadow-6': 'Kunlin',
+    'jerin-shadow-7': 'Shenlin',
+    'jerin-shadow-8': 'Gaolin'
+  });
+  const EN_NAME_OVERRIDES_BY_JP = Object.freeze({
+    'フェアリン': 'Fealin',
+    'ボムリン': 'Bomblin',
+    'シャボリン': 'Shabolin',
+    'バブリン': 'Baburin',
+    'チカリン': 'Chikarin',
+    'キラリン': 'Kirarin',
+    'ピカリン': 'Pikarin',
+    'チャリン': 'Charin',
+    'スカイジェリン': 'Sky Jerin',
+    'オーシャンジェリン': 'Ocean Jerin',
+    'アビスジェリン': 'Abyss Jerin'
+  });
   let viewerAnimationTimer = null;
   let viewerAnimationFrameIndex = 0;
 
@@ -145,6 +193,16 @@
     return '';
   }
 
+  function getEnglishNameOverride(entry) {
+    if (!entry || !IS_EN) return '';
+    const byId = EN_NAME_OVERRIDES_BY_ID[entry.id];
+    if (typeof byId === 'string' && byId) return byId;
+    const jpName = typeof entry.name === 'string' ? entry.name.trim() : '';
+    if (!jpName) return '';
+    const byName = EN_NAME_OVERRIDES_BY_JP[jpName];
+    return typeof byName === 'string' ? byName : '';
+  }
+
   function getEntryIndex(entry) {
     if (!entry) return -1;
     return manifestEntries.findIndex(item => item.id === entry.id);
@@ -153,6 +211,8 @@
   function getEntryName(entry, index = -1) {
     if (!entry) return I18N.draftName;
     if (!IS_EN) return entry.name || I18N.draftName;
+    const override = getEnglishNameOverride(entry);
+    if (override) return override;
     const english = getEnglishCandidate(entry.nameEn, entry.name_en, entry.enName, entry.en_name, entry.name);
     if (english) return english;
     return toTitleFromId(entry.id || entry.role || '', index);
@@ -161,6 +221,8 @@
   function getEntryButtonLabel(entry, index = -1) {
     if (!entry) return `Character ${Number.isFinite(index) ? index + 1 : ''}`.trim();
     if (!IS_EN) return entry.buttonLabel || entry.name || `Character ${index + 1}`;
+    const override = getEnglishNameOverride(entry);
+    if (override) return override;
     const english = getEnglishCandidate(
       entry.buttonLabelEn,
       entry.button_label_en,
