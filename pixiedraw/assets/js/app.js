@@ -15,11 +15,12 @@
     rightTabsBar: document.getElementById('rightRailTabs'),
     rightTabButtons: Array.from(document.querySelectorAll('[data-right-tab]')),
     rightTabPanes: document.getElementById('rightRailPanes'),
+    topActionButtons: Array.from(document.querySelectorAll('[data-ui-action]')),
     mobileDrawer: document.getElementById('mobileDrawer'),
     mobileDrawerHandle: document.getElementById('mobileDrawerHandle'),
     mobileTopBar: document.getElementById('mobileTopBar'),
     mobileShortcutsMount: document.getElementById('mobileShortcutsMount'),
-    mobileTabs: Array.from(document.querySelectorAll('.mobile-tab')),
+    mobileTabs: Array.from(document.querySelectorAll('[data-mobile-tab]')),
     colorTabSwatch: document.getElementById('colorTabSwatch'),
     mobileColorTabSwatch: document.getElementById('mobileColorTabSwatch'),
     toolTabIcon: document.getElementById('toolTabIcon'),
@@ -105,6 +106,8 @@
       toolQuickPalette: document.getElementById('toolQuickPalette'),
       addPaletteColor: document.getElementById('addPaletteColor'),
       removePaletteColor: document.getElementById('removePaletteColor'),
+      movePaletteBackward: document.getElementById('movePaletteBackward'),
+      movePaletteForward: document.getElementById('movePaletteForward'),
       sortPaletteHue: document.getElementById('sortPaletteHue'),
       sortPaletteSaturation: document.getElementById('sortPaletteSaturation'),
       sortPaletteValue: document.getElementById('sortPaletteValue'),
@@ -173,7 +176,6 @@
       mirrorAxisHorizontal: document.getElementById('mirrorAxisHorizontal'),
       mirrorAxisDiagonalA: document.getElementById('mirrorAxisDiagonalA'),
       mirrorAxisDiagonalB: document.getElementById('mirrorAxisDiagonalB'),
-      mirrorToolPopupToggleMode: document.getElementById('mirrorToolPopupToggleMode'),
       mirrorToolPopoverItems: document.getElementById('mirrorToolPopoverItems'),
       mirrorToolPopoverHelp: document.getElementById('mirrorToolPopoverHelp'),
       mirrorToolPopoverClose: document.getElementById('mirrorToolPopoverClose'),
@@ -430,6 +432,11 @@
   const RIGHT_TAB_KEYS = ['frames', 'settings', 'help', 'file', 'multi'];
   const TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE = 'virtualCursorToggle';
   const TOOL_ACTION_MIRROR_POPUP = 'mirrorPopup';
+  const TOOL_ACTION_CAMERA_MODE = 'cameraMode';
+  const TOP_UI_ACTION_MIRROR_POPUP = TOOL_ACTION_MIRROR_POPUP;
+  const TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE = TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE;
+  const TOP_UI_ACTION_OPEN_LENS_CAMERA = 'openLensCamera';
+  const EXTERNAL_TOOL_PIXIEELENS_ID = 'pixieelens';
   const TOOL_ACTIONS = new Set([
     TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE,
     TOOL_ACTION_MIRROR_POPUP,
@@ -439,10 +446,8 @@
     pen: { label: 'ペン', tools: ['pen'] },
     eyedropper: { label: 'スポイト', tools: ['eyedropper'] },
     eraser: { label: '消しゴム', tools: ['eraser'] },
-  shape: { label: '図形', tools: ['line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill'] },
+    shape: { label: '図形', tools: ['line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill'] },
     fill: { label: '塗りつぶし', tools: ['fill'] },
-    mirror: { label: '対称', tools: [TOOL_ACTION_MIRROR_POPUP] },
-    virtualCursor: { label: '仮想カーソル', tools: [TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE] },
   };
   const DEFAULT_GROUP_TOOL = {
     selection: 'selectRect',
@@ -451,8 +456,6 @@
     eraser: 'eraser',
     shape: 'line',
     fill: 'fill',
-    mirror: TOOL_ACTION_MIRROR_POPUP,
-    virtualCursor: TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE,
   };
   const TOOL_TO_GROUP = Object.keys(TOOL_GROUPS).reduce((acc, key) => {
     TOOL_GROUPS[key].tools.forEach(tool => {
@@ -522,12 +525,12 @@
         ja: [
           '設定の「カラーモード」でインデックスカラー/RGBカラーを切り替えます。',
           'どちらのモードでも「+」で色追加、「-」で削除ができます。',
-          '貼り付け時に未登録色がある場合は自動でパレットへ追加されます。',
+          '貼り付け時は、インデックスカラーでは既存パレットの近似色へ合わせ、RGBカラーでは対応色をパレットへ追加します。',
         ],
         en: [
           'Switch Indexed/RGB mode from Settings > Color Mode.',
           'Use + to add colors and - to remove in either mode.',
-          'Missing pasted colors are auto-added to the palette.',
+          'Pasted colors snap to the nearest existing indexed color, while RGB mode adds matching palette colors.',
         ],
       },
     }),
@@ -889,6 +892,18 @@
   const EXPORT_INTERSTITIAL_LAST_SHOWN_KEY = 'pixieedraw:export-interstitial-last-shown-at';
   const EXPORT_INTERSTITIAL_COOLDOWN_MS = 45 * 1000;
   const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
+    Object.freeze({
+      id: '2026-03-09-camera-mirror-palette-sync',
+      at: '2026-03-09T22:10:00+09:00',
+      title: 'カメラ連携・ミラーモード・パレット同期を改善',
+      details: Object.freeze([
+        'PNG / GIF 読み込み時に、使用色だけのカスタムパレットを自動作成するよう変更。256色を超える場合は減色して取り込むよう調整。',
+        '貼り付け時の色処理を整理し、インデックスカラーでは既存パレットの近似色へ合わせ、RGBカラーでは対応色をパレットへ追加するよう変更。',
+        'プリセットパレットを編集 / 拡張した場合は、現在のパレット表示を自動で「カスタム」へ切り替えるよう対応。',
+        '上部カメラボタンから PiXiEELENS を起動できるようにし、撮影結果を別プロジェクトタブとして PiXiEEDraw へ取り込めるよう対応。',
+        'ミラーモードは上部ボタンで ON/OFF、キャンバス周囲の「＋」で各軸を ON/OFF と位置調整できる構成へ再整理。',
+      ]),
+    }),
     Object.freeze({
       id: '2026-03-07-palette-settings-toast-sync-v2',
       at: '2026-03-07T23:10:00+09:00',
@@ -1435,6 +1450,17 @@
       : NEW_PROJECT_PALETTE_PRESET_DEFAULT;
   }
 
+  function normalizeCurrentPalettePreset(value, fallback = CURRENT_PALETTE_PRESET_CUSTOM) {
+    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (normalized === CURRENT_PALETTE_PRESET_CUSTOM || NEW_PROJECT_PALETTE_PRESET_SET.has(normalized)) {
+      return normalized;
+    }
+    if (fallback === CURRENT_PALETTE_PRESET_CUSTOM || NEW_PROJECT_PALETTE_PRESET_SET.has(fallback)) {
+      return fallback;
+    }
+    return CURRENT_PALETTE_PRESET_CUSTOM;
+  }
+
   function hashTextToUint32(value) {
     const text = String(value || '');
     let hash = 2166136261;
@@ -1530,12 +1556,18 @@
     return normalizePalettePresetDisplayName(label);
   }
 
-  function renderPalettePresetSelectOptions(select, selectedPresetId = NEW_PROJECT_PALETTE_PRESET_DEFAULT) {
+  function renderPalettePresetSelectOptions(select, selectedPresetId = NEW_PROJECT_PALETTE_PRESET_DEFAULT, { includeCustom = false } = {}) {
     if (!(select instanceof HTMLSelectElement)) {
       return;
     }
     const language = isEnglishUi() ? UI_LANGUAGE_EN : UI_LANGUAGE_JA;
     const fragment = document.createDocumentFragment();
+    if (includeCustom) {
+      const customOption = document.createElement('option');
+      customOption.value = CURRENT_PALETTE_PRESET_CUSTOM;
+      customOption.textContent = localizeText('カスタム', 'Custom');
+      fragment.appendChild(customOption);
+    }
     for (const definition of NEW_PROJECT_PALETTE_PRESET_DEFINITIONS) {
       const option = document.createElement('option');
       option.value = definition.id;
@@ -1545,7 +1577,9 @@
     select.textContent = '';
     select.appendChild(fragment);
     select.dataset.paletteLanguage = language;
-    select.value = normalizeNewProjectPalettePreset(selectedPresetId, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+    select.value = includeCustom
+      ? normalizeCurrentPalettePreset(selectedPresetId, currentPalettePresetId || CURRENT_PALETTE_PRESET_CUSTOM)
+      : normalizeNewProjectPalettePreset(selectedPresetId, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
   }
 
   function renderNewProjectPalettePresetOptions(selectedPresetId = newProjectPalettePresetId) {
@@ -1555,23 +1589,69 @@
     );
   }
 
-  function renderColorPanelPalettePresetOptions(selectedPresetId = newProjectPalettePresetId) {
+  function renderColorPanelPalettePresetOptions(selectedPresetId = currentPalettePresetId) {
     renderPalettePresetSelectOptions(
       dom.controls.palettePresetSelect,
-      selectedPresetId
+      selectedPresetId,
+      { includeCustom: true }
     );
     renderPalettePresetPicker(selectedPresetId);
   }
 
+  function getCurrentPalettePresetDisplayName(presetId = currentPalettePresetId) {
+    const normalized = normalizeCurrentPalettePreset(presetId, currentPalettePresetId);
+    if (normalized === CURRENT_PALETTE_PRESET_CUSTOM) {
+      return localizeText('カスタム', 'Custom');
+    }
+    return getPalettePresetDisplayName(
+      getNewProjectPalettePresetDefinition(normalized, NEW_PROJECT_PALETTE_PRESET_DEFAULT)
+    );
+  }
+
+  function getCurrentPalettePresetPreviewColors(presetId = currentPalettePresetId) {
+    const normalized = normalizeCurrentPalettePreset(presetId, currentPalettePresetId);
+    if (normalized === CURRENT_PALETTE_PRESET_CUSTOM) {
+      if (Array.isArray(state?.palette) && state.palette.length) {
+        return state.palette.map(color => normalizeColorValue(color));
+      }
+      return [{ r: 0, g: 0, b: 0, a: 0 }];
+    }
+    return getNewProjectPalettePresetColors(normalized, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+  }
+
+  function findMatchingPalettePresetIdForPalette(palette = state?.palette) {
+    const normalizedPalette = Array.isArray(palette)
+      ? palette.map(color => normalizeColorValue(color))
+      : [];
+    if (!normalizedPalette.length) {
+      return CURRENT_PALETTE_PRESET_CUSTOM;
+    }
+    for (const definition of NEW_PROJECT_PALETTE_PRESET_DEFINITIONS) {
+      const presetColors = getNewProjectPalettePresetColors(definition.id, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+      if (presetColors.length !== normalizedPalette.length) {
+        continue;
+      }
+      if (palettesMatch(presetColors, normalizedPalette)) {
+        return definition.id;
+      }
+    }
+    return CURRENT_PALETTE_PRESET_CUSTOM;
+  }
+
+  function syncCurrentPalettePresetFromPalette(palette = state?.palette, { syncControl = true } = {}) {
+    const matchedPresetId = findMatchingPalettePresetIdForPalette(palette);
+    return setCurrentPalettePresetId(matchedPresetId, { syncControl });
+  }
+
   function renderPalettePresetPreview(
-    presetId = newProjectPalettePresetId,
+    presetId = currentPalettePresetId,
     previewNode = dom.controls.palettePresetPreview,
     maxDots = 16
   ) {
     if (!(previewNode instanceof HTMLElement)) {
       return;
     }
-    const colors = getNewProjectPalettePresetColors(presetId, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+    const colors = getCurrentPalettePresetPreviewColors(presetId);
     previewNode.textContent = '';
     const fragment = document.createDocumentFragment();
     const limit = clamp(Math.round(Number(maxDots) || 16), 1, 32);
@@ -1682,15 +1762,14 @@
     );
   }
 
-  function renderPalettePresetPicker(selectedPresetId = newProjectPalettePresetId) {
+  function renderPalettePresetPicker(selectedPresetId = currentPalettePresetId) {
     const button = dom.controls.palettePresetPickerButton;
     const menu = dom.controls.palettePresetPickerMenu;
     if (!(button instanceof HTMLButtonElement) || !(menu instanceof HTMLElement)) {
       return;
     }
-    const normalized = normalizeNewProjectPalettePreset(selectedPresetId, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
-    const selectedDefinition = getNewProjectPalettePresetDefinition(normalized, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
-    const selectedLabel = getPalettePresetDisplayName(selectedDefinition);
+    const normalized = normalizeCurrentPalettePreset(selectedPresetId, currentPalettePresetId);
+    const selectedLabel = getCurrentPalettePresetDisplayName(normalized);
     button.textContent = '';
     button.title = selectedLabel;
     const selectedLabelNode = document.createElement('span');
@@ -1698,7 +1777,7 @@
     selectedLabelNode.textContent = selectedLabel;
     const selectedSwatches = document.createElement('span');
     selectedSwatches.className = 'palette-preset-picker__swatches';
-    const selectedColors = getNewProjectPalettePresetColors(normalized, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
+    const selectedColors = getCurrentPalettePresetPreviewColors(normalized);
     selectedColors.slice(0, PALETTE_PRESET_BUTTON_SWATCH_MAX).forEach(color => {
       const swatch = document.createElement('span');
       swatch.className = 'palette-preset-picker__swatch';
@@ -1709,6 +1788,38 @@
     button.appendChild(selectedSwatches);
     menu.textContent = '';
     const fragment = document.createDocumentFragment();
+    const customRow = document.createElement('button');
+    customRow.type = 'button';
+    customRow.className = 'palette-preset-picker__option';
+    customRow.dataset.presetId = CURRENT_PALETTE_PRESET_CUSTOM;
+    customRow.setAttribute('role', 'option');
+    const isCustomActive = normalized === CURRENT_PALETTE_PRESET_CUSTOM;
+    customRow.classList.toggle('is-active', isCustomActive);
+    customRow.setAttribute('aria-selected', String(isCustomActive));
+
+    const customLabel = document.createElement('span');
+    customLabel.className = 'palette-preset-picker__label';
+    customLabel.textContent = localizeText('カスタム', 'Custom');
+    customRow.appendChild(customLabel);
+
+    const customSwatches = document.createElement('span');
+    customSwatches.className = 'palette-preset-picker__swatches';
+    getCurrentPalettePresetPreviewColors(CURRENT_PALETTE_PRESET_CUSTOM)
+      .slice(0, PALETTE_PRESET_BUTTON_SWATCH_MAX)
+      .forEach(color => {
+        const swatch = document.createElement('span');
+        swatch.className = 'palette-preset-picker__swatch';
+        swatch.style.background = rgbaToCss(normalizeColorValue(color));
+        customSwatches.appendChild(swatch);
+      });
+    customRow.appendChild(customSwatches);
+
+    customRow.addEventListener('click', () => {
+      setCurrentPalettePresetId(CURRENT_PALETTE_PRESET_CUSTOM, { syncControl: true });
+      setPalettePresetPickerOpen(false);
+    });
+    fragment.appendChild(customRow);
+
     NEW_PROJECT_PALETTE_PRESET_DEFINITIONS.forEach(definition => {
       const row = document.createElement('button');
       row.type = 'button';
@@ -1843,6 +1954,14 @@
         dom.newProject.palettePreset.value = normalized;
       }
       renderNewProjectPalettePresetPicker(normalized);
+    }
+    return normalized;
+  }
+
+  function setCurrentPalettePresetId(presetId, { syncControl = true } = {}) {
+    const normalized = normalizeCurrentPalettePreset(presetId, currentPalettePresetId || CURRENT_PALETTE_PRESET_CUSTOM);
+    currentPalettePresetId = normalized;
+    if (syncControl) {
       renderColorPanelPalettePresetOptions(normalized);
       if (dom.controls.palettePresetSelect instanceof HTMLSelectElement) {
         dom.controls.palettePresetSelect.value = normalized;
@@ -1851,6 +1970,10 @@
       renderPalettePresetPreview(normalized);
     }
     return normalized;
+  }
+
+  function markCurrentPalettePresetCustom({ syncControl = true } = {}) {
+    return setCurrentPalettePresetId(CURRENT_PALETTE_PRESET_CUSTOM, { syncControl });
   }
 
   let uiLanguage = resolveInitialUiLanguage();
@@ -1940,6 +2063,24 @@
   const MOBILE_BACK_GUARD_BEFOREUNLOAD_BYPASS_MS = 1500;
   const textCompression = createTextCompression();
   const LENS_IMPORT_SESSION_FLAG = 'pixiee-lens:import-request';
+  const LENS_CAMERA_RETURN_QUERY_KEY = 'draw_return';
+  const LENS_CAMERA_DRAW_URL_QUERY_KEY = 'draw_url';
+  const LENS_CAMERA_RETURN_MODE_SELF = 'self';
+  const EXTERNAL_TOOLS = Object.freeze({
+    [EXTERNAL_TOOL_PIXIEELENS_ID]: Object.freeze({
+      id: EXTERNAL_TOOL_PIXIEELENS_ID,
+      action: TOP_UI_ACTION_OPEN_LENS_CAMERA,
+      launchUrl: 'https://pixieed.jp/pixiee-lens/index.html',
+      iconSrc: 'assets/icons/pixieelensicon_frame_01.png',
+      displayName: Object.freeze({ ja: 'PiXiEELENS', en: 'PiXiEELENS' }),
+      actionLabel: Object.freeze({ ja: 'カメラ', en: 'Camera' }),
+      protocol: Object.freeze({
+        returnQueryKey: LENS_CAMERA_RETURN_QUERY_KEY,
+        drawUrlQueryKey: LENS_CAMERA_DRAW_URL_QUERY_KEY,
+        defaultReturnMode: LENS_CAMERA_RETURN_MODE_SELF,
+      }),
+    }),
+  });
   let lensImportRequested = (() => {
     if (typeof window === 'undefined') {
       return false;
@@ -2167,6 +2308,7 @@
   const NEW_PROJECT_PALETTE_PRESET_MAP = new Map(
     NEW_PROJECT_PALETTE_PRESET_DEFINITIONS.map(definition => [definition.id, definition])
   );
+  const CURRENT_PALETTE_PRESET_CUSTOM = 'custom';
   const newProjectPalettePresetColorCache = new Map();
   const RESIDENT_MULTI_ROOM_PROFILES = Object.freeze({
     'resident-256-main': Object.freeze({
@@ -2496,7 +2638,8 @@
     [MIRROR_AXIS_DIAGONAL_A]: false,
     [MIRROR_AXIS_DIAGONAL_B]: false,
   });
-  const MIRROR_HANDLE_OUTSIDE_OFFSET = 16;
+  const MIRROR_HANDLE_OUTSIDE_OFFSET = 28;
+  const MIRROR_HANDLE_DRAG_THRESHOLD = 4;
   const MIRROR_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', 'fill']);
   const MIRROR_TOOL_SECTION_SPLIT_THRESHOLD = 8;
   const MIRROR_TOOL_ITEMS = Object.freeze([
@@ -2623,6 +2766,7 @@
   let palettePresetPickerEscapeBound = false;
   let palettePresetPickerViewportBound = false;
   let newProjectPalettePresetId = loadStoredNewProjectPalettePresetId();
+  let currentPalettePresetId = normalizeCurrentPalettePreset(newProjectPalettePresetId, CURRENT_PALETTE_PRESET_CUSTOM);
   const state = createInitialState({ palettePreset: newProjectPalettePresetId });
   if (EMBED_CONFIG.lockCanvasSize) {
     lockedCanvasWidth = state.width;
@@ -2696,6 +2840,9 @@
     startAxisY: 0,
     startCanvasWidth: 1,
     startCanvasHeight: 1,
+    moved: false,
+    suppressClickAxis: '',
+    suppressClickAt: 0,
   };
   let drawButtonResizeListenerBound = false;
   let compactToolFlyoutDismissBound = false;
@@ -4432,7 +4579,10 @@
     });
   }
 
-  function applyHistorySnapshot(snapshot, { preserveView = false } = {}) {
+  function applyHistorySnapshot(snapshot, { preserveView = false, forcePalettePresetSync = false } = {}) {
+    const previousPaletteSnapshot = Array.isArray(state.palette)
+      ? state.palette.map(color => normalizeColorValue(color))
+      : null;
     state.width = snapshot.width;
     state.height = snapshot.height;
     if (!preserveView) {
@@ -4600,6 +4750,9 @@
     updateDocumentMetadata();
     scheduleSessionPersist();
     updateMemoryStatus();
+    if (forcePalettePresetSync || !previousPaletteSnapshot || !palettesMatch(previousPaletteSnapshot, state.palette)) {
+      syncCurrentPalettePresetFromPalette(state.palette, { syncControl: true });
+    }
     if (isMultiMasterMode() && !multiState.applyRemoteInProgress) {
       scheduleMultiSessionStateBroadcast({ immediate: false });
     }
@@ -5532,53 +5685,225 @@
 
   function updateVirtualCursorActionToolButtons() {
     const enabled = Boolean(state.showVirtualCursor);
-    const toggleButtons = Array.from(document.querySelectorAll(`.tool-button[data-tool="${TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE}"]`));
+    const toggleButtons = Array.from(document.querySelectorAll(`.tool-button[data-tool="${TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE}"], [data-ui-action="${TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE}"]`));
     toggleButtons.forEach(button => {
       const icon = button.querySelector('img');
-      const label = button.querySelector('span');
-      button.setAttribute('aria-label', enabled ? '仮想カーソルを非表示' : '仮想カーソルを表示');
+      const srOnly = button.querySelector('.sr-only');
+      const label = srOnly instanceof HTMLElement ? srOnly : button.querySelector('span');
+      const controlLabel = localizeText(
+        enabled ? '仮想カーソルを非表示' : '仮想カーソルを表示',
+        enabled ? 'Hide Virtual Cursor' : 'Show Virtual Cursor'
+      );
+      button.classList.toggle('is-active', enabled);
+      button.setAttribute('aria-pressed', String(enabled));
+      button.setAttribute('aria-label', controlLabel);
+      button.setAttribute('title', controlLabel);
       if (icon instanceof HTMLImageElement) {
         icon.src = 'assets/icons/tool-cursor.png';
         icon.alt = '仮想カーソル';
       }
       if (label) {
-        label.textContent = enabled ? '仮想OFF' : '仮想ON';
+        label.textContent = srOnly instanceof HTMLElement
+          ? localizeText('仮想カーソル', 'Virtual Cursor')
+          : (enabled ? '仮想OFF' : '仮想ON');
       }
     });
   }
 
+  function getMirrorActionAnchor() {
+    const candidates = Array.from(document.querySelectorAll(
+      `[data-ui-action="${TOP_UI_ACTION_MIRROR_POPUP}"], .tool-button[data-tool="${TOOL_ACTION_MIRROR_POPUP}"]`
+    ));
+    const visible = candidates.find(node => (
+      node instanceof HTMLElement
+      && !node.hidden
+      && node.getClientRects().length > 0
+    ));
+    if (visible instanceof HTMLElement) {
+      return visible;
+    }
+    for (const node of candidates) {
+      if (node instanceof HTMLElement) {
+        return node;
+      }
+    }
+    return null;
+  }
+
+  function updateMirrorActionButtons() {
+    const buttons = Array.from(document.querySelectorAll(`.tool-button[data-tool="${TOOL_ACTION_MIRROR_POPUP}"], [data-ui-action="${TOP_UI_ACTION_MIRROR_POPUP}"]`));
+    const active = Boolean(getNormalizedMirrorState().enabled);
+    const controlLabel = localizeText(
+      active ? 'ミラーモードをオフ' : 'ミラーモードをオン',
+      active ? 'Turn Mirror Mode Off' : 'Turn Mirror Mode On'
+    );
+    const label = localizeText('対称', 'Mirror');
+    buttons.forEach(button => {
+      if (!(button instanceof HTMLElement)) {
+        return;
+      }
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', String(active));
+      button.setAttribute('aria-label', controlLabel);
+      button.setAttribute('title', controlLabel);
+      const srOnly = button.querySelector('.sr-only');
+      if (srOnly instanceof HTMLElement) {
+        srOnly.textContent = label;
+      }
+    });
+  }
+
+  function getExternalToolDefinition(toolId = '') {
+    if (!toolId || typeof toolId !== 'string') {
+      return null;
+    }
+    return EXTERNAL_TOOLS[toolId] || null;
+  }
+
+  function getExternalToolDefinitionByAction(action = '') {
+    const tools = Object.values(EXTERNAL_TOOLS);
+    return tools.find(tool => tool?.action === action) || null;
+  }
+
+  function getExternalToolLocalizedName(tool) {
+    if (!tool?.displayName) {
+      return '';
+    }
+    return localizeText(tool.displayName.ja, tool.displayName.en);
+  }
+
+  function getExternalToolLocalizedActionLabel(tool) {
+    if (!tool?.actionLabel) {
+      return '';
+    }
+    return localizeText(tool.actionLabel.ja, tool.actionLabel.en);
+  }
+
+  function syncExternalToolActionButtons() {
+    dom.topActionButtons.forEach(button => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      const toolId = button.dataset.externalTool || '';
+      const tool = getExternalToolDefinition(toolId) || getExternalToolDefinitionByAction(button.dataset.uiAction || '');
+      if (!tool) {
+        return;
+      }
+      button.dataset.externalTool = tool.id;
+      const icon = button.querySelector('img');
+      if (icon instanceof HTMLImageElement && typeof tool.iconSrc === 'string' && tool.iconSrc) {
+        icon.setAttribute('src', tool.iconSrc);
+        icon.alt = '';
+      }
+    });
+  }
+
+  function buildLensCameraModeUrl({ returnMode = LENS_CAMERA_RETURN_MODE_SELF } = {}) {
+    const lensTool = getExternalToolDefinition(EXTERNAL_TOOL_PIXIEELENS_ID);
+    const fallbackPath = lensTool?.launchUrl || 'https://pixieed.jp/pixiee-lens/index.html';
+    const protocol = lensTool?.protocol || {};
+    const returnQueryKey = protocol.returnQueryKey || LENS_CAMERA_RETURN_QUERY_KEY;
+    const drawUrlQueryKey = protocol.drawUrlQueryKey || LENS_CAMERA_DRAW_URL_QUERY_KEY;
+    try {
+      const lensUrl = new URL(lensTool?.launchUrl || fallbackPath);
+      if (typeof returnMode === 'string' && returnMode) {
+        lensUrl.searchParams.set(returnQueryKey, returnMode);
+      }
+      const drawUrl = buildLensCameraReturnDrawUrl();
+      if (drawUrl) {
+        lensUrl.searchParams.set(drawUrlQueryKey, drawUrl);
+      }
+      return lensUrl.toString();
+    } catch (error) {
+      return fallbackPath;
+    }
+  }
+
+  function buildLensCameraReturnDrawUrl() {
+    if (typeof window === 'undefined' || !window.location) {
+      return '';
+    }
+    try {
+      const drawUrl = new URL(window.location.href);
+      drawUrl.searchParams.delete('lens');
+      return drawUrl.toString();
+    } catch (error) {
+      return '';
+    }
+  }
+
+  async function launchLensCameraMode() {
+    const lensTool = getExternalToolDefinition(EXTERNAL_TOOL_PIXIEELENS_ID);
+    const lensToolName = getExternalToolLocalizedName(lensTool) || 'PiXiEELENS';
+    const fallbackGroup = TOOL_TO_GROUP[state.tool] || 'pen';
+    if (TOOL_GROUPS[fallbackGroup] && state.activeToolGroup !== fallbackGroup) {
+      state.activeToolGroup = fallbackGroup;
+      updateToolGroupButtons();
+      updateToolVisibility();
+    }
+    if (!AUTOSAVE_SUPPORTED && hasDocumentUnsavedChanges()) {
+      const accepted = window.confirm(
+        localizeText(
+          'このブラウザでは自動保存が使えません。現在の内容を保存せずにカメラモードへ移動しますか？',
+          'Autosave is unavailable in this browser. Leave for Camera Mode without saving the current project?'
+        )
+      );
+      if (!accepted) {
+        return false;
+      }
+    } else if (AUTOSAVE_SUPPORTED) {
+      try {
+        if (!autosaveProjectId) {
+          setActiveAutosaveProjectId(createAutosaveProjectId());
+        }
+        markAutosaveDirty();
+        await writeAutosaveSnapshot(true);
+      } catch (error) {
+        console.warn(`Failed to save project before launching ${lensToolName}`, error);
+      }
+    }
+    const lensUrl = buildLensCameraModeUrl();
+    try {
+      window.location.assign(lensUrl);
+      return true;
+    } catch (error) {
+      console.warn(`Failed to open ${lensToolName}`, error);
+      updateAutosaveStatus(
+        localizeText(`${lensToolName} を開けませんでした`, `Failed to open ${lensToolName}`),
+        'error'
+      );
+      return false;
+    }
+  }
+
   function runToolAction(tool, options = {}) {
-    const sourceButton = options.sourceButton instanceof HTMLElement ? options.sourceButton : null;
     if (tool === TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE) {
       setVirtualCursorEnabled(!state.showVirtualCursor);
       updateVirtualCursorActionToolButtons();
       return true;
     }
     if (tool === TOOL_ACTION_MIRROR_POPUP) {
-      const anchor = sourceButton instanceof HTMLElement
-        ? sourceButton
-        : document.querySelector('.tool-button[data-tool="mirrorPopup"]');
-      if (shouldDockMirrorToolPopover()) {
-        setMirrorToolPopoverOpen(true, {
-          anchor: anchor instanceof HTMLElement ? anchor : undefined,
-        });
-        if (dom.mirrorToolPopover instanceof HTMLElement) {
-          requestAnimationFrame(() => {
-            dom.mirrorToolPopover?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-          });
-        }
-        return true;
-      }
-      if (isMirrorToolPopoverOpen()) {
-        setMirrorToolPopoverOpen(false);
-        return true;
-      }
-      setMirrorToolPopoverOpen(true, {
-        anchor: anchor instanceof HTMLElement ? anchor : undefined,
-      });
+      setMirrorModeEnabled(!getNormalizedMirrorState().enabled);
+      return true;
+    }
+    if (tool === TOOL_ACTION_CAMERA_MODE) {
+      void launchLensCameraMode();
       return true;
     }
     
+    return false;
+  }
+
+  function runUiAction(action, options = {}) {
+    if (action === TOP_UI_ACTION_MIRROR_POPUP) {
+      return runToolAction(TOOL_ACTION_MIRROR_POPUP, options);
+    }
+    if (action === TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE) {
+      return runToolAction(TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE, options);
+    }
+    if (action === TOP_UI_ACTION_OPEN_LENS_CAMERA) {
+      return runToolAction(TOOL_ACTION_CAMERA_MODE, options);
+    }
     return false;
   }
 
@@ -5715,6 +6040,61 @@
     return false;
   }
 
+  function getKeyboardNavigableTabButtons(buttons) {
+    if (!Array.isArray(buttons)) {
+      return [];
+    }
+    return buttons.filter(button => (
+      button instanceof HTMLButtonElement
+      && !button.hidden
+      && !button.disabled
+      && button.getAttribute('aria-hidden') !== 'true'
+    ));
+  }
+
+  function bindTabKeyboardNavigation(button, getButtons) {
+    if (!(button instanceof HTMLButtonElement) || button.dataset.tabKeynavBound === 'true') {
+      return;
+    }
+    button.dataset.tabKeynavBound = 'true';
+    button.addEventListener('keydown', event => {
+      const isPrevious = event.key === 'ArrowLeft' || event.key === 'ArrowUp';
+      const isNext = event.key === 'ArrowRight' || event.key === 'ArrowDown';
+      const isHome = event.key === 'Home';
+      const isEnd = event.key === 'End';
+      if (!isPrevious && !isNext && !isHome && !isEnd) {
+        return;
+      }
+      const buttons = getKeyboardNavigableTabButtons(getButtons());
+      if (!buttons.length) {
+        return;
+      }
+      const currentIndex = buttons.indexOf(button);
+      if (currentIndex < 0) {
+        return;
+      }
+      let targetIndex = currentIndex;
+      if (isHome) {
+        targetIndex = 0;
+      } else if (isEnd) {
+        targetIndex = buttons.length - 1;
+      } else if (isPrevious) {
+        targetIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+      } else if (isNext) {
+        targetIndex = (currentIndex + 1) % buttons.length;
+      }
+      const targetButton = buttons[targetIndex];
+      if (!(targetButton instanceof HTMLButtonElement)) {
+        return;
+      }
+      event.preventDefault();
+      if (targetButton !== button) {
+        targetButton.focus();
+        targetButton.click();
+      }
+    });
+  }
+
   function setDualLeftRailEnabled(enabled, { persist = true } = {}) {
     state.dualLeftRail = false;
     endLeftDualSplitResize({ persist: false });
@@ -5732,6 +6112,7 @@
     dom.leftTabButtons = Array.from(document.querySelectorAll('[data-left-tab]'));
     if (!dom.leftTabButtons || !dom.leftTabButtons.length) return;
     dom.leftTabButtons.forEach(button => {
+      bindTabKeyboardNavigation(button, () => dom.leftTabButtons);
       button.addEventListener('click', () => {
         if (layoutMode === 'mobilePortrait') return;
         const target = button.dataset.leftTab;
@@ -5986,6 +6367,7 @@
       left: 0,
     };
     const edgePadding = 4;
+    const railGap = 8;
     const safeLeft = viewportBounds.left + safeArea.left;
     const safeTop = viewportBounds.top + safeArea.top;
     const safeRight = viewportBounds.right - safeArea.right;
@@ -5997,14 +6379,21 @@
     const maxWidth = isWideFlyout ? 460 : 340;
     const minLeft = safeLeft + edgePadding;
     const maxAvailableWidth = Math.max(160, Math.round(safeRight - minLeft - edgePadding));
-    let width = clamp(Math.round(safeWidth * widthRatio), minWidth, maxWidth);
-    width = Math.min(width, maxAvailableWidth);
-    let computedLeft = Math.round(railRect.left - width - 4);
+    const maxAvailableWidthByRail = Math.max(1, Math.round(railRect.left - minLeft - railGap));
+    const preferredWidth = clamp(Math.round(safeWidth * widthRatio), minWidth, maxWidth);
+    let width = Math.min(preferredWidth, maxAvailableWidth, maxAvailableWidthByRail);
+    width = Math.max(1, Math.round(width));
+    let computedLeft = Math.round(railRect.left - width - railGap);
     if (computedLeft < minLeft) {
       computedLeft = minLeft;
-      width = Math.min(width, maxAvailableWidth);
     }
-    const maxLeft = Math.max(minLeft, Math.round(safeRight - width - edgePadding));
+    const maxLeft = Math.max(
+      minLeft,
+      Math.min(
+        Math.round(safeRight - width - edgePadding),
+        Math.round(railRect.left - width - railGap)
+      )
+    );
     const preferredLeft = Number.isFinite(compactRightFlyoutLockedLeft)
       ? compactRightFlyoutLockedLeft
       : computedLeft;
@@ -6053,6 +6442,7 @@
     }
     if (!dom.rightTabButtons || !dom.rightTabButtons.length) return;
     dom.rightTabButtons.forEach(button => {
+      bindTabKeyboardNavigation(button, () => dom.rightTabButtons);
       if (button.dataset.bound === 'true') return;
       button.dataset.bound = 'true';
       button.addEventListener('click', () => {
@@ -7195,16 +7585,12 @@
   }
 
   function syncMirrorToolPopoverControls(mirrorState = getNormalizedMirrorState()) {
-    if (dom.controls.mirrorToolPopupToggleMode instanceof HTMLInputElement) {
-      dom.controls.mirrorToolPopupToggleMode.checked = Boolean(mirrorState.enabled);
-    }
-    const showToolControls = Boolean(mirrorState.enabled);
     if (dom.controls.mirrorToolPopoverItems instanceof HTMLElement) {
-      dom.controls.mirrorToolPopoverItems.hidden = !showToolControls;
-      dom.controls.mirrorToolPopoverItems.setAttribute('aria-hidden', String(!showToolControls));
+      dom.controls.mirrorToolPopoverItems.hidden = false;
+      dom.controls.mirrorToolPopoverItems.setAttribute('aria-hidden', 'false');
     }
     if (dom.controls.mirrorToolPopoverHelp instanceof HTMLElement) {
-      dom.controls.mirrorToolPopoverHelp.hidden = !showToolControls;
+      dom.controls.mirrorToolPopoverHelp.hidden = false;
     }
     if (!(dom.controls.mirrorToolPopoverItems instanceof HTMLElement)) {
       return;
@@ -7606,6 +7992,8 @@
       dom.controls.mirrorAxisDiagonalB.disabled = false;
     }
     syncMirrorToolPopoverControls(mirrorState);
+    updateMirrorActionButtons();
+    updateVirtualCursorActionToolButtons();
     syncVirtualCursorControlVisibility({ syncToggle: true });
     if (dom.controls.toggleFloatingPreview instanceof HTMLInputElement) {
       dom.controls.toggleFloatingPreview.checked = Boolean(state.floatingPreview?.enabled);
@@ -7908,6 +8296,39 @@
     });
   }
 
+  function applyTopActionLocalization() {
+    const actionLabels = {
+      [TOP_UI_ACTION_MIRROR_POPUP]: { ja: '対称', en: 'Mirror' },
+      [TOP_UI_ACTION_VIRTUAL_CURSOR_TOGGLE]: { ja: '仮想カーソル', en: 'Virtual Cursor' },
+    };
+
+    dom.topActionButtons.forEach(button => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      const key = button.dataset.uiAction || '';
+      const externalTool = getExternalToolDefinition(button.dataset.externalTool || '') || getExternalToolDefinitionByAction(key);
+      const label = externalTool
+        ? getExternalToolLocalizedActionLabel(externalTool)
+        : (() => {
+          const entry = actionLabels[key];
+          return entry ? localizeText(entry.ja, entry.en) : '';
+        })();
+      if (!label) {
+        return;
+      }
+      button.setAttribute('aria-label', label);
+      button.setAttribute('title', label);
+      const srOnly = button.querySelector('.sr-only');
+      if (srOnly instanceof HTMLElement) {
+        srOnly.textContent = label;
+      }
+    });
+    syncExternalToolActionButtons();
+    updateMirrorActionButtons();
+    updateVirtualCursorActionToolButtons();
+  }
+
   function applyToolLocalization() {
     const toolGroupLabels = {
       selection: { ja: '範囲選択', en: 'Selection' },
@@ -7916,8 +8337,6 @@
       eraser: { ja: '消しゴム', en: 'Eraser' },
       shape: { ja: '図形', en: 'Shapes' },
       fill: { ja: '塗りつぶし', en: 'Fill' },
-      mirror: { ja: '対称', en: 'Mirror' },
-      virtualCursor: { ja: '仮想カーソル', en: 'Virtual Cursor' },
     };
 
     dom.toolGroupButtons.forEach(button => {
@@ -8025,6 +8444,7 @@
     setLocalizedTextContent('#updateToastCloseBtn', '閉じる', 'Close');
 
     applyTabLocalization();
+    applyTopActionLocalization();
     applyToolLocalization();
 
     setLocalizedAttribute('#panelFrames .timeline-card', 'aria-label', 'レイヤーとフレームのタイムライン', 'Layer/Frame Timeline');
@@ -8168,13 +8588,17 @@
     setLocalizedAttribute('#sortPaletteHue', 'aria-label', '色相順でソート', 'Sort by hue');
     setLocalizedAttribute('#sortPaletteSaturation', 'aria-label', '彩度順でソート', 'Sort by saturation');
     setLocalizedAttribute('#sortPaletteValue', 'aria-label', '明度順でソート', 'Sort by value');
+    setLocalizedAttribute('#movePaletteBackward', 'aria-label', '選択した色を前へ移動', 'Move selected color earlier');
+    setLocalizedAttribute('#movePaletteForward', 'aria-label', '選択した色を後ろへ移動', 'Move selected color later');
+    setLocalizedAttribute('#movePaletteBackward', 'title', '選択した色を前へ移動', 'Move selected color earlier');
+    setLocalizedAttribute('#movePaletteForward', 'title', '選択した色を後ろへ移動', 'Move selected color later');
     setLocalizedControlLabel('palettePresetSelect', 'プリセット', 'Preset');
     setLocalizedAttribute('#palettePresetPickerButton', 'aria-label', 'パレットプリセットを選択', 'Choose palette preset');
     setLocalizedAttribute('#palettePresetPickerMenu', 'aria-label', 'プリセット一覧', 'Preset list');
     setLocalizedAttribute('#newProjectPalettePresetPickerButton', 'aria-label', '新規作成のパレットプリセットを選択', 'Choose new project palette preset');
     setLocalizedAttribute('#newProjectPalettePresetPickerMenu', 'aria-label', '新規作成プリセット一覧', 'New project preset list');
-    renderColorPanelPalettePresetOptions(dom.controls.palettePresetSelect?.value || newProjectPalettePresetId);
-    renderPalettePresetPreview(dom.controls.palettePresetSelect?.value || newProjectPalettePresetId);
+    renderColorPanelPalettePresetOptions(dom.controls.palettePresetSelect?.value || currentPalettePresetId);
+    renderPalettePresetPreview(dom.controls.palettePresetSelect?.value || currentPalettePresetId);
     setLocalizedAttribute('#panelSettings .field.field--list[role="group"]', 'aria-label', '表示設定', 'Display Settings');
     setLocalizedToggleLabel('toggleGrid', 'グリッド', 'Grid');
     setLocalizedToggleLabel('toggleMajorGrid', 'メジャー', 'Major');
@@ -8191,7 +8615,7 @@
     setLocalizedToggleLabel('mirrorAxisHorizontal', '上下対称', 'Horizontal Mirror');
     setLocalizedToggleLabel('mirrorAxisDiagonalA', '斜め対称 (＼)', 'Diagonal Mirror (\\)');
     setLocalizedToggleLabel('mirrorAxisDiagonalB', '斜め対称 (/)', 'Diagonal Mirror (/)');
-    setLocalizedTextContent('#mirrorAxisHelp', 'ミラーモード中は軸ライン外側のつまみをドラッグして、対称軸を移動できます。', 'In mirror mode, drag the outside handles to move each mirror axis.');
+    setLocalizedTextContent('#mirrorAxisHelp', 'ミラーモード中はキャンバス周囲の＋で対称軸をON/OFFし、ONの軸はそのままドラッグして位置を動かせます。', 'When mirror mode is on, use the + handles around the canvas to turn axes on or off. Drag an active + handle to move that axis.');
     setLocalizedTextContent('.virtual-cursor-scale__label', '仮想カーソルボタンサイズ', 'Virtual Cursor Button Size');
     setLocalizedTextContent('#mobileDrawHelp', 'スマホ描画: 仮想カーソルをONにしてキャンバスをドラッグでカーソル移動、「描画」ボタン長押しで描画します（左半分=主色 / 右半分=副色）。選択範囲を移動する時は「移動」ツール、または選択ツールのまま選択範囲上で描画ボタンを長押しし、もう1本の指でキャンバスをドラッグします。2本指ドラッグ/ピンチで移動と拡大縮小ができます。', 'Mobile draw: turn on Virtual Cursor, drag the canvas to move the cursor, and long-press Draw to paint (left half = primary / right half = secondary). To move a selection, use Move, or keep a selection tool active, hold Draw on the selected area, and drag the canvas with a second finger. Use two fingers to pan and pinch zoom.');
     setLocalizedTextContent('#settingsDisplayHint', '背景とUI配色を切り替えます（描画色には影響しません）。', 'Switch the background and UI colors (does not change drawing colors).');
@@ -8210,11 +8634,10 @@
     setLocalizedAttribute('#floatingPreviewCanvas', 'aria-label', '小窓プレビューキャンバス', 'Floating preview canvas');
     setLocalizedAttribute('#floatingPreviewResize', 'aria-label', 'プレビューパネルのサイズを変更', 'Resize preview panel');
     setLocalizedAttribute('#resizeLeftUnifiedSplit', 'aria-label', 'ツールとカラーの縦割合を変更', 'Resize tools and color split');
-    setLocalizedTextContent('#mirrorToolPopover .mirror-tool-popover__header strong', '対称ツール', 'Mirror Tools');
+    setLocalizedTextContent('#mirrorToolPopover .mirror-tool-popover__header strong', '対称軸', 'Mirror Axes');
     setLocalizedTextContent('#mirrorToolPopoverClose', '閉じる', 'Close');
     setLocalizedAttribute('#mirrorToolPopoverClose', 'aria-label', '対称ポップアップを閉じる', 'Close mirror popup');
-    setLocalizedToggleLabel('mirrorToolPopupToggleMode', 'ミラーモード', 'Mirror Mode');
-    setLocalizedTextContent('#mirrorToolPopoverHelp', '挙動は既存ミラーモードと同じです。軸位置はキャンバス外のつまみで移動できます。', 'Behavior is the same as mirror mode. You can move axis handles from outside the canvas.');
+    setLocalizedTextContent('#mirrorToolPopoverHelp', 'ここでは対称軸だけを切り替えられます。ON/OFF は上部ボタンか設定のミラーモードから変更できます。', 'This popup only changes mirror axes. Turn mirror mode on or off from the top button or Settings > Mirror Mode.');
 
     setLocalizedTextContent('#newProject', '新規作成', 'New Project');
     setLocalizedTextContent('#openDocument', 'ファイルを開く', 'Open File');
@@ -9155,9 +9578,10 @@
         updateAutosaveStatus('自動保存: 起動時の 1x1 バックアップ読み込みをスキップしました', 'warn');
         return false;
       }
+      synchronizeImportedSnapshotPalette(snapshot);
       autosaveRestoring = true;
       try {
-        applyHistorySnapshot(snapshot);
+        applyHistorySnapshot(snapshot, { forcePalettePresetSync: true });
         history.pending = null;
         if (projectSession) {
           history.limit = projectSession.historyLimit;
@@ -9587,10 +10011,11 @@
     if (isTinyStartupSnapshot(snapshot)) {
       return false;
     }
+    synchronizeImportedSnapshotPalette(snapshot);
     iosSnapshotRestoring = true;
     try {
       const prevFrameCount = Array.isArray(state.frames) ? state.frames.length : 0;
-      applyHistorySnapshot(snapshot);
+      applyHistorySnapshot(snapshot, { forcePalettePresetSync: true });
       history.past = [];
       history.future = [];
       history.pending = null;
@@ -10233,57 +10658,101 @@
     });
   }
 
-  function buildIndexedPaletteFromImageData(data, maxColors = MAX_IMPORTED_PALETTE_COLORS) {
-    if (!(data instanceof Uint8ClampedArray)) {
-      return { palette: [], indices: new Int16Array(0), overflow: false };
-    }
-    const pixelCount = Math.floor(data.length / 4);
-    const colorMap = new Map();
-    const palette = [];
-    let overflow = false;
-
-    for (let i = 0; i < pixelCount; i += 1) {
-      const base = i * 4;
-      const a = data[base + 3];
-      if (a === 0) {
+  function buildIndexedPaletteFromFrameDataList(frameDataList, maxColors = MAX_IMPORTED_PALETTE_COLORS) {
+    const frames = Array.isArray(frameDataList) ? frameDataList : [];
+    const normalizedMaxColors = clamp(
+      Math.round(Number(maxColors) || MAX_IMPORTED_PALETTE_COLORS),
+      1,
+      MAX_IMPORTED_PALETTE_COLORS
+    );
+    const orderedColors = [];
+    const colorCounts = new Map();
+    for (let frameIndex = 0; frameIndex < frames.length; frameIndex += 1) {
+      const data = frames[frameIndex];
+      if (!(data instanceof Uint8ClampedArray)) {
         continue;
       }
-      const r = data[base];
-      const g = data[base + 1];
-      const b = data[base + 2];
-      const key = `${r},${g},${b},${a}`;
-      if (!colorMap.has(key)) {
-        if (palette.length >= maxColors) {
-          overflow = true;
-          break;
+      const pixelCount = Math.floor(data.length / 4);
+      for (let i = 0; i < pixelCount; i += 1) {
+        const base = i * 4;
+        const a = data[base + 3];
+        if (a === 0) {
+          continue;
         }
-        colorMap.set(key, palette.length);
-        palette.push({ r, g, b, a });
+        const r = data[base];
+        const g = data[base + 1];
+        const b = data[base + 2];
+        const key = `${r},${g},${b},${a}`;
+        const existing = colorCounts.get(key);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          const entry = { r, g, b, a, count: 1 };
+          colorCounts.set(key, entry);
+          orderedColors.push(entry);
+        }
       }
     }
-
-    if (overflow) {
-      return { palette, indices: null, overflow: true };
+    const sourceColorCount = orderedColors.length;
+    let palette = sourceColorCount <= normalizedMaxColors
+      ? orderedColors.map(color => normalizeColorValue(color))
+      : quantizeRgbaColors(orderedColors, normalizedMaxColors);
+    if (!palette.length) {
+      palette = [{ r: 0, g: 0, b: 0, a: 0 }];
     }
-
-    const indices = new Int16Array(pixelCount).fill(-1);
-    for (let i = 0; i < pixelCount; i += 1) {
-      const base = i * 4;
-      const a = data[base + 3];
-      if (a === 0) {
-        continue;
+    const dedupedPalette = [];
+    const dedupedLookup = new Map();
+    palette.forEach((color) => {
+      const normalized = normalizeColorValue(color);
+      const key = getPaletteColorKey(normalized);
+      if (!dedupedLookup.has(key)) {
+        dedupedLookup.set(key, dedupedPalette.length);
+        dedupedPalette.push(normalized);
       }
-      const r = data[base];
-      const g = data[base + 1];
-      const b = data[base + 2];
-      const key = `${r},${g},${b},${a}`;
-      const paletteIndex = colorMap.get(key);
-      if (paletteIndex !== undefined) {
-        indices[i] = paletteIndex;
+    });
+    palette = dedupedPalette.length ? dedupedPalette : [{ r: 0, g: 0, b: 0, a: 0 }];
+    const colorMap = new Map();
+    orderedColors.forEach((entry) => {
+      const key = getPaletteColorKey(entry);
+      const exactIndex = dedupedLookup.get(key);
+      if (Number.isInteger(exactIndex) && exactIndex >= 0) {
+        colorMap.set(key, exactIndex);
+        return;
       }
-    }
+      colorMap.set(key, findNearestPaletteColorIndexByRgba(entry, palette, 0));
+    });
 
-    return { palette, indices, overflow: false };
+    const frameIndices = frames.map((data) => {
+      if (!(data instanceof Uint8ClampedArray)) {
+        return new Int16Array(0);
+      }
+      const pixelCount = Math.floor(data.length / 4);
+      const indices = new Int16Array(pixelCount).fill(-1);
+      for (let i = 0; i < pixelCount; i += 1) {
+        const base = i * 4;
+        const a = data[base + 3];
+        if (a === 0) {
+          continue;
+        }
+        const r = data[base];
+        const g = data[base + 1];
+        const b = data[base + 2];
+        const key = `${r},${g},${b},${a}`;
+        const paletteIndex = colorMap.get(key);
+        if (paletteIndex !== undefined) {
+          indices[i] = paletteIndex;
+        }
+      }
+      return indices;
+    });
+
+    return {
+      palette,
+      frameIndices,
+      overflow: false,
+      reduced: sourceColorCount > palette.length,
+      sourceColorCount,
+    };
   }
 
   function dataUrlToBlob(dataUrl) {
@@ -10347,40 +10816,40 @@
     let secondaryPaletteIndex = 0;
     let activeRgb = { r: 255, g: 255, b: 255, a: 255 };
 
-    if (normalizedFramesData.length === 1) {
-      const frameInfo = normalizedFramesData[0];
-      const imageData = frameInfo?.imageData;
-      if (!imageData || !Number.isFinite(imageData.width) || !Number.isFinite(imageData.height)) {
-        throw createImageImportError('画像を読み込めませんでした');
-      }
-      const layer = createLayer(localizeText('画像レイヤー', 'Image Layer'), width, height);
-      const extraction = buildIndexedPaletteFromImageData(imageData.data);
-      if (!extraction.overflow && extraction.palette.length > 0) {
-        layer.indices = extraction.indices;
+    const extractedFrameData = normalizedFramesData.map((frameInfo) => (
+      frameInfo?.imageData?.data instanceof Uint8ClampedArray
+        ? frameInfo.imageData.data
+        : null
+    ));
+    const extraction = buildIndexedPaletteFromFrameDataList(extractedFrameData);
+    const canUseImportedPalette = (
+      !extraction.overflow
+      && Array.isArray(extraction.frameIndices)
+      && extraction.frameIndices.length === normalizedFramesData.length
+    );
+
+    if (canUseImportedPalette) {
+      palette = extraction.palette.length
+        ? extraction.palette.map(color => ({ ...color }))
+        : [{ r: 0, g: 0, b: 0, a: 0 }];
+      activePaletteIndex = 0;
+      secondaryPaletteIndex = Math.min(1, Math.max(0, palette.length - 1));
+      activeRgb = { ...palette[activePaletteIndex] };
+      normalizedFramesData.forEach((frameInfo, index) => {
+        const layer = createLayer(localizeText('画像レイヤー', 'Image Layer'), width, height);
+        const frameIndices = extraction.frameIndices[index];
+        if (frameIndices instanceof Int16Array && frameIndices.length === layer.indices.length) {
+          layer.indices = new Int16Array(frameIndices);
+        } else {
+          layer.indices.fill(-1);
+        }
         layer.direct = null;
-        palette = extraction.palette.map(color => ({ ...color }));
-        activePaletteIndex = 0;
-        secondaryPaletteIndex = Math.min(1, Math.max(0, palette.length - 1));
-        activeRgb = { ...palette[activePaletteIndex] };
-      } else {
-        const direct = ensureLayerDirect(layer, width, height);
-        direct.set(imageData.data);
-        palette = paletteSource.map(color => ({ ...color }));
-        activePaletteIndex = palette.length
-          ? clamp(state.activePaletteIndex ?? 0, 0, palette.length - 1)
-          : 0;
-        secondaryPaletteIndex = palette.length
-          ? clamp(state.secondaryPaletteIndex ?? activePaletteIndex, 0, palette.length - 1)
-          : activePaletteIndex;
-        activeRgb = state.activeRgb
-          ? { ...state.activeRgb }
-          : (palette[activePaletteIndex] ? { ...palette[activePaletteIndex] } : { r: 255, g: 255, b: 255, a: 255 });
-      }
-      frames.push({
-        id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}`,
-        name: getDefaultFrameName(1),
-        duration: normalizeImportFrameDuration(frameInfo?.duration),
-        layers: [layer],
+        frames.push({
+          id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Date.now().toString(36)}-${index}`,
+          name: getDefaultFrameName(index + 1),
+          duration: normalizeImportFrameDuration(frameInfo?.duration),
+          layers: [layer],
+        });
       });
     } else {
       palette = paletteSource.map(color => ({ ...color }));
@@ -10458,7 +10927,7 @@
       activeRightTab: state.activeRightTab ?? 'frames',
     };
 
-    applyHistorySnapshot(snapshot);
+    applyHistorySnapshot(snapshot, { forcePalettePresetSync: true });
     history.past = [];
     history.future = [];
     history.pending = null;
@@ -10474,16 +10943,22 @@
     setActiveAutosaveProjectId(createAutosaveProjectId());
     markAutosaveDirty();
     scheduleAutosaveSnapshot();
+    const paletteReductionLabel = extraction.reduced
+      ? localizeText(
+        ` / 減色 ${extraction.sourceColorCount}色→${palette.length}色`,
+        ` / Reduced ${extraction.sourceColorCount} colors to ${palette.length}`
+      )
+      : '';
     if (importSize.scaled) {
       const integerScaleLabel = importSize.integerScaleFactor > 1
         ? ` / 整数倍縮小 x${importSize.integerScaleFactor}`
         : '';
       updateAutosaveStatus(
-        `画像を読み込みました (${importSize.sourceWidth}x${importSize.sourceHeight} → ${width}x${height}${integerScaleLabel}) / 端末内へ自動保存します`,
+        `画像を読み込みました (${importSize.sourceWidth}x${importSize.sourceHeight} → ${width}x${height}${integerScaleLabel})${paletteReductionLabel} / 端末内へ自動保存します`,
         'success'
       );
     } else {
-      updateAutosaveStatus('画像を読み込みました / 端末内へ自動保存します', 'success');
+      updateAutosaveStatus(`画像を読み込みました${paletteReductionLabel} / 端末内へ自動保存します`, 'success');
     }
     scheduleSessionPersist();
   }
@@ -10632,10 +11107,20 @@
     }
 
     try {
-      await loadDocumentFromImageFile(file);
+      const imported = await openDocumentsAsProjectTabs(
+        [file],
+        async lensFile => {
+          await loadDocumentFromImageFile(lensFile);
+          await ensureAutosaveForLensImport();
+          return true;
+        },
+        { source: 'lens' }
+      );
+      if (!imported) {
+        finalizeLensImportAttempt({ clearPayload: true });
+        return false;
+      }
       hideStartupScreen();
-      updateAutosaveStatus('PiXiEELENS から画像を取り込みました', 'success');
-      await ensureAutosaveForLensImport(inferredName);
       if (AUTOSAVE_SUPPORTED) {
         try {
           await writeAutosaveSnapshot(true);
@@ -10643,6 +11128,13 @@
           console.warn('Immediate autosave after PiXiEELENS import failed', error);
         }
       }
+      updateAutosaveStatus(
+        localizeText(
+          'PiXiEELENS の画像を別プロジェクトタブで開きました',
+          'Opened PiXiEELENS capture in a separate project tab'
+        ),
+        'success'
+      );
       finalizeLensImportAttempt({ clearPayload: true });
       return true;
     } catch (error) {
@@ -11392,6 +11884,27 @@
         openToolSpotlightDialog();
       });
     }
+  }
+
+  function setupTopActionButtons() {
+    dom.topActionButtons = Array.from(document.querySelectorAll('[data-ui-action]'));
+    if (!Array.isArray(dom.topActionButtons) || !dom.topActionButtons.length) {
+      return;
+    }
+    syncExternalToolActionButtons();
+    dom.topActionButtons.forEach(button => {
+      if (!(button instanceof HTMLButtonElement) || button.dataset.actionBound === 'true') {
+        return;
+      }
+      button.dataset.actionBound = 'true';
+      button.addEventListener('click', () => {
+        const action = button.dataset.uiAction || '';
+        if (!action) {
+          return;
+        }
+        runUiAction(action, { sourceButton: button });
+      });
+    });
   }
 
   function showExportInterstitialAfterImageExport() {
@@ -12392,6 +12905,7 @@
     });
 
     applyHistorySnapshot(snapshot);
+    setCurrentPalettePresetId(normalizedPalettePreset, { syncControl: true });
     history.past = [];
     history.future = [];
     history.pending = null;
@@ -12868,10 +13382,11 @@
       updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
       return false;
     }
+    synchronizeImportedSnapshotPalette(snapshot);
 
     autosaveRestoring = true;
     try {
-      applyHistorySnapshot(snapshot);
+      applyHistorySnapshot(snapshot, { forcePalettePresetSync: true });
       history.pending = null;
       if (projectSession) {
         history.limit = projectSession.historyLimit;
@@ -13039,6 +13554,7 @@
       }
       try {
         const snapshot = deserializeDocumentPayload(payload);
+        synchronizeImportedSnapshotPalette(snapshot);
         restored.push(compressHistorySnapshot(snapshot));
       } catch (error) {
         // Ignore invalid history entries.
@@ -16548,6 +17064,146 @@
     return boxes.map(box => averageColorFromBox(box.colors));
   }
 
+  function quantizeRgbaColors(colors, maxColors) {
+    if (!colors.length) {
+      return [];
+    }
+    const normalizedMaxColors = clamp(Math.round(Number(maxColors) || 0), 1, MAX_IMPORTED_PALETTE_COLORS);
+    if (colors.length <= normalizedMaxColors) {
+      return colors.map(color => normalizeColorValue(color));
+    }
+    const boxes = [createRgbaColorBox(colors)];
+    while (boxes.length < normalizedMaxColors) {
+      boxes.sort((a, b) => {
+        if (b.range === a.range) {
+          return b.totalCount - a.totalCount;
+        }
+        return b.range - a.range;
+      });
+      const box = boxes.shift();
+      if (!box || box.colors.length <= 1) {
+        if (box) {
+          boxes.push(box);
+        }
+        break;
+      }
+      const split = splitRgbaColorBox(box);
+      if (!split) {
+        boxes.push(box);
+        break;
+      }
+      boxes.push(split[0], split[1]);
+    }
+    return boxes.map(box => averageRgbaColorFromBox(box.colors));
+  }
+
+  function createRgbaColorBox(colors) {
+    let rMin = 255;
+    let rMax = 0;
+    let gMin = 255;
+    let gMax = 0;
+    let bMin = 255;
+    let bMax = 0;
+    let aMin = 255;
+    let aMax = 0;
+    let totalCount = 0;
+    colors.forEach(color => {
+      rMin = Math.min(rMin, color.r);
+      rMax = Math.max(rMax, color.r);
+      gMin = Math.min(gMin, color.g);
+      gMax = Math.max(gMax, color.g);
+      bMin = Math.min(bMin, color.b);
+      bMax = Math.max(bMax, color.b);
+      aMin = Math.min(aMin, color.a);
+      aMax = Math.max(aMax, color.a);
+      totalCount += color.count || 1;
+    });
+    const rRange = rMax - rMin;
+    const gRange = gMax - gMin;
+    const bRange = bMax - bMin;
+    const aRange = aMax - aMin;
+    return {
+      colors: colors.slice(),
+      rMin,
+      rMax,
+      gMin,
+      gMax,
+      bMin,
+      bMax,
+      aMin,
+      aMax,
+      rRange,
+      gRange,
+      bRange,
+      aRange,
+      range: Math.max(rRange, gRange, bRange, aRange * 1.35),
+      totalCount,
+    };
+  }
+
+  function splitRgbaColorBox(box) {
+    const channel = selectRgbaSplitChannel(box);
+    const sorted = box.colors.slice().sort((a, b) => a[channel] - b[channel]);
+    if (!sorted.length) {
+      return null;
+    }
+    const total = sorted.reduce((sum, color) => sum + (color.count || 1), 0);
+    const target = total / 2;
+    let run = 0;
+    let pivot = 0;
+    for (; pivot < sorted.length - 1; pivot += 1) {
+      run += sorted[pivot].count || 1;
+      if (run >= target) {
+        break;
+      }
+    }
+    const left = sorted.slice(0, pivot + 1);
+    const right = sorted.slice(pivot + 1);
+    if (!left.length || !right.length) {
+      return null;
+    }
+    return [createRgbaColorBox(left), createRgbaColorBox(right)];
+  }
+
+  function selectRgbaSplitChannel(box) {
+    const weightedAlphaRange = box.aRange * 1.35;
+    if (weightedAlphaRange >= box.rRange && weightedAlphaRange >= box.gRange && weightedAlphaRange >= box.bRange) {
+      return 'a';
+    }
+    if (box.rRange >= box.gRange && box.rRange >= box.bRange) {
+      return 'r';
+    }
+    if (box.gRange >= box.rRange && box.gRange >= box.bRange) {
+      return 'g';
+    }
+    return 'b';
+  }
+
+  function averageRgbaColorFromBox(colors) {
+    let total = 0;
+    let rTotal = 0;
+    let gTotal = 0;
+    let bTotal = 0;
+    let aTotal = 0;
+    colors.forEach(color => {
+      const weight = color.count || 1;
+      total += weight;
+      rTotal += color.r * weight;
+      gTotal += color.g * weight;
+      bTotal += color.b * weight;
+      aTotal += color.a * weight;
+    });
+    if (!total) {
+      return { r: 0, g: 0, b: 0, a: 0 };
+    }
+    return normalizeColorValue({
+      r: Math.round(rTotal / total),
+      g: Math.round(gTotal / total),
+      b: Math.round(bTotal / total),
+      a: Math.round(aTotal / total),
+    });
+  }
+
   function createColorBox(colors) {
     let rMin = 255;
     let rMax = 0;
@@ -18123,6 +18779,7 @@
     ensureOpenProjectTabsInitialized();
     setupLeftTabs();
     setupRightTabs();
+    setupTopActionButtons();
     setupLayout();
     setupGlobalFocusDismiss();
     setupControls();
@@ -19167,6 +19824,7 @@
     }
 
     dom.mobileTabs.forEach(tab => {
+      bindTabKeyboardNavigation(tab, () => dom.mobileTabs);
       tab.addEventListener('click', () => {
         const target = tab.dataset.mobileTab;
         if (!target) {
@@ -19559,10 +20217,7 @@
     if (!(target instanceof Element)) {
       return false;
     }
-    if (target.closest('.tool-button[data-tool="mirrorPopup"]')) {
-      return true;
-    }
-    if (target.closest('.tool-group-button[data-tool-group="mirror"]')) {
+    if (target.closest(`.tool-button[data-tool="${TOOL_ACTION_MIRROR_POPUP}"], [data-ui-action="${TOP_UI_ACTION_MIRROR_POPUP}"]`)) {
       return true;
     }
     if (dom.mirrorToolPopover instanceof HTMLElement && dom.mirrorToolPopover.contains(target)) {
@@ -19618,7 +20273,7 @@
     }
     let anchor = mirrorToolPopoverState.anchor;
     if (!(anchor instanceof HTMLElement) || !anchor.isConnected) {
-      anchor = document.querySelector('.tool-button[data-tool="mirrorPopup"]');
+      anchor = getMirrorActionAnchor();
       mirrorToolPopoverState.anchor = anchor instanceof HTMLElement ? anchor : null;
     }
     if (!(anchor instanceof HTMLElement)) {
@@ -19675,13 +20330,14 @@
       popover.hidden = true;
       popover.classList.remove('is-open');
       popover.setAttribute('aria-hidden', 'true');
+      updateMirrorActionButtons();
       return;
     }
     if (options.anchor instanceof HTMLElement) {
       mirrorToolPopoverState.anchor = options.anchor;
     }
     if (!(mirrorToolPopoverState.anchor instanceof HTMLElement)) {
-      const fallback = document.querySelector('.tool-button[data-tool="mirrorPopup"]');
+      const fallback = getMirrorActionAnchor();
       mirrorToolPopoverState.anchor = fallback instanceof HTMLElement ? fallback : null;
     }
     mirrorToolPopoverState.open = true;
@@ -19690,6 +20346,7 @@
     popover.hidden = false;
     popover.classList.add('is-open');
     popover.setAttribute('aria-hidden', 'false');
+    updateMirrorActionButtons();
     positionMirrorToolPopover();
     requestAnimationFrame(positionMirrorToolPopover);
   }
@@ -19729,6 +20386,9 @@
     }
     mirrorState.enabled = next;
     state.mirror = mirrorState;
+    if (!next && isMirrorToolPopoverOpen()) {
+      setMirrorToolPopoverOpen(false);
+    }
     if (updateControl && dom.controls.toggleMirrorMode instanceof HTMLInputElement) {
       dom.controls.toggleMirrorMode.checked = next;
     }
@@ -19750,29 +20410,18 @@
     }
     const mirrorState = getNormalizedMirrorState();
     const nextEnabled = Boolean(enabled);
-    if (!nextEnabled) {
-      const activeAxisCount = MIRROR_AXIS_KEYS.reduce(
-        (count, key) => count + (mirrorState.axes[key] ? 1 : 0),
-        0
-      );
-      const isLastActiveAxis = activeAxisCount <= 1 && Boolean(mirrorState.axes[axis]);
-      if (isLastActiveAxis) {
-        mirrorState.axes[axis] = true;
-        mirrorState.enabled = true;
-        state.mirror = mirrorState;
-        if (syncControls) {
-          syncControlsWithState();
-        }
-        updateAutosaveStatus(
-          localizeText('ミラーモードは最低1つの対称軸が必要です', 'Mirror mode requires at least one active axis'),
-          'info'
-        );
-        requestOverlayRender();
-        return;
+    const previousEnabled = Boolean(mirrorState.axes[axis]);
+    const shouldEnableMirrorMode = nextEnabled && !mirrorState.enabled;
+    if (previousEnabled === nextEnabled && !shouldEnableMirrorMode) {
+      if (syncControls) {
+        syncControlsWithState();
       }
+      return;
     }
     mirrorState.axes[axis] = nextEnabled;
-    mirrorState.enabled = hasActiveMirrorAxes(mirrorState);
+    if (nextEnabled) {
+      mirrorState.enabled = true;
+    }
     state.mirror = mirrorState;
     if (syncControls) {
       syncControlsWithState();
@@ -20066,9 +20715,11 @@
     }
     if (!visible || !Number.isFinite(x) || !Number.isFinite(y)) {
       handle.classList.add('is-hidden');
+      handle.setAttribute('aria-hidden', 'true');
       return;
     }
     handle.classList.remove('is-hidden');
+    handle.setAttribute('aria-hidden', 'false');
     handle.style.left = `${x}px`;
     handle.style.top = `${y}px`;
   }
@@ -20087,6 +20738,25 @@
     return dom.mirrorHandles.find(handle => handle?.dataset?.mirrorAxis === axis) || null;
   }
 
+  function getMirrorAxisHandleLabel(axis, active) {
+    let axisLabel = '';
+    if (axis === MIRROR_AXIS_VERTICAL) {
+      axisLabel = localizeText('左右対称', 'Vertical Mirror');
+    } else if (axis === MIRROR_AXIS_HORIZONTAL) {
+      axisLabel = localizeText('上下対称', 'Horizontal Mirror');
+    } else if (axis === MIRROR_AXIS_DIAGONAL_A) {
+      axisLabel = localizeText('斜め対称 (＼)', 'Diagonal Mirror (\\)');
+    } else if (axis === MIRROR_AXIS_DIAGONAL_B) {
+      axisLabel = localizeText('斜め対称 (/)', 'Diagonal Mirror (/)');
+    }
+    if (!axisLabel) {
+      return '';
+    }
+    return active
+      ? localizeText(`${axisLabel}: クリックでオフ、ドラッグで位置移動`, `${axisLabel}: click to turn off, drag to move`)
+      : localizeText(`${axisLabel}をオン`, `Turn ${axisLabel} on`);
+  }
+
   function updateMirrorGuideHandles() {
     const guideContainer = dom.mirrorGuides;
     if (!(guideContainer instanceof HTMLElement)) {
@@ -20094,9 +20764,11 @@
     }
     const mirrorState = getNormalizedMirrorState();
     const metrics = getCanvasScreenMetrics();
-    const showGuides = Boolean(mirrorState.enabled && hasActiveMirrorAxes(mirrorState) && metrics);
-    guideContainer.hidden = !showGuides;
-    if (!showGuides) {
+    const showControls = Boolean(mirrorState.enabled && metrics);
+    const showGuides = Boolean(showControls && hasActiveMirrorAxes(mirrorState));
+    guideContainer.hidden = !showControls;
+    guideContainer.setAttribute('aria-hidden', String(!showControls));
+    if (!showControls) {
       MIRROR_AXIS_KEYS.forEach(axis => {
         setMirrorGuideLine(getMirrorGuideLineElement(axis), null, null, false);
         setMirrorHandlePosition(getMirrorHandleElement(axis), NaN, NaN, false);
@@ -20110,11 +20782,33 @@
     const pivotX = left + (axisXRatio * width);
     const pivotY = top + (axisYRatio * height);
     const outside = MIRROR_HANDLE_OUTSIDE_OFFSET;
+    const diagonalHandleXLeft = left;
+    const diagonalHandleXRight = left + width;
+    const diagonalHandleY = top - outside;
 
     const verticalActive = Boolean(mirrorState.axes[MIRROR_AXIS_VERTICAL]);
     const horizontalActive = Boolean(mirrorState.axes[MIRROR_AXIS_HORIZONTAL]);
     const diagonalAActive = Boolean(mirrorState.axes[MIRROR_AXIS_DIAGONAL_A]);
     const diagonalBActive = Boolean(mirrorState.axes[MIRROR_AXIS_DIAGONAL_B]);
+    const axisToggleDisabled = !canCurrentClientEditProjectStructure();
+
+    MIRROR_AXIS_KEYS.forEach(axis => {
+      const button = getMirrorHandleElement(axis);
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      const pressed = Boolean(mirrorState.axes[axis]);
+      const controlLabel = getMirrorAxisHandleLabel(axis, pressed);
+      button.classList.toggle('is-active', pressed);
+      button.classList.toggle('is-disabled', axisToggleDisabled);
+      button.setAttribute('aria-pressed', String(pressed));
+      button.setAttribute('aria-disabled', String(axisToggleDisabled));
+      if (controlLabel) {
+        button.setAttribute('aria-label', controlLabel);
+        button.setAttribute('title', controlLabel);
+      }
+      button.disabled = axisToggleDisabled;
+    });
 
     setMirrorGuideLine(
       getMirrorGuideLineElement(MIRROR_AXIS_VERTICAL),
@@ -20153,16 +20847,16 @@
       getMirrorHandleElement(MIRROR_AXIS_VERTICAL),
       pivotX,
       top - outside,
-      verticalActive
+      true
     );
     setMirrorHandlePosition(
       getMirrorHandleElement(MIRROR_AXIS_HORIZONTAL),
       left - outside,
       pivotY,
-      horizontalActive
+      true
     );
 
-    if (diagonalAActive && diagonalAStart && diagonalAEnd) {
+    if (diagonalAStart && diagonalAEnd) {
       const pickTopLeft = point => (point.x + point.y);
       const anchor = pickTopLeft(diagonalAStart) <= pickTopLeft(diagonalAEnd) ? diagonalAStart : diagonalAEnd;
       const vx = anchor.x - pivotX;
@@ -20175,10 +20869,15 @@
         true
       );
     } else {
-      setMirrorHandlePosition(getMirrorHandleElement(MIRROR_AXIS_DIAGONAL_A), NaN, NaN, false);
+      setMirrorHandlePosition(
+        getMirrorHandleElement(MIRROR_AXIS_DIAGONAL_A),
+        diagonalHandleXLeft,
+        diagonalHandleY,
+        true
+      );
     }
 
-    if (diagonalBActive && diagonalBStart && diagonalBEnd) {
+    if (diagonalBStart && diagonalBEnd) {
       const pickTopRight = point => (point.x - point.y);
       const anchor = pickTopRight(diagonalBStart) >= pickTopRight(diagonalBEnd) ? diagonalBStart : diagonalBEnd;
       const vx = anchor.x - pivotX;
@@ -20191,7 +20890,12 @@
         true
       );
     } else {
-      setMirrorHandlePosition(getMirrorHandleElement(MIRROR_AXIS_DIAGONAL_B), NaN, NaN, false);
+      setMirrorHandlePosition(
+        getMirrorHandleElement(MIRROR_AXIS_DIAGONAL_B),
+        diagonalHandleXRight,
+        diagonalHandleY,
+        true
+      );
     }
   }
 
@@ -20247,10 +20951,25 @@
     mirrorHandleDragState.startAxisY = 0;
     mirrorHandleDragState.startCanvasWidth = 1;
     mirrorHandleDragState.startCanvasHeight = 1;
+    mirrorHandleDragState.moved = false;
     if (persist) {
       scheduleSessionPersist({ includeSnapshots: false });
     }
     updateMirrorGuideHandles();
+  }
+
+  function shouldSuppressMirrorHandleClick(axis) {
+    if (mirrorHandleDragState.suppressClickAxis !== axis) {
+      return false;
+    }
+    if ((Date.now() - mirrorHandleDragState.suppressClickAt) > 350) {
+      mirrorHandleDragState.suppressClickAxis = '';
+      mirrorHandleDragState.suppressClickAt = 0;
+      return false;
+    }
+    mirrorHandleDragState.suppressClickAxis = '';
+    mirrorHandleDragState.suppressClickAt = 0;
+    return true;
   }
 
   function handleMirrorHandlePointerDown(event) {
@@ -20270,12 +20989,19 @@
     if (!mirrorState.enabled) {
       return;
     }
+    event.preventDefault();
+    event.stopPropagation();
+    if (!canCurrentClientEditProjectStructure()) {
+      setMultiStatus(localizeText('参加/視聴モードでは対称軸設定はマスターのみ変更できます', 'In participant/viewer mode, only the master can change mirror axes'), 'warn');
+      return;
+    }
+    if (!mirrorState.axes[axis]) {
+      return;
+    }
     const rect = drawing.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) {
       return;
     }
-    event.preventDefault();
-    event.stopPropagation();
     mirrorHandleDragState.active = true;
     mirrorHandleDragState.pointerId = event.pointerId;
     mirrorHandleDragState.axis = axis;
@@ -20286,6 +21012,9 @@
     mirrorHandleDragState.startAxisY = Number(mirrorState.axisY) || 0;
     mirrorHandleDragState.startCanvasWidth = Math.max(1, rect.width);
     mirrorHandleDragState.startCanvasHeight = Math.max(1, rect.height);
+    mirrorHandleDragState.moved = false;
+    mirrorHandleDragState.suppressClickAxis = '';
+    mirrorHandleDragState.suppressClickAt = 0;
     try {
       target.setPointerCapture?.(event.pointerId);
     } catch (error) {
@@ -20303,6 +21032,14 @@
       return;
     }
     event.preventDefault();
+    if (!mirrorHandleDragState.moved) {
+      const deltaX = Number(event.clientX) - mirrorHandleDragState.startClientX;
+      const deltaY = Number(event.clientY) - mirrorHandleDragState.startClientY;
+      mirrorHandleDragState.moved = Math.hypot(deltaX, deltaY) >= MIRROR_HANDLE_DRAG_THRESHOLD;
+    }
+    if (!mirrorHandleDragState.moved) {
+      return;
+    }
     updateMirrorFromDragPosition(event.clientX, event.clientY, axis);
     updateMirrorGuideHandles();
   }
@@ -20312,7 +21049,13 @@
       return;
     }
     event.preventDefault();
-    finishMirrorHandleDrag({ persist: true });
+    const axis = mirrorHandleDragState.axis;
+    const moved = mirrorHandleDragState.moved;
+    finishMirrorHandleDrag({ persist: moved });
+    if (moved && isMirrorAxisKey(axis)) {
+      mirrorHandleDragState.suppressClickAxis = axis;
+      mirrorHandleDragState.suppressClickAt = Date.now();
+    }
   }
 
   function setupMirrorGuides() {
@@ -20328,7 +21071,19 @@
       handle.addEventListener('pointermove', handleMirrorHandlePointerMove);
       handle.addEventListener('pointerup', handleMirrorHandlePointerUp);
       handle.addEventListener('pointercancel', handleMirrorHandlePointerUp);
-      handle.addEventListener('click', event => event.preventDefault());
+      handle.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const axis = handle.dataset.mirrorAxis || '';
+        if (!isMirrorAxisKey(axis)) {
+          return;
+        }
+        const mirrorState = getNormalizedMirrorState();
+        if (!mirrorState.enabled || shouldSuppressMirrorHandleClick(axis)) {
+          return;
+        }
+        setMirrorAxisEnabled(axis, !Boolean(mirrorState.axes[axis]));
+      });
     });
     updateMirrorGuideHandles();
   }
@@ -20364,13 +21119,6 @@
     popover.setAttribute('aria-hidden', 'true');
     renderMirrorToolPopover();
     syncMirrorToolPopoverControls();
-
-    dom.controls.mirrorToolPopupToggleMode?.addEventListener('change', event => {
-      if (!(event.target instanceof HTMLInputElement)) {
-        return;
-      }
-      setMirrorModeEnabled(Boolean(event.target.checked));
-    });
     dom.controls.mirrorToolPopoverItems?.addEventListener('click', event => {
       const target = event.target instanceof Element ? event.target : null;
       if (!target) {
@@ -21536,6 +22284,25 @@
     return !isMultiGuestMode() && !isMultiSpectatorMode();
   }
 
+  function syncPaletteReindexControlState() {
+    const allowPaletteReindex = isIndexColorMode() && canCurrentClientReindexPalette();
+    if (dom.controls.removePaletteColor instanceof HTMLButtonElement) {
+      const canRemove = state.palette.length > 1;
+      dom.controls.removePaletteColor.disabled = !allowPaletteReindex || !canRemove;
+    }
+    if (dom.controls.movePaletteBackward instanceof HTMLButtonElement) {
+      const canMoveBackward = state.palette.length > 1 && state.activePaletteIndex > 0;
+      dom.controls.movePaletteBackward.disabled = !allowPaletteReindex || !canMoveBackward;
+    }
+    if (dom.controls.movePaletteForward instanceof HTMLButtonElement) {
+      const canMoveForward = state.palette.length > 1 && state.activePaletteIndex < (state.palette.length - 1);
+      dom.controls.movePaletteForward.disabled = !allowPaletteReindex || !canMoveForward;
+    }
+    if (dom.controls.paletteIndex instanceof HTMLInputElement) {
+      dom.controls.paletteIndex.disabled = !allowPaletteReindex;
+    }
+  }
+
   function setActiveRgbColor(color, { syncInputs = true, render = true, persist = true } = {}) {
     state.activeRgb = normalizeColorValue(color);
     if (syncInputs) {
@@ -21578,9 +22345,7 @@
       const canRemove = state.palette.length > 1;
       dom.controls.removePaletteColor.disabled = !allowPaletteReindex || !canRemove;
     }
-    if (dom.controls.paletteIndex instanceof HTMLInputElement) {
-      dom.controls.paletteIndex.disabled = !allowPaletteReindex;
-    }
+    syncPaletteReindexControlState();
     if (dom.controls.paletteHue instanceof HTMLInputElement) {
       dom.controls.paletteHue.disabled = !allowColorPicking;
     }
@@ -21832,7 +22597,23 @@
     return fallback;
   }
 
-  function getPresetBasedPaletteAddColor(presetId = (dom.controls.palettePresetSelect?.value || newProjectPalettePresetId)) {
+  function getPresetBasedPaletteAddColor(presetId = (dom.controls.palettePresetSelect?.value || currentPalettePresetId)) {
+    const normalizedCurrentPresetId = normalizeCurrentPalettePreset(presetId, currentPalettePresetId);
+    if (normalizedCurrentPresetId === CURRENT_PALETTE_PRESET_CUSTOM) {
+      const usedKeys = new Set(buildPaletteColorLookup(state.palette).keys());
+      const fallbackBase = normalizeColorValue(
+        state.palette?.[state.activePaletteIndex]
+        || state.activeRgb
+        || state.palette?.[state.palette.length - 1]
+        || { r: 88, g: 196, b: 255, a: 255 }
+      );
+      return reserveUniquePaletteColor(
+        fallbackBase,
+        usedKeys,
+        (state.palette?.length || 0) + state.activePaletteIndex + 1,
+        { allowTransparent: false }
+      );
+    }
     const normalizedPresetId = normalizeNewProjectPalettePreset(
       presetId,
       newProjectPalettePresetId || NEW_PROJECT_PALETTE_PRESET_DEFAULT
@@ -22280,6 +23061,7 @@
       return false;
     }
     const normalizedPresetId = setNewProjectPalettePresetId(presetId, { persist: true, syncControl: true });
+    setCurrentPalettePresetId(normalizedPresetId, { syncControl: true });
     const definition = getNewProjectPalettePresetDefinition(normalizedPresetId, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
     const sourceColors = getNewProjectPalettePresetColors(normalizedPresetId, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
     const targetPaletteLength = Math.max(
@@ -22325,6 +23107,7 @@
       requestRender();
       requestOverlayRender();
       scheduleSessionPersist();
+      setCurrentPalettePresetId(normalizedPresetId, { syncControl: true });
       if (announce) {
         const label = getPalettePresetDisplayName(definition);
         updateAutosaveStatus(
@@ -22360,7 +23143,7 @@
     }
     syncPaletteInputs();
     renderPalette();
-    applyPaletteChange();
+    applyPaletteChange({ preserveCurrentPalettePreset: true });
     commitHistory();
     if (announce) {
       const label = getPalettePresetDisplayName(definition);
@@ -22452,15 +23235,36 @@
     return true;
   }
 
+  function moveActivePaletteBy(delta) {
+    if (!isIndexColorMode()) {
+      return false;
+    }
+    if (!canCurrentClientReindexPalette()) {
+      setMultiStatus(localizeText('パレットの並び替えはマスターのみ実行できます', 'Only the master can reorder palette colors'), 'warn');
+      return false;
+    }
+    const step = Math.round(Number(delta) || 0);
+    if (!step) {
+      return false;
+    }
+    const currentIndex = clamp(state.activePaletteIndex, 0, state.palette.length - 1);
+    const targetIndex = clamp(currentIndex + step, 0, state.palette.length - 1);
+    if (currentIndex === targetIndex) {
+      return false;
+    }
+    reorderPalette(currentIndex, targetIndex);
+    return true;
+  }
+
   function setupPaletteEditor() {
     renderColorPanelPalettePresetOptions();
-    renderPalettePresetPicker(dom.controls.palettePresetSelect?.value || newProjectPalettePresetId);
+    renderPalettePresetPicker(dom.controls.palettePresetSelect?.value || currentPalettePresetId);
     renderNewProjectPalettePresetOptions(dom.newProject?.palettePreset?.value || newProjectPalettePresetId);
     renderNewProjectPalettePresetPicker(dom.newProject?.palettePreset?.value || newProjectPalettePresetId);
     if (dom.controls.palettePresetSelect instanceof HTMLSelectElement) {
-      dom.controls.palettePresetSelect.value = normalizeNewProjectPalettePreset(
+      dom.controls.palettePresetSelect.value = normalizeCurrentPalettePreset(
         dom.controls.palettePresetSelect.value,
-        newProjectPalettePresetId
+        currentPalettePresetId
       );
       renderPalettePresetPreview(dom.controls.palettePresetSelect.value);
       if (dom.controls.palettePresetSelect.dataset.bound !== 'true') {
@@ -22468,7 +23272,11 @@
         dom.controls.palettePresetSelect.addEventListener('change', event => {
           const nextValue = event?.target instanceof HTMLSelectElement
             ? event.target.value
-            : (dom.controls.palettePresetSelect?.value || newProjectPalettePresetId);
+            : (dom.controls.palettePresetSelect?.value || currentPalettePresetId);
+          if (normalizeCurrentPalettePreset(nextValue, currentPalettePresetId) === CURRENT_PALETTE_PRESET_CUSTOM) {
+            setCurrentPalettePresetId(CURRENT_PALETTE_PRESET_CUSTOM, { syncControl: true });
+            return;
+          }
           applyPalettePresetToCurrentPalette(nextValue, { announce: true });
         });
       }
@@ -22595,7 +23403,7 @@
           || state.palette[state.palette.length - 1]
           || { r: 88, g: 196, b: 255, a: 255 }
         )
-        : getPresetBasedPaletteAddColor(dom.controls.palettePresetSelect?.value || newProjectPalettePresetId);
+        : getPresetBasedPaletteAddColor(dom.controls.palettePresetSelect?.value || currentPalettePresetId);
       state.palette.push({ ...nextColor });
       state.activePaletteIndex = normalizePaletteIndex(nextIndex, state.activePaletteIndex);
       state.activeRgb = normalizeColorValue(nextColor);
@@ -22616,6 +23424,14 @@
       if (state.palette.length <= 1) return;
       const index = clamp(state.activePaletteIndex, 0, state.palette.length - 1);
       removePaletteColor(index);
+    });
+
+    dom.controls.movePaletteBackward?.addEventListener('click', () => {
+      moveActivePaletteBy(-1);
+    });
+
+    dom.controls.movePaletteForward?.addEventListener('click', () => {
+      moveActivePaletteBy(1);
     });
 
     dom.controls.paletteIndex?.addEventListener('change', () => {
@@ -22857,11 +23673,7 @@
     renderToolQuickPalette();
     updateColorTabSwatch();
     updateFloatingDrawButtonPalettePreview();
-    if (dom.controls.removePaletteColor) {
-      dom.controls.removePaletteColor.disabled = !isIndexColorMode()
-        || !canCurrentClientReindexPalette()
-        || state.palette.length <= 1;
-    }
+    syncPaletteReindexControlState();
   }
 
   function removePaletteColor(index) {
@@ -22902,7 +23714,12 @@
     );
   }
 
-  function applyPaletteChange() {
+  function applyPaletteChange({ preserveCurrentPalettePreset = false } = {}) {
+    if (preserveCurrentPalettePreset) {
+      setCurrentPalettePresetId(currentPalettePresetId, { syncControl: true });
+    } else {
+      markCurrentPalettePresetCustom({ syncControl: true });
+    }
     markHistoryDirty();
     requestRender();
     requestOverlayRender();
@@ -29899,6 +30716,60 @@
     return `${normalized.r},${normalized.g},${normalized.b},${normalized.a}`;
   }
 
+  function ensurePaletteColor(palette, paletteLookup, color) {
+    const targetPalette = Array.isArray(palette) ? palette : [];
+    const lookup = paletteLookup instanceof Map ? paletteLookup : buildPaletteColorLookup(targetPalette);
+    const normalized = normalizeColorValue(color);
+    const key = getPaletteColorKey(normalized);
+    let paletteIndex = lookup.get(key);
+    let added = false;
+    if (!Number.isInteger(paletteIndex) || paletteIndex < 0) {
+      paletteIndex = targetPalette.length;
+      targetPalette.push(normalized);
+      lookup.set(key, paletteIndex);
+      added = true;
+    }
+    return { paletteIndex, added, color: normalized };
+  }
+
+  function getPaletteColorDistanceScore(sourceColor, targetColor) {
+    const source = normalizeColorValue(sourceColor);
+    const target = normalizeColorValue(targetColor);
+    const dr = source.r - target.r;
+    const dg = source.g - target.g;
+    const db = source.b - target.b;
+    const da = source.a - target.a;
+    return (dr * dr * 3) + (dg * dg * 4) + (db * db * 2) + (da * da * 6);
+  }
+
+  function findNearestPaletteIndexForColor(color, palette = state.palette, fallbackIndex = state.activePaletteIndex) {
+    if (!Array.isArray(palette) || !palette.length) {
+      return -1;
+    }
+    const normalized = normalizeColorValue(color);
+    let bestIndex = -1;
+    let bestScore = Infinity;
+    for (let index = 0; index < palette.length; index += 1) {
+      const candidate = normalizeColorValue(palette[index]);
+      if (normalized.a > 0 && candidate.a <= 0 && palette.length > 1) {
+        continue;
+      }
+      const score = getPaletteColorDistanceScore(normalized, candidate);
+      if (score < bestScore) {
+        bestScore = score;
+        bestIndex = index;
+      }
+    }
+    if (bestIndex >= 0) {
+      return bestIndex;
+    }
+    if (normalized.a > 0) {
+      return -1;
+    }
+    const fallback = Number.isFinite(fallbackIndex) ? Math.round(fallbackIndex) : 0;
+    return clamp(fallback, 0, palette.length - 1);
+  }
+
   function buildPaletteColorLookup(palette = state.palette) {
     const lookup = new Map();
     if (!Array.isArray(palette)) {
@@ -29913,7 +30784,227 @@
     return lookup;
   }
 
-  function remapClipboardSelectionColorsToCurrentPalette(clip, indices, direct, mask) {
+  function buildLayerColorDataForPaletteSync(layer, palette) {
+    if (!(layer?.indices instanceof Int16Array)) {
+      return null;
+    }
+    const pixelCount = layer.indices.length;
+    const data = new Uint8ClampedArray(pixelCount * 4);
+    const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length === pixelCount * 4
+      ? layer.direct
+      : null;
+    for (let i = 0; i < pixelCount; i += 1) {
+      const base = i * 4;
+      const paletteIndex = layer.indices[i];
+      if (paletteIndex >= 0 && Array.isArray(palette) && palette[paletteIndex]) {
+        const color = normalizeColorValue(palette[paletteIndex]);
+        data[base] = color.r;
+        data[base + 1] = color.g;
+        data[base + 2] = color.b;
+        data[base + 3] = color.a;
+      } else if (direct) {
+        data[base] = direct[base];
+        data[base + 1] = direct[base + 1];
+        data[base + 2] = direct[base + 2];
+        data[base + 3] = direct[base + 3];
+      }
+    }
+    return data;
+  }
+
+  function limitSnapshotPaletteColors(snapshot, maxColors = MAX_IMPORTED_PALETTE_COLORS) {
+    if (!snapshot || typeof snapshot !== 'object') {
+      return { reduced: false, sourceColorCount: 0, paletteSize: 0 };
+    }
+    const palette = Array.isArray(snapshot.palette)
+      ? snapshot.palette.map(color => normalizeColorValue(color))
+      : [];
+    if (palette.length <= maxColors) {
+      return { reduced: false, sourceColorCount: palette.length, paletteSize: palette.length };
+    }
+    const layerEntries = [];
+    if (Array.isArray(snapshot.frames)) {
+      snapshot.frames.forEach((frame) => {
+        const layers = Array.isArray(frame?.layers) ? frame.layers : [];
+        layers.forEach((layer) => {
+          if (!(layer?.indices instanceof Int16Array)) {
+            return;
+          }
+          const colorData = buildLayerColorDataForPaletteSync(layer, palette);
+          if (colorData instanceof Uint8ClampedArray) {
+            layerEntries.push({ layer, colorData });
+          }
+        });
+      });
+    }
+    if (!layerEntries.length) {
+      snapshot.palette = palette.slice(0, maxColors).map(color => normalizeColorValue(color));
+      return {
+        reduced: palette.length > snapshot.palette.length,
+        sourceColorCount: palette.length,
+        paletteSize: snapshot.palette.length,
+      };
+    }
+    const extraction = buildIndexedPaletteFromFrameDataList(
+      layerEntries.map(entry => entry.colorData),
+      maxColors
+    );
+    const nextPalette = Array.isArray(extraction.palette) && extraction.palette.length
+      ? extraction.palette.map(color => normalizeColorValue(color))
+      : [{ r: 0, g: 0, b: 0, a: 0 }];
+    const colorMode = normalizeColorMode(snapshot.colorMode, COLOR_MODE_INDEX);
+    let layerEntryIndex = 0;
+    if (Array.isArray(snapshot.frames)) {
+      snapshot.frames.forEach((frame) => {
+        const layers = Array.isArray(frame?.layers) ? frame.layers : [];
+        layers.forEach((layer) => {
+          if (!(layer?.indices instanceof Int16Array)) {
+            return;
+          }
+          const extractedIndices = Array.isArray(extraction.frameIndices)
+            ? extraction.frameIndices[layerEntryIndex]
+            : null;
+          layerEntryIndex += 1;
+          if (!(extractedIndices instanceof Int16Array) || extractedIndices.length !== layer.indices.length) {
+            return;
+          }
+          if (colorMode === COLOR_MODE_INDEX) {
+            layer.indices = new Int16Array(extractedIndices);
+            layer.direct = null;
+            return;
+          }
+          const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length === layer.indices.length * 4
+            ? layer.direct
+            : null;
+          if (!direct) {
+            layer.indices = new Int16Array(extractedIndices);
+            layer.direct = null;
+            return;
+          }
+          const remappedIndices = new Int16Array(layer.indices);
+          for (let i = 0; i < remappedIndices.length; i += 1) {
+            remappedIndices[i] = layer.indices[i] >= 0 ? extractedIndices[i] : -1;
+          }
+          layer.indices = remappedIndices;
+        });
+      });
+    }
+    const oldActiveColor = normalizeColorValue(
+      snapshot.activeRgb
+      || palette[clamp(Math.round(Number(snapshot.activePaletteIndex) || 0), 0, Math.max(0, palette.length - 1))]
+      || palette[0]
+      || nextPalette[0]
+    );
+    const oldSecondaryColor = normalizeColorValue(
+      palette[clamp(Math.round(Number(snapshot.secondaryPaletteIndex) || 0), 0, Math.max(0, palette.length - 1))]
+      || oldActiveColor
+    );
+    snapshot.palette = nextPalette;
+    snapshot.activePaletteIndex = findNearestPaletteColorIndexByRgba(oldActiveColor, nextPalette, 0);
+    snapshot.secondaryPaletteIndex = findNearestPaletteColorIndexByRgba(
+      oldSecondaryColor,
+      nextPalette,
+      snapshot.activePaletteIndex
+    );
+    snapshot.activeRgb = normalizeColorValue(nextPalette[snapshot.activePaletteIndex] || oldActiveColor || nextPalette[0]);
+    return {
+      reduced: palette.length > nextPalette.length || Boolean(extraction.reduced),
+      sourceColorCount: extraction.sourceColorCount || palette.length,
+      paletteSize: nextPalette.length,
+    };
+  }
+
+  function synchronizeImportedSnapshotPalette(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') {
+      return { addedCount: 0, convertedPixels: 0, reduced: false, paletteSize: 0 };
+    }
+    const palette = Array.isArray(snapshot.palette)
+      ? snapshot.palette.map(color => normalizeColorValue(color))
+      : [];
+    const paletteLookup = buildPaletteColorLookup(palette);
+    const colorMode = normalizeColorMode(snapshot.colorMode, COLOR_MODE_INDEX);
+    let addedCount = 0;
+    let convertedPixels = 0;
+
+    if (Array.isArray(snapshot.frames)) {
+      snapshot.frames.forEach((frame) => {
+        const layers = Array.isArray(frame?.layers) ? frame.layers : [];
+        layers.forEach((layer) => {
+          if (!(layer?.indices instanceof Int16Array)) {
+            return;
+          }
+          const pixelCount = layer.indices.length;
+          const expectedLength = pixelCount * 4;
+          const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length === expectedLength
+            ? layer.direct
+            : null;
+          if (!direct) {
+            layer.direct = null;
+            return;
+          }
+          let convertedLayer = false;
+          for (let i = 0; i < pixelCount; i += 1) {
+            if (layer.indices[i] >= 0) {
+              continue;
+            }
+            const base = i * 4;
+            const alpha = direct[base + 3];
+            if (alpha <= 0) {
+              continue;
+            }
+            const result = ensurePaletteColor(palette, paletteLookup, {
+              r: direct[base],
+              g: direct[base + 1],
+              b: direct[base + 2],
+              a: alpha,
+            });
+            if (result.added) {
+              addedCount += 1;
+            }
+            if (colorMode === COLOR_MODE_INDEX) {
+              layer.indices[i] = result.paletteIndex;
+              direct[base] = 0;
+              direct[base + 1] = 0;
+              direct[base + 2] = 0;
+              direct[base + 3] = 0;
+              convertedPixels += 1;
+              convertedLayer = true;
+            }
+          }
+          if (colorMode === COLOR_MODE_INDEX && convertedLayer) {
+            layer.direct = null;
+          }
+        });
+      });
+    }
+
+    if (!palette.length) {
+      palette.push({ r: 0, g: 0, b: 0, a: 0 });
+    }
+
+    snapshot.palette = palette;
+    const limitResult = palette.length > MAX_IMPORTED_PALETTE_COLORS
+      ? limitSnapshotPaletteColors(snapshot, MAX_IMPORTED_PALETTE_COLORS)
+      : { reduced: false, sourceColorCount: palette.length, paletteSize: palette.length };
+    const resolvedPalette = Array.isArray(snapshot.palette)
+      ? snapshot.palette.map(color => normalizeColorValue(color))
+      : [{ r: 0, g: 0, b: 0, a: 0 }];
+    snapshot.palette = resolvedPalette;
+    const maxPaletteIndex = Math.max(0, resolvedPalette.length - 1);
+    const fallbackActivePaletteIndex = Number.isFinite(snapshot.activePaletteIndex)
+      ? Math.round(snapshot.activePaletteIndex)
+      : 0;
+    snapshot.activePaletteIndex = clamp(fallbackActivePaletteIndex, 0, maxPaletteIndex);
+    const fallbackSecondaryPaletteIndex = Number.isFinite(snapshot.secondaryPaletteIndex)
+      ? Math.round(snapshot.secondaryPaletteIndex)
+      : snapshot.activePaletteIndex;
+    snapshot.secondaryPaletteIndex = clamp(fallbackSecondaryPaletteIndex, 0, maxPaletteIndex);
+    const fallbackActiveRgb = resolvedPalette[snapshot.activePaletteIndex] || resolvedPalette[0];
+    snapshot.activeRgb = normalizeColorValue(snapshot.activeRgb || fallbackActiveRgb);
+    return { addedCount, convertedPixels, ...limitResult };
+  }
+
+  function remapClipboardSelectionColorsToCurrentPalette(clip, indices, direct, mask, { strategy = 'add-missing' } = {}) {
     if (
       !(indices instanceof Int16Array)
       || !(mask instanceof Uint8Array)
@@ -29926,6 +31017,7 @@
     const paletteLookup = buildPaletteColorLookup(state.palette);
     const sourceIndexMap = new Map();
     let addedCount = 0;
+    const useNearestPalette = strategy === 'nearest-existing';
     for (let i = 0; i < remappedIndices.length; i += 1) {
       if (mask[i] !== 1) {
         continue;
@@ -29942,11 +31034,21 @@
             const existingIndex = paletteLookup.get(sourceKey);
             if (Number.isInteger(existingIndex) && existingIndex >= 0) {
               mappedIndex = existingIndex;
+            } else if (useNearestPalette) {
+              mappedIndex = findNearestPaletteIndexForColor(sourceColor, state.palette, state.activePaletteIndex);
+              if (!Number.isInteger(mappedIndex) || mappedIndex < 0) {
+                const result = ensurePaletteColor(state.palette, paletteLookup, sourceColor);
+                mappedIndex = result.paletteIndex;
+                if (result.added) {
+                  addedCount += 1;
+                }
+              }
             } else {
-              mappedIndex = state.palette.length;
-              state.palette.push(sourceColor);
-              paletteLookup.set(sourceKey, mappedIndex);
-              addedCount += 1;
+              const result = ensurePaletteColor(state.palette, paletteLookup, sourceColor);
+              mappedIndex = result.paletteIndex;
+              if (result.added) {
+                addedCount += 1;
+              }
             }
           } else {
             mappedIndex = normalizePaletteIndex(sourceIndex, state.activePaletteIndex);
@@ -29972,10 +31074,22 @@
       const directKey = getPaletteColorKey(directColor);
       let mappedIndex = paletteLookup.get(directKey);
       if (!Number.isInteger(mappedIndex) || mappedIndex < 0) {
-        mappedIndex = state.palette.length;
-        state.palette.push(directColor);
-        paletteLookup.set(directKey, mappedIndex);
-        addedCount += 1;
+        if (useNearestPalette) {
+          mappedIndex = findNearestPaletteIndexForColor(directColor, state.palette, state.activePaletteIndex);
+          if (!Number.isInteger(mappedIndex) || mappedIndex < 0) {
+            const result = ensurePaletteColor(state.palette, paletteLookup, directColor);
+            mappedIndex = result.paletteIndex;
+            if (result.added) {
+              addedCount += 1;
+            }
+          }
+        } else {
+          const result = ensurePaletteColor(state.palette, paletteLookup, directColor);
+          mappedIndex = result.paletteIndex;
+          if (result.added) {
+            addedCount += 1;
+          }
+        }
       }
       remappedIndices[i] = mappedIndex;
       direct[base] = 0;
@@ -30036,7 +31150,13 @@
       : new Uint8ClampedArray(size * 4);
     let paletteAddedCount = 0;
     if (autoExpandPalette) {
-      const remapResult = remapClipboardSelectionColorsToCurrentPalette(clip, indices, direct, mask);
+      const remapResult = remapClipboardSelectionColorsToCurrentPalette(
+        clip,
+        indices,
+        direct,
+        mask,
+        { strategy: isIndexColorMode() ? 'nearest-existing' : 'add-missing' }
+      );
       indices = remapResult.indices;
       paletteAddedCount = remapResult.addedCount;
     }
@@ -30315,6 +31435,7 @@
     if (moveState.paletteAddedCount > 0) {
       renderPalette();
       syncPaletteInputs();
+      applyPaletteChange();
       updateAutosaveStatus(
         localizeText(
           `貼り付け色をパレットへ追加しました (${moveState.paletteAddedCount}色)`,
@@ -40776,6 +41897,7 @@
         state.palette = localPaletteSnapshot.map(color => normalizeColorValue(color));
         state.activePaletteIndex = normalizePaletteIndex(localPaletteIndex, state.activePaletteIndex);
         state.secondaryPaletteIndex = normalizePaletteIndex(localSecondaryPaletteIndex, state.activePaletteIndex);
+        syncCurrentPalettePresetFromPalette(state.palette, { syncControl: true });
       }
       history.past = [];
       history.future = [];
