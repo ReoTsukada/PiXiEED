@@ -6223,7 +6223,42 @@
     const DRAW_IMPORT_STORAGE_KEY = 'pixiee-lens:pending-draw-import';
     const DRAW_IMPORT_STORAGE_VERSION = 1;
     const DRAW_IMPORT_EXPIRY_MS = 1000 * 60 * 5;
+    const DRAW_RETURN_QUERY_KEY = 'draw_return';
+    const DRAW_TARGET_URL_QUERY_KEY = 'draw_url';
+    const DRAW_RETURN_MODE_SELF = 'self';
     const FOUR_COLOR_DARK_THRESHOLD = 96;
+
+    function shouldReturnToDrawInSameTab() {
+      if (typeof window === 'undefined' || !window.location) {
+        return false;
+      }
+      try {
+        const currentUrl = new URL(window.location.href);
+        return currentUrl.searchParams.get(DRAW_RETURN_QUERY_KEY) === DRAW_RETURN_MODE_SELF;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function getRequestedDrawUrl() {
+      if (typeof window === 'undefined' || !window.location) {
+        return null;
+      }
+      try {
+        const currentUrl = new URL(window.location.href);
+        const rawValue = currentUrl.searchParams.get(DRAW_TARGET_URL_QUERY_KEY);
+        if (!rawValue) {
+          return null;
+        }
+        const targetUrl = new URL(rawValue, currentUrl);
+        if (!/^https?:$/i.test(targetUrl.protocol)) {
+          return null;
+        }
+        return targetUrl;
+      } catch (error) {
+        return null;
+      }
+    }
 
     function updateAspectLayout() {
       if (!aspectOverlay || !aspectCenter || !aspectFrame || !aspectShadeTop || !aspectShadeBottom || !aspectShadeLeft || !aspectShadeRight) {
@@ -9737,8 +9772,13 @@
         return;
       }
       const baseUrl = new URL('./', window.location.href);
-      const drawUrl = new URL('../pixiedraw/', baseUrl);
+      const drawUrl = getRequestedDrawUrl() || new URL('../pixiedraw/', baseUrl);
       drawUrl.searchParams.set('lens', '1');
+      if (shouldReturnToDrawInSameTab()) {
+        closeCapturePreview();
+        window.location.assign(drawUrl.toString());
+        return;
+      }
       const opened = window.open(drawUrl.toString(), '_blank', 'noopener');
       if (!opened) {
         setStatus('PiXiEEDraw を開けませんでした。ポップアップがブロックされていないか確認してください。');
