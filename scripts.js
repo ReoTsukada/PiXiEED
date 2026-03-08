@@ -1021,6 +1021,13 @@
   function setupRecentUpdates() {
     const updates = [
       {
+        title: 'PiXiEEDraw カメラ連携・ミラー・パレット同期を改善',
+        summary: 'PNG/GIF読込時の使用色だけのパレット生成、貼り付け時のインデックス/RGB別色処理、PiXiEELENSカメラ連携、ミラーモードの＋操作整理を反映しました。',
+        date: '2026-03-09',
+        tag: 'Tool',
+        href: 'pixiedraw/index.html'
+      },
+      {
         title: 'PiXiEEDraw 設定UIとパレット表示を調整',
         summary: 'プリセット色プレビュー最大32色、新規作成パネルの構成整理、設定下5ボタンのサブスタイル統一（あ/A）、ローカル拡張（外付け）追加、キャンバスサイズ枠強調、更新トーストのスクロール表示に対応しました。',
         date: '2026-03-07',
