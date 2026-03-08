@@ -624,6 +624,24 @@ body.is-mobile-layout.is-unified-left-tools-color:not(.is-unified-left-color-foc
   gap: 6px;
 }
 
+.rail--right[data-compact="true"] #rightRailTabs {
+  width: 100%;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.rail--right[data-compact="true"] #rightRailTabs::-webkit-scrollbar {
+  display: none;
+}
+
+.rail--right[data-compact="true"] #rightRailTabs .rail-tab {
+  width: 100%;
+  min-width: 0;
+}
+
 .rail[data-compact="true"] .rail-tab {
   flex: none;
   width: 100%;
@@ -903,6 +921,10 @@ body.is-mobile-layout.is-unified-left-tools-color:not(.is-unified-left-color-foc
   display: none;
 }
 
+.rail--left[data-compact="true"] #panelColor .palette-action--move {
+  display: none;
+}
+
 .rail--left[data-compact="true"] #panelColor .palette-topline,
 .rail--left[data-compact="true"] #panelColor .palette-index-inline {
   display: none;
@@ -1139,6 +1161,10 @@ body.is-dual-left-rail:not(.is-mobile-layout) .rail--left[data-compact="false"] 
 
 .rail--right .rail-tabs {
   gap: 6px;
+}
+
+#rightRailTabs {
+  width: 100%;
 }
 
 .rail--right .rail-tab {
@@ -1649,6 +1675,17 @@ body.is-startup-active #virtualCursorCanvas {
 .mirror-handle:focus-visible {
   outline: 2px solid rgba(255, 235, 172, 0.8);
   outline-offset: 2px;
+}
+
+.mirror-handle.is-active {
+  border-color: rgba(255, 197, 96, 0.9);
+  background:
+    linear-gradient(180deg, rgba(34, 30, 12, 0.98), rgba(24, 18, 8, 0.98));
+}
+
+.mirror-handle.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .mirror-handle.is-hidden {
@@ -6513,6 +6550,11 @@ body.is-startup-active {
   opacity: 0.5;
   border-color: var(--border);
   cursor: not-allowed;
+}
+
+.mobile-tab--action,
+.rail-tab--action {
+  cursor: pointer;
 }
 
 .mobile-panels {
