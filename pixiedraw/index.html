@@ -139,31 +139,21 @@
 <button class="startup-screen__link" id="startupActionSkip" type="button">この画面を閉じる</button>
 </div>
 </div>
-<div aria-hidden="true" class="update-toast" data-update-id="2026-03-07-palette-settings-toast-sync-v2" hidden="" id="updateToast" role="status" aria-live="polite">
+<div aria-hidden="true" class="update-toast" data-update-id="2026-03-09-camera-mirror-palette-sync" hidden="" id="updateToast" role="status" aria-live="polite">
 <div class="update-toast__body">
 <p class="update-toast__message">
-<strong>更新情報 (2026/03/07)</strong><br/>
+<strong>更新情報 (2026/03/09)</strong><br/>
 【今回追加】<br/>
-・パレットプリセットのボタン内カラープレビューを最大32色表示に対応<br/>
-・新規作成パネルの独立プリセットプレビューを削除して構成を整理<br/>
-・設定パネルの下5ボタン（応援チップ/あ/A/使い方ヘルプ/ショートカット/更新情報）を軽量なサブスタイルに統一<br/>
-・設定パネルにローカル拡張（外付け）欄を追加し、この端末だけで動く拡張コードの保存 / 反映 / 停止に対応<br/>
-・言語切替ボタンの表示を「あ/A」に統一<br/>
-・キャンバスサイズブロックに色付き枠を追加して視認性を改善<br/>
-・更新項目が多い時は、トースト内をスクロールして読めるように調整<br/>
+・PNG / GIF読み込み時は、使用色だけのカスタムパレットを自動作成し、256色超過時は減色して取り込み<br/>
+・貼り付け時は、インデックスカラーでは既存パレットの近似色へ合わせ、RGBカラーでは対応色をパレットへ追加<br/>
+・プリセットパレットを編集 / 拡張した時は、自動でカスタムパレット表示へ切り替え<br/>
+・上部カメラボタンから PiXiEELENS を開けるようにし、撮影結果は別プロジェクトタブとして取り込み<br/>
+・ミラーモードを上部ON/OFF + キャンバス周囲の「＋」操作に整理し、各軸をON/OFFしながら位置調整できるよう改善<br/>
 <br/>
 【前回分（継続掲載）】<br/>
-・設定パネルから開ける「使い方ヘルプ」を追加（検索対応）<br/>
-・小窓プレビューを追加（移動 / リサイズ / 再生・停止）<br/>
-・JPEG / SVG 出力を追加し、出力形式を拡張<br/>
-・カラーモード切替（インデックスカラー / RGBカラー）を追加<br/>
-・RGB→インデックス切替時、未登録色を自動でパレット追加して変換<br/>
+・設定パネルにローカル拡張（外付け）欄を追加<br/>
 ・共有モード導線を簡略化（部屋を開く / 参加する）し、キー入力フローを整理<br/>
-・新規ルームは非公開開始に統一、公開切替は後から反映可能に調整<br/>
-・スマホのブラウザ戻る確認で「OK」時はホームへ戻る挙動に変更<br/>
-・範囲選択の方向キー移動をドラッグ挙動と揃え、移動中の欠けを軽減<br/>
-・出力後ポップアップに「ホームへ戻る / コンテストを見る」を追加<br/>
-・画面内の説明ラベルを最小化し、必要な案内はヘルプへ集約<br/>
+・JPEG / SVG 出力、カラーモード切替、小窓プレビュー、使い方ヘルプを追加<br/>
 ・詳細は設定の「更新情報」から確認できます
 </p>
 <div class="update-toast__actions">
@@ -201,6 +191,18 @@
 <button aria-controls="mobilePanelMulti" aria-label="共有モード" aria-selected="false" class="mobile-tab" data-mobile-tab="multi" id="mobileTabMulti" role="tab" tabindex="-1" type="button">
 <img alt="" class="tab-icon" src="assets/icons/maltimode.svg"/>
 <span class="sr-only">共有モード</span>
+</button>
+<button aria-label="対称" class="mobile-tab mobile-tab--action" data-ui-action="mirrorPopup" title="対称" type="button">
+<img alt="" class="tab-icon" src="assets/icons/tasyou1.svg"/>
+<span class="sr-only">対称</span>
+</button>
+<button aria-label="仮想カーソル" class="mobile-tab mobile-tab--action" data-ui-action="virtualCursorToggle" title="仮想カーソル" type="button">
+<img alt="" class="tab-icon" src="assets/icons/tool-cursor.png"/>
+<span class="sr-only">仮想カーソル</span>
+</button>
+<button aria-label="カメラ" class="mobile-tab mobile-tab--action" data-external-tool="pixieelens" data-ui-action="openLensCamera" id="mobileActionLensCamera" title="カメラ" type="button">
+<img alt="" class="tab-icon" src="assets/icons/pixieelensicon_frame_01.png"/>
+<span class="sr-only">カメラ</span>
 </button>
 </div>
 <div aria-label="モバイルショートカット" class="mobile-shortcuts" id="mobileShortcutsMount">
@@ -297,6 +299,18 @@
 <img alt="" class="tab-icon" src="assets/icons/maltimode.svg"/>
 <span class="sr-only">共有モード</span>
 </button>
+<button aria-label="対称" class="rail-tab rail-tab--action" data-ui-action="mirrorPopup" title="対称" type="button">
+<img alt="" class="tab-icon" src="assets/icons/tasyou1.svg"/>
+<span class="sr-only">対称</span>
+</button>
+<button aria-label="仮想カーソル" class="rail-tab rail-tab--action" data-ui-action="virtualCursorToggle" title="仮想カーソル" type="button">
+<img alt="" class="tab-icon" src="assets/icons/tool-cursor.png"/>
+<span class="sr-only">仮想カーソル</span>
+</button>
+<button aria-label="カメラ" class="rail-tab rail-tab--action" data-external-tool="pixieelens" data-ui-action="openLensCamera" title="カメラ" type="button">
+<img alt="" class="tab-icon" src="assets/icons/pixieelensicon_frame_01.png"/>
+<span class="sr-only">カメラ</span>
+</button>
 </div>
   <div class="rail-tabpanes" id="rightRailPanes"></div>
 <button aria-label="右パネルを開く / 幅を変更" class="rail-resizer rail-resizer--right" id="resizeRightRail" type="button"></button>
@@ -320,16 +334,12 @@
 </div>
 <div aria-hidden="true" class="mirror-tool-popover" hidden="" id="mirrorToolPopover" role="dialog">
 <div class="mirror-tool-popover__header">
-<strong>対称ツール</strong>
+<strong>対称軸</strong>
 <button aria-label="対称ポップアップを閉じる" class="mirror-tool-popover__close" id="mirrorToolPopoverClose" type="button">閉じる</button>
 </div>
 <div class="mirror-tool-popover__body">
-<label class="toggle-option" for="mirrorToolPopupToggleMode">
-<input id="mirrorToolPopupToggleMode" type="checkbox"/>
-<span>ミラーモード</span>
-</label>
 <div class="mirror-tool-popover__items" id="mirrorToolPopoverItems"></div>
-<p class="help-text mirror-tool-popover__help" id="mirrorToolPopoverHelp">挙動は既存ミラーモードと同じです。軸位置はキャンバス外のつまみで移動できます。</p>
+<p class="help-text mirror-tool-popover__help" id="mirrorToolPopoverHelp">ここでは対称軸だけを切り替えられます。ON/OFF は上部ボタンか設定のミラーモードから変更できます。</p>
 </div>
 </div>
 <!-- 立体ツール（solidShape）を一時的に削除しました -->
@@ -373,14 +383,6 @@
 <button aria-selected="false" class="tool-group-button" data-tool-group="fill" role="tab" title="塗りつぶし" type="button">
 <img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tool-fill.png" width="20"/>
 <span class="tool-group-label">塗りつぶし</span>
-</button>
-<button aria-selected="false" class="tool-group-button" data-tool-group="mirror" role="tab" title="対称" type="button">
-<img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tasyou1.svg" width="20"/>
-<span class="tool-group-label">対称</span>
-</button>
-<button aria-selected="false" class="tool-group-button" data-tool-group="virtualCursor" role="tab" title="仮想カーソル" type="button">
-<img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tool-cursor.png" width="20"/>
-<span class="tool-group-label">仮想カーソル</span>
 </button>
 </div>
 <div aria-label="描画ツール" class="tool-grid" id="toolGrid" role="toolbar">
@@ -440,14 +442,6 @@
 <button aria-pressed="false" class="tool-button" data-tool="selectSame" data-tool-group="selection" type="button">
 <img alt="同色選択" height="32" src="assets/icons/tool-select-magic.svg" width="32"/>
 <span>同色</span>
-</button>
-<button aria-pressed="false" class="tool-button" data-tool="mirrorPopup" data-tool-group="mirror" type="button">
-<img alt="対称設定" height="32" src="assets/icons/tasyou1.svg" width="32"/>
-<span>対称</span>
-</button>
-<button aria-pressed="false" class="tool-button" data-tool="virtualCursorToggle" data-tool-group="virtualCursor" type="button">
-<img alt="仮想カーソル" height="32" src="assets/icons/tool-cursor.png" width="32"/>
-<span>仮想表示</span>
 </button>
 </div>
 <div class="tool-quick-color" id="toolQuickColor">
@@ -516,6 +510,8 @@
 <button aria-label="明度順でソート" class="chip" id="sortPaletteValue" type="button">明度</button>
 <button aria-label="選択した色を削除" class="chip" id="removePaletteColor" type="button">-</button>
 <button aria-label="色を追加" class="chip" id="addPaletteColor" type="button">+</button>
+<button aria-label="選択した色を前へ移動" class="chip palette-action--move" id="movePaletteBackward" type="button">◀</button>
+<button aria-label="選択した色を後ろへ移動" class="chip palette-action--move" id="movePaletteForward" type="button">▶</button>
 </div>
 </div>
 <div aria-label="カラーパレット" class="palette-grid" id="paletteList" role="listbox"></div>
@@ -1030,7 +1026,7 @@
 <span>斜め対称 (/)</span>
 </label>
 </div>
-<p class="help-text ui-guide-text" id="mirrorAxisHelp">ミラーモード中は軸ライン外側のつまみをドラッグして、対称軸を移動できます。</p>
+<p class="help-text ui-guide-text" id="mirrorAxisHelp">ミラーモード中はキャンバス周囲の＋で対称軸をON/OFFし、ONの軸はそのままドラッグして位置を動かせます。</p>
 <div class="virtual-cursor-scale" id="virtualCursorScale">
 <label class="virtual-cursor-scale__control" for="virtualCursorButtonScale">
 <span class="virtual-cursor-scale__label">仮想カーソルボタンサイズ</span>
