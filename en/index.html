@@ -228,6 +228,40 @@
       display:grid;
       gap:12px;
     }
+    .hero-global-dot-card{
+      display:grid;
+      gap:6px;
+      padding:12px 14px;
+      border-radius:14px;
+      border:1px solid rgba(126,255,214,0.22);
+      background:
+        linear-gradient(135deg, rgba(8,35,34,0.88), rgba(11,67,86,0.68)),
+        radial-gradient(circle at top left, rgba(126,255,214,0.22), transparent 58%);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+    .hero-global-dot-card.is-loading .hero-global-dot-card__value{
+      opacity:0.72;
+    }
+    .hero-global-dot-card__label{
+      margin:0;
+      font-size:11px;
+      letter-spacing:0.12em;
+      text-transform:uppercase;
+      color:#9ae6cf;
+    }
+    .hero-global-dot-card__value{
+      margin:0;
+      font-size:clamp(28px, 7vw, 42px);
+      line-height:1;
+      color:#f8fffd;
+      font-weight:800;
+    }
+    .hero-global-dot-card__meta{
+      margin:0;
+      font-size:12px;
+      line-height:1.5;
+      color:#c7f2e6;
+    }
     .chips{ display:flex; gap:8px; flex-wrap:wrap; }
     .chip{
       border:1px solid rgba(255,255,255,0.18);
@@ -2161,6 +2195,11 @@
         <div class="hero-copy">
           <h1>Free Pixel Art Tools by PiXiEED</h1>
           <p class="subtitle">PiXiEED is a browser-based pixel art hub for drawing, playing, and contact.</p>
+          <div class="hero-global-dot-card is-loading" id="globalDotCounter" aria-live="polite">
+            <p class="hero-global-dot-card__label">World Dot Total</p>
+            <p class="hero-global-dot-card__value" id="globalDotCountValue">...</p>
+            <p class="hero-global-dot-card__meta" id="globalDotCountMeta">Loading totals from PiXiEEDraw / Lite saved works...</p>
+          </div>
           <div class="hero-actions">
             <button class="button" id="toggleDrawGuide" type="button" aria-controls="draw-guide" aria-expanded="false">Draw</button>
             <button class="button button--ghost" id="togglePlayGuide" type="button" aria-controls="play-guide" aria-expanded="false">Play</button>
@@ -3089,6 +3128,38 @@
           preview.style.setProperty('--preview-height', `${height}px`);
         });
       }
+      async function setupGlobalDotCounter(){
+        const card = document.getElementById('globalDotCounter');
+        const value = document.getElementById('globalDotCountValue');
+        const meta = document.getElementById('globalDotCountMeta');
+        const dotStatsApi = window.PiXiEEDDotStats && typeof window.PiXiEEDDotStats === 'object'
+          ? window.PiXiEEDDotStats
+          : null;
+        if (!card || !value || !meta || !dotStatsApi || typeof dotStatsApi.fetchGlobalDotTotal !== 'function') {
+          return;
+        }
+        try {
+          const total = await dotStatsApi.fetchGlobalDotTotal();
+          const compact = typeof dotStatsApi.formatCompactCount === 'function'
+            ? dotStatsApi.formatCompactCount(total, 'en-US')
+            : dotStatsApi.formatCount(total, 'en-US');
+          const exact = dotStatsApi.formatCount(total, 'en-US');
+          value.textContent = `${compact} PX`;
+          value.title = `${exact} PX`;
+          value.setAttribute('aria-label', `World dot total ${exact} PX`);
+          card.title = `World dot total ${exact} PX`;
+          meta.textContent = 'Combined dots from works saved in PiXiEEDraw and PiXiEEDraw Lite';
+        } catch (error) {
+          console.warn('Failed to load global dot total', error);
+          value.textContent = '--';
+          value.removeAttribute('title');
+          value.removeAttribute('aria-label');
+          card.removeAttribute('title');
+          meta.textContent = 'Unable to load the global dot total right now';
+        } finally {
+          card.classList.remove('is-loading');
+        }
+      }
       document.addEventListener('DOMContentLoaded', () => {
         applyAvatar();
         setupAvatarToggle();
@@ -3096,6 +3167,7 @@
         setupHeroGuideToggles();
         setupAudienceShotToggles();
         setupHeroPlaceSwap();
+        setupGlobalDotCounter();
         syncHeroPreviewHeights();
         window.addEventListener('resize', syncHeroPreviewHeights);
         const y = document.getElementById('year');
@@ -3104,6 +3176,7 @@
     })();
   </script>
   <script>window.__PIXIEED_DISABLE_LEGACY_PUBLIC_ROOMS__ = true;</script>
+  <script src="scripts/pixieed-dot-stats.js"></script>
   <script src="scripts.js"></script>
   <script src="portfolio/dots/manifest.js"></script>
   <script src="scripts/gallery.js"></script>
