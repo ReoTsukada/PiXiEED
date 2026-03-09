@@ -2445,6 +2445,8 @@
   let autosaveDirty = false;
   let autosaveDirtyGeneration = 0;
   let autosaveProjectId = '';
+  let projectDotBaselineSnapshot = null;
+  let projectDotCumulativeStats = null;
   let autosaveLifecycleFlushAt = 0;
   let unsavedChangeToken = 0;
   let durableSaveToken = 0;
@@ -9636,6 +9638,7 @@
       const parsedDocument = snapshotFromDocumentText(text);
       const snapshot = parsedDocument?.snapshot || null;
       const projectSession = parsedDocument?.projectSession || null;
+      const dotStats = parsedDocument?.dotStats || null;
       if (!snapshot) {
         updateAutosaveStatus('自動保存: ファイルを読み込めませんでした', 'error');
         return false;
@@ -9679,6 +9682,7 @@
       resetDocumentUnsavedChanges();
       syncPixfindSnapshotAfterDocumentReset();
       updateMemoryStatus();
+      setTrackedProjectDotBaseline(snapshot, dotStats);
       return true;
     } catch (error) {
       autosaveRestoring = false;
@@ -10088,6 +10092,7 @@
       clearTimelapseRecording({ silent: true });
       resetDocumentUnsavedChanges();
       updateMemoryStatus();
+      setTrackedProjectDotBaseline(snapshot, null);
     } finally {
       iosSnapshotRestoring = false;
     }
@@ -11013,6 +11018,7 @@
     updateHistoryButtons();
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
+    setTrackedProjectDotBaseline(snapshot, null);
 
     autosaveHandle = null;
     pendingAutosaveHandle = null;
@@ -13004,6 +13010,7 @@
     updateHistoryButtons();
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
+    setTrackedProjectDotBaseline(snapshot, null);
 
     autosaveHandle = null;
     pendingAutosaveHandle = null;
@@ -13470,6 +13477,8 @@
     }
     const snapshot = parsedDocument?.snapshot || null;
     const projectSession = parsedDocument?.projectSession || null;
+    const preserveDotStats = Boolean(options?.projectId || options?.openedFromRecent || options?.preserveDotStats);
+    const dotStats = preserveDotStats ? (parsedDocument?.dotStats || null) : null;
     if (!snapshot) {
       updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
       return false;
@@ -13511,6 +13520,7 @@
     resetDocumentUnsavedChanges();
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
+    setTrackedProjectDotBaseline(snapshot, dotStats);
 
     const requestedProjectId = normalizeAutosaveProjectId(options?.projectId || '');
     setActiveAutosaveProjectId(requestedProjectId || createAutosaveProjectId());
@@ -13731,9 +13741,13 @@
     const projectSession = hasPackagedDocument
       ? parseProjectSessionPayload(parsed.session)
       : null;
+    const dotStats = hasPackagedDocument
+      ? resolvePackagedProjectDotStats(parsed)
+      : null;
     return {
       snapshot,
       projectSession,
+      dotStats,
     };
   }
 
@@ -14531,24 +14545,73 @@
     return previewCanvas.toDataURL('image/png');
   }
 
-  function buildPackagedProjectPayload(snapshot, { session = null, updatedAt = '' } = {}) {
-    const dotStatsApi = window.PiXiEEDDotStats && typeof window.PiXiEEDDotStats === 'object'
+  function getDotStatsApi() {
+    return window.PiXiEEDDotStats && typeof window.PiXiEEDDotStats === 'object'
       ? window.PiXiEEDDotStats
       : null;
-    let resolvedDotStats = null;
-    if (dotStatsApi) {
-      try {
-        resolvedDotStats = typeof dotStatsApi.countEditorSnapshot === 'function'
-          ? dotStatsApi.countEditorSnapshot(snapshot)
-          : null;
-        if (resolvedDotStats && typeof dotStatsApi.normalizeDotStats === 'function') {
-          resolvedDotStats = dotStatsApi.normalizeDotStats(resolvedDotStats);
-        }
-      } catch (error) {
-        console.warn('Failed to compute project dot stats', error);
-        resolvedDotStats = null;
+  }
+
+  function createEmptyTrackedDotStats(dotStatsApi = getDotStatsApi()) {
+    if (dotStatsApi && typeof dotStatsApi.normalizeDotStats === 'function') {
+      const normalized = dotStatsApi.normalizeDotStats({ totalDots: 0, frameDots: [] });
+      if (normalized) {
+        return normalized;
       }
     }
+    return {
+      totalDots: 0,
+      frameDots: [],
+    };
+  }
+
+  function setTrackedProjectDotBaseline(snapshot, dotStats = null) {
+    const dotStatsApi = getDotStatsApi();
+    const normalizedDotStats = dotStatsApi && typeof dotStatsApi.normalizeDotStats === 'function'
+      ? (dotStatsApi.normalizeDotStats(dotStats || { totalDots: 0, frameDots: [] }) || createEmptyTrackedDotStats(dotStatsApi))
+      : (dotStats || createEmptyTrackedDotStats(null));
+    projectDotCumulativeStats = normalizedDotStats;
+    if (!snapshot || !dotStatsApi || typeof dotStatsApi.cloneEditorSnapshot !== 'function') {
+      projectDotBaselineSnapshot = null;
+      return;
+    }
+    try {
+      projectDotBaselineSnapshot = dotStatsApi.cloneEditorSnapshot(snapshot);
+    } catch (error) {
+      console.warn('Failed to clone dot tracking baseline snapshot', error);
+      projectDotBaselineSnapshot = null;
+    }
+  }
+
+  function resolveTrackedProjectDotStats(snapshot = null) {
+    const dotStatsApi = getDotStatsApi();
+    if (!dotStatsApi || typeof dotStatsApi.normalizeDotStats !== 'function') {
+      return null;
+    }
+    const baseStats = dotStatsApi.normalizeDotStats(projectDotCumulativeStats || createEmptyTrackedDotStats(dotStatsApi))
+      || createEmptyTrackedDotStats(dotStatsApi);
+    const currentSnapshot = snapshot && typeof snapshot === 'object'
+      ? snapshot
+      : makeHistorySnapshot({ clonePixelData: false });
+    let deltaStats = createEmptyTrackedDotStats(dotStatsApi);
+    try {
+      if (typeof dotStatsApi.countEditorSnapshotDiff === 'function') {
+        deltaStats = dotStatsApi.countEditorSnapshotDiff(currentSnapshot, projectDotBaselineSnapshot);
+      } else if (typeof dotStatsApi.countEditorSnapshot === 'function') {
+        deltaStats = dotStatsApi.countEditorSnapshot(currentSnapshot);
+      }
+    } catch (error) {
+      console.warn('Failed to compute tracked project dot stats', error);
+      deltaStats = createEmptyTrackedDotStats(dotStatsApi);
+    }
+    if (typeof dotStatsApi.combineDotStats === 'function') {
+      const combined = dotStatsApi.combineDotStats(baseStats, deltaStats);
+      return dotStatsApi.normalizeDotStats(combined) || combined;
+    }
+    return dotStatsApi.normalizeDotStats(deltaStats) || deltaStats;
+  }
+
+  function buildPackagedProjectPayload(snapshot, { session = null, updatedAt = '' } = {}) {
+    const resolvedDotStats = resolveTrackedProjectDotStats(snapshot);
     const payload = serializeDocumentSnapshot(snapshot);
     const packagedSession = session && typeof session === 'object'
       ? session
@@ -14568,25 +14631,11 @@
   }
 
   function resolvePackagedProjectDotStats(packagedPayload, snapshot = null) {
-    const dotStatsApi = window.PiXiEEDDotStats && typeof window.PiXiEEDDotStats === 'object'
-      ? window.PiXiEEDDotStats
-      : null;
+    const dotStatsApi = getDotStatsApi();
     if (!dotStatsApi || typeof dotStatsApi.normalizeDotStats !== 'function') {
       return null;
     }
-    const packagedStats = dotStatsApi.normalizeDotStats(packagedPayload?.dotStats || null);
-    if (packagedStats) {
-      return packagedStats;
-    }
-    if (!snapshot || typeof dotStatsApi.countEditorSnapshot !== 'function') {
-      return null;
-    }
-    try {
-      return dotStatsApi.normalizeDotStats(dotStatsApi.countEditorSnapshot(snapshot));
-    } catch (error) {
-      console.warn('Failed to resolve packaged project dot stats', error);
-      return null;
-    }
+    return dotStatsApi.normalizeDotStats(packagedPayload?.dotStats || null);
   }
 
   function schedulePackagedProjectDotSync(projectId, dotStats) {
@@ -14673,6 +14722,7 @@
       await saveRecentProjectsList(existingEntries, limited);
       setRecentProjectsCache(limited);
       if (dotStats) {
+        setTrackedProjectDotBaseline(snapshot, dotStats);
         schedulePackagedProjectDotSync(resolvedProjectId, dotStats);
       }
       return updatedEntry;
@@ -17174,6 +17224,10 @@
       markDocumentDurablySaved();
       await storeAutosaveHandle(handle);
       const packaged = buildPackagedProjectPayload(snapshot);
+      const dotStats = resolvePackagedProjectDotStats(packaged);
+      if (dotStats) {
+        setTrackedProjectDotBaseline(snapshot, dotStats);
+      }
       recordRecentProjectSnapshot(snapshot, packaged, {
         projectId: autosaveProjectId || createAutosaveProjectId(),
       }).catch(error => {
@@ -17256,6 +17310,10 @@
       });
       if (result && !String(result).endsWith('cancel')) {
         markDocumentDurablySaved();
+        const savedDotStats = resolvePackagedProjectDotStats(packaged);
+        if (savedDotStats) {
+          setTrackedProjectDotBaseline(snapshot, savedDotStats);
+        }
         if (announceStatus) {
           updateAutosaveStatus('手動保存: ファイルを書き出しました', 'success');
         }
@@ -37582,6 +37640,7 @@
     resetDocumentUnsavedChanges();
     updateHistoryButtons();
     markRemoteMultiStateDirty({ clearLayerPatchSnapshots: true });
+    setTrackedProjectDotBaseline(snapshot, null);
     syncControlsWithState();
     renderFrameList();
     renderLayerList();
@@ -38183,6 +38242,7 @@
     updateHistoryButtons();
     updateMemoryStatus();
     resetDocumentUnsavedChanges();
+    setTrackedProjectDotBaseline(snapshot, null);
     syncControlsWithState();
     renderFrameList();
     renderLayerList();
