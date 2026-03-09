@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "build:web": "node scripts/stage-web-assets.mjs",
+    "icons:generate": "bash scripts/generate-app-icons.sh",
     "cap:copy": "npm run build:web && npx cap copy",
     "cap:sync": "npm run build:web && npx cap sync",
     "cap:add:android": "npm run build:web && npx cap add android",
