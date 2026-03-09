@@ -3376,6 +3376,9 @@
     })();
     const isStandaloneApp = Boolean(window.navigator && window.navigator.standalone) || displayModeStandalone;
     const isIOSStandaloneApp = isIOSDevice && isStandaloneApp;
+    const NATIVE_FILESYSTEM_DIRECTORY_DOCUMENTS = 'DOCUMENTS';
+    const NATIVE_FILESYSTEM_DIRECTORY_DATA = 'DATA';
+    const NATIVE_CAPTURES_SUBDIRECTORY = 'PiXiEELENS/Captures';
     const requiresCameraUserGesture = isIOSStandaloneApp;
     let cameraStartLocked = requiresCameraUserGesture;
 
@@ -9410,6 +9413,175 @@
       });
     }
 
+    let nativeFilesystemPlugin = undefined;
+    let nativeMediaPlugin = undefined;
+
+    function isNativeAppRuntime() {
+      const capacitor = window.Capacitor || globalThis.Capacitor || null;
+      try {
+        if (capacitor && typeof capacitor.isNativePlatform === 'function' && capacitor.isNativePlatform()) {
+          return true;
+        }
+      } catch (error) {
+        // Ignore native runtime detection failures and continue with fallback checks.
+      }
+      const protocol = String(window.location && window.location.protocol || '');
+      return protocol === 'capacitor:' || protocol === 'ionic:' || protocol === 'app:';
+    }
+
+    function getNativeFilesystemPlugin() {
+      if (nativeFilesystemPlugin !== undefined) {
+        return nativeFilesystemPlugin || null;
+      }
+      nativeFilesystemPlugin = null;
+      const capacitor = window.Capacitor || globalThis.Capacitor || null;
+      if (!capacitor || typeof capacitor.registerPlugin !== 'function') {
+        return null;
+      }
+      try {
+        nativeFilesystemPlugin = capacitor.registerPlugin('Filesystem');
+      } catch (error) {
+        console.warn('Filesystem plugin registration failed', error);
+        nativeFilesystemPlugin = null;
+      }
+      return nativeFilesystemPlugin || null;
+    }
+
+    function getNativeMediaPlugin() {
+      if (nativeMediaPlugin !== undefined) {
+        return nativeMediaPlugin || null;
+      }
+      nativeMediaPlugin = null;
+      const capacitor = window.Capacitor || globalThis.Capacitor || null;
+      if (!capacitor || typeof capacitor.registerPlugin !== 'function') {
+        return null;
+      }
+      try {
+        nativeMediaPlugin = capacitor.registerPlugin('PiXiEEDMedia');
+      } catch (error) {
+        console.warn('PiXiEEDMedia plugin registration failed', error);
+        nativeMediaPlugin = null;
+      }
+      return nativeMediaPlugin || null;
+    }
+
+    function sanitizeNativeFilename(filename, fallback = 'capture.png') {
+      const raw = typeof filename === 'string' ? filename : '';
+      const basename = raw.split(/[\\/]/).pop() || '';
+      const cleaned = basename
+        .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return cleaned || fallback;
+    }
+
+    async function blobToBase64Payload(blob) {
+      const dataUrl = await blobToDataUrl(blob);
+      if (typeof dataUrl !== 'string' || !dataUrl) {
+        throw new Error('blob-to-base64-error');
+      }
+      const commaIndex = dataUrl.indexOf(',');
+      return commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : dataUrl;
+    }
+
+    async function ensureNativeFilesystemDocumentsAccess(filesystem) {
+      if (!filesystem) {
+        return false;
+      }
+      if (!isAndroidDevice) {
+        return true;
+      }
+      if (typeof filesystem.checkPermissions !== 'function' && typeof filesystem.requestPermissions !== 'function') {
+        return true;
+      }
+      try {
+        if (typeof filesystem.checkPermissions === 'function') {
+          const current = await filesystem.checkPermissions();
+          if (current && current.publicStorage === 'granted') {
+            return true;
+          }
+        }
+        if (typeof filesystem.requestPermissions === 'function') {
+          const requested = await filesystem.requestPermissions();
+          if (requested && requested.publicStorage === 'granted') {
+            return true;
+          }
+        }
+      } catch (error) {
+        console.warn('Filesystem permission request failed', error);
+      }
+      return false;
+    }
+
+    async function saveBlobToNativeFilesystem(blob, filename, subdirectory = NATIVE_CAPTURES_SUBDIRECTORY) {
+      if (!(blob instanceof Blob) || blob.size <= 0 || !isNativeAppRuntime()) {
+        return 'unsupported';
+      }
+      const filesystem = getNativeFilesystemPlugin();
+      if (!filesystem || typeof filesystem.writeFile !== 'function') {
+        return 'unsupported';
+      }
+      const safeFilename = sanitizeNativeFilename(filename);
+      const directoryCandidates = [NATIVE_FILESYSTEM_DIRECTORY_DOCUMENTS, NATIVE_FILESYSTEM_DIRECTORY_DATA];
+      let base64Data = null;
+      let documentsPermissionResolved = false;
+      for (const directory of directoryCandidates) {
+        try {
+          if (directory === NATIVE_FILESYSTEM_DIRECTORY_DOCUMENTS && !documentsPermissionResolved) {
+            documentsPermissionResolved = true;
+            const granted = await ensureNativeFilesystemDocumentsAccess(filesystem);
+            if (!granted) {
+              continue;
+            }
+          }
+          if (base64Data === null) {
+            base64Data = await blobToBase64Payload(blob);
+          }
+          const path = `${subdirectory}/${safeFilename}`;
+          await filesystem.writeFile({
+            path,
+            data: base64Data,
+            directory,
+            recursive: true
+          });
+          return 'native';
+        } catch (error) {
+          console.warn(`Native capture save failed (${directory})`, error);
+        }
+      }
+      return 'unsupported';
+    }
+
+    function isNativePhotoLibraryMimeType(mimeType) {
+      const normalized = String(mimeType || '').trim().toLowerCase();
+      return normalized.startsWith('image/') && normalized !== 'image/svg+xml';
+    }
+
+    async function saveBlobToNativePhotoLibrary(blob, filename, mimeType = 'image/png') {
+      if (!(blob instanceof Blob) || blob.size <= 0 || !isNativeAppRuntime()) {
+        return 'unsupported';
+      }
+      if (!isNativePhotoLibraryMimeType(mimeType)) {
+        return 'unsupported';
+      }
+      const mediaPlugin = getNativeMediaPlugin();
+      if (!mediaPlugin || typeof mediaPlugin.saveImageToLibrary !== 'function') {
+        return 'unsupported';
+      }
+      try {
+        const data = await blobToBase64Payload(blob);
+        await mediaPlugin.saveImageToLibrary({
+          data,
+          filename: sanitizeNativeFilename(filename, 'PiXiEED.png'),
+          mimeType
+        });
+        return 'gallery';
+      } catch (error) {
+        console.warn('Native gallery save failed', error);
+        return 'unsupported';
+      }
+    }
+
     function getFilenameExtensions(filename) {
       const match = String(filename || '').trim().match(/(\.[a-z0-9]+)$/i);
       if (!match) {
@@ -9659,6 +9831,14 @@
     async function saveBlobWithFilePicker(blob, filename, mimeType = 'application/octet-stream') {
       if (!(blob instanceof Blob)) {
         return 'unsupported';
+      }
+      const galleryResult = await saveBlobToNativePhotoLibrary(blob, filename, mimeType);
+      if (galleryResult === 'gallery') {
+        return 'gallery';
+      }
+      const nativeResult = await saveBlobToNativeFilesystem(blob, filename);
+      if (nativeResult === 'native') {
+        return 'native';
       }
       if (!useFileSystemAccessSave) {
         return 'unsupported';
@@ -10081,7 +10261,7 @@
         if (pickerResult === 'cancel') {
           return false;
         }
-        const pickerSaved = pickerResult === 'saved';
+        const pickerSaved = pickerResult === 'saved' || pickerResult === 'native' || pickerResult === 'gallery';
         let autoShareSucceeded = false;
         const shouldAutoShare = !pickerSaved && autoShareOnMobile && isIOSDevice && canShareFiles;
         if (shouldAutoShare) {
@@ -10099,7 +10279,15 @@
             // continue to fallback preview
           }
         }
-        if (pickerSaved) {
+        if (pickerResult === 'gallery') {
+          infoMessage = drawPayload
+            ? '写真アプリへ保存しました。「PiXiEEDrawで編集」で続けて編集できます。'
+            : `${formatLabel}を写真アプリへ保存しました。`;
+        } else if (pickerResult === 'native') {
+          infoMessage = drawPayload
+            ? '端末ファイルへ保存しました。「PiXiEEDrawで編集」で続けて編集できます。'
+            : `${formatLabel}を端末ファイルへ保存しました。`;
+        } else if (pickerSaved) {
           infoMessage = drawPayload
             ? 'ファイルへ保存しました。「PiXiEEDrawで編集」で続けて編集できます。'
             : `${formatLabel}をファイルへ保存しました。`;
