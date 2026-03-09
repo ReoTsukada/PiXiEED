@@ -1373,9 +1373,16 @@
          data-ad-slot="2141591954"></ins>
   </div>
 </footer>
+<script src="../scripts/pixieed-dot-stats.js"></script>
 <script>
 (() => {
   const CANVAS_SIZES = [4, 8, 16];
+  const dotStatsApi = window.PiXiEEDDotStats && typeof window.PiXiEEDDotStats === 'object'
+    ? window.PiXiEEDDotStats
+    : null;
+  let liteDotProjectId = dotStatsApi && typeof dotStatsApi.createProjectId === 'function'
+    ? dotStatsApi.createProjectId('pixiedraw-lite')
+    : `pixiedraw-lite-${Date.now().toString(36)}`;
   let canvasSizeIndex = 2;
   let canvasSize = CANVAS_SIZES[canvasSizeIndex];
   const canvas = document.getElementById('canvas');
@@ -2811,6 +2818,9 @@
       }
     } else {
       baseLayer.imageData = blank;
+      if (dotStatsApi && typeof dotStatsApi.createProjectId === 'function') {
+        liteDotProjectId = dotStatsApi.createProjectId('pixiedraw-lite');
+      }
     }
     imageData = blank;
     data = imageData.data;
@@ -4363,6 +4373,25 @@
     const filename = `pixieedrawlite-${canvasSize}px@640.png`;
     const result = await saveDataUrlWithPickerFallback(output, filename, 'image/png');
     if (result === 'cancel') return;
+    if (dotStatsApi && typeof dotStatsApi.countImageData === 'function' && typeof dotStatsApi.syncProjectDotCount === 'function') {
+      try {
+        const dotStats = dotStatsApi.countImageData(baseLayer.imageData, {
+          frameId: 'frame-1',
+          frameName: 'Canvas',
+        });
+        if (dotStats && dotStats.totalDots > 0 && liteDotProjectId) {
+          dotStatsApi.syncProjectDotCount({
+            projectId: liteDotProjectId,
+            dotCount: dotStats.totalDots,
+            app: 'pixiedraw-lite',
+          }).catch(error => {
+            console.warn('Failed to sync PiXiEEDraw Lite dot total', error);
+          });
+        }
+      } catch (error) {
+        console.warn('Failed to count PiXiEEDraw Lite dots', error);
+      }
+    }
     markDownloaded();
   });
   runTutorialResetMigration();
