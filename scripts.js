@@ -870,8 +870,13 @@
         :root{
           --pixieed-page-gutter:0px;
           --pixieed-layout-max-width:100vw;
+          --pixieed-safe-bottom:env(safe-area-inset-bottom, 0px);
           --pixieed-footer-ad-height:clamp(40px, 6.4vw, 52px);
-          --pixieed-footer-ad-offset:calc(var(--pixieed-footer-ad-height) + 10px + env(safe-area-inset-bottom, 0px));
+          --pixieed-footer-ad-padding-y:8px;
+          --pixieed-bottom-nav-height:60px;
+          --pixieed-bottom-nav-padding-y:6px;
+          --pixieed-footer-ad-total-height:calc(var(--pixieed-footer-ad-height) + (var(--pixieed-footer-ad-padding-y) * 2) + var(--pixieed-safe-bottom));
+          --pixieed-footer-ad-offset:calc(var(--pixieed-footer-ad-total-height) + 10px);
           --pixieed-footer-ad-bg:rgba(11,18,36,0.96);
         }
         @media (orientation: landscape){
@@ -885,7 +890,8 @@
             --pixieed-page-gutter:clamp(40px, 6vw, 128px);
             --pixieed-layout-max-width:1040px;
             --pixieed-footer-ad-height:44px;
-            --pixieed-footer-ad-offset:calc(var(--pixieed-footer-ad-height) + 8px + env(safe-area-inset-bottom, 0px));
+            --pixieed-footer-ad-total-height:calc(var(--pixieed-footer-ad-height) + (var(--pixieed-footer-ad-padding-y) * 2) + var(--pixieed-safe-bottom));
+            --pixieed-footer-ad-offset:calc(var(--pixieed-footer-ad-total-height) + 8px);
           }
         }
         body.has-footer-ad > .page,
@@ -905,8 +911,9 @@
         }
         body.has-footer-ad .bottom-nav{
           bottom:var(--pixieed-footer-ad-offset) !important;
-          height:60px !important;
-          padding:6px max(10px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px)) !important;
+          height:calc(var(--pixieed-bottom-nav-height) + var(--pixieed-safe-bottom)) !important;
+          box-sizing:border-box !important;
+          padding:var(--pixieed-bottom-nav-padding-y) max(10px, env(safe-area-inset-right, 0px)) calc(var(--pixieed-bottom-nav-padding-y) + var(--pixieed-safe-bottom)) max(10px, env(safe-area-inset-left, 0px)) !important;
         }
         body.has-footer-ad .bottom-nav__item{
           padding:4px 0 !important;
@@ -929,8 +936,8 @@
           z-index:70;
           width:auto !important;
           max-width:none !important;
-          padding:8px env(safe-area-inset-right, 0px) calc(8px + env(safe-area-inset-bottom, 0px)) env(safe-area-inset-left, 0px);
           box-sizing:border-box;
+          padding:var(--pixieed-footer-ad-padding-y) env(safe-area-inset-right, 0px) calc(var(--pixieed-footer-ad-padding-y) + var(--pixieed-safe-bottom)) env(safe-area-inset-left, 0px);
           display:flex !important;
           justify-content:center;
           align-items:center;
@@ -941,7 +948,7 @@
           background:var(--pixieed-footer-ad-bg);
           border-top:1px solid rgba(255,255,255,0.08);
           backdrop-filter:blur(8px);
-          min-height:var(--pixieed-footer-ad-height);
+          min-height:var(--pixieed-footer-ad-total-height);
         }
         .ad-footer ins{
           display:block !important;
