@@ -2361,8 +2361,9 @@
   const MULTI_CHANNEL_PREFIX = 'pixiedraw-room-';
   const MULTI_PUBLIC_LOBBY_CHANNEL = 'pixiedraw-public-rooms-v1';
   const MULTI_PUBLIC_ROOM_SYNC_THROTTLE_MS = 2400;
-  const MULTI_PUBLIC_ROOM_THUMBNAIL_MAX_EDGE = 128;
+  const MULTI_PUBLIC_ROOM_THUMBNAIL_MAX_EDGE = 96;
   const MULTI_PUBLIC_ROOM_THUMBNAIL_MAX_DATA_URL_LENGTH = 180000;
+  const MULTI_PUBLIC_ROOM_THUMBNAIL_REFRESH_MIN_MS = 7000;
   const RESIDENT_ROOM_PERSIST_VERSION = 1;
   const RESIDENT_ROOM_PERSIST_STORAGE_PREFIX = 'pixieedraw:resident-room-persist:';
   const RESIDENT_ROOM_PERSIST_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 365 * 5;
@@ -2390,6 +2391,7 @@
   ]);
   // Keep autosave slightly delayed so heavy serialization does not block drawing per stroke.
   const AUTOSAVE_WRITE_DELAY = 900;
+  const AUTOSAVE_REMOTE_MULTI_WRITE_DELAY = 2200;
   const AUTOSAVE_THUMBNAIL_UPDATE_INTERVAL_MS = 12000;
   const RECENT_PROJECT_LIMIT = 12;
   const THUMBNAIL_MAX_EDGE = 144;
@@ -2429,6 +2431,7 @@
   let exportDirectoryDisplayLabel = '';
   let exportDirectorySetupDismissed = false;
   let autosaveWriteTimer = null;
+  let autosaveWriteDeadline = 0;
   let autosaveWriteInFlight = false;
   let autosaveWriteQueued = false;
   const autosaveTabInstanceId = (() => {
@@ -2531,6 +2534,9 @@
     resumeJoinPolicy: null,
     resumeExportPermission: null,
     layerPatchSnapshots: new Map(),
+    layerPatchSendSequences: new Map(),
+    layerPatchReceiveSequences: new Map(),
+    layerPatchResyncRequestAt: new Map(),
     masterLayerPatchTimer: null,
     masterLayerPatchInFlight: false,
     masterLayerPatchQueued: false,
@@ -2550,6 +2556,9 @@
     publicLobbyChannel: null,
     publicLobbySyncTimer: null,
     publicLobbySyncInFlight: false,
+    publicLobbyThumbnailDirty: true,
+    publicLobbyThumbnailDataUrl: '',
+    publicLobbyThumbnailUpdatedAt: 0,
     residentPersistTimer: null,
     residentPersistInFlight: false,
     residentPersistQueued: false,
@@ -5029,6 +5038,9 @@
     if (!targetId) {
       return false;
     }
+    if (!ensureCurrentClientCanReplaceActiveProject({ announce })) {
+      return false;
+    }
     if (openProjectTabBusy) {
       return false;
     }
@@ -5108,6 +5120,16 @@
     }
     const target = openProjectTabs[index];
     const wasActive = target?.id === activeOpenProjectTabId;
+    if (wasActive && isMultiMasterProjectReplacementBlocked()) {
+      setMultiStatus(
+        localizeText(
+          '共有中のメインプロジェクトは、マスター接続中は閉じられません。先に共有を切断してください。',
+          'You cannot close the shared main project while connected as master. Disconnect collab first.'
+        ),
+        'warn'
+      );
+      return false;
+    }
     const fallback = wasActive
       ? (openProjectTabs[index - 1] || openProjectTabs[index + 1] || null)
       : null;
@@ -9389,7 +9411,7 @@
     }
   }
 
-  function scheduleAutosaveSnapshot() {
+  function scheduleAutosaveSnapshot({ delayMs = AUTOSAVE_WRITE_DELAY } = {}) {
     if (!AUTOSAVE_SUPPORTED) return;
     if (autosaveRestoring) return;
     const blockedStatus = getAutosaveBlockedStatusMessage();
@@ -9398,20 +9420,33 @@
         window.clearTimeout(autosaveWriteTimer);
         autosaveWriteTimer = null;
       }
+      autosaveWriteDeadline = 0;
       updateAutosaveStatus(blockedStatus, 'info');
       return;
     }
     if (!autosaveDirty) return;
+    const safeDelayMs = Math.max(120, Math.round(Number(delayMs) || AUTOSAVE_WRITE_DELAY));
+    const deadline = Date.now() + safeDelayMs;
+    if (
+      autosaveWriteTimer !== null
+      && Number.isFinite(autosaveWriteDeadline)
+      && autosaveWriteDeadline > 0
+      && autosaveWriteDeadline <= deadline
+    ) {
+      return;
+    }
     if (autosaveWriteTimer !== null) {
       window.clearTimeout(autosaveWriteTimer);
     }
+    autosaveWriteDeadline = deadline;
     autosaveWriteTimer = window.setTimeout(() => {
       autosaveWriteTimer = null;
+      autosaveWriteDeadline = 0;
       writeAutosaveSnapshot().catch(error => {
         console.warn('Autosave failed', error);
         updateAutosaveStatus('自動保存: 保存に失敗しました', 'error');
       });
-    }, AUTOSAVE_WRITE_DELAY);
+    }, Math.max(0, deadline - Date.now()));
   }
 
   function isAutosaveInteractionBusy() {
@@ -9468,6 +9503,7 @@
     if (autosaveWriteTimer !== null) {
       window.clearTimeout(autosaveWriteTimer);
       autosaveWriteTimer = null;
+      autosaveWriteDeadline = 0;
     }
     if (autosaveWriteInFlight) {
       autosaveWriteQueued = true;
@@ -9500,6 +9536,7 @@
         window.clearTimeout(autosaveWriteTimer);
         autosaveWriteTimer = null;
       }
+      autosaveWriteDeadline = 0;
       autosaveWriteQueued = false;
       updateAutosaveStatus(blockedStatus, 'info');
       return false;
@@ -9583,6 +9620,9 @@
   }
 
   async function restoreAutosaveDocument(handle) {
+    if (!ensureCurrentClientCanReplaceActiveProject({ announce: false })) {
+      return false;
+    }
     try {
       const file = await handle.getFile();
       if (!file) {
@@ -10101,6 +10141,9 @@
   }
 
   async function openDocumentsAsProjectTabs(items, loader, { source = 'open' } = {}) {
+    if (!ensureCurrentClientCanReplaceActiveProject()) {
+      return false;
+    }
     if (openProjectTabBusy) {
       return false;
     }
@@ -10182,6 +10225,9 @@
     if (!entry || typeof entry !== 'object') {
       return false;
     }
+    if (!ensureCurrentClientCanReplaceActiveProject()) {
+      return false;
+    }
     const projectId = normalizeAutosaveProjectId(entry.id || '');
     if (openProjectTabBusy) {
       return false;
@@ -10235,6 +10281,9 @@
   }
 
   async function openDocumentDialog() {
+    if (!ensureCurrentClientCanReplaceActiveProject()) {
+      return false;
+    }
     if (!canCurrentClientImportExternalData()) {
       setMultiStatus(localizeText('参加/視聴モードでは読み込み/インポートはマスターのみ操作できます', 'In participant/viewer mode, only the master can open/import files'), 'warn');
       return false;
@@ -10322,8 +10371,7 @@
             files,
             async file => {
               if (isImportableImageFile(file)) {
-                await loadDocumentFromImageFile(file);
-                return true;
+                return await loadDocumentFromImageFile(file);
               }
               const text = await file.text();
               return await loadDocumentFromText(text, null, { suppressAutosaveStatus: true });
@@ -10806,6 +10854,9 @@
   }
 
   async function loadDocumentFromImageFile(file) {
+    if (!ensureCurrentClientCanReplaceActiveProject()) {
+      return false;
+    }
     let importResult;
     try {
       importResult = await decodeImageFileToFrames(file);
@@ -10987,6 +11038,7 @@
       updateAutosaveStatus(`画像を読み込みました${paletteReductionLabel} / 端末内へ自動保存します`, 'success');
     }
     scheduleSessionPersist();
+    return true;
   }
 
   async function fallbackRestoreAutosaveAfterLensFailure() {
@@ -11136,7 +11188,10 @@
       const imported = await openDocumentsAsProjectTabs(
         [file],
         async lensFile => {
-          await loadDocumentFromImageFile(lensFile);
+          const loaded = await loadDocumentFromImageFile(lensFile);
+          if (!loaded) {
+            return false;
+          }
           await ensureAutosaveForLensImport();
           return true;
         },
@@ -12551,6 +12606,9 @@
   }
 
   function openNewProjectDialog() {
+    if (!ensureCurrentClientCanReplaceActiveProject()) {
+      return;
+    }
     const config = dom.newProject;
     if (!config) {
       void promptNewProjectFallback();
@@ -12845,6 +12903,9 @@
   }
 
   async function promptNewProjectFallback() {
+    if (!ensureCurrentClientCanReplaceActiveProject()) {
+      return;
+    }
     const name = window.prompt('ファイル名を入力してください', state.documentName || DEFAULT_DOCUMENT_NAME);
     if (name === null) return;
     const widthRaw = window.prompt(`キャンバスの横幅 (${MIN_CANVAS_SIZE}〜${MAX_CANVAS_SIZE})`, String(state.width));
@@ -12903,6 +12964,9 @@
     palettePreset = newProjectPalettePresetId,
     promptExportDirectory = false,
   }) {
+    if (!ensureCurrentClientCanReplaceActiveProject()) {
+      return false;
+    }
     const widthNumber = lockedCanvasWidth !== null ? lockedCanvasWidth : Number(width);
     const heightNumber = lockedCanvasHeight !== null ? lockedCanvasHeight : Number(height);
     if (!Number.isFinite(widthNumber) || !Number.isFinite(heightNumber)) {
@@ -13370,8 +13434,7 @@
     try {
       const file = await handle.getFile();
       if (isImportableImageFile(file)) {
-        await loadDocumentFromImageFile(file);
-        return true;
+        return await loadDocumentFromImageFile(file);
       }
       const text = await file.text();
       return await loadDocumentFromText(text, handle, options);
@@ -13394,6 +13457,9 @@
   }
 
   async function loadDocumentFromText(text, handle, options = {}) {
+    if (!ensureCurrentClientCanReplaceActiveProject({ announce: !options?.suppressAutosaveStatus })) {
+      return false;
+    }
     let parsedDocument = null;
     try {
       parsedDocument = snapshotFromDocumentText(text);
@@ -14550,6 +14616,9 @@
     }
     const hideStartupOnSuccess = options.hideStartup !== false;
     const silent = options.silent === true;
+    if (!ensureCurrentClientCanReplaceActiveProject({ announce: !silent })) {
+      return false;
+    }
     try {
       if (entry.project && typeof entry.project === 'object') {
         const loaded = await loadDocumentFromText(JSON.stringify(entry.project), null, {
@@ -34027,7 +34096,7 @@
     requestAnimationFrame(() => {
       renderScheduled = false;
       renderCanvas();
-      if (shouldSyncMultiPublicLobbyRoom()) {
+      if (shouldSyncMultiPublicLobbyRoom() && multiState.publicLobbyThumbnailDirty) {
         scheduleMultiPublicLobbyRoomSync({ immediate: false });
       }
       if (!state.playback.isPlaying) {
@@ -36527,6 +36596,9 @@
     const lobbyChannel = multiState.publicLobbyChannel;
     multiState.publicLobbyChannel = null;
     multiState.publicLobbySyncInFlight = false;
+    multiState.publicLobbyThumbnailDirty = true;
+    multiState.publicLobbyThumbnailDataUrl = '';
+    multiState.publicLobbyThumbnailUpdatedAt = 0;
     if (!lobbyChannel) {
       return;
     }
@@ -36647,6 +36719,37 @@
     return fallbackDataUrl;
   }
 
+  function markMultiPublicLobbyThumbnailDirty() {
+    multiState.publicLobbyThumbnailDirty = true;
+  }
+
+  function getMultiPublicRoomThumbnailDataUrl({ force = false } = {}) {
+    const cachedDataUrl = typeof multiState.publicLobbyThumbnailDataUrl === 'string'
+      ? multiState.publicLobbyThumbnailDataUrl
+      : '';
+    const lastUpdatedAt = Number(multiState.publicLobbyThumbnailUpdatedAt || 0);
+    const now = Date.now();
+    if (!force && !multiState.publicLobbyThumbnailDirty) {
+      return cachedDataUrl;
+    }
+    if (
+      !force
+      && cachedDataUrl
+      && lastUpdatedAt > 0
+      && (now - lastUpdatedAt) < MULTI_PUBLIC_ROOM_THUMBNAIL_REFRESH_MIN_MS
+    ) {
+      return cachedDataUrl;
+    }
+    const dataUrl = createMultiPublicRoomThumbnailDataUrl();
+    if (typeof dataUrl === 'string' && dataUrl) {
+      multiState.publicLobbyThumbnailDataUrl = dataUrl;
+      multiState.publicLobbyThumbnailUpdatedAt = now;
+      multiState.publicLobbyThumbnailDirty = false;
+      return dataUrl;
+    }
+    return cachedDataUrl;
+  }
+
   function buildMultiPublicLobbyPresencePayload() {
     if (!shouldSyncMultiPublicLobbyRoom()) {
       return null;
@@ -36671,7 +36774,7 @@
       participantCount: counts.totalCount,
       roomVisibility,
       isPublic,
-      thumbnailDataUrl: isPublic ? createMultiPublicRoomThumbnailDataUrl() : '',
+      thumbnailDataUrl: isPublic ? getMultiPublicRoomThumbnailDataUrl() : '',
       updatedAt: Date.now(),
       sentAt: Date.now(),
     };
@@ -36702,6 +36805,9 @@
       return false;
     } finally {
       multiState.publicLobbySyncInFlight = false;
+      if (shouldSyncMultiPublicLobbyRoom() && multiState.publicLobbyThumbnailDirty) {
+        scheduleMultiPublicLobbyRoomSync({ immediate: false });
+      }
     }
   }
 
@@ -38732,6 +38838,26 @@
 
   function canCurrentClientImportExternalData() {
     return !isMultiReadOnlyMode();
+  }
+
+  function isMultiMasterProjectReplacementBlocked() {
+    return isMultiMasterMode();
+  }
+
+  function ensureCurrentClientCanReplaceActiveProject({ announce = true } = {}) {
+    if (!isMultiMasterProjectReplacementBlocked()) {
+      return true;
+    }
+    if (announce) {
+      setMultiStatus(
+        localizeText(
+          '共有中のメインプロジェクトを保護するため、マスター接続中は別プロジェクトへ切替できません。先に共有を切断してください。',
+          'To protect the shared main project, you cannot switch to another project while connected as master. Disconnect collab first.'
+        ),
+        'warn'
+      );
+    }
+    return false;
   }
 
   function normalizeMultiBlockedClientIds(rawBlockedClientIds) {
@@ -41140,6 +41266,15 @@
     if (multiState.layerPatchSnapshots instanceof Map) {
       multiState.layerPatchSnapshots.clear();
     }
+    if (multiState.layerPatchSendSequences instanceof Map) {
+      multiState.layerPatchSendSequences.clear();
+    }
+    if (multiState.layerPatchReceiveSequences instanceof Map) {
+      multiState.layerPatchReceiveSequences.clear();
+    }
+    if (multiState.layerPatchResyncRequestAt instanceof Map) {
+      multiState.layerPatchResyncRequestAt.clear();
+    }
   }
 
   function clearMultiLayerPatchSendTimers() {
@@ -41157,16 +41292,22 @@
     multiState.guestLayerPatchInFlight = false;
   }
 
-  function markRemoteMultiStateDirty({ clearLayerPatchSnapshots = false } = {}) {
+  function markRemoteMultiStateDirty({
+    clearLayerPatchSnapshots = false,
+    autosaveDelayMs = AUTOSAVE_REMOTE_MULTI_WRITE_DELAY,
+  } = {}) {
     invalidateFillPreviewCache();
     invalidateOnionSkinCache();
     clearPlaybackFrameCache();
     if (clearLayerPatchSnapshots) {
       clearMultiLayerPatchSnapshots();
     }
+    if (isMultiMasterMode()) {
+      multiState.publicLobbyThumbnailDirty = true;
+    }
     markAutosaveDirty();
     markDocumentUnsavedChange();
-    scheduleAutosaveSnapshot();
+    scheduleAutosaveSnapshot({ delayMs: autosaveDelayMs });
     scheduleSessionPersist({ includeSnapshots: false });
   }
 
@@ -41625,6 +41766,14 @@
     }).catch(() => {});
   }
 
+  function normalizeMultiSessionRevision(value, fallback = 0) {
+    const normalized = Math.round(Number(value));
+    if (!Number.isFinite(normalized) || normalized < 0) {
+      return fallback;
+    }
+    return normalized;
+  }
+
   function buildMultiSessionStatePayload({ targetClientId = '' } = {}) {
     const snapshot = makeHistorySnapshot({
       includeUiState: false,
@@ -41656,7 +41805,7 @@
     };
   }
 
-  function buildGuestSessionStatePayload({ targetClientId = '' } = {}) {
+  function buildGuestSessionStatePayload({ targetClientId = '', reason = '' } = {}) {
     const snapshot = makeHistorySnapshot({
       includeUiState: false,
       includeSelection: false,
@@ -41666,6 +41815,7 @@
       projectKey: multiState.projectKey,
       clientId: multiState.clientId,
       targetClientId: targetClientId || '',
+      reason: typeof reason === 'string' ? reason : '',
       sentAt: Date.now(),
       maxGuests: normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT),
       roomVisibility: normalizeMultiRoomVisibility(
@@ -41783,6 +41933,92 @@
     const safeFrameIndex = Number.isFinite(frameIndex) ? Math.max(0, Math.round(frameIndex)) : 0;
     const safeLayerKey = typeof layerKey === 'string' ? layerKey : '';
     return `${safeKind}:${safeClientId}:${safeFrameIndex}:${safeLayerKey}`;
+  }
+
+  function normalizeMultiPatchSequence(value, fallback = 0) {
+    const normalized = Math.round(Number(value));
+    if (!Number.isFinite(normalized) || normalized <= 0) {
+      return fallback;
+    }
+    return normalized;
+  }
+
+  function getNextMultiLayerPatchSequence(streamKey) {
+    const current = multiState.layerPatchSendSequences instanceof Map
+      ? normalizeMultiPatchSequence(multiState.layerPatchSendSequences.get(streamKey), 0)
+      : 0;
+    return current + 1;
+  }
+
+  function commitMultiLayerPatchSequence(streamKey, sequence) {
+    const normalizedSequence = normalizeMultiPatchSequence(sequence, 0);
+    if (!normalizedSequence || !(multiState.layerPatchSendSequences instanceof Map)) {
+      return;
+    }
+    multiState.layerPatchSendSequences.set(streamKey, normalizedSequence);
+  }
+
+  function inspectIncomingMultiLayerPatchSequence(streamKey, payload) {
+    const sequence = normalizeMultiPatchSequence(payload?.sequence, 0);
+    if (!sequence) {
+      return { action: 'apply', sequence: 0 };
+    }
+    const lastSequence = multiState.layerPatchReceiveSequences instanceof Map
+      ? normalizeMultiPatchSequence(multiState.layerPatchReceiveSequences.get(streamKey), 0)
+      : 0;
+    const mode = payload?.mode === 'diff' ? 'diff' : 'full';
+    if (sequence <= lastSequence) {
+      return { action: 'stale', sequence, lastSequence };
+    }
+    if (mode === 'full') {
+      return { action: 'apply', sequence, lastSequence };
+    }
+    if (!lastSequence) {
+      return sequence === 1
+        ? { action: 'apply', sequence, lastSequence }
+        : { action: 'resync', sequence, lastSequence };
+    }
+    if (sequence === (lastSequence + 1)) {
+      return { action: 'apply', sequence, lastSequence };
+    }
+    return { action: 'resync', sequence, lastSequence };
+  }
+
+  function markIncomingMultiLayerPatchSequenceApplied(streamKey, sequence) {
+    const normalizedSequence = normalizeMultiPatchSequence(sequence, 0);
+    if (!normalizedSequence || !(multiState.layerPatchReceiveSequences instanceof Map)) {
+      return;
+    }
+    multiState.layerPatchReceiveSequences.set(streamKey, normalizedSequence);
+    if (multiState.layerPatchResyncRequestAt instanceof Map) {
+      multiState.layerPatchResyncRequestAt.delete(streamKey);
+    }
+  }
+
+  async function requestTargetedGuestSessionState(senderClientId, streamKey = '') {
+    if (!isMultiMasterMode()) {
+      return false;
+    }
+    const normalizedClientId = typeof senderClientId === 'string' ? senderClientId.trim() : '';
+    if (!normalizedClientId || normalizedClientId === multiState.clientId) {
+      return false;
+    }
+    const requestKey = streamKey || normalizedClientId;
+    const now = Date.now();
+    if (multiState.layerPatchResyncRequestAt instanceof Map) {
+      const previousAt = Number(multiState.layerPatchResyncRequestAt.get(requestKey) || 0);
+      if ((now - previousAt) < 600) {
+        return false;
+      }
+      multiState.layerPatchResyncRequestAt.set(requestKey, now);
+    }
+    return sendMultiBroadcast('master-state-request', {
+      clientId: multiState.clientId,
+      projectKey: multiState.projectKey,
+      targetClientId: normalizedClientId,
+      sentAt: now,
+      reason: 'layer-resync',
+    });
   }
 
   function captureLayerPatchSnapshot(layer, pixelCount) {
@@ -41958,11 +42194,11 @@
 
   function applyLayerPatchPayloadToLayer(layer, payload, pixelCount) {
     if (!layer || typeof payload !== 'object' || !payload) {
-      return false;
+      return null;
     }
     const size = Math.max(0, Math.floor(Number(pixelCount) || 0));
     if (!size) {
-      return false;
+      return null;
     }
     const mode = payload.mode === 'diff' ? 'diff' : 'full';
     const hasDirect = typeof payload.hasDirect === 'boolean'
@@ -41972,28 +42208,28 @@
     if (mode === 'full') {
       const decodedIndices = decodeLayerIndicesPayload(payload.indices, size);
       if (!(decodedIndices instanceof Int16Array) || decodedIndices.length !== size) {
-        return false;
+        return null;
       }
       layer.indices = decodedIndices;
       if (hasDirect) {
         const decodedDirect = decodeLayerDirectPayload(payload.direct, size);
         if (!(decodedDirect instanceof Uint8ClampedArray) || decodedDirect.length !== size * 4) {
-          return false;
+          return null;
         }
         layer.direct = decodedDirect;
       } else {
         layer.direct = null;
       }
-      return true;
+      return { full: true, dirtyRect: null };
     }
 
     const changed = decodeLayerDiffPositionsPayload(payload.changed);
     if (!(changed instanceof Uint32Array) || !changed.length) {
-      return false;
+      return null;
     }
     const nextIndices = decodeLayerDiffIndicesPayload(payload.indices, changed.length);
     if (!(nextIndices instanceof Int16Array) || nextIndices.length !== changed.length) {
-      return false;
+      return null;
     }
     if (!(layer.indices instanceof Int16Array) || layer.indices.length !== size) {
       layer.indices = new Int16Array(size).fill(-1);
@@ -42003,17 +42239,22 @@
     if (hasDirect) {
       nextDirect = decodeLayerDiffDirectPayload(payload.direct, changed.length);
       if (!(nextDirect instanceof Uint8Array) || nextDirect.length !== changed.length * 4) {
-        return false;
+        return null;
       }
       targetDirect = ensureLayerDirect(layer);
     } else {
       layer.direct = null;
     }
 
+    const canvasWidth = Math.max(1, Math.floor(Number(state.width) || 0));
+    let minX = canvasWidth;
+    let minY = Math.max(1, Math.floor(Number(state.height) || 0));
+    let maxX = -1;
+    let maxY = -1;
     for (let i = 0; i < changed.length; i += 1) {
       const index = changed[i];
       if (!Number.isFinite(index) || index < 0 || index >= size) {
-        return false;
+        return null;
       }
       const pixelIndex = Math.floor(index);
       layer.indices[pixelIndex] = nextIndices[i];
@@ -42025,8 +42266,19 @@
         targetDirect[toBase + 2] = nextDirect[fromBase + 2];
         targetDirect[toBase + 3] = nextDirect[fromBase + 3];
       }
+      const px = pixelIndex % canvasWidth;
+      const py = Math.floor(pixelIndex / canvasWidth);
+      if (px < minX) minX = px;
+      if (py < minY) minY = py;
+      if (px > maxX) maxX = px;
+      if (py > maxY) maxY = py;
     }
-    return true;
+    return {
+      full: false,
+      dirtyRect: maxX >= minX && maxY >= minY
+        ? { x0: minX, y0: minY, x1: maxX, y1: maxY }
+        : null,
+    };
   }
 
   function clearPendingMultiSessionStateApply() {
@@ -42292,7 +42544,11 @@
 
   function applyMultiSessionStatePayload(payload) {
     if (!payload || typeof payload !== 'object') {
-      return;
+      return false;
+    }
+    const receivedRevision = normalizeMultiSessionRevision(payload.revision, 0);
+    if (receivedRevision && receivedRevision <= multiState.revision) {
+      return false;
     }
     multiState.maxGuests = normalizeMultiMaxGuests(payload.maxGuests, multiState.maxGuests);
     multiState.roomVisibility = normalizeMultiRoomVisibility(
@@ -42319,8 +42575,7 @@
     if (payload.document && typeof payload.document === 'object') {
       applyMultiAuthoritativeDocument(payload.document);
     }
-    const receivedRevision = Number(payload.revision);
-    if (Number.isFinite(receivedRevision) && receivedRevision > multiState.revision) {
+    if (receivedRevision > multiState.revision) {
       multiState.revision = receivedRevision;
     }
     const keyText = multiState.projectKey ? ` (${multiState.projectKey})` : '';
@@ -42336,6 +42591,7 @@
     } catch (e) {
       /* ignore */
     }
+    return true;
   }
 
   async function flushMasterLayerPatchSendQueue() {
@@ -42454,6 +42710,7 @@
       frameIndex,
       assignment.anchorLayerId
     );
+    const sequence = getNextMultiLayerPatchSequence(streamKey);
     const previousSnapshot = multiState.layerPatchSnapshots.get(streamKey) || null;
     const diffPayload = buildLayerDiffPayload(layer, previousSnapshot, pixelCount);
     if (!diffPayload) {
@@ -42468,8 +42725,10 @@
         projectKey: multiState.projectKey,
         frameIndex,
         anchorLayerId: assignment.anchorLayerId,
+        sequence,
         ...diffPayload,
       },
+      sequence,
     };
   }
 
@@ -42484,6 +42743,7 @@
       if (snapshot) {
         multiState.layerPatchSnapshots.set(patch.streamKey, snapshot);
       }
+      commitMultiLayerPatchSequence(patch.streamKey, patch.sequence);
     }
     return sent;
   }
@@ -42542,6 +42802,7 @@
       return null;
     }
     const streamKey = getMultiLayerPatchStreamKey('master-send', multiState.clientId, frameIndex, layer.id);
+    const sequence = getNextMultiLayerPatchSequence(streamKey);
     const previousSnapshot = multiState.layerPatchSnapshots.get(streamKey) || null;
     const diffPayload = buildLayerDiffPayload(layer, previousSnapshot, pixelCount);
     if (!diffPayload) {
@@ -42556,8 +42817,10 @@
         projectKey: multiState.projectKey,
         frameIndex,
         layerId: layer.id,
+        sequence,
         ...diffPayload,
       },
+      sequence,
     };
   }
 
@@ -42572,6 +42835,7 @@
       if (snapshot) {
         multiState.layerPatchSnapshots.set(patch.streamKey, snapshot);
       }
+      commitMultiLayerPatchSequence(patch.streamKey, patch.sequence);
     }
     return sent;
   }
@@ -43210,6 +43474,13 @@
     if (multiState.role !== 'guest' && multiState.role !== 'spectator') {
       return;
     }
+    const receivedRevision = normalizeMultiSessionRevision(payload.revision, 0);
+    if (receivedRevision) {
+      const pendingRevision = normalizeMultiSessionRevision(multiState.pendingSessionStatePayload?.revision, 0);
+      if (receivedRevision <= Math.max(multiState.revision, pendingRevision)) {
+        return;
+      }
+    }
     if (shouldDeferMultiSessionStateApply()) {
       multiState.pendingSessionStatePayload = payload;
       schedulePendingMultiSessionStateApply();
@@ -43225,6 +43496,10 @@
     if (!payload || typeof payload !== 'object') {
       return;
     }
+    const targetClientId = typeof payload.targetClientId === 'string' ? payload.targetClientId.trim() : '';
+    if (targetClientId && targetClientId !== multiState.clientId) {
+      return;
+    }
     const requesterClientId = typeof payload.clientId === 'string' ? payload.clientId.trim() : '';
     if (!requesterClientId || requesterClientId === multiState.clientId) {
       return;
@@ -43232,7 +43507,11 @@
     if (isMultiClientBlocked(requesterClientId)) {
       return;
     }
-    const responsePayload = buildGuestSessionStatePayload({ targetClientId: requesterClientId });
+    const responseReason = typeof payload.reason === 'string' ? payload.reason.trim() : '';
+    const responsePayload = buildGuestSessionStatePayload({
+      targetClientId: requesterClientId,
+      reason: responseReason,
+    });
     await sendMultiBroadcast('guest-session-state', responsePayload);
   }
 
@@ -43254,11 +43533,32 @@
     if (isMultiClientBlocked(senderClientId)) {
       return;
     }
-    if (!multiState.awaitingGuestStateRecovery) {
-      return;
-    }
     const hasDocument = payload.document && typeof payload.document === 'object';
     if (!hasDocument) {
+      return;
+    }
+    const responseReason = typeof payload.reason === 'string' ? payload.reason.trim() : '';
+    if (!multiState.awaitingGuestStateRecovery) {
+      if (responseReason !== 'layer-resync') {
+        return;
+      }
+      let snapshot = null;
+      try {
+        snapshot = deserializeDocumentPayload(payload.document);
+      } catch (error) {
+        console.warn('Failed to deserialize targeted guest sync payload', error);
+        return;
+      }
+      const appliedPartial = applyHistorySnapshotForClient(snapshot, senderClientId, { preserveView: true });
+      if (!appliedPartial) {
+        return;
+      }
+      if (isResidentMultiRestrictedMasterMode()) {
+        ensureResidentTimelapseCaptureStarted();
+        scheduleTimelapseCaptureFromState();
+        scheduleResidentRoomPersist({ immediate: false, force: true });
+      }
+      scheduleMultiSessionStateBroadcast({ immediate: true });
       return;
     }
     multiState.maxGuests = normalizeMultiMaxGuests(payload.maxGuests, multiState.maxGuests);
@@ -43363,11 +43663,45 @@
     if (!pixelCount) {
       return;
     }
-    const applied = applyLayerPatchPayloadToLayer(targetLayer, payload, pixelCount);
-    if (!applied) {
+    const streamKey = getMultiLayerPatchStreamKey(
+      'guest-recv',
+      senderClientId,
+      frameIndex,
+      assignment.anchorLayerId
+    );
+    const sequenceState = inspectIncomingMultiLayerPatchSequence(streamKey, payload);
+    if (sequenceState.action === 'stale') {
       return;
     }
+    if (sequenceState.action === 'resync') {
+      if (inMasterMode) {
+        await requestTargetedGuestSessionState(senderClientId, streamKey);
+      } else if (isMultiMasterCurrentlyOnline()) {
+        maybeRequestGuestAssignmentSync();
+      }
+      return;
+    }
+    const applyResult = applyLayerPatchPayloadToLayer(targetLayer, payload, pixelCount);
+    if (!applyResult) {
+      if (inMasterMode) {
+        await requestTargetedGuestSessionState(senderClientId, streamKey);
+      } else if (isMultiMasterCurrentlyOnline()) {
+        maybeRequestGuestAssignmentSync();
+      }
+      return;
+    }
+    markIncomingMultiLayerPatchSequenceApplied(streamKey, sequenceState.sequence);
     markRemoteMultiStateDirty();
+    if (applyResult.full || !applyResult.dirtyRect) {
+      markCanvasDirty();
+    } else {
+      markDirtyRect(
+        applyResult.dirtyRect.x0,
+        applyResult.dirtyRect.y0,
+        applyResult.dirtyRect.x1,
+        applyResult.dirtyRect.y1
+      );
+    }
     requestRender();
     requestOverlayRender();
     if (inMasterMode && isResidentMultiRestrictedMasterMode()) {
@@ -43392,6 +43726,7 @@
       layerId: targetLayer.id,
       mode: relayMode,
       hasDirect: relayHasDirect,
+      sequence: sequenceState.sequence,
       changed: typeof payload.changed === 'string' ? payload.changed : '',
       indices: typeof payload.indices === 'string' ? payload.indices : '',
       direct: typeof payload.direct === 'string' ? payload.direct : '',
@@ -43429,11 +43764,32 @@
     if (!pixelCount) {
       return;
     }
-    const applied = applyLayerPatchPayloadToLayer(targetLayer, payload, pixelCount);
-    if (!applied) {
+    const streamKey = getMultiLayerPatchStreamKey('master-recv', senderClientId, frameIndex, layerId);
+    const sequenceState = inspectIncomingMultiLayerPatchSequence(streamKey, payload);
+    if (sequenceState.action === 'stale') {
       return;
     }
+    if (sequenceState.action === 'resync') {
+      maybeRequestGuestAssignmentSync();
+      return;
+    }
+    const applyResult = applyLayerPatchPayloadToLayer(targetLayer, payload, pixelCount);
+    if (!applyResult) {
+      maybeRequestGuestAssignmentSync();
+      return;
+    }
+    markIncomingMultiLayerPatchSequenceApplied(streamKey, sequenceState.sequence);
     markRemoteMultiStateDirty();
+    if (applyResult.full || !applyResult.dirtyRect) {
+      markCanvasDirty();
+    } else {
+      markDirtyRect(
+        applyResult.dirtyRect.x0,
+        applyResult.dirtyRect.y0,
+        applyResult.dirtyRect.x1,
+        applyResult.dirtyRect.y1
+      );
+    }
     requestRender();
     requestOverlayRender();
   }
@@ -43705,6 +44061,9 @@
       multiState.projectKey = projectKey;
       storeMultiProjectKey(projectKey);
       multiState.revision = 0;
+      multiState.publicLobbyThumbnailDirty = true;
+      multiState.publicLobbyThumbnailDataUrl = '';
+      multiState.publicLobbyThumbnailUpdatedAt = 0;
       multiState.assignments.clear();
       multiState.participants.clear();
       multiState.blockedClientIds.clear();
@@ -43859,6 +44218,7 @@
     if (isMultiMasterMode()) {
       if (isResidentMultiRestrictedMasterMode()) {
         if (HISTORY_DRAW_TOOLS.has(_label)) {
+          markMultiPublicLobbyThumbnailDirty();
           scheduleMasterLayerPatchSend();
           scheduleMultiPublicLobbyRoomSync({ immediate: false });
           scheduleResidentRoomPersist({ immediate: false });
@@ -43866,6 +44226,7 @@
         return;
       }
       if (HISTORY_DRAW_TOOLS.has(_label)) {
+        markMultiPublicLobbyThumbnailDirty();
         scheduleMasterLayerPatchSend();
         scheduleMultiPublicLobbyRoomSync({ immediate: false });
         return;
@@ -43873,6 +44234,7 @@
       if (MULTI_PALETTE_HISTORY_LABELS.has(_label)) {
         return;
       }
+      markMultiPublicLobbyThumbnailDirty();
       scheduleMultiSessionStateBroadcast({ immediate: false });
       scheduleMultiPublicLobbyRoomSync({ immediate: false });
       return;
