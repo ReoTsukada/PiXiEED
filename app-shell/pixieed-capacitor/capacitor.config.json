@@ -1,0 +1,9 @@
+{
+  "appId": "jp.pixieed.app",
+  "appName": "PiXiEED",
+  "webDir": "dist/web",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}
