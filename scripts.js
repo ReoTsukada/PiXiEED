@@ -876,7 +876,7 @@
           --pixieed-bottom-nav-height:60px;
           --pixieed-bottom-nav-padding-y:6px;
           --pixieed-footer-ad-total-height:calc(var(--pixieed-footer-ad-height) + (var(--pixieed-footer-ad-padding-y) * 2) + var(--pixieed-safe-bottom));
-          --pixieed-footer-ad-offset:calc(var(--pixieed-footer-ad-total-height) + 10px);
+          --pixieed-footer-ad-offset:var(--pixieed-footer-ad-total-height);
           --pixieed-footer-ad-bg:rgba(11,18,36,0.96);
         }
         @media (orientation: landscape){
@@ -891,7 +891,7 @@
             --pixieed-layout-max-width:1040px;
             --pixieed-footer-ad-height:44px;
             --pixieed-footer-ad-total-height:calc(var(--pixieed-footer-ad-height) + (var(--pixieed-footer-ad-padding-y) * 2) + var(--pixieed-safe-bottom));
-            --pixieed-footer-ad-offset:calc(var(--pixieed-footer-ad-total-height) + 8px);
+            --pixieed-footer-ad-offset:var(--pixieed-footer-ad-total-height);
           }
         }
         body.has-footer-ad > .page,
