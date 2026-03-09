@@ -409,6 +409,253 @@
     return formatCount(normalized, locale);
   }
 
+  function getDocumentLocale() {
+    if (typeof document === 'undefined') {
+      return 'en-US';
+    }
+    const lang = typeof document.documentElement?.lang === 'string'
+      ? document.documentElement.lang.trim()
+      : '';
+    if (!lang) {
+      return 'en-US';
+    }
+    return lang.toLowerCase().startsWith('ja') ? 'ja-JP' : 'en-US';
+  }
+
+  function getHeaderDotCopy(locale) {
+    const isJapanese = typeof locale === 'string' && locale.toLowerCase().startsWith('ja');
+    return {
+      label: 'WORLD DOT TOTAL',
+      loadingValue: '...',
+      errorValue: '--',
+      loadingTitle: isJapanese ? '世界ドット総数を読み込み中' : 'Loading world dot total',
+      errorTitle: isJapanese ? '世界ドット総数を取得できませんでした' : 'Unable to load world dot total',
+      exactTitlePrefix: isJapanese ? '世界ドット総数' : 'World dot total',
+    };
+  }
+
+  function ensureHeaderDotTotalStyles() {
+    if (typeof document === 'undefined' || !document.head) {
+      return;
+    }
+    if (document.getElementById('pixieed-header-dot-total-style')) {
+      return;
+    }
+    const style = document.createElement('style');
+    style.id = 'pixieed-header-dot-total-style';
+    style.textContent = `
+      .header-inner.header-dot-total-ready{
+        display:grid !important;
+        grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+        align-items:center;
+        gap:12px;
+      }
+      .header-inner.header-dot-total-ready .header-slot-left{
+        grid-column:1;
+        justify-self:start;
+        min-width:0;
+      }
+      .header-inner.header-dot-total-ready .header-slot-right{
+        grid-column:3;
+        justify-self:end;
+        min-width:0;
+        display:flex;
+        align-items:center;
+        justify-content:flex-end;
+        gap:8px;
+        flex-wrap:wrap;
+      }
+      .header-inner.header-dot-total-ready .header-slot-right.header-slot-right--empty{
+        min-height:1px;
+      }
+      .header-inner.header-dot-total-ready .header-dot-total{
+        grid-column:2;
+        justify-self:center;
+        width:clamp(190px, 27vw, 360px);
+        max-width:100%;
+        min-width:0;
+        display:grid;
+        gap:2px;
+        padding:7px 14px 8px;
+        border-radius:999px;
+        border:1px solid rgba(126,255,214,0.24);
+        background:
+          linear-gradient(135deg, rgba(8,35,34,0.92), rgba(11,67,86,0.74)),
+          radial-gradient(circle at top left, rgba(126,255,214,0.18), transparent 58%);
+        box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);
+        text-align:center;
+        text-decoration:none;
+        color:#f8fffd;
+      }
+      .header-inner.header-dot-total-ready .header-dot-total__label{
+        margin:0;
+        font-size:10px;
+        line-height:1;
+        letter-spacing:0.14em;
+        text-transform:uppercase;
+        color:#9ae6cf;
+        white-space:nowrap;
+      }
+      .header-inner.header-dot-total-ready .header-dot-total__value{
+        margin:0;
+        font-size:clamp(18px, 2.4vw, 24px);
+        line-height:1.05;
+        font-weight:800;
+        color:#f8fffd;
+        white-space:nowrap;
+      }
+      .header-inner.header-dot-total-ready .header-dot-total.is-loading .header-dot-total__value{
+        opacity:0.74;
+      }
+      @media (max-width:760px){
+        .header-inner.header-dot-total-ready{
+          grid-template-columns:minmax(0,1fr) auto;
+          grid-template-areas:
+            "left right"
+            "center center";
+          row-gap:10px;
+        }
+        .header-inner.header-dot-total-ready .header-slot-left{
+          grid-area:left;
+        }
+        .header-inner.header-dot-total-ready .header-slot-right{
+          grid-area:right;
+        }
+        .header-inner.header-dot-total-ready .header-dot-total{
+          grid-area:center;
+          width:min(100%, 420px);
+          padding:8px 12px 9px;
+          border-radius:14px;
+        }
+      }
+      @media (max-width:520px){
+        .header-inner.header-dot-total-ready{
+          gap:10px;
+          row-gap:8px;
+        }
+        .header-inner.header-dot-total-ready .header-dot-total__label{
+          font-size:9px;
+          letter-spacing:0.12em;
+        }
+        .header-inner.header-dot-total-ready .header-dot-total__value{
+          font-size:clamp(17px, 6vw, 22px);
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function ensureHeaderDotTotalStructure(headerInner) {
+    if (!(headerInner instanceof HTMLElement)) {
+      return null;
+    }
+    const children = Array.from(headerInner.children).filter(node => node instanceof HTMLElement);
+    if (!children.length) {
+      return null;
+    }
+    let counter = children.find(node => node.classList.contains('header-dot-total')) || null;
+    const contentChildren = children.filter(node => !node.classList.contains('header-dot-total'));
+    const left = contentChildren[0] || null;
+    let right = contentChildren.length > 1 ? contentChildren[contentChildren.length - 1] : null;
+    if (!(left instanceof HTMLElement)) {
+      return null;
+    }
+    left.classList.add('header-slot-left');
+    if (!(right instanceof HTMLElement)) {
+      right = document.createElement('div');
+      right.className = 'header-slot-right header-slot-right--empty';
+      right.setAttribute('aria-hidden', 'true');
+      headerInner.appendChild(right);
+    } else {
+      right.classList.add('header-slot-right');
+    }
+    if (!(counter instanceof HTMLElement)) {
+      counter = document.createElement('div');
+      counter.className = 'header-dot-total is-loading';
+      counter.innerHTML = `
+        <span class="header-dot-total__label"></span>
+        <span class="header-dot-total__value"></span>
+      `;
+      headerInner.insertBefore(counter, right);
+    } else if (counter.nextElementSibling !== right) {
+      headerInner.insertBefore(counter, right);
+    }
+    headerInner.classList.add('header-dot-total-ready');
+    return {
+      counter,
+      labelNode: counter.querySelector('.header-dot-total__label'),
+      valueNode: counter.querySelector('.header-dot-total__value'),
+    };
+  }
+
+  async function mountHeaderDotTotal() {
+    if (typeof document === 'undefined') {
+      return;
+    }
+    const headerInners = Array.from(document.querySelectorAll('header .header-inner'))
+      .filter(node => node instanceof HTMLElement);
+    if (!headerInners.length) {
+      return;
+    }
+    ensureHeaderDotTotalStyles();
+    const locale = getDocumentLocale();
+    const copy = getHeaderDotCopy(locale);
+    const instances = headerInners
+      .map(ensureHeaderDotTotalStructure)
+      .filter(Boolean);
+    if (!instances.length) {
+      return;
+    }
+    instances.forEach(instance => {
+      if (!instance?.counter || !instance.labelNode || !instance.valueNode) {
+        return;
+      }
+      instance.labelNode.textContent = copy.label;
+      instance.valueNode.textContent = copy.loadingValue;
+      instance.counter.classList.add('is-loading');
+      instance.counter.title = copy.loadingTitle;
+      instance.counter.setAttribute('aria-label', copy.loadingTitle);
+    });
+    try {
+      const total = await fetchGlobalDotTotal();
+      const compact = formatCompactCount(total, locale);
+      const exact = formatCount(total, locale);
+      instances.forEach(instance => {
+        if (!instance?.counter || !instance.labelNode || !instance.valueNode) {
+          return;
+        }
+        instance.valueNode.textContent = `${compact} PX`;
+        instance.counter.title = `${copy.exactTitlePrefix} ${exact} PX`;
+        instance.counter.setAttribute('aria-label', `${copy.exactTitlePrefix} ${exact} PX`);
+        instance.counter.classList.remove('is-loading');
+      });
+    } catch (error) {
+      console.warn('Failed to load world dot total', error);
+      instances.forEach(instance => {
+        if (!instance?.counter || !instance.valueNode) {
+          return;
+        }
+        instance.valueNode.textContent = copy.errorValue;
+        instance.counter.title = copy.errorTitle;
+        instance.counter.setAttribute('aria-label', copy.errorTitle);
+        instance.counter.classList.remove('is-loading');
+      });
+    }
+  }
+
+  function autoMountHeaderDotTotal() {
+    if (typeof document === 'undefined') {
+      return;
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        mountHeaderDotTotal();
+      }, { once: true });
+      return;
+    }
+    mountHeaderDotTotal();
+  }
+
   window.PiXiEEDDotStats = {
     SUPABASE_URL,
     normalizeDotStats,
@@ -421,5 +668,7 @@
     fetchGlobalDotTotal,
     formatCount,
     formatCompactCount,
+    mountHeaderDotTotal,
   };
+  autoMountHeaderDotTotal();
 })();
