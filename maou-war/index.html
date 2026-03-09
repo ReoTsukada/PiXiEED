@@ -60,6 +60,7 @@
 </script>
 <script async crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
 <script>
+  // モバイル端末で実際の表示領域サイズを取得し、CSS変数へ反映する。
   (function syncViewportVars() {
     const root = document.documentElement;
     const updateViewportVars = () => {
@@ -83,6 +84,7 @@
   })();
 </script>
 <style>
+  /* テーマ色、余白、ビューポート関連の共通設定。 */
   :root {
     color-scheme: dark;
     --bg: radial-gradient(circle at 20% 20%, rgba(59,130,246,0.2), rgba(15,23,42,1)),
@@ -113,6 +115,7 @@
       --app-height: 100dvh;
     }
   }
+  /* ゲーム操作中の選択や長押しメニュー表示を抑止する。 */
   * {
     box-sizing: border-box;
     user-select: none;
@@ -140,6 +143,7 @@
     padding: calc(10px + var(--safe-top)) calc(12px + var(--safe-right)) calc(72px + var(--safe-bottom)) calc(12px + var(--safe-left));
   }
   a { color: inherit; text-decoration: none; }
+  /* 画面全体の基本レイアウト。 */
   .game-shell {
     width: min(1200px, 100%);
     height: 100%;
@@ -236,6 +240,7 @@
     margin: 0;
     font-size: 18px;
   }
+  /* HPやMPなどの主要情報をまとめて見せるHUD。 */
   .hud {
     display: grid;
     gap: 8px;
@@ -333,6 +338,7 @@
     font-weight: 700;
     letter-spacing: 0.02em;
   }
+  /* マップキャンバスを収めるコンテナ。 */
   .map-frame {
     background: rgba(0,0,0,0.35);
     border: 1px solid rgba(255,255,255,0.18);
@@ -491,6 +497,7 @@
     max-width: 100% !important;
     min-width: 0 !important;
   }
+  /* モバイル向けの詳細ステータスシート。 */
   .sheet-overlay {
     position: fixed;
     inset: 0;
@@ -675,6 +682,7 @@
     font-size: 11px;
     color: #c7d2fe;
   }
+  /* 戦闘画面や結果画面で使う全画面オーバーレイ。 */
   .battle-overlay,
   .result-overlay {
     position: fixed;
@@ -801,6 +809,7 @@
   .battle-log p.is-player { color: #7dd3fc; }
   .battle-log p.is-enemy { color: #fca5a5; }
   .battle-log p:last-child { margin-bottom: 0; }
+  /* スキル報酬やイベント選択肢を表示するオーバーレイ。 */
   .choice-overlay {
     position: fixed;
     inset: 0;
@@ -888,6 +897,7 @@
   .rank-status { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
   .result-actions { display: flex; flex-wrap: wrap; gap: 8px; }
   .result-actions .btn { flex: 1 1 140px; }
+  /* 狭い画面ではレイアウトを縦寄せに切り替える。 */
   @media (max-width: 900px) {
     .main { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr); }
     .map-panel { overflow: hidden; grid-template-rows: auto 1fr; }
@@ -968,6 +978,7 @@
   }
 </style>
 <style id="interaction-guard">
+  /* Safari系でのドラッグや選択を追加で防ぐ。 */
   * { -webkit-touch-callout: none; -webkit-user-drag: none; -webkit-user-select: none; -ms-user-select: none; user-select: none; }
   input, textarea, [contenteditable] { -webkit-user-select: none; -ms-user-select: none; user-select: none; }
 </style>
@@ -978,8 +989,10 @@
 <link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
 </head>
 <body>
+  <!-- メインゲーム画面。マップ、ステータス、ログをまとめて表示する。 -->
   <div class="game-shell">
     <div class="main">
+      <!-- プレイ中に主に見るHUDとマップ表示エリア。 -->
       <section class="panel map-panel">
         <div class="hud">
           <div class="hud-bars">
@@ -1015,6 +1028,7 @@
         </div>
       </section>
 
+      <!-- デスクトップ向けの固定ステータス表示。 -->
       <aside class="panel status-panel">
         <h2>まおうさま すてーたす</h2>
         <div class="stat-grid">
@@ -1043,6 +1057,7 @@
 
   </div>
 
+  <!-- モバイルや詳細確認用のステータス、ログ、スキル、装備シート。 -->
   <div class="sheet-overlay" id="statusSheet" aria-hidden="true">
     <div class="sheet">
       <div class="sheet-header">
@@ -1093,6 +1108,7 @@
     </div>
   </div>
 
+  <!-- ターン制戦闘の表示と戦闘ログを担うオーバーレイ。 -->
   <div class="battle-overlay" id="battleOverlay" aria-hidden="true">
     <div class="battle-panel">
       <div class="battle-header">
@@ -1126,6 +1142,7 @@
     </div>
   </div>
 
+  <!-- スキル報酬やイベント選択肢を表示するオーバーレイ。 -->
   <div class="choice-overlay" id="skillChoiceOverlay" aria-hidden="true">
     <div class="choice-panel">
       <h2>宝箱のスキル</h2>
@@ -1139,6 +1156,7 @@
     </div>
   </div>
 
+  <!-- ゲーム終了時の結果表示とランキング表示。 -->
   <div class="result-overlay" id="resultOverlay" aria-hidden="true">
     <div class="result-panel">
       <h2 class="result-title" id="resultTitle">--</h2>
@@ -1164,6 +1182,7 @@
 
 <script>
 (() => {
+  // ゲーム本体。定数定義から描画、移動、戦闘、ランキング処理までをまとめる。
   const MAP_SIZE = 9;
   const NORMAL_VIEW_TILES = 9;
   const HEAL_RATE = 0.2;
@@ -1820,10 +1839,12 @@
   let routeInsightSeen = new Set();
   const MOVE_ANIM_MS = 180;
 
+  // プレイヤー状態とゲーム進行の初期値。
   const BASE_STATS = { hp: 10, mp: 1, atk: 1, spd: 1, def: 1, luc: 1 };
   const DEFAULT_CHOICE_TITLE = '宝箱のスキル';
   const DEFAULT_CHOICE_SUBTITLE = '1つ選んでください';
 
+  // スキルタグ進行用の空カウンタを生成する。
   function createTagCounter() {
     return TAG_IDS.reduce((acc, tag) => {
       acc[tag] = 0;
@@ -1846,6 +1867,7 @@
     return { weapon: false, armor: false, accessory: false };
   }
 
+  // プレイヤーの現在状態をまとめて持つ中心オブジェクト。
   const player = {
     x: 0,
     y: 0,
@@ -1883,6 +1905,7 @@
     poisonSteps: 0
   };
 
+  // マップ生成補助で使う簡易疑似乱数。
   let rngSeed = Date.now() % 2147483647;
   function rand() {
     rngSeed = rngSeed * 16807 % 2147483647;
@@ -1915,6 +1938,7 @@
     mimic: { hp: 1.1, atk: 1.05, def: 1.0, spd: 0.9, luc: 1.0, mp: 0.8 },
     hero: { hp: 1.05, atk: 1.05, def: 1.05, spd: 1.05, luc: 1.05, mp: 1.0 }
   };
+  // 敵レベル情報から実際の戦闘ステータスを算出する。
   function buildStatsFromLevel(level, profile = ENEMY_ARCHETYPES.default) {
     const stats = {
       hp: 10 + 0.5 * level,
@@ -1945,6 +1969,7 @@
     return buildStatsFromLevel(level, profile);
   }
 
+  // 地形の偏りを作るための簡易ノイズ関数を生成する。
   function generateNoiseField(scale) {
     const gridW = Math.ceil(MAP_SIZE / scale) + 2;
     const gridH = Math.ceil(MAP_SIZE / scale) + 2;
@@ -1969,6 +1994,7 @@
     };
   }
 
+  // マップ上で移動可能な陸地セルを決める。
   function buildIslandMask() {
     if (MAP_SIZE <= 9) {
       return Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(true));
@@ -2649,6 +2675,7 @@
     });
   }
 
+  // 新しい周回用にマップ、敵、イベント、訪問状態をまとめて初期化する。
   function buildMap() {
     tiles = FIXED_MAP.map(row => row.slice());
     trailTileOwners = Array.from({ length: MAP_SIZE }, () => Array(MAP_SIZE).fill(null));
@@ -2849,6 +2876,7 @@
     return null;
   }
 
+  // 現在の画面サイズに合わせてキャンバス寸法を調整する。
   function resizeCanvas() {
     const frame = mapCanvas.parentElement;
     if (!frame) return;
@@ -3038,6 +3066,7 @@
     drawMarker(x, y, '#60a5fa', '魔');
   }
 
+  // 現在見えているタイル、プレイヤー、各種マーカーを描画する。
   function renderMap(offsets = null) {
     if (!tileSize) return;
     ctx.clearRect(0, 0, viewSizePx, viewSizePx);
@@ -3140,6 +3169,7 @@
     typeNext();
   }
 
+  // フッターログとシート内ログの両方へ1行追加する。
   function addLog(text) {
     const message = String(text ?? '');
     if (!message) return;
@@ -3232,6 +3262,7 @@
     return safe;
   }
 
+  // ショップ購入を実行し、恒久的な能力上昇を反映する。
   function buyShopVariant(shopKey, shopLabel, variant) {
     ensurePlayerShopState();
     if (!variant) return false;
@@ -3504,6 +3535,7 @@
     `;
   }
 
+  // スキル一覧UIと選択状態を更新する。
   function renderSkillList() {
     if (!skillListEl || !skillDetailEl) return;
     skillListEl.innerHTML = '';
@@ -3653,6 +3685,7 @@
     `;
   }
 
+  // 所持装備一覧を描画し、装備中アクセサリを同期する。
   function renderGearList() {
     if (!gearListEl || !gearDetailEl) return;
     gearListEl.innerHTML = '';
@@ -3695,6 +3728,7 @@
     }
   }
 
+  // 最新のプレイヤー状態を各種ステータスUIへ反映する中心処理。
   function updateStats() {
     updateUnitStats(player);
     updatePlayerLevel();
@@ -4388,6 +4422,7 @@
     }
   }
 
+  // 着地したタイルの種類に応じてイベントや戦闘を解決する。
   async function resolveTileEvent(x, y) {
     const tileId = tiles[y]?.[x];
     if (!tileId) return;
@@ -4525,6 +4560,7 @@
     return !isTileBlocked(tileId);
   }
 
+  // クリック移動用にA*で経路を探索する。
   function findAStarPath(startX, startY, goalX, goalY) {
     if (startX === goalX && startY === goalY) return [];
     if (!canMoveTo(goalX, goalY)) return null;
@@ -4604,6 +4640,7 @@
     return null;
   }
 
+  // 求めた経路に沿って1マスずつ自動移動させる。
   async function movePlayerByAStar(goalX, goalY) {
     if (battleActive || isChoosingSkill || gameOver || isMoving || isAutoPathMoving) return;
     isAutoPathMoving = true;
@@ -4719,6 +4756,7 @@
     return { targetX, targetY };
   }
 
+  // キャンバス入力をタイル座標へ変換し、移動やワープを開始する。
   function handleMapClick(event) {
     event.preventDefault();
     if (battleActive || isChoosingSkill || gameOver || isMoving || isAutoPathMoving) return;
@@ -4793,6 +4831,7 @@
     return true;
   }
 
+  // クリティカル、DOT、防御、スキル補正を反映して最終ダメージを求める。
   function calcDamage(attacker, defender, opts = {}) {
     const power = opts.power || 1;
     const ignoreDef = opts.ignoreDef || false;
@@ -5281,6 +5320,7 @@
     };
   }
 
+  // 戦闘オーバーレイ表示から勝敗決定までの戦闘ループ全体を管理する。
   async function runBattle(enemyTemplate, options = {}) {
     const isBoss = options.isBoss || false;
     const allowDefeat = options.allowDefeat !== false;
@@ -5637,6 +5677,7 @@
     return '名無し';
   }
 
+  // ランキング送信やオフライン時キュー保存に使うキーと状態値。
   const CLIENT_ID_KEY = 'pixieed_client_id';
   const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
   const SCORE_QUEUE_KEY = 'maou-war_score_queue';
@@ -5748,6 +5789,7 @@
     }
   }
 
+  // テーブル列の差異に対応しながらスコア送信を試みる。
   async function sendScorePayload(supabase, payload) {
     let { error } = await supabase.from('scores').insert(payload);
     if (error && isMissingColumn(error, 'game')) {
@@ -5798,6 +5840,7 @@
     return true;
   }
 
+  // オフライン中に溜めたスコア送信キューを再送する。
   async function flushScoreQueue() {
     if (scoreQueueBusy) return;
     const queue = loadScoreQueue();
@@ -5860,6 +5903,7 @@
     }
   }
 
+  // リザルト時のスコアを送信し、その後ランキングを取得する。
   async function submitScore(score, cleared) {
     rankStatus.textContent = 'ダメージ送信中...';
     rankList.innerHTML = '';
@@ -5975,6 +6019,7 @@
     });
   }
 
+  // リザルト画面を開き、最終スコア処理を開始する。
   function endGame(cleared) {
     if (gameOver) return;
     gameOver = true;
@@ -5996,6 +6041,7 @@
     submitScore(score, cleared);
   }
 
+  // 再挑戦用にプレイヤー状態、UI、マップを初期状態へ戻す。
   function resetGame() {
     player.baseStats = { ...BASE_STATS };
     player.level = 1;
@@ -6064,6 +6110,7 @@
     maybeLogRouteInsight();
   }
 
+  // UIイベントを結び付け、初回起動時の初期化を行う。
   document.getElementById('retryBtn').addEventListener('click', resetGame);
 
   function setSheetOpen(open) {
@@ -6113,6 +6160,7 @@
 </script>
 <script>
   (() => {
+    // フッター広告枠が未初期化の場合だけAdSense描画を要求する。
     const ad = document.querySelector('.ad-footer ins.adsbygoogle');
     if (!ad) return;
     if (ad.getAttribute('data-adsbygoogle-status') === 'done') return;
