@@ -2,13 +2,15 @@
   const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
   const SYNC_RPC_ENDPOINT = `${SUPABASE_URL}/rest/v1/rpc/sync_project_dot_count`;
+  const FETCH_STATS_RPC_ENDPOINT = `${SUPABASE_URL}/rest/v1/rpc/get_global_dot_stats`;
   const FETCH_RPC_ENDPOINT = `${SUPABASE_URL}/rest/v1/rpc/get_global_dot_total`;
   const MAX_PROJECT_ID_LENGTH = 120;
+  const HEADER_DOT_TOTAL_ROTATE_MS = 5000;
 
   const inflightSyncs = new Map();
   const queuedSyncs = new Map();
   const lastSyncedCounts = new Map();
-  const RPC_VALUE_KEYS = ['get_global_dot_total', 'sync_project_dot_count', 'total_dots', 'value'];
+  const RPC_VALUE_KEYS = ['get_global_dot_total', 'sync_project_dot_count', 'total_dots', 'value', 'all_time_total', 'today_total'];
 
   function normalizeDotCount(value) {
     const parsed = Number(value);
@@ -366,6 +368,127 @@
     return normalizeBigIntCount(total);
   }
 
+  function extractObjectPayload(payload, rawText = '') {
+    const resolveCandidate = candidate => {
+      if (Array.isArray(candidate) && candidate.length === 1) {
+        return resolveCandidate(candidate[0]);
+      }
+      if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+        if (
+          Object.prototype.hasOwnProperty.call(candidate, 'get_global_dot_stats')
+          && candidate.get_global_dot_stats
+          && typeof candidate.get_global_dot_stats === 'object'
+        ) {
+          return resolveCandidate(candidate.get_global_dot_stats);
+        }
+        return candidate;
+      }
+      if (typeof candidate === 'string' && candidate.trim().startsWith('{')) {
+        try {
+          return resolveCandidate(JSON.parse(candidate));
+        } catch (error) {
+          return null;
+        }
+      }
+      return null;
+    };
+    const fromPayload = resolveCandidate(payload);
+    if (fromPayload) {
+      return fromPayload;
+    }
+    if (typeof rawText === 'string' && rawText.trim().startsWith('{')) {
+      try {
+        return resolveCandidate(JSON.parse(rawText));
+      } catch (error) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  function readBigIntFromObject(source, keys) {
+    if (!source || typeof source !== 'object') {
+      return null;
+    }
+    for (let index = 0; index < keys.length; index += 1) {
+      const key = keys[index];
+      if (!Object.prototype.hasOwnProperty.call(source, key)) {
+        continue;
+      }
+      const resolved = extractBigIntRpcValue(source[key], '');
+      if (typeof resolved === 'bigint') {
+        return normalizeBigIntCount(resolved);
+      }
+    }
+    return null;
+  }
+
+  function readStringFromObject(source, keys) {
+    if (!source || typeof source !== 'object') {
+      return '';
+    }
+    for (let index = 0; index < keys.length; index += 1) {
+      const key = keys[index];
+      if (!Object.prototype.hasOwnProperty.call(source, key)) {
+        continue;
+      }
+      const value = source[key];
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+    }
+    return '';
+  }
+
+  function extractGlobalDotStats(payload, rawText = '') {
+    const source = extractObjectPayload(payload, rawText);
+    if (!source) {
+      return null;
+    }
+    const allTimeTotal = readBigIntFromObject(source, [
+      'all_time_total',
+      'allTimeTotal',
+      'global_dot_total',
+      'total_dots',
+      'total',
+    ]);
+    if (typeof allTimeTotal !== 'bigint') {
+      return null;
+    }
+    const hasTodayTotal = ['today_total', 'todayTotal', 'today_dots']
+      .some(key => Object.prototype.hasOwnProperty.call(source, key));
+    const todayTotal = hasTodayTotal
+      ? (readBigIntFromObject(source, ['today_total', 'todayTotal', 'today_dots']) ?? 0n)
+      : 0n;
+    return {
+      allTimeTotal: normalizeBigIntCount(allTimeTotal),
+      todayTotal: normalizeBigIntCount(todayTotal),
+      hasTodayTotal,
+      todayDateJst: readStringFromObject(source, ['today_date_jst', 'todayDateJst', 'today_date']),
+      timezoneLabel: readStringFromObject(source, ['timezone_label', 'timezoneLabel', 'timezone']),
+    };
+  }
+
+  async function fetchGlobalDotStats() {
+    try {
+      const rpcResponse = await postRpc(FETCH_STATS_RPC_ENDPOINT, {});
+      const stats = extractGlobalDotStats(rpcResponse?.data, rpcResponse?.rawText || '');
+      if (stats) {
+        return stats;
+      }
+    } catch (error) {
+      console.warn('Failed to load daily world dot stats, falling back to total only', error);
+    }
+    const total = await fetchGlobalDotTotal();
+    return {
+      allTimeTotal: total,
+      todayTotal: 0n,
+      hasTodayTotal: false,
+      todayDateJst: '',
+      timezoneLabel: 'Asia/Tokyo',
+    };
+  }
+
   function formatCount(value, locale = undefined) {
     const normalized = normalizeBigIntCount(value);
     try {
@@ -426,11 +549,18 @@
     const isJapanese = typeof locale === 'string' && locale.toLowerCase().startsWith('ja');
     return {
       label: 'WORLD DOT TOTAL',
-      loadingValue: '...',
+      allTimeLabel: isJapanese ? '通算' : 'ALL TIME',
+      todayLabel: isJapanese ? '今日' : 'TODAY',
+      loadingStatValue: '...',
+      unavailableStatValue: '--',
       errorValue: '--',
-      loadingTitle: isJapanese ? '世界ドット総数を読み込み中' : 'Loading world dot total',
-      errorTitle: isJapanese ? '世界ドット総数を取得できませんでした' : 'Unable to load world dot total',
+      loadingTitle: isJapanese ? '世界ドット総数を読み込み中' : 'Loading world dot totals',
+      errorTitle: isJapanese ? '世界ドット総数を取得できませんでした' : 'Unable to load world dot totals',
       exactTitlePrefix: isJapanese ? '世界ドット総数' : 'World dot total',
+      exactAllTimePrefix: isJapanese ? '通算' : 'All time',
+      exactTodayPrefix: isJapanese ? '今日' : 'Today',
+      todayResetSuffix: isJapanese ? '日本時間0:00リセット' : 'resets at 00:00 JST',
+      unavailableTodayText: isJapanese ? '取得待ち' : 'pending',
     };
   }
 
@@ -487,12 +617,12 @@
       .header-inner.header-dot-total-ready .header-dot-total{
         grid-column:2;
         justify-self:center;
-        width:clamp(190px, 27vw, 360px);
+        width:clamp(178px, 24vw, 272px);
         max-width:100%;
         min-width:0;
         display:grid;
         gap:2px;
-        padding:7px 14px 8px;
+        padding:7px 12px 8px;
         border-radius:999px;
         border:1px solid rgba(126,255,214,0.24);
         background:
@@ -512,21 +642,32 @@
         color:#9ae6cf;
         white-space:nowrap;
       }
-      .header-inner.header-dot-total-ready .header-dot-total__value{
+      .header-inner.header-dot-total-ready .header-dot-total__metric-label{
         margin:0;
-        font-size:clamp(18px, 2.4vw, 24px);
+        font-size:8px;
+        line-height:1;
+        letter-spacing:0.12em;
+        text-transform:uppercase;
+        color:rgba(154,230,207,0.82);
+        white-space:nowrap;
+      }
+      .header-inner.header-dot-total-ready .header-dot-total__metric-value{
+        margin:0;
+        font-size:clamp(16px, 2.05vw, 20px);
         line-height:1.05;
         font-weight:800;
         color:#f8fffd;
         white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
       }
-      .header-inner.header-dot-total-ready .header-dot-total.is-loading .header-dot-total__value{
+      .header-inner.header-dot-total-ready .header-dot-total.is-loading .header-dot-total__metric-value{
         opacity:0.74;
       }
       @media (max-width:760px){
         .header-inner.header-dot-total-ready{
           gap:8px;
-          grid-template-columns:minmax(0,1fr) minmax(0, 170px) minmax(0,1fr);
+          grid-template-columns:minmax(0,1fr) minmax(0, 178px) minmax(0,1fr);
         }
         .header-inner.header-dot-total-ready .header-slot-left .brand{
           gap:8px;
@@ -546,8 +687,11 @@
           font-size:9px;
           letter-spacing:0.12em;
         }
-        .header-inner.header-dot-total-ready .header-dot-total__value{
-          font-size:clamp(16px, 4vw, 19px);
+        .header-inner.header-dot-total-ready .header-dot-total__metric-label{
+          font-size:7px;
+        }
+        .header-inner.header-dot-total-ready .header-dot-total__metric-value{
+          font-size:clamp(15px, 3.5vw, 18px);
         }
         .header-inner.header-dot-total-ready .header-slot-right{
           gap:6px;
@@ -563,7 +707,7 @@
       @media (max-width:520px){
         .header-inner.header-dot-total-ready{
           gap:6px;
-          grid-template-columns:minmax(0,1fr) minmax(0, 142px) minmax(0,1fr);
+          grid-template-columns:minmax(0,1fr) minmax(0, 156px) minmax(0,1fr);
         }
         .header-inner.header-dot-total-ready .header-slot-left .brand-title{
           font-size:15px;
@@ -575,8 +719,12 @@
           font-size:8px;
           letter-spacing:0.1em;
         }
-        .header-inner.header-dot-total-ready .header-dot-total__value{
-          font-size:clamp(15px, 5vw, 17px);
+        .header-inner.header-dot-total-ready .header-dot-total__metric-label{
+          font-size:6px;
+          letter-spacing:0.08em;
+        }
+        .header-inner.header-dot-total-ready .header-dot-total__metric-value{
+          font-size:clamp(14px, 4vw, 16px);
         }
         .header-inner.header-dot-total-ready .header-slot-right{
           gap:4px;
@@ -608,16 +756,17 @@
         font-size:11px;
       }
       .header-inner.header-dot-total-ready.header-dot-total-tight .header-dot-total{
-        width:clamp(132px, 24vw, 150px);
+        width:clamp(144px, 22vw, 164px);
         padding:6px 10px 7px;
         border-radius:12px;
       }
-      .header-inner.header-dot-total-ready.header-dot-total-tight .header-dot-total__label{
+      .header-inner.header-dot-total-ready.header-dot-total-tight .header-dot-total__label,
+      .header-inner.header-dot-total-ready.header-dot-total-tight .header-dot-total__metric-label{
         font-size:8px;
         letter-spacing:0.1em;
       }
-      .header-inner.header-dot-total-ready.header-dot-total-tight .header-dot-total__value{
-        font-size:clamp(14px, 2vw, 17px);
+      .header-inner.header-dot-total-ready.header-dot-total-tight .header-dot-total__metric-value{
+        font-size:clamp(13px, 1.8vw, 15px);
       }
       .header-inner.header-dot-total-ready.header-dot-total-tight .header-slot-right{
         gap:4px;
@@ -648,16 +797,17 @@
         font-size:10px;
       }
       .header-inner.header-dot-total-ready.header-dot-total-compact .header-dot-total{
-        width:clamp(112px, 20vw, 128px);
+        width:clamp(126px, 18vw, 142px);
         padding:5px 8px 6px;
         border-radius:11px;
       }
-      .header-inner.header-dot-total-ready.header-dot-total-compact .header-dot-total__label{
+      .header-inner.header-dot-total-ready.header-dot-total-compact .header-dot-total__label,
+      .header-inner.header-dot-total-ready.header-dot-total-compact .header-dot-total__metric-label{
         font-size:7px;
         letter-spacing:0.08em;
       }
-      .header-inner.header-dot-total-ready.header-dot-total-compact .header-dot-total__value{
-        font-size:clamp(13px, 1.8vw, 15px);
+      .header-inner.header-dot-total-ready.header-dot-total-compact .header-dot-total__metric-value{
+        font-size:clamp(12px, 1.6vw, 14px);
       }
       .header-inner.header-dot-total-ready.header-dot-total-compact .header-slot-right{
         gap:3px;
@@ -688,16 +838,17 @@
         display:none;
       }
       .header-inner.header-dot-total-ready.header-dot-total-micro .header-dot-total{
-        width:clamp(96px, 18vw, 108px);
+        width:clamp(108px, 16vw, 120px);
         padding:4px 6px 5px;
         border-radius:10px;
       }
-      .header-inner.header-dot-total-ready.header-dot-total-micro .header-dot-total__label{
+      .header-inner.header-dot-total-ready.header-dot-total-micro .header-dot-total__label,
+      .header-inner.header-dot-total-ready.header-dot-total-micro .header-dot-total__metric-label{
         font-size:6px;
         letter-spacing:0.06em;
       }
-      .header-inner.header-dot-total-ready.header-dot-total-micro .header-dot-total__value{
-        font-size:clamp(12px, 1.6vw, 13px);
+      .header-inner.header-dot-total-ready.header-dot-total-micro .header-dot-total__metric-value{
+        font-size:clamp(11px, 1.4vw, 12px);
       }
       .header-inner.header-dot-total-ready.header-dot-total-micro .header-slot-right{
         gap:2px;
@@ -810,7 +961,8 @@
       counter.className = 'header-dot-total is-loading';
       counter.innerHTML = `
         <span class="header-dot-total__label"></span>
-        <span class="header-dot-total__value"></span>
+        <span class="header-dot-total__metric-label"></span>
+        <span class="header-dot-total__metric-value"></span>
       `;
       headerInner.insertBefore(counter, right);
     } else if (counter.nextElementSibling !== right) {
@@ -820,8 +972,55 @@
     return {
       counter,
       labelNode: counter.querySelector('.header-dot-total__label'),
-      valueNode: counter.querySelector('.header-dot-total__value'),
+      metricLabelNode: counter.querySelector('.header-dot-total__metric-label'),
+      metricValueNode: counter.querySelector('.header-dot-total__metric-value'),
     };
+  }
+
+  function buildHeaderDotTitle(stats, copy, locale) {
+    const allTimeExact = formatCount(stats?.allTimeTotal ?? 0n, locale);
+    if (stats?.hasTodayTotal) {
+      const todayExact = formatCount(stats.todayTotal ?? 0n, locale);
+      return `${copy.exactTitlePrefix}: ${copy.exactAllTimePrefix} ${allTimeExact} PX / ${copy.exactTodayPrefix} ${todayExact} PX (${copy.todayResetSuffix})`;
+    }
+    return `${copy.exactTitlePrefix}: ${copy.exactAllTimePrefix} ${allTimeExact} PX / ${copy.exactTodayPrefix} ${copy.unavailableTodayText} (${copy.todayResetSuffix})`;
+  }
+
+  function clearHeaderDotTotalRotation() {
+    const intervalId = window.__PIXIEED_HEADER_DOT_TOTAL_ROTATION_ID__;
+    if (intervalId) {
+      window.clearInterval(intervalId);
+      window.__PIXIEED_HEADER_DOT_TOTAL_ROTATION_ID__ = 0;
+    }
+  }
+
+  function startHeaderDotTotalRotation(instances, metrics, cardTitle) {
+    clearHeaderDotTotalRotation();
+    if (!Array.isArray(metrics) || !metrics.length) {
+      return;
+    }
+    let activeIndex = 0;
+    const applyMetric = () => {
+      const metric = metrics[activeIndex] || metrics[0];
+      instances.forEach(instance => {
+        if (!instance?.counter || !instance.metricLabelNode || !instance.metricValueNode) {
+          return;
+        }
+        instance.metricLabelNode.textContent = metric.label;
+        instance.metricValueNode.textContent = metric.value;
+        instance.counter.title = cardTitle;
+        instance.counter.setAttribute('aria-label', cardTitle);
+      });
+      updateHeaderDotTotalLayout();
+    };
+    applyMetric();
+    if (metrics.length <= 1) {
+      return;
+    }
+    window.__PIXIEED_HEADER_DOT_TOTAL_ROTATION_ID__ = window.setInterval(() => {
+      activeIndex = (activeIndex + 1) % metrics.length;
+      applyMetric();
+    }, HEADER_DOT_TOTAL_ROTATE_MS);
   }
 
   async function mountHeaderDotTotal() {
@@ -844,37 +1043,64 @@
     }
     bindHeaderDotTotalLayoutObserver();
     instances.forEach(instance => {
-      if (!instance?.counter || !instance.labelNode || !instance.valueNode) {
+      if (
+        !instance?.counter
+        || !instance.labelNode
+        || !instance.metricLabelNode
+        || !instance.metricValueNode
+      ) {
         return;
       }
       instance.labelNode.textContent = copy.label;
-      instance.valueNode.textContent = copy.loadingValue;
+      instance.metricLabelNode.textContent = copy.allTimeLabel;
+      instance.metricValueNode.textContent = copy.loadingStatValue;
       instance.counter.classList.add('is-loading');
       instance.counter.title = copy.loadingTitle;
       instance.counter.setAttribute('aria-label', copy.loadingTitle);
     });
     updateHeaderDotTotalLayout();
     try {
-      const total = await fetchGlobalDotTotal();
-      const compact = formatCompactCount(total, locale);
-      const exact = formatCount(total, locale);
+      const stats = await fetchGlobalDotStats();
+      const metrics = [
+        {
+          label: copy.allTimeLabel,
+          value: `${formatCompactCount(stats.allTimeTotal, locale)} PX`,
+        },
+      ];
+      if (stats.hasTodayTotal) {
+        metrics.push({
+          label: copy.todayLabel,
+          value: `${formatCompactCount(stats.todayTotal, locale)} PX`,
+        });
+      } else {
+        metrics.push({
+          label: copy.todayLabel,
+          value: copy.unavailableStatValue,
+        });
+      }
+      const cardTitle = buildHeaderDotTitle(stats, copy, locale);
       instances.forEach(instance => {
-        if (!instance?.counter || !instance.labelNode || !instance.valueNode) {
+        if (
+          !instance?.counter
+          || !instance.labelNode
+          || !instance.metricLabelNode
+          || !instance.metricValueNode
+        ) {
           return;
         }
-        instance.valueNode.textContent = `${compact} PX`;
-        instance.counter.title = `${copy.exactTitlePrefix} ${exact} PX`;
-        instance.counter.setAttribute('aria-label', `${copy.exactTitlePrefix} ${exact} PX`);
+        instance.labelNode.textContent = copy.label;
         instance.counter.classList.remove('is-loading');
       });
-      updateHeaderDotTotalLayout();
+      startHeaderDotTotalRotation(instances, metrics, cardTitle);
     } catch (error) {
       console.warn('Failed to load world dot total', error);
+      clearHeaderDotTotalRotation();
       instances.forEach(instance => {
-        if (!instance?.counter || !instance.valueNode) {
+        if (!instance?.counter || !instance.metricLabelNode || !instance.metricValueNode) {
           return;
         }
-        instance.valueNode.textContent = copy.errorValue;
+        instance.metricLabelNode.textContent = copy.allTimeLabel;
+        instance.metricValueNode.textContent = copy.errorValue;
         instance.counter.title = copy.errorTitle;
         instance.counter.setAttribute('aria-label', copy.errorTitle);
         instance.counter.classList.remove('is-loading');
@@ -906,6 +1132,7 @@
     countImageData,
     syncProjectDotCount,
     fetchGlobalDotTotal,
+    fetchGlobalDotStats,
     formatCount,
     formatCompactCount,
     mountHeaderDotTotal,
