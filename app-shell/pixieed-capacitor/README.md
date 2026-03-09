@@ -25,6 +25,12 @@ npm install
 npm run build:web
 ```
 
+PiXiEED アプリアイコンを `icon/PiXiEED.icon512.png` から再生成する場合:
+
+```bash
+npm run icons:generate
+```
+
 3. ネイティブプロジェクトを生成
 
 ```bash
@@ -94,6 +100,7 @@ npm run cap:open:ios
 ```bash
 npm run doctor:android
 npm run doctor:ios
+npm run icons:generate
 npm run android:keystore:generate
 npm run android:sdk:install
 npm run android:build:debug
@@ -107,6 +114,7 @@ npm run ios:export:appstore
 
 - `doctor:android`: `JAVA_HOME` と `ANDROID_SDK_ROOT` を app shell 用に補って確認します。
 - `doctor:ios`: Xcode / iOS SDK / 利用可能 Simulator を確認します。
+- `icons:generate`: `icon/PiXiEED.icon512.png` から Android / iOS のアプリアイコンを再生成します。
 - `android:keystore:generate`: Android の upload keystore と `keystore.properties` をローカル生成します。
 - `android:sdk:install`: `compileSdkVersion = 36` に必要な Android SDK パッケージを入れます。
 - `android:build:debug`: Android の debug APK ビルドを実行します。
