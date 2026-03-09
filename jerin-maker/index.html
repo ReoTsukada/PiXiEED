@@ -1760,6 +1760,8 @@
     undoStack: [],
     redoStack: [],
   };
+  let liteDotBaselineImageData = null;
+  let liteDotCumulativeStats = null;
   let undoStack = baseLayer.undoStack;
   let redoStack = baseLayer.redoStack;
   ctx.imageSmoothingEnabled = false;
@@ -2095,6 +2097,9 @@
     const target = normalizeCanvasSize(nextSize);
     const sourceSize = canvasSize;
     baseLayer.imageData = resampleImageData(baseLayer.imageData, target);
+    if (liteDotBaselineImageData) {
+      liteDotBaselineImageData = resampleImageData(liteDotBaselineImageData, target);
+    }
     if (diffLayer?.imageData) {
       diffLayer.imageData = resampleImageData(diffLayer.imageData, target);
     }
@@ -2193,6 +2198,76 @@
     if (!source) return ctx.createImageData(canvasSize, canvasSize);
     return new ImageData(new Uint8ClampedArray(source.data), source.width, source.height);
   }
+
+  function createEmptyLiteDotStats() {
+    if (dotStatsApi && typeof dotStatsApi.normalizeDotStats === 'function') {
+      const normalized = dotStatsApi.normalizeDotStats({
+        totalDots: 0,
+        frameDots: [{
+          frameId: 'frame-1',
+          name: 'Canvas',
+          dotCount: 0,
+        }],
+      });
+      if (normalized) {
+        return normalized;
+      }
+    }
+    return {
+      totalDots: 0,
+      frameDots: [{
+        frameId: 'frame-1',
+        name: 'Canvas',
+        dotCount: 0,
+      }],
+    };
+  }
+
+  function setLiteDotTrackingBaseline(sourceImageData = baseLayer.imageData, dotStats = null, { renewProjectId = false } = {}) {
+    liteDotCumulativeStats = dotStatsApi && typeof dotStatsApi.normalizeDotStats === 'function'
+      ? (dotStatsApi.normalizeDotStats(dotStats || createEmptyLiteDotStats()) || createEmptyLiteDotStats())
+      : (dotStats || createEmptyLiteDotStats());
+    liteDotBaselineImageData = dotStatsApi && typeof dotStatsApi.cloneImageDataLike === 'function'
+      ? (dotStatsApi.cloneImageDataLike(sourceImageData) || cloneImageData(sourceImageData))
+      : cloneImageData(sourceImageData);
+    if (renewProjectId) {
+      liteDotProjectId = dotStatsApi && typeof dotStatsApi.createProjectId === 'function'
+        ? dotStatsApi.createProjectId('pixiedraw-lite')
+        : `pixiedraw-lite-${Date.now().toString(36)}`;
+    }
+  }
+
+  function resolveLiteTrackedDotStats() {
+    if (!dotStatsApi || typeof dotStatsApi.normalizeDotStats !== 'function') {
+      return null;
+    }
+    const baseStats = dotStatsApi.normalizeDotStats(liteDotCumulativeStats || createEmptyLiteDotStats())
+      || createEmptyLiteDotStats();
+    let deltaStats = createEmptyLiteDotStats();
+    try {
+      if (typeof dotStatsApi.countImageDataDiff === 'function') {
+        deltaStats = dotStatsApi.countImageDataDiff(baseLayer.imageData, liteDotBaselineImageData, {
+          frameId: 'frame-1',
+          frameName: 'Canvas',
+        });
+      } else if (typeof dotStatsApi.countImageData === 'function') {
+        deltaStats = dotStatsApi.countImageData(baseLayer.imageData, {
+          frameId: 'frame-1',
+          frameName: 'Canvas',
+        });
+      }
+    } catch (error) {
+      console.warn('Failed to compute PiXiEEDraw Lite tracked dots', error);
+      deltaStats = createEmptyLiteDotStats();
+    }
+    if (typeof dotStatsApi.combineDotStats === 'function') {
+      const combined = dotStatsApi.combineDotStats(baseStats, deltaStats);
+      return dotStatsApi.normalizeDotStats(combined) || combined;
+    }
+    return dotStatsApi.normalizeDotStats(deltaStats) || deltaStats;
+  }
+
+  setLiteDotTrackingBaseline(baseLayer.imageData, null);
 
   function ensureDiffLayer() {
     if (diffLayer && diffLayer.imageData.width === canvasSize && diffLayer.imageData.height === canvasSize) {
@@ -2818,9 +2893,7 @@
       }
     } else {
       baseLayer.imageData = blank;
-      if (dotStatsApi && typeof dotStatsApi.createProjectId === 'function') {
-        liteDotProjectId = dotStatsApi.createProjectId('pixiedraw-lite');
-      }
+      setLiteDotTrackingBaseline(blank, null, { renewProjectId: true });
     }
     imageData = blank;
     data = imageData.data;
@@ -4373,13 +4446,10 @@
     const filename = `pixieedrawlite-${canvasSize}px@640.png`;
     const result = await saveDataUrlWithPickerFallback(output, filename, 'image/png');
     if (result === 'cancel') return;
-    if (dotStatsApi && typeof dotStatsApi.countImageData === 'function' && typeof dotStatsApi.syncProjectDotCount === 'function') {
+    if (dotStatsApi && typeof dotStatsApi.syncProjectDotCount === 'function') {
       try {
-        const dotStats = dotStatsApi.countImageData(baseLayer.imageData, {
-          frameId: 'frame-1',
-          frameName: 'Canvas',
-        });
-        if (dotStats && dotStats.totalDots > 0 && liteDotProjectId) {
+        const dotStats = resolveLiteTrackedDotStats();
+        if (dotStats && liteDotProjectId) {
           dotStatsApi.syncProjectDotCount({
             projectId: liteDotProjectId,
             dotCount: dotStats.totalDots,
@@ -4387,6 +4457,9 @@
           }).catch(error => {
             console.warn('Failed to sync PiXiEEDraw Lite dot total', error);
           });
+        }
+        if (dotStats) {
+          setLiteDotTrackingBaseline(baseLayer.imageData, dotStats);
         }
       } catch (error) {
         console.warn('Failed to count PiXiEEDraw Lite dots', error);
