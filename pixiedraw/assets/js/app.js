@@ -14532,11 +14532,28 @@
   }
 
   function buildPackagedProjectPayload(snapshot, { session = null, updatedAt = '' } = {}) {
+    const dotStatsApi = window.PiXiEEDDotStats && typeof window.PiXiEEDDotStats === 'object'
+      ? window.PiXiEEDDotStats
+      : null;
+    let resolvedDotStats = null;
+    if (dotStatsApi) {
+      try {
+        resolvedDotStats = typeof dotStatsApi.countEditorSnapshot === 'function'
+          ? dotStatsApi.countEditorSnapshot(snapshot)
+          : null;
+        if (resolvedDotStats && typeof dotStatsApi.normalizeDotStats === 'function') {
+          resolvedDotStats = dotStatsApi.normalizeDotStats(resolvedDotStats);
+        }
+      } catch (error) {
+        console.warn('Failed to compute project dot stats', error);
+        resolvedDotStats = null;
+      }
+    }
     const payload = serializeDocumentSnapshot(snapshot);
     const packagedSession = session && typeof session === 'object'
       ? session
       : buildProjectSessionPayload();
-    return {
+    const packaged = {
       type: PROJECT_PACKAGE_TYPE,
       packageVersion: PROJECT_PACKAGE_VERSION,
       version: DOCUMENT_FILE_VERSION,
@@ -14544,6 +14561,54 @@
       session: packagedSession,
       updatedAt: updatedAt || new Date().toISOString(),
     };
+    if (resolvedDotStats) {
+      packaged.dotStats = resolvedDotStats;
+    }
+    return packaged;
+  }
+
+  function resolvePackagedProjectDotStats(packagedPayload, snapshot = null) {
+    const dotStatsApi = window.PiXiEEDDotStats && typeof window.PiXiEEDDotStats === 'object'
+      ? window.PiXiEEDDotStats
+      : null;
+    if (!dotStatsApi || typeof dotStatsApi.normalizeDotStats !== 'function') {
+      return null;
+    }
+    const packagedStats = dotStatsApi.normalizeDotStats(packagedPayload?.dotStats || null);
+    if (packagedStats) {
+      return packagedStats;
+    }
+    if (!snapshot || typeof dotStatsApi.countEditorSnapshot !== 'function') {
+      return null;
+    }
+    try {
+      return dotStatsApi.normalizeDotStats(dotStatsApi.countEditorSnapshot(snapshot));
+    } catch (error) {
+      console.warn('Failed to resolve packaged project dot stats', error);
+      return null;
+    }
+  }
+
+  function schedulePackagedProjectDotSync(projectId, dotStats) {
+    const resolvedProjectId = normalizeAutosaveProjectId(projectId || '');
+    if (!resolvedProjectId || !dotStats || dotStats.totalDots <= 0) {
+      return;
+    }
+    const dotStatsApi = window.PiXiEEDDotStats && typeof window.PiXiEEDDotStats === 'object'
+      ? window.PiXiEEDDotStats
+      : null;
+    if (!dotStatsApi || typeof dotStatsApi.syncProjectDotCount !== 'function') {
+      return;
+    }
+    window.setTimeout(() => {
+      dotStatsApi.syncProjectDotCount({
+        projectId: resolvedProjectId,
+        dotCount: dotStats.totalDots,
+        app: 'pixiedraw',
+      }).catch(error => {
+        console.warn('Failed to sync PiXiEEDraw dot total', error);
+      });
+    }, 0);
   }
 
   async function recordRecentProjectSnapshot(
@@ -14591,6 +14656,7 @@
       const thumbnail = shouldRefreshThumbnail
         ? (await generateSnapshotThumbnail(snapshot))
         : previousEntry.thumbnail;
+      const dotStats = resolvePackagedProjectDotStats(packaged, snapshot);
       const updatedEntry = {
         id: resolvedProjectId,
         name: displayName,
@@ -14599,10 +14665,16 @@
         thumbnail: thumbnail || null,
         project: packaged,
       };
+      if (dotStats) {
+        updatedEntry.dotStats = dotStats;
+      }
       workingEntries.unshift(updatedEntry);
       const limited = workingEntries.slice(0, RECENT_PROJECT_LIMIT);
       await saveRecentProjectsList(existingEntries, limited);
       setRecentProjectsCache(limited);
+      if (dotStats) {
+        schedulePackagedProjectDotSync(resolvedProjectId, dotStats);
+      }
       return updatedEntry;
     } catch (error) {
       console.warn('Failed to record recent project snapshot', error);
