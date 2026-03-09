@@ -10,8 +10,20 @@
   const platform = nav.platform || '';
   const pathname = typeof window.location?.pathname === 'string' ? window.location.pathname : '';
   const isPixieeDrawPath = /(?:^|\/)pixiedraw(?:\/|$)/i.test(pathname);
+  const isNativeApp = (() => {
+    const capacitor = window.Capacitor || globalThis.Capacitor;
+    try {
+      if (capacitor && typeof capacitor.isNativePlatform === 'function' && capacitor.isNativePlatform()) {
+        return true;
+      }
+    } catch (_error) {
+      // Ignore Capacitor runtime detection failures.
+    }
+    const protocol = String(window.location?.protocol || '');
+    return protocol === 'capacitor:' || protocol === 'ionic:' || protocol === 'app:';
+  })();
 
-  if (!isPixieeDrawPath) {
+  if (!isPixieeDrawPath || isNativeApp) {
     return;
   }
 
