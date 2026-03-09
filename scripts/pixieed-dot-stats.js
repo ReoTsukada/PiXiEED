@@ -200,6 +200,392 @@
     };
   }
 
+  function cloneEditorSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') {
+      return null;
+    }
+    return {
+      width: Math.max(1, Math.floor(Number(snapshot.width) || 0)),
+      height: Math.max(1, Math.floor(Number(snapshot.height) || 0)),
+      documentName: typeof snapshot.documentName === 'string' ? snapshot.documentName : '',
+      frames: Array.isArray(snapshot.frames)
+        ? snapshot.frames.map((frame, frameIndex) => ({
+          id: typeof frame?.id === 'string' ? frame.id : `frame-${frameIndex + 1}`,
+          name: typeof frame?.name === 'string' ? frame.name : `Frame ${frameIndex + 1}`,
+          layers: Array.isArray(frame?.layers)
+            ? frame.layers.map((layer, layerIndex) => ({
+              id: typeof layer?.id === 'string' ? layer.id : `layer-${layerIndex + 1}`,
+              name: typeof layer?.name === 'string' ? layer.name : `Layer ${layerIndex + 1}`,
+              indices: layer?.indices instanceof Int16Array ? new Int16Array(layer.indices) : null,
+              direct: layer?.direct instanceof Uint8ClampedArray ? new Uint8ClampedArray(layer.direct) : null,
+            }))
+            : [],
+        }))
+        : [],
+    };
+  }
+
+  function cloneImageDataLike(imageData) {
+    if (!imageData || !(imageData.data instanceof Uint8ClampedArray)) {
+      return null;
+    }
+    const width = Math.max(1, Math.floor(Number(imageData.width) || 0));
+    const height = Math.max(1, Math.floor(Number(imageData.height) || 0));
+    return new ImageData(new Uint8ClampedArray(imageData.data), width, height);
+  }
+
+  function resolveFrameKey(frame, index) {
+    return clampProjectId(typeof frame?.id === 'string' ? frame.id : `frame-${index + 1}`) || `frame-${index + 1}`;
+  }
+
+  function resolveLayerKey(layer, index) {
+    return clampProjectId(typeof layer?.id === 'string' ? layer.id : `layer-${index + 1}`) || `layer-${index + 1}`;
+  }
+
+  function getFrameLabel(frame, index) {
+    return typeof frame?.name === 'string' && frame.name.trim()
+      ? frame.name.trim()
+      : `Frame ${index + 1}`;
+  }
+
+  function getLayerIndexValue(indices, pixelIndex) {
+    return indices instanceof Int16Array && pixelIndex >= 0 && pixelIndex < indices.length
+      ? indices[pixelIndex]
+      : -1;
+  }
+
+  function getDirectAlphaValue(direct, pixelBase) {
+    return direct instanceof Uint8ClampedArray && pixelBase >= 0 && pixelBase + 3 < direct.length
+      ? direct[pixelBase + 3]
+      : 0;
+  }
+
+  function getDirectChannelValue(direct, pixelBase, offset) {
+    return direct instanceof Uint8ClampedArray && pixelBase >= 0 && pixelBase + offset < direct.length
+      ? direct[pixelBase + offset]
+      : 0;
+  }
+
+  function countLayerPixelDiffSameSize(currentLayer, baselineLayer, pixelCount) {
+    const currentIndices = currentLayer?.indices instanceof Int16Array ? currentLayer.indices : null;
+    const baselineIndices = baselineLayer?.indices instanceof Int16Array ? baselineLayer.indices : null;
+    const currentDirect = currentLayer?.direct instanceof Uint8ClampedArray ? currentLayer.direct : null;
+    const baselineDirect = baselineLayer?.direct instanceof Uint8ClampedArray ? baselineLayer.direct : null;
+    let total = 0;
+    for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
+      const currentIndex = getLayerIndexValue(currentIndices, pixelIndex);
+      const baselineIndex = getLayerIndexValue(baselineIndices, pixelIndex);
+      if (currentIndex >= 0 || baselineIndex >= 0) {
+        if (currentIndex !== baselineIndex) {
+          total += 1;
+        }
+        continue;
+      }
+      const pixelBase = pixelIndex * 4;
+      const currentAlpha = getDirectAlphaValue(currentDirect, pixelBase);
+      const baselineAlpha = getDirectAlphaValue(baselineDirect, pixelBase);
+      if (currentAlpha <= 0 && baselineAlpha <= 0) {
+        continue;
+      }
+      if (currentAlpha !== baselineAlpha) {
+        total += 1;
+        continue;
+      }
+      if (
+        getDirectChannelValue(currentDirect, pixelBase, 0) !== getDirectChannelValue(baselineDirect, pixelBase, 0)
+        || getDirectChannelValue(currentDirect, pixelBase, 1) !== getDirectChannelValue(baselineDirect, pixelBase, 1)
+        || getDirectChannelValue(currentDirect, pixelBase, 2) !== getDirectChannelValue(baselineDirect, pixelBase, 2)
+      ) {
+        total += 1;
+      }
+    }
+    return total;
+  }
+
+  function countLayerPixelDiffDifferentSize(
+    currentLayer,
+    baselineLayer,
+    currentWidth,
+    currentHeight,
+    baselineWidth,
+    baselineHeight
+  ) {
+    const currentIndices = currentLayer?.indices instanceof Int16Array ? currentLayer.indices : null;
+    const baselineIndices = baselineLayer?.indices instanceof Int16Array ? baselineLayer.indices : null;
+    const currentDirect = currentLayer?.direct instanceof Uint8ClampedArray ? currentLayer.direct : null;
+    const baselineDirect = baselineLayer?.direct instanceof Uint8ClampedArray ? baselineLayer.direct : null;
+    const maxWidth = Math.max(currentWidth, baselineWidth);
+    const maxHeight = Math.max(currentHeight, baselineHeight);
+    let total = 0;
+    for (let y = 0; y < maxHeight; y += 1) {
+      for (let x = 0; x < maxWidth; x += 1) {
+        const currentPixelIndex = x < currentWidth && y < currentHeight
+          ? ((y * currentWidth) + x)
+          : -1;
+        const baselinePixelIndex = x < baselineWidth && y < baselineHeight
+          ? ((y * baselineWidth) + x)
+          : -1;
+        const currentIndex = getLayerIndexValue(currentIndices, currentPixelIndex);
+        const baselineIndex = getLayerIndexValue(baselineIndices, baselinePixelIndex);
+        if (currentIndex >= 0 || baselineIndex >= 0) {
+          if (currentIndex !== baselineIndex) {
+            total += 1;
+          }
+          continue;
+        }
+        const currentBase = currentPixelIndex >= 0 ? currentPixelIndex * 4 : -1;
+        const baselineBase = baselinePixelIndex >= 0 ? baselinePixelIndex * 4 : -1;
+        const currentAlpha = getDirectAlphaValue(currentDirect, currentBase);
+        const baselineAlpha = getDirectAlphaValue(baselineDirect, baselineBase);
+        if (currentAlpha <= 0 && baselineAlpha <= 0) {
+          continue;
+        }
+        if (currentAlpha !== baselineAlpha) {
+          total += 1;
+          continue;
+        }
+        if (
+          getDirectChannelValue(currentDirect, currentBase, 0) !== getDirectChannelValue(baselineDirect, baselineBase, 0)
+          || getDirectChannelValue(currentDirect, currentBase, 1) !== getDirectChannelValue(baselineDirect, baselineBase, 1)
+          || getDirectChannelValue(currentDirect, currentBase, 2) !== getDirectChannelValue(baselineDirect, baselineBase, 2)
+        ) {
+          total += 1;
+        }
+      }
+    }
+    return total;
+  }
+
+  function countLayerPixelDiff(
+    currentLayer,
+    baselineLayer,
+    currentWidth,
+    currentHeight,
+    baselineWidth,
+    baselineHeight
+  ) {
+    const safeCurrentWidth = Math.max(1, Math.floor(Number(currentWidth) || 0));
+    const safeCurrentHeight = Math.max(1, Math.floor(Number(currentHeight) || 0));
+    const safeBaselineWidth = Math.max(1, Math.floor(Number(baselineWidth) || 0));
+    const safeBaselineHeight = Math.max(1, Math.floor(Number(baselineHeight) || 0));
+    if (safeCurrentWidth === safeBaselineWidth && safeCurrentHeight === safeBaselineHeight) {
+      return countLayerPixelDiffSameSize(currentLayer, baselineLayer, safeCurrentWidth * safeCurrentHeight);
+    }
+    return countLayerPixelDiffDifferentSize(
+      currentLayer,
+      baselineLayer,
+      safeCurrentWidth,
+      safeCurrentHeight,
+      safeBaselineWidth,
+      safeBaselineHeight
+    );
+  }
+
+  function countFramePixelDiff(
+    currentFrame,
+    baselineFrame,
+    currentWidth,
+    currentHeight,
+    baselineWidth,
+    baselineHeight
+  ) {
+    const currentLayers = Array.isArray(currentFrame?.layers) ? currentFrame.layers : [];
+    const baselineLayers = Array.isArray(baselineFrame?.layers) ? baselineFrame.layers : [];
+    const baselineByKey = new Map();
+    baselineLayers.forEach((layer, index) => {
+      baselineByKey.set(resolveLayerKey(layer, index), layer);
+    });
+    const consumedKeys = new Set();
+    let frameTotal = 0;
+    currentLayers.forEach((layer, index) => {
+      const key = resolveLayerKey(layer, index);
+      frameTotal += countLayerPixelDiff(
+        layer,
+        baselineByKey.get(key) || null,
+        currentWidth,
+        currentHeight,
+        baselineWidth,
+        baselineHeight
+      );
+      consumedKeys.add(key);
+    });
+    baselineLayers.forEach((layer, index) => {
+      const key = resolveLayerKey(layer, index);
+      if (consumedKeys.has(key)) {
+        return;
+      }
+      frameTotal += countLayerPixelDiff(
+        null,
+        layer,
+        currentWidth,
+        currentHeight,
+        baselineWidth,
+        baselineHeight
+      );
+    });
+    return frameTotal;
+  }
+
+  function countEditorSnapshotDiff(snapshot, baselineSnapshot) {
+    const currentSnapshot = snapshot && typeof snapshot === 'object'
+      ? snapshot
+      : { width: 1, height: 1, frames: [] };
+    const previousSnapshot = baselineSnapshot && typeof baselineSnapshot === 'object'
+      ? baselineSnapshot
+      : { width: 1, height: 1, frames: [] };
+    const currentWidth = Math.max(1, Math.floor(Number(currentSnapshot.width) || 0));
+    const currentHeight = Math.max(1, Math.floor(Number(currentSnapshot.height) || 0));
+    const baselineWidth = Math.max(1, Math.floor(Number(previousSnapshot.width) || 0));
+    const baselineHeight = Math.max(1, Math.floor(Number(previousSnapshot.height) || 0));
+    const currentFrames = Array.isArray(currentSnapshot.frames) ? currentSnapshot.frames : [];
+    const baselineFrames = Array.isArray(previousSnapshot.frames) ? previousSnapshot.frames : [];
+    const baselineByKey = new Map();
+    baselineFrames.forEach((frame, index) => {
+      baselineByKey.set(resolveFrameKey(frame, index), frame);
+    });
+    const consumedKeys = new Set();
+    const frameDots = [];
+    let totalDots = 0;
+
+    currentFrames.forEach((frame, index) => {
+      const key = resolveFrameKey(frame, index);
+      const frameTotal = countFramePixelDiff(
+        frame,
+        baselineByKey.get(key) || null,
+        currentWidth,
+        currentHeight,
+        baselineWidth,
+        baselineHeight
+      );
+      frameDots.push({
+        frameId: key,
+        name: getFrameLabel(frame, index),
+        dotCount: frameTotal,
+      });
+      totalDots += frameTotal;
+      consumedKeys.add(key);
+    });
+
+    baselineFrames.forEach((frame, index) => {
+      const key = resolveFrameKey(frame, index);
+      if (consumedKeys.has(key)) {
+        return;
+      }
+      const frameTotal = countFramePixelDiff(
+        null,
+        frame,
+        currentWidth,
+        currentHeight,
+        baselineWidth,
+        baselineHeight
+      );
+      frameDots.push({
+        frameId: key,
+        name: getFrameLabel(frame, index),
+        dotCount: frameTotal,
+      });
+      totalDots += frameTotal;
+    });
+
+    return {
+      totalDots,
+      frameDots,
+    };
+  }
+
+  function countImageDataDiff(imageData, baselineImageData, options = {}) {
+    const currentWidth = Math.max(1, Math.floor(Number(imageData?.width) || 0));
+    const currentHeight = Math.max(1, Math.floor(Number(imageData?.height) || 0));
+    const baselineWidth = Math.max(1, Math.floor(Number(baselineImageData?.width) || 0));
+    const baselineHeight = Math.max(1, Math.floor(Number(baselineImageData?.height) || 0));
+    const currentData = imageData?.data instanceof Uint8ClampedArray ? imageData.data : null;
+    const baselineData = baselineImageData?.data instanceof Uint8ClampedArray ? baselineImageData.data : null;
+    let totalDots = 0;
+    if (currentWidth === baselineWidth && currentHeight === baselineHeight) {
+      const pixelCount = currentWidth * currentHeight;
+      for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
+        const pixelBase = pixelIndex * 4;
+        const currentAlpha = getDirectAlphaValue(currentData, pixelBase);
+        const baselineAlpha = getDirectAlphaValue(baselineData, pixelBase);
+        if (currentAlpha <= 0 && baselineAlpha <= 0) {
+          continue;
+        }
+        if (
+          currentAlpha !== baselineAlpha
+          || getDirectChannelValue(currentData, pixelBase, 0) !== getDirectChannelValue(baselineData, pixelBase, 0)
+          || getDirectChannelValue(currentData, pixelBase, 1) !== getDirectChannelValue(baselineData, pixelBase, 1)
+          || getDirectChannelValue(currentData, pixelBase, 2) !== getDirectChannelValue(baselineData, pixelBase, 2)
+        ) {
+          totalDots += 1;
+        }
+      }
+    } else {
+      const maxWidth = Math.max(currentWidth, baselineWidth);
+      const maxHeight = Math.max(currentHeight, baselineHeight);
+      for (let y = 0; y < maxHeight; y += 1) {
+        for (let x = 0; x < maxWidth; x += 1) {
+          const currentPixelIndex = x < currentWidth && y < currentHeight
+            ? ((y * currentWidth) + x)
+            : -1;
+          const baselinePixelIndex = x < baselineWidth && y < baselineHeight
+            ? ((y * baselineWidth) + x)
+            : -1;
+          const currentBase = currentPixelIndex >= 0 ? currentPixelIndex * 4 : -1;
+          const baselineBase = baselinePixelIndex >= 0 ? baselinePixelIndex * 4 : -1;
+          const currentAlpha = getDirectAlphaValue(currentData, currentBase);
+          const baselineAlpha = getDirectAlphaValue(baselineData, baselineBase);
+          if (currentAlpha <= 0 && baselineAlpha <= 0) {
+            continue;
+          }
+          if (
+            currentAlpha !== baselineAlpha
+            || getDirectChannelValue(currentData, currentBase, 0) !== getDirectChannelValue(baselineData, baselineBase, 0)
+            || getDirectChannelValue(currentData, currentBase, 1) !== getDirectChannelValue(baselineData, baselineBase, 1)
+            || getDirectChannelValue(currentData, currentBase, 2) !== getDirectChannelValue(baselineData, baselineBase, 2)
+          ) {
+            totalDots += 1;
+          }
+        }
+      }
+    }
+    return {
+      totalDots,
+      frameDots: [{
+        frameId: clampProjectId(typeof options.frameId === 'string' ? options.frameId : 'frame-1') || 'frame-1',
+        name: typeof options.frameName === 'string' && options.frameName.trim()
+          ? options.frameName.trim()
+          : 'Canvas',
+        dotCount: totalDots,
+      }],
+    };
+  }
+
+  function combineDotStats(baseStats, nextStats) {
+    const resolvedBase = normalizeDotStats(baseStats) || { totalDots: 0, frameDots: [] };
+    const resolvedNext = normalizeDotStats(nextStats) || { totalDots: 0, frameDots: [] };
+    const frameDots = resolvedBase.frameDots.map(entry => ({ ...entry }));
+    const frameIndexById = new Map();
+    frameDots.forEach((entry, index) => {
+      frameIndexById.set(entry.frameId, index);
+    });
+    resolvedNext.frameDots.forEach((entry, index) => {
+      const normalizedEntry = normalizeFrameDotEntry(entry, index);
+      if (frameIndexById.has(normalizedEntry.frameId)) {
+        const targetIndex = frameIndexById.get(normalizedEntry.frameId);
+        const target = frameDots[targetIndex];
+        target.name = normalizedEntry.name || target.name;
+        target.dotCount = normalizeDotCount(target.dotCount + normalizedEntry.dotCount);
+        return;
+      }
+      frameIndexById.set(normalizedEntry.frameId, frameDots.length);
+      frameDots.push({ ...normalizedEntry });
+    });
+    return {
+      totalDots: normalizeDotCount(resolvedBase.totalDots + resolvedNext.totalDots),
+      frameDots,
+    };
+  }
+
   async function postRpc(endpoint, payload) {
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -1128,8 +1514,13 @@
     normalizeDotCount,
     normalizeBigIntCount,
     createProjectId,
+    cloneEditorSnapshot,
+    cloneImageDataLike,
     countEditorSnapshot,
+    countEditorSnapshotDiff,
     countImageData,
+    countImageDataDiff,
+    combineDotStats,
     syncProjectDotCount,
     fetchGlobalDotTotal,
     fetchGlobalDotStats,
