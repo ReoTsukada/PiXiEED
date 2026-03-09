@@ -26,6 +26,7 @@ private func repositoryRoot() -> URL {
     .deletingLastPathComponent()
     .deletingLastPathComponent()
     .deletingLastPathComponent()
+    .deletingLastPathComponent()
 }
 
 private func color(hex: String?) -> NSColor {
