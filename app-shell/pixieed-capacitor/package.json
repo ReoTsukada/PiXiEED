@@ -1,0 +1,40 @@
+{
+  "name": "pixieed-capacitor-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Capacitor shell for shipping the full PiXiEED app to Google Play and the App Store.",
+  "type": "module",
+  "scripts": {
+    "build:web": "node scripts/stage-web-assets.mjs",
+    "cap:copy": "npm run build:web && npx cap copy",
+    "cap:sync": "npm run build:web && npx cap sync",
+    "cap:add:android": "npm run build:web && npx cap add android",
+    "cap:add:ios": "npm run build:web && npx cap add ios",
+    "cap:open:android": "npx cap open android",
+    "cap:open:ios": "npx cap open ios",
+    "doctor": "node scripts/stage-web-assets.mjs --check",
+    "doctor:android": "bash scripts/doctor-android.sh",
+    "doctor:ios": "bash scripts/doctor-ios.sh",
+    "android:keystore:generate": "bash scripts/android-generate-upload-keystore.sh",
+    "android:sdk:install": "bash scripts/android-sdk-install.sh",
+    "android:build:debug": "bash scripts/android-build-debug.sh",
+    "android:build:release-apk": "bash scripts/android-build-release.sh assembleRelease",
+    "android:build:aab": "bash scripts/android-build-release.sh bundleRelease",
+    "ios:build:sim": "bash scripts/ios-build-simulator.sh",
+    "ios:archive:unsigned": "bash scripts/ios-archive.sh --unsigned",
+    "ios:archive": "bash scripts/ios-archive.sh",
+    "ios:export:appstore": "bash scripts/ios-export-appstore.sh"
+  },
+  "dependencies": {
+    "@capacitor/core": "latest",
+    "@capacitor/filesystem": "^8.1.2"
+  },
+  "devDependencies": {
+    "@capacitor/android": "latest",
+    "@capacitor/cli": "latest",
+    "@capacitor/ios": "latest"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
