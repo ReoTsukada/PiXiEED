@@ -124,9 +124,8 @@ body.is-playing {
 }
 
 .difficulty-header {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 1rem;
 }
@@ -301,8 +300,8 @@ body.is-playing {
 
 .puzzle-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: clamp(0.7rem, 1.6vmin, 1rem);
   align-content: flex-start;
   justify-items: stretch;
   grid-auto-rows: max-content;
@@ -327,7 +326,7 @@ body.is-playing {
   box-shadow: var(--panel-shadow);
   cursor: pointer;
   transition: transform 0.18s ease, box-shadow 0.18s ease, border 0.18s ease;
-  min-height: 180px;
+  min-height: clamp(176px, 24vw, 232px);
   width: 100%;
   min-width: 0;
 }
@@ -509,8 +508,8 @@ body.is-playing {
 }
 
 .panel-actions {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 0.75rem;
   align-items: stretch;
 }
@@ -631,6 +630,7 @@ body.is-playing {
 .game-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas: "left center right";
   align-items: center;
   gap: 0.6rem 1rem;
 }
@@ -642,14 +642,17 @@ body.is-playing {
 }
 
 .game-header-slot--left {
+  grid-area: left;
   justify-content: flex-start;
 }
 
 .game-header-slot--center {
+  grid-area: center;
   justify-content: center;
 }
 
 .game-header-slot--right {
+  grid-area: right;
   justify-content: flex-end;
 }
 
@@ -697,8 +700,9 @@ body.is-playing {
 .game-controls {
   display: flex;
   gap: clamp(0.35rem, 1.2vmin, 0.6rem);
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
 }
 
 .game-controls .button {
@@ -1184,6 +1188,7 @@ body.is-playing {
 .creator-form {
   display: grid;
   gap: var(--screen-gap);
+  min-width: 0;
 }
 
 .creator-fields {
@@ -1426,8 +1431,22 @@ body.is-playing {
     padding: clamp(1.1rem, 3.5vmin, 2rem);
   }
 
+  .panel-actions {
+    grid-template-columns: 1fr;
+  }
+
   .screen--difficulty {
     gap: 0.7rem;
+  }
+
+  .difficulty-header {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  #difficultyBackButton {
+    margin-left: 0;
+    width: 100%;
   }
 
   .mode-selector {
@@ -1468,15 +1487,15 @@ body.is-playing {
 
   .puzzle-list {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.6rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
     align-content: start;
     justify-items: stretch;
   }
 
   .puzzle-card {
     min-width: 0;
-    min-height: 150px;
+    min-height: 168px;
     padding: 0.7rem 0.8rem;
   }
 
@@ -1510,7 +1529,7 @@ body.is-playing {
   .game-layout {
     grid-template-columns: 1fr;
     grid-template-rows: repeat(2, minmax(0, 1fr));
-    gap: 0.4rem;
+    gap: 0.55rem;
     justify-items: stretch;
     height: 100%;
   }
@@ -1520,9 +1539,14 @@ body.is-playing {
   }
 
   .game-header {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "left left"
+      "center center"
+      "right right";
     justify-items: stretch;
     align-items: flex-start;
+    gap: 0.55rem;
   }
 
   .game-header-slot {
@@ -1539,17 +1563,40 @@ body.is-playing {
   }
 
   .game-metrics {
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-content: stretch;
+    width: 100%;
+    gap: 0.4rem;
   }
 
   .game-controls {
-    flex-wrap: nowrap;
-    gap: 0.35rem;
-    justify-content: flex-start;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+    justify-content: stretch;
+    width: 100%;
   }
 
   .game-controls .button {
-    flex: 0 1 auto;
+    width: 100%;
+    min-height: 42px;
+    justify-content: center;
+    padding-inline: 0.7rem;
+  }
+
+  #deletePuzzleButton {
+    grid-column: 1 / -1;
+  }
+
+  .status-card {
+    justify-content: center;
+    min-width: 0;
+  }
+
+  .status-row {
+    align-items: center;
+    text-align: center;
   }
 
   .target-panel {
@@ -1612,16 +1659,17 @@ body.is-playing {
   }
 
   .creator-fields {
+    grid-template-columns: 1fr;
     gap: 0.5rem 0.6rem;
   }
 
   .creator-preview {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     grid-template-rows: none;
-    gap: 0;
+    gap: 0.6rem;
     min-height: auto;
     height: auto;
-    margin-inline: -0.2rem;
+    margin-inline: 0;
   }
 
   .creator-preview-frame {
@@ -1640,7 +1688,7 @@ body.is-playing {
   }
 
   .creator-files {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 0.45rem 0.45rem;
   }
 
@@ -1649,7 +1697,7 @@ body.is-playing {
   }
 
   .creator-target-fields {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 0.4rem;
   }
 }
@@ -1674,7 +1722,70 @@ body.is-playing {
 
   .canvas-frame {
     height: auto;
-    aspect-ratio: 1 / 1;
+    aspect-ratio: auto;
+  }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  .screen--game {
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+  }
+
+  .game-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "left center"
+      "right right";
+    align-items: start;
+  }
+
+  .game-controls {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  #deletePuzzleButton {
+    grid-column: 1 / -1;
+  }
+
+  .game-controls .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .game-side-info {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .app.is-hidden-object-mode .game-side-info {
+    grid-template-columns: 1fr;
+  }
+
+  .creator-fields,
+  .creator-files {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 430px) {
+  .puzzle-card__author {
+    display: none;
+  }
+
+  .game-title {
+    font-size: 1.35rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .puzzle-list {
+    grid-template-columns: 1fr;
+  }
+
+  .game-controls {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1737,6 +1848,8 @@ body.is-playing {
 
   .game-header {
     grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-areas: "left center right";
   }
 
   .game-side-info {
