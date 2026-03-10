@@ -897,6 +897,19 @@
   const EXPORT_INTERSTITIAL_COOLDOWN_MS = 45 * 1000;
   const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
     Object.freeze({
+      id: '2026-03-10-byogpt-personal-view-spritemap',
+      at: '2026-03-10T22:40:00+09:00',
+      title: 'BYOGPT・個人表示設定・SpriteMAP出力を追加',
+      details: Object.freeze([
+        '設定パネルのローカル拡張（外付け）に BYOGPT 接続を追加。自分の OpenAI 互換エンドポイントやプロキシを使って拡張コード生成と `api.ai.request(...)` が使えるよう対応。',
+        'BYOGPT セクションは OFF の時に入力欄ごと非表示に整理し、OpenAI APIキー取得ボタンも追加。スマホ/PCで崩れにくいレイアウトへ調整。',
+        '共有中でも、視点・選択・色・ツール・背景・グリッド・ミラー・オニオンスキンは各ユーザーの端末ごとに保持されるよう変更。',
+        'レイヤー表示 ON/OFF とレイヤー不透明度は、共有データではなく各自の表示設定として保存されるよう変更。見え方だけを変えても他ユーザーや書き出し結果には影響しないよう整理。',
+        '共有パレットは接続直後の初回同期だけマスター内容を初期値として取り込み、その後の色選択や調整は各ユーザーのローカル状態として維持するよう変更。',
+        '保存/出力に SpriteMAP（全フレームを1枚にまとめる形式）を追加。',
+      ]),
+    }),
+    Object.freeze({
       id: '2026-03-09-camera-mirror-palette-sync',
       at: '2026-03-09T22:10:00+09:00',
       title: 'カメラ連携・ミラーモード・パレット同期を改善',
@@ -1668,6 +1681,75 @@
     previewNode.appendChild(fragment);
   }
 
+  function appendPalettePresetSwatches(container, colors, maxSwatches = PALETTE_PRESET_BUTTON_SWATCH_MAX) {
+    if (!(container instanceof HTMLElement)) {
+      return;
+    }
+    const normalizedColors = Array.isArray(colors) ? colors : [];
+    const limit = clamp(Math.round(Number(maxSwatches) || 0), 0, PALETTE_PRESET_BUTTON_SWATCH_MAX);
+    normalizedColors.slice(0, limit).forEach(color => {
+      const swatch = document.createElement('span');
+      swatch.className = 'palette-preset-picker__swatch';
+      swatch.style.background = rgbaToCss(normalizeColorValue(color));
+      container.appendChild(swatch);
+    });
+  }
+
+  function getPalettePresetButtonSwatchCount(button, labelNode, colors) {
+    const colorCount = clamp(Array.isArray(colors) ? colors.length : 0, 0, PALETTE_PRESET_BUTTON_SWATCH_MAX);
+    if (!colorCount) {
+      return 0;
+    }
+    if (!(button instanceof HTMLButtonElement) || !(labelNode instanceof HTMLElement)) {
+      return Math.min(colorCount, PALETTE_PRESET_BUTTON_SWATCH_FALLBACK);
+    }
+    const style = window.getComputedStyle(button);
+    const paddingInline = (Number.parseFloat(style.paddingLeft) || 0) + (Number.parseFloat(style.paddingRight) || 0);
+    const gap = Number.parseFloat(style.columnGap || style.gap || '0') || 0;
+    const buttonWidth = button.clientWidth || Math.round(button.getBoundingClientRect().width) || 0;
+    if (!buttonWidth) {
+      return Math.min(colorCount, PALETTE_PRESET_BUTTON_SWATCH_FALLBACK);
+    }
+    const labelWidth = Math.ceil(
+      labelNode.getBoundingClientRect().width
+      || labelNode.scrollWidth
+      || labelNode.offsetWidth
+      || 0
+    );
+    const availableWidth = Math.floor(
+      buttonWidth - paddingInline - labelWidth - gap - PALETTE_PRESET_BUTTON_SWATCH_FRAME_PX
+    );
+    if (availableWidth <= 0) {
+      return 0;
+    }
+    return clamp(
+      Math.floor((availableWidth + 1) / PALETTE_PRESET_BUTTON_SWATCH_STEP_PX),
+      0,
+      colorCount
+    );
+  }
+
+  function refreshPalettePresetPickerButtons() {
+    renderPalettePresetPicker(currentPalettePresetId);
+    renderNewProjectPalettePresetPicker(newProjectPalettePresetId);
+  }
+
+  function schedulePalettePresetPickerRefresh() {
+    if (palettePresetPickerRefreshFrame) {
+      return;
+    }
+    palettePresetPickerRefreshFrame = window.requestAnimationFrame(() => {
+      palettePresetPickerRefreshFrame = 0;
+      refreshPalettePresetPickerButtons();
+      if (dom.controls.palettePresetPickerButton?.getAttribute('aria-expanded') === 'true') {
+        updatePalettePresetPickerMenuPosition();
+      }
+      if (dom.newProject?.palettePresetPickerButton?.getAttribute('aria-expanded') === 'true') {
+        updateNewProjectPalettePresetPickerMenuPosition();
+      }
+    });
+  }
+
   function setPresetPickerOpen(button, menu, open, updatePosition) {
     if (!(button instanceof HTMLButtonElement) || !(menu instanceof HTMLElement)) {
       return;
@@ -1779,17 +1861,15 @@
     const selectedLabelNode = document.createElement('span');
     selectedLabelNode.className = 'palette-preset-picker__button-label';
     selectedLabelNode.textContent = selectedLabel;
-    const selectedSwatches = document.createElement('span');
-    selectedSwatches.className = 'palette-preset-picker__swatches';
     const selectedColors = getCurrentPalettePresetPreviewColors(normalized);
-    selectedColors.slice(0, PALETTE_PRESET_BUTTON_SWATCH_MAX).forEach(color => {
-      const swatch = document.createElement('span');
-      swatch.className = 'palette-preset-picker__swatch';
-      swatch.style.background = rgbaToCss(normalizeColorValue(color));
-      selectedSwatches.appendChild(swatch);
-    });
     button.appendChild(selectedLabelNode);
-    button.appendChild(selectedSwatches);
+    const selectedSwatchCount = getPalettePresetButtonSwatchCount(button, selectedLabelNode, selectedColors);
+    if (selectedSwatchCount > 0) {
+      const selectedSwatches = document.createElement('span');
+      selectedSwatches.className = 'palette-preset-picker__swatches';
+      appendPalettePresetSwatches(selectedSwatches, selectedColors, selectedSwatchCount);
+      button.appendChild(selectedSwatches);
+    }
     menu.textContent = '';
     const fragment = document.createDocumentFragment();
     const customRow = document.createElement('button');
@@ -1808,14 +1888,10 @@
 
     const customSwatches = document.createElement('span');
     customSwatches.className = 'palette-preset-picker__swatches';
-    getCurrentPalettePresetPreviewColors(CURRENT_PALETTE_PRESET_CUSTOM)
-      .slice(0, PALETTE_PRESET_BUTTON_SWATCH_MAX)
-      .forEach(color => {
-        const swatch = document.createElement('span');
-        swatch.className = 'palette-preset-picker__swatch';
-        swatch.style.background = rgbaToCss(normalizeColorValue(color));
-        customSwatches.appendChild(swatch);
-      });
+    appendPalettePresetSwatches(
+      customSwatches,
+      getCurrentPalettePresetPreviewColors(CURRENT_PALETTE_PRESET_CUSTOM)
+    );
     customRow.appendChild(customSwatches);
 
     customRow.addEventListener('click', () => {
@@ -1842,12 +1918,7 @@
       const swatches = document.createElement('span');
       swatches.className = 'palette-preset-picker__swatches';
       const colors = getNewProjectPalettePresetColors(definition.id, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
-      colors.slice(0, PALETTE_PRESET_BUTTON_SWATCH_MAX).forEach(color => {
-        const swatch = document.createElement('span');
-        swatch.className = 'palette-preset-picker__swatch';
-        swatch.style.background = rgbaToCss(normalizeColorValue(color));
-        swatches.appendChild(swatch);
-      });
+      appendPalettePresetSwatches(swatches, colors);
       row.appendChild(swatches);
 
       row.addEventListener('click', () => {
@@ -1873,17 +1944,15 @@
     const selectedLabelNode = document.createElement('span');
     selectedLabelNode.className = 'palette-preset-picker__button-label';
     selectedLabelNode.textContent = selectedLabel;
-    const selectedSwatches = document.createElement('span');
-    selectedSwatches.className = 'palette-preset-picker__swatches';
     const selectedColors = getNewProjectPalettePresetColors(normalized, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
-    selectedColors.slice(0, PALETTE_PRESET_BUTTON_SWATCH_MAX).forEach(color => {
-      const swatch = document.createElement('span');
-      swatch.className = 'palette-preset-picker__swatch';
-      swatch.style.background = rgbaToCss(normalizeColorValue(color));
-      selectedSwatches.appendChild(swatch);
-    });
     button.appendChild(selectedLabelNode);
-    button.appendChild(selectedSwatches);
+    const selectedSwatchCount = getPalettePresetButtonSwatchCount(button, selectedLabelNode, selectedColors);
+    if (selectedSwatchCount > 0) {
+      const selectedSwatches = document.createElement('span');
+      selectedSwatches.className = 'palette-preset-picker__swatches';
+      appendPalettePresetSwatches(selectedSwatches, selectedColors, selectedSwatchCount);
+      button.appendChild(selectedSwatches);
+    }
 
     menu.textContent = '';
     const fragment = document.createDocumentFragment();
@@ -1905,12 +1974,7 @@
       const swatches = document.createElement('span');
       swatches.className = 'palette-preset-picker__swatches';
       const colors = getNewProjectPalettePresetColors(definition.id, NEW_PROJECT_PALETTE_PRESET_DEFAULT);
-      colors.slice(0, PALETTE_PRESET_BUTTON_SWATCH_MAX).forEach(color => {
-        const swatch = document.createElement('span');
-        swatch.className = 'palette-preset-picker__swatch';
-        swatch.style.background = rgbaToCss(normalizeColorValue(color));
-        swatches.appendChild(swatch);
-      });
+      appendPalettePresetSwatches(swatches, colors);
       row.appendChild(swatches);
 
       row.addEventListener('click', () => {
@@ -1987,7 +2051,13 @@
     if (typeof document === 'undefined' || !document.documentElement) {
       return;
     }
-    document.documentElement.lang = uiLanguage === UI_LANGUAGE_EN ? 'en' : 'ja';
+    const nextLanguage = uiLanguage === UI_LANGUAGE_EN ? 'en' : 'ja';
+    document.documentElement.lang = nextLanguage;
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new CustomEvent('pixieedraw:uilanguagechange', {
+        detail: { language: nextLanguage },
+      }));
+    }
   }
 
   function isEnglishUi() {
@@ -2118,6 +2188,9 @@
   const AUTOSAVE_TAB_LOCK_NOTICE_THROTTLE_MS = 3000;
   const NEW_PROJECT_PALETTE_PRESET_STORAGE_KEY = 'pixieedraw:new-project-palette-preset';
   const PALETTE_PRESET_BUTTON_SWATCH_MAX = 32;
+  const PALETTE_PRESET_BUTTON_SWATCH_FALLBACK = 8;
+  const PALETTE_PRESET_BUTTON_SWATCH_STEP_PX = 9;
+  const PALETTE_PRESET_BUTTON_SWATCH_FRAME_PX = 4;
   const EXPORT_DIRECTORY_HANDLE_KEY = 'exportDirectory';
   const EXPORT_DIRECTORY_DISPLAY_LABEL_KEY = 'pixieedraw:export-directory-display-label';
   const EXPORT_WORKSPACE_DIR_NAME = 'PiXiEED';
@@ -2567,6 +2640,7 @@
     residentPersistSignature: '',
     residentAutoPromoteTimer: null,
     assignmentSyncRequestAt: 0,
+    paletteSeededFromShared: false,
   // masterForcedDanmakuOff removed: clients control danmaku locally
   };
   let multiSupabaseClientPromise = null;
@@ -2780,9 +2854,12 @@
   let palettePresetPickerPointerBound = false;
   let palettePresetPickerEscapeBound = false;
   let palettePresetPickerViewportBound = false;
+  let palettePresetPickerRefreshFrame = 0;
   let newProjectPalettePresetId = loadStoredNewProjectPalettePresetId();
   let currentPalettePresetId = normalizeCurrentPalettePreset(newProjectPalettePresetId, CURRENT_PALETTE_PRESET_CUSTOM);
   const state = createInitialState({ palettePreset: newProjectPalettePresetId });
+  let localLayerVisibilityById = new Map();
+  let localLayerPreviewOpacityById = new Map();
   if (EMBED_CONFIG.lockCanvasSize) {
     lockedCanvasWidth = state.width;
     lockedCanvasHeight = state.height;
@@ -3892,6 +3969,365 @@
     return snapshot;
   }
 
+  function cloneLocalLayerVisibilityMap(source = localLayerVisibilityById) {
+    const map = new Map();
+    if (!(source instanceof Map)) {
+      return map;
+    }
+    source.forEach((value, layerId) => {
+      if (typeof layerId !== 'string' || !layerId || value !== false) {
+        return;
+      }
+      map.set(layerId, false);
+    });
+    return map;
+  }
+
+  function serializeLocalLayerVisibilityMap(source = localLayerVisibilityById) {
+    const payload = {};
+    cloneLocalLayerVisibilityMap(source).forEach((value, layerId) => {
+      payload[layerId] = value;
+    });
+    return payload;
+  }
+
+  function deserializeLocalLayerVisibilityMap(raw, fallback = localLayerVisibilityById) {
+    const map = cloneLocalLayerVisibilityMap(fallback);
+    if (!raw || typeof raw !== 'object') {
+      return map;
+    }
+    Object.entries(raw).forEach(([layerId, value]) => {
+      if (typeof layerId !== 'string' || !layerId) {
+        return;
+      }
+      if (value === false) {
+        map.set(layerId, false);
+      } else {
+        map.delete(layerId);
+      }
+    });
+    return map;
+  }
+
+  function rememberLocalLayerVisibility(layerId, visible) {
+    if (typeof layerId !== 'string' || !layerId) {
+      return;
+    }
+    if (visible === false) {
+      localLayerVisibilityById.set(layerId, false);
+      return;
+    }
+    localLayerVisibilityById.delete(layerId);
+  }
+
+  function getDisplayedLayerVisibility(layer, fallback = true) {
+    if (!layer || typeof layer !== 'object') {
+      return fallback !== false;
+    }
+    if (typeof layer.id === 'string' && layer.id && localLayerVisibilityById.has(layer.id)) {
+      return localLayerVisibilityById.get(layer.id) !== false;
+    }
+    return Object.prototype.hasOwnProperty.call(layer, 'visible') ? layer.visible !== false : fallback !== false;
+  }
+
+  function applyLocalLayerVisibilityToState() {
+    (state.frames || []).forEach(frame => {
+      if (!frame || !Array.isArray(frame.layers)) {
+        return;
+      }
+      frame.layers.forEach(layer => {
+        if (!layer || typeof layer !== 'object') {
+          return;
+        }
+        layer.visible = getDisplayedLayerVisibility(layer, true);
+      });
+    });
+  }
+
+  function syncLocalLayerVisibilityMapFromState() {
+    const next = cloneLocalLayerVisibilityMap(localLayerVisibilityById);
+    (state.frames || []).forEach(frame => {
+      if (!frame || !Array.isArray(frame.layers)) {
+        return;
+      }
+      frame.layers.forEach(layer => {
+        if (!layer || typeof layer.id !== 'string' || !layer.id) {
+          return;
+        }
+        if (layer.visible === false) {
+          next.set(layer.id, false);
+        } else {
+          next.delete(layer.id);
+        }
+      });
+    });
+    localLayerVisibilityById = next;
+  }
+
+  function cloneLocalLayerPreviewOpacityMap(source = localLayerPreviewOpacityById) {
+    const map = new Map();
+    if (!(source instanceof Map)) {
+      return map;
+    }
+    source.forEach((value, layerId) => {
+      if (typeof layerId !== 'string' || !layerId) {
+        return;
+      }
+      const normalized = normalizeLayerOpacity(value);
+      if (Math.abs(normalized - 1) <= 0.0001) {
+        return;
+      }
+      map.set(layerId, normalized);
+    });
+    return map;
+  }
+
+  function serializeLocalLayerPreviewOpacityMap(source = localLayerPreviewOpacityById) {
+    const payload = {};
+    cloneLocalLayerPreviewOpacityMap(source).forEach((value, layerId) => {
+      payload[layerId] = value;
+    });
+    return payload;
+  }
+
+  function deserializeLocalLayerPreviewOpacityMap(raw, fallback = localLayerPreviewOpacityById) {
+    const map = cloneLocalLayerPreviewOpacityMap(fallback);
+    if (!raw || typeof raw !== 'object') {
+      return map;
+    }
+    Object.entries(raw).forEach(([layerId, value]) => {
+      if (typeof layerId !== 'string' || !layerId) {
+        return;
+      }
+      const normalized = normalizeLayerOpacity(value);
+      if (Math.abs(normalized - 1) <= 0.0001) {
+        map.delete(layerId);
+      } else {
+        map.set(layerId, normalized);
+      }
+    });
+    return map;
+  }
+
+  function rememberLocalLayerPreviewOpacity(layerId, opacity) {
+    if (typeof layerId !== 'string' || !layerId) {
+      return;
+    }
+    const normalized = normalizeLayerOpacity(opacity);
+    if (Math.abs(normalized - 1) <= 0.0001) {
+      localLayerPreviewOpacityById.delete(layerId);
+      return;
+    }
+    localLayerPreviewOpacityById.set(layerId, normalized);
+  }
+
+  function getDisplayedLayerPreviewOpacity(layer, fallback = 1) {
+    if (!layer || typeof layer !== 'object') {
+      return normalizeLayerOpacity(fallback);
+    }
+    if (typeof layer.id === 'string' && layer.id && localLayerPreviewOpacityById.has(layer.id)) {
+      return normalizeLayerOpacity(localLayerPreviewOpacityById.get(layer.id));
+    }
+    return normalizeLayerOpacity(Object.prototype.hasOwnProperty.call(layer, 'opacity') ? layer.opacity : fallback);
+  }
+
+  function applyLocalLayerPreviewOpacityToState() {
+    (state.frames || []).forEach(frame => {
+      if (!frame || !Array.isArray(frame.layers)) {
+        return;
+      }
+      frame.layers.forEach(layer => {
+        if (!layer || typeof layer !== 'object') {
+          return;
+        }
+        layer.opacity = getDisplayedLayerPreviewOpacity(layer, 1);
+      });
+    });
+  }
+
+  function syncLocalLayerPreviewOpacityMapFromState() {
+    const next = cloneLocalLayerPreviewOpacityMap(localLayerPreviewOpacityById);
+    (state.frames || []).forEach(frame => {
+      if (!frame || !Array.isArray(frame.layers)) {
+        return;
+      }
+      frame.layers.forEach(layer => {
+        if (!layer || typeof layer.id !== 'string' || !layer.id) {
+          return;
+        }
+        const normalized = normalizeLayerOpacity(layer.opacity);
+        if (Math.abs(normalized - 1) > 0.0001) {
+          next.set(layer.id, normalized);
+        } else {
+          next.delete(layer.id);
+        }
+      });
+    });
+    localLayerPreviewOpacityById = next;
+  }
+
+  function capturePersonalPreferenceSnapshot(source = state) {
+    syncLocalLayerVisibilityMapFromState();
+    syncLocalLayerPreviewOpacityMapFromState();
+    const width = Math.max(1, Math.round(Number(source?.width) || Number(state.width) || DEFAULT_CANVAS_SIZE));
+    const height = Math.max(1, Math.round(Number(source?.height) || Number(state.height) || DEFAULT_CANVAS_SIZE));
+    const frameCount = Math.max(
+      0,
+      Array.isArray(source?.frames) ? source.frames.length : (Array.isArray(state.frames) ? state.frames.length : 0)
+    );
+    const activePaletteIndex = normalizePaletteIndex(source?.activePaletteIndex, state.activePaletteIndex);
+    return {
+      scale: normalizeZoomScale(source?.scale, state.scale || MIN_ZOOM_SCALE),
+      pan: {
+        x: Math.round(Number(source?.pan?.x) || 0),
+        y: Math.round(Number(source?.pan?.y) || 0),
+      },
+      tool: normalizeToolId(source?.tool, state.tool || 'pen'),
+      brushSize: clamp(Math.round(Number(source?.brushSize) || state.brushSize || 1), 1, 64),
+      outlineSize: clamp(Math.round(Number(source?.outlineSize) || state.outlineSize || 1), 1, 64),
+      brushShape: normalizeBrushShape(source?.brushShape, state.brushShape || BRUSH_SHAPE_SQUARE),
+      selectSameMode: normalizeSelectSameMode(source?.selectSameMode, state.selectSameMode || SELECT_SAME_MODE_CONNECTED),
+      customBrush: normalizeCustomBrushData(source?.customBrush),
+      activeToolGroup: TOOL_GROUPS[source?.activeToolGroup]
+        ? source.activeToolGroup
+        : (TOOL_TO_GROUP[normalizeToolId(source?.tool, state.tool || 'pen')] || 'pen'),
+      lastGroupTool: { ...DEFAULT_GROUP_TOOL, ...(source?.lastGroupTool || {}) },
+      colorMode: normalizeColorMode(source?.colorMode, state.colorMode || COLOR_MODE_INDEX),
+      activePaletteIndex,
+      secondaryPaletteIndex: normalizePaletteIndex(source?.secondaryPaletteIndex, activePaletteIndex),
+      activeRgb: normalizeColorValue(source?.activeRgb || state.activeRgb),
+      activeFrame: clamp(Math.round(Number(source?.activeFrame) || 0), 0, Math.max(0, frameCount - 1)),
+      activeLayer: typeof source?.activeLayer === 'string' ? source.activeLayer : '',
+      selectionMask: source?.selectionMask instanceof Uint8Array ? new Uint8Array(source.selectionMask) : null,
+      selectionBounds: source?.selectionBounds && typeof source.selectionBounds === 'object'
+        ? { ...source.selectionBounds }
+        : null,
+      showGrid: Boolean(source?.showGrid ?? true),
+      showMajorGrid: Boolean(source?.showMajorGrid ?? true),
+      gridScreenStep: clamp(Math.round(Number(source?.gridScreenStep) || 16), 1, 256),
+      majorGridSpacing: clamp(Math.round(Number(source?.majorGridSpacing) || 16), 2, 512),
+      backgroundMode: source?.backgroundMode === 'light' || source?.backgroundMode === 'pink' ? source.backgroundMode : 'dark',
+      uiTheme: normalizeUiTheme(source?.uiTheme, DEFAULT_UI_THEME),
+      showPixelGuides: Boolean(source?.showPixelGuides ?? true),
+      mirror: normalizeMirrorAxisState(source?.mirror, width, height),
+      showVirtualCursor: Boolean(source?.showVirtualCursor),
+      virtualCursorButtonScale: normalizeFloatingDrawButtonScale(source?.virtualCursorButtonScale),
+      floatingPreview: normalizeFloatingPreviewState(source?.floatingPreview, FLOATING_PREVIEW_DEFAULT_STATE),
+      showChecker: Boolean(source?.showChecker ?? true),
+      onionSkin: normalizeOnionSkinState(source?.onionSkin),
+      activeLeftTab: LEFT_TAB_KEYS.includes(source?.activeLeftTab) ? source.activeLeftTab : 'tools',
+      activeRightTab: RIGHT_TAB_KEYS.includes(source?.activeRightTab) ? source.activeRightTab : 'frames',
+      danmakuEnabled: source?.danmakuEnabled !== false,
+      layerVisibilityById: serializeLocalLayerVisibilityMap(localLayerVisibilityById),
+      layerPreviewOpacityById: serializeLocalLayerPreviewOpacityMap(localLayerPreviewOpacityById),
+    };
+  }
+
+  function applyPersonalPreferenceSnapshot(preferences) {
+    if (!preferences || typeof preferences !== 'object') {
+      return;
+    }
+    state.scale = normalizeZoomScale(preferences.scale, state.scale || MIN_ZOOM_SCALE);
+    state.pan = {
+      x: Math.round(Number(preferences.pan?.x) || 0),
+      y: Math.round(Number(preferences.pan?.y) || 0),
+    };
+    state.tool = normalizeToolId(preferences.tool, state.tool);
+    state.brushSize = clamp(Math.round(Number(preferences.brushSize) || state.brushSize || 1), 1, 64);
+    state.outlineSize = clamp(Math.round(Number(preferences.outlineSize) || state.outlineSize || 1), 1, 64);
+    state.selectSameMode = normalizeSelectSameMode(preferences.selectSameMode, state.selectSameMode);
+    state.customBrush = normalizeCustomBrushData(preferences.customBrush);
+    state.brushShape = normalizeBrushShape(preferences.brushShape, state.brushShape);
+    if (state.brushShape === BRUSH_SHAPE_CUSTOM && !hasCustomBrushData()) {
+      state.brushShape = BRUSH_SHAPE_SQUARE;
+    }
+    state.activeToolGroup = TOOL_GROUPS[preferences.activeToolGroup]
+      ? preferences.activeToolGroup
+      : (TOOL_TO_GROUP[state.tool] || 'pen');
+    state.lastGroupTool = { ...DEFAULT_GROUP_TOOL, ...(preferences.lastGroupTool || {}) };
+    if (!TOOL_GROUPS[state.activeToolGroup]?.tools?.includes(state.tool)) {
+      state.activeToolGroup = TOOL_TO_GROUP[state.tool] || 'pen';
+    }
+    state.colorMode = normalizeColorMode(preferences.colorMode, state.colorMode);
+    const paletteLength = Math.max(1, Array.isArray(state.palette) ? state.palette.length : 0);
+    state.activePaletteIndex = clamp(
+      normalizePaletteIndex(preferences.activePaletteIndex, state.activePaletteIndex),
+      0,
+      paletteLength - 1
+    );
+    state.secondaryPaletteIndex = clamp(
+      normalizePaletteIndex(preferences.secondaryPaletteIndex, state.activePaletteIndex),
+      0,
+      paletteLength - 1
+    );
+    state.activeRgb = normalizeColorValue(preferences.activeRgb || state.activeRgb);
+    const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
+    if (frameCount > 0) {
+      state.activeFrame = clamp(Math.round(Number(preferences.activeFrame) || 0), 0, frameCount - 1);
+      const activeFrame = state.frames[state.activeFrame];
+      const preferredLayerId = typeof preferences.activeLayer === 'string' ? preferences.activeLayer : '';
+      const preferredLayer = Array.isArray(activeFrame?.layers)
+        ? activeFrame.layers.find(layer => layer?.id === preferredLayerId)
+        : null;
+      state.activeLayer = preferredLayer?.id
+        || activeFrame?.layers?.[activeFrame.layers.length - 1]?.id
+        || activeFrame?.layers?.[0]?.id
+        || null;
+    } else {
+      state.activeFrame = 0;
+      state.activeLayer = null;
+    }
+    const pixelCount = Math.max(0, Math.floor(Number(state.width) || 0) * Math.floor(Number(state.height) || 0));
+    const canRestoreSelection = typeof preferences.activeLayer === 'string'
+      && preferences.activeLayer.length > 0
+      && preferences.activeLayer === state.activeLayer;
+    if (canRestoreSelection && preferences.selectionMask instanceof Uint8Array && preferences.selectionMask.length === pixelCount) {
+      state.selectionMask = new Uint8Array(preferences.selectionMask);
+      state.selectionBounds = preferences.selectionBounds && typeof preferences.selectionBounds === 'object'
+        ? { ...preferences.selectionBounds }
+        : computeSelectionBoundsFromMask(state.selectionMask);
+    } else {
+      state.selectionMask = null;
+      state.selectionBounds = null;
+    }
+    state.showGrid = Boolean(preferences.showGrid ?? true);
+    state.showMajorGrid = Boolean(preferences.showMajorGrid ?? true);
+    state.gridScreenStep = clamp(
+      Math.round(Number(preferences.gridScreenStep) || state.gridScreenStep || 16),
+      1,
+      256
+    );
+    state.majorGridSpacing = clamp(
+      Math.round(Number(preferences.majorGridSpacing) || state.majorGridSpacing || 16),
+      2,
+      512
+    );
+    state.backgroundMode = preferences.backgroundMode === 'light' || preferences.backgroundMode === 'pink'
+      ? preferences.backgroundMode
+      : 'dark';
+    state.uiTheme = normalizeUiTheme(preferences.uiTheme, DEFAULT_UI_THEME);
+    state.showPixelGuides = Boolean(preferences.showPixelGuides ?? true);
+    state.mirror = normalizeMirrorAxisState(preferences.mirror, state.width, state.height);
+    state.showVirtualCursor = Boolean(preferences.showVirtualCursor);
+    state.virtualCursorButtonScale = normalizeFloatingDrawButtonScale(preferences.virtualCursorButtonScale);
+    state.floatingPreview = normalizeFloatingPreviewState(preferences.floatingPreview, FLOATING_PREVIEW_DEFAULT_STATE);
+    state.showChecker = Boolean(preferences.showChecker ?? true);
+    state.onionSkin = normalizeOnionSkinState(preferences.onionSkin);
+    state.activeLeftTab = LEFT_TAB_KEYS.includes(preferences.activeLeftTab) ? preferences.activeLeftTab : 'tools';
+    state.activeRightTab = RIGHT_TAB_KEYS.includes(preferences.activeRightTab) ? preferences.activeRightTab : 'frames';
+    state.danmakuEnabled = preferences.danmakuEnabled !== false;
+    localLayerVisibilityById = deserializeLocalLayerVisibilityMap(
+      preferences.layerVisibilityById,
+      localLayerVisibilityById
+    );
+    applyLocalLayerVisibilityToState();
+    localLayerPreviewOpacityById = deserializeLocalLayerPreviewOpacityMap(
+      preferences.layerPreviewOpacityById,
+      localLayerPreviewOpacityById
+    );
+    applyLocalLayerPreviewOpacityToState();
+  }
+
   function applyPendingSelectionMoveToSnapshot(snapshot, { includeSelection = true, clonePixelData = true } = {}) {
     if (!snapshot || !clonePixelData) {
       return;
@@ -4594,7 +5030,13 @@
     });
   }
 
-  function applyHistorySnapshot(snapshot, { preserveView = false, forcePalettePresetSync = false } = {}) {
+  function applyHistorySnapshot(
+    snapshot,
+    { preserveView = false, forcePalettePresetSync = false, preservePersonalPreferences = true } = {}
+  ) {
+    const personalPreferences = preservePersonalPreferences
+      ? capturePersonalPreferenceSnapshot()
+      : null;
     const previousPaletteSnapshot = Array.isArray(state.palette)
       ? state.palette.map(color => normalizeColorValue(color))
       : null;
@@ -4727,6 +5169,9 @@
       state.playback = { ...snapshot.playback };
     }
     state.documentName = normalizeDocumentName(snapshot.documentName);
+    if (personalPreferences) {
+      applyPersonalPreferenceSnapshot(personalPreferences);
+    }
 
     pointerState.active = false;
     pointerState.preview = null;
@@ -4777,13 +5222,37 @@
     if (typeof value !== 'string') {
       return DEFAULT_DOCUMENT_BASENAME;
     }
-    const ext = PROJECT_FILE_EXTENSION;
     let base = value.trim();
     if (!base) {
       return DEFAULT_DOCUMENT_BASENAME;
     }
-    if (base.toLowerCase().endsWith(ext)) {
-      base = base.slice(0, -ext.length);
+    const removableExtensions = [
+      PROJECT_FILE_EXTENSION,
+      '.pxdraw',
+      '.json',
+      '.txt',
+      '.png',
+      '.gif',
+      '.jpg',
+      '.jpeg',
+      '.webp',
+      '.bmp',
+      '.svg',
+      '.avif',
+    ];
+    let changed = true;
+    while (changed && base) {
+      changed = false;
+      const lowerBase = base.toLowerCase();
+      for (let index = 0; index < removableExtensions.length; index += 1) {
+        const extension = removableExtensions[index];
+        if (!lowerBase.endsWith(extension)) {
+          continue;
+        }
+        base = base.slice(0, -extension.length).trim();
+        changed = true;
+        break;
+      }
     }
     base = base.replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
     return base || DEFAULT_DOCUMENT_BASENAME;
@@ -5423,7 +5892,10 @@
     if (!frame) {
       return null;
     }
-    const pixels = compositeFramePixels(frame, width, height, state.palette);
+    const pixels = compositeFramePixels(frame, width, height, state.palette, {
+      useLocalLayerPreviewVisibility: true,
+      useLocalLayerPreviewOpacity: true,
+    });
     if (!(pixels instanceof Uint8ClampedArray) || pixels.length !== width * height * 4) {
       return null;
     }
@@ -6108,11 +6580,9 @@
     }
     button.dataset.tabKeynavBound = 'true';
     button.addEventListener('keydown', event => {
-      const isPrevious = event.key === 'ArrowLeft' || event.key === 'ArrowUp';
-      const isNext = event.key === 'ArrowRight' || event.key === 'ArrowDown';
       const isHome = event.key === 'Home';
       const isEnd = event.key === 'End';
-      if (!isPrevious && !isNext && !isHome && !isEnd) {
+      if (!isHome && !isEnd) {
         return;
       }
       const buttons = getKeyboardNavigableTabButtons(getButtons());
@@ -6128,10 +6598,6 @@
         targetIndex = 0;
       } else if (isEnd) {
         targetIndex = buttons.length - 1;
-      } else if (isPrevious) {
-        targetIndex = (currentIndex - 1 + buttons.length) % buttons.length;
-      } else if (isNext) {
-        targetIndex = (currentIndex + 1) % buttons.length;
       }
       const targetButton = buttons[targetIndex];
       if (!(targetButton instanceof HTMLButtonElement)) {
@@ -7994,7 +8460,10 @@
         pink: '背景:桃',
       };
       dom.controls.toggleBackgroundMode.setAttribute('aria-pressed', String(state.backgroundMode !== 'dark'));
-      dom.controls.toggleBackgroundMode.textContent = labelMap[state.backgroundMode] || localizeText('背景', 'BG');
+      const label = labelMap[state.backgroundMode] || localizeText('背景', 'BG');
+      dom.controls.toggleBackgroundMode.textContent = label;
+      dom.controls.toggleBackgroundMode.setAttribute('aria-label', label);
+      dom.controls.toggleBackgroundMode.setAttribute('title', label);
     }
     if (dom.controls.toggleUiTheme instanceof HTMLButtonElement) {
       const normalizedTheme = normalizeUiTheme(state.uiTheme, DEFAULT_UI_THEME);
@@ -8632,9 +9101,9 @@
     setLocalizedTextContent('#colorModeIndexLabel', 'インデックスカラー', 'Indexed Color');
     setLocalizedTextContent('#colorModeRgbLabel', 'RGBカラー', 'RGB Color');
     setLocalizedTextContent('#settingsColorModeHint', 'インデックスカラーとRGBカラーを切り替えます。', 'Switch between Indexed Color and RGB Color.');
-    setLocalizedTextContent('#sortPaletteHue', '色相', 'Hue');
-    setLocalizedTextContent('#sortPaletteSaturation', '彩度', 'Sat');
-    setLocalizedTextContent('#sortPaletteValue', '明度', 'Value');
+    setLocalizedTextContent('#sortPaletteHue', '色相', 'H');
+    setLocalizedTextContent('#sortPaletteSaturation', '彩度', 'S');
+    setLocalizedTextContent('#sortPaletteValue', '明度', 'V');
     setLocalizedAttribute('#sortPaletteHue', 'aria-label', '色相順でソート', 'Sort by hue');
     setLocalizedAttribute('#sortPaletteSaturation', 'aria-label', '彩度順でソート', 'Sort by saturation');
     setLocalizedAttribute('#sortPaletteValue', 'aria-label', '明度順でソート', 'Sort by value');
@@ -8647,8 +9116,8 @@
     setLocalizedAttribute('#palettePresetPickerMenu', 'aria-label', 'プリセット一覧', 'Preset list');
     setLocalizedAttribute('#newProjectPalettePresetPickerButton', 'aria-label', '新規作成のパレットプリセットを選択', 'Choose new project palette preset');
     setLocalizedAttribute('#newProjectPalettePresetPickerMenu', 'aria-label', '新規作成プリセット一覧', 'New project preset list');
-    renderColorPanelPalettePresetOptions(dom.controls.palettePresetSelect?.value || currentPalettePresetId);
-    renderPalettePresetPreview(dom.controls.palettePresetSelect?.value || currentPalettePresetId);
+    renderColorPanelPalettePresetOptions(currentPalettePresetId);
+    renderPalettePresetPreview(currentPalettePresetId);
     setLocalizedAttribute('#panelSettings .field.field--list[role="group"]', 'aria-label', '表示設定', 'Display Settings');
     setLocalizedToggleLabel('toggleGrid', 'グリッド', 'Grid');
     setLocalizedToggleLabel('toggleMajorGrid', 'メジャー', 'Major');
@@ -8669,6 +9138,8 @@
     setLocalizedTextContent('.virtual-cursor-scale__label', '仮想カーソルボタンサイズ', 'Virtual Cursor Button Size');
     setLocalizedTextContent('#mobileDrawHelp', 'スマホ描画: 仮想カーソルをONにしてキャンバスをドラッグでカーソル移動、「描画」ボタン長押しで描画します（左半分=主色 / 右半分=副色）。選択範囲を移動する時は「移動」ツール、または選択ツールのまま選択範囲上で描画ボタンを長押しし、もう1本の指でキャンバスをドラッグします。2本指ドラッグ/ピンチで移動と拡大縮小ができます。', 'Mobile draw: turn on Virtual Cursor, drag the canvas to move the cursor, and long-press Draw to paint (left half = primary / right half = secondary). To move a selection, use Move, or keep a selection tool active, hold Draw on the selected area, and drag the canvas with a second finger. Use two fingers to pan and pinch zoom.');
     setLocalizedTextContent('#settingsDisplayHint', '背景とUI配色を切り替えます（描画色には影響しません）。', 'Switch the background and UI colors (does not change drawing colors).');
+    setLocalizedAttribute('#toggleBackgroundMode', 'aria-label', '背景色を切り替え', 'Change background color');
+    setLocalizedAttribute('#toggleBackgroundMode', 'title', '背景色を切り替え', 'Change background color');
 
     setLocalizedTextContent('#floatingDrawButton', '描画', 'Draw');
     setLocalizedAttribute('#floatingDrawButton', 'aria-label', '描画ボタン（左=主色 / 右=副色）', 'Draw button (left = primary / right = secondary)');
@@ -8710,6 +9181,7 @@
     setLocalizedSelectOption(dom.exportDialog?.format, 'png', 'PNG（画像）', 'PNG (Image)');
     setLocalizedSelectOption(dom.exportDialog?.format, 'jpeg', 'JPEG（画像）', 'JPEG (Image)');
     setLocalizedSelectOption(dom.exportDialog?.format, 'svg', 'SVG（画像）', 'SVG (Image)');
+    setLocalizedSelectOption(dom.exportDialog?.format, 'spritemap', 'SpriteMAP（全フレーム1枚）', 'SpriteMAP (All Frames)');
     setLocalizedSelectOption(dom.exportDialog?.format, 'gridpng', 'PNG（グリッド分割）', 'PNG (Grid Split)');
     setLocalizedSelectOption(dom.exportDialog?.format, 'gif', 'GIF（アニメーション）', 'GIF (Animation)');
     setLocalizedSelectOption(dom.exportDialog?.format, 'timelapse', 'タイムラプスGIF（記録）', 'Timelapse GIF');
@@ -8793,6 +9265,10 @@
   function refreshLocalizedUi() {
     applyUiLocalization();
     syncControlsWithState();
+    renderColorPanelPalettePresetOptions(currentPalettePresetId);
+    renderPalettePresetPreview(currentPalettePresetId);
+    renderNewProjectPalettePresetOptions(newProjectPalettePresetId);
+    renderNewProjectPalettePresetPicker(newProjectPalettePresetId);
     const cachedEntries = Array.from(recentProjectsCache.values());
     syncStartupResumeState(cachedEntries);
     renderRecentProjectsList(cachedEntries);
@@ -12040,20 +12516,22 @@
       && inputMode !== 'svg'
       && inputMode !== 'grid'
       && inputMode !== 'gridpng'
+      && inputMode !== 'spritemap'
+      && inputMode !== 'spritesheet'
       && inputMode !== 'gif'
       && inputMode !== 'timelapse'
       && inputMode !== 'pixfind'
       && inputMode !== 'project'
     ) {
-      window.alert('png / jpeg / svg / grid / gif / timelapse / pixfind / project のいずれかを入力してください。');
+      window.alert('png / jpeg / svg / spritemap / grid / gif / timelapse / pixfind / project のいずれかを入力してください。');
       return;
     }
     const normalized = normalizeExportFormat(inputMode);
     if (!ensureCurrentClientCanExportProject({ announce: true, format: normalized })) {
       return;
     }
-    if (normalized === 'png' || normalized === 'gridpng') {
-      const candidates = getExportScaleCandidates();
+    if (normalized === 'png' || normalized === 'gridpng' || normalized === 'spritemap') {
+      const candidates = getExportScaleCandidates(normalized);
       applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const maxScale = exportMaxScale || 1;
@@ -12086,6 +12564,8 @@
         syncExportGridInputs();
         scheduleSessionPersist({ includeSnapshots: false });
         exportProjectAsGridPng();
+      } else if (normalized === 'spritemap') {
+        exportProjectAsSpriteMap();
       } else {
         exportProjectAsPng();
       }
@@ -12611,6 +13091,72 @@
     return setActiveLayerTrackIndex(nextIndex, options);
   }
 
+  function addOrDuplicateFrameAfterActive({ duplicate = false } = {}) {
+    if (state.playback.isPlaying) {
+      return false;
+    }
+    if (!canCurrentClientEditProjectStructure()) {
+      setMultiStatus(
+        localizeText(
+          duplicate
+            ? '参加/視聴モードではフレーム複製はマスターのみ操作できます'
+            : '参加/視聴モードではフレーム追加はマスターのみ操作できます',
+          duplicate
+            ? 'In participant/viewer mode, only the master can duplicate frames'
+            : 'In participant/viewer mode, only the master can add frames'
+        ),
+        'warn'
+      );
+      return false;
+    }
+    const baseFrame = getActiveFrame();
+    if (!baseFrame) {
+      return false;
+    }
+    clearTimelineSelection();
+    beginHistory(duplicate ? 'duplicateFrame' : 'addFrame');
+    const sourceLayers = duplicate ? baseFrame.layers : baseFrame.layers;
+    const newFrame = createFrame(
+      getDefaultFrameName(state.frames.length + 1),
+      sourceLayers,
+      state.width,
+      state.height
+    );
+    if (duplicate) {
+      newFrame.duration = Number.isFinite(baseFrame.duration) && baseFrame.duration > 0
+        ? baseFrame.duration
+        : newFrame.duration;
+      newFrame.name = getDefaultFrameName(state.activeFrame + 2);
+    }
+    state.frames.splice(state.activeFrame + 1, 0, newFrame);
+    state.activeFrame += 1;
+    state.activeLayer = newFrame.layers[newFrame.layers.length - 1].id;
+    markHistoryDirty();
+    scheduleSessionPersist();
+    renderFrameList();
+    renderLayerList();
+    requestRender();
+    requestOverlayRender();
+    commitHistory();
+    updateAutosaveStatus(
+      localizeText(
+        duplicate ? 'フレームを複製しました' : 'フレームを追加しました',
+        duplicate ? 'Frame duplicated' : 'Frame added'
+      ),
+      'success'
+    );
+    return true;
+  }
+
+  function togglePlaybackFromShortcut() {
+    if (state.playback.isPlaying) {
+      stopPlayback();
+      return true;
+    }
+    startPlayback();
+    return Boolean(state.playback.isPlaying);
+  }
+
   function openNewProjectDialog() {
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return;
@@ -12676,6 +13222,8 @@
         exportProjectAsJpeg();
       } else if (mode === 'svg') {
         exportProjectAsSvg();
+      } else if (mode === 'spritemap') {
+        exportProjectAsSpriteMap();
       } else if (mode === 'gridpng') {
         exportProjectAsGridPng();
       } else if (mode === 'timelapse') {
@@ -12708,6 +13256,7 @@
     if (config.format && config.format.dataset.bound !== 'true') {
       config.format.dataset.bound = 'true';
       config.format.addEventListener('change', () => {
+        refreshExportScaleControls();
         updateExportFormatAvailability();
         updateExportOriginalToggleUI();
       });
@@ -14469,13 +15018,10 @@
     const data = imageData.data;
     const palette = Array.isArray(snapshot.palette) ? snapshot.palette : [];
     frame.layers.forEach(layer => {
-      if (!layer || !layer.visible || normalizeLayerOpacity(layer.opacity) <= 0) {
+      if (!layer) {
         return;
       }
-      const opacity = normalizeLayerOpacity(layer.opacity);
-      if (opacity <= 0) {
-        return;
-      }
+      const opacity = 1;
       const blendMode = normalizeLayerBlendMode(layer.blendMode);
       const indices = layer.indices instanceof Int16Array ? layer.indices : null;
       const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
@@ -14803,20 +15349,12 @@
 
   function serializeDocumentSnapshot(snapshot) {
     const palette = snapshot.palette.map(color => normalizeColorValue(color));
-    const brushShape = normalizeBrushShape(snapshot.brushShape ?? state.brushShape, BRUSH_SHAPE_SQUARE);
-    const selectSameMode = normalizeSelectSameMode(snapshot.selectSameMode ?? state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
-    const customBrushPayload = serializeCustomBrushPayload(snapshot.customBrush ?? state.customBrush);
+    // Personal view/tool/color preferences stay in local session storage instead of shared project payloads.
     const serialized = {
       version: DOCUMENT_FILE_VERSION,
       width: snapshot.width,
       height: snapshot.height,
-      scale: snapshot.scale,
-      pan: { ...snapshot.pan },
       palette,
-      activePaletteIndex: snapshot.activePaletteIndex,
-      secondaryPaletteIndex: snapshot.secondaryPaletteIndex,
-      activeRgb: normalizeColorValue(snapshot.activeRgb),
-      colorMode: normalizeColorMode(snapshot.colorMode, state.colorMode),
       frames: snapshot.frames.map(frame => ({
         id: frame.id,
         name: frame.name,
@@ -14824,67 +15362,14 @@
         layers: frame.layers.map(layer => ({
           id: layer.id,
           name: layer.name,
-          visible: layer.visible,
-          opacity: normalizeLayerOpacity(layer.opacity),
           blendMode: normalizeLayerBlendMode(layer.blendMode),
           indices: encodeTypedArray(layer.indices),
           direct: encodeTypedArray(layer.direct),
         })),
       })),
-      showGrid: snapshot.showGrid,
-      showMajorGrid: snapshot.showMajorGrid,
-      gridScreenStep: snapshot.gridScreenStep,
-      majorGridSpacing: snapshot.majorGridSpacing,
-      backgroundMode: snapshot.backgroundMode,
-      uiTheme: normalizeUiTheme(snapshot.uiTheme, DEFAULT_UI_THEME),
       documentName: normalizeDocumentName(snapshot.documentName),
-      showPixelGuides: snapshot.showPixelGuides,
-      mirror: normalizeMirrorAxisState(snapshot.mirror, snapshot.width, snapshot.height),
-      showVirtualCursor: snapshot.showVirtualCursor,
-      showChecker: snapshot.showChecker,
-      onionSkin: normalizeOnionSkinState(snapshot.onionSkin),
       dualLeftRail: false,
-      brushShape,
-      selectSameMode,
-      customBrush: customBrushPayload,
     };
-    if (Object.prototype.hasOwnProperty.call(snapshot, 'activeFrame')) {
-      serialized.activeFrame = clamp(
-        Math.round(Number(snapshot.activeFrame) || 0),
-        0,
-        Math.max(0, (Array.isArray(snapshot.frames) ? snapshot.frames.length : 1) - 1)
-      );
-    }
-    if (Object.prototype.hasOwnProperty.call(snapshot, 'activeLayer') && typeof snapshot.activeLayer === 'string') {
-      serialized.activeLayer = snapshot.activeLayer;
-    }
-    if (snapshot.selectionMask instanceof Uint8Array) {
-      serialized.selectionMask = encodeTypedArray(snapshot.selectionMask);
-    }
-    if (snapshot.selectionBounds && typeof snapshot.selectionBounds === 'object') {
-      serialized.selectionBounds = { ...snapshot.selectionBounds };
-    }
-    if (Object.prototype.hasOwnProperty.call(snapshot, 'tool')) {
-      serialized.tool = normalizeToolId(snapshot.tool, state.tool);
-    }
-    if (Object.prototype.hasOwnProperty.call(snapshot, 'brushSize')) {
-      serialized.brushSize = clamp(Math.round(Number(snapshot.brushSize) || state.brushSize || 1), 1, 64);
-    }
-    if (Object.prototype.hasOwnProperty.call(snapshot, 'outlineSize')) {
-      serialized.outlineSize = clamp(Math.round(Number(snapshot.outlineSize) || state.outlineSize || 1), 1, 64);
-    }
-    if (Object.prototype.hasOwnProperty.call(snapshot, 'activeToolGroup')) {
-      serialized.activeToolGroup = snapshot.activeToolGroup;
-    }
-    if (snapshot.lastGroupTool && typeof snapshot.lastGroupTool === 'object') {
-      serialized.lastGroupTool = { ...snapshot.lastGroupTool };
-    }
-    if (Object.prototype.hasOwnProperty.call(snapshot, 'activeLeftTab')) {
-      serialized.activeLeftTab = snapshot.activeLeftTab;
-    }
-    if (Object.prototype.hasOwnProperty.call(snapshot, 'activeRightTab')) {
-      serialized.activeRightTab = snapshot.activeRightTab;
-    }
     if (snapshot.playback && typeof snapshot.playback === 'object') {
       serialized.playback = {
         isPlaying: Boolean(snapshot.playback.isPlaying),
@@ -14945,7 +15430,7 @@
           id: typeof layer.id === 'string' ? layer.id : `layer-${frameIndex}-${layerIndex}`,
           name: typeof layer.name === 'string' ? layer.name : getDefaultLayerName(layerIndex + 1),
           visible: layer.visible !== false,
-          opacity: normalizeLayerOpacity(layer.opacity),
+          opacity: 1,
           blendMode: normalizeLayerBlendMode(layer.blendMode),
           indices,
           direct,
@@ -15347,7 +15832,6 @@
         return;
       }
       const total = tileCountPerFrame * frameCount;
-      const frameDigits = Math.max(2, String(frameCount).length);
       const rowDigits = Math.max(2, String(rowSegments.length).length);
       const columnDigits = Math.max(2, String(columnSegments.length).length);
       let exportedCount = 0;
@@ -15360,7 +15844,6 @@
         }
         const frameCanvas = createFrameCanvas(framePixels[frameIndex], width, height);
         const outputCanvas = scaleCanvasNearestNeighbor(frameCanvas, selectedScale);
-        const frameNumber = String(frameIndex + 1).padStart(frameDigits, '0');
         for (let rowIndex = 0; rowIndex < rowSegments.length; rowIndex += 1) {
           if (wasCancelled || hadFailure) {
             break;
@@ -15382,10 +15865,15 @@
               exportHeight,
               'image/png'
             );
-            let suffix = `frame_${frameNumber}_tile_r${rowNumber}_c${columnNumber}`;
-            if (selectedScale > 1) {
-              suffix += `_x${selectedScale}`;
+            const suffixParts = [];
+            if (frameCount > 1) {
+              suffixParts.push(String(frameIndex + 1));
             }
+            suffixParts.push(`r${rowNumber}`, `c${columnNumber}`);
+            if (selectedScale > 1) {
+              suffixParts.push(`x${selectedScale}`);
+            }
+            const suffix = suffixParts.join('_');
             const deliveryResult = await triggerDownloadFromBlob(
               blob,
               createExportFileName('png', suffix),
@@ -15481,8 +15969,8 @@
       const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
       const includeOriginal = shouldExportOriginalCompanion('png', selectedScale);
       const tasks = [];
+      const hasMultipleFrames = frameCount > 1;
       for (let index = 0; index < frameCount; index += 1) {
-        const frameNumber = String(index + 1).padStart(2, '0');
         const baseCanvas = createFrameCanvas(framePixels[index], width, height);
         const variants = [{ scale: selectedScale, isOriginal: false }];
         if (includeOriginal) {
@@ -15495,9 +15983,9 @@
           if (!blob) {
             throw new Error('Failed to create PNG blob');
           }
-          let suffix = `frame_${frameNumber}`;
+          let suffix = hasMultipleFrames ? String(index + 1) : '';
           if (variant.scale > 1 || includeOriginal) {
-            suffix += `_x${variant.scale}`;
+            suffix = suffix ? `${suffix}_x${variant.scale}` : `x${variant.scale}`;
           }
           tasks.push({
             blob,
@@ -15558,6 +16046,100 @@
     } catch (error) {
       console.error('PNG export failed', error);
       updateAutosaveStatus('PNGの書き出しに失敗しました', 'error');
+    }
+  }
+
+  async function exportProjectAsSpriteMap() {
+    if (!ensureCurrentClientCanExportProject({ announce: true, format: 'spritemap' })) {
+      return;
+    }
+    const frameCount = state.frames.length;
+    if (!frameCount) {
+      updateAutosaveStatus('SpriteMAPにまとめるフレームがありません', 'warn');
+      return;
+    }
+    try {
+      const { width, height } = state;
+      const candidates = getExportScaleCandidates('spritemap');
+      const selectedScale = applyExportScaleConstraints(candidates);
+      syncExportScaleInputs();
+      const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
+      const spriteMapPlan = buildSpriteMapExportPlan(framePixels, width, height, state.palette);
+      const includeOriginal = shouldExportOriginalCompanion('spritemap', selectedScale);
+      const variants = [{ scale: selectedScale, isOriginal: false }];
+      if (includeOriginal) {
+        variants.push({ scale: 1, isOriginal: true });
+      }
+      const tasks = [];
+      const layoutLabel = `${spriteMapPlan.columns}x${spriteMapPlan.rows}`;
+      for (let variantIndex = 0; variantIndex < variants.length; variantIndex += 1) {
+        const variant = variants[variantIndex];
+        const spriteMap = buildSpriteMapCanvas(spriteMapPlan.framePixels, width, height, {
+          scale: variant.scale,
+          columns: spriteMapPlan.columns,
+          rows: spriteMapPlan.rows,
+          placements: spriteMapPlan.placements,
+        });
+        const blob = await canvasToBlob(spriteMap.canvas, 'image/png');
+        if (!blob) {
+          throw new Error('Failed to create SpriteMAP blob');
+        }
+        let suffix = 'spritemap';
+        if (variant.scale > 1 || includeOriginal) {
+          suffix += `_x${variant.scale}`;
+        }
+        tasks.push({
+          blob,
+          filename: createExportFileName('png', suffix),
+          shareText: `SpriteMAPを書き出しました (${layoutLabel}${spriteMapPlan.colorSpriteCount > 0 ? ` / 色${spriteMapPlan.usedColorCount}` : ''}${variant.scale > 1 ? ` / ×${variant.scale}` : ''})`,
+        });
+      }
+
+      const result = await deliverExportTasks(tasks, {
+        mimeType: 'image/png',
+        fileExtensions: ['.png'],
+        shareTitle: state.documentName || 'PiXiEEDraw',
+        shareText: 'SpriteMAPを書き出しました',
+      });
+      const detailParts = [`全${frameCount}フレーム`, `配置 ${layoutLabel}`];
+      if (spriteMapPlan.colorSpriteCount > 0) {
+        detailParts.push(`使用色 ${spriteMapPlan.usedColorCount}色`);
+        detailParts.push(`色スプライト ${spriteMapPlan.colorSpriteCount}枚`);
+      }
+      if (selectedScale > 1) {
+        detailParts.push(`×${selectedScale}`);
+      }
+      if (includeOriginal) {
+        detailParts.push('原寸も追加');
+      }
+      const detail = detailParts.length ? ` (${detailParts.join(' / ')})` : '';
+
+      if (result.exportedCount === result.total) {
+        updateAutosaveStatus(`SpriteMAPを書き出しました${detail}`, 'success');
+      } else if (result.wasCancelled) {
+        const remaining = result.total - result.exportedCount;
+        updateAutosaveStatus(remaining === result.total
+          ? 'SpriteMAPの書き出しをキャンセルしました'
+          : `SpriteMAPを書き出しましたが ${remaining} 件はキャンセルされました`, 'warn');
+      } else if (result.exportedCount > 0 && result.hadFailure) {
+        updateAutosaveStatus(`SpriteMAPを書き出しましたが ${result.total - result.exportedCount} 件エクスポートできませんでした`, 'warn');
+      } else {
+        updateAutosaveStatus('SpriteMAPの書き出しに失敗しました', 'error');
+      }
+      if (result.exportedCount > 0) {
+        markDocumentDurablySaved();
+        if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
+          const companionResult = await maybeSaveProjectCompanionAfterExport('spritemap', {
+            exportedCount: result.exportedCount,
+            wasCancelled: result.wasCancelled,
+          });
+          announceProjectCompanionSaveResult('spritemap', companionResult);
+        }
+        showExportInterstitialAfterImageExport();
+      }
+    } catch (error) {
+      console.error('SpriteMAP export failed', error);
+      updateAutosaveStatus('SpriteMAPの書き出しに失敗しました', 'error');
     }
   }
 
@@ -15930,17 +16512,21 @@
 
   function compositeFramePixels(frame, width, height, palette, options = {}) {
     const includeHiddenLayers = Boolean(options && options.includeHiddenLayers);
+    const useLocalLayerPreviewVisibility = Boolean(options && options.useLocalLayerPreviewVisibility);
+    const useLocalLayerPreviewOpacity = Boolean(options && options.useLocalLayerPreviewOpacity);
     const pixelCount = width * height;
     const output = new Uint8ClampedArray(pixelCount * 4);
     if (!frame || !Array.isArray(frame.layers)) {
       return output;
     }
     frame.layers.forEach(layer => {
-      if (!layer || (!includeHiddenLayers && !layer.visible) || normalizeLayerOpacity(layer.opacity) <= 0) {
-        return;
-      }
-      const layerOpacity = normalizeLayerOpacity(layer.opacity);
-      if (layerOpacity <= 0) {
+      const layerVisible = useLocalLayerPreviewVisibility
+        ? getDisplayedLayerVisibility(layer, true)
+        : true;
+      const layerOpacity = useLocalLayerPreviewOpacity
+        ? getDisplayedLayerPreviewOpacity(layer, 1)
+        : 1;
+      if (!layer || (!includeHiddenLayers && !layerVisible) || layerOpacity <= 0) {
         return;
       }
       const layerBlendMode = normalizeLayerBlendMode(layer.blendMode);
@@ -15984,13 +16570,187 @@
     return { columns, rows };
   }
 
-  function getExportScaleCandidates() {
+  function collectUsedColorsFromFramePixels(framePixels, palette = state.palette) {
+    const frames = Array.isArray(framePixels) ? framePixels : [];
+    const discoveredColors = [];
+    const discoveredLookup = new Map();
+    for (let frameIndex = 0; frameIndex < frames.length; frameIndex += 1) {
+      const pixels = frames[frameIndex];
+      if (!(pixels instanceof Uint8ClampedArray)) {
+        continue;
+      }
+      const pixelCount = Math.floor(pixels.length / 4);
+      for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
+        const base = pixelIndex * 4;
+        const alpha = pixels[base + 3];
+        if (!alpha) {
+          continue;
+        }
+        const color = {
+          r: pixels[base],
+          g: pixels[base + 1],
+          b: pixels[base + 2],
+          a: alpha,
+        };
+        const key = getPaletteColorKey(color);
+        if (!discoveredLookup.has(key)) {
+          discoveredLookup.set(key, discoveredColors.length);
+          discoveredColors.push(normalizeColorValue(color));
+        }
+      }
+    }
+    if (!discoveredColors.length) {
+      return [];
+    }
+
+    const orderedColors = [];
+    const orderedLookup = new Set();
+    if (Array.isArray(palette) && palette.length) {
+      palette.forEach((color) => {
+        const normalized = normalizeColorValue(color);
+        if (normalized.a <= 0) {
+          return;
+        }
+        const key = getPaletteColorKey(normalized);
+        if (discoveredLookup.has(key) && !orderedLookup.has(key)) {
+          orderedLookup.add(key);
+          orderedColors.push(normalized);
+        }
+      });
+    }
+    discoveredColors.forEach((color) => {
+      const key = getPaletteColorKey(color);
+      if (!orderedLookup.has(key)) {
+        orderedLookup.add(key);
+        orderedColors.push(color);
+      }
+    });
+    return orderedColors;
+  }
+
+  function buildColorSpriteFramesFromColors(colors, frameWidth, frameHeight) {
+    const safeFrameWidth = Math.max(1, Math.floor(Number(frameWidth) || 0));
+    const safeFrameHeight = Math.max(1, Math.floor(Number(frameHeight) || 0));
+    const orderedColors = Array.isArray(colors)
+      ? colors
+        .map(color => normalizeColorValue(color))
+        .filter(color => color.a > 0)
+      : [];
+    if (!orderedColors.length) {
+      return {
+        framePixels: [],
+        colorCount: 0,
+        spriteCount: 0,
+        swatchSize: 1,
+        columns: safeFrameWidth,
+        rows: safeFrameHeight,
+        capacityPerSprite: safeFrameWidth * safeFrameHeight,
+      };
+    }
+
+    const swatchSize = 1;
+    const columns = Math.max(1, Math.floor(safeFrameWidth / swatchSize));
+    const rows = Math.max(1, Math.floor(safeFrameHeight / swatchSize));
+    const capacityPerSprite = Math.max(1, columns * rows);
+    const framePixels = [];
+    let colorIndex = 0;
+    while (colorIndex < orderedColors.length) {
+      const pixels = new Uint8ClampedArray(safeFrameWidth * safeFrameHeight * 4);
+      const swatchCount = Math.min(capacityPerSprite, orderedColors.length - colorIndex);
+      for (let swatchIndex = 0; swatchIndex < swatchCount; swatchIndex += 1) {
+        const color = orderedColors[colorIndex + swatchIndex];
+        const column = swatchIndex % columns;
+        const row = Math.floor(swatchIndex / columns);
+        const startX = column * swatchSize;
+        const startY = row * swatchSize;
+        const endX = Math.min(safeFrameWidth, startX + swatchSize);
+        const endY = Math.min(safeFrameHeight, startY + swatchSize);
+        for (let y = startY; y < endY; y += 1) {
+          const rowBase = y * safeFrameWidth;
+          for (let x = startX; x < endX; x += 1) {
+            const base = (rowBase + x) * 4;
+            pixels[base] = color.r;
+            pixels[base + 1] = color.g;
+            pixels[base + 2] = color.b;
+            pixels[base + 3] = color.a;
+          }
+        }
+      }
+      framePixels.push(pixels);
+      colorIndex += swatchCount;
+    }
+
+    return {
+      framePixels,
+      colorCount: orderedColors.length,
+      spriteCount: framePixels.length,
+      swatchSize,
+      columns,
+      rows,
+      capacityPerSprite,
+    };
+  }
+
+  function buildSpriteMapExportPlan(framePixels, frameWidth, frameHeight, palette = state.palette) {
+    const sourceFrames = Array.isArray(framePixels) ? framePixels : [];
+    const safeFrameWidth = Math.max(1, Math.floor(Number(frameWidth) || 0));
+    const safeFrameHeight = Math.max(1, Math.floor(Number(frameHeight) || 0));
+    const baseLayout = computeSpriteSheetLayout(sourceFrames.length);
+    const usedColors = collectUsedColorsFromFramePixels(sourceFrames, palette);
+    const colorSpriteSet = buildColorSpriteFramesFromColors(usedColors, safeFrameWidth, safeFrameHeight);
+    const tiles = [];
+    for (let index = 0; index < sourceFrames.length; index += 1) {
+      tiles.push({
+        pixels: sourceFrames[index],
+        column: index % baseLayout.columns,
+        row: Math.floor(index / baseLayout.columns),
+      });
+    }
+    const columns = colorSpriteSet.spriteCount > 0
+      ? Math.max(1, baseLayout.columns + 1)
+      : Math.max(1, baseLayout.columns);
+    for (let index = 0; index < colorSpriteSet.framePixels.length; index += 1) {
+      tiles.push({
+        pixels: colorSpriteSet.framePixels[index],
+        column: columns - 1,
+        row: index,
+      });
+    }
+    const rows = Math.max(1, baseLayout.rows, colorSpriteSet.spriteCount);
+    return {
+      framePixels: tiles.map(tile => tile.pixels),
+      placements: tiles.map(tile => ({ column: tile.column, row: tile.row })),
+      sourceFrameCount: sourceFrames.length,
+      colorSpriteCount: colorSpriteSet.spriteCount,
+      usedColorCount: colorSpriteSet.colorCount,
+      colorSwatchSize: colorSpriteSet.swatchSize,
+      baseColumns: baseLayout.columns,
+      baseRows: baseLayout.rows,
+      columns,
+      rows,
+      sheetWidth: safeFrameWidth * columns,
+      sheetHeight: safeFrameHeight * rows,
+    };
+  }
+
+  function getExportScaleCandidates(mode = dom.exportDialog?.format?.value || 'png') {
+    const format = normalizeExportFormat(mode);
     const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
-    const { columns, rows } = computeSpriteSheetLayout(frameCount);
     const frameWidth = Math.max(1, state.width);
     const frameHeight = Math.max(1, state.height);
-    const maxScaleWidth = Math.floor(MAX_EXPORT_DIMENSION / frameWidth);
-    const maxScaleHeight = Math.floor(MAX_EXPORT_DIMENSION / frameHeight);
+    const spriteMapPlan = format === 'spritemap' && frameCount > 0
+      ? buildSpriteMapExportPlan(
+        compositeDocumentFrames(state.frames, frameWidth, frameHeight, state.palette),
+        frameWidth,
+        frameHeight,
+        state.palette
+      )
+      : null;
+    const { columns, rows } = spriteMapPlan || computeSpriteSheetLayout(frameCount);
+    const sheetWidth = spriteMapPlan ? spriteMapPlan.sheetWidth : frameWidth;
+    const sheetHeight = spriteMapPlan ? spriteMapPlan.sheetHeight : frameHeight;
+    const maxScaleWidth = Math.floor(MAX_EXPORT_DIMENSION / sheetWidth);
+    const maxScaleHeight = Math.floor(MAX_EXPORT_DIMENSION / sheetHeight);
     const maxScale = Math.max(1, Math.min(
       Math.max(1, maxScaleWidth || 0),
       Math.max(1, maxScaleHeight || 0),
@@ -16000,15 +16760,15 @@
     for (let scale = 1; scale <= limit; scale += 1) {
       options.push({
         scale,
-        width: frameWidth * scale,
-        height: frameHeight * scale,
+        width: sheetWidth * scale,
+        height: sheetHeight * scale,
       });
     }
     return {
       options,
       maxScale,
-      sheetWidth: frameWidth,
-      sheetHeight: frameHeight,
+      sheetWidth,
+      sheetHeight,
       columns,
       rows,
     };
@@ -16025,6 +16785,7 @@
     if (normalized === 'timelapse') return 'timelapse';
     if (normalized === 'jpeg' || normalized === 'jpg') return 'jpeg';
     if (normalized === 'svg') return 'svg';
+    if (normalized === 'spritemap' || normalized === 'sprite-map' || normalized === 'spritesheet' || normalized === 'sprite-sheet') return 'spritemap';
     if (normalized === 'png') return 'png';
     if (normalized === 'gridpng' || normalized === 'grid') return 'gridpng';
     if (normalized === 'pixfind') return 'pixfind';
@@ -16036,6 +16797,7 @@
     const normalized = normalizeExportFormat(mode);
     if (normalized === 'jpeg') return 'JPEG';
     if (normalized === 'svg') return 'SVG';
+    if (normalized === 'spritemap') return 'SpriteMAP';
     if (normalized === 'gridpng') return localizeText('PNG（グリッド分割）', 'PNG (Grid Split)');
     if (normalized === 'gif') return 'GIF';
     if (normalized === 'timelapse') return localizeText('タイムラプスGIF', 'Timelapse GIF');
@@ -16090,6 +16852,7 @@
     const supportsCompanionFormat = format === 'png'
       || format === 'jpeg'
       || format === 'svg'
+      || format === 'spritemap'
       || format === 'gif'
       || format === 'gridpng'
       || format === 'timelapse';
@@ -16185,7 +16948,7 @@
     const format = normalizeExportFormat(mode);
     const normalizedScale = Math.max(1, Math.floor(Number(scale) || 1));
     return normalizedScale > 1
-      && (format === 'png' || format === 'jpeg' || format === 'svg' || format === 'gif');
+      && (format === 'png' || format === 'jpeg' || format === 'svg' || format === 'spritemap' || format === 'gif');
   }
 
   function shouldExportOriginalCompanion(mode, scale = exportScale) {
@@ -16197,6 +16960,7 @@
     return format === 'png'
       || format === 'jpeg'
       || format === 'svg'
+      || format === 'spritemap'
       || format === 'gif'
       || format === 'gridpng'
       || format === 'timelapse';
@@ -16207,6 +16971,7 @@
     return format === 'png'
       || format === 'jpeg'
       || format === 'svg'
+      || format === 'spritemap'
       || format === 'gif'
       || format === 'gridpng'
       || format === 'timelapse';
@@ -16568,7 +17333,7 @@
   }
 
   function refreshExportScaleControls() {
-    const candidates = getExportScaleCandidates();
+    const candidates = getExportScaleCandidates(dom.exportDialog?.format?.value || 'png');
     applyExportScaleConstraints(candidates);
     syncExportScaleInputs();
   }
@@ -16689,6 +17454,76 @@
     const targetHeight = height * numericScale;
     const scaledFrames = framePixels.map(pixels => scaleFramePixelsNearestNeighbor(pixels, width, height, numericScale).pixels);
     return { width: targetWidth, height: targetHeight, framePixels: scaledFrames };
+  }
+
+  function buildSpriteMapCanvas(framePixels, frameWidth, frameHeight, {
+    scale = 1,
+    columns: requestedColumns = 0,
+    rows: requestedRows = 0,
+    placements = null,
+  } = {}) {
+    const safeFrameWidth = Math.max(1, Math.floor(Number(frameWidth) || 0));
+    const safeFrameHeight = Math.max(1, Math.floor(Number(frameHeight) || 0));
+    const frames = Array.isArray(framePixels) ? framePixels : [];
+    const frameCount = Math.max(1, frames.length);
+    const fallbackLayout = computeSpriteSheetLayout(frameCount);
+    const normalizedPlacements = Array.isArray(placements) ? placements : [];
+    const placementColumns = normalizedPlacements.reduce((max, placement) => {
+      const value = Math.floor(Number(placement?.column) || 0);
+      return Math.max(max, value + 1);
+    }, 0);
+    const placementRows = normalizedPlacements.reduce((max, placement) => {
+      const value = Math.floor(Number(placement?.row) || 0);
+      return Math.max(max, value + 1);
+    }, 0);
+    const explicitColumns = Math.max(0, Math.floor(Number(requestedColumns) || 0));
+    const columns = explicitColumns > 0
+      ? explicitColumns
+      : (placementColumns > 0 ? placementColumns : fallbackLayout.columns);
+    const explicitRows = Math.max(0, Math.floor(Number(requestedRows) || 0));
+    const rows = Math.max(
+      1,
+      explicitRows,
+      placementRows,
+      Math.ceil(frameCount / columns)
+    );
+    const scaledSet = scaleFrameSetNearestNeighbor(frames, safeFrameWidth, safeFrameHeight, scale);
+    const sheetCanvas = document.createElement('canvas');
+    sheetCanvas.width = Math.max(1, scaledSet.width * columns);
+    sheetCanvas.height = Math.max(1, scaledSet.height * rows);
+    const ctx = sheetCanvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('SpriteMAP用キャンバスのコンテキストを取得できませんでした');
+    }
+    ctx.imageSmoothingEnabled = false;
+    ctx.msImageSmoothingEnabled = false;
+    ctx.webkitImageSmoothingEnabled = false;
+    for (let index = 0; index < scaledSet.framePixels.length; index += 1) {
+      const pixels = scaledSet.framePixels[index];
+      if (!(pixels instanceof Uint8ClampedArray)) {
+        continue;
+      }
+      const placement = normalizedPlacements[index];
+      const column = placement && Number.isFinite(Number(placement.column))
+        ? clamp(Math.floor(Number(placement.column) || 0), 0, Math.max(0, columns - 1))
+        : index % columns;
+      const row = placement && Number.isFinite(Number(placement.row))
+        ? clamp(Math.floor(Number(placement.row) || 0), 0, Math.max(0, rows - 1))
+        : Math.floor(index / columns);
+      const x = column * scaledSet.width;
+      const y = row * scaledSet.height;
+      const frameCanvas = createFrameCanvas(pixels, scaledSet.width, scaledSet.height);
+      ctx.drawImage(frameCanvas, x, y);
+    }
+    return {
+      canvas: sheetCanvas,
+      columns,
+      rows,
+      frameWidth: scaledSet.width,
+      frameHeight: scaledSet.height,
+      sheetWidth: sheetCanvas.width,
+      sheetHeight: sheetCanvas.height,
+    };
   }
 
   async function deliverExportTasks(tasks, options = {}) {
@@ -20202,13 +21037,8 @@
       if (layoutMode !== 'mobilePortrait') {
         return;
       }
-      const currentIndex = getMobileDrawerModeRank(mobileDrawerState.mode);
       let nextMode = null;
-      if (event.key === 'ArrowUp') {
-        nextMode = MOBILE_DRAWER_MODE_ORDER[clamp(currentIndex + 1, 0, MOBILE_DRAWER_MODE_ORDER.length - 1)];
-      } else if (event.key === 'ArrowDown') {
-        nextMode = MOBILE_DRAWER_MODE_ORDER[clamp(currentIndex - 1, 0, MOBILE_DRAWER_MODE_ORDER.length - 1)];
-      } else if (event.key === 'Home') {
+      if (event.key === 'Home') {
         nextMode = 'peek';
       } else if (event.key === 'End') {
         nextMode = 'full';
@@ -20806,10 +21636,6 @@
   }
 
   function setMirrorModeEnabled(enabled, options = {}) {
-    if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus(localizeText('参加/視聴モードではミラーモード設定はマスターのみ変更できます', 'In participant/viewer mode, only the master can change mirror mode settings'), 'warn');
-      return;
-    }
     const { persist = true, updateControl = true } = options;
     const mirrorState = getNormalizedMirrorState();
     const next = Boolean(enabled);
@@ -20846,10 +21672,6 @@
   }
 
   function setMirrorAxisEnabled(axis, enabled, options = {}) {
-    if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus(localizeText('参加/視聴モードでは対称軸設定はマスターのみ変更できます', 'In participant/viewer mode, only the master can change mirror axes'), 'warn');
-      return;
-    }
     const { persist = true, syncControls = true } = options;
     if (!isMirrorAxisKey(axis)) {
       return;
@@ -21437,10 +22259,6 @@
     }
     event.preventDefault();
     event.stopPropagation();
-    if (!canCurrentClientEditProjectStructure()) {
-      setMultiStatus(localizeText('参加/視聴モードでは対称軸設定はマスターのみ変更できます', 'In participant/viewer mode, only the master can change mirror axes'), 'warn');
-      return;
-    }
     if (!mirrorState.axes[axis]) {
       return;
     }
@@ -23792,6 +24610,9 @@
     if (!palettePresetPickerViewportBound) {
       palettePresetPickerViewportBound = true;
       const updateWhenOpen = event => {
+        if (event?.type === 'resize') {
+          schedulePalettePresetPickerRefresh();
+        }
         const targetNode = event?.target instanceof Node ? event.target : null;
         if (event?.type === 'scroll' && targetNode) {
           if (
@@ -25334,25 +26155,7 @@
     });
 
     dom.controls.addFrame?.addEventListener('click', () => {
-      if (!canCurrentClientEditProjectStructure()) {
-        setMultiStatus(localizeText('参加/視聴モードではフレーム追加はマスターのみ操作できます', 'In participant/viewer mode, only the master can add frames'), 'warn');
-        return;
-      }
-      const baseFrame = getActiveFrame();
-      if (!baseFrame) return;
-      clearTimelineSelection();
-      beginHistory('addFrame');
-      const newFrame = createFrame(getDefaultFrameName(state.frames.length + 1), baseFrame.layers, state.width, state.height);
-      state.frames.splice(state.activeFrame + 1, 0, newFrame);
-      state.activeFrame += 1;
-      state.activeLayer = newFrame.layers[newFrame.layers.length - 1].id;
-      markHistoryDirty();
-      scheduleSessionPersist();
-      renderFrameList();
-      renderLayerList();
-      requestRender();
-      requestOverlayRender();
-      commitHistory();
+      addOrDuplicateFrameAfterActive({ duplicate: false });
     });
 
     dom.controls.removeFrame?.addEventListener('click', () => {
@@ -25384,16 +26187,6 @@
       moveActiveFrame(1);
     });
 
-    let layerOpacityInteractionActive = false;
-    const finalizeLayerOpacityInteraction = () => {
-      if (!layerOpacityInteractionActive) {
-        return;
-      }
-      layerOpacityInteractionActive = false;
-      commitHistory();
-      renderLayerList();
-    };
-
     if (dom.controls.layerOpacity instanceof HTMLInputElement) {
       const opacityControl = dom.controls.layerOpacity;
       const readOpacityPercent = () => {
@@ -25409,30 +26202,22 @@
           syncActiveLayerSettingsUI();
           return;
         }
-        if (!layerOpacityInteractionActive) {
-          beginHistory('setLayerOpacity');
-          layerOpacityInteractionActive = true;
-        }
         const changed = setActiveLayerTrackOpacity(opacityPercent / 100);
         if (!changed) {
           return;
         }
-        markHistoryDirty();
+        clearPlaybackFrameCache();
         requestRender();
         requestOverlayRender();
         renderLayerList();
+        renderTimelineMatrix();
+        scheduleSessionPersist({ includeSnapshots: false });
       });
-      opacityControl.addEventListener('change', () => {
-        finalizeLayerOpacityInteraction();
-      });
-      opacityControl.addEventListener('blur', finalizeLayerOpacityInteraction);
-      opacityControl.addEventListener('pointercancel', finalizeLayerOpacityInteraction);
     }
 
     if (dom.controls.layerBlendMode instanceof HTMLSelectElement) {
       const blendControl = dom.controls.layerBlendMode;
       blendControl.addEventListener('change', () => {
-        finalizeLayerOpacityInteraction();
         const normalizedBlendMode = normalizeLayerBlendMode(blendControl.value);
         blendControl.value = normalizedBlendMode;
         beginHistory('setLayerBlendMode');
@@ -25769,61 +26554,43 @@
       const frame = state.frames[frameIndex];
       const layerIndex = frame.layers.length - 1 - rowIndex;
       if (layerIndex >= 0 && layerIndex < frame.layers.length) {
-        return Boolean(frame.layers[layerIndex]?.visible);
+        return getDisplayedLayerVisibility(frame.layers[layerIndex], true);
       }
     }
     return true;
   }
 
   function setLayerVisibilityForRow(rowIndex, visible) {
-    // If the client cannot edit project structure (guest/spectator), allow local-only visibility toggles
+    const nextVisible = visible !== false;
     let needsChange = false;
     state.frames.forEach(frame => {
       const layerIndex = frame.layers.length - 1 - rowIndex;
       if (layerIndex >= 0 && layerIndex < frame.layers.length) {
         const targetLayer = frame.layers[layerIndex];
-        if (targetLayer && targetLayer.visible !== visible) {
+        if (targetLayer && getDisplayedLayerVisibility(targetLayer, true) !== nextVisible) {
           needsChange = true;
         }
       }
     });
-    if (!needsChange) return;
-
-    if (!canCurrentClientEditProjectStructure()) {
-      // Local-only toggle: do not alter shared document or broadcast; preserve local UX
-      state.frames.forEach(frame => {
-        const layerIndex = frame.layers.length - 1 - rowIndex;
-        if (layerIndex >= 0 && layerIndex < frame.layers.length) {
-          const targetLayer = frame.layers[layerIndex];
-          if (targetLayer && targetLayer.visible !== visible) {
-            targetLayer.visible = visible;
-          }
-        }
-      });
-      renderTimelineMatrix();
-      requestRender();
-      requestOverlayRender();
-      setMultiStatus(localizeText('表示状態をローカルで変更しました', 'Visibility was changed locally'), 'info');
+    if (!needsChange) {
       return;
     }
-
-    // Master / local edit: authoritative change (history + broadcast)
-    beginHistory('layerVisibilityRow');
     state.frames.forEach(frame => {
       const layerIndex = frame.layers.length - 1 - rowIndex;
       if (layerIndex >= 0 && layerIndex < frame.layers.length) {
         const targetLayer = frame.layers[layerIndex];
-        if (targetLayer && targetLayer.visible !== visible) {
-          targetLayer.visible = visible;
+        if (targetLayer && getDisplayedLayerVisibility(targetLayer, true) !== nextVisible) {
+          targetLayer.visible = nextVisible;
+          rememberLocalLayerVisibility(targetLayer.id, nextVisible);
         }
       }
     });
-    markHistoryDirty();
-    scheduleSessionPersist();
+    clearPlaybackFrameCache();
+    scheduleSessionPersist({ includeSnapshots: false });
+    renderLayerList();
     renderTimelineMatrix();
     requestRender();
     requestOverlayRender();
-    commitHistory();
   }
 
   function toggleLayerVisibilityForRow(rowIndex) {
@@ -25856,9 +26623,6 @@
   }
 
   function setActiveLayerTrackOpacity(opacity) {
-    if (!canCurrentClientEditProjectStructure()) {
-      return false;
-    }
     const layerIndex = getActiveLayerTrackIndex();
     if (layerIndex < 0) {
       return false;
@@ -25870,9 +26634,10 @@
     const normalizedOpacity = clamp(parsed, 0, 1);
     let changed = false;
     forEachLayerInTrack(layerIndex, layer => {
-      const currentOpacity = normalizeLayerOpacity(layer.opacity);
+      const currentOpacity = getDisplayedLayerPreviewOpacity(layer, 1);
       if (Math.abs(currentOpacity - normalizedOpacity) > 0.0001) {
         layer.opacity = normalizedOpacity;
+        rememberLocalLayerPreviewOpacity(layer.id, normalizedOpacity);
         changed = true;
       }
     });
@@ -25917,7 +26682,7 @@
     const blendControl = dom.controls.layerBlendMode;
     const targetLabel = dom.controls.layerSettingsTarget;
     const normalizedBlendMode = hasLayer ? normalizeLayerBlendMode(layer.blendMode) : DEFAULT_LAYER_BLEND_MODE;
-    const normalizedOpacity = hasLayer ? normalizeLayerOpacity(layer.opacity) : 1;
+    const normalizedOpacity = hasLayer ? getDisplayedLayerPreviewOpacity(layer, 1) : 1;
     const opacityPercent = clamp(Math.round(normalizedOpacity * 100), 0, 100);
 
     if (targetLabel) {
@@ -25961,9 +26726,6 @@
   }
 
   function setOnionSkinSettings(patch = {}) {
-    if (!canCurrentClientEditProjectStructure()) {
-      return false;
-    }
     const current = normalizeOnionSkinState(state.onionSkin);
     const next = normalizeOnionSkinState({ ...current, ...(patch || {}) });
     const changed = current.enabled !== next.enabled
@@ -26062,10 +26824,6 @@
       }
 
       if (target.classList.contains('timeline-visibility')) {
-        if (!canCurrentClientEditProjectStructure()) {
-          setMultiStatus(localizeText('参加/視聴モードではレイヤー表示切替はマスターのみ操作できます', 'In participant/viewer mode, only the master can toggle layer visibility'), 'warn');
-          return;
-        }
         const rowIndex = Number.parseInt(target.dataset.layerRowIndex || '', 10);
         if (Number.isFinite(rowIndex)) {
           toggleLayerVisibilityForRow(rowIndex);
@@ -26431,7 +27189,6 @@
             : localizeText('レイヤーを表示', 'Show layer')
         );
         visibilityToggle.textContent = rowVisibility ? '●' : '○';
-        visibilityToggle.disabled = isMultiReadOnlyMode();
         rowVisibilityCell.appendChild(visibilityToggle);
 
         const tag = document.createElement('button');
@@ -27655,6 +28412,21 @@
     return true;
   }
 
+  function shouldUseArrowKeysForSelectionMove() {
+    if (!selectionMaskHasPixels(state.selectionMask)) {
+      return false;
+    }
+    if (hasPendingSelectionMove() || pointerState.selectionMove) {
+      return true;
+    }
+    const activeTool = getActiveTool();
+    return activeTool === 'selectRect'
+      || activeTool === 'selectLasso'
+      || activeTool === 'selectSame'
+      || activeTool === 'selectionMove'
+      || activeTool === 'selectionTransform';
+  }
+
   function nudgeLayerFrameByKeyboard(direction, { step = 1 } = {}) {
     if (state.playback.isPlaying) {
       return false;
@@ -27951,7 +28723,8 @@
     }
     const frame = getActiveFrame();
     const pixels = compositeFramePixels(frame, width, height, state.palette, {
-      includeHiddenLayers: true,
+      useLocalLayerPreviewVisibility: true,
+      useLocalLayerPreviewOpacity: true,
     });
     let imageData = null;
     try {
@@ -29062,10 +29835,44 @@
     return true;
   }
 
+  function handleFramePlaybackShortcut(event) {
+    if (!event || event.altKey || event.ctrlKey || event.metaKey) {
+      return false;
+    }
+    if (startupVisible || hasOpenBlockingDialog() || pointerState.active) {
+      return false;
+    }
+    if (isEditableTarget(event.target)) {
+      return false;
+    }
+    const code = typeof event.code === 'string' ? event.code : '';
+    if (code === 'Comma' || code === 'Period') {
+      if (state.playback.isPlaying) {
+        stopPlayback();
+      }
+      const offset = code === 'Comma' ? -1 : 1;
+      const previousFrame = state.activeFrame;
+      setActiveFrameIndex(previousFrame + offset, { wrap: false, persist: true, render: true, syncUi: true });
+      return state.activeFrame !== previousFrame;
+    }
+    if (event.repeat) {
+      return false;
+    }
+    if (code === 'KeyN') {
+      return addOrDuplicateFrameAfterActive({ duplicate: event.shiftKey });
+    }
+    if (code === 'KeyP' && !event.shiftKey) {
+      return togglePlaybackFromShortcut();
+    }
+    return false;
+  }
+
   function setupKeyboard() {
     document.addEventListener('keydown', event => {
       const target = event.target;
       const editable = isEditableTarget(target);
+      const isPlainArrowKey = !event.metaKey && !event.ctrlKey && !event.altKey;
+      const arrowDirection = isPlainArrowKey ? getDirectionFromArrowKey(event.key) : null;
       if (event.code === 'Space' && !editable && !event.metaKey && !event.ctrlKey && !event.altKey) {
         setSpacePanActive(true);
         event.preventDefault();
@@ -29081,32 +29888,30 @@
         }
         return;
       }
-      if (state.playback.isPlaying) {
-        return;
-      }
-      const isPlainArrowKey = !event.metaKey && !event.ctrlKey && !event.altKey;
-      const arrowDirection = isPlainArrowKey ? getDirectionFromArrowKey(event.key) : null;
       if (
         !editable
         && !pointerState.active
         && arrowDirection
         && !startupVisible
         && !hasOpenBlockingDialog()
-        && !state.showVirtualCursor
       ) {
         const step = event.shiftKey ? 4 : 1;
-        const isDesktopArrowContext = layoutMode !== 'mobilePortrait';
         let handled = false;
-        if (isDesktopArrowContext && selectionMaskHasPixels(state.selectionMask)) {
+        if (shouldUseArrowKeysForSelectionMove()) {
           handled = nudgeSelectionByKeyboard(arrowDirection, { step, announce: true });
         }
-        if (!handled && isDesktopArrowContext) {
+        if (!handled && !state.playback.isPlaying) {
           handled = nudgeLayerFrameByKeyboard(arrowDirection, { step });
         }
-        if (handled || isDesktopArrowContext) {
-          event.preventDefault();
-          return;
-        }
+        event.preventDefault();
+        return;
+      }
+      if (state.playback.isPlaying) {
+        return;
+      }
+      if (!editable && handleFramePlaybackShortcut(event)) {
+        event.preventDefault();
+        return;
       }
       if (!editable && handleToolShortcut(event)) {
         event.preventDefault();
@@ -33593,7 +34398,7 @@
     let index = -1;
     for (let i = layers.length - 1; i >= 0; i -= 1) {
       const layer = layers[i];
-      if (!layer.visible || normalizeLayerOpacity(layer.opacity) <= 0) continue;
+      if (!getDisplayedLayerVisibility(layer, true) || getDisplayedLayerPreviewOpacity(layer, 1) <= 0) continue;
       const idx = y * state.width + x;
       if (layer.indices[idx] >= 0) {
         color = state.palette[layer.indices[idx]];
@@ -33626,7 +34431,7 @@
     const idx = y * state.width + x;
     for (let i = frame.layers.length - 1; i >= 0; i -= 1) {
       const layer = frame.layers[i];
-      if (!layer.visible || normalizeLayerOpacity(layer.opacity) <= 0 || layer.id === excludedLayerId) {
+      if (!getDisplayedLayerVisibility(layer, true) || getDisplayedLayerPreviewOpacity(layer, 1) <= 0 || layer.id === excludedLayerId) {
         continue;
       }
       if (layer.indices[idx] >= 0) {
@@ -34272,8 +35077,8 @@
     const palette = state.palette;
     for (let l = 0; l < layers.length; l += 1) {
       const layer = layers[l];
-      if (!layer || !layer.visible || normalizeLayerOpacity(layer.opacity) <= 0) continue;
-      const opacity = normalizeLayerOpacity(layer.opacity);
+      if (!layer || !getDisplayedLayerVisibility(layer, true) || getDisplayedLayerPreviewOpacity(layer, 1) <= 0) continue;
+      const opacity = getDisplayedLayerPreviewOpacity(layer, 1);
       if (opacity <= 0) continue;
       const layerBlendMode = normalizeLayerBlendMode(layer.blendMode);
       const layerIndices = layer.indices instanceof Int16Array ? layer.indices : null;
@@ -34691,7 +35496,10 @@
     if (!frame || !Array.isArray(frame.layers) || width <= 0 || height <= 0) {
       return null;
     }
-    const sourcePixels = compositeFramePixels(frame, width, height, state.palette);
+    const sourcePixels = compositeFramePixels(frame, width, height, state.palette, {
+      useLocalLayerPreviewVisibility: true,
+      useLocalLayerPreviewOpacity: true,
+    });
     if (!(sourcePixels instanceof Uint8ClampedArray) || sourcePixels.length !== width * height * 4) {
       return null;
     }
@@ -36256,6 +37064,8 @@
   function persistSessionState() {
     if (!canUseSessionStorage) return;
     try {
+      syncLocalLayerVisibilityMapFromState();
+      syncLocalLayerPreviewOpacityMapFromState();
       const snapshot = {
         scale: normalizeZoomScale(state.scale, MIN_ZOOM_SCALE),
       pan: {
@@ -36280,8 +37090,11 @@
           state.floatingPreview,
           FLOATING_PREVIEW_DEFAULT_STATE
         ),
+        layerVisibilityById: serializeLocalLayerVisibilityMap(localLayerVisibilityById),
+        layerPreviewOpacityById: serializeLocalLayerPreviewOpacityMap(localLayerPreviewOpacityById),
         showChecker: Boolean(state.showChecker),
         onionSkin: normalizeOnionSkinState(state.onionSkin),
+        danmakuEnabled: Boolean(state.danmakuEnabled),
         dualLeftRail: false,
         leftDualToolsWidth: normalizeLeftDualToolsWidth(leftDualSizing.tools, railSizing.left),
         leftUnifiedToolsRatio: normalizeLeftUnifiedToolsRatio(leftUnifiedSplitSizing.ratio, LEFT_UNIFIED_TOOLS_RATIO_DEFAULT),
@@ -36433,8 +37246,21 @@
         FLOATING_PREVIEW_DEFAULT_STATE
       );
     }
+    localLayerVisibilityById = deserializeLocalLayerVisibilityMap(
+      payload.layerVisibilityById,
+      localLayerVisibilityById
+    );
+    applyLocalLayerVisibilityToState();
+    localLayerPreviewOpacityById = deserializeLocalLayerPreviewOpacityMap(
+      payload.layerPreviewOpacityById,
+      localLayerPreviewOpacityById
+    );
+    applyLocalLayerPreviewOpacityToState();
     if (typeof payload.showChecker === 'boolean') {
       state.showChecker = payload.showChecker;
+    }
+    if (typeof payload.danmakuEnabled === 'boolean') {
+      state.danmakuEnabled = payload.danmakuEnabled;
     }
     state.dualLeftRail = false;
     leftDualSizing.tools = LEFT_DUAL_MIN_COLUMN_WIDTH;
@@ -42477,7 +43303,7 @@
       colorMode: normalizeColorMode(state.colorMode, COLOR_MODE_INDEX),
       activeRgb: normalizeColorValue(state.activeRgb),
     };
-    const preserveLocalPalette = isMultiPaletteIsolationEnabled();
+    const preserveLocalPalette = isMultiPaletteIsolationEnabled() && multiState.paletteSeededFromShared;
     const localPaletteSnapshot = preserveLocalPalette && Array.isArray(state.palette)
       ? state.palette.map(color => normalizeColorValue(color))
       : null;
@@ -42486,21 +43312,6 @@
     // Keep viewport local in multi mode. Zoom/pan should never be synced from remote payload.
     snapshot.scale = normalizeZoomScale(preserved.scale, snapshot.scale);
     snapshot.pan = { x: preserved.pan.x, y: preserved.pan.y };
-    // Capture local layer visibility for guests/spectators so visibility toggles are per-client
-    let localVisibilityMap = null;
-    try {
-      if (isMultiGuestMode() || isMultiSpectatorMode()) {
-        localVisibilityMap = new Map();
-        (state.frames || []).forEach(frame => {
-          if (!frame || !Array.isArray(frame.layers)) return;
-          frame.layers.forEach(layer => {
-            if (layer && layer.id) localVisibilityMap.set(layer.id, Boolean(layer.visible));
-          });
-        });
-      }
-    } catch (e) {
-      localVisibilityMap = null;
-    }
     const prevFrameCount = Array.isArray(state.frames) ? state.frames.length : 0;
     multiState.applyRemoteInProgress = true;
     try {
@@ -42508,27 +43319,13 @@
       if (preserveLocalPalette) {
         remapDocumentIndexedPixelsToDirect();
       }
-      // Restore local visibility preferences for guests/spectators so master's visibility doesn't override
-      if (localVisibilityMap && localVisibilityMap instanceof Map) {
-        try {
-          (state.frames || []).forEach(frame => {
-            if (!frame || !Array.isArray(frame.layers)) return;
-            frame.layers.forEach(layer => {
-              if (!layer || !layer.id) return;
-              if (localVisibilityMap.has(layer.id)) {
-                layer.visible = Boolean(localVisibilityMap.get(layer.id));
-              }
-            });
-          });
-        } catch (e) {
-          /* ignore */
-        }
-      }
       if (Array.isArray(localPaletteSnapshot) && localPaletteSnapshot.length) {
         state.palette = localPaletteSnapshot.map(color => normalizeColorValue(color));
         state.activePaletteIndex = normalizePaletteIndex(localPaletteIndex, state.activePaletteIndex);
         state.secondaryPaletteIndex = normalizePaletteIndex(localSecondaryPaletteIndex, state.activePaletteIndex);
         syncCurrentPalettePresetFromPalette(state.palette, { syncControl: true });
+      } else if (isMultiPaletteIsolationEnabled()) {
+        multiState.paletteSeededFromShared = true;
       }
       history.past = [];
       history.future = [];
@@ -44029,6 +44826,7 @@
     multiState.roomVisibility = MULTI_DEFAULT_ROOM_VISIBILITY;
     multiState.joinPolicy = MULTI_DEFAULT_JOIN_POLICY;
     multiState.exportPermission = MULTI_DEFAULT_EXPORT_PERMISSION;
+    multiState.paletteSeededFromShared = false;
     multiState.residentPersistInFlight = false;
     multiState.residentPersistQueued = false;
     multiState.residentPersistSignature = '';
@@ -44117,6 +44915,7 @@
     clearPendingMultiSessionStateApply();
     clearMultiLayerPatchSnapshots();
     clearMultiLayerPatchSendTimers();
+    multiState.paletteSeededFromShared = false;
     multiState.maxGuests = normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT);
     multiState.roomVisibility = normalizeMultiRoomVisibility(
       multiState.roomVisibility,
