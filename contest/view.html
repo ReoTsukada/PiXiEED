@@ -364,7 +364,7 @@
       align-items:center;
       justify-content:center;
       cursor:pointer;
-      z-index:2;
+      z-index:4;
     }
     .heart-btn img{ width:100%; height:100%; object-fit:contain; display:block; }
     .meta{
@@ -572,15 +572,52 @@
       -webkit-user-drag:none;
       user-select:none;
     }
-    .entry-watermark{
+    .entry-watermark-layer{
       position:absolute;
-      color:rgba(255,255,255,0.04);
-      font-weight:800;
-      font-size:14px;
-      letter-spacing:0.08em;
-      text-shadow:0 0 12px rgba(0,0,0,0.18);
+      inset:0;
       z-index:2;
       pointer-events:none;
+      overflow:hidden;
+      user-select:none;
+    }
+    .entry-watermark{
+      position:absolute;
+      left:var(--wm-left, 50%);
+      top:var(--wm-top, 50%);
+      transform:translate(-50%, -50%) rotate(var(--wm-rotate, 0deg)) scale(var(--wm-scale, 1));
+      color:hsla(var(--wm-hue, 180), var(--wm-sat, 56%), var(--wm-light, 75%), var(--wm-alpha, 0.035));
+      font-weight:var(--wm-weight, 650);
+      font-size:var(--wm-size, 14px);
+      letter-spacing:0.08em;
+      line-height:1;
+      white-space:nowrap;
+      text-shadow:0 0 var(--wm-blur, 4px) rgba(8,12,24,var(--wm-shadow-alpha,0.055));
+      mix-blend-mode:overlay;
+      pointer-events:none;
+      user-select:none;
+    }
+    .entry-watermark--micro{
+      letter-spacing:0.12em;
+      mix-blend-mode:soft-light;
+    }
+    .entry-watermark-texture{
+      position:absolute;
+      inset:-5%;
+      width:110%;
+      height:110%;
+      object-fit:cover;
+      pointer-events:none;
+      user-select:none;
+    }
+    .entry-watermark-texture--generated{
+      opacity:0.085;
+      filter:saturate(1.16) contrast(1.12);
+      mix-blend-mode:overlay;
+    }
+    .entry-watermark-texture--external{
+      opacity:0.026;
+      filter:saturate(1.04) contrast(1.02);
+      mix-blend-mode:soft-light;
     }
     .entry-card .heart-btn{
       right:4px;
@@ -825,15 +862,7 @@
       <div class="entry-hero" id="hero">
         <img id="heroImg" alt="dot work" draggable="false" decoding="async"/>
         <video id="heroVideo" autoplay loop muted playsinline controls preload="metadata" hidden></video>
-        <span class="entry-watermark" style="top:6px; left:6px;">PiXiEED</span>
-        <span class="entry-watermark" style="top:6px; right:6px;">PiXiEED</span>
-        <span class="entry-watermark" style="right:6px; bottom:6px;">PiXiEED</span>
-        <span class="entry-watermark" style="left:6px; bottom:6px;">PiXiEED</span>
-        <span class="entry-watermark" style="left:50%; top:50%; transform:translate(-50%,-50%);">PiXiEED</span>
-        <span class="entry-watermark" style="left:50%; top:25%; transform:translate(-50%,-50%);">PiXiEED</span>
-        <span class="entry-watermark" style="left:50%; top:75%; transform:translate(-50%,-50%);">PiXiEED</span>
-        <span class="entry-watermark" style="left:25%; top:50%; transform:translate(-50%,-50%);">PiXiEED</span>
-        <span class="entry-watermark" style="left:75%; top:50%; transform:translate(-50%,-50%);">PiXiEED</span>
+        <div class="entry-watermark-layer" id="heroWatermark" aria-hidden="true"></div>
         <button class="heart-btn" id="heroLike" aria-label="いいね"><img id="heroLikeIcon" alt="like icon"/></button>
       </div>
       <div class="meta">
@@ -970,6 +999,8 @@
     const CONTEST_SHARE_TITLE_SIZE = 32;
     const SHARE_HASHTAG = '#PiXiEED';
     const CONTEST_TEMP_CLOSED = false;
+    const CONTEST_WATERMARK_TEXT = 'PiXiEED';
+    const CONTEST_WATERMARK_TEXTURE_SRC = (document.body?.dataset?.watermarkTextureSrc || '').trim();
     const SUPABASE_MAINTENANCE_KEY = 'pixieed_supabase_maintenance';
     const CONTEST_SHARE_QUEUE_KEY = 'contest_share_queue';
     const CONTEST_SHARE_QUEUE_LIMIT = 20;
@@ -1653,6 +1684,161 @@
       if(!entry) return '';
       const value = String(entry.video_url || '').trim();
       return value || '';
+    }
+
+    function getContestWatermarkTextureSrc(){
+      return String(CONTEST_WATERMARK_TEXTURE_SRC || '').trim();
+    }
+
+    function hashString(value){
+      const input = String(value || CONTEST_WATERMARK_TEXT);
+      let hash = 2166136261;
+      for(let i = 0; i < input.length; i++){
+        hash ^= input.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      return hash >>> 0;
+    }
+
+    function createSeededRandom(seed){
+      let state = (seed >>> 0) || 1;
+      return () => {
+        state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+        return state / 4294967296;
+      };
+    }
+
+    function resolveContestWatermarkSeed(entryData){
+      if(entryData === null || entryData === undefined) return CONTEST_WATERMARK_TEXT;
+      if(typeof entryData === 'string' || typeof entryData === 'number') return String(entryData);
+      return [
+        entryData.id ?? '',
+        entryData.title ?? '',
+        entryData.name ?? '',
+        entryData.submitted_at ?? '',
+        entryData.image_url ?? '',
+        entryData.thumb_url ?? ''
+      ].join('|');
+    }
+
+    function buildContestWatermarkTextureDataUrl(seedInput, options = {}){
+      const {
+        width = 256,
+        height = 256,
+        lines = 12,
+        dots = 72,
+        microLabels = 28
+      } = options;
+      const random = createSeededRandom(hashString(`texture|${seedInput}`));
+      const parts = [
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">`,
+        `<rect width="${width}" height="${height}" fill="transparent"/>`
+      ];
+      for(let i = 0; i < lines; i++){
+        const x1 = (-width * 0.15 + random() * width * 1.3).toFixed(2);
+        const y1 = (-height * 0.1 + random() * height * 1.2).toFixed(2);
+        const x2 = (-width * 0.05 + random() * width * 1.2).toFixed(2);
+        const y2 = (-height * 0.1 + random() * height * 1.2).toFixed(2);
+        const hue = Math.round(random() * 360);
+        const sat = Math.round(54 + random() * 30);
+        const light = Math.round(56 + random() * 18);
+        const alpha = (0.025 + random() * 0.05).toFixed(3);
+        const widthPx = (0.7 + random() * 1.6).toFixed(2);
+        parts.push(
+          `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="hsl(${hue},${sat}%,${light}%)" stroke-opacity="${alpha}" stroke-width="${widthPx}" stroke-linecap="round"/>`
+        );
+      }
+      for(let i = 0; i < microLabels; i++){
+        const x = (random() * width).toFixed(2);
+        const y = (random() * height).toFixed(2);
+        const rotate = Math.round(-46 + random() * 92);
+        const hue = Math.round(random() * 360);
+        const sat = Math.round(50 + random() * 26);
+        const light = Math.round(58 + random() * 18);
+        const alpha = (0.022 + random() * 0.045).toFixed(3);
+        const size = (5 + random() * 4.4).toFixed(2);
+        const weight = random() > 0.72 ? 700 : 600;
+        const label = random() > 0.18 ? CONTEST_WATERMARK_TEXT : 'PXE';
+        parts.push(
+          `<text x="${x}" y="${y}" fill="hsl(${hue},${sat}%,${light}%)" fill-opacity="${alpha}" font-size="${size}" font-weight="${weight}" letter-spacing="1.2" transform="rotate(${rotate} ${x} ${y})" font-family="system-ui, sans-serif">${label}</text>`
+        );
+      }
+      for(let i = 0; i < dots; i++){
+        const x = (random() * width).toFixed(2);
+        const y = (random() * height).toFixed(2);
+        const w = (0.8 + random() * 2.8).toFixed(2);
+        const h = (0.8 + random() * 2.8).toFixed(2);
+        const hue = Math.round(random() * 360);
+        const sat = Math.round(58 + random() * 24);
+        const light = Math.round(50 + random() * 24);
+        const alpha = (0.03 + random() * 0.08).toFixed(3);
+        parts.push(
+          `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${(random() * 0.8).toFixed(2)}" fill="hsl(${hue},${sat}%,${light}%)" fill-opacity="${alpha}"/>`
+        );
+      }
+      parts.push('</svg>');
+      return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(parts.join(''))}`;
+    }
+
+    function buildContestWatermarkMarkup(seedInput, options = {}){
+      const {
+        count = 28,
+        sizeMin = 10,
+        sizeMax = 20,
+        includeTexture = true,
+        microCount = Math.max(22, Math.round(count * 1.7))
+      } = options;
+      const random = createSeededRandom(hashString(seedInput));
+      const marks = [];
+      const microMarks = [];
+      const total = Math.max(14, Math.round(count + random() * 6 - 3));
+      const sizeRange = Math.max(sizeMax - sizeMin, 0);
+      for(let i = 0; i < total; i++){
+        const left = 3 + random() * 94;
+        const top = 5 + random() * 90;
+        const rotate = Math.round(-34 + random() * 68);
+        const scale = (0.82 + random() * 0.82).toFixed(3);
+        const size = (sizeMin + random() * sizeRange).toFixed(2);
+        const alpha = (0.009 + random() * 0.021).toFixed(3);
+        const hue = Math.round(random() * 360);
+        const sat = Math.round(44 + random() * 18);
+        const light = Math.round(68 + random() * 16);
+        const weight = random() > 0.82 ? 700 : 600;
+        const blur = (1.5 + random() * 4).toFixed(1);
+        const shadowAlpha = (0.015 + random() * 0.04).toFixed(3);
+        marks.push(
+          `<span class="entry-watermark" style="--wm-left:${left.toFixed(2)}%;--wm-top:${top.toFixed(2)}%;--wm-rotate:${rotate}deg;--wm-scale:${scale};--wm-size:${size}px;--wm-alpha:${alpha};--wm-hue:${hue};--wm-sat:${sat}%;--wm-light:${light}%;--wm-weight:${weight};--wm-blur:${blur}px;--wm-shadow-alpha:${shadowAlpha};">${CONTEST_WATERMARK_TEXT}</span>`
+        );
+      }
+      for(let i = 0; i < microCount; i++){
+        const left = 2 + random() * 96;
+        const top = 3 + random() * 94;
+        const rotate = Math.round(-55 + random() * 110);
+        const scale = (0.9 + random() * 0.7).toFixed(3);
+        const size = (5.2 + random() * 3.8).toFixed(2);
+        const alpha = (0.008 + random() * 0.018).toFixed(3);
+        const hue = Math.round(random() * 360);
+        const sat = Math.round(46 + random() * 20);
+        const light = Math.round(66 + random() * 14);
+        const weight = random() > 0.75 ? 700 : 600;
+        const blur = (0.8 + random() * 2.2).toFixed(1);
+        const shadowAlpha = (0.008 + random() * 0.03).toFixed(3);
+        const label = random() > 0.16 ? CONTEST_WATERMARK_TEXT : 'PXE';
+        microMarks.push(
+          `<span class="entry-watermark entry-watermark--micro" style="--wm-left:${left.toFixed(2)}%;--wm-top:${top.toFixed(2)}%;--wm-rotate:${rotate}deg;--wm-scale:${scale};--wm-size:${size}px;--wm-alpha:${alpha};--wm-hue:${hue};--wm-sat:${sat}%;--wm-light:${light}%;--wm-weight:${weight};--wm-blur:${blur}px;--wm-shadow-alpha:${shadowAlpha};">${label}</span>`
+        );
+      }
+      const generatedTextureSrc = buildContestWatermarkTextureDataUrl(seedInput, {
+        lines: Math.max(8, Math.round(count * 0.45)),
+        dots: Math.max(40, Math.round(count * 3.6)),
+        microLabels: Math.max(18, Math.round(microCount * 0.7))
+      });
+      const generatedTextureMarkup = `<img class="entry-watermark-texture entry-watermark-texture--generated" src="${generatedTextureSrc}" alt="" decoding="async">`;
+      const textureSrc = includeTexture ? getContestWatermarkTextureSrc() : '';
+      const textureMarkup = textureSrc
+        ? `<img class="entry-watermark-texture entry-watermark-texture--external" src="${escapeHtml(textureSrc)}" alt="" loading="lazy" decoding="async">`
+        : '';
+      return `<div class="entry-watermark-layer" aria-hidden="true">${generatedTextureMarkup}${textureMarkup}${marks.join('')}${microMarks.join('')}</div>`;
     }
 
     function resolveAuthorUrl(entry){
@@ -2385,12 +2571,14 @@
       const authorEl = $('heroAuthor');
       const likesEl = $('heroLikes');
       const likeIcon = $('heroLikeIcon');
+      const heroWatermark = $('heroWatermark');
       const delBtn = $('deleteEntry');
       const playBtn = $('pixfindPlay');
       const downloadBtn = $('downloadButton');
       const shareBtn = $('shareButton');
       if(!entry){
         img.src = '';
+        if(heroWatermark) heroWatermark.innerHTML = '';
         if(video){
           video.pause();
           video.removeAttribute('src');
@@ -2423,6 +2611,13 @@
       const videoSrc = resolveEntryVideo(entry);
       const posterSrc = resolveEntryImage(entry, { preferThumb: true }) || fallbackImgSrc;
       const showVideo = Boolean(videoSrc && video);
+      if(heroWatermark){
+        heroWatermark.innerHTML = buildContestWatermarkMarkup(resolveContestWatermarkSeed(entry), {
+          count: 32,
+          sizeMin: 12,
+          sizeMax: 24
+        });
+      }
       if(showVideo){
         img.hidden = true;
         img.removeAttribute('src');
@@ -2665,6 +2860,7 @@
         item.innerHTML = `
           <div class="entry-imgwrap">
             <img src="${resolveEntryImage(e, { preferThumb: true })}" alt="${e.title}" draggable="false" loading="lazy" decoding="async">
+            ${buildContestWatermarkMarkup(resolveContestWatermarkSeed(e), { count: 20, sizeMin: 10, sizeMax: 17 })}
           </div>
         `;
         wrap.appendChild(item);
