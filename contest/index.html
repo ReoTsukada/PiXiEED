@@ -452,15 +452,52 @@
       -webkit-touch-callout:none;
       user-select:none;
     }
-    .entry-watermark{
+    .entry-watermark-layer{
       position:absolute;
-      color:rgba(255,255,255,0.04);
-      font-weight:800;
-      font-size:14px;
-      letter-spacing:0.08em;
-      text-shadow:0 0 12px rgba(0,0,0,0.18);
+      inset:0;
       z-index:2;
       pointer-events:none;
+      overflow:hidden;
+      user-select:none;
+    }
+    .entry-watermark{
+      position:absolute;
+      left:var(--wm-left, 50%);
+      top:var(--wm-top, 50%);
+      transform:translate(-50%, -50%) rotate(var(--wm-rotate, 0deg)) scale(var(--wm-scale, 1));
+      color:hsla(var(--wm-hue, 180), var(--wm-sat, 56%), var(--wm-light, 75%), var(--wm-alpha, 0.035));
+      font-weight:var(--wm-weight, 650);
+      font-size:var(--wm-size, 14px);
+      letter-spacing:0.08em;
+      line-height:1;
+      white-space:nowrap;
+      text-shadow:0 0 var(--wm-blur, 4px) rgba(8,12,24,var(--wm-shadow-alpha,0.055));
+      mix-blend-mode:overlay;
+      pointer-events:none;
+      user-select:none;
+    }
+    .entry-watermark--micro{
+      letter-spacing:0.12em;
+      mix-blend-mode:soft-light;
+    }
+    .entry-watermark-texture{
+      position:absolute;
+      inset:-5%;
+      width:110%;
+      height:110%;
+      object-fit:cover;
+      pointer-events:none;
+      user-select:none;
+    }
+    .entry-watermark-texture--generated{
+      opacity:0.085;
+      filter:saturate(1.16) contrast(1.12);
+      mix-blend-mode:overlay;
+    }
+    .entry-watermark-texture--external{
+      opacity:0.026;
+      filter:saturate(1.04) contrast(1.02);
+      mix-blend-mode:soft-light;
     }
     .heart-btn{
       position:absolute;
@@ -475,7 +512,7 @@
       align-items:center;
       justify-content:center;
       cursor:pointer;
-      z-index:2;
+      z-index:4;
     }
     .heart-btn img{
       width:100%;
@@ -765,7 +802,7 @@
     .fab-menu{
       position:fixed;
       right:18px;
-      bottom:86px;
+      bottom:calc(86px + var(--pixieed-footer-ad-offset, 0px));
       width:56px;
       height:56px;
       z-index:60;
@@ -851,7 +888,7 @@
       justify-content:center;
       background:rgba(0,0,0,0.65);
       backdrop-filter:blur(4px);
-      padding:calc(16px + env(safe-area-inset-top, 0px) + var(--header-offset)) 16px calc(16px + env(safe-area-inset-bottom, 0px) + var(--bottom-nav));
+      padding:calc(16px + env(safe-area-inset-top, 0px) + var(--header-offset)) 16px calc(16px + env(safe-area-inset-bottom, 0px) + var(--bottom-nav) + var(--pixieed-footer-ad-offset, 0px));
       z-index:95;
     }
     .post-panel.is-open{ display:flex; }
@@ -863,12 +900,12 @@
       border-radius:16px;
       padding:14px;
       box-shadow:0 12px 40px rgba(0,0,0,0.4);
-      max-height:calc(100vh - (env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px) + var(--bottom-nav) + var(--header-offset) + 32px));
+      max-height:calc(100vh - (env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px) + var(--bottom-nav) + var(--pixieed-footer-ad-offset, 0px) + var(--header-offset) + 32px));
       overflow:auto;
     }
     @supports (height: 100dvh){
       .post-card{
-        max-height:calc(100dvh - (env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px) + var(--bottom-nav) + var(--header-offset) + 32px));
+        max-height:calc(100dvh - (env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px) + var(--bottom-nav) + var(--pixieed-footer-ad-offset, 0px) + var(--header-offset) + 32px));
       }
     }
     .post-preview{
@@ -1217,14 +1254,6 @@
         </div>
       </div>
     </header>
-    <section class="card ad-banner" aria-label="広告">
-      <ins class="adsbygoogle"
-           style="display:block"
-           data-ad-client="ca-pub-9801602250480253"
-           data-ad-slot="2141591954"
-           data-ad-format="horizontal"></ins>
-      <small class="ad-banner__label">広告</small>
-    </section>
     <section class="card">
       <div class="top-bar">
         <h1>ドットギャラリー</h1>
@@ -1319,6 +1348,7 @@
               <p class="helper">英数字のみ（例: 1234 / pixieed）</p>
             </div>
           </div>
+          <p class="helper">公開版とダウンロード版は保護付きで保存されます。原本は端末側で保管してください。</p>
         </div>
         <div class="field">
           <label>プレビュー</label>
@@ -1439,6 +1469,8 @@
     const CONTEST_SHARE_TITLE_SIZE = 32;
     const SHARE_HASHTAG = '#PiXiEED';
     const CONTEST_TEMP_CLOSED = false;
+    const CONTEST_WATERMARK_TEXT = 'PiXiEED';
+    const CONTEST_WATERMARK_TEXTURE_SRC = (document.body?.dataset?.watermarkTextureSrc || '').trim();
     let supportsClientId = true;
     let supportsTags = true;
     let supportsDownloadSettings = true;
@@ -1822,6 +1854,161 @@
       return entry.image_url || entry.image_base64 || entry.thumb_url || '';
     }
 
+    function getContestWatermarkTextureSrc(){
+      return String(CONTEST_WATERMARK_TEXTURE_SRC || '').trim();
+    }
+
+    function hashString(value){
+      const input = String(value || CONTEST_WATERMARK_TEXT);
+      let hash = 2166136261;
+      for(let i = 0; i < input.length; i++){
+        hash ^= input.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      return hash >>> 0;
+    }
+
+    function createSeededRandom(seed){
+      let state = (seed >>> 0) || 1;
+      return () => {
+        state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+        return state / 4294967296;
+      };
+    }
+
+    function resolveContestWatermarkSeed(entry){
+      if(entry === null || entry === undefined) return CONTEST_WATERMARK_TEXT;
+      if(typeof entry === 'string' || typeof entry === 'number') return String(entry);
+      return [
+        entry.id ?? '',
+        entry.title ?? '',
+        entry.name ?? '',
+        entry.submitted_at ?? '',
+        entry.image_url ?? '',
+        entry.thumb_url ?? ''
+      ].join('|');
+    }
+
+    function buildContestWatermarkTextureDataUrl(seedInput, options = {}){
+      const {
+        width = 256,
+        height = 256,
+        lines = 12,
+        dots = 72,
+        microLabels = 28
+      } = options;
+      const random = createSeededRandom(hashString(`texture|${seedInput}`));
+      const parts = [
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">`,
+        `<rect width="${width}" height="${height}" fill="transparent"/>`
+      ];
+      for(let i = 0; i < lines; i++){
+        const x1 = (-width * 0.15 + random() * width * 1.3).toFixed(2);
+        const y1 = (-height * 0.1 + random() * height * 1.2).toFixed(2);
+        const x2 = (-width * 0.05 + random() * width * 1.2).toFixed(2);
+        const y2 = (-height * 0.1 + random() * height * 1.2).toFixed(2);
+        const hue = Math.round(random() * 360);
+        const sat = Math.round(54 + random() * 30);
+        const light = Math.round(56 + random() * 18);
+        const alpha = (0.025 + random() * 0.05).toFixed(3);
+        const widthPx = (0.7 + random() * 1.6).toFixed(2);
+        parts.push(
+          `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="hsl(${hue},${sat}%,${light}%)" stroke-opacity="${alpha}" stroke-width="${widthPx}" stroke-linecap="round"/>`
+        );
+      }
+      for(let i = 0; i < microLabels; i++){
+        const x = (random() * width).toFixed(2);
+        const y = (random() * height).toFixed(2);
+        const rotate = Math.round(-46 + random() * 92);
+        const hue = Math.round(random() * 360);
+        const sat = Math.round(50 + random() * 26);
+        const light = Math.round(58 + random() * 18);
+        const alpha = (0.022 + random() * 0.045).toFixed(3);
+        const size = (5 + random() * 4.4).toFixed(2);
+        const weight = random() > 0.72 ? 700 : 600;
+        const label = random() > 0.18 ? CONTEST_WATERMARK_TEXT : 'PXE';
+        parts.push(
+          `<text x="${x}" y="${y}" fill="hsl(${hue},${sat}%,${light}%)" fill-opacity="${alpha}" font-size="${size}" font-weight="${weight}" letter-spacing="1.2" transform="rotate(${rotate} ${x} ${y})" font-family="system-ui, sans-serif">${label}</text>`
+        );
+      }
+      for(let i = 0; i < dots; i++){
+        const x = (random() * width).toFixed(2);
+        const y = (random() * height).toFixed(2);
+        const w = (0.8 + random() * 2.8).toFixed(2);
+        const h = (0.8 + random() * 2.8).toFixed(2);
+        const hue = Math.round(random() * 360);
+        const sat = Math.round(58 + random() * 24);
+        const light = Math.round(50 + random() * 24);
+        const alpha = (0.03 + random() * 0.08).toFixed(3);
+        parts.push(
+          `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${(random() * 0.8).toFixed(2)}" fill="hsl(${hue},${sat}%,${light}%)" fill-opacity="${alpha}"/>`
+        );
+      }
+      parts.push('</svg>');
+      return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(parts.join(''))}`;
+    }
+
+    function buildContestWatermarkMarkup(seedInput, options = {}){
+      const {
+        count = 24,
+        sizeMin = 10,
+        sizeMax = 18,
+        includeTexture = true,
+        microCount = Math.max(18, Math.round(count * 1.7))
+      } = options;
+      const random = createSeededRandom(hashString(seedInput));
+      const marks = [];
+      const microMarks = [];
+      const total = Math.max(12, Math.round(count + random() * 6 - 3));
+      const sizeRange = Math.max(sizeMax - sizeMin, 0);
+      for(let i = 0; i < total; i++){
+        const left = 3 + random() * 94;
+        const top = 5 + random() * 90;
+        const rotate = Math.round(-34 + random() * 68);
+        const scale = (0.82 + random() * 0.82).toFixed(3);
+        const size = (sizeMin + random() * sizeRange).toFixed(2);
+        const alpha = (0.009 + random() * 0.021).toFixed(3);
+        const hue = Math.round(random() * 360);
+        const sat = Math.round(44 + random() * 18);
+        const light = Math.round(68 + random() * 16);
+        const weight = random() > 0.82 ? 700 : 600;
+        const blur = (1.5 + random() * 4).toFixed(1);
+        const shadowAlpha = (0.015 + random() * 0.04).toFixed(3);
+        marks.push(
+          `<span class="entry-watermark" style="--wm-left:${left.toFixed(2)}%;--wm-top:${top.toFixed(2)}%;--wm-rotate:${rotate}deg;--wm-scale:${scale};--wm-size:${size}px;--wm-alpha:${alpha};--wm-hue:${hue};--wm-sat:${sat}%;--wm-light:${light}%;--wm-weight:${weight};--wm-blur:${blur}px;--wm-shadow-alpha:${shadowAlpha};">${CONTEST_WATERMARK_TEXT}</span>`
+        );
+      }
+      for(let i = 0; i < microCount; i++){
+        const left = 2 + random() * 96;
+        const top = 3 + random() * 94;
+        const rotate = Math.round(-55 + random() * 110);
+        const scale = (0.9 + random() * 0.7).toFixed(3);
+        const size = (5.2 + random() * 3.8).toFixed(2);
+        const alpha = (0.008 + random() * 0.018).toFixed(3);
+        const hue = Math.round(random() * 360);
+        const sat = Math.round(46 + random() * 20);
+        const light = Math.round(66 + random() * 14);
+        const weight = random() > 0.75 ? 700 : 600;
+        const blur = (0.8 + random() * 2.2).toFixed(1);
+        const shadowAlpha = (0.008 + random() * 0.03).toFixed(3);
+        const label = random() > 0.16 ? CONTEST_WATERMARK_TEXT : 'PXE';
+        microMarks.push(
+          `<span class="entry-watermark entry-watermark--micro" style="--wm-left:${left.toFixed(2)}%;--wm-top:${top.toFixed(2)}%;--wm-rotate:${rotate}deg;--wm-scale:${scale};--wm-size:${size}px;--wm-alpha:${alpha};--wm-hue:${hue};--wm-sat:${sat}%;--wm-light:${light}%;--wm-weight:${weight};--wm-blur:${blur}px;--wm-shadow-alpha:${shadowAlpha};">${label}</span>`
+        );
+      }
+      const generatedTextureSrc = buildContestWatermarkTextureDataUrl(seedInput, {
+        lines: Math.max(8, Math.round(count * 0.45)),
+        dots: Math.max(40, Math.round(count * 3.6)),
+        microLabels: Math.max(18, Math.round(microCount * 0.7))
+      });
+      const generatedTextureMarkup = `<img class="entry-watermark-texture entry-watermark-texture--generated" src="${generatedTextureSrc}" alt="" decoding="async">`;
+      const textureSrc = includeTexture ? getContestWatermarkTextureSrc() : '';
+      const textureMarkup = textureSrc
+        ? `<img class="entry-watermark-texture entry-watermark-texture--external" src="${escapeHtml(textureSrc)}" alt="" loading="lazy" decoding="async">`
+        : '';
+      return `<div class="entry-watermark-layer" aria-hidden="true">${generatedTextureMarkup}${textureMarkup}${marks.join('')}${microMarks.join('')}</div>`;
+    }
+
     function dataUrlToFile(dataUrl, filename){
       if(!dataUrl) return null;
       const parts = dataUrl.split(',');
@@ -1989,17 +2176,24 @@
       if(!ctx) throw new Error('canvas init failed');
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(img, 0, 0);
-      const thumbCanvas = createThumbnailCanvas(canvas);
-      const thumbBlob = await canvasToBlob(thumbCanvas, 'image/png');
+      const protectedAssets = await createProtectedContestAssets(canvas, {
+        hash: task.hash || '',
+        phash: task.phash || '',
+        submittedAt: task.submitted_at || new Date().toISOString(),
+        title: task.title || '',
+        name: task.name || '',
+        clientId: task.clientId || clientId || '',
+        userId: task.userId || ''
+      });
       return {
         width: Number.isFinite(task.width) ? task.width : img.width,
         height: Number.isFinite(task.height) ? task.height : img.height,
         colors: Number.isFinite(task.colors) ? task.colors : null,
-        dataUrl: task.dataUrl,
+        dataUrl: protectedAssets.dataUrl,
         hash: task.hash,
         phash: task.phash,
-        imageBlob,
-        thumbBlob,
+        imageBlob: protectedAssets.imageBlob,
+        thumbBlob: protectedAssets.thumbBlob,
       };
     }
 
@@ -2491,7 +2685,7 @@
       return bestFps;
     }
 
-    async function convertGifToVideo(file){
+    async function convertGifToVideo(file, { protectionSeed = '' } = {}){
       if(!file || String(file.type || '').toLowerCase() !== 'image/gif') return null;
       if(typeof ImageDecoder === 'undefined' || typeof MediaRecorder === 'undefined') return null;
       if(typeof HTMLCanvasElement === 'undefined' || typeof HTMLCanvasElement.prototype.captureStream !== 'function'){
@@ -2539,6 +2733,9 @@
         const ctx = canvas.getContext('2d');
         if(!ctx) return null;
         ctx.imageSmoothingEnabled = false;
+        const overlayCanvas = protectionSeed
+          ? await createContestProtectionOverlayCanvas(width, height, protectionSeed, { densityScale: 1.15 })
+          : null;
 
         stream = canvas.captureStream(0);
         let videoTrack = stream.getVideoTracks()[0] || null;
@@ -2570,6 +2767,9 @@
         for(const { frame, durationMs } of frames){
           ctx.clearRect(0, 0, width, height);
           ctx.drawImage(frame, 0, 0, width, height);
+          if(overlayCanvas){
+            ctx.drawImage(overlayCanvas, 0, 0, width, height);
+          }
           if(useManualFrame){
             videoTrack.requestFrame();
           }
@@ -3079,16 +3279,31 @@
       // 近似ハッシュ用に小さく縮小（16x16グレースケール）
       const phash = await computePHash(tCanvas);
       const hash = await hashUint8(new Uint8Array(baseData));
+      const protectionSeed = createContestProtectionSeed({
+        hash,
+        phash,
+        submittedAt: new Date().toISOString(),
+        title: file.name || '',
+        name: loadNickname() || '',
+        clientId: clientId || '',
+        userId: supabaseUser?.id || ''
+      });
 
-      // GIFもPNGサムネに変換して保存（トリミング後のキャンバスを使用）
-      const dataUrl = tCanvas.toDataURL('image/png');
-      const thumbCanvas = createThumbnailCanvas(tCanvas);
-      const imageBlob = await canvasToBlob(tCanvas, 'image/png');
-      const thumbBlob = await canvasToBlob(thumbCanvas, 'image/png');
+      // 公開版は保護レイヤーを焼き込んだ画像として保存する
+      const protectedAssets = await createProtectedContestAssets(tCanvas, {
+        hash,
+        phash,
+        submittedAt: new Date().toISOString(),
+        title: file.name || '',
+        name: loadNickname() || '',
+        clientId: clientId || '',
+        userId: supabaseUser?.id || '',
+        protectionSeed
+      });
       let videoBlob = null;
       let videoMime = '';
       if(includeVideo && isGif){
-        const video = await convertGifToVideo(file);
+        const video = await convertGifToVideo(file, { protectionSeed });
         if(video?.videoBlob){
           videoBlob = video.videoBlob;
           videoMime = video.videoMime || '';
@@ -3098,27 +3313,146 @@
         width: tWidth,
         height: tHeight,
         colors: colors.size,
-        dataUrl,
+        dataUrl: protectedAssets.dataUrl,
         hash,
         phash,
-        imageBlob,
-        thumbBlob,
+        imageBlob: protectedAssets.imageBlob,
+        thumbBlob: protectedAssets.thumbBlob,
         isGif,
         videoBlob,
         videoMime,
+        protectionSeed,
       };
     }
 
-    function drawWatermark(ctx, width, height){
+    function createContestProtectionSeed(parts = {}){
+      return [
+        parts.hash || '',
+        parts.phash || '',
+        parts.clientId || clientId || 'guest',
+        parts.userId || supabaseUser?.id || '',
+        parts.submittedAt || new Date().toISOString(),
+        parts.title || '',
+        parts.name || ''
+      ].join('|');
+    }
+
+    function loadOverlayImage(src){
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.decoding = 'async';
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('overlay image load failed'));
+        img.src = src;
+      });
+    }
+
+    function drawWatermark(ctx, width, height, seedInput, { count = 12, microCount = Math.max(20, Math.round(count * 1.8)) } = {}){
+      const random = createSeededRandom(hashString(`baked|${seedInput}`));
       ctx.save();
-      const size = Math.max(12, Math.round(Math.min(width, height) * 0.08));
-      ctx.font = `${size}px 'DotGothic16', sans-serif`;
-      ctx.fillStyle = 'rgba(255,255,255,0.12)';
-      ctx.textBaseline = 'bottom';
-      ctx.textAlign = 'right';
-      ctx.filter = 'drop-shadow(0 0 6px rgba(0,0,0,0.45))';
-      ctx.fillText('PiXiEED', width - 8, height - 6);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for(let i = 0; i < count; i++){
+        const x = width * (0.06 + random() * 0.88);
+        const y = height * (0.08 + random() * 0.84);
+        const rotate = (-35 + random() * 70) * Math.PI / 180;
+        const fontSize = Math.max(10, Math.round(Math.min(width, height) * (0.038 + random() * 0.03)));
+        const alpha = 0.035 + random() * 0.04;
+        const hue = Math.round(random() * 360);
+        const sat = 52 + Math.round(random() * 26);
+        const light = 62 + Math.round(random() * 18);
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotate);
+        ctx.fillStyle = `hsla(${hue}, ${sat}%, ${light}%, ${alpha.toFixed(3)})`;
+        ctx.font = `${random() > 0.78 ? 700 : 600} ${fontSize}px 'DotGothic16', sans-serif`;
+        ctx.shadowColor = `rgba(8,12,24,${(0.03 + random() * 0.05).toFixed(3)})`;
+        ctx.shadowBlur = 2 + random() * 4;
+        ctx.fillText('PiXiEED', 0, 0);
+        ctx.restore();
+      }
+      for(let i = 0; i < microCount; i++){
+        const x = width * (0.02 + random() * 0.96);
+        const y = height * (0.03 + random() * 0.94);
+        const rotate = (-58 + random() * 116) * Math.PI / 180;
+        const fontSize = Math.max(5, Math.round(Math.min(width, height) * (0.014 + random() * 0.012)));
+        const alpha = 0.02 + random() * 0.03;
+        const hue = Math.round(random() * 360);
+        const sat = 44 + Math.round(random() * 22);
+        const light = 62 + Math.round(random() * 16);
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotate);
+        ctx.fillStyle = `hsla(${hue}, ${sat}%, ${light}%, ${alpha.toFixed(3)})`;
+        ctx.font = `${random() > 0.72 ? 700 : 600} ${fontSize}px 'DotGothic16', sans-serif`;
+        ctx.shadowColor = `rgba(8,12,24,${(0.015 + random() * 0.03).toFixed(3)})`;
+        ctx.shadowBlur = 1 + random() * 2;
+        ctx.fillText(random() > 0.18 ? 'PiXiEED' : 'PXE', 0, 0);
+        ctx.restore();
+      }
       ctx.restore();
+    }
+
+    async function createContestProtectionOverlayCanvas(width, height, seedInput, { densityScale = 1 } = {}){
+      const overlay = document.createElement('canvas');
+      overlay.width = width;
+      overlay.height = height;
+      const ctx = overlay.getContext('2d');
+      if(!ctx) return overlay;
+      ctx.imageSmoothingEnabled = false;
+      const generatedTextureSrc = buildContestWatermarkTextureDataUrl(`${seedInput}|public`, {
+        lines: Math.max(8, Math.round(12 * densityScale)),
+        dots: Math.max(40, Math.round(70 * densityScale)),
+        microLabels: Math.max(18, Math.round(26 * densityScale))
+      });
+      try{
+        const generatedTexture = await loadOverlayImage(generatedTextureSrc);
+        ctx.save();
+        ctx.globalAlpha = 0.72;
+        ctx.drawImage(generatedTexture, 0, 0, width, height);
+        ctx.restore();
+      }catch(err){
+        console.warn('generated watermark texture skipped', err);
+      }
+      const externalTextureSrc = getContestWatermarkTextureSrc();
+      if(externalTextureSrc){
+        try{
+          const externalTexture = await loadOverlayImage(externalTextureSrc);
+          ctx.save();
+          ctx.globalAlpha = 0.18;
+          ctx.drawImage(externalTexture, 0, 0, width, height);
+          ctx.restore();
+        }catch(err){
+          console.warn('external watermark texture skipped', err);
+        }
+      }
+      drawWatermark(ctx, width, height, seedInput, {
+        count: Math.max(10, Math.round(12 * densityScale)),
+        microCount: Math.max(18, Math.round(26 * densityScale))
+      });
+      return overlay;
+    }
+
+    async function createProtectedContestAssets(sourceCanvas, meta = {}){
+      const protectionSeed = meta.protectionSeed || createContestProtectionSeed(meta);
+      const protectedCanvas = document.createElement('canvas');
+      protectedCanvas.width = sourceCanvas.width;
+      protectedCanvas.height = sourceCanvas.height;
+      const protectedCtx = protectedCanvas.getContext('2d');
+      if(!protectedCtx) throw new Error('protect canvas init failed');
+      protectedCtx.imageSmoothingEnabled = false;
+      protectedCtx.drawImage(sourceCanvas, 0, 0);
+      const overlayCanvas = await createContestProtectionOverlayCanvas(sourceCanvas.width, sourceCanvas.height, protectionSeed);
+      protectedCtx.drawImage(overlayCanvas, 0, 0);
+      await embedInvisibleHash(protectedCanvas);
+      const thumbCanvas = createThumbnailCanvas(protectedCanvas);
+      return {
+        protectionSeed,
+        canvas: protectedCanvas,
+        dataUrl: protectedCanvas.toDataURL('image/png'),
+        imageBlob: await canvasToBlob(protectedCanvas, 'image/png'),
+        thumbBlob: await canvasToBlob(thumbCanvas, 'image/png')
+      };
     }
 
     async function embedInvisibleHash(canvas){
@@ -3510,15 +3844,7 @@
         item.innerHTML = `
           <div class="entry-imgwrap">
             <img src="${resolveEntryThumb(entry)}" alt="${entry.title}" draggable="false" loading="${isFirstTwoRows ? 'eager' : 'lazy'}" fetchpriority="${isFirstRow ? 'high' : 'auto'}" decoding="async">
-            <span class="entry-watermark" style="top:6px; left:6px;">PiXiEED</span>
-            <span class="entry-watermark" style="top:6px; right:6px;">PiXiEED</span>
-            <span class="entry-watermark" style="right:6px; bottom:6px;">PiXiEED</span>
-            <span class="entry-watermark" style="left:6px; bottom:6px;">PiXiEED</span>
-            <span class="entry-watermark" style="left:50%; top:50%; transform:translate(-50%,-50%);">PiXiEED</span>
-            <span class="entry-watermark" style="left:50%; top:25%; transform:translate(-50%,-50%);">PiXiEED</span>
-            <span class="entry-watermark" style="left:50%; top:75%; transform:translate(-50%,-50%);">PiXiEED</span>
-            <span class="entry-watermark" style="left:25%; top:50%; transform:translate(-50%,-50%);">PiXiEED</span>
-            <span class="entry-watermark" style="left:75%; top:50%; transform:translate(-50%,-50%);">PiXiEED</span>
+            ${buildContestWatermarkMarkup(resolveContestWatermarkSeed(entry), { count: 24, sizeMin: 10, sizeMax: 18 })}
             <button class="heart-btn" data-id="${entry.id}" aria-label="いいね">
               <img src="${likedEntries.has(entry.id) ? FAV_SRC : NFAV_SRC}" alt="like icon">
             </button>
