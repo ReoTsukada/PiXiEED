@@ -1010,7 +1010,7 @@
         gap:2px;
         padding:7px 12px 8px;
         border-radius:999px;
-        border:1px solid rgba(126,255,214,0.24);
+        border:1px solid transparent;
         background:
           linear-gradient(135deg, rgba(8,35,34,0.92), rgba(11,67,86,0.74)),
           radial-gradient(circle at top left, rgba(126,255,214,0.18), transparent 58%);
