@@ -233,7 +233,6 @@ const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
 const DEFAULT_PUZZLE_BUCKET = 'pixfind-puzzles';
 const CONTEST_BUCKET = 'pixieed-contest';
-const FALLBACK_PUZZLE_BUCKET = CONTEST_BUCKET;
 const CONTEST_THUMB_SIZE = 256;
 const SUPABASE_TABLE = 'pixfind_puzzles';
 const CONTEST_TABLE = 'contest_entries';
@@ -273,7 +272,6 @@ let publishQueueBusy = false;
 let puzzleBucket = (typeof window !== 'undefined' && window.PIXFIND_STORAGE_BUCKET)
   ? window.PIXFIND_STORAGE_BUCKET
   : DEFAULT_PUZZLE_BUCKET;
-let puzzleBucketFallbackUsed = false;
 
 function normalizeGameMode(rawMode) {
   if (typeof rawMode !== 'string') return DEFAULT_GAME_MODE;
@@ -316,6 +314,36 @@ function normalizeComparableUrl(value) {
   } catch (_) {
     return raw;
   }
+}
+
+function isContestPublicAssetUrl(value) {
+  const normalized = normalizeComparableUrl(value);
+  if (!normalized) return false;
+  return normalized === CONTEST_PUBLIC_BASE || normalized.startsWith(`${CONTEST_PUBLIC_BASE}/`);
+}
+
+function isLegacyContestPuzzleAssetUrl(value) {
+  const normalized = normalizeComparableUrl(value);
+  if (!isContestPublicAssetUrl(normalized)) return false;
+  try {
+    return new URL(normalized).pathname.includes(`/${CONTEST_BUCKET}/puzzles/`);
+  } catch (_) {
+    return normalized.includes('/puzzles/');
+  }
+}
+
+// Contest public images are display-only. PiXFiND gameplay must use puzzle assets.
+function isPlayablePuzzleAssetUrl(value) {
+  const normalized = normalizeComparableUrl(value);
+  return Boolean(normalized) && !isContestPublicAssetUrl(normalized);
+}
+
+function pickPlayablePuzzleAsset(primaryValue, fallbackValue = null) {
+  const primary = normalizeComparableUrl(primaryValue);
+  if (isPlayablePuzzleAssetUrl(primary)) return primary;
+  const fallback = normalizeComparableUrl(fallbackValue);
+  if (isPlayablePuzzleAssetUrl(fallback)) return fallback;
+  return primary || fallback || '';
 }
 
 function inferPuzzleModeFromHints(hints = null) {
@@ -1173,22 +1201,18 @@ async function handleCreatorPublish() {
     }
 
     const shareUrl = createShareUrl(normalized ?? { id: puzzleId, slug, source: 'published' });
-    const bucketNote = puzzleBucketFallbackUsed
-      ? `pixfind-puzzles バケットが見つからないため ${FALLBACK_PUZZLE_BUCKET} に保存しています。`
-      : '';
-    const statusSuffix = bucketNote ? ` ${bucketNote}` : '';
     const shareMessage = `${shareUrl}\n${SHARE_HASHTAG}`;
     if (navigator.clipboard?.writeText) {
       try {
         await navigator.clipboard.writeText(shareMessage);
-        setCreatorStatus(`公開しました。共有リンクをコピーしました。${statusSuffix}`);
+        setCreatorStatus('公開しました。共有リンクをコピーしました。');
       } catch (_) {
         window.prompt('公開しました。共有リンクをコピーしてください。', shareMessage);
-        setCreatorStatus(`公開しました。${statusSuffix}`);
+        setCreatorStatus('公開しました。');
       }
     } else {
       window.prompt('公開しました。共有リンクをコピーしてください。', shareMessage);
-      setCreatorStatus(`公開しました。${statusSuffix}`);
+      setCreatorStatus('公開しました。');
     }
     closeCreatorOverlay();
   } catch (error) {
@@ -1297,7 +1321,7 @@ function encodeStoragePath(path) {
   return path.split('/').map(segment => encodeURIComponent(segment)).join('/');
 }
 
-async function uploadPuzzleFile(path, body, contentType = null, allowFallback = true) {
+async function uploadPuzzleFile(path, body, contentType = null) {
   if (!body) {
     throw new Error('upload body is missing');
   }
@@ -1321,14 +1345,7 @@ async function uploadPuzzleFile(path, body, contentType = null, allowFallback = 
   if (!response.ok) {
     const detail = await response.text();
     markSupabaseMaintenanceFromError(null, response.status);
-    const error = buildSupabaseError(`upload failed: ${response.status} ${detail}`, response.status, detail);
-    if (allowFallback && shouldFallbackPuzzleBucket(error, bucket)) {
-      setPuzzleBucket(FALLBACK_PUZZLE_BUCKET);
-      puzzleBucketFallbackUsed = true;
-      console.warn(`PiXFiND bucket missing. Falling back to ${FALLBACK_PUZZLE_BUCKET}.`);
-      return await uploadPuzzleFile(path, body, contentType, false);
-    }
-    throw error;
+    throw buildSupabaseError(`upload failed: ${response.status} ${detail}`, response.status, detail);
   }
   noteSupabaseSuccess();
   return getSupabasePublicUrl(path);
@@ -1361,6 +1378,25 @@ async function uploadContestFile(path, body, contentType = null) {
   }
   noteSupabaseSuccess();
   return getContestPublicUrl(path);
+}
+
+function getUrlExtension(url, fallback = 'png') {
+  try {
+    const pathname = new URL(url).pathname || '';
+    const match = pathname.match(/\.([a-z0-9]+)$/i);
+    return match ? match[1].toLowerCase() : fallback;
+  } catch (_) {
+    const match = String(url || '').match(/\.([a-z0-9]+)(?:$|[?#])/i);
+    return match ? match[1].toLowerCase() : fallback;
+  }
+}
+
+async function fetchPublicAssetBlob(url) {
+  const response = await fetch(url, { cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(`asset fetch failed: ${response.status}`);
+  }
+  return await response.blob();
 }
 
 async function insertPublishedPuzzle(payload, { removedColumns = [] } = {}) {
@@ -1430,6 +1466,134 @@ async function updatePublishedPuzzle(id, patch, { removedColumns = [] } = {}) {
   const data = await response.json();
   noteSupabaseSuccess();
   return Array.isArray(data) ? data[0] : null;
+}
+
+async function invokeSupabaseRpc(functionName, payload = null) {
+  const url = `${SUPABASE_REST_URL}/rpc/${encodeURIComponent(functionName)}`;
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        ...supabaseHeaders(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload || {}),
+    });
+  } catch (error) {
+    markSupabaseMaintenanceFromError(error);
+    throw error;
+  }
+  if (!response.ok) {
+    const detail = await response.text();
+    markSupabaseMaintenanceFromError(null, response.status);
+    throw buildSupabaseError(`rpc failed: ${response.status} ${detail}`, response.status, detail);
+  }
+  noteSupabaseSuccess();
+  try {
+    return await response.json();
+  } catch (_) {
+    return null;
+  }
+}
+
+async function repairLegacyPublishedPuzzleAssets(entry, fallback = null) {
+  if (!entry && !fallback) return null;
+  const primary = entry && typeof entry === 'object' ? entry : {};
+  const secondary = fallback && typeof fallback === 'object' ? fallback : {};
+  const source = { ...secondary, ...primary };
+  const identifier = source.id ?? source.slug;
+  if (!identifier) return source;
+
+  const rawOriginal = normalizeComparableUrl(source.original_url ?? source.original ?? null);
+  const rawDiff = normalizeComparableUrl(source.diff_url ?? source.diff ?? null);
+  const fallbackOriginal = normalizeComparableUrl(secondary.original_url ?? secondary.original ?? null);
+  const fallbackDiff = normalizeComparableUrl(secondary.diff_url ?? secondary.diff ?? null);
+  let nextOriginal = pickPlayablePuzzleAsset(rawOriginal, fallbackOriginal);
+  let nextDiff = pickPlayablePuzzleAsset(rawDiff, fallbackDiff);
+  const migrateOriginal = !nextOriginal && isLegacyContestPuzzleAssetUrl(rawOriginal);
+  const migrateDiff = !nextDiff && isLegacyContestPuzzleAssetUrl(rawDiff);
+
+  if (!migrateOriginal && !migrateDiff) {
+    return {
+      ...source,
+      original_url: nextOriginal || rawOriginal || '',
+      diff_url: nextDiff || rawDiff || '',
+    };
+  }
+
+  const [originalBlob, diffBlob] = await Promise.all([
+    migrateOriginal ? fetchPublicAssetBlob(rawOriginal) : Promise.resolve(null),
+    migrateDiff ? fetchPublicAssetBlob(rawDiff) : Promise.resolve(null),
+  ]);
+
+  if (migrateOriginal && originalBlob) {
+    const originalExt = getUrlExtension(rawOriginal, getExtensionFromMimeType(originalBlob.type) || 'png');
+    nextOriginal = await uploadPuzzleFile(
+      `puzzles/${identifier}/original.${originalExt}`,
+      originalBlob,
+      originalBlob.type || 'application/octet-stream',
+    );
+  }
+  if (migrateDiff && diffBlob) {
+    const diffExt = getUrlExtension(rawDiff, getExtensionFromMimeType(diffBlob.type) || 'png');
+    nextDiff = await uploadPuzzleFile(
+      `puzzles/${identifier}/diff.${diffExt}`,
+      diffBlob,
+      diffBlob.type || 'application/octet-stream',
+    );
+  }
+
+  const targets = normalizePuzzleTargets(
+    source.targets ?? source.target_items ?? source.targetItems ?? source.items,
+  );
+  const mode = resolvePuzzleMode(
+    source.mode ?? source.game_mode ?? source.play_mode,
+    targets,
+    source,
+  );
+  const rawThumbnail = normalizeComparableUrl(source.thumbnail_url ?? source.thumbnail ?? null);
+  const fallbackThumbnail = normalizeComparableUrl(secondary.thumbnail_url ?? secondary.thumbnail ?? null);
+  let nextThumbnail = pickPlayablePuzzleAsset(rawThumbnail, fallbackThumbnail);
+  if (!nextThumbnail && isLegacyContestPuzzleAssetUrl(rawThumbnail)) {
+    if (rawThumbnail === rawOriginal && nextOriginal) {
+      nextThumbnail = nextOriginal;
+    } else if (rawThumbnail === rawDiff && nextDiff) {
+      nextThumbnail = nextDiff;
+    }
+  }
+  nextThumbnail = resolvePuzzleThumbnail(mode, nextOriginal, nextDiff, nextThumbnail) || nextDiff || nextOriginal || '';
+
+  const patch = {};
+  if (nextOriginal && nextOriginal !== rawOriginal) patch.original_url = nextOriginal;
+  if (nextDiff && nextDiff !== rawDiff) patch.diff_url = nextDiff;
+  if (nextThumbnail && nextThumbnail !== rawThumbnail) patch.thumbnail_url = nextThumbnail;
+  let updated = source;
+  if (source.id && Object.keys(patch).length) {
+    try {
+      updated = {
+        ...source,
+        ...(await invokeSupabaseRpc('repair_legacy_pixfind_puzzle_assets', {
+          p_id: source.id,
+          p_original_url: patch.original_url ?? null,
+          p_diff_url: patch.diff_url ?? null,
+          p_thumbnail_url: patch.thumbnail_url ?? null,
+        }) || patch),
+      };
+    } catch (error) {
+      console.warn('legacy published puzzle repair patch failed', source.id, error);
+      updated = { ...source, ...patch };
+    }
+  } else if (Object.keys(patch).length) {
+    updated = { ...source, ...patch };
+  }
+
+  return {
+    ...updated,
+    original_url: nextOriginal || updated.original_url || updated.original || '',
+    diff_url: nextDiff || updated.diff_url || updated.diff || '',
+    thumbnail_url: nextThumbnail || updated.thumbnail_url || updated.thumbnail || '',
+  };
 }
 
 async function deletePublishedPuzzle(id, { clientIdValue = null } = {}) {
@@ -1699,13 +1863,6 @@ function isBucketNotFoundError(error) {
   }
   const detailMessage = getSupabaseDetailMessage(error?.detail).toLowerCase();
   return detailMessage.includes('bucket not found') || (detailMessage.includes('bucket') && detailMessage.includes('not found'));
-}
-
-function shouldFallbackPuzzleBucket(error, bucket) {
-  if (!isBucketNotFoundError(error)) return false;
-  if (bucket !== DEFAULT_PUZZLE_BUCKET) return false;
-  if (!FALLBACK_PUZZLE_BUCKET || FALLBACK_PUZZLE_BUCKET === bucket) return false;
-  return true;
 }
 
 function buildSupabaseError(message, status, detail) {
@@ -2162,9 +2319,9 @@ function normalizePublishedPuzzleEntry(entry, fallback = null) {
   const source = { ...secondary, ...primary };
   const identifier = source.id ?? source.slug;
   if (!identifier) return null;
-  const original = source.original_url ?? source.original ?? null;
-  const diff = source.diff_url ?? source.diff ?? null;
-  if (!original || !diff) return null;
+  const original = normalizeComparableUrl(source.original_url ?? source.original ?? null);
+  const diff = normalizeComparableUrl(source.diff_url ?? source.diff ?? null);
+  if (!isPlayablePuzzleAssetUrl(original) || !isPlayablePuzzleAssetUrl(diff)) return null;
   const targets = normalizePuzzleTargets(
     source.targets ?? source.target_items ?? source.targetItems ?? source.items,
   );
@@ -2220,7 +2377,18 @@ async function loadPublishedPuzzles() {
     }
     const data = await response.json();
     if (!Array.isArray(data)) return cached.length ? cached : [];
-    const normalized = data.map((entry) => {
+    const repaired = [];
+    for (const entry of data) {
+      const key = entry?.id ?? entry?.slug;
+      const fallback = key ? cachedByKey.get(key) : null;
+      try {
+        repaired.push(await repairLegacyPublishedPuzzleAssets(entry, fallback));
+      } catch (error) {
+        console.warn('legacy published puzzle repair failed', key, error);
+        repaired.push(fallback || entry);
+      }
+    }
+    const normalized = repaired.map((entry) => {
       const key = entry?.id ?? entry?.slug;
       const fallback = key ? cachedByKey.get(key) : null;
       return normalizePublishedPuzzleEntry(entry, fallback);
@@ -2368,9 +2536,9 @@ function normalizePuzzleEntry(entry) {
   if (!entry) return null;
   const identifier = entry.id ?? entry.slug;
   if (!identifier) return null;
-  const original = entry.original ?? null;
-  const diff = entry.diff ?? null;
-  if (!original || !diff) return null;
+  const original = normalizeComparableUrl(entry.original ?? null);
+  const diff = normalizeComparableUrl(entry.diff ?? null);
+  if (!isPlayablePuzzleAssetUrl(original) || !isPlayablePuzzleAssetUrl(diff)) return null;
   const targets = normalizePuzzleTargets(entry.targets);
   const mode = resolvePuzzleMode(entry.mode, targets);
   return {
@@ -2943,18 +3111,23 @@ function renderTargetPanel() {
 }
 
 function fitCanvasesToFrame() {
-  if (!state.imageSize.width) return;
+  if (!state.imageSize.width || !state.imageSize.height) return;
+  const sourceWidth = state.imageSize.width;
+  const sourceHeight = state.imageSize.height;
+  const sourceRatio = sourceHeight / sourceWidth;
   const canvases = [dom.canvasOriginal, dom.canvasChallenge];
   canvases.forEach(canvas => {
     if (!canvas) return;
     const frame = canvas.parentElement;
     if (!frame) return;
     const frameWidth = frame.clientWidth;
-    const frameHeight = frame.clientHeight;
+    const frameHeight = frame.clientHeight || Math.round(frameWidth * sourceRatio);
     if (!frameWidth || !frameHeight) return;
-    const maxSize = Math.min(frameWidth, frameHeight);
-    canvas.style.width = `${maxSize}px`;
-    canvas.style.height = `${maxSize}px`;
+    const scale = Math.min(frameWidth / sourceWidth, frameHeight / sourceHeight);
+    const renderWidth = Math.max(1, Math.floor(sourceWidth * scale));
+    const renderHeight = Math.max(1, Math.floor(sourceHeight * scale));
+    canvas.style.width = `${renderWidth}px`;
+    canvas.style.height = `${renderHeight}px`;
   });
   refreshZoomBounds();
 }
