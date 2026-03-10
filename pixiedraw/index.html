@@ -139,21 +139,16 @@
 <button class="startup-screen__link" id="startupActionSkip" type="button">この画面を閉じる</button>
 </div>
 </div>
-<div aria-hidden="true" class="update-toast" data-update-id="2026-03-09-camera-mirror-palette-sync" hidden="" id="updateToast" role="status" aria-live="polite">
+<div aria-hidden="true" class="update-toast" data-update-id="2026-03-10-byogpt-personal-view-spritemap" hidden="" id="updateToast" role="status" aria-live="polite">
 <div class="update-toast__body">
 <p class="update-toast__message">
-<strong>更新情報 (2026/03/09)</strong><br/>
+<strong>更新情報 (2026/03/10)</strong><br/>
 【今回追加】<br/>
-・PNG / GIF読み込み時は、使用色だけのカスタムパレットを自動作成し、256色超過時は減色して取り込み<br/>
-・貼り付け時は、インデックスカラーでは既存パレットの近似色へ合わせ、RGBカラーでは対応色をパレットへ追加<br/>
-・プリセットパレットを編集 / 拡張した時は、自動でカスタムパレット表示へ切り替え<br/>
-・上部カメラボタンから PiXiEELENS を開けるようにし、撮影結果は別プロジェクトタブとして取り込み<br/>
-・ミラーモードを上部ON/OFF + キャンバス周囲の「＋」操作に整理し、各軸をON/OFFしながら位置調整できるよう改善<br/>
-<br/>
-【前回分（継続掲載）】<br/>
-・設定パネルにローカル拡張（外付け）欄を追加<br/>
-・共有モード導線を簡略化（部屋を開く / 参加する）し、キー入力フローを整理<br/>
-・JPEG / SVG 出力、カラーモード切替、小窓プレビュー、使い方ヘルプを追加<br/>
+・ローカル拡張に BYOGPT を追加。自分の OpenAI 互換接続で拡張コード生成や `api.ai.request(...)` が使えます<br/>
+・BYOGPT は OFF で入力欄ごと非表示、APIキー取得ボタンつきで見た目を整理しました<br/>
+・共有中でも、視点 / 色 / ツール / 選択 / 背景 / ミラー / オニオン / レイヤー表示 / レイヤー薄表示は各自の表示だけで保持されます<br/>
+・共有パレットは最初だけマスター内容で始め、その後の色選びや調整は各自ローカルで続けられます<br/>
+・SpriteMAP（全フレーム1枚）出力を追加しました<br/>
 ・詳細は設定の「更新情報」から確認できます
 </p>
 <div class="update-toast__actions">
@@ -1094,6 +1089,7 @@
 <option value="png">PNG（画像）</option>
 <option value="jpeg">JPEG（画像）</option>
 <option value="svg">SVG（画像）</option>
+<option value="spritemap">SpriteMAP（全フレーム1枚）</option>
 <option value="gridpng">PNG（グリッド分割）</option>
 <option value="gif">GIF（アニメーション）</option>
 <option value="timelapse">タイムラプスGIF（記録）</option>
@@ -1297,8 +1293,13 @@
 <p class="shortcut-help-row" role="listitem"><span>図形グループ呼び出し</span><span class="shortcut-help-key">U</span></p>
 <p class="shortcut-help-row" role="listitem"><span>対称ポップ開閉</span><span class="shortcut-help-key">Y</span></p>
 <p class="shortcut-help-row" role="listitem"><span>仮想カーソル ON/OFF</span><span class="shortcut-help-key">K</span></p>
-<p class="shortcut-help-row" role="listitem"><span>選択範囲移動（PC）</span><span class="shortcut-help-key">↑ ↓ ← →（Shiftで4px）</span></p>
-<p class="shortcut-help-row" role="listitem"><span>フレーム/レイヤー移動（PC）</span><span class="shortcut-help-key">選択なし時に ↑ ↓ ← →</span></p>
+<p class="shortcut-help-row" role="listitem"><span>選択範囲移動（PC）</span><span class="shortcut-help-key">選択ツール中に ↑ ↓ ← →（Shiftで4px）</span></p>
+<p class="shortcut-help-row" role="listitem"><span>前/次フレーム</span><span class="shortcut-help-key">, / .</span></p>
+<p class="shortcut-help-row" role="listitem"><span>前/次フレーム（代替）</span><span class="shortcut-help-key">通常時に ← / →</span></p>
+<p class="shortcut-help-row" role="listitem"><span>前/次レイヤー</span><span class="shortcut-help-key">通常時に ↑ / ↓</span></p>
+<p class="shortcut-help-row" role="listitem"><span>フレーム追加</span><span class="shortcut-help-key">N</span></p>
+<p class="shortcut-help-row" role="listitem"><span>現在フレーム複製</span><span class="shortcut-help-key">Shift + N</span></p>
+<p class="shortcut-help-row" role="listitem"><span>再生 / 停止</span><span class="shortcut-help-key">P</span></p>
 </div>
 </div>
 <div class="shortcut-help-section">
