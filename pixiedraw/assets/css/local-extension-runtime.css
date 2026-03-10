@@ -35,6 +35,104 @@
   gap: 6px;
 }
 
+.local-ext-panel__actions > * {
+  min-width: 0;
+}
+
+.local-ext-panel__actions--ai > * {
+  flex: 1 1 140px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.local-ext-panel__subsection {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(var(--ui-rgb), 0.34);
+  background: rgba(4, 10, 16, 0.76);
+  padding: 8px;
+  container-type: inline-size;
+}
+
+.local-ext-panel__content {
+  display: grid;
+  gap: 8px;
+}
+
+.local-ext-panel__section-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.local-ext-panel__warning {
+  margin: 0;
+  color: #ffd27a;
+}
+
+.local-ext-panel__grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr));
+}
+
+.local-ext-panel__field {
+  display: grid;
+  gap: 4px;
+}
+
+.local-ext-panel__field > span {
+  font-size: 0.78rem;
+  opacity: 0.86;
+}
+
+.local-ext-panel__input,
+.local-ext-panel__select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid rgba(var(--ui-rgb), 0.46);
+  color: var(--fg);
+  background: rgba(6, 12, 18, 0.9);
+}
+
+.local-ext-panel__advanced {
+  border: 1px dashed rgba(var(--ui-rgb), 0.34);
+  background: rgba(6, 12, 18, 0.66);
+  padding: 0 8px 8px;
+}
+
+.local-ext-panel__advanced-summary {
+  cursor: pointer;
+  font-weight: 700;
+  padding: 8px 0;
+}
+
+.local-ext-panel__advanced-body {
+  display: grid;
+  gap: 8px;
+}
+
+@container (max-width: 520px) {
+  .local-ext-panel__actions--ai > * {
+    flex-basis: calc(50% - 3px);
+  }
+
+  .local-ext-panel__actions--ai > *:last-child:nth-child(odd) {
+    flex-basis: 100%;
+  }
+
+  .local-ext-panel__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@container (max-width: 320px) {
+  .local-ext-panel__actions--ai > * {
+    flex-basis: 100%;
+  }
+}
+
 .local-ext-panel__tools {
   display: grid;
   gap: 6px;
@@ -92,6 +190,10 @@
   border: 1px solid rgba(var(--ui-rgb), 0.46);
   color: var(--fg);
   background: rgba(6, 12, 18, 0.9);
+}
+
+.local-ext-panel__code--compact {
+  min-height: 84px;
 }
 
 .local-ext-panel__status {
