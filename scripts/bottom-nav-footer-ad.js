@@ -1,4 +1,93 @@
 (function () {
+  function injectMinimalSiteChrome() {
+    const styleId = 'pixieed-minimal-site-chrome';
+    if (document.getElementById(styleId)) {
+      return;
+    }
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      :root{
+        --pixieed-clean-line:rgba(255,255,255,0.04);
+        --pixieed-clean-line-strong:rgba(255,255,255,0.06);
+        --pixieed-clean-shadow:0 14px 34px rgba(2,6,18,0.24);
+        --pixieed-clean-shadow-soft:0 8px 20px rgba(2,6,18,0.16);
+      }
+      header,
+      .site-header,
+      .top-nav{
+        border-bottom-color:transparent !important;
+        box-shadow:none !important;
+      }
+      .brand-icon{
+        border-color:var(--pixieed-clean-line-strong) !important;
+        box-shadow:none !important;
+      }
+      .lang-switch,
+      .support-tip-link,
+      .chip,
+      .button.button--ghost,
+      .button.secondary{
+        border-color:var(--pixieed-clean-line-strong) !important;
+        box-shadow:none !important;
+      }
+      .card,
+      .section,
+      .panel,
+      .item,
+      .entry-card,
+      .portfolio-card,
+      .auth-card,
+      .post-card,
+      .avatar-panel,
+      .public-room-card,
+      .update-card,
+      .audience-card,
+      .new-tool-card,
+      .category-hub-card,
+      .seo-guide-card,
+      .link-card,
+      .content-card,
+      .feature-card,
+      .hero-card,
+      .display,
+      .portfolio-window,
+      .portfolio-window__art,
+      .project-alert,
+      .faq-item{
+        border-color:var(--pixieed-clean-line) !important;
+        box-shadow:var(--pixieed-clean-shadow) !important;
+      }
+      .card.card--ad,
+      .entry-card.entry-card--ad,
+      .ad-banner,
+      .ad-card{
+        border-color:rgba(255,255,255,0.03) !important;
+      }
+      .section--highlight,
+      .section--accent,
+      .panel-head{
+        border-color:var(--pixieed-clean-line) !important;
+        box-shadow:none !important;
+      }
+      .display__frame,
+      .hero-card__preview,
+      .hero-image img,
+      .display__screen,
+      .public-room-thumb,
+      .portfolio-window__content,
+      .portfolio-window__art img{
+        border-color:var(--pixieed-clean-line) !important;
+        box-shadow:var(--pixieed-clean-shadow-soft) !important;
+      }
+      .bottom-nav,
+      .ad-footer{
+        border-top-color:transparent !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function setupMobileInputViewportGuard() {
     if (window.__PIXIEED_MOBILE_INPUT_GUARD_BOUND__) {
       return;
@@ -430,10 +519,12 @@
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
+      injectMinimalSiteChrome();
       setupMobileInputViewportGuard();
       injectFooterAd();
     }, { once: true });
   } else {
+    injectMinimalSiteChrome();
     setupMobileInputViewportGuard();
     injectFooterAd();
   }
