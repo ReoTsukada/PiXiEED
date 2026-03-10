@@ -7,9 +7,9 @@
   --accent: #8c8cff;
   --accent-strong: #6c6cf0;
   --accent-soft: rgba(120, 120, 255, 0.2);
-  --border-soft: rgba(255, 255, 255, 0.08);
-  --shadow-soft: 0 24px 48px rgba(8, 12, 60, 0.35);
-  --shadow-hard: 0 16px 20px rgba(0, 0, 0, 0.45);
+  --border-soft: rgba(255, 255, 255, 0.04);
+  --shadow-soft: 0 18px 38px rgba(2, 6, 18, 0.22);
+  --shadow-hard: 0 14px 30px rgba(2, 6, 18, 0.18);
   --font-heading: 'Fredoka','DotGothic16',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   --font-body: 'Fredoka','DotGothic16',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   --transition: 220ms ease;
@@ -91,7 +91,7 @@ a:focus {
   z-index: 20;
   backdrop-filter: blur(12px);
   background: rgba(8, 9, 20, 0.85);
-  border-bottom: 1px solid var(--border-soft);
+  border-bottom: 1px solid transparent;
   display: flex;
   gap: 1.5rem;
   padding: 0.65rem clamp(1.2rem, 4vw, 3rem);
@@ -164,7 +164,7 @@ a:focus {
   color: var(--fg-primary);
   font-weight: 600;
   text-align: center;
-  box-shadow: 0 20px 36px rgba(4, 8, 30, 0.55);
+  box-shadow: var(--shadow-soft);
 }
 
 .project-alert strong {
@@ -259,8 +259,8 @@ a:focus {
   flex: 0 0 clamp(240px, 35vw, 280px);
   border-radius: 20px;
   background: var(--bg-panel);
-  border: 1px solid rgba(140, 140, 255, 0.18);
-  box-shadow: 0 24px 36px rgba(8, 10, 40, 0.45);
+  border: 1px solid transparent;
+  box-shadow: var(--shadow-soft);
   padding: 1.25rem;
   display: flex;
   flex-direction: column;
@@ -285,7 +285,7 @@ a:focus {
   background: linear-gradient(135deg, rgba(40, 48, 120, 0.85), rgba(20, 25, 70, 0.92));
   position: relative;
   overflow: hidden;
-  box-shadow: 0 18px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-hard);
 }
 
 .hero-card__preview--note::after {
@@ -317,7 +317,7 @@ a:focus {
   object-fit: cover;
   object-position: center;
   image-rendering: pixelated;
-  box-shadow: 0 18px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-hard);
 }
 
 .hero-card.hero-card--project img,
@@ -360,23 +360,23 @@ a:focus {
 
 .hero-card--slot {
   background: linear-gradient(160deg, rgba(30, 24, 56, 0.95), rgba(18, 20, 42, 0.92));
-  border: 1px solid rgba(160, 160, 255, 0.22);
+  border: 1px solid transparent;
 }
 
 .hero-card--portfolio {
   background: linear-gradient(150deg, rgba(28, 32, 72, 0.96), rgba(20, 24, 56, 0.92));
-  border: 1px solid rgba(160, 160, 255, 0.24);
+  border: 1px solid transparent;
 }
 
 .hero-card--note {
   background: linear-gradient(150deg, rgba(36, 42, 96, 0.95), rgba(18, 20, 40, 0.9));
-  border: 1px solid rgba(138, 196, 255, 0.22);
+  border: 1px solid transparent;
 }
 
 .hero-card--ad {
   background: linear-gradient(140deg, rgba(46, 28, 80, 0.95), rgba(20, 16, 32, 0.92));
-  border: 1px solid rgba(255, 200, 0, 0.28);
-  box-shadow: 0 26px 32px rgba(70, 50, 120, 0.45);
+  border: 1px solid transparent;
+  box-shadow: var(--shadow-soft);
 }
 
 .section {
@@ -385,16 +385,16 @@ a:focus {
 
 .section--accent {
   background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid transparent;
   border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  box-shadow: var(--shadow-hard);
 }
 
 .section--highlight {
   background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid transparent;
   border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  box-shadow: var(--shadow-hard);
 }
 
 .section + .section,
@@ -426,8 +426,8 @@ a:focus {
   padding: 1.6rem;
   border-radius: 16px;
   background: var(--bg-panel);
-  border: 1px solid var(--border-soft);
-  box-shadow: var(--shadow-hard);
+  border: 1px solid transparent;
+  box-shadow: var(--shadow-soft);
   color: inherit;
   text-decoration: none;
   transition: transform var(--transition), box-shadow var(--transition);
@@ -616,7 +616,7 @@ body.portfolio-page main > .section > .section-inner {
 .display {
   background: var(--bg-panel);
   border-radius: 18px;
-  border: 1px solid var(--border-soft);
+  border: 1px solid transparent;
   box-shadow: var(--shadow-hard);
   overflow: hidden;
   transition: transform var(--transition), box-shadow var(--transition);
@@ -664,7 +664,7 @@ body.portfolio-page main > .section > .section-inner {
   width: 100%;
   aspect-ratio: var(--display-screen-aspect, 16 / 9);
   border-radius: 12px;
-  border: 2px solid rgba(140, 140, 255, 0.25);
+  border: 2px solid transparent;
   background: linear-gradient(135deg, rgba(74, 78, 240, 0.6), rgba(38, 40, 132, 0.65));
   color: rgba(0, 0, 0, 0.4);
   font-weight: 700;
@@ -794,7 +794,7 @@ body.portfolio-page main > .section > .section-inner {
   background: var(--bg-panel-alt);
   border-radius: 16px;
   padding: 1.8rem;
-  border: 1px solid var(--border-soft);
+  border: 1px solid transparent;
   box-shadow: var(--shadow-hard);
 }
 
@@ -833,7 +833,7 @@ body.portfolio-page main > .section > .section-inner {
   width: min(380px, 80vw);
   border-radius: 14px;
   background: rgba(12, 16, 40, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid transparent;
   padding: 1rem;
   box-shadow: var(--shadow-soft);
   position: relative;
@@ -863,7 +863,7 @@ body.portfolio-page main > .section > .section-inner {
   padding: 0.75rem;
   border-radius: 12px;
   background: linear-gradient(150deg, rgba(36, 42, 96, 0.9), rgba(18, 20, 40, 0.9));
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid transparent;
   box-shadow: var(--shadow-soft);
   display: grid;
   gap: 0.65rem;
@@ -887,7 +887,7 @@ body.portfolio-page main > .section > .section-inner {
 }
 
 .site-footer {
-  border-top: 1px solid var(--border-soft);
+  border-top: 1px solid transparent;
   background: rgba(6, 7, 18, 0.95);
   padding: 2rem clamp(1.5rem, 5vw, 4rem);
   color: var(--fg-secondary);
@@ -986,7 +986,7 @@ body.portfolio-page main > .section > .section-inner {
   width: min(420px, 90vw);
   background: rgba(14, 16, 32, 0.92);
   border-radius: 20px;
-  border: 1px solid rgba(140, 140, 255, 0.28);
+  border: 1px solid transparent;
   box-shadow: var(--shadow-hard);
   padding: 2.2rem 2rem 2rem;
   color: var(--fg-primary);
@@ -1009,7 +1009,7 @@ body.portfolio-page main > .section > .section-inner {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid transparent;
   background: rgba(0, 0, 0, 0.45);
   color: var(--fg-primary);
   font-size: 1.2rem;
@@ -1027,7 +1027,7 @@ body.portfolio-page main > .section > .section-inner {
   gap: 0.35rem;
   padding: 1rem 1.2rem;
   border-radius: 14px;
-  border: 1px solid rgba(140, 140, 255, 0.25);
+  border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.05);
   transition: border var(--transition), transform var(--transition);
   color: var(--fg-primary);
@@ -1079,7 +1079,7 @@ body.portfolio-page main > .section > .section-inner {
   width: 100%;
   padding: 0.75rem 1rem;
   border-radius: 12px;
-  border: 1px solid rgba(140, 140, 255, 0.32);
+  border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.06);
   color: var(--fg-primary);
   font-size: 1rem;
@@ -1108,7 +1108,7 @@ body.portfolio-page main > .section > .section-inner {
 .project-gate__cancel {
   padding: 0.65rem 1.2rem;
   border-radius: 999px;
-  border: 1px solid rgba(140, 140, 255, 0.32);
+  border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.05);
   color: var(--fg-primary);
   cursor: pointer;
