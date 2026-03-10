@@ -3908,7 +3908,9 @@ body.is-mobile-layout .mobile-draw-help {
   grid-template-columns: auto minmax(120px, 1fr);
   align-items: center;
   gap: 6px;
-  min-width: min(240px, 100%);
+  width: min(100%, 228px);
+  min-width: 0;
+  flex: 0 0 auto;
 }
 
 .palette-preset-inline span {
@@ -3923,7 +3925,9 @@ body.is-mobile-layout .mobile-draw-help {
 
 .palette-preset-picker {
   position: relative;
-  min-width: min(240px, 100%);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .palette-preset-picker__button {
@@ -3937,12 +3941,12 @@ body.is-mobile-layout .mobile-draw-help {
   gap: 4px;
   padding: 6px 10px;
   text-align: left;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .palette-preset-picker__button-label {
   min-width: 0;
-  max-width: 150px;
+  max-width: 112px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4005,10 +4009,13 @@ body.is-mobile-layout .mobile-draw-help {
   grid-auto-columns: 8px;
   gap: 1px;
   align-items: center;
+  min-width: 0;
+  max-width: 100%;
   padding: 1px;
   border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 3px;
   background: rgba(0, 0, 0, 0.3);
+  overflow: hidden;
 }
 
 .palette-preset-picker__swatch {
