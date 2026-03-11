@@ -895,17 +895,23 @@
   const UPDATE_HISTORY_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;
   const EXPORT_INTERSTITIAL_LAST_SHOWN_KEY = 'pixieedraw:export-interstitial-last-shown-at';
   const EXPORT_INTERSTITIAL_COOLDOWN_MS = 45 * 1000;
+  const SUPPRESSED_UPDATE_HISTORY_IDS = new Set([
+    '2026-03-11-local-extension-personal-view-spritemap',
+  ]);
   const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
     Object.freeze({
-      id: '2026-03-11-local-extension-personal-view-spritemap',
-      at: '2026-03-11T10:30:00+09:00',
-      title: 'ローカル拡張整理・個人表示設定・SpriteMAP出力',
+      id: '2026-03-11-personal-view-copy-paste-stability',
+      at: '2026-03-11T22:10:00+09:00',
+      title: 'ローカル設定整理・コピペ安定化・SpriteMAP出力',
+      published: false,
       details: Object.freeze([
         '設定パネルのローカル拡張（外付け）から GPT連携を撤去。旧AI設定やローカル保存されていたAPIキーも読み込み時に削除するよう整理。',
         '共有中でも、視点・選択・色・ツール・背景・グリッド・ミラー・オニオンスキンは各ユーザーの端末ごとに保持されるよう変更。',
         'レイヤー表示 ON/OFF とレイヤー不透明度は、共有データではなく各自の表示設定として保存されるよう変更。見え方だけを変えても他ユーザーや書き出し結果には影響しないよう整理。',
         '共有パレットは接続直後の初回同期だけマスター内容を初期値として取り込み、その後の色選択や調整は各ユーザーのローカル状態として維持するよう変更。',
         '保存/出力に SpriteMAP（全フレームを1枚にまとめる形式）を追加。',
+        '選択範囲のコピー / 切り取り / 貼り付けを整理し、未確定の移動プレビューも見えている位置と変形状態のまま扱えるよう改善。',
+        'コピー → 貼り付け → 移動 → 再貼り付けでは、移動中の選択を先に確定してから新しい貼り付けを始めるよう改善。',
       ]),
     }),
     Object.freeze({
@@ -12212,6 +12218,13 @@
       ...BUILTIN_UPDATE_HISTORY_ENTRIES,
     ];
     source.forEach(entry => {
+      if (!entry || typeof entry !== 'object') {
+        return;
+      }
+      const entryId = typeof entry.id === 'string' ? entry.id.trim() : '';
+      if ((entry.published === false) || (entryId && SUPPRESSED_UPDATE_HISTORY_IDS.has(entryId))) {
+        return;
+      }
       const normalized = normalizeUpdateHistoryEntry(entry);
       if (!normalized) {
         return;
@@ -13771,6 +13784,11 @@
   }
 
   function showUpdateToast({ manual = false } = {}) {
+    const updateToast = dom.startup?.updateToast;
+    if (updateToast?.dataset.updatePublished === 'false') {
+      hideUpdateToast();
+      return;
+    }
     setUpdateToastVisibility(true, { markSeen: !manual });
   }
 
@@ -13812,12 +13830,16 @@
     }
     const updateToast = dom.startup?.updateToast;
     if (updateToast) {
-      const updateId = updateToast.dataset.updateId || '';
-      const seen = hasSeenUpdateToast(updateId);
-      if (seen) {
+      if (updateToast.dataset.updatePublished === 'false') {
         hideUpdateToast();
       } else {
-        showUpdateToast();
+        const updateId = updateToast.dataset.updateId || '';
+        const seen = hasSeenUpdateToast(updateId);
+        if (seen) {
+          hideUpdateToast();
+        } else {
+          showUpdateToast();
+        }
       }
     }
     dom.startup?.updateToastCloseButton?.addEventListener('click', () => {
