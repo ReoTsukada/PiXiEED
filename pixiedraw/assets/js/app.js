@@ -93,6 +93,8 @@
       brushSizeValue: document.getElementById('brushSizeValue'),
       selectSameModeField: document.getElementById('selectSameModeField'),
       selectSameModeButtons: Array.from(document.querySelectorAll('button[data-select-same-mode]')),
+      selectionShapeModeField: document.getElementById('selectionShapeModeField'),
+      selectionShapeModeButtons: Array.from(document.querySelectorAll('button[data-selection-shape-mode]')),
       selectionOutlineField: document.getElementById('selectionOutlineField'),
       selectionOutline4Action: document.getElementById('selectionOutline4Action'),
       selectionOutline8Action: document.getElementById('selectionOutline8Action'),
@@ -291,6 +293,7 @@
       multiBlockedTarget: document.getElementById('multiBlockedTarget'),
       multiBlockedRemove: document.getElementById('multiBlockedRemove'),
       multiBlockedHint: document.getElementById('multiBlockedHint'),
+      supportTipLink: document.getElementById('supportTipLink'),
       multiMasterOnlyGroups: Array.from(document.querySelectorAll('[data-multi-master-only]')),
       multiMasterOpsGroups: Array.from(document.querySelectorAll('[data-multi-master-ops]')),
     },
@@ -897,13 +900,14 @@
   const EXPORT_INTERSTITIAL_COOLDOWN_MS = 45 * 1000;
   const SUPPRESSED_UPDATE_HISTORY_IDS = new Set([
     '2026-03-11-local-extension-personal-view-spritemap',
+    '2026-03-11-personal-view-copy-paste-stability',
   ]);
   const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
     Object.freeze({
-      id: '2026-03-11-personal-view-copy-paste-stability',
-      at: '2026-03-11T22:10:00+09:00',
-      title: 'ローカル設定整理・コピペ安定化・SpriteMAP出力',
-      published: false,
+      id: '2026-03-11-selection-multiplayer-polish',
+      at: '2026-03-11T23:45:00+09:00',
+      title: '個人設定整理・タイムライン複製・範囲選択改善・SpriteMAP出力',
+      published: true,
       details: Object.freeze([
         '設定パネルのローカル拡張（外付け）から GPT連携を撤去。旧AI設定やローカル保存されていたAPIキーも読み込み時に削除するよう整理。',
         '共有中でも、視点・選択・色・ツール・背景・グリッド・ミラー・オニオンスキンは各ユーザーの端末ごとに保持されるよう変更。',
@@ -912,6 +916,13 @@
         '保存/出力に SpriteMAP（全フレームを1枚にまとめる形式）を追加。',
         '選択範囲のコピー / 切り取り / 貼り付けを整理し、未確定の移動プレビューも見えている位置と変形状態のまま扱えるよう改善。',
         'コピー → 貼り付け → 移動 → 再貼り付けでは、移動中の選択を先に確定してから新しい貼り付けを始めるよう改善。',
+        'フレーム番号セルやレイヤー番号セルを選択している時は、追加ボタンで空追加ではなくその選択範囲をそのまま複製できるよう変更。モバイル操作でも同じ挙動に統一。',
+        'フレーム / レイヤーの構造選択はタイムライン内だけで有効になるよう整理し、キャンバスを触るか Escape を押した時点で解除されるよう変更。',
+        '範囲選択は「描画のみ」と「図形のまま」を切り替えられるようにし、矩形や投げ縄の形をそのまま選べるよう改善。',
+        '選択範囲の内側を押した時はすぐ新しい選択を始めず、既存選択として扱うよう調整。キャンバス外でもビューポート内を押せば選択解除できるよう変更。',
+        '選択がキャンバス外にはみ出していても、貼り付け時は見えている部分を確定して次の貼り付けへ進めるよう改善。',
+        '「図形のまま」でコピーした選択は、透明セルで下の絵を消さず、非透明ピクセルだけを貼り付けるよう整理。',
+        'Capacitor のネイティブアプリ版では、外部販売サイトへの「応援チップ」リンクを自動で非表示にするよう変更。',
       ]),
     }),
     Object.freeze({
@@ -2779,6 +2790,9 @@
   const SELECT_SAME_MODE_CONNECTED = 'connected';
   const SELECT_SAME_MODE_GLOBAL = 'global';
   const SELECT_SAME_MODE_SET = new Set([SELECT_SAME_MODE_CONNECTED, SELECT_SAME_MODE_GLOBAL]);
+  const SELECTION_SHAPE_MODE_CONTENT = 'content';
+  const SELECTION_SHAPE_MODE_SHAPE = 'shape';
+  const SELECTION_SHAPE_MODE_SET = new Set([SELECTION_SHAPE_MODE_CONTENT, SELECTION_SHAPE_MODE_SHAPE]);
   const CUSTOM_BRUSH_MAX_PIXELS = 8192;
   const VIRTUAL_CURSOR_SUPPORTED_TOOLS = new Set([
     'pen',
@@ -3349,6 +3363,18 @@
     return SELECT_SAME_MODE_CONNECTED;
   }
 
+  function normalizeSelectionShapeMode(value, fallback = SELECTION_SHAPE_MODE_CONTENT) {
+    const normalizedValue = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (SELECTION_SHAPE_MODE_SET.has(normalizedValue)) {
+      return normalizedValue;
+    }
+    const normalizedFallback = typeof fallback === 'string' ? fallback.trim().toLowerCase() : '';
+    if (SELECTION_SHAPE_MODE_SET.has(normalizedFallback)) {
+      return normalizedFallback;
+    }
+    return SELECTION_SHAPE_MODE_CONTENT;
+  }
+
   function normalizeCustomBrushData(source) {
     if (!source || typeof source !== 'object' || !Array.isArray(source.offsets)) {
       return null;
@@ -3469,6 +3495,7 @@
       onionSkin: requestedOnionSkin = DEFAULT_ONION_SKIN,
       uiTheme: requestedUiTheme = DEFAULT_UI_THEME,
       selectSameMode: requestedSelectSameMode = SELECT_SAME_MODE_CONNECTED,
+      selectionShapeMode: requestedSelectionShapeMode = SELECTION_SHAPE_MODE_CONTENT,
       brushShape: requestedBrushShape = BRUSH_SHAPE_SQUARE,
       customBrush: requestedCustomBrush = null,
       floatingPreview: requestedFloatingPreview = null,
@@ -3517,6 +3544,7 @@
       outlineSize: 1,
       brushShape,
       selectSameMode: normalizeSelectSameMode(requestedSelectSameMode, SELECT_SAME_MODE_CONNECTED),
+      selectionShapeMode: normalizeSelectionShapeMode(requestedSelectionShapeMode, SELECTION_SHAPE_MODE_CONTENT),
       customBrush,
       showGrid: true,
       showPixelGuides: true,
@@ -3585,7 +3613,7 @@
     return layer.direct;
   }
 
-  function cloneLayer(baseLayer, width, height) {
+  function cloneLayer(baseLayer, width, height, { copyPixels = true } = {}) {
     const size = width * height;
     const layer = {
       id: crypto.randomUUID ? crypto.randomUUID() : `layer-${Math.random().toString(36).slice(2)}`,
@@ -3593,23 +3621,94 @@
       visible: baseLayer.visible,
       opacity: normalizeLayerOpacity(baseLayer.opacity),
       blendMode: normalizeLayerBlendMode(baseLayer.blendMode),
-      indices: new Int16Array(size),
+      indices: new Int16Array(size).fill(-1),
       direct: null,
     };
-    layer.indices.set(baseLayer.indices);
-    if (baseLayer.direct instanceof Uint8ClampedArray) {
+    if (copyPixels && baseLayer.indices instanceof Int16Array) {
+      layer.indices.set(baseLayer.indices);
+    }
+    if (copyPixels && baseLayer.direct instanceof Uint8ClampedArray) {
       const direct = ensureLayerDirect(layer, width, height);
       direct.set(baseLayer.direct);
     }
     return layer;
   }
 
-  function createFrame(name, layers, width, height) {
+  function createFrame(name, layers, width, height, options = {}) {
+    const { copyPixels = true } = options || {};
     return {
       id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Math.random().toString(36).slice(2)}`,
       name,
       duration: 1000 / 12,
-      layers: layers.map(layer => cloneLayer(layer, width ?? state.width, height ?? state.height)),
+      layers: layers.map(layer => cloneLayer(layer, width ?? state.width, height ?? state.height, { copyPixels })),
+    };
+  }
+
+  function snapshotLayerForClipboard(layer, width = state.width, height = state.height) {
+    if (!layer) {
+      return null;
+    }
+    const size = Math.max(0, Math.floor(width) || 0) * Math.max(0, Math.floor(height) || 0);
+    const indices = new Int16Array(size).fill(-1);
+    if (layer.indices instanceof Int16Array) {
+      indices.set(layer.indices.subarray(0, Math.min(indices.length, layer.indices.length)));
+    }
+    let direct = null;
+    if (layer.direct instanceof Uint8ClampedArray) {
+      direct = new Uint8ClampedArray(size * 4);
+      direct.set(layer.direct.subarray(0, Math.min(direct.length, layer.direct.length)));
+    }
+    return {
+      name: typeof layer.name === 'string' ? layer.name : getDefaultLayerName(1),
+      visible: layer.visible !== false,
+      opacity: normalizeLayerOpacity(layer.opacity),
+      blendMode: normalizeLayerBlendMode(layer.blendMode),
+      indices,
+      direct,
+    };
+  }
+
+  function createLayerFromClipboardSnapshot(snapshot, width = state.width, height = state.height) {
+    const layerName = typeof snapshot?.name === 'string' && snapshot.name.trim()
+      ? snapshot.name.trim()
+      : getDefaultLayerName(1);
+    const layer = createLayer(layerName, width, height);
+    layer.visible = snapshot?.visible !== false;
+    layer.opacity = normalizeLayerOpacity(snapshot?.opacity);
+    layer.blendMode = normalizeLayerBlendMode(snapshot?.blendMode);
+    if (snapshot?.indices instanceof Int16Array) {
+      layer.indices.set(snapshot.indices.subarray(0, Math.min(layer.indices.length, snapshot.indices.length)));
+    }
+    if (snapshot?.direct instanceof Uint8ClampedArray) {
+      const direct = ensureLayerDirect(layer, width, height);
+      direct.set(snapshot.direct.subarray(0, Math.min(direct.length, snapshot.direct.length)));
+    }
+    return layer;
+  }
+
+  function snapshotFrameForClipboard(frame, width = state.width, height = state.height) {
+    if (!frame || !Array.isArray(frame.layers)) {
+      return null;
+    }
+    return {
+      name: typeof frame.name === 'string' ? frame.name : getDefaultFrameName(1),
+      duration: Number.isFinite(frame.duration) && frame.duration > 0 ? frame.duration : (1000 / 12),
+      layers: frame.layers.map(layer => snapshotLayerForClipboard(layer, width, height)),
+    };
+  }
+
+  function createFrameFromClipboardSnapshot(snapshot, width = state.width, height = state.height) {
+    const frameName = typeof snapshot?.name === 'string' && snapshot.name.trim()
+      ? snapshot.name.trim()
+      : getDefaultFrameName(1);
+    const layers = Array.isArray(snapshot?.layers) && snapshot.layers.length
+      ? snapshot.layers.map(layer => createLayerFromClipboardSnapshot(layer, width, height))
+      : [createLayer(getDefaultLayerName(1), width, height)];
+    return {
+      id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Math.random().toString(36).slice(2)}`,
+      name: frameName,
+      duration: Number.isFinite(snapshot?.duration) && snapshot.duration > 0 ? snapshot.duration : (1000 / 12),
+      layers,
     };
   }
 
@@ -3643,6 +3742,7 @@
 
   const internalClipboard = {
     selection: null,
+    timeline: null,
   };
 
   const TOUCH_PAN_MIN_POINTERS = 2;
@@ -3963,6 +4063,7 @@
       snapshot.brushSize = state.brushSize;
       snapshot.outlineSize = state.outlineSize;
       snapshot.selectSameMode = normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
+      snapshot.selectionShapeMode = normalizeSelectionShapeMode(state.selectionShapeMode, SELECTION_SHAPE_MODE_CONTENT);
       snapshot.activeToolGroup = state.activeToolGroup;
       snapshot.lastGroupTool = { ...(state.lastGroupTool || DEFAULT_GROUP_TOOL) };
       snapshot.activeLeftTab = state.activeLeftTab;
@@ -4192,6 +4293,7 @@
       outlineSize: clamp(Math.round(Number(source?.outlineSize) || state.outlineSize || 1), 1, 64),
       brushShape: normalizeBrushShape(source?.brushShape, state.brushShape || BRUSH_SHAPE_SQUARE),
       selectSameMode: normalizeSelectSameMode(source?.selectSameMode, state.selectSameMode || SELECT_SAME_MODE_CONNECTED),
+      selectionShapeMode: normalizeSelectionShapeMode(source?.selectionShapeMode, state.selectionShapeMode || SELECTION_SHAPE_MODE_CONTENT),
       customBrush: normalizeCustomBrushData(source?.customBrush),
       activeToolGroup: TOOL_GROUPS[source?.activeToolGroup]
         ? source.activeToolGroup
@@ -4241,6 +4343,7 @@
     state.brushSize = clamp(Math.round(Number(preferences.brushSize) || state.brushSize || 1), 1, 64);
     state.outlineSize = clamp(Math.round(Number(preferences.outlineSize) || state.outlineSize || 1), 1, 64);
     state.selectSameMode = normalizeSelectSameMode(preferences.selectSameMode, state.selectSameMode);
+    state.selectionShapeMode = normalizeSelectionShapeMode(preferences.selectionShapeMode, state.selectionShapeMode);
     state.customBrush = normalizeCustomBrushData(preferences.customBrush);
     state.brushShape = normalizeBrushShape(preferences.brushShape, state.brushShape);
     if (state.brushShape === BRUSH_SHAPE_CUSTOM && !hasCustomBrushData()) {
@@ -4395,11 +4498,12 @@
       return;
     }
 
-    const sourceMask = moveState.mask instanceof Uint8Array ? moveState.mask : null;
     const sourceIndices = moveState.indices instanceof Int16Array ? moveState.indices : null;
     const sourceDirect = moveState.direct instanceof Uint8ClampedArray ? moveState.direct : null;
     const moveWidth = Math.max(0, Number(moveState.width) || 0);
     const moveHeight = Math.max(0, Number(moveState.height) || 0);
+    const sourceMask = moveState.mask instanceof Uint8Array ? moveState.mask : null;
+    const sourceContentMask = getSelectionMoveContentMask(moveState);
     if (!sourceMask || !sourceIndices || moveWidth <= 0 || moveHeight <= 0) {
       return;
     }
@@ -4431,14 +4535,36 @@
     const offsetY = Math.round(Number(moveState.offset?.y) || 0);
     const originX = Math.round(Number(moveState.bounds.x0) || 0);
     const originY = Math.round(Number(moveState.bounds.y0) || 0);
-    const transformed = buildSelectionMoveTransformedEntries(moveState);
-    const entries = Array.isArray(transformed.entries) ? transformed.entries : [];
+    const transformedSelection = buildSelectionMoveTransformedEntries(moveState);
+    const transformedContent = buildSelectionMoveTransformedEntries(moveState, {
+      sourceMask: sourceContentMask,
+      cacheProperty: 'transformedContentEntryCache',
+      cacheScope: 'content',
+    });
+    const selectionEntries = Array.isArray(transformedSelection.entries) ? transformedSelection.entries : [];
+    const contentEntries = Array.isArray(transformedContent.entries) ? transformedContent.entries : [];
     const newMask = new Uint8Array(pixelCount);
     const newBounds = { x0: width, y0: height, x1: -1, y1: -1 };
     let placed = false;
 
-    for (let i = 0; i < entries.length; i += 1) {
-      const entry = entries[i];
+    for (let i = 0; i < selectionEntries.length; i += 1) {
+      const entry = selectionEntries[i];
+      const targetX = originX + (Number(entry.x) || 0) + offsetX;
+      const targetY = originY + (Number(entry.y) || 0) + offsetY;
+      if (targetX < 0 || targetY < 0 || targetX >= width || targetY >= height) {
+        continue;
+      }
+      const targetIndex = (targetY * width) + targetX;
+      newMask[targetIndex] = 1;
+      placed = true;
+      if (targetX < newBounds.x0) newBounds.x0 = targetX;
+      if (targetY < newBounds.y0) newBounds.y0 = targetY;
+      if (targetX > newBounds.x1) newBounds.x1 = targetX;
+      if (targetY > newBounds.y1) newBounds.y1 = targetY;
+    }
+
+    for (let i = 0; i < contentEntries.length; i += 1) {
+      const entry = contentEntries[i];
       const sourceIndex = Number(entry?.sourceIndex);
       if (!Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= sourceSize) {
         continue;
@@ -4465,14 +4591,6 @@
           targetDirect[targetBase + 3] = 0;
         }
       }
-      newMask[targetIndex] = 1;
-      if (!placed) {
-        placed = true;
-      }
-      if (targetX < newBounds.x0) newBounds.x0 = targetX;
-      if (targetY < newBounds.y0) newBounds.y0 = targetY;
-      if (targetX > newBounds.x1) newBounds.x1 = targetX;
-      if (targetY > newBounds.y1) newBounds.y1 = targetY;
     }
 
     if (!includeSelection) {
@@ -5062,6 +5180,9 @@
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'selectSameMode')) {
       state.selectSameMode = normalizeSelectSameMode(snapshot.selectSameMode, state.selectSameMode);
+    }
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'selectionShapeMode')) {
+      state.selectionShapeMode = normalizeSelectionShapeMode(snapshot.selectionShapeMode, state.selectionShapeMode);
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'brushShape')) {
       state.brushShape = normalizeBrushShape(snapshot.brushShape, state.brushShape);
@@ -8405,6 +8526,30 @@
     });
   }
 
+  function syncSelectionShapeModeControls() {
+    const activeMode = normalizeSelectionShapeMode(state.selectionShapeMode, SELECTION_SHAPE_MODE_CONTENT);
+    if (state.selectionShapeMode !== activeMode) {
+      state.selectionShapeMode = activeMode;
+    }
+    const shouldShow = state.tool === 'selectRect' || state.tool === 'selectLasso';
+    if (dom.controls.selectionShapeModeField instanceof HTMLElement) {
+      dom.controls.selectionShapeModeField.hidden = !shouldShow;
+      dom.controls.selectionShapeModeField.setAttribute('aria-hidden', String(!shouldShow));
+    }
+    if (!Array.isArray(dom.controls.selectionShapeModeButtons)) {
+      return;
+    }
+    dom.controls.selectionShapeModeButtons.forEach(button => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      const mode = normalizeSelectionShapeMode(button.dataset.selectionShapeMode, SELECTION_SHAPE_MODE_CONTENT);
+      const pressed = mode === activeMode;
+      button.classList.toggle('is-active', pressed);
+      button.setAttribute('aria-pressed', String(pressed));
+    });
+  }
+
   function syncZoomControls(scaleValue = state.scale) {
     const normalizedScale = normalizeZoomScale(scaleValue, MIN_ZOOM_SCALE);
     if (dom.controls.zoomSlider instanceof HTMLInputElement) {
@@ -8437,6 +8582,7 @@
     syncBrushControls();
     syncBrushSizeFieldVisibility();
     syncSelectSameModeControls();
+    syncSelectionShapeModeControls();
     if (dom.controls.canvasWidth instanceof HTMLInputElement) {
       if (document.activeElement !== dom.controls.canvasWidth) {
         dom.controls.canvasWidth.value = String(state.width);
@@ -8934,6 +9080,9 @@
     setLocalizedTextContent('#selectSameModeField > span', '同色モード', 'Same Color Mode');
     setLocalizedTextContent('#selectSameModeField [data-select-same-mode="connected"]', '連結のみ', 'Connected');
     setLocalizedTextContent('#selectSameModeField [data-select-same-mode="global"]', '全体', 'Global');
+    setLocalizedTextContent('#selectionShapeModeField > span', '範囲モード', 'Selection Shape');
+    setLocalizedTextContent('#selectionShapeModeField [data-selection-shape-mode="content"]', '描画のみ', 'Paint Only');
+    setLocalizedTextContent('#selectionShapeModeField [data-selection-shape-mode="shape"]', '図形のまま', 'Keep Shape');
   }
 
   function applyUiLocalization() {
@@ -9269,6 +9418,7 @@
 
   function refreshLocalizedUi() {
     applyUiLocalization();
+    syncSupportTipVisibility();
     syncControlsWithState();
     renderColorPanelPalettePresetOptions(currentPalettePresetId);
     renderPalettePresetPreview(currentPalettePresetId);
@@ -9291,6 +9441,15 @@
       storeUiLanguage(normalized);
     }
     refreshLocalizedUi();
+  }
+
+  function syncSupportTipVisibility() {
+    if (!(dom.controls.supportTipLink instanceof HTMLElement)) {
+      return;
+    }
+    const hidden = isNativeAppRuntime();
+    dom.controls.supportTipLink.hidden = hidden;
+    dom.controls.supportTipLink.setAttribute('aria-hidden', String(hidden));
   }
 
   function getMaxSpriteMultiplier() {
@@ -13127,18 +13286,20 @@
     }
     clearTimelineSelection();
     beginHistory(duplicate ? 'duplicateFrame' : 'addFrame');
-    const sourceLayers = duplicate ? baseFrame.layers : baseFrame.layers;
+    const sourceLayers = baseFrame.layers;
+    const nextFrameNumber = clamp(state.activeFrame + 2, 1, Number.MAX_SAFE_INTEGER);
     const newFrame = createFrame(
-      getDefaultFrameName(state.frames.length + 1),
+      getDefaultFrameName(nextFrameNumber),
       sourceLayers,
       state.width,
-      state.height
+      state.height,
+      { copyPixels: duplicate }
     );
+    if (Number.isFinite(baseFrame.duration) && baseFrame.duration > 0) {
+      newFrame.duration = baseFrame.duration;
+    }
     if (duplicate) {
-      newFrame.duration = Number.isFinite(baseFrame.duration) && baseFrame.duration > 0
-        ? baseFrame.duration
-        : newFrame.duration;
-      newFrame.name = getDefaultFrameName(state.activeFrame + 2);
+      newFrame.name = getDefaultFrameName(nextFrameNumber);
     }
     state.frames.splice(state.activeFrame + 1, 0, newFrame);
     state.activeFrame += 1;
@@ -15484,6 +15645,7 @@
     const selectionBounds = validateBoundsObject(payload.selectionBounds);
     const activeTool = normalizeToolId(payload.tool, state.tool);
     const selectSameMode = normalizeSelectSameMode(payload.selectSameMode, state.selectSameMode);
+    const selectionShapeMode = normalizeSelectionShapeMode(payload.selectionShapeMode, state.selectionShapeMode);
     const customBrush = deserializeCustomBrushPayload(payload.customBrush);
     const requestedBrushShape = normalizeBrushShape(payload.brushShape, BRUSH_SHAPE_SQUARE);
     const brushShape = requestedBrushShape === BRUSH_SHAPE_CUSTOM && !customBrush
@@ -15536,6 +15698,7 @@
       brushSize: clamp(Math.round(Number(payload.brushSize) || state.brushSize || 1), 1, 64),
       brushShape,
       selectSameMode,
+      selectionShapeMode,
       customBrush,
       colorMode,
       palette,
@@ -22567,9 +22730,9 @@
       } else if (action === 'zoomIn') {
         adjustZoomBySteps(1);
       } else if (action === 'copy') {
-        copySelection();
+        performCopyAction();
       } else if (action === 'paste') {
-        pasteSelection();
+        performPasteAction();
       } else if (action === 'cancelSelectionMove') {
         cancelPendingSelectionMove();
       } else if (action === 'confirmSelectionMove') {
@@ -22660,6 +22823,28 @@
         });
       });
       syncSelectSameModeControls();
+    }
+
+    if (Array.isArray(dom.controls.selectionShapeModeButtons)) {
+      dom.controls.selectionShapeModeButtons.forEach(button => {
+        if (!(button instanceof HTMLButtonElement)) {
+          return;
+        }
+        button.addEventListener('click', event => {
+          const target = event.currentTarget;
+          if (!(target instanceof HTMLButtonElement)) {
+            return;
+          }
+          const next = normalizeSelectionShapeMode(target.dataset.selectionShapeMode, state.selectionShapeMode);
+          if (next === state.selectionShapeMode) {
+            return;
+          }
+          state.selectionShapeMode = next;
+          syncSelectionShapeModeControls();
+          scheduleSessionPersist();
+        });
+      });
+      syncSelectionShapeModeControls();
     }
 
     dom.controls.selectionOutline4Action?.addEventListener('click', () => {
@@ -23508,6 +23693,7 @@
     }
     syncBrushSizeFieldVisibility();
     syncSelectSameModeControls();
+    syncSelectionShapeModeControls();
     updateCanvasControlButtons();
     updateToolTabIcon();
     focusUnifiedLeftContext('tools', { persist: false });
@@ -25558,6 +25744,14 @@
     return hadSelection;
   }
 
+  function clearTimelineSelectionForCanvasInteraction() {
+    if (!clearTimelineSelection()) {
+      return false;
+    }
+    renderTimelineMatrix();
+    return true;
+  }
+
   function setTimelineFrameSelection(frameIndex, { append = false } = {}) {
     if (!Number.isInteger(frameIndex) || frameIndex < 0 || frameIndex >= state.frames.length) {
       return false;
@@ -25683,6 +25877,327 @@
       return [];
     }
     return Array.from(timelineSelection.layerIndexes).sort((a, b) => a - b);
+  }
+
+  function hasTimelineStructureSelection() {
+    return getTimelineSelectedFrameIndexes().length > 0 || getTimelineSelectedLayerIndexes().length > 0;
+  }
+
+  function copyTimelineSelection() {
+    const selectedFrameIndexes = getTimelineSelectedFrameIndexes();
+    if (selectedFrameIndexes.length) {
+      const frames = selectedFrameIndexes
+        .map(index => snapshotFrameForClipboard(state.frames[index], state.width, state.height))
+        .filter(Boolean);
+      if (!frames.length) {
+        return false;
+      }
+      internalClipboard.timeline = {
+        kind: 'frame',
+        width: state.width,
+        height: state.height,
+        frames,
+      };
+      updateAutosaveStatus(
+        localizeText(
+          `フレームをコピーしました (${frames.length})`,
+          `Copied ${frames.length} frame${frames.length === 1 ? '' : 's'}`
+        ),
+        'info'
+      );
+      return true;
+    }
+
+    const selectedLayerIndexes = getTimelineSelectedLayerIndexes();
+    if (selectedLayerIndexes.length) {
+      const tracks = selectedLayerIndexes.map(layerIndex => ({
+        layers: state.frames.map(frame => snapshotLayerForClipboard(frame?.layers?.[layerIndex], state.width, state.height)),
+      }));
+      if (!tracks.length) {
+        return false;
+      }
+      internalClipboard.timeline = {
+        kind: 'layer',
+        width: state.width,
+        height: state.height,
+        tracks,
+      };
+      updateAutosaveStatus(
+        localizeText(
+          `レイヤーをコピーしました (${tracks.length})`,
+          `Copied ${tracks.length} layer${tracks.length === 1 ? '' : 's'}`
+        ),
+        'info'
+      );
+      return true;
+    }
+
+    return false;
+  }
+
+  function validateTimelineClipboardDimensions(clip) {
+    const clipWidth = Math.max(0, Math.floor(Number(clip?.width) || 0));
+    const clipHeight = Math.max(0, Math.floor(Number(clip?.height) || 0));
+    if (clipWidth === state.width && clipHeight === state.height) {
+      return true;
+    }
+    updateAutosaveStatus(
+      localizeText(
+        'タイムラインのコピー元と現在のキャンバスサイズが違うため貼り付けできません',
+        'Cannot paste timeline data because the clipboard size does not match the current canvas'
+      ),
+      'warn'
+    );
+    return false;
+  }
+
+  function pasteTimelineClipboard() {
+    const clip = internalClipboard.timeline;
+    if (!clip) {
+      return false;
+    }
+    if (state.playback.isPlaying) {
+      return false;
+    }
+    if (!canCurrentClientEditProjectStructure()) {
+      setMultiStatus(
+        localizeText(
+          '参加/視聴モードではフレーム / レイヤー貼り付けはマスターのみ操作できます',
+          'In participant/viewer mode, only the master can paste frames or layers'
+        ),
+        'warn'
+      );
+      return false;
+    }
+    if (!validateTimelineClipboardDimensions(clip)) {
+      return false;
+    }
+
+    if (clip.kind === 'frame') {
+      const targetIndexes = getTimelineSelectedFrameIndexes();
+      const sourceFrames = Array.isArray(clip.frames) ? clip.frames : [];
+      if (!targetIndexes.length || !sourceFrames.length) {
+        return false;
+      }
+      const insertIndex = targetIndexes[targetIndexes.length - 1] + 1;
+      const preferredLayerIndex = getActiveLayerIndex();
+      const pastedFrames = sourceFrames
+        .map(frame => createFrameFromClipboardSnapshot(frame, state.width, state.height))
+        .filter(Boolean);
+      if (!pastedFrames.length) {
+        return false;
+      }
+      beginHistory('pasteFrame');
+      state.frames.splice(insertIndex, 0, ...pastedFrames);
+      state.activeFrame = insertIndex;
+      const activePastedFrame = state.frames[insertIndex];
+      if (activePastedFrame?.layers?.length) {
+        const nextLayerIndex = preferredLayerIndex >= 0
+          ? clamp(preferredLayerIndex, 0, activePastedFrame.layers.length - 1)
+          : (activePastedFrame.layers.length - 1);
+        state.activeLayer = activePastedFrame.layers[nextLayerIndex].id;
+      }
+      timelineSelection.mode = TIMELINE_SELECTION_MODE_FRAME;
+      timelineSelection.frameIndexes = new Set(pastedFrames.map((_, offset) => insertIndex + offset));
+      timelineSelection.layerIndexes.clear();
+      timelineSelection.slotKeys.clear();
+      normalizeTimelineSelectionState();
+      markHistoryDirty();
+      scheduleSessionPersist();
+      renderFrameList();
+      renderLayerList();
+      requestRender();
+      requestOverlayRender();
+      commitHistory();
+      updateAutosaveStatus(
+        localizeText(
+          `フレームを貼り付けました (${pastedFrames.length})`,
+          `Pasted ${pastedFrames.length} frame${pastedFrames.length === 1 ? '' : 's'}`
+        ),
+        'success'
+      );
+      return true;
+    }
+
+    if (clip.kind === 'layer') {
+      const targetIndexes = getTimelineSelectedLayerIndexes();
+      const tracks = Array.isArray(clip.tracks) ? clip.tracks : [];
+      if (!targetIndexes.length || !tracks.length) {
+        return false;
+      }
+      const insertIndex = targetIndexes[targetIndexes.length - 1] + 1;
+      beginHistory('pasteLayer');
+      tracks.forEach((track, offset) => {
+        const layerSnapshots = Array.isArray(track?.layers) ? track.layers : [];
+        const fallbackLayerSnapshot = layerSnapshots.find(Boolean) || null;
+        state.frames.forEach((frame, frameIndex) => {
+          if (!frame || !Array.isArray(frame.layers)) {
+            return;
+          }
+          const sourceLayerSnapshot = layerSnapshots[frameIndex] || fallbackLayerSnapshot;
+          const newLayer = createLayerFromClipboardSnapshot(sourceLayerSnapshot, state.width, state.height);
+          frame.layers.splice(insertIndex + offset, 0, newLayer);
+        });
+      });
+      const insertedIndexes = tracks.map((_, offset) => insertIndex + offset);
+      const activeFrame = getActiveFrame();
+      if (activeFrame?.layers?.length && insertedIndexes.length) {
+        const nextLayer = activeFrame.layers[clamp(insertedIndexes[0], 0, activeFrame.layers.length - 1)];
+        if (nextLayer) {
+          state.activeLayer = nextLayer.id;
+        }
+      }
+      timelineSelection.mode = TIMELINE_SELECTION_MODE_LAYER;
+      timelineSelection.layerIndexes = new Set(insertedIndexes);
+      timelineSelection.frameIndexes.clear();
+      timelineSelection.slotKeys.clear();
+      normalizeTimelineSelectionState();
+      markHistoryDirty();
+      scheduleSessionPersist();
+      renderFrameList();
+      renderLayerList();
+      requestRender();
+      requestOverlayRender();
+      commitHistory();
+      updateAutosaveStatus(
+        localizeText(
+          `レイヤーを貼り付けました (${tracks.length})`,
+          `Pasted ${tracks.length} layer${tracks.length === 1 ? '' : 's'}`
+        ),
+        'success'
+      );
+      return true;
+    }
+
+    return false;
+  }
+
+  function duplicateSelectedTimelineFrames() {
+    const selectedFrameIndexes = getTimelineSelectedFrameIndexes();
+    if (!selectedFrameIndexes.length) {
+      return false;
+    }
+    if (state.playback.isPlaying) {
+      return false;
+    }
+    if (!canCurrentClientEditProjectStructure()) {
+      setMultiStatus(
+        localizeText(
+          '参加/視聴モードではフレーム複製はマスターのみ操作できます',
+          'In participant/viewer mode, only the master can duplicate frames'
+        ),
+        'warn'
+      );
+      return false;
+    }
+    const insertIndex = selectedFrameIndexes[selectedFrameIndexes.length - 1] + 1;
+    const preferredLayerIndex = getActiveLayerIndex();
+    const duplicatedFrames = selectedFrameIndexes
+      .map(index => snapshotFrameForClipboard(state.frames[index], state.width, state.height))
+      .filter(Boolean)
+      .map((snapshot, offset) => {
+        const frame = createFrameFromClipboardSnapshot(snapshot, state.width, state.height);
+        frame.name = getDefaultFrameName(insertIndex + offset + 1);
+        return frame;
+      });
+    if (!duplicatedFrames.length) {
+      return false;
+    }
+    beginHistory('duplicateFrame');
+    state.frames.splice(insertIndex, 0, ...duplicatedFrames);
+    state.activeFrame = insertIndex;
+    const activeDuplicatedFrame = state.frames[insertIndex];
+    if (activeDuplicatedFrame?.layers?.length) {
+      const nextLayerIndex = preferredLayerIndex >= 0
+        ? clamp(preferredLayerIndex, 0, activeDuplicatedFrame.layers.length - 1)
+        : (activeDuplicatedFrame.layers.length - 1);
+      state.activeLayer = activeDuplicatedFrame.layers[nextLayerIndex].id;
+    }
+    timelineSelection.mode = TIMELINE_SELECTION_MODE_FRAME;
+    timelineSelection.frameIndexes = new Set(duplicatedFrames.map((_, offset) => insertIndex + offset));
+    timelineSelection.layerIndexes.clear();
+    timelineSelection.slotKeys.clear();
+    normalizeTimelineSelectionState();
+    markHistoryDirty();
+    scheduleSessionPersist();
+    renderFrameList();
+    renderLayerList();
+    requestRender();
+    requestOverlayRender();
+    commitHistory();
+    updateAutosaveStatus(
+      localizeText(
+        `フレームを複製しました (${duplicatedFrames.length})`,
+        `Duplicated ${duplicatedFrames.length} frame${duplicatedFrames.length === 1 ? '' : 's'}`
+      ),
+      'success'
+    );
+    return true;
+  }
+
+  function duplicateSelectedTimelineLayers() {
+    const selectedLayerIndexes = getTimelineSelectedLayerIndexes();
+    if (!selectedLayerIndexes.length) {
+      return false;
+    }
+    if (!canCurrentClientEditProjectStructure()) {
+      setMultiStatus(
+        localizeText(
+          '参加/視聴モードではレイヤー複製はマスターのみ操作できます',
+          'In participant/viewer mode, only the master can duplicate layers'
+        ),
+        'warn'
+      );
+      return false;
+    }
+    const insertIndex = selectedLayerIndexes[selectedLayerIndexes.length - 1] + 1;
+    const trackSnapshots = selectedLayerIndexes.map(layerIndex => ({
+      layers: state.frames.map(frame => snapshotLayerForClipboard(frame?.layers?.[layerIndex], state.width, state.height)),
+    }));
+    if (!trackSnapshots.length) {
+      return false;
+    }
+    beginHistory('duplicateLayer');
+    trackSnapshots.forEach((track, offset) => {
+      const layerSnapshots = Array.isArray(track?.layers) ? track.layers : [];
+      const fallbackLayerSnapshot = layerSnapshots.find(Boolean) || null;
+      state.frames.forEach((frame, frameIndex) => {
+        if (!frame || !Array.isArray(frame.layers)) {
+          return;
+        }
+        const sourceLayerSnapshot = layerSnapshots[frameIndex] || fallbackLayerSnapshot;
+        const newLayer = createLayerFromClipboardSnapshot(sourceLayerSnapshot, state.width, state.height);
+        frame.layers.splice(insertIndex + offset, 0, newLayer);
+      });
+    });
+    const insertedIndexes = trackSnapshots.map((_, offset) => insertIndex + offset);
+    const activeFrame = getActiveFrame();
+    if (activeFrame?.layers?.length && insertedIndexes.length) {
+      const nextLayer = activeFrame.layers[clamp(insertedIndexes[0], 0, activeFrame.layers.length - 1)];
+      if (nextLayer) {
+        state.activeLayer = nextLayer.id;
+      }
+    }
+    timelineSelection.mode = TIMELINE_SELECTION_MODE_LAYER;
+    timelineSelection.layerIndexes = new Set(insertedIndexes);
+    timelineSelection.frameIndexes.clear();
+    timelineSelection.slotKeys.clear();
+    normalizeTimelineSelectionState();
+    markHistoryDirty();
+    scheduleSessionPersist();
+    renderFrameList();
+    renderLayerList();
+    requestRender();
+    requestOverlayRender();
+    commitHistory();
+    updateAutosaveStatus(
+      localizeText(
+        `レイヤーを複製しました (${trackSnapshots.length})`,
+        `Duplicated ${trackSnapshots.length} layer${trackSnapshots.length === 1 ? '' : 's'}`
+      ),
+      'success'
+    );
+    return true;
   }
 
   function swapLayerPixelPayload(layerA, layerB) {
@@ -26113,6 +26628,10 @@
 
   function setupFramesAndLayers() {
     dom.controls.addLayer?.addEventListener('click', () => {
+      if (getTimelineSelectedLayerIndexes().length) {
+        duplicateSelectedTimelineLayers();
+        return;
+      }
       if (!canCurrentClientEditProjectStructure()) {
         setMultiStatus(localizeText('参加/視聴モードではレイヤー追加はマスターのみ操作できます', 'In participant/viewer mode, only the master can add layers'), 'warn');
         return;
@@ -26176,6 +26695,10 @@
     });
 
     dom.controls.addFrame?.addEventListener('click', () => {
+      if (getTimelineSelectedFrameIndexes().length) {
+        duplicateSelectedTimelineFrames();
+        return;
+      }
       addOrDuplicateFrameAfterActive({ duplicate: false });
     });
 
@@ -26867,10 +27390,8 @@
           return;
         }
         state.activeLayer = layerId;
-        if (event.shiftKey && Number.isFinite(layerIndex)) {
-          setTimelineLayerSelection(layerIndex, { append: true });
-        } else {
-          clearTimelineSelection();
+        if (Number.isFinite(layerIndex)) {
+          setTimelineLayerSelection(layerIndex, { append: event.shiftKey });
         }
         scheduleSessionPersist();
         renderTimelineMatrix();
@@ -26887,11 +27408,7 @@
         const currentLayers = currentFrame ? currentFrame.layers.slice().reverse() : [];
         const activeLayerRow = currentLayers.findIndex(layer => layer.id === state.activeLayer);
         state.activeFrame = frameIndex;
-        if (event.shiftKey) {
-          setTimelineFrameSelection(frameIndex, { append: true });
-        } else {
-          clearTimelineSelection();
-        }
+        setTimelineFrameSelection(frameIndex, { append: event.shiftKey });
         if (isMultiAssignedCellRestrictedEditorMode()) {
           enforceGuestAssignedLayerSelection({ announce: false });
         } else {
@@ -27132,6 +27649,13 @@
       const isMultiSelectedFrame = isFrameSelectionMode && timelineSelection.frameIndexes.has(frameIndex);
       if (isMultiSelectedFrame) {
         header.classList.add('is-multi-selected-frame');
+        header.classList.add('is-structure-selected', 'is-structure-selected-frame', 'is-structure-selection-top');
+        if (!timelineSelection.frameIndexes.has(frameIndex - 1)) {
+          header.classList.add('is-structure-selection-left');
+        }
+        if (!timelineSelection.frameIndexes.has(frameIndex + 1)) {
+          header.classList.add('is-structure-selection-right');
+        }
       }
       const isOnionFrame = onionFrameIndexes.has(frameIndex);
       if (isOnionFrame) {
@@ -27150,9 +27674,6 @@
       button.type = 'button';
       button.className = 'timeline-frame-button pixel-frame';
       button.dataset.timelineFrameIndex = String(frameIndex);
-      if (isMultiSelectedFrame) {
-        button.classList.add('is-selected');
-      }
       const frameNumberMatch = String(frame.name).match(/(\d+)/);
       button.textContent = frameNumberMatch && frameNumberMatch[1] ? frameNumberMatch[1] : String(frameIndex + 1);
 
@@ -27190,9 +27711,21 @@
         && Number.isInteger(layerTrackIndex)
         && layerTrackIndex >= 0
         && timelineSelection.layerIndexes.has(layerTrackIndex);
+      const isLayerSelectionStart = isMultiSelectedLayer && !timelineSelection.layerIndexes.has(layerTrackIndex + 1);
+      const isLayerSelectionEnd = isMultiSelectedLayer && !timelineSelection.layerIndexes.has(layerTrackIndex - 1);
       if (isMultiSelectedLayer) {
         rowVisibilityCell.classList.add('is-multi-selected-layer');
         rowHeader.classList.add('is-multi-selected-layer');
+        rowVisibilityCell.classList.add('is-structure-selected', 'is-structure-selected-layer', 'is-structure-selection-left');
+        rowHeader.classList.add('is-structure-selected', 'is-structure-selected-layer');
+        if (isLayerSelectionStart) {
+          rowVisibilityCell.classList.add('is-structure-selection-top');
+          rowHeader.classList.add('is-structure-selection-top');
+        }
+        if (isLayerSelectionEnd) {
+          rowVisibilityCell.classList.add('is-structure-selection-bottom');
+          rowHeader.classList.add('is-structure-selection-bottom');
+        }
       }
 
       if (layer) {
@@ -27218,9 +27751,6 @@
         tag.dataset.timelineLayerId = layer.id;
         tag.dataset.timelineLayerIndex = String(layerTrackIndex);
         tag.disabled = isMultiReadOnlyMode();
-        if (isMultiSelectedLayer) {
-          tag.classList.add('is-selected');
-        }
         tag.textContent = labelName;
         rowHeader.appendChild(tag);
       } else {
@@ -27278,9 +27808,37 @@
           && timelineSelection.slotKeys.has(createTimelineSlotKey(frameIndex, layerIndex));
         const isActiveLayerRow = rowIndex === activeLayerRow;
         const isActiveFrameColumn = frameIndex === activeFrameIndex;
+        const isMultiSelectedFrame = isFrameSelectionMode && timelineSelection.frameIndexes.has(frameIndex);
+        const isColumnSelectionStart = isMultiSelectedFrame && !timelineSelection.frameIndexes.has(frameIndex - 1);
+        const isColumnSelectionEnd = isMultiSelectedFrame && !timelineSelection.frameIndexes.has(frameIndex + 1);
         let isActiveCell = false;
         let isEmptyCell = false;
         let isHiddenCell = false;
+
+        if (isMultiSelectedFrame) {
+          cell.classList.add('is-structure-selected', 'is-structure-selected-frame');
+          if (isColumnSelectionStart) {
+            cell.classList.add('is-structure-selection-left');
+          }
+          if (isColumnSelectionEnd) {
+            cell.classList.add('is-structure-selection-right');
+          }
+          if (rowIndex === layerCount - 1) {
+            cell.classList.add('is-structure-selection-bottom');
+          }
+        }
+        if (isMultiSelectedLayer) {
+          cell.classList.add('is-structure-selected', 'is-structure-selected-layer');
+          if (isLayerSelectionStart) {
+            cell.classList.add('is-structure-selection-top');
+          }
+          if (isLayerSelectionEnd) {
+            cell.classList.add('is-structure-selection-bottom');
+          }
+          if (frameIndex === frameCount - 1) {
+            cell.classList.add('is-structure-selection-right');
+          }
+        }
 
         if (!targetLayer) {
           isEmptyCell = true;
@@ -27691,7 +28249,7 @@
     const shouldMoveSelectionWithSelectionTool = Boolean(
       VIRTUAL_CURSOR_SELECTION_TOOLS.has(activeTool)
       && selectionMaskHasPixels(state.selectionMask)
-      && isPositionInCurrentSelection(cell)
+      && isPositionInCurrentSelectionInteractionArea(cell)
     );
     const sessionTool = shouldMoveSelectionWithSelectionTool ? 'move' : activeTool;
 
@@ -29907,6 +30465,7 @@
         } else {
           clearSelection();
         }
+        clearTimelineSelectionForCanvasInteraction();
         return;
       }
       if (
@@ -29953,17 +30512,17 @@
         event.preventDefault();
         redo();
       } else if (key === 'c') {
-        const success = copySelection();
+        const success = performCopyAction();
         if (success) {
           event.preventDefault();
         }
       } else if (key === 'x') {
-        const success = cutSelection();
+        const success = performCutAction();
         if (success) {
           event.preventDefault();
         }
       } else if (key === 'v') {
-        const success = pasteSelection();
+        const success = performPasteAction();
         if (success) {
           event.preventDefault();
         }
@@ -30255,6 +30814,7 @@
     if (isTouch) {
       updateTouchPointer(event);
     }
+    clearTimelineSelectionForCanvasInteraction();
     const isMiddleMousePan = event.pointerType !== 'touch' && event.button === 1;
     if (isMiddleMousePan) {
       event.preventDefault();
@@ -30454,6 +31014,8 @@
     const selectionMask = state.selectionMask;
     const hasSelection = Boolean(selectionMask && selectionMaskHasPixels(selectionMask));
     const selectionHit = hasSelection && isPositionInCurrentSelection(position);
+    const selectionBoundsHit = hasSelection && isPositionInCurrentSelectionBounds(position);
+    const selectionInteractionHit = selectionHit || selectionBoundsHit;
     const isSelectionTool = activeTool === 'selectRect' || activeTool === 'selectLasso' || activeTool === 'selectSame' || activeTool === 'move';
     const pendingMoveState = !pointerState.active ? getPendingSelectionMoveState() : null;
     const pendingSelectionHit = Boolean(pendingMoveState && isPositionInMoveState(position, pendingMoveState));
@@ -30487,7 +31049,7 @@
     if (
       isSelectionTool
       && hasSelection
-      && selectionHit
+      && selectionInteractionHit
       && !pointerState.selectionExtendOnDown
       && !(activeTool === 'selectRect' && selectRectGridGesture.enabled)
     ) {
@@ -30499,7 +31061,7 @@
     }
 
     if (activeTool === 'move') {
-      if (hasSelection && !selectionHit) {
+      if (hasSelection && !selectionInteractionHit) {
         clearSelection();
       }
       const hasSelectionAfterClear = Boolean(state.selectionMask && selectionMaskHasPixels(state.selectionMask));
@@ -30516,7 +31078,7 @@
     if (
       (activeTool === 'selectRect' || activeTool === 'selectLasso')
       && hasSelection
-      && !selectionHit
+      && !selectionInteractionHit
       && !pointerState.selectionExtendOnDown
     ) {
       clearSelection();
@@ -31136,6 +31698,19 @@
     return true;
   }
 
+  function isPositionInBounds(position, bounds) {
+    if (!position || !bounds) {
+      return false;
+    }
+    const x = Math.floor(position.x);
+    const y = Math.floor(position.y);
+    return x >= bounds.x0 && x <= bounds.x1 && y >= bounds.y0 && y <= bounds.y1;
+  }
+
+  function getCurrentSelectionBounds() {
+    return normalizeSelectionBoundsForState(state.selectionBounds) || computeSelectionBoundsFromMask(state.selectionMask);
+  }
+
   function isPositionInCurrentSelection(position) {
     if (!position) {
       return false;
@@ -31155,6 +31730,14 @@
     }
     const idx = y * state.width + x;
     return mask[idx] === 1;
+  }
+
+  function isPositionInCurrentSelectionBounds(position) {
+    return isPositionInBounds(position, getCurrentSelectionBounds());
+  }
+
+  function isPositionInCurrentSelectionInteractionArea(position) {
+    return isPositionInCurrentSelection(position) || isPositionInCurrentSelectionBounds(position);
   }
 
   function isPositionInMoveState(position, moveState) {
@@ -31209,6 +31792,56 @@
     return x >= bounds.x0 && x <= bounds.x1 && y >= bounds.y0 && y <= bounds.y1;
   }
 
+  function getMoveStateSourcePixelAlpha(moveState, sourceIndex) {
+    if (!moveState || !Number.isInteger(sourceIndex) || sourceIndex < 0) {
+      return 0;
+    }
+    const indices = moveState.indices instanceof Int16Array ? moveState.indices : null;
+    const direct = moveState.direct instanceof Uint8ClampedArray ? moveState.direct : null;
+    const paletteIndex = indices && sourceIndex < indices.length ? indices[sourceIndex] : -1;
+    if (paletteIndex >= 0 && Array.isArray(state.palette) && state.palette[paletteIndex]) {
+      return Number(state.palette[paletteIndex].a) || 0;
+    }
+    if (direct) {
+      const base = sourceIndex * 4;
+      if (base + 3 < direct.length) {
+        return Number(direct[base + 3]) || 0;
+      }
+    }
+    return 0;
+  }
+
+  function buildSelectionMoveContentMask(mask, moveStateLike) {
+    if (!(mask instanceof Uint8Array)) {
+      return null;
+    }
+    const contentMask = new Uint8Array(mask.length);
+    for (let i = 0; i < mask.length; i += 1) {
+      if (mask[i] !== 1) {
+        continue;
+      }
+      if (getMoveStateSourcePixelAlpha(moveStateLike, i) > 0) {
+        contentMask[i] = 1;
+      }
+    }
+    return contentMask;
+  }
+
+  function getSelectionMoveContentMask(moveState) {
+    if (!moveState) {
+      return null;
+    }
+    const size = Math.max(0, Math.floor(Number(moveState.width) || 0)) * Math.max(0, Math.floor(Number(moveState.height) || 0));
+    if (moveState.contentMask instanceof Uint8Array && moveState.contentMask.length === size) {
+      return moveState.contentMask;
+    }
+    if (!(moveState.mask instanceof Uint8Array) || moveState.mask.length !== size) {
+      return null;
+    }
+    moveState.contentMask = buildSelectionMoveContentMask(moveState.mask, moveState);
+    return moveState.contentMask;
+  }
+
   function createSelectionMoveState(layer, bounds, mask) {
     if (!layer || !bounds || !mask) {
       return null;
@@ -31221,6 +31854,7 @@
 
     const size = width * height;
     const localMask = new Uint8Array(size);
+    const localContentMask = new Uint8Array(size);
     const localIndices = new Int16Array(size);
     const localDirect = new Uint8ClampedArray(size * 4);
     const imageData = createBlankImageData(width, height);
@@ -31271,6 +31905,9 @@
               imageData.data[localBase + 1] = color.g;
               imageData.data[localBase + 2] = color.b;
               imageData.data[localBase + 3] = color.a;
+              if ((Number(color.a) || 0) > 0) {
+                localContentMask[localIndex] = 1;
+              }
             }
           }
         } else {
@@ -31293,6 +31930,7 @@
       width,
       height,
       mask: localMask,
+      contentMask: localContentMask,
       indices: localIndices,
       direct: localDirect,
       imageData,
@@ -31304,6 +31942,7 @@
       transformFlipHorizontal: false,
       transformFlipVertical: false,
       transformedEntryCache: null,
+      transformedContentEntryCache: null,
       transformedPreviewRenderCache: null,
     };
   }
@@ -31374,8 +32013,17 @@
     return { x: mappedX, y: mappedY };
   }
 
-  function buildSelectionMoveTransformedEntries(moveState) {
-    if (!moveState || !(moveState.mask instanceof Uint8Array)) {
+  function buildSelectionMoveTransformedEntries(moveState, options = {}) {
+    const sourceMask = options?.sourceMask instanceof Uint8Array
+      ? options.sourceMask
+      : moveState?.mask;
+    const cacheProperty = typeof options?.cacheProperty === 'string' && options.cacheProperty
+      ? options.cacheProperty
+      : 'transformedEntryCache';
+    const cacheScope = typeof options?.cacheScope === 'string' && options.cacheScope
+      ? options.cacheScope
+      : 'selection';
+    if (!moveState || !(sourceMask instanceof Uint8Array)) {
       return {
         entries: [],
         bounds: null,
@@ -31387,7 +32035,7 @@
     const sourceWidth = Math.max(0, Math.floor(Number(moveState.width) || 0));
     const sourceHeight = Math.max(0, Math.floor(Number(moveState.height) || 0));
     const sourceSize = sourceWidth * sourceHeight;
-    if (sourceWidth <= 0 || sourceHeight <= 0 || moveState.mask.length !== sourceSize) {
+    if (sourceWidth <= 0 || sourceHeight <= 0 || sourceMask.length !== sourceSize) {
       return {
         entries: [],
         bounds: null,
@@ -31397,13 +32045,13 @@
       };
     }
     const transform = getSelectionMoveTransformState(moveState);
-    const key = `${transform.rotationDeg}:${transform.flipHorizontal ? 1 : 0}:${transform.flipVertical ? 1 : 0}`;
+    const key = `${cacheScope}:${transform.rotationDeg}:${transform.flipHorizontal ? 1 : 0}:${transform.flipVertical ? 1 : 0}`;
     if (
-      moveState.transformedEntryCache
-      && moveState.transformedEntryCache.key === key
-      && Array.isArray(moveState.transformedEntryCache.entries)
+      moveState[cacheProperty]
+      && moveState[cacheProperty].key === key
+      && Array.isArray(moveState[cacheProperty].entries)
     ) {
-      return moveState.transformedEntryCache;
+      return moveState[cacheProperty];
     }
 
     const entries = [];
@@ -31416,7 +32064,7 @@
     for (let y = 0; y < sourceHeight; y += 1) {
       for (let x = 0; x < sourceWidth; x += 1) {
         const sourceIndex = (y * sourceWidth) + x;
-        if (moveState.mask[sourceIndex] !== 1) {
+        if (sourceMask[sourceIndex] !== 1) {
           continue;
         }
         const mapped = transformSelectionMoveLocalPixel(x, y, sourceWidth, sourceHeight, transform);
@@ -31465,7 +32113,7 @@
       width: transformedWidth,
       height: transformedHeight,
     };
-    moveState.transformedEntryCache = result;
+    moveState[cacheProperty] = result;
     return result;
   }
 
@@ -31823,6 +32471,14 @@
       width,
       height,
       mask: new Uint8Array(transformed.mask),
+      contentMask: (() => {
+        const transformedContent = buildSelectionMoveTransformedEntries(moveState, {
+          sourceMask: getSelectionMoveContentMask(moveState),
+          cacheProperty: 'transformedContentEntryCache',
+          cacheScope: 'content',
+        });
+        return transformedContent.mask instanceof Uint8Array ? new Uint8Array(transformedContent.mask) : null;
+      })(),
       indices,
       direct,
       bounds: visualBounds,
@@ -32470,6 +33126,9 @@
       width: moveState.width,
       height: moveState.height,
       mask: new Uint8Array(moveState.mask),
+      contentMask: getSelectionMoveContentMask(moveState) instanceof Uint8Array
+        ? new Uint8Array(getSelectionMoveContentMask(moveState))
+        : null,
       indices: new Int16Array(moveState.indices),
       direct: new Uint8ClampedArray(moveState.direct),
       palette: state.palette.map(color => normalizeColorValue(color)),
@@ -32493,6 +33152,39 @@
     return true;
   }
 
+  function hasCanvasSelectionClipboardContext() {
+    return hasPendingSelectionMove()
+      || Boolean(state.pendingPasteMoveState)
+      || selectionMaskHasPixels(state.selectionMask);
+  }
+
+  function performCopyAction() {
+    if (hasCanvasSelectionClipboardContext()) {
+      return copySelection();
+    }
+    if (hasTimelineStructureSelection()) {
+      return copyTimelineSelection();
+    }
+    return copySelection();
+  }
+
+  function performCutAction() {
+    if (hasTimelineStructureSelection() && !hasCanvasSelectionClipboardContext()) {
+      return false;
+    }
+    return cutSelection();
+  }
+
+  function performPasteAction() {
+    if (hasTimelineStructureSelection() && !hasCanvasSelectionClipboardContext()) {
+      const timelinePasted = pasteTimelineClipboard();
+      if (timelinePasted || !internalClipboard.selection) {
+        return timelinePasted;
+      }
+    }
+    return pasteSelection();
+  }
+
   function createMoveStateFromClipboard(clip, bounds, layer, { autoExpandPalette = false } = {}) {
     if (!clip) {
       return null;
@@ -32506,6 +33198,9 @@
     const mask = clip.mask instanceof Uint8Array && clip.mask.length === size
       ? new Uint8Array(clip.mask)
       : new Uint8Array(size);
+    const contentMask = clip.contentMask instanceof Uint8Array && clip.contentMask.length === size
+      ? new Uint8Array(clip.contentMask)
+      : null;
     let indices = clip.indices instanceof Int16Array && clip.indices.length === size
       ? new Int16Array(clip.indices)
       : new Int16Array(size);
@@ -32542,6 +33237,7 @@
       width,
       height,
       mask,
+      contentMask: contentMask || buildSelectionMoveContentMask(mask, { indices, direct }),
       indices,
       direct,
       imageData,
@@ -32556,6 +33252,7 @@
       transformFlipHorizontal: false,
       transformFlipVertical: false,
       transformedEntryCache: null,
+      transformedContentEntryCache: null,
       transformedPreviewRenderCache: null,
     };
   }
@@ -32793,7 +33490,7 @@
       return false;
     }
     if (hasPendingSelectionMove()) {
-      const finalized = confirmPendingSelectionMove();
+      const finalized = confirmPendingSelectionMove({ allowOutOfBoundsClip: true });
       if (!finalized) {
         updateCanvasControlButtons();
         return false;
@@ -32923,7 +33620,8 @@
   }
 
   function clearSelectionSourcePixels(moveState) {
-    const { layer, bounds, mask, width, height } = moveState;
+    const { layer, bounds, width, height } = moveState;
+    const mask = getSelectionMoveContentMask(moveState) || moveState.mask;
     if (!layer) {
       return;
     }
@@ -32994,7 +33692,7 @@
     updateCanvasControlButtons();
   }
 
-  function finalizeSelectionMove() {
+  function finalizeSelectionMove(options = {}) {
     const moveState = pointerState.selectionMove || state.pendingPasteMoveState;
     if (!moveState) {
       pointerState.tool = state.tool;
@@ -33009,7 +33707,10 @@
 
     const { offset } = moveState;
     const applySelection = moveState.applySelectionOnFinalize !== false;
-    const result = placeSelectionPixels(moveState, offset.x, offset.y, { requireFullyInBounds: true });
+    const allowOutOfBoundsClip = Boolean(options && options.allowOutOfBoundsClip);
+    const result = placeSelectionPixels(moveState, offset.x, offset.y, {
+      requireFullyInBounds: !allowOutOfBoundsClip,
+    });
 
     if (result.blockedByBounds) {
       const hover = getVirtualCursorCellPosition() || pointerState.current || null;
@@ -33075,13 +33776,13 @@
     return null;
   }
 
-  function confirmPendingSelectionMove() {
+  function confirmPendingSelectionMove(options = {}) {
     const moveState = getPendingSelectionMoveState();
     if (!moveState) {
       return false;
     }
     pointerState.selectionMove = moveState;
-    const finalized = finalizeSelectionMove();
+    const finalized = finalizeSelectionMove(options);
     if (finalized) {
       clearSelection();
     }
@@ -33112,11 +33813,17 @@
 
   function placeSelectionPixels(moveState, offsetX, offsetY, { requireFullyInBounds = false } = {}) {
     const { layer, bounds, indices, direct } = moveState;
-    const transformed = buildSelectionMoveTransformedEntries(moveState);
-    const entries = Array.isArray(transformed.entries) ? transformed.entries : [];
+    const transformedSelection = buildSelectionMoveTransformedEntries(moveState);
+    const transformedContent = buildSelectionMoveTransformedEntries(moveState, {
+      sourceMask: getSelectionMoveContentMask(moveState),
+      cacheProperty: 'transformedContentEntryCache',
+      cacheScope: 'content',
+    });
+    const selectionEntries = Array.isArray(transformedSelection.entries) ? transformedSelection.entries : [];
+    const contentEntries = Array.isArray(transformedContent.entries) ? transformedContent.entries : [];
     if (requireFullyInBounds) {
-      for (let i = 0; i < entries.length; i += 1) {
-        const entry = entries[i];
+      for (let i = 0; i < selectionEntries.length; i += 1) {
+        const entry = selectionEntries[i];
         const targetX = (Number(bounds?.x0) || 0) + (Number(entry?.x) || 0) + offsetX;
         const targetY = (Number(bounds?.y0) || 0) + (Number(entry?.y) || 0) + offsetY;
         if (targetX < 0 || targetY < 0 || targetX >= state.width || targetY >= state.height) {
@@ -33135,10 +33842,25 @@
     let placed = false;
     let clippedCount = 0;
 
+    for (let i = 0; i < selectionEntries.length; i += 1) {
+      const entry = selectionEntries[i];
+      const targetX = (Number(bounds?.x0) || 0) + (Number(entry?.x) || 0) + offsetX;
+      const targetY = (Number(bounds?.y0) || 0) + (Number(entry?.y) || 0) + offsetY;
+      if (targetX < 0 || targetY < 0 || targetX >= state.width || targetY >= state.height) {
+        continue;
+      }
+      const targetIndex = (targetY * state.width) + targetX;
+      newMask[targetIndex] = 1;
+      if (targetX < newBounds.x0) newBounds.x0 = targetX;
+      if (targetY < newBounds.y0) newBounds.y0 = targetY;
+      if (targetX > newBounds.x1) newBounds.x1 = targetX;
+      if (targetY > newBounds.y1) newBounds.y1 = targetY;
+    }
+
     const targetDirect = direct ? ensureLayerDirect(layer) : null;
 
-    for (let i = 0; i < entries.length; i += 1) {
-      const entry = entries[i];
+    for (let i = 0; i < contentEntries.length; i += 1) {
+      const entry = contentEntries[i];
       const sourceIndex = Number(entry?.sourceIndex);
       if (!Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= indices.length) {
         continue;
@@ -33159,17 +33881,12 @@
         targetDirect[targetBase + 2] = direct[sourceBase + 2];
         targetDirect[targetBase + 3] = direct[sourceBase + 3];
       }
-      newMask[targetIndex] = 1;
       if (!placed) {
         placed = true;
       }
-      if (targetX < newBounds.x0) newBounds.x0 = targetX;
-      if (targetY < newBounds.y0) newBounds.y0 = targetY;
-      if (targetX > newBounds.x1) newBounds.x1 = targetX;
-      if (targetY > newBounds.y1) newBounds.y1 = targetY;
     }
 
-    if (!placed) {
+    if (newBounds.x0 > newBounds.x1 || newBounds.y0 > newBounds.y1) {
       return {
         placed: false,
         mask: null,
@@ -33524,6 +34241,7 @@
       return;
     }
     moveState.transformedEntryCache = null;
+    moveState.transformedContentEntryCache = null;
     moveState.transformedPreviewRenderCache = null;
   }
 
@@ -34798,8 +35516,29 @@
     preview.end = { x: bounds.x1, y: bounds.y1 };
   }
 
+  function markSelectionMaskPixel(mask, bounds, x, y) {
+    const idx = y * state.width + x;
+    mask[idx] = 1;
+    if (x < bounds.x0) bounds.x0 = x;
+    if (y < bounds.y0) bounds.y0 = y;
+    if (x > bounds.x1) bounds.x1 = x;
+    if (y > bounds.y1) bounds.y1 = y;
+  }
+
+  function shouldIncludeShapeSelectionPixel(layer, x, y, selectionShapeMode = state.selectionShapeMode) {
+    const normalizedMode = normalizeSelectionShapeMode(selectionShapeMode, state.selectionShapeMode);
+    if (normalizedMode === SELECTION_SHAPE_MODE_SHAPE) {
+      return true;
+    }
+    return layerHasDrawablePixel(layer, x, y);
+  }
+
   function createSelectionByGridRect(startCell, endCell, options = {}) {
-    const { append = false, cellSize = SELECT_RECT_GRID_CELL_SIZE } = options || {};
+    const {
+      append = false,
+      cellSize = SELECT_RECT_GRID_CELL_SIZE,
+      selectionShapeMode = state.selectionShapeMode,
+    } = options || {};
     const boundsRect = getSelectionGridRectPixelBounds(startCell, endCell, cellSize);
     if (!boundsRect) {
       if (!append) {
@@ -34817,13 +35556,8 @@
     const { mask, bounds, hasBaseSelection } = createSelectionAccumulator({ append });
     for (let y = boundsRect.y0; y <= boundsRect.y1; y += 1) {
       for (let x = boundsRect.x0; x <= boundsRect.x1; x += 1) {
-        if (!layerHasDrawablePixel(layer, x, y)) continue;
-        const idx = y * state.width + x;
-        mask[idx] = 1;
-        if (x < bounds.x0) bounds.x0 = x;
-        if (y < bounds.y0) bounds.y0 = y;
-        if (x > bounds.x1) bounds.x1 = x;
-        if (y > bounds.y1) bounds.y1 = y;
+        if (!shouldIncludeShapeSelectionPixel(layer, x, y, selectionShapeMode)) continue;
+        markSelectionMaskPixel(mask, bounds, x, y);
       }
     }
 
@@ -34842,7 +35576,7 @@
   }
 
   function createSelectionRect(start, end, options = {}) {
-    const { append = false } = options || {};
+    const { append = false, selectionShapeMode = state.selectionShapeMode } = options || {};
     const layer = getActiveLayer();
     if (!layer) {
       if (!append) {
@@ -34858,13 +35592,8 @@
 
     for (let y = y0; y <= y1; y += 1) {
       for (let x = x0; x <= x1; x += 1) {
-        if (!layerHasDrawablePixel(layer, x, y)) continue;
-        const idx = y * state.width + x;
-        mask[idx] = 1;
-        if (x < bounds.x0) bounds.x0 = x;
-        if (y < bounds.y0) bounds.y0 = y;
-        if (x > bounds.x1) bounds.x1 = x;
-        if (y > bounds.y1) bounds.y1 = y;
+        if (!shouldIncludeShapeSelectionPixel(layer, x, y, selectionShapeMode)) continue;
+        markSelectionMaskPixel(mask, bounds, x, y);
       }
     }
 
@@ -34884,7 +35613,7 @@
 
   function createSelectionLasso(points, options = {}) {
     if (!points || points.length < 3) return;
-    const { append = false } = options || {};
+    const { append = false, selectionShapeMode = state.selectionShapeMode } = options || {};
     const layer = getActiveLayer();
     if (!layer) {
       if (!append) {
@@ -34913,13 +35642,8 @@
     for (let y = searchBounds.y0; y <= searchBounds.y1; y += 1) {
       for (let x = searchBounds.x0; x <= searchBounds.x1; x += 1) {
         if (!pointInPolygon({ x, y }, points)) continue;
-        if (!layerHasDrawablePixel(layer, x, y)) continue;
-        const idx = y * state.width + x;
-        mask[idx] = 1;
-        if (x < bounds.x0) bounds.x0 = x;
-        if (y < bounds.y0) bounds.y0 = y;
-        if (x > bounds.x1) bounds.x1 = x;
-        if (y > bounds.y1) bounds.y1 = y;
+        if (!shouldIncludeShapeSelectionPixel(layer, x, y, selectionShapeMode)) continue;
+        markSelectionMaskPixel(mask, bounds, x, y);
       }
     }
 
@@ -35548,6 +36272,12 @@
       const isMiddleMousePan = !isTouch && event.button === 1;
       const isPrimaryButton = !isTouch && (event.button === 0 || event.button === undefined);
       const wantsPan = !isTouch && (isMiddleMousePan || ((state.tool === 'pan' || keyboardState.spacePanActive) && isPrimaryButton));
+      const shouldClearSelection = (isTouch || isPrimaryButton)
+        && !wantsPan
+        && (selectionMaskHasPixels(state.selectionMask) || Boolean(getPendingSelectionMoveState()));
+      if (shouldClearSelection) {
+        clearSelection();
+      }
       if (wantsPan) {
         event.preventDefault();
         if (pointerState.active) {
@@ -37220,11 +37950,12 @@
         x: Math.round(Number(state.pan?.x) || 0),
         y: Math.round(Number(state.pan?.y) || 0),
       },
-      tool: state.tool,
-      brushSize: clamp(Math.round(state.brushSize || 1), 1, 32),
-      outlineSize: clamp(Math.round(state.outlineSize || 1), 1, 8),
-      selectSameMode: normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED),
-      brushShape: normalizeBrushShape(state.brushShape, BRUSH_SHAPE_SQUARE),
+	      tool: state.tool,
+	      brushSize: clamp(Math.round(state.brushSize || 1), 1, 32),
+	      outlineSize: clamp(Math.round(state.outlineSize || 1), 1, 8),
+	      selectSameMode: normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED),
+	      selectionShapeMode: normalizeSelectionShapeMode(state.selectionShapeMode, SELECTION_SHAPE_MODE_CONTENT),
+	      brushShape: normalizeBrushShape(state.brushShape, BRUSH_SHAPE_SQUARE),
       customBrush: serializeCustomBrushPayload(state.customBrush),
       showGrid: Boolean(state.showGrid),
         gridScreenStep: clamp(Math.round(state.gridScreenStep || 16), 1, 256),
@@ -37322,9 +38053,12 @@
     if (Number.isFinite(payload.outlineSize)) {
       state.outlineSize = clamp(Math.round(payload.outlineSize), 1, 8);
     }
-    if (typeof payload.selectSameMode === 'string') {
-      state.selectSameMode = normalizeSelectSameMode(payload.selectSameMode, state.selectSameMode);
-    }
+	    if (typeof payload.selectSameMode === 'string') {
+	      state.selectSameMode = normalizeSelectSameMode(payload.selectSameMode, state.selectSameMode);
+	    }
+	    if (typeof payload.selectionShapeMode === 'string') {
+	      state.selectionShapeMode = normalizeSelectionShapeMode(payload.selectionShapeMode, state.selectionShapeMode);
+	    }
     if (Object.prototype.hasOwnProperty.call(payload, 'customBrush')) {
       state.customBrush = deserializeCustomBrushPayload(payload.customBrush);
     }
