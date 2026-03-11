@@ -675,6 +675,7 @@ body.is-mobile-layout.is-unified-left-tools-color:not(.is-unified-left-color-foc
 
 .rail--right[data-compact="true"] #panelFrames,
 .rail--right[data-compact="true"] #panelSettings,
+.rail--right[data-compact="true"] #panelExtensions,
 .rail--right[data-compact="true"] #panelHelp,
 .rail--right[data-compact="true"] #panelFile {
   padding: 10px 8px;
@@ -683,6 +684,7 @@ body.is-mobile-layout.is-unified-left-tools-color:not(.is-unified-left-color-foc
 /* Right rail spacing must stay identical regardless of width/compact state. */
 .rail--right #panelFrames,
 .rail--right #panelSettings,
+.rail--right #panelExtensions,
 .rail--right #panelHelp,
 .rail--right #panelFile {
   gap: 8px;
@@ -1062,7 +1064,8 @@ body.is-unified-left-tools-color:not(.is-mobile-layout) .rail--left[data-compact
   box-shadow: none;
 }
 
-.tool-group-button.is-active {
+.tool-group-button.is-active,
+.tool-group-button--action[aria-pressed="true"] {
   border-style: solid;
   border-width: 2px;
   background: linear-gradient(180deg, rgba(34, 67, 95, 0.98), rgba(18, 40, 60, 0.98));
@@ -1071,7 +1074,8 @@ body.is-unified-left-tools-color:not(.is-mobile-layout) .rail--left[data-compact
   box-shadow: none;
 }
 
-.tool-group-button.is-active::after {
+.tool-group-button.is-active::after,
+.tool-group-button--action[aria-pressed="true"]::after {
   background: rgba(190, 247, 255, 0.98);
 }
 
