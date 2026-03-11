@@ -4343,6 +4343,7 @@ body.is-mobile-layout .mobile-draw-help {
 
 .timeline-cell {
   display: flex;
+  box-sizing: border-box;
   align-items: center;
   justify-content: center;
   gap: 4px;
@@ -4351,6 +4352,31 @@ body.is-mobile-layout .mobile-draw-help {
   min-height: var(--timeline-cell-size);
   max-width: var(--timeline-cell-size);
   max-height: var(--timeline-cell-size);
+  border: 0 solid transparent;
+}
+
+.timeline-cell.is-structure-selected {
+  --timeline-structure-selection-color: rgba(var(--ui-rgb-focus), 0.9);
+}
+
+.timeline-cell.is-structure-selection-top {
+  border-top-width: 1px;
+  border-top-color: var(--timeline-structure-selection-color);
+}
+
+.timeline-cell.is-structure-selection-right {
+  border-right-width: 1px;
+  border-right-color: var(--timeline-structure-selection-color);
+}
+
+.timeline-cell.is-structure-selection-bottom {
+  border-bottom-width: 1px;
+  border-bottom-color: var(--timeline-structure-selection-color);
+}
+
+.timeline-cell.is-structure-selection-left {
+  border-left-width: 1px;
+  border-left-color: var(--timeline-structure-selection-color);
 }
 
 .timeline-cell--corner,
@@ -4394,7 +4420,7 @@ body.is-mobile-layout .mobile-draw-help {
 }
 
 .timeline-cell--layer.is-multi-selected-layer {
-  box-shadow: inset 0 0 0 1px rgba(var(--ui-rgb-focus), 0.68);
+  box-shadow: none;
 }
 
 .timeline-cell--layer.is-placeholder {
@@ -4472,7 +4498,7 @@ body.is-mobile-layout .mobile-draw-help {
 }
 
 .timeline-cell--frame-header.is-multi-selected-frame {
-  box-shadow: inset 0 0 0 1px rgba(var(--ui-rgb-focus), 0.7);
+  box-shadow: none;
 }
 
 .timeline-frame-button {
