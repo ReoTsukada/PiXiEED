@@ -177,6 +177,10 @@
 <img alt="" class="tab-icon" src="assets/icons/menu-settings.svg"/>
 <span class="sr-only">設定</span>
 </button>
+<button aria-controls="mobilePanelExtensions" aria-label="拡張" aria-selected="false" class="mobile-tab" data-mobile-tab="extensions" id="mobileTabExtensions" role="tab" tabindex="-1" type="button">
+<img alt="" class="tab-icon" src="assets/icons/EXicon.png"/>
+<span class="sr-only">拡張</span>
+</button>
 <button aria-controls="mobilePanelHelp" aria-hidden="true" aria-label="使い方ヘルプ" aria-selected="false" class="mobile-tab" data-mobile-tab="help" hidden="" id="mobileTabHelp" role="tab" tabindex="-1" type="button">
 <img alt="" class="tab-icon" src="assets/icons/menu-help.svg"/>
 <span class="sr-only">使い方ヘルプ</span>
@@ -188,14 +192,6 @@
 <button aria-controls="mobilePanelMulti" aria-label="共有モード" aria-selected="false" class="mobile-tab" data-mobile-tab="multi" id="mobileTabMulti" role="tab" tabindex="-1" type="button">
 <img alt="" class="tab-icon" src="assets/icons/maltimode.svg"/>
 <span class="sr-only">共有モード</span>
-</button>
-<button aria-label="対称" class="mobile-tab mobile-tab--action" data-ui-action="mirrorPopup" title="対称" type="button">
-<img alt="" class="tab-icon" src="assets/icons/tasyou1.svg"/>
-<span class="sr-only">対称</span>
-</button>
-<button aria-label="仮想カーソル" class="mobile-tab mobile-tab--action" data-ui-action="virtualCursorToggle" title="仮想カーソル" type="button">
-<img alt="" class="tab-icon" src="assets/icons/tool-cursor.png"/>
-<span class="sr-only">仮想カーソル</span>
 </button>
 <button aria-label="カメラ" class="mobile-tab mobile-tab--action" data-external-tool="pixieelens" data-ui-action="openLensCamera" id="mobileActionLensCamera" title="カメラ" type="button">
 <img alt="" class="tab-icon" src="assets/icons/pixieelensicon_frame_01.png"/>
@@ -274,7 +270,7 @@
 </div>
 </div>
 </main>
-<aside aria-label="フレーム、レイヤー、設定、ファイル、共有" class="rail rail--right" data-collapsed="false" data-compact="true" id="rightRail">
+<aside aria-label="フレーム、レイヤー、設定、拡張、ファイル、共有" class="rail rail--right" data-collapsed="false" data-compact="true" id="rightRail">
 <div aria-label="右パネル切り替え" class="rail-tabs" id="rightRailTabs" role="tablist">
 <button aria-controls="panelFrames" aria-label="フレームとレイヤー" aria-selected="true" class="rail-tab is-active" data-right-tab="frames" role="tab" title="フレームとレイヤー" type="button">
 <img alt="" class="tab-icon" src="assets/icons/menu-frame.png"/>
@@ -283,6 +279,10 @@
 <button aria-controls="panelSettings" aria-label="設定" aria-selected="false" class="rail-tab" data-right-tab="settings" role="tab" tabindex="-1" title="設定" type="button">
 <img alt="" class="tab-icon" src="assets/icons/menu-settings.svg"/>
 <span class="sr-only">設定</span>
+</button>
+<button aria-controls="panelExtensions" aria-label="拡張" aria-selected="false" class="rail-tab" data-right-tab="extensions" role="tab" tabindex="-1" title="拡張" type="button">
+<img alt="" class="tab-icon" src="assets/icons/EXicon.png"/>
+<span class="sr-only">拡張</span>
 </button>
 <button aria-controls="panelHelp" aria-hidden="true" aria-label="使い方ヘルプ" aria-selected="false" class="rail-tab" data-right-tab="help" hidden="" role="tab" tabindex="-1" title="使い方ヘルプ" type="button">
 <img alt="" class="tab-icon" src="assets/icons/menu-help.svg"/>
@@ -295,14 +295,6 @@
 <button aria-controls="panelMulti" aria-label="共有モード" aria-selected="false" class="rail-tab" data-right-tab="multi" role="tab" tabindex="-1" title="共有モード" type="button">
 <img alt="" class="tab-icon" src="assets/icons/maltimode.svg"/>
 <span class="sr-only">共有モード</span>
-</button>
-<button aria-label="対称" class="rail-tab rail-tab--action" data-ui-action="mirrorPopup" title="対称" type="button">
-<img alt="" class="tab-icon" src="assets/icons/tasyou1.svg"/>
-<span class="sr-only">対称</span>
-</button>
-<button aria-label="仮想カーソル" class="rail-tab rail-tab--action" data-ui-action="virtualCursorToggle" title="仮想カーソル" type="button">
-<img alt="" class="tab-icon" src="assets/icons/tool-cursor.png"/>
-<span class="sr-only">仮想カーソル</span>
 </button>
 <button aria-label="カメラ" class="rail-tab rail-tab--action" data-external-tool="pixieelens" data-ui-action="openLensCamera" title="カメラ" type="button">
 <img alt="" class="tab-icon" src="assets/icons/pixieelensicon_frame_01.png"/>
@@ -349,6 +341,7 @@
 <div aria-labelledby="mobileTabColor" class="mobile-panel" hidden="" id="mobilePanelColor" role="tabpanel"></div>
 <div aria-labelledby="mobileTabFrames" class="mobile-panel" hidden="" id="mobilePanelFrames" role="tabpanel"></div>
 <div aria-labelledby="mobileTabSettings" class="mobile-panel" hidden="" id="mobilePanelSettings" role="tabpanel"></div>
+<div aria-labelledby="mobileTabExtensions" class="mobile-panel" hidden="" id="mobilePanelExtensions" role="tabpanel"></div>
 <div aria-labelledby="mobileTabHelp" class="mobile-panel" hidden="" id="mobilePanelHelp" role="tabpanel"></div>
 <div aria-labelledby="mobileTabFile" class="mobile-panel" hidden="" id="mobilePanelFile" role="tabpanel"></div>
 <div aria-labelledby="mobileTabMulti" class="mobile-panel" hidden="" id="mobilePanelMulti" role="tabpanel"></div>
@@ -380,6 +373,14 @@
 <button aria-selected="false" class="tool-group-button" data-tool-group="fill" role="tab" title="塗りつぶし" type="button">
 <img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tool-fill.png" width="20"/>
 <span class="tool-group-label">塗りつぶし</span>
+</button>
+<button aria-label="対称" aria-pressed="false" class="tool-group-button tool-group-button--action" data-ui-action="mirrorPopup" title="対称" type="button">
+<img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tasyou1.svg" width="20"/>
+<span class="tool-group-label">対称</span>
+</button>
+<button aria-label="仮想カーソル" aria-pressed="false" class="tool-group-button tool-group-button--action" data-ui-action="virtualCursorToggle" title="仮想カーソル" type="button">
+<img alt="" aria-hidden="true" class="tool-group-icon" height="20" src="assets/icons/tool-cursor.png" width="20"/>
+<span class="tool-group-label">仮想カーソル</span>
 </button>
 </div>
 <div aria-label="描画ツール" class="tool-grid" id="toolGrid" role="toolbar">
@@ -662,6 +663,11 @@
 </div>
 </div>
 </div>
+</div>
+</section>
+<section class="panel-section" data-section="extensions" id="panelExtensions">
+<div class="panel-section__body">
+<div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 </div>
 </section>
 <section class="panel-section" data-section="file" id="panelFile">
@@ -1560,7 +1566,7 @@
       };
       const sideSections = {
         left: ['panelTools', 'panelColor'],
-        right: ['panelFrames', 'panelSettings', 'panelHelp', 'panelFile', 'panelMulti'],
+        right: ['panelFrames', 'panelSettings', 'panelExtensions', 'panelHelp', 'panelFile', 'panelMulti'],
       };
       if (!(ads.left instanceof HTMLElement) && !(ads.right instanceof HTMLElement)) return;
 
