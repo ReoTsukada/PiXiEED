@@ -897,12 +897,11 @@
   const EXPORT_INTERSTITIAL_COOLDOWN_MS = 45 * 1000;
   const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
     Object.freeze({
-      id: '2026-03-10-byogpt-personal-view-spritemap',
-      at: '2026-03-10T22:40:00+09:00',
-      title: 'BYOGPT・個人表示設定・SpriteMAP出力を追加',
+      id: '2026-03-11-local-extension-personal-view-spritemap',
+      at: '2026-03-11T10:30:00+09:00',
+      title: 'ローカル拡張整理・個人表示設定・SpriteMAP出力',
       details: Object.freeze([
-        '設定パネルのローカル拡張（外付け）に BYOGPT 接続を追加。自分の OpenAI 互換エンドポイントやプロキシを使って拡張コード生成と `api.ai.request(...)` が使えるよう対応。',
-        'BYOGPT セクションは OFF の時に入力欄ごと非表示に整理し、OpenAI APIキー取得ボタンも追加。スマホ/PCで崩れにくいレイアウトへ調整。',
+        '設定パネルのローカル拡張（外付け）から GPT連携を撤去。旧AI設定やローカル保存されていたAPIキーも読み込み時に削除するよう整理。',
         '共有中でも、視点・選択・色・ツール・背景・グリッド・ミラー・オニオンスキンは各ユーザーの端末ごとに保持されるよう変更。',
         'レイヤー表示 ON/OFF とレイヤー不透明度は、共有データではなく各自の表示設定として保存されるよう変更。見え方だけを変えても他ユーザーや書き出し結果には影響しないよう整理。',
         '共有パレットは接続直後の初回同期だけマスター内容を初期値として取り込み、その後の色選択や調整は各ユーザーのローカル状態として維持するよう変更。',
@@ -30994,7 +30993,7 @@
     const pendingMove = state.pendingPasteMoveState;
     const layer = getActiveLayer();
     let moveState = null;
-    if (pendingMove && pendingMove.hasCleared && reuseOffset) {
+    if (pendingMove && reuseOffset) {
       moveState = pendingMove;
       state.pendingPasteMoveState = null;
     } else {
@@ -31060,7 +31059,7 @@
     const layer = getActiveLayer();
 
     let moveState = null;
-    if (pendingMove && pendingMove.hasCleared && reuseOffset) {
+    if (pendingMove && reuseOffset) {
       moveState = pendingMove;
       state.pendingPasteMoveState = null;
     } else {
@@ -31720,6 +31719,95 @@
     return moveState;
   }
 
+  function snapshotPendingSelectionMoveForClipboard(moveState) {
+    if (!moveState || !moveState.hasCleared) {
+      return null;
+    }
+    const transformed = buildSelectionMoveTransformedEntries(moveState);
+    const entries = Array.isArray(transformed.entries) ? transformed.entries : [];
+    const transformedBounds = transformed.bounds;
+    const width = Math.max(0, Math.floor(Number(transformed.width) || 0));
+    const height = Math.max(0, Math.floor(Number(transformed.height) || 0));
+    const size = width * height;
+    if (!entries.length || !transformedBounds || width <= 0 || height <= 0 || !(transformed.mask instanceof Uint8Array) || transformed.mask.length !== size) {
+      return null;
+    }
+
+    const indices = new Int16Array(size);
+    indices.fill(-1);
+    const direct = new Uint8ClampedArray(size * 4);
+    const imageData = createBlankImageData(width, height);
+    const outputData = imageData?.data instanceof Uint8ClampedArray ? imageData.data : null;
+    const sourceIndices = moveState.indices instanceof Int16Array ? moveState.indices : null;
+    const sourceDirect = moveState.direct instanceof Uint8ClampedArray ? moveState.direct : null;
+    const sourceImageData = moveState.imageData?.data instanceof Uint8ClampedArray ? moveState.imageData.data : null;
+
+    for (let i = 0; i < entries.length; i += 1) {
+      const entry = entries[i];
+      const sourceIndex = Number(entry?.sourceIndex);
+      const outX = (Number(entry?.x) || 0) - transformedBounds.x0;
+      const outY = (Number(entry?.y) || 0) - transformedBounds.y0;
+      if (
+        !Number.isInteger(sourceIndex)
+        || sourceIndex < 0
+        || outX < 0
+        || outY < 0
+        || outX >= width
+        || outY >= height
+      ) {
+        continue;
+      }
+      const localIndex = (outY * width) + outX;
+      const localBase = localIndex * 4;
+      const sourceBase = sourceIndex * 4;
+      if (sourceIndices && sourceIndex < sourceIndices.length) {
+        indices[localIndex] = sourceIndices[sourceIndex];
+      }
+      if (sourceDirect && sourceBase + 3 < sourceDirect.length) {
+        direct[localBase] = sourceDirect[sourceBase];
+        direct[localBase + 1] = sourceDirect[sourceBase + 1];
+        direct[localBase + 2] = sourceDirect[sourceBase + 2];
+        direct[localBase + 3] = sourceDirect[sourceBase + 3];
+      }
+      if (outputData) {
+        if (sourceImageData && sourceBase + 3 < sourceImageData.length) {
+          outputData[localBase] = sourceImageData[sourceBase];
+          outputData[localBase + 1] = sourceImageData[sourceBase + 1];
+          outputData[localBase + 2] = sourceImageData[sourceBase + 2];
+          outputData[localBase + 3] = sourceImageData[sourceBase + 3];
+        } else if (indices[localIndex] >= 0 && state.palette[indices[localIndex]]) {
+          const color = state.palette[indices[localIndex]];
+          outputData[localBase] = color.r;
+          outputData[localBase + 1] = color.g;
+          outputData[localBase + 2] = color.b;
+          outputData[localBase + 3] = color.a;
+        } else if (sourceDirect && sourceBase + 3 < sourceDirect.length) {
+          outputData[localBase] = sourceDirect[sourceBase];
+          outputData[localBase + 1] = sourceDirect[sourceBase + 1];
+          outputData[localBase + 2] = sourceDirect[sourceBase + 2];
+          outputData[localBase + 3] = sourceDirect[sourceBase + 3];
+        }
+      }
+    }
+
+    const visualBounds = getSelectionMoveVisualBounds(moveState) || {
+      x0: (Number(moveState.bounds?.x0) || 0) + (Number(moveState.offset?.x) || 0) + transformedBounds.x0,
+      y0: (Number(moveState.bounds?.y0) || 0) + (Number(moveState.offset?.y) || 0) + transformedBounds.y0,
+      x1: (Number(moveState.bounds?.x0) || 0) + (Number(moveState.offset?.x) || 0) + transformedBounds.x1,
+      y1: (Number(moveState.bounds?.y0) || 0) + (Number(moveState.offset?.y) || 0) + transformedBounds.y1,
+    };
+
+    return {
+      width,
+      height,
+      mask: new Uint8Array(transformed.mask),
+      indices,
+      direct,
+      bounds: visualBounds,
+      imageData,
+    };
+  }
+
   function cloneImageData(imageData) {
     if (!imageData) {
       return null;
@@ -32369,13 +32457,16 @@
   }
 
   function copySelection() {
-    const moveState = snapshotSelectionForClipboard();
+    const pendingClipboardMoveState = snapshotPendingSelectionMoveForClipboard(getPendingSelectionMoveState());
+    const moveState = pendingClipboardMoveState || snapshotSelectionForClipboard();
     if (!moveState) {
       updateCanvasControlButtons();
       return false;
     }
     storeSelectionInClipboard(moveState);
-    state.pendingPasteMoveState = null;
+    if (!pendingClipboardMoveState) {
+      state.pendingPasteMoveState = null;
+    }
     updateCanvasControlButtons();
     return true;
   }
@@ -32627,6 +32718,33 @@
       updateCanvasControlButtons();
       return false;
     }
+    const pendingMoveState = getPendingSelectionMoveState();
+    if (pendingMoveState) {
+      const clipboardMoveState = snapshotPendingSelectionMoveForClipboard(pendingMoveState);
+      if (!clipboardMoveState) {
+        updateCanvasControlButtons();
+        return false;
+      }
+      pointerState.selectionMove = pendingMoveState;
+      const finalized = finalizeSelectionMove();
+      if (!finalized) {
+        updateCanvasControlButtons();
+        return false;
+      }
+      const finalizedMoveState = snapshotSelectionForClipboard();
+      if (!finalizedMoveState) {
+        updateCanvasControlButtons();
+        return false;
+      }
+      storeSelectionInClipboard(clipboardMoveState);
+      beginHistory('selectionCut');
+      clearSelectionSourcePixels(finalizedMoveState);
+      commitHistory();
+      clearSelection();
+      requestOverlayRender();
+      updateCanvasControlButtons();
+      return true;
+    }
     const moveState = snapshotSelectionForClipboard();
     if (!moveState) {
       updateCanvasControlButtons();
@@ -32651,6 +32769,13 @@
     if (pointerState.active) {
       updateCanvasControlButtons();
       return false;
+    }
+    if (hasPendingSelectionMove()) {
+      const finalized = confirmPendingSelectionMove();
+      if (!finalized) {
+        updateCanvasControlButtons();
+        return false;
+      }
     }
     const clip = internalClipboard.selection;
     if (!clip) {
@@ -32931,7 +33056,7 @@
   function confirmPendingSelectionMove() {
     const moveState = getPendingSelectionMoveState();
     if (!moveState) {
-      return;
+      return false;
     }
     pointerState.selectionMove = moveState;
     const finalized = finalizeSelectionMove();
@@ -32939,6 +33064,7 @@
       clearSelection();
     }
     updateCanvasControlButtons();
+    return finalized;
   }
 
   function cancelPendingSelectionMove() {
