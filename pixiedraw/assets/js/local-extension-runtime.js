@@ -5,7 +5,8 @@
 
   const STORAGE_KEY_ENABLED = 'pixieedraw:local-extension:enabled';
   const STORAGE_KEY_CODE = 'pixieedraw:local-extension:code';
-  const STORAGE_KEY_OPEN = 'pixieedraw:local-extension:open';
+  const TEMPLATE_SCRIPT_FILENAME = 'pixieedraw-tool-template.js';
+  const SCRIPT_WATCH_INTERVAL_MS = 1800;
   const LOCAL_TOOL_MAX_COUNT = 24;
   const LOCAL_PAINT_BATCH_MAX = 32768;
   const RETIRED_AI_STORAGE_KEYS = Object.freeze([
@@ -37,6 +38,12 @@
     localInputLayer: null,
     localOverlayObserver: null,
     localPaintMap: new Map(),
+    builtInToolObserver: null,
+    scriptFileHandle: null,
+    scriptFileName: '',
+    scriptFileLastModified: 0,
+    scriptFileWatchTimer: null,
+    scriptFileReadInFlight: false,
   };
 
   function isEnglishUi() {
@@ -79,6 +86,216 @@
       '  }',
       '});',
     ].join('\n');
+  }
+
+  function canUseScriptFileSystem() {
+    return typeof window.showOpenFilePicker === 'function' && typeof window.showSaveFilePicker === 'function';
+  }
+
+  function applyImportedCode(nextCode, { autoEnable = true } = {}) {
+    const ui = runtimeState.ui;
+    const code = String(nextCode || '');
+    runtimeState.code = code;
+    writeStorage(STORAGE_KEY_CODE, code);
+    if (ui?.code instanceof HTMLTextAreaElement) {
+      ui.code.value = code;
+    }
+    if (autoEnable) {
+      if (!runtimeState.enabled) {
+        setEnabled(true, { persist: true, restart: true });
+      } else {
+        reloadRuntime();
+      }
+    }
+  }
+
+  function clearScriptWatchTimer() {
+    if (runtimeState.scriptFileWatchTimer !== null) {
+      window.clearInterval(runtimeState.scriptFileWatchTimer);
+      runtimeState.scriptFileWatchTimer = null;
+    }
+  }
+
+  function getBoundScriptLabel() {
+    const name = sanitizeText(runtimeState.scriptFileName, 180);
+    return name || localizeText('未選択', 'Not selected');
+  }
+
+  async function readBoundScriptFile({ apply = true, silent = false, ignoreTimestamp = false, autoEnable = runtimeState.enabled } = {}) {
+    const handle = runtimeState.scriptFileHandle;
+    if (!handle || typeof handle.getFile !== 'function' || runtimeState.scriptFileReadInFlight) {
+      return false;
+    }
+    runtimeState.scriptFileReadInFlight = true;
+    try {
+      const file = await handle.getFile();
+      if (!(file instanceof File)) {
+        if (!silent) {
+          setStatus(localizeText('スクリプトファイルを読めませんでした', 'Could not read the script file'), 'error');
+        }
+        return false;
+      }
+      runtimeState.scriptFileName = file.name || runtimeState.scriptFileName || '';
+      if (!ignoreTimestamp && runtimeState.scriptFileLastModified && file.lastModified === runtimeState.scriptFileLastModified) {
+        return false;
+      }
+      const text = await file.text();
+      if (!String(text || '').trim()) {
+        if (!silent) {
+          setStatus(localizeText('スクリプトファイルが空です', 'The script file is empty'), 'warn');
+        }
+        return false;
+      }
+      runtimeState.scriptFileLastModified = Number(file.lastModified) || Date.now();
+      if (apply) {
+        applyImportedCode(text, { autoEnable });
+      }
+      if (!silent) {
+        setStatus(
+          localizeText(
+            `スクリプトを再読込して反映しました: ${getBoundScriptLabel()}`,
+            `Reloaded and applied the script: ${getBoundScriptLabel()}`
+          ),
+          'success'
+        );
+      }
+      return true;
+    } catch (error) {
+      if (!silent) {
+        setStatus(localizeText('スクリプトファイルの再読込に失敗しました', 'Failed to reload the script file'), 'error');
+      }
+      return false;
+    } finally {
+      runtimeState.scriptFileReadInFlight = false;
+    }
+  }
+
+  function startWatchingBoundScriptFile() {
+    clearScriptWatchTimer();
+    if (!runtimeState.scriptFileHandle || typeof runtimeState.scriptFileHandle.getFile !== 'function') {
+      return;
+    }
+    runtimeState.scriptFileWatchTimer = window.setInterval(() => {
+      readBoundScriptFile({ apply: true, silent: true, ignoreTimestamp: false, autoEnable: runtimeState.enabled }).catch(() => {});
+    }, SCRIPT_WATCH_INTERVAL_MS);
+  }
+
+  async function bindScriptFileHandle(handle, { readNow = true, autoEnableOnRead = true } = {}) {
+    if (!handle || typeof handle.getFile !== 'function') {
+      return false;
+    }
+    runtimeState.scriptFileHandle = handle;
+    runtimeState.scriptFileName = handle.name || '';
+    runtimeState.scriptFileLastModified = 0;
+    startWatchingBoundScriptFile();
+    if (readNow) {
+      return await readBoundScriptFile({ apply: true, silent: false, ignoreTimestamp: true, autoEnable: autoEnableOnRead });
+    }
+    return true;
+  }
+
+  async function createTemplateScriptFile() {
+    if (!canUseScriptFileSystem()) {
+      setStatus(localizeText('このブラウザではスクリプトファイル作成に対応していません', 'This browser does not support script file creation'), 'warn');
+      return false;
+    }
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: TEMPLATE_SCRIPT_FILENAME,
+        excludeAcceptAllOption: false,
+        types: [
+          {
+            description: 'PiXiEEDraw Script',
+            accept: {
+              'text/javascript': ['.js'],
+              'text/plain': ['.txt'],
+            },
+          },
+        ],
+      });
+      if (!handle || typeof handle.createWritable !== 'function') {
+        return false;
+      }
+      const writable = await handle.createWritable();
+      await writable.write(buildTemplateCode());
+      await writable.close();
+      await bindScriptFileHandle(handle, { readNow: true, autoEnableOnRead: true });
+      setStatus(
+        localizeText(
+          `雛形スクリプトを作成しました: ${getBoundScriptLabel()}`,
+          `Created the template script: ${getBoundScriptLabel()}`
+        ),
+        'success'
+      );
+      return true;
+    } catch (error) {
+      if (error && error.name === 'AbortError') {
+        return false;
+      }
+      setStatus(localizeText('雛形スクリプトの作成に失敗しました', 'Failed to create the template script'), 'error');
+      return false;
+    }
+  }
+
+  async function pickScriptFileHandle() {
+    if (!canUseScriptFileSystem()) {
+      return false;
+    }
+    try {
+      const handles = await window.showOpenFilePicker({
+        multiple: false,
+        excludeAcceptAllOption: false,
+        types: [
+          {
+            description: 'PiXiEEDraw Script',
+            accept: {
+              'text/javascript': ['.js'],
+              'text/plain': ['.txt'],
+            },
+          },
+        ],
+      });
+      const handle = Array.isArray(handles) ? handles[0] : null;
+      if (!handle) {
+        return false;
+      }
+      return await bindScriptFileHandle(handle, { readNow: true, autoEnableOnRead: true });
+    } catch (error) {
+      if (error && error.name === 'AbortError') {
+        return false;
+      }
+      setStatus(localizeText('スクリプトファイルを開けませんでした', 'Could not open the script file'), 'error');
+      return false;
+    }
+  }
+
+  async function importScriptFile(file) {
+    if (!(file instanceof File)) {
+      return false;
+    }
+    const name = String(file.name || '').toLowerCase();
+    if (name && !name.endsWith('.js') && !name.endsWith('.txt')) {
+      setStatus(localizeText('`.js` または `.txt` のスクリプトを読み込んでください', 'Load a `.js` or `.txt` script file'), 'warn');
+      return false;
+    }
+    let text = '';
+    try {
+      text = await file.text();
+    } catch (error) {
+      setStatus(localizeText('スクリプトの読込に失敗しました', 'Failed to read the script file'), 'error');
+      return false;
+    }
+    if (!String(text || '').trim()) {
+      setStatus(localizeText('スクリプトが空です', 'The script file is empty'), 'warn');
+      return false;
+    }
+    applyImportedCode(text, { autoEnable: true });
+    runtimeState.scriptFileHandle = null;
+    runtimeState.scriptFileName = file.name || '';
+    runtimeState.scriptFileLastModified = Number(file.lastModified) || Date.now();
+    clearScriptWatchTimer();
+    setStatus(localizeText('スクリプトを読み込み、自動で反映しました', 'Loaded the script and applied it automatically'), 'success');
+    return true;
   }
 
   const SANDBOX_SRC = String.raw`<!doctype html>
@@ -690,6 +907,18 @@
       .map(tool => ({ id: tool.id, label: tool.label, hint: tool.hint }));
   }
 
+  function getLocalToolToolbarGlyph(label) {
+    const text = sanitizeText(label, 40).trim();
+    if (!text) {
+      return 'LX';
+    }
+    const words = text.split(/\s+/).filter(Boolean);
+    if (words.length >= 2) {
+      return (words[0][0] + words[1][0]).toUpperCase();
+    }
+    return text.replace(/\s+/g, '').slice(0, 2).toUpperCase();
+  }
+
   function dispatchLocalToolChangeEvent() {
     dispatchEventToRuntime('toolchange', {
       activeToolId: runtimeState.activeLocalToolId || '',
@@ -700,21 +929,27 @@
 
   function renderLocalToolButtons() {
     const ui = runtimeState.ui;
-    if (!ui || !(ui.toolList instanceof HTMLElement)) {
-      return;
+    const toolList = ui?.toolList instanceof HTMLElement ? ui.toolList : null;
+    const toolGrid = document.getElementById('toolGrid');
+    if (toolList) {
+      toolList.innerHTML = '';
     }
-    ui.toolList.innerHTML = '';
+    if (toolGrid instanceof HTMLElement) {
+      Array.from(toolGrid.querySelectorAll('.local-ext-toolbar-button')).forEach(button => button.remove());
+    }
     const tools = runtimeState.localToolOrder
       .map(id => runtimeState.localTools.get(id))
       .filter(Boolean);
     if (!tools.length) {
-      const empty = document.createElement('p');
-      empty.className = 'help-text local-ext-panel__tool-empty';
-      empty.textContent = localizeText(
-        '拡張コードから api.registerTool(...) で追加できます。',
-        'Add tools from extension code with api.registerTool(...).'
-      );
-      ui.toolList.appendChild(empty);
+      if (toolList) {
+        const empty = document.createElement('p');
+        empty.className = 'help-text local-ext-panel__tool-empty';
+        empty.textContent = localizeText(
+          '拡張コードから api.registerTool(...) で追加できます。',
+          'Add tools from extension code with api.registerTool(...).'
+        );
+        toolList.appendChild(empty);
+      }
       return;
     }
     const fragment = document.createDocumentFragment();
@@ -730,12 +965,58 @@
       const isActive = runtimeState.activeLocalToolId === tool.id;
       button.classList.toggle('is-active', isActive);
       button.setAttribute('aria-pressed', String(isActive));
+      button.setAttribute(
+        'aria-label',
+        tool.hint
+          ? `${tool.label}: ${tool.hint}`
+          : `${tool.label}: ${localizeText('ローカルツール', 'Local tool')}`
+      );
       button.addEventListener('click', () => {
-        setActiveLocalToolId(tool.id, { notifyRuntime: true });
+        const currentlyActive = runtimeState.activeLocalToolId === tool.id;
+        setActiveLocalToolId(currentlyActive ? '' : tool.id, { notifyRuntime: true });
       });
       fragment.appendChild(button);
     });
-    ui.toolList.appendChild(fragment);
+    if (toolList) {
+      toolList.appendChild(fragment);
+    }
+    if (toolGrid instanceof HTMLElement) {
+      const toolbarFragment = document.createDocumentFragment();
+      tools.forEach(tool => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'tool-button local-ext-toolbar-button';
+        button.dataset.localExtToolId = tool.id;
+        const isActive = runtimeState.activeLocalToolId === tool.id;
+        button.classList.toggle('is-active', isActive);
+        button.setAttribute('aria-pressed', String(isActive));
+        button.title = tool.hint
+          ? `${tool.label} / ${tool.hint}`
+          : `${tool.label} / ${localizeText('ローカルツール', 'Local tool')}`;
+        button.setAttribute(
+          'aria-label',
+          tool.hint
+            ? `${tool.label}: ${tool.hint}`
+            : `${tool.label}: ${localizeText('ローカルツール', 'Local tool')}`
+        );
+
+        const icon = document.createElement('div');
+        icon.className = 'tool-icon local-ext-toolbar-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = getLocalToolToolbarGlyph(tool.label);
+
+        const label = document.createElement('span');
+        label.textContent = tool.label;
+
+        button.append(icon, label);
+        button.addEventListener('click', () => {
+          const currentlyActive = runtimeState.activeLocalToolId === tool.id;
+          setActiveLocalToolId(currentlyActive ? '' : tool.id, { notifyRuntime: true });
+        });
+        toolbarFragment.appendChild(button);
+      });
+      toolGrid.appendChild(toolbarFragment);
+    }
   }
 
   function renderLocalToolMeta() {
@@ -775,6 +1056,49 @@
       });
       dispatchLocalToolChangeEvent();
     }
+  }
+
+  function bindBuiltInToolOverride() {
+    document.addEventListener('click', event => {
+      const target = event.target instanceof Element ? event.target : null;
+      const button = target ? target.closest('.tool-button') : null;
+      if (!(button instanceof HTMLElement) || button.classList.contains('local-ext-toolbar-button')) {
+        return;
+      }
+      if (runtimeState.activeLocalToolId) {
+        setActiveLocalToolId('', { notifyRuntime: true });
+      }
+    }, true);
+
+    const toolGrid = document.getElementById('toolGrid');
+    if (!(toolGrid instanceof HTMLElement) || typeof MutationObserver !== 'function') {
+      return;
+    }
+    if (runtimeState.builtInToolObserver instanceof MutationObserver) {
+      runtimeState.builtInToolObserver.disconnect();
+    }
+    runtimeState.builtInToolObserver = new MutationObserver(mutations => {
+      if (!runtimeState.activeLocalToolId) {
+        return;
+      }
+      const builtInToolActivated = mutations.some(mutation => {
+        if (mutation.type !== 'attributes' || mutation.attributeName !== 'class') {
+          return false;
+        }
+        const target = mutation.target;
+        return target instanceof HTMLElement
+          && target.matches('.tool-button[data-tool]:not(.local-ext-toolbar-button)')
+          && target.classList.contains('is-active');
+      });
+      if (builtInToolActivated) {
+        setActiveLocalToolId('', { notifyRuntime: true });
+      }
+    });
+    runtimeState.builtInToolObserver.observe(toolGrid, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class'],
+    });
   }
 
   function clearLocalTools({ notifyRuntime = true } = {}) {
@@ -1268,18 +1592,19 @@
   }
 
   function buildUi() {
-    const settingsBody = document.querySelector('#panelSettings .panel-section__body');
-    if (!(settingsBody instanceof HTMLElement)) {
+    const extensionsBody = document.querySelector('#panelExtensions .panel-section__body');
+    if (!(extensionsBody instanceof HTMLElement)) {
       return null;
     }
 
-    const panel = document.createElement('details');
+    const panel = document.createElement('div');
     panel.className = 'field field--list local-ext-panel';
     panel.id = 'localExtensionPanel';
 
-    const summary = document.createElement('summary');
-    summary.textContent = localizeText('ローカル拡張（外付け）', 'Local Extension (External)');
-    panel.appendChild(summary);
+    const title = document.createElement('div');
+    title.className = 'local-ext-panel__title';
+    title.textContent = localizeText('ローカル拡張（外付け）', 'Local Extension (External)');
+    panel.appendChild(title);
 
     const body = document.createElement('div');
     body.className = 'local-ext-panel__body';
@@ -1306,12 +1631,37 @@
     row.appendChild(toggleLabel);
     body.appendChild(row);
 
+    const scriptField = document.createElement('div');
+    scriptField.className = 'local-ext-panel__field';
+
+    const scriptLabel = document.createElement('span');
+    scriptLabel.className = 'local-ext-panel__script-label';
+    scriptLabel.textContent = localizeText('スクリプト', 'Script');
+
+    const scriptHint = document.createElement('p');
+    scriptHint.className = 'help-text local-ext-panel__script-hint';
+    scriptHint.textContent = localizeText(
+      '雛形ファイルを作成して VSCode や GPT連携メモ帳で編集し、同じ `.js` を選択しておくと保存時に自動で再読込されます。',
+      'Create a template file, edit it in VS Code or a GPT-connected editor, and keep that `.js` selected to auto-reload on save.'
+    );
+
+    scriptField.append(scriptLabel, scriptHint);
+    body.appendChild(scriptField);
+
     const code = document.createElement('textarea');
     code.id = 'localExtensionCode';
     code.className = 'local-ext-panel__code';
     code.spellcheck = false;
-    code.placeholder = localizeText('ここにローカル拡張コードを入力', 'Enter local extension code here');
+    code.readOnly = true;
+    code.placeholder = localizeText('ここに現在のスクリプトが表示されます', 'The current script is shown here');
     body.appendChild(code);
+
+    const scriptFileInput = document.createElement('input');
+    scriptFileInput.type = 'file';
+    scriptFileInput.accept = '.js,.txt,text/javascript,text/plain';
+    scriptFileInput.hidden = true;
+    scriptFileInput.id = 'localExtensionScriptFile';
+    body.appendChild(scriptFileInput);
 
     const actions = document.createElement('div');
     actions.className = 'local-ext-panel__actions';
@@ -1319,7 +1669,7 @@
     const saveButton = document.createElement('button');
     saveButton.type = 'button';
     saveButton.className = 'chip';
-    saveButton.textContent = localizeText('保存', 'Save');
+    saveButton.textContent = localizeText('再読込', 'Reload File');
 
     const reloadButton = document.createElement('button');
     reloadButton.type = 'button';
@@ -1334,9 +1684,19 @@
     const templateButton = document.createElement('button');
     templateButton.type = 'button';
     templateButton.className = 'chip';
-    templateButton.textContent = localizeText('テンプレ', 'Template');
+    templateButton.textContent = localizeText('雛形表示', 'Show Template');
 
-    actions.append(saveButton, reloadButton, stopButton, templateButton);
+    const downloadTemplateButton = document.createElement('button');
+    downloadTemplateButton.type = 'button';
+    downloadTemplateButton.className = 'chip';
+    downloadTemplateButton.textContent = localizeText('雛形ファイル', 'Create Template File');
+
+    const importScriptButton = document.createElement('button');
+    importScriptButton.type = 'button';
+    importScriptButton.className = 'chip';
+    importScriptButton.textContent = localizeText('スクリプト選択', 'Choose Script');
+
+    actions.append(saveButton, reloadButton, stopButton, templateButton, downloadTemplateButton, importScriptButton);
     body.appendChild(actions);
 
     const toolBox = document.createElement('div');
@@ -1389,7 +1749,7 @@
     body.appendChild(output);
 
     panel.appendChild(body);
-    settingsBody.appendChild(panel);
+    extensionsBody.prepend(panel);
 
     const badge = document.createElement('div');
     badge.className = 'local-ext-badge';
@@ -1398,15 +1758,20 @@
 
     return {
       panel,
-      summary,
+      title,
       description,
       enabled,
       toggleText,
+      scriptLabel,
+      scriptHint,
       code,
+      scriptFileInput,
       saveButton,
       reloadButton,
       stopButton,
       templateButton,
+      downloadTemplateButton,
+      importScriptButton,
       toolHeading,
       clearToolButton,
       toolList,
@@ -1423,8 +1788,8 @@
     if (!ui) {
       return;
     }
-    if (ui.summary instanceof HTMLElement) {
-      ui.summary.textContent = localizeText('ローカル拡張（外付け）', 'Local Extension (External)');
+    if (ui.title instanceof HTMLElement) {
+      ui.title.textContent = localizeText('ローカル拡張（外付け）', 'Local Extension (External)');
     }
     if (ui.description instanceof HTMLElement) {
       ui.description.textContent = localizeText(
@@ -1436,10 +1801,19 @@
       ui.toggleText.textContent = localizeText('有効化', 'Enable');
     }
     if (ui.code instanceof HTMLTextAreaElement) {
-      ui.code.placeholder = localizeText('ここにローカル拡張コードを入力', 'Enter local extension code here');
+      ui.code.placeholder = localizeText('ここに現在のスクリプトが表示されます', 'The current script is shown here');
+    }
+    if (ui.scriptLabel instanceof HTMLElement) {
+      ui.scriptLabel.textContent = localizeText('スクリプト', 'Script');
+    }
+    if (ui.scriptHint instanceof HTMLElement) {
+      ui.scriptHint.textContent = localizeText(
+        '雛形ファイルを作成して VSCode や GPT連携メモ帳で編集し、同じ `.js` を選択しておくと保存時に自動で再読込されます。',
+        'Create a template file, edit it in VS Code or a GPT-connected editor, and keep that `.js` selected to auto-reload on save.'
+      );
     }
     if (ui.saveButton instanceof HTMLButtonElement) {
-      ui.saveButton.textContent = localizeText('保存', 'Save');
+      ui.saveButton.textContent = localizeText('再読込', 'Reload File');
     }
     if (ui.reloadButton instanceof HTMLButtonElement) {
       ui.reloadButton.textContent = localizeText('反映', 'Apply');
@@ -1448,7 +1822,13 @@
       ui.stopButton.textContent = localizeText('停止', 'Stop');
     }
     if (ui.templateButton instanceof HTMLButtonElement) {
-      ui.templateButton.textContent = localizeText('テンプレ', 'Template');
+      ui.templateButton.textContent = localizeText('雛形表示', 'Show Template');
+    }
+    if (ui.downloadTemplateButton instanceof HTMLButtonElement) {
+      ui.downloadTemplateButton.textContent = localizeText('雛形ファイル', 'Create Template File');
+    }
+    if (ui.importScriptButton instanceof HTMLButtonElement) {
+      ui.importScriptButton.textContent = localizeText('スクリプト選択', 'Choose Script');
     }
     if (ui.toolHeading instanceof HTMLElement) {
       ui.toolHeading.textContent = localizeText('ローカルツール', 'Local Tools');
@@ -1477,24 +1857,25 @@
     clearRetiredAiStorage();
     runtimeState.code = readStorage(STORAGE_KEY_CODE, '');
     runtimeState.enabled = readStorage(STORAGE_KEY_ENABLED, '0') === '1';
-    const isOpen = readStorage(STORAGE_KEY_OPEN, '0') === '1';
-    ui.panel.open = isOpen;
     ui.enabled.checked = runtimeState.enabled;
     ui.code.value = runtimeState.code;
     applyUiLocalization();
-
-    ui.panel.addEventListener('toggle', () => {
-      writeStorage(STORAGE_KEY_OPEN, ui.panel.open ? '1' : '0');
-    });
 
     ui.enabled.addEventListener('change', () => {
       setEnabled(ui.enabled.checked, { persist: true, restart: true });
     });
 
-    ui.saveButton.addEventListener('click', () => {
-      runtimeState.code = ui.code.value || '';
-      writeStorage(STORAGE_KEY_CODE, runtimeState.code);
-      setStatus(localizeText('ローカル拡張コードを保存しました', 'Saved local extension code'), 'success');
+    ui.saveButton.addEventListener('click', async () => {
+      if (runtimeState.scriptFileHandle) {
+        const reloaded = await readBoundScriptFile({ apply: true, silent: false, ignoreTimestamp: true, autoEnable: true });
+        if (!reloaded) {
+          setStatus(localizeText('選択中のスクリプトを再読込できませんでした', 'Could not reload the selected script'), 'warn');
+        }
+        return;
+      }
+      if (ui.scriptFileInput instanceof HTMLInputElement) {
+        ui.scriptFileInput.click();
+      }
     });
 
     ui.reloadButton.addEventListener('click', () => {
@@ -1514,22 +1895,61 @@
     });
 
     ui.templateButton.addEventListener('click', () => {
-      if ((ui.code.value || '').trim()) {
-        const accepted = window.confirm(
-          localizeText(
-            '現在のコードをテンプレートで上書きしますか？',
-            'Replace the current code with the template?'
-          )
-        );
-        if (!accepted) {
+      const templateCode = buildTemplateCode();
+      if (ui.code instanceof HTMLTextAreaElement) {
+        ui.code.value = templateCode;
+      }
+      setStatus(localizeText('雛形を表示しました', 'Showing the template'), 'info');
+    });
+
+    ui.downloadTemplateButton.addEventListener('click', async () => {
+      const created = await createTemplateScriptFile();
+      if (!created && !canUseScriptFileSystem()) {
+        if (ui.code instanceof HTMLTextAreaElement) {
+          ui.code.value = buildTemplateCode();
+        }
+      }
+    });
+
+    ui.importScriptButton.addEventListener('click', async () => {
+      if (canUseScriptFileSystem()) {
+        const picked = await pickScriptFileHandle();
+        if (picked) {
           return;
         }
       }
-      ui.code.value = buildTemplateCode();
-      runtimeState.code = ui.code.value;
-      writeStorage(STORAGE_KEY_CODE, runtimeState.code);
-      setStatus(localizeText('テンプレートを入力しました', 'Inserted template code'), 'info');
+      if (ui.scriptFileInput instanceof HTMLInputElement) {
+        ui.scriptFileInput.click();
+      }
     });
+
+    ui.scriptFileInput.addEventListener('change', async () => {
+      const file = ui.scriptFileInput.files && ui.scriptFileInput.files[0] ? ui.scriptFileInput.files[0] : null;
+      if (file) {
+        await importScriptFile(file);
+      }
+      ui.scriptFileInput.value = '';
+    });
+
+    if (ui.code instanceof HTMLTextAreaElement) {
+      ui.code.addEventListener('dragover', event => {
+        event.preventDefault();
+        ui.code.classList.add('is-drop-target');
+      });
+
+      ui.code.addEventListener('dragleave', () => {
+        ui.code.classList.remove('is-drop-target');
+      });
+
+      ui.code.addEventListener('drop', async event => {
+        event.preventDefault();
+        ui.code.classList.remove('is-drop-target');
+        const file = event.dataTransfer?.files && event.dataTransfer.files[0] ? event.dataTransfer.files[0] : null;
+        if (file) {
+          await importScriptFile(file);
+        }
+      });
+    }
 
     ui.clearToolButton.addEventListener('click', () => {
       setActiveLocalToolId('', { notifyRuntime: true });
@@ -1553,6 +1973,7 @@
       applyUiLocalization();
     });
     bindGlobalEvents();
+    bindBuiltInToolOverride();
     if (runtimeState.enabled) {
       startRuntime();
     } else {
