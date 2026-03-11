@@ -6,40 +6,22 @@
   const STORAGE_KEY_ENABLED = 'pixieedraw:local-extension:enabled';
   const STORAGE_KEY_CODE = 'pixieedraw:local-extension:code';
   const STORAGE_KEY_OPEN = 'pixieedraw:local-extension:open';
-  const STORAGE_KEY_AI_ENABLED = 'pixieedraw:local-extension:ai-enabled';
-  const STORAGE_KEY_AI_ENDPOINT = 'pixieedraw:local-extension:ai-endpoint';
-  const STORAGE_KEY_AI_API_FORMAT = 'pixieedraw:local-extension:ai-api-format';
-  const STORAGE_KEY_AI_API_KEY = 'pixieedraw:local-extension:ai-api-key';
-  const STORAGE_KEY_AI_MODEL = 'pixieedraw:local-extension:ai-model';
-  const STORAGE_KEY_AI_SYSTEM_PROMPT = 'pixieedraw:local-extension:ai-system-prompt';
-  const STORAGE_KEY_AI_LAST_PROMPT = 'pixieedraw:local-extension:ai-last-prompt';
-  const STORAGE_KEY_AI_CODE_PRESET = 'pixieedraw:local-extension:ai-code-preset';
-  const AI_API_FORMAT_RESPONSES = 'responses';
-  const AI_API_FORMAT_CHAT_COMPLETIONS = 'chat-completions';
-  const AI_CODE_PRESET_EXTENSION_BUILDER = 'pixieedraw-extension-builder';
-  const AI_DEFAULT_ENDPOINT = 'https://api.openai.com/v1/responses';
-  const AI_DEFAULT_MODEL = 'gpt-5';
-  const AI_DEFAULT_CODE_PRESET = AI_CODE_PRESET_EXTENSION_BUILDER;
-  const AI_REQUEST_TIMEOUT_MS = 45000;
-  const AI_MAX_INPUT_LENGTH = 16000;
-  const AI_MAX_INSTRUCTIONS_LENGTH = 8000;
   const LOCAL_TOOL_MAX_COUNT = 24;
   const LOCAL_PAINT_BATCH_MAX = 32768;
+  const RETIRED_AI_STORAGE_KEYS = Object.freeze([
+    'pixieedraw:local-extension:ai-enabled',
+    'pixieedraw:local-extension:ai-endpoint',
+    'pixieedraw:local-extension:ai-api-format',
+    'pixieedraw:local-extension:ai-api-key',
+    'pixieedraw:local-extension:ai-model',
+    'pixieedraw:local-extension:ai-system-prompt',
+    'pixieedraw:local-extension:ai-last-prompt',
+    'pixieedraw:local-extension:ai-code-preset',
+  ]);
 
   const runtimeState = {
     enabled: false,
     code: '',
-    aiConfig: {
-      enabled: false,
-      endpoint: AI_DEFAULT_ENDPOINT,
-      apiFormat: AI_API_FORMAT_RESPONSES,
-      apiKey: '',
-      model: AI_DEFAULT_MODEL,
-      systemPrompt: '',
-      lastPrompt: '',
-      codePreset: AI_DEFAULT_CODE_PRESET,
-    },
-    aiBusyCount: 0,
     frame: null,
     frameReady: false,
     messageQueue: [],
@@ -71,7 +53,7 @@
       "api.on('init', (ctx) => {",
       `  api.toast(${JSON.stringify(localizeText('ローカル拡張を起動しました', 'Local extension started'))}, 'success');`,
       "  api.badge('Local Ext ON');",
-      `  api.panel(${JSON.stringify(localizeText('ローカル拡張', 'Local Extension'))}, ${JSON.stringify(localizeText('この表示はあなたの端末だけです。', 'This panel is visible only on your device.'))});`,
+      `  api.panel(${JSON.stringify(localizeText('ローカル拡張', 'Local Extension'))}, ${JSON.stringify(localizeText('マルチ中でもこの表示はあなたの端末だけです。', 'Even during multiplayer, this panel is visible only on your device.'))});`,
       `  api.registerTool({ id: 'stamp8', label: '8x8 Stamp', hint: ${JSON.stringify(localizeText('ローカル描画だけ実行', 'Runs local-only painting'))} });`,
       "  api.activateTool('stamp8');",
       "  api.capturePointer(true);",
@@ -100,7 +82,7 @@
   }
 
   const SANDBOX_SRC = String.raw`<!doctype html>
-<html><head><meta charset="utf-8"></head><body>
+<html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; style-src 'none'; object-src 'none'; media-src 'none'; font-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'; navigate-to 'none'"></head><body>
 <script>
 (() => {
   const HOST_MARK = '__pixieLocalHost';
@@ -109,6 +91,56 @@
   const pendingRequests = new Map();
   let requestSeq = 0;
   let latestContext = Object.freeze({});
+
+  function blockedCapability(name) {
+    return () => {
+      throw new Error(name + ' is disabled in PiXiEEDraw local extensions');
+    };
+  }
+
+  const blockedAsyncCapability = (name) => () => Promise.reject(new Error(name + ' is disabled in PiXiEEDraw local extensions'));
+  try { window.fetch = blockedAsyncCapability('fetch'); } catch (_) {}
+  try {
+    window.XMLHttpRequest = class BlockedXMLHttpRequest {
+      constructor() {
+        throw new Error('XMLHttpRequest is disabled in PiXiEEDraw local extensions');
+      }
+    };
+  } catch (_) {}
+  try {
+    window.WebSocket = class BlockedWebSocket {
+      constructor() {
+        throw new Error('WebSocket is disabled in PiXiEEDraw local extensions');
+      }
+    };
+  } catch (_) {}
+  try {
+    window.EventSource = class BlockedEventSource {
+      constructor() {
+        throw new Error('EventSource is disabled in PiXiEEDraw local extensions');
+      }
+    };
+  } catch (_) {}
+  try {
+    window.Worker = class BlockedWorker {
+      constructor() {
+        throw new Error('Worker is disabled in PiXiEEDraw local extensions');
+      }
+    };
+  } catch (_) {}
+  try {
+    window.SharedWorker = class BlockedSharedWorker {
+      constructor() {
+        throw new Error('SharedWorker is disabled in PiXiEEDraw local extensions');
+      }
+    };
+  } catch (_) {}
+  try { window.open = blockedCapability('window.open'); } catch (_) {}
+  try {
+    if (navigator && typeof navigator === 'object') {
+      navigator.sendBeacon = blockedCapability('navigator.sendBeacon');
+    }
+  } catch (_) {}
 
   function post(type, payload) {
     parent.postMessage({ [EXT_MARK]: 1, type, payload }, '*');
@@ -225,8 +257,8 @@
       return latestContext;
     },
     ai: Object.freeze({
-      request(options = {}) {
-        return request('ai-request', { request: options });
+      request() {
+        return Promise.reject(new Error('PiXiEEDraw local AI integration has been retired'));
       },
     }),
     log(...values) {
@@ -319,432 +351,10 @@
     return String(value || '').replace(/\r\n?/g, '\n').replace(/\s+$/g, '').slice(0, limit);
   }
 
-  function sanitizeUrl(value, limit = 600) {
-    return String(value || '').trim().slice(0, limit);
-  }
-
-  function normalizeAiApiFormat(value) {
-    return value === AI_API_FORMAT_CHAT_COMPLETIONS
-      ? AI_API_FORMAT_CHAT_COMPLETIONS
-      : AI_API_FORMAT_RESPONSES;
-  }
-
-  function normalizeAiCodePreset(value) {
-    return value === AI_CODE_PRESET_EXTENSION_BUILDER ? AI_CODE_PRESET_EXTENSION_BUILDER : '';
-  }
-
-  function normalizeAiConfig(source) {
-    const config = source && typeof source === 'object' ? source : {};
-    return {
-      enabled: Boolean(config.enabled),
-      endpoint: sanitizeUrl(config.endpoint || AI_DEFAULT_ENDPOINT, 600) || AI_DEFAULT_ENDPOINT,
-      apiFormat: normalizeAiApiFormat(config.apiFormat),
-      apiKey: sanitizeText(config.apiKey || '', 600),
-      model: sanitizeText(config.model || AI_DEFAULT_MODEL, 120) || AI_DEFAULT_MODEL,
-      systemPrompt: sanitizeMultilineText(config.systemPrompt || '', AI_MAX_INSTRUCTIONS_LENGTH),
-      lastPrompt: sanitizeMultilineText(config.lastPrompt || '', 4000),
-      codePreset: normalizeAiCodePreset(config.codePreset || AI_DEFAULT_CODE_PRESET),
-    };
-  }
-
-  function loadAiConfigFromStorage() {
-    return normalizeAiConfig({
-      enabled: readStorage(STORAGE_KEY_AI_ENABLED, '0') === '1',
-      endpoint: readStorage(STORAGE_KEY_AI_ENDPOINT, AI_DEFAULT_ENDPOINT),
-      apiFormat: readStorage(STORAGE_KEY_AI_API_FORMAT, AI_API_FORMAT_RESPONSES),
-      apiKey: readStorage(STORAGE_KEY_AI_API_KEY, ''),
-      model: readStorage(STORAGE_KEY_AI_MODEL, AI_DEFAULT_MODEL),
-      systemPrompt: readStorage(STORAGE_KEY_AI_SYSTEM_PROMPT, ''),
-      lastPrompt: readStorage(STORAGE_KEY_AI_LAST_PROMPT, ''),
-      codePreset: readStorage(STORAGE_KEY_AI_CODE_PRESET, AI_DEFAULT_CODE_PRESET),
+  function clearRetiredAiStorage() {
+    RETIRED_AI_STORAGE_KEYS.forEach(key => {
+      removeStorage(key);
     });
-  }
-
-  function persistAiConfig(config) {
-    const normalized = normalizeAiConfig(config);
-    runtimeState.aiConfig = normalized;
-    writeStorage(STORAGE_KEY_AI_ENABLED, normalized.enabled ? '1' : '0');
-    writeStorage(STORAGE_KEY_AI_ENDPOINT, normalized.endpoint);
-    writeStorage(STORAGE_KEY_AI_API_FORMAT, normalized.apiFormat);
-    if (normalized.apiKey) {
-      writeStorage(STORAGE_KEY_AI_API_KEY, normalized.apiKey);
-    } else {
-      removeStorage(STORAGE_KEY_AI_API_KEY);
-    }
-    writeStorage(STORAGE_KEY_AI_MODEL, normalized.model);
-    if (normalized.systemPrompt) {
-      writeStorage(STORAGE_KEY_AI_SYSTEM_PROMPT, normalized.systemPrompt);
-    } else {
-      removeStorage(STORAGE_KEY_AI_SYSTEM_PROMPT);
-    }
-    if (normalized.lastPrompt) {
-      writeStorage(STORAGE_KEY_AI_LAST_PROMPT, normalized.lastPrompt);
-    } else {
-      removeStorage(STORAGE_KEY_AI_LAST_PROMPT);
-    }
-    if (normalized.codePreset) {
-      writeStorage(STORAGE_KEY_AI_CODE_PRESET, normalized.codePreset);
-    } else {
-      removeStorage(STORAGE_KEY_AI_CODE_PRESET);
-    }
-    return normalized;
-  }
-
-  function parseHostLabel(value) {
-    try {
-      return new URL(String(value || '')).host || '';
-    } catch (error) {
-      return '';
-    }
-  }
-
-  function buildAiContextSnapshot() {
-    const config = normalizeAiConfig(runtimeState.aiConfig);
-    return {
-      enabled: config.enabled,
-      apiFormat: config.apiFormat,
-      model: config.model,
-      endpointHost: parseHostLabel(config.endpoint),
-      hasApiKey: Boolean(config.apiKey),
-    };
-  }
-
-  function buildAiCodeWriterSystemPrompt() {
-    return localizeText(
-      [
-        'あなたは PiXiEEDraw のローカル拡張を書く JavaScript エンジニアです。',
-        '返答は JavaScript コードのみで、Markdown の ``` は使わないでください。',
-        'import / export は使わず、グローバルの api オブジェクトだけを使ってください。',
-        '共有プロジェクト状態を書き換える API はない前提で、ローカル拡張として完結させてください。',
-      ].join('\n'),
-      [
-        'You are a JavaScript engineer writing PiXiEEDraw local extensions.',
-        'Return JavaScript code only. Do not wrap the answer in Markdown fences.',
-        'Do not use import or export. Use only the global api object.',
-        'Assume there is no API for mutating shared project state. Keep the extension local-only.',
-      ].join('\n')
-    );
-  }
-
-  function getAiCodePresetDefinition(presetId) {
-    if (normalizeAiCodePreset(presetId) !== AI_CODE_PRESET_EXTENSION_BUILDER) {
-      return null;
-    }
-    return {
-      id: AI_CODE_PRESET_EXTENSION_BUILDER,
-      label: localizeText('PiXiEEDraw拡張作成', 'PiXiEEDraw Extension Builder'),
-      promptTemplate: localizeText(
-        [
-          'やりたいこと:',
-          '- ローカル拡張ツールを1つ追加したい',
-          '- ツール名: Glow Stamp',
-          '- 動作: クリック位置を中心に 12x12 の発光風スタンプを置く',
-          '- 補足: init でツール登録し、選択後すぐ使えるようにする',
-          '- 表示: api.toast と api.panel で使い方を軽く出す',
-          '',
-          '条件:',
-          '- そのまま貼って動く完全な JavaScript を返す',
-          '- import / export は使わない',
-          '- 既存コードがあれば壊さずに活かす',
-        ].join('\n'),
-        [
-          'Goal:',
-          '- Add one local extension tool',
-          '- Tool name: Glow Stamp',
-          '- Behavior: place a 12x12 glowing stamp centered on the clicked cell',
-          '- Setup: register the tool on init and make it ready to use',
-          '- UI: show brief usage with api.toast and api.panel',
-          '',
-          'Constraints:',
-          '- Return complete JavaScript that can run as-is',
-          '- Do not use import or export',
-          '- Preserve existing code when possible',
-        ].join('\n')
-      ),
-      codeInstructions: localizeText(
-        [
-          '依頼を満たす最小の構成で、貼り付け後すぐ動く完成コードを返してください。',
-          '必要なときだけ api.capturePointer(true) を使い、不要なら使わないでください。',
-          'ツール追加では api.registerTool / api.activateTool / api.drawPixels を優先して使ってください。',
-          '使い方が分かるように init 時に短い案内を出してください。',
-        ].join('\n'),
-        [
-          'Return complete code that can run immediately after pasting.',
-          'Use api.capturePointer(true) only when needed.',
-          'For tool creation, prefer api.registerTool, api.activateTool, and api.drawPixels when appropriate.',
-          'Show a short usage hint during init.',
-        ].join('\n')
-      ),
-    };
-  }
-
-  function getAiCodePresetLabel(presetId) {
-    const preset = getAiCodePresetDefinition(presetId);
-    return preset ? preset.label : localizeText('なし', 'None');
-  }
-
-  function buildAiApiReference() {
-    return [
-      'Available PiXiEEDraw local extension API:',
-      "- api.on(eventName, handler) for 'init', 'interval', 'keydown', 'pointerdown', 'toolchange', 'tool:activate', 'tool:pointerdown', 'tool:pointermove', 'tool:pointerup', 'tool:pointercancel'",
-      '- api.toast(message, level)',
-      '- api.badge(text)',
-      '- api.panel(title, body)',
-      '- api.registerTool({ id, label, hint })',
-      '- api.unregisterTool(id)',
-      '- api.clearTools()',
-      '- api.activateTool(id)',
-      '- api.capturePointer(enabled)',
-      '- api.drawPixels([{ x, y }], { r, g, b, a })',
-      '- api.clearPixels()',
-      '- api.getContext()',
-      "- api.ai.request({ instructions, input }) returns a Promise that resolves to { text, model, apiFormat, endpointHost } when BYOGPT is enabled in the host UI",
-    ].join('\n');
-  }
-
-  function stripMarkdownCodeFence(text) {
-    const trimmed = sanitizeMultilineText(text, AI_MAX_INPUT_LENGTH).trim();
-    const fenced = trimmed.match(/^```(?:[a-z0-9_-]+)?\s*([\s\S]*?)```$/i);
-    return fenced ? fenced[1].trim() : trimmed;
-  }
-
-  function insertGeneratedCode(textarea, nextCode) {
-    if (!(textarea instanceof HTMLTextAreaElement)) {
-      return false;
-    }
-    const text = sanitizeMultilineText(nextCode, AI_MAX_INPUT_LENGTH * 2).trim();
-    if (!text) {
-      return false;
-    }
-    const hasSelection = Number.isFinite(textarea.selectionStart)
-      && Number.isFinite(textarea.selectionEnd)
-      && textarea.selectionStart !== textarea.selectionEnd;
-    const useSelection = hasSelection || document.activeElement === textarea;
-    let nextValue = '';
-    if (useSelection) {
-      const start = Math.max(0, Number(textarea.selectionStart) || 0);
-      const end = Math.max(start, Number(textarea.selectionEnd) || start);
-      nextValue = `${textarea.value.slice(0, start)}${text}${textarea.value.slice(end)}`;
-      textarea.value = nextValue;
-      textarea.selectionStart = start;
-      textarea.selectionEnd = start + text.length;
-    } else if ((textarea.value || '').trim()) {
-      nextValue = `${textarea.value.replace(/\s+$/g, '')}\n\n${text}`;
-      textarea.value = nextValue;
-      textarea.selectionStart = nextValue.length - text.length;
-      textarea.selectionEnd = nextValue.length;
-    } else {
-      textarea.value = text;
-      textarea.selectionStart = 0;
-      textarea.selectionEnd = text.length;
-    }
-    textarea.focus();
-    return true;
-  }
-
-  function extractAiErrorMessage(payload, fallback = '') {
-    const source = payload && typeof payload === 'object' ? payload : {};
-    if (source.error && typeof source.error === 'object' && source.error.message) {
-      return sanitizeText(source.error.message, 320);
-    }
-    if (typeof source.message === 'string' && source.message.trim()) {
-      return sanitizeText(source.message, 320);
-    }
-    if (typeof fallback === 'string' && fallback.trim()) {
-      return sanitizeText(fallback, 320);
-    }
-    return localizeText('AI リクエストに失敗しました', 'AI request failed');
-  }
-
-  function extractAiResponseText(payload) {
-    const source = payload && typeof payload === 'object' ? payload : {};
-    if (typeof source.output_text === 'string' && source.output_text.trim()) {
-      return source.output_text.trim();
-    }
-    if (Array.isArray(source.output)) {
-      const chunks = [];
-      source.output.forEach(item => {
-        if (!item || typeof item !== 'object') {
-          return;
-        }
-        const content = Array.isArray(item.content) ? item.content : [];
-        content.forEach(part => {
-          if (!part || typeof part !== 'object') {
-            return;
-          }
-          if ((part.type === 'output_text' || part.type === 'text') && typeof part.text === 'string' && part.text.trim()) {
-            chunks.push(part.text.trim());
-          }
-        });
-      });
-      if (chunks.length) {
-        return chunks.join('\n\n');
-      }
-    }
-    if (Array.isArray(source.choices)) {
-      const chunks = [];
-      source.choices.forEach(choice => {
-        const message = choice && typeof choice === 'object' ? choice.message : null;
-        if (!message) {
-          return;
-        }
-        if (typeof message.content === 'string' && message.content.trim()) {
-          chunks.push(message.content.trim());
-          return;
-        }
-        if (Array.isArray(message.content)) {
-          message.content.forEach(part => {
-            if (!part || typeof part !== 'object') {
-              return;
-            }
-            if (typeof part.text === 'string' && part.text.trim()) {
-              chunks.push(part.text.trim());
-            }
-          });
-        }
-      });
-      if (chunks.length) {
-        return chunks.join('\n\n');
-      }
-    }
-    if (Array.isArray(source.candidates)) {
-      const chunks = [];
-      source.candidates.forEach(candidate => {
-        const parts = Array.isArray(candidate?.content?.parts) ? candidate.content.parts : [];
-        parts.forEach(part => {
-          if (typeof part?.text === 'string' && part.text.trim()) {
-            chunks.push(part.text.trim());
-          }
-        });
-      });
-      if (chunks.length) {
-        return chunks.join('\n\n');
-      }
-    }
-    if (typeof source.text === 'string' && source.text.trim()) {
-      return source.text.trim();
-    }
-    return '';
-  }
-
-  function buildAiRequestBody(config, request) {
-    const instructions = sanitizeMultilineText(request.instructions || '', AI_MAX_INSTRUCTIONS_LENGTH);
-    const input = sanitizeMultilineText(request.input || '', AI_MAX_INPUT_LENGTH);
-    if (config.apiFormat === AI_API_FORMAT_CHAT_COMPLETIONS) {
-      const messages = [];
-      if (instructions) {
-        messages.push({ role: 'system', content: instructions });
-      }
-      messages.push({ role: 'user', content: input });
-      return {
-        model: config.model,
-        messages,
-      };
-    }
-    return {
-      model: config.model,
-      instructions,
-      input,
-    };
-  }
-
-  async function performAiRequest(request, { source = 'panel' } = {}) {
-    const config = normalizeAiConfig(runtimeState.aiConfig);
-    runtimeState.aiConfig = config;
-    if (!config.enabled) {
-      throw new Error(localizeText('BYOGPT がOFFです', 'BYOGPT is OFF'));
-    }
-    if (!config.endpoint || !/^https?:\/\//i.test(config.endpoint)) {
-      throw new Error(localizeText('AI エンドポイントURLを設定してください', 'Set a valid AI endpoint URL'));
-    }
-    if (!config.model) {
-      throw new Error(localizeText('AI モデル名を設定してください', 'Set an AI model name'));
-    }
-    const userInput = sanitizeMultilineText(request?.input || '', AI_MAX_INPUT_LENGTH);
-    if (!userInput) {
-      throw new Error(localizeText('AI へ送る内容が空です', 'AI input is empty'));
-    }
-    const configPrompt = sanitizeMultilineText(config.systemPrompt || '', AI_MAX_INSTRUCTIONS_LENGTH);
-    const requestInstructions = sanitizeMultilineText(request?.instructions || '', AI_MAX_INSTRUCTIONS_LENGTH);
-    const body = buildAiRequestBody(config, {
-      instructions: [configPrompt, requestInstructions].filter(Boolean).join('\n\n'),
-      input: userInput,
-    });
-    const headers = {
-      'Content-Type': 'application/json',
-    };
-    if (config.apiKey) {
-      headers.Authorization = `Bearer ${config.apiKey}`;
-    }
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
-    let response;
-    let rawText = '';
-    try {
-      response = await window.fetch(config.endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-      rawText = await response.text();
-    } catch (error) {
-      if (error?.name === 'AbortError') {
-        throw new Error(localizeText('AI リクエストがタイムアウトしました', 'AI request timed out'));
-      }
-      throw new Error(extractAiErrorMessage({}, error?.message || String(error || '')));
-    } finally {
-      window.clearTimeout(timeoutId);
-    }
-    let payload = null;
-    try {
-      payload = rawText ? JSON.parse(rawText) : null;
-    } catch (error) {
-      payload = null;
-    }
-    if (!response.ok) {
-      throw new Error(extractAiErrorMessage(payload, rawText || `HTTP ${response.status}`));
-    }
-    const text = extractAiResponseText(payload);
-    if (!text) {
-      throw new Error(localizeText('AI の返答から本文を取得できませんでした', 'Could not extract text from the AI response'));
-    }
-    return {
-      ok: true,
-      text: sanitizeMultilineText(text, AI_MAX_INPUT_LENGTH * 2),
-      model: config.model,
-      apiFormat: config.apiFormat,
-      endpointHost: parseHostLabel(config.endpoint),
-      source,
-    };
-  }
-
-  function buildAiTestInput() {
-    return localizeText(
-      'PiXiEEDraw の BYOGPT 接続テストです。1行で接続OKと返してください。',
-      'This is a PiXiEEDraw BYOGPT connection test. Reply with one short line saying the connection works.'
-    );
-  }
-
-  function buildAiCodeWriterRequest(userPrompt, currentCode, presetId = '') {
-    const prompt = sanitizeMultilineText(userPrompt, 4000);
-    const current = sanitizeMultilineText(currentCode, 8000);
-    const preset = getAiCodePresetDefinition(presetId);
-    return {
-      instructions: [
-        buildAiCodeWriterSystemPrompt(),
-        preset?.codeInstructions || '',
-        localizeText(
-          '既存コードがあれば意図を保って変更し、不要な機能は削除しないでください。',
-          'If current code exists, preserve its intent and avoid removing unrelated behavior.'
-        ),
-      ].join('\n\n'),
-      input: [
-        `${localizeText('依頼', 'Request')}:\n${prompt}`,
-        `${localizeText('現在のコード', 'Current Code')}:\n${current || '(none)'}`,
-        `${localizeText('拡張API', 'Extension API')}:\n${buildAiApiReference()}`,
-      ].join('\n\n'),
-    };
   }
 
   function normalizeToolId(value) {
@@ -1251,7 +861,6 @@
       activeLocalToolId: runtimeState.activeLocalToolId || '',
       localToolCapture: Boolean(runtimeState.captureCanvasPointer),
       localPaintPixelCount: runtimeState.localPaintMap.size,
-      ai: buildAiContextSnapshot(),
     };
   }
 
@@ -1262,56 +871,6 @@
     }
     ui.status.textContent = sanitizeText(message, 300);
     ui.status.dataset.kind = kind;
-  }
-
-  function setAiStatus(message, kind = 'info') {
-    const ui = runtimeState.ui;
-    if (!ui || !(ui.aiStatus instanceof HTMLElement)) {
-      return;
-    }
-    ui.aiStatus.textContent = sanitizeText(message, 320);
-    ui.aiStatus.dataset.kind = kind;
-  }
-
-  function updateAiVisibility() {
-    const ui = runtimeState.ui;
-    if (!ui || !(ui.aiContent instanceof HTMLElement) || !(ui.aiEnabled instanceof HTMLInputElement)) {
-      return;
-    }
-    const visible = ui.aiEnabled.checked;
-    ui.aiContent.hidden = !visible;
-  }
-
-  function setAiBusy(isBusy) {
-    const ui = runtimeState.ui;
-    runtimeState.aiBusyCount = Math.max(0, runtimeState.aiBusyCount + (isBusy ? 1 : -1));
-    const busy = runtimeState.aiBusyCount > 0;
-    if (!ui) {
-      return;
-    }
-    if (ui.aiTestButton instanceof HTMLButtonElement) {
-      ui.aiTestButton.disabled = busy;
-    }
-    if (ui.aiGenerateButton instanceof HTMLButtonElement) {
-      ui.aiGenerateButton.disabled = busy;
-    }
-    if (ui.aiSaveButton instanceof HTMLButtonElement) {
-      ui.aiSaveButton.disabled = busy;
-    }
-  }
-
-  function renderAiSummary() {
-    const ui = runtimeState.ui;
-    if (!ui || !(ui.aiSummary instanceof HTMLElement)) {
-      return;
-    }
-    const config = normalizeAiConfig(runtimeState.aiConfig);
-    runtimeState.aiConfig = config;
-    const host = parseHostLabel(config.endpoint) || config.endpoint || localizeText('未設定', 'Not set');
-    ui.aiSummary.textContent = localizeText(
-      `状態: ${config.enabled ? 'ON' : 'OFF'} / ${config.apiFormat} / ${config.model} / ${host}`,
-      `Status: ${config.enabled ? 'ON' : 'OFF'} / ${config.apiFormat} / ${config.model} / ${host}`
-    );
   }
 
   function setOutput(title = '', body = '') {
@@ -1545,40 +1104,22 @@
     return captured;
   }
 
-  async function handleAiRequestFromRuntime(payload, sourceWindow) {
+  function replyRetiredAiRequest(payload, sourceWindow) {
     const requestId = sanitizeText(payload?.id || '', 120);
-    if (!requestId) {
+    const frame = runtimeState.frame;
+    if (!requestId || !(frame instanceof HTMLIFrameElement) || frame.contentWindow !== sourceWindow) {
       return;
     }
-    try {
-      const result = await performAiRequest(payload?.request || {}, { source: 'runtime' });
-      const frame = runtimeState.frame;
-      if (!(frame instanceof HTMLIFrameElement) || frame.contentWindow !== sourceWindow) {
-        return;
-      }
-      postToSandbox('ai-result', {
-        payload: {
-          id: requestId,
-          ok: true,
-          text: result.text,
-          model: result.model,
-          apiFormat: result.apiFormat,
-          endpointHost: result.endpointHost,
-        },
-      });
-    } catch (error) {
-      const frame = runtimeState.frame;
-      if (!(frame instanceof HTMLIFrameElement) || frame.contentWindow !== sourceWindow) {
-        return;
-      }
-      postToSandbox('ai-result', {
-        payload: {
-          id: requestId,
-          ok: false,
-          message: extractAiErrorMessage({}, error?.message || String(error || '')),
-        },
-      });
-    }
+    postToSandbox('ai-result', {
+      payload: {
+        id: requestId,
+        ok: false,
+        message: localizeText(
+          'PiXiEEDraw の GPT連携は廃止されました',
+          'PiXiEEDraw local AI integration has been retired'
+        ),
+      },
+    });
   }
 
   function bindGlobalEvents() {
@@ -1596,7 +1137,7 @@
         return;
       }
       if (data.type === 'ai-request') {
-        void handleAiRequestFromRuntime(data.payload && typeof data.payload === 'object' ? data.payload : {}, event.source);
+        replyRetiredAiRequest(data.payload && typeof data.payload === 'object' ? data.payload : {}, event.source);
         return;
       }
       if (data.type === 'tool-register') {
@@ -1723,6 +1264,7 @@
     window.addEventListener('resize', () => {
       syncLocalCanvasGeometry();
     }, { passive: true });
+
   }
 
   function buildUi() {
@@ -1745,8 +1287,8 @@
     const description = document.createElement('p');
     description.className = 'help-text ui-guide-text';
     description.textContent = localizeText(
-      'この端末だけで動作します。共有状態へ書き込むAPIは公開しません。',
-      'Runs only on this device. No API is exposed for writing into shared state.'
+      'マルチ中でもこの端末だけで動作します。共有状態へ書き込むAPIは公開せず、拡張コードからの外部通信もできません。',
+      'Even during multiplayer, this runs only on this device. No API is exposed for writing into shared state, and direct external network access is disabled.'
     );
     body.appendChild(description);
 
@@ -1763,179 +1305,6 @@
     toggleLabel.append(enabled, toggleText);
     row.appendChild(toggleLabel);
     body.appendChild(row);
-
-    const aiSection = document.createElement('div');
-    aiSection.className = 'local-ext-panel__subsection';
-
-    const aiHeading = document.createElement('div');
-    aiHeading.className = 'local-ext-panel__section-title';
-    aiHeading.textContent = localizeText('BYOGPT 接続', 'BYOGPT Connection');
-    aiSection.appendChild(aiHeading);
-
-    const aiContent = document.createElement('div');
-    aiContent.className = 'local-ext-panel__content';
-
-    const aiNotice = document.createElement('p');
-    aiNotice.className = 'help-text ui-guide-text local-ext-panel__warning';
-    aiNotice.textContent = localizeText(
-      'APIキーはこのブラウザにだけ保存されます。実運用はユーザー側プロキシ経由を推奨します。',
-      'API keys stay only in this browser. For production use, prefer a user-owned proxy.'
-    );
-    const aiEnabledRow = document.createElement('div');
-    aiEnabledRow.className = 'local-ext-panel__row';
-    const aiEnabledLabel = document.createElement('label');
-    aiEnabledLabel.className = 'toggle-option';
-    aiEnabledLabel.setAttribute('for', 'localExtensionAiEnabled');
-    const aiEnabled = document.createElement('input');
-    aiEnabled.id = 'localExtensionAiEnabled';
-    aiEnabled.type = 'checkbox';
-    const aiEnabledText = document.createElement('span');
-    aiEnabledText.textContent = localizeText('BYOGPT を有効化', 'Enable BYOGPT');
-    aiEnabledLabel.append(aiEnabled, aiEnabledText);
-    aiEnabledRow.appendChild(aiEnabledLabel);
-    aiSection.appendChild(aiEnabledRow);
-    aiContent.appendChild(aiNotice);
-
-    const aiApiKeyField = document.createElement('label');
-    aiApiKeyField.className = 'local-ext-panel__field';
-    const aiApiKeyLabel = document.createElement('span');
-    aiApiKeyLabel.textContent = localizeText('APIキー', 'API Key');
-    const aiApiKey = document.createElement('input');
-    aiApiKey.id = 'localExtensionAiApiKey';
-    aiApiKey.type = 'password';
-    aiApiKey.className = 'local-ext-panel__input';
-    aiApiKey.placeholder = localizeText('OpenAIなら sk-... を貼り付け', 'Paste your key here, for example sk-...');
-    aiApiKey.autocomplete = 'off';
-    aiApiKeyField.append(aiApiKeyLabel, aiApiKey);
-    aiContent.appendChild(aiApiKeyField);
-
-    const aiApiKeyActions = document.createElement('div');
-    aiApiKeyActions.className = 'local-ext-panel__actions';
-    const aiApiKeyLink = document.createElement('a');
-    aiApiKeyLink.className = 'chip';
-    aiApiKeyLink.href = 'https://platform.openai.com/api-keys';
-    aiApiKeyLink.target = '_blank';
-    aiApiKeyLink.rel = 'noopener noreferrer';
-    aiApiKeyLink.textContent = localizeText('OpenAI APIキー取得', 'Get OpenAI API Key');
-    aiApiKeyActions.appendChild(aiApiKeyLink);
-    aiContent.appendChild(aiApiKeyActions);
-
-    const aiAdvancedDetails = document.createElement('details');
-    aiAdvancedDetails.className = 'local-ext-panel__advanced';
-
-    const aiAdvancedSummary = document.createElement('summary');
-    aiAdvancedSummary.className = 'local-ext-panel__advanced-summary';
-    aiAdvancedSummary.textContent = localizeText('詳細設定を開く', 'Show Advanced Settings');
-    aiAdvancedDetails.appendChild(aiAdvancedSummary);
-
-    const aiAdvancedBody = document.createElement('div');
-    aiAdvancedBody.className = 'local-ext-panel__advanced-body';
-
-    const aiGrid = document.createElement('div');
-    aiGrid.className = 'local-ext-panel__grid';
-
-    const aiEndpointField = document.createElement('label');
-    aiEndpointField.className = 'local-ext-panel__field';
-    const aiEndpointLabel = document.createElement('span');
-    aiEndpointLabel.textContent = localizeText('エンドポイント', 'Endpoint');
-    const aiEndpoint = document.createElement('input');
-    aiEndpoint.id = 'localExtensionAiEndpoint';
-    aiEndpoint.type = 'url';
-    aiEndpoint.className = 'local-ext-panel__input';
-    aiEndpoint.placeholder = AI_DEFAULT_ENDPOINT;
-    aiEndpoint.autocomplete = 'off';
-    aiEndpointField.append(aiEndpointLabel, aiEndpoint);
-
-    const aiApiFormatField = document.createElement('label');
-    aiApiFormatField.className = 'local-ext-panel__field';
-    const aiApiFormatLabel = document.createElement('span');
-    aiApiFormatLabel.textContent = localizeText('API形式', 'API Format');
-    const aiApiFormat = document.createElement('select');
-    aiApiFormat.id = 'localExtensionAiApiFormat';
-    aiApiFormat.className = 'local-ext-panel__select';
-    const aiResponseOption = document.createElement('option');
-    aiResponseOption.value = AI_API_FORMAT_RESPONSES;
-    aiResponseOption.textContent = 'OpenAI Responses';
-    const aiChatOption = document.createElement('option');
-    aiChatOption.value = AI_API_FORMAT_CHAT_COMPLETIONS;
-    aiChatOption.textContent = 'Chat Completions';
-    aiApiFormat.append(aiResponseOption, aiChatOption);
-    aiApiFormatField.append(aiApiFormatLabel, aiApiFormat);
-
-    const aiModelField = document.createElement('label');
-    aiModelField.className = 'local-ext-panel__field';
-    const aiModelLabel = document.createElement('span');
-    aiModelLabel.textContent = localizeText('モデル', 'Model');
-    const aiModel = document.createElement('input');
-    aiModel.id = 'localExtensionAiModel';
-    aiModel.type = 'text';
-    aiModel.className = 'local-ext-panel__input';
-    aiModel.placeholder = AI_DEFAULT_MODEL;
-    aiModel.autocomplete = 'off';
-    aiModelField.append(aiModelLabel, aiModel);
-    aiGrid.append(aiEndpointField, aiApiFormatField, aiModelField);
-    aiAdvancedBody.appendChild(aiGrid);
-
-    const aiSystemPromptField = document.createElement('label');
-    aiSystemPromptField.className = 'local-ext-panel__field';
-    const aiSystemPromptLabel = document.createElement('span');
-    aiSystemPromptLabel.textContent = localizeText('共通システムプロンプト', 'Shared System Prompt');
-    const aiSystemPrompt = document.createElement('textarea');
-    aiSystemPrompt.id = 'localExtensionAiSystemPrompt';
-    aiSystemPrompt.className = 'local-ext-panel__code local-ext-panel__code--compact';
-    aiSystemPrompt.spellcheck = false;
-    aiSystemPrompt.placeholder = localizeText('必要な場合だけ追記してください', 'Add only if you need extra global instructions');
-    aiSystemPromptField.append(aiSystemPromptLabel, aiSystemPrompt);
-    aiAdvancedBody.appendChild(aiSystemPromptField);
-    aiAdvancedDetails.appendChild(aiAdvancedBody);
-    aiContent.appendChild(aiAdvancedDetails);
-
-    const aiPromptField = document.createElement('label');
-    aiPromptField.className = 'local-ext-panel__field';
-    const aiPromptLabel = document.createElement('span');
-    aiPromptLabel.textContent = localizeText('やりたいこと', 'What You Want');
-
-    const aiPrompt = document.createElement('textarea');
-    aiPrompt.id = 'localExtensionAiPrompt';
-    aiPrompt.className = 'local-ext-panel__code local-ext-panel__code--compact';
-    aiPrompt.spellcheck = false;
-    aiPrompt.placeholder = localizeText('例: 32x32 のチェッカースタンプを追加して', 'Example: Add a 32x32 checker stamp tool');
-    aiPromptField.append(aiPromptLabel, aiPrompt);
-    aiContent.appendChild(aiPromptField);
-
-    const aiActions = document.createElement('div');
-    aiActions.className = 'local-ext-panel__actions local-ext-panel__actions--ai';
-
-    const aiSaveButton = document.createElement('button');
-    aiSaveButton.type = 'button';
-    aiSaveButton.className = 'chip';
-    aiSaveButton.textContent = localizeText('AI設定を保存', 'Save AI Settings');
-
-    const aiTestButton = document.createElement('button');
-    aiTestButton.type = 'button';
-    aiTestButton.className = 'chip';
-    aiTestButton.textContent = localizeText('接続テスト', 'Test Connection');
-
-    const aiGenerateButton = document.createElement('button');
-    aiGenerateButton.type = 'button';
-    aiGenerateButton.className = 'chip';
-    aiGenerateButton.textContent = localizeText('コード生成', 'Generate Code');
-
-    aiActions.append(aiSaveButton, aiTestButton, aiGenerateButton);
-    aiContent.appendChild(aiActions);
-
-    const aiSummary = document.createElement('p');
-    aiSummary.className = 'help-text local-ext-panel__tool-meta';
-    aiContent.appendChild(aiSummary);
-
-    const aiStatus = document.createElement('p');
-    aiStatus.className = 'help-text local-ext-panel__status';
-    aiStatus.id = 'localExtensionAiStatus';
-    aiStatus.setAttribute('aria-live', 'polite');
-    aiContent.appendChild(aiStatus);
-    aiSection.appendChild(aiContent);
-
-    body.appendChild(aiSection);
 
     const code = document.createElement('textarea');
     code.id = 'localExtensionCode';
@@ -2033,30 +1402,6 @@
       description,
       enabled,
       toggleText,
-      aiHeading,
-      aiContent,
-      aiNotice,
-      aiEnabled,
-      aiEnabledText,
-      aiEndpointLabel,
-      aiEndpoint,
-      aiApiFormatLabel,
-      aiApiFormat,
-      aiModelLabel,
-      aiModel,
-      aiApiKeyLabel,
-      aiApiKey,
-      aiApiKeyLink,
-      aiSystemPromptLabel,
-      aiSystemPrompt,
-      aiAdvancedSummary,
-      aiPromptLabel,
-      aiPrompt,
-      aiSaveButton,
-      aiTestButton,
-      aiGenerateButton,
-      aiSummary,
-      aiStatus,
       code,
       saveButton,
       reloadButton,
@@ -2083,75 +1428,12 @@
     }
     if (ui.description instanceof HTMLElement) {
       ui.description.textContent = localizeText(
-        'この端末だけで動作します。共有状態へ書き込むAPIは公開しません。',
-        'Runs only on this device. No API is exposed for writing into shared state.'
+        'マルチ中でもこの端末だけで動作します。共有状態へ書き込むAPIは公開せず、拡張コードからの外部通信もできません。',
+        'Even during multiplayer, this runs only on this device. No API is exposed for writing into shared state, and direct external network access is disabled.'
       );
     }
     if (ui.toggleText instanceof HTMLElement) {
       ui.toggleText.textContent = localizeText('有効化', 'Enable');
-    }
-    if (ui.aiHeading instanceof HTMLElement) {
-      ui.aiHeading.textContent = localizeText('BYOGPT 接続', 'BYOGPT Connection');
-    }
-    if (ui.aiNotice instanceof HTMLElement) {
-      ui.aiNotice.textContent = localizeText(
-        'APIキーはこのブラウザにだけ保存されます。実運用はユーザー側プロキシ経由を推奨します。',
-        'API keys stay only in this browser. For production use, prefer a user-owned proxy.'
-      );
-    }
-    if (ui.aiEnabledText instanceof HTMLElement) {
-      ui.aiEnabledText.textContent = localizeText('BYOGPT を使う', 'Use BYOGPT');
-    }
-    if (ui.aiEndpointLabel instanceof HTMLElement) {
-      ui.aiEndpointLabel.textContent = localizeText('エンドポイント', 'Endpoint');
-    }
-    if (ui.aiApiFormatLabel instanceof HTMLElement) {
-      ui.aiApiFormatLabel.textContent = localizeText('API形式', 'API Format');
-    }
-    if (ui.aiModelLabel instanceof HTMLElement) {
-      ui.aiModelLabel.textContent = localizeText('モデル', 'Model');
-    }
-    if (ui.aiApiKeyLabel instanceof HTMLElement) {
-      ui.aiApiKeyLabel.textContent = localizeText('APIキー', 'API Key');
-    }
-    if (ui.aiApiKeyLink instanceof HTMLAnchorElement) {
-      ui.aiApiKeyLink.textContent = localizeText('OpenAI APIキー取得', 'Get OpenAI API Key');
-    }
-    if (ui.aiSystemPromptLabel instanceof HTMLElement) {
-      ui.aiSystemPromptLabel.textContent = localizeText('AIへの追加指示', 'Extra AI Instructions');
-    }
-    if (ui.aiAdvancedSummary instanceof HTMLElement) {
-      ui.aiAdvancedSummary.textContent = localizeText('詳細設定を開く', 'Show Advanced Settings');
-    }
-    if (ui.aiPromptLabel instanceof HTMLElement) {
-      ui.aiPromptLabel.textContent = localizeText('やりたいこと', 'What You Want');
-    }
-    if (ui.aiSystemPrompt instanceof HTMLTextAreaElement) {
-      ui.aiSystemPrompt.placeholder = localizeText(
-        '必要な場合だけ追記してください',
-        'Add only if you need extra global instructions'
-      );
-    }
-    if (ui.aiPrompt instanceof HTMLTextAreaElement) {
-      ui.aiPrompt.placeholder = localizeText(
-        '例: クリック位置に 16x16 のハートスタンプを置くツールを追加して',
-        'Example: Add a tool that places a 16x16 heart stamp on the clicked cell'
-      );
-    }
-    if (ui.aiApiKey instanceof HTMLInputElement) {
-      ui.aiApiKey.placeholder = localizeText(
-        'OpenAIなら sk-... を貼り付け',
-        'Paste your key here, for example sk-...'
-      );
-    }
-    if (ui.aiSaveButton instanceof HTMLButtonElement) {
-      ui.aiSaveButton.textContent = localizeText('設定保存', 'Save Settings');
-    }
-    if (ui.aiTestButton instanceof HTMLButtonElement) {
-      ui.aiTestButton.textContent = localizeText('接続テスト', 'Test Connection');
-    }
-    if (ui.aiGenerateButton instanceof HTMLButtonElement) {
-      ui.aiGenerateButton.textContent = localizeText('コード生成', 'Generate Code');
     }
     if (ui.code instanceof HTMLTextAreaElement) {
       ui.code.placeholder = localizeText('ここにローカル拡張コードを入力', 'Enter local extension code here');
@@ -2185,7 +1467,6 @@
     }
     renderLocalToolButtons();
     renderLocalToolMeta();
-    renderAiSummary();
   }
 
   function hydrateUi() {
@@ -2193,28 +1474,14 @@
     if (!ui) {
       return;
     }
+    clearRetiredAiStorage();
     runtimeState.code = readStorage(STORAGE_KEY_CODE, '');
     runtimeState.enabled = readStorage(STORAGE_KEY_ENABLED, '0') === '1';
-    runtimeState.aiConfig = loadAiConfigFromStorage();
     const isOpen = readStorage(STORAGE_KEY_OPEN, '0') === '1';
     ui.panel.open = isOpen;
     ui.enabled.checked = runtimeState.enabled;
     ui.code.value = runtimeState.code;
-    ui.aiEnabled.checked = runtimeState.aiConfig.enabled;
-    ui.aiEndpoint.value = runtimeState.aiConfig.endpoint;
-    ui.aiApiFormat.value = runtimeState.aiConfig.apiFormat;
-    ui.aiModel.value = runtimeState.aiConfig.model;
-    ui.aiApiKey.value = runtimeState.aiConfig.apiKey;
-    ui.aiSystemPrompt.value = runtimeState.aiConfig.systemPrompt;
-    ui.aiPrompt.value = runtimeState.aiConfig.lastPrompt;
-    if (!(ui.aiPrompt.value || '').trim()) {
-      const preset = getAiCodePresetDefinition(runtimeState.aiConfig.codePreset);
-      if (preset) {
-        ui.aiPrompt.value = preset.promptTemplate;
-      }
-    }
     applyUiLocalization();
-    updateAiVisibility();
 
     ui.panel.addEventListener('toggle', () => {
       writeStorage(STORAGE_KEY_OPEN, ui.panel.open ? '1' : '0');
@@ -2223,39 +1490,6 @@
     ui.enabled.addEventListener('change', () => {
       setEnabled(ui.enabled.checked, { persist: true, restart: true });
     });
-
-    ui.aiEnabled.addEventListener('change', () => {
-      if (ui.aiEnabled.checked) {
-        const accepted = window.confirm(
-          localizeText(
-            'BYOGPT はまだテスト段階です。利用は個人責任でお願いします。続けますか？',
-            'BYOGPT is still experimental. Use it at your own risk. Continue?'
-          )
-        );
-        if (!accepted) {
-          ui.aiEnabled.checked = false;
-        }
-      }
-      saveAiConfigFromUi();
-      updateAiVisibility();
-    });
-
-    const readAiConfigFromUi = () => normalizeAiConfig({
-      enabled: ui.aiEnabled.checked,
-      endpoint: ui.aiEndpoint.value,
-      apiFormat: ui.aiApiFormat.value,
-      apiKey: ui.aiApiKey.value,
-      model: ui.aiModel.value,
-      systemPrompt: ui.aiSystemPrompt.value,
-      codePreset: runtimeState.aiConfig.codePreset || AI_DEFAULT_CODE_PRESET,
-      lastPrompt: ui.aiPrompt.value,
-    });
-
-    const saveAiConfigFromUi = () => {
-      const config = persistAiConfig(readAiConfigFromUi());
-      renderAiSummary();
-      return config;
-    };
 
     ui.saveButton.addEventListener('click', () => {
       runtimeState.code = ui.code.value || '';
@@ -2302,69 +1536,13 @@
       setStatus(localizeText('ローカルツールの選択を解除しました', 'Cleared local tool selection'), 'info');
     });
 
-    ui.aiSaveButton.addEventListener('click', () => {
-      saveAiConfigFromUi();
-      setAiStatus(localizeText('BYOGPT 設定を保存しました', 'Saved BYOGPT settings'), 'success');
-    });
-
-    ui.aiTestButton.addEventListener('click', async () => {
-      saveAiConfigFromUi();
-      setAiBusy(true);
-      setAiStatus(localizeText('接続テスト中...', 'Testing connection...'), 'info');
-      try {
-        const result = await performAiRequest({
-          input: buildAiTestInput(),
-        }, { source: 'panel-test' });
-        setAiStatus(
-          localizeText(
-            `接続OK: ${result.model} @ ${result.endpointHost || 'endpoint'}`,
-            `Connected: ${result.model} @ ${result.endpointHost || 'endpoint'}`
-          ),
-          'success'
-        );
-      } catch (error) {
-        setAiStatus(extractAiErrorMessage({}, error?.message || String(error || '')), 'error');
-      } finally {
-        setAiBusy(false);
-      }
-    });
-
-    ui.aiGenerateButton.addEventListener('click', async () => {
-      const config = saveAiConfigFromUi();
-      if (!sanitizeMultilineText(config.lastPrompt, 4000)) {
-        setAiStatus(localizeText('コード生成の依頼を入力してください', 'Enter a prompt for code generation'), 'warn');
-        return;
-      }
-      setAiBusy(true);
-      setAiStatus(localizeText('コードを生成中...', 'Generating code...'), 'info');
-      try {
-        const result = await performAiRequest(
-          buildAiCodeWriterRequest(config.lastPrompt, ui.code.value || '', config.codePreset),
-          { source: 'panel-generate' }
-        );
-        const cleaned = stripMarkdownCodeFence(result.text);
-        if (!cleaned) {
-          throw new Error(localizeText('AI からコードを取得できませんでした', 'The AI did not return code'));
-        }
-        insertGeneratedCode(ui.code, cleaned);
-        runtimeState.code = ui.code.value || '';
-        writeStorage(STORAGE_KEY_CODE, runtimeState.code);
-        setAiStatus(localizeText('コードを挿し込みました。必要なら「反映」で実行してください', 'Inserted code. Use Apply when you want to run it'), 'success');
-        setStatus(localizeText('AIがローカル拡張コードを生成しました', 'AI generated local extension code'), 'success');
-      } catch (error) {
-        setAiStatus(extractAiErrorMessage({}, error?.message || String(error || '')), 'error');
-      } finally {
-        setAiBusy(false);
-      }
-    });
-
     renderLocalToolButtons();
     renderLocalToolMeta();
-    renderAiSummary();
     updateLocalInputLayerState();
   }
 
   function init() {
+    clearRetiredAiStorage();
     const ui = buildUi();
     if (!ui) {
       return;
