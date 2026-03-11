@@ -30,6 +30,7 @@
       color: document.getElementById('mobilePanelColor'),
       frames: document.getElementById('mobilePanelFrames'),
       settings: document.getElementById('mobilePanelSettings'),
+      extensions: document.getElementById('mobilePanelExtensions'),
       help: document.getElementById('mobilePanelHelp'),
       file: document.getElementById('mobilePanelFile'),
       multi: document.getElementById('mobilePanelMulti'),
@@ -39,6 +40,7 @@
       color: document.getElementById('panelColor'),
       frames: document.getElementById('panelFrames'),
       settings: document.getElementById('panelSettings'),
+      extensions: document.getElementById('panelExtensions'),
       help: document.getElementById('panelHelp'),
       file: document.getElementById('panelFile'),
       multi: document.getElementById('panelMulti'),
@@ -432,7 +434,7 @@
   };
 
   const LEFT_TAB_KEYS = ['tools', 'color'];
-  const RIGHT_TAB_KEYS = ['frames', 'settings', 'help', 'file', 'multi'];
+  const RIGHT_TAB_KEYS = ['frames', 'settings', 'extensions', 'help', 'file', 'multi'];
   const TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE = 'virtualCursorToggle';
   const TOOL_ACTION_MIRROR_POPUP = 'mirrorPopup';
   const TOOL_ACTION_CAMERA_MODE = 'cameraMode';
@@ -496,6 +498,7 @@
     color: 'full',
     frames: 'full',
     settings: 'full',
+    extensions: 'full',
     help: 'full',
     file: 'full',
     multi: 'full',
@@ -853,6 +856,7 @@
     },
     frames: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.frames },
     settings: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.settings },
+    extensions: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.extensions },
     help: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.help },
     file: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.file },
     multi: { desktop: dom.rightTabPanes || dom.rightRail, mobile: dom.mobilePanels.multi },
@@ -6315,11 +6319,15 @@
     toggleButtons.forEach(button => {
       const icon = button.querySelector('img');
       const srOnly = button.querySelector('.sr-only');
-      const label = srOnly instanceof HTMLElement ? srOnly : button.querySelector('span');
+      const groupLabel = button.querySelector('.tool-group-label');
+      const label = srOnly instanceof HTMLElement
+        ? srOnly
+        : (groupLabel instanceof HTMLElement ? groupLabel : button.querySelector('span'));
       const controlLabel = localizeText(
         enabled ? '仮想カーソルを非表示' : '仮想カーソルを表示',
         enabled ? 'Hide Virtual Cursor' : 'Show Virtual Cursor'
       );
+      const visibleLabel = localizeText('仮想カーソル', 'Virtual Cursor');
       button.classList.toggle('is-active', enabled);
       button.setAttribute('aria-pressed', String(enabled));
       button.setAttribute('aria-label', controlLabel);
@@ -6329,9 +6337,7 @@
         icon.alt = '仮想カーソル';
       }
       if (label) {
-        label.textContent = srOnly instanceof HTMLElement
-          ? localizeText('仮想カーソル', 'Virtual Cursor')
-          : (enabled ? '仮想OFF' : '仮想ON');
+        label.textContent = visibleLabel;
       }
     });
   }
@@ -6373,8 +6379,11 @@
       button.setAttribute('aria-label', controlLabel);
       button.setAttribute('title', controlLabel);
       const srOnly = button.querySelector('.sr-only');
+      const groupLabel = button.querySelector('.tool-group-label');
       if (srOnly instanceof HTMLElement) {
         srOnly.textContent = label;
+      } else if (groupLabel instanceof HTMLElement) {
+        groupLabel.textContent = label;
       }
     });
   }
@@ -7537,8 +7546,7 @@
     if (isMobileCompact) {
       compactToolFlyoutLockedLeft = null;
       ensureMobileToolGridPortal(true, { mobilePeek: true });
-      const activeTools = TOOL_GROUPS[state.activeToolGroup]?.tools || [];
-      const toolCount = Math.max(1, activeTools.length);
+      const toolCount = getVisibleToolGridButtonCount();
       const itemSize = 44;
       const gap = 8;
       const padding = 16;
@@ -7570,8 +7578,7 @@
       dom.toolGrid.style.gridTemplateColumns = `repeat(${columns}, ${itemSize}px)`;
     } else {
       ensureMobileToolGridPortal(true, { mobilePeek: false });
-      const activeTools = TOOL_GROUPS[state.activeToolGroup]?.tools || [];
-      const toolCount = Math.max(1, activeTools.length);
+      const toolCount = getVisibleToolGridButtonCount();
       const compactItemSize = 44;
       const compactGap = 8;
       const compactPadding = 16;
@@ -7640,6 +7647,16 @@
     if (isMirrorToolPopoverOpen()) {
       positionMirrorToolPopover();
     }
+  }
+
+  function getVisibleToolGridButtonCount() {
+    if (!(dom.toolGrid instanceof HTMLElement)) {
+      return 1;
+    }
+    const visibleCount = Array.from(dom.toolGrid.querySelectorAll('.tool-button'))
+      .filter(button => button instanceof HTMLElement && !button.hidden && button.getAttribute('aria-hidden') !== 'true')
+      .length;
+    return Math.max(1, visibleCount);
   }
 
   function setCompactToolFlyoutOpen(open, { force = false, keepMirrorPopover = false } = {}) {
@@ -8924,6 +8941,7 @@
       color: { ja: 'カラー', en: 'Color' },
       frames: { ja: 'フレームとレイヤー', en: 'Frames & Layers' },
       settings: { ja: '設定', en: 'Settings' },
+      extensions: { ja: '拡張', en: 'Extensions' },
       help: { ja: '使い方ヘルプ', en: 'Help' },
       file: { ja: 'ファイル', en: 'File' },
       multi: { ja: '共有モード', en: 'Collab' },
@@ -8962,6 +8980,10 @@
       const srOnly = button.querySelector('.sr-only');
       if (srOnly instanceof HTMLElement) {
         srOnly.textContent = label;
+      }
+      const groupLabel = button.querySelector('.tool-group-label');
+      if (groupLabel instanceof HTMLElement) {
+        groupLabel.textContent = label;
       }
     });
   }
