@@ -139,15 +139,18 @@
 <button class="startup-screen__link" id="startupActionSkip" type="button">この画面を閉じる</button>
 </div>
 </div>
-<div aria-hidden="true" class="update-toast" data-update-id="2026-03-11-personal-view-copy-paste-stability" data-update-published="false" hidden="" id="updateToast" role="status" aria-live="polite">
+<div aria-hidden="true" class="update-toast" data-update-id="2026-03-11-selection-multiplayer-polish" data-update-published="true" hidden="" id="updateToast" role="status" aria-live="polite">
 <div class="update-toast__body">
 <p class="update-toast__message">
 <strong>更新情報 (2026/03/11)</strong><br/>
 【今回更新】<br/>
-・ローカル拡張の GPT連携を撤去し、旧AI設定やローカル保存キーも整理しました<br/>
-・共有中の視点 / 選択 / 色 / ツール / 背景 / ミラー / オニオン / レイヤー表示 / レイヤー薄表示は各自ローカル保持になりました<br/>
+・GPT連携を撤去し、共有中の視点 / 選択 / 色 / ツール / 背景 / ミラー / オニオン / レイヤー表示 / 薄表示は各自ローカル保持になりました<br/>
 ・共有パレットは最初だけマスター内容で始め、その後の色選びや調整は各自ローカルで続けられます<br/>
-・SpriteMAP（全フレーム1枚）出力を追加し、選択範囲のコピー / 貼り付けまわりも安定化しました<br/>
+・SpriteMAP（全フレーム1枚）出力を追加しました<br/>
+・選択範囲のコピー / 貼り付けを整理し、図形のまま選ぶモード、キャンバス外クリック解除、はみ出し選択からの再ペーストに対応しました<br/>
+・図形のままペーストでは透明セルを無視し、非透明ピクセルだけ貼り付けるよう調整しました<br/>
+・フレーム / レイヤー番号セルを選んだ状態では、追加ボタンでそのまま複製できます<br/>
+・アプリ版では外部販売サイトの「応援チップ」を非表示にしました<br/>
 ・詳細は設定の「更新情報」から確認できます
 </p>
 <div class="update-toast__actions">
@@ -481,6 +484,13 @@
 <div aria-label="同色モード" class="select-same-mode-buttons" role="group">
 <button aria-pressed="true" class="chip select-same-mode-button is-active" data-select-same-mode="connected" type="button">連結のみ</button>
 <button aria-pressed="false" class="chip select-same-mode-button" data-select-same-mode="global" type="button">全体</button>
+</div>
+</label>
+<label class="field" hidden id="selectionShapeModeField">
+<span>範囲モード</span>
+<div aria-label="範囲モード" class="select-same-mode-buttons" role="group">
+<button aria-pressed="true" class="chip select-same-mode-button is-active" data-selection-shape-mode="content" type="button">描画のみ</button>
+<button aria-pressed="false" class="chip select-same-mode-button" data-selection-shape-mode="shape" type="button">図形のまま</button>
 </div>
 </label>
 <output class="brush-custom-info" id="customBrushInfo">カスタム: 未作成</output>
