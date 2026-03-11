@@ -22736,7 +22736,7 @@
       } else if (action === 'cancelSelectionMove') {
         cancelPendingSelectionMove();
       } else if (action === 'confirmSelectionMove') {
-        confirmPendingSelectionMove();
+        confirmPendingSelectionMove({ allowOutOfBoundsClip: true });
       }
       updateCanvasControlButtons();
     };
@@ -31030,7 +31030,7 @@
           return;
         }
       }
-      confirmPendingSelectionMove();
+      confirmPendingSelectionMove({ allowOutOfBoundsClip: true });
       pointerState.active = false;
       pointerState.pointerId = null;
       pointerState.tool = null;
@@ -31586,7 +31586,7 @@
       if (!mask || !bounds || !layer) {
         return false;
       }
-      moveState = createSelectionMoveState(layer, bounds, mask);
+      moveState = createSelectionMoveState(layer, bounds, mask, state.selectionContentMask);
     }
     if (!moveState) {
       return false;
@@ -31652,7 +31652,7 @@
       if (!mask || !bounds || !layer) {
         return false;
       }
-      moveState = createSelectionMoveState(layer, bounds, mask);
+      moveState = createSelectionMoveState(layer, bounds, mask, state.selectionContentMask);
     }
     if (!moveState) {
       return false;
@@ -31842,7 +31842,7 @@
     return moveState.contentMask;
   }
 
-  function createSelectionMoveState(layer, bounds, mask) {
+  function createSelectionMoveState(layer, bounds, mask, sourceContentMask = null) {
     if (!layer || !bounds || !mask) {
       return null;
     }
@@ -31860,6 +31860,7 @@
     const imageData = createBlankImageData(width, height);
 
     const layerDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    const hasSourceContentMask = sourceContentMask instanceof Uint8Array && sourceContentMask.length === mask.length;
 
     for (let y = 0; y < height; y += 1) {
       for (let x = 0; x < width; x += 1) {
@@ -31875,12 +31876,25 @@
         const canvasBase = canvasIndex * 4;
         const localBase = localIndex * 4;
         if (selected) {
-          localIndices[localIndex] = layer.indices[canvasIndex];
+          const paletteIndex = layer.indices[canvasIndex];
+          const fallbackColor = {
+            r: layerDirect ? layerDirect[canvasBase] : 0,
+            g: layerDirect ? layerDirect[canvasBase + 1] : 0,
+            b: layerDirect ? layerDirect[canvasBase + 2] : 0,
+            a: layerDirect ? layerDirect[canvasBase + 3] : 0,
+          };
+          const sourceColor = paletteIndex >= 0 && state.palette[paletteIndex]
+            ? state.palette[paletteIndex]
+            : fallbackColor;
+          const hasContent = hasSourceContentMask
+            ? sourceContentMask[canvasIndex] === 1
+            : (Number(sourceColor?.a) || 0) > 0;
+          localIndices[localIndex] = hasContent ? paletteIndex : -1;
           if (layerDirect) {
-            localDirect[localBase] = layerDirect[canvasBase];
-            localDirect[localBase + 1] = layerDirect[canvasBase + 1];
-            localDirect[localBase + 2] = layerDirect[canvasBase + 2];
-            localDirect[localBase + 3] = layerDirect[canvasBase + 3];
+            localDirect[localBase] = hasContent ? layerDirect[canvasBase] : 0;
+            localDirect[localBase + 1] = hasContent ? layerDirect[canvasBase + 1] : 0;
+            localDirect[localBase + 2] = hasContent ? layerDirect[canvasBase + 2] : 0;
+            localDirect[localBase + 3] = hasContent ? layerDirect[canvasBase + 3] : 0;
           } else {
             localDirect[localBase] = 0;
             localDirect[localBase + 1] = 0;
@@ -31888,27 +31902,20 @@
             localDirect[localBase + 3] = 0;
           }
           if (imageData) {
-            const paletteIndex = layer.indices[canvasIndex];
-            let color = null;
-            if (paletteIndex >= 0 && state.palette[paletteIndex]) {
-              color = state.palette[paletteIndex];
+            if (hasContent) {
+              imageData.data[localBase] = sourceColor.r;
+              imageData.data[localBase + 1] = sourceColor.g;
+              imageData.data[localBase + 2] = sourceColor.b;
+              imageData.data[localBase + 3] = sourceColor.a;
             } else {
-              color = {
-                r: layerDirect ? layerDirect[canvasBase] : 0,
-                g: layerDirect ? layerDirect[canvasBase + 1] : 0,
-                b: layerDirect ? layerDirect[canvasBase + 2] : 0,
-                a: layerDirect ? layerDirect[canvasBase + 3] : 0,
-              };
+              imageData.data[localBase] = 0;
+              imageData.data[localBase + 1] = 0;
+              imageData.data[localBase + 2] = 0;
+              imageData.data[localBase + 3] = 0;
             }
-            if (color) {
-              imageData.data[localBase] = color.r;
-              imageData.data[localBase + 1] = color.g;
-              imageData.data[localBase + 2] = color.b;
-              imageData.data[localBase + 3] = color.a;
-              if ((Number(color.a) || 0) > 0) {
-                localContentMask[localIndex] = 1;
-              }
-            }
+          }
+          if (hasContent) {
+            localContentMask[localIndex] = 1;
           }
         } else {
           localIndices[localIndex] = -1;
@@ -32379,7 +32386,7 @@
     if (!layer) {
       return null;
     }
-    const moveState = createSelectionMoveState(layer, bounds, mask);
+    const moveState = createSelectionMoveState(layer, bounds, mask, state.selectionContentMask);
     if (!moveState) {
       return null;
     }
@@ -33553,6 +33560,7 @@
     if (result.placed && result.bounds) {
       markHistoryDirty();
       state.selectionMask = result.mask;
+      state.selectionContentMask = result.contentMask;
       state.selectionBounds = result.bounds;
       internalClipboard.selection.bounds = { ...result.bounds };
       markDirtyRect(result.bounds.x0, result.bounds.y0, result.bounds.x1, result.bounds.y1);
@@ -33737,12 +33745,14 @@
       }
       if (applySelection) {
         state.selectionMask = result.mask;
+        state.selectionContentMask = result.contentMask;
         state.selectionBounds = result.bounds;
         if (internalClipboard.selection && result.bounds) {
           internalClipboard.selection.bounds = { ...result.bounds };
         }
       } else {
         state.selectionMask = null;
+        state.selectionContentMask = null;
         state.selectionBounds = null;
       }
     } else {
@@ -33750,6 +33760,7 @@
         clearSelection();
       } else {
         state.selectionMask = null;
+        state.selectionContentMask = null;
         state.selectionBounds = null;
       }
     }
@@ -33830,6 +33841,7 @@
           return {
             placed: false,
             mask: null,
+            contentMask: null,
             bounds: null,
             clippedCount: 1,
             blockedByBounds: true,
@@ -33838,6 +33850,7 @@
       }
     }
     const newMask = new Uint8Array(state.width * state.height);
+    const newContentMask = new Uint8Array(state.width * state.height);
     const newBounds = { x0: state.width, y0: state.height, x1: -1, y1: -1 };
     let placed = false;
     let clippedCount = 0;
@@ -33875,6 +33888,7 @@
       const targetBase = targetIndex * 4;
       const sourceBase = sourceIndex * 4;
       layer.indices[targetIndex] = indices[sourceIndex];
+      newContentMask[targetIndex] = 1;
       if (targetDirect) {
         targetDirect[targetBase] = direct[sourceBase];
         targetDirect[targetBase + 1] = direct[sourceBase + 1];
@@ -33890,6 +33904,7 @@
       return {
         placed: false,
         mask: null,
+        contentMask: null,
         bounds: null,
         clippedCount,
         blockedByBounds: false,
@@ -33899,6 +33914,7 @@
     return {
       placed: true,
       mask: newMask,
+      contentMask: newContentMask,
       bounds: newBounds,
       clippedCount,
       blockedByBounds: false,
@@ -34643,7 +34659,7 @@
     if (!mask || !bounds || !layer || !selectionMaskHasPixels(mask)) {
       return null;
     }
-    const moveState = createSelectionMoveState(layer, bounds, mask);
+    const moveState = createSelectionMoveState(layer, bounds, mask, state.selectionContentMask);
     if (!moveState) {
       return null;
     }
@@ -35570,6 +35586,7 @@
 
     hideSelectionTransformMenu();
     state.selectionMask = mask;
+    state.selectionContentMask = null;
     state.selectionBounds = bounds;
     updateCanvasControlButtons();
     requestOverlayRender();
@@ -35606,6 +35623,7 @@
 
     hideSelectionTransformMenu();
     state.selectionMask = mask;
+    state.selectionContentMask = null;
     state.selectionBounds = bounds;
     updateCanvasControlButtons();
     requestOverlayRender();
@@ -35656,6 +35674,7 @@
 
     hideSelectionTransformMenu();
     state.selectionMask = mask;
+    state.selectionContentMask = null;
     state.selectionBounds = bounds;
     updateCanvasControlButtons();
     requestOverlayRender();
@@ -35778,6 +35797,7 @@
 
     hideSelectionTransformMenu();
     state.selectionMask = mask;
+    state.selectionContentMask = null;
     state.selectionBounds = bounds;
     updateCanvasControlButtons();
     requestOverlayRender();
@@ -35821,17 +35841,24 @@
   function clearSelection() {
     const pendingMoveState = getPendingSelectionMoveState();
     if (pendingMoveState) {
-      // Avoid data loss: commit pending moved pixels before clearing the selection state.
+      // Clicking away should commit the visible portion even if the selection is partially out of bounds.
       pointerState.selectionMove = pendingMoveState;
-      finalizeSelectionMove();
+      const finalized = finalizeSelectionMove({ allowOutOfBoundsClip: true });
+      if (!finalized) {
+        updateCanvasControlButtons();
+        requestOverlayRender();
+        return false;
+      }
     }
     hideSelectionTransformMenu();
     state.selectionMask = null;
+    state.selectionContentMask = null;
     state.selectionBounds = null;
     state.pendingPasteMoveState = null;
     pointerState.selectionMove = null;
     updateCanvasControlButtons();
     requestOverlayRender();
+    return true;
   }
 
   function renderEverything() {
@@ -46893,7 +46920,7 @@
             && (isCanvasSurfaceTarget(targetElement) || isViewportControlTarget(targetElement))
           );
           if (!keepCanvasFlow) {
-            confirmPendingSelectionMove();
+            confirmPendingSelectionMove({ allowOutOfBoundsClip: true });
           }
         }
         if (!isMouseLikePointer) {
