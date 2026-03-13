@@ -5,10 +5,13 @@
 
   const STORAGE_KEY_ENABLED = 'pixieedraw:local-extension:enabled';
   const STORAGE_KEY_CODE = 'pixieedraw:local-extension:code';
-  const TEMPLATE_SCRIPT_FILENAME = 'pixieedraw-tool-template.js';
+  const STORAGE_KEY_PLUGIN_DATA = 'pixieedraw:local-extension:data';
+  const TEMPLATE_SCRIPT_FILENAME = 'pixieedraw-8way-sprite-assistant-template.js';
   const SCRIPT_WATCH_INTERVAL_MS = 1800;
   const LOCAL_TOOL_MAX_COUNT = 24;
   const LOCAL_PAINT_BATCH_MAX = 32768;
+  const SANDBOX_FRAME_MIN_HEIGHT = 180;
+  const SANDBOX_FRAME_MAX_HEIGHT = 560;
   const RETIRED_AI_STORAGE_KEYS = Object.freeze([
     'pixieedraw:local-extension:ai-enabled',
     'pixieedraw:local-extension:ai-endpoint',
@@ -44,6 +47,7 @@
     scriptFileLastModified: 0,
     scriptFileWatchTimer: null,
     scriptFileReadInFlight: false,
+    frameHeight: 240,
   };
 
   function isEnglishUi() {
@@ -56,36 +60,841 @@
   }
 
   function buildTemplateCode() {
-    return [
-      "api.on('init', (ctx) => {",
-      `  api.toast(${JSON.stringify(localizeText('ローカル拡張を起動しました', 'Local extension started'))}, 'success');`,
-      "  api.badge('Local Ext ON');",
-      `  api.panel(${JSON.stringify(localizeText('ローカル拡張', 'Local Extension'))}, ${JSON.stringify(localizeText('マルチ中でもこの表示はあなたの端末だけです。', 'Even during multiplayer, this panel is visible only on your device.'))});`,
-      `  api.registerTool({ id: 'stamp8', label: '8x8 Stamp', hint: ${JSON.stringify(localizeText('ローカル描画だけ実行', 'Runs local-only painting'))} });`,
-      "  api.activateTool('stamp8');",
-      "  api.capturePointer(true);",
-      '});',
-      '',
-      "api.on('tool:pointerdown', (event) => {",
-      "  if (event.toolId !== 'stamp8' || !event.cell || !event.cell.inside) return;",
-      "  const { x, y } = event.cell;",
-      "  const pixels = [];",
-      "  for (let py = 0; py < 8; py += 1) {",
-      "    for (let px = 0; px < 8; px += 1) {",
-      "      pixels.push({ x: x + px, y: y + py });",
-      '    }',
-      '  }',
-      "  api.drawPixels(pixels, { r: 88, g: 196, b: 255, a: 180 });",
-      `  api.toast(${JSON.stringify(localizeText('8x8 ローカル描画', '8x8 local paint'))}, 'info');`,
-      '});',
-      '',
-      "api.on('keydown', (event) => {",
-      "  if (event.key === 'F8') {",
-      `    api.toast(${JSON.stringify(localizeText('F8 が押されました', 'F8 pressed'))}, 'info');`,
-      "    api.clearPixels();",
-      '  }',
-      '});',
-    ].join('\n');
+    return String.raw`/*
+ * PiXiEEDraw Local Extension Template
+ * 8-Way Sprite Assistant
+ *
+ * このファイルを GPT に渡す時は、このコメントを残してください。
+ * GPT が PiXiEEDraw の内部構造を知らなくても編集できるように、
+ * 「どこまで安全に触れてよいか」をここにまとめています。
+ *
+ * 実行環境:
+ * - この拡張は PiXiEEDraw のローカル拡張です
+ * - 実行場所は sandbox iframe の中だけです
+ * - このファイル内の document / window は iframe 自身のものです
+ * - 親ページ DOM や他ユーザーの画面には触れません
+ * - 拡張はこの端末だけで動き、共有同期されません
+ *
+ * 安全に追加しやすいもの:
+ * - 独自UI
+ * - 独自canvas
+ * - ローカル保存付きの設定
+ * - 補助プレビュー
+ * - 簡単な音やアニメーション
+ *
+ * できないこと:
+ * - 外部通信
+ * - 親ページ DOM の直接編集
+ * - 共有データの直接変更
+ * - 他人の端末への反映
+ * - 既存ツール欄へのボタン追加
+ * - メインキャンバス上への重ね描き
+ * - キャンバス入力の横取り
+ *
+ * 使える API:
+ * - api.on(name, handler)
+ * - api.toast(message, level)
+ * - api.ui.getRoot()
+ * - api.ui.clear()
+ * - api.ui.mount(node)
+ * - api.ui.append(node)
+ * - api.ui.setTitle(text)
+ * - api.ui.setSubtitle(text)
+ * - api.ui.setStatus(text, kind)
+ * - api.ui.addStyles(css)
+ * - api.ui.el(tag, props, children)
+ * - api.getContext()
+ * - api.storage.get(key, fallback)
+ * - api.storage.set(key, value)
+ * - api.storage.remove(key)
+ *
+ * よく使う event:
+ * - init
+ * - context
+ * - interval
+ *
+ * GPT に守らせる条件:
+ * - 単一の .js ファイルのまま編集する
+ * - 外部ライブラリを使わない
+ * - 外部通信しない
+ * - 親ページ DOM は触らない
+ * - 既存の拡張パネル shell は api.ui から使う
+ * - 既存のコード構造とコメントをできるだけ保つ
+ * - 完成コードだけを返す
+ */
+
+(() => {
+  'use strict';
+
+  // 1) Config
+  const STORAGE_KEY = 'eight-way-sprite-assistant-state-v1';
+  const GRID_SIZE = 24;
+  const EDITOR_CELL_SIZE = 12;
+  const PREVIEW_CELL_SIZE = 4;
+  const MASTER_DIRECTIONS = ['N', 'E', 'S', 'W'];
+  const ALL_DIRECTIONS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const DERIVED_DIRECTIONS = {
+    NE: ['N', 'E'],
+    SE: ['E', 'S'],
+    SW: ['S', 'W'],
+    NW: ['W', 'N'],
+  };
+  const COLORS = {
+    bg: '#071018',
+    panel: 'rgba(8, 18, 26, 0.88)',
+    panelStrong: 'rgba(12, 26, 36, 0.96)',
+    border: 'rgba(166, 234, 255, 0.24)',
+    grid: 'rgba(166, 234, 255, 0.12)',
+    fill: '#7ce3ff',
+    fillSoft: 'rgba(124, 227, 255, 0.18)',
+    hover: 'rgba(255, 223, 120, 0.32)',
+    text: '#eaf8ff',
+    muted: 'rgba(234, 248, 255, 0.72)',
+    accent: '#ffd27a',
+    derived: 'rgba(255, 210, 122, 0.15)',
+    active: 'rgba(124, 227, 255, 0.18)',
+  };
+
+  // 2) State
+  const state = {
+    activeMaster: 'E',
+    masters: createMasterState(),
+    hover: null,
+    drag: {
+      paintValue: true,
+      pointerId: null,
+    },
+    saveTimer: null,
+  };
+
+  // 3) Helpers
+  function createGrid(size) {
+    return Array.from({ length: size }, () => Array(size).fill(false));
+  }
+
+  function createMasterState() {
+    const next = {};
+    MASTER_DIRECTIONS.forEach(dir => {
+      next[dir] = createGrid(GRID_SIZE);
+    });
+    return next;
+  }
+
+  function clearGrid(grid) {
+    for (let y = 0; y < grid.length; y += 1) {
+      grid[y].fill(false);
+    }
+  }
+
+  function cloneGrid(source) {
+    return source.map(row => row.slice());
+  }
+
+  function makeEl(tag, props, children) {
+    const el = document.createElement(tag);
+    if (props && typeof props === 'object') {
+      Object.keys(props).forEach(key => {
+        const value = props[key];
+        if (key === 'className') {
+          el.className = value;
+        } else if (key === 'text') {
+          el.textContent = value;
+        } else {
+          el[key] = value;
+        }
+      });
+    }
+    if (Array.isArray(children)) {
+      children.forEach(child => {
+        if (child) {
+          el.appendChild(child);
+        }
+      });
+    }
+    return el;
+  }
+
+  function isMasterDirection(direction) {
+    return MASTER_DIRECTIONS.includes(direction);
+  }
+
+  function getSourceDirections(direction) {
+    return isMasterDirection(direction) ? [direction] : (DERIVED_DIRECTIONS[direction] || ['E']);
+  }
+
+  function getPreferredEditorDirection(direction) {
+    const sources = getSourceDirections(direction);
+    if (sources.length <= 1) {
+      return sources[0];
+    }
+    return state.activeMaster === sources[0] ? sources[1] : sources[0];
+  }
+
+  function resolveDirectionLabel(direction) {
+    return {
+      N: 'Front',
+      NE: 'Front-Right',
+      E: 'Right',
+      SE: 'Back-Right',
+      S: 'Back',
+      SW: 'Back-Left',
+      W: 'Left',
+      NW: 'Front-Left',
+    }[direction] || direction;
+  }
+
+  function computeSignedField(grid) {
+    const field = createGrid(GRID_SIZE);
+    for (let y = 0; y < GRID_SIZE; y += 1) {
+      for (let x = 0; x < GRID_SIZE; x += 1) {
+        const inside = Boolean(grid[y][x]);
+        let nearest = Infinity;
+        for (let yy = 0; yy < GRID_SIZE; yy += 1) {
+          for (let xx = 0; xx < GRID_SIZE; xx += 1) {
+            if (Boolean(grid[yy][xx]) === inside) {
+              continue;
+            }
+            const distance = Math.hypot(xx - x, yy - y);
+            if (distance < nearest) {
+              nearest = distance;
+            }
+          }
+        }
+        field[y][x] = inside ? nearest : -nearest;
+      }
+    }
+    return field;
+  }
+
+  function cleanupGrid(grid) {
+    const next = cloneGrid(grid);
+    for (let y = 0; y < GRID_SIZE; y += 1) {
+      for (let x = 0; x < GRID_SIZE; x += 1) {
+        let neighbors = 0;
+        for (let yy = y - 1; yy <= y + 1; yy += 1) {
+          for (let xx = x - 1; xx <= x + 1; xx += 1) {
+            if (xx === x && yy === y) {
+              continue;
+            }
+            if (yy < 0 || xx < 0 || yy >= GRID_SIZE || xx >= GRID_SIZE) {
+              continue;
+            }
+            if (grid[yy][xx]) {
+              neighbors += 1;
+            }
+          }
+        }
+        if (grid[y][x] && neighbors <= 1) {
+          next[y][x] = false;
+        } else if (!grid[y][x] && neighbors >= 5) {
+          next[y][x] = true;
+        }
+      }
+    }
+    return next;
+  }
+
+  function blendFields(fieldA, fieldB, mix) {
+    const ratio = Number.isFinite(mix) ? mix : 0.5;
+    const next = createGrid(GRID_SIZE);
+    for (let y = 0; y < GRID_SIZE; y += 1) {
+      for (let x = 0; x < GRID_SIZE; x += 1) {
+        const value = fieldA[y][x] * (1 - ratio) + fieldB[y][x] * ratio;
+        next[y][x] = value >= 0;
+      }
+    }
+    return cleanupGrid(next);
+  }
+
+  function buildDirectionSet() {
+    const fields = MASTER_DIRECTIONS.reduce((acc, direction) => {
+      acc[direction] = computeSignedField(state.masters[direction]);
+      return acc;
+    }, {});
+    return {
+      N: cloneGrid(state.masters.N),
+      NE: blendFields(fields.N, fields.E, 0.5),
+      E: cloneGrid(state.masters.E),
+      SE: blendFields(fields.E, fields.S, 0.5),
+      S: cloneGrid(state.masters.S),
+      SW: blendFields(fields.S, fields.W, 0.5),
+      W: cloneGrid(state.masters.W),
+      NW: blendFields(fields.W, fields.N, 0.5),
+    };
+  }
+
+  function paintPattern(grid, pattern, offsetX, offsetY) {
+    pattern.forEach((row, rowIndex) => {
+      for (let i = 0; i < row.length; i += 1) {
+        if (row[i] !== '#') {
+          continue;
+        }
+        const x = offsetX + i;
+        const y = offsetY + rowIndex;
+        if (x >= 0 && y >= 0 && x < GRID_SIZE && y < GRID_SIZE) {
+          grid[y][x] = true;
+        }
+      }
+    });
+  }
+
+  function serializeState() {
+    return {
+      activeMaster: state.activeMaster,
+      masters: MASTER_DIRECTIONS.reduce((acc, dir) => {
+        acc[dir] = cloneGrid(state.masters[dir]);
+        return acc;
+      }, {}),
+    };
+  }
+
+  async function saveStateSoon() {
+    if (state.saveTimer) {
+      clearTimeout(state.saveTimer);
+    }
+    state.saveTimer = setTimeout(async () => {
+      state.saveTimer = null;
+      try {
+        await api.storage.set(STORAGE_KEY, serializeState());
+      } catch (_) {
+        // ignore local save errors
+      }
+    }, 120);
+  }
+
+  async function loadState() {
+    try {
+      const saved = await api.storage.get(STORAGE_KEY, null);
+      if (!saved || typeof saved !== 'object') {
+        return;
+      }
+      if (saved.masters && typeof saved.masters === 'object') {
+        MASTER_DIRECTIONS.forEach(name => {
+          const source = saved.masters[name];
+          if (!Array.isArray(source)) {
+            return;
+          }
+          const next = createGrid(GRID_SIZE);
+          for (let y = 0; y < GRID_SIZE; y += 1) {
+            const row = Array.isArray(source[y]) ? source[y] : [];
+            for (let x = 0; x < GRID_SIZE; x += 1) {
+              next[y][x] = Boolean(row[x]);
+            }
+          }
+          state.masters[name] = next;
+        });
+      }
+      if (typeof saved.activeMaster === 'string' && isMasterDirection(saved.activeMaster)) {
+        state.activeMaster = saved.activeMaster;
+      }
+    } catch (_) {
+      // ignore local load errors
+    }
+  }
+
+  function clearCurrentDirection() {
+    clearGrid(state.masters[state.activeMaster]);
+    renderAll();
+    saveStateSoon();
+  }
+
+  function clearAllDirections() {
+    MASTER_DIRECTIONS.forEach(name => {
+      clearGrid(state.masters[name]);
+    });
+    renderAll();
+    saveStateSoon();
+  }
+
+  function applySampleSprite() {
+    clearAllDirections();
+    const centerX = 8;
+    const centerY = 5;
+    paintPattern(state.masters.N, [
+      '..####....',
+      '.######...',
+      '.######...',
+      '..####....',
+      '.######...',
+      '########..',
+      '..####....',
+      '.##..##...',
+      '.##..##...',
+      '.#....#...',
+    ], centerX, centerY);
+    paintPattern(state.masters.E, [
+      '..###.....',
+      '.#####....',
+      '#######...',
+      '..#####...',
+      '.######...',
+      '.#######..',
+      '..#####...',
+      '..##..##..',
+      '..##...##.',
+      '.##.....#.',
+    ], centerX, centerY);
+    paintPattern(state.masters.S, [
+      '..####....',
+      '.######...',
+      '.######...',
+      '..####....',
+      '.######...',
+      '..######..',
+      '...####...',
+      '..##..##..',
+      '..##..##..',
+      '..#....#..',
+    ], centerX, centerY);
+    paintPattern(state.masters.W, [
+      '.....###..',
+      '....#####.',
+      '...#######',
+      '...#####..',
+      '...######.',
+      '..#######.',
+      '...#####..',
+      '..##..##..',
+      '.##...##..',
+      '.#.....##.',
+    ], centerX - 1, centerY);
+    renderAll();
+    saveStateSoon();
+  }
+
+  // 4) Panel shell + DOM
+  const ui = api.ui;
+  ui.setTitle('8-Way Sprite Assistant');
+  ui.setSubtitle('N / E / S / W を描くと、斜め4方向を自動 in-between で補完します。');
+  ui.addStyles([
+    '.app {',
+    '  display: grid;',
+    '  gap: 10px;',
+    '}',
+    '.hero {',
+    '  display: grid;',
+    '  gap: 6px;',
+    '  padding: 10px;',
+    '  border: 1px solid ' + COLORS.border + ';',
+    '  background: ' + COLORS.panel + ';',
+    '}',
+    '.hero__title {',
+    '  font-weight: 800;',
+    '  letter-spacing: 0.03em;',
+    '}',
+    '.hero__text {',
+    '  color: ' + COLORS.muted + ';',
+    '}',
+    '.toolbar {',
+    '  display: flex;',
+    '  flex-wrap: wrap;',
+    '  gap: 8px;',
+    '}',
+    '.stats {',
+    '  display: flex;',
+    '  flex-wrap: wrap;',
+    '  gap: 10px 14px;',
+    '  color: ' + COLORS.muted + ';',
+    '}',
+    '.master-strip {',
+    '  display: flex;',
+    '  flex-wrap: wrap;',
+    '  gap: 8px;',
+    '}',
+    '.master-button {',
+    '  min-width: 74px;',
+    '}',
+    '.master-button.is-active {',
+    '  border-color: rgba(166, 234, 255, 0.74);',
+    '  box-shadow: inset 0 0 0 1px rgba(166, 234, 255, 0.36);',
+    '  background: rgba(22, 52, 74, 0.98);',
+    '}',
+    '.layout {',
+    '  display: grid;',
+    '  gap: 10px;',
+    '  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);',
+    '}',
+    '.panel {',
+      '  display: grid;',
+      '  gap: 10px;',
+      '  padding: 10px;',
+      '  border: 1px solid ' + COLORS.border + ';',
+      '  background: ' + COLORS.panelStrong + ';',
+    '}',
+    '.panel__head {',
+    '  display: flex;',
+    '  align-items: center;',
+    '  justify-content: space-between;',
+    '  gap: 8px;',
+    '}',
+    '.panel__title {',
+    '  font-weight: 700;',
+    '}',
+    '.panel__meta {',
+    '  color: ' + COLORS.muted + ';',
+    '  font-size: 11px;',
+    '}',
+    '.panel__actions {',
+    '  display: flex;',
+    '  flex-wrap: wrap;',
+    '  gap: 8px;',
+    '}',
+    '.editor-canvas {',
+    '  width: 100%;',
+    '}',
+    '.preview-grid {',
+    '  display: grid;',
+    '  gap: 8px;',
+    '  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));',
+    '}',
+    '.preview-card {',
+    '  display: grid;',
+    '  gap: 6px;',
+    '  padding: 8px;',
+    '  border: 1px solid rgba(166, 234, 255, 0.18);',
+    '  background: rgba(10, 20, 28, 0.74);',
+    '}',
+    '.preview-card.is-derived {',
+    '  background: ' + COLORS.derived + ';',
+    '}',
+    '.preview-card.is-active {',
+    '  border-color: rgba(166, 234, 255, 0.7);',
+    '  box-shadow: inset 0 0 0 1px rgba(166, 234, 255, 0.28);',
+    '  background: ' + COLORS.active + ';',
+    '}',
+    '.preview-card__head {',
+    '  display: flex;',
+    '  align-items: baseline;',
+    '  justify-content: space-between;',
+    '  gap: 6px;',
+    '}',
+    '.preview-card__label {',
+    '  font-weight: 700;',
+    '  font-size: 0.82rem;',
+    '}',
+    '.preview-card__meta {',
+    '  font-size: 0.72rem;',
+    '  color: ' + COLORS.muted + ';',
+    '}',
+    'button {',
+    '  min-height: 34px;',
+    '  padding: 6px 10px;',
+    '  border: 1px solid rgba(166, 234, 255, 0.32);',
+    '  background: rgba(18, 40, 56, 0.96);',
+    '  color: ' + COLORS.text + ';',
+    '  cursor: pointer;',
+    '}',
+    'button:hover {',
+    '  border-color: rgba(166, 234, 255, 0.58);',
+    '}',
+    'canvas {',
+    '  display: block;',
+    '  max-width: 100%;',
+    '  image-rendering: pixelated;',
+    '  background: ' + COLORS.bg + ';',
+    '  border: 1px solid rgba(166, 234, 255, 0.22);',
+    '  touch-action: none;',
+    '}',
+    '.preview-canvas {',
+    '  width: 100%;',
+    '}',
+    '.panel__hint {',
+    '  color: ' + COLORS.muted + ';',
+    '}',
+    '@media (max-width: 760px) {',
+    '  .layout {',
+    '    grid-template-columns: 1fr;',
+    '  }',
+    '}'
+  ].join('\n'));
+
+  ui.clear();
+  const app = makeEl('div', { className: 'app' });
+  ui.mount(app);
+
+  const hero = makeEl('section', { className: 'hero' });
+  const heroTitle = makeEl('div', { className: 'hero__title', text: '8-Way Sprite Assistant Template' });
+  const heroText = makeEl('div', {
+    className: 'hero__text',
+    text: 'N / E / S / W の4方向を描くと、NE / SE / SW / NW を隣接方向どうしの中間として自動生成します。'
+  });
+  const toolbar = makeEl('div', { className: 'toolbar' });
+  const clearCurrentButton = makeEl('button', { type: 'button', text: 'Clear Current' });
+  const clearAllButton = makeEl('button', { type: 'button', text: 'Clear All' });
+  const sampleButton = makeEl('button', { type: 'button', text: 'Sample' });
+  toolbar.append(clearCurrentButton, clearAllButton, sampleButton);
+  const stats = makeEl('div', { className: 'stats' });
+  const activeText = makeEl('span', { text: 'Editing: E' });
+  const uniqueText = makeEl('span', { text: 'Manual directions: 4' });
+  const derivedText = makeEl('span', { text: 'Auto in-between: NE / SE / SW / NW' });
+  stats.append(activeText, uniqueText, derivedText);
+  hero.append(heroTitle, heroText, toolbar, stats);
+  app.appendChild(hero);
+
+  const masterStrip = makeEl('div', { className: 'master-strip' });
+  const masterButtons = {};
+  MASTER_DIRECTIONS.forEach(direction => {
+    const button = makeEl('button', {
+      type: 'button',
+      className: 'master-button',
+      text: direction,
+    });
+    button.addEventListener('click', () => {
+      state.activeMaster = direction;
+      renderAll();
+      saveStateSoon();
+    });
+    masterButtons[direction] = button;
+    masterStrip.appendChild(button);
+  });
+  app.appendChild(masterStrip);
+
+  const layout = makeEl('section', { className: 'layout' });
+  app.appendChild(layout);
+
+  const editorPanel = makeEl('section', { className: 'panel' });
+  const editorHead = makeEl('div', { className: 'panel__head' });
+  const editorTitle = makeEl('div', { className: 'panel__title', text: 'Editor' });
+  const editorMeta = makeEl('div', { className: 'panel__meta', text: 'L: paint / Alt or R: erase' });
+  const editorCanvas = makeEl('canvas', { className: 'editor-canvas' });
+  editorCanvas.width = GRID_SIZE * EDITOR_CELL_SIZE;
+  editorCanvas.height = GRID_SIZE * EDITOR_CELL_SIZE;
+  const editorCtx = editorCanvas.getContext('2d');
+  const editorHint = makeEl('div', {
+    className: 'panel__hint',
+    text: '斜め4方向は自動補完です。派生方向をクリックすると、その元になる編集方向へ移動します。',
+  });
+  editorHead.append(editorTitle, editorMeta);
+  editorPanel.append(editorHead, editorCanvas, editorHint);
+  layout.appendChild(editorPanel);
+
+  const previewPanel = makeEl('section', { className: 'panel' });
+  const previewHead = makeEl('div', { className: 'panel__head' });
+  const previewTitle = makeEl('div', { className: 'panel__title', text: '8-Way Preview' });
+  const previewMeta = makeEl('div', { className: 'panel__meta', text: '4 manual + 4 auto in-between' });
+  const previewGrid = makeEl('div', { className: 'preview-grid' });
+  const previewCards = {};
+  ALL_DIRECTIONS.forEach(direction => {
+    const card = makeEl('button', {
+      type: 'button',
+      className: 'preview-card',
+    });
+    const head = makeEl('div', { className: 'preview-card__head' });
+    const label = makeEl('div', { className: 'preview-card__label', text: direction });
+    const meta = makeEl('div', { className: 'preview-card__meta', text: isMasterDirection(direction) ? 'edit' : 'auto' });
+    const canvas = makeEl('canvas', { className: 'preview-canvas' });
+    canvas.width = GRID_SIZE * PREVIEW_CELL_SIZE;
+    canvas.height = GRID_SIZE * PREVIEW_CELL_SIZE;
+    head.append(label, meta);
+    card.append(head, canvas);
+    card.addEventListener('click', () => {
+      state.activeMaster = getPreferredEditorDirection(direction);
+      renderAll();
+      saveStateSoon();
+    });
+    previewCards[direction] = {
+      card,
+      canvas,
+      ctx: canvas.getContext('2d'),
+      label,
+      meta,
+    };
+    previewGrid.appendChild(card);
+  });
+  previewHead.append(previewTitle, previewMeta);
+  previewPanel.append(previewHead, previewGrid);
+  layout.appendChild(previewPanel);
+
+  // 5) Rendering
+  function drawGrid(ctx, canvas, grid, cellSize, options) {
+    const settings = options || {};
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = settings.background || COLORS.bg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let y = 0; y < GRID_SIZE; y += 1) {
+      for (let x = 0; x < GRID_SIZE; x += 1) {
+        if (!grid[y][x]) {
+          continue;
+        }
+        ctx.fillStyle = settings.fill || COLORS.fill;
+        ctx.fillRect(
+          x * cellSize + 1,
+          y * cellSize + 1,
+          Math.max(1, cellSize - 2),
+          Math.max(1, cellSize - 2)
+        );
+      }
+    }
+    if (settings.hover) {
+      ctx.fillStyle = COLORS.hover;
+      ctx.fillRect(
+        settings.hover.x * cellSize + 1,
+        settings.hover.y * cellSize + 1,
+        Math.max(1, cellSize - 2),
+        Math.max(1, cellSize - 2)
+      );
+    }
+    ctx.strokeStyle = COLORS.grid;
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= GRID_SIZE; i += 1) {
+      const pos = i * cellSize + 0.5;
+      ctx.beginPath();
+      ctx.moveTo(pos, 0);
+      ctx.lineTo(pos, canvas.height);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, pos);
+      ctx.lineTo(canvas.width, pos);
+      ctx.stroke();
+    }
+  }
+
+  function renderEditor() {
+    const current = state.masters[state.activeMaster];
+    if (!editorCtx || !current) {
+      return;
+    }
+    editorMeta.textContent = 'Editing: ' + state.activeMaster + ' / L: paint / Alt or R: erase';
+    drawGrid(editorCtx, editorCanvas, current, EDITOR_CELL_SIZE, {
+      hover: state.hover,
+      fill: COLORS.fill,
+    });
+  }
+
+  function renderMasterButtons() {
+    MASTER_DIRECTIONS.forEach(direction => {
+      const button = masterButtons[direction];
+      if (!button) {
+        return;
+      }
+      const active = state.activeMaster === direction;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+  }
+
+  function renderPreviewCards() {
+    const directions = buildDirectionSet();
+    ALL_DIRECTIONS.forEach(direction => {
+      const card = previewCards[direction];
+      if (!card || !card.ctx) {
+        return;
+      }
+      drawGrid(card.ctx, card.canvas, directions[direction], PREVIEW_CELL_SIZE, {
+        fill: COLORS.fill,
+      });
+      const sources = getSourceDirections(direction);
+      const derived = !isMasterDirection(direction);
+      card.card.classList.toggle('is-derived', derived);
+      card.card.classList.toggle('is-active', sources.includes(state.activeMaster));
+      card.meta.textContent = derived ? ('auto ' + sources.join(' + ')) : 'edit';
+      card.label.textContent = direction;
+    });
+  }
+
+  function renderStats() {
+    activeText.textContent = 'Editing: ' + state.activeMaster + ' (' + resolveDirectionLabel(state.activeMaster) + ')';
+    uniqueText.textContent = 'Unique directions: ' + String(MASTER_DIRECTIONS.length);
+    derivedText.textContent = 'Auto in-between: NE(N+E) / SE(E+S) / SW(S+W) / NW(W+N)';
+  }
+
+  function renderAll() {
+    renderMasterButtons();
+    renderEditor();
+    renderPreviewCards();
+    renderStats();
+  }
+
+  // 6) Editor input
+  function getCellFromEvent(event) {
+    const canvas = editorCanvas;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / Math.max(1, rect.width);
+    const scaleY = canvas.height / Math.max(1, rect.height);
+    const rawX = (event.clientX - rect.left) * scaleX;
+    const rawY = (event.clientY - rect.top) * scaleY;
+    const x = Math.floor(rawX / EDITOR_CELL_SIZE);
+    const y = Math.floor(rawY / EDITOR_CELL_SIZE);
+    if (x < 0 || y < 0 || x >= GRID_SIZE || y >= GRID_SIZE) {
+      return null;
+    }
+    return { x, y };
+  }
+
+  function setCell(cell, value) {
+    const grid = state.masters[state.activeMaster];
+    if (!cell || !grid) {
+      return false;
+    }
+    const nextValue = Boolean(value);
+    if (grid[cell.y][cell.x] === nextValue) {
+      return false;
+    }
+    grid[cell.y][cell.x] = nextValue;
+    return true;
+  }
+
+  editorCanvas.addEventListener('contextmenu', event => {
+    event.preventDefault();
+  });
+
+  editorCanvas.addEventListener('pointerdown', event => {
+    const cell = getCellFromEvent(event);
+    if (!cell) {
+      return;
+    }
+    state.drag.paintValue = !(event.button === 2 || event.altKey);
+    state.drag.pointerId = event.pointerId;
+    state.hover = cell;
+    setCell(cell, state.drag.paintValue);
+    renderAll();
+    saveStateSoon();
+    try {
+      editorCanvas.setPointerCapture(event.pointerId);
+    } catch (_) {
+      // ignore
+    }
+    event.preventDefault();
+  });
+
+  editorCanvas.addEventListener('pointermove', event => {
+    const cell = getCellFromEvent(event);
+    state.hover = cell;
+    if (state.drag.pointerId === event.pointerId && cell) {
+      if (setCell(cell, state.drag.paintValue)) {
+        saveStateSoon();
+      }
+    }
+    renderAll();
+  });
+
+  editorCanvas.addEventListener('pointerleave', () => {
+    state.hover = null;
+    renderAll();
+  });
+
+  const finishPaint = event => {
+    if (state.drag.pointerId !== event.pointerId) {
+      return;
+    }
+    state.drag.pointerId = null;
+    renderAll();
+  };
+
+  editorCanvas.addEventListener('pointerup', finishPaint);
+  editorCanvas.addEventListener('pointercancel', finishPaint);
+  clearCurrentButton.addEventListener('click', clearCurrentDirection);
+  clearAllButton.addEventListener('click', clearAllDirections);
+  sampleButton.addEventListener('click', applySampleSprite);
+
+  // 7) Init
+  api.on('init', async () => {
+    api.toast('8-Way Sprite Assistant loaded', 'success');
+    await loadState();
+    renderAll();
+  });
+})();
+`;
   }
 
   function canUseScriptFileSystem() {
@@ -119,6 +928,16 @@
   function getBoundScriptLabel() {
     const name = sanitizeText(runtimeState.scriptFileName, 180);
     return name || localizeText('未選択', 'Not selected');
+  }
+
+  function refreshScriptBindingUi() {
+    const ui = runtimeState.ui;
+    if (!ui || !(ui.scriptValue instanceof HTMLElement)) {
+      return;
+    }
+    const hasBinding = Boolean(String(runtimeState.scriptFileName || '').trim());
+    ui.scriptValue.textContent = getBoundScriptLabel();
+    ui.scriptValue.dataset.empty = hasBinding ? 'false' : 'true';
   }
 
   async function readBoundScriptFile({ apply = true, silent = false, ignoreTimestamp = false, autoEnable = runtimeState.enabled } = {}) {
@@ -187,6 +1006,7 @@
     runtimeState.scriptFileHandle = handle;
     runtimeState.scriptFileName = handle.name || '';
     runtimeState.scriptFileLastModified = 0;
+    refreshScriptBindingUi();
     startWatchingBoundScriptFile();
     if (readNow) {
       return await readBoundScriptFile({ apply: true, silent: false, ignoreTimestamp: true, autoEnable: autoEnableOnRead });
@@ -293,13 +1113,14 @@
     runtimeState.scriptFileHandle = null;
     runtimeState.scriptFileName = file.name || '';
     runtimeState.scriptFileLastModified = Number(file.lastModified) || Date.now();
+    refreshScriptBindingUi();
     clearScriptWatchTimer();
     setStatus(localizeText('スクリプトを読み込み、自動で反映しました', 'Loaded the script and applied it automatically'), 'success');
     return true;
   }
 
   const SANDBOX_SRC = String.raw`<!doctype html>
-<html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; style-src 'none'; object-src 'none'; media-src 'none'; font-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'; navigate-to 'none'"></head><body>
+<html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; connect-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; object-src 'none'; media-src data: blob:; font-src data:; frame-src 'none'; child-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'"><style>html,body{margin:0;padding:0;background:transparent;color:#eaf8ff;font:12px/1.5 ui-sans-serif,system-ui,sans-serif}body{overflow:auto;padding:8px;box-sizing:border-box}*,*::before,*::after{box-sizing:border-box}button,input,textarea,select{font:inherit}canvas{image-rendering:pixelated;display:block;max-width:100%}</style></head><body>
 <script>
 (() => {
   const HOST_MARK = '__pixieLocalHost';
@@ -308,6 +1129,129 @@
   const pendingRequests = new Map();
   let requestSeq = 0;
   let latestContext = Object.freeze({});
+  let layoutFrame = 0;
+  let lastReportedWidth = 0;
+  let lastReportedHeight = 0;
+
+  function makeEl(tag, props, children) {
+    const el = document.createElement(tag);
+    if (props && typeof props === 'object') {
+      Object.keys(props).forEach((key) => {
+        const value = props[key];
+        if (key === 'className') {
+          el.className = String(value || '');
+        } else if (key === 'text') {
+          el.textContent = String(value == null ? '' : value);
+        } else if (key === 'hidden') {
+          el.hidden = Boolean(value);
+        } else {
+          el[key] = value;
+        }
+      });
+    }
+    if (Array.isArray(children)) {
+      children.forEach((child) => {
+        if (child instanceof Node) {
+          el.appendChild(child);
+        }
+      });
+    }
+    return el;
+  }
+
+  const shell = (() => {
+    const style = document.createElement('style');
+    style.textContent = [
+      ':root { color-scheme: dark; }',
+      'body { overflow: auto; padding: 8px; box-sizing: border-box; }',
+      '.pixie-ext-shell {',
+      '  display: grid;',
+      '  gap: 8px;',
+      '  border: 1px solid rgba(166, 234, 255, 0.24);',
+      '  background: rgba(7, 14, 20, 0.92);',
+      '  padding: 10px;',
+      '}',
+      '.pixie-ext-shell__header {',
+      '  display: grid;',
+      '  gap: 4px;',
+      '}',
+      '.pixie-ext-shell__title {',
+      '  font-weight: 800;',
+      '  letter-spacing: 0.03em;',
+      '}',
+      '.pixie-ext-shell__subtitle {',
+      '  color: rgba(234, 248, 255, 0.72);',
+      '}',
+      '.pixie-ext-shell__status {',
+      '  min-height: 1.2em;',
+      '}',
+      '.pixie-ext-shell__status[data-kind="success"] { color: #84f3ad; }',
+      '.pixie-ext-shell__status[data-kind="warn"] { color: #ffd27a; }',
+      '.pixie-ext-shell__status[data-kind="error"] { color: #ff9c9c; }',
+      '.pixie-ext-shell__body {',
+      '  display: grid;',
+      '  gap: 10px;',
+      '  align-content: start;',
+      '}',
+    ].join('\n');
+    document.head.appendChild(style);
+
+    const shellEl = makeEl('div', { className: 'pixie-ext-shell' });
+    const header = makeEl('div', { className: 'pixie-ext-shell__header' });
+    const title = makeEl('div', { className: 'pixie-ext-shell__title', text: 'Local Extension' });
+    const subtitle = makeEl('div', {
+      className: 'pixie-ext-shell__subtitle',
+      text: 'Build custom UI inside this dedicated panel only.',
+    });
+    const status = makeEl('div', {
+      className: 'pixie-ext-shell__status',
+      hidden: true,
+    });
+    const body = makeEl('div', { className: 'pixie-ext-shell__body' });
+    header.append(title, subtitle);
+    shellEl.append(header, status, body);
+    document.body.appendChild(shellEl);
+    return { shellEl, title, subtitle, status, body };
+  })();
+
+  function clearOwnedStyles() {
+    Array.from(document.querySelectorAll('style[data-pixie-ext-owned="1"]')).forEach((node) => {
+      node.remove();
+    });
+  }
+
+  function setShellTitle(text) {
+    const next = String(text || '').trim();
+    shell.title.textContent = next || 'Local Extension';
+    reportLayout();
+    return shell.title.textContent;
+  }
+
+  function setShellSubtitle(text) {
+    const next = String(text || '').trim();
+    shell.subtitle.textContent = next;
+    shell.subtitle.hidden = !next;
+    reportLayout();
+    return shell.subtitle.textContent;
+  }
+
+  function setShellStatus(text, kind = 'info') {
+    const next = String(text || '').trim();
+    shell.status.textContent = next;
+    shell.status.hidden = !next;
+    shell.status.dataset.kind = String(kind || 'info');
+    reportLayout();
+    return shell.status.textContent;
+  }
+
+  function resetShell() {
+    clearOwnedStyles();
+    setShellTitle('Local Extension');
+    setShellSubtitle('Build custom UI inside this dedicated panel only.');
+    setShellStatus('', 'info');
+    shell.body.replaceChildren();
+    reportLayout();
+  }
 
   function blockedCapability(name) {
     return () => {
@@ -361,6 +1305,36 @@
 
   function post(type, payload) {
     parent.postMessage({ [EXT_MARK]: 1, type, payload }, '*');
+  }
+
+  function flushLayout() {
+    layoutFrame = 0;
+    try {
+      const width = Math.ceil(Math.max(
+        shell.shellEl ? shell.shellEl.scrollWidth : 0,
+        shell.shellEl ? shell.shellEl.getBoundingClientRect().width : 0,
+        document.body ? document.body.getBoundingClientRect().width : 0
+      ));
+      const height = Math.ceil(Math.max(
+        shell.shellEl ? shell.shellEl.scrollHeight : 0,
+        shell.shellEl ? shell.shellEl.getBoundingClientRect().height : 0
+      ));
+      if (width === lastReportedWidth && height === lastReportedHeight) {
+        return;
+      }
+      lastReportedWidth = width;
+      lastReportedHeight = height;
+      post('layout', { width, height });
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  function reportLayout() {
+    if (layoutFrame) {
+      return;
+    }
+    layoutFrame = requestAnimationFrame(flushLayout);
   }
 
   function on(eventName, handler) {
@@ -438,6 +1412,11 @@
     pending.reject(new Error(message));
   }
 
+  function disabledBridge(name) {
+    post('disabled-capability', { name: String(name || 'API') });
+    return false;
+  }
+
   const api = Object.freeze({
     on,
     toast(message, level = 'info') {
@@ -450,29 +1429,88 @@
       post('panel', { title: String(title || ''), body: String(body || '') });
     },
     registerTool(tool) {
-      post('tool-register', { tool });
+      return disabledBridge('api.registerTool');
     },
     unregisterTool(id) {
-      post('tool-unregister', { id: String(id || '') });
+      return disabledBridge('api.unregisterTool');
     },
     clearTools() {
-      post('tools-clear', {});
+      return disabledBridge('api.clearTools');
     },
     activateTool(id) {
-      post('tool-activate', { id: String(id || '') });
+      return disabledBridge('api.activateTool');
     },
     capturePointer(enabled = true) {
-      post('pointer-capture', { enabled: Boolean(enabled) });
+      return disabledBridge('api.capturePointer');
     },
     drawPixels(pixels, color) {
-      post('local-paint', { pixels, color });
+      return disabledBridge('api.drawPixels');
     },
     clearPixels() {
-      post('local-paint-clear', {});
+      return disabledBridge('api.clearPixels');
     },
     getContext() {
       return latestContext;
     },
+    ui: Object.freeze({
+      getRoot() {
+        return shell.body;
+      },
+      clear() {
+        shell.body.replaceChildren();
+        reportLayout();
+        return shell.body;
+      },
+      mount(node) {
+        shell.body.replaceChildren();
+        if (node instanceof Node) {
+          shell.body.appendChild(node);
+        }
+        reportLayout();
+        return shell.body;
+      },
+      append(node) {
+        if (node instanceof Node) {
+          shell.body.appendChild(node);
+          reportLayout();
+        }
+        return shell.body;
+      },
+      setTitle(text = '') {
+        return setShellTitle(text);
+      },
+      setSubtitle(text = '') {
+        return setShellSubtitle(text);
+      },
+      setStatus(text = '', kind = 'info') {
+        return setShellStatus(text, kind);
+      },
+      addStyles(css = '') {
+        const style = document.createElement('style');
+        style.dataset.pixieExtOwned = '1';
+        style.textContent = String(css || '');
+        document.head.appendChild(style);
+        reportLayout();
+        return style;
+      },
+      el(tag, props, children) {
+        return makeEl(tag, props, children);
+      },
+    }),
+    storage: Object.freeze({
+      async get(key, fallback = null) {
+        const result = await request('storage-get', { key: String(key || ''), fallback });
+        return result && Object.prototype.hasOwnProperty.call(result, 'value') ? result.value : fallback;
+      },
+      async set(key, value) {
+        await request('storage-set', { key: String(key || ''), value });
+        return true;
+      },
+      async remove(key) {
+        await request('storage-remove', { key: String(key || '') });
+        return true;
+      },
+    }),
     ai: Object.freeze({
       request() {
         return Promise.reject(new Error('PiXiEEDraw local AI integration has been retired'));
@@ -499,12 +1537,15 @@
       clearHandlers();
       rejectPendingRequests('Extension reloaded');
       latestContext = Object.freeze(data.context && typeof data.context === 'object' ? data.context : {});
+      resetShell();
       try {
         const fn = new Function('api', '"use strict";\n' + String(data.code || '') + '\n//# sourceURL=pixieed-local-extension.js');
         fn(api);
         emit('init', latestContext);
         post('status', { ok: true, message: 'Local extension loaded' });
       } catch (error) {
+        setShellStatus(error && error.message ? error.message : String(error), 'error');
+        shell.body.replaceChildren();
         post('status', {
           ok: false,
           message: error && error.message ? error.message : String(error),
@@ -515,7 +1556,12 @@
     if (data.type === 'unload') {
       clearHandlers();
       rejectPendingRequests('Extension stopped');
+      resetShell();
       post('status', { ok: true, message: 'Local extension stopped' });
+      return;
+    }
+    if (data.type === 'request-result') {
+      settleRequest(data.payload && typeof data.payload === 'object' ? data.payload : {});
       return;
     }
     if (data.type === 'ai-result') {
@@ -530,6 +1576,15 @@
     }
   });
 
+  if (typeof ResizeObserver === 'function') {
+    const observer = new ResizeObserver(() => {
+      reportLayout();
+    });
+    observer.observe(shell.shellEl);
+  }
+  resetShell();
+  window.addEventListener('load', reportLayout, { once: true });
+  window.addEventListener('resize', reportLayout, { passive: true });
   post('ready', {});
 })();
 </script>
@@ -566,6 +1621,89 @@
 
   function sanitizeMultilineText(value, limit = 4000) {
     return String(value || '').replace(/\r\n?/g, '\n').replace(/\s+$/g, '').slice(0, limit);
+  }
+
+  function notifyPanelOnlyCapability(name) {
+    const label = sanitizeText(name, 80) || 'API';
+    setStatus(
+      localizeText(
+        `${label} は無効です。拡張は専用パネル内だけで動作します。`,
+        `${label} is disabled. Extensions run only inside the dedicated panel.`
+      ),
+      'warn'
+    );
+  }
+
+  function getPluginStorageNamespace() {
+    const source = sanitizeText(runtimeState.scriptFileName || '', 180).trim().toLowerCase();
+    return source || 'default';
+  }
+
+  function readPluginStorageRoot() {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY_PLUGIN_DATA);
+      if (!raw) {
+        return {};
+      }
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function writePluginStorageRoot(root) {
+    try {
+      window.localStorage.setItem(STORAGE_KEY_PLUGIN_DATA, JSON.stringify(root || {}));
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function readPluginStorageValue(key, fallback = null) {
+    const storageKey = sanitizeText(key, 120).trim();
+    if (!storageKey) {
+      return fallback;
+    }
+    const root = readPluginStorageRoot();
+    const namespace = getPluginStorageNamespace();
+    const bucket = root[namespace];
+    if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket) || !(storageKey in bucket)) {
+      return fallback;
+    }
+    return bucket[storageKey];
+  }
+
+  function writePluginStorageValue(key, value) {
+    const storageKey = sanitizeText(key, 120).trim();
+    if (!storageKey) {
+      return false;
+    }
+    const root = readPluginStorageRoot();
+    const namespace = getPluginStorageNamespace();
+    const bucket = root[namespace] && typeof root[namespace] === 'object' && !Array.isArray(root[namespace])
+      ? root[namespace]
+      : {};
+    bucket[storageKey] = value;
+    root[namespace] = bucket;
+    return writePluginStorageRoot(root);
+  }
+
+  function removePluginStorageValue(key) {
+    const storageKey = sanitizeText(key, 120).trim();
+    if (!storageKey) {
+      return false;
+    }
+    const root = readPluginStorageRoot();
+    const namespace = getPluginStorageNamespace();
+    const bucket = root[namespace];
+    if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket) || !(storageKey in bucket)) {
+      return true;
+    }
+    delete bucket[storageKey];
+    root[namespace] = bucket;
+    return writePluginStorageRoot(root);
   }
 
   function clearRetiredAiStorage() {
@@ -635,10 +1773,27 @@
 
   function getCanvasDomRefs() {
     const viewport = document.getElementById('canvasViewport');
+    if (!(viewport instanceof HTMLElement)) {
+      return null;
+    }
+    const activeLocalSurface = document.querySelector('.local-canvas-surface.is-active');
+    if (activeLocalSurface instanceof HTMLElement) {
+      const stack = activeLocalSurface.querySelector('.local-canvas-stack');
+      const drawing = activeLocalSurface.querySelector('.local-canvas-surface__canvas');
+      const selection = activeLocalSurface.querySelector('.local-canvas-surface__selection');
+      if (stack instanceof HTMLElement && drawing instanceof HTMLCanvasElement) {
+        return {
+          viewport,
+          stack,
+          drawing,
+          selection: selection instanceof HTMLCanvasElement ? selection : null,
+        };
+      }
+    }
     const stack = document.getElementById('canvasStack');
     const drawing = document.getElementById('drawingCanvas');
     const selection = document.getElementById('selectionCanvas');
-    if (!(viewport instanceof HTMLElement) || !(stack instanceof HTMLElement) || !(drawing instanceof HTMLCanvasElement)) {
+    if (!(stack instanceof HTMLElement) || !(drawing instanceof HTMLCanvasElement)) {
       return null;
     }
     return {
@@ -919,14 +2074,6 @@
     return text.replace(/\s+/g, '').slice(0, 2).toUpperCase();
   }
 
-  function dispatchLocalToolChangeEvent() {
-    dispatchEventToRuntime('toolchange', {
-      activeToolId: runtimeState.activeLocalToolId || '',
-      capturePointer: Boolean(runtimeState.captureCanvasPointer),
-      tools: buildLocalToolSummary(),
-    });
-  }
-
   function renderLocalToolButtons() {
     const ui = runtimeState.ui;
     const toolList = ui?.toolList instanceof HTMLElement ? ui.toolList : null;
@@ -945,11 +2092,12 @@
         const empty = document.createElement('p');
         empty.className = 'help-text local-ext-panel__tool-empty';
         empty.textContent = localizeText(
-          '拡張コードから api.registerTool(...) で追加できます。',
-          'Add tools from extension code with api.registerTool(...).'
+          '専用パネル内で使う拡張UIを表示できます。',
+          'Show extension UI inside the dedicated panel.'
         );
         toolList.appendChild(empty);
       }
+      updatePanelVisibility();
       return;
     }
     const fragment = document.createDocumentFragment();
@@ -1017,6 +2165,7 @@
       });
       toolGrid.appendChild(toolbarFragment);
     }
+    updatePanelVisibility();
   }
 
   function renderLocalToolMeta() {
@@ -1033,6 +2182,31 @@
       `選択中: ${activeLabel} / キャンバス入力取得: ${captureLabel}`,
       `Selected: ${activeLabel} / Canvas Capture: ${captureLabel}`
     );
+    updatePanelVisibility();
+  }
+
+  function updatePanelVisibility() {
+    const ui = runtimeState.ui;
+    if (!ui) {
+      return;
+    }
+    const hasWorkspace = runtimeState.enabled && Boolean(String(runtimeState.code || '').trim());
+    if (ui.workspace instanceof HTMLElement) {
+      ui.workspace.hidden = !hasWorkspace;
+    }
+    if (ui.toolBox instanceof HTMLElement) {
+      ui.toolBox.hidden = true;
+    }
+    if (ui.clearToolButton instanceof HTMLButtonElement) {
+      ui.clearToolButton.hidden = true;
+    }
+    const hasOutput = Boolean(
+      (ui.outputTitle instanceof HTMLElement && ui.outputTitle.dataset.customized)
+      || (ui.outputBody instanceof HTMLElement && ui.outputBody.dataset.customized)
+    );
+    if (ui.output instanceof HTMLElement) {
+      ui.output.hidden = !hasOutput;
+    }
   }
 
   function setActiveLocalToolId(toolId, { notifyRuntime = false } = {}) {
@@ -1050,12 +2224,6 @@
     renderLocalToolButtons();
     renderLocalToolMeta();
     updateLocalInputLayerState();
-    if (notifyRuntime) {
-      dispatchEventToRuntime('tool:activate', {
-        id: runtimeState.activeLocalToolId || '',
-      });
-      dispatchLocalToolChangeEvent();
-    }
   }
 
   function bindBuiltInToolOverride() {
@@ -1110,9 +2278,6 @@
     renderLocalToolButtons();
     renderLocalToolMeta();
     updateLocalInputLayerState();
-    if (notifyRuntime) {
-      dispatchLocalToolChangeEvent();
-    }
   }
 
   function registerLocalTool(tool, { notifyRuntime = true } = {}) {
@@ -1140,9 +2305,6 @@
     renderLocalToolButtons();
     renderLocalToolMeta();
     updateLocalInputLayerState();
-    if (notifyRuntime) {
-      dispatchLocalToolChangeEvent();
-    }
     return true;
   }
 
@@ -1160,9 +2322,6 @@
     renderLocalToolButtons();
     renderLocalToolMeta();
     updateLocalInputLayerState();
-    if (notifyRuntime) {
-      dispatchLocalToolChangeEvent();
-    }
     return true;
   }
 
@@ -1221,6 +2380,7 @@
       );
       delete ui.outputBody.dataset.customized;
     }
+    updatePanelVisibility();
   }
 
   function setBadge(text) {
@@ -1231,6 +2391,43 @@
     const label = sanitizeText(text, 160);
     ui.badge.textContent = label;
     ui.badge.classList.toggle('is-visible', Boolean(label));
+  }
+
+  function syncSandboxFrameMount(frame) {
+    const host = runtimeState.ui?.workspaceBody instanceof HTMLElement ? runtimeState.ui.workspaceBody : null;
+    if (!(frame instanceof HTMLIFrameElement) || !(host instanceof HTMLElement)) {
+      return;
+    }
+    if (frame.parentElement !== host) {
+      host.appendChild(frame);
+    }
+  }
+
+  function setSandboxFrameHeight(height) {
+    const frame = runtimeState.frame;
+    if (!(frame instanceof HTMLIFrameElement)) {
+      return;
+    }
+    const nextHeight = Math.round(clampNumber(height, SANDBOX_FRAME_MIN_HEIGHT, SANDBOX_FRAME_MAX_HEIGHT));
+    if (runtimeState.frameHeight === nextHeight && frame.style.height === `${nextHeight}px`) {
+      return;
+    }
+    runtimeState.frameHeight = nextHeight;
+    frame.style.height = `${nextHeight}px`;
+  }
+
+  function postSandboxRequestResult(requestId, ok, payload = {}) {
+    const id = sanitizeText(requestId, 120).trim();
+    if (!id) {
+      return;
+    }
+    postToSandbox('request-result', {
+      payload: {
+        id,
+        ok: Boolean(ok),
+        ...(payload && typeof payload === 'object' ? payload : {}),
+      },
+    });
   }
 
   function destroySandboxFrame() {
@@ -1244,6 +2441,8 @@
 
   function ensureSandboxFrame() {
     if (runtimeState.frame instanceof HTMLIFrameElement) {
+      syncSandboxFrameMount(runtimeState.frame);
+      setSandboxFrameHeight(runtimeState.frameHeight);
       return runtimeState.frame;
     }
     const iframe = document.createElement('iframe');
@@ -1251,41 +2450,44 @@
     iframe.setAttribute('title', 'Local extension sandbox');
     iframe.setAttribute('sandbox', 'allow-scripts');
     iframe.srcdoc = SANDBOX_SRC;
-    iframe.hidden = true;
     iframe.addEventListener('load', () => {
       runtimeState.frameReady = true;
+      setSandboxFrameHeight(runtimeState.frameHeight);
       flushQueuedMessages();
     });
-    document.body.appendChild(iframe);
+    syncSandboxFrameMount(iframe);
     runtimeState.frame = iframe;
     runtimeState.frameReady = false;
     runtimeState.messageQueue = [];
+    setSandboxFrameHeight(runtimeState.frameHeight);
     return iframe;
   }
 
   function postToSandbox(type, payload = {}) {
     const frame = ensureSandboxFrame();
+    const targetWindow = frame.contentWindow;
     const packet = {
       __pixieLocalHost: 1,
       type,
       ...payload,
     };
-    if (!runtimeState.frameReady || !(frame.contentWindow instanceof Window)) {
+    if (!runtimeState.frameReady || !targetWindow) {
       runtimeState.messageQueue.push(packet);
       return;
     }
-    frame.contentWindow.postMessage(packet, '*');
+    targetWindow.postMessage(packet, '*');
   }
 
   function flushQueuedMessages() {
     const frame = runtimeState.frame;
-    if (!(frame instanceof HTMLIFrameElement) || !(frame.contentWindow instanceof Window) || !runtimeState.frameReady) {
+    const targetWindow = frame instanceof HTMLIFrameElement ? frame.contentWindow : null;
+    if (!(frame instanceof HTMLIFrameElement) || !targetWindow || !runtimeState.frameReady) {
       return;
     }
     const queued = runtimeState.messageQueue.slice();
     runtimeState.messageQueue = [];
     queued.forEach(packet => {
-      frame.contentWindow.postMessage(packet, '*');
+      targetWindow.postMessage(packet, '*');
     });
   }
 
@@ -1302,6 +2504,8 @@
     clearLocalPaintPixels();
     updateLocalInputLayerState();
     setBadge('');
+    setOutput('', '');
+    updatePanelVisibility();
   }
 
   function dispatchEventToRuntime(name, payload) {
@@ -1363,6 +2567,7 @@
     if (persist) {
       writeStorage(STORAGE_KEY_ENABLED, runtimeState.enabled ? '1' : '0');
     }
+    updatePanelVisibility();
     if (restart) {
       reloadRuntime();
     } else {
@@ -1464,38 +2669,74 @@
         replyRetiredAiRequest(data.payload && typeof data.payload === 'object' ? data.payload : {}, event.source);
         return;
       }
-      if (data.type === 'tool-register') {
-        const registered = registerLocalTool(data.payload && data.payload.tool, { notifyRuntime: false });
-        if (!registered) {
-          setStatus(localizeText('ローカルツール登録に失敗しました', 'Failed to register local tool'), 'warn');
+      if (data.type === 'disabled-capability') {
+        notifyPanelOnlyCapability(data.payload && data.payload.name ? data.payload.name : 'API');
+        return;
+      }
+      if (data.type === 'layout') {
+        const height = Number(data.payload && data.payload.height);
+        if (Number.isFinite(height)) {
+          setSandboxFrameHeight(height + 2);
         }
         return;
       }
+      if (data.type === 'storage-get') {
+        const payload = data.payload && typeof data.payload === 'object' ? data.payload : {};
+        const fallback = Object.prototype.hasOwnProperty.call(payload, 'fallback') ? payload.fallback : null;
+        const value = readPluginStorageValue(payload.key, fallback);
+        postSandboxRequestResult(payload.id, true, { value });
+        return;
+      }
+      if (data.type === 'storage-set') {
+        const payload = data.payload && typeof data.payload === 'object' ? data.payload : {};
+        const ok = writePluginStorageValue(payload.key, payload.value);
+        postSandboxRequestResult(
+          payload.id,
+          ok,
+          ok ? {} : {
+            message: localizeText('ローカル保存に失敗しました', 'Failed to save local extension data'),
+          }
+        );
+        return;
+      }
+      if (data.type === 'storage-remove') {
+        const payload = data.payload && typeof data.payload === 'object' ? data.payload : {};
+        const ok = removePluginStorageValue(payload.key);
+        postSandboxRequestResult(
+          payload.id,
+          ok,
+          ok ? {} : {
+            message: localizeText('ローカル保存の削除に失敗しました', 'Failed to remove local extension data'),
+          }
+        );
+        return;
+      }
+      if (data.type === 'tool-register') {
+        notifyPanelOnlyCapability('api.registerTool');
+        return;
+      }
       if (data.type === 'tool-unregister') {
-        unregisterLocalTool(data.payload && data.payload.id, { notifyRuntime: false });
+        notifyPanelOnlyCapability('api.unregisterTool');
         return;
       }
       if (data.type === 'tools-clear') {
-        clearLocalTools({ notifyRuntime: false });
+        notifyPanelOnlyCapability('api.clearTools');
         return;
       }
       if (data.type === 'tool-activate') {
-        setActiveLocalToolId(data.payload && data.payload.id, { notifyRuntime: false });
+        notifyPanelOnlyCapability('api.activateTool');
         return;
       }
       if (data.type === 'pointer-capture') {
-        runtimeState.captureCanvasPointer = Boolean(data.payload && data.payload.enabled);
-        runtimeState.trackedPointerId = null;
-        renderLocalToolMeta();
-        updateLocalInputLayerState();
+        notifyPanelOnlyCapability('api.capturePointer');
         return;
       }
       if (data.type === 'local-paint') {
-        paintLocalPixels(data.payload && data.payload.pixels, data.payload && data.payload.color);
+        notifyPanelOnlyCapability('api.drawPixels');
         return;
       }
       if (data.type === 'local-paint-clear') {
-        clearLocalPaintPixels();
+        notifyPanelOnlyCapability('api.clearPixels');
         return;
       }
       if (data.type === 'status') {
@@ -1530,65 +2771,6 @@
         }
       }
     });
-
-    document.addEventListener('keydown', event => {
-      if (!runtimeState.enabled) {
-        return;
-      }
-      dispatchEventToRuntime('keydown', {
-        key: event.key,
-        code: event.code,
-        ctrlKey: event.ctrlKey,
-        shiftKey: event.shiftKey,
-        altKey: event.altKey,
-        metaKey: event.metaKey,
-        repeat: event.repeat,
-        now: Date.now(),
-      });
-    }, true);
-
-    document.addEventListener('pointerdown', event => {
-      if (!runtimeState.enabled) {
-        return;
-      }
-      syncLocalCanvasGeometry();
-      const target = event.target instanceof HTMLElement ? event.target : null;
-      dispatchEventToRuntime('pointerdown', {
-        x: Math.round(event.clientX),
-        y: Math.round(event.clientY),
-        targetId: target ? target.id || '' : '',
-        targetClass: target ? sanitizeText(target.className || '', 80) : '',
-        button: event.button,
-        now: Date.now(),
-      });
-      maybeDispatchToolPointerEvent(event, 'pointerdown');
-    }, { passive: false, capture: true });
-
-    document.addEventListener('pointermove', event => {
-      if (!runtimeState.enabled) {
-        return;
-      }
-      maybeDispatchToolPointerEvent(event, 'pointermove');
-    }, { passive: false, capture: true });
-
-    document.addEventListener('pointerup', event => {
-      if (!runtimeState.enabled) {
-        return;
-      }
-      maybeDispatchToolPointerEvent(event, 'pointerup');
-    }, { passive: false, capture: true });
-
-    document.addEventListener('pointercancel', event => {
-      if (!runtimeState.enabled) {
-        return;
-      }
-      maybeDispatchToolPointerEvent(event, 'pointercancel');
-    }, { passive: false, capture: true });
-
-    window.addEventListener('resize', () => {
-      syncLocalCanvasGeometry();
-    }, { passive: true });
-
   }
 
   function buildUi() {
@@ -1612,8 +2794,8 @@
     const description = document.createElement('p');
     description.className = 'help-text ui-guide-text';
     description.textContent = localizeText(
-      'マルチ中でもこの端末だけで動作します。共有状態へ書き込むAPIは公開せず、拡張コードからの外部通信もできません。',
-      'Even during multiplayer, this runs only on this device. No API is exposed for writing into shared state, and direct external network access is disabled.'
+      'この端末だけで動く sandbox 内で拡張を実行します。独自UIや canvas は作れますが、既存UI・メインキャンバス・共有状態・外部サイトには触れません。',
+      'Extensions run only on this device inside a sandbox. They can build custom UI and canvases, but cannot touch the existing UI, main canvas, shared state, or external sites.'
     );
     body.appendChild(description);
 
@@ -1636,16 +2818,26 @@
 
     const scriptLabel = document.createElement('span');
     scriptLabel.className = 'local-ext-panel__script-label';
-    scriptLabel.textContent = localizeText('スクリプト', 'Script');
+    scriptLabel.textContent = localizeText('拡張ファイル', 'Extension File');
+
+    const scriptValue = document.createElement('div');
+    scriptValue.className = 'local-ext-panel__script-value';
+    scriptValue.textContent = getBoundScriptLabel();
+    scriptValue.dataset.empty = 'true';
 
     const scriptHint = document.createElement('p');
     scriptHint.className = 'help-text local-ext-panel__script-hint';
-    scriptHint.textContent = localizeText(
-      '雛形ファイルを作成して VSCode や GPT連携メモ帳で編集し、同じ `.js` を選択しておくと保存時に自動で再読込されます。',
-      'Create a template file, edit it in VS Code or a GPT-connected editor, and keep that `.js` selected to auto-reload on save.'
-    );
+    scriptHint.textContent = canUseScriptFileSystem()
+      ? localizeText(
+        '作成または選択した `.js` を外部エディタで保存すると自動反映します。',
+        'Save the created or selected `.js` in an external editor to auto-apply changes.'
+      )
+      : localizeText(
+        '既存の `.js` を選んで使えます。更新後はもう一度選び直してください。',
+        'You can use an existing `.js` file here. Re-select it after editing to update it.'
+      );
 
-    scriptField.append(scriptLabel, scriptHint);
+    scriptField.append(scriptLabel, scriptValue, scriptHint);
     body.appendChild(scriptField);
 
     const code = document.createElement('textarea');
@@ -1654,6 +2846,7 @@
     code.spellcheck = false;
     code.readOnly = true;
     code.placeholder = localizeText('ここに現在のスクリプトが表示されます', 'The current script is shown here');
+    code.hidden = true;
     body.appendChild(code);
 
     const scriptFileInput = document.createElement('input');
@@ -1666,41 +2859,36 @@
     const actions = document.createElement('div');
     actions.className = 'local-ext-panel__actions';
 
-    const saveButton = document.createElement('button');
-    saveButton.type = 'button';
-    saveButton.className = 'chip';
-    saveButton.textContent = localizeText('再読込', 'Reload File');
+    const createScriptButton = document.createElement('button');
+    createScriptButton.type = 'button';
+    createScriptButton.className = 'button button--primary';
+    createScriptButton.textContent = localizeText('拡張ファイルを作る', 'Create Extension File');
 
-    const reloadButton = document.createElement('button');
-    reloadButton.type = 'button';
-    reloadButton.className = 'chip';
-    reloadButton.textContent = localizeText('反映', 'Apply');
+    const chooseScriptButton = document.createElement('button');
+    chooseScriptButton.type = 'button';
+    chooseScriptButton.className = 'button';
+    chooseScriptButton.textContent = localizeText('既存ファイルを選ぶ', 'Choose Existing File');
 
-    const stopButton = document.createElement('button');
-    stopButton.type = 'button';
-    stopButton.className = 'chip';
-    stopButton.textContent = localizeText('停止', 'Stop');
-
-    const templateButton = document.createElement('button');
-    templateButton.type = 'button';
-    templateButton.className = 'chip';
-    templateButton.textContent = localizeText('雛形表示', 'Show Template');
-
-    const downloadTemplateButton = document.createElement('button');
-    downloadTemplateButton.type = 'button';
-    downloadTemplateButton.className = 'chip';
-    downloadTemplateButton.textContent = localizeText('雛形ファイル', 'Create Template File');
-
-    const importScriptButton = document.createElement('button');
-    importScriptButton.type = 'button';
-    importScriptButton.className = 'chip';
-    importScriptButton.textContent = localizeText('スクリプト選択', 'Choose Script');
-
-    actions.append(saveButton, reloadButton, stopButton, templateButton, downloadTemplateButton, importScriptButton);
+    actions.append(createScriptButton, chooseScriptButton);
     body.appendChild(actions);
+
+    const workspace = document.createElement('div');
+    workspace.className = 'local-ext-panel__workspace';
+    workspace.hidden = true;
+
+    const workspaceTitle = document.createElement('div');
+    workspaceTitle.className = 'local-ext-panel__workspace-title';
+    workspaceTitle.textContent = localizeText('拡張UI', 'Extension UI');
+
+    const workspaceBody = document.createElement('div');
+    workspaceBody.className = 'local-ext-panel__workspace-body';
+
+    workspace.append(workspaceTitle, workspaceBody);
+    body.appendChild(workspace);
 
     const toolBox = document.createElement('div');
     toolBox.className = 'local-ext-panel__tools';
+    toolBox.hidden = true;
 
     const toolHeading = document.createElement('div');
     toolHeading.className = 'local-ext-panel__tools-heading';
@@ -1736,6 +2924,7 @@
 
     const output = document.createElement('div');
     output.className = 'local-ext-panel__output';
+    output.hidden = true;
     const outputTitle = document.createElement('div');
     outputTitle.className = 'local-ext-panel__output-title';
     outputTitle.textContent = localizeText('ローカル出力', 'Local Output');
@@ -1751,11 +2940,6 @@
     panel.appendChild(body);
     extensionsBody.prepend(panel);
 
-    const badge = document.createElement('div');
-    badge.className = 'local-ext-badge';
-    badge.id = 'localExtensionBadge';
-    document.body.appendChild(badge);
-
     return {
       panel,
       title,
@@ -1763,23 +2947,25 @@
       enabled,
       toggleText,
       scriptLabel,
+      scriptValue,
       scriptHint,
       code,
       scriptFileInput,
-      saveButton,
-      reloadButton,
-      stopButton,
-      templateButton,
-      downloadTemplateButton,
-      importScriptButton,
+      createScriptButton,
+      chooseScriptButton,
+      workspace,
+      workspaceTitle,
+      workspaceBody,
+      toolBox,
       toolHeading,
       clearToolButton,
       toolList,
       toolMeta,
       status,
+      output,
       outputTitle,
       outputBody,
-      badge,
+      badge: null,
     };
   }
 
@@ -1793,8 +2979,8 @@
     }
     if (ui.description instanceof HTMLElement) {
       ui.description.textContent = localizeText(
-        'マルチ中でもこの端末だけで動作します。共有状態へ書き込むAPIは公開せず、拡張コードからの外部通信もできません。',
-        'Even during multiplayer, this runs only on this device. No API is exposed for writing into shared state, and direct external network access is disabled.'
+        'この端末だけで動く sandbox 内で拡張を実行します。独自UIや canvas を作れますが、共有状態や外部サイトには触れません。',
+        'Extensions run only on this device inside a sandbox. They can build custom UI and canvases, but cannot touch shared state or external sites.'
       );
     }
     if (ui.toggleText instanceof HTMLElement) {
@@ -1804,31 +2990,29 @@
       ui.code.placeholder = localizeText('ここに現在のスクリプトが表示されます', 'The current script is shown here');
     }
     if (ui.scriptLabel instanceof HTMLElement) {
-      ui.scriptLabel.textContent = localizeText('スクリプト', 'Script');
+      ui.scriptLabel.textContent = localizeText('拡張ファイル', 'Extension File');
     }
+    refreshScriptBindingUi();
     if (ui.scriptHint instanceof HTMLElement) {
-      ui.scriptHint.textContent = localizeText(
-        '雛形ファイルを作成して VSCode や GPT連携メモ帳で編集し、同じ `.js` を選択しておくと保存時に自動で再読込されます。',
-        'Create a template file, edit it in VS Code or a GPT-connected editor, and keep that `.js` selected to auto-reload on save.'
-      );
+      ui.scriptHint.textContent = canUseScriptFileSystem()
+        ? localizeText(
+          '作成または選択した `.js` を外部エディタで保存すると自動反映します。',
+          'Save the created or selected `.js` in an external editor to auto-apply changes.'
+        )
+        : localizeText(
+          '既存の `.js` を選んで使えます。更新後はもう一度選び直してください。',
+          'You can use an existing `.js` file here. Re-select it after editing to update it.'
+        );
     }
-    if (ui.saveButton instanceof HTMLButtonElement) {
-      ui.saveButton.textContent = localizeText('再読込', 'Reload File');
+    if (ui.createScriptButton instanceof HTMLButtonElement) {
+      ui.createScriptButton.textContent = localizeText('拡張ファイルを作る', 'Create Extension File');
+      ui.createScriptButton.hidden = !canUseScriptFileSystem();
     }
-    if (ui.reloadButton instanceof HTMLButtonElement) {
-      ui.reloadButton.textContent = localizeText('反映', 'Apply');
+    if (ui.chooseScriptButton instanceof HTMLButtonElement) {
+      ui.chooseScriptButton.textContent = localizeText('既存ファイルを選ぶ', 'Choose Existing File');
     }
-    if (ui.stopButton instanceof HTMLButtonElement) {
-      ui.stopButton.textContent = localizeText('停止', 'Stop');
-    }
-    if (ui.templateButton instanceof HTMLButtonElement) {
-      ui.templateButton.textContent = localizeText('雛形表示', 'Show Template');
-    }
-    if (ui.downloadTemplateButton instanceof HTMLButtonElement) {
-      ui.downloadTemplateButton.textContent = localizeText('雛形ファイル', 'Create Template File');
-    }
-    if (ui.importScriptButton instanceof HTMLButtonElement) {
-      ui.importScriptButton.textContent = localizeText('スクリプト選択', 'Choose Script');
+    if (ui.workspaceTitle instanceof HTMLElement) {
+      ui.workspaceTitle.textContent = localizeText('拡張UI', 'Extension UI');
     }
     if (ui.toolHeading instanceof HTMLElement) {
       ui.toolHeading.textContent = localizeText('ローカルツール', 'Local Tools');
@@ -1847,6 +3031,7 @@
     }
     renderLocalToolButtons();
     renderLocalToolMeta();
+    updatePanelVisibility();
   }
 
   function hydrateUi() {
@@ -1860,58 +3045,17 @@
     ui.enabled.checked = runtimeState.enabled;
     ui.code.value = runtimeState.code;
     applyUiLocalization();
+    refreshScriptBindingUi();
 
     ui.enabled.addEventListener('change', () => {
       setEnabled(ui.enabled.checked, { persist: true, restart: true });
     });
 
-    ui.saveButton.addEventListener('click', async () => {
-      if (runtimeState.scriptFileHandle) {
-        const reloaded = await readBoundScriptFile({ apply: true, silent: false, ignoreTimestamp: true, autoEnable: true });
-        if (!reloaded) {
-          setStatus(localizeText('選択中のスクリプトを再読込できませんでした', 'Could not reload the selected script'), 'warn');
-        }
-        return;
-      }
-      if (ui.scriptFileInput instanceof HTMLInputElement) {
-        ui.scriptFileInput.click();
-      }
+    ui.createScriptButton.addEventListener('click', async () => {
+      await createTemplateScriptFile();
     });
 
-    ui.reloadButton.addEventListener('click', () => {
-      runtimeState.code = ui.code.value || '';
-      writeStorage(STORAGE_KEY_CODE, runtimeState.code);
-      if (!runtimeState.enabled) {
-        setEnabled(true, { persist: true, restart: true });
-      } else {
-        reloadRuntime();
-      }
-      setStatus(localizeText('ローカル拡張を反映しました', 'Applied local extension'), 'success');
-    });
-
-    ui.stopButton.addEventListener('click', () => {
-      setEnabled(false, { persist: true, restart: true });
-      setStatus(localizeText('ローカル拡張を停止しました', 'Stopped local extension'), 'info');
-    });
-
-    ui.templateButton.addEventListener('click', () => {
-      const templateCode = buildTemplateCode();
-      if (ui.code instanceof HTMLTextAreaElement) {
-        ui.code.value = templateCode;
-      }
-      setStatus(localizeText('雛形を表示しました', 'Showing the template'), 'info');
-    });
-
-    ui.downloadTemplateButton.addEventListener('click', async () => {
-      const created = await createTemplateScriptFile();
-      if (!created && !canUseScriptFileSystem()) {
-        if (ui.code instanceof HTMLTextAreaElement) {
-          ui.code.value = buildTemplateCode();
-        }
-      }
-    });
-
-    ui.importScriptButton.addEventListener('click', async () => {
+    ui.chooseScriptButton.addEventListener('click', async () => {
       if (canUseScriptFileSystem()) {
         const picked = await pickScriptFileHandle();
         if (picked) {
@@ -1931,26 +3075,6 @@
       ui.scriptFileInput.value = '';
     });
 
-    if (ui.code instanceof HTMLTextAreaElement) {
-      ui.code.addEventListener('dragover', event => {
-        event.preventDefault();
-        ui.code.classList.add('is-drop-target');
-      });
-
-      ui.code.addEventListener('dragleave', () => {
-        ui.code.classList.remove('is-drop-target');
-      });
-
-      ui.code.addEventListener('drop', async event => {
-        event.preventDefault();
-        ui.code.classList.remove('is-drop-target');
-        const file = event.dataTransfer?.files && event.dataTransfer.files[0] ? event.dataTransfer.files[0] : null;
-        if (file) {
-          await importScriptFile(file);
-        }
-      });
-    }
-
     ui.clearToolButton.addEventListener('click', () => {
       setActiveLocalToolId('', { notifyRuntime: true });
       setStatus(localizeText('ローカルツールの選択を解除しました', 'Cleared local tool selection'), 'info');
@@ -1959,6 +3083,7 @@
     renderLocalToolButtons();
     renderLocalToolMeta();
     updateLocalInputLayerState();
+    updatePanelVisibility();
   }
 
   function init() {
