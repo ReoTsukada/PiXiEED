@@ -110,7 +110,14 @@
       event.preventDefault();
     });
   </script>
-<link rel="manifest" href="manifest.webmanifest"/>
+<script>
+  if (window.location.protocol !== 'file:') {
+    const manifestLink = document.createElement('link');
+    manifestLink.rel = 'manifest';
+    manifestLink.href = 'manifest.webmanifest';
+    document.head.appendChild(manifestLink);
+  }
+</script>
 <link rel="apple-touch-icon" href="/icon/icon-512-4.png"/>
 </head>
 <body>
@@ -222,10 +229,18 @@
 <div aria-label="プロジェクトタブ" class="project-tabs__list" id="projectTabsList" role="tablist"></div>
 </div>
 <div class="stage__canvas" id="canvasViewport">
+<div class="stage__workspace" data-local-canvas-layout="single" id="viewportWorkspace">
+<div class="stage__main-canvas" id="mainCanvasArea">
 <div aria-live="off" class="canvas-stack" id="canvasStack">
 <canvas aria-label="描画キャンバス" height="32" id="drawingCanvas" width="32"></canvas>
 <canvas aria-hidden="true" height="32" id="overlayCanvas" width="32"></canvas>
 <canvas aria-hidden="true" height="32" id="selectionCanvas" width="32"></canvas>
+</div>
+</div>
+<div aria-hidden="true" class="canvas-resize-preview is-hidden" hidden="" id="canvasResizePreview"></div>
+<button aria-label="キャンバス左上をドラッグしてサイズ変更" class="canvas-resize-handle canvas-resize-handle--corner-start is-hidden" data-resize-anchor="start" hidden="" id="canvasResizeHandleStart" type="button"></button>
+<button aria-label="キャンバスサイズをドラッグで変更" class="canvas-resize-handle canvas-resize-handle--corner is-hidden" data-resize-anchor="end" hidden="" id="canvasResizeHandleCorner" type="button"></button>
+<div aria-label="マルチキャンバス" class="local-canvas-dock is-hidden" hidden="" id="localCanvasDock"></div>
 </div>
 <!-- Danmaku overlay: floating comments (弾幕) -->
 <div id="danmakuOverlay" class="danmaku-overlay" aria-hidden="true"></div>
@@ -834,6 +849,11 @@
 </select>
 </label>
 <p class="help-text ui-guide-text" id="multiJoinPolicyHint">自動参加: 招待リンクは参加者入室になります。</p>
+<label class="toggle-option" for="multiParticipantFreeCellMove">
+<input id="multiParticipantFreeCellMove" type="checkbox"/>
+<span>参加者が空きセルへ自由移動できるようにする</span>
+</label>
+<p class="help-text ui-guide-text" id="multiParticipantFreeCellMoveHint">同じセルへの同時参加はできません。</p>
 </div>
 <div class="field field--list multi-join-requests-field">
 <span>参加リクエスト</span>
@@ -1004,6 +1024,26 @@
 <input id="toggleFloatingPreview" type="checkbox"/>
 <span>小窓プレビュー</span>
 </label>
+</li>
+<li>
+<label class="toggle-option" for="toggleCanvasResizeHandles">
+<input checked="" id="toggleCanvasResizeHandles" type="checkbox"/>
+<span>キャンバスサイズつまみ</span>
+</label>
+</li>
+<li>
+<label class="toggle-option" for="toggleLocalCanvas">
+<input id="toggleLocalCanvas" type="checkbox"/>
+<span>マルチキャンバス</span>
+</label>
+<div aria-label="マルチキャンバス設定" class="local-canvas-count-controls is-hidden" hidden="" id="localCanvasCountControls">
+<span class="local-canvas-count-controls__label" id="localCanvasCountLabel">キャンバス数</span>
+<div class="local-canvas-count-controls__row">
+<button class="chip local-canvas-count-controls__button" id="removeLocalCanvas" type="button" aria-label="マルチキャンバスを減らす">-</button>
+<span aria-live="polite" class="local-canvas-count-controls__value" id="localCanvasCountValue">0</span>
+<button class="chip local-canvas-count-controls__button" id="addLocalCanvas" type="button" aria-label="マルチキャンバスを増やす">+</button>
+</div>
+</div>
 </li>
 <li>
 <label class="toggle-option" for="toggleMirrorMode">
