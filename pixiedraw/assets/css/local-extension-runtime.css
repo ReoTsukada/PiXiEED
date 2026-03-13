@@ -30,13 +30,20 @@
 }
 
 .local-ext-panel__actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
 }
 
 .local-ext-panel__actions > * {
   min-width: 0;
+  box-sizing: border-box;
+}
+
+.local-ext-panel__actions > .button {
+  display: inline-flex;
+  width: 100%;
+  justify-content: center;
 }
 
 .local-ext-panel__actions--ai > * {
@@ -90,6 +97,22 @@
   margin: 0;
 }
 
+.local-ext-panel__script-value {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid rgba(var(--ui-rgb), 0.34);
+  background: rgba(6, 12, 18, 0.72);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+
+.local-ext-panel__script-value[data-empty="true"] {
+  opacity: 0.7;
+}
+
 .local-ext-panel__field > span {
   font-size: 0.78rem;
   opacity: 0.86;
@@ -121,6 +144,30 @@
 .local-ext-panel__advanced-body {
   display: grid;
   gap: 8px;
+}
+
+.local-ext-panel__workspace {
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(var(--ui-rgb), 0.34);
+  background: rgba(4, 10, 16, 0.78);
+  padding: 8px;
+}
+
+.local-ext-panel__workspace-title {
+  font-weight: 700;
+  font-size: 0.83rem;
+}
+
+.local-ext-panel__workspace-body {
+  min-height: 180px;
+  border: 1px solid rgba(var(--ui-rgb), 0.24);
+  background:
+    linear-gradient(0deg, rgba(var(--ui-rgb), 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ui-rgb), 0.08) 1px, transparent 1px),
+    rgba(7, 14, 20, 0.92);
+  background-size: 8px 8px;
+  overflow: hidden;
 }
 
 @container (max-width: 520px) {
@@ -204,6 +251,13 @@
 
 .local-ext-panel__code[readonly] {
   cursor: default;
+}
+
+.local-ext-panel__code[hidden],
+.local-ext-panel__workspace[hidden],
+.local-ext-panel__tools[hidden],
+.local-ext-panel__output[hidden] {
+  display: none !important;
 }
 
 .local-ext-toolbar-button {
@@ -321,14 +375,12 @@
 }
 
 .local-ext-runtime-frame {
-  width: 0;
-  height: 0;
+  display: block;
+  width: 100%;
+  min-height: 180px;
+  height: 240px;
   border: 0;
-  position: fixed;
-  left: 0;
-  top: 0;
-  opacity: 0;
-  pointer-events: none;
+  background: transparent;
 }
 
 .local-ext-overlay-canvas {
