@@ -1427,6 +1427,227 @@ body.is-dual-left-rail:not(.is-mobile-layout) .rail--left[data-compact="false"] 
   overflow: hidden;
 }
 
+.stage__workspace {
+  --workspace-canvas-columns: 1;
+  --workspace-canvas-rows: 1;
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+.stage__workspace[data-local-canvas-layout='single'] {
+  --workspace-canvas-columns: 1;
+  --workspace-canvas-rows: 1;
+}
+
+.stage__workspace[data-local-canvas-layout='grid'] {
+  align-content: stretch;
+  justify-content: stretch;
+}
+
+.stage__main-canvas {
+  position: absolute;
+  min-width: 0;
+  min-height: 0;
+  overflow: visible;
+}
+
+.canvas-resize-preview {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border: 1px solid rgba(255, 218, 120, 0.92);
+  box-shadow: 0 0 0 1px rgba(18, 10, 2, 0.92) inset;
+  pointer-events: none;
+  z-index: 8;
+}
+
+.canvas-resize-preview.is-hidden {
+  display: none;
+}
+
+.canvas-resize-handle {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: nwse-resize;
+  z-index: 9;
+}
+
+.canvas-resize-handle::before,
+.canvas-resize-handle::after {
+  content: "";
+  position: absolute;
+  box-sizing: border-box;
+  transition: transform 110ms ease, border-color 110ms ease, filter 110ms ease, opacity 110ms ease;
+}
+
+.canvas-resize-handle--corner::before {
+  right: 2px;
+  bottom: 2px;
+  width: 13px;
+  height: 13px;
+  border-right: 4px solid rgba(17, 10, 3, 0.92);
+  border-bottom: 4px solid rgba(17, 10, 3, 0.92);
+}
+
+.canvas-resize-handle--corner::after {
+  right: 3px;
+  bottom: 3px;
+  width: 11px;
+  height: 11px;
+  border-right: 2px solid rgba(255, 224, 148, 0.98);
+  border-bottom: 2px solid rgba(255, 224, 148, 0.98);
+}
+
+.canvas-resize-handle--corner-start {
+  cursor: nwse-resize;
+}
+
+.canvas-resize-handle--corner {
+  clip-path: polygon(
+    100% 0,
+    100% 100%,
+    0 100%,
+    0 calc(100% - 6px),
+    calc(100% - 6px) calc(100% - 6px),
+    calc(100% - 6px) 0
+  );
+}
+
+.canvas-resize-handle--corner-start::before {
+  left: 2px;
+  top: 2px;
+  width: 13px;
+  height: 13px;
+  border-left: 4px solid rgba(17, 10, 3, 0.92);
+  border-top: 4px solid rgba(17, 10, 3, 0.92);
+}
+
+.canvas-resize-handle--corner-start::after {
+  left: 3px;
+  top: 3px;
+  width: 11px;
+  height: 11px;
+  border-left: 2px solid rgba(255, 224, 148, 0.98);
+  border-top: 2px solid rgba(255, 224, 148, 0.98);
+}
+
+.canvas-resize-handle--corner-start {
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% 6px,
+    6px 6px,
+    6px 100%,
+    0 100%
+  );
+}
+
+.canvas-resize-handle:hover::before,
+.canvas-resize-handle:hover::after,
+.canvas-resize-handle:focus-visible::before,
+.canvas-resize-handle:focus-visible::after,
+.canvas-resize-handle.is-active::before,
+.canvas-resize-handle.is-active::after {
+  transform: scale(1.04);
+  filter: drop-shadow(0 0 7px rgba(255, 221, 136, 0.42));
+}
+
+.canvas-resize-handle:hover::after,
+.canvas-resize-handle:focus-visible::after,
+.canvas-resize-handle.is-active::after {
+  border-color: rgba(255, 245, 188, 1);
+  filter: drop-shadow(0 0 9px rgba(255, 232, 154, 0.82));
+}
+
+.canvas-resize-handle:hover::before,
+.canvas-resize-handle:focus-visible::before,
+.canvas-resize-handle.is-active::before {
+  border-color: rgba(30, 18, 6, 0.98);
+  filter: drop-shadow(0 0 3px rgba(255, 228, 162, 0.22));
+}
+
+.canvas-resize-handle.is-hidden {
+  display: none;
+}
+
+.canvas-resize-handle:focus-visible {
+  outline: none;
+}
+
+.local-canvas-dock {
+  display: contents;
+}
+
+.local-canvas-dock.is-hidden {
+  display: none;
+}
+
+.local-canvas-surface {
+  position: absolute;
+  min-width: 0;
+  min-height: 0;
+  overflow: visible;
+}
+
+.local-canvas-surface.is-active .local-canvas-stack {
+  box-shadow:
+    0 0 0 2px rgba(255, 239, 176, 1),
+    0 0 18px rgba(255, 214, 110, 0.28);
+  border-color: rgba(255, 239, 176, 1);
+}
+
+.local-canvas-surface.is-hover-preview .local-canvas-stack {
+  box-shadow:
+    0 0 0 2px rgba(156, 225, 255, 0.92),
+    0 0 16px rgba(82, 188, 255, 0.18);
+  border-color: rgba(156, 225, 255, 0.92);
+}
+
+.local-canvas-surface.is-empty {
+  opacity: 0.42;
+}
+
+.local-canvas-stack {
+  position: relative;
+  display: inline-flex;
+  border: 1px solid rgba(var(--ui-rgb), 0.42);
+  box-shadow: none;
+}
+
+.local-canvas-stack canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  display: block;
+  pointer-events: none;
+}
+
+.local-canvas-surface .local-canvas-surface__canvas {
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.local-canvas-surface__canvas,
+.local-canvas-surface__overlay,
+.local-canvas-surface__selection {
+  width: 100%;
+  height: 100%;
+}
+
+.local-canvas-surface__overlay,
+.local-canvas-surface__selection {
+  position: absolute;
+  inset: 0;
+}
+
 .canvas-stack {
   position: relative;
   display: inline-flex;
@@ -1641,7 +1862,7 @@ body.is-startup-active #virtualCursorCanvas {
   cursor: grab;
   pointer-events: auto;
   touch-action: none;
-  transition: transform 110ms ease, border-color 110ms ease, opacity 120ms ease;
+  transition: transform 110ms ease, border-color 110ms ease, background 110ms ease, box-shadow 110ms ease, opacity 120ms ease;
 }
 
 .mirror-handle::before,
@@ -1654,6 +1875,7 @@ body.is-startup-active #virtualCursorCanvas {
   height: 1px;
   transform-origin: center;
   background: rgba(var(--ui-rgb), 0.95);
+  transition: background 110ms ease;
 }
 
 .mirror-handle::before {
@@ -1668,7 +1890,18 @@ body.is-startup-active #virtualCursorCanvas {
 .mirror-handle:focus-visible {
   transform: scale(1.08);
   border-color: rgba(255, 235, 172, 0.95);
-  box-shadow: none;
+  background:
+    linear-gradient(180deg, rgba(42, 34, 14, 0.98), rgba(24, 18, 8, 0.98));
+  box-shadow:
+    0 0 0 1px rgba(255, 230, 150, 0.2),
+    0 0 12px rgba(255, 214, 112, 0.34);
+}
+
+.mirror-handle:hover::before,
+.mirror-handle:hover::after,
+.mirror-handle:focus-visible::before,
+.mirror-handle:focus-visible::after {
+  background: rgba(255, 242, 195, 0.98);
 }
 
 .mirror-handle:active {
@@ -2165,6 +2398,64 @@ body.is-startup-active #virtualCursorCanvas {
 .floating-preview-panel__resize-handle:focus-visible {
   outline: 2px solid rgba(var(--ui-rgb-focus), 0.78);
   outline-offset: -2px;
+}
+
+.toggle-option--inline-control {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.local-canvas-count-controls {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+  padding-left: 28px;
+}
+
+.local-canvas-count-controls.is-hidden {
+  display: none;
+}
+
+.local-canvas-count-controls__label {
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+}
+
+.local-canvas-count-controls__row {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.local-canvas-count-controls__button {
+  min-width: 34px;
+  min-height: 28px;
+  padding: 4px 10px;
+  line-height: 1;
+}
+
+.local-canvas-count-controls__value {
+  min-width: 1.5rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--fg);
+}
+
+.stage__main-canvas.is-multi-canvas-selected .canvas-stack {
+  box-shadow:
+    0 0 0 2px rgba(255, 239, 176, 1),
+    0 0 18px rgba(255, 214, 110, 0.28);
+  border-color: rgba(255, 239, 176, 1);
+}
+
+.stage__main-canvas.is-multi-canvas-hover-preview .canvas-stack {
+  box-shadow:
+    0 0 0 2px rgba(156, 225, 255, 0.92),
+    0 0 16px rgba(82, 188, 255, 0.18);
+  border-color: rgba(156, 225, 255, 0.92);
 }
 
 .canvas-control-buttons.is-clipboard-mode .chip {
