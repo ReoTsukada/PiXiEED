@@ -53,6 +53,12 @@
       virtualCursor: /** @type {HTMLCanvasElement} */ (document.getElementById('virtualCursorCanvas')),
     },
     canvasViewport: document.getElementById('canvasViewport'),
+    viewportWorkspace: document.getElementById('viewportWorkspace'),
+    mainCanvasArea: document.getElementById('mainCanvasArea'),
+    localCanvasDock: document.getElementById('localCanvasDock'),
+    canvasResizePreview: document.getElementById('canvasResizePreview'),
+    canvasResizeHandleStart: document.getElementById('canvasResizeHandleStart'),
+    canvasResizeHandleCorner: document.getElementById('canvasResizeHandleCorner'),
     projectTabsBar: document.getElementById('projectTabsBar'),
     projectTabsList: document.getElementById('projectTabsList'),
     mirrorToolPopover: document.getElementById('mirrorToolPopover'),
@@ -106,6 +112,9 @@
       brushShapeButtons: Array.from(document.querySelectorAll('button[data-brush-shape]')),
       customBrushInfo: document.getElementById('customBrushInfo'),
       colorMode: Array.from(document.querySelectorAll('input[name="colorMode"]')),
+      colorModeIndexLabel: document.getElementById('colorModeIndexLabel'),
+      colorModeRgbLabel: document.getElementById('colorModeRgbLabel'),
+      colorModeHint: document.getElementById('settingsColorModeHint'),
       paletteList: document.getElementById('paletteList'),
       toolQuickPalette: document.getElementById('toolQuickPalette'),
       addPaletteColor: document.getElementById('addPaletteColor'),
@@ -121,6 +130,7 @@
       palettePresetPickerMenu: document.getElementById('palettePresetPickerMenu'),
       palettePresetPreview: document.getElementById('palettePresetPreview'),
       applyPalettePreset: document.getElementById('applyPalettePreset'),
+      paletteIndexField: document.getElementById('paletteIndexField'),
       paletteIndex: document.getElementById('paletteIndex'),
       paletteHue: document.getElementById('paletteHue'),
       paletteHueValue: document.getElementById('paletteHueValue'),
@@ -174,6 +184,13 @@
       togglePixelPreview: document.getElementById('togglePixelPreview'),
       toggleVirtualCursor: document.getElementById('toggleVirtualCursor'),
       toggleFloatingPreview: document.getElementById('toggleFloatingPreview'),
+      toggleCanvasResizeHandles: document.getElementById('toggleCanvasResizeHandles'),
+      toggleLocalCanvas: document.getElementById('toggleLocalCanvas'),
+      addLocalCanvas: document.getElementById('addLocalCanvas'),
+      removeLocalCanvas: document.getElementById('removeLocalCanvas'),
+      localCanvasCountControls: document.getElementById('localCanvasCountControls'),
+      localCanvasCountLabel: document.getElementById('localCanvasCountLabel'),
+      localCanvasCountValue: document.getElementById('localCanvasCountValue'),
       toggleOnionSkin: document.getElementById('toggleOnionSkin'),
       toggleMirrorMode: document.getElementById('toggleMirrorMode'),
       mirrorAxisVertical: document.getElementById('mirrorAxisVertical'),
@@ -282,9 +299,11 @@
       multiRoomVisibilityHint: document.getElementById('multiRoomVisibilityHint'),
       multiJoinPolicy: document.getElementById('multiJoinPolicy'),
       multiJoinPolicyHint: document.getElementById('multiJoinPolicyHint'),
-  multiDanmakuToggle: document.getElementById('multiDanmakuToggle'),
-  settingDanmakuToggle: document.getElementById('settingDanmakuToggle'),
-  danmakuOverlay: document.getElementById('danmakuOverlay'),
+      multiParticipantFreeCellMove: document.getElementById('multiParticipantFreeCellMove'),
+      multiParticipantFreeCellMoveHint: document.getElementById('multiParticipantFreeCellMoveHint'),
+      multiDanmakuToggle: document.getElementById('multiDanmakuToggle'),
+      settingDanmakuToggle: document.getElementById('settingDanmakuToggle'),
+      danmakuOverlay: document.getElementById('danmakuOverlay'),
       multiExportPermission: document.getElementById('multiExportPermission'),
       multiGuestCapacityHint: document.getElementById('multiGuestCapacityHint'),
       multiInviteCopy: document.getElementById('multiInviteCopy'),
@@ -2407,47 +2426,7 @@
   );
   const CURRENT_PALETTE_PRESET_CUSTOM = 'custom';
   const newProjectPalettePresetColorCache = new Map();
-  const RESIDENT_MULTI_ROOM_PROFILES = Object.freeze({
-    'resident-256-main': Object.freeze({
-      width: 256,
-      height: 256,
-      maxGuests: 9,
-      slotColumns: 5,
-      slotRows: 2,
-      slotRestriction: 'free',
-      roomNameJa: 'フリーキャンバス',
-      roomNameEn: 'Free Canvas',
-      layerNameJa: 'フリーキャンバス',
-      layerNameEn: 'Free Canvas',
-      roomVisibility: MULTI_ROOM_VISIBILITY_PUBLIC,
-    }),
-    'resident-64-main': Object.freeze({
-      width: 512,
-      height: 512,
-      maxGuests: 9,
-      slotColumns: 8,
-      slotRows: 8,
-      slotRestriction: 'partition',
-      roomNameJa: '64キャンバス',
-      roomNameEn: '64 Canvas',
-      layerNameJa: '64キャンバス',
-      layerNameEn: '64 Canvas',
-      roomVisibility: MULTI_ROOM_VISIBILITY_PUBLIC,
-    }),
-    'resident-32-main': Object.freeze({
-      width: 512,
-      height: 512,
-      maxGuests: 9,
-      slotColumns: 16,
-      slotRows: 16,
-      slotRestriction: 'partition',
-      roomNameJa: '32キャンバス',
-      roomNameEn: '32 Canvas',
-      layerNameJa: '32キャンバス',
-      layerNameEn: '32 Canvas',
-      roomVisibility: MULTI_ROOM_VISIBILITY_PUBLIC,
-    }),
-  });
+  const RESIDENT_MULTI_ROOM_PROFILES = Object.freeze({});
   const MULTI_SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
   const MULTI_SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
   const MULTI_SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
@@ -2457,14 +2436,6 @@
   const MULTI_PUBLIC_ROOM_THUMBNAIL_MAX_EDGE = 96;
   const MULTI_PUBLIC_ROOM_THUMBNAIL_MAX_DATA_URL_LENGTH = 180000;
   const MULTI_PUBLIC_ROOM_THUMBNAIL_REFRESH_MIN_MS = 7000;
-  const RESIDENT_ROOM_PERSIST_VERSION = 1;
-  const RESIDENT_ROOM_PERSIST_STORAGE_PREFIX = 'pixieedraw:resident-room-persist:';
-  const RESIDENT_ROOM_PERSIST_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 365 * 5;
-  const RESIDENT_ROOM_PERSIST_WRITE_DELAY = 2200;
-  const RESIDENT_ROOM_PERSIST_REMOTE_BUCKET = 'pixieed-resident-state';
-  const RESIDENT_ROOM_PERSIST_REMOTE_LEGACY_BUCKETS = Object.freeze(['pixieed-contest']);
-  const RESIDENT_ROOM_PERSIST_REMOTE_PREFIX = 'resident-room-state';
-  const RESIDENT_ROOM_PERSIST_REMOTE_MAX_BYTES = 4_500_000;
   const MULTI_SYNC_THROTTLE_MS = 150;
   const MULTI_LAYER_PATCH_FULL_RATIO = 0.45;
   const MULTI_JOIN_REQUEST_COOLDOWN_MS = 6000;
@@ -2491,7 +2462,6 @@
   const THUMBNAIL_CANVAS_SIZE = 160;
   const LOCAL_PROJECT_THUMBNAIL_UPDATE_INTERVAL_MS = 1500;
   const MULTI_REPLICA_AUTOSAVE_BLOCKED_STATUS = '自動保存: マルチ中はマスターのみ端末保存します';
-  const RESIDENT_CANVAS_AUTOSAVE_BLOCKED_STATUS = '自動保存: フリー/64/32キャンバスでは端末内保存しません';
   const DOCUMENT_FILE_VERSION = 1;
   const LENS_IMPORT_STORAGE_KEY = 'pixiee-lens:pending-draw-import';
   const PIXFIND_UPLOAD_KEY = 'pixfind_creator_upload_v1';
@@ -2560,9 +2530,6 @@
     key: '',
     metrics: null,
   };
-  const residentAssignedRangeGuideStyleCache = {
-    lineWidth: Number.NaN,
-  };
   let exportScale = 1;
   let exportSheetInfo = null;
   let exportMaxScale = 1;
@@ -2583,14 +2550,11 @@
   const TIMELAPSE_CAPTURE_DEBOUNCE_MS = 48;
   const timelapseState = {
     enabled: true,
-    snapshots: [],
+    tracksByCanvasId: Object.create(null),
     fps: TIMELAPSE_DEFAULT_FPS,
-    warningShown: false,
-    sampleStep: 1,
-    lastCaptureToken: -1,
   };
   let timelapseCaptureTimer = null;
-  let timelapseCaptureQueued = false;
+  const timelapseQueuedCanvasIds = new Set();
   let pixfindModeEnabled = false;
   let pixfindModeFirstEnableConfirmed = false;
   const multiState = {
@@ -2610,6 +2574,7 @@
     maxGuests: MULTI_DEFAULT_GUEST_LIMIT,
     roomVisibility: MULTI_DEFAULT_ROOM_VISIBILITY,
     joinPolicy: MULTI_DEFAULT_JOIN_POLICY,
+    participantFreeCellMove: false,
     masterOpsMode: false,
     exportPermission: MULTI_DEFAULT_EXPORT_PERMISSION,
     assignments: new Map(),
@@ -2627,6 +2592,7 @@
     resumeMaxGuests: null,
     resumeRoomVisibility: null,
     resumeJoinPolicy: null,
+    resumeParticipantFreeCellMove: null,
     resumeExportPermission: null,
     layerPatchSnapshots: new Map(),
     layerPatchSendSequences: new Map(),
@@ -2640,6 +2606,7 @@
     guestLayerPatchQueued: false,
     blockedClientIds: new Set(),
     pendingJoinRequests: new Map(),
+    pendingAssignmentMoveRequests: new Map(),
     joinRequestCooldownUntil: 0,
     joinRequestPending: false,
     awaitingGuestStateRecovery: false,
@@ -2654,11 +2621,6 @@
     publicLobbyThumbnailDirty: true,
     publicLobbyThumbnailDataUrl: '',
     publicLobbyThumbnailUpdatedAt: 0,
-    residentPersistTimer: null,
-    residentPersistInFlight: false,
-    residentPersistQueued: false,
-    residentPersistSignature: '',
-    residentAutoPromoteTimer: null,
     assignmentSyncRequestAt: 0,
     paletteSeededFromShared: false,
   // masterForcedDanmakuOff removed: clients control danmaku locally
@@ -2747,7 +2709,10 @@
     [MIRROR_AXIS_DIAGONAL_A]: false,
     [MIRROR_AXIS_DIAGONAL_B]: false,
   });
-  const MIRROR_HANDLE_OUTSIDE_OFFSET = 28;
+  const MIRROR_HANDLE_OUTSIDE_OFFSET = 72;
+  const CANVAS_RESIZE_HANDLE_GAP = 4;
+  const CANVAS_RESIZE_HANDLE_SIZE = 18;
+  const MULTI_CANVAS_SURFACE_GAP = 48;
   const MIRROR_HANDLE_DRAG_THRESHOLD = 4;
   const MIRROR_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', 'fill']);
   const MIRROR_TOOL_SECTION_SPLIT_THRESHOLD = 8;
@@ -2872,6 +2837,15 @@
     width: 220,
     height: 220,
   });
+  const MULTI_CANVAS_FEATURE_ENABLED = false;
+  const LOCAL_VIEWPORT_CANVAS_MAX_COUNT = 3;
+  const LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE = Object.freeze({
+    count: 0,
+    selectedKind: 'main',
+    selectedIndex: -1,
+    anchorLeft: null,
+    anchorTop: null,
+  });
   let lockedCanvasWidth = null;
   let lockedCanvasHeight = null;
   let palettePresetPickerPointerBound = false;
@@ -2881,6 +2855,29 @@
   let newProjectPalettePresetId = loadStoredNewProjectPalettePresetId();
   let currentPalettePresetId = normalizeCurrentPalettePreset(newProjectPalettePresetId, CURRENT_PALETTE_PRESET_CUSTOM);
   const state = createInitialState({ palettePreset: newProjectPalettePresetId });
+  const projectCanvasStore = createProjectCanvasStoreFromState(state);
+  installProjectCanvasStateProxy(state, projectCanvasStore);
+  let localViewportCanvasState = normalizeLocalViewportCanvasState(null, LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE);
+  const localViewportCanvasEntries = [];
+  const mainViewportCanvasSurface = {
+    kind: 'main',
+    index: 0,
+    panel: dom.mainCanvasArea,
+    body: dom.mainCanvasArea,
+    stack: dom.canvases.stack,
+    drawing: dom.canvases.drawing,
+    overlay: dom.canvases.overlay,
+    selection: dom.canvases.selection,
+    drawingCtx: ctx.drawing,
+    overlayCtx: ctx.overlay,
+    selectionCtx: ctx.selection,
+    canvasDoc: null,
+    canvasDocId: '',
+  };
+  let activeCanvasSurface = mainViewportCanvasSurface;
+  let committedProjectCanvasId = '';
+  let hoveredProjectCanvasId = '';
+  let pendingProjectCanvasUiSync = false;
   let localLayerVisibilityById = new Map();
   let localLayerPreviewOpacityById = new Map();
   if (EMBED_CONFIG.lockCanvasSize) {
@@ -2925,6 +2922,20 @@
     startClientX: 0,
     startClientY: 0,
     startRect: null,
+  };
+  const canvasResizeHandleState = {
+    pointerId: null,
+    handle: null,
+    anchor: '',
+    startClientX: 0,
+    startClientY: 0,
+    startWidth: 0,
+    startHeight: 0,
+    previewWidth: 0,
+    previewHeight: 0,
+    previewOffsetX: 0,
+    previewOffsetY: 0,
+    active: false,
   };
   let floatingPreviewCtx = null;
   const virtualCursorDrawState = {
@@ -3007,9 +3018,54 @@
   let startupVisible = false;
   let startupVirtualCursorState = null;
   let layoutMode = null;
+  let multiEntryJoinPanelOpen = false;
+  function bindClickHandlerOnce(element, datasetKey, handler) {
+    if (!(element instanceof HTMLElement) || typeof handler !== 'function') {
+      return;
+    }
+    if (element.dataset[datasetKey] === 'true') {
+      return;
+    }
+    element.dataset[datasetKey] = 'true';
+    element.addEventListener('click', handler);
+  }
+
+  function bindCoreProjectActionButtons() {
+    bindClickHandlerOnce(dom.startup?.newButton, 'coreProjectActionBound', () => {
+      openNewProjectDialog({ dismissStartup: true });
+    });
+    bindClickHandlerOnce(dom.startup?.openButton, 'coreProjectActionBound', async () => {
+      const opened = await openDocumentDialog();
+      if (opened) {
+        hideStartupScreen();
+      }
+    });
+    bindClickHandlerOnce(dom.controls.openDocument, 'coreProjectActionBound', () => {
+      openDocumentDialog();
+    });
+    bindClickHandlerOnce(dom.controls.showLocalProjects, 'coreProjectActionBound', () => {
+      showStartupScreen();
+    });
+    bindClickHandlerOnce(dom.newProject?.button, 'coreProjectActionBound', () => {
+      openNewProjectDialog();
+    });
+  }
+
   multiState.clientId = ensureMultiClientId();
   multiState.projectKey = readStoredMultiProjectKey();
-  restoreSessionState();
+  bindCoreProjectActionButtons();
+  try {
+    restoreSessionState();
+  } catch (error) {
+    console.warn('Failed to restore session state', error);
+    if (canUseSessionStorage) {
+      try {
+        window.localStorage.removeItem(SESSION_STORAGE_KEY);
+      } catch (storageError) {
+        // Ignore storage cleanup failures.
+      }
+    }
+  }
   if (!RELOAD_SNAPSHOT_ENABLED && canUseSessionStorage) {
     try {
       window.sessionStorage.removeItem(RELOAD_SNAPSHOT_STORAGE_KEY);
@@ -3059,7 +3115,8 @@
   let lastSelectionDashTime = 0;
   const DEFAULT_HISTORY_LIMIT = 80;
   const history = { past: [], future: [], pending: null, limit: DEFAULT_HISTORY_LIMIT };
-  // Per-client history for multi-session participants. Keyed by clientId.
+  // Per-client/per-canvas history for multi-session participants.
+  // Key format: `${clientId}\u0000${canvasId}`
   // Each entry: { past: [compressedSnapshots], future: [compressedSnapshots], limit }
   const multiHistory = new Map();
   let historyTrimmedRecently = false;
@@ -3089,7 +3146,7 @@
   const MOVE_PAD_REPEAT_INTERVAL_MS = 80;
   const SELECTION_TRANSFORM_ROTATION_STEP_DEG = 15;
   const SELECTION_TRANSFORM_DRAG_THRESHOLD_PX = 6;
-  const SELECTION_TRANSFORM_HANDLE_HIT_RADIUS_PX = 16;
+  const SELECTION_TRANSFORM_HANDLE_HIT_RADIUS_PX = 7;
   const SELECTION_TRANSFORM_HANDLE_DRAW_RADIUS_PX = 7;
   const SELECTION_TRANSFORM_PREVIEW_CACHE_MAX_PIXELS = 131072;
   const MULTI_LAYER_PATCH_DEBOUNCE_MS = 40;
@@ -3125,6 +3182,7 @@
   };
   const selectionTransformUi = {
     handles: [],
+    hoverHandleId: '',
     menuVisible: false,
     menuHandleId: '',
     menuLocalX: null,
@@ -3166,11 +3224,9 @@
   let multiEntryMetricsRaf = null;
   let multiAutoResumeAttempted = false;
   let multiInviteAutoJoinHandled = false;
-  let multiEntryJoinPanelOpen = false;
   let mirrorGuideSyncRaf = null;
   let deferredUiSetupScheduled = false;
   let deferredUiSetupDone = false;
-  let canvasWheelListenerBound = false;
   const paletteEditorState = {
     hsv: { h: 0, s: 0, v: 1, a: 255 },
     wheelPointer: { active: false, pointerId: null, upHandler: null, mode: null, captureTarget: null },
@@ -3249,6 +3305,12 @@
   function getNormalizedMirrorState() {
     state.mirror = normalizeMirrorAxisState(state.mirror, state.width, state.height);
     return state.mirror;
+  }
+
+  function resetMirrorPivotToCanvasCenter(mirrorState) {
+    const centered = createInitialMirrorState(state.width, state.height);
+    mirrorState.axisX = centered.axisX;
+    mirrorState.axisY = centered.axisY;
   }
 
   function normalizeLayerBlendMode(value) {
@@ -3341,6 +3403,69 @@
       width,
       height,
     };
+  }
+
+  function normalizeLocalViewportCanvasState(source, fallback = LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE) {
+    if (!MULTI_CANVAS_FEATURE_ENABLED) {
+      return {
+        ...LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE,
+        anchorLeft: null,
+        anchorTop: null,
+      };
+    }
+    const settings = source && typeof source === 'object' ? source : {};
+    const safeFallback = fallback && typeof fallback === 'object'
+      ? fallback
+      : LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE;
+    const requestedCount = Number.isFinite(Number(settings.count))
+      ? Number(settings.count)
+      : Number(safeFallback.count);
+    const normalizedCount = clamp(Math.round(requestedCount || 0), 0, LOCAL_VIEWPORT_CANVAS_MAX_COUNT);
+    const requestedSelectedKind = settings.selectedKind === 'local'
+      ? 'local'
+      : (safeFallback.selectedKind === 'local' ? 'local' : 'main');
+    const fallbackSelectedIndex = Number.isFinite(Number(safeFallback.selectedIndex))
+      ? Math.round(Number(safeFallback.selectedIndex))
+      : -1;
+    const requestedSelectedIndex = Number.isFinite(Number(settings.selectedIndex))
+      ? Math.round(Number(settings.selectedIndex))
+      : fallbackSelectedIndex;
+    const normalizedSelectedKind = normalizedCount > 0 && requestedSelectedKind === 'local'
+      ? 'local'
+      : 'main';
+    const normalizedSelectedIndex = normalizedSelectedKind === 'local'
+      ? clamp(requestedSelectedIndex, 0, Math.max(0, normalizedCount - 1))
+      : -1;
+    const parseAxis = (value, fallbackValue = null) => {
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) {
+        return Math.round(numeric);
+      }
+      const fallbackNumeric = Number(fallbackValue);
+      return Number.isFinite(fallbackNumeric) ? Math.round(fallbackNumeric) : null;
+    };
+    return {
+      count: normalizedCount,
+      selectedKind: normalizedSelectedKind,
+      selectedIndex: normalizedSelectedIndex,
+      anchorLeft: parseAxis(settings.anchorLeft, safeFallback.anchorLeft),
+      anchorTop: parseAxis(settings.anchorTop, safeFallback.anchorTop),
+    };
+  }
+
+  function collapseToSingleProjectCanvasSource(canvases, activeCanvasId = '') {
+    const sourceCanvases = Array.isArray(canvases) && canvases.length
+      ? canvases
+      : [createProjectCanvasDocument({}, { clonePixelData: false, fallbackIndex: 1 })];
+    if (MULTI_CANVAS_FEATURE_ENABLED) {
+      return sourceCanvases;
+    }
+    const activeSource = sourceCanvases.find(canvas => canvas?.id === activeCanvasId) || sourceCanvases[0] || {};
+    return [activeSource];
+  }
+
+  function normalizeProjectCanvasViewScale(value, fallback = 8) {
+    return normalizeZoomScale(value, fallback);
   }
 
   function normalizeBrushShape(value, fallback = BRUSH_SHAPE_SQUARE) {
@@ -3560,6 +3685,7 @@
         requestedFloatingPreview,
         FLOATING_PREVIEW_DEFAULT_STATE
       ),
+      showCanvasResizeHandles: true,
       showMajorGrid: true,
       gridScreenStep: 8,
       majorGridSpacing: 16,
@@ -3716,10 +3842,215 @@
     };
   }
 
+  function getDefaultProjectCanvasName(index = 1) {
+    const safeIndex = Math.max(1, Math.round(Number(index) || 1));
+    return `Canvas ${safeIndex}`;
+  }
+
+  function cloneCanvasDocumentFrames(frames, width, height, { clonePixelData = true } = {}) {
+    if (!Array.isArray(frames) || !frames.length) {
+      const fallbackLayer = createLayer(getDefaultLayerName(1), width, height);
+      return [createFrame(getDefaultFrameName(1), [fallbackLayer], width, height, { copyPixels: false })];
+    }
+    return frames.map((frame, frameIndex) => ({
+      id: typeof frame?.id === 'string' && frame.id ? frame.id : `frame-${frameIndex + 1}`,
+      name: typeof frame?.name === 'string' ? frame.name : getDefaultFrameName(frameIndex + 1),
+      duration: clamp(Number(frame?.duration) || (1000 / 12), 16, 2000),
+      layers: Array.isArray(frame?.layers) && frame.layers.length
+        ? frame.layers.map((layer, layerIndex) => {
+          const nextLayer = createLayer(
+            typeof layer?.name === 'string' ? layer.name : getDefaultLayerName(layerIndex + 1),
+            width,
+            height
+          );
+          nextLayer.id = typeof layer?.id === 'string' && layer.id
+            ? layer.id
+            : (crypto.randomUUID ? crypto.randomUUID() : `layer-${Math.random().toString(36).slice(2)}`);
+          nextLayer.visible = layer?.visible !== false;
+          nextLayer.opacity = normalizeLayerOpacity(layer?.opacity);
+          nextLayer.blendMode = normalizeLayerBlendMode(layer?.blendMode);
+          if (clonePixelData && layer?.indices instanceof Int16Array) {
+            nextLayer.indices.set(layer.indices.subarray(0, Math.min(nextLayer.indices.length, layer.indices.length)));
+          } else if (!clonePixelData && layer?.indices instanceof Int16Array) {
+            nextLayer.indices = layer.indices;
+          } else if (!clonePixelData && Array.isArray(layer?.indices)) {
+            nextLayer.indices = new Int16Array(layer.indices);
+          }
+          if (clonePixelData && layer?.direct instanceof Uint8ClampedArray) {
+            const direct = ensureLayerDirect(nextLayer, width, height);
+            direct.set(layer.direct.subarray(0, Math.min(direct.length, layer.direct.length)));
+          } else if (!clonePixelData && layer?.direct instanceof Uint8ClampedArray) {
+            nextLayer.direct = layer.direct;
+          } else if (!clonePixelData && Array.isArray(layer?.direct)) {
+            nextLayer.direct = new Uint8ClampedArray(layer.direct);
+          }
+          return nextLayer;
+        })
+        : [createLayer(getDefaultLayerName(1), width, height)],
+    }));
+  }
+
+  function normalizeCanvasSelectionMask(mask, pixelCount) {
+    if (!(mask instanceof Uint8Array) || mask.length !== pixelCount) {
+      return null;
+    }
+    return new Uint8Array(mask);
+  }
+
+  function normalizeCanvasSelectionBounds(bounds, selectionMask = null) {
+    const validated = validateBoundsObject(bounds);
+    if (validated) {
+      return validated;
+    }
+    if (selectionMask instanceof Uint8Array) {
+      return computeSelectionBoundsFromMask(selectionMask);
+    }
+    return null;
+  }
+
+  function createProjectCanvasDocument(source = {}, { clonePixelData = true, fallbackIndex = 1 } = {}) {
+    const width = clamp(
+      Math.round(Number(source?.width) || DEFAULT_CANVAS_SIZE),
+      MIN_CANVAS_SIZE,
+      MAX_CANVAS_SIZE
+    );
+    const height = clamp(
+      Math.round(Number(source?.height) || DEFAULT_CANVAS_SIZE),
+      MIN_CANVAS_SIZE,
+      MAX_CANVAS_SIZE
+    );
+    const frames = cloneCanvasDocumentFrames(source?.frames, width, height, { clonePixelData });
+    const frameCount = Math.max(1, frames.length);
+    const activeFrame = clamp(Math.round(Number(source?.activeFrame) || 0), 0, frameCount - 1);
+    const frame = frames[activeFrame];
+    const requestedLayerId = typeof source?.activeLayer === 'string' ? source.activeLayer : '';
+    const activeLayer = frame.layers.some(layer => layer?.id === requestedLayerId)
+      ? requestedLayerId
+      : (frame.layers[frame.layers.length - 1]?.id || frame.layers[0]?.id || null);
+    const pixelCount = width * height;
+    const selectionMask = normalizeCanvasSelectionMask(source?.selectionMask, pixelCount);
+    const selectionContentMask = normalizeCanvasSelectionMask(source?.selectionContentMask, pixelCount);
+    return {
+      id: typeof source?.id === 'string' && source.id
+        ? source.id
+        : (crypto.randomUUID ? crypto.randomUUID() : `canvas-${Math.random().toString(36).slice(2)}`),
+      name: typeof source?.name === 'string' && source.name.trim()
+        ? source.name.trim()
+        : getDefaultProjectCanvasName(fallbackIndex),
+      width,
+      height,
+      viewScale: normalizeProjectCanvasViewScale(
+        source?.viewScale,
+        normalizeProjectCanvasViewScale(source?.scale, 8)
+      ),
+      frames,
+      activeFrame,
+      activeLayer,
+      selectionMask,
+      selectionContentMask,
+      selectionBounds: normalizeCanvasSelectionBounds(source?.selectionBounds, selectionMask),
+      pendingPasteMoveState: null,
+    };
+  }
+
+  function cloneProjectCanvasDocument(source, options = {}) {
+    return createProjectCanvasDocument(source, options);
+  }
+
+  function createProjectCanvasStoreFromState(sourceState) {
+    const initialCanvas = createProjectCanvasDocument({
+      id: typeof sourceState?.activeCanvasId === 'string' ? sourceState.activeCanvasId : '',
+      name: getDefaultProjectCanvasName(1),
+      width: sourceState?.width,
+      height: sourceState?.height,
+      frames: sourceState?.frames,
+      activeFrame: sourceState?.activeFrame,
+      activeLayer: sourceState?.activeLayer,
+      selectionMask: sourceState?.selectionMask,
+      selectionContentMask: sourceState?.selectionContentMask,
+      selectionBounds: sourceState?.selectionBounds,
+    }, { clonePixelData: false, fallbackIndex: 1 });
+    return {
+      canvases: [initialCanvas],
+      activeCanvasId: initialCanvas.id,
+    };
+  }
+
+  function getProjectCanvasDocumentFields(targetState, store) {
+    const activeCanvas = Array.isArray(store.canvases) && store.canvases.length
+      ? (store.canvases.find(canvas => canvas?.id === store.activeCanvasId) || store.canvases[0])
+      : null;
+    if (activeCanvas) {
+      return activeCanvas;
+    }
+    const fallbackCanvas = createProjectCanvasDocument({}, { clonePixelData: false, fallbackIndex: 1 });
+    store.canvases = [fallbackCanvas];
+    store.activeCanvasId = fallbackCanvas.id;
+    return fallbackCanvas;
+  }
+
+  function installProjectCanvasStateProxy(targetState, store) {
+    const proxyFields = [
+      'width',
+      'height',
+      'frames',
+      'activeFrame',
+      'activeLayer',
+      'selectionMask',
+      'selectionContentMask',
+      'selectionBounds',
+      'pendingPasteMoveState',
+    ];
+    proxyFields.forEach(field => {
+      Object.defineProperty(targetState, field, {
+        configurable: true,
+        enumerable: true,
+        get() {
+          return getProjectCanvasDocumentFields(targetState, store)[field];
+        },
+        set(value) {
+          getProjectCanvasDocumentFields(targetState, store)[field] = value;
+        },
+      });
+    });
+    Object.defineProperty(targetState, 'projectCanvases', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return store.canvases;
+      },
+      set(value) {
+        if (Array.isArray(value) && value.length) {
+          store.canvases = collapseToSingleProjectCanvasSource(value, store.activeCanvasId);
+          const nextActive = store.canvases.find(canvas => canvas?.id === store.activeCanvasId);
+          if (!nextActive) {
+            store.activeCanvasId = store.canvases[0]?.id || '';
+          }
+        }
+      },
+    });
+    Object.defineProperty(targetState, 'activeCanvasId', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return store.activeCanvasId;
+      },
+      set(value) {
+        const requestedId = typeof value === 'string' ? value : '';
+        if (requestedId && store.canvases.some(canvas => canvas?.id === requestedId)) {
+          store.activeCanvasId = requestedId;
+          return;
+        }
+        store.activeCanvasId = store.canvases[0]?.id || '';
+      },
+    });
+  }
+
   function createPointerState() {
     return {
       active: false,
       pointerId: null,
+      surface: null,
       tool: null,
       start: null,
       current: null,
@@ -4005,6 +4336,60 @@
     );
   }
 
+  function snapshotProjectCanvasDocument(canvasDoc, { clonePixelData = true } = {}) {
+    const resolved = createProjectCanvasDocument(canvasDoc, {
+      clonePixelData,
+      fallbackIndex: 1,
+    });
+    return {
+      id: resolved.id,
+      name: resolved.name,
+      width: resolved.width,
+      height: resolved.height,
+      viewScale: normalizeProjectCanvasViewScale(state.scale, resolved.viewScale || 8),
+      frames: resolved.frames.map(frame => ({
+        id: frame.id,
+        name: frame.name,
+        duration: frame.duration,
+        layers: frame.layers.map(layer => ({
+          id: layer.id,
+          name: layer.name,
+          visible: layer.visible,
+          opacity: normalizeLayerOpacity(layer.opacity),
+          blendMode: normalizeLayerBlendMode(layer.blendMode),
+          indices: clonePixelData ? new Int16Array(layer.indices) : layer.indices,
+          direct: layer.direct instanceof Uint8ClampedArray
+            ? (clonePixelData ? new Uint8ClampedArray(layer.direct) : layer.direct)
+            : null,
+        })),
+      })),
+      activeFrame: resolved.activeFrame,
+      activeLayer: resolved.activeLayer,
+      selectionMask: resolved.selectionMask ? new Uint8Array(resolved.selectionMask) : null,
+      selectionContentMask: resolved.selectionContentMask ? new Uint8Array(resolved.selectionContentMask) : null,
+      selectionBounds: resolved.selectionBounds ? { ...resolved.selectionBounds } : null,
+    };
+  }
+
+  function syncSnapshotActiveCanvasPayload(snapshot) {
+    if (!snapshot || !Array.isArray(snapshot.canvases) || !snapshot.canvases.length) {
+      return;
+    }
+    const activeCanvas = snapshot.canvases.find(canvas => canvas?.id === snapshot.activeCanvasId) || snapshot.canvases[0];
+    if (!activeCanvas) {
+      return;
+    }
+    snapshot.width = activeCanvas.width;
+    snapshot.height = activeCanvas.height;
+    snapshot.scale = normalizeProjectCanvasViewScale(state.scale, activeCanvas.viewScale || snapshot.scale || MIN_ZOOM_SCALE);
+    snapshot.frames = activeCanvas.frames;
+    snapshot.activeFrame = activeCanvas.activeFrame;
+    snapshot.activeLayer = activeCanvas.activeLayer;
+    snapshot.selectionMask = activeCanvas.selectionMask ? new Uint8Array(activeCanvas.selectionMask) : null;
+    snapshot.selectionContentMask = activeCanvas.selectionContentMask ? new Uint8Array(activeCanvas.selectionContentMask) : null;
+    snapshot.selectionBounds = activeCanvas.selectionBounds ? { ...activeCanvas.selectionBounds } : null;
+  }
+
   function makeHistorySnapshot({ includeUiState = true, includeSelection = true, clonePixelData = true } = {}) {
     // Pending selection move/transform keeps source pixels cleared until confirm.
     // For persistence/reload snapshots we must materialize that preview placement,
@@ -4045,6 +4430,7 @@
       showPixelGuides: state.showPixelGuides,
       mirror: normalizeMirrorAxisState(state.mirror, state.width, state.height),
       showVirtualCursor: state.showVirtualCursor,
+      showCanvasResizeHandles: Boolean(state.showCanvasResizeHandles ?? true),
       showChecker: state.showChecker,
       onionSkin: normalizeOnionSkinState(state.onionSkin),
       dualLeftRail: false,
@@ -4075,7 +4461,17 @@
       snapshot.playback = { ...state.playback };
     }
 
+    if (MULTI_CANVAS_FEATURE_ENABLED) {
+      snapshot.activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
+      snapshot.canvases = getProjectCanvasDocuments().map(canvasDoc => snapshotProjectCanvasDocument(canvasDoc, {
+        clonePixelData: effectiveClonePixelData,
+      }));
+    }
+
     applyPendingSelectionMoveToSnapshot(snapshot, { includeSelection, clonePixelData: effectiveClonePixelData });
+    if (MULTI_CANVAS_FEATURE_ENABLED) {
+      syncSnapshotActiveCanvasPayload(snapshot);
+    }
     return snapshot;
   }
 
@@ -4322,6 +4718,7 @@
       showPixelGuides: Boolean(source?.showPixelGuides ?? true),
       mirror: normalizeMirrorAxisState(source?.mirror, width, height),
       showVirtualCursor: Boolean(source?.showVirtualCursor),
+      showCanvasResizeHandles: Boolean(source?.showCanvasResizeHandles ?? true),
       virtualCursorButtonScale: normalizeFloatingDrawButtonScale(source?.virtualCursorButtonScale),
       floatingPreview: normalizeFloatingPreviewState(source?.floatingPreview, FLOATING_PREVIEW_DEFAULT_STATE),
       showChecker: Boolean(source?.showChecker ?? true),
@@ -4421,6 +4818,7 @@
     state.showPixelGuides = Boolean(preferences.showPixelGuides ?? true);
     state.mirror = normalizeMirrorAxisState(preferences.mirror, state.width, state.height);
     state.showVirtualCursor = Boolean(preferences.showVirtualCursor);
+    state.showCanvasResizeHandles = Boolean(preferences.showCanvasResizeHandles ?? true);
     state.virtualCursorButtonScale = normalizeFloatingDrawButtonScale(preferences.virtualCursorButtonScale);
     state.floatingPreview = normalizeFloatingPreviewState(preferences.floatingPreview, FLOATING_PREVIEW_DEFAULT_STATE);
     state.showChecker = Boolean(preferences.showChecker ?? true);
@@ -4785,6 +5183,34 @@
 
   function compressHistorySnapshot(snapshot) {
     if (!snapshot) return snapshot;
+    const compressCanvasList = canvases => Array.isArray(canvases)
+      ? canvases.map(canvas => ({
+        id: canvas.id,
+        name: canvas.name,
+        width: canvas.width,
+        height: canvas.height,
+        viewScale: normalizeProjectCanvasViewScale(canvas.viewScale, 8),
+        activeFrame: canvas.activeFrame,
+        activeLayer: canvas.activeLayer,
+        selectionMask: canvas.selectionMask ? compressUint8Array(canvas.selectionMask, { clamped: false }) : null,
+        selectionContentMask: canvas.selectionContentMask ? compressUint8Array(canvas.selectionContentMask, { clamped: false }) : null,
+        selectionBounds: canvas.selectionBounds ? { ...canvas.selectionBounds } : null,
+        frames: canvas.frames.map(frame => ({
+          id: frame.id,
+          name: frame.name,
+          duration: frame.duration,
+          layers: frame.layers.map(layer => ({
+            id: layer.id,
+            name: layer.name,
+            visible: layer.visible,
+            opacity: normalizeLayerOpacity(layer.opacity),
+            blendMode: normalizeLayerBlendMode(layer.blendMode),
+            indices: compressInt16Array(layer.indices),
+            direct: layer.direct ? compressUint8Array(layer.direct, { clamped: true }) : null,
+          })),
+        })),
+      }))
+      : null;
     const compressed = {
       width: snapshot.width,
       height: snapshot.height,
@@ -4817,6 +5243,7 @@
       showPixelGuides: snapshot.showPixelGuides,
       mirror: normalizeMirrorAxisState(snapshot.mirror, snapshot.width, snapshot.height),
       showVirtualCursor: snapshot.showVirtualCursor,
+      showCanvasResizeHandles: Boolean(snapshot.showCanvasResizeHandles ?? true),
       showChecker: snapshot.showChecker,
       onionSkin: normalizeOnionSkinState(snapshot.onionSkin),
       dualLeftRail: false,
@@ -4861,11 +5288,43 @@
     if (Object.prototype.hasOwnProperty.call(snapshot, 'playback')) {
       compressed.playback = { ...snapshot.playback };
     }
+    if (Array.isArray(snapshot.canvases) && snapshot.canvases.length) {
+      compressed.activeCanvasId = typeof snapshot.activeCanvasId === 'string' ? snapshot.activeCanvasId : '';
+      compressed.canvases = compressCanvasList(snapshot.canvases);
+    }
     return compressed;
   }
 
   function decompressHistorySnapshot(snapshot) {
     if (!snapshot) return snapshot;
+    const decompressCanvasList = canvases => Array.isArray(canvases)
+      ? canvases.map(canvas => ({
+        id: canvas.id,
+        name: canvas.name,
+        width: canvas.width,
+        height: canvas.height,
+        viewScale: normalizeProjectCanvasViewScale(canvas.viewScale, 8),
+        activeFrame: canvas.activeFrame,
+        activeLayer: canvas.activeLayer,
+        selectionMask: canvas.selectionMask ? decodeUint8Data(canvas.selectionMask, { clamped: false }) : null,
+        selectionContentMask: canvas.selectionContentMask ? decodeUint8Data(canvas.selectionContentMask, { clamped: false }) : null,
+        selectionBounds: canvas.selectionBounds ? { ...canvas.selectionBounds } : null,
+        frames: canvas.frames.map(frame => ({
+          id: frame.id,
+          name: frame.name,
+          duration: frame.duration,
+          layers: frame.layers.map(layer => ({
+            id: layer.id,
+            name: layer.name,
+            visible: layer.visible,
+            opacity: normalizeLayerOpacity(layer.opacity),
+            blendMode: normalizeLayerBlendMode(layer.blendMode),
+            indices: decodeInt16Data(layer.indices),
+            direct: layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null,
+          })),
+        })),
+      }))
+      : null;
     const decompressed = {
       width: snapshot.width,
       height: snapshot.height,
@@ -4898,6 +5357,7 @@
       showPixelGuides: snapshot.showPixelGuides,
       mirror: normalizeMirrorAxisState(snapshot.mirror, snapshot.width, snapshot.height),
       showVirtualCursor: snapshot.showVirtualCursor,
+      showCanvasResizeHandles: Boolean(snapshot.showCanvasResizeHandles ?? true),
       showChecker: snapshot.showChecker,
       onionSkin: normalizeOnionSkinState(snapshot.onionSkin),
       dualLeftRail: false,
@@ -4941,6 +5401,11 @@
     }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'playback')) {
       decompressed.playback = { ...snapshot.playback };
+    }
+    if (Array.isArray(snapshot.canvases) && snapshot.canvases.length) {
+      decompressed.activeCanvasId = typeof snapshot.activeCanvasId === 'string' ? snapshot.activeCanvasId : '';
+      decompressed.canvases = decompressCanvasList(snapshot.canvases);
+      syncSnapshotActiveCanvasPayload(decompressed);
     }
     return decompressed;
   }
@@ -4994,16 +5459,16 @@
   }
 
   function estimateTimelapseBytes() {
-    if (!Array.isArray(timelapseState.snapshots) || !timelapseState.snapshots.length) {
-      return 0;
-    }
     let total = 0;
-    timelapseState.snapshots.forEach(entry => {
-      if (!entry || typeof entry !== 'object') {
-        return;
-      }
-      total += estimateEncodedByteLength(entry.pixels, 1);
-      total += 16;
+    Object.values(getAllTimelapseTracks()).forEach(track => {
+      const snapshots = Array.isArray(track?.snapshots) ? track.snapshots : [];
+      snapshots.forEach(entry => {
+        if (!entry || typeof entry !== 'object') {
+          return;
+        }
+        total += estimateEncodedByteLength(entry.pixels, 1);
+        total += 16;
+      });
     });
     return total;
   }
@@ -5097,13 +5562,14 @@
       ` | History ${history.past.length}/${history.limit}`
     );
     text += localizeText(
-      ` | タイムラプス ${timelapseState.snapshots.length}`,
-      ` | Timelapse ${timelapseState.snapshots.length}`
+      ` | タイムラプス ${getAllTimelapseStepCount()}`,
+      ` | Timelapse ${getAllTimelapseStepCount()}`
     );
-    if (timelapseState.sampleStep > 1) {
+    const activeTrack = getActiveTimelapseTrack();
+    if ((Number(activeTrack?.sampleStep) || 1) > 1) {
       text += localizeText(
-        ` (間引きx${timelapseState.sampleStep})`,
-        ` (thinning x${timelapseState.sampleStep})`
+        ` (選択中を間引きx${activeTrack.sampleStep})`,
+        ` (active thinning x${activeTrack.sampleStep})`
       );
     }
     const now = performance && typeof performance.now === 'function' ? performance.now() : Date.now();
@@ -5123,7 +5589,7 @@
     history.future = [];
     history.pending = null;
     history.limit = DEFAULT_HISTORY_LIMIT;
-    clearTimelapseRecording({ silent: true });
+    clearTimelapseRecording({ silent: true, scope: 'all' });
     fillPreviewCache.contextKey = null;
     fillPreviewCache.byPixel = null;
     updateHistoryButtons();
@@ -5167,12 +5633,29 @@
     const previousPaletteSnapshot = Array.isArray(state.palette)
       ? state.palette.map(color => normalizeColorValue(color))
       : null;
+    if (Array.isArray(snapshot?.canvases) && snapshot.canvases.length) {
+      replaceProjectCanvasDocuments(snapshot.canvases, typeof snapshot.activeCanvasId === 'string' ? snapshot.activeCanvasId : '');
+    } else {
+      replaceProjectCanvasDocuments([{
+        id: typeof snapshot?.activeCanvasId === 'string' ? snapshot.activeCanvasId : '',
+        name: getDefaultProjectCanvasName(1),
+        width: snapshot.width,
+        height: snapshot.height,
+        frames: snapshot.frames,
+        activeFrame: snapshot.activeFrame,
+        activeLayer: snapshot.activeLayer,
+        selectionMask: snapshot.selectionMask,
+        selectionContentMask: snapshot.selectionContentMask,
+        selectionBounds: snapshot.selectionBounds,
+      }], typeof snapshot?.activeCanvasId === 'string' ? snapshot.activeCanvasId : '');
+    }
     state.width = snapshot.width;
     state.height = snapshot.height;
     if (!preserveView) {
       state.scale = normalizeZoomScale(snapshot.scale, state.scale || MIN_ZOOM_SCALE);
       state.pan = { x: snapshot.pan.x, y: snapshot.pan.y };
     }
+    syncActiveProjectCanvasViewScale();
     if (Object.prototype.hasOwnProperty.call(snapshot, 'tool')) {
       state.tool = normalizeToolId(snapshot.tool, state.tool);
     }
@@ -5255,6 +5738,11 @@
     } else {
       state.selectionMask = null;
     }
+    if (Object.prototype.hasOwnProperty.call(snapshot, 'selectionContentMask')) {
+      state.selectionContentMask = snapshot.selectionContentMask ? new Uint8Array(snapshot.selectionContentMask) : null;
+    } else {
+      state.selectionContentMask = null;
+    }
     if (Object.prototype.hasOwnProperty.call(snapshot, 'selectionBounds')) {
       state.selectionBounds = snapshot.selectionBounds ? { ...snapshot.selectionBounds } : null;
     } else {
@@ -5292,6 +5780,7 @@
     state.showPixelGuides = snapshot.showPixelGuides;
     state.mirror = normalizeMirrorAxisState(snapshot.mirror, snapshot.width, snapshot.height);
     state.showVirtualCursor = Boolean(snapshot.showVirtualCursor);
+    state.showCanvasResizeHandles = Boolean(snapshot.showCanvasResizeHandles ?? true);
     state.showChecker = snapshot.showChecker;
     state.onionSkin = normalizeOnionSkinState(snapshot.onionSkin);
     state.dualLeftRail = false;
@@ -5323,8 +5812,11 @@
     }
     updateFloatingDrawButtonEnabledState();
     refreshViewportCursorStyle();
+    ensureLocalViewportCanvasEntries();
+    bindActiveCanvasSurface(getProjectCanvasSurfaceForIndex(getActiveProjectCanvasIndex()) || mainViewportCanvasSurface);
 
     resizeCanvases();
+    renderAllProjectCanvasSurfaces();
     renderFrameList();
     renderLayerList();
     renderPalette();
@@ -5820,9 +6312,6 @@
   function handleAutosavePageHide() {
     flushPendingTimelapseCapture({ force: true });
     flushAutosaveSnapshotOnLifecycle({ force: true });
-    if (isResidentMultiRestrictedMasterMode()) {
-      scheduleResidentRoomPersist({ immediate: true, force: true });
-    }
   }
 
   function handleAutosaveVisibilityChange() {
@@ -5831,9 +6320,6 @@
     }
     flushPendingTimelapseCapture({ force: true });
     flushAutosaveSnapshotOnLifecycle({ force: true });
-    if (isResidentMultiRestrictedMasterMode()) {
-      scheduleResidentRoomPersist({ immediate: true, force: true });
-    }
   }
 
   function persistCriticalSessionStateForNavigation() {
@@ -6109,40 +6595,117 @@
     }
   }
 
+  function normalizeMultiHistoryClientId(clientId = multiState.clientId || '') {
+    return typeof clientId === 'string' ? clientId.trim() : '';
+  }
+
+  function normalizeMultiHistoryCanvasId(canvasId = getActiveProjectCanvasDocument()?.id || '') {
+    const normalized = typeof canvasId === 'string' ? canvasId.trim() : '';
+    if (normalized) {
+      return normalized;
+    }
+    return typeof getActiveProjectCanvasDocument()?.id === 'string'
+      ? getActiveProjectCanvasDocument().id
+      : '';
+  }
+
+  function getMultiHistoryKey(clientId = multiState.clientId || '', canvasId = getActiveProjectCanvasDocument()?.id || '') {
+    const normalizedClientId = normalizeMultiHistoryClientId(clientId);
+    const normalizedCanvasId = normalizeMultiHistoryCanvasId(canvasId);
+    if (!normalizedClientId || !normalizedCanvasId) {
+      return '';
+    }
+    return `${normalizedClientId}\u0000${normalizedCanvasId}`;
+  }
+
+  function createMultiHistoryBucket(limit = history.limit) {
+    return {
+      past: [],
+      future: [],
+      limit: Math.max(MIN_HISTORY_LIMIT, Math.round(Number(limit) || DEFAULT_HISTORY_LIMIT)),
+    };
+  }
+
+  function getMultiHistoryBucket(clientId = multiState.clientId || '', canvasId = getActiveProjectCanvasDocument()?.id || '', { create = false } = {}) {
+    const key = getMultiHistoryKey(clientId, canvasId);
+    if (!key) {
+      return null;
+    }
+    let bucket = multiHistory.get(key) || null;
+    if (!bucket && create) {
+      bucket = createMultiHistoryBucket();
+      multiHistory.set(key, bucket);
+    }
+    if (!bucket) {
+      return null;
+    }
+    if (!Array.isArray(bucket.past)) {
+      bucket.past = [];
+    }
+    if (!Array.isArray(bucket.future)) {
+      bucket.future = [];
+    }
+    bucket.limit = Math.max(MIN_HISTORY_LIMIT, Math.round(Number(history.limit) || bucket.limit || DEFAULT_HISTORY_LIMIT));
+    return bucket;
+  }
+
+  function clearMultiHistory() {
+    multiHistory.clear();
+  }
+
+  function pruneMultiHistoryCanvases() {
+    const validCanvasIds = new Set(
+      getProjectCanvasDocuments()
+        .map(canvas => (typeof canvas?.id === 'string' ? canvas.id : ''))
+        .filter(Boolean)
+    );
+    Array.from(multiHistory.keys()).forEach(key => {
+      const separatorIndex = key.indexOf('\u0000');
+      const canvasId = separatorIndex >= 0 ? key.slice(separatorIndex + 1) : '';
+      if (!validCanvasIds.has(canvasId)) {
+        multiHistory.delete(key);
+      }
+    });
+  }
+
   function commitHistory() {
     if (!history.pending) return;
     const pendingLabel = history.pending.label;
     if (history.pending.dirty) {
       const beforeSnapshot = history.pending.before;
-      // In multi-session, separate histories: master uses global history, guests use per-client history
-      if (isMultiClientScopedHistoryMode()) {
-        // guests/spectators: record drawing actions to their own history when applicable
-        if (HISTORY_DRAW_TOOLS.has(pendingLabel)) {
-          try {
-            const clientId = multiState.clientId || '';
-            const compressed = beforeSnapshot;
-            let ch = multiHistory.get(clientId);
-            if (!ch) {
-              ch = { past: [], future: [], limit: history.limit };
-              multiHistory.set(clientId, ch);
-            }
-            ch.past.push(compressed);
-            if (ch.past.length > ch.limit) ch.past.shift();
-            ch.future.length = 0;
-          } catch (error) {
-            console.warn('Failed to record per-client history. Falling back to global history.', error);
+      const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
+      const shouldRecordScopedHistory = multiState.connected
+        && HISTORY_DRAW_TOOLS.has(pendingLabel)
+        && (
+          isMultiClientScopedHistoryMode()
+          || (isMultiMasterMode() && isAssignedCellActiveForCanvas(multiState.clientId, getActiveProjectCanvasDocument()))
+        );
+      if (shouldRecordScopedHistory) {
+        try {
+          const bucket = getMultiHistoryBucket(multiState.clientId || '', activeCanvasId, { create: true });
+          if (bucket) {
+            bucket.past.push(beforeSnapshot);
+            if (bucket.past.length > bucket.limit) bucket.past.shift();
+            bucket.future.length = 0;
+          } else if (!isMultiClientScopedHistoryMode()) {
+            history.past.push(beforeSnapshot);
+          }
+        } catch (error) {
+          console.warn('Failed to record per-client/per-canvas history. Falling back to global history.', error);
+          if (!isMultiClientScopedHistoryMode()) {
             history.past.push(beforeSnapshot);
           }
         }
       } else {
-        // master or not in multi-session: use global history
         history.past.push(beforeSnapshot);
       }
-      if (timelapseState.enabled && timelapseState.snapshots.length === 0) {
+      const activeTimelapseTrack = getActiveTimelapseTrack();
+      if (timelapseState.enabled && (!activeTimelapseTrack || activeTimelapseTrack.snapshots.length === 0)) {
         const startEntry = createTimelapseFrameEntryFromSnapshot(beforeSnapshot);
         if (startEntry) {
-          timelapseState.snapshots.push(startEntry);
-          thinTimelapseSnapshotsIfNeeded();
+          const track = getActiveTimelapseTrack({ create: true });
+          track.snapshots.push(startEntry);
+          thinTimelapseSnapshotsIfNeeded(track);
         }
       }
       scheduleTimelapseCaptureFromState();
@@ -6160,61 +6723,73 @@
   }
 
   function undo() {
-    // In multi-session, guests/spectators should be able to undo/redo their own drawing actions only.
-    // Masters keep the global undo/redo behavior and cannot undo guests.
     if (cancelPendingCurveInteraction()) {
       return;
     }
     commitHistory();
-    // Master or not connected: behave as before (global history)
-    if (!isMultiClientScopedHistoryMode()) {
-      if (!history.past.length) return;
-      const snapshot = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
-      history.future.push(snapshot);
-      if (history.future.length > history.limit) {
-        history.future.shift();
-      }
-      const previous = history.past.pop();
-      applyHistorySnapshot(decompressHistorySnapshot(previous), { preserveView: true });
-      updateHistoryButtons();
-      markAutosaveDirty();
-      markDocumentUnsavedChange();
-      scheduleAutosaveSnapshot();
-      return;
-    }
-
-    // Replica role (guest/spectator): operate on per-client history and only restore assigned cell
-    const clientId = multiState.clientId || '';
-    const ch = multiHistory.get(clientId) || { past: [], future: [], limit: history.limit };
-    if (!ch.past.length) return;
-    try {
-      const currentCompressed = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
-      ch.future.push(currentCompressed);
-      if (ch.future.length > ch.limit) ch.future.shift();
-      const prevCompressed = ch.past.pop();
-      const prev = decompressHistorySnapshot(prevCompressed);
-      const applied = applyHistorySnapshotForClient(prev, clientId, { preserveView: true });
-      // save updated ch back
-      multiHistory.set(clientId, ch);
-      if (applied) {
-        updateHistoryButtons();
-        markAutosaveDirty();
-        markDocumentUnsavedChange();
-        scheduleAutosaveSnapshot();
-        // propagate local-only undo result to peers
+    const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
+    const bucket = getMultiHistoryBucket(multiState.clientId || '', activeCanvasId);
+    const shouldUseScopedHistory = multiState.connected
+      && (
+        isMultiClientScopedHistoryMode()
+        || Boolean((bucket?.past?.length || 0) || (bucket?.future?.length || 0))
+      );
+    if (shouldUseScopedHistory) {
+      if (!bucket?.past?.length) {
+        if (isMultiClientScopedHistoryMode()) {
+          return;
+        }
+      } else {
         try {
-          if (isMultiMasterMode()) {
-            scheduleMasterLayerPatchSend({ immediate: true });
-            scheduleMultiPublicLobbyRoomSync({ immediate: false });
-          } else {
-            scheduleGuestLayerPatchSend({ immediate: true });
+          const currentCompressed = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
+          bucket.future.push(currentCompressed);
+          if (bucket.future.length > bucket.limit) bucket.future.shift();
+          const prevCompressed = bucket.past.pop();
+          const prev = decompressHistorySnapshot(prevCompressed);
+          const applied = applyHistorySnapshotForClient(prev, multiState.clientId || '', {
+            preserveView: true,
+            canvasId: activeCanvasId,
+          });
+          if (applied) {
+            updateHistoryButtons();
+            markAutosaveDirty();
+            markDocumentUnsavedChange();
+            scheduleAutosaveSnapshot();
+            try {
+              if (isMultiMasterMode()) {
+                scheduleMasterLayerPatchSend({ immediate: true });
+                scheduleMultiPublicLobbyRoomSync({ immediate: false });
+              } else {
+                scheduleGuestLayerPatchSend({ immediate: true });
+              }
+            } catch (error) {
+              console.warn('Failed to sync undo patch to peers', error);
+            }
           }
+          return;
         } catch (error) {
-          console.warn('Failed to sync undo patch to peers', error);
+          console.warn('Undo failed in per-client/per-canvas history mode', error);
+          if (isMultiClientScopedHistoryMode()) {
+            return;
+          }
         }
       }
-    } catch (error) {
-      console.warn('Undo failed in per-client history mode', error);
+    }
+
+    if (!history.past.length) return;
+    const snapshot = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
+    history.future.push(snapshot);
+    if (history.future.length > history.limit) {
+      history.future.shift();
+    }
+    const previous = history.past.pop();
+    applyHistorySnapshot(decompressHistorySnapshot(previous), { preserveView: true });
+    updateHistoryButtons();
+    markAutosaveDirty();
+    markDocumentUnsavedChange();
+    scheduleAutosaveSnapshot();
+    if (multiState.connected && isMultiMasterMode()) {
+      scheduleMultiSessionStateBroadcast({ immediate: true });
     }
   }
 
@@ -6223,53 +6798,69 @@
       return;
     }
     commitHistory();
-    // Master or not connected: behave as before (global history)
-    if (!isMultiClientScopedHistoryMode()) {
-      if (!history.future.length) return;
-      const snapshot = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
-      history.past.push(snapshot);
-      if (history.past.length > history.limit) {
-        history.past.shift();
-      }
-      const next = history.future.pop();
-      applyHistorySnapshot(decompressHistorySnapshot(next), { preserveView: true });
-      updateHistoryButtons();
-      markAutosaveDirty();
-      markDocumentUnsavedChange();
-      scheduleAutosaveSnapshot();
-      return;
-    }
-
-    // Replica role (guest/spectator): operate on per-client history only
-    const clientId = multiState.clientId || '';
-    const ch = multiHistory.get(clientId) || { past: [], future: [], limit: history.limit };
-    if (!ch.future.length) return;
-    try {
-      const currentCompressed = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
-      ch.past.push(currentCompressed);
-      if (ch.past.length > ch.limit) ch.past.shift();
-      const nextCompressed = ch.future.pop();
-      const next = decompressHistorySnapshot(nextCompressed);
-      const applied = applyHistorySnapshotForClient(next, clientId, { preserveView: true });
-      multiHistory.set(clientId, ch);
-      if (applied) {
-        updateHistoryButtons();
-        markAutosaveDirty();
-        markDocumentUnsavedChange();
-        scheduleAutosaveSnapshot();
+    const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
+    const bucket = getMultiHistoryBucket(multiState.clientId || '', activeCanvasId);
+    const shouldUseScopedHistory = multiState.connected
+      && (
+        isMultiClientScopedHistoryMode()
+        || Boolean((bucket?.past?.length || 0) || (bucket?.future?.length || 0))
+      );
+    if (shouldUseScopedHistory) {
+      if (!bucket?.future?.length) {
+        if (isMultiClientScopedHistoryMode()) {
+          return;
+        }
+      } else {
         try {
-          if (isMultiMasterMode()) {
-            scheduleMasterLayerPatchSend({ immediate: true });
-            scheduleMultiPublicLobbyRoomSync({ immediate: false });
-          } else {
-            scheduleGuestLayerPatchSend({ immediate: true });
+          const currentCompressed = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
+          bucket.past.push(currentCompressed);
+          if (bucket.past.length > bucket.limit) bucket.past.shift();
+          const nextCompressed = bucket.future.pop();
+          const next = decompressHistorySnapshot(nextCompressed);
+          const applied = applyHistorySnapshotForClient(next, multiState.clientId || '', {
+            preserveView: true,
+            canvasId: activeCanvasId,
+          });
+          if (applied) {
+            updateHistoryButtons();
+            markAutosaveDirty();
+            markDocumentUnsavedChange();
+            scheduleAutosaveSnapshot();
+            try {
+              if (isMultiMasterMode()) {
+                scheduleMasterLayerPatchSend({ immediate: true });
+                scheduleMultiPublicLobbyRoomSync({ immediate: false });
+              } else {
+                scheduleGuestLayerPatchSend({ immediate: true });
+              }
+            } catch (error) {
+              console.warn('Failed to sync redo patch to peers', error);
+            }
           }
+          return;
         } catch (error) {
-          console.warn('Failed to sync redo patch to peers', error);
+          console.warn('Redo failed in per-client/per-canvas history mode', error);
+          if (isMultiClientScopedHistoryMode()) {
+            return;
+          }
         }
       }
-    } catch (error) {
-      console.warn('Redo failed in per-client history mode', error);
+    }
+
+    if (!history.future.length) return;
+    const snapshot = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
+    history.past.push(snapshot);
+    if (history.past.length > history.limit) {
+      history.past.shift();
+    }
+    const next = history.future.pop();
+    applyHistorySnapshot(decompressHistorySnapshot(next), { preserveView: true });
+    updateHistoryButtons();
+    markAutosaveDirty();
+    markDocumentUnsavedChange();
+    scheduleAutosaveSnapshot();
+    if (multiState.connected && isMultiMasterMode()) {
+      scheduleMultiSessionStateBroadcast({ immediate: true });
     }
   }
 
@@ -6297,16 +6888,21 @@
 
   function updateHistoryButtons() {
     try {
-      if (!isMultiClientScopedHistoryMode()) {
+      if (!multiState.connected) {
         if (dom.controls.undoAction) dom.controls.undoAction.disabled = history.past.length === 0;
         if (dom.controls.redoAction) dom.controls.redoAction.disabled = history.future.length === 0;
         return;
       }
-      // For replica-style roles (guest/spectator/resident master), show per-client undo/redo availability.
-      const clientId = multiState.clientId || '';
-      const ch = multiHistory.get(clientId) || { past: [], future: [] };
-      if (dom.controls.undoAction) dom.controls.undoAction.disabled = ch.past.length === 0;
-      if (dom.controls.redoAction) dom.controls.redoAction.disabled = ch.future.length === 0;
+      const bucket = getMultiHistoryBucket(multiState.clientId || '', getActiveProjectCanvasDocument()?.id || '');
+      const scopedUndoAvailable = Boolean(bucket?.past?.length);
+      const scopedRedoAvailable = Boolean(bucket?.future?.length);
+      if (isMultiClientScopedHistoryMode()) {
+        if (dom.controls.undoAction) dom.controls.undoAction.disabled = !scopedUndoAvailable;
+        if (dom.controls.redoAction) dom.controls.redoAction.disabled = !scopedRedoAvailable;
+        return;
+      }
+      if (dom.controls.undoAction) dom.controls.undoAction.disabled = !scopedUndoAvailable && history.past.length === 0;
+      if (dom.controls.redoAction) dom.controls.redoAction.disabled = !scopedRedoAvailable && history.future.length === 0;
     } catch (e) {
       if (dom.controls.undoAction) dom.controls.undoAction.disabled = history.past.length === 0;
       if (dom.controls.redoAction) dom.controls.redoAction.disabled = history.future.length === 0;
@@ -7273,15 +7869,17 @@
 
     if (isCurvePointerActive) {
       detachPointerListeners();
-      if (pointerState.pointerId !== null && dom.canvases.drawing) {
+      const captureCanvas = pointerState.surface?.drawing || dom.canvases.drawing;
+      if (pointerState.pointerId !== null && captureCanvas) {
         try {
-          dom.canvases.drawing.releasePointerCapture(pointerState.pointerId);
+          captureCanvas.releasePointerCapture(pointerState.pointerId);
         } catch (error) {
           // Ignore capture release issues while cancelling unfinished curve edit.
         }
       }
       pointerState.active = false;
       pointerState.pointerId = null;
+      pointerState.surface = null;
       pointerState.path = [];
       pointerState.preview = null;
     }
@@ -7814,7 +8412,7 @@
       pointerState.curveHandle = null;
       curveBuilder.end = position;
       pointerState.preview = { start: pointerState.start, end: position };
-      dom.canvases.drawing.setPointerCapture(event.pointerId);
+      (pointerState.surface?.drawing || dom.canvases.drawing)?.setPointerCapture(event.pointerId);
       window.addEventListener('pointermove', handlePointerMove);
       window.addEventListener('pointerup', handlePointerUp);
       requestOverlayRender();
@@ -7831,7 +8429,7 @@
       pointerState.last = position;
       pointerState.path = [position];
       pointerState.preview = null;
-      dom.canvases.drawing.setPointerCapture(event.pointerId);
+      (pointerState.surface?.drawing || dom.canvases.drawing)?.setPointerCapture(event.pointerId);
       window.addEventListener('pointermove', handlePointerMove);
       window.addEventListener('pointerup', handlePointerUp);
       if (curveBuilder.stage === 'control1') {
@@ -7865,7 +8463,7 @@
 
   function handleCurvePointerUp(event) {
     if (!curveBuilder) {
-      dom.canvases.drawing.releasePointerCapture(event.pointerId);
+      (pointerState.surface?.drawing || dom.canvases.drawing)?.releasePointerCapture(event.pointerId);
       return;
     }
     window.removeEventListener('pointermove', handlePointerMove);
@@ -7879,7 +8477,7 @@
       pointerState.pointerId = null;
       pointerState.path = [];
       pointerState.curveHandle = null;
-      dom.canvases.drawing.releasePointerCapture(event.pointerId);
+      (pointerState.surface?.drawing || dom.canvases.drawing)?.releasePointerCapture(event.pointerId);
       if (!moved) {
         curveBuilder.awaitingEndPoint = true;
         pointerState.preview = null;
@@ -7905,7 +8503,7 @@
       pointerState.active = false;
       pointerState.pointerId = null;
       pointerState.path = [];
-      dom.canvases.drawing.releasePointerCapture(event.pointerId);
+      (pointerState.surface?.drawing || dom.canvases.drawing)?.releasePointerCapture(event.pointerId);
       requestOverlayRender();
       scheduleSessionPersist();
       return;
@@ -7917,7 +8515,7 @@
       pointerState.active = false;
       pointerState.pointerId = null;
       pointerState.path = [];
-      dom.canvases.drawing.releasePointerCapture(event.pointerId);
+      (pointerState.surface?.drawing || dom.canvases.drawing)?.releasePointerCapture(event.pointerId);
       finalizeCurve();
       return;
     }
@@ -8108,13 +8706,18 @@
     const stack = dom.canvases.stack;
     if (!stack) return;
     const scale = Math.max(Number(state.scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE);
+    const width = Math.max(1, Math.round(Number(state.width) || 1));
+    const height = Math.max(1, Math.round(Number(state.height) || 1));
     const tileScreenSize = 16 * scale;
     const minorStep = scale;
     const majorMultiplier = Math.max(Number(state.majorGridSpacing) || 16, 1);
     const majorStep = Math.max(minorStep, majorMultiplier * minorStep);
     state.gridScreenStep = minorStep;
+    stack.style.width = `${width * scale}px`;
+    stack.style.height = `${height * scale}px`;
     stack.dataset.grid = state.showGrid ? 'true' : 'false';
     stack.dataset.majorGrid = state.showMajorGrid ? 'true' : 'false';
+    stack.classList.toggle('is-flat', !state.showChecker);
     stack.style.setProperty('--grid-screen-step', `${minorStep}px`);
     stack.style.setProperty('--grid-major-step', `${majorStep}px`);
     stack.style.setProperty('--grid-offset-x', '0px');
@@ -8685,6 +9288,37 @@
     if (dom.controls.toggleFloatingPreview instanceof HTMLInputElement) {
       dom.controls.toggleFloatingPreview.checked = Boolean(state.floatingPreview?.enabled);
     }
+    if (dom.controls.toggleCanvasResizeHandles instanceof HTMLInputElement) {
+      dom.controls.toggleCanvasResizeHandles.checked = Boolean(state.showCanvasResizeHandles ?? true);
+    }
+    const localCanvasCount = normalizeLocalViewportCanvasState(
+      localViewportCanvasState,
+      LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
+    ).count;
+    if (dom.controls.toggleLocalCanvas instanceof HTMLInputElement) {
+      dom.controls.toggleLocalCanvas.checked = MULTI_CANVAS_FEATURE_ENABLED && localCanvasCount > 0;
+      dom.controls.toggleLocalCanvas.disabled = !MULTI_CANVAS_FEATURE_ENABLED;
+    }
+    if (dom.controls.localCanvasCountControls instanceof HTMLElement) {
+      const showControls = MULTI_CANVAS_FEATURE_ENABLED && localCanvasCount > 0;
+      dom.controls.localCanvasCountControls.hidden = !showControls;
+      dom.controls.localCanvasCountControls.classList.toggle('is-hidden', !showControls);
+      dom.controls.localCanvasCountControls.setAttribute('aria-hidden', String(!showControls));
+    }
+    if (dom.controls.localCanvasCountValue instanceof HTMLElement) {
+      dom.controls.localCanvasCountValue.textContent = String(MULTI_CANVAS_FEATURE_ENABLED ? localCanvasCount : 0);
+    }
+    if (dom.controls.removeLocalCanvas instanceof HTMLButtonElement) {
+      dom.controls.removeLocalCanvas.disabled = !MULTI_CANVAS_FEATURE_ENABLED || localCanvasCount <= 0;
+    }
+    if (dom.controls.addLocalCanvas instanceof HTMLButtonElement) {
+      dom.controls.addLocalCanvas.disabled = !MULTI_CANVAS_FEATURE_ENABLED || localCanvasCount >= LOCAL_VIEWPORT_CANVAS_MAX_COUNT;
+    }
+    if (MULTI_CANVAS_FEATURE_ENABLED && localCanvasCount > 0) {
+      syncMultiCanvasSelectionUi();
+    } else if (dom.mainCanvasArea instanceof HTMLElement) {
+      dom.mainCanvasArea.classList.add('is-multi-canvas-selected');
+    }
     if (dom.controls.toggleInlineHelp instanceof HTMLInputElement) {
       dom.controls.toggleInlineHelp.checked = inlineGuidesVisible;
     }
@@ -8708,6 +9342,8 @@
     updateExportOriginalToggleUI();
     syncTimelapseControls();
     updateMirrorGuideHandles();
+    updateCanvasResizeHandlePosition();
+    syncCanvasResizeHandleVisibility();
     syncMultiControls();
     applyMultiRoleUiLocks();
   }
@@ -9238,6 +9874,8 @@
     setLocalizedControlLabel('multiExportPermission', '出力権限', 'Export Permission');
     setLocalizedControlLabel('multiJoinPolicy', '参加方式', 'Join Policy');
     setLocalizedTextContent('#multiJoinPolicyHint', '自動参加: 招待リンクは参加者入室になります。', 'Auto Join: invite link opens as participant join.');
+    setLocalizedToggleLabel('multiParticipantFreeCellMove', '参加者が空きセルへ自由移動できるようにする', 'Allow participants to move to any free cell');
+    setLocalizedTextContent('#multiParticipantFreeCellMoveHint', '同じセルへの同時参加はできません。', 'Two participants cannot use the same cell at the same time.');
     setLocalizedTextContent('#panelMulti .multi-join-requests-field > span', '参加リクエスト', 'Join Requests');
     setLocalizedControlLabel('multiJoinRequestTarget', '対象', 'Target');
     setLocalizedTextContent('#multiJoinRequestApprove', '承認', 'Approve');
@@ -9302,6 +9940,14 @@
     setLocalizedToggleLabel('togglePixelPreview', '1px ガイド', '1px Guide');
     setLocalizedToggleLabel('toggleVirtualCursor', '仮想カーソル', 'Virtual Cursor');
     setLocalizedToggleLabel('toggleFloatingPreview', '小窓プレビュー', 'Floating Preview');
+    setLocalizedToggleLabel('toggleCanvasResizeHandles', 'キャンバスサイズつまみ', 'Canvas Resize Handles');
+    setLocalizedTextContent('#localCanvasCountLabel', 'キャンバス数', 'Canvas Count');
+    setLocalizedAttribute('#toggleLocalCanvas', 'aria-label', 'マルチキャンバス', 'Multi Canvas');
+    setLocalizedAttribute('#toggleLocalCanvas', 'title', 'マルチキャンバス', 'Multi Canvas');
+    setLocalizedAttribute('#removeLocalCanvas', 'aria-label', 'マルチキャンバスを減らす', 'Remove multi canvas');
+    setLocalizedAttribute('#addLocalCanvas', 'aria-label', 'マルチキャンバスを増やす', 'Add multi canvas');
+    setLocalizedAttribute('#removeLocalCanvas', 'title', 'マルチキャンバスを減らす', 'Remove multi canvas');
+    setLocalizedAttribute('#addLocalCanvas', 'title', 'マルチキャンバスを増やす', 'Add multi canvas');
     setLocalizedToggleLabel('toggleTimelapse', 'タイムラプス記録', 'Timelapse Recording');
     setLocalizedToggleLabel('toggleOnionSkin', 'オニオンスキン', 'Onion Skin');
     setLocalizedToggleLabel('toggleMirrorMode', 'ミラーモード', 'Mirror Mode');
@@ -9330,6 +9976,10 @@
     setLocalizedTextContent('#floatingPreviewStop', '停止', 'Stop');
     setLocalizedAttribute('#floatingPreviewCanvas', 'aria-label', '小窓プレビューキャンバス', 'Floating preview canvas');
     setLocalizedAttribute('#floatingPreviewResize', 'aria-label', 'プレビューパネルのサイズを変更', 'Resize preview panel');
+    setLocalizedAttribute('#canvasResizeHandleStart', 'aria-label', 'キャンバス左上をドラッグしてサイズ変更', 'Drag top-left corner to resize canvas');
+    setLocalizedAttribute('#canvasResizeHandleStart', 'title', 'キャンバス左上をドラッグしてサイズ変更', 'Drag top-left corner to resize canvas');
+    setLocalizedAttribute('#canvasResizeHandleCorner', 'aria-label', 'キャンバス右下をドラッグしてサイズ変更', 'Drag bottom-right corner to resize canvas');
+    setLocalizedAttribute('#canvasResizeHandleCorner', 'title', 'キャンバス右下をドラッグしてサイズ変更', 'Drag bottom-right corner to resize canvas');
     setLocalizedAttribute('#resizeLeftUnifiedSplit', 'aria-label', 'ツールとカラーの縦割合を変更', 'Resize tools and color split');
     setLocalizedTextContent('#mirrorToolPopover .mirror-tool-popover__header strong', '対称軸', 'Mirror Axes');
     setLocalizedTextContent('#mirrorToolPopoverClose', '閉じる', 'Close');
@@ -9545,9 +10195,6 @@
   }
 
   function getAutosaveBlockedStatusMessage() {
-    if (isResidentMultiConnectedRoom()) {
-      return RESIDENT_CANVAS_AUTOSAVE_BLOCKED_STATUS;
-    }
     if (multiState.connected && !isMultiMasterMode()) {
       return MULTI_REPLICA_AUTOSAVE_BLOCKED_STATUS;
     }
@@ -10318,22 +10965,23 @@
           history.limit = projectSession.historyLimit;
           history.past = projectSession.historyPast;
           history.future = projectSession.historyFuture;
-          if (!(timelapseState.snapshots instanceof Array)) {
-            timelapseState.snapshots = [];
-          }
-          timelapseState.snapshots.length = 0;
-          projectSession.timelapse.snapshots.forEach(entry => {
-            timelapseState.snapshots.push(entry);
+          timelapseState.tracksByCanvasId = Object.create(null);
+          Object.entries(projectSession.timelapse.tracksByCanvasId || {}).forEach(([canvasId, track]) => {
+            timelapseState.tracksByCanvasId[canvasId] = {
+              snapshots: Array.isArray(track?.snapshots) ? track.snapshots.slice() : [],
+              warningShown: Boolean(track?.warningShown),
+              sampleStep: Math.max(1, Math.round(Number(track?.sampleStep) || 1)),
+              lastCaptureToken: Number.isFinite(Number(track?.lastCaptureToken))
+                ? Math.round(Number(track.lastCaptureToken))
+                : -1,
+            };
           });
           timelapseState.enabled = projectSession.timelapse.enabled;
           timelapseState.fps = projectSession.timelapse.fps;
-          timelapseState.warningShown = projectSession.timelapse.warningShown;
-          timelapseState.sampleStep = projectSession.timelapse.sampleStep;
-          timelapseState.lastCaptureToken = projectSession.timelapse.lastCaptureToken;
         } else {
           history.past = [];
           history.future = [];
-          clearTimelapseRecording({ silent: true });
+          clearTimelapseRecording({ silent: true, scope: 'all' });
         }
       } finally {
         autosaveRestoring = false;
@@ -10751,7 +11399,7 @@
       history.past = [];
       history.future = [];
       history.pending = null;
-      clearTimelapseRecording({ silent: true });
+      clearTimelapseRecording({ silent: true, scope: 'all' });
       resetDocumentUnsavedChanges();
       updateMemoryStatus();
       setTrackedProjectDotBaseline(snapshot, null);
@@ -10985,11 +11633,7 @@
           return false;
         }
         console.warn('Document open failed', error);
-        const message = error?.source === 'image-import'
-          ? '画像の読み込みに失敗しました'
-          : 'ドキュメントを開けませんでした';
-        updateAutosaveStatus(message, 'error');
-        return false;
+        return openDocumentViaInput();
       }
     }
     return openDocumentViaInput();
@@ -11060,7 +11704,13 @@
         input.value = '';
       });
       document.body.appendChild(input);
-      input.click();
+      try {
+        input.click();
+      } catch (error) {
+        cleanup();
+        updateAutosaveStatus('ドキュメントを開けませんでした', 'error');
+        finish(false);
+      }
     });
   }
 
@@ -11662,6 +12312,7 @@
       showPixelGuides: state.showPixelGuides ?? true,
       mirror: normalizeMirrorAxisState(state.mirror, width, height),
       showVirtualCursor: state.showVirtualCursor ?? false,
+      showCanvasResizeHandles: state.showCanvasResizeHandles ?? true,
       showChecker: state.showChecker ?? true,
       onionSkin: normalizeOnionSkinState(state.onionSkin),
       dualLeftRail: false,
@@ -11675,7 +12326,7 @@
     history.past = [];
     history.future = [];
     history.pending = null;
-    clearTimelapseRecording({ silent: true });
+    clearTimelapseRecording({ silent: true, scope: 'all' });
     resetDocumentUnsavedChanges();
     updateHistoryButtons();
     resetExportScaleDefaults();
@@ -12687,11 +13338,8 @@
     if (!ensureCurrentClientCanExportProject({ announce: true })) {
       return;
     }
-    const residentPngOnly = isResidentMultiConnectedRoom();
     const choice = window.prompt(
-      residentPngOnly
-        ? '出力形式を入力してください (png)'
-        : '出力形式を入力してください (png / jpeg / svg / grid / gif / timelapse / pixfind / project)',
+      '出力形式を入力してください (png / jpeg / svg / grid / gif / timelapse / pixfind / project)',
       'png'
     );
     if (!choice) {
@@ -12785,14 +13433,86 @@
     return clamp(Math.round(parsed), TIMELAPSE_MIN_FPS, TIMELAPSE_MAX_FPS);
   }
 
-  function createTimelapseFrameEntryFromState() {
-    const width = Math.max(1, Number(state.width) || 1);
-    const height = Math.max(1, Number(state.height) || 1);
-    const frames = Array.isArray(state.frames) ? state.frames : [];
+  function createEmptyTimelapseTrack() {
+    return {
+      snapshots: [],
+      warningShown: false,
+      sampleStep: 1,
+      lastCaptureToken: -1,
+    };
+  }
+
+  function normalizeTimelapseCanvasId(value, fallback = '') {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+    if (typeof fallback === 'string' && fallback.trim()) {
+      return fallback.trim();
+    }
+    return getActiveProjectCanvasDocument()?.id || '';
+  }
+
+  function getTimelapseTrack(canvasId = '', { create = false } = {}) {
+    const resolvedCanvasId = normalizeTimelapseCanvasId(canvasId);
+    if (!resolvedCanvasId) {
+      return null;
+    }
+    const existing = timelapseState.tracksByCanvasId[resolvedCanvasId];
+    if (existing) {
+      return existing;
+    }
+    if (!create) {
+      return null;
+    }
+    const track = createEmptyTimelapseTrack();
+    timelapseState.tracksByCanvasId[resolvedCanvasId] = track;
+    return track;
+  }
+
+  function getActiveTimelapseTrack(options = {}) {
+    return getTimelapseTrack(getActiveProjectCanvasDocument()?.id || '', options);
+  }
+
+  function getAllTimelapseTracks() {
+    return timelapseState.tracksByCanvasId;
+  }
+
+  function getActiveTimelapseStepCount() {
+    return getActiveTimelapseTrack()?.snapshots?.length || 0;
+  }
+
+  function getAllTimelapseStepCount() {
+    return Object.values(getAllTimelapseTracks()).reduce((sum, track) => {
+      return sum + (Array.isArray(track?.snapshots) ? track.snapshots.length : 0);
+    }, 0);
+  }
+
+  function pruneTimelapseTracksToExistingCanvases() {
+    const validCanvasIds = new Set(
+      getProjectCanvasDocuments()
+        .map(canvas => (typeof canvas?.id === 'string' ? canvas.id : ''))
+        .filter(Boolean)
+    );
+    Object.keys(timelapseState.tracksByCanvasId).forEach(canvasId => {
+      if (!validCanvasIds.has(canvasId)) {
+        delete timelapseState.tracksByCanvasId[canvasId];
+      }
+    });
+    Array.from(timelapseQueuedCanvasIds).forEach(canvasId => {
+      if (!validCanvasIds.has(canvasId)) {
+        timelapseQueuedCanvasIds.delete(canvasId);
+      }
+    });
+  }
+
+  function createTimelapseFrameEntryFromCanvas(canvasDoc = getActiveProjectCanvasDocument()) {
+    const width = Math.max(1, Number(canvasDoc?.width) || 1);
+    const height = Math.max(1, Number(canvasDoc?.height) || 1);
+    const frames = Array.isArray(canvasDoc?.frames) ? canvasDoc.frames : [];
     if (!frames.length) {
       return null;
     }
-    const frameIndex = clamp(Math.round(Number(state.activeFrame) || 0), 0, frames.length - 1);
+    const frameIndex = clamp(Math.round(Number(canvasDoc?.activeFrame) || 0), 0, frames.length - 1);
     const frame = frames[frameIndex];
     if (!frame) {
       return null;
@@ -12803,6 +13523,10 @@
       height,
       pixels: compressUint8Array(pixels, { clamped: true }),
     };
+  }
+
+  function createTimelapseFrameEntryFromState() {
+    return createTimelapseFrameEntryFromCanvas(getActiveProjectCanvasDocument());
   }
 
   function createTimelapseFrameEntryFromSnapshot(snapshot) {
@@ -12838,63 +13562,102 @@
     };
   }
 
-  function thinTimelapseSnapshotsIfNeeded() {
-    const snapshots = timelapseState.snapshots;
+  function thinTimelapseSnapshotsIfNeeded(track = getActiveTimelapseTrack()) {
+    const snapshots = Array.isArray(track?.snapshots) ? track.snapshots : null;
     if (!Array.isArray(snapshots) || snapshots.length <= TIMELAPSE_MAX_STEPS) {
       return false;
     }
     for (let index = snapshots.length - 2; index >= 1; index -= 2) {
       snapshots.splice(index, 1);
     }
-    timelapseState.sampleStep = Math.max(1, timelapseState.sampleStep * 2);
+    track.sampleStep = Math.max(1, Math.round(Number(track.sampleStep) || 1) * 2);
     return true;
   }
 
-  function captureTimelapseFrameFromState() {
+  function areTimelapseFrameEntriesEqual(a, b) {
+    const resolvedA = resolveTimelapseFrameEntry(a);
+    const resolvedB = resolveTimelapseFrameEntry(b);
+    if (!resolvedA || !resolvedB) {
+      return false;
+    }
+    if (resolvedA.width !== resolvedB.width || resolvedA.height !== resolvedB.height) {
+      return false;
+    }
+    if (resolvedA.pixels.length !== resolvedB.pixels.length) {
+      return false;
+    }
+    for (let index = 0; index < resolvedA.pixels.length; index += 1) {
+      if (resolvedA.pixels[index] !== resolvedB.pixels[index]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function captureTimelapseFrameFromState(canvasId = getActiveProjectCanvasDocument()?.id || '') {
     if (!timelapseState.enabled) {
-      return;
+      return false;
     }
-    const entry = createTimelapseFrameEntryFromState();
+    const resolvedCanvasId = normalizeTimelapseCanvasId(canvasId);
+    const canvasDoc = getProjectCanvasDocumentById(resolvedCanvasId) || getActiveProjectCanvasDocument();
+    const entry = createTimelapseFrameEntryFromCanvas(canvasDoc);
     if (!entry) {
-      return;
+      return false;
     }
-    timelapseState.snapshots.push(entry);
-    timelapseState.lastCaptureToken = unsavedChangeToken;
-    const thinned = thinTimelapseSnapshotsIfNeeded();
-    if (thinned && !timelapseState.warningShown) {
-      timelapseState.warningShown = true;
+    const track = getTimelapseTrack(resolvedCanvasId, { create: true });
+    const lastEntry = Array.isArray(track.snapshots) && track.snapshots.length
+      ? track.snapshots[track.snapshots.length - 1]
+      : null;
+    if (lastEntry && areTimelapseFrameEntriesEqual(lastEntry, entry)) {
+      track.lastCaptureToken = unsavedChangeToken;
+      if (getActiveProjectCanvasDocument()?.id === resolvedCanvasId) {
+        syncTimelapseControls();
+      }
+      return false;
+    }
+    track.snapshots.push(entry);
+    track.lastCaptureToken = unsavedChangeToken;
+    const thinned = thinTimelapseSnapshotsIfNeeded(track);
+    if (thinned && !track.warningShown) {
+      track.warningShown = true;
       updateAutosaveStatus('タイムラプス記録が増えたため自動で間引きしました', 'warn');
     }
-    syncTimelapseControls();
+    if (getActiveProjectCanvasDocument()?.id === resolvedCanvasId) {
+      syncTimelapseControls();
+    }
     updateMemoryStatus();
+    return true;
   }
 
   function flushPendingTimelapseCapture({ force = false } = {}) {
-    const queued = timelapseCaptureQueued;
-    const hasMissingCapture = timelapseState.lastCaptureToken !== unsavedChangeToken;
+    const queuedCanvasIds = Array.from(timelapseQueuedCanvasIds);
     if (timelapseCaptureTimer !== null) {
       window.clearTimeout(timelapseCaptureTimer);
       timelapseCaptureTimer = null;
     }
-    if (!queued && !hasMissingCapture && !force) {
+    if (!queuedCanvasIds.length && !force) {
       return false;
     }
-    timelapseCaptureQueued = false;
+    timelapseQueuedCanvasIds.clear();
     if (!timelapseState.enabled) {
       return false;
     }
-    if (!queued && !hasMissingCapture) {
-      return false;
-    }
-    captureTimelapseFrameFromState();
-    return true;
+    let captured = false;
+    queuedCanvasIds.forEach(canvasId => {
+      captured = captureTimelapseFrameFromState(canvasId) || captured;
+    });
+    return captured;
   }
 
-  function scheduleTimelapseCaptureFromState({ immediate = false } = {}) {
+  function scheduleTimelapseCaptureFromState({ immediate = false, canvasId = getActiveProjectCanvasDocument()?.id || '' } = {}) {
     if (!timelapseState.enabled) {
       return;
     }
-    timelapseCaptureQueued = true;
+    const resolvedCanvasId = normalizeTimelapseCanvasId(canvasId);
+    if (!resolvedCanvasId) {
+      return;
+    }
+    timelapseQueuedCanvasIds.add(resolvedCanvasId);
     if (immediate) {
       flushPendingTimelapseCapture();
       return;
@@ -12909,10 +13672,12 @@
   }
 
   function syncTimelapseControls() {
-    const stepCount = timelapseState.snapshots.length;
+    const track = getActiveTimelapseTrack();
+    const stepCount = Array.isArray(track?.snapshots) ? track.snapshots.length : 0;
     const fps = normalizeTimelapseFps(timelapseState.fps);
-    const sampleInfo = timelapseState.sampleStep > 1
-      ? localizeText(` / 間引きx${timelapseState.sampleStep}`, ` / thinning x${timelapseState.sampleStep}`)
+    const sampleStep = Math.max(1, Math.round(Number(track?.sampleStep) || 1));
+    const sampleInfo = sampleStep > 1
+      ? localizeText(` / 間引きx${sampleStep}`, ` / thinning x${sampleStep}`)
       : '';
     timelapseState.fps = fps;
 
@@ -12934,19 +13699,33 @@
     }
   }
 
-  function clearTimelapseRecording({ silent = false } = {}) {
+  function clearTimelapseRecording({ silent = false, scope = 'active' } = {}) {
     if (timelapseCaptureTimer !== null) {
       window.clearTimeout(timelapseCaptureTimer);
       timelapseCaptureTimer = null;
     }
-    timelapseCaptureQueued = false;
-    timelapseState.snapshots.length = 0;
-    timelapseState.warningShown = false;
-    timelapseState.sampleStep = 1;
-    timelapseState.lastCaptureToken = -1;
+    if (scope === 'all') {
+      timelapseQueuedCanvasIds.clear();
+      timelapseState.tracksByCanvasId = Object.create(null);
+    } else {
+      const activeCanvasId = normalizeTimelapseCanvasId(getActiveProjectCanvasDocument()?.id || '');
+      timelapseQueuedCanvasIds.delete(activeCanvasId);
+      const track = getTimelapseTrack(activeCanvasId);
+      if (track) {
+        track.snapshots.length = 0;
+        track.warningShown = false;
+        track.sampleStep = 1;
+        track.lastCaptureToken = -1;
+      }
+    }
     syncTimelapseControls();
     if (!silent) {
-      updateAutosaveStatus('タイムラプス記録をクリアしました', 'info');
+      updateAutosaveStatus(
+        scope === 'all'
+          ? 'タイムラプス記録をすべてクリアしました'
+          : 'このキャンバスのタイムラプス記録をクリアしました',
+        'info'
+      );
     }
     updateMemoryStatus();
   }
@@ -12959,15 +13738,11 @@
     }
     timelapseState.enabled = next;
     if (next) {
-      const shouldCaptureStart = timelapseState.snapshots.length === 0
-        || timelapseState.lastCaptureToken !== unsavedChangeToken;
-      if (shouldCaptureStart) {
-        scheduleTimelapseCaptureFromState({ immediate: true });
-      }
+      scheduleTimelapseCaptureFromState({ immediate: true });
     } else if (timelapseCaptureTimer !== null) {
       window.clearTimeout(timelapseCaptureTimer);
       timelapseCaptureTimer = null;
-      timelapseCaptureQueued = false;
+      timelapseQueuedCanvasIds.clear();
     }
     syncTimelapseControls();
     updateAutosaveStatus(
@@ -13004,10 +13779,12 @@
 
   function buildTimelapseExportEntries() {
     flushPendingTimelapseCapture();
-    const snapshots = timelapseState.snapshots.slice();
-    if (timelapseState.enabled && timelapseState.lastCaptureToken !== unsavedChangeToken) {
+    const activeCanvasId = normalizeTimelapseCanvasId(getActiveProjectCanvasDocument()?.id || '');
+    const track = getTimelapseTrack(activeCanvasId);
+    const snapshots = Array.isArray(track?.snapshots) ? track.snapshots.slice() : [];
+    if (timelapseState.enabled) {
       const current = createTimelapseFrameEntryFromState();
-      if (current) {
+      if (current && (!snapshots.length || !areTimelapseFrameEntriesEqual(snapshots[snapshots.length - 1], current))) {
         snapshots.push(current);
       }
     }
@@ -13018,7 +13795,7 @@
     if (!ensureCurrentClientCanExportProject({ announce: true, format: 'timelapse' })) {
       return;
     }
-    if (timelapseState.snapshots.length <= 0 && timelapseState.lastCaptureToken < 0) {
+    if (getActiveTimelapseStepCount() <= 0) {
       updateAutosaveStatus('タイムラプス記録がありません。設定でONにして描画してください。', 'warn');
       return;
     }
@@ -13352,7 +14129,7 @@
     return Boolean(state.playback.isPlaying);
   }
 
-  function openNewProjectDialog() {
+  function openNewProjectDialog({ dismissStartup = false } = {}) {
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return;
     }
@@ -13363,32 +14140,42 @@
     }
     const dialog = config.dialog;
     if (dialog && typeof dialog.showModal === 'function') {
-      if (config.nameInput) {
-        const currentName = state.documentName || DEFAULT_DOCUMENT_NAME;
-        config.nameInput.value = extractDocumentBaseName(currentName);
+      try {
+        if (config.nameInput) {
+          const currentName = state.documentName || DEFAULT_DOCUMENT_NAME;
+          config.nameInput.value = extractDocumentBaseName(currentName);
+        }
+        if (config.widthInput) {
+          config.widthInput.value = String(state.width);
+        }
+        if (config.heightInput) {
+          config.heightInput.value = String(state.height);
+        }
+        if (config.palettePreset) {
+          const normalizedPreset = normalizeNewProjectPalettePreset(
+            newProjectPalettePresetId,
+            NEW_PROJECT_PALETTE_PRESET_DEFAULT
+          );
+          renderNewProjectPalettePresetOptions(normalizedPreset);
+          config.palettePreset.value = normalizedPreset;
+          renderNewProjectPalettePresetPicker(normalizedPreset);
+          setNewProjectPalettePresetPickerOpen(false);
+        }
+        dialog.showModal();
+        if (dismissStartup) {
+          hideStartupScreen();
+        }
+        window.requestAnimationFrame(() => {
+          config.nameInput?.focus();
+          config.nameInput?.select?.();
+        });
+        return;
+      } catch (error) {
+        console.warn('Failed to open new project dialog', error);
       }
-      if (config.widthInput) {
-        config.widthInput.value = String(state.width);
-      }
-      if (config.heightInput) {
-        config.heightInput.value = String(state.height);
-      }
-      if (config.palettePreset) {
-        const normalizedPreset = normalizeNewProjectPalettePreset(
-          newProjectPalettePresetId,
-          NEW_PROJECT_PALETTE_PRESET_DEFAULT
-        );
-        renderNewProjectPalettePresetOptions(normalizedPreset);
-        config.palettePreset.value = normalizedPreset;
-        renderNewProjectPalettePresetPicker(normalizedPreset);
-        setNewProjectPalettePresetPickerOpen(false);
-      }
-      dialog.showModal();
-      window.requestAnimationFrame(() => {
-        config.nameInput?.focus();
-        config.nameInput?.select?.();
-      });
-      return;
+    }
+    if (dismissStartup) {
+      hideStartupScreen();
     }
     void promptNewProjectFallback();
   }
@@ -13749,7 +14536,7 @@
     history.past = [];
     history.future = [];
     history.pending = null;
-    clearTimelapseRecording({ silent: true });
+    clearTimelapseRecording({ silent: true, scope: 'all' });
     resetDocumentUnsavedChanges();
     updateHistoryButtons();
     resetExportScaleDefaults();
@@ -13984,6 +14771,7 @@
     if (!container) {
       return;
     }
+    bindCoreProjectActionButtons();
     getUpdateHistoryEntries();
     if (dom.startup?.hint) {
       dom.startup.hint.textContent = AUTOSAVE_SUPPORTED
@@ -14059,10 +14847,6 @@
         }
       }
     });
-    dom.startup?.newButton?.addEventListener('click', () => {
-      hideStartupScreen();
-      openNewProjectDialog();
-    });
     dom.startup?.resumeButton?.addEventListener('click', async () => {
       const firstEntry = Array.from(recentProjectsCache.values())[0] || null;
       if (!firstEntry) {
@@ -14080,12 +14864,6 @@
         refreshRecentProjectsUI().catch(error => {
           console.warn('Failed to refresh recent projects', error);
         });
-      }
-    });
-    dom.startup?.openButton?.addEventListener('click', async () => {
-      const opened = await openDocumentDialog();
-      if (opened) {
-        hideStartupScreen();
       }
     });
     dom.startup?.quickSetupButton?.addEventListener('click', async () => {
@@ -14247,22 +15025,23 @@
         history.past = projectSession.historyPast;
         history.future = projectSession.historyFuture;
 
-        if (!(timelapseState.snapshots instanceof Array)) {
-          timelapseState.snapshots = [];
-        }
-        timelapseState.snapshots.length = 0;
-        projectSession.timelapse.snapshots.forEach(entry => {
-          timelapseState.snapshots.push(entry);
+        timelapseState.tracksByCanvasId = Object.create(null);
+        Object.entries(projectSession.timelapse.tracksByCanvasId || {}).forEach(([canvasId, track]) => {
+          timelapseState.tracksByCanvasId[canvasId] = {
+            snapshots: Array.isArray(track?.snapshots) ? track.snapshots.slice() : [],
+            warningShown: Boolean(track?.warningShown),
+            sampleStep: Math.max(1, Math.round(Number(track?.sampleStep) || 1)),
+            lastCaptureToken: Number.isFinite(Number(track?.lastCaptureToken))
+              ? Math.round(Number(track.lastCaptureToken))
+              : -1,
+          };
         });
         timelapseState.enabled = projectSession.timelapse.enabled;
         timelapseState.fps = projectSession.timelapse.fps;
-        timelapseState.warningShown = projectSession.timelapse.warningShown;
-        timelapseState.sampleStep = projectSession.timelapse.sampleStep;
-        timelapseState.lastCaptureToken = projectSession.timelapse.lastCaptureToken;
       } else {
         history.past = [];
         history.future = [];
-        clearTimelapseRecording({ silent: true });
+        clearTimelapseRecording({ silent: true, scope: 'all' });
       }
     } finally {
       autosaveRestoring = false;
@@ -14337,13 +15116,12 @@
     return serialized;
   }
 
-  function serializeProjectTimelapseSnapshots() {
-    flushPendingTimelapseCapture({ force: true });
-    if (!Array.isArray(timelapseState.snapshots) || !timelapseState.snapshots.length) {
+  function serializeProjectTimelapseSnapshotList(list) {
+    if (!Array.isArray(list) || !list.length) {
       return [];
     }
     const snapshots = [];
-    timelapseState.snapshots.forEach(entry => {
+    list.forEach(entry => {
       const resolved = resolveTimelapseFrameEntry(entry);
       if (!resolved) {
         return;
@@ -14357,6 +15135,26 @@
     return snapshots;
   }
 
+  function serializeProjectTimelapseTracks() {
+    flushPendingTimelapseCapture({ force: true });
+    const payload = {};
+    Object.entries(getAllTimelapseTracks()).forEach(([canvasId, track]) => {
+      const snapshots = serializeProjectTimelapseSnapshotList(track?.snapshots || []);
+      if (!snapshots.length) {
+        return;
+      }
+      payload[canvasId] = {
+        warningShown: Boolean(track?.warningShown),
+        sampleStep: Math.max(1, Math.round(Number(track?.sampleStep) || 1)),
+        lastCaptureToken: Number.isFinite(Number(track?.lastCaptureToken))
+          ? Math.round(Number(track.lastCaptureToken))
+          : -1,
+        snapshots,
+      };
+    });
+    return payload;
+  }
+
   function buildProjectSessionPayload() {
     const historyLimit = normalizeProjectHistoryLimit(history.limit, DEFAULT_HISTORY_LIMIT);
     return {
@@ -14366,12 +15164,7 @@
       timelapse: {
         enabled: Boolean(timelapseState.enabled),
         fps: normalizeTimelapseFps(timelapseState.fps),
-        warningShown: Boolean(timelapseState.warningShown),
-        sampleStep: Math.max(1, Math.round(Number(timelapseState.sampleStep) || 1)),
-        lastCaptureToken: Number.isFinite(Number(timelapseState.lastCaptureToken))
-          ? Math.round(Number(timelapseState.lastCaptureToken))
-          : -1,
-        snapshots: serializeProjectTimelapseSnapshots(),
+        byCanvas: serializeProjectTimelapseTracks(),
       },
     };
   }
@@ -14384,14 +15177,9 @@
       timelapse: {
         enabled: Boolean(timelapseState.enabled),
         fps: normalizeTimelapseFps(timelapseState.fps),
-        warningShown: Boolean(timelapseState.warningShown),
-        sampleStep: Math.max(1, Math.round(Number(timelapseState.sampleStep) || 1)),
-        lastCaptureToken: Number.isFinite(Number(timelapseState.lastCaptureToken))
-          ? Math.round(Number(timelapseState.lastCaptureToken))
-          : -1,
+        byCanvas: serializeProjectTimelapseTracks(),
         // Persist timelapse frames in autosave as well so reopening can export
         // from the original drawing start, not just after reopening.
-        snapshots: serializeProjectTimelapseSnapshots(),
       },
     };
   }
@@ -14455,7 +15243,33 @@
     return restored;
   }
 
-  function parseProjectSessionPayload(payload) {
+  function deserializeProjectTimelapseTracks(byCanvas, fallbackCanvasId = '') {
+    const restored = Object.create(null);
+    if (!byCanvas || typeof byCanvas !== 'object' || Array.isArray(byCanvas)) {
+      return restored;
+    }
+    Object.entries(byCanvas).forEach(([canvasId, trackPayload]) => {
+      const resolvedCanvasId = normalizeTimelapseCanvasId(canvasId, fallbackCanvasId);
+      if (!resolvedCanvasId || !trackPayload || typeof trackPayload !== 'object') {
+        return;
+      }
+      const snapshots = deserializeProjectTimelapseSnapshots(trackPayload.snapshots);
+      if (!snapshots.length) {
+        return;
+      }
+      restored[resolvedCanvasId] = {
+        snapshots,
+        warningShown: Boolean(trackPayload.warningShown),
+        sampleStep: Math.max(1, Math.round(Number(trackPayload.sampleStep) || 1)),
+        lastCaptureToken: Number.isFinite(Number(trackPayload.lastCaptureToken))
+          ? Math.round(Number(trackPayload.lastCaptureToken))
+          : -1,
+      };
+    });
+    return restored;
+  }
+
+  function parseProjectSessionPayload(payload, fallbackCanvasId = '') {
     if (!payload || typeof payload !== 'object') {
       return null;
     }
@@ -14465,7 +15279,21 @@
     const timelapsePayload = payload.timelapse && typeof payload.timelapse === 'object'
       ? payload.timelapse
       : {};
-    const timelapseSnapshots = deserializeProjectTimelapseSnapshots(timelapsePayload.snapshots);
+    const timelapseTracksByCanvasId = deserializeProjectTimelapseTracks(timelapsePayload.byCanvas, fallbackCanvasId);
+    if (!Object.keys(timelapseTracksByCanvasId).length) {
+      const legacySnapshots = deserializeProjectTimelapseSnapshots(timelapsePayload.snapshots);
+      const resolvedCanvasId = normalizeTimelapseCanvasId(fallbackCanvasId);
+      if (legacySnapshots.length && resolvedCanvasId) {
+        timelapseTracksByCanvasId[resolvedCanvasId] = {
+          snapshots: legacySnapshots,
+          warningShown: Boolean(timelapsePayload.warningShown),
+          sampleStep: Math.max(1, Math.round(Number(timelapsePayload.sampleStep) || 1)),
+          lastCaptureToken: Number.isFinite(Number(timelapsePayload.lastCaptureToken))
+            ? Math.round(Number(timelapsePayload.lastCaptureToken))
+            : -1,
+        };
+      }
+    }
     return {
       historyLimit,
       historyPast,
@@ -14473,12 +15301,7 @@
       timelapse: {
         enabled: Boolean(timelapsePayload.enabled),
         fps: normalizeTimelapseFps(timelapsePayload.fps),
-        warningShown: Boolean(timelapsePayload.warningShown),
-        sampleStep: Math.max(1, Math.round(Number(timelapsePayload.sampleStep) || 1)),
-        lastCaptureToken: Number.isFinite(Number(timelapsePayload.lastCaptureToken))
-          ? Math.round(Number(timelapsePayload.lastCaptureToken))
-          : -1,
-        snapshots: timelapseSnapshots,
+        tracksByCanvasId: timelapseTracksByCanvasId,
       },
     };
   }
@@ -14492,7 +15315,7 @@
     const payload = hasPackagedDocument ? parsed.document : parsed;
     const snapshot = deserializeDocumentPayload(payload);
     const projectSession = hasPackagedDocument
-      ? parseProjectSessionPayload(parsed.session)
+      ? parseProjectSessionPayload(parsed.session, snapshot?.activeCanvasId || '')
       : null;
     const dotStats = hasPackagedDocument
       ? resolvePackagedProjectDotStats(parsed)
@@ -15422,9 +16245,6 @@
     if (!AUTOSAVE_SUPPORTED) {
       return null;
     }
-    if (isResidentMultiConnectedRoom()) {
-      return null;
-    }
     if (!snapshot || typeof snapshot !== 'object') {
       return null;
     }
@@ -15553,6 +16373,45 @@
 
   function serializeDocumentSnapshot(snapshot) {
     const palette = snapshot.palette.map(color => normalizeColorValue(color));
+    const maxPaletteIndex = Math.max(0, palette.length - 1);
+    const activePaletteIndex = clamp(
+      Number.isFinite(Number(snapshot.activePaletteIndex)) ? Math.round(Number(snapshot.activePaletteIndex)) : 0,
+      0,
+      maxPaletteIndex
+    );
+    const secondaryPaletteIndex = clamp(
+      Number.isFinite(Number(snapshot.secondaryPaletteIndex)) ? Math.round(Number(snapshot.secondaryPaletteIndex)) : activePaletteIndex,
+      0,
+      maxPaletteIndex
+    );
+    const serializedCanvases = MULTI_CANVAS_FEATURE_ENABLED && Array.isArray(snapshot.canvases) && snapshot.canvases.length
+      ? snapshot.canvases.map(canvas => ({
+        id: canvas.id,
+        name: typeof canvas.name === 'string' ? canvas.name : '',
+        width: canvas.width,
+        height: canvas.height,
+        viewScale: normalizeProjectCanvasViewScale(canvas.viewScale, 8),
+        activeFrame: canvas.activeFrame,
+        activeLayer: canvas.activeLayer,
+        selectionMask: canvas.selectionMask ? encodeTypedArray(canvas.selectionMask) : null,
+        selectionContentMask: canvas.selectionContentMask ? encodeTypedArray(canvas.selectionContentMask) : null,
+        selectionBounds: canvas.selectionBounds ? { ...canvas.selectionBounds } : null,
+        frames: canvas.frames.map(frame => ({
+          id: frame.id,
+          name: frame.name,
+          duration: frame.duration,
+          layers: frame.layers.map(layer => ({
+            id: layer.id,
+            name: layer.name,
+            visible: layer.visible !== false,
+            opacity: normalizeLayerOpacity(layer.opacity),
+            blendMode: normalizeLayerBlendMode(layer.blendMode),
+            indices: encodeTypedArray(layer.indices),
+            direct: encodeTypedArray(layer.direct),
+          })),
+        })),
+      }))
+      : null;
     // Personal view/tool/color preferences stay in local session storage instead of shared project payloads.
     const serialized = {
       version: DOCUMENT_FILE_VERSION,
@@ -15566,14 +16425,31 @@
         layers: frame.layers.map(layer => ({
           id: layer.id,
           name: layer.name,
+          visible: layer.visible !== false,
+          opacity: normalizeLayerOpacity(layer.opacity),
           blendMode: normalizeLayerBlendMode(layer.blendMode),
           indices: encodeTypedArray(layer.indices),
           direct: encodeTypedArray(layer.direct),
         })),
       })),
+      activeFrame: snapshot.activeFrame,
+      activeLayer: snapshot.activeLayer,
+      colorMode: normalizeColorMode(snapshot.colorMode, COLOR_MODE_INDEX),
+      activePaletteIndex,
+      secondaryPaletteIndex,
+      activeRgb: normalizeColorValue(snapshot.activeRgb || palette[activePaletteIndex] || palette[0] || { r: 0, g: 0, b: 0, a: 0 }),
+      selectionMask: snapshot.selectionMask ? encodeTypedArray(snapshot.selectionMask) : null,
+      selectionContentMask: snapshot.selectionContentMask ? encodeTypedArray(snapshot.selectionContentMask) : null,
+      selectionBounds: snapshot.selectionBounds ? { ...snapshot.selectionBounds } : null,
       documentName: normalizeDocumentName(snapshot.documentName),
       dualLeftRail: false,
     };
+    if (serializedCanvases) {
+      serialized.canvases = serializedCanvases;
+      serialized.activeCanvasId = typeof snapshot.activeCanvasId === 'string'
+        ? snapshot.activeCanvasId
+        : (serializedCanvases[0]?.id || '');
+    }
     if (snapshot.playback && typeof snapshot.playback === 'object') {
       serialized.playback = {
         isPlaying: Boolean(snapshot.playback.isPlaying),
@@ -15634,7 +16510,7 @@
           id: typeof layer.id === 'string' ? layer.id : `layer-${frameIndex}-${layerIndex}`,
           name: typeof layer.name === 'string' ? layer.name : getDefaultLayerName(layerIndex + 1),
           visible: layer.visible !== false,
-          opacity: 1,
+          opacity: normalizeLayerOpacity(layer.opacity),
           blendMode: normalizeLayerBlendMode(layer.blendMode),
           indices,
           direct,
@@ -15661,6 +16537,14 @@
       if (maskBytes.length === pixelCount) {
         selectionMask = new Uint8Array(maskBytes.length);
         selectionMask.set(maskBytes);
+      }
+    }
+    let selectionContentMask = null;
+    if (typeof payload.selectionContentMask === 'string') {
+      const contentMaskBytes = decodeBase64(payload.selectionContentMask);
+      if (contentMaskBytes.length === pixelCount) {
+        selectionContentMask = new Uint8Array(contentMaskBytes.length);
+        selectionContentMask.set(contentMaskBytes);
       }
     }
 
@@ -15708,7 +16592,7 @@
       typeof payload.documentName === 'string' ? payload.documentName : (typeof payload.name === 'string' ? payload.name : state.documentName),
     );
 
-    return {
+    const activeCanvasSnapshot = {
       width,
       height,
       scale: normalizeZoomScale(payload.scale, state.scale || MIN_ZOOM_SCALE),
@@ -15731,6 +16615,7 @@
       activeFrame: activeFrameIndex,
       activeLayer: activeLayerId,
       selectionMask,
+      selectionContentMask,
       selectionBounds,
       showGrid: Boolean(payload.showGrid ?? state.showGrid),
       showMajorGrid: Boolean(payload.showMajorGrid ?? state.showMajorGrid),
@@ -15745,6 +16630,7 @@
       showPixelGuides: Boolean(payload.showPixelGuides ?? state.showPixelGuides),
       mirror: normalizeMirrorAxisState(payload.mirror, width, height),
       showVirtualCursor: Boolean(payload.showVirtualCursor ?? state.showVirtualCursor),
+      showCanvasResizeHandles: Boolean(payload.showCanvasResizeHandles ?? state.showCanvasResizeHandles ?? true),
       showChecker: Boolean(payload.showChecker ?? state.showChecker),
       onionSkin: normalizeOnionSkinState(payload.onionSkin ?? state.onionSkin),
       dualLeftRail: false,
@@ -15756,6 +16642,123 @@
         : { isPlaying: false, lastFrame: 0 },
       documentName,
     };
+    if (Array.isArray(payload.canvases) && payload.canvases.length) {
+      const canvases = payload.canvases.map((canvas, canvasIndex) => {
+        const canvasWidth = clamp(
+          Math.round(Number(canvas?.width) || width),
+          1,
+          4096
+        );
+        const canvasHeight = clamp(
+          Math.round(Number(canvas?.height) || height),
+          1,
+          4096
+        );
+        const canvasPixelCount = canvasWidth * canvasHeight;
+        const frameList = Array.isArray(canvas?.frames) && canvas.frames.length ? canvas.frames : framesSource;
+        const deserializedFrames = frameList.map((frame, frameIndex) => {
+          if (!frame || !Array.isArray(frame.layers) || !frame.layers.length) {
+            throw new Error(`Canvas ${canvasIndex} frame ${frameIndex} has no layers`);
+          }
+          const layers = frame.layers.map((layer, layerIndex) => {
+            if (!layer || typeof layer.indices !== 'string') {
+              throw new Error(`Canvas ${canvasIndex} layer ${layerIndex} is missing index data`);
+            }
+            const indicesBytes = decodeBase64(layer.indices);
+            if (indicesBytes.length !== canvasPixelCount * 2) {
+              throw new Error('Canvas layer pixel data mismatch');
+            }
+            const indicesView = new Int16Array(indicesBytes.buffer, indicesBytes.byteOffset, indicesBytes.byteLength / 2);
+            const indices = new Int16Array(indicesView.length);
+            indices.set(indicesView);
+            let direct = null;
+            if (typeof layer.direct === 'string' && layer.direct.length > 0) {
+              const directBytes = decodeBase64(layer.direct);
+              if (directBytes.length !== canvasPixelCount * 4) {
+                throw new Error('Canvas direct pixel data mismatch');
+              }
+              direct = new Uint8ClampedArray(directBytes.length);
+              direct.set(directBytes);
+            }
+            return {
+              id: typeof layer.id === 'string' ? layer.id : `layer-${canvasIndex}-${frameIndex}-${layerIndex}`,
+              name: typeof layer.name === 'string' ? layer.name : getDefaultLayerName(layerIndex + 1),
+              visible: layer.visible !== false,
+              opacity: normalizeLayerOpacity(layer.opacity),
+              blendMode: normalizeLayerBlendMode(layer.blendMode),
+              indices,
+              direct,
+            };
+          });
+          return {
+            id: typeof frame.id === 'string' ? frame.id : `frame-${canvasIndex}-${frameIndex + 1}`,
+            name: typeof frame.name === 'string' ? frame.name : getDefaultFrameName(frameIndex + 1),
+            duration: clamp(Number(frame.duration) || 1000 / 12, 16, 2000),
+            layers,
+          };
+        });
+        const activeFrameIndexForCanvas = clamp(
+          Math.round(Number(canvas?.activeFrame) || 0),
+          0,
+          deserializedFrames.length - 1
+        );
+        const activeFrameForCanvas = deserializedFrames[activeFrameIndexForCanvas];
+        let activeLayerIdForCanvas = typeof canvas?.activeLayer === 'string'
+          ? canvas.activeLayer
+          : activeFrameForCanvas.layers[activeFrameForCanvas.layers.length - 1].id;
+        if (!activeFrameForCanvas.layers.some(layer => layer.id === activeLayerIdForCanvas)) {
+          activeLayerIdForCanvas = activeFrameForCanvas.layers[activeFrameForCanvas.layers.length - 1].id;
+        }
+        let canvasSelectionMask = null;
+        if (typeof canvas?.selectionMask === 'string') {
+          const maskBytes = decodeBase64(canvas.selectionMask);
+          if (maskBytes.length === canvasPixelCount) {
+            canvasSelectionMask = new Uint8Array(maskBytes.length);
+            canvasSelectionMask.set(maskBytes);
+          }
+        }
+        let canvasSelectionContentMask = null;
+        if (typeof canvas?.selectionContentMask === 'string') {
+          const contentMaskBytes = decodeBase64(canvas.selectionContentMask);
+          if (contentMaskBytes.length === canvasPixelCount) {
+            canvasSelectionContentMask = new Uint8Array(contentMaskBytes.length);
+            canvasSelectionContentMask.set(contentMaskBytes);
+          }
+        }
+        return {
+          id: typeof canvas?.id === 'string' && canvas.id ? canvas.id : `canvas-${canvasIndex + 1}`,
+          name: typeof canvas?.name === 'string' && canvas.name.trim() ? canvas.name : getDefaultProjectCanvasName(canvasIndex + 1),
+          width: canvasWidth,
+          height: canvasHeight,
+          viewScale: normalizeProjectCanvasViewScale(canvas?.viewScale, activeCanvasSnapshot.scale || 8),
+          frames: deserializedFrames,
+          activeFrame: activeFrameIndexForCanvas,
+          activeLayer: activeLayerIdForCanvas,
+          selectionMask: canvasSelectionMask,
+          selectionContentMask: canvasSelectionContentMask,
+          selectionBounds: validateBoundsObject(canvas?.selectionBounds),
+        };
+      });
+      const resolvedActiveCanvasId = typeof payload.activeCanvasId === 'string' && payload.activeCanvasId
+        ? payload.activeCanvasId
+        : (canvases[0]?.id || '');
+      if (MULTI_CANVAS_FEATURE_ENABLED) {
+        activeCanvasSnapshot.canvases = canvases;
+        activeCanvasSnapshot.activeCanvasId = resolvedActiveCanvasId;
+      }
+      const selectedCanvas = canvases.find(canvas => canvas?.id === resolvedActiveCanvasId) || canvases[0];
+      if (selectedCanvas) {
+        activeCanvasSnapshot.width = selectedCanvas.width;
+        activeCanvasSnapshot.height = selectedCanvas.height;
+        activeCanvasSnapshot.frames = selectedCanvas.frames;
+        activeCanvasSnapshot.activeFrame = selectedCanvas.activeFrame;
+        activeCanvasSnapshot.activeLayer = selectedCanvas.activeLayer;
+        activeCanvasSnapshot.selectionMask = selectedCanvas.selectionMask;
+        activeCanvasSnapshot.selectionContentMask = selectedCanvas.selectionContentMask;
+        activeCanvasSnapshot.selectionBounds = selectedCanvas.selectionBounds;
+      }
+    }
+    return activeCanvasSnapshot;
   }
 
   // -------------------------------------------------------------------------
@@ -19885,9 +20888,22 @@
   }
 
   // Keep the entire canvas visible when the zoom level is at the minimum (100%).
+  function getMainCanvasViewportElement() {
+    if (dom.canvasViewport instanceof HTMLElement) {
+      return dom.canvasViewport;
+    }
+    if (dom.mainCanvasArea instanceof HTMLElement) {
+      return dom.mainCanvasArea;
+    }
+    return activeCanvasSurface?.body instanceof HTMLElement ? activeCanvasSurface.body : null;
+  }
+
   function clampPanToViewportAtMinZoom() {
-    const viewport = dom.canvasViewport;
-    const stack = dom.canvases.stack;
+    if (getProjectCanvasCount() > 1) {
+      return;
+    }
+    const viewport = getMainCanvasViewportElement();
+    const stack = mainViewportCanvasSurface.stack || dom.canvases.stack;
     const scale = Number(state.scale) || MIN_ZOOM_SCALE;
     if (!viewport || !stack) return;
     if (Math.abs(scale - MIN_ZOOM_SCALE) > ZOOM_EPSILON) return;
@@ -19919,7 +20935,7 @@
   }
 
   function applyViewportTransform() {
-    if (!dom.canvases.stack) return;
+    if (!(dom.viewportWorkspace instanceof HTMLElement)) return;
     clampPanToViewportAtMinZoom();
     const panX = Math.round(Number(state.pan.x) || 0);
     const panY = Math.round(Number(state.pan.y) || 0);
@@ -19929,9 +20945,11 @@
     if (panY !== state.pan.y) {
       state.pan.y = panY;
     }
-    dom.canvases.stack.style.transform = `translate(${panX}px, ${panY}px)`;
+    dom.viewportWorkspace.style.transform = `translate(${panX}px, ${panY}px)`;
     updateGridDecorations();
     updateMirrorGuideHandles();
+    updateCanvasResizeHandlePosition();
+    syncCanvasResizeHandleVisibility();
   }
 
 
@@ -20256,12 +21274,35 @@
   }
 
   async function init() {
-    await initializeIosSnapshotFallback();
-    await initializeAutosave();
-    if (RELOAD_SNAPSHOT_ENABLED) {
-      restoreReloadSessionSnapshot();
+    try {
+      await initializeIosSnapshotFallback();
+    } catch (error) {
+      console.warn('iOS snapshot bootstrap failed', error);
     }
-    await initializeExportDirectoryBinding();
+    try {
+      await initializeAutosave();
+    } catch (error) {
+      console.warn('Autosave bootstrap failed', error);
+    }
+    if (RELOAD_SNAPSHOT_ENABLED) {
+      try {
+        restoreReloadSessionSnapshot();
+      } catch (error) {
+        console.warn('Reload session restore failed', error);
+        if (canUseSessionStorage) {
+          try {
+            window.sessionStorage.removeItem(RELOAD_SNAPSHOT_STORAGE_KEY);
+          } catch (storageError) {
+            // Ignore reload snapshot cleanup failures.
+          }
+        }
+      }
+    }
+    try {
+      await initializeExportDirectoryBinding();
+    } catch (error) {
+      console.warn('Export directory bootstrap failed', error);
+    }
     setupOpenProjectTabs();
     ensureOpenProjectTabsInitialized();
     setupLeftTabs();
@@ -20290,7 +21331,13 @@
     if (lensImportRequested || skipStartup) {
       hideStartupScreen();
     }
-    const importedFromLens = await maybeImportLensCapture();
+    let importedFromLens = false;
+    try {
+      importedFromLens = await maybeImportLensCapture();
+    } catch (error) {
+      console.warn('Lens capture bootstrap failed', error);
+      importedFromLens = false;
+    }
     renderEverything();
     refreshLocalizedUi();
     scheduleDeferredUiSetup();
@@ -21845,6 +22892,7 @@
     const { persist = true, updateControl = true } = options;
     const mirrorState = getNormalizedMirrorState();
     const next = Boolean(enabled);
+    const enablingFromOff = next && !mirrorState.enabled;
     const needsDefaultAxis = next && !hasActiveMirrorAxes(mirrorState);
     const needsAxisReset = !next && hasActiveMirrorAxes(mirrorState);
     if (mirrorState.enabled === next && !needsDefaultAxis && !needsAxisReset) {
@@ -21853,6 +22901,9 @@
       }
       syncControlsWithState();
       return;
+    }
+    if (enablingFromOff) {
+      resetMirrorPivotToCanvasCenter(mirrorState);
     }
     if (needsDefaultAxis) {
       mirrorState.axes[MIRROR_AXIS_VERTICAL] = true;
@@ -21891,6 +22942,9 @@
         syncControlsWithState();
       }
       return;
+    }
+    if (shouldEnableMirrorMode) {
+      resetMirrorPivotToCanvasCenter(mirrorState);
     }
     mirrorState.axes[axis] = nextEnabled;
     if (nextEnabled) {
@@ -21934,6 +22988,20 @@
     const ratioY = (mirrorState.axisY + 0.5) / prevH;
     mirrorState.axisX = clampMirrorAxisX((ratioX * nextW) - 0.5, nextW);
     mirrorState.axisY = clampMirrorAxisY((ratioY * nextH) - 0.5, nextH);
+    state.mirror = mirrorState;
+  }
+
+  function translateMirrorPivotForCanvasResize(nextWidth, nextHeight, { offsetX = 0, offsetY = 0 } = {}) {
+    const nextW = Math.max(1, Math.floor(Number(nextWidth) || 1));
+    const nextH = Math.max(1, Math.floor(Number(nextHeight) || 1));
+    const shiftX = Number(offsetX) || 0;
+    const shiftY = Number(offsetY) || 0;
+    const mirrorState = getNormalizedMirrorState();
+    const fallback = createInitialMirrorState(nextW, nextH);
+    const currentAxisX = Number.isFinite(mirrorState.axisX) ? mirrorState.axisX : fallback.axisX;
+    const currentAxisY = Number.isFinite(mirrorState.axisY) ? mirrorState.axisY : fallback.axisY;
+    mirrorState.axisX = clampMirrorAxisX(currentAxisX + shiftX, nextW);
+    mirrorState.axisY = clampMirrorAxisY(currentAxisY + shiftY, nextH);
     state.mirror = mirrorState;
   }
 
@@ -22143,19 +23211,6 @@
     canvasScreenMetricsCache.key = cacheKey;
     canvasScreenMetricsCache.metrics = metrics;
     return metrics;
-  }
-
-  function getResidentAssignedRangeGuideLineWidth() {
-    const cachedLineWidth = Number(residentAssignedRangeGuideStyleCache.lineWidth);
-    if (Number.isFinite(cachedLineWidth) && cachedLineWidth > 0) {
-      return cachedLineWidth;
-    }
-    const stack = dom.canvases.stack;
-    const stackStyles = stack ? window.getComputedStyle(stack) : null;
-    const majorLineWidthRaw = stackStyles ? stackStyles.getPropertyValue('--grid-major-line-width') : '';
-    const lineWidth = clamp(Number.parseFloat(majorLineWidthRaw) || 1, 0.5, 2);
-    residentAssignedRangeGuideStyleCache.lineWidth = lineWidth;
-    return lineWidth;
   }
 
   function setMirrorGuideLine(lineElement, start, end, visible) {
@@ -22672,6 +23727,7 @@
   /* solidShape tool functions removed */
 
   function setupControls() {
+    bindCoreProjectActionButtons();
     if (dom.controls.toggleGrid instanceof HTMLInputElement) {
       dom.controls.toggleGrid.addEventListener('change', () => {
         state.showGrid = dom.controls.toggleGrid.checked;
@@ -22958,6 +24014,39 @@
     };
     dom.controls.toggleFloatingPreview?.addEventListener('change', handleFloatingPreviewToggleInput);
     dom.controls.toggleFloatingPreview?.addEventListener('input', handleFloatingPreviewToggleInput);
+    const handleCanvasResizeHandlesToggleInput = event => {
+      if (!(event.target instanceof HTMLInputElement)) {
+        return;
+      }
+      state.showCanvasResizeHandles = Boolean(event.target.checked);
+      if (!state.showCanvasResizeHandles && canvasResizeHandleState.active) {
+        stopCanvasResizeHandleInteraction({ apply: false });
+      }
+      syncCanvasResizeHandleVisibility();
+      updateCanvasResizeHandlePosition();
+      scheduleSessionPersist({ includeSnapshots: false });
+    };
+    dom.controls.toggleCanvasResizeHandles?.addEventListener('change', handleCanvasResizeHandlesToggleInput);
+    dom.controls.toggleCanvasResizeHandles?.addEventListener('input', handleCanvasResizeHandlesToggleInput);
+    const handleLocalCanvasToggleInput = event => {
+      if (!(event.target instanceof HTMLInputElement)) {
+        return;
+      }
+      if (!MULTI_CANVAS_FEATURE_ENABLED) {
+        event.target.checked = false;
+        setLocalViewportCanvasCount(0, { persist: true, announce: false });
+        return;
+      }
+      const enabled = Boolean(event.target.checked);
+      const currentCount = normalizeLocalViewportCanvasState(
+        localViewportCanvasState,
+        LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
+      ).count;
+      const nextCount = enabled ? Math.max(1, currentCount) : 0;
+      setLocalViewportCanvasCount(nextCount, { persist: true, announce: false });
+    };
+    dom.controls.toggleLocalCanvas?.addEventListener('change', handleLocalCanvasToggleInput);
+    dom.controls.toggleLocalCanvas?.addEventListener('input', handleLocalCanvasToggleInput);
 
     if (dom.controls.virtualCursorButtonScale instanceof HTMLInputElement) {
       const slider = dom.controls.virtualCursorButtonScale;
@@ -22972,14 +24061,6 @@
         setVirtualCursorButtonScale(event.target.value);
       });
     }
-
-    dom.controls.openDocument?.addEventListener('click', () => {
-      openDocumentDialog();
-    });
-
-    dom.controls.showLocalProjects?.addEventListener('click', () => {
-      showStartupScreen();
-    });
 
     dom.controls.exportProject?.addEventListener('click', () => {
       openExportDialog();
@@ -23053,13 +24134,6 @@
     dom.controls.sendToPixfind?.addEventListener('click', () => {
       exportProjectToPixfind();
     });
-
-
-    if (dom.newProject?.button) {
-      dom.newProject.button.addEventListener('click', () => {
-        openNewProjectDialog();
-      });
-    }
     if (dom.newProject?.form) {
       dom.newProject.form.addEventListener('submit', event => {
         event.preventDefault();
@@ -23291,6 +24365,82 @@
     updateCanvasResizeControls();
   }
 
+  function applyCanvasResizeDimensions(
+    width,
+    height,
+    {
+      restoreFocusInput = null,
+      preserveAnchoredContent = false,
+      contentOffsetX = 0,
+      contentOffsetY = 0,
+    } = {}
+  ) {
+    const nextWidth = clamp(Math.round(Number(width) || state.width), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    const nextHeight = clamp(Math.round(Number(height) || state.height), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    if (nextWidth === state.width && nextHeight === state.height) {
+      updateCanvasResizeControls({ normalizeValues: true });
+      return false;
+    }
+
+    const previousWidth = state.width;
+    const previousHeight = state.height;
+    const scale = Number(state.scale) || MIN_ZOOM_SCALE;
+    beginHistory('resizeCanvas');
+    resizeAllLayers(nextWidth, nextHeight, {
+      offsetX: Math.round(Number(contentOffsetX) || 0),
+      offsetY: Math.round(Number(contentOffsetY) || 0),
+    });
+    state.width = nextWidth;
+    state.height = nextHeight;
+    translateMirrorPivotForCanvasResize(nextWidth, nextHeight, {
+      offsetX: Math.round(Number(contentOffsetX) || 0),
+      offsetY: Math.round(Number(contentOffsetY) || 0),
+    });
+    if (preserveAnchoredContent) {
+      const widthDelta = nextWidth - previousWidth;
+      const heightDelta = nextHeight - previousHeight;
+      state.pan.x = Math.round(
+        (Number(state.pan.x) || 0) + ((((widthDelta) / 2) - contentOffsetX) * scale)
+      );
+      state.pan.y = Math.round(
+        (Number(state.pan.y) || 0) + ((((heightDelta) / 2) - contentOffsetY) * scale)
+      );
+    }
+    if (dom.controls.canvasWidth instanceof HTMLInputElement) {
+      dom.controls.canvasWidth.value = String(nextWidth);
+    }
+    if (dom.controls.canvasHeight instanceof HTMLInputElement) {
+      dom.controls.canvasHeight.value = String(nextHeight);
+    }
+    markHistoryDirty();
+    resizeCanvases();
+    clearSelection();
+    requestRender();
+    requestOverlayRender();
+    commitHistory();
+    scheduleSessionPersist();
+    updateCanvasResizeControls({ normalizeValues: true });
+
+    if (restoreFocusInput instanceof HTMLInputElement && !restoreFocusInput.disabled && restoreFocusInput.isConnected) {
+      requestAnimationFrame(() => {
+        try {
+          restoreFocusInput.focus({ preventScroll: true });
+        } catch (error) {
+          restoreFocusInput.focus();
+        }
+        const valueLength = String(restoreFocusInput.value || '').length;
+        if (typeof restoreFocusInput.setSelectionRange === 'function') {
+          try {
+            restoreFocusInput.setSelectionRange(valueLength, valueLength);
+          } catch (error) {
+            // Ignore selection range errors for unsupported input types/browsers.
+          }
+        }
+      });
+    }
+    return true;
+  }
+
   function handleCanvasResizeRequest(options = {}) {
     const restoreFocusInput = options.restoreFocusInput instanceof HTMLInputElement
       ? options.restoreFocusInput
@@ -23342,25 +24492,7 @@
       restoreFocus();
       return;
     }
-
-    const previousWidth = state.width;
-    const previousHeight = state.height;
-    beginHistory('resizeCanvas');
-    resizeAllLayers(width, height);
-    state.width = width;
-    state.height = height;
-    rescaleMirrorPivotForCanvas(previousWidth, previousHeight, width, height);
-    dom.controls.canvasWidth.value = String(width);
-    dom.controls.canvasHeight.value = String(height);
-    markHistoryDirty();
-    resizeCanvases();
-    clearSelection();
-    requestRender();
-    requestOverlayRender();
-    commitHistory();
-    scheduleSessionPersist();
-    updateCanvasResizeControls({ normalizeValues: true });
-    restoreFocus();
+    applyCanvasResizeDimensions(width, height, { restoreFocusInput });
   }
 
   function setupNumberSteppers() {
@@ -23375,18 +24507,27 @@
     });
   }
 
-  function resizeAllLayers(width, height) {
+  function resizeAllLayers(width, height, { offsetX = 0, offsetY = 0 } = {}) {
+    const shiftX = Math.round(Number(offsetX) || 0);
+    const shiftY = Math.round(Number(offsetY) || 0);
     state.frames.forEach(frame => {
       frame.layers = frame.layers.map(layer => {
         const resized = createLayer(layer.name, width, height);
-        const minW = Math.min(width, state.width);
-        const minH = Math.min(height, state.height);
+        resized.id = layer.id;
         const sourceDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
         const targetDirect = sourceDirect ? ensureLayerDirect(resized, width, height) : null;
-        for (let y = 0; y < minH; y += 1) {
-          for (let x = 0; x < minW; x += 1) {
+        for (let y = 0; y < state.height; y += 1) {
+          const dstY = y + shiftY;
+          if (dstY < 0 || dstY >= height) {
+            continue;
+          }
+          for (let x = 0; x < state.width; x += 1) {
+            const dstX = x + shiftX;
+            if (dstX < 0 || dstX >= width) {
+              continue;
+            }
             const srcIdx = y * state.width + x;
-            const dstIdx = y * width + x;
+            const dstIdx = dstY * width + dstX;
             resized.indices[dstIdx] = layer.indices[srcIdx];
             if (sourceDirect && targetDirect) {
               const baseSrc = srcIdx * 4;
@@ -23551,94 +24692,12 @@
     setActiveTool(state.tool, toolButtons, { persist: false });
     updateVirtualCursorActionToolButtons();
 
-    dom.canvases.drawing.addEventListener('pointerdown', handlePointerDown);
-    dom.canvases.drawing.addEventListener('pointercancel', handlePointerCancel);
+    getProjectCanvasSurfaceEntries().forEach(surface => {
+      if (surface?.drawing instanceof HTMLCanvasElement) {
+        bindCanvasSurfaceInteractionEvents(surface.drawing);
+      }
+    });
     window.addEventListener('pointercancel', handlePointerCancel);
-    dom.canvases.drawing.addEventListener('pointermove', event => {
-      if (pointerState.active) return;
-      const controllingTouch = state.showVirtualCursor
-        && event.pointerType === 'touch'
-        && virtualCursorControl.pointerId === event.pointerId;
-      if (controllingTouch) {
-        event.preventDefault();
-        updateVirtualCursorFromControlDelta(event);
-        return;
-      }
-      updateVirtualCursorFromEvent(event);
-      const awaitingLineEnd = curveBuilder && curveBuilder.stage === 'line' && curveBuilder.awaitingEndPoint && curveBuilder.start;
-      const position = getPointerPosition(event);
-
-      if (awaitingLineEnd) {
-        let needsRender = false;
-        const start = curveBuilder.start;
-        if (start && position) {
-          const prev = pointerState.preview;
-          if (!prev || prev.end?.x !== position.x || prev.end?.y !== position.y) {
-            pointerState.preview = { start, end: position };
-            needsRender = true;
-          }
-          if (pointerState.tool !== 'curve') {
-            pointerState.tool = 'curve';
-            needsRender = true;
-          }
-          if (hoverPixel) {
-            hoverPixel = null;
-            needsRender = true;
-          }
-        } else {
-          if (pointerState.preview) {
-            pointerState.preview = null;
-            needsRender = true;
-          }
-          if (pointerState.tool === 'curve') {
-            pointerState.tool = null;
-            needsRender = true;
-          }
-          if (hoverPixel) {
-            hoverPixel = null;
-            needsRender = true;
-          }
-        }
-        if (needsRender) {
-          requestOverlayRender();
-        }
-        return;
-      }
-
-      if (pointerState.preview && pointerState.tool === 'curve') {
-        pointerState.preview = null;
-        pointerState.tool = null;
-        requestOverlayRender();
-      }
-
-      if (!position) {
-        if (hoverPixel) {
-          hoverPixel = null;
-          requestOverlayRender();
-        }
-        return;
-      }
-      if (!hoverPixel || hoverPixel.x !== position.x || hoverPixel.y !== position.y) {
-        hoverPixel = position;
-        requestOverlayRender();
-      }
-    });
-    dom.canvases.drawing.addEventListener('pointerleave', () => {
-      let needsRender = false;
-      if (hoverPixel) {
-        hoverPixel = null;
-        needsRender = true;
-      }
-      if (curveBuilder && curveBuilder.stage === 'line' && curveBuilder.awaitingEndPoint && pointerState.preview) {
-        pointerState.preview = null;
-        pointerState.tool = null;
-        needsRender = true;
-      }
-      if (needsRender) {
-        requestOverlayRender();
-      }
-    });
-    dom.canvases.drawing.addEventListener('contextmenu', event => event.preventDefault());
   }
 
   function setActiveTool(tool, buttons = toolButtons, options = {}) {
@@ -23774,7 +24833,89 @@
   }
 
   function canCurrentClientReindexPalette() {
+    if (isMultiPaletteIsolationEnabled()) {
+      return !isMultiSpectatorMode();
+    }
     return !isMultiGuestMode() && !isMultiSpectatorMode();
+  }
+
+  function announcePaletteReindexRestriction() {
+    if (isMultiSpectatorMode()) {
+      setMultiStatus(
+        localizeText(
+          '視聴モードではローカルパレットを変更できません',
+          'View-only mode cannot edit the local palette.'
+        ),
+        'warn'
+      );
+      return;
+    }
+    setMultiStatus(
+      localizeText(
+        'パレットの並び替えはマスターのみ実行できます',
+        'Only the master can reorder palette colors'
+      ),
+      'warn'
+    );
+  }
+
+  function forEachProjectCanvasLayer(visitor) {
+    if (typeof visitor !== 'function') {
+      return;
+    }
+    getProjectCanvasDocuments().forEach((canvasDoc, canvasIndex) => {
+      const frames = Array.isArray(canvasDoc?.frames) ? canvasDoc.frames : [];
+      frames.forEach((frame, frameIndex) => {
+        const layers = Array.isArray(frame?.layers) ? frame.layers : [];
+        layers.forEach((layer, layerIndex) => {
+          visitor({
+            canvasDoc,
+            canvasIndex,
+            frame,
+            frameIndex,
+            layer,
+            layerIndex,
+          });
+        });
+      });
+    });
+  }
+
+  function getSnapshotCanvasLikeDocuments(snapshot) {
+    if (Array.isArray(snapshot?.canvases) && snapshot.canvases.length) {
+      return snapshot.canvases;
+    }
+    if (Array.isArray(snapshot?.frames) && snapshot.frames.length) {
+      return [{
+        id: typeof snapshot?.activeCanvasId === 'string' ? snapshot.activeCanvasId : '',
+        width: snapshot?.width,
+        height: snapshot?.height,
+        frames: snapshot.frames,
+      }];
+    }
+    return [];
+  }
+
+  function forEachSnapshotCanvasLayer(snapshot, visitor) {
+    if (!snapshot || typeof snapshot !== 'object' || typeof visitor !== 'function') {
+      return;
+    }
+    getSnapshotCanvasLikeDocuments(snapshot).forEach((canvasDoc, canvasIndex) => {
+      const frames = Array.isArray(canvasDoc?.frames) ? canvasDoc.frames : [];
+      frames.forEach((frame, frameIndex) => {
+        const layers = Array.isArray(frame?.layers) ? frame.layers : [];
+        layers.forEach((layer, layerIndex) => {
+          visitor({
+            canvasDoc,
+            canvasIndex,
+            frame,
+            frameIndex,
+            layer,
+            layerIndex,
+          });
+        });
+      });
+    });
   }
 
   function syncPaletteReindexControlState() {
@@ -23815,6 +24956,28 @@
   function syncColorModeControls() {
     const currentMode = normalizeColorMode(state.colorMode, COLOR_MODE_INDEX);
     state.colorMode = currentMode;
+    const multiPaletteIsolation = isMultiPaletteIsolationEnabled();
+    if (dom.controls.colorModeIndexLabel instanceof HTMLElement) {
+      dom.controls.colorModeIndexLabel.textContent = multiPaletteIsolation
+        ? localizeText('ローカルインデックス', 'Local Indexed')
+        : localizeText('インデックスカラー', 'Indexed Color');
+    }
+    if (dom.controls.colorModeRgbLabel instanceof HTMLElement) {
+      dom.controls.colorModeRgbLabel.textContent = multiPaletteIsolation
+        ? localizeText('ローカルRGB', 'Local RGB')
+        : localizeText('RGBカラー', 'RGB Color');
+    }
+    if (dom.controls.colorModeHint instanceof HTMLElement) {
+      dom.controls.colorModeHint.textContent = multiPaletteIsolation
+        ? localizeText(
+          '共同制作中は色モードとパレットは各自ローカルです。既存ピクセルの色替えは行われません。',
+          'During collab, color mode and palette are local to each user. Existing pixels are not recolored.'
+        )
+        : localizeText(
+          'インデックスカラーとRGBカラーを切り替えます。',
+          'Switch between indexed color and RGB color.'
+        );
+    }
     if (Array.isArray(dom.controls.colorMode)) {
       dom.controls.colorMode.forEach(input => {
         if (!(input instanceof HTMLInputElement)) {
@@ -23875,10 +25038,16 @@
     if (dom.controls.sortPaletteValue instanceof HTMLButtonElement) {
       dom.controls.sortPaletteValue.disabled = !allowPaletteSorting;
     }
-    const paletteIndexField = document.getElementById('paletteIndexField');
+    const paletteIndexField = dom.controls.paletteIndexField;
     if (paletteIndexField instanceof HTMLElement) {
       paletteIndexField.hidden = !isIndexMode;
       paletteIndexField.setAttribute('aria-hidden', String(!isIndexMode));
+      const paletteIndexLabel = paletteIndexField.querySelector('span');
+      if (paletteIndexLabel instanceof HTMLElement) {
+        paletteIndexLabel.textContent = multiPaletteIsolation
+          ? localizeText('ローカル番号', 'Local Slot')
+          : localizeText('インデックス', 'Index');
+      }
     }
   }
 
@@ -23890,59 +25059,53 @@
     let convertedPixels = 0;
     let addedCount = 0;
     let touchedLayers = 0;
-    if (!Array.isArray(state.frames)) {
-      return { convertedPixels, addedCount, touchedLayers, paletteLookup };
-    }
-    state.frames.forEach(frame => {
-      const layers = Array.isArray(frame?.layers) ? frame.layers : [];
-      layers.forEach(layer => {
-        if (!(layer?.indices instanceof Int16Array)) {
-          return;
-        }
-        const indices = layer.indices;
-        const pixelCount = indices.length;
-        const expectedLength = pixelCount * 4;
-        const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length === expectedLength
-          ? layer.direct
-          : null;
-        if (!direct) {
-          layer.direct = null;
-          return;
-        }
-        let layerTouched = false;
-        for (let i = 0; i < pixelCount; i += 1) {
-          if (indices[i] >= 0) {
-            continue;
-          }
-          const base = i * 4;
-          const alpha = direct[base + 3];
-          if (alpha <= 0) {
-            continue;
-          }
-          const r = direct[base];
-          const g = direct[base + 1];
-          const b = direct[base + 2];
-          const key = `${r},${g},${b},${alpha}`;
-          let mappedIndex = paletteLookup.get(key);
-          if (!Number.isInteger(mappedIndex) || mappedIndex < 0) {
-            mappedIndex = state.palette.length;
-            state.palette.push({ r, g, b, a: alpha });
-            paletteLookup.set(key, mappedIndex);
-            addedCount += 1;
-          }
-          indices[i] = mappedIndex;
-          direct[base] = 0;
-          direct[base + 1] = 0;
-          direct[base + 2] = 0;
-          direct[base + 3] = 0;
-          convertedPixels += 1;
-          layerTouched = true;
-        }
-        if (layerTouched) {
-          touchedLayers += 1;
-        }
+    forEachProjectCanvasLayer(({ layer }) => {
+      if (!(layer?.indices instanceof Int16Array)) {
+        return;
+      }
+      const indices = layer.indices;
+      const pixelCount = indices.length;
+      const expectedLength = pixelCount * 4;
+      const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length === expectedLength
+        ? layer.direct
+        : null;
+      if (!direct) {
         layer.direct = null;
-      });
+        return;
+      }
+      let layerTouched = false;
+      for (let i = 0; i < pixelCount; i += 1) {
+        if (indices[i] >= 0) {
+          continue;
+        }
+        const base = i * 4;
+        const alpha = direct[base + 3];
+        if (alpha <= 0) {
+          continue;
+        }
+        const r = direct[base];
+        const g = direct[base + 1];
+        const b = direct[base + 2];
+        const key = `${r},${g},${b},${alpha}`;
+        let mappedIndex = paletteLookup.get(key);
+        if (!Number.isInteger(mappedIndex) || mappedIndex < 0) {
+          mappedIndex = state.palette.length;
+          state.palette.push({ r, g, b, a: alpha });
+          paletteLookup.set(key, mappedIndex);
+          addedCount += 1;
+        }
+        indices[i] = mappedIndex;
+        direct[base] = 0;
+        direct[base + 1] = 0;
+        direct[base + 2] = 0;
+        direct[base + 3] = 0;
+        convertedPixels += 1;
+        layerTouched = true;
+      }
+      if (layerTouched) {
+        touchedLayers += 1;
+      }
+      layer.direct = null;
     });
     return { convertedPixels, addedCount, touchedLayers, paletteLookup };
   }
@@ -23951,48 +25114,42 @@
     const palette = Array.isArray(state.palette) ? state.palette : [];
     let convertedPixels = 0;
     let touchedLayers = 0;
-    if (!Array.isArray(state.frames)) {
-      return { convertedPixels, touchedLayers };
-    }
-    state.frames.forEach(frame => {
-      const layers = Array.isArray(frame?.layers) ? frame.layers : [];
-      layers.forEach(layer => {
-        if (!(layer?.indices instanceof Int16Array)) {
-          return;
+    forEachProjectCanvasLayer(({ canvasDoc, layer }) => {
+      if (!(layer?.indices instanceof Int16Array)) {
+        return;
+      }
+      const indices = layer.indices;
+      if (!indices.length) {
+        return;
+      }
+      const direct = ensureLayerDirect(layer, canvasDoc?.width, canvasDoc?.height);
+      let layerTouched = false;
+      for (let i = 0; i < indices.length; i += 1) {
+        const paletteIndex = indices[i];
+        if (paletteIndex < 0) {
+          continue;
         }
-        const indices = layer.indices;
-        if (!indices.length) {
-          return;
+        const base = i * 4;
+        const paletteColor = palette[paletteIndex];
+        if (paletteColor) {
+          const normalized = normalizeColorValue(paletteColor);
+          direct[base] = normalized.r;
+          direct[base + 1] = normalized.g;
+          direct[base + 2] = normalized.b;
+          direct[base + 3] = normalized.a;
+        } else {
+          direct[base] = 0;
+          direct[base + 1] = 0;
+          direct[base + 2] = 0;
+          direct[base + 3] = 0;
         }
-        const direct = ensureLayerDirect(layer);
-        let layerTouched = false;
-        for (let i = 0; i < indices.length; i += 1) {
-          const paletteIndex = indices[i];
-          if (paletteIndex < 0) {
-            continue;
-          }
-          const base = i * 4;
-          const paletteColor = palette[paletteIndex];
-          if (paletteColor) {
-            const normalized = normalizeColorValue(paletteColor);
-            direct[base] = normalized.r;
-            direct[base + 1] = normalized.g;
-            direct[base + 2] = normalized.b;
-            direct[base + 3] = normalized.a;
-          } else {
-            direct[base] = 0;
-            direct[base + 1] = 0;
-            direct[base + 2] = 0;
-            direct[base + 3] = 0;
-          }
-          indices[i] = -1;
-          convertedPixels += 1;
-          layerTouched = true;
-        }
-        if (layerTouched) {
-          touchedLayers += 1;
-        }
-      });
+        indices[i] = -1;
+        convertedPixels += 1;
+        layerTouched = true;
+      }
+      if (layerTouched) {
+        touchedLayers += 1;
+      }
     });
     return { convertedPixels, touchedLayers };
   }
@@ -24204,6 +25361,18 @@
       focusUnifiedLeftContext('color', { persist: false });
       if (persist) {
         scheduleSessionPersist();
+        updateAutosaveStatus(
+          nextMode === COLOR_MODE_INDEX
+            ? localizeText(
+              '共同制作中のインデックスはローカル専用です。既存ピクセルの色替えは行いません。',
+              'Indexed mode is local-only during collab. Existing pixels are not recolored.'
+            )
+            : localizeText(
+              '共同制作中のRGBはローカル専用です。描画結果だけが共有されます。',
+              'RGB mode is local-only during collab. Only painted results are shared.'
+            ),
+          'info'
+        );
       }
       return true;
     }
@@ -24445,94 +25614,88 @@
       : [{ r: 0, g: 0, b: 0, a: 0 }];
     let remappedPixels = 0;
     let touchedLayers = 0;
-    if (!Array.isArray(state.frames)) {
-      return { remappedPixels, touchedLayers };
-    }
-    state.frames.forEach(frame => {
-      const layers = Array.isArray(frame?.layers) ? frame.layers : [];
-      layers.forEach(layer => {
-        if (!(layer?.indices instanceof Int16Array)) {
-          return;
-        }
-        const indices = layer.indices;
-        const pixelCount = indices.length;
-        if (!pixelCount) {
-          return;
-        }
-        const hasDirect = layer.direct instanceof Uint8ClampedArray
-          && layer.direct.length === pixelCount * 4;
-        const direct = hasDirect ? layer.direct : null;
-        const nextDirect = mode === COLOR_MODE_RGB
-          ? ensureLayerDirect(layer)
-          : null;
-        let layerTouched = false;
-        for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
-          const paletteIndex = indices[pixelIndex];
-          let sourceColor = null;
-          if (paletteIndex >= 0) {
-            sourceColor = oldPalette[paletteIndex]
-              ? normalizeColorValue(oldPalette[paletteIndex])
-              : { r: 0, g: 0, b: 0, a: 0 };
-          } else if (direct) {
-            const base = pixelIndex * 4;
-            const alpha = direct[base + 3];
-            if (alpha > 0) {
-              sourceColor = {
-                r: direct[base],
-                g: direct[base + 1],
-                b: direct[base + 2],
-                a: alpha,
-              };
-            }
+    forEachProjectCanvasLayer(({ canvasDoc, layer }) => {
+      if (!(layer?.indices instanceof Int16Array)) {
+        return;
+      }
+      const indices = layer.indices;
+      const pixelCount = indices.length;
+      if (!pixelCount) {
+        return;
+      }
+      const hasDirect = layer.direct instanceof Uint8ClampedArray
+        && layer.direct.length === pixelCount * 4;
+      const direct = hasDirect ? layer.direct : null;
+      const nextDirect = mode === COLOR_MODE_RGB
+        ? ensureLayerDirect(layer, canvasDoc?.width, canvasDoc?.height)
+        : null;
+      let layerTouched = false;
+      for (let pixelIndex = 0; pixelIndex < pixelCount; pixelIndex += 1) {
+        const paletteIndex = indices[pixelIndex];
+        let sourceColor = null;
+        if (paletteIndex >= 0) {
+          sourceColor = oldPalette[paletteIndex]
+            ? normalizeColorValue(oldPalette[paletteIndex])
+            : { r: 0, g: 0, b: 0, a: 0 };
+        } else if (direct) {
+          const base = pixelIndex * 4;
+          const alpha = direct[base + 3];
+          if (alpha > 0) {
+            sourceColor = {
+              r: direct[base],
+              g: direct[base + 1],
+              b: direct[base + 2],
+              a: alpha,
+            };
           }
-          if (!sourceColor) {
-            if (mode === COLOR_MODE_INDEX) {
-              indices[pixelIndex] = -1;
-            } else if (nextDirect instanceof Uint8ClampedArray) {
-              const base = pixelIndex * 4;
-              nextDirect[base] = 0;
-              nextDirect[base + 1] = 0;
-              nextDirect[base + 2] = 0;
-              nextDirect[base + 3] = 0;
-              indices[pixelIndex] = -1;
-            }
-            continue;
-          }
-          const mappedIndex = findNearestPaletteColorIndexByRgba(sourceColor, newPalette, 0);
-          const mappedColor = normalizeColorValue(newPalette[mappedIndex] || newPalette[0]);
+        }
+        if (!sourceColor) {
           if (mode === COLOR_MODE_INDEX) {
-            if (indices[pixelIndex] !== mappedIndex) {
-              indices[pixelIndex] = mappedIndex;
-              layerTouched = true;
-            } else if (paletteIndex < 0) {
-              indices[pixelIndex] = mappedIndex;
-              layerTouched = true;
-            }
+            indices[pixelIndex] = -1;
           } else if (nextDirect instanceof Uint8ClampedArray) {
             const base = pixelIndex * 4;
-            const same = nextDirect[base] === mappedColor.r
-              && nextDirect[base + 1] === mappedColor.g
-              && nextDirect[base + 2] === mappedColor.b
-              && nextDirect[base + 3] === mappedColor.a
-              && indices[pixelIndex] < 0;
-            if (!same) {
-              nextDirect[base] = mappedColor.r;
-              nextDirect[base + 1] = mappedColor.g;
-              nextDirect[base + 2] = mappedColor.b;
-              nextDirect[base + 3] = mappedColor.a;
-              indices[pixelIndex] = -1;
-              layerTouched = true;
-            }
+            nextDirect[base] = 0;
+            nextDirect[base + 1] = 0;
+            nextDirect[base + 2] = 0;
+            nextDirect[base + 3] = 0;
+            indices[pixelIndex] = -1;
           }
-          remappedPixels += 1;
+          continue;
         }
+        const mappedIndex = findNearestPaletteColorIndexByRgba(sourceColor, newPalette, 0);
+        const mappedColor = normalizeColorValue(newPalette[mappedIndex] || newPalette[0]);
         if (mode === COLOR_MODE_INDEX) {
-          layer.direct = null;
+          if (indices[pixelIndex] !== mappedIndex) {
+            indices[pixelIndex] = mappedIndex;
+            layerTouched = true;
+          } else if (paletteIndex < 0) {
+            indices[pixelIndex] = mappedIndex;
+            layerTouched = true;
+          }
+        } else if (nextDirect instanceof Uint8ClampedArray) {
+          const base = pixelIndex * 4;
+          const same = nextDirect[base] === mappedColor.r
+            && nextDirect[base + 1] === mappedColor.g
+            && nextDirect[base + 2] === mappedColor.b
+            && nextDirect[base + 3] === mappedColor.a
+            && indices[pixelIndex] < 0;
+          if (!same) {
+            nextDirect[base] = mappedColor.r;
+            nextDirect[base + 1] = mappedColor.g;
+            nextDirect[base + 2] = mappedColor.b;
+            nextDirect[base + 3] = mappedColor.a;
+            indices[pixelIndex] = -1;
+            layerTouched = true;
+          }
         }
-        if (layerTouched) {
-          touchedLayers += 1;
-        }
-      });
+        remappedPixels += 1;
+      }
+      if (mode === COLOR_MODE_INDEX) {
+        layer.direct = null;
+      }
+      if (layerTouched) {
+        touchedLayers += 1;
+      }
     });
     return { remappedPixels, touchedLayers };
   }
@@ -24733,7 +25896,7 @@
       return false;
     }
     if (!canCurrentClientReindexPalette()) {
-      setMultiStatus(localizeText('パレットの並び替えはマスターのみ実行できます', 'Only the master can reorder palette colors'), 'warn');
+      announcePaletteReindexRestriction();
       return false;
     }
     const step = Math.round(Number(delta) || 0);
@@ -24914,7 +26077,7 @@
         return;
       }
       if (!canCurrentClientReindexPalette()) {
-        setMultiStatus(localizeText('パレットの削除はマスターのみ実行できます', 'Only the master can remove palette colors'), 'warn');
+        announcePaletteReindexRestriction();
         return;
       }
       if (state.palette.length <= 1) return;
@@ -24937,7 +26100,7 @@
       }
       if (!canCurrentClientReindexPalette()) {
         dom.controls.paletteIndex.value = String(state.activePaletteIndex);
-        setMultiStatus(localizeText('パレットの並び替えはマスターのみ実行できます', 'Only the master can reorder palette colors'), 'warn');
+        announcePaletteReindexRestriction();
         return;
       }
       const target = clamp(Number(dom.controls.paletteIndex.value), 0, state.palette.length - 1);
@@ -25189,16 +26352,14 @@
 
   function remapPaletteIndices(mapping) {
     if (!mapping) return;
-    state.frames.forEach(frame => {
-      frame.layers.forEach(layer => {
-        const length = layer.indices.length;
-        for (let i = 0; i < length; i += 1) {
-          const oldIndex = layer.indices[i];
-          if (oldIndex < 0) continue;
-          const next = mapping[oldIndex];
-          layer.indices[i] = typeof next === 'number' && next >= 0 ? next : -1;
-        }
-      });
+    forEachProjectCanvasLayer(({ layer }) => {
+      const length = layer.indices.length;
+      for (let i = 0; i < length; i += 1) {
+        const oldIndex = layer.indices[i];
+        if (oldIndex < 0) continue;
+        const next = mapping[oldIndex];
+        layer.indices[i] = typeof next === 'number' && next >= 0 ? next : -1;
+      }
     });
     state.activePaletteIndex = normalizePaletteIndex(
       mapping[state.activePaletteIndex],
@@ -25218,6 +26379,7 @@
     }
     markHistoryDirty();
     requestRender();
+    renderAllProjectCanvasSurfaces();
     requestOverlayRender();
     scheduleSessionPersist();
     updateColorTabSwatch();
@@ -25623,9 +26785,17 @@
     if (!(multiState.assignments instanceof Map) || !multiState.assignments.size) {
       return map;
     }
+    const canvasDoc = getActiveProjectCanvasDocument();
+    if (!canvasDoc) {
+      return map;
+    }
     multiState.assignments.forEach((assignment, clientId) => {
-      const frameIndex = getAssignedFrameIndexForClient(clientId);
-      const layerIndex = getAssignedLayerTrackIndexForClient(clientId);
+      const assignedCell = getAssignedCellForClientOnCanvas(clientId, canvasDoc);
+      if (!assignedCell) {
+        return;
+      }
+      const frameIndex = assignedCell.frameIndex;
+      const layerIndex = assignedCell.trackIndex;
       if (!hasTimelineLayerIndex(frameIndex, layerIndex)) {
         return;
       }
@@ -27404,6 +28574,14 @@
           return;
         }
         if (isMultiAssignedCellRestrictedEditorMode()) {
+          if (isMultiGuestMode() && Number.isFinite(layerIndex) && layerIndex >= 0) {
+            requestMultiGuestMoveToCell(state.activeFrame, layerIndex).catch(() => {});
+            clearTimelineSelection();
+            scheduleSessionPersist();
+            renderTimelineMatrix();
+            requestOverlayRender();
+            return;
+          }
           enforceGuestAssignedLayerSelection({ announce: true });
           clearTimelineSelection();
           scheduleSessionPersist();
@@ -27429,11 +28607,27 @@
         const currentFrame = getActiveFrame();
         const currentLayers = currentFrame ? currentFrame.layers.slice().reverse() : [];
         const activeLayerRow = currentLayers.findIndex(layer => layer.id === state.activeLayer);
-        state.activeFrame = frameIndex;
         setTimelineFrameSelection(frameIndex, { append: event.shiftKey });
         if (isMultiAssignedCellRestrictedEditorMode()) {
+          if (isMultiGuestMode()) {
+            const candidateLayers = state.frames[frameIndex]?.layers?.slice().reverse() || [];
+            const nextLayer = candidateLayers[activeLayerRow] || candidateLayers[candidateLayers.length - 1] || candidateLayers[0];
+            const nextTrackIndex = nextLayer
+              ? (state.frames[frameIndex]?.layers?.findIndex(layer => layer?.id === nextLayer.id) ?? -1)
+              : -1;
+            if (nextTrackIndex >= 0) {
+              requestMultiGuestMoveToCell(frameIndex, nextTrackIndex).catch(() => {});
+              scheduleSessionPersist();
+              renderTimelineMatrix();
+              requestRender();
+              requestOverlayRender();
+              return;
+            }
+          }
+          state.activeFrame = frameIndex;
           enforceGuestAssignedLayerSelection({ announce: false });
         } else {
+          state.activeFrame = frameIndex;
           const candidateLayers = state.frames[frameIndex]?.layers?.slice().reverse() || [];
           const nextLayer = candidateLayers[activeLayerRow] || candidateLayers[candidateLayers.length - 1] || candidateLayers[0];
           if (nextLayer) {
@@ -27454,8 +28648,17 @@
         if (!Number.isFinite(frameIndex) || !Number.isFinite(layerIndex) || !layerId || frameIndex < 0 || frameIndex >= state.frames.length) {
           return;
         }
-        state.activeFrame = frameIndex;
         if (isMultiAssignedCellRestrictedEditorMode()) {
+          if (isMultiGuestMode()) {
+            requestMultiGuestMoveToCell(frameIndex, layerIndex).catch(() => {});
+            clearTimelineSelection();
+            scheduleSessionPersist();
+            renderTimelineMatrix();
+            requestRender();
+            requestOverlayRender();
+            return;
+          }
+          state.activeFrame = frameIndex;
           enforceGuestAssignedLayerSelection({ announce: true });
           clearTimelineSelection();
           scheduleSessionPersist();
@@ -27464,6 +28667,7 @@
           requestOverlayRender();
           return;
         }
+        state.activeFrame = frameIndex;
         state.activeLayer = layerId;
         if (event.shiftKey) {
           setTimelineSlotSelection(frameIndex, layerIndex, { append: true });
@@ -27574,6 +28778,9 @@
     const isFrameSelectionMode = timelineSelection.mode === TIMELINE_SELECTION_MODE_FRAME;
     const isSlotSelectionMode = timelineSelection.mode === TIMELINE_SELECTION_MODE_SLOT;
     const multiAssignmentCellMap = buildMultiAssignmentTimelineCellMap();
+    const guestMoveMode = isMultiAssignedCellRestrictedEditorMode()
+      ? (canCurrentGuestFreelyMoveAssignedCell() ? 'free' : 'request')
+      : 'none';
 
     const reversedLayersByFrame = frames.map(frame => frame.layers.slice().reverse());
     const activeLayers = reversedLayersByFrame[activeFrameIndex];
@@ -27608,6 +28815,7 @@
     } else {
       timelineKeyParts.push('sel:none');
     }
+    timelineKeyParts.push(`gm:${guestMoveMode}`);
     if (multiAssignmentCellMap.size) {
       const assignmentKey = Array.from(multiAssignmentCellMap.entries())
         .map(([cellKey, value]) => `${cellKey}:${value.clientId}:${value.locked ? 1 : 0}`)
@@ -27698,6 +28906,17 @@
       button.dataset.timelineFrameIndex = String(frameIndex);
       const frameNumberMatch = String(frame.name).match(/(\d+)/);
       button.textContent = frameNumberMatch && frameNumberMatch[1] ? frameNumberMatch[1] : String(frameIndex + 1);
+      if (guestMoveMode === 'free') {
+        button.title = localizeText(
+          `クリックで フレーム ${frameIndex + 1} へ移動`,
+          `Click to move to Frame ${frameIndex + 1}`
+        );
+      } else if (guestMoveMode === 'request') {
+        button.title = localizeText(
+          `クリックで フレーム ${frameIndex + 1} への移動許可を申請`,
+          `Click to request moving to Frame ${frameIndex + 1}`
+        );
+      }
 
       header.appendChild(button);
       applyTimelineSlotFrame(button, frameIndex === activeFrameIndex ? 'active' : 'default');
@@ -27774,6 +28993,17 @@
         tag.dataset.timelineLayerIndex = String(layerTrackIndex);
         tag.disabled = isMultiReadOnlyMode();
         tag.textContent = labelName;
+        if (guestMoveMode === 'free') {
+          tag.title = localizeText(
+            `クリックで レイヤー ${labelName} へ移動`,
+            `Click to move to Layer ${labelName}`
+          );
+        } else if (guestMoveMode === 'request') {
+          tag.title = localizeText(
+            `クリックで レイヤー ${labelName} への移動許可を申請`,
+            `Click to request moving to Layer ${labelName}`
+          );
+        }
         rowHeader.appendChild(tag);
       } else {
         rowVisibilityCell.classList.add('is-placeholder');
@@ -27906,6 +29136,17 @@
               ? localizeText(`担当: ${assignedUserName}${assignedUserLockLabel}`, `Assignee: ${assignedUserName}${assignedUserLockLabel}`)
               : (assignedUser?.locked ? localizeText('担当セル: ロック中', 'Assigned cell: Locked') : '');
           }
+          if (guestMoveMode === 'free') {
+            slot.title = localizeText(
+              `${slotLabel} / クリックで即移動`,
+              `${slotLabel} / Click to move immediately`
+            );
+          } else if (guestMoveMode === 'request') {
+            slot.title = localizeText(
+              `${slotLabel} / クリックで移動許可を申請`,
+              `${slotLabel} / Click to request move permission`
+            );
+          }
           if (frameIndex === activeFrameIndex && targetLayer.id === state.activeLayer) {
             slot.classList.add('is-active');
             cell.classList.add('is-active-cell');
@@ -27970,6 +29211,8 @@
     setupFloatingMovePad();
     setupSelectionTransformMenu();
     setupFloatingPreviewPanel();
+    setupLocalViewportCanvasDock();
+    setupCanvasResizeHandle();
     const gestureSurface = dom.stage || dom.canvasViewport;
     if (dom.canvasViewport) {
       dom.canvasViewport.addEventListener('pointerenter', handleViewportPointerEnter);
@@ -28014,15 +29257,14 @@
   }
 
   function ensureCanvasWheelListener() {
-    if (canvasWheelListenerBound) {
-      return;
-    }
-    const stack = dom.canvases.stack;
-    if (!stack) {
-      return;
-    }
-    stack.addEventListener('wheel', handleCanvasWheel, { passive: false });
-    canvasWheelListenerBound = true;
+    getProjectCanvasSurfaceEntries().forEach(surface => {
+      const stack = surface?.stack;
+      if (!(stack instanceof HTMLElement) || stack.dataset.wheelBound === 'true') {
+        return;
+      }
+      stack.dataset.wheelBound = 'true';
+      stack.addEventListener('wheel', handleCanvasWheel, { passive: false });
+    });
   }
 
   function getVirtualCursorCellPosition(cursor = virtualCursor) {
@@ -28244,10 +29486,6 @@
     }
     const activeTool = state.tool;
     if (!VIRTUAL_CURSOR_SUPPORTED_TOOLS.has(activeTool)) {
-      return false;
-    }
-    if (isResidentMultiToolRestrictedMode() && !isResidentMultiToolAllowed(activeTool)) {
-      setMultiStatus(localizeText('このキャンバスでは範囲選択・移動系ツールは無効です', 'Selection and move tools are disabled in this canvas'), 'warn');
       return false;
     }
     const cell = getVirtualCursorCellPosition();
@@ -28650,7 +29888,8 @@
   }
 
   function getClampedPointerPosition(event) {
-    const drawing = dom.canvases.drawing;
+    const metrics = getCanvasInteractionSurfaceMetrics(event?.target || null);
+    const drawing = metrics.surface?.drawing instanceof HTMLCanvasElement ? metrics.surface.drawing : dom.canvases.drawing;
     if (!drawing) {
       return null;
     }
@@ -28663,8 +29902,8 @@
     if (!Number.isFinite(relativeX) || !Number.isFinite(relativeY)) {
       return null;
     }
-    const x = relativeX * state.width;
-    const y = relativeY * state.height;
+    const x = relativeX * metrics.width;
+    const y = relativeY * metrics.height;
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
       return null;
     }
@@ -28966,12 +30205,6 @@
       }
       return false;
     }
-    if (isResidentMultiToolRestrictedMode()) {
-      if (announce) {
-        setMultiStatus(localizeText('このキャンバスでは範囲選択・移動系ツールは無効です', 'Selection and move tools are disabled in this canvas'), 'warn');
-      }
-      return false;
-    }
     if (isMultiAssignedCellRestrictedEditorMode() && !enforceGuestAssignedLayerSelection({ announce })) {
       return false;
     }
@@ -29062,12 +30295,6 @@
     if (isMultiSpectatorMode()) {
       if (announce) {
         setMultiStatus(localizeText('視聴モードでは描画できません', 'Drawing is disabled in viewer mode'), 'warn');
-      }
-      return false;
-    }
-    if (isResidentMultiToolRestrictedMode()) {
-      if (announce) {
-        setMultiStatus(localizeText('このキャンバスでは範囲選択・移動系ツールは無効です', 'Selection and move tools are disabled in this canvas'), 'warn');
       }
       return false;
     }
@@ -29538,6 +30765,1472 @@
       window.visualViewport.addEventListener('scroll', handleFloatingPreviewPanelViewportChange);
     }
     syncFloatingPreviewPanelVisibility({ persist: false });
+  }
+
+  function getLocalViewportCanvasCount() {
+    if (!MULTI_CANVAS_FEATURE_ENABLED) {
+      localViewportCanvasState = normalizeLocalViewportCanvasState(
+        LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE,
+        LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
+      );
+      return 0;
+    }
+    const count = Math.max(0, getProjectCanvasCount() - 1);
+    localViewportCanvasState = normalizeLocalViewportCanvasState(
+      { ...localViewportCanvasState, count },
+      localViewportCanvasState
+    );
+    return count;
+  }
+
+  function setLocalViewportCanvasLayoutAnchor(left, top) {
+    const nextState = normalizeLocalViewportCanvasState(
+      {
+        ...localViewportCanvasState,
+        anchorLeft: left,
+        anchorTop: top,
+      },
+      localViewportCanvasState
+    );
+    if (
+      nextState.anchorLeft === localViewportCanvasState.anchorLeft
+      && nextState.anchorTop === localViewportCanvasState.anchorTop
+    ) {
+      return false;
+    }
+    localViewportCanvasState = nextState;
+    return true;
+  }
+
+  function getProjectCanvasDocuments() {
+    if (!Array.isArray(projectCanvasStore.canvases) || !projectCanvasStore.canvases.length) {
+      const fallback = createProjectCanvasDocument({}, { clonePixelData: false, fallbackIndex: 1 });
+      projectCanvasStore.canvases = [fallback];
+      projectCanvasStore.activeCanvasId = fallback.id;
+    } else if (!MULTI_CANVAS_FEATURE_ENABLED && projectCanvasStore.canvases.length > 1) {
+      const collapsed = collapseToSingleProjectCanvasSource(
+        projectCanvasStore.canvases,
+        projectCanvasStore.activeCanvasId
+      );
+      projectCanvasStore.canvases = collapsed.map((canvas, index) => createProjectCanvasDocument(canvas, {
+        clonePixelData: true,
+        fallbackIndex: index + 1,
+      }));
+      projectCanvasStore.activeCanvasId = projectCanvasStore.canvases[0]?.id || '';
+    }
+    return projectCanvasStore.canvases;
+  }
+
+  function getProjectCanvasCount() {
+    return getProjectCanvasDocuments().length;
+  }
+
+  function getProjectCanvasDocumentAt(index) {
+    const canvases = getProjectCanvasDocuments();
+    const safeIndex = clamp(Math.round(Number(index) || 0), 0, Math.max(0, canvases.length - 1));
+    return canvases[safeIndex] || null;
+  }
+
+  function getProjectCanvasDocumentById(canvasId) {
+    if (typeof canvasId !== 'string' || !canvasId) {
+      return null;
+    }
+    return getProjectCanvasDocuments().find(canvas => canvas?.id === canvasId) || null;
+  }
+
+  function getActiveProjectCanvasDocument() {
+    return getProjectCanvasDocumentById(projectCanvasStore.activeCanvasId) || getProjectCanvasDocumentAt(0);
+  }
+
+  function getActiveProjectCanvasIndex() {
+    const activeId = getActiveProjectCanvasDocument()?.id || '';
+    return Math.max(0, getProjectCanvasDocuments().findIndex(canvas => canvas?.id === activeId));
+  }
+
+  function getProjectCanvasViewScale(canvasDoc, fallback = null) {
+    const safeFallback = Number.isFinite(Number(fallback))
+      ? Number(fallback)
+      : (Number(state.scale) || 8);
+    return normalizeProjectCanvasViewScale(canvasDoc?.viewScale, safeFallback);
+  }
+
+  function getProjectCanvasDisplayScale(canvasDoc) {
+    return normalizeProjectCanvasViewScale(state.scale, getProjectCanvasViewScale(canvasDoc, state.scale || 8));
+  }
+
+  function storeProjectCanvasViewScale(canvasDoc, scale = state.scale) {
+    const normalizedScale = normalizeProjectCanvasViewScale(scale, state.scale || 8);
+    const canvases = getProjectCanvasDocuments();
+    if (!canvases.length) {
+      return;
+    }
+    canvases.forEach(doc => {
+      if (doc) {
+        doc.viewScale = normalizedScale;
+      }
+    });
+  }
+
+  function syncActiveProjectCanvasViewScale() {
+    storeProjectCanvasViewScale(getActiveProjectCanvasDocument(), state.scale);
+  }
+
+  function replaceProjectCanvasDocuments(canvases, activeCanvasId = '') {
+    const sourceCanvases = collapseToSingleProjectCanvasSource(canvases, activeCanvasId);
+    projectCanvasStore.canvases = sourceCanvases.map((canvas, index) => createProjectCanvasDocument(canvas, {
+      clonePixelData: true,
+      fallbackIndex: index + 1,
+    }));
+    const nextActive = projectCanvasStore.canvases.find(canvas => canvas?.id === activeCanvasId) || projectCanvasStore.canvases[0];
+    projectCanvasStore.activeCanvasId = nextActive?.id || projectCanvasStore.canvases[0]?.id || '';
+    const activeIndex = getActiveProjectCanvasIndex();
+    localViewportCanvasState = normalizeLocalViewportCanvasState(
+      {
+        ...localViewportCanvasState,
+        count: Math.max(0, projectCanvasStore.canvases.length - 1),
+        selectedKind: activeIndex === 0 ? 'main' : 'local',
+        selectedIndex: activeIndex > 0 ? activeIndex - 1 : -1,
+      },
+      localViewportCanvasState
+    );
+    const sharedScale = normalizeProjectCanvasViewScale(nextActive?.viewScale, state.scale || MIN_ZOOM_SCALE);
+    projectCanvasStore.canvases.forEach(canvas => {
+      if (canvas) {
+        canvas.viewScale = sharedScale;
+      }
+    });
+    pruneMultiHistoryCanvases();
+    pruneTimelapseTracksToExistingCanvases();
+    committedProjectCanvasId = getActiveProjectCanvasDocument()?.id || committedProjectCanvasId || '';
+    hoveredProjectCanvasId = '';
+  }
+
+  function createBlankProjectCanvasDocument(sourceCanvas = getActiveProjectCanvasDocument(), index = getProjectCanvasCount() + 1) {
+    const width = Math.max(1, Math.round(Number(sourceCanvas?.width) || Number(state.width) || DEFAULT_CANVAS_SIZE));
+    const height = Math.max(1, Math.round(Number(sourceCanvas?.height) || Number(state.height) || DEFAULT_CANVAS_SIZE));
+    const layer = createLayer(getDefaultLayerName(1), width, height);
+    const frame = createFrame(getDefaultFrameName(1), [layer], width, height, { copyPixels: false });
+    return createProjectCanvasDocument({
+      name: getDefaultProjectCanvasName(index),
+      width,
+      height,
+      viewScale: normalizeProjectCanvasViewScale(state.scale, state.scale || 8),
+      frames: [frame],
+      activeFrame: 0,
+      activeLayer: frame.layers[frame.layers.length - 1]?.id || null,
+    }, { clonePixelData: false, fallbackIndex: index });
+  }
+
+  function ensureCanvasSurfaceContexts(surface) {
+    if (!surface) {
+      return;
+    }
+    if (surface.drawing instanceof HTMLCanvasElement && !surface.drawingCtx) {
+      surface.drawingCtx = surface.drawing.getContext('2d', { willReadFrequently: true }) || surface.drawing.getContext('2d');
+      if (surface.drawingCtx) surface.drawingCtx.imageSmoothingEnabled = false;
+    }
+    if (surface.overlay instanceof HTMLCanvasElement && !surface.overlayCtx) {
+      surface.overlayCtx = surface.overlay.getContext('2d', { willReadFrequently: true }) || surface.overlay.getContext('2d');
+      if (surface.overlayCtx) surface.overlayCtx.imageSmoothingEnabled = false;
+    }
+    if (surface.selection instanceof HTMLCanvasElement && !surface.selectionCtx) {
+      surface.selectionCtx = surface.selection.getContext('2d', { willReadFrequently: true }) || surface.selection.getContext('2d');
+      if (surface.selectionCtx) surface.selectionCtx.imageSmoothingEnabled = false;
+    }
+  }
+
+  function bindActiveCanvasSurface(surface) {
+    const resolvedSurface = surface || mainViewportCanvasSurface;
+    syncProjectCanvasSurfaceDocumentRefs();
+    ensureCanvasSurfaceContexts(resolvedSurface);
+    activeCanvasSurface = resolvedSurface;
+    const resolvedCanvasDoc = resolvedSurface.kind === 'local'
+      ? getProjectCanvasDocumentForEntry(resolvedSurface)
+      : getProjectCanvasDocumentAt(0);
+    resolvedSurface.canvasDoc = resolvedCanvasDoc;
+    resolvedSurface.canvasDocId = resolvedCanvasDoc?.id || '';
+    if (resolvedSurface.stack instanceof HTMLElement) {
+      resolvedSurface.stack.style.transform = 'none';
+    }
+    dom.canvases.stack = resolvedSurface.stack;
+    dom.canvases.drawing = resolvedSurface.drawing;
+    dom.canvases.overlay = resolvedSurface.overlay;
+    dom.canvases.selection = resolvedSurface.selection;
+    ctx.drawing = resolvedSurface.drawingCtx;
+    ctx.overlay = resolvedSurface.overlayCtx;
+    ctx.selection = resolvedSurface.selectionCtx;
+    updateCanvasResizeHandlePosition();
+    syncCanvasResizeHandleVisibility();
+  }
+
+  function bindCanvasSurfaceInteractionEvents(canvas) {
+    if (!(canvas instanceof HTMLCanvasElement) || canvas.dataset.pointerBinding === 'true') {
+      return;
+    }
+    canvas.dataset.pointerBinding = 'true';
+    canvas.addEventListener('pointerdown', handlePointerDown);
+    canvas.addEventListener('pointercancel', handlePointerCancel);
+    canvas.addEventListener('pointermove', event => {
+      let needsRender = false;
+      if (!pointerState.active) {
+        const hoverSurface = getCanvasInteractionSurfaceFromTarget(event.currentTarget instanceof Element ? event.currentTarget : event.target);
+        if (hoverSurface?.canvasDocId) {
+          previewProjectCanvasSelection(hoverSurface);
+        }
+        if (updateSelectionTransformHandleHover(event.clientX, event.clientY)) {
+          needsRender = true;
+        }
+      }
+      if (pointerState.active) return;
+      const controllingTouch = state.showVirtualCursor
+        && event.pointerType === 'touch'
+        && virtualCursorControl.pointerId === event.pointerId;
+      if (controllingTouch) {
+        event.preventDefault();
+        updateVirtualCursorFromControlDelta(event);
+        return;
+      }
+      updateVirtualCursorFromEvent(event);
+      const awaitingLineEnd = curveBuilder && curveBuilder.stage === 'line' && curveBuilder.awaitingEndPoint && curveBuilder.start;
+      const position = getPointerPosition(event);
+
+      if (awaitingLineEnd) {
+        const start = curveBuilder.start;
+        if (start && position) {
+          const prev = pointerState.preview;
+          if (!prev || prev.end?.x !== position.x || prev.end?.y !== position.y) {
+            pointerState.preview = { start, end: position };
+            needsRender = true;
+          }
+          if (pointerState.tool !== 'curve') {
+            pointerState.tool = 'curve';
+            needsRender = true;
+          }
+          if (hoverPixel) {
+            hoverPixel = null;
+            needsRender = true;
+          }
+        } else {
+          if (pointerState.preview) {
+            pointerState.preview = null;
+            needsRender = true;
+          }
+          if (pointerState.tool === 'curve') {
+            pointerState.tool = null;
+            needsRender = true;
+          }
+          if (hoverPixel) {
+            hoverPixel = null;
+            needsRender = true;
+          }
+        }
+        if (needsRender) {
+          requestOverlayRender();
+        }
+        return;
+      }
+
+      if (pointerState.preview && pointerState.tool === 'curve') {
+        pointerState.preview = null;
+        pointerState.tool = null;
+        requestOverlayRender();
+      }
+
+      if (!position) {
+        if (hoverPixel) {
+          hoverPixel = null;
+          needsRender = true;
+        }
+        if (needsRender) {
+          requestOverlayRender();
+        }
+        return;
+      }
+      if (!hoverPixel || hoverPixel.x !== position.x || hoverPixel.y !== position.y) {
+        hoverPixel = position;
+        needsRender = true;
+      }
+      if (needsRender) {
+        requestOverlayRender();
+      }
+    });
+    canvas.addEventListener('pointerleave', event => {
+      const relatedTarget = event.relatedTarget instanceof Element ? event.relatedTarget : null;
+      if (!pointerState.active && (!relatedTarget || !isCanvasSurfaceTarget(relatedTarget))) {
+        clearHoveredProjectCanvas();
+      }
+      let needsRender = false;
+      if (setSelectionTransformHoverHandle('')) {
+        needsRender = true;
+      }
+      if (hoverPixel) {
+        hoverPixel = null;
+        needsRender = true;
+      }
+      if (curveBuilder && curveBuilder.stage === 'line' && curveBuilder.awaitingEndPoint && pointerState.preview) {
+        pointerState.preview = null;
+        pointerState.tool = null;
+        needsRender = true;
+      }
+      if (needsRender) {
+        requestOverlayRender();
+      }
+    });
+    canvas.addEventListener('contextmenu', event => event.preventDefault());
+  }
+
+  function createLocalViewportCanvasEntry(index) {
+    const panel = document.createElement('section');
+    panel.className = 'local-canvas-surface';
+    panel.dataset.localCanvasIndex = String(index);
+    panel.setAttribute('aria-label', localizeText(`マルチキャンバス ${index + 2}`, `Multi Canvas ${index + 2}`));
+
+    const stack = document.createElement('div');
+    stack.className = 'canvas-stack local-canvas-stack';
+
+    const drawing = document.createElement('canvas');
+    drawing.className = 'local-canvas-surface__canvas';
+    drawing.setAttribute('aria-label', localizeText(`マルチキャンバス ${index + 2}`, `Multi Canvas ${index + 2}`));
+
+    const overlay = document.createElement('canvas');
+    overlay.className = 'local-canvas-surface__overlay';
+    overlay.setAttribute('aria-hidden', 'true');
+
+    const selection = document.createElement('canvas');
+    selection.className = 'local-canvas-surface__selection';
+    selection.setAttribute('aria-hidden', 'true');
+
+    stack.appendChild(drawing);
+    stack.appendChild(overlay);
+    stack.appendChild(selection);
+    panel.appendChild(stack);
+    bindCanvasSurfaceInteractionEvents(drawing);
+    return {
+      kind: 'local',
+      index,
+      panel,
+      body: panel,
+      stack,
+      drawing,
+      overlay,
+      selection,
+      drawingCtx: null,
+      overlayCtx: null,
+      selectionCtx: null,
+      canvasDoc: null,
+      canvasDocId: '',
+    };
+  }
+
+  function getProjectCanvasDocumentForEntry(entry) {
+    if (!entry || typeof entry.index !== 'number') {
+      return null;
+    }
+    return getProjectCanvasDocumentAt(entry.index + 1);
+  }
+
+  function getProjectCanvasSurfaceEntries() {
+    return [mainViewportCanvasSurface, ...localViewportCanvasEntries];
+  }
+
+  function getProjectCanvasSurfaceForIndex(index) {
+    return index === 0 ? mainViewportCanvasSurface : (localViewportCanvasEntries[index - 1] || null);
+  }
+
+  function getProjectCanvasSurfaceByCanvasId(canvasId = '') {
+    const normalizedId = typeof canvasId === 'string' ? canvasId : '';
+    if (!normalizedId) {
+      return null;
+    }
+    return getProjectCanvasSurfaceEntries().find(surface => surface?.canvasDocId === normalizedId) || null;
+  }
+
+  function syncProjectCanvasSurfaceDocumentRefs() {
+    const documents = getProjectCanvasDocuments();
+    mainViewportCanvasSurface.canvasDoc = documents[0] || null;
+    mainViewportCanvasSurface.canvasDocId = mainViewportCanvasSurface.canvasDoc?.id || '';
+    localViewportCanvasEntries.forEach((entry, index) => {
+      const canvasDoc = documents[index + 1] || null;
+      entry.canvasDoc = canvasDoc;
+      entry.canvasDocId = canvasDoc?.id || '';
+    });
+  }
+
+  function getCanvasInteractionSurfaceMetrics(surface) {
+    const resolvedSurface = getResolvedCanvasInteractionSurface(surface || null);
+    const canvasDoc = resolvedSurface?.canvasDoc || getProjectCanvasDocumentById(resolvedSurface?.canvasDocId);
+    const width = Math.max(1, Math.round(Number(canvasDoc?.width) || Number(state.width) || 1));
+    const height = Math.max(1, Math.round(Number(canvasDoc?.height) || Number(state.height) || 1));
+    return {
+      surface: resolvedSurface,
+      width,
+      height,
+    };
+  }
+
+  function syncMultiCanvasSelectionUi() {
+    const activeIndex = getActiveProjectCanvasIndex();
+    const hoveredCanvasId = hoveredProjectCanvasId;
+    const committedCanvasId = committedProjectCanvasId;
+    const mainCanvasId = getProjectCanvasDocumentAt(0)?.id || '';
+    const mainIsPreview = Boolean(hoveredCanvasId && hoveredCanvasId === mainCanvasId && hoveredCanvasId !== committedCanvasId);
+    if (dom.mainCanvasArea instanceof HTMLElement) {
+      dom.mainCanvasArea.classList.toggle('is-multi-canvas-selected', activeIndex === 0 && !mainIsPreview);
+      dom.mainCanvasArea.classList.toggle('is-multi-canvas-hover-preview', mainIsPreview);
+    }
+    localViewportCanvasEntries.forEach(entry => {
+      const isPreview = Boolean(
+        hoveredCanvasId
+        && hoveredCanvasId === entry.canvasDocId
+        && hoveredCanvasId !== committedCanvasId
+      );
+      entry.panel.classList.toggle('is-active', activeIndex === entry.index + 1 && !isPreview);
+      entry.panel.classList.toggle('is-hover-preview', isPreview);
+    });
+    syncLocalViewportCanvasEntryMetadata();
+  }
+
+  function setHoveredProjectCanvasById(canvasId = '') {
+    const normalizedId = typeof canvasId === 'string' ? canvasId : '';
+    if (hoveredProjectCanvasId === normalizedId) {
+      return;
+    }
+    hoveredProjectCanvasId = normalizedId;
+    syncMultiCanvasSelectionUi();
+  }
+
+  function previewProjectCanvasSelection(surface) {
+    const canvasId = surface?.canvasDocId || surface?.canvasDoc?.id || '';
+    if (!canvasId) {
+      return false;
+    }
+    setHoveredProjectCanvasById(canvasId);
+    return false;
+  }
+
+  function commitPreviewProjectCanvasSelection({ persist = false, flushUi = false } = {}) {
+    committedProjectCanvasId = getActiveProjectCanvasDocument()?.id || committedProjectCanvasId || '';
+    hoveredProjectCanvasId = '';
+    if (flushUi) {
+      flushActiveProjectCanvasUiSync({ persist });
+    } else {
+      syncMultiCanvasSelectionUi();
+      if (persist) {
+        scheduleSessionPersist();
+      }
+    }
+  }
+
+  function clearHoveredProjectCanvas({ restoreCommitted = true } = {}) {
+    if (pointerState.active) {
+      return;
+    }
+    hoveredProjectCanvasId = '';
+    syncMultiCanvasSelectionUi();
+  }
+
+  function finalizePendingSelectionBeforeCanvasSwitch(targetCanvasId = '') {
+    const nextCanvasId = typeof targetCanvasId === 'string' ? targetCanvasId : '';
+    const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
+    if (!nextCanvasId || nextCanvasId === activeCanvasId) {
+      return true;
+    }
+    if (!getPendingSelectionMoveState()) {
+      return true;
+    }
+    return confirmPendingSelectionMove({ allowOutOfBoundsClip: true });
+  }
+
+  function setActiveProjectCanvasByIndex(index, { persist = true, syncUi = true } = {}) {
+    const targetCanvas = getProjectCanvasDocumentAt(index);
+    if (!targetCanvas) {
+      return false;
+    }
+    const previousId = projectCanvasStore.activeCanvasId;
+    projectCanvasStore.activeCanvasId = targetCanvas.id;
+    localViewportCanvasState = normalizeLocalViewportCanvasState(
+      {
+        ...localViewportCanvasState,
+        count: Math.max(0, getProjectCanvasCount() - 1),
+        selectedKind: index === 0 ? 'main' : 'local',
+        selectedIndex: index > 0 ? index - 1 : -1,
+      },
+      localViewportCanvasState
+    );
+    bindActiveCanvasSurface(getProjectCanvasSurfaceForIndex(index) || mainViewportCanvasSurface);
+    if (syncUi) {
+      pendingProjectCanvasUiSync = false;
+      resizeCanvases({
+        forceRender: false,
+        applyTransform: false,
+        syncControls: false,
+        updateScaleLimits: false,
+      });
+      renderFrameList();
+      renderLayerList();
+      syncControlsWithState();
+      requestRender();
+      requestOverlayRender();
+      syncMultiCanvasSelectionUi();
+    } else {
+      pendingProjectCanvasUiSync = true;
+      syncMultiCanvasSelectionUi();
+    }
+    updateHistoryButtons();
+    if (persist) {
+      scheduleSessionPersist();
+    }
+    return previousId !== targetCanvas.id;
+  }
+
+  function flushActiveProjectCanvasUiSync({ persist = true } = {}) {
+    if (!pendingProjectCanvasUiSync) {
+      return;
+    }
+    pendingProjectCanvasUiSync = false;
+    resizeCanvases({
+      forceRender: false,
+      applyTransform: false,
+      syncControls: false,
+      updateScaleLimits: false,
+    });
+    renderFrameList();
+    renderLayerList();
+    syncControlsWithState();
+    requestRender();
+    requestOverlayRender();
+    syncMultiCanvasSelectionUi();
+    updateHistoryButtons();
+    if (persist) {
+      scheduleSessionPersist();
+    }
+  }
+
+  function setSelectedMultiCanvas(kind = 'main', index = -1, { persist = true } = {}) {
+    const targetIndex = kind === 'local'
+      ? clamp(Math.round(Number(index) || 0) + 1, 0, Math.max(0, getProjectCanvasCount() - 1))
+      : 0;
+    setActiveProjectCanvasByIndex(targetIndex, { persist });
+  }
+
+  function syncLocalViewportCanvasEntryMetadata() {
+    const selectedCanvasId = getActiveProjectCanvasDocument()?.id || '';
+    const previewCanvasId = hoveredProjectCanvasId;
+    const committedCanvasId = committedProjectCanvasId;
+    localViewportCanvasEntries.forEach(entry => {
+      const canvasDoc = getProjectCanvasDocumentForEntry(entry);
+      entry.canvasDoc = canvasDoc;
+      entry.canvasDocId = canvasDoc?.id || '';
+      entry.panel.classList.toggle('is-empty', !canvasDoc);
+      entry.panel.classList.toggle(
+        'is-active',
+        Boolean(canvasDoc && canvasDoc.id === selectedCanvasId && canvasDoc.id !== previewCanvasId)
+      );
+      entry.panel.classList.toggle(
+        'is-hover-preview',
+        Boolean(canvasDoc && previewCanvasId && canvasDoc.id === previewCanvasId && canvasDoc.id !== committedCanvasId)
+      );
+      entry.panel.title = canvasDoc
+        ? localizeText(`マルチキャンバス ${entry.index + 2}: ${canvasDoc.name}`, `Multi Canvas ${entry.index + 2}: ${canvasDoc.name}`)
+        : localizeText(`マルチキャンバス ${entry.index + 2}: なし`, `Multi Canvas ${entry.index + 2}: empty`);
+    });
+  }
+
+  function getProjectCanvasActiveFrame(canvasDoc) {
+    if (!canvasDoc || !Array.isArray(canvasDoc.frames) || !canvasDoc.frames.length) {
+      return null;
+    }
+    const frameIndex = clamp(Math.round(Number(canvasDoc.activeFrame) || 0), 0, canvasDoc.frames.length - 1);
+    return canvasDoc.frames[frameIndex] || canvasDoc.frames[0] || null;
+  }
+
+  function getProjectCanvasActiveLayer(canvasDoc) {
+    const frame = getProjectCanvasActiveFrame(canvasDoc);
+    if (!frame || !Array.isArray(frame.layers) || !frame.layers.length) {
+      return null;
+    }
+    return frame.layers.find(layer => layer?.id === canvasDoc?.activeLayer)
+      || frame.layers[frame.layers.length - 1]
+      || frame.layers[0]
+      || null;
+  }
+
+  function getMainCanvasInteractionSurface() {
+    const canvasDoc = getProjectCanvasDocumentAt(0);
+    mainViewportCanvasSurface.canvasDoc = canvasDoc;
+    mainViewportCanvasSurface.canvasDocId = canvasDoc?.id || '';
+    return {
+      kind: 'main',
+      drawing: mainViewportCanvasSurface.drawing,
+      overlay: mainViewportCanvasSurface.overlay,
+      selection: mainViewportCanvasSurface.selection,
+      stack: mainViewportCanvasSurface.stack,
+      panel: mainViewportCanvasSurface.panel,
+      entry: mainViewportCanvasSurface,
+      canvasDoc,
+      canvasDocId: canvasDoc?.id || '',
+      layer: getProjectCanvasActiveLayer(canvasDoc),
+      layerId: getProjectCanvasActiveLayer(canvasDoc)?.id || '',
+    };
+  }
+
+  function getLocalViewportCanvasEntryFromTarget(target) {
+    if (!(target instanceof Element)) {
+      return null;
+    }
+    for (let index = 0; index < localViewportCanvasEntries.length; index += 1) {
+      const entry = localViewportCanvasEntries[index];
+      if (target === entry?.drawing || target === entry?.overlay || target === entry?.selection) {
+        return entry;
+      }
+    }
+    return null;
+  }
+
+  function getCanvasInteractionSurfaceFromTarget(target) {
+    const localEntry = getLocalViewportCanvasEntryFromTarget(target);
+    if (localEntry && localEntry.drawing instanceof HTMLCanvasElement) {
+      const canvasDoc = getProjectCanvasDocumentForEntry(localEntry);
+      return {
+        kind: 'local',
+        drawing: localEntry.drawing,
+        overlay: localEntry.overlay,
+        selection: localEntry.selection,
+        stack: localEntry.stack,
+        panel: localEntry.panel,
+        entry: localEntry,
+        canvasDoc,
+        canvasDocId: canvasDoc?.id || '',
+        layer: getProjectCanvasActiveLayer(canvasDoc),
+        layerId: getProjectCanvasActiveLayer(canvasDoc)?.id || '',
+      };
+    }
+    if (
+      target === mainViewportCanvasSurface.drawing
+      || target === mainViewportCanvasSurface.overlay
+      || target === mainViewportCanvasSurface.selection
+    ) {
+      return getMainCanvasInteractionSurface();
+    }
+    return null;
+  }
+
+  function getResolvedCanvasInteractionSurface(source = null) {
+    if (source && typeof source === 'object' && source.drawing instanceof HTMLCanvasElement) {
+      return source;
+    }
+    if (source instanceof Element) {
+      return getCanvasInteractionSurfaceFromTarget(source);
+    }
+    if (pointerState.surface && pointerState.surface.drawing instanceof HTMLCanvasElement) {
+      return pointerState.surface;
+    }
+    if (activeCanvasSurface?.drawing instanceof HTMLCanvasElement) {
+      const canvasDoc = activeCanvasSurface.canvasDoc || getProjectCanvasDocumentById(activeCanvasSurface.canvasDocId);
+      return {
+        kind: activeCanvasSurface.kind || 'main',
+        drawing: activeCanvasSurface.drawing,
+        overlay: activeCanvasSurface.overlay,
+        selection: activeCanvasSurface.selection,
+        stack: activeCanvasSurface.stack,
+        panel: activeCanvasSurface.panel,
+        entry: activeCanvasSurface,
+        canvasDoc,
+        canvasDocId: canvasDoc?.id || activeCanvasSurface.canvasDocId || '',
+        layer: getProjectCanvasActiveLayer(canvasDoc),
+        layerId: getProjectCanvasActiveLayer(canvasDoc)?.id || '',
+      };
+    }
+    return getMainCanvasInteractionSurface();
+  }
+
+  function syncActiveLayerFromInteractionSurface(surface, { syncUi = true, persist = true } = {}) {
+    const canvasDoc = surface?.canvasDoc || getProjectCanvasDocumentById(surface?.canvasDocId);
+    if (!canvasDoc) {
+      return false;
+    }
+    const targetIndex = getProjectCanvasDocuments().findIndex(canvas => canvas?.id === canvasDoc.id);
+    if (targetIndex < 0) {
+      return false;
+    }
+    return setActiveProjectCanvasByIndex(targetIndex, { persist, syncUi });
+  }
+
+  function syncProjectCanvasSurfaceDimensions(surface, canvasDoc) {
+    if (!surface || !canvasDoc || !(surface.stack instanceof HTMLElement)) {
+      return;
+    }
+    ensureCanvasSurfaceContexts(surface);
+    const width = Math.max(1, Math.round(Number(canvasDoc.width) || 1));
+    const height = Math.max(1, Math.round(Number(canvasDoc.height) || 1));
+    const scale = getProjectCanvasDisplayScale(canvasDoc);
+    const cssWidth = `${width * scale}px`;
+    const cssHeight = `${height * scale}px`;
+    [surface.drawing, surface.overlay, surface.selection].forEach(canvas => {
+      if (!(canvas instanceof HTMLCanvasElement)) {
+        return;
+      }
+      if (canvas.width !== width) {
+        canvas.width = width;
+        if (canvas === surface.drawing) surface.drawingCtx = null;
+        if (canvas === surface.overlay) surface.overlayCtx = null;
+        if (canvas === surface.selection) surface.selectionCtx = null;
+      }
+      if (canvas.height !== height) {
+        canvas.height = height;
+        if (canvas === surface.drawing) surface.drawingCtx = null;
+        if (canvas === surface.overlay) surface.overlayCtx = null;
+        if (canvas === surface.selection) surface.selectionCtx = null;
+      }
+      canvas.style.width = cssWidth;
+      canvas.style.height = cssHeight;
+    });
+    ensureCanvasSurfaceContexts(surface);
+    surface.stack.style.width = cssWidth;
+    surface.stack.style.height = cssHeight;
+    surface.stack.dataset.background = state.backgroundMode;
+    surface.stack.dataset.grid = state.showGrid ? 'true' : 'false';
+    surface.stack.dataset.majorGrid = state.showMajorGrid ? 'true' : 'false';
+    surface.stack.classList.toggle('is-flat', !state.showChecker);
+    surface.stack.style.setProperty('--grid-screen-step', `${scale}px`);
+    surface.stack.style.setProperty('--grid-major-step', `${scale * Math.max(Number(state.majorGridSpacing) || 16, 1)}px`);
+    surface.stack.style.setProperty('--grid-offset-x', '0px');
+    surface.stack.style.setProperty('--grid-offset-y', '0px');
+    surface.stack.style.setProperty('--grid-major-offset-x', '0px');
+    surface.stack.style.setProperty('--grid-major-offset-y', '0px');
+    surface.stack.style.setProperty('--tile-screen-size', `${16 * scale}px`);
+    surface.stack.style.setProperty('--tile-offset-x', '0px');
+    surface.stack.style.setProperty('--tile-offset-y', '0px');
+  }
+
+  function ensureLocalViewportCanvasEntries() {
+    const host = dom.localCanvasDock;
+    if (!(host instanceof HTMLElement)) {
+      return;
+    }
+    const count = getLocalViewportCanvasCount();
+    while (localViewportCanvasEntries.length > count) {
+      const entry = localViewportCanvasEntries.pop();
+      entry?.panel.remove();
+    }
+    while (localViewportCanvasEntries.length < count) {
+      const entry = createLocalViewportCanvasEntry(localViewportCanvasEntries.length);
+      localViewportCanvasEntries.push(entry);
+      host.appendChild(entry.panel);
+    }
+    localViewportCanvasEntries.forEach((entry, index) => {
+      entry.index = index;
+      entry.panel.dataset.localCanvasIndex = String(index);
+      entry.panel.setAttribute('aria-label', localizeText(`マルチキャンバス ${index + 2}`, `Multi Canvas ${index + 2}`));
+      entry.drawing.setAttribute('aria-label', localizeText(`マルチキャンバス ${index + 2}`, `Multi Canvas ${index + 2}`));
+    });
+    ensureCanvasWheelListener();
+  }
+
+  function computeLocalViewportCanvasLayout() {
+    const totalCanvases = Math.max(1, getProjectCanvasCount());
+    const viewport = dom.canvasViewport;
+    if (!(viewport instanceof HTMLElement) || totalCanvases <= 1) {
+      return { mode: 'single', columns: 1, rows: 1 };
+    }
+    const viewportWidth = Math.max(1, Math.round(viewport.clientWidth || viewport.getBoundingClientRect().width || 1));
+    const maxCanvasWidth = Math.max(...getProjectCanvasDocuments().map(canvas => (
+      Math.max(1, Math.round(Number(canvas?.width) || 1)) * getProjectCanvasDisplayScale(canvas)
+    )));
+    const gap = MULTI_CANVAS_SURFACE_GAP;
+    const padding = 16;
+    const estimatedWidth = Math.max(1, Math.round(maxCanvasWidth) + gap);
+    const columns = clamp(Math.floor((viewportWidth - padding * 2 + gap) / estimatedWidth) || 1, 1, totalCanvases);
+    const rows = Math.max(1, Math.ceil(totalCanvases / columns));
+    return { mode: 'grid', columns, rows };
+  }
+
+  function syncLocalViewportCanvasDockLayout() {
+    const workspace = dom.viewportWorkspace;
+    if (!(workspace instanceof HTMLElement)) {
+      return;
+    }
+    const layout = computeLocalViewportCanvasLayout();
+    workspace.dataset.localCanvasLayout = layout.mode;
+    workspace.style.setProperty('--workspace-canvas-columns', String(layout.columns));
+    workspace.style.setProperty('--workspace-canvas-rows', String(layout.rows));
+
+    const viewport = dom.canvasViewport;
+    const viewportWidth = Math.max(1, Math.round(viewport?.clientWidth || viewport?.getBoundingClientRect().width || 1));
+    const viewportHeight = Math.max(1, Math.round(viewport?.clientHeight || viewport?.getBoundingClientRect().height || 1));
+    const gap = MULTI_CANVAS_SURFACE_GAP;
+    const padding = 16;
+    const surfaces = getProjectCanvasSurfaceEntries().map((surface, index) => ({
+      surface,
+      canvas: getProjectCanvasDocumentAt(index),
+      index,
+    })).filter(item => item.surface && item.canvas);
+
+    if (surfaces.length <= 1) {
+      const single = surfaces[0];
+      if (single?.canvas && single.surface?.panel instanceof HTMLElement) {
+        const displayScale = getProjectCanvasDisplayScale(single.canvas);
+        const drawWidth = Math.max(1, Math.round(Number(single.canvas.width) || 1)) * displayScale;
+        const drawHeight = Math.max(1, Math.round(Number(single.canvas.height) || 1)) * displayScale;
+        const nextLeft = Math.max(padding, Math.round((viewportWidth - drawWidth) / 2));
+        const nextTop = Math.max(padding, Math.round((viewportHeight - drawHeight) / 2));
+        single.surface.panel.style.left = `${nextLeft}px`;
+        single.surface.panel.style.top = `${nextTop}px`;
+        setLocalViewportCanvasLayoutAnchor(nextLeft, nextTop);
+      }
+      return;
+    }
+
+    const columns = layout.columns;
+    const sizes = surfaces.map(item => ({
+      ...item,
+      drawWidth: Math.max(1, Math.round(Number(item.canvas.width) || 1)) * getProjectCanvasDisplayScale(item.canvas),
+      drawHeight: Math.max(1, Math.round(Number(item.canvas.height) || 1)) * getProjectCanvasDisplayScale(item.canvas),
+    }));
+    const columnWidths = new Array(columns).fill(0);
+    const rowHeights = new Array(Math.ceil(sizes.length / columns)).fill(0);
+    sizes.forEach((item, itemIndex) => {
+      const columnIndex = itemIndex % columns;
+      const rowIndex = Math.floor(itemIndex / columns);
+      columnWidths[columnIndex] = Math.max(columnWidths[columnIndex], item.drawWidth);
+      rowHeights[rowIndex] = Math.max(rowHeights[rowIndex], item.drawHeight);
+    });
+    const mainPanel = mainViewportCanvasSurface?.panel instanceof HTMLElement
+      ? mainViewportCanvasSurface.panel
+      : null;
+    const parsePanelAxis = (value, fallback) => {
+      const parsed = Number.parseFloat(String(value || ''));
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+    const defaultAnchorLeft = Math.max(padding, Math.round((viewportWidth - columnWidths[0]) / 2));
+    const defaultAnchorTop = Math.max(padding, Math.round((viewportHeight - rowHeights[0]) / 2));
+    const storedAnchorLeft = Number.isFinite(Number(localViewportCanvasState?.anchorLeft))
+      ? Math.round(Number(localViewportCanvasState.anchorLeft))
+      : defaultAnchorLeft;
+    const storedAnchorTop = Number.isFinite(Number(localViewportCanvasState?.anchorTop))
+      ? Math.round(Number(localViewportCanvasState.anchorTop))
+      : defaultAnchorTop;
+    const anchorLeft = parsePanelAxis(mainPanel?.style.left, storedAnchorLeft);
+    const anchorTop = parsePanelAxis(mainPanel?.style.top, storedAnchorTop);
+    sizes.forEach((item, itemIndex) => {
+      if (!(item.surface.panel instanceof HTMLElement)) {
+        return;
+      }
+      const columnIndex = itemIndex % columns;
+      const rowIndex = Math.floor(itemIndex / columns);
+      let left = anchorLeft;
+      for (let i = 0; i < columnIndex; i += 1) {
+        left += columnWidths[i] + gap;
+      }
+      let top = anchorTop;
+      for (let i = 0; i < rowIndex; i += 1) {
+        top += rowHeights[i] + gap;
+      }
+      item.surface.panel.style.left = `${Math.round(left)}px`;
+      item.surface.panel.style.top = `${Math.round(top)}px`;
+    });
+    setLocalViewportCanvasLayoutAnchor(anchorLeft, anchorTop);
+  }
+
+  function buildProjectCanvasImageData(canvasDoc) {
+    const width = Math.max(1, Math.round(Number(canvasDoc?.width) || 1));
+    const height = Math.max(1, Math.round(Number(canvasDoc?.height) || 1));
+    const frame = getProjectCanvasActiveFrame(canvasDoc) || { layers: [] };
+    const pixels = compositeFramePixels(frame, width, height, state.palette, {
+      useLocalLayerPreviewVisibility: true,
+      useLocalLayerPreviewOpacity: true,
+    });
+    try {
+      return new ImageData(pixels, width, height);
+    } catch (error) {
+      return new ImageData(new Uint8ClampedArray(pixels), width, height);
+    }
+  }
+
+  function renderProjectCanvasSurface(surface, canvasDoc, { imageData = null } = {}) {
+    if (!surface || !canvasDoc) {
+      return;
+    }
+    surface.canvasDoc = canvasDoc;
+    surface.canvasDocId = canvasDoc.id || '';
+    syncProjectCanvasSurfaceDimensions(surface, canvasDoc);
+    ensureCanvasSurfaceContexts(surface);
+    if (!surface.drawingCtx) {
+      return;
+    }
+    const resolvedImage = imageData instanceof ImageData ? imageData : buildProjectCanvasImageData(canvasDoc);
+    surface.drawingCtx.clearRect(0, 0, canvasDoc.width, canvasDoc.height);
+    surface.drawingCtx.putImageData(resolvedImage, 0, 0);
+  }
+
+  function renderAllProjectCanvasSurfaces() {
+    const documents = getProjectCanvasDocuments();
+    getProjectCanvasSurfaceEntries().forEach((surface, index) => {
+      const canvasDoc = documents[index] || null;
+      if (!canvasDoc) {
+        return;
+      }
+      renderProjectCanvasSurface(surface, canvasDoc);
+    });
+    syncMultiCanvasSelectionUi();
+  }
+
+  function renderInactiveProjectCanvasSurfaces() {
+    const documents = getProjectCanvasDocuments();
+    getProjectCanvasSurfaceEntries().forEach((surface, index) => {
+      const canvasDoc = documents[index] || null;
+      if (!canvasDoc || surface === activeCanvasSurface) {
+        return;
+      }
+      renderProjectCanvasSurface(surface, canvasDoc);
+    });
+    syncMultiCanvasSelectionUi();
+  }
+
+  function renderLocalViewportCanvases() {
+    renderInactiveProjectCanvasSurfaces();
+  }
+
+  function renderLocalViewportCanvasOverlays() {
+    const activeDrawing = activeCanvasSurface?.drawing instanceof HTMLCanvasElement
+      ? activeCanvasSurface.drawing
+      : null;
+    const interactionDrawing = pointerState.active && pointerState.surface?.drawing instanceof HTMLCanvasElement
+      ? pointerState.surface.drawing
+      : null;
+    const hoveredSurface = !pointerState.active
+      ? getProjectCanvasSurfaceByCanvasId(hoveredProjectCanvasId)
+      : null;
+    const hoveredDrawing = hoveredSurface?.drawing instanceof HTMLCanvasElement
+      ? hoveredSurface.drawing
+      : null;
+    getProjectCanvasSurfaceEntries().forEach(surface => {
+      ensureCanvasSurfaceContexts(surface);
+      const keepOverlay = Boolean(
+        surface.drawing === activeDrawing
+        || surface.drawing === interactionDrawing
+        || surface.drawing === hoveredDrawing
+      );
+      const keepSelection = Boolean(
+        surface.drawing === activeDrawing
+        || surface.drawing === interactionDrawing
+      );
+      if (!keepOverlay) {
+        surface.overlayCtx?.clearRect(0, 0, surface.overlay.width, surface.overlay.height);
+      }
+      if (!keepSelection) {
+        surface.selectionCtx?.clearRect(0, 0, surface.selection.width, surface.selection.height);
+      }
+    });
+    if (
+      !pointerState.active
+      && hoveredSurface
+      && hoveredSurface !== activeCanvasSurface
+      && hoverPixel
+    ) {
+      drawHoverPreviewOnSurface(hoveredSurface, hoverPixel, getActiveTool());
+    }
+  }
+
+  function syncLocalViewportCanvasDockVisibility({ persist = false, render = true } = {}) {
+    const host = dom.localCanvasDock;
+    const workspace = dom.viewportWorkspace;
+    if (!(host instanceof HTMLElement) || !(workspace instanceof HTMLElement)) {
+      return;
+    }
+    const count = getLocalViewportCanvasCount();
+    host.dataset.background = state.backgroundMode;
+    host.dataset.showChecker = state.showChecker ? 'true' : 'false';
+    if (count <= 0) {
+      while (localViewportCanvasEntries.length) {
+        const entry = localViewportCanvasEntries.pop();
+        entry?.panel.remove();
+      }
+      host.classList.add('is-hidden');
+      host.hidden = true;
+      host.setAttribute('aria-hidden', 'true');
+      workspace.dataset.localCanvasLayout = 'single';
+      workspace.style.setProperty('--workspace-canvas-columns', '1');
+      workspace.style.setProperty('--workspace-canvas-rows', '1');
+      syncLocalViewportCanvasDockLayout();
+      syncMultiCanvasSelectionUi();
+      if (persist) {
+        scheduleSessionPersist({ includeSnapshots: false });
+      }
+      return;
+    }
+    host.classList.remove('is-hidden');
+    host.hidden = false;
+    host.setAttribute('aria-hidden', 'false');
+    ensureLocalViewportCanvasEntries();
+    syncLocalViewportCanvasDockLayout();
+    if (render) {
+      renderInactiveProjectCanvasSurfaces();
+      renderLocalViewportCanvasOverlays();
+    }
+    if (persist) {
+      scheduleSessionPersist({ includeSnapshots: false });
+    }
+  }
+
+  function setLocalViewportCanvasCount(nextCount, { persist = true, announce = true } = {}) {
+    if (!MULTI_CANVAS_FEATURE_ENABLED) {
+      const currentCanvases = getProjectCanvasDocuments();
+      if (currentCanvases.length > 1) {
+        replaceProjectCanvasDocuments(currentCanvases, getActiveProjectCanvasDocument()?.id || currentCanvases[0]?.id || '');
+        ensureLocalViewportCanvasEntries();
+        bindActiveCanvasSurface(mainViewportCanvasSurface);
+        syncLocalViewportCanvasDockVisibility({ persist, render: true });
+        renderFrameList();
+        renderLayerList();
+        syncControlsWithState();
+        applyViewportTransform();
+        requestRender();
+        requestOverlayRender();
+      } else {
+        localViewportCanvasState = normalizeLocalViewportCanvasState(
+          LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE,
+          LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
+        );
+        syncLocalViewportCanvasDockVisibility({ persist, render: true });
+      }
+      return;
+    }
+    const previous = getLocalViewportCanvasCount();
+    const currentCanvases = getProjectCanvasDocuments();
+    const targetCount = clamp(Math.round(Number(nextCount) || 0), 0, LOCAL_VIEWPORT_CANVAS_MAX_COUNT);
+    const sourceCanvas = getActiveProjectCanvasDocument() || currentCanvases[0] || null;
+    const nextCanvases = currentCanvases.slice(0, targetCount + 1).map((canvas, index) => createProjectCanvasDocument(canvas, {
+      clonePixelData: true,
+      fallbackIndex: index + 1,
+    }));
+    while (nextCanvases.length < targetCount + 1) {
+      nextCanvases.push(createBlankProjectCanvasDocument(sourceCanvas, nextCanvases.length + 1));
+    }
+    const nextActiveIndex = clamp(getActiveProjectCanvasIndex(), 0, Math.max(0, nextCanvases.length - 1));
+    replaceProjectCanvasDocuments(nextCanvases, nextCanvases[nextActiveIndex]?.id || nextCanvases[0]?.id || '');
+    ensureLocalViewportCanvasEntries();
+    bindActiveCanvasSurface(getProjectCanvasSurfaceForIndex(nextActiveIndex) || mainViewportCanvasSurface);
+    syncLocalViewportCanvasDockVisibility({ persist, render: true });
+    renderFrameList();
+    renderLayerList();
+    syncControlsWithState();
+    applyViewportTransform();
+    requestRender();
+    requestOverlayRender();
+    const normalizedCount = getLocalViewportCanvasCount();
+    if (normalizedCount !== previous) {
+      markAutosaveDirty();
+      markDocumentUnsavedChange();
+      if (persist) {
+        scheduleSessionPersist({ includeSnapshots: true });
+      }
+    }
+    if (!announce || normalizedCount === previous) {
+      return;
+    }
+    updateAutosaveStatus(
+      normalizedCount > 0
+        ? localizeText(`マルチキャンバスを ${normalizedCount} 面にしました`, `Multi canvases: ${normalizedCount}`)
+        : localizeText('マルチキャンバスをOFFにしました', 'Multi canvases turned off'),
+      'info'
+    );
+  }
+
+  function adjustLocalViewportCanvasCount(delta, options = {}) {
+    const count = getLocalViewportCanvasCount();
+    setLocalViewportCanvasCount(count + Math.round(Number(delta) || 0), options);
+  }
+
+  function handleLocalViewportCanvasViewportChange() {
+    syncLocalViewportCanvasDockVisibility({ persist: false, render: true });
+    applyViewportTransform();
+  }
+
+  function reconcileProjectCanvasesFromLocalViewportState() {
+    const desiredCount = getLocalViewportCanvasCount();
+    const currentCanvases = getProjectCanvasDocuments();
+    const targetCanvasTotal = Math.max(1, desiredCount + 1);
+    if (currentCanvases.length >= targetCanvasTotal) {
+      return false;
+    }
+    const sourceCanvas = getActiveProjectCanvasDocument() || currentCanvases[0] || null;
+    const nextCanvases = currentCanvases.map((canvas, index) => createProjectCanvasDocument(canvas, {
+      clonePixelData: true,
+      fallbackIndex: index + 1,
+    }));
+    while (nextCanvases.length < targetCanvasTotal) {
+      nextCanvases.push(createBlankProjectCanvasDocument(sourceCanvas, nextCanvases.length + 1));
+    }
+    replaceProjectCanvasDocuments(nextCanvases, getActiveProjectCanvasDocument()?.id || nextCanvases[0]?.id || '');
+    return true;
+  }
+
+  function setupLocalViewportCanvasDock() {
+    ensureCanvasSurfaceContexts(mainViewportCanvasSurface);
+    bindActiveCanvasSurface(mainViewportCanvasSurface);
+    if (reconcileProjectCanvasesFromLocalViewportState()) {
+      bindActiveCanvasSurface(getProjectCanvasSurfaceForIndex(getActiveProjectCanvasIndex()) || mainViewportCanvasSurface);
+    }
+    if (dom.controls.addLocalCanvas instanceof HTMLButtonElement) {
+      dom.controls.addLocalCanvas.addEventListener('click', event => {
+        event.preventDefault();
+        adjustLocalViewportCanvasCount(1, { persist: true, announce: true });
+      });
+    }
+    if (dom.controls.removeLocalCanvas instanceof HTMLButtonElement) {
+      dom.controls.removeLocalCanvas.addEventListener('click', event => {
+        event.preventDefault();
+        adjustLocalViewportCanvasCount(-1, { persist: true, announce: true });
+      });
+    }
+    window.addEventListener('resize', handleLocalViewportCanvasViewportChange);
+    window.addEventListener('orientationchange', handleLocalViewportCanvasViewportChange);
+    if (window.visualViewport && typeof window.visualViewport.addEventListener === 'function') {
+      window.visualViewport.addEventListener('resize', handleLocalViewportCanvasViewportChange);
+      window.visualViewport.addEventListener('scroll', handleLocalViewportCanvasViewportChange);
+    }
+    syncLocalViewportCanvasDockVisibility({ persist: false, render: true });
+  }
+
+  function canUseCanvasResizeHandle() {
+    return canCurrentClientEditProjectStructure()
+      && Boolean(state.showCanvasResizeHandles ?? true)
+      && lockedCanvasWidth === null
+      && lockedCanvasHeight === null;
+  }
+
+  function getCanvasResizeOverlayMetrics() {
+    const area = dom.viewportWorkspace instanceof HTMLElement
+      ? dom.viewportWorkspace
+      : dom.mainCanvasArea;
+    const drawing = activeCanvasSurface?.drawing instanceof HTMLCanvasElement
+      ? activeCanvasSurface.drawing
+      : dom.canvases.drawing;
+    if (!(area instanceof HTMLElement) || !(drawing instanceof HTMLCanvasElement)) {
+      return null;
+    }
+    const areaRect = area.getBoundingClientRect();
+    const drawingRect = drawing.getBoundingClientRect();
+    if (areaRect.width <= 0 || areaRect.height <= 0 || drawingRect.width <= 0 || drawingRect.height <= 0) {
+      return null;
+    }
+    return {
+      left: drawingRect.left - areaRect.left,
+      top: drawingRect.top - areaRect.top,
+      width: drawingRect.width,
+      height: drawingRect.height,
+    };
+  }
+
+  function setCanvasResizePreviewRect(widthPx, heightPx, { offsetXPx = 0, offsetYPx = 0 } = {}) {
+    const preview = dom.canvasResizePreview;
+    const metrics = getCanvasResizeOverlayMetrics();
+    if (!(preview instanceof HTMLElement) || !metrics) {
+      return;
+    }
+    preview.style.left = `${Math.round(metrics.left - offsetXPx)}px`;
+    preview.style.top = `${Math.round(metrics.top - offsetYPx)}px`;
+    preview.style.width = `${Math.max(1, Math.round(widthPx))}px`;
+    preview.style.height = `${Math.max(1, Math.round(heightPx))}px`;
+  }
+
+  function syncCanvasResizeHandleVisibility() {
+    const handles = [dom.canvasResizeHandleStart, dom.canvasResizeHandleCorner];
+    const preview = dom.canvasResizePreview;
+    const enabled = canUseCanvasResizeHandle();
+    const metrics = getCanvasResizeOverlayMetrics();
+    const visible = Boolean(enabled && metrics && !state.playback.isPlaying);
+    handles.forEach(handle => {
+      if (!(handle instanceof HTMLElement)) {
+        return;
+      }
+      handle.classList.toggle('is-hidden', !visible);
+      handle.hidden = !visible;
+      handle.setAttribute('aria-hidden', String(!visible));
+    });
+    if (!(preview instanceof HTMLElement)) {
+      return;
+    }
+    if (!canvasResizeHandleState.active) {
+      preview.classList.add('is-hidden');
+      preview.hidden = true;
+      preview.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  function updateCanvasResizeHandlePosition() {
+    const metrics = getCanvasResizeOverlayMetrics();
+    const startHandle = dom.canvasResizeHandleStart;
+    const endHandle = dom.canvasResizeHandleCorner;
+    if (!(startHandle instanceof HTMLElement) || !(endHandle instanceof HTMLElement) || !metrics || !canUseCanvasResizeHandle()) {
+      syncCanvasResizeHandleVisibility();
+      return;
+    }
+    const selectionHandleClearance = (SELECTION_TRANSFORM_HANDLE_DRAW_RADIUS_PX * 2) + 6;
+    const handleGap = Math.max(CANVAS_RESIZE_HANDLE_GAP, selectionHandleClearance);
+    const startX = metrics.left - CANVAS_RESIZE_HANDLE_SIZE - handleGap;
+    const startY = metrics.top - CANVAS_RESIZE_HANDLE_SIZE - handleGap;
+    const endX = metrics.left + metrics.width + handleGap;
+    const endY = metrics.top + metrics.height + handleGap;
+    startHandle.style.left = `${Math.round(startX)}px`;
+    startHandle.style.top = `${Math.round(startY)}px`;
+    endHandle.style.left = `${Math.round(endX)}px`;
+    endHandle.style.top = `${Math.round(endY)}px`;
+    startHandle.classList.remove('is-hidden');
+    startHandle.hidden = false;
+    startHandle.setAttribute('aria-hidden', 'false');
+    endHandle.classList.remove('is-hidden');
+    endHandle.hidden = false;
+    endHandle.setAttribute('aria-hidden', 'false');
+    if (canvasResizeHandleState.active) {
+      const scale = Number(state.scale) || MIN_ZOOM_SCALE;
+      setCanvasResizePreviewRect(
+        canvasResizeHandleState.previewWidth * scale,
+        canvasResizeHandleState.previewHeight * scale,
+        {
+          offsetXPx: canvasResizeHandleState.previewOffsetX * scale,
+          offsetYPx: canvasResizeHandleState.previewOffsetY * scale,
+        }
+      );
+    }
+  }
+
+  function formatCanvasResizeIndicatorLabel(width, height) {
+    const safeWidth = Math.max(1, Math.round(Number(width) || 1));
+    const safeHeight = Math.max(1, Math.round(Number(height) || 1));
+    return `X: ${safeWidth}, Y: ${safeHeight}`;
+  }
+
+  function hideViewportIndicator() {
+    const indicator = dom.zoomIndicator;
+    if (!indicator) {
+      return;
+    }
+    if (zoomIndicatorTimeoutId !== null) {
+      window.clearTimeout(zoomIndicatorTimeoutId);
+      zoomIndicatorTimeoutId = null;
+    }
+    indicator.classList.remove('is-visible');
+    indicator.setAttribute('aria-hidden', 'true');
+  }
+
+  function showViewportIndicator(label, { autoHideMs = ZOOM_INDICATOR_TIMEOUT } = {}) {
+    const indicator = dom.zoomIndicator;
+    if (!indicator) {
+      return;
+    }
+    indicator.textContent = String(label || '');
+    indicator.classList.add('is-visible');
+    indicator.setAttribute('aria-hidden', 'false');
+    if (zoomIndicatorTimeoutId !== null) {
+      window.clearTimeout(zoomIndicatorTimeoutId);
+      zoomIndicatorTimeoutId = null;
+    }
+    if (Number.isFinite(autoHideMs) && autoHideMs > 0) {
+      zoomIndicatorTimeoutId = window.setTimeout(() => {
+        indicator.classList.remove('is-visible');
+        indicator.setAttribute('aria-hidden', 'true');
+        zoomIndicatorTimeoutId = null;
+      }, autoHideMs);
+    }
+  }
+
+  function stopCanvasResizeHandleInteraction({ apply = true } = {}) {
+    const activeHandle = canvasResizeHandleState.handle;
+    const preview = dom.canvasResizePreview;
+    const nextWidth = canvasResizeHandleState.previewWidth;
+    const nextHeight = canvasResizeHandleState.previewHeight;
+    const shouldApply = apply
+      && canvasResizeHandleState.active
+      && nextWidth > 0
+      && nextHeight > 0
+      && (nextWidth !== canvasResizeHandleState.startWidth || nextHeight !== canvasResizeHandleState.startHeight);
+    if (activeHandle instanceof HTMLElement) {
+      activeHandle.classList.remove('is-active');
+      if (Number.isFinite(canvasResizeHandleState.pointerId)) {
+        try {
+          activeHandle.releasePointerCapture?.(canvasResizeHandleState.pointerId);
+        } catch (error) {
+          // Ignore pointer release errors.
+        }
+      }
+    }
+    if (preview instanceof HTMLElement) {
+      preview.classList.add('is-hidden');
+      preview.hidden = true;
+      preview.setAttribute('aria-hidden', 'true');
+    }
+    window.removeEventListener('pointermove', handleCanvasResizeHandlePointerMove);
+    window.removeEventListener('pointerup', handleCanvasResizeHandlePointerUp);
+    window.removeEventListener('pointercancel', handleCanvasResizeHandlePointerCancel);
+    canvasResizeHandleState.pointerId = null;
+    canvasResizeHandleState.handle = null;
+    canvasResizeHandleState.anchor = '';
+    canvasResizeHandleState.active = false;
+    if (shouldApply) {
+      applyCanvasResizeDimensions(nextWidth, nextHeight, {
+        preserveAnchoredContent: true,
+        contentOffsetX: canvasResizeHandleState.previewOffsetX,
+        contentOffsetY: canvasResizeHandleState.previewOffsetY,
+      });
+    }
+    canvasResizeHandleState.startWidth = 0;
+    canvasResizeHandleState.startHeight = 0;
+    canvasResizeHandleState.previewWidth = 0;
+    canvasResizeHandleState.previewHeight = 0;
+    canvasResizeHandleState.previewOffsetX = 0;
+    canvasResizeHandleState.previewOffsetY = 0;
+    hideViewportIndicator();
+    syncCanvasResizeHandleVisibility();
+    updateCanvasResizeHandlePosition();
+  }
+
+  function beginCanvasResizeHandleInteraction(event) {
+    if (event.button !== undefined && event.button !== 0) {
+      return;
+    }
+    if (!canUseCanvasResizeHandle() || state.playback.isPlaying) {
+      return;
+    }
+    const handle = event.currentTarget;
+    if (!(handle instanceof HTMLElement)) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    canvasResizeHandleState.pointerId = event.pointerId ?? -1;
+    canvasResizeHandleState.handle = handle;
+    canvasResizeHandleState.anchor = handle.dataset.resizeAnchor === 'start' ? 'start' : 'end';
+    canvasResizeHandleState.startClientX = event.clientX;
+    canvasResizeHandleState.startClientY = event.clientY;
+    canvasResizeHandleState.startWidth = Math.max(1, Math.round(Number(state.width) || 1));
+    canvasResizeHandleState.startHeight = Math.max(1, Math.round(Number(state.height) || 1));
+    canvasResizeHandleState.previewWidth = canvasResizeHandleState.startWidth;
+    canvasResizeHandleState.previewHeight = canvasResizeHandleState.startHeight;
+    canvasResizeHandleState.previewOffsetX = 0;
+    canvasResizeHandleState.previewOffsetY = 0;
+    canvasResizeHandleState.active = true;
+    handle.classList.add('is-active');
+    try {
+      handle.setPointerCapture?.(event.pointerId);
+    } catch (error) {
+      // Ignore pointer capture errors.
+    }
+    const preview = dom.canvasResizePreview;
+    if (preview instanceof HTMLElement) {
+      preview.classList.remove('is-hidden');
+      preview.hidden = false;
+      preview.setAttribute('aria-hidden', 'false');
+      const scale = Number(state.scale) || MIN_ZOOM_SCALE;
+      setCanvasResizePreviewRect(
+        canvasResizeHandleState.previewWidth * scale,
+        canvasResizeHandleState.previewHeight * scale,
+        {
+          offsetXPx: 0,
+          offsetYPx: 0,
+        }
+      );
+    }
+    showViewportIndicator(
+      formatCanvasResizeIndicatorLabel(
+        canvasResizeHandleState.previewWidth,
+        canvasResizeHandleState.previewHeight
+      ),
+      { autoHideMs: null }
+    );
+    window.addEventListener('pointermove', handleCanvasResizeHandlePointerMove, { passive: false });
+    window.addEventListener('pointerup', handleCanvasResizeHandlePointerUp);
+    window.addEventListener('pointercancel', handleCanvasResizeHandlePointerCancel);
+  }
+
+  function handleCanvasResizeHandlePointerMove(event) {
+    if (canvasResizeHandleState.pointerId !== event.pointerId || !canvasResizeHandleState.active) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const scale = Math.max(Number(state.scale) || MIN_ZOOM_SCALE, MIN_ZOOM_SCALE);
+    const dx = event.clientX - canvasResizeHandleState.startClientX;
+    const dy = event.clientY - canvasResizeHandleState.startClientY;
+    const deltaWidth = Math.round(dx / scale);
+    const deltaHeight = Math.round(dy / scale);
+    if (canvasResizeHandleState.anchor === 'start') {
+      canvasResizeHandleState.previewWidth = clamp(
+        canvasResizeHandleState.startWidth - deltaWidth,
+        MIN_CANVAS_SIZE,
+        MAX_CANVAS_SIZE
+      );
+      canvasResizeHandleState.previewHeight = clamp(
+        canvasResizeHandleState.startHeight - deltaHeight,
+        MIN_CANVAS_SIZE,
+        MAX_CANVAS_SIZE
+      );
+      canvasResizeHandleState.previewOffsetX = canvasResizeHandleState.previewWidth - canvasResizeHandleState.startWidth;
+      canvasResizeHandleState.previewOffsetY = canvasResizeHandleState.previewHeight - canvasResizeHandleState.startHeight;
+    } else {
+      canvasResizeHandleState.previewWidth = clamp(
+        canvasResizeHandleState.startWidth + deltaWidth,
+        MIN_CANVAS_SIZE,
+        MAX_CANVAS_SIZE
+      );
+      canvasResizeHandleState.previewHeight = clamp(
+        canvasResizeHandleState.startHeight + deltaHeight,
+        MIN_CANVAS_SIZE,
+        MAX_CANVAS_SIZE
+      );
+      canvasResizeHandleState.previewOffsetX = 0;
+      canvasResizeHandleState.previewOffsetY = 0;
+    }
+    setCanvasResizePreviewRect(
+      canvasResizeHandleState.previewWidth * scale,
+      canvasResizeHandleState.previewHeight * scale,
+      {
+        offsetXPx: canvasResizeHandleState.previewOffsetX * scale,
+        offsetYPx: canvasResizeHandleState.previewOffsetY * scale,
+      }
+    );
+    showViewportIndicator(
+      formatCanvasResizeIndicatorLabel(
+        canvasResizeHandleState.previewWidth,
+        canvasResizeHandleState.previewHeight
+      ),
+      { autoHideMs: null }
+    );
+  }
+
+  function handleCanvasResizeHandlePointerUp(event) {
+    if (canvasResizeHandleState.pointerId !== event.pointerId) {
+      return;
+    }
+    stopCanvasResizeHandleInteraction({ apply: true });
+  }
+
+  function handleCanvasResizeHandlePointerCancel(event) {
+    if (canvasResizeHandleState.pointerId !== event.pointerId) {
+      return;
+    }
+    stopCanvasResizeHandleInteraction({ apply: false });
+  }
+
+  function setupCanvasResizeHandle() {
+    const handles = [dom.canvasResizeHandleStart, dom.canvasResizeHandleCorner].filter(handle => handle instanceof HTMLButtonElement);
+    if (!handles.length) {
+      return;
+    }
+    handles.forEach(handle => {
+      if (handle.dataset.bound === 'true') {
+        return;
+      }
+      handle.dataset.bound = 'true';
+      handle.addEventListener('pointerdown', beginCanvasResizeHandleInteraction);
+      handle.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
+    });
+    updateCanvasResizeHandlePosition();
+    syncCanvasResizeHandleVisibility();
   }
 
   function handleFloatingDrawButtonResize() {
@@ -30064,6 +32757,7 @@
     syncControls = true,
     updateScaleLimits = true,
   } = {}) {
+    syncActiveProjectCanvasViewScale();
     const { width, height, scale } = state;
     state.mirror = normalizeMirrorAxisState(state.mirror, width, height);
     const drawingCanvas = dom.canvases.drawing;
@@ -30121,7 +32815,9 @@
         selectionCanvas.style.height = cssHeight;
       }
     }
+    updateGridDecorations();
     resizeVirtualCursorCanvas();
+    syncLocalViewportCanvasDockVisibility({ persist: false, render: false });
     if (applyTransform) {
       applyViewportTransform();
     }
@@ -30135,26 +32831,14 @@
     if (forceRender || drawingReset || overlayReset) {
       markCanvasDirty();
       renderCanvas();
+    } else if (getLocalViewportCanvasCount() > 0) {
+      renderLocalViewportCanvases();
     }
     requestOverlayRender();
   }
 
   function showZoomIndicator(scale) {
-    const indicator = dom.zoomIndicator;
-    if (!indicator) {
-      return;
-    }
-    indicator.textContent = formatZoomLabel(scale);
-    indicator.classList.add('is-visible');
-    indicator.setAttribute('aria-hidden', 'false');
-    if (zoomIndicatorTimeoutId !== null) {
-      window.clearTimeout(zoomIndicatorTimeoutId);
-    }
-    zoomIndicatorTimeoutId = window.setTimeout(() => {
-      indicator.classList.remove('is-visible');
-      indicator.setAttribute('aria-hidden', 'true');
-      zoomIndicatorTimeoutId = null;
-    }, ZOOM_INDICATOR_TIMEOUT);
+    showViewportIndicator(formatZoomLabel(scale), { autoHideMs: ZOOM_INDICATOR_TIMEOUT });
   }
 
   function getVirtualCursorZoomFocus() {
@@ -30259,8 +32943,10 @@
     setZoom(getZoomScaleAtIndex(nextIndex), focus);
   }
 
-  function getCanvasFocusAt(clientX, clientY, { clampToCanvas = false } = {}) {
-    const drawing = dom.canvases.drawing;
+  function getCanvasFocusAt(clientX, clientY, { clampToCanvas = false, surface = null } = {}) {
+    const drawing = surface?.drawing instanceof HTMLCanvasElement
+      ? surface.drawing
+      : dom.canvases.drawing;
     if (!drawing) {
       return null;
     }
@@ -30275,7 +32961,8 @@
     }
     const clampedClientX = clampToCanvas ? clamp(clientX, rect.left, rect.right) : clientX;
     const clampedClientY = clampToCanvas ? clamp(clientY, rect.top, rect.bottom) : clientY;
-    const scale = Number(state.scale) || MIN_ZOOM_SCALE;
+    const canvasDoc = surface?.canvasDoc || getActiveProjectCanvasDocument();
+    const scale = getProjectCanvasDisplayScale(canvasDoc);
     const worldX = (clampedClientX - rect.left) / scale;
     const worldY = (clampedClientY - rect.top) / scale;
     return {
@@ -30326,7 +33013,23 @@
   }
 
   function handleCanvasWheel(event) {
-    const pointerFocus = getCanvasFocusAt(event.clientX, event.clientY);
+    const targetElement = event.target instanceof Element
+      ? event.target
+      : (event.currentTarget instanceof Element ? event.currentTarget : null);
+    const targetSurface = getCanvasInteractionSurfaceFromTarget(targetElement);
+    if (!targetSurface?.canvasDoc) {
+      return;
+    }
+    if (!finalizePendingSelectionBeforeCanvasSwitch(targetSurface.canvasDocId || '')) {
+      return;
+    }
+    if (targetSurface.canvasDocId && targetSurface.canvasDocId !== (getActiveProjectCanvasDocument()?.id || '')) {
+      syncActiveLayerFromInteractionSurface(targetSurface, { syncUi: true, persist: false });
+    }
+    commitPreviewProjectCanvasSelection({ persist: false, flushUi: false });
+    flushActiveProjectCanvasUiSync({ persist: false });
+    const resolvedSurface = getResolvedCanvasInteractionSurface(targetSurface);
+    const pointerFocus = getCanvasFocusAt(event.clientX, event.clientY, { surface: resolvedSurface });
     const focus = state.showVirtualCursor
       ? (getVirtualCursorZoomFocus() || pointerFocus)
       : pointerFocus;
@@ -30593,7 +33296,7 @@
 
   function resetPointerState({ commitHistory: shouldCommit = false } = {}) {
     if (pointerState.pointerId !== null) {
-      const captureTarget = pointerState.panCaptureElement || dom.canvases.drawing;
+      const captureTarget = pointerState.panCaptureElement || pointerState.surface?.drawing || dom.canvases.drawing;
       if (captureTarget && typeof captureTarget.releasePointerCapture === 'function') {
         try {
           captureTarget.releasePointerCapture(pointerState.pointerId);
@@ -30604,6 +33307,7 @@
     }
     pointerState.active = false;
     pointerState.pointerId = null;
+    pointerState.surface = null;
     pointerState.tool = null;
     pointerState.start = null;
     pointerState.current = null;
@@ -30635,6 +33339,7 @@
   function resetPointerStateForVirtualCursor() {
     pointerState.active = false;
     pointerState.pointerId = null;
+    pointerState.surface = null;
     pointerState.tool = null;
     pointerState.start = null;
     pointerState.current = null;
@@ -30801,7 +33506,7 @@
   function finishPanInteraction() {
     detachPointerListeners();
     if (pointerState.pointerId !== null) {
-      const captureTarget = pointerState.panCaptureElement || dom.canvases.drawing;
+      const captureTarget = pointerState.panCaptureElement || pointerState.surface?.drawing || dom.canvases.drawing;
       if (captureTarget && typeof captureTarget.releasePointerCapture === 'function') {
         try {
           captureTarget.releasePointerCapture(pointerState.pointerId);
@@ -30812,6 +33517,7 @@
     }
     pointerState.active = false;
     pointerState.pointerId = null;
+    pointerState.surface = null;
     pointerState.tool = null;
     pointerState.panMode = null;
     pointerState.touchPanStart = null;
@@ -30832,9 +33538,39 @@
   function handlePointerDown(event) {
     markSaveInteractionActivity();
     pointerState.selectionExtendOnDown = false;
+    const targetElement = event.target instanceof Element ? event.target : null;
+    let interactionSurface = getCanvasInteractionSurfaceFromTarget(targetElement) || getMainCanvasInteractionSurface();
+    const activeCanvasIdBeforeDown = getActiveProjectCanvasDocument()?.id || '';
+    const requestedCanvasId = interactionSurface?.canvasDocId || '';
     const isTouch = event.pointerType === 'touch';
+    const shouldTouchSelectOnly = Boolean(
+      isTouch
+      && requestedCanvasId
+      && requestedCanvasId !== activeCanvasIdBeforeDown
+    );
+    if (!finalizePendingSelectionBeforeCanvasSwitch(requestedCanvasId)) {
+      event.preventDefault();
+      updateCanvasControlButtons();
+      requestOverlayRender();
+      return;
+    }
+    syncActiveLayerFromInteractionSurface(interactionSurface, {
+      syncUi: shouldTouchSelectOnly,
+      persist: false,
+    });
+    commitPreviewProjectCanvasSelection({ persist: shouldTouchSelectOnly, flushUi: false });
+    if (!shouldTouchSelectOnly) {
+      flushActiveProjectCanvasUiSync({ persist: false });
+    }
+    interactionSurface = getCanvasInteractionSurfaceFromTarget(targetElement) || getMainCanvasInteractionSurface();
     if (isTouch) {
       updateTouchPointer(event);
+    }
+    if (shouldTouchSelectOnly) {
+      event.preventDefault();
+      hoverPixel = null;
+      requestOverlayRender();
+      return;
     }
     clearTimelineSelectionForCanvasInteraction();
     const isMiddleMousePan = event.pointerType !== 'touch' && event.button === 1;
@@ -30883,14 +33619,10 @@
     }
 
     event.preventDefault();
-    const position = getPointerPosition(event);
+    const position = getPointerPosition(event, { surface: interactionSurface });
     const activeTool = state.tool;
     // If playback is active, don't allow drawing except pan
     if (state.playback.isPlaying && activeTool !== 'pan') {
-      return;
-    }
-    if (isResidentMultiToolRestrictedMode() && !isResidentMultiToolAllowed(activeTool)) {
-      setMultiStatus(localizeText('このキャンバスでは範囲選択・移動系ツールは無効です', 'Selection and move tools are disabled in this canvas'), 'warn');
       return;
     }
     // Spectator (viewer) mode: only allow pan interactions
@@ -30928,7 +33660,8 @@
         // On mobile, one-finger pan is disabled; wait for two-finger gesture.
         return;
       }
-      startPanInteraction(event, { multiTouch: false });
+      pointerState.surface = interactionSurface;
+      startPanInteraction(event, { multiTouch: false, captureElement: interactionSurface?.drawing || dom.canvases.drawing });
       return;
     }
 
@@ -30950,7 +33683,7 @@
       ? getSelectionTransformHandleHit(event.clientX, event.clientY)
       : null;
     if (transformHandle) {
-      const startedTransform = beginSelectionTransformInteraction(event, position, transformHandle);
+      const startedTransform = beginSelectionTransformInteraction(event, position, transformHandle, interactionSurface);
       if (startedTransform) {
         updateCanvasControlButtons();
         return;
@@ -30961,7 +33694,7 @@
       : { enabled: false, cell: null };
 
     if (keyboardState.customBrushGestureArmed) {
-      if (!dom.canvases.drawing) {
+      if (!(interactionSurface?.drawing instanceof HTMLCanvasElement)) {
         return;
       }
       keyboardState.customBrushGestureUsed = true;
@@ -30969,11 +33702,12 @@
       if (state.selectionMask) {
         clearSelection();
       }
-      dom.canvases.drawing.setPointerCapture(event.pointerId);
+      interactionSurface.drawing.setPointerCapture(event.pointerId);
       hoverPixel = null;
       requestOverlayRender();
       pointerState.active = true;
       pointerState.pointerId = event.pointerId;
+      pointerState.surface = interactionSurface;
       pointerState.tool = POINTER_TOOL_CUSTOM_BRUSH_RECT;
       pointerState.start = position;
       pointerState.current = position;
@@ -31018,20 +33752,21 @@
       }
       if (isTouch) {
         hoverPixel = null;
-        captureVirtualCursorPointer(event.pointerId, event.pointerType, dom.canvases.drawing, event);
+        pointerState.surface = interactionSurface;
+        captureVirtualCursorPointer(event.pointerId, event.pointerType, interactionSurface?.drawing || dom.canvases.drawing, event);
         requestOverlayRender();
         return;
       }
       if (event.pointerType === 'mouse' || event.pointerType === 'pen') {
         hoverPixel = null;
-        captureVirtualCursorPointer(event.pointerId, event.pointerType, dom.canvases.drawing, event);
+        pointerState.surface = interactionSurface;
+        captureVirtualCursorPointer(event.pointerId, event.pointerType, interactionSurface?.drawing || dom.canvases.drawing, event);
         requestOverlayRender();
         return;
       }
     }
 
     pointerState.selectionClearedOnDown = false;
-    pointerState.selectionMove = null;
 
     const selectionMask = state.selectionMask;
     const hasSelection = Boolean(selectionMask && selectionMaskHasPixels(selectionMask));
@@ -31040,6 +33775,9 @@
     const selectionInteractionHit = selectionHit || selectionBoundsHit;
     const isSelectionTool = activeTool === 'selectRect' || activeTool === 'selectLasso' || activeTool === 'selectSame' || activeTool === 'move';
     const pendingMoveState = !pointerState.active ? getPendingSelectionMoveState() : null;
+    if (!pendingMoveState) {
+      pointerState.selectionMove = null;
+    }
     const pendingSelectionHit = Boolean(pendingMoveState && isPositionInMoveState(position, pendingMoveState));
     const pendingSelectionBoundsHit = Boolean(pendingMoveState && isPositionInMoveVisualBounds(position, pendingMoveState));
 
@@ -31052,7 +33790,11 @@
           return;
         }
       }
-      confirmPendingSelectionMove({ allowOutOfBoundsClip: true });
+      const cleared = clearSelection();
+      if (!cleared) {
+        updateCanvasControlButtons();
+        return;
+      }
       pointerState.active = false;
       pointerState.pointerId = null;
       pointerState.tool = null;
@@ -31120,18 +33862,20 @@
       if (HISTORY_DRAW_TOOLS.has(activeTool) && !layer) {
         return;
       }
+      pointerState.surface = interactionSurface;
       handleCurvePointerDown(event, position, layer);
       return;
     }
 
-    if (!dom.canvases.drawing) {
+    if (!(interactionSurface?.drawing instanceof HTMLCanvasElement)) {
       return;
     }
-    dom.canvases.drawing.setPointerCapture(event.pointerId);
+    interactionSurface.drawing.setPointerCapture(event.pointerId);
     hoverPixel = null;
     requestOverlayRender();
     pointerState.active = true;
     pointerState.pointerId = event.pointerId;
+    pointerState.surface = interactionSurface;
     pointerState.tool = activeTool;
     pointerState.start = position;
     pointerState.current = position;
@@ -31148,9 +33892,10 @@
       sampleColor(position.x, position.y);
       pointerState.active = false;
       pointerState.drawPaletteIndex = null;
-      if (dom.canvases.drawing) {
-        dom.canvases.drawing.releasePointerCapture(event.pointerId);
+      if (interactionSurface?.drawing instanceof HTMLCanvasElement) {
+        interactionSurface.drawing.releasePointerCapture(event.pointerId);
       }
+      flushActiveProjectCanvasUiSync();
       setActiveTool('pen');
       return;
     }
@@ -31170,13 +33915,14 @@
       pointerState.tool = state.tool;
       pointerState.pointerId = null;
       pointerState.drawPaletteIndex = null;
-      if (dom.canvases.drawing) {
+      if (interactionSurface?.drawing instanceof HTMLCanvasElement) {
         try {
-          dom.canvases.drawing.releasePointerCapture(event.pointerId);
+          interactionSurface.drawing.releasePointerCapture(event.pointerId);
         } catch (error) {
           // Ignore capture release issues.
         }
       }
+      flushActiveProjectCanvasUiSync();
       return;
     }
 
@@ -31320,7 +34066,7 @@
       return;
     }
 
-    const position = getPointerPosition(event, { clampToCanvas: true });
+    const position = getPointerPosition(event, { clampToCanvas: true, surface: pointerState.surface });
     if (!position) return;
     pointerState.current = position;
     pointerState.path.push(position);
@@ -31417,8 +34163,8 @@
 
     updateVirtualCursorFromEvent(event);
 
-    if (dom.canvases.drawing) {
-      dom.canvases.drawing.releasePointerCapture(event.pointerId);
+    if (pointerState.surface?.drawing instanceof HTMLCanvasElement) {
+      pointerState.surface.drawing.releasePointerCapture(event.pointerId);
     }
     pointerState.active = false;
     detachPointerListeners();
@@ -31428,7 +34174,7 @@
       return;
     }
 
-    hoverPixel = getPointerPosition(event);
+    hoverPixel = getPointerPosition(event, { surface: pointerState.surface });
     let tool = pointerState.tool;
     const moveState = pointerState.selectionMove;
     const movePending = Boolean(moveState && moveState.hasCleared);
@@ -31443,6 +34189,7 @@
         promotePendingSelectionMove(moveState, {
           hover: hoverPixel || pointerState.current,
         });
+        pointerState.surface = null;
         return;
       }
       finalizeSelectionMove();
@@ -31522,6 +34269,8 @@
     pointerState.selectionClearedOnDown = false;
     pointerState.selectionExtendOnDown = false;
     pointerState.path = [];
+    pointerState.surface = null;
+    flushActiveProjectCanvasUiSync();
     requestOverlayRender();
   }
 
@@ -31565,7 +34314,10 @@
   }
 
   function beginLayerMove(event, startPosition, layer) {
-    if (!layer || !dom.canvases.drawing) {
+    const captureCanvas = pointerState.surface?.drawing instanceof HTMLCanvasElement
+      ? pointerState.surface.drawing
+      : dom.canvases.drawing;
+    if (!layer || !(captureCanvas instanceof HTMLCanvasElement)) {
       return false;
     }
     hideSelectionTransformMenu();
@@ -31574,7 +34326,7 @@
       return false;
     }
 
-    dom.canvases.drawing.setPointerCapture(event.pointerId);
+    captureCanvas.setPointerCapture(event.pointerId);
     hoverPixel = null;
     requestOverlayRender();
     pointerState.active = true;
@@ -31596,12 +34348,17 @@
   function beginSelectionMove(event, startPosition, options = {}) {
     const { reuseOffset = false } = options || {};
     hideSelectionTransformMenu();
-    const pendingMove = state.pendingPasteMoveState;
     const layer = getActiveLayer();
     let moveState = null;
-    if (pendingMove && reuseOffset) {
+    const pendingMove = reuseOffset ? getPendingSelectionMoveState() : null;
+    if (pendingMove && pendingMove.hasCleared) {
       moveState = pendingMove;
-      state.pendingPasteMoveState = null;
+      if (pointerState.selectionMove === pendingMove) {
+        pointerState.selectionMove = null;
+      }
+      if (state.pendingPasteMoveState === pendingMove) {
+        state.pendingPasteMoveState = null;
+      }
     } else {
       const mask = state.selectionMask;
       const bounds = state.selectionBounds;
@@ -31628,7 +34385,10 @@
       moveState.offset.y = 0;
     }
 
-    dom.canvases.drawing.setPointerCapture(event.pointerId);
+    const captureCanvas = pointerState.surface?.drawing instanceof HTMLCanvasElement
+      ? pointerState.surface.drawing
+      : dom.canvases.drawing;
+    captureCanvas?.setPointerCapture(event.pointerId);
     hoverPixel = null;
     requestOverlayRender();
     pointerState.active = true;
@@ -31661,13 +34421,18 @@
     if (!startPosition) {
       return false;
     }
-    const pendingMove = state.pendingPasteMoveState;
     const layer = getActiveLayer();
 
     let moveState = null;
-    if (pendingMove && reuseOffset) {
+    const pendingMove = reuseOffset ? getPendingSelectionMoveState() : null;
+    if (pendingMove && pendingMove.hasCleared) {
       moveState = pendingMove;
-      state.pendingPasteMoveState = null;
+      if (pointerState.selectionMove === pendingMove) {
+        pointerState.selectionMove = null;
+      }
+      if (state.pendingPasteMoveState === pendingMove) {
+        state.pendingPasteMoveState = null;
+      }
     } else {
       const mask = state.selectionMask;
       const bounds = state.selectionBounds;
@@ -32869,20 +35634,15 @@
       return { reduced: false, sourceColorCount: palette.length, paletteSize: palette.length };
     }
     const layerEntries = [];
-    if (Array.isArray(snapshot.frames)) {
-      snapshot.frames.forEach((frame) => {
-        const layers = Array.isArray(frame?.layers) ? frame.layers : [];
-        layers.forEach((layer) => {
-          if (!(layer?.indices instanceof Int16Array)) {
-            return;
-          }
-          const colorData = buildLayerColorDataForPaletteSync(layer, palette);
-          if (colorData instanceof Uint8ClampedArray) {
-            layerEntries.push({ layer, colorData });
-          }
-        });
-      });
-    }
+    forEachSnapshotCanvasLayer(snapshot, ({ layer }) => {
+      if (!(layer?.indices instanceof Int16Array)) {
+        return;
+      }
+      const colorData = buildLayerColorDataForPaletteSync(layer, palette);
+      if (colorData instanceof Uint8ClampedArray) {
+        layerEntries.push({ layer, colorData });
+      }
+    });
     if (!layerEntries.length) {
       snapshot.palette = palette.slice(0, maxColors).map(color => normalizeColorValue(color));
       return {
@@ -32900,41 +35660,36 @@
       : [{ r: 0, g: 0, b: 0, a: 0 }];
     const colorMode = normalizeColorMode(snapshot.colorMode, COLOR_MODE_INDEX);
     let layerEntryIndex = 0;
-    if (Array.isArray(snapshot.frames)) {
-      snapshot.frames.forEach((frame) => {
-        const layers = Array.isArray(frame?.layers) ? frame.layers : [];
-        layers.forEach((layer) => {
-          if (!(layer?.indices instanceof Int16Array)) {
-            return;
-          }
-          const extractedIndices = Array.isArray(extraction.frameIndices)
-            ? extraction.frameIndices[layerEntryIndex]
-            : null;
-          layerEntryIndex += 1;
-          if (!(extractedIndices instanceof Int16Array) || extractedIndices.length !== layer.indices.length) {
-            return;
-          }
-          if (colorMode === COLOR_MODE_INDEX) {
-            layer.indices = new Int16Array(extractedIndices);
-            layer.direct = null;
-            return;
-          }
-          const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length === layer.indices.length * 4
-            ? layer.direct
-            : null;
-          if (!direct) {
-            layer.indices = new Int16Array(extractedIndices);
-            layer.direct = null;
-            return;
-          }
-          const remappedIndices = new Int16Array(layer.indices);
-          for (let i = 0; i < remappedIndices.length; i += 1) {
-            remappedIndices[i] = layer.indices[i] >= 0 ? extractedIndices[i] : -1;
-          }
-          layer.indices = remappedIndices;
-        });
-      });
-    }
+    forEachSnapshotCanvasLayer(snapshot, ({ layer }) => {
+      if (!(layer?.indices instanceof Int16Array)) {
+        return;
+      }
+      const extractedIndices = Array.isArray(extraction.frameIndices)
+        ? extraction.frameIndices[layerEntryIndex]
+        : null;
+      layerEntryIndex += 1;
+      if (!(extractedIndices instanceof Int16Array) || extractedIndices.length !== layer.indices.length) {
+        return;
+      }
+      if (colorMode === COLOR_MODE_INDEX) {
+        layer.indices = new Int16Array(extractedIndices);
+        layer.direct = null;
+        return;
+      }
+      const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length === layer.indices.length * 4
+        ? layer.direct
+        : null;
+      if (!direct) {
+        layer.indices = new Int16Array(extractedIndices);
+        layer.direct = null;
+        return;
+      }
+      const remappedIndices = new Int16Array(layer.indices);
+      for (let i = 0; i < remappedIndices.length; i += 1) {
+        remappedIndices[i] = layer.indices[i] >= 0 ? extractedIndices[i] : -1;
+      }
+      layer.indices = remappedIndices;
+    });
     const oldActiveColor = normalizeColorValue(
       snapshot.activeRgb
       || palette[clamp(Math.round(Number(snapshot.activePaletteIndex) || 0), 0, Math.max(0, palette.length - 1))]
@@ -32972,57 +35727,52 @@
     let addedCount = 0;
     let convertedPixels = 0;
 
-    if (Array.isArray(snapshot.frames)) {
-      snapshot.frames.forEach((frame) => {
-        const layers = Array.isArray(frame?.layers) ? frame.layers : [];
-        layers.forEach((layer) => {
-          if (!(layer?.indices instanceof Int16Array)) {
-            return;
-          }
-          const pixelCount = layer.indices.length;
-          const expectedLength = pixelCount * 4;
-          const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length === expectedLength
-            ? layer.direct
-            : null;
-          if (!direct) {
-            layer.direct = null;
-            return;
-          }
-          let convertedLayer = false;
-          for (let i = 0; i < pixelCount; i += 1) {
-            if (layer.indices[i] >= 0) {
-              continue;
-            }
-            const base = i * 4;
-            const alpha = direct[base + 3];
-            if (alpha <= 0) {
-              continue;
-            }
-            const result = ensurePaletteColor(palette, paletteLookup, {
-              r: direct[base],
-              g: direct[base + 1],
-              b: direct[base + 2],
-              a: alpha,
-            });
-            if (result.added) {
-              addedCount += 1;
-            }
-            if (colorMode === COLOR_MODE_INDEX) {
-              layer.indices[i] = result.paletteIndex;
-              direct[base] = 0;
-              direct[base + 1] = 0;
-              direct[base + 2] = 0;
-              direct[base + 3] = 0;
-              convertedPixels += 1;
-              convertedLayer = true;
-            }
-          }
-          if (colorMode === COLOR_MODE_INDEX && convertedLayer) {
-            layer.direct = null;
-          }
+    forEachSnapshotCanvasLayer(snapshot, ({ layer }) => {
+      if (!(layer?.indices instanceof Int16Array)) {
+        return;
+      }
+      const pixelCount = layer.indices.length;
+      const expectedLength = pixelCount * 4;
+      const direct = layer.direct instanceof Uint8ClampedArray && layer.direct.length === expectedLength
+        ? layer.direct
+        : null;
+      if (!direct) {
+        layer.direct = null;
+        return;
+      }
+      let convertedLayer = false;
+      for (let i = 0; i < pixelCount; i += 1) {
+        if (layer.indices[i] >= 0) {
+          continue;
+        }
+        const base = i * 4;
+        const alpha = direct[base + 3];
+        if (alpha <= 0) {
+          continue;
+        }
+        const result = ensurePaletteColor(palette, paletteLookup, {
+          r: direct[base],
+          g: direct[base + 1],
+          b: direct[base + 2],
+          a: alpha,
         });
-      });
-    }
+        if (result.added) {
+          addedCount += 1;
+        }
+        if (colorMode === COLOR_MODE_INDEX) {
+          layer.indices[i] = result.paletteIndex;
+          direct[base] = 0;
+          direct[base + 1] = 0;
+          direct[base + 2] = 0;
+          direct[base + 3] = 0;
+          convertedPixels += 1;
+          convertedLayer = true;
+        }
+      }
+      if (colorMode === COLOR_MODE_INDEX && convertedLayer) {
+        layer.direct = null;
+      }
+    });
 
     if (!palette.length) {
       palette.push({ r: 0, g: 0, b: 0, a: 0 });
@@ -33461,11 +36211,6 @@
   }
 
   function cutSelection() {
-    if (isResidentMultiToolRestrictedMode()) {
-      setMultiStatus(localizeText('このキャンバスでは切り取りは使用できません', 'Cut is unavailable in this canvas'), 'warn');
-      updateCanvasControlButtons();
-      return false;
-    }
     const pendingMoveState = getPendingSelectionMoveState();
     if (pendingMoveState) {
       const clipboardMoveState = snapshotPendingSelectionMoveForClipboard(pendingMoveState);
@@ -34228,41 +36973,46 @@
     }
   }
 
-  function getPointerPositionRaw(event, { clampToCanvas = false } = {}) {
-    if (!dom.canvases.drawing) {
+  function getPointerPositionRaw(event, { clampToCanvas = false, surface = null } = {}) {
+    const metrics = getCanvasInteractionSurfaceMetrics(surface || event?.target || null);
+    const drawingCanvas = metrics.surface?.drawing instanceof HTMLCanvasElement
+      ? metrics.surface.drawing
+      : dom.canvases.drawing;
+    if (!drawingCanvas) {
       return null;
     }
-    const rect = dom.canvases.drawing.getBoundingClientRect();
+    const rect = drawingCanvas.getBoundingClientRect();
     if (!(rect.width > 0) || !(rect.height > 0)) {
       return null;
     }
-    const rawX = ((event.clientX - rect.left) / rect.width) * state.width;
-    const rawY = ((event.clientY - rect.top) / rect.height) * state.height;
+    const rawX = ((event.clientX - rect.left) / rect.width) * metrics.width;
+    const rawY = ((event.clientY - rect.top) / rect.height) * metrics.height;
     if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) {
       return null;
     }
     if (clampToCanvas) {
       return {
-        x: clamp(rawX, 0, Math.max(0, state.width - 1)),
-        y: clamp(rawY, 0, Math.max(0, state.height - 1)),
+        x: clamp(rawX, 0, Math.max(0, metrics.width - 1)),
+        y: clamp(rawY, 0, Math.max(0, metrics.height - 1)),
       };
     }
     return { x: rawX, y: rawY };
   }
 
-  function getPointerPosition(event, { clampToCanvas = false } = {}) {
-    const raw = getPointerPositionRaw(event, { clampToCanvas });
+  function getPointerPosition(event, { clampToCanvas = false, surface = null } = {}) {
+    const raw = getPointerPositionRaw(event, { clampToCanvas, surface });
     if (!raw) {
       return null;
     }
+    const metrics = getCanvasInteractionSurfaceMetrics(surface || event?.target || null);
     let x = Math.floor(raw.x);
     let y = Math.floor(raw.y);
     if (clampToCanvas) {
-      x = clamp(x, 0, Math.max(0, state.width - 1));
-      y = clamp(y, 0, Math.max(0, state.height - 1));
+      x = clamp(x, 0, Math.max(0, metrics.width - 1));
+      y = clamp(y, 0, Math.max(0, metrics.height - 1));
       return { x, y };
     }
-    if (x < 0 || y < 0 || x >= state.width || y >= state.height) return null;
+    if (x < 0 || y < 0 || x >= metrics.width || y >= metrics.height) return null;
     return { x, y };
   }
 
@@ -34394,12 +37144,14 @@
   function hideSelectionTransformMenu() {
     const menu = dom.controls.selectionTransformMenu;
     if (!(menu instanceof HTMLElement)) {
+      selectionTransformUi.hoverHandleId = '';
       selectionTransformUi.menuVisible = false;
       selectionTransformUi.menuHandleId = '';
       selectionTransformUi.menuLocalX = null;
       selectionTransformUi.menuLocalY = null;
       return;
     }
+    selectionTransformUi.hoverHandleId = '';
     selectionTransformUi.menuVisible = false;
     selectionTransformUi.menuHandleId = '';
     selectionTransformUi.menuLocalX = null;
@@ -34531,6 +37283,7 @@
   function drawSelectionTransformHandles() {
     if (!shouldRenderSelectionTransformHandles() || !ctx.virtual) {
       selectionTransformUi.handles = [];
+      selectionTransformUi.hoverHandleId = '';
       if (!ctx.virtual || !shouldRenderSelectionTransformHandles()) {
         hideSelectionTransformMenu();
       }
@@ -34540,6 +37293,7 @@
     const metrics = getCanvasScreenMetrics();
     if (!Array.isArray(worldCorners) || worldCorners.length < 4 || !metrics) {
       selectionTransformUi.handles = [];
+      selectionTransformUi.hoverHandleId = '';
       hideSelectionTransformMenu();
       return;
     }
@@ -34548,6 +37302,7 @@
     const bounds = getWorldCornerBounds(worldCorners);
     if (!bounds) {
       selectionTransformUi.handles = [];
+      selectionTransformUi.hoverHandleId = '';
       hideSelectionTransformMenu();
       return;
     }
@@ -34565,16 +37320,25 @@
     for (let i = 0; i < handles.length; i += 1) {
       const handle = handles[i];
       const isActive = selectionTransformUi.interaction?.handleId === handle.id;
-      const size = (SELECTION_TRANSFORM_HANDLE_DRAW_RADIUS_PX * 2) + (isActive ? 2 : 0);
+      const isHovered = !isActive && selectionTransformUi.hoverHandleId === handle.id;
+      const size = (SELECTION_TRANSFORM_HANDLE_DRAW_RADIUS_PX * 2) + (isActive ? 2 : (isHovered ? 1 : 0));
       const drawRect = getSelectionTransformHandleDrawRect(handle.id, handle.x, handle.y, size);
       if (!drawRect) {
         continue;
       }
-      ctx.virtual.fillStyle = isActive ? 'rgba(255, 124, 124, 0.95)' : 'rgba(88, 196, 255, 0.95)';
+      ctx.virtual.save();
+      if (isHovered) {
+        ctx.virtual.shadowColor = 'rgba(255, 218, 118, 0.72)';
+        ctx.virtual.shadowBlur = 10;
+      }
+      ctx.virtual.fillStyle = isActive
+        ? 'rgba(255, 124, 124, 0.95)'
+        : (isHovered ? 'rgba(255, 218, 118, 0.98)' : 'rgba(88, 196, 255, 0.95)');
       ctx.virtual.fillRect(drawRect.left, drawRect.top, size, size);
       ctx.virtual.lineWidth = 2;
-      ctx.virtual.strokeStyle = 'rgba(8, 14, 20, 0.95)';
+      ctx.virtual.strokeStyle = isHovered ? 'rgba(39, 22, 4, 0.96)' : 'rgba(8, 14, 20, 0.95)';
       ctx.virtual.strokeRect(drawRect.left, drawRect.top, size, size);
+      ctx.virtual.restore();
     }
     ctx.virtual.lineWidth = 1;
     ctx.virtual.strokeStyle = 'rgba(255, 255, 255, 0.75)';
@@ -34643,8 +37407,8 @@
       if (!drawRect) {
         continue;
       }
-      const radius = Math.max(8, Number(handle.hitRadius) || SELECTION_TRANSFORM_HANDLE_HIT_RADIUS_PX);
-      const hitPadding = Math.max(3, Math.round(radius - (drawRect.size * 0.5)));
+      const radius = Math.max(0, Number(handle.hitRadius) || SELECTION_TRANSFORM_HANDLE_HIT_RADIUS_PX);
+      const hitPadding = Math.max(0, Math.round(radius - (drawRect.size * 0.5)));
       const hitLeft = drawRect.left - hitPadding;
       const hitTop = drawRect.top - hitPadding;
       const hitRight = drawRect.left + drawRect.size + hitPadding;
@@ -34654,6 +37418,26 @@
       }
     }
     return null;
+  }
+
+  function setSelectionTransformHoverHandle(handleId = '') {
+    const nextHandleId = typeof handleId === 'string' ? handleId : '';
+    if (selectionTransformUi.hoverHandleId === nextHandleId) {
+      return false;
+    }
+    selectionTransformUi.hoverHandleId = nextHandleId;
+    return true;
+  }
+
+  function updateSelectionTransformHandleHover(clientX, clientY) {
+    if (pointerState.active || selectionTransformUi.interaction) {
+      return setSelectionTransformHoverHandle('');
+    }
+    if (!shouldRenderSelectionTransformHandles()) {
+      return setSelectionTransformHoverHandle('');
+    }
+    const hit = getSelectionTransformHandleHit(clientX, clientY);
+    return setSelectionTransformHoverHandle(hit?.id || '');
   }
 
   function getSelectionMoveTransformCenter(moveState) {
@@ -34690,7 +37474,7 @@
     return moveState.hasCleared ? moveState : null;
   }
 
-  function beginSelectionTransformInteraction(event, position, handle) {
+  function beginSelectionTransformInteraction(event, position, handle, surface = null) {
     if (!dom.canvases.drawing || !handle) {
       return false;
     }
@@ -34698,6 +37482,7 @@
     if (!moveState) {
       return false;
     }
+    pointerState.surface = getResolvedCanvasInteractionSurface(surface || event?.target || null);
     const drawCanvas = dom.canvases.drawing;
     const pointerId = event.pointerId;
     try {
@@ -34719,7 +37504,7 @@
     pointerState.selectionClearedOnDown = false;
     pointerState.selectionExtendOnDown = false;
 
-    const raw = getPointerPositionRaw(event, { clampToCanvas: false });
+    const raw = getPointerPositionRaw(event, { clampToCanvas: false, surface: pointerState.surface });
     const center = getSelectionMoveTransformCenter(moveState);
     const transform = getSelectionMoveTransformState(moveState);
     const startAngleDeg = raw && center
@@ -34747,7 +37532,7 @@
     if (!interaction || !moveState) {
       return;
     }
-    const raw = getPointerPositionRaw(event, { clampToCanvas: false });
+    const raw = getPointerPositionRaw(event, { clampToCanvas: false, surface: pointerState.surface });
     const center = getSelectionMoveTransformCenter(moveState);
     if (raw && center) {
       const angleDeg = Math.atan2(raw.y - center.y, raw.x - center.x) * 180 / Math.PI;
@@ -34777,11 +37562,13 @@
   function completeSelectionTransformInteraction(event, { cancel = false } = {}) {
     const moveState = pointerState.selectionMove;
     const interaction = selectionTransformUi.interaction;
+    const surface = pointerState.surface;
     selectionTransformUi.interaction = null;
     detachPointerListeners();
-    if (dom.canvases.drawing && Number.isFinite(pointerState.pointerId)) {
+    const captureCanvas = pointerState.surface?.drawing || dom.canvases.drawing;
+    if (captureCanvas && Number.isFinite(pointerState.pointerId)) {
       try {
-        dom.canvases.drawing.releasePointerCapture(pointerState.pointerId);
+        captureCanvas.releasePointerCapture(pointerState.pointerId);
       } catch (error) {
         // Ignore pointer capture release errors.
       }
@@ -34798,10 +37585,11 @@
     pointerState.selectionMove = null;
 
     if (moveState && moveState.hasCleared) {
-      const hover = event ? getPointerPosition(event, { clampToCanvas: true }) : null;
+      const hover = event ? getPointerPosition(event, { clampToCanvas: true, surface }) : null;
       promotePendingSelectionMove(moveState, { hover });
       scheduleSessionPersist();
     }
+    pointerState.surface = null;
 
     if (cancel || !interaction || interaction.moved) {
       hideSelectionTransformMenu();
@@ -34817,10 +37605,6 @@
     }
     if (isMultiSpectatorMode()) {
       setMultiStatus(localizeText('視聴モードでは描画できません', 'Drawing is disabled in viewer mode'), 'warn');
-      return false;
-    }
-    if (isResidentMultiToolRestrictedMode()) {
-      setMultiStatus(localizeText('このキャンバスでは範囲選択・移動系ツールは無効です', 'Selection and move tools are disabled in this canvas'), 'warn');
       return false;
     }
     if (isMultiAssignedCellRestrictedEditorMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
@@ -34889,7 +37673,6 @@
 
   function setPixelSingle(layer, x, y, paletteIndexOverride) {
     if (x < 0 || y < 0 || x >= state.width || y >= state.height) return;
-    if (!canCurrentClientEditResidentPoint(x, y)) return;
     if (state.selectionMask && state.selectionMask[y * state.width + x] !== 1) return;
     const index = y * state.width + x;
     const base = index * 4;
@@ -35186,12 +37969,6 @@
     if (x < 0 || y < 0 || x >= width || y >= height) {
       return;
     }
-    const residentPointEditable = isResidentMultiConnectedRoom()
-      ? buildResidentPointEditCheckerForClient(multiState.clientId, multiState.projectKey)
-      : null;
-    if (residentPointEditable && !residentPointEditable(x, y)) {
-      return;
-    }
     const indexMode = isIndexColorMode();
     const fillMode = normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
     const paletteIndex = indexMode ? resolveDrawPaletteIndex(paletteIndexOverride) : -1;
@@ -35248,7 +38025,6 @@
       for (let py = 0; py < height; py += 1) {
         const rowOffset = py * width;
         for (let px = 0; px < width; px += 1) {
-          if (residentPointEditable && !residentPointEditable(px, py)) continue;
           const idx = rowOffset + px;
           if (selectionMask && selectionMask[idx] !== 1) continue;
           if (!matchesTarget(idx)) continue;
@@ -35264,7 +38040,6 @@
       const px = stack.pop();
       if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
       if (px < 0 || py < 0 || px >= width || py >= height) continue;
-      if (residentPointEditable && !residentPointEditable(px, py)) continue;
       const idx = py * width + px;
       if (visited[idx]) continue;
       visited[idx] = 1;
@@ -35979,6 +38754,7 @@
       if (frameImage) {
         ctx.drawing.putImageData(frameImage, 0, 0);
         renderFloatingPreviewPanel();
+        renderInactiveProjectCanvasSurfaces();
         return;
       }
     }
@@ -36039,6 +38815,7 @@
 
     ctx.drawing.putImageData(image, x0, y0);
     renderFloatingPreviewPanel();
+    renderInactiveProjectCanvasSurfaces();
   }
 
   function requestOverlayRender() {
@@ -36052,6 +38829,7 @@
       if (!overlayNeedsRedraw) return;
       overlayNeedsRedraw = false;
       renderOverlay(timestamp);
+      renderLocalViewportCanvasOverlays();
     });
   }
 
@@ -36269,11 +39047,17 @@
       return;
     }
     mouseInsideViewport = false;
+    if (!pointerState.active) {
+      clearHoveredProjectCanvas();
+    }
+    if (setSelectionTransformHoverHandle('')) {
+      requestOverlayRender();
+    }
     refreshViewportCursorStyle();
   }
 
   function isCanvasSurfaceTarget(target) {
-    return target === dom.canvases.drawing || target === dom.canvases.overlay || target === dom.canvases.selection;
+    return Boolean(getCanvasInteractionSurfaceFromTarget(target));
   }
 
   function isViewportControlTarget(target) {
@@ -36286,6 +39070,7 @@
       || target.closest('.floating-preview-panel')
       || target.closest('.selection-transform-menu')
       || target.closest('.mirror-handle')
+      || target.closest('.canvas-resize-handle')
     );
   }
 
@@ -36294,6 +39079,32 @@
     const isCanvasTarget = targetElement && isCanvasSurfaceTarget(targetElement);
     const isControlTarget = targetElement && isViewportControlTarget(targetElement);
     const isTouch = event.pointerType === 'touch';
+    const activeTool = state.tool;
+    const isSelectionToolForTransform = activeTool === 'selectRect'
+      || activeTool === 'selectLasso'
+      || activeTool === 'selectSame'
+      || activeTool === 'move'
+      || activeTool === 'selectionTransform';
+
+    if (!isCanvasTarget && !isControlTarget && !pointerState.active) {
+      const transformHandle = isSelectionToolForTransform
+        && !(event.pointerType === 'mouse' && event.button === 2)
+        ? getSelectionTransformHandleHit(event.clientX, event.clientY)
+        : null;
+      if (transformHandle) {
+        const interactionSurface = getResolvedCanvasInteractionSurface(targetElement);
+        const position = getPointerPosition(event, { surface: interactionSurface });
+        if (position) {
+          event.preventDefault();
+          clearTimelineSelectionForCanvasInteraction();
+          const startedTransform = beginSelectionTransformInteraction(event, position, transformHandle, interactionSurface);
+          if (startedTransform) {
+            updateCanvasControlButtons();
+            return;
+          }
+        }
+      }
+    }
 
     if (!isCanvasTarget && !isControlTarget) {
       if (isTouch) {
@@ -36359,6 +39170,11 @@
   }
 
   function handleViewportPointerMove(event) {
+    if (!pointerState.active && (event.pointerType === 'mouse' || event.pointerType === 'pen')) {
+      if (updateSelectionTransformHandleHover(event.clientX, event.clientY)) {
+        requestOverlayRender();
+      }
+    }
     if (!state.showVirtualCursor) {
       return;
     }
@@ -36504,167 +39320,17 @@
     ctx.overlay.restore();
   }
 
-  function shouldRenderResident128SlotGuides(profile = getResidentMultiRoomProfile(multiState.projectKey)) {
-    if (!profile || typeof profile !== 'object') {
-      return false;
-    }
-    if (!isResidentMultiConnectedRoom()) {
-      return false;
-    }
-    if (profile.projectKey !== 'resident-128-main') {
-      return false;
-    }
-    const width = Math.round(Number(profile.width) || 0);
-    const height = Math.round(Number(profile.height) || 0);
-    const columns = Math.max(1, Math.round(Number(profile.slotColumns) || 1));
-    const rows = Math.max(1, Math.round(Number(profile.slotRows) || 1));
-    return width === 128 && height === 128 && columns === 4 && rows === 4;
-  }
-
-  function shouldRenderResidentAssignedRangeGuide(profile = getResidentMultiRoomProfile(multiState.projectKey)) {
-    if (!profile || typeof profile !== 'object') {
-      return false;
-    }
-    if (!isResidentMultiConnectedRoom()) {
-      return false;
-    }
-    if (!isResidentMultiSlotRestricted(profile.projectKey)) {
-      return false;
-    }
-    return profile.projectKey === 'resident-64-main' || profile.projectKey === 'resident-32-main';
-  }
-
-  function drawResidentAssignedRangeGuide() {
-    if (!ctx.virtual) {
-      return;
-    }
-    const profile = getResidentMultiRoomProfile(multiState.projectKey);
-    if (!shouldRenderResidentAssignedRangeGuide(profile)) {
-      return;
-    }
-    const metrics = getCanvasScreenMetrics();
-    if (!metrics) {
-      return;
-    }
-    const unitX = metrics.width / Math.max(1, Number(state.width) || 1);
-    const unitY = metrics.height / Math.max(1, Number(state.height) || 1);
-    // Match major-grid line thickness in screen space (usually 1px).
-    const lineWidth = getResidentAssignedRangeGuideLineWidth();
-    const inset = lineWidth / 2;
-    const dpr = window.devicePixelRatio || 1;
-    const selfSlot = getResidentMultiAssignedSlotIndex(multiState.clientId);
-
-    const toScreenRect = (slotRect) => {
-      if (!slotRect || slotRect.width <= 0 || slotRect.height <= 0) {
-        return null;
-      }
-      return {
-        x: metrics.left + (slotRect.x * unitX),
-        y: metrics.top + (slotRect.y * unitY),
-        width: slotRect.width * unitX,
-        height: slotRect.height * unitY,
-      };
-    };
-
-    const drawScreenRect = (screenRect, strokeStyle) => {
-      if (!screenRect) {
-        return;
-      }
-      ctx.virtual.strokeStyle = strokeStyle;
-      ctx.virtual.strokeRect(
-        screenRect.x + inset,
-        screenRect.y + inset,
-        Math.max(0, screenRect.width - lineWidth),
-        Math.max(0, screenRect.height - lineWidth)
-      );
-    };
-
-    ctx.virtual.save();
-    ctx.virtual.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.virtual.lineWidth = lineWidth;
-    const drawnSlots = new Set();
-    multiState.assignments.forEach((entry, clientId) => {
-      if (!entry || typeof entry !== 'object') {
-        return;
-      }
-      const role = normalizeMultiRole(entry.role, 'guest');
-      if (role !== 'guest' && role !== 'master') {
-        return;
-      }
-      const slot = normalizeResidentMultiSlotIndex(
-        Number.isFinite(Number(entry.residentSlot)) ? Number(entry.residentSlot) : Number(entry.trackHint),
-        profile
-      );
-      if (slot < 0 || drawnSlots.has(slot)) {
-        return;
-      }
-      const slotRect = getResidentMultiSlotRect(slot, profile.projectKey);
-      const screenRect = toScreenRect(slotRect);
-      if (!screenRect) {
-        return;
-      }
-      const isSelf = clientId === multiState.clientId || slot === selfSlot;
-      drawScreenRect(
-        screenRect,
-        isSelf ? 'rgba(255, 32, 32, 0.95)' : 'rgba(128, 196, 255, 0.48)'
-      );
-      drawnSlots.add(slot);
-    });
-    if (selfSlot >= 0 && !drawnSlots.has(selfSlot)) {
-      const selfRect = getResidentMultiSlotRect(selfSlot, profile.projectKey);
-      drawScreenRect(toScreenRect(selfRect), 'rgba(255, 32, 32, 0.95)');
-    }
-    ctx.virtual.restore();
-  }
-
-  function drawResident128SlotGuides() {
-    if (!ctx.overlay) {
-      return;
-    }
-    const profile = getResidentMultiRoomProfile(multiState.projectKey);
-    if (!shouldRenderResident128SlotGuides(profile)) {
-      return;
-    }
-    const columns = Math.max(1, Math.round(Number(profile.slotColumns) || 1));
-    const rows = Math.max(1, Math.round(Number(profile.slotRows) || 1));
-    const assignedRect = getResidentMultiAssignedRect(multiState.clientId);
-    const assignedColor = hexToRgba(getMultiAssignmentColorForClient(multiState.clientId)) || { r: 88, g: 196, b: 255, a: 255 };
-
-    ctx.overlay.save();
-    if (assignedRect && assignedRect.width > 0 && assignedRect.height > 0) {
-      const fillAlpha = isMultiReadOnlyMode() ? 0.1 : 0.16;
-      ctx.overlay.fillStyle = `rgba(${assignedColor.r}, ${assignedColor.g}, ${assignedColor.b}, ${fillAlpha})`;
-      ctx.overlay.fillRect(assignedRect.x, assignedRect.y, assignedRect.width, assignedRect.height);
-      ctx.overlay.strokeStyle = `rgba(${assignedColor.r}, ${assignedColor.g}, ${assignedColor.b}, 0.95)`;
-      ctx.overlay.lineWidth = 1;
-      ctx.overlay.strokeRect(
-        assignedRect.x + 0.5,
-        assignedRect.y + 0.5,
-        Math.max(0, assignedRect.width - 1),
-        Math.max(0, assignedRect.height - 1)
-      );
-    }
-
-    ctx.overlay.strokeStyle = 'rgba(255, 255, 255, 0.62)';
-    ctx.overlay.lineWidth = 1;
-    for (let col = 1; col < columns; col += 1) {
-      const x = getResidentMultiPartitionStart(profile.width, columns, col);
-      ctx.overlay.beginPath();
-      ctx.overlay.moveTo(x + 0.5, 0);
-      ctx.overlay.lineTo(x + 0.5, profile.height);
-      ctx.overlay.stroke();
-    }
-    for (let row = 1; row < rows; row += 1) {
-      const y = getResidentMultiPartitionStart(profile.height, rows, row);
-      ctx.overlay.beginPath();
-      ctx.overlay.moveTo(0, y + 0.5);
-      ctx.overlay.lineTo(profile.width, y + 0.5);
-      ctx.overlay.stroke();
-    }
-    ctx.overlay.restore();
-  }
-
   function renderOverlay(timestamp) {
+    if (
+      pointerState.active
+      && pointerState.surface?.drawing instanceof HTMLCanvasElement
+      && dom.canvases.drawing !== pointerState.surface.drawing
+    ) {
+      const interactionSurface = getCanvasInteractionSurfaceFromTarget(pointerState.surface.drawing);
+      if (interactionSurface?.entry) {
+        bindActiveCanvasSurface(interactionSurface.entry);
+      }
+    }
     const { width, height } = state;
     if (state.playback.isPlaying) {
       resizeVirtualCursorCanvas();
@@ -36717,9 +39383,6 @@
       }
     }
     renderOnionSkin();
-    drawResidentAssignedRangeGuide();
-    drawResident128SlotGuides();
-
     if (hasSelectionOutline) {
       updateSelectionDashAnimation(now);
     } else {
@@ -36732,8 +39395,18 @@
     }
     drawSelectionTransformHandles();
 
+    const hoveredSurface = !pointerState.active
+      ? getProjectCanvasSurfaceByCanvasId(hoveredProjectCanvasId)
+      : null;
+    const hoverPreviewUsesSeparateSurface = Boolean(
+      hoveredSurface
+      && activeCanvasSurface
+      && hoveredSurface !== activeCanvasSurface
+    );
     const virtualFocusPixel = state.showVirtualCursor ? getVirtualCursorCellPosition() : null;
-    const focusPixel = pointerState.active ? pointerState.current : (virtualFocusPixel || hoverPixel);
+    const focusPixel = pointerState.active
+      ? pointerState.current
+      : (virtualFocusPixel || (hoverPreviewUsesSeparateSurface ? null : hoverPixel));
     const activeTool = (virtualCursorDrawState.active && virtualCursorDrawState.tool)
       ? virtualCursorDrawState.tool
       : getActiveTool();
@@ -36973,6 +39646,48 @@
     }
   }
 
+  function drawHoverPreviewOnSurface(surface, center, tool = getActiveTool()) {
+    if (!surface?.overlayCtx || !center) {
+      return;
+    }
+    const canvasDoc = surface.canvasDoc || getProjectCanvasDocumentById(surface.canvasDocId);
+    const width = Math.max(1, Math.round(Number(canvasDoc?.width) || 1));
+    const height = Math.max(1, Math.round(Number(canvasDoc?.height) || 1));
+    const x = Math.floor(Number(center.x) || 0);
+    const y = Math.floor(Number(center.y) || 0);
+    if (x < 0 || y < 0 || x >= width || y >= height) {
+      surface.overlayCtx.clearRect(0, 0, surface.overlay.width, surface.overlay.height);
+      return;
+    }
+    const overlayCtx = surface.overlayCtx;
+    overlayCtx.clearRect(0, 0, surface.overlay.width, surface.overlay.height);
+    overlayCtx.save();
+    if (SELECTION_TOOLS.has(tool) || tool === 'eyedropper' || FILL_TOOLS.has(tool)) {
+      overlayCtx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+      overlayCtx.fillRect(x, y, 1, 1);
+      overlayCtx.strokeStyle = 'rgba(9, 18, 34, 0.92)';
+      overlayCtx.lineWidth = 0.14;
+      overlayCtx.strokeRect(x + 0.07, y + 0.07, 0.86, 0.86);
+      overlayCtx.restore();
+      return;
+    }
+    const previewColor = tool === 'eraser'
+      ? { r: 255, g: 255, b: 255, a: 180 }
+      : normalizeColorValue(getActiveDrawColor());
+    const offsets = getBrushOffsets(clamp(Math.round(state.brushSize || 1), 1, 64));
+    overlayCtx.fillStyle = rgbaToCss(previewColor);
+    for (let i = 0; i < offsets.length; i += 1) {
+      const { dx, dy } = offsets[i];
+      const px = x + dx;
+      const py = y + dy;
+      if (px < 0 || py < 0 || px >= width || py >= height) {
+        continue;
+      }
+      overlayCtx.fillRect(px, py, 1, 1);
+    }
+    overlayCtx.restore();
+  }
+
   function drawBrushPreview(center, tool = getActiveTool(), sizeOverride) {
     if (!center || !ctx.overlay) return;
     const { width, height } = state;
@@ -37158,12 +39873,6 @@
     if (x < 0 || y < 0 || x >= width || y >= height) {
       return [];
     }
-    const residentPointEditable = isResidentMultiConnectedRoom()
-      ? buildResidentPointEditCheckerForClient(multiState.clientId, multiState.projectKey)
-      : null;
-    if (residentPointEditable && !residentPointEditable(x, y)) {
-      return [];
-    }
     const selectionMask = state.selectionMask;
     const startIdx = y * width + x;
     if (selectionMask && selectionMask[startIdx] !== 1) {
@@ -37224,7 +39933,6 @@
       for (let py = 0; py < height; py += 1) {
         const rowOffset = py * width;
         for (let px = 0; px < width; px += 1) {
-          if (residentPointEditable && !residentPointEditable(px, py)) continue;
           const idx = rowOffset + px;
           if (selectionMask && selectionMask[idx] !== 1) continue;
           if (!matchesTarget(idx)) continue;
@@ -37242,7 +39950,6 @@
       const px = stack.pop();
       if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
       if (px < 0 || py < 0 || px >= width || py >= height) continue;
-      if (residentPointEditable && !residentPointEditable(px, py)) continue;
       const idx = py * width + px;
       if (visited[idx]) continue;
       visited[idx] = 1;
@@ -37293,13 +40000,7 @@
     const fillMode = normalizeSelectSameMode(state.selectSameMode, SELECT_SAME_MODE_CONNECTED);
     const activeColor = normalizeColorValue(getActiveDrawColor());
     const colorKey = `${normalizeColorMode(state.colorMode, COLOR_MODE_INDEX)}-${state.activePaletteIndex}-${activeColor.r},${activeColor.g},${activeColor.b},${activeColor.a}`;
-    const residentSlotKey = isResidentMultiConnectedRoom()
-      ? `resident-slot-${Math.max(-1, getResidentMultiAssignedSlotIndex(multiState.clientId))}`
-      : 'resident-slot-none';
-    const residentOwnedKey = isResidentMultiConnectedRoom()
-      ? `resident-owned-${getResidentMultiOwnedSlotSignature(multiState.projectKey)}`
-      : 'resident-owned-none';
-    return `${frame.id}|${layer.id}|${state.width}x${state.height}|${selectionKey}|fill-mode-${fillMode}|${colorKey}|${residentSlotKey}|${residentOwnedKey}`;
+    return `${frame.id}|${layer.id}|${state.width}x${state.height}|${selectionKey}|fill-mode-${fillMode}|${colorKey}`;
   }
 
   function ensureFillPreviewLookup(contextKey) {
@@ -38013,10 +40714,15 @@
         showPixelGuides: Boolean(state.showPixelGuides),
         mirror: normalizeMirrorAxisState(state.mirror, state.width, state.height),
         showVirtualCursor: Boolean(state.showVirtualCursor),
+        showCanvasResizeHandles: Boolean(state.showCanvasResizeHandles ?? true),
         virtualCursorButtonScale: normalizeFloatingDrawButtonScale(state.virtualCursorButtonScale),
         floatingPreview: normalizeFloatingPreviewState(
           state.floatingPreview,
           FLOATING_PREVIEW_DEFAULT_STATE
+        ),
+        localViewportCanvases: normalizeLocalViewportCanvasState(
+          localViewportCanvasState,
+          LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
         ),
         layerVisibilityById: serializeLocalLayerVisibilityMap(localLayerVisibilityById),
         layerPreviewOpacityById: serializeLocalLayerPreviewOpacityMap(localLayerPreviewOpacityById),
@@ -38060,6 +40766,7 @@
           multiState.joinPolicy,
           MULTI_DEFAULT_JOIN_POLICY
         ),
+        multiParticipantFreeCellMove: Boolean(multiState.participantFreeCellMove),
         multiMasterOpsMode: Boolean(multiState.masterOpsMode),
         multiExportPermission: normalizeMultiExportPermission(
           multiState.exportPermission,
@@ -38163,6 +40870,9 @@
     if (typeof payload.showVirtualCursor === 'boolean') {
       state.showVirtualCursor = payload.showVirtualCursor;
     }
+    if (typeof payload.showCanvasResizeHandles === 'boolean') {
+      state.showCanvasResizeHandles = payload.showCanvasResizeHandles;
+    }
     if (Number.isFinite(payload.virtualCursorButtonScale)) {
       state.virtualCursorButtonScale = normalizeFloatingDrawButtonScale(payload.virtualCursorButtonScale);
     }
@@ -38175,6 +40885,17 @@
       state.floatingPreview = normalizeFloatingPreviewState(
         state.floatingPreview,
         FLOATING_PREVIEW_DEFAULT_STATE
+      );
+    }
+    if (Object.prototype.hasOwnProperty.call(payload, 'localViewportCanvases')) {
+      localViewportCanvasState = normalizeLocalViewportCanvasState(
+        payload.localViewportCanvases,
+        localViewportCanvasState
+      );
+    } else {
+      localViewportCanvasState = normalizeLocalViewportCanvasState(
+        localViewportCanvasState,
+        LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
       );
     }
     localLayerVisibilityById = deserializeLocalLayerVisibilityMap(
@@ -38299,6 +41020,9 @@
         multiState.joinPolicy
       );
     }
+    if (typeof payload.multiParticipantFreeCellMove === 'boolean') {
+      multiState.participantFreeCellMove = payload.multiParticipantFreeCellMove;
+    }
     if (typeof payload.multiMasterOpsMode === 'boolean') {
       multiState.masterOpsMode = payload.multiMasterOpsMode;
     }
@@ -38329,6 +41053,13 @@
       return clamp(fallbackNumeric, MULTI_GUEST_LIMIT_MIN, MULTI_GUEST_LIMIT_MAX);
     }
     return MULTI_DEFAULT_GUEST_LIMIT;
+  }
+
+  function normalizeMultiParticipantFreeCellMove(value, fallback = false) {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    return Boolean(fallback);
   }
 
   function normalizeMultiExportPermission(value, fallback = MULTI_DEFAULT_EXPORT_PERMISSION) {
@@ -38723,13 +41454,7 @@
       return true;
     }
     if (normalizedFormat === 'project') {
-      if (isResidentMultiConnectedRoom()) {
-        return false;
-      }
       return isMultiMasterMode();
-    }
-    if (isResidentMultiConnectedRoom()) {
-      return normalizedFormat === 'png';
     }
     const permission = normalizeMultiExportPermission(
       multiState.exportPermission,
@@ -38759,15 +41484,9 @@
       return '';
     }
     if (normalizedFormat === 'project') {
-      if (isResidentMultiConnectedRoom()) {
-        return 'フリー/64/32キャンバスではプロジェクト保存はできません';
-      }
       if (!isMultiMasterMode()) {
         return 'プロジェクト保存はマスターのみ利用できます';
       }
-    }
-    if (isResidentMultiConnectedRoom()) {
-      return `${getExportFormatLabel(normalizedFormat)}はフリー/64/32キャンバスで出力できません（PNGのみ）`;
     }
     return `出力は${getMultiExportPermissionLabel()}に制限されています`;
   }
@@ -38868,546 +41587,8 @@
     });
   }
 
-  function getResidentMultiRoomProfile(projectKey) {
-    const normalizedKey = normalizeMultiProjectKey(projectKey);
-    if (!normalizedKey) {
-      return null;
-    }
-    const profile = RESIDENT_MULTI_ROOM_PROFILES[normalizedKey];
-    if (!profile || typeof profile !== 'object') {
-      return null;
-    }
-    const width = clamp(Math.round(Number(profile.width) || 0), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
-    const height = clamp(Math.round(Number(profile.height) || 0), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
-    const maxGuests = normalizeMultiMaxGuests(profile.maxGuests, multiState.maxGuests);
-    const roomVisibility = normalizeMultiRoomVisibility(
-      profile.roomVisibility,
-      MULTI_ROOM_VISIBILITY_PUBLIC
-    );
-    const slotColumns = clamp(
-      Math.round(Number(profile.slotColumns) || 0),
-      1,
-      Math.max(1, width)
-    );
-    const slotRows = clamp(
-      Math.round(Number(profile.slotRows) || 0),
-      1,
-      Math.max(1, height)
-    );
-    const slotRestriction = profile.slotRestriction === 'free' ? 'free' : 'partition';
-    const slotCount = Math.max(1, Math.max(maxGuests + 1, slotColumns * slotRows));
-    return {
-      projectKey: normalizedKey,
-      width,
-      height,
-      maxGuests,
-      slotColumns,
-      slotRows,
-      slotRestriction,
-      roomNameJa: typeof profile.roomNameJa === 'string' ? profile.roomNameJa.trim() : '',
-      roomNameEn: typeof profile.roomNameEn === 'string' ? profile.roomNameEn.trim() : '',
-      layerNameJa: typeof profile.layerNameJa === 'string' ? profile.layerNameJa.trim() : '',
-      layerNameEn: typeof profile.layerNameEn === 'string' ? profile.layerNameEn.trim() : '',
-      slotCount,
-      roomVisibility,
-    };
-  }
-
-  function isResidentMultiProjectKey(projectKey = multiState.projectKey) {
-    return Boolean(getResidentMultiRoomProfile(projectKey));
-  }
-
-  function isResidentMultiConnectedRoom() {
-    return multiState.connected && isResidentMultiProjectKey(multiState.projectKey);
-  }
-
-  function isResidentMultiSlotRestricted(projectKey = multiState.projectKey) {
-    const profile = getResidentMultiRoomProfile(projectKey);
-    if (!profile || typeof profile !== 'object') {
-      return false;
-    }
-    return profile.slotRestriction !== 'free';
-  }
-
-  function getResidentMultiCanvasLabel(projectKey = multiState.projectKey, { forLayer = false } = {}) {
-    const profile = getResidentMultiRoomProfile(projectKey);
-    if (profile && typeof profile === 'object') {
-      const ja = forLayer
-        ? (profile.layerNameJa || profile.roomNameJa)
-        : (profile.roomNameJa || profile.layerNameJa);
-      const en = forLayer
-        ? (profile.layerNameEn || profile.roomNameEn)
-        : (profile.roomNameEn || profile.layerNameEn);
-      if (ja || en) {
-        return localizeText(ja || 'フリーキャンバス', en || 'Free Canvas');
-      }
-    }
-    return localizeText('フリーキャンバス', 'Free Canvas');
-  }
-
-  function isResidentMultiRestrictedMasterMode() {
-    return isMultiMasterMode() && isResidentMultiProjectKey(multiState.projectKey);
-  }
-
   function isMultiAssignedCellRestrictedEditorMode() {
-    return isMultiGuestMode() || isResidentMultiRestrictedMasterMode();
-  }
-
-  function isResidentMultiToolRestrictedMode() {
-    return isResidentMultiConnectedRoom()
-      && isResidentMultiSlotRestricted(multiState.projectKey)
-      && (isMultiGuestMode() || isResidentMultiRestrictedMasterMode());
-  }
-
-  function isResidentMultiToolAllowed(toolId) {
-    const tool = normalizeToolId(toolId, 'pen');
-    return tool === 'pan'
-      || tool === 'pen'
-      || tool === 'eraser'
-      || tool === 'line'
-      || tool === 'curve'
-      || tool === 'rect'
-      || tool === 'rectFill'
-      || tool === 'ellipse'
-      || tool === 'ellipseFill'
-      || tool === 'fill'
-      || tool === 'eyedropper';
-  }
-
-  function getResidentMultiSlotCount(profile = getResidentMultiRoomProfile(multiState.projectKey)) {
-    if (!profile || typeof profile !== 'object') {
-      return 0;
-    }
-    const slotCount = Math.round(Number(profile.slotCount) || 0);
-    return Math.max(0, slotCount);
-  }
-
-  function normalizeResidentMultiSlotIndex(slotIndex, profile = getResidentMultiRoomProfile(multiState.projectKey)) {
-    const slotCount = getResidentMultiSlotCount(profile);
-    if (!slotCount) {
-      return -1;
-    }
-    const normalized = Math.round(Number(slotIndex) || 0);
-    if (!Number.isFinite(normalized)) {
-      return -1;
-    }
-    return clamp(normalized, 0, slotCount - 1);
-  }
-
-  function getResidentMultiPrimaryLayer() {
-    const frame = Array.isArray(state.frames) && state.frames.length ? state.frames[0] : null;
-    if (!frame || !Array.isArray(frame.layers) || !frame.layers.length) {
-      return null;
-    }
-    return frame.layers[0] || null;
-  }
-
-  function createResidentFlattenedPrimaryLayer(
-    width = state.width,
-    height = state.height,
-    profile = getResidentMultiRoomProfile(multiState.projectKey)
-  ) {
-    const labelProjectKey = profile?.projectKey || multiState.projectKey;
-    const flattenedLayer = createLayer(
-      getResidentMultiCanvasLabel(labelProjectKey, { forLayer: true }),
-      width,
-      height
-    );
-    try {
-      const composite = buildPlaybackFrameImageData(0);
-      if (composite && composite.data instanceof Uint8ClampedArray) {
-        flattenedLayer.indices.fill(-1);
-        const direct = ensureLayerDirect(flattenedLayer, width, height);
-        direct.set(composite.data);
-      }
-    } catch (error) {
-      // If flattening fails, keep an empty layer.
-    }
-    flattenedLayer.visible = true;
-    flattenedLayer.opacity = 1;
-    flattenedLayer.blendMode = DEFAULT_LAYER_BLEND_MODE;
-    return flattenedLayer;
-  }
-
-  function ensureResidentSingleFrameSingleLayer(profile = getResidentMultiRoomProfile(multiState.projectKey)) {
-    if (!profile || typeof profile !== 'object') {
-      return false;
-    }
-    const layerLabel = getResidentMultiCanvasLabel(profile.projectKey || multiState.projectKey, { forLayer: true });
-    const targetWidth = clamp(Math.round(Number(profile.width) || state.width), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
-    const targetHeight = clamp(Math.round(Number(profile.height) || state.height), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
-    let changed = false;
-    if (!Array.isArray(state.frames) || !state.frames.length) {
-      state.frames = [createFrame(
-        getDefaultFrameName(1),
-        [createLayer(layerLabel, targetWidth, targetHeight)],
-        targetWidth,
-        targetHeight
-      )];
-      changed = true;
-    }
-    const frame0 = state.frames[0];
-    const hasSingleFrame = state.frames.length === 1;
-    const hasSingleLayer = Boolean(frame0 && Array.isArray(frame0.layers) && frame0.layers.length === 1);
-    if (!hasSingleFrame || !hasSingleLayer) {
-      const flattenedLayer = createResidentFlattenedPrimaryLayer(targetWidth, targetHeight, profile);
-      const baseFrameName = typeof frame0?.name === 'string' && frame0.name.trim()
-        ? frame0.name.trim()
-        : getDefaultFrameName(1);
-      const baseDuration = Number.isFinite(Number(frame0?.duration)) && Number(frame0.duration) > 0
-        ? Number(frame0.duration)
-        : (1000 / 12);
-      state.frames = [{
-        id: (typeof frame0?.id === 'string' && frame0.id.trim()) ? frame0.id.trim() : (crypto.randomUUID ? crypto.randomUUID() : `frame-${Math.random().toString(36).slice(2)}`),
-        name: baseFrameName,
-        duration: baseDuration,
-        layers: [flattenedLayer],
-      }];
-      changed = true;
-    }
-    const primaryLayer = getResidentMultiPrimaryLayer();
-    if (!primaryLayer) {
-      return changed;
-    }
-    if (!primaryLayer.visible) {
-      primaryLayer.visible = true;
-      changed = true;
-    }
-    if ((typeof primaryLayer.name === 'string' ? primaryLayer.name : '') !== layerLabel) {
-      primaryLayer.name = layerLabel;
-      changed = true;
-    }
-    if (normalizeLayerOpacity(primaryLayer.opacity) !== 1) {
-      primaryLayer.opacity = 1;
-      changed = true;
-    }
-    if (normalizeLayerBlendMode(primaryLayer.blendMode) !== DEFAULT_LAYER_BLEND_MODE) {
-      primaryLayer.blendMode = DEFAULT_LAYER_BLEND_MODE;
-      changed = true;
-    }
-    if (state.activeFrame !== 0) {
-      state.activeFrame = 0;
-      changed = true;
-    }
-    if (state.activeLayer !== primaryLayer.id) {
-      state.activeLayer = primaryLayer.id;
-      changed = true;
-    }
-    return changed;
-  }
-
-  function getResidentMultiPartitionStart(length, parts, index) {
-    const safeLength = Math.max(1, Math.floor(Number(length) || 1));
-    const safeParts = Math.max(1, Math.floor(Number(parts) || 1));
-    const safeIndex = clamp(Math.floor(Number(index) || 0), 0, safeParts - 1);
-    const base = Math.floor(safeLength / safeParts);
-    const rest = safeLength % safeParts;
-    return (safeIndex * base) + Math.min(safeIndex, rest);
-  }
-
-  function getResidentMultiPartitionSize(length, parts, index) {
-    const safeLength = Math.max(1, Math.floor(Number(length) || 1));
-    const safeParts = Math.max(1, Math.floor(Number(parts) || 1));
-    const safeIndex = clamp(Math.floor(Number(index) || 0), 0, safeParts - 1);
-    const base = Math.floor(safeLength / safeParts);
-    const rest = safeLength % safeParts;
-    return base + (safeIndex < rest ? 1 : 0);
-  }
-
-  function getResidentMultiSlotRect(slotIndex, projectKey = multiState.projectKey) {
-    const profile = getResidentMultiRoomProfile(projectKey);
-    if (!profile) {
-      return null;
-    }
-    const normalizedSlot = normalizeResidentMultiSlotIndex(slotIndex, profile);
-    if (normalizedSlot < 0) {
-      return null;
-    }
-    const columns = Math.max(1, Math.round(Number(profile.slotColumns) || 1));
-    const rows = Math.max(1, Math.round(Number(profile.slotRows) || 1));
-    const colIndex = normalizedSlot % columns;
-    const rowIndex = clamp(Math.floor(normalizedSlot / columns), 0, rows - 1);
-    const x = getResidentMultiPartitionStart(profile.width, columns, colIndex);
-    const y = getResidentMultiPartitionStart(profile.height, rows, rowIndex);
-    const width = getResidentMultiPartitionSize(profile.width, columns, colIndex);
-    const height = getResidentMultiPartitionSize(profile.height, rows, rowIndex);
-    return {
-      slotIndex: normalizedSlot,
-      x,
-      y,
-      width,
-      height,
-      xEnd: x + width,
-      yEnd: y + height,
-    };
-  }
-
-  function getResidentMultiSlotIndexFromPoint(x, y, projectKey = multiState.projectKey) {
-    const profile = getResidentMultiRoomProfile(projectKey);
-    if (!profile) {
-      return -1;
-    }
-    const px = Math.floor(Number(x) || 0);
-    const py = Math.floor(Number(y) || 0);
-    if (px < 0 || py < 0 || px >= profile.width || py >= profile.height) {
-      return -1;
-    }
-    const slotCount = getResidentMultiSlotCount(profile);
-    for (let slot = 0; slot < slotCount; slot += 1) {
-      const rect = getResidentMultiSlotRect(slot, profile.projectKey);
-      if (isResidentMultiPointInsideRect(px, py, rect)) {
-        return slot;
-      }
-    }
-    return -1;
-  }
-
-  function isResidentMultiPointInsideRect(x, y, rect) {
-    if (!rect || typeof rect !== 'object') {
-      return false;
-    }
-    const px = Math.floor(Number(x) || 0);
-    const py = Math.floor(Number(y) || 0);
-    return px >= rect.x && py >= rect.y && px < rect.xEnd && py < rect.yEnd;
-  }
-
-  function getResidentMultiAssignedSlotIndex(clientId = multiState.clientId) {
-    if (!isResidentMultiProjectKey(multiState.projectKey)) {
-      return -1;
-    }
-    const assignment = getMultiAssignment(clientId);
-    if (!assignment || typeof assignment !== 'object') {
-      return -1;
-    }
-    const role = normalizeMultiRole(assignment.role, 'guest');
-    if (role !== 'guest' && role !== 'master') {
-      return -1;
-    }
-    const profile = getResidentMultiRoomProfile(multiState.projectKey);
-    if (!profile) {
-      return -1;
-    }
-    const slotFromEntry = Number.isFinite(Number(assignment.residentSlot))
-      ? Number(assignment.residentSlot)
-      : Number(assignment.trackHint);
-    const normalizedSlot = normalizeResidentMultiSlotIndex(slotFromEntry, profile);
-    return normalizedSlot;
-  }
-
-  function getResidentMultiAssignedRect(clientId = multiState.clientId) {
-    const slotIndex = getResidentMultiAssignedSlotIndex(clientId);
-    if (slotIndex < 0) {
-      return null;
-    }
-    return getResidentMultiSlotRect(slotIndex, multiState.projectKey);
-  }
-
-  function isResidentMultiSlotOwned(slotIndex, projectKey = multiState.projectKey) {
-    const profile = getResidentMultiRoomProfile(projectKey);
-    const normalizedSlot = normalizeResidentMultiSlotIndex(slotIndex, profile);
-    if (!profile || normalizedSlot < 0) {
-      return false;
-    }
-    let owned = false;
-    multiState.assignments.forEach(entry => {
-      if (!entry || typeof entry !== 'object' || owned) {
-        return;
-      }
-      const role = normalizeMultiRole(entry.role, 'guest');
-      if (role !== 'guest' && role !== 'master') {
-        return;
-      }
-      const entrySlot = normalizeResidentMultiSlotIndex(
-        Number.isFinite(Number(entry.residentSlot)) ? Number(entry.residentSlot) : Number(entry.trackHint),
-        profile
-      );
-      if (entrySlot === normalizedSlot) {
-        owned = true;
-      }
-    });
-    return owned;
-  }
-
-  function getResidentMultiOwnedSlotSignature(projectKey = multiState.projectKey) {
-    const profile = getResidentMultiRoomProfile(projectKey);
-    if (!profile) {
-      return 'none';
-    }
-    const entries = [];
-    multiState.assignments.forEach((entry, clientId) => {
-      if (!entry || typeof entry !== 'object') {
-        return;
-      }
-      const role = normalizeMultiRole(entry.role, 'guest');
-      if (role !== 'guest' && role !== 'master') {
-        return;
-      }
-      const slot = normalizeResidentMultiSlotIndex(
-        Number.isFinite(Number(entry.residentSlot)) ? Number(entry.residentSlot) : Number(entry.trackHint),
-        profile
-      );
-      if (slot < 0) {
-        return;
-      }
-      const normalizedClientId = typeof clientId === 'string' ? clientId.trim() : '';
-      entries.push(`${slot}:${normalizedClientId}`);
-    });
-    if (!entries.length) {
-      return 'none';
-    }
-    entries.sort((a, b) => a.localeCompare(b));
-    return entries.join('|');
-  }
-
-  function buildResidentPointEditCheckerForClient(clientId = multiState.clientId, projectKey = multiState.projectKey) {
-    const profile = getResidentMultiRoomProfile(projectKey);
-    if (!profile) {
-      return null;
-    }
-    const assignment = getMultiAssignment(clientId);
-    const roleFallback = clientId === multiState.clientId
-      ? normalizeMultiRole(multiState.role, 'guest')
-      : 'guest';
-    const role = normalizeMultiRole(assignment?.role, roleFallback);
-    if (role === 'spectator') {
-      return () => false;
-    }
-    if (!isResidentMultiSlotRestricted(profile.projectKey)) {
-      return () => true;
-    }
-    const normalizedSlot = normalizeResidentMultiSlotIndex(
-      Number.isFinite(Number(assignment?.residentSlot))
-        ? Number(assignment.residentSlot)
-        : Number(assignment?.trackHint),
-      profile
-    );
-    if (normalizedSlot < 0) {
-      return () => false;
-    }
-    const assignedRect = getResidentMultiSlotRect(normalizedSlot, profile.projectKey);
-    if (!assignedRect) {
-      return () => false;
-    }
-    return (x, y) => isResidentMultiPointInsideRect(x, y, assignedRect);
-  }
-
-  function canCurrentClientEditResidentPoint(x, y) {
-    if (!isResidentMultiConnectedRoom()) {
-      return true;
-    }
-    const checker = buildResidentPointEditCheckerForClient(multiState.clientId, multiState.projectKey);
-    if (!checker) {
-      return true;
-    }
-    return checker(x, y);
-  }
-
-  function applyResidentMultiRoomProfile(profile, { announce = false } = {}) {
-    if (!profile || typeof profile !== 'object' || !isMultiMasterMode()) {
-      return false;
-    }
-    const targetWidth = clamp(Math.round(Number(profile.width) || state.width), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
-    const targetHeight = clamp(Math.round(Number(profile.height) || state.height), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
-    const targetMaxGuests = normalizeMultiMaxGuests(profile.maxGuests, multiState.maxGuests);
-    const targetVisibility = normalizeMultiRoomVisibility(
-      profile.roomVisibility,
-      MULTI_ROOM_VISIBILITY_PUBLIC
-    );
-
-    let updated = false;
-    if (ensureResidentSingleFrameSingleLayer(profile)) {
-      updated = true;
-    }
-    if (multiState.maxGuests !== targetMaxGuests) {
-      multiState.maxGuests = targetMaxGuests;
-      updated = true;
-    }
-    if (multiState.roomVisibility !== targetVisibility) {
-      multiState.roomVisibility = targetVisibility;
-      updated = true;
-    }
-
-    if (state.width !== targetWidth || state.height !== targetHeight) {
-      const previousWidth = state.width;
-      const previousHeight = state.height;
-      beginHistory('residentProfileResize');
-      resizeAllLayers(targetWidth, targetHeight);
-      state.width = targetWidth;
-      state.height = targetHeight;
-      rescaleMirrorPivotForCanvas(previousWidth, previousHeight, targetWidth, targetHeight);
-      if (dom.controls.canvasWidth) {
-        dom.controls.canvasWidth.value = String(targetWidth);
-      }
-      if (dom.controls.canvasHeight) {
-        dom.controls.canvasHeight.value = String(targetHeight);
-      }
-      markHistoryDirty();
-      resizeCanvases();
-      clearSelection();
-      requestRender();
-      requestOverlayRender();
-      commitHistory();
-      updated = true;
-    }
-
-    if (!updated) {
-      return false;
-    }
-    renderFrameList();
-    renderLayerList();
-    syncControlsWithState();
-    requestRender();
-    requestOverlayRender();
-    syncMultiControls();
-    scheduleSessionPersist({ includeSnapshots: false });
-    if (announce) {
-      setMultiStatus(`共有モード: キャンバス設定を適用 (${profile.projectKey || multiState.projectKey})`, 'info');
-    }
-    return true;
-  }
-
-  async function primeResidentMasterDocument(profile) {
-    if (!profile || typeof profile !== 'object') {
-      return false;
-    }
-    const restored = await restoreResidentRoomPersistedState(profile);
-    if (restored) {
-      ensureResidentTimelapseCaptureStarted();
-      scheduleResidentRoomPersist({ immediate: false, projectKey: profile.projectKey || multiState.projectKey, force: false });
-      return true;
-    }
-    const targetWidth = clamp(Math.round(Number(profile.width) || state.width), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
-    const targetHeight = clamp(Math.round(Number(profile.height) || state.height), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
-    const projectLabel = getResidentMultiCanvasLabel(profile.projectKey || multiState.projectKey);
-    const layerLabel = getResidentMultiCanvasLabel(profile.projectKey || multiState.projectKey, { forLayer: true });
-    const snapshot = createInitialState({ width: targetWidth, height: targetHeight, name: projectLabel });
-    const frame = Array.isArray(snapshot.frames) && snapshot.frames.length ? snapshot.frames[0] : null;
-    const layer = frame && Array.isArray(frame.layers) && frame.layers.length ? frame.layers[0] : null;
-    if (layer) {
-      layer.name = layerLabel;
-      layer.visible = true;
-      layer.opacity = 1;
-      layer.blendMode = DEFAULT_LAYER_BLEND_MODE;
-    }
-    applyHistorySnapshot(snapshot);
-    history.past = [];
-    history.future = [];
-    history.pending = null;
-    clearTimelapseRecording({ silent: true });
-    resetDocumentUnsavedChanges();
-    updateHistoryButtons();
-    markRemoteMultiStateDirty({ clearLayerPatchSnapshots: true });
-    setTrackedProjectDotBaseline(snapshot, null);
-    syncControlsWithState();
-    renderFrameList();
-    renderLayerList();
-    requestRender();
-    requestOverlayRender();
-    markAutosaveDirty();
-    scheduleAutosaveSnapshot();
-    ensureResidentTimelapseCaptureStarted();
-    scheduleResidentRoomPersist({ immediate: true, projectKey: profile.projectKey || multiState.projectKey, force: true });
-    return true;
+    return isMultiGuestMode();
   }
 
   function parseMultiBooleanQueryValue(value) {
@@ -39570,546 +41751,6 @@
     }
   }
 
-  function normalizeResidentRoomPersistProjectKey(projectKey = multiState.projectKey) {
-    const normalized = normalizeMultiProjectKey(projectKey);
-    if (!normalized) {
-      return '';
-    }
-    if (!isResidentMultiProjectKey(normalized)) {
-      return '';
-    }
-    return normalized;
-  }
-
-  function getResidentRoomPersistStorageKey(projectKey = multiState.projectKey) {
-    const normalized = normalizeResidentRoomPersistProjectKey(projectKey);
-    if (!normalized) {
-      return '';
-    }
-    return `${RESIDENT_ROOM_PERSIST_STORAGE_PREFIX}${normalized}`;
-  }
-
-  function getResidentRoomPersistRemotePath(projectKey = multiState.projectKey) {
-    const normalized = normalizeResidentRoomPersistProjectKey(projectKey);
-    if (!normalized) {
-      return '';
-    }
-    return `${RESIDENT_ROOM_PERSIST_REMOTE_PREFIX}/${normalized}.json`;
-  }
-
-  function getTextByteSize(text) {
-    if (typeof text !== 'string') {
-      return 0;
-    }
-    try {
-      return new Blob([text]).size;
-    } catch (error) {
-      return text.length;
-    }
-  }
-
-  function withTimeoutResult(promise, timeoutMs = 3000, fallback = null) {
-    const safeTimeout = Math.max(50, Math.round(Number(timeoutMs) || 0));
-    return new Promise(resolve => {
-      let settled = false;
-      const timer = window.setTimeout(() => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        resolve(fallback);
-      }, safeTimeout);
-      Promise.resolve(promise)
-        .then(value => {
-          if (settled) {
-            return;
-          }
-          settled = true;
-          window.clearTimeout(timer);
-          resolve(value);
-        })
-        .catch(() => {
-          if (settled) {
-            return;
-          }
-          settled = true;
-          window.clearTimeout(timer);
-          resolve(fallback);
-        });
-    });
-  }
-
-  function thinSerializedTimelapseSnapshotList(list) {
-    if (!Array.isArray(list) || list.length <= 2) {
-      return false;
-    }
-    for (let index = list.length - 2; index >= 1; index -= 2) {
-      list.splice(index, 1);
-    }
-    return true;
-  }
-
-  function buildResidentRoomPersistSignature(projectKey = multiState.projectKey) {
-    const normalizedProjectKey = normalizeResidentRoomPersistProjectKey(projectKey);
-    if (!normalizedProjectKey) {
-      return '';
-    }
-    return [
-      normalizedProjectKey,
-      String(Math.round(Number(state.width) || 0)),
-      String(Math.round(Number(state.height) || 0)),
-      String(Math.round(Number(unsavedChangeToken) || 0)),
-      String(Math.round(Number(timelapseState.lastCaptureToken) || 0)),
-      String(Array.isArray(timelapseState.snapshots) ? timelapseState.snapshots.length : 0),
-      timelapseState.enabled ? '1' : '0',
-    ].join('|');
-  }
-
-  function ensureResidentTimelapseCaptureStarted() {
-    if (!isResidentMultiRestrictedMasterMode()) {
-      return false;
-    }
-    if (!timelapseState.enabled) {
-      timelapseState.enabled = true;
-    }
-    if (Array.isArray(timelapseState.snapshots) && timelapseState.snapshots.length > 0) {
-      return false;
-    }
-    const startEntry = createTimelapseFrameEntryFromState();
-    if (!startEntry) {
-      return false;
-    }
-    timelapseState.snapshots.push(startEntry);
-    timelapseState.lastCaptureToken = unsavedChangeToken;
-    syncTimelapseControls();
-    updateMemoryStatus();
-    return true;
-  }
-
-  function buildResidentRoomPersistPayload(projectKey = multiState.projectKey, { maxBytes = 0 } = {}) {
-    const normalizedProjectKey = normalizeResidentRoomPersistProjectKey(projectKey);
-    if (!normalizedProjectKey) {
-      return null;
-    }
-    const snapshot = makeHistorySnapshot({
-      includeUiState: false,
-      includeSelection: false,
-      clonePixelData: false,
-    });
-    if (!snapshot || !Array.isArray(snapshot.frames) || !snapshot.frames.length) {
-      return null;
-    }
-    const sessionPayload = buildAutosaveSessionPayload();
-    const timelapsePayload = sessionPayload && typeof sessionPayload.timelapse === 'object'
-      ? {
-        enabled: Boolean(sessionPayload.timelapse.enabled),
-        fps: normalizeTimelapseFps(sessionPayload.timelapse.fps),
-        warningShown: Boolean(sessionPayload.timelapse.warningShown),
-        sampleStep: Math.max(1, Math.round(Number(sessionPayload.timelapse.sampleStep) || 1)),
-        lastCaptureToken: Number.isFinite(Number(sessionPayload.timelapse.lastCaptureToken))
-          ? Math.round(Number(sessionPayload.timelapse.lastCaptureToken))
-          : -1,
-        snapshots: Array.isArray(sessionPayload.timelapse.snapshots)
-          ? sessionPayload.timelapse.snapshots.slice()
-          : [],
-      }
-      : {
-        enabled: true,
-        fps: normalizeTimelapseFps(timelapseState.fps),
-        warningShown: false,
-        sampleStep: 1,
-        lastCaptureToken: -1,
-        snapshots: [],
-      };
-    const payload = {
-      version: RESIDENT_ROOM_PERSIST_VERSION,
-      projectKey: normalizedProjectKey,
-      updatedAt: Date.now(),
-      document: serializeDocumentSnapshot(snapshot),
-      session: {
-        historyLimit: normalizeProjectHistoryLimit(history.limit, DEFAULT_HISTORY_LIMIT),
-        historyPast: [],
-        historyFuture: [],
-        timelapse: timelapsePayload,
-      },
-    };
-
-    let encoded = encodeReloadSnapshotPayload(payload);
-    if (!encoded) {
-      return null;
-    }
-    const limit = Math.max(0, Math.floor(Number(maxBytes) || 0));
-    if (limit > 0) {
-      let safety = 0;
-      while (getTextByteSize(encoded) > limit && safety < 10) {
-        const snapshots = payload.session?.timelapse?.snapshots;
-        if (!Array.isArray(snapshots) || snapshots.length <= 12) {
-          break;
-        }
-        const thinned = thinSerializedTimelapseSnapshotList(snapshots);
-        if (!thinned) {
-          break;
-        }
-        payload.session.timelapse.sampleStep = Math.max(
-          1,
-          Math.round(Number(payload.session.timelapse.sampleStep) || 1) * 2
-        );
-        payload.session.timelapse.warningShown = true;
-        encoded = encodeReloadSnapshotPayload(payload);
-        if (!encoded) {
-          return null;
-        }
-        safety += 1;
-      }
-    }
-    return { payload, encoded };
-  }
-
-  function readResidentRoomPersistPayloadFromEncoded(encodedText, projectKey = multiState.projectKey) {
-    if (typeof encodedText !== 'string' || !encodedText.length) {
-      return null;
-    }
-    const normalizedProjectKey = normalizeResidentRoomPersistProjectKey(projectKey);
-    if (!normalizedProjectKey) {
-      return null;
-    }
-    const parsed = decodeReloadSnapshotPayload(encodedText);
-    if (!parsed || typeof parsed !== 'object') {
-      return null;
-    }
-    const version = Math.round(Number(parsed.version) || 0);
-    const payloadProjectKey = normalizeMultiProjectKey(parsed.projectKey || '');
-    if (version !== RESIDENT_ROOM_PERSIST_VERSION || payloadProjectKey !== normalizedProjectKey) {
-      return null;
-    }
-    const updatedAt = Number(parsed.updatedAt);
-    if (Number.isFinite(updatedAt)) {
-      const age = Date.now() - updatedAt;
-      if (age < 0 || age > RESIDENT_ROOM_PERSIST_MAX_AGE_MS) {
-        return null;
-      }
-    }
-    if (!parsed.document || typeof parsed.document !== 'object') {
-      return null;
-    }
-    let snapshot = null;
-    try {
-      snapshot = deserializeDocumentPayload(parsed.document);
-    } catch (error) {
-      return null;
-    }
-    if (!snapshot || !Array.isArray(snapshot.frames) || !snapshot.frames.length) {
-      return null;
-    }
-    const profile = getResidentMultiRoomProfile(normalizedProjectKey);
-    if (profile) {
-      const snapshotWidth = Math.max(1, Math.round(Number(snapshot.width) || 0));
-      const snapshotHeight = Math.max(1, Math.round(Number(snapshot.height) || 0));
-      if (snapshotWidth !== profile.width || snapshotHeight !== profile.height) {
-        return null;
-      }
-    }
-    const projectSession = parseProjectSessionPayload(parsed.session);
-    return {
-      snapshot,
-      projectSession,
-      updatedAt: Number(parsed.updatedAt) || 0,
-      payload: parsed,
-    };
-  }
-
-  function readResidentRoomPersistPayloadFromLocal(projectKey = multiState.projectKey) {
-    if (!canUseSessionStorage) {
-      return null;
-    }
-    const storageKey = getResidentRoomPersistStorageKey(projectKey);
-    if (!storageKey) {
-      return null;
-    }
-    let raw = '';
-    try {
-      raw = window.localStorage.getItem(storageKey) || '';
-    } catch (error) {
-      return null;
-    }
-    if (!raw) {
-      return null;
-    }
-    const parsed = readResidentRoomPersistPayloadFromEncoded(raw, projectKey);
-    if (!parsed) {
-      try {
-        window.localStorage.removeItem(storageKey);
-      } catch (error) {
-        // Ignore storage errors.
-      }
-    }
-    return parsed;
-  }
-
-  function writeResidentRoomPersistPayloadToLocal(encodedText, projectKey = multiState.projectKey) {
-    if (!canUseSessionStorage || typeof encodedText !== 'string' || !encodedText.length) {
-      return false;
-    }
-    const storageKey = getResidentRoomPersistStorageKey(projectKey);
-    if (!storageKey) {
-      return false;
-    }
-    try {
-      window.localStorage.setItem(storageKey, encodedText);
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  async function readResidentRoomPersistPayloadFromRemote(projectKey = multiState.projectKey) {
-    const normalizedProjectKey = normalizeResidentRoomPersistProjectKey(projectKey);
-    if (!normalizedProjectKey) {
-      return null;
-    }
-    const remotePath = getResidentRoomPersistRemotePath(normalizedProjectKey);
-    if (!remotePath) {
-      return null;
-    }
-    try {
-      const supabase = await ensureMultiSupabaseClient();
-      if (!supabase?.storage?.from) {
-        return null;
-      }
-      const bucketCandidates = [RESIDENT_ROOM_PERSIST_REMOTE_BUCKET]
-        .concat(Array.isArray(RESIDENT_ROOM_PERSIST_REMOTE_LEGACY_BUCKETS) ? RESIDENT_ROOM_PERSIST_REMOTE_LEGACY_BUCKETS : []);
-      const visited = new Set();
-      for (let index = 0; index < bucketCandidates.length; index += 1) {
-        const bucket = typeof bucketCandidates[index] === 'string' ? bucketCandidates[index].trim() : '';
-        if (!bucket || visited.has(bucket)) {
-          continue;
-        }
-        visited.add(bucket);
-        const downloadResult = await withTimeoutResult(
-          supabase
-            .storage
-            .from(bucket)
-            .download(remotePath),
-          2600,
-          null
-        );
-        const data = downloadResult?.data || null;
-        const error = downloadResult?.error || null;
-        if (error || !data) {
-          continue;
-        }
-        let raw = '';
-        try {
-          raw = await data.text();
-        } catch (errorRead) {
-          raw = '';
-        }
-        if (typeof raw !== 'string' || !raw.length) {
-          continue;
-        }
-        const parsed = readResidentRoomPersistPayloadFromEncoded(raw, normalizedProjectKey);
-        if (parsed) {
-          return Object.assign({}, parsed, { sourceBucket: bucket });
-        }
-      }
-      return null;
-    } catch (error) {
-      return null;
-    }
-  }
-
-  async function writeResidentRoomPersistPayloadToRemote(encodedText, projectKey = multiState.projectKey) {
-    if (typeof encodedText !== 'string' || !encodedText.length) {
-      return false;
-    }
-    const normalizedProjectKey = normalizeResidentRoomPersistProjectKey(projectKey);
-    if (!normalizedProjectKey) {
-      return false;
-    }
-    const remotePath = getResidentRoomPersistRemotePath(normalizedProjectKey);
-    if (!remotePath) {
-      return false;
-    }
-    if (getTextByteSize(encodedText) > RESIDENT_ROOM_PERSIST_REMOTE_MAX_BYTES) {
-      return false;
-    }
-    try {
-      const supabase = await ensureMultiSupabaseClient();
-      if (!supabase?.storage?.from) {
-        return false;
-      }
-      const payloadBlob = new Blob([encodedText], { type: 'text/plain;charset=utf-8' });
-      const uploadResult = await withTimeoutResult(
-        supabase
-          .storage
-          .from(RESIDENT_ROOM_PERSIST_REMOTE_BUCKET)
-          .upload(remotePath, payloadBlob, {
-            upsert: true,
-            contentType: 'text/plain;charset=utf-8',
-            cacheControl: '0',
-          }),
-        2600,
-        null
-      );
-      const error = uploadResult?.error || null;
-      return !error;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  function applyResidentRoomPersistedState(restored) {
-    if (!restored || typeof restored !== 'object' || !restored.snapshot) {
-      return false;
-    }
-    const snapshot = restored.snapshot;
-    const projectSession = restored.projectSession;
-    autosaveRestoring = true;
-    try {
-      applyHistorySnapshot(snapshot);
-      history.pending = null;
-      if (projectSession) {
-        history.limit = projectSession.historyLimit;
-        history.past = projectSession.historyPast;
-        history.future = projectSession.historyFuture;
-        if (!(timelapseState.snapshots instanceof Array)) {
-          timelapseState.snapshots = [];
-        }
-        timelapseState.snapshots.length = 0;
-        projectSession.timelapse.snapshots.forEach(entry => {
-          timelapseState.snapshots.push(entry);
-        });
-        timelapseState.enabled = true;
-        timelapseState.fps = normalizeTimelapseFps(projectSession.timelapse.fps);
-        timelapseState.warningShown = Boolean(projectSession.timelapse.warningShown);
-        timelapseState.sampleStep = Math.max(1, Math.round(Number(projectSession.timelapse.sampleStep) || 1));
-        timelapseState.lastCaptureToken = Number.isFinite(Number(projectSession.timelapse.lastCaptureToken))
-          ? Math.round(Number(projectSession.timelapse.lastCaptureToken))
-          : -1;
-      } else {
-        history.past = [];
-        history.future = [];
-        clearTimelapseRecording({ silent: true });
-      }
-    } finally {
-      autosaveRestoring = false;
-    }
-    clearMultiLayerPatchSnapshots();
-    syncTimelapseControls();
-    updateHistoryButtons();
-    updateMemoryStatus();
-    resetDocumentUnsavedChanges();
-    setTrackedProjectDotBaseline(snapshot, null);
-    syncControlsWithState();
-    renderFrameList();
-    renderLayerList();
-    requestRender();
-    requestOverlayRender();
-    return true;
-  }
-
-  async function restoreResidentRoomPersistedState(profile = getResidentMultiRoomProfile(multiState.projectKey)) {
-    if (!profile || typeof profile !== 'object') {
-      return false;
-    }
-    const projectKey = normalizeResidentRoomPersistProjectKey(profile.projectKey || multiState.projectKey);
-    if (!projectKey) {
-      return false;
-    }
-    const remote = await readResidentRoomPersistPayloadFromRemote(projectKey);
-    if (remote && applyResidentRoomPersistedState(remote)) {
-      const encoded = encodeReloadSnapshotPayload(remote.payload);
-      if (encoded) {
-        writeResidentRoomPersistPayloadToLocal(encoded, projectKey);
-        const sourceBucket = typeof remote.sourceBucket === 'string' ? remote.sourceBucket.trim() : '';
-        if (sourceBucket && sourceBucket !== RESIDENT_ROOM_PERSIST_REMOTE_BUCKET) {
-          writeResidentRoomPersistPayloadToRemote(encoded, projectKey).catch(() => {});
-        }
-      }
-      return true;
-    }
-    // Resident rooms must always restore from the shared source.
-    // Do not restore from per-device local cache to avoid per-user divergence.
-    return false;
-  }
-
-  function clearResidentRoomPersistTimer() {
-    if (multiState.residentPersistTimer !== null) {
-      window.clearTimeout(multiState.residentPersistTimer);
-      multiState.residentPersistTimer = null;
-    }
-  }
-
-  function shouldPersistResidentRoomState(projectKey = multiState.projectKey) {
-    const normalizedProjectKey = normalizeResidentRoomPersistProjectKey(projectKey);
-    if (!normalizedProjectKey) {
-      return false;
-    }
-    return Boolean(isMultiMasterMode() && !multiState.connecting && multiState.connected);
-  }
-
-  async function flushResidentRoomPersistNow({ projectKey = multiState.projectKey, force = false } = {}) {
-    const normalizedProjectKey = normalizeResidentRoomPersistProjectKey(projectKey);
-    if (!normalizedProjectKey) {
-      return false;
-    }
-    if (!shouldPersistResidentRoomState(normalizedProjectKey)) {
-      return false;
-    }
-    if (multiState.residentPersistInFlight) {
-      multiState.residentPersistQueued = true;
-      return false;
-    }
-    ensureResidentTimelapseCaptureStarted();
-    const signature = buildResidentRoomPersistSignature(normalizedProjectKey);
-    if (!force && signature && signature === multiState.residentPersistSignature) {
-      return true;
-    }
-    multiState.residentPersistInFlight = true;
-    let persisted = false;
-    try {
-      const built = buildResidentRoomPersistPayload(normalizedProjectKey, {
-        maxBytes: RESIDENT_ROOM_PERSIST_REMOTE_MAX_BYTES,
-      });
-      if (!built || typeof built.encoded !== 'string' || !built.encoded.length) {
-        return false;
-      }
-      const localSaved = writeResidentRoomPersistPayloadToLocal(built.encoded, normalizedProjectKey);
-      const remoteSaved = await writeResidentRoomPersistPayloadToRemote(built.encoded, normalizedProjectKey);
-      persisted = Boolean(localSaved || remoteSaved);
-      if (persisted && signature) {
-        multiState.residentPersistSignature = signature;
-      }
-      return persisted;
-    } finally {
-      multiState.residentPersistInFlight = false;
-      if (multiState.residentPersistQueued) {
-        multiState.residentPersistQueued = false;
-        scheduleResidentRoomPersist({ immediate: true, projectKey: normalizedProjectKey, force: !persisted });
-      }
-    }
-  }
-
-  function scheduleResidentRoomPersist({ immediate = false, projectKey = multiState.projectKey, force = false } = {}) {
-    const normalizedProjectKey = normalizeResidentRoomPersistProjectKey(projectKey);
-    if (!normalizedProjectKey || !shouldPersistResidentRoomState(normalizedProjectKey)) {
-      clearResidentRoomPersistTimer();
-      return;
-    }
-    if (immediate) {
-      clearResidentRoomPersistTimer();
-      flushResidentRoomPersistNow({ projectKey: normalizedProjectKey, force }).catch(() => {});
-      return;
-    }
-    if (multiState.residentPersistTimer !== null) {
-      return;
-    }
-    multiState.residentPersistTimer = window.setTimeout(() => {
-      multiState.residentPersistTimer = null;
-      flushResidentRoomPersistNow({ projectKey: normalizedProjectKey, force }).catch(() => {});
-    }, RESIDENT_ROOM_PERSIST_WRITE_DELAY);
-  }
-
   function clearStoredMultiResumeSession() {
     if (!canUseSessionStorage) {
       return;
@@ -40154,6 +41795,9 @@
           MULTI_DEFAULT_JOIN_POLICY
         )
         : MULTI_DEFAULT_JOIN_POLICY,
+      participantFreeCellMove: role === 'master'
+        ? normalizeMultiParticipantFreeCellMove(multiState.participantFreeCellMove, false)
+        : false,
       exportPermission: role === 'master'
         ? normalizeMultiExportPermission(multiState.exportPermission, MULTI_DEFAULT_EXPORT_PERMISSION)
         : MULTI_DEFAULT_EXPORT_PERMISSION,
@@ -40209,6 +41853,9 @@
     const joinPolicy = role === 'master'
       ? normalizeMultiJoinPolicy(parsed.joinPolicy, MULTI_DEFAULT_JOIN_POLICY)
       : MULTI_DEFAULT_JOIN_POLICY;
+    const participantFreeCellMove = role === 'master'
+      ? normalizeMultiParticipantFreeCellMove(parsed.participantFreeCellMove, false)
+      : false;
     const exportPermission = role === 'master'
       ? normalizeMultiExportPermission(parsed.exportPermission, MULTI_DEFAULT_EXPORT_PERMISSION)
       : MULTI_DEFAULT_EXPORT_PERMISSION;
@@ -40220,6 +41867,7 @@
       maxGuests,
       roomVisibility,
       joinPolicy,
+      participantFreeCellMove,
       exportPermission,
     };
   }
@@ -40253,6 +41901,9 @@
     multiState.resumeJoinPolicy = pending.role === 'master'
       ? normalizeMultiJoinPolicy(pending.joinPolicy, multiState.joinPolicy)
       : null;
+    multiState.resumeParticipantFreeCellMove = pending.role === 'master'
+      ? normalizeMultiParticipantFreeCellMove(pending.participantFreeCellMove, multiState.participantFreeCellMove)
+      : null;
     multiState.resumeExportPermission = pending.role === 'master'
       ? normalizeMultiExportPermission(pending.exportPermission, multiState.exportPermission)
       : null;
@@ -40265,6 +41916,10 @@
       multiState.joinPolicy = normalizeMultiJoinPolicy(
         pending.joinPolicy,
         multiState.joinPolicy
+      );
+      multiState.participantFreeCellMove = normalizeMultiParticipantFreeCellMove(
+        pending.participantFreeCellMove,
+        multiState.participantFreeCellMove
       );
       multiState.exportPermission = normalizeMultiExportPermission(
         pending.exportPermission,
@@ -40326,8 +41981,7 @@
   function canCurrentClientRequestGuestRole() {
     return multiState.connected
       && !multiState.connecting
-      && multiState.role === 'spectator'
-      && !isResidentMultiProjectKey(multiState.projectKey);
+      && multiState.role === 'spectator';
   }
 
   function clearMultiJoinRequests() {
@@ -40347,6 +42001,92 @@
       return false;
     }
     return multiState.pendingJoinRequests.delete(normalizedClientId);
+  }
+
+  function getPendingMultiAssignmentMoveRequest(clientId) {
+    if (!(multiState.pendingAssignmentMoveRequests instanceof Map)) {
+      return null;
+    }
+    const normalizedClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    if (!normalizedClientId) {
+      return null;
+    }
+    return multiState.pendingAssignmentMoveRequests.get(normalizedClientId) || null;
+  }
+
+  function removePendingMultiAssignmentMoveRequest(clientId) {
+    if (!(multiState.pendingAssignmentMoveRequests instanceof Map)) {
+      return false;
+    }
+    const normalizedClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    if (!normalizedClientId) {
+      return false;
+    }
+    return multiState.pendingAssignmentMoveRequests.delete(normalizedClientId);
+  }
+
+  function upsertPendingMultiAssignmentMoveRequest(
+    clientId,
+    frameIndexRaw,
+    trackIndexRaw,
+    sentAt = Date.now(),
+    canvasId = ''
+  ) {
+    const normalizedClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    if (!normalizedClientId) {
+      return false;
+    }
+    const frameIndex = Math.max(0, Math.round(Number(frameIndexRaw) || 0));
+    const trackIndex = Math.max(0, Math.round(Number(trackIndexRaw) || 0));
+    const normalizedCanvasId = normalizeMultiAssignmentCanvasId(
+      canvasId,
+      getMultiAssignment(normalizedClientId)?.canvasId || getActiveProjectCanvasDocument()?.id || ''
+    );
+    if (!(multiState.pendingAssignmentMoveRequests instanceof Map)) {
+      multiState.pendingAssignmentMoveRequests = new Map();
+    }
+    multiState.pendingAssignmentMoveRequests.set(normalizedClientId, {
+      clientId: normalizedClientId,
+      canvasId: normalizedCanvasId,
+      frameIndex,
+      trackIndex,
+      sentAt: Number.isFinite(Number(sentAt)) ? Math.round(Number(sentAt)) : Date.now(),
+    });
+    return true;
+  }
+
+  function prunePendingMultiAssignmentMoveRequests() {
+    if (!(multiState.pendingAssignmentMoveRequests instanceof Map) || !multiState.pendingAssignmentMoveRequests.size) {
+      return;
+    }
+    multiState.pendingAssignmentMoveRequests.forEach((entry, clientId) => {
+      if (!clientId || clientId === multiState.clientId || isMultiClientBlocked(clientId)) {
+        multiState.pendingAssignmentMoveRequests.delete(clientId);
+        return;
+      }
+      const assignment = getMultiAssignment(clientId);
+      if (!assignment || assignment.role !== 'guest') {
+        multiState.pendingAssignmentMoveRequests.delete(clientId);
+        return;
+      }
+      const canvasId = normalizeMultiAssignmentCanvasId(entry?.canvasId, assignment.canvasId || '');
+      const canvasDoc = getProjectCanvasDocumentById(canvasId);
+      if (!canvasDoc) {
+        multiState.pendingAssignmentMoveRequests.delete(clientId);
+        return;
+      }
+      const frameIndex = Math.round(Number(entry?.frameIndex));
+      const trackIndex = Math.round(Number(entry?.trackIndex));
+      const canvasFrameCount = Array.isArray(canvasDoc.frames) ? canvasDoc.frames.length : 0;
+      if (!canvasFrameCount || !Number.isFinite(frameIndex) || frameIndex < 0 || frameIndex >= canvasFrameCount) {
+        multiState.pendingAssignmentMoveRequests.delete(clientId);
+        return;
+      }
+      const layerCount = Array.isArray(canvasDoc.frames[frameIndex]?.layers) ? canvasDoc.frames[frameIndex].layers.length : 0;
+      if (!layerCount || !Number.isFinite(trackIndex) || trackIndex < 0 || trackIndex >= layerCount) {
+        multiState.pendingAssignmentMoveRequests.delete(clientId);
+      }
+    });
   }
 
   function upsertMultiJoinRequest(clientId, name = '', sentAt = Date.now()) {
@@ -40408,12 +42148,11 @@
     const requestField = dom.controls.multiJoinRequestField;
     const requestButton = dom.controls.multiRequestGuestRole;
     const requestHint = dom.controls.multiJoinRequestHint;
-    const isResidentRoom = isResidentMultiProjectKey(multiState.projectKey);
     const joinPolicy = normalizeMultiJoinPolicy(
       multiState.joinPolicy,
       MULTI_DEFAULT_JOIN_POLICY
     );
-    const isRequestAreaVisible = !isResidentRoom && (canCurrentClientRequestGuestRole() || multiState.joinRequestPending);
+    const isRequestAreaVisible = canCurrentClientRequestGuestRole() || multiState.joinRequestPending;
     if (requestField instanceof HTMLElement) {
       requestField.hidden = !isRequestAreaVisible;
     }
@@ -40432,11 +42171,6 @@
         requestHint.textContent = localizeText(
           '接続すると参加リクエストを送信できます。',
           'Connect to send a join request.'
-        );
-      } else if (isResidentRoom && isMultiSpectatorMode()) {
-        requestHint.textContent = localizeText(
-          'このキャンバスは空きが出ると自動で参加者になります。',
-          'In this canvas, you will auto-join when a slot opens.'
         );
       } else if (isMultiGuestMode()) {
         requestHint.textContent = localizeText('あなたは参加者です。', 'You are currently a participant.');
@@ -40693,7 +42427,7 @@
     history.past = [];
     history.future = [];
     history.pending = null;
-    clearTimelapseRecording({ silent: true });
+    clearTimelapseRecording({ silent: true, scope: 'all' });
     if (wasUnsaved) {
       markDocumentUnsavedChange();
     } else {
@@ -40719,6 +42453,11 @@
       ? multiState.participants.get(masterClientId)
       : null;
     return Boolean(participant && participant.role === 'master');
+  }
+
+  function canCurrentGuestFreelyMoveAssignedCell() {
+    return isMultiGuestMode()
+      && normalizeMultiParticipantFreeCellMove(multiState.participantFreeCellMove, false);
   }
 
   function canCurrentClientEditProjectStructure() {
@@ -40888,6 +42627,110 @@
     return multiState.assignments.get(clientId) || null;
   }
 
+  function normalizeMultiAssignmentCanvasId(canvasId, fallbackCanvasId = getActiveProjectCanvasDocument()?.id || '') {
+    const requestedId = typeof canvasId === 'string' ? canvasId.trim() : '';
+    if (requestedId && getProjectCanvasDocumentById(requestedId)) {
+      return requestedId;
+    }
+    const fallbackId = typeof fallbackCanvasId === 'string' ? fallbackCanvasId.trim() : '';
+    if (fallbackId && getProjectCanvasDocumentById(fallbackId)) {
+      return fallbackId;
+    }
+    return getProjectCanvasDocumentAt(0)?.id || '';
+  }
+
+  function getAssignmentCanvasDocument(assignment, fallbackCanvasDoc = getActiveProjectCanvasDocument()) {
+    const fallbackDoc = fallbackCanvasDoc || getActiveProjectCanvasDocument() || getProjectCanvasDocumentAt(0);
+    if (!assignment || typeof assignment !== 'object') {
+      return fallbackDoc || null;
+    }
+    const canvasId = normalizeMultiAssignmentCanvasId(assignment.canvasId, fallbackDoc?.id || '');
+    const canvasDoc = getProjectCanvasDocumentById(canvasId) || fallbackDoc || null;
+    if (canvasDoc?.id) {
+      assignment.canvasId = canvasDoc.id;
+    }
+    return canvasDoc;
+  }
+
+  function resolveAssignedFrameIndexForCanvas(assignment, canvasDoc = getActiveProjectCanvasDocument()) {
+    if (!assignment || !canvasDoc || !Array.isArray(canvasDoc.frames) || !canvasDoc.frames.length) {
+      return -1;
+    }
+    let frameIndex = canvasDoc.frames.findIndex(frame => frame?.id === assignment.frameId);
+    if (frameIndex < 0 && Number.isFinite(assignment.frameHint)) {
+      frameIndex = clamp(Math.round(Number(assignment.frameHint) || 0), 0, canvasDoc.frames.length - 1);
+    }
+    return frameIndex;
+  }
+
+  function resolveAssignedLayerTrackIndexForCanvas(assignment, canvasDoc = getActiveProjectCanvasDocument()) {
+    if (!assignment || !canvasDoc || !Array.isArray(canvasDoc.frames) || !canvasDoc.frames.length) {
+      return -1;
+    }
+    const frame0 = canvasDoc.frames[0];
+    if (!frame0 || !Array.isArray(frame0.layers) || !frame0.layers.length) {
+      return -1;
+    }
+    let trackIndex = frame0.layers.findIndex(layer => layer?.id === assignment.anchorLayerId);
+    if (trackIndex < 0 && Number.isFinite(assignment.trackHint)) {
+      trackIndex = clamp(Math.round(Number(assignment.trackHint) || 0), 0, frame0.layers.length - 1);
+    }
+    return trackIndex;
+  }
+
+  function getProjectCanvasActiveLayerTrackIndex(canvasDoc = getActiveProjectCanvasDocument()) {
+    const frameIndex = clamp(
+      Math.round(Number(canvasDoc?.activeFrame) || 0),
+      0,
+      Math.max(0, (canvasDoc?.frames?.length || 1) - 1)
+    );
+    const frame = Array.isArray(canvasDoc?.frames) ? canvasDoc.frames[frameIndex] : null;
+    if (!frame || !Array.isArray(frame.layers)) {
+      return -1;
+    }
+    return frame.layers.findIndex(layer => layer?.id === canvasDoc?.activeLayer);
+  }
+
+  function getAssignedCellForClientOnCanvas(clientId, canvasDoc = getActiveProjectCanvasDocument()) {
+    const assignment = getMultiAssignment(clientId);
+    if (!assignment || !canvasDoc || !Array.isArray(canvasDoc.frames) || !canvasDoc.frames.length) {
+      return null;
+    }
+    const assignmentCanvasId = normalizeMultiAssignmentCanvasId(assignment.canvasId, canvasDoc.id || '');
+    if (assignmentCanvasId && canvasDoc.id && assignmentCanvasId !== canvasDoc.id) {
+      return null;
+    }
+    if (canvasDoc.id) {
+      assignment.canvasId = canvasDoc.id;
+    }
+    const frameIndex = resolveAssignedFrameIndexForCanvas(assignment, canvasDoc);
+    const trackIndex = resolveAssignedLayerTrackIndexForCanvas(assignment, canvasDoc);
+    if (frameIndex < 0 || trackIndex < 0) {
+      return null;
+    }
+    const frame = canvasDoc.frames[frameIndex];
+    if (!frame || !Array.isArray(frame.layers) || trackIndex >= frame.layers.length) {
+      return null;
+    }
+    return {
+      frameIndex,
+      trackIndex,
+      layer: frame.layers[trackIndex] || null,
+    };
+  }
+
+  function isAssignedCellActiveForCanvas(clientId, canvasDoc = getActiveProjectCanvasDocument()) {
+    const assignedCell = getAssignedCellForClientOnCanvas(clientId, canvasDoc);
+    if (!assignedCell || !canvasDoc) {
+      return false;
+    }
+    return assignedCell.frameIndex === clamp(
+      Math.round(Number(canvasDoc.activeFrame) || 0),
+      0,
+      Math.max(0, (canvasDoc.frames?.length || 1) - 1)
+    ) && assignedCell.trackIndex === getProjectCanvasActiveLayerTrackIndex(canvasDoc);
+  }
+
   function getMultiLayerTrackIndexByAnchorLayerId(anchorLayerId) {
     if (!anchorLayerId || !Array.isArray(state.frames) || !state.frames.length) {
       return -1;
@@ -40906,63 +42749,83 @@
     return state.frames.findIndex(frame => frame?.id === frameId);
   }
 
-  function getAssignedFrameIndexForClient(clientId) {
+  function getAssignedFrameIndexForClient(clientId, canvasDoc = null) {
     const assignment = getMultiAssignment(clientId);
     if (!assignment) {
       return -1;
     }
-    let frameIndex = getMultiFrameIndexByFrameId(assignment.frameId);
-    if (frameIndex < 0 && Number.isFinite(assignment.frameHint) && Array.isArray(state.frames) && state.frames.length) {
-      frameIndex = clamp(Math.round(Number(assignment.frameHint) || 0), 0, state.frames.length - 1);
+    const resolvedCanvasDoc = getAssignmentCanvasDocument(assignment, canvasDoc || getActiveProjectCanvasDocument());
+    if (!resolvedCanvasDoc || !Array.isArray(resolvedCanvasDoc.frames) || !resolvedCanvasDoc.frames.length) {
+      return -1;
     }
-    if (frameIndex >= 0 && state.frames[frameIndex]?.id) {
-      assignment.frameId = state.frames[frameIndex].id;
+    let frameIndex = resolvedCanvasDoc.frames.findIndex(frame => frame?.id === assignment.frameId);
+    if (frameIndex < 0 && Number.isFinite(assignment.frameHint)) {
+      frameIndex = clamp(Math.round(Number(assignment.frameHint) || 0), 0, resolvedCanvasDoc.frames.length - 1);
+    }
+    if (frameIndex >= 0 && resolvedCanvasDoc.frames[frameIndex]?.id) {
+      assignment.canvasId = resolvedCanvasDoc.id || assignment.canvasId || '';
+      assignment.frameId = resolvedCanvasDoc.frames[frameIndex].id;
       assignment.frameHint = frameIndex;
     }
     return frameIndex;
   }
 
-  function getAssignedLayerTrackIndexForClient(clientId) {
+  function getAssignedLayerTrackIndexForClient(clientId, canvasDoc = null) {
     const assignment = getMultiAssignment(clientId);
     if (!assignment) {
       return -1;
     }
-    let trackIndex = getMultiLayerTrackIndexByAnchorLayerId(assignment.anchorLayerId);
+    const resolvedCanvasDoc = getAssignmentCanvasDocument(assignment, canvasDoc || getActiveProjectCanvasDocument());
+    const frame0 = resolvedCanvasDoc?.frames?.[0];
+    if (!frame0 || !Array.isArray(frame0.layers) || !frame0.layers.length) {
+      return -1;
+    }
+    let trackIndex = frame0.layers.findIndex(layer => layer?.id === assignment.anchorLayerId);
     if (trackIndex < 0 && Number.isFinite(assignment.trackHint)) {
-      const frame0 = state.frames[0];
-      if (frame0 && Array.isArray(frame0.layers) && frame0.layers.length) {
-        trackIndex = clamp(Math.round(Number(assignment.trackHint) || 0), 0, frame0.layers.length - 1);
-      }
+      trackIndex = clamp(Math.round(Number(assignment.trackHint) || 0), 0, frame0.layers.length - 1);
     }
     if (trackIndex >= 0) {
+      assignment.canvasId = resolvedCanvasDoc.id || assignment.canvasId || '';
+      assignment.anchorLayerId = frame0.layers[trackIndex]?.id || assignment.anchorLayerId;
       assignment.trackHint = trackIndex;
     }
     return trackIndex;
   }
 
-  function getAssignedLayerForFrame(clientId, frameIndex = state.activeFrame) {
-    const trackIndex = getAssignedLayerTrackIndexForClient(clientId);
+  function getAssignedLayerForFrame(clientId, frameIndex = state.activeFrame, canvasDoc = null) {
+    const assignment = getMultiAssignment(clientId);
+    const resolvedCanvasDoc = getAssignmentCanvasDocument(assignment, canvasDoc || getActiveProjectCanvasDocument());
+    if (!resolvedCanvasDoc || !Array.isArray(resolvedCanvasDoc.frames) || !resolvedCanvasDoc.frames.length) {
+      return null;
+    }
+    const trackIndex = getAssignedLayerTrackIndexForClient(clientId, resolvedCanvasDoc);
     if (trackIndex < 0) {
       return null;
     }
-    const frame = state.frames[clamp(Math.round(Number(frameIndex) || 0), 0, Math.max(0, state.frames.length - 1))];
+    const frame = resolvedCanvasDoc.frames[clamp(Math.round(Number(frameIndex) || 0), 0, Math.max(0, resolvedCanvasDoc.frames.length - 1))];
     if (!frame || !Array.isArray(frame.layers) || trackIndex >= frame.layers.length) {
       return null;
     }
     return frame.layers[trackIndex] || null;
   }
 
-  function getAssignedCellForClient(clientId) {
-    const frameIndex = getAssignedFrameIndexForClient(clientId);
-    const trackIndex = getAssignedLayerTrackIndexForClient(clientId);
+  function getAssignedCellForClient(clientId, canvasDoc = null) {
+    const assignment = getMultiAssignment(clientId);
+    const resolvedCanvasDoc = getAssignmentCanvasDocument(assignment, canvasDoc || getActiveProjectCanvasDocument());
+    if (!resolvedCanvasDoc || !Array.isArray(resolvedCanvasDoc.frames) || !resolvedCanvasDoc.frames.length) {
+      return null;
+    }
+    const frameIndex = getAssignedFrameIndexForClient(clientId, resolvedCanvasDoc);
+    const trackIndex = getAssignedLayerTrackIndexForClient(clientId, resolvedCanvasDoc);
     if (frameIndex < 0 || trackIndex < 0) {
       return null;
     }
-    const layer = getAssignedLayerForFrame(clientId, frameIndex);
+    const layer = getAssignedLayerForFrame(clientId, frameIndex, resolvedCanvasDoc);
     if (!layer) {
       return null;
     }
     return {
+      canvasId: resolvedCanvasDoc.id || '',
       frameIndex,
       trackIndex,
       layer,
@@ -40973,8 +42836,11 @@
     return `${frameIndex}:${trackIndex}`;
   }
 
-  function getUsedMultiAssignmentCellKeys(ignoreClientId = '') {
+  function getUsedMultiAssignmentCellKeys(ignoreClientId = '', canvasDoc = getActiveProjectCanvasDocument()) {
     const used = new Set();
+    if (!canvasDoc) {
+      return used;
+    }
     multiState.assignments.forEach((entry, clientId) => {
       if (!entry || typeof entry !== 'object') {
         return;
@@ -40982,21 +42848,20 @@
       if (ignoreClientId && clientId === ignoreClientId) {
         return;
       }
-      const frameIndex = getAssignedFrameIndexForClient(clientId);
-      const trackIndex = getAssignedLayerTrackIndexForClient(clientId);
-      if (frameIndex < 0 || trackIndex < 0) {
+      const assignedCell = getAssignedCellForClientOnCanvas(clientId, canvasDoc);
+      if (!assignedCell) {
         return;
       }
-      used.add(getMultiAssignmentCellKey(frameIndex, trackIndex));
+      used.add(getMultiAssignmentCellKey(assignedCell.frameIndex, assignedCell.trackIndex));
     });
     return used;
   }
 
-  function isMultiAssignmentCellOccupied(frameIndex, trackIndex, ignoreClientId = '') {
+  function isMultiAssignmentCellOccupied(frameIndex, trackIndex, ignoreClientId = '', canvasDoc = getActiveProjectCanvasDocument()) {
     if (frameIndex < 0 || trackIndex < 0) {
       return false;
     }
-    const used = getUsedMultiAssignmentCellKeys(ignoreClientId);
+    const used = getUsedMultiAssignmentCellKeys(ignoreClientId, canvasDoc);
     return used.has(getMultiAssignmentCellKey(frameIndex, trackIndex));
   }
 
@@ -41004,16 +42869,17 @@
     preferredFrameIndex = 0,
     preferredTrackIndex = 0,
     ignoreClientId = '',
+    canvasDoc = getActiveProjectCanvasDocument(),
   } = {}) {
-    const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
+    const frameCount = Array.isArray(canvasDoc?.frames) ? canvasDoc.frames.length : 0;
     if (!frameCount) {
       return null;
     }
-    const used = getUsedMultiAssignmentCellKeys(ignoreClientId);
+    const used = getUsedMultiAssignmentCellKeys(ignoreClientId, canvasDoc);
     const baseFrameIndex = clamp(Math.round(Number(preferredFrameIndex) || 0), 0, frameCount - 1);
     for (let frameOffset = 0; frameOffset < frameCount; frameOffset += 1) {
       const frameIndex = (baseFrameIndex + frameOffset) % frameCount;
-      const frame = state.frames[frameIndex];
+      const frame = canvasDoc.frames[frameIndex];
       const layerCount = Array.isArray(frame?.layers) ? frame.layers.length : 0;
       if (!layerCount) {
         continue;
@@ -41031,10 +42897,9 @@
   }
 
   function normalizeMultiAssignmentsForCurrentDocument() {
-    const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
-    const frame0 = state.frames[0];
-    const layerTrackCount = frame0 && Array.isArray(frame0.layers) ? frame0.layers.length : 0;
-    if (!frameCount || !layerTrackCount) {
+    const fallbackCanvasDoc = getActiveProjectCanvasDocument() || getProjectCanvasDocumentAt(0);
+    const canvasDocs = getProjectCanvasDocuments().filter(canvas => canvas && Array.isArray(canvas.frames) && canvas.frames.length);
+    if (!canvasDocs.length) {
       return;
     }
     const sortedEntries = Array.from(multiState.assignments.entries()).sort((a, b) => {
@@ -41049,15 +42914,19 @@
       }
       return String(a[0]).localeCompare(String(b[0]));
     });
-    const usedCellKeys = new Set();
+    const usedCellKeysByCanvasId = new Map();
     sortedEntries.forEach(([clientId, entry]) => {
       if (!entry || typeof entry !== 'object') {
         return;
       }
-      let trackIndex = getMultiLayerTrackIndexByAnchorLayerId(entry.anchorLayerId);
-      if (trackIndex < 0 && Number.isFinite(entry.trackHint)) {
-        trackIndex = clamp(Math.round(Number(entry.trackHint) || 0), 0, layerTrackCount - 1);
+      const canvasDoc = getAssignmentCanvasDocument(entry, fallbackCanvasDoc);
+      const frameCount = Array.isArray(canvasDoc?.frames) ? canvasDoc.frames.length : 0;
+      const frame0 = canvasDoc?.frames?.[0];
+      const layerTrackCount = frame0 && Array.isArray(frame0.layers) ? frame0.layers.length : 0;
+      if (!canvasDoc || !canvasDoc.id || !frameCount || !layerTrackCount) {
+        return;
       }
+      let trackIndex = resolveAssignedLayerTrackIndexForCanvas(entry, canvasDoc);
       if (trackIndex < 0 || trackIndex >= layerTrackCount) {
         trackIndex = clamp(Math.round(Number(entry.trackHint) || 0), 0, layerTrackCount - 1);
       }
@@ -41066,20 +42935,23 @@
         return;
       }
 
-      let frameIndex = getMultiFrameIndexByFrameId(entry.frameId);
-      if (frameIndex < 0 && Number.isFinite(entry.frameHint)) {
-        frameIndex = clamp(Math.round(Number(entry.frameHint) || 0), 0, frameCount - 1);
-      }
+      let frameIndex = resolveAssignedFrameIndexForCanvas(entry, canvasDoc);
       if (frameIndex < 0 || frameIndex >= frameCount) {
         frameIndex = 0;
       }
 
+      let usedCellKeys = usedCellKeysByCanvasId.get(canvasDoc.id);
+      if (!usedCellKeys) {
+        usedCellKeys = new Set();
+        usedCellKeysByCanvasId.set(canvasDoc.id, usedCellKeys);
+      }
       let cellKey = getMultiAssignmentCellKey(frameIndex, trackIndex);
       if (usedCellKeys.has(cellKey)) {
         const fallback = findFirstAvailableMultiAssignmentCell({
           preferredFrameIndex: frameIndex,
           preferredTrackIndex: trackIndex,
           ignoreClientId: clientId,
+          canvasDoc,
         });
         if (fallback) {
           frameIndex = fallback.frameIndex;
@@ -41090,9 +42962,10 @@
       usedCellKeys.add(cellKey);
 
       const resolvedAnchor = frame0.layers[trackIndex];
+      entry.canvasId = canvasDoc.id;
       entry.anchorLayerId = resolvedAnchor?.id || anchorLayer.id;
       entry.trackHint = trackIndex;
-      entry.frameId = state.frames[frameIndex]?.id || '';
+      entry.frameId = canvasDoc.frames[frameIndex]?.id || '';
       entry.frameHint = frameIndex;
       multiState.assignments.set(clientId, entry);
     });
@@ -41167,15 +43040,32 @@
       select.value || multiState.selectedAssignClientId || multiState.selectedRoleControlClientId || ''
     );
     const assignment = targetClientId ? getMultiAssignment(targetClientId) : null;
-    const frameCount = Math.max(1, Array.isArray(state.frames) ? state.frames.length : 1);
-    const layerCount = Math.max(1, Array.isArray(state.frames?.[0]?.layers) ? state.frames[0].layers.length : 1);
+    const pendingRequest = targetClientId ? getPendingMultiAssignmentMoveRequest(targetClientId) : null;
+    const targetCanvas = (() => {
+      const pendingCanvasId = pendingRequest
+        ? normalizeMultiAssignmentCanvasId(
+          pendingRequest.canvasId,
+          assignment?.canvasId || getActiveProjectCanvasDocument()?.id || ''
+        )
+        : '';
+      return getProjectCanvasDocumentById(pendingCanvasId)
+        || getAssignmentCanvasDocument(assignment, getActiveProjectCanvasDocument())
+        || getActiveProjectCanvasDocument()
+        || getProjectCanvasDocumentAt(0)
+        || null;
+    })();
+    const frameCount = Math.max(1, Array.isArray(targetCanvas?.frames) ? targetCanvas.frames.length : 1);
+    const layerCount = Math.max(1, Array.isArray(targetCanvas?.frames?.[0]?.layers) ? targetCanvas.frames[0].layers.length : 1);
     frameInput.min = '1';
     layerInput.min = '1';
     frameInput.max = String(frameCount);
     layerInput.max = String(layerCount);
-    if (assignment) {
-      const frameIndex = getAssignedFrameIndexForClient(targetClientId);
-      const trackIndex = getAssignedLayerTrackIndexForClient(targetClientId);
+    if (pendingRequest) {
+      frameInput.value = String(clamp(pendingRequest.frameIndex, 0, Math.max(0, frameCount - 1)) + 1);
+      layerInput.value = String(clamp(pendingRequest.trackIndex, 0, Math.max(0, layerCount - 1)) + 1);
+    } else if (assignment) {
+      const frameIndex = getAssignedFrameIndexForClient(targetClientId, targetCanvas);
+      const trackIndex = getAssignedLayerTrackIndexForClient(targetClientId, targetCanvas);
       frameInput.value = String((frameIndex >= 0 ? frameIndex : 0) + 1);
       layerInput.value = String((trackIndex >= 0 ? trackIndex : 0) + 1);
     } else {
@@ -41186,6 +43076,7 @@
 
   function syncMultiAssignmentControls() {
     normalizeMultiAssignmentsForCurrentDocument();
+    prunePendingMultiAssignmentMoveRequests();
     const select = dom.controls.multiAssignTarget;
     const frameInput = dom.controls.multiAssignFrame;
     const layerInput = dom.controls.multiAssignLayer;
@@ -41208,7 +43099,17 @@
           option.value = row.clientId;
           const lockLabel = row.locked ? localizeText(' [ロック中]', ' [Locked]') : '';
           const onlineLabel = row.online ? '' : localizeText(' (オフライン)', ' (offline)');
-          option.textContent = `${row.name}${lockLabel}${onlineLabel}`;
+          const pendingRequest = getPendingMultiAssignmentMoveRequest(row.clientId);
+          const pendingCanvas = pendingRequest
+            ? getProjectCanvasDocumentById(normalizeMultiAssignmentCanvasId(pendingRequest.canvasId, getActiveProjectCanvasDocument()?.id || ''))
+            : null;
+          const requestLabel = pendingRequest
+            ? localizeText(
+              ` [申請: ${pendingCanvas?.name || getDefaultProjectCanvasName(1)} / F${pendingRequest.frameIndex + 1} / L${pendingRequest.trackIndex + 1}]`,
+              ` [Request: ${pendingCanvas?.name || getDefaultProjectCanvasName(1)} / F${pendingRequest.frameIndex + 1} / L${pendingRequest.trackIndex + 1}]`
+            )
+            : '';
+          option.textContent = `${row.name}${lockLabel}${requestLabel}${onlineLabel}`;
           select.appendChild(option);
         });
         if (rows.length) {
@@ -41245,6 +43146,7 @@
     const targetClientId = targetInfo.clientId;
     const targetAssignment = targetInfo.assignment;
     const targetRole = targetInfo.role;
+    const targetPendingRequest = targetClientId ? getPendingMultiAssignmentMoveRequest(targetClientId) : null;
     const hasTargetGuest = Boolean(targetClientId && targetRole === 'guest' && rows.some(row => row.clientId === targetClientId));
     const hasTargetAssignment = Boolean(hasTargetGuest && targetAssignment);
     if (frameInput instanceof HTMLInputElement) {
@@ -41255,6 +43157,9 @@
     }
     if (applyButton instanceof HTMLButtonElement) {
       applyButton.disabled = !canControl || !hasTargetAssignment;
+      applyButton.textContent = targetPendingRequest
+        ? localizeText('申請セルへ移動', 'Move To Requested Cell')
+        : localizeText('参加者を移動', 'Move Participant');
     }
     if (lockButton instanceof HTMLButtonElement) {
       lockButton.disabled = !canControl || !hasTargetAssignment;
@@ -41359,7 +43264,15 @@
     }
   }
 
-  function moveMultiParticipantToCell(clientId, frameIndexRaw, trackIndexRaw) {
+  function moveMultiParticipantToCell(
+    clientId,
+    frameIndexRaw,
+    trackIndexRaw,
+    {
+      announceStatus = true,
+      canvasId = getActiveProjectCanvasDocument()?.id || '',
+    } = {}
+  ) {
     if (!isMultiMasterMode()) {
       setMultiStatus(localizeText('参加者のセル移動はマスターのみ操作できます', 'Only the master can move participant cells'), 'warn');
       return false;
@@ -41379,15 +43292,18 @@
       return false;
     }
     normalizeMultiAssignmentsForCurrentDocument();
-    const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
-    const layerCount = Array.isArray(state.frames?.[0]?.layers) ? state.frames[0].layers.length : 0;
+    const targetCanvas = getProjectCanvasDocumentById(
+      normalizeMultiAssignmentCanvasId(canvasId, assignment.canvasId || getActiveProjectCanvasDocument()?.id || '')
+    ) || getActiveProjectCanvasDocument();
+    const frameCount = Array.isArray(targetCanvas?.frames) ? targetCanvas.frames.length : 0;
+    const layerCount = Array.isArray(targetCanvas?.frames?.[0]?.layers) ? targetCanvas.frames[0].layers.length : 0;
     if (!frameCount || !layerCount) {
       setMultiStatus(localizeText('セル移動できるフレーム/レイヤーがありません', 'No frame/layer is available for reassignment'), 'warn');
       return false;
     }
     const frameIndex = clamp(Math.round(Number(frameIndexRaw) || 0), 0, frameCount - 1);
     const trackIndex = clamp(Math.round(Number(trackIndexRaw) || 0), 0, layerCount - 1);
-    const occupied = isMultiAssignmentCellOccupied(frameIndex, trackIndex, targetClientId);
+    const occupied = isMultiAssignmentCellOccupied(frameIndex, trackIndex, targetClientId, targetCanvas);
     if (occupied) {
       setMultiStatus(
         localizeText(
@@ -41398,28 +43314,380 @@
       );
       return false;
     }
-    const anchorLayer = state.frames[0]?.layers?.[trackIndex];
-    const targetFrame = state.frames[frameIndex];
+    const anchorLayer = targetCanvas.frames[0]?.layers?.[trackIndex];
+    const targetFrame = targetCanvas.frames[frameIndex];
     if (!anchorLayer || !anchorLayer.id || !targetFrame || !targetFrame.id) {
       setMultiStatus(localizeText('指定セルへ移動できませんでした', 'Failed to move to the specified cell'), 'error');
       return false;
     }
+    assignment.canvasId = targetCanvas.id;
     assignment.anchorLayerId = anchorLayer.id;
     assignment.trackHint = trackIndex;
     assignment.frameId = targetFrame.id;
     assignment.frameHint = frameIndex;
     multiState.assignments.set(targetClientId, assignment);
+    removePendingMultiAssignmentMoveRequest(targetClientId);
     renderMultiParticipantsList();
     syncMultiAssignmentControls();
     scheduleMultiSessionStateBroadcast({ immediate: true });
+    if (announceStatus) {
+      setMultiStatus(
+        localizeText(
+          `参加者を フレーム ${frameIndex + 1} / レイヤー ${trackIndex + 1} へ移動しました`,
+          `Moved participant to Frame ${frameIndex + 1} / Layer ${trackIndex + 1}`
+        ),
+        'success'
+      );
+    }
+    return true;
+  }
+
+  async function sendMultiAssignmentMoveRequest(frameIndexRaw, trackIndexRaw) {
+    if (!canCurrentGuestFreelyMoveAssignedCell()) {
+      return false;
+    }
+    const targetCanvas = getActiveProjectCanvasDocument();
+    const frameCount = Array.isArray(targetCanvas?.frames) ? targetCanvas.frames.length : 0;
+    if (!frameCount) {
+      return false;
+    }
+    const assignment = getMultiAssignment(multiState.clientId);
+    if (!assignment) {
+      maybeRequestGuestAssignmentSync();
+      setMultiStatus(localizeText('割り当てセルを待機中です。マスターの同期を待ってください。', 'Waiting for assigned cell. Please wait for master sync.'), 'warn');
+      return false;
+    }
+    if (assignment.locked) {
+      setMultiStatus(localizeText('この参加者セルはマスターによってロックされています', 'This participant cell is locked by the master'), 'warn');
+      return false;
+    }
+    const frameIndex = clamp(Math.round(Number(frameIndexRaw) || 0), 0, frameCount - 1);
+    const layerCount = Array.isArray(targetCanvas.frames[frameIndex]?.layers) ? targetCanvas.frames[frameIndex].layers.length : 0;
+    if (!layerCount) {
+      setMultiStatus(localizeText('指定セルへ移動できませんでした', 'Failed to move to the specified cell'), 'warn');
+      return false;
+    }
+    const trackIndex = clamp(Math.round(Number(trackIndexRaw) || 0), 0, layerCount - 1);
+    const assignedCell = getAssignedCellForClient(multiState.clientId);
+    if (
+      assignedCell
+      && assignedCell.canvasId === (targetCanvas?.id || '')
+      && assignedCell.frameIndex === frameIndex
+      && assignedCell.trackIndex === trackIndex
+    ) {
+      state.activeFrame = frameIndex;
+      state.activeLayer = assignedCell.layer.id;
+      syncControlsWithState();
+      renderFrameList();
+      renderLayerList();
+      renderTimelineMatrix();
+      scheduleSessionPersist();
+      requestRender();
+      requestOverlayRender();
+      return true;
+    }
+    if (isMultiAssignmentCellOccupied(frameIndex, trackIndex, multiState.clientId, targetCanvas)) {
+      setMultiStatus(localizeText('そのセルは他の参加者が使用中です', 'That cell is already used by another participant'), 'warn');
+      return false;
+    }
+    const sent = await sendMultiBroadcast('assignment-move-request', {
+      projectKey: multiState.projectKey,
+      clientId: multiState.clientId,
+      canvasId: targetCanvas?.id || '',
+      frameIndex,
+      trackIndex,
+      sentAt: Date.now(),
+    });
+    if (!sent) {
+      setMultiStatus(localizeText('セル移動リクエストの送信に失敗しました', 'Failed to send cell move request'), 'error');
+      return false;
+    }
     setMultiStatus(
       localizeText(
-        `参加者を フレーム ${frameIndex + 1} / レイヤー ${trackIndex + 1} へ移動しました`,
-        `Moved participant to Frame ${frameIndex + 1} / Layer ${trackIndex + 1}`
+        `フレーム ${frameIndex + 1} / レイヤー ${trackIndex + 1} への移動リクエストを送信しました`,
+        `Sent a move request to Frame ${frameIndex + 1} / Layer ${trackIndex + 1}`
       ),
-      'success'
+      'info'
     );
     return true;
+  }
+
+  async function sendMultiAssignmentMovePermissionRequest(frameIndexRaw, trackIndexRaw) {
+    if (!isMultiGuestMode()) {
+      return false;
+    }
+    const targetCanvas = getActiveProjectCanvasDocument();
+    const frameCount = Array.isArray(targetCanvas?.frames) ? targetCanvas.frames.length : 0;
+    if (!frameCount) {
+      return false;
+    }
+    const assignment = getMultiAssignment(multiState.clientId);
+    if (!assignment) {
+      maybeRequestGuestAssignmentSync();
+      setMultiStatus(localizeText('割り当てセルを待機中です。マスターの同期を待ってください。', 'Waiting for assigned cell. Please wait for master sync.'), 'warn');
+      return false;
+    }
+    if (assignment.locked) {
+      setMultiStatus(localizeText('この参加者セルはマスターによってロックされています', 'This participant cell is locked by the master'), 'warn');
+      return false;
+    }
+    const frameIndex = clamp(Math.round(Number(frameIndexRaw) || 0), 0, frameCount - 1);
+    const layerCount = Array.isArray(targetCanvas.frames[frameIndex]?.layers) ? targetCanvas.frames[frameIndex].layers.length : 0;
+    if (!layerCount) {
+      return false;
+    }
+    const trackIndex = clamp(Math.round(Number(trackIndexRaw) || 0), 0, layerCount - 1);
+    const assignedCell = getAssignedCellForClient(multiState.clientId);
+    if (
+      assignedCell
+      && assignedCell.canvasId === (targetCanvas?.id || '')
+      && assignedCell.frameIndex === frameIndex
+      && assignedCell.trackIndex === trackIndex
+    ) {
+      state.activeFrame = frameIndex;
+      state.activeLayer = assignedCell.layer.id;
+      syncControlsWithState();
+      renderFrameList();
+      renderLayerList();
+      renderTimelineMatrix();
+      scheduleSessionPersist();
+      requestRender();
+      requestOverlayRender();
+      return true;
+    }
+    const sent = await sendMultiBroadcast('assignment-move-request', {
+      projectKey: multiState.projectKey,
+      clientId: multiState.clientId,
+      canvasId: targetCanvas?.id || '',
+      frameIndex,
+      trackIndex,
+      mode: 'request',
+      sentAt: Date.now(),
+    });
+    if (!sent) {
+      setMultiStatus(localizeText('移動許可申請の送信に失敗しました', 'Failed to send move permission request'), 'error');
+      return false;
+    }
+    setMultiStatus(
+      localizeText(
+        `フレーム ${frameIndex + 1} / レイヤー ${trackIndex + 1} への移動許可を申請しました`,
+        `Requested permission to move to Frame ${frameIndex + 1} / Layer ${trackIndex + 1}`
+      ),
+      'info'
+    );
+    return true;
+  }
+
+  async function requestMultiGuestMoveToCell(frameIndexRaw, trackIndexRaw) {
+    if (canCurrentGuestFreelyMoveAssignedCell()) {
+      return sendMultiAssignmentMoveRequest(frameIndexRaw, trackIndexRaw);
+    }
+    return sendMultiAssignmentMovePermissionRequest(frameIndexRaw, trackIndexRaw);
+  }
+
+  async function sendMultiAssignmentMoveResult(targetClientId, {
+    decision = 'denied',
+    frameIndex = -1,
+    trackIndex = -1,
+    canvasId = '',
+  } = {}) {
+    if (!isMultiMasterMode()) {
+      return false;
+    }
+    const normalizedClientId = typeof targetClientId === 'string' ? targetClientId.trim() : '';
+    if (!normalizedClientId || normalizedClientId === multiState.clientId) {
+      return false;
+    }
+    return sendMultiBroadcast('assignment-move-result', {
+      projectKey: multiState.projectKey,
+      clientId: multiState.clientId,
+      targetClientId: normalizedClientId,
+      decision: typeof decision === 'string' ? decision.trim().slice(0, 32) : 'denied',
+      canvasId: normalizeMultiAssignmentCanvasId(canvasId, getActiveProjectCanvasDocument()?.id || ''),
+      frameIndex: Number.isFinite(Number(frameIndex)) ? Math.max(0, Math.round(Number(frameIndex))) : -1,
+      trackIndex: Number.isFinite(Number(trackIndex)) ? Math.max(0, Math.round(Number(trackIndex))) : -1,
+      sentAt: Date.now(),
+    });
+  }
+
+  async function handleMultiAssignmentMoveRequestMessage(payload) {
+    if (!isMultiMasterMode()) {
+      return;
+    }
+    if (!payload || typeof payload !== 'object') {
+      return;
+    }
+    const senderClientId = typeof payload.clientId === 'string' ? payload.clientId.trim() : '';
+    const projectKey = normalizeMultiProjectKey(payload.projectKey || '');
+    const mode = typeof payload.mode === 'string' ? payload.mode.trim() : 'immediate';
+    if (!senderClientId || senderClientId === multiState.clientId || projectKey !== multiState.projectKey) {
+      return;
+    }
+    if (isMultiClientBlocked(senderClientId)) {
+      await sendMultiAssignmentMoveResult(senderClientId, { decision: 'blocked' });
+      return;
+    }
+    if (mode === 'immediate' && !normalizeMultiParticipantFreeCellMove(multiState.participantFreeCellMove, false)) {
+      await sendMultiAssignmentMoveResult(senderClientId, { decision: 'disabled' });
+      return;
+    }
+    const assignment = getMultiAssignment(senderClientId);
+    if (!assignment || assignment.role !== 'guest') {
+      await sendMultiAssignmentMoveResult(senderClientId, { decision: 'unassigned' });
+      return;
+    }
+    if (assignment.locked) {
+      await sendMultiAssignmentMoveResult(senderClientId, { decision: 'locked' });
+      return;
+    }
+    const payloadCanvasId = normalizeMultiAssignmentCanvasId(
+      payload.canvasId,
+      assignment.canvasId || getActiveProjectCanvasDocument()?.id || ''
+    );
+    const targetCanvas = getProjectCanvasDocumentById(payloadCanvasId);
+    const frameCount = Array.isArray(targetCanvas?.frames) ? targetCanvas.frames.length : 0;
+    const requestedFrameIndex = Math.round(Number(payload.frameIndex));
+    if (!frameCount || !Number.isFinite(requestedFrameIndex) || requestedFrameIndex < 0 || requestedFrameIndex >= frameCount) {
+      await sendMultiAssignmentMoveResult(senderClientId, { decision: 'invalid', canvasId: payloadCanvasId });
+      return;
+    }
+    const layerCount = Array.isArray(targetCanvas.frames[requestedFrameIndex]?.layers) ? targetCanvas.frames[requestedFrameIndex].layers.length : 0;
+    const requestedTrackIndex = Math.round(Number(payload.trackIndex));
+    if (!layerCount || !Number.isFinite(requestedTrackIndex) || requestedTrackIndex < 0 || requestedTrackIndex >= layerCount) {
+      await sendMultiAssignmentMoveResult(senderClientId, { decision: 'invalid', canvasId: payloadCanvasId });
+      return;
+    }
+    if (mode === 'request') {
+      upsertPendingMultiAssignmentMoveRequest(
+        senderClientId,
+        requestedFrameIndex,
+        requestedTrackIndex,
+        payload.sentAt,
+        targetCanvas.id
+      );
+      if (!multiState.masterOpsMode) {
+        multiState.masterOpsMode = true;
+      }
+      selectMultiControlTarget(senderClientId);
+      syncMultiControls();
+      syncMultiAssignmentControls();
+      setMultiStatus(
+        localizeText(
+          `${resolveMultiCommentAuthorName(senderClientId)} が フレーム ${requestedFrameIndex + 1} / レイヤー ${requestedTrackIndex + 1} への移動許可を申請しました`,
+          `${resolveMultiCommentAuthorName(senderClientId)} requested permission to move to Frame ${requestedFrameIndex + 1} / Layer ${requestedTrackIndex + 1}`
+        ),
+        'info'
+      );
+      return;
+    }
+    if (isMultiAssignmentCellOccupied(requestedFrameIndex, requestedTrackIndex, senderClientId, targetCanvas)) {
+      await sendMultiAssignmentMoveResult(senderClientId, {
+        decision: 'occupied',
+        canvasId: targetCanvas.id,
+        frameIndex: requestedFrameIndex,
+        trackIndex: requestedTrackIndex,
+      });
+      return;
+    }
+    const moved = moveMultiParticipantToCell(senderClientId, requestedFrameIndex, requestedTrackIndex, {
+      announceStatus: false,
+      canvasId: targetCanvas.id,
+    });
+    if (!moved) {
+      await sendMultiAssignmentMoveResult(senderClientId, {
+        decision: 'denied',
+        canvasId: targetCanvas.id,
+        frameIndex: requestedFrameIndex,
+        trackIndex: requestedTrackIndex,
+      });
+      return;
+    }
+    await sendMultiAssignmentMoveResult(senderClientId, {
+      decision: 'approved',
+      canvasId: targetCanvas.id,
+      frameIndex: requestedFrameIndex,
+      trackIndex: requestedTrackIndex,
+    });
+  }
+
+  function handleMultiAssignmentMoveResultMessage(payload) {
+    if (!isMultiGuestMode()) {
+      return;
+    }
+    if (!payload || typeof payload !== 'object') {
+      return;
+    }
+    const targetClientId = typeof payload.targetClientId === 'string' ? payload.targetClientId.trim() : '';
+    const projectKey = normalizeMultiProjectKey(payload.projectKey || '');
+    if (!targetClientId || targetClientId !== multiState.clientId || projectKey !== multiState.projectKey) {
+      return;
+    }
+    const decision = typeof payload.decision === 'string' ? payload.decision.trim() : 'denied';
+    const payloadCanvasId = normalizeMultiAssignmentCanvasId(payload.canvasId, getActiveProjectCanvasDocument()?.id || '');
+    const targetCanvas = getProjectCanvasDocumentById(payloadCanvasId) || getActiveProjectCanvasDocument();
+    const frameIndex = Math.round(Number(payload.frameIndex));
+    const trackIndex = Math.round(Number(payload.trackIndex));
+    if (decision === 'approved') {
+      const frame = targetCanvas && Number.isFinite(frameIndex) ? targetCanvas.frames[frameIndex] : null;
+      const targetLayer = frame && Array.isArray(frame.layers) && Number.isFinite(trackIndex)
+        ? frame.layers[trackIndex] || null
+        : null;
+      const anchorLayer = Array.isArray(targetCanvas?.frames?.[0]?.layers) && Number.isFinite(trackIndex)
+        ? targetCanvas.frames[0].layers[trackIndex] || null
+        : null;
+      const assignment = getMultiAssignment(multiState.clientId);
+      if (assignment && anchorLayer && frame && targetLayer) {
+        assignment.canvasId = targetCanvas?.id || assignment.canvasId || '';
+        assignment.anchorLayerId = anchorLayer.id;
+        assignment.trackHint = trackIndex;
+        assignment.frameId = frame.id;
+        assignment.frameHint = frameIndex;
+        multiState.assignments.set(multiState.clientId, assignment);
+      }
+      if (targetCanvas?.id) {
+        const targetCanvasIndex = getProjectCanvasDocuments().findIndex(canvas => canvas?.id === targetCanvas.id);
+        if (targetCanvasIndex >= 0 && targetCanvas.id !== (getActiveProjectCanvasDocument()?.id || '')) {
+          setActiveProjectCanvasByIndex(targetCanvasIndex, { persist: false, syncUi: true });
+        }
+      }
+      if (targetLayer) {
+        state.activeFrame = clamp(frameIndex, 0, Math.max(0, state.frames.length - 1));
+        state.activeLayer = targetLayer.id;
+      }
+      renderMultiParticipantsList();
+      syncControlsWithState();
+      renderFrameList();
+      renderLayerList();
+      renderTimelineMatrix();
+      requestRender();
+      requestOverlayRender();
+      setMultiStatus(
+        localizeText(
+          `フレーム ${frameIndex + 1} / レイヤー ${trackIndex + 1} へ移動しました`,
+          `Moved to Frame ${frameIndex + 1} / Layer ${trackIndex + 1}`
+        ),
+        'success'
+      );
+      return;
+    }
+    if (decision === 'occupied') {
+      setMultiStatus(localizeText('そのセルは他の参加者が使用中です', 'That cell is already used by another participant'), 'warn');
+      return;
+    }
+    if (decision === 'locked') {
+      setMultiStatus(localizeText('この参加者セルはマスターによってロックされています', 'This participant cell is locked by the master'), 'warn');
+      return;
+    }
+    if (decision === 'disabled') {
+      setMultiStatus(localizeText('この部屋では参加者セルの自由移動はOFFです', 'Participant free cell movement is OFF in this room'), 'warn');
+      return;
+    }
+    if (decision === 'unassigned') {
+      maybeRequestGuestAssignmentSync();
+      setMultiStatus(localizeText('割り当てセルを待機中です。マスターの同期を待ってください。', 'Waiting for assigned cell. Please wait for master sync.'), 'warn');
+      return;
+    }
+    setMultiStatus(localizeText('セル移動に失敗しました', 'Failed to move to the requested cell'), 'warn');
   }
 
   async function sendMultiKickClientNotice(targetClientId, reason = 'kicked') {
@@ -41483,6 +43751,7 @@
       return false;
     }
     const hadAssignment = multiState.assignments.delete(targetClientId);
+    removePendingMultiAssignmentMoveRequest(targetClientId);
     multiState.participants.delete(targetClientId);
     if (multiState.selectedAssignClientId === targetClientId || multiState.selectedRoleControlClientId === targetClientId) {
       setMultiSelectedControlClientId('');
@@ -41585,12 +43854,6 @@
       return false;
     }
     let assignment = getMultiAssignment(multiState.clientId);
-    if (!assignment && isResidentMultiRestrictedMasterMode()) {
-      assignment = ensureMasterLayerAssignment();
-      if (assignment) {
-        normalizeMultiAssignmentsForCurrentDocument();
-      }
-    }
     if (!assignment) {
       maybeRequestGuestAssignmentSync();
       if (announce) {
@@ -41598,12 +43861,23 @@
       }
       return false;
     }
-    let assignedCell = getAssignedCellForClient(multiState.clientId);
-    if (!assignedCell && isResidentMultiRestrictedMasterMode()) {
-      assignment = ensureMasterLayerAssignment() || assignment;
-      normalizeMultiAssignmentsForCurrentDocument();
-      assignedCell = getAssignedCellForClient(multiState.clientId);
+    const assignmentCanvas = getAssignmentCanvasDocument(assignment, getActiveProjectCanvasDocument());
+    if (!assignmentCanvas) {
+      maybeRequestGuestAssignmentSync();
+      if (announce) {
+        setMultiStatus(localizeText('割り当てキャンバスを待機中です。マスターの同期を待ってください。', 'Waiting for assigned canvas. Please wait for master sync.'), 'warn');
+      }
+      return false;
     }
+    let changed = false;
+    if ((getActiveProjectCanvasDocument()?.id || '') !== assignmentCanvas.id) {
+      const targetCanvasIndex = getProjectCanvasDocuments().findIndex(canvas => canvas?.id === assignmentCanvas.id);
+      if (targetCanvasIndex >= 0) {
+        setActiveProjectCanvasByIndex(targetCanvasIndex, { persist: false, syncUi: true });
+        changed = true;
+      }
+    }
+    let assignedCell = getAssignedCellForClientOnCanvas(multiState.clientId, assignmentCanvas);
     if (!assignedCell) {
       maybeRequestGuestAssignmentSync();
       if (announce) {
@@ -41611,7 +43885,6 @@
       }
       return false;
     }
-    let changed = false;
     if (enforceFrame && state.activeFrame !== assignedCell.frameIndex) {
       state.activeFrame = assignedCell.frameIndex;
       changed = true;
@@ -41619,6 +43892,14 @@
     if (enforceLayer && state.activeLayer !== assignedCell.layer.id) {
       state.activeLayer = assignedCell.layer.id;
       changed = true;
+    }
+    if (changed) {
+      syncControlsWithState();
+      renderFrameList();
+      renderLayerList();
+      renderTimelineMatrix();
+      requestRender();
+      requestOverlayRender();
     }
     if (assignment.locked) {
       if (announce) {
@@ -41929,10 +44210,12 @@
         return false;
       }
       removeMultiJoinRequest(targetClientId);
+      removePendingMultiAssignmentMoveRequest(targetClientId);
     } else {
       if (getMultiAssignment(targetClientId)) {
         multiState.assignments.delete(targetClientId);
       }
+      removePendingMultiAssignmentMoveRequest(targetClientId);
       if (multiState.selectedAssignClientId === targetClientId || multiState.selectedRoleControlClientId === targetClientId) {
         setMultiSelectedControlClientId('');
       }
@@ -42056,14 +44339,14 @@
   }
 
   function isMultiReadOnlyMode() {
-    return isMultiGuestMode() || isMultiSpectatorMode() || isResidentMultiRestrictedMasterMode();
+    return isMultiGuestMode() || isMultiSpectatorMode();
   }
 
   function isMultiClientScopedHistoryMode() {
     if (!multiState.connected) {
       return false;
     }
-    return isMultiGuestMode() || isMultiSpectatorMode() || isResidentMultiRestrictedMasterMode();
+    return isMultiGuestMode() || isMultiSpectatorMode();
   }
 
   function isMultiMasterConfigMode() {
@@ -42264,7 +44547,7 @@
       }
       dom.controls.multiStartSession.textContent = startLabel;
     }
-    const showMasterOnly = selectedRole === 'master' && !isResidentMultiConnectedRoom();
+    const showMasterOnly = selectedRole === 'master';
     if (Array.isArray(dom.controls.multiMasterOnlyGroups)) {
       dom.controls.multiMasterOnlyGroups.forEach(node => {
         if (node instanceof HTMLElement) {
@@ -42281,9 +44564,9 @@
       clientId: entry.clientId,
       role: entry.role === 'master' ? 'master' : 'guest',
       name: typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim().slice(0, 32) : '',
+      canvasId: normalizeMultiAssignmentCanvasId(entry.canvasId, getActiveProjectCanvasDocument()?.id || ''),
       anchorLayerId: entry.anchorLayerId,
       trackHint: Number.isFinite(entry.trackHint) ? Math.round(entry.trackHint) : -1,
-      residentSlot: Number.isFinite(entry.residentSlot) ? Math.round(entry.residentSlot) : -1,
       frameId: typeof entry.frameId === 'string' ? entry.frameId : '',
       frameHint: Number.isFinite(entry.frameHint) ? Math.round(entry.frameHint) : -1,
       joinedAt: Number(entry.joinedAt) || Date.now(),
@@ -42313,9 +44596,9 @@
           clientId,
           role: entry.role === 'master' ? 'master' : 'guest',
           name: normalizeMultiParticipantName(entry.name, DEFAULT_MULTI_PARTICIPANT_NAME),
+          canvasId: typeof entry.canvasId === 'string' ? entry.canvasId.trim() : '',
           anchorLayerId,
           trackHint: Number.isFinite(entry.trackHint) ? Math.max(0, Math.round(entry.trackHint)) : null,
-          residentSlot: Number.isFinite(entry.residentSlot) ? Math.max(0, Math.round(entry.residentSlot)) : null,
           frameId: typeof entry.frameId === 'string' ? entry.frameId.trim() : '',
           frameHint: Number.isFinite(entry.frameHint) ? Math.max(0, Math.round(entry.frameHint)) : null,
           joinedAt: Number(entry.joinedAt) || Date.now(),
@@ -42329,7 +44612,7 @@
       : (isMultiMasterMode() ? multiState.clientId : multiState.masterClientId);
     renderMultiParticipantsList();
     applyMultiRoleUiLocks();
-    if (isMultiGuestMode() || isResidentMultiRestrictedMasterMode()) {
+    if (isMultiGuestMode()) {
       enforceGuestAssignedLayerSelection({ announce: false });
     }
   }
@@ -42417,25 +44700,22 @@
       if (isSelf) {
         li.classList.add('is-self');
       }
-      const frameIndex = getAssignedFrameIndexForClient(row.clientId);
-      const trackIndex = getAssignedLayerTrackIndexForClient(row.clientId);
-      const residentSlot = getResidentMultiAssignedSlotIndex(row.clientId);
-      const residentMode = isResidentMultiProjectKey(multiState.projectKey);
-      const frameLabel = residentMode
-        ? ''
-        : (frameIndex >= 0
-          ? localizeText(` / フレーム ${frameIndex + 1}`, ` / Frame ${frameIndex + 1}`)
-          : '');
-      const layerLabel = residentMode
-        ? (residentSlot >= 0
-          ? localizeText(` / セル ${residentSlot + 1}`, ` / Cell ${residentSlot + 1}`)
-          : '')
-        : (trackIndex >= 0
-          ? localizeText(` / レイヤー ${trackIndex + 1}`, ` / Layer ${trackIndex + 1}`)
-          : '');
+      const assignment = getMultiAssignment(row.clientId);
+      const assignmentCanvas = getAssignmentCanvasDocument(assignment, getActiveProjectCanvasDocument());
+      const frameIndex = getAssignedFrameIndexForClient(row.clientId, assignmentCanvas);
+      const trackIndex = getAssignedLayerTrackIndexForClient(row.clientId, assignmentCanvas);
+      const canvasLabel = assignmentCanvas && getProjectCanvasCount() > 1
+        ? localizeText(` / ${assignmentCanvas.name}`, ` / ${assignmentCanvas.name}`)
+        : '';
+      const frameLabel = frameIndex >= 0
+        ? localizeText(` / フレーム ${frameIndex + 1}`, ` / Frame ${frameIndex + 1}`)
+        : '';
+      const layerLabel = trackIndex >= 0
+        ? localizeText(` / レイヤー ${trackIndex + 1}`, ` / Layer ${trackIndex + 1}`)
+        : '';
       const onlineLabel = row.online ? '' : localizeText(' (オフライン)', ' (offline)');
       const lockedLabel = row.locked ? localizeText(' / ロック中', ' / Locked') : '';
-      li.textContent = `${getMultiRoleLabel(row.role)}: ${row.name}${frameLabel}${layerLabel}${lockedLabel}${onlineLabel}`;
+      li.textContent = `${getMultiRoleLabel(row.role)}: ${row.name}${canvasLabel}${frameLabel}${layerLabel}${lockedLabel}${onlineLabel}`;
       list.appendChild(li);
     });
     syncMultiAssignmentControls();
@@ -42890,6 +45170,29 @@
       dom.controls.multiJoinPolicy.value = multiState.joinPolicy;
       dom.controls.multiJoinPolicy.disabled = multiState.connecting || !inMasterConfigMode;
     }
+    const canUseParticipantFreeCellMove = inMasterConfigMode;
+    if (dom.controls.multiParticipantFreeCellMove instanceof HTMLInputElement) {
+      dom.controls.multiParticipantFreeCellMove.checked = Boolean(multiState.participantFreeCellMove);
+      dom.controls.multiParticipantFreeCellMove.disabled = multiState.connecting || !canUseParticipantFreeCellMove;
+    }
+    if (dom.controls.multiParticipantFreeCellMoveHint instanceof HTMLElement) {
+      if (!multiState.connected) {
+        dom.controls.multiParticipantFreeCellMoveHint.textContent = localizeText(
+          'ON にすると参加者は空いているフレーム / レイヤーセルへ自分で移動できます。',
+          'When ON, participants can move themselves to any free frame/layer cell.'
+        );
+      } else if (multiState.participantFreeCellMove) {
+        dom.controls.multiParticipantFreeCellMoveHint.textContent = localizeText(
+          '参加者は空きセルへ自分で移動できます。同じセルへの同時参加はできません。',
+          'Participants can move themselves to any free cell. Two participants cannot share a cell.'
+        );
+      } else {
+        dom.controls.multiParticipantFreeCellMoveHint.textContent = localizeText(
+          'OFF 中はセル移動はマスターのみです。',
+          'When OFF, only the master can move participant cells.'
+        );
+      }
+    }
     if (dom.controls.multiPresetFriends instanceof HTMLButtonElement) {
       dom.controls.multiPresetFriends.disabled = multiState.connecting || !inMasterConfigMode;
     }
@@ -42910,7 +45213,7 @@
           `Current: Streaming preset (Approval / ${visibilityLabel} / ${exportLabel})`
         );
     }
-    const canUseMasterOpsMode = inMasterConfigMode && !isResidentMultiConnectedRoom();
+    const canUseMasterOpsMode = inMasterConfigMode;
     if (!canUseMasterOpsMode && multiState.masterOpsMode) {
       multiState.masterOpsMode = false;
     }
@@ -43029,7 +45332,7 @@
     updatePixfindModeUI();
     enforceMobileSpectatorTabLock({ forceActivate: true });
     syncMultiAssignmentControls();
-    // Tool lock by role (spectator / resident room restrictions)
+    // Tool lock by role (spectator restrictions)
     try {
       if (isMultiSpectatorMode()) {
         // Ensure pan is active so viewer can pan/zoom
@@ -43041,28 +45344,6 @@
         }
         if (Array.isArray(dom.toolGroupButtons)) {
           dom.toolGroupButtons.forEach(btn => { try { btn.disabled = true; } catch (e) { /* ignore */ } });
-        }
-      } else if (isResidentMultiToolRestrictedMode()) {
-        if (!isResidentMultiToolAllowed(state.tool)) {
-          setActiveTool('pen');
-        }
-        if (Array.isArray(toolButtons)) {
-          toolButtons.forEach(btn => {
-            try {
-              const toolId = typeof btn?.dataset?.tool === 'string' ? btn.dataset.tool : '';
-              const allowed = isResidentMultiToolAllowed(toolId);
-              btn.disabled = !allowed;
-              btn.classList.toggle('is-disabled', !allowed);
-            } catch (e) { /* ignore */ }
-          });
-        }
-        if (Array.isArray(dom.toolGroupButtons)) {
-          dom.toolGroupButtons.forEach(btn => {
-            try {
-              const groupId = typeof btn?.dataset?.toolGroup === 'string' ? btn.dataset.toolGroup : '';
-              btn.disabled = groupId === 'selection';
-            } catch (e) { /* ignore */ }
-          });
         }
       } else {
         if (Array.isArray(toolButtons)) {
@@ -43128,6 +45409,7 @@
       dom.controls.multiForceSpectator,
       dom.controls.multiRoomVisibility,
       dom.controls.multiJoinPolicy,
+      dom.controls.multiParticipantFreeCellMove,
       dom.controls.multiPresetFriends,
       dom.controls.multiPresetStream,
       dom.controls.multiMasterOpsMode,
@@ -43333,49 +45615,24 @@
     if (!isMultiMasterMode()) {
       return null;
     }
-    const residentProfile = getResidentMultiRoomProfile(multiState.projectKey);
-    if (residentProfile) {
-      ensureResidentSingleFrameSingleLayer(residentProfile);
-      const frame0 = state.frames[0];
-      const primaryLayer = getResidentMultiPrimaryLayer();
-      if (!frame0 || !frame0.id || !primaryLayer) {
-        return null;
-      }
-      const existing = getMultiAssignment(multiState.clientId);
-      const existingSlot = normalizeResidentMultiSlotIndex(
-        Number.isFinite(Number(existing?.residentSlot)) ? Number(existing.residentSlot) : Number(existing?.trackHint),
-        residentProfile
-      );
-      const slot = existingSlot >= 0 ? existingSlot : 0;
-      const assignment = existing && typeof existing === 'object' ? existing : {};
-      assignment.clientId = multiState.clientId;
-      assignment.role = 'master';
-      assignment.name = getLocalMultiParticipantName();
-      assignment.anchorLayerId = primaryLayer.id;
-      assignment.trackHint = 0;
-      assignment.residentSlot = slot;
-      assignment.frameId = frame0.id;
-      assignment.frameHint = 0;
-      assignment.joinedAt = Number(assignment.joinedAt) || Date.now();
-      assignment.locked = false;
-      multiState.assignments.set(multiState.clientId, assignment);
-      multiState.masterClientId = multiState.clientId;
-      state.activeFrame = 0;
-      state.activeLayer = primaryLayer.id;
-      return assignment;
-    }
+    const activeCanvas = getActiveProjectCanvasDocument();
+    const activeCanvasId = activeCanvas?.id || '';
     const frame0 = state.frames[0];
     if (!frame0 || !Array.isArray(frame0.layers) || !frame0.layers.length) {
       return null;
     }
     const existing = getMultiAssignment(multiState.clientId);
     if (existing) {
-      const existingTrack = getMultiLayerTrackIndexByAnchorLayerId(existing.anchorLayerId);
+      const existingCanvasId = normalizeMultiAssignmentCanvasId(existing.canvasId, activeCanvasId);
+      const existingTrack = existingCanvasId === activeCanvasId
+        ? getMultiLayerTrackIndexByAnchorLayerId(existing.anchorLayerId)
+        : -1;
       if (existingTrack >= 0) {
         const frameCount = Math.max(1, Array.isArray(state.frames) ? state.frames.length : 1);
         const fallbackFrameIndex = clamp(Math.round(Number(state.activeFrame) || 0), 0, frameCount - 1);
-        const existingFrame = getAssignedFrameIndexForClient(multiState.clientId);
+        const existingFrame = getAssignedFrameIndexForClient(multiState.clientId, activeCanvas);
         const resolvedFrameIndex = existingFrame >= 0 ? existingFrame : fallbackFrameIndex;
+        existing.canvasId = activeCanvasId;
         existing.trackHint = existingTrack;
         existing.frameId = state.frames[resolvedFrameIndex]?.id || '';
         existing.frameHint = resolvedFrameIndex;
@@ -43402,6 +45659,7 @@
       clientId: multiState.clientId,
       role: 'master',
       name: getLocalMultiParticipantName(),
+      canvasId: activeCanvasId,
       anchorLayerId: anchorLayer.id,
       trackHint: state.frames[0].layers.length - 1,
       frameId: state.frames[clamp(Math.round(Number(state.activeFrame) || 0), 0, Math.max(0, state.frames.length - 1))]?.id || '',
@@ -43476,67 +45734,6 @@
     if (isMultiClientBlocked(clientId)) {
       return null;
     }
-    const residentProfile = getResidentMultiRoomProfile(multiState.projectKey);
-    if (residentProfile) {
-      ensureResidentSingleFrameSingleLayer(residentProfile);
-      const frame0 = state.frames[0];
-      const primaryLayer = getResidentMultiPrimaryLayer();
-      if (!frame0 || !frame0.id || !primaryLayer) {
-        return null;
-      }
-      const existing = getMultiAssignment(clientId);
-      if (existing) {
-        return existing;
-      }
-      if (isMultiGuestLimitReached()) {
-        return null;
-      }
-      const usedSlots = new Set();
-      multiState.assignments.forEach(entry => {
-        if (!entry || typeof entry !== 'object') {
-          return;
-        }
-        const slot = normalizeResidentMultiSlotIndex(
-          Number.isFinite(Number(entry.residentSlot)) ? Number(entry.residentSlot) : Number(entry.trackHint),
-          residentProfile
-        );
-        if (slot >= 0) {
-          usedSlots.add(slot);
-        }
-      });
-      let assignedSlot = -1;
-      for (let i = 0; i < getResidentMultiSlotCount(residentProfile); i += 1) {
-        if (!usedSlots.has(i)) {
-          assignedSlot = i;
-          break;
-        }
-      }
-      if (assignedSlot < 0) {
-        return null;
-      }
-      const safeName = typeof participantName === 'string' && participantName.trim()
-        ? participantName.trim().slice(0, 24)
-        : DEFAULT_MULTI_PARTICIPANT_NAME;
-      const assignment = {
-        clientId,
-        role: 'guest',
-        name: safeName,
-        anchorLayerId: primaryLayer.id,
-        trackHint: 0,
-        residentSlot: assignedSlot,
-        frameId: frame0.id,
-        frameHint: 0,
-        joinedAt: Date.now(),
-        locked: false,
-      };
-      multiState.assignments.set(clientId, assignment);
-      normalizeMultiAssignmentsForCurrentDocument();
-      renderFrameList();
-      renderLayerList();
-      requestRender();
-      requestOverlayRender();
-      return assignment;
-    }
     const existing = getMultiAssignment(clientId);
     if (existing) {
       return existing;
@@ -43566,6 +45763,7 @@
       clientId,
       role: 'guest',
       name: safeName,
+      canvasId: getActiveProjectCanvasDocument()?.id || '',
       anchorLayerId,
       trackHint: insertIndex,
       frameId: '',
@@ -43603,36 +45801,6 @@
       multiState.guestStateRecoveryTimer = null;
     }
     multiState.awaitingGuestStateRecovery = false;
-  }
-
-  function clearResidentAutoPromoteTimer() {
-    if (multiState.residentAutoPromoteTimer !== null) {
-      window.clearTimeout(multiState.residentAutoPromoteTimer);
-      multiState.residentAutoPromoteTimer = null;
-    }
-  }
-
-  function scheduleResidentAutoPromoteToMaster() {
-    if (multiState.residentAutoPromoteTimer !== null) {
-      return;
-    }
-    const attempt = () => {
-      if (!multiState.connected || isMultiMasterMode() || !isResidentMultiProjectKey(multiState.projectKey)) {
-        clearResidentAutoPromoteTimer();
-        return;
-      }
-      if (isMultiMasterCurrentlyOnline()) {
-        clearResidentAutoPromoteTimer();
-        return;
-      }
-      if (multiState.connecting) {
-        multiState.residentAutoPromoteTimer = window.setTimeout(attempt, 220);
-        return;
-      }
-      clearResidentAutoPromoteTimer();
-      connectMultiSessionAs('master').catch(() => {});
-    };
-    multiState.residentAutoPromoteTimer = window.setTimeout(attempt, 220);
   }
 
   function maybeRequestGuestAssignmentSync() {
@@ -43681,6 +45849,10 @@
         multiState.joinPolicy,
         MULTI_DEFAULT_JOIN_POLICY
       ),
+      participantFreeCellMove: normalizeMultiParticipantFreeCellMove(
+        multiState.participantFreeCellMove,
+        false
+      ),
       exportPermission: normalizeMultiExportPermission(
         multiState.exportPermission,
         MULTI_DEFAULT_EXPORT_PERMISSION
@@ -43694,7 +45866,7 @@
     };
   }
 
-  function buildGuestSessionStatePayload({ targetClientId = '', reason = '' } = {}) {
+  function buildGuestSessionStatePayload({ targetClientId = '', reason = '', canvasId = '' } = {}) {
     const snapshot = makeHistorySnapshot({
       includeUiState: false,
       includeSelection: false,
@@ -43705,6 +45877,7 @@
       clientId: multiState.clientId,
       targetClientId: targetClientId || '',
       reason: typeof reason === 'string' ? reason : '',
+      canvasId: normalizeMultiHistoryCanvasId(canvasId),
       sentAt: Date.now(),
       maxGuests: normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT),
       roomVisibility: normalizeMultiRoomVisibility(
@@ -43714,6 +45887,10 @@
       joinPolicy: normalizeMultiJoinPolicy(
         multiState.joinPolicy,
         MULTI_DEFAULT_JOIN_POLICY
+      ),
+      participantFreeCellMove: normalizeMultiParticipantFreeCellMove(
+        multiState.participantFreeCellMove,
+        false
       ),
       exportPermission: normalizeMultiExportPermission(
         multiState.exportPermission,
@@ -43816,12 +45993,13 @@
     }
   }
 
-  function getMultiLayerPatchStreamKey(kind, clientId, frameIndex, layerKey) {
+  function getMultiLayerPatchStreamKey(kind, clientId, canvasId, frameIndex, layerKey) {
     const safeKind = typeof kind === 'string' ? kind : 'unknown';
     const safeClientId = typeof clientId === 'string' ? clientId : '';
+    const safeCanvasId = typeof canvasId === 'string' ? canvasId : '';
     const safeFrameIndex = Number.isFinite(frameIndex) ? Math.max(0, Math.round(frameIndex)) : 0;
     const safeLayerKey = typeof layerKey === 'string' ? layerKey : '';
-    return `${safeKind}:${safeClientId}:${safeFrameIndex}:${safeLayerKey}`;
+    return `${safeKind}:${safeClientId}:${safeCanvasId}:${safeFrameIndex}:${safeLayerKey}`;
   }
 
   function normalizeMultiPatchSequence(value, fallback = 0) {
@@ -43884,7 +46062,7 @@
     }
   }
 
-  async function requestTargetedGuestSessionState(senderClientId, streamKey = '') {
+  async function requestTargetedGuestSessionState(senderClientId, streamKey = '', canvasId = '') {
     if (!isMultiMasterMode()) {
       return false;
     }
@@ -43905,6 +46083,7 @@
       clientId: multiState.clientId,
       projectKey: multiState.projectKey,
       targetClientId: normalizedClientId,
+      canvasId: normalizeMultiHistoryCanvasId(canvasId),
       sentAt: now,
       reason: 'layer-resync',
     });
@@ -44081,7 +46260,7 @@
     }
   }
 
-  function applyLayerPatchPayloadToLayer(layer, payload, pixelCount) {
+  function applyLayerPatchPayloadToLayer(layer, payload, pixelCount, { width = state.width, height = state.height } = {}) {
     if (!layer || typeof payload !== 'object' || !payload) {
       return null;
     }
@@ -44130,14 +46309,14 @@
       if (!(nextDirect instanceof Uint8Array) || nextDirect.length !== changed.length * 4) {
         return null;
       }
-      targetDirect = ensureLayerDirect(layer);
+      targetDirect = ensureLayerDirect(layer, width, height);
     } else {
       layer.direct = null;
     }
 
-    const canvasWidth = Math.max(1, Math.floor(Number(state.width) || 0));
+    const canvasWidth = Math.max(1, Math.floor(Number(width) || 0));
     let minX = canvasWidth;
-    let minY = Math.max(1, Math.floor(Number(state.height) || 0));
+    let minY = Math.max(1, Math.floor(Number(height) || 0));
     let maxX = -1;
     let maxY = -1;
     for (let i = 0; i < changed.length; i += 1) {
@@ -44183,6 +46362,15 @@
       return true;
     }
     if (history.pending) {
+      return true;
+    }
+    if (
+      isMultiGuestMode()
+      && (
+        multiState.guestLayerPatchQueued
+        || multiState.guestLayerPatchInFlight
+      )
+    ) {
       return true;
     }
     return false;
@@ -44297,103 +46485,52 @@
   }
 
   // Apply a history snapshot only to the cells that clientId can currently edit.
-  // In slot-partition resident rooms this is restricted to the client's assigned slot.
-  function applyHistorySnapshotForClient(snapshot, clientId, { preserveView = false } = {}) {
+  function applyHistorySnapshotForClient(snapshot, clientId, { preserveView = false, canvasId = '' } = {}) {
     if (!snapshot || typeof snapshot !== 'object') return false;
     if (!clientId) return false;
-    const residentPointEditable = buildResidentPointEditCheckerForClient(clientId, multiState.projectKey);
-    if (residentPointEditable) {
-      const srcFrame = Array.isArray(snapshot.frames) ? snapshot.frames[0] : null;
-      const srcLayer = srcFrame && Array.isArray(srcFrame.layers) ? srcFrame.layers[0] : null;
-      const targetFrame = Array.isArray(state.frames) ? state.frames[0] : null;
-      const targetLayer = targetFrame && Array.isArray(targetFrame.layers) ? targetFrame.layers[0] : null;
-      if (!srcLayer || !targetLayer) return false;
-      const width = Math.max(0, Math.floor(Number(state.width) || 0));
-      const height = Math.max(0, Math.floor(Number(state.height) || 0));
-      const pixelCount = width * height;
-      if (!pixelCount) return false;
-      const srcIndices = srcLayer.indices instanceof Int16Array
-        ? srcLayer.indices
-        : (Array.isArray(srcLayer.indices) ? new Int16Array(srcLayer.indices) : null);
-      const srcDirect = srcLayer.direct instanceof Uint8ClampedArray
-        ? srcLayer.direct
-        : (Array.isArray(srcLayer.direct) ? new Uint8ClampedArray(srcLayer.direct) : null);
-      if (!(targetLayer.indices instanceof Int16Array) || targetLayer.indices.length !== pixelCount) {
-        targetLayer.indices = new Int16Array(pixelCount).fill(-1);
-      }
-      let targetDirect = targetLayer.direct instanceof Uint8ClampedArray && targetLayer.direct.length === pixelCount * 4
-        ? targetLayer.direct
-        : null;
-      if (srcDirect && !targetDirect) {
-        targetDirect = ensureLayerDirect(targetLayer, width, height);
-      }
-      let appliedAny = false;
-      for (let y = 0; y < height; y += 1) {
-        for (let x = 0; x < width; x += 1) {
-          if (!residentPointEditable(x, y)) {
-            continue;
-          }
-          const idx = y * width + x;
-          if (srcIndices && srcIndices.length === pixelCount) {
-            targetLayer.indices[idx] = srcIndices[idx];
-          }
-          if (targetDirect) {
-            const base = idx * 4;
-            if (srcDirect && srcDirect.length === pixelCount * 4) {
-              targetDirect[base] = srcDirect[base];
-              targetDirect[base + 1] = srcDirect[base + 1];
-              targetDirect[base + 2] = srcDirect[base + 2];
-              targetDirect[base + 3] = srcDirect[base + 3];
-            } else {
-              targetDirect[base] = 0;
-              targetDirect[base + 1] = 0;
-              targetDirect[base + 2] = 0;
-              targetDirect[base + 3] = 0;
-            }
-          }
-          appliedAny = true;
-        }
-      }
-      if (!appliedAny) return false;
-      markRemoteMultiStateDirty();
-      requestRender();
-      requestOverlayRender();
-      if (!preserveView) {
-        state.activeFrame = 0;
-        state.activeLayer = targetLayer.id;
-        syncControlsWithState();
-      }
-      return true;
-    }
-    const assigned = getAssignedCellForClient(clientId);
+    const resolvedCanvasId = normalizeMultiHistoryCanvasId(
+      canvasId
+      || (typeof snapshot.activeCanvasId === 'string' ? snapshot.activeCanvasId : '')
+      || getActiveProjectCanvasDocument()?.id
+      || ''
+    );
+    const targetCanvas = getProjectCanvasDocumentById(resolvedCanvasId) || (!resolvedCanvasId ? getActiveProjectCanvasDocument() : null);
+    if (!targetCanvas) return false;
+    const assigned = getAssignedCellForClientOnCanvas(clientId, targetCanvas);
     if (!assigned) return false;
-    const frameIndex = clamp(Math.round(Number(assigned.frameIndex) || 0), 0, Math.max(0, state.frames.length - 1));
-    const trackIndex = clamp(Math.round(Number(assigned.trackIndex) || 0), 0, Math.max(0, (state.frames[frameIndex]?.layers?.length || 0) - 1));
-    const srcFrame = Array.isArray(snapshot.frames) ? snapshot.frames[frameIndex] : null;
+    const frameIndex = clamp(Math.round(Number(assigned.frameIndex) || 0), 0, Math.max(0, targetCanvas.frames.length - 1));
+    const trackIndex = clamp(Math.round(Number(assigned.trackIndex) || 0), 0, Math.max(0, (targetCanvas.frames[frameIndex]?.layers?.length || 0) - 1));
+    const snapshotCanvas = Array.isArray(snapshot.canvases) && snapshot.canvases.length
+      ? (snapshot.canvases.find(canvas => canvas?.id === resolvedCanvasId) || null)
+      : snapshot;
+    if (!snapshotCanvas || !Array.isArray(snapshotCanvas.frames)) return false;
+    const srcFrame = snapshotCanvas.frames[frameIndex] || null;
     if (!srcFrame || !Array.isArray(srcFrame.layers)) return false;
     const srcLayer = srcFrame.layers[trackIndex];
     if (!srcLayer) return false;
-    // Apply pixel data (indices/direct) to current document's corresponding layer
-    const targetFrame = state.frames[frameIndex];
+    const targetFrame = targetCanvas.frames[frameIndex];
     if (!targetFrame || !Array.isArray(targetFrame.layers)) return false;
     const targetLayer = targetFrame.layers[trackIndex];
     if (!targetLayer) return false;
     try {
       if (srcLayer.indices instanceof Int16Array || Array.isArray(srcLayer.indices)) {
-        // clone to avoid shared references
         targetLayer.indices = new Int16Array(srcLayer.indices);
       }
       if (srcLayer.direct instanceof Uint8ClampedArray || Array.isArray(srcLayer.direct)) {
         targetLayer.direct = new Uint8ClampedArray(srcLayer.direct);
+      } else {
+        targetLayer.direct = null;
       }
-      // keep other layer metadata (name/visible/opacity) as-is to avoid surprising changes
       markRemoteMultiStateDirty();
       requestRender();
       requestOverlayRender();
-      if (!preserveView) {
-        // if snapshot contained UI-selected frame/layer and we are allowed to, apply them
-        if (typeof snapshot.activeFrame === 'number') state.activeFrame = clamp(Number(snapshot.activeFrame) || 0, 0, Math.max(0, state.frames.length - 1));
-        if (typeof snapshot.activeLayer === 'string') state.activeLayer = snapshot.activeLayer;
+      if (!preserveView && targetCanvas.id === (getActiveProjectCanvasDocument()?.id || '')) {
+        if (typeof snapshotCanvas.activeFrame === 'number') {
+          targetCanvas.activeFrame = clamp(Number(snapshotCanvas.activeFrame) || 0, 0, Math.max(0, targetCanvas.frames.length - 1));
+        }
+        if (typeof snapshotCanvas.activeLayer === 'string') {
+          targetCanvas.activeLayer = snapshotCanvas.activeLayer;
+        }
         syncControlsWithState();
       }
       return true;
@@ -44419,6 +46556,10 @@
       payload.joinPolicy,
       multiState.joinPolicy
     );
+    multiState.participantFreeCellMove = normalizeMultiParticipantFreeCellMove(
+      payload.participantFreeCellMove,
+      multiState.participantFreeCellMove
+    );
     multiState.exportPermission = normalizeMultiExportPermission(
       payload.exportPermission,
       multiState.exportPermission
@@ -44431,10 +46572,10 @@
         return;
       }
     }
-    applyMultiAssignmentsFromPayload(payload.assignments, payload.masterClientId, payload.blockedClientIds);
     if (payload.document && typeof payload.document === 'object') {
       applyMultiAuthoritativeDocument(payload.document);
     }
+    applyMultiAssignmentsFromPayload(payload.assignments, payload.masterClientId, payload.blockedClientIds);
     if (receivedRevision > multiState.revision) {
       multiState.revision = receivedRevision;
     }
@@ -44445,6 +46586,7 @@
       setMultiStatus(`共有モード: 参加中${keyText}`, 'success');
     }
     syncMultiControls();
+    renderTimelineMatrix();
     // Danmaku is client-local. Sync local controls to current local state.
     try {
       syncDanmakuControls();
@@ -44551,22 +46693,25 @@
     if (!enforceGuestAssignedLayerSelection({ announce: true })) {
       return null;
     }
-    const frameIndex = getAssignedFrameIndexForClient(multiState.clientId);
+    const canvasDoc = getActiveProjectCanvasDocument();
+    const canvasId = canvasDoc?.id || '';
+    const frameIndex = getAssignedFrameIndexForClient(multiState.clientId, canvasDoc);
     if (frameIndex < 0) {
       return null;
     }
     const assignment = getMultiAssignment(multiState.clientId);
-    const layer = getAssignedLayerForFrame(multiState.clientId, frameIndex);
+    const layer = getAssignedLayerForFrame(multiState.clientId, frameIndex, canvasDoc);
     if (!assignment || !layer) {
       return null;
     }
     const pixelCount = Math.max(0, Math.floor(Number(state.width) || 0) * Math.floor(Number(state.height) || 0));
-    if (!pixelCount) {
+    if (!pixelCount || !canvasId) {
       return null;
     }
     const streamKey = getMultiLayerPatchStreamKey(
       'guest-send',
       multiState.clientId,
+      canvasId,
       frameIndex,
       assignment.anchorLayerId
     );
@@ -44583,6 +46728,7 @@
       payload: {
         clientId: multiState.clientId,
         projectKey: multiState.projectKey,
+        canvasId,
         frameIndex,
         anchorLayerId: assignment.anchorLayerId,
         sequence,
@@ -44648,6 +46794,8 @@
     if (!isMultiMasterMode()) {
       return null;
     }
+    const canvasDoc = getActiveProjectCanvasDocument();
+    const canvasId = canvasDoc?.id || '';
     const frameIndex = clamp(Math.round(Number(state.activeFrame) || 0), 0, Math.max(0, state.frames.length - 1));
     const frame = state.frames[frameIndex];
     if (!frame || !Array.isArray(frame.layers)) {
@@ -44658,10 +46806,10 @@
       return null;
     }
     const pixelCount = Math.max(0, Math.floor(Number(state.width) || 0) * Math.floor(Number(state.height) || 0));
-    if (!pixelCount) {
+    if (!pixelCount || !canvasId) {
       return null;
     }
-    const streamKey = getMultiLayerPatchStreamKey('master-send', multiState.clientId, frameIndex, layer.id);
+    const streamKey = getMultiLayerPatchStreamKey('master-send', multiState.clientId, canvasId, frameIndex, layer.id);
     const sequence = getNextMultiLayerPatchSequence(streamKey);
     const previousSnapshot = multiState.layerPatchSnapshots.get(streamKey) || null;
     const diffPayload = buildLayerDiffPayload(layer, previousSnapshot, pixelCount);
@@ -44675,6 +46823,7 @@
       payload: {
         clientId: multiState.clientId,
         projectKey: multiState.projectKey,
+        canvasId,
         frameIndex,
         layerId: layer.id,
         sequence,
@@ -44698,229 +46847,6 @@
       commitMultiLayerPatchSequence(patch.streamKey, patch.sequence);
     }
     return sent;
-  }
-
-  function applyResidentQueueAndAssignmentsFromPresence(nextParticipants) {
-    if (!isMultiMasterMode() || !isResidentMultiProjectKey(multiState.projectKey)) {
-      return false;
-    }
-    if (!(nextParticipants instanceof Map)) {
-      return false;
-    }
-    const profile = getResidentMultiRoomProfile(multiState.projectKey);
-    if (profile) {
-      ensureResidentSingleFrameSingleLayer(profile);
-    }
-    const primaryLayer = getResidentMultiPrimaryLayer();
-    const frame0 = Array.isArray(state.frames) && state.frames.length ? state.frames[0] : null;
-    if (!profile || !primaryLayer || !frame0 || !frame0.id) {
-      return false;
-    }
-    const slotCount = getResidentMultiSlotCount(profile);
-    if (!slotCount) {
-      return false;
-    }
-    const onlineClientIds = new Set(Array.from(nextParticipants.keys()));
-    let changed = false;
-    const roleChangeNotices = [];
-    const notifyRole = (clientId, role, reason) => {
-      roleChangeNotices.push({ clientId, role, reason });
-    };
-
-    const upsertResidentAssignment = (clientId, role, name, slotIndex, joinedAt = Date.now()) => {
-      const normalizedSlot = normalizeResidentMultiSlotIndex(slotIndex, profile);
-      if (normalizedSlot < 0) {
-        return null;
-      }
-      const nextRole = role === 'master' ? 'master' : 'guest';
-      const existing = getMultiAssignment(clientId);
-      const nextEntry = existing && typeof existing === 'object' ? existing : {};
-      nextEntry.clientId = clientId;
-      nextEntry.role = nextRole;
-      nextEntry.name = normalizeMultiParticipantName(name, DEFAULT_MULTI_PARTICIPANT_NAME);
-      nextEntry.anchorLayerId = primaryLayer.id;
-      nextEntry.trackHint = 0;
-      nextEntry.residentSlot = normalizedSlot;
-      nextEntry.frameId = frame0.id;
-      nextEntry.frameHint = 0;
-      nextEntry.joinedAt = Number(joinedAt) || Date.now();
-      nextEntry.locked = false;
-      multiState.assignments.set(clientId, nextEntry);
-      return nextEntry;
-    };
-
-    const getUsedResidentSlots = () => {
-      const used = new Set();
-      multiState.assignments.forEach((entry, clientId) => {
-        if (!entry || typeof entry !== 'object') {
-          return;
-        }
-        if (!onlineClientIds.has(clientId)) {
-          return;
-        }
-        const slot = normalizeResidentMultiSlotIndex(
-          Number.isFinite(Number(entry.residentSlot)) ? Number(entry.residentSlot) : Number(entry.trackHint),
-          profile
-        );
-        if (slot >= 0) {
-          used.add(slot);
-        }
-      });
-      return used;
-    };
-
-    const findFirstAvailableResidentSlot = (preferredSlot = 0) => {
-      const used = getUsedResidentSlots();
-      const normalizedPreferred = normalizeResidentMultiSlotIndex(preferredSlot, profile);
-      if (normalizedPreferred >= 0 && !used.has(normalizedPreferred)) {
-        return normalizedPreferred;
-      }
-      for (let i = 0; i < slotCount; i += 1) {
-        if (!used.has(i)) {
-          return i;
-        }
-      }
-      return -1;
-    };
-
-    const offlineAssignedClientIds = [];
-    multiState.assignments.forEach((entry, clientId) => {
-      if (!entry || typeof entry !== 'object') {
-        return;
-      }
-      if (clientId === multiState.clientId) {
-        return;
-      }
-      if (!onlineClientIds.has(clientId)) {
-        offlineAssignedClientIds.push(clientId);
-      }
-    });
-    offlineAssignedClientIds.forEach(clientId => {
-      if (multiState.assignments.delete(clientId)) {
-        changed = true;
-      }
-      removeMultiJoinRequest(clientId);
-      if (multiState.selectedAssignClientId === clientId || multiState.selectedRoleControlClientId === clientId) {
-        setMultiSelectedControlClientId('');
-      }
-    });
-
-    const selfParticipant = nextParticipants.get(multiState.clientId) || null;
-    const selfAssignment = getMultiAssignment(multiState.clientId);
-    let selfSlot = normalizeResidentMultiSlotIndex(
-      Number.isFinite(Number(selfAssignment?.residentSlot)) ? Number(selfAssignment.residentSlot) : Number(selfAssignment?.trackHint),
-      profile
-    );
-    if (selfSlot < 0) {
-      selfSlot = findFirstAvailableResidentSlot(0);
-    }
-    if (selfSlot >= 0) {
-      const previousRole = normalizeMultiRole(selfAssignment?.role, 'guest');
-      const previousSlot = normalizeResidentMultiSlotIndex(
-        Number.isFinite(Number(selfAssignment?.residentSlot)) ? Number(selfAssignment.residentSlot) : Number(selfAssignment?.trackHint),
-        profile
-      );
-      const assignment = upsertResidentAssignment(
-        multiState.clientId,
-        'master',
-        selfParticipant?.name || getLocalMultiParticipantName(),
-        selfSlot,
-        selfParticipant?.joinedAt || Date.now()
-      );
-      if (assignment && (previousRole !== 'master' || previousSlot !== selfSlot)) {
-        changed = true;
-      }
-    }
-
-    const waitingEntries = Array.from(nextParticipants.values())
-      .filter(entry => entry && typeof entry === 'object')
-      .filter(entry => {
-        const clientId = typeof entry.clientId === 'string' ? entry.clientId.trim() : '';
-        if (!clientId || clientId === multiState.clientId) {
-          return false;
-        }
-        if (isMultiClientBlocked(clientId)) {
-          return false;
-        }
-        return true;
-      })
-      .sort((a, b) => {
-        const joinedDiff = (Number(a.joinedAt) || 0) - (Number(b.joinedAt) || 0);
-        if (joinedDiff !== 0) {
-          return joinedDiff;
-        }
-        return String(a.clientId || '').localeCompare(String(b.clientId || ''));
-      });
-
-    waitingEntries.forEach(entry => {
-      const clientId = typeof entry.clientId === 'string' ? entry.clientId.trim() : '';
-      if (!clientId) {
-        return;
-      }
-      const normalizedRole = normalizeMultiRole(entry.role, 'spectator');
-      const existingAssignment = getMultiAssignment(clientId);
-      if (existingAssignment?.role === 'guest') {
-        removeMultiJoinRequest(clientId);
-        const normalizedExistingSlot = normalizeResidentMultiSlotIndex(
-          Number.isFinite(Number(existingAssignment.residentSlot)) ? Number(existingAssignment.residentSlot) : Number(existingAssignment.trackHint),
-          profile
-        );
-        if (normalizedExistingSlot < 0) {
-          const reassignedSlot = findFirstAvailableResidentSlot(0);
-          if (reassignedSlot >= 0) {
-            upsertResidentAssignment(clientId, 'guest', entry.name, reassignedSlot, entry.joinedAt);
-            changed = true;
-          }
-        }
-        if (normalizedRole !== 'guest') {
-          entry.role = 'guest';
-          nextParticipants.set(clientId, entry);
-          notifyRole(clientId, 'guest', 'resident-restore-guest');
-        }
-        return;
-      }
-      const availableSlot = findFirstAvailableResidentSlot(0);
-      if (availableSlot < 0) {
-        upsertMultiJoinRequest(clientId, entry.name, entry.joinedAt);
-        if (normalizedRole !== 'spectator') {
-          entry.role = 'spectator';
-          nextParticipants.set(clientId, entry);
-          notifyRole(clientId, 'spectator', 'resident-queue');
-        }
-        return;
-      }
-      const assignment = upsertResidentAssignment(
-        clientId,
-        'guest',
-        entry.name,
-        availableSlot,
-        entry.joinedAt
-      );
-      if (!assignment) {
-        upsertMultiJoinRequest(clientId, entry.name, entry.joinedAt);
-        if (normalizedRole !== 'spectator') {
-          entry.role = 'spectator';
-          nextParticipants.set(clientId, entry);
-          notifyRole(clientId, 'spectator', 'resident-queue');
-        }
-        return;
-      }
-      changed = true;
-      removeMultiJoinRequest(clientId);
-      entry.role = 'guest';
-      nextParticipants.set(clientId, entry);
-      notifyRole(clientId, 'guest', 'resident-auto-promote');
-    });
-
-    if (changed) {
-      normalizeMultiAssignmentsForCurrentDocument();
-    }
-    if (roleChangeNotices.length) {
-      roleChangeNotices.forEach(notice => {
-        sendMultiRoleChangeNotice(notice.clientId, notice.role, notice.reason).catch(() => {});
-      });
-    }
-    return changed;
   }
 
   function refreshMultiParticipantsFromPresence() {
@@ -44955,7 +46881,6 @@
       });
     });
     const onlineMaster = Array.from(nextParticipants.values()).find(entry => entry.role === 'master') || null;
-    const residentQueueChanged = applyResidentQueueAndAssignmentsFromPresence(nextParticipants);
     if (isMultiMasterMode()) {
       multiState.masterClientId = multiState.clientId;
     } else {
@@ -44990,42 +46915,6 @@
     }
 
     multiState.participants = nextParticipants;
-    // Auto-promotion for resident rooms: if no master and local client is earliest, promote to master.
-    try {
-      if (!isMultiMasterMode() && multiState.connected && isResidentMultiProjectKey(multiState.projectKey)) {
-        const onlineMasterExists = !!onlineMaster;
-        if (!onlineMasterExists && nextParticipants.size) {
-          const selfClientId = typeof multiState.clientId === 'string' ? multiState.clientId.trim() : '';
-          let earliestId = '';
-          if (nextParticipants.size === 1 && selfClientId && nextParticipants.has(selfClientId)) {
-            earliestId = selfClientId;
-          } else {
-            const ordered = Array.from(nextParticipants.values())
-              .filter(participant => participant && typeof participant.clientId === 'string' && participant.clientId.trim())
-              .sort((left, right) => {
-                const leftAt = Number(left?.joinedAt) || 0;
-                const rightAt = Number(right?.joinedAt) || 0;
-                if (leftAt !== rightAt) {
-                  return leftAt - rightAt;
-                }
-                return String(left.clientId).localeCompare(String(right.clientId));
-              });
-            earliestId = ordered.length ? String(ordered[0].clientId || '').trim() : '';
-          }
-          if (earliestId && earliestId === (multiState.clientId || '')) {
-            scheduleResidentAutoPromoteToMaster();
-          } else {
-            clearResidentAutoPromoteTimer();
-          }
-        } else {
-          clearResidentAutoPromoteTimer();
-        }
-      } else {
-        clearResidentAutoPromoteTimer();
-      }
-    } catch (error) {
-      clearResidentAutoPromoteTimer();
-    }
     if (!isMultiMasterMode()) {
       if (onlineMaster && previousMasterClientId !== onlineMaster.clientId) {
         setMultiStatus(`共有モード: マスター接続中 (${multiState.projectKey})`, 'info');
@@ -45036,11 +46925,7 @@
     renderMultiParticipantsList();
     syncMultiJoinRequestControls();
     if (isMultiMasterMode()) {
-      if (residentQueueChanged) {
-        scheduleMultiSessionStateBroadcast({ immediate: true });
-      } else {
-        scheduleMultiPublicLobbyRoomSync({ immediate: false });
-      }
+      scheduleMultiPublicLobbyRoomSync({ immediate: false });
     }
   }
 
@@ -45080,11 +46965,6 @@
     }
     if (isMultiClientBlocked(senderClientId)) {
       await sendMultiJoinRequestResult(senderClientId, 'blocked');
-      return;
-    }
-    if (isResidentMultiProjectKey(multiState.projectKey)) {
-      refreshMultiParticipantsFromPresence();
-      scheduleMultiSessionStateBroadcast({ targetClientId: senderClientId, immediate: true });
       return;
     }
     const requestName = normalizeMultiParticipantName(payload.name, DEFAULT_MULTI_PARTICIPANT_NAME);
@@ -45256,13 +47136,6 @@
         await sendMultiKickClientNotice(senderClientId, 'blocked');
         return;
       }
-      if (isResidentMultiProjectKey(multiState.projectKey)) {
-        refreshMultiParticipantsFromPresence();
-        renderMultiParticipantsList();
-        syncMultiJoinRequestControls();
-        scheduleMultiSessionStateBroadcast({ targetClientId: senderClientId, immediate: true });
-        return;
-      }
       const senderRole = normalizeMultiRole(payload.role, 'guest');
       if (senderRole === 'master') {
         setMultiStatus(localizeText('共有モード: 同一キーに別マスターがいます', 'Collab mode: another master is already using this key'), 'warn');
@@ -45300,12 +47173,6 @@
     }
     if (isMultiClientBlocked(requesterClientId)) {
       await sendMultiKickClientNotice(requesterClientId, 'blocked');
-      return;
-    }
-    if (isResidentMultiProjectKey(multiState.projectKey)) {
-      refreshMultiParticipantsFromPresence();
-      syncMultiJoinRequestControls();
-      scheduleMultiSessionStateBroadcast({ targetClientId: requesterClientId, immediate: true });
       return;
     }
     const requesterRole = normalizeMultiRole(payload.role, 'guest');
@@ -45371,6 +47238,7 @@
     const responsePayload = buildGuestSessionStatePayload({
       targetClientId: requesterClientId,
       reason: responseReason,
+      canvasId: typeof payload.canvasId === 'string' ? payload.canvasId : '',
     });
     await sendMultiBroadcast('guest-session-state', responsePayload);
   }
@@ -45409,14 +47277,12 @@
         console.warn('Failed to deserialize targeted guest sync payload', error);
         return;
       }
-      const appliedPartial = applyHistorySnapshotForClient(snapshot, senderClientId, { preserveView: true });
+      const appliedPartial = applyHistorySnapshotForClient(snapshot, senderClientId, {
+        preserveView: true,
+        canvasId: typeof payload.canvasId === 'string' ? payload.canvasId : '',
+      });
       if (!appliedPartial) {
         return;
-      }
-      if (isResidentMultiRestrictedMasterMode()) {
-        ensureResidentTimelapseCaptureStarted();
-        scheduleTimelapseCaptureFromState();
-        scheduleResidentRoomPersist({ immediate: false, force: true });
       }
       scheduleMultiSessionStateBroadcast({ immediate: true });
       return;
@@ -45430,6 +47296,10 @@
       payload.joinPolicy,
       multiState.joinPolicy
     );
+    multiState.participantFreeCellMove = normalizeMultiParticipantFreeCellMove(
+      payload.participantFreeCellMove,
+      multiState.participantFreeCellMove
+    );
     multiState.exportPermission = normalizeMultiExportPermission(
       payload.exportPermission,
       multiState.exportPermission
@@ -45437,11 +47307,6 @@
     const applied = applyMultiAuthoritativeDocument(payload.document);
     if (!applied) {
       return;
-    }
-    if (isResidentMultiRestrictedMasterMode()) {
-      ensureResidentTimelapseCaptureStarted();
-      scheduleTimelapseCaptureFromState();
-      scheduleResidentRoomPersist({ immediate: false, force: true });
     }
     applyMultiAssignmentsFromPayload(payload.assignments, multiState.clientId, payload.blockedClientIds);
     multiState.assignments.forEach((entry, clientId) => {
@@ -45497,35 +47362,71 @@
     normalizeMultiAssignmentsForCurrentDocument();
     const assignment = getMultiAssignment(senderClientId);
     if (!assignment) {
+      if (inMasterMode) {
+        await requestTargetedGuestSessionState(senderClientId);
+      }
       return;
     }
     if (assignment.locked) {
+      if (inMasterMode) {
+        await requestTargetedGuestSessionState(senderClientId);
+      }
       return;
     }
     if (payload.anchorLayerId !== assignment.anchorLayerId) {
+      if (inMasterMode) {
+        await requestTargetedGuestSessionState(senderClientId);
+      }
       return;
     }
-    const trackIndex = getMultiLayerTrackIndexByAnchorLayerId(assignment.anchorLayerId);
+    const payloadCanvasId = typeof payload.canvasId === 'string' ? payload.canvasId.trim() : '';
+    const targetCanvas = getProjectCanvasDocumentById(payloadCanvasId) || (!payloadCanvasId ? getActiveProjectCanvasDocument() : null);
+    if (!targetCanvas) {
+      if (inMasterMode) {
+        await requestTargetedGuestSessionState(senderClientId, '', payloadCanvasId);
+      }
+      return;
+    }
+    if (normalizeMultiAssignmentCanvasId(assignment.canvasId, targetCanvas.id || '') !== targetCanvas.id) {
+      if (inMasterMode) {
+        await requestTargetedGuestSessionState(senderClientId, '', targetCanvas.id);
+      }
+      return;
+    }
+    const trackIndex = resolveAssignedLayerTrackIndexForCanvas(assignment, targetCanvas);
     if (trackIndex < 0) {
+      if (inMasterMode) {
+        await requestTargetedGuestSessionState(senderClientId, '', targetCanvas.id);
+      }
       return;
     }
-    const frameIndex = clamp(Math.round(Number(payload.frameIndex) || 0), 0, Math.max(0, state.frames.length - 1));
-    const assignedFrameIndex = getAssignedFrameIndexForClient(senderClientId);
+    const frameIndex = clamp(Math.round(Number(payload.frameIndex) || 0), 0, Math.max(0, targetCanvas.frames.length - 1));
+    const assignedFrameIndex = resolveAssignedFrameIndexForCanvas(assignment, targetCanvas);
     if (assignedFrameIndex < 0 || frameIndex !== assignedFrameIndex) {
+      if (inMasterMode) {
+        await requestTargetedGuestSessionState(senderClientId, '', targetCanvas.id);
+      }
       return;
     }
-    const frame = state.frames[frameIndex];
+    const frame = targetCanvas.frames[frameIndex];
     if (!frame || !Array.isArray(frame.layers) || trackIndex >= frame.layers.length) {
+      if (inMasterMode) {
+        await requestTargetedGuestSessionState(senderClientId, '', targetCanvas.id);
+      }
       return;
     }
     const targetLayer = frame.layers[trackIndex];
-    const pixelCount = Math.max(0, Math.floor(Number(state.width) || 0) * Math.floor(Number(state.height) || 0));
+    const pixelCount = Math.max(0, Math.floor(Number(targetCanvas.width) || 0) * Math.floor(Number(targetCanvas.height) || 0));
     if (!pixelCount) {
+      if (inMasterMode) {
+        await requestTargetedGuestSessionState(senderClientId, '', targetCanvas.id);
+      }
       return;
     }
     const streamKey = getMultiLayerPatchStreamKey(
       'guest-recv',
       senderClientId,
+      targetCanvas.id,
       frameIndex,
       assignment.anchorLayerId
     );
@@ -45535,16 +47436,19 @@
     }
     if (sequenceState.action === 'resync') {
       if (inMasterMode) {
-        await requestTargetedGuestSessionState(senderClientId, streamKey);
+        await requestTargetedGuestSessionState(senderClientId, streamKey, targetCanvas.id);
       } else if (isMultiMasterCurrentlyOnline()) {
         maybeRequestGuestAssignmentSync();
       }
       return;
     }
-    const applyResult = applyLayerPatchPayloadToLayer(targetLayer, payload, pixelCount);
+    const applyResult = applyLayerPatchPayloadToLayer(targetLayer, payload, pixelCount, {
+      width: targetCanvas.width,
+      height: targetCanvas.height,
+    });
     if (!applyResult) {
       if (inMasterMode) {
-        await requestTargetedGuestSessionState(senderClientId, streamKey);
+        await requestTargetedGuestSessionState(senderClientId, streamKey, targetCanvas.id);
       } else if (isMultiMasterCurrentlyOnline()) {
         maybeRequestGuestAssignmentSync();
       }
@@ -45552,7 +47456,9 @@
     }
     markIncomingMultiLayerPatchSequenceApplied(streamKey, sequenceState.sequence);
     markRemoteMultiStateDirty();
-    if (applyResult.full || !applyResult.dirtyRect) {
+    if (targetCanvas.id !== (getActiveProjectCanvasDocument()?.id || '')) {
+      markCanvasDirty();
+    } else if (applyResult.full || !applyResult.dirtyRect) {
       markCanvasDirty();
     } else {
       markDirtyRect(
@@ -45564,11 +47470,6 @@
     }
     requestRender();
     requestOverlayRender();
-    if (inMasterMode && isResidentMultiRestrictedMasterMode()) {
-      ensureResidentTimelapseCaptureStarted();
-      scheduleTimelapseCaptureFromState();
-      scheduleResidentRoomPersist({ immediate: false });
-    }
     if (!inMasterMode) {
       if (isMultiMasterCurrentlyOnline()) {
         return;
@@ -45582,6 +47483,7 @@
     await sendMultiBroadcast('master-layer-patch', {
       clientId: senderClientId,
       projectKey: multiState.projectKey,
+      canvasId: targetCanvas.id,
       frameIndex,
       layerId: targetLayer.id,
       mode: relayMode,
@@ -45607,8 +47509,13 @@
     if (multiState.masterClientId && senderClientId !== multiState.masterClientId && senderClientId !== multiState.clientId) {
       return;
     }
-    const frameIndex = clamp(Math.round(Number(payload.frameIndex) || 0), 0, Math.max(0, state.frames.length - 1));
-    const frame = state.frames[frameIndex];
+    const payloadCanvasId = typeof payload.canvasId === 'string' ? payload.canvasId.trim() : '';
+    const targetCanvas = getProjectCanvasDocumentById(payloadCanvasId) || (!payloadCanvasId ? getActiveProjectCanvasDocument() : null);
+    if (!targetCanvas) {
+      return;
+    }
+    const frameIndex = clamp(Math.round(Number(payload.frameIndex) || 0), 0, Math.max(0, targetCanvas.frames.length - 1));
+    const frame = targetCanvas.frames[frameIndex];
     if (!frame || !Array.isArray(frame.layers)) {
       return;
     }
@@ -45620,11 +47527,11 @@
     if (!targetLayer) {
       return;
     }
-    const pixelCount = Math.max(0, Math.floor(Number(state.width) || 0) * Math.floor(Number(state.height) || 0));
+    const pixelCount = Math.max(0, Math.floor(Number(targetCanvas.width) || 0) * Math.floor(Number(targetCanvas.height) || 0));
     if (!pixelCount) {
       return;
     }
-    const streamKey = getMultiLayerPatchStreamKey('master-recv', senderClientId, frameIndex, layerId);
+    const streamKey = getMultiLayerPatchStreamKey('master-recv', senderClientId, targetCanvas.id, frameIndex, layerId);
     const sequenceState = inspectIncomingMultiLayerPatchSequence(streamKey, payload);
     if (sequenceState.action === 'stale') {
       return;
@@ -45633,14 +47540,19 @@
       maybeRequestGuestAssignmentSync();
       return;
     }
-    const applyResult = applyLayerPatchPayloadToLayer(targetLayer, payload, pixelCount);
+    const applyResult = applyLayerPatchPayloadToLayer(targetLayer, payload, pixelCount, {
+      width: targetCanvas.width,
+      height: targetCanvas.height,
+    });
     if (!applyResult) {
       maybeRequestGuestAssignmentSync();
       return;
     }
     markIncomingMultiLayerPatchSequenceApplied(streamKey, sequenceState.sequence);
     markRemoteMultiStateDirty();
-    if (applyResult.full || !applyResult.dirtyRect) {
+    if (targetCanvas.id !== (getActiveProjectCanvasDocument()?.id || '')) {
+      markCanvasDirty();
+    } else if (applyResult.full || !applyResult.dirtyRect) {
       markCanvasDirty();
     } else {
       markDirtyRect(
@@ -45708,26 +47620,16 @@
       || multiState.role === 'spectator'
       ? multiState.role
       : 'none';
-    const residentProjectKeyAtDisconnect = disconnectedRole === 'master'
-      ? normalizeResidentRoomPersistProjectKey(multiState.projectKey)
-      : '';
     const shouldRestoreReplicaSnapshot = Boolean(
       restoreLocalDocument
       && isMultiReplicaRole(disconnectedRole)
     );
-    clearResidentRoomPersistTimer();
-    if (residentProjectKeyAtDisconnect) {
-      await flushResidentRoomPersistNow({
-        projectKey: residentProjectKeyAtDisconnect,
-        force: true,
-      });
-    }
     clearMultiBroadcastTimer();
     clearPendingMultiSessionStateApply();
     clearMultiLayerPatchSnapshots();
     clearMultiLayerPatchSendTimers();
     clearMultiGuestStateRecovery();
-    clearResidentAutoPromoteTimer();
+    clearMultiHistory();
     const channel = multiState.channel;
     multiState.channel = null;
     multiState.connected = false;
@@ -45737,6 +47639,7 @@
     multiState.assignments.clear();
     multiState.participants.clear();
     multiState.blockedClientIds.clear();
+    multiState.pendingAssignmentMoveRequests.clear();
     multiState.selectedAssignClientId = '';
     multiState.selectedRoleControlClientId = '';
     multiState.comments = [];
@@ -45753,14 +47656,13 @@
     multiState.resumeMaxGuests = null;
     multiState.resumeRoomVisibility = null;
     multiState.resumeJoinPolicy = null;
+    multiState.resumeParticipantFreeCellMove = null;
     multiState.resumeExportPermission = null;
     multiState.roomVisibility = MULTI_DEFAULT_ROOM_VISIBILITY;
     multiState.joinPolicy = MULTI_DEFAULT_JOIN_POLICY;
+    multiState.participantFreeCellMove = false;
     multiState.exportPermission = MULTI_DEFAULT_EXPORT_PERMISSION;
     multiState.paletteSeededFromShared = false;
-    multiState.residentPersistInFlight = false;
-    multiState.residentPersistQueued = false;
-    multiState.residentPersistSignature = '';
     clearStoredMultiResumeSession();
     await disconnectMultiPublicLobbyChannel();
     if (channel) {
@@ -45787,7 +47689,7 @@
         history.past = [];
         history.future = [];
         history.pending = null;
-        clearTimelapseRecording({ silent: true });
+        clearTimelapseRecording({ silent: true, scope: 'all' });
         resetDocumentUnsavedChanges();
         updateHistoryButtons();
         markAutosaveDirty();
@@ -45821,14 +47723,11 @@
       setMultiStatus(localizeText('共有モード: プロジェクトキーを入力してください', 'Collab mode: enter a project key'), 'warn');
       return false;
     }
-    const residentProfile = getResidentMultiRoomProfile(projectKey);
-    const allowResidentGuestJoin = requestedRole === 'guest' && Boolean(residentProfile);
-    const normalizedRole = requestedRole === 'guest' && !(allowGuestJoin || allowResidentGuestJoin)
+    const normalizedRole = requestedRole === 'guest' && !allowGuestJoin
       ? 'spectator'
       : requestedRole;
     const enterReplicaMode = isMultiReplicaRole(normalizedRole);
     multiState.desiredRole = normalizedRole;
-    clearResidentAutoPromoteTimer();
     if (!multiState.connected && !multiState.connecting) {
       multiState.uiView = normalizedRole;
     }
@@ -45846,6 +47745,7 @@
     clearPendingMultiSessionStateApply();
     clearMultiLayerPatchSnapshots();
     clearMultiLayerPatchSendTimers();
+    clearMultiHistory();
     multiState.paletteSeededFromShared = false;
     multiState.maxGuests = normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT);
     multiState.roomVisibility = normalizeMultiRoomVisibility(
@@ -45913,6 +47813,12 @@
       channel.on('broadcast', { event: 'role-change' }, message => {
         handleMultiRoleChangeMessage(message?.payload || {});
       });
+      channel.on('broadcast', { event: 'assignment-move-request' }, message => {
+        handleMultiAssignmentMoveRequestMessage(message?.payload || {});
+      });
+      channel.on('broadcast', { event: 'assignment-move-result' }, message => {
+        handleMultiAssignmentMoveResultMessage(message?.payload || {});
+      });
 
       await waitForMultiSubscription(channel);
       multiState.channel = channel;
@@ -45929,6 +47835,7 @@
       multiState.assignments.clear();
       multiState.participants.clear();
       multiState.blockedClientIds.clear();
+      multiState.pendingAssignmentMoveRequests.clear();
       clearMultiJoinRequests();
       multiState.selectedAssignClientId = '';
       multiState.selectedRoleControlClientId = '';
@@ -45961,6 +47868,10 @@
           multiState.resumeJoinPolicy,
           multiState.joinPolicy
         );
+        const resumeParticipantFreeCellMove = normalizeMultiParticipantFreeCellMove(
+          multiState.resumeParticipantFreeCellMove,
+          multiState.participantFreeCellMove
+        );
         const resumeExportPermission = normalizeMultiExportPermission(
           multiState.resumeExportPermission,
           multiState.exportPermission
@@ -45970,10 +47881,12 @@
         multiState.resumeMaxGuests = null;
         multiState.resumeRoomVisibility = null;
         multiState.resumeJoinPolicy = null;
+        multiState.resumeParticipantFreeCellMove = null;
         multiState.resumeExportPermission = null;
         multiState.maxGuests = resumeMaxGuests;
         multiState.roomVisibility = resumeRoomVisibility;
         multiState.joinPolicy = resumeJoinPolicy;
+        multiState.participantFreeCellMove = resumeParticipantFreeCellMove;
         multiState.exportPermission = resumeExportPermission;
         multiState.blockedClientIds = normalizeMultiBlockedClientIds(resumeBlockedClientIds);
         if (resumeAssignments && resumeAssignments.length) {
@@ -45986,10 +47899,6 @@
         } else {
           ensureMasterLayerAssignment();
         }
-        const residentProfile = getResidentMultiRoomProfile(projectKey);
-        if (residentProfile) {
-          applyResidentMultiRoomProfile(residentProfile);
-        }
         multiState.masterClientId = multiState.clientId;
       } else {
         multiState.masterClientId = null;
@@ -45998,6 +47907,7 @@
         multiState.resumeMaxGuests = null;
         multiState.resumeRoomVisibility = null;
         multiState.resumeJoinPolicy = null;
+        multiState.resumeParticipantFreeCellMove = null;
         multiState.resumeExportPermission = null;
       }
 
@@ -46018,9 +47928,6 @@
 
       if (normalizedRole === 'master') {
         clearMultiLocalSnapshotBeforeReplica();
-        if (residentProfile) {
-          await primeResidentMasterDocument(residentProfile);
-        }
         startMultiMasterRecoveryFlow(projectKey);
       } else {
         await sendMultiBroadcast('sync-request', {
@@ -46037,21 +47944,6 @@
           }
         } else {
           setMultiStatus(`共有モード: 参加中 (${projectKey})`, 'success');
-        }
-        if (residentProfile) {
-          // Eagerly try resident auto-promotion to avoid a no-master "cannot draw" dead zone.
-          window.setTimeout(() => {
-            if (!multiState.connected || multiState.connecting || isMultiMasterMode()) {
-              return;
-            }
-            if (!isResidentMultiProjectKey(multiState.projectKey)) {
-              return;
-            }
-            if (isMultiMasterCurrentlyOnline()) {
-              return;
-            }
-            scheduleResidentAutoPromoteToMaster();
-          }, 120);
         }
       }
       storePendingMultiResumeSession();
@@ -46078,15 +47970,6 @@
       return;
     }
     if (isMultiMasterMode()) {
-      if (isResidentMultiRestrictedMasterMode()) {
-        if (HISTORY_DRAW_TOOLS.has(_label)) {
-          markMultiPublicLobbyThumbnailDirty();
-          scheduleMasterLayerPatchSend();
-          scheduleMultiPublicLobbyRoomSync({ immediate: false });
-          scheduleResidentRoomPersist({ immediate: false });
-        }
-        return;
-      }
       if (HISTORY_DRAW_TOOLS.has(_label)) {
         markMultiPublicLobbyThumbnailDirty();
         scheduleMasterLayerPatchSend();
@@ -46307,13 +48190,47 @@
         applyMultiMasterPreset('stream');
       });
     }
+    if (dom.controls.multiParticipantFreeCellMove instanceof HTMLInputElement && dom.controls.multiParticipantFreeCellMove.dataset.bound !== 'true') {
+      dom.controls.multiParticipantFreeCellMove.dataset.bound = 'true';
+      dom.controls.multiParticipantFreeCellMove.addEventListener('change', event => {
+        if (!(event.target instanceof HTMLInputElement)) {
+          return;
+        }
+        const canUse = isMultiMasterConfigMode();
+        if (!canUse) {
+          event.target.checked = Boolean(multiState.participantFreeCellMove);
+          syncMultiControls();
+          return;
+        }
+        const nextValue = Boolean(event.target.checked);
+        const changed = nextValue !== multiState.participantFreeCellMove;
+        multiState.participantFreeCellMove = nextValue;
+        event.target.checked = nextValue;
+        if (!changed) {
+          syncMultiControls();
+          return;
+        }
+        scheduleSessionPersist({ includeSnapshots: false });
+        if (isMultiMasterMode()) {
+          scheduleMultiSessionStateBroadcast({ immediate: true });
+          setMultiStatus(
+            nextValue
+              ? localizeText('参加者セルの自由移動をONにしました', 'Participant free cell movement enabled')
+              : localizeText('参加者セルの自由移動をOFFにしました', 'Participant free cell movement disabled'),
+            'success'
+          );
+        }
+        syncMultiControls();
+        renderTimelineMatrix();
+      });
+    }
     if (dom.controls.multiMasterOpsMode instanceof HTMLInputElement && dom.controls.multiMasterOpsMode.dataset.bound !== 'true') {
       dom.controls.multiMasterOpsMode.dataset.bound = 'true';
       dom.controls.multiMasterOpsMode.addEventListener('change', event => {
         if (!(event.target instanceof HTMLInputElement)) {
           return;
         }
-        const canUseMasterOpsMode = isMultiMasterConfigMode() && !isResidentMultiConnectedRoom();
+        const canUseMasterOpsMode = isMultiMasterConfigMode();
         if (!canUseMasterOpsMode) {
           event.target.checked = Boolean(multiState.masterOpsMode);
           syncMultiControls();
@@ -46568,6 +48485,21 @@
       dom.controls.multiAssignApply.addEventListener('click', () => {
         const targetClientId = multiState.selectedAssignClientId
           || (dom.controls.multiAssignTarget instanceof HTMLSelectElement ? dom.controls.multiAssignTarget.value : '');
+        const pendingRequest = targetClientId ? getPendingMultiAssignmentMoveRequest(targetClientId) : null;
+        const assignment = targetClientId ? getMultiAssignment(targetClientId) : null;
+        const targetCanvas = (() => {
+          const pendingCanvasId = pendingRequest
+            ? normalizeMultiAssignmentCanvasId(
+              pendingRequest.canvasId,
+              assignment?.canvasId || getActiveProjectCanvasDocument()?.id || ''
+            )
+            : '';
+          return getProjectCanvasDocumentById(pendingCanvasId)
+            || getAssignmentCanvasDocument(assignment, getActiveProjectCanvasDocument())
+            || getActiveProjectCanvasDocument()
+            || getProjectCanvasDocumentAt(0)
+            || null;
+        })();
         const frameNumber = dom.controls.multiAssignFrame instanceof HTMLInputElement
           ? Number(dom.controls.multiAssignFrame.value)
           : 1;
@@ -46577,7 +48509,10 @@
         const moved = moveMultiParticipantToCell(
           targetClientId,
           (Number.isFinite(frameNumber) ? frameNumber : 1) - 1,
-          (Number.isFinite(layerNumber) ? layerNumber : 1) - 1
+          (Number.isFinite(layerNumber) ? layerNumber : 1) - 1,
+          {
+            canvasId: targetCanvas?.id || pendingRequest?.canvasId || assignment?.canvasId || getActiveProjectCanvasDocument()?.id || '',
+          }
         );
         if (moved) {
           updateMultiAssignmentControlsFromSelection();
