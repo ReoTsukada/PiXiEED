@@ -210,7 +210,7 @@
   }
   .main {
     display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(240px, 0.9fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: 12px;
     min-height: 0;
     height: 100%;
@@ -226,7 +226,7 @@
   }
   .map-panel {
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
     gap: 8px;
   }
   .map-title {
@@ -382,6 +382,9 @@
     height: 12px;
     border-radius: 4px;
     border: 1px solid rgba(255,255,255,0.2);
+  }
+  .status-panel {
+    display: none;
   }
   .status-panel h2 {
     margin: 0;
@@ -900,7 +903,7 @@
   /* 狭い画面ではレイアウトを縦寄せに切り替える。 */
   @media (max-width: 900px) {
     .main { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr); }
-    .map-panel { overflow: hidden; grid-template-rows: auto 1fr; }
+    .map-panel { overflow: hidden; grid-template-rows: minmax(0, 1fr) auto; }
     .map-frame { width: 100%; height: 100%; max-height: 100%; }
     .status-panel { display: none; }
     .sheet-overlay { padding: calc(10px + var(--safe-top)) calc(10px + var(--safe-right)) calc(10px + var(--safe-bottom)) calc(10px + var(--safe-left)); }
@@ -994,6 +997,9 @@
     <div class="main">
       <!-- プレイ中に主に見るHUDとマップ表示エリア。 -->
       <section class="panel map-panel">
+        <div class="map-frame">
+          <canvas id="mapCanvas" width="480" height="480"></canvas>
+        </div>
         <div class="hud">
           <div class="hud-bars">
             <div class="hud-bar">
@@ -1022,9 +1028,6 @@
             <span class="hud-chip hud-chip--coin"><img class="hud-icon" src="../character-dots/tyarin.png" alt="">チャリン <strong id="coinShort">--</strong></span>
             <button class="hud-btn hud-btn--status" id="openStatus" type="button">ステータス</button>
           </div>
-        </div>
-        <div class="map-frame">
-          <canvas id="mapCanvas" width="480" height="480"></canvas>
         </div>
       </section>
 
