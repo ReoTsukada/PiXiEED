@@ -39,7 +39,7 @@ let postQueueBusy = false;
 const PLACEHOLDERS = new Array(10).fill(0).map((_, i) => ({
   title: `サンプル${i + 1}`,
   name: `サンプル${i + 1}`,
-  mode: i % 2 === 0 ? 'timed10' : 'free'
+  mode: 'free'
 }));
 
 function $(id){
@@ -1174,9 +1174,7 @@ async function buildPlaceholders(){
 
 function applyFilterAndSort(entries){
   let filtered = entries.slice();
-  if(currentFilter === 'timed10'){
-    filtered = filtered.filter(e => e.mode === 'timed10');
-  }else if(currentFilter === 'px32'){
+  if(currentFilter === 'px32'){
     filtered = filtered.filter(e => (e.width || 999) <= 32 && (e.height || 999) <= 32);
   }
   if(currentSort === 'popular'){
