@@ -10,6 +10,13 @@
       url: '../index.html',
       entries: [
         {
+          date: '2026-03-15',
+          items: [
+            'ホームの更新状況カードに、最新の PiXiEEDraw / 各ツール / 関連ページ更新を反映',
+            '開発ノートに最新の PiXiEEDraw とサイト更新メモを追加'
+          ]
+        },
+        {
           date: '2026-02-05',
           items: [
             '開発ノートまとめページを追加',
@@ -60,6 +67,12 @@
   const fallbackAutoNotes = Object.freeze({
     pixiedraw: [
       {
+        date: '2026-03-15',
+        items: [
+          'マルチキャンバス追加 / 選択プレビューとミラーの選択中キャンバス参照修正 / 共同制作の再同期・参加者セル再配置改善 / コメント欄のログスクロール化 / タブ終了確認を追加'
+        ]
+      },
+      {
         date: '2026-02-25',
         items: [
           'ツール/カラーパネルを統合 / 左レーンコンパクト時を1列固定+フライアウト化 / ボタンサイズ44px統一 / カラーパネルを縦スクロール最適化'
@@ -91,6 +104,20 @@
   });
 
   const indexLinkToNoteId = Object.freeze({
+    'index.html': 'site',
+    'en/index.html': 'site',
+    'notes/index.html': 'site',
+    'tools.html': 'site',
+    'games.html': 'site',
+    'contest/index.html': 'site',
+    'glossary/index.html': 'site',
+    'en/glossary/index.html': 'site',
+    'portfolio/index.html': 'site',
+    'en/portfolio/index.html': 'site',
+    'pixel-art-editor/index.html': 'site',
+    'pixel-art-animation/index.html': 'site',
+    'pixel-art-maker/index.html': 'site',
+    'pixel-art-online/index.html': 'site',
     'pixiedraw/index.html': 'pixiedraw',
     'jerin-maker/index.html': 'pixiedraw-lite',
     'pixiee-lens/index.html': 'pixiee-lens',
