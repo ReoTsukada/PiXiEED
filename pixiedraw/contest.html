@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no, viewport-fit=cover"/>
-  <title>PiXiEEDraw Lite - 10分ドット投稿</title>
+  <title>PiXiEEDraw Lite - 投稿</title>
   <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-5.png"/>
   <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-5.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -233,12 +233,8 @@
   <div class="page">
     <header>
       <div>
-        <h1>10分ドット投稿</h1>
+        <h1>投稿</h1>
         <p class="subtitle">PiXiEEDraw Lite から出力したPNGを投稿できます（元サイズ512x512以内 / 256色以内）</p>
-      </div>
-      <div class="timer-row">
-        <span class="timer-chip" id="timerLabel">未開始</span>
-        <button class="button" type="button" id="startTimedBtn">10分モードを開始</button>
       </div>
     </header>
 
@@ -246,7 +242,7 @@
       <section class="card prompt">
         <h2 class="prompt-title">今日のお題</h2>
         <div class="prompt-text" id="promptText">今日のお題: --</div>
-        <p class="helper">※お題は公開表示のまま。10分モード開始でカウントダウンがスタートします。</p>
+        <p class="helper">※お題は公開表示のままです。</p>
       </section>
 
       <section class="card">
@@ -265,7 +261,6 @@
             <input id="contestFile" name="contestFile" type="file" accept="image/png"/>
             <p class="helper">元サイズ512x512以内 / 256色以内</p>
           </div>
-          <label><input type="checkbox" id="timedMode" name="timedMode"/> 10分ドットモードで投稿する</label>
           <button class="button" type="submit">投稿する</button>
           <p class="status" id="contestStatus"></p>
         </form>
@@ -273,7 +268,7 @@
     </div>
 
     <section class="card">
-      <h2 class="prompt-title">みんなの10分ドット</h2>
+      <h2 class="prompt-title">みんなの投稿</h2>
       <div id="contestGallery" class="gallery"></div>
     </section>
   </div>
