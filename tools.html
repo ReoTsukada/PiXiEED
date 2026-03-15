@@ -34,13 +34,13 @@
         "@type": "ItemList",
         "name": "PiXiEED Tools And Games",
         "itemListElement": [
-          { "@type": "ListItem", "position": 1, "name": "PiXiEEDraw", "url": "https://pixieed.jp/projects/pixiedraw/" },
-          { "@type": "ListItem", "position": 2, "name": "PiXiEEDraw Lite（ピクドラ）", "url": "https://pixieed.jp/projects/jerin-maker/" },
-          { "@type": "ListItem", "position": 3, "name": "PiXiEELENS", "url": "https://pixieed.jp/projects/pixiee-lens/" },
-          { "@type": "ListItem", "position": 4, "name": "QRコードメーカー", "url": "https://pixieed.jp/projects/qr-maker/" },
-          { "@type": "ListItem", "position": 5, "name": "PiXFiND", "url": "https://pixieed.jp/projects/pixfind/" },
-          { "@type": "ListItem", "position": 6, "name": "魔王様!!いつまでよければいいですか!?", "url": "https://pixieed.jp/projects/maoitu/" },
-          { "@type": "ListItem", "position": 7, "name": "魔王奪還戦", "url": "https://pixieed.jp/projects/maou-war/" }
+          { "@type": "ListItem", "position": 1, "name": "PiXiEEDraw", "url": "https://pixieed.jp/pixiedraw/" },
+          { "@type": "ListItem", "position": 2, "name": "PiXiEEDraw Lite（ピクドラ）", "url": "https://pixieed.jp/jerin-maker/" },
+          { "@type": "ListItem", "position": 3, "name": "PiXiEELENS", "url": "https://pixieed.jp/pixiee-lens/" },
+          { "@type": "ListItem", "position": 4, "name": "QRコードメーカー", "url": "https://pixieed.jp/qr-maker/" },
+          { "@type": "ListItem", "position": 5, "name": "PiXFiND", "url": "https://pixieed.jp/pixfind/" },
+          { "@type": "ListItem", "position": 6, "name": "魔王様!!いつまでよければいいですか!?", "url": "https://pixieed.jp/maoitu/" },
+          { "@type": "ListItem", "position": 7, "name": "魔王奪還戦", "url": "https://pixieed.jp/maou-war/" }
         ]
       }
     ]
@@ -172,6 +172,25 @@
     }
     h1{ margin:0; font-size:22px; }
     .subtitle{ margin:0; color:#cbd5e1; font-size:12px; }
+    .section-head{
+      display:grid;
+      gap:6px;
+      margin-bottom:12px;
+    }
+    .section-head--compact{
+      gap:4px;
+    }
+    .section-title{
+      margin:0;
+      font-size:18px;
+      color:#f9fafb;
+    }
+    .section-note{
+      margin:0;
+      color:#9ca3af;
+      font-size:12px;
+      line-height:1.6;
+    }
     .seo-links{
       margin:8px 0 0;
       color:#cbd5e1;
@@ -199,6 +218,42 @@
       display:flex;
       align-items:center;
       justify-content:center;
+    }
+    .page-about{
+      display:grid;
+      gap:4px;
+    }
+    footer{
+      color:#cbd5e1;
+      text-align:center;
+      font-size:12px;
+      display:grid;
+      gap:8px;
+    }
+    .footer-links{
+      display:flex;
+      flex-wrap:wrap;
+      justify-content:center;
+      gap:12px;
+      padding:0;
+      margin:0;
+      list-style:none;
+    }
+    .footer-links a{
+      color:#cbd5e1;
+      text-decoration:none;
+      border:1px solid rgba(255,255,255,0.16);
+      border-radius:10px;
+      padding:6px 10px;
+      background:rgba(255,255,255,0.04);
+      font-weight:700;
+      transition:transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    .footer-links a:hover,
+    .footer-links a:focus-visible{
+      transform:translateY(-1px);
+      border-color:rgba(255,255,255,0.26);
+      background:rgba(255,255,255,0.08);
     }
     .filters{
       display:flex;
@@ -900,14 +955,10 @@
       </div>
     </header>
     <section class="card">
-      <h1>ドット絵ツール & ゲーム一覧</h1>
-      <p class="subtitle">PiXiEED（ピクシード）は、ブラウザで使えるドット絵作成サイトです。みんなで一緒に描けるリアルタイム共同作業対応の PiXiEEDraw を含め、描く・変換する・遊ぶを1ページで比較できます。</p>
-      <p class="seo-links">ドット絵エディターを探している方は <a href="pixiedraw/index.html">ドット絵エディター PiXiEEDraw（ピクシードロー）</a> と <a href="jerin-maker/index.html">16×16ドット絵ツール PiXiEEDraw Lite</a> へ直接アクセスできます。</p>
-      <p class="seo-links">間違い探しゲームなら <a href="pixfind/index.html">PiXFiND（ピクスファインド）</a> をチェック。</p>
-      <p class="seo-links">QRコードを作るなら <a href="qr-maker/index.html">登録不要・無料のQRコードメーカー</a> をチェック。</p>
-      <p class="seo-links">カメラで身の回りのものをドット絵変換するなら <a href="pixiee-lens/index.html">ドット絵カメラ PiXiEELENS</a>。</p>
-    </section>
-    <section class="card">
+      <div class="section-head">
+        <h1>ドット絵ツール & ゲーム一覧</h1>
+        <p class="subtitle">使いたいツールやゲームを、カテゴリとキーワードで絞り込めます。</p>
+      </div>
       <div class="filters">
         <button class="chip is-active" data-filter="all" type="button">すべて</button>
         <button class="chip" data-filter="tool" type="button">ツール</button>
@@ -916,6 +967,10 @@
       </div>
     </section>
     <section class="card">
+      <div class="section-head section-head--compact">
+        <h2 class="section-title">作品一覧</h2>
+        <p class="section-note" id="toolsSummary">ツールとゲームを読み込んでいます。</p>
+      </div>
       <div class="grid" id="toolsGrid">
         <a class="item" href="maoitu/index.html">
           <div class="thumb">
@@ -990,13 +1045,41 @@
         </a>
       </div>
     </section>
+    <section class="card card--ad" aria-label="広告">
+      <div class="ad-block ad-inline">
+        <ins class="adsbygoogle ad-slot"
+             style="display:block"
+             data-ad-client="ca-pub-9801602250480253"
+             data-ad-slot="rotate"
+             data-ad-format="auto"
+             data-full-width-responsive="true"></ins>
+      </div>
+    </section>
+    <section class="card page-about">
+      <div class="section-head section-head--compact">
+        <h2 class="section-title">このページについて</h2>
+        <p class="subtitle">PiXiEED（ピクシード）は、ブラウザで使えるドット絵作成サイトです。みんなで一緒に描けるリアルタイム共同作業対応の PiXiEEDraw を含め、描く・変換する・遊ぶを1ページで比較できます。</p>
+      </div>
+      <p class="seo-links">ドット絵エディターを探している方は <a href="pixiedraw/index.html">ドット絵エディター PiXiEEDraw（ピクシードロー）</a> と <a href="jerin-maker/index.html">16×16ドット絵ツール PiXiEEDraw Lite</a> へ直接アクセスできます。</p>
+      <p class="seo-links">間違い探しゲームなら <a href="pixfind/index.html">PiXFiND（ピクスファインド）</a> をチェック。</p>
+      <p class="seo-links">QRコードを作るなら <a href="qr-maker/index.html">登録不要・無料のQRコードメーカー</a> をチェック。</p>
+      <p class="seo-links">カメラで身の回りのものをドット絵変換するなら <a href="pixiee-lens/index.html">ドット絵カメラ PiXiEELENS</a>。</p>
+    </section>
+    <footer>
+      <p>© <span id="year"></span> PiXiEED. All rights reserved.</p>
+      <div class="footer-links">
+        <a href="glossary/index.html">用語集</a>
+        <a href="terms/index.html">利用規約</a>
+        <a href="privacy/index.html">プライバシーポリシー</a>
+      </div>
+    </footer>
   </div>
   <nav class="bottom-nav">
     <a class="bottom-nav__item" data-tab="home" href="./index.html">
       <span class="icon"><img src="FooterIcon1.png" alt=""/></span><span>ホーム</span>
     </a>
     <a class="bottom-nav__item" data-tab="contest" href="contest/index.html">
-      <span class="icon"><img src="FooterIcon2.png" alt=""/></span><span>コンテスト</span>
+      <span class="icon"><img src="FooterIcon2.png" alt=""/></span><span>広場</span>
     </a>
 
     <a class="bottom-nav__item is-active" data-tab="tools" href="tools.html">
@@ -1370,6 +1453,7 @@
 
       function renderList(filter, keyword){
         const wrap = document.getElementById('toolsGrid');
+        const summary = document.getElementById('toolsSummary');
         if(!wrap) return;
         const kw = (keyword || '').toLowerCase();
         const list = ITEMS.filter(item => {
@@ -1385,6 +1469,11 @@
           const bOrder = BASE_ORDER.get(b.id) ?? Number.MAX_SAFE_INTEGER;
           return aOrder - bOrder;
         });
+        if(summary){
+          summary.textContent = list.length
+            ? `${list.length}件を表示中です。`
+            : '条件に合う作品が見つかりません。';
+        }
         if(!list.length){
           wrap.innerHTML = '<p class="helper" style="text-align:center;">該当する作品がありません</p>';
           return;
@@ -1472,6 +1561,8 @@
         setupProfileModal();
         setupFilters();
         setActiveNav();
+        const year = document.getElementById('year');
+        if(year) year.textContent = new Date().getFullYear();
         try{
           if(window.pixieedObserveAds){
             window.pixieedObserveAds();
