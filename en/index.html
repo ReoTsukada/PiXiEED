@@ -4,8 +4,8 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no, viewport-fit=cover"/>
   <base href="../">
-  <title>PiXiEED | Free Pixel Art Tools for Drawing, Playing, and Contact</title>
-  <meta name="description" content="PiXiEED is a browser-based pixel art hub. From beginner tools to PiXiEEDraw with full production features and multiplayer collaboration, draw, play, and contact in one place."/>
+  <title>PiXiEED | Pixel Art Tools, Guides, and Updates</title>
+  <meta name="description" content="PiXiEED is a browser-based pixel art hub. Start drawing, compare tools, check terminology, and follow updates from one home page."/>
   <meta name="keywords" content="PiXiEED,PiXiEEDraw,PiXFiND,pixel art,pixel editor,browser pixel art tool"/>
   <link rel="canonical" href="https://pixieed.jp/en/"/>
   <link rel="alternate" hreflang="ja" href="https://pixieed.jp/"/>
@@ -13,15 +13,15 @@
   <link rel="alternate" hreflang="x-default" href="https://pixieed.jp/"/>
   <meta property="og:type" content="website"/>
   <meta property="og:site_name" content="PiXiEED"/>
-  <meta property="og:title" content="PiXiEED | Free Pixel Art Tools for Drawing, Playing, and Contact"/>
-  <meta property="og:description" content="Draw pixel art in your browser with tools ranging from beginner mode to full-featured PiXiEEDraw multiplayer collaboration."/>
+  <meta property="og:title" content="PiXiEED | Pixel Art Tools, Guides, and Updates"/>
+  <meta property="og:description" content="PiXiEED is a browser-based pixel art hub. Start drawing, compare tools, check terminology, and follow updates from one home page."/>
   <meta property="og:url" content="https://pixieed.jp/en/"/>
   <meta property="og:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
   <meta name="twitter:card" content="summary_large_image"/>
   <meta name="twitter:site" content="@PiXiEED_arta"/>
   <meta name="twitter:url" content="https://pixieed.jp/en/"/>
-  <meta name="twitter:title" content="PiXiEED | Free Pixel Art Tools for Drawing, Playing, and Contact"/>
-  <meta name="twitter:description" content="Draw pixel art in your browser with tools ranging from beginner mode to full-featured PiXiEEDraw multiplayer collaboration."/>
+  <meta name="twitter:title" content="PiXiEED | Pixel Art Tools, Guides, and Updates"/>
+  <meta name="twitter:description" content="PiXiEED is a browser-based pixel art hub. Start drawing, compare tools, check terminology, and follow updates from one home page."/>
   <meta name="twitter:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
   <link rel="icon" type="image/png" href="character-dots/mao1.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -223,6 +223,21 @@
     .hero-place{
       display:grid;
       gap:12px;
+    }
+    .hero-summary-panel{
+      display:grid;
+      gap:12px;
+      padding:16px;
+      border-radius:14px;
+      border:1px solid rgba(175, 210, 255, 0.2);
+      background:
+        linear-gradient(180deg, rgba(96, 165, 250, 0.14), rgba(15, 23, 42, 0.08)),
+        rgba(255,255,255,0.04);
+    }
+    .hero-summary-grid{
+      display:grid;
+      gap:10px;
+      grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
     }
     .hero-copy{
       display:grid;
@@ -2159,15 +2174,15 @@
     <section class="card" id="home-hero">
       <div class="hero-grid">
         <div class="hero-copy">
-          <h1>Free Pixel Art Tools by PiXiEED</h1>
-          <p class="subtitle">PiXiEED is a browser-based pixel art hub for drawing, playing, and contact.</p>
+          <h1>Start Pixel Art Production with PiXiEED</h1>
+          <p class="subtitle">Free browser-based pixel art hub. Start creating, check terminology, browse tools and games, and follow updates from one home page.</p>
           <div class="hero-actions">
-            <button class="button" id="toggleDrawGuide" type="button" aria-controls="draw-guide" aria-expanded="false">Draw</button>
-            <button class="button button--ghost" id="togglePlayGuide" type="button" aria-controls="play-guide" aria-expanded="false">Play</button>
-            <button class="button button--ghost" id="toggleContactGuide" type="button" aria-controls="contact-guide" aria-expanded="false">Contact</button>
+            <button class="button" id="toggleDrawGuide" type="button" aria-controls="draw-guide" aria-expanded="false">Start Creating</button>
+            <button class="button button--ghost" id="toggleLearnGuide" type="button" aria-controls="learn-guide" aria-expanded="false">Terms &amp; Guides</button>
+            <button class="button button--ghost" id="toggleUpdateGuide" type="button" aria-controls="update-guide" aria-expanded="false">Browse &amp; Updates</button>
           </div>
           <div class="hero-draw-guide" id="draw-guide" hidden>
-            <p class="hero-draw-guide__title">Draw: choose your tool</p>
+            <p class="hero-draw-guide__title">Create: choose your starting point</p>
             <div class="hero-draw-guide__actions">
               <a class="hero-draw-guide__link" href="jerin-maker/index.html">
                 <span class="hero-draw-guide__icon"><img src="icon/icon-192-5.png" alt=""></span>
@@ -2177,49 +2192,89 @@
                 <span class="hero-draw-guide__icon"><img src="icon/icon-192-4.png" alt=""></span>
                 <span class="hero-draw-guide__text">PiXiEEDraw (full production editor with multiplayer collaboration)</span>
               </a>
-            </div>
-          </div>
-          <div class="hero-draw-guide" id="play-guide" hidden>
-            <p class="hero-draw-guide__title">Play: pick a title</p>
-            <div class="hero-draw-guide__actions">
-              <a class="hero-draw-guide__link" href="maoitu/index.html">
-                <span class="hero-draw-guide__icon"><img src="icon/icon-192-3.png" alt=""></span>
-                <span class="hero-draw-guide__text">Maoitsu (survival action game)</span>
-              </a>
-              <a class="hero-draw-guide__link" href="pixfind/index.html">
-                <span class="hero-draw-guide__icon"><img src="icon/icon-192-2.png" alt=""></span>
-                <span class="hero-draw-guide__text">PiXFiND (spot-the-difference in pixel art)</span>
-              </a>
-              <a class="hero-draw-guide__link" href="pixiee-lens/index.html">
-                <span class="hero-draw-guide__icon"><img src="icon/icon-192-1.png" alt=""></span>
-                <span class="hero-draw-guide__text">PiXiEELENS (pixel camera filter tool)</span>
+              <a class="hero-draw-guide__link" href="pixel-art-maker/index.html">
+                <span class="hero-draw-guide__icon"><img src="icon/icon-192-6.png" alt=""></span>
+                <span class="hero-draw-guide__text">Beginner guide (quick path to your first finished piece)</span>
               </a>
             </div>
           </div>
-          <div class="hero-draw-guide" id="contact-guide" hidden>
-            <p class="hero-draw-guide__title">Contact: choose a channel</p>
+          <div class="hero-draw-guide" id="learn-guide" hidden>
+            <p class="hero-draw-guide__title">Learn: terms and production guides</p>
             <div class="hero-draw-guide__actions">
-              <a class="hero-draw-guide__link" href="https://x.com/PiXiEED_arta" target="_blank" rel="noopener">
-                <span class="hero-draw-guide__icon"><img src="FooterIcon2.png" alt=""></span>
-                <span class="hero-draw-guide__text">Contact on X (@PiXiEED_arta)</span>
+              <a class="hero-draw-guide__link" href="glossary/index.html">
+                <span class="hero-draw-guide__icon"><span class="glossary-mark" aria-hidden="true">A/a</span></span>
+                <span class="hero-draw-guide__text">Pixel Art Glossary (check key terms while you work)</span>
               </a>
-              <a class="hero-draw-guide__link" href="mailto:pixieed.arta@gmail.com">
-                <span class="hero-draw-guide__icon"><img src="icon/icon-mail.png" alt=""></span>
-                <span class="hero-draw-guide__text">Open email address</span>
+              <a class="hero-draw-guide__link" href="pixel-art-editor/index.html">
+                <span class="hero-draw-guide__icon"><img src="icon/icon-192-4.png" alt=""></span>
+                <span class="hero-draw-guide__text">Editor guide (understand core features and workflow)</span>
+              </a>
+              <a class="hero-draw-guide__link" href="pixel-art-animation/index.html">
+                <span class="hero-draw-guide__icon"><img src="icon/icon-192-4.png" alt=""></span>
+                <span class="hero-draw-guide__text">Animation guide (learn motion and shared workflow entry points)</span>
+              </a>
+            </div>
+          </div>
+          <div class="hero-draw-guide" id="update-guide" hidden>
+            <p class="hero-draw-guide__title">Browse: collections and update notes</p>
+            <div class="hero-draw-guide__actions">
+              <a class="hero-draw-guide__link" href="tools.html">
+                <span class="hero-draw-guide__icon"><img src="FooterIcon3.png" alt=""></span>
+                <span class="hero-draw-guide__text">Tools &amp; Games collection (compare the full lineup)</span>
+              </a>
+              <a class="hero-draw-guide__link" href="notes/index.html">
+                <span class="hero-draw-guide__icon"><img src="FooterIcon1.png" alt=""></span>
+                <span class="hero-draw-guide__text">Update notes (track recent improvements and releases)</span>
+              </a>
+              <a class="hero-draw-guide__link" href="en/portfolio/index.html">
+                <span class="hero-draw-guide__icon"><img src="FooterIcon4.png" alt=""></span>
+                <span class="hero-draw-guide__text">Business portfolio (works, characters, and client-facing material)</span>
               </a>
             </div>
           </div>
         </div>
         <div class="hero-place" id="heroPlaceSlot">
-          <div class="dot-hero" id="dotPlace">
-            <h2>Pixel Art</h2>
-            <div class="dot-gallery__viewer">
-              <img alt="" id="dotGalleryMain" loading="lazy" src=""/>
+          <div class="hero-summary-panel">
+            <p class="section-eyebrow">Home Index</p>
+            <h2>What This Home Covers</h2>
+            <p class="subtitle">This page is structured for search-driven visitors who need fast access to creation, terminology, collections, and update tracking.</p>
+            <div class="hero-summary-grid">
+              <a class="seo-guide-card" href="#start-guides">
+                <div class="seo-guide-card__head">
+                  <span class="seo-guide-card__icon"><img src="icon/icon-192-5.png" alt=""></span>
+                  <h3 class="seo-guide-card__title">Start Creating</h3>
+                </div>
+                <p class="seo-guide-card__text">Compare Lite and PiXiEEDraw, then jump straight into the right tool.</p>
+                <p class="seo-guide-card__meta">Compare / Start</p>
+              </a>
+              <a class="seo-guide-card" href="glossary/index.html">
+                <div class="seo-guide-card__head">
+                  <span class="seo-guide-card__icon"><span class="glossary-mark" aria-hidden="true">A/a</span></span>
+                  <h3 class="seo-guide-card__title">Terminology</h3>
+                </div>
+                <p class="seo-guide-card__text">Use the glossary and guides to clear up common production questions.</p>
+                <p class="seo-guide-card__meta">Terms / Learn</p>
+              </a>
+              <a class="seo-guide-card" href="tools.html">
+                <div class="seo-guide-card__head">
+                  <span class="seo-guide-card__icon"><img src="FooterIcon3.png" alt=""></span>
+                  <h3 class="seo-guide-card__title">Collections</h3>
+                </div>
+                <p class="seo-guide-card__text">Browse tools and games side by side to find the right entry point.</p>
+                <p class="seo-guide-card__meta">Browse / Compare</p>
+              </a>
+              <a class="seo-guide-card" href="notes/index.html">
+                <div class="seo-guide-card__head">
+                  <span class="seo-guide-card__icon"><img src="FooterIcon1.png" alt=""></span>
+                  <h3 class="seo-guide-card__title">Updates</h3>
+                </div>
+                <p class="seo-guide-card__text">Follow what changed recently without leaving the creation funnel.</p>
+                <p class="seo-guide-card__meta">Notes / Updates</p>
+              </a>
             </div>
-            <div class="dot-gallery__buttons" id="dotGalleryButtons" aria-label="Pixel art gallery"></div>
-          </div>
           </div>
         </div>
+      </div>
     </section>
 
     <section class="section section--highlight" id="start-guides">
@@ -2350,7 +2405,7 @@
           <a class="new-tool-card" href="notes/index.html">
             <div class="new-tool-card__head">
               <div class="new-tool-card__title-wrap">
-                <span class="new-tool-card__icon"><img src="character-dots/mao1.png" alt=""></span>
+                <span class="new-tool-card__icon"><img src="FooterIcon1.png" alt=""></span>
                 <h3 class="new-tool-card__title">See Updates</h3>
               </div>
               <span class="new-tool-card__badge new-tool-card__badge--next">UPDATE</span>
@@ -2413,12 +2468,12 @@
           <article class="category-hub-card">
             <div class="category-hub-card__head">
               <span class="category-hub-card__icon"><span class="glossary-mark" aria-hidden="true">A/a</span></span>
-              <h3 class="category-hub-card__title">Learn & View</h3>
+              <h3 class="category-hub-card__title">Learn & Check</h3>
             </div>
-            <p class="category-hub-card__text">Glossary, gallery, and latest updates.</p>
+            <p class="category-hub-card__text">Glossary, update notes, and the business portfolio.</p>
             <div class="category-hub-card__links">
               <a href="glossary/index.html">Glossary</a>
-              <a href="portfolio/index.html">Portfolio</a>
+              <a href="en/portfolio/index.html">Business Portfolio</a>
               <a href="notes/index.html">Update Notes</a>
             </div>
           </article>
@@ -2483,8 +2538,8 @@
             <a class="chip" href="glossary/index.html">Glossary</a>
             <a class="chip" href="tools.html">Find Tools</a>
             <a class="chip" href="games.html">Play Games</a>
-            <a class="chip" href="portfolio/index.html">View Works</a>
-            <a class="chip" href="#character-intro">Character Index</a>
+            <a class="chip" href="en/portfolio/index.html">Business Portfolio</a>
+            <a class="chip" href="notes/index.html">See Updates</a>
           </div>
         </div>
 
@@ -2535,18 +2590,19 @@
             <a class="project-place__link" href="tools.html">Open Tools/Games</a>
           </div>
         </div>
-        <!-- publicRoomsHub moved to appear under the dot-hero section -->
+        <!-- project-place source items -->
         <ul class="project-place__source" id="gameGalleryItems" hidden>
           <li data-title="PiXiEEDraw (camera flow + mirror + palette sync)" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-03-09" data-update="PNG/GIF import now builds a used-color custom palette, indexed paste snaps to the nearest existing color while RGB paste adds matching colors, PiXiEELENS camera launch was added, and mirror mode was reorganized around top toggles plus canvas-side + handles." data-desc="Improves image import, color syncing, camera entry flow, and symmetry drawing controls." data-link="pixiedraw/index.html"></li>
-          <li data-title="PiXiEED Home (guide flow refresh)" data-image="character-dots/mao1.png" data-type="project" data-updated="2026-03-07" data-update="Homepage copy was rewritten for user-facing clarity, guide blocks were moved lower, and Lite/PiXiEEDraw cards now include real screenshot toggles." data-desc="The top page now makes tool choice clearer for first-time visitors." data-link="en/index.html"></li>
+          <li data-title="PiXiEED Home (production-first refresh)" data-image="FooterIcon1.png" data-type="project" data-updated="2026-03-15" data-update="The home hero now prioritizes creation entry points, terminology/guides, and update browsing, while dot art and character showcases moved into the business portfolio." data-desc="Search visitors now reach making-focused guidance first, while portfolio browsing has its own dedicated destination." data-link="en/index.html"></li>
+          <li data-title="PiXiEED Home (guide flow refresh)" data-image="FooterIcon1.png" data-type="project" data-updated="2026-03-07" data-update="Homepage copy was rewritten for user-facing clarity, guide blocks were moved lower, and Lite/PiXiEEDraw cards now include real screenshot toggles." data-desc="The top page now makes tool choice clearer for first-time visitors." data-link="en/index.html"></li>
           <li data-title="PiXiEEDraw (settings UI + palette polish)" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-03-07" data-update="Preset color preview now supports up to 32 swatches, the new-project preset preview was simplified, Settings now includes a local external-extension panel, the five utility buttons use a lighter sub-style (A/あ label), the canvas-size block is highlighted, and long update toasts are scrollable." data-desc="Improves readability and tap comfort in Settings without adding visual noise." data-link="pixiedraw/index.html"></li>
           <li data-title="PiXiEEDraw (simpler collab entry flow)" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-03-07" data-update="Master now opens a room with auto key generation, joiners enter a key then choose participant/viewer, and new rooms start private by default." data-desc="Collaboration setup now needs fewer steps for first-time users." data-link="pixiedraw/index.html"></li>
           <li data-title="PiXiEEDraw (export + color + selection updates)" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-03-07" data-update="Added JPEG/SVG export, added Indexed/RGB color mode switching with RGB-to-index auto palette add, and improved arrow-key selection move behavior." data-desc="Production workflow was strengthened from color handling to export and selection move." data-link="pixiedraw/index.html"></li>
           <li data-title="Pixel Art Glossary (EN)" data-image="icon/icon-192-6.png" data-type="project" data-updated="2026-03-05" data-update="Launched an English glossary with searchable terms for pixel art fundamentals, rendering, animation, and production workflow." data-desc="Improved onboarding for non-Japanese users with dedicated terminology reference." data-link="glossary/index.html"></li>
-          <li data-title="PiXiEED Home" data-image="character-dots/mao1.png" data-type="project" data-updated="2026-02-24" data-update="Updated homepage messaging and top-level action navigation (Draw / Play / Contact)." data-desc="Homepage information architecture refreshed for clarity." data-link="en/index.html"></li>
+          <li data-title="PiXiEED Home" data-image="FooterIcon1.png" data-type="project" data-updated="2026-02-24" data-update="Updated homepage messaging and top-level action navigation (Draw / Play / Contact)." data-desc="Homepage information architecture refreshed for clarity." data-link="en/index.html"></li>
           <li data-title="Action Navigation" data-image="icon/icon-192-4.png" data-type="project" data-updated="2026-02-24" data-update="Top CTA now opens dedicated guides for drawing, playing, and contact." data-desc="Faster one-tap access to intended actions." data-link="en/index.html"></li>
           <li data-title="Tools & Games Cards" data-image="icon/icon-192-6.png" data-type="project" data-updated="2026-02-24" data-update="Hub cards reorganized for clearer browsing and roadmap visibility." data-desc="Collection sections improved for scanning." data-link="tools.html"></li>
-          <li data-title="Character Index" data-image="character-dots/pikarin1.png" data-type="project" data-updated="2026-02-24" data-update="Character showcase and preview transitions refined." data-desc="Improved discoverability of original characters." data-link="#character-intro"></li>
+          <li data-title="Character Index" data-image="character-dots/pikarin1.png" data-type="project" data-updated="2026-02-24" data-update="Character showcase and preview transitions refined." data-desc="Improved discoverability of original characters." data-link="en/portfolio/index.html#character-intro"></li>
           <li data-title="PiXiEEDraw Lite" data-image="icon/icon-192-5.png" data-type="tool" data-updated="2026-02-24" data-update="Beginner guidance strengthened for 16x16 creation and PNG export." data-desc="Great starting point for first pixel pieces." data-link="jerin-maker/index.html"></li>
           <li data-title="PiXiEELENS" data-image="icon/icon-192-1.png" data-type="tool" data-updated="2026-02-24" data-update="Capture and export flows improved for social sharing." data-desc="Pixel camera workflow tuned for fast output." data-link="pixiee-lens/index.html"></li>
           <li data-title="PiXiEEDraw (Multiplayer Beta)" data-image="icon/icon-192-4.png" data-type="tool" data-updated="2026-02-24" data-update="Shared mode expanded for real-time co-creation with role flow and sync refinements." data-desc="PiXiEEDraw keeps its full production toolset while enabling multiplayer team editing." data-link="pixiedraw/index.html"></li>
@@ -2563,43 +2619,6 @@
              data-ad-slot="2141591954"
              data-ad-format="auto"
              data-full-width-responsive="true"></ins>
-      </div>
-    </section>
-
-    <section class="section section--highlight" id="character-intro">
-      <div class="section-inner" id="characterPlaceSlot">
-        <div class="character-place" id="characterPlace">
-          <p class="section-eyebrow">Original Character Workbench</p>
-          <div class="character-preview__heading">
-            <h2>Characters</h2>
-            <p hidden>This section introduces original characters centered around Jerin from the game series.</p>
-          </div>
-          <div aria-live="polite" class="character-preview">
-            <div class="character-preview__frame dot-gallery__viewer">
-              <img alt="" hidden id="characterGalleryMain" loading="lazy" src=""/>
-              <div class="character-preview__placeholder" id="characterGalleryPlaceholder">
-                <small id="characterPlaceholderMeta">Waiting for preview</small>
-              </div>
-            </div>
-            <div class="character-preview__details" id="characterPreviewDetails">
-              <h3 class="character-preview__name" id="characterGalleryName">Character A (Draft)</h3>
-              <p class="character-preview__weight" id="characterGalleryWeight">Weight: TBD</p>
-              <div class="character-preview__traits">
-                <h4>Traits</h4>
-                <ul id="characterTraits">
-                  <li>Trait note</li>
-                </ul>
-              </div>
-              <div class="character-preview__detail">
-                <h4>Details</h4>
-                <p id="characterGalleryDetail">Details for the selected character appear here.</p>
-              </div>
-            </div>
-          </div>
-          <p class="character-sprites__hint" hidden>Click a PNG below to switch preview and details.</p>
-          <div aria-label="Character list" class="character-preview__buttons dot-gallery__buttons" id="characterGalleryButtons" role="listbox"></div>
-          <p class="hero-description" id="heroCharacterDescription" hidden></p>
-        </div>
       </div>
     </section>
 
@@ -2661,7 +2680,7 @@
       <span class="icon"><img src="FooterIcon1.png" alt=""/></span><span>Home</span>
     </a>
     <a class="bottom-nav__item" data-tab="contest" href="contest/index.html">
-      <span class="icon"><img src="FooterIcon2.png" alt=""/></span><span>Contest</span>
+      <span class="icon"><img src="FooterIcon2.png" alt=""/></span><span>Plaza</span>
     </a>
 
     <a class="bottom-nav__item" data-tab="tools" href="tools.html">
@@ -2670,7 +2689,7 @@
     <a class="bottom-nav__item" data-tab="lens" href="pixiee-lens/index.html">
       <span class="icon"><img src="FooterIcon5.png" alt=""/></span><span>PiXiEELENS</span>
     </a>
-    <a class="bottom-nav__item" data-tab="portfolio" href="portfolio/index.html">
+    <a class="bottom-nav__item" data-tab="portfolio" href="en/portfolio/index.html">
       <span class="icon"><img src="FooterIcon4.png" alt=""/></span><span>Business</span>
     </a>
   </nav>
@@ -2874,140 +2893,6 @@
           });
         }
       }
-      function setupHeroPlaceSwap(){
-        const heroSlot = document.getElementById('heroPlaceSlot');
-        const characterSlot = document.getElementById('characterPlaceSlot');
-        const dotPlace = document.getElementById('dotPlace');
-        const characterPlace = document.getElementById('characterPlace');
-        const toggleBtn = document.getElementById('toggleHeroPlace');
-        const heroDesc = document.getElementById('heroCharacterDescription');
-        const nameEl = document.getElementById('characterGalleryName');
-        const detailEl = document.getElementById('characterGalleryDetail');
-        if(
-          !heroSlot ||
-          !characterSlot ||
-          !dotPlace ||
-          !characterPlace ||
-          !toggleBtn
-        ) return;
-
-        const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        let latestDescription = '';
-        let typeTimer = null;
-        const setActiveButtons = (showCharacter) => {
-          toggleBtn.setAttribute('aria-pressed', showCharacter ? 'true' : 'false');
-          toggleBtn.classList.toggle('is-active', showCharacter);
-          toggleBtn.textContent = showCharacter ? 'Pixel Art' : 'Characters';
-          // When showing character in hero, the toggle should jump to character section.
-          toggleBtn.setAttribute('href', showCharacter ? '#character-intro' : '#home-hero');
-        };
-        const animateSwap = (element) => {
-          if(!element) return;
-          element.classList.remove('swap-animate');
-          void element.offsetWidth;
-          element.classList.add('swap-animate');
-          window.setTimeout(() => {
-            element.classList.remove('swap-animate');
-          }, 260);
-        };
-        const buildDescription = (data = {}) => {
-          const name = String(data.name || '').trim();
-          const detail = String(data.detail || data.description || data.background || '').trim();
-          if(name && detail) return `${name}：${detail}`;
-          return detail || name;
-        };
-        const getCurrentDescriptionFromDom = () => {
-          const name = String(nameEl?.textContent || '').trim();
-          const detail = String(detailEl?.textContent || '').trim();
-          return buildDescription({ name, detail }) || 'Character description is being prepared.';
-        };
-        const typeHeroText = (text, options = {}) => {
-          if(!heroDesc) return;
-          const content = String(text || '').trim();
-          if(!content){
-            heroDesc.textContent = '';
-            heroDesc.hidden = true;
-            return;
-          }
-          heroDesc.hidden = false;
-          if(typeTimer){
-            clearTimeout(typeTimer);
-            typeTimer = null;
-          }
-          if(options.animate === false || prefersReducedMotion){
-            heroDesc.textContent = content;
-            return;
-          }
-          heroDesc.textContent = '';
-          let index = 0;
-          const step = () => {
-            heroDesc.textContent += content.charAt(index++);
-            if(index < content.length){
-              typeTimer = window.setTimeout(step, 18);
-            }
-          };
-          step();
-        };
-        const applyHeroDescription = (animate = true) => {
-          if(!heroDesc) return;
-          if(heroSlot.contains(characterPlace)){
-            if(!latestDescription){
-              latestDescription = getCurrentDescriptionFromDom();
-            }
-            typeHeroText(latestDescription, { animate });
-          }else{
-            heroDesc.textContent = '';
-            heroDesc.hidden = true;
-          }
-        };
-        const handleCharacterUpdate = (data = {}) => {
-          latestDescription = buildDescription(data);
-          if(!latestDescription){
-            latestDescription = getCurrentDescriptionFromDom();
-          }
-          if(heroSlot.contains(characterPlace)){
-            typeHeroText(latestDescription, { animate: true });
-          }
-        };
-        const setState = (showCharacter, options = {}) => {
-          const { animate = true } = options;
-          if(showCharacter){
-            heroSlot.appendChild(characterPlace);
-            characterSlot.appendChild(dotPlace);
-            characterPlace.classList.add('is-hero');
-            setActiveButtons(true);
-            if(animate){
-              animateSwap(characterPlace);
-              animateSwap(dotPlace);
-            }
-            applyHeroDescription(animate);
-            window.requestAnimationFrame(syncHeroPreviewHeights);
-            return;
-          }
-          heroSlot.appendChild(dotPlace);
-          characterSlot.appendChild(characterPlace);
-          characterPlace.classList.remove('is-hero');
-          setActiveButtons(false);
-          if(animate){
-            animateSwap(dotPlace);
-          }
-          applyHeroDescription(false);
-          window.requestAnimationFrame(syncHeroPreviewHeights);
-        };
-
-        toggleBtn.addEventListener('click', (event) => {
-          event.preventDefault();
-          const isShowingCharacter = heroSlot.contains(characterPlace);
-          setState(!isShowingCharacter);
-        });
-        window.addEventListener('pixieed:characterSelected', (event) => {
-          handleCharacterUpdate(event?.detail || {});
-        });
-        if(window.__PIXIEED_CURRENT_CHARACTER){
-          latestDescription = buildDescription(window.__PIXIEED_CURRENT_CHARACTER);
-        }
-        setState(false, { animate: false });
-      }
       function setupHeroGuideToggles(){
         const pairs = [
           {
@@ -3015,12 +2900,12 @@
             guide: document.getElementById('draw-guide')
           },
           {
-            button: document.getElementById('togglePlayGuide'),
-            guide: document.getElementById('play-guide')
+            button: document.getElementById('toggleLearnGuide'),
+            guide: document.getElementById('learn-guide')
           },
           {
-            button: document.getElementById('toggleContactGuide'),
-            guide: document.getElementById('contact-guide')
+            button: document.getElementById('toggleUpdateGuide'),
+            guide: document.getElementById('update-guide')
           }
         ].filter((pair) => pair.button && pair.guide);
         if(!pairs.length) return;
@@ -3095,7 +2980,6 @@
         setupProfileModal();
         setupHeroGuideToggles();
         setupAudienceShotToggles();
-        setupHeroPlaceSwap();
         syncHeroPreviewHeights();
         window.addEventListener('resize', syncHeroPreviewHeights);
         const y = document.getElementById('year');
@@ -3106,10 +2990,6 @@
   <script>window.__PIXIEED_DISABLE_LEGACY_PUBLIC_ROOMS__ = true;</script>
   <script src="scripts/pixieed-dot-stats.js"></script>
   <script src="scripts.js"></script>
-  <script src="portfolio/dots/manifest.js"></script>
-  <script src="scripts/gallery.js"></script>
-  <script src="character-dots/manifest.js"></script>
-  <script src="scripts/character-gallery.js"></script>
   <script src="scripts/game-gallery.js"></script>
   <script type="module">
     const MULTI_SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
