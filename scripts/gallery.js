@@ -5,12 +5,21 @@
 
   const PORTFOLIO_SEEN_STORAGE_KEY = 'pixieed:portfolioSeen';
   const headerPortfolioLink = document.querySelector('.portfolio-nav a[href="#dot-gallery"]');
+  const assetBase = normalizeBasePath(
+    buttonsContainer.dataset.assetBase ||
+    viewer.dataset.assetBase ||
+    'portfolio/dots/'
+  );
+  const manifestPath =
+    buttonsContainer.dataset.manifestPath ||
+    viewer.dataset.manifestPath ||
+    'portfolio/dots/manifest.json';
   let portfolioSeen = loadPortfolioSeenState();
 
   if (Array.isArray(window.DOT_GALLERY_MANIFEST) && window.DOT_GALLERY_MANIFEST.length) {
     initialize(window.DOT_GALLERY_MANIFEST);
   } else {
-    fetch('portfolio/dots/manifest.json', { cache: 'no-store' })
+    fetch(manifestPath, { cache: 'no-store' })
       .then(response => response.ok ? response.json() : Promise.reject())
       .then(data => initialize(Array.isArray(data) ? data : []))
       .catch(() => initialize([]));
@@ -41,13 +50,9 @@
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'dot-gallery__button' + (index === 0 ? ' is-active' : '');
-      const src = entry.file.startsWith('http') || entry.file.startsWith('data:')
-        ? entry.file
-        : (entry.file.includes('/') ? entry.file : `portfolio/dots/${entry.file}`);
+      const src = resolveAssetPath(entry.file);
       const thumb = entry.thumb
-        ? (entry.thumb.startsWith('http') || entry.thumb.startsWith('data:')
-            ? entry.thumb
-            : (entry.thumb.includes('/') ? entry.thumb : `portfolio/dots/${entry.thumb}`))
+        ? resolveAssetPath(entry.thumb)
         : src;
       button.dataset.src = src;
       button.dataset.alt = entry.alt || entry.label || '';
@@ -94,7 +99,28 @@
     if (!img) return;
     img.style.transform = 'none';
     img.style.width = '100%';
-    img.style.height = 'auto';
+    img.style.height = '100%';
+    img.style.maxWidth = 'none';
+    img.style.maxHeight = 'none';
+    img.style.objectFit = 'contain';
+  }
+
+  function normalizeBasePath(value) {
+    const base = String(value || '').trim();
+    if (!base) return '';
+    return base.endsWith('/') ? base : `${base}/`;
+  }
+
+  function resolveAssetPath(file) {
+    const source = String(file || '').trim();
+    if (!source) return '';
+    if (/^(?:https?:)?\/\//.test(source) || source.startsWith('data:') || source.startsWith('/')) {
+      return source;
+    }
+    if (source.startsWith('./') || source.startsWith('../') || source.includes('/')) {
+      return source;
+    }
+    return assetBase ? `${assetBase}${source}` : source;
   }
 
   function getEntryId(entry, index) {
