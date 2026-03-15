@@ -4,9 +4,6 @@ const FORM_ID = 'contestForm';
 const FILE_INPUT_ID = 'contestFile';
 const STATUS_ID = 'contestStatus';
 const GALLERY_ID = 'contestGallery';
-const START_BTN_ID = 'startTimedBtn';
-const TIMER_LABEL_ID = 'timerLabel';
-const TIMED_CHECKBOX_ID = 'timedMode';
 const PROMPT_TEXT = '今日のお題: 「自由投稿」 (本番用に差し替えてください)';
 const MAX_SIZE = 512;
 const MAX_COLORS = 256;
@@ -28,13 +25,9 @@ const CONTEST_SHARE_QUEUE_LIMIT = 20;
 const POST_QUEUE_KEY = 'contest_post_queue';
 const POST_QUEUE_LIMIT = 20;
 const POST_QUEUE_RETRY_MS = 60000;
-const TIMED_DURATION_MS = 10 * 60 * 1000;
 const NAME_DISPLAY_ID = 'contestNameDisplay';
 const NICKNAME_KEY = 'pixieed_nickname';
 
-let deadline = null;
-let timerHandle = null;
-let timedStartedAt = null;
 let clientId = null;
 let likedEntries = new Set();
 let supportsImageUrls = true;
@@ -815,39 +808,6 @@ async function uploadContestImages(imageInfo){
   }
 }
 
-function formatTimer(ms){
-  if(ms < 0) ms = 0;
-  const totalSec = Math.floor(ms / 1000);
-  const m = String(Math.floor(totalSec / 60)).padStart(2,'0');
-  const s = String(totalSec % 60).padStart(2,'0');
-  return `${m}:${s}`;
-}
-
-function updateTimer(){
-  const label = $(TIMER_LABEL_ID);
-  if(!label){
-    clearInterval(timerHandle);
-    return;
-  }
-  if(!deadline){
-    label.textContent = '未開始';
-    return;
-  }
-  const remain = deadline - Date.now();
-  label.textContent = remain > 0 ? `${formatTimer(remain)} / 10:00` : '00:00 (投稿締切)';
-  if(remain <= 0){
-    clearInterval(timerHandle);
-  }
-}
-
-function startTimedMode(){
-  timedStartedAt = Date.now();
-  deadline = timedStartedAt + TIMED_DURATION_MS;
-  clearInterval(timerHandle);
-  timerHandle = setInterval(updateTimer, 1000);
-  updateTimer();
-}
-
 async function fileToImageInfo(file){
   const blob = file;
   const img = await createImageBitmap(blob);
@@ -886,21 +846,10 @@ async function handleSubmit(e){
   const form = e.currentTarget;
   const name = loadNickname() || '名無し';
   const title = form.title.value.trim() || '無題';
-  const isTimed = form[TIMED_CHECKBOX_ID]?.checked;
   const file = form[FILE_INPUT_ID]?.files?.[0];
   if(!file){
     setStatus('画像ファイルを選択してください');
     return;
-  }
-  if(isTimed){
-    if(!deadline){
-      setStatus('10分モードを開始してください');
-      return;
-    }
-    if(Date.now() > deadline){
-      setStatus('10分を超えたため投稿できません');
-      return;
-    }
   }
   setStatus('画像を確認しています...');
   let imageInfo;
@@ -911,14 +860,13 @@ async function handleSubmit(e){
     return;
   }
   const submittedAt = new Date().toISOString();
-  const startedAt = isTimed ? new Date(timedStartedAt).toISOString() : null;
   if(isSupabaseMaintenance()){
     const queued = queuePostTask({
       name,
       title,
       prompt: PROMPT_TEXT,
-      mode: isTimed ? 'timed10' : 'free',
-      started_at: startedAt,
+      mode: 'free',
+      started_at: null,
       submitted_at: submittedAt,
       width: imageInfo.width,
       height: imageInfo.height,
@@ -943,8 +891,8 @@ async function handleSubmit(e){
     name,
     title,
     prompt: PROMPT_TEXT,
-    mode: isTimed ? 'timed10' : 'free',
-    started_at: startedAt,
+    mode: 'free',
+    started_at: null,
     submitted_at: submittedAt,
     width: imageInfo.width,
     height: imageInfo.height,
@@ -974,8 +922,8 @@ async function handleSubmit(e){
         name,
         title,
         prompt: PROMPT_TEXT,
-        mode: isTimed ? 'timed10' : 'free',
-        started_at: startedAt,
+        mode: 'free',
+        started_at: null,
         submitted_at: submittedAt,
         width: imageInfo.width,
         height: imageInfo.height,
@@ -1041,7 +989,7 @@ function renderEntries(entries){
           <span class="entry-like">❤ ${entry.likeCount || 0}</span>
         </div>
         <p class="entry-author">by ${escapeHtml(entry.name || '名無し')}</p>
-        <p class="entry-info">${entry.width}x${entry.height} / ${entry.colors}色 ${entry.mode === 'timed10' ? '（10分）' : ''}</p>
+        <p class="entry-info">${entry.width}x${entry.height} / ${entry.colors}色</p>
         <button class="like-btn" data-id="${entry.id}" ${likedEntries.has(entry.id) ? 'disabled' : ''}>
           ${likedEntries.has(entry.id) ? 'いいね済み' : 'いいね'}
         </button>
@@ -1190,18 +1138,10 @@ function initUI(){
     form.addEventListener('submit', handleSubmit);
   }
   updateNameDisplay();
-  const startBtn = $(START_BTN_ID);
-  if(startBtn){
-    startBtn.addEventListener('click', () => {
-      startTimedMode();
-      setStatus('10分ドットモードを開始しました');
-    });
-  }
   const promptEl = document.getElementById('promptText');
   if(promptEl){
     promptEl.textContent = PROMPT_TEXT;
   }
-  updateTimer();
   if(supabaseMaintenance){
     setSupabaseMaintenance(true, 'cached');
   }
