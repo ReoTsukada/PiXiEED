@@ -3,16 +3,43 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no, viewport-fit=cover"/>
-  <meta name="robots" content="noai,noimageai,nosnippet,noarchive"/>
-  <title>PiXiEED ドットギャラリー</title>
-  <meta name="description" content="ドット絵制作・pixel art commission、ブラウザゲーム用アセット、ツールとゲームをまとめたPiXiEED公式サイト。"/>
+  <meta name="robots" content="noai,noimageai,noarchive"/>
+  <title>PiXiEED 広場</title>
+  <meta name="description" content="PiXiEEDの広場。ユーザー投稿と公開中の共同制作ルームを同じグリッドで眺めて、そのまま参加できるページです。"/>
+  <link rel="canonical" href="https://pixieed.jp/contest/index.html"/>
   <meta property="og:type" content="website"/>
   <meta property="og:site_name" content="PiXiEED"/>
-  <meta property="og:title" content="PiXiEED | ドット絵専用総合サイト"/>
-  <meta property="og:description" content="ドット絵制作の外注・pixel art commission、ブラウザゲーム用アセット制作、ツールとゲームを紹介するPiXiEED公式サイト。"/>
+  <meta property="og:title" content="PiXiEED | 広場"/>
+  <meta property="og:description" content="ユーザー投稿と公開中の共同制作ルームを同じグリッドで見られるPiXiEEDの広場です。"/>
   <meta property="og:url" content="https://pixieed.jp/contest/index.html"/>
   <meta property="og:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
+  <meta property="og:locale" content="ja_JP"/>
   <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:site" content="@PiXiEED_arta"/>
+  <meta name="twitter:url" content="https://pixieed.jp/contest/index.html"/>
+  <meta name="twitter:title" content="PiXiEED | 広場"/>
+  <meta name="twitter:description" content="ユーザー投稿と公開中の共同制作ルームを同じグリッドで見られるPiXiEEDの広場です。"/>
+  <meta name="twitter:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "CollectionPage",
+        "name": "PiXiEED 広場",
+        "url": "https://pixieed.jp/contest/index.html",
+        "description": "ユーザー投稿と公開中の共同制作ルームを同じグリッドで見られるPiXiEEDの広場です。"
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "PiXiEED", "item": "https://pixieed.jp/" },
+          { "@type": "ListItem", "position": 2, "name": "広場", "item": "https://pixieed.jp/contest/index.html" }
+        ]
+      }
+    ]
+  }
+  </script>
   <link rel="icon" type="image/png" href="../character-dots/mao1.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -529,7 +556,127 @@
     .entry-title{ font-weight:800; color:#f9fafb; }
     .entry-like{ color:#fbbf24; font-weight:800; }
     .entry-author{ margin:0; color:#cbd5e1; font-size:12px; }
+    .entry-author-row{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      min-width:0;
+    }
+    .entry-author-avatar{
+      width:22px;
+      height:22px;
+      border-radius:999px;
+      overflow:hidden;
+      flex:0 0 22px;
+      background:rgba(148, 163, 184, 0.2);
+      border:1px solid rgba(255,255,255,0.14);
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      color:#f8fafc;
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:0.02em;
+    }
+    .entry-author-avatar img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .entry-author-name{
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      color:#cbd5e1;
+      font-size:12px;
+      font-weight:700;
+    }
     .entry-info{ margin:0; color:#94a3b8; font-size:11px; }
+    .entry-type-chip{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:0.04em;
+      color:#ffe7c6;
+      background:rgba(255, 159, 67, 0.14);
+      border:1px solid rgba(255, 159, 67, 0.32);
+    }
+    .entry-type-chip--room{
+      color:#dff4ff;
+      background:rgba(59, 130, 246, 0.16);
+      border-color:rgba(96, 165, 250, 0.3);
+    }
+    .entry-tags{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+    }
+    .entry-tag{
+      display:inline-flex;
+      align-items:center;
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:10px;
+      font-weight:700;
+      color:#dbeafe;
+      background:rgba(148, 163, 184, 0.16);
+      border:1px solid rgba(148, 163, 184, 0.22);
+    }
+    .entry-card--room .entry-imgwrap{
+      background:
+        radial-gradient(circle at 20% 20%, rgba(96,165,250,0.28), rgba(15,23,42,0.2)),
+        linear-gradient(180deg, rgba(15,23,42,0.22), rgba(2,6,23,0.8));
+    }
+    .entry-room-label{
+      position:absolute;
+      top:8px;
+      left:8px;
+      z-index:3;
+      display:inline-flex;
+      align-items:center;
+      padding:5px 9px;
+      border-radius:999px;
+      background:rgba(15,23,42,0.78);
+      border:1px solid rgba(148, 163, 184, 0.22);
+      color:#dbeafe;
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:0.04em;
+    }
+    .entry-room-placeholder{
+      width:100%;
+      height:100%;
+      display:grid;
+      place-items:center;
+      color:#dbeafe;
+      font-size:12px;
+      font-weight:800;
+      letter-spacing:0.12em;
+      background:
+        linear-gradient(135deg, rgba(37, 99, 235, 0.22), rgba(15, 23, 42, 0.16)),
+        radial-gradient(circle at 70% 30%, rgba(236, 72, 153, 0.12), transparent 45%);
+    }
+    .entry-room-cta{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      margin-top:2px;
+      padding:8px 10px;
+      border-radius:10px;
+      color:#ffffff;
+      background:linear-gradient(135deg, rgba(37,99,235,0.92), rgba(14,165,233,0.92));
+      font-size:12px;
+      font-weight:800;
+      letter-spacing:0.02em;
+    }
     .like-btn{
       border:1px solid rgba(251,191,36,0.5);
       background:rgba(251,191,36,0.12);
@@ -542,6 +689,25 @@
     }
     .like-btn:disabled{ opacity:0.5; cursor:not-allowed; }
     .empty{ color:#cbd5e1; text-align:center; margin:8px 0 0; font-family:'DotGothic16', monospace; }
+    .section-head{
+      display:grid;
+      gap:6px;
+      margin-bottom:12px;
+    }
+    .section-head--compact{
+      gap:4px;
+    }
+    .section-title{
+      margin:0;
+      font-size:18px;
+      color:#f9fafb;
+    }
+    .section-note{
+      margin:0;
+      color:#9ca3af;
+      font-size:12px;
+      line-height:1.6;
+    }
     .feed-subtitle{
       margin:0;
       color:#9ca3af;
@@ -568,6 +734,42 @@
       border:1px solid rgba(255,255,255,0.2);
       color:#e5e7eb;
       box-shadow:none;
+    }
+    .page-about{
+      display:grid;
+      gap:4px;
+    }
+    footer{
+      color:#cbd5e1;
+      text-align:center;
+      font-size:12px;
+      display:grid;
+      gap:8px;
+    }
+    .footer-links{
+      display:flex;
+      flex-wrap:wrap;
+      justify-content:center;
+      gap:12px;
+      padding:0;
+      margin:0;
+      list-style:none;
+    }
+    .footer-links a{
+      color:#cbd5e1;
+      text-decoration:none;
+      border:1px solid rgba(255,255,255,0.16);
+      border-radius:10px;
+      padding:6px 10px;
+      background:rgba(255,255,255,0.04);
+      font-weight:700;
+      transition:transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    .footer-links a:hover,
+    .footer-links a:focus-visible{
+      transform:translateY(-1px);
+      border-color:rgba(255,255,255,0.26);
+      background:rgba(255,255,255,0.08);
     }
     .auth-chip{
       display:flex;
@@ -1255,21 +1457,15 @@
       </div>
     </header>
     <section class="card">
-      <div class="top-bar">
-        <h1>ドットギャラリー</h1>
-        <p class="subtitle">みんなのドットを眺めよう。元サイズ512x512以内 / 256色以内のPNGを投稿もできます。</p>
-        <p class="feed-subtitle">最新→いいね順で並びます</p>
-        <div class="quick-tools">
-          <a class="button" href="../pixiedraw/index.html" rel="noopener" target="_blank">PiXiEEDraw</a>
-          <a class="button secondary" href="../jerin-maker/index.html" rel="noopener" target="_blank">PiXiEEDraw Lite</a>
-        </div>
+      <div class="section-head">
+        <h1>広場</h1>
+        <p class="subtitle">投稿作品や公開中の共同制作ルームを、カテゴリとキーワードで絞り込めます。</p>
       </div>
-    </section>
-    <section class="card">
       <div class="tabs">
         <div id="filterTabs" style="display:flex; gap:8px;">
           <button class="tab-btn is-active" data-filter="all" type="button">すべて</button>
-          <button class="tab-btn" data-filter="timed10" type="button">10m</button>
+          <button class="tab-btn" data-filter="posts" type="button">投稿</button>
+          <button class="tab-btn" data-filter="rooms" type="button">公開中の部屋</button>
           <button class="tab-btn" data-filter="px32" type="button">32px</button>
         </div>
         <div class="sort-tabs" id="sortTabs">
@@ -1279,17 +1475,50 @@
         </div>
       </div>
       <div class="tag-search">
-        <label for="tagSearch">タグ検索</label>
-        <input id="tagSearch" type="search" placeholder="タグで絞り込み（例: 夜景）" aria-label="タグ検索"/>
+        <label for="tagSearch">検索</label>
+        <input id="tagSearch" type="search" placeholder="タグ・作品名・部屋名で絞り込み（例: 夜景 / resident）" aria-label="広場内検索"/>
+      </div>
+    </section>
+    <section class="card">
+      <div class="section-head section-head--compact">
+        <h2 class="section-title">作品一覧</h2>
+        <p class="feed-subtitle" id="feedSubtitle">投稿と公開中の部屋を同じグリッドに表示します。</p>
       </div>
       <div id="contestGallery" class="gallery"></div>
       <div class="load-more" id="loadMoreWrap" hidden>
         <button class="load-more-btn" id="loadMoreBtn" type="button">もっと見る</button>
       </div>
     </section>
-
-    <div class="grid">
-    </div>
+    <section class="card" aria-label="広告">
+      <div class="entry-ad-slot">
+        <ins class="adsbygoogle"
+             style="display:block"
+             data-ad-client="ca-pub-9801602250480253"
+             data-ad-slot="rotate"
+             data-ad-format="auto"
+             data-full-width-responsive="true"></ins>
+      </div>
+      <p class="entry-ad-note">広告</p>
+    </section>
+    <section class="card page-about">
+      <div class="section-head section-head--compact">
+        <h2 class="section-title">広場について</h2>
+        <p class="subtitle">投稿作品と公開中の共同制作ルームを同じ広場で見られます。元サイズ512x512以内 / 256色以内のPNG・GIFを投稿できます。</p>
+      </div>
+      <p class="section-note">PiXiEEDraw や PiXiEEDraw Lite で作った作品をそのまま共有し、他のユーザーの投稿や公開中の部屋も同じ流れで見比べられます。</p>
+      <div class="quick-tools">
+        <a class="button" href="../pixiedraw/index.html" rel="noopener" target="_blank">PiXiEEDraw</a>
+        <a class="button secondary" href="../jerin-maker/index.html" rel="noopener" target="_blank">PiXiEEDraw Lite</a>
+      </div>
+    </section>
+    <footer>
+      <p>© <span id="year"></span> PiXiEED. All rights reserved.</p>
+      <div class="footer-links">
+        <a href="../glossary/index.html">用語集</a>
+        <a href="../terms/index.html">利用規約</a>
+        <a href="../privacy/index.html">プライバシーポリシー</a>
+      </div>
+    </footer>
   </div>
   <div class="fab-menu" id="fabMenu">
     <button class="fab-toggle" id="fabToggle" type="button" aria-label="作成メニューを開く" aria-expanded="false">＋</button>
@@ -1372,7 +1601,7 @@
       <span class="icon"><img src="../FooterIcon1.png" alt=""/></span><span>ホーム</span>
     </a>
     <a class="bottom-nav__item" data-tab="contest" href="../contest/index.html">
-      <span class="icon"><img src="../FooterIcon2.png" alt=""/></span><span>コンテスト</span>
+      <span class="icon"><img src="../FooterIcon2.png" alt=""/></span><span>広場</span>
     </a>
 
     <a class="bottom-nav__item" data-tab="tools" href="../tools.html">
@@ -1469,8 +1698,16 @@
     const CONTEST_SHARE_TITLE_SIZE = 32;
     const SHARE_HASHTAG = '#PiXiEED';
     const CONTEST_TEMP_CLOSED = false;
+    const FEED_SUBTITLE_ID = 'feedSubtitle';
     const CONTEST_WATERMARK_TEXT = 'PiXiEED';
     const CONTEST_WATERMARK_TEXTURE_SRC = (document.body?.dataset?.watermarkTextureSrc || '').trim();
+    const MULTI_SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
+    const MULTI_PUBLIC_LOBBY_CHANNEL = 'pixiedraw-public-rooms-v1';
+    const ROOMS_SOURCE_PATH = '../rooms.json';
+    const PUBLIC_ROOM_PAGE_PATH = '../public-room.html';
+    const RESIDENT_THUMB_CACHE_KEY = 'pixieed:resident-room-thumb-cache-v1';
+    const RESIDENT_THUMB_CACHE_LIMIT = 12;
+    const ROOM_THUMBNAIL_EDGE = 96;
     let supportsClientId = true;
     let supportsTags = true;
     let supportsDownloadSettings = true;
@@ -1481,6 +1718,9 @@
     let supportsPhash = true;
     let supportsUserId = true;
     let supportsXUrl = true;
+    let supportsEntryAvatar = true;
+    let supportsSyncedProfileNickname = true;
+    let supportsSyncedProfileAvatar = true;
     let supportsProfileXUrl = true;
     let supabaseUser = null;
     let supabaseSession = null;
@@ -1496,17 +1736,21 @@
     let currentSort = 'new';
     let currentTagQuery = '';
     let cachedEntries = [];
+    let cachedRooms = [];
     let currentOffset = 0;
     let hasMoreEntries = true;
     let isLoadingEntries = false;
+    let isLoadingRooms = false;
     let postTags = [];
     let supabase = null;
     let supabaseMaintenance = Boolean(readSupabaseMaintenance());
     let postQueueBusy = false;
     const legacyHydratedIds = new Set();
     const entryThumbCache = new Map();
+    const syncedProfiles = new Map();
     let supabaseInitPromise = null;
     let profileSyncChannel = null;
+    let plazaRoomProbePromise = null;
     const SAMPLE_COLORS = ['#7dd3fc','#f472b6','#facc15','#34d399','#c084fc','#60a5fa','#f59e0b','#a3e635','#f43f5e','#38bdf8'];
     const PLACEHOLDERS = Array.from({ length: 10 }, (_, i) => ({
       id: 100000 + i,
@@ -1520,7 +1764,7 @@
       image_base64: makePlaceholder(SAMPLE_COLORS[i % SAMPLE_COLORS.length]),
       submitted_at: new Date().toISOString(),
       likeCount: 0,
-      mode: i % 2 === 0 ? 'timed10' : 'free',
+      mode: 'free',
       color: SAMPLE_COLORS[i % SAMPLE_COLORS.length]
     }));
     const ENTRY_FALLBACK_THUMB = makePlaceholder('#334155');
@@ -1530,13 +1774,324 @@
 
     function $(id){ return document.getElementById(id); }
 
+    function normalizeProjectKey(value){
+      if(typeof value !== 'string') return '';
+      return value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40);
+    }
+
+    function buildMultiInviteHref(projectKey, role = 'guest'){
+      const normalizedKey = normalizeProjectKey(projectKey);
+      if(!normalizedKey) return '../pixiedraw/index.html';
+      const inviteRole = (role === 'master' || role === 'guest' || role === 'spectator')
+        ? role
+        : 'guest';
+      const params = new URLSearchParams();
+      params.set('multiInvite', '1');
+      params.set('multiKey', normalizedKey);
+      params.set('multiAutoJoin', '1');
+      params.set('multiRole', inviteRole);
+      return `../pixiedraw/index.html?${params.toString()}`;
+    }
+
+    function createSolidThumbnailDataUrl(color = '#000000', size = ROOM_THUMBNAIL_EDGE){
+      try{
+        const edge = Math.max(16, Math.round(Number(size) || ROOM_THUMBNAIL_EDGE));
+        const canvas = document.createElement('canvas');
+        canvas.width = edge;
+        canvas.height = edge;
+        const ctx = canvas.getContext('2d');
+        if(!ctx) return '';
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, edge, edge);
+        return canvas.toDataURL('image/png');
+      }catch(_){
+        return '';
+      }
+    }
+
+    const ROOM_FALLBACK_THUMB = createSolidThumbnailDataUrl('#020617', ROOM_THUMBNAIL_EDGE);
+
+    function readResidentThumbnailCache(){
+      try{
+        const raw = window.localStorage.getItem(RESIDENT_THUMB_CACHE_KEY);
+        if(typeof raw !== 'string' || !raw.trim()) return {};
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      }catch(_){
+        return {};
+      }
+    }
+
+    function writeResidentThumbnailCache(cache){
+      try{
+        window.localStorage.setItem(RESIDENT_THUMB_CACHE_KEY, JSON.stringify(cache || {}));
+      }catch(_){}
+    }
+
+    function getResidentThumbnailFromCache(projectKey, cache){
+      const normalizedKey = normalizeProjectKey(projectKey);
+      if(!normalizedKey || !cache || typeof cache !== 'object') return null;
+      const entry = cache[normalizedKey];
+      if(!entry || typeof entry !== 'object') return null;
+      const thumbnail = typeof entry.thumbnailDataUrl === 'string' ? entry.thumbnailDataUrl : '';
+      if(!thumbnail.startsWith('data:image/')) return null;
+      const updatedAt = Number(entry.updatedAt) || 0;
+      return { thumbnailDataUrl: thumbnail, updatedAt };
+    }
+
+    function setResidentThumbnailCache(projectKey, thumbnailDataUrl, updatedAt = Date.now(), cache = null){
+      const normalizedKey = normalizeProjectKey(projectKey);
+      if(!normalizedKey || typeof thumbnailDataUrl !== 'string' || !thumbnailDataUrl.startsWith('data:image/')){
+        return cache && typeof cache === 'object' ? cache : readResidentThumbnailCache();
+      }
+      const nextCache = (cache && typeof cache === 'object') ? cache : readResidentThumbnailCache();
+      nextCache[normalizedKey] = {
+        thumbnailDataUrl,
+        updatedAt: Number(updatedAt) || Date.now(),
+      };
+      const keys = Object.keys(nextCache);
+      if(keys.length > RESIDENT_THUMB_CACHE_LIMIT){
+        keys
+          .sort((a, b) => (Number(nextCache[b]?.updatedAt) || 0) - (Number(nextCache[a]?.updatedAt) || 0))
+          .slice(RESIDENT_THUMB_CACHE_LIMIT)
+          .forEach(key => { delete nextCache[key]; });
+      }
+      writeResidentThumbnailCache(nextCache);
+      return nextCache;
+    }
+
+    function parsePublicLobbyRooms(presenceState){
+      const byKey = new Map();
+      Object.keys(presenceState || {}).forEach(key => {
+        const rows = Array.isArray(presenceState[key]) ? presenceState[key] : [];
+        rows.forEach(row => {
+          const projectKey = normalizeProjectKey(row?.projectKey || '');
+          if(!projectKey) return;
+          if(row?.roomVisibility && row.roomVisibility !== 'public') return;
+          const updatedAt = Number(row?.updatedAt) || Number(row?.sentAt) || Date.now();
+          const prev = byKey.get(projectKey);
+          if(prev && updatedAt <= prev.updatedAt) return;
+          byKey.set(projectKey, {
+            projectKey,
+            updatedAt,
+            thumbnailDataUrl: typeof row?.thumbnailDataUrl === 'string' ? row.thumbnailDataUrl : '',
+            participantCount: Math.max(0, Math.round(Number(row?.participantCount) || 0)),
+            maxGuests: Math.max(0, Math.round(Number(row?.maxGuests) || 0)),
+          });
+        });
+      });
+      return byKey;
+    }
+
+    async function fetchPublicLobbyRooms(realtimeClient){
+      const lobby = realtimeClient.channel(MULTI_PUBLIC_LOBBY_CHANNEL);
+      try{
+        await lobby.subscribe();
+      }catch(_){}
+      await wait(650);
+      let state = {};
+      try{
+        state = typeof lobby.presenceState === 'function' ? (lobby.presenceState() || {}) : {};
+      }catch(_){
+        state = {};
+      }
+      try{
+        await lobby.unsubscribe();
+      }catch(_){}
+      return parsePublicLobbyRooms(state);
+    }
+
+    async function probeLegacyPublicRoomThumbnail(realtimeClient, channelName){
+      if(typeof channelName !== 'string' || !channelName.trim()) return null;
+      const roomChannel = channelName.trim();
+      const channel = realtimeClient.channel(roomChannel);
+      let thumbnail = null;
+      channel.on('broadcast', { event: 'status-response' }, ({ payload }) => {
+        try{
+          if(!payload || payload.room !== roomChannel) return;
+          if(typeof payload.data === 'string' && payload.data.startsWith('data:image/')){
+            thumbnail = payload.data;
+          }
+        }catch(_){}
+      });
+      try{
+        await channel.subscribe();
+      }catch(_){}
+      try{
+        await channel.send({ type:'broadcast', event:'status-request', payload:{ room: roomChannel, ts: Date.now() } });
+      }catch(_){}
+      await wait(700);
+      try{
+        await channel.unsubscribe();
+      }catch(_){}
+      return thumbnail;
+    }
+
+    function buildRoomFeedItem(room){
+      const updatedAt = Number(room?.updatedAt) || Date.now();
+      const participantCount = Math.max(0, Number(room?.participantCount) || 0);
+      const maxUsers = Math.max(0, Number(room?.maxUsers) || 0);
+      const roomType = room?.type === 'resident' ? '共同制作ルーム' : '公開ルーム';
+      const href = room?.type === 'resident'
+        ? buildMultiInviteHref(room.projectKey || room.channel || room.id || '', 'guest')
+        : `${PUBLIC_ROOM_PAGE_PATH}?room=${encodeURIComponent(room.channel || room.id || '')}`;
+      return {
+        ...room,
+        id: `room-${room.id || room.projectKey || room.channel || updatedAt}`,
+        feedType: 'room',
+        title: room.name || room.projectKey || room.channel || '公開中の部屋',
+        thumbnail: room.thumbnail || ROOM_FALLBACK_THUMB,
+        updatedAt,
+        participantCount,
+        maxUsers,
+        roomType,
+        href,
+      };
+    }
+
+    function getFeedItems(){
+      return cachedEntries.concat(cachedRooms);
+    }
+
+    function getItemTimestamp(item){
+      if(item?.feedType === 'room'){
+        return Number(item.updatedAt) || 0;
+      }
+      return new Date(item?.submitted_at || 0).getTime();
+    }
+
+    function getItemPopularity(item){
+      if(item?.feedType === 'room'){
+        return Math.max(0, Number(item.participantCount) || 0);
+      }
+      return Math.max(0, Number(item?.likeCount) || 0);
+    }
+
+    function formatFeedTimestamp(value){
+      const timestamp = typeof value === 'number' ? value : new Date(value || 0).getTime();
+      if(!timestamp) return '';
+      try{
+        return new Date(timestamp).toLocaleString('ja-JP', {
+          month: 'numeric',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      }catch(_){
+        return '';
+      }
+    }
+
+    function resolveAvatarImageSrc(avatarId){
+      const id = String(avatarId || '').trim();
+      if(!id) return '';
+      const found = AVATARS.find(item => item.id === id);
+      return found?.src || '';
+    }
+
+    function getSyncedProfile(entry){
+      const userId = String(entry?.user_id || '').trim();
+      if(!userId) return null;
+      return syncedProfiles.get(userId) || null;
+    }
+
+    async function syncProfilesForEntries(entries){
+      if(!supabase || !Array.isArray(entries) || !entries.length) return;
+      const userIds = Array.from(new Set(
+        entries
+          .map(entry => String(entry?.user_id || '').trim())
+          .filter(Boolean)
+      ));
+      const missingIds = userIds.filter(userId => !syncedProfiles.has(userId));
+      if(!missingIds.length) return;
+      const buildSelectColumns = () => {
+        const columns = ['id'];
+        if(supportsSyncedProfileNickname) columns.push('nickname');
+        if(supportsSyncedProfileAvatar) columns.push('avatar');
+        return columns.join(',');
+      };
+      try{
+        let res = await supabase
+          .from('user_profiles')
+          .select(buildSelectColumns())
+          .in('id', missingIds);
+        let errorMsg = String(res.error?.message || '').toLowerCase();
+        if(res.error && supportsSyncedProfileAvatar && errorMsg.includes('avatar')){
+          supportsSyncedProfileAvatar = false;
+          res = await supabase
+            .from('user_profiles')
+            .select(buildSelectColumns())
+            .in('id', missingIds);
+          errorMsg = String(res.error?.message || '').toLowerCase();
+        }
+        if(res.error && supportsSyncedProfileNickname && errorMsg.includes('nickname')){
+          supportsSyncedProfileNickname = false;
+          res = await supabase
+            .from('user_profiles')
+            .select(buildSelectColumns())
+            .in('id', missingIds);
+          errorMsg = String(res.error?.message || '').toLowerCase();
+        }
+        if(res.error){
+          console.warn('profile fetch skipped', res.error);
+          return;
+        }
+        (Array.isArray(res.data) ? res.data : []).forEach(profile => {
+          const userId = String(profile?.id || '').trim();
+          if(!userId) return;
+          syncedProfiles.set(userId, {
+            nickname: typeof profile?.nickname === 'string' ? profile.nickname.trim() : '',
+            avatar: typeof profile?.avatar === 'string' ? profile.avatar.trim() : '',
+          });
+        });
+      }catch(err){
+        console.warn('profile fetch skipped', err);
+      }
+    }
+
+    function isEntryOwnedByCurrentUser(entry){
+      if(!entry) return false;
+      if(entry.user_id && supabaseUser?.id){
+        return entry.user_id === supabaseUser.id;
+      }
+      return Boolean(entry.client_id && clientId && entry.client_id === clientId);
+    }
+
+    function getEntryDisplayName(entry){
+      if(isEntryOwnedByCurrentUser(entry)){
+        return loadNickname() || entry?.name || '名無し';
+      }
+      const syncedProfile = getSyncedProfile(entry);
+      return syncedProfile?.nickname || entry?.name || '名無し';
+    }
+
+    function getEntryDisplayAvatarSrc(entry){
+      const syncedProfile = getSyncedProfile(entry);
+      const avatarId = isEntryOwnedByCurrentUser(entry)
+        ? loadAvatar()
+        : (syncedProfile?.avatar || entry?.avatar || '');
+      return resolveAvatarImageSrc(avatarId) || resolveAvatarImageSrc('mao');
+    }
+
+    function getEntryAvatarFallbackLabel(entry){
+      const name = getEntryDisplayName(entry);
+      return String(name || '?').trim().charAt(0) || '?';
+    }
+
+    function refreshPlazaFeed(){
+      const gallery = $(GALLERY_ID);
+      if(!gallery) return;
+      renderEntries(applyFilterAndSort(getFeedItems()));
+      updateLoadMoreUI();
+    }
+
     function applyContestTemporaryClosedMode(){
       const page = document.querySelector('.page');
       if(page){
         page.innerHTML = `
           <section class="card" style="margin-top:14px;">
             <div class="top-bar">
-              <h1>コンテストは一時クローズ中です</h1>
+              <h1>広場は一時クローズ中です</h1>
               <p class="subtitle">現在メンテナンス中のため、投稿と閲覧を停止しています。再開までお待ちください。</p>
               <div class="quick-tools">
                 <a class="button" href="../index.html">ホームへ</a>
@@ -1552,7 +2107,7 @@
       if(postPanel) postPanel.remove();
       const authPanel = document.getElementById('authPanel');
       if(authPanel) authPanel.remove();
-      document.title = 'PiXiEED コンテスト（一時クローズ中）';
+      document.title = 'PiXiEED 広場（一時クローズ中）';
     }
 
     const AVATARS = [
@@ -1711,6 +2266,7 @@
       updateNameDisplay();
       applyAvatarToBrand();
       renderAvatarChoices();
+      refreshPlazaFeed();
     }
 
     function updateNameDisplay(){
@@ -1732,6 +2288,10 @@
       try{
         localStorage.setItem('pixieed_avatar', id);
       }catch(_){}
+    }
+
+    function getCurrentHeaderAvatarId(){
+      return loadAvatar();
     }
 
     function ensureClientId(){
@@ -2056,6 +2616,7 @@
       return {
         queueId,
         name: task.name || '名無し',
+        avatarId: typeof task.avatarId === 'string' && task.avatarId.trim() ? task.avatarId.trim() : getCurrentHeaderAvatarId(),
         title: task.title || '無題',
         tags: Array.isArray(task.tags) ? task.tags.slice(0, MAX_TAGS) : [],
         allowDownload: !!task.allowDownload,
@@ -2128,6 +2689,11 @@
       if(supportsXUrl && missing === 'x_url'){
         supportsXUrl = false;
         delete payload.x_url;
+        return true;
+      }
+      if(supportsEntryAvatar && missing === 'avatar'){
+        supportsEntryAvatar = false;
+        delete payload.avatar;
         return true;
       }
       if(supportsImageHash && missing === 'image_hash'){
@@ -2244,16 +2810,19 @@
           if(supportsTags && normalized.tags.length){
             payload.tags = normalized.tags.join(',');
           }
-          if(supportsDownloadSettings){
-            payload.allow_download = normalized.allowDownload;
-            payload.download_passcode = normalized.allowDownload && normalized.requirePasscode ? normalized.passcode : null;
-          }
-          if(supportsXUrl && normalized.xUrl){
-            payload.x_url = normalized.xUrl;
-          }
-          if(normalized.userId && supportsUserId){
-            payload.user_id = normalized.userId;
-          }
+        if(supportsDownloadSettings){
+          payload.allow_download = normalized.allowDownload;
+          payload.download_passcode = normalized.allowDownload && normalized.requirePasscode ? normalized.passcode : null;
+        }
+        if(supportsXUrl && normalized.xUrl){
+          payload.x_url = normalized.xUrl;
+        }
+        if(supportsEntryAvatar){
+          payload.avatar = normalized.avatarId || getCurrentHeaderAvatarId();
+        }
+        if(normalized.userId && supportsUserId){
+          payload.user_id = normalized.userId;
+        }
           if(supportsClientId && normalized.clientId){
             payload.client_id = normalized.clientId;
           }
@@ -2405,6 +2974,7 @@
           markProfileDirty('avatar');
           renderAvatarChoices();
           applyAvatarToBrand();
+          refreshPlazaFeed();
           const panel = document.getElementById('avatarPanel');
           const toggle = document.getElementById('avatarToggle');
           if(panel){
@@ -2440,7 +3010,8 @@
           btn.addEventListener('click', () => {
             currentFilter = btn.dataset.filter || 'all';
             filterTabs.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('is-active', b === btn));
-            renderEntries(applyFilterAndSort(cachedEntries));
+            renderEntries(applyFilterAndSort(getFeedItems()));
+            updateLoadMoreUI();
           });
         });
       }
@@ -2449,7 +3020,7 @@
           btn.addEventListener('click', () => {
             currentSort = btn.dataset.sort || 'new';
             sortTabs.querySelectorAll('.sort-btn').forEach(b => b.classList.toggle('is-active', b === btn));
-            renderEntries(applyFilterAndSort(cachedEntries));
+            renderEntries(applyFilterAndSort(getFeedItems()));
           });
         });
       }
@@ -2533,7 +3104,8 @@
       input.addEventListener('input', () => {
         const raw = normalizeTag(input.value);
         currentTagQuery = raw.toLowerCase();
-        renderEntries(applyFilterAndSort(cachedEntries));
+        renderEntries(applyFilterAndSort(getFeedItems()));
+        updateLoadMoreUI();
       });
     }
 
@@ -2541,7 +3113,7 @@
       const wrap = $(LOAD_MORE_WRAP_ID);
       const btn = $(LOAD_MORE_BTN_ID);
       if(!wrap || !btn) return;
-      wrap.hidden = !hasMoreEntries;
+      wrap.hidden = currentFilter === 'rooms' || !hasMoreEntries;
       btn.disabled = isLoadingEntries;
       btn.textContent = isLoadingEntries ? '読み込み中...' : 'もっと見る';
     }
@@ -3612,6 +4184,7 @@
       }
       const gifSavedAsStill = imageInfo.isGif && !imageInfo.videoBlob;
       const submittedAt = new Date().toISOString();
+      const submissionMode = 'free';
       if(!supabase || isSupabaseMaintenance()){
         const ready = await ensureSupabaseReady();
         if(!ready || isSupabaseMaintenance()){
@@ -3622,6 +4195,7 @@
             allowDownload,
             requirePasscode,
             passcode,
+            mode: submissionMode,
             submitted_at: submittedAt,
             width: imageInfo.width,
             height: imageInfo.height,
@@ -3630,6 +4204,7 @@
             phash: imageInfo.phash,
             userId: supabaseUser?.id || null,
             clientId,
+            avatarId: getCurrentHeaderAvatarId(),
             xUrl,
             dataUrl: imageInfo.dataUrl,
           });
@@ -3697,7 +4272,7 @@
           name,
           title,
           prompt: '自由投稿',
-          mode: 'free',
+          mode: submissionMode,
           started_at: null,
           submitted_at: submittedAt,
           width: imageInfo.width,
@@ -3728,6 +4303,9 @@
         }
         if(supportsXUrl && xUrl){
           payload.x_url = xUrl;
+        }
+        if(supportsEntryAvatar){
+          payload.avatar = getCurrentHeaderAvatarId();
         }
         if(supabaseUser?.id && supportsUserId){
           payload.user_id = supabaseUser.id;
@@ -3783,6 +4361,7 @@
             allowDownload,
             requirePasscode,
             passcode,
+            mode: submissionMode,
             submitted_at: submittedAt,
             width: imageInfo.width,
             height: imageInfo.height,
@@ -3791,6 +4370,7 @@
             phash: imageInfo.phash,
             userId: supabaseUser?.id || null,
             clientId,
+            avatarId: getCurrentHeaderAvatarId(),
             xUrl,
             dataUrl: imageInfo.dataUrl,
           });
@@ -3808,7 +4388,10 @@
           setStatus('投稿に失敗しました');
         }
       }
-      await fetchAndRender();
+      await Promise.all([
+        fetchAndRender(),
+        fetchPlazaRooms({ force:true })
+      ]);
     }
 
     function createAdCard(){
@@ -3827,35 +4410,138 @@
       return wrap;
     }
 
+    function getEmptyMessage(){
+      switch(currentFilter){
+        case 'posts':
+          return 'まだ投稿がありません。';
+        case 'rooms':
+          return '公開中の部屋はまだありません。';
+        case 'px32':
+          return '32px以下の投稿はまだありません。';
+        default:
+          return '表示できる投稿や部屋はまだありません。';
+      }
+    }
+
+    function updateFeedSubtitle(items){
+      const subtitle = $(FEED_SUBTITLE_ID);
+      if(!subtitle) return;
+      const rendered = Array.isArray(items) ? items : [];
+      const renderedPosts = rendered.filter(item => item?.feedType !== 'room').length;
+      const renderedRooms = rendered.filter(item => item?.feedType === 'room').length;
+      let text = '';
+      if(currentFilter === 'posts'){
+        text = `投稿 ${renderedPosts}件を表示中`;
+      }else if(currentFilter === 'rooms'){
+        text = renderedRooms ? `公開中の部屋 ${renderedRooms}件を表示中` : '公開中の部屋はまだありません。';
+      }else if(currentFilter === 'px32'){
+        text = `32px以下の投稿 ${renderedPosts}件を表示中`;
+      }else{
+        text = `投稿 ${cachedEntries.length}件 / 公開中の部屋 ${cachedRooms.length}件 を同じグリッドに表示`;
+      }
+      if(currentTagQuery){
+        text += ` ・「${currentTagQuery}」で絞り込み中`;
+      }
+      subtitle.textContent = text;
+    }
+
+    function buildEntryMetaLine(entry){
+      const bits = [];
+      if(entry.width && entry.height){
+        bits.push(`${entry.width}×${entry.height}`);
+      }else{
+        bits.push('自由投稿');
+      }
+      const dateLabel = formatFeedTimestamp(entry.submitted_at);
+      if(dateLabel) bits.push(dateLabel);
+      return bits.join(' · ');
+    }
+
+    function createEntryCard(entry, idx){
+      const isFirstRow = idx < 3;
+      const isFirstTwoRows = idx < 6;
+      const item = document.createElement('a');
+      const tags = parseTags(entry.tags).slice(0, 3);
+      const authorName = getEntryDisplayName(entry);
+      const authorAvatarSrc = getEntryDisplayAvatarSrc(entry);
+      const authorFallback = getEntryAvatarFallbackLabel(entry);
+      item.className = 'entry-card entry-card--post';
+      item.href = `view.html?id=${entry.id}`;
+      item.innerHTML = `
+        <div class="entry-imgwrap">
+          <img src="${resolveEntryThumb(entry)}" alt="${entry.title || '作品'}" draggable="false" loading="${isFirstTwoRows ? 'eager' : 'lazy'}" fetchpriority="${isFirstRow ? 'high' : 'auto'}" decoding="async">
+          ${buildContestWatermarkMarkup(resolveContestWatermarkSeed(entry), { count: 24, sizeMin: 10, sizeMax: 18 })}
+          <button class="heart-btn" data-id="${entry.id}" aria-label="いいね">
+            <img src="${likedEntries.has(entry.id) ? FAV_SRC : NFAV_SRC}" alt="like icon">
+          </button>
+        </div>
+        <div class="entry-meta">
+          <div class="entry-meta__top">
+            <span class="entry-type-chip">投稿</span>
+            <span class="entry-like">❤ ${Math.max(0, Number(entry.likeCount) || 0)}</span>
+          </div>
+          <div class="entry-title">${entry.title || '無題'}</div>
+          <div class="entry-author-row">
+            <span class="entry-author-avatar">${authorAvatarSrc ? `<img src="${authorAvatarSrc}" alt="${authorName} icon">` : authorFallback}</span>
+            <span class="entry-author-name">${authorName}</span>
+          </div>
+          <p class="entry-info">${buildEntryMetaLine(entry)}</p>
+          ${tags.length ? `<div class="entry-tags">${tags.map(tag => `<span class="entry-tag">#${tag}</span>`).join('')}</div>` : ''}
+        </div>
+      `;
+      return item;
+    }
+
+    function createRoomCard(room){
+      const participants = Math.max(0, Number(room.participantCount) || 0);
+      const roomBadges = [
+        room.roomType,
+        room.size || '',
+        room.maxUsers ? `最大${room.maxUsers}人` : '',
+        formatFeedTimestamp(room.updatedAt)
+      ].filter(Boolean);
+      const item = document.createElement('a');
+      item.className = 'entry-card entry-card--room';
+      item.href = room.href || '../pixiedraw/index.html';
+      item.innerHTML = `
+        <div class="entry-imgwrap entry-imgwrap--room">
+          ${room.thumbnail ? `<img src="${room.thumbnail}" alt="${room.title} thumbnail" loading="lazy" decoding="async">` : `<span class="entry-room-placeholder">ROOM</span>`}
+          <span class="entry-room-label">${room.roomType}</span>
+        </div>
+        <div class="entry-meta">
+          <div class="entry-meta__top">
+            <span class="entry-type-chip entry-type-chip--room">公開中の部屋</span>
+            <span class="entry-like">参加 ${participants}人</span>
+          </div>
+          <div class="entry-title">${room.title}</div>
+          <p class="entry-info">${room.description || 'PiXiEEDrawで公開中の共同制作ルームです。'}</p>
+          ${roomBadges.length ? `<div class="entry-tags">${roomBadges.map(label => `<span class="entry-tag">${label}</span>`).join('')}</div>` : ''}
+          <span class="entry-room-cta">入室する</span>
+        </div>
+      `;
+      return item;
+    }
+
     function renderEntries(entries){
       const gallery = $(GALLERY_ID);
       if(!gallery) return;
       if(!entries.length){
-        gallery.innerHTML = '<p class="empty">まだ投稿がありません。</p>';
+        gallery.innerHTML = `<p class="empty">${getEmptyMessage()}</p>`;
+        updateFeedSubtitle(entries);
         return;
       }
       gallery.innerHTML = '';
       entries.forEach((entry, idx) => {
-        const isFirstRow = idx < 3;
-        const isFirstTwoRows = idx < 6;
-        const item = document.createElement('a');
-        item.className = 'entry-card';
-        item.href = `view.html?id=${entry.id}`;
-        item.innerHTML = `
-          <div class="entry-imgwrap">
-            <img src="${resolveEntryThumb(entry)}" alt="${entry.title}" draggable="false" loading="${isFirstTwoRows ? 'eager' : 'lazy'}" fetchpriority="${isFirstRow ? 'high' : 'auto'}" decoding="async">
-            ${buildContestWatermarkMarkup(resolveContestWatermarkSeed(entry), { count: 24, sizeMin: 10, sizeMax: 18 })}
-            <button class="heart-btn" data-id="${entry.id}" aria-label="いいね">
-              <img src="${likedEntries.has(entry.id) ? FAV_SRC : NFAV_SRC}" alt="like icon">
-            </button>
-          </div>
-        `;
+        const item = entry?.feedType === 'room'
+          ? createRoomCard(entry)
+          : createEntryCard(entry, idx);
         gallery.appendChild(item);
         // 15件ごとに1行バナー広告を挿入（末尾は除外）
         if((idx + 1) % 15 === 0 && (idx + 1) < entries.length){
           gallery.appendChild(createAdCard());
         }
       });
+      updateFeedSubtitle(entries);
       gallery.querySelectorAll('.heart-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.preventDefault();
@@ -3871,6 +4557,115 @@
       }catch(e){
         console.warn('ads render skipped', e);
       }
+    }
+
+    async function fetchPlazaRooms({ force = false } = {}){
+      if(isLoadingRooms && plazaRoomProbePromise){
+        return plazaRoomProbePromise;
+      }
+      if(!force && cachedRooms.length){
+        return cachedRooms;
+      }
+      isLoadingRooms = true;
+      plazaRoomProbePromise = (async () => {
+        try{
+          const res = await fetch(ROOMS_SOURCE_PATH, { cache: 'no-store' });
+          const rooms = await res.json();
+          const mod = await import(MULTI_SUPABASE_MODULE_URL);
+          const realtimeClient = mod.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { realtime:{ params:{ eventsPerSecond:48 } } });
+          const lobbyRooms = await fetchPublicLobbyRooms(realtimeClient);
+          let residentThumbCache = readResidentThumbnailCache();
+          const configuredResidentProjectKeys = new Set();
+          const active = [];
+          for(const room of (Array.isArray(rooms) ? rooms : [])){
+            if(!room || typeof room !== 'object') continue;
+            if(room.type === 'public'){
+              const thumbnail = await probeLegacyPublicRoomThumbnail(realtimeClient, room.channel);
+              if(!thumbnail) continue;
+              active.push({
+                ...room,
+                thumbnail,
+                participantCount: 0,
+                updatedAt: Date.now(),
+              });
+              continue;
+            }
+            if(room.type === 'resident'){
+              const projectKey = normalizeProjectKey(room.projectKey || room.channel || room.id || '');
+              if(!projectKey) continue;
+              configuredResidentProjectKeys.add(projectKey);
+              const lobby = lobbyRooms.get(projectKey);
+              if(!lobby) continue;
+              const liveThumb = (typeof lobby.thumbnailDataUrl === 'string' && lobby.thumbnailDataUrl.startsWith('data:image/'))
+                ? lobby.thumbnailDataUrl
+                : '';
+              if(liveThumb){
+                residentThumbCache = setResidentThumbnailCache(
+                  projectKey,
+                  liveThumb,
+                  Number(lobby.updatedAt) || Date.now(),
+                  residentThumbCache
+                );
+              }
+              const cachedThumb = getResidentThumbnailFromCache(projectKey, residentThumbCache);
+              active.push({
+                ...room,
+                projectKey,
+                thumbnail: liveThumb || cachedThumb?.thumbnailDataUrl || ROOM_FALLBACK_THUMB,
+                participantCount: Number(lobby.participantCount) || 0,
+                maxUsers: Math.max(0, Number(room.maxUsers) || (Number(lobby.maxGuests) || 0) + 1),
+                updatedAt: Number(lobby.updatedAt) || Date.now(),
+              });
+            }
+          }
+
+          lobbyRooms.forEach((lobby, projectKey) => {
+            const normalizedProjectKey = normalizeProjectKey(projectKey);
+            if(!normalizedProjectKey || configuredResidentProjectKeys.has(normalizedProjectKey)){
+              return;
+            }
+            const liveThumb = (typeof lobby.thumbnailDataUrl === 'string' && lobby.thumbnailDataUrl.startsWith('data:image/'))
+              ? lobby.thumbnailDataUrl
+              : '';
+            if(liveThumb){
+              residentThumbCache = setResidentThumbnailCache(
+                normalizedProjectKey,
+                liveThumb,
+                Number(lobby.updatedAt) || Date.now(),
+                residentThumbCache
+              );
+            }
+            const cachedThumb = getResidentThumbnailFromCache(normalizedProjectKey, residentThumbCache);
+            const maxGuests = Math.max(0, Math.round(Number(lobby.maxGuests) || 0));
+            active.push({
+              id: `resident-dynamic-${normalizedProjectKey}`,
+              name: `公開ルーム (${normalizedProjectKey})`,
+              type: 'resident',
+              projectKey: normalizedProjectKey,
+              channel: normalizedProjectKey,
+              description: 'PiXiEEDrawで公開中の共同制作ルームです。',
+              size: '',
+              maxUsers: maxGuests > 0 ? (maxGuests + 1) : 0,
+              thumbnail: liveThumb || cachedThumb?.thumbnailDataUrl || ROOM_FALLBACK_THUMB,
+              participantCount: Number(lobby.participantCount) || 0,
+              updatedAt: Number(lobby.updatedAt) || Date.now(),
+            });
+          });
+
+          active.sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0));
+          cachedRooms = active.map(buildRoomFeedItem);
+        }catch(err){
+          console.error('plaza rooms fetch failed', err);
+          cachedRooms = [];
+        }finally{
+          isLoadingRooms = false;
+          plazaRoomProbePromise = null;
+          renderEntries(applyFilterAndSort(getFeedItems()));
+          updateLoadMoreUI();
+        }
+        return cachedRooms;
+      })();
+      return plazaRoomProbePromise;
     }
 
     async function fetchLikesForEntryIds(entryIds){
@@ -3931,7 +4726,7 @@
         return { ...entry, image_base64: legacy };
       });
       if(changed){
-        renderEntries(applyFilterAndSort(cachedEntries));
+        renderEntries(applyFilterAndSort(getFeedItems()));
       }
       return entries;
     }
@@ -3954,12 +4749,16 @@
         try{
           const buildBaseSelect = () => (
             supportsImageUrls
-              ? 'id,title,mode,submitted_at,width,height,image_url,thumb_url'
-              : 'id,title,mode,submitted_at,width,height,image_base64'
+              ? 'id,name,title,mode,submitted_at,width,height,image_url,thumb_url,user_id,client_id'
+              : 'id,name,title,mode,submitted_at,width,height,image_base64,user_id,client_id'
           );
           const buildSelectColumns = () => {
             const baseSelect = buildBaseSelect();
-            return supportsTags ? `${baseSelect},tags` : baseSelect;
+            const columns = [baseSelect];
+            if(supportsTags) columns.push('tags');
+            if(supportsXUrl) columns.push('x_url');
+            if(supportsEntryAvatar) columns.push('avatar');
+            return columns.join(',');
           };
           let res = await supabase
             .from('contest_entries')
@@ -3969,6 +4768,24 @@
           let errorMsg = String(res.error?.message || '').toLowerCase();
           if(res.error && supportsTags && errorMsg.includes('tags')){
             supportsTags = false;
+            res = await supabase
+              .from('contest_entries')
+              .select(buildSelectColumns())
+              .order('submitted_at', { ascending:false })
+              .range(currentOffset, currentOffset + PAGE_SIZE - 1);
+            errorMsg = String(res.error?.message || '').toLowerCase();
+          }
+          if(res.error && supportsXUrl && errorMsg.includes('x_url')){
+            supportsXUrl = false;
+            res = await supabase
+              .from('contest_entries')
+              .select(buildSelectColumns())
+              .order('submitted_at', { ascending:false })
+              .range(currentOffset, currentOffset + PAGE_SIZE - 1);
+            errorMsg = String(res.error?.message || '').toLowerCase();
+          }
+          if(res.error && supportsEntryAvatar && errorMsg.includes('avatar')){
+            supportsEntryAvatar = false;
             res = await supabase
               .from('contest_entries')
               .select(buildSelectColumns())
@@ -4029,6 +4846,7 @@
         ...e,
         likeCount: likeCounts[e.id] || e.likeCount || 0
       }));
+      await syncProfilesForEntries(enriched);
       if(append){
         cachedEntries = cachedEntries.concat(enriched);
       }else{
@@ -4038,7 +4856,7 @@
       if(enriched.length < PAGE_SIZE){
         hasMoreEntries = false;
       }
-      renderEntries(applyFilterAndSort(cachedEntries));
+      renderEntries(applyFilterAndSort(getFeedItems()));
       void hydrateLegacyImagesInBackground(useEntries);
       setStatus('');
       isLoadingEntries = false;
@@ -4047,25 +4865,44 @@
 
     function applyFilterAndSort(entries){
       let filtered = entries.slice();
-      if(currentFilter === 'timed10'){
-        filtered = filtered.filter(e => e.mode === 'timed10');
+      if(currentFilter === 'posts'){
+        filtered = filtered.filter(item => item?.feedType !== 'room');
+      }else if(currentFilter === 'rooms'){
+        filtered = filtered.filter(item => item?.feedType === 'room');
       }else if(currentFilter === 'px32'){
-        filtered = filtered.filter(e => (e.width || 999) <= 32 && (e.height || 999) <= 32);
+        filtered = filtered.filter(item => item?.feedType !== 'room' && (item.width || 999) <= 32 && (item.height || 999) <= 32);
       }
       if(currentTagQuery){
         const query = currentTagQuery.toLowerCase();
-        filtered = filtered.filter(e => {
-          const tags = parseTags(e.tags);
-          return tags.some(tag => tag.toLowerCase().includes(query));
+        filtered = filtered.filter(item => {
+          if(item?.feedType === 'room'){
+            return [
+              item.title,
+              item.description,
+              item.size,
+              item.roomType,
+              item.projectKey,
+            ]
+              .filter(Boolean)
+              .some(value => String(value).toLowerCase().includes(query));
+          }
+          const tags = parseTags(item.tags);
+          if(tags.some(tag => tag.toLowerCase().includes(query))){
+            return true;
+          }
+          return [item.title, item.name]
+            .filter(Boolean)
+            .some(value => String(value).toLowerCase().includes(query));
         });
       }
       if(currentSort === 'popular'){
-        filtered.sort((a,b) => {
-          if(b.likeCount !== a.likeCount) return b.likeCount - a.likeCount;
-          return new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime();
+        filtered.sort((a, b) => {
+          const popularityDiff = getItemPopularity(b) - getItemPopularity(a);
+          if(popularityDiff !== 0) return popularityDiff;
+          return getItemTimestamp(b) - getItemTimestamp(a);
         });
       }else{
-        filtered.sort((a,b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
+        filtered.sort((a, b) => getItemTimestamp(b) - getItemTimestamp(a));
       }
       return filtered;
     }
@@ -4083,7 +4920,7 @@
     if(target){
       target.likeCount = Math.max(0, (target.likeCount || 0) + (already ? -1 : 1));
     }
-    renderEntries(applyFilterAndSort(cachedEntries));
+    renderEntries(applyFilterAndSort(getFeedItems()));
 
     if(supabase){
       try{
@@ -4528,6 +5365,7 @@
           updateNameDisplay();
           applyAvatarToBrand();
           renderAvatarChoices();
+          refreshPlazaFeed();
           if(supabase && supabaseUser?.id){
             try{
               const payload = { id: supabaseUser.id, nickname: nick || null, avatar: loadAvatar() };
@@ -4630,6 +5468,8 @@
 
     async function init(){
       ensureClientId();
+      const year = document.getElementById('year');
+      if(year) year.textContent = new Date().getFullYear();
       if(CONTEST_TEMP_CLOSED){
         applyContestTemporaryClosedMode();
         setActiveNav();
@@ -4709,7 +5549,10 @@
       }catch(e){
         console.warn('ads render skipped', e);
       }
-      await fetchAndRender();
+      await Promise.all([
+        fetchAndRender(),
+        fetchPlazaRooms({ force:true })
+      ]);
     }
 
     window.addEventListener('DOMContentLoaded', init);
