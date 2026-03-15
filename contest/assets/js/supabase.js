@@ -1,4 +1,4 @@
-// Supabase client for 10分ドット投稿
+// Supabase client for contest posting
 export const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
 export const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
 
