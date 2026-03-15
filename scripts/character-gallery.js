@@ -9,6 +9,16 @@
   const detailEl = document.getElementById('characterGalleryDetail');
   const traitsEl = document.getElementById('characterTraits');
   const detailsEl = document.getElementById('characterPreviewDetails');
+  const assetBase = normalizeBasePath(
+    buttonsContainer?.dataset.assetBase ||
+    viewer?.dataset.assetBase ||
+    'character-dots/'
+  );
+  const revealAllEntries = parseBoolean(
+    buttonsContainer?.dataset.revealAll ||
+    viewer?.dataset.revealAll ||
+    document.body?.dataset.revealAllCharacters
+  );
 
   if (
     !viewer ||
@@ -25,7 +35,7 @@
 
   const reduceMotionQuery = { matches: false };
   const typingControllers = new Map();
-  const DEFAULT_IMAGE_SCALE = 0.7;
+  const DEFAULT_IMAGE_SCALE = 1;
   const DEFAULT_ANIMATION_INTERVAL_MS = 180;
   const EDGE_TRIM_CHARACTER_IDS = new Set(['sky-burin', 'ocean-burin', 'abyss-burin']);
   const CHARACTER_SEEN_STORAGE_KEY = 'pixieed:characterGallerySeen';
@@ -570,17 +580,32 @@
   }
 
   function normalizePath(file) {
-    if (!file) {
+    const source = typeof file === 'string' ? file.trim() : '';
+    if (!source) {
       return '';
     }
-    const isAbsolute = /^(?:https?:)?\/\//.test(file) || file.startsWith('data:') || file.startsWith('/');
+    const isAbsolute = /^(?:https?:)?\/\//.test(source) || source.startsWith('data:') || source.startsWith('/');
     if (isAbsolute) {
-      return file;
+      return source;
     }
-    if (file.startsWith('./') || file.startsWith('../') || file.startsWith('character-dots/')) {
-      return file;
+    if (source.startsWith('./') || source.startsWith('../') || source.includes('/')) {
+      return source;
     }
-    return `character-dots/${file}`;
+    return assetBase ? `${assetBase}${source}` : source;
+  }
+
+  function normalizeBasePath(value) {
+    const base = String(value || '').trim();
+    if (!base) {
+      return '';
+    }
+    return base.endsWith('/') ? base : `${base}/`;
+  }
+
+  function parseBoolean(value) {
+    if (typeof value !== 'string') return false;
+    const normalized = value.trim().toLowerCase();
+    return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
   }
 
   function isSilhouetteEntry(entry) {
@@ -593,6 +618,7 @@
 
   function getDisplayEntry(entry) {
     if (!entry) return entry;
+    if (revealAllEntries) return entry;
     const secretId = entry.secret?.id || entry.id;
     const releaseUnlocked = hasAutoRelease(entry.secret);
     const releaseLabel = formatReleaseLabel(entry.secret);
