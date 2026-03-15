@@ -8,18 +8,17 @@
 <meta content="#1f1f1f" name="theme-color"/>
 <meta content="PiXiEEDrawは、無料で使えるブラウザのドット絵作成ツール。レイヤー、フレームアニメ、オニオンスキン、GIF/PNG/JPEG/SVG書き出し、リアルタイム共同編集に対応。" name="description"/>
 <meta content="PiXiEEDraw,ピクシードロー,ドット絵 エディター,ドット絵 描く サイト,ピクセルアート,リアルタイム 共同編集,アニメーション GIF,オニオンスキン" name="keywords"/>
-<meta content="noindex,follow" name="robots"/>
-<link rel="canonical" href="https://pixieed.jp/projects/pixiedraw/"/>
+<link rel="canonical" href="https://pixieed.jp/pixiedraw/"/>
 <meta content="website" property="og:type"/>
 <meta content="PiXiEED" property="og:site_name"/>
 <meta content="ja_JP" property="og:locale"/>
 <meta content="ドット絵作成ツール PiXiEEDraw | 無料ブラウザで描く・共同編集" property="og:title"/>
 <meta content="PiXiEEDrawは、無料で使えるブラウザのドット絵作成ツール。レイヤー、フレームアニメ、オニオンスキン、GIF/PNG/JPEG/SVG書き出し、リアルタイム共同編集に対応。" property="og:description"/>
-<meta content="https://pixieed.jp/projects/pixiedraw/" property="og:url"/>
+<meta content="https://pixieed.jp/pixiedraw/" property="og:url"/>
 <meta content="https://pixieed.jp/pixiedraw/ogp-app.png" property="og:image"/>
 <meta content="summary_large_image" name="twitter:card"/>
 <meta content="@PiXiEED_arta" name="twitter:site"/>
-<meta content="https://pixieed.jp/projects/pixiedraw/" name="twitter:url"/>
+<meta content="https://pixieed.jp/pixiedraw/" name="twitter:url"/>
 <meta content="ドット絵作成ツール PiXiEEDraw | 無料ブラウザで描く・共同編集" name="twitter:title"/>
 <meta content="PiXiEEDrawは、無料で使えるブラウザのドット絵作成ツール。レイヤー、フレームアニメ、オニオンスキン、GIF/PNG/JPEG/SVG書き出し、リアルタイム共同編集に対応。" name="twitter:description"/>
 <meta content="https://pixieed.jp/pixiedraw/ogp-app.png" name="twitter:image"/>
@@ -30,7 +29,7 @@
   "name": "PiXiEEDraw",
   "applicationCategory": "DesignApplication",
   "operatingSystem": "Web",
-  "url": "https://pixieed.jp/projects/pixiedraw/",
+  "url": "https://pixieed.jp/pixiedraw/",
   "image": "https://pixieed.jp/pixiedraw/ogp-app.png",
   "description": "PiXiEEDrawは、無料で使えるブラウザのドット絵作成ツール。レイヤー、フレームアニメ、オニオンスキン、GIF/PNG/JPEG/SVG書き出し、リアルタイム共同編集に対応。",
   "featureList": [
@@ -746,13 +745,13 @@
 <div class="field field--compact multi-project-key-field" id="multiJoinProjectKeyField">
 <span>プロジェクトキー</span>
 <div class="multi-project-key-row multi-project-key-row--single">
-<input autocomplete="off" id="multiJoinProjectKey" inputmode="text" maxlength="40" placeholder="例: room-1234" spellcheck="false" type="text"/>
+<input autocomplete="off" id="multiJoinProjectKey" inputmode="text" maxlength="40" placeholder="例: k9f3x2-p7q" spellcheck="false" type="text"/>
 </div>
 </div>
 <div class="multi-entry-role-actions">
 <button class="button multi-entry-action" id="multiEntryJoinAsGuest" type="button">
-<span id="multiEntryJoinAsGuestTitle">参加者で入る</span>
-<small id="multiEntryJoinAsGuestMeta">入室後に自動で参加申請</small>
+<span id="multiEntryJoinAsGuestTitle">参加申請して入る</span>
+<small id="multiEntryJoinAsGuestMeta">まず視聴で入り、参加申請を送信</small>
 </button>
 <button class="button multi-entry-action" id="multiEntrySpectator" type="button">
 <span id="multiEntrySpectatorTitle">視聴で入る</span>
@@ -760,31 +759,35 @@
 </button>
 </div>
 <button class="chip multi-entry-join-back" id="multiEntryJoinBack" type="button">戻る</button>
-<p class="help-text ui-guide-text" id="multiEntryJoinHint">キー入力後に参加者か視聴者を選んで入室します。</p>
+<p class="help-text ui-guide-text" id="multiEntryJoinHint">描画したい場合は「参加申請して入る」を選びます。見るだけなら「視聴で入る」です。</p>
 </div>
 <p class="help-text ui-guide-text" id="multiEntryHint">部屋を開くとキーが発行されます。参加する場合はキー入力パネルへ進んでください。</p>
 </div>
 <div class="multi-flow-panel" hidden id="multiFlowPanel">
-<div class="field field--list multi-comment-field">
-<div aria-live="polite" class="multi-comment-log" id="multiCommentList">
-<p class="help-text">コメントはまだありません。</p>
+<div aria-label="共有モード内タブ" class="multi-flow-tabs" role="tablist">
+<button aria-controls="multiFlowCollabPanel" aria-selected="true" class="multi-flow-tab is-active" data-multi-flow-tab="collab" id="multiFlowTabCollab" role="tab" type="button">
+<span id="multiFlowTabCollabLabel">共同</span>
+</button>
+<button aria-controls="multiFlowCommentsPanel" aria-selected="false" class="multi-flow-tab" data-multi-flow-tab="comments" id="multiFlowTabComments" role="tab" tabindex="-1" type="button">
+<span id="multiFlowTabCommentsLabel">コメント</span>
+</button>
 </div>
-<div class="multi-danmaku-toggle" style="display:flex;align-items:center;gap:8px;">
-  <label class="toggle-option" for="multiDanmakuToggle">
-    <input id="multiDanmakuToggle" type="checkbox" checked />
-    <span>コメント弾幕</span>
-  </label>
+<div aria-labelledby="multiFlowTabCollab" class="multi-flow-tabpanel multi-flow-tabpanel--collab" id="multiFlowCollabPanel" role="tabpanel">
+<section class="multi-overview" id="multiOverview">
+<div class="multi-overview__header">
+<div class="multi-status-row">
+<p aria-live="polite" class="help-text" id="multiStatus">共有モード: OFF</p>
 </div>
-<div class="multi-comment-input-row">
-<input autocomplete="off" id="multiCommentInput" maxlength="140" placeholder="コメントを入力" type="text"/>
-<button class="chip" id="multiCommentSend" type="button">送信</button>
+<div class="multi-overview__chips" id="multiOverviewChips"></div>
 </div>
-<div class="field field--compact multi-project-key-field" hidden id="multiProjectKeyField">
+<p class="help-text ui-guide-text" id="multiOverviewSummary">接続状態に応じて、できることがここに表示されます。</p>
+<p class="help-text ui-guide-text" id="multiOverviewHint">参加者一覧から参加申請、承認、セル移動を操作できます。</p>
+</section>
+<div class="field field--compact multi-project-key-field multi-project-key-field--flow" hidden id="multiProjectKeyField">
 <span>プロジェクトキー</span>
 <div class="multi-project-key-row">
-<input autocomplete="off" id="multiProjectKey" inputmode="text" maxlength="40" placeholder="例: room-1234" readonly spellcheck="false" type="text"/>
+<input autocomplete="off" id="multiProjectKey" inputmode="text" maxlength="40" placeholder="例: k9f3x2-p7q" readonly spellcheck="false" type="text"/>
 <button aria-label="プロジェクトキーをコピー" class="chip multi-project-key-copy" id="multiCopyKey" title="プロジェクトキーをコピー" type="button">コピー</button>
-</div>
 </div>
 </div>
 <div class="field-group">
@@ -798,16 +801,12 @@
 <button class="chip" id="multiInviteCopy" type="button">招待リンクをコピー</button>
 <button class="chip" id="multiInviteShare" type="button">招待を共有</button>
 </div>
-<button class="chip" id="multiBroadcastState" type="button">全員に同期</button>
 </div>
 <div class="field field--list multi-join-request-field" hidden id="multiJoinRequestField">
 <button class="chip" id="multiRequestGuestRole" type="button">参加リクエストを送信</button>
 <p class="help-text ui-guide-text" id="multiJoinRequestHint">参加はマスターの承認後に有効になります。</p>
 </div>
-<div class="multi-status-row">
-<p aria-live="polite" class="help-text" id="multiStatus">共有モード: OFF</p>
-</div>
-<details class="field field--list multi-participants-panel">
+<details class="field field--list multi-participants-panel" open>
 <summary>参加者/視聴者一覧</summary>
 <div class="multi-participants-scroll">
 <ul class="toggle-list multi-participants-list" id="multiParticipants">
@@ -816,7 +815,7 @@
 </div>
 </details>
 <details class="field field--list multi-master-advanced" data-multi-master-only="true" id="multiMasterAdvanced">
-<summary>詳細設定（必要なときだけ）</summary>
+<summary>部屋設定</summary>
 <div class="multi-master-advanced-body">
 <div class="field field--list multi-capacity-field">
 <span>参加管理</span>
@@ -855,7 +854,7 @@
 </label>
 <p class="help-text ui-guide-text" id="multiParticipantFreeCellMoveHint">同じセルへの同時参加はできません。</p>
 </div>
-<div class="field field--list multi-join-requests-field">
+<div class="field field--list multi-join-requests-field" data-multi-list-managed="true">
 <span>参加リクエスト</span>
 <label class="field field--compact">
 <span>対象</span>
@@ -866,7 +865,7 @@
 <button class="chip" id="multiJoinRequestReject" type="button">却下</button>
 </div>
 </div>
-<div class="field field--list multi-master-ops-toggle-field">
+<div class="field field--list multi-master-ops-toggle-field" data-multi-list-managed="true">
 <span>運営モード</span>
 <label class="toggle-option" for="multiMasterOpsMode">
 <input id="multiMasterOpsMode" type="checkbox"/>
@@ -874,7 +873,7 @@
 </label>
 <p class="help-text ui-guide-text" id="multiMasterOpsHint">通常はOFF推奨です。</p>
 </div>
-<div class="field field--list multi-role-control-field" data-multi-master-ops="true">
+<div class="field field--list multi-role-control-field" data-multi-list-managed="true" data-multi-master-ops="true">
 <span>参加/視聴の切替</span>
 <label class="field field--compact">
 <span>対象</span>
@@ -885,7 +884,7 @@
 <button class="chip" id="multiForceSpectator" type="button">視聴者にする</button>
 </div>
 </div>
-<div class="field field--list multi-assignment-field" data-multi-master-ops="true">
+<div class="field field--list multi-assignment-field" data-multi-list-managed="true" data-multi-master-ops="true">
 <span>参加者セル移動</span>
 <div class="field field--inline multi-assignment-inputs">
 <label class="field field--tiny">
@@ -904,10 +903,26 @@
 <button class="chip" id="multiAssignBan" type="button">BAN</button>
 </div>
 </div>
+<div class="field field--list">
+<span id="multiBroadcastStateLabel">再同期</span>
+<button class="chip" id="multiBroadcastState" type="button">全員に同期</button>
+<p class="help-text ui-guide-text" id="multiBroadcastStateHint">表示ずれや割り当て反映ずれが起きた時だけ使います。</p>
+</div>
 </div>
 </details>
 <div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 </div>
+<section aria-labelledby="multiFlowTabComments" class="multi-flow-tabpanel multi-flow-tabpanel--comments" hidden id="multiFlowCommentsPanel" role="tabpanel">
+<div class="field field--list multi-comment-field">
+<div aria-live="polite" class="multi-comment-log" id="multiCommentList">
+<p class="help-text">コメントはまだありません。</p>
+</div>
+<div class="multi-comment-input-row">
+<input autocomplete="off" id="multiCommentInput" maxlength="140" placeholder="コメントを入力" type="text"/>
+<button class="chip" id="multiCommentSend" type="button">送信</button>
+</div>
+</div>
+</section>
 </div>
 </section>
 <section class="panel-section" data-section="settings" id="panelSettings">
@@ -1316,6 +1331,21 @@
 <footer class="modal__footer">
 <button class="button button--ghost" id="cancelNewProject" type="button">キャンセル</button>
 <button class="button button--primary" id="confirmNewProject" type="submit">作成</button>
+</footer>
+</form>
+</dialog>
+<dialog aria-labelledby="globalHistoryConfirmTitle" class="modal" id="globalHistoryConfirmDialog">
+<form class="modal__form" method="dialog">
+<header class="modal__header">
+<h2 class="modal__title" id="globalHistoryConfirmTitle">全体Undo</h2>
+</header>
+<div class="modal__body">
+<p id="globalHistoryConfirmMessage">この操作は共有ドキュメント全体に反映されます。</p>
+<p class="help-text" id="globalHistoryConfirmDetail">参加者全員の表示が更新されます。続ける前に内容を確認してください。</p>
+</div>
+<footer class="modal__footer">
+<button class="button button--ghost" id="globalHistoryConfirmCancel" type="button">キャンセル</button>
+<button class="button button--primary" id="globalHistoryConfirmConfirm" type="button">全体Undoする</button>
 </footer>
 </form>
 </dialog>
