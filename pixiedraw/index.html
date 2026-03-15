@@ -145,18 +145,19 @@
 <button class="startup-screen__link" id="startupActionSkip" type="button">この画面を閉じる</button>
 </div>
 </div>
-<div aria-hidden="true" class="update-toast" data-update-id="2026-03-11-selection-multiplayer-polish" data-update-published="true" hidden="" id="updateToast" role="status" aria-live="polite">
+<div aria-hidden="true" class="update-toast" data-update-id="2026-03-15-multi-canvas-collab-polish" data-update-published="true" hidden="" id="updateToast" role="status" aria-live="polite">
 <div class="update-toast__body">
 <p class="update-toast__message">
-<strong>更新情報 (2026/03/11)</strong><br/>
+<strong>更新情報 (2026/03/15)</strong><br/>
 【今回更新】<br/>
-・GPT連携を撤去し、共有中の視点 / 選択 / 色 / ツール / 背景 / ミラー / オニオン / レイヤー表示 / 薄表示は各自ローカル保持になりました<br/>
-・共有パレットは最初だけマスター内容で始め、その後の色選びや調整は各自ローカルで続けられます<br/>
-・SpriteMAP（全フレーム1枚）出力を追加しました<br/>
-・選択範囲のコピー / 貼り付けを整理し、図形のまま選ぶモード、キャンバス外クリック解除、はみ出し選択からの再ペーストに対応しました<br/>
-・図形のままペーストでは透明セルを無視し、非透明ピクセルだけ貼り付けるよう調整しました<br/>
-・フレーム / レイヤー番号セルを選んだ状態では、追加ボタンでそのまま複製できます<br/>
-・アプリ版では外部販売サイトの「応援チップ」を非表示にしました<br/>
+・マルチキャンバスを追加し、設定からON/OFF、追加/削除、Undo/Redo、保存/再読込、共有同期に対応しました<br/>
+・選択範囲プレビュー / ミラー / タイムライン操作は、選択中キャンバスを正しく参照するよう修正しました<br/>
+・追加キャンバスの初回クリックは選択だけになり、ドラッグした時だけそのまま描画開始します<br/>
+・共同制作の再同期、参加者セル再配置、キャンバス削除判定を見直し、古い同期やセル衝突で崩れにくくしました<br/>
+・PiXFiND は共有中に使えないようにし、接続開始時は自動でOFFにします<br/>
+・コメント欄はログだけスクロールし、入力欄は最下部固定になりました<br/>
+・プロジェクトタブの×は対象タブだけを確認付きで閉じるよう修正しました<br/>
+・参加者セルの自由移動は新規ルームで初期ONになりました<br/>
 ・詳細は設定の「更新情報」から確認できます
 </p>
 <div class="update-toast__actions">
