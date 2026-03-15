@@ -250,6 +250,10 @@
       multiEntryActions: document.getElementById('multiEntryActions'),
       multiEntryJoinPanel: document.getElementById('multiEntryJoinPanel'),
       multiFlowPanel: document.getElementById('multiFlowPanel'),
+      multiFlowTabCollab: document.getElementById('multiFlowTabCollab'),
+      multiFlowTabComments: document.getElementById('multiFlowTabComments'),
+      multiFlowCollabPanel: document.getElementById('multiFlowCollabPanel'),
+      multiFlowCommentsPanel: document.getElementById('multiFlowCommentsPanel'),
       multiEntryMaster: document.getElementById('multiEntryMaster'),
       multiEntryGuest: document.getElementById('multiEntryGuest'),
       multiEntryJoinAsGuest: document.getElementById('multiEntryJoinAsGuest'),
@@ -271,6 +275,10 @@
       multiCopyKey: document.getElementById('multiCopyKey'),
       multiBroadcastState: document.getElementById('multiBroadcastState'),
       multiStatus: document.getElementById('multiStatus'),
+      multiOverview: document.getElementById('multiOverview'),
+      multiOverviewSummary: document.getElementById('multiOverviewSummary'),
+      multiOverviewHint: document.getElementById('multiOverviewHint'),
+      multiOverviewChips: document.getElementById('multiOverviewChips'),
       multiHelpToggle: document.getElementById('multiHelpToggle'),
       multiHelpPanel: document.getElementById('multiHelpPanel'),
       multiHelpClose: document.getElementById('multiHelpClose'),
@@ -387,6 +395,14 @@
       dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('updateHistoryDialog')),
       list: document.getElementById('updateHistoryList'),
       close: document.getElementById('closeUpdateHistory'),
+    },
+    globalHistoryConfirm: {
+      dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('globalHistoryConfirmDialog')),
+      title: document.getElementById('globalHistoryConfirmTitle'),
+      message: document.getElementById('globalHistoryConfirmMessage'),
+      detail: document.getElementById('globalHistoryConfirmDetail'),
+      cancel: document.getElementById('globalHistoryConfirmCancel'),
+      confirm: document.getElementById('globalHistoryConfirmConfirm'),
     },
     toolSpotlight: {
       dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('toolSpotlightDialog')),
@@ -2259,6 +2275,7 @@
   const MULTI_INVITE_QUERY_KEY = 'multiKey';
   const MULTI_INVITE_QUERY_AUTO_JOIN = 'multiAutoJoin';
   const MULTI_INVITE_QUERY_ROLE = 'multiRole';
+  const MULTI_GUEST_MOVE_PREVIEW_DEBOUNCE_MS = 140;
   const NEW_PROJECT_PALETTE_PRESET_NAMES = Object.freeze([
     'Pixel Core',
     'Retro Bits',
@@ -2437,6 +2454,8 @@
   const MULTI_PUBLIC_ROOM_THUMBNAIL_MAX_DATA_URL_LENGTH = 180000;
   const MULTI_PUBLIC_ROOM_THUMBNAIL_REFRESH_MIN_MS = 7000;
   const MULTI_SYNC_THROTTLE_MS = 150;
+  const MULTI_MASTER_RECOVERY_REASON = 'master-recovery';
+  const MULTI_GUEST_RECOVERY_PUSH_THROTTLE_MS = 1600;
   const MULTI_LAYER_PATCH_FULL_RATIO = 0.45;
   const MULTI_JOIN_REQUEST_COOLDOWN_MS = 6000;
   const MULTI_COMMENT_MAX_LENGTH = 140;
@@ -2570,6 +2589,7 @@
     connecting: false,
     applyRemoteInProgress: false,
     uiView: 'entry',
+    activeTab: 'collab',
     desiredRole: 'master',
     maxGuests: MULTI_DEFAULT_GUEST_LIMIT,
     roomVisibility: MULTI_DEFAULT_ROOM_VISIBILITY,
@@ -2587,6 +2607,9 @@
     pendingSessionStateTimer: null,
     selectedAssignClientId: '',
     selectedRoleControlClientId: '',
+    guestMovePreview: null,
+    guestMovePreviewTimer: null,
+    guestMovePreviewVersion: 0,
     resumeAssignments: null,
     resumeBlockedClientIds: null,
     resumeMaxGuests: null,
@@ -2611,6 +2634,8 @@
     joinRequestPending: false,
     awaitingGuestStateRecovery: false,
     guestStateRecoveryTimer: null,
+    guestRecoveryPushAt: 0,
+    guestRecoveryTargetClientId: '',
     comments: [],
     commentIds: new Set(),
     localSnapshotBeforeReplica: null,
@@ -2641,6 +2666,10 @@
   const railSizing = {
     left: RAIL_DEFAULT_WIDTH.left,
     right: RAIL_DEFAULT_WIDTH.right,
+    expandedWidth: {
+      left: RAIL_CLICK_OPEN_WIDTH.left,
+      right: RAIL_CLICK_OPEN_WIDTH.right,
+    },
     activeSide: null,
     pointerId: null,
     startClientX: 0,
@@ -3136,7 +3165,21 @@
   const selectionMaskCacheIds = new WeakMap();
   let selectionMaskCacheIdCounter = 1;
   const HISTORY_DRAW_TOOLS = new Set(['pen', 'eraser', 'line', 'curve', 'rect', 'rectFill', 'ellipse', 'ellipseFill', 'fill']);
+  const MULTI_SCOPED_HISTORY_LABELS = new Set([
+    ...HISTORY_DRAW_TOOLS,
+    'selectionCut',
+    'selectionMove',
+    'selectionPaste',
+    'selectionTransform',
+    'selectionOutline4',
+    'selectionOutline8',
+  ]);
+  const MULTI_LAYER_PATCH_HISTORY_LABELS = new Set(MULTI_SCOPED_HISTORY_LABELS);
   const MULTI_PALETTE_HISTORY_LABELS = new Set(['paletteAdd', 'paletteRemove', 'paletteReorder', 'paletteColor', 'paletteApplyPreset']);
+  const globalHistoryConfirmState = {
+    resolve: null,
+    closing: false,
+  };
   const MEMORY_MONITOR_INTERVAL = 5000;
   const MEMORY_WARNING_DEFAULT = 250 * 1024 * 1024;
   const MIN_HISTORY_LIMIT = 20;
@@ -4443,6 +4486,9 @@
       if (state.selectionMask) {
         snapshot.selectionMask = new Uint8Array(state.selectionMask);
       }
+      if (state.selectionContentMask) {
+        snapshot.selectionContentMask = new Uint8Array(state.selectionContentMask);
+      }
       if (state.selectionBounds) {
         snapshot.selectionBounds = { ...state.selectionBounds };
       }
@@ -4946,6 +4992,7 @@
     const selectionEntries = Array.isArray(transformedSelection.entries) ? transformedSelection.entries : [];
     const contentEntries = Array.isArray(transformedContent.entries) ? transformedContent.entries : [];
     const newMask = new Uint8Array(pixelCount);
+    const newContentMask = new Uint8Array(pixelCount);
     const newBounds = { x0: width, y0: height, x1: -1, y1: -1 };
     let placed = false;
 
@@ -4977,6 +5024,7 @@
         continue;
       }
       const targetIndex = (targetY * width) + targetX;
+      newContentMask[targetIndex] = 1;
       targetIndices[targetIndex] = sourceIndices[sourceIndex];
       if (targetDirect) {
         const targetBase = targetIndex * 4;
@@ -5001,11 +5049,13 @@
 
     if (placed && moveState.applySelectionOnFinalize !== false) {
       snapshot.selectionMask = newMask;
+      snapshot.selectionContentMask = newContentMask;
       snapshot.selectionBounds = newBounds;
       snapshot.activeFrame = targetFrameIndex;
       snapshot.activeLayer = targetLayer.id || snapshot.activeLayer;
     } else {
       snapshot.selectionMask = null;
+      snapshot.selectionContentMask = null;
       snapshot.selectionBounds = null;
     }
   }
@@ -5258,6 +5308,9 @@
     if (snapshot.selectionMask) {
       compressed.selectionMask = compressUint8Array(snapshot.selectionMask, { clamped: false });
     }
+    if (snapshot.selectionContentMask) {
+      compressed.selectionContentMask = compressUint8Array(snapshot.selectionContentMask, { clamped: false });
+    }
     if (snapshot.selectionBounds) {
       compressed.selectionBounds = { ...snapshot.selectionBounds };
     }
@@ -5372,6 +5425,9 @@
     if (snapshot.selectionMask) {
       decompressed.selectionMask = decodeUint8Data(snapshot.selectionMask, { clamped: false });
     }
+    if (snapshot.selectionContentMask) {
+      decompressed.selectionContentMask = decodeUint8Data(snapshot.selectionContentMask, { clamped: false });
+    }
     if (snapshot.selectionBounds) {
       decompressed.selectionBounds = { ...snapshot.selectionBounds };
     }
@@ -5429,6 +5485,9 @@
     if (state.selectionMask) {
       total += state.selectionMask.length;
     }
+    if (state.selectionContentMask) {
+      total += state.selectionContentMask.length;
+    }
     total += state.palette.length * 16;
     return total;
   }
@@ -5446,6 +5505,9 @@
     }
     if (snapshot.selectionMask) {
       total += estimateEncodedByteLength(snapshot.selectionMask, 1);
+    }
+    if (snapshot.selectionContentMask) {
+      total += estimateEncodedByteLength(snapshot.selectionContentMask, 1);
     }
     if (Array.isArray(snapshot.palette)) {
       total += snapshot.palette.length * 16;
@@ -6609,13 +6671,54 @@
       : '';
   }
 
-  function getMultiHistoryKey(clientId = multiState.clientId || '', canvasId = getActiveProjectCanvasDocument()?.id || '') {
+  function getMultiHistoryScope(clientId = multiState.clientId || '', canvasId = getActiveProjectCanvasDocument()?.id || '') {
     const normalizedClientId = normalizeMultiHistoryClientId(clientId);
     const normalizedCanvasId = normalizeMultiHistoryCanvasId(canvasId);
     if (!normalizedClientId || !normalizedCanvasId) {
+      return null;
+    }
+    const requestedCanvas = getProjectCanvasDocumentById(normalizedCanvasId)
+      || (((getActiveProjectCanvasDocument()?.id || '') === normalizedCanvasId) ? getActiveProjectCanvasDocument() : null)
+      || null;
+    const assignment = getMultiAssignment(normalizedClientId);
+    const assignmentCanvas = getAssignmentCanvasDocument(assignment, requestedCanvas);
+    if (!assignment || !assignmentCanvas || (assignmentCanvas.id || '') !== normalizedCanvasId) {
+      return {
+        clientId: normalizedClientId,
+        canvasId: normalizedCanvasId,
+        frameToken: '',
+        layerToken: '',
+      };
+    }
+    const frameIndex = resolveAssignedFrameIndexForCanvas(assignment, assignmentCanvas);
+    const trackIndex = resolveAssignedLayerTrackIndexForCanvas(assignment, assignmentCanvas);
+    const frameId = frameIndex >= 0
+      ? (assignmentCanvas.frames?.[frameIndex]?.id || '')
+      : '';
+    const anchorLayerId = trackIndex >= 0
+      ? (assignmentCanvas.frames?.[0]?.layers?.[trackIndex]?.id || assignment.anchorLayerId || '')
+      : (assignment.anchorLayerId || '');
+    return {
+      clientId: normalizedClientId,
+      canvasId: normalizedCanvasId,
+      frameToken: frameId || (frameIndex >= 0 ? `f${frameIndex}` : ''),
+      layerToken: anchorLayerId || (trackIndex >= 0 ? `l${trackIndex}` : ''),
+    };
+  }
+
+  function getMultiHistoryKey(clientId = multiState.clientId || '', canvasId = getActiveProjectCanvasDocument()?.id || '') {
+    const scope = getMultiHistoryScope(clientId, canvasId);
+    if (!scope) {
       return '';
     }
-    return `${normalizedClientId}\u0000${normalizedCanvasId}`;
+    const parts = [scope.clientId, scope.canvasId];
+    if (scope.frameToken) {
+      parts.push(scope.frameToken);
+    }
+    if (scope.layerToken) {
+      parts.push(scope.layerToken);
+    }
+    return parts.join('\u0000');
   }
 
   function createMultiHistoryBucket(limit = history.limit) {
@@ -6653,6 +6756,216 @@
     multiHistory.clear();
   }
 
+  function setHistoryEntryLabel(entry, label = '') {
+    if (!entry || typeof entry !== 'object') {
+      return entry;
+    }
+    entry.historyLabel = typeof label === 'string' ? label : '';
+    return entry;
+  }
+
+  function getHistoryEntryLabel(entry) {
+    return typeof entry?.historyLabel === 'string' ? entry.historyLabel : '';
+  }
+
+  function hasPendingCurveUndoRedoInterception() {
+    return Boolean(
+      curveBuilder
+      || (history.pending && history.pending.label === 'curve')
+      || (pointerState.active && pointerState.tool === 'curve')
+    );
+  }
+
+  function isLocalOnlyMultiHistoryLabel(label = '') {
+    return MULTI_PALETTE_HISTORY_LABELS.has(String(label || ''));
+  }
+
+  function isGuardedMultiSharedHistoryLabel(label = '') {
+    const normalizedLabel = String(label || '');
+    return multiState.connected
+      && isMultiMasterMode()
+      && !MULTI_LAYER_PATCH_HISTORY_LABELS.has(normalizedLabel)
+      && !isLocalOnlyMultiHistoryLabel(normalizedLabel);
+  }
+
+  function getGuardedHistoryLabelDisplayName(label = '') {
+    switch (String(label || '')) {
+      case 'addLayer':
+        return localizeText('レイヤー追加', 'Add Layer');
+      case 'removeLayer':
+        return localizeText('レイヤー削除', 'Remove Layer');
+      case 'duplicateLayer':
+        return localizeText('レイヤー複製', 'Duplicate Layer');
+      case 'pasteLayer':
+        return localizeText('レイヤー貼り付け', 'Paste Layer');
+      case 'setLayerBlendMode':
+        return localizeText('レイヤー合成モード変更', 'Change Layer Blend Mode');
+      case 'addFrame':
+        return localizeText('フレーム追加', 'Add Frame');
+      case 'removeFrame':
+        return localizeText('フレーム削除', 'Remove Frame');
+      case 'duplicateFrame':
+        return localizeText('フレーム複製', 'Duplicate Frame');
+      case 'pasteFrame':
+        return localizeText('フレーム貼り付け', 'Paste Frame');
+      case 'setAllFrameFps':
+        return localizeText('再生速度変更', 'Change Playback Speed');
+      case 'resizeCanvas':
+        return localizeText('キャンバスサイズ変更', 'Resize Canvas');
+      case 'clearCanvas':
+        return localizeText('キャンバス全消去', 'Clear Canvas');
+      case 'scaleSprite':
+        return localizeText('全体拡大縮小', 'Scale Sprite');
+      case 'colorModeConvert':
+        return localizeText('色モード変換', 'Convert Color Mode');
+      case 'paletteAdd':
+        return localizeText('パレット色追加', 'Add Palette Color');
+      case 'paletteRemove':
+        return localizeText('パレット色削除', 'Remove Palette Color');
+      case 'paletteReorder':
+        return localizeText('パレット並び替え', 'Reorder Palette');
+      case 'paletteColor':
+        return localizeText('パレット色変更', 'Edit Palette Color');
+      case 'paletteApplyPreset':
+        return localizeText('パレットプリセット適用', 'Apply Palette Preset');
+      case 'toggleOnionSkin':
+        return localizeText('オニオンスキン切替', 'Toggle Onion Skin');
+      case 'setOnionSkin':
+        return localizeText('オニオンスキン設定変更', 'Change Onion Skin Settings');
+      default:
+        return localizeText('共有ドキュメント変更', 'Shared Document Change');
+    }
+  }
+
+  function buildGlobalHistoryConfirmContent(action, historyLabel = '') {
+    const normalizedAction = action === 'redo' ? 'redo' : 'undo';
+    const title = normalizedAction === 'redo'
+      ? localizeText('全体Redo', 'Shared Redo')
+      : localizeText('全体Undo', 'Shared Undo');
+    const operationName = getGuardedHistoryLabelDisplayName(historyLabel);
+    const message = normalizedAction === 'redo'
+      ? localizeText(
+        `次にやり直すのは「${operationName}」です。`,
+        `The next action to redo is "${operationName}".`
+      )
+      : localizeText(
+        `次に戻すのは「${operationName}」です。`,
+        `The next action to undo is "${operationName}".`
+      );
+    const detail = localizeText(
+      'この操作は共有ドキュメント全体に反映され、参加者全員の表示も更新されます。',
+      'This updates the shared document for everyone and refreshes all participant views.'
+    );
+    const confirmLabel = normalizedAction === 'redo'
+      ? localizeText('全体Redoする', 'Run Shared Redo')
+      : localizeText('全体Undoする', 'Run Shared Undo');
+    const fallbackMessage = `${message}\n${detail}\n${localizeText('続けますか？', 'Continue?')}`;
+    return {
+      title,
+      message,
+      detail,
+      confirmLabel,
+      fallbackMessage,
+    };
+  }
+
+  function resolveGlobalHistoryConfirm(accepted) {
+    const resolver = globalHistoryConfirmState.resolve;
+    globalHistoryConfirmState.resolve = null;
+    if (typeof resolver === 'function') {
+      resolver(Boolean(accepted));
+    }
+  }
+
+  function closeGlobalHistoryConfirmDialog({ accepted = false } = {}) {
+    const dialog = dom.globalHistoryConfirm?.dialog;
+    globalHistoryConfirmState.closing = true;
+    resolveGlobalHistoryConfirm(accepted);
+    if (dialog instanceof HTMLDialogElement && dialog.open) {
+      dialog.close();
+    }
+    globalHistoryConfirmState.closing = false;
+  }
+
+  async function requestGlobalHistoryConfirm(action, historyLabel = '') {
+    const content = buildGlobalHistoryConfirmContent(action, historyLabel);
+    const dialog = dom.globalHistoryConfirm?.dialog;
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+      return window.confirm(content.fallbackMessage);
+    }
+    if (dom.globalHistoryConfirm?.title) {
+      dom.globalHistoryConfirm.title.textContent = content.title;
+    }
+    if (dom.globalHistoryConfirm?.message) {
+      dom.globalHistoryConfirm.message.textContent = content.message;
+    }
+    if (dom.globalHistoryConfirm?.detail) {
+      dom.globalHistoryConfirm.detail.textContent = content.detail;
+    }
+    if (dom.globalHistoryConfirm?.confirm) {
+      dom.globalHistoryConfirm.confirm.textContent = content.confirmLabel;
+    }
+    if (globalHistoryConfirmState.resolve) {
+      resolveGlobalHistoryConfirm(false);
+    }
+    return new Promise(resolve => {
+      globalHistoryConfirmState.resolve = resolve;
+      try {
+        if (dialog.open) {
+          dialog.close();
+        }
+        dialog.showModal();
+        window.requestAnimationFrame(() => {
+          dom.globalHistoryConfirm?.confirm?.focus();
+        });
+      } catch (error) {
+        console.warn('Failed to open global history confirm dialog', error);
+        globalHistoryConfirmState.resolve = null;
+        resolve(window.confirm(content.fallbackMessage));
+      }
+    });
+  }
+
+  function peekGuardedHistoryActionLabel(action) {
+    const normalizedAction = action === 'redo' ? 'redo' : 'undo';
+    if (!multiState.connected || !isMultiMasterMode()) {
+      return null;
+    }
+    if (hasPendingSelectionMove() || hasPendingCurveUndoRedoInterception()) {
+      return null;
+    }
+    if (normalizedAction === 'undo' && history.pending?.dirty) {
+      return isGuardedMultiSharedHistoryLabel(history.pending.label)
+        ? String(history.pending.label || '')
+        : null;
+    }
+    if (normalizedAction === 'redo' && history.pending?.dirty) {
+      return null;
+    }
+    const stack = normalizedAction === 'redo' ? history.future : history.past;
+    if (!Array.isArray(stack) || !stack.length) {
+      return null;
+    }
+    const label = getHistoryEntryLabel(stack[stack.length - 1]);
+    return isGuardedMultiSharedHistoryLabel(label) ? label : null;
+  }
+
+  async function runHistoryActionWithGuard(action) {
+    const normalizedAction = action === 'redo' ? 'redo' : 'undo';
+    const guardedLabel = peekGuardedHistoryActionLabel(normalizedAction);
+    if (guardedLabel !== null) {
+      const accepted = await requestGlobalHistoryConfirm(normalizedAction, guardedLabel);
+      if (!accepted) {
+        return;
+      }
+    }
+    if (normalizedAction === 'redo') {
+      redo();
+    } else {
+      undo();
+    }
+  }
+
   function pruneMultiHistoryCanvases() {
     const validCanvasIds = new Set(
       getProjectCanvasDocuments()
@@ -6660,10 +6973,18 @@
         .filter(Boolean)
     );
     Array.from(multiHistory.keys()).forEach(key => {
-      const separatorIndex = key.indexOf('\u0000');
-      const canvasId = separatorIndex >= 0 ? key.slice(separatorIndex + 1) : '';
+      const parts = String(key).split('\u0000');
+      const clientId = parts.length >= 1 ? parts[0] : '';
+      const canvasId = parts.length >= 2 ? parts[1] : '';
       if (!validCanvasIds.has(canvasId)) {
         multiHistory.delete(key);
+        return;
+      }
+      if (clientId) {
+        const expectedKey = getMultiHistoryKey(clientId, canvasId);
+        if (expectedKey && expectedKey !== key) {
+          multiHistory.delete(key);
+        }
       }
     });
   }
@@ -6672,14 +6993,11 @@
     if (!history.pending) return;
     const pendingLabel = history.pending.label;
     if (history.pending.dirty) {
-      const beforeSnapshot = history.pending.before;
+      const beforeSnapshot = setHistoryEntryLabel(history.pending.before, pendingLabel);
       const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
       const shouldRecordScopedHistory = multiState.connected
-        && HISTORY_DRAW_TOOLS.has(pendingLabel)
-        && (
-          isMultiClientScopedHistoryMode()
-          || (isMultiMasterMode() && isAssignedCellActiveForCanvas(multiState.clientId, getActiveProjectCanvasDocument()))
-        );
+        && isMultiClientScopedHistoryMode()
+        && MULTI_SCOPED_HISTORY_LABELS.has(pendingLabel);
       if (shouldRecordScopedHistory) {
         try {
           const bucket = getMultiHistoryBucket(multiState.clientId || '', activeCanvasId, { create: true });
@@ -6726,6 +7044,10 @@
     if (cancelPendingCurveInteraction()) {
       return;
     }
+    if (hasPendingSelectionMove()) {
+      cancelPendingSelectionMove();
+      return;
+    }
     commitHistory();
     const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
     const bucket = getMultiHistoryBucket(multiState.clientId || '', activeCanvasId);
@@ -6741,14 +7063,19 @@
         }
       } else {
         try {
-          const currentCompressed = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
+          const prevCompressed = bucket.past.pop();
+          const historyLabel = getHistoryEntryLabel(prevCompressed);
+          const currentCompressed = setHistoryEntryLabel(
+            compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false })),
+            historyLabel
+          );
           bucket.future.push(currentCompressed);
           if (bucket.future.length > bucket.limit) bucket.future.shift();
-          const prevCompressed = bucket.past.pop();
           const prev = decompressHistorySnapshot(prevCompressed);
           const applied = applyHistorySnapshotForClient(prev, multiState.clientId || '', {
             preserveView: true,
             canvasId: activeCanvasId,
+            restoreSelection: true,
           });
           if (applied) {
             updateHistoryButtons();
@@ -6777,24 +7104,37 @@
     }
 
     if (!history.past.length) return;
-    const snapshot = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
+    const previous = history.past.pop();
+    const historyLabel = getHistoryEntryLabel(previous);
+    const snapshot = setHistoryEntryLabel(
+      compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false })),
+      historyLabel
+    );
     history.future.push(snapshot);
     if (history.future.length > history.limit) {
       history.future.shift();
     }
-    const previous = history.past.pop();
     applyHistorySnapshot(decompressHistorySnapshot(previous), { preserveView: true });
     updateHistoryButtons();
     markAutosaveDirty();
     markDocumentUnsavedChange();
     scheduleAutosaveSnapshot();
     if (multiState.connected && isMultiMasterMode()) {
-      scheduleMultiSessionStateBroadcast({ immediate: true });
+      if (MULTI_LAYER_PATCH_HISTORY_LABELS.has(historyLabel)) {
+        scheduleMasterLayerPatchSend({ immediate: true });
+        scheduleMultiPublicLobbyRoomSync({ immediate: false });
+      } else if (!isLocalOnlyMultiHistoryLabel(historyLabel)) {
+        scheduleMultiSessionStateBroadcast({ immediate: true });
+      }
     }
   }
 
   function redo() {
     if (cancelPendingCurveInteraction()) {
+      return;
+    }
+    if (hasPendingSelectionMove()) {
+      cancelPendingSelectionMove();
       return;
     }
     commitHistory();
@@ -6812,14 +7152,19 @@
         }
       } else {
         try {
-          const currentCompressed = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
+          const nextCompressed = bucket.future.pop();
+          const historyLabel = getHistoryEntryLabel(nextCompressed);
+          const currentCompressed = setHistoryEntryLabel(
+            compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false })),
+            historyLabel
+          );
           bucket.past.push(currentCompressed);
           if (bucket.past.length > bucket.limit) bucket.past.shift();
-          const nextCompressed = bucket.future.pop();
           const next = decompressHistorySnapshot(nextCompressed);
           const applied = applyHistorySnapshotForClient(next, multiState.clientId || '', {
             preserveView: true,
             canvasId: activeCanvasId,
+            restoreSelection: true,
           });
           if (applied) {
             updateHistoryButtons();
@@ -6848,19 +7193,28 @@
     }
 
     if (!history.future.length) return;
-    const snapshot = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
+    const next = history.future.pop();
+    const historyLabel = getHistoryEntryLabel(next);
+    const snapshot = setHistoryEntryLabel(
+      compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false })),
+      historyLabel
+    );
     history.past.push(snapshot);
     if (history.past.length > history.limit) {
       history.past.shift();
     }
-    const next = history.future.pop();
     applyHistorySnapshot(decompressHistorySnapshot(next), { preserveView: true });
     updateHistoryButtons();
     markAutosaveDirty();
     markDocumentUnsavedChange();
     scheduleAutosaveSnapshot();
     if (multiState.connected && isMultiMasterMode()) {
-      scheduleMultiSessionStateBroadcast({ immediate: true });
+      if (MULTI_LAYER_PATCH_HISTORY_LABELS.has(historyLabel)) {
+        scheduleMasterLayerPatchSend({ immediate: true });
+        scheduleMultiPublicLobbyRoomSync({ immediate: false });
+      } else if (!isLocalOnlyMultiHistoryLabel(historyLabel)) {
+        scheduleMultiSessionStateBroadcast({ immediate: true });
+      }
     }
   }
 
@@ -9831,12 +10185,12 @@
     setLocalizedTextContent('#multiEntryMasterMeta', 'キー自動生成', 'Auto-create key');
     setLocalizedTextContent('#multiEntryGuestTitle', '参加する', 'Join Room');
     setLocalizedTextContent('#multiEntryGuestMeta', 'キー入力へ進む', 'Open key input');
-    setLocalizedTextContent('#multiEntryJoinAsGuestTitle', '参加者で入る', 'Join as Participant');
-    setLocalizedTextContent('#multiEntryJoinAsGuestMeta', '入室後に自動で参加申請', 'Auto-send join request');
+    setLocalizedTextContent('#multiEntryJoinAsGuestTitle', '参加申請して入る', 'Join and Request Access');
+    setLocalizedTextContent('#multiEntryJoinAsGuestMeta', 'まず視聴で入り、参加申請を送信', 'Enter as viewer first, then request access');
     setLocalizedTextContent('#multiEntrySpectatorTitle', '視聴で入る', 'Join as Viewer');
     setLocalizedTextContent('#multiEntrySpectatorMeta', '見るだけで入室', 'View-only mode');
     setLocalizedTextContent('#multiEntryJoinBack', '戻る', 'Back');
-    setLocalizedTextContent('#multiEntryJoinHint', 'キー入力後に参加者か視聴者を選んで入室します。', 'Enter the key, then choose participant or viewer.');
+    setLocalizedTextContent('#multiEntryJoinHint', '描画したい場合は「参加申請して入る」を選びます。見るだけなら「視聴で入る」です。', 'Choose "Join and Request Access" if you want to draw. Choose viewer mode if you only want to watch.');
     setLocalizedTextContent('#multiEntryHint', '部屋を開くとキーが発行されます。参加する場合はキー入力パネルへ進んでください。', 'A key is issued after opening a room. To join, open the key input panel.');
     setLocalizedToggleLabel('multiDanmakuToggle', 'コメント弾幕', 'Comment Overlay');
     setLocalizedTextContent('#multiCommentSend', '送信', 'Send');
@@ -9848,11 +10202,17 @@
     setLocalizedAttribute('#multiCopyKey', 'title', 'プロジェクトキーをコピー', 'Copy project key');
     setLocalizedTextContent('#panelMulti .multi-master-actions > span', '部屋管理', 'Room Controls');
     setLocalizedTextContent('#multiBroadcastState', '全員に同期', 'Sync to All');
+    setLocalizedTextContent('#multiBroadcastStateLabel', '再同期', 'Resync');
+    setLocalizedTextContent('#multiBroadcastStateHint', '表示ずれや割り当て反映ずれが起きた時だけ使います。', 'Use this only when displays or assignment updates fall out of sync.');
     setLocalizedTextContent('#multiInviteCopy', '招待リンクをコピー', 'Copy Invite Link');
     setLocalizedTextContent('#multiInviteShare', '招待を共有', 'Share Invite');
     setLocalizedTextContent('#multiRequestGuestRole', '参加リクエストを送信', 'Send Join Request');
     setLocalizedTextContent('#multiJoinRequestHint', '参加はマスターの承認後に有効になります。', 'Joining becomes active after master approval.');
     setLocalizedTextContent('#multiStatus', '共有モード: OFF', 'Collab mode: OFF');
+    setLocalizedTextContent('#multiFlowTabCollabLabel', '共同', 'Collab');
+    setLocalizedTextContent('#multiFlowTabCommentsLabel', 'コメント', 'Comments');
+    setLocalizedTextContent('#multiOverviewSummary', '接続状態に応じて、できることがここに表示されます。', 'What you can do appears here based on your connection state.');
+    setLocalizedTextContent('#multiOverviewHint', '参加者一覧から参加申請、承認、セル移動を操作できます。', 'Use the participant list for join requests, approval, and cell movement.');
     setLocalizedAttribute('#multiHelpToggle', 'aria-label', 'マルチ説明を表示', 'Show collab help');
     setLocalizedTextContent('#multiHelpPanel > span', 'マルチ説明', 'Collab Help');
     setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(1)', '描画は参加者のみ、コメントは全員が利用できます。', 'Only participants can draw; everyone can comment.');
@@ -9861,6 +10221,7 @@
     setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(4)', '招待リンクはプロジェクトキー付きで参加画面を開きます。', 'Invite links open the join screen with project key.');
     setLocalizedTextContent('#multiHelpClose', '閉じる', 'Close');
     setLocalizedTextContent('#panelMulti .multi-participants-panel > summary', '参加者/視聴者一覧', 'Participants / Viewers');
+    setLocalizedTextContent('#panelMulti .multi-master-advanced > summary', '部屋設定', 'Room Settings');
     setLocalizedTextContent('#multiParticipants .help-text', '未接続', 'Not connected');
     setLocalizedTextContent('#multiPresetFriends', '友達向け', 'Friends');
     setLocalizedTextContent('#multiPresetStream', '配信向け', 'Streaming');
@@ -10050,6 +10411,11 @@
     );
     setLocalizedTextContent('#cancelNewProject', 'キャンセル', 'Cancel');
     setLocalizedTextContent('#confirmNewProject', '作成', 'Create');
+    setLocalizedTextContent('#globalHistoryConfirmTitle', '全体Undo', 'Shared Undo');
+    setLocalizedTextContent('#globalHistoryConfirmMessage', 'この操作は共有ドキュメント全体に反映されます。', 'This action updates the shared document for everyone.');
+    setLocalizedTextContent('#globalHistoryConfirmDetail', '参加者全員の表示が更新されます。続ける前に内容を確認してください。', 'All participant views will be refreshed. Review the action before continuing.');
+    setLocalizedTextContent('#globalHistoryConfirmCancel', 'キャンセル', 'Cancel');
+    setLocalizedTextContent('#globalHistoryConfirmConfirm', '全体Undoする', 'Run Shared Undo');
 
     setLocalizedTextContent('#shortcutHelpTitle', 'ショートカット一覧', 'Keyboard Shortcuts');
     setLocalizedTextContent('#closeShortcutHelp', '閉じる', 'Close');
@@ -14406,6 +14772,36 @@
     if (dialog && dialog.open) {
       dialog.close();
     }
+  }
+
+  function setupGlobalHistoryConfirmDialog() {
+    const config = dom.globalHistoryConfirm;
+    if (!config) {
+      return;
+    }
+    const dialog = config.dialog;
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+      if (dialog) {
+        dialog.hidden = true;
+      }
+      return;
+    }
+    config.cancel?.addEventListener('click', () => {
+      closeGlobalHistoryConfirmDialog({ accepted: false });
+    });
+    config.confirm?.addEventListener('click', () => {
+      closeGlobalHistoryConfirmDialog({ accepted: true });
+    });
+    dialog.addEventListener('cancel', event => {
+      event.preventDefault();
+      closeGlobalHistoryConfirmDialog({ accepted: false });
+    });
+    dialog.addEventListener('close', () => {
+      if (globalHistoryConfirmState.closing) {
+        return;
+      }
+      resolveGlobalHistoryConfirm(false);
+    });
   }
 
   async function handleNewProjectSubmit() {
@@ -21521,6 +21917,22 @@
     apply('right');
   }
 
+  function isRailCompactMode(side) {
+    const railNode = getRailNode(side);
+    return railNode instanceof HTMLElement && railNode.dataset.compact === 'true';
+  }
+
+  function getRailExpandedToggleWidth(side) {
+    if (side !== 'left' && side !== 'right') {
+      return RAIL_CLICK_OPEN_WIDTH.left;
+    }
+    const remembered = Math.round(Number(railSizing.expandedWidth?.[side]) || 0);
+    const minimum = side === 'left' && isDualLeftRailEnabled()
+      ? getLeftDualMinTotalWidth()
+      : RAIL_CLICK_OPEN_WIDTH[side];
+    return Math.max(minimum, remembered || minimum);
+  }
+
   function setRailWidth(side, width, { persist = true } = {}) {
     if (side !== 'left' && side !== 'right') {
       return;
@@ -21552,48 +21964,53 @@
       }
       updateRightTabVisibility();
     }
+    if (!isRailCompactMode(side) && railSizing.expandedWidth && typeof railSizing.expandedWidth === 'object') {
+      railSizing.expandedWidth[side] = normalized;
+    }
     updateRailMetrics();
     if (persist) {
       scheduleSessionPersist();
     }
   }
 
-  function openRailFromHandle(side) {
+  function toggleRailFromHandle(side) {
     if (layoutMode === 'mobilePortrait') {
       return;
     }
     if (side !== 'left' && side !== 'right') {
       return;
     }
-
-    const compactMode = side === 'left' ? isCompactToolRailMode() : isCompactRightRailMode();
+    const compactMode = isRailCompactMode(side);
     if (!compactMode) {
+      if (side === 'left') {
+        setCompactToolFlyoutOpen(false);
+        updateToolVisibility();
+      } else {
+        setCompactRightFlyoutOpen(false);
+        updateRightTabVisibility();
+      }
+      setRailWidth(side, RAIL_DEFAULT_WIDTH[side], { persist: true });
       return;
     }
-
-    const currentWidth = Number(railSizing[side]) || RAIL_DEFAULT_WIDTH[side];
-    const leftDualTarget = side === 'left' && isDualLeftRailEnabled()
-      ? getLeftDualMinTotalWidth()
-      : RAIL_CLICK_OPEN_WIDTH[side];
-    const targetWidth = Math.max(currentWidth, leftDualTarget);
-    setRailWidth(side, targetWidth, { persist: true });
-
+    setRailWidth(side, getRailExpandedToggleWidth(side), { persist: true });
+    if (!isRailCompactMode(side)) {
+      if (side === 'left') {
+        setCompactToolFlyoutOpen(false);
+        updateToolVisibility();
+      } else {
+        setCompactRightFlyoutOpen(false);
+        updateRightTabVisibility();
+      }
+      return;
+    }
     if (side === 'left') {
-      if (!isCompactToolRailMode()) {
-        return;
+      if (state.activeLeftTab === 'tools' || isUnifiedLeftToolsColorMode() || isDualLeftRailEnabled()) {
+        setCompactToolFlyoutOpen(!isCompactToolFlyoutOpen(), { force: true });
+        updateToolVisibility();
       }
-      if (state.activeLeftTab !== 'tools') {
-        setLeftTab('tools');
-      }
-      setCompactToolFlyoutOpen(true);
-      updateToolVisibility();
       return;
     }
-
-    if (!isCompactRightRailMode()) {
-      return;
-    }
-    setCompactRightFlyoutOpen(true);
+    setCompactRightFlyoutOpen(!isCompactRightFlyoutOpen());
     updateRightTabVisibility();
   }
 
@@ -21896,7 +22313,7 @@
     }
     endRailResize({ persist: moved });
     if (!moved) {
-      openRailFromHandle(side);
+      toggleRailFromHandle(side);
     }
   }
 
@@ -22241,6 +22658,19 @@
       return;
     }
     if (mobileDrawerState.drag.pointerId !== null && event.pointerId !== mobileDrawerState.drag.pointerId) {
+      return;
+    }
+    const moved = Boolean(mobileDrawerState.drag.moved);
+    if (event.type === 'pointercancel') {
+      endMobileDrawerDrag({ persist: moved });
+      return;
+    }
+    if (!moved) {
+      endMobileDrawerDrag({ persist: false, snap: false });
+      setMobileDrawerMode(
+        normalizeMobileDrawerMode(mobileDrawerState.mode) === 'peek' ? 'full' : 'peek',
+        { persist: true }
+      );
       return;
     }
     endMobileDrawerDrag({ persist: true });
@@ -24151,6 +24581,7 @@
         closeNewProjectDialog();
       });
     }
+    setupGlobalHistoryConfirmDialog();
 
     if (dom.controls.applySpriteScale) {
       dom.controls.applySpriteScale.addEventListener('click', () => {
@@ -24236,8 +24667,12 @@
       scheduleSessionPersist();
     });
 
-    dom.controls.undoAction?.addEventListener('click', () => undo());
-    dom.controls.redoAction?.addEventListener('click', () => redo());
+    dom.controls.undoAction?.addEventListener('click', () => {
+      void runHistoryActionWithGuard('undo');
+    });
+    dom.controls.redoAction?.addEventListener('click', () => {
+      void runHistoryActionWithGuard('redo');
+    });
 
     setupNumberSteppers();
     setupMultiModeControls();
@@ -28575,16 +29010,14 @@
         }
         if (isMultiAssignedCellRestrictedEditorMode()) {
           if (isMultiGuestMode() && Number.isFinite(layerIndex) && layerIndex >= 0) {
-            requestMultiGuestMoveToCell(state.activeFrame, layerIndex).catch(() => {});
             clearTimelineSelection();
-            scheduleSessionPersist();
-            renderTimelineMatrix();
-            requestOverlayRender();
+            if (!scheduleMultiGuestMovePreview(state.activeFrame, layerIndex, { source: 'timeline-layer-tag' })) {
+              renderTimelineMatrix();
+            }
             return;
           }
           enforceGuestAssignedLayerSelection({ announce: true });
           clearTimelineSelection();
-          scheduleSessionPersist();
           renderTimelineMatrix();
           requestOverlayRender();
           return;
@@ -28607,7 +29040,6 @@
         const currentFrame = getActiveFrame();
         const currentLayers = currentFrame ? currentFrame.layers.slice().reverse() : [];
         const activeLayerRow = currentLayers.findIndex(layer => layer.id === state.activeLayer);
-        setTimelineFrameSelection(frameIndex, { append: event.shiftKey });
         if (isMultiAssignedCellRestrictedEditorMode()) {
           if (isMultiGuestMode()) {
             const candidateLayers = state.frames[frameIndex]?.layers?.slice().reverse() || [];
@@ -28616,23 +29048,28 @@
               ? (state.frames[frameIndex]?.layers?.findIndex(layer => layer?.id === nextLayer.id) ?? -1)
               : -1;
             if (nextTrackIndex >= 0) {
-              requestMultiGuestMoveToCell(frameIndex, nextTrackIndex).catch(() => {});
-              scheduleSessionPersist();
-              renderTimelineMatrix();
-              requestRender();
-              requestOverlayRender();
+              clearTimelineSelection();
+              if (!scheduleMultiGuestMovePreview(frameIndex, nextTrackIndex, { source: 'timeline-frame-button' })) {
+                renderTimelineMatrix();
+              }
               return;
             }
           }
           state.activeFrame = frameIndex;
           enforceGuestAssignedLayerSelection({ announce: false });
         } else {
+          setTimelineFrameSelection(frameIndex, { append: event.shiftKey });
           state.activeFrame = frameIndex;
           const candidateLayers = state.frames[frameIndex]?.layers?.slice().reverse() || [];
           const nextLayer = candidateLayers[activeLayerRow] || candidateLayers[candidateLayers.length - 1] || candidateLayers[0];
           if (nextLayer) {
             state.activeLayer = nextLayer.id;
           }
+          scheduleSessionPersist();
+          renderTimelineMatrix();
+          requestRender();
+          requestOverlayRender();
+          return;
         }
         scheduleSessionPersist();
         renderTimelineMatrix();
@@ -28650,18 +29087,15 @@
         }
         if (isMultiAssignedCellRestrictedEditorMode()) {
           if (isMultiGuestMode()) {
-            requestMultiGuestMoveToCell(frameIndex, layerIndex).catch(() => {});
             clearTimelineSelection();
-            scheduleSessionPersist();
-            renderTimelineMatrix();
-            requestRender();
-            requestOverlayRender();
+            if (!scheduleMultiGuestMovePreview(frameIndex, layerIndex, { source: 'timeline-slot' })) {
+              renderTimelineMatrix();
+            }
             return;
           }
           state.activeFrame = frameIndex;
           enforceGuestAssignedLayerSelection({ announce: true });
           clearTimelineSelection();
-          scheduleSessionPersist();
           renderTimelineMatrix();
           requestRender();
           requestOverlayRender();
@@ -28778,6 +29212,8 @@
     const isFrameSelectionMode = timelineSelection.mode === TIMELINE_SELECTION_MODE_FRAME;
     const isSlotSelectionMode = timelineSelection.mode === TIMELINE_SELECTION_MODE_SLOT;
     const multiAssignmentCellMap = buildMultiAssignmentTimelineCellMap();
+    const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
+    const pendingGuestMovePreview = getPendingMultiGuestMovePreview(activeCanvasId);
     const guestMoveMode = isMultiAssignedCellRestrictedEditorMode()
       ? (canCurrentGuestFreelyMoveAssignedCell() ? 'free' : 'request')
       : 'none';
@@ -28816,6 +29252,11 @@
       timelineKeyParts.push('sel:none');
     }
     timelineKeyParts.push(`gm:${guestMoveMode}`);
+    if (pendingGuestMovePreview) {
+      timelineKeyParts.push(`gp:${pendingGuestMovePreview.canvasId}:${pendingGuestMovePreview.frameIndex}:${pendingGuestMovePreview.trackIndex}:${pendingGuestMovePreview.version}`);
+    } else {
+      timelineKeyParts.push('gp:');
+    }
     if (multiAssignmentCellMap.size) {
       const assignmentKey = Array.from(multiAssignmentCellMap.entries())
         .map(([cellKey, value]) => `${cellKey}:${value.clientId}:${value.locked ? 1 : 0}`)
@@ -28917,6 +29358,9 @@
           `Click to request moving to Frame ${frameIndex + 1}`
         );
       }
+      if (pendingGuestMovePreview && pendingGuestMovePreview.frameIndex === frameIndex) {
+        button.classList.add('is-pending-target');
+      }
 
       header.appendChild(button);
       applyTimelineSlotFrame(button, frameIndex === activeFrameIndex ? 'active' : 'default');
@@ -29003,6 +29447,9 @@
             `クリックで レイヤー ${labelName} への移動許可を申請`,
             `Click to request moving to Layer ${labelName}`
           );
+        }
+        if (pendingGuestMovePreview && pendingGuestMovePreview.trackIndex === layerTrackIndex) {
+          tag.classList.add('is-pending-target');
         }
         rowHeader.appendChild(tag);
       } else {
@@ -29151,6 +29598,14 @@
             slot.classList.add('is-active');
             cell.classList.add('is-active-cell');
             isActiveCell = true;
+          }
+          if (
+            pendingGuestMovePreview
+            && pendingGuestMovePreview.frameIndex === frameIndex
+            && pendingGuestMovePreview.trackIndex === layerIndex
+          ) {
+            slot.classList.add('is-pending-target');
+            cell.classList.add('is-pending-target-cell');
           }
           if (isSelectedSlot) {
             slot.classList.add('is-selected');
@@ -30477,17 +30932,20 @@
     const sourceHeight = Math.max(1, Math.round(Number(state.height) || 1));
     const availableWidth = Math.max(1, Math.floor(body.clientWidth));
     const availableHeight = Math.max(1, Math.floor(body.clientHeight));
-    const fitScale = Math.min(availableWidth / sourceWidth, availableHeight / sourceHeight);
-    let drawWidth = sourceWidth;
-    let drawHeight = sourceHeight;
-    if (fitScale >= 1) {
-      const integerScale = Math.max(1, Math.floor(fitScale));
-      drawWidth = sourceWidth * integerScale;
-      drawHeight = sourceHeight * integerScale;
+    const sourceAspect = sourceWidth / sourceHeight;
+    const availableAspect = availableWidth / availableHeight;
+    let drawWidth = availableWidth;
+    let drawHeight = availableHeight;
+    if (availableAspect > sourceAspect) {
+      drawHeight = availableHeight;
+      drawWidth = Math.max(1, Math.round(drawHeight * sourceAspect));
     } else {
-      drawWidth = Math.max(1, Math.floor(sourceWidth * fitScale));
-      drawHeight = Math.max(1, Math.floor(sourceHeight * fitScale));
+      drawWidth = availableWidth;
+      drawHeight = Math.max(1, Math.round(drawWidth / sourceAspect));
     }
+    drawWidth = Math.min(availableWidth, Math.max(1, drawWidth));
+    drawHeight = Math.min(availableHeight, Math.max(1, drawHeight));
+    canvas.style.aspectRatio = `${sourceWidth} / ${sourceHeight}`;
     canvas.style.width = `${drawWidth}px`;
     canvas.style.height = `${drawHeight}px`;
   }
@@ -33077,6 +33535,7 @@
       dom.newProject?.dialog,
       dom.exportDialog?.dialog,
       dom.exportInterstitial?.dialog,
+      dom.globalHistoryConfirm?.dialog,
       dom.shortcutHelp?.dialog,
       dom.updateHistory?.dialog,
       dom.toolSpotlight?.dialog,
@@ -33232,10 +33691,10 @@
       const key = event.key.toLowerCase();
       if (key === 'z' && !event.shiftKey) {
         event.preventDefault();
-        undo();
+        void runHistoryActionWithGuard('undo');
       } else if ((key === 'z' && event.shiftKey) || key === 'y') {
         event.preventDefault();
-        redo();
+        void runHistoryActionWithGuard('redo');
       } else if (key === 'c') {
         const success = performCopyAction();
         if (success) {
@@ -41965,9 +42424,21 @@
   }
 
   function generateMultiProjectKey() {
-    const partA = Math.random().toString(36).slice(2, 6);
-    const partB = Math.random().toString(36).slice(2, 6);
-    return normalizeMultiProjectKey(`room-${partA}-${partB}`);
+    const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    const randomLength = 3;
+    let randomPart = '';
+    if (globalThis.crypto && typeof globalThis.crypto.getRandomValues === 'function') {
+      const bytes = new Uint8Array(randomLength);
+      globalThis.crypto.getRandomValues(bytes);
+      randomPart = Array.from(bytes, byte => alphabet[byte % alphabet.length]).join('');
+    } else {
+      while (randomPart.length < randomLength) {
+        randomPart += Math.random().toString(36).slice(2);
+      }
+      randomPart = randomPart.slice(0, randomLength);
+    }
+    const timePart = Date.now().toString(36).slice(-6).padStart(6, '0');
+    return normalizeMultiProjectKey(`${timePart}-${randomPart}`);
   }
 
   function isMultiMasterMode() {
@@ -42001,6 +42472,17 @@
       return false;
     }
     return multiState.pendingJoinRequests.delete(normalizedClientId);
+  }
+
+  function getPendingMultiJoinRequest(clientId) {
+    if (!(multiState.pendingJoinRequests instanceof Map)) {
+      return null;
+    }
+    const normalizedClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    if (!normalizedClientId) {
+      return null;
+    }
+    return multiState.pendingJoinRequests.get(normalizedClientId) || null;
   }
 
   function getPendingMultiAssignmentMoveRequest(clientId) {
@@ -42152,7 +42634,9 @@
       multiState.joinPolicy,
       MULTI_DEFAULT_JOIN_POLICY
     );
-    const isRequestAreaVisible = canCurrentClientRequestGuestRole() || multiState.joinRequestPending;
+    const inlineRequestHandledByParticipantsList = dom.controls.multiParticipants instanceof HTMLElement;
+    const isRequestAreaVisible = !inlineRequestHandledByParticipantsList
+      && (canCurrentClientRequestGuestRole() || multiState.joinRequestPending);
     if (requestField instanceof HTMLElement) {
       requestField.hidden = !isRequestAreaVisible;
     }
@@ -42324,11 +42808,11 @@
     return true;
   }
 
-  async function approveSelectedMultiJoinRequest() {
+  async function approveMultiJoinRequest(clientId) {
     if (!isMultiMasterMode()) {
       return false;
     }
-    const targetClientId = getSelectedMultiJoinRequestClientId();
+    const targetClientId = typeof clientId === 'string' ? clientId.trim() : '';
     if (!targetClientId) {
       setMultiStatus(
         localizeText(
@@ -42349,11 +42833,15 @@
     return true;
   }
 
-  async function rejectSelectedMultiJoinRequest() {
+  async function approveSelectedMultiJoinRequest() {
+    return approveMultiJoinRequest(getSelectedMultiJoinRequestClientId());
+  }
+
+  async function rejectMultiJoinRequest(clientId) {
     if (!isMultiMasterMode()) {
       return false;
     }
-    const targetClientId = getSelectedMultiJoinRequestClientId();
+    const targetClientId = typeof clientId === 'string' ? clientId.trim() : '';
     if (!targetClientId) {
       setMultiStatus(
         localizeText(
@@ -42376,6 +42864,10 @@
       'info'
     );
     return true;
+  }
+
+  async function rejectSelectedMultiJoinRequest() {
+    return rejectMultiJoinRequest(getSelectedMultiJoinRequestClientId());
   }
 
   function isMultiReplicaRole(role) {
@@ -43326,6 +43818,7 @@
     assignment.frameId = targetFrame.id;
     assignment.frameHint = frameIndex;
     multiState.assignments.set(targetClientId, assignment);
+    pruneMultiHistoryCanvases();
     removePendingMultiAssignmentMoveRequest(targetClientId);
     renderMultiParticipantsList();
     syncMultiAssignmentControls();
@@ -43342,7 +43835,11 @@
     return true;
   }
 
-  async function sendMultiAssignmentMoveRequest(frameIndexRaw, trackIndexRaw) {
+  async function sendMultiAssignmentMoveRequest(frameIndexRaw, trackIndexRaw, {
+    requestVersion = null,
+    announceStatus = true,
+    source = 'timeline',
+  } = {}) {
     if (!canCurrentGuestFreelyMoveAssignedCell()) {
       return false;
     }
@@ -43375,6 +43872,7 @@
       && assignedCell.frameIndex === frameIndex
       && assignedCell.trackIndex === trackIndex
     ) {
+      clearMultiGuestMovePreview();
       state.activeFrame = frameIndex;
       state.activeLayer = assignedCell.layer.id;
       syncControlsWithState();
@@ -43396,23 +43894,34 @@
       canvasId: targetCanvas?.id || '',
       frameIndex,
       trackIndex,
+      requestVersion: Number.isFinite(Number(requestVersion)) ? Math.max(0, Math.round(Number(requestVersion))) : null,
+      source: typeof source === 'string' && source.trim() ? source.trim().slice(0, 32) : 'timeline',
       sentAt: Date.now(),
     });
     if (!sent) {
+      if ((multiState.guestMovePreview?.version || -1) === Math.max(0, Math.round(Number(requestVersion) || -1))) {
+        clearMultiGuestMovePreview({ render: true });
+      }
       setMultiStatus(localizeText('セル移動リクエストの送信に失敗しました', 'Failed to send cell move request'), 'error');
       return false;
     }
-    setMultiStatus(
-      localizeText(
-        `フレーム ${frameIndex + 1} / レイヤー ${trackIndex + 1} への移動リクエストを送信しました`,
-        `Sent a move request to Frame ${frameIndex + 1} / Layer ${trackIndex + 1}`
-      ),
-      'info'
-    );
+    if (announceStatus) {
+      setMultiStatus(
+        localizeText(
+          `フレーム ${frameIndex + 1} / レイヤー ${trackIndex + 1} への移動リクエストを送信しました`,
+          `Sent a move request to Frame ${frameIndex + 1} / Layer ${trackIndex + 1}`
+        ),
+        'info'
+      );
+    }
     return true;
   }
 
-  async function sendMultiAssignmentMovePermissionRequest(frameIndexRaw, trackIndexRaw) {
+  async function sendMultiAssignmentMovePermissionRequest(frameIndexRaw, trackIndexRaw, {
+    requestVersion = null,
+    announceStatus = true,
+    source = 'timeline',
+  } = {}) {
     if (!isMultiGuestMode()) {
       return false;
     }
@@ -43444,6 +43953,7 @@
       && assignedCell.frameIndex === frameIndex
       && assignedCell.trackIndex === trackIndex
     ) {
+      clearMultiGuestMovePreview();
       state.activeFrame = frameIndex;
       state.activeLayer = assignedCell.layer.id;
       syncControlsWithState();
@@ -43462,27 +43972,34 @@
       frameIndex,
       trackIndex,
       mode: 'request',
+      requestVersion: Number.isFinite(Number(requestVersion)) ? Math.max(0, Math.round(Number(requestVersion))) : null,
+      source: typeof source === 'string' && source.trim() ? source.trim().slice(0, 32) : 'timeline',
       sentAt: Date.now(),
     });
     if (!sent) {
+      if ((multiState.guestMovePreview?.version || -1) === Math.max(0, Math.round(Number(requestVersion) || -1))) {
+        clearMultiGuestMovePreview({ render: true });
+      }
       setMultiStatus(localizeText('移動許可申請の送信に失敗しました', 'Failed to send move permission request'), 'error');
       return false;
     }
-    setMultiStatus(
-      localizeText(
-        `フレーム ${frameIndex + 1} / レイヤー ${trackIndex + 1} への移動許可を申請しました`,
-        `Requested permission to move to Frame ${frameIndex + 1} / Layer ${trackIndex + 1}`
-      ),
-      'info'
-    );
+    if (announceStatus) {
+      setMultiStatus(
+        localizeText(
+          `フレーム ${frameIndex + 1} / レイヤー ${trackIndex + 1} への移動許可を申請しました`,
+          `Requested permission to move to Frame ${frameIndex + 1} / Layer ${trackIndex + 1}`
+        ),
+        'info'
+      );
+    }
     return true;
   }
 
-  async function requestMultiGuestMoveToCell(frameIndexRaw, trackIndexRaw) {
+  async function requestMultiGuestMoveToCell(frameIndexRaw, trackIndexRaw, options = {}) {
     if (canCurrentGuestFreelyMoveAssignedCell()) {
-      return sendMultiAssignmentMoveRequest(frameIndexRaw, trackIndexRaw);
+      return sendMultiAssignmentMoveRequest(frameIndexRaw, trackIndexRaw, options);
     }
-    return sendMultiAssignmentMovePermissionRequest(frameIndexRaw, trackIndexRaw);
+    return sendMultiAssignmentMovePermissionRequest(frameIndexRaw, trackIndexRaw, options);
   }
 
   async function sendMultiAssignmentMoveResult(targetClientId, {
@@ -43490,6 +44007,7 @@
     frameIndex = -1,
     trackIndex = -1,
     canvasId = '',
+    requestVersion = null,
   } = {}) {
     if (!isMultiMasterMode()) {
       return false;
@@ -43506,6 +44024,7 @@
       canvasId: normalizeMultiAssignmentCanvasId(canvasId, getActiveProjectCanvasDocument()?.id || ''),
       frameIndex: Number.isFinite(Number(frameIndex)) ? Math.max(0, Math.round(Number(frameIndex))) : -1,
       trackIndex: Number.isFinite(Number(trackIndex)) ? Math.max(0, Math.round(Number(trackIndex))) : -1,
+      requestVersion: Number.isFinite(Number(requestVersion)) ? Math.max(0, Math.round(Number(requestVersion))) : null,
       sentAt: Date.now(),
     });
   }
@@ -43520,24 +44039,27 @@
     const senderClientId = typeof payload.clientId === 'string' ? payload.clientId.trim() : '';
     const projectKey = normalizeMultiProjectKey(payload.projectKey || '');
     const mode = typeof payload.mode === 'string' ? payload.mode.trim() : 'immediate';
+    const requestVersion = Number.isFinite(Number(payload.requestVersion))
+      ? Math.max(0, Math.round(Number(payload.requestVersion)))
+      : null;
     if (!senderClientId || senderClientId === multiState.clientId || projectKey !== multiState.projectKey) {
       return;
     }
     if (isMultiClientBlocked(senderClientId)) {
-      await sendMultiAssignmentMoveResult(senderClientId, { decision: 'blocked' });
+      await sendMultiAssignmentMoveResult(senderClientId, { decision: 'blocked', requestVersion });
       return;
     }
     if (mode === 'immediate' && !normalizeMultiParticipantFreeCellMove(multiState.participantFreeCellMove, false)) {
-      await sendMultiAssignmentMoveResult(senderClientId, { decision: 'disabled' });
+      await sendMultiAssignmentMoveResult(senderClientId, { decision: 'disabled', requestVersion });
       return;
     }
     const assignment = getMultiAssignment(senderClientId);
     if (!assignment || assignment.role !== 'guest') {
-      await sendMultiAssignmentMoveResult(senderClientId, { decision: 'unassigned' });
+      await sendMultiAssignmentMoveResult(senderClientId, { decision: 'unassigned', requestVersion });
       return;
     }
     if (assignment.locked) {
-      await sendMultiAssignmentMoveResult(senderClientId, { decision: 'locked' });
+      await sendMultiAssignmentMoveResult(senderClientId, { decision: 'locked', requestVersion });
       return;
     }
     const payloadCanvasId = normalizeMultiAssignmentCanvasId(
@@ -43548,13 +44070,13 @@
     const frameCount = Array.isArray(targetCanvas?.frames) ? targetCanvas.frames.length : 0;
     const requestedFrameIndex = Math.round(Number(payload.frameIndex));
     if (!frameCount || !Number.isFinite(requestedFrameIndex) || requestedFrameIndex < 0 || requestedFrameIndex >= frameCount) {
-      await sendMultiAssignmentMoveResult(senderClientId, { decision: 'invalid', canvasId: payloadCanvasId });
+      await sendMultiAssignmentMoveResult(senderClientId, { decision: 'invalid', canvasId: payloadCanvasId, requestVersion });
       return;
     }
     const layerCount = Array.isArray(targetCanvas.frames[requestedFrameIndex]?.layers) ? targetCanvas.frames[requestedFrameIndex].layers.length : 0;
     const requestedTrackIndex = Math.round(Number(payload.trackIndex));
     if (!layerCount || !Number.isFinite(requestedTrackIndex) || requestedTrackIndex < 0 || requestedTrackIndex >= layerCount) {
-      await sendMultiAssignmentMoveResult(senderClientId, { decision: 'invalid', canvasId: payloadCanvasId });
+      await sendMultiAssignmentMoveResult(senderClientId, { decision: 'invalid', canvasId: payloadCanvasId, requestVersion });
       return;
     }
     if (mode === 'request') {
@@ -43586,6 +44108,7 @@
         canvasId: targetCanvas.id,
         frameIndex: requestedFrameIndex,
         trackIndex: requestedTrackIndex,
+        requestVersion,
       });
       return;
     }
@@ -43599,6 +44122,7 @@
         canvasId: targetCanvas.id,
         frameIndex: requestedFrameIndex,
         trackIndex: requestedTrackIndex,
+        requestVersion,
       });
       return;
     }
@@ -43607,6 +44131,7 @@
       canvasId: targetCanvas.id,
       frameIndex: requestedFrameIndex,
       trackIndex: requestedTrackIndex,
+      requestVersion,
     });
   }
 
@@ -43627,6 +44152,20 @@
     const targetCanvas = getProjectCanvasDocumentById(payloadCanvasId) || getActiveProjectCanvasDocument();
     const frameIndex = Math.round(Number(payload.frameIndex));
     const trackIndex = Math.round(Number(payload.trackIndex));
+    const requestVersion = Number.isFinite(Number(payload.requestVersion))
+      ? Math.max(0, Math.round(Number(payload.requestVersion)))
+      : null;
+    if (
+      Number.isFinite(requestVersion)
+      && requestVersion !== null
+      && requestVersion > 0
+      && requestVersion < Math.max(0, Math.round(Number(multiState.guestMovePreviewVersion) || 0))
+    ) {
+      return;
+    }
+    if ((multiState.guestMovePreview?.version || -1) === requestVersion) {
+      clearMultiGuestMovePreview();
+    }
     if (decision === 'approved') {
       const frame = targetCanvas && Number.isFinite(frameIndex) ? targetCanvas.frames[frameIndex] : null;
       const targetLayer = frame && Array.isArray(frame.layers) && Number.isFinite(trackIndex)
@@ -43671,23 +44210,56 @@
       return;
     }
     if (decision === 'occupied') {
+      clearMultiGuestMovePreview({ render: true });
       setMultiStatus(localizeText('そのセルは他の参加者が使用中です', 'That cell is already used by another participant'), 'warn');
       return;
     }
     if (decision === 'locked') {
+      clearMultiGuestMovePreview({ render: true });
       setMultiStatus(localizeText('この参加者セルはマスターによってロックされています', 'This participant cell is locked by the master'), 'warn');
       return;
     }
     if (decision === 'disabled') {
+      clearMultiGuestMovePreview({ render: true });
       setMultiStatus(localizeText('この部屋では参加者セルの自由移動はOFFです', 'Participant free cell movement is OFF in this room'), 'warn');
       return;
     }
     if (decision === 'unassigned') {
+      clearMultiGuestMovePreview({ render: true });
       maybeRequestGuestAssignmentSync();
       setMultiStatus(localizeText('割り当てセルを待機中です。マスターの同期を待ってください。', 'Waiting for assigned cell. Please wait for master sync.'), 'warn');
       return;
     }
+    clearMultiGuestMovePreview({ render: true });
     setMultiStatus(localizeText('セル移動に失敗しました', 'Failed to move to the requested cell'), 'warn');
+  }
+
+  async function rejectPendingMultiAssignmentMoveRequest(clientId) {
+    if (!isMultiMasterMode()) {
+      setMultiStatus(localizeText('移動申請の却下はマスターのみ操作できます', 'Only the master can reject move requests'), 'warn');
+      return false;
+    }
+    const targetClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    if (!targetClientId) {
+      setMultiStatus(localizeText('却下する参加者を選択してください', 'Select a participant to reject'), 'warn');
+      return false;
+    }
+    const pendingRequest = getPendingMultiAssignmentMoveRequest(targetClientId);
+    if (!pendingRequest) {
+      setMultiStatus(localizeText('却下する移動申請はありません', 'No pending move request to reject'), 'info');
+      return false;
+    }
+    removePendingMultiAssignmentMoveRequest(targetClientId);
+    renderMultiParticipantsList();
+    syncMultiAssignmentControls();
+    await sendMultiAssignmentMoveResult(targetClientId, {
+      decision: 'denied',
+      canvasId: pendingRequest.canvasId || '',
+      frameIndex: pendingRequest.frameIndex,
+      trackIndex: pendingRequest.trackIndex,
+    });
+    setMultiStatus(localizeText('移動申請を却下しました', 'Move request rejected'), 'info');
+    return true;
   }
 
   async function sendMultiKickClientNotice(targetClientId, reason = 'kicked') {
@@ -43926,6 +44498,146 @@
     return '';
   }
 
+  function appendMultiOverviewChip(container, label, tone = 'neutral') {
+    if (!(container instanceof HTMLElement) || typeof label !== 'string' || !label.trim()) {
+      return;
+    }
+    const chip = document.createElement('span');
+    chip.className = `multi-overview__chip multi-overview__chip--${tone}`;
+    chip.textContent = label.trim();
+    container.appendChild(chip);
+  }
+
+  function renderMultiOverview() {
+    const overview = dom.controls.multiOverview;
+    const chips = dom.controls.multiOverviewChips;
+    const summary = dom.controls.multiOverviewSummary;
+    const hint = dom.controls.multiOverviewHint;
+    if (!(overview instanceof HTMLElement)) {
+      return;
+    }
+    if (chips instanceof HTMLElement) {
+      chips.innerHTML = '';
+    }
+
+    let summaryText = localizeText('部屋を開くか、プロジェクトキーを入力して参加してください。', 'Open a room or enter a project key to join.');
+    let hintText = localizeText('参加者一覧から参加申請、承認、セル移動を操作できます。', 'Use the participant list for join requests, approval, and cell movement.');
+
+    const pushChip = (label, tone = 'neutral') => {
+      if (chips instanceof HTMLElement) {
+        appendMultiOverviewChip(chips, label, tone);
+      }
+    };
+
+    if (multiState.connecting) {
+      const pendingRole = normalizeMultiDesiredRole(multiState.desiredRole);
+      pushChip(localizeText('接続中', 'Connecting'), 'info');
+      pushChip(
+        pendingRole === 'master'
+          ? localizeText('部屋作成', 'Open Room')
+          : (pendingRole === 'guest'
+            ? localizeText('参加申請', 'Join Request')
+            : localizeText('視聴', 'Viewer')),
+        pendingRole === 'master'
+          ? 'master'
+          : (pendingRole === 'guest' ? 'guest' : 'spectator')
+      );
+      summaryText = localizeText('接続中です。参加者一覧とコメント欄を準備しています。', 'Connecting. Preparing the participant list and comments.');
+      hintText = localizeText('接続が完了すると、今の役割に応じた操作内容がここに表示されます。', 'Available actions for your role will appear here after connection.');
+    } else if (isMultiMasterMode()) {
+      pushChip(getMultiRoleLabel('master'), 'master');
+      pushChip(localizeText(`参加枠 ${getAssignedGuestCount()} / ${multiState.maxGuests}`, `Slots ${getAssignedGuestCount()} / ${multiState.maxGuests}`), 'info');
+      pushChip(getMultiJoinPolicyLabel(), 'neutral');
+      pushChip(getMultiRoomVisibilityLabel(), isMultiRoomPublic() ? 'success' : 'neutral');
+      summaryText = localizeText(
+        '参加者一覧から承認、視聴切替、セル移動、ロック、キック、BANを行えます。',
+        'Use the participant list to approve, switch roles, move cells, lock, kick, and ban.'
+      );
+      hintText = localizeText(
+        `部屋設定では ${getMultiJoinPolicyLabel()} / ${getMultiRoomVisibilityLabel()} / 出力 ${getMultiExportPermissionLabel()} を変更できます。`,
+        `Room settings control ${getMultiJoinPolicyLabel()} / ${getMultiRoomVisibilityLabel()} / export ${getMultiExportPermissionLabel()}.`
+      );
+    } else if (isMultiGuestMode()) {
+      const placement = describeMultiParticipantPlacement(multiState.clientId, 'guest');
+      const freeMoveEnabled = canCurrentGuestFreelyMoveAssignedCell();
+      const canExportImage = canCurrentClientExportProject('png');
+      pushChip(getMultiRoleLabel('guest'), 'guest');
+      pushChip(localizeText('描画可', 'Can Draw'), 'success');
+      pushChip(freeMoveEnabled ? localizeText('自由移動ON', 'Free Move ON') : localizeText('固定セル', 'Assigned Cell'), freeMoveEnabled ? 'success' : 'neutral');
+      if (canExportImage) {
+        pushChip(localizeText('画像出力可', 'Can Export'), 'info');
+      }
+      summaryText = localizeText(
+        `描画とコメントができます。担当は ${placement.text} です。`,
+        `You can draw and comment. Your assignment is ${placement.text}.`
+      );
+      if (placement.locked) {
+        hintText = localizeText(
+          '担当セルはロック中です。移動はマスター操作のみです。',
+          'Your assigned cell is locked. Only the master can move it.'
+        );
+      } else if (freeMoveEnabled) {
+        hintText = localizeText(
+          '参加者一覧の自分の行から、空いているセルへ移動できます。',
+          'Use your row in the participant list to move to any free cell.'
+        );
+      } else {
+        hintText = localizeText(
+          'セルを移動したいときは、参加者一覧の自分の行から移動申請を送れます。',
+          'Use your row in the participant list to request a cell move.'
+        );
+      }
+      if (!canExportImage) {
+        hintText += localizeText(' 画像出力は現在制限されています。', ' Image export is currently restricted.');
+      }
+    } else if (isMultiSpectatorMode()) {
+      pushChip(getMultiRoleLabel('spectator'), 'spectator');
+      pushChip(localizeText('コメント可', 'Can Comment'), 'info');
+      pushChip(localizeText('描画不可', 'Read Only'), 'warn');
+      if (multiState.joinRequestPending) {
+        pushChip(localizeText('参加申請中', 'Request Pending'), 'warn');
+        summaryText = localizeText(
+          'コメントと閲覧ができます。参加申請は送信済みで、マスターの承認待ちです。',
+          'You can comment and watch. Your join request has been sent and is waiting for master approval.'
+        );
+        hintText = localizeText(
+          '承認されると自動で参加者へ切り替わります。参加者一覧で状態を確認できます。',
+          'You will switch to participant automatically after approval. Check the participant list for status.'
+        );
+      } else {
+        summaryText = localizeText(
+          'コメントと閲覧ができます。描画したい場合は参加リクエストを送ってください。',
+          'You can comment and watch. Send a join request if you want to draw.'
+        );
+        hintText = localizeText(
+          '参加者一覧の自分の行を開くと、参加リクエストを送れます。',
+          'Open your own row in the participant list to send a join request.'
+        );
+      }
+    } else {
+      const pendingRole = normalizeMultiDesiredRole(multiState.desiredRole);
+      pushChip(
+        pendingRole === 'master'
+          ? localizeText('部屋作成', 'Open Room')
+          : localizeText('参加準備', 'Join Setup'),
+        pendingRole === 'master' ? 'master' : 'neutral'
+      );
+      summaryText = pendingRole === 'master'
+        ? localizeText('部屋を開く準備ができています。接続後は参加者一覧から運営できます。', 'Ready to open a room. After connection, manage participants from the participant list.')
+        : localizeText('参加準備ができています。接続後はまず視聴として入り、必要なら参加申請を送ります。', 'Ready to join. You will enter as a viewer first, then request access if needed.');
+      hintText = pendingRole === 'master'
+        ? localizeText('コメント欄は残したまま、参加者一覧を主操作面として使えます。', 'Comments stay visible while the participant list becomes the main control surface.')
+        : localizeText('描画したい場合は「参加申請して入る」、見るだけなら「視聴で入る」を選びます。', 'Choose request access to draw, or viewer mode if you only want to watch.');
+    }
+
+    if (summary instanceof HTMLElement) {
+      summary.textContent = summaryText;
+    }
+    if (hint instanceof HTMLElement) {
+      hint.textContent = hintText;
+    }
+  }
+
   function setMultiStatus(message, tone = 'info') {
     const text = typeof message === 'string' && message.trim()
       ? message.trim()
@@ -43938,6 +44650,7 @@
     node.textContent = text;
     node.style.color = getMultiStatusColor(tone);
     node.dataset.tone = tone;
+    renderMultiOverview();
   }
 
   async function writeTextToClipboard(text) {
@@ -44285,6 +44998,76 @@
     return view === 'master' || view === 'guest' || view === 'spectator' ? view : 'entry';
   }
 
+  function normalizeMultiFlowTab(tab) {
+    return tab === 'comments' ? 'comments' : 'collab';
+  }
+
+  function getMultiFlowTabButtons() {
+    return [
+      dom.controls.multiFlowTabCollab,
+      dom.controls.multiFlowTabComments,
+    ].filter(button => button instanceof HTMLButtonElement);
+  }
+
+  function setMultiCommentTabNotification(enabled) {
+    const button = dom.controls.multiFlowTabComments;
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    button.classList.toggle('has-notification', Boolean(enabled));
+  }
+
+  function isMultiFlowPanelVisible() {
+    return dom.controls.multiFlowPanel instanceof HTMLElement
+      && !dom.controls.multiFlowPanel.hidden
+      && dom.controls.multiFlowPanel.offsetParent !== null;
+  }
+
+  function isMultiCommentsTabVisible() {
+    return normalizeMultiFlowTab(multiState.activeTab) === 'comments'
+      && isMultiFlowPanelVisible();
+  }
+
+  function updateMultiFlowTabsUi() {
+    const activeTab = normalizeMultiFlowTab(multiState.activeTab);
+    multiState.activeTab = activeTab;
+    const panels = {
+      collab: dom.controls.multiFlowCollabPanel,
+      comments: dom.controls.multiFlowCommentsPanel,
+    };
+    getMultiFlowTabButtons().forEach(button => {
+      const tab = normalizeMultiFlowTab(button.dataset.multiFlowTab || '');
+      const isActive = tab === activeTab;
+      button.classList.toggle('is-active', isActive);
+      button.setAttribute('aria-selected', String(isActive));
+      button.setAttribute('tabindex', isActive ? '0' : '-1');
+      const panel = panels[tab];
+      if (panel instanceof HTMLElement) {
+        panel.hidden = !isActive;
+      }
+    });
+    if (activeTab === 'comments') {
+      setMultiCommentTabNotification(false);
+      setMultiTabNotification(false);
+    }
+  }
+
+  function setMultiFlowTab(tab, { focus = false } = {}) {
+    const nextTab = normalizeMultiFlowTab(tab);
+    const changed = multiState.activeTab !== nextTab;
+    multiState.activeTab = nextTab;
+    updateMultiFlowTabsUi();
+    if (focus) {
+      const button = nextTab === 'comments'
+        ? dom.controls.multiFlowTabComments
+        : dom.controls.multiFlowTabCollab;
+      if (button instanceof HTMLButtonElement) {
+        button.focus();
+      }
+    }
+    return changed;
+  }
+
   function setMultiDesiredRole(role) {
     const normalized = normalizeMultiDesiredRole(role);
     if (multiState.desiredRole === normalized) {
@@ -44574,6 +45357,64 @@
     }));
   }
 
+  function normalizeMultiAssignmentPayloadEntry(entry) {
+    if (!entry || typeof entry !== 'object') {
+      return null;
+    }
+    const clientId = typeof entry.clientId === 'string' ? entry.clientId.trim() : '';
+    const anchorLayerId = typeof entry.anchorLayerId === 'string' ? entry.anchorLayerId.trim() : '';
+    if (!clientId || !anchorLayerId) {
+      return null;
+    }
+    if (isMultiClientBlocked(clientId)) {
+      return null;
+    }
+    return {
+      clientId,
+      role: entry.role === 'master' ? 'master' : 'guest',
+      name: normalizeMultiParticipantName(entry.name, DEFAULT_MULTI_PARTICIPANT_NAME),
+      canvasId: typeof entry.canvasId === 'string' ? entry.canvasId.trim() : '',
+      anchorLayerId,
+      trackHint: Number.isFinite(entry.trackHint) ? Math.max(0, Math.round(entry.trackHint)) : null,
+      frameId: typeof entry.frameId === 'string' ? entry.frameId.trim() : '',
+      frameHint: Number.isFinite(entry.frameHint) ? Math.max(0, Math.round(entry.frameHint)) : null,
+      joinedAt: Number(entry.joinedAt) || Date.now(),
+      locked: Boolean(entry.locked),
+    };
+  }
+
+  function mergeMultiAssignmentFromPayloadEntry(entry) {
+    const normalized = normalizeMultiAssignmentPayloadEntry(entry);
+    if (!normalized) {
+      return null;
+    }
+    const previous = multiState.assignments.get(normalized.clientId) || null;
+    multiState.assignments.set(normalized.clientId, previous
+      ? { ...previous, ...normalized }
+      : normalized);
+    normalizeMultiAssignmentsForCurrentDocument();
+    pruneMultiHistoryCanvases();
+    return multiState.assignments.get(normalized.clientId) || normalized;
+  }
+
+  function mergeMultiSenderAssignmentFromPayload(assignments, senderClientId) {
+    if (!Array.isArray(assignments)) {
+      return null;
+    }
+    const normalizedClientId = typeof senderClientId === 'string' ? senderClientId.trim() : '';
+    if (!normalizedClientId) {
+      return null;
+    }
+    const entry = assignments.find(item => {
+      const clientId = typeof item?.clientId === 'string' ? item.clientId.trim() : '';
+      return clientId === normalizedClientId;
+    }) || null;
+    if (!entry) {
+      return null;
+    }
+    return mergeMultiAssignmentFromPayloadEntry(entry);
+  }
+
   function applyMultiAssignmentsFromPayload(assignments, masterClientId, blockedClientIds = undefined) {
     if (Array.isArray(blockedClientIds)) {
       multiState.blockedClientIds = normalizeMultiBlockedClientIds(blockedClientIds);
@@ -44581,32 +45422,15 @@
     multiState.assignments.clear();
     if (Array.isArray(assignments)) {
       assignments.forEach(entry => {
-        if (!entry || typeof entry !== 'object') {
+        const normalizedEntry = normalizeMultiAssignmentPayloadEntry(entry);
+        if (!normalizedEntry) {
           return;
         }
-        const clientId = typeof entry.clientId === 'string' ? entry.clientId.trim() : '';
-        const anchorLayerId = typeof entry.anchorLayerId === 'string' ? entry.anchorLayerId.trim() : '';
-        if (!clientId || !anchorLayerId) {
-          return;
-        }
-        if (isMultiClientBlocked(clientId)) {
-          return;
-        }
-        multiState.assignments.set(clientId, {
-          clientId,
-          role: entry.role === 'master' ? 'master' : 'guest',
-          name: normalizeMultiParticipantName(entry.name, DEFAULT_MULTI_PARTICIPANT_NAME),
-          canvasId: typeof entry.canvasId === 'string' ? entry.canvasId.trim() : '',
-          anchorLayerId,
-          trackHint: Number.isFinite(entry.trackHint) ? Math.max(0, Math.round(entry.trackHint)) : null,
-          frameId: typeof entry.frameId === 'string' ? entry.frameId.trim() : '',
-          frameHint: Number.isFinite(entry.frameHint) ? Math.max(0, Math.round(entry.frameHint)) : null,
-          joinedAt: Number(entry.joinedAt) || Date.now(),
-          locked: Boolean(entry.locked),
-        });
+        multiState.assignments.set(normalizedEntry.clientId, normalizedEntry);
       });
     }
     normalizeMultiAssignmentsForCurrentDocument();
+    pruneMultiHistoryCanvases();
     multiState.masterClientId = typeof masterClientId === 'string' && masterClientId.trim()
       ? masterClientId.trim()
       : (isMultiMasterMode() ? multiState.clientId : multiState.masterClientId);
@@ -44615,6 +45439,52 @@
     if (isMultiGuestMode()) {
       enforceGuestAssignedLayerSelection({ announce: false });
     }
+  }
+
+  function describeMultiParticipantPlacement(clientId, role, {
+    includeRoleLabel = false,
+  } = {}) {
+    const normalizedClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    const normalizedRole = normalizeMultiRole(role, 'guest');
+    const assignment = normalizedClientId ? getMultiAssignment(normalizedClientId) : null;
+    const assignmentCanvas = getAssignmentCanvasDocument(assignment, getActiveProjectCanvasDocument());
+    const frameIndex = normalizedClientId
+      ? getAssignedFrameIndexForClient(normalizedClientId, assignmentCanvas)
+      : -1;
+    const trackIndex = normalizedClientId
+      ? getAssignedLayerTrackIndexForClient(normalizedClientId, assignmentCanvas)
+      : -1;
+    const parts = [];
+    if (includeRoleLabel && normalizedRole === 'master') {
+      parts.push(localizeText('マスター', 'Master'));
+    }
+    if (assignmentCanvas && getProjectCanvasCount() > 1) {
+      parts.push(assignmentCanvas.name);
+    }
+    if (frameIndex >= 0) {
+      parts.push(localizeText(`フレーム ${frameIndex + 1}`, `Frame ${frameIndex + 1}`));
+    }
+    if (trackIndex >= 0) {
+      parts.push(localizeText(`レイヤー ${trackIndex + 1}`, `Layer ${trackIndex + 1}`));
+    }
+    if (!parts.length) {
+      parts.push(
+        normalizedRole === 'spectator'
+          ? localizeText('視聴中', 'Viewing')
+          : (normalizedRole === 'guest'
+            ? localizeText('参加中', 'Participating')
+            : localizeText('セル未割当', 'No assigned cell'))
+      );
+    }
+    return {
+      assignment,
+      assignmentCanvas,
+      frameIndex,
+      trackIndex,
+      parts,
+      text: parts.join(' / '),
+      locked: Boolean(assignment?.locked),
+    };
   }
 
   function buildMultiParticipantRows() {
@@ -44675,6 +45545,28 @@
     return rows;
   }
 
+  function createMultiParticipantsActionButton(label, onClick, {
+    title = '',
+    disabled = false,
+    className = 'chip',
+  } = {}) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = className;
+    button.textContent = label;
+    if (title) {
+      button.title = title;
+    }
+    button.disabled = Boolean(disabled);
+    if (typeof onClick === 'function') {
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        onClick(event);
+      });
+    }
+    return button;
+  }
+
   function renderMultiParticipantsList() {
     normalizeMultiAssignmentsForCurrentDocument();
     const list = dom.controls.multiParticipants;
@@ -44682,7 +45574,53 @@
       return;
     }
     list.innerHTML = '';
-    const rows = buildMultiParticipantRows();
+    const rows = buildMultiParticipantRows().map(row => ({ ...row }));
+    if (isMultiMasterMode() && multiState.pendingJoinRequests instanceof Map) {
+      multiState.pendingJoinRequests.forEach(request => {
+        if (!request || typeof request !== 'object') {
+          return;
+        }
+        const clientId = typeof request.clientId === 'string' ? request.clientId.trim() : '';
+        if (!clientId) {
+          return;
+        }
+        const existing = rows.find(row => row.clientId === clientId);
+        if (existing) {
+          existing.pendingJoinRequest = true;
+          existing.requestSentAt = Number(request.sentAt) || Date.now();
+          existing.name = existing.name || normalizeMultiParticipantName(request.name, DEFAULT_MULTI_PARTICIPANT_NAME);
+          return;
+        }
+        rows.push({
+          clientId,
+          role: 'spectator',
+          name: normalizeMultiParticipantName(request.name, DEFAULT_MULTI_PARTICIPANT_NAME),
+          online: true,
+          joinedAt: Number(request.sentAt) || Date.now(),
+          locked: false,
+          pendingJoinRequest: true,
+          requestSentAt: Number(request.sentAt) || Date.now(),
+        });
+      });
+    }
+    rows.sort((a, b) => {
+      const getWeight = row => {
+        if (row.role === 'master') return 0;
+        if (row.pendingJoinRequest) return 1;
+        if (row.role === 'guest') return 2;
+        if (row.role === 'spectator') return 3;
+        return 4;
+      };
+      const weightDiff = getWeight(a) - getWeight(b);
+      if (weightDiff !== 0) {
+        return weightDiff;
+      }
+      const joinedDiff = (a.joinedAt || 0) - (b.joinedAt || 0);
+      if (joinedDiff !== 0) {
+        return joinedDiff;
+      }
+      return String(a.clientId).localeCompare(String(b.clientId));
+    });
     if (!rows.length) {
       const empty = document.createElement('li');
       empty.className = 'help-text';
@@ -44695,29 +45633,336 @@
     }
     rows.forEach(row => {
       const li = document.createElement('li');
-      li.className = 'help-text';
+      li.className = 'multi-participant-item';
       const isSelf = row.clientId === multiState.clientId;
-      if (isSelf) {
-        li.classList.add('is-self');
+      const placement = describeMultiParticipantPlacement(row.clientId, row.role, { includeRoleLabel: true });
+      const assignment = placement.assignment;
+      const assignmentCanvas = placement.assignmentCanvas;
+      const frameIndex = placement.frameIndex;
+      const trackIndex = placement.trackIndex;
+      const pendingJoinRequest = Boolean(row.pendingJoinRequest || getPendingMultiJoinRequest(row.clientId));
+      const pendingMoveRequest = getPendingMultiAssignmentMoveRequest(row.clientId);
+      const metaParts = placement.parts.slice();
+
+      const selectRowTarget = () => {
+        if (isMultiMasterMode() && row.clientId && row.clientId !== multiState.clientId) {
+          selectMultiControlTarget(row.clientId);
+        }
+      };
+
+      const body = document.createElement('div');
+      body.className = 'multi-participant-item__body';
+      let hasBody = false;
+
+      const appendBodyBlock = element => {
+        if (!(element instanceof HTMLElement)) {
+          return;
+        }
+        body.appendChild(element);
+        hasBody = true;
+      };
+
+      const actions = document.createElement('div');
+      actions.className = 'multi-participant-item__actions';
+      const appendAction = button => {
+        if (!(button instanceof HTMLButtonElement)) {
+          return;
+        }
+        actions.appendChild(button);
+        hasBody = true;
+      };
+
+      if (isMultiMasterMode() && !isSelf) {
+        if (pendingJoinRequest) {
+          appendAction(
+            createMultiParticipantsActionButton(
+              localizeText('承認', 'Approve'),
+              () => {
+                selectRowTarget();
+                approveMultiJoinRequest(row.clientId).catch(() => {});
+              }
+            )
+          );
+          appendAction(
+            createMultiParticipantsActionButton(
+              localizeText('却下', 'Reject'),
+              () => {
+                selectRowTarget();
+                rejectMultiJoinRequest(row.clientId).catch(() => {});
+              }
+            )
+          );
+        }
+
+        if (row.role === 'guest') {
+          const moveRow = document.createElement('div');
+          moveRow.className = 'multi-participant-item__move';
+          const targetFrameValue = pendingMoveRequest
+            ? pendingMoveRequest.frameIndex + 1
+            : Math.max(1, frameIndex + 1);
+          const targetLayerValue = pendingMoveRequest
+            ? pendingMoveRequest.trackIndex + 1
+            : Math.max(1, trackIndex + 1);
+          const frameField = document.createElement('label');
+          frameField.className = 'multi-participant-item__move-field';
+          const frameFieldLabel = document.createElement('span');
+          frameFieldLabel.textContent = 'F';
+          const frameInput = document.createElement('input');
+          frameInput.type = 'number';
+          frameInput.min = '1';
+          frameInput.step = '1';
+          frameInput.value = String(targetFrameValue);
+          frameField.append(frameFieldLabel, frameInput);
+          const layerField = document.createElement('label');
+          layerField.className = 'multi-participant-item__move-field';
+          const layerFieldLabel = document.createElement('span');
+          layerFieldLabel.textContent = 'L';
+          const layerInput = document.createElement('input');
+          layerInput.type = 'number';
+          layerInput.min = '1';
+          layerInput.step = '1';
+          layerInput.value = String(targetLayerValue);
+          layerField.append(layerFieldLabel, layerInput);
+          const moveButton = createMultiParticipantsActionButton(
+            pendingMoveRequest
+              ? localizeText('申請セルへ移動', 'Move To Requested Cell')
+              : localizeText('セル移動', 'Move Cell'),
+            () => {
+              selectRowTarget();
+              moveMultiParticipantToCell(
+                row.clientId,
+                Math.max(0, Math.round(Number(frameInput.value) || 1) - 1),
+                Math.max(0, Math.round(Number(layerInput.value) || 1) - 1)
+              );
+            }
+          );
+          moveRow.append(frameField, layerField, moveButton);
+          appendBodyBlock(moveRow);
+          if (pendingMoveRequest) {
+            appendAction(
+              createMultiParticipantsActionButton(
+                localizeText('移動申請を却下', 'Reject Move Request'),
+                () => {
+                  selectRowTarget();
+                  rejectPendingMultiAssignmentMoveRequest(row.clientId).catch(() => {});
+                }
+              )
+            );
+          }
+          appendAction(
+            createMultiParticipantsActionButton(
+              row.locked ? localizeText('ロック解除', 'Unlock') : localizeText('セルロック', 'Lock Cell'),
+              () => {
+                selectRowTarget();
+                setMultiParticipantCellLocked(row.clientId, !row.locked);
+              }
+            )
+          );
+          appendAction(
+            createMultiParticipantsActionButton(
+              localizeText('視聴にする', 'Make Viewer'),
+              () => {
+                selectRowTarget();
+                forceMultiParticipantRole(row.clientId, 'spectator').catch(() => {});
+              }
+            )
+          );
+        } else if (row.role === 'spectator' && !pendingJoinRequest) {
+          appendAction(
+            createMultiParticipantsActionButton(
+              localizeText('参加者にする', 'Make Participant'),
+              () => {
+                selectRowTarget();
+                forceMultiParticipantRole(row.clientId, 'guest').catch(() => {});
+              }
+            )
+          );
+        }
+
+        if (row.role !== 'master') {
+          appendAction(
+            createMultiParticipantsActionButton(
+              localizeText('キック', 'Kick'),
+              () => {
+                selectRowTarget();
+                kickMultiParticipant(row.clientId).catch(() => {});
+              }
+            )
+          );
+          appendAction(
+            createMultiParticipantsActionButton(
+              'BAN',
+              () => {
+                selectRowTarget();
+                banMultiParticipant(row.clientId).catch(() => {});
+              }
+            )
+          );
+        }
+      } else if (isSelf && isMultiReplicaRole(multiState.role)) {
+        if (multiState.role === 'spectator') {
+          appendAction(
+            createMultiParticipantsActionButton(
+              multiState.joinRequestPending
+                ? localizeText('参加申請中', 'Request Pending')
+                : localizeText('参加リクエスト', 'Join Request'),
+              () => {
+                sendMultiGuestJoinRequest().catch(() => {});
+              },
+              { disabled: multiState.joinRequestPending || !canCurrentClientRequestGuestRole() }
+            )
+          );
+        } else if (multiState.role === 'guest') {
+          const selfMoveRow = document.createElement('div');
+          selfMoveRow.className = 'multi-participant-item__move';
+          const selfFrameField = document.createElement('label');
+          selfFrameField.className = 'multi-participant-item__move-field';
+          const selfFrameLabel = document.createElement('span');
+          selfFrameLabel.textContent = 'F';
+          const selfFrameInput = document.createElement('input');
+          selfFrameInput.type = 'number';
+          selfFrameInput.min = '1';
+          selfFrameInput.step = '1';
+          selfFrameInput.value = String((pendingMoveRequest?.frameIndex ?? frameIndex) + 1 || 1);
+          selfFrameField.append(selfFrameLabel, selfFrameInput);
+          const selfLayerField = document.createElement('label');
+          selfLayerField.className = 'multi-participant-item__move-field';
+          const selfLayerLabel = document.createElement('span');
+          selfLayerLabel.textContent = 'L';
+          const selfLayerInput = document.createElement('input');
+          selfLayerInput.type = 'number';
+          selfLayerInput.min = '1';
+          selfLayerInput.step = '1';
+          selfLayerInput.value = String((pendingMoveRequest?.trackIndex ?? trackIndex) + 1 || 1);
+          selfLayerField.append(selfLayerLabel, selfLayerInput);
+          const selfMoveButton = createMultiParticipantsActionButton(
+            canCurrentGuestFreelyMoveAssignedCell()
+              ? localizeText('セル移動', 'Move Cell')
+              : localizeText('移動申請', 'Request Move'),
+            () => {
+              const nextFrameIndex = Math.max(0, Math.round(Number(selfFrameInput.value) || 1) - 1);
+              const nextTrackIndex = Math.max(0, Math.round(Number(selfLayerInput.value) || 1) - 1);
+              if (canCurrentGuestFreelyMoveAssignedCell()) {
+                scheduleMultiGuestMovePreview(nextFrameIndex, nextTrackIndex, {
+                  source: 'participants-list',
+                  immediate: true,
+                });
+                return;
+              }
+              requestMultiGuestMoveToCell(nextFrameIndex, nextTrackIndex, {
+                source: 'participants-list',
+              }).catch(() => {});
+            },
+            { disabled: Boolean(row.locked) }
+          );
+          selfMoveRow.append(selfFrameField, selfLayerField, selfMoveButton);
+          appendBodyBlock(selfMoveRow);
+          appendAction(
+            createMultiParticipantsActionButton(
+              localizeText('視聴に戻る', 'Switch To Viewer'),
+              () => {
+                connectMultiSessionAs('spectator').catch(() => {});
+              }
+            )
+          );
+        }
       }
-      const assignment = getMultiAssignment(row.clientId);
-      const assignmentCanvas = getAssignmentCanvasDocument(assignment, getActiveProjectCanvasDocument());
-      const frameIndex = getAssignedFrameIndexForClient(row.clientId, assignmentCanvas);
-      const trackIndex = getAssignedLayerTrackIndexForClient(row.clientId, assignmentCanvas);
-      const canvasLabel = assignmentCanvas && getProjectCanvasCount() > 1
-        ? localizeText(` / ${assignmentCanvas.name}`, ` / ${assignmentCanvas.name}`)
-        : '';
-      const frameLabel = frameIndex >= 0
-        ? localizeText(` / フレーム ${frameIndex + 1}`, ` / Frame ${frameIndex + 1}`)
-        : '';
-      const layerLabel = trackIndex >= 0
-        ? localizeText(` / レイヤー ${trackIndex + 1}`, ` / Layer ${trackIndex + 1}`)
-        : '';
-      const onlineLabel = row.online ? '' : localizeText(' (オフライン)', ' (offline)');
-      const lockedLabel = row.locked ? localizeText(' / ロック中', ' / Locked') : '';
-      li.textContent = `${getMultiRoleLabel(row.role)}: ${row.name}${canvasLabel}${frameLabel}${layerLabel}${lockedLabel}${onlineLabel}`;
+
+      if (actions.childElementCount > 0) {
+        appendBodyBlock(actions);
+      }
+
+      const summary = document.createElement(hasBody ? 'summary' : 'div');
+      summary.className = 'multi-participant-item__summary';
+      if (hasBody) {
+        summary.title = localizeText('開くと操作できます', 'Open to show actions');
+      }
+      const main = document.createElement('span');
+      main.className = 'multi-participant-item__main';
+      const nameLine = document.createElement('span');
+      nameLine.className = 'multi-participant-item__name-line';
+      const name = document.createElement('strong');
+      name.className = 'multi-participant-item__name';
+      name.textContent = row.name || DEFAULT_MULTI_PARTICIPANT_NAME;
+      nameLine.appendChild(name);
+      if (isSelf) {
+        const selfTag = document.createElement('span');
+        selfTag.className = 'multi-participant-item__tag multi-participant-item__tag--self';
+        selfTag.textContent = localizeText('あなた', 'You');
+        nameLine.appendChild(selfTag);
+      }
+      const cell = document.createElement('span');
+      cell.className = 'multi-participant-item__cell';
+      cell.textContent = metaParts.join(' / ');
+      main.append(nameLine, cell);
+      summary.appendChild(main);
+
+      const state = document.createElement('span');
+      state.className = 'multi-participant-item__state';
+      let hasStateTag = false;
+      const appendStateTag = (label, className = '') => {
+        const tag = document.createElement('span');
+        tag.className = className
+          ? `multi-participant-item__tag ${className}`
+          : 'multi-participant-item__tag';
+        tag.textContent = label;
+        state.appendChild(tag);
+        hasStateTag = true;
+      };
+      if (pendingJoinRequest) {
+        appendStateTag(localizeText('参加申請中', 'Join Request'), 'multi-participant-item__tag--request');
+      }
+      if (pendingMoveRequest) {
+        appendStateTag(localizeText(
+          `移動申請 F${pendingMoveRequest.frameIndex + 1}/L${pendingMoveRequest.trackIndex + 1}`,
+          `Move Request F${pendingMoveRequest.frameIndex + 1}/L${pendingMoveRequest.trackIndex + 1}`
+        ), 'multi-participant-item__tag--request');
+      }
+      if (row.locked) {
+        appendStateTag(localizeText('ロック', 'Locked'), 'multi-participant-item__tag--locked');
+      }
+      if (!row.online) {
+        appendStateTag(localizeText('オフライン', 'Offline'));
+      }
+      if (hasStateTag) {
+        summary.appendChild(state);
+      }
+
+      if (hasBody) {
+        const details = document.createElement('details');
+        details.className = 'multi-participant-item__details';
+        if (isSelf) {
+          details.classList.add('is-self');
+        }
+        if (!row.online) {
+          details.classList.add('is-offline');
+        }
+        if (pendingJoinRequest) {
+          details.classList.add('is-pending-request');
+        }
+        if (pendingJoinRequest || pendingMoveRequest || (isSelf && multiState.role === 'spectator')) {
+          details.open = true;
+        }
+        details.append(summary, body);
+        li.appendChild(details);
+      } else {
+        const plain = document.createElement('div');
+        plain.className = 'multi-participant-item__details is-static';
+        if (isSelf) {
+          plain.classList.add('is-self');
+        }
+        if (!row.online) {
+          plain.classList.add('is-offline');
+        }
+        if (pendingJoinRequest) {
+          plain.classList.add('is-pending-request');
+        }
+        plain.appendChild(summary);
+        li.appendChild(plain);
+      }
       list.appendChild(li);
     });
+    renderMultiOverview();
     syncMultiAssignmentControls();
   }
 
@@ -44796,6 +46041,7 @@
       text: commentText,
       sentAt,
     };
+    const isSelfComment = Boolean(clientId) && clientId === multiState.clientId;
     if (!Array.isArray(multiState.comments)) {
       multiState.comments = [];
     }
@@ -44812,10 +46058,15 @@
     // If the client has danmaku disabled, surface a red-dot notification on the multi tab
     try {
       const hasDanmaku = Boolean(state.danmakuEnabled);
-      const multiPanelVisible = dom.controls.multiFlowPanel instanceof HTMLElement ? !dom.controls.multiFlowPanel.hidden : false;
-      const multiTabActive = state.activeRightTab === 'multi';
-      if (!hasDanmaku && !multiPanelVisible && !multiTabActive) {
-        setMultiTabNotification(true);
+      const multiPanelVisible = isMultiFlowPanelVisible();
+      const commentsTabVisible = isMultiCommentsTabVisible();
+      if (!hasDanmaku && !isSelfComment) {
+        if (!multiPanelVisible) {
+          setMultiTabNotification(true);
+        }
+        if (multiPanelVisible && !commentsTabVisible) {
+          setMultiCommentTabNotification(true);
+        }
       }
     } catch (e) {
       /* ignore notification errors */
@@ -44848,14 +46099,21 @@
     const entries = Array.isArray(multiState.comments) ? multiState.comments : [];
     if (!entries.length) {
       const empty = document.createElement('p');
-      empty.className = 'help-text';
+      empty.className = 'help-text multi-comment-empty';
       empty.textContent = localizeText('コメントはまだありません。', 'No comments yet.');
       root.appendChild(empty);
-      // no comments to show — clear notification (user has seen there are none)
-      try { setMultiTabNotification(false); } catch (e) { /* ignore */ }
+      if (isMultiCommentsTabVisible()) {
+        try {
+          setMultiCommentTabNotification(false);
+          setMultiTabNotification(false);
+        } catch (e) {
+          /* ignore */
+        }
+      }
       return;
     }
     const list = document.createElement('ul');
+    list.className = 'multi-comment-thread';
     entries.forEach(entry => {
       const item = document.createElement('li');
       item.className = 'multi-comment-item';
@@ -44867,15 +46125,15 @@
       const avatarSrc = typeof entry.avatarSrc === 'string' && entry.avatarSrc.trim()
         ? entry.avatarSrc.trim()
         : resolvePixieedAvatarSrcFromId(entry.avatarId);
-      const metaRow = document.createElement('div');
-      metaRow.className = 'multi-comment-meta';
-      const authorWrap = document.createElement('span');
-      authorWrap.className = 'multi-comment-author-wrap';
       const avatar = document.createElement('img');
       avatar.className = 'multi-comment-avatar';
       avatar.src = avatarSrc;
       avatar.alt = '';
       avatar.setAttribute('aria-hidden', 'true');
+      const body = document.createElement('div');
+      body.className = 'multi-comment-body';
+      const header = document.createElement('div');
+      header.className = 'multi-comment-header';
       const author = document.createElement('span');
       author.className = 'multi-comment-author';
       if (isSelf) {
@@ -44911,15 +46169,21 @@
       const text = document.createElement('p');
       text.className = 'multi-comment-text';
       text.textContent = entry.text;
-      authorWrap.append(avatar, author);
-      metaRow.append(authorWrap, time);
-      item.append(metaRow, text);
+      header.append(author, time);
+      body.append(header, text);
+      item.append(avatar, body);
       list.appendChild(item);
     });
     root.appendChild(list);
     root.scrollTop = root.scrollHeight;
-    // comments are now visible — clear notification
-    try { setMultiTabNotification(false); } catch (e) { /* ignore */ }
+    if (isMultiCommentsTabVisible()) {
+      try {
+        setMultiCommentTabNotification(false);
+        setMultiTabNotification(false);
+      } catch (e) {
+        /* ignore */
+      }
+    }
   }
 
   // --- Danmaku (コメント弾幕) support ---
@@ -45058,6 +46322,7 @@
       && !multiState.connecting;
     const inMasterConfigMode = isMultiMasterConfigMode();
     syncMultiPanelFlowUi();
+    updateMultiFlowTabsUi();
     const isJoinPanelVisible = isEntryView && multiEntryJoinPanelOpen;
     const isFlowKeyFieldVisible = !isEntryView;
     syncMultiProjectKeyInputValues(multiState.projectKey, { preserveFocused: true });
@@ -45090,7 +46355,10 @@
           ? localizeText('先にプロジェクトキーを入力してください', 'Enter a project key first')
           : localizeText('接続中は切替できません', 'Cannot switch while connected');
       } else {
-        dom.controls.multiEntryJoinAsGuest.title = localizeText('キーで入室し、参加申請を自動送信します', 'Join with key and auto-send join request');
+        dom.controls.multiEntryJoinAsGuest.title = localizeText(
+          'まず視聴として入室し、そのまま参加申請を送信します',
+          'Enter as a viewer first, then send a join request'
+        );
       }
     }
     if (dom.controls.multiEntrySpectator instanceof HTMLButtonElement) {
@@ -45314,6 +46582,7 @@
     if (dom.controls.multiCommentSend instanceof HTMLButtonElement) {
       dom.controls.multiCommentSend.disabled = !canSendComment;
     }
+    renderMultiOverview();
     if (dom.controls.exportProject instanceof HTMLButtonElement) {
       const canExport = !multiState.connecting && canCurrentClientExportProject('png');
       dom.controls.exportProject.disabled = !canExport;
@@ -45795,12 +47064,204 @@
     multiState.pendingBroadcastTargetClientId = '';
   }
 
+  function clearMultiGuestMovePreview({ render = false } = {}) {
+    if (multiState.guestMovePreviewTimer !== null) {
+      window.clearTimeout(multiState.guestMovePreviewTimer);
+      multiState.guestMovePreviewTimer = null;
+    }
+    multiState.guestMovePreview = null;
+    if (render) {
+      renderTimelineMatrix();
+      requestOverlayRender();
+    }
+  }
+
+  function getPendingMultiGuestMovePreview(canvasId = getActiveProjectCanvasDocument()?.id || '') {
+    const preview = multiState.guestMovePreview;
+    if (!preview || typeof preview !== 'object') {
+      return null;
+    }
+    if (!isMultiGuestMode() || !canCurrentGuestFreelyMoveAssignedCell()) {
+      return null;
+    }
+    const previewCanvasId = normalizeMultiAssignmentCanvasId(preview.canvasId, canvasId || '');
+    const normalizedCanvasId = normalizeMultiAssignmentCanvasId(canvasId, previewCanvasId || '');
+    if (normalizedCanvasId && previewCanvasId && normalizedCanvasId !== previewCanvasId) {
+      return null;
+    }
+    const frameIndex = Math.round(Number(preview.frameIndex));
+    const trackIndex = Math.round(Number(preview.trackIndex));
+    const version = Math.round(Number(preview.version));
+    if (!Number.isFinite(frameIndex) || frameIndex < 0 || !Number.isFinite(trackIndex) || trackIndex < 0 || !Number.isFinite(version) || version < 0) {
+      return null;
+    }
+    return {
+      canvasId: previewCanvasId || normalizedCanvasId || '',
+      frameIndex,
+      trackIndex,
+      version,
+      source: typeof preview.source === 'string' ? preview.source : 'timeline',
+    };
+  }
+
+  function setMultiGuestMovePreview(frameIndex, trackIndex, {
+    canvasId = getActiveProjectCanvasDocument()?.id || '',
+    source = 'timeline',
+  } = {}) {
+    const normalizedCanvasId = normalizeMultiAssignmentCanvasId(canvasId, getActiveProjectCanvasDocument()?.id || '');
+    const nextPreview = {
+      canvasId: normalizedCanvasId,
+      frameIndex: Math.max(0, Math.round(Number(frameIndex) || 0)),
+      trackIndex: Math.max(0, Math.round(Number(trackIndex) || 0)),
+      version: Math.max(0, Math.round(Number(multiState.guestMovePreviewVersion) || 0)) + 1,
+      source: typeof source === 'string' && source.trim() ? source.trim() : 'timeline',
+    };
+    multiState.guestMovePreviewVersion = nextPreview.version;
+    multiState.guestMovePreview = nextPreview;
+    return nextPreview;
+  }
+
+  function scheduleMultiGuestMovePreview(frameIndexRaw, trackIndexRaw, {
+    canvasId = getActiveProjectCanvasDocument()?.id || '',
+    source = 'timeline',
+    immediate = false,
+  } = {}) {
+    if (!isMultiGuestMode()) {
+      return false;
+    }
+    if (!canCurrentGuestFreelyMoveAssignedCell()) {
+      requestMultiGuestMoveToCell(frameIndexRaw, trackIndexRaw, {
+        source,
+        announceStatus: true,
+      }).catch(() => {});
+      return true;
+    }
+    const targetCanvas = getProjectCanvasDocumentById(
+      normalizeMultiAssignmentCanvasId(canvasId, getActiveProjectCanvasDocument()?.id || '')
+    ) || getActiveProjectCanvasDocument();
+    const frameCount = Array.isArray(targetCanvas?.frames) ? targetCanvas.frames.length : 0;
+    if (!frameCount) {
+      return false;
+    }
+    const assignment = getMultiAssignment(multiState.clientId);
+    if (!assignment) {
+      maybeRequestGuestAssignmentSync();
+      setMultiStatus(localizeText('割り当てセルを待機中です。マスターの同期を待ってください。', 'Waiting for assigned cell. Please wait for master sync.'), 'warn');
+      return false;
+    }
+    if (assignment.locked) {
+      setMultiStatus(localizeText('この参加者セルはマスターによってロックされています', 'This participant cell is locked by the master'), 'warn');
+      return false;
+    }
+    const frameIndex = clamp(Math.round(Number(frameIndexRaw) || 0), 0, frameCount - 1);
+    const layerCount = Array.isArray(targetCanvas.frames[frameIndex]?.layers) ? targetCanvas.frames[frameIndex].layers.length : 0;
+    if (!layerCount) {
+      setMultiStatus(localizeText('指定セルへ移動できませんでした', 'Failed to move to the specified cell'), 'warn');
+      return false;
+    }
+    const trackIndex = clamp(Math.round(Number(trackIndexRaw) || 0), 0, layerCount - 1);
+    const assignedCell = getAssignedCellForClient(multiState.clientId);
+    if (
+      assignedCell
+      && assignedCell.canvasId === (targetCanvas?.id || '')
+      && assignedCell.frameIndex === frameIndex
+      && assignedCell.trackIndex === trackIndex
+    ) {
+      clearMultiGuestMovePreview();
+      state.activeFrame = frameIndex;
+      state.activeLayer = assignedCell.layer.id;
+      syncControlsWithState();
+      renderFrameList();
+      renderLayerList();
+      renderTimelineMatrix();
+      scheduleSessionPersist();
+      requestRender();
+      requestOverlayRender();
+      return true;
+    }
+    if (isMultiAssignmentCellOccupied(frameIndex, trackIndex, multiState.clientId, targetCanvas)) {
+      setMultiStatus(localizeText('そのセルは他の参加者が使用中です', 'That cell is already used by another participant'), 'warn');
+      return false;
+    }
+    const currentPreview = getPendingMultiGuestMovePreview(targetCanvas?.id || '');
+    const nextPreview = currentPreview
+      && currentPreview.frameIndex === frameIndex
+      && currentPreview.trackIndex === trackIndex
+      ? currentPreview
+      : setMultiGuestMovePreview(frameIndex, trackIndex, {
+        canvasId: targetCanvas?.id || '',
+        source,
+      });
+    renderTimelineMatrix();
+    if (multiState.guestMovePreviewTimer !== null) {
+      window.clearTimeout(multiState.guestMovePreviewTimer);
+      multiState.guestMovePreviewTimer = null;
+    }
+    const dispatchMove = () => {
+      const preview = getPendingMultiGuestMovePreview(targetCanvas?.id || '');
+      if (!preview || preview.version !== nextPreview.version) {
+        return;
+      }
+      requestMultiGuestMoveToCell(preview.frameIndex, preview.trackIndex, {
+        requestVersion: preview.version,
+        source,
+        announceStatus: false,
+      }).catch(() => {
+        if ((multiState.guestMovePreview?.version || -1) === preview.version) {
+          clearMultiGuestMovePreview({ render: true });
+        }
+      });
+    };
+    if (immediate) {
+      dispatchMove();
+      return true;
+    }
+    multiState.guestMovePreviewTimer = window.setTimeout(() => {
+      multiState.guestMovePreviewTimer = null;
+      dispatchMove();
+    }, MULTI_GUEST_MOVE_PREVIEW_DEBOUNCE_MS);
+    return true;
+  }
+
   function clearMultiGuestStateRecovery() {
     if (multiState.guestStateRecoveryTimer !== null) {
       window.clearTimeout(multiState.guestStateRecoveryTimer);
       multiState.guestStateRecoveryTimer = null;
     }
     multiState.awaitingGuestStateRecovery = false;
+  }
+
+  async function sendGuestRecoveryStateToMaster(targetClientId, {
+    reason = MULTI_MASTER_RECOVERY_REASON,
+    canvasId = '',
+    force = false,
+  } = {}) {
+    if (!isMultiReplicaRole(multiState.role) || !multiState.connected || !multiState.channel) {
+      return false;
+    }
+    const normalizedTargetClientId = typeof targetClientId === 'string' ? targetClientId.trim() : '';
+    if (!normalizedTargetClientId || normalizedTargetClientId === multiState.clientId) {
+      return false;
+    }
+    const now = Date.now();
+    if (
+      !force
+      && multiState.guestRecoveryTargetClientId === normalizedTargetClientId
+      && (now - Number(multiState.guestRecoveryPushAt || 0)) < MULTI_GUEST_RECOVERY_PUSH_THROTTLE_MS
+    ) {
+      return false;
+    }
+    const payload = buildGuestSessionStatePayload({
+      targetClientId: normalizedTargetClientId,
+      reason,
+      canvasId,
+    });
+    const sent = await sendMultiBroadcast('guest-session-state', payload);
+    if (sent) {
+      multiState.guestRecoveryPushAt = now;
+      multiState.guestRecoveryTargetClientId = normalizedTargetClientId;
+    }
+    return sent;
   }
 
   function maybeRequestGuestAssignmentSync() {
@@ -45946,6 +47407,7 @@
       clientId: multiState.clientId,
       projectKey: multiState.projectKey,
       targetClientId: '',
+      reason: MULTI_MASTER_RECOVERY_REASON,
       sentAt: Date.now(),
     });
     multiState.guestStateRecoveryTimer = window.setTimeout(() => {
@@ -46449,6 +47911,7 @@
       history.past = [];
       history.future = [];
       history.pending = null;
+      clearMultiHistory();
       updateHistoryButtons();
       if (isMultiGuestMode() || isMultiSpectatorMode()) {
         state.scale = normalizeZoomScale(preserved.scale, state.scale);
@@ -46485,7 +47948,7 @@
   }
 
   // Apply a history snapshot only to the cells that clientId can currently edit.
-  function applyHistorySnapshotForClient(snapshot, clientId, { preserveView = false, canvasId = '' } = {}) {
+  function applyHistorySnapshotForClient(snapshot, clientId, { preserveView = false, canvasId = '', restoreSelection = false } = {}) {
     if (!snapshot || typeof snapshot !== 'object') return false;
     if (!clientId) return false;
     const resolvedCanvasId = normalizeMultiHistoryCanvasId(
@@ -46520,6 +47983,25 @@
         targetLayer.direct = new Uint8ClampedArray(srcLayer.direct);
       } else {
         targetLayer.direct = null;
+      }
+      if (restoreSelection && targetCanvas.id === (getActiveProjectCanvasDocument()?.id || '')) {
+        if (typeof snapshotCanvas.activeFrame === 'number') {
+          targetCanvas.activeFrame = clamp(Number(snapshotCanvas.activeFrame) || 0, 0, Math.max(0, targetCanvas.frames.length - 1));
+        }
+        if (typeof snapshotCanvas.activeLayer === 'string') {
+          targetCanvas.activeLayer = snapshotCanvas.activeLayer;
+        }
+        state.selectionMask = snapshotCanvas.selectionMask ? new Uint8Array(snapshotCanvas.selectionMask) : null;
+        state.selectionContentMask = snapshotCanvas.selectionContentMask ? new Uint8Array(snapshotCanvas.selectionContentMask) : null;
+        state.selectionBounds = snapshotCanvas.selectionBounds ? { ...snapshotCanvas.selectionBounds } : null;
+        state.pendingPasteMoveState = null;
+        pointerState.selectionMove = null;
+        selectionTransformUi.interaction = null;
+        hideSelectionTransformMenu();
+        updateCanvasControlButtons();
+        syncControlsWithState();
+        renderFrameList();
+        renderLayerList();
       }
       markRemoteMultiStateDirty();
       requestRender();
@@ -46560,6 +48042,9 @@
       payload.participantFreeCellMove,
       multiState.participantFreeCellMove
     );
+    if (!isMultiGuestMode() || !canCurrentGuestFreelyMoveAssignedCell()) {
+      clearMultiGuestMovePreview();
+    }
     multiState.exportPermission = normalizeMultiExportPermission(
       payload.exportPermission,
       multiState.exportPermission
@@ -46918,6 +48403,9 @@
     if (!isMultiMasterMode()) {
       if (onlineMaster && previousMasterClientId !== onlineMaster.clientId) {
         setMultiStatus(`共有モード: マスター接続中 (${multiState.projectKey})`, 'info');
+        if (isMultiGuestMode()) {
+          sendGuestRecoveryStateToMaster(onlineMaster.clientId).catch(() => {});
+        }
       } else if (!onlineMaster && previousMasterClientId) {
         setMultiStatus(localizeText('共有モード: マスター不在。更新の受信待ちです', 'Collab mode: master is offline. Waiting for updates.'), 'warn');
       }
@@ -47090,6 +48578,7 @@
         : '共有モード: マスターにより視聴者へ切替中…',
       'info'
     );
+    clearMultiGuestMovePreview();
     multiState.joinRequestPending = false;
     await connectMultiSessionAs(nextRole, { allowGuestJoin: nextRole === 'guest' });
   }
@@ -47155,8 +48644,13 @@
       return;
     }
     if (!isMultiMasterMode() && payload.role === 'master') {
+      const shouldPushRecoveryState = isMultiReplicaRole(multiState.role)
+        && multiState.masterClientId !== senderClientId;
       multiState.masterClientId = senderClientId;
       renderMultiParticipantsList();
+      if (shouldPushRecoveryState) {
+        sendGuestRecoveryStateToMaster(senderClientId).catch(() => {});
+      }
     }
   }
 
@@ -47217,7 +48711,7 @@
   }
 
   async function handleMultiMasterStateRequestMessage(payload) {
-    if (!isMultiGuestMode()) {
+    if (!isMultiReplicaRole(multiState.role)) {
       return;
     }
     if (!payload || typeof payload !== 'object') {
@@ -47266,10 +48760,9 @@
       return;
     }
     const responseReason = typeof payload.reason === 'string' ? payload.reason.trim() : '';
-    if (!multiState.awaitingGuestStateRecovery) {
-      if (responseReason !== 'layer-resync') {
-        return;
-      }
+    const usePartialApply = responseReason === 'layer-resync';
+    if (usePartialApply) {
+      mergeMultiSenderAssignmentFromPayload(payload.assignments, senderClientId);
       let snapshot = null;
       try {
         snapshot = deserializeDocumentPayload(payload.document);
@@ -47287,6 +48780,12 @@
       scheduleMultiSessionStateBroadcast({ immediate: true });
       return;
     }
+    if (responseReason === MULTI_MASTER_RECOVERY_REASON && !multiState.awaitingGuestStateRecovery) {
+      return;
+    }
+    if (!multiState.awaitingGuestStateRecovery) {
+      return;
+    }
     multiState.maxGuests = normalizeMultiMaxGuests(payload.maxGuests, multiState.maxGuests);
     multiState.roomVisibility = normalizeMultiRoomVisibility(
       payload.roomVisibility,
@@ -47300,6 +48799,9 @@
       payload.participantFreeCellMove,
       multiState.participantFreeCellMove
     );
+    if (!isMultiGuestMode() || !canCurrentGuestFreelyMoveAssignedCell()) {
+      clearMultiGuestMovePreview();
+    }
     multiState.exportPermission = normalizeMultiExportPermission(
       payload.exportPermission,
       multiState.exportPermission
@@ -47629,12 +49131,14 @@
     clearMultiLayerPatchSnapshots();
     clearMultiLayerPatchSendTimers();
     clearMultiGuestStateRecovery();
+    clearMultiGuestMovePreview();
     clearMultiHistory();
     const channel = multiState.channel;
     multiState.channel = null;
     multiState.connected = false;
     multiState.connecting = false;
     multiState.role = 'none';
+    multiState.activeTab = 'collab';
     multiState.masterClientId = null;
     multiState.assignments.clear();
     multiState.participants.clear();
@@ -47648,6 +49152,8 @@
     multiState.joinRequestPending = false;
     multiState.joinRequestCooldownUntil = 0;
     multiState.assignmentSyncRequestAt = 0;
+    multiState.guestRecoveryPushAt = 0;
+    multiState.guestRecoveryTargetClientId = '';
     multiState.applyRemoteInProgress = false;
     multiState.uiView = 'entry';
     multiEntryJoinPanelOpen = false;
@@ -47658,6 +49164,8 @@
     multiState.resumeJoinPolicy = null;
     multiState.resumeParticipantFreeCellMove = null;
     multiState.resumeExportPermission = null;
+    setMultiTabNotification(false);
+    setMultiCommentTabNotification(false);
     multiState.roomVisibility = MULTI_DEFAULT_ROOM_VISIBILITY;
     multiState.joinPolicy = MULTI_DEFAULT_JOIN_POLICY;
     multiState.participantFreeCellMove = false;
@@ -47842,6 +49350,8 @@
       clearMultiComments();
       multiState.joinRequestPending = false;
       multiState.assignmentSyncRequestAt = 0;
+      multiState.guestRecoveryPushAt = 0;
+      multiState.guestRecoveryTargetClientId = '';
       multiState.awaitingGuestStateRecovery = false;
       if (multiState.guestStateRecoveryTimer !== null) {
         window.clearTimeout(multiState.guestStateRecoveryTimer);
@@ -47970,7 +49480,7 @@
       return;
     }
     if (isMultiMasterMode()) {
-      if (HISTORY_DRAW_TOOLS.has(_label)) {
+      if (MULTI_LAYER_PATCH_HISTORY_LABELS.has(_label)) {
         markMultiPublicLobbyThumbnailDirty();
         scheduleMasterLayerPatchSend();
         scheduleMultiPublicLobbyRoomSync({ immediate: false });
@@ -48396,6 +49906,16 @@
       }
       scheduleMultiEntryScreenMetricsUpdate();
     }
+    getMultiFlowTabButtons().forEach(button => {
+      if (!(button instanceof HTMLButtonElement) || button.dataset.bound === 'true') {
+        return;
+      }
+      button.dataset.bound = 'true';
+      bindTabKeyboardNavigation(button, getMultiFlowTabButtons);
+      button.addEventListener('click', () => {
+        setMultiFlowTab(button.dataset.multiFlowTab || '');
+      });
+    });
     if (dom.controls.multiStartSession instanceof HTMLButtonElement && dom.controls.multiStartSession.dataset.bound !== 'true') {
       dom.controls.multiStartSession.dataset.bound = 'true';
       dom.controls.multiStartSession.addEventListener('click', () => {
