@@ -3,20 +3,29 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no, viewport-fit=cover"/>
-  <meta name="robots" content="noai,noimageai,nosnippet,noarchive"/>
-  <title>ドット作品</title>
-  <meta name="description" content="ドット絵制作・pixel art commission、ブラウザゲーム用アセット、ツールとゲームをまとめたPiXiEED公式サイト。"/>
+  <meta name="robots" content="noai,noimageai,noarchive"/>
+  <title>広場の作品 | PiXiEED</title>
+  <meta name="description" content="PiXiEED広場の作品詳細ページ。投稿されたドット絵やGIFの詳細、作者、関連作品を確認できます。"/>
+  <link rel="canonical" href="https://pixieed.jp/contest/view.html"/>
   <meta property="og:type" content="website"/>
   <meta property="og:site_name" content="PiXiEED"/>
-  <meta property="og:title" content="PiXiEED | ドット絵専用総合サイト"/>
-  <meta property="og:description" content="ドット絵制作の外注・pixel art commission、ブラウザゲーム用アセット制作、ツールとゲームを紹介するPiXiEED公式サイト。"/>
+  <meta property="og:title" content="広場の作品 | PiXiEED"/>
+  <meta property="og:description" content="PiXiEED広場の作品詳細ページ。投稿されたドット絵やGIFの詳細、作者、関連作品を確認できます。"/>
   <meta property="og:url" content="https://pixieed.jp/contest/view.html"/>
   <meta property="og:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
+  <meta property="og:locale" content="ja_JP"/>
   <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:site" content="@PiXiEED_arta"/>
+  <meta name="twitter:url" content="https://pixieed.jp/contest/view.html"/>
+  <meta name="twitter:title" content="広場の作品 | PiXiEED"/>
+  <meta name="twitter:description" content="PiXiEED広場の作品詳細ページ。投稿されたドット絵やGIFの詳細、作者、関連作品を確認できます。"/>
+  <meta name="twitter:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
   <link rel="icon" type="image/png" href="../character-dots/mao1.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
+  <script src="../scripts/ads-lazy.js"></script>
   <style>
     :root{ color-scheme: dark; }
     *{
@@ -386,6 +395,30 @@
       gap:8px;
       flex-wrap:wrap;
       min-height:18px;
+    }
+    .author-avatar{
+      width:24px;
+      height:24px;
+      border-radius:999px;
+      overflow:hidden;
+      flex:0 0 24px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      background:rgba(148, 163, 184, 0.2);
+      border:1px solid rgba(255,255,255,0.14);
+      color:#f8fafc;
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:0.02em;
+    }
+    .author-avatar img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
     }
     .author{ margin:0; color:#cbd5e1; font-size:13px; }
     .author a{
@@ -920,13 +953,24 @@
         <button class="load-more-btn" id="relatedLoadMoreBtn" type="button">続きを見る</button>
       </div>
     </section>
+    <section class="card" aria-label="広告">
+      <div class="entry-ad-slot">
+        <ins class="adsbygoogle"
+             style="display:block"
+             data-ad-client="ca-pub-9801602250480253"
+             data-ad-slot="rotate"
+             data-ad-format="auto"
+             data-full-width-responsive="true"></ins>
+      </div>
+      <p class="entry-ad-note">広告</p>
+    </section>
   </div>
   <nav class="bottom-nav">
     <a class="bottom-nav__item" data-tab="home" href="../index.html">
       <span class="icon"><img src="../FooterIcon1.png" alt=""/></span><span>ホーム</span>
     </a>
     <a class="bottom-nav__item" data-tab="contest" href="../contest/index.html">
-      <span class="icon"><img src="../FooterIcon2.png" alt=""/></span><span>コンテスト</span>
+      <span class="icon"><img src="../FooterIcon2.png" alt=""/></span><span>広場</span>
     </a>
 
     <a class="bottom-nav__item" data-tab="tools" href="../tools.html">
@@ -1068,11 +1112,15 @@
     let supportsVideoColumns = true;
     let supportsStorageUploads = true;
     let supportsXUrl = true;
+    let supportsEntryAvatar = true;
+    let supportsSyncedProfileNickname = true;
+    let supportsSyncedProfileAvatar = true;
     let supportsProfileXUrl = true;
     let relatedOffset = 0;
     let relatedHasMore = false;
     let relatedLoading = false;
     let entryLoaded = false;
+    const syncedProfiles = new Map();
     const ENTRY_SELECT_WITH_URL = 'id,client_id,user_id,name,title,width,height,colors,image_url,thumb_url,image_base64,submitted_at,mode,tags,prompt,allow_download,download_passcode';
     const ENTRY_SELECT_BASE = 'id,client_id,user_id,name,title,width,height,colors,image_base64,submitted_at,mode,tags,prompt,allow_download,download_passcode';
     const RELATED_SELECT_WITH_URL = 'id,name,title,submitted_at,mode,image_url,thumb_url';
@@ -1546,6 +1594,7 @@
       }
       applyAvatarToBrand();
       renderAvatarChoices();
+      refreshCurrentEntryAuthor();
     }
 
     function loadAvatar(){
@@ -1622,6 +1671,7 @@
           markProfileDirty('avatar');
           renderAvatarChoices();
           applyAvatarToBrand();
+          refreshCurrentEntryAuthor();
           const panel = document.getElementById('avatarPanel');
           const toggle = document.getElementById('avatarToggle');
           if(panel){
@@ -1841,6 +1891,146 @@
       return `<div class="entry-watermark-layer" aria-hidden="true">${generatedTextureMarkup}${textureMarkup}${marks.join('')}${microMarks.join('')}</div>`;
     }
 
+    function resolveAvatarImageSrc(avatarId){
+      const id = String(avatarId || '').trim();
+      if(!id) return '';
+      const found = AVATARS.find(item => item.id === id);
+      return found?.src || '';
+    }
+
+    function getSyncedProfile(entryData){
+      const userId = String(entryData?.user_id || '').trim();
+      if(!userId) return null;
+      return syncedProfiles.get(userId) || null;
+    }
+
+    async function syncProfileForEntry(entryData){
+      const userId = String(entryData?.user_id || '').trim();
+      if(!userId || syncedProfiles.has(userId)) return;
+      const buildSelectColumns = () => {
+        const columns = ['id'];
+        if(supportsSyncedProfileNickname) columns.push('nickname');
+        if(supportsSyncedProfileAvatar) columns.push('avatar');
+        return columns.join(',');
+      };
+      try{
+        const rows = await supabaseSelect('user_profiles', {
+          eq: { id: userId },
+          limit: 1,
+          select: buildSelectColumns()
+        });
+        const profile = Array.isArray(rows) && rows.length ? rows[0] : null;
+        syncedProfiles.set(userId, {
+          nickname: typeof profile?.nickname === 'string' ? profile.nickname.trim() : '',
+          avatar: typeof profile?.avatar === 'string' ? profile.avatar.trim() : '',
+        });
+      }catch(err){
+        const errorMsg = String(err?.message || '').toLowerCase();
+        if(supportsSyncedProfileAvatar && errorMsg.includes('avatar')){
+          supportsSyncedProfileAvatar = false;
+          await syncProfileForEntry(entryData);
+          return;
+        }
+        if(supportsSyncedProfileNickname && errorMsg.includes('nickname')){
+          supportsSyncedProfileNickname = false;
+          await syncProfileForEntry(entryData);
+          return;
+        }
+        console.warn('profile fetch skipped', err);
+      }
+    }
+
+    function isEntryOwnedByCurrentUser(entryData){
+      if(!entryData) return false;
+      if(entryData.user_id && supabaseUser?.id){
+        return entryData.user_id === supabaseUser.id;
+      }
+      return Boolean(entryData.client_id && clientId && entryData.client_id === clientId);
+    }
+
+    function getEntryDisplayName(entryData){
+      if(isEntryOwnedByCurrentUser(entryData)){
+        return loadNickname() || entryData?.name || '名無し';
+      }
+      const syncedProfile = getSyncedProfile(entryData);
+      return syncedProfile?.nickname || entryData?.name || '名無し';
+    }
+
+    function getEntryDisplayAvatarSrc(entryData){
+      const syncedProfile = getSyncedProfile(entryData);
+      const avatarId = isEntryOwnedByCurrentUser(entryData)
+        ? loadAvatar()
+        : (syncedProfile?.avatar || entryData?.avatar || '');
+      return resolveAvatarImageSrc(avatarId) || resolveAvatarImageSrc('mao');
+    }
+
+    function getEntryAvatarFallbackLabel(entryData){
+      const name = getEntryDisplayName(entryData);
+      return String(name || '?').trim().charAt(0) || '?';
+    }
+
+    function upsertMeta(selector, attributes, content){
+      let node = document.head.querySelector(selector);
+      if(!node){
+        node = document.createElement('meta');
+        Object.entries(attributes).forEach(([key, value]) => {
+          node.setAttribute(key, value);
+        });
+        document.head.appendChild(node);
+      }
+      node.setAttribute('content', content);
+    }
+
+    function upsertCanonical(href){
+      let link = document.head.querySelector('link[rel="canonical"]');
+      if(!link){
+        link = document.createElement('link');
+        link.setAttribute('rel', 'canonical');
+        document.head.appendChild(link);
+      }
+      link.setAttribute('href', href);
+    }
+
+    function buildEntryMetaDescription(entryData){
+      if(!entryData) return 'PiXiEED広場の作品詳細ページ。投稿されたドット絵やGIFの詳細、作者、関連作品を確認できます。';
+      const title = String(entryData.title || '無題').trim();
+      const author = getEntryDisplayName(entryData);
+      const tags = parseTags(entryData.tags).slice(0, 3);
+      const size = entryData.width && entryData.height ? `${entryData.width}x${entryData.height}px` : '';
+      const colors = entryData.colors ? `${entryData.colors}色` : '';
+      const parts = [
+        `${title}。`,
+        author ? `${author} の広場投稿です。` : '',
+        size || colors ? [size, colors].filter(Boolean).join(' / ') + '。' : '',
+        tags.length ? `タグ: ${tags.join(' / ')}。` : '',
+        'PiXiEED広場で詳細と関連作品を確認できます。'
+      ];
+      return parts.join('').trim();
+    }
+
+    function updateEntryMetadata(entryData){
+      const title = String(entryData?.title || '広場の作品').trim() || '広場の作品';
+      const pageTitle = `${title} | PiXiEED 広場`;
+      const description = buildEntryMetaDescription(entryData);
+      const canonicalUrl = entryData?.id
+        ? `${CONTEST_SHARE_BASE_URL}?id=${entryData.id}`
+        : CONTEST_SHARE_BASE_URL;
+      document.title = pageTitle;
+      upsertMeta('meta[name="description"]', { name: 'description' }, description);
+      upsertMeta('meta[property="og:title"]', { property: 'og:title' }, pageTitle);
+      upsertMeta('meta[property="og:description"]', { property: 'og:description' }, description);
+      upsertMeta('meta[property="og:url"]', { property: 'og:url' }, canonicalUrl);
+      upsertMeta('meta[name="twitter:title"]', { name: 'twitter:title' }, pageTitle);
+      upsertMeta('meta[name="twitter:description"]', { name: 'twitter:description' }, description);
+      upsertMeta('meta[name="twitter:url"]', { name: 'twitter:url' }, canonicalUrl);
+      upsertCanonical(canonicalUrl);
+    }
+
+    function refreshCurrentEntryAuthor(){
+      if(!entry) return;
+      renderAuthor(document.getElementById('heroAuthor'), entry);
+    }
+
     function resolveAuthorUrl(entry){
       const fromEntry = normalizeXUrl(entry?.x_url || '');
       if(fromEntry) return fromEntry;
@@ -1852,7 +2042,20 @@
     function renderAuthor(authorEl, entryData){
       if(!authorEl) return;
       authorEl.textContent = '';
-      const name = entryData?.name || '名無し';
+      const name = getEntryDisplayName(entryData);
+      const avatarSrc = getEntryDisplayAvatarSrc(entryData);
+      const avatarFallback = getEntryAvatarFallbackLabel(entryData);
+      const avatar = document.createElement('span');
+      avatar.className = 'author-avatar';
+      if(avatarSrc){
+        const avatarImg = document.createElement('img');
+        avatarImg.src = avatarSrc;
+        avatarImg.alt = `${name} icon`;
+        avatar.appendChild(avatarImg);
+      }else{
+        avatar.textContent = avatarFallback;
+      }
+      authorEl.appendChild(avatar);
       const prefix = document.createElement('span');
       prefix.textContent = 'by ';
       authorEl.appendChild(prefix);
@@ -1907,6 +2110,9 @@
       let base = supportsImageUrls ? ENTRY_SELECT_WITH_URL : ENTRY_SELECT_BASE;
       if(supportsVideoColumns){
         base = `${base},${VIDEO_SELECT_COLUMNS}`;
+      }
+      if(supportsEntryAvatar){
+        base = `${base},avatar`;
       }
       return supportsXUrl ? `${base},x_url` : base;
     }
@@ -2279,6 +2485,7 @@
         }
         applyAvatarToBrand();
         renderAvatarChoices();
+        refreshCurrentEntryAuthor();
       }catch(err){
         console.warn('profile sync failed', err);
       }
@@ -2465,6 +2672,7 @@
           if(nick) saveNickname(nick);
           saveXUrl(xUrl);
           applyAvatarToBrand();
+          refreshCurrentEntryAuthor();
           if(supabaseAuth && supabaseUser?.id){
             try{
               const payload = { id: supabaseUser.id, nickname: nick || null, avatar: loadAvatar() };
@@ -2798,6 +3006,11 @@
           await fetchEntry(id);
           return;
         }
+        if(supportsEntryAvatar && isMissingColumn(err, 'avatar')){
+          supportsEntryAvatar = false;
+          await fetchEntry(id);
+          return;
+        }
         if(supportsImageUrls && (isMissingColumn(err, 'image_url') || isMissingColumn(err, 'thumb_url'))){
           supportsImageUrls = false;
           await fetchEntry(id);
@@ -2814,6 +3027,10 @@
           setStatus('ネットワークエラーが発生しています');
         }
       }
+      if(loaded){
+        await syncProfileForEntry(entry);
+      }
+      updateEntryMetadata(loaded ? entry : null);
       render();
       entryLoaded = loaded;
       if(loaded){
@@ -3331,7 +3548,7 @@
       if(page){
         page.innerHTML = `
           <section class="card">
-            <h2 style="margin:0 0 8px;">コンテストは一時クローズ中です</h2>
+            <h2 style="margin:0 0 8px;">広場は一時クローズ中です</h2>
             <p class="helper" style="margin:0 0 12px;">現在メンテナンス中のため、投稿と閲覧を停止しています。再開までお待ちください。</p>
             <div style="display:flex;gap:12px;flex-wrap:wrap;">
               <a href="../index.html">ホームへ</a>
@@ -3342,7 +3559,7 @@
       }
       const authPanel = document.getElementById('authPanel');
       if(authPanel) authPanel.remove();
-      document.title = 'PiXiEED コンテスト（一時クローズ中）';
+      document.title = 'PiXiEED 広場（一時クローズ中）';
     }
 
     async function init(){
