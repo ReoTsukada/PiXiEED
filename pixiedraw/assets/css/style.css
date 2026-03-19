@@ -2834,6 +2834,11 @@ input[type='range']::-moz-focus-outer {
   line-height: 1.45;
 }
 
+#panelFile #enableAutosave,
+#panelFile #bindExportFolder {
+  margin-top: 8px;
+}
+
 #panelFile .file-contest-promo {
   margin-top: 2px;
   padding: 10px;
@@ -4489,7 +4494,7 @@ body.is-mobile-layout .mobile-draw-help {
 #panelColor .color-mode--index {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 
 #panelSettings .settings-color-mode-field {
@@ -6126,6 +6131,18 @@ body.is-mobile-layout .mobile-draw-help {
   overflow: hidden !important;
 }
 
+.panel-ad .ad-box ins.adsbygoogle,
+.panel-ad .ad-box ins.ad-seed,
+.panel-ad .ad-box ins.adsbygoogle iframe,
+.panel-ad .ad-box .adsbygoogle iframe,
+.rail-ad .ad-box ins.adsbygoogle,
+.rail-ad .ad-box ins.ad-seed,
+.rail-ad .ad-box ins.adsbygoogle iframe,
+.rail-ad .ad-box .adsbygoogle iframe {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
 /* In mobile layout, disable side-panel ad mounts completely. */
 body.is-mobile-layout .panel-ad-mount,
 body.is-mobile-layout .panel-ad,
@@ -6198,6 +6215,7 @@ body.is-mobile-layout #rightPanelAdSlot {
   transition: transform 160ms cubic-bezier(.2,.9,.2,1), opacity 140ms ease;
   pointer-events: none;
   overflow: hidden;
+  box-sizing: border-box;
   min-height: calc(var(--mobile-bottom-ad-slot-height) + env(safe-area-inset-bottom, 0px));
   height: calc(var(--mobile-bottom-ad-slot-height) + env(safe-area-inset-bottom, 0px));
   max-height: calc(var(--mobile-bottom-ad-slot-height) + env(safe-area-inset-bottom, 0px));
@@ -6279,12 +6297,15 @@ body.is-mobile-layout #rightPanelAdSlot {
   max-height: var(--mobile-bottom-ad-slot-height) !important;
   border: 0 !important;
   overflow: hidden !important;
+  box-sizing: border-box !important;
 }
 
 #mobileBottomAd .mobile-ad-box iframe {
   min-height: var(--mobile-bottom-ad-slot-height) !important;
   height: var(--mobile-bottom-ad-slot-height) !important;
   max-height: var(--mobile-bottom-ad-slot-height) !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 #panelSettings .settings-size-row--sprite .settings-size-controls .number-stepper__btn {
@@ -6435,6 +6456,15 @@ body.is-startup-active {
   font-size: 0.78rem;
   line-height: 1.45;
   color: rgba(255, 255, 255, 0.6);
+}
+
+.startup-screen__hint a {
+  color: rgba(var(--ui-rgb), 0.85);
+  text-decoration: underline;
+}
+
+.startup-screen__hint a:hover {
+  color: rgb(var(--ui-rgb-focus));
 }
 
 .startup-screen__hint[data-tone='success'] {
@@ -6891,10 +6921,13 @@ body.is-startup-active {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  min-width: 0;
   min-height: clamp(48px, 9vw, 60px);
   height: clamp(48px, 9vw, 60px);
   max-width: 100%;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .export-ad__slot .adsbygoogle,
@@ -6906,8 +6939,8 @@ body.is-startup-active {
   min-height: clamp(48px, 9vw, 60px);
   height: clamp(48px, 9vw, 60px);
   margin: 0 auto !important;
-  box-sizing: border-box;
-  overflow: hidden;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
   text-align: center;
 }
 
@@ -6918,6 +6951,13 @@ body.is-startup-active {
   max-width: 100% !important;
   min-width: 0 !important;
   margin: 0 auto !important;
+  box-sizing: border-box !important;
+}
+
+.export-ad__slot img,
+.export-interstitial__slot img {
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .export-ad__label {
@@ -7176,6 +7216,7 @@ body.is-startup-active {
     linear-gradient(90deg, rgba(var(--ui-rgb), 0.08) 1px, transparent 1px),
     rgba(10, 16, 26, 0.72);
   background-size: 12px 12px;
+  overflow: hidden;
 }
 
 .export-interstitial__slot {
@@ -7184,6 +7225,9 @@ body.is-startup-active {
   display: flex;
   align-items: center;
   justify-content: center;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .export-interstitial__slot .adsbygoogle,
@@ -7195,8 +7239,8 @@ body.is-startup-active {
   min-height: clamp(200px, 58vh, 460px);
   height: clamp(200px, 58vh, 460px);
   margin: 0 auto !important;
-  box-sizing: border-box;
-  overflow: hidden;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
   text-align: center;
 }
 
@@ -7207,6 +7251,7 @@ body.is-startup-active {
   max-width: 100% !important;
   min-width: 0 !important;
   margin: 0 auto !important;
+  box-sizing: border-box !important;
 }
 
 @media (min-width: 600px) {
