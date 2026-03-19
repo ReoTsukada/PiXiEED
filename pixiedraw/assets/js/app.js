@@ -3,6 +3,10 @@
     return;
   }
 
+  // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
+  const APP_BUILD_VERSION = '2026.03.20';
+  const APP_SW_VERSION = APP_BUILD_VERSION;
+
   const dom = {
     appRoot: document.getElementById('appRoot'),
     layout: document.getElementById('appLayout'),
@@ -323,6 +327,10 @@
       multiBlockedRemove: document.getElementById('multiBlockedRemove'),
       multiBlockedHint: document.getElementById('multiBlockedHint'),
       supportTipLink: document.getElementById('supportTipLink'),
+      pixieedAccountStatus: document.getElementById('pixieedAccountStatus'),
+      pixieedAccountLogin: document.getElementById('pixieedAccountLogin'),
+      pixieedAccountLogout: document.getElementById('pixieedAccountLogout'),
+      pixieedAccountDock: document.getElementById('pixieedAccountDock'),
       multiMasterOnlyGroups: Array.from(document.querySelectorAll('[data-multi-master-only]')),
       multiMasterOpsGroups: Array.from(document.querySelectorAll('[data-multi-master-ops]')),
     },
@@ -406,9 +414,16 @@
     },
     toolSpotlight: {
       dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('toolSpotlightDialog')),
+      list: document.querySelector('#toolSpotlightDialog .tool-spotlight-list'),
       close: document.getElementById('closeToolSpotlight'),
       goHome: document.getElementById('toolSpotlightGoHome'),
       openContest: document.getElementById('toolSpotlightOpenContest'),
+      supportTip: document.getElementById('toolSpotlightSupportTip'),
+    },
+    loginPrompt: {
+      dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('loginPromptDialog')),
+      close: document.getElementById('closeLoginPrompt'),
+      goHome: document.getElementById('loginPromptGoHome'),
     },
     /* solidShape tool removed */
   };
@@ -943,6 +958,30 @@
   ]);
   const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
     Object.freeze({
+      id: '2026-03-20-ui-spacing',
+      at: '2026-03-20T23:55:00+09:00',
+      title: 'ファイル/カラーの配置間隔を微調整',
+      published: true,
+      details: Object.freeze([
+        'ファイルパネルで「キャンバスをクリア」と出力フォルダ設定ボタンの間隔を調整。',
+        'パレットの色操作ボタン（追加/削除/移動）をカラースウォッチに近づけるよう配置を調整。',
+      ]),
+    }),
+    Object.freeze({
+      id: '2026-03-20-account-export-ads',
+      at: '2026-03-20T21:30:00+09:00',
+      title: 'アカウント導線と出力広告/ログイン導線を改善',
+      published: true,
+      details: Object.freeze([
+        '設定パネルにPiXiEEDアカウント欄を追加し、ログイン状態の表示とログアウト操作を設定内に集約。',
+        '画面内のアカウントボタンは廃止し、設定内の導線だけに統一。',
+        'ログアウト時は即座に「ログイン」表示へ戻るようUI更新を追加。',
+        '出力フローを「出力→広告→閉じる→出力開始」に変更。',
+        '出力完了後にログイン促しパネルを表示し、ホームのログイン画面へ移動できる導線を追加。',
+        '出力/広告の表示幅と中央揃えを安定化。',
+      ]),
+    }),
+    Object.freeze({
       id: '2026-03-15-multi-canvas-collab-polish',
       at: '2026-03-15T23:55:00+09:00',
       title: 'マルチキャンバス・共同制作・コメント/タブ周りを改善',
@@ -1195,7 +1234,43 @@
   const UI_LANGUAGE_STORAGE_KEY = 'pixieedraw:ui-language';
   const UI_LANGUAGE_JA = 'ja';
   const UI_LANGUAGE_EN = 'en';
-  const UI_LANGUAGE_SET = new Set([UI_LANGUAGE_JA, UI_LANGUAGE_EN]);
+  const UI_LANGUAGE_ZH = 'zh';
+  const UI_LANGUAGE_SET = new Set([UI_LANGUAGE_JA, UI_LANGUAGE_EN, UI_LANGUAGE_ZH]);
+  const UI_LANGUAGE_ZH_MAP = Object.freeze({
+    設定: '设置',
+    ファイル: '文件',
+    保存: '保存',
+    出力: '导出',
+    '保存/出力': '保存/导出',
+    新規作成: '新建',
+    'ファイルを開く': '打开文件',
+    '端末内プロジェクト': '本地项目',
+    'キャンバスをクリア': '清空画布',
+    アカウント: '账号',
+    ログイン: '登录',
+    ログアウト: '退出登录',
+    'ホームに戻る': '返回首页',
+    '広場を見る': '查看广场',
+    応援チップ: '支援小费',
+    '使い方ヘルプ': '使用帮助',
+    'ショートカット一覧': '快捷键列表',
+    更新情報: '更新信息',
+    タイムラプス: '延时',
+    記録クリア: '清除记录',
+    再生FPS: '播放FPS',
+    ツール: '工具',
+    カラー: '颜色',
+    フレーム: '帧',
+    レイヤー: '图层',
+    共有: '协作',
+    背景: '背景',
+    '背景:黒': '背景：黑',
+    '背景:白': '背景：白',
+    '背景:桃': '背景：粉',
+    'BG: Black': '背景：黑',
+    'BG: White': '背景：白',
+    'BG: Pink': '背景：粉',
+  });
 
   function normalizeUiLanguage(value, fallback = UI_LANGUAGE_JA) {
     const normalized = String(value || '').trim().toLowerCase();
@@ -1638,7 +1713,7 @@
     return generated.map(color => normalizeColorValue(color));
   }
 
-  function getPalettePresetDisplayName(definition, language = (isEnglishUi() ? UI_LANGUAGE_EN : UI_LANGUAGE_JA)) {
+  function getPalettePresetDisplayName(definition, language = (uiLanguage === UI_LANGUAGE_JA ? UI_LANGUAGE_JA : UI_LANGUAGE_EN)) {
     if (!definition || typeof definition !== 'object') {
       return '';
     }
@@ -1652,7 +1727,7 @@
     if (!(select instanceof HTMLSelectElement)) {
       return;
     }
-    const language = isEnglishUi() ? UI_LANGUAGE_EN : UI_LANGUAGE_JA;
+    const language = uiLanguage === UI_LANGUAGE_JA ? UI_LANGUAGE_JA : UI_LANGUAGE_EN;
     const fragment = document.createDocumentFragment();
     if (includeCustom) {
       const customOption = document.createElement('option');
@@ -2126,7 +2201,9 @@
     if (typeof document === 'undefined' || !document.documentElement) {
       return;
     }
-    const nextLanguage = uiLanguage === UI_LANGUAGE_EN ? 'en' : 'ja';
+    const nextLanguage = uiLanguage === UI_LANGUAGE_EN
+      ? 'en'
+      : (uiLanguage === UI_LANGUAGE_ZH ? 'zh' : 'ja');
     document.documentElement.lang = nextLanguage;
     if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
       window.dispatchEvent(new CustomEvent('pixieedraw:uilanguagechange', {
@@ -2139,11 +2216,52 @@
     return uiLanguage === UI_LANGUAGE_EN;
   }
 
-  function localizeText(jaText, enText) {
+  function isChineseUi() {
+    return uiLanguage === UI_LANGUAGE_ZH;
+  }
+
+  function getNextUiLanguage() {
+    if (uiLanguage === UI_LANGUAGE_JA) {
+      return UI_LANGUAGE_EN;
+    }
+    if (uiLanguage === UI_LANGUAGE_EN) {
+      return UI_LANGUAGE_ZH;
+    }
+    return UI_LANGUAGE_JA;
+  }
+
+  function resolveChineseText(jaText, enText) {
+    if (typeof jaText === 'string' && UI_LANGUAGE_ZH_MAP[jaText]) {
+      return UI_LANGUAGE_ZH_MAP[jaText];
+    }
+    if (typeof enText === 'string' && UI_LANGUAGE_ZH_MAP[enText]) {
+      return UI_LANGUAGE_ZH_MAP[enText];
+    }
+    return '';
+  }
+
+  function localizeText(jaText, enText, zhText = '') {
+    if (isChineseUi()) {
+      const directZh = typeof zhText === 'string' && zhText ? zhText : resolveChineseText(jaText, enText);
+      if (directZh) {
+        return directZh;
+      }
+      return enText || jaText;
+    }
     return isEnglishUi() ? enText : jaText;
   }
 
   function localizeUiThemePresetLabel(label) {
+    if (isChineseUi()) {
+      const map = {
+        緑色: '绿色',
+        ピンク: '粉色',
+        白色: '白色',
+        水色: '浅蓝',
+        黄色: '黄色',
+      };
+      return map[label] || label;
+    }
     if (!isEnglishUi()) {
       return label;
     }
@@ -2272,6 +2390,7 @@
   const EXPORT_DIRECTORY_PICKER_ID = 'pixieed-export-directory';
   const PIXIEED_NICKNAME_STORAGE_KEY = 'pixieed_nickname';
   const PIXIEED_AVATAR_STORAGE_KEY = 'pixieed_avatar';
+  const PIXIEED_X_URL_STORAGE_KEY = 'pixieed_x_url';
   const DEFAULT_MULTI_PARTICIPANT_NAME = '名無し';
   const MULTI_PROJECT_KEY_STORAGE_KEY = 'pixieedraw:multi-project-key';
   const MULTI_CLIENT_ID_STORAGE_KEY = 'pixieedraw:multi-client-id';
@@ -2475,6 +2594,7 @@
   const MULTI_PUBLIC_ROOM_THUMBNAIL_MAX_DATA_URL_LENGTH = 180000;
   const MULTI_PUBLIC_ROOM_THUMBNAIL_REFRESH_MIN_MS = 7000;
   const MULTI_SYNC_THROTTLE_MS = 150;
+  const MULTI_RESYNC_THROTTLE_MS = 1500;
   const MULTI_MASTER_RECOVERY_REASON = 'master-recovery';
   const MULTI_GUEST_RECOVERY_PUSH_THROTTLE_MS = 1600;
   const MULTI_LAYER_PATCH_FULL_RATIO = 0.45;
@@ -2583,6 +2703,7 @@
   let exportGridTileHeight = 8;
   let exportAdRequested = false;
   let exportInterstitialAdRequested = false;
+  let pendingExportAction = null;
   const TIMELAPSE_DEFAULT_FPS = 12;
   const TIMELAPSE_MIN_FPS = 1;
   const TIMELAPSE_MAX_FPS = 60;
@@ -2604,6 +2725,7 @@
     projectKey: '',
     channelName: '',
     clientId: null,
+    buildVersion: APP_BUILD_VERSION,
     supabase: null,
     channel: null,
     connected: false,
@@ -2654,6 +2776,10 @@
     pendingAssignmentMoveRequests: new Map(),
     joinRequestCooldownUntil: 0,
     joinRequestPending: false,
+    lastResyncAt: 0,
+    lastVersionMismatch: '',
+    versionMismatchAt: 0,
+    peerBuildVersions: new Map(),
     awaitingGuestStateRecovery: false,
     guestStateRecoveryTimer: null,
     guestRecoveryPushAt: 0,
@@ -2672,6 +2798,16 @@
     paletteSeededFromShared: false,
   // masterForcedDanmakuOff removed: clients control danmaku locally
   };
+  const accountState = {
+    isLoggedIn: false,
+    userId: '',
+    profile: { nickname: '', avatarId: '', xUrl: '' },
+    session: null,
+    supabase: null,
+  };
+  let accountSupabaseInitPromise = null;
+  let accountProfileSyncPromise = null;
+  let supportsPixieedProfileXUrl = true;
   let multiSupabaseClientPromise = null;
 
   const RAIL_DEFAULT_WIDTH = Object.freeze({ left: 78, right: 78 });
@@ -3105,6 +3241,7 @@
   multiState.clientId = ensureMultiClientId();
   multiState.projectKey = readStoredMultiProjectKey();
   bindCoreProjectActionButtons();
+  registerPwaServiceWorker();
   try {
     restoreSessionState();
   } catch (error) {
@@ -3132,6 +3269,9 @@
   window.addEventListener('beforeunload', handleUnsavedBeforeUnload);
   window.addEventListener('pagehide', handleAutosavePageHide);
   document.addEventListener('visibilitychange', handleAutosaveVisibilityChange);
+  document.addEventListener('visibilitychange', handleMultiVisibilityChange);
+  window.addEventListener('focus', handleMultiWindowFocus);
+  window.addEventListener('online', handleMultiOnline);
   installMobileBackButtonGuard();
   if (RELOAD_SNAPSHOT_ENABLED) {
     window.addEventListener('beforeunload', persistReloadSessionSnapshot);
@@ -3146,6 +3286,7 @@
     window.addEventListener('pagehide', releaseAutosaveTabLock);
   }
   let hoverPixel = null;
+  let appReloadInProgress = false;
   let zoomIndicatorTimeoutId = null;
   let wheelZoomRaf = null;
   let wheelZoomApplying = false;
@@ -3295,6 +3436,8 @@
   const paletteEditorState = {
     hsv: { h: 0, s: 0, v: 1, a: 255 },
     wheelPointer: { active: false, pointerId: null, upHandler: null, mode: null, captureTarget: null },
+    colorHistoryActive: false,
+    colorHistoryDirty: false,
   };
   let dirtyRegion = null;
   let canvasControlMode = 'zoom';
@@ -4138,6 +4281,7 @@
       preview: null,
       selectionPreview: null,
       selectionMove: null,
+      lastSelectionMove: null,
       drawPaletteIndex: null,
       selectionClearedOnDown: false,
       selectionExtendOnDown: false,
@@ -6517,6 +6661,65 @@
     flushAutosaveSnapshotOnLifecycle({ force: true });
   }
 
+  function scheduleAppReload(reason = '') {
+    if (appReloadInProgress) {
+      return;
+    }
+    appReloadInProgress = true;
+    try {
+      persistCriticalSessionStateForNavigation();
+    } catch (error) {
+      // Ignore persistence errors during forced reload.
+    }
+    try {
+      armMobileBackBeforeUnloadBypass();
+    } catch (error) {
+      // Ignore bypass errors.
+    }
+    window.setTimeout(() => {
+      try {
+        window.location.reload();
+      } catch (error) {
+        window.location.href = window.location.href;
+      }
+    }, 120);
+  }
+
+  function registerPwaServiceWorker() {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+      return;
+    }
+    if (window.location.protocol === 'file:') {
+      return;
+    }
+    let hadController = Boolean(navigator.serviceWorker.controller);
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController) {
+        hadController = true;
+        return;
+      }
+      scheduleAppReload('pwa-controllerchange');
+    });
+    const swUrl = `service-worker.js?v=${encodeURIComponent(APP_SW_VERSION)}`;
+    navigator.serviceWorker.register(swUrl).catch(error => {
+      console.warn('Failed to register service worker', error);
+    });
+  }
+
+  function handleMultiVisibilityChange() {
+    if (document.visibilityState === 'visible') {
+      requestMultiResync('visibility');
+    }
+  }
+
+  function handleMultiWindowFocus() {
+    requestMultiResync('focus');
+  }
+
+  function handleMultiOnline() {
+    requestMultiResync('online');
+  }
+
   function persistCriticalSessionStateForNavigation() {
     flushPendingTimelapseCapture({ force: true });
     flushAutosaveSnapshotOnLifecycle({ force: true });
@@ -7897,7 +8100,12 @@
     const target = tab === 'color' ? 'color' : 'tools';
     setLeftTab(target, { persist });
     if (layoutMode === 'mobilePortrait') {
-      activateMobileTab('tools', { ensureDrawer: false });
+      const activeKey = Array.isArray(dom.mobileTabs)
+        ? (dom.mobileTabs.find(button => button.classList.contains('is-active'))?.dataset.mobileTab || '')
+        : '';
+      if (activeKey === 'tools' || activeKey === 'color') {
+        activateMobileTab('tools', { ensureDrawer: false });
+      }
     }
   }
 
@@ -9732,14 +9940,10 @@
       dom.controls.toggleMajorGrid.checked = state.showMajorGrid;
     }
     if (dom.controls.toggleBackgroundMode) {
-      const labelMap = isEnglishUi() ? {
-        dark: 'BG: Black',
-        light: 'BG: White',
-        pink: 'BG: Pink',
-      } : {
-        dark: '背景:黒',
-        light: '背景:白',
-        pink: '背景:桃',
+      const labelMap = {
+        dark: localizeText('背景:黒', 'BG: Black', '背景：黑'),
+        light: localizeText('背景:白', 'BG: White', '背景：白'),
+        pink: localizeText('背景:桃', 'BG: Pink', '背景：粉'),
       };
       dom.controls.toggleBackgroundMode.setAttribute('aria-pressed', String(state.backgroundMode !== 'dark'));
       const label = labelMap[state.backgroundMode] || localizeText('背景', 'BG');
@@ -9972,7 +10176,7 @@
 
       const list = document.createElement('ul');
       list.className = 'help-guide-item__list';
-      const points = isEnglishUi() ? item.points.en : item.points.ja;
+      const points = uiLanguage === UI_LANGUAGE_JA ? item.points.ja : item.points.en;
       points.forEach(point => {
         const listItem = document.createElement('li');
         listItem.textContent = point;
@@ -10259,15 +10463,15 @@
     setDocumentLanguage();
 
     if (dom.controls.toggleLanguageMode instanceof HTMLButtonElement) {
-      const switchLabel = 'あ/A';
+      const switchLabel = 'あ/A/中';
       dom.controls.toggleLanguageMode.textContent = switchLabel;
       dom.controls.toggleLanguageMode.setAttribute(
         'aria-label',
-        isEnglishUi() ? 'Switch language (A/あ)' : '言語を切り替え（A/あ）'
+        localizeText('言語を切り替え（あ/A/中）', 'Switch language (あ/A/中)', '切换语言（あ/A/中）')
       );
     }
 
-    setLocalizedTextContent('.startup-screen__subtitle', 'PiXiEEDraw（ピクシードロー）でドット絵づくりをはじめよう', 'Start creating pixel art with PiXiEEDraw');
+    setLocalizedTextContent('.startup-screen__subtitle', 'PiXiEEDraw（ピクシードロー）でドット絵づくり・共同制作・アニメ制作をはじめよう', 'Start pixel art, collab, and animation with PiXiEEDraw');
     setLocalizedTextContent('#startupActionResume', '前回の続きから再開', 'Resume Last Session');
     setLocalizedTextContent('#startupActionNew', '新規作成', 'New Project');
     setLocalizedTextContent('#startupActionOpen', 'ファイルを開く', 'Open File');
@@ -10283,6 +10487,11 @@
       AUTOSAVE_SUPPORTED
         ? 'Your drawing is autosaved on this device and restored when you reopen.'
         : 'Autosave is not available in this browser. Please save manually from Save / Export.'
+    );
+    setLocalizedHtmlContent(
+      '#startupLensHint',
+      '写真をドット絵変換するなら <a href="../pixiee-lens/index.html" target="_blank" rel="noopener">PiXiEELENS</a>',
+      'Convert photos to pixel art with <a href="../pixiee-lens/index.html" target="_blank" rel="noopener">PiXiEELENS</a>.'
     );
     setLocalizedTextContent('#updateToastCloseBtn', '閉じる', 'Close');
 
@@ -10414,12 +10623,17 @@
     setLocalizedTextContent('#multiAssignKick', 'キック', 'Kick');
     setLocalizedTextContent('#multiAssignBan', 'BAN', 'Ban');
 
-    setLocalizedTextContent('#goHomeButton', '他のツール一覧へ', 'Other Tools');
+    setLocalizedTextContent('#goHomeButton', 'ホームに戻る', 'Back to Home');
+    setLocalizedTextContent('#goContestButton', '広場を見る', 'View Plaza');
     setLocalizedTextContent('#supportTipLink', '応援チップ', 'Support Tip');
     setLocalizedAttribute('#supportTipLink', 'aria-label', 'PiXiEEDの応援チップを購入（外部サイト）', 'Buy a PiXiEED support tip (external site)');
     setLocalizedTextContent('#openOperationHelpPanel', '使い方ヘルプ', 'Help');
     setLocalizedTextContent('#openShortcutHelp', 'ショートカット一覧', 'Keyboard Shortcuts');
     setLocalizedTextContent('#openUpdateHistory', '更新情報', 'Updates');
+    setLocalizedTextContent('#pixieedAccountLabel', 'アカウント', 'Account');
+    setLocalizedTextContent('#pixieedAccountLogin', 'ログイン', 'Sign In');
+    setLocalizedTextContent('#pixieedAccountLogout', 'ログアウト', 'Sign Out');
+    setLocalizedTextContent('#pixieedAccountDock', 'ログイン', 'Sign In');
 
     setLocalizedTextContent('#panelSettings .settings-size-row--canvas > span', 'キャンバスサイズ', 'Canvas Size');
     setLocalizedControlLabel('canvasWidth', 'X', 'X');
@@ -10481,6 +10695,7 @@
     setLocalizedTextContent('#settingsDisplayHint', '背景とUI配色を切り替えます（描画色には影響しません）。', 'Switch the background and UI colors (does not change drawing colors).');
     setLocalizedAttribute('#toggleBackgroundMode', 'aria-label', '背景色を切り替え', 'Change background color');
     setLocalizedAttribute('#toggleBackgroundMode', 'title', '背景色を切り替え', 'Change background color');
+    updatePixieedAccountUi();
 
     setLocalizedTextContent('#floatingDrawButton', '描画', 'Draw');
     setLocalizedAttribute('#floatingDrawButton', 'aria-label', '描画ボタン（左=主色 / 右=副色）', 'Draw button (left = primary / right = secondary)');
@@ -10547,7 +10762,7 @@
     setLocalizedTextContent('#exportInterstitialTitle', '広告', 'Ad');
     setLocalizedAttribute('#closeExportInterstitial', 'aria-label', '広告を閉じる', 'Close ad');
     setLocalizedTextContent('#closeExportInterstitial', '閉じる', 'Close');
-    setLocalizedTextContent('.export-interstitial__lead', '画像の出力が完了しました。', 'Image export is complete.');
+    setLocalizedTextContent('.export-interstitial__lead', '広告を閉じると出力を開始します。', 'Close the ad to start export.');
 
     setLocalizedTextContent('#newProjectTitle', '新規プロジェクト', 'New Project');
     setLocalizedTextContent('.new-project__name-field > span', 'ファイル名', 'File Name');
@@ -10590,8 +10805,14 @@
     setLocalizedTextContent('#toolSpotlightLensDesc', 'カメラ画像をドット化できるツール。撮影してそのまま編集導線につなげられます。', 'Turn camera images into pixel art and continue straight into editing.');
     setLocalizedTextContent('#toolSpotlightContestTitle', 'PiXiEEDコンテスト', 'PiXiEED Contest');
     setLocalizedTextContent('#toolSpotlightContestDesc', '保存した作品を投稿して、みんなの作品もチェックできます。', 'Post your saved artwork and browse creations from everyone.');
+    setLocalizedTextContent('#toolSpotlightTipTitle', '応援チップ', 'Support Tip');
+    setLocalizedTextContent('#toolSpotlightTipDesc', 'みんなの応援でPiXiEEDは成長することができます。', 'PiXiEED grows with everyone’s support.');
     setLocalizedTextContent('#toolSpotlightGoHome', 'ホームへ戻る', 'Back to Home');
-    setLocalizedTextContent('#toolSpotlightOpenContest', 'コンテストを見る', 'View Contest');
+    setLocalizedTextContent('#toolSpotlightOpenContest', '広場を見る', 'View Plaza');
+    setLocalizedTextContent('#loginPromptTitle', 'ログイン', 'Sign In');
+    setLocalizedTextContent('#loginPromptLead', 'ログインすると、プロフィール共有や引き継ぎができます。', 'Sign in to sync your profile and carry it to other devices.');
+    setLocalizedTextContent('#loginPromptGoHome', 'ホームでログイン', 'Open Home Login');
+    setLocalizedTextContent('#closeLoginPrompt', '閉じる', 'Close');
     setLocalizedTextContent('#closeToolSpotlight', '閉じる', 'Close');
     setLocalizedTextContent('#helpPanelTitle', '使い方ヘルプ', 'Help');
     setLocalizedTextContent('#helpPanelLead', '操作方法を検索できます。必要なキーワードを入力してください。', 'Search operation guides by keyword.');
@@ -10646,6 +10867,11 @@
     const hidden = isNativeAppRuntime();
     dom.controls.supportTipLink.hidden = hidden;
     dom.controls.supportTipLink.setAttribute('aria-hidden', String(hidden));
+    const spotlightTip = dom.toolSpotlight?.supportTip;
+    if (spotlightTip instanceof HTMLElement) {
+      spotlightTip.hidden = hidden;
+      spotlightTip.setAttribute('aria-hidden', String(hidden));
+    }
   }
 
   function getMaxSpriteMultiplier() {
@@ -11507,6 +11733,8 @@
           history.future = [];
           clearTimelapseRecording({ silent: true, scope: 'all' });
         }
+        reconcileTimelapseTracksForSingleCanvas();
+        ensureTimelapseStartCapture();
       } finally {
         autosaveRestoring = false;
       }
@@ -13693,6 +13921,46 @@
     });
   }
 
+  function shuffleToolSpotlightCards() {
+    const list = dom.toolSpotlight?.list;
+    if (!(list instanceof HTMLElement)) {
+      return;
+    }
+    const cards = Array.from(list.querySelectorAll('.tool-spotlight-card'));
+    if (cards.length <= 1) {
+      return;
+    }
+    const visibleCards = cards.filter(card => !(card.hidden || card.getAttribute('aria-hidden') === 'true'));
+    if (visibleCards.length <= 1) {
+      return;
+    }
+    const tipCard = dom.toolSpotlight?.supportTip || null;
+    const contestTitle = document.getElementById('toolSpotlightContestTitle');
+    const contestCard = contestTitle instanceof HTMLElement
+      ? contestTitle.closest('.tool-spotlight-card')
+      : null;
+    const shuffled = visibleCards.filter(card => card !== tipCard && card !== contestCard);
+    if (shuffled.length > 1) {
+      for (let i = shuffled.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+    }
+    if (tipCard && !(tipCard.hidden || tipCard.getAttribute('aria-hidden') === 'true')) {
+      list.appendChild(tipCard);
+    }
+    shuffled.forEach(card => list.appendChild(card));
+    if (contestCard && !(contestCard.hidden || contestCard.getAttribute('aria-hidden') === 'true')) {
+      list.appendChild(contestCard);
+    }
+    const visibleSet = new Set([tipCard, contestCard, ...shuffled].filter(Boolean));
+    cards.forEach(card => {
+      if (!visibleSet.has(card)) {
+        list.appendChild(card);
+      }
+    });
+  }
+
   function openToolSpotlightDialog() {
     const dialog = dom.toolSpotlight?.dialog;
     if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
@@ -13701,6 +13969,7 @@
     if (dialog.open) {
       return;
     }
+    shuffleToolSpotlightCards();
     dialog.showModal();
     window.requestAnimationFrame(() => {
       dom.toolSpotlight?.close?.focus?.({ preventScroll: true });
@@ -13712,6 +13981,45 @@
     if (dialog instanceof HTMLDialogElement && dialog.open) {
       dialog.close();
     }
+  }
+
+  function openLoginPromptDialog() {
+    if (accountState.isLoggedIn) {
+      return;
+    }
+    const dialog = dom.loginPrompt?.dialog;
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+      return;
+    }
+    if (dialog.open) {
+      return;
+    }
+    dialog.showModal();
+    window.requestAnimationFrame(() => {
+      dom.loginPrompt?.close?.focus?.({ preventScroll: true });
+    });
+  }
+
+  function closeLoginPromptDialog() {
+    const dialog = dom.loginPrompt?.dialog;
+    if (dialog instanceof HTMLDialogElement && dialog.open) {
+      dialog.close();
+    }
+  }
+
+  function showLoginPromptAfterExport() {
+    openToolSpotlightDialog();
+    if (accountState.isLoggedIn) {
+      return;
+    }
+    const spotlightDialog = dom.toolSpotlight?.dialog;
+    if (spotlightDialog instanceof HTMLDialogElement && spotlightDialog.open) {
+      spotlightDialog.addEventListener('close', () => {
+        openLoginPromptDialog();
+      }, { once: true });
+      return;
+    }
+    openLoginPromptDialog();
   }
 
   function canShowExportInterstitial() {
@@ -13799,7 +14107,25 @@
     window.requestAnimationFrame(renderWhenReady);
   }
 
-  function closeExportInterstitial({ showToolSpotlight = false } = {}) {
+  function runPendingExportAction() {
+    const action = pendingExportAction;
+    pendingExportAction = null;
+    if (typeof action !== 'function') {
+      return;
+    }
+    try {
+      const result = action();
+      if (result && typeof result.then === 'function') {
+        result.catch(error => {
+          console.warn('Export action failed', error);
+        });
+      }
+    } catch (error) {
+      console.warn('Export action failed', error);
+    }
+  }
+
+  function closeExportInterstitial({ runPendingExport = false } = {}) {
     const dialog = dom.exportInterstitial?.dialog;
     if (!(dialog instanceof HTMLDialogElement)) {
       return;
@@ -13810,10 +14136,21 @@
     }
     exportInterstitialAdRequested = false;
     document.body.classList.remove('is-export-interstitial-active');
-    if (showToolSpotlight && wasOpen) {
+    if (runPendingExport && wasOpen) {
       window.requestAnimationFrame(() => {
-        openToolSpotlightDialog();
+        runPendingExportAction();
       });
+    }
+  }
+
+  function queueExportWithInterstitial(action) {
+    if (typeof action !== 'function') {
+      return;
+    }
+    pendingExportAction = action;
+    const opened = openExportInterstitialDialog({ force: true });
+    if (!opened) {
+      runPendingExportAction();
     }
   }
 
@@ -13838,16 +14175,16 @@
     });
   }
 
-  function showExportInterstitialAfterImageExport() {
+  function openExportInterstitialDialog({ force = false } = {}) {
     const dialog = dom.exportInterstitial?.dialog;
     if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
-      return;
+      return false;
     }
     if (dialog.open) {
-      return;
+      return true;
     }
-    if (!canShowExportInterstitial()) {
-      return;
+    if (!force && !canShowExportInterstitial()) {
+      return false;
     }
     markExportInterstitialShown();
     dialog.showModal();
@@ -13856,6 +14193,7 @@
     window.requestAnimationFrame(() => {
       dom.exportInterstitial?.close?.focus?.({ preventScroll: true });
     });
+    return true;
   }
 
   function exportProjectWithFallback() {
@@ -13895,57 +14233,34 @@
     if (!ensureCurrentClientCanExportProject({ announce: true, format: normalized })) {
       return;
     }
-    if (normalized === 'png' || normalized === 'gridpng' || normalized === 'spritemap') {
-      const candidates = getExportScaleCandidates(normalized);
-      applyExportScaleConstraints(candidates);
-      syncExportScaleInputs();
-      const maxScale = exportMaxScale || 1;
-      if (maxScale > 1 && exportSheetInfo) {
-        const minW = exportSheetInfo.sheetWidth;
-        const minH = exportSheetInfo.sheetHeight;
-        const maxW = minW * maxScale;
-        const maxH = minH * maxScale;
-        const scaleInput = window.prompt(
-          `書き出し倍率を入力してください (1〜${maxScale})\n幅 ${minW}〜${maxW}PX / 高さ ${minH}〜${maxH}PX`,
-          String(exportScale),
-        );
-        if (scaleInput === null) {
-          return;
-        }
-        exportScaleUserOverride = true;
-        setExportScale(scaleInput);
-      }
-      if (normalized === 'gridpng') {
-        const tileWidthInput = window.prompt('分割サイズの横幅(px)を入力してください', String(exportGridTileWidth));
-        if (tileWidthInput === null) {
-          return;
-        }
-        const tileHeightInput = window.prompt('分割サイズの高さ(px)を入力してください', String(exportGridTileHeight));
-        if (tileHeightInput === null) {
-          return;
-        }
-        exportGridTileWidth = normalizeExportGridTileSize(tileWidthInput, exportGridTileWidth);
-        exportGridTileHeight = normalizeExportGridTileSize(tileHeightInput, exportGridTileHeight);
-        syncExportGridInputs();
-        scheduleSessionPersist({ includeSnapshots: false });
-        exportProjectAsGridPng();
-      } else if (normalized === 'spritemap') {
-        exportProjectAsSpriteMap();
-      } else {
-        exportProjectAsPng();
-      }
+    queueExportWithInterstitial(() => performExportByMode(normalized));
+  }
+
+  async function performExportByMode(mode) {
+    const normalized = normalizeExportFormat(mode || 'png');
+    if (normalized === 'gif') {
+      await exportProjectAsGif();
     } else if (normalized === 'jpeg') {
-      exportProjectAsJpeg();
+      await exportProjectAsJpeg();
     } else if (normalized === 'svg') {
-      exportProjectAsSvg();
-    } else if (normalized === 'gif') {
-      exportProjectAsGif();
+      await exportProjectAsSvg();
+    } else if (normalized === 'spritemap') {
+      await exportProjectAsSpriteMap();
+    } else if (normalized === 'gridpng') {
+      await exportProjectAsGridPng();
     } else if (normalized === 'timelapse') {
-      exportTimelapseGif();
+      await exportTimelapseGif();
+    } else if (normalized === 'contest') {
+      updateAutosaveStatus('コンテスト投稿は現在停止中です', 'warn');
     } else if (normalized === 'pixfind') {
       exportProjectToPixfind();
     } else if (normalized === 'project') {
-      saveProjectAsPixieedraw();
+      const result = await saveProjectAsPixieedraw();
+      if (result?.saved) {
+        showLoginPromptAfterExport();
+      }
+    } else {
+      await exportProjectAsPng();
     }
   }
 
@@ -14009,6 +14324,43 @@
     return Object.values(getAllTimelapseTracks()).reduce((sum, track) => {
       return sum + (Array.isArray(track?.snapshots) ? track.snapshots.length : 0);
     }, 0);
+  }
+
+  function reconcileTimelapseTracksForSingleCanvas() {
+    const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
+    if (!activeCanvasId || getProjectCanvasCount() !== 1) {
+      return false;
+    }
+    if (timelapseState.tracksByCanvasId[activeCanvasId]) {
+      return false;
+    }
+    const entries = Object.entries(timelapseState.tracksByCanvasId);
+    if (!entries.length) {
+      return false;
+    }
+    let bestTrack = null;
+    let bestCount = -1;
+    entries.forEach(([, track]) => {
+      const count = Array.isArray(track?.snapshots) ? track.snapshots.length : 0;
+      if (count > bestCount) {
+        bestCount = count;
+        bestTrack = track;
+      }
+    });
+    if (!bestTrack || bestCount <= 0) {
+      return false;
+    }
+    timelapseState.tracksByCanvasId = {
+      [activeCanvasId]: {
+        snapshots: Array.isArray(bestTrack.snapshots) ? bestTrack.snapshots.slice() : [],
+        warningShown: Boolean(bestTrack.warningShown),
+        sampleStep: Math.max(1, Math.round(Number(bestTrack.sampleStep) || 1)),
+        lastCaptureToken: Number.isFinite(Number(bestTrack.lastCaptureToken))
+          ? Math.round(Number(bestTrack.lastCaptureToken))
+          : -1,
+      },
+    };
+    return true;
   }
 
   function pruneTimelapseTracksToExistingCanvases() {
@@ -14151,6 +14503,21 @@
     }
     updateMemoryStatus();
     return true;
+  }
+
+  function ensureTimelapseStartCapture(canvasId = getActiveProjectCanvasDocument()?.id || '') {
+    if (!timelapseState.enabled) {
+      return false;
+    }
+    const resolvedCanvasId = normalizeTimelapseCanvasId(canvasId);
+    if (!resolvedCanvasId) {
+      return false;
+    }
+    const track = getTimelapseTrack(resolvedCanvasId);
+    if (track && Array.isArray(track.snapshots) && track.snapshots.length > 0) {
+      return false;
+    }
+    return captureTimelapseFrameFromState(resolvedCanvasId);
   }
 
   function flushPendingTimelapseCapture({ force = false } = {}) {
@@ -14410,7 +14777,7 @@
           });
           announceProjectCompanionSaveResult('timelapse', companionResult);
         }
-        showExportInterstitialAfterImageExport();
+        showLoginPromptAfterExport();
       }
       syncTimelapseControls();
     } catch (error) {
@@ -14723,28 +15090,13 @@
         updateExportFormatAvailability();
         return;
       }
-      if (mode === 'gif') {
-        exportProjectAsGif();
-      } else if (mode === 'jpeg') {
-        exportProjectAsJpeg();
-      } else if (mode === 'svg') {
-        exportProjectAsSvg();
-      } else if (mode === 'spritemap') {
-        exportProjectAsSpriteMap();
-      } else if (mode === 'gridpng') {
-        exportProjectAsGridPng();
-      } else if (mode === 'timelapse') {
-        exportTimelapseGif();
-      } else if (mode === 'contest') {
+      if (mode === 'contest') {
         updateAutosaveStatus('コンテスト投稿は現在停止中です', 'warn');
-      } else if (mode === 'pixfind') {
-        exportProjectToPixfind();
-      } else if (mode === 'project') {
-        saveProjectAsPixieedraw();
-      } else {
-        exportProjectAsPng();
+        closeExportDialog();
+        return;
       }
       closeExportDialog();
+      queueExportWithInterstitial(() => performExportByMode(mode));
     });
     bind(config.cancel, () => {
       closeExportDialog();
@@ -14890,15 +15242,32 @@
       return;
     }
     dom.exportInterstitial?.close?.addEventListener('click', () => {
-      closeExportInterstitial({ showToolSpotlight: true });
+      closeExportInterstitial({ runPendingExport: true });
     });
     dialog.addEventListener('cancel', event => {
       event.preventDefault();
-      closeExportInterstitial({ showToolSpotlight: true });
+      closeExportInterstitial({ runPendingExport: true });
     });
     dialog.addEventListener('close', () => {
       exportInterstitialAdRequested = false;
       document.body.classList.remove('is-export-interstitial-active');
+    });
+  }
+
+  function setupLoginPromptDialog() {
+    const dialog = dom.loginPrompt?.dialog;
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+      if (dialog) {
+        dialog.hidden = true;
+      }
+      return;
+    }
+    dom.loginPrompt?.close?.addEventListener('click', () => {
+      closeLoginPromptDialog();
+    });
+    dialog.addEventListener('cancel', event => {
+      event.preventDefault();
+      closeLoginPromptDialog();
     });
   }
 
@@ -15092,6 +15461,7 @@
     history.future = [];
     history.pending = null;
     clearTimelapseRecording({ silent: true, scope: 'all' });
+    ensureTimelapseStartCapture();
     resetDocumentUnsavedChanges();
     updateHistoryButtons();
     resetExportScaleDefaults();
@@ -15598,6 +15968,8 @@
         history.future = [];
         clearTimelapseRecording({ silent: true, scope: 'all' });
       }
+      reconcileTimelapseTracksForSingleCanvas();
+      ensureTimelapseStartCapture();
     } finally {
       autosaveRestoring = false;
     }
@@ -17770,7 +18142,7 @@
           });
           announceProjectCompanionSaveResult('gridpng', companionResult);
         }
-        showExportInterstitialAfterImageExport();
+        showLoginPromptAfterExport();
       }
     } catch (error) {
       console.error('Grid PNG export failed', error);
@@ -17866,7 +18238,7 @@
           });
         }
         if (!skipInterstitial) {
-          showExportInterstitialAfterImageExport();
+          showLoginPromptAfterExport();
         }
       }
     } catch (error) {
@@ -17961,7 +18333,7 @@
           });
           announceProjectCompanionSaveResult('spritemap', companionResult);
         }
-        showExportInterstitialAfterImageExport();
+        showLoginPromptAfterExport();
       }
     } catch (error) {
       console.error('SpriteMAP export failed', error);
@@ -18150,7 +18522,7 @@
           });
           announceProjectCompanionSaveResult('jpeg', companionResult);
         }
-        showExportInterstitialAfterImageExport();
+        showLoginPromptAfterExport();
       }
     } catch (error) {
       console.error('JPEG export failed', error);
@@ -18235,7 +18607,7 @@
           });
           announceProjectCompanionSaveResult('svg', companionResult);
         }
-        showExportInterstitialAfterImageExport();
+        showLoginPromptAfterExport();
       }
     } catch (error) {
       console.error('SVG export failed', error);
@@ -18323,7 +18695,7 @@
           });
         }
         if (!skipInterstitial) {
-          showExportInterstitialAfterImageExport();
+          showLoginPromptAfterExport();
         }
       }
     } catch (error) {
@@ -21928,8 +22300,10 @@
     setupLayout();
     setupGlobalFocusDismiss();
     setupControls();
+    void initPixieedAccount();
     setupExportDialog();
     setupExportInterstitialDialog();
+    setupLoginPromptDialog();
     setupUpdateHistoryDialog();
     setupToolSpotlightDialog();
     setupHelpPanel();
@@ -24414,6 +24788,24 @@
 
   function setupControls() {
     bindCoreProjectActionButtons();
+    if (dom.controls.pixieedAccountLogout instanceof HTMLButtonElement && dom.controls.pixieedAccountLogout.dataset.bound !== 'true') {
+      dom.controls.pixieedAccountLogout.dataset.bound = 'true';
+      dom.controls.pixieedAccountLogout.addEventListener('click', async () => {
+        try {
+          const supabase = await ensurePixieedAccountClient();
+          if (!supabase) {
+            return;
+          }
+          await supabase.auth.signOut();
+        } catch (error) {
+          console.warn('Pixieed account sign out failed', error);
+        } finally {
+          applyPixieedAccountSession(null);
+          updatePixieedAccountUi();
+        }
+      });
+    }
+    updatePixieedAccountUi();
     if (dom.controls.toggleGrid instanceof HTMLInputElement) {
       dom.controls.toggleGrid.addEventListener('change', () => {
         state.showGrid = dom.controls.toggleGrid.checked;
@@ -24803,7 +25195,7 @@
       openOperationHelpPanel();
     });
     dom.controls.toggleLanguageMode?.addEventListener('click', () => {
-      const nextLanguage = isEnglishUi() ? UI_LANGUAGE_JA : UI_LANGUAGE_EN;
+      const nextLanguage = getNextUiLanguage();
       setUiLanguage(nextLanguage, { persist: true });
     });
     dom.controls.openUpdateHistory?.addEventListener('click', () => {
@@ -26823,6 +27215,9 @@
     dom.controls.paletteHue?.addEventListener('input', () => {
       handlePaletteSliderInput({ source: 'hue' });
     });
+    dom.controls.paletteHue?.addEventListener('change', () => {
+      commitPaletteColorHistorySession();
+    });
 
     if (dom.controls.paletteHue) {
       dom.controls.paletteHue.style.background = 'linear-gradient(90deg, #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%)';
@@ -26831,13 +27226,22 @@
     dom.controls.paletteSaturation?.addEventListener('input', () => {
       handlePaletteSliderInput({ source: 'saturation' });
     });
+    dom.controls.paletteSaturation?.addEventListener('change', () => {
+      commitPaletteColorHistorySession();
+    });
 
     dom.controls.paletteValue?.addEventListener('input', () => {
       handlePaletteSliderInput({ source: 'value' });
     });
+    dom.controls.paletteValue?.addEventListener('change', () => {
+      commitPaletteColorHistorySession();
+    });
 
     dom.controls.paletteAlphaSlider?.addEventListener('input', () => {
       handlePaletteSliderInput({ source: 'alpha' });
+    });
+    dom.controls.paletteAlphaSlider?.addEventListener('change', () => {
+      commitPaletteColorHistorySession();
     });
 
     const wheel = dom.controls.paletteWheel;
@@ -27082,9 +27486,54 @@
     updateColorTabSwatch();
   }
 
+  function applyPalettePreviewChange() {
+    requestRender();
+    renderAllProjectCanvasSurfaces();
+    requestOverlayRender();
+    scheduleSessionPersist();
+  }
+
+  function beginPaletteColorHistorySession() {
+    if (paletteEditorState.colorHistoryActive) {
+      return;
+    }
+    if (history.pending) {
+      return;
+    }
+    beginHistory('paletteColor');
+    if (history.pending?.label !== 'paletteColor') {
+      return;
+    }
+    paletteEditorState.colorHistoryActive = true;
+    paletteEditorState.colorHistoryDirty = false;
+  }
+
+  function markPaletteColorHistoryDirty() {
+    if (!paletteEditorState.colorHistoryActive || paletteEditorState.colorHistoryDirty) {
+      return;
+    }
+    paletteEditorState.colorHistoryDirty = true;
+    markCurrentPalettePresetCustom({ syncControl: true });
+    markHistoryDirty();
+  }
+
+  function commitPaletteColorHistorySession() {
+    if (!paletteEditorState.colorHistoryActive) {
+      return;
+    }
+    const shouldCommit = paletteEditorState.colorHistoryDirty;
+    paletteEditorState.colorHistoryActive = false;
+    paletteEditorState.colorHistoryDirty = false;
+    if (shouldCommit) {
+      applyPaletteChange();
+    }
+    commitHistory();
+  }
+
   function handlePaletteSliderInput({ source = 'unknown' } = {}) {
     if (!canCurrentClientEditPaletteColors()) return;
     if (!getPaletteEditorTargetColor()) return;
+    beginPaletteColorHistorySession();
     focusUnifiedLeftContext('color', { persist: false });
     const hueValue = clamp(Number(dom.controls.paletteHue?.value ?? paletteEditorState.hsv.h), 0, 360);
     const saturationValue = clamp(Number(dom.controls.paletteSaturation?.value ?? paletteEditorState.hsv.s * 100), 0, 100) / 100;
@@ -27326,14 +27775,13 @@
       const active = state.palette[activeIndex];
       const needsPaletteSync = !active || !colorsMatchRgba(active, normalized);
       if (needsPaletteSync) {
-        beginHistory('paletteColor');
         if (active) {
           Object.assign(active, normalized);
         } else {
           state.palette[activeIndex] = { ...normalized };
         }
-        applyPaletteChange();
-        commitHistory();
+        markPaletteColorHistoryDirty();
+        applyPalettePreviewChange();
       } else {
         scheduleSessionPersist();
       }
@@ -27344,10 +27792,9 @@
     }
     const active = state.palette[state.activePaletteIndex];
     if (!active) return;
-    beginHistory('paletteColor');
     Object.assign(active, rgba);
-    applyPaletteChange();
-    commitHistory();
+    markPaletteColorHistoryDirty();
+    applyPalettePreviewChange();
     renderPalette();
   }
 
@@ -27374,6 +27821,7 @@
     } catch (error) {
       // Some mobile browsers may reject pointer capture in edge cases.
     }
+    beginPaletteColorHistorySession();
     updatePaletteFromWheelEvent(event);
     window.addEventListener('pointermove', handlePaletteWheelPointerMove, { passive: false });
     const pointerUpHandler = evt => handlePaletteWheelPointerUp(evt);
@@ -27410,6 +27858,7 @@
       paletteEditorState.wheelPointer.upHandler = null;
     }
     window.removeEventListener('pointermove', handlePaletteWheelPointerMove);
+    commitPaletteColorHistorySession();
   }
 
   function updatePaletteFromWheelEvent(event) {
@@ -35275,6 +35724,7 @@
     pointerState.preview = null;
     pointerState.selectionPreview = null;
     pointerState.selectionMove = moveState;
+    pointerState.lastSelectionMove = moveState;
 
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
@@ -35419,6 +35869,7 @@
     pointerState.preview = null;
     pointerState.selectionPreview = null;
     pointerState.selectionMove = moveState;
+    pointerState.lastSelectionMove = moveState;
     pointerState.selectionClearedOnDown = false;
     pointerState.selectionExtendOnDown = false;
     updateCanvasControlButtons();
@@ -35671,6 +36122,7 @@
       previewCanvas,
       offset: { x: 0, y: 0 },
       hasCleared: false,
+      committed: false,
       applySelectionOnFinalize: true,
       transformRotationDeg: 0,
       transformFlipHorizontal: false,
@@ -36963,6 +37415,7 @@
       previewCanvas,
       offset: { x: 0, y: 0 },
       hasCleared: false,
+      committed: false,
       restoreIndices: null,
       restoreDirect: null,
       applySelectionOnFinalize: true,
@@ -37140,6 +37593,7 @@
       previewCanvas,
       offset: { x: 0, y: 0 },
       hasCleared: false,
+      committed: false,
       restoreIndices: null,
       restoreDirect: null,
       applySelectionOnFinalize: true,
@@ -37330,6 +37784,7 @@
     pointerState.active = false;
     pointerState.drawPaletteIndex = null;
     state.pendingPasteMoveState = moveState;
+    pointerState.lastSelectionMove = moveState;
     updateCanvasControlButtons();
     requestOverlayRender();
     return true;
@@ -37404,6 +37859,8 @@
       markDirtyRect(bounds.x0, bounds.y0, bounds.x1, bounds.y1);
     }
     moveState.hasCleared = true;
+    moveState.committed = false;
+    pointerState.lastSelectionMove = moveState;
     requestRender();
     updateCanvasControlButtons();
   }
@@ -37446,6 +37903,8 @@
     pointerState.selectionMove = null;
     pointerState.tool = state.tool;
     state.pendingPasteMoveState = null;
+    moveState.committed = true;
+    pointerState.lastSelectionMove = null;
 
     if (result.placed) {
       if (result.bounds) {
@@ -37486,11 +37945,17 @@
   }
 
   function getPendingSelectionMoveState() {
-    if (pointerState.selectionMove && pointerState.selectionMove.hasCleared) {
-      return pointerState.selectionMove;
+    const direct = pointerState.selectionMove;
+    if (direct && direct.hasCleared && !direct.committed) {
+      return direct;
     }
-    if (state.pendingPasteMoveState && state.pendingPasteMoveState.hasCleared) {
-      return state.pendingPasteMoveState;
+    const pending = state.pendingPasteMoveState;
+    if (pending && pending.hasCleared && !pending.committed) {
+      return pending;
+    }
+    const fallback = pointerState.lastSelectionMove;
+    if (fallback && fallback.hasCleared && !fallback.committed) {
+      return fallback;
     }
     return null;
   }
@@ -37518,6 +37983,7 @@
     pointerState.selectionMove = null;
     pointerState.tool = state.tool;
     state.pendingPasteMoveState = null;
+    pointerState.lastSelectionMove = null;
     pointerState.pointerId = null;
     pointerState.active = false;
     pointerState.preview = null;
@@ -39594,6 +40060,7 @@
     state.selectionBounds = null;
     state.pendingPasteMoveState = null;
     pointerState.selectionMove = null;
+    pointerState.lastSelectionMove = null;
     updateCanvasControlButtons();
     requestOverlayRender();
     return true;
@@ -43584,7 +44051,7 @@
     return '../character-dots/mao1.png';
   }
 
-  function readPixieedAccountNickname() {
+  function readPixieedLocalNickname() {
     if (!canUseSessionStorage) {
       return '';
     }
@@ -43600,7 +44067,23 @@
     }
   }
 
-  function readPixieedAccountAvatarId() {
+  function writePixieedLocalNickname(value) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    const trimmed = typeof value === 'string' ? value.trim().slice(0, 32) : '';
+    try {
+      if (trimmed) {
+        window.localStorage.setItem(PIXIEED_NICKNAME_STORAGE_KEY, trimmed);
+      } else {
+        window.localStorage.removeItem(PIXIEED_NICKNAME_STORAGE_KEY);
+      }
+    } catch (error) {
+      // Ignore local storage write errors.
+    }
+  }
+
+  function readPixieedLocalAvatarId() {
     if (!canUseSessionStorage) {
       return 'mao';
     }
@@ -43609,6 +44092,267 @@
       return normalizePixieedAvatarId(raw);
     } catch (error) {
       return 'mao';
+    }
+  }
+
+  function writePixieedLocalAvatarId(value) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    const normalized = normalizePixieedAvatarId(value);
+    try {
+      window.localStorage.setItem(PIXIEED_AVATAR_STORAGE_KEY, normalized);
+    } catch (error) {
+      // Ignore local storage write errors.
+    }
+  }
+
+  function readPixieedLocalXUrl() {
+    if (!canUseSessionStorage) {
+      return '';
+    }
+    try {
+      const raw = window.localStorage.getItem(PIXIEED_X_URL_STORAGE_KEY);
+      if (typeof raw !== 'string') {
+        return '';
+      }
+      return raw.trim();
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function writePixieedLocalXUrl(value) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    const trimmed = typeof value === 'string' ? value.trim() : '';
+    try {
+      if (trimmed) {
+        window.localStorage.setItem(PIXIEED_X_URL_STORAGE_KEY, trimmed);
+      } else {
+        window.localStorage.removeItem(PIXIEED_X_URL_STORAGE_KEY);
+      }
+    } catch (error) {
+      // Ignore local storage write errors.
+    }
+  }
+
+  function readPixieedAccountNickname() {
+    const profileNickname = accountState.isLoggedIn ? accountState.profile.nickname : '';
+    if (profileNickname) {
+      return profileNickname.trim().slice(0, 32);
+    }
+    return readPixieedLocalNickname();
+  }
+
+  function readPixieedAccountAvatarId() {
+    const profileAvatar = accountState.isLoggedIn ? accountState.profile.avatarId : '';
+    if (profileAvatar) {
+      return normalizePixieedAvatarId(profileAvatar);
+    }
+    return readPixieedLocalAvatarId();
+  }
+
+  function readPixieedAccountXUrl() {
+    const profileXUrl = accountState.isLoggedIn ? accountState.profile.xUrl : '';
+    if (profileXUrl) {
+      return profileXUrl;
+    }
+    return readPixieedLocalXUrl();
+  }
+
+  function isMissingColumn(error, column) {
+    const msg = String(error?.message || '').toLowerCase();
+    const needle = String(column || '').toLowerCase();
+    return Boolean(msg && needle && msg.includes(needle));
+  }
+
+  async function ensurePixieedAccountClient() {
+    if (accountState.supabase) {
+      return accountState.supabase;
+    }
+    if (accountSupabaseInitPromise) {
+      return accountSupabaseInitPromise;
+    }
+    accountSupabaseInitPromise = (async () => {
+      const module = await import(MULTI_SUPABASE_MODULE_URL);
+      const supabase = module.createClient(MULTI_SUPABASE_URL, MULTI_SUPABASE_ANON_KEY, {
+        global: { headers: { 'x-client-id': multiState.clientId || '' } },
+      });
+      accountState.supabase = supabase;
+      return supabase;
+    })();
+    try {
+      return await accountSupabaseInitPromise;
+    } finally {
+      accountSupabaseInitPromise = null;
+    }
+  }
+
+  function applyPixieedAccountSession(session) {
+    accountState.session = session || null;
+    accountState.userId = session?.user?.id || '';
+    accountState.isLoggedIn = Boolean(accountState.userId);
+    if (!accountState.isLoggedIn) {
+      accountState.profile = { nickname: '', avatarId: '', xUrl: '' };
+    }
+  }
+
+  async function syncPixieedAccountProfile() {
+    if (accountProfileSyncPromise) {
+      return accountProfileSyncPromise;
+    }
+    accountProfileSyncPromise = (async () => {
+      const userId = accountState.userId;
+      if (!userId) {
+        return null;
+      }
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase) {
+        return null;
+      }
+      const localNick = readPixieedLocalNickname();
+      const localAvatar = readPixieedLocalAvatarId();
+      const localXUrl = readPixieedLocalXUrl();
+      let selectColumns = supportsPixieedProfileXUrl ? 'nickname, avatar, x_url' : 'nickname, avatar';
+      let { data, error } = await supabase
+        .from('user_profiles')
+        .select(selectColumns)
+        .eq('id', userId)
+        .maybeSingle();
+      if (error && supportsPixieedProfileXUrl && isMissingColumn(error, 'x_url')) {
+        supportsPixieedProfileXUrl = false;
+        selectColumns = 'nickname, avatar';
+        ({ data, error } = await supabase
+          .from('user_profiles')
+          .select(selectColumns)
+          .eq('id', userId)
+          .maybeSingle());
+      }
+      if (error) throw error;
+      const serverNick = typeof data?.nickname === 'string' ? data.nickname.trim() : '';
+      const serverAvatarRaw = typeof data?.avatar === 'string' ? data.avatar.trim() : '';
+      const serverAvatar = serverAvatarRaw ? normalizePixieedAvatarId(serverAvatarRaw) : '';
+      const serverXUrl = typeof data?.x_url === 'string' ? data.x_url.trim() : '';
+      if (serverNick) {
+        writePixieedLocalNickname(serverNick);
+      }
+      if (serverAvatarRaw) {
+        writePixieedLocalAvatarId(serverAvatar);
+      }
+      if (serverXUrl) {
+        writePixieedLocalXUrl(serverXUrl);
+      }
+      const nextProfile = {
+        nickname: serverNick || localNick,
+        avatarId: normalizePixieedAvatarId(serverAvatar || localAvatar),
+        xUrl: serverXUrl || localXUrl,
+      };
+      accountState.profile = nextProfile;
+      const payload = { id: userId };
+      if (!serverNick && localNick) {
+        payload.nickname = localNick;
+      }
+      if (!serverAvatarRaw && localAvatar) {
+        payload.avatar = localAvatar;
+      }
+      if (supportsPixieedProfileXUrl && !serverXUrl && localXUrl) {
+        payload.x_url = localXUrl;
+      }
+      if (Object.keys(payload).length > 1) {
+        let upsert = await supabase.from('user_profiles').upsert(payload);
+        if (upsert.error && supportsPixieedProfileXUrl && isMissingColumn(upsert.error, 'x_url')) {
+          supportsPixieedProfileXUrl = false;
+          delete payload.x_url;
+          if (Object.keys(payload).length > 1) {
+            upsert = await supabase.from('user_profiles').upsert(payload);
+          } else {
+            upsert = null;
+          }
+        }
+        if (upsert?.error) throw upsert.error;
+      }
+      updatePixieedAccountUi();
+      return nextProfile;
+    })();
+    try {
+      return await accountProfileSyncPromise;
+    } finally {
+      accountProfileSyncPromise = null;
+    }
+  }
+
+  function updatePixieedAccountUi() {
+    const status = dom.controls.pixieedAccountStatus;
+    const loginLink = dom.controls.pixieedAccountLogin;
+    const logoutButton = dom.controls.pixieedAccountLogout;
+    const dock = dom.controls.pixieedAccountDock;
+    if (status instanceof HTMLElement) {
+      const nickname = readPixieedAccountNickname();
+      if (accountState.isLoggedIn) {
+        const email = accountState.session?.user?.email || '';
+        const label = nickname || email;
+        status.textContent = label
+          ? localizeText(`ログイン中: ${label}`, `Signed in: ${label}`)
+          : localizeText('ログイン中', 'Signed in');
+      } else {
+        status.textContent = nickname
+          ? localizeText(`未ログイン（ローカル: ${nickname}）`, `Signed out (local: ${nickname})`)
+          : localizeText('未ログイン', 'Signed out');
+      }
+    }
+    if (loginLink instanceof HTMLElement) {
+      loginLink.hidden = accountState.isLoggedIn;
+      loginLink.setAttribute('aria-hidden', String(accountState.isLoggedIn));
+    }
+    if (logoutButton instanceof HTMLElement) {
+      logoutButton.hidden = !accountState.isLoggedIn;
+      logoutButton.setAttribute('aria-hidden', String(!accountState.isLoggedIn));
+    }
+    if (dock instanceof HTMLElement) {
+      const nickname = readPixieedAccountNickname();
+      if (accountState.isLoggedIn) {
+        dock.textContent = localizeText('アカウント', 'Account');
+        const email = accountState.session?.user?.email || '';
+        const label = nickname || email;
+        if (label) {
+          dock.setAttribute('title', label);
+        } else {
+          dock.removeAttribute('title');
+        }
+      } else {
+        dock.textContent = localizeText('ログイン', 'Sign In');
+        dock.removeAttribute('title');
+      }
+    }
+  }
+
+  async function initPixieedAccount() {
+    try {
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase) {
+        updatePixieedAccountUi();
+        return;
+      }
+      const { data } = await supabase.auth.getSession();
+      applyPixieedAccountSession(data?.session || null);
+      if (accountState.isLoggedIn) {
+        await syncPixieedAccountProfile();
+      } else {
+        updatePixieedAccountUi();
+      }
+      supabase.auth.onAuthStateChange(async (_event, session) => {
+        applyPixieedAccountSession(session || null);
+        if (accountState.isLoggedIn) {
+          await syncPixieedAccountProfile();
+        } else {
+          updatePixieedAccountUi();
+        }
+      });
+    } catch (error) {
+      console.warn('Pixieed account init failed', error);
+      updatePixieedAccountUi();
     }
   }
 
@@ -48005,7 +48749,90 @@
       role: multiState.role,
       name: getLocalMultiParticipantName(),
       projectKey: multiState.projectKey,
+      buildVersion: APP_BUILD_VERSION,
     }).catch(() => {});
+  }
+
+  function normalizeMultiBuildVersion(value) {
+    if (typeof value !== 'string') {
+      return '';
+    }
+    return value.trim();
+  }
+
+  function handleMultiBuildVersionMismatch(remoteVersion, { source = '', clientId = '' } = {}) {
+    const normalized = normalizeMultiBuildVersion(remoteVersion);
+    if (!normalized || normalized === APP_BUILD_VERSION) {
+      return false;
+    }
+    const now = Date.now();
+    if (
+      normalized === multiState.lastVersionMismatch
+      && (now - Number(multiState.versionMismatchAt || 0)) < 4000
+    ) {
+      return true;
+    }
+    multiState.lastVersionMismatch = normalized;
+    multiState.versionMismatchAt = now;
+    setMultiStatus(
+      localizeText(
+        `共有モード: バージョン不一致（相手 ${normalized} / この端末 ${APP_BUILD_VERSION}）。再読み込みしてください。`,
+        `Collab mode: version mismatch (peer ${normalized} / this device ${APP_BUILD_VERSION}). Please reload.`
+      ),
+      'warn'
+    );
+    console.warn('Multi build version mismatch', {
+      local: APP_BUILD_VERSION,
+      remote: normalized,
+      source,
+      clientId,
+    });
+    if (isStandaloneAppDisplayMode()) {
+      scheduleAppReload('multi-version-mismatch');
+    }
+    return true;
+  }
+
+  function recordMultiPeerBuildVersion(clientId, buildVersion, { source = '' } = {}) {
+    const normalizedClientId = typeof clientId === 'string' ? clientId.trim() : '';
+    const normalizedVersion = normalizeMultiBuildVersion(buildVersion);
+    if (!normalizedClientId || !normalizedVersion) {
+      return;
+    }
+    if (!(multiState.peerBuildVersions instanceof Map)) {
+      multiState.peerBuildVersions = new Map();
+    }
+    multiState.peerBuildVersions.set(normalizedClientId, normalizedVersion);
+    if (normalizedVersion !== APP_BUILD_VERSION) {
+      handleMultiBuildVersionMismatch(normalizedVersion, { source, clientId: normalizedClientId });
+    }
+  }
+
+  function requestMultiResync(reason = '') {
+    if (!multiState.connected || multiState.connecting || !multiState.channel) {
+      return false;
+    }
+    const now = Date.now();
+    if ((now - Number(multiState.lastResyncAt || 0)) < MULTI_RESYNC_THROTTLE_MS) {
+      return false;
+    }
+    multiState.lastResyncAt = now;
+    clearPendingMultiSessionStateApply();
+    if (isMultiMasterMode()) {
+      scheduleMultiSessionStateBroadcast({ immediate: true });
+      scheduleMultiPublicLobbyRoomSync({ immediate: true });
+      return true;
+    }
+    sendMultiBroadcast('sync-request', {
+      clientId: multiState.clientId,
+      role: multiState.role,
+      name: getLocalMultiParticipantName(),
+      projectKey: multiState.projectKey,
+      buildVersion: APP_BUILD_VERSION,
+      reason: typeof reason === 'string' ? reason : '',
+      sentAt: now,
+    }).catch(() => {});
+    return true;
   }
 
   function normalizeMultiSessionRevision(value, fallback = 0) {
@@ -48025,6 +48852,7 @@
     return {
       projectKey: multiState.projectKey,
       masterClientId: multiState.clientId,
+      buildVersion: APP_BUILD_VERSION,
       maxGuests: normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT),
       roomVisibility: normalizeMultiRoomVisibility(
         multiState.roomVisibility,
@@ -48069,6 +48897,7 @@
     return {
       projectKey: multiState.projectKey,
       clientId: multiState.clientId,
+      buildVersion: APP_BUILD_VERSION,
       targetClientId: targetClientId || '',
       reason: typeof reason === 'string' ? reason : '',
       canvasId: normalizeMultiHistoryCanvasId(canvasId),
@@ -49399,6 +50228,7 @@
     if (!senderClientId || senderClientId === multiState.clientId) {
       return;
     }
+    recordMultiPeerBuildVersion(senderClientId, payload.buildVersion, { source: 'hello' });
     if (isMultiMasterMode()) {
       if (isMultiClientBlocked(senderClientId)) {
         await sendMultiKickClientNotice(senderClientId, 'blocked');
@@ -49444,6 +50274,7 @@
     if (!requesterClientId || requesterClientId === multiState.clientId) {
       return;
     }
+    recordMultiPeerBuildVersion(requesterClientId, payload.buildVersion, { source: 'sync-request' });
     if (isMultiClientBlocked(requesterClientId)) {
       await sendMultiKickClientNotice(requesterClientId, 'blocked');
       return;
@@ -49473,6 +50304,10 @@
     }
     if (multiState.role !== 'guest' && multiState.role !== 'spectator') {
       return;
+    }
+    const payloadMasterClientId = typeof payload.masterClientId === 'string' ? payload.masterClientId.trim() : '';
+    if (payloadMasterClientId) {
+      recordMultiPeerBuildVersion(payloadMasterClientId, payload.buildVersion, { source: 'session-state' });
     }
     const receivedRevision = normalizeMultiSessionRevision(payload.revision, 0);
     if (receivedRevision) {
@@ -49536,6 +50371,7 @@
     if (!senderClientId || senderClientId === multiState.clientId) {
       return;
     }
+    recordMultiPeerBuildVersion(senderClientId, payload.buildVersion, { source: 'guest-session-state' });
     if (isMultiClientBlocked(senderClientId)) {
       return;
     }
@@ -49970,6 +50806,9 @@
     multiState.assignments.clear();
     multiState.participants.clear();
     multiState.blockedClientIds.clear();
+    if (multiState.peerBuildVersions instanceof Map) {
+      multiState.peerBuildVersions.clear();
+    }
     multiState.pendingAssignmentMoveRequests.clear();
     multiState.selectedAssignClientId = '';
     multiState.selectedRoleControlClientId = '';
@@ -49981,6 +50820,9 @@
     multiState.assignmentSyncRequestAt = 0;
     multiState.guestRecoveryPushAt = 0;
     multiState.guestRecoveryTargetClientId = '';
+    multiState.lastResyncAt = 0;
+    multiState.lastVersionMismatch = '';
+    multiState.versionMismatchAt = 0;
     multiState.applyRemoteInProgress = false;
     multiState.uiView = 'entry';
     multiEntryJoinPanelOpen = false;
@@ -50262,6 +51104,7 @@
         name: getLocalMultiParticipantName(),
         projectKey,
         joinedAt: Date.now(),
+        buildVersion: APP_BUILD_VERSION,
       });
 
       if (normalizedRole === 'master') {
@@ -50273,6 +51116,7 @@
           role: normalizedRole,
           name: getLocalMultiParticipantName(),
           projectKey,
+          buildVersion: APP_BUILD_VERSION,
         });
         if (normalizedRole === 'spectator') {
           if (requestedRole === 'guest' && !allowGuestJoin) {
