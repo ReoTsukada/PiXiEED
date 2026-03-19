@@ -6,21 +6,21 @@
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <title>ドット絵作成ツール PiXiEEDraw | 無料ブラウザで描く・共同編集</title>
 <meta content="#1f1f1f" name="theme-color"/>
-<meta content="PiXiEEDrawは、無料で使えるブラウザのドット絵作成ツール。レイヤー、フレームアニメ、オニオンスキン、GIF/PNG/JPEG/SVG書き出し、リアルタイム共同編集に対応。" name="description"/>
-<meta content="PiXiEEDraw,ピクシードロー,ドット絵 エディター,ドット絵 描く サイト,ピクセルアート,リアルタイム 共同編集,アニメーション GIF,オニオンスキン" name="keywords"/>
+<meta content="PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・共同制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、ローカル拡張、PC/モバイル対応。" name="description"/>
+<meta content="PiXiEEDraw,ピクシードロー,ドット絵 エディター,ドット絵 描く サイト,ピクセルアート,リアルタイム 共同編集,アニメーション GIF,オニオンスキン,タイムラプスGIF,ローカル拡張,PC スマホ" name="keywords"/>
 <link rel="canonical" href="https://pixieed.jp/pixiedraw/"/>
 <meta content="website" property="og:type"/>
 <meta content="PiXiEED" property="og:site_name"/>
 <meta content="ja_JP" property="og:locale"/>
 <meta content="ドット絵作成ツール PiXiEEDraw | 無料ブラウザで描く・共同編集" property="og:title"/>
-<meta content="PiXiEEDrawは、無料で使えるブラウザのドット絵作成ツール。レイヤー、フレームアニメ、オニオンスキン、GIF/PNG/JPEG/SVG書き出し、リアルタイム共同編集に対応。" property="og:description"/>
+<meta content="PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・共同制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、ローカル拡張、PC/モバイル対応。" property="og:description"/>
 <meta content="https://pixieed.jp/pixiedraw/" property="og:url"/>
 <meta content="https://pixieed.jp/pixiedraw/ogp-app.png" property="og:image"/>
 <meta content="summary_large_image" name="twitter:card"/>
 <meta content="@PiXiEED_arta" name="twitter:site"/>
 <meta content="https://pixieed.jp/pixiedraw/" name="twitter:url"/>
 <meta content="ドット絵作成ツール PiXiEEDraw | 無料ブラウザで描く・共同編集" name="twitter:title"/>
-<meta content="PiXiEEDrawは、無料で使えるブラウザのドット絵作成ツール。レイヤー、フレームアニメ、オニオンスキン、GIF/PNG/JPEG/SVG書き出し、リアルタイム共同編集に対応。" name="twitter:description"/>
+<meta content="PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・共同制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、ローカル拡張、PC/モバイル対応。" name="twitter:description"/>
 <meta content="https://pixieed.jp/pixiedraw/ogp-app.png" name="twitter:image"/>
 <script type="application/ld+json">
 {
@@ -31,13 +31,15 @@
   "operatingSystem": "Web",
   "url": "https://pixieed.jp/pixiedraw/",
   "image": "https://pixieed.jp/pixiedraw/ogp-app.png",
-  "description": "PiXiEEDrawは、無料で使えるブラウザのドット絵作成ツール。レイヤー、フレームアニメ、オニオンスキン、GIF/PNG/JPEG/SVG書き出し、リアルタイム共同編集に対応。",
+  "description": "PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・共同制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、ローカル拡張、PC/モバイル対応。",
   "featureList": [
     "リアルタイム共有モード（マスター/参加者）",
+    "マルチキャンバス編集",
     "フレームアニメーション編集（FPS設定）",
     "オニオンスキン表示",
     "レイヤー不透明度・合成モード",
-    "GIF/PNG/JPEG/SVG/プロジェクト書き出し",
+    "PNG/JPEG/SVG/GIF/タイムラプスGIF/プロジェクト書き出し",
+    "ローカル拡張（端末内で動作）",
     "PC/タブレット/スマホ対応"
   ],
   "softwareVersion": "2026.03",
@@ -127,7 +129,7 @@
 <div class="startup-screen__content">
 <div class="startup-screen__header">
 <h1 class="startup-screen__title" id="startupScreenTitle">PiXiEEDraw</h1>
-<p class="startup-screen__subtitle">PiXiEEDraw（ピクシードロー）でドット絵づくりをはじめよう</p>
+<p class="startup-screen__subtitle">PiXiEEDraw（ピクシードロー）でドット絵づくり・共同制作・アニメ制作をはじめよう</p>
 </div>
 <div aria-label="起動操作" class="startup-screen__actions" role="group">
 <button class="button button--primary" id="startupActionResume" type="button">前回の続きから再開</button>
@@ -137,6 +139,7 @@
 <div class="startup-screen__hints">
 <p class="startup-screen__hint" id="startupScreenHint">描画内容はこの端末に自動保存され、起動時に前回データを復元できます。</p>
 <p class="startup-screen__hint" id="startupResumeHint">端末内プロジェクトを確認しています…</p>
+<p class="startup-screen__hint" id="startupLensHint">写真をドット絵変換するなら PiXiEELENS</p>
 </div>
 <div class="startup-screen__recent" hidden="" id="startupRecentProjects">
 <h2 class="startup-screen__recent-title">端末内プロジェクト（自動保存）</h2>
@@ -145,19 +148,19 @@
 <button class="startup-screen__link" id="startupActionSkip" type="button">この画面を閉じる</button>
 </div>
 </div>
-<div aria-hidden="true" class="update-toast" data-update-id="2026-03-15-multi-canvas-collab-polish" data-update-published="true" hidden="" id="updateToast" role="status" aria-live="polite">
+<div aria-hidden="true" class="update-toast" data-update-id="2026-03-20-ui-spacing" data-update-published="true" hidden="" id="updateToast" role="status" aria-live="polite">
 <div class="update-toast__body">
 <p class="update-toast__message">
-<strong>更新情報 (2026/03/15)</strong><br/>
+<strong>更新情報 (2026/03/20)</strong><br/>
 【今回更新】<br/>
-・マルチキャンバスを追加し、設定からON/OFF、追加/削除、Undo/Redo、保存/再読込、共有同期に対応しました<br/>
-・選択範囲プレビュー / ミラー / タイムライン操作は、選択中キャンバスを正しく参照するよう修正しました<br/>
-・追加キャンバスの初回クリックは選択だけになり、ドラッグした時だけそのまま描画開始します<br/>
-・共同制作の再同期、参加者セル再配置、キャンバス削除判定を見直し、古い同期やセル衝突で崩れにくくしました<br/>
-・PiXFiND は共有中に使えないようにし、接続開始時は自動でOFFにします<br/>
-・コメント欄はログだけスクロールし、入力欄は最下部固定になりました<br/>
-・プロジェクトタブの×は対象タブだけを確認付きで閉じるよう修正しました<br/>
-・参加者セルの自由移動は新規ルームで初期ONになりました<br/>
+・設定パネルにPiXiEEDアカウント欄を追加し、ログイン状態とログアウトを表示します<br/>
+・画面内のアカウントボタンは廃止し、設定内のみに統合しました<br/>
+・ログアウト時は即座に「ログイン」表示へ戻るよう修正しました<br/>
+・出力フローを「出力→広告→閉じる→出力開始」に変更しました<br/>
+・出力完了後はログイン促しパネルを表示し、ホームのログインへ移動できます<br/>
+・出力/広告の表示幅と中央揃えを安定化しました<br/>
+・ファイルパネルのキャンバスクリアと出力フォルダ設定の間隔を調整しました<br/>
+・パレットの色操作ボタンをカラースウォッチに近づけました<br/>
 ・詳細は設定の「更新情報」から確認できます
 </p>
 <div class="update-toast__actions">
@@ -698,13 +701,6 @@
 <p class="help-text ui-guide-text">自動保存: ON（この端末）</p>
 <p class="help-text ui-guide-text">共有・配布用の保存は「保存/出力」から手動で行います。</p>
 </div>
-<div class="field field--list file-contest-promo" id="fileContestPromo">
-<span id="fileContestPromoTitle">コンテスト投稿</span>
-<p class="help-text ui-guide-text" id="fileContestPromoDescription">保存/出力の「保存完了後にコンテスト投稿画面へ移動する」をONにすると、そのまま投稿できます。</p>
-<div class="field-group file-contest-promo__actions">
-<a class="button button--primary" href="../contest/index.html" id="openContestFromFilePanel">コンテストページを見る</a>
-</div>
-</div>
 <button class="button" hidden id="enableAutosave" type="button">ローカル自動保存（常時ON）</button>
 <button class="button" hidden id="bindExportFolder" type="button">出力フォルダを設定</button>
 <p aria-live="polite" class="help-text export-destination-label" id="exportDestinationLabel">画像/GIF/SVG出力先: 未固定（保存時に保存先を選択）</p>
@@ -929,12 +925,21 @@
 <section class="panel-section" data-section="settings" id="panelSettings">
 <div class="panel-section__body">
   <div class="settings-nav">
-    <a class="button settings-nav__action settings-nav__action--primary" href="https://pixieed.jp/tools.html" id="goHomeButton">他のツール一覧へ</a>
+    <a class="button settings-nav__action settings-nav__action--primary" href="../index.html" id="goHomeButton">ホームに戻る</a>
+    <a class="button settings-nav__action settings-nav__action--primary" href="../contest/index.html" id="goContestButton">広場を見る</a>
     <a class="chip settings-nav__action settings-nav__quick settings-nav__close settings-nav__support" href="https://pixieed.stores.jp" id="supportTipLink" target="_blank" rel="noopener noreferrer" aria-label="PiXiEEDの応援チップを購入">応援チップ</a>
     <button class="chip settings-nav__action settings-nav__quick settings-nav__close" id="toggleLanguageMode" type="button">あ/A</button>
     <button class="chip settings-nav__action settings-nav__quick settings-nav__close" id="openOperationHelpPanel" type="button">使い方ヘルプ</button>
     <button aria-haspopup="dialog" class="chip settings-nav__action settings-nav__quick settings-nav__close" id="openShortcutHelp" type="button">ショートカット一覧</button>
     <button aria-haspopup="dialog" class="chip settings-nav__action settings-nav__quick settings-nav__close" id="openUpdateHistory" type="button">更新情報</button>
+  </div>
+  <div class="field field--list settings-account-field">
+    <span id="pixieedAccountLabel">アカウント</span>
+    <p class="help-text" id="pixieedAccountStatus">未ログイン</p>
+    <div class="field field--inline">
+      <a class="chip" id="pixieedAccountLogin" href="../index.html#auth" target="_blank" rel="noopener">ログイン</a>
+      <button class="chip" id="pixieedAccountLogout" type="button" hidden>ログアウト</button>
+    </div>
   </div>
 <div class="settings-size-grid">
 <div class="field settings-size-row settings-size-row--canvas">
@@ -1229,7 +1234,7 @@
 <button aria-label="広告を閉じる" class="export-interstitial__close" id="closeExportInterstitial" type="button">閉じる</button>
 </header>
 <div class="modal__body">
-<p class="help-text export-interstitial__lead">画像の出力が完了しました。</p>
+<p class="help-text export-interstitial__lead">広告を閉じると出力を開始します。</p>
 <div aria-label="全画面広告" class="export-interstitial__slot-wrap">
 <div class="export-interstitial__slot">
 <ins class="export-interstitial-ins" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="exportInterstitialAdSlot" style="display:block"></ins>
@@ -1274,12 +1279,33 @@
 <p class="tool-spotlight-card__description" id="toolSpotlightContestDesc">保存した作品を投稿して、みんなの作品もチェックできます。</p>
 </div>
 </a>
+<a class="tool-spotlight-card" href="https://pixieed.stores.jp" id="toolSpotlightSupportTip" rel="noopener" role="listitem" target="_blank">
+<img alt="応援チップ" class="tool-spotlight-card__icon" src="../icon/PiXiEED.icon512.png"/>
+<div class="tool-spotlight-card__content">
+<h3 class="tool-spotlight-card__title" id="toolSpotlightTipTitle">応援チップ</h3>
+<p class="tool-spotlight-card__description" id="toolSpotlightTipDesc">みんなの応援でPiXiEEDは成長することができます。</p>
+</div>
+</a>
 </div>
 </div>
 <footer class="modal__footer tool-spotlight-modal__footer">
 <a class="button button--ghost" href="../index.html" id="toolSpotlightGoHome">ホームへ戻る</a>
-<a class="button" href="../contest/index.html" id="toolSpotlightOpenContest">コンテストを見る</a>
+<a class="button" href="../contest/index.html" id="toolSpotlightOpenContest">広場を見る</a>
 <button class="button button--primary" id="closeToolSpotlight" type="button">閉じる</button>
+</footer>
+</form>
+</dialog>
+<dialog aria-labelledby="loginPromptTitle" class="modal login-prompt-modal" id="loginPromptDialog">
+<form class="modal__form" method="dialog">
+<header class="modal__header">
+<h2 class="modal__title" id="loginPromptTitle">ログイン</h2>
+</header>
+<div class="modal__body">
+<p class="help-text" id="loginPromptLead">ログインすると、プロフィール共有や引き継ぎができます。</p>
+</div>
+<footer class="modal__footer">
+<a class="button button--primary" href="../index.html#auth" id="loginPromptGoHome">ホームでログイン</a>
+<button class="button button--ghost" id="closeLoginPrompt" type="button">閉じる</button>
 </footer>
 </form>
 </dialog>
