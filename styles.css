@@ -2633,6 +2633,7 @@ body.portfolio-page main > .section > .section-inner {
   margin: 1.4rem auto;
   width: 100%;
   max-width: min(720px, 100%);
+  min-width: 0;
   padding: 10px;
   background: rgba(255,255,255,0.05);
   border: 1px solid rgba(255,255,255,0.12);
@@ -2644,6 +2645,7 @@ body.portfolio-page main > .section > .section-inner {
   justify-content: center;
   overflow: hidden;
   min-height: clamp(48px, 9vw, 60px);
+  box-sizing: border-box;
 }
 
 .ad-block--section {
@@ -2710,6 +2712,7 @@ body.portfolio-page ins.adsbygoogle {
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   width: min(100%, 720px);
   max-width: 100%;
+  min-width: 0;
   padding: 6px 0 calc(6px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
   display: flex;
@@ -2727,6 +2730,38 @@ body.portfolio-page ins.adsbygoogle {
   height: clamp(48px, 9vw, 60px);
   background: transparent;
   outline: none;
+  box-sizing: border-box;
+}
+
+.ad-block ins,
+.ad-block iframe,
+.ad-block img,
+.ad-card ins,
+.ad-card iframe,
+.ad-card img,
+.ogp-card--ad .ad-card ins,
+.ogp-card--ad .ad-card iframe,
+.ogp-card--ad .ad-card img,
+.ad-footer ins,
+.ad-footer iframe,
+.ad-footer img,
+.project-ad ins,
+.project-ad iframe,
+.project-ad img,
+.entry-ad-slot ins,
+.entry-ad-slot iframe,
+.entry-ad-slot img,
+.puzzle-ad-slot ins,
+.puzzle-ad-slot iframe,
+.puzzle-ad-slot img,
+.game-ad ins,
+.game-ad iframe,
+.game-ad img,
+.ad-slot,
+.ad-slot iframe,
+.ad-slot img {
+  max-width: 100% !important;
+  box-sizing: border-box;
 }
 
 body.portfolio-page .ad-block--project {
@@ -2948,6 +2983,13 @@ body.project-page .project-update::before {
   max-width:100% !important;
   display:block !important;
   overflow:hidden !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+.adsbygoogle iframe,
+ins.adsbygoogle iframe {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
 }
 body.project-page .hero-cta {
   display: grid;
@@ -3008,6 +3050,7 @@ body.project-page .project-howto__note {
 body.project-page .project-ad{
   width: 100%;
   max-width: min(720px, 100%);
+  min-width: 0;
   margin: 0 auto 16px;
   padding: 10px;
   background: rgba(255,255,255,0.05);
@@ -3017,6 +3060,7 @@ body.project-page .project-ad{
   position: relative;
   overflow: hidden;
   min-height: clamp(48px, 9vw, 60px);
+  box-sizing: border-box;
 }
 body.project-page .project-ad--top{
   max-width: min(640px, 100%);
@@ -3032,6 +3076,7 @@ body.project-page .project-ad ins.adsbygoogle{
   min-height: clamp(48px, 9vw, 60px);
   height: clamp(48px, 9vw, 60px);
   overflow:hidden;
+  box-sizing: border-box;
 }
 body.project-page .project-ad--top ins.adsbygoogle{
   width:100% !important;
