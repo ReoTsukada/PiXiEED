@@ -428,11 +428,17 @@
       border:1px solid rgba(255,255,255,0.12);
       box-shadow:0 10px 30px rgba(0,0,0,0.28);
       position:relative;
+      box-sizing:border-box;
     }
     .entry-ad-slot{
       width:100%;
       max-width:100%;
       min-width:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:clamp(48px, 9vw, 60px);
+      box-sizing:border-box;
     }
     .entry-ad-slot ins{
       display:block;
@@ -440,6 +446,12 @@
       min-height:clamp(48px, 9vw, 60px);
       height:clamp(48px, 9vw, 60px);
       overflow:hidden;
+      box-sizing:border-box;
+    }
+    .entry-ad-slot iframe,
+    .entry-ad-slot img{
+      max-width:100% !important;
+      box-sizing:border-box;
     }
     .entry-ad-note{
       margin:0;
@@ -1651,7 +1663,9 @@
               <input class="auth-input" id="authEmail" type="email" placeholder="メールアドレス" autocomplete="email">
               <input class="auth-input" id="authPasscode" type="password" placeholder="パスコード（6〜20文字）" autocomplete="current-password">
             </div>
-            <button class="auth-btn" id="authBtn" type="button">メール＋パスコードでログイン</button>
+            <div class="auth-actions" style="display:grid; gap:8px;">
+              <button class="auth-btn" id="authLoginBtn" type="button">ログイン</button>
+            </div>
             <button class="auth-btn logout" id="logoutBtn" type="button" style="display:none;">ログアウト</button>
             <p class="helper" style="margin:0;">別端末でも同じアカウントで利用できます。</p>
           </div>
@@ -5209,17 +5223,17 @@
     }
 
     function updateAuthUI(){
-      const btn = document.getElementById('authBtn');
+      const loginBtn = document.getElementById('authLoginBtn');
       const logoutBtn = document.getElementById('logoutBtn');
       const emailInput = document.getElementById('authEmail');
       const passInput = document.getElementById('authPasscode');
       const authInputs = document.getElementById('authInputs');
       const linkedEmail = document.getElementById('linkedEmail');
       const nick = loadNickname();
-      if(!btn) return;
+      if(!loginBtn) return;
       if(supabaseUser){
-        btn.textContent = 'ログインリンクを再送';
         if(logoutBtn) logoutBtn.style.display = 'block';
+        if(loginBtn) loginBtn.style.display = 'none';
         setAuthStatus(`ログイン中${supabaseUser.email ? `: ${supabaseUser.email}` : ''}${nick ? ` / ${nick}` : ''}`);
         if(emailInput){
           emailInput.value = supabaseUser.email || emailInput.value;
@@ -5235,7 +5249,7 @@
           linkedEmail.textContent = supabaseUser.email ? `紐付け済み: ${supabaseUser.email}` : '紐付け済み';
         }
       }else{
-        btn.textContent = 'メールでログイン';
+        if(loginBtn) loginBtn.style.display = '';
         if(logoutBtn) logoutBtn.style.display = 'none';
         setAuthStatus(nick ? `ニックネーム: ${nick}` : '');
         if(emailInput){
@@ -5302,7 +5316,7 @@
     }
 
     function setupAuthButton(){
-      const btn = document.getElementById('authBtn');
+      const loginBtn = document.getElementById('authLoginBtn');
       const logoutBtn = document.getElementById('logoutBtn');
       const openBtn = document.getElementById('openProfilePanel');
       const closeBtn = document.getElementById('closeAuthPanel');
@@ -5388,42 +5402,56 @@
           }
         });
       }
-      if(!btn) return;
-      btn.addEventListener('click', async () => {
-        if(!supabase){
-          setAuthStatus('オンラインでログインしてください');
-          return;
-        }
+      const readAuthInputs = () => {
         const emailInput = document.getElementById('authEmail');
         const passInput = document.getElementById('authPasscode');
         const email = (emailInput?.value || '').trim();
         const passcode = (passInput?.value || '').trim();
+        return { email, passcode };
+      };
+      const isConfirmError = (error) => String(error?.message || '').toLowerCase().includes('confirm');
+      const isAlreadyRegisteredError = (error) => {
+        const msg = String(error?.message || '').toLowerCase();
+        return msg.includes('already') || msg.includes('registered') || msg.includes('exists');
+      };
+      const validateAuthInputs = async () => {
+        const { email, passcode } = readAuthInputs();
         if(!email){
           setAuthStatus('メールアドレスを入力してください');
-          return;
+          return null;
         }
         if(!passcode){
           await sendLoginLink(email);
-          return;
+          return null;
         }
         if(passcode.length < 6 || passcode.length > 20){
           setAuthStatus('パスコードは6〜20文字で入力してください');
+          return null;
+        }
+        return { email, passcode };
+      };
+      if(!loginBtn) return;
+      if(loginBtn) loginBtn.addEventListener('click', async () => {
+        if(!supabase){
+          setAuthStatus('オンラインでログインしてください');
           return;
         }
+        const input = await validateAuthInputs();
+        if(!input) return;
+        const { email, passcode } = input;
         setAuthStatus('サインインしています...');
         try{
           const { error } = await supabase.auth.signInWithPassword({ email, password: passcode });
           if(error){
             // 既に登録済みで未確認なら再送
-            if(String(error.message || '').toLowerCase().includes('confirm')){
+            if(isConfirmError(error)){
               await supabase.auth.resend({ type:'signup', email, options:{ emailRedirectTo: window.location.href } });
               setAuthStatus('確認メールを再送しました。メールを確認してください');
               return;
             }
             const { error: signUpError } = await supabase.auth.signUp({ email, password: passcode, options:{ emailRedirectTo: window.location.href } });
             if(signUpError){
-              const msg = String(signUpError.message || '').toLowerCase();
-              if(msg.includes('already') || msg.includes('registered') || msg.includes('exists')){
+              if(isAlreadyRegisteredError(signUpError)){
                 setAuthStatus('このメールは登録済みです。パスコードを確認してください');
                 return;
               }
@@ -5475,7 +5503,7 @@
         setActiveNav();
         return;
       }
-      if(location.hash === '#auth'){
+      if(location.hash && location.hash.startsWith('#auth')){
         const openBtn = document.getElementById('openProfilePanel');
         if(openBtn){
           setTimeout(() => openBtn.click(), 0);
