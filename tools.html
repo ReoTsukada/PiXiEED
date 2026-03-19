@@ -1119,6 +1119,17 @@
         <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
       </div>
       <div class="profile-block">
+        <p class="helper" style="margin:0;">アカウントの保存（メール）</p>
+        <div id="authInputs" style="display:grid; gap:8px;">
+          <input class="auth-input" id="authEmail" type="email" placeholder="メールアドレス" autocomplete="email">
+          <input class="auth-input" id="authPasscode" type="password" placeholder="パスコード（6〜20文字）" autocomplete="current-password">
+        </div>
+        <div class="auth-actions" style="display:grid; gap:8px;">
+          <button class="auth-btn" id="authLoginBtn" type="button">ログイン</button>
+        </div>
+        <button class="auth-btn logout" id="logoutBtn" type="button" style="display:none;">ログアウト</button>
+        <span class="helper" id="linkedEmail" style="display:none;"></span>
+        <p class="helper" style="margin:0;">別端末でも同じアカウントで利用できます。</p>
         <p class="helper" id="authStatus"></p>
       </div>
     </div>
@@ -1197,6 +1208,13 @@
         jellnall19:'character-dots/JELLNALL19.png',
         baburin:'character-dots/baburinpng.png'
       };
+      const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
+      const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
+      const SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
+      let supabaseAuth = null;
+      let supabaseSession = null;
+      let supabaseUser = null;
+      let supportsProfileXUrl = true;
 
       const ITEMS = [
         {
@@ -1241,7 +1259,7 @@
           category:'tool',
           href:'pixiedraw/index.html',
           image:'icon/icon-192-4.png',
-          updated:'2025-10-30',
+          updated:'2026-03-20',
           readme:'pixiedraw/README.md'
         },
         {
@@ -1422,7 +1440,6 @@
         const saveBtn = document.getElementById('saveProfile');
         const nickInput = document.getElementById('profileNickname');
         const xInput = document.getElementById('profileX');
-        const status = document.getElementById('authStatus');
         const toggle = (open) => {
           if(!panel) return;
           if(open){
@@ -1440,13 +1457,229 @@
         if(closeBtn) closeBtn.addEventListener('click', () => toggle(false));
         if(panel){ panel.addEventListener('click', (e) => { if(e.target === panel) toggle(false); }); }
         if(saveBtn){
-          saveBtn.addEventListener('click', () => {
+          saveBtn.addEventListener('click', async () => {
             const nick = (nickInput?.value || '').trim();
             const xUrl = normalizeXUrl(xInput?.value || '');
             if(nick){ saveNickname(nick); }
             saveXUrl(xUrl);
             applyAvatar();
-            if(status) status.textContent = 'プロフィールを保存しました';
+            if(supabaseAuth && supabaseUser?.id){
+              try{
+                const payload = { id: supabaseUser.id, nickname: nick || null, avatar: loadAvatar() };
+                if(supportsProfileXUrl) payload.x_url = xUrl || null;
+                let res = await supabaseAuth.from('user_profiles').upsert(payload);
+                if(res.error && supportsProfileXUrl && isMissingColumn(res.error, 'x_url')){
+                  supportsProfileXUrl = false;
+                  delete payload.x_url;
+                  res = await supabaseAuth.from('user_profiles').upsert(payload);
+                }
+                if(res.error) throw res.error;
+                setAuthStatus('プロフィールを保存しました');
+              }catch(err){
+                console.warn('profile save fallback', err);
+                setAuthStatus('ローカルに保存しました');
+              }
+            }else{
+              setAuthStatus('ローカルに保存しました');
+            }
+          });
+        }
+      }
+
+      function setAuthStatus(message){
+        const status = document.getElementById('authStatus');
+        if(status) status.textContent = message || '';
+      }
+      function isMissingColumn(error, column){
+        return String(error?.message || '').includes(column);
+      }
+      function applyProfileFromServer(data){
+        if(!data) return;
+        const nick = typeof data.nickname === 'string' ? data.nickname : '';
+        const avatar = typeof data.avatar === 'string' ? data.avatar : '';
+        const xUrl = typeof data.x_url === 'string' ? data.x_url : '';
+        if(nick) saveNickname(nick);
+        if(avatar) saveAvatar(avatar);
+        if(xUrl) saveXUrl(xUrl);
+        applyAvatar();
+      }
+      async function syncProfileFromServer(){
+        if(!supabaseAuth || !supabaseUser?.id) return;
+        try{
+          let res = await supabaseAuth.from('user_profiles')
+            .select('nickname,avatar,x_url')
+            .eq('id', supabaseUser.id)
+            .maybeSingle();
+          if(res.error && supportsProfileXUrl && isMissingColumn(res.error, 'x_url')){
+            supportsProfileXUrl = false;
+            res = await supabaseAuth.from('user_profiles')
+              .select('nickname,avatar')
+              .eq('id', supabaseUser.id)
+              .maybeSingle();
+          }
+          if(res.error) throw res.error;
+          applyProfileFromServer(res.data);
+        }catch(err){
+          console.warn('profile sync failed', err);
+        }
+      }
+      function updateAuthUI(){
+        const loginBtn = document.getElementById('authLoginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const emailInput = document.getElementById('authEmail');
+        const passInput = document.getElementById('authPasscode');
+        const authInputs = document.getElementById('authInputs');
+        const linkedEmail = document.getElementById('linkedEmail');
+        const nick = loadNickname();
+        if(supabaseUser){
+          if(loginBtn) loginBtn.style.display = 'none';
+          if(logoutBtn) logoutBtn.style.display = 'block';
+          if(authInputs) authInputs.style.display = 'none';
+          if(emailInput){
+            emailInput.value = supabaseUser.email || emailInput.value;
+            emailInput.disabled = true;
+          }
+          if(passInput){
+            passInput.value = '';
+            passInput.disabled = true;
+          }
+          if(linkedEmail){
+            linkedEmail.style.display = 'inline-flex';
+            linkedEmail.textContent = supabaseUser.email ? `紐付け済み: ${supabaseUser.email}` : '紐付け済み';
+          }
+          setAuthStatus(`ログイン中${supabaseUser.email ? `: ${supabaseUser.email}` : ''}${nick ? ` / ${nick}` : ''}`);
+        }else{
+          if(loginBtn) loginBtn.style.display = '';
+          if(logoutBtn) logoutBtn.style.display = 'none';
+          if(authInputs) authInputs.style.display = 'grid';
+          if(emailInput) emailInput.disabled = false;
+          if(passInput) passInput.disabled = false;
+          if(linkedEmail){
+            linkedEmail.style.display = 'none';
+            linkedEmail.textContent = '';
+          }
+          setAuthStatus(nick ? `ニックネーム: ${nick}` : '');
+        }
+      }
+      async function initSupabaseAuth(){
+        try{
+          const { createClient } = await import(SUPABASE_MODULE_URL);
+          supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          const { data } = await supabaseAuth.auth.getSession();
+          supabaseSession = data?.session || null;
+          supabaseUser = supabaseSession?.user || null;
+          supabaseAuth.auth.onAuthStateChange(async (_event, session) => {
+            supabaseSession = session || null;
+            supabaseUser = session?.user || null;
+            await syncProfileFromServer();
+            updateAuthUI();
+          });
+          await syncProfileFromServer();
+          updateAuthUI();
+        }catch(err){
+          console.warn('Supabase auth init failed', err);
+          supabaseAuth = null;
+          updateAuthUI();
+        }
+      }
+      function setupAuthControls(){
+        const loginBtn = document.getElementById('authLoginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const sendLoginLink = async (email) => {
+          if(!supabaseAuth){
+            setAuthStatus('オンラインでログインしてください');
+            return false;
+          }
+          setAuthStatus('ログインリンクを送信しています...');
+          try{
+            const { error } = await supabaseAuth.auth.signInWithOtp({
+              email,
+              options:{ emailRedirectTo: window.location.href }
+            });
+            if(error) throw error;
+            setAuthStatus('ログインリンクを送信しました。メールを確認してください');
+            return true;
+          }catch(err){
+            console.error(err);
+            setAuthStatus('ログインリンクの送信に失敗しました');
+            return false;
+          }
+        };
+        const readAuthInputs = () => {
+          const emailInput = document.getElementById('authEmail');
+          const passInput = document.getElementById('authPasscode');
+          const email = (emailInput?.value || '').trim();
+          const passcode = (passInput?.value || '').trim();
+          return { email, passcode };
+        };
+        const isConfirmError = (error) => String(error?.message || '').toLowerCase().includes('confirm');
+        const isAlreadyRegisteredError = (error) => {
+          const msg = String(error?.message || '').toLowerCase();
+          return msg.includes('already') || msg.includes('registered') || msg.includes('exists');
+        };
+        const validateAuthInputs = async () => {
+          const { email, passcode } = readAuthInputs();
+          if(!email){
+            setAuthStatus('メールアドレスを入力してください');
+            return null;
+          }
+          if(!passcode){
+            await sendLoginLink(email);
+            return null;
+          }
+          if(passcode.length < 6 || passcode.length > 20){
+            setAuthStatus('パスコードは6〜20文字で入力してください');
+            return null;
+          }
+          return { email, passcode };
+        };
+        if(loginBtn) loginBtn.addEventListener('click', async () => {
+          if(!supabaseAuth){
+            setAuthStatus('オンラインでログインしてください');
+            return;
+          }
+          const input = await validateAuthInputs();
+          if(!input) return;
+          const { email, passcode } = input;
+          setAuthStatus('サインインしています...');
+          try{
+            const { error } = await supabaseAuth.auth.signInWithPassword({ email, password: passcode });
+            if(error){
+              if(isConfirmError(error)){
+                await supabaseAuth.auth.resend({ type:'signup', email, options:{ emailRedirectTo: window.location.href } });
+                setAuthStatus('確認メールを再送しました。メールを確認してください');
+                return;
+              }
+              const { error: signUpError } = await supabaseAuth.auth.signUp({ email, password: passcode, options:{ emailRedirectTo: window.location.href } });
+              if(signUpError){
+                if(isAlreadyRegisteredError(signUpError)){
+                  setAuthStatus('このメールは登録済みです。パスコードを確認してください');
+                  return;
+                }
+                setAuthStatus('ログイン／登録に失敗しました');
+                console.error(signUpError);
+                return;
+              }
+              setAuthStatus('確認メールを送信しました。メールを確認してください');
+            }else{
+              setAuthStatus('サインインしました');
+            }
+          }catch(err){
+            console.error(err);
+            setAuthStatus('ログインに失敗しました');
+          }
+        });
+        if(logoutBtn){
+          logoutBtn.addEventListener('click', async () => {
+            if(!supabaseAuth) return;
+            try{
+              await supabaseAuth.auth.signOut();
+            }catch(err){
+              console.warn('logout failed', err);
+            }
+            supabaseSession = null;
+            supabaseUser = null;
+            updateAuthUI();
           });
         }
       }
@@ -1559,6 +1792,8 @@
         applyAvatar();
         setupAvatarToggle();
         setupProfileModal();
+        setupAuthControls();
+        initSupabaseAuth();
         setupFilters();
         setActiveNav();
         const year = document.getElementById('year');
