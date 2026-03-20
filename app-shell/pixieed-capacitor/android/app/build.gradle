@@ -15,8 +15,8 @@ def releaseSigning = [
     keyPassword: System.getenv('PIXIEED_ANDROID_KEY_PASSWORD') ?: keystoreProperties.getProperty('keyPassword'),
 ]
 def hasReleaseSigning = releaseSigning.values().every { it }
-def releaseVersionCode = (System.getenv('PIXIEED_ANDROID_VERSION_CODE') ?: '4') as Integer
-def releaseVersionName = System.getenv('PIXIEED_ANDROID_VERSION_NAME') ?: '1.0.3'
+def releaseVersionCode = (System.getenv('PIXIEED_ANDROID_VERSION_CODE') ?: '5') as Integer
+def releaseVersionName = System.getenv('PIXIEED_ANDROID_VERSION_NAME') ?: '1.0.4'
 
 android {
     namespace = "jp.pixieed.app"
