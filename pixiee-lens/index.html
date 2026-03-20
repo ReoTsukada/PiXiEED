@@ -11863,5 +11863,61 @@
       startCamera();
     }
   </script>
+  <script>
+    (() => {
+      if (window.__PIXIEED_HOME_BACK_GUARD__) return;
+      window.__PIXIEED_HOME_BACK_GUARD__ = true;
+      if (typeof window.history?.pushState !== 'function' || typeof window.history?.replaceState !== 'function') {
+        return;
+      }
+      const HOME_PATHS = new Set(['/', '/index.html']);
+      const currentUrl = new URL(window.location.href);
+      if (HOME_PATHS.has(currentUrl.pathname)) {
+        return;
+      }
+      const entryKey = 'pixieed_entry_url_v1';
+      let entryUrl = null;
+      try {
+        entryUrl = window.sessionStorage.getItem(entryKey);
+        if (!entryUrl) {
+          window.sessionStorage.setItem(entryKey, currentUrl.href);
+          entryUrl = currentUrl.href;
+        }
+      } catch (_error) {
+        const referrer = document.referrer;
+        if (referrer) {
+          try {
+            const referrerOrigin = new URL(referrer).origin;
+            if (referrerOrigin === currentUrl.origin) {
+              return;
+            }
+          } catch (_err) {
+            // ignore invalid referrer
+          }
+        }
+        entryUrl = currentUrl.href;
+      }
+      if (entryUrl !== currentUrl.href) {
+        return;
+      }
+      const stateKey = '__pixieedHomeGuard';
+      const currentState = window.history.state;
+      const baseState = currentState && typeof currentState === 'object'
+        ? { ...currentState }
+        : {};
+      if (baseState[stateKey]) {
+        return;
+      }
+      baseState[stateKey] = 'base';
+      window.history.replaceState(baseState, document.title, currentUrl.href);
+      window.history.pushState({ [stateKey]: 'sentinel' }, document.title, currentUrl.href);
+      window.addEventListener('popstate', (event) => {
+        const nextState = event.state || {};
+        if (nextState && nextState[stateKey] === 'base') {
+          window.location.replace(`${currentUrl.origin}/index.html`);
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
