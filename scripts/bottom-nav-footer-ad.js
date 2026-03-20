@@ -380,6 +380,16 @@
     if (!bottomNav) return;
     if (document.querySelector('.ad-footer')) return;
 
+    const syncPageGutter = () => {
+      const body = document.body;
+      if (!body) return;
+      const styles = window.getComputedStyle(body);
+      const left = Number.parseFloat(styles.paddingLeft) || 0;
+      const right = Number.parseFloat(styles.paddingRight) || 0;
+      const gutter = Math.max(left, right, 0);
+      document.documentElement.style.setProperty('--pixieed-page-gutter', `${gutter}px`);
+    };
+
     const styleId = 'pixieed-ad-footer-style';
     if (!document.getElementById(styleId)) {
       const style = document.createElement('style');
@@ -491,6 +501,14 @@
       const currentPadding = window.getComputedStyle(document.body).paddingBottom || '0px';
       document.body.style.paddingBottom = `calc(${currentPadding} + var(--pixieed-footer-ad-offset))`;
       document.body.dataset.footerAdPaddingApplied = 'true';
+    }
+    syncPageGutter();
+    if (!window.__PIXIEED_FOOTER_AD_GUTTER_BOUND__) {
+      window.__PIXIEED_FOOTER_AD_GUTTER_BOUND__ = true;
+      window.addEventListener('resize', syncPageGutter, { passive: true });
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', syncPageGutter, { passive: true });
+      }
     }
 
     const footer = document.createElement('div');
