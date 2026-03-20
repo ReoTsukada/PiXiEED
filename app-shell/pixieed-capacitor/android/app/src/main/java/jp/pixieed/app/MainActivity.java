@@ -10,6 +10,8 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.util.Base64;
+import android.webkit.CookieManager;
+import android.webkit.WebView;
 
 import androidx.annotation.Nullable;
 
@@ -22,6 +24,7 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
+import com.google.android.gms.ads.MobileAds;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -32,6 +35,26 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(PiXiEEDMediaPlugin.class);
         super.onCreate(savedInstanceState);
+        registerAdsWebView();
+    }
+
+    private void registerAdsWebView() {
+        if (getBridge() == null) {
+            return;
+        }
+        WebView webView = getBridge().getWebView();
+        if (webView == null) {
+            return;
+        }
+        try {
+            CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
+            webView.getSettings().setJavaScriptEnabled(true);
+            webView.getSettings().setDomStorageEnabled(true);
+            webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+            MobileAds.registerWebView(webView);
+        } catch (Exception ignored) {
+            // Avoid crashing the app if ads SDK isn't available.
+        }
     }
 }
 
