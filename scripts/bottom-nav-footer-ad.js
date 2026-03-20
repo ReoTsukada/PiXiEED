@@ -485,18 +485,18 @@
         }
         body.has-footer-ad > .page,
         body.has-footer-ad > main{
-          width:min(var(--pixieed-layout-max-width), calc(100vw - (var(--pixieed-page-gutter) * 2)));
-          max-width:100%;
+          width:100%;
+          max-width:min(var(--pixieed-layout-max-width), 100%);
           margin-left:auto !important;
           margin-right:auto !important;
         }
         body.has-footer-ad > .page > header,
         body.has-footer-ad > .page > .top-nav,
         body.has-footer-ad > .page > [aria-label="top-nav"]{
-          width:100vw;
-          max-width:100vw !important;
-          margin-left:calc(50% - 50vw) !important;
-          margin-right:calc(50% - 50vw) !important;
+          width:calc(100% + (var(--pixieed-page-gutter) * 2));
+          max-width:none !important;
+          margin-left:calc(var(--pixieed-page-gutter) * -1) !important;
+          margin-right:calc(var(--pixieed-page-gutter) * -1) !important;
         }
         body.has-footer-ad .bottom-nav{
           bottom:var(--pixieed-footer-ad-offset) !important;
