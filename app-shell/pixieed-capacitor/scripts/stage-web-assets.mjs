@@ -18,6 +18,7 @@ const includeEntries = [
   'games.html',
   'glossary',
   'icon',
+  'index.html',
   'jerin-maker',
   'maoitu',
   'manifest.webmanifest',
@@ -28,6 +29,7 @@ const includeEntries = [
   'pixfind',
   'pixiedraw',
   'pixiee-lens',
+  'portfolio',
   'privacy',
   'projects',
   'public-room.html',
@@ -251,7 +253,6 @@ async function main() {
     await copyEntry(entry);
   }
 
-  await writeFile(path.join(webRoot, 'index.html'), buildLauncherHtml(), 'utf8');
   await writeFile(buildManifestPath, `${JSON.stringify(getBuildSummary(includeEntries), null, 2)}\n`, 'utf8');
 
   console.log(`Staged ${includeEntries.length} entries into ${webRoot}`);
