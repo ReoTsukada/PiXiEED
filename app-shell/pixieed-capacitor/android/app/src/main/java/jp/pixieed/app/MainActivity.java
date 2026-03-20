@@ -31,11 +31,33 @@ import java.io.FileOutputStream;
 import java.io.OutputStream;
 
 public class MainActivity extends BridgeActivity {
+    private static final String HOME_PATH = "/index.html";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(PiXiEEDMediaPlugin.class);
         super.onCreate(savedInstanceState);
         registerAdsWebView();
+    }
+
+    @Override
+    public void onBackPressed() {
+        WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+        if (webView != null) {
+            if (webView.canGoBack()) {
+                webView.goBack();
+                return;
+            }
+            String currentUrl = webView.getUrl();
+            if (!isHomeUrl(currentUrl)) {
+                String homeUrl = resolveHomeUrl(currentUrl);
+                if (homeUrl != null) {
+                    webView.loadUrl(homeUrl);
+                    return;
+                }
+            }
+        }
+        super.onBackPressed();
     }
 
     private void registerAdsWebView() {
@@ -55,6 +77,35 @@ public class MainActivity extends BridgeActivity {
         } catch (Exception ignored) {
             // Avoid crashing the app if ads SDK isn't available.
         }
+    }
+
+    private boolean isHomeUrl(@Nullable String url) {
+        if (url == null || url.isEmpty()) {
+            return false;
+        }
+        Uri uri = Uri.parse(url);
+        String path = uri.getPath();
+        return path == null || path.isEmpty() || "/".equals(path) || HOME_PATH.equals(path);
+    }
+
+    @Nullable
+    private String resolveHomeUrl(@Nullable String currentUrl) {
+        if (currentUrl == null || currentUrl.isEmpty()) {
+            return null;
+        }
+        Uri uri = Uri.parse(currentUrl);
+        String scheme = uri.getScheme();
+        String host = uri.getHost();
+        if (scheme == null || host == null) {
+            return null;
+        }
+        int port = uri.getPort();
+        StringBuilder origin = new StringBuilder();
+        origin.append(scheme).append("://").append(host);
+        if (port > 0) {
+            origin.append(":").append(port);
+        }
+        return origin.append(HOME_PATH).toString();
     }
 }
 
