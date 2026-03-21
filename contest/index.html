@@ -1502,7 +1502,7 @@
           </div>
         </button>
         <div class="header-actions">
-          <a class="support-tip-link" href="https://pixieed.stores.jp" target="_blank" rel="noopener noreferrer" aria-label="PiXiEEDの応援チップを購入">応援チップ</a>
+          <a class="support-tip-link" href="https://kyyiuakrqomzlikfaire.supabase.co/functions/v1/stripe-browser-adfree-checkout?product=support_tip&amp;return_url=https%3A%2F%2Fpixieed.jp%2Fcontest%2F" target="_blank" rel="noopener noreferrer" aria-label="PiXiEEDの応援チップを購入">応援チップ</a>
         </div>
       </div>
     </header>
@@ -1708,21 +1708,17 @@
           </div>
         </details>
       </div>
-      <div class="profile-block">
+      <div class="profile-block" hidden>
         <p class="helper" style="margin:0;">広告非表示（ブラウザ版）</p>
-        <p class="helper" id="pixieedAdFreeStatus" style="margin:0;">ログイン後に購入コードを適用できます。</p>
+        <p class="helper" id="pixieedAdFreeStatus" style="margin:0;">ログイン後に購入番号または購入コードを適用できます。</p>
         <div class="auth-actions" style="display:grid; gap:8px;">
-          <a class="auth-btn" id="pixieedAdFreePurchase" href="https://pixieed.stores.jp" target="_blank" rel="noopener noreferrer">広告非表示を購入</a>
+          <a class="auth-btn" id="pixieedAdFreePurchase" href="#" rel="noopener">広告非表示を購入</a>
         </div>
         <div style="display:grid; gap:8px;">
-          <input class="auth-input" id="pixieedAdFreeOrderId" type="text" placeholder="注文番号" maxlength="64" autocomplete="off">
-          <button class="auth-btn" id="pixieedAdFreeClaim" type="button">購入コードを受け取る</button>
+          <input class="auth-input" id="pixieedAdFreeOrderId" type="text" placeholder="購入番号 / 購入コード" maxlength="64" autocomplete="off">
+          <button class="auth-btn" id="pixieedAdFreeClaim" type="button">適用</button>
         </div>
-        <div style="display:grid; gap:8px;">
-          <input class="auth-input" id="pixieedAdFreeRedeemCode" type="text" placeholder="購入コード" maxlength="48" autocomplete="one-time-code">
-          <button class="auth-btn" id="pixieedAdFreeRedeem" type="button">コードを適用</button>
-        </div>
-        <p class="helper" style="margin:0;">購入時と同じメールアドレスでログインし、注文番号から購入コードを受け取って適用します。</p>
+        <p class="helper" style="margin:0;">購入時と同じメールアドレスでログインしてください。購入後は自動反映され、うまくいかない場合は購入番号または購入コードを入力して適用できます。</p>
         <p class="helper" style="margin:0;">広告を消さずに支援したい場合は、上部の応援チップも利用できます。</p>
       </div>
       <p class="auth-status" id="authStatus"></p>
