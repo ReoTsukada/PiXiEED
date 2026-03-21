@@ -821,14 +821,10 @@
 <input data-stepper="true" id="multiMaxGuests" inputmode="numeric" max="15" min="1" step="1" type="number" value="5"/>
 </label>
 <p class="help-text ui-guide-text" id="multiGuestCapacityHint">参加枠: 0 / 5</p>
-<label class="field field--compact">
+<div class="field field--compact">
 <span>部屋公開</span>
-<select id="multiRoomVisibility">
-<option value="public" selected>公開</option>
-<option value="private">非公開</option>
-</select>
-</label>
-<p class="help-text ui-guide-text" id="multiRoomVisibilityHint">非公開: ホームには表示されません。</p>
+<p class="help-text ui-guide-text" id="multiRoomVisibilityHint">公開部屋の一覧は停止中です。マルチプレイは非公開で開始され、招待リンクで共有できます。</p>
+</div>
 <label class="field field--compact">
 <span>出力権限</span>
 <select id="multiExportPermission">
@@ -940,6 +936,18 @@
       <a class="chip" id="pixieedAccountLogin" href="../index.html#auth" target="_blank" rel="noopener">ログイン</a>
       <button class="chip" id="pixieedAccountLogout" type="button" hidden>ログアウト</button>
     </div>
+  </div>
+  <div class="field field--list settings-account-field">
+    <span>広告非表示（ブラウザ版）</span>
+    <p class="help-text" id="pixieedAdFreeStatus">ログイン後に購入コードを適用できます。</p>
+    <div class="field field--inline">
+      <a class="chip" id="pixieedAdFreePurchase" href="https://pixieed.stores.jp" target="_blank" rel="noopener noreferrer">広告非表示パスを購入</a>
+    </div>
+    <div class="field field--inline">
+      <input autocomplete="one-time-code" id="pixieedAdFreeRedeemCode" maxlength="48" placeholder="購入コード" type="text"/>
+      <button class="chip" id="pixieedAdFreeRedeem" type="button">コードを適用</button>
+    </div>
+    <p class="help-text">購入後に届くコードを、ログイン中のアカウントへ紐付けます。</p>
   </div>
 <div class="settings-size-grid">
 <div class="field settings-size-row settings-size-row--canvas">
@@ -1482,6 +1490,7 @@
       })();
     </script>
 <script defer="" src="../scripts/pixieed-dot-stats.js"></script>
+<script src="../scripts/pixieed-adfree.js"></script>
 <script defer="" src="assets/js/app.js"></script>
 <script defer="" src="assets/js/local-extension-runtime.js"></script>
   <!-- Mobile bottom ad placeholder (visible in portrait / small screens) -->
@@ -1496,6 +1505,16 @@
   </div>
   <script>
     (function () {
+      if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+        document.documentElement.style.setProperty('--mobile-bottom-ad-height', '0px');
+        document.body.classList.remove('bottom-ad-active');
+        const mobileAd = document.getElementById('mobileBottomAd');
+        if (mobileAd instanceof HTMLElement) {
+          mobileAd.classList.remove('visible');
+          mobileAd.setAttribute('aria-hidden', 'true');
+        }
+        return;
+      }
       // Manage the mobile bottom ad visibility and geometry by orientation.
       const mobileAd = document.getElementById('mobileBottomAd');
       if (!mobileAd) return;
@@ -1744,6 +1763,7 @@
     // right before push(), so 0px hidden slots never poison the global queue.
     (function initAds() {
       if (!document || !window) return;
+      if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) return;
       const ADS_CLIENT = 'ca-pub-9801602250480253';
       const SLOTS = [
         { containerId: 'leftPanelAdSlot', slot: '3806415737' },
