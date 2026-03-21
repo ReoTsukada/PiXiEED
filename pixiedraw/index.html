@@ -144,23 +144,26 @@
 <div class="startup-screen__recent" hidden="" id="startupRecentProjects">
 <h2 class="startup-screen__recent-title">端末内プロジェクト（自動保存）</h2>
 <div class="startup-recent-list" id="startupRecentList" role="list"></div>
+<div aria-label="広告" class="export-ad startup-screen__ad" id="startupRecentAdContainer">
+<div class="export-ad__slot">
+<ins class="startup-recent-ad-ins" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="startupRecentAdSlot" style="display:block"></ins>
+</div>
+<small class="export-ad__label">広告</small>
+</div>
 </div>
 <button class="startup-screen__link" id="startupActionSkip" type="button">この画面を閉じる</button>
 </div>
 </div>
-<div aria-hidden="true" class="update-toast" data-update-id="2026-03-20-ui-spacing" data-update-published="true" hidden="" id="updateToast" role="status" aria-live="polite">
+<div aria-hidden="true" class="update-toast" data-update-id="2026-03-22-composite-thumbnail-ads" data-update-published="true" hidden="" id="updateToast" role="status" aria-live="polite">
 <div class="update-toast__body">
 <p class="update-toast__message">
-<strong>更新情報 (2026/03/20)</strong><br/>
+<strong>更新情報 (2026/03/22)</strong><br/>
 【今回更新】<br/>
-・設定パネルにPiXiEEDアカウント欄を追加し、ログイン状態とログアウトを表示します<br/>
-・画面内のアカウントボタンは廃止し、設定内のみに統合しました<br/>
-・ログアウト時は即座に「ログイン」表示へ戻るよう修正しました<br/>
-・出力フローを「出力→広告→閉じる→出力開始」に変更しました<br/>
-・出力完了後はログイン促しパネルを表示し、ホームのログインへ移動できます<br/>
-・出力/広告の表示幅と中央揃えを安定化しました<br/>
-・ファイルパネルのキャンバスクリアと出力フォルダ設定の間隔を調整しました<br/>
-・パレットの色操作ボタンをカラースウォッチに近づけました<br/>
+・スポイトは表示中の合成色をそのまま拾うよう修正しました<br/>
+・プロジェクトサムネイルは実際の合成結果に合わせ、マルチキャンバス時は xN バッジを表示します<br/>
+・起動画面 / 新規作成 / 更新情報 / ショートカット一覧に広告枠を追加しました<br/>
+・右パネル広告はヘルプ / ファイル中心で表示するよう調整しました<br/>
+・配信用に応援チップと広告非表示の導線を一時非表示にしました<br/>
 ・詳細は設定の「更新情報」から確認できます
 </p>
 <div class="update-toast__actions">
@@ -1120,7 +1123,7 @@
 <button class="chip" id="pixieedAccountLogout" type="button" hidden>ログアウト</button>
 </div>
 </div>
-<div class="field field--list settings-account-field" hidden>
+<div class="field field--list settings-account-field" id="pixieedAdFreeField">
 <span>広告非表示（ブラウザ版）</span>
 <p class="help-text" id="pixieedAdFreeStatus">ログイン後に購入番号または購入コードを適用できます。</p>
 <div class="field field--inline">
@@ -1287,7 +1290,7 @@
 <p class="tool-spotlight-card__description" id="toolSpotlightContestDesc">保存した作品を投稿して、みんなの作品もチェックできます。</p>
 </div>
 </a>
-<a class="tool-spotlight-card" href="https://kyyiuakrqomzlikfaire.supabase.co/functions/v1/stripe-browser-adfree-checkout?product=support_tip&amp;return_url=https%3A%2F%2Fpixieed.jp%2Fpixiedraw%2F" id="toolSpotlightSupportTip" rel="noopener" role="listitem" target="_blank">
+<a aria-hidden="true" class="tool-spotlight-card" href="https://kyyiuakrqomzlikfaire.supabase.co/functions/v1/stripe-browser-adfree-checkout?product=support_tip&amp;return_url=https%3A%2F%2Fpixieed.jp%2Fpixiedraw%2F" hidden="" id="toolSpotlightSupportTip" rel="noopener" role="listitem" target="_blank">
 <img alt="応援チップ" class="tool-spotlight-card__icon" src="../icon/PiXiEED.icon512.png"/>
 <div class="tool-spotlight-card__content">
 <h3 class="tool-spotlight-card__title" id="toolSpotlightTipTitle">応援チップ</h3>
@@ -1362,6 +1365,12 @@
 </div>
 </div>
 <p class="help-text" id="newProjectExportFolderGuide">必要な場合のみ保存先フォルダを指定できます。指定しない場合は現在の設定（未設定を含む）を使います。</p>
+<div aria-label="広告" class="export-ad new-project__ad" id="newProjectAdContainer">
+<div class="export-ad__slot">
+<ins class="new-project-ad-ins" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="newProjectAdSlot" style="display:block"></ins>
+</div>
+<small class="export-ad__label">広告</small>
+</div>
 </div>
 <footer class="modal__footer">
 <button class="button button--ghost" id="cancelNewProject" type="button">キャンセル</button>
@@ -1435,6 +1444,12 @@
 <p class="shortcut-help-row" role="listitem"><span>選択解除/移動キャンセル</span><span class="shortcut-help-key">Esc</span></p>
 </div>
 </div>
+<div aria-label="広告" class="export-ad shortcut-help__ad" id="shortcutHelpAdContainer">
+<div class="export-ad__slot">
+<ins class="shortcut-help-ad-ins" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="shortcutHelpAdSlot" style="display:block"></ins>
+</div>
+<small class="export-ad__label">広告</small>
+</div>
 </div>
 <footer class="modal__footer">
 <button class="button button--primary" id="closeShortcutHelp" type="button">閉じる</button>
@@ -1449,6 +1464,12 @@
 <div class="modal__body update-history-modal__body">
 <p class="help-text">直近1年の更新内容を表示しています。</p>
 <div class="update-history-list" id="updateHistoryList" role="list"></div>
+<div aria-label="広告" class="export-ad update-history__ad" id="updateHistoryAdContainer">
+<div class="export-ad__slot">
+<ins class="update-history-ad-ins" data-ad-client="ca-pub-9801602250480253" data-ad-format="auto" data-ad-slot="2141591954" data-full-width-responsive="true" id="updateHistoryAdSlot" style="display:block"></ins>
+</div>
+<small class="export-ad__label">広告</small>
+</div>
 </div>
 <footer class="modal__footer">
 <button class="button button--primary" id="closeUpdateHistory" type="button">閉じる</button>
@@ -1682,7 +1703,7 @@
       };
       const sideSections = {
         left: ['panelTools', 'panelColor'],
-        right: ['panelFrames', 'panelSettings', 'panelExtensions', 'panelHelp', 'panelFile', 'panelMulti'],
+        right: ['panelHelp', 'panelFile', 'panelSettings', 'panelExtensions'],
       };
       if (!(ads.left instanceof HTMLElement) && !(ads.right instanceof HTMLElement)) return;
 
