@@ -69,6 +69,7 @@
 <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700&amp;display=swap" rel="stylesheet"/>
 <link href="styles.css" rel="stylesheet"/>
 <script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
+<script src="../scripts/pixieed-adfree.js"></script>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-2.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-2.png"/>
 <style id="ads-safe">
@@ -168,6 +169,7 @@
 <script id="ads-lazy">
   (function() {
     if (window.pixieedObserveAds) return;
+    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) return;
 
     const SLOT_SEQUENCE = ['2141591954','9073878884','2261515379'];
     const SLOT_KEY = 'pixieedAdSlotIndex';
