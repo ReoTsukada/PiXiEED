@@ -1,8 +1,8 @@
 # Browser Ad-Free Rollout
 
-PiXiEED のブラウザ版広告非表示を、`STORES購入 -> webhook -> 注文番号からコード受取 -> コード適用` で本番化する手順です。
+PiXiEED のブラウザ版広告非表示を、`Stripe Checkout (PayPay対応) -> webhook -> 自動反映 or 購入番号入力 -> 適用` で本番化する手順です。
 
-STORES の商品説明や購入後案内で使う文言は `docs/browser-adfree-stores-copy.md` を参照してください。
+以前の `STORES購入 -> webhook -> 注文番号からコード受取` 導線は legacy として残っていますが、現在の購入導線は Stripe 前提です。
 
 ## 1. 前提
 
@@ -10,12 +10,34 @@ STORES の商品説明や購入後案内で使う文言は `docs/browser-adfree-
 - 追加済み migration
   - `supabase/migrations/20260321010000_browser_adfree_entitlements.sql`
   - `supabase/migrations/20260321020000_browser_adfree_purchase_orders.sql`
-- 追加済み Edge Function
-  - `supabase/functions/stores-browser-adfree-webhook/index.ts`
+- 追加済み Edge Functions
+  - `supabase/functions/stripe-browser-adfree-checkout/index.ts`
+  - `supabase/functions/stripe-browser-adfree-webhook/index.ts`
 
-## 2. Supabase CLI を使う場合
+## 2. Stripe 側で用意するもの
 
-### 2-1. CLI の準備
+Stripe Dashboard で以下を作成または確認します。
+
+- 広告非表示用の Product / Price
+- PayPay を有効化した Checkout
+- Webhook Endpoint
+
+必要な値:
+
+- `STRIPE_SECRET_KEY`
+- `PIXIEED_STRIPE_WEBHOOK_SECRET`
+- `PIXIEED_STRIPE_BROWSER_ADFREE_PRICE_ID`
+- `PIXIEED_STRIPE_SUPPORT_TIP_PRICE_ID`
+
+任意:
+
+- `PIXIEED_STRIPE_ALLOWED_HOSTS`
+- `PIXIEED_STRIPE_DEFAULT_RETURN_URL`
+- `PIXIEED_BROWSER_ADFREE_DURATION_DAYS`
+
+## 3. Supabase CLI を使う場合
+
+### 3-1. CLI の準備
 
 ```bash
 brew install supabase/tap/supabase
@@ -23,95 +45,108 @@ supabase login
 supabase link --project-ref kyyiuakrqomzlikfaire
 ```
 
-### 2-2. migration 適用
+### 3-2. migration 適用
 
 ```bash
 supabase db push --project-ref kyyiuakrqomzlikfaire
 ```
 
-### 2-3. Edge Function secrets 設定
+### 3-3. Edge Function secrets 設定
 
 ```bash
 supabase secrets set \
-  PIXIEED_STORES_WEBHOOK_SECRET=__LONG_RANDOM_SECRET__ \
+  STRIPE_SECRET_KEY=__STRIPE_SECRET_KEY__ \
+  PIXIEED_STRIPE_WEBHOOK_SECRET=__STRIPE_WEBHOOK_SECRET__ \
+  PIXIEED_STRIPE_BROWSER_ADFREE_PRICE_ID=price_xxxxxxxxxxxxx \
+  PIXIEED_STRIPE_SUPPORT_TIP_PRICE_ID=price_xxxxxxxxxxxxx \
+  PIXIEED_STRIPE_ALLOWED_HOSTS=pixieed.jp,www.pixieed.jp,localhost,127.0.0.1 \
+  PIXIEED_STRIPE_DEFAULT_RETURN_URL=https://pixieed.jp/pixiedraw/ \
   PIXIEED_BROWSER_ADFREE_DURATION_DAYS=31 \
-  PIXIEED_BROWSER_ADFREE_PRODUCT_MATCH=広告非表示 \
   --project-ref kyyiuakrqomzlikfaire
 ```
 
-### 2-4. Edge Function deploy
-
-Supabase Docs では、外部 webhook 用の Function は `--no-verify-jwt` で deploy できます。  
-Ref: https://supabase.com/docs/guides/functions/deploy
+### 3-4. Edge Function deploy
 
 ```bash
-supabase functions deploy stores-browser-adfree-webhook \
+supabase functions deploy stripe-browser-adfree-checkout \
+  --project-ref kyyiuakrqomzlikfaire \
+  --no-verify-jwt \
+  --use-api
+
+supabase functions deploy stripe-browser-adfree-webhook \
   --project-ref kyyiuakrqomzlikfaire \
   --no-verify-jwt \
   --use-api
 ```
 
-## 3. Supabase Dashboard で進める場合
-
-CLI がない場合は以下でも進められます。
+## 4. Supabase Dashboard で進める場合
 
 1. SQL Editor で migration 2本を順に実行
-2. Edge Functions で `stores-browser-adfree-webhook` を新規作成
-3. `supabase/functions/stores-browser-adfree-webhook/index.ts` の内容を貼る
+2. Edge Functions で以下を新規作成
+   - `stripe-browser-adfree-checkout`
+   - `stripe-browser-adfree-webhook`
+3. 各 `index.ts` の内容を貼る
 4. Function の JWT 検証を OFF
 5. Secrets に以下を追加
-   - `PIXIEED_STORES_WEBHOOK_SECRET`
+   - `STRIPE_SECRET_KEY`
+   - `PIXIEED_STRIPE_WEBHOOK_SECRET`
+   - `PIXIEED_STRIPE_BROWSER_ADFREE_PRICE_ID`
+   - `PIXIEED_STRIPE_SUPPORT_TIP_PRICE_ID`
+   - `PIXIEED_STRIPE_ALLOWED_HOSTS`
+   - `PIXIEED_STRIPE_DEFAULT_RETURN_URL`
    - `PIXIEED_BROWSER_ADFREE_DURATION_DAYS`
-   - `PIXIEED_BROWSER_ADFREE_PRODUCT_MATCH`
 
-## 4. STORES 側 webhook 設定
+## 5. Stripe Webhook 設定
 
-webhook URL:
+Webhook URL:
 
 ```text
-https://kyyiuakrqomzlikfaire.supabase.co/functions/v1/stores-browser-adfree-webhook?secret=__LONG_RANDOM_SECRET__&product=browser_ad_free
+https://kyyiuakrqomzlikfaire.supabase.co/functions/v1/stripe-browser-adfree-webhook
 ```
 
-推奨:
+listen する event:
 
-- webhook は広告非表示商品の購入完了イベントにだけ向ける
-- 商品名に `広告非表示` を含める
-- PiXiEED アカウントと同じメールアドレスで購入してもらう
+- `checkout.session.completed`
+- `checkout.session.async_payment_succeeded`
+- `checkout.session.async_payment_failed`
 
-この実装では、購入時メールアドレスとログイン中アカウントのメールアドレスが一致しないと redeem できません。
+この実装では Checkout Session の `metadata.product_key=browser_ad_free` を見て広告非表示商品だけ処理します。
 
-## 5. 動作確認
+## 6. フロントの流れ
 
-### 5-1. webhook 単体テスト
+`広告非表示を購入` ボタンは次の Function を開きます。
 
-```bash
-curl -X POST \
-  "https://kyyiuakrqomzlikfaire.supabase.co/functions/v1/stores-browser-adfree-webhook?secret=__LONG_RANDOM_SECRET__&product=browser_ad_free" \
-  -H "content-type: application/json" \
-  -d '{
-    "order": {
-      "id": "TEST-ORDER-1001",
-      "email": "you@example.com",
-      "status": "paid",
-      "items": [
-        { "name": "PiXiEEDDraw 広告非表示" }
-      ]
-    }
-  }'
+```text
+https://kyyiuakrqomzlikfaire.supabase.co/functions/v1/stripe-browser-adfree-checkout
 ```
+
+Function 側で Stripe Checkout Session を作り、購入後は元のページへ戻します。戻り URL には `stripe_checkout_session_id` が付き、ログイン済みなら自動で適用を試みます。
+
+`product=support_tip` で開いた場合は、同じ checkout Function を使って応援チップ決済へ進みます。こちらは entitlement を付けず、決済後は元のページへ戻るだけです。
+
+自動反映できなかった場合でも、同じ入力欄に以下どちらかを入れて `適用` を押せば反映できます。
+
+- 購入番号: Stripe Checkout Session ID (`cs_...`)
+- 購入コード: `PXA...`
+
+## 7. 動作確認
+
+### 7-1. 決済確認
+
+1. PiXiEED でログインした状態で `広告非表示を購入`
+2. Stripe Checkout で PayPay またはカード決済
+3. 元のページへ戻る
 
 期待:
 
-- `browser_adfree_purchase_orders` に注文が作成される
-- `user_entitlement_codes` にコードが作成される
+- `stripe_checkout_session_id` 付きで戻る
+- ログイン済みなら自動で広告非表示が有効になる
 
-### 5-2. UI テスト
+### 7-2. 手動適用確認
 
-1. `you@example.com` と同じメールで PiXiEED にログイン
-2. PiXiEEDDraw 設定の「広告非表示（ブラウザ版）」へ移動
-3. 注文番号 `TEST-ORDER-1001` を入力
-4. `購入コードを受け取る` を押す
-5. `コードを適用` を押す
+1. PiXiEEDDraw 設定の `広告非表示（ブラウザ版）` へ移動
+2. `cs_...` の購入番号または `PXA...` の購入コードを入力
+3. `適用` を押す
 
 期待:
 
@@ -122,7 +157,7 @@ curl -X POST \
 
 が止まる
 
-## 6. DB 確認用 SQL
+## 8. DB 確認用 SQL
 
 ```sql
 select provider, provider_order_id, buyer_email, payment_status, code, issued_at, claimed_at
@@ -147,15 +182,17 @@ order by updated_at desc
 limit 20;
 ```
 
-## 7. 失敗時の確認
+## 9. 失敗時の確認
 
-- webhook が届いていない
-- webhook payload に注文番号 / メール / 商品名が入っていない
-- 商品名が `PIXIEED_BROWSER_ADFREE_PRODUCT_MATCH` に一致していない
+- `STRIPE_SECRET_KEY` / `PIXIEED_STRIPE_WEBHOOK_SECRET` / `PIXIEED_STRIPE_BROWSER_ADFREE_PRICE_ID` が未設定
+- Stripe Webhook が必要 event を送っていない
 - 購入時メールと PiXiEED ログインメールが違う
-- Edge Function の secret が URL と一致していない
+- `PIXIEED_STRIPE_ALLOWED_HOSTS` に現在のホストが入っていない
+- Webhook の `checkout.session.completed` は来ているが、反映前に戻って claim が先に走っている
 
-## 8. 一時的な手動復旧
+最後のケースは、同じ入力欄に `cs_...` を入れて `適用` を押せば再試行できます。
+
+## 10. 一時的な手動復旧
 
 webhook 未整備でも、最悪は `user_entitlement_codes` に手動コードを発行し、購入者へ渡せば広告非表示は有効化できます。  
-ただし本来の本番運用は webhook 経由を前提にしてください。
+ただし本来の本番運用は Stripe webhook 経由を前提にしてください。
