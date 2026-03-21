@@ -10597,8 +10597,8 @@
     setLocalizedTextContent('#panelMulti .multi-capacity-field > span', '参加管理', 'Participant Management');
     setLocalizedControlLabel('multiMaxGuests', '参加上限 (1〜15)', 'Participant Limit (1-15)');
     setLocalizedTextContent('#multiGuestCapacityHint', '参加枠: 0 / 5', 'Participant slots: 0 / 5');
-    setLocalizedControlLabel('multiRoomVisibility', '部屋公開', 'Room Visibility');
-    setLocalizedTextContent('#multiRoomVisibilityHint', '非公開: ホームには表示されません。', 'Private: hidden from Home list.');
+    setLocalizedControlLabel('multiRoomVisibility', '部屋公開（停止中）', 'Room Visibility (Disabled)');
+    setLocalizedTextContent('#multiRoomVisibilityHint', '公開部屋の一覧は停止中です。マルチプレイは非公開で開始され、招待リンクで共有できます。', 'Public room listing is disabled. Multiplayer starts private and can be shared by invite link.');
     setLocalizedControlLabel('multiExportPermission', '出力権限', 'Export Permission');
     setLocalizedControlLabel('multiJoinPolicy', '参加方式', 'Join Policy');
     setLocalizedTextContent('#multiJoinPolicyHint', '自動参加: 招待リンクは参加者入室になります。', 'Auto Join: invite link opens as participant join.');
@@ -13640,6 +13640,9 @@
   }
 
   function queueExportAdRender() {
+    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+      return;
+    }
     const dialog = dom.exportDialog?.dialog;
     const adSlot = dom.exportDialog?.adSlot;
     if (!(dialog instanceof HTMLDialogElement) || !dialog.open || !(adSlot instanceof HTMLElement)) {
@@ -14023,6 +14026,9 @@
   }
 
   function canShowExportInterstitial() {
+    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+      return false;
+    }
     const dialog = dom.exportInterstitial?.dialog;
     if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
       return false;
@@ -14053,6 +14059,9 @@
   }
 
   function queueExportInterstitialAdRender() {
+    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+      return;
+    }
     const dialog = dom.exportInterstitial?.dialog;
     const adSlot = dom.exportInterstitial?.adSlot;
     if (!(dialog instanceof HTMLDialogElement) || !dialog.open || !(adSlot instanceof HTMLElement)) {
@@ -42512,7 +42521,7 @@
     let changed = false;
     if (normalizedPreset === 'friends') {
       const nextJoinPolicy = MULTI_JOIN_POLICY_OPEN;
-      const nextRoomVisibility = MULTI_ROOM_VISIBILITY_PUBLIC;
+      const nextRoomVisibility = MULTI_ROOM_VISIBILITY_PRIVATE;
       const nextExportPermission = MULTI_EXPORT_PERMISSION_MASTER_AND_GUEST;
       if (multiState.joinPolicy !== nextJoinPolicy) {
         multiState.joinPolicy = nextJoinPolicy;
@@ -42576,15 +42585,7 @@
   }
 
   function normalizeMultiRoomVisibility(value, fallback = MULTI_DEFAULT_ROOM_VISIBILITY) {
-    if (value === MULTI_ROOM_VISIBILITY_PUBLIC) {
-      return MULTI_ROOM_VISIBILITY_PUBLIC;
-    }
-    if (value === MULTI_ROOM_VISIBILITY_PRIVATE) {
-      return MULTI_ROOM_VISIBILITY_PRIVATE;
-    }
-    return fallback === MULTI_ROOM_VISIBILITY_PUBLIC
-      ? MULTI_ROOM_VISIBILITY_PUBLIC
-      : MULTI_ROOM_VISIBILITY_PRIVATE;
+    return MULTI_ROOM_VISIBILITY_PRIVATE;
   }
 
   function getMultiRoomVisibilityLabel(value = multiState.roomVisibility) {
@@ -42800,7 +42801,7 @@
       participantCount: counts.totalCount,
       roomVisibility,
       isPublic,
-      thumbnailDataUrl: isPublic ? getMultiPublicRoomThumbnailDataUrl() : '',
+      thumbnailDataUrl: '',
       updatedAt: Date.now(),
       sentAt: Date.now(),
     };
@@ -47882,10 +47883,15 @@
       dom.controls.multiMaxGuests.disabled = multiState.connecting || !inMasterConfigMode;
     }
     if (dom.controls.multiRoomVisibility instanceof HTMLSelectElement) {
-      setLocalizedSelectOption(dom.controls.multiRoomVisibility, 'public', '公開', 'Public');
-      setLocalizedSelectOption(dom.controls.multiRoomVisibility, 'private', '非公開', 'Private');
-      dom.controls.multiRoomVisibility.value = multiState.roomVisibility;
-      dom.controls.multiRoomVisibility.disabled = multiState.connecting || !inMasterConfigMode;
+      if (
+        dom.controls.multiRoomVisibility.options.length !== 1
+        || dom.controls.multiRoomVisibility.options[0].value !== MULTI_ROOM_VISIBILITY_PRIVATE
+      ) {
+        dom.controls.multiRoomVisibility.innerHTML = '<option value="private">非公開固定</option>';
+      }
+      setLocalizedSelectOption(dom.controls.multiRoomVisibility, 'private', '非公開固定', 'Private Only');
+      dom.controls.multiRoomVisibility.value = MULTI_ROOM_VISIBILITY_PRIVATE;
+      dom.controls.multiRoomVisibility.disabled = true;
     }
     if (dom.controls.multiExportPermission instanceof HTMLSelectElement) {
       setLocalizedSelectOption(dom.controls.multiExportPermission, 'master-guest', 'マスター + 参加者', 'Master + Participants');
@@ -47977,27 +47983,10 @@
       );
     }
     if (dom.controls.multiRoomVisibilityHint instanceof HTMLElement) {
-      if (!multiState.connected) {
-        dom.controls.multiRoomVisibilityHint.textContent = localizeText(
-          '接続後に公開設定が反映されます。',
-          'Visibility applies after connection.'
-        );
-      } else if (!isMultiMasterMode()) {
-        dom.controls.multiRoomVisibilityHint.textContent = localizeText(
-          `部屋公開: ${getMultiRoomVisibilityLabel()}`,
-          `Room visibility: ${getMultiRoomVisibilityLabel()}`
-        );
-      } else if (isMultiRoomPublic()) {
-        dom.controls.multiRoomVisibilityHint.textContent = localizeText(
-          '公開: ホームの「公開中の部屋」に表示されます。',
-          'Public: shown in Home "Open Rooms".'
-        );
-      } else {
-        dom.controls.multiRoomVisibilityHint.textContent = localizeText(
-          '非公開: ホームには表示されません。',
-          'Private: hidden from Home list.'
-        );
-      }
+      dom.controls.multiRoomVisibilityHint.textContent = localizeText(
+        '公開部屋の一覧は停止中です。マルチプレイは非公開で開始され、招待リンクで共有できます。',
+        'Public room listing is disabled. Multiplayer starts private and can be shared by invite link.'
+      );
     }
     if (dom.controls.multiJoinPolicyHint instanceof HTMLElement) {
       const joinPolicy = normalizeMultiJoinPolicy(multiState.joinPolicy, MULTI_DEFAULT_JOIN_POLICY);
