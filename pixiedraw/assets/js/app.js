@@ -327,6 +327,7 @@
       multiBlockedRemove: document.getElementById('multiBlockedRemove'),
       multiBlockedHint: document.getElementById('multiBlockedHint'),
       supportTipLink: document.getElementById('supportTipLink'),
+      adFreeField: document.getElementById('pixieedAdFreeField'),
       pixieedAccountStatus: document.getElementById('pixieedAccountStatus'),
       pixieedAccountLogin: document.getElementById('pixieedAccountLogin'),
       pixieedAccountLogout: document.getElementById('pixieedAccountLogout'),
@@ -346,6 +347,8 @@
       quickSetupStatus: document.getElementById('startupQuickSetupStatus'),
       recentSection: document.getElementById('startupRecentProjects'),
       recentList: document.getElementById('startupRecentList'),
+      recentAdContainer: document.getElementById('startupRecentAdContainer'),
+      recentAdSlot: document.getElementById('startupRecentAdSlot'),
       updateToast: document.getElementById('updateToast'),
       updateToastCloseButton: document.getElementById('updateToastCloseBtn'),
     },
@@ -362,6 +365,8 @@
       palettePresetPickerMenu: document.getElementById('newProjectPalettePresetPickerMenu'),
       bindExportFolder: document.getElementById('newProjectBindExportFolder'),
       exportDestinationLabel: document.getElementById('newProjectExportDestinationLabel'),
+      adContainer: document.getElementById('newProjectAdContainer'),
+      adSlot: document.getElementById('newProjectAdSlot'),
       cancel: document.getElementById('cancelNewProject'),
       confirm: document.getElementById('confirmNewProject'),
     },
@@ -398,10 +403,14 @@
     },
     shortcutHelp: {
       dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('shortcutHelpDialog')),
+      adContainer: document.getElementById('shortcutHelpAdContainer'),
+      adSlot: document.getElementById('shortcutHelpAdSlot'),
     },
     updateHistory: {
       dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('updateHistoryDialog')),
       list: document.getElementById('updateHistoryList'),
+      adContainer: document.getElementById('updateHistoryAdContainer'),
+      adSlot: document.getElementById('updateHistoryAdSlot'),
       close: document.getElementById('closeUpdateHistory'),
     },
     globalHistoryConfirm: {
@@ -952,11 +961,25 @@
   const UPDATE_HISTORY_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;
   const EXPORT_INTERSTITIAL_LAST_SHOWN_KEY = 'pixieedraw:export-interstitial-last-shown-at';
   const EXPORT_INTERSTITIAL_COOLDOWN_MS = 45 * 1000;
+  const STREAMING_HIDE_MONETIZATION_UI = true;
   const SUPPRESSED_UPDATE_HISTORY_IDS = new Set([
     '2026-03-11-local-extension-personal-view-spritemap',
     '2026-03-11-personal-view-copy-paste-stability',
   ]);
   const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
+    Object.freeze({
+      id: '2026-03-22-composite-thumbnail-ads',
+      at: '2026-03-22T23:40:00+09:00',
+      title: '合成色スポイト・サムネイル・広告導線を調整',
+      published: true,
+      details: Object.freeze([
+        'スポイトは最上位レイヤーの生色ではなく、画面表示どおりの合成色を取得するよう修正。',
+        '最近のプロジェクトとプロジェクト保存サムネイルは、レイヤーの表示状態・不透明度を反映した合成結果ベースで生成するよう変更。',
+        'マルチキャンバスのプロジェクトサムネイルは、前面サムネイル右上に xN バッジを表示して複数キャンバスを判別しやすく改善。',
+        '広告は起動画面・新規作成・更新情報・ショートカット一覧へ追加し、右パネル広告はヘルプ / ファイル中心で表示するよう整理。',
+        '配信用に、設定内の広告非表示導線と応援チップ導線、出力後の応援チップカードを一時非表示に変更。',
+      ]),
+    }),
     Object.freeze({
       id: '2026-03-20-ui-spacing',
       at: '2026-03-20T23:55:00+09:00',
@@ -2701,6 +2724,10 @@
   const EXPORT_GRID_TILE_MAX_SIZE = MAX_EXPORT_DIMENSION;
   let exportGridTileWidth = 8;
   let exportGridTileHeight = 8;
+  let startupRecentAdRequested = false;
+  let newProjectAdRequested = false;
+  let shortcutHelpAdRequested = false;
+  let updateHistoryAdRequested = false;
   let exportAdRequested = false;
   let exportInterstitialAdRequested = false;
   let pendingExportAction = null;
@@ -10479,6 +10506,7 @@
     setLocalizedAttribute('#projectTabsBar', 'aria-label', '開いているプロジェクト', 'Open Projects');
     setLocalizedAttribute('#projectTabsList', 'aria-label', 'プロジェクトタブ', 'Project Tabs');
     setLocalizedTextContent('#startupRecentProjects .startup-screen__recent-title', '端末内プロジェクト（自動保存）', 'Local Projects (Autosave)');
+    setLocalizedTextContent('#startupRecentAdContainer .export-ad__label', '広告', 'Ad');
     setLocalizedTextContent(
       '#startupScreenHint',
       AUTOSAVE_SUPPORTED
@@ -10777,6 +10805,7 @@
     setLocalizedTextContent('#newProjectBindExportFolder', '保存先フォルダを設定', 'Set export folder');
     setLocalizedAttribute('#newProjectBindExportFolder', 'aria-label', '新規プロジェクトの保存先フォルダを指定', 'Choose folder for new project exports');
     setLocalizedAttribute('#newProjectExportDestinationLabel', 'aria-label', '新規プロジェクトの現在の保存先', 'Current destination for new project exports');
+    setLocalizedTextContent('#newProjectAdContainer .export-ad__label', '広告', 'Ad');
     setLocalizedTextContent(
       '#newProjectExportFolderGuide',
       '必要な場合のみ保存先フォルダを指定できます。指定しない場合は現在の設定（未設定を含む）を使います。',
@@ -10792,8 +10821,10 @@
 
     setLocalizedTextContent('#shortcutHelpTitle', 'ショートカット一覧', 'Keyboard Shortcuts');
     setLocalizedTextContent('#closeShortcutHelp', '閉じる', 'Close');
+    setLocalizedTextContent('#shortcutHelpAdContainer .export-ad__label', '広告', 'Ad');
     setLocalizedTextContent('#updateHistoryTitle', '更新情報', 'Updates');
     setLocalizedTextContent('#updateHistoryDialog .help-text', '直近1年の更新内容を表示しています。', 'Shows update notes for the past year.');
+    setLocalizedTextContent('#updateHistoryAdContainer .export-ad__label', '広告', 'Ad');
     setLocalizedTextContent('#closeUpdateHistory', '閉じる', 'Close');
     setLocalizedTextContent('#toolSpotlightTitle', '他ツールの紹介', 'More Tools');
     setLocalizedTextContent('#toolSpotlightLead', '出力ありがとうございます。次に遊べる・使えるツールです。', 'Thanks for exporting. Here are tools you can try next.');
@@ -10861,12 +10892,15 @@
   }
 
   function syncSupportTipVisibility() {
-    if (!(dom.controls.supportTipLink instanceof HTMLElement)) {
-      return;
+    const hidden = isNativeAppRuntime() || STREAMING_HIDE_MONETIZATION_UI;
+    if (dom.controls.supportTipLink instanceof HTMLElement) {
+      dom.controls.supportTipLink.hidden = hidden;
+      dom.controls.supportTipLink.setAttribute('aria-hidden', String(hidden));
     }
-    const hidden = isNativeAppRuntime();
-    dom.controls.supportTipLink.hidden = hidden;
-    dom.controls.supportTipLink.setAttribute('aria-hidden', String(hidden));
+    if (dom.controls.adFreeField instanceof HTMLElement) {
+      dom.controls.adFreeField.hidden = hidden;
+      dom.controls.adFreeField.setAttribute('aria-hidden', String(hidden));
+    }
     const spotlightTip = dom.toolSpotlight?.supportTip;
     if (spotlightTip instanceof HTMLElement) {
       spotlightTip.hidden = hidden;
@@ -13715,6 +13749,7 @@
     }
     dialog.showModal();
     window.requestAnimationFrame(() => {
+      queueShortcutHelpAdRender();
       dom.controls.closeShortcutHelp?.focus?.({ preventScroll: true });
     });
   }
@@ -13724,6 +13759,122 @@
     if (dialog instanceof HTMLDialogElement && dialog.open) {
       dialog.close();
     }
+  }
+
+  function queueShortcutHelpAdRender() {
+    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+      return;
+    }
+    const dialog = dom.shortcutHelp?.dialog;
+    const adSlot = dom.shortcutHelp?.adSlot;
+    if (!(dialog instanceof HTMLDialogElement) || !dialog.open || !(adSlot instanceof HTMLElement)) {
+      return;
+    }
+    if (shortcutHelpAdRequested) {
+      return;
+    }
+    if (adSlot.dataset.loaded === '1' || adSlot.getAttribute('data-adsbygoogle-status') === 'done') {
+      shortcutHelpAdRequested = true;
+      return;
+    }
+    if (!adSlot.classList.contains('adsbygoogle')) {
+      adSlot.classList.add('adsbygoogle');
+    }
+
+    const getWidth = () => {
+      try {
+        const rect = adSlot.getBoundingClientRect();
+        return (rect && rect.width) || adSlot.clientWidth || adSlot.offsetWidth || 0;
+      } catch (error) {
+        return adSlot.clientWidth || adSlot.offsetWidth || 0;
+      }
+    };
+
+    let attempts = 0;
+    const MAX_ATTEMPTS = 24;
+    const renderWhenReady = () => {
+      if (!(dialog instanceof HTMLDialogElement) || !dialog.open) {
+        shortcutHelpAdRequested = false;
+        return;
+      }
+      const width = getWidth();
+      if (width <= 0) {
+        attempts += 1;
+        if (attempts < MAX_ATTEMPTS) {
+          window.requestAnimationFrame(renderWhenReady);
+          return;
+        }
+        shortcutHelpAdRequested = false;
+        return;
+      }
+      shortcutHelpAdRequested = true;
+      try {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        adSlot.dataset.loaded = '1';
+      } catch (error) {
+        shortcutHelpAdRequested = false;
+      }
+    };
+
+    window.requestAnimationFrame(renderWhenReady);
+  }
+
+  function queueUpdateHistoryAdRender() {
+    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+      return;
+    }
+    const dialog = dom.updateHistory?.dialog;
+    const adSlot = dom.updateHistory?.adSlot;
+    if (!(dialog instanceof HTMLDialogElement) || !dialog.open || !(adSlot instanceof HTMLElement)) {
+      return;
+    }
+    if (updateHistoryAdRequested) {
+      return;
+    }
+    if (adSlot.dataset.loaded === '1' || adSlot.getAttribute('data-adsbygoogle-status') === 'done') {
+      updateHistoryAdRequested = true;
+      return;
+    }
+    if (!adSlot.classList.contains('adsbygoogle')) {
+      adSlot.classList.add('adsbygoogle');
+    }
+
+    const getWidth = () => {
+      try {
+        const rect = adSlot.getBoundingClientRect();
+        return (rect && rect.width) || adSlot.clientWidth || adSlot.offsetWidth || 0;
+      } catch (error) {
+        return adSlot.clientWidth || adSlot.offsetWidth || 0;
+      }
+    };
+
+    let attempts = 0;
+    const MAX_ATTEMPTS = 24;
+    const renderWhenReady = () => {
+      if (!(dialog instanceof HTMLDialogElement) || !dialog.open) {
+        updateHistoryAdRequested = false;
+        return;
+      }
+      const width = getWidth();
+      if (width <= 0) {
+        attempts += 1;
+        if (attempts < MAX_ATTEMPTS) {
+          window.requestAnimationFrame(renderWhenReady);
+          return;
+        }
+        updateHistoryAdRequested = false;
+        return;
+      }
+      updateHistoryAdRequested = true;
+      try {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        adSlot.dataset.loaded = '1';
+      } catch (error) {
+        updateHistoryAdRequested = false;
+      }
+    };
+
+    window.requestAnimationFrame(renderWhenReady);
   }
 
   function parseUpdateHistoryTimestamp(value) {
@@ -13896,6 +14047,7 @@
     }
     dialog.showModal();
     window.requestAnimationFrame(() => {
+      queueUpdateHistoryAdRender();
       dom.updateHistory?.close?.focus?.({ preventScroll: true });
     });
   }
@@ -15067,6 +15219,7 @@
           hideStartupScreen();
         }
         window.requestAnimationFrame(() => {
+          queueNewProjectAdRender();
           config.nameInput?.focus();
           config.nameInput?.select?.();
         });
@@ -15079,6 +15232,64 @@
       hideStartupScreen();
     }
     void promptNewProjectFallback();
+  }
+
+  function queueNewProjectAdRender() {
+    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+      return;
+    }
+    const dialog = dom.newProject?.dialog;
+    const adSlot = dom.newProject?.adSlot;
+    if (!(dialog instanceof HTMLDialogElement) || !dialog.open || !(adSlot instanceof HTMLElement)) {
+      return;
+    }
+    if (newProjectAdRequested) {
+      return;
+    }
+    if (adSlot.dataset.loaded === '1' || adSlot.getAttribute('data-adsbygoogle-status') === 'done') {
+      newProjectAdRequested = true;
+      return;
+    }
+    if (!adSlot.classList.contains('adsbygoogle')) {
+      adSlot.classList.add('adsbygoogle');
+    }
+
+    const getWidth = () => {
+      try {
+        const rect = adSlot.getBoundingClientRect();
+        return (rect && rect.width) || adSlot.clientWidth || adSlot.offsetWidth || 0;
+      } catch (error) {
+        return adSlot.clientWidth || adSlot.offsetWidth || 0;
+      }
+    };
+
+    let attempts = 0;
+    const MAX_ATTEMPTS = 24;
+    const renderWhenReady = () => {
+      if (!(dialog instanceof HTMLDialogElement) || !dialog.open) {
+        newProjectAdRequested = false;
+        return;
+      }
+      const width = getWidth();
+      if (width <= 0) {
+        attempts += 1;
+        if (attempts < MAX_ATTEMPTS) {
+          window.requestAnimationFrame(renderWhenReady);
+          return;
+        }
+        newProjectAdRequested = false;
+        return;
+      }
+      newProjectAdRequested = true;
+      try {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        adSlot.dataset.loaded = '1';
+      } catch (error) {
+        newProjectAdRequested = false;
+      }
+    };
+
+    window.requestAnimationFrame(renderWhenReady);
   }
 
   function setupExportDialog() {
@@ -15608,6 +15819,7 @@
     container.setAttribute('aria-hidden', 'false');
     document.body.classList.add('is-startup-active');
     window.requestAnimationFrame(() => {
+      queueStartupRecentAdRender();
       container.focus?.({ preventScroll: true });
       const startupTargets = [
         dom.startup?.resumeButton,
@@ -15618,6 +15830,65 @@
       const defaultTarget = startupTargets.find(target => target instanceof HTMLElement && !target.hasAttribute('disabled')) || container;
       defaultTarget?.focus?.({ preventScroll: true });
     });
+  }
+
+  function queueStartupRecentAdRender() {
+    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) {
+      return;
+    }
+    const screen = dom.startup?.screen;
+    const section = dom.startup?.recentSection;
+    const adSlot = dom.startup?.recentAdSlot;
+    if (!(screen instanceof HTMLElement) || screen.hidden || !(section instanceof HTMLElement) || section.hidden || !(adSlot instanceof HTMLElement)) {
+      return;
+    }
+    if (startupRecentAdRequested) {
+      return;
+    }
+    if (adSlot.dataset.loaded === '1' || adSlot.getAttribute('data-adsbygoogle-status') === 'done') {
+      startupRecentAdRequested = true;
+      return;
+    }
+    if (!adSlot.classList.contains('adsbygoogle')) {
+      adSlot.classList.add('adsbygoogle');
+    }
+
+    const getWidth = () => {
+      try {
+        const rect = adSlot.getBoundingClientRect();
+        return (rect && rect.width) || adSlot.clientWidth || adSlot.offsetWidth || 0;
+      } catch (error) {
+        return adSlot.clientWidth || adSlot.offsetWidth || 0;
+      }
+    };
+
+    let attempts = 0;
+    const MAX_ATTEMPTS = 24;
+    const renderWhenReady = () => {
+      if (!(screen instanceof HTMLElement) || screen.hidden || !(section instanceof HTMLElement) || section.hidden) {
+        startupRecentAdRequested = false;
+        return;
+      }
+      const width = getWidth();
+      if (width <= 0) {
+        attempts += 1;
+        if (attempts < MAX_ATTEMPTS) {
+          window.requestAnimationFrame(renderWhenReady);
+          return;
+        }
+        startupRecentAdRequested = false;
+        return;
+      }
+      startupRecentAdRequested = true;
+      try {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        adSlot.dataset.loaded = '1';
+      } catch (error) {
+        startupRecentAdRequested = false;
+      }
+    };
+
+    window.requestAnimationFrame(renderWhenReady);
   }
 
   function hideStartupScreen() {
@@ -16764,7 +17035,7 @@
       return;
     }
     resumeButton.disabled = false;
-    const displayLabel = firstEntry.fileName || firstEntry.name || DEFAULT_DOCUMENT_NAME;
+    const displayLabel = extractDocumentBaseName(firstEntry.fileName || firstEntry.name || DEFAULT_DOCUMENT_NAME);
     const updatedAt = Date.parse(firstEntry.updatedAt || '');
     const atLabel = Number.isFinite(updatedAt)
       ? formatUpdateHistoryDate(updatedAt, '')
@@ -16792,7 +17063,7 @@
       if (!entry || !entry.id) {
         return;
       }
-      const displayLabel = entry.fileName || entry.name || DEFAULT_DOCUMENT_NAME;
+      const displayLabel = extractDocumentBaseName(entry.fileName || entry.name || DEFAULT_DOCUMENT_NAME);
       const card = document.createElement('article');
       card.className = 'startup-recent-card';
       card.dataset.projectId = entry.id;
@@ -16808,8 +17079,8 @@
         const img = new Image();
         img.src = entry.thumbnail;
         img.alt = localizeText(
-          `${entry.fileName || entry.name || 'プロジェクト'} のプレビュー`,
-          `${entry.fileName || entry.name || 'Project'} preview`
+          `${displayLabel || 'プロジェクト'} のプレビュー`,
+          `${displayLabel || 'Project'} preview`
         );
         img.decoding = 'async';
         thumb.appendChild(img);
@@ -16843,6 +17114,11 @@
       card.appendChild(deleteButton);
       list.appendChild(card);
     });
+    if (startupVisible) {
+      window.requestAnimationFrame(() => {
+        queueStartupRecentAdRender();
+      });
+    }
   }
 
   async function refreshRecentProjectsUI(options = {}) {
@@ -16956,20 +17232,71 @@
     compositeLayerPixelNormalized(data, destBase, srcR, srcG, srcB, srcA, opacity, normalizedBlendMode);
   }
 
-  async function generateSnapshotThumbnail(snapshot) {
-    if (!snapshot || !snapshot.frames || !snapshot.frames.length) {
+  function resolveSnapshotThumbnailCanvasSource(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') {
       return null;
     }
-    const width = Math.max(1, Math.floor(Number(snapshot.width) || 0));
-    const height = Math.max(1, Math.floor(Number(snapshot.height) || 0));
+    const canvases = Array.isArray(snapshot.canvases) && snapshot.canvases.length
+      ? snapshot.canvases
+      : [snapshot];
+    const activeCanvasId = typeof snapshot.activeCanvasId === 'string' ? snapshot.activeCanvasId : '';
+    const source = canvases.find(canvas => canvas?.id === activeCanvasId) || canvases[0] || null;
+    if (!source) {
+      return null;
+    }
+    const width = Math.max(1, Math.floor(Number(source.width) || Number(snapshot.width) || 0));
+    const height = Math.max(1, Math.floor(Number(source.height) || Number(snapshot.height) || 0));
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
       return null;
     }
-    const frameIndex = clamp(Number(snapshot.activeFrame) || 0, 0, snapshot.frames.length - 1);
-    const frame = snapshot.frames[frameIndex];
+    const frames = Array.isArray(source.frames) && source.frames.length
+      ? source.frames
+      : (Array.isArray(snapshot.frames) ? snapshot.frames : []);
+    if (!frames.length) {
+      return null;
+    }
+    const frameIndex = clamp(Number(source.activeFrame ?? snapshot.activeFrame) || 0, 0, frames.length - 1);
+    const frame = frames[frameIndex];
     if (!frame || !Array.isArray(frame.layers)) {
       return null;
     }
+    return {
+      canvasCount: canvases.length,
+      width,
+      height,
+      frame,
+    };
+  }
+
+  function drawSnapshotThumbnailStackDecorations(previewCtx, x, y, width, height, canvasCount) {
+    const extraCanvasCount = Math.max(0, Math.floor(Number(canvasCount) || 0) - 1);
+    if (!previewCtx || extraCanvasCount <= 0) {
+      return;
+    }
+    const badgeText = `x${Math.max(1, Math.floor(Number(canvasCount) || 1))}`;
+    const badgePaddingX = 8;
+    const badgeHeight = 22;
+    previewCtx.font = '600 13px sans-serif';
+    const badgeWidth = Math.max(20, Math.ceil(previewCtx.measureText(badgeText).width) + (badgePaddingX * 2));
+    const badgeX = Math.max(4, Math.round(x + width - badgeWidth - 4));
+    const badgeY = Math.max(4, Math.round(y + 4));
+    previewCtx.fillStyle = 'rgba(7, 13, 24, 0.86)';
+    previewCtx.fillRect(badgeX, badgeY, badgeWidth, badgeHeight);
+    previewCtx.strokeStyle = 'rgba(230, 240, 255, 0.36)';
+    previewCtx.lineWidth = 1;
+    previewCtx.strokeRect(badgeX + 0.5, badgeY + 0.5, Math.max(0, badgeWidth - 1), Math.max(0, badgeHeight - 1));
+    previewCtx.fillStyle = 'rgba(245, 250, 255, 0.94)';
+    previewCtx.textAlign = 'center';
+    previewCtx.textBaseline = 'middle';
+    previewCtx.fillText(badgeText, badgeX + (badgeWidth / 2), badgeY + (badgeHeight / 2) + 0.5);
+  }
+
+  async function generateSnapshotThumbnail(snapshot) {
+    const source = resolveSnapshotThumbnailCanvasSource(snapshot);
+    if (!source) {
+      return null;
+    }
+    const { width, height, frame, canvasCount } = source;
     const offscreen = document.createElement('canvas');
     offscreen.width = width;
     offscreen.height = height;
@@ -16977,58 +17304,9 @@
     if (!offscreenCtx) {
       return null;
     }
-    const imageData = offscreenCtx.createImageData(width, height);
-    const data = imageData.data;
     const palette = Array.isArray(snapshot.palette) ? snapshot.palette : [];
-    frame.layers.forEach(layer => {
-      if (!layer) {
-        return;
-      }
-      const opacity = 1;
-      const blendMode = normalizeLayerBlendMode(layer.blendMode);
-      const indices = layer.indices instanceof Int16Array ? layer.indices : null;
-      const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
-      if (!indices && !direct) {
-        return;
-      }
-      for (let y = 0; y < height; y += 1) {
-        const rowOffset = y * width;
-        for (let x = 0; x < width; x += 1) {
-          const pixelIndex = rowOffset + x;
-          let srcA = 0;
-          let srcR = 0;
-          let srcG = 0;
-          let srcB = 0;
-          if (indices) {
-            const paletteIndex = indices[pixelIndex];
-            if (paletteIndex >= 0) {
-              const color = palette[paletteIndex];
-              if (!color) {
-                continue;
-              }
-              srcR = color.r;
-              srcG = color.g;
-              srcB = color.b;
-              srcA = color.a;
-            }
-          }
-          if (srcA === 0 && direct) {
-            const base = pixelIndex * 4;
-            srcA = direct[base + 3];
-            if (srcA > 0) {
-              srcR = direct[base];
-              srcG = direct[base + 1];
-              srcB = direct[base + 2];
-            }
-          }
-          if (srcA <= 0) {
-            continue;
-          }
-          const destBase = pixelIndex * 4;
-          compositeLayerPixelNormalized(data, destBase, srcR, srcG, srcB, srcA, opacity, blendMode);
-        }
-      }
-    });
+    const imageData = offscreenCtx.createImageData(width, height);
+    imageData.data.set(compositeFramePixels(frame, width, height, palette));
     offscreenCtx.putImageData(imageData, 0, 0);
 
     const previewCanvas = document.createElement('canvas');
@@ -17038,6 +17316,7 @@
     if (!previewCtx) {
       return null;
     }
+    const hasStackedCanvases = canvasCount > 1;
     previewCtx.fillStyle = 'rgba(12, 20, 32, 0.92)';
     previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
     const padding = Math.round((THUMBNAIL_CANVAS_SIZE - THUMBNAIL_MAX_EDGE) / 2);
@@ -17051,6 +17330,12 @@
     const offsetY = Math.round((THUMBNAIL_CANVAS_SIZE - drawHeight) / 2);
     previewCtx.imageSmoothingEnabled = false;
     previewCtx.drawImage(offscreen, 0, 0, width, height, offsetX, offsetY, drawWidth, drawHeight);
+    previewCtx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+    previewCtx.lineWidth = 1;
+    previewCtx.strokeRect(offsetX + 0.5, offsetY + 0.5, Math.max(0, drawWidth - 1), Math.max(0, drawHeight - 1));
+    if (hasStackedCanvases) {
+      drawSnapshotThumbnailStackDecorations(previewCtx, offsetX, offsetY, drawWidth, drawHeight, canvasCount);
+    }
     return previewCanvas.toDataURL('image/png');
   }
 
@@ -18729,10 +19014,10 @@
     frame.layers.forEach(layer => {
       const layerVisible = useLocalLayerPreviewVisibility
         ? getDisplayedLayerVisibility(layer, true)
-        : true;
+        : (layer?.visible !== false);
       const layerOpacity = useLocalLayerPreviewOpacity
         ? getDisplayedLayerPreviewOpacity(layer, 1)
-        : 1;
+        : normalizeLayerOpacity(layer?.opacity);
       if (!layer || (!includeHiddenLayers && !layerVisible) || layerOpacity <= 0) {
         return;
       }
@@ -39486,71 +39771,96 @@
     updateColorTabSwatch();
   }
 
-  function sampleCompositeColor(x, y) {
-    const layers = getActiveFrame().layers;
-    let color = null;
-    let mode = 'rgb';
-    let index = -1;
-    for (let i = layers.length - 1; i >= 0; i -= 1) {
-      const layer = layers[i];
-      if (!getDisplayedLayerVisibility(layer, true) || getDisplayedLayerPreviewOpacity(layer, 1) <= 0) continue;
-      const idx = y * state.width + x;
-      if (layer.indices[idx] >= 0) {
-        color = state.palette[layer.indices[idx]];
-        mode = 'index';
-        index = layer.indices[idx];
-        break;
-      }
-      const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
-      const base = idx * 4;
-      const a = direct ? direct[base + 3] : 0;
-      if (a > 0) {
-        color = {
-          r: direct ? direct[base] : 0,
-          g: direct ? direct[base + 1] : 0,
-          b: direct ? direct[base + 2] : 0,
-          a,
-        };
-        mode = 'rgb';
-        break;
-      }
+  function sampleCompositePixelColor(x, y, { excludedLayerId = '' } = {}) {
+    const frame = getActiveFrame();
+    if (!frame || !Array.isArray(frame.layers)) {
+      return null;
     }
-    return { color, mode, index };
+    const width = Math.max(0, Math.floor(Number(state.width) || 0));
+    const height = Math.max(0, Math.floor(Number(state.height) || 0));
+    if (x < 0 || y < 0 || x >= width || y >= height) {
+      return null;
+    }
+    const pixelIndex = (y * width) + x;
+    const composite = new Uint8ClampedArray(4);
+    let hasVisibleColor = false;
+
+    for (let i = 0; i < frame.layers.length; i += 1) {
+      const layer = frame.layers[i];
+      if (!layer || (excludedLayerId && layer.id === excludedLayerId)) {
+        continue;
+      }
+      if (!getDisplayedLayerVisibility(layer, true)) {
+        continue;
+      }
+      const layerOpacity = getDisplayedLayerPreviewOpacity(layer, 1);
+      if (layerOpacity <= 0) {
+        continue;
+      }
+      const indices = layer.indices instanceof Int16Array ? layer.indices : null;
+      const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+      const paletteIndex = indices ? indices[pixelIndex] : -1;
+      let srcR = 0;
+      let srcG = 0;
+      let srcB = 0;
+      let srcA = 0;
+      if (paletteIndex >= 0) {
+        const color = state.palette[paletteIndex];
+        if (!color) {
+          continue;
+        }
+        srcR = color.r;
+        srcG = color.g;
+        srcB = color.b;
+        srcA = color.a;
+      } else if (direct) {
+        const base = pixelIndex * 4;
+        srcR = direct[base];
+        srcG = direct[base + 1];
+        srcB = direct[base + 2];
+        srcA = direct[base + 3];
+      } else {
+        continue;
+      }
+      if (!Number.isFinite(srcA) || srcA <= 0) {
+        continue;
+      }
+      compositeLayerPixelNormalized(
+        composite,
+        0,
+        srcR,
+        srcG,
+        srcB,
+        srcA,
+        layerOpacity,
+        normalizeLayerBlendMode(layer.blendMode)
+      );
+      hasVisibleColor = true;
+    }
+
+    if (!hasVisibleColor || composite[3] <= 0) {
+      return null;
+    }
+    const color = normalizeColorValue({
+      r: composite[0],
+      g: composite[1],
+      b: composite[2],
+      a: composite[3],
+    });
+    const matchedPaletteIndex = findNearestPaletteIndexForColor(color, state.palette, -1);
+    if (matchedPaletteIndex >= 0 && colorsMatchRgba(color, state.palette[matchedPaletteIndex])) {
+      return { color, mode: 'index', index: matchedPaletteIndex };
+    }
+    return { color, mode: 'rgb', index: -1 };
+  }
+
+  function sampleCompositeColor(x, y) {
+    return sampleCompositePixelColor(x, y) || { color: null, mode: 'rgb', index: -1 };
   }
 
   function sampleCompositeColorExcludingLayer(x, y, excludedLayerId) {
-    const frame = getActiveFrame();
-    if (!frame) {
-      return null;
-    }
-    const idx = y * state.width + x;
-    for (let i = frame.layers.length - 1; i >= 0; i -= 1) {
-      const layer = frame.layers[i];
-      if (!getDisplayedLayerVisibility(layer, true) || getDisplayedLayerPreviewOpacity(layer, 1) <= 0 || layer.id === excludedLayerId) {
-        continue;
-      }
-      if (layer.indices[idx] >= 0) {
-        const paletteColor = state.palette[layer.indices[idx]];
-        if (paletteColor) {
-          const normalized = normalizeColorValue(paletteColor);
-          return normalized;
-        }
-      }
-      const direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
-      if (direct) {
-        const base = idx * 4;
-        const alpha = direct[base + 3];
-        if (alpha > 0) {
-          return {
-            r: direct[base],
-            g: direct[base + 1],
-            b: direct[base + 2],
-            a: alpha,
-          };
-        }
-      }
-    }
-    return null;
+    const sample = sampleCompositePixelColor(x, y, { excludedLayerId });
+    return sample ? normalizeColorValue(sample.color) : null;
   }
 
   function sampleLayerColor(layer, x, y) {
