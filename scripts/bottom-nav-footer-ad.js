@@ -1,4 +1,35 @@
 (function () {
+  function bootstrapPixieedAdFree() {
+    try {
+      const raw = window.localStorage.getItem('pixieed_browser_adfree_cache_v1');
+      if (raw) {
+        const cached = JSON.parse(raw);
+        const expiresAt = typeof cached?.expiresAt === 'string' ? cached.expiresAt : '';
+        const isExpired = expiresAt ? Date.parse(expiresAt) <= Date.now() : false;
+        if (cached?.active === true && !isExpired) {
+          window.__PIXIEED_ADS_DISABLED__ = true;
+        }
+      }
+    } catch (_error) {
+      // ignore cache errors
+    }
+    if (window.pixieedAdFree || document.querySelector('script[data-pixieed-adfree="true"]')) {
+      return;
+    }
+    const currentScript = document.currentScript;
+    const script = document.createElement('script');
+    script.defer = true;
+    script.dataset.pixieedAdfree = 'true';
+    script.src = currentScript?.src
+      ? new URL('./pixieed-adfree.js', currentScript.src).href
+      : new URL('/scripts/pixieed-adfree.js', window.location.href).href;
+    document.head.appendChild(script);
+  }
+
+  function arePixieedAdsDisabled() {
+    return Boolean(window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive);
+  }
+
   function injectMinimalSiteChrome() {
     const styleId = 'pixieed-minimal-site-chrome';
     if (document.getElementById(styleId)) {
@@ -437,6 +468,7 @@
   }
 
   function injectFooterAd() {
+    if (arePixieedAdsDisabled()) return;
     const bottomNav = document.querySelector('.bottom-nav');
     if (!bottomNav) return;
     if (document.querySelector('.ad-footer')) return;
@@ -598,12 +630,14 @@
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
+      bootstrapPixieedAdFree();
       injectMinimalSiteChrome();
       setupHomeBackGuard();
       setupMobileInputViewportGuard();
       injectFooterAd();
     }, { once: true });
   } else {
+    bootstrapPixieedAdFree();
     injectMinimalSiteChrome();
     setupHomeBackGuard();
     setupMobileInputViewportGuard();
