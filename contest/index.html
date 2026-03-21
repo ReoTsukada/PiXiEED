@@ -46,6 +46,7 @@
   <link rel="preconnect" href="https://kyyiuakrqomzlikfaire.supabase.co" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
+  <script src="../scripts/pixieed-adfree.js"></script>
   <style>
     :root{
       color-scheme: dark;
@@ -94,7 +95,7 @@
       backdrop-filter:blur(8px);
       border-bottom:1px solid rgba(255,255,255,0.08);
       margin:-20px -14px 8px;
-      padding:12px 14px;
+      padding:calc(12px + env(safe-area-inset-top, 0px)) 14px 12px;
       box-sizing:border-box;
       font-family:'Fredoka','DotGothic16',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     }
@@ -1300,6 +1301,7 @@
 <script id="ads-lazy">
   (function() {
     if (window.pixieedObserveAds) return;
+    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) return;
 
     const SLOT_SEQUENCE = ['2141591954','9073878884','2261515379'];
     const SLOT_KEY = 'pixieedAdSlotIndex';
@@ -1507,13 +1509,12 @@
     <section class="card">
       <div class="section-head">
         <h1>広場</h1>
-        <p class="subtitle">投稿作品や公開中の共同制作ルームを、カテゴリとキーワードで絞り込めます。</p>
+        <p class="subtitle">投稿作品を、カテゴリとキーワードで絞り込めます。</p>
       </div>
       <div class="tabs">
         <div id="filterTabs" style="display:flex; gap:8px;">
           <button class="tab-btn is-active" data-filter="all" type="button">すべて</button>
           <button class="tab-btn" data-filter="posts" type="button">投稿</button>
-          <button class="tab-btn" data-filter="rooms" type="button">公開中の部屋</button>
           <button class="tab-btn" data-filter="px32" type="button">32px</button>
         </div>
         <div class="sort-tabs" id="sortTabs">
@@ -1524,13 +1525,13 @@
       </div>
       <div class="tag-search">
         <label for="tagSearch">検索</label>
-        <input id="tagSearch" type="search" placeholder="タグ・作品名・部屋名で絞り込み（例: 夜景 / resident）" aria-label="広場内検索"/>
+        <input id="tagSearch" type="search" placeholder="タグ・作品名で絞り込み（例: 夜景 / キャラ）" aria-label="広場内検索"/>
       </div>
     </section>
     <section class="card">
       <div class="section-head section-head--compact">
         <h2 class="section-title">作品一覧</h2>
-        <p class="feed-subtitle" id="feedSubtitle">投稿と公開中の部屋を同じグリッドに表示します。</p>
+        <p class="feed-subtitle" id="feedSubtitle">投稿作品を一覧表示します。</p>
       </div>
       <div id="contestGallery" class="gallery"></div>
       <div class="load-more" id="loadMoreWrap" hidden>
@@ -1551,9 +1552,9 @@
     <section class="card page-about">
       <div class="section-head section-head--compact">
         <h2 class="section-title">広場について</h2>
-        <p class="subtitle">投稿作品と公開中の共同制作ルームを同じ広場で見られます。元サイズ512x512以内 / 256色以内のPNG・GIFを投稿できます。</p>
+        <p class="subtitle">投稿作品を広場でまとめて見られます。元サイズ512x512以内 / 256色以内のPNG・GIFを投稿できます。</p>
       </div>
-      <p class="section-note">PiXiEEDraw や PiXiEEDraw Lite で作った作品をそのまま共有し、他のユーザーの投稿や公開中の部屋も同じ流れで見比べられます。</p>
+      <p class="section-note">PiXiEEDraw や PiXiEEDraw Lite で作った作品をそのまま共有し、他のユーザーの投稿を同じ流れで見比べられます。</p>
       <div class="quick-tools">
         <a class="button" href="../pixiedraw/index.html" rel="noopener" target="_blank">PiXiEEDraw</a>
         <a class="button secondary" href="../jerin-maker/index.html" rel="noopener" target="_blank">PiXiEEDraw Lite</a>
@@ -1706,6 +1707,18 @@
             <p class="helper" style="margin:0;">別端末でも同じアカウントで利用できます。</p>
           </div>
         </details>
+      </div>
+      <div class="profile-block">
+        <p class="helper" style="margin:0;">広告非表示（ブラウザ版）</p>
+        <p class="helper" id="pixieedAdFreeStatus" style="margin:0;">ログイン後に購入コードを適用できます。</p>
+        <div class="auth-actions" style="display:grid; gap:8px;">
+          <a class="auth-btn" id="pixieedAdFreePurchase" href="https://pixieed.stores.jp" target="_blank" rel="noopener noreferrer">広告非表示パスを購入</a>
+        </div>
+        <div style="display:grid; gap:8px;">
+          <input class="auth-input" id="pixieedAdFreeRedeemCode" type="text" placeholder="購入コード" maxlength="48" autocomplete="one-time-code">
+          <button class="auth-btn" id="pixieedAdFreeRedeem" type="button">コードを適用</button>
+        </div>
+        <p class="helper" style="margin:0;">購入後に届くコードを、ログイン中のアカウントへ紐付けます。</p>
       </div>
       <p class="auth-status" id="authStatus"></p>
     </div>
@@ -2000,7 +2013,7 @@
     }
 
     function getFeedItems(){
-      return cachedEntries.concat(cachedRooms);
+      return cachedEntries.slice();
     }
 
     function getItemTimestamp(item){
@@ -3058,7 +3071,8 @@
       if(filterTabs){
         filterTabs.querySelectorAll('.tab-btn').forEach(btn => {
           btn.addEventListener('click', () => {
-            currentFilter = btn.dataset.filter || 'all';
+            const nextFilter = btn.dataset.filter || 'all';
+            currentFilter = nextFilter === 'rooms' ? 'all' : nextFilter;
             filterTabs.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('is-active', b === btn));
             renderEntries(applyFilterAndSort(getFeedItems()));
             updateLoadMoreUI();
@@ -3163,7 +3177,7 @@
       const wrap = $(LOAD_MORE_WRAP_ID);
       const btn = $(LOAD_MORE_BTN_ID);
       if(!wrap || !btn) return;
-      wrap.hidden = currentFilter === 'rooms' || !hasMoreEntries;
+      wrap.hidden = !hasMoreEntries;
       btn.disabled = isLoadingEntries;
       btn.textContent = isLoadingEntries ? '読み込み中...' : 'もっと見る';
     }
@@ -4464,12 +4478,10 @@
       switch(currentFilter){
         case 'posts':
           return 'まだ投稿がありません。';
-        case 'rooms':
-          return '公開中の部屋はまだありません。';
         case 'px32':
           return '32px以下の投稿はまだありません。';
         default:
-          return '表示できる投稿や部屋はまだありません。';
+          return '表示できる投稿はまだありません。';
       }
     }
 
@@ -4478,16 +4490,13 @@
       if(!subtitle) return;
       const rendered = Array.isArray(items) ? items : [];
       const renderedPosts = rendered.filter(item => item?.feedType !== 'room').length;
-      const renderedRooms = rendered.filter(item => item?.feedType === 'room').length;
       let text = '';
       if(currentFilter === 'posts'){
         text = `投稿 ${renderedPosts}件を表示中`;
-      }else if(currentFilter === 'rooms'){
-        text = renderedRooms ? `公開中の部屋 ${renderedRooms}件を表示中` : '公開中の部屋はまだありません。';
       }else if(currentFilter === 'px32'){
         text = `32px以下の投稿 ${renderedPosts}件を表示中`;
       }else{
-        text = `投稿 ${cachedEntries.length}件 / 公開中の部屋 ${cachedRooms.length}件 を同じグリッドに表示`;
+        text = `投稿 ${cachedEntries.length}件を表示中`;
       }
       if(currentTagQuery){
         text += ` ・「${currentTagQuery}」で絞り込み中`;
@@ -4610,111 +4619,9 @@
     }
 
     async function fetchPlazaRooms({ force = false } = {}){
-      if(isLoadingRooms && plazaRoomProbePromise){
-        return plazaRoomProbePromise;
-      }
-      if(!force && cachedRooms.length){
-        return cachedRooms;
-      }
-      isLoadingRooms = true;
-      plazaRoomProbePromise = (async () => {
-        try{
-          const res = await fetch(ROOMS_SOURCE_PATH, { cache: 'no-store' });
-          const rooms = await res.json();
-          const mod = await import(MULTI_SUPABASE_MODULE_URL);
-          const realtimeClient = mod.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { realtime:{ params:{ eventsPerSecond:48 } } });
-          const lobbyRooms = await fetchPublicLobbyRooms(realtimeClient);
-          let residentThumbCache = readResidentThumbnailCache();
-          const configuredResidentProjectKeys = new Set();
-          const active = [];
-          for(const room of (Array.isArray(rooms) ? rooms : [])){
-            if(!room || typeof room !== 'object') continue;
-            if(room.type === 'public'){
-              const thumbnail = await probeLegacyPublicRoomThumbnail(realtimeClient, room.channel);
-              if(!thumbnail) continue;
-              active.push({
-                ...room,
-                thumbnail,
-                participantCount: 0,
-                updatedAt: Date.now(),
-              });
-              continue;
-            }
-            if(room.type === 'resident'){
-              const projectKey = normalizeProjectKey(room.projectKey || room.channel || room.id || '');
-              if(!projectKey) continue;
-              configuredResidentProjectKeys.add(projectKey);
-              const lobby = lobbyRooms.get(projectKey);
-              if(!lobby) continue;
-              const liveThumb = (typeof lobby.thumbnailDataUrl === 'string' && lobby.thumbnailDataUrl.startsWith('data:image/'))
-                ? lobby.thumbnailDataUrl
-                : '';
-              if(liveThumb){
-                residentThumbCache = setResidentThumbnailCache(
-                  projectKey,
-                  liveThumb,
-                  Number(lobby.updatedAt) || Date.now(),
-                  residentThumbCache
-                );
-              }
-              const cachedThumb = getResidentThumbnailFromCache(projectKey, residentThumbCache);
-              active.push({
-                ...room,
-                projectKey,
-                thumbnail: liveThumb || cachedThumb?.thumbnailDataUrl || ROOM_FALLBACK_THUMB,
-                participantCount: Number(lobby.participantCount) || 0,
-                maxUsers: Math.max(0, Number(room.maxUsers) || (Number(lobby.maxGuests) || 0) + 1),
-                updatedAt: Number(lobby.updatedAt) || Date.now(),
-              });
-            }
-          }
-
-          lobbyRooms.forEach((lobby, projectKey) => {
-            const normalizedProjectKey = normalizeProjectKey(projectKey);
-            if(!normalizedProjectKey || configuredResidentProjectKeys.has(normalizedProjectKey)){
-              return;
-            }
-            const liveThumb = (typeof lobby.thumbnailDataUrl === 'string' && lobby.thumbnailDataUrl.startsWith('data:image/'))
-              ? lobby.thumbnailDataUrl
-              : '';
-            if(liveThumb){
-              residentThumbCache = setResidentThumbnailCache(
-                normalizedProjectKey,
-                liveThumb,
-                Number(lobby.updatedAt) || Date.now(),
-                residentThumbCache
-              );
-            }
-            const cachedThumb = getResidentThumbnailFromCache(normalizedProjectKey, residentThumbCache);
-            const maxGuests = Math.max(0, Math.round(Number(lobby.maxGuests) || 0));
-            active.push({
-              id: `resident-dynamic-${normalizedProjectKey}`,
-              name: `公開ルーム (${normalizedProjectKey})`,
-              type: 'resident',
-              projectKey: normalizedProjectKey,
-              channel: normalizedProjectKey,
-              description: 'PiXiEEDrawで公開中の共同制作ルームです。',
-              size: '',
-              maxUsers: maxGuests > 0 ? (maxGuests + 1) : 0,
-              thumbnail: liveThumb || cachedThumb?.thumbnailDataUrl || ROOM_FALLBACK_THUMB,
-              participantCount: Number(lobby.participantCount) || 0,
-              updatedAt: Number(lobby.updatedAt) || Date.now(),
-            });
-          });
-
-          active.sort((a, b) => (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0));
-          cachedRooms = active.map(buildRoomFeedItem);
-        }catch(err){
-          console.error('plaza rooms fetch failed', err);
-          cachedRooms = [];
-        }finally{
-          isLoadingRooms = false;
-          plazaRoomProbePromise = null;
-          renderEntries(applyFilterAndSort(getFeedItems()));
-          updateLoadMoreUI();
-        }
-        return cachedRooms;
-      })();
+      cachedRooms = [];
+      isLoadingRooms = false;
+      plazaRoomProbePromise = Promise.resolve(cachedRooms);
       return plazaRoomProbePromise;
     }
 
@@ -4915,10 +4822,11 @@
 
     function applyFilterAndSort(entries){
       let filtered = entries.slice();
+      if(currentFilter === 'rooms'){
+        currentFilter = 'all';
+      }
       if(currentFilter === 'posts'){
         filtered = filtered.filter(item => item?.feedType !== 'room');
-      }else if(currentFilter === 'rooms'){
-        filtered = filtered.filter(item => item?.feedType === 'room');
       }else if(currentFilter === 'px32'){
         filtered = filtered.filter(item => item?.feedType !== 'room' && (item.width || 999) <= 32 && (item.height || 999) <= 32);
       }
