@@ -145,6 +145,52 @@
       body.pixieed-adfree ins.adsbygoogle {
         display: none !important;
       }
+
+      /* Keep PiXiEEDraw control positions stable by preserving known ad slots as invisible placeholders. */
+      body.pixieed-adfree .panel-ad-mount {
+        display: block !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+      }
+
+      body.pixieed-adfree #leftPanelAd,
+      body.pixieed-adfree #rightPanelAd {
+        display: flex !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        min-height: var(--panel-ad-height, 110px) !important;
+        height: auto !important;
+        max-height: none !important;
+      }
+
+      body.pixieed-adfree #leftPanelAdSlot,
+      body.pixieed-adfree #rightPanelAdSlot {
+        display: flex !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        min-height: var(--panel-ad-height, 112px) !important;
+        height: auto !important;
+        max-height: none !important;
+      }
+
+      body.pixieed-adfree #exportAdContainer {
+        display: block !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+
+      body.pixieed-adfree .export-interstitial__slot-wrap {
+        display: flex !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+
+      body.pixieed-adfree #mobileBottomAd {
+        display: flex !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -178,6 +224,8 @@
 
   function syncUi() {
     const purchaseLink = document.getElementById('pixieedAdFreePurchase');
+    const claimInput = document.getElementById('pixieedAdFreeOrderId');
+    const claimButton = document.getElementById('pixieedAdFreeClaim');
     const redeemInput = document.getElementById('pixieedAdFreeRedeemCode');
     const redeemButton = document.getElementById('pixieedAdFreeRedeem');
 
@@ -187,6 +235,12 @@
       purchaseLink.rel = 'noopener noreferrer';
     }
 
+    if (claimInput instanceof HTMLInputElement) {
+      claimInput.disabled = !state.isLoggedIn || state.isLoading;
+    }
+    if (claimButton instanceof HTMLButtonElement) {
+      claimButton.disabled = !state.isLoggedIn || state.isLoading;
+    }
     if (redeemInput instanceof HTMLInputElement) {
       redeemInput.disabled = !state.isLoggedIn || state.isLoading;
     }
@@ -340,6 +394,49 @@
     }
   }
 
+  async function claimPurchaseCode(rawOrderId) {
+    const orderId = String(rawOrderId || '').trim();
+    if (!orderId) {
+      state.lastError = '注文番号を入力してください。';
+      uiMessage = state.lastError;
+      syncUi();
+      return { ok: false, error: state.lastError };
+    }
+    if (!state.isLoggedIn) {
+      state.lastError = '購入時と同じメールアドレスでログインしてください。';
+      uiMessage = state.lastError;
+      syncUi();
+      return { ok: false, error: state.lastError };
+    }
+    uiMessage = '注文番号を確認しています...';
+    syncUi();
+    try {
+      const supabase = await ensureSupabase();
+      const { data, error } = await supabase.rpc('claim_browser_adfree_purchase_code', { input_order_id: orderId });
+      if (error) {
+        throw error;
+      }
+      const code = typeof data?.code === 'string' ? data.code.trim() : '';
+      if (!code) {
+        throw new Error('購入コードを受け取れませんでした。');
+      }
+      const redeemInput = document.getElementById('pixieedAdFreeRedeemCode');
+      if (redeemInput instanceof HTMLInputElement) {
+        redeemInput.value = code;
+      }
+      uiMessage = '購入コードを受け取りました。続けて「コードを適用」を押してください。';
+      state.lastError = '';
+      syncUi();
+      return { ok: true, code };
+    } catch (error) {
+      const message = String(error?.message || error || '購入コードの取得に失敗しました。');
+      state.lastError = message;
+      uiMessage = message;
+      syncUi();
+      return { ok: false, error: message };
+    }
+  }
+
   function bindUi() {
     if (uiBound) {
       return;
@@ -349,6 +446,14 @@
     applyDomState();
     syncUi();
     const redeemButton = document.getElementById('pixieedAdFreeRedeem');
+    const claimButton = document.getElementById('pixieedAdFreeClaim');
+    if (claimButton instanceof HTMLButtonElement) {
+      claimButton.addEventListener('click', async () => {
+        const input = document.getElementById('pixieedAdFreeOrderId');
+        const orderId = input instanceof HTMLInputElement ? input.value : '';
+        await claimPurchaseCode(orderId);
+      });
+    }
     if (redeemButton instanceof HTMLButtonElement) {
       redeemButton.addEventListener('click', async () => {
         const input = document.getElementById('pixieedAdFreeRedeemCode');
@@ -380,6 +485,7 @@
     state,
     ready,
     refresh,
+    claimPurchaseCode,
     redeemCode,
     subscribe,
     get purchaseUrl() {
