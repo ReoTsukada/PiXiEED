@@ -403,22 +403,7 @@ export async function startResidentRoom(rawConfig = {}) {
   }
 
   function buildPublicLobbyPresencePayload() {
-    if (!projectKey) return null;
-    const activeCount = Array.isArray(roomState.activeIds) ? roomState.activeIds.length : 0;
-    const queueCount = Array.isArray(roomState.queueIds) ? roomState.queueIds.length : 0;
-    return {
-      projectKey,
-      room: channelName,
-      roomVisibility: 'public',
-      isPublic: true,
-      participantCount: Math.max(0, activeCount),
-      guestCount: Math.max(0, activeCount),
-      spectatorCount: Math.max(0, queueCount),
-      maxGuests: Math.max(1, Math.round(Number(config.maxUsers) || 1)),
-      updatedAt: Date.now(),
-      sentAt: Date.now(),
-      thumbnailDataUrl: createPublicLobbyThumbnailDataUrl(),
-    };
+    return null;
   }
 
   async function ensurePublicLobbyChannel() {
@@ -445,7 +430,10 @@ export async function startResidentRoom(rawConfig = {}) {
       return false;
     }
     const payload = buildPublicLobbyPresencePayload();
-    if (!payload) return false;
+    if (!payload) {
+      teardownPublicLobbyChannel();
+      return false;
+    }
     publicLobbySyncInFlight = true;
     try {
       const targetChannel = await ensurePublicLobbyChannel();
@@ -463,17 +451,7 @@ export async function startResidentRoom(rawConfig = {}) {
   }
 
   function schedulePublicLobbyPresenceSync({ immediate = false } = {}) {
-    if (!connected) return;
-    if (immediate) {
-      clearPublicLobbySyncTimer();
-      syncPublicLobbyPresenceNow();
-      return;
-    }
-    if (publicLobbySyncTimer !== null) return;
-    publicLobbySyncTimer = window.setTimeout(() => {
-      publicLobbySyncTimer = null;
-      syncPublicLobbyPresenceNow();
-    }, PUBLIC_LOBBY_SYNC_THROTTLE_MS);
+    teardownPublicLobbyChannel();
   }
 
   function teardownPublicLobbyChannel() {
