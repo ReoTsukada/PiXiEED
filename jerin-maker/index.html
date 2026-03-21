@@ -53,6 +53,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-5.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-5.png"/>
 <script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
+<script src="../scripts/pixieed-adfree.js"></script>
 <script>
   (function syncViewportVars() {
     const root = document.documentElement;
@@ -1071,6 +1072,7 @@
 <script id="ads-lazy">
   (function() {
     if (window.pixieedObserveAds) return;
+    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) return;
 
     const SLOT_SEQUENCE = ['2141591954','9073878884','2261515379'];
     const SLOT_KEY = 'pixieedAdSlotIndex';
