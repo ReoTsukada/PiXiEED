@@ -1,5 +1,34 @@
 (function () {
+  function bootstrapPixieedAdFree() {
+    try {
+      const raw = window.localStorage.getItem('pixieed_browser_adfree_cache_v1');
+      if (raw) {
+        const cached = JSON.parse(raw);
+        const expiresAt = typeof cached?.expiresAt === 'string' ? cached.expiresAt : '';
+        const isExpired = expiresAt ? Date.parse(expiresAt) <= Date.now() : false;
+        if (cached?.active === true && !isExpired) {
+          window.__PIXIEED_ADS_DISABLED__ = true;
+        }
+      }
+    } catch (_error) {
+      // ignore cache errors
+    }
+    if (window.pixieedAdFree || document.querySelector('script[data-pixieed-adfree="true"]')) {
+      return;
+    }
+    const script = document.createElement('script');
+    script.defer = true;
+    script.dataset.pixieedAdfree = 'true';
+    script.src = new URL('/scripts/pixieed-adfree.js', window.location.href).href;
+    document.head.appendChild(script);
+  }
+
+  function arePixieedAdsDisabled() {
+    return Boolean(window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive);
+  }
+
   function init() {
+    bootstrapPixieedAdFree();
     setupHomeBackGuard();
     injectMinimalSiteChrome();
     ensureGlobalClientId();
@@ -1011,6 +1040,7 @@
   }
 
   function injectFooterAd() {
+    if (arePixieedAdsDisabled()) return;
     const bottomNav = document.querySelector('.bottom-nav');
     if (!bottomNav) return;
     if (document.querySelector('.ad-footer')) return; // 既に配置済みなら何もしない
@@ -1161,6 +1191,7 @@
   }
 
   function ensureProjectAds() {
+    if (arePixieedAdsDisabled()) return;
     if (!document.body || !document.body.classList.contains('project-page')) return;
     if (window.pixieedObserveAds) {
       window.pixieedObserveAds();
@@ -1168,6 +1199,7 @@
   }
 
   function scheduleProjectAds() {
+    if (arePixieedAdsDisabled()) return;
     if (!document.body || !document.body.classList.contains('project-page')) return;
     ensureProjectAds();
     window.setTimeout(ensureProjectAds, 1200);
