@@ -25,6 +25,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
+  <script src="../scripts/pixieed-adfree.js"></script>
   <script src="../scripts/ads-lazy.js"></script>
   <style>
     :root{ color-scheme: dark; }
@@ -69,7 +70,7 @@
       backdrop-filter:blur(8px);
       border-bottom:1px solid rgba(255,255,255,0.08);
       margin:-20px -14px 8px;
-      padding:12px 14px;
+      padding:calc(12px + env(safe-area-inset-top, 0px)) 14px 12px;
       box-sizing:border-box;
       font-family:'Fredoka','DotGothic16',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     }
@@ -1056,6 +1057,18 @@
             <p class="author" style="margin:0;">別端末でも同じアカウントで利用できます。</p>
           </div>
         </details>
+      </div>
+      <div class="profile-block">
+        <p class="author" style="margin:0;">広告非表示（ブラウザ版）</p>
+        <p class="auth-status" id="pixieedAdFreeStatus" style="margin:0;">ログイン後に購入コードを適用できます。</p>
+        <div class="auth-actions" style="display:grid; gap:8px;">
+          <a class="auth-btn" id="pixieedAdFreePurchase" href="https://pixieed.stores.jp" target="_blank" rel="noopener noreferrer">広告非表示パスを購入</a>
+        </div>
+        <div style="display:grid; gap:8px;">
+          <input class="auth-input" id="pixieedAdFreeRedeemCode" type="text" placeholder="購入コード" maxlength="48" autocomplete="one-time-code">
+          <button class="auth-btn" id="pixieedAdFreeRedeem" type="button">コードを適用</button>
+        </div>
+        <p class="author" style="margin:0;">購入後に届くコードを、ログイン中のアカウントへ紐付けます。</p>
       </div>
       <p class="auth-status" id="authStatus"></p>
     </div>
