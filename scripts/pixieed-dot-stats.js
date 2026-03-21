@@ -1,4 +1,33 @@
 (() => {
+  function bootstrapPixieedAdFree() {
+    try {
+      const raw = window.localStorage.getItem('pixieed_browser_adfree_cache_v1');
+      if (raw) {
+        const cached = JSON.parse(raw);
+        const expiresAt = typeof cached?.expiresAt === 'string' ? cached.expiresAt : '';
+        const isExpired = expiresAt ? Date.parse(expiresAt) <= Date.now() : false;
+        if (cached?.active === true && !isExpired) {
+          window.__PIXIEED_ADS_DISABLED__ = true;
+        }
+      }
+    } catch (_error) {
+      // ignore cache errors
+    }
+    if (window.pixieedAdFree || document.querySelector('script[data-pixieed-adfree="true"]')) {
+      return;
+    }
+    const currentScript = document.currentScript;
+    const script = document.createElement('script');
+    script.defer = true;
+    script.dataset.pixieedAdfree = 'true';
+    script.src = currentScript?.src
+      ? new URL('./pixieed-adfree.js', currentScript.src).href
+      : new URL('/scripts/pixieed-adfree.js', window.location.href).href;
+    document.head.appendChild(script);
+  }
+
+  bootstrapPixieedAdFree();
+
   const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
   const SYNC_RPC_ENDPOINT = `${SUPABASE_URL}/rest/v1/rpc/sync_project_dot_count`;
