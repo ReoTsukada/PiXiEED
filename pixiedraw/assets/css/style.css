@@ -6509,6 +6509,21 @@ body.is-startup-active {
   scrollbar-width: thin;
 }
 
+.startup-screen__ad {
+  margin-top: 2px;
+}
+
+.startup-screen__ad .export-ad__slot {
+  min-height: clamp(44px, 8vw, 56px);
+  height: clamp(44px, 8vw, 56px);
+}
+
+.startup-screen__ad .export-ad__slot .adsbygoogle,
+.startup-screen__ad .export-ad__slot ins.adsbygoogle {
+  min-height: clamp(44px, 8vw, 56px);
+  height: clamp(44px, 8vw, 56px);
+}
+
 .startup-recent-list::-webkit-scrollbar {
   width: 6px;
 }
@@ -6871,6 +6886,21 @@ body.is-startup-active {
   max-width: min(480px, 100%);
 }
 
+.new-project__ad {
+  margin-top: 4px;
+}
+
+.new-project__ad .export-ad__slot {
+  min-height: clamp(44px, 8vw, 56px);
+  height: clamp(44px, 8vw, 56px);
+}
+
+.new-project__ad .export-ad__slot .adsbygoogle,
+.new-project__ad .export-ad__slot ins.adsbygoogle {
+  min-height: clamp(44px, 8vw, 56px);
+  height: clamp(44px, 8vw, 56px);
+}
+
 .help-text {
   margin-top: 8px;
   font-size: 0.85rem;
@@ -6977,6 +7007,21 @@ body.is-startup-active {
   min-width: min(320px, calc(var(--mobile-viewport-width) - var(--safe-area-left) - var(--safe-area-right) - 24px));
 }
 
+.shortcut-help__ad {
+  margin-top: 2px;
+}
+
+.shortcut-help__ad .export-ad__slot {
+  min-height: clamp(44px, 8vw, 56px);
+  height: clamp(44px, 8vw, 56px);
+}
+
+.shortcut-help__ad .export-ad__slot .adsbygoogle,
+.shortcut-help__ad .export-ad__slot ins.adsbygoogle {
+  min-height: clamp(44px, 8vw, 56px);
+  height: clamp(44px, 8vw, 56px);
+}
+
 .update-history-modal {
   width: min(760px, calc(var(--mobile-viewport-width) - var(--safe-area-left) - var(--safe-area-right) - 24px));
   min-width: min(320px, calc(var(--mobile-viewport-width) - var(--safe-area-left) - var(--safe-area-right) - 24px));
@@ -6988,6 +7033,21 @@ body.is-startup-active {
 
 .update-history-modal__body .help-text {
   margin-top: 0;
+}
+
+.update-history__ad {
+  margin-top: 2px;
+}
+
+.update-history__ad .export-ad__slot {
+  min-height: clamp(44px, 8vw, 56px);
+  height: clamp(44px, 8vw, 56px);
+}
+
+.update-history__ad .export-ad__slot .adsbygoogle,
+.update-history__ad .export-ad__slot ins.adsbygoogle {
+  min-height: clamp(44px, 8vw, 56px);
+  height: clamp(44px, 8vw, 56px);
 }
 
 .update-history-list {
