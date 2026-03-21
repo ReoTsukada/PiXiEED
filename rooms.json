@@ -1,12 +1,5 @@
 [
   {
-    "id": "public-room-1",
-    "name": "公開ルーム #1",
-    "type": "public",
-    "channel": "public-room-1",
-    "description": "誰でも参加できる公開遊びルーム（256×256）。"
-  },
-  {
     "id": "resident-room-256",
     "name": "フリーキャンバス 256x256",
     "type": "resident",
