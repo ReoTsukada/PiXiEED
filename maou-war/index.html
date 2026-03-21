@@ -59,6 +59,7 @@
   });
 </script>
 <script async crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
+<script src="../scripts/pixieed-adfree.js"></script>
 <script>
   // モバイル端末で実際の表示領域サイズを取得し、CSS変数へ反映する。
   (function syncViewportVars() {
@@ -6164,6 +6165,7 @@
 <script>
   (() => {
     // フッター広告枠が未初期化の場合だけAdSense描画を要求する。
+    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) return;
     const ad = document.querySelector('.ad-footer ins.adsbygoogle');
     if (!ad) return;
     if (ad.getAttribute('data-adsbygoogle-status') === 'done') return;
