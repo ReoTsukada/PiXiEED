@@ -49,6 +49,7 @@
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-6.png"/>
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
 <script async="" crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
+<script src="../scripts/pixieed-adfree.js"></script>
 <script>
   const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
   const GA_PAGE_PATH = '/qr-maker/';
@@ -633,6 +634,7 @@
 <script id="ads-lazy">
   (function() {
     if (window.pixieedObserveAds) return;
+    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) return;
 
     const SLOT_SEQUENCE = ['2141591954','9073878884','2261515379'];
     const SLOT_KEY = 'pixieedAdSlotIndex';
