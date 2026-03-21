@@ -50,6 +50,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
+  <script src="scripts/pixieed-adfree.js"></script>
   <style>
     :root{ color-scheme: dark; }
     *{ box-sizing:border-box; user-select:none; -webkit-user-select:none; -ms-user-select:none; }
@@ -88,7 +89,7 @@
       backdrop-filter:blur(8px);
       border-bottom:1px solid rgba(255,255,255,0.08);
       margin:-20px -14px 8px;
-      padding:12px 14px;
+      padding:calc(12px + env(safe-area-inset-top, 0px)) 14px 12px;
       box-sizing:border-box;
       font-family:'Fredoka','DotGothic16',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     }
@@ -1648,7 +1649,8 @@
       bottom:0;
       left:0;
       right:0;
-      height:68px;
+      height:calc(68px + env(safe-area-inset-bottom, 0px));
+      padding-bottom:env(safe-area-inset-bottom, 0px);
       background:rgba(11,18,36,0.96);
       border-top:1px solid rgba(255,255,255,0.08);
       display:flex;
@@ -1656,6 +1658,7 @@
       align-items:center;
       z-index:90;
       backdrop-filter:blur(8px);
+      box-sizing:border-box;
     }
     .bottom-nav__item{
       flex:1;
@@ -1957,6 +1960,7 @@
 <script id="ads-lazy">
   (function() {
     if (window.pixieedObserveAds) return;
+    if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) return;
 
     const SLOT_SEQUENCE = ['2141591954','9073878884','2261515379'];
     const SLOT_KEY = 'pixieedAdSlotIndex';
@@ -2345,7 +2349,7 @@
             <p class="audience-card__meta">ブラウザ完結 / みんなで一緒に描ける / 無料</p>
             <div class="choice-secondary">
               <a class="button" href="pixiedraw/index.html">PiXiEEDrawを使う</a>
-              <a class="button button--ghost" href="#publicRoomsHub">公開中の部屋を見る</a>
+              <a class="button button--ghost" href="pixiedraw/index.html">共同制作を始める</a>
             </div>
           </article>
         </div>
@@ -2383,16 +2387,16 @@
             <p class="new-tool-card__desc">制作中に迷いやすい用語を日本語/英語で確認できます。</p>
             <p class="new-tool-card__meta">学ぶ / 調べる / 用語確認</p>
           </a>
-          <a class="new-tool-card" href="#publicRoomsHub">
+          <a class="new-tool-card" href="pixiedraw/index.html">
             <div class="new-tool-card__head">
               <div class="new-tool-card__title-wrap">
                 <span class="new-tool-card__icon"><img src="icon/icon-192-4.png" alt=""></span>
-                <h3 class="new-tool-card__title">公開中の部屋</h3>
+                <h3 class="new-tool-card__title">共同制作</h3>
               </div>
-              <span class="new-tool-card__badge new-tool-card__badge--live">LIVE</span>
+              <span class="new-tool-card__badge new-tool-card__badge--live">MULTI</span>
             </div>
-            <p class="new-tool-card__desc">いま公開されている共同キャンバスへすぐ参加できます。</p>
-            <p class="new-tool-card__meta">入室する / 続きから描く</p>
+            <p class="new-tool-card__desc">招待リンクで同じキャンバスに参加し、リアルタイムで共同制作できます。</p>
+            <p class="new-tool-card__meta">招待する / 一緒に描く</p>
           </a>
           <a class="new-tool-card" href="notes/index.html">
             <div class="new-tool-card__head">
@@ -2442,7 +2446,7 @@
             <div class="category-hub-card__links">
               <a href="pixel-art-animation/index.html">動かし方ガイド</a>
               <a href="pixiedraw/index.html">アニメ制作</a>
-              <a href="#publicRoomsHub">公開中の部屋</a>
+              <a href="pixiedraw/index.html">共同制作</a>
             </div>
           </article>
           <article class="category-hub-card">
@@ -2589,27 +2593,12 @@
             </ul>
             <div class="value-actions">
               <a class="button" href="pixiedraw/index.html">PiXiEEDrawで本格制作を始める</a>
-              <a class="button button--ghost" href="#publicRoomsHub">共同制作ルームを見る</a>
+              <a class="button button--ghost" href="pixiedraw/index.html">共同制作を始める</a>
             </div>
           </article>
         </div>
       </div>
     </section>
-
-    <!-- 公開中の部屋（ドット絵の下へ移動） -->
-    <div class="project-place__group public-rooms-hub" id="publicRoomsHub">
-      <div class="public-rooms-hub__head">
-        <div>
-          <p class="project-place__label">Open Rooms</p>
-          <h3 class="project-place__title">公開中の部屋</h3>
-        </div>
-        <button class="chip public-rooms-hub__refresh" id="refreshPublicRooms" type="button">更新</button>
-      </div>
-      <p class="public-rooms-hub__lead">公開中の部屋を表示します。サムネイルから直接入室できます。</p>
-      <div class="public-room-grid" id="publicRoomGrid" aria-live="polite">
-        <p class="public-room-empty">公開中の部屋はありません。</p>
-      </div>
-    </div>
 
     <section class="section section--highlight" id="hub-intro">
       <div class="section-inner">
@@ -2826,6 +2815,18 @@
         <span class="helper" id="linkedEmail" style="display:none;"></span>
         <p class="helper" style="margin:0;">別端末でも同じアカウントで利用できます。</p>
         <p class="helper" id="authStatus"></p>
+      </div>
+      <div class="profile-block">
+        <p class="helper" style="margin:0;">広告非表示（ブラウザ版）</p>
+        <p class="helper" id="pixieedAdFreeStatus" style="margin:0;">ログイン後に購入コードを適用できます。</p>
+        <div class="auth-actions" style="display:grid; gap:8px;">
+          <a class="auth-btn" id="pixieedAdFreePurchase" href="https://pixieed.stores.jp" target="_blank" rel="noopener noreferrer">広告非表示パスを購入</a>
+        </div>
+        <div style="display:grid; gap:8px;">
+          <input class="auth-input" id="pixieedAdFreeRedeemCode" type="text" placeholder="購入コード" maxlength="48" autocomplete="one-time-code">
+          <button class="auth-btn" id="pixieedAdFreeRedeem" type="button">コードを適用</button>
+        </div>
+        <p class="helper" style="margin:0;">購入後に届くコードを、ログイン中のアカウントへ紐付けます。</p>
       </div>
     </div>
   </div>
@@ -3585,151 +3586,16 @@
     }
 
     async function probeAndRenderRooms(){
-      const grid = document.getElementById('publicRoomGrid');
-      if (!grid) return;
-      grid.innerHTML = '<p class="public-room-empty">公開中の部屋を読み込み中…</p>';
-      try{
-        const res = await fetch('rooms.json');
-        const rooms = await res.json();
-        const mod = await import(MULTI_SUPABASE_MODULE_URL);
-        const supabase = mod.createClient(MULTI_SUPABASE_URL, MULTI_SUPABASE_ANON_KEY, { realtime: { params: { eventsPerSecond: 48 } } });
-
-        const lobbyRooms = await fetchPublicLobbyRooms(supabase);
-        let residentThumbCache = readResidentThumbnailCache();
-        const configuredRooms = withResidentRooms(Array.isArray(rooms) ? rooms : []);
-        const configuredResidentProjectKeys = new Set();
-        const active = (await Promise.all(configuredRooms.map(async (r) => {
-          if (!r || typeof r !== 'object') return null;
-          if (RESIDENT_CANVASES_HIDDEN && r.type === 'resident') {
-            return null;
-          }
-          if (r.type === 'resident'){
-            const projectKey = normalizeProjectKey(r.projectKey || r.channel || r.id || '');
-            if (projectKey) {
-              configuredResidentProjectKeys.add(projectKey);
-            }
-            const lobby = projectKey ? lobbyRooms.get(projectKey) : null;
-            const liveThumb = (typeof lobby?.thumbnailDataUrl === 'string' && lobby.thumbnailDataUrl.startsWith('data:image/'))
-              ? lobby.thumbnailDataUrl
-              : '';
-            if (projectKey && liveThumb) {
-              residentThumbCache = setResidentThumbnailCache(
-                projectKey,
-                liveThumb,
-                Number(lobby?.updatedAt) || Date.now(),
-                residentThumbCache
-              );
-            }
-            const cachedThumb = getResidentThumbnailFromCache(projectKey, residentThumbCache);
-            const fallbackThumb = cachedThumb?.thumbnailDataUrl || RESIDENT_BLACK_THUMBNAIL_DATA_URL || '';
-            return Object.assign({}, r, {
-              projectKey,
-              isLive: Boolean(lobby),
-              thumbnail: liveThumb || fallbackThumb || null,
-              participantCount: Number(lobby?.participantCount) || 0,
-              updatedAt: Number(lobby?.updatedAt) || Number(cachedThumb?.updatedAt) || 0,
-            });
-          }
-          if (r.type === 'public'){
-            const thumbnail = await probeLegacyPublicRoomThumbnail(supabase, r.channel);
-            if (!thumbnail) return null;
-            return Object.assign({}, r, { thumbnail, isLive: true, updatedAt: Date.now() });
-          }
-          return null;
-        }))).filter(Boolean);
-
-        // Add dynamically published multi rooms that are not listed in rooms.json.
-        lobbyRooms.forEach((lobby, projectKey) => {
-          const normalizedProjectKey = normalizeProjectKey(projectKey);
-          if (
-            !normalizedProjectKey
-            || configuredResidentProjectKeys.has(normalizedProjectKey)
-            || (RESIDENT_CANVASES_HIDDEN && RESIDENT_PROJECT_KEY_SET.has(normalizedProjectKey))
-          ) {
-            return;
-          }
-          const liveThumb = (typeof lobby?.thumbnailDataUrl === 'string' && lobby.thumbnailDataUrl.startsWith('data:image/'))
-            ? lobby.thumbnailDataUrl
-            : '';
-          if (liveThumb) {
-            residentThumbCache = setResidentThumbnailCache(
-              normalizedProjectKey,
-              liveThumb,
-              Number(lobby?.updatedAt) || Date.now(),
-              residentThumbCache
-            );
-          }
-          const cachedThumb = getResidentThumbnailFromCache(normalizedProjectKey, residentThumbCache);
-          const fallbackThumb = cachedThumb?.thumbnailDataUrl || RESIDENT_BLACK_THUMBNAIL_DATA_URL || '';
-          const maxGuests = Math.max(0, Math.round(Number(lobby?.maxGuests) || 0));
-          active.push({
-            id: `resident-dynamic-${normalizedProjectKey}`,
-            name: `公開ルーム (${normalizedProjectKey})`,
-            type: 'resident',
-            projectKey: normalizedProjectKey,
-            channel: normalizedProjectKey,
-            description: 'PiXiEEDrawで公開中の共同制作ルームです。',
-            size: '',
-            maxUsers: maxGuests > 0 ? (maxGuests + 1) : 0,
-            isLive: true,
-            thumbnail: liveThumb || fallbackThumb || null,
-            participantCount: Number(lobby?.participantCount) || 0,
-            updatedAt: Number(lobby?.updatedAt) || Date.now(),
-          });
-        });
-
-        active.sort((a, b) => {
-          const left = Number(a?.updatedAt) || 0;
-          const right = Number(b?.updatedAt) || 0;
-          return right - left;
-        });
-
-        grid.innerHTML = '';
-        if (!active.length){ grid.innerHTML = '<p class="public-room-empty">公開中の部屋はありません。</p>'; return; }
-        for (const r of active){
-          const card = document.createElement('div');
-          card.className = 'public-room-card';
-          // determine thumbnail/placeholder
-          const thumbHtml = r.thumbnail
-            ? `<div class="public-room-thumb"><img src="${r.thumbnail}" alt="${r.name} thumbnail" loading="lazy" /></div>`
-            : `<div class="public-room-thumb"><span>ROOM</span></div>`;
-
-          // action area
-          let actionHtml = '';
-          if (r.type === 'public'){
-            const href = `public-room.html?room=${encodeURIComponent(r.channel)}`;
-            actionHtml = `<a class="public-room-action button" href="${href}">入室</a>`;
-          } else if (r.type === 'resident'){
-            const residentPage = buildMultiInviteHref(r.projectKey || r.channel || r.id || '', 'guest');
-            actionHtml = `<a class="public-room-action button" href="${residentPage}">入室</a>`;
-          }
-
-          const residentLiveInfo = r.type === 'resident'
-            ? (r.isLive ? ` · 参加中 ${Math.max(0, Number(r.participantCount) || 0)} 人` : ' · 待機中')
-            : '';
-          const updatedLabel = r.updatedAt
-            ? new Date(r.updatedAt).toLocaleString()
-            : (r.type === 'resident' ? '待機中' : new Date().toLocaleString());
-
-          const metaInfo = `
-            <div class="public-room-meta">
-              <div class="public-room-title">${r.name}</div>
-              <div class="public-room-info">${r.description || ''}</div>
-              <div class="public-room-meta-extra">${r.size ? r.size + ' · ' : ''}${r.maxUsers ? '最大 ' + r.maxUsers + ' 人' : ''}${residentLiveInfo}</div>
-              <div class="public-room-time">${updatedLabel}</div>
-              <div class="public-room-action-row">${actionHtml}</div>
-            </div>`;
-
-          card.innerHTML = `${thumbHtml}${metaInfo}`;
-          grid.appendChild(card);
-        }
-      }catch(e){
-        console.error('probe rooms failed', e);
-        renderResidentFallbackCards(grid);
+      const section = document.getElementById('publicRoomsHub');
+      if (section instanceof HTMLElement) {
+        section.hidden = true;
       }
     }
 
-    document.getElementById('refreshPublicRooms').addEventListener('click', ()=>{ probeAndRenderRooms(); });
+    const refreshPublicRoomsButton = document.getElementById('refreshPublicRooms');
+    if (refreshPublicRoomsButton instanceof HTMLButtonElement) {
+      refreshPublicRoomsButton.addEventListener('click', ()=>{ probeAndRenderRooms(); });
+    }
     probeAndRenderRooms();
   </script>
 </body>
