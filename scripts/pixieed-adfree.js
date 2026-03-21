@@ -8,7 +8,10 @@
   const SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
   const CACHE_KEY = 'pixieed_browser_adfree_cache_v1';
   const ENTITLEMENT_KEY = 'browser_ad_free';
-  const PURCHASE_URL = 'https://pixieed.stores.jp';
+  const CHECKOUT_ENDPOINT = `${SUPABASE_URL}/functions/v1/stripe-browser-adfree-checkout`;
+  const AUTO_APPLY_QUERY_KEY = 'stripe_checkout_session_id';
+  const AUTO_APPLY_STATUS_KEY = 'stripe_checkout_status';
+  const ACCESS_CODE_PATTERN = /^PXA[A-Z0-9]{6,}$/i;
   const STYLE_ID = 'pixieed-adfree-style';
   const listeners = new Set();
 
@@ -19,6 +22,7 @@
   let readyResolved = false;
   let readyResolver = null;
   let uiMessage = '';
+  let autoApplyStarted = false;
 
   const state = {
     isReady: false,
@@ -26,6 +30,7 @@
     isLoggedIn: false,
     isActive: false,
     userId: '',
+    userEmail: '',
     expiresAt: '',
     lastError: '',
   };
@@ -111,6 +116,67 @@
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${y}/${m}/${day}`;
+  }
+
+  function getAccessInput() {
+    const input = document.getElementById('pixieedAdFreeOrderId');
+    return input instanceof HTMLInputElement ? input : null;
+  }
+
+  function setAccessInputValue(value) {
+    const input = getAccessInput();
+    if (input) {
+      input.value = value;
+    }
+  }
+
+  function readQueryParam(name) {
+    try {
+      return new URL(window.location.href).searchParams.get(name) || '';
+    } catch (_error) {
+      return '';
+    }
+  }
+
+  function clearCheckoutParams() {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete(AUTO_APPLY_QUERY_KEY);
+      url.searchParams.delete(AUTO_APPLY_STATUS_KEY);
+      window.history.replaceState({}, '', url.toString());
+    } catch (_error) {
+      // ignore history failures
+    }
+  }
+
+  function buildCheckoutReturnUrl() {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete(AUTO_APPLY_QUERY_KEY);
+      url.searchParams.delete(AUTO_APPLY_STATUS_KEY);
+      return url.toString();
+    } catch (_error) {
+      return 'https://pixieed.jp/pixiedraw/';
+    }
+  }
+
+  function buildPurchaseUrl() {
+    try {
+      const url = new URL(CHECKOUT_ENDPOINT);
+      url.searchParams.set('product', ENTITLEMENT_KEY);
+      url.searchParams.set('return_url', buildCheckoutReturnUrl());
+      url.searchParams.set('cancel_url', buildCheckoutReturnUrl());
+      if (state.isLoggedIn && state.userEmail) {
+        url.searchParams.set('email', state.userEmail);
+      }
+      return url.toString();
+    } catch (_error) {
+      return CHECKOUT_ENDPOINT;
+    }
+  }
+
+  function shouldRetryPurchaseClaim(message) {
+    return /purchase not found|not found|見つかりません|まだ反映/i.test(String(message || ''));
   }
 
   function injectStyle() {
@@ -226,13 +292,11 @@
     const purchaseLink = document.getElementById('pixieedAdFreePurchase');
     const claimInput = document.getElementById('pixieedAdFreeOrderId');
     const claimButton = document.getElementById('pixieedAdFreeClaim');
-    const redeemInput = document.getElementById('pixieedAdFreeRedeemCode');
-    const redeemButton = document.getElementById('pixieedAdFreeRedeem');
 
     if (purchaseLink instanceof HTMLAnchorElement) {
-      purchaseLink.href = PURCHASE_URL;
-      purchaseLink.target = '_blank';
-      purchaseLink.rel = 'noopener noreferrer';
+      purchaseLink.href = buildPurchaseUrl();
+      purchaseLink.target = '_self';
+      purchaseLink.rel = 'noopener';
     }
 
     if (claimInput instanceof HTMLInputElement) {
@@ -241,19 +305,21 @@
     if (claimButton instanceof HTMLButtonElement) {
       claimButton.disabled = !state.isLoggedIn || state.isLoading;
     }
-    if (redeemInput instanceof HTMLInputElement) {
-      redeemInput.disabled = !state.isLoggedIn || state.isLoading;
-    }
-    if (redeemButton instanceof HTMLButtonElement) {
-      redeemButton.disabled = !state.isLoggedIn || state.isLoading;
-    }
 
     if (uiMessage) {
       updateStatusElement(uiMessage, Boolean(state.lastError));
       return;
     }
+    if (readQueryParam(AUTO_APPLY_STATUS_KEY) === 'cancelled' && !state.isActive) {
+      updateStatusElement('購入はキャンセルされました。再度購入する場合は「広告非表示を購入」を押してください。');
+      return;
+    }
+    if (!state.isLoggedIn && readQueryParam(AUTO_APPLY_QUERY_KEY)) {
+      updateStatusElement('購入は完了しています。購入時と同じメールアドレスでログインすると自動で反映します。');
+      return;
+    }
     if (!state.isLoggedIn) {
-      updateStatusElement('ログイン後に購入コードを適用できます。');
+      updateStatusElement('ログイン後に購入番号または購入コードを適用できます。');
       return;
     }
     if (state.isActive) {
@@ -261,7 +327,7 @@
       updateStatusElement(expiry ? `広告非表示が有効です (${expiry} まで)` : '広告非表示が有効です。');
       return;
     }
-    updateStatusElement('未購入です。購入後にコードを適用してください。');
+    updateStatusElement('未購入です。購入後は自動反映されます。うまくいかない場合は購入番号または購入コードを入力してください。');
   }
 
   function notify() {
@@ -273,6 +339,7 @@
       isLoggedIn: state.isLoggedIn,
       isActive: state.isActive,
       userId: state.userId,
+      userEmail: state.userEmail,
       expiresAt: state.expiresAt,
       lastError: state.lastError,
     };
@@ -310,9 +377,11 @@
     const { data } = await supabase.auth.getSession();
     const session = data?.session || null;
     state.userId = session?.user?.id || '';
+    state.userEmail = typeof session?.user?.email === 'string' ? session.user.email.trim().toLowerCase() : '';
     state.isLoggedIn = Boolean(state.userId);
     if (!state.userId) {
       state.isActive = false;
+      state.userEmail = '';
       state.expiresAt = '';
       return;
     }
@@ -347,6 +416,7 @@
         state.isLoading = false;
         state.isReady = true;
         notify();
+        maybeAutoApplyFromUrl();
         resolveReady();
         refreshPromise = null;
       }
@@ -379,10 +449,8 @@
       }
       uiMessage = 'コードを適用しました。';
       state.lastError = '';
-      const input = document.getElementById('pixieedAdFreeRedeemCode');
-      if (input instanceof HTMLInputElement) {
-        input.value = '';
-      }
+      setAccessInputValue('');
+      clearCheckoutParams();
       await refresh();
       return { ok: true };
     } catch (error) {
@@ -394,10 +462,11 @@
     }
   }
 
-  async function claimPurchaseCode(rawOrderId) {
+  async function claimPurchaseCode(rawOrderId, options = {}) {
+    const autoRedeem = Boolean(options && options.autoRedeem);
     const orderId = String(rawOrderId || '').trim();
     if (!orderId) {
-      state.lastError = '注文番号を入力してください。';
+      state.lastError = '購入番号または購入コードを入力してください。';
       uiMessage = state.lastError;
       syncUi();
       return { ok: false, error: state.lastError };
@@ -408,7 +477,7 @@
       syncUi();
       return { ok: false, error: state.lastError };
     }
-    uiMessage = '注文番号を確認しています...';
+    uiMessage = '購入番号を確認しています...';
     syncUi();
     try {
       const supabase = await ensureSupabase();
@@ -420,11 +489,11 @@
       if (!code) {
         throw new Error('購入コードを受け取れませんでした。');
       }
-      const redeemInput = document.getElementById('pixieedAdFreeRedeemCode');
-      if (redeemInput instanceof HTMLInputElement) {
-        redeemInput.value = code;
+      if (autoRedeem) {
+        return await redeemCode(code);
       }
-      uiMessage = '購入コードを受け取りました。続けて「コードを適用」を押してください。';
+      setAccessInputValue(code);
+      uiMessage = '購入コードを受け取りました。続けて「適用」を押してください。';
       state.lastError = '';
       syncUi();
       return { ok: true, code };
@@ -437,6 +506,51 @@
     }
   }
 
+  async function applyAccessValue(rawValue) {
+    const value = String(rawValue || '').trim();
+    if (!value) {
+      state.lastError = '購入番号または購入コードを入力してください。';
+      uiMessage = state.lastError;
+      syncUi();
+      return { ok: false, error: state.lastError };
+    }
+    if (ACCESS_CODE_PATTERN.test(value)) {
+      return redeemCode(value);
+    }
+    return claimPurchaseCode(value, { autoRedeem: true });
+  }
+
+  async function maybeAutoApplyFromUrl() {
+    const sessionId = readQueryParam(AUTO_APPLY_QUERY_KEY);
+    if (!sessionId) {
+      return;
+    }
+    if (state.isActive) {
+      clearCheckoutParams();
+      return;
+    }
+    if (!state.isLoggedIn || state.isLoading || autoApplyStarted) {
+      return;
+    }
+    autoApplyStarted = true;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const result = await claimPurchaseCode(sessionId, { autoRedeem: true });
+      if (result?.ok) {
+        clearCheckoutParams();
+        return;
+      }
+      if (!shouldRetryPurchaseClaim(result?.error)) {
+        return;
+      }
+      await new Promise(resolve => {
+        window.setTimeout(resolve, 1200 * (attempt + 1));
+      });
+    }
+    uiMessage = '購入は完了しています。少し待ってから、同じ入力欄に購入番号を入れて「適用」を押してください。';
+    state.lastError = '';
+    syncUi();
+  }
+
   function bindUi() {
     if (uiBound) {
       return;
@@ -445,20 +559,12 @@
     injectStyle();
     applyDomState();
     syncUi();
-    const redeemButton = document.getElementById('pixieedAdFreeRedeem');
     const claimButton = document.getElementById('pixieedAdFreeClaim');
     if (claimButton instanceof HTMLButtonElement) {
       claimButton.addEventListener('click', async () => {
         const input = document.getElementById('pixieedAdFreeOrderId');
         const orderId = input instanceof HTMLInputElement ? input.value : '';
-        await claimPurchaseCode(orderId);
-      });
-    }
-    if (redeemButton instanceof HTMLButtonElement) {
-      redeemButton.addEventListener('click', async () => {
-        const input = document.getElementById('pixieedAdFreeRedeemCode');
-        const code = input instanceof HTMLInputElement ? input.value : '';
-        await redeemCode(code);
+        await applyAccessValue(orderId);
       });
     }
   }
@@ -473,6 +579,7 @@
       isLoggedIn: state.isLoggedIn,
       isActive: state.isActive,
       userId: state.userId,
+      userEmail: state.userEmail,
       expiresAt: state.expiresAt,
       lastError: state.lastError,
     });
@@ -486,10 +593,11 @@
     ready,
     refresh,
     claimPurchaseCode,
+    applyAccessValue,
     redeemCode,
     subscribe,
     get purchaseUrl() {
-      return PURCHASE_URL;
+      return buildPurchaseUrl();
     },
   };
 
