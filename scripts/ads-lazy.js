@@ -1,4 +1,16 @@
 (function() {
+  try {
+    const raw = window.localStorage.getItem('pixieed_browser_adfree_cache_v1');
+    if (raw) {
+      const cached = JSON.parse(raw);
+      const expiresAt = typeof cached?.expiresAt === 'string' ? cached.expiresAt : '';
+      const isExpired = expiresAt ? Date.parse(expiresAt) <= Date.now() : false;
+      if (cached?.active === true && !isExpired) {
+        window.__PIXIEED_ADS_DISABLED__ = true;
+      }
+    }
+  } catch (_error) {}
+  if (window.__PIXIEED_ADS_DISABLED__ || window.pixieedAdFree?.state?.isActive) return;
   if (window.pixieedObserveAds) return;
 
   const SLOT_SEQUENCE = ['2141591954', '9073878884', '2261515379'];
