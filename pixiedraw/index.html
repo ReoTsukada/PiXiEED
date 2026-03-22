@@ -154,16 +154,15 @@
 <button class="startup-screen__link" id="startupActionSkip" type="button">この画面を閉じる</button>
 </div>
 </div>
-<div aria-hidden="true" class="update-toast" data-update-id="2026-03-22-composite-thumbnail-ads" data-update-published="true" hidden="" id="updateToast" role="status" aria-live="polite">
+<div aria-hidden="true" class="update-toast" data-update-id="2026-03-22-voxel-extension-preview" data-update-published="true" hidden="" id="updateToast" role="status" aria-live="polite">
 <div class="update-toast__body">
 <p class="update-toast__message">
 <strong>更新情報 (2026/03/22)</strong><br/>
 【今回更新】<br/>
-・スポイトは表示中の合成色をそのまま拾うよう修正しました<br/>
-・プロジェクトサムネイルは実際の合成結果に合わせ、マルチキャンバス時は xN バッジを表示します<br/>
-・起動画面 / 新規作成 / 更新情報 / ショートカット一覧に広告枠を追加しました<br/>
-・右パネル広告はヘルプ / ファイル中心で表示するよう調整しました<br/>
-・配信用に応援チップと広告非表示の導線を一時非表示にしました<br/>
+・拡張モードにボクセル6面入力と小窓プレビューを追加しました<br/>
+・小窓プレビューはドラッグで上下左右に回転でき、描画ごとに即時更新されます<br/>
+・マルチキャンバスは初期グリッド配置のあと自由配置でき、選択中だけ移動つまみを表示します<br/>
+・OBJのボクセル出力は一旦廃止し、制作とプレビュー調整を優先する構成に戻しました<br/>
 ・詳細は設定の「更新情報」から確認できます
 </p>
 <div class="update-toast__actions">
@@ -242,6 +241,7 @@
 <canvas aria-hidden="true" height="32" id="overlayCanvas" width="32"></canvas>
 <canvas aria-hidden="true" height="32" id="selectionCanvas" width="32"></canvas>
 </div>
+<div aria-hidden="true" class="canvas-surface-badge" hidden="" id="mainCanvasSurfaceBadge"></div>
 </div>
 <div aria-hidden="true" class="canvas-resize-preview is-hidden" hidden="" id="canvasResizePreview"></div>
 <button aria-label="キャンバス左上をドラッグしてサイズ変更" class="canvas-resize-handle canvas-resize-handle--corner-start is-hidden" data-resize-anchor="start" hidden="" id="canvasResizeHandleStart" type="button"></button>
@@ -688,6 +688,19 @@
 </section>
 <section class="panel-section" data-section="extensions" id="panelExtensions">
 <div class="panel-section__body">
+<div class="field field--list extension-voxel-field" id="voxelExtensionField">
+<span id="voxelExtensionTitle">ボクセル拡張モード</span>
+<label class="toggle-option" for="toggleVoxelExtensionMode">
+<input id="toggleVoxelExtensionMode" type="checkbox"/>
+<span id="toggleVoxelExtensionModeLabel">専用6面を使う</span>
+</label>
+<div class="field-group extension-voxel-actions">
+<button class="button" id="setupVoxelExtension" type="button">6面をセットアップ</button>
+<button class="button" id="refreshVoxelPreview" type="button">プレビュー更新</button>
+</div>
+<p class="help-text ui-guide-text" id="voxelExtensionHint">Front / Back / Left / Right / Top / Bottom の6面から小窓プレビューを自動生成します。小窓をドラッグすると左右と上下に回転できます。</p>
+<p aria-live="polite" class="help-text" id="voxelExtensionStatus">ボクセルモード: OFF</p>
+</div>
 <div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 </div>
 </section>
