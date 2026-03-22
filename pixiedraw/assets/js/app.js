@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.03.20';
+  const APP_BUILD_VERSION = '2026.03.22';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -59,6 +59,7 @@
     canvasViewport: document.getElementById('canvasViewport'),
     viewportWorkspace: document.getElementById('viewportWorkspace'),
     mainCanvasArea: document.getElementById('mainCanvasArea'),
+    mainCanvasSurfaceBadge: document.getElementById('mainCanvasSurfaceBadge'),
     localCanvasDock: document.getElementById('localCanvasDock'),
     canvasResizePreview: document.getElementById('canvasResizePreview'),
     canvasResizeHandleStart: document.getElementById('canvasResizeHandleStart'),
@@ -195,6 +196,13 @@
       localCanvasCountControls: document.getElementById('localCanvasCountControls'),
       localCanvasCountLabel: document.getElementById('localCanvasCountLabel'),
       localCanvasCountValue: document.getElementById('localCanvasCountValue'),
+      toggleVoxelExtensionMode: document.getElementById('toggleVoxelExtensionMode'),
+      setupVoxelExtension: document.getElementById('setupVoxelExtension'),
+      refreshVoxelPreview: document.getElementById('refreshVoxelPreview'),
+      voxelPreviewYaw: document.getElementById('voxelPreviewYaw'),
+      voxelPreviewYawValue: document.getElementById('voxelPreviewYawValue'),
+      voxelExtensionField: document.getElementById('voxelExtensionField'),
+      voxelExtensionStatus: document.getElementById('voxelExtensionStatus'),
       toggleOnionSkin: document.getElementById('toggleOnionSkin'),
       toggleMirrorMode: document.getElementById('toggleMirrorMode'),
       mirrorAxisVertical: document.getElementById('mirrorAxisVertical'),
@@ -967,6 +975,18 @@
     '2026-03-11-personal-view-copy-paste-stability',
   ]);
   const BUILTIN_UPDATE_HISTORY_ENTRIES = Object.freeze([
+    Object.freeze({
+      id: '2026-03-22-voxel-extension-preview',
+      at: '2026-03-22T23:58:00+09:00',
+      title: 'ボクセル拡張モードと小窓プレビューを追加',
+      published: true,
+      details: Object.freeze([
+        '拡張モードに Front / Back / Left / Right / Top / Bottom の6面入力を追加し、小窓プレビューで立体確認できるよう変更。',
+        '小窓プレビューはドラッグで yaw / pitch を回せるようにし、描画ごとに即時更新されるよう調整。',
+        'マルチキャンバスは起動時と初期化時にグリッド配置し、その後は自由配置できるよう変更。移動つまみは選択中のキャンバスだけ表示。',
+        'ボクセルOBJ出力は一旦廃止し、ボクセル制作とプレビュー確認を優先する構成に戻した。',
+      ]),
+    }),
     Object.freeze({
       id: '2026-03-22-composite-thumbnail-ads',
       at: '2026-03-22T23:40:00+09:00',
@@ -3052,13 +3072,55 @@
     height: 220,
   });
   const MULTI_CANVAS_FEATURE_ENABLED = true;
-  const LOCAL_VIEWPORT_CANVAS_MAX_COUNT = 3;
+  const LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT = 3;
   const LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE = Object.freeze({
     count: 0,
     selectedKind: 'main',
     selectedIndex: -1,
+    layoutScale: 1,
+    positionsRelative: true,
     anchorLeft: null,
     anchorTop: null,
+    positions: Object.freeze([]),
+  });
+  const EXTENSION_MODE_NONE = 'none';
+  const EXTENSION_MODE_VOXEL = 'voxel';
+  const VOXEL_EXTENSION_SOURCE_CANVAS_TOTAL = 6;
+  const VOXEL_EXTENSION_CANVAS_TOTAL = VOXEL_EXTENSION_SOURCE_CANVAS_TOTAL;
+  const VOXEL_EXTENSION_LOCAL_CANVAS_MAX_COUNT = VOXEL_EXTENSION_CANVAS_TOTAL - 1;
+  const VOXEL_EXTENSION_MAX_SOURCE_EDGE = 64;
+  const VOXEL_EXTENSION_PREVIEW_MAX_EDGE = 224;
+  const VOXEL_EXTENSION_PREVIEW_ELEVATION_DEG = 32;
+  const VOXEL_EXTENSION_PREVIEW_PITCH_MIN_DEG = -80;
+  const VOXEL_EXTENSION_PREVIEW_PITCH_MAX_DEG = 80;
+  const VOXEL_EXTENSION_DEFAULT_YAW_DEG = 45;
+  const VOXEL_EXTENSION_LABELS = Object.freeze({
+    front: { ja: '正面', en: 'Front' },
+    back: { ja: '背面', en: 'Back' },
+    left: { ja: '左面', en: 'Left' },
+    right: { ja: '右面', en: 'Right' },
+    top: { ja: '上面', en: 'Top' },
+    bottom: { ja: '下面', en: 'Bottom' },
+  });
+  const VOXEL_EXTENSION_PROJECT_NAMES = Object.freeze({
+    front: 'Front',
+    back: 'Back',
+    left: 'Left',
+    right: 'Right',
+    top: 'Top',
+    bottom: 'Bottom',
+  });
+  const VOXEL_EXTENSION_DEFAULT_STATE = Object.freeze({
+    mode: EXTENSION_MODE_NONE,
+    frontCanvasId: '',
+    backCanvasId: '',
+    leftCanvasId: '',
+    rightCanvasId: '',
+    topCanvasId: '',
+    bottomCanvasId: '',
+    previewCanvasId: '',
+    previewYawDeg: VOXEL_EXTENSION_DEFAULT_YAW_DEG,
+    previewPitchDeg: VOXEL_EXTENSION_PREVIEW_ELEVATION_DEG,
   });
   let lockedCanvasWidth = null;
   let lockedCanvasHeight = null;
@@ -3071,8 +3133,22 @@
   const state = createInitialState({ palettePreset: newProjectPalettePresetId });
   const projectCanvasStore = createProjectCanvasStoreFromState(state);
   installProjectCanvasStateProxy(state, projectCanvasStore);
+  let voxelExtensionState = normalizeVoxelExtensionState(null, VOXEL_EXTENSION_DEFAULT_STATE);
   let localViewportCanvasState = normalizeLocalViewportCanvasState(null, LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE);
+  let localViewportCanvasLayoutResetPending = true;
+  let viewportCanvasVisibilityRecoveryActive = false;
   const localViewportCanvasEntries = [];
+  const canvasSurfacePanelDragState = {
+    pointerId: null,
+    surfaceKind: '',
+    surfaceIndex: -1,
+    target: null,
+    panel: null,
+    pointerOffsetX: 0,
+    pointerOffsetY: 0,
+    startClientX: 0,
+    startClientY: 0,
+  };
   const mainViewportCanvasSurface = {
     kind: 'main',
     index: 0,
@@ -3087,8 +3163,12 @@
     selectionCtx: ctx.selection,
     canvasDoc: null,
     canvasDocId: '',
+    dragHandle: null,
   };
   let activeCanvasSurface = mainViewportCanvasSurface;
+  let voxelExtensionPreviewMeta = null;
+  let voxelExtensionPreviewPixels = null;
+  let voxelExtensionGuideProjections = null;
   let committedProjectCanvasId = '';
   let hoveredProjectCanvasId = '';
   let pendingProjectCanvasUiSync = false;
@@ -3640,12 +3720,141 @@
     };
   }
 
+  function parseLocalViewportCanvasAxis(value, fallbackValue = null) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+      return Math.round(numeric);
+    }
+    const fallbackNumeric = Number(fallbackValue);
+    return Number.isFinite(fallbackNumeric) ? Math.round(fallbackNumeric) : null;
+  }
+
+  function parseLocalViewportCanvasUnit(value, fallbackValue = null) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+      return Math.round(numeric * 1000) / 1000;
+    }
+    const fallbackNumeric = Number(fallbackValue);
+    return Number.isFinite(fallbackNumeric) ? (Math.round(fallbackNumeric * 1000) / 1000) : null;
+  }
+
+  function normalizeLocalViewportCanvasPosition(source, fallback = null, options = {}) {
+    const {
+      relative = true,
+      fallbackRelative = true,
+      anchorLeft = 0,
+      anchorTop = 0,
+      layoutScale = 1,
+      fallbackAnchorLeft = 0,
+      fallbackAnchorTop = 0,
+      fallbackLayoutScale = 1,
+    } = options || {};
+    const settings = source && typeof source === 'object' ? source : {};
+    const safeFallback = fallback && typeof fallback === 'object' ? fallback : {};
+    const safeLayoutScale = normalizeLocalViewportCanvasLayoutScale(layoutScale, 1);
+    const safeFallbackLayoutScale = normalizeLocalViewportCanvasLayoutScale(fallbackLayoutScale, safeLayoutScale);
+    const normalizeCoordinate = (value, fallbackValue, isRelative, refAnchor, refScale, fallbackIsRelative, fallbackRefAnchor, fallbackRefScale) => {
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) {
+        if (isRelative) {
+          return parseLocalViewportCanvasUnit(numeric, null);
+        }
+        return parseLocalViewportCanvasUnit((numeric - refAnchor) / Math.max(refScale, Number.EPSILON), null);
+      }
+      const fallbackNumeric = Number(fallbackValue);
+      if (Number.isFinite(fallbackNumeric)) {
+        if (fallbackIsRelative) {
+          return parseLocalViewportCanvasUnit(fallbackNumeric, null);
+        }
+        return parseLocalViewportCanvasUnit(
+          (fallbackNumeric - fallbackRefAnchor) / Math.max(fallbackRefScale, Number.EPSILON),
+          null
+        );
+      }
+      return null;
+    };
+    return {
+      left: normalizeCoordinate(
+        settings.left,
+        safeFallback.left,
+        relative,
+        anchorLeft,
+        safeLayoutScale,
+        fallbackRelative,
+        fallbackAnchorLeft,
+        safeFallbackLayoutScale
+      ),
+      top: normalizeCoordinate(
+        settings.top,
+        safeFallback.top,
+        relative,
+        anchorTop,
+        safeLayoutScale,
+        fallbackRelative,
+        fallbackAnchorTop,
+        safeFallbackLayoutScale
+      ),
+    };
+  }
+
+  function getCurrentLocalViewportCanvasLayoutScale() {
+    const numericScale = Number(state?.scale);
+    if (Number.isFinite(numericScale) && numericScale > 0) {
+      return numericScale;
+    }
+    return 1;
+  }
+
+  function normalizeLocalViewportCanvasLayoutScale(value, fallbackValue = null) {
+    const currentScale = getCurrentLocalViewportCanvasLayoutScale();
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return numeric;
+    }
+    const fallbackNumeric = Number(fallbackValue);
+    if (Number.isFinite(fallbackNumeric) && fallbackNumeric > 0) {
+      return fallbackNumeric;
+    }
+    return currentScale;
+  }
+
+  function scaleLocalViewportCanvasAxisForDisplay(value, layoutScale = null) {
+    const axis = parseLocalViewportCanvasAxis(value, null);
+    if (axis === null) {
+      return null;
+    }
+    const storedScale = normalizeLocalViewportCanvasLayoutScale(layoutScale, getCurrentLocalViewportCanvasLayoutScale());
+    const currentScale = getCurrentLocalViewportCanvasLayoutScale();
+    return Math.round(axis * (currentScale / storedScale));
+  }
+
+  function normalizeLocalViewportCanvasPositions(source, fallback, count) {
+    const normalizedCount = Math.max(0, Math.round(Number(count) || 0));
+    const sourceList = Array.isArray(source) ? source : [];
+    const fallbackList = Array.isArray(fallback) ? fallback : [];
+    const options = arguments[3] && typeof arguments[3] === 'object' ? arguments[3] : {};
+    const positions = [];
+    for (let index = 0; index < normalizedCount; index += 1) {
+      positions.push(
+        normalizeLocalViewportCanvasPosition(
+          sourceList[index],
+          fallbackList[index],
+          options
+        )
+      );
+    }
+    return positions;
+  }
+
   function normalizeLocalViewportCanvasState(source, fallback = LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE) {
     if (!MULTI_CANVAS_FEATURE_ENABLED) {
       return {
         ...LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE,
+        layoutScale: getCurrentLocalViewportCanvasLayoutScale(),
+        positionsRelative: true,
         anchorLeft: null,
         anchorTop: null,
+        positions: [],
       };
     }
     const settings = source && typeof source === 'object' ? source : {};
@@ -3655,7 +3864,7 @@
     const requestedCount = Number.isFinite(Number(settings.count))
       ? Number(settings.count)
       : Number(safeFallback.count);
-    const normalizedCount = clamp(Math.round(requestedCount || 0), 0, LOCAL_VIEWPORT_CANVAS_MAX_COUNT);
+    const normalizedCount = clamp(Math.round(requestedCount || 0), 0, getLocalViewportCanvasMaxCount());
     const requestedSelectedKind = settings.selectedKind === 'local'
       ? 'local'
       : (safeFallback.selectedKind === 'local' ? 'local' : 'main');
@@ -3671,20 +3880,99 @@
     const normalizedSelectedIndex = normalizedSelectedKind === 'local'
       ? clamp(requestedSelectedIndex, 0, Math.max(0, normalizedCount - 1))
       : -1;
-    const parseAxis = (value, fallbackValue = null) => {
-      const numeric = Number(value);
-      if (Number.isFinite(numeric)) {
-        return Math.round(numeric);
-      }
-      const fallbackNumeric = Number(fallbackValue);
-      return Number.isFinite(fallbackNumeric) ? Math.round(fallbackNumeric) : null;
-    };
+    const layoutScale = normalizeLocalViewportCanvasLayoutScale(
+      settings.layoutScale,
+      safeFallback.layoutScale
+    );
+    const anchorLeft = parseLocalViewportCanvasAxis(settings.anchorLeft, safeFallback.anchorLeft);
+    const anchorTop = parseLocalViewportCanvasAxis(settings.anchorTop, safeFallback.anchorTop);
+    const fallbackAnchorLeft = parseLocalViewportCanvasAxis(safeFallback.anchorLeft, 0) || 0;
+    const fallbackAnchorTop = parseLocalViewportCanvasAxis(safeFallback.anchorTop, 0) || 0;
+    const positionsRelative = true;
     return {
       count: normalizedCount,
       selectedKind: normalizedSelectedKind,
       selectedIndex: normalizedSelectedIndex,
-      anchorLeft: parseAxis(settings.anchorLeft, safeFallback.anchorLeft),
-      anchorTop: parseAxis(settings.anchorTop, safeFallback.anchorTop),
+      layoutScale,
+      positionsRelative,
+      anchorLeft,
+      anchorTop,
+      positions: normalizeLocalViewportCanvasPositions(
+        settings.positions,
+        safeFallback.positions,
+        normalizedCount,
+        {
+          relative: settings.positionsRelative !== false,
+          fallbackRelative: safeFallback.positionsRelative !== false,
+          anchorLeft: anchorLeft ?? 0,
+          anchorTop: anchorTop ?? 0,
+          layoutScale,
+          fallbackAnchorLeft,
+          fallbackAnchorTop,
+          fallbackLayoutScale: normalizeLocalViewportCanvasLayoutScale(safeFallback.layoutScale, layoutScale),
+        }
+      ),
+    };
+  }
+
+  function normalizeVoxelExtensionState(source, fallback = VOXEL_EXTENSION_DEFAULT_STATE) {
+    const settings = source && typeof source === 'object' ? source : {};
+    const safeFallback = fallback && typeof fallback === 'object'
+      ? fallback
+      : VOXEL_EXTENSION_DEFAULT_STATE;
+    const mode = settings.mode === EXTENSION_MODE_VOXEL
+      ? EXTENSION_MODE_VOXEL
+      : (safeFallback.mode === EXTENSION_MODE_VOXEL ? EXTENSION_MODE_VOXEL : EXTENSION_MODE_NONE);
+    const normalizeCanvasId = (value, fallbackValue = '') => {
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+      if (typeof fallbackValue === 'string' && fallbackValue.trim()) {
+        return fallbackValue.trim();
+      }
+      return '';
+    };
+    const normalizePreviewYaw = (value, fallbackValue = VOXEL_EXTENSION_DEFAULT_YAW_DEG) => {
+      const numericValue = Number(value);
+      if (Number.isFinite(numericValue)) {
+        return Math.round(numericValue);
+      }
+      const numericFallback = Number(fallbackValue);
+      if (Number.isFinite(numericFallback)) {
+        return Math.round(numericFallback);
+      }
+      return VOXEL_EXTENSION_DEFAULT_YAW_DEG;
+    };
+    const normalizePreviewPitch = (value, fallbackValue = VOXEL_EXTENSION_PREVIEW_ELEVATION_DEG) => {
+      const numericValue = Number(value);
+      if (Number.isFinite(numericValue)) {
+        return clamp(
+          Math.round(numericValue),
+          VOXEL_EXTENSION_PREVIEW_PITCH_MIN_DEG,
+          VOXEL_EXTENSION_PREVIEW_PITCH_MAX_DEG
+        );
+      }
+      const numericFallback = Number(fallbackValue);
+      if (Number.isFinite(numericFallback)) {
+        return clamp(
+          Math.round(numericFallback),
+          VOXEL_EXTENSION_PREVIEW_PITCH_MIN_DEG,
+          VOXEL_EXTENSION_PREVIEW_PITCH_MAX_DEG
+        );
+      }
+      return VOXEL_EXTENSION_PREVIEW_ELEVATION_DEG;
+    };
+    return {
+      mode,
+      frontCanvasId: normalizeCanvasId(settings.frontCanvasId, safeFallback.frontCanvasId),
+      backCanvasId: normalizeCanvasId(settings.backCanvasId, safeFallback.backCanvasId),
+      leftCanvasId: normalizeCanvasId(settings.leftCanvasId, safeFallback.leftCanvasId),
+      rightCanvasId: normalizeCanvasId(settings.rightCanvasId, safeFallback.rightCanvasId),
+      topCanvasId: normalizeCanvasId(settings.topCanvasId, safeFallback.topCanvasId),
+      bottomCanvasId: normalizeCanvasId(settings.bottomCanvasId, safeFallback.bottomCanvasId),
+      previewCanvasId: normalizeCanvasId(settings.previewCanvasId, safeFallback.previewCanvasId),
+      previewYawDeg: normalizePreviewYaw(settings.previewYawDeg, safeFallback.previewYawDeg),
+      previewPitchDeg: normalizePreviewPitch(settings.previewPitchDeg, safeFallback.previewPitchDeg),
     };
   }
 
@@ -4313,6 +4601,11 @@
       selectionClearedOnDown: false,
       selectionExtendOnDown: false,
       startClient: null,
+      voxelPreviewYawStart: null,
+      voxelPreviewDragWidth: null,
+      voxelPreviewPitchStart: null,
+      voxelPreviewDragHeight: null,
+      voxelPreviewYawChanged: false,
       panOrigin: { x: 0, y: 0 },
       panMode: null,
       touchPanStart: null,
@@ -4339,6 +4632,8 @@
   const TOUCH_PINCH_MIN_RATIO = 0.05;
   const TOUCH_PINCH_MODE_PRIORITY_RATIO = 1.3;
   const INACTIVE_CANVAS_SWITCH_DRAG_THRESHOLD_PX = 4;
+  const VOXEL_PREVIEW_DRAG_TURN_DEGREES = 180;
+  const VOXEL_PREVIEW_DRAG_TILT_DEGREES = 140;
   const activeTouchPointers = new Map();
   const keyboardState = {
     spacePanActive: false,
@@ -4671,6 +4966,9 @@
     // For persistence/reload snapshots we must materialize that preview placement,
     // so force pixel cloning when a pending move exists.
     const effectiveClonePixelData = clonePixelData || Boolean(getPendingSelectionMoveState());
+    if (isVoxelExtensionModeEnabled()) {
+      syncVoxelExtensionPreviewFromSource({ updateViewport: false });
+    }
     const snapshot = {
       width: state.width,
       height: state.height,
@@ -4711,6 +5009,7 @@
       onionSkin: normalizeOnionSkinState(state.onionSkin),
       dualLeftRail: false,
       documentName: state.documentName,
+      voxelExtension: normalizeVoxelExtensionState(voxelExtensionState, VOXEL_EXTENSION_DEFAULT_STATE),
     };
 
     if (includeSelection) {
@@ -5547,6 +5846,7 @@
       onionSkin: normalizeOnionSkinState(snapshot.onionSkin),
       dualLeftRail: false,
       documentName: snapshot.documentName,
+      voxelExtension: normalizeVoxelExtensionState(snapshot.voxelExtension, VOXEL_EXTENSION_DEFAULT_STATE),
     };
     if (Object.prototype.hasOwnProperty.call(snapshot, 'activeFrame')) {
       compressed.activeFrame = snapshot.activeFrame;
@@ -5665,6 +5965,7 @@
       onionSkin: normalizeOnionSkinState(snapshot.onionSkin),
       dualLeftRail: false,
       documentName: snapshot.documentName,
+      voxelExtension: normalizeVoxelExtensionState(snapshot.voxelExtension, VOXEL_EXTENSION_DEFAULT_STATE),
     };
     if (Object.prototype.hasOwnProperty.call(snapshot, 'activeFrame')) {
       decompressed.activeFrame = snapshot.activeFrame;
@@ -5939,6 +6240,8 @@
     snapshot,
     { preserveView = false, forcePalettePresetSync = false, preservePersonalPreferences = true } = {}
   ) {
+    const previousProjectCanvasCount = getProjectCanvasCount();
+    const previousVoxelModeEnabled = isVoxelExtensionModeEnabled();
     const personalPreferences = preservePersonalPreferences
       ? capturePersonalPreferenceSnapshot()
       : null;
@@ -5960,6 +6263,13 @@
         selectionContentMask: snapshot.selectionContentMask,
         selectionBounds: snapshot.selectionBounds,
       }], typeof snapshot?.activeCanvasId === 'string' ? snapshot.activeCanvasId : '');
+    }
+    const nextProjectCanvasCount = Array.isArray(snapshot?.canvases) && snapshot.canvases.length
+      ? snapshot.canvases.length
+      : 1;
+    const nextVoxelModeEnabled = normalizeVoxelExtensionState(snapshot?.voxelExtension, VOXEL_EXTENSION_DEFAULT_STATE).mode === EXTENSION_MODE_VOXEL;
+    if (previousProjectCanvasCount !== nextProjectCanvasCount || previousVoxelModeEnabled !== nextVoxelModeEnabled) {
+      requestLocalViewportCanvasLayoutReset({ clearStored: true });
     }
     state.width = snapshot.width;
     state.height = snapshot.height;
@@ -6100,6 +6410,7 @@
       state.playback = { ...snapshot.playback };
     }
     state.documentName = normalizeDocumentName(snapshot.documentName);
+    voxelExtensionState = normalizeVoxelExtensionState(snapshot.voxelExtension, VOXEL_EXTENSION_DEFAULT_STATE);
     if (personalPreferences) {
       applyPersonalPreferenceSnapshot(personalPreferences);
     }
@@ -6124,6 +6435,9 @@
     }
     updateFloatingDrawButtonEnabledState();
     refreshViewportCursorStyle();
+    if (isVoxelExtensionModeEnabled()) {
+      ensureVoxelExtensionCanvasSetup({ announce: false, trackChange: false });
+    }
     ensureLocalViewportCanvasEntries();
     bindActiveCanvasSurface(getProjectCanvasSurfaceForIndex(getActiveProjectCanvasIndex()) || mainViewportCanvasSurface);
 
@@ -10028,7 +10342,8 @@
     updateVirtualCursorActionToolButtons();
     syncVirtualCursorControlVisibility({ syncToggle: true });
     if (dom.controls.toggleFloatingPreview instanceof HTMLInputElement) {
-      dom.controls.toggleFloatingPreview.checked = Boolean(state.floatingPreview?.enabled);
+      dom.controls.toggleFloatingPreview.checked = Boolean(state.floatingPreview?.enabled) || isVoxelExtensionModeEnabled();
+      dom.controls.toggleFloatingPreview.disabled = isVoxelExtensionModeEnabled();
     }
     if (dom.controls.toggleCanvasResizeHandles instanceof HTMLInputElement) {
       dom.controls.toggleCanvasResizeHandles.checked = Boolean(state.showCanvasResizeHandles ?? true);
@@ -10038,9 +10353,10 @@
       LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
     ).count;
     const canEditProjectStructure = canCurrentClientEditProjectStructure();
+    const voxelModeEnabled = isVoxelExtensionModeEnabled();
     if (dom.controls.toggleLocalCanvas instanceof HTMLInputElement) {
       dom.controls.toggleLocalCanvas.checked = MULTI_CANVAS_FEATURE_ENABLED && localCanvasCount > 0;
-      dom.controls.toggleLocalCanvas.disabled = !MULTI_CANVAS_FEATURE_ENABLED || !canEditProjectStructure;
+      dom.controls.toggleLocalCanvas.disabled = !MULTI_CANVAS_FEATURE_ENABLED || !canEditProjectStructure || voxelModeEnabled;
     }
     if (dom.controls.localCanvasCountControls instanceof HTMLElement) {
       const showControls = MULTI_CANVAS_FEATURE_ENABLED && localCanvasCount > 0;
@@ -10052,16 +10368,17 @@
       dom.controls.localCanvasCountValue.textContent = String(MULTI_CANVAS_FEATURE_ENABLED ? localCanvasCount : 0);
     }
     if (dom.controls.removeLocalCanvas instanceof HTMLButtonElement) {
-      dom.controls.removeLocalCanvas.disabled = !MULTI_CANVAS_FEATURE_ENABLED || localCanvasCount <= 0 || !canEditProjectStructure;
+      dom.controls.removeLocalCanvas.disabled = !MULTI_CANVAS_FEATURE_ENABLED || localCanvasCount <= 0 || !canEditProjectStructure || voxelModeEnabled;
     }
     if (dom.controls.addLocalCanvas instanceof HTMLButtonElement) {
-      dom.controls.addLocalCanvas.disabled = !MULTI_CANVAS_FEATURE_ENABLED || localCanvasCount >= LOCAL_VIEWPORT_CANVAS_MAX_COUNT || !canEditProjectStructure;
+      dom.controls.addLocalCanvas.disabled = !MULTI_CANVAS_FEATURE_ENABLED || localCanvasCount >= getLocalViewportCanvasMaxCount() || !canEditProjectStructure || voxelModeEnabled;
     }
     if (MULTI_CANVAS_FEATURE_ENABLED && localCanvasCount > 0) {
       syncMultiCanvasSelectionUi();
     } else if (dom.mainCanvasArea instanceof HTMLElement) {
       dom.mainCanvasArea.classList.add('is-multi-canvas-selected');
     }
+    syncVoxelExtensionModeUi();
     if (dom.controls.toggleInlineHelp instanceof HTMLInputElement) {
       dom.controls.toggleInlineHelp.checked = inlineGuidesVisible;
     }
@@ -10709,6 +11026,14 @@
     setLocalizedAttribute('#addLocalCanvas', 'aria-label', 'マルチキャンバスを増やす', 'Add multi canvas');
     setLocalizedAttribute('#removeLocalCanvas', 'title', 'マルチキャンバスを減らす', 'Remove multi canvas');
     setLocalizedAttribute('#addLocalCanvas', 'title', 'マルチキャンバスを増やす', 'Add multi canvas');
+    setLocalizedTextContent('#voxelExtensionTitle', 'ボクセル拡張モード', 'Voxel Extension Mode');
+    setLocalizedToggleLabel('toggleVoxelExtensionMode', '専用6面を使う', 'Use dedicated 6-face setup');
+    setLocalizedTextContent('#setupVoxelExtension', '6面をセットアップ', 'Setup 6 faces');
+    setLocalizedTextContent('#refreshVoxelPreview', 'プレビュー更新', 'Refresh Preview');
+    setLocalizedTextContent('#voxelExtensionHint', 'Front / Back / Left / Right / Top / Bottom の6面から小窓プレビューを自動生成します。小窓をドラッグすると左右と上下に回転できます。', 'Floating preview is regenerated from Front / Back / Left / Right / Top / Bottom. Drag the floating preview to rotate horizontally and vertically.');
+    setLocalizedAttribute('#toggleVoxelExtensionMode', 'aria-label', 'ボクセル拡張モード', 'Voxel extension mode');
+    setLocalizedAttribute('#setupVoxelExtension', 'aria-label', 'ボクセル用6面キャンバスをセットアップ', 'Setup the voxel 6-face workspace');
+    setLocalizedAttribute('#refreshVoxelPreview', 'aria-label', 'ボクセルプレビューを更新', 'Refresh the voxel preview');
     setLocalizedToggleLabel('toggleTimelapse', 'タイムラプス記録', 'Timelapse Recording');
     setLocalizedToggleLabel('toggleOnionSkin', 'オニオンスキン', 'Onion Skin');
     setLocalizedToggleLabel('toggleMirrorMode', 'ミラーモード', 'Mirror Mode');
@@ -14362,7 +14687,7 @@
       return;
     }
     const choice = window.prompt(
-      '出力形式を入力してください (png / jpeg / svg / grid / gif / timelapse / pixfind / project)',
+      '出力形式を入力してください (png / jpeg / svg / grid / gif / timelapse / obj / pixfind / project)',
       'png'
     );
     if (!choice) {
@@ -17666,6 +17991,7 @@
       selectionBounds: snapshot.selectionBounds ? { ...snapshot.selectionBounds } : null,
       documentName: normalizeDocumentName(snapshot.documentName),
       dualLeftRail: false,
+      voxelExtension: normalizeVoxelExtensionState(snapshot.voxelExtension, VOXEL_EXTENSION_DEFAULT_STATE),
     };
     if (serializedCanvases) {
       serialized.canvases = serializedCanvases;
@@ -17864,6 +18190,7 @@
         }
         : { isPlaying: false, lastFrame: 0 },
       documentName,
+      voxelExtension: normalizeVoxelExtensionState(payload.voxelExtension, VOXEL_EXTENSION_DEFAULT_STATE),
     };
     if (Array.isArray(payload.canvases) && payload.canvases.length) {
       const canvases = payload.canvases.map((canvas, canvasIndex) => {
@@ -20029,12 +20356,19 @@
     for (let index = 0; index < tasks.length; index += 1) {
       const task = tasks[index];
       const deliveryResult = await triggerDownloadFromBlob(task.blob, task.filename, {
-        mimeType: options.mimeType,
-        fileExtensions: options.fileExtensions,
+        mimeType: task.mimeType || options.mimeType,
+        fileExtensions: task.fileExtensions || options.fileExtensions,
         shareTitle: options.shareTitle,
         shareText: task.shareText || options.shareText,
-        allowFilePicker: true,
-        allowBoundDirectory: true,
+        allowFilePicker: options.allowFilePicker !== false,
+        allowBoundDirectory: options.allowBoundDirectory !== false,
+        preferShare: options.preferShare,
+        allowAnchorDownload: options.allowAnchorDownload,
+        forceAnchorDownload: options.forceAnchorDownload,
+        allowNativePhotoLibrary: options.allowNativePhotoLibrary,
+        allowNativeSave: options.allowNativeSave,
+        nativeDirectory: options.nativeDirectory,
+        nativeSubdirectory: options.nativeSubdirectory,
       });
       switch (deliveryResult) {
         case 'gallery':
@@ -22217,9 +22551,116 @@
     }
   }
 
+  function getViewportVisibilityTargetSurface() {
+    if (activeCanvasSurface?.panel instanceof HTMLElement) {
+      return activeCanvasSurface;
+    }
+    return mainViewportCanvasSurface;
+  }
+
+  function clampPanToKeepVisibleCanvas() {
+    const viewport = dom.canvasViewport;
+    if (!(viewport instanceof HTMLElement)) {
+      return;
+    }
+    const targetSurface = getViewportVisibilityTargetSurface();
+    const panel = targetSurface?.panel instanceof HTMLElement ? targetSurface.panel : null;
+    const canvasDoc = targetSurface?.canvasDoc
+      || getProjectCanvasDocumentById(targetSurface?.canvasDocId)
+      || (targetSurface?.kind === 'local' ? getProjectCanvasDocumentForEntry(targetSurface) : getProjectCanvasDocumentAt(0));
+    if (!(panel instanceof HTMLElement) || !canvasDoc) {
+      return;
+    }
+    const viewportWidth = Math.max(1, Math.round(viewport.clientWidth || viewport.getBoundingClientRect().width || 1));
+    const viewportHeight = Math.max(1, Math.round(viewport.clientHeight || viewport.getBoundingClientRect().height || 1));
+    const drawWidth = Math.max(1, Math.round(Number(canvasDoc?.width) || 1)) * getProjectCanvasDisplayScale(canvasDoc);
+    const drawHeight = Math.max(1, Math.round(Number(canvasDoc?.height) || 1)) * getProjectCanvasDisplayScale(canvasDoc);
+    const panelLeft = parseLocalViewportCanvasAxis(panel.style.left, panel.offsetLeft) || 0;
+    const panelTop = parseLocalViewportCanvasAxis(panel.style.top, panel.offsetTop) || 0;
+    const minVisibleX = Math.max(12, Math.min(48, Math.round(viewportWidth / 4), Math.round(drawWidth)));
+    const minVisibleY = Math.max(12, Math.min(48, Math.round(viewportHeight / 4), Math.round(drawHeight)));
+    let nextPanX = Math.round(Number(state.pan.x) || 0);
+    let nextPanY = Math.round(Number(state.pan.y) || 0);
+    const visibleLeft = panelLeft + nextPanX;
+    const visibleTop = panelTop + nextPanY;
+    const visibleRight = visibleLeft + drawWidth;
+    const visibleBottom = visibleTop + drawHeight;
+    if (visibleRight < minVisibleX || visibleLeft > viewportWidth - minVisibleX) {
+      const minPanX = Math.round(minVisibleX - panelLeft - drawWidth);
+      const maxPanX = Math.round((viewportWidth - minVisibleX) - panelLeft);
+      nextPanX = clamp(nextPanX, minPanX, maxPanX);
+    }
+    if (visibleBottom < minVisibleY || visibleTop > viewportHeight - minVisibleY) {
+      const minPanY = Math.round(minVisibleY - panelTop - drawHeight);
+      const maxPanY = Math.round((viewportHeight - minVisibleY) - panelTop);
+      nextPanY = clamp(nextPanY, minPanY, maxPanY);
+    }
+    if (nextPanX !== state.pan.x) {
+      state.pan.x = nextPanX;
+    }
+    if (nextPanY !== state.pan.y) {
+      state.pan.y = nextPanY;
+    }
+  }
+
+  function isProjectCanvasPanelVisibleInViewport(panel, viewportRect) {
+    if (!(panel instanceof HTMLElement) || !viewportRect) {
+      return false;
+    }
+    const rect = panel.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return false;
+    }
+    const minVisibleX = 8;
+    const minVisibleY = 8;
+    return (
+      rect.right > viewportRect.left + minVisibleX
+      && rect.left < viewportRect.right - minVisibleX
+      && rect.bottom > viewportRect.top + minVisibleY
+      && rect.top < viewportRect.bottom - minVisibleY
+    );
+  }
+
+  function ensureProjectCanvasVisibleInViewport({ persist = false } = {}) {
+    if (viewportCanvasVisibilityRecoveryActive) {
+      return false;
+    }
+    const viewport = dom.canvasViewport;
+    if (!(viewport instanceof HTMLElement)) {
+      return false;
+    }
+    const viewportRect = viewport.getBoundingClientRect();
+    if (viewportRect.width <= 0 || viewportRect.height <= 0) {
+      return false;
+    }
+    const surfaces = getProjectCanvasSurfaceEntries().filter(surface => surface?.panel instanceof HTMLElement);
+    if (!surfaces.length) {
+      return false;
+    }
+    const hasVisibleSurface = surfaces.some(surface => isProjectCanvasPanelVisibleInViewport(surface.panel, viewportRect));
+    if (hasVisibleSurface) {
+      return false;
+    }
+    viewportCanvasVisibilityRecoveryActive = true;
+    try {
+      state.pan.x = 0;
+      state.pan.y = 0;
+      requestLocalViewportCanvasLayoutReset({ clearStored: true });
+      syncLocalViewportCanvasDockLayout();
+      applyViewportTransform();
+      if (persist) {
+        scheduleSessionPersist({ includeSnapshots: false });
+      }
+      return true;
+    } finally {
+      viewportCanvasVisibilityRecoveryActive = false;
+    }
+  }
+
   function applyViewportTransform() {
     if (!(dom.viewportWorkspace instanceof HTMLElement)) return;
     clampPanToViewportAtMinZoom();
+    clampPanToKeepVisibleCanvas();
     const panX = Math.round(Number(state.pan.x) || 0);
     const panY = Math.round(Number(state.pan.y) || 0);
     if (panX !== state.pan.x) {
@@ -22233,6 +22674,7 @@
     updateMirrorGuideHandles();
     updateCanvasResizeHandlePosition();
     syncCanvasResizeHandleVisibility();
+    ensureProjectCanvasVisibleInViewport({ persist: false });
   }
 
 
@@ -25415,6 +25857,15 @@
         syncControlsWithState();
         return;
       }
+      if (isVoxelExtensionModeEnabled()) {
+        event.target.checked = getLocalViewportCanvasCount() > 0;
+        updateAutosaveStatus(
+          localizeText('ボクセルモード中は通常のマルチキャンバス数を変更できません', 'Standard multi-canvas controls are locked while voxel mode is enabled'),
+          'info'
+        );
+        syncControlsWithState();
+        return;
+      }
       const enabled = Boolean(event.target.checked);
       const currentCount = normalizeLocalViewportCanvasState(
         localViewportCanvasState,
@@ -25425,6 +25876,75 @@
     };
     dom.controls.toggleLocalCanvas?.addEventListener('change', handleLocalCanvasToggleInput);
     dom.controls.toggleLocalCanvas?.addEventListener('input', handleLocalCanvasToggleInput);
+    const handleVoxelExtensionToggleInput = event => {
+      if (!(event.target instanceof HTMLInputElement)) {
+        return;
+      }
+      if (!canUseVoxelExtensionMode()) {
+        event.target.checked = isVoxelExtensionModeEnabled();
+        syncVoxelExtensionModeUi();
+        return;
+      }
+      if (!canCurrentClientEditProjectStructure()) {
+        event.target.checked = isVoxelExtensionModeEnabled();
+        announceMultiCanvasEditRestriction();
+        syncVoxelExtensionModeUi();
+        return;
+      }
+      const changed = setVoxelExtensionModeEnabled(Boolean(event.target.checked), { announce: true });
+      if (!changed) {
+        event.target.checked = isVoxelExtensionModeEnabled();
+      }
+      syncControlsWithState();
+    };
+    dom.controls.toggleVoxelExtensionMode?.addEventListener('change', handleVoxelExtensionToggleInput);
+    dom.controls.toggleVoxelExtensionMode?.addEventListener('input', handleVoxelExtensionToggleInput);
+    dom.controls.setupVoxelExtension?.addEventListener('click', event => {
+      event.preventDefault();
+      setVoxelExtensionModeEnabled(true, { announce: true });
+      syncControlsWithState();
+    });
+    dom.controls.refreshVoxelPreview?.addEventListener('click', event => {
+      event.preventDefault();
+      if (!isVoxelExtensionModeEnabled()) {
+        return;
+      }
+      syncVoxelExtensionPreviewFromSource({ updateViewport: true });
+      renderAllProjectCanvasSurfaces();
+      requestRender();
+      requestOverlayRender();
+      updateAutosaveStatus(localizeText('ボクセルプレビューを更新しました', 'Voxel preview refreshed'), 'success');
+    });
+    const applyVoxelPreviewYaw = (value, { persistProject = false } = {}) => {
+      const nextYawDeg = normalizeVoxelPreviewYawDegrees(value);
+      voxelExtensionState = normalizeVoxelExtensionState({
+        ...voxelExtensionState,
+        previewYawDeg: nextYawDeg,
+      }, VOXEL_EXTENSION_DEFAULT_STATE);
+      syncVoxelExtensionModeUi();
+      if (isVoxelExtensionModeEnabled()) {
+        renderVoxelExtensionPreviewSurfaceNow({ updateViewport: true });
+        requestRender();
+        requestOverlayRender();
+      }
+      scheduleSessionPersist();
+      if (persistProject) {
+        markAutosaveDirty();
+        scheduleAutosaveSnapshot();
+      }
+    };
+    dom.controls.voxelPreviewYaw?.addEventListener('input', event => {
+      if (!(event.target instanceof HTMLInputElement)) {
+        return;
+      }
+      applyVoxelPreviewYaw(event.target.value, { persistProject: false });
+    });
+    dom.controls.voxelPreviewYaw?.addEventListener('change', event => {
+      if (!(event.target instanceof HTMLInputElement)) {
+        return;
+      }
+      applyVoxelPreviewYaw(event.target.value, { persistProject: true });
+    });
 
     if (dom.controls.virtualCursorButtonScale instanceof HTMLInputElement) {
       const slider = dom.controls.virtualCursorButtonScale;
@@ -30699,6 +31219,11 @@
     setupSelectionTransformMenu();
     setupFloatingPreviewPanel();
     setupLocalViewportCanvasDock();
+    if (isVoxelExtensionModeEnabled()) {
+      ensureVoxelExtensionCanvasSetup({ announce: false, trackChange: false });
+    } else {
+      syncVoxelExtensionModeUi();
+    }
     setupCanvasResizeHandle();
     const gestureSurface = dom.stage || dom.canvasViewport;
     if (dom.canvasViewport) {
@@ -30977,6 +31502,10 @@
     }
     const cell = getVirtualCursorCellPosition();
     if (!cell) {
+      return false;
+    }
+    if (isVoxelPreviewCanvasId(getActiveProjectCanvasDocument()?.id || '')) {
+      announceVoxelPreviewReadonly();
       return false;
     }
     const requiresLayer = HISTORY_DRAW_TOOLS.has(activeTool);
@@ -31928,6 +32457,14 @@
     };
   }
 
+  function isFloatingVoxelPreviewActive() {
+    return Boolean(
+      isVoxelExtensionModeEnabled()
+      && voxelExtensionPreviewMeta
+      && voxelExtensionPreviewPixels instanceof Uint8ClampedArray
+    );
+  }
+
   function clampFloatingPreviewRect(rectLike) {
     const base = normalizeFloatingPreviewState(rectLike, state.floatingPreview);
     const viewport = getFloatingPreviewViewportSize();
@@ -31967,8 +32504,12 @@
     if (!(body instanceof HTMLElement) || !(canvas instanceof HTMLCanvasElement)) {
       return;
     }
-    const sourceWidth = Math.max(1, Math.round(Number(state.width) || 1));
-    const sourceHeight = Math.max(1, Math.round(Number(state.height) || 1));
+    const sourceWidth = isFloatingVoxelPreviewActive()
+      ? Math.max(1, Math.round(Number(voxelExtensionPreviewMeta?.width) || 1))
+      : Math.max(1, Math.round(Number(state.width) || 1));
+    const sourceHeight = isFloatingVoxelPreviewActive()
+      ? Math.max(1, Math.round(Number(voxelExtensionPreviewMeta?.height) || 1))
+      : Math.max(1, Math.round(Number(state.height) || 1));
     const availableWidth = Math.max(1, Math.floor(body.clientWidth));
     const availableHeight = Math.max(1, Math.floor(body.clientHeight));
     const sourceAspect = sourceWidth / sourceHeight;
@@ -32010,16 +32551,17 @@
   }
 
   function updateFloatingPreviewPanelPlaybackButtons() {
+    const isVoxelPreview = isVoxelExtensionModeEnabled();
     const isPlaying = Boolean(state.playback?.isPlaying);
     if (dom.controls.floatingPreviewPlay instanceof HTMLButtonElement) {
-      dom.controls.floatingPreviewPlay.hidden = isPlaying;
-      dom.controls.floatingPreviewPlay.disabled = isPlaying;
-      dom.controls.floatingPreviewPlay.setAttribute('aria-hidden', String(isPlaying));
+      dom.controls.floatingPreviewPlay.hidden = isVoxelPreview || isPlaying;
+      dom.controls.floatingPreviewPlay.disabled = isVoxelPreview || isPlaying;
+      dom.controls.floatingPreviewPlay.setAttribute('aria-hidden', String(isVoxelPreview || isPlaying));
     }
     if (dom.controls.floatingPreviewStop instanceof HTMLButtonElement) {
-      dom.controls.floatingPreviewStop.hidden = !isPlaying;
-      dom.controls.floatingPreviewStop.disabled = !isPlaying;
-      dom.controls.floatingPreviewStop.setAttribute('aria-hidden', String(!isPlaying));
+      dom.controls.floatingPreviewStop.hidden = isVoxelPreview || !isPlaying;
+      dom.controls.floatingPreviewStop.disabled = isVoxelPreview || !isPlaying;
+      dom.controls.floatingPreviewStop.setAttribute('aria-hidden', String(isVoxelPreview || !isPlaying));
     }
   }
 
@@ -32029,11 +32571,16 @@
     if (!(panel instanceof HTMLElement) || !(canvas instanceof HTMLCanvasElement)) {
       return;
     }
-    if (panel.hidden || !state.floatingPreview?.enabled) {
+    if (panel.hidden || (!state.floatingPreview?.enabled && !isVoxelExtensionModeEnabled())) {
       return;
     }
-    const width = Math.max(1, Math.round(Number(state.width) || 1));
-    const height = Math.max(1, Math.round(Number(state.height) || 1));
+    const isVoxelPreview = isFloatingVoxelPreviewActive();
+    const width = isVoxelPreview
+      ? Math.max(1, Math.round(Number(voxelExtensionPreviewMeta?.width) || 1))
+      : Math.max(1, Math.round(Number(state.width) || 1));
+    const height = isVoxelPreview
+      ? Math.max(1, Math.round(Number(voxelExtensionPreviewMeta?.height) || 1))
+      : Math.max(1, Math.round(Number(state.height) || 1));
     if (canvas.width !== width || canvas.height !== height) {
       canvas.width = width;
       canvas.height = height;
@@ -32046,11 +32593,12 @@
       }
       floatingPreviewCtx.imageSmoothingEnabled = false;
     }
-    const frame = getActiveFrame();
-    const pixels = compositeFramePixels(frame, width, height, state.palette, {
-      useLocalLayerPreviewVisibility: true,
-      useLocalLayerPreviewOpacity: true,
-    });
+    const pixels = isVoxelPreview
+      ? voxelExtensionPreviewPixels
+      : compositeFramePixels(getActiveFrame(), width, height, state.palette, {
+        useLocalLayerPreviewVisibility: true,
+        useLocalLayerPreviewOpacity: true,
+      });
     let imageData = null;
     try {
       imageData = new ImageData(pixels, width, height);
@@ -32064,9 +32612,11 @@
 
   function syncFloatingPreviewPanelVisibility({ persist = false } = {}) {
     const panel = dom.floatingPreviewPanel;
-    const enabled = Boolean(state.floatingPreview?.enabled);
+    const voxelModeEnabled = isVoxelExtensionModeEnabled();
+    const enabled = Boolean(state.floatingPreview?.enabled) || voxelModeEnabled;
     if (dom.controls.toggleFloatingPreview instanceof HTMLInputElement) {
       dom.controls.toggleFloatingPreview.checked = enabled;
+      dom.controls.toggleFloatingPreview.disabled = voxelModeEnabled;
     }
     if (!(panel instanceof HTMLElement)) {
       return;
@@ -32135,7 +32685,7 @@
     if (event.button !== undefined && event.button !== 0) {
       return;
     }
-    if (!state.floatingPreview?.enabled || floatingPreviewPanelState.mode) {
+    if ((!(state.floatingPreview?.enabled) && !isVoxelExtensionModeEnabled()) || floatingPreviewPanelState.mode) {
       return;
     }
     const panel = dom.floatingPreviewPanel;
@@ -32206,7 +32756,7 @@
   }
 
   function handleFloatingPreviewPanelViewportChange() {
-    if (!state.floatingPreview?.enabled) {
+    if (!state.floatingPreview?.enabled && !isVoxelExtensionModeEnabled()) {
       return;
     }
     applyFloatingPreviewPanelRect({ persist: false, render: true });
@@ -32223,6 +32773,22 @@
     panel.addEventListener('click', event => {
       event.stopPropagation();
     });
+    if (dom.floatingPreviewCanvas instanceof HTMLCanvasElement) {
+      dom.floatingPreviewCanvas.addEventListener('pointerdown', event => {
+        if (!isVoxelExtensionModeEnabled()) {
+          return;
+        }
+        if (event.button !== undefined && event.button !== 0) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        startVoxelPreviewRotateInteraction(event, {
+          kind: 'floating-voxel-preview',
+          drawing: dom.floatingPreviewCanvas,
+        });
+      });
+    }
     if (dom.floatingPreviewHeader instanceof HTMLElement) {
       dom.floatingPreviewHeader.addEventListener('pointerdown', event => {
         beginFloatingPreviewPanelInteraction(event, 'drag');
@@ -32284,6 +32850,7 @@
     const nextState = normalizeLocalViewportCanvasState(
       {
         ...localViewportCanvasState,
+        layoutScale: getCurrentLocalViewportCanvasLayoutScale(),
         anchorLeft: left,
         anchorTop: top,
       },
@@ -32296,7 +32863,108 @@
       return false;
     }
     localViewportCanvasState = nextState;
+    localViewportCanvasLayoutResetPending = false;
     return true;
+  }
+
+  function getStoredLocalViewportCanvasPosition(index) {
+    const safeIndex = Math.max(0, Math.round(Number(index) || 0));
+    const positions = Array.isArray(localViewportCanvasState?.positions)
+      ? localViewportCanvasState.positions
+      : [];
+    return normalizeLocalViewportCanvasPosition(positions[safeIndex], null, {
+      relative: true,
+      fallbackRelative: true,
+    });
+  }
+
+  function getDisplayLocalViewportCanvasPosition(index, anchorLeft = 0, anchorTop = 0) {
+    const storedPosition = getStoredLocalViewportCanvasPosition(index);
+    const currentScale = getCurrentLocalViewportCanvasLayoutScale();
+    return {
+      left: storedPosition.left === null
+        ? null
+        : Math.round(anchorLeft + (storedPosition.left * currentScale)),
+      top: storedPosition.top === null
+        ? null
+        : Math.round(anchorTop + (storedPosition.top * currentScale)),
+    };
+  }
+
+  function setLocalViewportCanvasPosition(index, left, top) {
+    const count = Math.max(0, getLocalViewportCanvasCount());
+    if (count <= 0) {
+      return false;
+    }
+    const safeIndex = clamp(Math.round(Number(index) || 0), 0, Math.max(0, count - 1));
+    const nextPositions = normalizeLocalViewportCanvasPositions(
+      localViewportCanvasState?.positions,
+      localViewportCanvasState?.positions,
+      count,
+      {
+        relative: true,
+        fallbackRelative: true,
+      }
+    );
+    const anchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, 0) || 0;
+    const anchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, 0) || 0;
+    const currentScale = getCurrentLocalViewportCanvasLayoutScale();
+    nextPositions[safeIndex] = normalizeLocalViewportCanvasPosition(
+      {
+        left: (Number(left) - anchorLeft) / Math.max(currentScale, Number.EPSILON),
+        top: (Number(top) - anchorTop) / Math.max(currentScale, Number.EPSILON),
+      },
+      nextPositions[safeIndex],
+      {
+        relative: true,
+        fallbackRelative: true,
+      }
+    );
+    const nextState = normalizeLocalViewportCanvasState(
+      {
+        ...localViewportCanvasState,
+        layoutScale: getCurrentLocalViewportCanvasLayoutScale(),
+        positionsRelative: true,
+        positions: nextPositions,
+      },
+      localViewportCanvasState
+    );
+    const previousPosition = getStoredLocalViewportCanvasPosition(safeIndex);
+    const nextPosition = nextState.positions[safeIndex] || normalizeLocalViewportCanvasPosition(null, null);
+    if (
+      previousPosition.left === nextPosition.left
+      && previousPosition.top === nextPosition.top
+    ) {
+      return false;
+    }
+    localViewportCanvasState = nextState;
+    localViewportCanvasLayoutResetPending = false;
+    return true;
+  }
+
+  function requestLocalViewportCanvasLayoutReset({ clearStored = true } = {}) {
+    localViewportCanvasLayoutResetPending = true;
+    if (!clearStored) {
+      return false;
+    }
+    const nextState = normalizeLocalViewportCanvasState(
+      {
+        ...localViewportCanvasState,
+        layoutScale: getCurrentLocalViewportCanvasLayoutScale(),
+        positionsRelative: true,
+        anchorLeft: null,
+        anchorTop: null,
+        positions: [],
+      },
+      localViewportCanvasState
+    );
+    const changed = (
+      nextState.anchorLeft !== localViewportCanvasState.anchorLeft
+      || nextState.anchorTop !== localViewportCanvasState.anchorTop
+      || JSON.stringify(nextState.positions) !== JSON.stringify(localViewportCanvasState.positions)
+    );
+    localViewportCanvasState = nextState;
+    return changed;
   }
 
   function getProjectCanvasDocuments() {
@@ -32584,11 +33252,160 @@
     canvas.addEventListener('contextmenu', event => event.preventDefault());
   }
 
+  function teardownCanvasSurfacePanelDragInteraction() {
+    window.removeEventListener('pointermove', handleCanvasSurfacePanelDragPointerMove);
+    window.removeEventListener('pointerup', handleCanvasSurfacePanelDragPointerUp);
+    window.removeEventListener('pointercancel', handleCanvasSurfacePanelDragPointerCancel);
+  }
+
+  function stopCanvasSurfacePanelDragInteraction({ persist = true } = {}) {
+    if (!canvasSurfacePanelDragState.panel) {
+      return;
+    }
+    const panel = canvasSurfacePanelDragState.panel;
+    if (panel instanceof HTMLElement) {
+      panel.classList.remove('is-moving');
+    }
+    const target = canvasSurfacePanelDragState.target;
+    if (target instanceof HTMLElement && Number.isFinite(canvasSurfacePanelDragState.pointerId)) {
+      try {
+        target.releasePointerCapture?.(canvasSurfacePanelDragState.pointerId);
+      } catch (error) {
+        // Ignore pointer capture release failures.
+      }
+    }
+    const shouldPersist = persist && (
+      canvasSurfacePanelDragState.surfaceKind === 'main'
+      || canvasSurfacePanelDragState.surfaceKind === 'local'
+    );
+    canvasSurfacePanelDragState.pointerId = null;
+    canvasSurfacePanelDragState.surfaceKind = '';
+    canvasSurfacePanelDragState.surfaceIndex = -1;
+    canvasSurfacePanelDragState.target = null;
+    canvasSurfacePanelDragState.panel = null;
+    canvasSurfacePanelDragState.pointerOffsetX = 0;
+    canvasSurfacePanelDragState.pointerOffsetY = 0;
+    canvasSurfacePanelDragState.startClientX = 0;
+    canvasSurfacePanelDragState.startClientY = 0;
+    teardownCanvasSurfacePanelDragInteraction();
+    if (shouldPersist) {
+      scheduleSessionPersist({ includeSnapshots: false });
+    }
+  }
+
+  function beginCanvasSurfacePanelDragInteraction(event, surface) {
+    if (event.button !== undefined && event.button !== 0) {
+      return;
+    }
+    const panel = surface?.panel instanceof HTMLElement ? surface.panel : null;
+    const target = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+    if (!panel || !target || canvasSurfacePanelDragState.panel) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    canvasSurfacePanelDragState.pointerId = event.pointerId ?? -1;
+    canvasSurfacePanelDragState.surfaceKind = surface?.kind === 'local' ? 'local' : 'main';
+    canvasSurfacePanelDragState.surfaceIndex = canvasSurfacePanelDragState.surfaceKind === 'local'
+      ? Math.max(0, Math.round(Number(surface?.index) || 0))
+      : 0;
+    canvasSurfacePanelDragState.target = target;
+    canvasSurfacePanelDragState.panel = panel;
+    const panelRect = panel.getBoundingClientRect();
+    canvasSurfacePanelDragState.pointerOffsetX = (Number(event.clientX) || 0) - panelRect.left;
+    canvasSurfacePanelDragState.pointerOffsetY = (Number(event.clientY) || 0) - panelRect.top;
+    canvasSurfacePanelDragState.startClientX = Number(event.clientX) || 0;
+    canvasSurfacePanelDragState.startClientY = Number(event.clientY) || 0;
+    panel.classList.add('is-moving');
+    try {
+      target.setPointerCapture?.(event.pointerId);
+    } catch (error) {
+      // Ignore pointer capture failures.
+    }
+    window.addEventListener('pointermove', handleCanvasSurfacePanelDragPointerMove, { passive: false });
+    window.addEventListener('pointerup', handleCanvasSurfacePanelDragPointerUp);
+    window.addEventListener('pointercancel', handleCanvasSurfacePanelDragPointerCancel);
+  }
+
+  function handleCanvasSurfacePanelDragPointerMove(event) {
+    if (canvasSurfacePanelDragState.pointerId !== event.pointerId) {
+      return;
+    }
+    const panel = canvasSurfacePanelDragState.panel;
+    if (!(panel instanceof HTMLElement)) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const workspaceRect = dom.viewportWorkspace?.getBoundingClientRect?.();
+    if (!workspaceRect) {
+      return;
+    }
+    const nextLeft = Math.round((Number(event.clientX) || 0) - workspaceRect.left - canvasSurfacePanelDragState.pointerOffsetX);
+    const nextTop = Math.round((Number(event.clientY) || 0) - workspaceRect.top - canvasSurfacePanelDragState.pointerOffsetY);
+    panel.style.left = `${nextLeft}px`;
+    panel.style.top = `${nextTop}px`;
+    if (canvasSurfacePanelDragState.surfaceKind === 'main') {
+      setLocalViewportCanvasLayoutAnchor(nextLeft, nextTop);
+      return;
+    }
+    setLocalViewportCanvasPosition(canvasSurfacePanelDragState.surfaceIndex, nextLeft, nextTop);
+  }
+
+  function handleCanvasSurfacePanelDragPointerUp(event) {
+    if (canvasSurfacePanelDragState.pointerId !== event.pointerId) {
+      return;
+    }
+    stopCanvasSurfacePanelDragInteraction({ persist: true });
+  }
+
+  function handleCanvasSurfacePanelDragPointerCancel(event) {
+    if (canvasSurfacePanelDragState.pointerId !== event.pointerId) {
+      return;
+    }
+    stopCanvasSurfacePanelDragInteraction({ persist: true });
+  }
+
+  function ensureCanvasSurfaceDragHandle(surface) {
+    const panel = surface?.panel instanceof HTMLElement ? surface.panel : null;
+    if (!panel) {
+      return null;
+    }
+    if (surface.dragHandle instanceof HTMLButtonElement && surface.dragHandle.isConnected) {
+      return surface.dragHandle;
+    }
+    const handle = document.createElement('button');
+    handle.type = 'button';
+    handle.className = 'canvas-surface-drag-handle';
+    handle.setAttribute(
+      'aria-label',
+      localizeText('ドラッグして配置を移動', 'Drag to reposition')
+    );
+    handle.title = localizeText('ドラッグして配置を移動', 'Drag to reposition');
+    handle.hidden = true;
+    handle.setAttribute('aria-hidden', 'true');
+    handle.addEventListener('pointerdown', event => {
+      beginCanvasSurfacePanelDragInteraction(event, surface);
+    });
+    handle.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    panel.appendChild(handle);
+    surface.dragHandle = handle;
+    return handle;
+  }
+
   function createLocalViewportCanvasEntry(index) {
     const panel = document.createElement('section');
     panel.className = 'local-canvas-surface';
     panel.dataset.localCanvasIndex = String(index);
     panel.setAttribute('aria-label', localizeText(`マルチキャンバス ${index + 2}`, `Multi Canvas ${index + 2}`));
+
+    const badge = document.createElement('div');
+    badge.className = 'canvas-surface-badge';
+    badge.hidden = true;
+    badge.setAttribute('aria-hidden', 'true');
 
     const stack = document.createElement('div');
     stack.className = 'canvas-stack local-canvas-stack';
@@ -32608,13 +33425,14 @@
     stack.appendChild(drawing);
     stack.appendChild(overlay);
     stack.appendChild(selection);
+    panel.appendChild(badge);
     panel.appendChild(stack);
-    bindCanvasSurfaceInteractionEvents(drawing);
-    return {
+    const entry = {
       kind: 'local',
       index,
       panel,
       body: panel,
+      badge,
       stack,
       drawing,
       overlay,
@@ -32624,7 +33442,11 @@
       selectionCtx: null,
       canvasDoc: null,
       canvasDocId: '',
+      dragHandle: null,
     };
+    ensureCanvasSurfaceDragHandle(entry);
+    bindCanvasSurfaceInteractionEvents(drawing);
+    return entry;
   }
 
   function getProjectCanvasDocumentForEntry(entry) {
@@ -32673,16 +33495,29 @@
     };
   }
 
+  function setCanvasSurfaceDragHandleVisible(handle, visible) {
+    if (!(handle instanceof HTMLElement)) {
+      return;
+    }
+    handle.hidden = !visible;
+    handle.setAttribute('aria-hidden', String(!visible));
+  }
+
   function syncMultiCanvasSelectionUi() {
     const activeIndex = getActiveProjectCanvasIndex();
     const hoveredCanvasId = hoveredProjectCanvasId;
     const committedCanvasId = committedProjectCanvasId;
     const mainCanvasId = getProjectCanvasDocumentAt(0)?.id || '';
     const mainIsPreview = Boolean(hoveredCanvasId && hoveredCanvasId === mainCanvasId && hoveredCanvasId !== committedCanvasId);
+    const multiCanvasVisible = getLocalViewportCanvasCount() > 0;
     if (dom.mainCanvasArea instanceof HTMLElement) {
       dom.mainCanvasArea.classList.toggle('is-multi-canvas-selected', activeIndex === 0 && !mainIsPreview);
       dom.mainCanvasArea.classList.toggle('is-multi-canvas-hover-preview', mainIsPreview);
     }
+    setCanvasSurfaceDragHandleVisible(
+      mainViewportCanvasSurface.dragHandle,
+      multiCanvasVisible && activeIndex === 0 && !mainIsPreview
+    );
     localViewportCanvasEntries.forEach(entry => {
       const isPreview = Boolean(
         hoveredCanvasId
@@ -32691,6 +33526,10 @@
       );
       entry.panel.classList.toggle('is-active', activeIndex === entry.index + 1 && !isPreview);
       entry.panel.classList.toggle('is-hover-preview', isPreview);
+      setCanvasSurfaceDragHandleVisible(
+        entry.dragHandle,
+        multiCanvasVisible && activeIndex === entry.index + 1 && !isPreview
+      );
     });
     syncLocalViewportCanvasEntryMetadata();
   }
@@ -32844,7 +33683,20 @@
       entry.panel.title = canvasDoc
         ? localizeText(`マルチキャンバス ${entry.index + 2}: ${canvasDoc.name}`, `Multi Canvas ${entry.index + 2}: ${canvasDoc.name}`)
         : localizeText(`マルチキャンバス ${entry.index + 2}: なし`, `Multi Canvas ${entry.index + 2}: empty`);
+      if (entry.badge instanceof HTMLElement) {
+        const role = getVoxelExtensionCanvasRoleById(entry.canvasDocId || '');
+        if (role) {
+          entry.badge.hidden = false;
+          entry.badge.dataset.role = role;
+          entry.badge.textContent = getVoxelExtensionRoleLabel(role);
+        } else {
+          entry.badge.hidden = true;
+          delete entry.badge.dataset.role;
+          entry.badge.textContent = '';
+        }
+      }
     });
+    syncVoxelExtensionCanvasBadges();
   }
 
   function getProjectCanvasActiveFrame(canvasDoc) {
@@ -33056,47 +33908,42 @@
     return { mode: 'grid', columns, rows };
   }
 
-  function syncLocalViewportCanvasDockLayout() {
-    const workspace = dom.viewportWorkspace;
-    if (!(workspace instanceof HTMLElement)) {
-      return;
-    }
-    const layout = computeLocalViewportCanvasLayout();
-    workspace.dataset.localCanvasLayout = layout.mode;
-    workspace.style.setProperty('--workspace-canvas-columns', String(layout.columns));
-    workspace.style.setProperty('--workspace-canvas-rows', String(layout.rows));
-
+  function computeDefaultLocalViewportCanvasPositions() {
     const viewport = dom.canvasViewport;
     const viewportWidth = Math.max(1, Math.round(viewport?.clientWidth || viewport?.getBoundingClientRect().width || 1));
     const viewportHeight = Math.max(1, Math.round(viewport?.clientHeight || viewport?.getBoundingClientRect().height || 1));
-    const gap = MULTI_CANVAS_SURFACE_GAP;
     const padding = 16;
     const surfaces = getProjectCanvasSurfaceEntries().map((surface, index) => ({
       surface,
       canvas: getProjectCanvasDocumentAt(index),
       index,
     })).filter(item => item.surface && item.canvas);
-
-    if (surfaces.length <= 1) {
-      const single = surfaces[0];
-      if (single?.canvas && single.surface?.panel instanceof HTMLElement) {
-        const displayScale = getProjectCanvasDisplayScale(single.canvas);
-        const drawWidth = Math.max(1, Math.round(Number(single.canvas.width) || 1)) * displayScale;
-        const drawHeight = Math.max(1, Math.round(Number(single.canvas.height) || 1)) * displayScale;
-        const nextLeft = Math.max(padding, Math.round((viewportWidth - drawWidth) / 2));
-        const nextTop = Math.max(padding, Math.round((viewportHeight - drawHeight) / 2));
-        single.surface.panel.style.left = `${nextLeft}px`;
-        single.surface.panel.style.top = `${nextTop}px`;
-        setLocalViewportCanvasLayoutAnchor(nextLeft, nextTop);
-      }
-      return;
+    if (!surfaces.length) {
+      return {
+        main: { left: padding, top: padding },
+        locals: [],
+      };
     }
-
-    const columns = layout.columns;
+    if (surfaces.length === 1) {
+      const canvas = surfaces[0].canvas;
+      const displayScale = getProjectCanvasDisplayScale(canvas);
+      const drawWidth = Math.max(1, Math.round(Number(canvas?.width) || 1)) * displayScale;
+      const drawHeight = Math.max(1, Math.round(Number(canvas?.height) || 1)) * displayScale;
+      return {
+        main: {
+          left: Math.max(padding, Math.round((viewportWidth - drawWidth) / 2)),
+          top: Math.max(padding, Math.round((viewportHeight - drawHeight) / 2)),
+        },
+        locals: [],
+      };
+    }
+    const layout = computeLocalViewportCanvasLayout();
+    const gap = MULTI_CANVAS_SURFACE_GAP;
+    const columns = Math.max(1, layout.columns || 1);
     const sizes = surfaces.map(item => ({
       ...item,
-      drawWidth: Math.max(1, Math.round(Number(item.canvas.width) || 1)) * getProjectCanvasDisplayScale(item.canvas),
-      drawHeight: Math.max(1, Math.round(Number(item.canvas.height) || 1)) * getProjectCanvasDisplayScale(item.canvas),
+      drawWidth: Math.max(1, Math.round(Number(item.canvas?.width) || 1)) * getProjectCanvasDisplayScale(item.canvas),
+      drawHeight: Math.max(1, Math.round(Number(item.canvas?.height) || 1)) * getProjectCanvasDisplayScale(item.canvas),
     }));
     const columnWidths = new Array(columns).fill(0);
     const rowHeights = new Array(Math.ceil(sizes.length / columns)).fill(0);
@@ -33106,41 +33953,85 @@
       columnWidths[columnIndex] = Math.max(columnWidths[columnIndex], item.drawWidth);
       rowHeights[rowIndex] = Math.max(rowHeights[rowIndex], item.drawHeight);
     });
+    const mainSize = sizes[0] || null;
+    const anchorLeft = Math.max(
+      padding,
+      Math.round((viewportWidth - Math.max(1, Math.round(Number(mainSize?.drawWidth) || 1))) / 2)
+    );
+    const anchorTop = Math.max(
+      padding,
+      Math.round((viewportHeight - Math.max(1, Math.round(Number(mainSize?.drawHeight) || 1))) / 2)
+    );
+    const columnOffsets = new Array(columns).fill(anchorLeft);
+    const rowOffsets = new Array(rowHeights.length).fill(anchorTop);
+    for (let columnIndex = 1; columnIndex < columns; columnIndex += 1) {
+      columnOffsets[columnIndex] = columnOffsets[columnIndex - 1] + columnWidths[columnIndex - 1] + gap;
+    }
+    for (let rowIndex = 1; rowIndex < rowHeights.length; rowIndex += 1) {
+      rowOffsets[rowIndex] = rowOffsets[rowIndex - 1] + rowHeights[rowIndex - 1] + gap;
+    }
+    const positions = sizes.map((item, itemIndex) => {
+      const columnIndex = itemIndex % columns;
+      const rowIndex = Math.floor(itemIndex / columns);
+      const left = columnOffsets[columnIndex] ?? anchorLeft;
+      const top = rowOffsets[rowIndex] ?? anchorTop;
+      return {
+        left: Math.round(left),
+        top: Math.round(top),
+      };
+    });
+    return {
+      main: positions[0] || { left: anchorLeft, top: anchorTop },
+      locals: positions.slice(1),
+    };
+  }
+
+  function syncLocalViewportCanvasDockLayout() {
+    const workspace = dom.viewportWorkspace;
+    if (!(workspace instanceof HTMLElement)) {
+      return;
+    }
+    const defaults = computeDefaultLocalViewportCanvasPositions();
     const mainPanel = mainViewportCanvasSurface?.panel instanceof HTMLElement
       ? mainViewportCanvasSurface.panel
       : null;
-    const parsePanelAxis = (value, fallback) => {
-      const parsed = Number.parseFloat(String(value || ''));
-      return Number.isFinite(parsed) ? parsed : fallback;
-    };
-    const defaultAnchorLeft = Math.max(padding, Math.round((viewportWidth - columnWidths[0]) / 2));
-    const defaultAnchorTop = Math.max(padding, Math.round((viewportHeight - rowHeights[0]) / 2));
-    const storedAnchorLeft = Number.isFinite(Number(localViewportCanvasState?.anchorLeft))
-      ? Math.round(Number(localViewportCanvasState.anchorLeft))
-      : defaultAnchorLeft;
-    const storedAnchorTop = Number.isFinite(Number(localViewportCanvasState?.anchorTop))
-      ? Math.round(Number(localViewportCanvasState.anchorTop))
-      : defaultAnchorTop;
-    const anchorLeft = parsePanelAxis(mainPanel?.style.left, storedAnchorLeft);
-    const anchorTop = parsePanelAxis(mainPanel?.style.top, storedAnchorTop);
-    sizes.forEach((item, itemIndex) => {
-      if (!(item.surface.panel instanceof HTMLElement)) {
+    const shouldReset = Boolean(localViewportCanvasLayoutResetPending);
+    const storedAnchorLeft = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorLeft, null);
+    const storedAnchorTop = parseLocalViewportCanvasAxis(localViewportCanvasState?.anchorTop, null);
+    const anchorLeft = shouldReset ? defaults.main.left : (storedAnchorLeft ?? defaults.main.left);
+    const anchorTop = shouldReset ? defaults.main.top : (storedAnchorTop ?? defaults.main.top);
+    const totalCanvases = Math.max(1, getProjectCanvasCount());
+    workspace.dataset.localCanvasLayout = totalCanvases > 1 ? 'free' : 'single';
+    workspace.style.setProperty('--workspace-canvas-columns', '1');
+    workspace.style.setProperty('--workspace-canvas-rows', '1');
+    if (mainPanel) {
+      mainPanel.style.left = `${anchorLeft}px`;
+      mainPanel.style.top = `${anchorTop}px`;
+    }
+    setLocalViewportCanvasLayoutAnchor(anchorLeft, anchorTop);
+    localViewportCanvasEntries.forEach((entry, index) => {
+      if (!(entry.panel instanceof HTMLElement)) {
         return;
       }
-      const columnIndex = itemIndex % columns;
-      const rowIndex = Math.floor(itemIndex / columns);
-      let left = anchorLeft;
-      for (let i = 0; i < columnIndex; i += 1) {
-        left += columnWidths[i] + gap;
+      const storedPosition = shouldReset
+        ? { left: null, top: null }
+        : getDisplayLocalViewportCanvasPosition(index, anchorLeft, anchorTop);
+      const defaultPosition = {
+        left: parseLocalViewportCanvasAxis(defaults.locals[index]?.left, null),
+        top: parseLocalViewportCanvasAxis(defaults.locals[index]?.top, null),
+      };
+      const left = storedPosition.left ?? defaultPosition.left ?? anchorLeft;
+      const top = storedPosition.top ?? defaultPosition.top ?? anchorTop;
+      entry.panel.style.left = `${left}px`;
+      entry.panel.style.top = `${top}px`;
+      if (
+        storedPosition.left !== left
+        || storedPosition.top !== top
+      ) {
+        setLocalViewportCanvasPosition(index, left, top);
       }
-      let top = anchorTop;
-      for (let i = 0; i < rowIndex; i += 1) {
-        top += rowHeights[i] + gap;
-      }
-      item.surface.panel.style.left = `${Math.round(left)}px`;
-      item.surface.panel.style.top = `${Math.round(top)}px`;
     });
-    setLocalViewportCanvasLayoutAnchor(anchorLeft, anchorTop);
+    localViewportCanvasLayoutResetPending = false;
   }
 
   function buildProjectCanvasImageData(canvasDoc) {
@@ -33174,6 +34065,15 @@
     surface.drawingCtx.putImageData(resolvedImage, 0, 0);
   }
 
+  function renderVoxelExtensionPreviewSurfaceNow({ updateViewport = false } = {}) {
+    if (!isVoxelExtensionModeEnabled()) {
+      return false;
+    }
+    const synced = syncVoxelExtensionPreviewFromSource({ updateViewport });
+    renderFloatingPreviewPanel();
+    return synced;
+  }
+
   function renderAllProjectCanvasSurfaces() {
     const documents = getProjectCanvasDocuments();
     getProjectCanvasSurfaceEntries().forEach((surface, index) => {
@@ -33200,6 +34100,39 @@
 
   function renderLocalViewportCanvases() {
     renderInactiveProjectCanvasSurfaces();
+  }
+
+  function drawVoxelGuideOverlayOnSurface(surface, guide) {
+    if (!surface?.overlayCtx || !(guide?.pixels instanceof Uint8ClampedArray)) {
+      return;
+    }
+    if (surface.overlay.width !== guide.width || surface.overlay.height !== guide.height) {
+      return;
+    }
+    let imageData = null;
+    try {
+      imageData = new ImageData(guide.pixels, guide.width, guide.height);
+    } catch (error) {
+      imageData = surface.overlayCtx.createImageData(guide.width, guide.height);
+      imageData.data.set(guide.pixels);
+    }
+    surface.overlayCtx.putImageData(imageData, 0, 0);
+  }
+
+  function renderVoxelGuideOverlays() {
+    if (!isVoxelExtensionModeEnabled() || !voxelExtensionGuideProjections) {
+      return;
+    }
+    getProjectCanvasSurfaceEntries().forEach(surface => {
+      if (!surface || surface === activeCanvasSurface) {
+        return;
+      }
+      const role = getVoxelExtensionCanvasRoleById(surface.canvasDocId || '');
+      if (!role || hasCanvasDocumentVisiblePixels(surface.canvasDoc)) {
+        return;
+      }
+      drawVoxelGuideOverlayOnSurface(surface, voxelExtensionGuideProjections[role] || null);
+    });
   }
 
   function renderLocalViewportCanvasOverlays() {
@@ -33233,6 +34166,7 @@
         surface.selectionCtx?.clearRect(0, 0, surface.selection.width, surface.selection.height);
       }
     });
+    renderVoxelGuideOverlays();
     if (
       !pointerState.active
       && hoveredSurface
@@ -33250,12 +34184,20 @@
       return;
     }
     const count = getLocalViewportCanvasCount();
+    const mainDragHandle = ensureCanvasSurfaceDragHandle(mainViewportCanvasSurface);
     host.dataset.background = state.backgroundMode;
     host.dataset.showChecker = state.showChecker ? 'true' : 'false';
     if (count <= 0) {
       while (localViewportCanvasEntries.length) {
         const entry = localViewportCanvasEntries.pop();
         entry?.panel.remove();
+      }
+      if (mainDragHandle instanceof HTMLElement) {
+        mainDragHandle.hidden = true;
+        mainDragHandle.setAttribute('aria-hidden', 'true');
+      }
+      if (dom.mainCanvasArea instanceof HTMLElement) {
+        dom.mainCanvasArea.classList.remove('is-free-positionable');
       }
       host.classList.add('is-hidden');
       host.hidden = true;
@@ -33273,11 +34215,20 @@
     host.classList.remove('is-hidden');
     host.hidden = false;
     host.setAttribute('aria-hidden', 'false');
+    if (mainDragHandle instanceof HTMLElement) {
+      mainDragHandle.hidden = true;
+      mainDragHandle.setAttribute('aria-hidden', 'true');
+    }
+    if (dom.mainCanvasArea instanceof HTMLElement) {
+      dom.mainCanvasArea.classList.add('is-free-positionable');
+    }
     ensureLocalViewportCanvasEntries();
     syncLocalViewportCanvasDockLayout();
     if (render) {
       renderInactiveProjectCanvasSurfaces();
       renderLocalViewportCanvasOverlays();
+    } else {
+      syncMultiCanvasSelectionUi();
     }
     if (persist) {
       scheduleSessionPersist({ includeSnapshots: false });
@@ -33310,7 +34261,7 @@
     }
     const previous = getLocalViewportCanvasCount();
     const currentCanvases = getProjectCanvasDocuments();
-    const targetCount = clamp(Math.round(Number(nextCount) || 0), 0, LOCAL_VIEWPORT_CANVAS_MAX_COUNT);
+    const targetCount = clamp(Math.round(Number(nextCount) || 0), 0, getLocalViewportCanvasMaxCount());
     if (targetCount === previous) {
       if (persist) {
         scheduleSessionPersist({ includeSnapshots: false });
@@ -33346,6 +34297,7 @@
       ? activeCanvasId
       : (nextCanvases[Math.min(activeCanvasIndex, nextCanvases.length - 1)]?.id || nextCanvases[0]?.id || '');
     replaceProjectCanvasDocuments(nextCanvases, resolvedActiveCanvasId);
+    requestLocalViewportCanvasLayoutReset({ clearStored: true });
     ensureLocalViewportCanvasEntries();
     bindActiveCanvasSurface(getProjectCanvasSurfaceForIndex(getActiveProjectCanvasIndex()) || mainViewportCanvasSurface);
     syncLocalViewportCanvasDockVisibility({ persist, render: true });
@@ -33386,6 +34338,1269 @@
     setLocalViewportCanvasCount(count + Math.round(Number(delta) || 0), options);
   }
 
+  function isVoxelExtensionModeEnabled() {
+    return normalizeVoxelExtensionState(voxelExtensionState, VOXEL_EXTENSION_DEFAULT_STATE).mode === EXTENSION_MODE_VOXEL;
+  }
+
+  function getLocalViewportCanvasMaxCount() {
+    const currentProjectCanvasCount = Array.isArray(projectCanvasStore?.canvases)
+      ? Math.max(0, projectCanvasStore.canvases.length - 1)
+      : 0;
+    const modeLimit = isVoxelExtensionModeEnabled()
+      ? VOXEL_EXTENSION_LOCAL_CANVAS_MAX_COUNT
+      : LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT;
+    return Math.max(LOCAL_VIEWPORT_CANVAS_STANDARD_MAX_COUNT, currentProjectCanvasCount, modeLimit);
+  }
+
+  function canUseVoxelExtensionMode() {
+    return MULTI_CANVAS_FEATURE_ENABLED && !multiState.connected && !multiState.connecting;
+  }
+
+  function getVoxelExtensionProjectName(role = 'front') {
+    return VOXEL_EXTENSION_PROJECT_NAMES[role] || VOXEL_EXTENSION_PROJECT_NAMES.front;
+  }
+
+  function getVoxelExtensionRoleLabel(role = 'front') {
+    const entry = VOXEL_EXTENSION_LABELS[role] || VOXEL_EXTENSION_LABELS.front;
+    return localizeText(entry.ja, entry.en);
+  }
+
+  function getVoxelExtensionResolvedCanvases(canvases = getProjectCanvasDocuments()) {
+    if (!Array.isArray(canvases) || !canvases.length) {
+      return null;
+    }
+    const resolveCanvas = (canvasId, fallbackIndex) => {
+      if (typeof canvasId === 'string' && canvasId) {
+        const matched = canvases.find(canvas => canvas?.id === canvasId);
+        if (matched) {
+          return matched;
+        }
+      }
+      return canvases[fallbackIndex] || null;
+    };
+    return {
+      preview: null,
+      front: resolveCanvas(voxelExtensionState.frontCanvasId, 0),
+      back: resolveCanvas(voxelExtensionState.backCanvasId, 1),
+      left: resolveCanvas(voxelExtensionState.leftCanvasId, 2),
+      right: resolveCanvas(voxelExtensionState.rightCanvasId, 3),
+      top: resolveCanvas(voxelExtensionState.topCanvasId, 4),
+      bottom: resolveCanvas(voxelExtensionState.bottomCanvasId, 5),
+    };
+  }
+
+  function syncVoxelExtensionCanvasIdsFromDocuments(canvases = getProjectCanvasDocuments()) {
+    const resolved = getVoxelExtensionResolvedCanvases(canvases);
+    if (!resolved) {
+      return false;
+    }
+    const nextState = normalizeVoxelExtensionState(voxelExtensionState, VOXEL_EXTENSION_DEFAULT_STATE);
+    const previousKey = [
+      nextState.frontCanvasId,
+      nextState.backCanvasId,
+      nextState.leftCanvasId,
+      nextState.rightCanvasId,
+      nextState.topCanvasId,
+      nextState.bottomCanvasId,
+      nextState.previewCanvasId,
+    ].join(':');
+    nextState.frontCanvasId = resolved.front?.id || '';
+    nextState.backCanvasId = resolved.back?.id || '';
+    nextState.leftCanvasId = resolved.left?.id || '';
+    nextState.rightCanvasId = resolved.right?.id || '';
+    nextState.topCanvasId = resolved.top?.id || '';
+    nextState.bottomCanvasId = resolved.bottom?.id || '';
+    nextState.previewCanvasId = '';
+    voxelExtensionState = nextState;
+    const nextKey = [
+      nextState.frontCanvasId,
+      nextState.backCanvasId,
+      nextState.leftCanvasId,
+      nextState.rightCanvasId,
+      nextState.topCanvasId,
+      nextState.bottomCanvasId,
+      '',
+    ].join(':');
+    return previousKey !== nextKey;
+  }
+
+  function getVoxelExtensionCanvasRoleById(canvasId = '') {
+    if (!isVoxelExtensionModeEnabled() || typeof canvasId !== 'string' || !canvasId) {
+      return '';
+    }
+    if (canvasId === voxelExtensionState.frontCanvasId) {
+      return 'front';
+    }
+    if (canvasId === voxelExtensionState.backCanvasId) {
+      return 'back';
+    }
+    if (canvasId === voxelExtensionState.leftCanvasId) {
+      return 'left';
+    }
+    if (canvasId === voxelExtensionState.rightCanvasId) {
+      return 'right';
+    }
+    if (canvasId === voxelExtensionState.topCanvasId) {
+      return 'top';
+    }
+    if (canvasId === voxelExtensionState.bottomCanvasId) {
+      return 'bottom';
+    }
+    return '';
+  }
+
+  function isVoxelPreviewCanvasId(canvasId = '') {
+    return isVoxelExtensionModeEnabled()
+      && typeof canvasId === 'string'
+      && canvasId
+      && canvasId === voxelExtensionState.previewCanvasId;
+  }
+
+  function announceVoxelPreviewReadonly() {
+    updateAutosaveStatus(
+      localizeText(
+        '小窓プレビューは自動生成です。6面の入力キャンバスを編集してください',
+        'The floating preview is auto-generated. Edit the 6 source faces instead.'
+      ),
+      'info'
+    );
+  }
+
+  function hasCanvasDocumentVisiblePixels(canvasDoc) {
+    if (!canvasDoc || !Array.isArray(canvasDoc.frames)) {
+      return false;
+    }
+    for (let frameIndex = 0; frameIndex < canvasDoc.frames.length; frameIndex += 1) {
+      const frame = canvasDoc.frames[frameIndex];
+      if (!frame || !Array.isArray(frame.layers)) {
+        continue;
+      }
+      for (let layerIndex = 0; layerIndex < frame.layers.length; layerIndex += 1) {
+        const layer = frame.layers[layerIndex];
+        if (!layer) {
+          continue;
+        }
+        if (layer.indices instanceof Int16Array) {
+          for (let i = 0; i < layer.indices.length; i += 1) {
+            if (layer.indices[i] >= 0) {
+              return true;
+            }
+          }
+        }
+        if (layer.direct instanceof Uint8ClampedArray) {
+          for (let i = 3; i < layer.direct.length; i += 4) {
+            if (layer.direct[i] > 0) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  function getVoxelExtensionOverwriteConfirmation(canvases = getProjectCanvasDocuments()) {
+    if (isVoxelExtensionModeEnabled() || !Array.isArray(canvases)) {
+      return true;
+    }
+    const legacyPreviewCandidate = canvases[VOXEL_EXTENSION_SOURCE_CANVAS_TOTAL] || null;
+    const overflowCanvases = canvases.slice(VOXEL_EXTENSION_SOURCE_CANVAS_TOTAL + 1);
+    const hasLegacyPreviewArtwork = Boolean(legacyPreviewCandidate && hasCanvasDocumentVisiblePixels(legacyPreviewCandidate));
+    const hasOverflowArtwork = overflowCanvases.some(canvas => hasCanvasDocumentVisiblePixels(canvas));
+    if (!hasLegacyPreviewArtwork && !hasOverflowArtwork) {
+      return true;
+    }
+    return window.confirm(
+      localizeText(
+        hasOverflowArtwork
+          ? '7枚目以降のキャンバスに描画内容があります。ボクセルモードを始めると、この内容は6面構成へ切り替わります。続けますか？'
+          : '7枚目の旧プレビューキャンバスに描画内容があります。ボクセルモードを始めると、この内容は小窓プレビューへ移行してキャンバス自体は外れます。続けますか？',
+        hasOverflowArtwork
+          ? 'Artwork exists on the 7th and later canvases. Enabling voxel mode will switch the project to the 6-face layout. Continue?'
+          : 'Artwork exists on the old 7th preview canvas. Enabling voxel mode will move preview output to the floating preview and remove that canvas. Continue?'
+      )
+    );
+  }
+
+  function getProjectCanvasCompositePixelsForVoxel(canvasDoc) {
+    const width = Math.max(1, Math.round(Number(canvasDoc?.width) || 1));
+    const height = Math.max(1, Math.round(Number(canvasDoc?.height) || 1));
+    const frame = getProjectCanvasActiveFrame(canvasDoc);
+    return compositeFramePixels(frame, width, height, state.palette, {
+      useLocalLayerPreviewVisibility: true,
+      useLocalLayerPreviewOpacity: true,
+    });
+  }
+
+  function getVoxelSourcePixel(pixels, width, x, y) {
+    const safeWidth = Math.max(1, Math.round(Number(width) || 1));
+    const base = ((y * safeWidth) + x) * 4;
+    return {
+      r: pixels[base],
+      g: pixels[base + 1],
+      b: pixels[base + 2],
+      a: pixels[base + 3],
+    };
+  }
+
+  function getVoxelSourceAlpha(pixels, width, x, y) {
+    const safeWidth = Math.max(1, Math.round(Number(width) || 1));
+    const base = ((y * safeWidth) + x) * 4;
+    return pixels[base + 3];
+  }
+
+  function getVoxelOpaqueBounds(pixels, width, height) {
+    const safeWidth = Math.max(1, Math.round(Number(width) || 1));
+    const safeHeight = Math.max(1, Math.round(Number(height) || 1));
+    let minX = safeWidth;
+    let minY = safeHeight;
+    let maxX = -1;
+    let maxY = -1;
+    for (let y = 0; y < safeHeight; y += 1) {
+      for (let x = 0; x < safeWidth; x += 1) {
+        if (getVoxelSourceAlpha(pixels, safeWidth, x, y) <= 0) {
+          continue;
+        }
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    }
+    if (maxX < minX || maxY < minY) {
+      return {
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        empty: true,
+      };
+    }
+    return {
+      x: minX,
+      y: minY,
+      width: (maxX - minX) + 1,
+      height: (maxY - minY) + 1,
+      empty: false,
+    };
+  }
+
+  function getVoxelBoundedPixel(pixels, width, bounds, x, y) {
+    return getVoxelSourcePixel(
+      pixels,
+      width,
+      bounds.x + x,
+      bounds.y + y
+    );
+  }
+
+  function hasVoxelBoundedAlpha(pixels, width, bounds, x, y) {
+    if (!bounds || bounds.empty) {
+      return false;
+    }
+    if (x < 0 || y < 0 || x >= bounds.width || y >= bounds.height) {
+      return false;
+    }
+    return getVoxelSourceAlpha(
+      pixels,
+      width,
+      bounds.x + x,
+      bounds.y + y
+    ) > 0;
+  }
+
+  function shadeVoxelColor(color, amount = 0) {
+    const safeAmount = clamp(Number(amount) || 0, -1, 1);
+    const blend = value => {
+      const current = clamp(Math.round(Number(value) || 0), 0, 255);
+      if (safeAmount >= 0) {
+        return Math.round(current + ((255 - current) * safeAmount));
+      }
+      return Math.round(current * (1 + safeAmount));
+    };
+    return {
+      r: blend(color.r),
+      g: blend(color.g),
+      b: blend(color.b),
+      a: clamp(Math.round(Number(color.a) || 255), 0, 255),
+    };
+  }
+
+  function pickVoxelColorChain(...colors) {
+    for (let index = 0; index < colors.length; index += 1) {
+      const color = colors[index];
+      if (color && Number(color.a) > 0) {
+        return color;
+      }
+    }
+    return colors.find(color => color && typeof color === 'object') || { r: 0, g: 0, b: 0, a: 0 };
+  }
+
+  function resolveVoxelProjectionAxisOrigin(targetLength, volumeLength, candidates = []) {
+    const safeTargetLength = Math.max(1, Math.round(Number(targetLength) || 1));
+    const safeVolumeLength = Math.max(1, Math.round(Number(volumeLength) || 1));
+    const maxOrigin = Math.max(0, safeTargetLength - safeVolumeLength);
+    const candidate = candidates.find(value => Number.isFinite(value));
+    if (Number.isFinite(candidate)) {
+      return clamp(Math.round(candidate), 0, maxOrigin);
+    }
+    return Math.max(0, Math.round((safeTargetLength - safeVolumeLength) / 2));
+  }
+
+  function normalizeVoxelPreviewYawDegrees(value = VOXEL_EXTENSION_DEFAULT_YAW_DEG) {
+    const numericValue = Number(value);
+    if (Number.isFinite(numericValue)) {
+      return Math.round(numericValue);
+    }
+    return VOXEL_EXTENSION_DEFAULT_YAW_DEG;
+  }
+
+  function normalizeVoxelPreviewPitchDegrees(value = VOXEL_EXTENSION_PREVIEW_ELEVATION_DEG) {
+    const numericValue = Number(value);
+    if (Number.isFinite(numericValue)) {
+      return clamp(
+        Math.round(numericValue),
+        VOXEL_EXTENSION_PREVIEW_PITCH_MIN_DEG,
+        VOXEL_EXTENSION_PREVIEW_PITCH_MAX_DEG
+      );
+    }
+    return VOXEL_EXTENSION_PREVIEW_ELEVATION_DEG;
+  }
+
+  function formatVoxelPreviewYawLabel(value = VOXEL_EXTENSION_DEFAULT_YAW_DEG) {
+    return `${normalizeVoxelPreviewYawDegrees(value)}°`;
+  }
+
+  function formatVoxelPreviewPitchLabel(value = VOXEL_EXTENSION_PREVIEW_ELEVATION_DEG) {
+    const pitch = normalizeVoxelPreviewPitchDegrees(value);
+    return `${pitch >= 0 ? '+' : ''}${pitch}°`;
+  }
+
+  function getVoxelPreviewFaceShadeAmount(face = 'front') {
+    switch (face) {
+      case 'top':
+        return 0.18;
+      case 'bottom':
+        return -0.24;
+      case 'left':
+        return -0.06;
+      case 'right':
+        return -0.18;
+      case 'back':
+        return -0.14;
+      case 'front':
+      default:
+        return 0;
+    }
+  }
+
+  function getVoxelPreviewProjectionScales(pitchRadians) {
+    const effectivePitchRadians = Number.isFinite(pitchRadians)
+      ? pitchRadians
+      : ((normalizeVoxelPreviewPitchDegrees(voxelExtensionState.previewPitchDeg) * Math.PI) / 180);
+    return {
+      depthScale: Math.sin(effectivePitchRadians) * 1.9,
+      heightScale: Math.max(1.2, Math.cos(effectivePitchRadians) * 2.35),
+    };
+  }
+
+  function getVoxelPreviewFixedProjectionScale(sizeX, sizeY, sizeZ) {
+    const halfX = Math.max(0.5, Number(sizeX) / 2);
+    const halfY = Math.max(0.5, Number(sizeY) / 2);
+    const halfZ = Math.max(0.5, Number(sizeZ) / 2);
+    const horizontalScale = 2;
+    const horizontalRadius = Math.hypot(halfX, halfZ);
+    const rawWidthMax = Math.max(1, horizontalRadius * horizontalScale * 2);
+    let rawHeightMax = 1;
+    for (let pitchDeg = VOXEL_EXTENSION_PREVIEW_PITCH_MIN_DEG; pitchDeg <= VOXEL_EXTENSION_PREVIEW_PITCH_MAX_DEG; pitchDeg += 1) {
+      const { depthScale, heightScale } = getVoxelPreviewProjectionScales((pitchDeg * Math.PI) / 180);
+      const nextHeight = ((halfY * heightScale) + (horizontalRadius * Math.abs(depthScale))) * 2;
+      rawHeightMax = Math.max(rawHeightMax, nextHeight);
+    }
+    return Math.max(1, Math.floor(Math.min(
+      (VOXEL_EXTENSION_PREVIEW_MAX_EDGE - 16) / rawWidthMax,
+      (VOXEL_EXTENSION_PREVIEW_MAX_EDGE - 16) / rawHeightMax
+    )) || 1);
+  }
+
+  function projectVoxelPreviewPoint(x, y, z, sizeX, sizeY, sizeZ, yawRadians, pitchRadians) {
+    const centeredX = x - (sizeX / 2);
+    const centeredY = y - (sizeY / 2);
+    const centeredZ = z - (sizeZ / 2);
+    const cosYaw = Math.cos(yawRadians);
+    const sinYaw = Math.sin(yawRadians);
+    const rotatedX = (centeredX * cosYaw) - (centeredZ * sinYaw);
+    const rotatedDepth = (centeredX * sinYaw) + (centeredZ * cosYaw);
+    const effectivePitchRadians = Number.isFinite(pitchRadians)
+      ? pitchRadians
+      : ((normalizeVoxelPreviewPitchDegrees(voxelExtensionState.previewPitchDeg) * Math.PI) / 180);
+    const { depthScale, heightScale } = getVoxelPreviewProjectionScales(effectivePitchRadians);
+    const horizontalScale = 2;
+    return {
+      x: rotatedX * horizontalScale,
+      y: (centeredY * heightScale) - (rotatedDepth * depthScale),
+      depth: (rotatedDepth * Math.cos(effectivePitchRadians)) + (centeredY * Math.sin(effectivePitchRadians)),
+    };
+  }
+
+  function fillVoxelPolygonRgba(buffer, width, height, points, color) {
+    if (!(buffer instanceof Uint8ClampedArray) || !Array.isArray(points) || points.length < 3) {
+      return;
+    }
+    let minY = Infinity;
+    let maxY = -Infinity;
+    points.forEach(point => {
+      if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+        return;
+      }
+      minY = Math.min(minY, point.y);
+      maxY = Math.max(maxY, point.y);
+    });
+    if (!Number.isFinite(minY) || !Number.isFinite(maxY)) {
+      return;
+    }
+    const safeHeight = Math.max(1, Math.round(Number(height) || 1));
+    const safeWidth = Math.max(1, Math.round(Number(width) || 1));
+    const startY = clamp(Math.floor(minY), 0, safeHeight - 1);
+    const endY = clamp(Math.ceil(maxY) - 1, 0, safeHeight - 1);
+    for (let y = startY; y <= endY; y += 1) {
+      const scanY = y + 0.5;
+      const intersections = [];
+      for (let index = 0; index < points.length; index += 1) {
+        const current = points[index];
+        const next = points[(index + 1) % points.length];
+        if (!current || !next) {
+          continue;
+        }
+        if (!Number.isFinite(current.x) || !Number.isFinite(current.y) || !Number.isFinite(next.x) || !Number.isFinite(next.y)) {
+          continue;
+        }
+        if (current.y === next.y) {
+          continue;
+        }
+        const minEdgeY = Math.min(current.y, next.y);
+        const maxEdgeY = Math.max(current.y, next.y);
+        if (scanY < minEdgeY || scanY >= maxEdgeY) {
+          continue;
+        }
+        const t = (scanY - current.y) / (next.y - current.y);
+        intersections.push(current.x + ((next.x - current.x) * t));
+      }
+      if (intersections.length < 2) {
+        continue;
+      }
+      intersections.sort((a, b) => a - b);
+      for (let i = 0; i < intersections.length - 1; i += 2) {
+        const startX = clamp(Math.ceil(intersections[i] - 0.5), 0, safeWidth - 1);
+        const endX = clamp(Math.floor(intersections[i + 1] - 0.5), 0, safeWidth - 1);
+        for (let x = startX; x <= endX; x += 1) {
+          const base = ((y * safeWidth) + x) * 4;
+          buffer[base] = color.r;
+          buffer[base + 1] = color.g;
+          buffer[base + 2] = color.b;
+          buffer[base + 3] = color.a;
+        }
+      }
+    }
+  }
+
+  function buildVoxelPreviewPixels(frontCanvas, backCanvas, leftCanvas, rightCanvas, topCanvas, bottomCanvas) {
+    const frontWidth = Math.max(1, Math.round(Number(frontCanvas?.width) || 1));
+    const frontHeight = Math.max(1, Math.round(Number(frontCanvas?.height) || 1));
+    const backWidth = Math.max(1, Math.round(Number(backCanvas?.width) || 1));
+    const backHeight = Math.max(1, Math.round(Number(backCanvas?.height) || 1));
+    const leftWidth = Math.max(1, Math.round(Number(leftCanvas?.width) || 1));
+    const leftHeight = Math.max(1, Math.round(Number(leftCanvas?.height) || 1));
+    const rightWidth = Math.max(1, Math.round(Number(rightCanvas?.width) || 1));
+    const rightHeight = Math.max(1, Math.round(Number(rightCanvas?.height) || 1));
+    const topWidth = Math.max(1, Math.round(Number(topCanvas?.width) || 1));
+    const topHeight = Math.max(1, Math.round(Number(topCanvas?.height) || 1));
+    const bottomWidth = Math.max(1, Math.round(Number(bottomCanvas?.width) || 1));
+    const bottomHeight = Math.max(1, Math.round(Number(bottomCanvas?.height) || 1));
+    const frontPixels = getProjectCanvasCompositePixelsForVoxel(frontCanvas);
+    const backPixels = getProjectCanvasCompositePixelsForVoxel(backCanvas);
+    const leftPixels = getProjectCanvasCompositePixelsForVoxel(leftCanvas);
+    const rightPixels = getProjectCanvasCompositePixelsForVoxel(rightCanvas);
+    const topPixels = getProjectCanvasCompositePixelsForVoxel(topCanvas);
+    const bottomPixels = getProjectCanvasCompositePixelsForVoxel(bottomCanvas);
+    const frontBounds = getVoxelOpaqueBounds(frontPixels, frontWidth, frontHeight);
+    const backBounds = getVoxelOpaqueBounds(backPixels, backWidth, backHeight);
+    const leftBounds = getVoxelOpaqueBounds(leftPixels, leftWidth, leftHeight);
+    const rightBounds = getVoxelOpaqueBounds(rightPixels, rightWidth, rightHeight);
+    const topBounds = getVoxelOpaqueBounds(topPixels, topWidth, topHeight);
+    const bottomBounds = getVoxelOpaqueBounds(bottomPixels, bottomWidth, bottomHeight);
+    const frontAvailable = !frontBounds.empty;
+    const backAvailable = !backBounds.empty;
+    const leftAvailable = !leftBounds.empty;
+    const rightAvailable = !rightBounds.empty;
+    const topAvailable = !topBounds.empty;
+    const bottomAvailable = !bottomBounds.empty;
+    if (!frontAvailable && !backAvailable && !leftAvailable && !rightAvailable && !topAvailable && !bottomAvailable) {
+      return {
+        width: 1,
+        height: 1,
+        pixels: new Uint8ClampedArray(4),
+        volume: { width: 1, height: 1, depth: 1 },
+        clamped: false,
+        guides: null,
+      };
+    }
+    const sourceSizeXCandidates = [
+      frontAvailable ? frontBounds.width : null,
+      backAvailable ? backBounds.width : null,
+      topAvailable ? topBounds.width : null,
+      bottomAvailable ? bottomBounds.width : null,
+    ].filter(Number.isFinite);
+    const sourceSizeYCandidates = [
+      frontAvailable ? frontBounds.height : null,
+      backAvailable ? backBounds.height : null,
+      rightAvailable ? rightBounds.height : null,
+      leftAvailable ? leftBounds.height : null,
+    ].filter(Number.isFinite);
+    const sourceSizeZCandidates = [
+      topAvailable ? topBounds.height : null,
+      bottomAvailable ? bottomBounds.height : null,
+      rightAvailable ? rightBounds.width : null,
+      leftAvailable ? leftBounds.width : null,
+    ].filter(Number.isFinite);
+    const sourceSizeX = sourceSizeXCandidates.length ? Math.max(1, Math.min(...sourceSizeXCandidates)) : 1;
+    const sourceSizeY = sourceSizeYCandidates.length ? Math.max(1, Math.min(...sourceSizeYCandidates)) : 1;
+    const sourceSizeZ = sourceSizeZCandidates.length ? Math.max(1, Math.min(...sourceSizeZCandidates)) : 1;
+    const sizeX = Math.max(1, Math.min(sourceSizeX, VOXEL_EXTENSION_MAX_SOURCE_EDGE));
+    const sizeY = Math.max(1, Math.min(sourceSizeY, VOXEL_EXTENSION_MAX_SOURCE_EDGE));
+    const sizeZ = Math.max(1, Math.min(sourceSizeZ, VOXEL_EXTENSION_MAX_SOURCE_EDGE));
+    const clamped = sizeX !== sourceSizeX || sizeY !== sourceSizeY || sizeZ !== sourceSizeZ;
+    const occupancy = new Uint8Array(sizeX * sizeY * sizeZ);
+    const voxelIndex = (x, y, z) => ((y * sizeZ) + z) * sizeX + x;
+    const hasFrontAlpha = (x, y) => (
+      frontAvailable
+        ? hasVoxelBoundedAlpha(frontPixels, frontWidth, frontBounds, x, y)
+        : true
+    );
+    const hasBackAlpha = (x, y) => (
+      backAvailable
+        ? hasVoxelBoundedAlpha(backPixels, backWidth, backBounds, (sizeX - 1) - x, y)
+        : true
+    );
+    const hasRightAlpha = (z, y) => (
+      rightAvailable
+        ? hasVoxelBoundedAlpha(rightPixels, rightWidth, rightBounds, z, y)
+        : true
+    );
+    const hasLeftAlpha = (z, y) => (
+      leftAvailable
+        ? hasVoxelBoundedAlpha(leftPixels, leftWidth, leftBounds, (sizeZ - 1) - z, y)
+        : true
+    );
+    const hasTopAlpha = (x, z) => (
+      topAvailable
+        ? hasVoxelBoundedAlpha(topPixels, topWidth, topBounds, x, z)
+        : true
+    );
+    const hasBottomAlpha = (x, z) => (
+      bottomAvailable
+        ? hasVoxelBoundedAlpha(bottomPixels, bottomWidth, bottomBounds, x, (sizeZ - 1) - z)
+        : true
+    );
+    const readFrontColor = (x, y) => (
+      frontAvailable
+        ? getVoxelBoundedPixel(frontPixels, frontWidth, frontBounds, x, y)
+        : null
+    );
+    const readBackColor = (x, y) => (
+      backAvailable
+        ? getVoxelBoundedPixel(backPixels, backWidth, backBounds, (sizeX - 1) - x, y)
+        : null
+    );
+    const readRightColor = (z, y) => (
+      rightAvailable
+        ? getVoxelBoundedPixel(rightPixels, rightWidth, rightBounds, z, y)
+        : null
+    );
+    const readLeftColor = (z, y) => (
+      leftAvailable
+        ? getVoxelBoundedPixel(leftPixels, leftWidth, leftBounds, (sizeZ - 1) - z, y)
+        : null
+    );
+    const readTopColor = (x, z) => (
+      topAvailable
+        ? getVoxelBoundedPixel(topPixels, topWidth, topBounds, x, z)
+        : null
+    );
+    const readBottomColor = (x, z) => (
+      bottomAvailable
+        ? getVoxelBoundedPixel(bottomPixels, bottomWidth, bottomBounds, x, (sizeZ - 1) - z)
+        : null
+    );
+    const getVoxelColorForRole = (role, x, y, z) => {
+      switch (role) {
+        case 'back':
+          return pickVoxelColorChain(
+            readBackColor(x, y),
+            readTopColor(x, z),
+            readLeftColor(z, y),
+            readRightColor(z, y),
+            readFrontColor(x, y),
+            readBottomColor(x, z)
+          );
+        case 'left':
+          return pickVoxelColorChain(
+            readLeftColor(z, y),
+            readFrontColor(x, y),
+            readTopColor(x, z),
+            readBackColor(x, y),
+            readBottomColor(x, z),
+            readRightColor(z, y)
+          );
+        case 'right':
+          return pickVoxelColorChain(
+            readRightColor(z, y),
+            readFrontColor(x, y),
+            readTopColor(x, z),
+            readBackColor(x, y),
+            readBottomColor(x, z),
+            readLeftColor(z, y)
+          );
+        case 'top':
+          return pickVoxelColorChain(
+            readTopColor(x, z),
+            readFrontColor(x, y),
+            readRightColor(z, y),
+            readLeftColor(z, y),
+            readBackColor(x, y),
+            readBottomColor(x, z)
+          );
+        case 'bottom':
+          return pickVoxelColorChain(
+            readBottomColor(x, z),
+            readFrontColor(x, y),
+            readRightColor(z, y),
+            readLeftColor(z, y),
+            readBackColor(x, y),
+            readTopColor(x, z)
+          );
+        case 'front':
+        default:
+          return pickVoxelColorChain(
+            readFrontColor(x, y),
+            readTopColor(x, z),
+            readRightColor(z, y),
+            readLeftColor(z, y),
+            readBackColor(x, y),
+            readBottomColor(x, z)
+          );
+      }
+    };
+    for (let y = 0; y < sizeY; y += 1) {
+      for (let x = 0; x < sizeX; x += 1) {
+        if (!hasFrontAlpha(x, y) || !hasBackAlpha(x, y)) {
+          continue;
+        }
+        for (let z = 0; z < sizeZ; z += 1) {
+          if (!hasTopAlpha(x, z) || !hasBottomAlpha(x, z)) {
+            continue;
+          }
+          if (!hasRightAlpha(z, y) || !hasLeftAlpha(z, y)) {
+            continue;
+          }
+          occupancy[voxelIndex(x, y, z)] = 1;
+        }
+      }
+    }
+    const isOccupied = (x, y, z) => occupancy[voxelIndex(x, y, z)] === 1;
+    const xAxisCandidates = [
+      frontAvailable ? frontBounds.x : null,
+      backAvailable ? backBounds.x : null,
+      topAvailable ? topBounds.x : null,
+      bottomAvailable ? bottomBounds.x : null,
+    ].filter(Number.isFinite);
+    const yAxisCandidates = [
+      frontAvailable ? frontBounds.y : null,
+      backAvailable ? backBounds.y : null,
+      rightAvailable ? rightBounds.y : null,
+      leftAvailable ? leftBounds.y : null,
+    ].filter(Number.isFinite);
+    const zAxisCandidates = [
+      rightAvailable ? rightBounds.x : null,
+      leftAvailable ? leftBounds.x : null,
+      topAvailable ? topBounds.y : null,
+      bottomAvailable ? bottomBounds.y : null,
+    ].filter(Number.isFinite);
+    const fillProjectionBuffer = (buffer, bufferWidth, x, y, color, alphaScale = 1) => {
+      if (!(buffer instanceof Uint8ClampedArray) || !color) {
+        return;
+      }
+      const safeWidth = Math.max(1, Math.round(Number(bufferWidth) || 1));
+      const base = ((y * safeWidth) + x) * 4;
+      buffer[base] = clamp(Math.round(Number(color.r) || 0), 0, 255);
+      buffer[base + 1] = clamp(Math.round(Number(color.g) || 0), 0, 255);
+      buffer[base + 2] = clamp(Math.round(Number(color.b) || 0), 0, 255);
+      buffer[base + 3] = clamp(Math.round((Number(color.a) || 0) * alphaScale), 0, 255);
+    };
+    const buildGuideProjection = ({
+      role,
+      targetWidth,
+      targetHeight,
+      localWidth,
+      localHeight,
+      offsetX,
+      offsetY,
+      resolveSample,
+    }) => {
+      const width = Math.max(1, Math.round(Number(targetWidth) || 1));
+      const height = Math.max(1, Math.round(Number(targetHeight) || 1));
+      const buffer = new Uint8ClampedArray(width * height * 4);
+      for (let localY = 0; localY < localHeight; localY += 1) {
+        for (let localX = 0; localX < localWidth; localX += 1) {
+          const sample = resolveSample(localX, localY);
+          if (!sample) {
+            continue;
+          }
+          const color = getVoxelColorForRole(role, sample.x, sample.y, sample.z);
+          const destX = offsetX + localX;
+          const destY = offsetY + localY;
+          if (destX < 0 || destY < 0 || destX >= width || destY >= height) {
+            continue;
+          }
+          fillProjectionBuffer(buffer, width, destX, destY, color, 0.62);
+        }
+      }
+      return { width, height, pixels: buffer };
+    };
+    const findFrontSample = (x, y) => {
+      for (let z = 0; z < sizeZ; z += 1) {
+        if (isOccupied(x, y, z)) {
+          return { x, y, z };
+        }
+      }
+      return null;
+    };
+    const findBackSample = (x, y) => {
+      for (let z = sizeZ - 1; z >= 0; z -= 1) {
+        if (isOccupied(x, y, z)) {
+          return { x, y, z };
+        }
+      }
+      return null;
+    };
+    const findLeftSample = (z, y) => {
+      for (let x = 0; x < sizeX; x += 1) {
+        if (isOccupied(x, y, z)) {
+          return { x, y, z };
+        }
+      }
+      return null;
+    };
+    const findRightSample = (z, y) => {
+      for (let x = sizeX - 1; x >= 0; x -= 1) {
+        if (isOccupied(x, y, z)) {
+          return { x, y, z };
+        }
+      }
+      return null;
+    };
+    const findTopSample = (x, z) => {
+      for (let y = 0; y < sizeY; y += 1) {
+        if (isOccupied(x, y, z)) {
+          return { x, y, z };
+        }
+      }
+      return null;
+    };
+    const findBottomSample = (x, z) => {
+      for (let y = sizeY - 1; y >= 0; y -= 1) {
+        if (isOccupied(x, y, z)) {
+          return { x, y, z };
+        }
+      }
+      return null;
+    };
+    const guides = {
+      front: buildGuideProjection({
+        role: 'front',
+        targetWidth: frontWidth,
+        targetHeight: frontHeight,
+        localWidth: sizeX,
+        localHeight: sizeY,
+        offsetX: resolveVoxelProjectionAxisOrigin(frontWidth, sizeX, xAxisCandidates),
+        offsetY: resolveVoxelProjectionAxisOrigin(frontHeight, sizeY, yAxisCandidates),
+        resolveSample: findFrontSample,
+      }),
+      back: buildGuideProjection({
+        role: 'back',
+        targetWidth: backWidth,
+        targetHeight: backHeight,
+        localWidth: sizeX,
+        localHeight: sizeY,
+        offsetX: resolveVoxelProjectionAxisOrigin(backWidth, sizeX, xAxisCandidates),
+        offsetY: resolveVoxelProjectionAxisOrigin(backHeight, sizeY, yAxisCandidates),
+        resolveSample: findBackSample,
+      }),
+      left: buildGuideProjection({
+        role: 'left',
+        targetWidth: leftWidth,
+        targetHeight: leftHeight,
+        localWidth: sizeZ,
+        localHeight: sizeY,
+        offsetX: resolveVoxelProjectionAxisOrigin(leftWidth, sizeZ, zAxisCandidates),
+        offsetY: resolveVoxelProjectionAxisOrigin(leftHeight, sizeY, yAxisCandidates),
+        resolveSample: findLeftSample,
+      }),
+      right: buildGuideProjection({
+        role: 'right',
+        targetWidth: rightWidth,
+        targetHeight: rightHeight,
+        localWidth: sizeZ,
+        localHeight: sizeY,
+        offsetX: resolveVoxelProjectionAxisOrigin(rightWidth, sizeZ, zAxisCandidates),
+        offsetY: resolveVoxelProjectionAxisOrigin(rightHeight, sizeY, yAxisCandidates),
+        resolveSample: findRightSample,
+      }),
+      top: buildGuideProjection({
+        role: 'top',
+        targetWidth: topWidth,
+        targetHeight: topHeight,
+        localWidth: sizeX,
+        localHeight: sizeZ,
+        offsetX: resolveVoxelProjectionAxisOrigin(topWidth, sizeX, xAxisCandidates),
+        offsetY: resolveVoxelProjectionAxisOrigin(topHeight, sizeZ, zAxisCandidates),
+        resolveSample: findTopSample,
+      }),
+      bottom: buildGuideProjection({
+        role: 'bottom',
+        targetWidth: bottomWidth,
+        targetHeight: bottomHeight,
+        localWidth: sizeX,
+        localHeight: sizeZ,
+        offsetX: resolveVoxelProjectionAxisOrigin(bottomWidth, sizeX, xAxisCandidates),
+        offsetY: resolveVoxelProjectionAxisOrigin(bottomHeight, sizeZ, zAxisCandidates),
+        resolveSample: findBottomSample,
+      }),
+    };
+    const yawDegrees = normalizeVoxelPreviewYawDegrees(voxelExtensionState.previewYawDeg);
+    const pitchDegrees = normalizeVoxelPreviewPitchDegrees(voxelExtensionState.previewPitchDeg);
+    const wrappedYawDegrees = ((yawDegrees % 360) + 360) % 360;
+    const yawRadians = (wrappedYawDegrees * Math.PI) / 180;
+    const pitchRadians = (pitchDegrees * Math.PI) / 180;
+    const margin = 8;
+    let minProjectedX = Infinity;
+    let maxProjectedX = -Infinity;
+    let minProjectedY = Infinity;
+    let maxProjectedY = -Infinity;
+    [0, sizeX].forEach(projectX => {
+      [0, sizeY].forEach(projectY => {
+        [0, sizeZ].forEach(projectZ => {
+          const projected = projectVoxelPreviewPoint(
+            projectX,
+            projectY,
+            projectZ,
+            sizeX,
+            sizeY,
+            sizeZ,
+            yawRadians,
+            pitchRadians
+          );
+          minProjectedX = Math.min(minProjectedX, projected.x);
+          maxProjectedX = Math.max(maxProjectedX, projected.x);
+          minProjectedY = Math.min(minProjectedY, projected.y);
+          maxProjectedY = Math.max(maxProjectedY, projected.y);
+        });
+      });
+    });
+    const rawWidth = Math.max(1, maxProjectedX - minProjectedX);
+    const rawHeight = Math.max(1, maxProjectedY - minProjectedY);
+    const previewScale = getVoxelPreviewFixedProjectionScale(sizeX, sizeY, sizeZ);
+    const previewWidth = VOXEL_EXTENSION_PREVIEW_MAX_EDGE;
+    const previewHeight = VOXEL_EXTENSION_PREVIEW_MAX_EDGE;
+    const projectedWidth = Math.max(1, Math.ceil(rawWidth * previewScale));
+    const projectedHeight = Math.max(1, Math.ceil(rawHeight * previewScale));
+    const offsetX = Math.round((previewWidth - projectedWidth) / 2);
+    const offsetY = Math.round((previewHeight - projectedHeight) / 2);
+    const faces = [];
+    const pushFace = (points, color, depth) => {
+      if (!Array.isArray(points) || points.length < 3 || !color || Number(color.a) <= 0) {
+        return;
+      }
+      faces.push({ points, color, depth });
+    };
+    for (let y = 0; y < sizeY; y += 1) {
+      const voxelBottom = sizeY - (y + 1);
+      const voxelTop = voxelBottom + 1;
+      for (let z = 0; z < sizeZ; z += 1) {
+        for (let x = 0; x < sizeX; x += 1) {
+          if (occupancy[voxelIndex(x, y, z)] !== 1) {
+            continue;
+          }
+          const frontColor = getVoxelColorForRole('front', x, y, z);
+          const backColor = getVoxelColorForRole('back', x, y, z);
+          const leftColor = getVoxelColorForRole('left', x, y, z);
+          const rightColor = getVoxelColorForRole('right', x, y, z);
+          const topFaceColor = getVoxelColorForRole('top', x, y, z);
+          const bottomFaceColor = getVoxelColorForRole('bottom', x, y, z);
+          const corners = {
+            fbl: [x, voxelBottom, z],
+            fbr: [x + 1, voxelBottom, z],
+            ftl: [x, voxelTop, z],
+            ftr: [x + 1, voxelTop, z],
+            bbl: [x, voxelBottom, z + 1],
+            bbr: [x + 1, voxelBottom, z + 1],
+            btl: [x, voxelTop, z + 1],
+            btr: [x + 1, voxelTop, z + 1],
+          };
+          const faceDefinitions = [
+            {
+              visible: z === 0 || occupancy[voxelIndex(x, y, z - 1)] !== 1,
+              color: shadeVoxelColor(frontColor, getVoxelPreviewFaceShadeAmount('front')),
+              points: [corners.fbl, corners.fbr, corners.ftr, corners.ftl],
+            },
+            {
+              visible: z === sizeZ - 1 || occupancy[voxelIndex(x, y, z + 1)] !== 1,
+              color: shadeVoxelColor(backColor, getVoxelPreviewFaceShadeAmount('back')),
+              points: [corners.bbr, corners.bbl, corners.btl, corners.btr],
+            },
+            {
+              visible: x === 0 || occupancy[voxelIndex(x - 1, y, z)] !== 1,
+              color: shadeVoxelColor(leftColor, getVoxelPreviewFaceShadeAmount('left')),
+              points: [corners.bbl, corners.fbl, corners.ftl, corners.btl],
+            },
+            {
+              visible: x === sizeX - 1 || occupancy[voxelIndex(x + 1, y, z)] !== 1,
+              color: shadeVoxelColor(rightColor, getVoxelPreviewFaceShadeAmount('right')),
+              points: [corners.fbr, corners.bbr, corners.btr, corners.ftr],
+            },
+            {
+              visible: y === 0 || occupancy[voxelIndex(x, y - 1, z)] !== 1,
+              color: shadeVoxelColor(topFaceColor, getVoxelPreviewFaceShadeAmount('top')),
+              points: [corners.ftl, corners.ftr, corners.btr, corners.btl],
+            },
+            {
+              visible: y === sizeY - 1 || occupancy[voxelIndex(x, y + 1, z)] !== 1,
+              color: shadeVoxelColor(bottomFaceColor, getVoxelPreviewFaceShadeAmount('bottom')),
+              points: [corners.fbl, corners.bbl, corners.bbr, corners.fbr],
+            },
+          ];
+          faceDefinitions.forEach(face => {
+            if (!face.visible) {
+              return;
+            }
+            const projectedPoints = face.points.map(point => {
+              const projected = projectVoxelPreviewPoint(
+                point[0],
+                point[1],
+                point[2],
+                sizeX,
+                sizeY,
+                sizeZ,
+                yawRadians,
+                pitchRadians
+              );
+              return {
+                x: offsetX + ((projected.x - minProjectedX) * previewScale),
+                y: offsetY + ((maxProjectedY - projected.y) * previewScale),
+                depth: projected.depth,
+              };
+            });
+            const depth = projectedPoints.reduce((sum, point) => sum + point.depth, 0) / projectedPoints.length;
+            pushFace(
+              projectedPoints.map(point => ({ x: point.x, y: point.y })),
+              face.color,
+              depth
+            );
+          });
+        }
+      }
+    }
+    faces.sort((leftFace, rightFace) => rightFace.depth - leftFace.depth);
+    const output = new Uint8ClampedArray(previewWidth * previewHeight * 4);
+    faces.forEach(face => {
+      fillVoxelPolygonRgba(output, previewWidth, previewHeight, face.points, face.color);
+    });
+    return {
+      width: previewWidth,
+      height: previewHeight,
+      pixels: output,
+      volume: { width: sizeX, height: sizeY, depth: sizeZ },
+      clamped,
+      guides,
+      yawDeg: yawDegrees,
+      pitchDeg: pitchDegrees,
+    };
+  }
+
+  function syncVoxelExtensionCanvasBadges() {
+    const mainBadge = dom.mainCanvasSurfaceBadge;
+    const mainCanvas = getProjectCanvasDocumentAt(0);
+    const mainRole = getVoxelExtensionCanvasRoleById(mainCanvas?.id || '');
+    if (mainBadge instanceof HTMLElement) {
+      if (mainRole) {
+        mainBadge.hidden = false;
+        mainBadge.dataset.role = mainRole;
+        mainBadge.textContent = getVoxelExtensionRoleLabel(mainRole);
+      } else {
+        mainBadge.hidden = true;
+        delete mainBadge.dataset.role;
+        mainBadge.textContent = '';
+      }
+    }
+    localViewportCanvasEntries.forEach(entry => {
+      if (!(entry?.badge instanceof HTMLElement)) {
+        return;
+      }
+      const role = getVoxelExtensionCanvasRoleById(entry.canvasDocId || '');
+      if (role) {
+        entry.badge.hidden = false;
+        entry.badge.dataset.role = role;
+        entry.badge.textContent = getVoxelExtensionRoleLabel(role);
+      } else {
+        entry.badge.hidden = true;
+        delete entry.badge.dataset.role;
+        entry.badge.textContent = '';
+      }
+    });
+  }
+
+  function syncVoxelExtensionModeUi() {
+    const toggle = dom.controls.toggleVoxelExtensionMode;
+    const status = dom.controls.voxelExtensionStatus;
+    const field = dom.controls.voxelExtensionField;
+    const refreshButton = dom.controls.refreshVoxelPreview;
+    const setupButton = dom.controls.setupVoxelExtension;
+    const yawControl = dom.controls.voxelPreviewYaw;
+    const yawValue = dom.controls.voxelPreviewYawValue;
+    const enabled = isVoxelExtensionModeEnabled();
+    const available = canUseVoxelExtensionMode();
+    const previewYawDeg = normalizeVoxelPreviewYawDegrees(voxelExtensionState.previewYawDeg);
+    const previewPitchDeg = normalizeVoxelPreviewPitchDegrees(voxelExtensionState.previewPitchDeg);
+    if (toggle instanceof HTMLInputElement) {
+      toggle.checked = enabled;
+      toggle.disabled = !available || !canCurrentClientEditProjectStructure();
+    }
+    if (setupButton instanceof HTMLButtonElement) {
+      setupButton.disabled = !available || !canCurrentClientEditProjectStructure();
+    }
+    if (refreshButton instanceof HTMLButtonElement) {
+      refreshButton.disabled = !enabled;
+    }
+    if (yawControl instanceof HTMLInputElement) {
+      yawControl.value = String(previewYawDeg);
+      yawControl.disabled = !enabled;
+    }
+    if (yawValue instanceof HTMLOutputElement || yawValue instanceof HTMLElement) {
+      yawValue.textContent = formatVoxelPreviewYawLabel(previewYawDeg);
+    }
+    if (field instanceof HTMLElement) {
+      field.dataset.mode = enabled ? EXTENSION_MODE_VOXEL : EXTENSION_MODE_NONE;
+    }
+    if (status instanceof HTMLElement) {
+      if (!available) {
+        status.textContent = localizeText(
+          '共有モード接続中はボクセルモードを使えません',
+          'Voxel mode is unavailable while collab is connected'
+        );
+      } else if (!enabled) {
+        status.textContent = localizeText('ボクセルモード: OFF', 'Voxel mode: OFF');
+      } else if (voxelExtensionPreviewMeta && voxelExtensionPreviewMeta.volume) {
+        const sizeLabel = localizeText(
+          `ボクセル ${voxelExtensionPreviewMeta.volume.width}×${voxelExtensionPreviewMeta.volume.height}×${voxelExtensionPreviewMeta.volume.depth} / 小窓 ${voxelExtensionPreviewMeta.width}×${voxelExtensionPreviewMeta.height}`,
+          `Voxel ${voxelExtensionPreviewMeta.volume.width}×${voxelExtensionPreviewMeta.volume.height}×${voxelExtensionPreviewMeta.volume.depth} / Floating ${voxelExtensionPreviewMeta.width}×${voxelExtensionPreviewMeta.height}`
+        );
+        const angleLabel = localizeText(
+          ` / 回転 Y${formatVoxelPreviewYawLabel(voxelExtensionPreviewMeta.yawDeg ?? previewYawDeg)} P${formatVoxelPreviewPitchLabel(voxelExtensionPreviewMeta.pitchDeg ?? previewPitchDeg)}`,
+          ` / Yaw ${formatVoxelPreviewYawLabel(voxelExtensionPreviewMeta.yawDeg ?? previewYawDeg)} Pitch ${formatVoxelPreviewPitchLabel(voxelExtensionPreviewMeta.pitchDeg ?? previewPitchDeg)}`
+        );
+        status.textContent = voxelExtensionPreviewMeta.clamped
+          ? `${sizeLabel}${angleLabel}${localizeText(`（64px上限で表示）`, ` (capped at ${VOXEL_EXTENSION_MAX_SOURCE_EDGE}px)`)}`
+          : `${sizeLabel}${angleLabel}`;
+      } else {
+        status.textContent = localizeText('ボクセルモード: 準備中', 'Voxel mode: preparing');
+      }
+    }
+    syncVoxelExtensionCanvasBadges();
+    syncFloatingPreviewPanelVisibility({ persist: false });
+  }
+
+  function syncVoxelExtensionPreviewFromSource({ updateViewport = true } = {}) {
+    if (!isVoxelExtensionModeEnabled()) {
+      voxelExtensionPreviewMeta = null;
+      voxelExtensionPreviewPixels = null;
+      voxelExtensionGuideProjections = null;
+      syncVoxelExtensionModeUi();
+      renderFloatingPreviewPanel();
+      return false;
+    }
+    syncVoxelExtensionCanvasIdsFromDocuments();
+    const resolved = getVoxelExtensionResolvedCanvases();
+    if (!resolved?.front || !resolved?.back || !resolved?.left || !resolved?.right || !resolved?.top || !resolved?.bottom) {
+      voxelExtensionPreviewMeta = null;
+      voxelExtensionPreviewPixels = null;
+      voxelExtensionGuideProjections = null;
+      syncVoxelExtensionModeUi();
+      renderFloatingPreviewPanel();
+      return false;
+    }
+    const rendered = buildVoxelPreviewPixels(
+      resolved.front,
+      resolved.back,
+      resolved.left,
+      resolved.right,
+      resolved.top,
+      resolved.bottom
+    );
+    voxelExtensionPreviewPixels = new Uint8ClampedArray(rendered.pixels);
+    voxelExtensionGuideProjections = rendered.guides || null;
+    voxelExtensionPreviewMeta = {
+      width: rendered.width,
+      height: rendered.height,
+      volume: { ...rendered.volume },
+      clamped: Boolean(rendered.clamped),
+      yawDeg: normalizeVoxelPreviewYawDegrees(rendered.yawDeg),
+      pitchDeg: normalizeVoxelPreviewPitchDegrees(rendered.pitchDeg),
+    };
+    if (updateViewport) {
+      syncLocalViewportCanvasDockLayout();
+    }
+    syncVoxelExtensionModeUi();
+    renderFloatingPreviewPanel();
+    return true;
+  }
+
+  function ensureVoxelExtensionCanvasSetup({ announce = true, trackChange = true } = {}) {
+    if (!canUseVoxelExtensionMode() || !canCurrentClientEditProjectStructure()) {
+      syncVoxelExtensionModeUi();
+      return false;
+    }
+    const currentCanvases = getProjectCanvasDocuments();
+    const currentVoxelState = normalizeVoxelExtensionState(voxelExtensionState, VOXEL_EXTENSION_DEFAULT_STATE);
+    if (!getVoxelExtensionOverwriteConfirmation(currentCanvases)) {
+      syncControlsWithState();
+      return false;
+    }
+    const looksLikeLegacyVoxelLayout = (
+      currentCanvases.length <= 4
+      && !currentVoxelState.backCanvasId
+      && !currentVoxelState.leftCanvasId
+      && !currentVoxelState.bottomCanvasId
+      && (currentVoxelState.rightCanvasId || currentVoxelState.topCanvasId || currentVoxelState.previewCanvasId)
+    );
+    const sourceCanvas = currentCanvases[0] || createBlankProjectCanvasDocument(null, 1);
+    const shouldResetLayoutAfterSetup = (
+      currentVoxelState.mode !== EXTENSION_MODE_VOXEL
+      || looksLikeLegacyVoxelLayout
+      || currentCanvases.length !== VOXEL_EXTENSION_CANVAS_TOTAL
+    );
+    const hasDedicatedPreviewCanvas = currentCanvases.length > VOXEL_EXTENSION_SOURCE_CANVAS_TOTAL;
+    const resolveExistingCanvas = (canvasId, fallbackIndex = 0) => {
+      if (typeof canvasId === 'string' && canvasId) {
+        const matched = currentCanvases.find(canvas => canvas?.id === canvasId);
+        if (matched) {
+          return matched;
+        }
+      }
+      return currentCanvases[fallbackIndex] || null;
+    };
+    const orderedSourceCanvases = looksLikeLegacyVoxelLayout
+      ? [
+          resolveExistingCanvas(currentVoxelState.frontCanvasId, 0),
+          resolveExistingCanvas(currentVoxelState.backCanvasId, 4),
+          resolveExistingCanvas(currentVoxelState.leftCanvasId, 5),
+          resolveExistingCanvas(currentVoxelState.rightCanvasId, 1),
+          resolveExistingCanvas(currentVoxelState.topCanvasId, 2),
+          resolveExistingCanvas(currentVoxelState.bottomCanvasId, 6),
+        ]
+      : [
+          resolveExistingCanvas(currentVoxelState.frontCanvasId, hasDedicatedPreviewCanvas ? 1 : 0),
+          resolveExistingCanvas(currentVoxelState.backCanvasId, hasDedicatedPreviewCanvas ? 2 : 1),
+          resolveExistingCanvas(currentVoxelState.leftCanvasId, hasDedicatedPreviewCanvas ? 3 : 2),
+          resolveExistingCanvas(currentVoxelState.rightCanvasId, hasDedicatedPreviewCanvas ? 4 : 3),
+          resolveExistingCanvas(currentVoxelState.topCanvasId, hasDedicatedPreviewCanvas ? 5 : 4),
+          resolveExistingCanvas(currentVoxelState.bottomCanvasId, hasDedicatedPreviewCanvas ? 6 : 5),
+        ];
+    const nextCanvases = orderedSourceCanvases.map((canvas, index) => (
+      canvas
+        ? createProjectCanvasDocument(canvas, {
+            clonePixelData: true,
+            fallbackIndex: index + 1,
+          })
+        : createBlankProjectCanvasDocument(sourceCanvas, index + 1)
+    ));
+    nextCanvases[0].name = getVoxelExtensionProjectName('front');
+    nextCanvases[1].name = getVoxelExtensionProjectName('back');
+    nextCanvases[2].name = getVoxelExtensionProjectName('left');
+    nextCanvases[3].name = getVoxelExtensionProjectName('right');
+    nextCanvases[4].name = getVoxelExtensionProjectName('top');
+    nextCanvases[5].name = getVoxelExtensionProjectName('bottom');
+    const activeCanvasId = currentCanvases.find(canvas => canvas?.id === getActiveProjectCanvasDocument()?.id)?.id || nextCanvases[0]?.id || '';
+    voxelExtensionState = normalizeVoxelExtensionState({
+      ...voxelExtensionState,
+      mode: EXTENSION_MODE_VOXEL,
+      previewCanvasId: '',
+      frontCanvasId: nextCanvases[0]?.id || '',
+      backCanvasId: nextCanvases[1]?.id || '',
+      leftCanvasId: nextCanvases[2]?.id || '',
+      rightCanvasId: nextCanvases[3]?.id || '',
+      topCanvasId: nextCanvases[4]?.id || '',
+      bottomCanvasId: nextCanvases[5]?.id || '',
+    }, VOXEL_EXTENSION_DEFAULT_STATE);
+    replaceProjectCanvasDocuments(nextCanvases, activeCanvasId);
+    if (shouldResetLayoutAfterSetup) {
+      requestLocalViewportCanvasLayoutReset({ clearStored: true });
+    }
+    ensureLocalViewportCanvasEntries();
+    bindActiveCanvasSurface(getProjectCanvasSurfaceForIndex(getActiveProjectCanvasIndex()) || mainViewportCanvasSurface);
+    syncVoxelExtensionCanvasIdsFromDocuments();
+    syncVoxelExtensionPreviewFromSource({ updateViewport: false });
+    resizeCanvases({
+      forceRender: false,
+      applyTransform: true,
+      syncControls: true,
+      updateScaleLimits: true,
+    });
+    renderAllProjectCanvasSurfaces();
+    renderFrameList();
+    renderLayerList();
+    renderTimelineMatrix();
+    requestRender();
+    requestOverlayRender();
+    if (trackChange) {
+      markDocumentUnsavedChange();
+      markAutosaveDirty();
+      scheduleAutosaveSnapshot();
+      scheduleSessionPersist();
+    }
+    if (announce) {
+      updateAutosaveStatus(
+        localizeText('ボクセル用6面キャンバスをセットアップしました', 'Voxel 6-face workspace is ready'),
+        'success'
+      );
+    }
+    return true;
+  }
+
+  function setVoxelExtensionModeEnabled(enabled, { announce = true } = {}) {
+    const nextEnabled = Boolean(enabled);
+    if (!nextEnabled) {
+      voxelExtensionState = normalizeVoxelExtensionState({
+        ...voxelExtensionState,
+        mode: EXTENSION_MODE_NONE,
+      }, VOXEL_EXTENSION_DEFAULT_STATE);
+      voxelExtensionPreviewMeta = null;
+      voxelExtensionPreviewPixels = null;
+      voxelExtensionGuideProjections = null;
+      syncVoxelExtensionModeUi();
+      renderFloatingPreviewPanel();
+      syncControlsWithState();
+      markDocumentUnsavedChange();
+      markAutosaveDirty();
+      scheduleAutosaveSnapshot();
+      scheduleSessionPersist();
+      if (announce) {
+        updateAutosaveStatus(localizeText('ボクセルモードをOFFにしました', 'Voxel mode disabled'), 'info');
+      }
+      return true;
+    }
+    return ensureVoxelExtensionCanvasSetup({ announce, trackChange: true });
+  }
+
   function handleLocalViewportCanvasViewportChange() {
     syncLocalViewportCanvasDockVisibility({ persist: false, render: true });
     applyViewportTransform();
@@ -33413,6 +35628,11 @@
   function setupLocalViewportCanvasDock() {
     ensureCanvasSurfaceContexts(mainViewportCanvasSurface);
     bindActiveCanvasSurface(mainViewportCanvasSurface);
+    const mainDragHandle = ensureCanvasSurfaceDragHandle(mainViewportCanvasSurface);
+    if (mainDragHandle instanceof HTMLElement) {
+      mainDragHandle.hidden = true;
+      mainDragHandle.setAttribute('aria-hidden', 'true');
+    }
     if (reconcileProjectCanvasesFromLocalViewportState()) {
       bindActiveCanvasSurface(getProjectCanvasSurfaceForIndex(getActiveProjectCanvasIndex()) || mainViewportCanvasSurface);
     }
@@ -33899,6 +36119,10 @@
       y: clamp(Math.floor(virtualCursor.y), 0, state.height - 1),
     };
     const activeTool = state.tool;
+    if (isVoxelPreviewCanvasId(getActiveProjectCanvasDocument()?.id || '') && activeTool !== 'eyedropper') {
+      announceVoxelPreviewReadonly();
+      return;
+    }
     const layer = getActiveLayer();
     let startedHistory = false;
     let actionPerformed = false;
@@ -34890,6 +37114,11 @@
     pointerState.selectionClearedOnDown = false;
     pointerState.selectionExtendOnDown = false;
     pointerState.startClient = null;
+    pointerState.voxelPreviewYawStart = null;
+    pointerState.voxelPreviewDragWidth = null;
+    pointerState.voxelPreviewPitchStart = null;
+    pointerState.voxelPreviewDragHeight = null;
+    pointerState.voxelPreviewYawChanged = false;
     pointerState.panOrigin = { x: state.pan.x, y: state.pan.y };
     pointerState.panMode = null;
     pointerState.touchPanStart = null;
@@ -34923,6 +37152,11 @@
     pointerState.selectionClearedOnDown = false;
     pointerState.selectionExtendOnDown = false;
     pointerState.startClient = null;
+    pointerState.voxelPreviewYawStart = null;
+    pointerState.voxelPreviewDragWidth = null;
+    pointerState.voxelPreviewPitchStart = null;
+    pointerState.voxelPreviewDragHeight = null;
+    pointerState.voxelPreviewYawChanged = false;
     pointerState.panMode = null;
     pointerState.touchPanStart = null;
     pointerState.touchPinchStartDistance = null;
@@ -34966,6 +37200,9 @@
 
   function shouldDeferInactiveCanvasPointerDown(event, requestedCanvasId = '', activeCanvasId = '') {
     if (state.showVirtualCursor) {
+      return false;
+    }
+    if (isVoxelPreviewCanvasId(requestedCanvasId)) {
       return false;
     }
     if (!requestedCanvasId || requestedCanvasId === activeCanvasId) {
@@ -35090,6 +37327,132 @@
     if (resetPinchFocus) {
       pointerState.touchPinchFocus = getTouchPinchFocusForCentroid(centroid);
     }
+  }
+
+  function getVoxelPreviewDragWidth(surface = null) {
+    const drawing = surface?.drawing instanceof HTMLCanvasElement
+      ? surface.drawing
+      : null;
+    const rect = drawing?.getBoundingClientRect?.();
+    const width = rect && Number.isFinite(rect.width) ? rect.width : 0;
+    return Math.max(96, Math.round(width || VOXEL_EXTENSION_PREVIEW_MAX_EDGE));
+  }
+
+  function getVoxelPreviewDragHeight(surface = null) {
+    const drawing = surface?.drawing instanceof HTMLCanvasElement
+      ? surface.drawing
+      : null;
+    const rect = drawing?.getBoundingClientRect?.();
+    const height = rect && Number.isFinite(rect.height) ? rect.height : 0;
+    return Math.max(96, Math.round(height || VOXEL_EXTENSION_PREVIEW_MAX_EDGE));
+  }
+
+  function startVoxelPreviewRotateInteraction(event, surface) {
+    if (!(surface?.drawing instanceof HTMLCanvasElement)) {
+      return false;
+    }
+    hoverPixel = null;
+    requestOverlayRender();
+    pointerState.active = true;
+    pointerState.pointerId = event.pointerId;
+    pointerState.surface = surface;
+    pointerState.tool = 'voxelPreviewRotate';
+    pointerState.start = null;
+    pointerState.current = null;
+    pointerState.last = null;
+    pointerState.path = [];
+    pointerState.preview = null;
+    pointerState.selectionPreview = null;
+    pointerState.selectionMove = null;
+    pointerState.drawPaletteIndex = null;
+    pointerState.selectionClearedOnDown = false;
+    pointerState.selectionExtendOnDown = false;
+    pointerState.startClient = { x: event.clientX, y: event.clientY };
+    pointerState.voxelPreviewYawStart = normalizeVoxelPreviewYawDegrees(voxelExtensionState.previewYawDeg);
+    pointerState.voxelPreviewPitchStart = normalizeVoxelPreviewPitchDegrees(voxelExtensionState.previewPitchDeg);
+    pointerState.voxelPreviewDragWidth = getVoxelPreviewDragWidth(surface);
+    pointerState.voxelPreviewDragHeight = getVoxelPreviewDragHeight(surface);
+    pointerState.voxelPreviewYawChanged = false;
+    try {
+      surface.drawing.setPointerCapture(event.pointerId);
+    } catch (error) {
+      // Ignore capture failures.
+    }
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    return true;
+  }
+
+  function updateVoxelPreviewYawFromDrag(event) {
+    if (pointerState.tool !== 'voxelPreviewRotate' || event.pointerId !== pointerState.pointerId) {
+      return false;
+    }
+    const dragWidth = Math.max(96, Number(pointerState.voxelPreviewDragWidth) || VOXEL_EXTENSION_PREVIEW_MAX_EDGE);
+    const dragHeight = Math.max(96, Number(pointerState.voxelPreviewDragHeight) || VOXEL_EXTENSION_PREVIEW_MAX_EDGE);
+    const startYaw = normalizeVoxelPreviewYawDegrees(pointerState.voxelPreviewYawStart);
+    const startPitch = normalizeVoxelPreviewPitchDegrees(pointerState.voxelPreviewPitchStart);
+    const deltaX = (Number(event.clientX) || 0) - (Number(pointerState.startClient?.x) || 0);
+    const deltaY = (Number(event.clientY) || 0) - (Number(pointerState.startClient?.y) || 0);
+    const nextYawDeg = normalizeVoxelPreviewYawDegrees(startYaw + ((deltaX / dragWidth) * VOXEL_PREVIEW_DRAG_TURN_DEGREES));
+    const nextPitchDeg = normalizeVoxelPreviewPitchDegrees(
+      startPitch - ((deltaY / dragHeight) * VOXEL_PREVIEW_DRAG_TILT_DEGREES)
+    );
+    if (
+      nextYawDeg === normalizeVoxelPreviewYawDegrees(voxelExtensionState.previewYawDeg)
+      && nextPitchDeg === normalizeVoxelPreviewPitchDegrees(voxelExtensionState.previewPitchDeg)
+    ) {
+      return false;
+    }
+    voxelExtensionState = normalizeVoxelExtensionState({
+      ...voxelExtensionState,
+      previewYawDeg: nextYawDeg,
+      previewPitchDeg: nextPitchDeg,
+    }, VOXEL_EXTENSION_DEFAULT_STATE);
+    pointerState.voxelPreviewYawChanged = true;
+    renderVoxelExtensionPreviewSurfaceNow({ updateViewport: false });
+    requestRender();
+    return true;
+  }
+
+  function finishVoxelPreviewRotateInteraction({ persist = true } = {}) {
+    if (pointerState.pointerId !== null && pointerState.surface?.drawing instanceof HTMLCanvasElement) {
+      try {
+        pointerState.surface.drawing.releasePointerCapture(pointerState.pointerId);
+      } catch (error) {
+        // Ignore capture release failures.
+      }
+    }
+    detachPointerListeners();
+    const yawChanged = Boolean(pointerState.voxelPreviewYawChanged);
+    pointerState.active = false;
+    pointerState.pointerId = null;
+    pointerState.surface = null;
+    pointerState.tool = null;
+    pointerState.start = null;
+    pointerState.current = null;
+    pointerState.last = null;
+    pointerState.path = [];
+    pointerState.preview = null;
+    pointerState.selectionPreview = null;
+    pointerState.selectionMove = null;
+    pointerState.drawPaletteIndex = null;
+    pointerState.selectionClearedOnDown = false;
+    pointerState.selectionExtendOnDown = false;
+    pointerState.startClient = null;
+    pointerState.voxelPreviewYawStart = null;
+    pointerState.voxelPreviewDragWidth = null;
+    pointerState.voxelPreviewPitchStart = null;
+    pointerState.voxelPreviewDragHeight = null;
+    pointerState.voxelPreviewYawChanged = false;
+    if (persist && yawChanged) {
+      markDocumentUnsavedChange();
+      markAutosaveDirty();
+      scheduleAutosaveSnapshot();
+      scheduleSessionPersist();
+    } else if (persist) {
+      scheduleSessionPersist();
+    }
+    requestOverlayRender();
   }
 
   function startPanInteraction(event, { multiTouch = false, captureElement = dom.canvases.drawing } = {}) {
@@ -35293,6 +37656,18 @@
           return;
         }
       }
+    }
+    if (
+      isVoxelPreviewCanvasId(interactionSurface?.canvasDocId || '')
+      && !isSecondaryMouseButton
+      && pointerButton === 0
+      && startVoxelPreviewRotateInteraction(event, interactionSurface)
+    ) {
+      return;
+    }
+    if (isVoxelPreviewCanvasId(interactionSurface?.canvasDocId || '') && activeTool !== 'pan' && activeTool !== 'eyedropper') {
+      announceVoxelPreviewReadonly();
+      return;
     }
     const layer = getActiveLayer();
     const shouldExtendSelection = Boolean(
@@ -35621,6 +37996,14 @@
       }
     }
     if (!pointerState.active) return;
+    if (pointerState.tool === 'voxelPreviewRotate') {
+      if (event.pointerId !== pointerState.pointerId) {
+        return;
+      }
+      event.preventDefault();
+      updateVoxelPreviewYawFromDrag(event);
+      return;
+    }
     if (pointerState.tool === 'pan') {
       if (pointerState.panMode === 'multiTouch') {
         if (activeTouchPointers.size < TOUCH_PAN_MIN_POINTERS) {
@@ -35807,7 +38190,15 @@
     }
     if (!pointerState.active) return;
     const isPanTool = pointerState.tool === 'pan';
+    const isVoxelPreviewRotate = pointerState.tool === 'voxelPreviewRotate';
     const isMultiTouchPan = isPanTool && pointerState.panMode === 'multiTouch';
+    if (isVoxelPreviewRotate) {
+      if (pointerState.pointerId !== event.pointerId) {
+        return;
+      }
+      finishVoxelPreviewRotateInteraction({ persist: true });
+      return;
+    }
     if (isPanTool) {
       if (isMultiTouchPan) {
         if (hasActiveMultiTouch()) {
@@ -35968,6 +38359,12 @@
       return;
     }
     if (!pointerState.active) {
+      return;
+    }
+    if (pointerState.tool === 'voxelPreviewRotate') {
+      if (pointerState.pointerId === event.pointerId) {
+        finishVoxelPreviewRotateInteraction({ persist: true });
+      }
       return;
     }
     if (pointerState.tool === 'pan') {
@@ -40449,7 +42846,10 @@
     if (!dirtyRegion) {
       markCanvasDirty();
     }
-    if (renderScheduled) return;
+    if (renderScheduled) {
+      renderVoxelExtensionPreviewSurfaceNow({ updateViewport: false });
+      return;
+    }
     renderScheduled = true;
     requestAnimationFrame(() => {
       renderScheduled = false;
@@ -40466,6 +42866,9 @@
   function renderCanvas() {
     if (!ctx.drawing) {
       return;
+    }
+    if (isVoxelExtensionModeEnabled()) {
+      syncVoxelExtensionPreviewFromSource({ updateViewport: false });
     }
     const { width, height } = state;
     if (width <= 0 || height <= 0) {
@@ -42625,6 +45028,7 @@
         LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE
       );
     }
+    requestLocalViewportCanvasLayoutReset({ clearStored: true });
     localLayerVisibilityById = deserializeLocalLayerVisibilityMap(
       payload.layerVisibilityById,
       localLayerVisibilityById
