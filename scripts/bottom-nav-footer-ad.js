@@ -1,17 +1,39 @@
 (function () {
-  function bootstrapPixieedAdFree() {
+  function isPixieedrawPageForAds() {
+    try {
+      const pathname = String(window.location.pathname || '').toLowerCase();
+      return /(?:^|\/)pixiedraw(?:\/|\/index\.html)?$/.test(pathname);
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function hasCachedAdFreeForCurrentPage() {
     try {
       const raw = window.localStorage.getItem('pixieed_browser_adfree_cache_v1');
-      if (raw) {
-        const cached = JSON.parse(raw);
+      if (!raw) return false;
+      const cached = JSON.parse(raw);
+      if (cached?.active === true) {
         const expiresAt = typeof cached?.expiresAt === 'string' ? cached.expiresAt : '';
-        const isExpired = expiresAt ? Date.parse(expiresAt) <= Date.now() : false;
-        if (cached?.active === true && !isExpired) {
-          window.__PIXIEED_ADS_DISABLED__ = true;
-        }
+        return !expiresAt || Date.parse(expiresAt) > Date.now();
       }
+      const entitlements = cached?.entitlements;
+      if (!entitlements || typeof entitlements !== 'object') return false;
+      const keys = isPixieedrawPageForAds()
+        ? ['browser_ad_free', 'pixiedraw_ad_free']
+        : ['browser_ad_free'];
+      return keys.some(key => {
+        const expiresAt = typeof entitlements?.[key]?.expiresAt === 'string' ? entitlements[key].expiresAt : '';
+        return entitlements?.[key] && (!expiresAt || Date.parse(expiresAt) > Date.now());
+      });
     } catch (_error) {
-      // ignore cache errors
+      return false;
+    }
+  }
+
+  function bootstrapPixieedAdFree() {
+    if (hasCachedAdFreeForCurrentPage()) {
+      window.__PIXIEED_ADS_DISABLED__ = true;
     }
     if (window.pixieedAdFree || document.querySelector('script[data-pixieed-adfree="true"]')) {
       return;

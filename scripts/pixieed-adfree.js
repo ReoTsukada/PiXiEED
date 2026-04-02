@@ -7,7 +7,8 @@
   const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
   const SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
   const CACHE_KEY = 'pixieed_browser_adfree_cache_v1';
-  const ENTITLEMENT_KEY = 'browser_ad_free';
+  const GLOBAL_ENTITLEMENT_KEY = 'browser_ad_free';
+  const PIXIEDRAW_ENTITLEMENT_KEY = 'pixiedraw_ad_free';
   const CHECKOUT_ENDPOINT = `${SUPABASE_URL}/functions/v1/stripe-browser-adfree-checkout`;
   const AUTO_APPLY_QUERY_KEY = 'stripe_checkout_session_id';
   const AUTO_APPLY_STATUS_KEY = 'stripe_checkout_status';
@@ -29,11 +30,47 @@
     isLoading: false,
     isLoggedIn: false,
     isActive: false,
+    activeEntitlements: {},
     userId: '',
     userEmail: '',
     expiresAt: '',
     lastError: '',
   };
+
+  function isPixieedrawPage() {
+    try {
+      const pathname = String(window.location.pathname || '').toLowerCase();
+      return /(?:^|\/)pixiedraw(?:\/|\/index\.html)?$/.test(pathname);
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function getPageEntitlementKeys() {
+    return isPixieedrawPage()
+      ? [GLOBAL_ENTITLEMENT_KEY, PIXIEDRAW_ENTITLEMENT_KEY]
+      : [GLOBAL_ENTITLEMENT_KEY];
+  }
+
+  function getPurchaseEntitlementKey() {
+    return isPixieedrawPage() ? PIXIEDRAW_ENTITLEMENT_KEY : GLOBAL_ENTITLEMENT_KEY;
+  }
+
+  function isActiveByExpiry(expiresAt) {
+    const normalized = typeof expiresAt === 'string' ? expiresAt : '';
+    if (!normalized) {
+      return true;
+    }
+    const timestamp = Date.parse(normalized);
+    return Number.isFinite(timestamp) && timestamp > Date.now();
+  }
+
+  function isAnyEntitlementActive(entitlements, keys = getPageEntitlementKeys()) {
+    return keys.some(key => {
+      const row = entitlements?.[key];
+      return row && isActiveByExpiry(row.expiresAt);
+    });
+  }
 
   const ready = new Promise(resolve => {
     readyResolver = resolve;
@@ -56,20 +93,34 @@
         return null;
       }
       const parsed = JSON.parse(raw);
-      if (!parsed || parsed.active !== true) {
-        return null;
-      }
-      const expiresAt = typeof parsed.expiresAt === 'string' ? parsed.expiresAt : '';
-      if (expiresAt) {
-        const timestamp = Date.parse(expiresAt);
-        if (Number.isFinite(timestamp) && timestamp <= Date.now()) {
+      if (parsed && parsed.active === true) {
+        const expiresAt = typeof parsed.expiresAt === 'string' ? parsed.expiresAt : '';
+        if (!isActiveByExpiry(expiresAt)) {
           return null;
         }
+        return {
+          entitlements: {
+            [GLOBAL_ENTITLEMENT_KEY]: {
+              expiresAt,
+            },
+          },
+        };
       }
-      return {
-        active: true,
-        expiresAt,
-      };
+      const rawEntitlements = parsed?.entitlements;
+      if (!rawEntitlements || typeof rawEntitlements !== 'object') {
+        return null;
+      }
+      const entitlements = {};
+      Object.entries(rawEntitlements).forEach(([key, value]) => {
+        const expiresAt = typeof value?.expiresAt === 'string' ? value.expiresAt : '';
+        if (isActiveByExpiry(expiresAt)) {
+          entitlements[key] = { expiresAt };
+        }
+      });
+      if (!Object.keys(entitlements).length) {
+        return null;
+      }
+      return { entitlements };
     } catch (_error) {
       return null;
     }
@@ -77,10 +128,16 @@
 
   function writeCachedState() {
     try {
-      if (state.isActive) {
+      const entitlements = {};
+      Object.entries(state.activeEntitlements || {}).forEach(([key, value]) => {
+        const expiresAt = typeof value?.expiresAt === 'string' ? value.expiresAt : '';
+        if (isActiveByExpiry(expiresAt)) {
+          entitlements[key] = { expiresAt };
+        }
+      });
+      if (Object.keys(entitlements).length) {
         window.localStorage.setItem(CACHE_KEY, JSON.stringify({
-          active: true,
-          expiresAt: state.expiresAt || '',
+          entitlements,
           savedAt: Date.now(),
         }));
       } else {
@@ -92,7 +149,7 @@
   }
 
   function isEntitlementActive(row) {
-    if (!row || row.entitlement_key !== ENTITLEMENT_KEY) {
+    if (!row || ![GLOBAL_ENTITLEMENT_KEY, PIXIEDRAW_ENTITLEMENT_KEY].includes(row.entitlement_key)) {
       return false;
     }
     if (row.revoked_at || (row.status && row.status !== 'active')) {
@@ -163,7 +220,7 @@
   function buildPurchaseUrl() {
     try {
       const url = new URL(CHECKOUT_ENDPOINT);
-      url.searchParams.set('product', ENTITLEMENT_KEY);
+      url.searchParams.set('product', getPurchaseEntitlementKey());
       url.searchParams.set('return_url', buildCheckoutReturnUrl());
       url.searchParams.set('cancel_url', buildCheckoutReturnUrl());
       if (state.isLoggedIn && state.userEmail) {
@@ -338,6 +395,7 @@
       isReady: state.isReady,
       isLoggedIn: state.isLoggedIn,
       isActive: state.isActive,
+      activeEntitlements: state.activeEntitlements,
       userId: state.userId,
       userEmail: state.userEmail,
       expiresAt: state.expiresAt,
@@ -381,21 +439,32 @@
     state.isLoggedIn = Boolean(state.userId);
     if (!state.userId) {
       state.isActive = false;
+      state.activeEntitlements = {};
       state.userEmail = '';
       state.expiresAt = '';
       return;
     }
-    const { data: row, error } = await supabase
+    const { data: rows, error } = await supabase
       .from('user_entitlements')
       .select('user_id, entitlement_key, status, expires_at, revoked_at')
       .eq('user_id', state.userId)
-      .eq('entitlement_key', ENTITLEMENT_KEY)
-      .maybeSingle();
+      .in('entitlement_key', [GLOBAL_ENTITLEMENT_KEY, PIXIEDRAW_ENTITLEMENT_KEY]);
     if (error) {
       throw error;
     }
-    state.isActive = isEntitlementActive(row || null);
-    state.expiresAt = typeof row?.expires_at === 'string' ? row.expires_at : '';
+    const activeEntitlements = {};
+    (Array.isArray(rows) ? rows : []).forEach(row => {
+      if (isEntitlementActive(row || null)) {
+        activeEntitlements[row.entitlement_key] = {
+          expiresAt: typeof row?.expires_at === 'string' ? row.expires_at : '',
+        };
+      }
+    });
+    state.activeEntitlements = activeEntitlements;
+    state.isActive = isAnyEntitlementActive(activeEntitlements);
+    const activeKeys = getPageEntitlementKeys();
+    const activeRow = activeKeys.map(key => activeEntitlements[key]).find(Boolean) || null;
+    state.expiresAt = typeof activeRow?.expiresAt === 'string' ? activeRow.expiresAt : '';
   }
 
   async function refresh() {
@@ -410,6 +479,7 @@
         await fetchEntitlement();
       } catch (error) {
         state.isActive = false;
+        state.activeEntitlements = {};
         state.expiresAt = '';
         state.lastError = String(error?.message || error || 'adfree fetch failed');
       } finally {
@@ -578,6 +648,7 @@
       isReady: state.isReady,
       isLoggedIn: state.isLoggedIn,
       isActive: state.isActive,
+      activeEntitlements: state.activeEntitlements,
       userId: state.userId,
       userEmail: state.userEmail,
       expiresAt: state.expiresAt,
@@ -603,8 +674,11 @@
 
   const cached = readCachedState();
   if (cached) {
-    state.isActive = true;
-    state.expiresAt = cached.expiresAt || '';
+    state.activeEntitlements = cached.entitlements || {};
+    state.isActive = isAnyEntitlementActive(state.activeEntitlements);
+    const activeKeys = getPageEntitlementKeys();
+    const activeRow = activeKeys.map(key => state.activeEntitlements[key]).find(Boolean) || null;
+    state.expiresAt = typeof activeRow?.expiresAt === 'string' ? activeRow.expiresAt : '';
     applyDomState();
   }
 

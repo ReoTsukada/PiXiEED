@@ -1,11 +1,18 @@
 (function() {
   try {
+    const pathname = String(window.location.pathname || '').toLowerCase();
+    const isPixieedrawPage = /(?:^|\/)pixiedraw(?:\/|\/index\.html)?$/.test(pathname);
     const raw = window.localStorage.getItem('pixieed_browser_adfree_cache_v1');
     if (raw) {
       const cached = JSON.parse(raw);
-      const expiresAt = typeof cached?.expiresAt === 'string' ? cached.expiresAt : '';
-      const isExpired = expiresAt ? Date.parse(expiresAt) <= Date.now() : false;
-      if (cached?.active === true && !isExpired) {
+      const entitlements = cached?.entitlements;
+      const keys = isPixieedrawPage ? ['browser_ad_free', 'pixiedraw_ad_free'] : ['browser_ad_free'];
+      const hasScopedEntitlement = keys.some(key => {
+        const expiresAt = typeof entitlements?.[key]?.expiresAt === 'string' ? entitlements[key].expiresAt : '';
+        return entitlements?.[key] && (!expiresAt || Date.parse(expiresAt) > Date.now());
+      });
+      const legacyActive = cached?.active === true && (!cached?.expiresAt || Date.parse(cached.expiresAt) > Date.now());
+      if (legacyActive || hasScopedEntitlement) {
         window.__PIXIEED_ADS_DISABLED__ = true;
       }
     }

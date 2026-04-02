@@ -7,16 +7,25 @@ const PRODUCTS: Record<string, {
   priceEnv: string;
   source: string;
   appendSessionParams: boolean;
+  mode: "payment" | "subscription";
 }> = {
   browser_ad_free: {
     priceEnv: "PIXIEED_STRIPE_BROWSER_ADFREE_PRICE_ID",
     source: "pixieed_browser_adfree",
     appendSessionParams: true,
+    mode: "payment",
+  },
+  pixiedraw_ad_free: {
+    priceEnv: "PIXIEED_STRIPE_PIXIEDRAW_ADFREE_PRICE_ID",
+    source: "pixiedraw_adfree_support",
+    appendSessionParams: true,
+    mode: "subscription",
   },
   support_tip: {
     priceEnv: "PIXIEED_STRIPE_SUPPORT_TIP_PRICE_ID",
     source: "pixieed_support_tip",
     appendSessionParams: false,
+    mode: "payment",
   },
 };
 
@@ -146,7 +155,7 @@ serve(async (request) => {
 
   try {
     const session = await stripe.checkout.sessions.create({
-      mode: "payment",
+      mode: product.mode,
       line_items: [
         {
           price: priceId,

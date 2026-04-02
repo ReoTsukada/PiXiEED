@@ -9,6 +9,10 @@ const HANDLED_EVENT_TYPES = new Set([
   "checkout.session.async_payment_failed",
 ]);
 const PAID_STATUSES = new Set(["paid", "completed", "confirmed", "fulfilled"]);
+const ENTITLEMENT_BY_PRODUCT: Record<string, string> = {
+  browser_ad_free: "browser_ad_free",
+  pixiedraw_ad_free: "pixiedraw_ad_free",
+};
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -128,7 +132,8 @@ serve(async (request) => {
 
   const session = event.data.object as Stripe.Checkout.Session;
   const productKey = pickProductKey(session);
-  if (productKey !== "browser_ad_free") {
+  const entitlementKey = ENTITLEMENT_BY_PRODUCT[productKey];
+  if (!entitlementKey) {
     return json({ ok: true, ignored: true, reason: "product mismatch", eventType: event.type });
   }
 
@@ -192,12 +197,15 @@ serve(async (request) => {
     } catch (error) {
       return json({ ok: false, error: String(error?.message || error || "code generation failed") }, 500);
     }
-    const durationDays = Math.max(1, Math.min(3650, Number(Deno.env.get("PIXIEED_BROWSER_ADFREE_DURATION_DAYS") || "31")));
+    const durationEnv = productKey === "pixiedraw_ad_free"
+      ? "PIXIEED_STRIPE_PIXIEDRAW_ADFREE_DURATION_DAYS"
+      : "PIXIEED_BROWSER_ADFREE_DURATION_DAYS";
+    const durationDays = Math.max(1, Math.min(3650, Number(Deno.env.get(durationEnv) || "31")));
     const { error: codeError } = await supabase
       .from("user_entitlement_codes")
       .insert({
         code,
-        entitlement_key: "browser_ad_free",
+        entitlement_key: entitlementKey,
         duration_days: durationDays,
         max_redemptions: 1,
         redemption_count: 0,

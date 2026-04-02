@@ -1,11 +1,17 @@
 {
-  "generatedAt": "2026-04-02T20:55:03.156Z",
+  "generatedAt": "2026-04-02T21:29:20.430Z",
   "projects": [
     {
       "id": "site",
       "name": "PiXiEED 全体",
       "url": "/index.html",
       "entries": [
+        {
+          "date": "2026-04-03",
+          "items": [
+            "画面 / ドキュメント / 構成 / 画像を更新"
+          ]
+        },
         {
           "date": "2026-03-22",
           "items": [
@@ -47,12 +53,6 @@
           "items": [
             "画面を更新"
           ]
-        },
-        {
-          "date": "2026-03-06",
-          "items": [
-            "SEO / 画面を更新"
-          ]
         }
       ]
     },
@@ -61,6 +61,12 @@
       "name": "PiXiEEDraw",
       "url": "/projects/pixiedraw/",
       "entries": [
+        {
+          "date": "2026-04-03",
+          "items": [
+            "ドキュメント / スタイル / 画像 / 機能を更新"
+          ]
+        },
         {
           "date": "2026-03-23",
           "items": [
@@ -102,12 +108,6 @@
           "items": [
             "ドキュメント / 画面 / 機能 / 画像を更新"
           ]
-        },
-        {
-          "date": "2026-03-11",
-          "items": [
-            "画面 / 機能 / スタイル / ドキュメントを更新"
-          ]
         }
       ]
     },
@@ -116,6 +116,12 @@
       "name": "PiXiEEDraw Lite",
       "url": "/projects/jerin-maker/",
       "entries": [
+        {
+          "date": "2026-04-03",
+          "items": [
+            "画面を更新"
+          ]
+        },
         {
           "date": "2026-03-21",
           "items": [
@@ -157,12 +163,6 @@
           "items": [
             "画面を更新"
           ]
-        },
-        {
-          "date": "2026-02-18",
-          "items": [
-            "画面を更新"
-          ]
         }
       ]
     },
@@ -171,6 +171,12 @@
       "name": "PiXiEELENS",
       "url": "/projects/pixiee-lens/",
       "entries": [
+        {
+          "date": "2026-04-03",
+          "items": [
+            "画面を更新"
+          ]
+        },
         {
           "date": "2026-03-21",
           "items": [
@@ -212,12 +218,6 @@
           "items": [
             "画面 / 構成を更新"
           ]
-        },
-        {
-          "date": "2026-02-18",
-          "items": [
-            "画面を更新"
-          ]
         }
       ]
     },
@@ -226,6 +226,12 @@
       "name": "QRコードメーカー",
       "url": "/projects/qr-maker/",
       "entries": [
+        {
+          "date": "2026-04-03",
+          "items": [
+            "画面を更新"
+          ]
+        },
         {
           "date": "2026-03-21",
           "items": [
@@ -267,12 +273,6 @@
           "items": [
             "画面を更新"
           ]
-        },
-        {
-          "date": "2026-02-11",
-          "items": [
-            "画面を更新"
-          ]
         }
       ]
     },
@@ -281,6 +281,12 @@
       "name": "PiXFiND",
       "url": "/projects/pixfind/",
       "entries": [
+        {
+          "date": "2026-04-03",
+          "items": [
+            "画面 / スタイルを更新"
+          ]
+        },
         {
           "date": "2026-03-21",
           "items": [
@@ -322,12 +328,6 @@
           "items": [
             "画面 / スタイル / 機能を更新"
           ]
-        },
-        {
-          "date": "2026-02-17",
-          "items": [
-            "画面 / スタイル / 機能を更新"
-          ]
         }
       ]
     },
@@ -336,6 +336,12 @@
       "name": "魔王様!!いつまでよければいいですか!?",
       "url": "/projects/maoitu/",
       "entries": [
+        {
+          "date": "2026-04-03",
+          "items": [
+            "画面を更新"
+          ]
+        },
         {
           "date": "2026-03-21",
           "items": [
@@ -377,12 +383,6 @@
           "items": [
             "画面を更新"
           ]
-        },
-        {
-          "date": "2026-02-07",
-          "items": [
-            "画面を更新"
-          ]
         }
       ]
     },
@@ -391,6 +391,12 @@
       "name": "魔王奪還戦",
       "url": "/projects/maou-war/",
       "entries": [
+        {
+          "date": "2026-04-03",
+          "items": [
+            "画面を更新"
+          ]
+        },
         {
           "date": "2026-03-21",
           "items": [
@@ -432,17 +438,64 @@
           "items": [
             "画面を更新"
           ]
-        },
-        {
-          "date": "2026-02-10",
-          "items": [
-            "画面 / 画像を更新"
-          ]
         }
       ]
     }
   ],
   "recentByDate": [
+    {
+      "date": "2026-04-03",
+      "updates": [
+        {
+          "id": "pixfind",
+          "name": "PiXFiND",
+          "url": "/projects/pixfind/",
+          "summary": "画面 / スタイルを更新"
+        },
+        {
+          "id": "site",
+          "name": "PiXiEED 全体",
+          "url": "/index.html",
+          "summary": "画面 / ドキュメント / 構成 / 画像を更新"
+        },
+        {
+          "id": "pixiedraw",
+          "name": "PiXiEEDraw",
+          "url": "/projects/pixiedraw/",
+          "summary": "ドキュメント / スタイル / 画像 / 機能を更新"
+        },
+        {
+          "id": "pixiedraw-lite",
+          "name": "PiXiEEDraw Lite",
+          "url": "/projects/jerin-maker/",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "pixiee-lens",
+          "name": "PiXiEELENS",
+          "url": "/projects/pixiee-lens/",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "qr-maker",
+          "name": "QRコードメーカー",
+          "url": "/projects/qr-maker/",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "maou-war",
+          "name": "魔王奪還戦",
+          "url": "/projects/maou-war/",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "maoitu",
+          "name": "魔王様!!いつまでよければいいですか!?",
+          "url": "/projects/maoitu/",
+          "summary": "画面を更新"
+        }
+      ]
+    },
     {
       "date": "2026-03-23",
       "updates": [
@@ -625,17 +678,6 @@
           "name": "PiXiEEDraw",
           "url": "/projects/pixiedraw/",
           "summary": "ドキュメント / 画面 / 機能 / 画像を更新"
-        }
-      ]
-    },
-    {
-      "date": "2026-03-11",
-      "updates": [
-        {
-          "id": "pixiedraw",
-          "name": "PiXiEEDraw",
-          "url": "/projects/pixiedraw/",
-          "summary": "画面 / 機能 / スタイル / ドキュメントを更新"
         }
       ]
     }
