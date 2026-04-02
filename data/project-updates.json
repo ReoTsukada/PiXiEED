@@ -1,0 +1,643 @@
+{
+  "generatedAt": "2026-04-02T11:47:27.785Z",
+  "projects": [
+    {
+      "id": "site",
+      "name": "PiXiEED 全体",
+      "url": "/index.html",
+      "entries": [
+        {
+          "date": "2026-03-22",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-03-21",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-03-20",
+          "items": [
+            "画面 / 機能を更新"
+          ]
+        },
+        {
+          "date": "2026-03-15",
+          "items": [
+            "機能 / 画面 / SEO / ドキュメントを更新"
+          ]
+        },
+        {
+          "date": "2026-03-09",
+          "items": [
+            "画面 / ドキュメント / SEOを更新"
+          ]
+        },
+        {
+          "date": "2026-03-08",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-03-07",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-03-06",
+          "items": [
+            "SEO / 画面を更新"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pixiedraw",
+      "name": "PiXiEEDraw",
+      "url": "/projects/pixiedraw/",
+      "entries": [
+        {
+          "date": "2026-03-23",
+          "items": [
+            "画面 / 機能を更新"
+          ]
+        },
+        {
+          "date": "2026-03-22",
+          "items": [
+            "画面 / 機能 / スタイルを更新"
+          ]
+        },
+        {
+          "date": "2026-03-21",
+          "items": [
+            "画面 / 機能を更新"
+          ]
+        },
+        {
+          "date": "2026-03-20",
+          "items": [
+            "機能 / 画面 / スタイルを更新"
+          ]
+        },
+        {
+          "date": "2026-03-15",
+          "items": [
+            "画面 / 機能 / スタイルを更新"
+          ]
+        },
+        {
+          "date": "2026-03-14",
+          "items": [
+            "ドキュメント / 画面 / 機能 / スタイルを更新"
+          ]
+        },
+        {
+          "date": "2026-03-12",
+          "items": [
+            "ドキュメント / 画面 / 機能 / 画像を更新"
+          ]
+        },
+        {
+          "date": "2026-03-11",
+          "items": [
+            "画面 / 機能 / スタイル / ドキュメントを更新"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pixiedraw-lite",
+      "name": "PiXiEEDraw Lite",
+      "url": "/projects/jerin-maker/",
+      "entries": [
+        {
+          "date": "2026-03-21",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-03-15",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-03-10",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-03-09",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-27",
+          "items": [
+            "ドキュメント / 画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-21",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-19",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-18",
+          "items": [
+            "画面を更新"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pixiee-lens",
+      "name": "PiXiEELENS",
+      "url": "/projects/pixiee-lens/",
+      "entries": [
+        {
+          "date": "2026-03-21",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-03-20",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-03-15",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-03-09",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-25",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-21",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-19",
+          "items": [
+            "画面 / 構成を更新"
+          ]
+        },
+        {
+          "date": "2026-02-18",
+          "items": [
+            "画面を更新"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "qr-maker",
+      "name": "QRコードメーカー",
+      "url": "/projects/qr-maker/",
+      "entries": [
+        {
+          "date": "2026-03-21",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-03-15",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-03-09",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-21",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-19",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-17",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-12",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-11",
+          "items": [
+            "画面を更新"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pixfind",
+      "name": "PiXFiND",
+      "url": "/projects/pixfind/",
+      "entries": [
+        {
+          "date": "2026-03-21",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-03-20",
+          "items": [
+            "機能を更新"
+          ]
+        },
+        {
+          "date": "2026-03-15",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-03-10",
+          "items": [
+            "スタイル / 機能を更新"
+          ]
+        },
+        {
+          "date": "2026-03-01",
+          "items": [
+            "スタイルを更新"
+          ]
+        },
+        {
+          "date": "2026-02-21",
+          "items": [
+            "機能を更新"
+          ]
+        },
+        {
+          "date": "2026-02-19",
+          "items": [
+            "画面 / スタイル / 機能を更新"
+          ]
+        },
+        {
+          "date": "2026-02-17",
+          "items": [
+            "画面 / スタイル / 機能を更新"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "maoitu",
+      "name": "魔王様!!いつまでよければいいですか!?",
+      "url": "/projects/maoitu/",
+      "entries": [
+        {
+          "date": "2026-03-21",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-03-15",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-19",
+          "items": [
+            "画面 / 機能を更新"
+          ]
+        },
+        {
+          "date": "2026-02-17",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-12",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-11",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-10",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-07",
+          "items": [
+            "画面を更新"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "maou-war",
+      "name": "魔王奪還戦",
+      "url": "/projects/maou-war/",
+      "entries": [
+        {
+          "date": "2026-03-21",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-03-14",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-03-09",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-19",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-17",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-14",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-12",
+          "items": [
+            "画面を更新"
+          ]
+        },
+        {
+          "date": "2026-02-10",
+          "items": [
+            "画面 / 画像を更新"
+          ]
+        }
+      ]
+    }
+  ],
+  "recentByDate": [
+    {
+      "date": "2026-03-23",
+      "updates": [
+        {
+          "id": "pixiedraw",
+          "name": "PiXiEEDraw",
+          "url": "/projects/pixiedraw/",
+          "summary": "画面 / 機能を更新"
+        }
+      ]
+    },
+    {
+      "date": "2026-03-22",
+      "updates": [
+        {
+          "id": "site",
+          "name": "PiXiEED 全体",
+          "url": "/index.html",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "pixiedraw",
+          "name": "PiXiEEDraw",
+          "url": "/projects/pixiedraw/",
+          "summary": "画面 / 機能 / スタイルを更新"
+        }
+      ]
+    },
+    {
+      "date": "2026-03-21",
+      "updates": [
+        {
+          "id": "pixfind",
+          "name": "PiXFiND",
+          "url": "/projects/pixfind/",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "site",
+          "name": "PiXiEED 全体",
+          "url": "/index.html",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "pixiedraw",
+          "name": "PiXiEEDraw",
+          "url": "/projects/pixiedraw/",
+          "summary": "画面 / 機能を更新"
+        },
+        {
+          "id": "pixiedraw-lite",
+          "name": "PiXiEEDraw Lite",
+          "url": "/projects/jerin-maker/",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "pixiee-lens",
+          "name": "PiXiEELENS",
+          "url": "/projects/pixiee-lens/",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "qr-maker",
+          "name": "QRコードメーカー",
+          "url": "/projects/qr-maker/",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "maou-war",
+          "name": "魔王奪還戦",
+          "url": "/projects/maou-war/",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "maoitu",
+          "name": "魔王様!!いつまでよければいいですか!?",
+          "url": "/projects/maoitu/",
+          "summary": "画面を更新"
+        }
+      ]
+    },
+    {
+      "date": "2026-03-20",
+      "updates": [
+        {
+          "id": "pixfind",
+          "name": "PiXFiND",
+          "url": "/projects/pixfind/",
+          "summary": "機能を更新"
+        },
+        {
+          "id": "site",
+          "name": "PiXiEED 全体",
+          "url": "/index.html",
+          "summary": "画面 / 機能を更新"
+        },
+        {
+          "id": "pixiedraw",
+          "name": "PiXiEEDraw",
+          "url": "/projects/pixiedraw/",
+          "summary": "機能 / 画面 / スタイルを更新"
+        },
+        {
+          "id": "pixiee-lens",
+          "name": "PiXiEELENS",
+          "url": "/projects/pixiee-lens/",
+          "summary": "画面を更新"
+        }
+      ]
+    },
+    {
+      "date": "2026-03-15",
+      "updates": [
+        {
+          "id": "pixfind",
+          "name": "PiXFiND",
+          "url": "/projects/pixfind/",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "site",
+          "name": "PiXiEED 全体",
+          "url": "/index.html",
+          "summary": "機能 / 画面 / SEO / ドキュメントを更新"
+        },
+        {
+          "id": "pixiedraw",
+          "name": "PiXiEEDraw",
+          "url": "/projects/pixiedraw/",
+          "summary": "画面 / 機能 / スタイルを更新"
+        },
+        {
+          "id": "pixiedraw-lite",
+          "name": "PiXiEEDraw Lite",
+          "url": "/projects/jerin-maker/",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "pixiee-lens",
+          "name": "PiXiEELENS",
+          "url": "/projects/pixiee-lens/",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "qr-maker",
+          "name": "QRコードメーカー",
+          "url": "/projects/qr-maker/",
+          "summary": "画面を更新"
+        },
+        {
+          "id": "maoitu",
+          "name": "魔王様!!いつまでよければいいですか!?",
+          "url": "/projects/maoitu/",
+          "summary": "画面を更新"
+        }
+      ]
+    },
+    {
+      "date": "2026-03-14",
+      "updates": [
+        {
+          "id": "pixiedraw",
+          "name": "PiXiEEDraw",
+          "url": "/projects/pixiedraw/",
+          "summary": "ドキュメント / 画面 / 機能 / スタイルを更新"
+        },
+        {
+          "id": "maou-war",
+          "name": "魔王奪還戦",
+          "url": "/projects/maou-war/",
+          "summary": "画面を更新"
+        }
+      ]
+    },
+    {
+      "date": "2026-03-12",
+      "updates": [
+        {
+          "id": "pixiedraw",
+          "name": "PiXiEEDraw",
+          "url": "/projects/pixiedraw/",
+          "summary": "ドキュメント / 画面 / 機能 / 画像を更新"
+        }
+      ]
+    },
+    {
+      "date": "2026-03-11",
+      "updates": [
+        {
+          "id": "pixiedraw",
+          "name": "PiXiEEDraw",
+          "url": "/projects/pixiedraw/",
+          "summary": "画面 / 機能 / スタイル / ドキュメントを更新"
+        }
+      ]
+    }
+  ]
+}
