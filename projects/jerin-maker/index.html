@@ -1,546 +1,247 @@
 <!DOCTYPE html>
-
 <html lang="ja">
 <head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
-<title>PiXiEEDraw Lite（ピクドラ） | 16×16ドット絵・ピクセルアート作成</title>
-<meta content="16×16固定の超シンプルなブラウザ向けドット絵ツール。ジェリンプレビュー付きで、ピクセルアートをすぐ描いてPNG保存できます。" name="description"/>
-<meta content="ドット絵,ピクセルアート,16×16,ブラウザ,PNG,ピクドラ,PiXiEEDraw Lite" name="keywords"/>
-<meta content="index,follow" name="robots"/>
-<link href="https://pixieed.jp/jerin-maker/" rel="canonical"/>
-<meta content="PiXiEEDraw Lite（ピクドラ） | 16×16ドット絵・ピクセルアート作成" property="og:title"/>
-<meta content="16×16固定の超シンプルなブラウザ向けドット絵ツール。ジェリンプレビュー付きで、ピクセルアートをすぐ描いてPNG保存できます。" property="og:description"/>
-<meta content="website" property="og:type"/>
-<meta content="https://pixieed.jp/jerin-maker/" property="og:url"/>
-<meta content="https://pixieed.jp/jerin-maker/ogp-app.png" property="og:image"/>
-<meta content="https://pixieed.jp/jerin-maker/ogp-app.png" property="og:image:secure_url"/>
-<meta content="image/png" property="og:image:type"/>
-<meta content="1260" property="og:image:width"/>
-<meta content="840" property="og:image:height"/>
-<meta content="PiXiEEDraw Lite（ピクドラ）" property="og:image:alt"/>
-<meta content="PiXiEED" property="og:site_name"/>
-<meta content="ja_JP" property="og:locale"/>
-<meta content="summary_large_image" name="twitter:card"/>
-<meta content="@PiXiEED_arta" name="twitter:site"/>
-<meta content="https://pixieed.jp/jerin-maker/" name="twitter:url"/>
-<meta content="PiXiEEDraw Lite（ピクドラ） | 16×16ドット絵・ピクセルアート作成" name="twitter:title"/>
-<meta content="16×16固定の超シンプルなブラウザ向けドット絵ツール。ジェリンプレビュー付きで、ピクセルアートをすぐ描いてPNG保存できます。" name="twitter:description"/>
-<meta content="https://pixieed.jp/jerin-maker/ogp-app.png" name="twitter:image"/>
-<meta content="PiXiEEDraw Lite（ピクドラ）" name="twitter:image:alt"/>
-<meta content="#0b1224" name="theme-color"/>
-<script type="application/ld+json">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>PiXiEEDraw Lite | 軽量で始めやすいドット絵ツール</title>
+  <meta name="description" content="PiXiEEDraw Liteは、16x16中心ですぐ描き始められる軽量ドット絵ツールです。スマホ対応、登録不要、短時間制作向けの特徴や使い方を1ページで確認できます。">
+  <link rel="canonical" href="https://pixieed.jp/projects/jerin-maker/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PiXiEED">
+  <meta property="og:title" content="PiXiEEDraw Lite | 軽量で始めやすいドット絵ツール">
+  <meta property="og:description" content="PiXiEEDraw Liteは、16x16中心ですぐ描き始められる軽量ドット絵ツールです。スマホ対応、登録不要、短時間制作向けの特徴や使い方を1ページで確認できます。">
+  <meta property="og:url" content="https://pixieed.jp/projects/jerin-maker/">
+  <meta property="og:image" content="https://pixieed.jp/jerin-maker/ogp-app.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PiXiEEDraw Lite | 軽量で始めやすいドット絵ツール">
+  <meta name="twitter:description" content="PiXiEEDraw Liteは、16x16中心ですぐ描き始められる軽量ドット絵ツールです。スマホ対応、登録不要、短時間制作向けの特徴や使い方を1ページで確認できます。">
+  <meta name="twitter:image" content="https://pixieed.jp/jerin-maker/ogp-app.png">
+  <link rel="icon" type="image/png" href="../../character-dots/mao1.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="../../site/landing.css">
+  <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@graph": [
       {
+        "@type": "WebPage",
+        "name": "PiXiEEDraw Lite",
+        "url": "https://pixieed.jp/projects/jerin-maker/",
+        "description": "PiXiEEDraw Liteは、16x16中心ですぐ描き始められる軽量ドット絵ツールです。スマホ対応、登録不要、短時間制作向けの特徴や使い方を1ページで確認できます。"
+      },
+      {
         "@type": "SoftwareApplication",
-        "name": "PiXiEEDraw Lite（ピクドラ）",
-        "applicationCategory": "DesignApplication",
+        "name": "PiXiEEDraw Lite",
+        "applicationCategory": "WebApplication",
         "operatingSystem": "Web",
-        "url": "https://pixieed.jp/jerin-maker/",
-        "image": "https://pixieed.jp/jerin-maker/ogp-app.png",
-        "description": "16×16固定の超シンプルなブラウザ向けドット絵ツール。ジェリンプレビュー付きで、ピクセルアートをすぐ描いてPNG保存できます。",
-        "offers": {
-          "@type": "Offer",
-          "price": "0",
-          "priceCurrency": "JPY",
-          "availability": "https://schema.org/InStock"
-        },
-        "publisher": {
-          "@type": "Organization",
-          "name": "PiXiEED",
-          "url": "https://pixieed.jp/"
-        }
+        "url": "https://pixieed.jp/projects/jerin-maker/",
+        "description": "PiXiEEDraw Liteは、16x16中心ですぐ描き始められる軽量ドット絵ツールです。スマホ対応、登録不要、短時間制作向けの特徴や使い方を1ページで確認できます。"
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "PiXiEED", "item": "https://pixieed.jp/" },
+          { "@type": "ListItem", "position": 2, "name": "プロジェクト", "item": "https://pixieed.jp/#projects" },
+          { "@type": "ListItem", "position": 3, "name": "PiXiEEDraw Lite", "item": "https://pixieed.jp/projects/jerin-maker/" }
+        ]
       },
       {
         "@type": "FAQPage",
         "mainEntity": [
-          {
-            "@type": "Question",
-            "name": "キャンバスサイズは変更できますか？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "基本は16×16pxで、8/16/32pxに切り替えできます。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "保存方法は？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "PNG（640px拡大書き出し）で保存できます。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "PiXiEEDrawとの違いは？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "Liteは描画とPNG書き出しに絞った軽量版です。レイヤーや自動保存などはPiXiEEDrawで提供しています。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "スマホでも使えますか？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "ブラウザで利用できるため、PC・スマホに対応しています。Chrome/Safari/Edgeでの利用を推奨しています。"
-            }
-          }
+          { "@type": "Question", "name": "PiXiEEDrawとの違いは？", "acceptedAnswer": { "@type": "Answer", "text": "Liteは軽さと始めやすさを優先しています。複数キャンバスや展開制作はPiXiEEDraw向きです。" } },
+          { "@type": "Question", "name": "スマホでも使えますか？", "acceptedAnswer": { "@type": "Answer", "text": "使えます。" } },
+          { "@type": "Question", "name": "登録は必要ですか？", "acceptedAnswer": { "@type": "Answer", "text": "不要です。" } }
         ]
       }
     ]
   }
   </script>
-<script async crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
-<!-- Google tag (gtag.js) -->
-<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
-<script>
-  const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
-  const GA_PAGE_PATH = '/projects/jerin-maker/';
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', GA_MEASUREMENT_ID, {
-    page_path: GA_PAGE_PATH,
-    page_title: document.title
-  });
-  </script>
-<link href="https://fonts.googleapis.com" rel="preconnect"/>
-<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet"/>
-<link href="../../styles.css" rel="stylesheet"/>
-<link rel="icon" type="image/png" sizes="192x192" href="../../icon/icon-192-5.png"/>
-<link rel="icon" type="image/png" sizes="512x512" href="../../icon/icon-512-5.png"/>
-<style id="ads-safe">
-  html, body {
-    max-width: 100vw;
-    overflow-x: hidden;
-  }
-  .adsbygoogle,
-  ins.adsbygoogle {
-    display: block !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    margin: 0 auto;
-    box-sizing: border-box;
-    overflow: hidden;
-  }
-  .adsbygoogle iframe,
-  ins.adsbygoogle iframe {
-    display: block;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-  }
-
-  /* global-overflow-guard */
-  .ad-block,
-  .ad-card,
-  .ad-footer,
-  .project-ad,
-  .entry-ad-slot,
-  .puzzle-ad-slot,
-  .game-ad,
-  .card--ad {
-    width: min(100%, 720px) !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    box-sizing: border-box;
-    overflow: hidden;
-  }
-  .ad-slot,
-  .ad-block ins.adsbygoogle,
-  .ad-footer ins,
-  .entry-ad-slot ins,
-  .puzzle-ad-slot ins.adsbygoogle,
-  .game-ad ins.adsbygoogle {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    box-sizing: border-box;
-    min-height: clamp(48px, 9vw, 60px) !important;
-    height: clamp(48px, 9vw, 60px) !important;
-    overflow: hidden !important;
-  }
-  .page,
-  main,
-  .card,
-  .section,
-  .panel,
-  .shell {
-    min-width: 0;
-    max-width: 100%;
-  }
-</style>
-  <style id="interaction-guard">
-    * {
-      -webkit-touch-callout: none;
-      -webkit-user-drag: none;
-      -webkit-user-select: none;
-      -ms-user-select: none;
-      user-select: none;
-    }
-    input,
-    textarea,
-    [contenteditable] {
-      -webkit-user-select: none;
-      -ms-user-select: none;
-      user-select: none;
-    }
-  </style>
-  <script id="interaction-guard-js">
-    document.addEventListener('contextmenu', (event) => {
-      event.preventDefault();
-    });
-    document.addEventListener('dragstart', (event) => {
-      event.preventDefault();
-    });
-  </script>
-  
-<script id="ads-lazy">
-  (function() {
-    if (window.pixieedObserveAds) return;
-
-    const SLOT_SEQUENCE = ['2141591954','9073878884','2261515379'];
-    const SLOT_KEY = 'pixieedAdSlotIndex';
-    const LOAD_TIMEOUT_MS = 10000;
-    const READY_POLL_MS = 250;
-
-    let slotIndex = 0;
-    let activeAd = null;
-    let readyTimer = null;
-    const queue = [];
-
-    const readSlotIndex = () => {
-      try {
-        const stored = sessionStorage.getItem(SLOT_KEY);
-        if (stored !== null) slotIndex = Number(stored) || 0;
-      } catch (err) {}
-    };
-
-    const storeSlotIndex = () => {
-      try {
-        sessionStorage.setItem(SLOT_KEY, String(slotIndex));
-      } catch (err) {}
-    };
-
-    readSlotIndex();
-
-    const nextSlot = () => {
-      if (!SLOT_SEQUENCE.length) return '';
-      const slot = SLOT_SEQUENCE[slotIndex % SLOT_SEQUENCE.length];
-      slotIndex += 1;
-      storeSlotIndex();
-      return slot;
-    };
-
-    const isReady = (ins) => (
-      ins.getAttribute('data-adsbygoogle-status') === 'done' ||
-      ins.getAttribute('data-ad-status') === 'filled'
-    );
-
-    const isEnqueued = (ins) => ins.dataset.adsQueueEnqueued === '1';
-    const isLoading = (ins) => ins.dataset.adsQueueLoading === '1';
-    const isLoaded = (ins) => ins.dataset.adsLazyLoaded === '1' || isReady(ins);
-
-    const assignSlot = (ins) => {
-      if (!ins || !(ins instanceof HTMLElement)) return;
-      if (ins.dataset.adSlotAssigned === '1') return;
-      const existingSlot = ins.getAttribute('data-ad-slot');
-      if (existingSlot && existingSlot !== 'rotate') {
-        ins.dataset.adSlotAssigned = '1';
-        return;
-      }
-      if (ins.dataset.adStatic === '1') {
-        ins.dataset.adSlotAssigned = '1';
-        return;
-      }
-      const slot = nextSlot();
-      if (slot) {
-        ins.setAttribute('data-ad-slot', slot);
-      }
-      ins.dataset.adSlotAssigned = '1';
-    };
-
-    const clearReadyTimer = () => {
-      if (!readyTimer) return;
-      clearTimeout(readyTimer);
-      readyTimer = null;
-    };
-
-    const releaseActiveAd = () => {
-      clearReadyTimer();
-      if (!activeAd) return;
-      activeAd.dataset.adsQueueLoading = '';
-      activeAd.dataset.adsQueueEnqueued = '';
-      activeAd.dataset.adsLazyLoaded = '1';
-      activeAd = null;
-      processQueue();
-    };
-
-    const waitUntilReady = (ins, startedAt) => {
-      if (!activeAd || activeAd !== ins) return;
-      if (!document.contains(ins) || isReady(ins) || (Date.now() - startedAt) >= LOAD_TIMEOUT_MS) {
-        releaseActiveAd();
-        return;
-      }
-      readyTimer = setTimeout(() => waitUntilReady(ins, startedAt), READY_POLL_MS);
-    };
-
-    const loadAd = (ins) => {
-      if (!ins || !(ins instanceof HTMLElement)) return false;
-      if (isLoaded(ins) || isLoading(ins)) return true;
-      assignSlot(ins);
-      ins.dataset.adsQueueLoading = '1';
-      ins.dataset.adsLazyLoaded = '1';
-      try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-      } catch (err) {
-        ins.dataset.adsQueueLoading = '';
-        ins.dataset.adsLazyLoaded = '';
-        return false;
-      }
-      return true;
-    };
-
-    const enqueueAd = (ins) => {
-      if (!ins || !(ins instanceof HTMLElement)) return;
-      if (isLoaded(ins) || isLoading(ins) || isEnqueued(ins)) return;
-      assignSlot(ins);
-      ins.dataset.adsQueueEnqueued = '1';
-      queue.push(ins);
-    };
-
-    function processQueue() {
-      if (activeAd) return;
-      while (queue.length) {
-        const ins = queue.shift();
-        if (!ins || !(ins instanceof HTMLElement)) continue;
-        if (!document.contains(ins)) continue;
-        ins.dataset.adsQueueEnqueued = '';
-        if (isLoaded(ins)) {
-          ins.dataset.adsLazyLoaded = '1';
-          continue;
-        }
-        activeAd = ins;
-        const startedAt = Date.now();
-        if (!loadAd(ins)) {
-          activeAd = null;
-          setTimeout(() => {
-            if (!document.contains(ins) || isLoaded(ins)) return;
-            enqueueAd(ins);
-            processQueue();
-          }, 1200);
-          return;
-        }
-        waitUntilReady(ins, startedAt);
-        return;
-      }
-    }
-
-    const observeAds = (root) => {
-      const scope = root && root.querySelectorAll ? root : document;
-      scope.querySelectorAll('ins.adsbygoogle').forEach(enqueueAd);
-      processQueue();
-    };
-
-    window.pixieedObserveAds = observeAds;
-
-    const setupQueue = () => {
-      observeAds(document);
-    };
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', setupQueue);
-    } else {
-      setupQueue();
-    }
-
-    const mo = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          if (!(node instanceof HTMLElement)) return;
-          if (node.matches && node.matches('ins.adsbygoogle')) {
-            enqueueAd(node);
-            return;
-          }
-          if (node.querySelectorAll) {
-            node.querySelectorAll('ins.adsbygoogle').forEach(enqueueAd);
-          }
-        });
-      });
-      processQueue();
-    });
-
-    const startObserver = () => {
-      if (!document.body) return;
-      mo.observe(document.body, { childList: true, subtree: true });
-    };
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', startObserver);
-    } else {
-      startObserver();
-    }
-  })();
-</script>
-<link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
 </head>
-<body class="project-page">
-<main>
-<section class="project-ad project-ad--top">
-<div style="position:relative;">
-<ins class="adsbygoogle"
-     style="display:block"
-     data-ad-client="ca-pub-9801602250480253"
-     data-ad-slot="2141591954"></ins>
-</div>
-<script>if (window.pixieedObserveAds) { window.pixieedObserveAds(); }</script>
-</section>
-<section class="hero" id="overview">
-<div class="project-visual project-visual--hero">
-<img alt="PiXiEEDraw Lite のプレビュー" loading="lazy" src="../../icon/icon-192-5.png" data-media="icon"/>
-</div>
-<div class="hero-copy">
-<p class="project-update" data-last-updated="">
-<span class="project-update__label">最終更新</span>
-<time class="project-update__value" datetime="">--</time>
-</p>
-<div class="project-actions hero-cta">
-<a class="cta-primary" href="../../jerin-maker/index.html" rel="noopener" target="_blank">PiXiEEDraw Liteを開く</a>
-<a class="cta-secondary" href="../../tools.html">他のゲーム・ツール</a>
-</div>
-<h1>PiXiEEDraw Lite（ピクドラ）</h1>
-<p>16×16のキャンバスで、シンプルにドットを描ける軽量ツールです。ジェリンのプレビューも用意しつつ、PiXiEEDrawとは別実装のライト版としてブラウザですぐ動きます。</p>
-</div>
-</section>
-<section class="section" id="updates">
-<div class="section-inner">
-<div class="project-note">
-<strong>更新メモ</strong>
-<ul class="project-note__list">
-<li>更新内容は準備中です。</li>
-</ul>
-<div class="project-note__actions">
-<a class="cta-secondary" href="../../notes/index.html">開発ノートまとめへ</a>
-</div>
-</div>
-</div>
-</section>
-<section class="section section--accent" id="workbench">
-<div class="section-inner">
-<h2>ブラウザ上ですぐ描ける</h2>
-<p>キャンバスは16×16pxで固定（8/16/32px切り替えも可能）。描画・消しゴム・グリッド・PNG書き出しに絞り、専用ページで軽快に動作します。</p>
-<div class="project-actions hero-cta" style="margin:1rem 0 0;">
-<a class="cta-primary" href="../../jerin-maker/index.html" rel="noopener" target="_blank">PiXiEEDraw Liteを開く</a>
-</div>
-<ol class="project-howto">
-<li>専用ページでキャンバス上をクリック/ドラッグして描画。ガイド線は常時オンです。</li>
-<li>パレットかカラーピッカーで色を選び、右クリックまたはAlt/Optionで消しゴムに切り替えられます。</li>
-<li>「PNGを書き出す」で640pxに拡大書き出し。ジェリンの下絵を表示して上から塗ることもできます。</li>
-</ol>
-</div>
-</section>
-<section class="project-ad project-ad--mid">
-<ins class="adsbygoogle"
-     style="display:block"
-     data-ad-client="ca-pub-9801602250480253"
-     data-ad-slot="9073878884"
-     data-ad-format="auto"
-     data-full-width-responsive="true"></ins>
-<small class="project-ad__label">広告</small>
-<script>if (window.pixieedObserveAds) { window.pixieedObserveAds(); }</script>
-</section>
-<section class="section" id="details">
-<div class="section-inner">
-<h2>プリセット仕様</h2>
-<div class="project-meta-grid">
-<dl class="project-meta">
-<dt>キャンバス</dt>
-<dd>16×16 px 固定（8/16/32切替可）/ グリッド常時表示</dd>
-</dl>
-<dl class="project-meta">
-<dt>エンジン</dt>
-<dd>PiXiEEDraw Lite（シンプル描画・ジェリンプレビュー）</dd>
-</dl>
-<dl class="project-meta">
-<dt>書き出し</dt>
-<dd>PNG（640px拡大書き出し）</dd>
-</dl>
-<dl class="project-meta">
-<dt>利用推奨</dt>
-<dd>Chrome / Safari / Edge（ブラウザ版・インストール不要）</dd>
-</dl>
-</div>
-<p class="project-howto__note">ブラウザの自動保存には対応していません。必要に応じてPNGを書き出して保存してください。</p>
-</div>
-</section>
-<section class="section" id="faq">
-<div class="section-inner">
-<h2>よくある質問</h2>
-<div class="project-meta-grid project-faq-grid">
-<dl class="project-meta">
-<dt>キャンバスサイズは変更できますか？</dt>
-<dd>基本は16×16pxで、8/16/32pxに切り替えできます。</dd>
-</dl>
-<dl class="project-meta">
-<dt>保存方法は？</dt>
-<dd>PNG（640px拡大書き出し）で保存できます。</dd>
-</dl>
-<dl class="project-meta">
-<dt>PiXiEEDrawとの違いは？</dt>
-<dd>Liteは描画とPNG書き出しに絞った軽量版です。レイヤーや自動保存などはPiXiEEDrawで提供しています。</dd>
-</dl>
-<dl class="project-meta">
-<dt>スマホでも使えますか？</dt>
-<dd>ブラウザで利用できるため、PC・スマホに対応しています。Chrome/Safari/Edgeでの利用を推奨しています。</dd>
-</dl>
-</div>
-</div>
-</section>
-<section class="project-ad project-ad--bottom">
-<ins class="adsbygoogle"
-     style="display:block"
-     data-ad-client="ca-pub-9801602250480253"
-     data-ad-slot="rotate"
-     data-ad-format="auto"
-     data-full-width-responsive="true"></ins>
-<small class="project-ad__label">広告</small>
-<script>if (window.pixieedObserveAds) { window.pixieedObserveAds(); }</script>
-</section>
-</main>
-<footer>
-<p>© <span id="year"></span> PiXiEED. All rights reserved.</p>
-<div class="footer-links">
-<a href="../../terms/index.html">利用規約</a>
-<a href="../../privacy/index.html">プライバシーポリシー</a>
-</div>
-</footer>
-<nav class="bottom-nav">
-  <a class="bottom-nav__item" data-tab="home" href="../../index.html">
-    <span class="icon"><img src="../../FooterIcon1.png" alt=""/></span><span>ホーム</span>
-  </a>
-  <a class="bottom-nav__item" data-tab="contest" href="../../contest/index.html">
-    <span class="icon"><img src="../../FooterIcon2.png" alt=""/></span><span>コンテスト</span>
-  </a>
+<body>
+  <header class="site-header" aria-label="top-nav">
+    <div class="header-inner header-inner--app">
+      <button class="brand" id="openProfilePanel" type="button">
+        <span class="brand-icon" id="brandAvatar">
+          <img src="../../character-dots/mao1.png" alt="logo">
+        </span>
+        <div class="brand-text">
+          <p class="brand-title">PiXiEED</p>
+          <p class="brand-sub" id="brandUser">ユーザー</p>
+        </div>
+      </button>
+      <div class="header-actions">
+        <a class="support-tip-link" id="supportTipLink" href="#" target="_blank" rel="noopener noreferrer" aria-label="PiXiEEDの応援チップを購入">応援チップ</a>
+      </div>
+    </div>
+  </header>
+<div class="page">
+  
+  <main class="page-shell">
+    <section class="section">
+      <div class="section__inner project-hero">
+        <div class="project-summary">
+          <p class="eyebrow">project</p>
+          <h1 class="section-title">PiXiEEDraw Lite</h1>
+          <p class="section-copy">短時間ですぐ描ける軽量ドット絵ツール</p>
+          <div class="project-tags"><span>1ページ完結紹介</span><span>スマホ対応</span><span>PiXiEED</span></div>
+          <div class="hero__actions">
+            <a class="button" href="../../jerin-maker/index.html">使ってみる</a>
+            <a class="button-secondary" href="../../contest/index.html">広場を見る</a>
+          </div>
+        </div>
+        <div class="project-hero__media"><img src="../../assets/screenshots/pixieedraw-lite-ui.png" alt="PiXiEEDraw Liteの画面"></div>
+      </div>
+    </section>
 
-  <a class="bottom-nav__item" data-tab="tools" href="../../tools.html">
-    <span class="icon"><img src="../../FooterIcon3.png" alt=""/></span><span>ツール/ゲーム</span>
-  </a>
-    <a class="bottom-nav__item" data-tab="lens" href="../../pixiee-lens/index.html">
-      <span class="icon"><img src="../../FooterIcon5.png" alt=""/></span><span>PiXiEELENS</span>
-    </a>
-  <a class="bottom-nav__item" data-tab="portfolio" href="../../portfolio/index.html">
-    <span class="icon"><img src="../../FooterIcon4.png" alt=""/></span><span>企業向け</span>
-  </a>
-</nav>
-<script src="../../scripts.js"></script>
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">overview</p>
+        <h2 class="section-title">概要</h2>
+        <p class="section-copy">PiXiEEDraw Liteは、重い機能を増やさず、すぐ描き始めるための軽量版ドット絵ツールです。</p><p class="section-copy">短時間の作業や、初めてドット絵を触る人の入口として向いています。</p><p class="section-copy">複雑な説明ページを増やさず、この紹介ページだけで理解できる形にしています。</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">features</p>
+        <h2 class="section-title">主な特徴</h2>
+        <div class="meta-grid"><article class="info-card"><h3>起動してすぐ描ける</h3><p class="card-copy">説明を挟みすぎず、最初の一枚をすぐ作れます。</p></article><article class="info-card"><h3>軽量で分かりやすい</h3><p class="card-copy">必要最小限の構成で迷いにくくしています。</p></article><article class="info-card"><h3>スマホでも扱いやすい</h3><p class="card-copy">縦画面でも読みやすく、操作量が少ない構成です。</p></article><article class="info-card"><h3>PNG保存に向く</h3><p class="card-copy">小さな作品をすぐ出力したい時に向きます。</p></article></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">scenes</p>
+        <h2 class="section-title">利用シーン</h2>
+        <ul class="bullet-list"><li>SNS用の小さなアイコンを作りたい時</li><li>短時間で1枚だけ描きたい時</li><li>ドット絵の入口として試したい時</li></ul>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">how to use</p>
+        <h2 class="section-title">使い方</h2>
+        <ol class="steps"><li>Liteを開く</li><li>色を選ぶ</li><li>そのまま描く</li><li>PNGで保存する</li></ol>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">samples</p>
+        <h2 class="section-title">サンプル</h2>
+        <div class="gallery-grid"><article class="sample-card"><img src="../../jerin-maker/ogp-app.png" alt="PiXiEEDraw Liteの紹介ビジュアル"><h3>紹介ビジュアル</h3><p class="card-copy">ツール全体の印象がすぐ伝わる OGP 画像です。</p></article><article class="sample-card"><img src="../../assets/screenshots/generated/jerin-maker-editor.png" alt="PiXiEEDraw Liteの描き始め画面"><h3>そのまま描ける画面</h3><p class="card-copy">最初の1枚を迷わず始められる、シンプルな実画面です。</p></article><article class="sample-card"><img src="../../assets/screenshots/generated/jerin-maker-color.png" alt="PiXiEEDraw Liteの色調整画面"><h3>色を決める調整画面</h3><p class="card-copy">配色を整えながら、見た目の方向性をすぐ詰められる実画面です。</p></article></div>
+      </div>
+    </section>
+
+    <section class="section" aria-label="広告">
+      <div class="section__inner">
+        <div class="card ad-banner">
+          <p class="ad-banner__label">広告</p>
+          <ins class="adsbygoogle"
+               style="display:block"
+               data-ad-client="ca-pub-9801602250480253"
+               data-ad-slot="rotate"
+               data-ad-format="auto"
+               data-full-width-responsive="true"></ins>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">faq</p>
+        <h2 class="section-title">FAQ</h2>
+        <div class="faq-card"><details><summary>PiXiEEDrawとの違いは？</summary><p>Liteは軽さと始めやすさを優先しています。複数キャンバスや展開制作はPiXiEEDraw向きです。</p></details><details><summary>スマホでも使えますか？</summary><p>使えます。</p></details><details><summary>登録は必要ですか？</summary><p>不要です。</p></details></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">links</p>
+        <h2 class="section-title">関連導線</h2>
+        <div class="link-grid related-tool-grid"><article class="link-card related-tool-card"><div class="related-tool-card__head"><span class="related-tool-card__icon"><img src="../../icon/icon-192-4.png" alt="PiXiEEDraw"></span><div><p class="meta-label">ツール</p><h3>PiXiEEDrawを見る</h3></div></div><p class="meta-copy">本格的な編集や追加機能が必要な場合はPiXiEEDrawへ進めます。</p><div class="inline-actions"><a class="button-secondary" href="../../projects/pixiedraw/index.html">PiXiEEDrawを見る</a></div></article><article class="link-card related-tool-card"><div class="related-tool-card__head"><span class="related-tool-card__icon"><img src="../../FooterIcon2.png" alt="広場"></span><div><p class="meta-label">広場</p><h3>広場を見る</h3></div></div><p class="meta-copy">軽量版で作った作品も広場の作品群と並べて確認できます。</p><div class="inline-actions"><a class="button-secondary" href="../../contest/index.html">広場を見る</a></div></article><article class="link-card related-tool-card"><div class="related-tool-card__head"><span class="related-tool-card__icon"><img src="../../pixiedraw/assets/icons/talk.png" alt="会話"></span><div><p class="meta-label">会話</p><h3>会話（準備中）</h3></div></div><p class="meta-copy">会話ページはまだ公開していません。準備ができるまでお待ちください。</p><div class="inline-actions"><a class="button-secondary" href="#" aria-disabled="true" onclick="return false;">会話（準備中）</a></div></article><article class="link-card related-tool-card"><div class="related-tool-card__head"><span class="related-tool-card__icon"><img src="../../FooterIcon4.png" alt="企業"></span><div><p class="meta-label">企業</p><h3>企業相談</h3></div></div><p class="meta-copy">法人向けの制作依頼や導入相談へ直接進める導線です。</p><div class="inline-actions"><a class="button-secondary" href="../../portfolio/index.html">企業相談</a></div></article></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">cta</p>
+        <h2 class="section-title">次の行動</h2>
+        <p class="section-copy">このページだけで何ができるか、誰向けか、どう始めるかが分かるようにしています。次は実際に開くか、広場で作品を見るか、相談するかのどれかに進めます。</p>
+        <div class="hero__actions">
+          <a class="button" href="../../jerin-maker/index.html">使ってみる</a>
+          <a class="button-secondary" href="../../contest/index.html">投稿を見る</a>
+          <a class="button-secondary" href="../../portfolio/index.html">企業相談</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+<footer>
+    <p>© <span id="year">2026</span> PiXiEED. All rights reserved.</p>
+    <div class="footer-links">
+      <a href="#" aria-disabled="true" onclick="return false;">会話</a>
+      <a href="../../portfolio/index.html">企業</a>
+      <a href="../../terms/index.html">利用規約</a>
+      <a href="../../privacy/index.html">プライバシーポリシー</a>
+    </div>
+  </footer>
+
+<nav class="bottom-nav" aria-label="下部ナビ">
+      <a class="bottom-nav__item" data-tab="home" href="../../index.html">
+        <span class="icon"><img src="../../FooterIcon1.png" alt=""></span><span>ホーム</span>
+      </a>
+      <a class="bottom-nav__item" data-tab="contest" href="../../contest/index.html">
+        <span class="icon"><img src="../../FooterIcon2.png" alt=""></span><span>広場</span>
+      </a>
+      <a class="bottom-nav__item" data-tab="talk" href="#" aria-disabled="true" onclick="return false;">
+        <span class="icon"><img src="../../pixiedraw/assets/icons/talk.png" alt=""></span><span>会話</span>
+      </a>
+      <a class="bottom-nav__item" data-tab="portfolio" href="../../portfolio/index.html">
+        <span class="icon"><img src="../../FooterIcon4.png" alt=""></span><span>企業</span>
+      </a>
+  </nav>
+
+  <script src="../../scripts/bottom-nav-footer-ad.js"></script>
+  <script>
+    const year = document.getElementById('year');
+    if (year) year.textContent = new Date().getFullYear();
+  </script>
+  <div class="auth-panel" id="authPanel" aria-hidden="true">
+    <div class="auth-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <h3 style="margin:0;font-size:16px;color:#f9fafb;">プロフィール</h3>
+        <button class="close-btn" type="button" id="closeAuthPanel">閉じる</button>
+      </div>
+      <div class="profile-block">
+        <div class="profile-row">
+          <button class="avatar-toggle" id="avatarToggle" type="button" aria-label="アイコンを変更" aria-expanded="false" aria-controls="avatarPanel">
+            <span class="avatar-toggle__img" id="avatarPreview"></span>
+          </button>
+          <label class="profile-name">
+            <span style="font-weight:700; color:#e5e7eb;">ニックネーム</span>
+            <input class="auth-input" id="profileNickname" type="text" placeholder="なまえ" maxlength="32">
+          </label>
+        </div>
+        <div class="avatar-panel" id="avatarPanel" hidden>
+          <div class="avatar-grid" id="avatarGrid"></div>
+        </div>
+        <label class="profile-name">
+          <span style="font-weight:700; color:#e5e7eb;">X (旧Twitter)</span>
+          <input class="auth-input" id="profileX" type="url" placeholder="https://x.com/username" maxlength="200" inputmode="url">
+        </label>
+        <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
+        <p class="auth-status" id="authStatus"></p>
+      </div>
+    </div>
+  </div>
+  <script src="../../scripts/ads-lazy.js"></script>
+  <script src="../../scripts/shared-profile-header.js"></script>
+  <script src="../../scripts/pixieed-dot-stats.js"></script>
+  <script src="../../scripts/shared-bottom-nav.js"></script>
+  <script src="../../scripts/pixel-art-fit.js"></script>
 </body>
 </html>

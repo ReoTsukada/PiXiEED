@@ -7,9 +7,6 @@
 <title>PiXiEED | 企業向けポートフォリオ・ドット絵とキャラクター</title>
 <meta content="PiXiEED（アルタ）の企業向けポートフォリオ。ドット絵作品、オリジナルキャラクター、アニメーション、ブラウザ演出の実績と提供サービスをまとめています。" name="description"/>
 <link href="https://pixieed.jp/portfolio/" rel="canonical"/>
-<link rel="alternate" hreflang="ja" href="https://pixieed.jp/portfolio/"/>
-<link rel="alternate" hreflang="en" href="https://pixieed.jp/en/portfolio/"/>
-<link rel="alternate" hreflang="x-default" href="https://pixieed.jp/portfolio/"/>
 <meta content="website" property="og:type"/>
 <meta content="PiXiEED" property="og:site_name"/>
 <meta content="PiXiEED | 企業向けポートフォリオ・ドット絵とキャラクター" property="og:title"/>
@@ -125,27 +122,6 @@
     align-items:center;
     gap:8px;
   }
-  .lang-switch{
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    min-width:42px;
-    min-height:32px;
-    padding:4px 10px;
-    border-radius:999px;
-    border:1px solid rgba(255,255,255,0.22);
-    background:rgba(255,255,255,0.06);
-    color:#f9fafb;
-    text-decoration:none;
-    font-weight:800;
-    font-size:12px;
-    letter-spacing:0.04em;
-  }
-  .lang-switch:hover,
-  .lang-switch:focus-visible{
-    background:rgba(255,255,255,0.14);
-    color:#ffffff;
-  }
   h1{ margin:0; font-size:24px; letter-spacing:0.02em; color:#f9fafb; }
   h2{ margin:0; font-size:18px; color:#f9fafb; letter-spacing:0.01em; }
   p{ margin:0; }
@@ -245,6 +221,12 @@
     border:1px solid rgba(255,255,255,0.18);
     background:transparent;
   }
+  .cta-download{
+    color:#f9fafb;
+    border:1px solid rgba(96, 165, 250, 0.38);
+    background:linear-gradient(135deg, rgba(59,130,246,0.28), rgba(14,165,233,0.22));
+    box-shadow:0 8px 20px rgba(14, 165, 233, 0.16);
+  }
   .bottom-nav{
     position:fixed;
     bottom:0;
@@ -312,7 +294,22 @@
     border:1px solid rgba(255,255,255,0.12);
     background:rgba(255,255,255,0.04);
   }
-  .dot-gallery__viewer,
+  .dot-gallery__viewer{
+    position:relative;
+    width:100%;
+    aspect-ratio:1 / 1;
+    min-height:0;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,0.12);
+    background:
+      radial-gradient(circle at 25% 20%, rgba(96, 165, 250, 0.16), rgba(15, 23, 42, 0.22)),
+      linear-gradient(180deg, rgba(15,23,42,0.18), rgba(2,6,23,0.66));
+    overflow:hidden;
+    display:grid;
+    place-items:center;
+    padding:0;
+    box-sizing:border-box;
+  }
   .character-preview__frame{
     position:relative;
     width:100%;
@@ -325,7 +322,7 @@
     overflow:hidden;
     display:grid;
     place-items:center;
-    padding:14px;
+    padding:0;
     box-sizing:border-box;
   }
   .dot-gallery__viewer img,
@@ -333,6 +330,7 @@
     width:100%;
     height:100%;
     object-fit:contain;
+    object-position:center;
     display:block;
     image-rendering:pixelated;
     image-rendering:crisp-edges;
@@ -340,9 +338,9 @@
   .dot-gallery__buttons,
   .character-preview__buttons{
     display:flex;
-    gap:10px;
+    gap:0;
     overflow-x:auto;
-    padding:8px 2px 10px;
+    padding:0;
     -webkit-overflow-scrolling:touch;
     scroll-snap-type:x proximity;
   }
@@ -361,21 +359,20 @@
     flex:0 0 auto;
     border:1px solid rgba(255,255,255,0.14);
     background:rgba(10,16,32,0.84);
-    border-radius:12px;
-    padding:8px;
+    border-radius:0;
+    padding:0;
     color:#e5e7eb;
     cursor:pointer;
     transition:transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
     scroll-snap-align:center;
-  }
-  .dot-gallery__button{
     width:96px;
     min-width:96px;
+    aspect-ratio:1 / 1;
+    overflow:hidden;
+    display:block;
   }
   .character-sprite{
-    width:96px;
-    min-width:96px;
-    min-height:120px;
+    min-height:0;
   }
   .dot-gallery__button:hover,
   .dot-gallery__button:focus-visible,
@@ -394,21 +391,26 @@
   .dot-gallery__button img,
   .character-sprite img{
     width:100%;
-    aspect-ratio:1 / 1;
+    height:100%;
     object-fit:contain;
+    object-position:center;
     image-rendering:pixelated;
     image-rendering:crisp-edges;
     display:block;
   }
-  .character-sprite{
-    display:grid;
-    gap:6px;
-  }
   .character-sprite span{
-    font-size:11px;
-    line-height:1.3;
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:0;
+    margin:0;
+    padding:4px 6px;
+    font-size:10px;
+    line-height:1.2;
     text-align:center;
-    color:#cbd5e1;
+    color:#f9fafb;
+    background:linear-gradient(180deg, rgba(2,6,23,0), rgba(2,6,23,0.86));
+    pointer-events:none;
   }
   .dot-gallery__button[data-unseen="true"]::after,
   .character-sprite[data-unseen="true"]::after{
@@ -689,7 +691,7 @@
   }
   @media (min-width: 860px){
     .portfolio-hero{
-      grid-template-columns:minmax(0, 1.05fr) minmax(340px, 0.95fr);
+      grid-template-columns:minmax(0, 0.9fr) minmax(420px, 1.1fr);
     }
     .character-preview{
       grid-template-columns:minmax(260px, 0.9fr) minmax(280px, 1.1fr);
@@ -723,7 +725,6 @@
 <link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
 </head>
 <body class="with-bottom-nav">
-<div class="page">
 <header aria-label="top-nav">
 <div class="header-inner">
 <button class="brand" id="openProfilePanel" type="button" aria-label="プロフィールを開く">
@@ -734,10 +735,11 @@
 </div>
 </button>
 <div class="header-tools">
-  <a class="lang-switch" href="../en/portfolio/index.html" lang="en" hreflang="en" aria-label="Switch to English">EN</a>
 </div>
 </div>
 </header>
+<div class="page">
+
 <main class="section section--highlight">
 <section class="section section--highlight" id="showcase">
 <div class="section-inner">
@@ -760,6 +762,9 @@
     <p class="section-eyebrow">Dot Showcase</p>
     <h2>ドット絵ギャラリー</h2>
     <p>静止画とアニメーションを切り替えながら、制作テイストの確認に使えます。</p>
+    <div class="hero-cta">
+      <a class="cta-secondary cta-download" href="../portfolio/dots-upscaled.zip" download="PiXiEED-portfolio-dots-upscaled.zip">拡大版をダウンロード</a>
+    </div>
     <div class="dot-gallery__viewer">
       <img alt="" id="dotGalleryMain" loading="lazy" src=""/>
     </div>
@@ -778,7 +783,7 @@
     </div>
     <div aria-live="polite" class="character-preview">
       <div class="character-preview__frame">
-        <img alt="" hidden id="characterGalleryMain" loading="lazy" src=""/>
+        <img alt="" data-pixel-art-max-scale="20" hidden id="characterGalleryMain" loading="lazy" src=""/>
         <div class="character-preview__placeholder" id="characterGalleryPlaceholder">
           <small id="characterPlaceholderMeta">差し替え待ち</small>
         </div>
@@ -878,15 +883,11 @@
     <a class="bottom-nav__item" data-tab="contest" href="../contest/index.html">
       <span class="icon"><img src="../FooterIcon2.png" alt=""/></span><span>広場</span>
     </a>
-
-    <a class="bottom-nav__item" data-tab="tools" href="../tools.html">
-      <span class="icon"><img src="../FooterIcon3.png" alt=""/></span><span>ツール/ゲーム</span>
+    <a class="bottom-nav__item" data-tab="talk" href="#" aria-disabled="true" onclick="return false;">
+      <span class="icon"><img src="../pixiedraw/assets/icons/talk.png" alt=""/></span><span>会話</span>
     </a>
-    <a class="bottom-nav__item" data-tab="lens" href="../pixiee-lens/index.html">
-      <span class="icon"><img src="../FooterIcon5.png" alt=""/></span><span>PiXiEELENS</span>
-    </a>
-<a class="bottom-nav__item is-active" data-tab="portfolio" href="./index.html">
-      <span class="icon"><img src="../FooterIcon4.png" alt=""/></span><span>企業向け</span>
+<a class="bottom-nav__item is-active" data-tab="portfolio" href="../portfolio/index.html">
+      <span class="icon"><img src="../FooterIcon4.png" alt=""/></span><span>企業</span>
     </a>
   </nav>
   <div class="auth-panel" id="authPanel" aria-hidden="true">
@@ -1337,7 +1338,10 @@
 <script src="../scripts/gallery.js"></script>
 <script src="../character-dots/manifest.js"></script>
 <script src="../scripts/character-gallery.js"></script>
+<script src="../scripts/shared-profile-header.js"></script>
 <script src="../scripts/pixieed-dot-stats.js"></script>
 </div>
+  <script src="../scripts/shared-bottom-nav.js"></script>
+  <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>

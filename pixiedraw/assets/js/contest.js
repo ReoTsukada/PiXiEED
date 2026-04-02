@@ -27,6 +27,7 @@ const POST_QUEUE_LIMIT = 20;
 const POST_QUEUE_RETRY_MS = 60000;
 const NAME_DISPLAY_ID = 'contestNameDisplay';
 const NICKNAME_KEY = 'pixieed_nickname';
+const CONTEST_DETAIL_PAGE = './contest-view.html';
 
 let clientId = null;
 let likedEntries = new Set();
@@ -981,19 +982,15 @@ function renderEntries(entries){
   entries.forEach(entry => {
     const item = document.createElement('div');
     item.className = 'entry-card';
+    const liked = likedEntries.has(entry.id);
     item.innerHTML = `
-      <div class="entry-imgwrap"><img src="${resolveEntryThumb(entry)}" alt="${entry.title}" loading="lazy" decoding="async"></div>
-      <div class="entry-meta">
-        <div class="entry-meta__top">
-          <span class="entry-title">${escapeHtml(entry.title || '無題')}</span>
-          <span class="entry-like">❤ ${entry.likeCount || 0}</span>
+      <a class="entry-link" href="${CONTEST_DETAIL_PAGE}?id=${encodeURIComponent(entry.id)}" aria-label="${escapeHtml((entry.title || '無題') + ' の詳細を開く')}">
+        <div class="entry-imgwrap"><img src="${resolveEntryThumb(entry)}" alt="${escapeHtml(entry.title || '無題')}" loading="lazy" decoding="async"></div>
+        <div class="entry-like-overlay ${liked ? 'is-liked' : ''}" aria-label="いいね ${entry.likeCount || 0}">
+          <span>${liked ? '♥' : '♡'}</span>
+          <span>${entry.likeCount || 0}</span>
         </div>
-        <p class="entry-author">by ${escapeHtml(entry.name || '名無し')}</p>
-        <p class="entry-info">${entry.width}x${entry.height} / ${entry.colors}色</p>
-        <button class="like-btn" data-id="${entry.id}" ${likedEntries.has(entry.id) ? 'disabled' : ''}>
-          ${likedEntries.has(entry.id) ? 'いいね済み' : 'いいね'}
-        </button>
-      </div>
+      </a>
     `;
     gallery.appendChild(item);
   });
@@ -1001,9 +998,6 @@ function renderEntries(entries){
     img.addEventListener('error', () => {
       img.src = placeholderSrc;
     });
-  });
-  gallery.querySelectorAll('.like-btn').forEach(btn => {
-    btn.addEventListener('click', () => likeEntry(Number(btn.dataset.id)));
   });
 }
 

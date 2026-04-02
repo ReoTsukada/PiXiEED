@@ -2681,7 +2681,7 @@
 <button class="option-button camera-settings__reset" id="cameraSettingsResetBtn" type="button">設定をリセット</button>
 <div aria-label="ページ移動" class="camera-settings__navigation" role="group">
 <a class="option-button camera-settings__link--home" href="../index.html">ホームへ</a>
-<a class="option-button camera-settings__link--tools" href="../tools.html">他ツール一覧</a>
+<a class="option-button camera-settings__link--tools" href="../index.html#projects">他ツール一覧</a>
 </div>
 </div>
 </div>
@@ -2941,9 +2941,10 @@
     const LENS_AD_CLIENT = 'ca-pub-9801602250480253';
     const LENS_AD_FALLBACK_SLOT = '2141591954';
     const LENS_BROWSER_FALLBACK_URL = 'https://pixieed.jp/projects/pixiee-lens/?open_lens=1';
-    const CAMERA_READY_TIMEOUT_MS = 5000;
+    const CAMERA_READY_TIMEOUT_MS = 8000;
     const CAMERA_REQUEST_TIMEOUT_MS = 7000;
     const CAMERA_PLAY_TIMEOUT_MS = 5000;
+    const CAMERA_BACKGROUND_STOP_DELAY_MS = 1200;
     const CAPTURE_LONG_PRESS_MS = 360;
     const GIF_CAPTURE_DEFAULT_FPS = 10;
     const GIF_CAPTURE_FPS_OPTIONS = Object.freeze([5, 8, 10, 20, 30]);
@@ -3055,7 +3056,6 @@
         handleCameraStartRequest();
       };
       cameraStartButton.addEventListener('click', triggerCameraStart);
-      cameraStartButton.addEventListener('touchend', triggerCameraStart, { passive: false });
     }
     if (cameraOpenBrowserButton) {
       cameraOpenBrowserButton.addEventListener('click', (event) => {
@@ -3063,11 +3063,6 @@
         event.stopPropagation();
         void handleOpenBrowserRequest();
       });
-      cameraOpenBrowserButton.addEventListener('touchend', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        void handleOpenBrowserRequest();
-      }, { passive: false });
     }
     if (cameraStartBackdrop) {
       cameraStartBackdrop.addEventListener('click', (event) => {
@@ -3411,6 +3406,9 @@
 
     let cameraPermissionDenied = false;
     let cameraReady = false;
+    let cameraPermissionRequested = false;
+    let cameraPermissionGranted = false;
+    let cameraBackgroundStopTimer = null;
     let captureInProgress = false;
     let captureLongPressTimer = null;
     let capturePressPointerId = null;
@@ -5824,7 +5822,6 @@
       if (cameraStartButton) {
         cameraStartButton.focus({ preventScroll: true });
       }
-      registerGestureCameraStarter();
     }
 
     function hideCameraStartOverlay() {
@@ -5857,6 +5854,21 @@
       cameraStartOverlayLastFocus = null;
     }
 
+    function clearCameraBackgroundStopTimer() {
+      if (cameraBackgroundStopTimer !== null) {
+        clearTimeout(cameraBackgroundStopTimer);
+        cameraBackgroundStopTimer = null;
+      }
+    }
+
+    function scheduleCameraBackgroundStop() {
+      clearCameraBackgroundStopTimer();
+      cameraBackgroundStopTimer = window.setTimeout(() => {
+        cameraBackgroundStopTimer = null;
+        stopCamera();
+      }, CAMERA_BACKGROUND_STOP_DELAY_MS);
+    }
+
     function waitForVideoReady(timeout = CAMERA_READY_TIMEOUT_MS) {
       if (!video) {
         return Promise.reject(new Error('Video element unavailable'));
@@ -5867,6 +5879,7 @@
       return new Promise((resolve, reject) => {
         let settled = false;
         let timer = null;
+        let pollTimer = null;
         const cleanup = () => {
           if (settled) {
             return;
@@ -5876,11 +5889,20 @@
             clearTimeout(timer);
             timer = null;
           }
+          if (pollTimer !== null) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+          }
+          video.removeEventListener('loadedmetadata', onLoaded);
           video.removeEventListener('loadeddata', onLoaded);
           video.removeEventListener('canplay', onLoaded);
+          video.removeEventListener('playing', onLoaded);
           video.removeEventListener('error', onError);
         };
         const onLoaded = () => {
+          if (video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
+            return;
+          }
           cleanup();
           resolve();
         };
@@ -5892,8 +5914,11 @@
           cleanup();
           reject(new Error('CameraReadyTimeout'));
         }, timeout);
+        pollTimer = window.setInterval(onLoaded, 120);
+        video.addEventListener('loadedmetadata', onLoaded, { once: true });
         video.addEventListener('loadeddata', onLoaded, { once: true });
         video.addEventListener('canplay', onLoaded, { once: true });
+        video.addEventListener('playing', onLoaded, { once: true });
         video.addEventListener('error', onError, { once: true });
       });
     }
@@ -11607,6 +11632,7 @@
     });
 
     function stopCamera() {
+      clearCameraBackgroundStopTimer();
       stopQrScanLoop();
       if (state.stream) {
         state.stream.getTracks().forEach((track) => track.stop());
@@ -11625,6 +11651,7 @@
       if (state.restarting) {
         return cameraReady;
       }
+      clearCameraBackgroundStopTimer();
       state.restarting = true;
       cameraReady = false;
       setCameraStatus('カメラを初期化しています…');
@@ -11671,6 +11698,7 @@
         let lastError = null;
         for (const constraints of constraintCandidates) {
           try {
+            cameraPermissionRequested = true;
             stream = await getUserMediaWithTimeout(constraints);
             break;
           } catch (error) {
@@ -11712,6 +11740,7 @@
         video.style.transform = state.useFrontCamera ? 'scaleX(-1)' : 'scaleX(1)';
         applyCameraSettings();
         cameraPermissionDenied = false;
+        cameraPermissionGranted = true;
         cameraReady = true;
         const cameraStatus = state.useFrontCamera ? 'フロントカメラ表示中' : '';
         setCameraStatus(cameraStatus);
@@ -11730,6 +11759,9 @@
         const isPermissionError = isCameraPermissionError(error);
         const isTimeoutError = Boolean(error && error.name === 'TimeoutError');
         cameraPermissionDenied = Boolean(isPermissionError);
+        if (cameraPermissionDenied) {
+          cameraPermissionGranted = false;
+        }
         cameraReady = false;
         const errorDetail = error && error.name ? ` (${error.name}${error.message ? `: ${error.message}` : ''})` : '';
         failureMessage = isTimeoutError
@@ -11763,9 +11795,10 @@
 
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        stopCamera();
+        scheduleCameraBackgroundStop();
         stopQrScanLoop();
       } else {
+        clearCameraBackgroundStopTimer();
         if (isIOSStandaloneApp) {
           cameraStartLocked = true;
           showStandaloneBrowserReopenOverlay('ホーム画面版ではブラウザで開き直してご利用ください。自動で開けない場合は「共有してSafariで開く」を押してください。');
@@ -11774,7 +11807,7 @@
         if (qrScanEnabled) {
           scheduleQrScanLoop(200);
         }
-        if (!cameraStartLocked) {
+        if (!cameraStartLocked && (!cameraPermissionRequested || cameraPermissionGranted)) {
           startCamera();
         }
       }
@@ -11790,6 +11823,7 @@
     });
 
     window.addEventListener('focus', () => {
+      clearCameraBackgroundStopTimer();
       if (document.hidden) {
         return;
       }
@@ -11797,6 +11831,9 @@
         return;
       }
       if (cameraStartLocked) {
+        return;
+      }
+      if (cameraPermissionRequested && !cameraPermissionGranted) {
         return;
       }
       if (cameraReady) {
@@ -11930,5 +11967,6 @@
       });
     })();
   </script>
+  <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>

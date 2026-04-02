@@ -963,15 +963,15 @@
   function getHeaderDotCopy(locale) {
     const isJapanese = typeof locale === 'string' && locale.toLowerCase().startsWith('ja');
     return {
-      label: 'WORLD DOT TOTAL',
+      label: 'WORLD PX TOTAL',
       allTimeLabel: isJapanese ? '通算' : 'ALL TIME',
       todayLabel: isJapanese ? '今日' : 'TODAY',
       loadingStatValue: '...',
       unavailableStatValue: '--',
       errorValue: '--',
-      loadingTitle: isJapanese ? '世界ドット総数を読み込み中' : 'Loading world dot totals',
-      errorTitle: isJapanese ? '世界ドット総数を取得できませんでした' : 'Unable to load world dot totals',
-      exactTitlePrefix: isJapanese ? '世界ドット総数' : 'World dot total',
+      loadingTitle: isJapanese ? '世界PX総数を読み込み中' : 'Loading world PX totals',
+      errorTitle: isJapanese ? '世界PX総数を取得できませんでした' : 'Unable to load world PX totals',
+      exactTitlePrefix: isJapanese ? '世界PX総数' : 'World PX total',
       exactAllTimePrefix: isJapanese ? '通算' : 'All time',
       exactTodayPrefix: isJapanese ? '今日' : 'Today',
       todayResetSuffix: isJapanese ? '日本時間0:00リセット' : 'resets at 00:00 JST',

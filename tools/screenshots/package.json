@@ -1,0 +1,11 @@
+{
+  "name": "pixieed-screenshot-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "capture": "node ./capture.mjs ./pages.json"
+  },
+  "dependencies": {
+    "playwright": "^1.54.2"
+  }
+}

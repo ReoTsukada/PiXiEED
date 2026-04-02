@@ -343,11 +343,11 @@ input[type='number']::-webkit-inner-spin-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--border);
+  border: 1px solid rgba(var(--ui-rgb), 0.28);
   border-radius: 0;
   background:
-    linear-gradient(0deg, rgba(var(--ui-rgb), 0.2) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--ui-rgb), 0.2) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(var(--ui-rgb), 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ui-rgb), 0.1) 1px, transparent 1px),
     rgba(8, 20, 28, 0.9);
   background-size: 4px 4px;
   color: var(--fg);
@@ -467,22 +467,22 @@ button {
 }
 
 .rail {
-  --rail-pad-inline: 16px;
-  --rail-pad-block: 16px;
+  --rail-pad-inline: 12px;
+  --rail-pad-block: 12px;
   position: absolute;
   top: 0;
   bottom: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   padding: var(--rail-pad-block) var(--rail-pad-inline);
-  border: 2px solid var(--border);
+  border: 1px solid rgba(var(--ui-rgb), 0.22);
   border-radius: 0;
   background:
-    linear-gradient(0deg, rgba(var(--ui-rgb), 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--ui-rgb), 0.03) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(var(--ui-rgb), 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ui-rgb), 0.015) 1px, transparent 1px),
     var(--bg-panel);
-  background-size: 8px 8px;
+  background-size: 10px 10px;
   box-shadow: none;
   overflow-y: hidden;
   overflow-x: visible;
@@ -499,18 +499,18 @@ button {
 
 .rail-tabs {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
 }
 
 .rail-tab {
   flex: 1;
-  padding: 6px 10px;
+  padding: 5px 9px;
   border-radius: 0;
-  border: 2px solid transparent;
+  border: 1px solid transparent;
   background:
-    linear-gradient(0deg, rgba(var(--ui-rgb), 0.09) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--ui-rgb), 0.09) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(var(--ui-rgb), 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ui-rgb), 0.05) 1px, transparent 1px),
     rgba(6, 12, 18, 0.9);
   background-size: 4px 4px;
   color: var(--fg-muted);
@@ -530,8 +530,8 @@ button {
 
 .rail-tab.is-active {
   background:
-    linear-gradient(0deg, rgba(var(--ui-rgb), 0.16) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--ui-rgb), 0.16) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(var(--ui-rgb), 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ui-rgb), 0.1) 1px, transparent 1px),
     rgba(10, 20, 30, 0.96);
   border-color: var(--border-strong);
   color: var(--fg);
@@ -565,7 +565,7 @@ button {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  gap: 16px;
+  gap: 10px;
 }
 
 .rail-tabpanes > .panel-section {
@@ -678,7 +678,7 @@ body.is-mobile-layout.is-unified-left-tools-color:not(.is-unified-left-color-foc
 .rail--right[data-compact="true"] #panelExtensions,
 .rail--right[data-compact="true"] #panelHelp,
 .rail--right[data-compact="true"] #panelFile {
-  padding: 10px 8px;
+  padding: 8px 6px;
 }
 
 /* Right rail spacing must stay identical regardless of width/compact state. */
@@ -687,8 +687,15 @@ body.is-mobile-layout.is-unified-left-tools-color:not(.is-unified-left-color-foc
 .rail--right #panelExtensions,
 .rail--right #panelHelp,
 .rail--right #panelFile {
-  gap: 8px;
-  padding: 10px 8px;
+  gap: 6px;
+  padding: 8px 6px;
+}
+
+.rail--right .panel-section {
+  background: rgba(6, 12, 18, 0.86);
+  background-image: none;
+  border: none;
+  box-shadow: none;
 }
 
 .rail--left[data-compact="true"] .rail-tabpanes {
@@ -1710,7 +1717,7 @@ body.is-dual-left-rail:not(.is-mobile-layout) .rail--left[data-compact="false"] 
 .local-canvas-stack {
   position: relative;
   display: inline-flex;
-  border: 1px solid rgba(var(--ui-rgb), 0.42);
+  border: 1px solid rgba(var(--ui-rgb), 0.14);
   box-shadow: none;
 }
 
@@ -2410,6 +2417,13 @@ body.is-startup-active #virtualCursorCanvas {
   overflow: hidden;
 }
 
+.floating-preview-panel.is-voxel-preview {
+  border-color: rgba(255, 228, 148, 0.92);
+  box-shadow:
+    0 0 0 1px rgba(255, 228, 148, 0.2),
+    0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
 .floating-preview-panel.is-hidden {
   display: none;
 }
@@ -2472,6 +2486,16 @@ body.is-startup-active #virtualCursorCanvas {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   background: rgba(0, 0, 0, 0.18);
+}
+
+.floating-preview-panel__gizmo {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  width: 84px;
+  height: 84px;
+  pointer-events: none;
+  opacity: 0.96;
 }
 
 .floating-preview-panel__resize-handle {
@@ -2538,12 +2562,17 @@ body.is-startup-active #virtualCursorCanvas {
 }
 
 .extension-voxel-field {
-  gap: 10px;
+  gap: 8px;
+}
+
+
+.settings-voxel-toggle-item {
+  grid-column: 1 / -1;
 }
 
 .extension-voxel-actions {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
 }
 
@@ -2735,15 +2764,15 @@ body.is-rail-resizing * {
 .panel-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   background:
-    linear-gradient(0deg, rgba(var(--ui-rgb), 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--ui-rgb), 0.045) 1px, transparent 1px),
-    rgba(5, 11, 17, 0.94);
-  background-size: 6px 6px;
-  border: 2px solid var(--border);
+    linear-gradient(0deg, rgba(var(--ui-rgb), 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ui-rgb), 0.02) 1px, transparent 1px),
+    rgba(5, 11, 17, 0.92);
+  background-size: 10px 10px;
+  border: 1px solid rgba(var(--ui-rgb), 0.22);
   border-radius: 0;
-  padding: 18px;
+  padding: 12px;
   box-shadow: none;
 }
 
@@ -2751,20 +2780,20 @@ body.is-rail-resizing * {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
 .panel-section__header h2 {
-  font-size: 1.05rem;
+  font-size: 0.98rem;
   margin: 0;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 12px;
+  gap: 4px;
+  margin-bottom: 8px;
 }
 
 .field span,
@@ -3191,11 +3220,11 @@ body:not(.show-inline-guides) .ui-guide-text {
   flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .field--list {
-  gap: 16px;
+  gap: 10px;
 }
 
 .toggle-list {
@@ -3204,8 +3233,8 @@ body:not(.show-inline-guides) .ui-guide-text {
   list-style: none;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 14px;
-  row-gap: 10px;
+  column-gap: 10px;
+  row-gap: 8px;
 }
 
 .toggle-list > li {
@@ -3216,7 +3245,7 @@ body:not(.show-inline-guides) .ui-guide-text {
   display: grid;
   grid-template-columns: 24px 1fr;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   font-size: 0.84rem;
   color: inherit;
 }
@@ -3231,15 +3260,15 @@ body:not(.show-inline-guides) .ui-guide-text {
 .mirror-axis-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 12px;
+  gap: 6px 10px;
   margin-top: -4px;
-  padding: 10px;
-  border: 1px solid rgba(var(--ui-rgb), 0.2);
+  padding: 8px;
+  border: 1px solid rgba(var(--ui-rgb), 0.16);
   background:
-    linear-gradient(0deg, rgba(var(--ui-rgb), 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--ui-rgb), 0.08) 1px, transparent 1px),
-    rgba(9, 18, 28, 0.78);
-  background-size: 6px 6px;
+    linear-gradient(0deg, rgba(var(--ui-rgb), 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ui-rgb), 0.04) 1px, transparent 1px),
+    rgba(9, 18, 28, 0.72);
+  background-size: 10px 10px;
 }
 
 @media (max-width: 680px) {
@@ -5787,10 +5816,10 @@ body.is-mobile-layout .mobile-draw-help {
   width: 28px;
   height: 28px;
   border-radius: 0;
-  border: 2px solid var(--border);
+  border: 1px solid rgba(var(--ui-rgb), 0.28);
   background:
-    linear-gradient(0deg, rgba(var(--ui-rgb), 0.18) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--ui-rgb), 0.18) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(var(--ui-rgb), 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ui-rgb), 0.1) 1px, transparent 1px),
     rgba(6, 16, 24, 0.9);
   background-size: 4px 4px;
   display: inline-flex;
@@ -5802,13 +5831,13 @@ body.is-mobile-layout .mobile-draw-help {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 10px 16px;
-  min-height: 44px;
+  padding: 8px 12px;
+  min-height: 38px;
   border-radius: 0;
-  border: 2px solid var(--border);
+  border: 1px solid rgba(var(--ui-rgb), 0.28);
   background:
-    linear-gradient(0deg, rgba(var(--ui-rgb), 0.2) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--ui-rgb), 0.2) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(var(--ui-rgb), 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ui-rgb), 0.12) 1px, transparent 1px),
     rgba(8, 20, 28, 0.9);
   background-size: 4px 4px;
   color: var(--fg);
@@ -5831,20 +5860,20 @@ body.is-mobile-layout .mobile-draw-help {
 
 .button--ghost {
   background:
-    linear-gradient(0deg, rgba(var(--ui-rgb), 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--ui-rgb), 0.12) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(var(--ui-rgb), 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ui-rgb), 0.08) 1px, transparent 1px),
     rgba(6, 16, 24, 0.9);
-  border-color: rgba(var(--ui-rgb), 0.35);
+  border-color: rgba(var(--ui-rgb), 0.2);
 }
 
 .button--ghost:hover {
-  border-color: rgba(var(--ui-rgb), 0.6);
+  border-color: rgba(var(--ui-rgb), 0.4);
 }
 
 .button--primary {
   background:
-    linear-gradient(0deg, rgba(var(--ui-rgb), 0.38) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(var(--ui-rgb), 0.38) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(var(--ui-rgb), 0.26) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--ui-rgb), 0.26) 1px, transparent 1px),
     rgba(20, 48, 60, 0.95);
   border-color: var(--accent);
   color: var(--fg);
@@ -8368,7 +8397,7 @@ body.is-startup-active {
 
 @media (max-width: 600px) {
   .panel-section {
-    padding: 14px;
+    padding: 12px;
   }
   .palette-editor {
     margin: 0;

@@ -6,21 +6,21 @@
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
 <title>ドット絵作成ツール PiXiEEDraw | 無料ブラウザで描く・共同編集</title>
 <meta content="#1f1f1f" name="theme-color"/>
-<meta content="PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・共同制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、ローカル拡張、PC/モバイル対応。" name="description"/>
-<meta content="PiXiEEDraw,ピクシードロー,ドット絵 エディター,ドット絵 描く サイト,ピクセルアート,リアルタイム 共同編集,アニメーション GIF,オニオンスキン,タイムラプスGIF,ローカル拡張,PC スマホ" name="keywords"/>
+<meta content="PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・共同制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、拡張機能、PC/モバイル対応。" name="description"/>
+<meta content="PiXiEEDraw,ピクシードロー,ドット絵 エディター,ドット絵 描く サイト,ピクセルアート,リアルタイム 共同編集,アニメーション GIF,オニオンスキン,タイムラプスGIF,拡張機能,PC スマホ" name="keywords"/>
 <link rel="canonical" href="https://pixieed.jp/pixiedraw/"/>
 <meta content="website" property="og:type"/>
 <meta content="PiXiEED" property="og:site_name"/>
 <meta content="ja_JP" property="og:locale"/>
 <meta content="ドット絵作成ツール PiXiEEDraw | 無料ブラウザで描く・共同編集" property="og:title"/>
-<meta content="PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・共同制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、ローカル拡張、PC/モバイル対応。" property="og:description"/>
+<meta content="PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・共同制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、拡張機能、PC/モバイル対応。" property="og:description"/>
 <meta content="https://pixieed.jp/pixiedraw/" property="og:url"/>
 <meta content="https://pixieed.jp/pixiedraw/ogp-app.png" property="og:image"/>
 <meta content="summary_large_image" name="twitter:card"/>
 <meta content="@PiXiEED_arta" name="twitter:site"/>
 <meta content="https://pixieed.jp/pixiedraw/" name="twitter:url"/>
 <meta content="ドット絵作成ツール PiXiEEDraw | 無料ブラウザで描く・共同編集" name="twitter:title"/>
-<meta content="PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・共同制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、ローカル拡張、PC/モバイル対応。" name="twitter:description"/>
+<meta content="PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・共同制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、拡張機能、PC/モバイル対応。" name="twitter:description"/>
 <meta content="https://pixieed.jp/pixiedraw/ogp-app.png" name="twitter:image"/>
 <script type="application/ld+json">
 {
@@ -31,7 +31,7 @@
   "operatingSystem": "Web",
   "url": "https://pixieed.jp/pixiedraw/",
   "image": "https://pixieed.jp/pixiedraw/ogp-app.png",
-  "description": "PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・共同制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、ローカル拡張、PC/モバイル対応。",
+  "description": "PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・共同制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、拡張機能、PC/モバイル対応。",
   "featureList": [
     "リアルタイム共有モード（マスター/参加者）",
     "マルチキャンバス編集",
@@ -39,7 +39,7 @@
     "オニオンスキン表示",
     "レイヤー不透明度・合成モード",
     "PNG/JPEG/SVG/GIF/タイムラプスGIF/プロジェクト書き出し",
-    "ローカル拡張（端末内で動作）",
+    "拡張機能（端末内 sandbox で動作）",
     "PC/タブレット/スマホ対応"
   ],
   "softwareVersion": "2026.03",
@@ -84,7 +84,6 @@
 
 
 <link href="assets/css/style.css" rel="stylesheet"/>
-<link href="assets/css/local-extension-runtime.css" rel="stylesheet"/>
 <link rel="icon" type="image/png" sizes="192x192" href="../icon/icon-192-4.png"/>
 <link rel="icon" type="image/png" sizes="512x512" href="../icon/icon-512-4.png"/>
   <style id="interaction-guard">
@@ -286,6 +285,7 @@
 </div>
 <div class="floating-preview-panel__body" id="floatingPreviewBody">
 <canvas aria-label="小窓プレビューキャンバス" class="floating-preview-panel__canvas" height="32" id="floatingPreviewCanvas" width="32"></canvas>
+<canvas aria-hidden="true" class="floating-preview-panel__gizmo" height="84" id="floatingPreviewGizmo" width="84"></canvas>
 </div>
 <button aria-label="プレビューパネルのサイズを変更" class="floating-preview-panel__resize-handle" id="floatingPreviewResize" type="button"></button>
 </div>
@@ -352,7 +352,7 @@
 <p class="help-text mirror-tool-popover__help" id="mirrorToolPopoverHelp">ここでは対称軸だけを切り替えられます。ON/OFF は上部ボタンか設定のミラーモードから変更できます。</p>
 </div>
 </div>
-<!-- 立体ツール（solidShape）を一時的に削除しました -->
+<!-- solidShape は削除済みです -->
 <div class="mobile-drawer" hidden="" id="mobileDrawer">
 <button aria-label="モバイルパネルの高さを調整" aria-controls="mobilePanels" class="mobile-drawer__handle" id="mobileDrawerHandle" type="button">
 <span aria-hidden="true" class="mobile-drawer__grip"></span>
@@ -441,7 +441,7 @@
 <img alt="塗り丸" height="32" src="assets/icons/tool-ellipse-fill.svg" width="32"/>
 <span>塗り丸</span>
 </button>
-<!-- 立体ツールボタンを削除しました -->
+<!-- 旧 solidShape ボタンは削除済みです -->
 <button aria-pressed="false" class="tool-button" data-tool="fill" data-tool-group="fill" type="button">
 <img alt="塗りつぶし" height="32" src="assets/icons/tool-fill.png" width="32"/>
 <span>塗りつぶし</span>
@@ -688,18 +688,9 @@
 </section>
 <section class="panel-section" data-section="extensions" id="panelExtensions">
 <div class="panel-section__body">
-<div class="field field--list extension-voxel-field" id="voxelExtensionField">
-<span id="voxelExtensionTitle">ボクセル拡張モード</span>
-<label class="toggle-option" for="toggleVoxelExtensionMode">
-<input id="toggleVoxelExtensionMode" type="checkbox"/>
-<span id="toggleVoxelExtensionModeLabel">専用6面を使う</span>
-</label>
-<div class="field-group extension-voxel-actions">
-<button class="button" id="setupVoxelExtension" type="button">6面をセットアップ</button>
-<button class="button" id="refreshVoxelPreview" type="button">プレビュー更新</button>
-</div>
-<p class="help-text ui-guide-text" id="voxelExtensionHint">Front / Back / Left / Right / Top / Bottom の6面から小窓プレビューを自動生成します。小窓をドラッグすると左右と上下に回転できます。</p>
-<p aria-live="polite" class="help-text" id="voxelExtensionStatus">ボクセルモード: OFF</p>
+<div class="field field--list">
+<span>拡張機能</span>
+<p class="help-text ui-guide-text">今は使用不可です。立体作成モードは設定のトグルへ移動しました。</p>
 </div>
 <div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 </div>
@@ -1048,6 +1039,21 @@
 <input id="toggleFloatingPreview" type="checkbox"/>
 <span>小窓プレビュー</span>
 </label>
+</li>
+<li class="settings-voxel-toggle-item">
+<div class="field field--list extension-voxel-field" id="voxelExtensionField">
+<span id="voxelExtensionTitle">ボクセルモード</span>
+<label class="toggle-option" for="toggleVoxelExtensionMode">
+<input id="toggleVoxelExtensionMode" type="checkbox"/>
+<span id="toggleVoxelExtensionModeLabel">ボクセルモード</span>
+</label>
+<p class="help-text ui-guide-text" id="voxelExtensionHint">ON にすると Front / Back / Left / Right / Top / Bottom の6面構成へ切り替わり、小窓プレビューを自動生成します。小窓をドラッグすると左右と上下に回転できます。</p>
+<label class="field field--compact" for="voxelDisplayPx">
+<span id="voxelDisplayPxLabel">表示PX</span>
+<input data-stepper="true" id="voxelDisplayPx" inputmode="numeric" max="24" min="0" step="1" type="number" value="0"/>
+</label>
+<p aria-live="polite" class="help-text" id="voxelExtensionStatus">ボクセルモード: OFF</p>
+</div>
 </li>
 <li>
 <label class="toggle-option" for="toggleCanvasResizeHandles">
@@ -1527,7 +1533,6 @@
 <script defer="" src="../scripts/pixieed-dot-stats.js"></script>
 <script src="../scripts/pixieed-adfree.js"></script>
 <script defer="" src="assets/js/app.js"></script>
-<script defer="" src="assets/js/local-extension-runtime.js"></script>
   <!-- Mobile bottom ad placeholder (visible in portrait / small screens) -->
   <div id="mobileBottomAd" aria-hidden="false">
     <div class="mobile-ad-box" id="mobileBottomAdSlot">
@@ -2211,5 +2216,6 @@
   </script>
 
 <script defer src="../scripts/pwa-install.js"></script>
+  <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>

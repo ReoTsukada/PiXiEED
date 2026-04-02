@@ -1,587 +1,247 @@
 <!DOCTYPE html>
-
 <html lang="ja">
 <head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
-<title>PiXiEELENS | ドット絵カメラで写真をピクセル化</title>
-<meta content="カメラで身の回りのものをドット絵変換。ブラウザで写真や画像をドット化・ピクセル化してレトロ写真が撮れるドット絵カメラ。パレット/グリッド、PNG保存、PiXiEEDraw編集に対応。" name="description"/>
-<meta content="ドット絵カメラ,ピクセル化,ドット化,レトロ写真,ブラウザ,PiXiEELENS,ピクシーレンズ,ピクセルアート" name="keywords"/>
-<meta content="index,follow" name="robots"/>
-<link href="https://pixieed.jp/pixiee-lens/" rel="canonical"/>
-<meta content="PiXiEELENS | ドット絵カメラで写真をピクセル化" property="og:title"/>
-<meta content="カメラで身の回りのものをドット絵変換。ブラウザで写真や画像をドット化・ピクセル化してレトロ写真が撮れるドット絵カメラ。パレット/グリッド、PNG保存、PiXiEEDraw編集に対応。" property="og:description"/>
-<meta content="website" property="og:type"/>
-<meta content="https://pixieed.jp/pixiee-lens/" property="og:url"/>
-<meta content="https://pixieed.jp/pixiee-lens/ogp.png" property="og:image"/>
-<meta content="PiXiEELENS のプレビューイメージ" property="og:image:alt"/>
-<meta content="PiXiEED" property="og:site_name"/>
-<meta content="ja_JP" property="og:locale"/>
-<meta content="summary_large_image" name="twitter:card"/>
-<meta content="@PiXiEED_arta" name="twitter:site"/>
-<meta content="https://pixieed.jp/pixiee-lens/" name="twitter:url"/>
-<meta content="PiXiEELENS | ドット絵カメラで写真をピクセル化" name="twitter:title"/>
-<meta content="カメラで身の回りのものをドット絵変換。ブラウザで写真や画像をドット化・ピクセル化してレトロ写真が撮れるドット絵カメラ。パレット/グリッド、PNG保存、PiXiEEDraw編集に対応。" name="twitter:description"/>
-<meta content="https://pixieed.jp/pixiee-lens/ogp.png" name="twitter:image"/>
-<meta content="PiXiEELENS のプレビューイメージ" name="twitter:image:alt"/>
-<meta content="#0b1224" name="theme-color"/>
-<script type="application/ld+json">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>PiXiEELENS | 写真やカメラ映像をドット絵風に変換するツール</title>
+  <meta name="description" content="PiXiEELENSは、写真やカメラ映像をドット絵風に変換するブラウザツールです。風景の取り込み、色数調整、PiXiEEDraw連携まで1ページで分かります。">
+  <link rel="canonical" href="https://pixieed.jp/projects/pixiee-lens/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PiXiEED">
+  <meta property="og:title" content="PiXiEELENS | 写真やカメラ映像をドット絵風に変換するツール">
+  <meta property="og:description" content="PiXiEELENSは、写真やカメラ映像をドット絵風に変換するブラウザツールです。風景の取り込み、色数調整、PiXiEEDraw連携まで1ページで分かります。">
+  <meta property="og:url" content="https://pixieed.jp/projects/pixiee-lens/">
+  <meta property="og:image" content="https://pixieed.jp/pixiee-lens/ogp.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PiXiEELENS | 写真やカメラ映像をドット絵風に変換するツール">
+  <meta name="twitter:description" content="PiXiEELENSは、写真やカメラ映像をドット絵風に変換するブラウザツールです。風景の取り込み、色数調整、PiXiEEDraw連携まで1ページで分かります。">
+  <meta name="twitter:image" content="https://pixieed.jp/pixiee-lens/ogp.png">
+  <link rel="icon" type="image/png" href="../../character-dots/mao1.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="../../site/landing.css">
+  <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@graph": [
       {
+        "@type": "WebPage",
+        "name": "PiXiEELENS",
+        "url": "https://pixieed.jp/projects/pixiee-lens/",
+        "description": "PiXiEELENSは、写真やカメラ映像をドット絵風に変換するブラウザツールです。風景の取り込み、色数調整、PiXiEEDraw連携まで1ページで分かります。"
+      },
+      {
         "@type": "SoftwareApplication",
         "name": "PiXiEELENS",
-        "applicationCategory": "MultimediaApplication",
+        "applicationCategory": "WebApplication",
         "operatingSystem": "Web",
-        "url": "https://pixieed.jp/pixiee-lens/",
-        "image": "https://pixieed.jp/pixiee-lens/ogp.png",
-        "description": "カメラで身の回りのものをドット絵変換。ブラウザで写真や画像をドット化・ピクセル化してレトロ写真が撮れるドット絵カメラ。パレット/グリッド、PNG保存、PiXiEEDraw編集に対応。",
-        "offers": {
-          "@type": "Offer",
-          "price": "0",
-          "priceCurrency": "JPY",
-          "availability": "https://schema.org/InStock"
-        },
-        "publisher": {
-          "@type": "Organization",
-          "name": "PiXiEED",
-          "url": "https://pixieed.jp/"
-        }
+        "url": "https://pixieed.jp/projects/pixiee-lens/",
+        "description": "PiXiEELENSは、写真やカメラ映像をドット絵風に変換するブラウザツールです。風景の取り込み、色数調整、PiXiEEDraw連携まで1ページで分かります。"
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "PiXiEED", "item": "https://pixieed.jp/" },
+          { "@type": "ListItem", "position": 2, "name": "プロジェクト", "item": "https://pixieed.jp/#projects" },
+          { "@type": "ListItem", "position": 3, "name": "PiXiEELENS", "item": "https://pixieed.jp/projects/pixiee-lens/" }
+        ]
       },
       {
         "@type": "FAQPage",
         "mainEntity": [
-          {
-            "@type": "Question",
-            "name": "PiXiEEDrawで編集できますか？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "撮影結果のプレビューからPiXiEEDrawで編集できます。PNGで保存して編集することも可能です。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "レトロなドット写真は撮れますか？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "カメラ映像をドット化・ピクセル化し、レトロなパレットで雰囲気を調整できます。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "スマホでも使えますか？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "PC/モバイルに対応し、Chrome/Edge/Safariの最新版を推奨しています。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "カメラが起動しない場合は？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "ブラウザのサイト設定からカメラ権限を許可してください。"
-            }
-          }
+          { "@type": "Question", "name": "スマホでも使えますか？", "acceptedAnswer": { "@type": "Answer", "text": "使えます。カメラ利用時はブラウザの権限許可が必要です。" } },
+          { "@type": "Question", "name": "撮った後に編集できますか？", "acceptedAnswer": { "@type": "Answer", "text": "必要ならPiXiEEDrawへ送って仕上げできます。" } },
+          { "@type": "Question", "name": "登録は必要ですか？", "acceptedAnswer": { "@type": "Answer", "text": "不要です。ブラウザでそのまま使います。" } }
         ]
       }
     ]
   }
   </script>
-<!-- Google tag (gtag.js) -->
-<script async crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
-<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
-<script>
-  const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
-  const GA_PAGE_PATH = '/projects/pixiee-lens/';
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', GA_MEASUREMENT_ID, {
-    page_path: GA_PAGE_PATH,
-    page_title: document.title
-  });
-  </script>
-<link href="https://fonts.googleapis.com" rel="preconnect"/>
-<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet"/>
-
-
-
-<link href="../../styles.css" rel="stylesheet"/>
-<link rel="icon" type="image/png" sizes="192x192" href="../../icon/icon-192-1.png"/>
-<link rel="icon" type="image/png" sizes="512x512" href="../../icon/icon-512-1.png"/>
-<style id="ads-safe">
-  html, body {
-    max-width: 100vw;
-    overflow-x: hidden;
-  }
-  .adsbygoogle,
-  ins.adsbygoogle {
-    display: block !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    margin: 0 auto;
-    box-sizing: border-box;
-    overflow: hidden;
-  }
-  .adsbygoogle iframe,
-  ins.adsbygoogle iframe {
-    display: block;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-  }
-
-  /* global-overflow-guard */
-  .ad-block,
-  .ad-card,
-  .ad-footer,
-  .project-ad,
-  .entry-ad-slot,
-  .puzzle-ad-slot,
-  .game-ad,
-  .card--ad {
-    width: min(100%, 720px) !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    box-sizing: border-box;
-    overflow: hidden;
-  }
-  .ad-slot,
-  .ad-block ins.adsbygoogle,
-  .ad-footer ins,
-  .entry-ad-slot ins,
-  .puzzle-ad-slot ins.adsbygoogle,
-  .game-ad ins.adsbygoogle {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    box-sizing: border-box;
-    min-height: clamp(48px, 9vw, 60px) !important;
-    height: clamp(48px, 9vw, 60px) !important;
-    overflow: hidden !important;
-  }
-  .page,
-  main,
-  .card,
-  .section,
-  .panel,
-  .shell {
-    min-width: 0;
-    max-width: 100%;
-  }
-</style>
-  <style id="interaction-guard">
-    * {
-      -webkit-touch-callout: none;
-      -webkit-user-drag: none;
-      -webkit-user-select: none;
-      -ms-user-select: none;
-      user-select: none;
-    }
-    input,
-    textarea,
-    [contenteditable] {
-      -webkit-user-select: none;
-      -ms-user-select: none;
-      user-select: none;
-    }
-  </style>
-  <script id="interaction-guard-js">
-    document.addEventListener('contextmenu', (event) => {
-      event.preventDefault();
-    });
-    document.addEventListener('dragstart', (event) => {
-      event.preventDefault();
-    });
-  </script>
-  
-<script id="ads-lazy">
-  (function() {
-    if (window.pixieedObserveAds) return;
-
-    const SLOT_SEQUENCE = ['2141591954','9073878884','2261515379'];
-    const SLOT_KEY = 'pixieedAdSlotIndex';
-    const LOAD_TIMEOUT_MS = 10000;
-    const READY_POLL_MS = 250;
-
-    let slotIndex = 0;
-    let activeAd = null;
-    let readyTimer = null;
-    const queue = [];
-
-    const readSlotIndex = () => {
-      try {
-        const stored = sessionStorage.getItem(SLOT_KEY);
-        if (stored !== null) slotIndex = Number(stored) || 0;
-      } catch (err) {}
-    };
-
-    const storeSlotIndex = () => {
-      try {
-        sessionStorage.setItem(SLOT_KEY, String(slotIndex));
-      } catch (err) {}
-    };
-
-    readSlotIndex();
-
-    const nextSlot = () => {
-      if (!SLOT_SEQUENCE.length) return '';
-      const slot = SLOT_SEQUENCE[slotIndex % SLOT_SEQUENCE.length];
-      slotIndex += 1;
-      storeSlotIndex();
-      return slot;
-    };
-
-    const isReady = (ins) => (
-      ins.getAttribute('data-adsbygoogle-status') === 'done' ||
-      ins.getAttribute('data-ad-status') === 'filled'
-    );
-
-    const isEnqueued = (ins) => ins.dataset.adsQueueEnqueued === '1';
-    const isLoading = (ins) => ins.dataset.adsQueueLoading === '1';
-    const isLoaded = (ins) => ins.dataset.adsLazyLoaded === '1' || isReady(ins);
-
-    const assignSlot = (ins) => {
-      if (!ins || !(ins instanceof HTMLElement)) return;
-      if (ins.dataset.adSlotAssigned === '1') return;
-      const existingSlot = ins.getAttribute('data-ad-slot');
-      if (existingSlot && existingSlot !== 'rotate') {
-        ins.dataset.adSlotAssigned = '1';
-        return;
-      }
-      if (ins.dataset.adStatic === '1') {
-        ins.dataset.adSlotAssigned = '1';
-        return;
-      }
-      const slot = nextSlot();
-      if (slot) {
-        ins.setAttribute('data-ad-slot', slot);
-      }
-      ins.dataset.adSlotAssigned = '1';
-    };
-
-    const clearReadyTimer = () => {
-      if (!readyTimer) return;
-      clearTimeout(readyTimer);
-      readyTimer = null;
-    };
-
-    const releaseActiveAd = () => {
-      clearReadyTimer();
-      if (!activeAd) return;
-      activeAd.dataset.adsQueueLoading = '';
-      activeAd.dataset.adsQueueEnqueued = '';
-      activeAd.dataset.adsLazyLoaded = '1';
-      activeAd = null;
-      processQueue();
-    };
-
-    const waitUntilReady = (ins, startedAt) => {
-      if (!activeAd || activeAd !== ins) return;
-      if (!document.contains(ins) || isReady(ins) || (Date.now() - startedAt) >= LOAD_TIMEOUT_MS) {
-        releaseActiveAd();
-        return;
-      }
-      readyTimer = setTimeout(() => waitUntilReady(ins, startedAt), READY_POLL_MS);
-    };
-
-    const loadAd = (ins) => {
-      if (!ins || !(ins instanceof HTMLElement)) return false;
-      if (isLoaded(ins) || isLoading(ins)) return true;
-      assignSlot(ins);
-      ins.dataset.adsQueueLoading = '1';
-      ins.dataset.adsLazyLoaded = '1';
-      try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-      } catch (err) {
-        ins.dataset.adsQueueLoading = '';
-        ins.dataset.adsLazyLoaded = '';
-        return false;
-      }
-      return true;
-    };
-
-    const enqueueAd = (ins) => {
-      if (!ins || !(ins instanceof HTMLElement)) return;
-      if (isLoaded(ins) || isLoading(ins) || isEnqueued(ins)) return;
-      assignSlot(ins);
-      ins.dataset.adsQueueEnqueued = '1';
-      queue.push(ins);
-    };
-
-    function processQueue() {
-      if (activeAd) return;
-      while (queue.length) {
-        const ins = queue.shift();
-        if (!ins || !(ins instanceof HTMLElement)) continue;
-        if (!document.contains(ins)) continue;
-        ins.dataset.adsQueueEnqueued = '';
-        if (isLoaded(ins)) {
-          ins.dataset.adsLazyLoaded = '1';
-          continue;
-        }
-        activeAd = ins;
-        const startedAt = Date.now();
-        if (!loadAd(ins)) {
-          activeAd = null;
-          setTimeout(() => {
-            if (!document.contains(ins) || isLoaded(ins)) return;
-            enqueueAd(ins);
-            processQueue();
-          }, 1200);
-          return;
-        }
-        waitUntilReady(ins, startedAt);
-        return;
-      }
-    }
-
-    const observeAds = (root) => {
-      const scope = root && root.querySelectorAll ? root : document;
-      scope.querySelectorAll('ins.adsbygoogle').forEach(enqueueAd);
-      processQueue();
-    };
-
-    window.pixieedObserveAds = observeAds;
-
-    const setupQueue = () => {
-      observeAds(document);
-    };
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', setupQueue);
-    } else {
-      setupQueue();
-    }
-
-    const mo = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          if (!(node instanceof HTMLElement)) return;
-          if (node.matches && node.matches('ins.adsbygoogle')) {
-            enqueueAd(node);
-            return;
-          }
-          if (node.querySelectorAll) {
-            node.querySelectorAll('ins.adsbygoogle').forEach(enqueueAd);
-          }
-        });
-      });
-      processQueue();
-    });
-
-    const startObserver = () => {
-      if (!document.body) return;
-      mo.observe(document.body, { childList: true, subtree: true });
-    };
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', startObserver);
-    } else {
-      startObserver();
-    }
-  })();
-</script>
-<link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
 </head>
-<body class="project-page">
-<main>
-<section class="project-ad project-ad--top">
-<div style="position:relative;">
-<ins class="adsbygoogle"
-     style="display:block"
-     data-ad-client="ca-pub-9801602250480253"
-     data-ad-slot="2141591954"></ins>
-</div>
-<script>if (window.pixieedObserveAds) { window.pixieedObserveAds(); }</script>
-</section>
-<section class="hero" id="overview">
-<div class="project-visual project-visual--hero">
-<img alt="PiXiEELENS のプレビューイメージ" loading="lazy" src="../../icon/icon-192-1.png" data-media="icon"/>
-</div>
-<div class="hero-copy">
-<p class="project-update" data-last-updated="">
-<span class="project-update__label">最終更新</span>
-<time class="project-update__value" datetime="">--</time>
-</p>
-<div class="hero-cta">
-<a class="cta-primary" href="../../pixiee-lens/index.html">プレイする</a>
-<a class="cta-secondary" href="../../tools.html">他のゲーム・ツール</a>
-</div>
-<h1>PiXiEELENS</h1>
-<p>カメラで身の回りのものをドット絵変換しよう。PiXiEELENSはブラウザで全画面カメラを起動し、ドット化・ピクセル化でレトロな写真が撮れるドット絵カメラです。撮影後はドット絵エディター <a href="../../pixiedraw/index.html">PiXiEEDraw</a> で編集して仕上げられます。</p>
-<p class="project-status">ラボ版として公開中です。PC/モバイルともに Chrome/Edge/Safari 最新版でのご利用を推奨します。</p>
-</div>
-</section>
-<section class="section" id="updates">
-<div class="section-inner">
-<div class="project-note">
-<strong>更新メモ</strong>
-<ul class="project-note__list">
-<li>更新内容は準備中です。</li>
-</ul>
-<div class="project-note__actions">
-<a class="cta-secondary" href="../../notes/index.html">開発ノートまとめへ</a>
-</div>
-</div>
-</div>
-</section>
-<section class="section section--accent" id="features">
-<div class="section-inner">
-<h2>ドット絵カメラの特徴</h2>
-<p>カメラとドット絵でレトロ写真を作りやすいポイントをまとめました。</p>
-<ul class="project-feature-list">
-<li>
-<strong>カメラでドット化</strong>
-            全画面カメラをドット化・ピクセル化して、粒度を調整しながらレトロ写真が撮れます。グリッドやアスペクトガイドもワンタップで重ねられます。
-          </li>
-<li>
-<strong>レトロ写真のパレット</strong>
-            GBC風やCPC風などのプリセットに加え、カスタムパレットJSONも読み込めます。配信やイベントで色味を統一できます。
-          </li>
-<li>
-<strong>PiXiEEDrawで編集</strong>
-            撮影したドット写真は <a href="../../pixiedraw/index.html">PiXiEEDraw</a> で編集して仕上げられます。PNG保存にも対応しています。
-          </li>
-</ul>
-</div>
-</section>
-<section class="project-ad project-ad--mid">
-<ins class="adsbygoogle"
-     style="display:block"
-     data-ad-client="ca-pub-9801602250480253"
-     data-ad-slot="9073878884"
-     data-ad-format="auto"
-     data-full-width-responsive="true"></ins>
-<small class="project-ad__label">広告</small>
-<script>if (window.pixieedObserveAds) { window.pixieedObserveAds(); }</script>
-</section>
-<section class="section" id="howto">
-<div class="section-inner">
-<h2>使い方</h2>
-<ol class="project-howto">
-<li>起動後、ブラウザから表示されるカメラ利用許可に「許可」を選択します。</li>
-<li>右下の HUD からドットモード・パレット・HUD 表示のオン/オフを切り替えます。</li>
-<li>ピクセル化の粒度はスライダーで変更可能です。スクリーンショットでPNG保存、またはプレビューから <a href="../../pixiedraw/index.html">PiXiEEDraw</a> で編集できます。</li>
-<li>必要に応じて画面右下の「設定」からHUD配置やタッチ操作ガイドを切り替え、利用シーンに合わせた表示に調整してください。</li>
-</ol>
-<p class="project-howto__note">カメラが起動しない場合は、ブラウザのサイト設定からカメラ権限を再度許可してください。外部ディスプレイにミラーリングすればフォトブースとしても利用できます。</p>
-</div>
-</section>
-<section class="section" id="details">
-<div class="section-inner">
-<h2>基本データ</h2>
-<div class="project-meta-grid">
-<dl class="project-meta">
-<dt>カテゴリ</dt>
-<dd>ドット絵カメラ / ピクセルラボ</dd>
-</dl>
-<dl class="project-meta">
-<dt>対応ブラウザ</dt>
-<dd>Chrome / Edge / Safari (最新)</dd>
-</dl>
-<dl class="project-meta">
-<dt>推奨デバイス</dt>
-<dd>スマホ / タブレット / Webカメラ搭載PC</dd>
-</dl>
-<dl class="project-meta">
-<dt>リリース</dt>
-<dd>2024年 ラボ公開</dd>
-</dl>
-</div>
-</div>
-</section>
-<section class="section" id="faq">
-<div class="section-inner">
-<h2>よくある質問</h2>
-<div class="project-meta-grid project-faq-grid">
-<dl class="project-meta">
-<dt>PiXiEEDrawで編集できますか？</dt>
-<dd>撮影結果のプレビューからPiXiEEDrawで編集できます。PNGで保存して編集することも可能です。</dd>
-</dl>
-<dl class="project-meta">
-<dt>レトロなドット写真は撮れますか？</dt>
-<dd>カメラ映像をドット化・ピクセル化し、レトロなパレットで雰囲気を調整できます。</dd>
-</dl>
-<dl class="project-meta">
-<dt>スマホでも使えますか？</dt>
-<dd>PC/モバイルに対応し、Chrome/Edge/Safariの最新版を推奨しています。</dd>
-</dl>
-<dl class="project-meta">
-<dt>カメラが起動しない場合は？</dt>
-<dd>ブラウザのサイト設定からカメラ権限を許可してください。</dd>
-</dl>
-</div>
-</div>
-</section>
-<section class="section section--highlight" id="share">
-<div class="section-inner">
-<h2>活用アイデアを募集中</h2>
-<p>配信やイベントでの利用例を共有いただけると今後のアップデート参考になります。ハッシュタグ <code>#PiXiEELENS</code> や公式X宛にスクリーンショットをお寄せください。</p>
-<div class="project-actions">
-<a class="cta-primary" href="../../pixiee-lens/index.html">プレイする</a>
-<a class="cta-secondary" href="https://x.com/PiXiEED_arta" rel="noopener" target="_blank">公式X (旧Twitter)</a>
-</div>
-</div>
-</section>
-<section class="project-ad project-ad--bottom">
-<ins class="adsbygoogle"
-     style="display:block"
-     data-ad-client="ca-pub-9801602250480253"
-     data-ad-slot="rotate"
-     data-ad-format="auto"
-     data-full-width-responsive="true"></ins>
-<small class="project-ad__label">広告</small>
-<script>if (window.pixieedObserveAds) { window.pixieedObserveAds(); }</script>
-</section>
-</main>
-<footer>
-<p>© <span id="year"></span> PiXiEED. All rights reserved.</p>
-<div class="footer-links">
-<a href="../../terms/index.html">利用規約</a>
-<a href="../../privacy/index.html">プライバシーポリシー</a>
-</div>
-</footer>
-<nav class="bottom-nav">
-  <a class="bottom-nav__item" data-tab="home" href="../../index.html">
-    <span class="icon"><img src="../../FooterIcon1.png" alt=""/></span><span>ホーム</span>
-  </a>
-  <a class="bottom-nav__item" data-tab="contest" href="../../contest/index.html">
-    <span class="icon"><img src="../../FooterIcon2.png" alt=""/></span><span>コンテスト</span>
-  </a>
+<body>
+  <header class="site-header" aria-label="top-nav">
+    <div class="header-inner header-inner--app">
+      <button class="brand" id="openProfilePanel" type="button">
+        <span class="brand-icon" id="brandAvatar">
+          <img src="../../character-dots/mao1.png" alt="logo">
+        </span>
+        <div class="brand-text">
+          <p class="brand-title">PiXiEED</p>
+          <p class="brand-sub" id="brandUser">ユーザー</p>
+        </div>
+      </button>
+      <div class="header-actions">
+        <a class="support-tip-link" id="supportTipLink" href="#" target="_blank" rel="noopener noreferrer" aria-label="PiXiEEDの応援チップを購入">応援チップ</a>
+      </div>
+    </div>
+  </header>
+<div class="page">
+  
+  <main class="page-shell">
+    <section class="section">
+      <div class="section__inner project-hero">
+        <div class="project-summary">
+          <p class="eyebrow">project</p>
+          <h1 class="section-title">PiXiEELENS</h1>
+          <p class="section-copy">写真やカメラをピクセル化して見た目を整える</p>
+          <div class="project-tags"><span>1ページ完結紹介</span><span>スマホ対応</span><span>PiXiEED</span></div>
+          <div class="hero__actions">
+            <a class="button" href="../../pixiee-lens/index.html">使ってみる</a>
+            <a class="button-secondary" href="../../contest/index.html">広場を見る</a>
+          </div>
+        </div>
+        <div class="project-hero__media"><img src="../../pixiee-lens/ogp.png" alt="PiXiEELENSの画面"></div>
+      </div>
+    </section>
 
-  <a class="bottom-nav__item" data-tab="tools" href="../../tools.html">
-    <span class="icon"><img src="../../FooterIcon3.png" alt=""/></span><span>ツール/ゲーム</span>
-  </a>
-    <a class="bottom-nav__item" data-tab="lens" href="../../pixiee-lens/index.html">
-      <span class="icon"><img src="../../FooterIcon5.png" alt=""/></span><span>PiXiEELENS</span>
-    </a>
-  <a class="bottom-nav__item" data-tab="portfolio" href="../../portfolio/index.html">
-    <span class="icon"><img src="../../FooterIcon4.png" alt=""/></span><span>企業向け</span>
-  </a>
-</nav>
-<script>
-  (() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-    const params = new URLSearchParams(window.location.search || '');
-    if (params.get('open_lens') !== '1') {
-      return;
-    }
-    const target = new URL('../../pixiee-lens/index.html', window.location.href);
-    target.searchParams.set('from', 'browser');
-    window.location.replace(target.toString());
-  })();
-</script>
-<script src="../../scripts.js"></script>
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">overview</p>
+        <h2 class="section-title">概要</h2>
+        <p class="section-copy">PiXiEELENSは、写真やカメラ映像をドット絵風の見た目に変換するためのツールです。</p><p class="section-copy">撮って終わりではなく、そのままPiXiEEDrawへつなげて仕上げる導線を持てます。</p><p class="section-copy">レトロ写真風の見た目をすぐ試したい人や、素材の下処理をしたい人に向いています。</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">features</p>
+        <h2 class="section-title">主な特徴</h2>
+        <div class="meta-grid"><article class="info-card"><h3>カメラでも画像でも試せる</h3><p class="card-copy">思いついた時にその場で見た目を変えられます。</p></article><article class="info-card"><h3>ドット絵らしい粒度調整</h3><p class="card-copy">粗さや雰囲気を確認しながら調整できます。</p></article><article class="info-card"><h3>PiXiEEDrawへつながる</h3><p class="card-copy">変換後の仕上げが別導線にならず、次の行動が明確です。</p></article><article class="info-card"><h3>スマホ前提で見やすい</h3><p class="card-copy">撮影から確認まで縦画面でも扱いやすくします。</p></article></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">scenes</p>
+        <h2 class="section-title">利用シーン</h2>
+        <ul class="bullet-list"><li>写真をレトロな見た目にしたい時</li><li>ドット絵素材の下絵を作りたい時</li><li>その場で見え方を試してSNSに使いたい時</li></ul>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">how to use</p>
+        <h2 class="section-title">使い方</h2>
+        <ol class="steps"><li>PiXiEELENSを開く</li><li>カメラか画像を選ぶ</li><li>ピクセル化の見え方を調整する</li><li>必要なら保存またはPiXiEEDrawへ送る</li></ol>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">samples</p>
+        <h2 class="section-title">サンプル</h2>
+        <div class="gallery-grid"><article class="sample-card"><img src="../../pixiee-lens/ogp.png" alt="PiXiEELENSの紹介ビジュアル"><h3>紹介ビジュアル</h3><p class="card-copy">ツールの世界観と用途がすぐ伝わる OGP 画像です。</p></article><article class="sample-card"><img src="../../assets/screenshots/generated/pixiee-lens-scene.png" alt="PiXiEELENSの風景プレビュー画面"><h3>風景をその場で確認</h3><p class="card-copy">街並みのような風景をそのまま映しながら、見え方をすぐ試せる実画面です。</p></article><article class="sample-card"><img src="../../assets/screenshots/generated/pixiee-lens-dot-scene.png" alt="PiXiEELENSのドット調整画面"><h3>ドット感を詰める画面</h3><p class="card-copy">ドット化した見え方を確認しながら、雰囲気を調整していける実画面です。</p></article></div>
+      </div>
+    </section>
+
+    <section class="section" aria-label="広告">
+      <div class="section__inner">
+        <div class="card ad-banner">
+          <p class="ad-banner__label">広告</p>
+          <ins class="adsbygoogle"
+               style="display:block"
+               data-ad-client="ca-pub-9801602250480253"
+               data-ad-slot="rotate"
+               data-ad-format="auto"
+               data-full-width-responsive="true"></ins>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">faq</p>
+        <h2 class="section-title">FAQ</h2>
+        <div class="faq-card"><details><summary>スマホでも使えますか？</summary><p>使えます。カメラ利用時はブラウザの権限許可が必要です。</p></details><details><summary>撮った後に編集できますか？</summary><p>必要ならPiXiEEDrawへ送って仕上げできます。</p></details><details><summary>登録は必要ですか？</summary><p>不要です。ブラウザでそのまま使います。</p></details></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">links</p>
+        <h2 class="section-title">関連導線</h2>
+        <div class="link-grid related-tool-grid"><article class="link-card related-tool-card"><div class="related-tool-card__head"><span class="related-tool-card__icon"><img src="../../icon/icon-192-4.png" alt="PiXiEEDraw"></span><div><p class="meta-label">ツール</p><h3>PiXiEEDrawを見る</h3></div></div><p class="meta-copy">仕上げや細部調整が必要な時は、PiXiEEDrawへ渡して編集できます。</p><div class="inline-actions"><a class="button-secondary" href="../../projects/pixiedraw/index.html">PiXiEEDrawを見る</a></div></article><article class="link-card related-tool-card"><div class="related-tool-card__head"><span class="related-tool-card__icon"><img src="../../FooterIcon2.png" alt="広場"></span><div><p class="meta-label">広場</p><h3>広場を見る</h3></div></div><p class="meta-copy">投稿された作品や他のユーザーの表現を一覧で確認できます。</p><div class="inline-actions"><a class="button-secondary" href="../../contest/index.html">広場を見る</a></div></article><article class="link-card related-tool-card"><div class="related-tool-card__head"><span class="related-tool-card__icon"><img src="../../pixiedraw/assets/icons/talk.png" alt="会話"></span><div><p class="meta-label">会話</p><h3>会話（準備中）</h3></div></div><p class="meta-copy">会話ページはまだ公開していません。準備ができるまでお待ちください。</p><div class="inline-actions"><a class="button-secondary" href="#" aria-disabled="true" onclick="return false;">会話（準備中）</a></div></article><article class="link-card related-tool-card"><div class="related-tool-card__head"><span class="related-tool-card__icon"><img src="../../FooterIcon4.png" alt="企業"></span><div><p class="meta-label">企業</p><h3>企業相談</h3></div></div><p class="meta-copy">法人向けの制作相談や導入相談は既存の企業ページへ送ります。</p><div class="inline-actions"><a class="button-secondary" href="../../portfolio/index.html">企業相談</a></div></article></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">cta</p>
+        <h2 class="section-title">次の行動</h2>
+        <p class="section-copy">このページだけで何ができるか、誰向けか、どう始めるかが分かるようにしています。次は実際に開くか、広場で作品を見るか、相談するかのどれかに進めます。</p>
+        <div class="hero__actions">
+          <a class="button" href="../../pixiee-lens/index.html">使ってみる</a>
+          <a class="button-secondary" href="../../contest/index.html">投稿を見る</a>
+          <a class="button-secondary" href="../../portfolio/index.html">企業相談</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+<footer>
+    <p>© <span id="year">2026</span> PiXiEED. All rights reserved.</p>
+    <div class="footer-links">
+      <a href="#" aria-disabled="true" onclick="return false;">会話</a>
+      <a href="../../portfolio/index.html">企業</a>
+      <a href="../../terms/index.html">利用規約</a>
+      <a href="../../privacy/index.html">プライバシーポリシー</a>
+    </div>
+  </footer>
+
+<nav class="bottom-nav" aria-label="下部ナビ">
+      <a class="bottom-nav__item" data-tab="home" href="../../index.html">
+        <span class="icon"><img src="../../FooterIcon1.png" alt=""></span><span>ホーム</span>
+      </a>
+      <a class="bottom-nav__item" data-tab="contest" href="../../contest/index.html">
+        <span class="icon"><img src="../../FooterIcon2.png" alt=""></span><span>広場</span>
+      </a>
+      <a class="bottom-nav__item" data-tab="talk" href="#" aria-disabled="true" onclick="return false;">
+        <span class="icon"><img src="../../pixiedraw/assets/icons/talk.png" alt=""></span><span>会話</span>
+      </a>
+      <a class="bottom-nav__item" data-tab="portfolio" href="../../portfolio/index.html">
+        <span class="icon"><img src="../../FooterIcon4.png" alt=""></span><span>企業</span>
+      </a>
+  </nav>
+
+  <script src="../../scripts/bottom-nav-footer-ad.js"></script>
+  <script>
+    const year = document.getElementById('year');
+    if (year) year.textContent = new Date().getFullYear();
+  </script>
+  <div class="auth-panel" id="authPanel" aria-hidden="true">
+    <div class="auth-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <h3 style="margin:0;font-size:16px;color:#f9fafb;">プロフィール</h3>
+        <button class="close-btn" type="button" id="closeAuthPanel">閉じる</button>
+      </div>
+      <div class="profile-block">
+        <div class="profile-row">
+          <button class="avatar-toggle" id="avatarToggle" type="button" aria-label="アイコンを変更" aria-expanded="false" aria-controls="avatarPanel">
+            <span class="avatar-toggle__img" id="avatarPreview"></span>
+          </button>
+          <label class="profile-name">
+            <span style="font-weight:700; color:#e5e7eb;">ニックネーム</span>
+            <input class="auth-input" id="profileNickname" type="text" placeholder="なまえ" maxlength="32">
+          </label>
+        </div>
+        <div class="avatar-panel" id="avatarPanel" hidden>
+          <div class="avatar-grid" id="avatarGrid"></div>
+        </div>
+        <label class="profile-name">
+          <span style="font-weight:700; color:#e5e7eb;">X (旧Twitter)</span>
+          <input class="auth-input" id="profileX" type="url" placeholder="https://x.com/username" maxlength="200" inputmode="url">
+        </label>
+        <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
+        <p class="auth-status" id="authStatus"></p>
+      </div>
+    </div>
+  </div>
+  <script src="../../scripts/ads-lazy.js"></script>
+  <script src="../../scripts/shared-profile-header.js"></script>
+  <script src="../../scripts/pixieed-dot-stats.js"></script>
+  <script src="../../scripts/shared-bottom-nav.js"></script>
+  <script src="../../scripts/pixel-art-fit.js"></script>
 </body>
 </html>

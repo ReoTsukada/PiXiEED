@@ -1,0 +1,181 @@
+{
+  "port": 4173,
+  "entries": [
+    {
+      "id": "pixiedraw_editor",
+      "urlPath": "/pixiedraw/index.html",
+      "waitFor": "#appRoot",
+      "clickSelectors": ["#startupActionSkip", "#updateToastCloseBtn"],
+      "hideSelectors": ["#startupScreen", "#updateToast"],
+      "waitAfterActionsMs": 500,
+      "viewport": { "width": 1440, "height": 960 },
+      "output": "assets/screenshots/generated/pixiedraw-editor.png"
+    },
+    {
+      "id": "pixiedraw_left_rail",
+      "urlPath": "/pixiedraw/index.html",
+      "waitFor": "#appRoot",
+      "initLocalStorage": {
+        "pixieedraw:sessionState": {
+          "leftTab": "color",
+          "rightTab": "frames",
+          "leftRailWidth": 360,
+          "rightRailWidth": 78
+        }
+      },
+      "clickSelectors": ["#startupActionSkip", "#updateToastCloseBtn"],
+      "hideSelectors": ["#startupScreen", "#updateToast"],
+      "waitAfterActionsMs": 700,
+      "viewport": { "width": 1440, "height": 960 },
+      "output": "assets/screenshots/generated/pixiedraw-left-rail.png"
+    },
+    {
+      "id": "pixiedraw_right_rail",
+      "urlPath": "/pixiedraw/index.html",
+      "waitFor": "#appRoot",
+      "initLocalStorage": {
+        "pixieedraw:sessionState": {
+          "leftTab": "tools",
+          "rightTab": "file",
+          "leftRailWidth": 78,
+          "rightRailWidth": 360
+        }
+      },
+      "clickSelectors": ["#startupActionSkip", "#updateToastCloseBtn"],
+      "hideSelectors": ["#startupScreen", "#updateToast"],
+      "waitAfterActionsMs": 700,
+      "viewport": { "width": 1440, "height": 960 },
+      "output": "assets/screenshots/generated/pixiedraw-right-rail.png"
+    },
+    {
+      "id": "jerin_maker_editor",
+      "urlPath": "/jerin-maker/index.html",
+      "waitFor": "#canvas",
+      "viewport": { "width": 1280, "height": 900 },
+      "output": "assets/screenshots/generated/jerin-maker-editor.png"
+    },
+    {
+      "id": "jerin_maker_color",
+      "urlPath": "/jerin-maker/index.html",
+      "waitFor": "#canvas",
+      "clickSelectors": ["#btnOpenColorPanel"],
+      "waitAfterActionsMs": 400,
+      "viewport": { "width": 1280, "height": 900 },
+      "output": "assets/screenshots/generated/jerin-maker-color.png"
+    },
+    {
+      "id": "pixiee_lens_scene",
+      "urlPath": "/pixiee-lens/index.html",
+      "waitFor": "#cameraFeed",
+      "hideSelectors": ["#cameraStartOverlay", "#capturePreviewOverlay", "#updateToast"],
+      "evaluateScripts": [
+        "(async () => { const scenicSrc = '/pixfind/assets/puzzles/d3-tabun-shibuya/original.png'; const video = document.getElementById('cameraFeed'); if (!video) return; video.style.opacity = '1'; video.style.backgroundImage = `url(${scenicSrc})`; video.style.backgroundSize = 'cover'; video.style.backgroundPosition = 'center center'; video.style.backgroundRepeat = 'no-repeat'; video.style.backgroundColor = '#0b1224'; video.style.filter = 'saturate(1.05) contrast(1.02)'; })()"
+      ],
+      "waitAfterActionsMs": 300,
+      "viewport": { "width": 1280, "height": 900 },
+      "output": "assets/screenshots/generated/pixiee-lens-scene.png"
+    },
+    {
+      "id": "pixiee_lens_dot_scene",
+      "urlPath": "/pixiee-lens/index.html",
+      "waitFor": "#cameraFeed",
+      "hideSelectors": ["#cameraStartOverlay", "#capturePreviewOverlay", "#updateToast"],
+      "evaluateScripts": [
+        "(async () => { const scenicSrc = '/pixfind/assets/puzzles/d3-tabun-shibuya/original.png'; const video = document.getElementById('cameraFeed'); const dotCanvas = document.getElementById('dotCanvas'); const paletteMenu = document.getElementById('paletteMenu'); const existing = document.getElementById('captureSceneMock'); if (existing) existing.remove(); const img = new Image(); img.src = scenicSrc; await img.decode().catch(() => {}); const stageWidth = Math.max(window.innerWidth, 1280); const stageHeight = Math.max(window.innerHeight, 900); const work = document.createElement('canvas'); work.width = 96; work.height = Math.max(54, Math.round(work.width * (img.naturalHeight || 720) / (img.naturalWidth || 1280))); const workCtx = work.getContext('2d'); workCtx.imageSmoothingEnabled = true; workCtx.drawImage(img, 0, 0, work.width, work.height); if (video) { video.style.opacity = '0'; video.style.background = 'transparent'; } if (dotCanvas) { dotCanvas.hidden = false; dotCanvas.width = work.width; dotCanvas.height = work.height; dotCanvas.style.position = 'fixed'; dotCanvas.style.left = '0'; dotCanvas.style.top = '0'; dotCanvas.style.width = stageWidth + 'px'; dotCanvas.style.height = stageHeight + 'px'; dotCanvas.style.objectFit = 'cover'; dotCanvas.style.zIndex = '1'; const ctx = dotCanvas.getContext('2d'); ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, dotCanvas.width, dotCanvas.height); ctx.drawImage(work, 0, 0); } if (paletteMenu) { paletteMenu.hidden = false; paletteMenu.style.display = 'block'; paletteMenu.style.zIndex = '40'; } })()"
+      ],
+      "waitAfterActionsMs": 300,
+      "viewport": { "width": 1280, "height": 900 },
+      "output": "assets/screenshots/generated/pixiee-lens-dot-scene.png"
+    },
+    {
+      "id": "qr_maker_basic",
+      "urlPath": "/qr-maker/index.html",
+      "waitFor": "#qrCanvas",
+      "viewport": { "width": 1280, "height": 900 },
+      "output": "assets/screenshots/generated/qr-maker-basic.png"
+    },
+    {
+      "id": "qr_maker_style",
+      "urlPath": "/qr-maker/index.html",
+      "waitFor": "#qrCanvas",
+      "evaluateScripts": [
+        "(async () => { qrInput.value = 'https://pixieed.jp/portfolio/index.html'; qrLevel.value = 'H'; qrMargin.value = '2'; qrSize.value = '480'; qrDark.value = '#1d4ed8'; qrLight.value = '#fef3c7'; [qrInput, qrLevel, qrMargin, qrSize, qrDark, qrLight].forEach((el) => { el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }); if (typeof syncLabels === 'function') syncLabels(); if (typeof renderQRCode === 'function') await renderQRCode(); })()"
+      ],
+      "waitAfterActionsMs": 200,
+      "viewport": { "width": 1280, "height": 900 },
+      "output": "assets/screenshots/generated/qr-maker-style.png"
+    },
+    {
+      "id": "pixfind_select",
+      "urlPath": "/pixfind/index.html",
+      "waitFor": "#app",
+      "clickSelectors": ["#startButton", "[data-difficulty='3']"],
+      "hideSelectors": ["#startScreen", "#creatorOverlay", "#completionOverlay", "#failureOverlay"],
+      "showSelectors": ["#difficultyScreen"],
+      "postWaitFor": "#difficultyScreen .difficulty-selector",
+      "waitAfterActionsMs": 400,
+      "viewport": { "width": 1280, "height": 900 },
+      "output": "assets/screenshots/generated/pixfind-select.png"
+    },
+    {
+      "id": "pixfind_play",
+      "urlPath": "/pixfind/index.html?puzzle=d3-tabun-shibuya",
+      "waitFor": "#app",
+      "hideSelectors": ["#creatorOverlay", "#completionOverlay", "#failureOverlay"],
+      "postWaitFor": "#gameScreen:not([hidden])",
+      "waitAfterActionsMs": 600,
+      "viewport": { "width": 1280, "height": 900 },
+      "output": "assets/screenshots/generated/pixfind-play.png"
+    },
+    {
+      "id": "pixfind_hidden_object",
+      "urlPath": "/pixfind/index.html",
+      "waitFor": "#app",
+      "hideSelectors": ["#creatorOverlay", "#completionOverlay", "#failureOverlay"],
+      "evaluateScripts": [
+        "(async () => { const original = await loadImageFromUrl('assets/puzzles/d3-tabun-shibuya/original.png'); if (!original) return; const makeRegion = (minX, minY, maxX, maxY) => ({ minX, minY, maxX, maxY, count: Math.max(1, (maxX - minX + 1) * (maxY - minY + 1)), centerX: (minX + maxX) / 2, centerY: (minY + maxY) / 2 }); const diffResult = { width: original.width, height: original.height, regions: [ makeRegion(7, 367, 102, 486), makeRegion(221, 46, 268, 103), makeRegion(349, 193, 408, 259), makeRegion(193, 420, 270, 489) ] }; const metadata = { id: 'pixfind-ho-shibuya', name: '多分いつもの渋谷', difficulty: 3, size: `${original.width}×${original.height}px`, source: 'official', mode: 'hidden-object', targets: ['木', 'ピンクの看板', '右のバス停', '中央下の車'], author: '', authorUrl: '', authorAvatar: resolveAvatarSrcFromId('mao'), clientId: null }; prepareGameBoard(original, original, diffResult, metadata); dom.gameTitle.textContent = metadata.name; renderGameAuthor(metadata); updateDeleteButton(metadata); setActiveScreen('game'); resetRound(); })()"
+      ],
+      "postWaitFor": "#gameScreen:not([hidden])",
+      "waitAfterActionsMs": 600,
+      "viewport": { "width": 1280, "height": 900 },
+      "output": "assets/screenshots/generated/pixfind-hidden-object.png"
+    },
+    {
+      "id": "maoitu_opening",
+      "urlPath": "/maoitu/game.html?mode=normal",
+      "waitFor": "#c",
+      "waitAfterActionsMs": 1800,
+      "viewport": { "width": 1280, "height": 900 },
+      "output": "assets/screenshots/generated/maoitu-opening.png"
+    },
+    {
+      "id": "maoitu_level10",
+      "urlPath": "/maoitu/game.html?mode=normal",
+      "waitFor": "#c",
+      "evaluateScripts": [
+        "(() => { if (typeof reset === 'function') reset(false); if (typeof applyDifficultyPreset === 'function') applyDifficultyPreset('normal'); alive = true; runCleared = false; maxDifficultyLevel = Infinity; S = 98; scoreCarry = 0; elapsedFrames = 600; o = 600; difficultyLevel = 10; enemySpawnIntervalFrames = minSpawnIntervalFrames; enemiesPerSpawn = maxEnemiesPerSpawn; feverFrames = 180; shieldCharges = 1; E.length = 0; angels.length = 0; P.x = PLAYER_START_X; P.y = PLAYER_START_Y; P.px = P.x; P.py = P.y; tx = PLAYER_START_TX; for (let i = 0; i < 10; i += 1) spawnEnemy(); for (let i = 0; i < 2; i += 1) spawnAngel(); E.forEach((enemy, index) => { enemy.y = 20 + (index * 16); enemy.x = (index * 27) % Math.max(1, W - enemy.w); enemy.px = enemy.x; enemy.py = enemy.y; }); angels.forEach((angel, index) => { angel.y = 42 + (index * 72); angel.x = 48 + (index * 140); angel.px = angel.x; angel.py = angel.y; }); const gameOverUi = document.getElementById('gameOverUi'); const sharePanelEl = document.getElementById('sharePanel'); if (gameOverUi) gameOverUi.style.display = 'none'; if (sharePanelEl) sharePanelEl.style.display = 'none'; if (typeof draw === 'function') draw(1); })()"
+      ],
+      "waitAfterActionsMs": 200,
+      "viewport": { "width": 1280, "height": 900 },
+      "output": "assets/screenshots/generated/maoitu-level10.png"
+    },
+    {
+      "id": "maou_war_map",
+      "urlPath": "/maou-war/index.html",
+      "waitFor": "#mapCanvas",
+      "viewport": { "width": 1280, "height": 960 },
+      "output": "assets/screenshots/generated/maou-war-map.png"
+    },
+    {
+      "id": "maou_war_status",
+      "urlPath": "/maou-war/index.html",
+      "waitFor": "#mapCanvas",
+      "evaluateScripts": [
+        "(() => { if (typeof setSheetOpen === 'function') setSheetOpen(true); })()"
+      ],
+      "waitAfterActionsMs": 200,
+      "viewport": { "width": 1280, "height": 960 },
+      "output": "assets/screenshots/generated/maou-war-status.png"
+    }
+  ]
+}

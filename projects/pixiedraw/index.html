@@ -1,631 +1,247 @@
 <!DOCTYPE html>
-
 <html lang="ja">
 <head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
-<title>ドット絵作成ツール PiXiEEDraw | 無料ブラウザで描く・共同編集</title>
-<meta content="PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・共同制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、ローカル拡張、PC/モバイル対応。" name="description"/>
-<meta content="PiXiEEDraw,ドット絵 エディター,ドット絵 描く サイト,ピクセルアート,リアルタイム 共同編集,アニメーション GIF,オニオンスキン" name="keywords"/>
-<meta content="index,follow" name="robots"/>
-<link href="https://pixieed.jp/pixiedraw/" rel="canonical"/>
-<meta content="ドット絵作成ツール PiXiEEDraw | 無料ブラウザで描く・共同編集" property="og:title"/>
-<meta content="PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・共同制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、ローカル拡張、PC/モバイル対応。" property="og:description"/>
-<meta content="website" property="og:type"/>
-<meta content="https://pixieed.jp/pixiedraw/" property="og:url"/>
-<meta content="https://pixieed.jp/pixiedraw/ogp-app.png" property="og:image"/>
-<meta content="PiXiEEDraw のUIプレビューイメージ" property="og:image:alt"/>
-<meta content="PiXiEED" property="og:site_name"/>
-<meta content="ja_JP" property="og:locale"/>
-<meta content="summary_large_image" name="twitter:card"/>
-<meta content="@PiXiEED_arta" name="twitter:site"/>
-<meta content="https://pixieed.jp/pixiedraw/" name="twitter:url"/>
-<meta content="ドット絵作成ツール PiXiEEDraw | 無料ブラウザで描く・共同編集" name="twitter:title"/>
-<meta content="PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・共同制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、ローカル拡張、PC/モバイル対応。" name="twitter:description"/>
-<meta content="https://pixieed.jp/pixiedraw/ogp-app.png" name="twitter:image"/>
-<meta content="PiXiEEDraw のUIプレビューイメージ" name="twitter:image:alt"/>
-<meta content="#0b1224" name="theme-color"/>
-<script type="application/ld+json">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>PiXiEEDraw | ブラウザとスマホで使えるドット絵エディター</title>
+  <meta name="description" content="PiXiEEDrawは、ブラウザとスマホで使えるドット絵エディターです。ピクセルアート制作、アニメーション、複数キャンバス、PNG/GIF書き出し、広場導線まで1ページで分かります。">
+  <link rel="canonical" href="https://pixieed.jp/projects/pixiedraw/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PiXiEED">
+  <meta property="og:title" content="PiXiEEDraw | ブラウザとスマホで使えるドット絵エディター">
+  <meta property="og:description" content="PiXiEEDrawは、ブラウザとスマホで使えるドット絵エディターです。ピクセルアート制作、アニメーション、複数キャンバス、PNG/GIF書き出し、広場導線まで1ページで分かります。">
+  <meta property="og:url" content="https://pixieed.jp/projects/pixiedraw/">
+  <meta property="og:image" content="https://pixieed.jp/assets/screenshots/pixieedraw-ui.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PiXiEEDraw | ブラウザとスマホで使えるドット絵エディター">
+  <meta name="twitter:description" content="PiXiEEDrawは、ブラウザとスマホで使えるドット絵エディターです。ピクセルアート制作、アニメーション、複数キャンバス、PNG/GIF書き出し、広場導線まで1ページで分かります。">
+  <meta name="twitter:image" content="https://pixieed.jp/assets/screenshots/pixieedraw-ui.png">
+  <link rel="icon" type="image/png" href="../../character-dots/mao1.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="../../site/landing.css">
+  <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@graph": [
       {
+        "@type": "WebPage",
+        "name": "PiXiEEDraw",
+        "url": "https://pixieed.jp/projects/pixiedraw/",
+        "description": "PiXiEEDrawは、ブラウザとスマホで使えるドット絵エディターです。ピクセルアート制作、アニメーション、複数キャンバス、PNG/GIF書き出し、広場導線まで1ページで分かります。"
+      },
+      {
         "@type": "SoftwareApplication",
         "name": "PiXiEEDraw",
-        "applicationCategory": "DesignApplication",
+        "applicationCategory": "WebApplication",
         "operatingSystem": "Web",
-        "url": "https://pixieed.jp/pixiedraw/",
-        "image": "https://pixieed.jp/pixiedraw/ogp-app.png",
-        "description": "PiXiEEDrawは無料で使えるブラウザのドット絵作成ツール。本格制作・共同制作・アニメ制作に対応し、レイヤー/オニオンスキン、PNG/JPEG/SVG/GIF/タイムラプスGIF書き出し、ローカル拡張、PC/モバイル対応。",
-        "featureList": [
-          "リアルタイム共有モード（マスター/参加者）",
-          "マルチキャンバス編集",
-          "フレームアニメーション編集（FPS設定）",
-          "オニオンスキン表示",
-          "レイヤー不透明度・合成モード",
-          "PNG/JPEG/SVG/GIF/タイムラプスGIF/プロジェクト書き出し",
-          "ローカル拡張（端末内で動作）",
-          "PC/タブレット/スマホ対応"
-        ],
-        "softwareVersion": "2026.03",
-        "dateModified": "2026-03-04",
-        "isAccessibleForFree": true,
-        "offers": {
-          "@type": "Offer",
-          "price": "0",
-          "priceCurrency": "JPY",
-          "availability": "https://schema.org/InStock"
-        },
-        "publisher": {
-          "@type": "Organization",
-          "name": "PiXiEED",
-          "url": "https://pixieed.jp/"
-        }
+        "url": "https://pixieed.jp/projects/pixiedraw/",
+        "description": "PiXiEEDrawは、ブラウザとスマホで使えるドット絵エディターです。ピクセルアート制作、アニメーション、複数キャンバス、PNG/GIF書き出し、広場導線まで1ページで分かります。"
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "PiXiEED", "item": "https://pixieed.jp/" },
+          { "@type": "ListItem", "position": 2, "name": "プロジェクト", "item": "https://pixieed.jp/#projects" },
+          { "@type": "ListItem", "position": 3, "name": "PiXiEEDraw", "item": "https://pixieed.jp/projects/pixiedraw/" }
+        ]
       },
       {
         "@type": "FAQPage",
         "mainEntity": [
-          {
-            "@type": "Question",
-            "name": "リアルタイムでみんなで描けますか？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "共有モード（マルチ）で、プロジェクトキーを使って複数人で同時に描画できます。マスター/参加者の役割とセル割当で制作を進められます。※テスト運用中。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "アニメーション制作に対応していますか？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "フレーム単位の編集、FPS調整、オニオンスキン表示に対応しています。完成後はGIFとして書き出しできます。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "PCとスマホで続きを描けますか？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "PiXiEEDrawファイルやPNGを書き出してGoogle Driveなどのクラウドに保存すれば、家のPCで作業した続きがスマホでも開けます。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "インストールは必要ですか？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "ブラウザで動作するため、インストール不要でURLを開けばすぐに使えます。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "保存はどうなりますか？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "編集中はローカルに自動保存され、PNGやスプライトシート、タイルセットとして書き出しできます。"
-            }
-          },
-          {
-            "@type": "Question",
-            "name": "対応端末は？",
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": "PC・タブレット・スマホに対応し、Chromeでの利用を推奨しています。"
-            }
-          }
+          { "@type": "Question", "name": "スマホでも使えますか？", "acceptedAnswer": { "@type": "Answer", "text": "使えます。スマホ前提でも読みやすく、開いたらすぐ使える構成です。" } },
+          { "@type": "Question", "name": "アニメーションは作れますか？", "acceptedAnswer": { "@type": "Answer", "text": "フレーム単位の制作と書き出し導線を用意しています。" } },
+          { "@type": "Question", "name": "他の人の作品も見られますか？", "acceptedAnswer": { "@type": "Answer", "text": "広場から作品一覧と詳細を見られます。" } }
         ]
       }
     ]
   }
   </script>
-<script async crossorigin="anonymous" src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253"></script>
-<!-- Google tag (gtag.js) -->
-<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZPVXMX85G"></script>
-<script>
-  const GA_MEASUREMENT_ID = 'G-SZPVXMX85G';
-  const GA_PAGE_PATH = '/projects/pixiedraw/';
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', GA_MEASUREMENT_ID, {
-    page_path: GA_PAGE_PATH,
-    page_title: document.title
-  });
-  </script>
-<link href="https://fonts.googleapis.com" rel="preconnect"/>
-<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Fredoka:wght@600&display=swap" rel="stylesheet"/>
-
-
-
-<link href="../../styles.css" rel="stylesheet"/>
-<link rel="icon" type="image/png" sizes="192x192" href="../../icon/icon-192-4.png"/>
-<link rel="icon" type="image/png" sizes="512x512" href="../../icon/icon-512-4.png"/>
-<style id="ads-safe">
-  html, body {
-    max-width: 100vw;
-    overflow-x: hidden;
-  }
-  .adsbygoogle,
-  ins.adsbygoogle {
-    display: block !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    margin: 0 auto;
-    box-sizing: border-box;
-    overflow: hidden;
-  }
-  .adsbygoogle iframe,
-  ins.adsbygoogle iframe {
-    display: block;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-  }
-
-  /* global-overflow-guard */
-  .ad-block,
-  .ad-card,
-  .ad-footer,
-  .project-ad,
-  .entry-ad-slot,
-  .puzzle-ad-slot,
-  .game-ad,
-  .card--ad {
-    width: min(100%, 720px) !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    box-sizing: border-box;
-    overflow: hidden;
-  }
-  .ad-slot,
-  .ad-block ins.adsbygoogle,
-  .ad-footer ins,
-  .entry-ad-slot ins,
-  .puzzle-ad-slot ins.adsbygoogle,
-  .game-ad ins.adsbygoogle {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    box-sizing: border-box;
-    min-height: clamp(48px, 9vw, 60px) !important;
-    height: clamp(48px, 9vw, 60px) !important;
-    overflow: hidden !important;
-  }
-  .page,
-  main,
-  .card,
-  .section,
-  .panel,
-  .shell {
-    min-width: 0;
-    max-width: 100%;
-  }
-</style>
-  <style id="interaction-guard">
-    * {
-      -webkit-touch-callout: none;
-      -webkit-user-drag: none;
-      -webkit-user-select: none;
-      -ms-user-select: none;
-      user-select: none;
-    }
-    input,
-    textarea,
-    [contenteditable] {
-      -webkit-user-select: none;
-      -ms-user-select: none;
-      user-select: none;
-    }
-  </style>
-  <script id="interaction-guard-js">
-    document.addEventListener('contextmenu', (event) => {
-      event.preventDefault();
-    });
-    document.addEventListener('dragstart', (event) => {
-      event.preventDefault();
-    });
-  </script>
-  
-<script id="ads-lazy">
-  (function() {
-    if (window.pixieedObserveAds) return;
-
-    const SLOT_SEQUENCE = ['2141591954','9073878884','2261515379'];
-    const SLOT_KEY = 'pixieedAdSlotIndex';
-    const LOAD_TIMEOUT_MS = 10000;
-    const READY_POLL_MS = 250;
-
-    let slotIndex = 0;
-    let activeAd = null;
-    let readyTimer = null;
-    const queue = [];
-
-    const readSlotIndex = () => {
-      try {
-        const stored = sessionStorage.getItem(SLOT_KEY);
-        if (stored !== null) slotIndex = Number(stored) || 0;
-      } catch (err) {}
-    };
-
-    const storeSlotIndex = () => {
-      try {
-        sessionStorage.setItem(SLOT_KEY, String(slotIndex));
-      } catch (err) {}
-    };
-
-    readSlotIndex();
-
-    const nextSlot = () => {
-      if (!SLOT_SEQUENCE.length) return '';
-      const slot = SLOT_SEQUENCE[slotIndex % SLOT_SEQUENCE.length];
-      slotIndex += 1;
-      storeSlotIndex();
-      return slot;
-    };
-
-    const isReady = (ins) => (
-      ins.getAttribute('data-adsbygoogle-status') === 'done' ||
-      ins.getAttribute('data-ad-status') === 'filled'
-    );
-
-    const isEnqueued = (ins) => ins.dataset.adsQueueEnqueued === '1';
-    const isLoading = (ins) => ins.dataset.adsQueueLoading === '1';
-    const isLoaded = (ins) => ins.dataset.adsLazyLoaded === '1' || isReady(ins);
-
-    const assignSlot = (ins) => {
-      if (!ins || !(ins instanceof HTMLElement)) return;
-      if (ins.dataset.adSlotAssigned === '1') return;
-      const existingSlot = ins.getAttribute('data-ad-slot');
-      if (existingSlot && existingSlot !== 'rotate') {
-        ins.dataset.adSlotAssigned = '1';
-        return;
-      }
-      if (ins.dataset.adStatic === '1') {
-        ins.dataset.adSlotAssigned = '1';
-        return;
-      }
-      const slot = nextSlot();
-      if (slot) {
-        ins.setAttribute('data-ad-slot', slot);
-      }
-      ins.dataset.adSlotAssigned = '1';
-    };
-
-    const clearReadyTimer = () => {
-      if (!readyTimer) return;
-      clearTimeout(readyTimer);
-      readyTimer = null;
-    };
-
-    const releaseActiveAd = () => {
-      clearReadyTimer();
-      if (!activeAd) return;
-      activeAd.dataset.adsQueueLoading = '';
-      activeAd.dataset.adsQueueEnqueued = '';
-      activeAd.dataset.adsLazyLoaded = '1';
-      activeAd = null;
-      processQueue();
-    };
-
-    const waitUntilReady = (ins, startedAt) => {
-      if (!activeAd || activeAd !== ins) return;
-      if (!document.contains(ins) || isReady(ins) || (Date.now() - startedAt) >= LOAD_TIMEOUT_MS) {
-        releaseActiveAd();
-        return;
-      }
-      readyTimer = setTimeout(() => waitUntilReady(ins, startedAt), READY_POLL_MS);
-    };
-
-    const loadAd = (ins) => {
-      if (!ins || !(ins instanceof HTMLElement)) return false;
-      if (isLoaded(ins) || isLoading(ins)) return true;
-      assignSlot(ins);
-      ins.dataset.adsQueueLoading = '1';
-      ins.dataset.adsLazyLoaded = '1';
-      try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-      } catch (err) {
-        ins.dataset.adsQueueLoading = '';
-        ins.dataset.adsLazyLoaded = '';
-        return false;
-      }
-      return true;
-    };
-
-    const enqueueAd = (ins) => {
-      if (!ins || !(ins instanceof HTMLElement)) return;
-      if (isLoaded(ins) || isLoading(ins) || isEnqueued(ins)) return;
-      assignSlot(ins);
-      ins.dataset.adsQueueEnqueued = '1';
-      queue.push(ins);
-    };
-
-    function processQueue() {
-      if (activeAd) return;
-      while (queue.length) {
-        const ins = queue.shift();
-        if (!ins || !(ins instanceof HTMLElement)) continue;
-        if (!document.contains(ins)) continue;
-        ins.dataset.adsQueueEnqueued = '';
-        if (isLoaded(ins)) {
-          ins.dataset.adsLazyLoaded = '1';
-          continue;
-        }
-        activeAd = ins;
-        const startedAt = Date.now();
-        if (!loadAd(ins)) {
-          activeAd = null;
-          setTimeout(() => {
-            if (!document.contains(ins) || isLoaded(ins)) return;
-            enqueueAd(ins);
-            processQueue();
-          }, 1200);
-          return;
-        }
-        waitUntilReady(ins, startedAt);
-        return;
-      }
-    }
-
-    const observeAds = (root) => {
-      const scope = root && root.querySelectorAll ? root : document;
-      scope.querySelectorAll('ins.adsbygoogle').forEach(enqueueAd);
-      processQueue();
-    };
-
-    window.pixieedObserveAds = observeAds;
-
-    const setupQueue = () => {
-      observeAds(document);
-    };
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', setupQueue);
-    } else {
-      setupQueue();
-    }
-
-    const mo = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          if (!(node instanceof HTMLElement)) return;
-          if (node.matches && node.matches('ins.adsbygoogle')) {
-            enqueueAd(node);
-            return;
-          }
-          if (node.querySelectorAll) {
-            node.querySelectorAll('ins.adsbygoogle').forEach(enqueueAd);
-          }
-        });
-      });
-      processQueue();
-    });
-
-    const startObserver = () => {
-      if (!document.body) return;
-      mo.observe(document.body, { childList: true, subtree: true });
-    };
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', startObserver);
-    } else {
-      startObserver();
-    }
-  })();
-</script>
-<link rel="apple-touch-icon" href="/icon/icon-512-4.png"/>
 </head>
-<body class="project-page">
-<main>
-<section class="project-ad project-ad--top">
-<div style="position:relative;">
-<ins class="adsbygoogle"
-     style="display:block"
-     data-ad-client="ca-pub-9801602250480253"
-     data-ad-slot="2141591954"></ins>
-</div>
-<script>if (window.pixieedObserveAds) { window.pixieedObserveAds(); }</script>
-</section>
-<section class="hero" id="overview">
-<div class="project-visual project-visual--hero">
-<img alt="PiXiEEDraw のUIプレビューイメージ" loading="lazy" src="../../icon/icon-192-4.png" data-media="icon"/>
-</div>
-<div class="hero-copy">
-<p class="project-update" data-last-updated="2026-02-20">
-<span class="project-update__label">最終更新</span>
-<time class="project-update__value" datetime="2026-02-20">2026/02/20</time>
-</p>
-<div class="hero-cta">
-<a class="cta-primary" href="../../pixiedraw/index.html">プレイする（ツールを開く）</a>
-<a class="cta-secondary" href="../../tools.html">他のゲーム・ツール</a>
-</div>
-<h1>PiXiEEDraw（ドット絵を描くサイト）</h1>
-<p>ブラウザ単体で編集から書き出しまで完結するドット絵作成ツールです。<strong>リアルタイム共有モード</strong>でみんなで同時に描けて、<strong>フレームアニメーション制作</strong>まで1つの画面で完結します。</p>
-<p>レイヤー合成・オニオンスキン・カスタムブラシ・自動保存に加え、PNG/JPEG/SVG/GIF/タイムラプスGIF出力に対応。ローカル拡張とPC/タブレット/スマホ対応で、制作フローを揃えられます。</p>
-</div>
-</section>
-<section class="section" id="updates">
-<div class="section-inner">
-<div class="project-note">
-<strong>更新メモ</strong>
-<ul class="project-note__list">
-<li>2026/02/20: PiXiEEDrawのみPWA対応に変更。未インストール端末向けインストールポップを最適化。</li>
-<li>2026/02/19: 共有モード（マルチ）を追加（マスター/参加者、セル割当、差分同期）。</li>
-<li>2026/02/19: 共有キー操作と役割フローを改善、共有モードアイコンを更新。</li>
-<li>2026/02/19: フレーム編集・オニオンスキン・再生同期を強化し、アニメ制作ワークフローを改善。</li>
-<li>2026/02/19: 範囲選択時のコピー/貼り付けボタンをPC・横画面でも左上表示に対応。</li>
-<li>共有モード（マルチ）は現在テスト運用中です。</li>
-</ul>
-<div class="project-note__actions">
-<a class="cta-secondary" href="../../notes/index.html">開発ノートまとめへ</a>
-</div>
-</div>
-</div>
-</section>
-<section class="section" id="howto">
-<div class="section-inner">
-<h2>使い方</h2>
-<ol class="project-howto">
-<li>起動後のスタート画面で「新規作成」または「ファイルを開く」を選び、キャンバスサイズや読み込むデータを設定します。</li>
-<li>左レールでツール、右レールでレイヤーやアニメーションを切り替えながらドットを配置します。モバイルでは画面下部のタブから同じ機能にアクセスできます。</li>
-<li>編集中は数秒ごとに自動保存が行われます。エクスポート時はPNG/JPEG/SVG/GIF/タイムラプスGIF/スプライトマップ/グリッド分割など目的に合わせた書き出し形式を選択してください。</li>
-<li>設定メニューから仮想カーソルやUIスケールを端末に合わせて調整できます。モバイルではボタンサイズを変えて描きやすさを確保してください。</li>
-</ol>
-<p class="project-howto__note">Chromeでの利用を推奨しています。Chrome以外のブラウザでは一部機能に制限がかかる場合があります。</p>
-</div>
-</section>
-<section class="section section--accent" id="features">
-<div class="section-inner">
-<h2>PiXiEEDraw の特徴</h2>
-<p>「ドット絵を描く」「アニメにする」「みんなで仕上げる」をブラウザだけで実現できる構成を目指して開発しています。特に <strong>リアルタイム共同編集</strong> と <strong>アニメーション制作</strong> を強化しています。</p>
-<ul class="project-feature-list">
-<li>
-<strong>リアルタイム共同編集（マルチ）</strong>
-            プロジェクトキーを使って参加者を接続し、同じ作品を同時進行で制作できます。マスター/参加者の役割とセル割当で分業しやすい設計です（テスト運用中）。
-          </li>
-<li>
-<strong>アニメーション制作対応</strong>
-            フレーム編集、FPS設定、オニオンスキン表示を使いながら動きの確認が可能。完成後はGIFやタイムラプスGIF、スプライトマップとして書き出せます。
-          </li>
-<li>
-<strong>モバイル最適 UI</strong>
-            スマホの縦画面・横画面をどちらも想定したレスポンシブ設計。指での描画やペン操作でもメニューが邪魔にならず、ステージとツールの並びを自動で再配置します。
-          </li>
-<li>
-<strong>自動保存 &amp; 復帰サポート</strong>
-            描いている最中でも数秒ごとにローカルへスナップショットを保存。ブラウザを閉じても直前の状態を復元でき、保存忘れのストレスを軽減します。
-          </li>
-<li>
-<strong>ローカル拡張</strong>
-            端末内だけで動く拡張パネルから、補助UIや小ツールを追加できます。
-          </li>
-<li>
-<strong>PC/スマホで引き継ぎ</strong>
-            PiXiEEDrawファイルやPNGを書き出してGoogle Driveなどのクラウドに保存すれば、家のPCと外出先のスマホで同じ作品を続けて描けます。
-          </li>
-<li>
-<strong>リビルド不要のタイルプレビュー</strong>
-            タイルセットを描いた瞬間に、同じパレットを使うシーン全体へライブ反映。配置済みマップを壊さず配色チェックができます。
-          </li>
-</ul>
-</div>
-</section>
-<section class="project-ad project-ad--mid">
-<ins class="adsbygoogle"
-     style="display:block"
-     data-ad-client="ca-pub-9801602250480253"
-     data-ad-slot="9073878884"
-     data-ad-format="auto"
-     data-full-width-responsive="true"></ins>
-<small class="project-ad__label">広告</small>
-<script>if (window.pixieedObserveAds) { window.pixieedObserveAds(); }</script>
-</section>
-<section class="section" id="details">
-<div class="section-inner">
-<h2>基本データ</h2>
-<div class="project-meta-grid">
-<dl class="project-meta">
-<dt>カテゴリ</dt>
-<dd>ブラウザドット絵エディター / ツール</dd>
-</dl>
-<dl class="project-meta">
-<dt>対応デバイス</dt>
-<dd>Chrome / Safari / Edge / Firefox</dd>
-</dl>
-<dl class="project-meta">
-<dt>リリース</dt>
-<dd>2025年 公開 / 2026年 継続アップデート中</dd>
-</dl>
-<dl class="project-meta">
-<dt>推奨入力</dt>
-<dd>マウス・ペンタブレット・マルチタッチ</dd>
-</dl>
-</div>
-</div>
-</section>
-<section class="section" id="faq">
-<div class="section-inner">
-<h2>よくある質問</h2>
-<div class="project-meta-grid project-faq-grid">
-<dl class="project-meta">
-<dt>リアルタイムでみんなで描けますか？</dt>
-<dd>共有モード（マルチ）で、プロジェクトキーを使って複数人で同時に描画できます。マスター/参加者の役割とセル割当で制作できます（テスト運用中）。</dd>
-</dl>
-<dl class="project-meta">
-<dt>アニメーション制作に対応していますか？</dt>
-<dd>フレーム編集、FPS調整、オニオンスキン表示に対応しています。完成したデータはGIFとして書き出しできます。</dd>
-</dl>
-<dl class="project-meta">
-<dt>PCとスマホで続きを描けますか？</dt>
-<dd>PiXiEEDrawファイルやPNGを書き出してGoogle Driveなどのクラウドに保存すれば、家のPCで作業した続きがスマホでも開けます。</dd>
-</dl>
-<dl class="project-meta">
-<dt>インストールは必要ですか？</dt>
-<dd>ブラウザで動作するため、インストール不要でURLを開けばすぐに使えます。</dd>
-</dl>
-<dl class="project-meta">
-<dt>保存はどうなりますか？</dt>
-<dd>編集中はローカルに自動保存され、PNGやスプライトシート、タイルセットとして書き出しできます。</dd>
-</dl>
-<dl class="project-meta">
-<dt>対応端末は？</dt>
-<dd>PC・タブレット・スマホに対応し、Chromeでの利用を推奨しています。</dd>
-</dl>
-</div>
-</div>
-</section>
-<section class="section section--highlight" id="share">
-<div class="section-inner">
-<h2>ご意見・フィードバック募集</h2>
-<p>操作感や機能リクエストを常時募集中です。PiXiEEDraw 内のフィードバックボタン、または公式Xのハッシュタグ <code>#PiXiEEDraw</code> からお寄せください。</p>
-<div class="project-actions">
-<a class="cta-primary" href="../../pixiedraw/index.html">プレイする（ツールを開く）</a>
-<a class="cta-secondary" href="mailto:pixieed.arta@gmail.com">メールで連絡する</a>
-</div>
-</div>
-</section>
-<section class="project-ad project-ad--bottom">
-<ins class="adsbygoogle"
-     style="display:block"
-     data-ad-client="ca-pub-9801602250480253"
-     data-ad-slot="rotate"
-     data-ad-format="auto"
-     data-full-width-responsive="true"></ins>
-<small class="project-ad__label">広告</small>
-<script>if (window.pixieedObserveAds) { window.pixieedObserveAds(); }</script>
-</section>
-</main>
-<footer>
-<p>© <span id="year"></span> PiXiEED. All rights reserved.</p>
-<div class="footer-links">
-<a href="../../terms/index.html">利用規約</a>
-<a href="../../privacy/index.html">プライバシーポリシー</a>
-</div>
-</footer>
-<nav class="bottom-nav">
-  <a class="bottom-nav__item" data-tab="home" href="../../index.html">
-    <span class="icon"><img src="../../FooterIcon1.png" alt=""/></span><span>ホーム</span>
-  </a>
-  <a class="bottom-nav__item" data-tab="contest" href="../../contest/index.html">
-    <span class="icon"><img src="../../FooterIcon2.png" alt=""/></span><span>コンテスト</span>
-  </a>
+<body>
+  <header class="site-header" aria-label="top-nav">
+    <div class="header-inner header-inner--app">
+      <button class="brand" id="openProfilePanel" type="button">
+        <span class="brand-icon" id="brandAvatar">
+          <img src="../../character-dots/mao1.png" alt="logo">
+        </span>
+        <div class="brand-text">
+          <p class="brand-title">PiXiEED</p>
+          <p class="brand-sub" id="brandUser">ユーザー</p>
+        </div>
+      </button>
+      <div class="header-actions">
+        <a class="support-tip-link" id="supportTipLink" href="#" target="_blank" rel="noopener noreferrer" aria-label="PiXiEEDの応援チップを購入">応援チップ</a>
+      </div>
+    </div>
+  </header>
+<div class="page">
+  
+  <main class="page-shell">
+    <section class="section">
+      <div class="section__inner project-hero">
+        <div class="project-summary">
+          <p class="eyebrow">project</p>
+          <h1 class="section-title">PiXiEEDraw</h1>
+          <p class="section-copy">ブラウザとスマホで使えるドット絵エディター</p>
+          <div class="project-tags"><span>1ページ完結紹介</span><span>スマホ対応</span><span>PiXiEED</span></div>
+          <div class="hero__actions">
+            <a class="button" href="../../pixiedraw/index.html">使ってみる</a>
+            <a class="button-secondary" href="../../contest/index.html">広場を見る</a>
+          </div>
+        </div>
+        <div class="project-hero__media"><img src="../../assets/screenshots/pixieedraw-ui.png" alt="PiXiEEDrawの編集画面"></div>
+      </div>
+    </section>
 
-  <a class="bottom-nav__item" data-tab="tools" href="../../tools.html">
-    <span class="icon"><img src="../../FooterIcon3.png" alt=""/></span><span>ツール/ゲーム</span>
-  </a>
-    <a class="bottom-nav__item" data-tab="lens" href="../../pixiee-lens/index.html">
-      <span class="icon"><img src="../../FooterIcon5.png" alt=""/></span><span>PiXiEELENS</span>
-    </a>
-  <a class="bottom-nav__item" data-tab="portfolio" href="../../portfolio/index.html">
-    <span class="icon"><img src="../../FooterIcon4.png" alt=""/></span><span>企業向け</span>
-  </a>
-</nav>
-<script src="../../scripts.js"></script>
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">overview</p>
+        <h2 class="section-title">概要</h2>
+        <p class="section-copy">PiXiEEDrawは、ブラウザでドット絵を描いて、そのまま保存や書き出しまで進められるエディターです。</p><p class="section-copy">スマホでも使いやすい前提で設計し、短い制作から複数キャンバスを使う制作まで対応します。</p><p class="section-copy">作る、保存する、広場で見るという流れが分断されていないことが強みです。</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">features</p>
+        <h2 class="section-title">主な特徴</h2>
+        <div class="meta-grid"><article class="info-card"><h3>ブラウザですぐ使える</h3><p class="card-copy">インストールなしで開いてそのまま制作に入れます。</p></article><article class="info-card"><h3>フレームと複数キャンバスに対応</h3><p class="card-copy">静止画から簡単なアニメ制作まで1つで扱えます。</p></article><article class="info-card"><h3>保存と書き出しが分かりやすい</h3><p class="card-copy">制作中の管理とPNGやGIFの書き出し導線を分けて用意します。</p></article><article class="info-card"><h3>広場へつながる</h3><p class="card-copy">描いた後に作品を見る、共有する導線が近い構成です。</p></article></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">scenes</p>
+        <h2 class="section-title">利用シーン</h2>
+        <ul class="bullet-list"><li>SNS投稿用の小さな作品を作りたい時</li><li>ゲーム用の試作素材を描きたい時</li><li>フレームごとの簡易アニメを作りたい時</li><li>他の作品を見ながら自分でも描きたい時</li></ul>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">how to use</p>
+        <h2 class="section-title">使い方</h2>
+        <ol class="steps"><li>PiXiEEDrawを開く</li><li>キャンバスサイズや必要な構成を決める</li><li>色を選んで描く</li><li>必要ならフレームや複数キャンバスを使う</li><li>保存または広場の作品閲覧へ進む</li></ol>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">samples</p>
+        <h2 class="section-title">サンプル</h2>
+        <div class="gallery-grid"><article class="sample-card"><img src="../../assets/screenshots/pixieedraw-ui.png" alt="PiXiEEDrawの紹介ビジュアル"><h3>紹介ビジュアル</h3><p class="card-copy">ツール全体の印象がすぐ伝わる OGP 画像です。</p></article><article class="sample-card"><img src="../../assets/screenshots/generated/pixiedraw-left-rail.png" alt="PiXiEEDrawの左レーンを開いた画面"><h3>左レーンを開いた編集画面</h3><p class="card-copy">ツールとパレットを広めに見ながら、その場で描き込みに入れる実画面です。</p></article><article class="sample-card"><img src="../../assets/screenshots/generated/pixiedraw-right-rail.png" alt="PiXiEEDrawの右レーンを開いた画面"><h3>右レーンを開いた管理画面</h3><p class="card-copy">ファイルや出力まわりまで見通しながら、仕上げ前の管理導線を確認できる実画面です。</p></article></div>
+      </div>
+    </section>
+
+    <section class="section" aria-label="広告">
+      <div class="section__inner">
+        <div class="card ad-banner">
+          <p class="ad-banner__label">広告</p>
+          <ins class="adsbygoogle"
+               style="display:block"
+               data-ad-client="ca-pub-9801602250480253"
+               data-ad-slot="rotate"
+               data-ad-format="auto"
+               data-full-width-responsive="true"></ins>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">faq</p>
+        <h2 class="section-title">FAQ</h2>
+        <div class="faq-card"><details><summary>スマホでも使えますか？</summary><p>使えます。スマホ前提でも読みやすく、開いたらすぐ使える構成です。</p></details><details><summary>アニメーションは作れますか？</summary><p>フレーム単位の制作と書き出し導線を用意しています。</p></details><details><summary>他の人の作品も見られますか？</summary><p>広場から作品一覧と詳細を見られます。</p></details></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">links</p>
+        <h2 class="section-title">関連導線</h2>
+        <div class="link-grid related-tool-grid"><article class="link-card related-tool-card"><div class="related-tool-card__head"><span class="related-tool-card__icon"><img src="../../FooterIcon2.png" alt="広場"></span><div><p class="meta-label">広場</p><h3>広場を見る</h3></div></div><p class="meta-copy">投稿作品や公開作品を一覧で見て、そのまま詳細へ進めます。</p><div class="inline-actions"><a class="button-secondary" href="../../contest/index.html">広場を見る</a></div></article><article class="link-card related-tool-card"><div class="related-tool-card__head"><span class="related-tool-card__icon"><img src="../../pixiedraw/assets/icons/talk.png" alt="会話"></span><div><p class="meta-label">会話</p><h3>会話（準備中）</h3></div></div><p class="meta-copy">会話ページはまだ公開していません。準備ができるまでお待ちください。</p><div class="inline-actions"><a class="button-secondary" href="#" aria-disabled="true" onclick="return false;">会話（準備中）</a></div></article><article class="link-card related-tool-card"><div class="related-tool-card__head"><span class="related-tool-card__icon"><img src="../../icon/icon-192-1.png" alt="PiXiEELENS"></span><div><p class="meta-label">ツール</p><h3>PiXiEELENSを見る</h3></div></div><p class="meta-copy">撮影した映像をドット調に整えて、PiXiEEDrawと組み合わせて使えます。</p><div class="inline-actions"><a class="button-secondary" href="../../projects/pixiee-lens/index.html">PiXiEELENSを見る</a></div></article><article class="link-card related-tool-card"><div class="related-tool-card__head"><span class="related-tool-card__icon"><img src="../../FooterIcon4.png" alt="企業"></span><div><p class="meta-label">企業</p><h3>企業相談</h3></div></div><p class="meta-copy">制作依頼、共同企画、導入相談などの法人向け導線です。</p><div class="inline-actions"><a class="button-secondary" href="../../portfolio/index.html">企業相談</a></div></article></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__inner">
+        <p class="eyebrow">cta</p>
+        <h2 class="section-title">次の行動</h2>
+        <p class="section-copy">このページだけで何ができるか、誰向けか、どう始めるかが分かるようにしています。次は実際に開くか、広場で作品を見るか、相談するかのどれかに進めます。</p>
+        <div class="hero__actions">
+          <a class="button" href="../../pixiedraw/index.html">使ってみる</a>
+          <a class="button-secondary" href="../../contest/index.html">投稿を見る</a>
+          <a class="button-secondary" href="../../portfolio/index.html">企業相談</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+<footer>
+    <p>© <span id="year">2026</span> PiXiEED. All rights reserved.</p>
+    <div class="footer-links">
+      <a href="#" aria-disabled="true" onclick="return false;">会話</a>
+      <a href="../../portfolio/index.html">企業</a>
+      <a href="../../terms/index.html">利用規約</a>
+      <a href="../../privacy/index.html">プライバシーポリシー</a>
+    </div>
+  </footer>
+
+<nav class="bottom-nav" aria-label="下部ナビ">
+      <a class="bottom-nav__item" data-tab="home" href="../../index.html">
+        <span class="icon"><img src="../../FooterIcon1.png" alt=""></span><span>ホーム</span>
+      </a>
+      <a class="bottom-nav__item" data-tab="contest" href="../../contest/index.html">
+        <span class="icon"><img src="../../FooterIcon2.png" alt=""></span><span>広場</span>
+      </a>
+      <a class="bottom-nav__item" data-tab="talk" href="#" aria-disabled="true" onclick="return false;">
+        <span class="icon"><img src="../../pixiedraw/assets/icons/talk.png" alt=""></span><span>会話</span>
+      </a>
+      <a class="bottom-nav__item" data-tab="portfolio" href="../../portfolio/index.html">
+        <span class="icon"><img src="../../FooterIcon4.png" alt=""></span><span>企業</span>
+      </a>
+  </nav>
+
+  <script src="../../scripts/bottom-nav-footer-ad.js"></script>
+  <script>
+    const year = document.getElementById('year');
+    if (year) year.textContent = new Date().getFullYear();
+  </script>
+  <div class="auth-panel" id="authPanel" aria-hidden="true">
+    <div class="auth-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <h3 style="margin:0;font-size:16px;color:#f9fafb;">プロフィール</h3>
+        <button class="close-btn" type="button" id="closeAuthPanel">閉じる</button>
+      </div>
+      <div class="profile-block">
+        <div class="profile-row">
+          <button class="avatar-toggle" id="avatarToggle" type="button" aria-label="アイコンを変更" aria-expanded="false" aria-controls="avatarPanel">
+            <span class="avatar-toggle__img" id="avatarPreview"></span>
+          </button>
+          <label class="profile-name">
+            <span style="font-weight:700; color:#e5e7eb;">ニックネーム</span>
+            <input class="auth-input" id="profileNickname" type="text" placeholder="なまえ" maxlength="32">
+          </label>
+        </div>
+        <div class="avatar-panel" id="avatarPanel" hidden>
+          <div class="avatar-grid" id="avatarGrid"></div>
+        </div>
+        <label class="profile-name">
+          <span style="font-weight:700; color:#e5e7eb;">X (旧Twitter)</span>
+          <input class="auth-input" id="profileX" type="url" placeholder="https://x.com/username" maxlength="200" inputmode="url">
+        </label>
+        <button class="auth-btn" id="saveProfile" type="button">プロフィールを保存</button>
+        <p class="auth-status" id="authStatus"></p>
+      </div>
+    </div>
+  </div>
+  <script src="../../scripts/ads-lazy.js"></script>
+  <script src="../../scripts/shared-profile-header.js"></script>
+  <script src="../../scripts/pixieed-dot-stats.js"></script>
+  <script src="../../scripts/shared-bottom-nav.js"></script>
+  <script src="../../scripts/pixel-art-fit.js"></script>
 </body>
 </html>

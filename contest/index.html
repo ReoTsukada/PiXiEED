@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no, viewport-fit=cover"/>
   <meta name="robots" content="noai,noimageai,noarchive"/>
   <title>PiXiEED 広場</title>
-  <meta name="description" content="PiXiEEDの広場。ユーザー投稿と公開中の共同制作ルームを同じグリッドで眺めて、そのまま参加できるページです。"/>
+  <meta name="description" content="PiXiEEDの広場。ユーザー投稿作品を一覧で見て、そのまま詳細を開けるページです。"/>
   <link rel="canonical" href="https://pixieed.jp/contest/index.html"/>
   <meta property="og:type" content="website"/>
   <meta property="og:site_name" content="PiXiEED"/>
   <meta property="og:title" content="PiXiEED | 広場"/>
-  <meta property="og:description" content="ユーザー投稿と公開中の共同制作ルームを同じグリッドで見られるPiXiEEDの広場です。"/>
+  <meta property="og:description" content="ユーザー投稿作品を一覧で見られるPiXiEEDの広場です。"/>
   <meta property="og:url" content="https://pixieed.jp/contest/index.html"/>
   <meta property="og:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
   <meta property="og:locale" content="ja_JP"/>
@@ -18,7 +18,7 @@
   <meta name="twitter:site" content="@PiXiEED_arta"/>
   <meta name="twitter:url" content="https://pixieed.jp/contest/index.html"/>
   <meta name="twitter:title" content="PiXiEED | 広場"/>
-  <meta name="twitter:description" content="ユーザー投稿と公開中の共同制作ルームを同じグリッドで見られるPiXiEEDの広場です。"/>
+  <meta name="twitter:description" content="ユーザー投稿作品を一覧で見られるPiXiEEDの広場です。"/>
   <meta name="twitter:image" content="https://pixieed.jp/PiXiEEDogp.png"/>
   <script type="application/ld+json">
   {
@@ -28,7 +28,7 @@
         "@type": "CollectionPage",
         "name": "PiXiEED 広場",
         "url": "https://pixieed.jp/contest/index.html",
-        "description": "ユーザー投稿と公開中の共同制作ルームを同じグリッドで見られるPiXiEEDの広場です。"
+        "description": "ユーザー投稿作品を一覧で見られるPiXiEEDの広場です。"
       },
       {
         "@type": "BreadcrumbList",
@@ -376,6 +376,7 @@
       display:grid;
       gap:12px;
       grid-template-columns:repeat(3, minmax(0, 1fr));
+      align-items:start;
     }
     .load-more{
       display:flex;
@@ -437,13 +438,13 @@
       color:#0b1224;
     }
     .entry-card{
-      background:rgba(255,255,255,0.05);
-      border:1px solid rgba(255,255,255,0.12);
+      background:transparent;
+      border:none;
       border-radius:12px;
       overflow:hidden;
-      display:flex;
-      flex-direction:column;
-      box-shadow:0 8px 24px rgba(0,0,0,0.26);
+      display:block;
+      box-shadow:none;
+      align-self:start;
       position:relative;
       text-decoration:none;
       color:inherit;
@@ -460,7 +461,7 @@
       min-height:clamp(48px, 9vw, 60px);
       gap:10px;
       max-width:100%;
-      background:rgba(255,255,255,0.05);
+      background:#000;
       border:1px solid rgba(255,255,255,0.12);
       box-shadow:0 10px 30px rgba(0,0,0,0.28);
       position:relative;
@@ -476,6 +477,7 @@
       justify-content:center;
       min-height:clamp(48px, 9vw, 60px);
       box-sizing:border-box;
+      background:#000;
     }
     .entry-ad-slot ins{
       display:block;
@@ -484,11 +486,13 @@
       height:clamp(48px, 9vw, 60px);
       overflow:hidden;
       box-sizing:border-box;
+      background:#000;
     }
     .entry-ad-slot iframe,
     .entry-ad-slot img{
       max-width:100% !important;
       box-sizing:border-box;
+      background:#000;
     }
     .entry-ad-note{
       margin:0;
@@ -505,9 +509,11 @@
     .entry-imgwrap{
       padding:0;
       background:transparent;
-      display:block;
+      display:flex;
+      align-items:center;
+      justify-content:center;
       position:relative;
-      aspect-ratio:1/1;
+      aspect-ratio:1 / 1;
       border-radius:12px;
       overflow:hidden;
       -webkit-touch-callout:none;
@@ -515,7 +521,9 @@
     .entry-imgwrap img{
       width:100%;
       height:100%;
-      object-fit:cover;
+      max-width:none;
+      max-height:none;
+      object-fit:contain;
       image-rendering:pixelated;
       image-rendering:crisp-edges;
       -ms-interpolation-mode:nearest-neighbor;
@@ -577,30 +585,44 @@
     }
     .heart-btn{
       position:absolute;
-      right:4px;
-      bottom:4px;
+      right:0;
+      bottom:0;
       border:none;
       background:transparent;
-      padding:0;
-      width:32px;
-      height:32px;
+      padding:8px 8px 8px 6px;
+      min-width:52px;
+      min-height:40px;
       display:flex;
       align-items:center;
       justify-content:center;
+      gap:4px;
       cursor:pointer;
       z-index:4;
     }
+    .heart-btn__count{
+      color:#f8fafc;
+      font-size:12px;
+      font-weight:800;
+      letter-spacing:0.02em;
+      line-height:1;
+      pointer-events:none;
+      text-shadow:0 1px 2px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.45);
+    }
     .heart-btn img{
-      width:100%;
-      height:100%;
+      width:18px;
+      height:18px;
       object-fit:contain;
       display:block;
+      image-rendering:pixelated;
+      flex:0 0 18px;
+      pointer-events:none;
+      filter:drop-shadow(0 1px 2px rgba(0,0,0,0.9)) drop-shadow(0 0 6px rgba(0,0,0,0.35));
     }
     .heart-btn:disabled{
       opacity:0.5;
       cursor:not-allowed;
     }
-    .entry-meta{ padding:10px; display:flex; flex-direction:column; gap:6px; }
+    .entry-meta{ display:none; }
     .entry-meta__top{ display:flex; align-items:center; justify-content:space-between; gap:6px; }
     .entry-title{ font-weight:800; color:#f9fafb; }
     .entry-like{ color:#fbbf24; font-weight:800; }
@@ -1246,6 +1268,7 @@
     margin-right: auto !important;
     box-sizing: border-box;
     overflow: hidden;
+    background: #000 !important;
   }
   .ad-slot,
   .ad-block ins.adsbygoogle,
@@ -1262,6 +1285,7 @@
     min-height: clamp(48px, 9vw, 60px) !important;
     height: clamp(48px, 9vw, 60px) !important;
     overflow: hidden !important;
+    background: #000 !important;
   }
   .page,
   main,
@@ -1489,8 +1513,7 @@
 <link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
 </head>
 <body>
-  <div class="page">
-    <header aria-label="top-nav">
+  <header aria-label="top-nav">
       <div class="header-inner">
         <button class="brand" id="openProfilePanel" type="button" style="background:none;border:0;cursor:pointer;padding:0;">
           <span class="brand-icon" id="brandAvatar">
@@ -1506,6 +1529,8 @@
         </div>
       </div>
     </header>
+<div class="page">
+    
     <section class="card">
       <div class="section-head">
         <h1>広場</h1>
@@ -1645,22 +1670,18 @@
       </form>
     </div>
   </div>
-  <nav class="bottom-nav">
+    <nav class="bottom-nav">
     <a class="bottom-nav__item" data-tab="home" href="../index.html">
       <span class="icon"><img src="../FooterIcon1.png" alt=""/></span><span>ホーム</span>
     </a>
     <a class="bottom-nav__item" data-tab="contest" href="../contest/index.html">
       <span class="icon"><img src="../FooterIcon2.png" alt=""/></span><span>広場</span>
     </a>
-
-    <a class="bottom-nav__item" data-tab="tools" href="../tools.html">
-      <span class="icon"><img src="../FooterIcon3.png" alt=""/></span><span>ツール/ゲーム</span>
-    </a>
-    <a class="bottom-nav__item" data-tab="lens" href="../pixiee-lens/index.html">
-      <span class="icon"><img src="../FooterIcon5.png" alt=""/></span><span>PiXiEELENS</span>
+    <a class="bottom-nav__item" data-tab="talk" href="#" aria-disabled="true" onclick="return false;">
+      <span class="icon"><img src="../pixiedraw/assets/icons/talk.png" alt=""/></span><span>会話</span>
     </a>
     <a class="bottom-nav__item" data-tab="portfolio" href="../portfolio/index.html">
-      <span class="icon"><img src="../FooterIcon4.png" alt=""/></span><span>企業向け</span>
+      <span class="icon"><img src="../FooterIcon4.png" alt=""/></span><span>企業</span>
     </a>
   </nav>
   <div class="auth-panel" id="authPanel" aria-hidden="true">
@@ -1766,12 +1787,6 @@
     const CONTEST_WATERMARK_TEXT = 'PiXiEED';
     const CONTEST_WATERMARK_TEXTURE_SRC = (document.body?.dataset?.watermarkTextureSrc || '').trim();
     const MULTI_SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
-    const MULTI_PUBLIC_LOBBY_CHANNEL = 'pixiedraw-public-rooms-v1';
-    const ROOMS_SOURCE_PATH = '../rooms.json';
-    const PUBLIC_ROOM_PAGE_PATH = '../public-room.html';
-    const RESIDENT_THUMB_CACHE_KEY = 'pixieed:resident-room-thumb-cache-v1';
-    const RESIDENT_THUMB_CACHE_LIMIT = 12;
-    const ROOM_THUMBNAIL_EDGE = 96;
     let supportsClientId = true;
     let supportsTags = true;
     let supportsDownloadSettings = true;
@@ -1800,11 +1815,9 @@
     let currentSort = 'new';
     let currentTagQuery = '';
     let cachedEntries = [];
-    let cachedRooms = [];
     let currentOffset = 0;
     let hasMoreEntries = true;
     let isLoadingEntries = false;
-    let isLoadingRooms = false;
     let postTags = [];
     let supabase = null;
     let supabaseMaintenance = Boolean(readSupabaseMaintenance());
@@ -1814,7 +1827,6 @@
     const syncedProfiles = new Map();
     let supabaseInitPromise = null;
     let profileSyncChannel = null;
-    let plazaRoomProbePromise = null;
     const SAMPLE_COLORS = ['#7dd3fc','#f472b6','#facc15','#34d399','#c084fc','#60a5fa','#f59e0b','#a3e635','#f43f5e','#38bdf8'];
     const PLACEHOLDERS = Array.from({ length: 10 }, (_, i) => ({
       id: 100000 + i,
@@ -1838,196 +1850,15 @@
 
     function $(id){ return document.getElementById(id); }
 
-    function normalizeProjectKey(value){
-      if(typeof value !== 'string') return '';
-      return value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40);
-    }
-
-    function buildMultiInviteHref(projectKey, role = 'guest'){
-      const normalizedKey = normalizeProjectKey(projectKey);
-      if(!normalizedKey) return '../pixiedraw/index.html';
-      const inviteRole = (role === 'master' || role === 'guest' || role === 'spectator')
-        ? role
-        : 'guest';
-      const params = new URLSearchParams();
-      params.set('multiInvite', '1');
-      params.set('multiKey', normalizedKey);
-      params.set('multiAutoJoin', '1');
-      params.set('multiRole', inviteRole);
-      return `../pixiedraw/index.html?${params.toString()}`;
-    }
-
-    function createSolidThumbnailDataUrl(color = '#000000', size = ROOM_THUMBNAIL_EDGE){
-      try{
-        const edge = Math.max(16, Math.round(Number(size) || ROOM_THUMBNAIL_EDGE));
-        const canvas = document.createElement('canvas');
-        canvas.width = edge;
-        canvas.height = edge;
-        const ctx = canvas.getContext('2d');
-        if(!ctx) return '';
-        ctx.fillStyle = color;
-        ctx.fillRect(0, 0, edge, edge);
-        return canvas.toDataURL('image/png');
-      }catch(_){
-        return '';
-      }
-    }
-
-    const ROOM_FALLBACK_THUMB = createSolidThumbnailDataUrl('#020617', ROOM_THUMBNAIL_EDGE);
-
-    function readResidentThumbnailCache(){
-      try{
-        const raw = window.localStorage.getItem(RESIDENT_THUMB_CACHE_KEY);
-        if(typeof raw !== 'string' || !raw.trim()) return {};
-        const parsed = JSON.parse(raw);
-        return parsed && typeof parsed === 'object' ? parsed : {};
-      }catch(_){
-        return {};
-      }
-    }
-
-    function writeResidentThumbnailCache(cache){
-      try{
-        window.localStorage.setItem(RESIDENT_THUMB_CACHE_KEY, JSON.stringify(cache || {}));
-      }catch(_){}
-    }
-
-    function getResidentThumbnailFromCache(projectKey, cache){
-      const normalizedKey = normalizeProjectKey(projectKey);
-      if(!normalizedKey || !cache || typeof cache !== 'object') return null;
-      const entry = cache[normalizedKey];
-      if(!entry || typeof entry !== 'object') return null;
-      const thumbnail = typeof entry.thumbnailDataUrl === 'string' ? entry.thumbnailDataUrl : '';
-      if(!thumbnail.startsWith('data:image/')) return null;
-      const updatedAt = Number(entry.updatedAt) || 0;
-      return { thumbnailDataUrl: thumbnail, updatedAt };
-    }
-
-    function setResidentThumbnailCache(projectKey, thumbnailDataUrl, updatedAt = Date.now(), cache = null){
-      const normalizedKey = normalizeProjectKey(projectKey);
-      if(!normalizedKey || typeof thumbnailDataUrl !== 'string' || !thumbnailDataUrl.startsWith('data:image/')){
-        return cache && typeof cache === 'object' ? cache : readResidentThumbnailCache();
-      }
-      const nextCache = (cache && typeof cache === 'object') ? cache : readResidentThumbnailCache();
-      nextCache[normalizedKey] = {
-        thumbnailDataUrl,
-        updatedAt: Number(updatedAt) || Date.now(),
-      };
-      const keys = Object.keys(nextCache);
-      if(keys.length > RESIDENT_THUMB_CACHE_LIMIT){
-        keys
-          .sort((a, b) => (Number(nextCache[b]?.updatedAt) || 0) - (Number(nextCache[a]?.updatedAt) || 0))
-          .slice(RESIDENT_THUMB_CACHE_LIMIT)
-          .forEach(key => { delete nextCache[key]; });
-      }
-      writeResidentThumbnailCache(nextCache);
-      return nextCache;
-    }
-
-    function parsePublicLobbyRooms(presenceState){
-      const byKey = new Map();
-      Object.keys(presenceState || {}).forEach(key => {
-        const rows = Array.isArray(presenceState[key]) ? presenceState[key] : [];
-        rows.forEach(row => {
-          const projectKey = normalizeProjectKey(row?.projectKey || '');
-          if(!projectKey) return;
-          if(row?.roomVisibility && row.roomVisibility !== 'public') return;
-          const updatedAt = Number(row?.updatedAt) || Number(row?.sentAt) || Date.now();
-          const prev = byKey.get(projectKey);
-          if(prev && updatedAt <= prev.updatedAt) return;
-          byKey.set(projectKey, {
-            projectKey,
-            updatedAt,
-            thumbnailDataUrl: typeof row?.thumbnailDataUrl === 'string' ? row.thumbnailDataUrl : '',
-            participantCount: Math.max(0, Math.round(Number(row?.participantCount) || 0)),
-            maxGuests: Math.max(0, Math.round(Number(row?.maxGuests) || 0)),
-          });
-        });
-      });
-      return byKey;
-    }
-
-    async function fetchPublicLobbyRooms(realtimeClient){
-      const lobby = realtimeClient.channel(MULTI_PUBLIC_LOBBY_CHANNEL);
-      try{
-        await lobby.subscribe();
-      }catch(_){}
-      await wait(650);
-      let state = {};
-      try{
-        state = typeof lobby.presenceState === 'function' ? (lobby.presenceState() || {}) : {};
-      }catch(_){
-        state = {};
-      }
-      try{
-        await lobby.unsubscribe();
-      }catch(_){}
-      return parsePublicLobbyRooms(state);
-    }
-
-    async function probeLegacyPublicRoomThumbnail(realtimeClient, channelName){
-      if(typeof channelName !== 'string' || !channelName.trim()) return null;
-      const roomChannel = channelName.trim();
-      const channel = realtimeClient.channel(roomChannel);
-      let thumbnail = null;
-      channel.on('broadcast', { event: 'status-response' }, ({ payload }) => {
-        try{
-          if(!payload || payload.room !== roomChannel) return;
-          if(typeof payload.data === 'string' && payload.data.startsWith('data:image/')){
-            thumbnail = payload.data;
-          }
-        }catch(_){}
-      });
-      try{
-        await channel.subscribe();
-      }catch(_){}
-      try{
-        await channel.send({ type:'broadcast', event:'status-request', payload:{ room: roomChannel, ts: Date.now() } });
-      }catch(_){}
-      await wait(700);
-      try{
-        await channel.unsubscribe();
-      }catch(_){}
-      return thumbnail;
-    }
-
-    function buildRoomFeedItem(room){
-      const updatedAt = Number(room?.updatedAt) || Date.now();
-      const participantCount = Math.max(0, Number(room?.participantCount) || 0);
-      const maxUsers = Math.max(0, Number(room?.maxUsers) || 0);
-      const roomType = room?.type === 'resident' ? '共同制作ルーム' : '公開ルーム';
-      const href = room?.type === 'resident'
-        ? buildMultiInviteHref(room.projectKey || room.channel || room.id || '', 'guest')
-        : `${PUBLIC_ROOM_PAGE_PATH}?room=${encodeURIComponent(room.channel || room.id || '')}`;
-      return {
-        ...room,
-        id: `room-${room.id || room.projectKey || room.channel || updatedAt}`,
-        feedType: 'room',
-        title: room.name || room.projectKey || room.channel || '公開中の部屋',
-        thumbnail: room.thumbnail || ROOM_FALLBACK_THUMB,
-        updatedAt,
-        participantCount,
-        maxUsers,
-        roomType,
-        href,
-      };
-    }
-
     function getFeedItems(){
       return cachedEntries.slice();
     }
 
     function getItemTimestamp(item){
-      if(item?.feedType === 'room'){
-        return Number(item.updatedAt) || 0;
-      }
       return new Date(item?.submitted_at || 0).getTime();
     }
 
     function getItemPopularity(item){
-      if(item?.feedType === 'room'){
-        return Math.max(0, Number(item.participantCount) || 0);
-      }
       return Math.max(0, Number(item?.likeCount) || 0);
     }
 
@@ -2159,7 +1990,7 @@
               <p class="subtitle">現在メンテナンス中のため、投稿と閲覧を停止しています。再開までお待ちください。</p>
               <div class="quick-tools">
                 <a class="button" href="../index.html">ホームへ</a>
-                <a class="button secondary" href="../tools.html">ツール/ゲームへ</a>
+                <a class="button secondary" href="../index.html#projects">プロジェクト一覧へ</a>
               </div>
             </div>
           </section>
@@ -3073,7 +2904,7 @@
         filterTabs.querySelectorAll('.tab-btn').forEach(btn => {
           btn.addEventListener('click', () => {
             const nextFilter = btn.dataset.filter || 'all';
-            currentFilter = nextFilter === 'rooms' ? 'all' : nextFilter;
+            currentFilter = nextFilter;
             filterTabs.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('is-active', b === btn));
             renderEntries(applyFilterAndSort(getFeedItems()));
             updateLoadMoreUI();
@@ -4152,37 +3983,6 @@
       }
     }
 
-    function trimTransparent(canvas){
-      const ctx = canvas.getContext('2d');
-      const { width, height } = canvas;
-      const imgData = ctx.getImageData(0,0,width,height);
-      const data = imgData.data;
-      let minX = width, minY = height, maxX = -1, maxY = -1;
-      for(let y=0; y<height; y++){
-        for(let x=0; x<width; x++){
-          const i = (y*width + x)*4;
-          const a = data[i+3];
-          if(a !== 0){
-            if(x < minX) minX = x;
-            if(y < minY) minY = y;
-            if(x > maxX) maxX = x;
-            if(y > maxY) maxY = y;
-          }
-        }
-      }
-      if(maxX === -1){ // 全部透明
-        return { canvas, ctx };
-      }
-      const cropW = maxX - minX + 1;
-      const cropH = maxY - minY + 1;
-      const trimmed = document.createElement('canvas');
-      trimmed.width = cropW;
-      trimmed.height = cropH;
-      const tCtx = trimmed.getContext('2d');
-      tCtx.putImageData(ctx.getImageData(minX, minY, cropW, cropH), 0, 0);
-      return { canvas: trimmed, ctx: tCtx };
-    }
-
     async function computePHash(srcCanvas){
       // 16x16グレースケール平均ハッシュ
       const size = 16;
@@ -4490,12 +4290,11 @@
       const subtitle = $(FEED_SUBTITLE_ID);
       if(!subtitle) return;
       const rendered = Array.isArray(items) ? items : [];
-      const renderedPosts = rendered.filter(item => item?.feedType !== 'room').length;
       let text = '';
       if(currentFilter === 'posts'){
-        text = `投稿 ${renderedPosts}件を表示中`;
+        text = `投稿 ${rendered.length}件を表示中`;
       }else if(currentFilter === 'px32'){
-        text = `32px以下の投稿 ${renderedPosts}件を表示中`;
+        text = `32px以下の投稿 ${rendered.length}件を表示中`;
       }else{
         text = `投稿 ${cachedEntries.length}件を表示中`;
       }
@@ -4521,62 +4320,18 @@
       const isFirstRow = idx < 3;
       const isFirstTwoRows = idx < 6;
       const item = document.createElement('a');
-      const tags = parseTags(entry.tags).slice(0, 3);
-      const authorName = getEntryDisplayName(entry);
-      const authorAvatarSrc = getEntryDisplayAvatarSrc(entry);
-      const authorFallback = getEntryAvatarFallbackLabel(entry);
       item.className = 'entry-card entry-card--post';
       item.href = `view.html?id=${entry.id}`;
+      const likeCount = Math.max(0, Number(entry.likeCount) || 0);
+      const liked = likedEntries.has(entry.id);
       item.innerHTML = `
         <div class="entry-imgwrap">
-          <img src="${resolveEntryThumb(entry)}" alt="${entry.title || '作品'}" draggable="false" loading="${isFirstTwoRows ? 'eager' : 'lazy'}" fetchpriority="${isFirstRow ? 'high' : 'auto'}" decoding="async">
+          <img src="${resolveEntryThumb(entry)}" alt="${entry.title || '作品'}" draggable="false" loading="${isFirstTwoRows ? 'eager' : 'lazy'}" fetchpriority="${isFirstRow ? 'high' : 'auto'}" decoding="async" data-pixel-art-fit="off">
           ${buildContestWatermarkMarkup(resolveContestWatermarkSeed(entry), { count: 24, sizeMin: 10, sizeMax: 18 })}
           <button class="heart-btn" data-id="${entry.id}" aria-label="いいね">
-            <img src="${likedEntries.has(entry.id) ? FAV_SRC : NFAV_SRC}" alt="like icon">
+            <span class="heart-btn__count">${likeCount}</span>
+            <img src="${liked ? FAV_SRC : NFAV_SRC}" alt="like icon">
           </button>
-        </div>
-        <div class="entry-meta">
-          <div class="entry-meta__top">
-            <span class="entry-type-chip">投稿</span>
-            <span class="entry-like">❤ ${Math.max(0, Number(entry.likeCount) || 0)}</span>
-          </div>
-          <div class="entry-title">${entry.title || '無題'}</div>
-          <div class="entry-author-row">
-            <span class="entry-author-avatar">${authorAvatarSrc ? `<img src="${authorAvatarSrc}" alt="${authorName} icon">` : authorFallback}</span>
-            <span class="entry-author-name">${authorName}</span>
-          </div>
-          <p class="entry-info">${buildEntryMetaLine(entry)}</p>
-          ${tags.length ? `<div class="entry-tags">${tags.map(tag => `<span class="entry-tag">#${tag}</span>`).join('')}</div>` : ''}
-        </div>
-      `;
-      return item;
-    }
-
-    function createRoomCard(room){
-      const participants = Math.max(0, Number(room.participantCount) || 0);
-      const roomBadges = [
-        room.roomType,
-        room.size || '',
-        room.maxUsers ? `最大${room.maxUsers}人` : '',
-        formatFeedTimestamp(room.updatedAt)
-      ].filter(Boolean);
-      const item = document.createElement('a');
-      item.className = 'entry-card entry-card--room';
-      item.href = room.href || '../pixiedraw/index.html';
-      item.innerHTML = `
-        <div class="entry-imgwrap entry-imgwrap--room">
-          ${room.thumbnail ? `<img src="${room.thumbnail}" alt="${room.title} thumbnail" loading="lazy" decoding="async">` : `<span class="entry-room-placeholder">ROOM</span>`}
-          <span class="entry-room-label">${room.roomType}</span>
-        </div>
-        <div class="entry-meta">
-          <div class="entry-meta__top">
-            <span class="entry-type-chip entry-type-chip--room">公開中の部屋</span>
-            <span class="entry-like">参加 ${participants}人</span>
-          </div>
-          <div class="entry-title">${room.title}</div>
-          <p class="entry-info">${room.description || 'PiXiEEDrawで公開中の共同制作ルームです。'}</p>
-          ${roomBadges.length ? `<div class="entry-tags">${roomBadges.map(label => `<span class="entry-tag">${label}</span>`).join('')}</div>` : ''}
-          <span class="entry-room-cta">入室する</span>
         </div>
       `;
       return item;
@@ -4592,9 +4347,7 @@
       }
       gallery.innerHTML = '';
       entries.forEach((entry, idx) => {
-        const item = entry?.feedType === 'room'
-          ? createRoomCard(entry)
-          : createEntryCard(entry, idx);
+        const item = createEntryCard(entry, idx);
         gallery.appendChild(item);
         // 15件ごとに1行バナー広告を挿入（末尾は除外）
         if((idx + 1) % 15 === 0 && (idx + 1) < entries.length){
@@ -4617,13 +4370,6 @@
       }catch(e){
         console.warn('ads render skipped', e);
       }
-    }
-
-    async function fetchPlazaRooms({ force = false } = {}){
-      cachedRooms = [];
-      isLoadingRooms = false;
-      plazaRoomProbePromise = Promise.resolve(cachedRooms);
-      return plazaRoomProbePromise;
     }
 
     async function fetchLikesForEntryIds(entryIds){
@@ -4823,28 +4569,14 @@
 
     function applyFilterAndSort(entries){
       let filtered = entries.slice();
-      if(currentFilter === 'rooms'){
-        currentFilter = 'all';
-      }
       if(currentFilter === 'posts'){
-        filtered = filtered.filter(item => item?.feedType !== 'room');
+        filtered = filtered.slice();
       }else if(currentFilter === 'px32'){
-        filtered = filtered.filter(item => item?.feedType !== 'room' && (item.width || 999) <= 32 && (item.height || 999) <= 32);
+        filtered = filtered.filter(item => (item.width || 999) <= 32 && (item.height || 999) <= 32);
       }
       if(currentTagQuery){
         const query = currentTagQuery.toLowerCase();
         filtered = filtered.filter(item => {
-          if(item?.feedType === 'room'){
-            return [
-              item.title,
-              item.description,
-              item.size,
-              item.roomType,
-              item.projectKey,
-            ]
-              .filter(Boolean)
-              .some(value => String(value).toLowerCase().includes(query));
-          }
           const tags = parseTags(item.tags);
           if(tags.some(tag => tag.toLowerCase().includes(query))){
             return true;
@@ -5531,6 +5263,8 @@
     window.addEventListener('DOMContentLoaded', init);
   </script>
   <script src="../scripts/pixieed-dot-stats.js"></script>
+  <script src="../scripts/shared-bottom-nav.js"></script>
   <script src="../scripts/bottom-nav-footer-ad.js"></script>
+  <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>

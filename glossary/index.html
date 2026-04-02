@@ -7,9 +7,6 @@
   <meta name="description" content="ドット絵・ピクセルアート制作でよく使う基本用語、解像度、描画表現、アニメ、ゲーム素材、制作機能までまとめたPiXiEED公式用語集。"/>
   <meta name="keywords" content="ドット絵 用語集,ピクセルアート 用語,インデックスカラー,スプライト,タイルセット"/>
   <link rel="canonical" href="https://pixieed.jp/glossary/"/>
-  <link rel="alternate" hreflang="ja" href="https://pixieed.jp/glossary/"/>
-  <link rel="alternate" hreflang="en" href="https://pixieed.jp/en/glossary/"/>
-  <link rel="alternate" hreflang="x-default" href="https://pixieed.jp/glossary/"/>
   <meta property="og:type" content="website"/>
   <meta property="og:site_name" content="PiXiEED"/>
   <meta property="og:title" content="ドット絵・ピクセルアート用語集 | PiXiEED"/>
@@ -99,35 +96,6 @@
     .chip:focus-visible{
       border-color:rgba(148, 227, 255, 0.7);
       background:rgba(84, 184, 255, 0.14);
-      outline:none;
-    }
-    .lang-edge{
-      position:fixed;
-      top:max(12px, env(safe-area-inset-top));
-      right:max(12px, env(safe-area-inset-right));
-      z-index:90;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      min-width:46px;
-      height:34px;
-      padding:0 12px;
-      border-radius:999px;
-      border:1px solid rgba(148, 227, 255, 0.6);
-      background:rgba(46, 126, 255, 0.35);
-      color:#eef8ff;
-      text-decoration:none;
-      font-size:12px;
-      font-weight:700;
-      letter-spacing:0.04em;
-      box-shadow:0 6px 18px rgba(10, 26, 72, 0.45);
-      backdrop-filter:blur(6px);
-    }
-    .lang-edge:hover,
-    .lang-edge:focus-visible{
-      background:rgba(66, 156, 255, 0.48);
-      border-color:rgba(174, 240, 255, 0.9);
-      color:#ffffff;
       outline:none;
     }
     .search-wrap{
@@ -220,10 +188,6 @@
       .card{
         padding:14px;
       }
-      .lang-edge{
-        top:max(8px, env(safe-area-inset-top));
-        right:max(8px, env(safe-area-inset-right));
-      }
       .term-item{
         padding:9px 10px;
       }
@@ -237,7 +201,6 @@
   </style>
 </head>
 <body>
-  <a class="lang-edge" href="../en/glossary/index.html" lang="en" hreflang="en" aria-label="Switch to English glossary">EN</a>
   <div class="page">
     <section class="card">
       <h1>ドット絵・ピクセルアート用語集</h1>
@@ -552,5 +515,7 @@
       update();
     })();
   </script>
+  <script src="../scripts/shared-bottom-nav.js"></script>
+  <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>

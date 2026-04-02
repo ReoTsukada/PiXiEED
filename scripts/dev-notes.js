@@ -119,15 +119,10 @@
 
   const indexLinkToNoteId = Object.freeze({
     'index.html': 'site',
-    'en/index.html': 'site',
     'notes/index.html': 'site',
-    'tools.html': 'site',
-    'games.html': 'site',
     'contest/index.html': 'site',
     'glossary/index.html': 'site',
-    'en/glossary/index.html': 'site',
     'portfolio/index.html': 'site',
-    'en/portfolio/index.html': 'site',
     'pixel-art-editor/index.html': 'site',
     'pixel-art-animation/index.html': 'site',
     'pixel-art-maker/index.html': 'site',
@@ -156,6 +151,7 @@
   render(notes);
 
   Promise.all([
+    hydrateFromGeneratedManifest(notes),
     hydrateFromIndexSource(notes),
     hydrateFromReadmes(notes)
   ]).then(() => {
@@ -182,6 +178,29 @@
       const fallback = fallbackAutoNotes[note.id];
       if (!fallback) return;
       mergeEntries(note, fallback);
+    });
+  }
+
+  async function hydrateFromGeneratedManifest(targetNotes) {
+    let payload = null;
+    try {
+      const response = await fetch('../data/project-updates.json', { cache: 'no-store' });
+      if (!response.ok) return;
+      payload = await response.json();
+    } catch (_error) {
+      return;
+    }
+    const projects = Array.isArray(payload?.projects) ? payload.projects : [];
+    projects.forEach((project) => {
+      const note = targetNotes.find(item => item.id === project?.id);
+      if (!note) return;
+      mergeEntries(note, Array.isArray(project?.entries) ? project.entries : []);
+      if (typeof project?.url === 'string' && project.url.trim()) {
+        note.url = normalizeManifestUrl(project.url);
+      }
+      if (typeof project?.name === 'string' && project.name.trim()) {
+        note.name = project.name.trim();
+      }
     });
   }
 
@@ -286,6 +305,14 @@
     let value = String(link || '').trim();
     value = value.replace(/^[./]+/, '');
     value = value.replace(/^\//, '');
+    return value;
+  }
+
+  function normalizeManifestUrl(url) {
+    const value = String(url || '').trim();
+    if (!value) return '';
+    if (/^https?:\/\//.test(value)) return value;
+    if (value.startsWith('/')) return `..${value}`;
     return value;
   }
 

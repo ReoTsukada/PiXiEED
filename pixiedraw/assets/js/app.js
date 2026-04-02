@@ -78,6 +78,7 @@
     floatingPreviewHeader: document.getElementById('floatingPreviewHeader'),
     floatingPreviewBody: document.getElementById('floatingPreviewBody'),
     floatingPreviewCanvas: /** @type {HTMLCanvasElement|null} */ (document.getElementById('floatingPreviewCanvas')),
+    floatingPreviewGizmo: /** @type {HTMLCanvasElement|null} */ (document.getElementById('floatingPreviewGizmo')),
     floatingPreviewResizeHandle: document.getElementById('floatingPreviewResize'),
     zoomIndicator: document.getElementById('zoomIndicator'),
     resizeHandles: {
@@ -154,6 +155,33 @@
       layerOpacityValue: document.getElementById('layerOpacityValue'),
       layerBlendMode: document.getElementById('layerBlendMode'),
       layerSettingsTarget: document.getElementById('layerSettingsTarget'),
+      simulationLayerSettings: document.getElementById('simulationLayerSettings'),
+      simulationLayerTarget: document.getElementById('simulationLayerTarget'),
+      simulationPaintMode: document.getElementById('simulationPaintMode'),
+      simulationElement: document.getElementById('simulationElement'),
+      simulationElementPalette: document.getElementById('simulationElementPalette'),
+      leftSimulationElementPaletteWrap: document.getElementById('leftSimulationElementPaletteWrap'),
+      leftSimulationElementPalette: document.getElementById('leftSimulationElementPalette'),
+      simulationDepthValue: document.getElementById('simulationDepthValue'),
+      simulationDepthValueOut: document.getElementById('simulationDepthValueOut'),
+      simulationAirValue: document.getElementById('simulationAirValue'),
+      simulationAirValueOut: document.getElementById('simulationAirValueOut'),
+      simulationAtmosphereEnabled: document.getElementById('simulationAtmosphereEnabled'),
+      simulationAtmosphereEnabledValue: document.getElementById('simulationAtmosphereEnabledValue'),
+      simulationShowLeftPalette: document.getElementById('simulationShowLeftPalette'),
+      simulationShowLeftPaletteValue: document.getElementById('simulationShowLeftPaletteValue'),
+      simulationAtmosphereStrength: document.getElementById('simulationAtmosphereStrength'),
+      simulationAtmosphereStrengthValue: document.getElementById('simulationAtmosphereStrengthValue'),
+      simulationWaterDisplayMode: document.getElementById('simulationWaterDisplayMode'),
+      simulationWaterMixStrength: document.getElementById('simulationWaterMixStrength'),
+      simulationWaterMixStrengthValue: document.getElementById('simulationWaterMixStrengthValue'),
+      simulationWaterShallow: document.getElementById('simulationWaterShallow'),
+      simulationWaterMid: document.getElementById('simulationWaterMid'),
+      simulationWaterDeep: document.getElementById('simulationWaterDeep'),
+      simulationWaterFoam: document.getElementById('simulationWaterFoam'),
+      simulationWaterHighlight: document.getElementById('simulationWaterHighlight'),
+      simulationFireDisplayMode: document.getElementById('simulationFireDisplayMode'),
+      simulationMetalDisplayMode: document.getElementById('simulationMetalDisplayMode'),
       frameSettingsTarget: document.getElementById('frameSettingsTarget'),
       onionSkinEnabled: document.getElementById('onionSkinEnabled'),
       onionSkinEnabledValue: document.getElementById('onionSkinEnabledValue'),
@@ -164,6 +192,7 @@
       onionOpacity: document.getElementById('onionOpacity'),
       onionOpacityValue: document.getElementById('onionOpacityValue'),
       addLayer: document.getElementById('addLayer'),
+      addSimulationLayer: document.getElementById('addSimulationLayer'),
       removeLayer: document.getElementById('removeLayer'),
       moveLayerUp: document.getElementById('moveLayerUp'),
       moveLayerDown: document.getElementById('moveLayerDown'),
@@ -197,10 +226,9 @@
       localCanvasCountLabel: document.getElementById('localCanvasCountLabel'),
       localCanvasCountValue: document.getElementById('localCanvasCountValue'),
       toggleVoxelExtensionMode: document.getElementById('toggleVoxelExtensionMode'),
-      setupVoxelExtension: document.getElementById('setupVoxelExtension'),
-      refreshVoxelPreview: document.getElementById('refreshVoxelPreview'),
       voxelPreviewYaw: document.getElementById('voxelPreviewYaw'),
       voxelPreviewYawValue: document.getElementById('voxelPreviewYawValue'),
+      voxelDisplayPx: document.getElementById('voxelDisplayPx'),
       voxelExtensionField: document.getElementById('voxelExtensionField'),
       voxelExtensionStatus: document.getElementById('voxelExtensionStatus'),
       toggleOnionSkin: document.getElementById('toggleOnionSkin'),
@@ -978,7 +1006,7 @@
     Object.freeze({
       id: '2026-03-22-voxel-extension-preview',
       at: '2026-03-22T23:58:00+09:00',
-      title: 'ボクセル拡張モードと小窓プレビューを追加',
+      title: 'ボクセルモードと小窓プレビューを追加',
       published: true,
       details: Object.freeze([
         '拡張モードに Front / Back / Left / Right / Top / Bottom の6面入力を追加し、小窓プレビューで立体確認できるよう変更。',
@@ -1050,7 +1078,7 @@
       title: '個人設定整理・タイムライン複製・範囲選択改善・SpriteMAP出力',
       published: true,
       details: Object.freeze([
-        '設定パネルのローカル拡張（外付け）から GPT連携を撤去。旧AI設定やローカル保存されていたAPIキーも読み込み時に削除するよう整理。',
+        '設定パネルの拡張機能から GPT連携を撤去。旧AI設定やローカル保存されていたAPIキーも読み込み時に削除するよう整理。',
         '共有中でも、視点・選択・色・ツール・背景・グリッド・ミラー・オニオンスキンは各ユーザーの端末ごとに保持されるよう変更。',
         'レイヤー表示 ON/OFF とレイヤー不透明度は、共有データではなく各自の表示設定として保存されるよう変更。見え方だけを変えても他ユーザーや書き出し結果には影響しないよう整理。',
         '共有パレットは接続直後の初回同期だけマスター内容を初期値として取り込み、その後の色選択や調整は各ユーザーのローカル状態として維持するよう変更。',
@@ -1086,7 +1114,7 @@
         'パレットプリセットボタン内のカラープレビューを最大32色表示に対応。',
         '新規作成パネルの独立プリセットプレビューを削除し、プリセット表示を整理。',
         '設定パネルの下5ボタン（応援チップ/あ/A/使い方ヘルプ/ショートカット/更新情報）をサブスタイルに統一。',
-        '設定パネルにローカル拡張（外付け）欄を追加し、この端末だけで動く拡張コードの保存 / 反映 / 停止に対応。',
+        '設定パネルに拡張機能欄を追加し、この端末だけで動く拡張コードの保存 / 反映 / 停止に対応。',
         '言語切替ボタンの表示を「あ/A」に統一。',
         'キャンバスサイズブロックに色付き枠を追加し、視認性を改善。',
         '更新トーストの内容が長い場合でも、トースト内スクロールで読めるよう表示を調整。',
@@ -3086,14 +3114,16 @@
   const EXTENSION_MODE_NONE = 'none';
   const EXTENSION_MODE_VOXEL = 'voxel';
   const VOXEL_EXTENSION_SOURCE_CANVAS_TOTAL = 6;
-  const VOXEL_EXTENSION_CANVAS_TOTAL = VOXEL_EXTENSION_SOURCE_CANVAS_TOTAL;
-  const VOXEL_EXTENSION_LOCAL_CANVAS_MAX_COUNT = VOXEL_EXTENSION_CANVAS_TOTAL - 1;
+  const VOXEL_EXTENSION_CANVAS_TOTAL = VOXEL_EXTENSION_SOURCE_CANVAS_TOTAL + 1;
+  const VOXEL_EXTENSION_LOCAL_CANVAS_MAX_COUNT = VOXEL_EXTENSION_SOURCE_CANVAS_TOTAL;
   const VOXEL_EXTENSION_MAX_SOURCE_EDGE = 64;
   const VOXEL_EXTENSION_PREVIEW_MAX_EDGE = 224;
+  const VOXEL_EXTENSION_DISPLAY_PIXEL_MIN = 0;
+  const VOXEL_EXTENSION_DISPLAY_PIXEL_MAX = 24;
   const VOXEL_EXTENSION_PREVIEW_ELEVATION_DEG = 32;
   const VOXEL_EXTENSION_PREVIEW_PITCH_MIN_DEG = -80;
   const VOXEL_EXTENSION_PREVIEW_PITCH_MAX_DEG = 80;
-  const VOXEL_EXTENSION_DEFAULT_YAW_DEG = 45;
+  const VOXEL_EXTENSION_DEFAULT_YAW_DEG = 0;
   const VOXEL_EXTENSION_LABELS = Object.freeze({
     front: { ja: '正面', en: 'Front' },
     back: { ja: '背面', en: 'Back' },
@@ -3110,6 +3140,7 @@
     top: 'Top',
     bottom: 'Bottom',
   });
+  const VOXEL_EXTENSION_ROLES = Object.freeze(['front', 'right', 'top', 'left', 'bottom', 'back']);
   const VOXEL_EXTENSION_DEFAULT_STATE = Object.freeze({
     mode: EXTENSION_MODE_NONE,
     frontCanvasId: '',
@@ -3121,6 +3152,7 @@
     previewCanvasId: '',
     previewYawDeg: VOXEL_EXTENSION_DEFAULT_YAW_DEG,
     previewPitchDeg: VOXEL_EXTENSION_PREVIEW_ELEVATION_DEG,
+    displayPx: 0,
   });
   let lockedCanvasWidth = null;
   let lockedCanvasHeight = null;
@@ -3134,6 +3166,7 @@
   const projectCanvasStore = createProjectCanvasStoreFromState(state);
   installProjectCanvasStateProxy(state, projectCanvasStore);
   let voxelExtensionState = normalizeVoxelExtensionState(null, VOXEL_EXTENSION_DEFAULT_STATE);
+  let voxelExtensionRestoreSnapshot = null;
   let localViewportCanvasState = normalizeLocalViewportCanvasState(null, LOCAL_VIEWPORT_CANVAS_DEFAULT_STATE);
   let localViewportCanvasLayoutResetPending = true;
   let viewportCanvasVisibilityRecoveryActive = false;
@@ -3232,6 +3265,7 @@
     active: false,
   };
   let floatingPreviewCtx = null;
+  let floatingPreviewGizmoCtx = null;
   const virtualCursorDrawState = {
     active: false,
     historyStarted: false,
@@ -3528,6 +3562,18 @@
     width: 0,
     height: 0,
     byFrame: new Map(),
+  };
+  const simulationRuntime = {
+    playing: false,
+    handle: null,
+    lastTickAt: 0,
+  };
+  const simulationEditorState = {
+    paintMode: 'element',
+    element: 2,
+    depthValue: 96,
+    airValue: 96,
+    showLeftPalette: false,
   };
   let curveBuilder = null;
   let paletteWheelCtx = null;
@@ -3962,6 +4008,17 @@
       }
       return VOXEL_EXTENSION_PREVIEW_ELEVATION_DEG;
     };
+    const normalizeDisplayPx = (value, fallbackValue = 0) => {
+      const numericValue = Number(value);
+      if (Number.isFinite(numericValue)) {
+        return clamp(Math.round(numericValue), VOXEL_EXTENSION_DISPLAY_PIXEL_MIN, VOXEL_EXTENSION_DISPLAY_PIXEL_MAX);
+      }
+      const numericFallback = Number(fallbackValue);
+      if (Number.isFinite(numericFallback)) {
+        return clamp(Math.round(numericFallback), VOXEL_EXTENSION_DISPLAY_PIXEL_MIN, VOXEL_EXTENSION_DISPLAY_PIXEL_MAX);
+      }
+      return 0;
+    };
     return {
       mode,
       frontCanvasId: normalizeCanvasId(settings.frontCanvasId, safeFallback.frontCanvasId),
@@ -3973,6 +4030,7 @@
       previewCanvasId: normalizeCanvasId(settings.previewCanvasId, safeFallback.previewCanvasId),
       previewYawDeg: normalizePreviewYaw(settings.previewYawDeg, safeFallback.previewYawDeg),
       previewPitchDeg: normalizePreviewPitch(settings.previewPitchDeg, safeFallback.previewPitchDeg),
+      displayPx: normalizeDisplayPx(settings.displayPx, safeFallback.displayPx),
     };
   }
 
@@ -4276,7 +4334,179 @@
     return layer.direct;
   }
 
+  function isSimulationLayer(layer) {
+    return Boolean(layer && layer.type === 'simulation' && layer.elementMap instanceof Uint8Array);
+  }
+
+  function cloneSimulationColor(color, fallback = { r: 0, g: 0, b: 0, a: 255 }) {
+    const source = color && typeof color === 'object' ? color : fallback;
+    return {
+      r: clamp(Math.round(Number(source.r) || 0), 0, 255),
+      g: clamp(Math.round(Number(source.g) || 0), 0, 255),
+      b: clamp(Math.round(Number(source.b) || 0), 0, 255),
+      a: clamp(Math.round(Number(source.a) || 255), 0, 255),
+    };
+  }
+
+  function normalizeSimulationDisplayMode(value, fallback = SIM_SOURCE_COLOR) {
+    return value === SIM_ELEMENT_PALETTE || value === SIM_MIXED || value === SIM_SOURCE_COLOR
+      ? value
+      : fallback;
+  }
+
+  function normalizeSimulationStyle(element, style) {
+    const defaults = SIM_DEFAULT_STYLE[element] || {
+      displayMode: SIM_SOURCE_COLOR,
+      mixStrength: 0,
+      palette: {},
+    };
+    const next = style && typeof style === 'object' ? style : defaults;
+    const normalized = {
+      displayMode: normalizeSimulationDisplayMode(next.displayMode, defaults.displayMode),
+      mixStrength: clamp(Number.isFinite(Number(next.mixStrength)) ? Number(next.mixStrength) : defaults.mixStrength, 0, 1),
+      palette: {},
+    };
+    Object.keys(defaults.palette || {}).forEach(key => {
+      normalized.palette[key] = cloneSimulationColor(next.palette?.[key], defaults.palette[key]);
+    });
+    return normalized;
+  }
+
+  function normalizeSimulationSettings(settings = {}) {
+    const source = settings && typeof settings === 'object' ? settings : {};
+    return {
+      gravityX: clamp(Math.round(Number(source.gravityX) || SIM_DEFAULT_SETTINGS.gravityX), -1, 1),
+      gravityY: clamp(Math.round(Number(source.gravityY) || SIM_DEFAULT_SETTINGS.gravityY), -1, 1),
+      windX: clamp(Math.round(Number(source.windX) || SIM_DEFAULT_SETTINGS.windX), -2, 2),
+      windY: clamp(Math.round(Number(source.windY) || SIM_DEFAULT_SETTINGS.windY), -2, 2),
+      tickRate: clamp(Math.round(Number(source.tickRate) || SIM_DEFAULT_SETTINGS.tickRate), 1, 60),
+      lightingEnabled: source.lightingEnabled !== false,
+      atmosphereEnabled: source.atmosphereEnabled !== false,
+      fireEffectEnabled: source.fireEffectEnabled !== false,
+      waterEffectEnabled: source.waterEffectEnabled !== false,
+      metalReflectionEnabled: source.metalReflectionEnabled !== false,
+      fogColor: cloneSimulationColor(source.fogColor, SIM_DEFAULT_SETTINGS.fogColor),
+      atmosphereStrength: clamp(
+        Number.isFinite(Number(source.atmosphereStrength)) ? Number(source.atmosphereStrength) : SIM_DEFAULT_SETTINGS.atmosphereStrength,
+        0,
+        1
+      ),
+    };
+  }
+
+  function createSimulationLayer(name, width, height) {
+    const size = Math.max(1, Math.floor(width) || 1) * Math.max(1, Math.floor(height) || 1);
+    return {
+      id: crypto.randomUUID ? crypto.randomUUID() : `layer-${Math.random().toString(36).slice(2)}`,
+      type: SIM_LAYER_TYPE,
+      name,
+      visible: true,
+      opacity: 1,
+      blendMode: DEFAULT_LAYER_BLEND_MODE,
+      elementMap: new Uint8Array(size),
+      sourceColorMap: new Uint8ClampedArray(size * 4),
+      velXMap: new Int8Array(size),
+      velYMap: new Int8Array(size),
+      lifeMap: new Uint8Array(size),
+      tempMap: new Uint16Array(size),
+      lightMap: new Uint8Array(size),
+      depthMap: new Uint8Array(size),
+      airMap: new Uint8Array(size),
+      auxMap: new Uint8Array(size),
+      activeMap: new Uint8Array(size),
+      settings: normalizeSimulationSettings(),
+      elementStyle: {
+        [SIM_ELEMENT_WATER]: normalizeSimulationStyle(SIM_ELEMENT_WATER),
+        [SIM_ELEMENT_FIRE]: normalizeSimulationStyle(SIM_ELEMENT_FIRE),
+        [SIM_ELEMENT_METAL]: normalizeSimulationStyle(SIM_ELEMENT_METAL),
+        [SIM_ELEMENT_SMOKE]: normalizeSimulationStyle(SIM_ELEMENT_SMOKE),
+        [SIM_ELEMENT_LIGHT]: normalizeSimulationStyle(SIM_ELEMENT_LIGHT),
+      },
+    };
+  }
+
+  function cloneSimulationLayer(baseLayer, width, height, { copyPixels = true } = {}) {
+    const layer = createSimulationLayer(baseLayer?.name || getDefaultLayerName(1), width, height);
+    layer.visible = baseLayer?.visible !== false;
+    layer.opacity = normalizeLayerOpacity(baseLayer?.opacity);
+    layer.blendMode = normalizeLayerBlendMode(baseLayer?.blendMode);
+    layer.settings = normalizeSimulationSettings(baseLayer?.settings);
+    layer.elementStyle = {
+      [SIM_ELEMENT_WATER]: normalizeSimulationStyle(SIM_ELEMENT_WATER, baseLayer?.elementStyle?.[SIM_ELEMENT_WATER]),
+      [SIM_ELEMENT_FIRE]: normalizeSimulationStyle(SIM_ELEMENT_FIRE, baseLayer?.elementStyle?.[SIM_ELEMENT_FIRE]),
+      [SIM_ELEMENT_METAL]: normalizeSimulationStyle(SIM_ELEMENT_METAL, baseLayer?.elementStyle?.[SIM_ELEMENT_METAL]),
+      [SIM_ELEMENT_SMOKE]: normalizeSimulationStyle(SIM_ELEMENT_SMOKE, baseLayer?.elementStyle?.[SIM_ELEMENT_SMOKE]),
+      [SIM_ELEMENT_LIGHT]: normalizeSimulationStyle(SIM_ELEMENT_LIGHT, baseLayer?.elementStyle?.[SIM_ELEMENT_LIGHT]),
+    };
+    if (!copyPixels) {
+      return layer;
+    }
+    [
+      'elementMap',
+      'sourceColorMap',
+      'velXMap',
+      'velYMap',
+      'lifeMap',
+      'tempMap',
+      'lightMap',
+      'depthMap',
+      'airMap',
+      'auxMap',
+      'activeMap',
+    ].forEach(key => {
+      if (ArrayBuffer.isView(baseLayer?.[key]) && baseLayer[key].length === layer[key].length) {
+        layer[key].set(baseLayer[key]);
+      }
+    });
+    return layer;
+  }
+
+  function cloneGenericLayer(baseLayer, width, height, options = {}) {
+    return isSimulationLayer(baseLayer)
+      ? cloneSimulationLayer(baseLayer, width, height, options)
+      : cloneLayer(baseLayer, width, height, options);
+  }
+
+  function createGenericLayerFromSnapshot(snapshot, width, height) {
+    if (snapshot?.type === SIM_LAYER_TYPE) {
+      const layer = createSimulationLayer(snapshot.name || getDefaultLayerName(1), width, height);
+      layer.visible = snapshot?.visible !== false;
+      layer.opacity = normalizeLayerOpacity(snapshot?.opacity);
+      layer.blendMode = normalizeLayerBlendMode(snapshot?.blendMode);
+      [
+        'elementMap',
+        'sourceColorMap',
+        'velXMap',
+        'velYMap',
+        'lifeMap',
+        'tempMap',
+        'lightMap',
+        'depthMap',
+        'airMap',
+        'auxMap',
+        'activeMap',
+      ].forEach(key => {
+        if (ArrayBuffer.isView(snapshot?.[key]) && snapshot[key].length === layer[key].length) {
+          layer[key].set(snapshot[key]);
+        }
+      });
+      layer.settings = normalizeSimulationSettings(snapshot?.settings);
+      layer.elementStyle = {
+        [SIM_ELEMENT_WATER]: normalizeSimulationStyle(SIM_ELEMENT_WATER, snapshot?.elementStyle?.[SIM_ELEMENT_WATER]),
+        [SIM_ELEMENT_FIRE]: normalizeSimulationStyle(SIM_ELEMENT_FIRE, snapshot?.elementStyle?.[SIM_ELEMENT_FIRE]),
+        [SIM_ELEMENT_METAL]: normalizeSimulationStyle(SIM_ELEMENT_METAL, snapshot?.elementStyle?.[SIM_ELEMENT_METAL]),
+        [SIM_ELEMENT_SMOKE]: normalizeSimulationStyle(SIM_ELEMENT_SMOKE, snapshot?.elementStyle?.[SIM_ELEMENT_SMOKE]),
+        [SIM_ELEMENT_LIGHT]: normalizeSimulationStyle(SIM_ELEMENT_LIGHT, snapshot?.elementStyle?.[SIM_ELEMENT_LIGHT]),
+      };
+      return layer;
+    }
+    return createLayerFromClipboardSnapshot(snapshot, width, height);
+  }
+
   function cloneLayer(baseLayer, width, height, { copyPixels = true } = {}) {
+    if (isSimulationLayer(baseLayer)) {
+      return cloneSimulationLayer(baseLayer, width, height, { copyPixels });
+    }
     const size = width * height;
     const layer = {
       id: crypto.randomUUID ? crypto.randomUUID() : `layer-${Math.random().toString(36).slice(2)}`,
@@ -4297,12 +4527,108 @@
     return layer;
   }
 
+  function resizeProjectCanvasFrames(canvasDoc, width, height) {
+    if (!canvasDoc || !Array.isArray(canvasDoc.frames)) {
+      return false;
+    }
+    const targetWidth = Math.max(1, Math.round(Number(width) || 1));
+    const targetHeight = Math.max(1, Math.round(Number(height) || 1));
+    const sourceWidth = Math.max(1, Math.round(Number(canvasDoc.width) || 1));
+    const sourceHeight = Math.max(1, Math.round(Number(canvasDoc.height) || 1));
+    if (sourceWidth === targetWidth && sourceHeight === targetHeight) {
+      return false;
+    }
+    canvasDoc.frames = canvasDoc.frames.map(frame => {
+      if (!frame || !Array.isArray(frame.layers)) {
+        return frame;
+      }
+      return {
+        ...frame,
+        layers: frame.layers.map(layer => {
+          if (isSimulationLayer(layer)) {
+            const resizedSimulation = createSimulationLayer(layer?.name || getDefaultLayerName(1), targetWidth, targetHeight);
+            resizedSimulation.id = layer?.id || resizedSimulation.id;
+            resizedSimulation.visible = layer?.visible !== false;
+            resizedSimulation.opacity = normalizeLayerOpacity(layer?.opacity);
+            resizedSimulation.blendMode = normalizeLayerBlendMode(layer?.blendMode);
+            resizedSimulation.settings = normalizeSimulationSettings(layer?.settings);
+            resizedSimulation.elementStyle = {
+              [SIM_ELEMENT_WATER]: normalizeSimulationStyle(SIM_ELEMENT_WATER, layer?.elementStyle?.[SIM_ELEMENT_WATER]),
+              [SIM_ELEMENT_FIRE]: normalizeSimulationStyle(SIM_ELEMENT_FIRE, layer?.elementStyle?.[SIM_ELEMENT_FIRE]),
+              [SIM_ELEMENT_METAL]: normalizeSimulationStyle(SIM_ELEMENT_METAL, layer?.elementStyle?.[SIM_ELEMENT_METAL]),
+              [SIM_ELEMENT_SMOKE]: normalizeSimulationStyle(SIM_ELEMENT_SMOKE, layer?.elementStyle?.[SIM_ELEMENT_SMOKE]),
+              [SIM_ELEMENT_LIGHT]: normalizeSimulationStyle(SIM_ELEMENT_LIGHT, layer?.elementStyle?.[SIM_ELEMENT_LIGHT]),
+            };
+            const copyWidth = Math.min(sourceWidth, targetWidth);
+            const copyHeight = Math.min(sourceHeight, targetHeight);
+            const simKeys = ['elementMap', 'velXMap', 'velYMap', 'lifeMap', 'tempMap', 'lightMap', 'depthMap', 'airMap', 'auxMap', 'activeMap'];
+            for (let y = 0; y < copyHeight; y += 1) {
+              for (let x = 0; x < copyWidth; x += 1) {
+                const srcIndex = (y * sourceWidth) + x;
+                const dstIndex = (y * targetWidth) + x;
+                const srcBase = srcIndex * 4;
+                const dstBase = dstIndex * 4;
+                if (layer?.sourceColorMap instanceof Uint8ClampedArray && srcBase + 3 < layer.sourceColorMap.length) {
+                  resizedSimulation.sourceColorMap[dstBase] = layer.sourceColorMap[srcBase];
+                  resizedSimulation.sourceColorMap[dstBase + 1] = layer.sourceColorMap[srcBase + 1];
+                  resizedSimulation.sourceColorMap[dstBase + 2] = layer.sourceColorMap[srcBase + 2];
+                  resizedSimulation.sourceColorMap[dstBase + 3] = layer.sourceColorMap[srcBase + 3];
+                }
+                for (let i = 0; i < simKeys.length; i += 1) {
+                  const key = simKeys[i];
+                  const source = ArrayBuffer.isView(layer?.[key]) ? layer[key] : null;
+                  if (source && srcIndex < source.length) {
+                    resizedSimulation[key][dstIndex] = source[srcIndex];
+                  }
+                }
+              }
+            }
+            return resizedSimulation;
+          }
+          const resized = createLayer(layer?.name || getDefaultLayerName(1), targetWidth, targetHeight);
+          resized.id = layer?.id || resized.id;
+          resized.visible = layer?.visible !== false;
+          resized.opacity = normalizeLayerOpacity(layer?.opacity);
+          resized.blendMode = normalizeLayerBlendMode(layer?.blendMode);
+          const sourceIndices = layer?.indices instanceof Int16Array ? layer.indices : null;
+          const sourceDirect = layer?.direct instanceof Uint8ClampedArray ? layer.direct : null;
+          const targetDirect = sourceDirect ? ensureLayerDirect(resized, targetWidth, targetHeight) : null;
+          const copyWidth = Math.min(sourceWidth, targetWidth);
+          const copyHeight = Math.min(sourceHeight, targetHeight);
+          for (let y = 0; y < copyHeight; y += 1) {
+            for (let x = 0; x < copyWidth; x += 1) {
+              const srcIndex = (y * sourceWidth) + x;
+              const dstIndex = (y * targetWidth) + x;
+              resized.indices[dstIndex] = sourceIndices && srcIndex < sourceIndices.length ? sourceIndices[srcIndex] : -1;
+              if (sourceDirect && targetDirect) {
+                const srcBase = srcIndex * 4;
+                const dstBase = dstIndex * 4;
+                if (srcBase + 3 < sourceDirect.length) {
+                  targetDirect[dstBase] = sourceDirect[srcBase];
+                  targetDirect[dstBase + 1] = sourceDirect[srcBase + 1];
+                  targetDirect[dstBase + 2] = sourceDirect[srcBase + 2];
+                  targetDirect[dstBase + 3] = sourceDirect[srcBase + 3];
+                }
+              }
+            }
+          }
+          return resized;
+        }),
+      };
+    });
+    canvasDoc.width = targetWidth;
+    canvasDoc.height = targetHeight;
+    return true;
+  }
+
   function createFrame(name, layers, width, height, options = {}) {
     const { copyPixels = true } = options || {};
     return {
       id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Math.random().toString(36).slice(2)}`,
       name,
       duration: 1000 / 12,
+      voxelPreviewYawDeg: VOXEL_EXTENSION_DEFAULT_YAW_DEG,
+      voxelPreviewPitchDeg: VOXEL_EXTENSION_PREVIEW_ELEVATION_DEG,
       layers: layers.map(layer => cloneLayer(layer, width ?? state.width, height ?? state.height, { copyPixels })),
     };
   }
@@ -4310,6 +4636,38 @@
   function snapshotLayerForClipboard(layer, width = state.width, height = state.height) {
     if (!layer) {
       return null;
+    }
+    if (isSimulationLayer(layer)) {
+      const sim = createSimulationLayer(typeof layer.name === 'string' ? layer.name : getDefaultLayerName(1), width, height);
+      sim.visible = layer.visible !== false;
+      sim.opacity = normalizeLayerOpacity(layer.opacity);
+      sim.blendMode = normalizeLayerBlendMode(layer.blendMode);
+      [
+        'elementMap',
+        'sourceColorMap',
+        'velXMap',
+        'velYMap',
+        'lifeMap',
+        'tempMap',
+        'lightMap',
+        'depthMap',
+        'airMap',
+        'auxMap',
+        'activeMap',
+      ].forEach(key => {
+        if (ArrayBuffer.isView(layer[key]) && layer[key].length === sim[key].length) {
+          sim[key].set(layer[key]);
+        }
+      });
+      sim.settings = normalizeSimulationSettings(layer.settings);
+      sim.elementStyle = {
+        [SIM_ELEMENT_WATER]: normalizeSimulationStyle(SIM_ELEMENT_WATER, layer?.elementStyle?.[SIM_ELEMENT_WATER]),
+        [SIM_ELEMENT_FIRE]: normalizeSimulationStyle(SIM_ELEMENT_FIRE, layer?.elementStyle?.[SIM_ELEMENT_FIRE]),
+        [SIM_ELEMENT_METAL]: normalizeSimulationStyle(SIM_ELEMENT_METAL, layer?.elementStyle?.[SIM_ELEMENT_METAL]),
+        [SIM_ELEMENT_SMOKE]: normalizeSimulationStyle(SIM_ELEMENT_SMOKE, layer?.elementStyle?.[SIM_ELEMENT_SMOKE]),
+        [SIM_ELEMENT_LIGHT]: normalizeSimulationStyle(SIM_ELEMENT_LIGHT, layer?.elementStyle?.[SIM_ELEMENT_LIGHT]),
+      };
+      return sim;
     }
     const size = Math.max(0, Math.floor(width) || 0) * Math.max(0, Math.floor(height) || 0);
     const indices = new Int16Array(size).fill(-1);
@@ -4332,6 +4690,9 @@
   }
 
   function createLayerFromClipboardSnapshot(snapshot, width = state.width, height = state.height) {
+    if (snapshot?.type === SIM_LAYER_TYPE) {
+      return createGenericLayerFromSnapshot(snapshot, width, height);
+    }
     const layerName = typeof snapshot?.name === 'string' && snapshot.name.trim()
       ? snapshot.name.trim()
       : getDefaultLayerName(1);
@@ -4356,6 +4717,8 @@
     return {
       name: typeof frame.name === 'string' ? frame.name : getDefaultFrameName(1),
       duration: Number.isFinite(frame.duration) && frame.duration > 0 ? frame.duration : (1000 / 12),
+      voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
+      voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
       layers: frame.layers.map(layer => snapshotLayerForClipboard(layer, width, height)),
     };
   }
@@ -4371,6 +4734,8 @@
       id: crypto.randomUUID ? crypto.randomUUID() : `frame-${Math.random().toString(36).slice(2)}`,
       name: frameName,
       duration: Number.isFinite(snapshot?.duration) && snapshot.duration > 0 ? snapshot.duration : (1000 / 12),
+      voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(snapshot?.voxelPreviewYawDeg),
+      voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(snapshot?.voxelPreviewPitchDeg),
       layers,
     };
   }
@@ -4399,6 +4764,9 @@
           nextLayer.id = typeof layer?.id === 'string' && layer.id
             ? layer.id
             : (crypto.randomUUID ? crypto.randomUUID() : `layer-${Math.random().toString(36).slice(2)}`);
+          if (isSimulationLayer(layer)) {
+            return cloneSimulationLayer(layer, width, height, { copyPixels: clonePixelData });
+          }
           nextLayer.visible = layer?.visible !== false;
           nextLayer.opacity = normalizeLayerOpacity(layer?.opacity);
           nextLayer.blendMode = normalizeLayerBlendMode(layer?.blendMode);
@@ -4421,6 +4789,156 @@
         })
         : [createLayer(getDefaultLayerName(1), width, height)],
     }));
+  }
+
+  function cloneLayerForSnapshot(layer, { clonePixelData = true } = {}) {
+    if (isSimulationLayer(layer)) {
+      return cloneSimulationLayer(layer, state.width, state.height, { copyPixels: clonePixelData });
+    }
+    const clonedLayer = {
+      id: layer.id,
+      name: layer.name,
+      visible: layer.visible,
+      opacity: normalizeLayerOpacity(layer.opacity),
+      blendMode: normalizeLayerBlendMode(layer.blendMode),
+      indices: clonePixelData ? new Int16Array(layer.indices) : layer.indices,
+      direct: null,
+    };
+    if (layer.direct instanceof Uint8ClampedArray) {
+      clonedLayer.direct = clonePixelData ? new Uint8ClampedArray(layer.direct) : layer.direct;
+    } else if (ArrayBuffer.isView(layer.direct)) {
+      clonedLayer.direct = new Uint8ClampedArray(layer.direct.buffer.slice(0));
+    }
+    return clonedLayer;
+  }
+
+  function serializeSimulationStyleForDocument(style) {
+    return JSON.stringify({
+      displayMode: normalizeSimulationDisplayMode(style?.displayMode, SIM_SOURCE_COLOR),
+      mixStrength: clamp(Number(style?.mixStrength), 0, 1),
+      palette: style?.palette || {},
+    });
+  }
+
+  function parseSimulationStyleFromDocument(value, element) {
+    try {
+      return normalizeSimulationStyle(element, typeof value === 'string' ? JSON.parse(value) : value);
+    } catch (error) {
+      return normalizeSimulationStyle(element);
+    }
+  }
+
+  function serializeLayerForDocument(layer) {
+    if (isSimulationLayer(layer)) {
+      return {
+        id: layer.id,
+        type: SIM_LAYER_TYPE,
+        name: layer.name,
+        visible: layer.visible !== false,
+        opacity: normalizeLayerOpacity(layer.opacity),
+        blendMode: normalizeLayerBlendMode(layer.blendMode),
+        elementMap: encodeTypedArray(layer.elementMap),
+        sourceColorMap: encodeTypedArray(layer.sourceColorMap),
+        velXMap: encodeTypedArray(layer.velXMap),
+        velYMap: encodeTypedArray(layer.velYMap),
+        lifeMap: encodeTypedArray(layer.lifeMap),
+        tempMap: encodeTypedArray(layer.tempMap),
+        lightMap: encodeTypedArray(layer.lightMap),
+        depthMap: encodeTypedArray(layer.depthMap),
+        airMap: encodeTypedArray(layer.airMap),
+        auxMap: encodeTypedArray(layer.auxMap),
+        activeMap: encodeTypedArray(layer.activeMap),
+        settings: JSON.stringify(normalizeSimulationSettings(layer.settings)),
+        waterStyle: serializeSimulationStyleForDocument(layer.elementStyle?.[SIM_ELEMENT_WATER]),
+        fireStyle: serializeSimulationStyleForDocument(layer.elementStyle?.[SIM_ELEMENT_FIRE]),
+        metalStyle: serializeSimulationStyleForDocument(layer.elementStyle?.[SIM_ELEMENT_METAL]),
+        smokeStyle: serializeSimulationStyleForDocument(layer.elementStyle?.[SIM_ELEMENT_SMOKE]),
+        lightStyle: serializeSimulationStyleForDocument(layer.elementStyle?.[SIM_ELEMENT_LIGHT]),
+      };
+    }
+    return {
+      id: layer.id,
+      name: layer.name,
+      visible: layer.visible !== false,
+      opacity: normalizeLayerOpacity(layer.opacity),
+      blendMode: normalizeLayerBlendMode(layer.blendMode),
+      indices: encodeTypedArray(layer.indices),
+      direct: encodeTypedArray(layer.direct),
+    };
+  }
+
+  function deserializeSimulationTypedArray(value, Type, expectedLength) {
+    if (typeof value !== 'string') {
+      return new Type(expectedLength);
+    }
+    const bytes = decodeBase64(value);
+    const itemSize = Type.BYTES_PER_ELEMENT || 1;
+    if (bytes.length !== expectedLength * itemSize) {
+      throw new Error('Simulation layer typed array mismatch');
+    }
+    const view = new Type(bytes.buffer, bytes.byteOffset, bytes.byteLength / itemSize);
+    const output = new Type(view.length);
+    output.set(view);
+    return output;
+  }
+
+  function deserializeLayerFromDocument(layer, pixelCount, fallbackId, fallbackName, width = state.width, height = state.height) {
+    if (layer?.type === SIM_LAYER_TYPE) {
+      const simLayer = createSimulationLayer(fallbackName, width, height);
+      simLayer.id = typeof layer.id === 'string' ? layer.id : fallbackId;
+      simLayer.name = typeof layer.name === 'string' ? layer.name : fallbackName;
+      simLayer.visible = layer.visible !== false;
+      simLayer.opacity = normalizeLayerOpacity(layer.opacity);
+      simLayer.blendMode = normalizeLayerBlendMode(layer.blendMode);
+      simLayer.elementMap = deserializeSimulationTypedArray(layer.elementMap, Uint8Array, pixelCount);
+      simLayer.sourceColorMap = deserializeSimulationTypedArray(layer.sourceColorMap, Uint8ClampedArray, pixelCount * 4);
+      simLayer.velXMap = deserializeSimulationTypedArray(layer.velXMap, Int8Array, pixelCount);
+      simLayer.velYMap = deserializeSimulationTypedArray(layer.velYMap, Int8Array, pixelCount);
+      simLayer.lifeMap = deserializeSimulationTypedArray(layer.lifeMap, Uint8Array, pixelCount);
+      simLayer.tempMap = deserializeSimulationTypedArray(layer.tempMap, Uint16Array, pixelCount);
+      simLayer.lightMap = deserializeSimulationTypedArray(layer.lightMap, Uint8Array, pixelCount);
+      simLayer.depthMap = deserializeSimulationTypedArray(layer.depthMap, Uint8Array, pixelCount);
+      simLayer.airMap = deserializeSimulationTypedArray(layer.airMap, Uint8Array, pixelCount);
+      simLayer.auxMap = deserializeSimulationTypedArray(layer.auxMap, Uint8Array, pixelCount);
+      simLayer.activeMap = deserializeSimulationTypedArray(layer.activeMap, Uint8Array, pixelCount);
+      simLayer.settings = normalizeSimulationSettings(typeof layer.settings === 'string' ? JSON.parse(layer.settings) : layer.settings);
+      simLayer.elementStyle = {
+        [SIM_ELEMENT_WATER]: parseSimulationStyleFromDocument(layer.waterStyle, SIM_ELEMENT_WATER),
+        [SIM_ELEMENT_FIRE]: parseSimulationStyleFromDocument(layer.fireStyle, SIM_ELEMENT_FIRE),
+        [SIM_ELEMENT_METAL]: parseSimulationStyleFromDocument(layer.metalStyle, SIM_ELEMENT_METAL),
+        [SIM_ELEMENT_SMOKE]: parseSimulationStyleFromDocument(layer.smokeStyle, SIM_ELEMENT_SMOKE),
+        [SIM_ELEMENT_LIGHT]: parseSimulationStyleFromDocument(layer.lightStyle, SIM_ELEMENT_LIGHT),
+      };
+      return simLayer;
+    }
+    if (!layer || typeof layer.indices !== 'string') {
+      throw new Error('Layer is missing index data');
+    }
+    const indicesBytes = decodeBase64(layer.indices);
+    if (indicesBytes.length !== pixelCount * 2) {
+      throw new Error('Layer pixel data mismatch');
+    }
+    const indicesView = new Int16Array(indicesBytes.buffer, indicesBytes.byteOffset, indicesBytes.byteLength / 2);
+    const indices = new Int16Array(indicesView.length);
+    indices.set(indicesView);
+    let direct = null;
+    if (typeof layer.direct === 'string' && layer.direct.length > 0) {
+      const directBytes = decodeBase64(layer.direct);
+      if (directBytes.length !== pixelCount * 4) {
+        throw new Error('Layer direct pixel data mismatch');
+      }
+      direct = new Uint8ClampedArray(directBytes.length);
+      direct.set(directBytes);
+    }
+    return {
+      id: typeof layer.id === 'string' ? layer.id : fallbackId,
+      name: typeof layer.name === 'string' ? layer.name : fallbackName,
+      visible: layer.visible !== false,
+      opacity: normalizeLayerOpacity(layer.opacity),
+      blendMode: normalizeLayerBlendMode(layer.blendMode),
+      indices,
+      direct,
+    };
   }
 
   function normalizeCanvasSelectionMask(mask, pixelCount) {
@@ -4634,6 +5152,87 @@
   const INACTIVE_CANVAS_SWITCH_DRAG_THRESHOLD_PX = 4;
   const VOXEL_PREVIEW_DRAG_TURN_DEGREES = 180;
   const VOXEL_PREVIEW_DRAG_TILT_DEGREES = 140;
+  const VOXEL_PREVIEW_DRAG_AXIS_LOCK_DEADZONE_PX = 10;
+  const SIM_LAYER_TYPE = 'simulation';
+  const SIM_ELEMENT_EMPTY = 0;
+  const SIM_ELEMENT_WALL = 1;
+  const SIM_ELEMENT_WATER = 2;
+  const SIM_ELEMENT_SAND = 3;
+  const SIM_ELEMENT_METAL = 4;
+  const SIM_ELEMENT_FIRE = 5;
+  const SIM_ELEMENT_SMOKE = 6;
+  const SIM_ELEMENT_LIGHT = 7;
+  const SIM_PAINT_MODE_ELEMENT = 'element';
+  const SIM_PAINT_MODE_DEPTH = 'depth';
+  const SIM_PAINT_MODE_AIR = 'air';
+  const SIM_MAX_LIGHT_RADIUS = 5;
+  const SIM_UPDATE_STEP_LIMIT = 3;
+  const SIM_SOURCE_COLOR = 'sourceColor';
+  const SIM_ELEMENT_PALETTE = 'elementPalette';
+  const SIM_MIXED = 'mixed';
+  const SIM_DEFAULT_STYLE = Object.freeze({
+    [SIM_ELEMENT_WATER]: {
+      displayMode: SIM_SOURCE_COLOR,
+      mixStrength: 0.6,
+      palette: {
+        shallow: { r: 127, g: 220, b: 255, a: 255 },
+        mid: { r: 53, g: 168, b: 224, a: 255 },
+        deep: { r: 27, g: 79, b: 153, a: 255 },
+        foam: { r: 238, g: 252, b: 255, a: 255 },
+        highlight: { r: 223, g: 255, b: 255, a: 255 },
+      },
+    },
+    [SIM_ELEMENT_FIRE]: {
+      displayMode: SIM_SOURCE_COLOR,
+      mixStrength: 0.72,
+      palette: {
+        core: { r: 255, g: 246, b: 188, a: 255 },
+        mid: { r: 255, g: 157, b: 70, a: 255 },
+        edge: { r: 202, g: 54, b: 25, a: 255 },
+        glow: { r: 255, g: 212, b: 123, a: 180 },
+      },
+    },
+    [SIM_ELEMENT_METAL]: {
+      displayMode: SIM_SOURCE_COLOR,
+      mixStrength: 0.48,
+      palette: {
+        base: { r: 164, g: 176, b: 192, a: 255 },
+        dark: { r: 74, g: 84, b: 96, a: 255 },
+        highlight: { r: 234, g: 240, b: 248, a: 255 },
+        reflection: { r: 188, g: 216, b: 244, a: 255 },
+      },
+    },
+    [SIM_ELEMENT_SMOKE]: {
+      displayMode: SIM_SOURCE_COLOR,
+      mixStrength: 0.55,
+      palette: {
+        light: { r: 170, g: 176, b: 182, a: 180 },
+        dark: { r: 89, g: 94, b: 100, a: 210 },
+      },
+    },
+    [SIM_ELEMENT_LIGHT]: {
+      displayMode: SIM_ELEMENT_PALETTE,
+      mixStrength: 1,
+      palette: {
+        core: { r: 255, g: 247, b: 186, a: 255 },
+      },
+    },
+  });
+  const SIM_DEFAULT_SETTINGS = Object.freeze({
+    lightingEnabled: true,
+    atmosphereEnabled: true,
+    fireEffectEnabled: true,
+    waterEffectEnabled: true,
+    metalReflectionEnabled: true,
+    fogColor: { r: 168, g: 188, b: 220, a: 255 },
+    atmosphereStrength: 0.35,
+  });
+  const SIM_EDITOR_DEFAULTS = {
+    paintMode: SIM_PAINT_MODE_ELEMENT,
+    element: SIM_ELEMENT_WATER,
+    depthValue: 96,
+    airValue: 96,
+  };
   const activeTouchPointers = new Map();
   const keyboardState = {
     spacePanActive: false,
@@ -4897,6 +5496,8 @@
         id: frame.id,
         name: frame.name,
         duration: frame.duration,
+        voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
+        voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
         layers: frame.layers.map(layer => ({
           id: layer.id,
           name: layer.name,
@@ -4983,17 +5584,9 @@
         id: frame.id,
         name: frame.name,
         duration: frame.duration,
-          layers: frame.layers.map(layer => ({
-            id: layer.id,
-            name: layer.name,
-            visible: layer.visible,
-            opacity: normalizeLayerOpacity(layer.opacity),
-            blendMode: normalizeLayerBlendMode(layer.blendMode),
-            indices: effectiveClonePixelData ? new Int16Array(layer.indices) : layer.indices,
-            direct: layer.direct instanceof Uint8ClampedArray
-              ? (effectiveClonePixelData ? new Uint8ClampedArray(layer.direct) : layer.direct)
-              : null,
-          })),
+        voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
+        voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
+          layers: frame.layers.map(layer => cloneLayerForSnapshot(layer, { clonePixelData: effectiveClonePixelData })),
         })),
       showGrid: state.showGrid,
       showMajorGrid: state.showMajorGrid,
@@ -5797,15 +6390,39 @@
           id: frame.id,
           name: frame.name,
           duration: frame.duration,
-          layers: frame.layers.map(layer => ({
-            id: layer.id,
-            name: layer.name,
-            visible: layer.visible,
-            opacity: normalizeLayerOpacity(layer.opacity),
-            blendMode: normalizeLayerBlendMode(layer.blendMode),
-            indices: compressInt16Array(layer.indices),
-            direct: layer.direct ? compressUint8Array(layer.direct, { clamped: true }) : null,
-          })),
+          voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
+          voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
+          layers: frame.layers.map(layer => isSimulationLayer(layer)
+            ? {
+              id: layer.id,
+              type: SIM_LAYER_TYPE,
+              name: layer.name,
+              visible: layer.visible,
+              opacity: normalizeLayerOpacity(layer.opacity),
+              blendMode: normalizeLayerBlendMode(layer.blendMode),
+              elementMap: compressUint8Array(layer.elementMap, { clamped: false }),
+              sourceColorMap: compressUint8Array(layer.sourceColorMap, { clamped: true }),
+              velXMap: compressUint8Array(new Uint8Array(layer.velXMap.buffer, layer.velXMap.byteOffset, layer.velXMap.byteLength), { clamped: false }),
+              velYMap: compressUint8Array(new Uint8Array(layer.velYMap.buffer, layer.velYMap.byteOffset, layer.velYMap.byteLength), { clamped: false }),
+              lifeMap: compressUint8Array(layer.lifeMap, { clamped: false }),
+              tempMap: compressUint8Array(new Uint8Array(layer.tempMap.buffer, layer.tempMap.byteOffset, layer.tempMap.byteLength), { clamped: false }),
+              lightMap: compressUint8Array(layer.lightMap, { clamped: false }),
+              depthMap: compressUint8Array(layer.depthMap, { clamped: false }),
+              airMap: compressUint8Array(layer.airMap, { clamped: false }),
+              auxMap: compressUint8Array(layer.auxMap, { clamped: false }),
+              activeMap: compressUint8Array(layer.activeMap, { clamped: false }),
+              settings: JSON.stringify(normalizeSimulationSettings(layer.settings)),
+              elementStyle: JSON.stringify(layer.elementStyle || {}),
+            }
+            : {
+              id: layer.id,
+              name: layer.name,
+              visible: layer.visible,
+              opacity: normalizeLayerOpacity(layer.opacity),
+              blendMode: normalizeLayerBlendMode(layer.blendMode),
+              indices: compressInt16Array(layer.indices),
+              direct: layer.direct ? compressUint8Array(layer.direct, { clamped: true }) : null,
+            }),
         })),
       }))
       : null;
@@ -5822,15 +6439,39 @@
         id: frame.id,
         name: frame.name,
         duration: frame.duration,
-        layers: frame.layers.map(layer => ({
-          id: layer.id,
-          name: layer.name,
-          visible: layer.visible,
-          opacity: normalizeLayerOpacity(layer.opacity),
-          blendMode: normalizeLayerBlendMode(layer.blendMode),
-          indices: compressInt16Array(layer.indices),
-          direct: layer.direct ? compressUint8Array(layer.direct, { clamped: true }) : null,
-        })),
+        voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
+        voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
+        layers: frame.layers.map(layer => isSimulationLayer(layer)
+          ? {
+            id: layer.id,
+            type: SIM_LAYER_TYPE,
+            name: layer.name,
+            visible: layer.visible,
+            opacity: normalizeLayerOpacity(layer.opacity),
+            blendMode: normalizeLayerBlendMode(layer.blendMode),
+            elementMap: compressUint8Array(layer.elementMap, { clamped: false }),
+            sourceColorMap: compressUint8Array(layer.sourceColorMap, { clamped: true }),
+            velXMap: compressUint8Array(new Uint8Array(layer.velXMap.buffer, layer.velXMap.byteOffset, layer.velXMap.byteLength), { clamped: false }),
+            velYMap: compressUint8Array(new Uint8Array(layer.velYMap.buffer, layer.velYMap.byteOffset, layer.velYMap.byteLength), { clamped: false }),
+            lifeMap: compressUint8Array(layer.lifeMap, { clamped: false }),
+            tempMap: compressUint8Array(new Uint8Array(layer.tempMap.buffer, layer.tempMap.byteOffset, layer.tempMap.byteLength), { clamped: false }),
+            lightMap: compressUint8Array(layer.lightMap, { clamped: false }),
+            depthMap: compressUint8Array(layer.depthMap, { clamped: false }),
+            airMap: compressUint8Array(layer.airMap, { clamped: false }),
+            auxMap: compressUint8Array(layer.auxMap, { clamped: false }),
+            activeMap: compressUint8Array(layer.activeMap, { clamped: false }),
+            settings: JSON.stringify(normalizeSimulationSettings(layer.settings)),
+            elementStyle: JSON.stringify(layer.elementStyle || {}),
+          }
+          : {
+            id: layer.id,
+            name: layer.name,
+            visible: layer.visible,
+            opacity: normalizeLayerOpacity(layer.opacity),
+            blendMode: normalizeLayerBlendMode(layer.blendMode),
+            indices: compressInt16Array(layer.indices),
+            direct: layer.direct ? compressUint8Array(layer.direct, { clamped: true }) : null,
+          }),
       })),
       showGrid: snapshot.showGrid,
       showMajorGrid: snapshot.showMajorGrid,
@@ -5916,15 +6557,40 @@
           id: frame.id,
           name: frame.name,
           duration: frame.duration,
-          layers: frame.layers.map(layer => ({
-            id: layer.id,
-            name: layer.name,
-            visible: layer.visible,
-            opacity: normalizeLayerOpacity(layer.opacity),
-            blendMode: normalizeLayerBlendMode(layer.blendMode),
-            indices: decodeInt16Data(layer.indices),
-            direct: layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null,
-          })),
+          voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
+          voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
+          layers: frame.layers.map(layer => {
+            if (layer?.type === SIM_LAYER_TYPE) {
+              const simLayer = createSimulationLayer(layer.name || getDefaultLayerName(1), canvas.width, canvas.height);
+              simLayer.id = layer.id;
+              simLayer.visible = layer.visible !== false;
+              simLayer.opacity = normalizeLayerOpacity(layer.opacity);
+              simLayer.blendMode = normalizeLayerBlendMode(layer.blendMode);
+              simLayer.elementMap = decodeUint8Data(layer.elementMap, { clamped: false }) || simLayer.elementMap;
+              simLayer.sourceColorMap = decodeUint8Data(layer.sourceColorMap, { clamped: true }) || simLayer.sourceColorMap;
+              simLayer.velXMap = new Int8Array((decodeUint8Data(layer.velXMap, { clamped: false }) || new Uint8Array(simLayer.velXMap.byteLength)).buffer.slice(0));
+              simLayer.velYMap = new Int8Array((decodeUint8Data(layer.velYMap, { clamped: false }) || new Uint8Array(simLayer.velYMap.byteLength)).buffer.slice(0));
+              simLayer.lifeMap = decodeUint8Data(layer.lifeMap, { clamped: false }) || simLayer.lifeMap;
+              simLayer.tempMap = new Uint16Array((decodeUint8Data(layer.tempMap, { clamped: false }) || new Uint8Array(simLayer.tempMap.byteLength)).buffer.slice(0));
+              simLayer.lightMap = decodeUint8Data(layer.lightMap, { clamped: false }) || simLayer.lightMap;
+              simLayer.depthMap = decodeUint8Data(layer.depthMap, { clamped: false }) || simLayer.depthMap;
+              simLayer.airMap = decodeUint8Data(layer.airMap, { clamped: false }) || simLayer.airMap;
+              simLayer.auxMap = decodeUint8Data(layer.auxMap, { clamped: false }) || simLayer.auxMap;
+              simLayer.activeMap = decodeUint8Data(layer.activeMap, { clamped: false }) || simLayer.activeMap;
+              simLayer.settings = normalizeSimulationSettings(typeof layer.settings === 'string' ? JSON.parse(layer.settings) : layer.settings);
+              simLayer.elementStyle = typeof layer.elementStyle === 'string' ? JSON.parse(layer.elementStyle) : (layer.elementStyle || simLayer.elementStyle);
+              return simLayer;
+            }
+            return {
+              id: layer.id,
+              name: layer.name,
+              visible: layer.visible,
+              opacity: normalizeLayerOpacity(layer.opacity),
+              blendMode: normalizeLayerBlendMode(layer.blendMode),
+              indices: decodeInt16Data(layer.indices),
+              direct: layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null,
+            };
+          }),
         })),
       }))
       : null;
@@ -5941,15 +6607,40 @@
         id: frame.id,
         name: frame.name,
         duration: frame.duration,
-        layers: frame.layers.map(layer => ({
-          id: layer.id,
-          name: layer.name,
-          visible: layer.visible,
-          opacity: normalizeLayerOpacity(layer.opacity),
-          blendMode: normalizeLayerBlendMode(layer.blendMode),
-          indices: decodeInt16Data(layer.indices),
-          direct: layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null,
-        })),
+        voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
+        voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
+        layers: frame.layers.map(layer => {
+          if (layer?.type === SIM_LAYER_TYPE) {
+            const simLayer = createSimulationLayer(layer.name || getDefaultLayerName(1), snapshot.width, snapshot.height);
+            simLayer.id = layer.id;
+            simLayer.visible = layer.visible !== false;
+            simLayer.opacity = normalizeLayerOpacity(layer.opacity);
+            simLayer.blendMode = normalizeLayerBlendMode(layer.blendMode);
+            simLayer.elementMap = decodeUint8Data(layer.elementMap, { clamped: false }) || simLayer.elementMap;
+            simLayer.sourceColorMap = decodeUint8Data(layer.sourceColorMap, { clamped: true }) || simLayer.sourceColorMap;
+            simLayer.velXMap = new Int8Array((decodeUint8Data(layer.velXMap, { clamped: false }) || new Uint8Array(simLayer.velXMap.byteLength)).buffer.slice(0));
+            simLayer.velYMap = new Int8Array((decodeUint8Data(layer.velYMap, { clamped: false }) || new Uint8Array(simLayer.velYMap.byteLength)).buffer.slice(0));
+            simLayer.lifeMap = decodeUint8Data(layer.lifeMap, { clamped: false }) || simLayer.lifeMap;
+            simLayer.tempMap = new Uint16Array((decodeUint8Data(layer.tempMap, { clamped: false }) || new Uint8Array(simLayer.tempMap.byteLength)).buffer.slice(0));
+            simLayer.lightMap = decodeUint8Data(layer.lightMap, { clamped: false }) || simLayer.lightMap;
+            simLayer.depthMap = decodeUint8Data(layer.depthMap, { clamped: false }) || simLayer.depthMap;
+            simLayer.airMap = decodeUint8Data(layer.airMap, { clamped: false }) || simLayer.airMap;
+            simLayer.auxMap = decodeUint8Data(layer.auxMap, { clamped: false }) || simLayer.auxMap;
+            simLayer.activeMap = decodeUint8Data(layer.activeMap, { clamped: false }) || simLayer.activeMap;
+            simLayer.settings = normalizeSimulationSettings(typeof layer.settings === 'string' ? JSON.parse(layer.settings) : layer.settings);
+            simLayer.elementStyle = typeof layer.elementStyle === 'string' ? JSON.parse(layer.elementStyle) : (layer.elementStyle || simLayer.elementStyle);
+            return simLayer;
+          }
+          return {
+            id: layer.id,
+            name: layer.name,
+            visible: layer.visible,
+            opacity: normalizeLayerOpacity(layer.opacity),
+            blendMode: normalizeLayerBlendMode(layer.blendMode),
+            indices: decodeInt16Data(layer.indices),
+            direct: layer.direct ? decodeUint8Data(layer.direct, { clamped: true }) : null,
+          };
+        }),
       })),
       showGrid: snapshot.showGrid,
       showMajorGrid: snapshot.showMajorGrid,
@@ -6315,23 +7006,9 @@
       id: frame.id,
       name: frame.name,
       duration: frame.duration,
-      layers: frame.layers.map(layer => {
-        const clonedLayer = {
-          id: layer.id,
-          name: layer.name,
-          visible: layer.visible,
-          opacity: normalizeLayerOpacity(layer.opacity),
-          blendMode: normalizeLayerBlendMode(layer.blendMode),
-          indices: new Int16Array(layer.indices),
-          direct: null,
-        };
-        if (layer.direct instanceof Uint8ClampedArray) {
-          clonedLayer.direct = new Uint8ClampedArray(layer.direct);
-        } else if (ArrayBuffer.isView(layer.direct)) {
-          clonedLayer.direct = new Uint8ClampedArray(layer.direct.buffer.slice(0));
-        }
-        return clonedLayer;
-      }),
+      voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
+      voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
+      layers: frame.layers.map(layer => cloneLayerForSnapshot(layer)),
     }));
     const frameCount = Array.isArray(state.frames) ? state.frames.length : 0;
     const requestedActiveFrame = Object.prototype.hasOwnProperty.call(snapshot, 'activeFrame')
@@ -7321,6 +7998,13 @@
   }
 
   function markHistoryDirty() {
+    if (isVoxelExtensionModeEnabled()) {
+      setVoxelPreviewOrientationForFrameIndex(
+        state.activeFrame,
+        voxelExtensionState.previewYawDeg,
+        voxelExtensionState.previewPitchDeg
+      );
+    }
     if (history.pending?.dirty) {
       return;
     }
@@ -8734,6 +9418,9 @@
 
   function setupRightTabs() {
     dom.rightTabButtons = Array.from(document.querySelectorAll('[data-right-tab]'));
+    if (!RIGHT_TAB_KEYS.includes(state.activeRightTab) || state.activeRightTab === 'extensions') {
+      state.activeRightTab = 'settings';
+    }
     if (!RIGHT_TAB_KEYS.includes(state.activeRightTab)) {
       state.activeRightTab = 'frames';
     }
@@ -8746,6 +9433,10 @@
         if (layoutMode === 'mobilePortrait') return;
         const target = button.dataset.rightTab;
         if (!target) return;
+        if (target === 'extensions') {
+          notifyExtensionsUnavailable();
+          return;
+        }
         const compactMode = isCompactRightRailMode();
         if (compactMode && state.activeRightTab === target) {
           setCompactRightFlyoutOpen(!isCompactRightFlyoutOpen());
@@ -8816,6 +9507,10 @@
 
   function setRightTab(tab) {
     if (!RIGHT_TAB_KEYS.includes(tab)) return;
+    if (tab === 'extensions') {
+      notifyExtensionsUnavailable();
+      return;
+    }
     if (state.activeRightTab === tab) return;
     state.activeRightTab = tab;
     updateRightTabUI();
@@ -11026,14 +11721,11 @@
     setLocalizedAttribute('#addLocalCanvas', 'aria-label', 'マルチキャンバスを増やす', 'Add multi canvas');
     setLocalizedAttribute('#removeLocalCanvas', 'title', 'マルチキャンバスを減らす', 'Remove multi canvas');
     setLocalizedAttribute('#addLocalCanvas', 'title', 'マルチキャンバスを増やす', 'Add multi canvas');
-    setLocalizedTextContent('#voxelExtensionTitle', 'ボクセル拡張モード', 'Voxel Extension Mode');
-    setLocalizedToggleLabel('toggleVoxelExtensionMode', '専用6面を使う', 'Use dedicated 6-face setup');
-    setLocalizedTextContent('#setupVoxelExtension', '6面をセットアップ', 'Setup 6 faces');
-    setLocalizedTextContent('#refreshVoxelPreview', 'プレビュー更新', 'Refresh Preview');
-    setLocalizedTextContent('#voxelExtensionHint', 'Front / Back / Left / Right / Top / Bottom の6面から小窓プレビューを自動生成します。小窓をドラッグすると左右と上下に回転できます。', 'Floating preview is regenerated from Front / Back / Left / Right / Top / Bottom. Drag the floating preview to rotate horizontally and vertically.');
-    setLocalizedAttribute('#toggleVoxelExtensionMode', 'aria-label', 'ボクセル拡張モード', 'Voxel extension mode');
-    setLocalizedAttribute('#setupVoxelExtension', 'aria-label', 'ボクセル用6面キャンバスをセットアップ', 'Setup the voxel 6-face workspace');
-    setLocalizedAttribute('#refreshVoxelPreview', 'aria-label', 'ボクセルプレビューを更新', 'Refresh the voxel preview');
+    setLocalizedTextContent('#voxelExtensionTitle', 'ボクセルモード', 'Voxel Mode');
+    setLocalizedToggleLabel('toggleVoxelExtensionMode', 'ボクセルモード', 'Voxel Mode');
+    setLocalizedTextContent('#voxelExtensionHint', 'ON にすると Front / Back / Left / Right / Top / Bottom の6面構成へ切り替わり、小窓プレビューを自動生成します。小窓をドラッグすると左右と上下に回転できます。', 'When enabled, the workspace switches to Front / Back / Left / Right / Top / Bottom and generates the floating preview automatically. Drag the floating preview to rotate horizontally and vertically.');
+    setLocalizedAttribute('#toggleVoxelExtensionMode', 'aria-label', 'ボクセルモード', 'Voxel mode');
+    setLocalizedControlLabel('voxelDisplayPx', '表示PX', 'Display PX');
     setLocalizedToggleLabel('toggleTimelapse', 'タイムラプス記録', 'Timelapse Recording');
     setLocalizedToggleLabel('toggleOnionSkin', 'オニオンスキン', 'Onion Skin');
     setLocalizedToggleLabel('toggleMirrorMode', 'ミラーモード', 'Mirror Mode');
@@ -15349,12 +16041,35 @@
       : clamp(Math.round(nextIndex), 0, length - 1);
     const previousIndex = state.activeFrame;
     state.activeFrame = normalizedIndex;
+    getProjectCanvasDocuments().forEach(canvasDoc => {
+      if (!canvasDoc || !Array.isArray(canvasDoc.frames) || !canvasDoc.frames.length) {
+        return;
+      }
+      canvasDoc.activeFrame = clamp(normalizedIndex, 0, canvasDoc.frames.length - 1);
+      const targetFrame = canvasDoc.frames[canvasDoc.activeFrame];
+      if (targetFrame && Array.isArray(targetFrame.layers) && !targetFrame.layers.some(layer => layer?.id === canvasDoc.activeLayer)) {
+        canvasDoc.activeLayer = targetFrame.layers[targetFrame.layers.length - 1]?.id || targetFrame.layers[0]?.id || canvasDoc.activeLayer;
+      }
+    });
     const frame = frames[normalizedIndex];
     if (frame && (!frame.layers.some(layer => layer.id === state.activeLayer) || !state.activeLayer)) {
       const lastLayer = frame.layers[frame.layers.length - 1];
       if (lastLayer) {
         state.activeLayer = lastLayer.id;
       }
+    }
+    if (isVoxelExtensionModeEnabled()) {
+      const frameOrientation = getVoxelPreviewOrientationForFrameIndex(
+        normalizedIndex,
+        voxelExtensionState.previewYawDeg,
+        voxelExtensionState.previewPitchDeg
+      );
+      voxelExtensionState = normalizeVoxelExtensionState({
+        ...voxelExtensionState,
+        previewYawDeg: frameOrientation.yawDeg,
+        previewPitchDeg: frameOrientation.pitchDeg,
+      }, VOXEL_EXTENSION_DEFAULT_STATE);
+      syncVoxelExtensionPreviewFromSource({ updateViewport: false });
     }
     if (isMultiAssignedCellRestrictedEditorMode()) {
       enforceGuestAssignedLayerSelection({ announce: false });
@@ -15412,6 +16127,10 @@
     }
     const previousLayerId = state.activeLayer;
     state.activeLayer = nextLayer.id;
+    const activeCanvasDoc = getActiveProjectCanvasDocument();
+    if (activeCanvasDoc) {
+      activeCanvasDoc.activeLayer = nextLayer.id;
+    }
     if (persist) {
       scheduleSessionPersist();
     }
@@ -15466,25 +16185,58 @@
     }
     clearTimelineSelection();
     beginHistory(duplicate ? 'duplicateFrame' : 'addFrame');
-    const sourceLayers = baseFrame.layers;
     const nextFrameNumber = clamp(state.activeFrame + 2, 1, Number.MAX_SAFE_INTEGER);
-    const newFrame = createFrame(
-      getDefaultFrameName(nextFrameNumber),
-      sourceLayers,
-      state.width,
-      state.height,
-      { copyPixels: duplicate }
-    );
-    if (Number.isFinite(baseFrame.duration) && baseFrame.duration > 0) {
-      newFrame.duration = baseFrame.duration;
+    if (isVoxelExtensionModeEnabled()) {
+      getProjectCanvasDocuments().forEach(canvasDoc => {
+        if (!canvasDoc || !Array.isArray(canvasDoc.frames) || !canvasDoc.frames.length) {
+          return;
+        }
+        const sourceFrame = canvasDoc.frames[clamp(state.activeFrame, 0, canvasDoc.frames.length - 1)] || canvasDoc.frames[canvasDoc.frames.length - 1];
+        if (!sourceFrame || !Array.isArray(sourceFrame.layers)) {
+          return;
+        }
+        const newFrame = createFrame(
+          getDefaultFrameName(nextFrameNumber),
+          sourceFrame.layers,
+          canvasDoc.width || state.width,
+          canvasDoc.height || state.height,
+          { copyPixels: duplicate }
+        );
+        if (Number.isFinite(sourceFrame.duration) && sourceFrame.duration > 0) {
+          newFrame.duration = sourceFrame.duration;
+        }
+        newFrame.voxelPreviewYawDeg = normalizeVoxelPreviewYawDegrees(sourceFrame?.voxelPreviewYawDeg);
+        newFrame.voxelPreviewPitchDeg = normalizeVoxelPreviewPitchDegrees(sourceFrame?.voxelPreviewPitchDeg);
+        if (duplicate) {
+          newFrame.name = getDefaultFrameName(nextFrameNumber);
+        }
+        canvasDoc.frames.splice(clamp(state.activeFrame + 1, 0, Number.MAX_SAFE_INTEGER), 0, newFrame);
+        canvasDoc.activeFrame = clamp(state.activeFrame + 1, 0, canvasDoc.frames.length - 1);
+        canvasDoc.activeLayer = newFrame.layers[newFrame.layers.length - 1]?.id || canvasDoc.activeLayer;
+      });
+    } else {
+      const sourceLayers = baseFrame.layers;
+      const newFrame = createFrame(
+        getDefaultFrameName(nextFrameNumber),
+        sourceLayers,
+        state.width,
+        state.height,
+        { copyPixels: duplicate }
+      );
+      if (Number.isFinite(baseFrame.duration) && baseFrame.duration > 0) {
+        newFrame.duration = baseFrame.duration;
+      }
+      newFrame.voxelPreviewYawDeg = normalizeVoxelPreviewYawDegrees(baseFrame?.voxelPreviewYawDeg);
+      newFrame.voxelPreviewPitchDeg = normalizeVoxelPreviewPitchDegrees(baseFrame?.voxelPreviewPitchDeg);
+      if (duplicate) {
+        newFrame.name = getDefaultFrameName(nextFrameNumber);
+      }
+      state.frames.splice(state.activeFrame + 1, 0, newFrame);
     }
-    if (duplicate) {
-      newFrame.name = getDefaultFrameName(nextFrameNumber);
-    }
-    state.frames.splice(state.activeFrame + 1, 0, newFrame);
     clearPendingMultiAssignmentMoveRequests();
     state.activeFrame += 1;
-    state.activeLayer = newFrame.layers[newFrame.layers.length - 1].id;
+    const nextActiveFrame = getActiveFrame();
+    state.activeLayer = nextActiveFrame?.layers?.[nextActiveFrame.layers.length - 1]?.id || state.activeLayer;
     markHistoryDirty();
     scheduleSessionPersist();
     renderFrameList();
@@ -17951,15 +18703,9 @@
           id: frame.id,
           name: frame.name,
           duration: frame.duration,
-          layers: frame.layers.map(layer => ({
-            id: layer.id,
-            name: layer.name,
-            visible: layer.visible !== false,
-            opacity: normalizeLayerOpacity(layer.opacity),
-            blendMode: normalizeLayerBlendMode(layer.blendMode),
-            indices: encodeTypedArray(layer.indices),
-            direct: encodeTypedArray(layer.direct),
-          })),
+          voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
+          voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
+          layers: frame.layers.map(layer => serializeLayerForDocument(layer)),
         })),
       }))
       : null;
@@ -17973,15 +18719,9 @@
         id: frame.id,
         name: frame.name,
         duration: frame.duration,
-        layers: frame.layers.map(layer => ({
-          id: layer.id,
-          name: layer.name,
-          visible: layer.visible !== false,
-          opacity: normalizeLayerOpacity(layer.opacity),
-          blendMode: normalizeLayerBlendMode(layer.blendMode),
-          indices: encodeTypedArray(layer.indices),
-          direct: encodeTypedArray(layer.direct),
-        })),
+        voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
+        voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
+        layers: frame.layers.map(layer => serializeLayerForDocument(layer)),
       })),
       activeFrame: snapshot.activeFrame,
       activeLayer: snapshot.activeLayer,
@@ -18039,40 +18779,20 @@
       if (!frame || !Array.isArray(frame.layers) || !frame.layers.length) {
         throw new Error(`Frame ${frameIndex} has no layers`);
       }
-      const layers = frame.layers.map((layer, layerIndex) => {
-        if (!layer || typeof layer.indices !== 'string') {
-          throw new Error(`Layer ${layerIndex} is missing index data`);
-        }
-        const indicesBytes = decodeBase64(layer.indices);
-        if (indicesBytes.length !== pixelCount * 2) {
-          throw new Error('Layer pixel data mismatch');
-        }
-        const indicesView = new Int16Array(indicesBytes.buffer, indicesBytes.byteOffset, indicesBytes.byteLength / 2);
-        const indices = new Int16Array(indicesView.length);
-        indices.set(indicesView);
-        let direct = null;
-        if (typeof layer.direct === 'string' && layer.direct.length > 0) {
-          const directBytes = decodeBase64(layer.direct);
-          if (directBytes.length !== pixelCount * 4) {
-            throw new Error('Layer direct pixel data mismatch');
-          }
-          direct = new Uint8ClampedArray(directBytes.length);
-          direct.set(directBytes);
-        }
-        return {
-          id: typeof layer.id === 'string' ? layer.id : `layer-${frameIndex}-${layerIndex}`,
-          name: typeof layer.name === 'string' ? layer.name : getDefaultLayerName(layerIndex + 1),
-          visible: layer.visible !== false,
-          opacity: normalizeLayerOpacity(layer.opacity),
-          blendMode: normalizeLayerBlendMode(layer.blendMode),
-          indices,
-          direct,
-        };
-      });
+      const layers = frame.layers.map((layer, layerIndex) => deserializeLayerFromDocument(
+        layer,
+        pixelCount,
+        `layer-${frameIndex}-${layerIndex}`,
+        getDefaultLayerName(layerIndex + 1),
+        width,
+        height
+      ));
       return {
         id: typeof frame.id === 'string' ? frame.id : `frame-${frameIndex + 1}`,
         name: typeof frame.name === 'string' ? frame.name : getDefaultFrameName(frameIndex + 1),
         duration: clamp(Number(frame.duration) || 1000 / 12, 16, 2000),
+        voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
+        voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
         layers,
       };
     });
@@ -18214,40 +18934,20 @@
           if (!frame || !Array.isArray(frame.layers) || !frame.layers.length) {
             throw new Error(`Canvas ${canvasIndex} frame ${frameIndex} has no layers`);
           }
-          const layers = frame.layers.map((layer, layerIndex) => {
-            if (!layer || typeof layer.indices !== 'string') {
-              throw new Error(`Canvas ${canvasIndex} layer ${layerIndex} is missing index data`);
-            }
-            const indicesBytes = decodeBase64(layer.indices);
-            if (indicesBytes.length !== canvasPixelCount * 2) {
-              throw new Error('Canvas layer pixel data mismatch');
-            }
-            const indicesView = new Int16Array(indicesBytes.buffer, indicesBytes.byteOffset, indicesBytes.byteLength / 2);
-            const indices = new Int16Array(indicesView.length);
-            indices.set(indicesView);
-            let direct = null;
-            if (typeof layer.direct === 'string' && layer.direct.length > 0) {
-              const directBytes = decodeBase64(layer.direct);
-              if (directBytes.length !== canvasPixelCount * 4) {
-                throw new Error('Canvas direct pixel data mismatch');
-              }
-              direct = new Uint8ClampedArray(directBytes.length);
-              direct.set(directBytes);
-            }
-            return {
-              id: typeof layer.id === 'string' ? layer.id : `layer-${canvasIndex}-${frameIndex}-${layerIndex}`,
-              name: typeof layer.name === 'string' ? layer.name : getDefaultLayerName(layerIndex + 1),
-              visible: layer.visible !== false,
-              opacity: normalizeLayerOpacity(layer.opacity),
-              blendMode: normalizeLayerBlendMode(layer.blendMode),
-              indices,
-              direct,
-            };
-          });
+          const layers = frame.layers.map((layer, layerIndex) => deserializeLayerFromDocument(
+            layer,
+            canvasPixelCount,
+            `layer-${canvasIndex}-${frameIndex}-${layerIndex}`,
+            getDefaultLayerName(layerIndex + 1),
+            canvasWidth,
+            canvasHeight
+          ));
           return {
             id: typeof frame.id === 'string' ? frame.id : `frame-${canvasIndex}-${frameIndex + 1}`,
             name: typeof frame.name === 'string' ? frame.name : getDefaultFrameName(frameIndex + 1),
             duration: clamp(Number(frame.duration) || 1000 / 12, 16, 2000),
+            voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
+            voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
             layers,
           };
         });
@@ -18779,17 +19479,17 @@
     if (!ensureCurrentClientCanExportProject({ announce: true, format: 'png' })) {
       return;
     }
-    const frameCount = state.frames.length;
+    const exportFrameSet = buildExportFrameSet();
+    const frameCount = exportFrameSet.frameCount;
     if (!frameCount) {
       updateAutosaveStatus('PNGを書き出すフレームがありません', 'warn');
       return;
     }
     try {
-      const { width, height } = state;
+      const { width, height, framePixels, isVoxelComposite } = exportFrameSet;
       const candidates = getExportScaleCandidates();
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
-      const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
       const includeOriginal = shouldExportOriginalCompanion('png', selectedScale);
       const tasks = [];
       const hasMultipleFrames = frameCount > 1;
@@ -18822,11 +19522,14 @@
         mimeType: 'image/png',
         fileExtensions: ['.png'],
         shareTitle: state.documentName || 'PiXiEEDraw',
-        shareText: 'PNGを書き出しました',
+        shareText: isVoxelComposite ? 'PNGを書き出しました（立体表示）' : 'PNGを書き出しました',
       });
       const detailParts = [];
       if (frameCount > 1) {
         detailParts.push(`全${frameCount}フレーム`);
+      }
+      if (isVoxelComposite) {
+        detailParts.push(localizeText('立体表示', 'Voxel View'));
       }
       if (selectedScale > 1) {
         detailParts.push(`×${selectedScale}`);
@@ -18870,6 +19573,127 @@
       console.error('PNG export failed', error);
       updateAutosaveStatus('PNGの書き出しに失敗しました', 'error');
     }
+  }
+
+  async function exportProjectAsVoxelPreviewPng() {
+    if (!ensureCurrentClientCanExportProject({ announce: true, format: 'voxelpreview' })) {
+      return;
+    }
+    if (!(voxelExtensionPreviewPixels instanceof Uint8ClampedArray) || !voxelExtensionPreviewMeta) {
+      updateAutosaveStatus(localizeText('立体プレビューを書き出せません', 'Voxel preview is not available for export'), 'warn');
+      return;
+    }
+    try {
+      const width = Math.max(1, Math.round(Number(voxelExtensionPreviewMeta.width) || 1));
+      const height = Math.max(1, Math.round(Number(voxelExtensionPreviewMeta.height) || 1));
+      const candidates = getExportScaleCandidates('voxelpreview');
+      const selectedScale = applyExportScaleConstraints(candidates);
+      syncExportScaleInputs();
+      const baseCanvas = createFrameCanvas(voxelExtensionPreviewPixels, width, height);
+      const outputCanvas = scaleCanvasNearestNeighbor(baseCanvas, selectedScale);
+      const blob = await canvasToBlob(outputCanvas, 'image/png');
+      if (!blob) {
+        throw new Error('Failed to create voxel preview PNG blob');
+      }
+      const suffix = selectedScale > 1 ? `voxel_preview_x${selectedScale}` : 'voxel_preview';
+      const tasks = [{
+        blob,
+        filename: createExportFileName('png', suffix),
+        shareText: localizeText('立体プレビューPNGを書き出しました', 'Exported voxel preview PNG'),
+      }];
+      const result = await deliverExportTasks(tasks, {
+        mimeType: 'image/png',
+        fileExtensions: ['.png'],
+        shareTitle: state.documentName || 'PiXiEEDraw',
+        shareText: localizeText('立体プレビューPNGを書き出しました', 'Exported voxel preview PNG'),
+      });
+      if (result.exportedCount > 0) {
+        updateAutosaveStatus(
+          localizeText(
+            selectedScale > 1 ? `立体プレビューPNGを書き出しました (×${selectedScale})` : '立体プレビューPNGを書き出しました',
+            selectedScale > 1 ? `Exported voxel preview PNG (x${selectedScale})` : 'Exported voxel preview PNG'
+          ),
+          'success'
+        );
+        markDocumentDurablySaved();
+        showLoginPromptAfterExport();
+      } else if (result.wasCancelled) {
+        updateAutosaveStatus(localizeText('立体プレビューPNGの書き出しをキャンセルしました', 'Voxel preview PNG export was canceled'), 'warn');
+      } else {
+        updateAutosaveStatus(localizeText('立体プレビューPNGの書き出しに失敗しました', 'Voxel preview PNG export failed'), 'error');
+      }
+    } catch (error) {
+      console.error('Voxel preview PNG export failed', error);
+      updateAutosaveStatus(localizeText('立体プレビューPNGの書き出しに失敗しました', 'Voxel preview PNG export failed'), 'error');
+    }
+  }
+
+  function buildVoxelPreviewAnimationFrameSet() {
+    if (!isVoxelExtensionModeEnabled()) {
+      return null;
+    }
+    const resolved = getVoxelExtensionResolvedCanvases();
+    if (!resolved?.front || !resolved?.back || !resolved?.left || !resolved?.right || !resolved?.top || !resolved?.bottom) {
+      return null;
+    }
+    const sourceCanvases = [resolved.front, resolved.back, resolved.left, resolved.right, resolved.top, resolved.bottom];
+    const frameCount = sourceCanvases.reduce((max, canvasDoc) => (
+      Math.max(max, Array.isArray(canvasDoc?.frames) ? canvasDoc.frames.length : 0)
+    ), 0);
+    if (frameCount <= 0) {
+      return null;
+    }
+    const framePixels = [];
+    const frameDurations = [];
+    let previewWidth = 0;
+    let previewHeight = 0;
+    for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+      const orientation = getVoxelPreviewOrientationForFrameIndex(
+        frameIndex,
+        voxelExtensionState.previewYawDeg,
+        voxelExtensionState.previewPitchDeg
+      );
+      const rendered = buildVoxelPreviewPixels(
+        resolved.front,
+        resolved.back,
+        resolved.left,
+        resolved.right,
+        resolved.top,
+        resolved.bottom,
+        {
+          frameIndex,
+          yawDeg: orientation.yawDeg,
+          pitchDeg: orientation.pitchDeg,
+        }
+      );
+      const scaledPreview = scaleVoxelPreviewPixels(
+        rendered.pixels,
+        rendered.width,
+        rendered.height,
+        1
+      );
+      framePixels.push(scaledPreview.pixels);
+      frameDurations.push(
+        clamp(
+          Math.round(
+            Number(getProjectCanvasFrameAt(resolved.front, frameIndex)?.duration)
+            || Number(state.frames?.[frameIndex]?.duration)
+            || (1000 / 12)
+          ),
+          16,
+          2000
+        )
+      );
+      previewWidth = scaledPreview.width;
+      previewHeight = scaledPreview.height;
+    }
+    return {
+      framePixels,
+      frameDurations,
+      width: Math.max(1, previewWidth),
+      height: Math.max(1, previewHeight),
+      frameCount,
+    };
   }
 
   async function exportProjectAsSpriteMap() {
@@ -19247,7 +20071,7 @@
     if (!canExportVoxelGlbInCurrentState()) {
       updateAutosaveStatus(
         localizeText(
-          'GLB はボクセル拡張モードの6面入力がそろっている時だけ書き出せます',
+          'GLB はボクセルモードの6面入力がそろっている時だけ書き出せます',
           'GLB export requires voxel mode with all 6 source faces'
         ),
         'warn'
@@ -19306,19 +20130,24 @@
     if (!ensureCurrentClientCanExportProject({ announce: true, format: 'gif' })) {
       return;
     }
-    const frameCount = state.frames.length;
+    const exportFrameSet = buildExportFrameSet();
+    const frameCount = exportFrameSet.frameCount;
     if (!frameCount) {
       updateAutosaveStatus('GIFを書き出すフレームがありません', 'warn');
       return;
     }
     try {
-      const { width, height } = state;
       const candidates = getExportScaleCandidates();
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const includeOriginal = shouldExportOriginalCompanion('gif', selectedScale);
-      const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
-      const frameDurations = state.frames.map(frame => clamp(Math.round(Number(frame.duration) || 0), 16, 2000));
+      const {
+        width,
+        height,
+        framePixels,
+        frameDurations,
+        isVoxelComposite,
+      } = exportFrameSet;
       const scaledSet = scaleFrameSetNearestNeighbor(framePixels, width, height, selectedScale);
       const tasks = [];
       const scaledGifBytes = buildGifFromPixels(
@@ -19348,6 +20177,9 @@
         shareText: 'GIFを書き出しました',
       });
       const detailParts = [];
+      if (isVoxelComposite) {
+        detailParts.push(localizeText('立体表示', 'Voxel View'));
+      }
       if (selectedScale > 1) {
         detailParts.push(`×${selectedScale}`);
       }
@@ -19395,6 +20227,284 @@
     return frames.map(frame => compositeFramePixels(frame, width, height, palette));
   }
 
+  function buildExportFrameSet() {
+    if (isVoxelExtensionModeEnabled()) {
+      const previewCanvasDoc = getProjectCanvasDocumentById(voxelExtensionState.previewCanvasId);
+      const frameCount = Math.max(
+        Array.isArray(state.frames) ? state.frames.length : 0,
+        Array.isArray(previewCanvasDoc?.frames) ? previewCanvasDoc.frames.length : 0
+      );
+      if (frameCount > 0) {
+        const frameImages = [];
+        const frameDurations = [];
+        let width = 0;
+        let height = 0;
+        for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+          const imageData = buildVoxelPreviewCanvasCompositeImageDataForFrameIndex(frameIndex);
+          if (!(imageData?.data instanceof Uint8ClampedArray)) {
+            continue;
+          }
+          frameImages.push(imageData);
+          width = Math.max(width, Math.round(Number(imageData.width) || 1));
+          height = Math.max(height, Math.round(Number(imageData.height) || 1));
+          const duration = Number(getProjectCanvasFrameAt(previewCanvasDoc, frameIndex)?.duration)
+            || Number(state.frames?.[frameIndex]?.duration)
+            || (1000 / 12);
+          frameDurations.push(clamp(Math.round(duration), 16, 2000));
+        }
+        if (frameImages.length) {
+          const safeWidth = Math.max(1, width);
+          const safeHeight = Math.max(1, height);
+          const framePixels = frameImages.map(imageData => {
+            const sourceWidth = Math.max(1, Math.round(Number(imageData.width) || 1));
+            const sourceHeight = Math.max(1, Math.round(Number(imageData.height) || 1));
+            const sourceData = imageData.data instanceof Uint8ClampedArray
+              ? imageData.data
+              : new Uint8ClampedArray(sourceWidth * sourceHeight * 4);
+            if (sourceWidth === safeWidth && sourceHeight === safeHeight) {
+              return new Uint8ClampedArray(sourceData);
+            }
+            const padded = new Uint8ClampedArray(safeWidth * safeHeight * 4);
+            const offsetX = Math.floor((safeWidth - sourceWidth) / 2);
+            const offsetY = Math.floor((safeHeight - sourceHeight) / 2);
+            for (let y = 0; y < sourceHeight; y += 1) {
+              const srcRowStart = y * sourceWidth * 4;
+              const destRowStart = ((y + offsetY) * safeWidth * 4) + (offsetX * 4);
+              padded.set(sourceData.subarray(srcRowStart, srcRowStart + (sourceWidth * 4)), destRowStart);
+            }
+            return padded;
+          });
+          return {
+            framePixels,
+            frameDurations,
+            width: safeWidth,
+            height: safeHeight,
+            frameCount: framePixels.length,
+            isVoxelComposite: true,
+          };
+        }
+      }
+    }
+    const width = state.width;
+    const height = state.height;
+    return {
+      framePixels: compositeDocumentFrames(state.frames, width, height, state.palette),
+      frameDurations: state.frames.map(frame => clamp(Math.round(Number(frame.duration) || 0), 16, 2000)),
+      width,
+      height,
+      frameCount: Array.isArray(state.frames) ? state.frames.length : 0,
+      isVoxelComposite: false,
+    };
+  }
+
+  function getSimulationActiveLayer(frame = getActiveFrame()) {
+    if (!frame || !Array.isArray(frame.layers)) {
+      return null;
+    }
+    const layer = frame.layers.find(item => item?.id === state.activeLayer) || null;
+    return isSimulationLayer(layer) ? layer : null;
+  }
+
+  function updateSimulationElementPaletteUi() {
+    const selected = clamp(Math.round(Number(simulationEditorState.element) || 0), 0, SIM_ELEMENT_LIGHT);
+    [dom.controls.simulationElementPalette, dom.controls.leftSimulationElementPalette].forEach(container => {
+      if (!(container instanceof HTMLElement)) {
+        return;
+      }
+      const buttons = container.querySelectorAll('[data-simulation-element]');
+      buttons.forEach(button => {
+        const value = clamp(Math.round(Number(button.getAttribute('data-simulation-element')) || 0), 0, SIM_ELEMENT_LIGHT);
+        button.classList.toggle('is-active', value === selected);
+        button.setAttribute('aria-pressed', value === selected ? 'true' : 'false');
+      });
+    });
+    if (dom.controls.leftSimulationElementPaletteWrap instanceof HTMLElement) {
+      dom.controls.leftSimulationElementPaletteWrap.hidden = true;
+    }
+    if (dom.controls.simulationShowLeftPaletteValue) {
+      dom.controls.simulationShowLeftPaletteValue.textContent = simulationEditorState.showLeftPalette ? 'ON' : 'OFF';
+    }
+  }
+
+  function buildSimulationElementPaletteButtons(container) {
+    if (!(container instanceof HTMLElement) || container.dataset.simulationPaletteBuilt === 'true') {
+      return;
+    }
+    container.dataset.simulationPaletteBuilt = 'true';
+    const labels = ['EMPTY', 'WALL', 'WATER', 'SAND', 'METAL', 'FIRE', 'SMOKE', 'LIGHT'];
+    labels.forEach((label, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'pixel-button pixel-frame';
+      button.dataset.simulationElement = String(index);
+      button.textContent = label;
+      button.addEventListener('click', () => {
+        simulationEditorState.element = index;
+        if (dom.controls.simulationElement instanceof HTMLSelectElement) {
+          dom.controls.simulationElement.value = String(index);
+        }
+        updateSimulationElementPaletteUi();
+      });
+      container.appendChild(button);
+    });
+  }
+
+  function mixSimulationColor(a, b, amount) {
+    const t = clamp(Number(amount), 0, 1);
+    return {
+      r: Math.round((a.r * (1 - t)) + (b.r * t)),
+      g: Math.round((a.g * (1 - t)) + (b.g * t)),
+      b: Math.round((a.b * (1 - t)) + (b.b * t)),
+      a: Math.round((a.a * (1 - t)) + (b.a * t)),
+    };
+  }
+
+  function brightenSimulationColor(color, amount, tint = null) {
+    const source = cloneSimulationColor(color, { r: 255, g: 255, b: 255, a: 255 });
+    const highlight = tint ? mixSimulationColor(source, cloneSimulationColor(tint, source), 0.35) : { ...source };
+    return mixSimulationColor(source, {
+      r: Math.min(255, Math.round(highlight.r + ((255 - highlight.r) * 0.85))),
+      g: Math.min(255, Math.round(highlight.g + ((255 - highlight.g) * 0.85))),
+      b: Math.min(255, Math.round(highlight.b + ((255 - highlight.b) * 0.85))),
+      a: source.a,
+    }, amount);
+  }
+
+  function sampleSimulationPaletteColor(layer, element, index, width, height, baseColor, tickSeed = 0) {
+    const style = layer?.elementStyle?.[element];
+    const depth = layer?.depthMap?.[index] || 0;
+    const light = layer?.lightMap?.[index] || 0;
+    const air = layer?.airMap?.[index] || 0;
+    const aux = layer?.auxMap?.[index] || 0;
+    let paletteColor = baseColor;
+    if (element === SIM_ELEMENT_WATER) {
+      const palette = style?.palette || {};
+      paletteColor = depth < 72
+        ? cloneSimulationColor(palette.shallow, baseColor)
+        : depth < 168
+          ? cloneSimulationColor(palette.mid, baseColor)
+          : cloneSimulationColor(palette.deep, baseColor);
+      if (aux === 2 || aux === 3) {
+        paletteColor = mixSimulationColor(paletteColor, cloneSimulationColor(palette.foam, paletteColor), 0.45);
+      }
+      const x = index % width;
+      const y = Math.floor(index / width);
+      const above = y > 0 ? layer.elementMap[index - width] : SIM_ELEMENT_EMPTY;
+      if (above === SIM_ELEMENT_EMPTY || above === SIM_ELEMENT_SMOKE) {
+        const shimmer = ((x * 17) + (y * 31) + tickSeed) & 7;
+        if (shimmer < 2) {
+          paletteColor = mixSimulationColor(paletteColor, cloneSimulationColor(palette.highlight, paletteColor), 0.35 + ((light / 255) * 0.18));
+        }
+      }
+    } else if (element === SIM_ELEMENT_FIRE) {
+      const palette = style?.palette || {};
+      const flicker = (((index * 13) + tickSeed) & 15) / 15;
+      paletteColor = flicker > 0.68
+        ? cloneSimulationColor(palette.core, baseColor)
+        : flicker > 0.34
+          ? cloneSimulationColor(palette.mid, baseColor)
+          : cloneSimulationColor(palette.edge, baseColor);
+    } else if (element === SIM_ELEMENT_METAL) {
+      const palette = style?.palette || {};
+      paletteColor = cloneSimulationColor(palette.base, baseColor);
+      if (light > 96) {
+        paletteColor = mixSimulationColor(paletteColor, cloneSimulationColor(palette.highlight, paletteColor), Math.min(0.5, light / 255));
+      }
+    } else if (element === SIM_ELEMENT_SMOKE) {
+      const palette = style?.palette || {};
+      paletteColor = air > 140
+        ? cloneSimulationColor(palette.light, baseColor)
+        : cloneSimulationColor(palette.dark, baseColor);
+    } else if (element === SIM_ELEMENT_LIGHT) {
+      paletteColor = cloneSimulationColor(style?.palette?.core, baseColor);
+    } else if (element === SIM_ELEMENT_WALL) {
+      paletteColor = baseColor;
+    }
+    return paletteColor;
+  }
+
+  function resolveSimulationPixelColor(layer, index, width, height, underlying) {
+    const element = layer?.elementMap?.[index] || 0;
+    if (element === SIM_ELEMENT_EMPTY) {
+      return null;
+    }
+    const sourceBase = layer?.sourceColorMap instanceof Uint8ClampedArray && ((index * 4) + 3) < layer.sourceColorMap.length
+      ? {
+        r: layer.sourceColorMap[index * 4],
+        g: layer.sourceColorMap[(index * 4) + 1],
+        b: layer.sourceColorMap[(index * 4) + 2],
+        a: layer.sourceColorMap[(index * 4) + 3],
+      }
+      : (underlying && underlying.a > 0
+        ? underlying
+        : { r: 0, g: 0, b: 0, a: 0 });
+    const style = layer?.elementStyle?.[element] || { displayMode: SIM_SOURCE_COLOR, mixStrength: 0, palette: {} };
+    const tickSeed = ((Date.now() / 80) | 0);
+    const paletteColor = sampleSimulationPaletteColor(layer, element, index, width, height, sourceBase.a > 0 ? sourceBase : { r: 255, g: 255, b: 255, a: 255 }, tickSeed);
+    let color;
+    if (style.displayMode === SIM_ELEMENT_PALETTE) {
+      color = paletteColor;
+    } else if (style.displayMode === SIM_MIXED) {
+      color = mixSimulationColor(sourceBase.a > 0 ? sourceBase : paletteColor, paletteColor, style.mixStrength);
+    } else {
+      color = sourceBase.a > 0 ? { ...sourceBase } : paletteColor;
+    }
+    const light = layer.lightMap?.[index] || 0;
+    if (element === SIM_ELEMENT_FIRE || element === SIM_ELEMENT_LIGHT) {
+      const emissive = brightenSimulationColor(sourceBase.a > 0 ? sourceBase : paletteColor, 0.45 + (light / 400), { r: 255, g: 220, b: 120, a: 255 });
+      color = mixSimulationColor(color, emissive, 0.25 + (light / 510));
+    } else if (element === SIM_ELEMENT_METAL && layer.settings?.metalReflectionEnabled !== false) {
+      const reflection = brightenSimulationColor(sourceBase.a > 0 ? sourceBase : cloneSimulationColor(style?.palette?.reflection, color), Math.max(0.2, light / 255), { r: 220, g: 236, b: 255, a: 255 });
+      color = mixSimulationColor(color, reflection, Math.max(0, ((light / 255) * 0.45) - ((layer.depthMap?.[index] || 0) / 700)));
+    } else if (element === SIM_ELEMENT_WATER && layer.settings?.waterEffectEnabled !== false) {
+      const speed = Math.min(1, (Math.abs(layer.velXMap?.[index] || 0) + Math.abs(layer.velYMap?.[index] || 0)) / 4);
+      const reflection = brightenSimulationColor(sourceBase.a > 0 ? sourceBase : cloneSimulationColor(style?.palette?.highlight, color), 0.22 + (light / 600) + (speed * 0.1), { r: 210, g: 244, b: 255, a: 255 });
+      color = mixSimulationColor(color, reflection, (light / 255) * 0.2 + speed * 0.18);
+    }
+    if (layer.settings?.lightingEnabled !== false && light > 0) {
+      const boost = 1 + (light / 255) * 0.22;
+      color = {
+        r: clamp(Math.round(color.r * boost), 0, 255),
+        g: clamp(Math.round(color.g * boost), 0, 255),
+        b: clamp(Math.round(color.b * boost), 0, 255),
+        a: color.a,
+      };
+    }
+    if (layer.settings?.atmosphereEnabled !== false) {
+      const fog = ((layer.depthMap?.[index] || 0) / 255) * ((layer.airMap?.[index] || 0) / 255) * clamp(Number(layer.settings?.atmosphereStrength), 0, 1);
+      color = mixSimulationColor(color, cloneSimulationColor(layer.settings?.fogColor, SIM_DEFAULT_SETTINGS.fogColor), fog);
+    }
+    if (color.a <= 0) {
+      color.a = 255;
+    }
+    return color;
+  }
+
+  function compositeSimulationLayerRegion(data, frame, layer, width, height, x0, y0, x1, y1) {
+    const opacity = getDisplayedLayerPreviewOpacity(layer, 1);
+    const blendMode = normalizeLayerBlendMode(layer.blendMode);
+    const regionWidth = x1 - x0 + 1;
+    for (let py = y0; py <= y1; py += 1) {
+      const rowOffset = (py - y0) * regionWidth * 4;
+      const layerRow = py * width;
+      for (let px = x0; px <= x1; px += 1) {
+        const pixelIndex = layerRow + px;
+        const destIndex = rowOffset + ((px - x0) * 4);
+        const underlying = {
+          r: data[destIndex],
+          g: data[destIndex + 1],
+          b: data[destIndex + 2],
+          a: data[destIndex + 3],
+        };
+        const resolved = resolveSimulationPixelColor(layer, pixelIndex, width, height, underlying);
+        if (!resolved || resolved.a <= 0) {
+          continue;
+        }
+        compositeLayerPixelNormalized(data, destIndex, resolved.r, resolved.g, resolved.b, resolved.a, opacity, blendMode);
+      }
+    }
+  }
+
   function compositeFramePixels(frame, width, height, palette, options = {}) {
     const includeHiddenLayers = Boolean(options && options.includeHiddenLayers);
     const useLocalLayerPreviewVisibility = Boolean(options && options.useLocalLayerPreviewVisibility);
@@ -19412,6 +20522,10 @@
         ? getDisplayedLayerPreviewOpacity(layer, 1)
         : normalizeLayerOpacity(layer?.opacity);
       if (!layer || (!includeHiddenLayers && !layerVisible) || layerOpacity <= 0) {
+        return;
+      }
+      if (isSimulationLayer(layer)) {
+        compositeSimulationLayerRegion(output, frame, layer, width, height, 0, 0, width - 1, height - 1);
         return;
       }
       const layerBlendMode = normalizeLayerBlendMode(layer.blendMode);
@@ -19670,6 +20784,7 @@
     if (normalized === 'timelapse') return 'timelapse';
     if (normalized === 'jpeg' || normalized === 'jpg') return 'jpeg';
     if (normalized === 'svg') return 'svg';
+    if (normalized === 'voxelpreview' || normalized === 'voxel-preview' || normalized === 'previewpng') return 'voxelpreview';
     if (normalized === 'glb') return 'glb';
     if (normalized === 'spritemap' || normalized === 'sprite-map' || normalized === 'spritesheet' || normalized === 'sprite-sheet') return 'spritemap';
     if (normalized === 'png') return 'png';
@@ -19683,6 +20798,7 @@
     const normalized = normalizeExportFormat(mode);
     if (normalized === 'jpeg') return 'JPEG';
     if (normalized === 'svg') return 'SVG';
+    if (normalized === 'voxelpreview') return localizeText('立体プレビューPNG', 'Voxel Preview PNG');
     if (normalized === 'glb') return 'GLB';
     if (normalized === 'spritemap') return 'SpriteMAP';
     if (normalized === 'gridpng') return localizeText('PNG（グリッド分割）', 'PNG (Grid Split)');
@@ -19710,13 +20826,22 @@
 
   function getFormatSpecificExportDisabledReason(mode = 'png') {
     const format = normalizeExportFormat(mode);
+    if (format === 'voxelpreview') {
+      if (!isVoxelExtensionModeEnabled() || !(voxelExtensionPreviewPixels instanceof Uint8ClampedArray) || !voxelExtensionPreviewMeta) {
+        return localizeText(
+          '立体プレビューPNGはボクセルモード中のみ利用できます',
+          'Voxel preview PNG is available only in voxel mode'
+        );
+      }
+      return '';
+    }
     if (format !== 'glb') {
       return '';
     }
     if (!isVoxelExtensionModeEnabled()) {
       return localizeText(
-        'GLB はボクセル拡張モードでのみ利用できます',
-        'GLB export is available only in voxel extension mode'
+        'GLB はボクセルモードでのみ利用できます',
+        'GLB export is available only in voxel mode'
       );
     }
     if (!canExportVoxelGlbInCurrentState()) {
@@ -19780,6 +20905,7 @@
   function canOfferProjectCompanionExport(mode) {
     const format = normalizeExportFormat(mode);
     const supportsCompanionFormat = format === 'png'
+      || format === 'voxelpreview'
       || format === 'jpeg'
       || format === 'svg'
       || format === 'spritemap'
@@ -19878,7 +21004,7 @@
     const format = normalizeExportFormat(mode);
     const normalizedScale = Math.max(1, Math.floor(Number(scale) || 1));
     return normalizedScale > 1
-      && (format === 'png' || format === 'jpeg' || format === 'svg' || format === 'spritemap' || format === 'gif');
+      && (format === 'png' || format === 'voxelpreview' || format === 'jpeg' || format === 'svg' || format === 'spritemap' || format === 'gif');
   }
 
   function shouldExportOriginalCompanion(mode, scale = exportScale) {
@@ -19888,6 +21014,7 @@
   function doesExportFormatUseScale(mode) {
     const format = normalizeExportFormat(mode);
     return format === 'png'
+      || format === 'voxelpreview'
       || format === 'jpeg'
       || format === 'svg'
       || format === 'spritemap'
@@ -19899,6 +21026,7 @@
   function doesExportFormatSupportProjectCompanion(mode) {
     const format = normalizeExportFormat(mode);
     return format === 'png'
+      || format === 'voxelpreview'
       || format === 'jpeg'
       || format === 'svg'
       || format === 'spritemap'
@@ -23953,6 +25081,10 @@
     const normalizedTarget = isUnifiedLeftToolsColorMode() && target === 'color'
       ? 'tools'
       : target;
+    if (normalizedTarget === 'extensions') {
+      notifyExtensionsUnavailable();
+      return false;
+    }
     if (isMobileSpectatorTabLockActive() && target !== 'multi') {
       return false;
     }
@@ -24014,6 +25146,19 @@
 
   function isMobileSpectatorTabLockActive() {
     return layoutMode === 'mobilePortrait' && isMultiSpectatorMode();
+  }
+
+  function getExtensionsUnavailableMessage() {
+    return localizeText(
+      '今は使用不可です。\n立体作成モードは設定のトグルへ移動しました。',
+      'Extensions are currently unavailable.\nVoxel creation mode has moved to the Settings toggle.'
+    );
+  }
+
+  function notifyExtensionsUnavailable() {
+    const message = getExtensionsUnavailableMessage();
+    updateAutosaveStatus(message.replace(/\n/g, ' '), 'info');
+    window.alert(message);
   }
 
   function enforceMobileSpectatorTabLock({ forceActivate = true } = {}) {
@@ -26010,27 +27155,14 @@
     };
     dom.controls.toggleVoxelExtensionMode?.addEventListener('change', handleVoxelExtensionToggleInput);
     dom.controls.toggleVoxelExtensionMode?.addEventListener('input', handleVoxelExtensionToggleInput);
-    dom.controls.setupVoxelExtension?.addEventListener('click', event => {
-      event.preventDefault();
-      setVoxelExtensionModeEnabled(true, { announce: true });
-      syncControlsWithState();
-    });
-    dom.controls.refreshVoxelPreview?.addEventListener('click', event => {
-      event.preventDefault();
-      if (!isVoxelExtensionModeEnabled()) {
-        return;
-      }
-      syncVoxelExtensionPreviewFromSource({ updateViewport: true });
-      renderAllProjectCanvasSurfaces();
-      requestRender();
-      requestOverlayRender();
-      updateAutosaveStatus(localizeText('ボクセルプレビューを更新しました', 'Voxel preview refreshed'), 'success');
-    });
-    const applyVoxelPreviewYaw = (value, { persistProject = false } = {}) => {
-      const nextYawDeg = normalizeVoxelPreviewYawDegrees(value);
+    const applyVoxelPreviewOrientation = (yawValue, pitchValue = voxelExtensionState.previewPitchDeg, { persistProject = false } = {}) => {
+      const nextYawDeg = normalizeVoxelPreviewYawDegrees(yawValue);
+      const nextPitchDeg = normalizeVoxelPreviewPitchDegrees(pitchValue);
+      setVoxelPreviewOrientationForFrameIndex(state.activeFrame, nextYawDeg, nextPitchDeg);
       voxelExtensionState = normalizeVoxelExtensionState({
         ...voxelExtensionState,
         previewYawDeg: nextYawDeg,
+        previewPitchDeg: nextPitchDeg,
       }, VOXEL_EXTENSION_DEFAULT_STATE);
       syncVoxelExtensionModeUi();
       if (isVoxelExtensionModeEnabled()) {
@@ -26044,6 +27176,9 @@
         scheduleAutosaveSnapshot();
       }
     };
+    const applyVoxelPreviewYaw = (value, options = {}) => {
+      applyVoxelPreviewOrientation(value, voxelExtensionState.previewPitchDeg, options);
+    };
     dom.controls.voxelPreviewYaw?.addEventListener('input', event => {
       if (!(event.target instanceof HTMLInputElement)) {
         return;
@@ -26055,6 +27190,34 @@
         return;
       }
       applyVoxelPreviewYaw(event.target.value, { persistProject: true });
+    });
+    dom.controls.voxelDisplayPx?.addEventListener('input', event => {
+      if (!(event.target instanceof HTMLInputElement)) {
+        return;
+      }
+      voxelExtensionState = normalizeVoxelExtensionState({
+        ...voxelExtensionState,
+        displayPx: event.target.value,
+      }, VOXEL_EXTENSION_DEFAULT_STATE);
+      syncVoxelExtensionPreviewFromSource({ updateViewport: true });
+      requestRender();
+      requestOverlayRender();
+      scheduleSessionPersist();
+    });
+    dom.controls.voxelDisplayPx?.addEventListener('change', event => {
+      if (!(event.target instanceof HTMLInputElement)) {
+        return;
+      }
+      voxelExtensionState = normalizeVoxelExtensionState({
+        ...voxelExtensionState,
+        displayPx: event.target.value,
+      }, VOXEL_EXTENSION_DEFAULT_STATE);
+      syncVoxelExtensionPreviewFromSource({ updateViewport: true });
+      requestRender();
+      requestOverlayRender();
+      markAutosaveDirty();
+      scheduleAutosaveSnapshot();
+      scheduleSessionPersist();
     });
 
     if (dom.controls.virtualCursorButtonScale instanceof HTMLInputElement) {
@@ -29928,6 +31091,34 @@
       commitHistory();
     });
 
+    dom.controls.addSimulationLayer?.addEventListener('click', () => {
+      if (!canCurrentClientEditProjectStructure()) {
+        setMultiStatus(localizeText('参加/視聴モードではレイヤー追加はマスターのみ操作できます', 'In participant/viewer mode, only the master can add layers'), 'warn');
+        return;
+      }
+      const activeFrame = getActiveFrame();
+      if (!activeFrame) return;
+      clearTimelineSelection();
+      beginHistory('addSimulationLayer');
+      const insertIndex = clamp(getActiveLayerIndex() + 1, 0, Number.MAX_SAFE_INTEGER);
+      state.frames.forEach((frame, frameIndex) => {
+        const targetIndex = Math.min(insertIndex, frame.layers.length);
+        const name = `${getDefaultLayerName(frame.layers.length + 1)} Sim`;
+        const newLayer = createSimulationLayer(name, state.width, state.height);
+        frame.layers.splice(targetIndex, 0, newLayer);
+        if (frameIndex === state.activeFrame) {
+          state.activeLayer = newLayer.id;
+        }
+      });
+      markHistoryDirty();
+      scheduleSessionPersist();
+      renderFrameList();
+      renderLayerList();
+      requestRender();
+      requestOverlayRender();
+      commitHistory();
+    });
+
     dom.controls.removeLayer?.addEventListener('click', () => {
       if (!canCurrentClientEditProjectStructure()) {
         setMultiStatus(localizeText('参加/視聴モードではレイヤー削除はマスターのみ操作できます', 'In participant/viewer mode, only the master can delete layers'), 'warn');
@@ -29967,6 +31158,116 @@
       commitHistory();
     });
 
+    const bindSimulationNumber = (control, apply, output = null, suffix = '') => {
+      if (!(control instanceof HTMLInputElement)) return;
+      control.addEventListener('input', () => {
+        const layer = getSimulationActiveLayer();
+        if (!layer) return;
+        const value = Number(control.value);
+        apply(layer, value);
+        if (output) output.textContent = `${Math.round(value)}${suffix}`;
+        markHistoryDirty();
+        requestRender();
+      });
+    };
+    if (dom.controls.simulationPaintMode instanceof HTMLSelectElement) {
+      dom.controls.simulationPaintMode.addEventListener('change', () => {
+        simulationEditorState.paintMode = dom.controls.simulationPaintMode.value;
+      });
+    }
+    if (dom.controls.simulationElement instanceof HTMLSelectElement) {
+      dom.controls.simulationElement.addEventListener('change', () => {
+        simulationEditorState.element = clamp(Math.round(Number(dom.controls.simulationElement.value) || 0), 0, SIM_ELEMENT_LIGHT);
+        updateSimulationElementPaletteUi();
+      });
+    }
+    buildSimulationElementPaletteButtons(dom.controls.leftSimulationElementPalette);
+    if (dom.controls.simulationShowLeftPalette instanceof HTMLInputElement) {
+      dom.controls.simulationShowLeftPalette.addEventListener('change', () => {
+        simulationEditorState.showLeftPalette = dom.controls.simulationShowLeftPalette.checked;
+        updateSimulationElementPaletteUi();
+      });
+    }
+    bindSimulationNumber(dom.controls.simulationDepthValue, (_layer, value) => {
+      simulationEditorState.depthValue = clamp(Math.round(value), 0, 255);
+    }, dom.controls.simulationDepthValueOut);
+    bindSimulationNumber(dom.controls.simulationAirValue, (_layer, value) => {
+      simulationEditorState.airValue = clamp(Math.round(value), 0, 255);
+    }, dom.controls.simulationAirValueOut);
+    bindSimulationNumber(dom.controls.simulationAtmosphereStrength, (layer, value) => {
+      layer.settings.atmosphereStrength = clamp(Number(value) / 100, 0, 1);
+      if (dom.controls.simulationAtmosphereStrengthValue) {
+        dom.controls.simulationAtmosphereStrengthValue.textContent = `${Math.round(value)}%`;
+      }
+    });
+    bindSimulationNumber(dom.controls.simulationWaterMixStrength, (layer, value) => {
+      layer.elementStyle[SIM_ELEMENT_WATER] = normalizeSimulationStyle(SIM_ELEMENT_WATER, {
+        ...layer.elementStyle[SIM_ELEMENT_WATER],
+        mixStrength: clamp(Number(value) / 100, 0, 1),
+      });
+      if (dom.controls.simulationWaterMixStrengthValue) {
+        dom.controls.simulationWaterMixStrengthValue.textContent = `${Math.round(value)}%`;
+      }
+    });
+    if (dom.controls.simulationAtmosphereEnabled instanceof HTMLInputElement) {
+      dom.controls.simulationAtmosphereEnabled.addEventListener('change', () => {
+        const layer = getSimulationActiveLayer();
+        if (!layer) return;
+        layer.settings.atmosphereEnabled = dom.controls.simulationAtmosphereEnabled.checked;
+        syncActiveLayerSettingsUI();
+        markHistoryDirty();
+        requestRender();
+      });
+    }
+    const bindSimulationSelectStyle = (control, element) => {
+      if (!(control instanceof HTMLSelectElement)) return;
+      control.addEventListener('change', () => {
+        const layer = getSimulationActiveLayer();
+        if (!layer) return;
+        layer.elementStyle[element] = normalizeSimulationStyle(element, {
+          ...layer.elementStyle[element],
+          displayMode: control.value,
+        });
+        markHistoryDirty();
+        requestRender();
+      });
+    };
+    bindSimulationSelectStyle(dom.controls.simulationWaterDisplayMode, SIM_ELEMENT_WATER);
+    bindSimulationSelectStyle(dom.controls.simulationFireDisplayMode, SIM_ELEMENT_FIRE);
+    bindSimulationSelectStyle(dom.controls.simulationMetalDisplayMode, SIM_ELEMENT_METAL);
+    const bindSimulationColor = (control, key) => {
+      if (!(control instanceof HTMLInputElement)) return;
+      control.addEventListener('input', () => {
+        const layer = getSimulationActiveLayer();
+        if (!layer) return;
+        const hex = String(control.value || '').replace('#', '');
+        if (hex.length !== 6) return;
+        layer.elementStyle[SIM_ELEMENT_WATER] = normalizeSimulationStyle(SIM_ELEMENT_WATER, {
+          ...layer.elementStyle[SIM_ELEMENT_WATER],
+          palette: {
+            ...(layer.elementStyle[SIM_ELEMENT_WATER]?.palette || {}),
+            [key]: {
+              r: parseInt(hex.slice(0, 2), 16),
+              g: parseInt(hex.slice(2, 4), 16),
+              b: parseInt(hex.slice(4, 6), 16),
+              a: 255,
+            },
+          },
+        });
+        markHistoryDirty();
+        requestRender();
+      });
+    };
+    bindSimulationColor(dom.controls.simulationWaterShallow, 'shallow');
+    bindSimulationColor(dom.controls.simulationWaterMid, 'mid');
+    bindSimulationColor(dom.controls.simulationWaterDeep, 'deep');
+    bindSimulationColor(dom.controls.simulationWaterFoam, 'foam');
+    bindSimulationColor(dom.controls.simulationWaterHighlight, 'highlight');
+    if (dom.controls.leftSimulationElementPaletteWrap instanceof HTMLElement) {
+      dom.controls.leftSimulationElementPaletteWrap.hidden = true;
+    }
+    updateSimulationElementPaletteUi();
+
     dom.controls.moveLayerUp?.addEventListener('click', () => {
       moveActiveLayer(-1);
     });
@@ -30000,8 +31301,21 @@
       clearPendingMultiAssignmentMoveRequests();
       clearTimelineSelection();
       beginHistory('removeFrame');
-      state.frames.splice(state.activeFrame, 1);
-      state.activeFrame = clamp(state.activeFrame, 0, state.frames.length - 1);
+      if (isVoxelExtensionModeEnabled()) {
+        getProjectCanvasDocuments().forEach(canvasDoc => {
+          if (!canvasDoc || !Array.isArray(canvasDoc.frames) || canvasDoc.frames.length <= 1) {
+            return;
+          }
+          canvasDoc.frames.splice(clamp(state.activeFrame, 0, canvasDoc.frames.length - 1), 1);
+          canvasDoc.activeFrame = clamp(state.activeFrame, 0, canvasDoc.frames.length - 1);
+          const frame = canvasDoc.frames[canvasDoc.activeFrame];
+          canvasDoc.activeLayer = frame?.layers?.[frame.layers.length - 1]?.id || canvasDoc.activeLayer;
+        });
+        state.activeFrame = clamp(state.activeFrame, 0, state.frames.length - 1);
+      } else {
+        state.frames.splice(state.activeFrame, 1);
+        state.activeFrame = clamp(state.activeFrame, 0, state.frames.length - 1);
+      }
       const frame = getActiveFrame();
       state.activeLayer = frame.layers[frame.layers.length - 1].id;
       markHistoryDirty();
@@ -30306,6 +31620,7 @@
     }
     const playbackLockedControls = [
       dom.controls.addLayer,
+      dom.controls.addSimulationLayer,
       dom.controls.removeLayer,
       dom.controls.addFrame,
       dom.controls.removeFrame,
@@ -30332,6 +31647,7 @@
   function applyTimelineToolbarFrames() {
     const configs = [
       { element: dom.controls.addLayer, variant: 'add' },
+      { element: dom.controls.addSimulationLayer, variant: 'add' },
       { element: dom.controls.removeLayer, variant: 'remove' },
       { element: dom.controls.addFrame, variant: 'add' },
       { element: dom.controls.removeFrame, variant: 'remove' },
@@ -30512,6 +31828,7 @@
       ? (frame.layers.find(item => item.id === state.activeLayer) || frame.layers[frame.layers.length - 1] || null)
       : null;
     const hasLayer = Boolean(layer);
+    const isSimLayer = isSimulationLayer(layer);
     const opacityControl = dom.controls.layerOpacity;
     const blendControl = dom.controls.layerBlendMode;
     const targetLabel = dom.controls.layerSettingsTarget;
@@ -30521,7 +31838,7 @@
 
     if (targetLabel) {
       targetLabel.textContent = hasLayer
-        ? localizeText(`対象: ${layer.name}`, `Target: ${layer.name}`)
+        ? localizeText(`対象: ${layer.name}${isSimLayer ? ' [Sim]' : ''}`, `Target: ${layer.name}${isSimLayer ? ' [Sim]' : ''}`)
         : localizeText('対象: なし', 'Target: None');
     }
     if (opacityControl instanceof HTMLInputElement) {
@@ -30532,6 +31849,44 @@
     if (blendControl instanceof HTMLSelectElement) {
       blendControl.disabled = !hasLayer;
       blendControl.value = normalizedBlendMode;
+    }
+    if (dom.controls.simulationLayerSettings instanceof HTMLElement) {
+      dom.controls.simulationLayerSettings.hidden = true;
+    }
+    if (false && isSimLayer) {
+      const waterStyle = normalizeSimulationStyle(SIM_ELEMENT_WATER, layer.elementStyle?.[SIM_ELEMENT_WATER]);
+      if (dom.controls.simulationLayerTarget) dom.controls.simulationLayerTarget.textContent = `${layer.name} [simulation]`;
+      if (dom.controls.simulationPaintMode) dom.controls.simulationPaintMode.value = simulationEditorState.paintMode;
+      if (dom.controls.simulationElement) dom.controls.simulationElement.value = String(simulationEditorState.element);
+      if (dom.controls.simulationDepthValue) dom.controls.simulationDepthValue.value = String(simulationEditorState.depthValue);
+      if (dom.controls.simulationAirValue) dom.controls.simulationAirValue.value = String(simulationEditorState.airValue);
+      if (dom.controls.simulationAtmosphereEnabled instanceof HTMLInputElement) {
+        dom.controls.simulationAtmosphereEnabled.checked = layer.settings.atmosphereEnabled !== false;
+      }
+      if (dom.controls.simulationAtmosphereEnabledValue) {
+        dom.controls.simulationAtmosphereEnabledValue.textContent = layer.settings.atmosphereEnabled !== false ? 'ON' : 'OFF';
+      }
+      if (dom.controls.simulationShowLeftPalette instanceof HTMLInputElement) {
+        dom.controls.simulationShowLeftPalette.checked = simulationEditorState.showLeftPalette;
+      }
+      const atmospherePercent = clamp(Math.round((Number(layer.settings.atmosphereStrength) || 0) * 100), 0, 100);
+      if (dom.controls.simulationAtmosphereStrength) dom.controls.simulationAtmosphereStrength.value = String(atmospherePercent);
+      if (dom.controls.simulationAtmosphereStrengthValue) dom.controls.simulationAtmosphereStrengthValue.textContent = `${atmospherePercent}%`;
+      if (dom.controls.simulationWaterDisplayMode) dom.controls.simulationWaterDisplayMode.value = waterStyle.displayMode;
+      const waterMixPercent = clamp(Math.round(waterStyle.mixStrength * 100), 0, 100);
+      if (dom.controls.simulationWaterMixStrength) dom.controls.simulationWaterMixStrength.value = String(waterMixPercent);
+      if (dom.controls.simulationWaterMixStrengthValue) dom.controls.simulationWaterMixStrengthValue.textContent = `${waterMixPercent}%`;
+      const toHex = color => `#${[color.r, color.g, color.b].map(v => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0')).join('')}`;
+      if (dom.controls.simulationWaterShallow) dom.controls.simulationWaterShallow.value = toHex(waterStyle.palette.shallow);
+      if (dom.controls.simulationWaterMid) dom.controls.simulationWaterMid.value = toHex(waterStyle.palette.mid);
+      if (dom.controls.simulationWaterDeep) dom.controls.simulationWaterDeep.value = toHex(waterStyle.palette.deep);
+      if (dom.controls.simulationWaterFoam) dom.controls.simulationWaterFoam.value = toHex(waterStyle.palette.foam);
+      if (dom.controls.simulationWaterHighlight) dom.controls.simulationWaterHighlight.value = toHex(waterStyle.palette.highlight);
+      if (dom.controls.simulationFireDisplayMode) dom.controls.simulationFireDisplayMode.value = normalizeSimulationDisplayMode(layer.elementStyle?.[SIM_ELEMENT_FIRE]?.displayMode, SIM_MIXED);
+      if (dom.controls.simulationMetalDisplayMode) dom.controls.simulationMetalDisplayMode.value = normalizeSimulationDisplayMode(layer.elementStyle?.[SIM_ELEMENT_METAL]?.displayMode, SIM_MIXED);
+      if (dom.controls.simulationDepthValueOut) dom.controls.simulationDepthValueOut.textContent = String(simulationEditorState.depthValue);
+      if (dom.controls.simulationAirValueOut) dom.controls.simulationAirValueOut.textContent = String(simulationEditorState.airValue);
+      updateSimulationElementPaletteUi();
     }
   }
 
@@ -31322,6 +32677,154 @@
     updatePixfindModeUI();
   }
 
+  function tryMoveSimulationCell(layer, fromIndex, toIndex, nextElementMap, nextVelXMap, nextVelYMap, nextLifeMap, nextTempMap, nextLightMap, nextDepthMap, nextAirMap, nextAuxMap, nextActiveMap) {
+    if (toIndex < 0 || toIndex >= nextElementMap.length) {
+      return false;
+    }
+    const target = nextElementMap[toIndex];
+    const source = nextElementMap[fromIndex];
+    if (target === SIM_ELEMENT_EMPTY) {
+      nextElementMap[toIndex] = source;
+      nextVelXMap[toIndex] = layer.velXMap[fromIndex];
+      nextVelYMap[toIndex] = layer.velYMap[fromIndex];
+      nextLifeMap[toIndex] = layer.lifeMap[fromIndex];
+      nextTempMap[toIndex] = layer.tempMap[fromIndex];
+      nextLightMap[toIndex] = layer.lightMap[fromIndex];
+      nextDepthMap[toIndex] = layer.depthMap[fromIndex];
+      nextAirMap[toIndex] = layer.airMap[fromIndex];
+      nextAuxMap[toIndex] = layer.auxMap[fromIndex];
+      nextElementMap[fromIndex] = SIM_ELEMENT_EMPTY;
+      nextVelXMap[fromIndex] = 0;
+      nextVelYMap[fromIndex] = 0;
+      nextLifeMap[fromIndex] = 0;
+      nextTempMap[fromIndex] = 0;
+      nextLightMap[fromIndex] = 0;
+      nextAuxMap[fromIndex] = 0;
+      nextActiveMap[toIndex] = 1;
+      nextActiveMap[fromIndex] = 1;
+      return true;
+    }
+    if (source === SIM_ELEMENT_SAND && (target === SIM_ELEMENT_WATER || target === SIM_ELEMENT_SMOKE || target === SIM_ELEMENT_FIRE)) {
+      nextElementMap[toIndex] = source;
+      nextElementMap[fromIndex] = target;
+      nextActiveMap[toIndex] = 1;
+      nextActiveMap[fromIndex] = 1;
+      return true;
+    }
+    return false;
+  }
+
+  function rebuildSimulationLightMap(layer, width, height) {
+    if (!isSimulationLayer(layer)) {
+      return;
+    }
+    layer.lightMap.fill(0);
+    for (let i = 0; i < layer.elementMap.length; i += 1) {
+      const element = layer.elementMap[i];
+      if (element !== SIM_ELEMENT_FIRE && element !== SIM_ELEMENT_LIGHT) continue;
+      const sx = i % width;
+      const sy = Math.floor(i / width);
+      const sourceStrength = element === SIM_ELEMENT_LIGHT ? 255 : 220;
+      for (let dy = -SIM_MAX_LIGHT_RADIUS; dy <= SIM_MAX_LIGHT_RADIUS; dy += 1) {
+        for (let dx = -SIM_MAX_LIGHT_RADIUS; dx <= SIM_MAX_LIGHT_RADIUS; dx += 1) {
+          const nx = sx + dx;
+          const ny = sy + dy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          const dist = Math.abs(dx) + Math.abs(dy);
+          if (dist > SIM_MAX_LIGHT_RADIUS) continue;
+          const ni = (ny * width) + nx;
+          const blocker = layer.elementMap[ni] === SIM_ELEMENT_WALL ? 26 : 0;
+          const value = Math.max(0, sourceStrength - (dist * 36) - blocker);
+          if (value > layer.lightMap[ni]) {
+            layer.lightMap[ni] = value;
+          }
+        }
+      }
+    }
+  }
+
+  function stepSimulationLayer(layer, width = state.width, height = state.height, tickCount = 1) {
+    if (!isSimulationLayer(layer)) {
+      return false;
+    }
+    let changed = false;
+    const size = Math.max(0, layer.elementMap.length);
+    if (layer.activeMap.length !== size) {
+      layer.activeMap = new Uint8Array(size);
+      changed = true;
+    }
+    for (let i = 0; i < size; i += 1) {
+      const active = layer.elementMap[i] !== SIM_ELEMENT_EMPTY ? 1 : 0;
+      if (layer.activeMap[i] !== active) {
+        layer.activeMap[i] = active;
+        changed = true;
+      }
+    }
+    const previousLight = new Uint8Array(layer.lightMap);
+    rebuildSimulationLightMap(layer, width, height);
+    for (let i = 0; i < size; i += 1) {
+      if (previousLight[i] !== layer.lightMap[i]) {
+        changed = true;
+        break;
+      }
+    }
+    return changed;
+  }
+
+  function stepSimulationForFrame(frame = getActiveFrame(), tickCount = 1) {
+    if (!frame || !Array.isArray(frame.layers)) {
+      return false;
+    }
+    let changed = false;
+    for (let i = 0; i < frame.layers.length; i += 1) {
+      const layer = frame.layers[i];
+      if (isSimulationLayer(layer) && stepSimulationLayer(layer, state.width, state.height, tickCount)) {
+        changed = true;
+      }
+    }
+    if (changed) {
+      clearPlaybackFrameCache();
+      markCanvasDirty();
+      requestRender();
+      requestOverlayRender();
+    }
+    return changed;
+  }
+
+  function stopSimulationPlayback() {
+    simulationRuntime.playing = false;
+    if (simulationRuntime.handle != null) {
+      cancelAnimationFrame(simulationRuntime.handle);
+      simulationRuntime.handle = null;
+    }
+  }
+
+  function runSimulationPlayback(timestamp) {
+    if (!simulationRuntime.playing) {
+      return;
+    }
+    const activeLayer = getSimulationActiveLayer();
+    const tickRate = Math.max(1, Number(activeLayer?.settings?.tickRate) || SIM_DEFAULT_SETTINGS.tickRate);
+    const frameDuration = 1000 / tickRate;
+    if (!simulationRuntime.lastTickAt) {
+      simulationRuntime.lastTickAt = timestamp;
+    }
+    if ((timestamp - simulationRuntime.lastTickAt) >= frameDuration) {
+      stepSimulationForFrame(getActiveFrame(), 1);
+      simulationRuntime.lastTickAt = timestamp;
+    }
+    simulationRuntime.handle = requestAnimationFrame(runSimulationPlayback);
+  }
+
+  function startSimulationPlayback() {
+    if (simulationRuntime.playing) {
+      return;
+    }
+    simulationRuntime.playing = true;
+    simulationRuntime.lastTickAt = 0;
+    simulationRuntime.handle = requestAnimationFrame(runSimulationPlayback);
+  }
+
   function setupCanvas() {
     resizeCanvases();
     ensureCanvasWheelListener();
@@ -31613,10 +33116,6 @@
     }
     const cell = getVirtualCursorCellPosition();
     if (!cell) {
-      return false;
-    }
-    if (isVoxelPreviewCanvasId(getActiveProjectCanvasDocument()?.id || '')) {
-      announceVoxelPreviewReadonly();
       return false;
     }
     const requiresLayer = HISTORY_DRAW_TOOLS.has(activeTool);
@@ -32719,6 +34218,7 @@
     }
     floatingPreviewCtx.putImageData(imageData, 0, 0);
     fitFloatingPreviewCanvasToPanel();
+    renderFloatingPreviewGizmo();
   }
 
   function syncFloatingPreviewPanelVisibility({ persist = false } = {}) {
@@ -32736,6 +34236,7 @@
       panel.classList.add('is-hidden');
       panel.hidden = true;
       panel.setAttribute('aria-hidden', 'true');
+      renderFloatingPreviewGizmo();
       updateFloatingPreviewPanelPlaybackButtons();
       if (persist) {
         scheduleSessionPersist({ includeSnapshots: false });
@@ -32745,6 +34246,7 @@
     panel.classList.remove('is-hidden');
     panel.hidden = false;
     panel.setAttribute('aria-hidden', 'false');
+    panel.classList.toggle('is-voxel-preview', voxelModeEnabled);
     applyFloatingPreviewPanelRect({ persist, render: true });
     updateFloatingPreviewPanelPlaybackButtons();
   }
@@ -32898,6 +34400,29 @@
           kind: 'floating-voxel-preview',
           drawing: dom.floatingPreviewCanvas,
         });
+      });
+      dom.floatingPreviewCanvas.addEventListener('dblclick', event => {
+        if (!isVoxelExtensionModeEnabled()) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        voxelExtensionState = normalizeVoxelExtensionState({
+          ...voxelExtensionState,
+          previewYawDeg: VOXEL_EXTENSION_DEFAULT_YAW_DEG,
+          previewPitchDeg: VOXEL_EXTENSION_PREVIEW_ELEVATION_DEG,
+        }, VOXEL_EXTENSION_DEFAULT_STATE);
+        setVoxelPreviewOrientationForFrameIndex(
+          state.activeFrame,
+          VOXEL_EXTENSION_DEFAULT_YAW_DEG,
+          VOXEL_EXTENSION_PREVIEW_ELEVATION_DEG
+        );
+        syncVoxelExtensionPreviewFromSource({ updateViewport: true });
+        requestRender();
+        requestOverlayRender();
+        markAutosaveDirty();
+        scheduleAutosaveSnapshot();
+        scheduleSessionPersist();
       });
     }
     if (dom.floatingPreviewHeader instanceof HTMLElement) {
@@ -33791,9 +35316,17 @@
         'is-hover-preview',
         Boolean(canvasDoc && previewCanvasId && canvasDoc.id === previewCanvasId && canvasDoc.id !== committedCanvasId)
       );
-      entry.panel.title = canvasDoc
-        ? localizeText(`マルチキャンバス ${entry.index + 2}: ${canvasDoc.name}`, `Multi Canvas ${entry.index + 2}: ${canvasDoc.name}`)
-        : localizeText(`マルチキャンバス ${entry.index + 2}: なし`, `Multi Canvas ${entry.index + 2}: empty`);
+      const displayLabel = getVoxelCanvasDisplayLabel(canvasDoc);
+      const panelLabel = isVoxelExtensionModeEnabled()
+        ? localizeText(`入力面 ${entry.index + 1}: ${displayLabel}`, `Input Face ${entry.index + 1}: ${displayLabel}`)
+        : (canvasDoc
+          ? localizeText(`マルチキャンバス ${entry.index + 2}: ${canvasDoc.name}`, `Multi Canvas ${entry.index + 2}: ${canvasDoc.name}`)
+          : localizeText(`マルチキャンバス ${entry.index + 2}: なし`, `Multi Canvas ${entry.index + 2}: empty`));
+      entry.panel.title = panelLabel;
+      entry.panel.setAttribute('aria-label', panelLabel);
+      if (entry.drawing instanceof HTMLCanvasElement) {
+        entry.drawing.setAttribute('aria-label', panelLabel);
+      }
       if (entry.badge instanceof HTMLElement) {
         const role = getVoxelExtensionCanvasRoleById(entry.canvasDocId || '');
         if (role) {
@@ -33810,12 +35343,23 @@
     syncVoxelExtensionCanvasBadges();
   }
 
-  function getProjectCanvasActiveFrame(canvasDoc) {
+  function getProjectCanvasFrameAt(canvasDoc, frameIndex = null) {
     if (!canvasDoc || !Array.isArray(canvasDoc.frames) || !canvasDoc.frames.length) {
       return null;
     }
-    const frameIndex = clamp(Math.round(Number(canvasDoc.activeFrame) || 0), 0, canvasDoc.frames.length - 1);
-    return canvasDoc.frames[frameIndex] || canvasDoc.frames[0] || null;
+    const isActiveCanvas = Boolean(canvasDoc?.id) && canvasDoc.id === (getActiveProjectCanvasDocument()?.id || '');
+    const resolvedFrameIndex = Number.isFinite(Number(frameIndex))
+      ? clamp(Math.round(Number(frameIndex)), 0, canvasDoc.frames.length - 1)
+      : clamp(
+        Math.round(Number(isActiveCanvas ? state.activeFrame : canvasDoc.activeFrame) || 0),
+        0,
+        canvasDoc.frames.length - 1
+      );
+    return canvasDoc.frames[resolvedFrameIndex] || canvasDoc.frames[0] || null;
+  }
+
+  function getProjectCanvasActiveFrame(canvasDoc) {
+    return getProjectCanvasFrameAt(canvasDoc);
   }
 
   function getProjectCanvasActiveLayer(canvasDoc) {
@@ -33823,7 +35367,10 @@
     if (!frame || !Array.isArray(frame.layers) || !frame.layers.length) {
       return null;
     }
-    return frame.layers.find(layer => layer?.id === canvasDoc?.activeLayer)
+    const preferredLayerId = (canvasDoc?.id && canvasDoc.id === (getActiveProjectCanvasDocument()?.id || ''))
+      ? state.activeLayer
+      : canvasDoc?.activeLayer;
+    return frame.layers.find(layer => layer?.id === preferredLayerId)
       || frame.layers[frame.layers.length - 1]
       || frame.layers[0]
       || null;
@@ -34160,6 +35707,137 @@
     }
   }
 
+  function buildVoxelPreviewCanvasCompositeImageData(canvasDoc) {
+    if (!canvasDoc || !isVoxelPreviewCanvasId(canvasDoc.id || '') || !(voxelExtensionPreviewPixels instanceof Uint8ClampedArray) || !voxelExtensionPreviewMeta) {
+      return null;
+    }
+    const width = Math.max(1, Math.round(Number(voxelExtensionPreviewMeta.width) || Number(canvasDoc?.width) || 1));
+    const height = Math.max(1, Math.round(Number(voxelExtensionPreviewMeta.height) || Number(canvasDoc?.height) || 1));
+    const basePixels = new Uint8ClampedArray(voxelExtensionPreviewPixels);
+    const overlayImage = buildProjectCanvasImageData(canvasDoc);
+    const overlayPixels = overlayImage?.data instanceof Uint8ClampedArray ? overlayImage.data : null;
+    if (overlayPixels && overlayPixels.length === basePixels.length) {
+      for (let index = 0; index < basePixels.length; index += 4) {
+        const srcA = (overlayPixels[index + 3] || 0) / 255;
+        if (srcA <= 0) {
+          continue;
+        }
+        const dstA = (basePixels[index + 3] || 0) / 255;
+        const outA = srcA + (dstA * (1 - srcA));
+        if (outA <= 0) {
+          basePixels[index] = 0;
+          basePixels[index + 1] = 0;
+          basePixels[index + 2] = 0;
+          basePixels[index + 3] = 0;
+          continue;
+        }
+        basePixels[index] = Math.round(((overlayPixels[index] * srcA) + (basePixels[index] * dstA * (1 - srcA))) / outA);
+        basePixels[index + 1] = Math.round(((overlayPixels[index + 1] * srcA) + (basePixels[index + 1] * dstA * (1 - srcA))) / outA);
+        basePixels[index + 2] = Math.round(((overlayPixels[index + 2] * srcA) + (basePixels[index + 2] * dstA * (1 - srcA))) / outA);
+        basePixels[index + 3] = Math.round(outA * 255);
+      }
+    }
+    try {
+      return new ImageData(basePixels, width, height);
+    } catch (error) {
+      const fallbackPixels = new Uint8ClampedArray(basePixels);
+      return new ImageData(fallbackPixels, width, height);
+    }
+  }
+
+  function buildVoxelPreviewCanvasCompositeImageDataForFrameIndex(frameIndex = state.activeFrame) {
+    if (!isVoxelExtensionModeEnabled()) {
+      return null;
+    }
+    const resolved = getVoxelExtensionResolvedCanvases();
+    const previewCanvasDoc = getProjectCanvasDocumentById(voxelExtensionState.previewCanvasId);
+    if (!resolved?.front || !resolved?.back || !resolved?.left || !resolved?.right || !resolved?.top || !resolved?.bottom || !previewCanvasDoc) {
+      return null;
+    }
+    const orientation = getVoxelPreviewOrientationForFrameIndex(
+      frameIndex,
+      voxelExtensionState.previewYawDeg,
+      voxelExtensionState.previewPitchDeg
+    );
+    const rendered = buildVoxelPreviewPixels(
+      resolved.front,
+      resolved.back,
+      resolved.left,
+      resolved.right,
+      resolved.top,
+      resolved.bottom,
+      {
+        frameIndex,
+        yawDeg: orientation.yawDeg,
+        pitchDeg: orientation.pitchDeg,
+        displayPx: voxelExtensionState.displayPx,
+      }
+    );
+    const scaledPreview = scaleVoxelPreviewPixels(
+      rendered.pixels,
+      rendered.width,
+      rendered.height,
+      1
+    );
+    const width = Math.max(1, Math.round(Number(scaledPreview.width) || 1));
+    const height = Math.max(1, Math.round(Number(scaledPreview.height) || 1));
+    const basePixels = new Uint8ClampedArray(scaledPreview.pixels);
+    const frame = getProjectCanvasFrameAt(previewCanvasDoc, frameIndex);
+    const overlayImage = (() => {
+      try {
+        return new ImageData(
+          compositeFramePixels(frame, width, height, state.palette, {
+            useLocalLayerPreviewVisibility: true,
+            useLocalLayerPreviewOpacity: true,
+          }),
+          width,
+          height
+        );
+      } catch (error) {
+        const pixels = compositeFramePixels(frame, width, height, state.palette, {
+          useLocalLayerPreviewVisibility: true,
+          useLocalLayerPreviewOpacity: true,
+        });
+        const image = createBlankImageData(width, height);
+        if (image?.data instanceof Uint8ClampedArray) {
+          image.data.set(pixels);
+          return image;
+        }
+        return null;
+      }
+    })();
+    const overlayPixels = overlayImage?.data instanceof Uint8ClampedArray ? overlayImage.data : null;
+    if (overlayPixels && overlayPixels.length === basePixels.length) {
+      for (let index = 0; index < basePixels.length; index += 4) {
+        const srcA = (overlayPixels[index + 3] || 0) / 255;
+        if (srcA <= 0) continue;
+        const dstA = (basePixels[index + 3] || 0) / 255;
+        const outA = srcA + (dstA * (1 - srcA));
+        if (outA <= 0) {
+          basePixels[index] = 0;
+          basePixels[index + 1] = 0;
+          basePixels[index + 2] = 0;
+          basePixels[index + 3] = 0;
+          continue;
+        }
+        basePixels[index] = Math.round(((overlayPixels[index] * srcA) + (basePixels[index] * dstA * (1 - srcA))) / outA);
+        basePixels[index + 1] = Math.round(((overlayPixels[index + 1] * srcA) + (basePixels[index + 1] * dstA * (1 - srcA))) / outA);
+        basePixels[index + 2] = Math.round(((overlayPixels[index + 2] * srcA) + (basePixels[index + 2] * dstA * (1 - srcA))) / outA);
+        basePixels[index + 3] = Math.round(outA * 255);
+      }
+    }
+    try {
+      return new ImageData(basePixels, width, height);
+    } catch (error) {
+      const fallback = createBlankImageData(width, height);
+      if (fallback?.data instanceof Uint8ClampedArray) {
+        fallback.data.set(basePixels);
+        return fallback;
+      }
+      return null;
+    }
+  }
+
   function renderProjectCanvasSurface(surface, canvasDoc, { imageData = null } = {}) {
     if (!surface || !canvasDoc) {
       return;
@@ -34171,7 +35849,13 @@
     if (!surface.drawingCtx) {
       return;
     }
-    const resolvedImage = imageData instanceof ImageData ? imageData : buildProjectCanvasImageData(canvasDoc);
+    let resolvedImage = imageData instanceof ImageData ? imageData : null;
+    if (!resolvedImage && isVoxelPreviewCanvasId(canvasDoc.id || '')) {
+      resolvedImage = buildVoxelPreviewCanvasCompositeImageData(canvasDoc);
+    }
+    if (!resolvedImage) {
+      resolvedImage = buildProjectCanvasImageData(canvasDoc);
+    }
     surface.drawingCtx.clearRect(0, 0, canvasDoc.width, canvasDoc.height);
     surface.drawingCtx.putImageData(resolvedImage, 0, 0);
   }
@@ -34230,6 +35914,76 @@
     surface.overlayCtx.putImageData(imageData, 0, 0);
   }
 
+  function scaleVoxelPreviewPixels(pixels, width, height, scale = 1) {
+    const safeWidth = Math.max(1, Math.round(Number(width) || 1));
+    const safeHeight = Math.max(1, Math.round(Number(height) || 1));
+    const safeScale = Math.max(1, Math.round(Number(scale) || 1));
+    if (!(pixels instanceof Uint8ClampedArray) || safeScale <= 1) {
+      return {
+        pixels: pixels instanceof Uint8ClampedArray ? pixels : new Uint8ClampedArray(safeWidth * safeHeight * 4),
+        width: safeWidth,
+        height: safeHeight,
+        scale: 1,
+      };
+    }
+    const targetWidth = safeWidth * safeScale;
+    const targetHeight = safeHeight * safeScale;
+    const scaled = new Uint8ClampedArray(targetWidth * targetHeight * 4);
+    for (let y = 0; y < safeHeight; y += 1) {
+      for (let x = 0; x < safeWidth; x += 1) {
+        const srcBase = ((y * safeWidth) + x) * 4;
+        for (let sy = 0; sy < safeScale; sy += 1) {
+          for (let sx = 0; sx < safeScale; sx += 1) {
+            const dx = (x * safeScale) + sx;
+            const dy = (y * safeScale) + sy;
+            const destBase = ((dy * targetWidth) + dx) * 4;
+            scaled[destBase] = pixels[srcBase];
+            scaled[destBase + 1] = pixels[srcBase + 1];
+            scaled[destBase + 2] = pixels[srcBase + 2];
+            scaled[destBase + 3] = pixels[srcBase + 3];
+          }
+        }
+      }
+    }
+    return {
+      pixels: scaled,
+      width: targetWidth,
+      height: targetHeight,
+      scale: safeScale,
+    };
+  }
+
+  function drawVoxelProjectionOverlayOnMainSurface() {
+    if (!isVoxelExtensionModeEnabled() || voxelExtensionState.previewCanvasId) {
+      return;
+    }
+    const surface = mainViewportCanvasSurface;
+    const overlayCtx = surface?.overlayCtx;
+    const overlayCanvas = surface?.overlay;
+    const pixels = voxelExtensionPreviewPixels;
+    const meta = voxelExtensionPreviewMeta;
+    if (
+      !overlayCtx
+      || !(overlayCanvas instanceof HTMLCanvasElement)
+      || !(pixels instanceof Uint8ClampedArray)
+      || !meta
+    ) {
+      return;
+    }
+    const sourceWidth = Math.max(1, Math.round(Number(meta.width) || 1));
+    const sourceHeight = Math.max(1, Math.round(Number(meta.height) || 1));
+    const offsetX = Math.floor((overlayCanvas.width - sourceWidth) / 2);
+    const offsetY = Math.floor((overlayCanvas.height - sourceHeight) / 2);
+    let imageData = null;
+    try {
+      imageData = new ImageData(pixels, sourceWidth, sourceHeight);
+    } catch (error) {
+      imageData = overlayCtx.createImageData(sourceWidth, sourceHeight);
+      imageData.data.set(pixels);
+    }
+    overlayCtx.putImageData(imageData, offsetX, offsetY);
+  }
+
   function renderVoxelGuideOverlays() {
     if (!isVoxelExtensionModeEnabled() || !voxelExtensionGuideProjections) {
       return;
@@ -34278,6 +36032,7 @@
       }
     });
     renderVoxelGuideOverlays();
+    drawVoxelProjectionOverlayOnMainSurface();
     if (
       !pointerState.active
       && hoveredSurface
@@ -34476,6 +36231,149 @@
     return localizeText(entry.ja, entry.en);
   }
 
+  function getVoxelPreviewCanvasLabel() {
+    return localizeText('立体プレビュー', 'Voxel Preview');
+  }
+
+  function getVoxelCanvasDisplayLabel(canvasDoc) {
+    if (!canvasDoc) {
+      return localizeText('未設定', 'Empty');
+    }
+    if (isVoxelPreviewCanvasId(canvasDoc.id || '')) {
+      return getVoxelPreviewCanvasLabel();
+    }
+    const role = getVoxelExtensionCanvasRoleById(canvasDoc.id || '');
+    if (role) {
+      return getVoxelExtensionRoleLabel(role);
+    }
+    return canvasDoc.name || localizeText('未設定', 'Empty');
+  }
+
+  function getVoxelExtensionCanvasIndexByRole(role = 'front') {
+    const resolved = getVoxelExtensionResolvedCanvases();
+    const targetCanvasId = resolved?.[role]?.id || '';
+    if (!targetCanvasId) {
+      return -1;
+    }
+    return getProjectCanvasDocuments().findIndex(canvas => canvas?.id === targetCanvasId);
+  }
+
+  function getActiveVoxelExtensionRole() {
+    const activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
+    return getVoxelExtensionCanvasRoleById(activeCanvasId) || 'front';
+  }
+
+  function setActiveVoxelExtensionRole(role = 'front', { persist = true, syncUi = true } = {}) {
+    const normalizedRole = VOXEL_EXTENSION_ROLES.includes(role) ? role : 'front';
+    const targetIndex = getVoxelExtensionCanvasIndexByRole(normalizedRole);
+    if (targetIndex < 0) {
+      return false;
+    }
+    if (!finalizePendingSelectionBeforeCanvasSwitch(getProjectCanvasDocumentAt(targetIndex)?.id || '')) {
+      return false;
+    }
+    return setActiveProjectCanvasByIndex(targetIndex, { persist, syncUi });
+  }
+
+  function rotateVoxelNavigatorVector(vector, yawDeg, pitchDeg) {
+    const yaw = (normalizeVoxelPreviewYawDegrees(yawDeg) * Math.PI) / 180;
+    const pitch = (-normalizeVoxelPreviewPitchDegrees(pitchDeg) * Math.PI) / 180;
+    const cosYaw = Math.cos(yaw);
+    const sinYaw = Math.sin(yaw);
+    const cosPitch = Math.cos(pitch);
+    const sinPitch = Math.sin(pitch);
+    const x1 = vector.x * cosYaw + vector.z * sinYaw;
+    const z1 = (-vector.x * sinYaw) + (vector.z * cosYaw);
+    const y2 = vector.y * cosPitch - z1 * sinPitch;
+    const z2 = vector.y * sinPitch + z1 * cosPitch;
+    return { x: x1, y: y2, z: z2 };
+  }
+
+  function getVoxelNavigatorFaceDepths() {
+    const yawDeg = normalizeVoxelPreviewYawDegrees(voxelExtensionState.previewYawDeg);
+    const pitchDeg = normalizeVoxelPreviewPitchDegrees(voxelExtensionState.previewPitchDeg);
+    const normals = {
+      front: { x: 0, y: 0, z: 1 },
+      back: { x: 0, y: 0, z: -1 },
+      left: { x: -1, y: 0, z: 0 },
+      right: { x: 1, y: 0, z: 0 },
+      top: { x: 0, y: 1, z: 0 },
+      bottom: { x: 0, y: -1, z: 0 },
+    };
+    return VOXEL_EXTENSION_ROLES.map(role => ({
+      role,
+      ...rotateVoxelNavigatorVector(normals[role], yawDeg, pitchDeg),
+    })).sort((a, b) => b.z - a.z);
+  }
+
+  function getVoxelNavigatorFrontRole() {
+    return getVoxelNavigatorFaceDepths()[0]?.role || 'front';
+  }
+
+  function renderVoxelNavigatorUi() {
+  }
+
+  function renderFloatingPreviewGizmo() {
+    const canvas = dom.floatingPreviewGizmo;
+    const panel = dom.floatingPreviewPanel;
+    const show = isVoxelExtensionModeEnabled();
+    if (canvas instanceof HTMLCanvasElement) {
+      canvas.hidden = !show;
+    }
+    if (!(canvas instanceof HTMLCanvasElement) || !(panel instanceof HTMLElement) || !show) {
+      return;
+    }
+    if (!floatingPreviewGizmoCtx) {
+      floatingPreviewGizmoCtx = canvas.getContext('2d');
+    }
+    const ctx = floatingPreviewGizmoCtx;
+    if (!ctx) {
+      return;
+    }
+    const width = canvas.width;
+    const height = canvas.height;
+    ctx.clearRect(0, 0, width, height);
+    const centerX = Math.round(width * 0.34);
+    const centerY = Math.round(height * 0.66);
+    const length = 22;
+    const axes = [
+      { label: 'X', color: '#ff6b6b', vector: { x: 1, y: 0, z: 0 } },
+      { label: 'Y', color: '#78e08f', vector: { x: 0, y: 1, z: 0 } },
+      { label: 'Z', color: '#6bb6ff', vector: { x: 0, y: 0, z: 1 } },
+    ].map(axis => {
+      const rotated = rotateVoxelNavigatorVector(
+        axis.vector,
+        voxelExtensionState.previewYawDeg,
+        voxelExtensionState.previewPitchDeg
+      );
+      return { ...axis, rotated };
+    }).sort((a, b) => a.rotated.z - b.rotated.z);
+    axes.forEach(axis => {
+      const dx = axis.rotated.x * length;
+      const dy = -axis.rotated.y * length;
+      const endX = centerX + dx;
+      const endY = centerY + dy;
+      const angle = Math.atan2(dy, dx);
+      ctx.save();
+      ctx.strokeStyle = axis.color;
+      ctx.fillStyle = axis.color;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(endX, endY);
+      ctx.lineTo(endX - Math.cos(angle - Math.PI / 6) * 7, endY - Math.sin(angle - Math.PI / 6) * 7);
+      ctx.lineTo(endX - Math.cos(angle + Math.PI / 6) * 7, endY - Math.sin(angle + Math.PI / 6) * 7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(axis.label, endX + Math.cos(angle) * 10, endY + Math.sin(angle) * 10);
+      ctx.restore();
+    });
+  }
+
   function getVoxelExtensionResolvedCanvases(canvases = getProjectCanvasDocuments()) {
     if (!Array.isArray(canvases) || !canvases.length) {
       return null;
@@ -34490,13 +36388,13 @@
       return canvases[fallbackIndex] || null;
     };
     return {
-      preview: null,
-      front: resolveCanvas(voxelExtensionState.frontCanvasId, 0),
-      back: resolveCanvas(voxelExtensionState.backCanvasId, 1),
-      left: resolveCanvas(voxelExtensionState.leftCanvasId, 2),
-      right: resolveCanvas(voxelExtensionState.rightCanvasId, 3),
-      top: resolveCanvas(voxelExtensionState.topCanvasId, 4),
-      bottom: resolveCanvas(voxelExtensionState.bottomCanvasId, 5),
+      preview: resolveCanvas(voxelExtensionState.previewCanvasId, 0),
+      front: resolveCanvas(voxelExtensionState.frontCanvasId, 1),
+      back: resolveCanvas(voxelExtensionState.backCanvasId, 2),
+      left: resolveCanvas(voxelExtensionState.leftCanvasId, 3),
+      right: resolveCanvas(voxelExtensionState.rightCanvasId, 4),
+      top: resolveCanvas(voxelExtensionState.topCanvasId, 5),
+      bottom: resolveCanvas(voxelExtensionState.bottomCanvasId, 6),
     };
   }
 
@@ -34515,13 +36413,13 @@
       nextState.bottomCanvasId,
       nextState.previewCanvasId,
     ].join(':');
+    nextState.previewCanvasId = resolved.preview?.id || '';
     nextState.frontCanvasId = resolved.front?.id || '';
     nextState.backCanvasId = resolved.back?.id || '';
     nextState.leftCanvasId = resolved.left?.id || '';
     nextState.rightCanvasId = resolved.right?.id || '';
     nextState.topCanvasId = resolved.top?.id || '';
     nextState.bottomCanvasId = resolved.bottom?.id || '';
-    nextState.previewCanvasId = '';
     voxelExtensionState = nextState;
     const nextKey = [
       nextState.frontCanvasId,
@@ -34530,7 +36428,7 @@
       nextState.rightCanvasId,
       nextState.topCanvasId,
       nextState.bottomCanvasId,
-      '',
+      nextState.previewCanvasId,
     ].join(':');
     return previousKey !== nextKey;
   }
@@ -34633,10 +36531,10 @@
     );
   }
 
-  function getProjectCanvasCompositePixelsForVoxel(canvasDoc) {
+  function getProjectCanvasCompositePixelsForVoxel(canvasDoc, frameIndex = null) {
     const width = Math.max(1, Math.round(Number(canvasDoc?.width) || 1));
     const height = Math.max(1, Math.round(Number(canvasDoc?.height) || 1));
-    const frame = getProjectCanvasActiveFrame(canvasDoc);
+    const frame = getProjectCanvasFrameAt(canvasDoc, frameIndex);
     return compositeFramePixels(frame, width, height, state.palette, {
       useLocalLayerPreviewVisibility: true,
       useLocalLayerPreviewOpacity: true,
@@ -34787,6 +36685,67 @@
     return `${pitch >= 0 ? '+' : ''}${pitch}°`;
   }
 
+  function getVoxelPreviewOrientationForFrame(frame, fallbackYaw = voxelExtensionState.previewYawDeg, fallbackPitch = voxelExtensionState.previewPitchDeg) {
+    return {
+      yawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg ?? fallbackYaw),
+      pitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg ?? fallbackPitch),
+    };
+  }
+
+  function setVoxelPreviewOrientationForFrame(frame, yawDeg, pitchDeg) {
+    if (!frame || typeof frame !== 'object') {
+      return false;
+    }
+    const nextYawDeg = normalizeVoxelPreviewYawDegrees(yawDeg);
+    const nextPitchDeg = normalizeVoxelPreviewPitchDegrees(pitchDeg);
+    if (
+      normalizeVoxelPreviewYawDegrees(frame.voxelPreviewYawDeg) === nextYawDeg
+      && normalizeVoxelPreviewPitchDegrees(frame.voxelPreviewPitchDeg) === nextPitchDeg
+    ) {
+      return false;
+    }
+    frame.voxelPreviewYawDeg = nextYawDeg;
+    frame.voxelPreviewPitchDeg = nextPitchDeg;
+    return true;
+  }
+
+  function setVoxelPreviewOrientationForFrameIndex(frameIndex, yawDeg, pitchDeg) {
+    const normalizedIndex = Math.max(0, Math.round(Number(frameIndex) || 0));
+    let changed = false;
+    getProjectCanvasDocuments().forEach(canvasDoc => {
+      if (!canvasDoc || !Array.isArray(canvasDoc.frames) || !canvasDoc.frames.length) {
+        return;
+      }
+      const frame = canvasDoc.frames[Math.min(normalizedIndex, canvasDoc.frames.length - 1)] || null;
+      if (setVoxelPreviewOrientationForFrame(frame, yawDeg, pitchDeg)) {
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
+  function getVoxelPreviewOrientationForFrameIndex(frameIndex, fallbackYaw = voxelExtensionState.previewYawDeg, fallbackPitch = voxelExtensionState.previewPitchDeg) {
+    const normalizedIndex = Math.max(0, Math.round(Number(frameIndex) || 0));
+    const canvases = getProjectCanvasDocuments();
+    for (let index = 0; index < canvases.length; index += 1) {
+      const canvasDoc = canvases[index];
+      if (!canvasDoc || !Array.isArray(canvasDoc.frames) || !canvasDoc.frames.length) {
+        continue;
+      }
+      const frame = canvasDoc.frames[Math.min(normalizedIndex, canvasDoc.frames.length - 1)] || null;
+      if (!frame) {
+        continue;
+      }
+      if (Number.isFinite(Number(frame.voxelPreviewYawDeg)) || Number.isFinite(Number(frame.voxelPreviewPitchDeg))) {
+        return getVoxelPreviewOrientationForFrame(frame, fallbackYaw, fallbackPitch);
+      }
+    }
+    return {
+      yawDeg: normalizeVoxelPreviewYawDegrees(fallbackYaw),
+      pitchDeg: normalizeVoxelPreviewPitchDegrees(fallbackPitch),
+    };
+  }
+
   function getVoxelPreviewFaceShadeAmount(face = 'front') {
     switch (face) {
       case 'top':
@@ -34815,7 +36774,7 @@
     };
   }
 
-  function getVoxelPreviewFixedProjectionScale(sizeX, sizeY, sizeZ) {
+  function getVoxelPreviewProjectionBoundsMax(sizeX, sizeY, sizeZ) {
     const halfX = Math.max(0.5, Number(sizeX) / 2);
     const halfY = Math.max(0.5, Number(sizeY) / 2);
     const halfZ = Math.max(0.5, Number(sizeZ) / 2);
@@ -34828,10 +36787,27 @@
       const nextHeight = ((halfY * heightScale) + (horizontalRadius * Math.abs(depthScale))) * 2;
       rawHeightMax = Math.max(rawHeightMax, nextHeight);
     }
-    return Math.max(1, Math.floor(Math.min(
+    return {
+      rawWidthMax,
+      rawHeightMax,
+    };
+  }
+
+  function getVoxelPreviewFixedProjectionScale(sizeX, sizeY, sizeZ, preferredDisplayPx = voxelExtensionState.displayPx) {
+    const { rawWidthMax, rawHeightMax } = getVoxelPreviewProjectionBoundsMax(sizeX, sizeY, sizeZ);
+    const fitScale = Math.max(1, Math.floor(Math.min(
       (VOXEL_EXTENSION_PREVIEW_MAX_EDGE - 16) / rawWidthMax,
       (VOXEL_EXTENSION_PREVIEW_MAX_EDGE - 16) / rawHeightMax
     )) || 1);
+    const preferred = clamp(
+      Math.round(Number(preferredDisplayPx) || 0),
+      VOXEL_EXTENSION_DISPLAY_PIXEL_MIN,
+      VOXEL_EXTENSION_DISPLAY_PIXEL_MAX
+    );
+    if (preferred > 0) {
+      return Math.max(1, Math.min(preferred, fitScale));
+    }
+    return fitScale;
   }
 
   function projectVoxelPreviewPoint(x, y, z, sizeX, sizeY, sizeZ, yawRadians, pitchRadians) {
@@ -35508,7 +37484,7 @@
     return output;
   }
 
-  function buildVoxelPreviewPixels(frontCanvas, backCanvas, leftCanvas, rightCanvas, topCanvas, bottomCanvas) {
+  function buildVoxelPreviewPixels(frontCanvas, backCanvas, leftCanvas, rightCanvas, topCanvas, bottomCanvas, options = {}) {
     const frontWidth = Math.max(1, Math.round(Number(frontCanvas?.width) || 1));
     const frontHeight = Math.max(1, Math.round(Number(frontCanvas?.height) || 1));
     const backWidth = Math.max(1, Math.round(Number(backCanvas?.width) || 1));
@@ -35521,12 +37497,15 @@
     const topHeight = Math.max(1, Math.round(Number(topCanvas?.height) || 1));
     const bottomWidth = Math.max(1, Math.round(Number(bottomCanvas?.width) || 1));
     const bottomHeight = Math.max(1, Math.round(Number(bottomCanvas?.height) || 1));
-    const frontPixels = getProjectCanvasCompositePixelsForVoxel(frontCanvas);
-    const backPixels = getProjectCanvasCompositePixelsForVoxel(backCanvas);
-    const leftPixels = getProjectCanvasCompositePixelsForVoxel(leftCanvas);
-    const rightPixels = getProjectCanvasCompositePixelsForVoxel(rightCanvas);
-    const topPixels = getProjectCanvasCompositePixelsForVoxel(topCanvas);
-    const bottomPixels = getProjectCanvasCompositePixelsForVoxel(bottomCanvas);
+    const frameIndex = Number.isFinite(Number(options?.frameIndex))
+      ? Math.max(0, Math.round(Number(options.frameIndex)))
+      : null;
+    const frontPixels = getProjectCanvasCompositePixelsForVoxel(frontCanvas, frameIndex);
+    const backPixels = getProjectCanvasCompositePixelsForVoxel(backCanvas, frameIndex);
+    const leftPixels = getProjectCanvasCompositePixelsForVoxel(leftCanvas, frameIndex);
+    const rightPixels = getProjectCanvasCompositePixelsForVoxel(rightCanvas, frameIndex);
+    const topPixels = getProjectCanvasCompositePixelsForVoxel(topCanvas, frameIndex);
+    const bottomPixels = getProjectCanvasCompositePixelsForVoxel(bottomCanvas, frameIndex);
     const frontBounds = getVoxelOpaqueBounds(frontPixels, frontWidth, frontHeight);
     const backBounds = getVoxelOpaqueBounds(backPixels, backWidth, backHeight);
     const leftBounds = getVoxelOpaqueBounds(leftPixels, leftWidth, leftHeight);
@@ -35539,6 +37518,13 @@
     const rightAvailable = !rightBounds.empty;
     const topAvailable = !topBounds.empty;
     const bottomAvailable = !bottomBounds.empty;
+    const missingFaces = [];
+    if (!frontAvailable) missingFaces.push('front');
+    if (!backAvailable) missingFaces.push('back');
+    if (!leftAvailable) missingFaces.push('left');
+    if (!rightAvailable) missingFaces.push('right');
+    if (!topAvailable) missingFaces.push('top');
+    if (!bottomAvailable) missingFaces.push('bottom');
     if (!frontAvailable && !backAvailable && !leftAvailable && !rightAvailable && !topAvailable && !bottomAvailable) {
       return {
         width: 1,
@@ -35547,6 +37533,8 @@
         volume: { width: 1, height: 1, depth: 1 },
         clamped: false,
         guides: null,
+        missingFaces,
+        mismatchAxes: ['x', 'y', 'z'],
       };
     }
     const sourceSizeXCandidates = [
@@ -35567,9 +37555,13 @@
       rightAvailable ? rightBounds.width : null,
       leftAvailable ? leftBounds.width : null,
     ].filter(Number.isFinite);
-    const sourceSizeX = sourceSizeXCandidates.length ? Math.max(1, Math.min(...sourceSizeXCandidates)) : 1;
-    const sourceSizeY = sourceSizeYCandidates.length ? Math.max(1, Math.min(...sourceSizeYCandidates)) : 1;
-    const sourceSizeZ = sourceSizeZCandidates.length ? Math.max(1, Math.min(...sourceSizeZCandidates)) : 1;
+    const mismatchAxes = [];
+    if (new Set(sourceSizeXCandidates).size > 1) mismatchAxes.push('x');
+    if (new Set(sourceSizeYCandidates).size > 1) mismatchAxes.push('y');
+    if (new Set(sourceSizeZCandidates).size > 1) mismatchAxes.push('z');
+    const sourceSizeX = sourceSizeXCandidates.length ? Math.max(1, Math.max(...sourceSizeXCandidates)) : 1;
+    const sourceSizeY = sourceSizeYCandidates.length ? Math.max(1, Math.max(...sourceSizeYCandidates)) : 1;
+    const sourceSizeZ = sourceSizeZCandidates.length ? Math.max(1, Math.max(...sourceSizeZCandidates)) : 1;
     const sizeX = Math.max(1, Math.min(sourceSizeX, VOXEL_EXTENSION_MAX_SOURCE_EDGE));
     const sizeY = Math.max(1, Math.min(sourceSizeY, VOXEL_EXTENSION_MAX_SOURCE_EDGE));
     const sizeZ = Math.max(1, Math.min(sourceSizeZ, VOXEL_EXTENSION_MAX_SOURCE_EDGE));
@@ -35579,32 +37571,32 @@
     const hasFrontAlpha = (x, y) => (
       frontAvailable
         ? hasVoxelBoundedAlpha(frontPixels, frontWidth, frontBounds, x, y)
-        : true
+        : false
     );
     const hasBackAlpha = (x, y) => (
       backAvailable
         ? hasVoxelBoundedAlpha(backPixels, backWidth, backBounds, (sizeX - 1) - x, y)
-        : true
+        : false
     );
     const hasRightAlpha = (z, y) => (
       rightAvailable
         ? hasVoxelBoundedAlpha(rightPixels, rightWidth, rightBounds, z, y)
-        : true
+        : false
     );
     const hasLeftAlpha = (z, y) => (
       leftAvailable
         ? hasVoxelBoundedAlpha(leftPixels, leftWidth, leftBounds, (sizeZ - 1) - z, y)
-        : true
+        : false
     );
     const hasTopAlpha = (x, z) => (
       topAvailable
         ? hasVoxelBoundedAlpha(topPixels, topWidth, topBounds, x, z)
-        : true
+        : false
     );
     const hasBottomAlpha = (x, z) => (
       bottomAvailable
         ? hasVoxelBoundedAlpha(bottomPixels, bottomWidth, bottomBounds, x, (sizeZ - 1) - z)
-        : true
+        : false
     );
     const readFrontColor = (x, y) => (
       frontAvailable
@@ -35697,14 +37689,17 @@
     };
     for (let y = 0; y < sizeY; y += 1) {
       for (let x = 0; x < sizeX; x += 1) {
-        if (!hasFrontAlpha(x, y) || !hasBackAlpha(x, y)) {
-          continue;
-        }
         for (let z = 0; z < sizeZ; z += 1) {
-          if (!hasTopAlpha(x, z) || !hasBottomAlpha(x, z)) {
-            continue;
-          }
-          if (!hasRightAlpha(z, y) || !hasLeftAlpha(z, y)) {
+          const xyKnown = frontAvailable || backAvailable;
+          const yzKnown = leftAvailable || rightAvailable;
+          const xzKnown = topAvailable || bottomAvailable;
+          const xyPass = hasFrontAlpha(x, y) || hasBackAlpha(x, y);
+          const yzPass = hasLeftAlpha(z, y) || hasRightAlpha(z, y);
+          const xzPass = hasTopAlpha(x, z) || hasBottomAlpha(x, z);
+          const knownAxes = (xyKnown ? 1 : 0) + (yzKnown ? 1 : 0) + (xzKnown ? 1 : 0);
+          const passedAxes = (xyPass ? 1 : 0) + (yzPass ? 1 : 0) + (xzPass ? 1 : 0);
+          const requiredPasses = knownAxes >= 3 ? 2 : knownAxes;
+          if (!knownAxes || passedAxes < requiredPasses) {
             continue;
           }
           occupancy[voxelIndex(x, y, z)] = 1;
@@ -35881,8 +37876,8 @@
         resolveSample: findBottomSample,
       }),
     };
-    const yawDegrees = normalizeVoxelPreviewYawDegrees(voxelExtensionState.previewYawDeg);
-    const pitchDegrees = normalizeVoxelPreviewPitchDegrees(voxelExtensionState.previewPitchDeg);
+    const yawDegrees = normalizeVoxelPreviewYawDegrees(options?.yawDeg ?? voxelExtensionState.previewYawDeg);
+    const pitchDegrees = normalizeVoxelPreviewPitchDegrees(options?.pitchDeg ?? voxelExtensionState.previewPitchDeg);
     const wrappedYawDegrees = ((yawDegrees % 360) + 360) % 360;
     const yawRadians = (wrappedYawDegrees * Math.PI) / 180;
     const pitchRadians = (pitchDegrees * Math.PI) / 180;
@@ -35913,11 +37908,12 @@
     });
     const rawWidth = Math.max(1, maxProjectedX - minProjectedX);
     const rawHeight = Math.max(1, maxProjectedY - minProjectedY);
-    const previewScale = getVoxelPreviewFixedProjectionScale(sizeX, sizeY, sizeZ);
-    const previewWidth = VOXEL_EXTENSION_PREVIEW_MAX_EDGE;
-    const previewHeight = VOXEL_EXTENSION_PREVIEW_MAX_EDGE;
+    const previewScale = getVoxelPreviewFixedProjectionScale(sizeX, sizeY, sizeZ, options?.displayPx ?? voxelExtensionState.displayPx);
+    const { rawWidthMax, rawHeightMax } = getVoxelPreviewProjectionBoundsMax(sizeX, sizeY, sizeZ);
     const projectedWidth = Math.max(1, Math.ceil(rawWidth * previewScale));
     const projectedHeight = Math.max(1, Math.ceil(rawHeight * previewScale));
+    const previewWidth = Math.max(16, Math.min(VOXEL_EXTENSION_PREVIEW_MAX_EDGE, Math.ceil(rawWidthMax * previewScale) + (margin * 2)));
+    const previewHeight = Math.max(16, Math.min(VOXEL_EXTENSION_PREVIEW_MAX_EDGE, Math.ceil(rawHeightMax * previewScale) + (margin * 2)));
     const offsetX = Math.round((previewWidth - projectedWidth) / 2);
     const offsetY = Math.round((previewHeight - projectedHeight) / 2);
     const faces = [];
@@ -36028,18 +38024,19 @@
       guides,
       yawDeg: yawDegrees,
       pitchDeg: pitchDegrees,
+      missingFaces,
+      mismatchAxes,
     };
   }
 
   function syncVoxelExtensionCanvasBadges() {
     const mainBadge = dom.mainCanvasSurfaceBadge;
     const mainCanvas = getProjectCanvasDocumentAt(0);
-    const mainRole = getVoxelExtensionCanvasRoleById(mainCanvas?.id || '');
     if (mainBadge instanceof HTMLElement) {
-      if (mainRole) {
+      if (isVoxelExtensionModeEnabled() && mainCanvas && isVoxelPreviewCanvasId(mainCanvas.id || '')) {
         mainBadge.hidden = false;
-        mainBadge.dataset.role = mainRole;
-        mainBadge.textContent = getVoxelExtensionRoleLabel(mainRole);
+        mainBadge.dataset.role = 'preview';
+        mainBadge.textContent = getVoxelPreviewCanvasLabel();
       } else {
         mainBadge.hidden = true;
         delete mainBadge.dataset.role;
@@ -36067,8 +38064,6 @@
     const toggle = dom.controls.toggleVoxelExtensionMode;
     const status = dom.controls.voxelExtensionStatus;
     const field = dom.controls.voxelExtensionField;
-    const refreshButton = dom.controls.refreshVoxelPreview;
-    const setupButton = dom.controls.setupVoxelExtension;
     const yawControl = dom.controls.voxelPreviewYaw;
     const yawValue = dom.controls.voxelPreviewYawValue;
     const enabled = isVoxelExtensionModeEnabled();
@@ -36079,11 +38074,15 @@
       toggle.checked = enabled;
       toggle.disabled = !available || !canCurrentClientEditProjectStructure();
     }
-    if (setupButton instanceof HTMLButtonElement) {
-      setupButton.disabled = !available || !canCurrentClientEditProjectStructure();
-    }
-    if (refreshButton instanceof HTMLButtonElement) {
-      refreshButton.disabled = !enabled;
+    if (dom.controls.voxelDisplayPx instanceof HTMLInputElement) {
+      dom.controls.voxelDisplayPx.value = String(
+        clamp(
+          Math.round(Number(voxelExtensionState.displayPx) || 0),
+          VOXEL_EXTENSION_DISPLAY_PIXEL_MIN,
+          VOXEL_EXTENSION_DISPLAY_PIXEL_MAX
+        )
+      );
+      dom.controls.voxelDisplayPx.disabled = !enabled;
     }
     if (yawControl instanceof HTMLInputElement) {
       yawControl.value = String(previewYawDeg);
@@ -36102,24 +38101,41 @@
           'Voxel mode is unavailable while collab is connected'
         );
       } else if (!enabled) {
-        status.textContent = localizeText('ボクセルモード: OFF', 'Voxel mode: OFF');
+        status.textContent = voxelExtensionRestoreSnapshot
+          ? localizeText('ボクセルモード: OFF（元のキャンバス構成へ復元可能）', 'Voxel mode: OFF (restorable canvas layout)')
+          : localizeText('ボクセルモード: OFF', 'Voxel mode: OFF');
       } else if (voxelExtensionPreviewMeta && voxelExtensionPreviewMeta.volume) {
         const sizeLabel = localizeText(
           `ボクセル ${voxelExtensionPreviewMeta.volume.width}×${voxelExtensionPreviewMeta.volume.height}×${voxelExtensionPreviewMeta.volume.depth} / 小窓 ${voxelExtensionPreviewMeta.width}×${voxelExtensionPreviewMeta.height}`,
           `Voxel ${voxelExtensionPreviewMeta.volume.width}×${voxelExtensionPreviewMeta.volume.height}×${voxelExtensionPreviewMeta.volume.depth} / Floating ${voxelExtensionPreviewMeta.width}×${voxelExtensionPreviewMeta.height}`
         );
+        const displayPxLabel = Number(voxelExtensionState.displayPx) > 0
+          ? localizeText(` / 表示PX ${Math.round(Number(voxelExtensionState.displayPx) || 0)}`, ` / Display PX ${Math.round(Number(voxelExtensionState.displayPx) || 0)}`)
+          : '';
         const angleLabel = localizeText(
           ` / 回転 Y${formatVoxelPreviewYawLabel(voxelExtensionPreviewMeta.yawDeg ?? previewYawDeg)} P${formatVoxelPreviewPitchLabel(voxelExtensionPreviewMeta.pitchDeg ?? previewPitchDeg)}`,
           ` / Yaw ${formatVoxelPreviewYawLabel(voxelExtensionPreviewMeta.yawDeg ?? previewYawDeg)} Pitch ${formatVoxelPreviewPitchLabel(voxelExtensionPreviewMeta.pitchDeg ?? previewPitchDeg)}`
         );
+        const warningParts = [];
+        if (Array.isArray(voxelExtensionPreviewMeta.missingFaces) && voxelExtensionPreviewMeta.missingFaces.length) {
+          const missingLabel = voxelExtensionPreviewMeta.missingFaces
+            .map(face => String(face || '').charAt(0).toUpperCase() + String(face || '').slice(1))
+            .join(',');
+          warningParts.push(localizeText(`不足:${missingLabel}`, `Missing:${missingLabel}`));
+        }
+        if (Array.isArray(voxelExtensionPreviewMeta.mismatchAxes) && voxelExtensionPreviewMeta.mismatchAxes.length) {
+          warningParts.push(localizeText(`寸法差:${voxelExtensionPreviewMeta.mismatchAxes.join('/')}`, `Mismatch:${voxelExtensionPreviewMeta.mismatchAxes.join('/')}`));
+        }
+        const warningLabel = warningParts.length ? ` / ${warningParts.join(' / ')}` : '';
         status.textContent = voxelExtensionPreviewMeta.clamped
-          ? `${sizeLabel}${angleLabel}${localizeText(`（64px上限で表示）`, ` (capped at ${VOXEL_EXTENSION_MAX_SOURCE_EDGE}px)`)}`
-          : `${sizeLabel}${angleLabel}`;
+          ? `${sizeLabel}${displayPxLabel}${angleLabel}${warningLabel}${localizeText(`（64px上限で表示）`, ` (capped at ${VOXEL_EXTENSION_MAX_SOURCE_EDGE}px)`)}`
+          : `${sizeLabel}${displayPxLabel}${angleLabel}${warningLabel}`;
       } else {
         status.textContent = localizeText('ボクセルモード: 準備中', 'Voxel mode: preparing');
       }
     }
     syncVoxelExtensionCanvasBadges();
+    renderVoxelNavigatorUi();
     syncFloatingPreviewPanelVisibility({ persist: false });
   }
 
@@ -36142,24 +38158,55 @@
       renderFloatingPreviewPanel();
       return false;
     }
+    const activeFrameOrientation = getVoxelPreviewOrientationForFrameIndex(
+      state.activeFrame,
+      voxelExtensionState.previewYawDeg,
+      voxelExtensionState.previewPitchDeg
+    );
+    voxelExtensionState = normalizeVoxelExtensionState({
+      ...voxelExtensionState,
+      previewYawDeg: activeFrameOrientation.yawDeg,
+      previewPitchDeg: activeFrameOrientation.pitchDeg,
+    }, VOXEL_EXTENSION_DEFAULT_STATE);
     const rendered = buildVoxelPreviewPixels(
       resolved.front,
       resolved.back,
       resolved.left,
       resolved.right,
       resolved.top,
-      resolved.bottom
+      resolved.bottom,
+      activeFrameOrientation
     );
-    voxelExtensionPreviewPixels = new Uint8ClampedArray(rendered.pixels);
+      const scaledPreview = scaleVoxelPreviewPixels(
+        rendered.pixels,
+        rendered.width,
+        rendered.height,
+        1
+      );
+    voxelExtensionPreviewPixels = new Uint8ClampedArray(scaledPreview.pixels);
     voxelExtensionGuideProjections = rendered.guides || null;
     voxelExtensionPreviewMeta = {
-      width: rendered.width,
-      height: rendered.height,
+      width: scaledPreview.width,
+      height: scaledPreview.height,
+      baseWidth: rendered.width,
+      baseHeight: rendered.height,
       volume: { ...rendered.volume },
       clamped: Boolean(rendered.clamped),
       yawDeg: normalizeVoxelPreviewYawDegrees(rendered.yawDeg),
       pitchDeg: normalizeVoxelPreviewPitchDegrees(rendered.pitchDeg),
+      scale: scaledPreview.scale,
+      missingFaces: Array.isArray(rendered.missingFaces) ? rendered.missingFaces.slice() : [],
+      mismatchAxes: Array.isArray(rendered.mismatchAxes) ? rendered.mismatchAxes.slice() : [],
     };
+    const previewCanvasDoc = getProjectCanvasDocumentById(voxelExtensionState.previewCanvasId);
+    if (previewCanvasDoc) {
+      resizeProjectCanvasFrames(
+        previewCanvasDoc,
+        Math.max(1, Math.round(Number(scaledPreview.width) || 1)),
+        Math.max(1, Math.round(Number(scaledPreview.height) || 1))
+      );
+      previewCanvasDoc.name = localizeText('立体プレビュー', 'Voxel Preview');
+    }
     if (updateViewport) {
       syncLocalViewportCanvasDockLayout();
     }
@@ -36175,6 +38222,15 @@
     }
     const currentCanvases = getProjectCanvasDocuments();
     const currentVoxelState = normalizeVoxelExtensionState(voxelExtensionState, VOXEL_EXTENSION_DEFAULT_STATE);
+    if (currentVoxelState.mode !== EXTENSION_MODE_VOXEL && !voxelExtensionRestoreSnapshot) {
+      voxelExtensionRestoreSnapshot = {
+        canvases: currentCanvases.map((canvas, index) => createProjectCanvasDocument(canvas, {
+          clonePixelData: true,
+          fallbackIndex: index + 1,
+        })),
+        activeCanvasId: getActiveProjectCanvasDocument()?.id || currentCanvases[0]?.id || '',
+      };
+    }
     if (!getVoxelExtensionOverwriteConfirmation(currentCanvases)) {
       syncControlsWithState();
       return false;
@@ -36192,7 +38248,7 @@
       || looksLikeLegacyVoxelLayout
       || currentCanvases.length !== VOXEL_EXTENSION_CANVAS_TOTAL
     );
-    const hasDedicatedPreviewCanvas = currentCanvases.length > VOXEL_EXTENSION_SOURCE_CANVAS_TOTAL;
+    const hasDedicatedPreviewCanvas = currentCanvases.length >= VOXEL_EXTENSION_CANVAS_TOTAL;
     const resolveExistingCanvas = (canvasId, fallbackIndex = 0) => {
       if (typeof canvasId === 'string' && canvasId) {
         const matched = currentCanvases.find(canvas => canvas?.id === canvasId);
@@ -36202,6 +38258,9 @@
       }
       return currentCanvases[fallbackIndex] || null;
     };
+    const previewCanvas = hasDedicatedPreviewCanvas
+      ? (resolveExistingCanvas(currentVoxelState.previewCanvasId, 0) || createBlankProjectCanvasDocument(sourceCanvas, 1))
+      : createBlankProjectCanvasDocument(sourceCanvas, 1);
     const orderedSourceCanvases = looksLikeLegacyVoxelLayout
       ? [
           resolveExistingCanvas(currentVoxelState.frontCanvasId, 0),
@@ -36209,7 +38268,7 @@
           resolveExistingCanvas(currentVoxelState.leftCanvasId, 5),
           resolveExistingCanvas(currentVoxelState.rightCanvasId, 1),
           resolveExistingCanvas(currentVoxelState.topCanvasId, 2),
-          resolveExistingCanvas(currentVoxelState.bottomCanvasId, 6),
+          resolveExistingCanvas(currentVoxelState.bottomCanvasId, 3),
         ]
       : [
           resolveExistingCanvas(currentVoxelState.frontCanvasId, hasDedicatedPreviewCanvas ? 1 : 0),
@@ -36219,31 +38278,40 @@
           resolveExistingCanvas(currentVoxelState.topCanvasId, hasDedicatedPreviewCanvas ? 5 : 4),
           resolveExistingCanvas(currentVoxelState.bottomCanvasId, hasDedicatedPreviewCanvas ? 6 : 5),
         ];
-    const nextCanvases = orderedSourceCanvases.map((canvas, index) => (
+    const nextSourceCanvases = orderedSourceCanvases.map((canvas, index) => (
       canvas
         ? createProjectCanvasDocument(canvas, {
             clonePixelData: true,
-            fallbackIndex: index + 1,
+            fallbackIndex: index + 2,
           })
-        : createBlankProjectCanvasDocument(sourceCanvas, index + 1)
+        : createBlankProjectCanvasDocument(sourceCanvas, index + 2)
     ));
-    nextCanvases[0].name = getVoxelExtensionProjectName('front');
-    nextCanvases[1].name = getVoxelExtensionProjectName('back');
-    nextCanvases[2].name = getVoxelExtensionProjectName('left');
-    nextCanvases[3].name = getVoxelExtensionProjectName('right');
-    nextCanvases[4].name = getVoxelExtensionProjectName('top');
-    nextCanvases[5].name = getVoxelExtensionProjectName('bottom');
-    const activeCanvasId = currentCanvases.find(canvas => canvas?.id === getActiveProjectCanvasDocument()?.id)?.id || nextCanvases[0]?.id || '';
+    nextSourceCanvases[0].name = getVoxelExtensionProjectName('front');
+    nextSourceCanvases[1].name = getVoxelExtensionProjectName('back');
+    nextSourceCanvases[2].name = getVoxelExtensionProjectName('left');
+    nextSourceCanvases[3].name = getVoxelExtensionProjectName('right');
+    nextSourceCanvases[4].name = getVoxelExtensionProjectName('top');
+    nextSourceCanvases[5].name = getVoxelExtensionProjectName('bottom');
+    const nextPreviewCanvas = createProjectCanvasDocument(previewCanvas, {
+      clonePixelData: false,
+      fallbackIndex: 1,
+    });
+    nextPreviewCanvas.name = localizeText('Voxel Preview', 'Voxel Preview');
+    const nextCanvases = [nextPreviewCanvas, ...nextSourceCanvases];
+    const currentActiveId = currentCanvases.find(canvas => canvas?.id === getActiveProjectCanvasDocument()?.id)?.id || '';
+    const activeCanvasId = nextCanvases.some(canvas => canvas?.id === currentActiveId && canvas.id !== nextPreviewCanvas.id)
+      ? currentActiveId
+      : (nextSourceCanvases[0]?.id || nextPreviewCanvas.id || '');
     voxelExtensionState = normalizeVoxelExtensionState({
       ...voxelExtensionState,
       mode: EXTENSION_MODE_VOXEL,
-      previewCanvasId: '',
-      frontCanvasId: nextCanvases[0]?.id || '',
-      backCanvasId: nextCanvases[1]?.id || '',
-      leftCanvasId: nextCanvases[2]?.id || '',
-      rightCanvasId: nextCanvases[3]?.id || '',
-      topCanvasId: nextCanvases[4]?.id || '',
-      bottomCanvasId: nextCanvases[5]?.id || '',
+      previewCanvasId: nextPreviewCanvas?.id || '',
+      frontCanvasId: nextSourceCanvases[0]?.id || '',
+      backCanvasId: nextSourceCanvases[1]?.id || '',
+      leftCanvasId: nextSourceCanvases[2]?.id || '',
+      rightCanvasId: nextSourceCanvases[3]?.id || '',
+      topCanvasId: nextSourceCanvases[4]?.id || '',
+      bottomCanvasId: nextSourceCanvases[5]?.id || '',
     }, VOXEL_EXTENSION_DEFAULT_STATE);
     replaceProjectCanvasDocuments(nextCanvases, activeCanvasId);
     if (shouldResetLayoutAfterSetup) {
@@ -36283,6 +38351,25 @@
   function setVoxelExtensionModeEnabled(enabled, { announce = true } = {}) {
     const nextEnabled = Boolean(enabled);
     if (!nextEnabled) {
+      if (voxelExtensionRestoreSnapshot?.canvases?.length) {
+        replaceProjectCanvasDocuments(
+          voxelExtensionRestoreSnapshot.canvases,
+          voxelExtensionRestoreSnapshot.activeCanvasId || voxelExtensionRestoreSnapshot.canvases[0]?.id || ''
+        );
+        ensureLocalViewportCanvasEntries();
+        bindActiveCanvasSurface(getProjectCanvasSurfaceForIndex(getActiveProjectCanvasIndex()) || mainViewportCanvasSurface);
+        requestLocalViewportCanvasLayoutReset({ clearStored: true });
+        resizeCanvases({
+          forceRender: false,
+          applyTransform: true,
+          syncControls: true,
+          updateScaleLimits: true,
+        });
+        renderAllProjectCanvasSurfaces();
+        renderFrameList();
+        renderLayerList();
+        renderTimelineMatrix();
+      }
       voxelExtensionState = normalizeVoxelExtensionState({
         ...voxelExtensionState,
         mode: EXTENSION_MODE_NONE,
@@ -36290,6 +38377,7 @@
       voxelExtensionPreviewMeta = null;
       voxelExtensionPreviewPixels = null;
       voxelExtensionGuideProjections = null;
+      voxelExtensionRestoreSnapshot = null;
       syncVoxelExtensionModeUi();
       renderFloatingPreviewPanel();
       syncControlsWithState();
@@ -36823,10 +38911,6 @@
       y: clamp(Math.floor(virtualCursor.y), 0, state.height - 1),
     };
     const activeTool = state.tool;
-    if (isVoxelPreviewCanvasId(getActiveProjectCanvasDocument()?.id || '') && activeTool !== 'eyedropper') {
-      announceVoxelPreviewReadonly();
-      return;
-    }
     const layer = getActiveLayer();
     let startedHistory = false;
     let actionPerformed = false;
@@ -37412,6 +39496,8 @@
     applyViewportTransform();
     syncZoomControls(targetScale);
     showZoomIndicator(targetScale);
+    requestRender();
+    requestOverlayRender();
     scheduleSessionPersist({ includeSnapshots: false });
   }
 
@@ -38077,6 +40163,7 @@
     pointerState.voxelPreviewDragWidth = getVoxelPreviewDragWidth(surface);
     pointerState.voxelPreviewDragHeight = getVoxelPreviewDragHeight(surface);
     pointerState.voxelPreviewYawChanged = false;
+    pointerState.voxelPreviewLockedAxis = null;
     try {
       surface.drawing.setPointerCapture(event.pointerId);
     } catch (error) {
@@ -38097,9 +40184,26 @@
     const startPitch = normalizeVoxelPreviewPitchDegrees(pointerState.voxelPreviewPitchStart);
     const deltaX = (Number(event.clientX) || 0) - (Number(pointerState.startClient?.x) || 0);
     const deltaY = (Number(event.clientY) || 0) - (Number(pointerState.startClient?.y) || 0);
-    const nextYawDeg = normalizeVoxelPreviewYawDegrees(startYaw + ((deltaX / dragWidth) * VOXEL_PREVIEW_DRAG_TURN_DEGREES));
+    const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(deltaY);
+    if (!pointerState.voxelPreviewLockedAxis) {
+      const deadzone = Math.max(1, Math.round(VOXEL_PREVIEW_DRAG_AXIS_LOCK_DEADZONE_PX));
+      if (Math.max(absDeltaX, absDeltaY) < deadzone) {
+        return false;
+      }
+      if (absDeltaX >= absDeltaY + deadzone) {
+        pointerState.voxelPreviewLockedAxis = 'horizontal';
+      } else if (absDeltaY >= absDeltaX + deadzone) {
+        pointerState.voxelPreviewLockedAxis = 'vertical';
+      } else {
+        return false;
+      }
+    }
+    const lockedDeltaX = pointerState.voxelPreviewLockedAxis === 'horizontal' ? deltaX : 0;
+    const lockedDeltaY = pointerState.voxelPreviewLockedAxis === 'vertical' ? deltaY : 0;
+    const nextYawDeg = normalizeVoxelPreviewYawDegrees(startYaw + ((lockedDeltaX / dragWidth) * VOXEL_PREVIEW_DRAG_TURN_DEGREES));
     const nextPitchDeg = normalizeVoxelPreviewPitchDegrees(
-      startPitch - ((deltaY / dragHeight) * VOXEL_PREVIEW_DRAG_TILT_DEGREES)
+      startPitch - ((lockedDeltaY / dragHeight) * VOXEL_PREVIEW_DRAG_TILT_DEGREES)
     );
     if (
       nextYawDeg === normalizeVoxelPreviewYawDegrees(voxelExtensionState.previewYawDeg)
@@ -38112,6 +40216,7 @@
       previewYawDeg: nextYawDeg,
       previewPitchDeg: nextPitchDeg,
     }, VOXEL_EXTENSION_DEFAULT_STATE);
+    setVoxelPreviewOrientationForFrameIndex(state.activeFrame, nextYawDeg, nextPitchDeg);
     pointerState.voxelPreviewYawChanged = true;
     renderVoxelExtensionPreviewSurfaceNow({ updateViewport: false });
     requestRender();
@@ -38131,6 +40236,7 @@
     pointerState.active = false;
     pointerState.pointerId = null;
     pointerState.surface = null;
+    pointerState.voxelPreviewLockedAxis = null;
     pointerState.tool = null;
     pointerState.start = null;
     pointerState.current = null;
@@ -38360,18 +40466,6 @@
           return;
         }
       }
-    }
-    if (
-      isVoxelPreviewCanvasId(interactionSurface?.canvasDocId || '')
-      && !isSecondaryMouseButton
-      && pointerButton === 0
-      && startVoxelPreviewRotateInteraction(event, interactionSurface)
-    ) {
-      return;
-    }
-    if (isVoxelPreviewCanvasId(interactionSurface?.canvasDocId || '') && activeTool !== 'pan' && activeTool !== 'eyedropper') {
-      announceVoxelPreviewReadonly();
-      return;
     }
     const layer = getActiveLayer();
     const shouldExtendSelection = Boolean(
@@ -39528,6 +41622,138 @@
     };
   }
 
+  function createCompositeSelectionMoveState(bounds, mask, imageData) {
+    if (!bounds || !(mask instanceof Uint8Array) || !(imageData?.data instanceof Uint8ClampedArray)) {
+      return null;
+    }
+    const width = Math.max(0, (bounds.x1 ?? 0) - (bounds.x0 ?? 0) + 1);
+    const height = Math.max(0, (bounds.y1 ?? 0) - (bounds.y0 ?? 0) + 1);
+    if (width <= 0 || height <= 0) {
+      return null;
+    }
+    const size = width * height;
+    const localMask = new Uint8Array(size);
+    const localContentMask = new Uint8Array(size);
+    const localIndices = new Int16Array(size);
+    localIndices.fill(-1);
+    const localDirect = new Uint8ClampedArray(size * 4);
+    const localImageData = createBlankImageData(width, height);
+    const sourceData = imageData.data;
+    const imageWidth = Math.max(1, Math.round(Number(imageData.width) || state.width || 1));
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const canvasX = bounds.x0 + x;
+        const canvasY = bounds.y0 + y;
+        if (canvasX < 0 || canvasY < 0 || canvasX >= state.width || canvasY >= state.height) {
+          continue;
+        }
+        const canvasIndex = canvasY * state.width + canvasX;
+        const localIndex = y * width + x;
+        if (mask[canvasIndex] !== 1) {
+          continue;
+        }
+        const sourceBase = ((canvasY * imageWidth) + canvasX) * 4;
+        const localBase = localIndex * 4;
+        localMask[localIndex] = 1;
+        localDirect[localBase] = sourceData[sourceBase];
+        localDirect[localBase + 1] = sourceData[sourceBase + 1];
+        localDirect[localBase + 2] = sourceData[sourceBase + 2];
+        localDirect[localBase + 3] = sourceData[sourceBase + 3];
+        if (localImageData?.data instanceof Uint8ClampedArray) {
+          localImageData.data[localBase] = sourceData[sourceBase];
+          localImageData.data[localBase + 1] = sourceData[sourceBase + 1];
+          localImageData.data[localBase + 2] = sourceData[sourceBase + 2];
+          localImageData.data[localBase + 3] = sourceData[sourceBase + 3];
+        }
+        if (sourceData[sourceBase + 3] > 0) {
+          localContentMask[localIndex] = 1;
+        }
+      }
+    }
+    if (!selectionMaskHasPixels(localMask)) {
+      return null;
+    }
+    const previewCanvas = createMovePreviewCanvasFromImageData(localImageData)
+      || createMovePreviewCanvasFromPixels(width, height, localMask, localIndices, localDirect);
+    return {
+      layer: getActiveLayer(),
+      layerId: getActiveLayer()?.id || null,
+      bounds: { ...bounds },
+      width,
+      height,
+      mask: localMask,
+      contentMask: localContentMask,
+      indices: localIndices,
+      direct: localDirect,
+      imageData: localImageData,
+      previewCanvas,
+      offset: { x: 0, y: 0 },
+      hasCleared: false,
+      committed: false,
+      applySelectionOnFinalize: true,
+      transformRotationDeg: 0,
+      transformFlipHorizontal: false,
+      transformFlipVertical: false,
+      transformedEntryCache: null,
+      transformedContentEntryCache: null,
+      transformedPreviewRenderCache: null,
+    };
+  }
+
+  function createFullCanvasMask(width, height) {
+    const safeWidth = Math.max(1, Math.floor(Number(width) || 1));
+    const safeHeight = Math.max(1, Math.floor(Number(height) || 1));
+    const mask = new Uint8Array(safeWidth * safeHeight);
+    mask.fill(1);
+    return mask;
+  }
+
+  function createBoundsMask(bounds, width, height) {
+    const safeWidth = Math.max(1, Math.floor(Number(width) || 1));
+    const safeHeight = Math.max(1, Math.floor(Number(height) || 1));
+    const mask = new Uint8Array(safeWidth * safeHeight);
+    const x0 = clamp(Math.round(Number(bounds?.x0) || 0), 0, safeWidth - 1);
+    const y0 = clamp(Math.round(Number(bounds?.y0) || 0), 0, safeHeight - 1);
+    const x1 = clamp(Math.round(Number(bounds?.x1) || 0), 0, safeWidth - 1);
+    const y1 = clamp(Math.round(Number(bounds?.y1) || 0), 0, safeHeight - 1);
+    for (let y = y0; y <= y1; y += 1) {
+      for (let x = x0; x <= x1; x += 1) {
+        mask[(y * safeWidth) + x] = 1;
+      }
+    }
+    return mask;
+  }
+
+  function snapshotRenderedCanvasImageData(surface = activeCanvasSurface) {
+    const drawingCanvas = surface?.drawing instanceof HTMLCanvasElement ? surface.drawing : null;
+    const drawingCtx = surface?.drawingCtx || drawingCanvas?.getContext?.('2d', { willReadFrequently: true }) || drawingCanvas?.getContext?.('2d');
+    if (!drawingCanvas || !drawingCtx) {
+      return null;
+    }
+    const width = Math.max(1, Math.round(Number(drawingCanvas.width) || 1));
+    const height = Math.max(1, Math.round(Number(drawingCanvas.height) || 1));
+    try {
+      return drawingCtx.getImageData(0, 0, width, height);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function snapshotVisibleVoxelPreviewForClipboard() {
+    const compositeImage = snapshotRenderedCanvasImageData(activeCanvasSurface)
+      || buildVoxelPreviewCanvasCompositeImageDataForFrameIndex(state.activeFrame);
+    if (!compositeImage) {
+      return null;
+    }
+    const width = Math.max(1, Math.round(Number(compositeImage.width) || 1));
+    const height = Math.max(1, Math.round(Number(compositeImage.height) || 1));
+    return createCompositeSelectionMoveState(
+      { x0: 0, y0: 0, x1: width - 1, y1: height - 1 },
+      createFullCanvasMask(width, height),
+      compositeImage
+    );
+  }
+
   function normalizeSelectionMoveRotationDeg(value) {
     const step = SELECTION_TRANSFORM_ROTATION_STEP_DEG;
     if (!Number.isFinite(value)) {
@@ -39953,7 +42179,21 @@
     }
     const mask = state.selectionMask;
     const bounds = state.selectionBounds;
-    if (!mask || !bounds) {
+    if (!bounds) {
+      return null;
+    }
+    if (isVoxelPreviewCanvasId(getActiveProjectCanvasDocument()?.id || '')) {
+      const effectiveMask = mask instanceof Uint8Array
+        ? mask
+        : createBoundsMask(bounds, state.width, state.height);
+      const compositeImage = snapshotRenderedCanvasImageData(activeCanvasSurface)
+        || buildVoxelPreviewCanvasCompositeImageDataForFrameIndex(state.activeFrame);
+      if (!compositeImage) {
+        return null;
+      }
+      return createCompositeSelectionMoveState(bounds, effectiveMask, compositeImage);
+    }
+    if (!mask) {
       return null;
     }
     const layer = getActiveLayer();
@@ -42474,9 +44714,24 @@
   }
 
   function setPixelSingle(layer, x, y, paletteIndexOverride) {
-    if (x < 0 || y < 0 || x >= state.width || y >= state.height) return;
-    if (state.selectionMask && state.selectionMask[y * state.width + x] !== 1) return;
-    const index = y * state.width + x;
+    const activeCanvasDoc = getActiveProjectCanvasDocument();
+    const canvasWidth = Math.max(1, Math.round(Number(activeCanvasDoc?.width) || Number(state.width) || 1));
+    const canvasHeight = Math.max(1, Math.round(Number(activeCanvasDoc?.height) || Number(state.height) || 1));
+    if (x < 0 || y < 0 || x >= canvasWidth || y >= canvasHeight) return;
+    const selectionIndex = y * canvasWidth + x;
+    if (
+      state.selectionMask instanceof Uint8Array
+      && selectionIndex >= 0
+      && selectionIndex < state.selectionMask.length
+      && state.selectionMask[selectionIndex] !== 1
+    ) {
+      return;
+    }
+    if (isSimulationLayer(layer)) {
+      setSimulationPixelSingle(layer, x, y);
+      return;
+    }
+    const index = y * canvasWidth + x;
     const base = index * 4;
     let direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
 
@@ -42554,6 +44809,89 @@
       direct[base + 2] = 0;
       direct[base + 3] = 0;
     }
+    markHistoryDirty();
+    markDirtyPixel(x, y);
+  }
+
+  function activateSimulationCell(layer, index) {
+    if (!isSimulationLayer(layer) || !Number.isInteger(index) || index < 0 || index >= layer.activeMap.length) {
+      return;
+    }
+    layer.activeMap[index] = 1;
+  }
+
+  function activateSimulationAround(layer, x, y, radius = 1) {
+    if (!isSimulationLayer(layer)) {
+      return;
+    }
+    for (let dy = -radius; dy <= radius; dy += 1) {
+      for (let dx = -radius; dx <= radius; dx += 1) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= state.width || ny >= state.height) continue;
+        activateSimulationCell(layer, (ny * state.width) + nx);
+      }
+    }
+  }
+
+  function seedSimulationElementState(layer, index, element) {
+    if (!isSimulationLayer(layer)) {
+      return;
+    }
+    if (element === SIM_ELEMENT_FIRE) {
+      layer.lifeMap[index] = 28;
+      layer.tempMap[index] = 760;
+    } else if (element === SIM_ELEMENT_SMOKE) {
+      layer.lifeMap[index] = 48;
+      layer.tempMap[index] = 140;
+    } else if (element === SIM_ELEMENT_WATER) {
+      layer.lifeMap[index] = 0;
+      layer.tempMap[index] = 0;
+      layer.auxMap[index] = 4;
+    } else if (element === SIM_ELEMENT_LIGHT) {
+      layer.lightMap[index] = 255;
+    } else {
+      layer.lifeMap[index] = 0;
+      layer.tempMap[index] = 0;
+      layer.lightMap[index] = 0;
+    }
+  }
+
+  function setSimulationPixelSingle(layer, x, y) {
+    const index = (y * state.width) + x;
+    const color = normalizeColorValue(getActiveDrawColor());
+    const colorBase = index * 4;
+    const mode = simulationEditorState.paintMode;
+    if (pointerState.tool === 'eraser') {
+      layer.elementMap[index] = SIM_ELEMENT_EMPTY;
+      layer.sourceColorMap[colorBase] = 0;
+      layer.sourceColorMap[colorBase + 1] = 0;
+      layer.sourceColorMap[colorBase + 2] = 0;
+      layer.sourceColorMap[colorBase + 3] = 0;
+      layer.velXMap[index] = 0;
+      layer.velYMap[index] = 0;
+      layer.lifeMap[index] = 0;
+      layer.tempMap[index] = 0;
+      layer.lightMap[index] = 0;
+      activateSimulationAround(layer, x, y, 2);
+      markHistoryDirty();
+      markDirtyPixel(x, y);
+      return;
+    }
+    if (mode === SIM_PAINT_MODE_DEPTH) {
+      layer.depthMap[index] = clamp(Math.round(Number(simulationEditorState.depthValue) || 0), 0, 255);
+    } else if (mode === SIM_PAINT_MODE_AIR) {
+      layer.airMap[index] = clamp(Math.round(Number(simulationEditorState.airValue) || 0), 0, 255);
+    } else {
+      const element = clamp(Math.round(Number(simulationEditorState.element) || 0), 0, SIM_ELEMENT_LIGHT);
+      layer.elementMap[index] = element;
+      layer.sourceColorMap[colorBase] = color.r;
+      layer.sourceColorMap[colorBase + 1] = color.g;
+      layer.sourceColorMap[colorBase + 2] = color.b;
+      layer.sourceColorMap[colorBase + 3] = color.a;
+      seedSimulationElementState(layer, index, element);
+    }
+    activateSimulationAround(layer, x, y, 2);
     markHistoryDirty();
     markDirtyPixel(x, y);
   }
@@ -43574,6 +45912,13 @@
     if (isVoxelExtensionModeEnabled()) {
       syncVoxelExtensionPreviewFromSource({ updateViewport: false });
     }
+    const activeCanvasDoc = getActiveProjectCanvasDocument();
+    if (isVoxelPreviewCanvasId(activeCanvasDoc?.id || '')) {
+      renderProjectCanvasSurface(activeCanvasSurface || mainViewportCanvasSurface, activeCanvasDoc);
+      renderFloatingPreviewPanel();
+      renderInactiveProjectCanvasSurfaces();
+      return;
+    }
     const { width, height } = state;
     if (width <= 0 || height <= 0) {
       dirtyRegion = null;
@@ -43611,6 +45956,10 @@
       if (!layer || !getDisplayedLayerVisibility(layer, true) || getDisplayedLayerPreviewOpacity(layer, 1) <= 0) continue;
       const opacity = getDisplayedLayerPreviewOpacity(layer, 1);
       if (opacity <= 0) continue;
+      if (isSimulationLayer(layer)) {
+        compositeSimulationLayerRegion(data, getActiveFrame(), layer, width, height, x0, y0, x1, y1);
+        continue;
+      }
       const layerBlendMode = normalizeLayerBlendMode(layer.blendMode);
       const layerIndices = layer.indices instanceof Int16Array ? layer.indices : null;
       const layerDirect = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
@@ -45195,17 +47544,32 @@
   }
 
   function getActiveFrame() {
+    const canvasDoc = getActiveProjectCanvasDocument();
+    const canvasFrame = getProjectCanvasActiveFrame(canvasDoc);
+    if (canvasFrame) {
+      return canvasFrame;
+    }
     return state.frames[state.activeFrame];
   }
 
   function getActiveLayer() {
     const frame = getActiveFrame();
-    return frame.layers.find(layer => layer.id === state.activeLayer) || frame.layers[frame.layers.length - 1];
+    if (!frame || !Array.isArray(frame.layers) || !frame.layers.length) {
+      return null;
+    }
+    const canvasDoc = getActiveProjectCanvasDocument();
+    const preferredLayerId = canvasDoc?.activeLayer || state.activeLayer;
+    return frame.layers.find(layer => layer.id === preferredLayerId) || frame.layers[frame.layers.length - 1];
   }
 
   function getActiveLayerIndex() {
     const frame = getActiveFrame();
-    return frame.layers.findIndex(layer => layer.id === state.activeLayer);
+    if (!frame || !Array.isArray(frame.layers) || !frame.layers.length) {
+      return -1;
+    }
+    const canvasDoc = getActiveProjectCanvasDocument();
+    const preferredLayerId = canvasDoc?.activeLayer || state.activeLayer;
+    return frame.layers.findIndex(layer => layer.id === preferredLayerId);
   }
 
   function bresenhamLine(x0, y0, x1, y1) {
@@ -52567,6 +54931,22 @@
   }
 
   function captureLayerPatchSnapshot(layer, pixelCount) {
+    if (isSimulationLayer(layer)) {
+      return {
+        type: SIM_LAYER_TYPE,
+        elementMap: new Uint8Array(layer.elementMap),
+        sourceColorMap: new Uint8ClampedArray(layer.sourceColorMap),
+        velXMap: new Int8Array(layer.velXMap),
+        velYMap: new Int8Array(layer.velYMap),
+        lifeMap: new Uint8Array(layer.lifeMap),
+        tempMap: new Uint16Array(layer.tempMap),
+        lightMap: new Uint8Array(layer.lightMap),
+        depthMap: new Uint8Array(layer.depthMap),
+        airMap: new Uint8Array(layer.airMap),
+        auxMap: new Uint8Array(layer.auxMap),
+        activeMap: new Uint8Array(layer.activeMap),
+      };
+    }
     if (!layer || !(layer.indices instanceof Int16Array)) {
       return null;
     }
@@ -52590,6 +54970,25 @@
   }
 
   function buildLayerDiffPayload(layer, snapshot, pixelCount) {
+    if (isSimulationLayer(layer)) {
+      return {
+        mode: 'full',
+        type: SIM_LAYER_TYPE,
+        elementMap: encodeTypedArray(layer.elementMap),
+        sourceColorMap: encodeTypedArray(layer.sourceColorMap),
+        velXMap: encodeTypedArray(new Uint8Array(layer.velXMap.buffer, layer.velXMap.byteOffset, layer.velXMap.byteLength)),
+        velYMap: encodeTypedArray(new Uint8Array(layer.velYMap.buffer, layer.velYMap.byteOffset, layer.velYMap.byteLength)),
+        lifeMap: encodeTypedArray(layer.lifeMap),
+        tempMap: encodeTypedArray(new Uint8Array(layer.tempMap.buffer, layer.tempMap.byteOffset, layer.tempMap.byteLength)),
+        lightMap: encodeTypedArray(layer.lightMap),
+        depthMap: encodeTypedArray(layer.depthMap),
+        airMap: encodeTypedArray(layer.airMap),
+        auxMap: encodeTypedArray(layer.auxMap),
+        activeMap: encodeTypedArray(layer.activeMap),
+        settings: JSON.stringify(normalizeSimulationSettings(layer.settings)),
+        elementStyle: JSON.stringify(layer.elementStyle || {}),
+      };
+    }
     const size = Math.max(0, Math.floor(Number(pixelCount) || 0));
     if (!size || !(layer?.indices instanceof Int16Array) || layer.indices.length !== size) {
       return null;
@@ -52740,6 +55139,22 @@
   function applyLayerPatchPayloadToLayer(layer, payload, pixelCount, { width = state.width, height = state.height } = {}) {
     if (!layer || typeof payload !== 'object' || !payload) {
       return null;
+    }
+    if (payload.type === SIM_LAYER_TYPE && isSimulationLayer(layer)) {
+      layer.elementMap = decodeUint8Data(payload.elementMap, { clamped: false }) || layer.elementMap;
+      layer.sourceColorMap = decodeUint8Data(payload.sourceColorMap, { clamped: true }) || layer.sourceColorMap;
+      layer.velXMap = new Int8Array((decodeUint8Data(payload.velXMap, { clamped: false }) || new Uint8Array(layer.velXMap.byteLength)).buffer.slice(0));
+      layer.velYMap = new Int8Array((decodeUint8Data(payload.velYMap, { clamped: false }) || new Uint8Array(layer.velYMap.byteLength)).buffer.slice(0));
+      layer.lifeMap = decodeUint8Data(payload.lifeMap, { clamped: false }) || layer.lifeMap;
+      layer.tempMap = new Uint16Array((decodeUint8Data(payload.tempMap, { clamped: false }) || new Uint8Array(layer.tempMap.byteLength)).buffer.slice(0));
+      layer.lightMap = decodeUint8Data(payload.lightMap, { clamped: false }) || layer.lightMap;
+      layer.depthMap = decodeUint8Data(payload.depthMap, { clamped: false }) || layer.depthMap;
+      layer.airMap = decodeUint8Data(payload.airMap, { clamped: false }) || layer.airMap;
+      layer.auxMap = decodeUint8Data(payload.auxMap, { clamped: false }) || layer.auxMap;
+      layer.activeMap = decodeUint8Data(payload.activeMap, { clamped: false }) || layer.activeMap;
+      layer.settings = normalizeSimulationSettings(typeof payload.settings === 'string' ? JSON.parse(payload.settings) : payload.settings);
+      layer.elementStyle = typeof payload.elementStyle === 'string' ? JSON.parse(payload.elementStyle) : (payload.elementStyle || layer.elementStyle);
+      return { full: true, dirtyRect: null };
     }
     const size = Math.max(0, Math.floor(Number(pixelCount) || 0));
     if (!size) {

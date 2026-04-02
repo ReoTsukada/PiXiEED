@@ -355,15 +355,21 @@
     .entry-hero{
       position:relative;
       width:100%;
-      height:min(80vh, 100vw);
-      background:rgba(255,255,255,0.04);
+      aspect-ratio:var(--hero-aspect, 1 / 1);
+      max-height:min(80vh, 100vw);
+      background:transparent;
       border:1px solid rgba(255,255,255,0.12);
       overflow:hidden;
       border-radius:12px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
     }
     .entry-hero img{
       width:100%;
       height:100%;
+      max-width:none;
+      max-height:none;
       object-fit:contain;
       image-rendering:pixelated;
       background:transparent;
@@ -602,16 +608,20 @@
     .entry-imgwrap{
       padding:0;
       background:transparent;
-      display:block;
+      display:flex;
+      align-items:center;
+      justify-content:center;
       position:relative;
-      aspect-ratio:1/1;
+      aspect-ratio:var(--entry-aspect, 1 / 1);
       border-radius:12px;
       overflow:hidden;
     }
     .entry-imgwrap img{
       width:100%;
       height:100%;
-      object-fit:cover;
+      max-width:none;
+      max-height:none;
+      object-fit:contain;
       image-rendering:pixelated;
       image-rendering:crisp-edges;
       -ms-interpolation-mode:nearest-neighbor;
@@ -703,7 +713,7 @@
       width:100%;
       max-width:100%;
       padding:10px;
-      background:rgba(255,255,255,0.05);
+      background:#000;
       border:1px solid rgba(255,255,255,0.12);
       box-shadow:0 10px 30px rgba(0,0,0,0.28);
       position:relative;
@@ -719,6 +729,7 @@
       justify-content:center;
       min-height:clamp(48px, 9vw, 60px);
       box-sizing:border-box;
+      background:#000;
     }
     .entry-ad-slot ins{
       display:block;
@@ -730,11 +741,13 @@
       margin:0 auto;
       overflow:hidden;
       box-sizing:border-box;
+      background:#000;
     }
     .entry-ad-slot iframe,
     .entry-ad-slot img{
       max-width:100% !important;
       box-sizing:border-box;
+      background:#000;
     }
     .entry-ad-note{
       margin:0;
@@ -906,8 +919,7 @@
 <link rel="apple-touch-icon" href="/icon/PiXiEED.icon512.png"/>
 </head>
 <body>
-  <div class="page">
-    <header aria-label="top-nav">
+  <header aria-label="top-nav">
       <div class="header-inner">
         <button class="brand" id="openProfilePanel" type="button">
           <span class="brand-icon" id="brandAvatar"><img src="../character-dots/mao1.png" alt="logo"></span>
@@ -921,9 +933,11 @@
         </div>
       </div>
     </header>
+<div class="page">
+    
     <section class="card">
       <div class="entry-hero" id="hero">
-        <img id="heroImg" alt="dot work" draggable="false" decoding="async"/>
+        <img id="heroImg" alt="dot work" draggable="false" decoding="async" data-pixel-art-fit="off"/>
         <video id="heroVideo" autoplay loop muted playsinline controls preload="metadata" hidden></video>
         <div class="entry-watermark-layer" id="heroWatermark" aria-hidden="true"></div>
         <button class="heart-btn" id="heroLike" aria-label="いいね"><img id="heroLikeIcon" alt="like icon"/></button>
@@ -995,22 +1009,18 @@
       <p class="entry-ad-note">広告</p>
     </section>
   </div>
-  <nav class="bottom-nav">
+    <nav class="bottom-nav">
     <a class="bottom-nav__item" data-tab="home" href="../index.html">
       <span class="icon"><img src="../FooterIcon1.png" alt=""/></span><span>ホーム</span>
     </a>
     <a class="bottom-nav__item" data-tab="contest" href="../contest/index.html">
       <span class="icon"><img src="../FooterIcon2.png" alt=""/></span><span>広場</span>
     </a>
-
-    <a class="bottom-nav__item" data-tab="tools" href="../tools.html">
-      <span class="icon"><img src="../FooterIcon3.png" alt=""/></span><span>ツール/ゲーム</span>
-    </a>
-    <a class="bottom-nav__item" data-tab="lens" href="../pixiee-lens/index.html">
-      <span class="icon"><img src="../FooterIcon5.png" alt=""/></span><span>PiXiEELENS</span>
+    <a class="bottom-nav__item" data-tab="talk" href="#" aria-disabled="true" onclick="return false;">
+      <span class="icon"><img src="../pixiedraw/assets/icons/talk.png" alt=""/></span><span>会話</span>
     </a>
     <a class="bottom-nav__item" data-tab="portfolio" href="../portfolio/index.html">
-      <span class="icon"><img src="../FooterIcon4.png" alt=""/></span><span>企業向け</span>
+      <span class="icon"><img src="../FooterIcon4.png" alt=""/></span><span>企業</span>
     </a>
   </nav>
   <div class="auth-panel" id="authPanel" aria-hidden="true">
@@ -3134,9 +3144,11 @@
         const item = document.createElement('a');
         item.className = 'entry-card';
         item.href = `view.html?id=${e.id}`;
+        const aspectWidth = Math.max(1, Number(e.width) || 1);
+        const aspectHeight = Math.max(1, Number(e.height) || 1);
         item.innerHTML = `
-          <div class="entry-imgwrap">
-            <img src="${resolveEntryImage(e, { preferThumb: true })}" alt="${e.title}" draggable="false" loading="lazy" decoding="async">
+          <div class="entry-imgwrap" style="--entry-aspect:${aspectWidth} / ${aspectHeight};">
+            <img src="${resolveEntryImage(e, { preferThumb: true })}" alt="${e.title}" draggable="false" loading="lazy" decoding="async" data-pixel-art-fit="off">
             ${buildContestWatermarkMarkup(resolveContestWatermarkSeed(e), { count: 20, sizeMin: 10, sizeMax: 17 })}
           </div>
         `;
@@ -3612,7 +3624,7 @@
             <p class="helper" style="margin:0 0 12px;">現在メンテナンス中のため、投稿と閲覧を停止しています。再開までお待ちください。</p>
             <div style="display:flex;gap:12px;flex-wrap:wrap;">
               <a href="../index.html">ホームへ</a>
-              <a href="../tools.html">ツール/ゲームへ</a>
+              <a href="../index.html#projects">プロジェクト一覧へ</a>
             </div>
           </section>
         `;
@@ -3682,5 +3694,6 @@
   </script>
   <script src="../scripts/pixieed-dot-stats.js"></script>
   <script src="../scripts/bottom-nav-footer-ad.js"></script>
+  <script src="../scripts/pixel-art-fit.js"></script>
 </body>
 </html>
