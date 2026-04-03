@@ -27,7 +27,12 @@
   }
 
   function replaceFooter() {
-    doc.querySelectorAll('footer').forEach((node) => node.remove());
+    doc.querySelectorAll('footer').forEach((node) => {
+      if (node.classList.contains('ad-footer')) {
+        return;
+      }
+      node.remove();
+    });
 
     const footer = doc.createElement('footer');
     footer.className = 'pixieed-shared-footer';
