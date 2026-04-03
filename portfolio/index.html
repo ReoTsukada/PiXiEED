@@ -580,7 +580,18 @@
     display:grid;
     gap:clamp(8px, 1.6vh, 12px);
     box-sizing:border-box;
-    overflow:hidden;
+    overflow-x:hidden;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-gutter:stable;
+  }
+  .auth-card > :first-child{
+    position:sticky;
+    top:0;
+    z-index:1;
+    background:rgba(15,23,42,0.95);
+    padding-bottom:4px;
   }
   @supports (height: 100dvh){
     .auth-card{
