@@ -309,6 +309,10 @@
           slide.classList.toggle('is-active', slideIndex === index);
         });
         activeIndex = index;
+        const activeSlide = slides[index];
+        if (activeSlide?.classList.contains('home-hero-slide--ad')) {
+          window.pixieedObserveAds?.(activeSlide);
+        }
       };
       const pickRandomContentIndex = () => {
         if (!contentIndices.length) return activeIndex;
