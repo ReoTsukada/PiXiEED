@@ -284,6 +284,7 @@
   <script src="scripts/shared-profile-header.js"></script>
   <script src="scripts/pixieed-dot-stats.js"></script>
   <script src="scripts/bottom-nav-footer-ad.js"></script>
+  <script src="scripts/ads-lazy.js"></script>
   <script>
     (() => {
       const slides = Array.from(document.querySelectorAll('[data-hero-slide]'));
@@ -329,13 +330,7 @@
       window.setInterval(() => {
         showSlide(pickNextIndex());
       }, 5000);
-      if (window.adsbygoogle && document.querySelector('.home-hero-ad .adsbygoogle')) {
-        try {
-          (window.adsbygoogle = window.adsbygoogle || []).push({});
-        } catch (_error) {
-          // ignore ad init failures on local preview
-        }
-      }
+      window.pixieedObserveAds?.(document);
     })();
   </script>
   <script>
