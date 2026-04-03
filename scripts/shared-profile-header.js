@@ -49,6 +49,17 @@
     document.head.appendChild(script);
   }
 
+  function ensureSharedAuthPanelScript() {
+    if (window.pixieedSharedAuthPanel || document.querySelector('script[data-pixieed-shared-auth="true"]')) {
+      return;
+    }
+    const script = document.createElement('script');
+    script.defer = true;
+    script.dataset.pixieedSharedAuth = 'true';
+    script.src = asset('./shared-auth-panel.js');
+    document.head.appendChild(script);
+  }
+
   const AVATARS = [
     { id: 'mao', src: asset('../character-dots/mao1.png') },
     { id: 'jerin1', src: asset('../character-dots/Jerin1.png') },
@@ -214,6 +225,7 @@
     const toggle = (open) => {
       panel.classList.toggle('is-open', open);
       panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+      panel.toggleAttribute('hidden', !open);
       if (open) {
         syncInputs();
         renderAvatarChoices();
@@ -223,7 +235,7 @@
 
     if (openBtn) openBtn.addEventListener('click', () => toggle(true));
     if (closeBtn) closeBtn.addEventListener('click', () => toggle(false));
-    panel.addEventListener('click', (event) => {
+      panel.addEventListener('click', (event) => {
       if (event.target === panel) toggle(false);
     });
 
@@ -245,11 +257,20 @@
         setStatus('プロフィールを保存しました');
       });
     }
+
+    const openAuthFromHash = () => {
+      if (window.location.hash === '#auth') {
+        toggle(true);
+      }
+    };
+    openAuthFromHash();
+    window.addEventListener('hashchange', openAuthFromHash);
   }
 
   function init() {
     renderSharedHeader();
     ensureSupportCheckoutPanelScript();
+    ensureSharedAuthPanelScript();
     setupSupportTipLink();
     applyAvatarToBrand();
     renderAvatarChoices();
