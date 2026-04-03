@@ -50,6 +50,19 @@
       ins.getAttribute('data-ad-status') === 'filled';
   }
 
+  function isRenderable(ins) {
+    if (!(ins instanceof HTMLElement)) return false;
+    if (ins.closest('[hidden]')) return false;
+    const heroSlide = ins.closest('.home-hero-slide');
+    if (heroSlide instanceof HTMLElement && !heroSlide.classList.contains('is-active')) {
+      return false;
+    }
+    if (ins.offsetParent === null && getComputedStyle(ins).position !== 'fixed') {
+      return false;
+    }
+    return true;
+  }
+
   function assignSlot(ins) {
     if (!(ins instanceof HTMLElement)) return;
     if (ins.dataset.adSlotAssigned === '1') return;
@@ -68,6 +81,7 @@
   function loadAd(ins) {
     if (!(ins instanceof HTMLElement)) return;
     if (ins.dataset.adsLazyLoaded === '1' || isReady(ins)) return;
+    if (!isRenderable(ins)) return;
     assignSlot(ins);
     ins.dataset.adsLazyLoaded = '1';
     try {
