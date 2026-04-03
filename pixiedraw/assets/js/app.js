@@ -997,7 +997,7 @@
   const UPDATE_HISTORY_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;
   const EXPORT_INTERSTITIAL_LAST_SHOWN_KEY = 'pixieedraw:export-interstitial-last-shown-at';
   const EXPORT_INTERSTITIAL_COOLDOWN_MS = 45 * 1000;
-  const STREAMING_HIDE_MONETIZATION_UI = true;
+  const STREAMING_HIDE_MONETIZATION_UI = false;
   const SUPPRESSED_UPDATE_HISTORY_IDS = new Set([
     '2026-03-11-local-extension-personal-view-spritemap',
     '2026-03-11-personal-view-copy-paste-stability',
