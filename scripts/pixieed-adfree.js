@@ -10,6 +10,7 @@
   const GLOBAL_ENTITLEMENT_KEY = 'browser_ad_free';
   const PIXIEDRAW_ENTITLEMENT_KEY = 'pixiedraw_ad_free';
   const CHECKOUT_ENDPOINT = `${SUPABASE_URL}/functions/v1/stripe-browser-adfree-checkout`;
+  const PIXIEDRAW_SUPPORT_URL = 'https://buy.stripe.com/aFadRaeo8ekv5L44MM2VG01';
   const AUTO_APPLY_QUERY_KEY = 'stripe_checkout_session_id';
   const AUTO_APPLY_STATUS_KEY = 'stripe_checkout_status';
   const ACCESS_CODE_PATTERN = /^PXA[A-Z0-9]{6,}$/i;
@@ -347,14 +348,32 @@
 
   function syncUi() {
     const purchaseLink = document.getElementById('pixieedAdFreePurchase');
+    const supportTipLinks = Array.from(document.querySelectorAll('a#supportTipLink'));
+    const spotlightTipLinks = Array.from(document.querySelectorAll('a#toolSpotlightSupportTip'));
     const claimInput = document.getElementById('pixieedAdFreeOrderId');
     const claimButton = document.getElementById('pixieedAdFreeClaim');
 
     if (purchaseLink instanceof HTMLAnchorElement) {
-      purchaseLink.href = buildPurchaseUrl();
+      purchaseLink.href = PIXIEDRAW_SUPPORT_URL;
       purchaseLink.target = '_self';
       purchaseLink.rel = 'noopener';
+      purchaseLink.dataset.supportPanelTrigger = 'true';
+      purchaseLink.dataset.supportPreferredProduct = 'pixiedraw_ad_free';
     }
+    supportTipLinks.forEach((link) => {
+      link.href = PIXIEDRAW_SUPPORT_URL;
+      link.target = '_self';
+      link.rel = 'noopener';
+      link.dataset.supportPanelTrigger = 'true';
+      link.dataset.supportPreferredProduct = 'pixiedraw_ad_free';
+    });
+    spotlightTipLinks.forEach((link) => {
+      link.href = PIXIEDRAW_SUPPORT_URL;
+      link.target = '_self';
+      link.rel = 'noopener';
+      link.dataset.supportPanelTrigger = 'true';
+      link.dataset.supportPreferredProduct = 'pixiedraw_ad_free';
+    });
 
     if (claimInput instanceof HTMLInputElement) {
       claimInput.disabled = !state.isLoggedIn || state.isLoading;
