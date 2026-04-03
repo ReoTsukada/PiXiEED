@@ -7,6 +7,9 @@ const HANDLED_EVENT_TYPES = new Set([
   "checkout.session.completed",
   "checkout.session.async_payment_succeeded",
   "checkout.session.async_payment_failed",
+  "invoice.paid",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
 ]);
 const PAID_STATUSES = new Set(["paid", "completed", "confirmed", "fulfilled"]);
 const ENTITLEMENT_BY_PRODUCT: Record<string, string> = {
@@ -89,6 +92,154 @@ function isPaidEvent(eventType: string, paymentStatus: string): boolean {
   return PAID_STATUSES.has(paymentStatus);
 }
 
+function isoFromUnix(value: unknown): string {
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return "";
+  }
+  return new Date(seconds * 1000).toISOString();
+}
+
+function pickSubscriptionId(payload: Stripe.Checkout.Session | Stripe.Invoice | Stripe.Subscription): string {
+  const raw = payload && typeof payload === "object" ? (
+    "subscription" in payload ? payload.subscription : ""
+  ) : "";
+  return typeof raw === "string" ? raw.trim() : "";
+}
+
+function pickInvoicePeriodEnd(invoice: Stripe.Invoice): string {
+  const lines = Array.isArray(invoice.lines?.data) ? invoice.lines.data : [];
+  for (const line of lines) {
+    const end = isoFromUnix(line?.period?.end);
+    if (end) {
+      return end;
+    }
+  }
+  return isoFromUnix((invoice as unknown as { period_end?: number }).period_end);
+}
+
+function pickSubscriptionPeriodEnd(subscription: Stripe.Subscription): string {
+  return isoFromUnix((subscription as unknown as { current_period_end?: number }).current_period_end);
+}
+
+async function findPurchaseBySubscriptionId(
+  supabase: ReturnType<typeof createClient>,
+  subscriptionId: string,
+  productKey?: string,
+) {
+  if (!subscriptionId) {
+    return { data: null, error: null };
+  }
+  let query = supabase
+    .from("browser_adfree_purchase_orders")
+    .select("id, provider_order_id, product_key, buyer_email, payment_status, code, claimed_by, metadata")
+    .contains("metadata", { subscription_id: subscriptionId })
+    .order("issued_at", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (productKey) {
+    query = query.eq("product_key", productKey);
+  }
+  return await query.maybeSingle();
+}
+
+async function syncEntitlementWindowByCode(
+  supabase: ReturnType<typeof createClient>,
+  code: string,
+  entitlementKey: string,
+  expiresAt: string,
+  options: {
+    revoke?: boolean;
+    buyerEmail?: string;
+    orderId?: string;
+    subscriptionId?: string;
+  } = {},
+) {
+  if (!code || !entitlementKey) {
+    return;
+  }
+  const nowIso = new Date().toISOString();
+  const codeMetadataPatch = {
+    buyer_email: options.buyerEmail || "",
+    provider_order_id: options.orderId || "",
+    subscription_id: options.subscriptionId || "",
+    entitlement_key: entitlementKey,
+    synced_at: nowIso,
+  };
+  const { data: codeRow, error: codeLookupError } = await supabase
+    .from("user_entitlement_codes")
+    .select("code, redeemed_by, metadata")
+    .eq("code", code)
+    .maybeSingle();
+  if (codeLookupError) {
+    throw codeLookupError;
+  }
+  const nextCodeMetadata = {
+    ...(codeRow?.metadata && typeof codeRow.metadata === "object" ? codeRow.metadata : {}),
+    ...codeMetadataPatch,
+  };
+  const codeUpdate: Record<string, unknown> = {
+    metadata: nextCodeMetadata,
+    updated_at: nowIso,
+  };
+  if (options.revoke) {
+    codeUpdate.active = false;
+    codeUpdate.expires_at = nowIso;
+  } else if (expiresAt) {
+    codeUpdate.active = true;
+    codeUpdate.expires_at = expiresAt;
+  }
+  const { error: codeUpdateError } = await supabase
+    .from("user_entitlement_codes")
+    .update(codeUpdate)
+    .eq("code", code);
+  if (codeUpdateError) {
+    throw codeUpdateError;
+  }
+
+  if (!codeRow?.redeemed_by) {
+    return;
+  }
+
+  const { data: entitlementRow, error: entitlementLookupError } = await supabase
+    .from("user_entitlements")
+    .select("metadata")
+    .eq("user_id", codeRow.redeemed_by)
+    .eq("entitlement_key", entitlementKey)
+    .maybeSingle();
+  if (entitlementLookupError) {
+    throw entitlementLookupError;
+  }
+  const nextEntitlementMetadata = {
+    ...(entitlementRow?.metadata && typeof entitlementRow.metadata === "object" ? entitlementRow.metadata : {}),
+    ...codeMetadataPatch,
+    last_synced_from_subscription_at: nowIso,
+  };
+  const entitlementUpdate: Record<string, unknown> = {
+    metadata: nextEntitlementMetadata,
+    updated_at: nowIso,
+  };
+  if (options.revoke) {
+    entitlementUpdate.status = "revoked";
+    entitlementUpdate.revoked_at = nowIso;
+    entitlementUpdate.expires_at = nowIso;
+  } else {
+    entitlementUpdate.status = "active";
+    entitlementUpdate.revoked_at = null;
+    if (expiresAt) {
+      entitlementUpdate.expires_at = expiresAt;
+    }
+  }
+  const { error: entitlementUpdateError } = await supabase
+    .from("user_entitlements")
+    .update(entitlementUpdate)
+    .eq("user_id", codeRow.redeemed_by)
+    .eq("entitlement_key", entitlementKey);
+  if (entitlementUpdateError) {
+    throw entitlementUpdateError;
+  }
+}
+
 serve(async (request) => {
   if (request.method !== "POST") {
     return json({ ok: false, error: "method not allowed" }, 405);
@@ -131,6 +282,123 @@ serve(async (request) => {
   }
 
   const session = event.data.object as Stripe.Checkout.Session;
+  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+
+  if (event.type === "invoice.paid") {
+    const invoice = event.data.object as Stripe.Invoice;
+    const subscriptionId = pickSubscriptionId(invoice);
+    if (!subscriptionId) {
+      return json({ ok: true, ignored: true, reason: "subscription missing", eventType: event.type });
+    }
+    const { data: purchase, error: purchaseError } = await findPurchaseBySubscriptionId(supabase, subscriptionId);
+    if (purchaseError) {
+      return json({ ok: false, error: purchaseError.message }, 500);
+    }
+    if (!purchase?.code) {
+      return json({ ok: true, ignored: true, reason: "purchase missing", eventType: event.type, subscriptionId });
+    }
+    const entitlementKey = ENTITLEMENT_BY_PRODUCT[purchase.product_key];
+    if (!entitlementKey) {
+      return json({ ok: true, ignored: true, reason: "product mismatch", eventType: event.type, subscriptionId });
+    }
+    const expiresAt = pickInvoicePeriodEnd(invoice);
+    try {
+      await syncEntitlementWindowByCode(supabase, purchase.code, entitlementKey, expiresAt, {
+        buyerEmail: purchase.buyer_email,
+        orderId: purchase.provider_order_id,
+        subscriptionId,
+      });
+    } catch (error) {
+      return json({ ok: false, error: String(error?.message || error || "invoice sync failed") }, 500);
+    }
+    const purchaseMetadata = {
+      ...(purchase.metadata && typeof purchase.metadata === "object" ? purchase.metadata : {}),
+      subscription_id: subscriptionId,
+      current_period_end: expiresAt,
+      last_invoice_paid_at: new Date().toISOString(),
+    };
+    const { error: purchaseUpdateError } = await supabase
+      .from("browser_adfree_purchase_orders")
+      .update({
+        payment_status: "paid",
+        metadata: purchaseMetadata,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", purchase.id);
+    if (purchaseUpdateError) {
+      return json({ ok: false, error: purchaseUpdateError.message }, 500);
+    }
+    return json({ ok: true, subscriptionId, eventType: event.type, synced: true });
+  }
+
+  if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
+    const subscription = event.data.object as Stripe.Subscription;
+    const subscriptionId = pickSubscriptionId(subscription);
+    if (!subscriptionId) {
+      return json({ ok: true, ignored: true, reason: "subscription missing", eventType: event.type });
+    }
+    const { data: purchase, error: purchaseError } = await findPurchaseBySubscriptionId(supabase, subscriptionId);
+    if (purchaseError) {
+      return json({ ok: false, error: purchaseError.message }, 500);
+    }
+    if (!purchase?.code) {
+      return json({ ok: true, ignored: true, reason: "purchase missing", eventType: event.type, subscriptionId });
+    }
+    const entitlementKey = ENTITLEMENT_BY_PRODUCT[purchase.product_key];
+    if (!entitlementKey) {
+      return json({ ok: true, ignored: true, reason: "product mismatch", eventType: event.type, subscriptionId });
+    }
+    const subscriptionStatus = String(subscription.status || "").trim().toLowerCase();
+    const cancelAtPeriodEnd = Boolean((subscription as unknown as { cancel_at_period_end?: boolean }).cancel_at_period_end);
+    const currentPeriodEnd = pickSubscriptionPeriodEnd(subscription);
+    const shouldRevokeNow = event.type === "customer.subscription.deleted"
+      || ["canceled", "unpaid", "incomplete_expired"].includes(subscriptionStatus);
+    try {
+      if (shouldRevokeNow) {
+        await syncEntitlementWindowByCode(supabase, purchase.code, entitlementKey, currentPeriodEnd, {
+          revoke: true,
+          buyerEmail: purchase.buyer_email,
+          orderId: purchase.provider_order_id,
+          subscriptionId,
+        });
+      } else if (currentPeriodEnd) {
+        await syncEntitlementWindowByCode(supabase, purchase.code, entitlementKey, currentPeriodEnd, {
+          buyerEmail: purchase.buyer_email,
+          orderId: purchase.provider_order_id,
+          subscriptionId,
+        });
+      }
+    } catch (error) {
+      return json({ ok: false, error: String(error?.message || error || "subscription sync failed") }, 500);
+    }
+    const purchaseMetadata = {
+      ...(purchase.metadata && typeof purchase.metadata === "object" ? purchase.metadata : {}),
+      subscription_id: subscriptionId,
+      current_period_end: currentPeriodEnd,
+      cancel_at_period_end: cancelAtPeriodEnd,
+      subscription_status: subscriptionStatus,
+      last_subscription_event_at: new Date().toISOString(),
+    };
+    const { error: purchaseUpdateError } = await supabase
+      .from("browser_adfree_purchase_orders")
+      .update({
+        payment_status: shouldRevokeNow ? "cancelled" : purchase.payment_status,
+        metadata: purchaseMetadata,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", purchase.id);
+    if (purchaseUpdateError) {
+      return json({ ok: false, error: purchaseUpdateError.message }, 500);
+    }
+    return json({ ok: true, subscriptionId, eventType: event.type, revoked: shouldRevokeNow });
+  }
+
+  const session = event.data.object as Stripe.Checkout.Session;
   const productKey = pickProductKey(session);
   const entitlementKey = ENTITLEMENT_BY_PRODUCT[productKey];
   if (!entitlementKey) {
@@ -143,13 +411,7 @@ serve(async (request) => {
   if (!orderId || !buyerEmail) {
     return json({ ok: false, error: "session id or buyer email missing" }, 422);
   }
-
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  });
+  const subscriptionId = pickSubscriptionId(session);
 
   const { data: existingPurchase, error: existingError } = await supabase
     .from("browser_adfree_purchase_orders")
@@ -168,6 +430,7 @@ serve(async (request) => {
     payment_link_id: typeof session.payment_link === "string" ? session.payment_link : "",
     payment_intent_id: typeof session.payment_intent === "string" ? session.payment_intent : "",
     checkout_source: session.metadata?.checkout_source || "",
+    subscription_id: subscriptionId,
   };
 
   if (!isPaidEvent(event.type, paymentStatus)) {
@@ -217,6 +480,7 @@ serve(async (request) => {
           product_key: productKey,
           payment_link_id: metadata.payment_link_id,
           payment_intent_id: metadata.payment_intent_id,
+          subscription_id: subscriptionId,
         },
       });
     if (codeError) {
