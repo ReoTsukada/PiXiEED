@@ -177,7 +177,18 @@
       display:grid;
       gap:clamp(8px, 1.6vh, 12px);
       box-sizing:border-box;
-      overflow:hidden;
+      overflow-x:hidden;
+      overflow-y:auto;
+      overscroll-behavior:contain;
+      -webkit-overflow-scrolling:touch;
+      scrollbar-gutter:stable;
+    }
+    .auth-card > :first-child{
+      position:sticky;
+      top:0;
+      z-index:1;
+      background:rgba(15,23,42,0.95);
+      padding-bottom:4px;
     }
     @supports (height: 100dvh){
       .auth-card{
@@ -1067,19 +1078,6 @@
             <p class="author" style="margin:0;">別端末でも同じアカウントで利用できます。</p>
           </div>
         </details>
-      </div>
-      <div class="profile-block">
-        <p class="author" style="margin:0;">広告非表示（ブラウザ版）</p>
-        <p class="auth-status" id="pixieedAdFreeStatus" style="margin:0;">ログイン後に購入番号または購入コードを適用できます。</p>
-        <div class="auth-actions" style="display:grid; gap:8px;">
-          <a class="auth-btn" id="pixieedAdFreePurchase" href="#" rel="noopener">広告非表示を購入</a>
-        </div>
-        <div style="display:grid; gap:8px;">
-          <input class="auth-input" id="pixieedAdFreeOrderId" type="text" placeholder="購入番号 / 購入コード" maxlength="64" autocomplete="off">
-          <button class="auth-btn" id="pixieedAdFreeClaim" type="button">適用</button>
-        </div>
-        <p class="author" style="margin:0;">購入時と同じメールアドレスでログインしてください。購入後は自動反映され、うまくいかない場合は購入番号または購入コードを入力して適用できます。</p>
-        <p class="author" style="margin:0;">広告を消さずに支援したい場合は、上部の応援チップも利用できます。</p>
       </div>
       <p class="auth-status" id="authStatus"></p>
     </div>
