@@ -1,4 +1,6 @@
 (function () {
+  const PIXIEED_SUPPORT_URL = 'https://buy.stripe.com/28E3cw5RC4JVehAenm2VG00';
+  const PIXIEDRAW_SUPPORT_URL = 'https://buy.stripe.com/aFadRaeo8ekv5L44MM2VG01';
   const currentScript = document.currentScript;
   const asset = (relativePath) => {
     try {
@@ -34,6 +36,17 @@
         </div>
       </div>
     `;
+  }
+
+  function ensureSupportCheckoutPanelScript() {
+    if (window.pixieedSupportCheckout || document.querySelector('script[data-pixieed-support-checkout="true"]')) {
+      return;
+    }
+    const script = document.createElement('script');
+    script.defer = true;
+    script.dataset.pixieedSupportCheckout = 'true';
+    script.src = asset('./support-checkout-panel.js');
+    document.head.appendChild(script);
   }
 
   const AVATARS = [
@@ -167,11 +180,26 @@
     if (status) status.textContent = message || '';
   }
 
+  function getSupportProductKey() {
+    try {
+      const pathname = String(window.location.pathname || '').toLowerCase();
+      return /(?:^|\/)pixiedraw(?:\/|\/index\.html)?$/.test(pathname)
+        ? 'pixiedraw_ad_free'
+        : 'support_tip';
+    } catch (_error) {
+      return 'support_tip';
+    }
+  }
+
   function setupSupportTipLink() {
     const link = document.getElementById('supportTipLink');
     if (!link) return;
-    const returnUrl = encodeURIComponent(window.location.href);
-    link.href = `https://kyyiuakrqomzlikfaire.supabase.co/functions/v1/stripe-browser-adfree-checkout?product=support_tip&return_url=${returnUrl}`;
+    const productKey = getSupportProductKey();
+    link.href = productKey === 'pixiedraw_ad_free' ? PIXIEDRAW_SUPPORT_URL : PIXIEED_SUPPORT_URL;
+    link.dataset.supportPanelTrigger = 'true';
+    link.dataset.supportPreferredProduct = productKey === 'pixiedraw_ad_free'
+      ? 'pixiedraw_ad_free'
+      : 'pixieed_support_monthly';
   }
 
   function setupPanel() {
@@ -221,6 +249,7 @@
 
   function init() {
     renderSharedHeader();
+    ensureSupportCheckoutPanelScript();
     setupSupportTipLink();
     applyAvatarToBrand();
     renderAvatarChoices();
