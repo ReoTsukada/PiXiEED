@@ -1146,14 +1146,14 @@
 <span>PiXiEEDraw広告非表示</span>
 <p class="help-text" id="pixieedAdFreeStatus">ログイン後に購入番号または購入コードを適用できます。PiXiEEDraw内の広告だけを非表示にします。</p>
 <div class="field field--inline">
-<a class="chip" id="pixieedAdFreePurchase" href="#" rel="noopener">PiXiEEDraw継続サポートを購入</a>
+<a class="chip" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" id="pixieedAdFreePurchase" href="https://buy.stripe.com/aFadRaeo8ekv5L44MM2VG01" rel="noopener">PiXiEEDraw継続サポートを購入</a>
 </div>
 <div class="field field--inline">
 <input autocomplete="off" id="pixieedAdFreeOrderId" maxlength="64" placeholder="購入番号 / 購入コード" type="text"/>
 <button class="chip" id="pixieedAdFreeClaim" type="button">適用</button>
 </div>
 <p class="help-text">購入時と同じメールアドレスでログインしてください。購入後は自動反映され、うまくいかない場合は購入番号または購入コードを入力して適用できます。</p>
-<p class="help-text">広告を消さずに支援したい場合は <a class="chip" href="https://kyyiuakrqomzlikfaire.supabase.co/functions/v1/stripe-browser-adfree-checkout?product=support_tip&amp;return_url=https%3A%2F%2Fpixieed.jp%2Fpixiedraw%2F" id="supportTipLink" target="_blank" rel="noopener noreferrer" aria-label="PiXiEEDの応援チップを購入">応援チップ</a> も利用できます。</p>
+<p class="help-text">広告を消さずに支援したい場合は <a class="chip" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="https://buy.stripe.com/aFadRaeo8ekv5L44MM2VG01" id="supportTipLink" target="_blank" rel="noopener noreferrer" aria-label="PiXiEEDraw継続サポートを購入">応援チップ</a> も利用できます。</p>
 </div>
 </div>
 </section>
@@ -1310,7 +1310,7 @@
 <p class="tool-spotlight-card__description" id="toolSpotlightContestDesc">保存した作品を投稿して、みんなの作品もチェックできます。</p>
 </div>
 </a>
-<a aria-hidden="true" class="tool-spotlight-card" href="https://kyyiuakrqomzlikfaire.supabase.co/functions/v1/stripe-browser-adfree-checkout?product=support_tip&amp;return_url=https%3A%2F%2Fpixieed.jp%2Fpixiedraw%2F" hidden="" id="toolSpotlightSupportTip" rel="noopener" role="listitem" target="_blank">
+<a aria-hidden="true" class="tool-spotlight-card" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="https://buy.stripe.com/aFadRaeo8ekv5L44MM2VG01" hidden="" id="toolSpotlightSupportTip" rel="noopener" role="listitem" target="_blank">
 <img alt="応援チップ" class="tool-spotlight-card__icon" src="../icon/PiXiEED.icon512.png"/>
 <div class="tool-spotlight-card__content">
 <h3 class="tool-spotlight-card__title" id="toolSpotlightTipTitle">応援チップ</h3>
@@ -1532,6 +1532,7 @@
     </script>
 <script defer="" src="../scripts/pixieed-dot-stats.js"></script>
 <script src="../scripts/pixieed-adfree.js"></script>
+<script src="../scripts/support-checkout-panel.js"></script>
 <script defer="" src="assets/js/app.js"></script>
   <!-- Mobile bottom ad placeholder (visible in portrait / small screens) -->
   <div id="mobileBottomAd" aria-hidden="false">
