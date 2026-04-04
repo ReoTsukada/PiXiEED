@@ -51372,16 +51372,31 @@
   }
 
   async function loadSharedProjectSnapshotRecordByInvite(inviteToken, { createIfMissing = false, title = '' } = {}) {
-    const project = await fetchSharedProjectRecordByInviteToken(inviteToken);
+    if (!canUseSharedProjectsBackend()) {
+      return null;
+    }
+    let project = null;
+    try {
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase) {
+        return null;
+      }
+      const joined = await supabase
+        .rpc('pixieed_join_shared_project_by_invite_token', {
+          target_invite_token: typeof inviteToken === 'string' ? inviteToken.trim() : '',
+        });
+      if (joined.error) {
+        handleSharedProjectsBackendError(joined.error, 'join-by-token');
+        return null;
+      }
+      project = Array.isArray(joined.data) ? (joined.data[0] || null) : (joined.data || null);
+    } catch (error) {
+      handleSharedProjectsBackendError(error, 'join-by-token-exception');
+      return null;
+    }
     if (!project) {
       return null;
     }
-    await ensureSharedProjectMembership(project.project_key, {
-      createIfMissing,
-      title: title || project.title,
-      inviteToken: project.invite_token,
-      visibility: project.visibility,
-    });
     return project;
   }
 
