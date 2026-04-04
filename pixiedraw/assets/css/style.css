@@ -31,7 +31,7 @@
   --rail-resizer-grip-top: 74px;
   --rail-resizer-grip-height: 92px;
   --mobile-banner-height: 0px;
-  --mobile-drawer-peek-height: 127px;
+  --mobile-drawer-peek-height: 188px;
   --mobile-drawer-half-height: clamp(188px, 36vh, 420px);
   --mobile-drawer-full-height: clamp(240px, 46vh, 520px);
   --mobile-drawer-height: var(--mobile-drawer-full-height);
@@ -63,7 +63,9 @@
   --canvas-control-size-mobile: clamp(32px, 9vw, 38px);
   --canvas-control-icon-size: 20px;
   --mobile-bottom-ad-slot-height: clamp(40px, 7vw, 48px);
+  --mobile-bottom-ad-height: var(--mobile-bottom-ad-slot-height);
   --ui-control-tile-size: 44px;
+  --ui-panel-control-height: var(--ui-control-tile-size);
   --ui-compact-tool-flyout-size: var(--ui-control-tile-size);
   --project-tabs-height: 40px;
   --project-tabs-mobile-height: 36px;
@@ -590,6 +592,10 @@ body.is-unified-left-tools-color #mobileTabColor {
 
 body.is-unified-left-tools-color #panelTools .tool-quick-color {
   display: none;
+}
+
+body.is-mobile-layout.is-unified-left-tools-color #panelTools .tool-quick-color {
+  display: block;
 }
 
 body.is-unified-left-tools-color:not(.is-mobile-layout) .rail--left .rail-tabpanes {
@@ -2468,9 +2474,12 @@ body.is-startup-active #virtualCursorCanvas {
 }
 
 .floating-preview-panel__btn {
-  min-height: 24px;
-  padding: 3px 8px;
-  font-size: 0.68rem;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  font-size: 0.84rem;
   line-height: 1;
 }
 
@@ -3516,6 +3525,10 @@ body.is-mobile-layout .mobile-draw-help {
   gap: 8px;
 }
 
+#panelMulti .multi-entry-actions[data-shared-single="true"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 #panelMulti .multi-entry-action {
   min-height: 68px;
   display: flex;
@@ -3643,6 +3656,23 @@ body.is-mobile-layout .mobile-draw-help {
   height: 9px;
   border-radius: 50%;
   background: #e53e3e;
+}
+
+.panel-section .button,
+.panel-section .chip,
+.panel-section .field input:not([type='range']):not([type='checkbox']):not([type='radio']):not([type='color']),
+.panel-section .field select,
+.panel-section .field textarea,
+#panelMulti .multi-flow-tab {
+  min-height: var(--ui-panel-control-height);
+}
+
+.panel-section .button,
+.panel-section .chip,
+#panelMulti .multi-flow-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #panelMulti .multi-flow-tabpanel {
@@ -3958,6 +3988,22 @@ body.is-mobile-layout .mobile-draw-help {
   color: var(--fg);
   font-size: 0.86rem;
   font-weight: 600;
+}
+
+#panelMulti .multi-participants-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  margin-left: 8px;
+  padding: 0 8px;
+  border: 1px solid rgba(var(--ui-rgb), 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--fg);
 }
 
 #panelMulti .multi-participants-panel > summary::-webkit-details-marker {
@@ -6371,7 +6417,7 @@ body.is-mobile-layout #rightPanelAdSlot {
   }
   #mobileBottomAd { display: flex !important; }
   /* Always reserve banner area in portrait so UI never overlaps the fixed ad. */
-  .app { padding-bottom: calc(var(--mobile-bottom-ad-slot-height) + env(safe-area-inset-bottom, 0px)); }
+  .app { padding-bottom: calc(var(--mobile-bottom-ad-height, var(--mobile-bottom-ad-slot-height)) + env(safe-area-inset-bottom, 0px)); }
 }
 
 /* Landscape and wider screens: allow larger ad but keep within rail */
@@ -7768,7 +7814,7 @@ body.is-startup-active {
 @media (max-width: 900px) and (orientation: portrait) {
   :root {
     --mobile-banner-height: 0px;
-    --mobile-drawer-peek-height: clamp(108px, 20vh, 168px);
+    --mobile-drawer-peek-height: clamp(184px, 24vh, 220px);
     --mobile-drawer-half-height: clamp(188px, 36vh, 420px);
     --mobile-drawer-full-height: clamp(240px, 46vh, 520px);
     --mobile-drawer-height: var(--mobile-drawer-full-height);
@@ -7980,6 +8026,9 @@ body.is-startup-active {
   }
   .mobile-drawer[data-mode='peek'] #panelColor .palette-editor {
     display: none;
+  }
+  .mobile-panel.is-active #panelColor .palette-editor {
+    display: grid;
   }
   .mobile-drawer[data-mode='peek'] #panelColor .palette-grid {
     display: grid;
@@ -8454,6 +8503,14 @@ body.is-startup-active {
       linear-gradient(180deg, rgba(30, 58, 82, 0.98), rgba(15, 33, 50, 0.98));
     background-size: 6px 6px, 6px 6px, auto;
     border-color: rgba(156, 234, 241, 0.96);
+  }
+
+  .rail--left[data-compact="true"] #panelTools[data-compact-flyout-open="true"] .tool-grid,
+  .rail--left[data-compact="true"] #panelTools[data-compact-flyout-open="true"] .tool-grid[data-active-group],
+  .tool-grid.is-compact-flyout-portal,
+  .tool-grid.is-compact-flyout-portal[data-active-group] {
+    grid-template-columns: repeat(2, minmax(var(--ui-compact-tool-flyout-size), 1fr));
+    width: clamp(168px, calc(var(--left-width) + 92px), 252px);
   }
 
   .rail[data-compact="true"] .rail-tab .tab-icon,
