@@ -25,6 +25,7 @@
   let readyResolver = null;
   let uiMessage = '';
   let autoApplyStarted = false;
+  let reloadPromptOpen = false;
 
   const state = {
     isReady: false,
@@ -430,6 +431,28 @@
     window.dispatchEvent(new CustomEvent('pixieed:adfreechange', { detail }));
   }
 
+  function promptReloadAfterApply() {
+    if (reloadPromptOpen) {
+      return;
+    }
+    reloadPromptOpen = true;
+    const accepted = window.confirm(
+      '広告非表示を適用しました。今すぐ更新して広告を非表示にしますか？'
+    );
+    reloadPromptOpen = false;
+    if (!accepted) {
+      uiMessage = '広告非表示を適用しました。反映するにはページを更新してください。';
+      syncUi();
+      return;
+    }
+    try {
+      window.location.reload();
+    } catch (_error) {
+      uiMessage = '広告非表示を適用しました。反映するにはページを更新してください。';
+      syncUi();
+    }
+  }
+
   async function ensureSupabase() {
     if (supabasePromise) {
       return supabasePromise;
@@ -541,6 +564,9 @@
       setAccessInputValue('');
       clearCheckoutParams();
       await refresh();
+      if (state.isActive) {
+        promptReloadAfterApply();
+      }
       return { ok: true };
     } catch (error) {
       const message = String(error?.message || error || 'コードの適用に失敗しました。');
