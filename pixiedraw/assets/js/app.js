@@ -49712,6 +49712,7 @@
   async function createSharedProjectFromCurrentDocument() {
     if (!canUseSharedProjectsBackend()) {
       setMultiStatus(localizeText('共有プロジェクトにはログインが必要です', 'Sign in to create a shared project'), 'warn');
+      openLoginPromptDialog();
       return false;
     }
     const existingAccess = readCurrentMultiProjectAccessInput();
@@ -49771,6 +49772,7 @@
   async function openSharedProjectFromInput() {
     if (!canUseSharedProjectsBackend()) {
       setMultiStatus(localizeText('共有プロジェクトにはログインが必要です', 'Sign in to open a shared project'), 'warn');
+      openLoginPromptDialog();
       return false;
     }
     const access = readCurrentMultiProjectAccessInput();
@@ -51837,7 +51839,6 @@
       const module = await import(MULTI_SUPABASE_MODULE_URL);
       const supabase = module.createClient(MULTI_SUPABASE_URL, MULTI_SUPABASE_ANON_KEY, {
         global: { headers: { 'x-client-id': multiState.clientId || '' } },
-        auth: { storageKey: 'pixieed-account-auth' },
       });
       accountState.supabase = supabase;
       return supabase;
@@ -55766,7 +55767,9 @@
       } else if (sharedProjectFlowPreferred) {
         dom.controls.multiStartSession.title = sharedModeEnabled
           ? localizeText('このプロジェクトは共有中です', 'This project is shared')
-          : localizeText('今のプロジェクトを共有プロジェクトにして共有モードを有効にします', 'Create a shared project from the current document and enable shared mode');
+          : (!accountState.isLoggedIn
+            ? localizeText('共有モードを使うにはログインが必要です', 'Sign in to use shared mode')
+            : localizeText('今のプロジェクトを共有プロジェクトにして共有モードを有効にします', 'Create a shared project from the current document and enable shared mode'));
       } else if (!currentProjectKey) {
         dom.controls.multiStartSession.title = localizeText('共有リンクまたはプロジェクトキーを入力してください', 'Enter an invite link or project key');
       } else if (isEntryView) {
@@ -59715,6 +59718,11 @@
       dom.controls.multiStartSession.dataset.bound = 'true';
       dom.controls.multiStartSession.addEventListener('click', async () => {
         if (prefersSharedProjectFlow()) {
+          if (!canUseSharedProjectsBackend()) {
+            setMultiStatus(localizeText('共有モードを使うにはログインが必要です', 'Sign in to use shared mode'), 'warn');
+            openLoginPromptDialog();
+            return;
+          }
           if (!activeSharedProjectKey) {
             const accepted = await openShareStartConfirmDialog();
             if (!accepted) {
