@@ -8016,7 +8016,8 @@ body.is-startup-active {
     display: none;
   }
   .mobile-drawer[data-mode='peek'] #panelTools .tool-quick-color__palette {
-    grid-auto-columns: var(--ui-control-tile-size);
+    display: flex;
+    flex-wrap: nowrap;
     gap: 4px;
   }
   .mobile-drawer[data-mode='peek'] #panelTools .tool-quick-color__swatch {
@@ -8031,11 +8032,9 @@ body.is-startup-active {
     display: grid;
   }
   .mobile-drawer[data-mode='peek'] #panelColor .palette-grid {
-    display: grid;
-    grid-template-columns: none;
-    grid-auto-flow: column;
-    grid-auto-columns: var(--ui-control-tile-size);
-    justify-content: start;
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
     gap: 8px;
     width: 100%;
     min-width: 0;
