@@ -51307,9 +51307,18 @@
         };
         const inserted = await supabase
           .from('shared_projects')
-          .upsert(insertPayload, { onConflict: 'project_key' });
-        if (inserted.error) {
+          .insert(insertPayload)
+          .select('id, project_key, invite_token, visibility, owner_user_id, title, latest_snapshot, latest_revision, latest_structure_revision, updated_at, created_at')
+          .maybeSingle();
+        if (inserted.error && String(inserted.error.code || '') !== '23505') {
           handleSharedProjectsBackendError(inserted.error, 'create-project');
+          return null;
+        }
+        project = inserted.data || null;
+        if (!project) {
+          project = await fetchSharedProjectRecord(normalizedProjectKey);
+        }
+        if (!project) {
           return null;
         }
         const bootstrapMembership = await supabase
@@ -51317,8 +51326,9 @@
           .upsert(
             {
               project_key: normalizedProjectKey,
+              project_id: project.id || null,
               user_id: accountState.userId,
-              role: 'owner',
+              role: project.owner_user_id === accountState.userId ? 'owner' : 'editor',
               last_opened_at: new Date().toISOString(),
             },
             { onConflict: 'project_key,user_id' }
@@ -51327,7 +51337,6 @@
           handleSharedProjectsBackendError(bootstrapMembership.error, 'bootstrap-membership');
           return null;
         }
-        project = await fetchSharedProjectRecord(normalizedProjectKey);
       }
       if (!project) {
         return null;
