@@ -14330,6 +14330,9 @@
     pendingAutosaveHandle = null;
     clearPendingPermissionListener();
     setActiveAutosaveProjectId(createAutosaveProjectId());
+    clearActiveSharedProjectSession();
+    storeMultiProjectKey('');
+    syncMultiProjectKeyInputValues('', { preserveFocused: false });
     markAutosaveDirty();
     scheduleAutosaveSnapshot();
     const paletteReductionLabel = extraction.reduced
@@ -17037,6 +17040,9 @@
     pendingAutosaveHandle = null;
     clearPendingPermissionListener();
     setActiveAutosaveProjectId(createAutosaveProjectId());
+    clearActiveSharedProjectSession();
+    storeMultiProjectKey('');
+    syncMultiProjectKeyInputValues('', { preserveFocused: false });
     markAutosaveDirty();
     if (AUTOSAVE_SUPPORTED && autosaveWriteTimer !== null) {
       window.clearTimeout(autosaveWriteTimer);
@@ -49660,11 +49666,17 @@
         return;
       }
       const preloadedProject = inviteRecordPromise ? await inviteRecordPromise : null;
-      const sharedProject = preloadedProject || await loadSharedProjectSnapshotRecord(normalizedInviteProjectKey, {
-        createIfMissing: requestedRole === 'master',
-        title: createSharedProjectSnapshotTitle(state.documentName || normalizedInviteProjectKey),
-        inviteToken: resolvedInviteToken,
-      });
+      const sharedProject = preloadedProject
+        || (resolvedInviteToken
+          ? await loadSharedProjectSnapshotRecordByInvite(resolvedInviteToken, {
+              createIfMissing: false,
+              title: createSharedProjectSnapshotTitle(state.documentName || normalizedInviteProjectKey),
+            })
+          : await loadSharedProjectSnapshotRecord(normalizedInviteProjectKey, {
+              createIfMissing: requestedRole === 'master',
+              title: createSharedProjectSnapshotTitle(state.documentName || normalizedInviteProjectKey),
+              inviteToken: resolvedInviteToken,
+            }));
       const sharedSnapshot = sharedProject?.latest_snapshot;
       if (!sharedSnapshot || typeof sharedSnapshot !== 'object') {
         return;
