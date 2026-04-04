@@ -2934,6 +2934,8 @@
     supabase: null,
   };
   let accountSupabaseInitPromise = null;
+  let accountInitPromise = null;
+  let accountAuthListenerBound = false;
   let accountProfileSyncPromise = null;
   let supportsPixieedProfileXUrl = true;
   let supportsSharedProjectsBackend = true;
@@ -52041,33 +52043,44 @@
   }
 
   async function initPixieedAccount() {
-    try {
-      const supabase = await ensurePixieedAccountClient();
-      if (!supabase) {
-        updatePixieedAccountUi();
-        return;
-      }
-      const { data } = await supabase.auth.getSession();
-      applyPixieedAccountSession(data?.session || null);
-      if (accountState.isLoggedIn) {
-        await syncPixieedAccountProfile();
-        await syncSharedRecentProjectsFromAccount();
-      } else {
-        updatePixieedAccountUi();
-      }
-      supabase.auth.onAuthStateChange(async (_event, session) => {
-        applyPixieedAccountSession(session || null);
+    if (accountInitPromise) {
+      return accountInitPromise;
+    }
+    accountInitPromise = (async () => {
+      try {
+        const supabase = await ensurePixieedAccountClient();
+        if (!supabase) {
+          updatePixieedAccountUi();
+          return;
+        }
+        const { data } = await supabase.auth.getSession();
+        applyPixieedAccountSession(data?.session || null);
         if (accountState.isLoggedIn) {
           await syncPixieedAccountProfile();
           await syncSharedRecentProjectsFromAccount();
         } else {
           updatePixieedAccountUi();
         }
-      });
-    } catch (error) {
-      console.warn('Pixieed account init failed', error);
-      updatePixieedAccountUi();
-    }
+        if (!accountAuthListenerBound) {
+          accountAuthListenerBound = true;
+          supabase.auth.onAuthStateChange(async (_event, session) => {
+            applyPixieedAccountSession(session || null);
+            if (accountState.isLoggedIn) {
+              await syncPixieedAccountProfile();
+              await syncSharedRecentProjectsFromAccount();
+            } else {
+              updatePixieedAccountUi();
+            }
+          });
+        }
+      } catch (error) {
+        console.warn('Pixieed account init failed', error);
+        updatePixieedAccountUi();
+      } finally {
+        accountInitPromise = null;
+      }
+    })();
+    return accountInitPromise;
   }
 
   function getLocalMultiParticipantName() {
@@ -59760,6 +59773,7 @@
       dom.controls.multiStartSession.dataset.bound = 'true';
       dom.controls.multiStartSession.addEventListener('click', async () => {
         if (prefersSharedProjectFlow()) {
+          await initPixieedAccount();
           if (!canUseSharedProjectsBackend()) {
             setMultiStatus(localizeText('共有モードを使うにはログインが必要です', 'Sign in to use shared mode'), 'warn');
             openLoginPromptDialog();
