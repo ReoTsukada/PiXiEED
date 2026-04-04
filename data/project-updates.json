@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-04T17:19:21.983Z",
+  "generatedAt": "2026-04-04T17:19:25.145Z",
   "projects": [
     {
       "id": "site",
@@ -62,6 +62,12 @@
       "url": "/projects/pixiedraw/",
       "entries": [
         {
+          "date": "2026-04-05",
+          "items": [
+            "機能を更新"
+          ]
+        },
+        {
           "date": "2026-04-04",
           "items": [
             "機能 / スタイル / 画面を更新"
@@ -101,12 +107,6 @@
           "date": "2026-03-15",
           "items": [
             "画面 / 機能 / スタイルを更新"
-          ]
-        },
-        {
-          "date": "2026-03-14",
-          "items": [
-            "ドキュメント / 画面 / 機能 / スタイルを更新"
           ]
         }
       ]
@@ -444,6 +444,17 @@
   ],
   "recentByDate": [
     {
+      "date": "2026-04-05",
+      "updates": [
+        {
+          "id": "pixiedraw",
+          "name": "PiXiEEDraw",
+          "url": "/projects/pixiedraw/",
+          "summary": "機能を更新"
+        }
+      ]
+    },
+    {
       "date": "2026-04-04",
       "updates": [
         {
@@ -660,23 +671,6 @@
           "id": "maoitu",
           "name": "魔王様!!いつまでよければいいですか!?",
           "url": "/projects/maoitu/",
-          "summary": "画面を更新"
-        }
-      ]
-    },
-    {
-      "date": "2026-03-14",
-      "updates": [
-        {
-          "id": "pixiedraw",
-          "name": "PiXiEEDraw",
-          "url": "/projects/pixiedraw/",
-          "summary": "ドキュメント / 画面 / 機能 / スタイルを更新"
-        },
-        {
-          "id": "maou-war",
-          "name": "魔王奪還戦",
-          "url": "/projects/maou-war/",
           "summary": "画面を更新"
         }
       ]
