@@ -11800,7 +11800,7 @@
     setLocalizedTextContent('#multiInviteShare', '招待を共有', 'Share Invite');
     setLocalizedTextContent('#multiRequestGuestRole', 'そのまま編集できます', 'Edit Immediately');
     setLocalizedTextContent('#multiJoinRequestHint', '共有リンクを開いた人は、そのまま編集できます。', 'Anyone who opens the invite link can edit immediately.');
-    setLocalizedTextContent('#multiStatus', '共有プロジェクト: 未選択', 'Shared project: none');
+    setLocalizedTextContent('#multiStatus', '共有モード: OFF', 'Shared mode: OFF');
     setLocalizedTextContent('#multiFlowTabCollabLabel', '共同', 'Collab');
     setLocalizedTextContent('#multiFlowTabCommentsLabel', 'コメント', 'Comments');
     setLocalizedTextContent('#multiOverviewSummary', '共有リンクで開いたプロジェクトを、そのまま共同編集できます。', 'Projects opened from invite links can be edited together immediately.');
@@ -17618,11 +17618,12 @@
     const requestedSharedProjectKey = normalizeMultiProjectKey(options?.sharedProjectKey || '');
     const requestedSharedProjectRevision = Math.max(0, Math.round(Number(options?.sharedProjectRevision) || 0));
     const activeEntryAfterLoad = recentProjectsCache.get(normalizeAutosaveProjectId(requestedProjectId || '')) || null;
+    const requestedSharedProjectId = requestedProjectId.startsWith(SHARED_PROJECT_ID_PREFIX);
     const derivedSharedProjectKey = requestedSharedProjectKey
-      || (isSharedRecentProjectEntry(activeEntryAfterLoad)
+      || (requestedSharedProjectId && isSharedRecentProjectEntry(activeEntryAfterLoad)
         ? normalizeMultiProjectKey(activeEntryAfterLoad.sharedProjectKey || '')
         : '');
-    if (derivedSharedProjectKey || requestedProjectId.startsWith(SHARED_PROJECT_ID_PREFIX)) {
+    if (derivedSharedProjectKey || requestedSharedProjectId) {
       setActiveSharedProjectSession(
         derivedSharedProjectKey,
         requestedSharedProjectRevision
@@ -53800,6 +53801,7 @@
       chips.innerHTML = '';
     }
 
+    const resolvedSharedProjectKey = resolveSharedProjectKeyForCurrentState();
     let summaryText = localizeText(
       '共有を作るか、共有リンクを貼り付けて同じプロジェクトを開いてください。',
       'Create shared or paste an invite link to open the same project.'
@@ -53815,7 +53817,7 @@
       }
     };
 
-    if (prefersSharedProjectFlow() && !activeSharedProjectKey && !multiState.connecting) {
+    if (prefersSharedProjectFlow() && !resolvedSharedProjectKey && !multiState.connecting) {
       pushChip(localizeText('共有モードOFF', 'Shared Mode Off'), 'neutral');
       summaryText = localizeText(
         '共有モードはOFFです。ONにするとこのプロジェクトを共有できます。',
@@ -53837,7 +53839,7 @@
         '共有リンクとプロジェクト一覧の両方から同じプロジェクトを開けます。',
         'The same project can be reopened from either the invite link or your project list.'
       );
-    } else if (isSharedProjectCollaborativeMode()) {
+    } else if (resolvedSharedProjectKey || isSharedProjectCollaborativeMode()) {
       pushChip(localizeText('共有プロジェクト', 'Shared Project'), 'success');
       pushChip(localizeText('全員編集可', 'Collaborative Edit'), 'info');
       summaryText = localizeText(
@@ -53947,9 +53949,10 @@
       ? message.trim()
       : localizeText('共有モード: OFF', 'Collab mode: OFF');
     if (prefersSharedProjectFlow()) {
+      const resolvedSharedProjectKey = resolveSharedProjectKeyForCurrentState();
       if (multiState.connecting) {
         text = localizeText('共有モード: 準備中…', 'Shared mode: preparing…');
-      } else if (activeSharedProjectKey || isSharedProjectCollaborativeMode()) {
+      } else if (resolvedSharedProjectKey || isSharedProjectCollaborativeMode()) {
         text = localizeText('共有モード: ON', 'Shared mode: ON');
       } else {
         text = localizeText('共有モード: OFF', 'Shared mode: OFF');
