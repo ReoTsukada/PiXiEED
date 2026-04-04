@@ -50956,6 +50956,35 @@
       supportsSharedProjectsBackend = false;
       disconnectActiveSharedProjectRealtimeChannel().catch(() => {});
     }
+    const status = Number(error?.status || 0);
+    const message = String(error?.message || '');
+    if (accountState.isLoggedIn) {
+      if (shouldDisableSharedProjectsBackend(error)) {
+        setMultiStatus(
+          localizeText(
+            '共有機能の本番データベースが未反映です。shared project の移行が本番に入っていません。',
+            'Shared mode is not available yet because the production database is missing the shared project migration.'
+          ),
+          'error'
+        );
+      } else if (status >= 500) {
+        setMultiStatus(
+          localizeText(
+            '共有機能のサーバー側でエラーが発生しています。時間をおいて再試行してください。',
+            'The shared project backend returned a server error. Please try again later.'
+          ),
+          'error'
+        );
+      } else if (message) {
+        setMultiStatus(
+          localizeText(
+            `共有機能エラー: ${message}`,
+            `Shared mode error: ${message}`
+          ),
+          'error'
+        );
+      }
+    }
     if (context) {
       console.warn(`Shared project backend error (${context})`, error);
     } else {
