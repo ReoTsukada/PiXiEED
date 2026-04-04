@@ -1,0 +1,3 @@
+-- Applied directly on the remote database for owner-only PiXiEEDraw ad-free codes.
+-- The actual secret codes are intentionally not stored in git.
+-- This no-op migration keeps local migration history aligned with the remote project.
