@@ -457,6 +457,14 @@
       cancel: document.getElementById('globalHistoryConfirmCancel'),
       confirm: document.getElementById('globalHistoryConfirmConfirm'),
     },
+    shareStartConfirm: {
+      dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('shareStartConfirmDialog')),
+      title: document.getElementById('shareStartConfirmTitle'),
+      message: document.getElementById('shareStartConfirmMessage'),
+      detail: document.getElementById('shareStartConfirmDetail'),
+      cancel: document.getElementById('shareStartConfirmCancel'),
+      confirm: document.getElementById('shareStartConfirmConfirm'),
+    },
     toolSpotlight: {
       dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('toolSpotlightDialog')),
       list: document.querySelector('#toolSpotlightDialog .tool-spotlight-list'),
@@ -2445,6 +2453,8 @@
   const AUTOSAVE_DB_VERSION = 2;
   const AUTOSAVE_STORE_NAME = 'handles';
   const RECENT_PROJECTS_STORE = 'recentProjects';
+  const RECENT_PROJECT_STORAGE_LOCAL = 'local';
+  const RECENT_PROJECT_STORAGE_SHARED = 'shared';
   const AUTOSAVE_HANDLE_KEY = 'document';
   const AUTOSAVE_ACTIVE_PROJECT_KEY = 'activeProjectId';
   const AUTOSAVE_TAB_LOCK_KEY = 'pixieedraw:autosave-tab-lock-v1';
@@ -2484,8 +2494,11 @@
   const MULTI_DEFAULT_ROOM_VISIBILITY = MULTI_ROOM_VISIBILITY_PRIVATE;
   const MULTI_INVITE_QUERY_FLAG = 'multiInvite';
   const MULTI_INVITE_QUERY_KEY = 'multiKey';
+  const MULTI_INVITE_QUERY_TOKEN = 'multiInviteToken';
   const MULTI_INVITE_QUERY_AUTO_JOIN = 'multiAutoJoin';
   const MULTI_INVITE_QUERY_ROLE = 'multiRole';
+  const SHARED_PROJECT_ID_PREFIX = 'shared-';
+  const SHARED_PROJECT_SYNC_DELAY = 1400;
   const MULTI_GUEST_MOVE_PREVIEW_DEBOUNCE_MS = 140;
   const NEW_PROJECT_PALETTE_PRESET_NAMES = Object.freeze([
     'Pixel Core',
@@ -2660,6 +2673,23 @@
   const MULTI_SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
   const MULTI_CHANNEL_PREFIX = 'pixiedraw-room-';
   const MULTI_PUBLIC_LOBBY_CHANNEL = 'pixiedraw-public-rooms-v1';
+  const MULTI_BROADCAST_EVENT = Object.freeze({
+    HELLO: 'hello',
+    SYNC_REQUEST: 'sync-request',
+    SESSION_STATE: 'session-state',
+    MASTER_STATE_REQUEST: 'master-state-request',
+    GUEST_SESSION_STATE: 'guest-session-state',
+    GUEST_LAYER_PATCH: 'guest-layer-patch',
+    GUEST_PALETTE_UPDATE: 'guest-palette-update',
+    MASTER_LAYER_PATCH: 'master-layer-patch',
+    KICK_CLIENT: 'kick-client',
+    COMMENT: 'comment',
+    JOIN_REQUEST: 'join-request',
+    JOIN_REQUEST_RESULT: 'join-request-result',
+    ROLE_CHANGE: 'role-change',
+    ASSIGNMENT_MOVE_REQUEST: 'assignment-move-request',
+    ASSIGNMENT_MOVE_RESULT: 'assignment-move-result',
+  });
   const MULTI_PUBLIC_ROOM_SYNC_THROTTLE_MS = 2400;
   const MULTI_PUBLIC_ROOM_THUMBNAIL_MAX_EDGE = 96;
   const MULTI_PUBLIC_ROOM_THUMBNAIL_MAX_DATA_URL_LENGTH = 180000;
@@ -2794,6 +2824,7 @@
   let pixfindModeEnabled = false;
   let pixfindModeFirstEnableConfirmed = false;
   const multiState = {
+    // Connection/runtime
     supported: true,
     role: 'none',
     status: '未接続',
@@ -2806,28 +2837,38 @@
     connected: false,
     connecting: false,
     applyRemoteInProgress: false,
+
+    // Local UI-only state
     uiView: 'entry',
     activeTab: 'collab',
     desiredRole: 'master',
+    selectedAssignClientId: '',
+    selectedRoleControlClientId: '',
+    guestMovePreview: null,
+    guestMovePreviewTimer: null,
+    guestMovePreviewVersion: 0,
+
+    // Shared room config
     maxGuests: MULTI_DEFAULT_GUEST_LIMIT,
     roomVisibility: MULTI_DEFAULT_ROOM_VISIBILITY,
     joinPolicy: MULTI_DEFAULT_JOIN_POLICY,
     participantFreeCellMove: MULTI_DEFAULT_PARTICIPANT_FREE_CELL_MOVE,
     masterOpsMode: false,
     exportPermission: MULTI_DEFAULT_EXPORT_PERMISSION,
+
+    // Shared authoritative data
     assignments: new Map(),
     participants: new Map(),
     masterClientId: null,
     revision: 0,
+
+    // Deferred authoritative apply
     broadcastTimer: null,
     pendingBroadcastTargetClientId: '',
     pendingSessionStatePayload: null,
     pendingSessionStateTimer: null,
-    selectedAssignClientId: '',
-    selectedRoleControlClientId: '',
-    guestMovePreview: null,
-    guestMovePreviewTimer: null,
-    guestMovePreviewVersion: 0,
+
+    // Reconnect / resume recovery
     resumeAssignments: null,
     resumeBlockedClientIds: null,
     resumeMaxGuests: null,
@@ -2835,6 +2876,8 @@
     resumeJoinPolicy: null,
     resumeParticipantFreeCellMove: null,
     resumeExportPermission: null,
+
+    // Patch / resync transport bookkeeping
     layerPatchSnapshots: new Map(),
     layerPatchSendSequences: new Map(),
     layerPatchReceiveSequences: new Map(),
@@ -2846,6 +2889,8 @@
     guestLayerPatchTimer: null,
     guestLayerPatchInFlight: false,
     guestLayerPatchQueued: false,
+
+    // Presence / moderation / join flow
     blockedClientIds: new Set(),
     pendingJoinRequests: new Map(),
     pendingAssignmentMoveRequests: new Map(),
@@ -2855,14 +2900,22 @@
     lastVersionMismatch: '',
     versionMismatchAt: 0,
     peerBuildVersions: new Map(),
+
+    // Replica-to-master recovery
     awaitingGuestStateRecovery: false,
     guestStateRecoveryTimer: null,
     guestRecoveryPushAt: 0,
     guestRecoveryTargetClientId: '',
+
+    // Shared social data
     comments: [],
     commentIds: new Set(),
+
+    // Local restore state for guest/spectator join/leave
     localSnapshotBeforeReplica: null,
     localUnsavedBeforeReplica: false,
+
+    // Public room/lobby sync
     publicLobbyChannel: null,
     publicLobbySyncTimer: null,
     publicLobbySyncInFlight: false,
@@ -2883,6 +2936,20 @@
   let accountSupabaseInitPromise = null;
   let accountProfileSyncPromise = null;
   let supportsPixieedProfileXUrl = true;
+  let supportsSharedProjectsBackend = true;
+  let sharedProjectSyncTimer = null;
+  let sharedProjectSyncInFlight = false;
+  let sharedProjectSyncQueuedPayload = null;
+  let sharedProjectCaptureTimer = null;
+  let activeSharedProjectId = '';
+  let activeSharedProjectKey = '';
+  let activeSharedProjectRevision = 0;
+  let activeSharedProjectStructureRevision = 0;
+  const sharedProjectLayerSnapshots = new Map();
+  let activeSharedProjectChannel = null;
+  let activeSharedProjectChannelKey = '';
+  let sharedProjectRefreshTimer = null;
+  let sharedProjectRefreshInFlight = false;
   let multiSupabaseClientPromise = null;
 
   const RAIL_DEFAULT_WIDTH = Object.freeze({ left: 78, right: 78 });
@@ -3480,6 +3547,17 @@
   ]);
   const MULTI_LAYER_PATCH_HISTORY_LABELS = new Set(MULTI_SCOPED_HISTORY_LABELS);
   const MULTI_PALETTE_HISTORY_LABELS = new Set(['paletteAdd', 'paletteRemove', 'paletteReorder', 'paletteColor', 'paletteApplyPreset']);
+  const SHARED_PROJECT_STRUCTURE_HISTORY_LABELS = new Set([
+    'addLayer',
+    'addSimulationLayer',
+    'duplicateLayer',
+    'pasteLayer',
+    'removeLayer',
+    'duplicateFrame',
+    'pasteFrame',
+    'removeFrame',
+    'resizeCanvas',
+  ]);
   const globalHistoryConfirmState = {
     resolve: null,
     closing: false,
@@ -7646,6 +7724,12 @@
 
   function markDocumentUnsavedChange() {
     unsavedChangeToken += 1;
+    if (activeSharedProjectKey && !autosaveRestoring && !multiState.applyRemoteInProgress) {
+      queueSharedProjectCurrentSnapshotCapture({
+        delayMs: Math.max(220, Math.round(SHARED_PROJECT_SYNC_DELAY / 2)),
+        projectKey: activeSharedProjectKey,
+      });
+    }
   }
 
   function markDocumentDurablySaved() {
@@ -7659,6 +7743,40 @@
 
   function hasDocumentUnsavedChanges() {
     return unsavedChangeToken > durableSaveToken;
+  }
+
+  function clearActiveSharedProjectSession() {
+    activeSharedProjectId = '';
+    activeSharedProjectKey = '';
+    activeSharedProjectRevision = 0;
+    activeSharedProjectStructureRevision = 0;
+    sharedProjectLayerSnapshots.clear();
+    if (sharedProjectCaptureTimer !== null) {
+      window.clearTimeout(sharedProjectCaptureTimer);
+      sharedProjectCaptureTimer = null;
+    }
+    if (sharedProjectRefreshTimer !== null) {
+      window.clearTimeout(sharedProjectRefreshTimer);
+      sharedProjectRefreshTimer = null;
+    }
+    disconnectActiveSharedProjectRealtimeChannel().catch(error => {
+      console.warn('Failed to disconnect shared project realtime channel', error);
+    });
+  }
+
+  function setActiveSharedProjectSession(projectKey = '', revision = 0, structureRevision = 0, projectId = '') {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey);
+    if (!normalizedProjectKey) {
+      clearActiveSharedProjectSession();
+      return;
+    }
+    activeSharedProjectId = typeof projectId === 'string' ? projectId.trim() : '';
+    activeSharedProjectKey = normalizedProjectKey;
+    activeSharedProjectRevision = Math.max(0, Math.round(Number(revision) || 0));
+    activeSharedProjectStructureRevision = Math.max(0, Math.round(Number(structureRevision) || 0));
+    ensureActiveSharedProjectRealtimeChannel().catch(error => {
+      console.warn('Failed to subscribe shared project realtime channel', error);
+    });
   }
 
   function markAutosaveDirty() {
@@ -7727,15 +7845,18 @@
   function handleMultiVisibilityChange() {
     if (document.visibilityState === 'visible') {
       requestMultiResync('visibility');
+      queueSharedProjectRefresh({ immediate: true, reason: 'visibility' });
     }
   }
 
   function handleMultiWindowFocus() {
     requestMultiResync('focus');
+    queueSharedProjectRefresh({ immediate: true, reason: 'focus' });
   }
 
   function handleMultiOnline() {
     requestMultiResync('online');
+    queueSharedProjectRefresh({ immediate: true, reason: 'online' });
   }
 
   function persistCriticalSessionStateForNavigation() {
@@ -8293,6 +8414,9 @@
 
   function peekGuardedHistoryActionLabel(action) {
     const normalizedAction = action === 'redo' ? 'redo' : 'undo';
+    if (isSharedProjectCollaborativeMode()) {
+      return null;
+    }
     if (!multiState.connected || !isMultiMasterMode()) {
       return null;
     }
@@ -8392,6 +8516,13 @@
         }
       }
       scheduleTimelapseCaptureFromState();
+      if (activeSharedProjectKey) {
+        queueSharedProjectCurrentSnapshotCapture({
+          delayMs: Math.max(120, Math.round(SHARED_PROJECT_SYNC_DELAY / 3)),
+          projectKey: activeSharedProjectKey,
+          historyLabel: pendingLabel,
+        });
+      }
       if (history.past.length > history.limit) {
         history.past.shift();
       }
@@ -8484,6 +8615,14 @@
     markAutosaveDirty();
     markDocumentUnsavedChange();
     scheduleAutosaveSnapshot();
+    if (isSharedProjectCollaborativeMode()) {
+      queueSharedProjectCurrentSnapshotCapture({
+        delayMs: 40,
+        projectKey: activeSharedProjectKey,
+        historyLabel,
+      });
+      return;
+    }
     if (multiState.connected && isMultiMasterMode()) {
       if (MULTI_LAYER_PATCH_HISTORY_LABELS.has(historyLabel)) {
         scheduleMasterLayerPatchSend({ immediate: true });
@@ -8573,6 +8712,14 @@
     markAutosaveDirty();
     markDocumentUnsavedChange();
     scheduleAutosaveSnapshot();
+    if (isSharedProjectCollaborativeMode()) {
+      queueSharedProjectCurrentSnapshotCapture({
+        delayMs: 40,
+        projectKey: activeSharedProjectKey,
+        historyLabel,
+      });
+      return;
+    }
     if (multiState.connected && isMultiMasterMode()) {
       if (MULTI_LAYER_PATCH_HISTORY_LABELS.has(historyLabel)) {
         scheduleMasterLayerPatchSend({ immediate: true });
@@ -8908,7 +9055,8 @@
 
     setRightTab('settings');
     if (isCompactRightRailMode()) {
-      setCompactRightFlyoutOpen(true);
+      setRailWidth('right', getRailExpandedToggleWidth('right'), { persist: true });
+      setCompactRightFlyoutOpen(false);
       updateRightTabVisibility();
     }
 
@@ -9195,15 +9343,21 @@
       }
       const toolsQuickPalette = toolsSection?.querySelector('.tool-quick-color');
       if (toolsQuickPalette instanceof HTMLElement) {
-        toolsQuickPalette.hidden = true;
-        toolsQuickPalette.setAttribute('aria-hidden', 'true');
+        const showQuickPalette = isMobile;
+        toolsQuickPalette.hidden = !showQuickPalette;
+        toolsQuickPalette.setAttribute('aria-hidden', String(!showQuickPalette));
       }
       if (colorSection) {
         colorSection.hidden = false;
         colorSection.setAttribute('aria-hidden', 'false');
         colorSection.classList.add('is-active');
+        const colorEditor = colorSection.querySelector('.palette-editor');
+        if (colorEditor instanceof HTMLElement) {
+          colorEditor.hidden = false;
+          colorEditor.setAttribute('aria-hidden', 'false');
+        }
       }
-      if (colorFocused || !isCompactToolRailMode()) {
+      if (!isCompactToolRailMode()) {
         setCompactToolFlyoutOpen(false);
       }
       syncLeftUnifiedSplitLayout();
@@ -9262,6 +9416,10 @@
 
   function isCompactRightFlyoutOpen() {
     return dom.rightRail instanceof HTMLElement && dom.rightRail.dataset.compactFlyoutOpen === 'true';
+  }
+
+  function shouldKeepRailPanelsPinned() {
+    return true;
   }
 
   function updateCompactFlyoutBackdropState() {
@@ -9438,16 +9596,18 @@
           return;
         }
         const compactMode = isCompactRightRailMode();
-        if (compactMode && state.activeRightTab === target) {
-          setCompactRightFlyoutOpen(!isCompactRightFlyoutOpen());
+        if (compactMode) {
+          setRailWidth('right', getRailExpandedToggleWidth('right'), { persist: true });
+          setCompactRightFlyoutOpen(false);
+          if (state.activeRightTab === target) {
+            updateRightTabVisibility();
+            return;
+          }
+          setRightTab(target);
           updateRightTabVisibility();
           return;
         }
         setRightTab(target);
-        if (compactMode) {
-          setCompactRightFlyoutOpen(true);
-          updateRightTabVisibility();
-        }
       });
     });
     if (!compactRightFlyoutDismissBound) {
@@ -9467,14 +9627,16 @@
         if (dom.rightRail instanceof HTMLElement && dom.rightRail.contains(target)) {
           return;
         }
-        setCompactRightFlyoutOpen(false);
-        updateRightTabVisibility();
+        if (!shouldKeepRailPanelsPinned()) {
+          setCompactRightFlyoutOpen(false);
+          updateRightTabVisibility();
+        }
       };
       document.addEventListener('pointerdown', dismissCompactRightFlyout, true);
       document.addEventListener('click', dismissCompactRightFlyout, true);
       document.addEventListener('touchstart', dismissCompactRightFlyout, { capture: true, passive: true });
       document.addEventListener('keydown', event => {
-        if (event.key !== 'Escape' || !isCompactRightFlyoutOpen()) {
+        if (event.key !== 'Escape' || !isCompactRightFlyoutOpen() || shouldKeepRailPanelsPinned()) {
           return;
         }
         setCompactRightFlyoutOpen(false);
@@ -9659,6 +9821,7 @@
           const hasSingleTool = targetTools.length === 1;
           const singleTool = hasSingleTool ? targetTools[0] : null;
           const mobilePeekMode = isMobilePeekToolFlyoutMode();
+          const desktopCompactMode = isCompactToolRailMode() && !mobilePeekMode && layoutMode !== 'mobilePortrait';
           const compactMode = isCompactToolRailMode() || mobilePeekMode;
           if (!compactMode) {
             setCompactToolFlyoutOpen(false);
@@ -9672,6 +9835,20 @@
             }
             return;
           }
+          if (desktopCompactMode) {
+            setRailWidth('left', getRailExpandedToggleWidth('left'), { persist: true });
+            setCompactToolFlyoutOpen(false);
+            setToolGroup(target);
+            if (singleTool) {
+              if (TOOL_ACTIONS.has(singleTool)) {
+                runToolAction(singleTool, { sourceButton: button });
+              } else {
+                setActiveTool(singleTool);
+              }
+            }
+            updateToolVisibility();
+            return;
+          }
           if (singleTool) {
             setToolGroup(target);
             if (TOOL_ACTIONS.has(singleTool)) {
@@ -9679,7 +9856,7 @@
             } else {
               setActiveTool(singleTool);
             }
-            setCompactToolFlyoutOpen(false, {
+            setCompactToolFlyoutOpen(true, {
               force: mobilePeekMode,
               keepMirrorPopover: singleTool === TOOL_ACTION_MIRROR_POPUP,
             });
@@ -9690,7 +9867,7 @@
           const isSameGroup = state.activeToolGroup === target;
           setToolGroup(target);
           if (isSameGroup && wasOpen) {
-            setCompactToolFlyoutOpen(false, { force: mobilePeekMode });
+            setCompactToolFlyoutOpen(true, { force: mobilePeekMode });
           } else {
             setCompactToolFlyoutOpen(true, { force: mobilePeekMode });
           }
@@ -9720,13 +9897,15 @@
           if (isMirrorToolPopoverOpen() && target instanceof Element && isMirrorPopoverPersistentTarget(target)) {
             return;
           }
-          setCompactToolFlyoutOpen(false);
-          updateToolVisibility();
+          if (!shouldKeepRailPanelsPinned()) {
+            setCompactToolFlyoutOpen(false);
+            updateToolVisibility();
+          }
         },
         true
       );
       document.addEventListener('keydown', event => {
-        if (event.key !== 'Escape' || !isCompactToolFlyoutOpen()) {
+        if (event.key !== 'Escape' || !isCompactToolFlyoutOpen() || shouldKeepRailPanelsPinned()) {
           return;
         }
         setCompactToolFlyoutOpen(false);
@@ -11275,7 +11454,8 @@
       setRightTab('help');
     }
     if (compactMode) {
-      setCompactRightFlyoutOpen(true);
+      setRailWidth('right', getRailExpandedToggleWidth('right'), { persist: true });
+      setCompactRightFlyoutOpen(false);
       updateRightTabVisibility();
     }
     window.requestAnimationFrame(() => {
@@ -11517,7 +11697,7 @@
     setLocalizedTextContent('#startupActionSkip', 'この画面を閉じる', 'Close');
     setLocalizedAttribute('#projectTabsBar', 'aria-label', '開いているプロジェクト', 'Open Projects');
     setLocalizedAttribute('#projectTabsList', 'aria-label', 'プロジェクトタブ', 'Project Tabs');
-    setLocalizedTextContent('#startupRecentProjects .startup-screen__recent-title', '端末内プロジェクト（自動保存）', 'Local Projects (Autosave)');
+    setLocalizedTextContent('#startupRecentProjects .startup-screen__recent-title', 'プロジェクト一覧', 'Projects');
     setLocalizedTextContent('#startupRecentAdContainer .export-ad__label', '広告', 'Ad');
     setLocalizedTextContent(
       '#startupScreenHint',
@@ -11588,44 +11768,47 @@
     setLocalizedSelectOption(dom.controls.layerBlendMode, 'difference', '差の絶対値', 'Difference');
     setLocalizedSelectOption(dom.controls.layerBlendMode, 'exclusion', '除外', 'Exclusion');
 
-    setLocalizedTextContent('#multiEntryMasterTitle', '部屋を開く', 'Open Room');
-    setLocalizedTextContent('#multiEntryMasterMeta', 'キー自動生成', 'Auto-create key');
-    setLocalizedTextContent('#multiEntryGuestTitle', '参加する', 'Join Room');
-    setLocalizedTextContent('#multiEntryGuestMeta', 'キー入力へ進む', 'Open key input');
-    setLocalizedTextContent('#multiEntryJoinAsGuestTitle', '参加申請して入る', 'Join and Request Access');
-    setLocalizedTextContent('#multiEntryJoinAsGuestMeta', 'まず視聴で入り、参加申請を送信', 'Enter as viewer first, then request access');
+    setLocalizedTextContent('#multiEntryMasterTitle', '共有', 'Share');
+    setLocalizedTextContent('#multiEntryMasterMeta', '空欄なら作成、リンクなら開く', 'Create if empty, open if link pasted');
+    setLocalizedTextContent('#multiEntryGuestTitle', '共有を開く', 'Open Shared');
+    setLocalizedTextContent('#multiEntryGuestMeta', '共有リンクを貼り付け', 'Paste invite link');
+    setLocalizedTextContent('#multiEntryJoinAsGuestTitle', '共有を開く', 'Open Shared Project');
+    setLocalizedTextContent('#multiEntryJoinAsGuestMeta', '共有プロジェクトをそのまま開く', 'Open the shared project directly');
     setLocalizedTextContent('#multiEntrySpectatorTitle', '視聴で入る', 'Join as Viewer');
     setLocalizedTextContent('#multiEntrySpectatorMeta', '見るだけで入室', 'View-only mode');
     setLocalizedTextContent('#multiEntryJoinBack', '戻る', 'Back');
-    setLocalizedTextContent('#multiEntryJoinHint', '描画したい場合は「参加申請して入る」を選びます。見るだけなら「視聴で入る」です。', 'Choose "Join and Request Access" if you want to draw. Choose viewer mode if you only want to watch.');
-    setLocalizedTextContent('#multiEntryHint', '部屋を開くとキーが発行されます。参加する場合はキー入力パネルへ進んでください。', 'A key is issued after opening a room. To join, open the key input panel.');
+    setLocalizedTextContent('#multiEntryJoinHint', '共有リンクを貼ってから上の「共有」を押すと、そのプロジェクトが自分の一覧にも追加されます。', 'Paste an invite link and press Share to add that project to your list.');
+    setLocalizedTextContent('#multiEntryHint', 'このまま「共有」を押すと共有プロジェクトを作成します。既存の共有を開く時はリンクを入力してください。', 'Press Share to create a shared project. Paste a link first if you want to open an existing one.');
+    setLocalizedTextContent('#multiJoinProjectKeyHint', '共有リンクはそのまま貼り付けできます。', 'You can paste the full invite link as is.');
     setLocalizedToggleLabel('multiDanmakuToggle', 'コメント弾幕', 'Comment Overlay');
     setLocalizedTextContent('#multiCommentSend', '送信', 'Send');
     setLocalizedTextContent('#multiLeaveSession', '切断', 'Disconnect');
-    setLocalizedControlLabel('multiJoinProjectKey', 'プロジェクトキー', 'Project Key');
-    setLocalizedControlLabel('multiProjectKey', 'プロジェクトキー', 'Project Key');
+    setLocalizedControlLabel('multiJoinProjectKey', '共有リンク / 招待コード', 'Invite Link / Code');
+    setLocalizedControlLabel('multiProjectKey', '共有リンク / 招待コード', 'Invite Link / Code');
+    setLocalizedTextContent('#multiProjectKeyFieldLabel', '共有リンク / 招待コード', 'Invite Link / Code');
+    setLocalizedTextContent('#multiProjectKeyFieldHint', '空欄のまま下の共有ボタンを押すと、新しい共有プロジェクトを作成します。', 'Press Share below with an empty field to create a new shared project.');
     setLocalizedTextContent('#multiCopyKey', 'コピー', 'Copy');
-    setLocalizedAttribute('#multiCopyKey', 'aria-label', 'プロジェクトキーをコピー', 'Copy project key');
-    setLocalizedAttribute('#multiCopyKey', 'title', 'プロジェクトキーをコピー', 'Copy project key');
-    setLocalizedTextContent('#panelMulti .multi-master-actions > span', '部屋管理', 'Room Controls');
+    setLocalizedAttribute('#multiCopyKey', 'aria-label', '共有リンクまたは共有IDをコピー', 'Copy invite link or shared ID');
+    setLocalizedAttribute('#multiCopyKey', 'title', '共有リンクまたは共有IDをコピー', 'Copy invite link or shared ID');
+    setLocalizedTextContent('#panelMulti .multi-master-actions > span', '共有', 'Share');
     setLocalizedTextContent('#multiBroadcastState', '全員に同期', 'Sync to All');
     setLocalizedTextContent('#multiBroadcastStateLabel', '再同期', 'Resync');
     setLocalizedTextContent('#multiBroadcastStateHint', '表示ずれや割り当て反映ずれが起きた時だけ使います。', 'Use this only when displays or assignment updates fall out of sync.');
-    setLocalizedTextContent('#multiInviteCopy', '招待リンクをコピー', 'Copy Invite Link');
+    setLocalizedTextContent('#multiInviteCopy', '共有URLをコピー', 'Copy Shared URL');
     setLocalizedTextContent('#multiInviteShare', '招待を共有', 'Share Invite');
-    setLocalizedTextContent('#multiRequestGuestRole', '参加リクエストを送信', 'Send Join Request');
-    setLocalizedTextContent('#multiJoinRequestHint', '参加はマスターの承認後に有効になります。', 'Joining becomes active after master approval.');
-    setLocalizedTextContent('#multiStatus', '共有モード: OFF', 'Collab mode: OFF');
+    setLocalizedTextContent('#multiRequestGuestRole', 'そのまま編集できます', 'Edit Immediately');
+    setLocalizedTextContent('#multiJoinRequestHint', '共有リンクを開いた人は、そのまま編集できます。', 'Anyone who opens the invite link can edit immediately.');
+    setLocalizedTextContent('#multiStatus', '共有プロジェクト: 未選択', 'Shared project: none');
     setLocalizedTextContent('#multiFlowTabCollabLabel', '共同', 'Collab');
     setLocalizedTextContent('#multiFlowTabCommentsLabel', 'コメント', 'Comments');
-    setLocalizedTextContent('#multiOverviewSummary', '接続状態に応じて、できることがここに表示されます。', 'What you can do appears here based on your connection state.');
-    setLocalizedTextContent('#multiOverviewHint', '参加者一覧から参加申請、承認、セル移動を操作できます。', 'Use the participant list for join requests, approval, and cell movement.');
+    setLocalizedTextContent('#multiOverviewSummary', '共有リンクで開いたプロジェクトを、そのまま共同編集できます。', 'Projects opened from invite links can be edited together immediately.');
+    setLocalizedTextContent('#multiOverviewHint', '描画はリアルタイム反映され、共有プロジェクトの最新状態が基準になります。', 'Drawing updates live, and the shared project snapshot stays the source of truth.');
     setLocalizedAttribute('#multiHelpToggle', 'aria-label', 'マルチ説明を表示', 'Show collab help');
     setLocalizedTextContent('#multiHelpPanel > span', 'マルチ説明', 'Collab Help');
-    setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(1)', '描画は参加者のみ、コメントは全員が利用できます。', 'Only participants can draw; everyone can comment.');
-    setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(2)', '参加者を選ぶと: 切替 / セル移動 / ロック / キック / BAN', 'Participant selected: switch / move cell / lock / kick / ban');
-    setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(3)', '視聴者を選ぶと: 切替のみ', 'Viewer selected: switch only');
-    setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(4)', '招待リンクはプロジェクトキー付きで参加画面を開きます。', 'Invite links open the join screen with project key.');
+    setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(1)', '共有リンクを開いた人は、そのまま同じプロジェクトを編集できます。', 'Anyone who opens the invite link can edit the same project immediately.');
+    setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(2)', '描画はリアルタイム反映され、構造変更は共有スナップショット基準で同期されます。', 'Drawing updates live, and structure changes sync from the shared snapshot.');
+    setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(3)', '共有プロジェクトは自分のプロジェクト一覧にも残るので、あとから開き直せます。', 'Shared projects stay in your project list so you can reopen them later.');
+    setLocalizedTextContent('#multiHelpPanel .help-text:nth-of-type(4)', '上の入力欄には共有リンクをそのまま貼り付けできます。', 'You can paste the full invite link directly into the field above.');
     setLocalizedTextContent('#multiHelpClose', '閉じる', 'Close');
     setLocalizedTextContent('#panelMulti .multi-participants-panel > summary', '参加者/視聴者一覧', 'Participants / Viewers');
     setLocalizedTextContent('#panelMulti .multi-master-advanced > summary', '部屋設定', 'Room Settings');
@@ -11644,7 +11827,7 @@
     setLocalizedTextContent('#multiJoinPolicyHint', '自動参加: 招待リンクは参加者入室になります。', 'Auto Join: invite link opens as participant join.');
     setLocalizedToggleLabel('multiParticipantFreeCellMove', '参加者が空きセルへ自由移動できるようにする', 'Allow participants to move to any free cell');
     setLocalizedTextContent('#multiParticipantFreeCellMoveHint', '同じセルへの同時参加はできません。', 'Two participants cannot use the same cell at the same time.');
-    setLocalizedTextContent('#panelMulti .multi-join-requests-field > span', '参加リクエスト', 'Join Requests');
+    setLocalizedTextContent('#panelMulti .multi-join-requests-field > span', '参加一覧', 'Participants');
     setLocalizedControlLabel('multiJoinRequestTarget', '対象', 'Target');
     setLocalizedTextContent('#multiJoinRequestApprove', '承認', 'Approve');
     setLocalizedTextContent('#multiJoinRequestReject', '却下', 'Reject');
@@ -11751,8 +11934,8 @@
     setLocalizedAttribute('#floatingMovePad [data-move-pad-dir="down"]', 'aria-label', '選択範囲を下へ移動', 'Move selection down');
     setLocalizedAttribute('#floatingPreviewPanel', 'aria-label', '小窓プレビュー', 'Floating Preview');
     setLocalizedTextContent('#floatingPreviewTitle', '小窓プレビュー', 'Floating Preview');
-    setLocalizedTextContent('#floatingPreviewPlay', '再生', 'Play');
-    setLocalizedTextContent('#floatingPreviewStop', '停止', 'Stop');
+    setLocalizedAttribute('#floatingPreviewPlay', 'aria-label', '再生', 'Play');
+    setLocalizedAttribute('#floatingPreviewStop', 'aria-label', '停止', 'Stop');
     setLocalizedAttribute('#floatingPreviewCanvas', 'aria-label', '小窓プレビューキャンバス', 'Floating preview canvas');
     setLocalizedAttribute('#floatingPreviewResize', 'aria-label', 'プレビューパネルのサイズを変更', 'Resize preview panel');
     setLocalizedAttribute('#canvasResizeHandleStart', 'aria-label', 'キャンバス左上をドラッグしてサイズ変更', 'Drag top-left corner to resize canvas');
@@ -13344,6 +13527,9 @@
     if (!entry || typeof entry !== 'object') {
       return false;
     }
+    if (isSharedRecentProjectEntry(entry)) {
+      return openRecentProject(entry, { hideStartup, silent: true });
+    }
     if (!ensureCurrentClientCanReplaceActiveProject()) {
       return false;
     }
@@ -14136,6 +14322,7 @@
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
     setTrackedProjectDotBaseline(snapshot, null);
+    centerProjectCanvasInViewport();
 
     autosaveHandle = null;
     pendingAutosaveHandle = null;
@@ -16079,6 +16266,9 @@
     }
     if (render) {
       if (previousIndex !== normalizedIndex) {
+        if (isVoxelExtensionModeEnabled()) {
+          syncVoxelExtensionPreviewFromSource({ updateViewport: false });
+        }
         renderFrameList();
         renderLayerList();
         requestRender();
@@ -16633,6 +16823,77 @@
     });
   }
 
+  function openShareStartConfirmDialog() {
+    return new Promise(resolve => {
+      const config = dom.shareStartConfirm;
+      const dialog = config?.dialog;
+      if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+        resolve(window.confirm(localizeText(
+          'このプロジェクトを共有しますか？ 共有を開始すると、このプロジェクトは継続して同期されます。',
+          'Share this project? Once sharing starts, this project will continue syncing.'
+        )));
+        return;
+      }
+      let settled = false;
+      const cleanup = result => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        config?.cancel?.removeEventListener('click', onCancel);
+        config?.confirm?.removeEventListener('click', onConfirm);
+        dialog.removeEventListener('cancel', onDialogCancel);
+        dialog.removeEventListener('close', onDialogClose);
+        resolve(result);
+      };
+      const onCancel = () => {
+        if (dialog.open) dialog.close();
+        cleanup(false);
+      };
+      const onConfirm = () => {
+        if (dialog.open) dialog.close();
+        cleanup(true);
+      };
+      const onDialogCancel = event => {
+        event.preventDefault();
+        if (dialog.open) dialog.close();
+        cleanup(false);
+      };
+      const onDialogClose = () => {
+        cleanup(dialog.returnValue === 'confirm');
+      };
+      config?.cancel?.addEventListener('click', onCancel, { once: true });
+      config?.confirm?.addEventListener('click', onConfirm, { once: true });
+      dialog.addEventListener('cancel', onDialogCancel, { once: true });
+      dialog.addEventListener('close', onDialogClose, { once: true });
+      dialog.showModal();
+      window.requestAnimationFrame(() => {
+        config?.confirm?.focus?.({ preventScroll: true });
+      });
+    });
+  }
+
+  function setupShareStartConfirmDialog() {
+    const dialog = dom.shareStartConfirm?.dialog;
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+      if (dialog) {
+        dialog.hidden = true;
+      }
+      return;
+    }
+    dom.shareStartConfirm?.cancel?.addEventListener('click', () => {
+      if (dialog.open) {
+        dialog.close();
+      }
+    });
+    dialog.addEventListener('cancel', event => {
+      event.preventDefault();
+      if (dialog.open) {
+        dialog.close();
+      }
+    });
+  }
+
   async function handleNewProjectSubmit() {
     const config = dom.newProject;
     if (config?.form && typeof config.form.reportValidity === 'function') {
@@ -16768,6 +17029,7 @@
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
     setTrackedProjectDotBaseline(snapshot, null);
+    centerProjectCanvasInViewport();
 
     autosaveHandle = null;
     pendingAutosaveHandle = null;
@@ -17341,9 +17603,28 @@
     resetExportScaleDefaults();
     syncPixfindSnapshotAfterDocumentReset();
     setTrackedProjectDotBaseline(snapshot, dotStats);
+    centerProjectCanvasInViewport();
 
     const requestedProjectId = normalizeAutosaveProjectId(options?.projectId || '');
     setActiveAutosaveProjectId(requestedProjectId || createAutosaveProjectId());
+    const requestedSharedProjectKey = normalizeMultiProjectKey(options?.sharedProjectKey || '');
+    const requestedSharedProjectRevision = Math.max(0, Math.round(Number(options?.sharedProjectRevision) || 0));
+    const activeEntryAfterLoad = recentProjectsCache.get(normalizeAutosaveProjectId(requestedProjectId || '')) || null;
+    const derivedSharedProjectKey = requestedSharedProjectKey
+      || (isSharedRecentProjectEntry(activeEntryAfterLoad)
+        ? normalizeMultiProjectKey(activeEntryAfterLoad.sharedProjectKey || '')
+        : '');
+    if (derivedSharedProjectKey || requestedProjectId.startsWith(SHARED_PROJECT_ID_PREFIX)) {
+      setActiveSharedProjectSession(
+        derivedSharedProjectKey,
+        requestedSharedProjectRevision
+        || Math.max(0, Math.round(Number(activeEntryAfterLoad?.sharedProjectRevision) || 0)),
+        Math.max(0, Math.round(Number(activeEntryAfterLoad?.sharedProjectStructureRevision) || 0)),
+        typeof activeEntryAfterLoad?.sharedProjectBackendId === 'string' ? activeEntryAfterLoad.sharedProjectBackendId : ''
+      );
+    } else {
+      clearActiveSharedProjectSession();
+    }
     markAutosaveDirty();
     scheduleSessionPersist();
     scheduleAutosaveSnapshot();
@@ -17621,6 +17902,104 @@
     }
     const trimmed = value.trim();
     return trimmed || '';
+  }
+
+  function normalizeRecentProjectStorageKind(value) {
+    return value === RECENT_PROJECT_STORAGE_SHARED
+      ? RECENT_PROJECT_STORAGE_SHARED
+      : RECENT_PROJECT_STORAGE_LOCAL;
+  }
+
+  function buildSharedRecentProjectId(projectKey) {
+    const normalizedKey = normalizeMultiProjectKey(projectKey);
+    return normalizedKey ? `${SHARED_PROJECT_ID_PREFIX}${normalizedKey}` : '';
+  }
+
+  function getRecentProjectStorageKind(entry) {
+    return normalizeRecentProjectStorageKind(entry?.storageKind);
+  }
+
+  function isSharedRecentProjectEntry(entry) {
+    return getRecentProjectStorageKind(entry) === RECENT_PROJECT_STORAGE_SHARED;
+  }
+
+  function normalizeSharedRecentProjectEntry(entry = {}) {
+    const projectKey = normalizeMultiProjectKey(entry.sharedProjectKey || entry.projectKey || '');
+    if (!projectKey) {
+      return null;
+    }
+    const id = normalizeAutosaveProjectId(entry.id || buildSharedRecentProjectId(projectKey));
+    if (!id) {
+      return null;
+    }
+    const roleHintSource = typeof entry.sharedRoleHint === 'string' ? entry.sharedRoleHint.trim() : '';
+    const sharedRoleHint = roleHintSource === 'master' || roleHintSource === 'guest'
+      ? roleHintSource
+      : 'guest';
+    const fileName = normalizeDocumentName(entry.fileName || entry.name || `${projectKey}.pixiedraw`);
+    const name = extractDocumentBaseName(entry.name || fileName || projectKey);
+    const updatedAt = Number.isFinite(Date.parse(entry.updatedAt || ''))
+      ? entry.updatedAt
+      : new Date().toISOString();
+    const sharedProjectRevision = Math.max(0, Math.round(Number(entry.sharedProjectRevision) || 0));
+    const sharedProjectStructureRevision = Math.max(0, Math.round(Number(entry.sharedProjectStructureRevision) || 0));
+    return {
+      id,
+      storageKind: RECENT_PROJECT_STORAGE_SHARED,
+      sharedProjectBackendId: typeof entry.sharedProjectBackendId === 'string' && entry.sharedProjectBackendId.trim()
+        ? entry.sharedProjectBackendId.trim()
+        : '',
+      sharedProjectId: typeof entry.sharedProjectId === 'string' && entry.sharedProjectId.trim()
+        ? entry.sharedProjectId.trim()
+        : id,
+      sharedProjectKey: projectKey,
+      sharedProjectInviteToken: typeof entry.sharedProjectInviteToken === 'string' && entry.sharedProjectInviteToken.trim()
+        ? entry.sharedProjectInviteToken.trim()
+        : '',
+      sharedProjectVisibility: typeof entry.sharedProjectVisibility === 'string' && entry.sharedProjectVisibility.trim()
+        ? entry.sharedProjectVisibility.trim()
+        : 'private',
+      sharedProjectRevision,
+      sharedProjectStructureRevision,
+      sharedRoleHint,
+      sharedAutoJoin: entry.sharedAutoJoin !== false,
+      name,
+      fileName,
+      updatedAt,
+      thumbnail: typeof entry.thumbnail === 'string' && entry.thumbnail.length > 0 ? entry.thumbnail : null,
+      project: null,
+    };
+  }
+
+  function resolveSharedProjectKeyForCurrentState(fallbackProjectKey = '') {
+    const normalizedFallback = normalizeMultiProjectKey(fallbackProjectKey || '');
+    if (normalizedFallback) {
+      return normalizedFallback;
+    }
+    const activeEntry = recentProjectsCache.get(normalizeAutosaveProjectId(autosaveProjectId || '')) || null;
+    if (isSharedRecentProjectEntry(activeEntry)) {
+      return normalizeMultiProjectKey(activeEntry.sharedProjectKey || '');
+    }
+    return normalizeMultiProjectKey(multiState.projectKey || readStoredMultiProjectKey() || '');
+  }
+
+  function getCurrentSharedRecentProjectEntry(projectKey = '') {
+    const resolvedProjectKey = resolveSharedProjectKeyForCurrentState(projectKey);
+    if (!resolvedProjectKey) {
+      return null;
+    }
+    const sharedProjectId = buildSharedRecentProjectId(resolvedProjectKey);
+    return normalizeSharedRecentProjectEntry(recentProjectsCache.get(sharedProjectId) || {
+      id: sharedProjectId,
+      sharedProjectBackendId: '',
+      sharedProjectKey: resolvedProjectKey,
+      sharedProjectInviteToken: '',
+      sharedProjectVisibility: 'private',
+      sharedProjectRevision: activeSharedProjectKey === resolvedProjectKey ? activeSharedProjectRevision : 0,
+      name: extractDocumentBaseName(state.documentName || DEFAULT_DOCUMENT_NAME),
+      sharedRoleHint: normalizeMultiDesiredRole(multiState.role || multiState.desiredRole || 'spectator'),
+      sharedAutoJoin: false,
+    });
   }
 
   function createAutosaveProjectId() {
@@ -17975,6 +18354,23 @@
         continue;
       }
 
+      if (isSharedRecentProjectEntry(original)) {
+        const normalizedShared = normalizeSharedRecentProjectEntry({ ...original, id: normalizedId });
+        if (!normalizedShared) {
+          changed = true;
+          removedCount += 1;
+          continue;
+        }
+        const sharedChanged = JSON.stringify(normalizedShared) !== JSON.stringify(original);
+        seenIds.add(normalizedId);
+        if (sharedChanged) {
+          changed = true;
+          repairedCount += 1;
+        }
+        sanitizedEntries.push(normalizedShared);
+        continue;
+      }
+
       const hasProjectPayload = Boolean(original.project && typeof original.project === 'object');
       if (!hasProjectPayload) {
         changed = true;
@@ -18082,6 +18478,49 @@
     return true;
   }
 
+  async function upsertSharedRecentProjectEntry({
+    projectKey = '',
+    name = '',
+    roleHint = 'guest',
+    autoJoin = false,
+    revision = 0,
+    structureRevision = 0,
+    inviteToken = '',
+    visibility = 'private',
+    projectId = '',
+  } = {}) {
+    if (!AUTOSAVE_SUPPORTED) {
+      return null;
+    }
+    const normalizedEntry = normalizeSharedRecentProjectEntry({
+      sharedProjectKey: projectKey,
+      sharedProjectBackendId: projectId || '',
+      sharedProjectId: projectId || buildSharedRecentProjectId(projectKey),
+      sharedProjectInviteToken: inviteToken,
+      sharedProjectVisibility: visibility,
+      name: name || extractDocumentBaseName(state.documentName || DEFAULT_DOCUMENT_NAME),
+      sharedRoleHint: roleHint,
+      sharedAutoJoin: autoJoin,
+      sharedProjectRevision: Math.max(0, Math.round(Number(revision) || 0)),
+      sharedProjectStructureRevision: Math.max(0, Math.round(Number(structureRevision) || 0)),
+      updatedAt: new Date().toISOString(),
+    });
+    if (!normalizedEntry) {
+      return null;
+    }
+    const existingEntries = await loadRecentProjectsMetadata();
+    const previousEntry = existingEntries.find(entry => entry?.id === normalizedEntry.id) || null;
+    const workingEntries = existingEntries.filter(entry => entry && entry.id && entry.id !== normalizedEntry.id);
+    workingEntries.unshift({
+      ...(previousEntry || {}),
+      ...normalizedEntry,
+    });
+    const limited = workingEntries.slice(0, RECENT_PROJECT_LIMIT);
+    await saveRecentProjectsList(existingEntries, limited);
+    setRecentProjectsCache(limited);
+    return normalizedEntry;
+  }
+
   function setRecentProjectsCache(entries) {
     recentProjectsCache.clear();
     if (Array.isArray(entries)) {
@@ -18144,10 +18583,12 @@
       if (!entry || !entry.id) {
         return;
       }
+      const isSharedEntry = isSharedRecentProjectEntry(entry);
       const displayLabel = extractDocumentBaseName(entry.fileName || entry.name || DEFAULT_DOCUMENT_NAME);
       const card = document.createElement('article');
       card.className = 'startup-recent-card';
       card.dataset.projectId = entry.id;
+      card.dataset.projectStorageKind = getRecentProjectStorageKind(entry);
       card.setAttribute('role', 'listitem');
       const openButton = document.createElement('button');
       openButton.type = 'button';
@@ -18178,16 +18619,26 @@
       const metaNode = document.createElement('span');
       metaNode.className = 'startup-recent-card__meta';
       const updatedAt = Date.parse(entry.updatedAt || '');
-      metaNode.textContent = Number.isFinite(updatedAt)
+      const updatedLabel = Number.isFinite(updatedAt)
         ? formatUpdateHistoryDate(updatedAt, localizeText('保存時刻不明', 'Saved time unavailable'))
         : localizeText('保存時刻不明', 'Saved time unavailable');
+      metaNode.textContent = isSharedEntry
+        ? localizeText(`共有プロジェクト / ${updatedLabel}`, `Shared Project / ${updatedLabel}`)
+        : updatedLabel;
       const deleteButton = document.createElement('button');
       deleteButton.type = 'button';
       deleteButton.className = 'startup-recent-card__delete';
       deleteButton.dataset.startupRecentDeleteId = entry.id;
       deleteButton.textContent = '×';
-      deleteButton.title = localizeText('端末内プロジェクトを削除', 'Delete local project');
-      deleteButton.setAttribute('aria-label', localizeText(`${displayLabel} を削除`, `Delete ${displayLabel}`));
+      deleteButton.title = isSharedEntry
+        ? localizeText('共有プロジェクト一覧から外す', 'Remove shared project from list')
+        : localizeText('端末内プロジェクトを削除', 'Delete local project');
+      deleteButton.setAttribute(
+        'aria-label',
+        isSharedEntry
+          ? localizeText(`${displayLabel} を一覧から外す`, `Remove ${displayLabel} from list`)
+          : localizeText(`${displayLabel} を削除`, `Delete ${displayLabel}`)
+      );
       openButton.appendChild(thumb);
       openButton.appendChild(nameNode);
       openButton.appendChild(metaNode);
@@ -18578,14 +19029,29 @@
         ? (await generateSnapshotThumbnail(snapshot))
         : previousEntry.thumbnail;
       const dotStats = resolvePackagedProjectDotStats(packaged, snapshot);
-      const updatedEntry = {
-        id: resolvedProjectId,
-        name: displayName,
-        fileName,
-        updatedAt: packaged.updatedAt || new Date().toISOString(),
-        thumbnail: thumbnail || null,
-        project: packaged,
-      };
+      const sharedEntrySeed = isSharedRecentProjectEntry(previousEntry)
+        ? previousEntry
+        : (resolvedProjectId.startsWith(SHARED_PROJECT_ID_PREFIX) ? getCurrentSharedRecentProjectEntry() : null);
+      const updatedEntry = sharedEntrySeed
+        ? {
+            ...normalizeSharedRecentProjectEntry({
+              ...sharedEntrySeed,
+              id: resolvedProjectId,
+              name: displayName,
+              fileName,
+              updatedAt: packaged.updatedAt || new Date().toISOString(),
+              thumbnail: thumbnail || null,
+            }),
+            project: null,
+          }
+        : {
+            id: resolvedProjectId,
+            name: displayName,
+            fileName,
+            updatedAt: packaged.updatedAt || new Date().toISOString(),
+            thumbnail: thumbnail || null,
+            project: packaged,
+          };
       if (dotStats) {
         updatedEntry.dotStats = dotStats;
       }
@@ -18593,6 +19059,12 @@
       const limited = workingEntries.slice(0, RECENT_PROJECT_LIMIT);
       await saveRecentProjectsList(existingEntries, limited);
       setRecentProjectsCache(limited);
+      if (sharedEntrySeed && hasDocumentUnsavedChanges()) {
+        queueSharedProjectSnapshotPersist(packaged, {
+          projectKey: sharedEntrySeed.sharedProjectKey,
+          title: displayName,
+        });
+      }
       if (dotStats) {
         setTrackedProjectDotBaseline(snapshot, dotStats);
         schedulePackagedProjectDotSync(resolvedProjectId, dotStats);
@@ -18602,6 +19074,73 @@
       console.warn('Failed to record recent project snapshot', error);
       return null;
     }
+  }
+
+  async function openSharedRecentProject(entry, { hideStartup = true, silent = false } = {}) {
+    const normalizedEntry = normalizeSharedRecentProjectEntry(entry);
+    if (!normalizedEntry) {
+      return false;
+    }
+    const requestedRole = normalizedEntry.sharedRoleHint || 'guest';
+    if (canUseSharedProjectsBackend()) {
+      const sharedProject = await loadSharedProjectSnapshotRecord(normalizedEntry.sharedProjectKey, {
+        createIfMissing: requestedRole === 'master',
+        title: normalizedEntry.name,
+      });
+      const sharedSnapshot = sharedProject?.latest_snapshot;
+      if (sharedSnapshot && typeof sharedSnapshot === 'object') {
+        const loaded = await loadDocumentFromText(JSON.stringify(sharedSnapshot), null, {
+          projectId: normalizedEntry.sharedProjectId || normalizedEntry.id,
+          suppressAutosaveStatus: true,
+          openedFromRecent: true,
+          preserveDotStats: true,
+          sharedProjectKey: normalizedEntry.sharedProjectKey,
+          sharedProjectRevision: Math.max(0, Math.round(Number(sharedProject?.latest_revision) || 0)),
+        });
+        if (loaded) {
+          normalizedEntry.name = createSharedProjectSnapshotTitle(sharedProject?.title || normalizedEntry.name);
+          normalizedEntry.fileName = normalizeDocumentName(`${normalizedEntry.name || normalizedEntry.sharedProjectKey}.pixiedraw`);
+          normalizedEntry.sharedProjectRevision = Math.max(0, Math.round(Number(sharedProject?.latest_revision) || 0));
+        }
+      }
+    }
+    multiAutoResumeAttempted = true;
+    clearStoredMultiResumeSession();
+    storeMultiProjectKey(normalizedEntry.sharedProjectKey);
+    syncMultiProjectKeyInputValues(normalizedEntry.sharedProjectKey, { preserveFocused: false });
+    setMultiDesiredRole(requestedRole);
+    setMultiUiView(requestedRole);
+    multiEntryJoinPanelOpen = false;
+    syncMultiControls();
+    await upsertSharedRecentProjectEntry({
+      projectKey: normalizedEntry.sharedProjectKey,
+      name: normalizedEntry.name,
+      roleHint: requestedRole,
+      autoJoin: normalizedEntry.sharedAutoJoin !== false,
+      revision: normalizedEntry.sharedProjectRevision,
+    });
+    setActiveSharedProjectSession(
+      normalizedEntry.sharedProjectKey,
+      normalizedEntry.sharedProjectRevision,
+      Math.max(0, Math.round(Number(normalizedEntry.sharedProjectStructureRevision) || 0)),
+      normalizedEntry.sharedProjectBackendId || ''
+    );
+    if (normalizedEntry.sharedAutoJoin !== false) {
+      await connectMultiSessionAs(requestedRole, { allowGuestJoin: requestedRole === 'guest' });
+    }
+    if (!silent) {
+      setMultiStatus(
+        localizeText(
+          '共有プロジェクトを開きました',
+          'Opened shared project'
+        ),
+        'success'
+      );
+    }
+    if (hideStartup) {
+      hideStartupScreen();
+    }
+    return true;
   }
 
   async function openRecentProject(entry, options = {}) {
@@ -18614,6 +19153,12 @@
       return false;
     }
     try {
+      if (isSharedRecentProjectEntry(entry)) {
+        return await openSharedRecentProject(entry, {
+          hideStartup: hideStartupOnSuccess,
+          silent,
+        });
+      }
       if (entry.project && typeof entry.project === 'object') {
         const loaded = await loadDocumentFromText(JSON.stringify(entry.project), null, {
           projectId: entry.id || '',
@@ -20229,6 +20774,13 @@
 
   function buildExportFrameSet() {
     if (isVoxelExtensionModeEnabled()) {
+      const voxelPreviewSet = buildVoxelPreviewAnimationFrameSet();
+      if (voxelPreviewSet?.frameCount) {
+        return {
+          ...voxelPreviewSet,
+          isVoxelComposite: true,
+        };
+      }
       const previewCanvasDoc = getProjectCanvasDocumentById(voxelExtensionState.previewCanvasId);
       const frameCount = Math.max(
         Array.isArray(state.frames) ? state.frames.length : 0,
@@ -23896,6 +24448,17 @@
     }
   }
 
+  function centerProjectCanvasInViewport({ persist = false } = {}) {
+    state.pan.x = 0;
+    state.pan.y = 0;
+    requestLocalViewportCanvasLayoutReset({ clearStored: true });
+    syncLocalViewportCanvasDockLayout();
+    applyViewportTransform();
+    if (persist) {
+      scheduleSessionPersist({ includeSnapshots: false });
+    }
+  }
+
   function applyViewportTransform() {
     if (!(dom.viewportWorkspace instanceof HTMLElement)) return;
     clampPanToViewportAtMinZoom();
@@ -24281,6 +24844,7 @@
     setupLoginPromptDialog();
     setupUpdateHistoryDialog();
     setupToolSpotlightDialog();
+    setupShareStartConfirmDialog();
     setupHelpPanel();
     setupTools();
     setupToolGroups();
@@ -24507,6 +25071,7 @@
     if (side !== 'left' && side !== 'right') {
       return;
     }
+    const wasCompactLeftRail = side === 'left' ? isCompactToolRailMode() : false;
     const wasCompactRightRail = side === 'right' ? isCompactRightRailMode() : false;
     const normalized = normalizeRailWidth(side, width);
     railSizing[side] = normalized;
@@ -24518,6 +25083,10 @@
     }
     updateRailCompactState(side);
     if (side === 'left') {
+      const isCompactLeftRail = isCompactToolRailMode();
+      if (isCompactLeftRail && !wasCompactLeftRail) {
+        setCompactToolFlyoutOpen(false);
+      }
       syncLeftDualRailLayout();
       if (!isCompactToolRailMode()) {
         setCompactToolFlyoutOpen(false);
@@ -24525,9 +25094,8 @@
       updateToolVisibility();
     } else {
       const isCompactRightRail = isCompactRightRailMode();
-      if (isCompactRightRail && !wasCompactRightRail && state.activeRightTab !== 'frames') {
-        // Keep non-default right tabs (settings/file/multi) visible after responsive compact transition.
-        setCompactRightFlyoutOpen(true);
+      if (isCompactRightRail && !wasCompactRightRail) {
+        setCompactRightFlyoutOpen(false);
       }
       if (!isCompactRightRail && isCompactRightFlyoutOpen()) {
         setCompactRightFlyoutOpen(false);
@@ -24574,13 +25142,11 @@
       return;
     }
     if (side === 'left') {
-      if (state.activeLeftTab === 'tools' || isUnifiedLeftToolsColorMode() || isDualLeftRailEnabled()) {
-        setCompactToolFlyoutOpen(!isCompactToolFlyoutOpen(), { force: true });
-        updateToolVisibility();
-      }
+      setCompactToolFlyoutOpen(false);
+      updateToolVisibility();
       return;
     }
-    setCompactRightFlyoutOpen(!isCompactRightFlyoutOpen());
+    setCompactRightFlyoutOpen(false);
     updateRightTabVisibility();
   }
 
@@ -25449,6 +26015,25 @@
     }
   }
 
+  function getVisibleMobileBottomAdHeight() {
+    if (typeof document === 'undefined' || typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') {
+      return 0;
+    }
+    const mobileBottomAd = document.getElementById('mobileBottomAd');
+    if (!(mobileBottomAd instanceof HTMLElement)) {
+      return 0;
+    }
+    const adStyle = window.getComputedStyle(mobileBottomAd);
+    const adRect = mobileBottomAd.getBoundingClientRect();
+    const adVisible =
+      adStyle.display !== 'none'
+      && adStyle.visibility !== 'hidden'
+      && adRect.height > 0
+      && adRect.bottom > 0
+      && adRect.top < window.innerHeight;
+    return adVisible ? Math.round(adRect.height) : 0;
+  }
+
   function updateAdaptiveMobileLayoutVars() {
     const root = document.documentElement;
     if (!(root instanceof HTMLElement)) {
@@ -25461,6 +26046,7 @@
       root.style.removeProperty('--mobile-drawer-peek-height');
       root.style.removeProperty('--mobile-drawer-half-height');
       root.style.removeProperty('--mobile-drawer-full-height');
+      root.style.removeProperty('--mobile-bottom-ad-height');
       return;
     }
     const { width, height } = getViewportSize();
@@ -25470,10 +26056,36 @@
       portrait ? 84 : 72,
       portrait ? 124 : 102
     );
+    const rootStyles = window.getComputedStyle(root);
+    const tileSize = Math.max(
+      40,
+      Math.round(Number.parseFloat(rootStyles.getPropertyValue('--ui-control-tile-size')) || 44)
+    );
+    const handleHeight = Math.max(
+      8,
+      Math.round(Number.parseFloat(rootStyles.getPropertyValue('--mobile-drawer-handle-height')) || 12)
+    );
+    const panelGap = Math.max(
+      0,
+      Math.round(Number.parseFloat(rootStyles.getPropertyValue('--mobile-drawer-panel-gap')) || 0)
+    );
+    const safeBottom = Math.max(
+      0,
+      Math.round(Number.parseFloat(rootStyles.getPropertyValue('--mobile-safe-area-bottom')) || 0)
+    );
+    const adHeight = getVisibleMobileBottomAdHeight();
+    root.style.setProperty('--mobile-bottom-ad-height', `${adHeight}px`);
+    const threeRowPeekMin =
+      (tileSize * 3)
+      + handleHeight
+      + panelGap
+      + 28
+      + Math.min(12, safeBottom)
+      + MOBILE_DRAWER_PEEK_HEIGHT_OFFSET;
     const peek = clamp(
-      Math.round(height * (portrait ? 0.19 : 0.22)) + MOBILE_DRAWER_PEEK_HEIGHT_OFFSET,
-      104 + MOBILE_DRAWER_PEEK_HEIGHT_OFFSET,
-      (portrait ? 176 : 180) + MOBILE_DRAWER_PEEK_HEIGHT_OFFSET
+      Math.round(height * (portrait ? 0.19 : 0.2)) + MOBILE_DRAWER_PEEK_HEIGHT_OFFSET,
+      threeRowPeekMin,
+      (portrait ? 220 : 196) + MOBILE_DRAWER_PEEK_HEIGHT_OFFSET
     );
     const fullMin = Math.max(peek + 84, portrait ? 238 : 220);
     const fullCapByViewport = Math.round(height - topbar - 52);
@@ -25792,16 +26404,9 @@
       }
     }
     const mobileBottomAd = document.getElementById('mobileBottomAd');
-    if (mobileBottomAd instanceof HTMLElement && typeof window.getComputedStyle === 'function') {
-      const adStyle = window.getComputedStyle(mobileBottomAd);
+    if (getVisibleMobileBottomAdHeight() > 0 && mobileBottomAd instanceof HTMLElement) {
       const adRect = mobileBottomAd.getBoundingClientRect();
-      const adVisible =
-        adStyle.display !== 'none'
-        && adStyle.visibility !== 'hidden'
-        && adRect.height > 0
-        && adRect.bottom > viewportBounds.top
-        && adRect.top < viewportBounds.bottom;
-      if (adVisible && Number.isFinite(adRect.top)) {
+      if (Number.isFinite(adRect.top)) {
         boundary = Math.min(boundary, adRect.top - edgeGap);
       }
     }
@@ -29401,7 +30006,7 @@
     if (!(container instanceof HTMLElement)) {
       return;
     }
-    if (isUnifiedLeftToolsColorMode()) {
+    if (isUnifiedLeftToolsColorMode() && layoutMode !== 'mobilePortrait') {
       container.hidden = true;
       container.setAttribute('aria-hidden', 'true');
       container.innerHTML = '';
@@ -32073,11 +32678,11 @@
               return;
             }
           }
-          state.activeFrame = frameIndex;
+          setActiveFrameIndex(frameIndex, { persist: false, render: false, syncUi: false });
           enforceGuestAssignedLayerSelection({ announce: false });
         } else {
           setTimelineFrameSelection(frameIndex, { append: event.shiftKey });
-          state.activeFrame = frameIndex;
+          setActiveFrameIndex(frameIndex, { persist: false, render: false, syncUi: false });
           const candidateLayers = state.frames[frameIndex]?.layers?.slice().reverse() || [];
           const nextLayer = candidateLayers[activeLayerRow] || candidateLayers[candidateLayers.length - 1] || candidateLayers[0];
           if (nextLayer) {
@@ -32111,7 +32716,7 @@
             }
             return;
           }
-          state.activeFrame = frameIndex;
+          setActiveFrameIndex(frameIndex, { persist: false, render: false, syncUi: false });
           enforceGuestAssignedLayerSelection({ announce: true });
           clearTimelineSelection();
           renderTimelineMatrix();
@@ -32119,7 +32724,7 @@
           requestOverlayRender();
           return;
         }
-        state.activeFrame = frameIndex;
+        setActiveFrameIndex(frameIndex, { persist: false, render: false, syncUi: false });
         state.activeLayer = layerId;
         if (event.shiftKey) {
           setTimelineSlotSelection(frameIndex, layerIndex, { append: true });
@@ -38158,8 +38763,26 @@
       renderFloatingPreviewPanel();
       return false;
     }
+    const activeFrameIndex = clamp(
+      Math.round(Number(state.activeFrame) || 0),
+      0,
+      Math.max(0, (Array.isArray(state.frames) ? state.frames.length : 1) - 1)
+    );
+    [
+      resolved.front,
+      resolved.back,
+      resolved.left,
+      resolved.right,
+      resolved.top,
+      resolved.bottom,
+    ].forEach(canvasDoc => {
+      if (!canvasDoc || !Array.isArray(canvasDoc.frames) || !canvasDoc.frames.length) {
+        return;
+      }
+      canvasDoc.activeFrame = clamp(activeFrameIndex, 0, canvasDoc.frames.length - 1);
+    });
     const activeFrameOrientation = getVoxelPreviewOrientationForFrameIndex(
-      state.activeFrame,
+      activeFrameIndex,
       voxelExtensionState.previewYawDeg,
       voxelExtensionState.previewPitchDeg
     );
@@ -38175,7 +38798,10 @@
       resolved.right,
       resolved.top,
       resolved.bottom,
-      activeFrameOrientation
+      {
+        ...activeFrameOrientation,
+        frameIndex: activeFrameIndex,
+      }
     );
       const scaledPreview = scaleVoxelPreviewPixels(
         rendered.pixels,
@@ -38206,6 +38832,10 @@
         Math.max(1, Math.round(Number(scaledPreview.height) || 1))
       );
       previewCanvasDoc.name = localizeText('立体プレビュー', 'Voxel Preview');
+      const previewSurface = getProjectCanvasSurfaceByCanvasId(previewCanvasDoc.id || '');
+      if (previewSurface) {
+        renderProjectCanvasSurface(previewSurface, previewCanvasDoc);
+      }
     }
     if (updateViewport) {
       syncLocalViewportCanvasDockLayout();
@@ -46317,6 +46947,7 @@
       const wantsPan = !isTouch && (isMiddleMousePan || ((state.tool === 'pan' || keyboardState.spacePanActive) && isPrimaryButton));
       const shouldClearSelection = (isTouch || isPrimaryButton)
         && !wantsPan
+        && !(isTouch && state.showVirtualCursor)
         && (selectionMaskHasPixels(state.selectionMask) || Boolean(getPendingSelectionMoveState()));
       if (shouldClearSelection) {
         clearSelection();
@@ -48644,6 +49275,9 @@
     if (!multiState.connected) {
       return true;
     }
+    if (isSharedProjectCollaborativeMode()) {
+      return true;
+    }
     if (normalizedFormat === 'project') {
       return isMultiMasterMode();
     }
@@ -48737,6 +49371,86 @@
       .slice(0, 40);
   }
 
+  function parseMultiProjectAccessInput(value) {
+    const raw = typeof value === 'string' ? value.trim() : '';
+    if (!raw) {
+      return {
+        raw: '',
+        projectKey: '',
+        inviteToken: '',
+      };
+    }
+    let projectKey = normalizeMultiProjectKey(raw);
+    let inviteToken = '';
+    const readParams = params => {
+      if (!(params instanceof URLSearchParams)) {
+        return;
+      }
+      const paramProjectKey = normalizeMultiProjectKey(
+        params.get(MULTI_INVITE_QUERY_KEY)
+        || params.get('projectKey')
+        || params.get('sharedProjectId')
+        || ''
+      );
+      if (paramProjectKey) {
+        projectKey = paramProjectKey;
+      }
+      const paramInviteToken = typeof params.get(MULTI_INVITE_QUERY_TOKEN) === 'string'
+        ? String(params.get(MULTI_INVITE_QUERY_TOKEN)).trim()
+        : '';
+      if (paramInviteToken) {
+        inviteToken = paramInviteToken;
+      }
+    };
+    try {
+      const url = new URL(raw, window.location.href);
+      readParams(url.searchParams);
+      if (!inviteToken) {
+        const hash = typeof url.hash === 'string' ? url.hash.replace(/^#/, '') : '';
+        if (hash) {
+          readParams(new URLSearchParams(hash));
+        }
+      }
+    } catch (error) {
+      // Ignore invalid URLs and keep raw parsing fallback below.
+    }
+    if (!inviteToken) {
+      const tokenMatch = raw.match(/\bsp_[a-z0-9]+\b/i);
+      if (tokenMatch) {
+        inviteToken = tokenMatch[0].trim();
+      }
+    }
+    return {
+      raw,
+      projectKey,
+      inviteToken,
+    };
+  }
+
+  function readCurrentMultiProjectAccessInput() {
+    if (dom.controls.multiJoinProjectKey instanceof HTMLInputElement) {
+      const parsed = parseMultiProjectAccessInput(dom.controls.multiJoinProjectKey.value);
+      if (parsed.projectKey || parsed.inviteToken) {
+        return parsed;
+      }
+    }
+    if (dom.controls.multiProjectKey instanceof HTMLInputElement) {
+      const parsed = parseMultiProjectAccessInput(dom.controls.multiProjectKey.value);
+      if (parsed.projectKey || parsed.inviteToken) {
+        return parsed;
+      }
+    }
+    const fallbackProjectKey = normalizeMultiProjectKey(multiState.projectKey || '');
+    const fallbackEntry = getCurrentSharedRecentProjectEntry(fallbackProjectKey);
+    return {
+      raw: fallbackProjectKey,
+      projectKey: fallbackProjectKey,
+      inviteToken: typeof fallbackEntry?.sharedProjectInviteToken === 'string'
+        ? fallbackEntry.sharedProjectInviteToken.trim()
+        : '',
+    };
+  }
+
   function getMultiProjectKeyInputElements() {
     const inputs = [];
     if (dom.controls.multiJoinProjectKey instanceof HTMLInputElement) {
@@ -48752,17 +49466,9 @@
   }
 
   function readCurrentMultiProjectKey() {
-    if (dom.controls.multiJoinProjectKey instanceof HTMLInputElement) {
-      const normalized = normalizeMultiProjectKey(dom.controls.multiJoinProjectKey.value);
-      if (normalized) {
-        return normalized;
-      }
-    }
-    if (dom.controls.multiProjectKey instanceof HTMLInputElement) {
-      const normalized = normalizeMultiProjectKey(dom.controls.multiProjectKey.value);
-      if (normalized) {
-        return normalized;
-      }
+    const parsed = readCurrentMultiProjectAccessInput();
+    if (parsed.projectKey) {
+      return parsed.projectKey;
     }
     return normalizeMultiProjectKey(multiState.projectKey || '');
   }
@@ -48791,27 +49497,36 @@
   }
 
   function resolveMultiInviteDefaultRole() {
-    const joinPolicy = normalizeMultiJoinPolicy(
-      multiState.joinPolicy,
-      MULTI_DEFAULT_JOIN_POLICY
-    );
-    return joinPolicy === MULTI_JOIN_POLICY_OPEN ? 'guest' : 'spectator';
+    return 'guest';
   }
 
   function buildMultiInviteUrl(projectKey = multiState.projectKey, options = {}) {
     const normalizedKey = normalizeMultiProjectKey(projectKey);
-    if (!normalizedKey) {
+    const inviteTokenSource = typeof options?.inviteToken === 'string' ? options.inviteToken.trim() : '';
+    const fallbackEntry = getCurrentSharedRecentProjectEntry(normalizedKey);
+    const inviteToken = inviteTokenSource || fallbackEntry?.sharedProjectInviteToken || '';
+    if (!normalizedKey && !inviteToken) {
       return '';
     }
     const requestedRole = options && typeof options.role === 'string' ? options.role.trim().toLowerCase() : '';
+    const autoJoin = options?.autoJoin === true;
     const inviteRole = requestedRole === 'master' || requestedRole === 'guest' || requestedRole === 'spectator'
       ? requestedRole
       : '';
     try {
       const url = new URL(window.location.href);
       url.searchParams.set(MULTI_INVITE_QUERY_FLAG, '1');
-      url.searchParams.set(MULTI_INVITE_QUERY_KEY, normalizedKey);
-      url.searchParams.set(MULTI_INVITE_QUERY_AUTO_JOIN, '1');
+      if (normalizedKey && !inviteToken) {
+        url.searchParams.set(MULTI_INVITE_QUERY_KEY, normalizedKey);
+      } else {
+        url.searchParams.delete(MULTI_INVITE_QUERY_KEY);
+      }
+      if (inviteToken) {
+        url.searchParams.set(MULTI_INVITE_QUERY_TOKEN, inviteToken);
+      } else {
+        url.searchParams.delete(MULTI_INVITE_QUERY_TOKEN);
+      }
+      url.searchParams.set(MULTI_INVITE_QUERY_AUTO_JOIN, autoJoin ? '1' : '0');
       if (inviteRole) {
         url.searchParams.set(MULTI_INVITE_QUERY_ROLE, inviteRole);
       } else {
@@ -48821,8 +49536,12 @@
     } catch (error) {
       const origin = window.location.origin || '';
       const path = window.location.pathname || '/';
+      const keyPart = normalizedKey && !inviteToken
+        ? `&${MULTI_INVITE_QUERY_KEY}=${encodeURIComponent(normalizedKey)}`
+        : '';
+      const tokenPart = inviteToken ? `&${MULTI_INVITE_QUERY_TOKEN}=${encodeURIComponent(inviteToken)}` : '';
       const rolePart = inviteRole ? `&${MULTI_INVITE_QUERY_ROLE}=${encodeURIComponent(inviteRole)}` : '';
-      return `${origin}${path}?${MULTI_INVITE_QUERY_FLAG}=1&${MULTI_INVITE_QUERY_KEY}=${encodeURIComponent(normalizedKey)}&${MULTI_INVITE_QUERY_AUTO_JOIN}=1${rolePart}`;
+      return `${origin}${path}?${MULTI_INVITE_QUERY_FLAG}=1${keyPart}${tokenPart}&${MULTI_INVITE_QUERY_AUTO_JOIN}=${autoJoin ? '1' : '0'}${rolePart}`;
     }
   }
 
@@ -48830,7 +49549,7 @@
     try {
       const url = new URL(window.location.href);
       let changed = false;
-      [MULTI_INVITE_QUERY_FLAG, MULTI_INVITE_QUERY_KEY, MULTI_INVITE_QUERY_AUTO_JOIN, MULTI_INVITE_QUERY_ROLE].forEach(key => {
+      [MULTI_INVITE_QUERY_FLAG, MULTI_INVITE_QUERY_KEY, MULTI_INVITE_QUERY_TOKEN, MULTI_INVITE_QUERY_AUTO_JOIN, MULTI_INVITE_QUERY_ROLE].forEach(key => {
         if (url.searchParams.has(key)) {
           url.searchParams.delete(key);
           changed = true;
@@ -48854,7 +49573,10 @@
         return null;
       }
       const projectKey = normalizeMultiProjectKey(params.get(MULTI_INVITE_QUERY_KEY) || '');
-      if (!projectKey) {
+      const inviteToken = typeof params.get(MULTI_INVITE_QUERY_TOKEN) === 'string'
+        ? String(params.get(MULTI_INVITE_QUERY_TOKEN)).trim()
+        : '';
+      if (!projectKey && !inviteToken) {
         return null;
       }
       const autoJoin = parseMultiBooleanQueryValue(params.get(MULTI_INVITE_QUERY_AUTO_JOIN) || '1');
@@ -48863,6 +49585,7 @@
       const role = (roleParam === 'master' || roleParam === 'guest' || roleParam === 'spectator') ? roleParam : '';
       return {
         projectKey,
+        inviteToken,
         autoJoin,
         role,
       };
@@ -48880,12 +49603,36 @@
     if (!invite) {
       return false;
     }
+    let resolvedInviteProjectKey = invite.projectKey;
+    let resolvedInviteToken = invite.inviteToken || '';
+    let inviteRecordPromise = null;
+    if (resolvedInviteToken && canUseSharedProjectsBackend()) {
+      inviteRecordPromise = loadSharedProjectSnapshotRecordByInvite(resolvedInviteToken, {
+        createIfMissing: false,
+        title: createSharedProjectSnapshotTitle(state.documentName || invite.projectKey || DEFAULT_DOCUMENT_NAME),
+      }).then(project => {
+        if (project?.project_key) {
+          resolvedInviteProjectKey = normalizeMultiProjectKey(project.project_key);
+        }
+        if (project?.invite_token) {
+          resolvedInviteToken = project.invite_token;
+        }
+        return project;
+      }).catch(error => {
+        console.warn('Failed to resolve shared invite token', error);
+        return null;
+      });
+    }
+    const normalizedInviteProjectKey = normalizeMultiProjectKey(resolvedInviteProjectKey || invite.projectKey || '');
+    if (!normalizedInviteProjectKey) {
+      return false;
+    }
     multiAutoResumeAttempted = true;
     clearStoredMultiResumeSession();
-    storeMultiProjectKey(invite.projectKey);
-    syncMultiProjectKeyInputValues(invite.projectKey, { preserveFocused: false });
+    storeMultiProjectKey(normalizedInviteProjectKey);
+    syncMultiProjectKeyInputValues(normalizedInviteProjectKey, { preserveFocused: false });
     // respect requested role from invite when present; default to spectator for safety
-    const requestedRole = (invite.role && (invite.role === 'master' || invite.role === 'guest' || invite.role === 'spectator')) ? invite.role : 'spectator';
+    const requestedRole = (invite.role && (invite.role === 'master' || invite.role === 'guest')) ? invite.role : 'guest';
     setMultiDesiredRole(requestedRole);
     if (invite.autoJoin) {
       setMultiUiView(requestedRole);
@@ -48901,16 +49648,216 @@
     multiState.resumeJoinPolicy = null;
     multiState.resumeExportPermission = null;
     syncMultiControls();
-    setMultiStatus(`共有モード: 招待リンクを読み込みました (${invite.projectKey})`, 'info');
+    setMultiStatus(`共有モード: 招待リンクを読み込みました (${normalizedInviteProjectKey})`, 'info');
+    const hydrateSharedInviteProject = async () => {
+      if (!canUseSharedProjectsBackend()) {
+        return;
+      }
+      const preloadedProject = inviteRecordPromise ? await inviteRecordPromise : null;
+      const sharedProject = preloadedProject || await loadSharedProjectSnapshotRecord(normalizedInviteProjectKey, {
+        createIfMissing: requestedRole === 'master',
+        title: createSharedProjectSnapshotTitle(state.documentName || normalizedInviteProjectKey),
+        inviteToken: resolvedInviteToken,
+      });
+      const sharedSnapshot = sharedProject?.latest_snapshot;
+      if (!sharedSnapshot || typeof sharedSnapshot !== 'object') {
+        return;
+      }
+      try {
+        await loadDocumentFromText(JSON.stringify(sharedSnapshot), null, {
+          projectId: buildSharedRecentProjectId(normalizedInviteProjectKey),
+          suppressAutosaveStatus: true,
+          openedFromRecent: true,
+          preserveDotStats: true,
+          sharedProjectKey: normalizedInviteProjectKey,
+          sharedProjectRevision: Math.max(0, Math.round(Number(sharedProject?.latest_revision) || 0)),
+        });
+      } catch (error) {
+        console.warn('Failed to hydrate shared invite project snapshot', error);
+      }
+    };
+    upsertSharedRecentProjectEntry({
+      projectKey: normalizedInviteProjectKey,
+      inviteToken: resolvedInviteToken,
+      name: extractDocumentBaseName(state.documentName || DEFAULT_DOCUMENT_NAME),
+      roleHint: requestedRole,
+      autoJoin: false,
+    }).catch(error => {
+      console.warn('Failed to record shared project invite entry', error);
+    });
     clearMultiInviteQueryParamsFromUrl();
-    if (invite.autoJoin) {
-      window.setTimeout(() => {
-        if (!multiState.connected && !multiState.connecting) {
-          const allowGuestJoin = requestedRole === 'guest';
-          connectMultiSessionAs(requestedRole, { allowGuestJoin });
-        }
-      }, 100);
+    window.setTimeout(() => {
+      hydrateSharedInviteProject()
+        .catch(error => {
+          console.warn('Failed to hydrate shared invite project', error);
+        })
+        .finally(() => {
+          if (invite.autoJoin && !multiState.connected && !multiState.connecting) {
+            const allowGuestJoin = requestedRole === 'guest';
+            connectMultiSessionAs(requestedRole, { allowGuestJoin });
+          } else if (!invite.autoJoin) {
+            setMultiStatus(
+              localizeText(
+                '共有プロジェクトを開きました。編集内容は共有されます。',
+                'Opened shared project. Your edits will sync with collaborators.'
+              ),
+              'success'
+            );
+          }
+        });
+    }, 100);
+    return true;
+  }
+
+  async function createSharedProjectFromCurrentDocument() {
+    if (!canUseSharedProjectsBackend()) {
+      setMultiStatus(localizeText('共有プロジェクトにはログインが必要です', 'Sign in to create a shared project'), 'warn');
+      return false;
     }
+    const existingAccess = readCurrentMultiProjectAccessInput();
+    const projectKey = normalizeMultiProjectKey(
+      existingAccess.projectKey
+      || activeSharedProjectKey
+      || multiState.projectKey
+      || generateMultiProjectKey()
+    );
+    if (!projectKey) {
+      setMultiStatus(localizeText('共有プロジェクトを作成できませんでした', 'Failed to create shared project'), 'error');
+      return false;
+    }
+    const snapshot = makeHistorySnapshot({ clonePixelData: true });
+    const packaged = buildPackagedProjectPayload(snapshot);
+    packaged.sharedHistoryLabel = 'sharedProjectCreate';
+    const project = await persistSharedProjectSnapshot(projectKey, packaged, {
+      title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
+    });
+    if (!project) {
+      setMultiStatus(localizeText('共有プロジェクトの作成に失敗しました', 'Failed to create shared project'), 'error');
+      return false;
+    }
+    storeMultiProjectKey(projectKey);
+    syncMultiProjectKeyInputValues(projectKey, { preserveFocused: false });
+    setMultiDesiredRole('guest');
+    setMultiUiView('guest');
+    multiEntryJoinPanelOpen = false;
+    setActiveSharedProjectSession(
+      projectKey,
+      Math.max(0, Math.round(Number(project.latest_revision) || 0)),
+      Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
+      project.id || ''
+    );
+    await upsertSharedRecentProjectEntry({
+      projectKey,
+      projectId: project.id || '',
+      inviteToken: project.invite_token || '',
+      visibility: project.visibility || 'shared',
+      name: createSharedProjectSnapshotTitle(project.title || state.documentName || projectKey),
+      roleHint: 'guest',
+      autoJoin: false,
+      revision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
+      structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
+    });
+    syncMultiControls();
+    setMultiStatus(
+      localizeText(
+        '共有プロジェクトを作成しました。招待リンクを共有してください。',
+        'Shared project created. Share the invite link.'
+      ),
+      'success'
+    );
+    return true;
+  }
+
+  async function openSharedProjectFromInput() {
+    if (!canUseSharedProjectsBackend()) {
+      setMultiStatus(localizeText('共有プロジェクトにはログインが必要です', 'Sign in to open a shared project'), 'warn');
+      return false;
+    }
+    const access = readCurrentMultiProjectAccessInput();
+    if (!access.projectKey && !access.inviteToken) {
+      setMultiStatus(
+        localizeText('共有リンクまたは招待コードを入力してください', 'Paste an invite link or invite code'),
+        'warn'
+      );
+      return false;
+    }
+    const sharedProject = access.inviteToken
+      ? await loadSharedProjectSnapshotRecordByInvite(access.inviteToken, {
+          createIfMissing: false,
+          title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
+        })
+      : await loadSharedProjectSnapshotRecord(access.projectKey, {
+          createIfMissing: false,
+          title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
+        });
+    if (!sharedProject?.project_key) {
+      setMultiStatus(
+        localizeText('共有プロジェクトが見つかりませんでした', 'Shared project not found'),
+        'error'
+      );
+      return false;
+    }
+    const resolvedProjectKey = normalizeMultiProjectKey(sharedProject.project_key);
+    if (!resolvedProjectKey) {
+      setMultiStatus(localizeText('共有プロジェクトを開けませんでした', 'Failed to open shared project'), 'error');
+      return false;
+    }
+    const sharedSnapshot = sharedProject.latest_snapshot;
+    if (sharedSnapshot && typeof sharedSnapshot === 'object') {
+      await loadDocumentFromText(JSON.stringify(sharedSnapshot), null, {
+        projectId: buildSharedRecentProjectId(resolvedProjectKey),
+        suppressAutosaveStatus: true,
+        openedFromRecent: true,
+        preserveDotStats: true,
+        sharedProjectKey: resolvedProjectKey,
+        sharedProjectRevision: Math.max(0, Math.round(Number(sharedProject.latest_revision) || 0)),
+      });
+    }
+    storeMultiProjectKey(resolvedProjectKey);
+    syncMultiProjectKeyInputValues(resolvedProjectKey, { preserveFocused: false });
+    setMultiDesiredRole('guest');
+    setMultiUiView('guest');
+    multiEntryJoinPanelOpen = false;
+    setActiveSharedProjectSession(
+      resolvedProjectKey,
+      Math.max(0, Math.round(Number(sharedProject.latest_revision) || 0)),
+      Math.max(0, Math.round(Number(sharedProject.latest_structure_revision) || 0)),
+      sharedProject.id || ''
+    );
+    await upsertSharedRecentProjectEntry({
+      projectKey: resolvedProjectKey,
+      projectId: sharedProject.id || '',
+      inviteToken: sharedProject.invite_token || access.inviteToken || '',
+      visibility: sharedProject.visibility || 'shared',
+      name: createSharedProjectSnapshotTitle(sharedProject.title || state.documentName || resolvedProjectKey),
+      roleHint: 'guest',
+      autoJoin: false,
+      revision: Math.max(0, Math.round(Number(sharedProject.latest_revision) || 0)),
+      structureRevision: Math.max(0, Math.round(Number(sharedProject.latest_structure_revision) || 0)),
+    });
+    syncMultiControls();
+    setMultiStatus(
+      localizeText(
+        '共有プロジェクトを開きました。編集内容は自動で共有されます。',
+        'Opened shared project. Your edits will sync automatically.'
+      ),
+      'success'
+    );
+    return true;
+  }
+
+  async function disableSharedProjectMode() {
+    if (multiState.connected || multiState.connecting) {
+      disconnectMultiSession({ silent: false });
+    }
+    clearActiveSharedProjectSession();
+    multiState.projectKey = '';
+    syncMultiProjectKeyInputValues('', { preserveFocused: false });
+    syncMultiControls();
+    setMultiStatus(
+      localizeText('共有モードをOFFにしました', 'Shared mode turned off'),
+      'info'
+    );
     return true;
   }
 
@@ -49078,6 +50025,10 @@
     if (!pending) {
       return;
     }
+    if (prefersSharedProjectFlow()) {
+      clearStoredMultiResumeSession();
+      return;
+    }
     clearStoredMultiResumeSession();
     storeMultiProjectKey(pending.projectKey);
     syncMultiProjectKeyInputValues(pending.projectKey, { preserveFocused: false });
@@ -49188,9 +50139,7 @@
   }
 
   function canCurrentClientRequestGuestRole() {
-    return multiState.connected
-      && !multiState.connecting
-      && multiState.role === 'spectator';
+    return false;
   }
 
   function clearMultiJoinRequests() {
@@ -49376,84 +50325,34 @@
     const requestField = dom.controls.multiJoinRequestField;
     const requestButton = dom.controls.multiRequestGuestRole;
     const requestHint = dom.controls.multiJoinRequestHint;
-    const joinPolicy = normalizeMultiJoinPolicy(
-      multiState.joinPolicy,
-      MULTI_DEFAULT_JOIN_POLICY
-    );
-    const inlineRequestHandledByParticipantsList = dom.controls.multiParticipants instanceof HTMLElement;
-    const isRequestAreaVisible = !inlineRequestHandledByParticipantsList
-      && (canCurrentClientRequestGuestRole() || multiState.joinRequestPending);
     if (requestField instanceof HTMLElement) {
-      requestField.hidden = !isRequestAreaVisible;
+      requestField.hidden = true;
     }
     if (requestButton instanceof HTMLButtonElement) {
-      const canRequest = canCurrentClientRequestGuestRole();
-      const disabled = !canRequest || multiState.joinRequestPending;
-      requestButton.disabled = disabled;
-      if (multiState.joinRequestPending) {
-        requestButton.textContent = localizeText('リクエスト送信済み', 'Request Sent');
-      } else {
-        requestButton.textContent = localizeText('参加リクエストを送信', 'Send Join Request');
-      }
+      requestButton.disabled = true;
+        requestButton.textContent = localizeText('そのまま編集できます', 'Edit Immediately');
     }
     if (requestHint instanceof HTMLElement) {
-      if (!multiState.connected) {
-        requestHint.textContent = localizeText(
-          '接続すると参加リクエストを送信できます。',
-          'Connect to send a join request.'
-        );
-      } else if (isMultiGuestMode()) {
-        requestHint.textContent = localizeText('あなたは参加者です。', 'You are currently a participant.');
-      } else if (multiState.joinRequestPending) {
-        requestHint.textContent = localizeText(
-          '承認待ちです。マスターの応答を待ってください。',
-          'Pending approval. Please wait for the master response.'
-        );
-      } else if (joinPolicy === MULTI_JOIN_POLICY_OPEN) {
-        requestHint.textContent = localizeText(
-          '自動参加設定です。送信すると空きがあれば参加できます。',
-          'Auto-join room. Send request to join if a slot is available.'
-        );
-      } else {
-        requestHint.textContent = localizeText(
-          '参加はマスターの承認後に有効になります。',
-          'Joining becomes active after master approval.'
-        );
-      }
+      requestHint.textContent = localizeText(
+        '共有リンクを開いた人は、そのまま編集できます。',
+        'Anyone who opens the invite link can edit immediately.'
+      );
     }
 
     const requestSelect = dom.controls.multiJoinRequestTarget;
     const approveButton = dom.controls.multiJoinRequestApprove;
     const rejectButton = dom.controls.multiJoinRequestReject;
-    if (isMultiMasterMode()) {
-      pruneMultiJoinRequests();
-    }
     if (requestSelect instanceof HTMLSelectElement) {
-      const previous = requestSelect.value || '';
-      const rows = isMultiMasterMode() && multiState.pendingJoinRequests instanceof Map
-        ? Array.from(multiState.pendingJoinRequests.values())
-        : [];
-      rows.sort((a, b) => (a.sentAt || 0) - (b.sentAt || 0));
       requestSelect.innerHTML = '';
-      rows.forEach(row => {
-        const option = document.createElement('option');
-        option.value = row.clientId;
-        option.textContent = row.name || DEFAULT_MULTI_PARTICIPANT_NAME;
-        requestSelect.appendChild(option);
-      });
-      if (rows.length) {
-        requestSelect.value = rows.some(row => row.clientId === previous)
-          ? previous
-          : rows[0].clientId;
-      }
-      requestSelect.disabled = !isMultiMasterMode() || rows.length === 0;
+      requestSelect.disabled = true;
     }
-    const hasSelection = Boolean(getSelectedMultiJoinRequestClientId());
     if (approveButton instanceof HTMLButtonElement) {
-      approveButton.disabled = !isMultiMasterMode() || !hasSelection;
+      approveButton.disabled = true;
+      approveButton.hidden = true;
     }
     if (rejectButton instanceof HTMLButtonElement) {
-      rejectButton.disabled = !isMultiMasterMode() || !hasSelection;
+      rejectButton.disabled = true;
+      rejectButton.hidden = true;
     }
   }
 
@@ -49620,6 +50519,62 @@
     return role === 'guest' || role === 'spectator';
   }
 
+  function getMultiRoleCapabilities(role = multiState.role) {
+    if (isSharedProjectCollaborativeMode()) {
+      const normalizedRole = normalizeMultiRole(role, 'guest');
+      return {
+        role: normalizedRole,
+        isMaster: normalizedRole === 'master',
+        isGuest: normalizedRole === 'guest',
+        isSpectator: normalizedRole === 'spectator',
+        isReplica: false,
+        canBroadcastAuthoritativeState: false,
+        canReceiveAuthoritativeState: false,
+        canRespondToMasterStateRequest: false,
+        canReceiveGuestPatch: false,
+        canReceiveMasterPatch: false,
+        canModerateParticipants: false,
+        canSendDrawPatch: false,
+        canSendComments: true,
+      };
+    }
+    const normalizedRole = normalizeMultiRole(role, 'guest');
+    const isMaster = normalizedRole === 'master';
+    const isGuest = normalizedRole === 'guest';
+    const isSpectator = normalizedRole === 'spectator';
+    return {
+      role: normalizedRole,
+      isMaster,
+      isGuest,
+      isSpectator,
+      isReplica: isGuest || isSpectator,
+      canBroadcastAuthoritativeState: isMaster,
+      canReceiveAuthoritativeState: isGuest || isSpectator,
+      canRespondToMasterStateRequest: isGuest || isSpectator,
+      canReceiveGuestPatch: isMaster || isGuest || isSpectator,
+      canReceiveMasterPatch: isGuest || isSpectator,
+      canModerateParticipants: isMaster,
+      canSendDrawPatch: isGuest,
+      canSendComments: isMaster || isGuest || isSpectator,
+    };
+  }
+
+  function isMultiPayloadForCurrentProject(payload) {
+    if (!payload || typeof payload !== 'object') {
+      return false;
+    }
+    const payloadProjectKey = normalizeMultiProjectKey(payload.projectKey);
+    return !payloadProjectKey || payloadProjectKey === multiState.projectKey;
+  }
+
+  function isMultiPayloadTargetedToCurrentClient(payload) {
+    if (!payload || typeof payload !== 'object') {
+      return false;
+    }
+    const targetClientId = typeof payload.targetClientId === 'string' ? payload.targetClientId.trim() : '';
+    return !targetClientId || targetClientId === multiState.clientId;
+  }
+
   function clearMultiLocalSnapshotBeforeReplica() {
     multiState.localSnapshotBeforeReplica = null;
     multiState.localUnsavedBeforeReplica = false;
@@ -49694,6 +50649,9 @@
   }
 
   function canCurrentGuestFreelyMoveAssignedCell() {
+    if (isSharedProjectCollaborativeMode()) {
+      return true;
+    }
     return isMultiGuestMode()
       && normalizeMultiParticipantFreeCellMove(
         multiState.participantFreeCellMove,
@@ -49712,14 +50670,23 @@
   }
 
   function canCurrentClientEditProjectStructure() {
+    if (isSharedProjectCollaborativeMode()) {
+      return true;
+    }
     return !isMultiReadOnlyMode();
   }
 
   function canCurrentClientImportExternalData() {
+    if (isSharedProjectCollaborativeMode()) {
+      return true;
+    }
     return !isMultiReadOnlyMode();
   }
 
   function isMultiMasterProjectReplacementBlocked() {
+    if (prefersSharedProjectFlow()) {
+      return false;
+    }
     return isMultiMasterMode();
   }
 
@@ -49951,6 +50918,914 @@
     return Boolean(msg && needle && msg.includes(needle));
   }
 
+  function isMissingTable(error, table) {
+    const msg = String(error?.message || '').toLowerCase();
+    const needle = String(table || '').toLowerCase();
+    return Boolean(msg && needle && msg.includes(needle));
+  }
+
+  function shouldIgnorePixieedProfileError(error) {
+    if (!error) {
+      return false;
+    }
+    const status = Number(error?.status || 0);
+    const msg = String(error?.message || '').toLowerCase();
+    return (
+      status === 404
+      || isMissingTable(error, 'user_profiles')
+      || msg.includes('user_profiles')
+    );
+  }
+
+  function shouldDisableSharedProjectsBackend(error) {
+    if (!error) {
+      return false;
+    }
+    return (
+      isMissingTable(error, 'shared_projects')
+      || isMissingTable(error, 'shared_project_members')
+      || isMissingColumn(error, 'latest_snapshot')
+      || String(error?.code || '') === 'PGRST204'
+    );
+  }
+
+  function handleSharedProjectsBackendError(error, context = '') {
+    if (shouldDisableSharedProjectsBackend(error)) {
+      supportsSharedProjectsBackend = false;
+      disconnectActiveSharedProjectRealtimeChannel().catch(() => {});
+    }
+    if (context) {
+      console.warn(`Shared project backend error (${context})`, error);
+    } else {
+      console.warn('Shared project backend error', error);
+    }
+  }
+
+  function canUseSharedProjectsBackend() {
+    return supportsSharedProjectsBackend && accountState.isLoggedIn;
+  }
+
+  function canApplyIncomingSharedProjectSnapshot() {
+    return (
+      !hasDocumentUnsavedChanges()
+      && !autosaveWriteInFlight
+      && !multiState.applyRemoteInProgress
+      && !multiState.connecting
+    );
+  }
+
+  function isSharedProjectRealtimePrimaryActive(projectKey = '') {
+    if (!canUseSharedProjectsBackend() || !activeSharedProjectKey) {
+      return false;
+    }
+    const normalizedProjectKey = normalizeMultiProjectKey(
+      projectKey || multiState.projectKey || readStoredMultiProjectKey() || ''
+    );
+    return Boolean(normalizedProjectKey && normalizedProjectKey === activeSharedProjectKey);
+  }
+
+  function isSharedProjectCollaborativeMode(projectKey = '') {
+    const normalizedProjectKey = normalizeMultiProjectKey(
+      projectKey
+      || activeSharedProjectKey
+      || resolveSharedProjectKeyForCurrentState(projectKey)
+      || multiState.projectKey
+    );
+    if (!normalizedProjectKey) {
+      return false;
+    }
+    return Boolean(
+      canUseSharedProjectsBackend()
+      && activeSharedProjectKey
+      && normalizedProjectKey === activeSharedProjectKey
+    );
+  }
+
+  function prefersSharedProjectFlow() {
+    return true;
+  }
+
+  function createSharedProjectSnapshotTitle(name = state.documentName || DEFAULT_DOCUMENT_NAME) {
+    return extractDocumentBaseName(normalizeDocumentName(name || DEFAULT_DOCUMENT_NAME));
+  }
+
+  function classifySharedProjectOpType(historyLabel = '') {
+    const normalizedLabel = String(historyLabel || '').trim();
+    if (!normalizedLabel) {
+      return 'snapshot';
+    }
+    if (SHARED_PROJECT_STRUCTURE_HISTORY_LABELS.has(normalizedLabel)) {
+      return 'structure';
+    }
+    if (MULTI_PALETTE_HISTORY_LABELS.has(normalizedLabel)) {
+      return 'palette';
+    }
+    if (MULTI_LAYER_PATCH_HISTORY_LABELS.has(normalizedLabel)) {
+      return 'draw';
+    }
+    return 'session';
+  }
+
+  function buildSharedProjectLayerSnapshotKey(canvasId, frameIndex, layerId) {
+    const normalizedCanvasId = typeof canvasId === 'string' ? canvasId.trim() : '';
+    const normalizedLayerId = typeof layerId === 'string' ? layerId.trim() : '';
+    const normalizedFrameIndex = Math.max(0, Math.round(Number(frameIndex) || 0));
+    if (!normalizedCanvasId || !normalizedLayerId) {
+      return '';
+    }
+    return `${normalizedCanvasId}\u0000${normalizedFrameIndex}\u0000${normalizedLayerId}`;
+  }
+
+  function buildSharedProjectDrawOpPayload(historyLabel = '') {
+    if (classifySharedProjectOpType(historyLabel) !== 'draw') {
+      return null;
+    }
+    const canvasDoc = getActiveProjectCanvasDocument();
+    const canvasId = canvasDoc?.id || '';
+    const frameIndex = clamp(
+      Math.round(Number(canvasDoc?.activeFrame ?? state.activeFrame) || 0),
+      0,
+      Math.max(0, (canvasDoc?.frames?.length || 1) - 1)
+    );
+    const frame = Array.isArray(canvasDoc?.frames) ? canvasDoc.frames[frameIndex] : null;
+    if (!canvasId || !frame || !Array.isArray(frame.layers)) {
+      return null;
+    }
+    const layer = frame.layers.find(item => item?.id === canvasDoc?.activeLayer || item?.id === state.activeLayer) || null;
+    if (!layer) {
+      return null;
+    }
+    const pixelCount = Math.max(
+      0,
+      Math.floor(Number(canvasDoc?.width ?? state.width) || 0) * Math.floor(Number(canvasDoc?.height ?? state.height) || 0)
+    );
+    if (!pixelCount) {
+      return null;
+    }
+    const snapshotKey = buildSharedProjectLayerSnapshotKey(canvasId, frameIndex, layer.id);
+    const previousSnapshot = snapshotKey ? (sharedProjectLayerSnapshots.get(snapshotKey) || null) : null;
+    const diffPayload = buildLayerDiffPayload(layer, previousSnapshot, pixelCount);
+    if (!diffPayload) {
+      return null;
+    }
+    const currentSnapshot = captureLayerPatchSnapshot(layer, pixelCount);
+    if (snapshotKey && currentSnapshot) {
+      sharedProjectLayerSnapshots.set(snapshotKey, currentSnapshot);
+    }
+    return {
+      canvasId,
+      frameIndex,
+      layerId: layer.id,
+      pixelCount,
+      patch: diffPayload,
+    };
+  }
+
+  function buildSharedProjectStructureOpPayload(historyLabel = '') {
+    if (classifySharedProjectOpType(historyLabel) !== 'structure') {
+      return null;
+    }
+    const canvases = getProjectCanvasDocuments();
+    const activeCanvas = getActiveProjectCanvasDocument() || null;
+    const activeCanvasId = activeCanvas?.id || '';
+    return {
+      kind: 'structure_snapshot_summary',
+      historyLabel: String(historyLabel || ''),
+      activeCanvasId,
+      canvasCount: canvases.length,
+      canvases: canvases.map((canvas, canvasIndex) => ({
+        id: typeof canvas?.id === 'string' ? canvas.id : '',
+        name: typeof canvas?.name === 'string' ? canvas.name : '',
+        order: canvasIndex,
+        width: Math.max(1, Math.round(Number(canvas?.width) || 0)),
+        height: Math.max(1, Math.round(Number(canvas?.height) || 0)),
+        activeFrame: clamp(
+          Math.round(Number(canvas?.activeFrame) || 0),
+          0,
+          Math.max(0, (canvas?.frames?.length || 1) - 1)
+        ),
+        frameCount: Array.isArray(canvas?.frames) ? canvas.frames.length : 0,
+        layerCounts: Array.isArray(canvas?.frames)
+          ? canvas.frames.map(frame => (Array.isArray(frame?.layers) ? frame.layers.length : 0))
+          : [],
+      })),
+    };
+  }
+
+  function applyIncomingSharedProjectVisualResult(targetCanvas, applyResult) {
+    if (targetCanvas?.id !== (getActiveProjectCanvasDocument()?.id || '')) {
+      markCanvasDirty();
+    } else if (!applyResult?.dirtyRect || applyResult.full) {
+      markCanvasDirty();
+    } else {
+      markDirtyRect(
+        applyResult.dirtyRect.x0,
+        applyResult.dirtyRect.y0,
+        applyResult.dirtyRect.x1,
+        applyResult.dirtyRect.y1
+      );
+    }
+    invalidateFillPreviewCache();
+    invalidateOnionSkinCache();
+    clearPlaybackFrameCache();
+    requestRender();
+    requestOverlayRender();
+  }
+
+  function resetLocalHistoryForSharedCollaborativeRemoteChange() {
+    if (!isSharedProjectCollaborativeMode()) {
+      return;
+    }
+    history.pending = null;
+    history.past = [];
+    history.future = [];
+    clearMultiHistory();
+    updateHistoryButtons();
+  }
+
+  function applyIncomingSharedProjectDrawOp(opRecord) {
+    const opPayload = opRecord?.payload?.op;
+    if (!opPayload || typeof opPayload !== 'object') {
+      return false;
+    }
+    const canvasId = typeof opPayload.canvasId === 'string' ? opPayload.canvasId.trim() : '';
+    const layerId = typeof opPayload.layerId === 'string' ? opPayload.layerId.trim() : '';
+    const frameIndex = Math.max(0, Math.round(Number(opPayload.frameIndex) || 0));
+    const pixelCount = Math.max(0, Math.floor(Number(opPayload.pixelCount) || 0));
+    const patch = opPayload.patch && typeof opPayload.patch === 'object' ? opPayload.patch : null;
+    if (!canvasId || !layerId || !pixelCount || !patch) {
+      return false;
+    }
+    const targetCanvas = getProjectCanvasDocumentById(canvasId);
+    if (!targetCanvas || !Array.isArray(targetCanvas.frames) || frameIndex >= targetCanvas.frames.length) {
+      return false;
+    }
+    const frame = targetCanvas.frames[frameIndex];
+    if (!frame || !Array.isArray(frame.layers)) {
+      return false;
+    }
+    const layer = frame.layers.find(entry => entry?.id === layerId) || null;
+    if (!layer) {
+      return false;
+    }
+    const applyResult = applyLayerPatchPayloadToLayer(layer, patch, pixelCount, {
+      width: targetCanvas.width,
+      height: targetCanvas.height,
+    });
+    if (!applyResult) {
+      return false;
+    }
+    resetLocalHistoryForSharedCollaborativeRemoteChange();
+    const snapshotKey = buildSharedProjectLayerSnapshotKey(canvasId, frameIndex, layerId);
+    const nextSnapshot = captureLayerPatchSnapshot(layer, pixelCount);
+    if (snapshotKey && nextSnapshot) {
+      sharedProjectLayerSnapshots.set(snapshotKey, nextSnapshot);
+    }
+    applyIncomingSharedProjectVisualResult(targetCanvas, applyResult);
+    return true;
+  }
+
+  function createSharedProjectInviteToken() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `sp_${crypto.randomUUID().replace(/-/g, '')}`;
+    }
+    return `sp_${Date.now().toString(36)}${Math.floor(Math.random() * 1e9).toString(36)}`;
+  }
+
+  async function fetchSharedProjectRecord(projectKey) {
+    if (!canUseSharedProjectsBackend()) {
+      return null;
+    }
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey);
+    if (!normalizedProjectKey) {
+      return null;
+    }
+    try {
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase) {
+        return null;
+      }
+      const { data, error } = await supabase
+        .from('shared_projects')
+        .select('id, project_key, invite_token, visibility, owner_user_id, title, latest_snapshot, latest_revision, latest_structure_revision, updated_at, created_at')
+        .eq('project_key', normalizedProjectKey)
+        .maybeSingle();
+      if (error) {
+        handleSharedProjectsBackendError(error, 'fetch');
+        return null;
+      }
+      return data || null;
+    } catch (error) {
+      handleSharedProjectsBackendError(error, 'fetch-exception');
+      return null;
+    }
+  }
+
+  async function fetchSharedProjectRecordByInviteToken(inviteToken) {
+    if (!canUseSharedProjectsBackend()) {
+      return null;
+    }
+    const normalizedInviteToken = typeof inviteToken === 'string' ? inviteToken.trim() : '';
+    if (!normalizedInviteToken) {
+      return null;
+    }
+    try {
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase) {
+        return null;
+      }
+      const { data, error } = await supabase
+        .from('shared_projects')
+        .select('id, project_key, invite_token, visibility, owner_user_id, title, latest_snapshot, latest_revision, latest_structure_revision, updated_at, created_at')
+        .eq('invite_token', normalizedInviteToken)
+        .maybeSingle();
+      if (error) {
+        handleSharedProjectsBackendError(error, 'fetch-by-token');
+        return null;
+      }
+      return data || null;
+    } catch (error) {
+      handleSharedProjectsBackendError(error, 'fetch-by-token-exception');
+      return null;
+    }
+  }
+
+  async function ensureSharedProjectMembership(projectKey, { createIfMissing = false, title = '', inviteToken = '', visibility = 'private' } = {}) {
+    if (!canUseSharedProjectsBackend()) {
+      return null;
+    }
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey);
+    if (!normalizedProjectKey) {
+      return null;
+    }
+    try {
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase) {
+        return null;
+      }
+      let project = await fetchSharedProjectRecord(normalizedProjectKey);
+      if (!project && createIfMissing) {
+        const insertPayload = {
+          project_key: normalizedProjectKey,
+          owner_user_id: accountState.userId,
+          title: createSharedProjectSnapshotTitle(title),
+          invite_token: (typeof inviteToken === 'string' && inviteToken.trim()) || createSharedProjectInviteToken(),
+          visibility: visibility === MULTI_ROOM_VISIBILITY_PUBLIC ? 'public' : 'shared',
+        };
+        const inserted = await supabase
+          .from('shared_projects')
+          .upsert(insertPayload, { onConflict: 'project_key' })
+          .select('id, project_key, invite_token, visibility, owner_user_id, title, latest_snapshot, latest_revision, latest_structure_revision, updated_at, created_at')
+          .maybeSingle();
+        if (inserted.error) {
+          handleSharedProjectsBackendError(inserted.error, 'create-project');
+          return null;
+        }
+        project = inserted.data || null;
+      }
+      if (!project) {
+        return null;
+      }
+      const membershipPayload = {
+        project_key: normalizedProjectKey,
+        project_id: project.id,
+        user_id: accountState.userId,
+        role: project.owner_user_id === accountState.userId ? 'owner' : 'editor',
+        last_opened_at: new Date().toISOString(),
+      };
+      const membership = await supabase
+        .from('shared_project_members')
+        .upsert(membershipPayload, { onConflict: 'project_key,user_id' });
+      if (membership.error) {
+        handleSharedProjectsBackendError(membership.error, 'ensure-membership');
+      }
+      return project;
+    } catch (error) {
+      handleSharedProjectsBackendError(error, 'ensure-membership-exception');
+      return null;
+    }
+  }
+
+  async function loadSharedProjectSnapshotRecord(projectKey, { createIfMissing = false, title = '' } = {}) {
+    const project = await ensureSharedProjectMembership(projectKey, { createIfMissing, title });
+    if (!project) {
+      return null;
+    }
+    return project;
+  }
+
+  async function loadSharedProjectSnapshotRecordByInvite(inviteToken, { createIfMissing = false, title = '' } = {}) {
+    const project = await fetchSharedProjectRecordByInviteToken(inviteToken);
+    if (!project) {
+      return null;
+    }
+    await ensureSharedProjectMembership(project.project_key, {
+      createIfMissing,
+      title: title || project.title,
+      inviteToken: project.invite_token,
+      visibility: project.visibility,
+    });
+    return project;
+  }
+
+  async function refreshActiveSharedProjectSnapshot({ force = false, reason = '' } = {}) {
+    if (!canUseSharedProjectsBackend() || !activeSharedProjectKey) {
+      return false;
+    }
+    if (sharedProjectRefreshInFlight) {
+      return false;
+    }
+    sharedProjectRefreshInFlight = true;
+    try {
+      const project = await fetchSharedProjectRecord(activeSharedProjectKey);
+      if (!project) {
+        return false;
+      }
+      const nextRevision = Math.max(0, Math.round(Number(project.latest_revision) || 0));
+      if (nextRevision <= activeSharedProjectRevision) {
+        return false;
+      }
+      if (!force && !canApplyIncomingSharedProjectSnapshot()) {
+        return false;
+      }
+      const sharedSnapshot = project.latest_snapshot;
+      if (!sharedSnapshot || typeof sharedSnapshot !== 'object') {
+        activeSharedProjectRevision = nextRevision;
+        return false;
+      }
+      const loaded = await loadDocumentFromText(JSON.stringify(sharedSnapshot), null, {
+        projectId: buildSharedRecentProjectId(activeSharedProjectKey),
+        suppressAutosaveStatus: true,
+        openedFromRecent: true,
+        preserveDotStats: true,
+        sharedProjectKey: activeSharedProjectKey,
+        sharedProjectRevision: nextRevision,
+      });
+      if (!loaded) {
+        return false;
+      }
+      setActiveSharedProjectSession(
+        activeSharedProjectKey,
+        nextRevision,
+        Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
+        project.id || ''
+      );
+      await upsertSharedRecentProjectEntry({
+        projectKey: activeSharedProjectKey,
+        projectId: project.id || '',
+        inviteToken: project.invite_token || '',
+        visibility: project.visibility || 'private',
+        name: createSharedProjectSnapshotTitle(project.title || activeSharedProjectKey),
+        roleHint: normalizeMultiDesiredRole(multiState.role || multiState.desiredRole || 'spectator'),
+        autoJoin: false,
+        revision: nextRevision,
+        structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
+      });
+      if (reason) {
+        updateAutosaveStatus(
+          localizeText('共有プロジェクトの最新内容を反映しました', 'Shared project updated'),
+          'info'
+        );
+      }
+      return true;
+    } catch (error) {
+      handleSharedProjectsBackendError(error, `refresh-${reason || 'snapshot'}`);
+      return false;
+    } finally {
+      sharedProjectRefreshInFlight = false;
+    }
+  }
+
+  async function persistSharedProjectSnapshot(projectKey, packagedPayload, { title = '', revision = null } = {}) {
+    if (!canUseSharedProjectsBackend()) {
+      return null;
+    }
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey);
+    if (!normalizedProjectKey || !packagedPayload || typeof packagedPayload !== 'object') {
+      return null;
+    }
+    const project = await ensureSharedProjectMembership(normalizedProjectKey, { createIfMissing: true, title });
+    if (!project) {
+      return null;
+    }
+    try {
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase) {
+        return null;
+      }
+      const nextRevision = Number.isFinite(Number(revision))
+        ? Math.max(0, Math.round(Number(revision)))
+        : Math.max(0, Math.round(Number(project.latest_revision) || 0) + 1);
+      const opType = classifySharedProjectOpType(packagedPayload?.sharedHistoryLabel || '');
+      const nextStructureRevision = opType === 'structure'
+        ? Math.max(0, Math.round(Number(project.latest_structure_revision) || 0) + 1)
+        : Math.max(0, Math.round(Number(project.latest_structure_revision) || 0));
+      const payload = {
+        project_key: normalizedProjectKey,
+        title: createSharedProjectSnapshotTitle(title || state.documentName || DEFAULT_DOCUMENT_NAME),
+        latest_snapshot: packagedPayload,
+        latest_revision: nextRevision,
+        latest_structure_revision: nextStructureRevision,
+      };
+      const { data, error } = await supabase
+        .from('shared_projects')
+        .update(payload)
+        .eq('project_key', normalizedProjectKey)
+        .select('id, project_key, invite_token, visibility, owner_user_id, title, latest_snapshot, latest_revision, latest_structure_revision, updated_at, created_at')
+        .maybeSingle();
+      if (error) {
+        handleSharedProjectsBackendError(error, 'persist');
+        return null;
+      }
+      return data || null;
+    } catch (error) {
+      handleSharedProjectsBackendError(error, 'persist-exception');
+      return null;
+    }
+  }
+
+  async function appendSharedProjectOp(projectRecord, {
+    revision = 0,
+    baseRevision = 0,
+    structureRevision = 0,
+    historyLabel = '',
+    opType = '',
+    opPayload = null,
+  } = {}) {
+    if (!canUseSharedProjectsBackend() || !projectRecord?.id || !accountState.userId) {
+      return null;
+    }
+    try {
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase) {
+        return null;
+      }
+      const payload = {
+        project_id: projectRecord.id,
+        revision: Math.max(0, Math.round(Number(revision) || 0)),
+        base_revision: Math.max(0, Math.round(Number(baseRevision) || 0)),
+        structure_revision: Math.max(0, Math.round(Number(structureRevision) || 0)),
+        op_type: opType || classifySharedProjectOpType(historyLabel),
+        actor_user_id: accountState.userId,
+        payload: {
+          historyLabel: String(historyLabel || ''),
+          documentName: state.documentName || DEFAULT_DOCUMENT_NAME,
+          activeCanvasId: getActiveProjectCanvasDocument()?.id || '',
+          activeFrame: clamp(Math.round(Number(state.activeFrame) || 0), 0, Math.max(0, (state.frames?.length || 1) - 1)),
+          createdAt: new Date().toISOString(),
+          op: opPayload && typeof opPayload === 'object' ? opPayload : null,
+        },
+      };
+      const { error } = await supabase.from('shared_project_ops').insert(payload);
+      if (error) {
+        handleSharedProjectsBackendError(error, 'append-op');
+        return null;
+      }
+      return payload;
+    } catch (error) {
+      handleSharedProjectsBackendError(error, 'append-op-exception');
+      return null;
+    }
+  }
+
+  async function syncSharedRecentProjectsFromAccount() {
+    if (!canUseSharedProjectsBackend()) {
+      return [];
+    }
+    try {
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase) {
+        return [];
+      }
+      const membershipResponse = await supabase
+        .from('shared_project_members')
+        .select('project_key, role, updated_at, joined_at')
+        .eq('user_id', accountState.userId);
+      if (membershipResponse.error) {
+        handleSharedProjectsBackendError(membershipResponse.error, 'list-memberships');
+        return [];
+      }
+      const memberships = Array.isArray(membershipResponse.data) ? membershipResponse.data : [];
+      if (!memberships.length) {
+        return [];
+      }
+      const projectKeys = memberships
+        .map(entry => normalizeMultiProjectKey(entry?.project_key || ''))
+        .filter(Boolean);
+      if (!projectKeys.length) {
+        return [];
+      }
+      const projectsResponse = await supabase
+        .from('shared_projects')
+        .select('id, project_key, invite_token, visibility, title, latest_revision, latest_structure_revision, updated_at')
+        .in('project_key', projectKeys);
+      if (projectsResponse.error) {
+        handleSharedProjectsBackendError(projectsResponse.error, 'list-projects');
+        return [];
+      }
+      const projectsByKey = new Map(
+        (Array.isArray(projectsResponse.data) ? projectsResponse.data : []).map(entry => [
+          normalizeMultiProjectKey(entry?.project_key || ''),
+          entry,
+        ])
+      );
+      const normalizedEntries = [];
+      for (let index = 0; index < memberships.length; index += 1) {
+        const membership = memberships[index];
+        const projectKey = normalizeMultiProjectKey(membership?.project_key || '');
+        if (!projectKey) {
+          continue;
+        }
+        const project = projectsByKey.get(projectKey) || null;
+        const sharedEntry = await upsertSharedRecentProjectEntry({
+          projectKey,
+          projectId: project?.id || '',
+          inviteToken: project?.invite_token || '',
+          visibility: project?.visibility || 'private',
+          name: createSharedProjectSnapshotTitle(project?.title || projectKey),
+          roleHint: membership?.role === 'owner' ? 'master' : 'guest',
+          autoJoin: false,
+          revision: Math.max(0, Math.round(Number(project?.latest_revision) || 0)),
+          structureRevision: Math.max(0, Math.round(Number(project?.latest_structure_revision) || 0)),
+        });
+        if (sharedEntry) {
+          normalizedEntries.push(sharedEntry);
+        }
+      }
+      return normalizedEntries;
+    } catch (error) {
+      handleSharedProjectsBackendError(error, 'sync-recent-projects-exception');
+      return [];
+    }
+  }
+
+  function queueSharedProjectSnapshotPersist(packagedPayload, {
+    projectKey = '',
+    title = '',
+    historyLabel = '',
+  } = {}) {
+    if (!canUseSharedProjectsBackend()) {
+      return;
+    }
+    const resolvedProjectKey = resolveSharedProjectKeyForCurrentState(projectKey);
+    if (!resolvedProjectKey || !packagedPayload || typeof packagedPayload !== 'object') {
+      return;
+    }
+    sharedProjectSyncQueuedPayload = {
+      projectKey: resolvedProjectKey,
+      title: createSharedProjectSnapshotTitle(title || state.documentName || DEFAULT_DOCUMENT_NAME),
+      historyLabel: String(historyLabel || ''),
+      baseRevision: activeSharedProjectRevision,
+      baseStructureRevision: activeSharedProjectStructureRevision,
+      packagedPayload: {
+        ...packagedPayload,
+        sharedHistoryLabel: String(historyLabel || ''),
+      },
+    };
+    if (sharedProjectSyncTimer !== null) {
+      window.clearTimeout(sharedProjectSyncTimer);
+    }
+    sharedProjectSyncTimer = window.setTimeout(async () => {
+      sharedProjectSyncTimer = null;
+      if (sharedProjectSyncInFlight || !sharedProjectSyncQueuedPayload) {
+        return;
+      }
+      const nextPayload = sharedProjectSyncQueuedPayload;
+      sharedProjectSyncQueuedPayload = null;
+      sharedProjectSyncInFlight = true;
+      try {
+        const classifiedOpType = classifySharedProjectOpType(nextPayload.historyLabel);
+        const opPayload = classifiedOpType === 'draw'
+          ? buildSharedProjectDrawOpPayload(nextPayload.historyLabel)
+          : classifiedOpType === 'structure'
+            ? buildSharedProjectStructureOpPayload(nextPayload.historyLabel)
+            : null;
+        const saved = await persistSharedProjectSnapshot(
+          nextPayload.projectKey,
+          nextPayload.packagedPayload,
+          { title: nextPayload.title }
+        );
+        if (saved) {
+          const nextStructureRevision = Math.max(
+            0,
+            Math.round(Number(saved.latest_structure_revision) || nextPayload.baseStructureRevision || 0)
+          );
+          if (nextPayload.projectKey === activeSharedProjectKey) {
+            activeSharedProjectRevision = Math.max(0, Math.round(Number(saved.latest_revision) || activeSharedProjectRevision));
+            activeSharedProjectStructureRevision = nextStructureRevision;
+            markDocumentDurablySaved();
+          }
+          await appendSharedProjectOp(saved, {
+            revision: Math.max(0, Math.round(Number(saved.latest_revision) || 0)),
+            baseRevision: Math.max(0, Math.round(Number(nextPayload.baseRevision) || 0)),
+            structureRevision: nextStructureRevision,
+            historyLabel: nextPayload.historyLabel,
+            opType: classifiedOpType,
+            opPayload,
+          });
+          await upsertSharedRecentProjectEntry({
+            projectKey: nextPayload.projectKey,
+            projectId: saved.id || '',
+            inviteToken: saved.invite_token || '',
+            visibility: saved.visibility || 'private',
+            name: createSharedProjectSnapshotTitle(saved.title || nextPayload.title),
+            roleHint: normalizeMultiDesiredRole(multiState.role || multiState.desiredRole || 'spectator'),
+            autoJoin: false,
+            revision: Math.max(0, Math.round(Number(saved.latest_revision) || 0)),
+            structureRevision: nextStructureRevision,
+          });
+        }
+      } finally {
+        sharedProjectSyncInFlight = false;
+        if (sharedProjectSyncQueuedPayload) {
+          queueSharedProjectSnapshotPersist(
+            sharedProjectSyncQueuedPayload.packagedPayload,
+            {
+              projectKey: sharedProjectSyncQueuedPayload.projectKey,
+              title: sharedProjectSyncQueuedPayload.title,
+              historyLabel: sharedProjectSyncQueuedPayload.historyLabel,
+            }
+          );
+        }
+      }
+    }, SHARED_PROJECT_SYNC_DELAY);
+  }
+
+  function queueSharedProjectRefresh({ immediate = false, reason = '' } = {}) {
+    if (!activeSharedProjectKey || !canUseSharedProjectsBackend()) {
+      return;
+    }
+    if (sharedProjectRefreshTimer !== null) {
+      window.clearTimeout(sharedProjectRefreshTimer);
+      sharedProjectRefreshTimer = null;
+    }
+    const delayMs = immediate ? 0 : SHARED_PROJECT_SYNC_DELAY;
+    sharedProjectRefreshTimer = window.setTimeout(() => {
+      sharedProjectRefreshTimer = null;
+      refreshActiveSharedProjectSnapshot({ reason }).catch(error => {
+        console.warn('Failed to refresh shared project snapshot', error);
+      });
+    }, delayMs);
+  }
+
+  function queueSharedProjectCurrentSnapshotCapture({
+    delayMs = SHARED_PROJECT_SYNC_DELAY,
+    projectKey = '',
+    title = '',
+    historyLabel = '',
+  } = {}) {
+    if (!canUseSharedProjectsBackend()) {
+      return;
+    }
+    const resolvedProjectKey = resolveSharedProjectKeyForCurrentState(projectKey);
+    if (!resolvedProjectKey || !hasDocumentUnsavedChanges()) {
+      return;
+    }
+    if (sharedProjectCaptureTimer !== null) {
+      window.clearTimeout(sharedProjectCaptureTimer);
+      sharedProjectCaptureTimer = null;
+    }
+    sharedProjectCaptureTimer = window.setTimeout(() => {
+      sharedProjectCaptureTimer = null;
+      if (!canUseSharedProjectsBackend() || !hasDocumentUnsavedChanges()) {
+        return;
+      }
+      if (resolvedProjectKey !== resolveSharedProjectKeyForCurrentState(resolvedProjectKey)) {
+        return;
+      }
+      const snapshot = makeHistorySnapshot({ clonePixelData: false });
+      const session = buildAutosaveSessionPayload();
+      const packaged = buildPackagedProjectPayload(snapshot, { session });
+      queueSharedProjectSnapshotPersist(packaged, {
+        projectKey: resolvedProjectKey,
+        title: createSharedProjectSnapshotTitle(title || state.documentName || DEFAULT_DOCUMENT_NAME),
+        historyLabel,
+      });
+    }, Math.max(0, Math.round(Number(delayMs) || 0)));
+  }
+
+  async function disconnectActiveSharedProjectRealtimeChannel() {
+    const channel = activeSharedProjectChannel;
+    activeSharedProjectChannel = null;
+    activeSharedProjectChannelKey = '';
+    if (!channel) {
+      return;
+    }
+    try {
+      if (typeof channel.unsubscribe === 'function') {
+        await channel.unsubscribe();
+      }
+    } catch (error) {
+      // Ignore unsubscribe failures.
+    }
+  }
+
+  async function ensureActiveSharedProjectRealtimeChannel() {
+    if (!canUseSharedProjectsBackend() || !activeSharedProjectKey) {
+      return null;
+    }
+    if (
+      activeSharedProjectChannel
+      && activeSharedProjectChannelKey === activeSharedProjectKey
+    ) {
+      return activeSharedProjectChannel;
+    }
+    await disconnectActiveSharedProjectRealtimeChannel();
+    const supabase = await ensurePixieedAccountClient();
+    if (!supabase) {
+      return null;
+    }
+    const projectKey = activeSharedProjectKey;
+    const channel = supabase.channel(`shared-project:${projectKey}`);
+    channel.on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'shared_projects',
+        filter: `project_key=eq.${projectKey}`,
+      },
+      payload => {
+        const nextRevision = Math.max(0, Math.round(Number(payload?.new?.latest_revision) || 0));
+        if (projectKey !== activeSharedProjectKey) {
+          return;
+        }
+        if (nextRevision <= activeSharedProjectRevision) {
+          return;
+        }
+        queueSharedProjectRefresh({ immediate: true, reason: 'realtime' });
+      }
+    );
+    if (activeSharedProjectId) {
+      channel.on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'shared_project_ops',
+          filter: `project_id=eq.${activeSharedProjectId}`,
+        },
+        payload => {
+          if (projectKey !== activeSharedProjectKey) {
+            return;
+          }
+          if (payload?.new?.actor_user_id && payload.new.actor_user_id === accountState.userId) {
+            return;
+          }
+          const nextRevision = Math.max(0, Math.round(Number(payload?.new?.revision) || 0));
+          const nextStructureRevision = Math.max(0, Math.round(Number(payload?.new?.structure_revision) || 0));
+          if (
+            nextRevision <= activeSharedProjectRevision
+            && nextStructureRevision <= activeSharedProjectStructureRevision
+          ) {
+            return;
+          }
+          const opType = typeof payload?.new?.op_type === 'string' ? payload.new.op_type.trim() : '';
+          const baseRevision = Math.max(0, Math.round(Number(payload?.new?.base_revision) || 0));
+          if (
+            opType === 'draw'
+            && nextStructureRevision === activeSharedProjectStructureRevision
+            && baseRevision <= activeSharedProjectRevision
+            && nextRevision === activeSharedProjectRevision + 1
+            && applyIncomingSharedProjectDrawOp(payload.new)
+          ) {
+            activeSharedProjectRevision = nextRevision;
+            return;
+          }
+          if (opType === 'structure') {
+            queueSharedProjectRefresh({ immediate: true, reason: 'structure-op' });
+            return;
+          }
+          queueSharedProjectRefresh({ immediate: true, reason: 'op-realtime' });
+        }
+      );
+    }
+    await new Promise((resolve, reject) => {
+      let settled = false;
+      const timeout = window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reject(new Error('Shared project realtime subscribe timed out'));
+      }, 15000);
+      channel.subscribe(status => {
+        if (status === 'SUBSCRIBED' && !settled) {
+          settled = true;
+          window.clearTimeout(timeout);
+          resolve();
+          return;
+        }
+        if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && !settled) {
+          settled = true;
+          window.clearTimeout(timeout);
+          reject(new Error(`Shared project realtime failed: ${status}`));
+        }
+      });
+    });
+    activeSharedProjectChannel = channel;
+    activeSharedProjectChannelKey = projectKey;
+    return channel;
+  }
+
   async function ensurePixieedAccountClient() {
     if (accountState.supabase) {
       return accountState.supabase;
@@ -49962,6 +51837,7 @@
       const module = await import(MULTI_SUPABASE_MODULE_URL);
       const supabase = module.createClient(MULTI_SUPABASE_URL, MULTI_SUPABASE_ANON_KEY, {
         global: { headers: { 'x-client-id': multiState.clientId || '' } },
+        auth: { storageKey: 'pixieed-account-auth' },
       });
       accountState.supabase = supabase;
       return supabase;
@@ -49979,6 +51855,7 @@
     accountState.isLoggedIn = Boolean(accountState.userId);
     if (!accountState.isLoggedIn) {
       accountState.profile = { nickname: '', avatarId: '', xUrl: '' };
+      disconnectActiveSharedProjectRealtimeChannel().catch(() => {});
     }
   }
 
@@ -50012,6 +51889,15 @@
           .select(selectColumns)
           .eq('id', userId)
           .maybeSingle());
+      }
+      if (shouldIgnorePixieedProfileError(error)) {
+        accountState.profile = {
+          nickname: localNick,
+          avatarId: normalizePixieedAvatarId(localAvatar),
+          xUrl: localXUrl,
+        };
+        updatePixieedAccountUi();
+        return accountState.profile;
       }
       if (error) throw error;
       const serverNick = typeof data?.nickname === 'string' ? data.nickname.trim() : '';
@@ -50122,6 +52008,7 @@
       applyPixieedAccountSession(data?.session || null);
       if (accountState.isLoggedIn) {
         await syncPixieedAccountProfile();
+        await syncSharedRecentProjectsFromAccount();
       } else {
         updatePixieedAccountUi();
       }
@@ -50129,6 +52016,7 @@
         applyPixieedAccountSession(session || null);
         if (accountState.isLoggedIn) {
           await syncPixieedAccountProfile();
+          await syncSharedRecentProjectsFromAccount();
         } else {
           updatePixieedAccountUi();
         }
@@ -50652,6 +52540,9 @@
   }
 
   function canNormalizeMultiAssignmentsForCanvasDocuments(canvasDocs, { announce = false } = {}) {
+    if (isSharedProjectCollaborativeMode()) {
+      return true;
+    }
     if (!isMultiMasterMode() || !(multiState.assignments instanceof Map) || !multiState.assignments.size) {
       return true;
     }
@@ -50679,6 +52570,9 @@
   }
 
   function normalizeMultiAssignmentsForCurrentDocument() {
+    if (isSharedProjectCollaborativeMode()) {
+      return;
+    }
     const fallbackCanvasDoc = getActiveProjectCanvasDocument() || getProjectCanvasDocumentAt(0);
     const canvasDocs = getProjectCanvasDocuments().filter(canvas => canvas && Array.isArray(canvas.frames) && canvas.frames.length);
     if (!canvasDocs.length) {
@@ -50806,6 +52700,32 @@
   }
 
   function syncMultiAssignmentControls() {
+    if (isSharedProjectCollaborativeMode()) {
+      const controls = [
+        dom.controls.multiAssignTarget,
+        dom.controls.multiAssignFrame,
+        dom.controls.multiAssignLayer,
+        dom.controls.multiAssignApply,
+        dom.controls.multiAssignLockToggle,
+        dom.controls.multiAssignKick,
+        dom.controls.multiAssignBan,
+        dom.controls.multiRoleTarget,
+        dom.controls.multiForceGuest,
+        dom.controls.multiForceSpectator,
+        dom.controls.multiBlockedTarget,
+        dom.controls.multiBlockedRemove,
+      ];
+      controls.forEach(control => {
+        if (control instanceof HTMLButtonElement || control instanceof HTMLInputElement || control instanceof HTMLSelectElement) {
+          control.disabled = true;
+        }
+      });
+      if (dom.controls.multiAssignmentField instanceof HTMLElement) {
+        dom.controls.multiAssignmentField.hidden = true;
+      }
+      syncMultiBlockedControls();
+      return;
+    }
     normalizeMultiAssignmentsForCurrentDocument();
     prunePendingMultiAssignmentMoveRequests();
     const select = dom.controls.multiAssignTarget;
@@ -51753,6 +53673,27 @@
     container.appendChild(chip);
   }
 
+  function setMultiEntryActionCopy(button, {
+    title = '',
+    meta = '',
+    titleSelector = '',
+    metaSelector = '',
+  } = {}) {
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    const titleNode = titleSelector ? document.querySelector(titleSelector) : null;
+    const metaNode = metaSelector ? document.querySelector(metaSelector) : null;
+    if (titleNode instanceof HTMLElement) {
+      titleNode.textContent = title;
+      if (metaNode instanceof HTMLElement) {
+        metaNode.textContent = meta;
+        return;
+      }
+    }
+    button.textContent = [title, meta].filter(Boolean).join(' ');
+  }
+
   function renderMultiOverview() {
     const overview = dom.controls.multiOverview;
     const chips = dom.controls.multiOverviewChips;
@@ -51765,8 +53706,14 @@
       chips.innerHTML = '';
     }
 
-    let summaryText = localizeText('部屋を開くか、プロジェクトキーを入力して参加してください。', 'Open a room or enter a project key to join.');
-    let hintText = localizeText('参加者一覧から参加申請、承認、セル移動を操作できます。', 'Use the participant list for join requests, approval, and cell movement.');
+    let summaryText = localizeText(
+      '共有を作るか、共有リンクを貼り付けて同じプロジェクトを開いてください。',
+      'Create shared or paste an invite link to open the same project.'
+    );
+    let hintText = localizeText(
+      '共有プロジェクトは参加者の一覧にも保存され、あとから同じ状態で開き直せます。',
+      'Shared projects stay in each member project list and can be reopened later.'
+    );
 
     const pushChip = (label, tone = 'neutral') => {
       if (chips instanceof HTMLElement) {
@@ -51774,21 +53721,39 @@
       }
     };
 
-    if (multiState.connecting) {
+    if (prefersSharedProjectFlow() && !activeSharedProjectKey && !multiState.connecting) {
+      pushChip(localizeText('共有モードOFF', 'Shared Mode Off'), 'neutral');
+      summaryText = localizeText(
+        '共有モードはOFFです。ONにするとこのプロジェクトを共有できます。',
+        'Shared mode is off. Turn it on to share this project.'
+      );
+      hintText = localizeText(
+        '共有モードをONにしたあと、共有URLをコピーして他の人に送ってください。',
+        'Turn on shared mode, then copy the share URL and send it to others.'
+      );
+    } else if (multiState.connecting) {
       const pendingRole = normalizeMultiDesiredRole(multiState.desiredRole);
       pushChip(localizeText('接続中', 'Connecting'), 'info');
-      pushChip(
-        pendingRole === 'master'
-          ? localizeText('部屋作成', 'Open Room')
-          : (pendingRole === 'guest'
-            ? localizeText('参加申請', 'Join Request')
-            : localizeText('視聴', 'Viewer')),
-        pendingRole === 'master'
-          ? 'master'
-          : (pendingRole === 'guest' ? 'guest' : 'spectator')
+      pushChip(localizeText('共有準備中', 'Preparing Shared'), 'info');
+      summaryText = localizeText(
+        '共有プロジェクトを準備しています。完了するとそのまま共同編集できます。',
+        'Preparing the shared project. You can edit together as soon as it is ready.'
       );
-      summaryText = localizeText('接続中です。参加者一覧とコメント欄を準備しています。', 'Connecting. Preparing the participant list and comments.');
-      hintText = localizeText('接続が完了すると、今の役割に応じた操作内容がここに表示されます。', 'Available actions for your role will appear here after connection.');
+      hintText = localizeText(
+        '共有リンクとプロジェクト一覧の両方から同じプロジェクトを開けます。',
+        'The same project can be reopened from either the invite link or your project list.'
+      );
+    } else if (isSharedProjectCollaborativeMode()) {
+      pushChip(localizeText('共有プロジェクト', 'Shared Project'), 'success');
+      pushChip(localizeText('全員編集可', 'Collaborative Edit'), 'info');
+      summaryText = localizeText(
+        'この共有プロジェクトでは、ソロに近い操作感で全員が編集できます。',
+        'Everyone can edit this shared project with a workflow close to solo editing.'
+      );
+      hintText = localizeText(
+        '描画はリアルタイム反映され、下のメンバー一覧で今だれが共有中か確認できます。',
+        'Drawing updates live, and the member list below shows who is currently sharing.'
+      );
     } else if (isMultiMasterMode()) {
       pushChip(getMultiRoleLabel('master'), 'master');
       pushChip(localizeText(`参加枠 ${getAssignedGuestCount()} / ${multiState.maxGuests}`, `Slots ${getAssignedGuestCount()} / ${multiState.maxGuests}`), 'info');
@@ -51884,9 +53849,18 @@
   }
 
   function setMultiStatus(message, tone = 'info') {
-    const text = typeof message === 'string' && message.trim()
+    let text = typeof message === 'string' && message.trim()
       ? message.trim()
       : localizeText('共有モード: OFF', 'Collab mode: OFF');
+    if (prefersSharedProjectFlow()) {
+      if (multiState.connecting) {
+        text = localizeText('共有モード: 準備中…', 'Shared mode: preparing…');
+      } else if (activeSharedProjectKey || isSharedProjectCollaborativeMode()) {
+        text = localizeText('共有モード: ON', 'Shared mode: ON');
+      } else {
+        text = localizeText('共有モード: OFF', 'Shared mode: OFF');
+      }
+    }
     multiState.status = text;
     const node = dom.controls.multiStatus;
     if (!(node instanceof HTMLElement)) {
@@ -51932,9 +53906,9 @@
 
   async function copyMultiInviteLink() {
     const inviteRole = resolveMultiInviteDefaultRole();
-    const inviteUrl = buildMultiInviteUrl(multiState.projectKey, { role: inviteRole });
+    const inviteUrl = buildMultiInviteUrl(activeSharedProjectKey || multiState.projectKey, { role: inviteRole, autoJoin: false });
     if (!inviteUrl) {
-      setMultiStatus(localizeText('招待リンク作成にはプロジェクトキーが必要です', 'A project key is required to create an invite link'), 'warn');
+      setMultiStatus(localizeText('先に共有モードをONにしてください', 'Turn on shared mode first'), 'warn');
       return false;
     }
     const copied = await writeTextToClipboard(inviteUrl);
@@ -51948,9 +53922,9 @@
 
   async function shareMultiInviteLink() {
     const inviteRole = resolveMultiInviteDefaultRole();
-    const inviteUrl = buildMultiInviteUrl(multiState.projectKey, { role: inviteRole });
+    const inviteUrl = buildMultiInviteUrl(activeSharedProjectKey || multiState.projectKey, { role: inviteRole, autoJoin: false });
     if (!inviteUrl) {
-      setMultiStatus(localizeText('招待リンク作成にはプロジェクトキーが必要です', 'A project key is required to create an invite link'), 'warn');
+      setMultiStatus(localizeText('先に共有モードをONにしてください', 'Turn on shared mode first'), 'warn');
       return false;
     }
     if (typeof navigator?.share === 'function') {
@@ -52274,7 +54248,11 @@
   }
 
   function updateMultiFlowTabsUi() {
-    const activeTab = normalizeMultiFlowTab(multiState.activeTab);
+    const showCommentsTab = !prefersSharedProjectFlow() && multiState.connected;
+    let activeTab = normalizeMultiFlowTab(multiState.activeTab);
+    if (!showCommentsTab && activeTab === 'comments') {
+      activeTab = 'collab';
+    }
     multiState.activeTab = activeTab;
     const panels = {
       collab: dom.controls.multiFlowCollabPanel,
@@ -52282,13 +54260,17 @@
     };
     getMultiFlowTabButtons().forEach(button => {
       const tab = normalizeMultiFlowTab(button.dataset.multiFlowTab || '');
+      if (tab === 'comments') {
+        button.hidden = !showCommentsTab;
+        button.setAttribute('aria-hidden', String(!showCommentsTab));
+      }
       const isActive = tab === activeTab;
       button.classList.toggle('is-active', isActive);
       button.setAttribute('aria-selected', String(isActive));
       button.setAttribute('tabindex', isActive ? '0' : '-1');
       const panel = panels[tab];
       if (panel instanceof HTMLElement) {
-        panel.hidden = !isActive;
+        panel.hidden = !isActive || (tab === 'comments' && !showCommentsTab);
       }
     });
     if (activeTab === 'comments') {
@@ -52367,11 +54349,17 @@
   }
 
   function isMultiReadOnlyMode() {
+    if (isSharedProjectCollaborativeMode()) {
+      return false;
+    }
     return isMultiGuestMode() || isMultiSpectatorMode();
   }
 
   function isMultiClientScopedHistoryMode() {
     if (!multiState.connected) {
+      return false;
+    }
+    if (isSharedProjectCollaborativeMode()) {
       return false;
     }
     return isMultiGuestMode() || isMultiSpectatorMode();
@@ -52497,15 +54485,19 @@
   }
 
   function syncMultiPanelFlowUi() {
+    const sharedProjectFlowPreferred = prefersSharedProjectFlow();
     const isEntry = !multiState.connected
       && !multiState.connecting
       && normalizeMultiUiView(multiState.uiView) === 'entry';
     if (!isEntry && multiEntryJoinPanelOpen) {
       multiEntryJoinPanelOpen = false;
     }
-    const showJoinPanel = isEntry && multiEntryJoinPanelOpen;
+    if (sharedProjectFlowPreferred && isEntry) {
+      multiEntryJoinPanelOpen = true;
+    }
+    const showJoinPanel = isEntry && !sharedProjectFlowPreferred && multiEntryJoinPanelOpen;
     const showJoinProjectKeyField = showJoinPanel;
-    const showFlowProjectKeyField = !isEntry;
+    const showFlowProjectKeyField = !sharedProjectFlowPreferred && !isEntry;
     const selectedRole = normalizeMultiDesiredRole(
       multiState.connected
         ? multiState.role
@@ -52523,19 +54515,22 @@
       dom.controls.multiProjectKeyField.setAttribute('aria-hidden', String(!showFlowProjectKeyField));
     }
     if (dom.controls.multiEntryScreen instanceof HTMLElement) {
-      dom.controls.multiEntryScreen.hidden = !isEntry;
+      dom.controls.multiEntryScreen.hidden = sharedProjectFlowPreferred || !isEntry;
     }
     if (dom.controls.multiEntryActions instanceof HTMLElement) {
-      dom.controls.multiEntryActions.hidden = showJoinPanel;
-      dom.controls.multiEntryActions.setAttribute('aria-hidden', String(showJoinPanel));
+      const hideEntryActions = showJoinPanel && !sharedProjectFlowPreferred;
+      dom.controls.multiEntryActions.hidden = hideEntryActions;
+      dom.controls.multiEntryActions.setAttribute('aria-hidden', String(hideEntryActions));
+      dom.controls.multiEntryActions.dataset.sharedSingle = sharedProjectFlowPreferred && isEntry ? 'true' : 'false';
     }
     if (dom.controls.multiEntryJoinPanel instanceof HTMLElement) {
       dom.controls.multiEntryJoinPanel.hidden = !showJoinPanel;
       dom.controls.multiEntryJoinPanel.setAttribute('aria-hidden', String(!showJoinPanel));
     }
     if (dom.controls.multiEntryHint instanceof HTMLElement) {
-      dom.controls.multiEntryHint.hidden = showJoinPanel;
-      dom.controls.multiEntryHint.setAttribute('aria-hidden', String(showJoinPanel));
+      const hideEntryHint = showJoinPanel && !sharedProjectFlowPreferred;
+      dom.controls.multiEntryHint.hidden = hideEntryHint;
+      dom.controls.multiEntryHint.setAttribute('aria-hidden', String(hideEntryHint));
     }
     if (dom.controls.multiEntryJoinHint instanceof HTMLElement) {
       dom.controls.multiEntryJoinHint.hidden = !showJoinPanel;
@@ -52546,17 +54541,19 @@
       dom.controls.multiEntryGuest.setAttribute('aria-controls', 'multiEntryJoinPanel');
     }
     if (dom.controls.multiFlowPanel instanceof HTMLElement) {
-      dom.controls.multiFlowPanel.hidden = isEntry;
+      dom.controls.multiFlowPanel.hidden = sharedProjectFlowPreferred ? false : isEntry;
     }
     if (isEntry) {
       setMultiHelpPanelVisible(false);
     }
     if (dom.controls.multiRoleLabel instanceof HTMLElement) {
-      dom.controls.multiRoleLabel.textContent = selectedRole === 'master'
-        ? localizeText('マスター設定', 'Master Setup')
-        : (selectedRole === 'spectator'
-          ? localizeText('視聴者設定', 'Viewer Setup')
-          : localizeText('参加リクエスト設定', 'Join Request Setup'));
+      dom.controls.multiRoleLabel.textContent = sharedProjectFlowPreferred
+        ? localizeText('共有プロジェクト', 'Shared Project')
+        : (selectedRole === 'master'
+          ? localizeText('マスター設定', 'Master Setup')
+          : (selectedRole === 'spectator'
+            ? localizeText('視聴者設定', 'Viewer Setup')
+            : localizeText('参加リクエスト設定', 'Join Request Setup')));
     }
     if (dom.controls.multiStartSession instanceof HTMLButtonElement) {
       let startLabel = selectedRole === 'master'
@@ -52753,7 +54750,7 @@
       const presenceRole = normalizeMultiRole(entry.role, 'guest');
       rows.push({
         clientId: entry.clientId,
-        role: assignment?.role === 'master' ? 'master' : presenceRole,
+        role: isSharedProjectCollaborativeMode() ? 'guest' : (assignment?.role === 'master' ? 'master' : presenceRole),
         name: normalizeMultiParticipantName(entry.name || assignment?.name, DEFAULT_MULTI_PARTICIPANT_NAME),
         online: true,
         joinedAt: Number(entry.joinedAt) || now,
@@ -52761,7 +54758,8 @@
       });
       seen.add(entry.clientId);
     });
-    multiState.assignments.forEach(assignment => {
+    if (!isSharedProjectCollaborativeMode()) {
+      multiState.assignments.forEach(assignment => {
       if (!assignment || !assignment.clientId || seen.has(assignment.clientId)) {
         return;
       }
@@ -52776,7 +54774,8 @@
         joinedAt: Number(assignment.joinedAt) || now,
         locked: Boolean(assignment.locked),
       });
-    });
+      });
+    }
     rows.sort((a, b) => {
       if (a.role !== b.role) {
         return getRoleSortWeight(a.role) - getRoleSortWeight(b.role);
@@ -52818,9 +54817,74 @@
     if (!(list instanceof HTMLElement)) {
       return;
     }
+    const countNode = document.getElementById('multiParticipantsCount');
     list.innerHTML = '';
     const rows = buildMultiParticipantRows().map(row => ({ ...row }));
-    if (isMultiMasterMode() && multiState.pendingJoinRequests instanceof Map) {
+    if (prefersSharedProjectFlow()) {
+      rows.sort((a, b) => {
+        const onlineDiff = Number(Boolean(b.online)) - Number(Boolean(a.online));
+        if (onlineDiff !== 0) {
+          return onlineDiff;
+        }
+        const joinedDiff = (a.joinedAt || 0) - (b.joinedAt || 0);
+        if (joinedDiff !== 0) {
+          return joinedDiff;
+        }
+        return String(a.clientId).localeCompare(String(b.clientId));
+      });
+      if (countNode instanceof HTMLElement) {
+        countNode.textContent = String(rows.length);
+      }
+      if (!rows.length) {
+        const empty = document.createElement('li');
+        empty.className = 'help-text';
+        empty.textContent = activeSharedProjectKey
+          ? localizeText('まだ他のメンバーはいません。共有URLを送るとここに表示されます。', 'No other members yet. Share the URL to invite others.')
+          : localizeText('共有モードをONにすると、ここにメンバーが表示されます。', 'Turn on shared mode to show members here.');
+        list.appendChild(empty);
+        return;
+      }
+      rows.forEach(row => {
+        const li = document.createElement('li');
+        li.className = 'multi-participant-item';
+        const plain = document.createElement('div');
+        plain.className = 'multi-participant-item__details is-static';
+        if (row.clientId === multiState.clientId) {
+          plain.classList.add('is-self');
+        }
+        if (!row.online) {
+          plain.classList.add('is-offline');
+        }
+        const summary = document.createElement('div');
+        summary.className = 'multi-participant-item__summary';
+        const main = document.createElement('span');
+        main.className = 'multi-participant-item__main';
+        const nameLine = document.createElement('span');
+        nameLine.className = 'multi-participant-item__name-line';
+        const name = document.createElement('strong');
+        name.className = 'multi-participant-item__name';
+        name.textContent = row.name || DEFAULT_MULTI_PARTICIPANT_NAME;
+        nameLine.appendChild(name);
+        if (row.clientId === multiState.clientId) {
+          const selfTag = document.createElement('span');
+          selfTag.className = 'multi-participant-item__tag multi-participant-item__tag--self';
+          selfTag.textContent = localizeText('あなた', 'You');
+          nameLine.appendChild(selfTag);
+        }
+        const cell = document.createElement('span');
+        cell.className = 'multi-participant-item__cell';
+        cell.textContent = row.online
+          ? localizeText('オンライン', 'Online')
+          : localizeText('オフライン', 'Offline');
+        main.append(nameLine, cell);
+        summary.appendChild(main);
+        plain.appendChild(summary);
+        li.appendChild(plain);
+        list.appendChild(li);
+      });
+      return;
+    }
+    if (!isSharedProjectCollaborativeMode() && isMultiMasterMode() && multiState.pendingJoinRequests instanceof Map) {
       multiState.pendingJoinRequests.forEach(request => {
         if (!request || typeof request !== 'object') {
           return;
@@ -52866,6 +54930,9 @@
       }
       return String(a.clientId).localeCompare(String(b.clientId));
     });
+    if (countNode instanceof HTMLElement) {
+      countNode.textContent = String(rows.length);
+    }
     if (!rows.length) {
       const empty = document.createElement('li');
       empty.className = 'help-text';
@@ -53561,7 +55628,11 @@
       multiState.exportPermission,
       MULTI_DEFAULT_EXPORT_PERMISSION
     );
-    const currentProjectKey = readCurrentMultiProjectKey();
+    const sharedProjectFlowPreferred = prefersSharedProjectFlow();
+    const currentAccess = readCurrentMultiProjectAccessInput();
+    const currentProjectKey = currentAccess.projectKey || readCurrentMultiProjectKey();
+    const hasCurrentProjectLocator = Boolean(currentProjectKey || currentAccess.inviteToken);
+    const sharedModeEnabled = sharedProjectFlowPreferred && Boolean(activeSharedProjectKey);
     const isEntryView = normalizeMultiUiView(multiState.uiView) === 'entry'
       && !multiState.connected
       && !multiState.connecting;
@@ -53572,65 +55643,132 @@
     const isFlowKeyFieldVisible = !isEntryView;
     syncMultiProjectKeyInputValues(multiState.projectKey, { preserveFocused: true });
     if (dom.controls.multiJoinProjectKey instanceof HTMLInputElement) {
-      dom.controls.multiJoinProjectKey.disabled = !isJoinPanelVisible || multiState.connecting || multiState.connected;
+      dom.controls.multiJoinProjectKey.disabled = sharedProjectFlowPreferred
+        ? (multiState.connecting || multiState.connected)
+        : (!isJoinPanelVisible || multiState.connecting || multiState.connected);
     }
     if (dom.controls.multiProjectKey instanceof HTMLInputElement) {
-      dom.controls.multiProjectKey.disabled = true;
+      dom.controls.multiProjectKey.disabled = sharedProjectFlowPreferred
+        ? (multiState.connecting || multiState.connected)
+        : true;
+      dom.controls.multiProjectKey.readOnly = !sharedProjectFlowPreferred;
     }
     if (dom.controls.multiEntryMaster instanceof HTMLButtonElement) {
       dom.controls.multiEntryMaster.disabled = multiState.connecting || multiState.connected;
+      setMultiEntryActionCopy(dom.controls.multiEntryMaster, sharedProjectFlowPreferred
+        ? {
+            title: localizeText('共有', 'Share'),
+            meta: localizeText('空欄なら作成、リンクなら開く', 'Create if empty, open if link pasted'),
+            titleSelector: '#multiEntryMasterTitle',
+            metaSelector: '#multiEntryMasterMeta',
+          }
+        : {
+            title: localizeText('部屋を開く', 'Open Room'),
+            meta: localizeText('キー自動生成', 'Auto-create key'),
+            titleSelector: '#multiEntryMasterTitle',
+            metaSelector: '#multiEntryMasterMeta',
+          });
       if (dom.controls.multiEntryMaster.disabled) {
         dom.controls.multiEntryMaster.title = localizeText('接続中は切替できません', 'Cannot switch while connected');
       } else {
-        dom.controls.multiEntryMaster.title = localizeText('新しいキーを自動生成して部屋を開きます', 'Generates a new key and opens a room');
+        dom.controls.multiEntryMaster.title = sharedProjectFlowPreferred
+          ? localizeText('入力が空なら共有を作成し、入力があればその共有を開きます', 'Create shared if the field is empty, or open the pasted shared project')
+          : localizeText('新しいキーを自動生成して部屋を開きます', 'Generates a new key and opens a room');
       }
     }
     if (dom.controls.multiEntryGuest instanceof HTMLButtonElement) {
       dom.controls.multiEntryGuest.disabled = multiState.connecting || multiState.connected;
+      dom.controls.multiEntryGuest.hidden = sharedProjectFlowPreferred;
+      setMultiEntryActionCopy(dom.controls.multiEntryGuest, sharedProjectFlowPreferred
+        ? {
+            title: localizeText('共有を開く', 'Open Shared'),
+            meta: localizeText('共有リンクを貼り付け', 'Paste invite link'),
+            titleSelector: '#multiEntryGuestTitle',
+            metaSelector: '#multiEntryGuestMeta',
+          }
+        : {
+            title: localizeText('参加する', 'Join'),
+            meta: localizeText('キー入力へ進む', 'Open key input'),
+            titleSelector: '#multiEntryGuestTitle',
+            metaSelector: '#multiEntryGuestMeta',
+          });
       if (dom.controls.multiEntryGuest.disabled) {
         dom.controls.multiEntryGuest.title = localizeText('接続中は切替できません', 'Cannot switch while connected');
       } else {
-        dom.controls.multiEntryGuest.title = localizeText('キー入力パネルを開きます', 'Open the key input panel');
+        dom.controls.multiEntryGuest.title = sharedProjectFlowPreferred
+          ? localizeText('共有リンクまたは招待コードの入力欄を開きます', 'Open the invite link or code input')
+          : localizeText('キー入力パネルを開きます', 'Open the key input panel');
       }
     }
     if (dom.controls.multiEntryJoinAsGuest instanceof HTMLButtonElement) {
-      dom.controls.multiEntryJoinAsGuest.disabled = !isJoinPanelVisible || multiState.connecting || multiState.connected || !currentProjectKey;
+      dom.controls.multiEntryJoinAsGuest.disabled = !isJoinPanelVisible || multiState.connecting || multiState.connected || !hasCurrentProjectLocator;
+      dom.controls.multiEntryJoinAsGuest.hidden = sharedProjectFlowPreferred;
+      setMultiEntryActionCopy(dom.controls.multiEntryJoinAsGuest, sharedProjectFlowPreferred
+        ? {
+            title: localizeText('共有を開く', 'Open Shared'),
+            meta: localizeText('共有プロジェクトをそのまま開く', 'Open shared project directly'),
+            titleSelector: '#multiEntryJoinAsGuestTitle',
+            metaSelector: '#multiEntryJoinAsGuestMeta',
+          }
+        : {
+            title: localizeText('参加申請して入る', 'Join With Request'),
+            meta: localizeText('まず視聴で入り、参加申請を送信', 'Enter as viewer first, then request access'),
+            titleSelector: '#multiEntryJoinAsGuestTitle',
+            metaSelector: '#multiEntryJoinAsGuestMeta',
+          });
       if (dom.controls.multiEntryJoinAsGuest.disabled) {
-        dom.controls.multiEntryJoinAsGuest.title = !currentProjectKey
-          ? localizeText('先にプロジェクトキーを入力してください', 'Enter a project key first')
+        dom.controls.multiEntryJoinAsGuest.title = !hasCurrentProjectLocator
+          ? localizeText('先に共有リンクまたは招待コードを入力してください', 'Enter an invite link or invite code first')
           : localizeText('接続中は切替できません', 'Cannot switch while connected');
       } else {
-        dom.controls.multiEntryJoinAsGuest.title = localizeText(
-          'まず視聴として入室し、そのまま参加申請を送信します',
-          'Enter as a viewer first, then send a join request'
-        );
+        dom.controls.multiEntryJoinAsGuest.title = sharedProjectFlowPreferred
+          ? localizeText('共有プロジェクトを開き、そのまま共同編集します', 'Open the shared project and start editing together')
+          : localizeText(
+            'まず視聴として入室し、そのまま参加申請を送信します',
+            'Enter as a viewer first, then send a join request'
+          );
       }
     }
     if (dom.controls.multiEntrySpectator instanceof HTMLButtonElement) {
-      dom.controls.multiEntrySpectator.disabled = !isJoinPanelVisible || multiState.connecting || multiState.connected || !currentProjectKey;
+      dom.controls.multiEntrySpectator.disabled = true;
+      dom.controls.multiEntrySpectator.hidden = true;
       if (dom.controls.multiEntrySpectator.disabled) {
-        dom.controls.multiEntrySpectator.title = !currentProjectKey
-          ? localizeText('先にプロジェクトキーを入力してください', 'Enter a project key first')
-          : localizeText('接続中は切替できません', 'Cannot switch while connected');
+        dom.controls.multiEntrySpectator.title = localizeText('視聴専用参加は使用しません', 'Viewer-only joining is not used');
       } else {
         dom.controls.multiEntrySpectator.title = localizeText('キーで視聴モードに入室します', 'Join in viewer mode with key');
       }
     }
     if (dom.controls.multiEntryJoinBack instanceof HTMLButtonElement) {
       dom.controls.multiEntryJoinBack.disabled = !isJoinPanelVisible || multiState.connecting || multiState.connected;
+      dom.controls.multiEntryJoinBack.hidden = sharedProjectFlowPreferred;
     }
     if (dom.controls.multiStartSession instanceof HTMLButtonElement) {
-      dom.controls.multiStartSession.disabled = multiState.connecting || multiState.connected || !currentProjectKey || isEntryView;
+      const canStartSharedFlow = sharedProjectFlowPreferred && !multiState.connecting && !multiState.connected && !sharedModeEnabled;
+      dom.controls.multiStartSession.disabled = sharedProjectFlowPreferred
+        ? !canStartSharedFlow
+        : (multiState.connecting || multiState.connected || !currentProjectKey || isEntryView);
+      dom.controls.multiStartSession.hidden = false;
+      dom.controls.multiStartSession.textContent = sharedProjectFlowPreferred
+        ? (sharedModeEnabled
+          ? localizeText('共有中', 'Shared')
+          : localizeText('共有モードをON', 'Turn Shared Mode On'))
+        : localizeText('開始', 'Start');
       if (multiState.connected) {
-        dom.controls.multiStartSession.title = multiState.role === 'guest'
-          ? localizeText('すでに参加中です', 'Already joined')
-          : (multiState.role === 'spectator'
-            ? localizeText('すでに視聴中です', 'Already viewing')
-            : localizeText('すでに開始済みです', 'Already started'));
+        dom.controls.multiStartSession.title = sharedProjectFlowPreferred
+          ? localizeText('共有プロジェクトを開いています', 'A shared project is already open')
+          : (multiState.role === 'guest'
+            ? localizeText('すでに参加中です', 'Already joined')
+            : (multiState.role === 'spectator'
+              ? localizeText('すでに視聴中です', 'Already viewing')
+              : localizeText('すでに開始済みです', 'Already started')));
       } else if (multiState.connecting) {
         dom.controls.multiStartSession.title = localizeText('接続中です', 'Connecting...');
+      } else if (sharedProjectFlowPreferred) {
+        dom.controls.multiStartSession.title = sharedModeEnabled
+          ? localizeText('このプロジェクトは共有中です', 'This project is shared')
+          : localizeText('今のプロジェクトを共有プロジェクトにして共有モードを有効にします', 'Create a shared project from the current document and enable shared mode');
       } else if (!currentProjectKey) {
-        dom.controls.multiStartSession.title = localizeText('プロジェクトキーを入力してください', 'Enter a project key');
+        dom.controls.multiStartSession.title = localizeText('共有リンクまたはプロジェクトキーを入力してください', 'Enter an invite link or project key');
       } else if (isEntryView) {
         dom.controls.multiStartSession.title = localizeText(
           '先に「部屋を開く / 参加する」を選択してください',
@@ -53645,6 +55783,7 @@
         || multiState.connecting
         || normalizeMultiUiView(multiState.uiView) !== 'entry';
       dom.controls.multiLeaveSession.disabled = !canLeaveOrBack;
+      dom.controls.multiLeaveSession.hidden = true;
     }
     if (dom.controls.multiGenerateKey instanceof HTMLButtonElement) {
       dom.controls.multiGenerateKey.disabled = multiState.connecting || multiState.connected;
@@ -53653,16 +55792,18 @@
       dom.controls.multiCopyKey.disabled = multiState.connecting
         || !currentProjectKey
         || !isFlowKeyFieldVisible;
+      dom.controls.multiCopyKey.hidden = sharedProjectFlowPreferred;
     }
     if (dom.controls.multiBroadcastState instanceof HTMLButtonElement) {
-      dom.controls.multiBroadcastState.disabled = !(multiState.connected && multiState.role === 'master');
+      dom.controls.multiBroadcastState.disabled = sharedProjectFlowPreferred || !(multiState.connected && multiState.role === 'master');
+      dom.controls.multiBroadcastState.hidden = sharedProjectFlowPreferred;
     }
     /* multiForceDanmakuToggle removed: danmaku is client-local and not master-forced */
     if (dom.controls.multiMaxGuests instanceof HTMLInputElement) {
       dom.controls.multiMaxGuests.value = String(multiState.maxGuests);
       dom.controls.multiMaxGuests.min = String(MULTI_GUEST_LIMIT_MIN);
       dom.controls.multiMaxGuests.max = String(MULTI_GUEST_LIMIT_MAX);
-      dom.controls.multiMaxGuests.disabled = multiState.connecting || !inMasterConfigMode;
+      dom.controls.multiMaxGuests.disabled = sharedProjectFlowPreferred || multiState.connecting || !inMasterConfigMode;
     }
     if (dom.controls.multiRoomVisibility instanceof HTMLSelectElement) {
       if (
@@ -53680,18 +55821,18 @@
       setLocalizedSelectOption(dom.controls.multiExportPermission, 'master', 'マスターのみ', 'Master Only');
       setLocalizedSelectOption(dom.controls.multiExportPermission, 'all', '全員', 'Everyone');
       dom.controls.multiExportPermission.value = multiState.exportPermission;
-      dom.controls.multiExportPermission.disabled = multiState.connecting || !inMasterConfigMode;
+      dom.controls.multiExportPermission.disabled = sharedProjectFlowPreferred || multiState.connecting || !inMasterConfigMode;
     }
     if (dom.controls.multiJoinPolicy instanceof HTMLSelectElement) {
       setLocalizedSelectOption(dom.controls.multiJoinPolicy, 'open', '自動参加（友達向け）', 'Auto Join (Friends)');
       setLocalizedSelectOption(dom.controls.multiJoinPolicy, 'approval', '承認制（配信向け）', 'Approval (Streaming)');
       dom.controls.multiJoinPolicy.value = multiState.joinPolicy;
-      dom.controls.multiJoinPolicy.disabled = multiState.connecting || !inMasterConfigMode;
+      dom.controls.multiJoinPolicy.disabled = sharedProjectFlowPreferred || multiState.connecting || !inMasterConfigMode;
     }
     const canUseParticipantFreeCellMove = inMasterConfigMode;
     if (dom.controls.multiParticipantFreeCellMove instanceof HTMLInputElement) {
       dom.controls.multiParticipantFreeCellMove.checked = Boolean(multiState.participantFreeCellMove);
-      dom.controls.multiParticipantFreeCellMove.disabled = multiState.connecting || !canUseParticipantFreeCellMove;
+      dom.controls.multiParticipantFreeCellMove.disabled = sharedProjectFlowPreferred || multiState.connecting || !canUseParticipantFreeCellMove;
     }
     if (dom.controls.multiParticipantFreeCellMoveHint instanceof HTMLElement) {
       if (!multiState.connected) {
@@ -53712,10 +55853,10 @@
       }
     }
     if (dom.controls.multiPresetFriends instanceof HTMLButtonElement) {
-      dom.controls.multiPresetFriends.disabled = multiState.connecting || !inMasterConfigMode;
+      dom.controls.multiPresetFriends.disabled = sharedProjectFlowPreferred || multiState.connecting || !inMasterConfigMode;
     }
     if (dom.controls.multiPresetStream instanceof HTMLButtonElement) {
-      dom.controls.multiPresetStream.disabled = multiState.connecting || !inMasterConfigMode;
+      dom.controls.multiPresetStream.disabled = sharedProjectFlowPreferred || multiState.connecting || !inMasterConfigMode;
     }
     if (dom.controls.multiPresetHint instanceof HTMLElement) {
       const joinPolicy = normalizeMultiJoinPolicy(multiState.joinPolicy, MULTI_DEFAULT_JOIN_POLICY);
@@ -53731,7 +55872,7 @@
           `Current: Streaming preset (Approval / ${visibilityLabel} / ${exportLabel})`
         );
     }
-    const canUseMasterOpsMode = inMasterConfigMode;
+    const canUseMasterOpsMode = !sharedProjectFlowPreferred && inMasterConfigMode;
     if (!canUseMasterOpsMode && multiState.masterOpsMode) {
       multiState.masterOpsMode = false;
     }
@@ -53758,29 +55899,46 @@
       });
     }
     if (dom.controls.multiGuestCapacityHint instanceof HTMLElement) {
-      const assignedGuestCount = getAssignedGuestCount();
-      dom.controls.multiGuestCapacityHint.textContent = localizeText(
-        `参加枠: ${assignedGuestCount} / ${multiState.maxGuests}`,
-        `Participant slots: ${assignedGuestCount} / ${multiState.maxGuests}`
-      );
+      if (sharedProjectFlowPreferred) {
+        dom.controls.multiGuestCapacityHint.textContent = localizeText(
+          '共有プロジェクトでは全員が対等に編集できます。',
+          'Everyone edits as an equal in shared projects.'
+        );
+      } else {
+        const assignedGuestCount = getAssignedGuestCount();
+        dom.controls.multiGuestCapacityHint.textContent = localizeText(
+          `参加枠: ${assignedGuestCount} / ${multiState.maxGuests}`,
+          `Participant slots: ${assignedGuestCount} / ${multiState.maxGuests}`
+        );
+      }
     }
     if (dom.controls.multiRoomVisibilityHint instanceof HTMLElement) {
-      dom.controls.multiRoomVisibilityHint.textContent = localizeText(
-        '公開部屋の一覧は停止中です。マルチプレイは非公開で開始され、招待リンクで共有できます。',
-        'Public room listing is disabled. Multiplayer starts private and can be shared by invite link.'
-      );
+      dom.controls.multiRoomVisibilityHint.textContent = sharedProjectFlowPreferred
+        ? localizeText(
+          '共有プロジェクトは招待リンクで共有され、同じプロジェクトとして参加者一覧にも残ります。',
+          'Shared projects are distributed by invite link and remain in each member project list.'
+        )
+        : localizeText(
+          '公開部屋の一覧は停止中です。マルチプレイは非公開で開始され、招待リンクで共有できます。',
+          'Public room listing is disabled. Multiplayer starts private and can be shared by invite link.'
+        );
     }
     if (dom.controls.multiJoinPolicyHint instanceof HTMLElement) {
       const joinPolicy = normalizeMultiJoinPolicy(multiState.joinPolicy, MULTI_DEFAULT_JOIN_POLICY);
-      if (!multiState.connected) {
+      if (sharedProjectFlowPreferred) {
+        dom.controls.multiJoinPolicyHint.textContent = localizeText(
+          '接続や承認より、共有プロジェクト自体を開いて同時編集する流れを優先します。',
+          'The flow prioritizes opening the shared project itself and editing together over room-style join/approval.'
+        );
+      } else if (!multiState.connected) {
         dom.controls.multiJoinPolicyHint.textContent = joinPolicy === MULTI_JOIN_POLICY_OPEN
           ? localizeText(
-            '自動参加: 招待リンクは参加者入室になります。',
-            'Auto Join: invite link opens as participant join.'
+            '共有リンク: まず共有プロジェクトを開きます。接続時は参加者で入室できます。',
+            'Share link: opens the shared project first. Connecting can join as participant.'
           )
           : localizeText(
-            '承認制: 招待リンクは視聴入室になります。',
-            'Approval: invite link opens as viewer join.'
+            '共有リンク: まず共有プロジェクトを開きます。接続時は視聴から始まります。',
+            'Share link: opens the shared project first. Connecting starts as viewer.'
           );
       } else if (!isMultiMasterMode()) {
         dom.controls.multiJoinPolicyHint.textContent = localizeText(
@@ -53800,10 +55958,38 @@
       }
     }
     if (dom.controls.multiInviteCopy instanceof HTMLButtonElement) {
-      dom.controls.multiInviteCopy.disabled = multiState.connecting || !inMasterConfigMode || !currentProjectKey;
+      dom.controls.multiInviteCopy.disabled = multiState.connecting
+        || !(sharedProjectFlowPreferred ? Boolean(activeSharedProjectKey) : (inMasterConfigMode && currentProjectKey));
+      dom.controls.multiInviteCopy.hidden = sharedProjectFlowPreferred ? !Boolean(activeSharedProjectKey) : false;
     }
     if (dom.controls.multiInviteShare instanceof HTMLButtonElement) {
-      dom.controls.multiInviteShare.disabled = multiState.connecting || !inMasterConfigMode || !currentProjectKey;
+      dom.controls.multiInviteShare.disabled = multiState.connecting
+        || !(sharedProjectFlowPreferred ? Boolean(activeSharedProjectKey || currentProjectKey) : (inMasterConfigMode && currentProjectKey));
+      dom.controls.multiInviteShare.hidden = true;
+    }
+    const participantsPanel = document.querySelector('#panelMulti .multi-participants-panel');
+    if (participantsPanel instanceof HTMLElement) {
+      participantsPanel.hidden = false;
+    }
+    if (dom.controls.multiCommentList instanceof HTMLElement) {
+      const commentsSection = dom.controls.multiCommentList.closest('.multi-flow-tabpanel--comments');
+      if (commentsSection instanceof HTMLElement) {
+        commentsSection.hidden = true;
+      }
+    }
+    if (dom.controls.multiMasterAdvanced instanceof HTMLElement) {
+      dom.controls.multiMasterAdvanced.hidden = sharedProjectFlowPreferred;
+    } else {
+      const masterAdvanced = document.getElementById('multiMasterAdvanced');
+      if (masterAdvanced instanceof HTMLElement) {
+        masterAdvanced.hidden = sharedProjectFlowPreferred;
+      }
+    }
+    if (dom.controls.multiJoinRequestField instanceof HTMLElement) {
+      dom.controls.multiJoinRequestField.hidden = sharedProjectFlowPreferred;
+    }
+    if (dom.controls.multiProjectKeyField instanceof HTMLElement) {
+      dom.controls.multiProjectKeyField.hidden = sharedProjectFlowPreferred;
     }
     const canSendComment = multiState.connected && !multiState.connecting;
     if (dom.controls.multiCommentInput instanceof HTMLInputElement) {
@@ -53836,7 +56022,7 @@
     syncMultiAssignmentControls();
     // Tool lock by role (spectator restrictions)
     try {
-      if (isMultiSpectatorMode()) {
+      if (isMultiSpectatorMode() && !isSharedProjectCollaborativeMode()) {
         // Ensure pan is active so viewer can pan/zoom
         setActiveTool('pan');
         if (Array.isArray(toolButtons)) {
@@ -53863,6 +56049,10 @@
   }
 
   function applyMultiRoleUiLocks() {
+    if (isSharedProjectCollaborativeMode()) {
+      updateCanvasResizeControls();
+      return;
+    }
     const isReadOnly = isMultiReadOnlyMode();
     const lockTargets = [
       dom.controls.addLayer,
@@ -53988,11 +56178,63 @@
     markDocumentUnsavedChange();
     scheduleAutosaveSnapshot({ delayMs: autosaveDelayMs });
     scheduleSessionPersist({ includeSnapshots: false });
+    queueSharedProjectCurrentSnapshotCapture({ delayMs: autosaveDelayMs });
   }
 
   function createMultiChannelName(projectKey) {
     const normalized = normalizeMultiProjectKey(projectKey);
     return `${MULTI_CHANNEL_PREFIX}${normalized || 'default'}`;
+  }
+
+  function bindMultiChannelRealtimeHandlers(channel) {
+    channel.on('presence', { event: 'sync' }, () => {
+      refreshMultiParticipantsFromPresence();
+    });
+    channel.on('broadcast', { event: MULTI_BROADCAST_EVENT.HELLO }, message => {
+      handleMultiHelloMessage(message?.payload || {});
+    });
+    channel.on('broadcast', { event: MULTI_BROADCAST_EVENT.SYNC_REQUEST }, message => {
+      handleMultiSyncRequestMessage(message?.payload || {});
+    });
+    channel.on('broadcast', { event: MULTI_BROADCAST_EVENT.SESSION_STATE }, message => {
+      handleMultiSessionStateMessage(message?.payload || {});
+    });
+    channel.on('broadcast', { event: MULTI_BROADCAST_EVENT.MASTER_STATE_REQUEST }, message => {
+      handleMultiMasterStateRequestMessage(message?.payload || {});
+    });
+    channel.on('broadcast', { event: MULTI_BROADCAST_EVENT.GUEST_SESSION_STATE }, message => {
+      handleMultiGuestSessionStateMessage(message?.payload || {});
+    });
+    channel.on('broadcast', { event: MULTI_BROADCAST_EVENT.GUEST_LAYER_PATCH }, message => {
+      handleMultiGuestLayerPatchMessage(message?.payload || {});
+    });
+    channel.on('broadcast', { event: MULTI_BROADCAST_EVENT.GUEST_PALETTE_UPDATE }, message => {
+      handleMultiGuestPaletteUpdateMessage(message?.payload || {});
+    });
+    channel.on('broadcast', { event: MULTI_BROADCAST_EVENT.MASTER_LAYER_PATCH }, message => {
+      handleMultiMasterLayerPatchMessage(message?.payload || {});
+    });
+    channel.on('broadcast', { event: MULTI_BROADCAST_EVENT.KICK_CLIENT }, message => {
+      handleMultiKickClientMessage(message?.payload || {});
+    });
+    channel.on('broadcast', { event: MULTI_BROADCAST_EVENT.COMMENT }, message => {
+      handleMultiCommentMessage(message?.payload || {});
+    });
+    channel.on('broadcast', { event: MULTI_BROADCAST_EVENT.JOIN_REQUEST }, message => {
+      handleMultiJoinRequestMessage(message?.payload || {});
+    });
+    channel.on('broadcast', { event: MULTI_BROADCAST_EVENT.JOIN_REQUEST_RESULT }, message => {
+      handleMultiJoinRequestResultMessage(message?.payload || {});
+    });
+    channel.on('broadcast', { event: MULTI_BROADCAST_EVENT.ROLE_CHANGE }, message => {
+      handleMultiRoleChangeMessage(message?.payload || {});
+    });
+    channel.on('broadcast', { event: MULTI_BROADCAST_EVENT.ASSIGNMENT_MOVE_REQUEST }, message => {
+      handleMultiAssignmentMoveRequestMessage(message?.payload || {});
+    });
+    channel.on('broadcast', { event: MULTI_BROADCAST_EVENT.ASSIGNMENT_MOVE_RESULT }, message => {
+      handleMultiAssignmentMoveResultMessage(message?.payload || {});
+    });
   }
 
   async function ensureMultiSupabaseClient() {
@@ -54008,7 +56250,7 @@
         throw new Error('Supabase client unavailable');
       }
       const supabase = module.createClient(MULTI_SUPABASE_URL, MULTI_SUPABASE_ANON_KEY, {
-        auth: { persistSession: false },
+        auth: { persistSession: false, storageKey: 'pixieed-multi-auth' },
         realtime: {
           params: { eventsPerSecond: 24 },
         },
@@ -54614,16 +56856,8 @@
     return normalized;
   }
 
-  function buildMultiSessionStatePayload({ targetClientId = '' } = {}) {
-    const snapshot = makeHistorySnapshot({
-      includeUiState: false,
-      includeSelection: false,
-      clonePixelData: false,
-    });
+  function getMultiSharedRoomConfigSnapshot() {
     return {
-      projectKey: multiState.projectKey,
-      masterClientId: multiState.clientId,
-      buildVersion: APP_BUILD_VERSION,
       maxGuests: normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT),
       roomVisibility: normalizeMultiRoomVisibility(
         multiState.roomVisibility,
@@ -54641,6 +56875,58 @@
         multiState.exportPermission,
         MULTI_DEFAULT_EXPORT_PERMISSION
       ),
+    };
+  }
+
+  function applyMultiSharedRoomConfigFromPayload(payload = {}) {
+    const next = {
+      maxGuests: normalizeMultiMaxGuests(payload.maxGuests, multiState.maxGuests),
+      roomVisibility: normalizeMultiRoomVisibility(
+        payload.roomVisibility,
+        multiState.roomVisibility
+      ),
+      joinPolicy: normalizeMultiJoinPolicy(
+        payload.joinPolicy,
+        multiState.joinPolicy
+      ),
+      participantFreeCellMove: normalizeMultiParticipantFreeCellMove(
+        payload.participantFreeCellMove,
+        multiState.participantFreeCellMove
+      ),
+      exportPermission: normalizeMultiExportPermission(
+        payload.exportPermission,
+        multiState.exportPermission
+      ),
+    };
+    multiState.maxGuests = next.maxGuests;
+    multiState.roomVisibility = next.roomVisibility;
+    multiState.joinPolicy = next.joinPolicy;
+    multiState.participantFreeCellMove = next.participantFreeCellMove;
+    multiState.exportPermission = next.exportPermission;
+    return next;
+  }
+
+  function shouldAcceptIncomingMultiSessionRevision(payload) {
+    const receivedRevision = normalizeMultiSessionRevision(payload?.revision, 0);
+    if (!receivedRevision) {
+      return true;
+    }
+    const pendingRevision = normalizeMultiSessionRevision(multiState.pendingSessionStatePayload?.revision, 0);
+    return receivedRevision > Math.max(multiState.revision, pendingRevision);
+  }
+
+  function buildMultiSessionStatePayload({ targetClientId = '' } = {}) {
+    const snapshot = makeHistorySnapshot({
+      includeUiState: false,
+      includeSelection: false,
+      clonePixelData: false,
+    });
+    const sharedConfig = getMultiSharedRoomConfigSnapshot();
+    return {
+      projectKey: multiState.projectKey,
+      masterClientId: multiState.clientId,
+      buildVersion: APP_BUILD_VERSION,
+      ...sharedConfig,
       assignments: serializeMultiAssignments(),
       blockedClientIds: serializeMultiBlockedClientIds(),
       revision: (multiState.revision += 1),
@@ -54665,6 +56951,7 @@
       includeSelection: false,
       clonePixelData: false,
     });
+    const sharedConfig = getMultiSharedRoomConfigSnapshot();
     return {
       projectKey: multiState.projectKey,
       clientId: multiState.clientId,
@@ -54678,23 +56965,7 @@
       expectedFrameId: typeof expectedFrameId === 'string' ? expectedFrameId.trim() : '',
       expectedAnchorLayerId: typeof expectedAnchorLayerId === 'string' ? expectedAnchorLayerId.trim() : '',
       sentAt: Date.now(),
-      maxGuests: normalizeMultiMaxGuests(multiState.maxGuests, MULTI_DEFAULT_GUEST_LIMIT),
-      roomVisibility: normalizeMultiRoomVisibility(
-        multiState.roomVisibility,
-        MULTI_DEFAULT_ROOM_VISIBILITY
-      ),
-      joinPolicy: normalizeMultiJoinPolicy(
-        multiState.joinPolicy,
-        MULTI_DEFAULT_JOIN_POLICY
-      ),
-      participantFreeCellMove: normalizeMultiParticipantFreeCellMove(
-        multiState.participantFreeCellMove,
-        MULTI_DEFAULT_PARTICIPANT_FREE_CELL_MOVE
-      ),
-      exportPermission: normalizeMultiExportPermission(
-        multiState.exportPermission,
-        MULTI_DEFAULT_EXPORT_PERMISSION
-      ),
+      ...sharedConfig,
       assignments: serializeMultiAssignments(),
       blockedClientIds: serializeMultiBlockedClientIds(),
       document: serializeDocumentSnapshot(snapshot),
@@ -54702,7 +56973,7 @@
   }
 
   async function broadcastMultiSessionState({ targetClientId = '' } = {}) {
-    if (!isMultiMasterMode()) {
+    if (!getMultiRoleCapabilities().canBroadcastAuthoritativeState) {
       return false;
     }
     const payload = buildMultiSessionStatePayload({ targetClientId });
@@ -54710,7 +56981,11 @@
   }
 
   function scheduleMultiSessionStateBroadcast({ targetClientId = '', immediate = false } = {}) {
-    if (!isMultiMasterMode()) {
+    if (!getMultiRoleCapabilities().canBroadcastAuthoritativeState) {
+      return;
+    }
+    if (isSharedProjectRealtimePrimaryActive(multiState.projectKey) && !targetClientId) {
+      scheduleMultiPublicLobbyRoomSync({ immediate });
       return;
     }
     scheduleMultiPublicLobbyRoomSync({ immediate });
@@ -54875,6 +57150,19 @@
     if (multiState.layerPatchResyncRequestAt instanceof Map) {
       multiState.layerPatchResyncRequestAt.delete(streamKey);
     }
+  }
+
+  function consumePendingMultiLayerResyncRequest(payload, senderClientId) {
+    const requestKey = normalizeMultiLayerResyncRequestKey(payload?.requestKey, senderClientId);
+    const pendingResync = multiState.layerPatchResyncRequests instanceof Map
+      ? (multiState.layerPatchResyncRequests.get(requestKey) || null)
+      : null;
+    const requestToken = typeof payload?.requestToken === 'string' ? payload.requestToken.trim() : '';
+    if (!pendingResync || pendingResync.clientId !== senderClientId || !requestToken || requestToken !== pendingResync.requestToken) {
+      return null;
+    }
+    multiState.layerPatchResyncRequests.delete(requestKey);
+    return pendingResync;
   }
 
   async function requestTargetedGuestSessionState(senderClientId, streamKey = '', canvasId = '') {
@@ -55459,26 +57747,10 @@
     if (receivedRevision && receivedRevision <= multiState.revision) {
       return false;
     }
-    multiState.maxGuests = normalizeMultiMaxGuests(payload.maxGuests, multiState.maxGuests);
-    multiState.roomVisibility = normalizeMultiRoomVisibility(
-      payload.roomVisibility,
-      multiState.roomVisibility
-    );
-    multiState.joinPolicy = normalizeMultiJoinPolicy(
-      payload.joinPolicy,
-      multiState.joinPolicy
-    );
-    multiState.participantFreeCellMove = normalizeMultiParticipantFreeCellMove(
-      payload.participantFreeCellMove,
-      multiState.participantFreeCellMove
-    );
+    applyMultiSharedRoomConfigFromPayload(payload);
     if (!isMultiGuestMode() || !canCurrentGuestFreelyMoveAssignedCell()) {
       clearMultiGuestMovePreview();
     }
-    multiState.exportPermission = normalizeMultiExportPermission(
-      payload.exportPermission,
-      multiState.exportPermission
-    );
     if (isMultiGuestMode() || isMultiSpectatorMode()) {
       const blockedClientIds = normalizeMultiBlockedClientIds(payload.blockedClientIds);
       if (blockedClientIds.has(multiState.clientId)) {
@@ -55795,8 +58067,11 @@
         });
       });
     });
+    const sharedCollaborative = isSharedProjectCollaborativeMode();
     const onlineMaster = Array.from(nextParticipants.values()).find(entry => entry.role === 'master') || null;
-    if (isMultiMasterMode()) {
+    if (sharedCollaborative) {
+      multiState.masterClientId = null;
+    } else if (isMultiMasterMode()) {
       multiState.masterClientId = multiState.clientId;
     } else {
       multiState.masterClientId = onlineMaster ? onlineMaster.clientId : null;
@@ -55830,7 +58105,12 @@
     }
 
     multiState.participants = nextParticipants;
-    if (!isMultiMasterMode()) {
+    if (sharedCollaborative) {
+      setMultiStatus(
+        localizeText(`共有プロジェクト接続中 (${multiState.projectKey})`, `Shared project connected (${multiState.projectKey})`),
+        'success'
+      );
+    } else if (!isMultiMasterMode()) {
       if (onlineMaster && previousMasterClientId !== onlineMaster.clientId) {
         setMultiStatus(`共有モード: マスター接続中 (${multiState.projectKey})`, 'info');
         if (isMultiGuestMode()) {
@@ -55867,6 +58147,9 @@
   }
 
   async function handleMultiJoinRequestMessage(payload) {
+    if (isSharedProjectCollaborativeMode()) {
+      return;
+    }
     if (!isMultiMasterMode()) {
       return;
     }
@@ -55924,6 +58207,9 @@
   }
 
   function handleMultiJoinRequestResultMessage(payload) {
+    if (isSharedProjectCollaborativeMode()) {
+      return;
+    }
     if (!payload || typeof payload !== 'object') {
       return;
     }
@@ -55960,6 +58246,9 @@
   }
 
   async function handleMultiRoleChangeMessage(payload) {
+    if (isSharedProjectCollaborativeMode()) {
+      return;
+    }
     if (!payload || typeof payload !== 'object') {
       return;
     }
@@ -55983,18 +58272,7 @@
       return;
     }
     const currentRole = normalizeMultiRoleControlTargetRole(multiState.role);
-    const nextMaxGuests = normalizeMultiMaxGuests(payload.maxGuests, multiState.maxGuests);
-    const nextRoomVisibility = normalizeMultiRoomVisibility(
-      payload.roomVisibility,
-      multiState.roomVisibility
-    );
-    const nextJoinPolicy = normalizeMultiJoinPolicy(
-      payload.joinPolicy,
-      multiState.joinPolicy
-    );
-    multiState.maxGuests = nextMaxGuests;
-    multiState.roomVisibility = nextRoomVisibility;
-    multiState.joinPolicy = nextJoinPolicy;
+    applyMultiSharedRoomConfigFromPayload(payload);
     if (currentRole === nextRole) {
       if (nextRole === 'guest') {
         multiState.joinRequestPending = false;
@@ -56117,26 +58395,25 @@
     if (!payload || typeof payload !== 'object') {
       return;
     }
-    const targetClientId = typeof payload.targetClientId === 'string' ? payload.targetClientId.trim() : '';
-    if (targetClientId && targetClientId !== multiState.clientId) {
+    if (!isMultiPayloadTargetedToCurrentClient(payload)) {
       return;
     }
-    if (isMultiMasterMode()) {
+    if (!getMultiRoleCapabilities().canReceiveAuthoritativeState) {
       return;
     }
-    if (multiState.role !== 'guest' && multiState.role !== 'spectator') {
+    if (!isMultiPayloadForCurrentProject(payload)) {
       return;
     }
     const payloadMasterClientId = typeof payload.masterClientId === 'string' ? payload.masterClientId.trim() : '';
     if (payloadMasterClientId) {
       recordMultiPeerBuildVersion(payloadMasterClientId, payload.buildVersion, { source: 'session-state' });
     }
-    const receivedRevision = normalizeMultiSessionRevision(payload.revision, 0);
-    if (receivedRevision) {
-      const pendingRevision = normalizeMultiSessionRevision(multiState.pendingSessionStatePayload?.revision, 0);
-      if (receivedRevision <= Math.max(multiState.revision, pendingRevision)) {
-        return;
-      }
+    if (!shouldAcceptIncomingMultiSessionRevision(payload)) {
+      return;
+    }
+    if (isSharedProjectRealtimePrimaryActive(multiState.projectKey)) {
+      queueSharedProjectRefresh({ immediate: true, reason: 'room-session-state' });
+      return;
     }
     if (shouldDeferMultiSessionStateApply()) {
       multiState.pendingSessionStatePayload = payload;
@@ -56147,14 +58424,19 @@
   }
 
   async function handleMultiMasterStateRequestMessage(payload) {
-    if (!isMultiReplicaRole(multiState.role)) {
+    if (isSharedProjectCollaborativeMode()) {
+      return;
+    }
+    if (!getMultiRoleCapabilities().canRespondToMasterStateRequest) {
       return;
     }
     if (!payload || typeof payload !== 'object') {
       return;
     }
-    const targetClientId = typeof payload.targetClientId === 'string' ? payload.targetClientId.trim() : '';
-    if (targetClientId && targetClientId !== multiState.clientId) {
+    if (!isMultiPayloadTargetedToCurrentClient(payload)) {
+      return;
+    }
+    if (!isMultiPayloadForCurrentProject(payload)) {
       return;
     }
     const requesterClientId = typeof payload.clientId === 'string' ? payload.clientId.trim() : '';
@@ -56179,14 +58461,20 @@
   }
 
   async function handleMultiGuestSessionStateMessage(payload) {
-    if (!isMultiMasterMode()) {
+    if (isSharedProjectCollaborativeMode()) {
+      queueSharedProjectRefresh({ immediate: true, reason: 'guest-session-state' });
+      return;
+    }
+    if (!getMultiRoleCapabilities().canBroadcastAuthoritativeState) {
       return;
     }
     if (!payload || typeof payload !== 'object') {
       return;
     }
-    const targetClientId = typeof payload.targetClientId === 'string' ? payload.targetClientId.trim() : '';
-    if (targetClientId && targetClientId !== multiState.clientId) {
+    if (!isMultiPayloadTargetedToCurrentClient(payload)) {
+      return;
+    }
+    if (!isMultiPayloadForCurrentProject(payload)) {
       return;
     }
     const senderClientId = typeof payload.clientId === 'string' ? payload.clientId.trim() : '';
@@ -56204,15 +58492,10 @@
     const responseReason = typeof payload.reason === 'string' ? payload.reason.trim() : '';
     const usePartialApply = responseReason === 'layer-resync';
     if (usePartialApply) {
-      const requestKey = normalizeMultiLayerResyncRequestKey(payload.requestKey, senderClientId);
-      const pendingResync = multiState.layerPatchResyncRequests instanceof Map
-        ? (multiState.layerPatchResyncRequests.get(requestKey) || null)
-        : null;
-      const requestToken = typeof payload.requestToken === 'string' ? payload.requestToken.trim() : '';
-      if (!pendingResync || pendingResync.clientId !== senderClientId || !requestToken || requestToken !== pendingResync.requestToken) {
+      const pendingResync = consumePendingMultiLayerResyncRequest(payload, senderClientId);
+      if (!pendingResync) {
         return;
       }
-      multiState.layerPatchResyncRequests.delete(requestKey);
       const expectedCanvasId = normalizeMultiHistoryCanvasId(payload.expectedCanvasId || pendingResync.canvasId || '');
       const expectedFrameId = typeof payload.expectedFrameId === 'string' && payload.expectedFrameId.trim()
         ? payload.expectedFrameId.trim()
@@ -56271,26 +58554,10 @@
     if (!multiState.awaitingGuestStateRecovery) {
       return;
     }
-    multiState.maxGuests = normalizeMultiMaxGuests(payload.maxGuests, multiState.maxGuests);
-    multiState.roomVisibility = normalizeMultiRoomVisibility(
-      payload.roomVisibility,
-      multiState.roomVisibility
-    );
-    multiState.joinPolicy = normalizeMultiJoinPolicy(
-      payload.joinPolicy,
-      multiState.joinPolicy
-    );
-    multiState.participantFreeCellMove = normalizeMultiParticipantFreeCellMove(
-      payload.participantFreeCellMove,
-      multiState.participantFreeCellMove
-    );
+    applyMultiSharedRoomConfigFromPayload(payload);
     if (!isMultiGuestMode() || !canCurrentGuestFreelyMoveAssignedCell()) {
       clearMultiGuestMovePreview();
     }
-    multiState.exportPermission = normalizeMultiExportPermission(
-      payload.exportPermission,
-      multiState.exportPermission
-    );
     const applied = applyMultiAuthoritativeDocument(payload.document);
     if (!applied) {
       return;
@@ -56330,8 +58597,12 @@
   }
 
   async function handleMultiGuestLayerPatchMessage(payload) {
-    const inMasterMode = isMultiMasterMode();
-    const inReplicaMode = isMultiGuestMode() || isMultiSpectatorMode();
+    if (isSharedProjectRealtimePrimaryActive(multiState.projectKey)) {
+      return;
+    }
+    const capabilities = getMultiRoleCapabilities();
+    const inMasterMode = capabilities.isMaster;
+    const inReplicaMode = capabilities.isReplica;
     if (!inMasterMode && !inReplicaMode) {
       return;
     }
@@ -56483,7 +58754,10 @@
   }
 
   async function handleMultiMasterLayerPatchMessage(payload) {
-    if (multiState.role !== 'guest' && multiState.role !== 'spectator') {
+    if (isSharedProjectRealtimePrimaryActive(multiState.projectKey)) {
+      return;
+    }
+    if (!getMultiRoleCapabilities().canReceiveMasterPatch) {
       return;
     }
     if (!payload || typeof payload !== 'object') {
@@ -56602,6 +58876,7 @@
   }
 
   async function disconnectMultiSession({ silent = false, restoreLocalDocument = true } = {}) {
+    const sharedCollaborative = isSharedProjectCollaborativeMode();
     const disconnectedRole = multiState.role === 'master'
       || multiState.role === 'guest'
       || multiState.role === 'spectator'
@@ -56610,6 +58885,7 @@
     const shouldRestoreReplicaSnapshot = Boolean(
       restoreLocalDocument
       && isMultiReplicaRole(disconnectedRole)
+      && !sharedCollaborative
     );
     clearMultiBroadcastTimer();
     clearPendingMultiSessionStateApply();
@@ -56722,10 +58998,13 @@
       setMultiStatus(localizeText('共有モード: プロジェクトキーを入力してください', 'Collab mode: enter a project key'), 'warn');
       return false;
     }
-    const normalizedRole = requestedRole === 'guest' && !allowGuestJoin
+    const sharedCollaborative = isSharedProjectRealtimePrimaryActive(projectKey);
+    const normalizedRole = sharedCollaborative
+      ? 'guest'
+      : (requestedRole === 'guest' && !allowGuestJoin
       ? 'spectator'
-      : requestedRole;
-    const enterReplicaMode = isMultiReplicaRole(normalizedRole);
+      : requestedRole);
+    const enterReplicaMode = isMultiReplicaRole(normalizedRole) && !sharedCollaborative;
     multiState.desiredRole = normalizedRole;
     if (!multiState.connected && !multiState.connecting) {
       multiState.uiView = normalizedRole;
@@ -56770,54 +59049,7 @@
           presence: { key: multiState.clientId || ensureMultiClientId() },
         },
       });
-      channel.on('presence', { event: 'sync' }, () => {
-        refreshMultiParticipantsFromPresence();
-      });
-      channel.on('broadcast', { event: 'hello' }, message => {
-        handleMultiHelloMessage(message?.payload || {});
-      });
-      channel.on('broadcast', { event: 'sync-request' }, message => {
-        handleMultiSyncRequestMessage(message?.payload || {});
-      });
-      channel.on('broadcast', { event: 'session-state' }, message => {
-        handleMultiSessionStateMessage(message?.payload || {});
-      });
-      channel.on('broadcast', { event: 'master-state-request' }, message => {
-        handleMultiMasterStateRequestMessage(message?.payload || {});
-      });
-      channel.on('broadcast', { event: 'guest-session-state' }, message => {
-        handleMultiGuestSessionStateMessage(message?.payload || {});
-      });
-      channel.on('broadcast', { event: 'guest-layer-patch' }, message => {
-        handleMultiGuestLayerPatchMessage(message?.payload || {});
-      });
-      channel.on('broadcast', { event: 'guest-palette-update' }, message => {
-        handleMultiGuestPaletteUpdateMessage(message?.payload || {});
-      });
-      channel.on('broadcast', { event: 'master-layer-patch' }, message => {
-        handleMultiMasterLayerPatchMessage(message?.payload || {});
-      });
-      channel.on('broadcast', { event: 'kick-client' }, message => {
-        handleMultiKickClientMessage(message?.payload || {});
-      });
-      channel.on('broadcast', { event: 'comment' }, message => {
-        handleMultiCommentMessage(message?.payload || {});
-      });
-      channel.on('broadcast', { event: 'join-request' }, message => {
-        handleMultiJoinRequestMessage(message?.payload || {});
-      });
-      channel.on('broadcast', { event: 'join-request-result' }, message => {
-        handleMultiJoinRequestResultMessage(message?.payload || {});
-      });
-      channel.on('broadcast', { event: 'role-change' }, message => {
-        handleMultiRoleChangeMessage(message?.payload || {});
-      });
-      channel.on('broadcast', { event: 'assignment-move-request' }, message => {
-        handleMultiAssignmentMoveRequestMessage(message?.payload || {});
-      });
-      channel.on('broadcast', { event: 'assignment-move-result' }, message => {
-        handleMultiAssignmentMoveResultMessage(message?.payload || {});
-      });
+      bindMultiChannelRealtimeHandlers(channel);
 
       await waitForMultiSubscription(channel);
       multiState.channel = channel;
@@ -56854,7 +59086,7 @@
         markRemoteMultiStateDirty({ clearLayerPatchSnapshots: true });
       }
 
-      if (normalizedRole === 'master') {
+      if (normalizedRole === 'master' && !sharedCollaborative) {
         const resumeAssignments = Array.isArray(multiState.resumeAssignments)
           ? multiState.resumeAssignments
           : null;
@@ -56929,7 +59161,7 @@
         buildVersion: APP_BUILD_VERSION,
       });
 
-      if (normalizedRole === 'master') {
+      if (normalizedRole === 'master' && !sharedCollaborative) {
         clearMultiLocalSnapshotBeforeReplica();
         startMultiMasterRecoveryFlow(projectKey);
       } else {
@@ -56940,7 +59172,9 @@
           projectKey,
           buildVersion: APP_BUILD_VERSION,
         });
-        if (normalizedRole === 'spectator') {
+        if (sharedCollaborative) {
+          setMultiStatus(`共有プロジェクト: 編集接続中 (${projectKey})`, 'success');
+        } else if (normalizedRole === 'spectator') {
           if (requestedRole === 'guest' && !allowGuestJoin) {
             setMultiStatus(`共有モード: 入室しました（参加はマスター承認後） (${projectKey})`, 'success');
           } else {
@@ -56951,6 +59185,36 @@
         }
       }
       storePendingMultiResumeSession();
+      upsertSharedRecentProjectEntry({
+        projectKey,
+        name: extractDocumentBaseName(state.documentName || DEFAULT_DOCUMENT_NAME),
+        roleHint: normalizedRole,
+        autoJoin: false,
+        revision: activeSharedProjectKey === projectKey ? activeSharedProjectRevision : 0,
+      }).catch(error => {
+        console.warn('Failed to update shared project recent entry', error);
+      });
+      if (canUseSharedProjectsBackend()) {
+        ensureSharedProjectMembership(projectKey, {
+          createIfMissing: normalizedRole === 'master',
+          title: state.documentName || DEFAULT_DOCUMENT_NAME,
+        }).then(project => {
+          if (!project) {
+            return;
+          }
+          if (normalizedRole === 'master') {
+            const snapshot = makeHistorySnapshot({ clonePixelData: false });
+            const session = buildAutosaveSessionPayload();
+            const packaged = buildPackagedProjectPayload(snapshot, { session });
+            queueSharedProjectSnapshotPersist(packaged, {
+              projectKey,
+              title: createSharedProjectSnapshotTitle(project.title || state.documentName || DEFAULT_DOCUMENT_NAME),
+            });
+          }
+        }).catch(error => {
+          console.warn('Failed to sync shared project membership on connect', error);
+        });
+      }
       refreshMultiParticipantsFromPresence();
       renderMultiParticipantsList();
       applyMultiRoleUiLocks();
@@ -56973,26 +59237,45 @@
     if (!multiState.connected || multiState.applyRemoteInProgress) {
       return;
     }
+    const useSharedProjectRealtimePrimary = isSharedProjectRealtimePrimaryActive(multiState.projectKey);
     if (isMultiMasterMode()) {
       if (MULTI_LAYER_PATCH_HISTORY_LABELS.has(_label)) {
         markMultiPublicLobbyThumbnailDirty();
-        scheduleMasterLayerPatchSend();
+        if (!useSharedProjectRealtimePrimary) {
+          scheduleMasterLayerPatchSend();
+        }
         scheduleMultiPublicLobbyRoomSync({ immediate: false });
+        queueSharedProjectCurrentSnapshotCapture({
+          delayMs: useSharedProjectRealtimePrimary ? 60 : AUTOSAVE_REMOTE_MULTI_WRITE_DELAY / 2,
+          historyLabel: _label,
+        });
         return;
       }
       if (MULTI_PALETTE_HISTORY_LABELS.has(_label)) {
         return;
       }
       markMultiPublicLobbyThumbnailDirty();
-      scheduleMultiSessionStateBroadcast({ immediate: false });
+      if (!useSharedProjectRealtimePrimary) {
+        scheduleMultiSessionStateBroadcast({ immediate: false });
+      }
       scheduleMultiPublicLobbyRoomSync({ immediate: false });
+      queueSharedProjectCurrentSnapshotCapture({
+        delayMs: useSharedProjectRealtimePrimary ? 80 : AUTOSAVE_REMOTE_MULTI_WRITE_DELAY / 2,
+        historyLabel: _label,
+      });
       return;
     }
     if (isMultiGuestMode()) {
       if (MULTI_PALETTE_HISTORY_LABELS.has(_label)) {
         return;
       }
-      scheduleGuestLayerPatchSend();
+      if (!useSharedProjectRealtimePrimary) {
+        scheduleGuestLayerPatchSend();
+      }
+      queueSharedProjectCurrentSnapshotCapture({
+        delayMs: useSharedProjectRealtimePrimary ? 60 : AUTOSAVE_REMOTE_MULTI_WRITE_DELAY / 2,
+        historyLabel: _label,
+      });
     }
   }
 
@@ -57007,12 +59290,16 @@
         if (!(event.target instanceof HTMLInputElement)) {
           return;
         }
-        const normalized = normalizeMultiProjectKey(event.target.value);
-        if (event.target.value !== normalized) {
-          event.target.value = normalized;
+        const parsed = parseMultiProjectAccessInput(event.target.value);
+        const normalized = parsed.projectKey;
+        if (normalized) {
+          storeMultiProjectKey(normalized);
+          if (event.target === dom.controls.multiProjectKey) {
+            syncMultiProjectKeyInputValues(normalized, { preserveFocused: true });
+          }
+        } else if (!String(event.target.value || '').trim()) {
+          storeMultiProjectKey('');
         }
-        storeMultiProjectKey(normalized);
-        syncMultiProjectKeyInputValues(normalized, { preserveFocused: true });
         syncMultiControls();
       });
     });
@@ -57305,6 +59592,16 @@
         if (multiState.connected || multiState.connecting) {
           return;
         }
+        if (prefersSharedProjectFlow()) {
+          if (!activeSharedProjectKey) {
+            const accepted = await openShareStartConfirmDialog();
+            if (!accepted) {
+              return;
+            }
+            await createSharedProjectFromCurrentDocument();
+          }
+          return;
+        }
         multiEntryJoinPanelOpen = false;
         // Always start a newly opened room as private. The master can publish it after opening.
         multiState.roomVisibility = MULTI_DEFAULT_ROOM_VISIBILITY;
@@ -57331,6 +59628,10 @@
       dom.controls.multiEntryJoinAsGuest.dataset.bound = 'true';
       dom.controls.multiEntryJoinAsGuest.addEventListener('click', async () => {
         if (multiState.connected || multiState.connecting) {
+          return;
+        }
+        if (prefersSharedProjectFlow()) {
+          await openSharedProjectFromInput();
           return;
         }
         const connected = await connectMultiSessionAs('guest');
@@ -57412,7 +59713,17 @@
     });
     if (dom.controls.multiStartSession instanceof HTMLButtonElement && dom.controls.multiStartSession.dataset.bound !== 'true') {
       dom.controls.multiStartSession.dataset.bound = 'true';
-      dom.controls.multiStartSession.addEventListener('click', () => {
+      dom.controls.multiStartSession.addEventListener('click', async () => {
+        if (prefersSharedProjectFlow()) {
+          if (!activeSharedProjectKey) {
+            const accepted = await openShareStartConfirmDialog();
+            if (!accepted) {
+              return;
+            }
+            await createSharedProjectFromCurrentDocument();
+          }
+          return;
+        }
         connectMultiSessionAs(normalizeMultiDesiredRole(multiState.desiredRole));
       });
     }
