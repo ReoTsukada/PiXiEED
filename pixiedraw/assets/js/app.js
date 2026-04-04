@@ -17624,6 +17624,10 @@
         Math.max(0, Math.round(Number(activeEntryAfterLoad?.sharedProjectStructureRevision) || 0)),
         typeof activeEntryAfterLoad?.sharedProjectBackendId === 'string' ? activeEntryAfterLoad.sharedProjectBackendId : ''
       );
+      setMultiStatus(
+        localizeText('共有モード: ON', 'Shared mode: ON'),
+        'info'
+      );
     } else {
       clearActiveSharedProjectSession();
     }
@@ -49760,6 +49764,11 @@
       revision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
       structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
     });
+    const sharedRecentProjectId = buildSharedRecentProjectId(projectKey);
+    setActiveAutosaveProjectId(sharedRecentProjectId);
+    await recordRecentProjectSnapshot(snapshot, packaged, {
+      projectId: sharedRecentProjectId,
+    });
     syncMultiControls();
     setMultiStatus(
       localizeText(
@@ -51268,15 +51277,14 @@
         return null;
       }
       const { data, error } = await supabase
-        .from('shared_projects')
-        .select('id, project_key, invite_token, visibility, owner_user_id, title, latest_snapshot, latest_revision, latest_structure_revision, updated_at, created_at')
-        .eq('invite_token', normalizedInviteToken)
-        .maybeSingle();
+        .rpc('pixieed_get_shared_project_by_invite_token', {
+          target_invite_token: normalizedInviteToken,
+        });
       if (error) {
         handleSharedProjectsBackendError(error, 'fetch-by-token');
         return null;
       }
-      return data || null;
+      return Array.isArray(data) ? (data[0] || null) : (data || null);
     } catch (error) {
       handleSharedProjectsBackendError(error, 'fetch-by-token-exception');
       return null;
@@ -51307,18 +51315,9 @@
         };
         const inserted = await supabase
           .from('shared_projects')
-          .insert(insertPayload)
-          .select('id, project_key, invite_token, visibility, owner_user_id, title, latest_snapshot, latest_revision, latest_structure_revision, updated_at, created_at')
-          .maybeSingle();
+          .insert(insertPayload);
         if (inserted.error && String(inserted.error.code || '') !== '23505') {
           handleSharedProjectsBackendError(inserted.error, 'create-project');
-          return null;
-        }
-        project = inserted.data || null;
-        if (!project) {
-          project = await fetchSharedProjectRecord(normalizedProjectKey);
-        }
-        if (!project) {
           return null;
         }
         const bootstrapMembership = await supabase
@@ -51326,15 +51325,18 @@
           .upsert(
             {
               project_key: normalizedProjectKey,
-              project_id: project.id || null,
               user_id: accountState.userId,
-              role: project.owner_user_id === accountState.userId ? 'owner' : 'editor',
+              role: 'owner',
               last_opened_at: new Date().toISOString(),
             },
             { onConflict: 'project_key,user_id' }
           );
         if (bootstrapMembership.error) {
           handleSharedProjectsBackendError(bootstrapMembership.error, 'bootstrap-membership');
+          return null;
+        }
+        project = await fetchSharedProjectRecord(normalizedProjectKey);
+        if (!project) {
           return null;
         }
       }
@@ -54903,7 +54905,7 @@
       if (!rows.length) {
         const empty = document.createElement('li');
         empty.className = 'help-text';
-        empty.textContent = activeSharedProjectKey
+        empty.textContent = resolveSharedProjectKeyForCurrentState()
           ? localizeText('まだ他のメンバーはいません。共有URLを送るとここに表示されます。', 'No other members yet. Share the URL to invite others.')
           : localizeText('共有モードをONにすると、ここにメンバーが表示されます。', 'Turn on shared mode to show members here.');
         list.appendChild(empty);
@@ -55696,8 +55698,11 @@
     const sharedProjectFlowPreferred = prefersSharedProjectFlow();
     const currentAccess = readCurrentMultiProjectAccessInput();
     const currentProjectKey = currentAccess.projectKey || readCurrentMultiProjectKey();
+    const resolvedSharedProjectKey = sharedProjectFlowPreferred
+      ? resolveSharedProjectKeyForCurrentState(currentProjectKey)
+      : '';
     const hasCurrentProjectLocator = Boolean(currentProjectKey || currentAccess.inviteToken);
-    const sharedModeEnabled = sharedProjectFlowPreferred && Boolean(activeSharedProjectKey);
+    const sharedModeEnabled = sharedProjectFlowPreferred && Boolean(resolvedSharedProjectKey);
     const isEntryView = normalizeMultiUiView(multiState.uiView) === 'entry'
       && !multiState.connected
       && !multiState.connecting;
@@ -56026,12 +56031,12 @@
     }
     if (dom.controls.multiInviteCopy instanceof HTMLButtonElement) {
       dom.controls.multiInviteCopy.disabled = multiState.connecting
-        || !(sharedProjectFlowPreferred ? Boolean(activeSharedProjectKey) : (inMasterConfigMode && currentProjectKey));
-      dom.controls.multiInviteCopy.hidden = sharedProjectFlowPreferred ? !Boolean(activeSharedProjectKey) : false;
+        || !(sharedProjectFlowPreferred ? Boolean(resolvedSharedProjectKey) : (inMasterConfigMode && currentProjectKey));
+      dom.controls.multiInviteCopy.hidden = sharedProjectFlowPreferred ? !Boolean(resolvedSharedProjectKey) : false;
     }
     if (dom.controls.multiInviteShare instanceof HTMLButtonElement) {
       dom.controls.multiInviteShare.disabled = multiState.connecting
-        || !(sharedProjectFlowPreferred ? Boolean(activeSharedProjectKey || currentProjectKey) : (inMasterConfigMode && currentProjectKey));
+        || !(sharedProjectFlowPreferred ? Boolean(resolvedSharedProjectKey || currentProjectKey) : (inMasterConfigMode && currentProjectKey));
       dom.controls.multiInviteShare.hidden = true;
     }
     const participantsPanel = document.querySelector('#panelMulti .multi-participants-panel');
