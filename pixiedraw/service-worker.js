@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pixiedraw-v2026.03.20';
+const CACHE_VERSION = 'pixiedraw-v2026.04.05-authfix1';
 const CORE_ASSETS = [
   '/pixiedraw/',
   '/pixiedraw/index.html',
