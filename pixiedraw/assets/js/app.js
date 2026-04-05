@@ -2933,6 +2933,8 @@
     session: null,
     supabase: null,
   };
+  const PIXIEED_AUTH_STORAGE_KEY = 'sb-kyyiuakrqomzlikfaire-auth-token';
+  const PIXIEED_AUTH_SESSION_CACHE_KEY = 'pixieed:auth-session-cache:v1';
   let accountSupabaseInitPromise = null;
   let accountInitPromise = null;
   let accountAuthListenerBound = false;
@@ -2954,6 +2956,8 @@
   let sharedProjectPollingTimer = null;
   let sharedProjectRefreshTimer = null;
   let sharedProjectRefreshInFlight = false;
+  let sharedProjectMembers = [];
+  let sharedProjectMembersSyncPromise = null;
   let multiSupabaseClientPromise = null;
 
   const RAIL_DEFAULT_WIDTH = Object.freeze({ left: 78, right: 78 });
@@ -7754,6 +7758,7 @@
     activeSharedProjectKey = '';
     activeSharedProjectRevision = 0;
     activeSharedProjectStructureRevision = 0;
+    sharedProjectMembers = [];
     sharedProjectLayerSnapshots.clear();
     if (sharedProjectCaptureTimer !== null) {
       window.clearTimeout(sharedProjectCaptureTimer);
@@ -7770,6 +7775,19 @@
     disconnectActiveSharedProjectRealtimeChannel().catch(error => {
       console.warn('Failed to disconnect shared project realtime channel', error);
     });
+    renderMultiParticipantsList();
+  }
+
+  async function ensureNoLegacyMultiSessionForSharedProject() {
+    if (!multiState.connected && !multiState.connecting) {
+      return;
+    }
+    await disconnectMultiSession({ silent: true, restoreLocalDocument: false });
+    multiState.connected = false;
+    multiState.connecting = false;
+    multiState.role = 'none';
+    clearStoredMultiResumeSession();
+    syncMultiControls();
   }
 
   function ensureSharedProjectRefreshLoop() {
@@ -7812,6 +7830,9 @@
     ensureSharedProjectRefreshLoop();
     ensureActiveSharedProjectRealtimeChannel().catch(error => {
       console.warn('Failed to subscribe shared project realtime channel', error);
+    });
+    syncSharedProjectMembers(normalizedProjectKey, activeSharedProjectId).catch(error => {
+      console.warn('Failed to load shared project members', error);
     });
   }
 
@@ -11727,7 +11748,7 @@
     }
 
     setLocalizedTextContent('.startup-screen__subtitle', 'PiXiEEDraw（ピクシードロー）でドット絵づくり・共同制作・アニメ制作をはじめよう', 'Start pixel art, collab, and animation with PiXiEEDraw');
-    setLocalizedTextContent('#startupActionResume', '前回の続きから再開', 'Resume Last Session');
+    setLocalizedTextContent('#startupActionResume', '最新の端末内プロジェクトを開く', 'Open Latest Local Project');
     setLocalizedTextContent('#startupActionNew', '新規作成', 'New Project');
     setLocalizedTextContent('#startupActionOpen', 'ファイルを開く', 'Open File');
     setLocalizedTextContent('#startupActionSkip', 'この画面を閉じる', 'Close');
@@ -12715,8 +12736,6 @@
 
     if (readMultiInviteFromUrl()) {
       setActiveAutosaveProjectId(createAutosaveProjectId());
-      markAutosaveDirty();
-      scheduleAutosaveSnapshot();
       updateAutosaveStatus('自動保存: 招待リンクを優先して読み込みます', 'info');
       return;
     }
@@ -12727,24 +12746,16 @@
       const sanitizeResult = await sanitizeRecentProjectsStore({ announce: false });
       const recentEntries = Array.isArray(sanitizeResult?.entries) ? sanitizeResult.entries : [];
       const storedProjectId = await loadStoredAutosaveProjectId();
-      let targetEntry = null;
-      if (storedProjectId) {
-        targetEntry = recentEntries.find(entry => entry?.id === storedProjectId) || null;
-      }
-      if (!targetEntry) {
-        targetEntry = recentEntries[0] || null;
-      }
-      if (targetEntry) {
-        const restored = await openRecentProject(targetEntry, { hideStartup: false, silent: true });
-        if (restored) {
-          updateAutosaveStatus('自動保存: 前回の端末内データを復元しました', 'success');
-          return;
-        }
-      }
-      setActiveAutosaveProjectId(storedProjectId || createAutosaveProjectId());
+      const reusableProjectId = normalizeAutosaveProjectId(storedProjectId || '');
+      setActiveAutosaveProjectId(reusableProjectId || createAutosaveProjectId());
       markAutosaveDirty();
       scheduleAutosaveSnapshot();
-      updateAutosaveStatus('自動保存: 端末内へ自動保存します', 'info');
+      updateAutosaveStatus(
+        recentEntries.length
+          ? '自動保存: 端末内プロジェクトを選ぶか、新規作成してください'
+          : '自動保存: 新規作成すると端末内への自動保存を開始します',
+        'info'
+      );
     } catch (error) {
       console.warn('Autosave initialisation failed', error);
       updateAutosaveStatus('自動保存: 初期化でエラーが発生しました', 'error');
@@ -17170,25 +17181,11 @@
   }
 
   function hasDismissedStartupScreen() {
-    if (!canUseSessionStorage) {
-      return false;
-    }
-    try {
-      return window.localStorage.getItem(STARTUP_SCREEN_DISMISSED_KEY) === '1';
-    } catch (error) {
-      return false;
-    }
+    return false;
   }
 
   function markStartupScreenDismissed() {
-    if (!canUseSessionStorage) {
-      return;
-    }
-    try {
-      window.localStorage.setItem(STARTUP_SCREEN_DISMISSED_KEY, '1');
-    } catch (error) {
-      // Ignore storage errors (private mode or quota exceeded)
-    }
+    // Startup screen is intentionally shown on every normal launch.
   }
 
   function showStartupScreen() {
@@ -17377,8 +17374,8 @@
     if (dom.startup?.hint) {
       dom.startup.hint.textContent = AUTOSAVE_SUPPORTED
         ? localizeText(
-          '描画内容はこの端末に自動保存され、起動時に前回データを復元できます。',
-          'Your drawing is autosaved on this device and restored when you reopen.'
+          '毎回ここから始まります。新規作成するか、端末内プロジェクトを選んで開いてください。',
+          'Every launch starts here. Create a new project or choose a local project to open.'
         )
         : localizeText(
           'このブラウザでは自動保存が利用できません。保存/出力から手動保存してください。',
@@ -19174,6 +19171,7 @@
     if (!normalizedEntry) {
       return false;
     }
+    await ensureNoLegacyMultiSessionForSharedProject();
     const requestedRole = normalizedEntry.sharedRoleHint || 'guest';
     if (canUseSharedProjectsBackend()) {
       const sharedProject = await loadSharedProjectSnapshotRecord(normalizedEntry.sharedProjectKey, {
@@ -19218,9 +19216,9 @@
       Math.max(0, Math.round(Number(normalizedEntry.sharedProjectStructureRevision) || 0)),
       normalizedEntry.sharedProjectBackendId || ''
     );
-    if (normalizedEntry.sharedAutoJoin !== false) {
-      await connectMultiSessionAs(requestedRole, { allowGuestJoin: requestedRole === 'guest' });
-    }
+    setActiveAutosaveProjectId(normalizedEntry.sharedProjectId || normalizedEntry.id);
+    syncMultiControls();
+    renderMultiParticipantsList();
     if (!silent) {
       setMultiStatus(
         localizeText(
@@ -24951,7 +24949,8 @@
     updateDocumentMetadata();
     setupStartupScreen();
     const skipStartup = EMBED_CONFIG.skipStartup === true;
-    if (lensImportRequested || skipStartup) {
+    const hasInviteLaunch = Boolean(readMultiInviteFromUrl());
+    if (lensImportRequested || skipStartup || hasInviteLaunch) {
       hideStartupScreen();
     }
     let importedFromLens = false;
@@ -24964,7 +24963,7 @@
     renderEverything();
     refreshLocalizedUi();
     scheduleDeferredUiSetup();
-    if (!lensImportRequested && !importedFromLens && !skipStartup && !hasDismissedStartupScreen()) {
+    if (!lensImportRequested && !importedFromLens && !skipStartup && !hasInviteLaunch && !hasDismissedStartupScreen()) {
       showStartupScreen();
     }
   }
@@ -49746,6 +49745,7 @@
       if (!canUseSharedProjectsBackend()) {
         return;
       }
+      await ensureNoLegacyMultiSessionForSharedProject();
       const preloadedProject = inviteRecordPromise ? await inviteRecordPromise : null;
       const sharedProject = preloadedProject
         || (resolvedInviteToken
@@ -49771,6 +49771,15 @@
           sharedProjectKey: normalizedInviteProjectKey,
           sharedProjectRevision: Math.max(0, Math.round(Number(sharedProject?.latest_revision) || 0)),
         });
+        setActiveAutosaveProjectId(buildSharedRecentProjectId(normalizedInviteProjectKey));
+        setActiveSharedProjectSession(
+          normalizedInviteProjectKey,
+          Math.max(0, Math.round(Number(sharedProject?.latest_revision) || 0)),
+          Math.max(0, Math.round(Number(sharedProject?.latest_structure_revision) || 0)),
+          sharedProject?.id || ''
+        );
+        syncMultiControls();
+        renderMultiParticipantsList();
       } catch (error) {
         console.warn('Failed to hydrate shared invite project snapshot', error);
       }
@@ -49791,18 +49800,13 @@
           console.warn('Failed to hydrate shared invite project', error);
         })
         .finally(() => {
-          if (invite.autoJoin && !multiState.connected && !multiState.connecting) {
-            const allowGuestJoin = requestedRole === 'guest';
-            connectMultiSessionAs(requestedRole, { allowGuestJoin });
-          } else if (!invite.autoJoin) {
-            setMultiStatus(
-              localizeText(
-                '共有プロジェクトを開きました。編集内容は共有されます。',
-                'Opened shared project. Your edits will sync with collaborators.'
-              ),
-              'success'
-            );
-          }
+          setMultiStatus(
+            localizeText(
+              '共有プロジェクトを開きました。編集内容は共有されます。',
+              'Opened shared project. Your edits will sync with collaborators.'
+            ),
+            'success'
+          );
         });
     }, 100);
     return true;
@@ -49818,6 +49822,7 @@
       openLoginPromptDialog();
       return false;
     }
+    await ensureNoLegacyMultiSessionForSharedProject();
     const existingAccess = readCurrentMultiProjectAccessInput();
     const projectKey = normalizeMultiProjectKey(
       existingAccess.projectKey
@@ -49886,6 +49891,7 @@
       openLoginPromptDialog();
       return false;
     }
+    await ensureNoLegacyMultiSessionForSharedProject();
     const access = readCurrentMultiProjectAccessInput();
     if (!access.projectKey && !access.inviteToken) {
       setMultiStatus(
@@ -49926,6 +49932,7 @@
         sharedProjectRevision: Math.max(0, Math.round(Number(sharedProject.latest_revision) || 0)),
       });
     }
+    setActiveAutosaveProjectId(buildSharedRecentProjectId(resolvedProjectKey));
     storeMultiProjectKey(resolvedProjectKey);
     syncMultiProjectKeyInputValues(resolvedProjectKey, { preserveFocused: false });
     setMultiDesiredRole('guest');
@@ -49949,6 +49956,7 @@
       structureRevision: Math.max(0, Math.round(Number(sharedProject.latest_structure_revision) || 0)),
     });
     syncMultiControls();
+    renderMultiParticipantsList();
     setMultiStatus(
       localizeText(
         '共有プロジェクトを開きました。編集内容は自動で共有されます。',
@@ -50014,6 +50022,10 @@
   }
 
   function storePendingMultiResumeSession() {
+    if (prefersSharedProjectFlow()) {
+      clearStoredMultiResumeSession();
+      return;
+    }
     if (!canUseSessionStorage) {
       return;
     }
@@ -51509,6 +51521,66 @@
     return project;
   }
 
+  async function syncSharedProjectMembers(projectKey = activeSharedProjectKey, projectId = activeSharedProjectId) {
+    if (!canUseSharedProjectsBackend() || !accountState.isLoggedIn) {
+      sharedProjectMembers = [];
+      renderMultiParticipantsList();
+      return [];
+    }
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    const normalizedProjectId = typeof projectId === 'string' ? projectId.trim() : '';
+    if (!normalizedProjectKey && !normalizedProjectId) {
+      sharedProjectMembers = [];
+      renderMultiParticipantsList();
+      return [];
+    }
+    if (sharedProjectMembersSyncPromise) {
+      return sharedProjectMembersSyncPromise;
+    }
+    sharedProjectMembersSyncPromise = (async () => {
+      try {
+        const supabase = await ensurePixieedAccountClient();
+        if (!supabase) {
+          return [];
+        }
+        let query = supabase
+          .from('shared_project_members')
+          .select('project_key, project_id, user_id, role, joined_at, updated_at, last_opened_at');
+        query = normalizedProjectId
+          ? query.eq('project_id', normalizedProjectId)
+          : query.eq('project_key', normalizedProjectKey);
+        const { data, error } = await query;
+        if (error) {
+          handleSharedProjectsBackendError(error, 'list-active-members');
+          return [];
+        }
+        const rows = Array.isArray(data) ? data : [];
+        sharedProjectMembers = rows.map(entry => {
+          const userId = typeof entry?.user_id === 'string' ? entry.user_id.trim() : '';
+          const isSelf = Boolean(userId) && userId === accountState.userId;
+          return {
+            clientId: userId || `${entry?.project_key || normalizedProjectKey}:${entry?.joined_at || entry?.updated_at || Date.now()}`,
+            role: 'guest',
+            name: isSelf
+              ? (readPixieedAccountNickname() || DEFAULT_MULTI_PARTICIPANT_NAME)
+              : (userId ? `user:${userId.slice(0, 8)}` : DEFAULT_MULTI_PARTICIPANT_NAME),
+            online: true,
+            joinedAt: Date.parse(entry?.joined_at || entry?.updated_at || entry?.last_opened_at || '') || Date.now(),
+            locked: false,
+          };
+        });
+        renderMultiParticipantsList();
+        return sharedProjectMembers;
+      } catch (error) {
+        console.warn('Failed to sync shared project members', error);
+        return [];
+      } finally {
+        sharedProjectMembersSyncPromise = null;
+      }
+    })();
+    return sharedProjectMembersSyncPromise;
+  }
+
   async function refreshActiveSharedProjectSnapshot({ force = false, reason = '' } = {}) {
     if (!canUseSharedProjectsBackend() || !activeSharedProjectKey) {
       return false;
@@ -51551,6 +51623,7 @@
         Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
         project.id || ''
       );
+      await syncSharedProjectMembers(activeSharedProjectKey, project.id || '');
       await upsertSharedRecentProjectEntry({
         projectKey: activeSharedProjectKey,
         projectId: project.id || '',
@@ -51948,6 +52021,18 @@
       channel.on(
         'postgres_changes',
         {
+          event: '*',
+          schema: 'public',
+          table: 'shared_project_members',
+          filter: `project_id=eq.${projectId}`,
+        },
+        () => {
+          syncSharedProjectMembers(projectKey, projectId).catch(() => {});
+        }
+      );
+      channel.on(
+        'postgres_changes',
+        {
           event: 'INSERT',
           schema: 'public',
           table: 'shared_project_ops',
@@ -52019,15 +52104,26 @@
     if (accountState.supabase) {
       return accountState.supabase;
     }
+    if (window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__) {
+      accountState.supabase = window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__;
+      return accountState.supabase;
+    }
     if (accountSupabaseInitPromise) {
       return accountSupabaseInitPromise;
     }
     accountSupabaseInitPromise = (async () => {
       const module = await import(MULTI_SUPABASE_MODULE_URL);
       const supabase = module.createClient(MULTI_SUPABASE_URL, MULTI_SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+          storageKey: PIXIEED_AUTH_STORAGE_KEY,
+        },
         global: { headers: { 'x-client-id': multiState.clientId || '' } },
       });
       accountState.supabase = supabase;
+      window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__ = supabase;
       return supabase;
     })();
     try {
@@ -52037,7 +52133,103 @@
     }
   }
 
+  function readPixieedCachedAuthSession() {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return null;
+    }
+    try {
+      const raw = window.localStorage.getItem(PIXIEED_AUTH_SESSION_CACHE_KEY);
+      if (!raw) {
+        return null;
+      }
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') {
+        return null;
+      }
+      const accessToken = typeof parsed.access_token === 'string' ? parsed.access_token.trim() : '';
+      const refreshToken = typeof parsed.refresh_token === 'string' ? parsed.refresh_token.trim() : '';
+      if (!accessToken || !refreshToken) {
+        return null;
+      }
+      return {
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      };
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function writePixieedCachedAuthSession(session) {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return;
+    }
+    try {
+      if (!session?.access_token || !session?.refresh_token) {
+        window.localStorage.removeItem(PIXIEED_AUTH_SESSION_CACHE_KEY);
+        return;
+      }
+      window.localStorage.setItem(PIXIEED_AUTH_SESSION_CACHE_KEY, JSON.stringify({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      }));
+    } catch (_error) {
+      // Ignore storage failures and continue with normal auth flow.
+    }
+  }
+
+  async function restorePixieedAccountSessionFromCache(supabase) {
+    if (!supabase?.auth || !accountState.supabase) {
+      return null;
+    }
+    const cachedSession = readPixieedCachedAuthSession();
+    if (!cachedSession) {
+      return null;
+    }
+    try {
+      const { data, error } = await supabase.auth.setSession(cachedSession);
+      if (error) {
+        writePixieedCachedAuthSession(null);
+        return null;
+      }
+      return data?.session || null;
+    } catch (_error) {
+      writePixieedCachedAuthSession(null);
+      return null;
+    }
+  }
+
+  function buildPixieedAccountLoginHref() {
+    if (typeof window === 'undefined') {
+      return '../index.html#auth';
+    }
+    try {
+      const url = new URL('../index.html', window.location.href);
+      url.hash = 'auth';
+      url.searchParams.set('returnTo', window.location.href);
+      return url.toString();
+    } catch (_error) {
+      return '../index.html#auth';
+    }
+  }
+
+  function syncPixieedAccountLoginLink() {
+    const loginLink = dom.controls.pixieedAccountLogin;
+    if (!(loginLink instanceof HTMLAnchorElement)) {
+      return;
+    }
+    loginLink.href = buildPixieedAccountLoginHref();
+    if (isStandaloneAppDisplayMode()) {
+      loginLink.target = '_self';
+      loginLink.rel = 'noopener';
+      return;
+    }
+    loginLink.target = '_blank';
+    loginLink.rel = 'noopener';
+  }
+
   function applyPixieedAccountSession(session) {
+    writePixieedCachedAuthSession(session || null);
     accountState.session = session || null;
     accountState.userId = session?.user?.id || '';
     accountState.isLoggedIn = Boolean(accountState.userId);
@@ -52160,6 +52352,7 @@
       }
     }
     if (loginLink instanceof HTMLElement) {
+      syncPixieedAccountLoginLink();
       loginLink.hidden = accountState.isLoggedIn;
       loginLink.setAttribute('aria-hidden', String(accountState.isLoggedIn));
     }
@@ -52196,8 +52389,16 @@
           updatePixieedAccountUi();
           return;
         }
-        const { data } = await supabase.auth.getSession();
-        applyPixieedAccountSession(data?.session || null);
+        let { data } = await supabase.auth.getSession();
+        let session = data?.session || null;
+        if (!session) {
+          session = await restorePixieedAccountSessionFromCache(supabase);
+          if (session) {
+            ({ data } = await supabase.auth.getSession());
+            session = data?.session || session;
+          }
+        }
+        applyPixieedAccountSession(session);
         if (accountState.isLoggedIn) {
           await syncPixieedAccountProfile();
           await syncSharedRecentProjectsFromAccount();
@@ -55030,6 +55231,10 @@
     list.innerHTML = '';
     const rows = buildMultiParticipantRows().map(row => ({ ...row }));
     if (prefersSharedProjectFlow()) {
+      if (resolveSharedProjectKeyForCurrentState() && sharedProjectMembers.length) {
+        rows.length = 0;
+        rows.push(...sharedProjectMembers.map(row => ({ ...row })));
+      }
       rows.sort((a, b) => {
         const onlineDiff = Number(Boolean(b.online)) - Number(Boolean(a.online));
         if (onlineDiff !== 0) {
