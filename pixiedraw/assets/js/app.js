@@ -2956,6 +2956,7 @@
   let activeSharedProjectChannel = null;
   let activeSharedProjectChannelKey = '';
   let activeSharedProjectChannelSignature = '';
+  let sharedProjectRealtimeRetryBlockedUntil = 0;
   let sharedProjectPollingTimer = null;
   let sharedProjectRefreshTimer = null;
   let sharedProjectRefreshInFlight = false;
@@ -52027,6 +52028,9 @@
     if (!canUseSharedProjectsBackend() || !activeSharedProjectKey) {
       return null;
     }
+    if (Date.now() < sharedProjectRealtimeRetryBlockedUntil) {
+      return null;
+    }
     const projectKey = activeSharedProjectKey;
     const projectId = activeSharedProjectId || '';
     const channelSignature = `${projectKey}::${projectId}`;
@@ -52117,27 +52121,38 @@
         }
       );
     }
-    await new Promise((resolve, reject) => {
-      let settled = false;
-      const timeout = window.setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        reject(new Error('Shared project realtime subscribe timed out'));
-      }, 15000);
-      channel.subscribe(status => {
-        if (status === 'SUBSCRIBED' && !settled) {
+    try {
+      await new Promise((resolve, reject) => {
+        let settled = false;
+        const timeout = window.setTimeout(() => {
+          if (settled) return;
           settled = true;
-          window.clearTimeout(timeout);
-          resolve();
-          return;
-        }
-        if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && !settled) {
-          settled = true;
-          window.clearTimeout(timeout);
-          reject(new Error(`Shared project realtime failed: ${status}`));
-        }
+          reject(new Error('Shared project realtime subscribe timed out'));
+        }, 15000);
+        channel.subscribe(status => {
+          if (status === 'SUBSCRIBED' && !settled) {
+            settled = true;
+            window.clearTimeout(timeout);
+            resolve();
+            return;
+          }
+          if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && !settled) {
+            settled = true;
+            window.clearTimeout(timeout);
+            reject(new Error(`Shared project realtime failed: ${status}`));
+          }
+        });
       });
-    });
+    } catch (error) {
+      sharedProjectRealtimeRetryBlockedUntil = Date.now() + 30000;
+      try {
+        await supabase.removeChannel(channel);
+      } catch (_removeError) {
+        // Ignore realtime cleanup failures and rely on polling fallback.
+      }
+      throw error;
+    }
+    sharedProjectRealtimeRetryBlockedUntil = 0;
     activeSharedProjectChannel = channel;
     activeSharedProjectChannelKey = projectKey;
     activeSharedProjectChannelSignature = channelSignature;
