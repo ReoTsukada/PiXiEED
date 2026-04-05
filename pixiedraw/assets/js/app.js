@@ -2951,6 +2951,7 @@
   let activeSharedProjectChannel = null;
   let activeSharedProjectChannelKey = '';
   let activeSharedProjectChannelSignature = '';
+  let sharedProjectPollingTimer = null;
   let sharedProjectRefreshTimer = null;
   let sharedProjectRefreshInFlight = false;
   let multiSupabaseClientPromise = null;
@@ -7762,9 +7763,35 @@
       window.clearTimeout(sharedProjectRefreshTimer);
       sharedProjectRefreshTimer = null;
     }
+    if (sharedProjectPollingTimer !== null) {
+      window.clearInterval(sharedProjectPollingTimer);
+      sharedProjectPollingTimer = null;
+    }
     disconnectActiveSharedProjectRealtimeChannel().catch(error => {
       console.warn('Failed to disconnect shared project realtime channel', error);
     });
+  }
+
+  function ensureSharedProjectRefreshLoop() {
+    if (sharedProjectPollingTimer !== null) {
+      window.clearInterval(sharedProjectPollingTimer);
+      sharedProjectPollingTimer = null;
+    }
+    if (!canUseSharedProjectsBackend() || !activeSharedProjectKey) {
+      return;
+    }
+    sharedProjectPollingTimer = window.setInterval(() => {
+      if (!canUseSharedProjectsBackend() || !activeSharedProjectKey) {
+        return;
+      }
+      if (document.visibilityState === 'hidden') {
+        return;
+      }
+      if (hasDocumentUnsavedChanges() || autosaveWriteInFlight || multiState.applyRemoteInProgress) {
+        return;
+      }
+      queueSharedProjectRefresh({ immediate: true, reason: 'poll' });
+    }, 1500);
   }
 
   function setActiveSharedProjectSession(projectKey = '', revision = 0, structureRevision = 0, projectId = '') {
@@ -7782,6 +7809,7 @@
     activeSharedProjectKey = normalizedProjectKey;
     activeSharedProjectRevision = Math.max(0, Math.round(Number(revision) || 0));
     activeSharedProjectStructureRevision = Math.max(0, Math.round(Number(structureRevision) || 0));
+    ensureSharedProjectRefreshLoop();
     ensureActiveSharedProjectRealtimeChannel().catch(error => {
       console.warn('Failed to subscribe shared project realtime channel', error);
     });
@@ -49769,6 +49797,10 @@
   }
 
   async function createSharedProjectFromCurrentDocument() {
+    if (isSharedProjectsBlockedByRuntime()) {
+      showSharedRuntimeBlockedStatus();
+      return false;
+    }
     if (!canUseSharedProjectsBackend()) {
       setMultiStatus(localizeText('共有プロジェクトにはログインが必要です', 'Sign in to create a shared project'), 'warn');
       openLoginPromptDialog();
@@ -49834,6 +49866,10 @@
   }
 
   async function openSharedProjectFromInput() {
+    if (isSharedProjectsBlockedByRuntime()) {
+      showSharedRuntimeBlockedStatus();
+      return false;
+    }
     if (!canUseSharedProjectsBackend()) {
       setMultiStatus(localizeText('共有プロジェクトにはログインが必要です', 'Sign in to open a shared project'), 'warn');
       openLoginPromptDialog();
@@ -51060,6 +51096,20 @@
     return supportsSharedProjectsBackend && accountState.isLoggedIn;
   }
 
+  function isSharedProjectsBlockedByRuntime() {
+    return window.location?.protocol === 'file:';
+  }
+
+  function showSharedRuntimeBlockedStatus() {
+    setMultiStatus(
+      localizeText(
+        '共有モードは file:// 直開きでは使えません。https または localhost で開いてください。',
+        'Shared mode is unavailable on file://. Open PiXiEEDraw over https or localhost.'
+      ),
+      'error'
+    );
+  }
+
   function canApplyIncomingSharedProjectSnapshot() {
     return (
       !hasDocumentUnsavedChanges()
@@ -51731,8 +51781,12 @@
             Math.round(Number(saved.latest_structure_revision) || nextPayload.baseStructureRevision || 0)
           );
           if (nextPayload.projectKey === activeSharedProjectKey) {
-            activeSharedProjectRevision = Math.max(0, Math.round(Number(saved.latest_revision) || activeSharedProjectRevision));
-            activeSharedProjectStructureRevision = nextStructureRevision;
+            setActiveSharedProjectSession(
+              nextPayload.projectKey,
+              Math.max(0, Math.round(Number(saved.latest_revision) || activeSharedProjectRevision)),
+              nextStructureRevision,
+              saved.id || activeSharedProjectId
+            );
             markDocumentDurablySaved();
           }
           await appendSharedProjectOp(saved, {
@@ -54041,6 +54095,10 @@
   }
 
   async function copyMultiInviteLink() {
+    if (isSharedProjectsBlockedByRuntime()) {
+      showSharedRuntimeBlockedStatus();
+      return false;
+    }
     const inviteRole = resolveMultiInviteDefaultRole();
     const inviteUrl = buildMultiInviteUrl(activeSharedProjectKey || multiState.projectKey, { role: inviteRole, autoJoin: false });
     if (!inviteUrl) {
@@ -54057,6 +54115,10 @@
   }
 
   async function shareMultiInviteLink() {
+    if (isSharedProjectsBlockedByRuntime()) {
+      showSharedRuntimeBlockedStatus();
+      return false;
+    }
     const inviteRole = resolveMultiInviteDefaultRole();
     const inviteUrl = buildMultiInviteUrl(activeSharedProjectKey || multiState.projectKey, { role: inviteRole, autoJoin: false });
     if (!inviteUrl) {
