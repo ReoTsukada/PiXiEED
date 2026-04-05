@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.03.22';
+  const APP_BUILD_VERSION = '2026.04.05-authfix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -2939,7 +2939,9 @@
   let accountSupabaseInitPromise = null;
   let accountInitPromise = null;
   let accountAuthListenerBound = false;
+  let accountAuthSubscription = null;
   let accountProfileSyncPromise = null;
+  const accountProfileSyncPromisesByUserId = new Map();
   let supportsPixieedProfileXUrl = true;
   let supportsSharedProjectsBackend = true;
   let sharedProjectSyncTimer = null;
@@ -17984,7 +17986,8 @@
     if (!projectKey) {
       return null;
     }
-    const id = normalizeAutosaveProjectId(entry.id || buildSharedRecentProjectId(projectKey));
+    const sharedRecentProjectId = buildSharedRecentProjectId(projectKey);
+    const id = normalizeAutosaveProjectId(entry.id || sharedRecentProjectId);
     if (!id) {
       return null;
     }
@@ -18005,9 +18008,7 @@
       sharedProjectBackendId: typeof entry.sharedProjectBackendId === 'string' && entry.sharedProjectBackendId.trim()
         ? entry.sharedProjectBackendId.trim()
         : '',
-      sharedProjectId: typeof entry.sharedProjectId === 'string' && entry.sharedProjectId.trim()
-        ? entry.sharedProjectId.trim()
-        : id,
+      sharedProjectId: sharedRecentProjectId,
       sharedProjectKey: projectKey,
       sharedProjectInviteToken: typeof entry.sharedProjectInviteToken === 'string' && entry.sharedProjectInviteToken.trim()
         ? entry.sharedProjectInviteToken.trim()
@@ -18586,7 +18587,7 @@
     const normalizedEntry = normalizeSharedRecentProjectEntry({
       sharedProjectKey: projectKey,
       sharedProjectBackendId: projectId || '',
-      sharedProjectId: projectId || buildSharedRecentProjectId(projectKey),
+      sharedProjectId: buildSharedRecentProjectId(projectKey),
       sharedProjectInviteToken: inviteToken,
       sharedProjectVisibility: visibility,
       name: name || extractDocumentBaseName(state.documentName || DEFAULT_DOCUMENT_NAME),
@@ -19182,7 +19183,7 @@
       const sharedSnapshot = sharedProject?.latest_snapshot;
       if (sharedSnapshot && typeof sharedSnapshot === 'object') {
         const loaded = await loadDocumentFromText(JSON.stringify(sharedSnapshot), null, {
-          projectId: normalizedEntry.sharedProjectId || normalizedEntry.id,
+          projectId: normalizedEntry.id,
           suppressAutosaveStatus: true,
           openedFromRecent: true,
           preserveDotStats: true,
@@ -19217,7 +19218,7 @@
       Math.max(0, Math.round(Number(normalizedEntry.sharedProjectStructureRevision) || 0)),
       normalizedEntry.sharedProjectBackendId || ''
     );
-    setActiveAutosaveProjectId(normalizedEntry.sharedProjectId || normalizedEntry.id);
+    setActiveAutosaveProjectId(normalizedEntry.id);
     syncMultiControls();
     renderMultiParticipantsList();
     if (!silent) {
@@ -51100,7 +51101,12 @@
   }
 
   function isMissingTable(error, table) {
-    const msg = String(error?.message || '').toLowerCase();
+    const msg = [
+      error?.message,
+      error?.details,
+      error?.hint,
+      error?.code,
+    ].filter(Boolean).join(' ').toLowerCase();
     const needle = String(table || '').toLowerCase();
     return Boolean(msg && needle && msg.includes(needle));
   }
@@ -51110,9 +51116,18 @@
       return false;
     }
     const status = Number(error?.status || 0);
-    const msg = String(error?.message || '').toLowerCase();
+    const msg = [
+      error?.message,
+      error?.details,
+      error?.hint,
+      error?.code,
+    ].filter(Boolean).join(' ').toLowerCase();
     return (
       status === 404
+      || msg.includes('relation does not exist')
+      || msg.includes('table not found')
+      || msg.includes('schema cache')
+      || msg.includes('not found')
       || isMissingTable(error, 'user_profiles')
       || msg.includes('user_profiles')
     );
@@ -51481,57 +51496,20 @@
       if (!supabase) {
         return null;
       }
-      let project = await fetchSharedProjectRecord(normalizedProjectKey);
-      if (!project && createIfMissing) {
-        const insertPayload = {
-          project_key: normalizedProjectKey,
-          owner_user_id: accountState.userId,
-          title: createSharedProjectSnapshotTitle(title),
-          invite_token: (typeof inviteToken === 'string' && inviteToken.trim()) || createSharedProjectInviteToken(),
-          visibility: visibility === MULTI_ROOM_VISIBILITY_PUBLIC ? 'public' : 'shared',
-        };
-        const inserted = await supabase
-          .from('shared_projects')
-          .insert(insertPayload);
-        if (inserted.error && String(inserted.error.code || '') !== '23505') {
-          handleSharedProjectsBackendError(inserted.error, 'create-project');
-          return null;
-        }
-        const bootstrapMembership = await supabase
-          .from('shared_project_members')
-          .upsert(
-            {
-              project_key: normalizedProjectKey,
-              user_id: accountState.userId,
-              role: 'owner',
-              last_opened_at: new Date().toISOString(),
-            },
-            { onConflict: 'project_key,user_id' }
-          );
-        if (bootstrapMembership.error) {
-          handleSharedProjectsBackendError(bootstrapMembership.error, 'bootstrap-membership');
-          return null;
-        }
-        project = await fetchSharedProjectRecord(normalizedProjectKey);
-        if (!project) {
-          return null;
-        }
-      }
-      if (!project) {
+      const { data, error } = await supabase.rpc('pixieed_ensure_shared_project_membership', {
+        target_project_key: normalizedProjectKey,
+        target_title: createSharedProjectSnapshotTitle(title),
+        target_invite_token: (typeof inviteToken === 'string' && inviteToken.trim()) || createSharedProjectInviteToken(),
+        target_visibility: visibility === MULTI_ROOM_VISIBILITY_PUBLIC ? 'public' : 'shared',
+        target_create_if_missing: Boolean(createIfMissing),
+      });
+      if (error) {
+        handleSharedProjectsBackendError(error, 'ensure-membership-rpc');
         return null;
       }
-      const membershipPayload = {
-        project_key: normalizedProjectKey,
-        project_id: project.id,
-        user_id: accountState.userId,
-        role: project.owner_user_id === accountState.userId ? 'owner' : 'editor',
-        last_opened_at: new Date().toISOString(),
-      };
-      const membership = await supabase
-        .from('shared_project_members')
-        .upsert(membershipPayload, { onConflict: 'project_key,user_id' });
-      if (membership.error) {
-        handleSharedProjectsBackendError(membership.error, 'ensure-membership');
+      const project = Array.isArray(data) ? (data[0] || null) : (data || null);
+      if (!project) {
+        return null;
       }
       return project;
     } catch (error) {
@@ -51723,31 +51701,51 @@
       if (!supabase) {
         return null;
       }
-      const nextRevision = Number.isFinite(Number(revision))
-        ? Math.max(0, Math.round(Number(revision)))
-        : Math.max(0, Math.round(Number(project.latest_revision) || 0) + 1);
       const opType = classifySharedProjectOpType(packagedPayload?.sharedHistoryLabel || '');
+      const baseRevision = Math.max(0, Math.round(Number(project.latest_revision) || 0));
+      const baseStructureRevision = Math.max(0, Math.round(Number(project.latest_structure_revision) || 0));
+      const nextRevision = Number.isFinite(Number(revision))
+        ? Math.max(baseRevision + 1, Math.round(Number(revision)))
+        : baseRevision + 1;
       const nextStructureRevision = opType === 'structure'
-        ? Math.max(0, Math.round(Number(project.latest_structure_revision) || 0) + 1)
-        : Math.max(0, Math.round(Number(project.latest_structure_revision) || 0));
-      const payload = {
-        project_key: normalizedProjectKey,
-        title: createSharedProjectSnapshotTitle(title || state.documentName || DEFAULT_DOCUMENT_NAME),
-        latest_snapshot: packagedPayload,
-        latest_revision: nextRevision,
-        latest_structure_revision: nextStructureRevision,
-      };
-      const { data, error } = await supabase
-        .from('shared_projects')
-        .update(payload)
-        .eq('project_key', normalizedProjectKey)
-        .select('id, project_key, invite_token, visibility, owner_user_id, title, latest_snapshot, latest_revision, latest_structure_revision, updated_at, created_at')
-        .maybeSingle();
+        ? Math.max(baseStructureRevision + 1, Math.round(baseStructureRevision + 1))
+        : baseStructureRevision;
+      const opPayload = opType === 'draw'
+        ? buildSharedProjectDrawOpPayload(packagedPayload?.sharedHistoryLabel || '')
+        : (opType === 'structure'
+          ? buildSharedProjectStructureOpPayload(packagedPayload?.sharedHistoryLabel || '')
+          : null);
+      const { data, error } = await supabase.rpc('pixieed_commit_shared_project_snapshot', {
+        target_project_key: normalizedProjectKey,
+        next_title: createSharedProjectSnapshotTitle(title || state.documentName || DEFAULT_DOCUMENT_NAME),
+        next_snapshot: packagedPayload,
+        base_revision: baseRevision,
+        next_revision: nextRevision,
+        base_structure_revision: baseStructureRevision,
+        next_structure_revision: nextStructureRevision,
+        op_type: opType,
+        history_label: String(packagedPayload?.sharedHistoryLabel || ''),
+        op_payload: opPayload || {},
+      });
       if (error) {
-        handleSharedProjectsBackendError(error, 'persist');
+        handleSharedProjectsBackendError(error, 'persist-rpc');
         return null;
       }
-      return data || null;
+      const result = Array.isArray(data) ? (data[0] || null) : (data || null);
+      if (!result) {
+        return null;
+      }
+      if (result.commit_status === 'conflict') {
+        activeSharedProjectRevision = Math.max(0, Math.round(Number(result.conflict_revision) || activeSharedProjectRevision));
+        activeSharedProjectStructureRevision = Math.max(0, Math.round(Number(result.conflict_structure_revision) || activeSharedProjectStructureRevision));
+        queueSharedProjectRefresh({ immediate: true, reason: 'commit-conflict' });
+        setMultiStatus(
+          localizeText('共有プロジェクトの更新競合が発生したため最新状態へ再同期します', 'Shared project conflict detected. Refreshing to latest state.'),
+          'warn'
+        );
+        return null;
+      }
+      return result;
     } catch (error) {
       handleSharedProjectsBackendError(error, 'persist-exception');
       return null;
@@ -51908,12 +51906,6 @@
       sharedProjectSyncQueuedPayload = null;
       sharedProjectSyncInFlight = true;
       try {
-        const classifiedOpType = classifySharedProjectOpType(nextPayload.historyLabel);
-        const opPayload = classifiedOpType === 'draw'
-          ? buildSharedProjectDrawOpPayload(nextPayload.historyLabel)
-          : classifiedOpType === 'structure'
-            ? buildSharedProjectStructureOpPayload(nextPayload.historyLabel)
-            : null;
         const saved = await persistSharedProjectSnapshot(
           nextPayload.projectKey,
           nextPayload.packagedPayload,
@@ -51933,14 +51925,6 @@
             );
             markDocumentDurablySaved();
           }
-          await appendSharedProjectOp(saved, {
-            revision: Math.max(0, Math.round(Number(saved.latest_revision) || 0)),
-            baseRevision: Math.max(0, Math.round(Number(nextPayload.baseRevision) || 0)),
-            structureRevision: nextStructureRevision,
-            historyLabel: nextPayload.historyLabel,
-            opType: classifiedOpType,
-            opPayload,
-          });
           await upsertSharedRecentProjectEntry({
             projectKey: nextPayload.projectKey,
             projectId: saved.id || '',
@@ -52166,7 +52150,16 @@
     }
     if (window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__) {
       accountState.supabase = window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__;
+      if (window.__PIXIEED_ACCOUNT_AUTH_BOUND__) {
+        accountAuthListenerBound = true;
+      }
+      if (window.__PIXIEED_ACCOUNT_AUTH_SUBSCRIPTION__) {
+        accountAuthSubscription = window.__PIXIEED_ACCOUNT_AUTH_SUBSCRIPTION__;
+      }
       return accountState.supabase;
+    }
+    if (window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__) {
+      accountSupabaseInitPromise = window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__;
     }
     if (accountSupabaseInitPromise) {
       return accountSupabaseInitPromise;
@@ -52184,10 +52177,15 @@
       });
       accountState.supabase = supabase;
       window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__ = supabase;
+      window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__ = Promise.resolve(supabase);
       return supabase;
     })();
+    window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__ = accountSupabaseInitPromise;
     try {
       return await accountSupabaseInitPromise;
+    } catch (error) {
+      window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__ = null;
+      throw error;
     } finally {
       accountSupabaseInitPromise = null;
     }
@@ -52299,18 +52297,47 @@
     }
   }
 
+  function getPixieedAccountProfileFallback() {
+    const metadata = accountState.session?.user?.user_metadata || accountState.session?.user?.app_metadata || {};
+    const nicknameFromMeta = typeof metadata?.nickname === 'string'
+      ? metadata.nickname.trim()
+      : (typeof metadata?.name === 'string' ? metadata.name.trim() : '');
+    const avatarFromMeta = typeof metadata?.avatar === 'string'
+      ? metadata.avatar.trim()
+      : (typeof metadata?.avatar_url === 'string' ? metadata.avatar_url.trim() : '');
+    const xUrlFromMeta = typeof metadata?.x_url === 'string'
+      ? metadata.x_url.trim()
+      : (typeof metadata?.xUrl === 'string' ? metadata.xUrl.trim() : '');
+    return {
+      nickname: accountState.profile?.nickname || readPixieedLocalNickname() || nicknameFromMeta || '',
+      avatarId: normalizePixieedAvatarId(
+        accountState.profile?.avatarId
+          || readPixieedLocalAvatarId()
+          || avatarFromMeta
+          || ''
+      ),
+      xUrl: accountState.profile?.xUrl || readPixieedLocalXUrl() || xUrlFromMeta || '',
+    };
+  }
+
   async function syncPixieedAccountProfile() {
-    if (accountProfileSyncPromise) {
-      return accountProfileSyncPromise;
+    const userId = accountState.userId;
+    if (!userId) {
+      const fallbackProfile = getPixieedAccountProfileFallback();
+      accountState.profile = fallbackProfile;
+      updatePixieedAccountUi();
+      return fallbackProfile;
+    }
+    if (accountProfileSyncPromisesByUserId.has(userId)) {
+      return accountProfileSyncPromisesByUserId.get(userId);
     }
     accountProfileSyncPromise = (async () => {
-      const userId = accountState.userId;
-      if (!userId) {
-        return null;
-      }
       const supabase = await ensurePixieedAccountClient();
       if (!supabase) {
-        return null;
+        const fallbackProfile = getPixieedAccountProfileFallback();
+        accountState.profile = fallbackProfile;
+        updatePixieedAccountUi();
+        return fallbackProfile;
       }
       const localNick = readPixieedLocalNickname();
       const localAvatar = readPixieedLocalAvatarId();
@@ -52331,11 +52358,7 @@
           .maybeSingle());
       }
       if (shouldIgnorePixieedProfileError(error)) {
-        accountState.profile = {
-          nickname: localNick,
-          avatarId: normalizePixieedAvatarId(localAvatar),
-          xUrl: localXUrl,
-        };
+        accountState.profile = getPixieedAccountProfileFallback();
         updatePixieedAccountUi();
         return accountState.profile;
       }
@@ -52385,9 +52408,11 @@
       updatePixieedAccountUi();
       return nextProfile;
     })();
+    accountProfileSyncPromisesByUserId.set(userId, accountProfileSyncPromise);
     try {
       return await accountProfileSyncPromise;
     } finally {
+      accountProfileSyncPromisesByUserId.delete(userId);
       accountProfileSyncPromise = null;
     }
   }
@@ -52421,11 +52446,13 @@
       logoutButton.setAttribute('aria-hidden', String(!accountState.isLoggedIn));
     }
     if (dock instanceof HTMLElement) {
-      const nickname = readPixieedAccountNickname();
+      const nickname = readPixieedAccountNickname()
+        || accountState.profile?.nickname
+        || '';
       if (accountState.isLoggedIn) {
         dock.textContent = localizeText('アカウント', 'Account');
         const email = accountState.session?.user?.email || '';
-        const label = nickname || email;
+        const label = nickname || email || localizeText('ログイン中', 'Signed in');
         if (label) {
           dock.setAttribute('title', label);
         } else {
@@ -52460,22 +52487,47 @@
         }
         applyPixieedAccountSession(session);
         if (accountState.isLoggedIn) {
-          await syncPixieedAccountProfile();
+          try {
+            await syncPixieedAccountProfile();
+          } catch (error) {
+            if (!shouldIgnorePixieedProfileError(error)) {
+              throw error;
+            }
+            accountState.profile = getPixieedAccountProfileFallback();
+            updatePixieedAccountUi();
+          }
           await syncSharedRecentProjectsFromAccount();
         } else {
           updatePixieedAccountUi();
         }
         if (!accountAuthListenerBound) {
-          accountAuthListenerBound = true;
-          supabase.auth.onAuthStateChange(async (_event, session) => {
-            applyPixieedAccountSession(session || null);
-            if (accountState.isLoggedIn) {
-              await syncPixieedAccountProfile();
-              await syncSharedRecentProjectsFromAccount();
-            } else {
-              updatePixieedAccountUi();
-            }
-          });
+          if (window.__PIXIEED_ACCOUNT_AUTH_BOUND__) {
+            accountAuthListenerBound = true;
+          } else {
+            accountAuthListenerBound = true;
+            window.__PIXIEED_ACCOUNT_AUTH_BOUND__ = true;
+          }
+          if (!accountAuthSubscription) {
+            const authSubscription = supabase.auth.onAuthStateChange(async (_event, session) => {
+              applyPixieedAccountSession(session || null);
+              if (accountState.isLoggedIn) {
+                try {
+                  await syncPixieedAccountProfile();
+                } catch (error) {
+                  if (!shouldIgnorePixieedProfileError(error)) {
+                    throw error;
+                  }
+                  accountState.profile = getPixieedAccountProfileFallback();
+                  updatePixieedAccountUi();
+                }
+                await syncSharedRecentProjectsFromAccount();
+              } else {
+                updatePixieedAccountUi();
+              }
+            });
+            accountAuthSubscription = authSubscription?.data?.subscription || authSubscription?.subscription || null;
+            window.__PIXIEED_ACCOUNT_AUTH_SUBSCRIPTION__ = accountAuthSubscription;
+          }
         }
       } catch (error) {
         console.warn('Pixieed account init failed', error);
