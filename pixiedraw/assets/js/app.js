@@ -18023,12 +18023,13 @@
     if (normalizedFallback) {
       return normalizedFallback;
     }
-    if (activeSharedProjectKey) {
-      return normalizeMultiProjectKey(activeSharedProjectKey);
-    }
-    const activeEntry = recentProjectsCache.get(normalizeAutosaveProjectId(autosaveProjectId || '')) || null;
+    const currentProjectId = normalizeAutosaveProjectId(autosaveProjectId || '');
+    const activeEntry = recentProjectsCache.get(currentProjectId) || null;
     if (isSharedRecentProjectEntry(activeEntry)) {
       return normalizeMultiProjectKey(activeEntry.sharedProjectKey || '');
+    }
+    if (currentProjectId.startsWith(SHARED_PROJECT_ID_PREFIX) && activeSharedProjectKey) {
+      return normalizeMultiProjectKey(activeSharedProjectKey);
     }
     return '';
   }
@@ -59796,7 +59797,7 @@
           return;
         }
         if (prefersSharedProjectFlow()) {
-          if (!activeSharedProjectKey) {
+          if (!resolveSharedProjectKeyForCurrentState()) {
             const accepted = await openShareStartConfirmDialog();
             if (!accepted) {
               return;
@@ -59924,7 +59925,7 @@
             openLoginPromptDialog();
             return;
           }
-          if (!activeSharedProjectKey) {
+          if (!resolveSharedProjectKeyForCurrentState()) {
             const accepted = await openShareStartConfirmDialog();
             if (!accepted) {
               return;
