@@ -2960,6 +2960,7 @@
   let sharedProjectPollingTimer = null;
   let sharedProjectRefreshTimer = null;
   let sharedProjectRefreshInFlight = false;
+  let pendingSharedProjectConflictReplay = null;
   let sharedProjectMembers = [];
   let sharedProjectMembersSyncPromise = null;
   let multiSupabaseClientPromise = null;
@@ -8579,7 +8580,7 @@
       scheduleTimelapseCaptureFromState();
       if (activeSharedProjectKey) {
         queueSharedProjectCurrentSnapshotCapture({
-          delayMs: Math.max(120, Math.round(SHARED_PROJECT_SYNC_DELAY / 3)),
+          delayMs: 40,
           projectKey: activeSharedProjectKey,
           historyLabel: pendingLabel,
         });
@@ -51367,6 +51368,74 @@
     requestOverlayRender();
   }
 
+  function replaySharedProjectDrawOpPayload(opPayload, { historyLabel = '' } = {}) {
+    const payload = opPayload && typeof opPayload === 'object' ? opPayload : null;
+    const canvasId = typeof payload?.canvasId === 'string' ? payload.canvasId.trim() : '';
+    const layerId = typeof payload?.layerId === 'string' ? payload.layerId.trim() : '';
+    const frameIndex = Math.max(0, Math.round(Number(payload?.frameIndex) || 0));
+    const pixelCount = Math.max(0, Math.floor(Number(payload?.pixelCount) || 0));
+    const patch = payload?.patch && typeof payload.patch === 'object' ? payload.patch : null;
+    if (!canvasId || !layerId || !pixelCount || !patch) {
+      return false;
+    }
+    const targetCanvas = getProjectCanvasDocumentById(canvasId);
+    if (!targetCanvas || !Array.isArray(targetCanvas.frames) || frameIndex >= targetCanvas.frames.length) {
+      return false;
+    }
+    const frame = targetCanvas.frames[frameIndex];
+    if (!frame || !Array.isArray(frame.layers)) {
+      return false;
+    }
+    const layer = frame.layers.find(entry => entry?.id === layerId) || null;
+    if (!layer) {
+      return false;
+    }
+    const applyResult = applyLayerPatchPayloadToLayer(layer, patch, pixelCount, {
+      width: targetCanvas.width,
+      height: targetCanvas.height,
+    });
+    if (!applyResult) {
+      return false;
+    }
+    const snapshotKey = buildSharedProjectLayerSnapshotKey(canvasId, frameIndex, layerId);
+    const nextSnapshot = captureLayerPatchSnapshot(layer, pixelCount);
+    if (snapshotKey && nextSnapshot) {
+      sharedProjectLayerSnapshots.set(snapshotKey, nextSnapshot);
+    }
+    applyIncomingSharedProjectVisualResult(targetCanvas, applyResult);
+    markDocumentUnsavedChange();
+    queueSharedProjectCurrentSnapshotCapture({
+      delayMs: 40,
+      projectKey: activeSharedProjectKey,
+      historyLabel: historyLabel || 'sharedConflictReplay',
+    });
+    return true;
+  }
+
+  function maybeReplayPendingSharedProjectConflictAfterRefresh(projectKey = activeSharedProjectKey) {
+    if (!pendingSharedProjectConflictReplay) {
+      return false;
+    }
+    if (pendingSharedProjectConflictReplay.projectKey !== projectKey) {
+      return false;
+    }
+    const pending = pendingSharedProjectConflictReplay;
+    pendingSharedProjectConflictReplay = null;
+    const replayed = replaySharedProjectDrawOpPayload(pending.opPayload, {
+      historyLabel: pending.historyLabel,
+    });
+    if (replayed) {
+      setMultiStatus(
+        localizeText(
+          '共有競合を検知し、あなたの描画を最新状態へ再適用しました',
+          'A shared edit conflict was detected. Your stroke was reapplied on the latest state.'
+        ),
+        'info'
+      );
+    }
+    return replayed;
+  }
+
   function resetLocalHistoryForSharedCollaborativeRemoteChange() {
     if (!isSharedProjectCollaborativeMode()) {
       return;
@@ -51670,6 +51739,7 @@
         revision: nextRevision,
         structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
       });
+      maybeReplayPendingSharedProjectConflictAfterRefresh(activeSharedProjectKey);
       if (reason) {
         updateAutosaveStatus(
           localizeText('共有プロジェクトの最新内容を反映しました', 'Shared project updated'),
@@ -51737,9 +51807,16 @@
         return null;
       }
       if (result.commit_status === 'conflict') {
+        if (opType === 'draw' && opPayload) {
+          pendingSharedProjectConflictReplay = {
+            projectKey: normalizedProjectKey,
+            opPayload,
+            historyLabel: String(packagedPayload?.sharedHistoryLabel || ''),
+          };
+        }
         activeSharedProjectRevision = Math.max(0, Math.round(Number(result.conflict_revision) || activeSharedProjectRevision));
         activeSharedProjectStructureRevision = Math.max(0, Math.round(Number(result.conflict_structure_revision) || activeSharedProjectStructureRevision));
-        queueSharedProjectRefresh({ immediate: true, reason: 'commit-conflict' });
+        queueSharedProjectRefresh({ immediate: true, reason: 'commit-conflict', force: true });
         setMultiStatus(
           localizeText('共有プロジェクトの更新競合が発生したため最新状態へ再同期します', 'Shared project conflict detected. Refreshing to latest state.'),
           'warn'
@@ -51954,7 +52031,7 @@
     }, SHARED_PROJECT_SYNC_DELAY);
   }
 
-  function queueSharedProjectRefresh({ immediate = false, reason = '' } = {}) {
+  function queueSharedProjectRefresh({ immediate = false, reason = '', force = false } = {}) {
     if (!activeSharedProjectKey || !canUseSharedProjectsBackend()) {
       return;
     }
@@ -51965,7 +52042,7 @@
     const delayMs = immediate ? 0 : SHARED_PROJECT_SYNC_DELAY;
     sharedProjectRefreshTimer = window.setTimeout(() => {
       sharedProjectRefreshTimer = null;
-      refreshActiveSharedProjectSnapshot({ reason }).catch(error => {
+      refreshActiveSharedProjectSnapshot({ reason, force }).catch(error => {
         console.warn('Failed to refresh shared project snapshot', error);
       });
     }, delayMs);
@@ -59840,11 +59917,11 @@
           scheduleMasterLayerPatchSend();
         }
         scheduleMultiPublicLobbyRoomSync({ immediate: false });
-        queueSharedProjectCurrentSnapshotCapture({
-          delayMs: useSharedProjectRealtimePrimary ? 60 : AUTOSAVE_REMOTE_MULTI_WRITE_DELAY / 2,
-          historyLabel: _label,
-        });
-        return;
+      queueSharedProjectCurrentSnapshotCapture({
+        delayMs: useSharedProjectRealtimePrimary ? 30 : AUTOSAVE_REMOTE_MULTI_WRITE_DELAY / 2,
+        historyLabel: _label,
+      });
+      return;
       }
       if (MULTI_PALETTE_HISTORY_LABELS.has(_label)) {
         return;
@@ -59855,7 +59932,7 @@
       }
       scheduleMultiPublicLobbyRoomSync({ immediate: false });
       queueSharedProjectCurrentSnapshotCapture({
-        delayMs: useSharedProjectRealtimePrimary ? 80 : AUTOSAVE_REMOTE_MULTI_WRITE_DELAY / 2,
+        delayMs: useSharedProjectRealtimePrimary ? 50 : AUTOSAVE_REMOTE_MULTI_WRITE_DELAY / 2,
         historyLabel: _label,
       });
       return;
@@ -59868,7 +59945,7 @@
         scheduleGuestLayerPatchSend();
       }
       queueSharedProjectCurrentSnapshotCapture({
-        delayMs: useSharedProjectRealtimePrimary ? 60 : AUTOSAVE_REMOTE_MULTI_WRITE_DELAY / 2,
+        delayMs: useSharedProjectRealtimePrimary ? 30 : AUTOSAVE_REMOTE_MULTI_WRITE_DELAY / 2,
         historyLabel: _label,
       });
     }
