@@ -8,6 +8,7 @@
   const SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
   const PANEL_SELECTOR = '#authPanel';
   const AUTH_BLOCK_ID = 'sharedAuthBlock';
+  const AUTH_STORAGE_KEY = 'sb-kyyiuakrqomzlikfaire-auth-token';
 
   let supabaseClient = null;
   let supabaseUser = null;
@@ -133,8 +134,43 @@
       return supabaseClient;
     }
     const module = await import(SUPABASE_MODULE_URL);
-    supabaseClient = module.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    supabaseClient = module.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storageKey: AUTH_STORAGE_KEY,
+      },
+    });
     return supabaseClient;
+  }
+
+  function getReturnToUrl() {
+    try {
+      const current = new URL(window.location.href);
+      const returnTo = current.searchParams.get('returnTo') || '';
+      if (!returnTo) {
+        return '';
+      }
+      const parsed = new URL(returnTo, window.location.href);
+      if (parsed.origin !== window.location.origin) {
+        return '';
+      }
+      return parsed.toString();
+    } catch (_error) {
+      return '';
+    }
+  }
+
+  function maybeReturnToCaller() {
+    const returnTo = getReturnToUrl();
+    if (!returnTo || !supabaseUser) {
+      return;
+    }
+    if (window.location.href === returnTo) {
+      return;
+    }
+    window.location.replace(returnTo);
   }
 
   async function syncProfileFromServer() {
@@ -402,8 +438,10 @@
         supabaseUser = session?.user || null;
         await syncProfileFromServer();
         updateAuthUi();
+        maybeReturnToCaller();
       });
       await syncProfileFromServer();
+      maybeReturnToCaller();
     } catch (_error) {
       supabaseClient = null;
     }
