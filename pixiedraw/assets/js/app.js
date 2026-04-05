@@ -54424,7 +54424,30 @@
       return false;
     }
     const inviteRole = resolveMultiInviteDefaultRole();
-    const inviteUrl = buildMultiInviteUrl(resolveSharedProjectKeyForCurrentState(), { role: inviteRole, autoJoin: false });
+    const resolvedProjectKey = resolveSharedProjectKeyForCurrentState();
+    let inviteToken = getCurrentSharedRecentProjectEntry(resolvedProjectKey)?.sharedProjectInviteToken || '';
+    if (!inviteToken && resolvedProjectKey && canUseSharedProjectsBackend()) {
+      const project = await fetchSharedProjectRecord(resolvedProjectKey);
+      if (project?.invite_token) {
+        inviteToken = project.invite_token;
+        await upsertSharedRecentProjectEntry({
+          projectKey: resolvedProjectKey,
+          projectId: project.id || '',
+          inviteToken,
+          visibility: project.visibility || 'shared',
+          name: createSharedProjectSnapshotTitle(project.title || state.documentName || resolvedProjectKey),
+          roleHint: normalizeMultiDesiredRole(multiState.role || multiState.desiredRole || 'guest'),
+          autoJoin: false,
+          revision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
+          structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
+        });
+      }
+    }
+    const inviteUrl = buildMultiInviteUrl(resolvedProjectKey, {
+      role: inviteRole,
+      autoJoin: false,
+      inviteToken,
+    });
     if (!inviteUrl) {
       setMultiStatus(localizeText('先に共有モードをONにしてください', 'Turn on shared mode first'), 'warn');
       return false;
@@ -54444,7 +54467,30 @@
       return false;
     }
     const inviteRole = resolveMultiInviteDefaultRole();
-    const inviteUrl = buildMultiInviteUrl(resolveSharedProjectKeyForCurrentState(), { role: inviteRole, autoJoin: false });
+    const resolvedProjectKey = resolveSharedProjectKeyForCurrentState();
+    let inviteToken = getCurrentSharedRecentProjectEntry(resolvedProjectKey)?.sharedProjectInviteToken || '';
+    if (!inviteToken && resolvedProjectKey && canUseSharedProjectsBackend()) {
+      const project = await fetchSharedProjectRecord(resolvedProjectKey);
+      if (project?.invite_token) {
+        inviteToken = project.invite_token;
+        await upsertSharedRecentProjectEntry({
+          projectKey: resolvedProjectKey,
+          projectId: project.id || '',
+          inviteToken,
+          visibility: project.visibility || 'shared',
+          name: createSharedProjectSnapshotTitle(project.title || state.documentName || resolvedProjectKey),
+          roleHint: normalizeMultiDesiredRole(multiState.role || multiState.desiredRole || 'guest'),
+          autoJoin: false,
+          revision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
+          structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
+        });
+      }
+    }
+    const inviteUrl = buildMultiInviteUrl(resolvedProjectKey, {
+      role: inviteRole,
+      autoJoin: false,
+      inviteToken,
+    });
     if (!inviteUrl) {
       setMultiStatus(localizeText('先に共有モードをONにしてください', 'Turn on shared mode first'), 'warn');
       return false;
