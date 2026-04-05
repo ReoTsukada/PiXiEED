@@ -55955,7 +55955,7 @@
       dom.controls.multiEntryJoinBack.hidden = sharedProjectFlowPreferred;
     }
     if (dom.controls.multiStartSession instanceof HTMLButtonElement) {
-      const canStartSharedFlow = sharedProjectFlowPreferred && !multiState.connecting && !multiState.connected && !sharedModeEnabled;
+      const canStartSharedFlow = sharedProjectFlowPreferred && !multiState.connecting && !sharedModeEnabled;
       dom.controls.multiStartSession.disabled = sharedProjectFlowPreferred
         ? !canStartSharedFlow
         : (multiState.connecting || multiState.connected || !currentProjectKey || isEntryView);
@@ -55965,7 +55965,7 @@
           ? localizeText('共有中', 'Shared')
           : localizeText('共有モードをON', 'Turn Shared Mode On'))
         : localizeText('開始', 'Start');
-      if (multiState.connected) {
+      if (multiState.connected && !sharedProjectFlowPreferred) {
         dom.controls.multiStartSession.title = sharedProjectFlowPreferred
           ? localizeText('共有プロジェクトを開いています', 'A shared project is already open')
           : (multiState.role === 'guest'
@@ -59804,7 +59804,7 @@
     if (dom.controls.multiEntryMaster instanceof HTMLButtonElement && dom.controls.multiEntryMaster.dataset.bound !== 'true') {
       dom.controls.multiEntryMaster.dataset.bound = 'true';
       dom.controls.multiEntryMaster.addEventListener('click', async () => {
-        if (multiState.connected || multiState.connecting) {
+        if (!prefersSharedProjectFlow() && (multiState.connected || multiState.connecting)) {
           return;
         }
         if (prefersSharedProjectFlow()) {
