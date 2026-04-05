@@ -49810,7 +49810,6 @@
     const projectKey = normalizeMultiProjectKey(
       existingAccess.projectKey
       || activeSharedProjectKey
-      || multiState.projectKey
       || generateMultiProjectKey()
     );
     if (!projectKey) {
@@ -54100,7 +54099,7 @@
       return false;
     }
     const inviteRole = resolveMultiInviteDefaultRole();
-    const inviteUrl = buildMultiInviteUrl(activeSharedProjectKey || multiState.projectKey, { role: inviteRole, autoJoin: false });
+    const inviteUrl = buildMultiInviteUrl(resolveSharedProjectKeyForCurrentState(), { role: inviteRole, autoJoin: false });
     if (!inviteUrl) {
       setMultiStatus(localizeText('先に共有モードをONにしてください', 'Turn on shared mode first'), 'warn');
       return false;
@@ -54120,7 +54119,7 @@
       return false;
     }
     const inviteRole = resolveMultiInviteDefaultRole();
-    const inviteUrl = buildMultiInviteUrl(activeSharedProjectKey || multiState.projectKey, { role: inviteRole, autoJoin: false });
+    const inviteUrl = buildMultiInviteUrl(resolveSharedProjectKeyForCurrentState(), { role: inviteRole, autoJoin: false });
     if (!inviteUrl) {
       setMultiStatus(localizeText('先に共有モードをONにしてください', 'Turn on shared mode first'), 'warn');
       return false;
@@ -55830,7 +55829,7 @@
     const currentAccess = readCurrentMultiProjectAccessInput();
     const currentProjectKey = currentAccess.projectKey || readCurrentMultiProjectKey();
     const resolvedSharedProjectKey = sharedProjectFlowPreferred
-      ? resolveSharedProjectKeyForCurrentState(currentProjectKey)
+      ? resolveSharedProjectKeyForCurrentState()
       : '';
     const hasCurrentProjectLocator = Boolean(currentProjectKey || currentAccess.inviteToken);
     const sharedModeEnabled = sharedProjectFlowPreferred && Boolean(resolvedSharedProjectKey);
