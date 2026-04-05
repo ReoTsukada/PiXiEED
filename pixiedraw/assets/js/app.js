@@ -2497,6 +2497,7 @@
   const MULTI_INVITE_QUERY_TOKEN = 'multiInviteToken';
   const MULTI_INVITE_QUERY_AUTO_JOIN = 'multiAutoJoin';
   const MULTI_INVITE_QUERY_ROLE = 'multiRole';
+  const MULTI_PENDING_INVITE_STORAGE_KEY = 'pixiedraw:pending-shared-invite:v1';
   const SHARED_PROJECT_ID_PREFIX = 'shared-';
   const SHARED_PROJECT_SYNC_DELAY = 1400;
   const MULTI_GUEST_MOVE_PREVIEW_DEBOUNCE_MS = 140;
@@ -49658,11 +49659,63 @@
     }
   }
 
+  function storePendingMultiInvite(invite) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    try {
+      if (!invite || typeof invite !== 'object') {
+        window.sessionStorage.removeItem(MULTI_PENDING_INVITE_STORAGE_KEY);
+        return;
+      }
+      window.sessionStorage.setItem(MULTI_PENDING_INVITE_STORAGE_KEY, JSON.stringify({
+        projectKey: normalizeMultiProjectKey(invite.projectKey || ''),
+        inviteToken: typeof invite.inviteToken === 'string' ? invite.inviteToken.trim() : '',
+        autoJoin: invite.autoJoin !== false,
+        role: typeof invite.role === 'string' ? invite.role.trim() : '',
+      }));
+    } catch (_error) {
+      // Ignore storage errors.
+    }
+  }
+
+  function readStoredPendingMultiInvite() {
+    if (!canUseSessionStorage) {
+      return null;
+    }
+    try {
+      const raw = window.sessionStorage.getItem(MULTI_PENDING_INVITE_STORAGE_KEY);
+      if (!raw) {
+        return null;
+      }
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') {
+        return null;
+      }
+      const projectKey = normalizeMultiProjectKey(parsed.projectKey || '');
+      const inviteToken = typeof parsed.inviteToken === 'string' ? parsed.inviteToken.trim() : '';
+      if (!projectKey && !inviteToken) {
+        return null;
+      }
+      const role = parsed.role === 'master' || parsed.role === 'guest' || parsed.role === 'spectator'
+        ? parsed.role
+        : '';
+      return {
+        projectKey,
+        inviteToken,
+        autoJoin: parsed.autoJoin !== false,
+        role,
+      };
+    } catch (_error) {
+      return null;
+    }
+  }
+
   function readMultiInviteFromUrl() {
     try {
       const params = new URLSearchParams(window.location.search);
       if (!parseMultiBooleanQueryValue(params.get(MULTI_INVITE_QUERY_FLAG) || '')) {
-        return null;
+        return readStoredPendingMultiInvite();
       }
       const projectKey = normalizeMultiProjectKey(params.get(MULTI_INVITE_QUERY_KEY) || '');
       const inviteToken = typeof params.get(MULTI_INVITE_QUERY_TOKEN) === 'string'
@@ -49675,14 +49728,16 @@
       // optional: request a role via invite (master / guest / spectator)
       const roleParam = typeof params.get(MULTI_INVITE_QUERY_ROLE) === 'string' ? String(params.get(MULTI_INVITE_QUERY_ROLE)).trim() : '';
       const role = (roleParam === 'master' || roleParam === 'guest' || roleParam === 'spectator') ? roleParam : '';
-      return {
+      const invite = {
         projectKey,
         inviteToken,
         autoJoin,
         role,
       };
+      storePendingMultiInvite(invite);
+      return invite;
     } catch (error) {
-      return null;
+      return readStoredPendingMultiInvite();
     }
   }
 
@@ -49793,13 +49848,14 @@
     }).catch(error => {
       console.warn('Failed to record shared project invite entry', error);
     });
-    clearMultiInviteQueryParamsFromUrl();
     window.setTimeout(() => {
       hydrateSharedInviteProject()
         .catch(error => {
           console.warn('Failed to hydrate shared invite project', error);
         })
         .finally(() => {
+          storePendingMultiInvite(null);
+          clearMultiInviteQueryParamsFromUrl();
           setMultiStatus(
             localizeText(
               '共有プロジェクトを開きました。編集内容は共有されます。',
@@ -51732,6 +51788,10 @@
       };
       const { error } = await supabase.from('shared_project_ops').insert(payload);
       if (error) {
+        if (String(error.code || '') === '23505' || Number(error.status || 0) === 409) {
+          queueSharedProjectRefresh({ immediate: true, reason: 'op-conflict' });
+          return payload;
+        }
         handleSharedProjectsBackendError(error, 'append-op');
         return null;
       }
