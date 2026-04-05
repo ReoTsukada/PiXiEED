@@ -2950,6 +2950,7 @@
   const sharedProjectLayerSnapshots = new Map();
   let activeSharedProjectChannel = null;
   let activeSharedProjectChannelKey = '';
+  let activeSharedProjectChannelSignature = '';
   let sharedProjectRefreshTimer = null;
   let sharedProjectRefreshInFlight = false;
   let multiSupabaseClientPromise = null;
@@ -7772,7 +7773,12 @@
       clearActiveSharedProjectSession();
       return;
     }
-    activeSharedProjectId = typeof projectId === 'string' ? projectId.trim() : '';
+    const normalizedProjectId = typeof projectId === 'string' ? projectId.trim() : '';
+    activeSharedProjectId = normalizedProjectId || (
+      activeSharedProjectKey === normalizedProjectKey
+        ? activeSharedProjectId
+        : ''
+    );
     activeSharedProjectKey = normalizedProjectKey;
     activeSharedProjectRevision = Math.max(0, Math.round(Number(revision) || 0));
     activeSharedProjectStructureRevision = Math.max(0, Math.round(Number(structureRevision) || 0));
@@ -17989,11 +17995,14 @@
     if (normalizedFallback) {
       return normalizedFallback;
     }
+    if (activeSharedProjectKey) {
+      return normalizeMultiProjectKey(activeSharedProjectKey);
+    }
     const activeEntry = recentProjectsCache.get(normalizeAutosaveProjectId(autosaveProjectId || '')) || null;
     if (isSharedRecentProjectEntry(activeEntry)) {
       return normalizeMultiProjectKey(activeEntry.sharedProjectKey || '');
     }
-    return normalizeMultiProjectKey(multiState.projectKey || readStoredMultiProjectKey() || '');
+    return '';
   }
 
   function getCurrentSharedRecentProjectEntry(projectKey = '') {
@@ -18013,6 +18022,37 @@
       sharedRoleHint: normalizeMultiDesiredRole(multiState.role || multiState.desiredRole || 'spectator'),
       sharedAutoJoin: false,
     });
+  }
+
+  function ensureBoundSharedProjectSessionFromCurrentState(projectKey = '') {
+    if (!canUseSharedProjectsBackend()) {
+      return null;
+    }
+    const currentEntry = getCurrentSharedRecentProjectEntry(projectKey);
+    if (!currentEntry || !isSharedRecentProjectEntry(currentEntry)) {
+      return null;
+    }
+    const entryProjectKey = normalizeMultiProjectKey(currentEntry.sharedProjectKey || '');
+    if (!entryProjectKey) {
+      return null;
+    }
+    const entryProjectId = typeof currentEntry.sharedProjectBackendId === 'string'
+      ? currentEntry.sharedProjectBackendId.trim()
+      : '';
+    const needsRebind = (
+      !activeSharedProjectKey
+      || activeSharedProjectKey !== entryProjectKey
+      || (entryProjectId && activeSharedProjectId !== entryProjectId)
+    );
+    if (needsRebind) {
+      setActiveSharedProjectSession(
+        entryProjectKey,
+        Math.max(0, Math.round(Number(currentEntry.sharedProjectRevision) || 0)),
+        Math.max(0, Math.round(Number(currentEntry.sharedProjectStructureRevision) || 0)),
+        entryProjectId
+      );
+    }
+    return currentEntry;
   }
 
   function createAutosaveProjectId() {
@@ -51030,22 +51070,17 @@
   }
 
   function isSharedProjectRealtimePrimaryActive(projectKey = '') {
-    if (!canUseSharedProjectsBackend() || !activeSharedProjectKey) {
+    ensureBoundSharedProjectSessionFromCurrentState(projectKey);
+    const resolvedSharedProjectKey = resolveSharedProjectKeyForCurrentState(projectKey);
+    if (!canUseSharedProjectsBackend() || !resolvedSharedProjectKey || !activeSharedProjectKey) {
       return false;
     }
-    const normalizedProjectKey = normalizeMultiProjectKey(
-      projectKey || multiState.projectKey || readStoredMultiProjectKey() || ''
-    );
-    return Boolean(normalizedProjectKey && normalizedProjectKey === activeSharedProjectKey);
+    return resolvedSharedProjectKey === activeSharedProjectKey;
   }
 
   function isSharedProjectCollaborativeMode(projectKey = '') {
-    const normalizedProjectKey = normalizeMultiProjectKey(
-      projectKey
-      || activeSharedProjectKey
-      || resolveSharedProjectKeyForCurrentState(projectKey)
-      || multiState.projectKey
-    );
+    ensureBoundSharedProjectSessionFromCurrentState(projectKey);
+    const normalizedProjectKey = resolveSharedProjectKeyForCurrentState(projectKey);
     if (!normalizedProjectKey) {
       return false;
     }
@@ -51793,6 +51828,7 @@
     const channel = activeSharedProjectChannel;
     activeSharedProjectChannel = null;
     activeSharedProjectChannelKey = '';
+    activeSharedProjectChannelSignature = '';
     if (!channel) {
       return;
     }
@@ -51809,9 +51845,12 @@
     if (!canUseSharedProjectsBackend() || !activeSharedProjectKey) {
       return null;
     }
+    const projectKey = activeSharedProjectKey;
+    const projectId = activeSharedProjectId || '';
+    const channelSignature = `${projectKey}::${projectId}`;
     if (
       activeSharedProjectChannel
-      && activeSharedProjectChannelKey === activeSharedProjectKey
+      && activeSharedProjectChannelSignature === channelSignature
     ) {
       return activeSharedProjectChannel;
     }
@@ -51820,7 +51859,6 @@
     if (!supabase) {
       return null;
     }
-    const projectKey = activeSharedProjectKey;
     const channel = supabase.channel(`shared-project:${projectKey}`);
     channel.on(
       'postgres_changes',
@@ -51841,14 +51879,14 @@
         queueSharedProjectRefresh({ immediate: true, reason: 'realtime' });
       }
     );
-    if (activeSharedProjectId) {
+    if (projectId) {
       channel.on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'shared_project_ops',
-          filter: `project_id=eq.${activeSharedProjectId}`,
+          filter: `project_id=eq.${projectId}`,
         },
         payload => {
           if (projectKey !== activeSharedProjectKey) {
@@ -51908,6 +51946,7 @@
     });
     activeSharedProjectChannel = channel;
     activeSharedProjectChannelKey = projectKey;
+    activeSharedProjectChannelSignature = channelSignature;
     return channel;
   }
 
@@ -59336,7 +59375,8 @@
   }
 
   function handleMultiLocalCommit(_label = '') {
-    if (!multiState.connected || multiState.applyRemoteInProgress) {
+    const sharedCollaborative = isSharedProjectCollaborativeMode();
+    if ((!multiState.connected && !sharedCollaborative) || multiState.applyRemoteInProgress) {
       return;
     }
     const useSharedProjectRealtimePrimary = isSharedProjectRealtimePrimaryActive(multiState.projectKey);
