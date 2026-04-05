@@ -12713,6 +12713,14 @@
       return;
     }
 
+    if (readMultiInviteFromUrl()) {
+      setActiveAutosaveProjectId(createAutosaveProjectId());
+      markAutosaveDirty();
+      scheduleAutosaveSnapshot();
+      updateAutosaveStatus('自動保存: 招待リンクを優先して読み込みます', 'info');
+      return;
+    }
+
     updateAutosaveStatus('自動保存: 端末内データを確認中…');
 
     try {
@@ -14392,6 +14400,9 @@
 
   async function fallbackRestoreAutosaveAfterLensFailure() {
     if (!lensImportRequested) {
+      return;
+    }
+    if (readMultiInviteFromUrl()) {
       return;
     }
     if (!AUTOSAVE_SUPPORTED) {
