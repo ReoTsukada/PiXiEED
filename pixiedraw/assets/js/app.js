@@ -54470,9 +54470,11 @@
     const copied = await writeTextToClipboard(inviteUrl);
     if (!copied) {
       setMultiStatus(localizeText('招待リンクのコピーに失敗しました', 'Failed to copy invite link'), 'error');
+      window.alert(localizeText('共有URLのコピーに失敗しました。もう一度お試しください。', 'Failed to copy the shared URL. Please try again.'));
       return false;
     }
     setMultiStatus(localizeText('招待リンクをコピーしました', 'Invite link copied'), 'success');
+    window.alert(localizeText('共有URLをコピーしました。', 'Shared URL copied.'));
     return true;
   }
 
