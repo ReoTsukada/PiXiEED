@@ -6,6 +6,7 @@
   const SUPABASE_URL = 'https://kyyiuakrqomzlikfaire.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_gnc61sD2hZvGHhEW8bQMoA_lrL07SN4';
   const SUPABASE_MODULE_URL = 'https://esm.sh/@supabase/supabase-js@2.46.1?bundle';
+  const AUTH_STORAGE_KEY = 'sb-kyyiuakrqomzlikfaire-auth-token';
   const CACHE_KEY = 'pixieed_browser_adfree_cache_v1';
   const GLOBAL_ENTITLEMENT_KEY = 'browser_ad_free';
   const PIXIEDRAW_ENTITLEMENT_KEY = 'pixiedraw_ad_free';
@@ -458,8 +459,23 @@
       return supabasePromise;
     }
     supabasePromise = (async () => {
+      if (window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__) {
+        return window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__;
+      }
+      if (window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__) {
+        return await window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__;
+      }
       const module = await import(SUPABASE_MODULE_URL);
-      const client = module.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const client = module.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+          storageKey: AUTH_STORAGE_KEY,
+        },
+      });
+      window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__ = client;
+      window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__ = Promise.resolve(client);
       if (!authListenerBound) {
         authListenerBound = true;
         client.auth.onAuthStateChange(() => {
