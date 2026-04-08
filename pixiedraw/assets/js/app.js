@@ -49788,6 +49788,29 @@
     return 'guest';
   }
 
+  function getSharedInviteBaseUrl() {
+    const currentHref = typeof window.location?.href === 'string' ? window.location.href : '';
+    if (currentHref) {
+      try {
+        const currentUrl = new URL(currentHref);
+        if (currentUrl.protocol === 'http:' || currentUrl.protocol === 'https:') {
+          return currentUrl;
+        }
+      } catch (error) {
+        // Fall through to canonical/base URL fallback below.
+      }
+    }
+    const canonicalHref = document.querySelector('link[rel="canonical"]')?.getAttribute('href') || '';
+    if (canonicalHref) {
+      try {
+        return new URL(canonicalHref, 'https://pixieed.jp/pixiedraw/');
+      } catch (error) {
+        // Fall through to the hard-coded production URL.
+      }
+    }
+    return new URL('https://pixieed.jp/pixiedraw/');
+  }
+
   function buildMultiInviteUrl(projectKey = multiState.projectKey, options = {}) {
     const normalizedKey = normalizeMultiProjectKey(projectKey);
     const inviteTokenSource = typeof options?.inviteToken === 'string' ? options.inviteToken.trim() : '';
@@ -49802,7 +49825,7 @@
       ? requestedRole
       : '';
     try {
-      const url = new URL(window.location.href);
+      const url = getSharedInviteBaseUrl();
       url.searchParams.set(MULTI_INVITE_QUERY_FLAG, '1');
       if (normalizedKey && !inviteToken) {
         url.searchParams.set(MULTI_INVITE_QUERY_KEY, normalizedKey);
@@ -49822,8 +49845,8 @@
       }
       return url.toString();
     } catch (error) {
-      const origin = window.location.origin || '';
-      const path = window.location.pathname || '/';
+      const origin = 'https://pixieed.jp';
+      const path = '/pixiedraw/';
       const keyPart = normalizedKey && !inviteToken
         ? `&${MULTI_INVITE_QUERY_KEY}=${encodeURIComponent(normalizedKey)}`
         : '';
@@ -50089,9 +50112,10 @@
     }
     await ensureNoLegacyMultiSessionForSharedProject();
     const existingAccess = readCurrentMultiProjectAccessInput();
+    const currentProjectIsShared = isCurrentProjectSharedEntry();
     const projectKey = normalizeMultiProjectKey(
       existingAccess.projectKey
-      || activeSharedProjectKey
+      || (currentProjectIsShared ? activeSharedProjectKey : '')
       || generateMultiProjectKey()
     );
     if (!projectKey) {
@@ -61393,7 +61417,7 @@
           return;
         }
         if (prefersSharedProjectFlow()) {
-          if (!resolveSharedProjectKeyForCurrentState()) {
+          if (!isCurrentProjectSharedEntry()) {
             const accepted = await openShareStartConfirmDialog();
             if (!accepted) {
               return;
@@ -61521,7 +61545,7 @@
             openLoginPromptDialog();
             return;
           }
-          if (!resolveSharedProjectKeyForCurrentState()) {
+          if (!isCurrentProjectSharedEntry()) {
             const accepted = await openShareStartConfirmDialog();
             if (!accepted) {
               return;
