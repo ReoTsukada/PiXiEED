@@ -2504,6 +2504,10 @@
   const SHARED_PROJECT_SYNC_DELAY = 1400;
   const SHARED_PROJECT_DRAW_COMMIT_DELAY = 30;
   const SHARED_PROJECT_CHECKPOINT_DELAY = 1200;
+  const SHARED_PROJECT_DEFERRED_PERSIST_DELAY = Math.max(
+    SHARED_PROJECT_CHECKPOINT_DELAY,
+    SHARED_PROJECT_SYNC_DELAY
+  );
   const SHARED_PROJECT_CHECKPOINT_OP_COUNT = 200;
   const SHARED_PROJECT_CHECKPOINT_INTERVAL_MS = 15000;
   const SHARED_PROJECT_MAX_MISSING_OP_FETCH = 512;
@@ -2961,6 +2965,7 @@
   let activeSharedProjectKey = '';
   let activeSharedProjectRevision = 0;
   let activeSharedProjectStructureRevision = 0;
+  let activeSharedProjectDocumentLoaded = false;
   const sharedProjectLayerSnapshots = new Map();
   let activeSharedProjectChannel = null;
   let activeSharedProjectChannelKey = '';
@@ -7799,6 +7804,7 @@
     activeSharedProjectKey = '';
     activeSharedProjectRevision = 0;
     activeSharedProjectStructureRevision = 0;
+    activeSharedProjectDocumentLoaded = false;
     sharedProjectLastAppliedSeq = 0;
     sharedProjectOpsSinceCheckpoint = 0;
     sharedProjectLastCheckpointAt = 0;
@@ -7873,6 +7879,7 @@
       || (activeSharedProjectId && normalizedProjectId && activeSharedProjectId !== normalizedProjectId)
     );
     if (projectChanged) {
+      activeSharedProjectDocumentLoaded = false;
       sharedProjectPendingRemoteOps.clear();
       sharedProjectSeenOpIds.clear();
       sharedProjectPendingLocalOps = [];
@@ -7903,6 +7910,30 @@
     syncSharedProjectMembers(normalizedProjectKey, activeSharedProjectId).catch(error => {
       console.warn('Failed to load shared project members', error);
     });
+  }
+
+  function markActiveSharedProjectDocumentLoaded(projectKey = activeSharedProjectKey) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    if (!normalizedProjectKey) {
+      return;
+    }
+    if (normalizedProjectKey === activeSharedProjectKey) {
+      activeSharedProjectDocumentLoaded = true;
+    }
+  }
+
+  function canPersistActiveSharedProjectDocument(projectKey = activeSharedProjectKey, historyLabel = '') {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    if (!normalizedProjectKey) {
+      return false;
+    }
+    if (isSharedProjectCheckpointHistoryLabel(historyLabel) || classifySharedProjectOpType(historyLabel) === 'create') {
+      return true;
+    }
+    if (normalizedProjectKey !== activeSharedProjectKey) {
+      return true;
+    }
+    return activeSharedProjectDocumentLoaded;
   }
 
   function markAutosaveDirty() {
@@ -8644,11 +8675,11 @@
       scheduleTimelapseCaptureFromState();
       if (activeSharedProjectKey) {
         const sharedOpType = classifySharedProjectOpType(pendingLabel);
-        if (sharedOpType === 'structure' || shouldCreateSharedProjectCheckpoint(sharedOpType)) {
+        if (shouldPersistSharedProjectSnapshotForHistoryLabel(pendingLabel, sharedOpType)) {
           queueSharedProjectCurrentSnapshotCapture({
             delayMs: sharedOpType === 'structure'
               ? Math.min(120, SHARED_PROJECT_CHECKPOINT_DELAY)
-              : SHARED_PROJECT_CHECKPOINT_DELAY,
+              : SHARED_PROJECT_DEFERRED_PERSIST_DELAY,
             projectKey: activeSharedProjectKey,
             historyLabel: pendingLabel,
           });
@@ -8748,8 +8779,15 @@
     scheduleAutosaveSnapshot();
     if (isSharedProjectCollaborativeMode()) {
       handleMultiLocalCommit(historyLabel);
-      if (classifySharedProjectOpType(historyLabel) === 'structure') {
-        checkpoint({ immediate: true, historyLabel });
+      const sharedOpType = classifySharedProjectOpType(historyLabel);
+      if (shouldPersistSharedProjectSnapshotForHistoryLabel(historyLabel, sharedOpType)) {
+        queueSharedProjectCurrentSnapshotCapture({
+          delayMs: sharedOpType === 'structure'
+            ? Math.min(120, SHARED_PROJECT_CHECKPOINT_DELAY)
+            : SHARED_PROJECT_DEFERRED_PERSIST_DELAY,
+          projectKey: activeSharedProjectKey,
+          historyLabel,
+        });
       }
       return;
     }
@@ -8844,8 +8882,15 @@
     scheduleAutosaveSnapshot();
     if (isSharedProjectCollaborativeMode()) {
       handleMultiLocalCommit(historyLabel);
-      if (classifySharedProjectOpType(historyLabel) === 'structure') {
-        checkpoint({ immediate: true, historyLabel });
+      const sharedOpType = classifySharedProjectOpType(historyLabel);
+      if (shouldPersistSharedProjectSnapshotForHistoryLabel(historyLabel, sharedOpType)) {
+        queueSharedProjectCurrentSnapshotCapture({
+          delayMs: sharedOpType === 'structure'
+            ? Math.min(120, SHARED_PROJECT_CHECKPOINT_DELAY)
+            : SHARED_PROJECT_DEFERRED_PERSIST_DELAY,
+          projectKey: activeSharedProjectKey,
+          historyLabel,
+        });
       }
       return;
     }
@@ -13000,6 +13045,7 @@
     }
     autosaveWriteInFlight = true;
     autosaveWriteQueued = false;
+    const endLoading = beginGlobalLoading(localizeText('保存中…', 'Saving...'));
     try {
       updateAutosaveStatus('自動保存: 端末内に保存中…');
       const snapshot = makeHistorySnapshot({ clonePixelData: false });
@@ -13032,6 +13078,7 @@
     } catch (error) {
       throw error;
     } finally {
+      endLoading();
       autosaveWriteInFlight = false;
       releaseAutosaveTabLock();
       if (autosaveWriteQueued || autosaveDirty) {
@@ -13045,7 +13092,6 @@
     if (!ensureCurrentClientCanReplaceActiveProject({ announce: false })) {
       return false;
     }
-    const endLoading = beginGlobalLoading(localizeText('端末内プロジェクトを読み込み中…', 'Loading local project...'));
     try {
       const file = await handle.getFile();
       if (!file) {
@@ -13113,8 +13159,6 @@
       console.warn('Failed to restore autosave document', error);
       updateAutosaveStatus('自動保存: ファイルを読み込めませんでした', 'error');
       return false;
-    } finally {
-      endLoading();
     }
   }
 
@@ -17701,107 +17745,102 @@
     if (!ensureCurrentClientCanReplaceActiveProject({ announce: !options?.suppressAutosaveStatus })) {
       return false;
     }
-    const endLoading = beginGlobalLoading(localizeText('読み込み中…', 'Loading...'));
+    let parsedDocument = null;
     try {
-      let parsedDocument = null;
-      try {
-        parsedDocument = snapshotFromDocumentText(text);
-      } catch (error) {
-        console.warn('Failed to parse document', error);
-        updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
-        return false;
-      }
-      const snapshot = parsedDocument?.snapshot || null;
-      const projectSession = parsedDocument?.projectSession || null;
-      const preserveDotStats = Boolean(options?.projectId || options?.openedFromRecent || options?.preserveDotStats);
-      const dotStats = preserveDotStats ? (parsedDocument?.dotStats || null) : null;
-      if (!snapshot) {
-        updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
-        return false;
-      }
-      synchronizeImportedSnapshotPalette(snapshot);
-
-      autosaveRestoring = true;
-      try {
-        applyHistorySnapshot(snapshot, { forcePalettePresetSync: true });
-        history.pending = null;
-        if (projectSession) {
-          history.limit = projectSession.historyLimit;
-          history.past = projectSession.historyPast;
-          history.future = projectSession.historyFuture;
-
-          timelapseState.tracksByCanvasId = Object.create(null);
-          Object.entries(projectSession.timelapse.tracksByCanvasId || {}).forEach(([canvasId, track]) => {
-            timelapseState.tracksByCanvasId[canvasId] = {
-              snapshots: Array.isArray(track?.snapshots) ? track.snapshots.slice() : [],
-              warningShown: Boolean(track?.warningShown),
-              sampleStep: Math.max(1, Math.round(Number(track?.sampleStep) || 1)),
-              lastCaptureToken: Number.isFinite(Number(track?.lastCaptureToken))
-                ? Math.round(Number(track.lastCaptureToken))
-                : -1,
-            };
-          });
-          timelapseState.enabled = projectSession.timelapse.enabled;
-          timelapseState.fps = projectSession.timelapse.fps;
-        } else {
-          history.past = [];
-          history.future = [];
-          clearTimelapseRecording({ silent: true, scope: 'all' });
-        }
-        reconcileTimelapseTracksForSingleCanvas();
-        ensureTimelapseStartCapture();
-      } finally {
-        autosaveRestoring = false;
-      }
-
-      syncTimelapseControls();
-      updateHistoryButtons();
-      updateMemoryStatus();
-      resetDocumentUnsavedChanges();
-      resetExportScaleDefaults();
-      syncPixfindSnapshotAfterDocumentReset();
-      setTrackedProjectDotBaseline(snapshot, dotStats);
-      centerProjectCanvasInViewport();
-
-      const requestedProjectId = normalizeAutosaveProjectId(options?.projectId || '');
-      setActiveAutosaveProjectId(requestedProjectId || createAutosaveProjectId());
-      const requestedSharedProjectKey = normalizeMultiProjectKey(options?.sharedProjectKey || '');
-      const requestedSharedProjectRevision = Math.max(0, Math.round(Number(options?.sharedProjectRevision) || 0));
-      const activeEntryAfterLoad = recentProjectsCache.get(normalizeAutosaveProjectId(requestedProjectId || '')) || null;
-      const requestedSharedProjectId = requestedProjectId.startsWith(SHARED_PROJECT_ID_PREFIX);
-      const derivedSharedProjectKey = requestedSharedProjectKey
-        || (requestedSharedProjectId && isSharedRecentProjectEntry(activeEntryAfterLoad)
-          ? normalizeMultiProjectKey(activeEntryAfterLoad.sharedProjectKey || '')
-          : '');
-      if (derivedSharedProjectKey || requestedSharedProjectId) {
-        setActiveSharedProjectSession(
-          derivedSharedProjectKey,
-          requestedSharedProjectRevision
-          || Math.max(0, Math.round(Number(activeEntryAfterLoad?.sharedProjectRevision) || 0)),
-          Math.max(0, Math.round(Number(activeEntryAfterLoad?.sharedProjectStructureRevision) || 0)),
-          typeof activeEntryAfterLoad?.sharedProjectBackendId === 'string' ? activeEntryAfterLoad.sharedProjectBackendId : ''
-        );
-        setMultiStatus(
-          localizeText('共有モード: ON', 'Shared mode: ON'),
-          'info'
-        );
-      } else {
-        clearActiveSharedProjectSession();
-      }
-      markAutosaveDirty();
-      scheduleSessionPersist();
-      scheduleAutosaveSnapshot();
-      if (!options?.suppressAutosaveStatus) {
-        if (options?.openedFromRecent) {
-          updateAutosaveStatus('自動保存: 端末内プロジェクトを読み込みました', 'success');
-        } else {
-          updateAutosaveStatus('自動保存: 読み込み内容を端末内に保存します', 'info');
-        }
-      }
-      return true;
-    } finally {
-      endLoading();
+      parsedDocument = snapshotFromDocumentText(text);
+    } catch (error) {
+      console.warn('Failed to parse document', error);
+      updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
+      return false;
     }
+    const snapshot = parsedDocument?.snapshot || null;
+    const projectSession = parsedDocument?.projectSession || null;
+    const preserveDotStats = Boolean(options?.projectId || options?.openedFromRecent || options?.preserveDotStats);
+    const dotStats = preserveDotStats ? (parsedDocument?.dotStats || null) : null;
+    if (!snapshot) {
+      updateAutosaveStatus('ドキュメントの読み込みに失敗しました', 'error');
+      return false;
+    }
+    synchronizeImportedSnapshotPalette(snapshot);
+
+    autosaveRestoring = true;
+    try {
+      applyHistorySnapshot(snapshot, { forcePalettePresetSync: true });
+      history.pending = null;
+      if (projectSession) {
+        history.limit = projectSession.historyLimit;
+        history.past = projectSession.historyPast;
+        history.future = projectSession.historyFuture;
+
+        timelapseState.tracksByCanvasId = Object.create(null);
+        Object.entries(projectSession.timelapse.tracksByCanvasId || {}).forEach(([canvasId, track]) => {
+          timelapseState.tracksByCanvasId[canvasId] = {
+            snapshots: Array.isArray(track?.snapshots) ? track.snapshots.slice() : [],
+            warningShown: Boolean(track?.warningShown),
+            sampleStep: Math.max(1, Math.round(Number(track?.sampleStep) || 1)),
+            lastCaptureToken: Number.isFinite(Number(track?.lastCaptureToken))
+              ? Math.round(Number(track.lastCaptureToken))
+              : -1,
+          };
+        });
+        timelapseState.enabled = projectSession.timelapse.enabled;
+        timelapseState.fps = projectSession.timelapse.fps;
+      } else {
+        history.past = [];
+        history.future = [];
+        clearTimelapseRecording({ silent: true, scope: 'all' });
+      }
+      reconcileTimelapseTracksForSingleCanvas();
+      ensureTimelapseStartCapture();
+    } finally {
+      autosaveRestoring = false;
+    }
+
+    syncTimelapseControls();
+    updateHistoryButtons();
+    updateMemoryStatus();
+    resetDocumentUnsavedChanges();
+    resetExportScaleDefaults();
+    syncPixfindSnapshotAfterDocumentReset();
+    setTrackedProjectDotBaseline(snapshot, dotStats);
+    centerProjectCanvasInViewport();
+
+    const requestedProjectId = normalizeAutosaveProjectId(options?.projectId || '');
+    setActiveAutosaveProjectId(requestedProjectId || createAutosaveProjectId());
+    const requestedSharedProjectKey = normalizeMultiProjectKey(options?.sharedProjectKey || '');
+    const requestedSharedProjectRevision = Math.max(0, Math.round(Number(options?.sharedProjectRevision) || 0));
+    const activeEntryAfterLoad = recentProjectsCache.get(normalizeAutosaveProjectId(requestedProjectId || '')) || null;
+    const requestedSharedProjectId = requestedProjectId.startsWith(SHARED_PROJECT_ID_PREFIX);
+    const derivedSharedProjectKey = requestedSharedProjectKey
+      || (requestedSharedProjectId && isSharedRecentProjectEntry(activeEntryAfterLoad)
+        ? normalizeMultiProjectKey(activeEntryAfterLoad.sharedProjectKey || '')
+        : '');
+    if (derivedSharedProjectKey || requestedSharedProjectId) {
+      setActiveSharedProjectSession(
+        derivedSharedProjectKey,
+        requestedSharedProjectRevision
+        || Math.max(0, Math.round(Number(activeEntryAfterLoad?.sharedProjectRevision) || 0)),
+        Math.max(0, Math.round(Number(activeEntryAfterLoad?.sharedProjectStructureRevision) || 0)),
+        typeof activeEntryAfterLoad?.sharedProjectBackendId === 'string' ? activeEntryAfterLoad.sharedProjectBackendId : ''
+      );
+      setMultiStatus(
+        localizeText('共有モード: ON', 'Shared mode: ON'),
+        'info'
+      );
+    } else {
+      clearActiveSharedProjectSession();
+    }
+    markAutosaveDirty();
+    scheduleSessionPersist();
+    scheduleAutosaveSnapshot();
+    if (!options?.suppressAutosaveStatus) {
+      if (options?.openedFromRecent) {
+        updateAutosaveStatus('自動保存: 端末内プロジェクトを読み込みました', 'success');
+      } else {
+        updateAutosaveStatus('自動保存: 読み込み内容を端末内に保存します', 'info');
+      }
+    }
+    return true;
   }
 
   function normalizeProjectHistoryLimit(value, fallback = history.limit) {
@@ -19283,6 +19322,7 @@
       if (
         sharedEntrySeed
         && hasDocumentUnsavedChanges()
+        && canPersistActiveSharedProjectDocument(sharedEntrySeed.sharedProjectKey)
         && !isSharedProjectRealtimePrimaryActive(sharedEntrySeed.sharedProjectKey)
       ) {
         queueSharedProjectSnapshotPersist(packaged, {
@@ -19306,8 +19346,6 @@
     if (!normalizedEntry) {
       return false;
     }
-    const endLoading = beginGlobalLoading(localizeText('共有プロジェクトを読み込み中…', 'Loading shared project...'));
-    try {
     await ensureNoLegacyMultiSessionForSharedProject();
     const requestedRole = normalizedEntry.sharedRoleHint || 'guest';
     let sharedProject = null;
@@ -19331,6 +19369,7 @@
           sharedProjectRevision: snapshotRevision,
         });
         if (loaded) {
+          markActiveSharedProjectDocumentLoaded(normalizedEntry.sharedProjectKey);
           normalizedEntry.name = createSharedProjectSnapshotTitle(sharedProject?.title || normalizedEntry.name);
           normalizedEntry.fileName = normalizeDocumentName(`${normalizedEntry.name || normalizedEntry.sharedProjectKey}.pixiedraw`);
           normalizedEntry.sharedProjectRevision = Math.max(0, Math.round(Number(sharedProject?.latest_revision) || 0));
@@ -19359,6 +19398,7 @@
       sharedProject?.id || normalizedEntry.sharedProjectBackendId || ''
     );
     if (sharedProject) {
+      markActiveSharedProjectDocumentLoaded(normalizedEntry.sharedProjectKey);
       await applySharedProjectOpsSinceRevision(
         sharedProject,
         Math.max(0, Math.round(Number(sharedProject?.latest_snapshot_revision) || 0))
@@ -19380,9 +19420,6 @@
       hideStartupScreen();
     }
     return true;
-    } finally {
-      endLoading();
-    }
   }
 
   async function openRecentProject(entry, options = {}) {
@@ -25043,97 +25080,87 @@
   }
 
   async function init() {
-    const endLoading = beginGlobalLoading(localizeText('起動中…', 'Starting up...'));
     try {
+      await initializeIosSnapshotFallback();
+    } catch (error) {
+      console.warn('iOS snapshot bootstrap failed', error);
+    }
+    try {
+      await initializeAutosave();
+    } catch (error) {
+      console.warn('Autosave bootstrap failed', error);
+    }
+    if (RELOAD_SNAPSHOT_ENABLED) {
       try {
-        setGlobalLoadingIndicatorLabel(localizeText('起動中…', 'Starting up...'));
-        await initializeIosSnapshotFallback();
+        restoreReloadSessionSnapshot();
       } catch (error) {
-        console.warn('iOS snapshot bootstrap failed', error);
-      }
-      try {
-        setGlobalLoadingIndicatorLabel(localizeText('端末内データを確認中…', 'Checking local data...'));
-        await initializeAutosave();
-      } catch (error) {
-        console.warn('Autosave bootstrap failed', error);
-      }
-      if (RELOAD_SNAPSHOT_ENABLED) {
-        try {
-          restoreReloadSessionSnapshot();
-        } catch (error) {
-          console.warn('Reload session restore failed', error);
-          if (canUseSessionStorage) {
-            try {
-              window.sessionStorage.removeItem(RELOAD_SNAPSHOT_STORAGE_KEY);
-            } catch (storageError) {
-              // Ignore reload snapshot cleanup failures.
-            }
+        console.warn('Reload session restore failed', error);
+        if (canUseSessionStorage) {
+          try {
+            window.sessionStorage.removeItem(RELOAD_SNAPSHOT_STORAGE_KEY);
+          } catch (storageError) {
+            // Ignore reload snapshot cleanup failures.
           }
         }
       }
+    }
+    try {
+      await initializeExportDirectoryBinding();
+    } catch (error) {
+      console.warn('Export directory bootstrap failed', error);
+    }
+    setupOpenProjectTabs();
+    ensureOpenProjectTabsInitialized();
+    setupLeftTabs();
+    setupRightTabs();
+    setupTopActionButtons();
+    setupLayout();
+    setupGlobalFocusDismiss();
+    setupControls();
+    void initPixieedAccount();
+    setupExportDialog();
+    setupExportInterstitialDialog();
+    setupLoginPromptDialog();
+    setupUpdateHistoryDialog();
+    setupToolSpotlightDialog();
+    setupShareStartConfirmDialog();
+    setupHelpPanel();
+    setupTools();
+    setupToolGroups();
+    setupPaletteEditor();
+    setupFramesAndLayers();
+    setupCanvas();
+    setupMirrorGuides();
+    setupMirrorGuideResizeObserver();
+    setupMirrorToolPopover();
+    setupKeyboard();
+    updateDocumentMetadata();
+    setupStartupScreen();
+    const skipStartup = EMBED_CONFIG.skipStartup === true;
+    if (lensImportRequested || skipStartup) {
+      hideStartupScreen();
+    }
+    let restoredAutosaveProject = false;
+    if (!lensImportRequested && !skipStartup) {
       try {
-        setGlobalLoadingIndicatorLabel(localizeText('保存先を初期化中…', 'Initializing save destination...'));
-        await initializeExportDirectoryBinding();
+        restoredAutosaveProject = await maybeRestoreAutosaveProjectOnStartup();
       } catch (error) {
-        console.warn('Export directory bootstrap failed', error);
+        console.warn('Startup autosave restore failed', error);
+        restoredAutosaveProject = false;
       }
-      setupOpenProjectTabs();
-      ensureOpenProjectTabsInitialized();
-      setupLeftTabs();
-      setupRightTabs();
-      setupTopActionButtons();
-      setupLayout();
-      setupGlobalFocusDismiss();
-      setupControls();
-      void initPixieedAccount();
-      setupExportDialog();
-      setupExportInterstitialDialog();
-      setupLoginPromptDialog();
-      setupUpdateHistoryDialog();
-      setupToolSpotlightDialog();
-      setupShareStartConfirmDialog();
-      setupHelpPanel();
-      setupTools();
-      setupToolGroups();
-      setupPaletteEditor();
-      setupFramesAndLayers();
-      setupCanvas();
-      setupMirrorGuides();
-      setupMirrorGuideResizeObserver();
-      setupMirrorToolPopover();
-      setupKeyboard();
-      updateDocumentMetadata();
-      setupStartupScreen();
-      const skipStartup = EMBED_CONFIG.skipStartup === true;
-      if (lensImportRequested || skipStartup) {
-        hideStartupScreen();
-      }
-      let restoredAutosaveProject = false;
-      if (!lensImportRequested && !skipStartup) {
-        try {
-          setGlobalLoadingIndicatorLabel(localizeText('前回のプロジェクトを確認中…', 'Checking recent project...'));
-          restoredAutosaveProject = await maybeRestoreAutosaveProjectOnStartup();
-        } catch (error) {
-          console.warn('Startup autosave restore failed', error);
-          restoredAutosaveProject = false;
-        }
-      }
-      let importedFromLens = false;
-      try {
-        setGlobalLoadingIndicatorLabel(localizeText('読み込みを仕上げています…', 'Finishing startup...'));
-        importedFromLens = await maybeImportLensCapture();
-      } catch (error) {
-        console.warn('Lens capture bootstrap failed', error);
-        importedFromLens = false;
-      }
-      renderEverything();
-      refreshLocalizedUi();
-      scheduleDeferredUiSetup();
-      if (!lensImportRequested && !importedFromLens && !skipStartup && !restoredAutosaveProject && !reloadSnapshotRestored && !hasDismissedStartupScreen()) {
-        showStartupScreen();
-      }
-    } finally {
-      endLoading();
+    }
+    let importedFromLens = false;
+    try {
+      importedFromLens = await maybeImportLensCapture();
+    } catch (error) {
+      console.warn('Lens capture bootstrap failed', error);
+      importedFromLens = false;
+    }
+    renderEverything();
+    refreshLocalizedUi();
+    scheduleDeferredUiSetup();
+    if (!lensImportRequested && !importedFromLens && !skipStartup && !restoredAutosaveProject && !reloadSnapshotRestored && !hasDismissedStartupScreen()) {
+      showStartupScreen();
     }
   }
 
@@ -50092,6 +50119,7 @@
       Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
       project.id || ''
     );
+    markActiveSharedProjectDocumentLoaded(projectKey);
     await upsertSharedRecentProjectEntry({
       projectKey,
       projectId: project.id || '',
@@ -50165,7 +50193,7 @@
         0,
         Math.round(Number(sharedProject.latest_snapshot_revision) || Number(sharedProject.latest_revision) || 0)
       );
-      await loadDocumentFromText(JSON.stringify(sharedSnapshot), null, {
+      const loaded = await loadDocumentFromText(JSON.stringify(sharedSnapshot), null, {
         projectId: buildSharedRecentProjectId(resolvedProjectKey),
         suppressAutosaveStatus: true,
         openedFromRecent: true,
@@ -50173,6 +50201,9 @@
         sharedProjectKey: resolvedProjectKey,
         sharedProjectRevision: snapshotRevision,
       });
+      if (loaded) {
+        markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
+      }
     }
     setActiveAutosaveProjectId(buildSharedRecentProjectId(resolvedProjectKey));
     storeMultiProjectKey(resolvedProjectKey);
@@ -50186,6 +50217,7 @@
       Math.max(0, Math.round(Number(sharedProject.latest_snapshot_structure_revision) || Number(sharedProject.latest_structure_revision) || 0)),
       sharedProject.id || ''
     );
+    markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
     await applySharedProjectOpsSinceRevision(
       sharedProject,
       Math.max(0, Math.round(Number(sharedProject.latest_snapshot_revision) || 0))
@@ -51887,6 +51919,31 @@
     return (Date.now() - sharedProjectLastCheckpointAt) >= SHARED_PROJECT_CHECKPOINT_INTERVAL_MS;
   }
 
+  function isSharedProjectCheckpointHistoryLabel(historyLabel = '') {
+    const normalizedLabel = String(historyLabel || '').trim();
+    if (!normalizedLabel) {
+      return false;
+    }
+    return (
+      normalizedLabel === 'checkpoint'
+      || normalizedLabel === 'sharedRemoteDrawCheckpoint'
+      || normalizedLabel === 'sharedConflictReplay'
+      || normalizedLabel === 'sharedForceResync'
+      || normalizedLabel === 'sharedProjectCreate'
+    );
+  }
+
+  function shouldPersistSharedProjectSnapshotForHistoryLabel(historyLabel = '', opType = 'snapshot') {
+    const normalizedType = String(opType || 'snapshot').trim() || 'snapshot';
+    if (normalizedType === 'create' || normalizedType === 'snapshot' || normalizedType === 'structure') {
+      return true;
+    }
+    if (isSharedProjectCheckpointHistoryLabel(historyLabel)) {
+      return true;
+    }
+    return false;
+  }
+
   function scheduleSharedProjectCheckpoint({ immediate = false, historyLabel = 'checkpoint' } = {}) {
     if (!activeSharedProjectKey || !canUseSharedProjectsBackend()) {
       return;
@@ -52045,13 +52102,21 @@
       return;
     }
     sendSharedProjectBroadcastOp(op);
-    sharedProjectPendingLocalOps.push({
+    const queuedOp = {
       projectKey: op.projectKey,
       historyLabel: op.historyLabel || '',
       op,
       opPayload: op.payload || null,
       retryOnConflict,
-    });
+    };
+    const opType = classifySharedProjectOpType(op.historyLabel || '');
+    if (opType === 'draw') {
+      // draw transport is latency-first
+      sharedProjectPendingLocalOps.unshift(queuedOp);
+      flushSharedProjectPendingLocalOps();
+      return;
+    }
+    sharedProjectPendingLocalOps.push(queuedOp);
     flushSharedProjectPendingLocalOps();
   }
 
@@ -52081,6 +52146,7 @@
       return false;
     }
     if (shouldCreateSharedProjectCheckpoint('draw')) {
+      // snapshot is recovery/checkpoint only
       scheduleSharedProjectCheckpoint({ historyLabel: 'sharedRemoteDrawCheckpoint' });
     }
     return applied;
@@ -52349,7 +52415,6 @@
       return false;
     }
     sharedProjectRefreshInFlight = true;
-    const endLoading = beginGlobalLoading(localizeText('共有内容を同期中…', 'Syncing shared project...'));
     try {
       const project = await fetchSharedProjectRecord(activeSharedProjectKey);
       if (!project) {
@@ -52389,6 +52454,7 @@
       if (!loaded) {
         return false;
       }
+      markActiveSharedProjectDocumentLoaded(activeSharedProjectKey);
       setActiveSharedProjectSession(
         activeSharedProjectKey,
         snapshotRevision,
@@ -52421,7 +52487,6 @@
       return false;
     } finally {
       sharedProjectRefreshInFlight = false;
-      endLoading();
     }
   }
 
@@ -52437,8 +52502,10 @@
     if (!normalizedProjectKey || !packagedPayload || typeof packagedPayload !== 'object') {
       return null;
     }
+    const endLoading = beginGlobalLoading(localizeText('共有内容を保存中…', 'Saving shared project...'));
     const project = await ensureSharedProjectMembership(normalizedProjectKey, { createIfMissing: true, title });
     if (!project) {
+      endLoading();
       return null;
     }
     try {
@@ -52503,6 +52570,8 @@
     } catch (error) {
       handleSharedProjectsBackendError(error, 'persist-exception');
       return null;
+    } finally {
+      endLoading();
     }
   }
 
@@ -52736,7 +52805,7 @@
       }
       const projectsResponse = await supabase
         .from('shared_projects')
-        .select('id, project_key, invite_token, visibility, title, latest_revision, latest_structure_revision, updated_at')
+        .select('id, project_key, invite_token, visibility, title, latest_revision, latest_structure_revision, latest_snapshot, updated_at')
         .in('project_key', projectKeys);
       if (projectsResponse.error) {
         handleSharedProjectsBackendError(projectsResponse.error, 'list-projects');
@@ -52756,12 +52825,22 @@
           continue;
         }
         const project = projectsByKey.get(projectKey) || null;
+        const existingSharedEntry = getSharedRecentProjectEntry(projectKey);
+        let thumbnail = existingSharedEntry?.thumbnail || null;
+        if (!thumbnail && project?.latest_snapshot && typeof project.latest_snapshot === 'object') {
+          try {
+            thumbnail = await generateSnapshotThumbnail(project.latest_snapshot);
+          } catch (error) {
+            console.warn('Failed to generate shared recent thumbnail', error);
+          }
+        }
         const sharedEntry = await upsertSharedRecentProjectEntry({
           projectKey,
           projectId: project?.id || '',
           inviteToken: project?.invite_token || '',
           visibility: project?.visibility || 'private',
           name: createSharedProjectSnapshotTitle(project?.title || projectKey),
+          thumbnail,
           roleHint: membership?.role === 'owner' ? 'master' : 'guest',
           autoJoin: false,
           revision: Math.max(0, Math.round(Number(project?.latest_revision) || 0)),
@@ -52788,6 +52867,9 @@
     }
     const resolvedProjectKey = resolveSharedProjectKeyForCurrentState(projectKey);
     if (!resolvedProjectKey || !packagedPayload || typeof packagedPayload !== 'object') {
+      return;
+    }
+    if (!canPersistActiveSharedProjectDocument(resolvedProjectKey, historyLabel)) {
       return;
     }
     sharedProjectSyncQueuedPayload = {
@@ -52878,7 +52960,7 @@
   }
 
   function queueSharedProjectCurrentSnapshotCapture({
-    delayMs = SHARED_PROJECT_SYNC_DELAY,
+    delayMs = SHARED_PROJECT_DEFERRED_PERSIST_DELAY,
     projectKey = '',
     title = '',
     historyLabel = '',
@@ -52892,10 +52974,11 @@
     }
     const resolvedOpType = classifySharedProjectOpType(historyLabel);
     if (
-      (resolvedOpType === 'draw' || resolvedOpType === 'palette')
-      && isSharedProjectRealtimePrimaryActive(resolvedProjectKey)
-      && !shouldCreateSharedProjectCheckpoint(resolvedOpType)
+      isSharedProjectRealtimePrimaryActive(resolvedProjectKey)
+      && !shouldPersistSharedProjectSnapshotForHistoryLabel(historyLabel, resolvedOpType)
     ) {
+      // op history remains the source of truth
+      // snapshot persistence is deferred and checkpoint-oriented
       return;
     }
     if (sharedProjectCaptureTimer !== null) {
@@ -53447,9 +53530,7 @@
   }
 
   async function initPixieedAccount() {
-    const endLoading = beginGlobalLoading(localizeText('アカウントを確認中…', 'Checking account...'));
     if (accountInitPromise) {
-      endLoading();
       return accountInitPromise;
     }
     accountInitPromise = (async () => {
@@ -53519,11 +53600,7 @@
         accountInitPromise = null;
       }
     })();
-    try {
-      return await accountInitPromise;
-    } finally {
-      endLoading();
-    }
+    return accountInitPromise;
   }
 
   function getLocalMultiParticipantName() {
@@ -60925,6 +61002,9 @@
           historyLabel: _label,
           opPayload: drawOpPayload,
         });
+        if (shouldCreateSharedProjectCheckpoint('draw')) {
+          scheduleSharedProjectCheckpoint({ historyLabel: isSharedProjectCheckpointHistoryLabel(_label) ? _label : 'checkpoint' });
+        }
         return;
       }
     }
@@ -60935,6 +61015,9 @@
           historyLabel: _label,
           opPayload: paletteOpPayload,
         });
+        if (shouldCreateSharedProjectCheckpoint('palette')) {
+          scheduleSharedProjectCheckpoint({ historyLabel: 'checkpoint' });
+        }
         return;
       }
     }
@@ -60956,10 +61039,12 @@
           scheduleMasterLayerPatchSend();
         }
         scheduleMultiPublicLobbyRoomSync({ immediate: false });
-        queueSharedProjectCurrentSnapshotCapture({
-          delayMs: useSharedProjectRealtimePrimary ? SHARED_PROJECT_CHECKPOINT_DELAY : AUTOSAVE_REMOTE_MULTI_WRITE_DELAY / 2,
-          historyLabel: _label,
-        });
+        if (!useSharedProjectRealtimePrimary || shouldPersistSharedProjectSnapshotForHistoryLabel(_label, sharedOpType)) {
+          queueSharedProjectCurrentSnapshotCapture({
+            delayMs: useSharedProjectRealtimePrimary ? SHARED_PROJECT_DEFERRED_PERSIST_DELAY : AUTOSAVE_REMOTE_MULTI_WRITE_DELAY / 2,
+            historyLabel: _label,
+          });
+        }
         return;
       }
       if (MULTI_PALETTE_HISTORY_LABELS.has(_label)) {
@@ -60970,10 +61055,12 @@
         scheduleMultiSessionStateBroadcast({ immediate: false });
       }
       scheduleMultiPublicLobbyRoomSync({ immediate: false });
-      queueSharedProjectCurrentSnapshotCapture({
-        delayMs: useSharedProjectRealtimePrimary ? SHARED_PROJECT_CHECKPOINT_DELAY : AUTOSAVE_REMOTE_MULTI_WRITE_DELAY / 2,
-        historyLabel: _label,
-      });
+      if (!useSharedProjectRealtimePrimary || shouldPersistSharedProjectSnapshotForHistoryLabel(_label, sharedOpType)) {
+        queueSharedProjectCurrentSnapshotCapture({
+          delayMs: useSharedProjectRealtimePrimary ? SHARED_PROJECT_DEFERRED_PERSIST_DELAY : AUTOSAVE_REMOTE_MULTI_WRITE_DELAY / 2,
+          historyLabel: _label,
+        });
+      }
       return;
     }
     if (isMultiGuestMode()) {
@@ -60983,10 +61070,12 @@
       if (!useSharedProjectRealtimePrimary) {
         scheduleGuestLayerPatchSend();
       }
-      queueSharedProjectCurrentSnapshotCapture({
-        delayMs: useSharedProjectRealtimePrimary ? SHARED_PROJECT_CHECKPOINT_DELAY : AUTOSAVE_REMOTE_MULTI_WRITE_DELAY / 2,
-        historyLabel: _label,
-      });
+      if (!useSharedProjectRealtimePrimary || shouldPersistSharedProjectSnapshotForHistoryLabel(_label, sharedOpType)) {
+        queueSharedProjectCurrentSnapshotCapture({
+          delayMs: useSharedProjectRealtimePrimary ? SHARED_PROJECT_DEFERRED_PERSIST_DELAY : AUTOSAVE_REMOTE_MULTI_WRITE_DELAY / 2,
+          historyLabel: _label,
+        });
+      }
     }
   }
 
