@@ -17441,6 +17441,12 @@
     if (!targetEntry) {
       return false;
     }
+    if (isSharedRecentProjectEntry(targetEntry)) {
+      await initPixieedAccount();
+      if (!canUseSharedProjectsBackend()) {
+        return false;
+      }
+    }
     const restored = await openRecentProjectAsTab(targetEntry, { hideStartup: true });
     if (restored) {
       updateAutosaveStatus(
@@ -19346,34 +19352,42 @@
     if (!normalizedEntry) {
       return false;
     }
+    await initPixieedAccount();
+    if (!canUseSharedProjectsBackend()) {
+      if (!silent) {
+        setMultiStatus(
+          localizeText('共有プロジェクトを開くにはログインが必要です', 'Sign in to open the shared project'),
+          'warn'
+        );
+      }
+      return false;
+    }
     await ensureNoLegacyMultiSessionForSharedProject();
     const requestedRole = normalizedEntry.sharedRoleHint || 'guest';
     let sharedProject = null;
-    if (canUseSharedProjectsBackend()) {
-      sharedProject = await loadSharedProjectSnapshotRecord(normalizedEntry.sharedProjectKey, {
-        createIfMissing: requestedRole === 'master',
-        title: normalizedEntry.name,
+    sharedProject = await loadSharedProjectSnapshotRecord(normalizedEntry.sharedProjectKey, {
+      createIfMissing: requestedRole === 'master',
+      title: normalizedEntry.name,
+    });
+    const sharedSnapshot = sharedProject?.latest_snapshot;
+    if (sharedSnapshot && typeof sharedSnapshot === 'object') {
+      const snapshotRevision = Math.max(
+        0,
+        Math.round(Number(sharedProject?.latest_snapshot_revision) || Number(sharedProject?.latest_revision) || 0)
+      );
+      const loaded = await loadDocumentFromText(JSON.stringify(sharedSnapshot), null, {
+        projectId: normalizedEntry.id,
+        suppressAutosaveStatus: true,
+        openedFromRecent: true,
+        preserveDotStats: true,
+        sharedProjectKey: normalizedEntry.sharedProjectKey,
+        sharedProjectRevision: snapshotRevision,
       });
-      const sharedSnapshot = sharedProject?.latest_snapshot;
-      if (sharedSnapshot && typeof sharedSnapshot === 'object') {
-        const snapshotRevision = Math.max(
-          0,
-          Math.round(Number(sharedProject?.latest_snapshot_revision) || Number(sharedProject?.latest_revision) || 0)
-        );
-        const loaded = await loadDocumentFromText(JSON.stringify(sharedSnapshot), null, {
-          projectId: normalizedEntry.id,
-          suppressAutosaveStatus: true,
-          openedFromRecent: true,
-          preserveDotStats: true,
-          sharedProjectKey: normalizedEntry.sharedProjectKey,
-          sharedProjectRevision: snapshotRevision,
-        });
-        if (loaded) {
-          markActiveSharedProjectDocumentLoaded(normalizedEntry.sharedProjectKey);
-          normalizedEntry.name = createSharedProjectSnapshotTitle(sharedProject?.title || normalizedEntry.name);
-          normalizedEntry.fileName = normalizeDocumentName(`${normalizedEntry.name || normalizedEntry.sharedProjectKey}.pixiedraw`);
-          normalizedEntry.sharedProjectRevision = Math.max(0, Math.round(Number(sharedProject?.latest_revision) || 0));
-        }
+      if (loaded) {
+        markActiveSharedProjectDocumentLoaded(normalizedEntry.sharedProjectKey);
+        normalizedEntry.name = createSharedProjectSnapshotTitle(sharedProject?.title || normalizedEntry.name);
+        normalizedEntry.fileName = normalizeDocumentName(`${normalizedEntry.name || normalizedEntry.sharedProjectKey}.pixiedraw`);
+        normalizedEntry.sharedProjectRevision = Math.max(0, Math.round(Number(sharedProject?.latest_revision) || 0));
       }
     }
     multiAutoResumeAttempted = true;
@@ -50001,6 +50015,7 @@
       'info'
     );
     const openSharedInviteProject = async () => {
+      await initPixieedAccount();
       if (!canUseSharedProjectsBackend()) {
         return false;
       }
@@ -50176,6 +50191,7 @@
       showSharedRuntimeBlockedStatus();
       return false;
     }
+    await initPixieedAccount();
     if (!canUseSharedProjectsBackend()) {
       setMultiStatus(localizeText('共有プロジェクトにはログインが必要です', 'Sign in to open a shared project'), 'warn');
       openLoginPromptDialog();
