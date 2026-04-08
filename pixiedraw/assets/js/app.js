@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.05-shared-ops1';
+  const APP_BUILD_VERSION = '2026.04.08-shared-op-main1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -2502,8 +2502,10 @@
   const SHARED_PROJECT_SYNC_DELAY = 1400;
   const SHARED_PROJECT_DRAW_COMMIT_DELAY = 30;
   const SHARED_PROJECT_CHECKPOINT_DELAY = 1200;
-  const SHARED_PROJECT_CHECKPOINT_OP_COUNT = 24;
-  const SHARED_PROJECT_CHECKPOINT_INTERVAL_MS = 12000;
+  const SHARED_PROJECT_CHECKPOINT_OP_COUNT = 200;
+  const SHARED_PROJECT_CHECKPOINT_INTERVAL_MS = 15000;
+  const SHARED_PROJECT_MAX_MISSING_OP_FETCH = 512;
+  const SHARED_PROJECT_BROADCAST_EVENT = 'shared-op';
   const MULTI_GUEST_MOVE_PREVIEW_DEBOUNCE_MS = 140;
   const NEW_PROJECT_PALETTE_PRESET_NAMES = Object.freeze([
     'Pixel Core',
@@ -2970,6 +2972,16 @@
   let sharedProjectLastCheckpointAt = 0;
   let sharedProjectOpCommitInFlight = false;
   let sharedProjectPendingLocalOps = [];
+  let sharedProjectLastAppliedSeq = 0;
+  const sharedProjectPendingRemoteOps = new Map();
+  const sharedProjectSeenOpIds = new Set();
+  let sharedProjectInFlightStroke = null;
+  const sharedProjectSessionId = (() => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `shared-${crypto.randomUUID()}`;
+    }
+    return `shared-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+  })();
   let sharedProjectMembers = [];
   let sharedProjectMembersSyncPromise = null;
   let multiSupabaseClientPromise = null;
@@ -7777,9 +7789,13 @@
     activeSharedProjectKey = '';
     activeSharedProjectRevision = 0;
     activeSharedProjectStructureRevision = 0;
+    sharedProjectLastAppliedSeq = 0;
     sharedProjectOpsSinceCheckpoint = 0;
     sharedProjectLastCheckpointAt = 0;
     sharedProjectPendingLocalOps = [];
+    sharedProjectPendingRemoteOps.clear();
+    sharedProjectSeenOpIds.clear();
+    sharedProjectInFlightStroke = null;
     sharedProjectOpCommitInFlight = false;
     sharedProjectMembers = [];
     sharedProjectLayerSnapshots.clear();
@@ -7828,7 +7844,7 @@
       if (document.visibilityState === 'hidden') {
         return;
       }
-      if (hasDocumentUnsavedChanges() || autosaveWriteInFlight || multiState.applyRemoteInProgress) {
+      if (autosaveWriteInFlight || multiState.applyRemoteInProgress) {
         return;
       }
       queueSharedProjectRefresh({ immediate: true, reason: 'poll' });
@@ -7842,6 +7858,18 @@
       return;
     }
     const normalizedProjectId = typeof projectId === 'string' ? projectId.trim() : '';
+    const projectChanged = Boolean(
+      (activeSharedProjectKey && activeSharedProjectKey !== normalizedProjectKey)
+      || (activeSharedProjectId && normalizedProjectId && activeSharedProjectId !== normalizedProjectId)
+    );
+    if (projectChanged) {
+      sharedProjectPendingRemoteOps.clear();
+      sharedProjectSeenOpIds.clear();
+      sharedProjectPendingLocalOps = [];
+      sharedProjectInFlightStroke = null;
+      sharedProjectLastAppliedSeq = 0;
+      pendingSharedProjectConflictReplay = null;
+    }
     activeSharedProjectId = normalizedProjectId || (
       activeSharedProjectKey === normalizedProjectKey
         ? activeSharedProjectId
@@ -7850,6 +7878,11 @@
     activeSharedProjectKey = normalizedProjectKey;
     activeSharedProjectRevision = Math.max(0, Math.round(Number(revision) || 0));
     activeSharedProjectStructureRevision = Math.max(0, Math.round(Number(structureRevision) || 0));
+    sharedProjectLastAppliedSeq = Math.max(sharedProjectLastAppliedSeq, activeSharedProjectRevision);
+    const sharedRecentProjectId = buildSharedRecentProjectId(normalizedProjectKey);
+    if (normalizeAutosaveProjectId(autosaveProjectId || '') !== sharedRecentProjectId) {
+      setActiveAutosaveProjectId(sharedRecentProjectId, { persist: false });
+    }
     if (!sharedProjectLastCheckpointAt) {
       sharedProjectLastCheckpointAt = Date.now();
     }
@@ -8601,7 +8634,7 @@
       scheduleTimelapseCaptureFromState();
       if (activeSharedProjectKey) {
         const sharedOpType = classifySharedProjectOpType(pendingLabel);
-        if (sharedOpType !== 'draw') {
+        if (sharedOpType === 'structure' || shouldCreateSharedProjectCheckpoint(sharedOpType)) {
           queueSharedProjectCurrentSnapshotCapture({
             delayMs: sharedOpType === 'structure'
               ? Math.min(120, SHARED_PROJECT_CHECKPOINT_DELAY)
@@ -8704,11 +8737,10 @@
     markDocumentUnsavedChange();
     scheduleAutosaveSnapshot();
     if (isSharedProjectCollaborativeMode()) {
-      queueSharedProjectCurrentSnapshotCapture({
-        delayMs: 40,
-        projectKey: activeSharedProjectKey,
-        historyLabel,
-      });
+      handleMultiLocalCommit(historyLabel);
+      if (classifySharedProjectOpType(historyLabel) === 'structure') {
+        checkpoint({ immediate: true, historyLabel });
+      }
       return;
     }
     if (multiState.connected && isMultiMasterMode()) {
@@ -8801,11 +8833,10 @@
     markDocumentUnsavedChange();
     scheduleAutosaveSnapshot();
     if (isSharedProjectCollaborativeMode()) {
-      queueSharedProjectCurrentSnapshotCapture({
-        delayMs: 40,
-        projectKey: activeSharedProjectKey,
-        historyLabel,
-      });
+      handleMultiLocalCommit(historyLabel);
+      if (classifySharedProjectOpType(historyLabel) === 'structure') {
+        checkpoint({ immediate: true, historyLabel });
+      }
       return;
     }
     if (multiState.connected && isMultiMasterMode()) {
@@ -17335,6 +17366,9 @@
     if (!AUTOSAVE_SUPPORTED || reloadSnapshotRestored) {
       return false;
     }
+    if (readMultiInviteFromUrl()) {
+      return false;
+    }
     const recentEntries = Array.from(recentProjectsCache.values());
     if (!recentEntries.length) {
       return false;
@@ -18093,10 +18127,27 @@
     if (isSharedRecentProjectEntry(activeEntry)) {
       return normalizeMultiProjectKey(activeEntry.sharedProjectKey || '');
     }
-    if (currentProjectId.startsWith(SHARED_PROJECT_ID_PREFIX) && activeSharedProjectKey) {
-      return normalizeMultiProjectKey(activeSharedProjectKey);
+    if (activeSharedProjectKey) {
+      const activeSharedEntry = recentProjectsCache.get(buildSharedRecentProjectId(activeSharedProjectKey)) || null;
+      if (isSharedRecentProjectEntry(activeSharedEntry)) {
+        return normalizeMultiProjectKey(activeSharedProjectKey);
+      }
     }
     return '';
+  }
+
+  function isCurrentProjectSharedEntry() {
+    const currentProjectId = normalizeAutosaveProjectId(autosaveProjectId || '');
+    if (!currentProjectId) {
+      return false;
+    }
+    if (isSharedRecentProjectEntry(recentProjectsCache.get(currentProjectId) || null)) {
+      return true;
+    }
+    if (activeSharedProjectKey) {
+      return currentProjectId === buildSharedRecentProjectId(activeSharedProjectKey);
+    }
+    return false;
   }
 
   function getCurrentSharedRecentProjectEntry(projectKey = '') {
@@ -49860,14 +49911,14 @@
     syncMultiControls();
     setMultiStatus(
       localizeText(
-        `共有プロジェクトを追加しています (${normalizedInviteProjectKey})`,
-        `Installing shared project (${normalizedInviteProjectKey})`
+        `共有プロジェクトを開いています (${normalizedInviteProjectKey})`,
+        `Opening shared project (${normalizedInviteProjectKey})`
       ),
       'info'
     );
-    const installSharedInviteProject = async () => {
+    const openSharedInviteProject = async () => {
       if (!canUseSharedProjectsBackend()) {
-        return;
+        return false;
       }
       const preloadedProject = inviteRecordPromise ? await inviteRecordPromise : null;
       const sharedProject = preloadedProject
@@ -49882,7 +49933,7 @@
               inviteToken: resolvedInviteToken,
             }));
       if (!sharedProject?.project_key) {
-        return;
+        return false;
       }
       const sharedSnapshot = sharedProject?.latest_snapshot;
       let thumbnail = null;
@@ -49907,41 +49958,59 @@
         revision: Math.max(0, Math.round(Number(sharedProject?.latest_revision) || 0)),
         structureRevision: Math.max(0, Math.round(Number(sharedProject?.latest_structure_revision) || 0)),
       });
-      syncMultiControls();
-      if (startupVisible) {
-        refreshRecentProjectsUI({ sanitize: false }).catch(error => {
-          console.warn('Failed to refresh recent projects after invite install', error);
-        });
+      const sharedEntry = getSharedRecentProjectEntry(normalizedInviteProjectKey) || normalizeSharedRecentProjectEntry({
+        projectKey: normalizedInviteProjectKey,
+        projectId: sharedProject.id || '',
+        inviteToken: sharedProject.invite_token || resolvedInviteToken,
+        visibility: sharedProject.visibility || 'shared',
+        name: projectTitle,
+        roleHint: 'guest',
+        autoJoin: false,
+        revision: Math.max(0, Math.round(Number(sharedProject?.latest_revision) || 0)),
+        structureRevision: Math.max(0, Math.round(Number(sharedProject?.latest_structure_revision) || 0)),
+      });
+      if (!sharedEntry) {
+        return false;
       }
-      window.alert(
-        localizeText(
-          '共有プロジェクトを端末内プロジェクトへ追加しました。端末内プロジェクト一覧から開けます。',
-          'Shared project installed to local projects. You can open it from the local project list.'
-        )
-      );
-      return true;
+      return await openSharedRecentProject(sharedEntry, {
+        hideStartup: true,
+        silent: true,
+      });
     };
-    let inviteInstalled = false;
     window.setTimeout(() => {
-      installSharedInviteProject()
+      openSharedInviteProject()
         .then(result => {
-          inviteInstalled = Boolean(result);
+          if (result) {
+            setMultiStatus(
+              localizeText(
+                '共有URLを読み込みました。共有プロジェクトを開いています。',
+                'Shared URL loaded. Opening shared project.'
+              ),
+              'success'
+            );
+          } else {
+            setMultiStatus(
+              localizeText(
+                '共有URLを開けませんでした。',
+                'Failed to open shared URL.'
+              ),
+              'error'
+            );
+          }
         })
         .catch(error => {
-          console.warn('Failed to install shared invite project', error);
+          console.warn('Failed to open shared invite project', error);
+          setMultiStatus(
+            localizeText(
+              '共有URLを開けませんでした。',
+              'Failed to open shared URL.'
+            ),
+            'error'
+          );
         })
         .finally(() => {
           storePendingMultiInvite(null);
           clearMultiInviteQueryParamsFromUrl();
-          if (inviteInstalled) {
-            setMultiStatus(
-              localizeText(
-                '共有URLを読み込みました。端末内プロジェクト一覧から開けます。',
-                'Shared URL loaded. Open it from your local project list.'
-              ),
-              'success'
-            );
-          }
         });
     }, 100);
     return true;
@@ -51432,6 +51501,309 @@
     };
   }
 
+  function buildSharedProjectPaletteOpPayload(historyLabel = '') {
+    if (classifySharedProjectOpType(historyLabel) !== 'palette') {
+      return null;
+    }
+    const palette = Array.isArray(state.palette)
+      ? state.palette.map(color => normalizeColorValue(color))
+      : [];
+    if (!palette.length) {
+      return null;
+    }
+    return {
+      palette,
+      paletteSize: palette.length,
+    };
+  }
+
+  function generateSharedProjectOpId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `op-${crypto.randomUUID()}`;
+    }
+    return `op-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+  }
+
+  function normalizeSharedProjectOpKind(historyLabel = '', opPayload = null) {
+    const normalizedLabel = String(historyLabel || '').trim();
+    const normalizedType = classifySharedProjectOpType(normalizedLabel);
+    if (normalizedType === 'draw') {
+      if (normalizedLabel === 'fill') {
+        return 'fill';
+      }
+      if (
+        normalizedLabel === 'selectionMove'
+        || normalizedLabel === 'selectionPaste'
+        || normalizedLabel === 'selectionCut'
+        || normalizedLabel === 'selectionTransform'
+      ) {
+        return 'selection-transform';
+      }
+      return 'layer-patch';
+    }
+    if (normalizedType === 'structure') {
+      if (normalizedLabel === 'addLayer' || normalizedLabel === 'addSimulationLayer' || normalizedLabel === 'duplicateLayer' || normalizedLabel === 'pasteLayer') {
+        return 'add-layer';
+      }
+      if (normalizedLabel === 'removeLayer') {
+        return 'remove-layer';
+      }
+      if (normalizedLabel === 'moveLayer' || normalizedLabel === 'reorderLayer') {
+        return 'move-layer';
+      }
+      if (normalizedLabel === 'duplicateFrame' || normalizedLabel === 'pasteFrame' || normalizedLabel === 'addFrame') {
+        return 'add-frame';
+      }
+      if (normalizedLabel === 'removeFrame') {
+        return 'remove-frame';
+      }
+      if (normalizedLabel === 'moveFrame' || normalizedLabel === 'reorderFrame') {
+        return 'move-frame';
+      }
+      if (normalizedLabel === 'resizeCanvas') {
+        return 'resize-canvas';
+      }
+      if (normalizedLabel === 'addCanvas') {
+        return 'canvas-create';
+      }
+      if (normalizedLabel === 'removeCanvas') {
+        return 'canvas-delete';
+      }
+      if (normalizedLabel === 'reorderCanvas') {
+        return 'canvas-reorder';
+      }
+      return 'structure';
+    }
+    if (normalizedType === 'palette') {
+      return 'palette-update';
+    }
+    if (normalizedType === 'create') {
+      return 'checkpoint';
+    }
+    return opPayload && typeof opPayload === 'object' ? 'snapshot' : 'session';
+  }
+
+  function getSharedProjectOpSeq(opRecord) {
+    return Math.max(
+      0,
+      Math.round(
+        Number(opRecord?.seq)
+        || Number(opRecord?.revision)
+        || 0
+      )
+    );
+  }
+
+  function extractSharedProjectOpPayload(opRecord) {
+    if (opRecord?.payload?.op && typeof opRecord.payload.op === 'object') {
+      return opRecord.payload.op;
+    }
+    if (opRecord?.op && typeof opRecord.op === 'object') {
+      return opRecord.op;
+    }
+    if (opRecord && typeof opRecord === 'object') {
+      return opRecord;
+    }
+    return null;
+  }
+
+  function getSharedProjectOpId(opRecord) {
+    const payload = extractSharedProjectOpPayload(opRecord);
+    if (typeof payload?.opId === 'string' && payload.opId.trim()) {
+      return payload.opId.trim();
+    }
+    if (typeof opRecord?.opId === 'string' && opRecord.opId.trim()) {
+      return opRecord.opId.trim();
+    }
+    return '';
+  }
+
+  function createOp(historyLabel = '', opPayload = null, { projectKey = activeSharedProjectKey } = {}) {
+    const payload = opPayload && typeof opPayload === 'object' ? { ...opPayload } : {};
+    const resolvedProjectKey = normalizeMultiProjectKey(projectKey || activeSharedProjectKey);
+    const canvasId = typeof payload.canvasId === 'string' ? payload.canvasId.trim() : '';
+    const layerId = typeof payload.layerId === 'string' ? payload.layerId.trim() : '';
+    const frameIndex = Math.max(0, Math.round(Number(payload.frameIndex) || 0));
+    return {
+      opId: generateSharedProjectOpId(),
+      projectKey: resolvedProjectKey,
+      clientId: multiState.clientId || ensureMultiClientId(),
+      sessionId: sharedProjectSessionId,
+      kind: normalizeSharedProjectOpKind(historyLabel, payload),
+      historyLabel: String(historyLabel || ''),
+      canvasId,
+      frameIndex,
+      layerId,
+      baseRevision: Math.max(0, Math.round(Number(activeSharedProjectRevision) || 0)),
+      baseStructureRevision: Math.max(0, Math.round(Number(activeSharedProjectStructureRevision) || 0)),
+      structureRevision: Math.max(0, Math.round(Number(activeSharedProjectStructureRevision) || 0)),
+      createdAt: new Date().toISOString(),
+      payload,
+    };
+  }
+
+  // Shared project realtime drawing:
+  // - local commit creates an op immediately
+  // - remote draw ops are applied before snapshot refresh
+  // - structure mismatch is the only reason to fall back to refresh
+  function canApplyIncomingSharedProjectDrawOp(opRecord) {
+    const payload = extractSharedProjectOpPayload(opRecord);
+    const canvasId = typeof payload?.canvasId === 'string' ? payload.canvasId.trim() : '';
+    const layerId = typeof payload?.layerId === 'string' ? payload.layerId.trim() : '';
+    const frameIndex = Math.max(0, Math.round(Number(payload?.frameIndex) || 0));
+    const pixelCount = Math.max(0, Math.floor(Number(payload?.pixelCount) || 0));
+    const patch = payload?.patch && typeof payload.patch === 'object' ? payload.patch : null;
+    const structureRevision = Math.max(
+      0,
+      Math.round(Number(opRecord?.structure_revision ?? payload?.structureRevision ?? payload?.structure_revision) || 0)
+    );
+    if (!canvasId || !layerId || !pixelCount || !patch) {
+      return false;
+    }
+    if (structureRevision !== activeSharedProjectStructureRevision) {
+      return false;
+    }
+    const targetCanvas = getProjectCanvasDocumentById(canvasId);
+    if (!targetCanvas || !Array.isArray(targetCanvas.frames) || frameIndex >= targetCanvas.frames.length) {
+      return false;
+    }
+    const frame = targetCanvas.frames[frameIndex];
+    if (!frame || !Array.isArray(frame.layers)) {
+      return false;
+    }
+    return Boolean(frame.layers.find(entry => entry?.id === layerId));
+  }
+
+  function applyLayerPatch(opRecord, { fromRemote = false } = {}) {
+    const payload = extractSharedProjectOpPayload(opRecord);
+    const canvasId = typeof payload?.canvasId === 'string' ? payload.canvasId.trim() : '';
+    const layerId = typeof payload?.layerId === 'string' ? payload.layerId.trim() : '';
+    const frameIndex = Math.max(0, Math.round(Number(payload?.frameIndex) || 0));
+    const pixelCount = Math.max(0, Math.floor(Number(payload?.pixelCount) || 0));
+    const patch = payload?.patch && typeof payload.patch === 'object' ? payload.patch : null;
+    if (!canvasId || !layerId || !pixelCount || !patch) {
+      return false;
+    }
+    const targetCanvas = getProjectCanvasDocumentById(canvasId);
+    if (!targetCanvas || !Array.isArray(targetCanvas.frames) || frameIndex >= targetCanvas.frames.length) {
+      return false;
+    }
+    const frame = targetCanvas.frames[frameIndex];
+    if (!frame || !Array.isArray(frame.layers)) {
+      return false;
+    }
+    const layer = frame.layers.find(entry => entry?.id === layerId) || null;
+    if (!layer) {
+      return false;
+    }
+    const applyResult = applyLayerPatchPayloadToLayer(layer, patch, pixelCount, {
+      width: targetCanvas.width,
+      height: targetCanvas.height,
+    });
+    if (!applyResult) {
+      return false;
+    }
+    if (fromRemote) {
+      resetLocalHistoryForSharedCollaborativeRemoteChange();
+    }
+    const snapshotKey = buildSharedProjectLayerSnapshotKey(canvasId, frameIndex, layerId);
+    const nextSnapshot = captureLayerPatchSnapshot(layer, pixelCount);
+    if (snapshotKey && nextSnapshot) {
+      sharedProjectLayerSnapshots.set(snapshotKey, nextSnapshot);
+    }
+    applyIncomingSharedProjectVisualResult(targetCanvas, applyResult);
+    noteSharedProjectOperationApplied({ opType: 'draw', fromRemote });
+    return true;
+  }
+
+  function applySharedProjectPaletteOp(opRecord, { fromRemote = true, provisional = false } = {}) {
+    const payload = extractSharedProjectOpPayload(opRecord);
+    const palette = Array.isArray(payload?.palette)
+      ? payload.palette.map(color => normalizeColorValue(color))
+      : null;
+    if (!palette || !palette.length) {
+      if (!provisional) {
+        queueSharedProjectRefresh({ immediate: true, reason: 'palette-op-fallback', force: true });
+      }
+      return false;
+    }
+    state.palette = palette;
+    state.activePaletteIndex = normalizePaletteIndex(state.activePaletteIndex, 0);
+    state.secondaryPaletteIndex = normalizePaletteIndex(state.secondaryPaletteIndex, state.activePaletteIndex);
+    const fallbackActiveColor = state.palette[state.activePaletteIndex] || state.palette[0] || state.activeRgb;
+    state.activeRgb = normalizeColorValue(fallbackActiveColor || { r: 255, g: 255, b: 255, a: 255 });
+    syncCurrentPalettePresetFromPalette(state.palette, { syncControl: true });
+    renderPalette();
+    syncPaletteInputs();
+    renderAllProjectCanvasSurfaces();
+    requestOverlayRender();
+    scheduleSessionPersist({ includeSnapshots: false });
+    if (fromRemote) {
+      resetLocalHistoryForSharedCollaborativeRemoteChange();
+    }
+    noteSharedProjectOperationApplied({ opType: 'palette', fromRemote });
+    return true;
+  }
+
+  function applyOp(opRecord, { fromRemote = false, provisional = false } = {}) {
+    const payload = extractSharedProjectOpPayload(opRecord);
+    if (!payload || typeof payload !== 'object') {
+      return false;
+    }
+    const opId = getSharedProjectOpId(opRecord);
+    const kind = typeof opRecord?.kind === 'string' && opRecord.kind.trim()
+      ? opRecord.kind.trim()
+      : (typeof payload?.kind === 'string' && payload.kind.trim()
+        ? payload.kind.trim()
+        : (typeof opRecord?.op_type === 'string' ? opRecord.op_type.trim() : ''));
+    if (opId && sharedProjectSeenOpIds.has(opId)) {
+      return true;
+    }
+    let applied = false;
+    if (
+      kind === 'layer-patch'
+      || kind === 'fill'
+      || kind === 'selection-transform'
+      || kind === 'stroke-commit'
+      || kind === 'draw'
+    ) {
+      applied = applyIncomingSharedProjectDrawOp(opRecord, { fromRemote, provisional });
+    } else if (
+      kind === 'palette-update'
+      || kind === 'palette'
+    ) {
+      applied = applySharedProjectPaletteOp(opRecord, { fromRemote, provisional });
+    } else if (
+      kind === 'add-layer'
+      || kind === 'remove-layer'
+      || kind === 'move-layer'
+      || kind === 'add-frame'
+      || kind === 'remove-frame'
+      || kind === 'move-frame'
+      || kind === 'resize-canvas'
+      || kind === 'canvas-create'
+      || kind === 'canvas-delete'
+      || kind === 'canvas-reorder'
+      || kind === 'structure'
+    ) {
+      queueSharedProjectRefresh({ immediate: true, reason: provisional ? 'structure-broadcast' : 'structure-op', force: true });
+      applied = true;
+    }
+    if (applied && opId) {
+      sharedProjectSeenOpIds.add(opId);
+      if (sharedProjectSeenOpIds.size > 4096) {
+        const seenIds = Array.from(sharedProjectSeenOpIds).slice(-2048);
+        sharedProjectSeenOpIds.clear();
+        seenIds.forEach(id => sharedProjectSeenOpIds.add(id));
+      }
+    }
+    return applied;
+  }
+
+  function checkpoint({ immediate = false, historyLabel = 'checkpoint' } = {}) {
+    scheduleSharedProjectCheckpoint({ immediate, historyLabel });
+  }
+
   function applyIncomingSharedProjectVisualResult(targetCanvas, applyResult) {
     if (targetCanvas?.id !== (getActiveProjectCanvasDocument()?.id || '')) {
       markCanvasDirty();
@@ -51467,6 +51839,8 @@
   }
 
   function shouldCreateSharedProjectCheckpoint(opType = 'draw') {
+    // Checkpoints are supplemental durability for shared projects.
+    // Draw operations should stay op-first and only snapshot periodically.
     if (!isSharedProjectCollaborativeMode()) {
       return false;
     }
@@ -51483,6 +51857,7 @@
     if (!activeSharedProjectKey || !canUseSharedProjectsBackend()) {
       return;
     }
+    // Snapshot remains a recovery/checkpoint path, not the primary draw sync path.
     queueSharedProjectCurrentSnapshotCapture({
       delayMs: immediate ? 0 : SHARED_PROJECT_CHECKPOINT_DELAY,
       projectKey: activeSharedProjectKey,
@@ -51558,6 +51933,94 @@
     return replayed;
   }
 
+  async function fetchMissingOps(projectKey = activeSharedProjectKey, afterSeq = sharedProjectLastAppliedSeq, limit = SHARED_PROJECT_MAX_MISSING_OP_FETCH) {
+    return await fetchSharedProjectOpsSince(projectKey, afterSeq, limit);
+  }
+
+  function drainPendingSharedProjectRemoteOps() {
+    while (sharedProjectPendingRemoteOps.has(sharedProjectLastAppliedSeq + 1)) {
+      const nextSeq = sharedProjectLastAppliedSeq + 1;
+      const nextOp = sharedProjectPendingRemoteOps.get(nextSeq);
+      sharedProjectPendingRemoteOps.delete(nextSeq);
+      if (!applyOp(nextOp, { fromRemote: true })) {
+        queueSharedProjectRefresh({ immediate: true, reason: 'pending-apply-failed', force: true });
+        return false;
+      }
+      sharedProjectLastAppliedSeq = nextSeq;
+      activeSharedProjectRevision = Math.max(activeSharedProjectRevision, nextSeq);
+      activeSharedProjectStructureRevision = Math.max(
+        activeSharedProjectStructureRevision,
+        Math.max(0, Math.round(Number(nextOp?.structure_revision) || 0))
+      );
+    }
+    return true;
+  }
+
+  async function replayOps(ops, { fromRemote = true } = {}) {
+    const list = Array.isArray(ops) ? ops.slice() : [];
+    if (!list.length) {
+      return true;
+    }
+    list.sort((left, right) => getSharedProjectOpSeq(left) - getSharedProjectOpSeq(right));
+    for (let index = 0; index < list.length; index += 1) {
+      const op = list[index];
+      const seq = getSharedProjectOpSeq(op);
+      if (!seq) {
+        continue;
+      }
+      if (seq <= sharedProjectLastAppliedSeq) {
+        applyOp(op, { fromRemote, provisional: false });
+        continue;
+      }
+      if (seq > sharedProjectLastAppliedSeq + 1) {
+        sharedProjectPendingRemoteOps.set(seq, op);
+        continue;
+      }
+      if (!applyOp(op, { fromRemote, provisional: false })) {
+        return false;
+      }
+      sharedProjectLastAppliedSeq = seq;
+      activeSharedProjectRevision = Math.max(activeSharedProjectRevision, seq);
+      activeSharedProjectStructureRevision = Math.max(
+        activeSharedProjectStructureRevision,
+        Math.max(0, Math.round(Number(op?.structure_revision) || 0))
+      );
+      if (!drainPendingSharedProjectRemoteOps()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function sendSharedProjectBroadcastOp(op) {
+    if (!activeSharedProjectChannel || typeof activeSharedProjectChannel.send !== 'function') {
+      ensureActiveSharedProjectRealtimeChannel().catch(() => {});
+      return;
+    }
+    activeSharedProjectChannel.send({
+      type: 'broadcast',
+      event: SHARED_PROJECT_BROADCAST_EVENT,
+      payload: op,
+    }).catch(() => {
+      // Ignore broadcast transport failures and let DB insert become the source of truth.
+    });
+  }
+
+  function sendOp(op, { retryOnConflict = true } = {}) {
+    if (!op || typeof op !== 'object' || !op.projectKey) {
+      return;
+    }
+    sendSharedProjectBroadcastOp(op);
+    sharedProjectPendingLocalOps.push({
+      projectKey: op.projectKey,
+      historyLabel: op.historyLabel || '',
+      op,
+      opPayload: op.payload || null,
+      retryOnConflict,
+    });
+    flushSharedProjectPendingLocalOps();
+  }
+
   function resetLocalHistoryForSharedCollaborativeRemoteChange() {
     if (!isSharedProjectCollaborativeMode()) {
       return;
@@ -51569,50 +52032,24 @@
     updateHistoryButtons();
   }
 
-  function applyIncomingSharedProjectDrawOp(opRecord) {
-    const opPayload = opRecord?.payload?.op;
-    if (!opPayload || typeof opPayload !== 'object') {
+  function applyIncomingSharedProjectDrawOp(opRecord, { fromRemote = true, provisional = false } = {}) {
+    if (!canApplyIncomingSharedProjectDrawOp(opRecord)) {
+      if (!provisional) {
+        queueSharedProjectRefresh({ immediate: true, reason: 'draw-op-fallback', force: true });
+      }
       return false;
     }
-    const canvasId = typeof opPayload.canvasId === 'string' ? opPayload.canvasId.trim() : '';
-    const layerId = typeof opPayload.layerId === 'string' ? opPayload.layerId.trim() : '';
-    const frameIndex = Math.max(0, Math.round(Number(opPayload.frameIndex) || 0));
-    const pixelCount = Math.max(0, Math.floor(Number(opPayload.pixelCount) || 0));
-    const patch = opPayload.patch && typeof opPayload.patch === 'object' ? opPayload.patch : null;
-    if (!canvasId || !layerId || !pixelCount || !patch) {
+    const applied = applyLayerPatch(opRecord, { fromRemote });
+    if (!applied) {
+      if (!provisional) {
+        queueSharedProjectRefresh({ immediate: true, reason: 'draw-op-apply-failed', force: true });
+      }
       return false;
     }
-    const targetCanvas = getProjectCanvasDocumentById(canvasId);
-    if (!targetCanvas || !Array.isArray(targetCanvas.frames) || frameIndex >= targetCanvas.frames.length) {
-      return false;
-    }
-    const frame = targetCanvas.frames[frameIndex];
-    if (!frame || !Array.isArray(frame.layers)) {
-      return false;
-    }
-    const layer = frame.layers.find(entry => entry?.id === layerId) || null;
-    if (!layer) {
-      return false;
-    }
-    const applyResult = applyLayerPatchPayloadToLayer(layer, patch, pixelCount, {
-      width: targetCanvas.width,
-      height: targetCanvas.height,
-    });
-    if (!applyResult) {
-      return false;
-    }
-    resetLocalHistoryForSharedCollaborativeRemoteChange();
-    const snapshotKey = buildSharedProjectLayerSnapshotKey(canvasId, frameIndex, layerId);
-    const nextSnapshot = captureLayerPatchSnapshot(layer, pixelCount);
-    if (snapshotKey && nextSnapshot) {
-      sharedProjectLayerSnapshots.set(snapshotKey, nextSnapshot);
-    }
-    applyIncomingSharedProjectVisualResult(targetCanvas, applyResult);
-    noteSharedProjectOperationApplied({ opType: 'draw', fromRemote: true });
     if (shouldCreateSharedProjectCheckpoint('draw')) {
       scheduleSharedProjectCheckpoint({ historyLabel: 'sharedRemoteDrawCheckpoint' });
     }
-    return true;
+    return applied;
   }
 
   function createSharedProjectInviteToken() {
@@ -51637,7 +52074,7 @@
       }
       const { data, error } = await supabase
         .from('shared_projects')
-        .select('id, project_key, invite_token, visibility, owner_user_id, title, latest_snapshot, latest_revision, latest_structure_revision, latest_snapshot_revision, latest_snapshot_structure_revision, updated_at, created_at')
+        .select('id, project_key, invite_token, visibility, owner_user_id, title, latest_snapshot, latest_revision, latest_structure_revision, latest_snapshot_revision, latest_snapshot_structure_revision, latest_op_seq, checkpoint_seq, checkpoint_created_at, updated_at, created_at')
         .eq('project_key', normalizedProjectKey)
         .maybeSingle();
       if (error) {
@@ -51709,6 +52146,8 @@
   }
 
   async function applySharedProjectOpsSinceRevision(projectRecord, afterRevision = 0) {
+    // Shared project reopen / reconnect path:
+    // load canonical snapshot first, then replay ordered ops since the snapshot revision.
     const projectKey = normalizeMultiProjectKey(projectRecord?.project_key || activeSharedProjectKey);
     if (!projectKey) {
       return false;
@@ -51718,40 +52157,22 @@
     if (targetRevision <= afterRevision) {
       return true;
     }
-    const ops = await fetchSharedProjectOpsSince(projectKey, afterRevision, Math.max(256, targetRevision - afterRevision + 8));
+    const ops = await fetchMissingOps(projectKey, afterRevision, Math.max(SHARED_PROJECT_MAX_MISSING_OP_FETCH, targetRevision - afterRevision + 8));
     if (!ops.length) {
       return false;
     }
-    let expectedRevision = Math.max(0, Math.round(Number(afterRevision) || 0));
-    for (let index = 0; index < ops.length; index += 1) {
-      const op = ops[index];
-      const nextRevision = Math.max(0, Math.round(Number(op?.revision) || 0));
-      if (nextRevision !== expectedRevision + 1) {
-        return false;
-      }
-      const opType = typeof op?.op_type === 'string' ? op.op_type.trim() : '';
-      if (opType === 'draw') {
-        const applied = applyIncomingSharedProjectDrawOp(op);
-        if (!applied) {
-          return false;
-        }
-      } else {
-        return false;
-      }
-      expectedRevision = nextRevision;
-      activeSharedProjectRevision = nextRevision;
-      activeSharedProjectStructureRevision = Math.max(
-        activeSharedProjectStructureRevision,
-        Math.max(0, Math.round(Number(op?.structure_revision) || 0))
-      );
+    sharedProjectLastAppliedSeq = Math.max(sharedProjectLastAppliedSeq, Math.round(Number(afterRevision) || 0));
+    const replayed = await replayOps(ops, { fromRemote: true });
+    if (!replayed) {
+      return false;
     }
     setActiveSharedProjectSession(
       projectKey,
-      Math.max(expectedRevision, targetRevision),
+      Math.max(sharedProjectLastAppliedSeq, targetRevision),
       Math.max(targetStructureRevision, activeSharedProjectStructureRevision),
       projectRecord?.id || activeSharedProjectId
     );
-    return expectedRevision >= targetRevision;
+    return sharedProjectLastAppliedSeq >= targetRevision;
   }
 
   async function ensureSharedProjectMembership(projectKey, { createIfMissing = false, title = '', inviteToken = '', visibility = 'private' } = {}) {
@@ -51903,6 +52324,7 @@
       if (nextRevision <= activeSharedProjectRevision) {
         return false;
       }
+      // Normal refresh prefers ordered op replay first; snapshot load is fallback/recovery.
       if (!force && project.latest_structure_revision === activeSharedProjectStructureRevision) {
         const syncedByOps = await applySharedProjectOpsSinceRevision(project, activeSharedProjectRevision);
         if (syncedByOps) {
@@ -51968,6 +52390,10 @@
   }
 
   async function persistSharedProjectSnapshot(projectKey, packagedPayload, { title = '', revision = null } = {}) {
+    // Full snapshot commit is now reserved for:
+    // - project creation
+    // - checkpoints
+    // - structure-heavy fallback / refresh recovery
     if (!canUseSharedProjectsBackend()) {
       return null;
     }
@@ -52045,7 +52471,10 @@
   }
 
   async function commitSharedProjectOperation(projectKey, {
+    // Realtime draw path:
+    // local commit -> op RPC insert -> remote apply -> periodic checkpoint only.
     historyLabel = '',
+    op = null,
     opPayload = null,
     retryOnConflict = true,
   } = {}) {
@@ -52053,8 +52482,11 @@
       return null;
     }
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey);
-    const resolvedOpType = classifySharedProjectOpType(historyLabel);
-    if (!normalizedProjectKey || !opPayload || typeof opPayload !== 'object' || resolvedOpType === 'snapshot') {
+    const resolvedOp = op && typeof op === 'object'
+      ? op
+      : createOp(historyLabel, opPayload, { projectKey: normalizedProjectKey });
+    const resolvedOpType = classifySharedProjectOpType(resolvedOp?.historyLabel || historyLabel);
+    if (!normalizedProjectKey || !resolvedOp?.payload || typeof resolvedOp.payload !== 'object' || resolvedOpType === 'snapshot') {
       return null;
     }
     const project = await ensureSharedProjectMembership(normalizedProjectKey, {
@@ -52076,8 +52508,18 @@
         base_revision: previousRevision,
         base_structure_revision: previousStructureRevision,
         op_type: resolvedOpType,
-        history_label: String(historyLabel || ''),
-        op_payload: opPayload,
+        history_label: String(resolvedOp.historyLabel || historyLabel || ''),
+        op_payload: {
+          ...resolvedOp.payload,
+          opId: resolvedOp.opId,
+          clientId: resolvedOp.clientId,
+          sessionId: resolvedOp.sessionId,
+          kind: resolvedOp.kind,
+          canvasId: resolvedOp.canvasId,
+          frameIndex: resolvedOp.frameIndex,
+          layerId: resolvedOp.layerId,
+          createdAt: resolvedOp.createdAt,
+        },
       });
       if (error) {
         handleSharedProjectsBackendError(error, 'commit-op-rpc');
@@ -52088,20 +52530,40 @@
         return null;
       }
       if (result.commit_status === 'conflict') {
-        if (retryOnConflict && resolvedOpType === 'draw') {
+        if (retryOnConflict && (resolvedOpType === 'draw' || resolvedOpType === 'palette')) {
           pendingSharedProjectConflictReplay = {
             projectKey: normalizedProjectKey,
-            opPayload,
-            historyLabel: String(historyLabel || ''),
+            opPayload: resolvedOp.payload,
+            historyLabel: String(resolvedOp.historyLabel || historyLabel || ''),
           };
           const conflictProject = await fetchSharedProjectRecord(normalizedProjectKey);
           if (conflictProject && await applySharedProjectOpsSinceRevision(conflictProject, previousRevision)) {
-            maybeReplayPendingSharedProjectConflictAfterRefresh(normalizedProjectKey);
+            if (resolvedOpType === 'draw') {
+              maybeReplayPendingSharedProjectConflictAfterRefresh(normalizedProjectKey);
+            }
+            enqueueSharedProjectOperationCommit(normalizedProjectKey, {
+              historyLabel: String(resolvedOp.historyLabel || historyLabel || ''),
+              opPayload: resolvedOp.payload,
+              retryOnConflict: false,
+            });
+            setMultiStatus(
+              localizeText(
+                resolvedOpType === 'palette'
+                  ? '共有競合を検知したため、最新状態へ追従してからパレット変更を再送しました'
+                  : '共有競合を検知したため、最新状態へ追従してから描画を再送しました',
+                resolvedOpType === 'palette'
+                  ? 'A shared edit conflict was detected. Your palette update was resent on top of the latest state.'
+                  : 'A shared edit conflict was detected. Your draw op was resent on top of the latest state.'
+              ),
+              'info'
+            );
           } else {
             activeSharedProjectRevision = Math.max(0, Math.round(Number(result.conflict_revision) || activeSharedProjectRevision));
             activeSharedProjectStructureRevision = Math.max(0, Math.round(Number(result.conflict_structure_revision) || activeSharedProjectStructureRevision));
             queueSharedProjectRefresh({ immediate: true, reason: 'op-conflict', force: true });
           }
+        } else if (resolvedOpType === 'draw') {
+          queueSharedProjectRefresh({ immediate: true, reason: 'op-conflict-final', force: true });
         }
         return null;
       }
@@ -52136,6 +52598,7 @@
     sharedProjectOpCommitInFlight = true;
     commitSharedProjectOperation(nextOp.projectKey, {
       historyLabel: nextOp.historyLabel,
+      op: nextOp.op || null,
       opPayload: nextOp.opPayload,
       retryOnConflict: nextOp.retryOnConflict !== false,
     }).finally(() => {
@@ -52156,13 +52619,8 @@
     if (!projectKey || !opPayload || typeof opPayload !== 'object') {
       return;
     }
-    sharedProjectPendingLocalOps.push({
-      projectKey,
-      historyLabel,
-      opPayload,
-      retryOnConflict,
-    });
-    flushSharedProjectPendingLocalOps();
+    const op = createOp(historyLabel, opPayload, { projectKey });
+    sendOp(op, { retryOnConflict });
   }
 
   async function appendSharedProjectOp(projectRecord, {
@@ -52398,9 +52856,9 @@
     }
     const resolvedOpType = classifySharedProjectOpType(historyLabel);
     if (
-      resolvedOpType === 'draw'
+      (resolvedOpType === 'draw' || resolvedOpType === 'palette')
       && isSharedProjectRealtimePrimaryActive(resolvedProjectKey)
-      && !shouldCreateSharedProjectCheckpoint('draw')
+      && !shouldCreateSharedProjectCheckpoint(resolvedOpType)
     ) {
       return;
     }
@@ -52465,7 +52923,42 @@
     if (!supabase) {
       return null;
     }
-    const channel = supabase.channel(`shared-project:${projectKey}`);
+    const channel = supabase.channel(`shared-project:${projectKey}`, {
+      config: {
+        broadcast: {
+          ack: false,
+          self: false,
+        },
+      },
+    });
+    channel.on(
+      'broadcast',
+      { event: SHARED_PROJECT_BROADCAST_EVENT },
+      payload => {
+        if (projectKey !== activeSharedProjectKey) {
+          return;
+        }
+        const op = payload?.payload && typeof payload.payload === 'object' ? payload.payload : null;
+        if (!op || op.projectKey !== projectKey) {
+          return;
+        }
+        if (op.clientId && op.clientId === (multiState.clientId || '')) {
+          return;
+        }
+        const drawKind = typeof op?.kind === 'string' ? op.kind : '';
+        if (
+          drawKind === 'layer-patch'
+          || drawKind === 'fill'
+          || drawKind === 'selection-transform'
+          || drawKind === 'stroke-commit'
+          || drawKind === 'draw'
+        ) {
+          applyIncomingSharedProjectDrawOp(op, { fromRemote: true, provisional: true });
+          return;
+        }
+        applyOp(op, { fromRemote: true, provisional: true });
+      }
+    );
     channel.on(
       'postgres_changes',
       {
@@ -52516,28 +53009,45 @@
           const nextRevision = Math.max(0, Math.round(Number(payload?.new?.revision) || 0));
           const nextStructureRevision = Math.max(0, Math.round(Number(payload?.new?.structure_revision) || 0));
           if (
-            nextRevision <= activeSharedProjectRevision
+              nextRevision <= activeSharedProjectRevision
             && nextStructureRevision <= activeSharedProjectStructureRevision
           ) {
             return;
           }
           const opType = typeof payload?.new?.op_type === 'string' ? payload.new.op_type.trim() : '';
-          const baseRevision = Math.max(0, Math.round(Number(payload?.new?.base_revision) || 0));
-          if (
-            opType === 'draw'
-            && nextStructureRevision === activeSharedProjectStructureRevision
-            && baseRevision <= activeSharedProjectRevision
-            && nextRevision === activeSharedProjectRevision + 1
-            && applyIncomingSharedProjectDrawOp(payload.new)
-          ) {
-            activeSharedProjectRevision = nextRevision;
+          if (nextRevision > sharedProjectLastAppliedSeq + 1) {
+            sharedProjectPendingRemoteOps.set(nextRevision, payload.new);
+            fetchMissingOps(projectKey, sharedProjectLastAppliedSeq).then(ops => {
+              replayOps(ops, { fromRemote: true }).catch(() => {});
+            }).catch(() => {});
             return;
+          }
+          if (nextRevision === sharedProjectLastAppliedSeq + 1) {
+            const drawKind = typeof payload?.new?.op_type === 'string' ? payload.new.op_type.trim() : '';
+            const applied = (
+              drawKind === 'draw'
+              ? applyIncomingSharedProjectDrawOp(payload.new, { fromRemote: true, provisional: false })
+              : (drawKind === 'palette'
+                ? applySharedProjectPaletteOp(payload.new, { fromRemote: true, provisional: false })
+                : applyOp(payload.new, { fromRemote: true, provisional: false }))
+            );
+            if (applied) {
+              sharedProjectLastAppliedSeq = nextRevision;
+              activeSharedProjectRevision = nextRevision;
+              activeSharedProjectStructureRevision = Math.max(activeSharedProjectStructureRevision, nextStructureRevision);
+              drainPendingSharedProjectRemoteOps();
+              return;
+            }
           }
           if (opType === 'structure') {
             queueSharedProjectRefresh({ immediate: true, reason: 'structure-op' });
             return;
           }
-          queueSharedProjectRefresh({ immediate: true, reason: 'op-realtime' });
+          fetchMissingOps(projectKey, sharedProjectLastAppliedSeq).then(ops => {
+            replayOps(ops, { fromRemote: true }).catch(() => {});
+          }).catch(() => {
+            queueSharedProjectRefresh({ immediate: true, reason: 'op-realtime', force: true });
+          });
         }
       );
     }
@@ -54804,10 +55314,13 @@
       const resolvedSharedProjectKey = resolveSharedProjectKeyForCurrentState();
       if (multiState.connecting) {
         text = localizeText('共有モード: 準備中…', 'Shared mode: preparing…');
+        tone = 'info';
       } else if (resolvedSharedProjectKey || isSharedProjectCollaborativeMode()) {
         text = localizeText('共有モード: ON', 'Shared mode: ON');
+        tone = 'success';
       } else {
         text = localizeText('共有モード: OFF', 'Shared mode: OFF');
+        tone = 'info';
       }
     }
     multiState.status = text;
@@ -54819,6 +55332,25 @@
     node.style.color = getMultiStatusColor(tone);
     node.dataset.tone = tone;
     renderMultiOverview();
+  }
+
+  function syncSharedModeStatusDisplay() {
+    if (!prefersSharedProjectFlow()) {
+      return;
+    }
+    if (multiState.connecting) {
+      setMultiStatus(localizeText('共有モード: 準備中…', 'Shared mode: preparing…'), 'info');
+      return;
+    }
+    const resolvedSharedProjectKey = resolveSharedProjectKeyForCurrentState();
+    const currentProjectIsShared = isCurrentProjectSharedEntry();
+    if (currentProjectIsShared || resolvedSharedProjectKey || isSharedProjectCollaborativeMode()) {
+      setMultiStatus(localizeText('共有モード: ON', 'Shared mode: ON'), 'success');
+      return;
+    }
+    if (!multiState.connected) {
+      setMultiStatus(localizeText('共有モード: OFF', 'Shared mode: OFF'), 'info');
+    }
   }
 
   async function writeTextToClipboard(text) {
@@ -56643,8 +57175,9 @@
     const resolvedSharedProjectKey = sharedProjectFlowPreferred
       ? resolveSharedProjectKeyForCurrentState()
       : '';
+    const currentProjectIsShared = sharedProjectFlowPreferred && isCurrentProjectSharedEntry();
     const hasCurrentProjectLocator = Boolean(currentProjectKey || currentAccess.inviteToken);
-    const sharedModeEnabled = sharedProjectFlowPreferred && Boolean(resolvedSharedProjectKey);
+    const sharedModeEnabled = sharedProjectFlowPreferred && currentProjectIsShared && Boolean(resolvedSharedProjectKey);
     const isEntryView = normalizeMultiUiView(multiState.uiView) === 'entry'
       && !multiState.connected
       && !multiState.connecting;
@@ -56656,17 +57189,19 @@
     syncMultiProjectKeyInputValues(multiState.projectKey, { preserveFocused: true });
     if (dom.controls.multiJoinProjectKey instanceof HTMLInputElement) {
       dom.controls.multiJoinProjectKey.disabled = sharedProjectFlowPreferred
-        ? (multiState.connecting || multiState.connected)
+        ? multiState.connecting
         : (!isJoinPanelVisible || multiState.connecting || multiState.connected);
     }
     if (dom.controls.multiProjectKey instanceof HTMLInputElement) {
       dom.controls.multiProjectKey.disabled = sharedProjectFlowPreferred
-        ? (multiState.connecting || multiState.connected)
+        ? multiState.connecting
         : true;
       dom.controls.multiProjectKey.readOnly = !sharedProjectFlowPreferred;
     }
     if (dom.controls.multiEntryMaster instanceof HTMLButtonElement) {
-      dom.controls.multiEntryMaster.disabled = multiState.connecting || multiState.connected;
+      dom.controls.multiEntryMaster.disabled = sharedProjectFlowPreferred
+        ? multiState.connecting
+        : (multiState.connecting || multiState.connected);
       setMultiEntryActionCopy(dom.controls.multiEntryMaster, sharedProjectFlowPreferred
         ? {
             title: localizeText('共有', 'Share'),
@@ -56755,7 +57290,7 @@
       dom.controls.multiEntryJoinBack.hidden = sharedProjectFlowPreferred;
     }
     if (dom.controls.multiStartSession instanceof HTMLButtonElement) {
-      const canStartSharedFlow = sharedProjectFlowPreferred && !multiState.connecting && !sharedModeEnabled;
+      const canStartSharedFlow = sharedProjectFlowPreferred && !multiState.connecting && !sharedModeEnabled && accountState.isLoggedIn;
       dom.controls.multiStartSession.disabled = sharedProjectFlowPreferred
         ? !canStartSharedFlow
         : (multiState.connecting || multiState.connected || !currentProjectKey || isEntryView);
@@ -60264,6 +60799,27 @@
         return;
       }
     }
+    if (useSharedProjectRealtimePrimary && sharedOpType === 'palette') {
+      const paletteOpPayload = buildSharedProjectPaletteOpPayload(_label);
+      if (paletteOpPayload) {
+        enqueueSharedProjectOperationCommit(resolveSharedProjectKeyForCurrentState(multiState.projectKey), {
+          historyLabel: _label,
+          opPayload: paletteOpPayload,
+        });
+        return;
+      }
+    }
+    if (useSharedProjectRealtimePrimary && sharedOpType === 'structure') {
+      const structureOpPayload = buildSharedProjectStructureOpPayload(_label);
+      if (structureOpPayload) {
+        enqueueSharedProjectOperationCommit(resolveSharedProjectKeyForCurrentState(multiState.projectKey), {
+          historyLabel: _label,
+          opPayload: structureOpPayload,
+        });
+        checkpoint({ immediate: true, historyLabel: _label });
+        return;
+      }
+    }
     if (isMultiMasterMode()) {
       if (MULTI_LAYER_PATCH_HISTORY_LABELS.has(_label)) {
         markMultiPublicLobbyThumbnailDirty();
@@ -60970,6 +61526,7 @@
     }
     setMultiHelpPanelVisible(false);
   syncMultiControls();
+  syncSharedModeStatusDisplay();
   // sync danmaku UI state
   syncDanmakuControls();
     renderMultiParticipantsList();
