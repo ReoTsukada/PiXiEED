@@ -8605,6 +8605,54 @@ body.is-startup-active {
   padding-right: var(--safe-area-right);
 }
 
+.global-loading-indicator {
+  position: fixed;
+  right: calc(14px + var(--safe-area-right));
+  bottom: calc(14px + var(--safe-area-bottom) + var(--mobile-bottom-ad-height, 0px));
+  z-index: 1400;
+  min-width: 180px;
+  max-width: min(240px, calc(100vw - var(--safe-area-left) - var(--safe-area-right) - 28px));
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--ui-rgb), 0.3);
+  background: rgba(8, 12, 18, 0.92);
+  color: var(--fg);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(10px);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  pointer-events: none;
+}
+
+.global-loading-indicator__label {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--fg);
+}
+
+.global-loading-indicator__bar {
+  margin-top: 8px;
+  width: 100%;
+  height: 5px;
+  overflow: hidden;
+  border: 1px solid rgba(var(--ui-rgb), 0.26);
+  background: rgba(4, 7, 11, 0.92);
+}
+
+.global-loading-indicator__fill {
+  width: 42%;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(var(--ui-rgb), 0.22), rgba(var(--ui-rgb-focus), 0.92), rgba(var(--ui-rgb), 0.22));
+  animation: global-loading-slide 1.1s linear infinite;
+}
+
+@keyframes global-loading-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(260%);
+  }
+}
+
 /* Hide all scrollbar sliders across PiXiEEDraw while keeping scroll behavior. */
 html,
 body,
