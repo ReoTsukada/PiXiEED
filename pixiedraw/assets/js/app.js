@@ -53363,15 +53363,24 @@
 
   function buildPixieedAccountLoginHref() {
     if (typeof window === 'undefined') {
-      return '../index.html#auth';
+      return 'https://pixieed.jp/index.html#auth';
     }
     try {
-      const url = new URL('../index.html', window.location.href);
+      const runtimeUrl = new URL(window.location.href);
+      const usingFileRuntime = runtimeUrl.protocol === 'file:';
+      const url = usingFileRuntime
+        ? new URL('https://pixieed.jp/index.html')
+        : new URL('../index.html', runtimeUrl.href);
       url.hash = 'auth';
-      url.searchParams.set('returnTo', window.location.href);
+      url.searchParams.set(
+        'returnTo',
+        usingFileRuntime
+          ? 'https://pixieed.jp/pixiedraw/'
+          : runtimeUrl.href
+      );
       return url.toString();
     } catch (_error) {
-      return '../index.html#auth';
+      return 'https://pixieed.jp/index.html#auth?returnTo=https%3A%2F%2Fpixieed.jp%2Fpixiedraw%2F';
     }
   }
 
