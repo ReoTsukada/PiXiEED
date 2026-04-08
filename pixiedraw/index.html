@@ -123,6 +123,12 @@
 <body>
 <!-- Mobile ad placeholder: using bottom banner (mobileBottomAd) for PiXiEEDraw lite behavior -->
 <div class="app" id="appRoot">
+<div aria-atomic="true" aria-live="polite" class="global-loading-indicator" hidden="" id="globalLoadingIndicator" role="status">
+<div class="global-loading-indicator__label" id="globalLoadingIndicatorLabel">読み込み中…</div>
+<div class="global-loading-indicator__bar" aria-hidden="true">
+<div class="global-loading-indicator__fill"></div>
+</div>
+</div>
 <div aria-labelledby="startupScreenTitle" aria-modal="true" class="startup-screen" hidden="" id="startupScreen" role="dialog" tabindex="-1">
 <div class="startup-screen__backdrop"></div>
 <div class="startup-screen__content">
