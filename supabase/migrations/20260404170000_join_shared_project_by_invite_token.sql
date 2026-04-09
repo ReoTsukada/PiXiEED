@@ -30,7 +30,7 @@ begin
   select *
   into project_row
   from public.shared_projects
-  where shared_projects.invite_token = normalized_invite_token;
+  where nullif(trim(shared_projects.invite_token), '') = normalized_invite_token;
 
   if not found then
     return;
