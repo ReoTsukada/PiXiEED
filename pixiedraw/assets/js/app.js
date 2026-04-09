@@ -2942,6 +2942,7 @@
   };
   const accountState = {
     isLoggedIn: false,
+    isAnonymous: false,
     userId: '',
     profile: { nickname: '', avatarId: '', xUrl: '' },
     session: null,
@@ -2951,6 +2952,7 @@
   const PIXIEED_AUTH_SESSION_CACHE_KEY = 'pixieed:auth-session-cache:v1';
   let accountSupabaseInitPromise = null;
   let accountInitPromise = null;
+  let sharedProjectAuthEnsurePromise = null;
   let accountAuthListenerBound = false;
   let accountAuthSubscription = null;
   let accountProfileSyncPromise = null;
@@ -17443,8 +17445,7 @@
       return false;
     }
     if (isSharedRecentProjectEntry(targetEntry)) {
-      await initPixieedAccount();
-      if (!canUseSharedProjectsBackend()) {
+      if (!await ensureSharedProjectBackendSession()) {
         return false;
       }
     }
@@ -19364,11 +19365,10 @@
     if (!normalizedEntry) {
       return false;
     }
-    await initPixieedAccount();
-    if (!canUseSharedProjectsBackend()) {
+    if (!await ensureSharedProjectBackendSession()) {
       if (!silent) {
         setMultiStatus(
-          localizeText('共有プロジェクトを開くにはログインが必要です', 'Sign in to open the shared project'),
+          localizeText('共有プロジェクトを開けませんでした。共有セッションを初期化できません。', 'Could not initialize a shared session for this project.'),
           'warn'
         );
       }
@@ -50029,8 +50029,7 @@
       'info'
     );
     const openSharedInviteProject = async () => {
-      await initPixieedAccount();
-      if (!canUseSharedProjectsBackend()) {
+      if (!await ensureSharedProjectBackendSession()) {
         return false;
       }
       const preloadedProject = inviteRecordPromise ? await inviteRecordPromise : null;
@@ -50136,9 +50135,8 @@
       showSharedRuntimeBlockedStatus();
       return false;
     }
-    if (!canUseSharedProjectsBackend()) {
-      setMultiStatus(localizeText('共有プロジェクトにはログインが必要です', 'Sign in to create a shared project'), 'warn');
-      openLoginPromptDialog();
+    if (!await ensureSharedProjectBackendSession()) {
+      setMultiStatus(localizeText('共有プロジェクト用のセッションを開始できませんでした', 'Failed to initialize a shared-project session'), 'warn');
       return false;
     }
     await ensureNoLegacyMultiSessionForSharedProject();
@@ -50207,10 +50205,8 @@
       showSharedRuntimeBlockedStatus();
       return false;
     }
-    await initPixieedAccount();
-    if (!canUseSharedProjectsBackend()) {
-      setMultiStatus(localizeText('共有プロジェクトにはログインが必要です', 'Sign in to open a shared project'), 'warn');
-      openLoginPromptDialog();
+    if (!await ensureSharedProjectBackendSession()) {
+      setMultiStatus(localizeText('共有プロジェクト用のセッションを開始できませんでした', 'Failed to initialize a shared-project session'), 'warn');
       return false;
     }
     await ensureNoLegacyMultiSessionForSharedProject();
@@ -52216,7 +52212,7 @@
   }
 
   async function fetchSharedProjectRecord(projectKey) {
-    if (!canUseSharedProjectsBackend()) {
+    if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
       return null;
     }
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey);
@@ -52245,7 +52241,7 @@
   }
 
   async function fetchSharedProjectRecordByInviteToken(inviteToken) {
-    if (!canUseSharedProjectsBackend()) {
+    if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
       return null;
     }
     const normalizedInviteToken = typeof inviteToken === 'string' ? inviteToken.trim() : '';
@@ -52273,7 +52269,7 @@
   }
 
   async function fetchSharedProjectOpsSince(projectKey, afterRevision = 0, limit = 256) {
-    if (!canUseSharedProjectsBackend()) {
+    if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
       return [];
     }
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey);
@@ -52332,7 +52328,7 @@
   }
 
   async function ensureSharedProjectMembership(projectKey, { createIfMissing = false, title = '', inviteToken = '', visibility = 'private' } = {}) {
-    if (!canUseSharedProjectsBackend()) {
+    if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
       return null;
     }
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey);
@@ -52375,7 +52371,7 @@
   }
 
   async function loadSharedProjectSnapshotRecordByInvite(inviteToken, { createIfMissing = false, title = '' } = {}) {
-    if (!canUseSharedProjectsBackend()) {
+    if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
       return null;
     }
     let project = null;
@@ -52404,7 +52400,7 @@
   }
 
   async function syncSharedProjectMembers(projectKey = activeSharedProjectKey, projectId = activeSharedProjectId) {
-    if (!canUseSharedProjectsBackend() || !accountState.isLoggedIn) {
+    if ((!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) || !accountState.userId) {
       sharedProjectMembers = [];
       renderMultiParticipantsList();
       return [];
@@ -52464,7 +52460,7 @@
   }
 
   async function refreshActiveSharedProjectSnapshot({ force = false, reason = '' } = {}) {
-    if (!canUseSharedProjectsBackend() || !activeSharedProjectKey) {
+    if ((!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) || !activeSharedProjectKey) {
       return false;
     }
     if (sharedProjectRefreshInFlight) {
@@ -52551,7 +52547,7 @@
     // - project creation
     // - checkpoints
     // - structure-heavy fallback / refresh recovery
-    if (!canUseSharedProjectsBackend()) {
+    if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
       return null;
     }
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey);
@@ -52639,7 +52635,7 @@
     opPayload = null,
     retryOnConflict = true,
   } = {}) {
-    if (!canUseSharedProjectsBackend()) {
+    if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
       return null;
     }
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey);
@@ -52833,7 +52829,7 @@
   }
 
   async function syncSharedRecentProjectsFromAccount() {
-    if (!canUseSharedProjectsBackend()) {
+    if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
       return [];
     }
     try {
@@ -53420,9 +53416,59 @@
     accountState.session = session || null;
     accountState.userId = session?.user?.id || '';
     accountState.isLoggedIn = Boolean(accountState.userId);
+    accountState.isAnonymous = Boolean(
+      session?.user?.is_anonymous
+      || session?.user?.app_metadata?.provider === 'anonymous'
+      || session?.user?.user_metadata?.provider === 'anonymous'
+    );
     if (!accountState.isLoggedIn) {
+      accountState.isAnonymous = false;
       accountState.profile = { nickname: '', avatarId: '', xUrl: '' };
       disconnectActiveSharedProjectRealtimeChannel().catch(() => {});
+    }
+  }
+
+  async function ensureSharedProjectBackendSession() {
+    if (canUseSharedProjectsBackend()) {
+      return true;
+    }
+    if (sharedProjectAuthEnsurePromise) {
+      return sharedProjectAuthEnsurePromise;
+    }
+    sharedProjectAuthEnsurePromise = (async () => {
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase?.auth) {
+        return false;
+      }
+      if (!accountState.session) {
+        await initPixieedAccount();
+      }
+      if (canUseSharedProjectsBackend()) {
+        return true;
+      }
+      try {
+        const nickname = readPixieedLocalNickname();
+        const { data, error } = await supabase.auth.signInAnonymously({
+          options: {
+            data: nickname ? { nickname } : {},
+          },
+        });
+        if (error) {
+          console.warn('Failed to establish anonymous shared-project session', error);
+          return false;
+        }
+        applyPixieedAccountSession(data?.session || null);
+        updatePixieedAccountUi();
+        return canUseSharedProjectsBackend();
+      } catch (error) {
+        console.warn('Anonymous shared-project auth failed', error);
+        return false;
+      }
+    })();
+    try {
+      return await sharedProjectAuthEnsurePromise;
+    } finally {
+      sharedProjectAuthEnsurePromise = null;
     }
   }
 
@@ -53553,12 +53599,15 @@
     const dock = dom.controls.pixieedAccountDock;
     if (status instanceof HTMLElement) {
       const nickname = readPixieedAccountNickname();
-      if (accountState.isLoggedIn) {
+      if (accountState.isLoggedIn && !accountState.isAnonymous) {
         const email = accountState.session?.user?.email || '';
         const label = nickname || email;
         status.textContent = label
           ? localizeText(`ログイン中: ${label}`, `Signed in: ${label}`)
           : localizeText('ログイン中', 'Signed in');
+      } else if (accountState.isAnonymous) {
+        const label = nickname || localizeText('共有ゲスト', 'Shared guest');
+        status.textContent = localizeText(`共有利用中: ${label}`, `Shared ready: ${label}`);
       } else {
         status.textContent = nickname
           ? localizeText(`未ログイン（ローカル: ${nickname}）`, `Signed out (local: ${nickname})`)
@@ -53567,18 +53616,18 @@
     }
     if (loginLink instanceof HTMLElement) {
       syncPixieedAccountLoginLink();
-      loginLink.hidden = accountState.isLoggedIn;
-      loginLink.setAttribute('aria-hidden', String(accountState.isLoggedIn));
+      loginLink.hidden = accountState.isLoggedIn && !accountState.isAnonymous;
+      loginLink.setAttribute('aria-hidden', String(accountState.isLoggedIn && !accountState.isAnonymous));
     }
     if (logoutButton instanceof HTMLElement) {
-      logoutButton.hidden = !accountState.isLoggedIn;
-      logoutButton.setAttribute('aria-hidden', String(!accountState.isLoggedIn));
+      logoutButton.hidden = !accountState.isLoggedIn || accountState.isAnonymous;
+      logoutButton.setAttribute('aria-hidden', String(!accountState.isLoggedIn || accountState.isAnonymous));
     }
     if (dock instanceof HTMLElement) {
       const nickname = readPixieedAccountNickname()
         || accountState.profile?.nickname
         || '';
-      if (accountState.isLoggedIn) {
+      if (accountState.isLoggedIn && !accountState.isAnonymous) {
         dock.textContent = localizeText('アカウント', 'Account');
         const email = accountState.session?.user?.email || '';
         const label = nickname || email || localizeText('ログイン中', 'Signed in');
@@ -53587,6 +53636,9 @@
         } else {
           dock.removeAttribute('title');
         }
+      } else if (accountState.isAnonymous) {
+        dock.textContent = localizeText('共有ゲスト', 'Shared guest');
+        dock.setAttribute('title', nickname || localizeText('端末アカウントで共有を利用中', 'Using sharing with a local device account'));
       } else {
         dock.textContent = localizeText('ログイン', 'Sign In');
         dock.removeAttribute('title');
@@ -53614,14 +53666,34 @@
             session = data?.session || session;
           }
         }
+        if (!session && supportsSharedProjectsBackend) {
+          try {
+            const nickname = readPixieedLocalNickname();
+            const anonymousAuth = await supabase.auth.signInAnonymously({
+              options: {
+                data: nickname ? { nickname } : {},
+              },
+            });
+            if (!anonymousAuth.error) {
+              session = anonymousAuth.data?.session || null;
+            }
+          } catch (error) {
+            console.warn('Automatic anonymous shared-project auth failed', error);
+          }
+        }
         applyPixieedAccountSession(session);
         if (accountState.isLoggedIn) {
-          try {
-            await syncPixieedAccountProfile();
-          } catch (error) {
-            if (!shouldIgnorePixieedProfileError(error)) {
-              throw error;
+          if (!accountState.isAnonymous) {
+            try {
+              await syncPixieedAccountProfile();
+            } catch (error) {
+              if (!shouldIgnorePixieedProfileError(error)) {
+                throw error;
+              }
+              accountState.profile = getPixieedAccountProfileFallback();
+              updatePixieedAccountUi();
             }
+          } else {
             accountState.profile = getPixieedAccountProfileFallback();
             updatePixieedAccountUi();
           }
@@ -53640,12 +53712,17 @@
             const authSubscription = supabase.auth.onAuthStateChange(async (_event, session) => {
               applyPixieedAccountSession(session || null);
               if (accountState.isLoggedIn) {
-                try {
-                  await syncPixieedAccountProfile();
-                } catch (error) {
-                  if (!shouldIgnorePixieedProfileError(error)) {
-                    throw error;
+                if (!accountState.isAnonymous) {
+                  try {
+                    await syncPixieedAccountProfile();
+                  } catch (error) {
+                    if (!shouldIgnorePixieedProfileError(error)) {
+                      throw error;
+                    }
+                    accountState.profile = getPixieedAccountProfileFallback();
+                    updatePixieedAccountUi();
                   }
+                } else {
                   accountState.profile = getPixieedAccountProfileFallback();
                   updatePixieedAccountUi();
                 }
@@ -57561,7 +57638,7 @@
       dom.controls.multiEntryJoinBack.hidden = sharedProjectFlowPreferred;
     }
     if (dom.controls.multiStartSession instanceof HTMLButtonElement) {
-      const canStartSharedFlow = sharedProjectFlowPreferred && !multiState.connecting && !sharedModeEnabled && accountState.isLoggedIn;
+      const canStartSharedFlow = sharedProjectFlowPreferred && !multiState.connecting && !sharedModeEnabled;
       dom.controls.multiStartSession.disabled = sharedProjectFlowPreferred
         ? !canStartSharedFlow
         : (multiState.connecting || multiState.connected || !currentProjectKey || isEntryView);
@@ -57584,9 +57661,7 @@
       } else if (sharedProjectFlowPreferred) {
         dom.controls.multiStartSession.title = sharedModeEnabled
           ? localizeText('このプロジェクトは共有中です', 'This project is shared')
-          : (!accountState.isLoggedIn
-            ? localizeText('共有モードを使うにはログインが必要です', 'Sign in to use shared mode')
-            : localizeText('今のプロジェクトを共有プロジェクトにして共有モードを有効にします', 'Create a shared project from the current document and enable shared mode'));
+          : localizeText('今のプロジェクトを共有プロジェクトにして共有モードを有効にします', 'Create a shared project from the current document and enable shared mode');
       } else if (!currentProjectKey) {
         dom.controls.multiStartSession.title = localizeText('共有リンクまたはプロジェクトキーを入力してください', 'Enter an invite link or project key');
       } else if (isEntryView) {
@@ -61580,10 +61655,8 @@
       dom.controls.multiStartSession.dataset.bound = 'true';
       dom.controls.multiStartSession.addEventListener('click', async () => {
         if (prefersSharedProjectFlow()) {
-          await initPixieedAccount();
-          if (!canUseSharedProjectsBackend()) {
-            setMultiStatus(localizeText('共有モードを使うにはログインが必要です', 'Sign in to use shared mode'), 'warn');
-            openLoginPromptDialog();
+          if (!await ensureSharedProjectBackendSession()) {
+            setMultiStatus(localizeText('共有モード用のセッションを開始できませんでした', 'Failed to initialize a shared-project session'), 'warn');
             return;
           }
           if (!isCurrentProjectSharedEntry()) {
