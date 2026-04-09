@@ -7908,14 +7908,50 @@
       return;
     }
     sharedProjectRealtimeWarnedAt = now;
-    console.warn('Failed to subscribe shared project realtime channel', error);
+    const reason = typeof error?.message === 'string' ? error.message : String(error || '');
+    console.warn('Failed to subscribe shared project realtime channel', {
+      reason,
+      accountLoggedIn: Boolean(accountState.isLoggedIn),
+      accountUserId: accountState.userId || '',
+      accountAnonymous: Boolean(accountState.isAnonymous),
+      activeProjectKey: activeSharedProjectKey || '',
+      activeProjectId: activeSharedProjectId || '',
+      retryBlockedUntil: sharedProjectRealtimeRetryBlockedUntil,
+      channelKey: activeSharedProjectChannelKey || '',
+      channelSignature: activeSharedProjectChannelSignature || '',
+    });
     setMultiStatus(
       localizeText(
-        '共有リアルタイム接続が不安定です。保存済み履歴から同期を継続します。',
-        'Shared realtime is unstable. Sync continues from saved history.'
+        reason.includes('auth')
+          ? '共有リアルタイム接続に必要な認証を確認できません。保存済み履歴から同期を継続します。'
+          : (reason.includes('CHANNEL_ERROR')
+            ? '共有リアルタイム接続でチャンネルエラーが発生しました。保存済み履歴から同期を継続します。'
+            : (reason.includes('CLOSED')
+              ? '共有リアルタイム接続が終了しました。保存済み履歴から同期を継続します。'
+              : '共有リアルタイム接続が不安定です。保存済み履歴から同期を継続します。')),
+        reason.includes('auth')
+          ? 'Shared realtime auth is unavailable. Sync continues from saved history.'
+          : (reason.includes('CHANNEL_ERROR')
+            ? 'Shared realtime hit a channel error. Sync continues from saved history.'
+            : (reason.includes('CLOSED')
+              ? 'Shared realtime channel closed. Sync continues from saved history.'
+              : 'Shared realtime is unstable. Sync continues from saved history.'))
       ),
       'warn'
     );
+  }
+
+  function getSharedProjectRealtimeClientType(supabase) {
+    if (!supabase) {
+      return 'unknown';
+    }
+    if (supabase === accountState.supabase) {
+      return 'authenticated';
+    }
+    if (supabase === multiState.supabase) {
+      return 'multi';
+    }
+    return 'unknown';
   }
 
   function setActiveSharedProjectSession(projectKey = '', revision = 0, structureRevision = 0, projectId = '') {
@@ -53612,9 +53648,18 @@
 
   async function ensureActiveSharedProjectRealtimeChannel() {
     if (!canUseSharedProjectsBackend() || !activeSharedProjectKey) {
+      console.debug('[shared-realtime] skipped subscribe: backend unavailable or no active project', {
+        canUseSharedProjectsBackend: canUseSharedProjectsBackend(),
+        activeSharedProjectKey: activeSharedProjectKey || '',
+      });
       return null;
     }
     if (Date.now() < sharedProjectRealtimeRetryBlockedUntil) {
+      console.debug('[shared-realtime] skipped subscribe: retry block active', {
+        activeSharedProjectKey: activeSharedProjectKey || '',
+        activeSharedProjectId: activeSharedProjectId || '',
+        retryBlockedUntil: sharedProjectRealtimeRetryBlockedUntil,
+      });
       return null;
     }
     const projectKey = activeSharedProjectKey;
@@ -53627,6 +53672,10 @@
       activeSharedProjectChannel
       && activeSharedProjectChannelSignature === channelSignature
     ) {
+      console.debug('[shared-realtime] reusing active channel', {
+        channelSignature,
+        topic: `shared-project:${projectKey}`,
+      });
       return activeSharedProjectChannel;
     }
     activeSharedProjectChannelSignature = channelSignature;
@@ -53634,9 +53683,45 @@
       await disconnectActiveSharedProjectRealtimeChannel();
       const supabase = await ensurePixieedAccountClient();
       if (!supabase) {
+        console.debug('[shared-realtime] subscribe aborted: missing authenticated supabase client', {
+          accountLoggedIn: Boolean(accountState.isLoggedIn),
+          accountUserId: accountState.userId || '',
+          accountAnonymous: Boolean(accountState.isAnonymous),
+        });
         return null;
       }
-      const channel = supabase.channel(`shared-project:${projectKey}`, {
+      const sessionAccessToken = typeof accountState.session?.access_token === 'string'
+        ? accountState.session.access_token.trim()
+        : '';
+      if (!sessionAccessToken) {
+        throw new Error('Shared realtime auth session missing access token');
+      }
+      if (supabase.realtime && typeof supabase.realtime.setAuth === 'function') {
+        try {
+          await supabase.realtime.setAuth(sessionAccessToken);
+        } catch (error) {
+          console.warn('[shared-realtime] failed to push auth token into realtime client', error);
+        }
+      }
+      const topic = `shared-project:${projectKey}`;
+      const subscribeStartedAt = Date.now();
+      const debugInfo = {
+        clientType: getSharedProjectRealtimeClientType(supabase),
+        accountLoggedIn: Boolean(accountState.isLoggedIn),
+        accountUserId: accountState.userId || '',
+        accountAnonymous: Boolean(accountState.isAnonymous),
+        projectKey,
+        projectId,
+        topic,
+        broadcastEvent: SHARED_PROJECT_BROADCAST_EVENT,
+        postgresFilters: [
+          `shared_projects:project_key=eq.${projectKey}`,
+          projectId ? `shared_project_members:project_id=eq.${projectId}` : '',
+          projectId ? `shared_project_ops:project_id=eq.${projectId}` : '',
+        ].filter(Boolean),
+      };
+      console.debug('[shared-realtime] subscribe start', debugInfo);
+      const channel = supabase.channel(topic, {
         config: {
           broadcast: {
             ack: false,
@@ -53801,13 +53886,41 @@
         const timeout = window.setTimeout(() => {
           if (settled) return;
           settled = true;
+          const details = {
+            elapsedMs: Date.now() - subscribeStartedAt,
+            state: typeof channel.state === 'string' ? channel.state : '',
+            joinState: typeof channel.joinPush?.state === 'string' ? channel.joinPush.state : '',
+            socketState: typeof supabase.realtime?.isConnected === 'function'
+              ? (supabase.realtime.isConnected() ? 'open' : 'not-open')
+              : '',
+            channels: typeof supabase.getChannels === 'function'
+              ? supabase.getChannels().map(entry => entry?.topic || '').filter(Boolean)
+              : [],
+          };
+          console.warn('[shared-realtime] subscribe timed out', {
+            ...debugInfo,
+            ...details,
+          });
           reject(new Error('Shared project realtime subscribe timed out'));
         }, 15000);
         channel.subscribe(status => {
+          console.debug('[shared-realtime] subscribe status', {
+            ...debugInfo,
+            status,
+            elapsedMs: Date.now() - subscribeStartedAt,
+            state: typeof channel.state === 'string' ? channel.state : '',
+            joinState: typeof channel.joinPush?.state === 'string' ? channel.joinPush.state : '',
+          });
           if (status === 'SUBSCRIBED' && !settled) {
             settled = true;
             window.clearTimeout(timeout);
             resolve();
+            return;
+          }
+          if (status === 'CLOSED' && !settled) {
+            settled = true;
+            window.clearTimeout(timeout);
+            reject(new Error('Shared project realtime failed: CLOSED'));
             return;
           }
           if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && !settled) {
