@@ -65,6 +65,14 @@ begin
     return;
   end if;
 
+  if nullif(trim(project_row.invite_token), '') is null then
+    update public.shared_projects as projects
+    set invite_token = coalesce(normalized_invite_token, 'sp_' || replace(gen_random_uuid()::text, '-', ''))
+    where projects.project_key = project_row.project_key
+    returning *
+    into project_row;
+  end if;
+
   insert into public.shared_project_members (
     project_key,
     project_id,
@@ -122,10 +130,9 @@ security definer
 set search_path = public
 as $$
 declare
-  current_user_id uuid := auth.uid();
   normalized_invite_token text := nullif(trim(target_invite_token), '');
 begin
-  if current_user_id is null or normalized_invite_token is null then
+  if normalized_invite_token is null then
     return;
   end if;
 
@@ -143,7 +150,7 @@ begin
     projects.updated_at,
     projects.created_at
   from public.shared_projects projects
-  where projects.invite_token = normalized_invite_token
+  where nullif(trim(projects.invite_token), '') = normalized_invite_token
   limit 1;
 end;
 $$;
@@ -180,7 +187,7 @@ begin
   select *
   into project_row
   from public.shared_projects
-  where shared_projects.invite_token = normalized_invite_token;
+  where nullif(trim(shared_projects.invite_token), '') = normalized_invite_token;
 
   if not found then
     return;
@@ -227,6 +234,7 @@ grant execute on function public.pixieed_ensure_shared_project_membership(text, 
 
 revoke all on function public.pixieed_get_shared_project_by_invite_token(text) from public;
 grant execute on function public.pixieed_get_shared_project_by_invite_token(text) to authenticated;
+grant execute on function public.pixieed_get_shared_project_by_invite_token(text) to anon;
 
 revoke all on function public.pixieed_join_shared_project_by_invite_token(text) from public;
 grant execute on function public.pixieed_join_shared_project_by_invite_token(text) to authenticated;
