@@ -17445,7 +17445,10 @@
       return false;
     }
     if (isSharedRecentProjectEntry(targetEntry)) {
-      if (!await ensureSharedProjectBackendSession()) {
+      await initPixieedAccount();
+      if ((!accountState.isLoggedIn || accountState.isAnonymous) && targetEntry.sharedProjectInviteToken) {
+        // Invite-token backed shared projects can reopen in viewer mode without login.
+      } else if (!await ensureSharedProjectBackendSession()) {
         return false;
       }
     }
@@ -19365,22 +19368,47 @@
     if (!normalizedEntry) {
       return false;
     }
-    if (!await ensureSharedProjectBackendSession()) {
+    await initPixieedAccount();
+    await ensureNoLegacyMultiSessionForSharedProject();
+    const requestedRole = (!accountState.isLoggedIn || accountState.isAnonymous)
+      ? 'spectator'
+      : (normalizedEntry.sharedRoleHint || 'guest');
+    let sharedProject = null;
+    if ((!accountState.isLoggedIn || accountState.isAnonymous) && normalizedEntry.sharedProjectInviteToken) {
+      sharedProject = await loadSharedProjectSnapshotRecordByInvite(normalizedEntry.sharedProjectInviteToken, {
+        createIfMissing: false,
+        title: normalizedEntry.name,
+      });
+    } else {
+      if (!await ensureSharedProjectBackendSession()) {
+        if (!silent) {
+          setMultiStatus(
+            localizeText('共有プロジェクトを開けませんでした。共有セッションを初期化できません。', 'Could not initialize a shared session for this project.'),
+            'warn'
+          );
+        }
+        return false;
+      }
+      sharedProject = await loadSharedProjectSnapshotRecord(normalizedEntry.sharedProjectKey, {
+        createIfMissing: requestedRole === 'master',
+        title: normalizedEntry.name,
+      });
+    }
+    if (sharedProject && isBrokenSharedInviteBinding(sharedProject, {
+      expectedInviteToken: normalizedEntry.sharedProjectInviteToken,
+      expectedProjectKey: normalizedEntry.sharedProjectKey,
+    })) {
       if (!silent) {
         setMultiStatus(
-          localizeText('共有プロジェクトを開けませんでした。共有セッションを初期化できません。', 'Could not initialize a shared session for this project.'),
-          'warn'
+          localizeText(
+            '共有リンクと共有プロジェクトの結び付きが壊れています。URL を再発行してください。',
+            'The invite link does not match the shared project. Please generate a new invite URL.'
+          ),
+          'error'
         );
       }
       return false;
     }
-    await ensureNoLegacyMultiSessionForSharedProject();
-    const requestedRole = normalizedEntry.sharedRoleHint || 'guest';
-    let sharedProject = null;
-    sharedProject = await loadSharedProjectSnapshotRecord(normalizedEntry.sharedProjectKey, {
-      createIfMissing: requestedRole === 'master',
-      title: normalizedEntry.name,
-    });
     const sharedSnapshot = sharedProject?.latest_snapshot;
     if (sharedSnapshot && typeof sharedSnapshot === 'object') {
       const snapshotRevision = Math.max(
@@ -49999,7 +50027,7 @@
     let resolvedInviteProjectKey = invite.projectKey;
     let resolvedInviteToken = invite.inviteToken || '';
     let inviteRecordPromise = null;
-    if (resolvedInviteToken && canUseSharedProjectsBackend()) {
+    if (resolvedInviteToken && canLookupSharedProjectsBackend()) {
       inviteRecordPromise = loadSharedProjectSnapshotRecordByInvite(resolvedInviteToken, {
         createIfMissing: false,
         title: createSharedProjectSnapshotTitle(state.documentName || invite.projectKey || DEFAULT_DOCUMENT_NAME),
@@ -50029,9 +50057,6 @@
       'info'
     );
     const openSharedInviteProject = async () => {
-      if (!await ensureSharedProjectBackendSession()) {
-        return false;
-      }
       const preloadedProject = inviteRecordPromise ? await inviteRecordPromise : null;
       const sharedProject = preloadedProject
         || (resolvedInviteToken
@@ -50045,6 +50070,26 @@
               inviteToken: resolvedInviteToken,
             }));
       if (!sharedProject?.project_key) {
+        setMultiStatus(
+          localizeText(
+            '共有リンクが無効か、対応する共有プロジェクトが見つかりませんでした。',
+            'The invite link is invalid or the shared project could not be found.'
+          ),
+          'error'
+        );
+        return false;
+      }
+      if (isBrokenSharedInviteBinding(sharedProject, {
+        expectedInviteToken: resolvedInviteToken,
+        expectedProjectKey: normalizedInviteProjectKey,
+      })) {
+        setMultiStatus(
+          localizeText(
+            '共有リンクと共有プロジェクトの結び付きが壊れています。URL を再発行してください。',
+            'The invite link does not match the shared project. Please generate a new invite URL.'
+          ),
+          'error'
+        );
         return false;
       }
       const sharedSnapshot = sharedProject?.latest_snapshot;
@@ -50065,7 +50110,7 @@
         name: projectTitle,
         fileName: normalizeDocumentName(`${projectTitle}.pixiedraw`),
         thumbnail,
-        roleHint: 'guest',
+        roleHint: (!accountState.isLoggedIn || accountState.isAnonymous) ? 'spectator' : 'guest',
         autoJoin: false,
         revision: Math.max(0, Math.round(Number(sharedProject?.latest_revision) || 0)),
         structureRevision: Math.max(0, Math.round(Number(sharedProject?.latest_structure_revision) || 0)),
@@ -50076,7 +50121,7 @@
         inviteToken: sharedProject.invite_token || resolvedInviteToken,
         visibility: sharedProject.visibility || 'shared',
         name: projectTitle,
-        roleHint: 'guest',
+        roleHint: (!accountState.isLoggedIn || accountState.isAnonymous) ? 'spectator' : 'guest',
         autoJoin: false,
         revision: Math.max(0, Math.round(Number(sharedProject?.latest_revision) || 0)),
         structureRevision: Math.max(0, Math.round(Number(sharedProject?.latest_structure_revision) || 0)),
@@ -50205,10 +50250,7 @@
       showSharedRuntimeBlockedStatus();
       return false;
     }
-    if (!await ensureSharedProjectBackendSession()) {
-      setMultiStatus(localizeText('共有プロジェクト用のセッションを開始できませんでした', 'Failed to initialize a shared-project session'), 'warn');
-      return false;
-    }
+    await initPixieedAccount();
     await ensureNoLegacyMultiSessionForSharedProject();
     const access = readCurrentMultiProjectAccessInput();
     if (!access.projectKey && !access.inviteToken) {
@@ -50230,6 +50272,19 @@
     if (!sharedProject?.project_key) {
       setMultiStatus(
         localizeText('共有プロジェクトが見つかりませんでした', 'Shared project not found'),
+        'error'
+      );
+      return false;
+    }
+    if (access.inviteToken && isBrokenSharedInviteBinding(sharedProject, {
+      expectedInviteToken: access.inviteToken,
+      expectedProjectKey: access.projectKey,
+    })) {
+      setMultiStatus(
+        localizeText(
+          '共有リンクと共有プロジェクトの結び付きが壊れています。URL を再発行してください。',
+          'The invite link does not match the shared project. Please generate a new invite URL.'
+        ),
         'error'
       );
       return false;
@@ -50260,8 +50315,8 @@
     setActiveAutosaveProjectId(buildSharedRecentProjectId(resolvedProjectKey));
     storeMultiProjectKey(resolvedProjectKey);
     syncMultiProjectKeyInputValues(resolvedProjectKey, { preserveFocused: false });
-    setMultiDesiredRole('guest');
-    setMultiUiView('guest');
+    setMultiDesiredRole((!accountState.isLoggedIn || accountState.isAnonymous) ? 'spectator' : 'guest');
+    setMultiUiView((!accountState.isLoggedIn || accountState.isAnonymous) ? 'spectator' : 'guest');
     multiEntryJoinPanelOpen = false;
     setActiveSharedProjectSession(
       resolvedProjectKey,
@@ -50280,7 +50335,7 @@
       inviteToken: sharedProject.invite_token || access.inviteToken || '',
       visibility: sharedProject.visibility || 'shared',
       name: createSharedProjectSnapshotTitle(sharedProject.title || state.documentName || resolvedProjectKey),
-      roleHint: 'guest',
+      roleHint: (!accountState.isLoggedIn || accountState.isAnonymous) ? 'spectator' : 'guest',
       autoJoin: false,
       revision: Math.max(0, Math.round(Number(sharedProject.latest_revision) || 0)),
       structureRevision: Math.max(0, Math.round(Number(sharedProject.latest_structure_revision) || 0)),
@@ -51460,7 +51515,11 @@
   }
 
   function canUseSharedProjectsBackend() {
-    return supportsSharedProjectsBackend && accountState.isLoggedIn;
+    return supportsSharedProjectsBackend && accountState.isLoggedIn && !accountState.isAnonymous;
+  }
+
+  function canLookupSharedProjectsBackend() {
+    return supportsSharedProjectsBackend;
   }
 
   function isSharedProjectsBlockedByRuntime() {
@@ -52241,7 +52300,7 @@
   }
 
   async function fetchSharedProjectRecordByInviteToken(inviteToken) {
-    if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
+    if (!canLookupSharedProjectsBackend()) {
       return null;
     }
     const normalizedInviteToken = typeof inviteToken === 'string' ? inviteToken.trim() : '';
@@ -52249,7 +52308,9 @@
       return null;
     }
     try {
-      const supabase = await ensurePixieedAccountClient();
+      const supabase = accountState.isLoggedIn
+        ? await ensurePixieedAccountClient()
+        : await ensureMultiSupabaseClient();
       if (!supabase) {
         return null;
       }
@@ -52371,8 +52432,15 @@
   }
 
   async function loadSharedProjectSnapshotRecordByInvite(inviteToken, { createIfMissing = false, title = '' } = {}) {
-    if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
+    if (!canLookupSharedProjectsBackend()) {
       return null;
+    }
+    const normalizedInviteToken = typeof inviteToken === 'string' ? inviteToken.trim() : '';
+    if (!normalizedInviteToken) {
+      return null;
+    }
+    if (!accountState.isLoggedIn || accountState.isAnonymous) {
+      return await fetchSharedProjectRecordByInviteToken(normalizedInviteToken);
     }
     let project = null;
     try {
@@ -52382,7 +52450,7 @@
       }
       const joined = await supabase
         .rpc('pixieed_join_shared_project_by_invite_token', {
-          target_invite_token: typeof inviteToken === 'string' ? inviteToken.trim() : '',
+          target_invite_token: normalizedInviteToken,
         });
       if (joined.error) {
         handleSharedProjectsBackendError(joined.error, 'join-by-token');
@@ -53436,40 +53504,34 @@
       return sharedProjectAuthEnsurePromise;
     }
     sharedProjectAuthEnsurePromise = (async () => {
-      const supabase = await ensurePixieedAccountClient();
-      if (!supabase?.auth) {
-        return false;
-      }
-      if (!accountState.session) {
-        await initPixieedAccount();
-      }
-      if (canUseSharedProjectsBackend()) {
-        return true;
-      }
-      try {
-        const nickname = readPixieedLocalNickname();
-        const { data, error } = await supabase.auth.signInAnonymously({
-          options: {
-            data: nickname ? { nickname } : {},
-          },
-        });
-        if (error) {
-          console.warn('Failed to establish anonymous shared-project session', error);
-          return false;
-        }
-        applyPixieedAccountSession(data?.session || null);
-        updatePixieedAccountUi();
-        return canUseSharedProjectsBackend();
-      } catch (error) {
-        console.warn('Anonymous shared-project auth failed', error);
-        return false;
-      }
+      await initPixieedAccount();
+      return canUseSharedProjectsBackend();
     })();
     try {
       return await sharedProjectAuthEnsurePromise;
     } finally {
       sharedProjectAuthEnsurePromise = null;
     }
+  }
+
+  function isBrokenSharedInviteBinding(projectRecord, {
+    expectedInviteToken = '',
+    expectedProjectKey = '',
+  } = {}) {
+    const normalizedExpectedToken = typeof expectedInviteToken === 'string' ? expectedInviteToken.trim() : '';
+    const normalizedExpectedProjectKey = normalizeMultiProjectKey(expectedProjectKey);
+    const projectKey = normalizeMultiProjectKey(projectRecord?.project_key || '');
+    const inviteToken = typeof projectRecord?.invite_token === 'string' ? projectRecord.invite_token.trim() : '';
+    if (!projectKey) {
+      return true;
+    }
+    if (normalizedExpectedToken && (!inviteToken || inviteToken !== normalizedExpectedToken)) {
+      return true;
+    }
+    if (normalizedExpectedProjectKey && projectKey !== normalizedExpectedProjectKey) {
+      return true;
+    }
+    return false;
   }
 
   function getPixieedAccountProfileFallback() {
@@ -53664,21 +53726,6 @@
           if (session) {
             ({ data } = await supabase.auth.getSession());
             session = data?.session || session;
-          }
-        }
-        if (!session && supportsSharedProjectsBackend) {
-          try {
-            const nickname = readPixieedLocalNickname();
-            const anonymousAuth = await supabase.auth.signInAnonymously({
-              options: {
-                data: nickname ? { nickname } : {},
-              },
-            });
-            if (!anonymousAuth.error) {
-              session = anonymousAuth.data?.session || null;
-            }
-          } catch (error) {
-            console.warn('Automatic anonymous shared-project auth failed', error);
           }
         }
         applyPixieedAccountSession(session);
