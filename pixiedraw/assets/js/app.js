@@ -2953,6 +2953,7 @@
   let accountSupabaseInitPromise = null;
   let accountInitPromise = null;
   let sharedProjectAuthEnsurePromise = null;
+  let pendingSharedInviteResumePromise = null;
   let accountAuthListenerBound = false;
   let accountAuthSubscription = null;
   let accountProfileSyncPromise = null;
@@ -15523,7 +15524,7 @@
   }
 
   function openLoginPromptDialog() {
-    if (accountState.isLoggedIn) {
+    if (accountState.isLoggedIn && !accountState.isAnonymous) {
       return;
     }
     const dialog = dom.loginPrompt?.dialog;
@@ -17445,10 +17446,18 @@
       return false;
     }
     if (isSharedRecentProjectEntry(targetEntry)) {
-      await initPixieedAccount();
-      if ((!accountState.isLoggedIn || accountState.isAnonymous) && targetEntry.sharedProjectInviteToken) {
-        // Invite-token backed shared projects can reopen in viewer mode without login.
-      } else if (!await ensureSharedProjectBackendSession()) {
+      storePendingSharedInvite({
+        inviteToken: targetEntry.sharedProjectInviteToken || '',
+        projectKey: targetEntry.sharedProjectKey || '',
+        requestedRole: targetEntry.sharedRoleHint || 'guest',
+        autoJoin: targetEntry.sharedAutoJoin !== false,
+        source: 'startup-reopen',
+      });
+      if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
+        return false;
+      }
+      clearPendingSharedInvite();
+      if (!await ensureSharedProjectBackendSession()) {
         return false;
       }
     }
@@ -19363,40 +19372,37 @@
     }
   }
 
-  async function openSharedRecentProject(entry, { hideStartup = true, silent = false } = {}) {
-    const normalizedEntry = normalizeSharedRecentProjectEntry(entry);
-    if (!normalizedEntry) {
+  async function openSharedProjectAccess(access, {
+    hideStartup = true,
+    silent = false,
+    successMessage = '',
+  } = {}) {
+    const normalizedProjectKey = normalizeMultiProjectKey(access?.projectKey || '');
+    const normalizedInviteToken = typeof access?.inviteToken === 'string' ? access.inviteToken.trim() : '';
+    const requestedRole = access?.requestedRole === 'master' || access?.requestedRole === 'guest' || access?.requestedRole === 'spectator'
+      ? access.requestedRole
+      : 'guest';
+    const sharedProject = normalizedInviteToken
+      ? await loadSharedProjectSnapshotRecordByInvite(normalizedInviteToken, {
+          createIfMissing: false,
+          title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
+        })
+      : await loadSharedProjectSnapshotRecord(normalizedProjectKey, {
+          createIfMissing: requestedRole === 'master',
+          title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
+        });
+    if (!sharedProject?.project_key) {
+      if (!silent) {
+        setMultiStatus(
+          localizeText('共有プロジェクトが見つかりませんでした', 'Shared project not found'),
+          'error'
+        );
+      }
       return false;
     }
-    await initPixieedAccount();
-    await ensureNoLegacyMultiSessionForSharedProject();
-    const requestedRole = (!accountState.isLoggedIn || accountState.isAnonymous)
-      ? 'spectator'
-      : (normalizedEntry.sharedRoleHint || 'guest');
-    let sharedProject = null;
-    if ((!accountState.isLoggedIn || accountState.isAnonymous) && normalizedEntry.sharedProjectInviteToken) {
-      sharedProject = await loadSharedProjectSnapshotRecordByInvite(normalizedEntry.sharedProjectInviteToken, {
-        createIfMissing: false,
-        title: normalizedEntry.name,
-      });
-    } else {
-      if (!await ensureSharedProjectBackendSession()) {
-        if (!silent) {
-          setMultiStatus(
-            localizeText('共有プロジェクトを開けませんでした。共有セッションを初期化できません。', 'Could not initialize a shared session for this project.'),
-            'warn'
-          );
-        }
-        return false;
-      }
-      sharedProject = await loadSharedProjectSnapshotRecord(normalizedEntry.sharedProjectKey, {
-        createIfMissing: requestedRole === 'master',
-        title: normalizedEntry.name,
-      });
-    }
-    if (sharedProject && isBrokenSharedInviteBinding(sharedProject, {
-      expectedInviteToken: normalizedEntry.sharedProjectInviteToken,
-      expectedProjectKey: normalizedEntry.sharedProjectKey,
+    if (normalizedInviteToken && isBrokenSharedInviteBinding(sharedProject, {
+      expectedInviteToken: normalizedInviteToken,
+      expectedProjectKey: normalizedProjectKey,
     })) {
       if (!silent) {
         setMultiStatus(
@@ -19409,63 +19415,66 @@
       }
       return false;
     }
-    const sharedSnapshot = sharedProject?.latest_snapshot;
+    const resolvedProjectKey = normalizeMultiProjectKey(sharedProject.project_key);
+    if (!resolvedProjectKey) {
+      if (!silent) {
+        setMultiStatus(localizeText('共有プロジェクトを開けませんでした', 'Failed to open shared project'), 'error');
+      }
+      return false;
+    }
+    const sharedSnapshot = sharedProject.latest_snapshot;
     if (sharedSnapshot && typeof sharedSnapshot === 'object') {
       const snapshotRevision = Math.max(
         0,
-        Math.round(Number(sharedProject?.latest_snapshot_revision) || Number(sharedProject?.latest_revision) || 0)
+        Math.round(Number(sharedProject.latest_snapshot_revision) || Number(sharedProject.latest_revision) || 0)
       );
       const loaded = await loadDocumentFromText(JSON.stringify(sharedSnapshot), null, {
-        projectId: normalizedEntry.id,
+        projectId: buildSharedRecentProjectId(resolvedProjectKey),
         suppressAutosaveStatus: true,
         openedFromRecent: true,
         preserveDotStats: true,
-        sharedProjectKey: normalizedEntry.sharedProjectKey,
+        sharedProjectKey: resolvedProjectKey,
         sharedProjectRevision: snapshotRevision,
       });
       if (loaded) {
-        markActiveSharedProjectDocumentLoaded(normalizedEntry.sharedProjectKey);
-        normalizedEntry.name = createSharedProjectSnapshotTitle(sharedProject?.title || normalizedEntry.name);
-        normalizedEntry.fileName = normalizeDocumentName(`${normalizedEntry.name || normalizedEntry.sharedProjectKey}.pixiedraw`);
-        normalizedEntry.sharedProjectRevision = Math.max(0, Math.round(Number(sharedProject?.latest_revision) || 0));
+        markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
       }
     }
-    multiAutoResumeAttempted = true;
-    clearStoredMultiResumeSession();
-    storeMultiProjectKey(normalizedEntry.sharedProjectKey);
-    syncMultiProjectKeyInputValues(normalizedEntry.sharedProjectKey, { preserveFocused: false });
+    setActiveAutosaveProjectId(buildSharedRecentProjectId(resolvedProjectKey));
+    storeMultiProjectKey(resolvedProjectKey);
+    syncMultiProjectKeyInputValues(resolvedProjectKey, { preserveFocused: false });
     setMultiDesiredRole(requestedRole);
     setMultiUiView(requestedRole);
     multiEntryJoinPanelOpen = false;
-    syncMultiControls();
-    await upsertSharedRecentProjectEntry({
-      projectKey: normalizedEntry.sharedProjectKey,
-      name: normalizedEntry.name,
-      roleHint: requestedRole,
-      autoJoin: normalizedEntry.sharedAutoJoin !== false,
-      revision: normalizedEntry.sharedProjectRevision,
-    });
     setActiveSharedProjectSession(
-      normalizedEntry.sharedProjectKey,
-      Math.max(0, Math.round(Number(sharedProject?.latest_snapshot_revision) || Number(normalizedEntry.sharedProjectRevision) || 0)),
-      Math.max(0, Math.round(Number(sharedProject?.latest_snapshot_structure_revision) || Number(normalizedEntry.sharedProjectStructureRevision) || 0)),
-      sharedProject?.id || normalizedEntry.sharedProjectBackendId || ''
+      resolvedProjectKey,
+      Math.max(0, Math.round(Number(sharedProject.latest_snapshot_revision) || Number(sharedProject.latest_revision) || 0)),
+      Math.max(0, Math.round(Number(sharedProject.latest_snapshot_structure_revision) || Number(sharedProject.latest_structure_revision) || 0)),
+      sharedProject.id || ''
     );
-    if (sharedProject) {
-      markActiveSharedProjectDocumentLoaded(normalizedEntry.sharedProjectKey);
-      await applySharedProjectOpsSinceRevision(
-        sharedProject,
-        Math.max(0, Math.round(Number(sharedProject?.latest_snapshot_revision) || 0))
-      );
-    }
-    setActiveAutosaveProjectId(normalizedEntry.id);
+    markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
+    await applySharedProjectOpsSinceRevision(
+      sharedProject,
+      Math.max(0, Math.round(Number(sharedProject.latest_snapshot_revision) || 0))
+    );
+    await upsertSharedRecentProjectEntry({
+      projectKey: resolvedProjectKey,
+      projectId: sharedProject.id || '',
+      inviteToken: sharedProject.invite_token || normalizedInviteToken || '',
+      visibility: sharedProject.visibility || 'shared',
+      name: createSharedProjectSnapshotTitle(sharedProject.title || state.documentName || resolvedProjectKey),
+      roleHint: requestedRole,
+      autoJoin: access?.autoJoin !== false,
+      revision: Math.max(0, Math.round(Number(sharedProject.latest_revision) || 0)),
+      structureRevision: Math.max(0, Math.round(Number(sharedProject.latest_structure_revision) || 0)),
+    });
     syncMultiControls();
     renderMultiParticipantsList();
     if (!silent) {
       setMultiStatus(
-        localizeText(
-          '共有プロジェクトを開きました',
-          'Opened shared project'
+        successMessage || localizeText(
+          '共有プロジェクトを開きました。編集内容は自動で共有されます。',
+          'Opened shared project. Your edits will sync automatically.'
         ),
         'success'
       );
@@ -19474,6 +19483,54 @@
       hideStartupScreen();
     }
     return true;
+  }
+
+  async function openSharedRecentProject(entry, { hideStartup = true, silent = false } = {}) {
+    const normalizedEntry = normalizeSharedRecentProjectEntry(entry);
+    if (!normalizedEntry) {
+      return false;
+    }
+    storePendingSharedInvite({
+      inviteToken: normalizedEntry.sharedProjectInviteToken || '',
+      projectKey: normalizedEntry.sharedProjectKey || '',
+      requestedRole: normalizedEntry.sharedRoleHint || 'guest',
+      autoJoin: normalizedEntry.sharedAutoJoin !== false,
+      source: 'recent-open',
+    });
+    if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
+      return false;
+    }
+    clearPendingSharedInvite();
+    await initPixieedAccount();
+    await ensureNoLegacyMultiSessionForSharedProject();
+    if (!await ensureSharedProjectBackendSession()) {
+      if (!silent) {
+        setMultiStatus(
+          localizeText('共有プロジェクトを開けませんでした。共有セッションを初期化できません。', 'Could not initialize a shared session for this project.'),
+          'warn'
+        );
+      }
+      return false;
+    }
+    multiAutoResumeAttempted = true;
+    clearStoredMultiResumeSession();
+    const opened = await openSharedProjectAccess({
+      inviteToken: normalizedEntry.sharedProjectInviteToken || '',
+      projectKey: normalizedEntry.sharedProjectKey || '',
+      requestedRole: normalizedEntry.sharedRoleHint || 'guest',
+      autoJoin: normalizedEntry.sharedAutoJoin !== false,
+    }, {
+      hideStartup,
+      silent,
+      successMessage: localizeText(
+        '共有プロジェクトを開きました',
+        'Opened shared project'
+      ),
+    });
+    if (opened) {
+      setActiveAutosaveProjectId(normalizedEntry.id);
+    }
+    return opened;
   }
 
   async function openRecentProject(entry, options = {}) {
@@ -49933,27 +49990,41 @@
     }
   }
 
-  function storePendingMultiInvite(invite) {
+  function clearPendingSharedInvite() {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    try {
+      window.sessionStorage.removeItem(MULTI_PENDING_INVITE_STORAGE_KEY);
+    } catch (_error) {
+      // Ignore storage errors.
+    }
+  }
+
+  function storePendingSharedInvite(invite) {
     if (!canUseSessionStorage) {
       return;
     }
     try {
       if (!invite || typeof invite !== 'object') {
-        window.sessionStorage.removeItem(MULTI_PENDING_INVITE_STORAGE_KEY);
+        clearPendingSharedInvite();
         return;
       }
       window.sessionStorage.setItem(MULTI_PENDING_INVITE_STORAGE_KEY, JSON.stringify({
         projectKey: normalizeMultiProjectKey(invite.projectKey || ''),
         inviteToken: typeof invite.inviteToken === 'string' ? invite.inviteToken.trim() : '',
         autoJoin: invite.autoJoin !== false,
-        role: typeof invite.role === 'string' ? invite.role.trim() : '',
+        requestedRole: typeof invite.requestedRole === 'string'
+          ? invite.requestedRole.trim()
+          : (typeof invite.role === 'string' ? invite.role.trim() : ''),
+        source: typeof invite.source === 'string' ? invite.source.trim() : '',
       }));
     } catch (_error) {
       // Ignore storage errors.
     }
   }
 
-  function readStoredPendingMultiInvite() {
+  function readPendingSharedInvite() {
     if (!canUseSessionStorage) {
       return null;
     }
@@ -49971,18 +50042,42 @@
       if (!projectKey && !inviteToken) {
         return null;
       }
-      const role = parsed.role === 'master' || parsed.role === 'guest' || parsed.role === 'spectator'
-        ? parsed.role
-        : '';
+      const requestedRole = parsed.requestedRole === 'master' || parsed.requestedRole === 'guest' || parsed.requestedRole === 'spectator'
+        ? parsed.requestedRole
+        : (parsed.role === 'master' || parsed.role === 'guest' || parsed.role === 'spectator'
+          ? parsed.role
+          : '');
+      const source = typeof parsed.source === 'string' ? parsed.source.trim() : '';
       return {
         projectKey,
         inviteToken,
         autoJoin: parsed.autoJoin !== false,
-        role,
+        requestedRole,
+        source,
       };
     } catch (_error) {
+      clearPendingSharedInvite();
       return null;
     }
+  }
+
+  function storePendingMultiInvite(invite) {
+    storePendingSharedInvite(invite);
+  }
+
+  function readStoredPendingMultiInvite() {
+    const invite = readPendingSharedInvite();
+    if (!invite) {
+      return null;
+    }
+    return {
+      projectKey: invite.projectKey,
+      inviteToken: invite.inviteToken,
+      autoJoin: invite.autoJoin,
+      role: invite.requestedRole === 'master' || invite.requestedRole === 'guest' || invite.requestedRole === 'spectator'
+        ? invite.requestedRole
+        : '',
+    };
   }
 
   function readMultiInviteFromUrl() {
@@ -50024,28 +50119,11 @@
     if (!invite) {
       return false;
     }
-    let resolvedInviteProjectKey = invite.projectKey;
-    let resolvedInviteToken = invite.inviteToken || '';
-    let inviteRecordPromise = null;
-    if (resolvedInviteToken && canLookupSharedProjectsBackend()) {
-      inviteRecordPromise = loadSharedProjectSnapshotRecordByInvite(resolvedInviteToken, {
-        createIfMissing: false,
-        title: createSharedProjectSnapshotTitle(state.documentName || invite.projectKey || DEFAULT_DOCUMENT_NAME),
-      }).then(project => {
-        if (project?.project_key) {
-          resolvedInviteProjectKey = normalizeMultiProjectKey(project.project_key);
-        }
-        if (project?.invite_token) {
-          resolvedInviteToken = project.invite_token;
-        }
-        return project;
-      }).catch(error => {
-        console.warn('Failed to resolve shared invite token', error);
-        return null;
-      });
-    }
-    const normalizedInviteProjectKey = normalizeMultiProjectKey(resolvedInviteProjectKey || invite.projectKey || '');
-    if (!normalizedInviteProjectKey) {
+    const normalizedInviteProjectKey = normalizeMultiProjectKey(invite.projectKey || '');
+    const requestedRole = invite.role === 'master' || invite.role === 'guest' || invite.role === 'spectator'
+      ? invite.role
+      : 'guest';
+    if (!normalizedInviteProjectKey && !invite.inviteToken) {
       return false;
     }
     syncMultiControls();
@@ -50057,108 +50135,76 @@
       'info'
     );
     const openSharedInviteProject = async () => {
-      const preloadedProject = inviteRecordPromise ? await inviteRecordPromise : null;
-      const sharedProject = preloadedProject
-        || (resolvedInviteToken
-          ? await loadSharedProjectSnapshotRecordByInvite(resolvedInviteToken, {
-              createIfMissing: false,
-              title: createSharedProjectSnapshotTitle(state.documentName || normalizedInviteProjectKey),
-            })
-          : await loadSharedProjectSnapshotRecord(normalizedInviteProjectKey, {
-              createIfMissing: requestedRole === 'master',
-              title: createSharedProjectSnapshotTitle(state.documentName || normalizedInviteProjectKey),
-              inviteToken: resolvedInviteToken,
-            }));
-      if (!sharedProject?.project_key) {
-        setMultiStatus(
-          localizeText(
-            '共有リンクが無効か、対応する共有プロジェクトが見つかりませんでした。',
-            'The invite link is invalid or the shared project could not be found.'
-          ),
-          'error'
-        );
-        return false;
-      }
-      if (isBrokenSharedInviteBinding(sharedProject, {
-        expectedInviteToken: resolvedInviteToken,
-        expectedProjectKey: normalizedInviteProjectKey,
-      })) {
-        setMultiStatus(
-          localizeText(
-            '共有リンクと共有プロジェクトの結び付きが壊れています。URL を再発行してください。',
-            'The invite link does not match the shared project. Please generate a new invite URL.'
-          ),
-          'error'
-        );
-        return false;
-      }
-      const sharedSnapshot = sharedProject?.latest_snapshot;
-      let thumbnail = null;
-      if (sharedSnapshot && typeof sharedSnapshot === 'object') {
-        try {
-          thumbnail = await generateSnapshotThumbnail(sharedSnapshot);
-        } catch (error) {
-          console.warn('Failed to generate shared invite thumbnail', error);
+      if ((!accountState.isLoggedIn || accountState.isAnonymous) && invite.inviteToken) {
+        const inviteProject = await fetchSharedProjectRecordByInviteToken(invite.inviteToken);
+        if (inviteProject?.project_key && !isBrokenSharedInviteBinding(inviteProject, {
+          expectedInviteToken: invite.inviteToken,
+          expectedProjectKey: normalizedInviteProjectKey,
+        })) {
+          let thumbnail = null;
+          if (inviteProject.latest_snapshot && typeof inviteProject.latest_snapshot === 'object') {
+            try {
+              thumbnail = await generateSnapshotThumbnail(inviteProject.latest_snapshot);
+            } catch (_error) {
+              thumbnail = null;
+            }
+          }
+          await upsertSharedRecentProjectEntry({
+            projectKey: normalizeMultiProjectKey(inviteProject.project_key),
+            projectId: inviteProject.id || '',
+            inviteToken: inviteProject.invite_token || invite.inviteToken,
+            visibility: inviteProject.visibility || 'shared',
+            name: createSharedProjectSnapshotTitle(inviteProject.title || normalizedInviteProjectKey || DEFAULT_DOCUMENT_NAME),
+            fileName: normalizeDocumentName(`${createSharedProjectSnapshotTitle(inviteProject.title || normalizedInviteProjectKey || DEFAULT_DOCUMENT_NAME)}.pixiedraw`),
+            thumbnail,
+            roleHint: 'guest',
+            autoJoin: invite.autoJoin !== false,
+            revision: Math.max(0, Math.round(Number(inviteProject.latest_revision) || 0)),
+            structureRevision: Math.max(0, Math.round(Number(inviteProject.latest_structure_revision) || 0)),
+          });
         }
       }
-      const projectTitle = createSharedProjectSnapshotTitle(sharedProject.title || normalizedInviteProjectKey);
-      await upsertSharedRecentProjectEntry({
-        projectKey: normalizedInviteProjectKey,
-        projectId: sharedProject.id || '',
-        inviteToken: sharedProject.invite_token || resolvedInviteToken,
-        visibility: sharedProject.visibility || 'shared',
-        name: projectTitle,
-        fileName: normalizeDocumentName(`${projectTitle}.pixiedraw`),
-        thumbnail,
-        roleHint: (!accountState.isLoggedIn || accountState.isAnonymous) ? 'spectator' : 'guest',
-        autoJoin: false,
-        revision: Math.max(0, Math.round(Number(sharedProject?.latest_revision) || 0)),
-        structureRevision: Math.max(0, Math.round(Number(sharedProject?.latest_structure_revision) || 0)),
-      });
-      const sharedEntry = getSharedRecentProjectEntry(normalizedInviteProjectKey) || normalizeSharedRecentProjectEntry({
-        projectKey: normalizedInviteProjectKey,
-        projectId: sharedProject.id || '',
-        inviteToken: sharedProject.invite_token || resolvedInviteToken,
-        visibility: sharedProject.visibility || 'shared',
-        name: projectTitle,
-        roleHint: (!accountState.isLoggedIn || accountState.isAnonymous) ? 'spectator' : 'guest',
-        autoJoin: false,
-        revision: Math.max(0, Math.round(Number(sharedProject?.latest_revision) || 0)),
-        structureRevision: Math.max(0, Math.round(Number(sharedProject?.latest_structure_revision) || 0)),
-      });
-      if (!sharedEntry) {
+      if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
+        storePendingSharedInvite({
+          inviteToken: invite.inviteToken || '',
+          projectKey: normalizedInviteProjectKey,
+          requestedRole,
+          autoJoin: invite.autoJoin !== false,
+          source: 'url-invite',
+        });
         return false;
       }
-      startupAutosaveRestoreProjectId = normalizeAutosaveProjectId(sharedEntry.id || '');
-      if (startupAutosaveRestoreProjectId) {
-        setActiveAutosaveProjectId(startupAutosaveRestoreProjectId);
-      }
-      return await openSharedRecentProject(sharedEntry, {
+      clearPendingSharedInvite();
+      return await openSharedProjectAccess({
+        inviteToken: invite.inviteToken || '',
+        projectKey: normalizedInviteProjectKey,
+        requestedRole,
+        autoJoin: invite.autoJoin !== false,
+      }, {
         hideStartup: true,
         silent: true,
+        successMessage: localizeText(
+          '共有URLを読み込みました。共有プロジェクトを開いています。',
+          'Shared URL loaded. Opening shared project.'
+        ),
       });
     };
     window.setTimeout(() => {
       openSharedInviteProject()
         .then(result => {
           if (result) {
-            setMultiStatus(
-              localizeText(
-                '共有URLを読み込みました。共有プロジェクトを開いています。',
-                'Shared URL loaded. Opening shared project.'
-              ),
-              'success'
-            );
-            storePendingMultiInvite(null);
+            clearPendingSharedInvite();
             clearMultiInviteQueryParamsFromUrl();
           } else {
-            setMultiStatus(
-              localizeText(
-                '共有URLを開けませんでした。',
-                'Failed to open shared URL.'
-              ),
-              'error'
-            );
+            if (!readPendingSharedInvite()) {
+              setMultiStatus(
+                localizeText(
+                  '共有URLを開けませんでした。',
+                  'Failed to open shared URL.'
+                ),
+                'error'
+              );
+            }
           }
         })
         .catch(error => {
@@ -50178,6 +50224,9 @@
   async function createSharedProjectFromCurrentDocument() {
     if (isSharedProjectsBlockedByRuntime()) {
       showSharedRuntimeBlockedStatus();
+      return false;
+    }
+    if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
       return false;
     }
     if (!await ensureSharedProjectBackendSession()) {
@@ -50260,96 +50309,52 @@
       );
       return false;
     }
-    const sharedProject = access.inviteToken
-      ? await loadSharedProjectSnapshotRecordByInvite(access.inviteToken, {
-          createIfMissing: false,
-          title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
-        })
-      : await loadSharedProjectSnapshotRecord(access.projectKey, {
-          createIfMissing: false,
-          title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
+    if (!(accountState.isLoggedIn && accountState.userId && !accountState.isAnonymous) && access.inviteToken) {
+      const inviteProject = await fetchSharedProjectRecordByInviteToken(access.inviteToken);
+      if (inviteProject?.project_key && !isBrokenSharedInviteBinding(inviteProject, {
+        expectedInviteToken: access.inviteToken,
+        expectedProjectKey: access.projectKey,
+      })) {
+        let thumbnail = null;
+        if (inviteProject.latest_snapshot && typeof inviteProject.latest_snapshot === 'object') {
+          try {
+            thumbnail = await generateSnapshotThumbnail(inviteProject.latest_snapshot);
+          } catch (_error) {
+            thumbnail = null;
+          }
+        }
+        await upsertSharedRecentProjectEntry({
+          projectKey: normalizeMultiProjectKey(inviteProject.project_key),
+          projectId: inviteProject.id || '',
+          inviteToken: inviteProject.invite_token || access.inviteToken || '',
+          visibility: inviteProject.visibility || 'shared',
+          name: createSharedProjectSnapshotTitle(inviteProject.title || access.projectKey || DEFAULT_DOCUMENT_NAME),
+          fileName: normalizeDocumentName(`${createSharedProjectSnapshotTitle(inviteProject.title || access.projectKey || DEFAULT_DOCUMENT_NAME)}.pixiedraw`),
+          thumbnail,
+          roleHint: 'guest',
+          autoJoin: false,
+          revision: Math.max(0, Math.round(Number(inviteProject.latest_revision) || 0)),
+          structureRevision: Math.max(0, Math.round(Number(inviteProject.latest_structure_revision) || 0)),
         });
-    if (!sharedProject?.project_key) {
-      setMultiStatus(
-        localizeText('共有プロジェクトが見つかりませんでした', 'Shared project not found'),
-        'error'
-      );
-      return false;
-    }
-    if (access.inviteToken && isBrokenSharedInviteBinding(sharedProject, {
-      expectedInviteToken: access.inviteToken,
-      expectedProjectKey: access.projectKey,
-    })) {
-      setMultiStatus(
-        localizeText(
-          '共有リンクと共有プロジェクトの結び付きが壊れています。URL を再発行してください。',
-          'The invite link does not match the shared project. Please generate a new invite URL.'
-        ),
-        'error'
-      );
-      return false;
-    }
-    const resolvedProjectKey = normalizeMultiProjectKey(sharedProject.project_key);
-    if (!resolvedProjectKey) {
-      setMultiStatus(localizeText('共有プロジェクトを開けませんでした', 'Failed to open shared project'), 'error');
-      return false;
-    }
-    const sharedSnapshot = sharedProject.latest_snapshot;
-    if (sharedSnapshot && typeof sharedSnapshot === 'object') {
-      const snapshotRevision = Math.max(
-        0,
-        Math.round(Number(sharedProject.latest_snapshot_revision) || Number(sharedProject.latest_revision) || 0)
-      );
-      const loaded = await loadDocumentFromText(JSON.stringify(sharedSnapshot), null, {
-        projectId: buildSharedRecentProjectId(resolvedProjectKey),
-        suppressAutosaveStatus: true,
-        openedFromRecent: true,
-        preserveDotStats: true,
-        sharedProjectKey: resolvedProjectKey,
-        sharedProjectRevision: snapshotRevision,
-      });
-      if (loaded) {
-        markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
       }
     }
-    setActiveAutosaveProjectId(buildSharedRecentProjectId(resolvedProjectKey));
-    storeMultiProjectKey(resolvedProjectKey);
-    syncMultiProjectKeyInputValues(resolvedProjectKey, { preserveFocused: false });
-    setMultiDesiredRole((!accountState.isLoggedIn || accountState.isAnonymous) ? 'spectator' : 'guest');
-    setMultiUiView((!accountState.isLoggedIn || accountState.isAnonymous) ? 'spectator' : 'guest');
-    multiEntryJoinPanelOpen = false;
-    setActiveSharedProjectSession(
-      resolvedProjectKey,
-      Math.max(0, Math.round(Number(sharedProject.latest_snapshot_revision) || Number(sharedProject.latest_revision) || 0)),
-      Math.max(0, Math.round(Number(sharedProject.latest_snapshot_structure_revision) || Number(sharedProject.latest_structure_revision) || 0)),
-      sharedProject.id || ''
-    );
-    markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
-    await applySharedProjectOpsSinceRevision(
-      sharedProject,
-      Math.max(0, Math.round(Number(sharedProject.latest_snapshot_revision) || 0))
-    );
-    await upsertSharedRecentProjectEntry({
-      projectKey: resolvedProjectKey,
-      projectId: sharedProject.id || '',
-      inviteToken: sharedProject.invite_token || access.inviteToken || '',
-      visibility: sharedProject.visibility || 'shared',
-      name: createSharedProjectSnapshotTitle(sharedProject.title || state.documentName || resolvedProjectKey),
-      roleHint: (!accountState.isLoggedIn || accountState.isAnonymous) ? 'spectator' : 'guest',
+    if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
+      storePendingSharedInvite({
+        inviteToken: access.inviteToken || '',
+        projectKey: access.projectKey || '',
+        requestedRole: 'guest',
+        autoJoin: false,
+        source: 'manual-open',
+      });
+      return false;
+    }
+    clearPendingSharedInvite();
+    return await openSharedProjectAccess({
+      inviteToken: access.inviteToken || '',
+      projectKey: access.projectKey || '',
+      requestedRole: 'guest',
       autoJoin: false,
-      revision: Math.max(0, Math.round(Number(sharedProject.latest_revision) || 0)),
-      structureRevision: Math.max(0, Math.round(Number(sharedProject.latest_structure_revision) || 0)),
     });
-    syncMultiControls();
-    renderMultiParticipantsList();
-    setMultiStatus(
-      localizeText(
-        '共有プロジェクトを開きました。編集内容は自動で共有されます。',
-        'Opened shared project. Your edits will sync automatically.'
-      ),
-      'success'
-    );
-    return true;
   }
 
   async function disableSharedProjectMode() {
@@ -52432,15 +52437,15 @@
   }
 
   async function loadSharedProjectSnapshotRecordByInvite(inviteToken, { createIfMissing = false, title = '' } = {}) {
-    if (!canLookupSharedProjectsBackend()) {
+    if (!canUseSharedProjectsBackend()) {
       return null;
     }
     const normalizedInviteToken = typeof inviteToken === 'string' ? inviteToken.trim() : '';
     if (!normalizedInviteToken) {
       return null;
     }
-    if (!accountState.isLoggedIn || accountState.isAnonymous) {
-      return await fetchSharedProjectRecordByInviteToken(normalizedInviteToken);
+    if (!await ensureSharedProjectBackendSession()) {
+      return null;
     }
     let project = null;
     try {
@@ -53514,6 +53519,114 @@
     }
   }
 
+  async function ensurePixieedAccountReady({ forceRefresh = false, silent = false } = {}) {
+    try {
+      await initPixieedAccount();
+      if (forceRefresh) {
+        const supabase = await ensurePixieedAccountClient();
+        if (supabase?.auth) {
+          let { data } = await supabase.auth.getSession();
+          let session = data?.session || null;
+          if (!session) {
+            session = await restorePixieedAccountSessionFromCache(supabase);
+            if (session) {
+              ({ data } = await supabase.auth.getSession());
+              session = data?.session || session;
+            }
+          }
+          applyPixieedAccountSession(session || null);
+          if (accountState.isLoggedIn) {
+            if (!accountState.isAnonymous) {
+              try {
+                await syncPixieedAccountProfile();
+              } catch (error) {
+                if (!shouldIgnorePixieedProfileError(error)) {
+                  throw error;
+                }
+                accountState.profile = getPixieedAccountProfileFallback();
+                updatePixieedAccountUi();
+              }
+            } else {
+              accountState.profile = getPixieedAccountProfileFallback();
+              updatePixieedAccountUi();
+            }
+            await syncSharedRecentProjectsFromAccount();
+          } else {
+            updatePixieedAccountUi();
+          }
+        }
+      }
+    } catch (error) {
+      if (!silent) {
+        console.warn('Failed to ensure PiXiEED account readiness', error);
+      }
+    }
+    return Boolean(accountState.isLoggedIn && accountState.userId && !accountState.isAnonymous);
+  }
+
+  async function ensureSharedProjectAuthenticatedStart({ requireLogin = true } = {}) {
+    if (!requireLogin) {
+      return true;
+    }
+    await ensurePixieedAccountReady({ forceRefresh: true, silent: true });
+    if (accountState.isLoggedIn && accountState.userId && !accountState.isAnonymous) {
+      return true;
+    }
+    setMultiStatus(
+      localizeText(
+        '共有を開始する前にPiXiEEDアカウントへログインしてください。',
+        'Please sign in to your PiXiEED account before starting shared editing.'
+      ),
+      'error'
+    );
+    openLoginPromptDialog();
+    return false;
+  }
+
+  async function resumePendingSharedInviteAfterLogin() {
+    if (pendingSharedInviteResumePromise) {
+      return pendingSharedInviteResumePromise;
+    }
+    pendingSharedInviteResumePromise = (async () => {
+      const pendingInvite = readPendingSharedInvite();
+      if (!pendingInvite) {
+        return false;
+      }
+      await ensurePixieedAccountReady({ forceRefresh: true, silent: true });
+      if (!accountState.isLoggedIn || !accountState.userId || accountState.isAnonymous) {
+        return false;
+      }
+      clearPendingSharedInvite();
+      const opened = await openSharedProjectAccess({
+        inviteToken: pendingInvite.inviteToken || '',
+        projectKey: pendingInvite.projectKey || '',
+        requestedRole: pendingInvite.requestedRole || 'guest',
+        autoJoin: pendingInvite.autoJoin !== false,
+      }, {
+        hideStartup: true,
+        silent: true,
+      });
+      if (opened) {
+        closeLoginPromptDialog();
+        clearMultiInviteQueryParamsFromUrl();
+        setMultiStatus(
+          localizeText(
+            'ログイン後に共有プロジェクトへの参加を再開しました。',
+            'Resumed joining the shared project after sign-in.'
+          ),
+          'success'
+        );
+        return true;
+      }
+      return false;
+    })();
+    try {
+      return await pendingSharedInviteResumePromise;
+    } finally {
+      pendingSharedInviteResumePromise = null;
+    }
+  }
+
   function isBrokenSharedInviteBinding(projectRecord, {
     expectedInviteToken = '',
     expectedProjectKey = '',
@@ -53745,6 +53858,11 @@
             updatePixieedAccountUi();
           }
           await syncSharedRecentProjectsFromAccount();
+          if (!accountState.isAnonymous) {
+            window.setTimeout(() => {
+              resumePendingSharedInviteAfterLogin().catch(() => {});
+            }, 0);
+          }
         } else {
           updatePixieedAccountUi();
         }
@@ -53774,6 +53892,11 @@
                   updatePixieedAccountUi();
                 }
                 await syncSharedRecentProjectsFromAccount();
+                if (!accountState.isAnonymous) {
+                  window.setTimeout(() => {
+                    resumePendingSharedInviteAfterLogin().catch(() => {});
+                  }, 0);
+                }
               } else {
                 updatePixieedAccountUi();
               }
@@ -61580,6 +61703,9 @@
           return;
         }
         if (prefersSharedProjectFlow()) {
+          if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
+            return;
+          }
           if (!isCurrentProjectSharedEntry()) {
             const accepted = await openShareStartConfirmDialog();
             if (!accepted) {
@@ -61702,8 +61828,7 @@
       dom.controls.multiStartSession.dataset.bound = 'true';
       dom.controls.multiStartSession.addEventListener('click', async () => {
         if (prefersSharedProjectFlow()) {
-          if (!await ensureSharedProjectBackendSession()) {
-            setMultiStatus(localizeText('共有モード用のセッションを開始できませんでした', 'Failed to initialize a shared-project session'), 'warn');
+          if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
             return;
           }
           if (!isCurrentProjectSharedEntry()) {
