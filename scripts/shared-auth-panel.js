@@ -14,6 +14,7 @@
   let supabaseUser = null;
   let initPromise = null;
   let supportsProfileXUrl = true;
+  let authListenerBound = false;
 
   function loadNickname() {
     try {
@@ -133,15 +134,26 @@
     if (supabaseClient) {
       return supabaseClient;
     }
+    if (window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__) {
+      supabaseClient = window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__;
+      return supabaseClient;
+    }
+    if (window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__) {
+      supabaseClient = await window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__;
+      return supabaseClient;
+    }
     const module = await import(SUPABASE_MODULE_URL);
-    supabaseClient = module.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    const clientPromise = Promise.resolve(module.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
         storageKey: AUTH_STORAGE_KEY,
       },
-    });
+    }));
+    window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__ = clientPromise;
+    supabaseClient = await clientPromise;
+    window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__ = supabaseClient;
     return supabaseClient;
   }
 
@@ -434,16 +446,20 @@
       const supabase = await ensureSupabase();
       const { data } = await supabase.auth.getSession();
       supabaseUser = data?.session?.user || null;
-      supabase.auth.onAuthStateChange(async (_event, session) => {
-        supabaseUser = session?.user || null;
-        await syncProfileFromServer();
-        updateAuthUi();
-        maybeReturnToCaller();
-      });
+      if (!authListenerBound) {
+        authListenerBound = true;
+        supabase.auth.onAuthStateChange(async (_event, session) => {
+          supabaseUser = session?.user || null;
+          await syncProfileFromServer();
+          updateAuthUi();
+          maybeReturnToCaller();
+        });
+      }
       await syncProfileFromServer();
       maybeReturnToCaller();
     } catch (_error) {
       supabaseClient = null;
+      window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__ = null;
     }
     updateAuthUi();
   }
