@@ -7954,6 +7954,58 @@
     return 'unknown';
   }
 
+  function getSharedProjectRealtimeDebugStage() {
+    let configuredStage = '';
+    try {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search || '');
+        configuredStage = String(
+          params.get('sharedRealtimeStage')
+          || window.localStorage?.getItem('pixiedraw:shared-realtime-stage')
+          || ''
+        ).trim().toUpperCase();
+      }
+    } catch (_error) {
+      configuredStage = '';
+    }
+    if (configuredStage === 'A' || configuredStage === 'B' || configuredStage === 'C' || configuredStage === 'D') {
+      return configuredStage;
+    }
+    return 'FULL';
+  }
+
+  function getSharedProjectRealtimeStageDescription(stage = 'FULL') {
+    switch (String(stage || 'FULL').toUpperCase()) {
+      case 'A':
+        return 'broadcast-only';
+      case 'B':
+        return 'broadcast+shared_projects';
+      case 'C':
+        return 'broadcast+shared_projects+shared_project_ops';
+      case 'D':
+        return 'broadcast+shared_projects+shared_project_ops+shared_project_members';
+      default:
+        return 'full';
+    }
+  }
+
+  function shouldEnableSharedProjectRealtimeStage(stage = 'FULL', target = 'broadcast') {
+    const normalizedStage = String(stage || 'FULL').toUpperCase();
+    if (target === 'broadcast') {
+      return true;
+    }
+    if (target === 'projects') {
+      return normalizedStage !== 'A';
+    }
+    if (target === 'ops') {
+      return normalizedStage === 'C' || normalizedStage === 'D' || normalizedStage === 'FULL';
+    }
+    if (target === 'members') {
+      return normalizedStage === 'D' || normalizedStage === 'FULL';
+    }
+    return true;
+  }
+
   function setActiveSharedProjectSession(projectKey = '', revision = 0, structureRevision = 0, projectId = '') {
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey);
     if (!normalizedProjectKey) {
@@ -51895,6 +51947,9 @@
     }
     const status = Number(error?.status || 0);
     const message = String(error?.message || '');
+    const code = String(error?.code || '');
+    const details = String(error?.details || '');
+    const hint = String(error?.hint || '');
     if (accountState.isLoggedIn) {
       if (shouldDisableSharedProjectsBackend(error)) {
         setMultiStatus(
@@ -51924,8 +51979,29 @@
     }
     if (context) {
       console.warn(`Shared project backend error (${context})`, error);
+      console.debug('[shared-backend] error detail', {
+        context,
+        status,
+        code,
+        message,
+        details,
+        hint,
+        accountLoggedIn: Boolean(accountState.isLoggedIn),
+        accountUserId: accountState.userId || '',
+        accountAnonymous: Boolean(accountState.isAnonymous),
+      });
     } else {
       console.warn('Shared project backend error', error);
+      console.debug('[shared-backend] error detail', {
+        status,
+        code,
+        message,
+        details,
+        hint,
+        accountLoggedIn: Boolean(accountState.isLoggedIn),
+        accountUserId: accountState.userId || '',
+        accountAnonymous: Boolean(accountState.isAnonymous),
+      });
     }
   }
 
@@ -53713,6 +53789,7 @@
         }
       }
       const topic = `shared-project:${projectKey}`;
+      const realtimeStage = getSharedProjectRealtimeDebugStage();
       const subscribeStartedAt = Date.now();
       const debugInfo = {
         clientType: getSharedProjectRealtimeClientType(supabase),
@@ -53722,11 +53799,19 @@
         projectKey,
         projectId,
         topic,
+        realtimeStage,
+        realtimeStageDescription: getSharedProjectRealtimeStageDescription(realtimeStage),
         broadcastEvent: SHARED_PROJECT_BROADCAST_EVENT,
         postgresFilters: [
-          `shared_projects:project_key=eq.${projectKey}`,
-          projectId ? `shared_project_members:project_id=eq.${projectId}` : '',
-          projectId ? `shared_project_ops:project_id=eq.${projectId}` : '',
+          shouldEnableSharedProjectRealtimeStage(realtimeStage, 'projects')
+            ? `shared_projects:project_key=eq.${projectKey}`
+            : '',
+          shouldEnableSharedProjectRealtimeStage(realtimeStage, 'ops') && projectId
+            ? `shared_project_ops:project_id=eq.${projectId}`
+            : '',
+          shouldEnableSharedProjectRealtimeStage(realtimeStage, 'members') && projectId
+            ? `shared_project_members:project_id=eq.${projectId}`
+            : '',
         ].filter(Boolean),
       };
       console.debug('[shared-realtime] subscribe start', debugInfo);
@@ -53766,129 +53851,134 @@
         applyOp(op, { fromRemote: true, provisional: true });
       }
     );
-      channel.on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'shared_projects',
-        filter: `project_key=eq.${projectKey}`,
-      },
-      payload => {
-        const nextRevision = Math.max(0, Math.round(Number(payload?.new?.latest_revision) || 0));
-        const nextStructureRevision = Math.max(0, Math.round(Number(payload?.new?.latest_structure_revision) || 0));
-        if (projectKey !== activeSharedProjectKey) {
-          return;
-        }
-        if (nextRevision <= activeSharedProjectRevision) {
-          return;
-        }
-        if (nextStructureRevision > activeSharedProjectStructureRevision) {
-          // structure changes still use stronger synchronization
-          queueSharedProjectRefresh({ immediate: true, reason: 'realtime-structure', force: true });
-          return;
-        }
-        if (!projectId && nextRevision > sharedProjectLastAppliedSeq + 1) {
-          recoverSharedProjectRealtimeGap(projectKey, {
-            afterSeq: sharedProjectLastAppliedSeq,
-            reason: 'project-update-gap',
-          }).then(recovered => {
-            if (!recovered) {
-              queueSharedProjectRefresh({ immediate: false, reason: 'project-update-gap', force: true });
+      if (shouldEnableSharedProjectRealtimeStage(realtimeStage, 'projects')) {
+        channel.on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'shared_projects',
+            filter: `project_key=eq.${projectKey}`,
+          },
+          payload => {
+            const nextRevision = Math.max(0, Math.round(Number(payload?.new?.latest_revision) || 0));
+            const nextStructureRevision = Math.max(0, Math.round(Number(payload?.new?.latest_structure_revision) || 0));
+            if (projectKey !== activeSharedProjectKey) {
+              return;
             }
-          }).catch(() => {
-            queueSharedProjectRefresh({ immediate: false, reason: 'project-update-gap', force: true });
-          });
-        }
+            if (nextRevision <= activeSharedProjectRevision) {
+              return;
+            }
+            if (nextStructureRevision > activeSharedProjectStructureRevision) {
+              // structure changes still use stronger synchronization
+              queueSharedProjectRefresh({ immediate: true, reason: 'realtime-structure', force: true });
+              return;
+            }
+            if (!projectId && nextRevision > sharedProjectLastAppliedSeq + 1) {
+              recoverSharedProjectRealtimeGap(projectKey, {
+                afterSeq: sharedProjectLastAppliedSeq,
+                reason: 'project-update-gap',
+              }).then(recovered => {
+                if (!recovered) {
+                  queueSharedProjectRefresh({ immediate: false, reason: 'project-update-gap', force: true });
+                }
+              }).catch(() => {
+                queueSharedProjectRefresh({ immediate: false, reason: 'project-update-gap', force: true });
+              });
+            }
+          }
+        );
       }
-    );
-      if (projectId) {
+      if (projectId && shouldEnableSharedProjectRealtimeStage(realtimeStage, 'members')) {
         channel.on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'shared_project_members',
-          filter: `project_id=eq.${projectId}`,
-        },
-        () => {
-          syncSharedProjectMembers(projectKey, projectId).catch(() => {});
-        }
-      );
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'shared_project_members',
+            filter: `project_id=eq.${projectId}`,
+          },
+          () => {
+            syncSharedProjectMembers(projectKey, projectId).catch(() => {});
+          }
+        );
+      }
+      if (projectId && shouldEnableSharedProjectRealtimeStage(realtimeStage, 'ops')) {
         channel.on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'shared_project_ops',
-          filter: `project_id=eq.${projectId}`,
-        },
-        payload => {
-          if (projectKey !== activeSharedProjectKey) {
-            return;
-          }
-          if (payload?.new?.actor_user_id && payload.new.actor_user_id === accountState.userId) {
-            return;
-          }
-          const nextRevision = Math.max(0, Math.round(Number(payload?.new?.revision) || 0));
-          const nextStructureRevision = Math.max(0, Math.round(Number(payload?.new?.structure_revision) || 0));
-          if (
-              nextRevision <= activeSharedProjectRevision
-            && nextStructureRevision <= activeSharedProjectStructureRevision
-          ) {
-            return;
-          }
-          const opType = typeof payload?.new?.op_type === 'string' ? payload.new.op_type.trim() : '';
-          if (nextRevision > sharedProjectLastAppliedSeq + 1) {
-            sharedProjectPendingRemoteOps.set(nextRevision, payload.new);
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'shared_project_ops',
+            filter: `project_id=eq.${projectId}`,
+          },
+          payload => {
+            if (projectKey !== activeSharedProjectKey) {
+              return;
+            }
+            if (payload?.new?.actor_user_id && payload.new.actor_user_id === accountState.userId) {
+              return;
+            }
+            const nextRevision = Math.max(0, Math.round(Number(payload?.new?.revision) || 0));
+            const nextStructureRevision = Math.max(0, Math.round(Number(payload?.new?.structure_revision) || 0));
+            if (
+                nextRevision <= activeSharedProjectRevision
+              && nextStructureRevision <= activeSharedProjectStructureRevision
+            ) {
+              return;
+            }
+            const opType = typeof payload?.new?.op_type === 'string' ? payload.new.op_type.trim() : '';
+            if (nextRevision > sharedProjectLastAppliedSeq + 1) {
+              sharedProjectPendingRemoteOps.set(nextRevision, payload.new);
+              recoverSharedProjectRealtimeGap(projectKey, {
+                afterSeq: sharedProjectLastAppliedSeq,
+                reason: 'insert-gap',
+              }).then(recovered => {
+                if (!recovered) {
+                  queueSharedProjectRefresh({ immediate: false, reason: 'insert-gap', force: true });
+                }
+              }).catch(() => {
+                queueSharedProjectRefresh({ immediate: false, reason: 'insert-gap', force: true });
+              });
+              return;
+            }
+            if (nextRevision === sharedProjectLastAppliedSeq + 1) {
+              const drawKind = typeof payload?.new?.op_type === 'string' ? payload.new.op_type.trim() : '';
+              const applied = (
+                drawKind === 'draw'
+                ? applyIncomingSharedProjectDrawOp(payload.new, { fromRemote: true, provisional: false })
+                : (drawKind === 'palette'
+                  ? applySharedProjectPaletteOp(payload.new, { fromRemote: true, provisional: false })
+                  : applyOp(payload.new, { fromRemote: true, provisional: false }))
+              );
+              if (applied) {
+                sharedProjectLastAppliedSeq = nextRevision;
+                activeSharedProjectRevision = nextRevision;
+                activeSharedProjectStructureRevision = Math.max(activeSharedProjectStructureRevision, nextStructureRevision);
+                sharedProjectLastRealtimeActivityAt = Date.now();
+                if (drainPendingSharedProjectRemoteOps()) {
+                  return;
+                }
+              }
+            }
+            if (opType === 'structure') {
+              queueSharedProjectRefresh({ immediate: true, reason: 'structure-op' });
+              return;
+            }
             recoverSharedProjectRealtimeGap(projectKey, {
               afterSeq: sharedProjectLastAppliedSeq,
-              reason: 'insert-gap',
+              reason: 'op-realtime',
             }).then(recovered => {
               if (!recovered) {
-                queueSharedProjectRefresh({ immediate: false, reason: 'insert-gap', force: true });
+                queueSharedProjectRefresh({ immediate: false, reason: 'op-realtime', force: true });
               }
             }).catch(() => {
-              queueSharedProjectRefresh({ immediate: false, reason: 'insert-gap', force: true });
-            });
-            return;
-          }
-          if (nextRevision === sharedProjectLastAppliedSeq + 1) {
-            const drawKind = typeof payload?.new?.op_type === 'string' ? payload.new.op_type.trim() : '';
-            const applied = (
-              drawKind === 'draw'
-              ? applyIncomingSharedProjectDrawOp(payload.new, { fromRemote: true, provisional: false })
-              : (drawKind === 'palette'
-                ? applySharedProjectPaletteOp(payload.new, { fromRemote: true, provisional: false })
-                : applyOp(payload.new, { fromRemote: true, provisional: false }))
-            );
-            if (applied) {
-              sharedProjectLastAppliedSeq = nextRevision;
-              activeSharedProjectRevision = nextRevision;
-              activeSharedProjectStructureRevision = Math.max(activeSharedProjectStructureRevision, nextStructureRevision);
-              sharedProjectLastRealtimeActivityAt = Date.now();
-              if (drainPendingSharedProjectRemoteOps()) {
-                return;
-              }
-            }
-          }
-          if (opType === 'structure') {
-            queueSharedProjectRefresh({ immediate: true, reason: 'structure-op' });
-            return;
-          }
-          recoverSharedProjectRealtimeGap(projectKey, {
-            afterSeq: sharedProjectLastAppliedSeq,
-            reason: 'op-realtime',
-          }).then(recovered => {
-            if (!recovered) {
               queueSharedProjectRefresh({ immediate: false, reason: 'op-realtime', force: true });
-            }
-          }).catch(() => {
-            queueSharedProjectRefresh({ immediate: false, reason: 'op-realtime', force: true });
-          });
-        }
-      );
+            });
+          }
+        );
       }
+      console.debug('[shared-realtime] subscribe stage registration complete', debugInfo);
       try {
         await new Promise((resolve, reject) => {
         let settled = false;
