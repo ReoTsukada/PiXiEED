@@ -19272,10 +19272,8 @@
       const packaged = packagedPayload && typeof packagedPayload === 'object'
         ? packagedPayload
         : buildPackagedProjectPayload(snapshot);
-      const existingEntries = await loadRecentProjectsMetadata();
-      const previousEntry = existingEntries.find(entry => entry?.id === resolvedProjectId) || null;
-      const workingEntries = existingEntries
-        .filter(entry => entry && entry.id && entry.id !== resolvedProjectId);
+      const initialEntries = await loadRecentProjectsMetadata();
+      const previousEntry = initialEntries.find(entry => entry?.id === resolvedProjectId) || null;
       const fileName = normalizeDocumentName(snapshot?.documentName || DEFAULT_DOCUMENT_NAME);
       const displayName = extractDocumentBaseName(fileName);
       const nowTs = Date.now();
@@ -19321,9 +19319,15 @@
       if (dotStats) {
         updatedEntry.dotStats = dotStats;
       }
-      workingEntries.unshift(updatedEntry);
+      const latestEntries = await loadRecentProjectsMetadata();
+      const latestPreviousEntry = latestEntries.find(entry => entry?.id === resolvedProjectId) || previousEntry;
+      const workingEntries = latestEntries.filter(entry => entry && entry.id && entry.id !== resolvedProjectId);
+      workingEntries.unshift({
+        ...(latestPreviousEntry || {}),
+        ...updatedEntry,
+      });
       const limited = workingEntries.slice(0, RECENT_PROJECT_LIMIT);
-      await saveRecentProjectsList(existingEntries, limited);
+      await saveRecentProjectsList(latestEntries, limited);
       setRecentProjectsCache(limited);
       if (
         sharedEntrySeed
@@ -25150,6 +25154,7 @@
     setupKeyboard();
     updateDocumentMetadata();
     setupStartupScreen();
+    const accountInitTask = initPixieedAccount();
     const skipStartup = EMBED_CONFIG.skipStartup === true;
     if (lensImportRequested || skipStartup) {
       hideStartupScreen();
@@ -25157,6 +25162,7 @@
     let restoredAutosaveProject = false;
     if (!lensImportRequested && !skipStartup) {
       try {
+        await accountInitTask;
         restoredAutosaveProject = await maybeRestoreAutosaveProjectOnStartup();
       } catch (error) {
         console.warn('Startup autosave restore failed', error);
