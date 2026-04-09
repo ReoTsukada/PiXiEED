@@ -2985,6 +2985,8 @@
   let activeSharedProjectChannelKey = '';
   let activeSharedProjectChannelSignature = '';
   let sharedProjectRealtimeRetryBlockedUntil = 0;
+  let sharedProjectRealtimeConnectPromise = null;
+  let sharedProjectRealtimeWarnedAt = 0;
   let sharedProjectPollingTimer = null;
   let sharedProjectRefreshTimer = null;
   let sharedProjectRefreshInFlight = false;
@@ -7835,6 +7837,7 @@
     sharedProjectInFlightStroke = null;
     sharedProjectOpCommitInFlight = false;
     sharedProjectGapRecoveryPromise = null;
+    sharedProjectRealtimeConnectPromise = null;
     sharedProjectMembers = [];
     sharedProjectLayerSnapshots.clear();
     if (sharedProjectCaptureTimer !== null) {
@@ -7899,6 +7902,22 @@
     }, SHARED_PROJECT_REFRESH_LOOP_INTERVAL_MS);
   }
 
+  function reportSharedProjectRealtimeSubscribeFailure(error) {
+    const now = Date.now();
+    if ((now - sharedProjectRealtimeWarnedAt) < 30000) {
+      return;
+    }
+    sharedProjectRealtimeWarnedAt = now;
+    console.warn('Failed to subscribe shared project realtime channel', error);
+    setMultiStatus(
+      localizeText(
+        '共有リアルタイム接続が不安定です。保存済み履歴から同期を継続します。',
+        'Shared realtime is unstable. Sync continues from saved history.'
+      ),
+      'warn'
+    );
+  }
+
   function setActiveSharedProjectSession(projectKey = '', revision = 0, structureRevision = 0, projectId = '') {
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey);
     if (!normalizedProjectKey) {
@@ -7919,6 +7938,7 @@
       sharedProjectInFlightStroke = null;
       sharedProjectLastAppliedSeq = 0;
       pendingSharedProjectConflictReplay = null;
+      sharedProjectRealtimeConnectPromise = null;
     }
     activeSharedProjectId = normalizedProjectId || (
       activeSharedProjectKey === normalizedProjectKey
@@ -7941,7 +7961,7 @@
     }
     ensureSharedProjectRefreshLoop();
     ensureActiveSharedProjectRealtimeChannel().catch(error => {
-      console.warn('Failed to subscribe shared project realtime channel', error);
+      reportSharedProjectRealtimeSubscribeFailure(error);
     });
     syncSharedProjectMembers(normalizedProjectKey, activeSharedProjectId).catch(error => {
       console.warn('Failed to load shared project members', error);
@@ -53600,26 +53620,31 @@
     const projectKey = activeSharedProjectKey;
     const projectId = activeSharedProjectId || '';
     const channelSignature = `${projectKey}::${projectId}`;
+    if (sharedProjectRealtimeConnectPromise && activeSharedProjectChannelSignature === channelSignature) {
+      return await sharedProjectRealtimeConnectPromise;
+    }
     if (
       activeSharedProjectChannel
       && activeSharedProjectChannelSignature === channelSignature
     ) {
       return activeSharedProjectChannel;
     }
-    await disconnectActiveSharedProjectRealtimeChannel();
-    const supabase = await ensurePixieedAccountClient();
-    if (!supabase) {
-      return null;
-    }
-    const channel = supabase.channel(`shared-project:${projectKey}`, {
-      config: {
-        broadcast: {
-          ack: false,
-          self: false,
+    activeSharedProjectChannelSignature = channelSignature;
+    sharedProjectRealtimeConnectPromise = (async () => {
+      await disconnectActiveSharedProjectRealtimeChannel();
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase) {
+        return null;
+      }
+      const channel = supabase.channel(`shared-project:${projectKey}`, {
+        config: {
+          broadcast: {
+            ack: false,
+            self: false,
+          },
         },
-      },
-    });
-    channel.on(
+      });
+      channel.on(
       'broadcast',
       { event: SHARED_PROJECT_BROADCAST_EVENT },
       payload => {
@@ -53647,7 +53672,7 @@
         applyOp(op, { fromRemote: true, provisional: true });
       }
     );
-    channel.on(
+      channel.on(
       'postgres_changes',
       {
         event: 'UPDATE',
@@ -53683,8 +53708,8 @@
         }
       }
     );
-    if (projectId) {
-      channel.on(
+      if (projectId) {
+        channel.on(
         'postgres_changes',
         {
           event: '*',
@@ -53696,7 +53721,7 @@
           syncSharedProjectMembers(projectKey, projectId).catch(() => {});
         }
       );
-      channel.on(
+        channel.on(
         'postgres_changes',
         {
           event: 'INSERT',
@@ -53769,9 +53794,9 @@
           });
         }
       );
-    }
-    try {
-      await new Promise((resolve, reject) => {
+      }
+      try {
+        await new Promise((resolve, reject) => {
         let settled = false;
         const timeout = window.setTimeout(() => {
           if (settled) return;
@@ -53791,21 +53816,33 @@
             reject(new Error(`Shared project realtime failed: ${status}`));
           }
         });
-      });
-    } catch (error) {
-      sharedProjectRealtimeRetryBlockedUntil = Date.now() + 30000;
-      try {
-        await supabase.removeChannel(channel);
-      } catch (_removeError) {
-        // Ignore realtime cleanup failures and rely on polling fallback.
+        });
+      } catch (error) {
+        sharedProjectRealtimeRetryBlockedUntil = Date.now() + 30000;
+        try {
+          await supabase.removeChannel(channel);
+        } catch (_removeError) {
+          // Ignore realtime cleanup failures and rely on polling fallback.
+        }
+        throw error;
       }
-      throw error;
+      sharedProjectRealtimeRetryBlockedUntil = 0;
+      sharedProjectRealtimeWarnedAt = 0;
+      activeSharedProjectChannel = channel;
+      activeSharedProjectChannelKey = projectKey;
+      activeSharedProjectChannelSignature = channelSignature;
+      return channel;
+    })();
+    try {
+      return await sharedProjectRealtimeConnectPromise;
+    } finally {
+      sharedProjectRealtimeConnectPromise = null;
+      if (!activeSharedProjectChannel) {
+        activeSharedProjectChannelSignature = activeSharedProjectKey
+          ? `${activeSharedProjectKey}::${activeSharedProjectId || ''}`
+          : '';
+      }
     }
-    sharedProjectRealtimeRetryBlockedUntil = 0;
-    activeSharedProjectChannel = channel;
-    activeSharedProjectChannelKey = projectKey;
-    activeSharedProjectChannelSignature = channelSignature;
-    return channel;
   }
 
   async function ensurePixieedAccountClient() {
