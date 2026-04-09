@@ -2452,9 +2452,10 @@
     return false;
   })();
   const AUTOSAVE_DB_NAME = 'pixieedraw-autosave';
-  const AUTOSAVE_DB_VERSION = 2;
+  const AUTOSAVE_DB_VERSION = 3;
   const AUTOSAVE_STORE_NAME = 'handles';
   const RECENT_PROJECTS_STORE = 'recentProjects';
+  const SHARED_LOCAL_OP_JOURNAL_STORE = 'sharedLocalOpJournal';
   const RECENT_PROJECT_STORAGE_LOCAL = 'local';
   const RECENT_PROJECT_STORAGE_SHARED = 'shared';
   const AUTOSAVE_HANDLE_KEY = 'document';
@@ -2511,7 +2512,11 @@
   const SHARED_PROJECT_CHECKPOINT_OP_COUNT = 200;
   const SHARED_PROJECT_CHECKPOINT_INTERVAL_MS = 15000;
   const SHARED_PROJECT_MAX_MISSING_OP_FETCH = 512;
+  const SHARED_PROJECT_REFRESH_LOOP_INTERVAL_MS = 2500;
+  const SHARED_PROJECT_REFRESH_IDLE_GRACE_MS = 6000;
   const SHARED_PROJECT_BROADCAST_EVENT = 'shared-op';
+  const SHARED_LOCAL_OP_JOURNAL_MAX_CONFIRMED_PER_PROJECT = 160;
+  const SHARED_LOCAL_OP_JOURNAL_PRUNE_BATCH = 320;
   const MULTI_GUEST_MOVE_PREVIEW_DEBOUNCE_MS = 140;
   const NEW_PROJECT_PALETTE_PRESET_NAMES = Object.freeze([
     'Pixel Core',
@@ -2747,6 +2752,12 @@
     if (!db.objectStoreNames.contains(RECENT_PROJECTS_STORE)) {
       db.createObjectStore(RECENT_PROJECTS_STORE);
     }
+    if (!db.objectStoreNames.contains(SHARED_LOCAL_OP_JOURNAL_STORE)) {
+      const store = db.createObjectStore(SHARED_LOCAL_OP_JOURNAL_STORE, { keyPath: 'id' });
+      store.createIndex('projectKey', 'projectKey', { unique: false });
+      store.createIndex('projectKeyStatus', ['projectKey', 'status'], { unique: false });
+      store.createIndex('projectKeyCreatedAt', ['projectKey', 'createdAt'], { unique: false });
+    }
   }
 
   function openAutosaveDatabase() {
@@ -2980,12 +2991,15 @@
   let pendingSharedProjectConflictReplay = null;
   let sharedProjectOpsSinceCheckpoint = 0;
   let sharedProjectLastCheckpointAt = 0;
+  let sharedProjectLastRealtimeActivityAt = 0;
   let sharedProjectOpCommitInFlight = false;
   let sharedProjectPendingLocalOps = [];
   let sharedProjectLastAppliedSeq = 0;
   const sharedProjectPendingRemoteOps = new Map();
   const sharedProjectSeenOpIds = new Set();
+  const sharedProjectSeenOpSeqById = new Map();
   let sharedProjectInFlightStroke = null;
+  let sharedProjectGapRecoveryPromise = null;
   const sharedProjectSessionId = (() => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
       return `shared-${crypto.randomUUID()}`;
@@ -2996,6 +3010,7 @@
   let sharedProjectMembersSyncPromise = null;
   let multiSupabaseClientPromise = null;
   let recentProjectsWritePromise = Promise.resolve();
+  let sharedLocalOpJournalWritePromise = Promise.resolve();
   let globalLoadingIndicatorDepth = 0;
   let globalLoadingIndicatorLabel = '';
   let globalLoadingIndicatorVisible = false;
@@ -7812,11 +7827,14 @@
     sharedProjectLastAppliedSeq = 0;
     sharedProjectOpsSinceCheckpoint = 0;
     sharedProjectLastCheckpointAt = 0;
+    sharedProjectLastRealtimeActivityAt = 0;
     sharedProjectPendingLocalOps = [];
     sharedProjectPendingRemoteOps.clear();
     sharedProjectSeenOpIds.clear();
+    sharedProjectSeenOpSeqById.clear();
     sharedProjectInFlightStroke = null;
     sharedProjectOpCommitInFlight = false;
+    sharedProjectGapRecoveryPromise = null;
     sharedProjectMembers = [];
     sharedProjectLayerSnapshots.clear();
     if (sharedProjectCaptureTimer !== null) {
@@ -7867,8 +7885,18 @@
       if (autosaveWriteInFlight || multiState.applyRemoteInProgress) {
         return;
       }
-      queueSharedProjectRefresh({ immediate: true, reason: 'poll' });
-    }, 1500);
+      const now = Date.now();
+      const realtimeLikelyHealthy = Boolean(
+        activeSharedProjectChannel
+        && sharedProjectRealtimeRetryBlockedUntil <= now
+      );
+      const recentlyAppliedRealtime = (now - sharedProjectLastRealtimeActivityAt) < SHARED_PROJECT_REFRESH_IDLE_GRACE_MS;
+      if (realtimeLikelyHealthy && recentlyAppliedRealtime) {
+        return;
+      }
+      // Refresh loop is rescue-only. Normal draw sync should stay op-first.
+      queueSharedProjectRefresh({ immediate: false, reason: realtimeLikelyHealthy ? 'poll-idle' : 'poll-recovery' });
+    }, SHARED_PROJECT_REFRESH_LOOP_INTERVAL_MS);
   }
 
   function setActiveSharedProjectSession(projectKey = '', revision = 0, structureRevision = 0, projectId = '') {
@@ -7886,6 +7914,7 @@
       activeSharedProjectDocumentLoaded = false;
       sharedProjectPendingRemoteOps.clear();
       sharedProjectSeenOpIds.clear();
+      sharedProjectSeenOpSeqById.clear();
       sharedProjectPendingLocalOps = [];
       sharedProjectInFlightStroke = null;
       sharedProjectLastAppliedSeq = 0;
@@ -7906,6 +7935,9 @@
     }
     if (!sharedProjectLastCheckpointAt) {
       sharedProjectLastCheckpointAt = Date.now();
+    }
+    if (!sharedProjectLastRealtimeActivityAt) {
+      sharedProjectLastRealtimeActivityAt = Date.now();
     }
     ensureSharedProjectRefreshLoop();
     ensureActiveSharedProjectRealtimeChannel().catch(error => {
@@ -16936,6 +16968,13 @@
     dom.loginPrompt?.close?.addEventListener('click', () => {
       closeLoginPromptDialog();
     });
+    if (dom.loginPrompt?.goHome instanceof HTMLAnchorElement) {
+      syncPixieedAccountLoginPromptLink();
+      dom.loginPrompt.goHome.addEventListener('click', event => {
+        event.preventDefault();
+        startPixieedAccountLoginFlow({ closePrompt: true });
+      });
+    }
     dialog.addEventListener('cancel', event => {
       event.preventDefault();
       closeLoginPromptDialog();
@@ -17456,7 +17495,6 @@
       if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
         return false;
       }
-      clearPendingSharedInvite();
       if (!await ensureSharedProjectBackendSession()) {
         return false;
       }
@@ -18611,6 +18649,297 @@
     await nextWrite;
   }
 
+  function buildSharedLocalOpJournalEntry(op, {
+    status = 'pending',
+    committedRevision = 0,
+    committedStructureRevision = 0,
+  } = {}) {
+    if (!op || typeof op !== 'object') {
+      return null;
+    }
+    const projectKey = normalizeMultiProjectKey(op.projectKey || '');
+    const opId = getSharedProjectOpId(op) || generateSharedProjectOpId();
+    if (!projectKey || !opId) {
+      return null;
+    }
+    return {
+      id: opId,
+      projectKey,
+      status: status === 'confirmed' ? 'confirmed' : 'pending',
+      historyLabel: String(op.historyLabel || ''),
+      kind: String(op.kind || ''),
+      baseRevision: Math.max(0, Math.round(Number(op.baseRevision) || 0)),
+      baseStructureRevision: Math.max(0, Math.round(Number(op.baseStructureRevision) || 0)),
+      committedRevision: Math.max(0, Math.round(Number(committedRevision) || 0)),
+      committedStructureRevision: Math.max(0, Math.round(Number(committedStructureRevision) || 0)),
+      createdAt: typeof op.createdAt === 'string' && op.createdAt.trim()
+        ? op.createdAt.trim()
+        : new Date().toISOString(),
+      canvasId: typeof op.canvasId === 'string' ? op.canvasId.trim() : '',
+      frameIndex: Math.max(0, Math.round(Number(op.frameIndex) || 0)),
+      layerId: typeof op.layerId === 'string' ? op.layerId.trim() : '',
+      op,
+    };
+  }
+
+  async function appendSharedLocalOpJournal(op, { status = 'pending' } = {}) {
+    if (!AUTOSAVE_SUPPORTED) {
+      return null;
+    }
+    const entry = buildSharedLocalOpJournalEntry(op, { status });
+    if (!entry) {
+      return null;
+    }
+    const writeTask = async () => {
+      const db = await openAutosaveDatabase();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction([SHARED_LOCAL_OP_JOURNAL_STORE], 'readwrite');
+        const store = tx.objectStore(SHARED_LOCAL_OP_JOURNAL_STORE);
+        store.put(entry);
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+      return entry;
+    };
+    const nextWrite = sharedLocalOpJournalWritePromise
+      .catch(() => {})
+      .then(writeTask);
+    sharedLocalOpJournalWritePromise = nextWrite.catch(() => {});
+    return await nextWrite;
+  }
+
+  async function updateSharedLocalOpJournalStatus(op, {
+    status = 'confirmed',
+    committedRevision = 0,
+    committedStructureRevision = 0,
+  } = {}) {
+    if (!AUTOSAVE_SUPPORTED) {
+      return null;
+    }
+    const entry = buildSharedLocalOpJournalEntry(op, {
+      status,
+      committedRevision,
+      committedStructureRevision,
+    });
+    if (!entry) {
+      return null;
+    }
+    const writeTask = async () => {
+      const db = await openAutosaveDatabase();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction([SHARED_LOCAL_OP_JOURNAL_STORE], 'readwrite');
+        const store = tx.objectStore(SHARED_LOCAL_OP_JOURNAL_STORE);
+        const request = store.get(entry.id);
+        request.onsuccess = () => {
+          const existing = request.result && typeof request.result === 'object' ? request.result : null;
+          store.put(existing
+            ? {
+                ...existing,
+                ...entry,
+                op: existing.op || entry.op,
+                createdAt: existing.createdAt || entry.createdAt,
+              }
+            : entry);
+        };
+        request.onerror = () => reject(request.error);
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+      return entry;
+    };
+    const nextWrite = sharedLocalOpJournalWritePromise
+      .catch(() => {})
+      .then(writeTask);
+    sharedLocalOpJournalWritePromise = nextWrite.catch(() => {});
+    return await nextWrite;
+  }
+
+  async function loadSharedLocalOpJournal(projectKey = activeSharedProjectKey) {
+    if (!AUTOSAVE_SUPPORTED) {
+      return [];
+    }
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    if (!normalizedProjectKey) {
+      return [];
+    }
+    try {
+      const db = await openAutosaveDatabase();
+      const entries = await new Promise((resolve, reject) => {
+        const tx = db.transaction([SHARED_LOCAL_OP_JOURNAL_STORE], 'readonly');
+        const store = tx.objectStore(SHARED_LOCAL_OP_JOURNAL_STORE);
+        const request = store.getAll();
+        let result = [];
+        request.onsuccess = () => {
+          result = Array.isArray(request.result) ? request.result : [];
+        };
+        request.onerror = () => reject(request.error);
+        tx.oncomplete = () => {
+          db.close();
+          resolve(result);
+        };
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+      return entries
+        .filter(entry => normalizeMultiProjectKey(entry?.projectKey || '') === normalizedProjectKey)
+        .sort((left, right) => String(left?.createdAt || '').localeCompare(String(right?.createdAt || '')));
+    } catch (error) {
+      console.warn('Failed to load shared local op journal', error);
+      return [];
+    }
+  }
+
+  async function pruneSharedLocalOpJournal(projectKey = activeSharedProjectKey, {
+    keepConfirmed = SHARED_LOCAL_OP_JOURNAL_MAX_CONFIRMED_PER_PROJECT,
+    checkpointRevision = 0,
+  } = {}) {
+    if (!AUTOSAVE_SUPPORTED) {
+      return 0;
+    }
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    if (!normalizedProjectKey) {
+      return 0;
+    }
+    const confirmedLimit = Math.max(32, Math.round(Number(keepConfirmed) || SHARED_LOCAL_OP_JOURNAL_MAX_CONFIRMED_PER_PROJECT));
+    const targetCheckpointRevision = Math.max(0, Math.round(Number(checkpointRevision) || 0));
+    const entries = await loadSharedLocalOpJournal(normalizedProjectKey);
+    if (!entries.length) {
+      return 0;
+    }
+    const confirmed = entries.filter(entry => entry?.status === 'confirmed');
+    if (!confirmed.length) {
+      return 0;
+    }
+    const removable = [];
+    const sortedConfirmed = confirmed
+      .slice()
+      .sort((left, right) => (
+        Math.max(0, Math.round(Number(left?.committedRevision) || 0))
+        - Math.max(0, Math.round(Number(right?.committedRevision) || 0))
+      ));
+    const overflow = Math.max(0, sortedConfirmed.length - confirmedLimit);
+    for (let index = 0; index < sortedConfirmed.length; index += 1) {
+      const entry = sortedConfirmed[index];
+      const committedRevision = Math.max(0, Math.round(Number(entry?.committedRevision) || 0));
+      if (targetCheckpointRevision > 0 && committedRevision > 0 && committedRevision <= targetCheckpointRevision) {
+        removable.push(entry.id);
+        continue;
+      }
+      if (index < overflow) {
+        removable.push(entry.id);
+      }
+      if (removable.length >= SHARED_LOCAL_OP_JOURNAL_PRUNE_BATCH) {
+        break;
+      }
+    }
+    if (!removable.length) {
+      return 0;
+    }
+    const writeTask = async () => {
+      const db = await openAutosaveDatabase();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction([SHARED_LOCAL_OP_JOURNAL_STORE], 'readwrite');
+        const store = tx.objectStore(SHARED_LOCAL_OP_JOURNAL_STORE);
+        removable.forEach(id => {
+          if (id) {
+            store.delete(id);
+          }
+        });
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+      return removable.length;
+    };
+    const nextWrite = sharedLocalOpJournalWritePromise
+      .catch(() => {})
+      .then(writeTask);
+    sharedLocalOpJournalWritePromise = nextWrite.catch(() => {});
+    return await nextWrite;
+  }
+
+  async function flushOrCompactSharedLocalOpJournal(projectKey = activeSharedProjectKey, {
+    checkpointRevision = 0,
+  } = {}) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    if (!normalizedProjectKey) {
+      return 0;
+    }
+    return await pruneSharedLocalOpJournal(normalizedProjectKey, { checkpointRevision });
+  }
+
+  async function resumeSharedLocalOpJournal(projectKey = activeSharedProjectKey) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    if (!normalizedProjectKey) {
+      return 0;
+    }
+    const entries = await loadSharedLocalOpJournal(normalizedProjectKey);
+    if (!entries.length) {
+      return 0;
+    }
+    const queuedIds = new Set(
+      sharedProjectPendingLocalOps
+        .map(entry => getSharedProjectOpId(entry?.op || entry))
+        .filter(Boolean)
+    );
+    let resumedCount = 0;
+    entries.forEach(entry => {
+      if (entry?.status !== 'pending') {
+        return;
+      }
+      const queuedOp = entry?.op && typeof entry.op === 'object' ? entry.op : null;
+      if (!queuedOp || normalizeMultiProjectKey(queuedOp.projectKey || '') !== normalizedProjectKey) {
+        return;
+      }
+      const opId = getSharedProjectOpId(queuedOp);
+      if (!opId || queuedIds.has(opId) || sharedProjectSeenOpIds.has(opId)) {
+        return;
+      }
+      const sharedOpType = classifySharedProjectOpType(queuedOp.historyLabel || '');
+      const queuedEntry = {
+        projectKey: normalizedProjectKey,
+        historyLabel: queuedOp.historyLabel || '',
+        op: queuedOp,
+        opPayload: queuedOp.payload || null,
+        retryOnConflict: true,
+      };
+      if (sharedOpType === 'draw') {
+        sharedProjectPendingLocalOps.unshift(queuedEntry);
+      } else {
+        sharedProjectPendingLocalOps.push(queuedEntry);
+      }
+      queuedIds.add(opId);
+      resumedCount += 1;
+    });
+    if (resumedCount) {
+      flushSharedProjectPendingLocalOps();
+    }
+    return resumedCount;
+  }
+
   async function sanitizeRecentProjectsStore({ announce = false } = {}) {
     if (!AUTOSAVE_SUPPORTED) {
       return { entries: [], changed: false, removedCount: 0, repairedCount: 0 };
@@ -19457,6 +19786,9 @@
       sharedProject,
       Math.max(0, Math.round(Number(sharedProject.latest_snapshot_revision) || 0))
     );
+    resumeSharedLocalOpJournal(resolvedProjectKey).catch(error => {
+      console.warn('Failed to resume shared local op journal after opening shared project', error);
+    });
     await upsertSharedRecentProjectEntry({
       projectKey: resolvedProjectKey,
       projectId: sharedProject.id || '',
@@ -19500,7 +19832,6 @@
     if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
       return false;
     }
-    clearPendingSharedInvite();
     await initPixieedAccount();
     await ensureNoLegacyMultiSessionForSharedProject();
     if (!await ensureSharedProjectBackendSession()) {
@@ -19528,6 +19859,7 @@
       ),
     });
     if (opened) {
+      clearPendingSharedInvite();
       setActiveAutosaveProjectId(normalizedEntry.id);
     }
     return opened;
@@ -27786,6 +28118,13 @@
 
   function setupControls() {
     bindCoreProjectActionButtons();
+    if (dom.controls.pixieedAccountLogin instanceof HTMLAnchorElement && dom.controls.pixieedAccountLogin.dataset.bound !== 'true') {
+      dom.controls.pixieedAccountLogin.dataset.bound = 'true';
+      dom.controls.pixieedAccountLogin.addEventListener('click', event => {
+        event.preventDefault();
+        startPixieedAccountLoginFlow();
+      });
+    }
     if (dom.controls.pixieedAccountLogout instanceof HTMLButtonElement && dom.controls.pixieedAccountLogout.dataset.bound !== 'true') {
       dom.controls.pixieedAccountLogout.dataset.bound = 'true';
       dom.controls.pixieedAccountLogout.addEventListener('click', async () => {
@@ -27801,6 +28140,15 @@
           applyPixieedAccountSession(null);
           updatePixieedAccountUi();
         }
+      });
+    }
+    if (dom.controls.pixieedAccountDock instanceof HTMLElement && dom.controls.pixieedAccountDock.dataset.bound !== 'true') {
+      dom.controls.pixieedAccountDock.dataset.bound = 'true';
+      dom.controls.pixieedAccountDock.addEventListener('click', () => {
+        if (accountState.isLoggedIn && !accountState.isAnonymous) {
+          return;
+        }
+        startPixieedAccountLoginFlow();
       });
     }
     updatePixieedAccountUi();
@@ -50174,7 +50522,6 @@
         });
         return false;
       }
-      clearPendingSharedInvite();
       return await openSharedProjectAccess({
         inviteToken: invite.inviteToken || '',
         projectKey: normalizedInviteProjectKey,
@@ -50348,13 +50695,16 @@
       });
       return false;
     }
-    clearPendingSharedInvite();
-    return await openSharedProjectAccess({
+    const opened = await openSharedProjectAccess({
       inviteToken: access.inviteToken || '',
       projectKey: access.projectKey || '',
       requestedRole: 'guest',
       autoJoin: false,
     });
+    if (opened) {
+      clearPendingSharedInvite();
+    }
+    return opened;
   }
 
   async function disableSharedProjectMode() {
@@ -51904,9 +52254,6 @@
       ? payload.palette.map(color => normalizeColorValue(color))
       : null;
     if (!palette || !palette.length) {
-      if (!provisional) {
-        queueSharedProjectRefresh({ immediate: true, reason: 'palette-op-fallback', force: true });
-      }
       return false;
     }
     state.palette = palette;
@@ -51933,12 +52280,19 @@
       return false;
     }
     const opId = getSharedProjectOpId(opRecord);
+    const seq = getSharedProjectOpSeq(opRecord);
     const kind = typeof opRecord?.kind === 'string' && opRecord.kind.trim()
       ? opRecord.kind.trim()
       : (typeof payload?.kind === 'string' && payload.kind.trim()
         ? payload.kind.trim()
         : (typeof opRecord?.op_type === 'string' ? opRecord.op_type.trim() : ''));
     if (opId && sharedProjectSeenOpIds.has(opId)) {
+      const seenSeq = Math.max(0, Math.round(Number(sharedProjectSeenOpSeqById.get(opId)) || 0));
+      if ((seq && seenSeq >= seq) || (!seq && seenSeq >= 0)) {
+        return true;
+      }
+    }
+    if (opId && sharedProjectSeenOpIds.has(opId) && !seq) {
       return true;
     }
     let applied = false;
@@ -51973,10 +52327,22 @@
     }
     if (applied && opId) {
       sharedProjectSeenOpIds.add(opId);
+      sharedProjectSeenOpSeqById.set(
+        opId,
+        Math.max(
+          Math.round(Number(sharedProjectSeenOpSeqById.get(opId)) || 0),
+          seq
+        )
+      );
       if (sharedProjectSeenOpIds.size > 4096) {
         const seenIds = Array.from(sharedProjectSeenOpIds).slice(-2048);
         sharedProjectSeenOpIds.clear();
+        const seenSeqEntries = seenIds.map(id => [id, sharedProjectSeenOpSeqById.get(id) || 0]);
+        sharedProjectSeenOpSeqById.clear();
         seenIds.forEach(id => sharedProjectSeenOpIds.add(id));
+        seenSeqEntries.forEach(([id, seenSeq]) => {
+          sharedProjectSeenOpSeqById.set(id, Math.max(0, Math.round(Number(seenSeq) || 0)));
+        });
       }
     }
     return applied;
@@ -52010,6 +52376,7 @@
     if (!isSharedProjectCollaborativeMode()) {
       return;
     }
+    sharedProjectLastRealtimeActivityAt = Date.now();
     if (opType === 'draw' || opType === 'palette' || opType === 'session') {
       sharedProjectOpsSinceCheckpoint += 1;
     } else if (opType === 'structure') {
@@ -52017,6 +52384,44 @@
     }
     if (fromRemote) {
       markDocumentDurablySaved();
+    }
+  }
+
+  async function recoverSharedProjectRealtimeGap(projectKey = activeSharedProjectKey, {
+    afterSeq = sharedProjectLastAppliedSeq,
+    reason = 'gap',
+  } = {}) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || activeSharedProjectKey);
+    if (!normalizedProjectKey || !canUseSharedProjectsBackend()) {
+      return false;
+    }
+    if (sharedProjectGapRecoveryPromise) {
+      return sharedProjectGapRecoveryPromise;
+    }
+    sharedProjectGapRecoveryPromise = (async () => {
+      const ops = await fetchMissingOps(normalizedProjectKey, afterSeq, SHARED_PROJECT_MAX_MISSING_OP_FETCH);
+      if (!ops.length) {
+        return false;
+      }
+      const replayed = await replayOps(ops, { fromRemote: true });
+      if (!replayed) {
+        return false;
+      }
+      sharedProjectLastRealtimeActivityAt = Date.now();
+      return true;
+    })();
+    try {
+      return await sharedProjectGapRecoveryPromise;
+    } catch (_error) {
+      return false;
+    } finally {
+      sharedProjectGapRecoveryPromise = null;
+      if (!normalizedProjectKey || normalizedProjectKey !== activeSharedProjectKey) {
+        return;
+      }
+      if (reason && !sharedProjectPendingRemoteOps.size) {
+        sharedProjectLastRealtimeActivityAt = Date.now();
+      }
     }
   }
 
@@ -52150,7 +52555,7 @@
       const nextOp = sharedProjectPendingRemoteOps.get(nextSeq);
       sharedProjectPendingRemoteOps.delete(nextSeq);
       if (!applyOp(nextOp, { fromRemote: true })) {
-        queueSharedProjectRefresh({ immediate: true, reason: 'pending-apply-failed', force: true });
+        sharedProjectPendingRemoteOps.set(nextSeq, nextOp);
         return false;
       }
       sharedProjectLastAppliedSeq = nextSeq;
@@ -52217,6 +52622,11 @@
     if (!op || typeof op !== 'object' || !op.projectKey) {
       return;
     }
+    // shared_project_ops is the source of truth; local journal is a durability buffer.
+    appendSharedLocalOpJournal(op, { status: 'pending' }).catch(error => {
+      console.warn('Failed to append shared local op journal entry', error);
+    });
+    // draw transport is latency-first
     sendSharedProjectBroadcastOp(op);
     const queuedOp = {
       projectKey: op.projectKey,
@@ -52248,20 +52658,15 @@
   }
 
   function applyIncomingSharedProjectDrawOp(opRecord, { fromRemote = true, provisional = false } = {}) {
+    // Draw remote apply is latency-first. Refresh is handled by gap recovery callers.
     if (!canApplyIncomingSharedProjectDrawOp(opRecord)) {
-      if (!provisional) {
-        queueSharedProjectRefresh({ immediate: true, reason: 'draw-op-fallback', force: true });
-      }
       return false;
     }
     const applied = applyLayerPatch(opRecord, { fromRemote });
     if (!applied) {
-      if (!provisional) {
-        queueSharedProjectRefresh({ immediate: true, reason: 'draw-op-apply-failed', force: true });
-      }
       return false;
     }
-    if (shouldCreateSharedProjectCheckpoint('draw')) {
+    if (!provisional && shouldCreateSharedProjectCheckpoint('draw')) {
       // snapshot is recovery/checkpoint only
       scheduleSharedProjectCheckpoint({ historyLabel: 'sharedRemoteDrawCheckpoint' });
     }
@@ -52553,6 +52958,7 @@
       if (!force && project.latest_structure_revision === activeSharedProjectStructureRevision) {
         const syncedByOps = await applySharedProjectOpsSinceRevision(project, activeSharedProjectRevision);
         if (syncedByOps) {
+          sharedProjectLastRealtimeActivityAt = Date.now();
           return true;
         }
       }
@@ -52599,6 +53005,7 @@
         revision: nextRevision,
         structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
       });
+      await resumeSharedLocalOpJournal(activeSharedProjectKey);
       maybeReplayPendingSharedProjectConflictAfterRefresh(activeSharedProjectKey);
       if (reason) {
         updateAutosaveStatus(
@@ -52691,6 +53098,11 @@
       }
       sharedProjectLastCheckpointAt = Date.now();
       sharedProjectOpsSinceCheckpoint = 0;
+      flushOrCompactSharedLocalOpJournal(normalizedProjectKey, {
+        checkpointRevision: Math.max(0, Math.round(Number(result.checkpoint_seq) || Number(result.latest_revision) || 0)),
+      }).catch(error => {
+        console.warn('Failed to compact shared local op journal after checkpoint', error);
+      });
       return result;
     } catch (error) {
       handleSharedProjectsBackendError(error, 'persist-exception');
@@ -52803,6 +53215,13 @@
         Math.max(0, Math.round(Number(result.latest_structure_revision) || activeSharedProjectStructureRevision)),
         result.id || activeSharedProjectId
       );
+      updateSharedLocalOpJournalStatus(resolvedOp, {
+        status: 'confirmed',
+        committedRevision: Math.max(0, Math.round(Number(result.latest_revision) || 0)),
+        committedStructureRevision: Math.max(0, Math.round(Number(result.latest_structure_revision) || 0)),
+      }).catch(error => {
+        console.warn('Failed to mark shared local op journal entry confirmed', error);
+      });
       markDocumentDurablySaved();
       noteSharedProjectOperationApplied({ opType: resolvedOpType, fromRemote: false });
       if (shouldCreateSharedProjectCheckpoint(resolvedOpType)) {
@@ -52810,6 +53229,11 @@
           historyLabel: resolvedOpType === 'structure' ? historyLabel : 'checkpoint',
         });
       }
+      flushOrCompactSharedLocalOpJournal(normalizedProjectKey, {
+        checkpointRevision: Math.max(0, Math.round(Number(result.checkpoint_seq) || 0)),
+      }).catch(error => {
+        console.warn('Failed to compact shared local op journal', error);
+      });
       return result;
     } catch (error) {
       handleSharedProjectsBackendError(error, 'commit-op-exception');
@@ -52821,7 +53245,16 @@
     if (sharedProjectOpCommitInFlight || !sharedProjectPendingLocalOps.length) {
       return;
     }
-    const nextOp = sharedProjectPendingLocalOps.shift();
+    let nextOpIndex = 0;
+    const prioritizedDrawIndex = sharedProjectPendingLocalOps.findIndex(candidate => (
+      classifySharedProjectOpType(candidate?.historyLabel || '') === 'draw'
+    ));
+    if (prioritizedDrawIndex > 0) {
+      nextOpIndex = prioritizedDrawIndex;
+    }
+    const nextOp = nextOpIndex === 0
+      ? sharedProjectPendingLocalOps.shift()
+      : sharedProjectPendingLocalOps.splice(nextOpIndex, 1)[0];
     if (!nextOp) {
       return;
     }
@@ -53075,7 +53508,8 @@
       window.clearTimeout(sharedProjectRefreshTimer);
       sharedProjectRefreshTimer = null;
     }
-    const delayMs = immediate ? 0 : SHARED_PROJECT_SYNC_DELAY;
+    // Refresh is fallback, not the primary draw sync path.
+    const delayMs = immediate ? 0 : Math.max(SHARED_PROJECT_SYNC_DELAY, SHARED_PROJECT_REFRESH_LOOP_INTERVAL_MS);
     sharedProjectRefreshTimer = window.setTimeout(() => {
       sharedProjectRefreshTimer = null;
       refreshActiveSharedProjectSnapshot({ reason, force }).catch(error => {
@@ -53116,6 +53550,12 @@
         return;
       }
       if (resolvedProjectKey !== resolveSharedProjectKeyForCurrentState(resolvedProjectKey)) {
+        return;
+      }
+      if (
+        isSharedProjectRealtimePrimaryActive(resolvedProjectKey)
+        && !shouldPersistSharedProjectSnapshotForHistoryLabel(historyLabel, resolvedOpType)
+      ) {
         return;
       }
       const snapshot = makeHistorySnapshot({ clonePixelData: false });
@@ -53213,13 +53653,30 @@
       },
       payload => {
         const nextRevision = Math.max(0, Math.round(Number(payload?.new?.latest_revision) || 0));
+        const nextStructureRevision = Math.max(0, Math.round(Number(payload?.new?.latest_structure_revision) || 0));
         if (projectKey !== activeSharedProjectKey) {
           return;
         }
         if (nextRevision <= activeSharedProjectRevision) {
           return;
         }
-        queueSharedProjectRefresh({ immediate: true, reason: 'realtime' });
+        if (nextStructureRevision > activeSharedProjectStructureRevision) {
+          // structure changes still use stronger synchronization
+          queueSharedProjectRefresh({ immediate: true, reason: 'realtime-structure', force: true });
+          return;
+        }
+        if (!projectId && nextRevision > sharedProjectLastAppliedSeq + 1) {
+          recoverSharedProjectRealtimeGap(projectKey, {
+            afterSeq: sharedProjectLastAppliedSeq,
+            reason: 'project-update-gap',
+          }).then(recovered => {
+            if (!recovered) {
+              queueSharedProjectRefresh({ immediate: false, reason: 'project-update-gap', force: true });
+            }
+          }).catch(() => {
+            queueSharedProjectRefresh({ immediate: false, reason: 'project-update-gap', force: true });
+          });
+        }
       }
     );
     if (projectId) {
@@ -53261,9 +53718,16 @@
           const opType = typeof payload?.new?.op_type === 'string' ? payload.new.op_type.trim() : '';
           if (nextRevision > sharedProjectLastAppliedSeq + 1) {
             sharedProjectPendingRemoteOps.set(nextRevision, payload.new);
-            fetchMissingOps(projectKey, sharedProjectLastAppliedSeq).then(ops => {
-              replayOps(ops, { fromRemote: true }).catch(() => {});
-            }).catch(() => {});
+            recoverSharedProjectRealtimeGap(projectKey, {
+              afterSeq: sharedProjectLastAppliedSeq,
+              reason: 'insert-gap',
+            }).then(recovered => {
+              if (!recovered) {
+                queueSharedProjectRefresh({ immediate: false, reason: 'insert-gap', force: true });
+              }
+            }).catch(() => {
+              queueSharedProjectRefresh({ immediate: false, reason: 'insert-gap', force: true });
+            });
             return;
           }
           if (nextRevision === sharedProjectLastAppliedSeq + 1) {
@@ -53279,18 +53743,25 @@
               sharedProjectLastAppliedSeq = nextRevision;
               activeSharedProjectRevision = nextRevision;
               activeSharedProjectStructureRevision = Math.max(activeSharedProjectStructureRevision, nextStructureRevision);
-              drainPendingSharedProjectRemoteOps();
-              return;
+              sharedProjectLastRealtimeActivityAt = Date.now();
+              if (drainPendingSharedProjectRemoteOps()) {
+                return;
+              }
             }
           }
           if (opType === 'structure') {
             queueSharedProjectRefresh({ immediate: true, reason: 'structure-op' });
             return;
           }
-          fetchMissingOps(projectKey, sharedProjectLastAppliedSeq).then(ops => {
-            replayOps(ops, { fromRemote: true }).catch(() => {});
+          recoverSharedProjectRealtimeGap(projectKey, {
+            afterSeq: sharedProjectLastAppliedSeq,
+            reason: 'op-realtime',
+          }).then(recovered => {
+            if (!recovered) {
+              queueSharedProjectRefresh({ immediate: false, reason: 'op-realtime', force: true });
+            }
           }).catch(() => {
-            queueSharedProjectRefresh({ immediate: true, reason: 'op-realtime', force: true });
+            queueSharedProjectRefresh({ immediate: false, reason: 'op-realtime', force: true });
           });
         }
       );
@@ -53484,6 +53955,46 @@
     loginLink.rel = 'noopener';
   }
 
+  function syncPixieedAccountLoginPromptLink() {
+    const goHome = dom.loginPrompt?.goHome;
+    if (!(goHome instanceof HTMLAnchorElement)) {
+      return;
+    }
+    goHome.href = buildPixieedAccountLoginHref();
+    if (isStandaloneAppDisplayMode()) {
+      goHome.target = '_self';
+      goHome.rel = 'noopener';
+      return;
+    }
+    goHome.target = '_blank';
+    goHome.rel = 'noopener';
+  }
+
+  function startPixieedAccountLoginFlow({ closePrompt = false } = {}) {
+    const href = buildPixieedAccountLoginHref();
+    if (!href) {
+      return false;
+    }
+    if (closePrompt) {
+      closeLoginPromptDialog();
+    }
+    try {
+      if (isStandaloneAppDisplayMode()) {
+        window.location.assign(href);
+      } else {
+        window.open(href, '_blank', 'noopener');
+      }
+      return true;
+    } catch (_error) {
+      try {
+        window.location.href = href;
+        return true;
+      } catch (_innerError) {
+        return false;
+      }
+    }
+  }
+
   function applyPixieedAccountSession(session) {
     writePixieedCachedAuthSession(session || null);
     accountState.session = session || null;
@@ -53596,7 +54107,6 @@
       if (!accountState.isLoggedIn || !accountState.userId || accountState.isAnonymous) {
         return false;
       }
-      clearPendingSharedInvite();
       const opened = await openSharedProjectAccess({
         inviteToken: pendingInvite.inviteToken || '',
         projectKey: pendingInvite.projectKey || '',
@@ -53607,6 +54117,7 @@
         silent: true,
       });
       if (opened) {
+        clearPendingSharedInvite();
         closeLoginPromptDialog();
         clearMultiInviteQueryParamsFromUrl();
         setMultiStatus(
@@ -53772,6 +54283,7 @@
     const loginLink = dom.controls.pixieedAccountLogin;
     const logoutButton = dom.controls.pixieedAccountLogout;
     const dock = dom.controls.pixieedAccountDock;
+    syncPixieedAccountLoginPromptLink();
     if (status instanceof HTMLElement) {
       const nickname = readPixieedAccountNickname();
       if (accountState.isLoggedIn && !accountState.isAnonymous) {
