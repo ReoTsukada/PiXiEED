@@ -2992,6 +2992,7 @@
   let sharedProjectMembers = [];
   let sharedProjectMembersSyncPromise = null;
   let multiSupabaseClientPromise = null;
+  let recentProjectsWritePromise = Promise.resolve();
   let globalLoadingIndicatorDepth = 0;
   let globalLoadingIndicatorLabel = '';
   let globalLoadingIndicatorVisible = false;
@@ -18559,35 +18560,42 @@
     if (!AUTOSAVE_SUPPORTED) return;
     const existingIds = new Set((existingEntries || []).map(entry => entry?.id).filter(Boolean));
     const nextIds = new Set((nextEntries || []).map(entry => entry?.id).filter(Boolean));
-    try {
-      const db = await openAutosaveDatabase();
-      await new Promise((resolve, reject) => {
-        const tx = db.transaction([RECENT_PROJECTS_STORE], 'readwrite');
-        const store = tx.objectStore(RECENT_PROJECTS_STORE);
-        (nextEntries || []).forEach(entry => {
-          if (!entry || !entry.id) {
-            return;
-          }
-          store.put(entry, entry.id);
+    const writeTask = async () => {
+      try {
+        const db = await openAutosaveDatabase();
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction([RECENT_PROJECTS_STORE], 'readwrite');
+          const store = tx.objectStore(RECENT_PROJECTS_STORE);
+          (nextEntries || []).forEach(entry => {
+            if (!entry || !entry.id) {
+              return;
+            }
+            store.put(entry, entry.id);
+          });
+          existingIds.forEach(id => {
+            if (!nextIds.has(id)) {
+              store.delete(id);
+            }
+          });
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          tx.onerror = () => {
+            const error = tx.error;
+            db.close();
+            reject(error);
+          };
         });
-        existingIds.forEach(id => {
-          if (!nextIds.has(id)) {
-            store.delete(id);
-          }
-        });
-        tx.oncomplete = () => {
-          db.close();
-          resolve();
-        };
-        tx.onerror = () => {
-          const error = tx.error;
-          db.close();
-          reject(error);
-        };
-      });
-    } catch (error) {
-      console.warn('Failed to update recent projects', error);
-    }
+      } catch (error) {
+        console.warn('Failed to update recent projects', error);
+      }
+    };
+    const nextWrite = recentProjectsWritePromise
+      .catch(() => {})
+      .then(writeTask);
+    recentProjectsWritePromise = nextWrite.catch(() => {});
+    await nextWrite;
   }
 
   async function sanitizeRecentProjectsStore({ announce = false } = {}) {
@@ -50077,6 +50085,10 @@
       if (!sharedEntry) {
         return false;
       }
+      startupAutosaveRestoreProjectId = normalizeAutosaveProjectId(sharedEntry.id || '');
+      if (startupAutosaveRestoreProjectId) {
+        setActiveAutosaveProjectId(startupAutosaveRestoreProjectId);
+      }
       return await openSharedRecentProject(sharedEntry, {
         hideStartup: true,
         silent: true,
@@ -50093,6 +50105,8 @@
               ),
               'success'
             );
+            storePendingMultiInvite(null);
+            clearMultiInviteQueryParamsFromUrl();
           } else {
             setMultiStatus(
               localizeText(
@@ -50112,10 +50126,6 @@
             ),
             'error'
           );
-        })
-        .finally(() => {
-          storePendingMultiInvite(null);
-          clearMultiInviteQueryParamsFromUrl();
         });
     }, 100);
     return true;
