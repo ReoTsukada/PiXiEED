@@ -52740,6 +52740,26 @@
     return `sp_${Date.now().toString(36)}${Math.floor(Math.random() * 1e9).toString(36)}`;
   }
 
+  async function fetchSharedProjectRecordViaRpc(supabase, projectKey, errorContext = 'fetch') {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey);
+    if (!supabase || !normalizedProjectKey) {
+      return null;
+    }
+    try {
+      const { data, error } = await supabase.rpc('pixieed_get_shared_project', {
+        target_project_key: normalizedProjectKey,
+      });
+      if (error) {
+        handleSharedProjectsBackendError(error, errorContext);
+        return null;
+      }
+      return Array.isArray(data) ? (data[0] || null) : (data || null);
+    } catch (error) {
+      handleSharedProjectsBackendError(error, `${errorContext}-exception`);
+      return null;
+    }
+  }
+
   async function fetchSharedProjectRecord(projectKey) {
     if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
       return null;
@@ -52753,16 +52773,7 @@
       if (!supabase) {
         return null;
       }
-      const { data, error } = await supabase
-        .from('shared_projects')
-        .select('id, project_key, invite_token, visibility, owner_user_id, title, latest_snapshot, latest_revision, latest_structure_revision, latest_snapshot_revision, latest_snapshot_structure_revision, latest_op_seq, checkpoint_seq, checkpoint_created_at, updated_at, created_at')
-        .eq('project_key', normalizedProjectKey)
-        .maybeSingle();
-      if (error) {
-        handleSharedProjectsBackendError(error, 'fetch');
-        return null;
-      }
-      return data || null;
+      return await fetchSharedProjectRecordViaRpc(supabase, normalizedProjectKey, 'fetch');
     } catch (error) {
       handleSharedProjectsBackendError(error, 'fetch-exception');
       return null;
@@ -53421,20 +53432,18 @@
       if (!projectKeys.length) {
         return [];
       }
-      const projectsResponse = await supabase
-        .from('shared_projects')
-        .select('id, project_key, invite_token, visibility, title, latest_revision, latest_structure_revision, latest_snapshot, updated_at')
-        .in('project_key', projectKeys);
-      if (projectsResponse.error) {
-        handleSharedProjectsBackendError(projectsResponse.error, 'list-projects');
-        return [];
-      }
-      const projectsByKey = new Map(
-        (Array.isArray(projectsResponse.data) ? projectsResponse.data : []).map(entry => [
-          normalizeMultiProjectKey(entry?.project_key || ''),
-          entry,
-        ])
+      const uniqueProjectKeys = [...new Set(projectKeys)];
+      const projectEntries = await Promise.all(
+        uniqueProjectKeys.map(projectKey => fetchSharedProjectRecordViaRpc(supabase, projectKey, 'list-projects'))
       );
+      const projectsByKey = new Map();
+      projectEntries.forEach(entry => {
+        const normalizedProjectKey = normalizeMultiProjectKey(entry?.project_key || '');
+        if (!normalizedProjectKey) {
+          return;
+        }
+        projectsByKey.set(normalizedProjectKey, entry);
+      });
       const normalizedEntries = [];
       for (let index = 0; index < memberships.length; index += 1) {
         const membership = memberships[index];
