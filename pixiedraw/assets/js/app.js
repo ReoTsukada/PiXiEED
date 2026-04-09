@@ -18285,6 +18285,10 @@
     });
   }
 
+  function getSharedRecentProjectEntry(projectKey = '') {
+    return getCurrentSharedRecentProjectEntry(projectKey);
+  }
+
   function ensureBoundSharedProjectSessionFromCurrentState(projectKey = '') {
     if (!canUseSharedProjectsBackend()) {
       return null;
