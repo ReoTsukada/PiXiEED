@@ -54104,6 +54104,30 @@
             persistedRevision: Math.max(0, Math.round(Number(savedSnapshot?.latest_revision) || 0)),
             persistedSnapshotRevision: Math.max(0, Math.round(Number(savedSnapshot?.latest_snapshot_revision) || 0)),
           });
+          if (savedSnapshot) {
+            setActiveSharedProjectSession(
+              normalizedProjectKey,
+              Math.max(
+                0,
+                Math.round(
+                  Number(savedSnapshot.latest_snapshot_revision)
+                  || Number(savedSnapshot.latest_revision)
+                  || Number(result.latest_revision)
+                  || 0
+                )
+              ),
+              Math.max(
+                0,
+                Math.round(
+                  Number(savedSnapshot.latest_snapshot_structure_revision)
+                  || Number(savedSnapshot.latest_structure_revision)
+                  || Number(result.latest_structure_revision)
+                  || 0
+                )
+              ),
+              savedSnapshot.id || result.id || activeSharedProjectId
+            );
+          }
           if (!savedSnapshot) {
             queueSharedProjectCurrentSnapshotCapture({
               delayMs: 0,
