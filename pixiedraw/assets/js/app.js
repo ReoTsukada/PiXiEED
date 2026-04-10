@@ -3005,6 +3005,7 @@
   const sharedProjectPendingRemoteOps = new Map();
   const sharedProjectSeenOpIds = new Set();
   const sharedProjectSeenOpSeqById = new Map();
+  const sharedProjectRemoteApplyFailureKeys = new Set();
   let sharedProjectInFlightStroke = null;
   let sharedProjectGapRecoveryPromise = null;
   let sharedProjectOpPollInFlight = false;
@@ -8115,6 +8116,7 @@
       sharedProjectPendingRemoteOps.clear();
       sharedProjectSeenOpIds.clear();
       sharedProjectSeenOpSeqById.clear();
+      sharedProjectRemoteApplyFailureKeys.clear();
       sharedProjectPendingLocalOps = [];
       sharedProjectInFlightStroke = null;
       sharedProjectLastAppliedSeq = 0;
@@ -52643,6 +52645,17 @@
     return inspectIncomingSharedProjectDrawOp(opRecord).ok;
   }
 
+  function shouldRefreshForSharedProjectApplySkip(reason = '') {
+    const normalizedReason = String(reason || '').trim();
+    return (
+      normalizedReason === 'structure-revision-mismatch'
+      || normalizedReason === 'missing-canvas-or-frame'
+      || normalizedReason === 'missing-frame-layers'
+      || normalizedReason === 'missing-target-layer'
+      || normalizedReason === 'missing-patch-fields'
+    );
+  }
+
   function isSharedProjectRemoteOpFromCurrentSession(opRecord) {
     const payload = extractSharedProjectOpPayload(opRecord);
     const sessionId = typeof (opRecord?.session_id ?? payload?.sessionId ?? payload?.session_id) === 'string'
@@ -53171,11 +53184,14 @@
     // Draw remote apply is latency-first. Refresh is handled by gap recovery callers.
     const diagnostics = inspectIncomingSharedProjectDrawOp(opRecord);
     if (!diagnostics.ok) {
-      console.debug('[shared-realtime] draw-apply-skipped', {
+      const opId = getSharedProjectOpId(opRecord);
+      const seq = getSharedProjectOpSeq(opRecord);
+      const failureKey = `${opId || 'no-op-id'}:${seq}:${diagnostics.reason}`;
+      console.warn(`[shared-realtime] draw-apply-skipped:${diagnostics.reason}`, {
         provisional,
         fromRemote,
-        opId: getSharedProjectOpId(opRecord),
-        seq: getSharedProjectOpSeq(opRecord),
+        opId,
+        seq,
         kind: typeof opRecord?.kind === 'string' ? opRecord.kind : '',
         reason: diagnostics.reason,
         canvasId: diagnostics.canvasId || '',
@@ -53184,6 +53200,19 @@
         structureRevision: diagnostics.structureRevision,
         activeStructureRevision: diagnostics.activeStructureRevision,
       });
+      if (
+        !provisional
+        && fromRemote
+        && shouldRefreshForSharedProjectApplySkip(diagnostics.reason)
+        && !sharedProjectRemoteApplyFailureKeys.has(failureKey)
+      ) {
+        sharedProjectRemoteApplyFailureKeys.add(failureKey);
+        queueSharedProjectRefresh({
+          immediate: true,
+          reason: `apply-skip-${diagnostics.reason}`,
+          force: true,
+        });
+      }
       return false;
     }
     const applied = applyLayerPatch(opRecord, { fromRemote });
@@ -53511,11 +53540,16 @@
         return false;
       }
       const nextRevision = Math.max(0, Math.round(Number(project.latest_revision) || 0));
-      if (nextRevision <= activeSharedProjectRevision) {
+      const nextStructureRevision = Math.max(0, Math.round(Number(project.latest_structure_revision) || 0));
+      if (
+        !force
+        && nextRevision <= activeSharedProjectRevision
+        && nextStructureRevision <= activeSharedProjectStructureRevision
+      ) {
         return false;
       }
       // Normal refresh prefers ordered op replay first; snapshot load is fallback/recovery.
-      if (!force && project.latest_structure_revision === activeSharedProjectStructureRevision) {
+      if (!force && nextStructureRevision === activeSharedProjectStructureRevision) {
         const syncedByOps = await applySharedProjectOpsSinceRevision(project, activeSharedProjectRevision);
         if (syncedByOps) {
           sharedProjectLastRealtimeActivityAt = Date.now();
@@ -53545,6 +53579,7 @@
       if (!loaded) {
         return false;
       }
+      sharedProjectRemoteApplyFailureKeys.clear();
       markActiveSharedProjectDocumentLoaded(activeSharedProjectKey);
       setActiveSharedProjectSession(
         activeSharedProjectKey,
