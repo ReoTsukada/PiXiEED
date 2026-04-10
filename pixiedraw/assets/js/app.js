@@ -5787,8 +5787,8 @@
       snapshot.playback = { ...state.playback };
     }
 
+    snapshot.activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
     if (shouldIncludeProjectCanvasPayload()) {
-      snapshot.activeCanvasId = getActiveProjectCanvasDocument()?.id || '';
       snapshot.canvases = getProjectCanvasDocuments().map(canvasDoc => snapshotProjectCanvasDocument(canvasDoc, {
         clonePixelData: effectiveClonePixelData,
       }));
@@ -20284,11 +20284,16 @@
       dualLeftRail: false,
       voxelExtension: normalizeVoxelExtensionState(snapshot.voxelExtension, VOXEL_EXTENSION_DEFAULT_STATE),
     };
+    const serializedActiveCanvasId = typeof snapshot.activeCanvasId === 'string'
+      ? snapshot.activeCanvasId
+      : (serializedCanvases?.[0]?.id || '');
     if (serializedCanvases) {
       serialized.canvases = serializedCanvases;
-      serialized.activeCanvasId = typeof snapshot.activeCanvasId === 'string'
-        ? snapshot.activeCanvasId
-        : (serializedCanvases[0]?.id || '');
+    }
+    if (serializedActiveCanvasId) {
+      // Preserve the stable canvas ID even for single-canvas documents so remote layer patches
+      // can target the same canvas after a snapshot refresh.
+      serialized.activeCanvasId = serializedActiveCanvasId;
     }
     if (snapshot.playback && typeof snapshot.playback === 'object') {
       serialized.playback = {
@@ -53353,6 +53358,7 @@
     if (!normalizedProjectKey) {
       return [];
     }
+    const startedAt = Date.now();
     try {
       const supabase = await ensurePixieedAccountClient();
       if (!supabase) {
@@ -53380,13 +53386,20 @@
         handleSharedProjectsBackendError(error, 'fetch-ops-since');
         return [];
       }
-      return Array.isArray(data) ? data : [];
+      const result = Array.isArray(data) ? data : [];
+      console.debug('[shared-backend] fetch-ops-since result', {
+        ...rpcDebugInfo,
+        durationMs: Math.max(0, Date.now() - startedAt),
+        opCount: result.length,
+      });
+      return result;
     } catch (error) {
       console.warn('[shared-backend] fetch-ops-since exception', {
         context: 'fetch-ops-since',
         projectKey: normalizedProjectKey,
         afterRevision: Math.max(0, Math.round(Number(afterRevision) || 0)),
         limit: Math.max(1, Math.round(Number(limit) || 256)),
+        durationMs: Math.max(0, Date.now() - startedAt),
         locationOrigin: typeof window !== 'undefined' && window.location ? String(window.location.origin || '') : '',
         locationHref: typeof window !== 'undefined' && window.location ? String(window.location.href || '') : '',
         referrer: typeof document !== 'undefined' ? String(document.referrer || '') : '',
