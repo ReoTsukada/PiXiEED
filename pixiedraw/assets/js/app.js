@@ -2990,6 +2990,8 @@
   let sharedProjectPollingTimer = null;
   let sharedProjectRefreshTimer = null;
   let sharedProjectRefreshInFlight = false;
+  let sharedProjectLastRefreshQueuedAt = 0;
+  let sharedProjectLastRefreshQueuedReason = '';
   let pendingSharedProjectConflictReplay = null;
   let sharedProjectOpsSinceCheckpoint = 0;
   let sharedProjectLastCheckpointAt = 0;
@@ -7852,6 +7854,8 @@
       window.clearTimeout(sharedProjectRefreshTimer);
       sharedProjectRefreshTimer = null;
     }
+    sharedProjectLastRefreshQueuedAt = 0;
+    sharedProjectLastRefreshQueuedReason = '';
     if (sharedProjectPollingTimer !== null) {
       window.clearInterval(sharedProjectPollingTimer);
       sharedProjectPollingTimer = null;
@@ -53749,11 +53753,40 @@
     if (!activeSharedProjectKey || !canUseSharedProjectsBackend()) {
       return;
     }
+    const normalizedReason = String(reason || '');
+    const now = Date.now();
+    if (
+      !immediate
+      && normalizedReason === 'poll-idle'
+      && (
+        sharedProjectRefreshInFlight
+        || sharedProjectRealtimeConnectPromise
+        || sharedProjectRefreshTimer !== null
+        || sharedProjectRealtimeRetryBlockedUntil > now
+        || (
+          sharedProjectLastRefreshQueuedReason === 'poll-idle'
+          && (now - sharedProjectLastRefreshQueuedAt) < (SHARED_PROJECT_REFRESH_LOOP_INTERVAL_MS * 2)
+        )
+      )
+    ) {
+      logSharedProjectRealtimeChannelLifecycle('skip-queue-refresh', {
+        caller: 'queueSharedProjectRefresh',
+        reason: 'poll-idle-suppressed',
+        extra: {
+          requestedReason: normalizedReason,
+          immediate,
+          force,
+        },
+      });
+      return;
+    }
     logSharedProjectRealtimeChannelLifecycle('queue-refresh', {
       caller: 'queueSharedProjectRefresh',
-      reason: reason || (immediate ? 'immediate' : 'scheduled'),
+      reason: normalizedReason || (immediate ? 'immediate' : 'scheduled'),
       extra: { immediate, force },
     });
+    sharedProjectLastRefreshQueuedAt = now;
+    sharedProjectLastRefreshQueuedReason = normalizedReason;
     if (sharedProjectRefreshTimer !== null) {
       window.clearTimeout(sharedProjectRefreshTimer);
       sharedProjectRefreshTimer = null;
@@ -53762,6 +53795,8 @@
     const delayMs = immediate ? 0 : Math.max(SHARED_PROJECT_SYNC_DELAY, SHARED_PROJECT_REFRESH_LOOP_INTERVAL_MS);
     sharedProjectRefreshTimer = window.setTimeout(() => {
       sharedProjectRefreshTimer = null;
+      sharedProjectLastRefreshQueuedAt = 0;
+      sharedProjectLastRefreshQueuedReason = '';
       refreshActiveSharedProjectSnapshot({ reason, force }).catch(error => {
         console.warn('Failed to refresh shared project snapshot', error);
       });
