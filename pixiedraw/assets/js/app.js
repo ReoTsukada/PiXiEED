@@ -7896,6 +7896,20 @@
         return;
       }
       const now = Date.now();
+      if (sharedProjectRealtimeRetryBlockedUntil > now) {
+        logSharedProjectRealtimeChannelLifecycle('skip-poll-refresh', {
+          caller: 'ensureSharedProjectRefreshLoop',
+          reason: 'retry-block-active',
+        });
+        return;
+      }
+      if (sharedProjectRealtimeConnectPromise) {
+        logSharedProjectRealtimeChannelLifecycle('skip-poll-refresh', {
+          caller: 'ensureSharedProjectRefreshLoop',
+          reason: 'realtime-connect-in-flight',
+        });
+        return;
+      }
       const realtimeLikelyHealthy = Boolean(
         activeSharedProjectChannel
         && sharedProjectRealtimeRetryBlockedUntil <= now
@@ -8102,6 +8116,7 @@
     activeSharedProjectRevision = Math.max(0, Math.round(Number(revision) || 0));
     activeSharedProjectStructureRevision = Math.max(0, Math.round(Number(structureRevision) || 0));
     sharedProjectLastAppliedSeq = Math.max(sharedProjectLastAppliedSeq, activeSharedProjectRevision);
+    const nextChannelSignature = `${normalizedProjectKey}::${activeSharedProjectId || ''}`;
     const sharedRecentProjectId = buildSharedRecentProjectId(normalizedProjectKey);
     if (normalizeAutosaveProjectId(autosaveProjectId || '') !== sharedRecentProjectId) {
       setActiveAutosaveProjectId(sharedRecentProjectId, { persist: false });
@@ -8113,9 +8128,24 @@
       sharedProjectLastRealtimeActivityAt = Date.now();
     }
     ensureSharedProjectRefreshLoop();
-    ensureActiveSharedProjectRealtimeChannel().catch(error => {
-      reportSharedProjectRealtimeSubscribeFailure(error);
-    });
+    const shouldEnsureRealtimeChannel = (
+      projectChanged
+      || activeSharedProjectChannelSignature !== nextChannelSignature
+      || (!activeSharedProjectChannel && !sharedProjectRealtimeConnectPromise && Date.now() >= sharedProjectRealtimeRetryBlockedUntil)
+    );
+    if (shouldEnsureRealtimeChannel) {
+      ensureActiveSharedProjectRealtimeChannel().catch(error => {
+        reportSharedProjectRealtimeSubscribeFailure(error);
+      });
+    } else {
+      logSharedProjectRealtimeChannelLifecycle('skip-realtime-rebind', {
+        caller: 'setActiveSharedProjectSession',
+        reason: 'same-signature-session-update',
+        projectKey: normalizedProjectKey,
+        projectId: activeSharedProjectId,
+        channelSignature: nextChannelSignature,
+      });
+    }
     syncSharedProjectMembers(normalizedProjectKey, activeSharedProjectId).catch(error => {
       console.warn('Failed to load shared project members', error);
     });
