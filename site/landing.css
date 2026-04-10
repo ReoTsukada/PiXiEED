@@ -563,7 +563,7 @@ footer{
   inset: 0;
   width: 100%;
   min-width: 100%;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 3 / 2;
   min-height: 0;
   max-height: 420px;
   display: none;
@@ -656,6 +656,7 @@ footer{
   max-width: 100% !important;
   height: 100% !important;
   min-height: 100% !important;
+  display: block !important;
   margin: 0 auto !important;
   background: #000 !important;
 }
