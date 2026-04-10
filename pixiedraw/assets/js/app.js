@@ -20071,38 +20071,6 @@
     if (!normalizedEntry) {
       return false;
     }
-    if (normalizedEntry.project && typeof normalizedEntry.project === 'object') {
-      try {
-        const fastRestored = await loadDocumentFromText(JSON.stringify(normalizedEntry.project), null, {
-          projectId: normalizedEntry.id || '',
-          suppressAutosaveStatus: true,
-          openedFromRecent: true,
-          preserveDotStats: true,
-          sharedProjectKey: normalizedEntry.sharedProjectKey || '',
-          sharedProjectRevision: Math.max(0, Math.round(Number(normalizedEntry.sharedProjectRevision) || 0)),
-        });
-        if (fastRestored) {
-          setActiveSharedProjectSession(
-            normalizedEntry.sharedProjectKey || '',
-            Math.max(0, Math.round(Number(normalizedEntry.sharedProjectRevision) || 0)),
-            Math.max(0, Math.round(Number(normalizedEntry.sharedProjectStructureRevision) || 0)),
-            normalizedEntry.sharedProjectBackendId || ''
-          );
-          markActiveSharedProjectDocumentLoaded(normalizedEntry.sharedProjectKey || '');
-          if (hideStartup) {
-            hideStartupScreen();
-          }
-          if (!silent) {
-            updateAutosaveStatus(
-              localizeText('共有プロジェクトのローカルキャッシュを先に復元しました', 'Restored the local shared project cache first'),
-              'info'
-            );
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to fast-restore shared recent project cache', error);
-      }
-    }
     storePendingSharedInvite({
       inviteToken: normalizedEntry.sharedProjectInviteToken || '',
       projectKey: normalizedEntry.sharedProjectKey || '',
@@ -20140,6 +20108,10 @@
       ),
     });
     if (opened) {
+      await refreshActiveSharedProjectSnapshot({
+        force: true,
+        reason: 'open-shared-recent-latest',
+      });
       clearPendingSharedInvite();
       setActiveAutosaveProjectId(normalizedEntry.id);
     }
