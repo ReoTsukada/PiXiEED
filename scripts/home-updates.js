@@ -2,6 +2,11 @@
   const root = document.getElementById('homeUpdates');
   if (!root) return;
 
+  if (window.location.protocol === 'file:') {
+    render([]);
+    return;
+  }
+
   fetch('data/project-updates.json', { cache: 'no-store' })
     .then((response) => {
       if (!response.ok) throw new Error('Failed to load updates');
