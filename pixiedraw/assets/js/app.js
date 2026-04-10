@@ -53653,6 +53653,22 @@
         0,
         Math.round(Number(project.latest_snapshot_revision) || Number(project.latest_revision) || 0)
       );
+      const prefersFreshCanonicalSnapshot = (
+        force
+        && (
+          String(reason || '').includes('draw-op')
+          || String(reason || '').includes('apply-skip-missing-canvas-or-frame')
+          || String(reason || '').includes('open-shared')
+        )
+      );
+      if (prefersFreshCanonicalSnapshot && snapshotRevision < nextRevision) {
+        queueSharedProjectRefresh({
+          immediate: false,
+          reason: `${reason || 'refresh'}-await-snapshot`,
+          force: true,
+        });
+        return false;
+      }
       const loaded = await loadDocumentFromText(JSON.stringify(sharedSnapshot), null, {
         projectId: buildSharedRecentProjectId(activeSharedProjectKey),
         suppressAutosaveStatus: true,
@@ -53905,14 +53921,39 @@
       markDocumentDurablySaved();
       noteSharedProjectOperationApplied({ opType: resolvedOpType, fromRemote: false });
       if (resolvedOpType === 'draw') {
-        // Keep the canonical snapshot close behind draw commits so receivers can recover
-        // from canvas/layer drift by reloading a near-current shared snapshot.
-        queueSharedProjectCurrentSnapshotCapture({
-          delayMs: 0,
-          projectKey: normalizedProjectKey,
-          title: state.documentName || DEFAULT_DOCUMENT_NAME,
-          historyLabel: 'realtimeSnapshotSync',
-        });
+        // Persist the full canonical snapshot immediately after a confirmed draw op
+        // so receivers never recover against an older document image.
+        try {
+          const snapshot = makeHistorySnapshot({ clonePixelData: false });
+          const packaged = buildPackagedProjectPayload(snapshot, {
+            session: buildProjectSessionPayload(),
+          });
+          packaged.sharedHistoryLabel = 'realtimeSnapshotSync';
+          const savedSnapshot = await persistSharedProjectSnapshot(
+            normalizedProjectKey,
+            packaged,
+            {
+              title: state.documentName || DEFAULT_DOCUMENT_NAME,
+              revision: Math.max(0, Math.round(Number(result.latest_revision) || 0)),
+            }
+          );
+          if (!savedSnapshot) {
+            queueSharedProjectCurrentSnapshotCapture({
+              delayMs: 0,
+              projectKey: normalizedProjectKey,
+              title: state.documentName || DEFAULT_DOCUMENT_NAME,
+              historyLabel: 'realtimeSnapshotSync',
+            });
+          }
+        } catch (error) {
+          console.warn('Failed to persist canonical shared snapshot after draw commit', error);
+          queueSharedProjectCurrentSnapshotCapture({
+            delayMs: 0,
+            projectKey: normalizedProjectKey,
+            title: state.documentName || DEFAULT_DOCUMENT_NAME,
+            historyLabel: 'realtimeSnapshotSync',
+          });
+        }
       }
       if (shouldCreateSharedProjectCheckpoint(resolvedOpType)) {
         scheduleSharedProjectCheckpoint({
