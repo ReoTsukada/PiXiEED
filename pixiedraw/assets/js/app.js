@@ -52560,7 +52560,7 @@
   // - local commit creates an op immediately
   // - remote draw ops are applied before snapshot refresh
   // - structure mismatch is the only reason to fall back to refresh
-  function canApplyIncomingSharedProjectDrawOp(opRecord) {
+  function inspectIncomingSharedProjectDrawOp(opRecord) {
     const payload = extractSharedProjectOpPayload(opRecord);
     const canvasId = typeof payload?.canvasId === 'string' ? payload.canvasId.trim() : '';
     const layerId = typeof payload?.layerId === 'string' ? payload.layerId.trim() : '';
@@ -52572,20 +52572,53 @@
       Math.round(Number(opRecord?.structure_revision ?? payload?.structureRevision ?? payload?.structure_revision) || 0)
     );
     if (!canvasId || !layerId || !pixelCount || !patch) {
-      return false;
+      return { ok: false, reason: 'missing-patch-fields', canvasId, layerId, frameIndex, pixelCount };
     }
     if (structureRevision !== activeSharedProjectStructureRevision) {
-      return false;
+      return {
+        ok: false,
+        reason: 'structure-revision-mismatch',
+        canvasId,
+        layerId,
+        frameIndex,
+        pixelCount,
+        structureRevision,
+        activeStructureRevision: activeSharedProjectStructureRevision,
+      };
     }
     const targetCanvas = getProjectCanvasDocumentById(canvasId);
     if (!targetCanvas || !Array.isArray(targetCanvas.frames) || frameIndex >= targetCanvas.frames.length) {
-      return false;
+      return { ok: false, reason: 'missing-canvas-or-frame', canvasId, layerId, frameIndex, pixelCount };
     }
     const frame = targetCanvas.frames[frameIndex];
     if (!frame || !Array.isArray(frame.layers)) {
-      return false;
+      return { ok: false, reason: 'missing-frame-layers', canvasId, layerId, frameIndex, pixelCount };
     }
-    return Boolean(frame.layers.find(entry => entry?.id === layerId));
+    if (!frame.layers.find(entry => entry?.id === layerId)) {
+      return { ok: false, reason: 'missing-target-layer', canvasId, layerId, frameIndex, pixelCount };
+    }
+    return {
+      ok: true,
+      reason: 'ok',
+      canvasId,
+      layerId,
+      frameIndex,
+      pixelCount,
+      structureRevision,
+      activeStructureRevision: activeSharedProjectStructureRevision,
+    };
+  }
+
+  function canApplyIncomingSharedProjectDrawOp(opRecord) {
+    return inspectIncomingSharedProjectDrawOp(opRecord).ok;
+  }
+
+  function isSharedProjectRemoteOpFromCurrentSession(opRecord) {
+    const payload = extractSharedProjectOpPayload(opRecord);
+    const sessionId = typeof (opRecord?.session_id ?? payload?.sessionId ?? payload?.session_id) === 'string'
+      ? String(opRecord?.session_id ?? payload?.sessionId ?? payload?.session_id).trim()
+      : '';
+    return Boolean(sessionId) && sessionId === sharedProjectSessionId;
   }
 
   function applyLayerPatch(opRecord, { fromRemote = false } = {}) {
@@ -52988,6 +53021,12 @@
 
   function sendSharedProjectBroadcastOp(op) {
     if (!activeSharedProjectChannel || typeof activeSharedProjectChannel.send !== 'function') {
+      console.debug('[shared-realtime] broadcast-send-skipped', {
+        reason: 'missing-active-channel',
+        projectKey: op?.projectKey || '',
+        opId: getSharedProjectOpId(op),
+        kind: typeof op?.kind === 'string' ? op.kind : '',
+      });
       ensureActiveSharedProjectRealtimeChannel().catch(() => {});
       return;
     }
@@ -52995,7 +53034,19 @@
       type: 'broadcast',
       event: SHARED_PROJECT_BROADCAST_EVENT,
       payload: op,
-    }).catch(() => {
+    }).then(() => {
+      console.debug('[shared-realtime] broadcast-send-ok', {
+        projectKey: op?.projectKey || '',
+        opId: getSharedProjectOpId(op),
+        kind: typeof op?.kind === 'string' ? op.kind : '',
+      });
+    }).catch(error => {
+      console.warn('[shared-realtime] broadcast-send-failed', {
+        projectKey: op?.projectKey || '',
+        opId: getSharedProjectOpId(op),
+        kind: typeof op?.kind === 'string' ? op.kind : '',
+        error: String(error?.message || error || ''),
+      });
       // Ignore broadcast transport failures and let DB insert become the source of truth.
     });
   }
@@ -53041,13 +53092,47 @@
 
   function applyIncomingSharedProjectDrawOp(opRecord, { fromRemote = true, provisional = false } = {}) {
     // Draw remote apply is latency-first. Refresh is handled by gap recovery callers.
-    if (!canApplyIncomingSharedProjectDrawOp(opRecord)) {
+    const diagnostics = inspectIncomingSharedProjectDrawOp(opRecord);
+    if (!diagnostics.ok) {
+      console.debug('[shared-realtime] draw-apply-skipped', {
+        provisional,
+        fromRemote,
+        opId: getSharedProjectOpId(opRecord),
+        seq: getSharedProjectOpSeq(opRecord),
+        kind: typeof opRecord?.kind === 'string' ? opRecord.kind : '',
+        reason: diagnostics.reason,
+        canvasId: diagnostics.canvasId || '',
+        layerId: diagnostics.layerId || '',
+        frameIndex: diagnostics.frameIndex,
+        structureRevision: diagnostics.structureRevision,
+        activeStructureRevision: diagnostics.activeStructureRevision,
+      });
       return false;
     }
     const applied = applyLayerPatch(opRecord, { fromRemote });
     if (!applied) {
+      console.debug('[shared-realtime] draw-apply-failed', {
+        provisional,
+        fromRemote,
+        opId: getSharedProjectOpId(opRecord),
+        seq: getSharedProjectOpSeq(opRecord),
+        kind: typeof opRecord?.kind === 'string' ? opRecord.kind : '',
+        canvasId: diagnostics.canvasId || '',
+        layerId: diagnostics.layerId || '',
+        frameIndex: diagnostics.frameIndex,
+      });
       return false;
     }
+    console.debug('[shared-realtime] draw-applied', {
+      provisional,
+      fromRemote,
+      opId: getSharedProjectOpId(opRecord),
+      seq: getSharedProjectOpSeq(opRecord),
+      kind: typeof opRecord?.kind === 'string' ? opRecord.kind : '',
+      canvasId: diagnostics.canvasId || '',
+      layerId: diagnostics.layerId || '',
+      frameIndex: diagnostics.frameIndex,
+    });
     if (!provisional && shouldCreateSharedProjectCheckpoint('draw')) {
       // snapshot is recovery/checkpoint only
       scheduleSharedProjectCheckpoint({ historyLabel: 'sharedRemoteDrawCheckpoint' });
@@ -54174,11 +54259,31 @@
         }
         const op = payload?.payload && typeof payload.payload === 'object' ? payload.payload : null;
         if (!op || op.projectKey !== projectKey) {
+          console.debug('[shared-realtime] broadcast-op-ignored', {
+            reason: 'invalid-payload-or-project-mismatch',
+            projectKey,
+            activeProjectKey: activeSharedProjectKey || '',
+            eventProjectKey: op?.projectKey || '',
+          });
           return;
         }
-        if (op.clientId && op.clientId === (multiState.clientId || '')) {
+        if (isSharedProjectRemoteOpFromCurrentSession(op)) {
+          console.debug('[shared-realtime] broadcast-op-ignored', {
+            reason: 'same-session',
+            projectKey,
+            opId: getSharedProjectOpId(op),
+            kind: typeof op?.kind === 'string' ? op.kind : '',
+          });
           return;
         }
+        console.debug('[shared-realtime] broadcast-op-received', {
+          projectKey,
+          opId: getSharedProjectOpId(op),
+          kind: typeof op?.kind === 'string' ? op.kind : '',
+          seq: getSharedProjectOpSeq(op),
+          clientId: typeof op?.clientId === 'string' ? op.clientId : '',
+          sessionId: typeof op?.sessionId === 'string' ? op.sessionId : '',
+        });
         const drawKind = typeof op?.kind === 'string' ? op.kind : '';
         if (
           drawKind === 'layer-patch'
@@ -54258,11 +54363,28 @@
             if (projectKey !== activeSharedProjectKey) {
               return;
             }
-            if (payload?.new?.actor_user_id && payload.new.actor_user_id === accountState.userId) {
+            if (isSharedProjectRemoteOpFromCurrentSession(payload?.new || null)) {
+              console.debug('[shared-realtime] db-op-ignored', {
+                reason: 'same-session',
+                projectKey,
+                revision: Math.max(0, Math.round(Number(payload?.new?.revision) || 0)),
+                opType: typeof payload?.new?.op_type === 'string' ? payload.new.op_type.trim() : '',
+                sessionId: typeof payload?.new?.session_id === 'string' ? payload.new.session_id : '',
+              });
               return;
             }
             const nextRevision = Math.max(0, Math.round(Number(payload?.new?.revision) || 0));
             const nextStructureRevision = Math.max(0, Math.round(Number(payload?.new?.structure_revision) || 0));
+            console.debug('[shared-realtime] db-op-received', {
+              projectKey,
+              revision: nextRevision,
+              structureRevision: nextStructureRevision,
+              opType: typeof payload?.new?.op_type === 'string' ? payload.new.op_type.trim() : '',
+              opId: getSharedProjectOpId(payload?.new || null),
+              clientId: typeof payload?.new?.client_id === 'string' ? payload.new.client_id : '',
+              sessionId: typeof payload?.new?.session_id === 'string' ? payload.new.session_id : '',
+              actorUserId: typeof payload?.new?.actor_user_id === 'string' ? payload.new.actor_user_id : '',
+            });
             if (
                 nextRevision <= activeSharedProjectRevision
               && nextStructureRevision <= activeSharedProjectStructureRevision
@@ -54355,6 +54477,7 @@
           if (status === 'SUBSCRIBED' && !settled) {
             settled = true;
             window.clearTimeout(timeout);
+            sharedProjectLastRealtimeActivityAt = Date.now();
             resolve();
             return;
           }
