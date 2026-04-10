@@ -18425,6 +18425,9 @@
       : new Date().toISOString();
     const sharedProjectRevision = Math.max(0, Math.round(Number(entry.sharedProjectRevision) || 0));
     const sharedProjectStructureRevision = Math.max(0, Math.round(Number(entry.sharedProjectStructureRevision) || 0));
+    const cachedProjectPayload = entry.project && typeof entry.project === 'object'
+      ? entry.project
+      : null;
     return {
       id,
       storageKind: RECENT_PROJECT_STORAGE_SHARED,
@@ -18447,7 +18450,7 @@
       fileName,
       updatedAt,
       thumbnail: typeof entry.thumbnail === 'string' && entry.thumbnail.length > 0 ? entry.thumbnail : null,
-      project: null,
+      project: cachedProjectPayload,
     };
   }
 
@@ -19877,8 +19880,8 @@
               fileName,
               updatedAt: packaged.updatedAt || new Date().toISOString(),
               thumbnail: thumbnail || null,
+              project: packaged,
             }),
-            project: null,
           }
         : {
             id: resolvedProjectId,
@@ -20043,6 +20046,38 @@
     const normalizedEntry = normalizeSharedRecentProjectEntry(entry);
     if (!normalizedEntry) {
       return false;
+    }
+    if (normalizedEntry.project && typeof normalizedEntry.project === 'object') {
+      try {
+        const fastRestored = await loadDocumentFromText(JSON.stringify(normalizedEntry.project), null, {
+          projectId: normalizedEntry.id || '',
+          suppressAutosaveStatus: true,
+          openedFromRecent: true,
+          preserveDotStats: true,
+          sharedProjectKey: normalizedEntry.sharedProjectKey || '',
+          sharedProjectRevision: Math.max(0, Math.round(Number(normalizedEntry.sharedProjectRevision) || 0)),
+        });
+        if (fastRestored) {
+          setActiveSharedProjectSession(
+            normalizedEntry.sharedProjectKey || '',
+            Math.max(0, Math.round(Number(normalizedEntry.sharedProjectRevision) || 0)),
+            Math.max(0, Math.round(Number(normalizedEntry.sharedProjectStructureRevision) || 0)),
+            normalizedEntry.sharedProjectBackendId || ''
+          );
+          markActiveSharedProjectDocumentLoaded(normalizedEntry.sharedProjectKey || '');
+          if (hideStartup) {
+            hideStartupScreen();
+          }
+          if (!silent) {
+            updateAutosaveStatus(
+              localizeText('共有プロジェクトのローカルキャッシュを先に復元しました', 'Restored the local shared project cache first'),
+              'info'
+            );
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to fast-restore shared recent project cache', error);
+      }
     }
     storePendingSharedInvite({
       inviteToken: normalizedEntry.sharedProjectInviteToken || '',
