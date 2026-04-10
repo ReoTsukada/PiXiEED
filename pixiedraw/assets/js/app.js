@@ -53936,7 +53936,7 @@
         // Keep the canonical snapshot close behind draw commits so receivers can recover
         // from canvas/layer drift by reloading a near-current shared snapshot.
         queueSharedProjectCurrentSnapshotCapture({
-          delayMs: SHARED_PROJECT_SYNC_DELAY,
+          delayMs: 0,
           projectKey: normalizedProjectKey,
           title: state.documentName || DEFAULT_DOCUMENT_NAME,
           historyLabel: 'realtimeSnapshotSync',
@@ -54569,7 +54569,7 @@
           || drawKind === 'stroke-commit'
           || drawKind === 'draw'
         ) {
-          applyIncomingSharedProjectDrawOp(op, { fromRemote: true, provisional: true });
+          triggerImmediateSharedProjectRecovery('broadcast-draw-op').catch(() => {});
           return;
         }
         applyOp(op, { fromRemote: true, provisional: true });
@@ -54687,11 +54687,14 @@
               const drawKind = typeof payload?.new?.op_type === 'string' ? payload.new.op_type.trim() : '';
               const applied = (
                 drawKind === 'draw'
-                ? applyIncomingSharedProjectDrawOp(payload.new, { fromRemote: true, provisional: false })
+                ? false
                 : (drawKind === 'palette'
                   ? applySharedProjectPaletteOp(payload.new, { fromRemote: true, provisional: false })
                   : applyOp(payload.new, { fromRemote: true, provisional: false }))
               );
+              if (drawKind === 'draw') {
+                triggerImmediateSharedProjectRecovery('db-draw-op').catch(() => {});
+              }
               if (applied) {
                 sharedProjectLastAppliedSeq = nextRevision;
                 activeSharedProjectRevision = nextRevision;
