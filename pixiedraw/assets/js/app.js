@@ -36279,6 +36279,42 @@
     return getProjectCanvasDocuments().find(canvas => canvas?.id === canvasId) || null;
   }
 
+  function adoptSingleProjectCanvasId(requestedCanvasId = '') {
+    const normalizedCanvasId = typeof requestedCanvasId === 'string' ? requestedCanvasId.trim() : '';
+    if (!normalizedCanvasId) {
+      return null;
+    }
+    const canvases = getProjectCanvasDocuments();
+    if (canvases.length !== 1) {
+      return null;
+    }
+    const soleCanvas = canvases[0] || null;
+    if (!soleCanvas) {
+      return null;
+    }
+    if (soleCanvas.id === normalizedCanvasId) {
+      return soleCanvas;
+    }
+    const previousCanvasId = typeof soleCanvas.id === 'string' ? soleCanvas.id : '';
+    soleCanvas.id = normalizedCanvasId;
+    if (projectCanvasStore.activeCanvasId === previousCanvasId || !projectCanvasStore.activeCanvasId) {
+      projectCanvasStore.activeCanvasId = normalizedCanvasId;
+    }
+    if (committedProjectCanvasId === previousCanvasId) {
+      committedProjectCanvasId = normalizedCanvasId;
+    }
+    if (hoveredProjectCanvasId === previousCanvasId) {
+      hoveredProjectCanvasId = normalizedCanvasId;
+    }
+    syncProjectCanvasSurfaceDocumentRefs();
+    console.info('[shared-realtime] adopted-single-canvas-id', {
+      previousCanvasId,
+      nextCanvasId: normalizedCanvasId,
+      activeSharedProjectKey: activeSharedProjectKey || '',
+    });
+    return soleCanvas;
+  }
+
   function getActiveProjectCanvasDocument() {
     return getProjectCanvasDocumentById(projectCanvasStore.activeCanvasId) || getProjectCanvasDocumentAt(0);
   }
@@ -52646,7 +52682,7 @@
         activeStructureRevision: activeSharedProjectStructureRevision,
       };
     }
-    const targetCanvas = getProjectCanvasDocumentById(canvasId);
+    const targetCanvas = getProjectCanvasDocumentById(canvasId) || adoptSingleProjectCanvasId(canvasId);
     if (!targetCanvas || !Array.isArray(targetCanvas.frames) || frameIndex >= targetCanvas.frames.length) {
       return { ok: false, reason: 'missing-canvas-or-frame', canvasId, layerId, frameIndex, pixelCount };
     }
@@ -52702,7 +52738,7 @@
     if (!canvasId || !layerId || !pixelCount || !patch) {
       return false;
     }
-    const targetCanvas = getProjectCanvasDocumentById(canvasId);
+    const targetCanvas = getProjectCanvasDocumentById(canvasId) || adoptSingleProjectCanvasId(canvasId);
     if (!targetCanvas || !Array.isArray(targetCanvas.frames) || frameIndex >= targetCanvas.frames.length) {
       return false;
     }
