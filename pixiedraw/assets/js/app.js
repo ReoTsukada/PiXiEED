@@ -53025,7 +53025,11 @@
 
   function shouldPersistSharedProjectSnapshotForHistoryLabel(historyLabel = '', opType = 'snapshot') {
     const normalizedType = String(opType || 'snapshot').trim() || 'snapshot';
+    const normalizedLabel = String(historyLabel || '').trim();
     if (normalizedType === 'create' || normalizedType === 'snapshot' || normalizedType === 'structure') {
+      return true;
+    }
+    if (normalizedLabel === 'realtimeSnapshotSync') {
       return true;
     }
     if (isSharedProjectCheckpointHistoryLabel(historyLabel)) {
@@ -53928,6 +53932,16 @@
       });
       markDocumentDurablySaved();
       noteSharedProjectOperationApplied({ opType: resolvedOpType, fromRemote: false });
+      if (resolvedOpType === 'draw') {
+        // Keep the canonical snapshot close behind draw commits so receivers can recover
+        // from canvas/layer drift by reloading a near-current shared snapshot.
+        queueSharedProjectCurrentSnapshotCapture({
+          delayMs: SHARED_PROJECT_SYNC_DELAY,
+          projectKey: normalizedProjectKey,
+          title: state.documentName || DEFAULT_DOCUMENT_NAME,
+          historyLabel: 'realtimeSnapshotSync',
+        });
+      }
       if (shouldCreateSharedProjectCheckpoint(resolvedOpType)) {
         scheduleSharedProjectCheckpoint({
           historyLabel: resolvedOpType === 'structure' ? historyLabel : 'checkpoint',
