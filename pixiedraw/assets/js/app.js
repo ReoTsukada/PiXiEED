@@ -53213,7 +53213,9 @@
     if (!diagnostics.ok) {
       const opId = getSharedProjectOpId(opRecord);
       const seq = getSharedProjectOpSeq(opRecord);
-      const failureKey = `${opId || 'no-op-id'}:${seq}:${diagnostics.reason}`;
+      const failureKey = provisional
+        ? `provisional:${diagnostics.canvasId || ''}:${diagnostics.frameIndex}:${diagnostics.layerId || ''}:${diagnostics.reason}`
+        : `${opId || 'no-op-id'}:${seq}:${diagnostics.reason}`;
       console.warn(`[shared-realtime] draw-apply-skipped:${diagnostics.reason}`, {
         provisional,
         fromRemote,
@@ -53228,8 +53230,7 @@
         activeStructureRevision: diagnostics.activeStructureRevision,
       });
       if (
-        !provisional
-        && fromRemote
+        fromRemote
         && shouldRefreshForSharedProjectApplySkip(diagnostics.reason)
         && !sharedProjectRemoteApplyFailureKeys.has(failureKey)
       ) {
