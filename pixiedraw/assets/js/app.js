@@ -7928,9 +7928,9 @@
       );
       const recentlyAppliedRealtime = (now - sharedProjectLastRealtimeActivityAt) < SHARED_PROJECT_REFRESH_IDLE_GRACE_MS;
       if (realtimeSubscribed && realtimeLikelyHealthy) {
-        if (!recentlyAppliedRealtime) {
-          pollSharedProjectRealtimeOpsRescue({ reason: 'idle-op-poll' }).catch(() => {});
-        }
+        // While the realtime channel is subscribed and healthy, keep draw sync event-driven.
+        // The sender side may not receive inbound realtime traffic for a while, which would
+        // otherwise incorrectly look "idle" and trigger repeated rescue polling.
         return;
       }
       if (realtimeLikelyHealthy && recentlyAppliedRealtime) {
