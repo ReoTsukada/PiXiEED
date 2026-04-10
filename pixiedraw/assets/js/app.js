@@ -18065,7 +18065,10 @@
 
     autosaveRestoring = true;
     try {
-      applyHistorySnapshot(snapshot, { forcePalettePresetSync: true });
+      applyHistorySnapshot(snapshot, {
+        forcePalettePresetSync: true,
+        preserveView: Boolean(options?.preserveView),
+      });
       history.pending = null;
       if (projectSession) {
         history.limit = projectSession.historyLimit;
@@ -53771,6 +53774,7 @@
         projectId: buildSharedRecentProjectId(activeSharedProjectKey),
         suppressAutosaveStatus: true,
         openedFromRecent: true,
+        preserveView: true,
         preserveDotStats: true,
         sharedProjectKey: activeSharedProjectKey,
         sharedProjectRevision: snapshotRevision,
