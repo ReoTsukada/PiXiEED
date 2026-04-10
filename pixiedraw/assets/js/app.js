@@ -53755,6 +53755,11 @@
     }
     const normalizedReason = String(reason || '');
     const now = Date.now();
+    const isForegroundRecoveryReason = (
+      normalizedReason === 'focus'
+      || normalizedReason === 'visibility'
+      || normalizedReason === 'online'
+    );
     if (
       !immediate
       && normalizedReason === 'poll-idle'
@@ -53772,6 +53777,31 @@
       logSharedProjectRealtimeChannelLifecycle('skip-queue-refresh', {
         caller: 'queueSharedProjectRefresh',
         reason: 'poll-idle-suppressed',
+        extra: {
+          requestedReason: normalizedReason,
+          immediate,
+          force,
+        },
+      });
+      return;
+    }
+    if (
+      immediate
+      && isForegroundRecoveryReason
+      && (
+        sharedProjectRefreshInFlight
+        || sharedProjectRealtimeConnectPromise
+        || sharedProjectRefreshTimer !== null
+        || sharedProjectRealtimeRetryBlockedUntil > now
+        || (
+          sharedProjectLastRefreshQueuedReason === normalizedReason
+          && (now - sharedProjectLastRefreshQueuedAt) < SHARED_PROJECT_REFRESH_LOOP_INTERVAL_MS
+        )
+      )
+    ) {
+      logSharedProjectRealtimeChannelLifecycle('skip-queue-refresh', {
+        caller: 'queueSharedProjectRefresh',
+        reason: 'foreground-refresh-suppressed',
         extra: {
           requestedReason: normalizedReason,
           immediate,
