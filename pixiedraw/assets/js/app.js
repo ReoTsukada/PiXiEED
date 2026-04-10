@@ -52530,6 +52530,15 @@
   }
 
   function extractSharedProjectOpPayload(opRecord) {
+    if (opRecord?.payload && typeof opRecord.payload === 'object') {
+      if (opRecord.payload.op && typeof opRecord.payload.op === 'object') {
+        return {
+          ...opRecord.payload,
+          ...opRecord.payload.op,
+        };
+      }
+      return opRecord.payload;
+    }
     if (opRecord?.payload?.op && typeof opRecord.payload.op === 'object') {
       return opRecord.payload.op;
     }
