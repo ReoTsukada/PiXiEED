@@ -1,4 +1,9 @@
 (function() {
+  if (window.location.protocol === 'file:') {
+    window.pixieedObserveAds = function noopObserveAds() {};
+    return;
+  }
+
   try {
     const pathname = String(window.location.pathname || '').toLowerCase();
     const isPixieedrawPage = /(?:^|\/)pixiedraw(?:\/|\/index\.html)?$/.test(pathname);
@@ -60,6 +65,10 @@
     if (ins.offsetParent === null && getComputedStyle(ins).position !== 'fixed') {
       return false;
     }
+    const rect = ins.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) {
+      return false;
+    }
     return true;
   }
 
@@ -83,12 +92,21 @@
     if (ins.dataset.adsLazyLoaded === '1' || isReady(ins)) return;
     if (!isRenderable(ins)) return;
     assignSlot(ins);
-    ins.dataset.adsLazyLoaded = '1';
-    try {
-      (window.adsbygoogle = window.adsbygoogle || []).push({});
-    } catch (_error) {
-      ins.dataset.adsLazyLoaded = '';
-    }
+    ins.dataset.adsLazyLoaded = 'pending';
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        if (!isRenderable(ins)) {
+          ins.dataset.adsLazyLoaded = '';
+          return;
+        }
+        try {
+          (window.adsbygoogle = window.adsbygoogle || []).push({});
+          ins.dataset.adsLazyLoaded = '1';
+        } catch (_error) {
+          ins.dataset.adsLazyLoaded = '';
+        }
+      });
+    });
   }
 
   function observeAds(root) {
