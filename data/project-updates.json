@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-09T17:44:41.103Z",
+  "generatedAt": "2026-04-10T01:02:59.150Z",
   "projects": [
     {
       "id": "site",
@@ -62,6 +62,12 @@
       "url": "/projects/pixiedraw/",
       "entries": [
         {
+          "date": "2026-04-10",
+          "items": [
+            "機能を更新"
+          ]
+        },
+        {
           "date": "2026-04-09",
           "items": [
             "機能を更新"
@@ -101,12 +107,6 @@
           "date": "2026-03-22",
           "items": [
             "画面 / 機能 / スタイルを更新"
-          ]
-        },
-        {
-          "date": "2026-03-21",
-          "items": [
-            "画面 / 機能を更新"
           ]
         }
       ]
@@ -444,6 +444,17 @@
   ],
   "recentByDate": [
     {
+      "date": "2026-04-10",
+      "updates": [
+        {
+          "id": "pixiedraw",
+          "name": "PiXiEEDraw",
+          "url": "/projects/pixiedraw/",
+          "summary": "機能を更新"
+        }
+      ]
+    },
+    {
       "date": "2026-04-09",
       "updates": [
         {
@@ -565,59 +576,6 @@
           "name": "PiXiEEDraw",
           "url": "/projects/pixiedraw/",
           "summary": "画面 / 機能 / スタイルを更新"
-        }
-      ]
-    },
-    {
-      "date": "2026-03-21",
-      "updates": [
-        {
-          "id": "pixfind",
-          "name": "PiXFiND",
-          "url": "/projects/pixfind/",
-          "summary": "画面を更新"
-        },
-        {
-          "id": "site",
-          "name": "PiXiEED 全体",
-          "url": "/index.html",
-          "summary": "画面を更新"
-        },
-        {
-          "id": "pixiedraw",
-          "name": "PiXiEEDraw",
-          "url": "/projects/pixiedraw/",
-          "summary": "画面 / 機能を更新"
-        },
-        {
-          "id": "pixiedraw-lite",
-          "name": "PiXiEEDraw Lite",
-          "url": "/projects/jerin-maker/",
-          "summary": "画面を更新"
-        },
-        {
-          "id": "pixiee-lens",
-          "name": "PiXiEELENS",
-          "url": "/projects/pixiee-lens/",
-          "summary": "画面を更新"
-        },
-        {
-          "id": "qr-maker",
-          "name": "QRコードメーカー",
-          "url": "/projects/qr-maker/",
-          "summary": "画面を更新"
-        },
-        {
-          "id": "maou-war",
-          "name": "魔王奪還戦",
-          "url": "/projects/maou-war/",
-          "summary": "画面を更新"
-        },
-        {
-          "id": "maoitu",
-          "name": "魔王様!!いつまでよければいいですか!?",
-          "url": "/projects/maoitu/",
-          "summary": "画面を更新"
         }
       ]
     }

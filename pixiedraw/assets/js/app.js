@@ -7820,7 +7820,11 @@
     return unsavedChangeToken > durableSaveToken;
   }
 
-  function clearActiveSharedProjectSession() {
+  function clearActiveSharedProjectSession(reason = 'clear-session') {
+    logSharedProjectRealtimeChannelLifecycle('clear-session', {
+      caller: 'clearActiveSharedProjectSession',
+      reason,
+    });
     activeSharedProjectId = '';
     activeSharedProjectKey = '';
     activeSharedProjectRevision = 0;
@@ -7852,7 +7856,10 @@
       window.clearInterval(sharedProjectPollingTimer);
       sharedProjectPollingTimer = null;
     }
-    disconnectActiveSharedProjectRealtimeChannel().catch(error => {
+    disconnectActiveSharedProjectRealtimeChannel({
+      reason,
+      caller: 'clearActiveSharedProjectSession',
+    }).catch(error => {
       console.warn('Failed to disconnect shared project realtime channel', error);
     });
     renderMultiParticipantsList();
@@ -8006,10 +8013,56 @@
     return true;
   }
 
+  function getSharedProjectRealtimeSessionDebugState() {
+    return {
+      activeProjectKey: activeSharedProjectKey || '',
+      activeProjectId: activeSharedProjectId || '',
+      activeRevision: activeSharedProjectRevision,
+      activeStructureRevision: activeSharedProjectStructureRevision,
+      channelKey: activeSharedProjectChannelKey || '',
+      channelSignature: activeSharedProjectChannelSignature || '',
+      hasActiveChannel: Boolean(activeSharedProjectChannel),
+      channelState: typeof activeSharedProjectChannel?.state === 'string' ? activeSharedProjectChannel.state : '',
+      joinState: typeof activeSharedProjectChannel?.joinPush?.state === 'string' ? activeSharedProjectChannel.joinPush.state : '',
+      retryBlockedUntil: sharedProjectRealtimeRetryBlockedUntil,
+      hasConnectPromise: Boolean(sharedProjectRealtimeConnectPromise),
+      accountLoggedIn: Boolean(accountState.isLoggedIn),
+      accountUserId: accountState.userId || '',
+      accountAnonymous: Boolean(accountState.isAnonymous),
+    };
+  }
+
+  function logSharedProjectRealtimeChannelLifecycle(action, {
+    reason = '',
+    caller = '',
+    projectKey = activeSharedProjectKey || '',
+    projectId = activeSharedProjectId || '',
+    channelSignature = activeSharedProjectChannelSignature || '',
+    channelKey = activeSharedProjectChannelKey || '',
+    extra = null,
+  } = {}) {
+    console.debug(`[shared-realtime] ${action}`, {
+      caller,
+      reason,
+      projectKey,
+      projectId,
+      channelSignature,
+      channelKey,
+      ...getSharedProjectRealtimeSessionDebugState(),
+      ...(extra && typeof extra === 'object' ? { extra } : {}),
+    });
+  }
+
   function setActiveSharedProjectSession(projectKey = '', revision = 0, structureRevision = 0, projectId = '') {
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey);
     if (!normalizedProjectKey) {
-      clearActiveSharedProjectSession();
+      logSharedProjectRealtimeChannelLifecycle('set-session-empty-project', {
+        caller: 'setActiveSharedProjectSession',
+        reason: 'missing-project-key',
+        projectKey: '',
+        projectId: typeof projectId === 'string' ? projectId.trim() : '',
+      });
+      clearActiveSharedProjectSession('set-empty-project');
       return;
     }
     const normalizedProjectId = typeof projectId === 'string' ? projectId.trim() : '';
@@ -8033,6 +8086,18 @@
         ? activeSharedProjectId
         : ''
     );
+    logSharedProjectRealtimeChannelLifecycle('set-session', {
+      caller: 'setActiveSharedProjectSession',
+      reason: projectChanged ? 'project-changed' : 'session-update',
+      projectKey: normalizedProjectKey,
+      projectId: activeSharedProjectId,
+      channelSignature: `${normalizedProjectKey}::${activeSharedProjectId || ''}`,
+      extra: {
+        incomingRevision: Math.max(0, Math.round(Number(revision) || 0)),
+        incomingStructureRevision: Math.max(0, Math.round(Number(structureRevision) || 0)),
+        projectChanged,
+      },
+    });
     activeSharedProjectKey = normalizedProjectKey;
     activeSharedProjectRevision = Math.max(0, Math.round(Number(revision) || 0));
     activeSharedProjectStructureRevision = Math.max(0, Math.round(Number(structureRevision) || 0));
@@ -53088,6 +53153,11 @@
     if ((!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) || !activeSharedProjectKey) {
       return false;
     }
+    logSharedProjectRealtimeChannelLifecycle('refresh-start', {
+      caller: 'refreshActiveSharedProjectSnapshot',
+      reason: reason || 'refresh',
+      extra: { force },
+    });
     if (sharedProjectRefreshInFlight) {
       return false;
     }
@@ -53649,6 +53719,11 @@
     if (!activeSharedProjectKey || !canUseSharedProjectsBackend()) {
       return;
     }
+    logSharedProjectRealtimeChannelLifecycle('queue-refresh', {
+      caller: 'queueSharedProjectRefresh',
+      reason: reason || (immediate ? 'immediate' : 'scheduled'),
+      extra: { immediate, force },
+    });
     if (sharedProjectRefreshTimer !== null) {
       window.clearTimeout(sharedProjectRefreshTimer);
       sharedProjectRefreshTimer = null;
@@ -53714,8 +53789,16 @@
     }, Math.max(0, Math.round(Number(delayMs) || 0)));
   }
 
-  async function disconnectActiveSharedProjectRealtimeChannel() {
+  async function disconnectActiveSharedProjectRealtimeChannel({ reason = 'disconnect', caller = 'unknown' } = {}) {
     const channel = activeSharedProjectChannel;
+    logSharedProjectRealtimeChannelLifecycle('disconnect-channel', {
+      caller,
+      reason,
+      extra: {
+        hasChannel: Boolean(channel),
+        channelTopic: channel?.topic || '',
+      },
+    });
     activeSharedProjectChannel = null;
     activeSharedProjectChannelKey = '';
     activeSharedProjectChannelSignature = '';
@@ -53724,6 +53807,13 @@
     }
     try {
       if (typeof channel.unsubscribe === 'function') {
+        logSharedProjectRealtimeChannelLifecycle('channel-unsubscribe', {
+          caller,
+          reason,
+          extra: {
+            channelTopic: channel?.topic || '',
+          },
+        });
         await channel.unsubscribe();
       }
     } catch (error) {
@@ -53751,6 +53841,13 @@
     const projectId = activeSharedProjectId || '';
     const channelSignature = `${projectKey}::${projectId}`;
     if (sharedProjectRealtimeConnectPromise && activeSharedProjectChannelSignature === channelSignature) {
+      logSharedProjectRealtimeChannelLifecycle('reuse-connect-promise', {
+        caller: 'ensureActiveSharedProjectRealtimeChannel',
+        reason: 'same-channel-signature',
+        projectKey,
+        projectId,
+        channelSignature,
+      });
       return await sharedProjectRealtimeConnectPromise;
     }
     if (
@@ -53765,7 +53862,10 @@
     }
     activeSharedProjectChannelSignature = channelSignature;
     sharedProjectRealtimeConnectPromise = (async () => {
-      await disconnectActiveSharedProjectRealtimeChannel();
+      await disconnectActiveSharedProjectRealtimeChannel({
+        reason: 'recreate-before-subscribe',
+        caller: 'ensureActiveSharedProjectRealtimeChannel',
+      });
       const supabase = await ensurePixieedAccountClient();
       if (!supabase) {
         console.debug('[shared-realtime] subscribe aborted: missing authenticated supabase client', {
@@ -54032,6 +54132,17 @@
       } catch (error) {
         sharedProjectRealtimeRetryBlockedUntil = Date.now() + 30000;
         try {
+          logSharedProjectRealtimeChannelLifecycle('remove-channel', {
+            caller: 'ensureActiveSharedProjectRealtimeChannel',
+            reason: 'subscribe-failure-cleanup',
+            projectKey,
+            projectId,
+            channelSignature,
+            extra: {
+              channelTopic: channel?.topic || '',
+              errorMessage: String(error?.message || error || ''),
+            },
+          });
           await supabase.removeChannel(channel);
         } catch (_removeError) {
           // Ignore realtime cleanup failures and rely on polling fallback.
