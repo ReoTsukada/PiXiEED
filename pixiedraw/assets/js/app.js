@@ -53608,6 +53608,14 @@
 
   async function refreshActiveSharedProjectSnapshot({ force = false, reason = '' } = {}) {
     if ((!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) || !activeSharedProjectKey) {
+      logSharedProjectRealtimeChannelLifecycle('refresh-skip', {
+        caller: 'refreshActiveSharedProjectSnapshot',
+        reason: reason || 'refresh',
+        extra: {
+          force,
+          blockedBy: 'missing-backend-session-or-project-key',
+        },
+      });
       return false;
     }
     logSharedProjectRealtimeChannelLifecycle('refresh-start', {
@@ -53616,37 +53624,117 @@
       extra: { force },
     });
     if (sharedProjectRefreshInFlight) {
+      logSharedProjectRealtimeChannelLifecycle('refresh-skip', {
+        caller: 'refreshActiveSharedProjectSnapshot',
+        reason: reason || 'refresh',
+        extra: {
+          force,
+          blockedBy: 'refresh-in-flight',
+        },
+      });
       return false;
     }
     sharedProjectRefreshInFlight = true;
     try {
       const project = await fetchSharedProjectRecord(activeSharedProjectKey);
       if (!project) {
+        logSharedProjectRealtimeChannelLifecycle('refresh-result', {
+          caller: 'refreshActiveSharedProjectSnapshot',
+          reason: reason || 'refresh',
+          extra: {
+            force,
+            result: 'missing-project-record',
+          },
+        });
         return false;
       }
       const nextRevision = Math.max(0, Math.round(Number(project.latest_revision) || 0));
       const nextStructureRevision = Math.max(0, Math.round(Number(project.latest_structure_revision) || 0));
+      logSharedProjectRealtimeChannelLifecycle('refresh-fetched-project', {
+        caller: 'refreshActiveSharedProjectSnapshot',
+        reason: reason || 'refresh',
+        extra: {
+          force,
+          nextRevision,
+          nextStructureRevision,
+          snapshotRevision: Math.max(
+            0,
+            Math.round(Number(project.latest_snapshot_revision) || Number(project.latest_revision) || 0)
+          ),
+          snapshotStructureRevision: Math.max(
+            0,
+            Math.round(Number(project.latest_snapshot_structure_revision) || Number(project.latest_structure_revision) || 0)
+          ),
+        },
+      });
       if (
         !force
         && nextRevision <= activeSharedProjectRevision
         && nextStructureRevision <= activeSharedProjectStructureRevision
       ) {
+        logSharedProjectRealtimeChannelLifecycle('refresh-result', {
+          caller: 'refreshActiveSharedProjectSnapshot',
+          reason: reason || 'refresh',
+          extra: {
+            force,
+            result: 'already-current',
+            nextRevision,
+            nextStructureRevision,
+          },
+        });
         return false;
       }
       // Normal refresh prefers ordered op replay first; snapshot load is fallback/recovery.
       if (!force && nextStructureRevision === activeSharedProjectStructureRevision) {
         const syncedByOps = await applySharedProjectOpsSinceRevision(project, activeSharedProjectRevision);
+        logSharedProjectRealtimeChannelLifecycle('refresh-ops-replay-result', {
+          caller: 'refreshActiveSharedProjectSnapshot',
+          reason: reason || 'refresh',
+          extra: {
+            force,
+            syncedByOps,
+            afterRevision: activeSharedProjectRevision,
+            targetRevision: nextRevision,
+          },
+        });
         if (syncedByOps) {
           sharedProjectLastRealtimeActivityAt = Date.now();
+          logSharedProjectRealtimeChannelLifecycle('refresh-result', {
+            caller: 'refreshActiveSharedProjectSnapshot',
+            reason: reason || 'refresh',
+            extra: {
+              force,
+              result: 'replayed-ops',
+              nextRevision,
+              nextStructureRevision,
+            },
+          });
           return true;
         }
       }
       if (!force && !canApplyIncomingSharedProjectSnapshot()) {
+        logSharedProjectRealtimeChannelLifecycle('refresh-result', {
+          caller: 'refreshActiveSharedProjectSnapshot',
+          reason: reason || 'refresh',
+          extra: {
+            force,
+            result: 'snapshot-apply-blocked',
+          },
+        });
         return false;
       }
       const sharedSnapshot = project.latest_snapshot;
       if (!sharedSnapshot || typeof sharedSnapshot !== 'object') {
         activeSharedProjectRevision = nextRevision;
+        logSharedProjectRealtimeChannelLifecycle('refresh-result', {
+          caller: 'refreshActiveSharedProjectSnapshot',
+          reason: reason || 'refresh',
+          extra: {
+            force,
+            result: 'missing-shared-snapshot',
+            nextRevision,
+          },
+        });
         return false;
       }
       const snapshotRevision = Math.max(
@@ -53662,6 +53750,16 @@
         )
       );
       if (prefersFreshCanonicalSnapshot && snapshotRevision < nextRevision) {
+        logSharedProjectRealtimeChannelLifecycle('refresh-result', {
+          caller: 'refreshActiveSharedProjectSnapshot',
+          reason: reason || 'refresh',
+          extra: {
+            force,
+            result: 'awaiting-fresher-canonical-snapshot',
+            snapshotRevision,
+            nextRevision,
+          },
+        });
         queueSharedProjectRefresh({
           immediate: false,
           reason: `${reason || 'refresh'}-await-snapshot`,
@@ -53678,8 +53776,29 @@
         sharedProjectRevision: snapshotRevision,
       });
       if (!loaded) {
+        logSharedProjectRealtimeChannelLifecycle('refresh-result', {
+          caller: 'refreshActiveSharedProjectSnapshot',
+          reason: reason || 'refresh',
+          extra: {
+            force,
+            result: 'snapshot-load-failed',
+            snapshotRevision,
+          },
+        });
         return false;
       }
+      logSharedProjectRealtimeChannelLifecycle('refresh-snapshot-loaded', {
+        caller: 'refreshActiveSharedProjectSnapshot',
+        reason: reason || 'refresh',
+        extra: {
+          force,
+          snapshotRevision,
+          snapshotStructureRevision: Math.max(
+            0,
+            Math.round(Number(project.latest_snapshot_structure_revision) || Number(project.latest_structure_revision) || 0)
+          ),
+        },
+      });
       sharedProjectRemoteApplyFailureKeys.clear();
       markActiveSharedProjectDocumentLoaded(activeSharedProjectKey);
       setActiveSharedProjectSession(
@@ -53688,7 +53807,17 @@
         Math.max(0, Math.round(Number(project.latest_snapshot_structure_revision) || Number(project.latest_structure_revision) || 0)),
         project.id || ''
       );
-      await applySharedProjectOpsSinceRevision(project, snapshotRevision);
+      const replayedAfterSnapshot = await applySharedProjectOpsSinceRevision(project, snapshotRevision);
+      logSharedProjectRealtimeChannelLifecycle('refresh-post-snapshot-ops', {
+        caller: 'refreshActiveSharedProjectSnapshot',
+        reason: reason || 'refresh',
+        extra: {
+          force,
+          replayedAfterSnapshot,
+          snapshotRevision,
+          targetRevision: nextRevision,
+        },
+      });
       await syncSharedProjectMembers(activeSharedProjectKey, project.id || '');
       await upsertSharedRecentProjectEntry({
         projectKey: activeSharedProjectKey,
@@ -53709,8 +53838,28 @@
           'info'
         );
       }
+      logSharedProjectRealtimeChannelLifecycle('refresh-result', {
+        caller: 'refreshActiveSharedProjectSnapshot',
+        reason: reason || 'refresh',
+        extra: {
+          force,
+          result: 'loaded-snapshot',
+          snapshotRevision,
+          nextRevision,
+          replayedAfterSnapshot,
+        },
+      });
       return true;
     } catch (error) {
+      logSharedProjectRealtimeChannelLifecycle('refresh-result', {
+        caller: 'refreshActiveSharedProjectSnapshot',
+        reason: reason || 'refresh',
+        extra: {
+          force,
+          result: 'exception',
+          error: String(error?.message || error || ''),
+        },
+      });
       handleSharedProjectsBackendError(error, `refresh-${reason || 'snapshot'}`);
       return false;
     } finally {
@@ -53923,12 +54072,23 @@
       if (resolvedOpType === 'draw') {
         // Persist the full canonical snapshot immediately after a confirmed draw op
         // so receivers never recover against an older document image.
+        console.debug('[shared-realtime] draw-commit-confirmed', {
+          projectKey: normalizedProjectKey,
+          opId: resolvedOp.opId || '',
+          latestRevision: Math.max(0, Math.round(Number(result.latest_revision) || 0)),
+          latestStructureRevision: Math.max(0, Math.round(Number(result.latest_structure_revision) || 0)),
+        });
         try {
           const snapshot = makeHistorySnapshot({ clonePixelData: false });
           const packaged = buildPackagedProjectPayload(snapshot, {
             session: buildProjectSessionPayload(),
           });
           packaged.sharedHistoryLabel = 'realtimeSnapshotSync';
+          console.debug('[shared-realtime] draw-commit-persist-snapshot-start', {
+            projectKey: normalizedProjectKey,
+            opId: resolvedOp.opId || '',
+            revision: Math.max(0, Math.round(Number(result.latest_revision) || 0)),
+          });
           const savedSnapshot = await persistSharedProjectSnapshot(
             normalizedProjectKey,
             packaged,
@@ -53937,6 +54097,13 @@
               revision: Math.max(0, Math.round(Number(result.latest_revision) || 0)),
             }
           );
+          console.debug('[shared-realtime] draw-commit-persist-snapshot-result', {
+            projectKey: normalizedProjectKey,
+            opId: resolvedOp.opId || '',
+            persisted: Boolean(savedSnapshot),
+            persistedRevision: Math.max(0, Math.round(Number(savedSnapshot?.latest_revision) || 0)),
+            persistedSnapshotRevision: Math.max(0, Math.round(Number(savedSnapshot?.latest_snapshot_revision) || 0)),
+          });
           if (!savedSnapshot) {
             queueSharedProjectCurrentSnapshotCapture({
               delayMs: 0,
