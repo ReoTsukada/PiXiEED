@@ -52219,6 +52219,16 @@
     const code = String(error?.code || '');
     const details = String(error?.details || '');
     const hint = String(error?.hint || '');
+    const locationOrigin = typeof window !== 'undefined' && window.location
+      ? String(window.location.origin || '')
+      : '';
+    const locationHref = typeof window !== 'undefined' && window.location
+      ? String(window.location.href || '')
+      : '';
+    const referrer = typeof document !== 'undefined' ? String(document.referrer || '') : '';
+    const visibilityState = typeof document !== 'undefined' ? String(document.visibilityState || '') : '';
+    const online = typeof navigator !== 'undefined' ? Boolean(navigator.onLine) : null;
+    const userAgent = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : '';
     if (accountState.isLoggedIn) {
       if (shouldDisableSharedProjectsBackend(error)) {
         setMultiStatus(
@@ -52255,6 +52265,12 @@
         message,
         details,
         hint,
+        locationOrigin,
+        locationHref,
+        referrer,
+        visibilityState,
+        online,
+        userAgent,
         accountLoggedIn: Boolean(accountState.isLoggedIn),
         accountUserId: accountState.userId || '',
         accountAnonymous: Boolean(accountState.isAnonymous),
@@ -52267,6 +52283,12 @@
         message,
         details,
         hint,
+        locationOrigin,
+        locationHref,
+        referrer,
+        visibilityState,
+        online,
+        userAgent,
         accountLoggedIn: Boolean(accountState.isLoggedIn),
         accountUserId: accountState.userId || '',
         accountAnonymous: Boolean(accountState.isAnonymous),
@@ -53336,17 +53358,42 @@
       if (!supabase) {
         return [];
       }
+      const rpcDebugInfo = {
+        context: 'fetch-ops-since',
+        projectKey: normalizedProjectKey,
+        afterRevision: Math.max(0, Math.round(Number(afterRevision) || 0)),
+        limit: Math.max(1, Math.round(Number(limit) || 256)),
+        locationOrigin: typeof window !== 'undefined' && window.location ? String(window.location.origin || '') : '',
+        locationHref: typeof window !== 'undefined' && window.location ? String(window.location.href || '') : '',
+        referrer: typeof document !== 'undefined' ? String(document.referrer || '') : '',
+        visibilityState: typeof document !== 'undefined' ? String(document.visibilityState || '') : '',
+        online: typeof navigator !== 'undefined' ? Boolean(navigator.onLine) : null,
+      };
+      console.debug('[shared-backend] fetch-ops-since start', rpcDebugInfo);
       const { data, error } = await supabase.rpc('pixieed_get_shared_project_ops_since', {
         target_project_key: normalizedProjectKey,
         after_revision: Math.max(0, Math.round(Number(afterRevision) || 0)),
         max_ops: Math.max(1, Math.round(Number(limit) || 256)),
       });
       if (error) {
+        console.warn('[shared-backend] fetch-ops-since failed', rpcDebugInfo);
         handleSharedProjectsBackendError(error, 'fetch-ops-since');
         return [];
       }
       return Array.isArray(data) ? data : [];
     } catch (error) {
+      console.warn('[shared-backend] fetch-ops-since exception', {
+        context: 'fetch-ops-since',
+        projectKey: normalizedProjectKey,
+        afterRevision: Math.max(0, Math.round(Number(afterRevision) || 0)),
+        limit: Math.max(1, Math.round(Number(limit) || 256)),
+        locationOrigin: typeof window !== 'undefined' && window.location ? String(window.location.origin || '') : '',
+        locationHref: typeof window !== 'undefined' && window.location ? String(window.location.href || '') : '',
+        referrer: typeof document !== 'undefined' ? String(document.referrer || '') : '',
+        visibilityState: typeof document !== 'undefined' ? String(document.visibilityState || '') : '',
+        online: typeof navigator !== 'undefined' ? Boolean(navigator.onLine) : null,
+        message: String(error?.message || error || ''),
+      });
       handleSharedProjectsBackendError(error, 'fetch-ops-since-exception');
       return [];
     }
