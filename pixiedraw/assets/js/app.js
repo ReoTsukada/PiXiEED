@@ -19143,6 +19143,59 @@
     return await pruneSharedLocalOpJournal(normalizedProjectKey, { checkpointRevision });
   }
 
+  async function discardStaleSharedLocalOpJournal(projectKey = activeSharedProjectKey, {
+    minBaseRevision = 0,
+    minBaseStructureRevision = 0,
+  } = {}) {
+    if (!AUTOSAVE_SUPPORTED) {
+      return 0;
+    }
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    if (!normalizedProjectKey) {
+      return 0;
+    }
+    const entries = await loadSharedLocalOpJournal(normalizedProjectKey);
+    if (!entries.length) {
+      return 0;
+    }
+    const removable = entries
+      .filter(entry => (
+        entry?.status === 'pending'
+        && (
+          Math.max(0, Math.round(Number(entry?.baseRevision) || 0)) < Math.max(0, Math.round(Number(minBaseRevision) || 0))
+          || Math.max(0, Math.round(Number(entry?.baseStructureRevision) || 0)) < Math.max(0, Math.round(Number(minBaseStructureRevision) || 0))
+        )
+      ))
+      .map(entry => entry?.id)
+      .filter(Boolean);
+    if (!removable.length) {
+      return 0;
+    }
+    const writeTask = async () => {
+      const db = await openAutosaveDatabase();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction([SHARED_LOCAL_OP_JOURNAL_STORE], 'readwrite');
+        const store = tx.objectStore(SHARED_LOCAL_OP_JOURNAL_STORE);
+        removable.forEach(id => store.delete(id));
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => {
+          const error = tx.error;
+          db.close();
+          reject(error);
+        };
+      });
+      return removable.length;
+    };
+    const nextWrite = sharedLocalOpJournalWritePromise
+      .catch(() => {})
+      .then(writeTask);
+    sharedLocalOpJournalWritePromise = nextWrite.catch(() => {});
+    return await nextWrite;
+  }
+
   async function resumeSharedLocalOpJournal(projectKey = activeSharedProjectKey) {
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
     if (!normalizedProjectKey) {
@@ -20038,8 +20091,11 @@
       sharedProject,
       Math.max(0, Math.round(Number(sharedProject.latest_snapshot_revision) || 0))
     );
-    resumeSharedLocalOpJournal(resolvedProjectKey).catch(error => {
-      console.warn('Failed to resume shared local op journal after opening shared project', error);
+    discardStaleSharedLocalOpJournal(resolvedProjectKey, {
+      minBaseRevision: Math.max(0, Math.round(Number(sharedProject.latest_revision) || 0)),
+      minBaseStructureRevision: Math.max(0, Math.round(Number(sharedProject.latest_structure_revision) || 0)),
+    }).catch(error => {
+      console.warn('Failed to discard stale shared local op journal after opening shared project', error);
     });
     await upsertSharedRecentProjectEntry({
       projectKey: resolvedProjectKey,
@@ -53834,7 +53890,10 @@
         revision: nextRevision,
         structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
       });
-      await resumeSharedLocalOpJournal(activeSharedProjectKey);
+      await discardStaleSharedLocalOpJournal(activeSharedProjectKey, {
+        minBaseRevision: nextRevision,
+        minBaseStructureRevision: nextStructureRevision,
+      });
       maybeReplayPendingSharedProjectConflictAfterRefresh(activeSharedProjectKey);
       if (reason) {
         updateAutosaveStatus(
