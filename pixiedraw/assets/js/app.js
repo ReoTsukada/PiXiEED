@@ -994,8 +994,9 @@
   }
 
   const SESSION_STORAGE_KEY = 'pixieedraw:sessionState';
-  const RELOAD_SNAPSHOT_ENABLED = false;
+  const RELOAD_SNAPSHOT_ENABLED = true;
   const RELOAD_SNAPSHOT_STORAGE_KEY = 'pixieedraw:reload-snapshot-v1';
+  const RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY = 'pixieedraw:reload-snapshot-fallback-v1';
   const RELOAD_SNAPSHOT_VERSION = 1;
   const RELOAD_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const RELOAD_SNAPSHOT_MAX_HISTORY_ITEMS = 160;
@@ -8932,7 +8933,7 @@
         history.past.shift();
       }
       history.future.length = 0;
-      scheduleAutosaveSnapshot();
+      requestImmediateAutosaveSnapshot();
       handleMultiLocalCommit(pendingLabel);
     }
     history.pending = null;
@@ -13157,6 +13158,16 @@
         updateAutosaveStatus('自動保存: 保存に失敗しました', 'error');
       });
     }, Math.max(0, deadline - Date.now()));
+  }
+
+  function requestImmediateAutosaveSnapshot() {
+    if (!AUTOSAVE_SUPPORTED || autosaveRestoring || !autosaveDirty) {
+      return;
+    }
+    writeAutosaveSnapshot(true).catch(error => {
+      console.warn('Immediate autosave failed', error);
+      updateAutosaveStatus('自動保存: 保存に失敗しました', 'error');
+    });
   }
 
   function isAutosaveInteractionBusy() {
@@ -41847,7 +41858,7 @@
     if (persist && yawChanged) {
       markDocumentUnsavedChange();
       markAutosaveDirty();
-      scheduleAutosaveSnapshot();
+      requestImmediateAutosaveSnapshot();
       scheduleSessionPersist();
     } else if (persist) {
       scheduleSessionPersist();
@@ -49222,6 +49233,7 @@
     return {
       version: RELOAD_SNAPSHOT_VERSION,
       at: Date.now(),
+      projectId: normalizeAutosaveProjectId(autosaveProjectId || ''),
       current: currentSnapshot,
       past,
       future,
@@ -49230,12 +49242,68 @@
     };
   }
 
+  function serializeReloadSnapshotValue(value) {
+    if (value instanceof Int16Array) {
+      return { __typedArray: 'Int16Array', data: encodeTypedArray(new Uint8Array(value.buffer, value.byteOffset, value.byteLength)) };
+    }
+    if (value instanceof Uint32Array) {
+      return { __typedArray: 'Uint32Array', data: encodeTypedArray(new Uint8Array(value.buffer, value.byteOffset, value.byteLength)) };
+    }
+    if (value instanceof Uint8ClampedArray) {
+      return { __typedArray: 'Uint8ClampedArray', data: encodeTypedArray(value) };
+    }
+    if (value instanceof Uint8Array) {
+      return { __typedArray: 'Uint8Array', data: encodeTypedArray(value) };
+    }
+    if (Array.isArray(value)) {
+      return value.map(item => serializeReloadSnapshotValue(item));
+    }
+    if (value && typeof value === 'object') {
+      const serialized = {};
+      Object.entries(value).forEach(([key, nestedValue]) => {
+        serialized[key] = serializeReloadSnapshotValue(nestedValue);
+      });
+      return serialized;
+    }
+    return value;
+  }
+
+  function deserializeReloadSnapshotValue(value) {
+    if (!value || typeof value !== 'object') {
+      return value;
+    }
+    if (Array.isArray(value)) {
+      return value.map(item => deserializeReloadSnapshotValue(item));
+    }
+    const typedArrayTag = typeof value.__typedArray === 'string' ? value.__typedArray : '';
+    if (typedArrayTag) {
+      const bytes = decodeBase64(typeof value.data === 'string' ? value.data : '');
+      if (typedArrayTag === 'Int16Array') {
+        return new Int16Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+      }
+      if (typedArrayTag === 'Uint32Array') {
+        return new Uint32Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+      }
+      if (typedArrayTag === 'Uint8ClampedArray') {
+        return new Uint8ClampedArray(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+      }
+      if (typedArrayTag === 'Uint8Array') {
+        return new Uint8Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+      }
+    }
+    const deserialized = {};
+    Object.entries(value).forEach(([key, nestedValue]) => {
+      deserialized[key] = deserializeReloadSnapshotValue(nestedValue);
+    });
+    return deserialized;
+  }
+
   function encodeReloadSnapshotPayload(payload) {
     if (!payload || typeof payload !== 'object') {
       return '';
     }
     try {
-      const json = JSON.stringify(payload);
+      const json = JSON.stringify(serializeReloadSnapshotValue(payload));
       if (!json) {
         return '';
       }
@@ -49277,7 +49345,9 @@
         return null;
       }
       const parsed = JSON.parse(decoded);
-      return parsed && typeof parsed === 'object' ? parsed : null;
+      return parsed && typeof parsed === 'object'
+        ? deserializeReloadSnapshotValue(parsed)
+        : null;
     } catch (error) {
       return null;
     }
@@ -49347,8 +49417,19 @@
       }
       try {
         window.sessionStorage.setItem(RELOAD_SNAPSHOT_STORAGE_KEY, encoded);
+        try {
+          window.localStorage.setItem(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY, encoded);
+        } catch (fallbackError) {
+          // Ignore localStorage fallback failures.
+        }
         return;
       } catch (error) {
+        try {
+          window.localStorage.setItem(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY, encoded);
+          return;
+        } catch (fallbackError) {
+          // Continue trimming history below.
+        }
         if (maxItems <= 0) {
           break;
         }
@@ -49358,6 +49439,11 @@
     }
     try {
       window.sessionStorage.removeItem(RELOAD_SNAPSHOT_STORAGE_KEY);
+    } catch (error) {
+      // Ignore storage errors.
+    }
+    try {
+      window.localStorage.removeItem(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY);
     } catch (error) {
       // Ignore storage errors.
     }
@@ -49379,7 +49465,14 @@
     try {
       raw = window.sessionStorage.getItem(RELOAD_SNAPSHOT_STORAGE_KEY) || '';
     } catch (error) {
-      return null;
+      raw = '';
+    }
+    if (!raw) {
+      try {
+        raw = window.localStorage.getItem(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY) || '';
+      } catch (error) {
+        raw = '';
+      }
     }
     if (!raw) {
       return null;
@@ -49413,6 +49506,7 @@
     const past = normalizeReloadHistoryList(parsed.past, historyLimit);
     const future = normalizeReloadHistoryList(parsed.future, historyLimit);
     return {
+      projectId: normalizeAutosaveProjectId(parsed.projectId || ''),
       currentSnapshot,
       past,
       future,
@@ -49446,6 +49540,21 @@
     } else {
       resetDocumentUnsavedChanges();
     }
+    const restoredProjectId = normalizeAutosaveProjectId(payload.projectId || '');
+    if (restoredProjectId) {
+      startupAutosaveRestoreProjectId = restoredProjectId;
+      setActiveAutosaveProjectId(restoredProjectId, { persist: false });
+    }
+    try {
+      window.sessionStorage.removeItem(RELOAD_SNAPSHOT_STORAGE_KEY);
+    } catch (error) {
+      // Ignore storage errors.
+    }
+    try {
+      window.localStorage.removeItem(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY);
+    } catch (error) {
+      // Ignore storage errors.
+    }
     updateHistoryButtons();
     markAutosaveDirty();
     scheduleAutosaveSnapshot();
@@ -49467,6 +49576,9 @@
         if (isAutosaveInteractionBusy() || hasRecentSaveInteraction()) {
           scheduleSessionPersist({ includeSnapshots: false });
           return;
+        }
+        if (RELOAD_SNAPSHOT_ENABLED) {
+          persistReloadSessionSnapshot();
         }
         persistSessionState();
       };
