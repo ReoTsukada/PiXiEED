@@ -2514,6 +2514,7 @@
   const SHARED_PROJECT_CHECKPOINT_INTERVAL_MS = 15000;
   const SHARED_PROJECT_MAX_MISSING_OP_FETCH = 512;
   const SHARED_PROJECT_REFRESH_LOOP_INTERVAL_MS = 2500;
+  const SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS = 350;
   const SHARED_PROJECT_REFRESH_IDLE_GRACE_MS = 6000;
   const SHARED_PROJECT_BROADCAST_EVENT = 'shared-op';
   const SHARED_LOCAL_OP_JOURNAL_MAX_CONFIRMED_PER_PROJECT = 160;
@@ -2985,6 +2986,7 @@
   let activeSharedProjectChannel = null;
   let activeSharedProjectChannelKey = '';
   let activeSharedProjectChannelSignature = '';
+  let sharedProjectRealtimeStatus = 'idle';
   let sharedProjectRealtimeRetryBlockedUntil = 0;
   let sharedProjectRealtimeConnectPromise = null;
   let sharedProjectRealtimeWarnedAt = 0;
@@ -3005,6 +3007,7 @@
   const sharedProjectSeenOpSeqById = new Map();
   let sharedProjectInFlightStroke = null;
   let sharedProjectGapRecoveryPromise = null;
+  let sharedProjectOpPollInFlight = false;
   const sharedProjectSessionId = (() => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
       return `shared-${crypto.randomUUID()}`;
@@ -7844,7 +7847,9 @@
     sharedProjectInFlightStroke = null;
     sharedProjectOpCommitInFlight = false;
     sharedProjectGapRecoveryPromise = null;
+    sharedProjectOpPollInFlight = false;
     sharedProjectRealtimeConnectPromise = null;
+    sharedProjectRealtimeStatus = 'idle';
     sharedProjectMembers = [];
     sharedProjectLayerSnapshots.clear();
     if (sharedProjectCaptureTimer !== null) {
@@ -7901,6 +7906,7 @@
         return;
       }
       const now = Date.now();
+      const realtimeSubscribed = sharedProjectRealtimeStatus === 'subscribed';
       if (sharedProjectRealtimeRetryBlockedUntil > now) {
         logSharedProjectRealtimeChannelLifecycle('skip-poll-refresh', {
           caller: 'ensureSharedProjectRefreshLoop',
@@ -7920,12 +7926,27 @@
         && sharedProjectRealtimeRetryBlockedUntil <= now
       );
       const recentlyAppliedRealtime = (now - sharedProjectLastRealtimeActivityAt) < SHARED_PROJECT_REFRESH_IDLE_GRACE_MS;
+      if (realtimeSubscribed && realtimeLikelyHealthy) {
+        if (!recentlyAppliedRealtime) {
+          pollSharedProjectRealtimeOpsRescue({ reason: 'idle-op-poll' }).catch(() => {});
+        }
+        return;
+      }
       if (realtimeLikelyHealthy && recentlyAppliedRealtime) {
         return;
       }
-      // Refresh loop is rescue-only. Normal draw sync should stay op-first.
-      queueSharedProjectRefresh({ immediate: false, reason: realtimeLikelyHealthy ? 'poll-idle' : 'poll-recovery' });
-    }, SHARED_PROJECT_REFRESH_LOOP_INTERVAL_MS);
+      pollSharedProjectRealtimeOpsRescue({
+        reason: realtimeLikelyHealthy ? 'idle-op-poll' : 'recovery-op-poll',
+      }).then(recovered => {
+        if (recovered) {
+          return;
+        }
+        // Refresh loop is rescue-only. Normal draw sync should stay op-first.
+        queueSharedProjectRefresh({ immediate: false, reason: realtimeLikelyHealthy ? 'poll-idle' : 'poll-recovery' });
+      }).catch(() => {
+        queueSharedProjectRefresh({ immediate: false, reason: realtimeLikelyHealthy ? 'poll-idle' : 'poll-recovery' });
+      });
+    }, Math.min(SHARED_PROJECT_REFRESH_LOOP_INTERVAL_MS, SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS));
   }
 
   function reportSharedProjectRealtimeSubscribeFailure(error) {
@@ -52840,6 +52861,53 @@
     }
   }
 
+  async function pollSharedProjectRealtimeOpsRescue({ reason = 'poll' } = {}) {
+    if (!activeSharedProjectKey || !canUseSharedProjectsBackend()) {
+      return false;
+    }
+    if (
+      sharedProjectOpPollInFlight
+      || sharedProjectGapRecoveryPromise
+      || sharedProjectRefreshInFlight
+      || sharedProjectOpCommitInFlight
+    ) {
+      return false;
+    }
+    sharedProjectOpPollInFlight = true;
+    try {
+      const afterSeq = sharedProjectLastAppliedSeq;
+      const ops = await fetchMissingOps(
+        activeSharedProjectKey,
+        afterSeq,
+        Math.min(128, SHARED_PROJECT_MAX_MISSING_OP_FETCH)
+      );
+      if (!ops.length) {
+        return false;
+      }
+      console.debug('[shared-realtime] rescue-op-poll', {
+        reason,
+        projectKey: activeSharedProjectKey || '',
+        afterSeq,
+        opCount: ops.length,
+      });
+      const replayed = await replayOps(ops, { fromRemote: true });
+      if (replayed) {
+        sharedProjectLastRealtimeActivityAt = Date.now();
+      }
+      return replayed;
+    } catch (error) {
+      console.warn('[shared-realtime] rescue-op-poll-failed', {
+        reason,
+        projectKey: activeSharedProjectKey || '',
+        afterSeq: sharedProjectLastAppliedSeq,
+        error: String(error?.message || error || ''),
+      });
+      return false;
+    } finally {
+      sharedProjectOpPollInFlight = false;
+    }
+  }
+
   function shouldCreateSharedProjectCheckpoint(opType = 'draw') {
     // Checkpoints are supplemental durability for shared projects.
     // Draw operations should stay op-first and only snapshot periodically.
@@ -53987,11 +54055,32 @@
     }
     const normalizedReason = String(reason || '');
     const now = Date.now();
+    const realtimeSubscribed = sharedProjectRealtimeStatus === 'subscribed';
     const isForegroundRecoveryReason = (
       normalizedReason === 'focus'
       || normalizedReason === 'visibility'
       || normalizedReason === 'online'
     );
+    if (
+      !force
+      && realtimeSubscribed
+      && (
+        normalizedReason === 'poll-idle'
+        || isForegroundRecoveryReason
+      )
+    ) {
+      logSharedProjectRealtimeChannelLifecycle('skip-queue-refresh', {
+        caller: 'queueSharedProjectRefresh',
+        reason: 'realtime-subscribed',
+        extra: {
+          requestedReason: normalizedReason,
+          immediate,
+          force,
+          realtimeStatus: sharedProjectRealtimeStatus,
+        },
+      });
+      return;
+    }
     if (
       !immediate
       && normalizedReason === 'poll-idle'
@@ -54167,6 +54256,7 @@
     const projectKey = activeSharedProjectKey;
     const projectId = activeSharedProjectId || '';
     const channelSignature = `${projectKey}::${projectId}`;
+    sharedProjectRealtimeStatus = 'subscribing';
     if (sharedProjectRealtimeConnectPromise && activeSharedProjectChannelSignature === channelSignature) {
       logSharedProjectRealtimeChannelLifecycle('reuse-connect-promise', {
         caller: 'ensureActiveSharedProjectRealtimeChannel',
@@ -54496,6 +54586,7 @@
         });
       } catch (error) {
         sharedProjectRealtimeRetryBlockedUntil = Date.now() + 30000;
+        sharedProjectRealtimeStatus = String(error?.message || '').includes('CLOSED') ? 'closed' : 'error';
         try {
           logSharedProjectRealtimeChannelLifecycle('remove-channel', {
             caller: 'ensureActiveSharedProjectRealtimeChannel',
@@ -54516,6 +54607,7 @@
       }
       sharedProjectRealtimeRetryBlockedUntil = 0;
       sharedProjectRealtimeWarnedAt = 0;
+      sharedProjectRealtimeStatus = 'subscribed';
       activeSharedProjectChannel = channel;
       activeSharedProjectChannelKey = projectKey;
       activeSharedProjectChannelSignature = channelSignature;
@@ -54526,6 +54618,9 @@
     } finally {
       sharedProjectRealtimeConnectPromise = null;
       if (!activeSharedProjectChannel) {
+        if (sharedProjectRealtimeStatus === 'subscribing') {
+          sharedProjectRealtimeStatus = 'idle';
+        }
         activeSharedProjectChannelSignature = activeSharedProjectKey
           ? `${activeSharedProjectKey}::${activeSharedProjectId || ''}`
           : '';
