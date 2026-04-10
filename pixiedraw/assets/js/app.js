@@ -3017,6 +3017,7 @@
   })();
   let sharedProjectMembers = [];
   let sharedProjectMembersSyncPromise = null;
+  let sharedProjectImmediateRecoveryPromise = null;
   let multiSupabaseClientPromise = null;
   let recentProjectsWritePromise = Promise.resolve();
   let sharedLocalOpJournalWritePromise = Promise.resolve();
@@ -53235,10 +53236,21 @@
         && !sharedProjectRemoteApplyFailureKeys.has(failureKey)
       ) {
         sharedProjectRemoteApplyFailureKeys.add(failureKey);
-        queueSharedProjectRefresh({
-          immediate: true,
-          reason: `apply-skip-${diagnostics.reason}`,
-          force: true,
+        const recoveryReason = `apply-skip-${diagnostics.reason}`;
+        triggerImmediateSharedProjectRecovery(recoveryReason).then(recovered => {
+          if (!recovered) {
+            queueSharedProjectRefresh({
+              immediate: true,
+              reason: recoveryReason,
+              force: true,
+            });
+          }
+        }).catch(() => {
+          queueSharedProjectRefresh({
+            immediate: true,
+            reason: recoveryReason,
+            force: true,
+          });
         });
       }
       return false;
@@ -54257,6 +54269,26 @@
         console.warn('Failed to refresh shared project snapshot', error);
       });
     }, delayMs);
+  }
+
+  function triggerImmediateSharedProjectRecovery(reason = 'recovery') {
+    if (!activeSharedProjectKey || sharedProjectImmediateRecoveryPromise) {
+      return sharedProjectImmediateRecoveryPromise || Promise.resolve(false);
+    }
+    sharedProjectImmediateRecoveryPromise = Promise.resolve()
+      .then(() => refreshActiveSharedProjectSnapshot({ reason, force: true }))
+      .catch(error => {
+        console.warn('[shared-realtime] immediate-recovery-failed', {
+          reason,
+          projectKey: activeSharedProjectKey || '',
+          error: String(error?.message || error || ''),
+        });
+        return false;
+      })
+      .finally(() => {
+        sharedProjectImmediateRecoveryPromise = null;
+      });
+    return sharedProjectImmediateRecoveryPromise;
   }
 
   function queueSharedProjectCurrentSnapshotCapture({
