@@ -3021,6 +3021,7 @@
   let multiSupabaseClientPromise = null;
   let recentProjectsWritePromise = Promise.resolve();
   let sharedLocalOpJournalWritePromise = Promise.resolve();
+  let pixieedAdFreeSharedLimitBound = false;
   let globalLoadingIndicatorDepth = 0;
   let globalLoadingIndicatorLabel = '';
   let globalLoadingIndicatorVisible = false;
@@ -18499,6 +18500,104 @@
       '共有プロジェクトは同時に 1 件までです。PiXiEEDraw継続サポート(広告非表示)で 3 件まで増やせます。',
       'Only 1 shared project can be used at a time. PiXiEEDraw ad-free support increases this to 3.'
     );
+  }
+
+  function buildSharedProjectGraceMessage({
+    effectiveLimit = getMaxSharedProjectCount(),
+    ownedProjectCount = 0,
+    graceUntil = '',
+  } = {}) {
+    const graceTimestamp = Date.parse(graceUntil || '');
+    const graceLabel = Number.isFinite(graceTimestamp)
+      ? formatUpdateHistoryDate(graceTimestamp, '')
+      : '';
+    const baseJa = `共有プロジェクトが上限超過です（${ownedProjectCount}件 / 上限${effectiveLimit}件）`;
+    const baseEn = `Shared projects exceed the limit (${ownedProjectCount} / limit ${effectiveLimit})`;
+    if (graceLabel) {
+      return localizeText(
+        `${baseJa}。${graceLabel} までに整理しないと古い共有プロジェクトから自動削除されます。`,
+        `${baseEn}. Older shared projects will be removed automatically if you do not reduce them by ${graceLabel}.`
+      );
+    }
+    return localizeText(
+      `${baseJa}。7日以内に整理しないと古い共有プロジェクトから自動削除されます。`,
+      `${baseEn}. Older shared projects will be removed automatically in 7 days unless you reduce them.`
+    );
+  }
+
+  async function pruneSharedRecentEntriesToKnownProjects(knownProjectKeys = []) {
+    if (!AUTOSAVE_SUPPORTED) {
+      return;
+    }
+    const normalizedKnownProjectKeys = new Set(
+      (Array.isArray(knownProjectKeys) ? knownProjectKeys : [])
+        .map(projectKey => normalizeMultiProjectKey(projectKey || ''))
+        .filter(Boolean)
+    );
+    const existingEntries = await loadRecentProjectsMetadata();
+    const nextEntries = existingEntries.filter(entry => {
+      if (!isSharedRecentProjectEntry(entry)) {
+        return true;
+      }
+      const projectKey = normalizeMultiProjectKey(entry.sharedProjectKey || '');
+      return normalizedKnownProjectKeys.has(projectKey);
+    });
+    const limitedEntries = enforceSharedRecentProjectLimit(nextEntries);
+    if (limitedEntries.length === existingEntries.length) {
+      setRecentProjectsCache(limitedEntries);
+      return;
+    }
+    await saveRecentProjectsList(existingEntries, limitedEntries);
+    setRecentProjectsCache(limitedEntries);
+  }
+
+  async function enforceSharedProjectOwnershipLimit() {
+    if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
+      return null;
+    }
+    try {
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase) {
+        return null;
+      }
+      const { data, error } = await supabase.rpc('pixieed_enforce_shared_project_limit');
+      if (error) {
+        handleSharedProjectsBackendError(error, 'enforce-shared-project-limit');
+        return null;
+      }
+      const result = Array.isArray(data) ? (data[0] || null) : (data || null);
+      if (!result) {
+        return null;
+      }
+      const effectiveLimit = Math.max(1, Math.round(Number(result.effective_limit) || getMaxSharedProjectCount()));
+      const ownedProjectCount = Math.max(0, Math.round(Number(result.owned_project_count) || 0));
+      const deletedProjectKeys = Array.isArray(result.deleted_project_keys)
+        ? result.deleted_project_keys.map(value => normalizeMultiProjectKey(value || '')).filter(Boolean)
+        : [];
+      if (deletedProjectKeys.length) {
+        const knownProjectKeys = getSharedRecentProjectEntries()
+          .map(entry => normalizeMultiProjectKey(entry.sharedProjectKey || ''))
+          .filter(projectKey => projectKey && !deletedProjectKeys.includes(projectKey));
+        await pruneSharedRecentEntriesToKnownProjects(knownProjectKeys);
+        setMultiStatus(
+          localizeText(
+            `共有プロジェクト上限に合わせて ${deletedProjectKeys.length} 件の古い共有プロジェクトを自動削除しました`,
+            `Automatically removed ${deletedProjectKeys.length} older shared projects to match your limit`
+          ),
+          'warn'
+        );
+      } else if (result.grace_active) {
+        setMultiStatus(buildSharedProjectGraceMessage({
+          effectiveLimit,
+          ownedProjectCount,
+          graceUntil: typeof result.grace_until === 'string' ? result.grace_until : '',
+        }), 'warn');
+      }
+      return result;
+    } catch (error) {
+      handleSharedProjectsBackendError(error, 'enforce-shared-project-limit-exception');
+      return null;
+    }
   }
 
   async function ensureSharedProjectCapacity(projectKey = '', { announce = true } = {}) {
@@ -54436,6 +54535,7 @@
       return [];
     }
     try {
+      await enforceSharedProjectOwnershipLimit();
       const supabase = await ensurePixieedAccountClient();
       if (!supabase) {
         return [];
@@ -54450,12 +54550,14 @@
       }
       const memberships = Array.isArray(membershipResponse.data) ? membershipResponse.data : [];
       if (!memberships.length) {
+        await pruneSharedRecentEntriesToKnownProjects([]);
         return [];
       }
       const projectKeys = memberships
         .map(entry => normalizeMultiProjectKey(entry?.project_key || ''))
         .filter(Boolean);
       if (!projectKeys.length) {
+        await pruneSharedRecentEntriesToKnownProjects([]);
         return [];
       }
       const uniqueProjectKeys = [...new Set(projectKeys)];
@@ -54503,6 +54605,7 @@
           normalizedEntries.push(sharedEntry);
         }
       }
+      await pruneSharedRecentEntriesToKnownProjects(uniqueProjectKeys);
       return normalizedEntries;
     } catch (error) {
       handleSharedProjectsBackendError(error, 'sync-recent-projects-exception');
@@ -55732,6 +55835,20 @@
     }
     accountInitPromise = (async () => {
       try {
+        if (!pixieedAdFreeSharedLimitBound && window.pixieedAdFree?.subscribe) {
+          pixieedAdFreeSharedLimitBound = true;
+          window.pixieedAdFree.subscribe(nextState => {
+            if (!accountState.isLoggedIn || accountState.isAnonymous) {
+              return;
+            }
+            if (!nextState?.isReady) {
+              return;
+            }
+            enforceSharedProjectOwnershipLimit().catch(error => {
+              console.warn('Failed to enforce shared project limit after ad-free update', error);
+            });
+          });
+        }
         const supabase = await ensurePixieedAccountClient();
         if (!supabase) {
           updatePixieedAccountUi();
