@@ -3027,6 +3027,8 @@
   let globalLoadingIndicatorShownAt = 0;
   let globalLoadingIndicatorShowTimer = null;
   let globalLoadingIndicatorHideTimer = null;
+  let startupProgressDepth = 0;
+  let startupProgressClose = null;
   const GLOBAL_LOADING_INDICATOR_SHOW_DELAY = 180;
   const GLOBAL_LOADING_INDICATOR_MIN_VISIBLE_MS = 320;
 
@@ -13323,7 +13325,6 @@
     }
     autosaveWriteInFlight = true;
     autosaveWriteQueued = false;
-    const endLoading = beginGlobalLoading(localizeText('保存中…', 'Saving...'));
     try {
       updateAutosaveStatus('自動保存: 端末内に保存中…');
       const snapshot = makeHistorySnapshot({ clonePixelData: false });
@@ -13356,7 +13357,6 @@
     } catch (error) {
       throw error;
     } finally {
-      endLoading();
       autosaveWriteInFlight = false;
       releaseAutosaveTabLock();
       if (autosaveWriteQueued || autosaveDirty) {
@@ -13978,61 +13978,70 @@
     if (!entry || typeof entry !== 'object') {
       return false;
     }
-    if (isSharedRecentProjectEntry(entry)) {
-      return openRecentProject(entry, { hideStartup, silent: true });
-    }
-    if (!ensureCurrentClientCanReplaceActiveProject()) {
-      return false;
-    }
-    const projectId = normalizeAutosaveProjectId(entry.id || '');
-    if (openProjectTabBusy) {
-      return false;
-    }
-    ensureOpenProjectTabsInitialized();
-    const existingIndex = projectId ? findOpenProjectTabIndexByProjectId(projectId) : -1;
-    if (existingIndex >= 0) {
-      const existingTab = openProjectTabs[existingIndex];
-      const switched = await activateOpenProjectTab(existingTab?.id || '');
-      if (switched && hideStartup) {
-        hideStartupScreen();
-      }
-      return switched;
-    }
-    if (openProjectTabs.length >= MAX_OPEN_PROJECT_TABS) {
-      updateAutosaveStatus(
-        localizeText(
-          `同時に開けるプロジェクトは最大 ${MAX_OPEN_PROJECT_TABS} 件です`,
-          `You can open up to ${MAX_OPEN_PROJECT_TABS} projects at once`
-        ),
-        'warn'
-      );
-      return false;
-    }
-    openProjectTabBusy = true;
+    const endStartupProgress = hideStartup || startupVisible
+      ? beginStartupProgress(localizeText('プロジェクトを開いています…', 'Opening project...'))
+      : null;
     try {
-      await persistActiveOpenProjectTab({ flushAutosave: true });
-      const loaded = await openRecentProject(entry, {
-        hideStartup: false,
-        silent: true,
-      });
-      if (!loaded) {
+      if (isSharedRecentProjectEntry(entry)) {
+        return await openRecentProject(entry, { hideStartup, silent: true });
+      }
+      if (!ensureCurrentClientCanReplaceActiveProject()) {
         return false;
       }
-      const appended = appendOpenProjectTabFromCurrentState({
-        activate: true,
-        source: 'local-recent',
-        projectId: projectId || autosaveProjectId,
-      });
-      if (!appended) {
+      const projectId = normalizeAutosaveProjectId(entry.id || '');
+      if (openProjectTabBusy) {
         return false;
       }
-      if (hideStartup) {
-        hideStartupScreen();
+      ensureOpenProjectTabsInitialized();
+      const existingIndex = projectId ? findOpenProjectTabIndexByProjectId(projectId) : -1;
+      if (existingIndex >= 0) {
+        const existingTab = openProjectTabs[existingIndex];
+        const switched = await activateOpenProjectTab(existingTab?.id || '');
+        if (switched && hideStartup) {
+          hideStartupScreen();
+        }
+        return switched;
       }
-      updateAutosaveStatus('自動保存: 端末内プロジェクトを開きました', 'success');
-      return true;
+      if (openProjectTabs.length >= MAX_OPEN_PROJECT_TABS) {
+        updateAutosaveStatus(
+          localizeText(
+            `同時に開けるプロジェクトは最大 ${MAX_OPEN_PROJECT_TABS} 件です`,
+            `You can open up to ${MAX_OPEN_PROJECT_TABS} projects at once`
+          ),
+          'warn'
+        );
+        return false;
+      }
+      openProjectTabBusy = true;
+      try {
+        await persistActiveOpenProjectTab({ flushAutosave: true });
+        const loaded = await openRecentProject(entry, {
+          hideStartup: false,
+          silent: true,
+        });
+        if (!loaded) {
+          return false;
+        }
+        const appended = appendOpenProjectTabFromCurrentState({
+          activate: true,
+          source: 'local-recent',
+          projectId: projectId || autosaveProjectId,
+        });
+        if (!appended) {
+          return false;
+        }
+        if (hideStartup) {
+          hideStartupScreen();
+        }
+        updateAutosaveStatus('自動保存: 端末内プロジェクトを開きました', 'success');
+        return true;
+      } finally {
+        openProjectTabBusy = false;
+      }
     } finally {
-      openProjectTabBusy = false;
+      if (typeof endStartupProgress === 'function') {
+        endStartupProgress();
+      }
     }
   }
 
@@ -20047,6 +20056,7 @@
       }
       return false;
     }
+    setStartupProgressLabel(localizeText('共有プロジェクトを読込中…', 'Loading shared project...'));
     const sharedSnapshot = sharedProject.latest_snapshot;
     if (sharedSnapshot && typeof sharedSnapshot === 'object') {
       const snapshotRevision = Math.max(
@@ -20155,6 +20165,7 @@
       ),
     });
     if (opened) {
+      setStartupProgressLabel(localizeText('共有プロジェクトの最新内容を取得中…', 'Fetching the latest shared project state...'));
       await refreshActiveSharedProjectSnapshot({
         force: true,
         reason: 'open-shared-recent-latest',
@@ -25828,7 +25839,9 @@
   }
 
   async function init() {
+    const endStartupProgress = beginStartupProgress(localizeText('起動準備中…', 'Preparing startup...'));
     try {
+      setStartupProgressLabel(localizeText('起動設定を確認中…', 'Checking startup settings...'));
       await initializeIosSnapshotFallback();
     } catch (error) {
       console.warn('iOS snapshot bootstrap failed', error);
@@ -25893,6 +25906,7 @@
     if (!lensImportRequested && !skipStartup) {
       try {
         await accountInitTask;
+        setStartupProgressLabel(localizeText('前回の作業を確認中…', 'Checking your previous work...'));
         restoredAutosaveProject = await maybeRestoreAutosaveProjectOnStartup();
       } catch (error) {
         console.warn('Startup autosave restore failed', error);
@@ -25901,17 +25915,20 @@
     }
     let importedFromLens = false;
     try {
+      setStartupProgressLabel(localizeText('起動内容を読込中…', 'Loading startup content...'));
       importedFromLens = await maybeImportLensCapture();
     } catch (error) {
       console.warn('Lens capture bootstrap failed', error);
       importedFromLens = false;
     }
+    setStartupProgressLabel(localizeText('起動を完了しています…', 'Finalizing startup...'));
     renderEverything();
     refreshLocalizedUi();
     scheduleDeferredUiSetup();
     if (!lensImportRequested && !importedFromLens && !skipStartup && !restoredAutosaveProject && !reloadSnapshotRestored && !hasDismissedStartupScreen()) {
       showStartupScreen();
     }
+    endStartupProgress();
   }
 
   function getActiveTool() {
@@ -53939,10 +53956,8 @@
     if (!normalizedProjectKey || !packagedPayload || typeof packagedPayload !== 'object') {
       return null;
     }
-    const endLoading = beginGlobalLoading(localizeText('共有内容を保存中…', 'Saving shared project...'));
     const project = await ensureSharedProjectMembership(normalizedProjectKey, { createIfMissing: true, title });
     if (!project) {
-      endLoading();
       return null;
     }
     try {
@@ -54012,8 +54027,6 @@
     } catch (error) {
       handleSharedProjectsBackendError(error, 'persist-exception');
       return null;
-    } finally {
-      endLoading();
     }
   }
 
@@ -57640,6 +57653,39 @@
       globalLoadingIndicatorDepth = Math.max(0, globalLoadingIndicatorDepth - 1);
       syncGlobalLoadingIndicator();
     };
+  }
+
+  function beginStartupProgress(label = '') {
+    startupProgressDepth += 1;
+    const nextLabel = label || localizeText('起動準備中…', 'Preparing startup...');
+    if (startupProgressDepth === 1 || typeof startupProgressClose !== 'function') {
+      startupProgressClose = beginGlobalLoading(nextLabel);
+    } else {
+      setGlobalLoadingIndicatorLabel(nextLabel);
+    }
+    let closed = false;
+    return () => {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      startupProgressDepth = Math.max(0, startupProgressDepth - 1);
+      if (startupProgressDepth > 0) {
+        return;
+      }
+      const close = startupProgressClose;
+      startupProgressClose = null;
+      if (typeof close === 'function') {
+        close();
+      }
+    };
+  }
+
+  function setStartupProgressLabel(label = '') {
+    if (startupProgressDepth <= 0) {
+      return;
+    }
+    setGlobalLoadingIndicatorLabel(label || localizeText('起動準備中…', 'Preparing startup...'));
   }
 
   function syncSharedModeStatusDisplay() {
