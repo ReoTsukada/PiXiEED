@@ -3031,6 +3031,8 @@
   let startupProgressClose = null;
   const GLOBAL_LOADING_INDICATOR_SHOW_DELAY = 180;
   const GLOBAL_LOADING_INDICATOR_MIN_VISIBLE_MS = 320;
+  const SHARED_PROJECT_LIMIT_DEFAULT = 1;
+  const SHARED_PROJECT_LIMIT_AD_FREE = 3;
 
   const RAIL_DEFAULT_WIDTH = Object.freeze({ left: 78, right: 78 });
   const RAIL_MIN_WIDTH = 68;
@@ -18440,6 +18442,83 @@
     return getRecentProjectStorageKind(entry) === RECENT_PROJECT_STORAGE_SHARED;
   }
 
+  function hasPixieedrawAdFreeSupport() {
+    if (window.__PIXIEED_ADS_DISABLED__) {
+      return true;
+    }
+    const adFreeState = window.pixieedAdFree?.state || null;
+    if (!adFreeState || adFreeState.isActive !== true) {
+      return false;
+    }
+    const entitlements = adFreeState.activeEntitlements;
+    if (!entitlements || typeof entitlements !== 'object') {
+      return true;
+    }
+    return Boolean(entitlements.pixiedraw_ad_free || entitlements.browser_ad_free);
+  }
+
+  function getMaxSharedProjectCount() {
+    return hasPixieedrawAdFreeSupport()
+      ? SHARED_PROJECT_LIMIT_AD_FREE
+      : SHARED_PROJECT_LIMIT_DEFAULT;
+  }
+
+  function getSharedRecentProjectEntries(entries = Array.from(recentProjectsCache.values())) {
+    if (!Array.isArray(entries)) {
+      return [];
+    }
+    return entries.filter(entry => isSharedRecentProjectEntry(entry));
+  }
+
+  function enforceSharedRecentProjectLimit(entries = []) {
+    if (!Array.isArray(entries) || !entries.length) {
+      return [];
+    }
+    const maxSharedProjects = getMaxSharedProjectCount();
+    let keptSharedProjects = 0;
+    return entries.filter(entry => {
+      if (!isSharedRecentProjectEntry(entry)) {
+        return true;
+      }
+      if (keptSharedProjects >= maxSharedProjects) {
+        return false;
+      }
+      keptSharedProjects += 1;
+      return true;
+    });
+  }
+
+  function buildSharedProjectLimitMessage(maxSharedProjects = getMaxSharedProjectCount()) {
+    if (maxSharedProjects > SHARED_PROJECT_LIMIT_DEFAULT) {
+      return localizeText(
+        `共有プロジェクトは同時に最大 ${maxSharedProjects} 件まで使えます`,
+        `You can use up to ${maxSharedProjects} shared projects at the same time`
+      );
+    }
+    return localizeText(
+      '共有プロジェクトは同時に 1 件までです。PiXiEEDraw継続サポート(広告非表示)で 3 件まで増やせます。',
+      'Only 1 shared project can be used at a time. PiXiEEDraw ad-free support increases this to 3.'
+    );
+  }
+
+  async function ensureSharedProjectCapacity(projectKey = '', { announce = true } = {}) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    const existingEntries = await loadRecentProjectsMetadata();
+    const existingSharedEntries = getSharedRecentProjectEntries(existingEntries);
+    const alreadyTracked = existingSharedEntries.some(entry => normalizeMultiProjectKey(entry.sharedProjectKey || '') === normalizedProjectKey);
+    if (alreadyTracked) {
+      return true;
+    }
+    const maxSharedProjects = getMaxSharedProjectCount();
+    if (existingSharedEntries.length < maxSharedProjects) {
+      return true;
+    }
+    if (announce) {
+      setMultiStatus(buildSharedProjectLimitMessage(maxSharedProjects), 'warn');
+    }
+    return false;
+  }
+
   function normalizeSharedRecentProjectEntry(entry = {}) {
     const projectKey = normalizeMultiProjectKey(entry.sharedProjectKey || entry.projectKey || '');
     if (!projectKey) {
@@ -19436,7 +19515,7 @@
       ...(previousEntry || {}),
       ...normalizedEntry,
     });
-    const limited = workingEntries.slice(0, RECENT_PROJECT_LIMIT);
+    const limited = enforceSharedRecentProjectLimit(workingEntries).slice(0, RECENT_PROJECT_LIMIT);
     await saveRecentProjectsList(existingEntries, limited);
     setRecentProjectsCache(limited);
     return normalizedEntry;
@@ -19592,7 +19671,11 @@
       return;
     }
     const entries = await loadRecentProjectsMetadata();
-    setRecentProjectsCache(entries);
+    const limitedEntries = enforceSharedRecentProjectLimit(entries);
+    if (limitedEntries.length !== entries.length) {
+      await saveRecentProjectsList(entries, limitedEntries);
+    }
+    setRecentProjectsCache(limitedEntries);
   }
 
   function blendChannelByMode(dst, src, blendMode) {
@@ -20054,6 +20137,9 @@
       if (!silent) {
         setMultiStatus(localizeText('共有プロジェクトを開けませんでした', 'Failed to open shared project'), 'error');
       }
+      return false;
+    }
+    if (!(await ensureSharedProjectCapacity(resolvedProjectKey, { announce: !silent }))) {
       return false;
     }
     setStartupProgressLabel(localizeText('共有プロジェクトを読込中…', 'Loading shared project...'));
@@ -51059,6 +51145,9 @@
     );
     if (!projectKey) {
       setMultiStatus(localizeText('共有プロジェクトを作成できませんでした', 'Failed to create shared project'), 'error');
+      return false;
+    }
+    if (!(await ensureSharedProjectCapacity(projectKey))) {
       return false;
     }
     const snapshot = makeHistorySnapshot({ clonePixelData: true });
