@@ -471,6 +471,15 @@
       cancel: document.getElementById('shareStartConfirmCancel'),
       confirm: document.getElementById('shareStartConfirmConfirm'),
     },
+    sharedProjectLimit: {
+      dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('sharedProjectLimitDialog')),
+      title: document.getElementById('sharedProjectLimitTitle'),
+      message: document.getElementById('sharedProjectLimitMessage'),
+      detail: document.getElementById('sharedProjectLimitDetail'),
+      cancel: document.getElementById('sharedProjectLimitCancel'),
+      manage: document.getElementById('sharedProjectLimitManage'),
+      support: document.getElementById('sharedProjectLimitSupport'),
+    },
     toolSpotlight: {
       dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('toolSpotlightDialog')),
       list: document.querySelector('#toolSpotlightDialog .tool-spotlight-list'),
@@ -17377,6 +17386,63 @@
     });
   }
 
+  function openSharedProjectLimitDialog(maxSharedProjects = getMaxSharedProjectCount()) {
+    const config = dom.sharedProjectLimit;
+    const dialog = config?.dialog;
+    const message = buildSharedProjectLimitMessage(maxSharedProjects);
+    const detail = localizeText(
+      '不要な共有プロジェクトを一覧から外すか、PiXiEEDraw継続サポートで上限を増やしてください。',
+      'Remove old shared projects from your list, or buy PiXiEEDraw ongoing support to increase the limit.'
+    );
+    if (config?.message instanceof HTMLElement) {
+      config.message.textContent = message;
+    }
+    if (config?.detail instanceof HTMLElement) {
+      config.detail.textContent = detail;
+    }
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+      window.alert(`${message}\n${detail}`);
+      showStartupScreen();
+      return;
+    }
+    if (dialog.open) {
+      return;
+    }
+    dialog.showModal();
+    window.requestAnimationFrame(() => {
+      config?.manage?.focus?.({ preventScroll: true });
+    });
+  }
+
+  function closeSharedProjectLimitDialog() {
+    const dialog = dom.sharedProjectLimit?.dialog;
+    if (dialog instanceof HTMLDialogElement && dialog.open) {
+      dialog.close();
+    }
+  }
+
+  function setupSharedProjectLimitDialog() {
+    const config = dom.sharedProjectLimit;
+    const dialog = config?.dialog;
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+      if (dialog) {
+        dialog.hidden = true;
+      }
+      return;
+    }
+    config?.cancel?.addEventListener('click', () => {
+      closeSharedProjectLimitDialog();
+    });
+    config?.manage?.addEventListener('click', () => {
+      closeSharedProjectLimitDialog();
+      showStartupScreen();
+    });
+    dialog.addEventListener('cancel', event => {
+      event.preventDefault();
+      closeSharedProjectLimitDialog();
+    });
+  }
+
   async function handleNewProjectSubmit() {
     const config = dom.newProject;
     if (config?.form && typeof config.form.reportValidity === 'function') {
@@ -18624,6 +18690,7 @@
     }
     if (announce) {
       setMultiStatus(buildSharedProjectLimitMessage(maxSharedProjects), 'warn');
+      openSharedProjectLimitDialog(maxSharedProjects);
     }
     return false;
   }
@@ -26080,6 +26147,7 @@
     setupUpdateHistoryDialog();
     setupToolSpotlightDialog();
     setupShareStartConfirmDialog();
+    setupSharedProjectLimitDialog();
     setupHelpPanel();
     setupTools();
     setupToolGroups();
@@ -52635,6 +52703,16 @@
     return supportsSharedProjectsBackend;
   }
 
+  function hasSharedProjectLocalWorkInFlight() {
+    return (
+      hasDocumentUnsavedChanges()
+      || pointerState.active
+      || sharedProjectOpCommitInFlight
+      || sharedProjectPendingLocalOps.length > 0
+      || sharedProjectSyncInFlight
+    );
+  }
+
   function isSharedProjectsBlockedByRuntime() {
     return window.location?.protocol === 'file:';
   }
@@ -52651,7 +52729,7 @@
 
   function canApplyIncomingSharedProjectSnapshot() {
     return (
-      !hasDocumentUnsavedChanges()
+      !hasSharedProjectLocalWorkInFlight()
       && !autosaveWriteInFlight
       && !multiState.applyRemoteInProgress
       && !multiState.connecting
@@ -53193,7 +53271,7 @@
     } else if (opType === 'structure') {
       sharedProjectOpsSinceCheckpoint = Math.max(sharedProjectOpsSinceCheckpoint, SHARED_PROJECT_CHECKPOINT_OP_COUNT);
     }
-    if (fromRemote) {
+    if (fromRemote && !hasSharedProjectLocalWorkInFlight()) {
       markDocumentDurablySaved();
     }
   }
@@ -54029,15 +54107,23 @@
           return true;
         }
       }
-      if (!force && !canApplyIncomingSharedProjectSnapshot()) {
+      if (!canApplyIncomingSharedProjectSnapshot()) {
         logSharedProjectRealtimeChannelLifecycle('refresh-result', {
           caller: 'refreshActiveSharedProjectSnapshot',
           reason: reason || 'refresh',
           extra: {
             force,
             result: 'snapshot-apply-blocked',
+            blockedByLocalWork: hasSharedProjectLocalWorkInFlight(),
           },
         });
+        if (force) {
+          queueSharedProjectRefresh({
+            immediate: false,
+            reason: `${reason || 'refresh'}-deferred-local-work`,
+            force: true,
+          });
+        }
         return false;
       }
       const hadLoadedDocument = activeSharedProjectDocumentLoaded;
