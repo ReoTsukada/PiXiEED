@@ -6600,9 +6600,14 @@ body.is-startup-active {
     var(--mobile-viewport-height)
     - var(--safe-area-top)
     - var(--safe-area-bottom)
+    - var(--mobile-bottom-ad-height, 0px)
     - 24px
   );
-  padding: clamp(18px, 2.8vh, 28px) clamp(16px, 4.6vw, 28px);
+  padding:
+    clamp(18px, 2.8vh, 28px)
+    clamp(16px, 4.6vw, 28px)
+    calc(clamp(22px, 3.2vh, 32px) + var(--mobile-bottom-ad-height, 0px))
+    clamp(16px, 4.6vw, 28px);
   border-radius: 18px;
   background:
     linear-gradient(0deg, rgba(var(--ui-rgb), 0.14) 1px, transparent 1px),
@@ -6618,6 +6623,7 @@ body.is-startup-active {
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
+  scroll-padding-bottom: calc(32px + var(--mobile-bottom-ad-height, 0px));
 }
 
 .startup-screen__content::-webkit-scrollbar {
@@ -6840,6 +6846,12 @@ body.is-startup-active {
   justify-content: center;
   cursor: pointer;
   transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.startup-recent-card__delete::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
 }
 
 .startup-recent-card__delete:hover,
@@ -7657,28 +7669,35 @@ body.is-startup-active {
   position: relative;
   width: 24px;
   height: 24px;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  margin: 0;
 }
 
 .mobile-tool-chip__icon {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 12px;
-  height: 12px;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
   padding: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.72));
 }
 
 .mobile-tool-chip__icon img,
 .mobile-tool-chip__icon svg {
   width: 100%;
   height: 100%;
+  color: var(--mobile-tool-icon-color, #f3f7fb);
+  fill: currentColor;
 }
 
 .mobile-topbar__quick {
@@ -7841,6 +7860,52 @@ body.is-startup-active {
   color: var(--fg);
   border-color: rgba(var(--ui-rgb-focus), 0.56);
   background: rgba(18, 34, 44, 0.94);
+}
+
+#mobileTabTools {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+#mobileTabTools::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0)),
+    var(--mobile-tool-current-color, rgba(13, 20, 30, 0.74));
+  opacity: 0.96;
+  pointer-events: none;
+}
+
+#mobileTabTools > * {
+  position: relative;
+  z-index: 1;
+}
+
+#mobileTabTools .mobile-tool-chip__icon {
+  color: var(--mobile-tool-icon-color, #f3f7fb);
+}
+
+#mobileTabTools .mobile-tool-chip {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#mobileTabTools .mobile-tool-chip__icon {
+  left: 50%;
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translate(-50%, -50%);
 }
 
 .mobile-tab:disabled {
