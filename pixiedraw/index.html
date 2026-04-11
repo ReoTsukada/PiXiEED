@@ -1301,6 +1301,21 @@
 </footer>
 </form>
 </dialog>
+<dialog aria-labelledby="recentProjectDeleteConfirmTitle" class="modal" id="recentProjectDeleteConfirmDialog">
+<form class="modal__form" method="dialog">
+<header class="modal__header">
+<h2 class="modal__title" id="recentProjectDeleteConfirmTitle">プロジェクト削除</h2>
+</header>
+<div class="modal__body">
+<p id="recentProjectDeleteConfirmMessage">このプロジェクトを削除しますか？</p>
+<p class="help-text" id="recentProjectDeleteConfirmDetail">この操作は取り消せません。</p>
+</div>
+<footer class="modal__footer">
+<button class="button button--ghost" id="recentProjectDeleteConfirmCancel" type="button">キャンセル</button>
+<button class="button button--primary" id="recentProjectDeleteConfirmConfirm" type="button">削除する</button>
+</footer>
+</form>
+</dialog>
 <dialog aria-labelledby="shareStartConfirmTitle" class="modal" id="shareStartConfirmDialog">
 <form class="modal__form" method="dialog">
 <header class="modal__header">
@@ -1322,12 +1337,12 @@
 <h2 class="modal__title" id="sharedProjectLimitTitle">共有プロジェクト上限</h2>
 </header>
 <div class="modal__body">
-<p id="sharedProjectLimitMessage">共有プロジェクトの上限に達しています。</p>
-<p class="help-text" id="sharedProjectLimitDetail">共有一覧から不要な共有プロジェクトを外すか、PiXiEEDraw継続サポートで上限を増やしてください。</p>
+<p id="sharedProjectLimitMessage">継続応援をしてシェア上限を増やしませんか？</p>
+<p class="help-text" id="sharedProjectLimitDetail">または共有プロジェクトを消しますか？ 不要な共有を削除すると新しく共有を作成できます。</p>
 </div>
 <footer class="modal__footer">
 <button class="button button--ghost" id="sharedProjectLimitCancel" type="button">閉じる</button>
-<button class="button" id="sharedProjectLimitManage" type="button">共有一覧を開く</button>
+<button class="button" id="sharedProjectLimitManage" type="button">プロジェクトを消す</button>
 <a class="button button--primary" data-support-panel-trigger="true" data-support-preferred-product="pixiedraw_ad_free" href="https://buy.stripe.com/aFadRaeo8ekv5L44MM2VG01" id="sharedProjectLimitSupport" rel="noopener" target="_blank">継続サポート</a>
 </footer>
 </form>
