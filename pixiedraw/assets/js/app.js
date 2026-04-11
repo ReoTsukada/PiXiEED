@@ -19143,10 +19143,7 @@
     return await pruneSharedLocalOpJournal(normalizedProjectKey, { checkpointRevision });
   }
 
-  async function discardStaleSharedLocalOpJournal(projectKey = activeSharedProjectKey, {
-    minBaseRevision = 0,
-    minBaseStructureRevision = 0,
-  } = {}) {
+  async function discardPendingSharedLocalOpJournal(projectKey = activeSharedProjectKey) {
     if (!AUTOSAVE_SUPPORTED) {
       return 0;
     }
@@ -19159,13 +19156,7 @@
       return 0;
     }
     const removable = entries
-      .filter(entry => (
-        entry?.status === 'pending'
-        && (
-          Math.max(0, Math.round(Number(entry?.baseRevision) || 0)) < Math.max(0, Math.round(Number(minBaseRevision) || 0))
-          || Math.max(0, Math.round(Number(entry?.baseStructureRevision) || 0)) < Math.max(0, Math.round(Number(minBaseStructureRevision) || 0))
-        )
-      ))
+      .filter(entry => entry?.status === 'pending')
       .map(entry => entry?.id)
       .filter(Boolean);
     if (!removable.length) {
@@ -20091,11 +20082,8 @@
       sharedProject,
       Math.max(0, Math.round(Number(sharedProject.latest_snapshot_revision) || 0))
     );
-    discardStaleSharedLocalOpJournal(resolvedProjectKey, {
-      minBaseRevision: Math.max(0, Math.round(Number(sharedProject.latest_revision) || 0)),
-      minBaseStructureRevision: Math.max(0, Math.round(Number(sharedProject.latest_structure_revision) || 0)),
-    }).catch(error => {
-      console.warn('Failed to discard stale shared local op journal after opening shared project', error);
+    discardPendingSharedLocalOpJournal(resolvedProjectKey).catch(error => {
+      console.warn('Failed to discard pending shared local op journal after opening shared project', error);
     });
     await upsertSharedRecentProjectEntry({
       projectKey: resolvedProjectKey,
@@ -53890,10 +53878,8 @@
         revision: nextRevision,
         structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
       });
-      await discardStaleSharedLocalOpJournal(activeSharedProjectKey, {
-        minBaseRevision: nextRevision,
-        minBaseStructureRevision: nextStructureRevision,
-      });
+      await discardPendingSharedLocalOpJournal(activeSharedProjectKey);
+      pendingSharedProjectConflictReplay = null;
       maybeReplayPendingSharedProjectConflictAfterRefresh(activeSharedProjectKey);
       if (reason) {
         updateAutosaveStatus(
