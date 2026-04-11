@@ -42182,6 +42182,16 @@
     } else {
       // Non-spectator: existing restrictions for drawing guests
       if (HISTORY_DRAW_TOOLS.has(activeTool)) {
+        if (isSharedProjectCollaborativeMode() && !activeSharedProjectDocumentLoaded) {
+          updateAutosaveStatus(
+            localizeText(
+              '共有プロジェクトの最新内容を読込中です。完了してから描画してください',
+              'Shared project is still loading the latest state. Please wait before drawing.'
+            ),
+            'warn'
+          );
+          return;
+        }
         if (isMultiAssignedCellRestrictedEditorMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
           return;
         }
@@ -53770,6 +53780,7 @@
         });
         return false;
       }
+      activeSharedProjectDocumentLoaded = false;
       const sharedSnapshot = project.latest_snapshot;
       if (!sharedSnapshot || typeof sharedSnapshot !== 'object') {
         activeSharedProjectRevision = nextRevision;
