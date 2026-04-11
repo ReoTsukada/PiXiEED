@@ -67,6 +67,8 @@
   --ui-control-tile-size: 44px;
   --ui-panel-control-height: var(--ui-control-tile-size);
   --ui-compact-tool-flyout-size: var(--ui-control-tile-size);
+  --left-unified-tools-min-height: calc((var(--ui-control-tile-size) * 2) + 34px);
+  --left-unified-color-min-height: 168px;
   --project-tabs-height: 40px;
   --project-tabs-mobile-height: 36px;
 }
@@ -608,12 +610,12 @@ body.is-unified-left-tools-color:not(.is-mobile-layout) .rail--left .rail-tabpan
 
 body.is-unified-left-tools-color:not(.is-mobile-layout) .rail--left .rail-tabpanes > #panelTools {
   flex: var(--left-unified-tools-grow, 0.5) 1 0;
-  min-height: calc(var(--ui-control-tile-size) + 20px);
+  min-height: var(--left-unified-tools-min-height);
 }
 
 body.is-unified-left-tools-color:not(.is-mobile-layout) .rail--left .rail-tabpanes > #panelColor {
   flex: var(--left-unified-color-grow, 0.5) 1 0;
-  min-height: 0;
+  min-height: var(--left-unified-color-min-height);
 }
 
 body.is-unified-left-tools-color:not(.is-mobile-layout) .rail--left .rail-tabpanes > .rail-resizer.rail-resizer--left-unified-split {
@@ -977,7 +979,11 @@ body.is-mobile-layout.is-unified-left-tools-color:not(.is-unified-left-color-foc
 body.is-unified-left-tools-color:not(.is-mobile-layout) .rail--left[data-compact="true"] .rail-tabpanes > #panelTools,
 body.is-unified-left-tools-color:not(.is-mobile-layout) .rail--left[data-compact="true"] .rail-tabpanes > #panelColor {
   flex-basis: 0;
-  min-height: calc(var(--ui-control-tile-size) + 20px);
+  min-height: var(--left-unified-tools-min-height);
+}
+
+body.is-unified-left-tools-color:not(.is-mobile-layout) .rail--left[data-compact="true"] .rail-tabpanes > #panelColor {
+  min-height: var(--left-unified-color-min-height);
 }
 
 body.is-unified-left-tools-color:not(.is-mobile-layout) .rail--left[data-compact="true"] #panelTools .panel-section__body {
@@ -8641,6 +8647,16 @@ body.is-startup-active {
   }
   body.is-mobile-layout.is-unified-left-tools-color #panelColor .palette-header {
     display: none;
+  }
+  body.is-mobile-layout.is-unified-left-tools-color .mobile-drawer[data-mode='full'] #panelColor .palette-header {
+    display: block;
+    margin-bottom: 10px;
+  }
+  body.is-mobile-layout.is-unified-left-tools-color .mobile-drawer[data-mode='full'] #panelColor .palette-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
   }
   body.is-mobile-layout.is-unified-left-tools-color .mobile-drawer[data-mode='full'] #panelTools .field-group--tools > .field:nth-of-type(n + 5),
   body.is-mobile-layout.is-unified-left-tools-color .mobile-drawer[data-mode='full'] #panelTools .field-group--tools > .brush-custom-info {
