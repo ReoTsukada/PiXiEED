@@ -177,44 +177,6 @@
 </div>
 <div class="mobile-topbar" hidden="" id="mobileTopBar">
 <div class="mobile-topbar__inner">
-<div aria-label="モバイル操作パネル" class="mobile-tabs" role="tablist">
-<button aria-controls="mobilePanelTools" aria-label="ツール" aria-selected="true" class="mobile-tab is-active" data-mobile-tab="tools" id="mobileTabTools" role="tab" type="button">
-<span class="tab-icon-container" id="mobileToolTabIcon"></span>
-<span class="sr-only">ツール</span>
-</button>
-<button aria-controls="mobilePanelColor" aria-label="カラー" aria-selected="false" class="mobile-tab" data-mobile-tab="color" id="mobileTabColor" role="tab" tabindex="-1" type="button">
-<span class="tab-swatch pixel-frame" id="mobileColorTabSwatch"></span>
-<span class="sr-only">カラー</span>
-</button>
-<button aria-controls="mobilePanelFrames" aria-label="フレームとレイヤー" aria-selected="false" class="mobile-tab" data-mobile-tab="frames" id="mobileTabFrames" role="tab" tabindex="-1" type="button">
-<img alt="" class="tab-icon" src="assets/icons/menu-frame.png"/>
-<span class="sr-only">フレームとレイヤー</span>
-</button>
-<button aria-controls="mobilePanelSettings" aria-label="設定" aria-selected="false" class="mobile-tab" data-mobile-tab="settings" id="mobileTabSettings" role="tab" tabindex="-1" type="button">
-<img alt="" class="tab-icon" src="assets/icons/menu-settings.svg"/>
-<span class="sr-only">設定</span>
-</button>
-<button aria-controls="mobilePanelExtensions" aria-label="拡張" aria-selected="false" class="mobile-tab" data-mobile-tab="extensions" id="mobileTabExtensions" role="tab" tabindex="-1" type="button">
-<img alt="" class="tab-icon" src="assets/icons/EXicon.png"/>
-<span class="sr-only">拡張</span>
-</button>
-<button aria-controls="mobilePanelHelp" aria-hidden="true" aria-label="使い方ヘルプ" aria-selected="false" class="mobile-tab" data-mobile-tab="help" hidden="" id="mobileTabHelp" role="tab" tabindex="-1" type="button">
-<img alt="" class="tab-icon" src="assets/icons/menu-help.svg"/>
-<span class="sr-only">使い方ヘルプ</span>
-</button>
-<button aria-controls="mobilePanelFile" aria-label="ファイル" aria-selected="false" class="mobile-tab" data-mobile-tab="file" id="mobileTabFile" role="tab" tabindex="-1" type="button">
-<img alt="" class="tab-icon" src="assets/icons/menu-file.svg"/>
-<span class="sr-only">ファイル</span>
-</button>
-<button aria-controls="mobilePanelMulti" aria-label="共有モード" aria-selected="false" class="mobile-tab" data-mobile-tab="multi" id="mobileTabMulti" role="tab" tabindex="-1" type="button">
-<img alt="" class="tab-icon" src="assets/icons/maltimode.svg"/>
-<span class="sr-only">共有モード</span>
-</button>
-<button aria-label="カメラ" class="mobile-tab mobile-tab--action" data-external-tool="pixieelens" data-ui-action="openLensCamera" id="mobileActionLensCamera" title="カメラ" type="button">
-<img alt="" class="tab-icon" src="assets/icons/pixieelensicon_frame_01.png"/>
-<span class="sr-only">カメラ</span>
-</button>
-</div>
 <div aria-label="モバイルショートカット" class="mobile-shortcuts" id="mobileShortcutsMount">
 </div>
 </div>
@@ -363,9 +325,47 @@
 <button aria-label="モバイルパネルの高さを調整" aria-controls="mobilePanels" class="mobile-drawer__handle" id="mobileDrawerHandle" type="button">
 <span aria-hidden="true" class="mobile-drawer__grip"></span>
 </button>
+<div class="mobile-drawer__nav">
+<div aria-label="モバイル操作パネル" class="mobile-tabs" role="tablist">
+<button aria-controls="mobilePanelTools" aria-label="ツール" aria-selected="true" class="mobile-tab is-active" data-mobile-tab="tools" id="mobileTabTools" role="tab" type="button">
+<span aria-hidden="true" class="mobile-tool-chip pixel-frame" id="mobileDrawerToolChipSwatch">
+<span aria-hidden="true" class="mobile-tool-chip__icon tab-icon-container" id="mobileDrawerToolTabIcon"></span>
+</span>
+<span class="sr-only">ツールと色</span>
+</button>
+<button aria-controls="mobilePanelFrames" aria-label="フレームとレイヤー" aria-selected="false" class="mobile-tab" data-mobile-tab="frames" id="mobileTabFrames" role="tab" tabindex="-1" type="button">
+<img alt="" class="tab-icon" src="assets/icons/menu-frame.png"/>
+<span class="sr-only">レイヤー</span>
+</button>
+<button aria-controls="mobilePanelFile" aria-label="ファイル" aria-selected="false" class="mobile-tab" data-mobile-tab="file" id="mobileTabFile" role="tab" tabindex="-1" type="button">
+<img alt="" class="tab-icon" src="assets/icons/menu-file.svg"/>
+<span class="sr-only">ファイル</span>
+</button>
+<button aria-controls="mobilePanelSettings" aria-label="設定" aria-selected="false" class="mobile-tab" data-mobile-tab="settings" id="mobileTabSettings" role="tab" tabindex="-1" type="button">
+<img alt="" class="tab-icon" src="assets/icons/menu-settings.svg"/>
+<span class="sr-only">設定</span>
+</button>
+<button aria-controls="mobilePanelMulti" aria-label="共有モード" aria-selected="false" class="mobile-tab" data-mobile-tab="multi" id="mobileTabMulti" role="tab" tabindex="-1" type="button">
+<img alt="" class="tab-icon" src="assets/icons/maltimode.svg"/>
+<span class="sr-only">共有</span>
+</button>
+<button aria-controls="mobilePanelExtensions" aria-label="拡張" aria-selected="false" class="mobile-tab" data-mobile-tab="extensions" hidden="" id="mobileTabExtensions" role="tab" tabindex="-1" type="button">
+<img alt="" class="tab-icon" src="assets/icons/EXicon.png"/>
+<span class="sr-only">拡張</span>
+</button>
+<button aria-controls="mobilePanelHelp" aria-hidden="true" aria-label="使い方ヘルプ" aria-selected="false" class="mobile-tab" data-mobile-tab="help" hidden="" id="mobileTabHelp" role="tab" tabindex="-1" type="button">
+<img alt="" class="tab-icon" src="assets/icons/menu-help.svg"/>
+<span class="sr-only">ヘルプ</span>
+</button>
+</div>
+<button aria-label="カメラ" class="mobile-tab mobile-tab--action mobile-drawer__action" data-external-tool="pixieelens" data-ui-action="openLensCamera" id="mobileActionLensCamera" title="カメラ" type="button">
+<img alt="" class="tab-icon" src="assets/icons/pixieelensicon_frame_01.png"/>
+<span class="sr-only">カメラ</span>
+</button>
+</div>
 <div class="mobile-panels" id="mobilePanels">
 <div aria-labelledby="mobileTabTools" class="mobile-panel is-active" id="mobilePanelTools" role="tabpanel"></div>
-<div aria-labelledby="mobileTabColor" class="mobile-panel" hidden="" id="mobilePanelColor" role="tabpanel"></div>
+<div aria-labelledby="mobileTabTools" class="mobile-panel" hidden="" id="mobilePanelColor" role="tabpanel"></div>
 <div aria-labelledby="mobileTabFrames" class="mobile-panel" hidden="" id="mobilePanelFrames" role="tabpanel"></div>
 <div aria-labelledby="mobileTabSettings" class="mobile-panel" hidden="" id="mobilePanelSettings" role="tabpanel"></div>
 <div aria-labelledby="mobileTabExtensions" class="mobile-panel" hidden="" id="mobilePanelExtensions" role="tabpanel"></div>
@@ -708,7 +708,6 @@
 <button class="button" id="openDocument" type="button">ファイルを開く</button>
 <button class="button" id="showLocalProjects" type="button">端末内プロジェクト</button>
 <button class="button button--primary" id="exportProject" type="button">保存/出力</button>
-<button class="button" id="clearCanvas" type="button">キャンバスをクリア</button>
 </div>
 <div class="file-panel-summary">
 <p class="help-text ui-guide-text">自動保存: ON（この端末）</p>
@@ -735,6 +734,12 @@
 <span id="memoryUsage">メモリ: 計測中…</span>
 <button class="chip" id="memoryClear" type="button">メモリ削除</button>
 </div>
+<details class="file-danger-zone">
+<summary>危険操作</summary>
+<div class="field-group field-group--danger">
+<button class="button button--danger" id="clearCanvas" type="button">キャンバスをクリア</button>
+</div>
+</details>
 <div class="panel-ad-mount" data-panel-ad-mount="right"></div>
 </div>
 </section>
@@ -807,14 +812,17 @@
 </section>
 <section class="panel-section" data-section="settings" id="panelSettings">
 <div class="panel-section__body">
-  <div class="settings-nav">
+  <details class="settings-nav-wrap">
+    <summary class="settings-nav-wrap__summary">その他のメニュー</summary>
+    <div class="settings-nav">
     <a class="button settings-nav__action settings-nav__action--primary" href="../index.html" id="goHomeButton">ホームに戻る</a>
     <a class="button settings-nav__action settings-nav__action--primary" href="../contest/index.html" id="goContestButton">広場を見る</a>
     <button class="chip settings-nav__action settings-nav__quick settings-nav__close" id="toggleLanguageMode" type="button">あ/A</button>
     <button class="chip settings-nav__action settings-nav__quick settings-nav__close" id="openOperationHelpPanel" type="button">使い方ヘルプ</button>
     <button aria-haspopup="dialog" class="chip settings-nav__action settings-nav__quick settings-nav__close" id="openShortcutHelp" type="button">ショートカット一覧</button>
     <button aria-haspopup="dialog" class="chip settings-nav__action settings-nav__quick settings-nav__close" id="openUpdateHistory" type="button">更新情報</button>
-  </div>
+    </div>
+  </details>
 <div class="settings-size-grid">
 <div class="field settings-size-row settings-size-row--canvas">
 <span>キャンバスサイズ</span>
