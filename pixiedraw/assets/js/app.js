@@ -463,6 +463,14 @@
       cancel: document.getElementById('globalHistoryConfirmCancel'),
       confirm: document.getElementById('globalHistoryConfirmConfirm'),
     },
+    recentProjectDeleteConfirm: {
+      dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('recentProjectDeleteConfirmDialog')),
+      title: document.getElementById('recentProjectDeleteConfirmTitle'),
+      message: document.getElementById('recentProjectDeleteConfirmMessage'),
+      detail: document.getElementById('recentProjectDeleteConfirmDetail'),
+      cancel: document.getElementById('recentProjectDeleteConfirmCancel'),
+      confirm: document.getElementById('recentProjectDeleteConfirmConfirm'),
+    },
     shareStartConfirm: {
       dialog: /** @type {HTMLDialogElement|null} */ (document.getElementById('shareStartConfirmDialog')),
       title: document.getElementById('shareStartConfirmTitle'),
@@ -17315,6 +17323,100 @@
     });
   }
 
+  function openRecentProjectDeleteConfirmDialog(entry = null) {
+    return new Promise(resolve => {
+      const config = dom.recentProjectDeleteConfirm;
+      const dialog = config?.dialog;
+      const isSharedEntry = isSharedRecentProjectEntry(entry);
+      const displayLabel = extractDocumentBaseName(entry?.fileName || entry?.name || DEFAULT_DOCUMENT_NAME);
+      const message = isSharedEntry
+        ? localizeText(
+          `共有プロジェクト「${displayLabel}」を一覧から外しますか？`,
+          `Remove shared project "${displayLabel}" from your list?`
+        )
+        : localizeText(
+          `端末内プロジェクト「${displayLabel}」を削除しますか？`,
+          `Delete local project "${displayLabel}"?`
+        );
+      const detail = isSharedEntry
+        ? localizeText(
+          '共有一覧から外します。共有自体には影響しません。',
+          'This removes it from your shared project list only. The shared project itself remains available.'
+        )
+        : localizeText(
+          'この操作は取り消せません。',
+          'This action cannot be undone.'
+        );
+      if (config?.message instanceof HTMLElement) {
+        config.message.textContent = message;
+      }
+      if (config?.detail instanceof HTMLElement) {
+        config.detail.textContent = detail;
+      }
+      if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+        resolve(window.confirm(`${message}\n${detail}`));
+        return;
+      }
+      let settled = false;
+      const cleanup = result => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        config?.cancel?.removeEventListener('click', onCancel);
+        config?.confirm?.removeEventListener('click', onConfirm);
+        dialog.removeEventListener('cancel', onDialogCancel);
+        dialog.removeEventListener('close', onDialogClose);
+        resolve(result);
+      };
+      const onCancel = () => {
+        if (dialog.open) dialog.close();
+        cleanup(false);
+      };
+      const onConfirm = () => {
+        if (dialog.open) dialog.close();
+        cleanup(true);
+      };
+      const onDialogCancel = event => {
+        event.preventDefault();
+        if (dialog.open) dialog.close();
+        cleanup(false);
+      };
+      const onDialogClose = () => {
+        cleanup(dialog.returnValue === 'confirm');
+      };
+      config?.cancel?.addEventListener('click', onCancel, { once: true });
+      config?.confirm?.addEventListener('click', onConfirm, { once: true });
+      dialog.addEventListener('cancel', onDialogCancel, { once: true });
+      dialog.addEventListener('close', onDialogClose, { once: true });
+      dialog.showModal();
+      window.requestAnimationFrame(() => {
+        config?.confirm?.focus?.({ preventScroll: true });
+      });
+    });
+  }
+
+  function setupRecentProjectDeleteConfirmDialog() {
+    const dialog = dom.recentProjectDeleteConfirm?.dialog;
+    if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+      if (dialog) {
+        dialog.hidden = true;
+      }
+      return;
+    }
+    dom.recentProjectDeleteConfirm?.cancel?.addEventListener('click', () => {
+      if (dialog.open) {
+        dialog.close();
+      }
+    });
+    dialog.addEventListener('cancel', event => {
+      event.preventDefault();
+      if (dialog.open) {
+        dialog.close();
+      }
+    });
+  }
+
   function openShareStartConfirmDialog() {
     return new Promise(resolve => {
       const config = dom.shareStartConfirm;
@@ -17389,10 +17491,13 @@
   function openSharedProjectLimitDialog(maxSharedProjects = getMaxSharedProjectCount()) {
     const config = dom.sharedProjectLimit;
     const dialog = config?.dialog;
-    const message = buildSharedProjectLimitMessage(maxSharedProjects);
+    const message = localizeText(
+      '継続応援をしてシェア上限を増やしませんか？',
+      'Would you like to increase your shared project limit with ongoing support?'
+    );
     const detail = localizeText(
-      '不要な共有プロジェクトを一覧から外すか、PiXiEEDraw継続サポートで上限を増やしてください。',
-      'Remove old shared projects from your list, or buy PiXiEEDraw ongoing support to increase the limit.'
+      `または共有プロジェクトを消しますか？ 上限は現在 ${maxSharedProjects} 件です。不要な共有を削除すると新しく共有を作成できます。`,
+      `Or would you rather delete a shared project? Your current limit is ${maxSharedProjects}. Remove an old shared project to create a new one.`
     );
     if (config?.message instanceof HTMLElement) {
       config.message.textContent = message;
@@ -17436,6 +17541,10 @@
     config?.manage?.addEventListener('click', () => {
       closeSharedProjectLimitDialog();
       showStartupScreen();
+      updateAutosaveStatus(
+        localizeText('一覧の × ボタンで不要な共有プロジェクトを削除できます', 'Use the x button in the list to remove an old shared project'),
+        'info'
+      );
     });
     dialog.addEventListener('cancel', event => {
       event.preventDefault();
@@ -18022,12 +18131,7 @@
         }
         const entry = recentProjectsCache.get(projectId) || null;
         const displayLabel = extractDocumentBaseName(entry?.fileName || entry?.name || DEFAULT_DOCUMENT_NAME);
-        const accepted = window.confirm(
-          localizeText(
-            `端末内プロジェクト「${displayLabel}」を削除しますか？\nこの操作は取り消せません。`,
-            `Delete local project "${displayLabel}"?\nThis action cannot be undone.`
-          )
-        );
+        const accepted = await openRecentProjectDeleteConfirmDialog(entry);
         if (!accepted) {
           return;
         }
@@ -19609,15 +19713,15 @@
       const bTime = typeof b?.updatedAt === 'string' ? b.updatedAt : '';
       return bTime.localeCompare(aTime);
     });
-    const limitedEntries = sanitizedEntries.slice(0, RECENT_PROJECT_LIMIT);
-    if (limitedEntries.length !== existingEntries.length) {
+    const normalizedEntries = sanitizedEntries.slice();
+    if (normalizedEntries.length !== existingEntries.length) {
       changed = true;
     }
 
     if (changed) {
-      await saveRecentProjectsList(existingEntries, limitedEntries);
+      await saveRecentProjectsList(existingEntries, normalizedEntries);
     }
-    setRecentProjectsCache(changed ? limitedEntries : existingEntries);
+    setRecentProjectsCache(changed ? normalizedEntries : existingEntries);
     if (announce && (removedCount > 0 || repairedCount > 0)) {
       updateAutosaveStatus(
         `端末内プロジェクトを整理しました（修復 ${repairedCount} / 除外 ${removedCount}）`,
@@ -19625,7 +19729,7 @@
       );
     }
     return {
-      entries: changed ? limitedEntries : existingEntries,
+      entries: changed ? normalizedEntries : existingEntries,
       changed,
       removedCount,
       repairedCount,
@@ -19691,23 +19795,30 @@
       ...(previousEntry || {}),
       ...normalizedEntry,
     });
-    const limited = enforceSharedRecentProjectLimit(workingEntries).slice(0, RECENT_PROJECT_LIMIT);
-    await saveRecentProjectsList(existingEntries, limited);
-    setRecentProjectsCache(limited);
+    const normalizedEntries = enforceSharedRecentProjectLimit(workingEntries);
+    await saveRecentProjectsList(existingEntries, normalizedEntries);
+    setRecentProjectsCache(normalizedEntries);
     return normalizedEntry;
   }
 
   function setRecentProjectsCache(entries) {
     recentProjectsCache.clear();
-    if (Array.isArray(entries)) {
-      entries.forEach(entry => {
+    const sortedEntries = Array.isArray(entries)
+      ? entries.slice().sort((a, b) => {
+        const aTime = typeof a?.updatedAt === 'string' ? a.updatedAt : '';
+        const bTime = typeof b?.updatedAt === 'string' ? b.updatedAt : '';
+        return bTime.localeCompare(aTime);
+      })
+      : [];
+    if (sortedEntries.length) {
+      sortedEntries.forEach(entry => {
         if (entry && entry.id) {
           recentProjectsCache.set(entry.id, entry);
         }
       });
     }
-    syncStartupResumeState(entries || []);
-    renderRecentProjectsList(entries || []);
+    syncStartupResumeState(sortedEntries);
+    renderRecentProjectsList(sortedEntries);
   }
 
   function syncStartupResumeState(entries = []) {
@@ -20240,9 +20351,13 @@
         ...(latestPreviousEntry || {}),
         ...updatedEntry,
       });
-      const limited = workingEntries.slice(0, RECENT_PROJECT_LIMIT);
-      await saveRecentProjectsList(latestEntries, limited);
-      setRecentProjectsCache(limited);
+      workingEntries.sort((a, b) => {
+        const aTime = typeof a?.updatedAt === 'string' ? a.updatedAt : '';
+        const bTime = typeof b?.updatedAt === 'string' ? b.updatedAt : '';
+        return bTime.localeCompare(aTime);
+      });
+      await saveRecentProjectsList(latestEntries, workingEntries);
+      setRecentProjectsCache(workingEntries);
       if (
         sharedEntrySeed
         && hasDocumentUnsavedChanges()
@@ -26146,6 +26261,7 @@
     setupLoginPromptDialog();
     setupUpdateHistoryDialog();
     setupToolSpotlightDialog();
+    setupRecentProjectDeleteConfirmDialog();
     setupShareStartConfirmDialog();
     setupSharedProjectLimitDialog();
     setupHelpPanel();
@@ -48806,10 +48922,30 @@
     const color = getActiveSwatchColor();
     if (!color) return;
     const borderColor = color.a >= 192 ? 'rgba(0, 0, 0, 0.45)' : 'rgba(255, 255, 255, 0.75)';
-    [dom.colorTabSwatch, dom.mobileColorTabSwatch, dom.mobileDrawerColorTabSwatch].forEach(element => {
+    [dom.colorTabSwatch, dom.mobileColorTabSwatch].forEach(element => {
       if (!element) return;
       applyPixelFrameBackground(element, color, { borderColor });
     });
+    if (dom.mobileDrawerColorTabSwatch instanceof HTMLElement) {
+      dom.mobileDrawerColorTabSwatch.style.background = 'transparent';
+      dom.mobileDrawerColorTabSwatch.style.backgroundImage = 'none';
+      dom.mobileDrawerColorTabSwatch.style.border = '0';
+      dom.mobileDrawerColorTabSwatch.style.boxShadow = 'none';
+    }
+    const mobileToolsButton = document.getElementById('mobileTabTools');
+    if (mobileToolsButton instanceof HTMLElement) {
+      const r = clamp(Math.round(Number(color.r) || 0), 0, 255);
+      const g = clamp(Math.round(Number(color.g) || 0), 0, 255);
+      const b = clamp(Math.round(Number(color.b) || 0), 0, 255);
+      const alpha = clamp((Number(color.a) || 255) / 255, 0, 1);
+      const luminance = ((0.2126 * r) + (0.7152 * g) + (0.0722 * b)) / 255;
+      const iconColor = luminance >= 0.62 ? 'rgba(12, 18, 26, 0.96)' : 'rgba(244, 248, 252, 0.98)';
+      mobileToolsButton.style.setProperty(
+        '--mobile-tool-current-color',
+        `rgba(${r}, ${g}, ${b}, ${Math.max(0.76, alpha * 0.96)})`
+      );
+      mobileToolsButton.style.setProperty('--mobile-tool-icon-color', iconColor);
+    }
   }
 
   function getActiveToolIconNode() {
