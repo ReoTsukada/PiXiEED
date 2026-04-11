@@ -3014,6 +3014,7 @@
   let sharedProjectPollingTimer = null;
   let sharedProjectRefreshTimer = null;
   let sharedProjectRefreshInFlight = false;
+  let sharedProjectDeferredRemoteOpsTimer = null;
   let sharedProjectLastRefreshQueuedAt = 0;
   let sharedProjectLastRefreshQueuedReason = '';
   let pendingSharedProjectConflictReplay = null;
@@ -3067,6 +3068,8 @@
   const LEFT_UNIFIED_TOOLS_RATIO_DEFAULT = 0.5;
   const LEFT_UNIFIED_TOOLS_RATIO_MIN = 0.2;
   const LEFT_UNIFIED_TOOLS_RATIO_MAX = 0.8;
+  const LEFT_UNIFIED_TOOLS_MIN_HEIGHT_FALLBACK = 122;
+  const LEFT_UNIFIED_COLOR_MIN_HEIGHT_FALLBACK = 168;
   const railSizing = {
     left: RAIL_DEFAULT_WIDTH.left,
     right: RAIL_DEFAULT_WIDTH.right,
@@ -7890,6 +7893,7 @@
     }
     sharedProjectLastRefreshQueuedAt = 0;
     sharedProjectLastRefreshQueuedReason = '';
+    clearDeferredSharedProjectRemoteOpsDrain();
     if (sharedProjectPollingTimer !== null) {
       window.clearInterval(sharedProjectPollingTimer);
       sharedProjectPollingTimer = null;
@@ -8145,6 +8149,7 @@
       sharedProjectSeenOpSeqById.clear();
       sharedProjectRemoteApplyFailureKeys.clear();
       sharedProjectPendingLocalOps = [];
+      clearDeferredSharedProjectRemoteOpsDrain();
       sharedProjectInFlightStroke = null;
       sharedProjectLastAppliedSeq = 0;
       pendingSharedProjectConflictReplay = null;
@@ -26343,6 +26348,100 @@
     return LEFT_UNIFIED_TOOLS_RATIO_DEFAULT;
   }
 
+  function measureLeftUnifiedSectionMinimumHeight(section, fallbackHeight) {
+    if (!(section instanceof HTMLElement)) {
+      return Math.max(1, Math.round(Number(fallbackHeight) || 0));
+    }
+    const styles = window.getComputedStyle(section);
+    const sectionGap = Math.max(0, parseFloat(styles.gap) || 0);
+    const paddingTop = Math.max(0, parseFloat(styles.paddingTop) || 0);
+    const paddingBottom = Math.max(0, parseFloat(styles.paddingBottom) || 0);
+    const body = section.querySelector('.panel-section__body');
+    const bodyStyles = body instanceof HTMLElement ? window.getComputedStyle(body) : null;
+    const bodyGap = Math.max(0, parseFloat(bodyStyles?.gap || '0') || 0);
+    let measuredContentHeight = 0;
+    if (section.id === 'panelTools') {
+      const toolGroups = section.querySelector('.tool-group-tabs');
+      const toolGrid = section.querySelector('.tool-grid[data-active-group]') || section.querySelector('.tool-grid');
+      const groupButton = toolGroups instanceof HTMLElement ? toolGroups.querySelector('.tool-group-button') : null;
+      const toolButton = toolGrid instanceof HTMLElement ? toolGrid.querySelector('.tool-button') : null;
+      const toolGroupsStyles = toolGroups instanceof HTMLElement ? window.getComputedStyle(toolGroups) : null;
+      const toolGridStyles = toolGrid instanceof HTMLElement ? window.getComputedStyle(toolGrid) : null;
+      const toolGroupsPaddingTop = Math.max(0, parseFloat(toolGroupsStyles?.paddingTop || '0') || 0);
+      const toolGroupsPaddingBottom = Math.max(0, parseFloat(toolGroupsStyles?.paddingBottom || '0') || 0);
+      const toolGroupsMarginBottom = Math.max(0, parseFloat(toolGroupsStyles?.marginBottom || '0') || 0);
+      const activeToolGroupRows = toolGroups instanceof HTMLElement
+        ? Math.max(1, Math.ceil((toolGroups.querySelectorAll('.tool-group-button').length || 1) / Math.max(1, Math.floor((toolGroups.clientWidth || toolGroups.scrollWidth || 1) / Math.max(1, groupButton instanceof HTMLElement ? Math.round(groupButton.getBoundingClientRect().width || groupButton.offsetWidth || 0) : 1)))))
+        : 1;
+      const firstGroupHeight = groupButton instanceof HTMLElement
+        ? Math.max(1, Math.round(groupButton.getBoundingClientRect().height || groupButton.offsetHeight || 0))
+        : 44;
+      const toolGroupsGap = Math.max(0, parseFloat(toolGroupsStyles?.gap || '0') || 0);
+      const toolGroupsHeight = toolGroups instanceof HTMLElement
+        ? Math.max(
+          firstGroupHeight + toolGroupsPaddingTop + toolGroupsPaddingBottom,
+          (firstGroupHeight * Math.min(activeToolGroupRows, 2)) + (toolGroupsGap * Math.max(0, Math.min(activeToolGroupRows, 2) - 1)) + toolGroupsPaddingTop + toolGroupsPaddingBottom
+        ) + toolGroupsMarginBottom
+        : 0;
+      const firstToolHeight = toolButton instanceof HTMLElement
+        ? Math.max(1, Math.round(toolButton.getBoundingClientRect().height || toolButton.offsetHeight || 0))
+        : 44;
+      const toolGridGap = Math.max(0, parseFloat(toolGridStyles?.gap || '0') || 0);
+      const toolGridPaddingTop = Math.max(0, parseFloat(toolGridStyles?.paddingTop || '0') || 0);
+      const toolGridPaddingBottom = Math.max(0, parseFloat(toolGridStyles?.paddingBottom || '0') || 0);
+      const toolGridHeight = firstToolHeight + toolGridPaddingTop + toolGridPaddingBottom + toolGridGap;
+      measuredContentHeight = toolGroupsHeight + toolGridHeight + bodyGap;
+    } else {
+      const paletteGrid = section.querySelector('.palette-grid');
+      const paletteEditor = section.querySelector('.palette-editor');
+      const paletteHeader = section.querySelector('.palette-header');
+      const paletteSwatch = paletteGrid instanceof HTMLElement ? paletteGrid.querySelector('.palette-swatch') : null;
+      const swatchHeight = paletteSwatch instanceof HTMLElement
+        ? Math.max(1, Math.round(paletteSwatch.getBoundingClientRect().height || paletteSwatch.offsetHeight || 0))
+        : 44;
+      const paletteHeaderHeight = paletteHeader instanceof HTMLElement
+        ? Math.max(0, Math.round(paletteHeader.getBoundingClientRect().height || paletteHeader.offsetHeight || 0))
+        : 0;
+      const paletteEditorHeight = paletteEditor instanceof HTMLElement
+        ? Math.max(0, Math.round(Math.min(paletteEditor.scrollHeight || 0, 220)))
+        : 0;
+      measuredContentHeight = paletteHeaderHeight + swatchHeight + paletteEditorHeight + bodyGap;
+    }
+    return Math.max(
+      Math.round(Number(fallbackHeight) || 0),
+      Math.round(measuredContentHeight + paddingTop + paddingBottom + sectionGap + 8)
+    );
+  }
+
+  function getLeftUnifiedSplitMinimumHeights() {
+    const toolsSection = dom.sections.tools;
+    const colorSection = dom.sections.color;
+    return {
+      tools: measureLeftUnifiedSectionMinimumHeight(toolsSection, LEFT_UNIFIED_TOOLS_MIN_HEIGHT_FALLBACK),
+      color: measureLeftUnifiedSectionMinimumHeight(colorSection, LEFT_UNIFIED_COLOR_MIN_HEIGHT_FALLBACK),
+    };
+  }
+
+  function getLeftUnifiedSplitRatioBounds(totalHeight) {
+    const safeTotalHeight = Math.max(1, Math.round(Number(totalHeight) || 0));
+    const minimums = getLeftUnifiedSplitMinimumHeights();
+    const minRatio = clamp(
+      minimums.tools / safeTotalHeight,
+      LEFT_UNIFIED_TOOLS_RATIO_MIN,
+      LEFT_UNIFIED_TOOLS_RATIO_MAX
+    );
+    const maxRatio = clamp(
+      1 - (minimums.color / safeTotalHeight),
+      minRatio,
+      LEFT_UNIFIED_TOOLS_RATIO_MAX
+    );
+    return {
+      min: minRatio,
+      max: Math.max(minRatio, maxRatio),
+      minimums,
+    };
+  }
+
   function ensureLeftUnifiedSplitHandle() {
     if (dom.resizeHandles.leftUnified instanceof HTMLElement) {
       return dom.resizeHandles.leftUnified;
@@ -26410,10 +26509,18 @@
     } else if (handle.parentNode !== panes) {
       panes.appendChild(handle);
     }
-    const ratio = normalizeLeftUnifiedToolsRatio(leftUnifiedSplitSizing.ratio, LEFT_UNIFIED_TOOLS_RATIO_DEFAULT);
+    const panesRect = panes.getBoundingClientRect();
+    const bounds = getLeftUnifiedSplitRatioBounds(panesRect.height || panes.clientHeight || 0);
+    const ratio = clamp(
+      normalizeLeftUnifiedToolsRatio(leftUnifiedSplitSizing.ratio, LEFT_UNIFIED_TOOLS_RATIO_DEFAULT),
+      bounds.min,
+      bounds.max
+    );
     leftUnifiedSplitSizing.ratio = ratio;
     panes.style.setProperty('--left-unified-tools-grow', ratio.toFixed(4));
     panes.style.setProperty('--left-unified-color-grow', (1 - ratio).toFixed(4));
+    panes.style.setProperty('--left-unified-tools-min-height', `${bounds.minimums.tools}px`);
+    panes.style.setProperty('--left-unified-color-min-height', `${bounds.minimums.color}px`);
     handle.hidden = false;
     handle.setAttribute('aria-hidden', 'false');
   }
@@ -26642,7 +26749,12 @@
     }
     const startTotal = Math.max(2, leftUnifiedSplitSizing.startToolsHeight + leftUnifiedSplitSizing.startColorHeight);
     const nextToolsHeight = leftUnifiedSplitSizing.startToolsHeight + deltaY;
-    const nextRatio = normalizeLeftUnifiedToolsRatio(nextToolsHeight / startTotal, leftUnifiedSplitSizing.ratio);
+    const bounds = getLeftUnifiedSplitRatioBounds(startTotal);
+    const nextRatio = clamp(
+      normalizeLeftUnifiedToolsRatio(nextToolsHeight / startTotal, leftUnifiedSplitSizing.ratio),
+      bounds.min,
+      bounds.max
+    );
     if (Math.abs(nextRatio - leftUnifiedSplitSizing.ratio) < 0.0005) {
       return;
     }
@@ -52872,6 +52984,44 @@
     );
   }
 
+  function shouldDeferIncomingSharedProjectRemoteApply() {
+    return (
+      hasSharedProjectLocalWorkInFlight()
+      || autosaveWriteInFlight
+      || multiState.applyRemoteInProgress
+      || multiState.connecting
+    );
+  }
+
+  function clearDeferredSharedProjectRemoteOpsDrain() {
+    if (sharedProjectDeferredRemoteOpsTimer !== null) {
+      window.clearTimeout(sharedProjectDeferredRemoteOpsTimer);
+      sharedProjectDeferredRemoteOpsTimer = null;
+    }
+  }
+
+  function scheduleDeferredSharedProjectRemoteOpsDrain(delayMs = 96) {
+    if (sharedProjectDeferredRemoteOpsTimer !== null || !activeSharedProjectKey) {
+      return;
+    }
+    sharedProjectDeferredRemoteOpsTimer = window.setTimeout(() => {
+      sharedProjectDeferredRemoteOpsTimer = null;
+      if (!activeSharedProjectKey) {
+        return;
+      }
+      if (shouldDeferIncomingSharedProjectRemoteApply()) {
+        scheduleDeferredSharedProjectRemoteOpsDrain(Math.max(96, delayMs));
+        return;
+      }
+      if (drainPendingSharedProjectRemoteOps()) {
+        return;
+      }
+      if (sharedProjectPendingRemoteOps.size) {
+        scheduleDeferredSharedProjectRemoteOpsDrain(Math.max(96, delayMs));
+      }
+    }, Math.max(16, Math.round(Number(delayMs) || 96)));
+  }
+
   function isSharedProjectRealtimePrimaryActive(projectKey = '') {
     ensureBoundSharedProjectSessionFromCurrentState(projectKey);
     const resolvedSharedProjectKey = resolveSharedProjectKeyForCurrentState(projectKey);
@@ -53628,6 +53778,10 @@
   function drainPendingSharedProjectRemoteOps() {
     while (sharedProjectPendingRemoteOps.has(sharedProjectLastAppliedSeq + 1)) {
       const nextSeq = sharedProjectLastAppliedSeq + 1;
+      if (shouldDeferIncomingSharedProjectRemoteApply()) {
+        scheduleDeferredSharedProjectRemoteOpsDrain();
+        return false;
+      }
       const nextOp = sharedProjectPendingRemoteOps.get(nextSeq);
       sharedProjectPendingRemoteOps.delete(nextSeq);
       if (!applyOp(nextOp, { fromRemote: true })) {
@@ -53662,6 +53816,11 @@
       }
       if (seq > sharedProjectLastAppliedSeq + 1) {
         sharedProjectPendingRemoteOps.set(seq, op);
+        continue;
+      }
+      if (fromRemote && shouldDeferIncomingSharedProjectRemoteApply()) {
+        sharedProjectPendingRemoteOps.set(seq, op);
+        scheduleDeferredSharedProjectRemoteOpsDrain();
         continue;
       }
       if (!applyOp(op, { fromRemote, provisional: false })) {
@@ -55328,7 +55487,9 @@
           || drawKind === 'stroke-commit'
           || drawKind === 'draw'
         ) {
-          triggerImmediateSharedProjectRecovery('broadcast-draw-op').catch(() => {});
+          if (!shouldDeferIncomingSharedProjectRemoteApply()) {
+            applyOp(op, { fromRemote: true, provisional: true });
+          }
           return;
         }
         applyOp(op, { fromRemote: true, provisional: true });
@@ -55443,17 +55604,12 @@
               return;
             }
             if (nextRevision === sharedProjectLastAppliedSeq + 1) {
-              const drawKind = typeof payload?.new?.op_type === 'string' ? payload.new.op_type.trim() : '';
-              const applied = (
-                drawKind === 'draw'
-                ? false
-                : (drawKind === 'palette'
-                  ? applySharedProjectPaletteOp(payload.new, { fromRemote: true, provisional: false })
-                  : applyOp(payload.new, { fromRemote: true, provisional: false }))
-              );
-              if (drawKind === 'draw') {
-                triggerImmediateSharedProjectRecovery('db-draw-op').catch(() => {});
+              if (shouldDeferIncomingSharedProjectRemoteApply()) {
+                sharedProjectPendingRemoteOps.set(nextRevision, payload.new);
+                scheduleDeferredSharedProjectRemoteOpsDrain();
+                return;
               }
+              const applied = applyOp(payload.new, { fromRemote: true, provisional: false });
               if (applied) {
                 sharedProjectLastAppliedSeq = nextRevision;
                 activeSharedProjectRevision = nextRevision;
