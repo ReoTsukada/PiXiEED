@@ -26,11 +26,15 @@
     mobileDrawerHandle: document.getElementById('mobileDrawerHandle'),
     mobileTopBar: document.getElementById('mobileTopBar'),
     mobileShortcutsMount: document.getElementById('mobileShortcutsMount'),
+    mobileQuickPanelButtons: Array.from(document.querySelectorAll('[data-mobile-quick-open-panel]')),
     mobileTabs: Array.from(document.querySelectorAll('[data-mobile-tab]')),
+    mobilePanelsContainer: document.getElementById('mobilePanels'),
     colorTabSwatch: document.getElementById('colorTabSwatch'),
-    mobileColorTabSwatch: document.getElementById('mobileColorTabSwatch'),
+    mobileColorTabSwatch: document.getElementById('mobileToolChipSwatch'),
+    mobileDrawerColorTabSwatch: document.getElementById('mobileDrawerToolChipSwatch'),
     toolTabIcon: document.getElementById('toolTabIcon'),
     mobileToolTabIcon: document.getElementById('mobileToolTabIcon'),
+    mobileDrawerToolTabIcon: document.getElementById('mobileDrawerToolTabIcon'),
     mobilePanels: {
       tools: document.getElementById('mobilePanelTools'),
       color: document.getElementById('mobilePanelColor'),
@@ -595,12 +599,12 @@
     y: TOOL_ACTION_MIRROR_POPUP,
     k: TOOL_ACTION_VIRTUAL_CURSOR_TOGGLE,
   });
-  const MOBILE_DRAWER_MODE_ORDER = Object.freeze(['peek', 'full']);
-  const MOBILE_DRAWER_DEFAULT_MODE = 'full';
+  const MOBILE_DRAWER_MODE_ORDER = Object.freeze(['half', 'full']);
+  const MOBILE_DRAWER_DEFAULT_MODE = 'half';
   const MOBILE_DRAWER_PEEK_HEIGHT_OFFSET = 3;
   const MOBILE_TAB_DRAWER_MODE = Object.freeze({
-    tools: 'full',
-    color: 'full',
+    tools: 'half',
+    color: 'half',
     frames: 'full',
     settings: 'full',
     extensions: 'full',
@@ -9543,7 +9547,10 @@
     if (dom.controls.selectionOutline8Action instanceof HTMLButtonElement) {
       dom.controls.selectionOutline8Action.disabled = disableOutline;
     }
-    const nextMode = movePending ? 'selectionMove' : ((hasSelection || hasClipboard) ? 'clipboard' : 'zoom');
+    const isMobilePortraitLayout = layoutMode === 'mobilePortrait';
+    const nextMode = movePending
+      ? 'selectionMove'
+      : (isMobilePortraitLayout ? 'clipboard' : ((hasSelection || hasClipboard) ? 'clipboard' : 'zoom'));
     const isZoomMode = nextMode === 'zoom';
     if (canvasControlMode !== nextMode) {
       canvasControlMode = nextMode;
@@ -9579,9 +9586,12 @@
     if (dom.controls.canvasControlButtons instanceof HTMLElement) {
       dom.controls.canvasControlButtons.classList.toggle('is-clipboard-mode', !isZoomMode);
       const isSelectionToolActive = TOOL_TO_GROUP[state.tool] === 'selection';
-      const showFloatingSelectionActions =
-        isSelectionToolActive
-        && (canvasControlMode === 'clipboard' || canvasControlMode === 'selectionMove');
+      const showFloatingSelectionActions = isMobilePortraitLayout
+        ? true
+        : (
+          isSelectionToolActive
+          && (canvasControlMode === 'clipboard' || canvasControlMode === 'selectionMove')
+        );
       dom.controls.canvasControlButtons.classList.toggle(
         'is-mobile-selection-actions-visible',
         showFloatingSelectionActions
@@ -26866,6 +26876,15 @@
     return closest;
   }
 
+  function getNextMobileDrawerMode(mode) {
+    const normalizedMode = normalizeMobileDrawerMode(mode);
+    const currentIndex = MOBILE_DRAWER_MODE_ORDER.indexOf(normalizedMode);
+    if (currentIndex === -1) {
+      return MOBILE_DRAWER_DEFAULT_MODE;
+    }
+    return MOBILE_DRAWER_MODE_ORDER[(currentIndex + 1) % MOBILE_DRAWER_MODE_ORDER.length];
+  }
+
   function setMobileDrawerMode(mode, { persist = false } = {}) {
     const normalizedMode = normalizeMobileDrawerMode(mode);
     mobileDrawerState.mode = normalizedMode;
@@ -26881,6 +26900,22 @@
     if (persist) {
       scheduleSessionPersist();
     }
+  }
+
+  function syncMobileQuickPanelButtons(activeTarget = '') {
+    if (!Array.isArray(dom.mobileQuickPanelButtons)) {
+      return;
+    }
+    dom.mobileQuickPanelButtons.forEach(button => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      const target = button.dataset.mobileQuickOpenPanel || '';
+      const isToolsTarget = target === 'tools' && (activeTarget === 'tools' || activeTarget === 'color');
+      const isActive = Boolean(target) && (target === activeTarget || isToolsTarget);
+      button.classList.toggle('is-active', isActive);
+      button.setAttribute('aria-pressed', String(isActive));
+    });
   }
 
   function activateMobileTab(target, { ensureDrawer = false } = {}) {
@@ -26943,6 +26978,7 @@
         }
       }
       updateToolVisibility();
+      syncMobileQuickPanelButtons(normalizedTarget);
       if (normalizedTarget === 'multi') {
         scheduleMultiEntryScreenMetricsUpdate();
       }
@@ -27060,10 +27096,7 @@
     }
     if (!moved) {
       endMobileDrawerDrag({ persist: false, snap: false });
-      setMobileDrawerMode(
-        normalizeMobileDrawerMode(mobileDrawerState.mode) === 'peek' ? 'full' : 'peek',
-        { persist: true }
-      );
+      setMobileDrawerMode(getNextMobileDrawerMode(mobileDrawerState.mode), { persist: true });
       return;
     }
     endMobileDrawerDrag({ persist: true });
@@ -27115,9 +27148,13 @@
       }
       let nextMode = null;
       if (event.key === 'Home') {
-        nextMode = 'peek';
+        nextMode = 'half';
       } else if (event.key === 'End') {
         nextMode = 'full';
+      } else if (event.key === 'ArrowUp') {
+        nextMode = 'full';
+      } else if (event.key === 'ArrowDown') {
+        nextMode = 'half';
       }
       if (!nextMode) {
         return;
@@ -27187,6 +27224,18 @@
           return;
         }
         activateMobileTab(target, { ensureDrawer: false });
+      });
+    });
+    dom.mobileQuickPanelButtons.forEach(button => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      button.addEventListener('click', () => {
+        const target = button.dataset.mobileQuickOpenPanel || '';
+        if (!target) {
+          return;
+        }
+        activateMobileTab(target, { ensureDrawer: true });
       });
     });
     setupRailResizers();
@@ -27292,9 +27341,9 @@
     const { width, height } = getViewportSize();
     const portrait = height >= width;
     const topbar = clamp(
-      Math.round(height * (portrait ? 0.12 : 0.15)),
-      portrait ? 84 : 72,
-      portrait ? 124 : 102
+      Math.round(height * (portrait ? 0.082 : 0.15)),
+      portrait ? 60 : 72,
+      portrait ? 76 : 102
     );
     const rootStyles = window.getComputedStyle(root);
     const tileSize = Math.max(
@@ -27315,32 +27364,36 @@
     );
     const adHeight = getVisibleMobileBottomAdHeight();
     root.style.setProperty('--mobile-bottom-ad-height', `${adHeight}px`);
-    const threeRowPeekMin =
-      (tileSize * 3)
+    const halfMinBase =
+      tileSize
       + handleHeight
       + panelGap
-      + 28
+      + 26
       + Math.min(12, safeBottom)
       + MOBILE_DRAWER_PEEK_HEIGHT_OFFSET;
-    const peek = clamp(
-      Math.round(height * (portrait ? 0.19 : 0.2)) + MOBILE_DRAWER_PEEK_HEIGHT_OFFSET,
-      threeRowPeekMin,
-      (portrait ? 220 : 196) + MOBILE_DRAWER_PEEK_HEIGHT_OFFSET
+    const halfMin = Math.max(halfMinBase, portrait ? 232 : 220);
+    const halfCap = Math.max(halfMin, Math.min(Math.round(height * (portrait ? 0.42 : 0.48)), portrait ? 420 : 320));
+    const half = clamp(
+      Math.round(height * (portrait ? 0.28 : 0.42)),
+      halfMin,
+      halfCap
     );
-    const fullMin = Math.max(peek + 84, portrait ? 238 : 220);
     const fullCapByViewport = Math.round(height - topbar - 52);
+    const fullMin = Math.min(
+      Math.max(half + 92, portrait ? 420 : 280),
+      Math.max(half + 48, fullCapByViewport)
+    );
     const fullCap = Math.max(fullMin, Math.min(fullCapByViewport, portrait ? 560 : 360));
     const full = clamp(
-      Math.round(height * (portrait ? 0.48 : 0.56)),
+      Math.round(height * (portrait ? 0.64 : 0.56)),
       fullMin,
       fullCap
     );
-    const half = full;
-    mobileDrawerState.heights.peek = peek;
+    mobileDrawerState.heights.peek = half;
     mobileDrawerState.heights.half = half;
     mobileDrawerState.heights.full = full;
     root.style.setProperty('--mobile-topbar-height', `${topbar}px`);
-    root.style.setProperty('--mobile-drawer-peek-height', `${peek}px`);
+    root.style.setProperty('--mobile-drawer-peek-height', `${half}px`);
     root.style.setProperty('--mobile-drawer-half-height', `${half}px`);
     root.style.setProperty('--mobile-drawer-full-height', `${full}px`);
     setMobileDrawerMode(mobileDrawerState.mode, { persist: false });
@@ -27471,6 +27524,8 @@
       if (preferredMobileTab) {
         activateMobileTab(preferredMobileTab, { ensureDrawer: false });
       }
+    } else {
+      syncMobileQuickPanelButtons('');
     }
     enforceMobileSpectatorTabLock({ forceActivate: true });
 
@@ -48683,7 +48738,7 @@
     const color = getActiveSwatchColor();
     if (!color) return;
     const borderColor = color.a >= 192 ? 'rgba(0, 0, 0, 0.45)' : 'rgba(255, 255, 255, 0.75)';
-    [dom.colorTabSwatch, dom.mobileColorTabSwatch].forEach(element => {
+    [dom.colorTabSwatch, dom.mobileColorTabSwatch, dom.mobileDrawerColorTabSwatch].forEach(element => {
       if (!element) return;
       applyPixelFrameBackground(element, color, { borderColor });
     });
@@ -48706,7 +48761,7 @@
   }
 
   function updateToolTabIcon() {
-    const targets = [dom.toolTabIcon, dom.mobileToolTabIcon].filter(Boolean);
+    const targets = [dom.toolTabIcon, dom.mobileToolTabIcon, dom.mobileDrawerToolTabIcon].filter(Boolean);
     if (!targets.length) {
       return;
     }
