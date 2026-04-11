@@ -53797,9 +53797,13 @@
         });
         return false;
       }
+      const hadLoadedDocument = activeSharedProjectDocumentLoaded;
       activeSharedProjectDocumentLoaded = false;
       const sharedSnapshot = project.latest_snapshot;
       if (!sharedSnapshot || typeof sharedSnapshot !== 'object') {
+        if (hadLoadedDocument) {
+          markActiveSharedProjectDocumentLoaded(activeSharedProjectKey);
+        }
         activeSharedProjectRevision = nextRevision;
         logSharedProjectRealtimeChannelLifecycle('refresh-result', {
           caller: 'refreshActiveSharedProjectSnapshot',
@@ -53825,6 +53829,9 @@
         )
       );
       if (prefersFreshCanonicalSnapshot && snapshotRevision < nextRevision) {
+        if (hadLoadedDocument) {
+          markActiveSharedProjectDocumentLoaded(activeSharedProjectKey);
+        }
         logSharedProjectRealtimeChannelLifecycle('refresh-result', {
           caller: 'refreshActiveSharedProjectSnapshot',
           reason: reason || 'refresh',
@@ -53852,6 +53859,9 @@
         sharedProjectRevision: snapshotRevision,
       });
       if (!loaded) {
+        if (hadLoadedDocument) {
+          markActiveSharedProjectDocumentLoaded(activeSharedProjectKey);
+        }
         logSharedProjectRealtimeChannelLifecycle('refresh-result', {
           caller: 'refreshActiveSharedProjectSnapshot',
           reason: reason || 'refresh',
@@ -53928,6 +53938,9 @@
       });
       return true;
     } catch (error) {
+      if (activeSharedProjectKey && !activeSharedProjectDocumentLoaded) {
+        markActiveSharedProjectDocumentLoaded(activeSharedProjectKey);
+      }
       logSharedProjectRealtimeChannelLifecycle('refresh-result', {
         caller: 'refreshActiveSharedProjectSnapshot',
         reason: reason || 'refresh',
