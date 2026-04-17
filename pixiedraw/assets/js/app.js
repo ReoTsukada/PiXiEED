@@ -2410,7 +2410,7 @@
     typeof File === 'function';
   const SHARE_HASHTAG = '#PiXiEED';
   const CONTEST_PENDING_UPLOAD_STORAGE_KEY = 'pixieed_contest_upload_v1';
-  const CONTEST_POST_PAGE_URL = '../contest/';
+  const CONTEST_POST_PAGE_URL = '../contest/index.html';
   const IS_ANDROID_LINE_BROWSER =
     IS_ANDROID_DEVICE
     && /line\//i.test(USER_AGENT);
