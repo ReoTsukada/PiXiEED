@@ -16723,6 +16723,12 @@
         fileExtensions: ['.gif'],
         shareTitle: state.documentName || 'PiXiEEDraw',
         shareText: 'タイムラプスGIFを書き出しました',
+        mode: 'timelapse',
+        includeProjectCompanion: shouldSaveProjectCompanion('timelapse'),
+        archiveSuffix: 'timelapse',
+        archiveShareText: shouldSaveProjectCompanion('timelapse')
+          ? 'タイムラプスGIFと .pixieedraw を ZIP で書き出しました'
+          : 'タイムラプスGIF一式をZIPで書き出しました',
       });
 
       const detailParts = [`${framePixels.length}ステップ`];
@@ -16746,10 +16752,12 @@
       if (result.exportedCount > 0) {
         markDocumentDurablySaved();
         if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
-          const companionResult = await maybeSaveProjectCompanionAfterExport('timelapse', {
-            exportedCount: result.exportedCount,
-            wasCancelled: result.wasCancelled,
-          });
+          const companionResult = shouldSaveProjectCompanion('timelapse')
+            ? 'saved'
+            : await maybeSaveProjectCompanionAfterExport('timelapse', {
+              exportedCount: result.exportedCount,
+              wasCancelled: result.wasCancelled,
+            });
           announceProjectCompanionSaveResult('timelapse', companionResult);
         }
         showLoginPromptAfterExport();
@@ -21504,8 +21512,12 @@
         fileExtensions: ['.png'],
         shareTitle: state.documentName || 'PiXiEEDraw',
         shareText: 'グリッド分割PNGを書き出しました',
+        mode: 'gridpng',
+        includeProjectCompanion: shouldSaveProjectCompanion('gridpng'),
         archiveSuffix: 'gridpng_frames',
-        archiveShareText: 'グリッド分割PNG一式をZIPで書き出しました',
+        archiveShareText: shouldSaveProjectCompanion('gridpng')
+          ? 'グリッド分割PNG一式と .pixieedraw を ZIP で書き出しました'
+          : 'グリッド分割PNG一式をZIPで書き出しました',
       });
       const exportedCount = result.exportedCount;
       const wasCancelled = result.wasCancelled;
@@ -21539,10 +21551,12 @@
       if (exportedCount > 0) {
         markDocumentDurablySaved();
         if (exportedCount === total && !wasCancelled && !hadFailure) {
-          const companionResult = await maybeSaveProjectCompanionAfterExport('gridpng', {
-            exportedCount,
-            wasCancelled,
-          });
+          const companionResult = shouldSaveProjectCompanion('gridpng')
+            ? 'saved'
+            : await maybeSaveProjectCompanionAfterExport('gridpng', {
+              exportedCount,
+              wasCancelled,
+            });
           announceProjectCompanionSaveResult('gridpng', companionResult);
         }
         showLoginPromptAfterExport();
@@ -21601,8 +21615,12 @@
         fileExtensions: ['.png'],
         shareTitle: state.documentName || 'PiXiEEDraw',
         shareText: isVoxelComposite ? 'PNGを書き出しました（立体表示）' : 'PNGを書き出しました',
+        mode: 'png',
+        includeProjectCompanion: shouldSaveProjectCompanion('png'),
         archiveSuffix: 'png_frames',
-        archiveShareText: isVoxelComposite ? 'PNG一式をZIPで書き出しました（立体表示）' : 'PNG一式をZIPで書き出しました',
+        archiveShareText: shouldSaveProjectCompanion('png')
+          ? (isVoxelComposite ? 'PNG一式と .pixieedraw を ZIP で書き出しました（立体表示）' : 'PNG一式と .pixieedraw を ZIP で書き出しました')
+          : (isVoxelComposite ? 'PNG一式をZIPで書き出しました（立体表示）' : 'PNG一式をZIPで書き出しました'),
       });
       const detailParts = [];
       if (frameCount > 1) {
@@ -21635,10 +21653,12 @@
         markDocumentDurablySaved();
         let skipInterstitial = false;
         if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
-          const companionResult = await maybeSaveProjectCompanionAfterExport('png', {
-            exportedCount: result.exportedCount,
-            wasCancelled: result.wasCancelled,
-          });
+          const companionResult = shouldSaveProjectCompanion('png')
+            ? 'saved'
+            : await maybeSaveProjectCompanionAfterExport('png', {
+              exportedCount: result.exportedCount,
+              wasCancelled: result.wasCancelled,
+            });
           announceProjectCompanionSaveResult('png', companionResult);
           skipInterstitial = await maybeRedirectToContestPostAfterExport('png', {
             primaryBlob: tasks[0]?.blob || null,
@@ -21827,6 +21847,12 @@
         fileExtensions: ['.png'],
         shareTitle: state.documentName || 'PiXiEEDraw',
         shareText: 'SpriteMAPを書き出しました',
+        mode: 'spritemap',
+        includeProjectCompanion: shouldSaveProjectCompanion('spritemap'),
+        archiveSuffix: 'spritemap',
+        archiveShareText: shouldSaveProjectCompanion('spritemap')
+          ? 'SpriteMAP一式と .pixieedraw を ZIP で書き出しました'
+          : 'SpriteMAP一式をZIPで書き出しました',
       });
       const detailParts = [`全${frameCount}フレーム`, `配置 ${layoutLabel}`];
       if (spriteMapPlan.colorSpriteCount > 0) {
@@ -21856,10 +21882,12 @@
       if (result.exportedCount > 0) {
         markDocumentDurablySaved();
         if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
-          const companionResult = await maybeSaveProjectCompanionAfterExport('spritemap', {
-            exportedCount: result.exportedCount,
-            wasCancelled: result.wasCancelled,
-          });
+          const companionResult = shouldSaveProjectCompanion('spritemap')
+            ? 'saved'
+            : await maybeSaveProjectCompanionAfterExport('spritemap', {
+              exportedCount: result.exportedCount,
+              wasCancelled: result.wasCancelled,
+            });
           announceProjectCompanionSaveResult('spritemap', companionResult);
         }
         showLoginPromptAfterExport();
@@ -22016,8 +22044,12 @@
         fileExtensions: ['.jpg', '.jpeg'],
         shareTitle: state.documentName || 'PiXiEEDraw',
         shareText: 'JPEGを書き出しました',
+        mode: 'jpeg',
+        includeProjectCompanion: shouldSaveProjectCompanion('jpeg'),
         archiveSuffix: 'jpeg_frames',
-        archiveShareText: 'JPEG一式をZIPで書き出しました',
+        archiveShareText: shouldSaveProjectCompanion('jpeg')
+          ? 'JPEG一式と .pixieedraw を ZIP で書き出しました'
+          : 'JPEG一式をZIPで書き出しました',
       });
       const detailParts = [];
       if (frameCount > 1) {
@@ -22047,10 +22079,12 @@
       if (result.exportedCount > 0) {
         markDocumentDurablySaved();
         if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
-          const companionResult = await maybeSaveProjectCompanionAfterExport('jpeg', {
-            exportedCount: result.exportedCount,
-            wasCancelled: result.wasCancelled,
-          });
+          const companionResult = shouldSaveProjectCompanion('jpeg')
+            ? 'saved'
+            : await maybeSaveProjectCompanionAfterExport('jpeg', {
+              exportedCount: result.exportedCount,
+              wasCancelled: result.wasCancelled,
+            });
           announceProjectCompanionSaveResult('jpeg', companionResult);
         }
         showLoginPromptAfterExport();
@@ -22104,8 +22138,12 @@
         fileExtensions: ['.svg'],
         shareTitle: state.documentName || 'PiXiEEDraw',
         shareText: 'SVGを書き出しました',
+        mode: 'svg',
+        includeProjectCompanion: shouldSaveProjectCompanion('svg'),
         archiveSuffix: 'svg_frames',
-        archiveShareText: 'SVG一式をZIPで書き出しました',
+        archiveShareText: shouldSaveProjectCompanion('svg')
+          ? 'SVG一式と .pixieedraw を ZIP で書き出しました'
+          : 'SVG一式をZIPで書き出しました',
       });
       const detailParts = [];
       if (frameCount > 1) {
@@ -22134,10 +22172,12 @@
       if (result.exportedCount > 0) {
         markDocumentDurablySaved();
         if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
-          const companionResult = await maybeSaveProjectCompanionAfterExport('svg', {
-            exportedCount: result.exportedCount,
-            wasCancelled: result.wasCancelled,
-          });
+          const companionResult = shouldSaveProjectCompanion('svg')
+            ? 'saved'
+            : await maybeSaveProjectCompanionAfterExport('svg', {
+              exportedCount: result.exportedCount,
+              wasCancelled: result.wasCancelled,
+            });
           announceProjectCompanionSaveResult('svg', companionResult);
         }
         showLoginPromptAfterExport();
@@ -22259,6 +22299,12 @@
         fileExtensions: ['.gif'],
         shareTitle: state.documentName || 'PiXiEEDraw',
         shareText: 'GIFを書き出しました',
+        mode: 'gif',
+        includeProjectCompanion: shouldSaveProjectCompanion('gif'),
+        archiveSuffix: 'gif',
+        archiveShareText: shouldSaveProjectCompanion('gif')
+          ? 'GIF一式と .pixieedraw を ZIP で書き出しました'
+          : 'GIF一式をZIPで書き出しました',
       });
       const detailParts = [];
       if (isVoxelComposite) {
@@ -22287,10 +22333,12 @@
         markDocumentDurablySaved();
         let skipInterstitial = false;
         if (result.exportedCount === result.total && !result.wasCancelled && !result.hadFailure) {
-          const companionResult = await maybeSaveProjectCompanionAfterExport('gif', {
-            exportedCount: result.exportedCount,
-            wasCancelled: result.wasCancelled,
-          });
+          const companionResult = shouldSaveProjectCompanion('gif')
+            ? 'saved'
+            : await maybeSaveProjectCompanionAfterExport('gif', {
+              exportedCount: result.exportedCount,
+              wasCancelled: result.wasCancelled,
+            });
           announceProjectCompanionSaveResult('gif', companionResult);
           skipInterstitial = await maybeRedirectToContestPostAfterExport('gif', {
             primaryBlob: tasks[0]?.blob || null,
@@ -23715,26 +23763,37 @@
   }
 
   async function deliverExportTasks(tasks, options = {}) {
-    const total = Array.isArray(tasks) ? tasks.length : 0;
+    const normalizedTasks = Array.isArray(tasks) ? tasks.slice() : [];
+    if (options.includeProjectCompanion && doesExportFormatSupportProjectCompanion(options.mode || '')) {
+      const companionBundle = buildProjectExportBundle();
+      normalizedTasks.push({
+        blob: companionBundle.blob,
+        filename: companionBundle.filename,
+        mimeType: PROJECT_FILE_MIME_TYPE,
+        fileExtensions: [PROJECT_FILE_EXTENSION],
+        shareText: `${state.documentName} (.pixieedraw)`,
+      });
+    }
+    const total = normalizedTasks.length;
     if (!total) {
       return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: false };
     }
     if (total > 1) {
       try {
-        const zipBlob = await buildZipBlobFromTasks(tasks);
+        const zipBlob = await buildZipBlobFromTasks(normalizedTasks);
         const zipFilename = createExportFileName('zip', options.archiveSuffix || 'export_bundle');
         const deliveryResult = await triggerDownloadFromBlob(zipBlob, zipFilename, {
           mimeType: 'application/zip',
           fileExtensions: ['.zip'],
           shareTitle: options.shareTitle || state.documentName || 'PiXiEEDraw',
           shareText: options.archiveShareText || options.shareText || 'ZIPを書き出しました',
-          allowFilePicker: options.allowFilePicker !== false,
-          allowBoundDirectory: options.allowBoundDirectory !== false,
-          preferShare: options.preferShare,
-          allowAnchorDownload: options.allowAnchorDownload,
-          forceAnchorDownload: options.forceAnchorDownload,
+          allowFilePicker: false,
+          allowBoundDirectory: false,
+          preferShare: false,
+          allowAnchorDownload: true,
+          forceAnchorDownload: true,
           allowNativePhotoLibrary: false,
-          allowNativeSave: options.allowNativeSave,
+          allowNativeSave: false,
           nativeDirectory: options.nativeDirectory,
           nativeSubdirectory: options.nativeSubdirectory,
         });
@@ -23760,8 +23819,8 @@
     let exportedCount = 0;
     let wasCancelled = false;
     let hadFailure = false;
-    for (let index = 0; index < tasks.length; index += 1) {
-      const task = tasks[index];
+    for (let index = 0; index < normalizedTasks.length; index += 1) {
+      const task = normalizedTasks[index];
       const deliveryResult = await triggerDownloadFromBlob(task.blob, task.filename, {
         mimeType: task.mimeType || options.mimeType,
         fileExtensions: task.fileExtensions || options.fileExtensions,
@@ -24308,19 +24367,35 @@
     }
   }
 
+  function buildProjectExportBundle() {
+    commitHistory();
+    const snapshot = makeHistorySnapshot();
+    const session = buildProjectSessionPayload();
+    const packaged = buildPackagedProjectPayload(snapshot, { session });
+    const json = JSON.stringify(packaged);
+    const blob = new Blob([json], { type: PROJECT_FILE_MIME_TYPE });
+    const filename = createAutosaveFileName();
+    return {
+      snapshot,
+      session,
+      packaged,
+      blob,
+      filename,
+    };
+  }
+
   async function saveProjectAsPixieedraw(options = {}) {
     if (!ensureCurrentClientCanExportProject({ announce: true, format: 'project' })) {
       return { saved: false, cancelled: false, skipped: true };
     }
     const announceStatus = options?.announceStatus !== false;
     try {
-      commitHistory();
-      const snapshot = makeHistorySnapshot();
-      const session = buildProjectSessionPayload();
-      const packaged = buildPackagedProjectPayload(snapshot, { session });
-      const json = JSON.stringify(packaged);
-      const blob = new Blob([json], { type: PROJECT_FILE_MIME_TYPE });
-      const filename = createAutosaveFileName();
+      const {
+        snapshot,
+        packaged,
+        blob,
+        filename,
+      } = buildProjectExportBundle();
 
       const boundHandle = autosaveHandle || pendingAutosaveHandle;
       if (!DISABLE_FILE_SYSTEM_ACCESS_SAVE && boundHandle) {
