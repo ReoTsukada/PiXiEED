@@ -115,7 +115,7 @@
   function getNavItems() {
     return [
       { key: 'home', label: 'ホーム', path: 'index.html', icon: 'FooterIcon1.png' },
-      { key: 'contest', label: '広場', path: 'contest/', icon: 'FooterIcon2.png' },
+      { key: 'contest', label: '広場', path: 'contest/index.html', icon: 'FooterIcon2.png' },
       { key: 'talk', label: '会話', disabled: true, icon: 'pixiedraw/assets/icons/talk.png' },
       { key: 'portfolio', label: '企業', path: 'portfolio/index.html', icon: 'FooterIcon4.png' }
     ];
