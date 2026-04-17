@@ -21302,14 +21302,14 @@
       return;
     }
     try {
-      const { width, height } = state;
+      const stillFrame = buildStillExportFrameSet();
+      const { width, height, pixels, frameIndex } = stillFrame;
       const candidates = getExportScaleCandidates();
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       exportGridTileWidth = normalizeExportGridTileSize(exportGridTileWidth, 8);
       exportGridTileHeight = normalizeExportGridTileSize(exportGridTileHeight, 8);
       syncExportGridInputs();
-      const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
       // Grid split size is defined in source pixels, then mapped to export scale.
       // This keeps tile count stable even when export scale is > 1.
       const rowSegments = buildGridRowSegmentsTopToBottom(height, exportGridTileHeight);
@@ -21319,82 +21319,77 @@
         updateAutosaveStatus('分割サイズの設定が無効です', 'warn');
         return;
       }
-      const total = tileCountPerFrame * frameCount;
+      const total = tileCountPerFrame;
       const rowDigits = Math.max(2, String(rowSegments.length).length);
       const columnDigits = Math.max(2, String(columnSegments.length).length);
       let exportedCount = 0;
       let wasCancelled = false;
       let hadFailure = false;
 
-      for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+      const frameCanvas = createFrameCanvas(pixels, width, height);
+      const outputCanvas = scaleCanvasNearestNeighbor(frameCanvas, selectedScale);
+      for (let rowIndex = 0; rowIndex < rowSegments.length; rowIndex += 1) {
         if (wasCancelled || hadFailure) {
           break;
         }
-        const frameCanvas = createFrameCanvas(framePixels[frameIndex], width, height);
-        const outputCanvas = scaleCanvasNearestNeighbor(frameCanvas, selectedScale);
-        for (let rowIndex = 0; rowIndex < rowSegments.length; rowIndex += 1) {
+        const rowSegment = rowSegments[rowIndex];
+        const rowNumber = String(rowIndex + 1).padStart(rowDigits, '0');
+        for (let columnIndex = 0; columnIndex < columnSegments.length; columnIndex += 1) {
+          const columnSegment = columnSegments[columnIndex];
+          const columnNumber = String(columnIndex + 1).padStart(columnDigits, '0');
+          const exportX = columnSegment.start * selectedScale;
+          const exportY = rowSegment.start * selectedScale;
+          const exportWidth = columnSegment.size * selectedScale;
+          const exportHeight = rowSegment.size * selectedScale;
+          const blob = await canvasRegionToBlob(
+            outputCanvas,
+            exportX,
+            exportY,
+            exportWidth,
+            exportHeight,
+            'image/png'
+          );
+          const suffixParts = [];
+          if (frameCount > 1) {
+            suffixParts.push(`frame_${String(frameIndex + 1).padStart(2, '0')}`);
+          }
+          suffixParts.push(`r${rowNumber}`, `c${columnNumber}`);
+          if (selectedScale > 1) {
+            suffixParts.push(`x${selectedScale}`);
+          }
+          const suffix = suffixParts.join('_');
+          const deliveryResult = await triggerDownloadFromBlob(
+            blob,
+            createExportFileName('png', suffix),
+            {
+              mimeType: 'image/png',
+              fileExtensions: ['.png'],
+              shareTitle: state.documentName || 'PiXiEEDraw',
+              shareText: `グリッド分割PNGを書き出しました (F${frameIndex + 1} / r${rowIndex + 1}, c${columnIndex + 1})`,
+              allowFilePicker: true,
+              allowBoundDirectory: true,
+            }
+          );
+          switch (deliveryResult) {
+            case 'gallery':
+            case 'native':
+            case 'directory':
+            case 'picker':
+            case 'download':
+            case 'share':
+            case 'window':
+              exportedCount += 1;
+              break;
+            case 'picker-cancel':
+            case 'share-cancel':
+              wasCancelled = true;
+              break;
+            default:
+              hadFailure = true;
+              break;
+          }
           if (wasCancelled || hadFailure) {
             break;
-          }
-          const rowSegment = rowSegments[rowIndex];
-          const rowNumber = String(rowIndex + 1).padStart(rowDigits, '0');
-          for (let columnIndex = 0; columnIndex < columnSegments.length; columnIndex += 1) {
-            const columnSegment = columnSegments[columnIndex];
-            const columnNumber = String(columnIndex + 1).padStart(columnDigits, '0');
-            const exportX = columnSegment.start * selectedScale;
-            const exportY = rowSegment.start * selectedScale;
-            const exportWidth = columnSegment.size * selectedScale;
-            const exportHeight = rowSegment.size * selectedScale;
-            const blob = await canvasRegionToBlob(
-              outputCanvas,
-              exportX,
-              exportY,
-              exportWidth,
-              exportHeight,
-              'image/png'
-            );
-            const suffixParts = [];
-            if (frameCount > 1) {
-              suffixParts.push(String(frameIndex + 1));
-            }
-            suffixParts.push(`r${rowNumber}`, `c${columnNumber}`);
-            if (selectedScale > 1) {
-              suffixParts.push(`x${selectedScale}`);
-            }
-            const suffix = suffixParts.join('_');
-            const deliveryResult = await triggerDownloadFromBlob(
-              blob,
-              createExportFileName('png', suffix),
-              {
-                mimeType: 'image/png',
-                fileExtensions: ['.png'],
-                shareTitle: state.documentName || 'PiXiEEDraw',
-                shareText: `グリッド分割PNGを書き出しました (r${rowIndex + 1}, c${columnIndex + 1})`,
-                allowFilePicker: true,
-                allowBoundDirectory: true,
-              }
-            );
-            switch (deliveryResult) {
-              case 'gallery':
-              case 'native':
-              case 'directory':
-              case 'picker':
-              case 'download':
-              case 'share':
-              case 'window':
-                exportedCount += 1;
-                break;
-              case 'picker-cancel':
-              case 'share-cancel':
-                wasCancelled = true;
-                break;
-              default:
-                hadFailure = true;
-                break;
-            }
-            if (wasCancelled || hadFailure) {
-              break;
-            }
           }
         }
       }
@@ -21402,7 +21397,7 @@
       const detailParts = [];
       detailParts.push(`分割 ${exportGridTileWidth}×${exportGridTileHeight}px`);
       if (frameCount > 1) {
-        detailParts.push(`全${frameCount}フレーム`);
+        detailParts.push(`選択フレーム ${frameIndex + 1}`);
       }
       if (selectedScale > 1) {
         detailParts.push(`倍率 ×${selectedScale}`);
@@ -21444,43 +21439,40 @@
     if (!ensureCurrentClientCanExportProject({ announce: true, format: 'png' })) {
       return;
     }
-    const exportFrameSet = buildExportFrameSet();
-    const frameCount = exportFrameSet.frameCount;
+    const frameCount = state.frames.length;
     if (!frameCount) {
       updateAutosaveStatus('PNGを書き出すフレームがありません', 'warn');
       return;
     }
     try {
-      const { width, height, framePixels, isVoxelComposite } = exportFrameSet;
+      const stillFrame = buildStillExportFrameSet();
+      const { width, height, pixels, frameIndex, isVoxelComposite } = stillFrame;
       const candidates = getExportScaleCandidates();
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const includeOriginal = shouldExportOriginalCompanion('png', selectedScale);
       const tasks = [];
-      const hasMultipleFrames = frameCount > 1;
-      for (let index = 0; index < frameCount; index += 1) {
-        const baseCanvas = createFrameCanvas(framePixels[index], width, height);
-        const variants = [{ scale: selectedScale, isOriginal: false }];
-        if (includeOriginal) {
-          variants.push({ scale: 1, isOriginal: true });
+      const baseCanvas = createFrameCanvas(pixels, width, height);
+      const variants = [{ scale: selectedScale, isOriginal: false }];
+      if (includeOriginal) {
+        variants.push({ scale: 1, isOriginal: true });
+      }
+      for (let variantIndex = 0; variantIndex < variants.length; variantIndex += 1) {
+        const variant = variants[variantIndex];
+        const outputCanvas = scaleCanvasNearestNeighbor(baseCanvas, variant.scale);
+        const blob = await canvasToBlob(outputCanvas, 'image/png');
+        if (!blob) {
+          throw new Error('Failed to create PNG blob');
         }
-        for (let variantIndex = 0; variantIndex < variants.length; variantIndex += 1) {
-          const variant = variants[variantIndex];
-          const outputCanvas = scaleCanvasNearestNeighbor(baseCanvas, variant.scale);
-          const blob = await canvasToBlob(outputCanvas, 'image/png');
-          if (!blob) {
-            throw new Error('Failed to create PNG blob');
-          }
-          let suffix = hasMultipleFrames ? String(index + 1) : '';
-          if (variant.scale > 1 || includeOriginal) {
-            suffix = suffix ? `${suffix}_x${variant.scale}` : `x${variant.scale}`;
-          }
-          tasks.push({
-            blob,
-            filename: createExportFileName('png', suffix),
-            shareText: `フレーム${index + 1}のPNGを書き出しました${variant.scale > 1 ? ` (×${variant.scale})` : ''}`,
-          });
+        let suffix = frameCount > 1 ? `frame_${String(frameIndex + 1).padStart(2, '0')}` : '';
+        if (variant.scale > 1 || includeOriginal) {
+          suffix = suffix ? `${suffix}_x${variant.scale}` : `x${variant.scale}`;
         }
+        tasks.push({
+          blob,
+          filename: createExportFileName('png', suffix),
+          shareText: `フレーム${frameIndex + 1}のPNGを書き出しました${variant.scale > 1 ? ` (×${variant.scale})` : ''}`,
+        });
       }
 
       const result = await deliverExportTasks(tasks, {
@@ -21491,7 +21483,7 @@
       });
       const detailParts = [];
       if (frameCount > 1) {
-        detailParts.push(`全${frameCount}フレーム`);
+        detailParts.push(`選択フレーム ${frameIndex + 1}`);
       }
       if (isVoxelComposite) {
         detailParts.push(localizeText('立体表示', 'Voxel View'));
@@ -21862,38 +21854,36 @@
       return;
     }
     try {
-      const { width, height } = state;
+      const stillFrame = buildStillExportFrameSet();
+      const { width, height, pixels, frameIndex } = stillFrame;
       const candidates = getExportScaleCandidates();
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
-      const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
       const includeOriginal = shouldExportOriginalCompanion('jpeg', selectedScale);
       const tasks = [];
-      for (let index = 0; index < frameCount; index += 1) {
-        const frameNumber = String(index + 1).padStart(2, '0');
-        const baseCanvas = createFrameCanvas(framePixels[index], width, height);
-        const variants = [{ scale: selectedScale, isOriginal: false }];
-        if (includeOriginal) {
-          variants.push({ scale: 1, isOriginal: true });
+      const frameNumber = String(frameIndex + 1).padStart(2, '0');
+      const baseCanvas = createFrameCanvas(pixels, width, height);
+      const variants = [{ scale: selectedScale, isOriginal: false }];
+      if (includeOriginal) {
+        variants.push({ scale: 1, isOriginal: true });
+      }
+      for (let variantIndex = 0; variantIndex < variants.length; variantIndex += 1) {
+        const variant = variants[variantIndex];
+        const scaledCanvas = scaleCanvasNearestNeighbor(baseCanvas, variant.scale);
+        const jpegCanvas = createJpegCanvasFromSourceCanvas(scaledCanvas);
+        const blob = await canvasToBlob(jpegCanvas, 'image/jpeg', 0.92);
+        if (!blob) {
+          throw new Error('Failed to create JPEG blob');
         }
-        for (let variantIndex = 0; variantIndex < variants.length; variantIndex += 1) {
-          const variant = variants[variantIndex];
-          const scaledCanvas = scaleCanvasNearestNeighbor(baseCanvas, variant.scale);
-          const jpegCanvas = createJpegCanvasFromSourceCanvas(scaledCanvas);
-          const blob = await canvasToBlob(jpegCanvas, 'image/jpeg', 0.92);
-          if (!blob) {
-            throw new Error('Failed to create JPEG blob');
-          }
-          let suffix = `frame_${frameNumber}`;
-          if (variant.scale > 1 || includeOriginal) {
-            suffix += `_x${variant.scale}`;
-          }
-          tasks.push({
-            blob,
-            filename: createExportFileName('jpg', suffix),
-            shareText: `フレーム${index + 1}のJPEGを書き出しました${variant.scale > 1 ? ` (×${variant.scale})` : ''}`,
-          });
+        let suffix = frameCount > 1 ? `frame_${frameNumber}` : '';
+        if (variant.scale > 1 || includeOriginal) {
+          suffix = suffix ? `${suffix}_x${variant.scale}` : `x${variant.scale}`;
         }
+        tasks.push({
+          blob,
+          filename: createExportFileName('jpg', suffix),
+          shareText: `フレーム${frameIndex + 1}のJPEGを書き出しました${variant.scale > 1 ? ` (×${variant.scale})` : ''}`,
+        });
       }
 
       const result = await deliverExportTasks(tasks, {
@@ -21904,7 +21894,7 @@
       });
       const detailParts = [];
       if (frameCount > 1) {
-        detailParts.push(`全${frameCount}フレーム`);
+        detailParts.push(`選択フレーム ${frameIndex + 1}`);
       }
       if (selectedScale > 1) {
         detailParts.push(`×${selectedScale}`);
@@ -21954,32 +21944,30 @@
       return;
     }
     try {
-      const { width, height } = state;
+      const stillFrame = buildStillExportFrameSet();
+      const { width, height, pixels, frameIndex } = stillFrame;
       const candidates = getExportScaleCandidates();
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
-      const framePixels = compositeDocumentFrames(state.frames, width, height, state.palette);
       const includeOriginal = shouldExportOriginalCompanion('svg', selectedScale);
       const tasks = [];
-      for (let index = 0; index < frameCount; index += 1) {
-        const frameNumber = String(index + 1).padStart(2, '0');
-        const variants = [{ scale: selectedScale, isOriginal: false }];
-        if (includeOriginal) {
-          variants.push({ scale: 1, isOriginal: true });
+      const frameNumber = String(frameIndex + 1).padStart(2, '0');
+      const variants = [{ scale: selectedScale, isOriginal: false }];
+      if (includeOriginal) {
+        variants.push({ scale: 1, isOriginal: true });
+      }
+      for (let variantIndex = 0; variantIndex < variants.length; variantIndex += 1) {
+        const variant = variants[variantIndex];
+        const blob = buildSvgBlobFromPixels(pixels, width, height, variant.scale);
+        let suffix = frameCount > 1 ? `frame_${frameNumber}` : '';
+        if (variant.scale > 1 || includeOriginal) {
+          suffix = suffix ? `${suffix}_x${variant.scale}` : `x${variant.scale}`;
         }
-        for (let variantIndex = 0; variantIndex < variants.length; variantIndex += 1) {
-          const variant = variants[variantIndex];
-          const blob = buildSvgBlobFromPixels(framePixels[index], width, height, variant.scale);
-          let suffix = `frame_${frameNumber}`;
-          if (variant.scale > 1 || includeOriginal) {
-            suffix += `_x${variant.scale}`;
-          }
-          tasks.push({
-            blob,
-            filename: createExportFileName('svg', suffix),
-            shareText: `フレーム${index + 1}のSVGを書き出しました${variant.scale > 1 ? ` (×${variant.scale})` : ''}`,
-          });
-        }
+        tasks.push({
+          blob,
+          filename: createExportFileName('svg', suffix),
+          shareText: `フレーム${frameIndex + 1}のSVGを書き出しました${variant.scale > 1 ? ` (×${variant.scale})` : ''}`,
+        });
       }
 
       const result = await deliverExportTasks(tasks, {
@@ -21990,7 +21978,7 @@
       });
       const detailParts = [];
       if (frameCount > 1) {
-        detailParts.push(`全${frameCount}フレーム`);
+        detailParts.push(`選択フレーム ${frameIndex + 1}`);
       }
       if (selectedScale > 1) {
         detailParts.push(`×${selectedScale}`);
@@ -22190,6 +22178,35 @@
 
   function compositeDocumentFrames(frames, width, height, palette) {
     return frames.map(frame => compositeFramePixels(frame, width, height, palette));
+  }
+
+  function buildStillExportFrameSet() {
+    if (isVoxelExtensionModeEnabled()) {
+      const imageData = buildVoxelPreviewCanvasCompositeImageDataForFrameIndex(state.activeFrame);
+      if (imageData?.data instanceof Uint8ClampedArray) {
+        return {
+          pixels: new Uint8ClampedArray(imageData.data),
+          width: Math.max(1, Math.round(Number(imageData.width) || 1)),
+          height: Math.max(1, Math.round(Number(imageData.height) || 1)),
+          frameIndex: clamp(Math.round(Number(state.activeFrame) || 0), 0, Math.max(0, state.frames.length - 1)),
+          isVoxelComposite: true,
+        };
+      }
+    }
+    const width = Math.max(1, Math.round(Number(state.width) || 1));
+    const height = Math.max(1, Math.round(Number(state.height) || 1));
+    const frameIndex = clamp(Math.round(Number(state.activeFrame) || 0), 0, Math.max(0, state.frames.length - 1));
+    const frame = state.frames[frameIndex] || null;
+    return {
+      pixels: compositeFramePixels(frame, width, height, state.palette, {
+        useLocalLayerPreviewVisibility: true,
+        useLocalLayerPreviewOpacity: true,
+      }),
+      width,
+      height,
+      frameIndex,
+      isVoxelComposite: false,
+    };
   }
 
   function buildExportFrameSet() {
