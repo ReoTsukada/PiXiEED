@@ -5207,7 +5207,7 @@
       selectionMask: sourceState?.selectionMask,
       selectionContentMask: sourceState?.selectionContentMask,
       selectionBounds: sourceState?.selectionBounds,
-    }, { clonePixelData: false, fallbackIndex: 1 });
+    }, { clonePixelData: true, fallbackIndex: 1 });
     return {
       canvases: [initialCanvas],
       activeCanvasId: initialCanvas.id,
@@ -7272,7 +7272,10 @@
       state.playback = { ...snapshot.playback };
     }
     state.documentName = normalizeDocumentName(snapshot.documentName);
-    voxelExtensionState = normalizeVoxelExtensionState(snapshot.voxelExtension, VOXEL_EXTENSION_DEFAULT_STATE);
+    voxelExtensionState = normalizeVoxelExtensionState({
+      ...VOXEL_EXTENSION_DEFAULT_STATE,
+      mode: EXTENSION_MODE_NONE,
+    }, VOXEL_EXTENSION_DEFAULT_STATE);
     if (personalPreferences) {
       applyPersonalPreferenceSnapshot(personalPreferences);
     }
@@ -7409,6 +7412,111 @@
     const safeSuffix = suffix ? `_${suffix}` : '';
     const normalizedExt = extension ? extension.replace(/^\.+/, '') : '';
     return normalizedExt ? `${safeBase}${safeSuffix}.${normalizedExt}` : `${safeBase}${safeSuffix}`;
+  }
+
+  let zipCrc32Table = null;
+
+  function getZipCrc32Table() {
+    if (zipCrc32Table) {
+      return zipCrc32Table;
+    }
+    zipCrc32Table = new Uint32Array(256);
+    for (let index = 0; index < 256; index += 1) {
+      let value = index;
+      for (let bit = 0; bit < 8; bit += 1) {
+        value = (value & 1) ? (0xEDB88320 ^ (value >>> 1)) : (value >>> 1);
+      }
+      zipCrc32Table[index] = value >>> 0;
+    }
+    return zipCrc32Table;
+  }
+
+  function computeCrc32(bytes) {
+    const table = getZipCrc32Table();
+    let crc = 0xFFFFFFFF;
+    for (let index = 0; index < bytes.length; index += 1) {
+      crc = table[(crc ^ bytes[index]) & 0xFF] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function createZipDosDateTime(date = new Date()) {
+    const year = Math.max(1980, date.getFullYear());
+    const month = clamp(date.getMonth() + 1, 1, 12);
+    const day = clamp(date.getDate(), 1, 31);
+    const hours = clamp(date.getHours(), 0, 23);
+    const minutes = clamp(date.getMinutes(), 0, 59);
+    const seconds = clamp(Math.floor(date.getSeconds() / 2), 0, 29);
+    return {
+      time: ((hours & 0x1F) << 11) | ((minutes & 0x3F) << 5) | (seconds & 0x1F),
+      date: (((year - 1980) & 0x7F) << 9) | ((month & 0x0F) << 5) | (day & 0x1F),
+    };
+  }
+
+  async function buildZipBlobFromTasks(tasks) {
+    const encoder = new TextEncoder();
+    const now = createZipDosDateTime(new Date());
+    const localParts = [];
+    const centralParts = [];
+    let localSize = 0;
+    for (let index = 0; index < tasks.length; index += 1) {
+      const task = tasks[index];
+      const filename = sanitizeNativeFilename(task.filename || `export_${index + 1}.bin`);
+      const filenameBytes = encoder.encode(filename);
+      const dataBytes = new Uint8Array(await task.blob.arrayBuffer());
+      const crc32 = computeCrc32(dataBytes);
+      const localHeader = new Uint8Array(30 + filenameBytes.length);
+      const localView = new DataView(localHeader.buffer);
+      localView.setUint32(0, 0x04034B50, true);
+      localView.setUint16(4, 20, true);
+      localView.setUint16(6, 0, true);
+      localView.setUint16(8, 0, true);
+      localView.setUint16(10, now.time, true);
+      localView.setUint16(12, now.date, true);
+      localView.setUint32(14, crc32, true);
+      localView.setUint32(18, dataBytes.length, true);
+      localView.setUint32(22, dataBytes.length, true);
+      localView.setUint16(26, filenameBytes.length, true);
+      localView.setUint16(28, 0, true);
+      localHeader.set(filenameBytes, 30);
+      localParts.push(localHeader, dataBytes);
+
+      const centralHeader = new Uint8Array(46 + filenameBytes.length);
+      const centralView = new DataView(centralHeader.buffer);
+      centralView.setUint32(0, 0x02014B50, true);
+      centralView.setUint16(4, 20, true);
+      centralView.setUint16(6, 20, true);
+      centralView.setUint16(8, 0, true);
+      centralView.setUint16(10, 0, true);
+      centralView.setUint16(12, now.time, true);
+      centralView.setUint16(14, now.date, true);
+      centralView.setUint32(16, crc32, true);
+      centralView.setUint32(20, dataBytes.length, true);
+      centralView.setUint32(24, dataBytes.length, true);
+      centralView.setUint16(28, filenameBytes.length, true);
+      centralView.setUint16(30, 0, true);
+      centralView.setUint16(32, 0, true);
+      centralView.setUint16(34, 0, true);
+      centralView.setUint16(36, 0, true);
+      centralView.setUint32(38, 0, true);
+      centralView.setUint32(42, localSize, true);
+      centralHeader.set(filenameBytes, 46);
+      centralParts.push(centralHeader);
+
+      localSize += localHeader.length + dataBytes.length;
+    }
+    const centralSize = centralParts.reduce((sum, part) => sum + part.length, 0);
+    const endRecord = new Uint8Array(22);
+    const endView = new DataView(endRecord.buffer);
+    endView.setUint32(0, 0x06054B50, true);
+    endView.setUint16(4, 0, true);
+    endView.setUint16(6, 0, true);
+    endView.setUint16(8, tasks.length, true);
+    endView.setUint16(10, tasks.length, true);
+    endView.setUint32(12, centralSize, true);
+    endView.setUint32(16, localSize, true);
+    endView.setUint16(20, 0, true);
+    return new Blob([...localParts, ...centralParts, endRecord], { type: 'application/zip' });
   }
 
   function createOpenProjectTabId() {
@@ -16726,6 +16834,19 @@
       : clamp(Math.round(nextIndex), 0, length - 1);
     const previousIndex = state.activeFrame;
     state.activeFrame = normalizedIndex;
+    if (previousIndex !== normalizedIndex) {
+      if (pointerState.active) {
+        abortActivePointerInteraction({ commitHistory: false });
+      }
+      pointerState.selectionMove = null;
+      pointerState.lastSelectionMove = null;
+      state.pendingPasteMoveState = null;
+      hoverPixel = null;
+      if (virtualCursorDrawState.active) {
+        virtualCursorDrawState.lastPosition = null;
+        virtualCursorDrawState.currentPosition = null;
+      }
+    }
     getProjectCanvasDocuments().forEach(canvasDoc => {
       if (!canvasDoc || !Array.isArray(canvasDoc.frames) || !canvasDoc.frames.length) {
         return;
@@ -16741,6 +16862,17 @@
       const lastLayer = frame.layers[frame.layers.length - 1];
       if (lastLayer) {
         state.activeLayer = lastLayer.id;
+      }
+    }
+    const activeCanvasDoc = getActiveProjectCanvasDocument();
+    if (activeCanvasDoc && frame && Array.isArray(frame.layers)) {
+      const syncedLayer = frame.layers.find(layer => layer?.id === state.activeLayer)
+        || frame.layers[frame.layers.length - 1]
+        || frame.layers[0]
+        || null;
+      if (syncedLayer?.id) {
+        activeCanvasDoc.activeLayer = syncedLayer.id;
+        state.activeLayer = syncedLayer.id;
       }
     }
     if (isVoxelExtensionModeEnabled()) {
@@ -16764,6 +16896,7 @@
     }
     if (render) {
       if (previousIndex !== normalizedIndex) {
+        markCanvasDirty();
         if (isVoxelExtensionModeEnabled()) {
           syncVoxelExtensionPreviewFromSource({ updateViewport: false });
         }
@@ -16925,6 +17058,7 @@
     state.activeFrame += 1;
     const nextActiveFrame = getActiveFrame();
     state.activeLayer = nextActiveFrame?.layers?.[nextActiveFrame.layers.length - 1]?.id || state.activeLayer;
+    markCanvasDirty();
     markHistoryDirty();
     scheduleSessionPersist();
     renderFrameList();
@@ -21296,14 +21430,14 @@
     if (!ensureCurrentClientCanExportProject({ announce: true, format: 'gridpng' })) {
       return;
     }
-    const frameCount = state.frames.length;
+    const exportFrames = getCurrentExportFrames();
+    const frameCount = exportFrames.length;
     if (!frameCount) {
       updateAutosaveStatus('グリッド分割で書き出すフレームがありません', 'warn');
       return;
     }
     try {
-      const stillFrame = buildStillExportFrameSet();
-      const { width, height, pixels, frameIndex } = stillFrame;
+      const selectedFrameIndex = clamp(Math.round(Number(state.activeFrame) || 0), 0, Math.max(0, frameCount - 1));
       const candidates = getExportScaleCandidates();
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
@@ -21319,85 +21453,69 @@
         updateAutosaveStatus('分割サイズの設定が無効です', 'warn');
         return;
       }
-      const total = tileCountPerFrame;
+      const total = tileCountPerFrame * frameCount;
       const rowDigits = Math.max(2, String(rowSegments.length).length);
       const columnDigits = Math.max(2, String(columnSegments.length).length);
-      let exportedCount = 0;
-      let wasCancelled = false;
-      let hadFailure = false;
+      const tasks = [];
 
-      const frameCanvas = createFrameCanvas(pixels, width, height);
-      const outputCanvas = scaleCanvasNearestNeighbor(frameCanvas, selectedScale);
-      for (let rowIndex = 0; rowIndex < rowSegments.length; rowIndex += 1) {
-        if (wasCancelled || hadFailure) {
-          break;
-        }
-        const rowSegment = rowSegments[rowIndex];
-        const rowNumber = String(rowIndex + 1).padStart(rowDigits, '0');
-        for (let columnIndex = 0; columnIndex < columnSegments.length; columnIndex += 1) {
-          const columnSegment = columnSegments[columnIndex];
-          const columnNumber = String(columnIndex + 1).padStart(columnDigits, '0');
-          const exportX = columnSegment.start * selectedScale;
-          const exportY = rowSegment.start * selectedScale;
-          const exportWidth = columnSegment.size * selectedScale;
-          const exportHeight = rowSegment.size * selectedScale;
-          const blob = await canvasRegionToBlob(
-            outputCanvas,
-            exportX,
-            exportY,
-            exportWidth,
-            exportHeight,
-            'image/png'
-          );
-          const suffixParts = [];
-          if (frameCount > 1) {
-            suffixParts.push(`frame_${String(frameIndex + 1).padStart(2, '0')}`);
-          }
-          suffixParts.push(`r${rowNumber}`, `c${columnNumber}`);
-          if (selectedScale > 1) {
-            suffixParts.push(`x${selectedScale}`);
-          }
-          const suffix = suffixParts.join('_');
-          const deliveryResult = await triggerDownloadFromBlob(
-            blob,
-            createExportFileName('png', suffix),
-            {
-              mimeType: 'image/png',
-              fileExtensions: ['.png'],
-              shareTitle: state.documentName || 'PiXiEEDraw',
-              shareText: `グリッド分割PNGを書き出しました (F${frameIndex + 1} / r${rowIndex + 1}, c${columnIndex + 1})`,
-              allowFilePicker: true,
-              allowBoundDirectory: true,
+      for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+        const stillFrame = buildStillExportFrameSet(frameIndex);
+        const { width, height, pixels } = stillFrame;
+        const frameCanvas = createFrameCanvas(pixels, width, height);
+        const outputCanvas = scaleCanvasNearestNeighbor(frameCanvas, selectedScale);
+        for (let rowIndex = 0; rowIndex < rowSegments.length; rowIndex += 1) {
+          const rowSegment = rowSegments[rowIndex];
+          const rowNumber = String(rowIndex + 1).padStart(rowDigits, '0');
+          for (let columnIndex = 0; columnIndex < columnSegments.length; columnIndex += 1) {
+            const columnSegment = columnSegments[columnIndex];
+            const columnNumber = String(columnIndex + 1).padStart(columnDigits, '0');
+            const exportX = columnSegment.start * selectedScale;
+            const exportY = rowSegment.start * selectedScale;
+            const exportWidth = columnSegment.size * selectedScale;
+            const exportHeight = rowSegment.size * selectedScale;
+            const blob = await canvasRegionToBlob(
+              outputCanvas,
+              exportX,
+              exportY,
+              exportWidth,
+              exportHeight,
+              'image/png'
+            );
+            const suffixParts = [];
+            if (frameCount > 1) {
+              suffixParts.push(`frame_${String(frameIndex + 1).padStart(2, '0')}`);
             }
-          );
-          switch (deliveryResult) {
-            case 'gallery':
-            case 'native':
-            case 'directory':
-            case 'picker':
-            case 'download':
-            case 'share':
-            case 'window':
-              exportedCount += 1;
-              break;
-            case 'picker-cancel':
-            case 'share-cancel':
-              wasCancelled = true;
-              break;
-            default:
-              hadFailure = true;
-              break;
-          }
-          if (wasCancelled || hadFailure) {
-            break;
+            suffixParts.push(`r${rowNumber}`, `c${columnNumber}`);
+            if (selectedScale > 1) {
+              suffixParts.push(`x${selectedScale}`);
+            }
+            const suffix = suffixParts.join('_');
+            tasks.push({
+              blob,
+              filename: createExportFileName('png', suffix),
+              shareText: `グリッド分割PNGを書き出しました (F${frameIndex + 1} / r${rowIndex + 1}, c${columnIndex + 1})`,
+            });
           }
         }
       }
 
+      const result = await deliverExportTasks(tasks, {
+        mimeType: 'image/png',
+        fileExtensions: ['.png'],
+        shareTitle: state.documentName || 'PiXiEEDraw',
+        shareText: 'グリッド分割PNGを書き出しました',
+        archiveSuffix: 'gridpng_frames',
+        archiveShareText: 'グリッド分割PNG一式をZIPで書き出しました',
+      });
+      const exportedCount = result.exportedCount;
+      const wasCancelled = result.wasCancelled;
+      const hadFailure = result.hadFailure;
+
       const detailParts = [];
       detailParts.push(`分割 ${exportGridTileWidth}×${exportGridTileHeight}px`);
       if (frameCount > 1) {
-        detailParts.push(`選択フレーム ${frameIndex + 1}`);
+        detailParts.push(`全${frameCount}フレーム`);
+        detailParts.push(`選択開始 ${selectedFrameIndex + 1}`);
       }
       if (selectedScale > 1) {
         detailParts.push(`倍率 ×${selectedScale}`);
@@ -21439,40 +21557,43 @@
     if (!ensureCurrentClientCanExportProject({ announce: true, format: 'png' })) {
       return;
     }
-    const frameCount = state.frames.length;
+    const frameCount = getCurrentExportFrames().length;
     if (!frameCount) {
       updateAutosaveStatus('PNGを書き出すフレームがありません', 'warn');
       return;
     }
     try {
-      const stillFrame = buildStillExportFrameSet();
-      const { width, height, pixels, frameIndex, isVoxelComposite } = stillFrame;
+      const isVoxelComposite = isVoxelExtensionModeEnabled();
       const candidates = getExportScaleCandidates();
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const includeOriginal = shouldExportOriginalCompanion('png', selectedScale);
       const tasks = [];
-      const baseCanvas = createFrameCanvas(pixels, width, height);
-      const variants = [{ scale: selectedScale, isOriginal: false }];
-      if (includeOriginal) {
-        variants.push({ scale: 1, isOriginal: true });
-      }
-      for (let variantIndex = 0; variantIndex < variants.length; variantIndex += 1) {
-        const variant = variants[variantIndex];
-        const outputCanvas = scaleCanvasNearestNeighbor(baseCanvas, variant.scale);
-        const blob = await canvasToBlob(outputCanvas, 'image/png');
-        if (!blob) {
-          throw new Error('Failed to create PNG blob');
+      for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+        const stillFrame = buildStillExportFrameSet(frameIndex);
+        const { width, height, pixels } = stillFrame;
+        const baseCanvas = createFrameCanvas(pixels, width, height);
+        const variants = [{ scale: selectedScale, isOriginal: false }];
+        if (includeOriginal) {
+          variants.push({ scale: 1, isOriginal: true });
         }
-        let suffix = frameCount > 1 ? `frame_${String(frameIndex + 1).padStart(2, '0')}` : '';
-        if (variant.scale > 1 || includeOriginal) {
-          suffix = suffix ? `${suffix}_x${variant.scale}` : `x${variant.scale}`;
+        for (let variantIndex = 0; variantIndex < variants.length; variantIndex += 1) {
+          const variant = variants[variantIndex];
+          const outputCanvas = scaleCanvasNearestNeighbor(baseCanvas, variant.scale);
+          const blob = await canvasToBlob(outputCanvas, 'image/png');
+          if (!blob) {
+            throw new Error('Failed to create PNG blob');
+          }
+          let suffix = frameCount > 1 ? `frame_${String(frameIndex + 1).padStart(2, '0')}` : '';
+          if (variant.scale > 1 || includeOriginal) {
+            suffix = suffix ? `${suffix}_x${variant.scale}` : `x${variant.scale}`;
+          }
+          tasks.push({
+            blob,
+            filename: createExportFileName('png', suffix),
+            shareText: `フレーム${frameIndex + 1}のPNGを書き出しました${variant.scale > 1 ? ` (×${variant.scale})` : ''}`,
+          });
         }
-        tasks.push({
-          blob,
-          filename: createExportFileName('png', suffix),
-          shareText: `フレーム${frameIndex + 1}のPNGを書き出しました${variant.scale > 1 ? ` (×${variant.scale})` : ''}`,
-        });
       }
 
       const result = await deliverExportTasks(tasks, {
@@ -21480,10 +21601,12 @@
         fileExtensions: ['.png'],
         shareTitle: state.documentName || 'PiXiEEDraw',
         shareText: isVoxelComposite ? 'PNGを書き出しました（立体表示）' : 'PNGを書き出しました',
+        archiveSuffix: 'png_frames',
+        archiveShareText: isVoxelComposite ? 'PNG一式をZIPで書き出しました（立体表示）' : 'PNG一式をZIPで書き出しました',
       });
       const detailParts = [];
       if (frameCount > 1) {
-        detailParts.push(`選択フレーム ${frameIndex + 1}`);
+        detailParts.push(`全${frameCount}フレーム`);
       }
       if (isVoxelComposite) {
         detailParts.push(localizeText('立体表示', 'Voxel View'));
@@ -21848,42 +21971,44 @@
     if (!ensureCurrentClientCanExportProject({ announce: true, format: 'jpeg' })) {
       return;
     }
-    const frameCount = state.frames.length;
+    const frameCount = getCurrentExportFrames().length;
     if (!frameCount) {
       updateAutosaveStatus('JPEGを書き出すフレームがありません', 'warn');
       return;
     }
     try {
-      const stillFrame = buildStillExportFrameSet();
-      const { width, height, pixels, frameIndex } = stillFrame;
       const candidates = getExportScaleCandidates();
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const includeOriginal = shouldExportOriginalCompanion('jpeg', selectedScale);
       const tasks = [];
-      const frameNumber = String(frameIndex + 1).padStart(2, '0');
-      const baseCanvas = createFrameCanvas(pixels, width, height);
-      const variants = [{ scale: selectedScale, isOriginal: false }];
-      if (includeOriginal) {
-        variants.push({ scale: 1, isOriginal: true });
-      }
-      for (let variantIndex = 0; variantIndex < variants.length; variantIndex += 1) {
-        const variant = variants[variantIndex];
-        const scaledCanvas = scaleCanvasNearestNeighbor(baseCanvas, variant.scale);
-        const jpegCanvas = createJpegCanvasFromSourceCanvas(scaledCanvas);
-        const blob = await canvasToBlob(jpegCanvas, 'image/jpeg', 0.92);
-        if (!blob) {
-          throw new Error('Failed to create JPEG blob');
+      for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+        const stillFrame = buildStillExportFrameSet(frameIndex);
+        const { width, height, pixels } = stillFrame;
+        const frameNumber = String(frameIndex + 1).padStart(2, '0');
+        const baseCanvas = createFrameCanvas(pixels, width, height);
+        const variants = [{ scale: selectedScale, isOriginal: false }];
+        if (includeOriginal) {
+          variants.push({ scale: 1, isOriginal: true });
         }
-        let suffix = frameCount > 1 ? `frame_${frameNumber}` : '';
-        if (variant.scale > 1 || includeOriginal) {
-          suffix = suffix ? `${suffix}_x${variant.scale}` : `x${variant.scale}`;
+        for (let variantIndex = 0; variantIndex < variants.length; variantIndex += 1) {
+          const variant = variants[variantIndex];
+          const scaledCanvas = scaleCanvasNearestNeighbor(baseCanvas, variant.scale);
+          const jpegCanvas = createJpegCanvasFromSourceCanvas(scaledCanvas);
+          const blob = await canvasToBlob(jpegCanvas, 'image/jpeg', 0.92);
+          if (!blob) {
+            throw new Error('Failed to create JPEG blob');
+          }
+          let suffix = frameCount > 1 ? `frame_${frameNumber}` : '';
+          if (variant.scale > 1 || includeOriginal) {
+            suffix = suffix ? `${suffix}_x${variant.scale}` : `x${variant.scale}`;
+          }
+          tasks.push({
+            blob,
+            filename: createExportFileName('jpg', suffix),
+            shareText: `フレーム${frameIndex + 1}のJPEGを書き出しました${variant.scale > 1 ? ` (×${variant.scale})` : ''}`,
+          });
         }
-        tasks.push({
-          blob,
-          filename: createExportFileName('jpg', suffix),
-          shareText: `フレーム${frameIndex + 1}のJPEGを書き出しました${variant.scale > 1 ? ` (×${variant.scale})` : ''}`,
-        });
       }
 
       const result = await deliverExportTasks(tasks, {
@@ -21891,10 +22016,12 @@
         fileExtensions: ['.jpg', '.jpeg'],
         shareTitle: state.documentName || 'PiXiEEDraw',
         shareText: 'JPEGを書き出しました',
+        archiveSuffix: 'jpeg_frames',
+        archiveShareText: 'JPEG一式をZIPで書き出しました',
       });
       const detailParts = [];
       if (frameCount > 1) {
-        detailParts.push(`選択フレーム ${frameIndex + 1}`);
+        detailParts.push(`全${frameCount}フレーム`);
       }
       if (selectedScale > 1) {
         detailParts.push(`×${selectedScale}`);
@@ -21938,36 +22065,38 @@
     if (!ensureCurrentClientCanExportProject({ announce: true, format: 'svg' })) {
       return;
     }
-    const frameCount = state.frames.length;
+    const frameCount = getCurrentExportFrames().length;
     if (!frameCount) {
       updateAutosaveStatus('SVGを書き出すフレームがありません', 'warn');
       return;
     }
     try {
-      const stillFrame = buildStillExportFrameSet();
-      const { width, height, pixels, frameIndex } = stillFrame;
       const candidates = getExportScaleCandidates();
       const selectedScale = applyExportScaleConstraints(candidates);
       syncExportScaleInputs();
       const includeOriginal = shouldExportOriginalCompanion('svg', selectedScale);
       const tasks = [];
-      const frameNumber = String(frameIndex + 1).padStart(2, '0');
-      const variants = [{ scale: selectedScale, isOriginal: false }];
-      if (includeOriginal) {
-        variants.push({ scale: 1, isOriginal: true });
-      }
-      for (let variantIndex = 0; variantIndex < variants.length; variantIndex += 1) {
-        const variant = variants[variantIndex];
-        const blob = buildSvgBlobFromPixels(pixels, width, height, variant.scale);
-        let suffix = frameCount > 1 ? `frame_${frameNumber}` : '';
-        if (variant.scale > 1 || includeOriginal) {
-          suffix = suffix ? `${suffix}_x${variant.scale}` : `x${variant.scale}`;
+      for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+        const stillFrame = buildStillExportFrameSet(frameIndex);
+        const { width, height, pixels } = stillFrame;
+        const frameNumber = String(frameIndex + 1).padStart(2, '0');
+        const variants = [{ scale: selectedScale, isOriginal: false }];
+        if (includeOriginal) {
+          variants.push({ scale: 1, isOriginal: true });
         }
-        tasks.push({
-          blob,
-          filename: createExportFileName('svg', suffix),
-          shareText: `フレーム${frameIndex + 1}のSVGを書き出しました${variant.scale > 1 ? ` (×${variant.scale})` : ''}`,
-        });
+        for (let variantIndex = 0; variantIndex < variants.length; variantIndex += 1) {
+          const variant = variants[variantIndex];
+          const blob = buildSvgBlobFromPixels(pixels, width, height, variant.scale);
+          let suffix = frameCount > 1 ? `frame_${frameNumber}` : '';
+          if (variant.scale > 1 || includeOriginal) {
+            suffix = suffix ? `${suffix}_x${variant.scale}` : `x${variant.scale}`;
+          }
+          tasks.push({
+            blob,
+            filename: createExportFileName('svg', suffix),
+            shareText: `フレーム${frameIndex + 1}のSVGを書き出しました${variant.scale > 1 ? ` (×${variant.scale})` : ''}`,
+          });
+        }
       }
 
       const result = await deliverExportTasks(tasks, {
@@ -21975,10 +22104,12 @@
         fileExtensions: ['.svg'],
         shareTitle: state.documentName || 'PiXiEEDraw',
         shareText: 'SVGを書き出しました',
+        archiveSuffix: 'svg_frames',
+        archiveShareText: 'SVG一式をZIPで書き出しました',
       });
       const detailParts = [];
       if (frameCount > 1) {
-        detailParts.push(`選択フレーム ${frameIndex + 1}`);
+        detailParts.push(`全${frameCount}フレーム`);
       }
       if (selectedScale > 1) {
         detailParts.push(`×${selectedScale}`);
@@ -22180,23 +22311,32 @@
     return frames.map(frame => compositeFramePixels(frame, width, height, palette));
   }
 
-  function buildStillExportFrameSet() {
+  function getCurrentExportFrames() {
+    const activeCanvasDoc = getActiveProjectCanvasDocument();
+    if (Array.isArray(activeCanvasDoc?.frames) && activeCanvasDoc.frames.length) {
+      return activeCanvasDoc.frames;
+    }
+    return Array.isArray(state.frames) ? state.frames : [];
+  }
+
+  function buildStillExportFrameSet(frameIndex = state.activeFrame) {
+    const exportFrames = getCurrentExportFrames();
     if (isVoxelExtensionModeEnabled()) {
-      const imageData = buildVoxelPreviewCanvasCompositeImageDataForFrameIndex(state.activeFrame);
+      const imageData = buildVoxelPreviewCanvasCompositeImageDataForFrameIndex(frameIndex);
       if (imageData?.data instanceof Uint8ClampedArray) {
         return {
           pixels: new Uint8ClampedArray(imageData.data),
           width: Math.max(1, Math.round(Number(imageData.width) || 1)),
           height: Math.max(1, Math.round(Number(imageData.height) || 1)),
-          frameIndex: clamp(Math.round(Number(state.activeFrame) || 0), 0, Math.max(0, state.frames.length - 1)),
+          frameIndex: clamp(Math.round(Number(frameIndex) || 0), 0, Math.max(0, exportFrames.length - 1)),
           isVoxelComposite: true,
         };
       }
     }
     const width = Math.max(1, Math.round(Number(state.width) || 1));
     const height = Math.max(1, Math.round(Number(state.height) || 1));
-    const frameIndex = clamp(Math.round(Number(state.activeFrame) || 0), 0, Math.max(0, state.frames.length - 1));
-    const frame = state.frames[frameIndex] || null;
+    const normalizedFrameIndex = clamp(Math.round(Number(frameIndex) || 0), 0, Math.max(0, exportFrames.length - 1));
+    const frame = exportFrames[normalizedFrameIndex] || null;
     return {
       pixels: compositeFramePixels(frame, width, height, state.palette, {
         useLocalLayerPreviewVisibility: true,
@@ -22204,7 +22344,7 @@
       }),
       width,
       height,
-      frameIndex,
+      frameIndex: normalizedFrameIndex,
       isVoxelComposite: false,
     };
   }
@@ -22274,14 +22414,15 @@
         }
       }
     }
+    const exportFrames = getCurrentExportFrames();
     const width = state.width;
     const height = state.height;
     return {
-      framePixels: compositeDocumentFrames(state.frames, width, height, state.palette),
-      frameDurations: state.frames.map(frame => clamp(Math.round(Number(frame.duration) || 0), 16, 2000)),
+      framePixels: compositeDocumentFrames(exportFrames, width, height, state.palette),
+      frameDurations: exportFrames.map(frame => clamp(Math.round(Number(frame.duration) || 0), 16, 2000)),
       width,
       height,
-      frameCount: Array.isArray(state.frames) ? state.frames.length : 0,
+      frameCount: exportFrames.length,
       isVoxelComposite: false,
     };
   }
@@ -23577,6 +23718,44 @@
     const total = Array.isArray(tasks) ? tasks.length : 0;
     if (!total) {
       return { exportedCount: 0, total: 0, wasCancelled: false, hadFailure: false };
+    }
+    if (total > 1) {
+      try {
+        const zipBlob = await buildZipBlobFromTasks(tasks);
+        const zipFilename = createExportFileName('zip', options.archiveSuffix || 'export_bundle');
+        const deliveryResult = await triggerDownloadFromBlob(zipBlob, zipFilename, {
+          mimeType: 'application/zip',
+          fileExtensions: ['.zip'],
+          shareTitle: options.shareTitle || state.documentName || 'PiXiEEDraw',
+          shareText: options.archiveShareText || options.shareText || 'ZIPを書き出しました',
+          allowFilePicker: options.allowFilePicker !== false,
+          allowBoundDirectory: options.allowBoundDirectory !== false,
+          preferShare: options.preferShare,
+          allowAnchorDownload: options.allowAnchorDownload,
+          forceAnchorDownload: options.forceAnchorDownload,
+          allowNativePhotoLibrary: false,
+          allowNativeSave: options.allowNativeSave,
+          nativeDirectory: options.nativeDirectory,
+          nativeSubdirectory: options.nativeSubdirectory,
+        });
+        switch (deliveryResult) {
+          case 'native':
+          case 'directory':
+          case 'picker':
+          case 'download':
+          case 'share':
+          case 'window':
+            return { exportedCount: total, total, wasCancelled: false, hadFailure: false };
+          case 'picker-cancel':
+          case 'share-cancel':
+            return { exportedCount: 0, total, wasCancelled: true, hadFailure: false };
+          default:
+            return { exportedCount: 0, total, wasCancelled: false, hadFailure: true };
+        }
+      } catch (error) {
+        console.warn('ZIP export packaging failed', error);
+        return { exportedCount: 0, total, wasCancelled: false, hadFailure: true };
+      }
     }
     let exportedCount = 0;
     let wasCancelled = false;
@@ -37612,6 +37791,16 @@
     if (!canvasDoc || !Array.isArray(canvasDoc.frames) || !canvasDoc.frames.length) {
       return null;
     }
+    if (getProjectCanvasCount() <= 1) {
+      const singleFrames = Array.isArray(state.frames) ? state.frames : canvasDoc.frames;
+      if (!singleFrames.length) {
+        return null;
+      }
+      const resolvedSingleFrameIndex = Number.isFinite(Number(frameIndex))
+        ? clamp(Math.round(Number(frameIndex)), 0, singleFrames.length - 1)
+        : clamp(Math.round(Number(state.activeFrame) || 0), 0, singleFrames.length - 1);
+      return singleFrames[resolvedSingleFrameIndex] || singleFrames[0] || null;
+    }
     const isActiveCanvas = Boolean(canvasDoc?.id) && canvasDoc.id === (getActiveProjectCanvasDocument()?.id || '');
     const resolvedFrameIndex = Number.isFinite(Number(frameIndex))
       ? clamp(Math.round(Number(frameIndex)), 0, canvasDoc.frames.length - 1)
@@ -38470,7 +38659,7 @@
   }
 
   function isVoxelExtensionModeEnabled() {
-    return normalizeVoxelExtensionState(voxelExtensionState, VOXEL_EXTENSION_DEFAULT_STATE).mode === EXTENSION_MODE_VOXEL;
+    return false;
   }
 
   function getLocalViewportCanvasMaxCount() {
@@ -38484,7 +38673,7 @@
   }
 
   function canUseVoxelExtensionMode() {
-    return MULTI_CANVAS_FEATURE_ENABLED && !multiState.connected && !multiState.connecting;
+    return false;
   }
 
   function getVoxelExtensionProjectName(role = 'front') {
@@ -49865,6 +50054,10 @@
   }
 
   function getActiveFrame() {
+    if (getProjectCanvasCount() <= 1 && Array.isArray(state.frames) && state.frames.length) {
+      const activeFrameIndex = clamp(Math.round(Number(state.activeFrame) || 0), 0, state.frames.length - 1);
+      return state.frames[activeFrameIndex] || state.frames[0] || null;
+    }
     const canvasDoc = getActiveProjectCanvasDocument();
     const canvasFrame = getProjectCanvasActiveFrame(canvasDoc);
     if (canvasFrame) {
@@ -49878,8 +50071,15 @@
     if (!frame || !Array.isArray(frame.layers) || !frame.layers.length) {
       return null;
     }
+    if (getProjectCanvasCount() <= 1) {
+      const preferredLayerId = state.activeLayer;
+      return frame.layers.find(layer => layer.id === preferredLayerId) || frame.layers[frame.layers.length - 1];
+    }
     const canvasDoc = getActiveProjectCanvasDocument();
-    const preferredLayerId = canvasDoc?.activeLayer || state.activeLayer;
+    const isActiveCanvas = Boolean(canvasDoc?.id) && canvasDoc.id === (getActiveProjectCanvasDocument()?.id || '');
+    const preferredLayerId = isActiveCanvas
+      ? (state.activeLayer || canvasDoc?.activeLayer)
+      : (canvasDoc?.activeLayer || state.activeLayer);
     return frame.layers.find(layer => layer.id === preferredLayerId) || frame.layers[frame.layers.length - 1];
   }
 
@@ -49888,8 +50088,14 @@
     if (!frame || !Array.isArray(frame.layers) || !frame.layers.length) {
       return -1;
     }
+    if (getProjectCanvasCount() <= 1) {
+      return frame.layers.findIndex(layer => layer.id === state.activeLayer);
+    }
     const canvasDoc = getActiveProjectCanvasDocument();
-    const preferredLayerId = canvasDoc?.activeLayer || state.activeLayer;
+    const isActiveCanvas = Boolean(canvasDoc?.id) && canvasDoc.id === (getActiveProjectCanvasDocument()?.id || '');
+    const preferredLayerId = isActiveCanvas
+      ? (state.activeLayer || canvasDoc?.activeLayer)
+      : (canvasDoc?.activeLayer || state.activeLayer);
     return frame.layers.findIndex(layer => layer.id === preferredLayerId);
   }
 
