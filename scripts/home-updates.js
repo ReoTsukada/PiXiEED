@@ -75,7 +75,10 @@
   function normalizeUrl(value) {
     if (!value) return './';
     if (/^https?:\/\//.test(value)) return value;
-    if (value.startsWith('/')) return `.${value}`;
-    return value;
+    const normalized = value.startsWith('/') ? `.${value}` : value;
+    if (window.location.protocol === 'file:' && /\/$/.test(normalized)) {
+      return `${normalized}index.html`;
+    }
+    return normalized;
   }
 })();
