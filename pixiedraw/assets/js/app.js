@@ -17475,11 +17475,17 @@
       const config = dom.recentProjectDeleteConfirm;
       const dialog = config?.dialog;
       const isSharedEntry = isSharedRecentProjectEntry(entry);
+      const sharedRoleHint = typeof entry?.sharedRoleHint === 'string' ? entry.sharedRoleHint.trim() : '';
+      const deletesOwnedSharedProject = isSharedEntry && sharedRoleHint === 'master';
       const displayLabel = extractDocumentBaseName(entry?.fileName || entry?.name || DEFAULT_DOCUMENT_NAME);
       const message = isSharedEntry
         ? localizeText(
-          `共有プロジェクト「${displayLabel}」を一覧から外しますか？`,
-          `Remove shared project "${displayLabel}" from your list?`
+          deletesOwnedSharedProject
+            ? `共有プロジェクト「${displayLabel}」を削除しますか？`
+            : `共有プロジェクト「${displayLabel}」を一覧から外しますか？`,
+          deletesOwnedSharedProject
+            ? `Delete shared project "${displayLabel}"?`
+            : `Remove shared project "${displayLabel}" from your list?`
         )
         : localizeText(
           `端末内プロジェクト「${displayLabel}」を削除しますか？`,
@@ -17487,8 +17493,12 @@
         );
       const detail = isSharedEntry
         ? localizeText(
-          '共有一覧から外します。共有自体には影響しません。',
-          'This removes it from your shared project list only. The shared project itself remains available.'
+          deletesOwnedSharedProject
+            ? 'あなたが所有している共有プロジェクト本体を削除します。この操作は取り消せません。'
+            : '共有一覧から外します。共有自体には影響しません。',
+          deletesOwnedSharedProject
+            ? 'This permanently deletes the shared project you own. This action cannot be undone.'
+            : 'This removes it from your shared project list only. The shared project itself remains available.'
         )
         : localizeText(
           'この操作は取り消せません。',
@@ -18291,16 +18301,49 @@
           openButton.disabled = true;
         }
         try {
+          const isSharedEntry = isSharedRecentProjectEntry(entry);
+          const sharedRoleHint = typeof entry?.sharedRoleHint === 'string' ? entry.sharedRoleHint.trim() : '';
+          const deletesOwnedSharedProject = isSharedEntry && sharedRoleHint === 'master';
+          if (deletesOwnedSharedProject) {
+            const removedBackend = await deleteOwnedSharedProjectFromBackend(entry);
+            if (!removedBackend) {
+              updateAutosaveStatus(
+                localizeText(
+                  '共有プロジェクト本体を削除できませんでした。ログイン状態とネットワークを確認して再試行してください。',
+                  'Failed to delete the shared project itself. Check sign-in state and network, then try again.'
+                ),
+                'error'
+              );
+              deleteButton.disabled = false;
+              if (openButton instanceof HTMLButtonElement) {
+                openButton.disabled = false;
+              }
+              return;
+            }
+          }
           const removed = await removeRecentProjectEntry(projectId);
           if (removed) {
             releaseAutosaveProjectId(projectId);
             updateAutosaveStatus(
-              localizeText(
-                `端末内プロジェクトを削除しました (${displayLabel})`,
-                `Deleted local project (${displayLabel})`
-              ),
+              deletesOwnedSharedProject
+                ? localizeText(
+                  `共有プロジェクトを削除しました (${displayLabel})`,
+                  `Deleted shared project (${displayLabel})`
+                )
+                : isSharedEntry
+                  ? localizeText(
+                    `共有プロジェクトを一覧から外しました (${displayLabel})`,
+                    `Removed shared project from list (${displayLabel})`
+                  )
+                : localizeText(
+                  `端末内プロジェクトを削除しました (${displayLabel})`,
+                  `Deleted local project (${displayLabel})`
+                ),
               'info'
             );
+            if (deletesOwnedSharedProject) {
+              await enforceSharedProjectOwnershipLimit();
+            }
           } else if (AUTOSAVE_SUPPORTED) {
             refreshRecentProjectsUI().catch(error => {
               console.warn('Failed to refresh recent projects', error);
@@ -18798,20 +18841,32 @@
     return entries.filter(entry => isSharedRecentProjectEntry(entry));
   }
 
+  function isOwnedSharedRecentProjectEntry(entry = null) {
+    if (!isSharedRecentProjectEntry(entry)) {
+      return false;
+    }
+    const roleHint = typeof entry?.sharedRoleHint === 'string' ? entry.sharedRoleHint.trim() : '';
+    return roleHint === 'master';
+  }
+
+  function getOwnedSharedRecentProjectEntries(entries = Array.from(recentProjectsCache.values())) {
+    return getSharedRecentProjectEntries(entries).filter(entry => isOwnedSharedRecentProjectEntry(entry));
+  }
+
   function enforceSharedRecentProjectLimit(entries = []) {
     if (!Array.isArray(entries) || !entries.length) {
       return [];
     }
     const maxSharedProjects = getMaxSharedProjectCount();
-    let keptSharedProjects = 0;
+    let keptOwnedSharedProjects = 0;
     return entries.filter(entry => {
-      if (!isSharedRecentProjectEntry(entry)) {
+      if (!isOwnedSharedRecentProjectEntry(entry)) {
         return true;
       }
-      if (keptSharedProjects >= maxSharedProjects) {
+      if (keptOwnedSharedProjects >= maxSharedProjects) {
         return false;
       }
-      keptSharedProjects += 1;
+      keptOwnedSharedProjects += 1;
       return true;
     });
   }
@@ -18819,13 +18874,13 @@
   function buildSharedProjectLimitMessage(maxSharedProjects = getMaxSharedProjectCount()) {
     if (maxSharedProjects > SHARED_PROJECT_LIMIT_DEFAULT) {
       return localizeText(
-        `共有プロジェクトは同時に最大 ${maxSharedProjects} 件まで使えます`,
-        `You can use up to ${maxSharedProjects} shared projects at the same time`
+        `自分が作成した共有プロジェクトは同時に最大 ${maxSharedProjects} 件まで使えます`,
+        `You can have up to ${maxSharedProjects} shared projects you own at the same time`
       );
     }
     return localizeText(
-      '共有プロジェクトは同時に 1 件までです。PiXiEEDraw継続サポート(広告非表示)で 3 件まで増やせます。',
-      'Only 1 shared project can be used at a time. PiXiEEDraw ad-free support increases this to 3.'
+      '自分が作成した共有プロジェクトは同時に 1 件までです。PiXiEEDraw継続サポート(広告非表示)で 3 件まで増やせます。',
+      'You can own 1 shared project at a time. PiXiEEDraw ad-free support increases this to 3.'
     );
   }
 
@@ -18927,16 +18982,54 @@
     }
   }
 
-  async function ensureSharedProjectCapacity(projectKey = '', { announce = true } = {}) {
+  async function deleteOwnedSharedProjectFromBackend(entry = null) {
+    if (!isSharedRecentProjectEntry(entry)) {
+      return true;
+    }
+    const roleHint = typeof entry?.sharedRoleHint === 'string' ? entry.sharedRoleHint.trim() : '';
+    if (roleHint !== 'master') {
+      return true;
+    }
+    const normalizedProjectKey = normalizeMultiProjectKey(entry?.sharedProjectKey || '');
+    if (!normalizedProjectKey) {
+      return false;
+    }
+    if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
+      return false;
+    }
+    try {
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase) {
+        return false;
+      }
+      const { data, error } = await supabase.rpc('pixieed_delete_owned_shared_project', {
+        target_project_key: normalizedProjectKey,
+      });
+      if (error) {
+        handleSharedProjectsBackendError(error, 'delete-owned-shared-project');
+        return false;
+      }
+      const result = Array.isArray(data) ? (data[0] || null) : (data || null);
+      return Boolean(result?.deleted);
+    } catch (error) {
+      handleSharedProjectsBackendError(error, 'delete-owned-shared-project-exception');
+      return false;
+    }
+  }
+
+  async function ensureSharedProjectCapacity(projectKey = '', { announce = true, countOwned = false } = {}) {
+    if (!countOwned) {
+      return true;
+    }
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
     const existingEntries = await loadRecentProjectsMetadata();
-    const existingSharedEntries = getSharedRecentProjectEntries(existingEntries);
-    const alreadyTracked = existingSharedEntries.some(entry => normalizeMultiProjectKey(entry.sharedProjectKey || '') === normalizedProjectKey);
+    const existingOwnedSharedEntries = getOwnedSharedRecentProjectEntries(existingEntries);
+    const alreadyTracked = existingOwnedSharedEntries.some(entry => normalizeMultiProjectKey(entry.sharedProjectKey || '') === normalizedProjectKey);
     if (alreadyTracked) {
       return true;
     }
     const maxSharedProjects = getMaxSharedProjectCount();
-    if (existingSharedEntries.length < maxSharedProjects) {
+    if (existingOwnedSharedEntries.length < maxSharedProjects) {
       return true;
     }
     if (announce) {
@@ -20056,9 +20149,15 @@
       const updatedLabel = Number.isFinite(updatedAt)
         ? formatUpdateHistoryDate(updatedAt, localizeText('保存時刻不明', 'Saved time unavailable'))
         : localizeText('保存時刻不明', 'Saved time unavailable');
-      metaNode.textContent = isSharedEntry
-        ? localizeText(`共有プロジェクト / ${updatedLabel}`, `Shared Project / ${updatedLabel}`)
-        : updatedLabel;
+      if (isSharedEntry) {
+        const roleHint = typeof entry.sharedRoleHint === 'string' ? entry.sharedRoleHint.trim() : '';
+        const sharedTypeLabel = roleHint === 'master'
+          ? localizeText('共有（自分・マスター）', 'Shared (Owned / Master)')
+          : localizeText('共有（参加・他ユーザー）', 'Shared (Joined / Other Owner)');
+        metaNode.textContent = `${sharedTypeLabel} / ${updatedLabel}`;
+      } else {
+        metaNode.textContent = localizeText(`端末内 / ${updatedLabel}`, `Local / ${updatedLabel}`);
+      }
       const deleteButton = document.createElement('button');
       deleteButton.type = 'button';
       deleteButton.className = 'startup-recent-card__delete';
@@ -20577,7 +20676,15 @@
       }
       return false;
     }
-    if (!(await ensureSharedProjectCapacity(resolvedProjectKey, { announce: !silent }))) {
+    const openingOwnedSharedProject = Boolean(
+      accountState.userId
+      && typeof sharedProject.owner_user_id === 'string'
+      && sharedProject.owner_user_id === accountState.userId
+    );
+    if (!(await ensureSharedProjectCapacity(resolvedProjectKey, {
+      announce: !silent,
+      countOwned: openingOwnedSharedProject,
+    }))) {
       return false;
     }
     setStartupProgressLabel(localizeText('共有プロジェクトを読込中…', 'Loading shared project...'));
@@ -20625,7 +20732,7 @@
       inviteToken: sharedProject.invite_token || normalizedInviteToken || '',
       visibility: sharedProject.visibility || 'shared',
       name: createSharedProjectSnapshotTitle(sharedProject.title || state.documentName || resolvedProjectKey),
-      roleHint: requestedRole,
+      roleHint: openingOwnedSharedProject ? 'master' : requestedRole,
       autoJoin: access?.autoJoin !== false,
       revision: Math.max(0, Math.round(Number(sharedProject.latest_revision) || 0)),
       structureRevision: Math.max(0, Math.round(Number(sharedProject.latest_structure_revision) || 0)),
@@ -51915,7 +52022,7 @@
       setMultiStatus(localizeText('共有プロジェクトを作成できませんでした', 'Failed to create shared project'), 'error');
       return false;
     }
-    if (!(await ensureSharedProjectCapacity(projectKey))) {
+    if (!(await ensureSharedProjectCapacity(projectKey, { countOwned: true }))) {
       return false;
     }
     const snapshot = makeHistorySnapshot({ clonePixelData: true });
@@ -51946,7 +52053,7 @@
       inviteToken: project.invite_token || '',
       visibility: project.visibility || 'shared',
       name: createSharedProjectSnapshotTitle(project.title || state.documentName || projectKey),
-      roleHint: 'guest',
+      roleHint: 'master',
       autoJoin: false,
       revision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
       structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
