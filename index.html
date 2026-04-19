@@ -129,13 +129,7 @@
               <p class="home-hero-slide__copy">登録不要で使えるQR作成ツールを、そのまま紹介ページから確認できます。</p>
             </div>
           </a>
-          <div class="home-hero-slide home-hero-slide--ad is-bg-ready" data-hero-slide aria-label="広告">
-            <img
-              src="PiXiEEDogp.png"
-              alt="PiXiEED"
-              width="1260"
-              height="840"
-              data-pixel-art-fit="off">
+          <div class="home-hero-slide home-hero-slide--ad" data-hero-slide aria-label="広告">
             <div class="home-hero-ad">
               <ins class="adsbygoogle"
                    style="display:block;width:100%;height:100%"
@@ -143,11 +137,6 @@
                    data-ad-slot="rotate"
                    data-ad-format="auto"
                    data-full-width-responsive="true"></ins>
-            </div>
-            <div class="home-hero-slide__content home-hero-slide__content--ad" aria-hidden="true">
-              <p class="home-hero-slide__eyebrow">sponsored</p>
-              <h2 class="home-hero-slide__title">PiXiEED</h2>
-              <p class="home-hero-slide__copy">広告の読み込み中や未配信時も、ホームのヒーローを同じサイズで安定表示します。</p>
             </div>
           </div>
         </div>
@@ -309,6 +298,7 @@
       const slides = Array.from(document.querySelectorAll('[data-hero-slide]'));
       if (!slides.length) return;
       slides.forEach(slide => {
+        if (slide.classList.contains('home-hero-slide--ad')) return;
         const img = slide.querySelector('img');
         const src = img?.getAttribute('src');
         if (!src) return;
@@ -321,7 +311,25 @@
         .filter(index => index !== adIndex);
       let activeIndex = Math.max(0, slides.findIndex(slide => slide.classList.contains('is-active')));
       if (activeIndex < 0) activeIndex = 0;
+      const CONTENT_DELAY_MS = 5000;
+      const AD_DELAY_MS = 9000;
       let rotationCount = 0;
+      let rotationTimer = null;
+      const clearRotationTimer = () => {
+        if (rotationTimer) {
+          window.clearTimeout(rotationTimer);
+          rotationTimer = null;
+        }
+      };
+      const scheduleNextRotation = () => {
+        clearRotationTimer();
+        const activeSlide = slides[activeIndex];
+        const delay = activeSlide?.classList.contains('home-hero-slide--ad') ? AD_DELAY_MS : CONTENT_DELAY_MS;
+        rotationTimer = window.setTimeout(() => {
+          showSlide(pickNextIndex());
+          scheduleNextRotation();
+        }, delay);
+      };
       const showSlide = index => {
         slides.forEach((slide, slideIndex) => {
           slide.classList.toggle('is-active', slideIndex === index);
@@ -330,6 +338,12 @@
         const activeSlide = slides[index];
         if (activeSlide?.classList.contains('home-hero-slide--ad')) {
           window.pixieedObserveAds?.(activeSlide);
+          window.setTimeout(() => {
+            window.pixieedObserveAds?.(activeSlide);
+          }, 1200);
+          window.setTimeout(() => {
+            window.pixieedObserveAds?.(activeSlide);
+          }, 3200);
         }
       };
       const pickRandomContentIndex = () => {
@@ -349,9 +363,7 @@
         return pickRandomContentIndex();
       };
       showSlide(activeIndex);
-      window.setInterval(() => {
-        showSlide(pickNextIndex());
-      }, 5000);
+      scheduleNextRotation();
       window.pixieedObserveAds?.(document);
     })();
   </script>
