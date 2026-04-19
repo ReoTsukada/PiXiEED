@@ -54131,8 +54131,24 @@
         opCount: ops.length,
       });
       const replayed = await replayOps(ops, { fromRemote: true });
+      const advanced = sharedProjectLastAppliedSeq > afterSeq;
       if (replayed) {
         sharedProjectLastRealtimeActivityAt = Date.now();
+      }
+      if (!advanced) {
+        console.warn('[shared-realtime] rescue-op-poll-stalled', {
+          reason,
+          projectKey: activeSharedProjectKey || '',
+          afterSeq,
+          opCount: ops.length,
+          pendingRemoteOps: sharedProjectPendingRemoteOps.size,
+        });
+        queueSharedProjectRefresh({
+          immediate: true,
+          reason: 'canonical-resync',
+          force: true,
+        });
+        return false;
       }
       return replayed;
     } catch (error) {
@@ -54862,6 +54878,10 @@
         || normalizedReason === 'online'
         || normalizedReason.includes('poll-recovery-')
       );
+      const requiresCanonicalSnapshot = (
+        normalizedReason === 'canonical-resync'
+        || normalizedReason.includes('canonical-resync-')
+      );
       logSharedProjectRealtimeChannelLifecycle('refresh-fetched-project', {
         caller: 'refreshActiveSharedProjectSnapshot',
         reason: reason || 'refresh',
@@ -54901,8 +54921,8 @@
       if (
         nextStructureRevision === activeSharedProjectStructureRevision
         && (
-          !force
-          || prefersOpReplayRecovery
+          (!force && !requiresCanonicalSnapshot)
+          || (prefersOpReplayRecovery && !requiresCanonicalSnapshot)
         )
       ) {
         const syncedByOps = await applySharedProjectOpsSinceRevision(project, activeSharedProjectRevision);
@@ -54932,6 +54952,7 @@
         }
         if (
           prefersOpReplayRecovery
+          && !requiresCanonicalSnapshot
           && nextRevision > activeSharedProjectRevision
         ) {
           logSharedProjectRealtimeChannelLifecycle('refresh-result', {
