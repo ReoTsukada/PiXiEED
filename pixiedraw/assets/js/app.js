@@ -12857,6 +12857,33 @@
     }
   }
 
+  function ensureInternetConnectedForAction(actionLabelJa = 'この機能', actionLabelEn = 'this feature') {
+    const online = typeof navigator !== 'undefined' ? navigator.onLine !== false : true;
+    if (online) {
+      return true;
+    }
+    const message = localizeText(
+      `インターネット接続を確認してください。\n${actionLabelJa}を使うにはオンライン接続が必要です。`,
+      `Please check your internet connection.\n${actionLabelEn} requires an online connection.`
+    );
+    updateAutosaveStatus(
+      localizeText(
+        'インターネット接続を確認してください',
+        'Please check your internet connection'
+      ),
+      'warn'
+    );
+    setMultiStatus(
+      localizeText(
+        'インターネット接続を確認してください',
+        'Please check your internet connection'
+      ),
+      'warn'
+    );
+    window.alert(message);
+    return false;
+  }
+
   function readAutosaveTabLock() {
     if (!canUseSessionStorage) {
       return null;
@@ -15516,6 +15543,9 @@
   }
 
   async function openExportDialog() {
+    if (!ensureInternetConnectedForAction('保存/出力', 'Save / Export')) {
+      return;
+    }
     if (!ensureCurrentClientCanExportProject({ announce: true })) {
       return;
     }
@@ -52077,6 +52107,9 @@
   }
 
   async function createSharedProjectFromCurrentDocument() {
+    if (!ensureInternetConnectedForAction('共有プロジェクトの作成', 'Creating a shared project')) {
+      return false;
+    }
     if (isSharedProjectsBlockedByRuntime()) {
       showSharedRuntimeBlockedStatus();
       return false;
@@ -52153,6 +52186,9 @@
   }
 
   async function openSharedProjectFromInput() {
+    if (!ensureInternetConnectedForAction('共有プロジェクトを開く', 'Opening a shared project')) {
+      return false;
+    }
     if (isSharedProjectsBlockedByRuntime()) {
       showSharedRuntimeBlockedStatus();
       return false;
@@ -54461,6 +54497,19 @@
         structureRevision: diagnostics.structureRevision,
         activeStructureRevision: diagnostics.activeStructureRevision,
       });
+      if (
+        fromRemote
+        && provisional
+        && diagnostics.reason === 'structure-revision-mismatch'
+        && !sharedProjectRemoteApplyFailureKeys.has(failureKey)
+      ) {
+        sharedProjectRemoteApplyFailureKeys.add(failureKey);
+        queueSharedProjectRefresh({
+          immediate: true,
+          reason: 'canonical-resync-structure-mismatch',
+          force: true,
+        });
+      }
       if (
         fromRemote
         && !provisional
