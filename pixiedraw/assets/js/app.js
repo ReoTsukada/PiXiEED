@@ -8243,6 +8243,27 @@
     });
   }
 
+  function logSharedProjectDrawBlock(reason, extra = null) {
+    if (!isSharedProjectCollaborativeMode()) {
+      return;
+    }
+    console.debug('[shared-draw] blocked', {
+      reason,
+      tool: state.tool || '',
+      activeProjectKey: activeSharedProjectKey || '',
+      activeProjectId: activeSharedProjectId || '',
+      activeRevision: activeSharedProjectRevision,
+      activeStructureRevision: activeSharedProjectStructureRevision,
+      documentLoaded: Boolean(activeSharedProjectDocumentLoaded),
+      multiConnected: Boolean(multiState.connected),
+      multiRole: multiState.role || '',
+      activeCanvasId: getActiveProjectCanvasDocument()?.id || '',
+      activeFrame: Math.max(0, Math.round(Number(state.activeFrame) || 0)),
+      activeLayer: typeof state.activeLayer === 'string' ? state.activeLayer : '',
+      ...(extra && typeof extra === 'object' ? { extra } : {}),
+    });
+  }
+
   function setActiveSharedProjectSession(projectKey = '', revision = 0, structureRevision = 0, projectId = '') {
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey);
     if (!normalizedProjectKey) {
@@ -43129,6 +43150,7 @@
     // Spectator (viewer) mode: only allow pan interactions
     if (isMultiSpectatorMode()) {
       if (activeTool !== 'pan') {
+        logSharedProjectDrawBlock('spectator-mode');
         setMultiStatus(localizeText('視聴モードでは描画や選択はできません', 'Drawing and selection are disabled in viewer mode'), 'warn');
         return;
       }
@@ -43137,6 +43159,7 @@
       // Non-spectator: existing restrictions for drawing guests
       if (HISTORY_DRAW_TOOLS.has(activeTool)) {
         if (isSharedProjectCollaborativeMode() && !activeSharedProjectDocumentLoaded) {
+          logSharedProjectDrawBlock('document-not-loaded');
           updateAutosaveStatus(
             localizeText(
               '共有プロジェクトの最新内容を読込中です。完了してから描画してください',
@@ -43147,6 +43170,7 @@
           return;
         }
         if (isMultiAssignedCellRestrictedEditorMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
+          logSharedProjectDrawBlock('assigned-cell-restriction');
           return;
         }
       }
@@ -43163,6 +43187,7 @@
     }
 
     if (HISTORY_DRAW_TOOLS.has(activeTool) && !layer) {
+      logSharedProjectDrawBlock('missing-active-layer');
       return;
     }
 
@@ -51677,6 +51702,9 @@
   }
 
   function isMultiAssignedCellRestrictedEditorMode() {
+    if (isSharedProjectCollaborativeMode()) {
+      return false;
+    }
     return isMultiGuestMode();
   }
 
