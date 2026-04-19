@@ -27,7 +27,10 @@
 
   const SLOT_SEQUENCE = ['2141591954', '9073878884', '2261515379'];
   const SLOT_KEY = 'pixieedAdSlotIndex';
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 2500;
   let slotIndex = 0;
+  let adsScriptPromise = null;
 
   try {
     const stored = sessionStorage.getItem(SLOT_KEY);
@@ -50,9 +53,41 @@
     return slot;
   }
 
+  function ensureAdsScript() {
+    const existing = document.querySelector('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]');
+    if (existing?.dataset.pixieedReady === '1') {
+      return Promise.resolve();
+    }
+    if (adsScriptPromise) return adsScriptPromise;
+    adsScriptPromise = new Promise((resolve, reject) => {
+      const script = existing || document.createElement('script');
+      const handleLoad = () => {
+        script.dataset.pixieedReady = '1';
+        resolve();
+      };
+      const handleError = () => {
+        adsScriptPromise = null;
+        reject(new Error('adsbygoogle script failed to load'));
+      };
+      script.async = true;
+      script.crossOrigin = 'anonymous';
+      script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9801602250480253';
+      script.addEventListener('load', handleLoad, { once: true });
+      script.addEventListener('error', handleError, { once: true });
+      if (!existing) {
+        document.head.appendChild(script);
+      }
+    });
+    return adsScriptPromise;
+  }
+
   function isReady(ins) {
     return ins.getAttribute('data-adsbygoogle-status') === 'done' ||
       ins.getAttribute('data-ad-status') === 'filled';
+  }
+
+  function isUnfilled(ins) {
+    return ins.getAttribute('data-ad-status') === 'unfilled';
   }
 
   function isRenderable(ins) {
@@ -87,12 +122,40 @@
     ins.dataset.adSlotAssigned = '1';
   }
 
-  function loadAd(ins) {
+  function queueRetry(ins) {
+    if (!(ins instanceof HTMLElement)) return;
+    if (isReady(ins)) return;
+    if (ins.dataset.adsRetryQueued === '1') return;
+    const attempts = Number(ins.dataset.adsAttemptCount || '0');
+    if (attempts >= MAX_RETRIES) return;
+    ins.dataset.adsRetryQueued = '1';
+    window.setTimeout(() => {
+      ins.dataset.adsRetryQueued = '';
+      if (isReady(ins)) return;
+      if (isUnfilled(ins)) {
+        ins.removeAttribute('data-ad-status');
+      }
+      ins.dataset.adsLazyLoaded = '';
+      loadAd(ins);
+    }, RETRY_DELAY_MS);
+  }
+
+  async function loadAd(ins) {
     if (!(ins instanceof HTMLElement)) return;
     if (ins.dataset.adsLazyLoaded === '1' || isReady(ins)) return;
     if (!isRenderable(ins)) return;
+    const attempts = Number(ins.dataset.adsAttemptCount || '0');
+    if (attempts >= MAX_RETRIES) return;
     assignSlot(ins);
     ins.dataset.adsLazyLoaded = 'pending';
+    ins.dataset.adsAttemptCount = String(attempts + 1);
+    try {
+      await ensureAdsScript();
+    } catch (_error) {
+      ins.dataset.adsLazyLoaded = '';
+      queueRetry(ins);
+      return;
+    }
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
         if (!isRenderable(ins)) {
@@ -102,8 +165,10 @@
         try {
           (window.adsbygoogle = window.adsbygoogle || []).push({});
           ins.dataset.adsLazyLoaded = '1';
+          queueRetry(ins);
         } catch (_error) {
           ins.dataset.adsLazyLoaded = '';
+          queueRetry(ins);
         }
       });
     });
@@ -124,6 +189,12 @@
 
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
+      if (mutation.type === 'attributes' && mutation.target instanceof HTMLElement && mutation.target.matches('ins.adsbygoogle')) {
+        if (isUnfilled(mutation.target)) {
+          queueRetry(mutation.target);
+        }
+        return;
+      }
       mutation.addedNodes.forEach((node) => {
         if (!(node instanceof HTMLElement)) return;
         if (node.matches('ins.adsbygoogle')) {
@@ -139,6 +210,8 @@
 
   if (document.documentElement) {
     observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-ad-status', 'data-adsbygoogle-status', 'class'],
       childList: true,
       subtree: true
     });
