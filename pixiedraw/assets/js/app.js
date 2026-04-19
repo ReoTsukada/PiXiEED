@@ -8081,10 +8081,18 @@
         if (recovered) {
           return;
         }
-        // Refresh loop is rescue-only. Normal draw sync should stay op-first.
-        queueSharedProjectRefresh({ immediate: false, reason: realtimeLikelyHealthy ? 'poll-idle' : 'poll-recovery' });
+        if (!realtimeLikelyHealthy) {
+          // Refresh loop is recovery-only when realtime itself looks unhealthy.
+          queueSharedProjectRefresh({ immediate: false, reason: 'poll-recovery', force: true });
+          return;
+        }
+        scheduleSharedProjectOpsRescueRetry();
       }).catch(() => {
-        queueSharedProjectRefresh({ immediate: false, reason: realtimeLikelyHealthy ? 'poll-idle' : 'poll-recovery' });
+        if (!realtimeLikelyHealthy) {
+          queueSharedProjectRefresh({ immediate: false, reason: 'poll-recovery', force: true });
+          return;
+        }
+        scheduleSharedProjectOpsRescueRetry();
       });
     }, Math.min(SHARED_PROJECT_REFRESH_LOOP_INTERVAL_MS, SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS));
   }
@@ -53391,7 +53399,8 @@
 
   function shouldDeferIncomingSharedProjectRemoteApply() {
     return (
-      hasSharedProjectLocalWorkInFlight()
+      !activeSharedProjectDocumentLoaded
+      || hasSharedProjectLocalWorkInFlight()
       || autosaveWriteInFlight
       || multiState.applyRemoteInProgress
       || multiState.connecting
@@ -54180,6 +54189,18 @@
     return await fetchSharedProjectOpsSince(projectKey, afterSeq, limit);
   }
 
+  function scheduleSharedProjectOpsRescueRetry(delayMs = SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS) {
+    if (!activeSharedProjectKey) {
+      return;
+    }
+    window.setTimeout(() => {
+      if (!activeSharedProjectKey || sharedProjectRefreshInFlight || sharedProjectGapRecoveryPromise) {
+        return;
+      }
+      pollSharedProjectRealtimeOpsRescue({ reason: 'retry-op-poll' }).catch(() => {});
+    }, Math.max(32, Math.round(Number(delayMs) || SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS)));
+  }
+
   function drainPendingSharedProjectRemoteOps() {
     while (sharedProjectPendingRemoteOps.has(sharedProjectLastAppliedSeq + 1)) {
       const nextSeq = sharedProjectLastAppliedSeq + 1;
@@ -54339,6 +54360,7 @@
       });
       if (
         fromRemote
+        && !provisional
         && shouldRefreshForSharedProjectApplySkip(diagnostics.reason)
         && !sharedProjectRemoteApplyFailureKeys.has(failureKey)
       ) {
@@ -55185,81 +55207,12 @@
       markDocumentDurablySaved();
       noteSharedProjectOperationApplied({ opType: resolvedOpType, fromRemote: false });
       if (resolvedOpType === 'draw') {
-        // Persist the full canonical snapshot immediately after a confirmed draw op
-        // so receivers never recover against an older document image.
         console.debug('[shared-realtime] draw-commit-confirmed', {
           projectKey: normalizedProjectKey,
           opId: resolvedOp.opId || '',
           latestRevision: Math.max(0, Math.round(Number(result.latest_revision) || 0)),
           latestStructureRevision: Math.max(0, Math.round(Number(result.latest_structure_revision) || 0)),
         });
-        try {
-          const snapshot = makeHistorySnapshot({ clonePixelData: false });
-          const packaged = buildPackagedProjectPayload(snapshot, {
-            session: buildProjectSessionPayload(),
-          });
-          packaged.sharedHistoryLabel = 'realtimeSnapshotSync';
-          console.debug('[shared-realtime] draw-commit-persist-snapshot-start', {
-            projectKey: normalizedProjectKey,
-            opId: resolvedOp.opId || '',
-            revision: Math.max(0, Math.round(Number(result.latest_revision) || 0)),
-          });
-          const savedSnapshot = await persistSharedProjectSnapshot(
-            normalizedProjectKey,
-            packaged,
-            {
-              title: state.documentName || DEFAULT_DOCUMENT_NAME,
-              revision: Math.max(0, Math.round(Number(result.latest_revision) || 0)),
-            }
-          );
-          console.debug('[shared-realtime] draw-commit-persist-snapshot-result', {
-            projectKey: normalizedProjectKey,
-            opId: resolvedOp.opId || '',
-            persisted: Boolean(savedSnapshot),
-            persistedRevision: Math.max(0, Math.round(Number(savedSnapshot?.latest_revision) || 0)),
-            persistedSnapshotRevision: Math.max(0, Math.round(Number(savedSnapshot?.latest_snapshot_revision) || 0)),
-          });
-          if (savedSnapshot) {
-            setActiveSharedProjectSession(
-              normalizedProjectKey,
-              Math.max(
-                0,
-                Math.round(
-                  Number(savedSnapshot.latest_snapshot_revision)
-                  || Number(savedSnapshot.latest_revision)
-                  || Number(result.latest_revision)
-                  || 0
-                )
-              ),
-              Math.max(
-                0,
-                Math.round(
-                  Number(savedSnapshot.latest_snapshot_structure_revision)
-                  || Number(savedSnapshot.latest_structure_revision)
-                  || Number(result.latest_structure_revision)
-                  || 0
-                )
-              ),
-              savedSnapshot.id || result.id || activeSharedProjectId
-            );
-          }
-          if (!savedSnapshot) {
-            queueSharedProjectCurrentSnapshotCapture({
-              delayMs: 0,
-              projectKey: normalizedProjectKey,
-              title: state.documentName || DEFAULT_DOCUMENT_NAME,
-              historyLabel: 'realtimeSnapshotSync',
-            });
-          }
-        } catch (error) {
-          console.warn('Failed to persist canonical shared snapshot after draw commit', error);
-          queueSharedProjectCurrentSnapshotCapture({
-            delayMs: 0,
-            projectKey: normalizedProjectKey,
-            title: state.documentName || DEFAULT_DOCUMENT_NAME,
-            historyLabel: 'realtimeSnapshotSync',
-          });
-        }
       }
       if (shouldCreateSharedProjectCheckpoint(resolvedOpType)) {
         scheduleSharedProjectCheckpoint({
@@ -55929,10 +55882,10 @@
                 reason: 'project-update-gap',
               }).then(recovered => {
                 if (!recovered) {
-                  queueSharedProjectRefresh({ immediate: false, reason: 'project-update-gap', force: true });
+                  scheduleSharedProjectOpsRescueRetry();
                 }
               }).catch(() => {
-                queueSharedProjectRefresh({ immediate: false, reason: 'project-update-gap', force: true });
+                scheduleSharedProjectOpsRescueRetry();
               });
             }
           }
@@ -56001,10 +55954,10 @@
                 reason: 'insert-gap',
               }).then(recovered => {
                 if (!recovered) {
-                  queueSharedProjectRefresh({ immediate: false, reason: 'insert-gap', force: true });
+                  scheduleSharedProjectOpsRescueRetry();
                 }
               }).catch(() => {
-                queueSharedProjectRefresh({ immediate: false, reason: 'insert-gap', force: true });
+                scheduleSharedProjectOpsRescueRetry();
               });
               return;
             }
@@ -56034,10 +55987,10 @@
               reason: 'op-realtime',
             }).then(recovered => {
               if (!recovered) {
-                queueSharedProjectRefresh({ immediate: false, reason: 'op-realtime', force: true });
+                scheduleSharedProjectOpsRescueRetry();
               }
             }).catch(() => {
-              queueSharedProjectRefresh({ immediate: false, reason: 'op-realtime', force: true });
+              scheduleSharedProjectOpsRescueRetry();
             });
           }
         );
@@ -63370,7 +63323,6 @@
       return;
     }
     if (isSharedProjectRealtimePrimaryActive(multiState.projectKey)) {
-      queueSharedProjectRefresh({ immediate: true, reason: 'room-session-state' });
       return;
     }
     if (shouldDeferMultiSessionStateApply()) {
@@ -63420,7 +63372,6 @@
 
   async function handleMultiGuestSessionStateMessage(payload) {
     if (isSharedProjectCollaborativeMode()) {
-      queueSharedProjectRefresh({ immediate: true, reason: 'guest-session-state' });
       return;
     }
     if (!getMultiRoleCapabilities().canBroadcastAuthoritativeState) {
