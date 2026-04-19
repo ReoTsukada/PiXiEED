@@ -3007,6 +3007,7 @@
   let activeSharedProjectChannel = null;
   let activeSharedProjectChannelKey = '';
   let activeSharedProjectChannelSignature = '';
+  let sharedProjectRealtimeConnectSignature = '';
   let sharedProjectRealtimeStatus = 'idle';
   let sharedProjectRealtimeRetryBlockedUntil = 0;
   let sharedProjectRealtimeConnectPromise = null;
@@ -7988,6 +7989,7 @@
     sharedProjectGapRecoveryPromise = null;
     sharedProjectOpPollInFlight = false;
     sharedProjectRealtimeConnectPromise = null;
+    sharedProjectRealtimeConnectSignature = '';
     sharedProjectRealtimeStatus = 'idle';
     sharedProjectMembers = [];
     sharedProjectLayerSnapshots.clear();
@@ -8306,7 +8308,10 @@
     ensureSharedProjectRefreshLoop();
     const shouldEnsureRealtimeChannel = (
       projectChanged
-      || activeSharedProjectChannelSignature !== nextChannelSignature
+      || (
+        activeSharedProjectChannelSignature !== nextChannelSignature
+        && sharedProjectRealtimeConnectSignature !== nextChannelSignature
+      )
       || (!activeSharedProjectChannel && !sharedProjectRealtimeConnectPromise && Date.now() >= sharedProjectRealtimeRetryBlockedUntil)
     );
     if (shouldEnsureRealtimeChannel) {
@@ -55720,7 +55725,7 @@
     const projectId = activeSharedProjectId || '';
     const channelSignature = `${projectKey}::${projectId}`;
     sharedProjectRealtimeStatus = 'subscribing';
-    if (sharedProjectRealtimeConnectPromise && activeSharedProjectChannelSignature === channelSignature) {
+    if (sharedProjectRealtimeConnectPromise && sharedProjectRealtimeConnectSignature === channelSignature) {
       logSharedProjectRealtimeChannelLifecycle('reuse-connect-promise', {
         caller: 'ensureActiveSharedProjectRealtimeChannel',
         reason: 'same-channel-signature',
@@ -55741,6 +55746,7 @@
       return activeSharedProjectChannel;
     }
     activeSharedProjectChannelSignature = channelSignature;
+    sharedProjectRealtimeConnectSignature = channelSignature;
     sharedProjectRealtimeConnectPromise = (async () => {
       await disconnectActiveSharedProjectRealtimeChannel({
         reason: 'recreate-before-subscribe',
@@ -56080,6 +56086,7 @@
       return await sharedProjectRealtimeConnectPromise;
     } finally {
       sharedProjectRealtimeConnectPromise = null;
+      sharedProjectRealtimeConnectSignature = '';
       if (!activeSharedProjectChannel) {
         if (sharedProjectRealtimeStatus === 'subscribing') {
           sharedProjectRealtimeStatus = 'idle';
