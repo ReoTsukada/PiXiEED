@@ -54854,6 +54854,14 @@
       }
       const nextRevision = Math.max(0, Math.round(Number(project.latest_revision) || 0));
       const nextStructureRevision = Math.max(0, Math.round(Number(project.latest_structure_revision) || 0));
+      const normalizedReason = String(reason || '');
+      const prefersOpReplayRecovery = (
+        normalizedReason === 'poll-recovery'
+        || normalizedReason === 'focus'
+        || normalizedReason === 'visibility'
+        || normalizedReason === 'online'
+        || normalizedReason.includes('poll-recovery-')
+      );
       logSharedProjectRealtimeChannelLifecycle('refresh-fetched-project', {
         caller: 'refreshActiveSharedProjectSnapshot',
         reason: reason || 'refresh',
@@ -54888,8 +54896,15 @@
         });
         return false;
       }
-      // Normal refresh prefers ordered op replay first; snapshot load is fallback/recovery.
-      if (!force && nextStructureRevision === activeSharedProjectStructureRevision) {
+      // Prefer ordered op replay whenever structure is unchanged. Forced refreshes still
+      // avoid snapshot rollback for recovery-only reasons such as poll/focus recovery.
+      if (
+        nextStructureRevision === activeSharedProjectStructureRevision
+        && (
+          !force
+          || prefersOpReplayRecovery
+        )
+      ) {
         const syncedByOps = await applySharedProjectOpsSinceRevision(project, activeSharedProjectRevision);
         logSharedProjectRealtimeChannelLifecycle('refresh-ops-replay-result', {
           caller: 'refreshActiveSharedProjectSnapshot',
@@ -54914,6 +54929,28 @@
             },
           });
           return true;
+        }
+        if (
+          prefersOpReplayRecovery
+          && nextRevision > activeSharedProjectRevision
+        ) {
+          logSharedProjectRealtimeChannelLifecycle('refresh-result', {
+            caller: 'refreshActiveSharedProjectSnapshot',
+            reason: reason || 'refresh',
+            extra: {
+              force,
+              result: 'ops-replay-incomplete-retry',
+              afterRevision: activeSharedProjectRevision,
+              nextRevision,
+              nextStructureRevision,
+            },
+          });
+          queueSharedProjectRefresh({
+            immediate: false,
+            reason: `${reason || 'refresh'}-ops-retry`,
+            force: true,
+          });
+          return false;
         }
       }
       if (!canApplyIncomingSharedProjectSnapshot()) {
@@ -54961,9 +54998,9 @@
       const prefersFreshCanonicalSnapshot = (
         force
         && (
-          String(reason || '').includes('draw-op')
-          || String(reason || '').includes('apply-skip-missing-canvas-or-frame')
-          || String(reason || '').includes('open-shared')
+          normalizedReason.includes('draw-op')
+          || normalizedReason.includes('apply-skip-missing-canvas-or-frame')
+          || normalizedReason.includes('open-shared')
         )
       );
       if (prefersFreshCanonicalSnapshot && snapshotRevision < nextRevision) {
