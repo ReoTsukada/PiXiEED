@@ -2537,6 +2537,7 @@
   const SHARED_PROJECT_REFRESH_LOOP_INTERVAL_MS = 2500;
   const SHARED_PROJECT_OP_RESCUE_POLL_INTERVAL_MS = 350;
   const SHARED_PROJECT_REFRESH_IDLE_GRACE_MS = 6000;
+  const SHARED_PROJECT_REALTIME_SUBSCRIBE_TIMEOUT_MS = 30000;
   const SHARED_PROJECT_BROADCAST_EVENT = 'shared-op';
   const SHARED_LOCAL_OP_JOURNAL_MAX_CONFIRMED_PER_PROJECT = 160;
   const SHARED_LOCAL_OP_JOURNAL_PRUNE_BATCH = 320;
@@ -19066,6 +19067,12 @@
         target_project_key: normalizedProjectKey,
       });
       if (error) {
+        if (isMissingRpcFunction(error, 'pixieed_delete_owned_shared_project')) {
+          console.warn('Shared project delete RPC is not deployed on this environment yet', {
+            projectKey: normalizedProjectKey,
+          });
+          return true;
+        }
         handleSharedProjectsBackendError(error, 'delete-owned-shared-project');
         return false;
       }
@@ -53332,6 +53339,23 @@
     );
   }
 
+  function isMissingRpcFunction(error, functionName = '') {
+    const normalizedFunctionName = String(functionName || '').trim().toLowerCase();
+    if (!normalizedFunctionName) {
+      return false;
+    }
+    const msg = [
+      error?.message,
+      error?.details,
+      error?.hint,
+      error?.code,
+    ].filter(Boolean).join(' ').toLowerCase();
+    return (
+      String(error?.code || '') === 'PGRST202'
+      && msg.includes(normalizedFunctionName)
+    );
+  }
+
   function handleSharedProjectsBackendError(error, context = '') {
     if (shouldDisableSharedProjectsBackend(error)) {
       supportsSharedProjectsBackend = false;
@@ -56082,7 +56106,7 @@
             ...details,
           });
           reject(new Error('Shared project realtime subscribe timed out'));
-        }, 15000);
+        }, SHARED_PROJECT_REALTIME_SUBSCRIBE_TIMEOUT_MS);
         channel.subscribe(status => {
           console.debug('[shared-realtime] subscribe status', {
             ...debugInfo,
