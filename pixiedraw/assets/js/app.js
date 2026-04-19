@@ -8363,6 +8363,32 @@
     }
   }
 
+  function hasUsableActiveSharedProjectDocumentState() {
+    if (!activeSharedProjectKey) {
+      return false;
+    }
+    const canvasDoc = getActiveProjectCanvasDocument();
+    if (!canvasDoc || !Array.isArray(canvasDoc.frames) || !canvasDoc.frames.length) {
+      return false;
+    }
+    const activeFrameIndex = clamp(
+      Math.round(Number(canvasDoc.activeFrame ?? state.activeFrame) || 0),
+      0,
+      Math.max(0, canvasDoc.frames.length - 1)
+    );
+    const frame = canvasDoc.frames[activeFrameIndex];
+    if (!frame || !Array.isArray(frame.layers) || !frame.layers.length) {
+      return false;
+    }
+    const activeLayerId = typeof (state.activeLayer || canvasDoc.activeLayer) === 'string'
+      ? String(state.activeLayer || canvasDoc.activeLayer).trim()
+      : '';
+    if (!activeLayerId) {
+      return frame.layers.some(layer => Boolean(layer?.id));
+    }
+    return frame.layers.some(layer => layer?.id === activeLayerId);
+  }
+
   function canPersistActiveSharedProjectDocument(projectKey = activeSharedProjectKey, historyLabel = '') {
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
     if (!normalizedProjectKey) {
@@ -43159,6 +43185,9 @@
       // Non-spectator: existing restrictions for drawing guests
       if (HISTORY_DRAW_TOOLS.has(activeTool)) {
         if (isSharedProjectCollaborativeMode() && !activeSharedProjectDocumentLoaded) {
+          if (hasUsableActiveSharedProjectDocumentState()) {
+            markActiveSharedProjectDocumentLoaded(activeSharedProjectKey);
+          } else {
           logSharedProjectDrawBlock('document-not-loaded');
           updateAutosaveStatus(
             localizeText(
@@ -43168,6 +43197,7 @@
             'warn'
           );
           return;
+          }
         }
         if (isMultiAssignedCellRestrictedEditorMode() && !enforceGuestAssignedLayerSelection({ announce: true })) {
           logSharedProjectDrawBlock('assigned-cell-restriction');
