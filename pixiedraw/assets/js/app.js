@@ -18500,10 +18500,10 @@
         try {
           const isSharedEntry = isSharedRecentProjectEntry(entry);
           const sharedRoleHint = typeof entry?.sharedRoleHint === 'string' ? entry.sharedRoleHint.trim() : '';
-          const deletesOwnedSharedProject = isSharedEntry && sharedRoleHint === 'master';
-          if (deletesOwnedSharedProject) {
-            const removedBackend = await deleteOwnedSharedProjectFromBackend(entry);
-            if (!removedBackend) {
+          let deletedSharedProjectBackend = false;
+          if (isSharedEntry) {
+            deletedSharedProjectBackend = await deleteOwnedSharedProjectFromBackend(entry);
+            if (!deletedSharedProjectBackend && sharedRoleHint === 'master') {
               updateAutosaveStatus(
                 localizeText(
                   '共有プロジェクト本体を削除できませんでした。ログイン状態とネットワークを確認して再試行してください。',
@@ -18517,6 +18517,9 @@
               }
               return;
             }
+          }
+          const deletesOwnedSharedProject = isSharedEntry && deletedSharedProjectBackend;
+          if (deletesOwnedSharedProject) {
           }
           const removed = await removeRecentProjectEntry(projectId);
           if (removed) {
@@ -19187,10 +19190,6 @@
 
   async function deleteOwnedSharedProjectFromBackend(entry = null) {
     if (!isSharedRecentProjectEntry(entry)) {
-      return true;
-    }
-    const roleHint = typeof entry?.sharedRoleHint === 'string' ? entry.sharedRoleHint.trim() : '';
-    if (roleHint !== 'master') {
       return true;
     }
     const normalizedProjectKey = normalizeMultiProjectKey(entry?.sharedProjectKey || '');
@@ -20969,14 +20968,34 @@
     const freshestProject = await awaitFreshSharedProjectSnapshot(sharedProject, {
       inviteToken: normalizedInviteToken,
       minRevision: Math.max(0, Math.round(Number(sharedProject.latest_revision) || 0)),
+      requireExactLatest: true,
+      timeoutMs: 4000,
+      pollIntervalMs: 180,
     }) || sharedProject;
+    const freshestSnapshotRevision = Math.max(
+      0,
+      Math.round(Number(freshestProject.latest_snapshot_revision) || Number(freshestProject.latest_revision) || 0)
+    );
+    const freshestLatestRevision = Math.max(0, Math.round(Number(freshestProject.latest_revision) || 0));
+    if (freshestSnapshotRevision < freshestLatestRevision) {
+      if (!silent) {
+        setMultiStatus(
+          localizeText(
+            '共有プロジェクトの最新キャンバスを準備中です。少し待ってから開き直してください。',
+            'The latest shared canvas is still being prepared. Please wait a moment and open it again.'
+          ),
+          'warn'
+        );
+      }
+      return false;
+    }
     const sharedSnapshot = freshestProject.latest_snapshot;
     if (sharedSnapshot && typeof sharedSnapshot === 'object') {
       const snapshotRevision = Math.max(
         0,
         Math.round(Number(freshestProject.latest_snapshot_revision) || Number(freshestProject.latest_revision) || 0)
       );
-      const latestRevision = Math.max(0, Math.round(Number(freshestProject.latest_revision) || 0));
+      const latestRevision = freshestLatestRevision;
       const loaded = await loadDocumentFromText(JSON.stringify(sharedSnapshot), null, {
         projectId: buildSharedRecentProjectId(resolvedProjectKey),
         suppressAutosaveStatus: true,
@@ -21011,7 +21030,7 @@
     );
     markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
     const sharedSnapshotRevision = Math.max(0, Math.round(Number(freshestProject.latest_snapshot_revision) || 0));
-    const sharedLatestRevision = Math.max(0, Math.round(Number(freshestProject.latest_revision) || 0));
+    const sharedLatestRevision = freshestLatestRevision;
     if (shouldTrustSharedProjectSnapshotRevision(sharedSnapshotRevision, sharedLatestRevision)) {
       await applySharedProjectOpsSinceRevision(
         freshestProject,
@@ -56307,6 +56326,7 @@
   async function awaitFreshSharedProjectSnapshot(projectRecord, {
     inviteToken = '',
     minRevision = 0,
+    requireExactLatest = false,
     timeoutMs = 1800,
     pollIntervalMs = 160,
   } = {}) {
@@ -56327,7 +56347,7 @@
       || Number(candidate.latest_revision)
       || 0
     ));
-    if (candidateSnapshotRevision >= requiredRevision) {
+    if (candidateSnapshotRevision >= requiredRevision && (!requireExactLatest || candidateSnapshotRevision === requiredRevision)) {
       return candidate;
     }
     const startedAt = Date.now();
@@ -56353,7 +56373,7 @@
         || Number(candidate.latest_revision)
         || 0
       ));
-      if (candidateSnapshotRevision >= requiredRevision) {
+      if (candidateSnapshotRevision >= requiredRevision && (!requireExactLatest || candidateSnapshotRevision === requiredRevision)) {
         return candidate;
       }
     }
@@ -56532,6 +56552,9 @@
       const fetchedProject = await fetchSharedProjectRecord(activeSharedProjectKey);
       const project = await awaitFreshSharedProjectSnapshot(fetchedProject, {
         minRevision: Math.max(0, Math.round(Number(fetchedProject?.latest_revision) || 0)),
+        requireExactLatest: true,
+        timeoutMs: force ? 2400 : 1400,
+        pollIntervalMs: 180,
       }) || fetchedProject;
       if (!project) {
         logSharedProjectRealtimeChannelLifecycle('refresh-result', {
@@ -56692,6 +56715,27 @@
         0,
         Math.round(Number(project.latest_snapshot_revision) || Number(project.latest_revision) || 0)
       );
+      if (snapshotRevision < nextRevision) {
+        if (hadLoadedDocument) {
+          markActiveSharedProjectDocumentLoaded(activeSharedProjectKey);
+        }
+        logSharedProjectRealtimeChannelLifecycle('refresh-result', {
+          caller: 'refreshActiveSharedProjectSnapshot',
+          reason: reason || 'refresh',
+          extra: {
+            force,
+            result: 'stale-canonical-snapshot-skipped',
+            snapshotRevision,
+            nextRevision,
+          },
+        });
+        queueSharedProjectRefresh({
+          immediate: false,
+          reason: `${reason || 'refresh'}-await-exact-snapshot`,
+          force: true,
+        });
+        return false;
+      }
       const trustedSnapshotRevision = shouldTrustSharedProjectSnapshotRevision(snapshotRevision, nextRevision);
       const prefersFreshCanonicalSnapshot = (
         force
