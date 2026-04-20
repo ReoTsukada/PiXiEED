@@ -19200,7 +19200,14 @@
           console.warn('Shared project delete RPC is not deployed on this environment yet', {
             projectKey: normalizedProjectKey,
           });
-          return true;
+          setMultiStatus(
+            localizeText(
+              '共有プロジェクト削除APIが未デプロイです。サーバー更新後に削除してください。',
+              'Shared project deletion API is not deployed yet. Delete it after the server is updated.'
+            ),
+            'error'
+          );
+          return false;
         }
         handleSharedProjectsBackendError(error, 'delete-owned-shared-project');
         return false;
