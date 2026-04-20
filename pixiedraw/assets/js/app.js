@@ -54634,7 +54634,9 @@
     }
     let applied = false;
     if (
-      kind === 'layer-patch'
+      kind === 'stroke-command'
+      || kind === 'stroke'
+      || kind === 'layer-patch'
       || kind === 'fill'
       || kind === 'selection-transform'
       || kind === 'stroke-commit'
