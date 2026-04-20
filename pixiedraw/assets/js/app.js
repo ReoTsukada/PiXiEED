@@ -7614,6 +7614,45 @@
     }
   }
 
+  async function purgeDeletedSharedProjectLocalReferences(projectKey = '', projectId = '') {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    clearDeletedSharedProjectLocalState(normalizedProjectKey, normalizedProjectId);
+    if (!AUTOSAVE_SUPPORTED) {
+      return false;
+    }
+    const existingEntries = await loadRecentProjectsMetadata();
+    const idsToRemove = existingEntries
+      .filter(entry => {
+        const entryId = normalizeAutosaveProjectId(entry?.id || '');
+        const entryProjectKey = normalizeMultiProjectKey(entry?.sharedProjectKey || '');
+        const entryBackendId = typeof entry?.sharedProjectBackendId === 'string' ? entry.sharedProjectBackendId.trim() : '';
+        const matchesProjectKey = normalizedProjectKey && entryProjectKey === normalizedProjectKey;
+        const matchesProjectId = normalizedProjectId && entryId === normalizedProjectId;
+        const matchesSharedRecentId = normalizedProjectKey && entryId === buildSharedRecentProjectId(normalizedProjectKey);
+        const matchesBackendId = normalizedProjectId && entryBackendId && entryBackendId === normalizedProjectId;
+        return matchesProjectKey || matchesProjectId || matchesSharedRecentId || matchesBackendId;
+      })
+      .map(entry => normalizeAutosaveProjectId(entry?.id || ''))
+      .filter(Boolean);
+    if (!idsToRemove.length) {
+      return false;
+    }
+    const nextEntries = existingEntries.filter(entry => !idsToRemove.includes(normalizeAutosaveProjectId(entry?.id || '')));
+    await saveRecentProjectsList(existingEntries, nextEntries);
+    setRecentProjectsCache(nextEntries);
+    idsToRemove.forEach(id => {
+      releaseAutosaveProjectId(id);
+      if (startupAutosaveRestoreProjectId === id) {
+        startupAutosaveRestoreProjectId = '';
+      }
+    });
+    if (idsToRemove.includes(normalizeAutosaveProjectId(autosaveProjectId || ''))) {
+      setActiveAutosaveProjectId(createAutosaveProjectId());
+    }
+    return true;
+  }
+
   function getActiveOpenProjectTab() {
     const index = findOpenProjectTabIndex(activeOpenProjectTabId);
     return index >= 0 ? openProjectTabs[index] : null;
@@ -18469,7 +18508,7 @@
           const removed = await removeRecentProjectEntry(projectId);
           if (removed) {
             if (deletesOwnedSharedProject && isSharedEntry) {
-              clearDeletedSharedProjectLocalState(entry?.sharedProjectKey || '', projectId);
+              await purgeDeletedSharedProjectLocalReferences(entry?.sharedProjectKey || '', projectId);
             }
             releaseAutosaveProjectId(projectId);
             updateAutosaveStatus(
@@ -18492,6 +18531,9 @@
             if (deletesOwnedSharedProject) {
               await enforceSharedProjectOwnershipLimit();
             }
+          } else if (deletesOwnedSharedProject && isSharedEntry) {
+            await purgeDeletedSharedProjectLocalReferences(entry?.sharedProjectKey || '', projectId);
+            await enforceSharedProjectOwnershipLimit();
           } else if (AUTOSAVE_SUPPORTED) {
             refreshRecentProjectsUI().catch(error => {
               console.warn('Failed to refresh recent projects', error);
@@ -19164,7 +19206,14 @@
         return false;
       }
       const result = Array.isArray(data) ? (data[0] || null) : (data || null);
-      return Boolean(result?.deleted);
+      const deleted = Boolean(result?.deleted);
+      if (deleted) {
+        await purgeDeletedSharedProjectLocalReferences(
+          normalizedProjectKey,
+          buildSharedRecentProjectId(normalizedProjectKey)
+        );
+      }
+      return deleted;
     } catch (error) {
       handleSharedProjectsBackendError(error, 'delete-owned-shared-project-exception');
       return false;
@@ -19193,9 +19242,12 @@
                 .map(entry => normalizeMultiProjectKey(entry.sharedProjectKey || ''))
                 .filter(projectKeyValue => projectKeyValue && !deletedProjectKeys.includes(projectKeyValue));
               await pruneSharedRecentEntriesToKnownProjects(knownProjectKeys);
-              deletedProjectKeys.forEach(deletedProjectKey => {
-                clearDeletedSharedProjectLocalState(deletedProjectKey, buildSharedRecentProjectId(deletedProjectKey));
-              });
+              for (const deletedProjectKey of deletedProjectKeys) {
+                await purgeDeletedSharedProjectLocalReferences(
+                  deletedProjectKey,
+                  buildSharedRecentProjectId(deletedProjectKey)
+                );
+              }
             }
             if (normalizedProjectKey) {
               const alreadyOwnedOnBackend = getOwnedSharedRecentProjectEntries()
