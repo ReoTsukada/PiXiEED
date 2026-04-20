@@ -7567,6 +7567,48 @@
     return changed;
   }
 
+  function clearDeletedSharedProjectLocalState(projectKey = '', projectId = '') {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    const sharedRecentProjectId = normalizedProjectKey
+      ? buildSharedRecentProjectId(normalizedProjectKey)
+      : '';
+    const matchesActiveSharedProject = normalizedProjectKey && activeSharedProjectKey === normalizedProjectKey;
+    const matchesAutosaveProject = normalizedProjectId
+      && normalizeAutosaveProjectId(autosaveProjectId || '') === normalizedProjectId;
+    const matchesSharedAutosaveProject = sharedRecentProjectId
+      && normalizeAutosaveProjectId(autosaveProjectId || '') === sharedRecentProjectId;
+    const pendingInvite = readPendingSharedInvite();
+    const matchesPendingInvite = Boolean(
+      pendingInvite
+      && (
+        (normalizedProjectKey && normalizeMultiProjectKey(pendingInvite.projectKey || '') === normalizedProjectKey)
+        || (
+          sharedRecentProjectId
+          && typeof pendingInvite.projectKey === 'string'
+          && normalizeMultiProjectKey(pendingInvite.projectKey || '') === normalizedProjectKey
+        )
+      )
+    );
+
+    if (matchesPendingInvite) {
+      clearPendingSharedInvite();
+    }
+    if (normalizedProjectKey && normalizeMultiProjectKey(multiState.projectKey || '') === normalizedProjectKey) {
+      storeMultiProjectKey('');
+      syncMultiProjectKeyInputValues('', { preserveFocused: false });
+    }
+    if (matchesActiveSharedProject || matchesSharedAutosaveProject) {
+      clearActiveSharedProjectSession('deleted-shared-project');
+    }
+    if (matchesAutosaveProject || matchesSharedAutosaveProject) {
+      setActiveAutosaveProjectId(createAutosaveProjectId());
+    }
+    if (sharedRecentProjectId && startupAutosaveRestoreProjectId === sharedRecentProjectId) {
+      startupAutosaveRestoreProjectId = '';
+    }
+  }
+
   function getActiveOpenProjectTab() {
     const index = findOpenProjectTabIndex(activeOpenProjectTabId);
     return index >= 0 ? openProjectTabs[index] : null;
@@ -18414,6 +18456,9 @@
           }
           const removed = await removeRecentProjectEntry(projectId);
           if (removed) {
+            if (deletesOwnedSharedProject && isSharedEntry) {
+              clearDeletedSharedProjectLocalState(entry?.sharedProjectKey || '', projectId);
+            }
             releaseAutosaveProjectId(projectId);
             updateAutosaveStatus(
               deletesOwnedSharedProject
@@ -52123,7 +52168,10 @@
     }
     await ensureNoLegacyMultiSessionForSharedProject();
     const existingAccess = readCurrentMultiProjectAccessInput();
-    const currentProjectIsShared = isCurrentProjectSharedEntry();
+    const currentProjectIsShared = Boolean(
+      isCurrentProjectSharedEntry()
+      && getCurrentSharedRecentProjectEntry(activeSharedProjectKey || existingAccess.projectKey || '')
+    );
     const projectKey = normalizeMultiProjectKey(
       existingAccess.projectKey
       || (currentProjectIsShared ? activeSharedProjectKey : '')
@@ -53669,7 +53717,7 @@
     const activeCanvas = getActiveProjectCanvasDocument() || null;
     const activeCanvasId = activeCanvas?.id || '';
     return {
-      kind: 'structure_snapshot_summary',
+      kind: 'structure-sync',
       historyLabel: String(historyLabel || ''),
       activeCanvasId,
       canvasCount: canvases.length,
@@ -53684,12 +53732,152 @@
           0,
           Math.max(0, (canvas?.frames?.length || 1) - 1)
         ),
-        frameCount: Array.isArray(canvas?.frames) ? canvas.frames.length : 0,
-        layerCounts: Array.isArray(canvas?.frames)
-          ? canvas.frames.map(frame => (Array.isArray(frame?.layers) ? frame.layers.length : 0))
+        activeLayer: typeof canvas?.activeLayer === 'string' ? canvas.activeLayer : '',
+        mirror: normalizeMirrorAxisState(canvas?.mirror, canvas?.width, canvas?.height),
+        frames: Array.isArray(canvas?.frames)
+          ? canvas.frames.map((frame, frameIndex) => ({
+            id: typeof frame?.id === 'string' ? frame.id : `frame-${canvasIndex}-${frameIndex}`,
+            name: typeof frame?.name === 'string' ? frame.name : getDefaultFrameName(frameIndex + 1),
+            duration: Math.max(1, Math.round(Number(frame?.duration) || (1000 / 12))),
+            voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frame?.voxelPreviewYawDeg),
+            voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frame?.voxelPreviewPitchDeg),
+            layers: Array.isArray(frame?.layers)
+              ? frame.layers.map((layer, layerIndex) => ({
+                id: typeof layer?.id === 'string' ? layer.id : `layer-${canvasIndex}-${frameIndex}-${layerIndex}`,
+                type: isSimulationLayer(layer) ? SIM_LAYER_TYPE : 'raster',
+                name: typeof layer?.name === 'string' ? layer.name : getDefaultLayerName(layerIndex + 1),
+                visible: layer?.visible !== false,
+                opacity: normalizeLayerOpacity(layer?.opacity),
+                blendMode: normalizeLayerBlendMode(layer?.blendMode),
+              }))
+              : [],
+          }))
           : [],
       })),
     };
+  }
+
+  function createSharedProjectLayerFromStructureSnapshot(layerSnapshot, width, height, existingLayer = null) {
+    const nextLayer = existingLayer
+      ? cloneGenericLayer(existingLayer, width, height, { copyPixels: true })
+      : (layerSnapshot?.type === SIM_LAYER_TYPE
+        ? createSimulationLayer(layerSnapshot?.name || getDefaultLayerName(1), width, height)
+        : createLayer(layerSnapshot?.name || getDefaultLayerName(1), width, height));
+    nextLayer.id = typeof layerSnapshot?.id === 'string' && layerSnapshot.id.trim()
+      ? layerSnapshot.id.trim()
+      : (nextLayer.id || (crypto.randomUUID ? crypto.randomUUID() : `layer-${Math.random().toString(36).slice(2)}`));
+    nextLayer.name = typeof layerSnapshot?.name === 'string' && layerSnapshot.name.trim()
+      ? layerSnapshot.name.trim()
+      : nextLayer.name;
+    nextLayer.visible = layerSnapshot?.visible !== false;
+    nextLayer.opacity = normalizeLayerOpacity(layerSnapshot?.opacity);
+    nextLayer.blendMode = normalizeLayerBlendMode(layerSnapshot?.blendMode);
+    return nextLayer;
+  }
+
+  function rebuildSharedProjectCanvasFromStructureSnapshot(canvasSnapshot, existingCanvas = null, fallbackIndex = 1) {
+    const width = clamp(Math.round(Number(canvasSnapshot?.width) || DEFAULT_CANVAS_SIZE), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    const height = clamp(Math.round(Number(canvasSnapshot?.height) || DEFAULT_CANVAS_SIZE), MIN_CANVAS_SIZE, MAX_CANVAS_SIZE);
+    const existingFrames = Array.isArray(existingCanvas?.frames) ? existingCanvas.frames : [];
+    const existingFramesById = new Map(
+      existingFrames
+        .filter(frame => frame && typeof frame.id === 'string' && frame.id.trim())
+        .map(frame => [frame.id.trim(), frame])
+    );
+    const nextFrames = (Array.isArray(canvasSnapshot?.frames) ? canvasSnapshot.frames : []).map((frameSnapshot, frameIndex) => {
+      const frameId = typeof frameSnapshot?.id === 'string' && frameSnapshot.id.trim()
+        ? frameSnapshot.id.trim()
+        : `frame-${fallbackIndex}-${frameIndex}`;
+      const existingFrame = existingFramesById.get(frameId) || null;
+      const existingLayers = Array.isArray(existingFrame?.layers) ? existingFrame.layers : [];
+      const existingLayersById = new Map(
+        existingLayers
+          .filter(layer => layer && typeof layer.id === 'string' && layer.id.trim())
+          .map(layer => [layer.id.trim(), layer])
+      );
+      return {
+        id: frameId,
+        name: typeof frameSnapshot?.name === 'string' && frameSnapshot.name.trim()
+          ? frameSnapshot.name.trim()
+          : getDefaultFrameName(frameIndex + 1),
+        duration: Math.max(1, Math.round(Number(frameSnapshot?.duration) || (1000 / 12))),
+        voxelPreviewYawDeg: normalizeVoxelPreviewYawDegrees(frameSnapshot?.voxelPreviewYawDeg),
+        voxelPreviewPitchDeg: normalizeVoxelPreviewPitchDegrees(frameSnapshot?.voxelPreviewPitchDeg),
+        layers: (Array.isArray(frameSnapshot?.layers) ? frameSnapshot.layers : []).map((layerSnapshot, layerIndex) => {
+          const layerId = typeof layerSnapshot?.id === 'string' && layerSnapshot.id.trim()
+            ? layerSnapshot.id.trim()
+            : `layer-${fallbackIndex}-${frameIndex}-${layerIndex}`;
+          return createSharedProjectLayerFromStructureSnapshot(
+            { ...layerSnapshot, id: layerId },
+            width,
+            height,
+            existingLayersById.get(layerId) || null
+          );
+        }),
+      };
+    });
+    return createProjectCanvasDocument({
+      id: typeof canvasSnapshot?.id === 'string' && canvasSnapshot.id.trim()
+        ? canvasSnapshot.id.trim()
+        : (existingCanvas?.id || (crypto.randomUUID ? crypto.randomUUID() : `canvas-${Math.random().toString(36).slice(2)}`)),
+      name: typeof canvasSnapshot?.name === 'string' && canvasSnapshot.name.trim()
+        ? canvasSnapshot.name.trim()
+        : (existingCanvas?.name || getDefaultProjectCanvasName(fallbackIndex)),
+      width,
+      height,
+      frames: nextFrames,
+      activeFrame: clamp(
+        Math.round(Number(canvasSnapshot?.activeFrame) || 0),
+        0,
+        Math.max(0, nextFrames.length - 1)
+      ),
+      activeLayer: typeof canvasSnapshot?.activeLayer === 'string' ? canvasSnapshot.activeLayer : '',
+      mirror: normalizeMirrorAxisState(canvasSnapshot?.mirror, width, height),
+    }, { clonePixelData: true, fallbackIndex });
+  }
+
+  function applySharedProjectStructureOp(opRecord, { fromRemote = true } = {}) {
+    const payload = extractSharedProjectOpPayload(opRecord);
+    const canvasSnapshots = Array.isArray(payload?.canvases) ? payload.canvases : [];
+    if (!canvasSnapshots.length) {
+      return false;
+    }
+    const currentCanvases = getProjectCanvasDocuments();
+    const currentCanvasesById = new Map(
+      currentCanvases
+        .filter(canvas => canvas && typeof canvas.id === 'string' && canvas.id.trim())
+        .map(canvas => [canvas.id.trim(), canvas])
+    );
+    const nextCanvases = canvasSnapshots.map((canvasSnapshot, index) => {
+      const canvasId = typeof canvasSnapshot?.id === 'string' ? canvasSnapshot.id.trim() : '';
+      return rebuildSharedProjectCanvasFromStructureSnapshot(
+        canvasSnapshot,
+        currentCanvasesById.get(canvasId) || null,
+        index + 1
+      );
+    });
+    if (!nextCanvases.length) {
+      return false;
+    }
+    projectCanvasStore.canvases = nextCanvases;
+    projectCanvasStore.activeCanvasId = typeof payload?.activeCanvasId === 'string' && nextCanvases.some(canvas => canvas?.id === payload.activeCanvasId)
+      ? payload.activeCanvasId
+      : (nextCanvases[0]?.id || '');
+    syncProjectCanvasSurfaceDocumentRefs();
+    clearPendingMultiAssignmentMoveRequests();
+    normalizeMultiAssignmentsForCurrentDocument();
+    markCanvasDirty();
+    renderFrameList();
+    renderLayerList();
+    renderAllProjectCanvasSurfaces();
+    requestRender();
+    requestOverlayRender();
+    scheduleSessionPersist({ includeSnapshots: false });
+    if (fromRemote) {
+      resetLocalHistoryForSharedCollaborativeRemoteChange();
+    }
+    noteSharedProjectOperationApplied({ opType: 'structure', fromRemote });
+    return true;
   }
 
   function buildSharedProjectPaletteOpPayload(historyLabel = '') {
@@ -54034,8 +54222,11 @@
       || kind === 'canvas-reorder'
       || kind === 'structure'
     ) {
-      queueSharedProjectRefresh({ immediate: true, reason: provisional ? 'structure-broadcast' : 'structure-op', force: true });
-      applied = true;
+      applied = applySharedProjectStructureOp(opRecord, { fromRemote });
+      if (!applied) {
+        queueSharedProjectRefresh({ immediate: true, reason: provisional ? 'structure-broadcast' : 'structure-op', force: true });
+        applied = true;
+      }
     }
     if (applied && opId) {
       sharedProjectSeenOpIds.add(opId);
