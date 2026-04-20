@@ -19389,6 +19389,16 @@
     });
   }
 
+  function getTrackedSharedRecentProjectEntry(projectKey = '') {
+    const resolvedProjectKey = resolveSharedProjectKeyForCurrentState(projectKey);
+    if (!resolvedProjectKey) {
+      return null;
+    }
+    const sharedProjectId = buildSharedRecentProjectId(resolvedProjectKey);
+    const entry = recentProjectsCache.get(sharedProjectId) || null;
+    return isSharedRecentProjectEntry(entry) ? normalizeSharedRecentProjectEntry(entry) : null;
+  }
+
   function getSharedRecentProjectEntry(projectKey = '') {
     return getCurrentSharedRecentProjectEntry(projectKey);
   }
@@ -52304,15 +52314,14 @@
       return false;
     }
     await ensureNoLegacyMultiSessionForSharedProject();
-    const existingAccess = readCurrentMultiProjectAccessInput();
+    const currentTrackedSharedEntry = getTrackedSharedRecentProjectEntry(activeSharedProjectKey || '');
     const currentProjectIsShared = Boolean(
-      isCurrentProjectSharedEntry()
-      && getCurrentSharedRecentProjectEntry(activeSharedProjectKey || existingAccess.projectKey || '')
+      activeSharedProjectKey
+      && isCurrentProjectSharedEntry()
+      && currentTrackedSharedEntry
     );
     const projectKey = normalizeMultiProjectKey(
-      existingAccess.projectKey
-      || (currentProjectIsShared ? activeSharedProjectKey : '')
-      || generateMultiProjectKey()
+      currentProjectIsShared ? activeSharedProjectKey : generateMultiProjectKey()
     );
     if (!projectKey) {
       setMultiStatus(localizeText('共有プロジェクトを作成できませんでした', 'Failed to create shared project'), 'error');
