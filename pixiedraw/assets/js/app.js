@@ -20959,6 +20959,7 @@
         0,
         Math.round(Number(sharedProject.latest_snapshot_revision) || Number(sharedProject.latest_revision) || 0)
       );
+      const latestRevision = Math.max(0, Math.round(Number(sharedProject.latest_revision) || 0));
       const loaded = await loadDocumentFromText(JSON.stringify(sharedSnapshot), null, {
         projectId: buildSharedRecentProjectId(resolvedProjectKey),
         suppressAutosaveStatus: true,
@@ -20969,6 +20970,14 @@
       });
       if (loaded) {
         markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
+        if (!shouldTrustSharedProjectSnapshotRevision(snapshotRevision, latestRevision)) {
+          setActiveSharedProjectSession(
+            resolvedProjectKey,
+            latestRevision,
+            Math.max(0, Math.round(Number(sharedProject.latest_structure_revision) || 0)),
+            sharedProject.id || ''
+          );
+        }
       }
     }
     setActiveAutosaveProjectId(buildSharedRecentProjectId(resolvedProjectKey));
@@ -20984,10 +20993,26 @@
       sharedProject.id || ''
     );
     markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
-    await applySharedProjectOpsSinceRevision(
-      sharedProject,
-      Math.max(0, Math.round(Number(sharedProject.latest_snapshot_revision) || 0))
-    );
+    const sharedSnapshotRevision = Math.max(0, Math.round(Number(sharedProject.latest_snapshot_revision) || 0));
+    const sharedLatestRevision = Math.max(0, Math.round(Number(sharedProject.latest_revision) || 0));
+    if (shouldTrustSharedProjectSnapshotRevision(sharedSnapshotRevision, sharedLatestRevision)) {
+      await applySharedProjectOpsSinceRevision(
+        sharedProject,
+        sharedSnapshotRevision
+      );
+    } else {
+      setActiveSharedProjectSession(
+        resolvedProjectKey,
+        sharedLatestRevision,
+        Math.max(0, Math.round(Number(sharedProject.latest_structure_revision) || 0)),
+        sharedProject.id || ''
+      );
+      console.warn('[shared-realtime] skipped-initial-op-replay-untrusted-snapshot-revision', {
+        projectKey: resolvedProjectKey,
+        snapshotRevision: sharedSnapshotRevision,
+        latestRevision: sharedLatestRevision,
+      });
+    }
     discardPendingSharedLocalOpJournal(resolvedProjectKey).catch(error => {
       console.warn('Failed to discard pending shared local op journal after opening shared project', error);
     });
@@ -56248,6 +56273,18 @@
     return sharedProjectLastAppliedSeq >= targetRevision;
   }
 
+  function shouldTrustSharedProjectSnapshotRevision(snapshotRevision = 0, latestRevision = 0) {
+    const normalizedSnapshotRevision = Math.max(0, Math.round(Number(snapshotRevision) || 0));
+    const normalizedLatestRevision = Math.max(0, Math.round(Number(latestRevision) || 0));
+    if (normalizedLatestRevision <= 0) {
+      return true;
+    }
+    if (normalizedSnapshotRevision <= 0 && normalizedLatestRevision > 0) {
+      return false;
+    }
+    return normalizedSnapshotRevision <= normalizedLatestRevision;
+  }
+
   async function ensureSharedProjectMembership(projectKey, { createIfMissing = false, title = '', inviteToken = '', visibility = 'private' } = {}) {
     if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
       return null;
@@ -56577,6 +56614,7 @@
         0,
         Math.round(Number(project.latest_snapshot_revision) || Number(project.latest_revision) || 0)
       );
+      const trustedSnapshotRevision = shouldTrustSharedProjectSnapshotRevision(snapshotRevision, nextRevision);
       const prefersFreshCanonicalSnapshot = (
         force
         && (
@@ -56646,11 +56684,13 @@
       markActiveSharedProjectDocumentLoaded(activeSharedProjectKey);
       setActiveSharedProjectSession(
         activeSharedProjectKey,
-        snapshotRevision,
+        trustedSnapshotRevision ? snapshotRevision : nextRevision,
         Math.max(0, Math.round(Number(project.latest_snapshot_structure_revision) || Number(project.latest_structure_revision) || 0)),
         project.id || ''
       );
-      const replayedAfterSnapshot = await applySharedProjectOpsSinceRevision(project, snapshotRevision);
+      const replayedAfterSnapshot = trustedSnapshotRevision
+        ? await applySharedProjectOpsSinceRevision(project, snapshotRevision)
+        : false;
       logSharedProjectRealtimeChannelLifecycle('refresh-post-snapshot-ops', {
         caller: 'refreshActiveSharedProjectSnapshot',
         reason: reason || 'refresh',
@@ -56658,6 +56698,7 @@
           force,
           replayedAfterSnapshot,
           snapshotRevision,
+          trustedSnapshotRevision,
           targetRevision: nextRevision,
         },
       });
