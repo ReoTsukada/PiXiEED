@@ -3017,6 +3017,7 @@
   let sharedProjectRefreshTimer = null;
   let sharedProjectRefreshInFlight = false;
   let sharedProjectDeferredRemoteOpsTimer = null;
+  let sharedProjectStructureMismatchTimer = null;
   let sharedProjectLastRefreshQueuedAt = 0;
   let sharedProjectLastRefreshQueuedReason = '';
   let pendingSharedProjectConflictReplay = null;
@@ -8049,6 +8050,7 @@
       window.clearTimeout(sharedProjectRefreshTimer);
       sharedProjectRefreshTimer = null;
     }
+    clearSharedProjectStructureMismatchRecovery();
     sharedProjectLastRefreshQueuedAt = 0;
     sharedProjectLastRefreshQueuedReason = '';
     clearDeferredSharedProjectRemoteOpsDrain();
@@ -8518,18 +8520,21 @@
   function handleMultiVisibilityChange() {
     if (document.visibilityState === 'visible') {
       requestMultiResync('visibility');
-      queueSharedProjectRefresh({ immediate: true, reason: 'visibility' });
+      pollSharedProjectRealtimeOpsRescue({ reason: 'visibility-op-poll' }).catch(() => {});
+      scheduleSharedProjectStructureMismatchRecovery(64);
     }
   }
 
   function handleMultiWindowFocus() {
     requestMultiResync('focus');
-    queueSharedProjectRefresh({ immediate: true, reason: 'focus' });
+    pollSharedProjectRealtimeOpsRescue({ reason: 'focus-op-poll' }).catch(() => {});
+    scheduleSharedProjectStructureMismatchRecovery(64);
   }
 
   function handleMultiOnline() {
     requestMultiResync('online');
-    queueSharedProjectRefresh({ immediate: true, reason: 'online' });
+    pollSharedProjectRealtimeOpsRescue({ reason: 'online-op-poll' }).catch(() => {});
+    scheduleSharedProjectStructureMismatchRecovery(64);
   }
 
   function persistCriticalSessionStateForNavigation() {
@@ -11152,6 +11157,7 @@
     let { control1, control2 } = curveBuilder;
     control1 = control1 || { ...start };
     control2 = control2 || { ...end };
+    captureSharedProjectCurveCommand(start, control1, control2, end, pointerState.surface || null);
     const points = sampleCubicBezierPoints(start, control1, control2, end);
     forEachCurveStrokePixel(points, (x, y) => stampBrush(layer, x, y));
     requestRender();
@@ -46144,6 +46150,7 @@
       storeSelectionInClipboard(clipboardMoveState);
       beginHistory('selectionCut');
       clearSelectionSourcePixels(finalizedMoveState);
+      captureSharedProjectRegionCommand(finalizedMoveState.bounds, pointerState.surface || null, 'selectionCut');
       commitHistory();
       clearSelection();
       requestOverlayRender();
@@ -46159,6 +46166,7 @@
     state.pendingPasteMoveState = null;
     beginHistory('selectionCut');
     clearSelectionSourcePixels(moveState);
+    captureSharedProjectRegionCommand(moveState.bounds, pointerState.surface || null, 'selectionCut');
     commitHistory();
     requestOverlayRender();
     updateCanvasControlButtons();
@@ -46251,6 +46259,7 @@
       state.pendingPasteMoveState = null;
       rollbackPendingHistory({ reRender: false });
     } else {
+      captureSharedProjectRegionCommand(result.bounds, pointerState.surface || null, 'selectionPaste');
       commitHistory();
     }
     updateCanvasControlButtons();
@@ -46449,6 +46458,21 @@
       }
     }
 
+    const unionBounds = result.bounds
+      ? {
+        x0: Math.min(Number(moveState.bounds?.x0) || 0, Number(result.bounds.x0) || 0),
+        y0: Math.min(Number(moveState.bounds?.y0) || 0, Number(result.bounds.y0) || 0),
+        x1: Math.max(Number(moveState.bounds?.x1) || 0, Number(result.bounds.x1) || 0),
+        y1: Math.max(Number(moveState.bounds?.y1) || 0, Number(result.bounds.y1) || 0),
+      }
+      : moveState.bounds;
+    captureSharedProjectRegionCommand(
+      unionBounds,
+      pointerState.surface || null,
+      moveState.transformRotationDeg || moveState.transformFlipHorizontal || moveState.transformFlipVertical
+        ? 'selectionTransform'
+        : 'selectionMove'
+    );
     markHistoryDirty();
     requestRender();
     requestOverlayRender();
@@ -53646,6 +53670,59 @@
     }
   }
 
+  function clearSharedProjectStructureMismatchRecovery() {
+    if (sharedProjectStructureMismatchTimer !== null) {
+      window.clearTimeout(sharedProjectStructureMismatchTimer);
+      sharedProjectStructureMismatchTimer = null;
+    }
+  }
+
+  function scheduleSharedProjectStructureMismatchRecovery(delayMs = 96) {
+    if (sharedProjectStructureMismatchTimer !== null || !activeSharedProjectKey) {
+      return;
+    }
+    sharedProjectStructureMismatchTimer = window.setTimeout(() => {
+      sharedProjectStructureMismatchTimer = null;
+      if (!activeSharedProjectKey) {
+        return;
+      }
+      const initialReplayCount = replayDeferredSharedProjectProvisionalOps();
+      if (!sharedProjectPendingProvisionalOps.size) {
+        return;
+      }
+      pollSharedProjectRealtimeOpsRescue({ reason: 'structure-mismatch-op-poll' })
+        .then(recovered => {
+          const replayedAfterPoll = replayDeferredSharedProjectProvisionalOps();
+          if (
+            recovered
+            || initialReplayCount > 0
+            || replayedAfterPoll > 0
+            || !sharedProjectPendingProvisionalOps.size
+          ) {
+            if (sharedProjectPendingProvisionalOps.size) {
+              scheduleSharedProjectStructureMismatchRecovery(Math.max(96, delayMs));
+            }
+            return;
+          }
+          queueSharedProjectRefresh({
+            immediate: false,
+            reason: 'canonical-resync-structure-mismatch',
+            force: true,
+          });
+        })
+        .catch(() => {
+          if (!sharedProjectPendingProvisionalOps.size) {
+            return;
+          }
+          queueSharedProjectRefresh({
+            immediate: false,
+            reason: 'canonical-resync-structure-mismatch',
+            force: true,
+          });
+        });
+    }, Math.max(48, Math.round(Number(delayMs) || 96)));
+  }
+
   function scheduleDeferredSharedProjectRemoteOpsDrain(delayMs = 96) {
     if (sharedProjectDeferredRemoteOpsTimer !== null || !activeSharedProjectKey) {
       return;
@@ -53854,6 +53931,101 @@
     };
   }
 
+  function captureSharedProjectCurveCommand(start, control1, control2, end, interactionSurface = null) {
+    if (!start || !end || !control1 || !control2) {
+      clearSharedProjectInFlightStroke();
+      return;
+    }
+    const baseCommand = buildSharedProjectBaseDrawCommand('curve', interactionSurface);
+    if (!baseCommand) {
+      clearSharedProjectInFlightStroke();
+      return;
+    }
+    sharedProjectInFlightStroke = {
+      ...baseCommand,
+      command: 'curve',
+      historyLabel: 'curve',
+      start: {
+        x: Math.round(Number(start.x) || 0),
+        y: Math.round(Number(start.y) || 0),
+      },
+      control1: {
+        x: Math.round(Number(control1.x) || 0),
+        y: Math.round(Number(control1.y) || 0),
+      },
+      control2: {
+        x: Math.round(Number(control2.x) || 0),
+        y: Math.round(Number(control2.y) || 0),
+      },
+      end: {
+        x: Math.round(Number(end.x) || 0),
+        y: Math.round(Number(end.y) || 0),
+      },
+    };
+  }
+
+  function captureSharedProjectRegionCommand(bounds, interactionSurface = null, historyLabel = 'selectionTransform') {
+    const normalizedBounds = bounds && typeof bounds === 'object'
+      ? {
+        x0: Math.round(Number(bounds.x0) || 0),
+        y0: Math.round(Number(bounds.y0) || 0),
+        x1: Math.round(Number(bounds.x1) || 0),
+        y1: Math.round(Number(bounds.y1) || 0),
+      }
+      : null;
+    if (
+      !normalizedBounds
+      || normalizedBounds.x1 < normalizedBounds.x0
+      || normalizedBounds.y1 < normalizedBounds.y0
+    ) {
+      clearSharedProjectInFlightStroke();
+      return;
+    }
+    const baseCommand = buildSharedProjectBaseDrawCommand('region', interactionSurface);
+    if (!baseCommand) {
+      clearSharedProjectInFlightStroke();
+      return;
+    }
+    const target = resolveSharedProjectDrawCommandTarget(baseCommand);
+    if (!target) {
+      clearSharedProjectInFlightStroke();
+      return;
+    }
+    const width = normalizedBounds.x1 - normalizedBounds.x0 + 1;
+    const height = normalizedBounds.y1 - normalizedBounds.y0 + 1;
+    const indices = [];
+    const direct = [];
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const canvasX = normalizedBounds.x0 + x;
+        const canvasY = normalizedBounds.y0 + y;
+        const canvasIndex = (canvasY * target.targetCanvas.width) + canvasX;
+        const base = canvasIndex * 4;
+        indices.push(Math.round(Number(target.layer.indices?.[canvasIndex]) || -1));
+        if (target.layer.direct instanceof Uint8ClampedArray) {
+          direct.push(
+            target.layer.direct[base] || 0,
+            target.layer.direct[base + 1] || 0,
+            target.layer.direct[base + 2] || 0,
+            target.layer.direct[base + 3] || 0
+          );
+        } else {
+          direct.push(0, 0, 0, 0);
+        }
+      }
+    }
+    sharedProjectInFlightStroke = {
+      ...baseCommand,
+      command: 'region',
+      historyLabel: String(historyLabel || 'selectionTransform'),
+      bounds: normalizedBounds,
+      width,
+      height,
+      indices,
+      direct,
+    };
+  }
+
   function appendSharedProjectStrokePoint(position) {
     if (!sharedProjectInFlightStroke || !position) {
       return;
@@ -53916,6 +54088,32 @@
       }
       payload.point = { x: Math.round(Number(drawCommand.point.x) || 0), y: Math.round(Number(drawCommand.point.y) || 0) };
       payload.fillMode = normalizeSelectSameMode(drawCommand.fillMode, SELECT_SAME_MODE_CONNECTED);
+      return payload;
+    }
+    if (drawCommand.command === 'curve') {
+      if (!drawCommand.start || !drawCommand.control1 || !drawCommand.control2 || !drawCommand.end) {
+        return null;
+      }
+      payload.start = { x: Math.round(Number(drawCommand.start.x) || 0), y: Math.round(Number(drawCommand.start.y) || 0) };
+      payload.control1 = { x: Math.round(Number(drawCommand.control1.x) || 0), y: Math.round(Number(drawCommand.control1.y) || 0) };
+      payload.control2 = { x: Math.round(Number(drawCommand.control2.x) || 0), y: Math.round(Number(drawCommand.control2.y) || 0) };
+      payload.end = { x: Math.round(Number(drawCommand.end.x) || 0), y: Math.round(Number(drawCommand.end.y) || 0) };
+      return payload;
+    }
+    if (drawCommand.command === 'region') {
+      if (!drawCommand.bounds || !drawCommand.width || !drawCommand.height) {
+        return null;
+      }
+      payload.bounds = {
+        x0: Math.round(Number(drawCommand.bounds.x0) || 0),
+        y0: Math.round(Number(drawCommand.bounds.y0) || 0),
+        x1: Math.round(Number(drawCommand.bounds.x1) || 0),
+        y1: Math.round(Number(drawCommand.bounds.y1) || 0),
+      };
+      payload.width = Math.max(1, Math.round(Number(drawCommand.width) || 1));
+      payload.height = Math.max(1, Math.round(Number(drawCommand.height) || 1));
+      payload.indices = Array.isArray(drawCommand.indices) ? drawCommand.indices.map(value => Math.round(Number(value) || -1)) : [];
+      payload.direct = Array.isArray(drawCommand.direct) ? drawCommand.direct.map(value => clamp(Math.round(Number(value) || 0), 0, 255)) : [];
       return payload;
     }
     return null;
@@ -54220,6 +54418,12 @@
       if (opPayload?.command === 'fill') {
         return 'fill-command';
       }
+      if (opPayload?.command === 'curve') {
+        return 'curve-command';
+      }
+      if (opPayload?.command === 'region') {
+        return 'region-command';
+      }
       if (normalizedLabel === 'fill') {
         return 'fill';
       }
@@ -54359,7 +54563,11 @@
           ? 'stroke'
           : (opRecord?.kind === 'shape-command'
             ? 'shape'
-            : (opRecord?.kind === 'fill-command' ? 'fill' : ''))
+            : (opRecord?.kind === 'fill-command'
+              ? 'fill'
+              : (opRecord?.kind === 'curve-command'
+                ? 'curve'
+                : (opRecord?.kind === 'region-command' ? 'region' : ''))))
       );
     const pixelCount = Math.max(0, Math.floor(Number(payload?.pixelCount) || 0));
     const patch = payload?.patch && typeof payload.patch === 'object' ? payload.patch : null;
@@ -54379,6 +54587,20 @@
     } else if (drawCommandType === 'fill') {
       if (!canvasId || !layerId || !payload?.point) {
         return { ok: false, reason: 'missing-fill-fields', canvasId, layerId, frameIndex, pixelCount: 0 };
+      }
+    } else if (drawCommandType === 'curve') {
+      if (!canvasId || !layerId || !payload?.start || !payload?.control1 || !payload?.control2 || !payload?.end) {
+        return { ok: false, reason: 'missing-curve-fields', canvasId, layerId, frameIndex, pixelCount: 0 };
+      }
+    } else if (drawCommandType === 'region') {
+      if (
+        !canvasId
+        || !layerId
+        || !payload?.bounds
+        || !Number.isFinite(Number(payload?.width))
+        || !Number.isFinite(Number(payload?.height))
+      ) {
+        return { ok: false, reason: 'missing-region-fields', canvasId, layerId, frameIndex, pixelCount: 0 };
       }
     } else if (!canvasId || !layerId || !pixelCount || !patch) {
       return { ok: false, reason: 'missing-patch-fields', canvasId, layerId, frameIndex, pixelCount };
@@ -54434,6 +54656,8 @@
       || normalizedReason === 'missing-stroke-fields'
       || normalizedReason === 'missing-shape-fields'
       || normalizedReason === 'missing-fill-fields'
+      || normalizedReason === 'missing-curve-fields'
+      || normalizedReason === 'missing-region-fields'
     );
   }
 
@@ -54559,6 +54783,35 @@
     return true;
   }
 
+  function applySharedProjectBrushPoint(layer, canvasDoc, command, x, y, brushOffsets = null) {
+    if (!layer || !canvasDoc) {
+      return false;
+    }
+    const offsets = Array.isArray(brushOffsets) && brushOffsets.length
+      ? brushOffsets
+      : getBrushOffsets(command?.brushSize || 1, command?.brushShape || BRUSH_SHAPE_SQUARE);
+    let changed = false;
+    for (let offsetIndex = 0; offsetIndex < offsets.length; offsetIndex += 1) {
+      const offset = offsets[offsetIndex];
+      const ox = Math.round(Number(x) || 0) + Math.round(Number(offset?.dx) || 0);
+      const oy = Math.round(Number(y) || 0) + Math.round(Number(offset?.dy) || 0);
+      const mirroredPoints = getMirroredPointSetForState(ox, oy, {
+        tool: command?.tool || 'pen',
+        includeOriginal: true,
+        mirrorState: command?.mirror,
+        width: canvasDoc.width,
+        height: canvasDoc.height,
+      });
+      for (let mirrorIndex = 0; mirrorIndex < mirroredPoints.length; mirrorIndex += 1) {
+        const mirroredPoint = mirroredPoints[mirrorIndex];
+        if (applySharedProjectStrokePixel(layer, canvasDoc, command, mirroredPoint.x, mirroredPoint.y)) {
+          changed = true;
+        }
+      }
+    }
+    return changed;
+  }
+
   function applySharedProjectStrokeCommand(opRecord, { fromRemote = true } = {}) {
     const payload = extractSharedProjectOpPayload(opRecord);
     const canvasId = typeof payload?.canvasId === 'string' ? payload.canvasId.trim() : '';
@@ -54616,18 +54869,20 @@
         : bresenhamLine(previous.x, previous.y, current.x, current.y);
       for (let lineIndex = 0; lineIndex < linePoints.length; lineIndex += 1) {
         const linePoint = linePoints[lineIndex];
-        const mirroredPoints = getMirroredPointSetForState(linePoint.x, linePoint.y, {
-          tool: command.tool,
-          includeOriginal: true,
-          mirrorState: command.mirror,
-          width: targetCanvas.width,
-          height: targetCanvas.height,
-        });
-        for (let mirrorIndex = 0; mirrorIndex < mirroredPoints.length; mirrorIndex += 1) {
-          const mirroredPoint = mirroredPoints[mirrorIndex];
-          for (let offsetIndex = 0; offsetIndex < brushOffsets.length; offsetIndex += 1) {
-            const offset = brushOffsets[offsetIndex];
-            applyDirtyPoint(mirroredPoint.x + offset.dx, mirroredPoint.y + offset.dy);
+        for (let offsetIndex = 0; offsetIndex < brushOffsets.length; offsetIndex += 1) {
+          const offset = brushOffsets[offsetIndex];
+          const ox = linePoint.x + offset.dx;
+          const oy = linePoint.y + offset.dy;
+          const mirroredPoints = getMirroredPointSetForState(ox, oy, {
+            tool: command.tool,
+            includeOriginal: true,
+            mirrorState: command.mirror,
+            width: targetCanvas.width,
+            height: targetCanvas.height,
+          });
+          for (let mirrorIndex = 0; mirrorIndex < mirroredPoints.length; mirrorIndex += 1) {
+            const mirroredPoint = mirroredPoints[mirrorIndex];
+            applyDirtyPoint(mirroredPoint.x, mirroredPoint.y);
           }
         }
       }
@@ -54672,24 +54927,6 @@
     return { targetCanvas, frame, layer, canvasId, layerId, frameIndex };
   }
 
-  function applySharedProjectPointToLayer(layer, targetCanvas, command, x, y) {
-    const mirroredPoints = getMirroredPointSetForState(x, y, {
-      tool: command.tool,
-      includeOriginal: true,
-      mirrorState: command.mirror,
-      width: targetCanvas.width,
-      height: targetCanvas.height,
-    });
-    let changed = false;
-    for (let i = 0; i < mirroredPoints.length; i += 1) {
-      const point = mirroredPoints[i];
-      if (applySharedProjectStrokePixel(layer, targetCanvas, command, point.x, point.y)) {
-        changed = true;
-      }
-    }
-    return changed;
-  }
-
   function applySharedProjectShapeCommand(opRecord, { fromRemote = true } = {}) {
     const payload = extractSharedProjectOpPayload(opRecord);
     const target = resolveSharedProjectDrawCommandTarget(payload);
@@ -54721,15 +54958,13 @@
     };
     let changed = false;
     const plotPoint = (x, y) => {
-      for (let offsetIndex = 0; offsetIndex < brushOffsets.length; offsetIndex += 1) {
-        const offset = brushOffsets[offsetIndex];
-        if (applySharedProjectPointToLayer(target.layer, target.targetCanvas, command, x + offset.dx, y + offset.dy)) {
-          changed = true;
-          dirtyRect.x0 = Math.min(dirtyRect.x0, x + offset.dx);
-          dirtyRect.y0 = Math.min(dirtyRect.y0, y + offset.dy);
-          dirtyRect.x1 = Math.max(dirtyRect.x1, x + offset.dx);
-          dirtyRect.y1 = Math.max(dirtyRect.y1, y + offset.dy);
-        }
+      if (applySharedProjectBrushPoint(target.layer, target.targetCanvas, command, x, y, brushOffsets)) {
+        changed = true;
+        const brushRadius = Math.max(1, Math.ceil(command.brushSize || 1));
+        dirtyRect.x0 = Math.min(dirtyRect.x0, x - brushRadius);
+        dirtyRect.y0 = Math.min(dirtyRect.y0, y - brushRadius);
+        dirtyRect.x1 = Math.max(dirtyRect.x1, x + brushRadius);
+        dirtyRect.y1 = Math.max(dirtyRect.y1, y + brushRadius);
       }
     };
     const normalizedTool = typeof command.tool === 'string' ? command.tool : '';
@@ -54847,7 +55082,7 @@
     };
     let changed = false;
     const applyPoint = (px, py) => {
-      if (applySharedProjectPointToLayer(target.layer, target.targetCanvas, command, px, py)) {
+      if (applySharedProjectBrushPoint(target.layer, target.targetCanvas, command, px, py, [{ dx: 0, dy: 0 }])) {
         changed = true;
         dirtyRect.x0 = Math.min(dirtyRect.x0, px);
         dirtyRect.y0 = Math.min(dirtyRect.y0, py);
@@ -54891,6 +55126,155 @@
     applyIncomingSharedProjectVisualResult(target.targetCanvas, {
       full: false,
       dirtyRect: changed ? dirtyRect : null,
+    });
+    markDocumentUnsavedChange();
+    noteSharedProjectOperationApplied({ opType: 'draw', fromRemote });
+    return true;
+  }
+
+  function applySharedProjectCurveCommand(opRecord, { fromRemote = true } = {}) {
+    const payload = extractSharedProjectOpPayload(opRecord);
+    const target = resolveSharedProjectDrawCommandTarget(payload);
+    if (!target || !payload?.start || !payload?.control1 || !payload?.control2 || !payload?.end) {
+      return false;
+    }
+    const command = {
+      ...payload,
+      brushShape: normalizeBrushShape(payload?.brushShape, BRUSH_SHAPE_SQUARE),
+      brushSize: clamp(Math.round(Number(payload?.brushSize) || 1), 1, 64),
+      mirror: normalizeMirrorAxisState(payload?.mirror, target.targetCanvas.width, target.targetCanvas.height),
+    };
+    const brushOffsets = Array.isArray(payload?.customBrushOffsets) && payload.customBrushOffsets.length
+      ? payload.customBrushOffsets.map(offset => ({
+        dx: Math.round(Number(offset?.dx) || 0),
+        dy: Math.round(Number(offset?.dy) || 0),
+      }))
+      : getBrushOffsets(command.brushSize, command.brushShape);
+    const start = { x: Math.round(Number(payload.start.x) || 0), y: Math.round(Number(payload.start.y) || 0) };
+    const control1 = { x: Math.round(Number(payload.control1.x) || 0), y: Math.round(Number(payload.control1.y) || 0) };
+    const control2 = { x: Math.round(Number(payload.control2.x) || 0), y: Math.round(Number(payload.control2.y) || 0) };
+    const end = { x: Math.round(Number(payload.end.x) || 0), y: Math.round(Number(payload.end.y) || 0) };
+    const dirtyRect = {
+      x0: Number.POSITIVE_INFINITY,
+      y0: Number.POSITIVE_INFINITY,
+      x1: Number.NEGATIVE_INFINITY,
+      y1: Number.NEGATIVE_INFINITY,
+    };
+    let changed = false;
+    const points = sampleCubicBezierPoints(start, control1, control2, end);
+    forEachCurveStrokePixel(points, (x, y) => {
+      if (applySharedProjectBrushPoint(target.layer, target.targetCanvas, command, x, y, brushOffsets)) {
+        changed = true;
+        const brushRadius = Math.max(1, Math.ceil(command.brushSize || 1));
+        dirtyRect.x0 = Math.min(dirtyRect.x0, x - brushRadius);
+        dirtyRect.y0 = Math.min(dirtyRect.y0, y - brushRadius);
+        dirtyRect.x1 = Math.max(dirtyRect.x1, x + brushRadius);
+        dirtyRect.y1 = Math.max(dirtyRect.y1, y + brushRadius);
+      }
+    });
+    if (!changed) {
+      return false;
+    }
+    const pixelCount = Math.max(
+      0,
+      Math.floor(Number(target.targetCanvas.width) || 0) * Math.floor(Number(target.targetCanvas.height) || 0)
+    );
+    const snapshotKey = buildSharedProjectLayerSnapshotKey(target.canvasId, target.frameIndex, target.layerId);
+    const nextSnapshot = captureLayerPatchSnapshot(target.layer, pixelCount);
+    if (snapshotKey && nextSnapshot) {
+      sharedProjectLayerSnapshots.set(snapshotKey, nextSnapshot);
+    }
+    applyIncomingSharedProjectVisualResult(target.targetCanvas, {
+      full: false,
+      dirtyRect,
+    });
+    markDocumentUnsavedChange();
+    noteSharedProjectOperationApplied({ opType: 'draw', fromRemote });
+    return true;
+  }
+
+  function applySharedProjectRegionCommand(opRecord, { fromRemote = true } = {}) {
+    const payload = extractSharedProjectOpPayload(opRecord);
+    const target = resolveSharedProjectDrawCommandTarget(payload);
+    const bounds = payload?.bounds && typeof payload.bounds === 'object' ? payload.bounds : null;
+    const width = Math.max(1, Math.round(Number(payload?.width) || 0));
+    const height = Math.max(1, Math.round(Number(payload?.height) || 0));
+    const indices = Array.isArray(payload?.indices) ? payload.indices : null;
+    const direct = Array.isArray(payload?.direct) ? payload.direct : null;
+    if (!target || !bounds || !indices || !direct || indices.length < (width * height) || direct.length < (width * height * 4)) {
+      return false;
+    }
+    const x0 = Math.round(Number(bounds.x0) || 0);
+    const y0 = Math.round(Number(bounds.y0) || 0);
+    let targetDirect = target.layer.direct instanceof Uint8ClampedArray ? target.layer.direct : null;
+    let changed = false;
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const canvasX = x0 + x;
+        const canvasY = y0 + y;
+        if (
+          canvasX < 0
+          || canvasY < 0
+          || canvasX >= target.targetCanvas.width
+          || canvasY >= target.targetCanvas.height
+        ) {
+          continue;
+        }
+        const sourceIndex = (y * width) + x;
+        const sourceBase = sourceIndex * 4;
+        const canvasIndex = (canvasY * target.targetCanvas.width) + canvasX;
+        const canvasBase = canvasIndex * 4;
+        const nextPaletteIndex = Math.round(Number(indices[sourceIndex]) || -1);
+        const nextR = clamp(Math.round(Number(direct[sourceBase]) || 0), 0, 255);
+        const nextG = clamp(Math.round(Number(direct[sourceBase + 1]) || 0), 0, 255);
+        const nextB = clamp(Math.round(Number(direct[sourceBase + 2]) || 0), 0, 255);
+        const nextA = clamp(Math.round(Number(direct[sourceBase + 3]) || 0), 0, 255);
+        const previousPaletteIndex = Math.round(Number(target.layer.indices[canvasIndex]) || -1);
+        const previousDirect = target.layer.direct instanceof Uint8ClampedArray ? target.layer.direct : null;
+        const prevR = previousDirect ? previousDirect[canvasBase] : 0;
+        const prevG = previousDirect ? previousDirect[canvasBase + 1] : 0;
+        const prevB = previousDirect ? previousDirect[canvasBase + 2] : 0;
+        const prevA = previousDirect ? previousDirect[canvasBase + 3] : 0;
+        if (
+          previousPaletteIndex === nextPaletteIndex
+          && prevR === nextR
+          && prevG === nextG
+          && prevB === nextB
+          && prevA === nextA
+        ) {
+          continue;
+        }
+        target.layer.indices[canvasIndex] = nextPaletteIndex;
+        if (!targetDirect) {
+          targetDirect = ensureLayerDirect(target.layer);
+        }
+        targetDirect[canvasBase] = nextR;
+        targetDirect[canvasBase + 1] = nextG;
+        targetDirect[canvasBase + 2] = nextB;
+        targetDirect[canvasBase + 3] = nextA;
+        changed = true;
+      }
+    }
+    if (!changed) {
+      return false;
+    }
+    const pixelCount = Math.max(
+      0,
+      Math.floor(Number(target.targetCanvas.width) || 0) * Math.floor(Number(target.targetCanvas.height) || 0)
+    );
+    const snapshotKey = buildSharedProjectLayerSnapshotKey(target.canvasId, target.frameIndex, target.layerId);
+    const nextSnapshot = captureLayerPatchSnapshot(target.layer, pixelCount);
+    if (snapshotKey && nextSnapshot) {
+      sharedProjectLayerSnapshots.set(snapshotKey, nextSnapshot);
+    }
+    applyIncomingSharedProjectVisualResult(target.targetCanvas, {
+      full: false,
+      dirtyRect: {
+        x0,
+        y0,
+        x1: x0 + width - 1,
+        y1: y0 + height - 1,
+      },
     });
     markDocumentUnsavedChange();
     noteSharedProjectOperationApplied({ opType: 'draw', fromRemote });
@@ -55000,6 +55384,8 @@
       || kind === 'stroke'
       || kind === 'shape-command'
       || kind === 'fill-command'
+      || kind === 'curve-command'
+      || kind === 'region-command'
       || kind === 'layer-patch'
       || kind === 'fill'
       || kind === 'selection-transform'
@@ -55282,6 +55668,26 @@
       }
       return replayed;
     }
+    if (payload?.command === 'curve') {
+      const replayed = applySharedProjectCurveCommand({ payload }, { fromRemote: false });
+      if (replayed) {
+        scheduleSharedProjectCheckpoint({
+          immediate: shouldCreateSharedProjectCheckpoint('draw'),
+          historyLabel: historyLabel || 'sharedConflictReplay',
+        });
+      }
+      return replayed;
+    }
+    if (payload?.command === 'region') {
+      const replayed = applySharedProjectRegionCommand({ payload }, { fromRemote: false });
+      if (replayed) {
+        scheduleSharedProjectCheckpoint({
+          immediate: shouldCreateSharedProjectCheckpoint('draw'),
+          historyLabel: historyLabel || 'sharedConflictReplay',
+        });
+      }
+      return replayed;
+    }
     const canvasId = typeof payload?.canvasId === 'string' ? payload.canvasId.trim() : '';
     const layerId = typeof payload?.layerId === 'string' ? payload.layerId.trim() : '';
     const frameIndex = Math.max(0, Math.round(Number(payload?.frameIndex) || 0));
@@ -55534,11 +55940,7 @@
         }
         if (!sharedProjectRemoteApplyFailureKeys.has(failureKey)) {
           sharedProjectRemoteApplyFailureKeys.add(failureKey);
-          queueSharedProjectRefresh({
-            immediate: true,
-            reason: 'canonical-resync-structure-mismatch',
-            force: true,
-          });
+          scheduleSharedProjectStructureMismatchRecovery();
         }
       }
       if (
@@ -55574,7 +55976,11 @@
         ? applySharedProjectShapeCommand(opRecord, { fromRemote })
         : (payload?.command === 'fill' || opRecord?.kind === 'fill-command'
           ? applySharedProjectFillCommand(opRecord, { fromRemote })
-          : applyLayerPatch(opRecord, { fromRemote })));
+          : (payload?.command === 'curve' || opRecord?.kind === 'curve-command'
+            ? applySharedProjectCurveCommand(opRecord, { fromRemote })
+            : (payload?.command === 'region' || opRecord?.kind === 'region-command'
+              ? applySharedProjectRegionCommand(opRecord, { fromRemote })
+              : applyLayerPatch(opRecord, { fromRemote })))));
     if (!applied) {
       console.debug('[shared-realtime] draw-apply-failed', {
         provisional,
@@ -57105,8 +57511,8 @@
               return;
             }
             if (nextStructureRevision > activeSharedProjectStructureRevision) {
-              // structure changes still use stronger synchronization
-              queueSharedProjectRefresh({ immediate: true, reason: 'realtime-structure', force: true });
+              scheduleSharedProjectStructureMismatchRecovery(64);
+              queueSharedProjectRefresh({ immediate: false, reason: 'realtime-structure', force: true });
               return;
             }
             if (!projectId && nextRevision > sharedProjectLastAppliedSeq + 1) {
