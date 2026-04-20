@@ -3027,6 +3027,7 @@
   let sharedProjectPendingLocalOps = [];
   let sharedProjectLastAppliedSeq = 0;
   const sharedProjectPendingRemoteOps = new Map();
+  const sharedProjectPendingProvisionalOps = new Map();
   const sharedProjectSeenOpIds = new Set();
   const sharedProjectSeenOpSeqById = new Map();
   const sharedProjectRemoteApplyFailureKeys = new Set();
@@ -8028,6 +8029,7 @@
     sharedProjectLastRealtimeActivityAt = 0;
     sharedProjectPendingLocalOps = [];
     sharedProjectPendingRemoteOps.clear();
+    sharedProjectPendingProvisionalOps.clear();
     sharedProjectSeenOpIds.clear();
     sharedProjectSeenOpSeqById.clear();
     sharedProjectInFlightStroke = null;
@@ -8330,6 +8332,7 @@
     if (projectChanged) {
       activeSharedProjectDocumentLoaded = false;
       sharedProjectPendingRemoteOps.clear();
+      sharedProjectPendingProvisionalOps.clear();
       sharedProjectSeenOpIds.clear();
       sharedProjectSeenOpSeqById.clear();
       sharedProjectRemoteApplyFailureKeys.clear();
@@ -43642,6 +43645,7 @@
     } else if (activeTool === 'line' || activeTool === 'rect' || activeTool === 'rectFill' || activeTool === 'ellipse' || activeTool === 'ellipseFill') {
       pointerState.preview = { start: position, end: position, points: [position] };
     } else {
+      beginSharedProjectStrokeCapture(activeTool, position, interactionSurface);
       applyBrushStroke(position.x, position.y, position.x, position.y);
     }
 
@@ -43778,6 +43782,7 @@
     pointerState.path.push(position);
 
     if (pointerState.tool === 'pen' || pointerState.tool === 'eraser') {
+      appendSharedProjectStrokePoint(position);
       applyBrushStroke(pointerState.last.x, pointerState.last.y, position.x, position.y);
       pointerState.last = position;
     } else if (pointerState.tool === 'fill') {
@@ -43980,6 +43985,7 @@
 
     if (HISTORY_DRAW_TOOLS.has(tool)) {
       commitHistory();
+      clearSharedProjectInFlightStroke();
     } else if (tool === 'selectSame') {
       const target = pointerState.current || pointerState.start;
       if (target) {
@@ -44046,10 +44052,12 @@
       if (pointerState.tool === 'fill') {
         abortActivePointerInteraction({ commitHistory: false });
         rollbackPendingHistory({ reRender: false });
+        clearSharedProjectInFlightStroke();
         requestOverlayRender();
         return;
       }
       abortActivePointerInteraction();
+      clearSharedProjectInFlightStroke();
     }
   }
 
@@ -53709,9 +53717,123 @@
     return `${normalizedCanvasId}\u0000${normalizedFrameIndex}\u0000${normalizedLayerId}`;
   }
 
+  function clearSharedProjectInFlightStroke() {
+    sharedProjectInFlightStroke = null;
+  }
+
+  function normalizeSharedProjectStrokePoints(points) {
+    if (!Array.isArray(points) || !points.length) {
+      return [];
+    }
+    const normalized = [];
+    for (let i = 0; i < points.length; i += 1) {
+      const point = points[i];
+      const x = Math.round(Number(point?.x));
+      const y = Math.round(Number(point?.y));
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        continue;
+      }
+      const previous = normalized[normalized.length - 1];
+      if (previous && previous.x === x && previous.y === y) {
+        continue;
+      }
+      normalized.push({ x, y });
+    }
+    return normalized;
+  }
+
+  function beginSharedProjectStrokeCapture(tool, position, interactionSurface = null) {
+    const normalizedTool = typeof tool === 'string' ? tool.trim() : '';
+    if ((normalizedTool !== 'pen' && normalizedTool !== 'eraser') || !position) {
+      clearSharedProjectInFlightStroke();
+      return;
+    }
+    const canvasDoc = getActiveProjectCanvasDocument();
+    const canvasId = interactionSurface?.canvasDocId || canvasDoc?.id || '';
+    const frameIndex = clamp(
+      Math.round(Number(canvasDoc?.activeFrame ?? state.activeFrame) || 0),
+      0,
+      Math.max(0, (canvasDoc?.frames?.length || 1) - 1)
+    );
+    const frame = Array.isArray(canvasDoc?.frames) ? canvasDoc.frames[frameIndex] : null;
+    const layerId = canvasDoc?.activeLayer || state.activeLayer || '';
+    const layer = Array.isArray(frame?.layers)
+      ? (frame.layers.find(entry => entry?.id === layerId) || null)
+      : null;
+    if (!canvasId || !layer?.id) {
+      clearSharedProjectInFlightStroke();
+      return;
+    }
+    const colorMode = isRgbColorMode() ? 'rgb' : 'palette';
+    const paletteIndex = resolveDrawPaletteIndex(pointerState.drawPaletteIndex);
+    const rgba = normalizeColorValue(getActiveDrawColor(undefined, paletteIndex));
+    sharedProjectInFlightStroke = {
+      tool: normalizedTool,
+      canvasId,
+      frameIndex,
+      layerId: layer.id,
+      brushSize: clamp(Math.round(Number(state.brushSize) || 1), 1, 64),
+      brushShape: getEffectiveBrushShape(),
+      customBrushOffsets: hasCustomBrushData() ? getBrushOffsets(state.brushSize, BRUSH_SHAPE_CUSTOM) : null,
+      colorMode,
+      paletteIndex,
+      rgba,
+      mirror: normalizeMirrorAxisState(canvasDoc?.mirror || state.mirror, canvasDoc?.width || state.width, canvasDoc?.height || state.height),
+      paletteIsolation: Boolean(isMultiPaletteIsolationEnabled()),
+      points: normalizeSharedProjectStrokePoints([position]),
+    };
+  }
+
+  function appendSharedProjectStrokePoint(position) {
+    if (!sharedProjectInFlightStroke || !position) {
+      return;
+    }
+    sharedProjectInFlightStroke.points = normalizeSharedProjectStrokePoints([
+      ...(Array.isArray(sharedProjectInFlightStroke.points) ? sharedProjectInFlightStroke.points : []),
+      position,
+    ]);
+  }
+
+  function buildSharedProjectStrokeCommandPayload(historyLabel = '') {
+    const normalizedLabel = String(historyLabel || '').trim();
+    if ((normalizedLabel !== 'pen' && normalizedLabel !== 'eraser') || !sharedProjectInFlightStroke) {
+      return null;
+    }
+    const stroke = sharedProjectInFlightStroke;
+    const points = normalizeSharedProjectStrokePoints(stroke.points);
+    if (!stroke.canvasId || !stroke.layerId || !points.length) {
+      return null;
+    }
+    return {
+      command: 'stroke',
+      tool: stroke.tool,
+      canvasId: stroke.canvasId,
+      frameIndex: Math.max(0, Math.round(Number(stroke.frameIndex) || 0)),
+      layerId: stroke.layerId,
+      brushSize: clamp(Math.round(Number(stroke.brushSize) || 1), 1, 64),
+      brushShape: normalizeBrushShape(stroke.brushShape, BRUSH_SHAPE_SQUARE),
+      customBrushOffsets: Array.isArray(stroke.customBrushOffsets)
+        ? stroke.customBrushOffsets.map(offset => ({
+          dx: Math.round(Number(offset?.dx) || 0),
+          dy: Math.round(Number(offset?.dy) || 0),
+        }))
+        : null,
+      colorMode: stroke.colorMode === 'rgb' ? 'rgb' : 'palette',
+      paletteIndex: normalizePaletteIndex(stroke.paletteIndex, state.activePaletteIndex),
+      rgba: normalizeColorValue(stroke.rgba),
+      mirror: normalizeMirrorAxisState(stroke.mirror, state.width, state.height),
+      paletteIsolation: Boolean(stroke.paletteIsolation),
+      points,
+    };
+  }
+
   function buildSharedProjectDrawOpPayload(historyLabel = '') {
     if (classifySharedProjectOpType(historyLabel) !== 'draw') {
       return null;
+    }
+    const strokeCommandPayload = buildSharedProjectStrokeCommandPayload(historyLabel);
+    if (strokeCommandPayload) {
+      return strokeCommandPayload;
     }
     const canvasDoc = getActiveProjectCanvasDocument();
     const canvasId = canvasDoc?.id || '';
@@ -53927,7 +54049,45 @@
       resetLocalHistoryForSharedCollaborativeRemoteChange();
     }
     noteSharedProjectOperationApplied({ opType: 'structure', fromRemote });
+    replayDeferredSharedProjectProvisionalOps();
     return true;
+  }
+
+  function replayDeferredSharedProjectProvisionalOps() {
+    if (!sharedProjectPendingProvisionalOps.size) {
+      return 0;
+    }
+    let replayedCount = 0;
+    const entries = Array.from(sharedProjectPendingProvisionalOps.entries());
+    entries.forEach(([opId, pending]) => {
+      if (!pending || typeof pending !== 'object') {
+        sharedProjectPendingProvisionalOps.delete(opId);
+        return;
+      }
+      const diagnostics = inspectIncomingSharedProjectDrawOp(pending.opRecord);
+      if (!diagnostics.ok) {
+        if (diagnostics.reason !== 'structure-revision-mismatch') {
+          sharedProjectPendingProvisionalOps.delete(opId);
+        }
+        return;
+      }
+      if (applyIncomingSharedProjectDrawOp(pending.opRecord, {
+        fromRemote: true,
+        provisional: true,
+      })) {
+        sharedProjectPendingProvisionalOps.delete(opId);
+        replayedCount += 1;
+      }
+    });
+    if (replayedCount > 0) {
+      console.debug('[shared-realtime] replayed-deferred-provisional-ops', {
+        projectKey: activeSharedProjectKey || '',
+        replayedCount,
+        remainingCount: sharedProjectPendingProvisionalOps.size,
+        activeStructureRevision: activeSharedProjectStructureRevision,
+      });
+    }
+    return replayedCount;
   }
 
   function buildSharedProjectPaletteOpPayload(historyLabel = '') {
@@ -53957,6 +54117,9 @@
     const normalizedLabel = String(historyLabel || '').trim();
     const normalizedType = classifySharedProjectOpType(normalizedLabel);
     if (normalizedType === 'draw') {
+      if (opPayload?.command === 'stroke') {
+        return 'stroke-command';
+      }
       if (normalizedLabel === 'fill') {
         return 'fill';
       }
@@ -54089,13 +54252,19 @@
     const canvasId = typeof payload?.canvasId === 'string' ? payload.canvasId.trim() : '';
     const layerId = typeof payload?.layerId === 'string' ? payload.layerId.trim() : '';
     const frameIndex = Math.max(0, Math.round(Number(payload?.frameIndex) || 0));
+    const isStrokeCommand = payload?.command === 'stroke' || opRecord?.kind === 'stroke-command';
     const pixelCount = Math.max(0, Math.floor(Number(payload?.pixelCount) || 0));
     const patch = payload?.patch && typeof payload.patch === 'object' ? payload.patch : null;
     const structureRevision = Math.max(
       0,
       Math.round(Number(opRecord?.structure_revision ?? payload?.structureRevision ?? payload?.structure_revision) || 0)
     );
-    if (!canvasId || !layerId || !pixelCount || !patch) {
+    if (isStrokeCommand) {
+      const points = normalizeSharedProjectStrokePoints(payload?.points);
+      if (!canvasId || !layerId || !points.length) {
+        return { ok: false, reason: 'missing-stroke-fields', canvasId, layerId, frameIndex, pixelCount: 0 };
+      }
+    } else if (!canvasId || !layerId || !pixelCount || !patch) {
       return { ok: false, reason: 'missing-patch-fields', canvasId, layerId, frameIndex, pixelCount };
     }
     if (structureRevision !== activeSharedProjectStructureRevision) {
@@ -54127,7 +54296,8 @@
       canvasId,
       layerId,
       frameIndex,
-      pixelCount,
+      pixelCount: isStrokeCommand ? 0 : pixelCount,
+      command: isStrokeCommand ? 'stroke' : 'patch',
       structureRevision,
       activeStructureRevision: activeSharedProjectStructureRevision,
     };
@@ -54145,7 +54315,224 @@
       || normalizedReason === 'missing-frame-layers'
       || normalizedReason === 'missing-target-layer'
       || normalizedReason === 'missing-patch-fields'
+      || normalizedReason === 'missing-stroke-fields'
     );
+  }
+
+  function getMirroredPointSetForState(x, y, {
+    tool = pointerState.tool || state.tool,
+    includeOriginal = true,
+    mirrorState = null,
+    width = state.width,
+    height = state.height,
+  } = {}) {
+    const result = [];
+    const queue = [];
+    const visited = new Set();
+    const normalizedMirrorState = normalizeMirrorAxisState(mirrorState || state.mirror, width, height);
+    const mirrorEnabled = isMirrorEnabledForTool(tool);
+    const safeWidth = Math.max(1, Number(width) || 1);
+    const safeHeight = Math.max(1, Number(height) || 1);
+
+    const addPoint = (candidateX, candidateY) => {
+      if (!Number.isFinite(candidateX) || !Number.isFinite(candidateY)) {
+        return;
+      }
+      const ix = Math.round(candidateX);
+      const iy = Math.round(candidateY);
+      if (ix < 0 || iy < 0 || ix >= safeWidth || iy >= safeHeight) {
+        return;
+      }
+      const key = iy * safeWidth + ix;
+      if (visited.has(key)) {
+        return;
+      }
+      visited.add(key);
+      result.push({ x: ix, y: iy });
+      queue.push({ x: ix, y: iy });
+    };
+
+    if (includeOriginal) {
+      addPoint(x, y);
+    } else {
+      queue.push({ x: Math.round(x), y: Math.round(y) });
+    }
+    if (!mirrorEnabled) {
+      return result;
+    }
+    for (let queueIndex = 0; queueIndex < queue.length; queueIndex += 1) {
+      const current = queue[queueIndex];
+      for (let i = 0; i < MIRROR_AXIS_KEYS.length; i += 1) {
+        const axis = MIRROR_AXIS_KEYS[i];
+        if (!normalizedMirrorState.axes[axis]) {
+          continue;
+        }
+        const reflected = reflectPointByMirrorAxis(current, axis, normalizedMirrorState);
+        if (!reflected) {
+          continue;
+        }
+        addPoint(reflected.x, reflected.y);
+      }
+    }
+    return result;
+  }
+
+  function applySharedProjectStrokePixel(layer, canvasDoc, command, x, y) {
+    if (!layer || !canvasDoc) {
+      return false;
+    }
+    const width = Math.max(1, Math.round(Number(canvasDoc.width) || 1));
+    const height = Math.max(1, Math.round(Number(canvasDoc.height) || 1));
+    if (x < 0 || y < 0 || x >= width || y >= height) {
+      return false;
+    }
+    if (isSimulationLayer(layer)) {
+      return false;
+    }
+    const index = y * width + x;
+    const base = index * 4;
+    let direct = layer.direct instanceof Uint8ClampedArray ? layer.direct : null;
+    const tool = typeof command?.tool === 'string' ? command.tool : 'pen';
+    if (tool === 'eraser') {
+      if (layer.indices[index] === -1 && (!direct || direct[base + 3] === 0)) {
+        return false;
+      }
+      layer.indices[index] = -1;
+      if (direct) {
+        direct[base] = 0;
+        direct[base + 1] = 0;
+        direct[base + 2] = 0;
+        direct[base + 3] = 0;
+      }
+      return true;
+    }
+    const rgba = normalizeColorValue(command?.rgba);
+    const paletteIsolation = Boolean(command?.paletteIsolation);
+    if (command?.colorMode === 'rgb' || paletteIsolation) {
+      if (!direct) {
+        direct = ensureLayerDirect(layer);
+      }
+      const sameColor = layer.indices[index] === -1
+        && direct[base] === rgba.r
+        && direct[base + 1] === rgba.g
+        && direct[base + 2] === rgba.b
+        && direct[base + 3] === rgba.a;
+      if (sameColor) {
+        return false;
+      }
+      layer.indices[index] = -1;
+      direct[base] = rgba.r;
+      direct[base + 1] = rgba.g;
+      direct[base + 2] = rgba.b;
+      direct[base + 3] = rgba.a;
+      return true;
+    }
+    const paletteIndex = normalizePaletteIndex(command?.paletteIndex, state.activePaletteIndex);
+    if (layer.indices[index] === paletteIndex) {
+      return false;
+    }
+    layer.indices[index] = paletteIndex;
+    if (direct) {
+      direct[base] = 0;
+      direct[base + 1] = 0;
+      direct[base + 2] = 0;
+      direct[base + 3] = 0;
+    }
+    return true;
+  }
+
+  function applySharedProjectStrokeCommand(opRecord, { fromRemote = true } = {}) {
+    const payload = extractSharedProjectOpPayload(opRecord);
+    const canvasId = typeof payload?.canvasId === 'string' ? payload.canvasId.trim() : '';
+    const layerId = typeof payload?.layerId === 'string' ? payload.layerId.trim() : '';
+    const frameIndex = Math.max(0, Math.round(Number(payload?.frameIndex) || 0));
+    const targetCanvas = getProjectCanvasDocumentById(canvasId) || adoptSingleProjectCanvasId(canvasId);
+    if (!targetCanvas || !Array.isArray(targetCanvas.frames) || frameIndex >= targetCanvas.frames.length) {
+      return false;
+    }
+    const frame = targetCanvas.frames[frameIndex];
+    if (!frame || !Array.isArray(frame.layers)) {
+      return false;
+    }
+    const layer = frame.layers.find(entry => entry?.id === layerId) || null;
+    if (!layer) {
+      return false;
+    }
+    const points = normalizeSharedProjectStrokePoints(payload?.points);
+    if (!points.length) {
+      return false;
+    }
+    const command = {
+      ...payload,
+      brushShape: normalizeBrushShape(payload?.brushShape, BRUSH_SHAPE_SQUARE),
+      brushSize: clamp(Math.round(Number(payload?.brushSize) || 1), 1, 64),
+      mirror: normalizeMirrorAxisState(payload?.mirror, targetCanvas.width, targetCanvas.height),
+    };
+    const brushOffsets = Array.isArray(payload?.customBrushOffsets) && payload.customBrushOffsets.length
+      ? payload.customBrushOffsets.map(offset => ({
+        dx: Math.round(Number(offset?.dx) || 0),
+        dy: Math.round(Number(offset?.dy) || 0),
+      }))
+      : getBrushOffsets(command.brushSize, command.brushShape);
+    const dirtyRect = {
+      x0: Number.POSITIVE_INFINITY,
+      y0: Number.POSITIVE_INFINITY,
+      x1: Number.NEGATIVE_INFINITY,
+      y1: Number.NEGATIVE_INFINITY,
+    };
+    let changed = false;
+    const applyDirtyPoint = (x, y) => {
+      if (applySharedProjectStrokePixel(layer, targetCanvas, command, x, y)) {
+        changed = true;
+        dirtyRect.x0 = Math.min(dirtyRect.x0, x);
+        dirtyRect.y0 = Math.min(dirtyRect.y0, y);
+        dirtyRect.x1 = Math.max(dirtyRect.x1, x);
+        dirtyRect.y1 = Math.max(dirtyRect.y1, y);
+      }
+    };
+    for (let pointIndex = 0; pointIndex < points.length; pointIndex += 1) {
+      const current = points[pointIndex];
+      const previous = points[Math.max(0, pointIndex - 1)];
+      const linePoints = pointIndex === 0
+        ? [current]
+        : bresenhamLine(previous.x, previous.y, current.x, current.y);
+      for (let lineIndex = 0; lineIndex < linePoints.length; lineIndex += 1) {
+        const linePoint = linePoints[lineIndex];
+        const mirroredPoints = getMirroredPointSetForState(linePoint.x, linePoint.y, {
+          tool: command.tool,
+          includeOriginal: true,
+          mirrorState: command.mirror,
+          width: targetCanvas.width,
+          height: targetCanvas.height,
+        });
+        for (let mirrorIndex = 0; mirrorIndex < mirroredPoints.length; mirrorIndex += 1) {
+          const mirroredPoint = mirroredPoints[mirrorIndex];
+          for (let offsetIndex = 0; offsetIndex < brushOffsets.length; offsetIndex += 1) {
+            const offset = brushOffsets[offsetIndex];
+            applyDirtyPoint(mirroredPoint.x + offset.dx, mirroredPoint.y + offset.dy);
+          }
+        }
+      }
+    }
+    if (!changed) {
+      return false;
+    }
+    const pixelCount = Math.max(
+      0,
+      Math.floor(Number(targetCanvas.width) || 0) * Math.floor(Number(targetCanvas.height) || 0)
+    );
+    const snapshotKey = buildSharedProjectLayerSnapshotKey(canvasId, frameIndex, layerId);
+    const nextSnapshot = captureLayerPatchSnapshot(layer, pixelCount);
+    if (snapshotKey && nextSnapshot) {
+      sharedProjectLayerSnapshots.set(snapshotKey, nextSnapshot);
+    }
+    applyIncomingSharedProjectVisualResult(targetCanvas, {
+      full: false,
+      dirtyRect: changed ? dirtyRect : null,
+    });
+    markDocumentUnsavedChange();
+    noteSharedProjectOperationApplied({ opType: 'draw', fromRemote });
+    return true;
   }
 
   function isSharedProjectRemoteOpFromCurrentSession(opRecord) {
@@ -54499,6 +54886,16 @@
 
   function replaySharedProjectDrawOpPayload(opPayload, { historyLabel = '' } = {}) {
     const payload = opPayload && typeof opPayload === 'object' ? opPayload : null;
+    if (payload?.command === 'stroke') {
+      const replayed = applySharedProjectStrokeCommand({ payload }, { fromRemote: false });
+      if (replayed) {
+        scheduleSharedProjectCheckpoint({
+          immediate: shouldCreateSharedProjectCheckpoint('draw'),
+          historyLabel: historyLabel || 'sharedConflictReplay',
+        });
+      }
+      return replayed;
+    }
     const canvasId = typeof payload?.canvasId === 'string' ? payload.canvasId.trim() : '';
     const layerId = typeof payload?.layerId === 'string' ? payload.layerId.trim() : '';
     const frameIndex = Math.max(0, Math.round(Number(payload?.frameIndex) || 0));
@@ -54742,14 +55139,21 @@
         fromRemote
         && provisional
         && diagnostics.reason === 'structure-revision-mismatch'
-        && !sharedProjectRemoteApplyFailureKeys.has(failureKey)
       ) {
-        sharedProjectRemoteApplyFailureKeys.add(failureKey);
-        queueSharedProjectRefresh({
-          immediate: true,
-          reason: 'canonical-resync-structure-mismatch',
-          force: true,
-        });
+        if (opId) {
+          sharedProjectPendingProvisionalOps.set(opId, {
+            opRecord,
+            queuedAt: Date.now(),
+          });
+        }
+        if (!sharedProjectRemoteApplyFailureKeys.has(failureKey)) {
+          sharedProjectRemoteApplyFailureKeys.add(failureKey);
+          queueSharedProjectRefresh({
+            immediate: true,
+            reason: 'canonical-resync-structure-mismatch',
+            force: true,
+          });
+        }
       }
       if (
         fromRemote
@@ -54777,7 +55181,10 @@
       }
       return false;
     }
-    const applied = applyLayerPatch(opRecord, { fromRemote });
+    const payload = extractSharedProjectOpPayload(opRecord);
+    const applied = (payload?.command === 'stroke' || opRecord?.kind === 'stroke-command')
+      ? applySharedProjectStrokeCommand(opRecord, { fromRemote })
+      : applyLayerPatch(opRecord, { fromRemote });
     if (!applied) {
       console.debug('[shared-realtime] draw-apply-failed', {
         provisional,
@@ -64593,6 +65000,9 @@
           historyLabel: _label,
           opPayload: drawOpPayload,
         });
+        if (drawOpPayload.command === 'stroke') {
+          clearSharedProjectInFlightStroke();
+        }
         if (shouldCreateSharedProjectCheckpoint('draw')) {
           scheduleSharedProjectCheckpoint({ historyLabel: isSharedProjectCheckpointHistoryLabel(_label) ? _label : 'checkpoint' });
         }
