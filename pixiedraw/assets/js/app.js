@@ -7604,6 +7604,9 @@
     if (matchesAutosaveProject || matchesSharedAutosaveProject) {
       setActiveAutosaveProjectId(createAutosaveProjectId());
     }
+    if (sharedRecentProjectId) {
+      releaseAutosaveProjectId(sharedRecentProjectId);
+    }
     if (sharedRecentProjectId && startupAutosaveRestoreProjectId === sharedRecentProjectId) {
       startupAutosaveRestoreProjectId = '';
     }
@@ -19164,6 +19167,48 @@
       return true;
     }
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    if (canUseSharedProjectsBackend() || await ensureSharedProjectBackendSession()) {
+      try {
+        const supabase = await ensurePixieedAccountClient();
+        if (supabase) {
+          const { data, error } = await supabase.rpc('pixieed_enforce_shared_project_limit');
+          if (!error) {
+            const result = Array.isArray(data) ? (data[0] || null) : (data || null);
+            const effectiveLimit = Math.max(1, Math.round(Number(result?.effective_limit) || getMaxSharedProjectCount()));
+            const ownedProjectCount = Math.max(0, Math.round(Number(result?.owned_project_count) || 0));
+            const deletedProjectKeys = Array.isArray(result?.deleted_project_keys)
+              ? result.deleted_project_keys.map(value => normalizeMultiProjectKey(value || '')).filter(Boolean)
+              : [];
+            if (deletedProjectKeys.length) {
+              const knownProjectKeys = getSharedRecentProjectEntries()
+                .map(entry => normalizeMultiProjectKey(entry.sharedProjectKey || ''))
+                .filter(projectKeyValue => projectKeyValue && !deletedProjectKeys.includes(projectKeyValue));
+              await pruneSharedRecentEntriesToKnownProjects(knownProjectKeys);
+              deletedProjectKeys.forEach(deletedProjectKey => {
+                clearDeletedSharedProjectLocalState(deletedProjectKey, buildSharedRecentProjectId(deletedProjectKey));
+              });
+            }
+            if (normalizedProjectKey) {
+              const alreadyOwnedOnBackend = getOwnedSharedRecentProjectEntries()
+                .some(entry => normalizeMultiProjectKey(entry.sharedProjectKey || '') === normalizedProjectKey);
+              if (alreadyOwnedOnBackend) {
+                return true;
+              }
+            }
+            if (ownedProjectCount < effectiveLimit) {
+              return true;
+            }
+            if (announce) {
+              setMultiStatus(buildSharedProjectLimitMessage(effectiveLimit), 'warn');
+              openSharedProjectLimitDialog(effectiveLimit);
+            }
+            return false;
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to validate shared project capacity via backend', error);
+      }
+    }
     const existingEntries = await loadRecentProjectsMetadata();
     const existingOwnedSharedEntries = getOwnedSharedRecentProjectEntries(existingEntries);
     const alreadyTracked = existingOwnedSharedEntries.some(entry => normalizeMultiProjectKey(entry.sharedProjectKey || '') === normalizedProjectKey);
