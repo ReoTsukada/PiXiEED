@@ -7855,7 +7855,11 @@
       return false;
     }
     const target = openProjectTabs[targetIndex];
-    if (!target?.project || typeof target.project !== 'object') {
+    const targetRecentEntry = normalizeSharedRecentProjectEntry(
+      recentProjectsCache.get(normalizeAutosaveProjectId(target?.projectId || '')) || null
+    );
+    const targetIsShared = Boolean(targetRecentEntry && isSharedRecentProjectEntry(targetRecentEntry));
+    if (!targetIsShared && (!target?.project || typeof target.project !== 'object')) {
       return false;
     }
     if (!skipPersistCurrent) {
@@ -7866,10 +7870,19 @@
     renderOpenProjectTabs();
     openProjectTabBusy = true;
     try {
-      const loaded = await loadDocumentFromText(JSON.stringify(target.project), null, {
-        projectId: target.projectId || '',
-        suppressAutosaveStatus: true,
-      });
+      let loaded = false;
+      if (targetIsShared) {
+        loaded = await openSharedRecentProject(targetRecentEntry, {
+          hideStartup: false,
+          silent: true,
+          skipLatestRefresh: true,
+        });
+      } else {
+        loaded = await loadDocumentFromText(JSON.stringify(target.project), null, {
+          projectId: target.projectId || '',
+          suppressAutosaveStatus: true,
+        });
+      }
       if (!loaded) {
         activeOpenProjectTabId = previousActiveId;
         renderOpenProjectTabs();
@@ -21044,7 +21057,7 @@
     return true;
   }
 
-  async function openSharedRecentProject(entry, { hideStartup = true, silent = false } = {}) {
+  async function openSharedRecentProject(entry, { hideStartup = true, silent = false, skipLatestRefresh = true } = {}) {
     const normalizedEntry = normalizeSharedRecentProjectEntry(entry);
     if (!normalizedEntry) {
       return false;
@@ -21086,11 +21099,13 @@
       ),
     });
     if (opened) {
-      setStartupProgressLabel(localizeText('共有プロジェクトの最新内容を取得中…', 'Fetching the latest shared project state...'));
-      await refreshActiveSharedProjectSnapshot({
-        force: true,
-        reason: 'open-shared-recent-latest',
-      });
+      if (!skipLatestRefresh) {
+        setStartupProgressLabel(localizeText('共有プロジェクトの最新内容を取得中…', 'Fetching the latest shared project state...'));
+        await refreshActiveSharedProjectSnapshot({
+          force: true,
+          reason: 'open-shared-recent-latest',
+        });
+      }
       clearPendingSharedInvite();
       setActiveAutosaveProjectId(normalizedEntry.id);
     }
