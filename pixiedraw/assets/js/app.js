@@ -53904,10 +53904,15 @@
     if (!nextCanvases.length) {
       return false;
     }
+    const nextStructureRevision = Math.max(
+      activeSharedProjectStructureRevision,
+      Math.round(Number(opRecord?.structure_revision ?? payload?.structureRevision ?? payload?.structure_revision) || 0)
+    );
     projectCanvasStore.canvases = nextCanvases;
     projectCanvasStore.activeCanvasId = typeof payload?.activeCanvasId === 'string' && nextCanvases.some(canvas => canvas?.id === payload.activeCanvasId)
       ? payload.activeCanvasId
       : (nextCanvases[0]?.id || '');
+    activeSharedProjectStructureRevision = nextStructureRevision;
     syncProjectCanvasSurfaceDocumentRefs();
     clearPendingMultiAssignmentMoveRequests();
     normalizeMultiAssignmentsForCurrentDocument();
