@@ -1025,6 +1025,7 @@
   const STARTUP_SCREEN_DISMISSED_KEY = 'pixieedraw:startupScreenDismissed';
   const UPDATE_TOAST_SEEN_PREFIX = 'pixieedraw:update-toast-seen:';
   const STARTUP_UPDATE_TOAST_HIDDEN_KEY = 'pixieedraw:update-toast-hidden';
+  const HIDDEN_SHARED_PROJECT_KEYS_STORAGE_PREFIX = 'pixieedraw:hidden-shared-projects:';
   const UPDATE_HISTORY_STORAGE_KEY = 'pixieedraw:update-history-log-v1';
   const UPDATE_HISTORY_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;
   const EXPORT_INTERSTITIAL_LAST_SHOWN_KEY = 'pixieedraw:export-interstitial-last-shown-at';
@@ -7617,6 +7618,9 @@
   async function purgeDeletedSharedProjectLocalReferences(projectKey = '', projectId = '') {
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
     const normalizedProjectId = normalizeAutosaveProjectId(projectId || '');
+    if (normalizedProjectKey) {
+      unhideSharedProjectFromRecentSync(normalizedProjectKey);
+    }
     clearDeletedSharedProjectLocalState(normalizedProjectKey, normalizedProjectId);
     if (!AUTOSAVE_SUPPORTED) {
       return false;
@@ -18519,7 +18523,8 @@
             }
           }
           const deletesOwnedSharedProject = isSharedEntry && deletedSharedProjectBackend;
-          if (deletesOwnedSharedProject) {
+          if (isSharedEntry && !deletesOwnedSharedProject) {
+            hideSharedProjectFromRecentSync(entry?.sharedProjectKey || '');
           }
           const removed = await removeRecentProjectEntry(projectId);
           if (removed) {
@@ -19055,6 +19060,71 @@
     return roleHint === 'master';
   }
 
+  function getHiddenSharedProjectsStorageKey() {
+    const userId = typeof accountState?.userId === 'string' ? accountState.userId.trim() : '';
+    return `${HIDDEN_SHARED_PROJECT_KEYS_STORAGE_PREFIX}${userId || 'anonymous'}`;
+  }
+
+  function readHiddenSharedProjectKeys() {
+    if (!canUseLocalStorage) {
+      return new Set();
+    }
+    try {
+      const raw = window.localStorage.getItem(getHiddenSharedProjectsStorageKey());
+      const parsed = JSON.parse(raw || '[]');
+      if (!Array.isArray(parsed)) {
+        return new Set();
+      }
+      return new Set(parsed.map(value => normalizeMultiProjectKey(value || '')).filter(Boolean));
+    } catch (_error) {
+      return new Set();
+    }
+  }
+
+  function writeHiddenSharedProjectKeys(projectKeys = []) {
+    if (!canUseLocalStorage) {
+      return;
+    }
+    try {
+      const normalizedKeys = [...new Set((Array.isArray(projectKeys) ? projectKeys : [])
+        .map(value => normalizeMultiProjectKey(value || ''))
+        .filter(Boolean))];
+      window.localStorage.setItem(getHiddenSharedProjectsStorageKey(), JSON.stringify(normalizedKeys));
+    } catch (_error) {
+      // Ignore localStorage write failures.
+    }
+  }
+
+  function hideSharedProjectFromRecentSync(projectKey = '') {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    if (!normalizedProjectKey) {
+      return;
+    }
+    const hiddenKeys = readHiddenSharedProjectKeys();
+    hiddenKeys.add(normalizedProjectKey);
+    writeHiddenSharedProjectKeys([...hiddenKeys]);
+  }
+
+  function unhideSharedProjectFromRecentSync(projectKey = '') {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    if (!normalizedProjectKey) {
+      return;
+    }
+    const hiddenKeys = readHiddenSharedProjectKeys();
+    if (!hiddenKeys.delete(normalizedProjectKey)) {
+      return;
+    }
+    writeHiddenSharedProjectKeys([...hiddenKeys]);
+  }
+
+  function isSharedProjectHiddenFromRecentSync(projectKey = '') {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    if (!normalizedProjectKey) {
+      return false;
+    }
+    return readHiddenSharedProjectKeys().has(normalizedProjectKey);
+  }
+
   function getOwnedSharedRecentProjectEntries(entries = Array.from(recentProjectsCache.values())) {
     return getSharedRecentProjectEntries(entries).filter(entry => isOwnedSharedRecentProjectEntry(entry));
   }
@@ -19227,6 +19297,7 @@
       const result = Array.isArray(data) ? (data[0] || null) : (data || null);
       const deleted = Boolean(result?.deleted);
       if (deleted) {
+        unhideSharedProjectFromRecentSync(normalizedProjectKey);
         await purgeDeletedSharedProjectLocalReferences(
           normalizedProjectKey,
           buildSharedRecentProjectId(normalizedProjectKey)
@@ -20953,6 +21024,7 @@
       }
       return false;
     }
+    unhideSharedProjectFromRecentSync(resolvedProjectKey);
     const openingOwnedSharedProject = Boolean(
       accountState.userId
       && typeof sharedProject.owner_user_id === 'string'
@@ -57245,8 +57317,10 @@
         return [];
       }
       const uniqueProjectKeys = [...new Set(projectKeys)];
+      const hiddenProjectKeys = readHiddenSharedProjectKeys();
+      const visibleProjectKeys = uniqueProjectKeys.filter(projectKey => !hiddenProjectKeys.has(projectKey));
       const projectEntries = await Promise.all(
-        uniqueProjectKeys.map(projectKey => fetchSharedProjectRecordViaRpc(supabase, projectKey, 'list-projects'))
+        visibleProjectKeys.map(projectKey => fetchSharedProjectRecordViaRpc(supabase, projectKey, 'list-projects'))
       );
       const projectsByKey = new Map();
       projectEntries.forEach(entry => {
@@ -57260,7 +57334,7 @@
       for (let index = 0; index < memberships.length; index += 1) {
         const membership = memberships[index];
         const projectKey = normalizeMultiProjectKey(membership?.project_key || '');
-        if (!projectKey) {
+        if (!projectKey || hiddenProjectKeys.has(projectKey)) {
           continue;
         }
         const project = projectsByKey.get(projectKey) || null;
@@ -57289,7 +57363,7 @@
           normalizedEntries.push(sharedEntry);
         }
       }
-      await pruneSharedRecentEntriesToKnownProjects(uniqueProjectKeys);
+      await pruneSharedRecentEntriesToKnownProjects(visibleProjectKeys);
       return normalizedEntries;
     } catch (error) {
       handleSharedProjectsBackendError(error, 'sync-recent-projects-exception');
