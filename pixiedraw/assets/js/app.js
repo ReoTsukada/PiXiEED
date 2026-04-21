@@ -3017,6 +3017,45 @@
   let sharedProjectPollingTimer = null;
   let sharedProjectRefreshTimer = null;
   let sharedProjectRefreshInFlight = false;
+  function getCurrentAccountStorageNamespace() {
+    const userId = typeof accountState.userId === 'string' ? accountState.userId.trim() : '';
+    return userId || 'anonymous';
+  }
+
+  function getScopedStorageKey(baseKey, namespace = getCurrentAccountStorageNamespace()) {
+    const normalizedBaseKey = typeof baseKey === 'string' ? baseKey.trim() : '';
+    const normalizedNamespace = typeof namespace === 'string' ? namespace.trim() : '';
+    if (!normalizedBaseKey) {
+      return '';
+    }
+    if (!normalizedNamespace) {
+      return normalizedBaseKey;
+    }
+    return `${normalizedBaseKey}:${normalizedNamespace}`;
+  }
+
+  function normalizeRecentProjectAccountUserId(value = '') {
+    const normalized = typeof value === 'string' ? value.trim() : '';
+    return normalized || 'anonymous';
+  }
+
+  function getCurrentRecentProjectAccountUserId() {
+    return normalizeRecentProjectAccountUserId(accountState.userId || '');
+  }
+
+  function isRecentProjectEntryVisibleForCurrentAccount(entry) {
+    return normalizeRecentProjectAccountUserId(entry?.accountUserId || '') === getCurrentRecentProjectAccountUserId();
+  }
+
+  function assignCurrentAccountToRecentProjectEntry(entry = {}) {
+    if (!entry || typeof entry !== 'object') {
+      return entry;
+    }
+    return {
+      ...entry,
+      accountUserId: getCurrentRecentProjectAccountUserId(),
+    };
+  }
   let sharedProjectDeferredRemoteOpsTimer = null;
   let sharedProjectStructureMismatchTimer = null;
   let sharedProjectLastRefreshQueuedAt = 0;
@@ -3568,7 +3607,7 @@
     console.warn('Failed to restore session state', error);
     if (canUseSessionStorage) {
       try {
-        window.localStorage.removeItem(SESSION_STORAGE_KEY);
+        window.localStorage.removeItem(getScopedStorageKey(SESSION_STORAGE_KEY));
       } catch (storageError) {
         // Ignore storage cleanup failures.
       }
@@ -3576,7 +3615,7 @@
   }
   if (!RELOAD_SNAPSHOT_ENABLED && canUseSessionStorage) {
     try {
-      window.sessionStorage.removeItem(RELOAD_SNAPSHOT_STORAGE_KEY);
+      window.sessionStorage.removeItem(getScopedStorageKey(RELOAD_SNAPSHOT_STORAGE_KEY));
     } catch (error) {
       // Ignore storage errors.
     }
@@ -19066,7 +19105,7 @@
   }
 
   function readHiddenSharedProjectKeys() {
-    if (!canUseLocalStorage) {
+    if (typeof window === 'undefined' || !window.localStorage) {
       return new Set();
     }
     try {
@@ -19082,7 +19121,7 @@
   }
 
   function writeHiddenSharedProjectKeys(projectKeys = []) {
-    if (!canUseLocalStorage) {
+    if (typeof window === 'undefined' || !window.localStorage) {
       return;
     }
     try {
@@ -19403,6 +19442,7 @@
       : null;
     return {
       id,
+      accountUserId: normalizeRecentProjectAccountUserId(entry.accountUserId || ''),
       storageKind: RECENT_PROJECT_STORAGE_SHARED,
       sharedProjectBackendId: typeof entry.sharedProjectBackendId === 'string' && entry.sharedProjectBackendId.trim()
         ? entry.sharedProjectBackendId.trim()
@@ -19539,9 +19579,10 @@
       await new Promise((resolve, reject) => {
         const tx = db.transaction([AUTOSAVE_STORE_NAME], 'readwrite');
         const store = tx.objectStore(AUTOSAVE_STORE_NAME);
+        const scopedKey = getScopedStorageKey(AUTOSAVE_ACTIVE_PROJECT_KEY);
         const request = normalizedId
-          ? store.put(normalizedId, AUTOSAVE_ACTIVE_PROJECT_KEY)
-          : store.delete(AUTOSAVE_ACTIVE_PROJECT_KEY);
+          ? store.put(normalizedId, scopedKey)
+          : store.delete(scopedKey);
         request.onerror = () => reject(request.error);
         tx.oncomplete = () => {
           db.close();
@@ -19566,7 +19607,7 @@
         let value = '';
         const tx = db.transaction([AUTOSAVE_STORE_NAME], 'readonly');
         const store = tx.objectStore(AUTOSAVE_STORE_NAME);
-        const request = store.get(AUTOSAVE_ACTIVE_PROJECT_KEY);
+        const request = store.get(getScopedStorageKey(AUTOSAVE_ACTIVE_PROJECT_KEY));
         request.onsuccess = () => {
           value = normalizeAutosaveProjectId(request.result || '');
         };
@@ -19779,7 +19820,7 @@
     clearStoredExportDirectoryDisplayLabel();
   }
 
-  async function loadRecentProjectsMetadata() {
+  async function loadRecentProjectsMetadata({ includeAllAccounts = false } = {}) {
     if (!AUTOSAVE_SUPPORTED) return [];
     try {
       const db = await openAutosaveDatabase();
@@ -19801,7 +19842,11 @@
             const bTime = typeof b?.updatedAt === 'string' ? b.updatedAt : '';
             return bTime.localeCompare(aTime);
           });
-          resolve(entries);
+          resolve(
+            includeAllAccounts
+              ? entries
+              : entries.filter(entry => isRecentProjectEntryVisibleForCurrentAccount(entry))
+          );
         };
         tx.onerror = () => {
           const error = tx.error;
@@ -19817,15 +19862,19 @@
 
   async function saveRecentProjectsList(existingEntries, nextEntries) {
     if (!AUTOSAVE_SUPPORTED) return;
-    const existingIds = new Set((existingEntries || []).map(entry => entry?.id).filter(Boolean));
-    const nextIds = new Set((nextEntries || []).map(entry => entry?.id).filter(Boolean));
     const writeTask = async () => {
       try {
+        const allExistingEntries = await loadRecentProjectsMetadata({ includeAllAccounts: true });
+        const preservedEntries = allExistingEntries.filter(entry => !isRecentProjectEntryVisibleForCurrentAccount(entry));
+        const normalizedNextEntries = (nextEntries || []).map(entry => assignCurrentAccountToRecentProjectEntry(entry));
+        const mergedEntries = preservedEntries.concat(normalizedNextEntries);
+        const existingIds = new Set(allExistingEntries.map(entry => entry?.id).filter(Boolean));
+        const nextIds = new Set(mergedEntries.map(entry => entry?.id).filter(Boolean));
         const db = await openAutosaveDatabase();
         await new Promise((resolve, reject) => {
           const tx = db.transaction([RECENT_PROJECTS_STORE], 'readwrite');
           const store = tx.objectStore(RECENT_PROJECTS_STORE);
-          (nextEntries || []).forEach(entry => {
+          mergedEntries.forEach(entry => {
             if (!entry || !entry.id) {
               return;
             }
@@ -20243,6 +20292,7 @@
       }
 
       const nextEntry = { ...original, id: normalizedId };
+      nextEntry.accountUserId = normalizeRecentProjectAccountUserId(original.accountUserId || '');
       let entryChanged = original.id !== normalizedId;
       let parsedSnapshot = null;
 
@@ -20359,6 +20409,7 @@
       return null;
     }
     const normalizedEntry = normalizeSharedRecentProjectEntry({
+      accountUserId: getCurrentRecentProjectAccountUserId(),
       sharedProjectKey: projectKey,
       sharedProjectBackendId: projectId || '',
       sharedProjectId: buildSharedRecentProjectId(projectKey),
@@ -20919,6 +20970,7 @@
         ? {
             ...normalizeSharedRecentProjectEntry({
               ...sharedEntrySeed,
+              accountUserId: getCurrentRecentProjectAccountUserId(),
               id: resolvedProjectId,
               name: displayName,
               fileName,
@@ -20929,6 +20981,7 @@
           }
         : {
             id: resolvedProjectId,
+            accountUserId: getCurrentRecentProjectAccountUserId(),
             name: displayName,
             fileName,
             updatedAt: packaged.updatedAt || new Date().toISOString(),
@@ -27037,7 +27090,7 @@
           console.warn('Reload session restore failed', error);
           if (canUseSessionStorage) {
             try {
-              window.sessionStorage.removeItem(RELOAD_SNAPSHOT_STORAGE_KEY);
+              window.sessionStorage.removeItem(getScopedStorageKey(RELOAD_SNAPSHOT_STORAGE_KEY));
             } catch (storageError) {
               // Ignore reload snapshot cleanup failures.
             }
@@ -50983,16 +51036,16 @@
         break;
       }
       try {
-        window.sessionStorage.setItem(RELOAD_SNAPSHOT_STORAGE_KEY, encoded);
+        window.sessionStorage.setItem(getScopedStorageKey(RELOAD_SNAPSHOT_STORAGE_KEY), encoded);
         try {
-          window.localStorage.setItem(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY, encoded);
+          window.localStorage.setItem(getScopedStorageKey(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY), encoded);
         } catch (fallbackError) {
           // Ignore localStorage fallback failures.
         }
         return;
       } catch (error) {
         try {
-          window.localStorage.setItem(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY, encoded);
+          window.localStorage.setItem(getScopedStorageKey(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY), encoded);
           return;
         } catch (fallbackError) {
           // Continue trimming history below.
@@ -51005,12 +51058,12 @@
       attempt += 1;
     }
     try {
-      window.sessionStorage.removeItem(RELOAD_SNAPSHOT_STORAGE_KEY);
+      window.sessionStorage.removeItem(getScopedStorageKey(RELOAD_SNAPSHOT_STORAGE_KEY));
     } catch (error) {
       // Ignore storage errors.
     }
     try {
-      window.localStorage.removeItem(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY);
+      window.localStorage.removeItem(getScopedStorageKey(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY));
     } catch (error) {
       // Ignore storage errors.
     }
@@ -51021,7 +51074,7 @@
       return null;
     }
     try {
-      const multiResumeRaw = window.sessionStorage.getItem(MULTI_RESUME_STORAGE_KEY);
+      const multiResumeRaw = window.sessionStorage.getItem(getScopedStorageKey(MULTI_RESUME_STORAGE_KEY));
       if (typeof multiResumeRaw === 'string' && multiResumeRaw.length) {
         return null;
       }
@@ -51030,13 +51083,13 @@
     }
     let raw = '';
     try {
-      raw = window.sessionStorage.getItem(RELOAD_SNAPSHOT_STORAGE_KEY) || '';
+      raw = window.sessionStorage.getItem(getScopedStorageKey(RELOAD_SNAPSHOT_STORAGE_KEY)) || '';
     } catch (error) {
       raw = '';
     }
     if (!raw) {
       try {
-        raw = window.localStorage.getItem(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY) || '';
+        raw = window.localStorage.getItem(getScopedStorageKey(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY)) || '';
       } catch (error) {
         raw = '';
       }
@@ -51113,12 +51166,12 @@
       setActiveAutosaveProjectId(restoredProjectId, { persist: false });
     }
     try {
-      window.sessionStorage.removeItem(RELOAD_SNAPSHOT_STORAGE_KEY);
+      window.sessionStorage.removeItem(getScopedStorageKey(RELOAD_SNAPSHOT_STORAGE_KEY));
     } catch (error) {
       // Ignore storage errors.
     }
     try {
-      window.localStorage.removeItem(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY);
+      window.localStorage.removeItem(getScopedStorageKey(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY));
     } catch (error) {
       // Ignore storage errors.
     }
@@ -51241,7 +51294,7 @@
           MULTI_DEFAULT_EXPORT_PERMISSION
         ),
       };
-      window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(snapshot));
+      window.localStorage.setItem(getScopedStorageKey(SESSION_STORAGE_KEY), JSON.stringify(snapshot));
     } catch (error) {
       // Ignore storage errors (private mode or quota exceeded)
     }
@@ -51251,7 +51304,7 @@
     if (!canUseSessionStorage) return;
     let payload;
     try {
-      const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+      const raw = window.localStorage.getItem(getScopedStorageKey(SESSION_STORAGE_KEY));
       if (!raw) return;
       payload = JSON.parse(raw);
     } catch (error) {
@@ -52631,7 +52684,7 @@
       return '';
     }
     try {
-      return normalizeMultiProjectKey(window.localStorage.getItem(MULTI_PROJECT_KEY_STORAGE_KEY) || '');
+      return normalizeMultiProjectKey(window.localStorage.getItem(getScopedStorageKey(MULTI_PROJECT_KEY_STORAGE_KEY)) || '');
     } catch (error) {
       return '';
     }
@@ -52645,9 +52698,9 @@
     }
     try {
       if (normalized) {
-        window.localStorage.setItem(MULTI_PROJECT_KEY_STORAGE_KEY, normalized);
+        window.localStorage.setItem(getScopedStorageKey(MULTI_PROJECT_KEY_STORAGE_KEY), normalized);
       } else {
-        window.localStorage.removeItem(MULTI_PROJECT_KEY_STORAGE_KEY);
+        window.localStorage.removeItem(getScopedStorageKey(MULTI_PROJECT_KEY_STORAGE_KEY));
       }
     } catch (error) {
       // Ignore storage errors.
@@ -52659,7 +52712,7 @@
       return;
     }
     try {
-      window.sessionStorage.removeItem(MULTI_RESUME_STORAGE_KEY);
+      window.sessionStorage.removeItem(getScopedStorageKey(MULTI_RESUME_STORAGE_KEY));
     } catch (error) {
       // Ignore storage errors.
     }
@@ -52713,7 +52766,7 @@
         : MULTI_DEFAULT_EXPORT_PERMISSION,
     };
     try {
-      window.sessionStorage.setItem(MULTI_RESUME_STORAGE_KEY, JSON.stringify(payload));
+      window.sessionStorage.setItem(getScopedStorageKey(MULTI_RESUME_STORAGE_KEY), JSON.stringify(payload));
     } catch (error) {
       // Ignore storage errors.
     }
@@ -52725,7 +52778,7 @@
     }
     let parsed = null;
     try {
-      const raw = window.sessionStorage.getItem(MULTI_RESUME_STORAGE_KEY);
+      const raw = window.sessionStorage.getItem(getScopedStorageKey(MULTI_RESUME_STORAGE_KEY));
       if (!raw) {
         return null;
       }
@@ -58263,6 +58316,7 @@
       accountState.profile = { nickname: '', avatarId: '', xUrl: '' };
       disconnectActiveSharedProjectRealtimeChannel().catch(() => {});
     }
+    setRecentProjectsCache([]);
   }
 
   async function ensureSharedProjectBackendSession() {
@@ -58637,12 +58691,14 @@
             updatePixieedAccountUi();
           }
           await syncSharedRecentProjectsFromAccount();
+          await refreshRecentProjectsUI({ sanitize: false });
           if (!accountState.isAnonymous) {
             window.setTimeout(() => {
               resumePendingSharedInviteAfterLogin().catch(() => {});
             }, 0);
           }
         } else {
+          await refreshRecentProjectsUI({ sanitize: false });
           updatePixieedAccountUi();
         }
         if (!accountAuthListenerBound) {
@@ -58671,12 +58727,14 @@
                   updatePixieedAccountUi();
                 }
                 await syncSharedRecentProjectsFromAccount();
+                await refreshRecentProjectsUI({ sanitize: false });
                 if (!accountState.isAnonymous) {
                   window.setTimeout(() => {
                     resumePendingSharedInviteAfterLogin().catch(() => {});
                   }, 0);
                 }
               } else {
+                await refreshRecentProjectsUI({ sanitize: false });
                 updatePixieedAccountUi();
               }
             });
