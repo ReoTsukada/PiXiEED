@@ -2986,6 +2986,8 @@
   };
   const PIXIEED_AUTH_STORAGE_KEY = 'sb-kyyiuakrqomzlikfaire-auth-token';
   const PIXIEED_AUTH_SESSION_CACHE_KEY = 'pixieed:auth-session-cache:v1';
+  const SHARED_PROJECT_DEVICE_ID_STORAGE_KEY = 'pixieedraw:shared-device-id';
+  const SHARED_PROJECT_SESSION_HEARTBEAT_INTERVAL_MS = 15000;
   let accountSupabaseInitPromise = null;
   let accountInitPromise = null;
   let sharedProjectAuthEnsurePromise = null;
@@ -3005,6 +3007,9 @@
   let activeSharedProjectRevision = 0;
   let activeSharedProjectStructureRevision = 0;
   let activeSharedProjectDocumentLoaded = false;
+  let sharedProjectDeviceId = '';
+  let sharedProjectSessionInstanceId = '';
+  let sharedProjectSessionHeartbeatTimer = null;
   const sharedProjectLayerSnapshots = new Map();
   let activeSharedProjectChannel = null;
   let activeSharedProjectChannelKey = '';
@@ -3055,6 +3060,46 @@
       ...entry,
       accountUserId: getCurrentRecentProjectAccountUserId(),
     };
+  }
+
+  function generateSharedProjectSessionToken(prefix = 'sp') {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return `${prefix}-${crypto.randomUUID()}`;
+    }
+    return `${prefix}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+  }
+
+  function ensureSharedProjectDeviceId() {
+    if (sharedProjectDeviceId) {
+      return sharedProjectDeviceId;
+    }
+    try {
+      const existing = typeof window !== 'undefined' && window.localStorage
+        ? String(window.localStorage.getItem(SHARED_PROJECT_DEVICE_ID_STORAGE_KEY) || '').trim()
+        : '';
+      if (existing) {
+        sharedProjectDeviceId = existing;
+        return sharedProjectDeviceId;
+      }
+    } catch (_error) {
+      // Ignore storage failures.
+    }
+    sharedProjectDeviceId = generateSharedProjectSessionToken('device');
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(SHARED_PROJECT_DEVICE_ID_STORAGE_KEY, sharedProjectDeviceId);
+      }
+    } catch (_error) {
+      // Ignore storage failures.
+    }
+    return sharedProjectDeviceId;
+  }
+
+  function ensureSharedProjectSessionInstanceId() {
+    if (!sharedProjectSessionInstanceId) {
+      sharedProjectSessionInstanceId = generateSharedProjectSessionToken('session');
+    }
+    return sharedProjectSessionInstanceId;
   }
   let sharedProjectDeferredRemoteOpsTimer = null;
   let sharedProjectStructureMismatchTimer = null;
@@ -3627,6 +3672,12 @@
   const pointerState = createPointerState();
   window.addEventListener('beforeunload', handleUnsavedBeforeUnload);
   window.addEventListener('pagehide', handleAutosavePageHide);
+  window.addEventListener('beforeunload', () => {
+    releaseSharedProjectSessionLock().catch(() => {});
+  });
+  window.addEventListener('pagehide', () => {
+    releaseSharedProjectSessionLock().catch(() => {});
+  });
   document.addEventListener('visibilitychange', handleAutosaveVisibilityChange);
   document.addEventListener('visibilitychange', handleMultiVisibilityChange);
   window.addEventListener('focus', handleMultiWindowFocus);
@@ -8110,6 +8161,7 @@
   }
 
   function clearActiveSharedProjectSession(reason = 'clear-session') {
+    releaseSharedProjectSessionLock().catch(() => {});
     logSharedProjectRealtimeChannelLifecycle('clear-session', {
       caller: 'clearActiveSharedProjectSession',
       reason,
@@ -8137,6 +8189,10 @@
     sharedProjectRealtimeStatus = 'idle';
     sharedProjectMembers = [];
     sharedProjectLayerSnapshots.clear();
+    if (sharedProjectSessionHeartbeatTimer !== null) {
+      window.clearInterval(sharedProjectSessionHeartbeatTimer);
+      sharedProjectSessionHeartbeatTimer = null;
+    }
     if (sharedProjectCaptureTimer !== null) {
       window.clearTimeout(sharedProjectCaptureTimer);
       sharedProjectCaptureTimer = null;
@@ -8461,6 +8517,7 @@
     activeSharedProjectRevision = Math.max(0, Math.round(Number(revision) || 0));
     activeSharedProjectStructureRevision = Math.max(0, Math.round(Number(structureRevision) || 0));
     sharedProjectLastAppliedSeq = Math.max(sharedProjectLastAppliedSeq, activeSharedProjectRevision);
+    ensureSharedProjectSessionHeartbeat();
     const nextChannelSignature = `${normalizedProjectKey}::${activeSharedProjectId || ''}`;
     const sharedRecentProjectId = buildSharedRecentProjectId(normalizedProjectKey);
     if (normalizeAutosaveProjectId(autosaveProjectId || '') !== sharedRecentProjectId) {
@@ -20976,7 +21033,7 @@
               fileName,
               updatedAt: packaged.updatedAt || new Date().toISOString(),
               thumbnail: thumbnail || null,
-              project: packaged,
+              project: null,
             }),
           }
         : {
@@ -21097,12 +21154,16 @@
       timeoutMs: 4000,
       pollIntervalMs: 180,
     }) || sharedProject;
+    if (!(await claimSharedProjectSessionLock(resolvedProjectKey, freshestProject.id || ''))) {
+      return false;
+    }
     const freshestSnapshotRevision = Math.max(
       0,
       Math.round(Number(freshestProject.latest_snapshot_revision) || Number(freshestProject.latest_revision) || 0)
     );
     const freshestLatestRevision = Math.max(0, Math.round(Number(freshestProject.latest_revision) || 0));
     if (freshestSnapshotRevision < freshestLatestRevision) {
+      await releaseSharedProjectSessionLock(resolvedProjectKey);
       if (!silent) {
         setMultiStatus(
           localizeText(
@@ -21142,6 +21203,21 @@
       }
     }
     setActiveAutosaveProjectId(buildSharedRecentProjectId(resolvedProjectKey));
+    try {
+      window.localStorage.removeItem(getScopedStorageKey(SESSION_STORAGE_KEY));
+    } catch (_error) {
+      // Ignore storage errors.
+    }
+    try {
+      window.sessionStorage.removeItem(getScopedStorageKey(RELOAD_SNAPSHOT_STORAGE_KEY));
+    } catch (_error) {
+      // Ignore storage errors.
+    }
+    try {
+      window.localStorage.removeItem(getScopedStorageKey(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY));
+    } catch (_error) {
+      // Ignore storage errors.
+    }
     storeMultiProjectKey(resolvedProjectKey);
     syncMultiProjectKeyInputValues(resolvedProjectKey, { preserveFocused: false });
     setMultiDesiredRole(requestedRole);
@@ -21153,6 +21229,7 @@
       Math.max(0, Math.round(Number(freshestProject.latest_snapshot_structure_revision) || Number(freshestProject.latest_structure_revision) || 0)),
       freshestProject.id || ''
     );
+    ensureSharedProjectSessionHeartbeat();
     markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
     const sharedSnapshotRevision = Math.max(0, Math.round(Number(freshestProject.latest_snapshot_revision) || 0));
     const sharedLatestRevision = freshestLatestRevision;
@@ -51013,6 +51090,19 @@
     if (!canUseSessionStorage) {
       return;
     }
+    if (isCurrentProjectSharedEntry()) {
+      try {
+        window.sessionStorage.removeItem(getScopedStorageKey(RELOAD_SNAPSHOT_STORAGE_KEY));
+      } catch (error) {
+        // Ignore storage errors.
+      }
+      try {
+        window.localStorage.removeItem(getScopedStorageKey(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY));
+      } catch (error) {
+        // Ignore storage errors.
+      }
+      return;
+    }
     if (multiState.connected || multiState.connecting) {
       return;
     }
@@ -51212,6 +51302,14 @@
 
   function persistSessionState() {
     if (!canUseSessionStorage) return;
+    if (isCurrentProjectSharedEntry()) {
+      try {
+        window.localStorage.removeItem(getScopedStorageKey(SESSION_STORAGE_KEY));
+      } catch (error) {
+        // Ignore storage errors.
+      }
+      return;
+    }
     try {
       syncLocalLayerVisibilityMapFromState();
       syncLocalLayerPreviewOpacityMapFromState();
@@ -56333,6 +56431,116 @@
       handleSharedProjectsBackendError(error, 'fetch-exception');
       return null;
     }
+  }
+
+  async function claimSharedProjectSessionLock(projectKey, projectId = '') {
+    if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
+      return false;
+    }
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    if (!normalizedProjectKey) {
+      return false;
+    }
+    try {
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase) {
+        return false;
+      }
+      const { data, error } = await supabase.rpc('pixieed_claim_shared_project_session', {
+        target_project_key: normalizedProjectKey,
+        target_project_id: typeof projectId === 'string' && projectId.trim() ? projectId.trim() : null,
+        target_device_id: ensureSharedProjectDeviceId(),
+        target_session_id: ensureSharedProjectSessionInstanceId(),
+      });
+      if (error) {
+        handleSharedProjectsBackendError(error, 'claim-shared-session');
+        return false;
+      }
+      const result = Array.isArray(data) ? (data[0] || null) : (data || null);
+      if (result?.allowed === true) {
+        return true;
+      }
+      if (result?.conflict_reason === 'same-account-active-elsewhere') {
+        setMultiStatus(
+          localizeText(
+            '同じPiXiEEDアカウントで別端末からこの共有プロジェクトを開いています。同時利用はできません。',
+            'This shared project is already open on another device with the same PiXiEED account.'
+          ),
+          'error'
+        );
+        return false;
+      }
+      return false;
+    } catch (error) {
+      handleSharedProjectsBackendError(error, 'claim-shared-session-exception');
+      return false;
+    }
+  }
+
+  async function touchSharedProjectSessionLock(projectKey = activeSharedProjectKey) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    if (!normalizedProjectKey || !accountState.isLoggedIn || accountState.isAnonymous) {
+      return false;
+    }
+    try {
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase) {
+        return false;
+      }
+      const { data, error } = await supabase.rpc('pixieed_touch_shared_project_session', {
+        target_project_key: normalizedProjectKey,
+        target_session_id: ensureSharedProjectSessionInstanceId(),
+      });
+      if (error) {
+        handleSharedProjectsBackendError(error, 'touch-shared-session');
+        return false;
+      }
+      return data === true || (Array.isArray(data) && data[0] === true);
+    } catch (error) {
+      handleSharedProjectsBackendError(error, 'touch-shared-session-exception');
+      return false;
+    }
+  }
+
+  async function releaseSharedProjectSessionLock(projectKey = activeSharedProjectKey) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    if (!normalizedProjectKey || !accountState.isLoggedIn || accountState.isAnonymous) {
+      return false;
+    }
+    try {
+      const supabase = await ensurePixieedAccountClient();
+      if (!supabase) {
+        return false;
+      }
+      const { data, error } = await supabase.rpc('pixieed_release_shared_project_session', {
+        target_project_key: normalizedProjectKey,
+        target_session_id: ensureSharedProjectSessionInstanceId(),
+      });
+      if (error) {
+        handleSharedProjectsBackendError(error, 'release-shared-session');
+        return false;
+      }
+      return data === true || (Array.isArray(data) && data[0] === true);
+    } catch (error) {
+      handleSharedProjectsBackendError(error, 'release-shared-session-exception');
+      return false;
+    }
+  }
+
+  function ensureSharedProjectSessionHeartbeat() {
+    if (sharedProjectSessionHeartbeatTimer !== null) {
+      window.clearInterval(sharedProjectSessionHeartbeatTimer);
+      sharedProjectSessionHeartbeatTimer = null;
+    }
+    if (!activeSharedProjectKey || !accountState.isLoggedIn || accountState.isAnonymous) {
+      return;
+    }
+    sharedProjectSessionHeartbeatTimer = window.setInterval(() => {
+      if (!activeSharedProjectKey || !accountState.isLoggedIn || accountState.isAnonymous) {
+        return;
+      }
+      touchSharedProjectSessionLock(activeSharedProjectKey).catch(() => {});
+    }, SHARED_PROJECT_SESSION_HEARTBEAT_INTERVAL_MS);
   }
 
   async function fetchSharedProjectRecordByInviteToken(inviteToken) {
