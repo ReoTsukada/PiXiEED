@@ -465,15 +465,17 @@
       if (window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__) {
         return await window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__;
       }
-      const module = await import(SUPABASE_MODULE_URL);
-      const clientPromise = Promise.resolve(module.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true,
-          storageKey: AUTH_STORAGE_KEY,
-        },
-      }));
+      const clientPromise = (async () => {
+        const module = await import(SUPABASE_MODULE_URL);
+        return module.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true,
+            storageKey: AUTH_STORAGE_KEY,
+          },
+        });
+      })();
       window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__ = clientPromise;
       const client = await clientPromise;
       window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__ = client;
