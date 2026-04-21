@@ -21085,54 +21085,72 @@
     if (!normalizedEntry) {
       return false;
     }
-    storePendingSharedInvite({
-      inviteToken: normalizedEntry.sharedProjectInviteToken || '',
-      projectKey: normalizedEntry.sharedProjectKey || '',
-      requestedRole: normalizedEntry.sharedRoleHint || 'guest',
-      autoJoin: normalizedEntry.sharedAutoJoin !== false,
-      source: 'recent-open',
-    });
-    if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
-      return false;
-    }
-    await initPixieedAccount();
-    await ensureNoLegacyMultiSessionForSharedProject();
-    if (!await ensureSharedProjectBackendSession()) {
-      if (!silent) {
-        setMultiStatus(
-          localizeText('共有プロジェクトを開けませんでした。共有セッションを初期化できません。', 'Could not initialize a shared session for this project.'),
-          'warn'
-        );
+    try {
+      storePendingSharedInvite({
+        inviteToken: normalizedEntry.sharedProjectInviteToken || '',
+        projectKey: normalizedEntry.sharedProjectKey || '',
+        requestedRole: normalizedEntry.sharedRoleHint || 'guest',
+        autoJoin: normalizedEntry.sharedAutoJoin !== false,
+        source: 'recent-open',
+      });
+      if (!(await ensureSharedProjectAuthenticatedStart({ requireLogin: true }))) {
+        return false;
       }
-      return false;
-    }
-    multiAutoResumeAttempted = true;
-    clearStoredMultiResumeSession();
-    const opened = await openSharedProjectAccess({
-      inviteToken: normalizedEntry.sharedProjectInviteToken || '',
-      projectKey: normalizedEntry.sharedProjectKey || '',
-      requestedRole: normalizedEntry.sharedRoleHint || 'guest',
-      autoJoin: normalizedEntry.sharedAutoJoin !== false,
-    }, {
-      hideStartup,
-      silent,
-      successMessage: localizeText(
-        '共有プロジェクトを開きました',
-        'Opened shared project'
-      ),
-    });
-    if (opened) {
-      if (!skipLatestRefresh) {
-        setStartupProgressLabel(localizeText('共有プロジェクトの最新内容を取得中…', 'Fetching the latest shared project state...'));
-        await refreshActiveSharedProjectSnapshot({
-          force: true,
-          reason: 'open-shared-recent-latest',
-        });
+      await initPixieedAccount();
+      await ensureNoLegacyMultiSessionForSharedProject();
+      if (!await ensureSharedProjectBackendSession()) {
+        if (!silent) {
+          setMultiStatus(
+            localizeText('共有プロジェクトを開けませんでした。共有セッションを初期化できません。', 'Could not initialize a shared session for this project.'),
+            'warn'
+          );
+        }
+        return false;
       }
+      multiAutoResumeAttempted = true;
+      clearStoredMultiResumeSession();
+      const opened = await openSharedProjectAccess({
+        inviteToken: normalizedEntry.sharedProjectInviteToken || '',
+        projectKey: normalizedEntry.sharedProjectKey || '',
+        requestedRole: normalizedEntry.sharedRoleHint || 'guest',
+        autoJoin: normalizedEntry.sharedAutoJoin !== false,
+      }, {
+        hideStartup,
+        silent,
+        successMessage: localizeText(
+          '共有プロジェクトを開きました',
+          'Opened shared project'
+        ),
+      });
+      if (opened) {
+        if (!skipLatestRefresh) {
+          setStartupProgressLabel(localizeText('共有プロジェクトの最新内容を取得中…', 'Fetching the latest shared project state...'));
+          await refreshActiveSharedProjectSnapshot({
+            force: true,
+            reason: 'open-shared-recent-latest',
+          });
+        }
+        clearPendingSharedInvite();
+        setActiveAutosaveProjectId(normalizedEntry.id);
+        return true;
+      }
+      await purgeDeletedSharedProjectLocalReferences(
+        normalizedEntry.sharedProjectKey || '',
+        normalizedEntry.id || ''
+      );
+      await removeRecentProjectEntry(normalizedEntry.id || '');
       clearPendingSharedInvite();
-      setActiveAutosaveProjectId(normalizedEntry.id);
+      return false;
+    } catch (error) {
+      console.warn('Failed to open shared recent project', error);
+      await purgeDeletedSharedProjectLocalReferences(
+        normalizedEntry.sharedProjectKey || '',
+        normalizedEntry.id || ''
+      );
+      await removeRecentProjectEntry(normalizedEntry.id || '');
+      clearPendingSharedInvite();
+      return false;
     }
-    return opened;
   }
 
   async function openRecentProject(entry, options = {}) {
@@ -26929,96 +26947,99 @@
   async function init() {
     const endStartupProgress = beginStartupProgress(localizeText('起動準備中…', 'Preparing startup...'));
     try {
-      setStartupProgressLabel(localizeText('起動設定を確認中…', 'Checking startup settings...'));
-      await initializeIosSnapshotFallback();
-    } catch (error) {
-      console.warn('iOS snapshot bootstrap failed', error);
-    }
-    try {
-      await initializeAutosave();
-    } catch (error) {
-      console.warn('Autosave bootstrap failed', error);
-    }
-    if (RELOAD_SNAPSHOT_ENABLED) {
       try {
-        restoreReloadSessionSnapshot();
+        setStartupProgressLabel(localizeText('起動設定を確認中…', 'Checking startup settings...'));
+        await initializeIosSnapshotFallback();
       } catch (error) {
-        console.warn('Reload session restore failed', error);
-        if (canUseSessionStorage) {
-          try {
-            window.sessionStorage.removeItem(RELOAD_SNAPSHOT_STORAGE_KEY);
-          } catch (storageError) {
-            // Ignore reload snapshot cleanup failures.
+        console.warn('iOS snapshot bootstrap failed', error);
+      }
+      try {
+        await initializeAutosave();
+      } catch (error) {
+        console.warn('Autosave bootstrap failed', error);
+      }
+      if (RELOAD_SNAPSHOT_ENABLED) {
+        try {
+          restoreReloadSessionSnapshot();
+        } catch (error) {
+          console.warn('Reload session restore failed', error);
+          if (canUseSessionStorage) {
+            try {
+              window.sessionStorage.removeItem(RELOAD_SNAPSHOT_STORAGE_KEY);
+            } catch (storageError) {
+              // Ignore reload snapshot cleanup failures.
+            }
           }
         }
       }
-    }
-    try {
-      await initializeExportDirectoryBinding();
-    } catch (error) {
-      console.warn('Export directory bootstrap failed', error);
-    }
-    setupOpenProjectTabs();
-    ensureOpenProjectTabsInitialized();
-    setupLeftTabs();
-    setupRightTabs();
-    setupTopActionButtons();
-    setupLayout();
-    setupGlobalFocusDismiss();
-    setupControls();
-    void initPixieedAccount();
-    setupExportDialog();
-    setupExportInterstitialDialog();
-    setupLoginPromptDialog();
-    setupUpdateHistoryDialog();
-    setupToolSpotlightDialog();
-    setupRecentProjectDeleteConfirmDialog();
-    setupShareStartConfirmDialog();
-    setupSharedProjectLimitDialog();
-    setupHelpPanel();
-    setupTools();
-    setupToolGroups();
-    setupPaletteEditor();
-    setupFramesAndLayers();
-    setupCanvas();
-    setupMirrorGuides();
-    setupMirrorGuideResizeObserver();
-    setupMirrorToolPopover();
-    setupKeyboard();
-    updateDocumentMetadata();
-    setupStartupScreen();
-    const accountInitTask = initPixieedAccount();
-    const skipStartup = EMBED_CONFIG.skipStartup === true;
-    if (lensImportRequested || skipStartup) {
-      hideStartupScreen();
-    }
-    let restoredAutosaveProject = false;
-    if (!lensImportRequested && !skipStartup) {
       try {
-        await accountInitTask;
-        setStartupProgressLabel(localizeText('前回の作業を確認中…', 'Checking your previous work...'));
-        restoredAutosaveProject = await maybeRestoreAutosaveProjectOnStartup();
+        await initializeExportDirectoryBinding();
       } catch (error) {
-        console.warn('Startup autosave restore failed', error);
-        restoredAutosaveProject = false;
+        console.warn('Export directory bootstrap failed', error);
       }
+      setupOpenProjectTabs();
+      ensureOpenProjectTabsInitialized();
+      setupLeftTabs();
+      setupRightTabs();
+      setupTopActionButtons();
+      setupLayout();
+      setupGlobalFocusDismiss();
+      setupControls();
+      void initPixieedAccount();
+      setupExportDialog();
+      setupExportInterstitialDialog();
+      setupLoginPromptDialog();
+      setupUpdateHistoryDialog();
+      setupToolSpotlightDialog();
+      setupRecentProjectDeleteConfirmDialog();
+      setupShareStartConfirmDialog();
+      setupSharedProjectLimitDialog();
+      setupHelpPanel();
+      setupTools();
+      setupToolGroups();
+      setupPaletteEditor();
+      setupFramesAndLayers();
+      setupCanvas();
+      setupMirrorGuides();
+      setupMirrorGuideResizeObserver();
+      setupMirrorToolPopover();
+      setupKeyboard();
+      updateDocumentMetadata();
+      setupStartupScreen();
+      const accountInitTask = initPixieedAccount();
+      const skipStartup = EMBED_CONFIG.skipStartup === true;
+      if (lensImportRequested || skipStartup) {
+        hideStartupScreen();
+      }
+      let restoredAutosaveProject = false;
+      if (!lensImportRequested && !skipStartup) {
+        try {
+          await accountInitTask;
+          setStartupProgressLabel(localizeText('前回の作業を確認中…', 'Checking your previous work...'));
+          restoredAutosaveProject = await maybeRestoreAutosaveProjectOnStartup();
+        } catch (error) {
+          console.warn('Startup autosave restore failed', error);
+          restoredAutosaveProject = false;
+        }
+      }
+      let importedFromLens = false;
+      try {
+        setStartupProgressLabel(localizeText('起動内容を読込中…', 'Loading startup content...'));
+        importedFromLens = await maybeImportLensCapture();
+      } catch (error) {
+        console.warn('Lens capture bootstrap failed', error);
+        importedFromLens = false;
+      }
+      setStartupProgressLabel(localizeText('起動を完了しています…', 'Finalizing startup...'));
+      renderEverything();
+      refreshLocalizedUi();
+      scheduleDeferredUiSetup();
+      if (!lensImportRequested && !importedFromLens && !skipStartup && !restoredAutosaveProject && !reloadSnapshotRestored && !hasDismissedStartupScreen()) {
+        showStartupScreen();
+      }
+    } finally {
+      endStartupProgress();
     }
-    let importedFromLens = false;
-    try {
-      setStartupProgressLabel(localizeText('起動内容を読込中…', 'Loading startup content...'));
-      importedFromLens = await maybeImportLensCapture();
-    } catch (error) {
-      console.warn('Lens capture bootstrap failed', error);
-      importedFromLens = false;
-    }
-    setStartupProgressLabel(localizeText('起動を完了しています…', 'Finalizing startup...'));
-    renderEverything();
-    refreshLocalizedUi();
-    scheduleDeferredUiSetup();
-    if (!lensImportRequested && !importedFromLens && !skipStartup && !restoredAutosaveProject && !reloadSnapshotRestored && !hasDismissedStartupScreen()) {
-      showStartupScreen();
-    }
-    endStartupProgress();
   }
 
   function getActiveTool() {
