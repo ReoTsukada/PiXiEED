@@ -18111,14 +18111,18 @@
   function openSharedProjectLimitDialog(maxSharedProjects = getMaxSharedProjectCount()) {
     const config = dom.sharedProjectLimit;
     const dialog = config?.dialog;
+    const {
+      ownedProjectCount,
+      effectiveLimit,
+    } = getSharedProjectOwnershipStatus();
     const message = localizeText(
-      '継続応援をしてシェア上限を増やしませんか？',
-      'Would you like to increase your shared project limit with ongoing support?'
+      '共有プロジェクトは上限以上のため開けません',
+      'Shared projects cannot be opened because you are at or above the limit'
     );
-    const detail = localizeText(
-      `または共有プロジェクトを消しますか？ 上限は現在 ${maxSharedProjects} 件です。不要な共有を削除すると新しく共有を作成できます。`,
-      `Or would you rather delete a shared project? Your current limit is ${maxSharedProjects}. Remove an old shared project to create a new one.`
-    );
+    const detail = buildSharedProjectOpenBlockedMessage({
+      effectiveLimit: Math.max(1, effectiveLimit || maxSharedProjects),
+      ownedProjectCount,
+    });
     if (config?.message instanceof HTMLElement) {
       config.message.textContent = message;
     }
@@ -19419,15 +19423,56 @@
     );
   }
 
+  function getSharedProjectOwnershipStatus(entries = null) {
+    const sourceEntries = Array.isArray(entries) ? entries : Array.from(recentProjectsCache.values());
+    const ownedProjectCount = getOwnedSharedRecentProjectEntries(sourceEntries).length;
+    const effectiveLimit = Math.max(1, getMaxSharedProjectCount());
+    const excessCount = Math.max(0, ownedProjectCount - effectiveLimit);
+    return {
+      ownedProjectCount,
+      effectiveLimit,
+      excessCount,
+      overLimit: excessCount > 0,
+    };
+  }
+
+  function buildSharedProjectCreationBlockedMessage({
+    effectiveLimit = getMaxSharedProjectCount(),
+    ownedProjectCount = 0,
+    excessCount = 0,
+  } = {}) {
+    const normalizedOwnedProjectCount = Math.max(0, Math.round(Number(ownedProjectCount) || 0));
+    const normalizedEffectiveLimit = Math.max(1, Math.round(Number(effectiveLimit) || getMaxSharedProjectCount()));
+    const normalizedExcessCount = Math.max(0, Math.round(Number(excessCount) || 0));
+    return localizeText(
+      `共有プロジェクトは ${normalizedOwnedProjectCount} 件あります。現在の上限は ${normalizedEffectiveLimit} 件です。既存の共有プロジェクトはそのまま開けますが、新しく作成するには ${normalizedExcessCount} 件整理してください。`,
+      `You currently have ${normalizedOwnedProjectCount} shared projects. Your current limit is ${normalizedEffectiveLimit}. Existing shared projects stay available, but you need to remove ${normalizedExcessCount} before creating a new one.`
+    );
+  }
+
+  function buildSharedProjectOpenBlockedMessage({
+    effectiveLimit = getMaxSharedProjectCount(),
+    ownedProjectCount = 0,
+  } = {}) {
+    const normalizedOwnedProjectCount = Math.max(0, Math.round(Number(ownedProjectCount) || 0));
+    const normalizedEffectiveLimit = Math.max(1, Math.round(Number(effectiveLimit) || getMaxSharedProjectCount()));
+    const reduceCount = Math.max(1, normalizedOwnedProjectCount - normalizedEffectiveLimit + 1);
+    return localizeText(
+      `共有プロジェクトは ${normalizedOwnedProjectCount} 件あり、現在の上限 ${normalizedEffectiveLimit} 件以上です。この状態では共有プロジェクトを開けません。先に ${reduceCount} 件整理してください。`,
+      `You have ${normalizedOwnedProjectCount} shared projects, which is at or above your current limit of ${normalizedEffectiveLimit}. Shared projects cannot be opened in this state. Please remove ${reduceCount} first.`
+    );
+  }
+
   function buildSharedProjectGraceMessage({
     effectiveLimit = getMaxSharedProjectCount(),
     ownedProjectCount = 0,
     graceUntil = '',
   } = {}) {
-    return localizeText(
-      `共有プロジェクトが上限超過です（${ownedProjectCount}件 / 目安${effectiveLimit}件）。既存プロジェクトは保持されますが、新規作成は上限内まで整理するまで制限されます。`,
-      `Shared projects exceed the limit (${ownedProjectCount} / target ${effectiveLimit}). Existing projects are preserved, but creating new ones stays blocked until you are back under the limit.`
-    );
+    return buildSharedProjectCreationBlockedMessage({
+      effectiveLimit,
+      ownedProjectCount,
+      excessCount: Math.max(0, Math.round(Number(ownedProjectCount) || 0) - Math.max(1, Math.round(Number(effectiveLimit) || getMaxSharedProjectCount()))),
+    });
   }
 
   async function pruneSharedRecentEntriesToKnownProjects(knownProjectKeys = []) {
@@ -19532,20 +19577,17 @@
     if (!countOwned) {
       return true;
     }
-    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
     const existingEntries = await loadRecentProjectsMetadata();
-    const existingOwnedSharedEntries = getOwnedSharedRecentProjectEntries(existingEntries);
-    const alreadyTracked = existingOwnedSharedEntries.some(entry => normalizeMultiProjectKey(entry.sharedProjectKey || '') === normalizedProjectKey);
-    if (alreadyTracked) {
-      return true;
-    }
-    const maxSharedProjects = getMaxSharedProjectCount();
-    if (existingOwnedSharedEntries.length < maxSharedProjects) {
+    const { ownedProjectCount, effectiveLimit } = getSharedProjectOwnershipStatus(existingEntries);
+    if (ownedProjectCount < effectiveLimit) {
       return true;
     }
     if (announce) {
-      setMultiStatus(buildSharedProjectLimitMessage(maxSharedProjects), 'warn');
-      openSharedProjectLimitDialog(maxSharedProjects);
+      setMultiStatus(buildSharedProjectOpenBlockedMessage({
+        effectiveLimit,
+        ownedProjectCount,
+      }), 'warn');
+      openSharedProjectLimitDialog(effectiveLimit);
     }
     return false;
   }
@@ -56673,7 +56715,22 @@
       return false;
     }
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    const normalizedProjectId = typeof projectId === 'string' ? projectId.trim() : '';
     if (!normalizedProjectKey) {
+      return false;
+    }
+    if (!normalizedProjectId) {
+      setMultiStatus(
+        localizeText(
+          '共有プロジェクトの識別子が壊れているため開けません。共有一覧を更新してから再度開いてください。',
+          'This shared project is missing its identifier and cannot be opened. Refresh your shared project list and try again.'
+        ),
+        'error'
+      );
+      console.warn('[shared-backend] missing project id before claiming session lock', {
+        projectKey: normalizedProjectKey,
+        projectId,
+      });
       return false;
     }
     try {
@@ -56683,11 +56740,20 @@
       }
       const { data, error } = await supabase.rpc('pixieed_claim_shared_project_session', {
         target_project_key: normalizedProjectKey,
-        target_project_id: typeof projectId === 'string' && projectId.trim() ? projectId.trim() : null,
+        target_project_id: normalizedProjectId,
         target_device_id: ensureSharedProjectDeviceId(),
         target_session_id: ensureSharedProjectSessionInstanceId(),
       });
       if (error) {
+        if (Number(error?.status || 0) === 400) {
+          setMultiStatus(
+            localizeText(
+              'この共有プロジェクトのセッション情報が古いか壊れています。共有一覧を更新してから開き直してください。',
+              'This shared project has stale or broken session metadata. Refresh your shared project list and open it again.'
+            ),
+            'error'
+          );
+        }
         handleSharedProjectsBackendError(error, 'claim-shared-session');
         return false;
       }
@@ -63122,8 +63188,13 @@
     }
     if (dom.controls.multiStartSession instanceof HTMLButtonElement) {
       const canStartSharedFlow = sharedProjectFlowPreferred && !multiState.connecting && !sharedModeEnabled;
+      const sharedOwnershipStatus = getSharedProjectOwnershipStatus();
+      const sharedCreationBlocked = sharedProjectFlowPreferred
+        && !sharedModeEnabled
+        && !multiState.connecting
+        && sharedOwnershipStatus.overLimit;
       dom.controls.multiStartSession.disabled = sharedProjectFlowPreferred
-        ? !canStartSharedFlow
+        ? (!canStartSharedFlow || sharedCreationBlocked)
         : (multiState.connecting || multiState.connected || !currentProjectKey || isEntryView);
       dom.controls.multiStartSession.hidden = false;
       dom.controls.multiStartSession.textContent = sharedProjectFlowPreferred
@@ -63141,6 +63212,8 @@
               : localizeText('すでに開始済みです', 'Already started')));
       } else if (multiState.connecting) {
         dom.controls.multiStartSession.title = localizeText('接続中です', 'Connecting...');
+      } else if (sharedCreationBlocked) {
+        dom.controls.multiStartSession.title = buildSharedProjectCreationBlockedMessage(sharedOwnershipStatus);
       } else if (sharedProjectFlowPreferred) {
         dom.controls.multiStartSession.title = sharedModeEnabled
           ? localizeText('このプロジェクトは共有中です', 'This project is shared')
