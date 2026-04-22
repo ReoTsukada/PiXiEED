@@ -21544,20 +21544,10 @@
         setActiveAutosaveProjectId(normalizedEntry.id);
         return true;
       }
-      await purgeDeletedSharedProjectLocalReferences(
-        normalizedEntry.sharedProjectKey || '',
-        normalizedEntry.id || ''
-      );
-      await removeRecentProjectEntry(normalizedEntry.id || '');
       clearPendingSharedInvite();
       return false;
     } catch (error) {
       console.warn('Failed to open shared recent project', error);
-      await purgeDeletedSharedProjectLocalReferences(
-        normalizedEntry.sharedProjectKey || '',
-        normalizedEntry.id || ''
-      );
-      await removeRecentProjectEntry(normalizedEntry.id || '');
       clearPendingSharedInvite();
       return false;
     }
@@ -54241,7 +54231,15 @@
     const online = typeof navigator !== 'undefined' ? Boolean(navigator.onLine) : null;
     const userAgent = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : '';
     if (accountState.isLoggedIn) {
-      if (shouldDisableSharedProjectsBackend(error)) {
+      if (code === '42804' && context === 'claim-shared-session') {
+        setMultiStatus(
+          localizeText(
+            '共有機能のサーバー定義が古いため、この共有プロジェクトを開けません。サーバー更新後に再度お試しください。',
+            'This shared project cannot be opened because the shared backend function definition is outdated. Please try again after the server is updated.'
+          ),
+          'error'
+        );
+      } else if (shouldDisableSharedProjectsBackend(error)) {
         setMultiStatus(
           localizeText(
             '共有機能の本番データベースが未反映です。shared project の移行が本番に入っていません。',
