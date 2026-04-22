@@ -56786,6 +56786,23 @@
         target_session_id: ensureSharedProjectSessionInstanceId(),
       });
       if (error) {
+        if (String(error?.code || '') === '42804') {
+          setMultiStatus(
+            localizeText(
+              '共有セッション確認APIが古いため、ロック確認を省略して共有プロジェクトを開きます。一部の同時利用制御は無効です。',
+              'The shared session claim API is outdated, so the project will open without session locking. Some concurrent-use protections are disabled.'
+            ),
+            'warn'
+          );
+          console.warn('[shared-backend] bypassing broken claim-shared-session rpc', {
+            projectKey: normalizedProjectKey,
+            projectId: normalizedProjectId,
+            code: error?.code || '',
+            message: error?.message || '',
+            details: error?.details || '',
+          });
+          return true;
+        }
         if (Number(error?.status || 0) === 400) {
           setMultiStatus(
             localizeText(
