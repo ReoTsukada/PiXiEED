@@ -1018,6 +1018,8 @@
   const RELOAD_SNAPSHOT_ENABLED = true;
   const RELOAD_SNAPSHOT_STORAGE_KEY = 'pixieedraw:reload-snapshot-v1';
   const RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY = 'pixieedraw:reload-snapshot-fallback-v1';
+  const RELOAD_PROJECT_FALLBACK_STORAGE_KEY = 'pixieedraw:reload-project-fallback-v1';
+  const RELOAD_TARGET_PROJECT_ID_KEY = 'pixieedraw:reload-target-project-id-v1';
   const RELOAD_SNAPSHOT_VERSION = 1;
   const RELOAD_SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const RELOAD_SNAPSHOT_MAX_HISTORY_ITEMS = 160;
@@ -2483,6 +2485,7 @@
   const RECENT_PROJECT_STORAGE_SHARED = 'shared';
   const AUTOSAVE_HANDLE_KEY = 'document';
   const AUTOSAVE_ACTIVE_PROJECT_KEY = 'activeProjectId';
+  const AUTOSAVE_ACTIVE_PROJECT_SYNC_KEY = 'pixieedraw:active-project-sync';
   const AUTOSAVE_TAB_LOCK_KEY = 'pixieedraw:autosave-tab-lock-v1';
   const AUTOSAVE_TAB_LOCK_TTL_MS = 8000;
   const AUTOSAVE_TAB_LOCK_NOTICE_THROTTLE_MS = 3000;
@@ -3037,6 +3040,101 @@
       return normalizedBaseKey;
     }
     return `${normalizedBaseKey}:${normalizedNamespace}`;
+  }
+
+  function getLocalRestoreStorageKeys(baseKey) {
+    const normalizedBaseKey = typeof baseKey === 'string' ? baseKey.trim() : '';
+    if (!normalizedBaseKey) {
+      return [];
+    }
+    const keys = [normalizedBaseKey];
+    const scopedKey = getScopedStorageKey(normalizedBaseKey);
+    if (scopedKey && scopedKey !== normalizedBaseKey) {
+      keys.push(scopedKey);
+    }
+    return keys;
+  }
+
+  function writeSessionStorageForLocalRestore(baseKey, value) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    getLocalRestoreStorageKeys(baseKey).forEach(key => {
+      try {
+        window.sessionStorage.setItem(key, value);
+      } catch (error) {
+        // Ignore storage write failures.
+      }
+    });
+  }
+
+  function writeLocalStorageForLocalRestore(baseKey, value) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    getLocalRestoreStorageKeys(baseKey).forEach(key => {
+      try {
+        window.localStorage.setItem(key, value);
+      } catch (error) {
+        // Ignore storage write failures.
+      }
+    });
+  }
+
+  function readSessionStorageForLocalRestore(baseKey) {
+    if (!canUseSessionStorage) {
+      return '';
+    }
+    const keys = getLocalRestoreStorageKeys(baseKey);
+    for (let index = 0; index < keys.length; index += 1) {
+      const key = keys[index];
+      try {
+        const value = window.sessionStorage.getItem(key) || '';
+        if (value) {
+          return value;
+        }
+      } catch (error) {
+        // Ignore storage read failures.
+      }
+    }
+    return '';
+  }
+
+  function readLocalStorageForLocalRestore(baseKey) {
+    if (!canUseSessionStorage) {
+      return '';
+    }
+    const keys = getLocalRestoreStorageKeys(baseKey);
+    for (let index = 0; index < keys.length; index += 1) {
+      const key = keys[index];
+      try {
+        const value = window.localStorage.getItem(key) || '';
+        if (value) {
+          return value;
+        }
+      } catch (error) {
+        // Ignore storage read failures.
+      }
+    }
+    return '';
+  }
+
+  function clearLocalRestoreStorage(baseKey) {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    getLocalRestoreStorageKeys(baseKey).forEach(key => {
+      try {
+        window.sessionStorage.removeItem(key);
+      } catch (error) {
+        // Ignore sessionStorage cleanup failures.
+      }
+      try {
+        window.localStorage.removeItem(key);
+      } catch (error) {
+        // Ignore localStorage cleanup failures.
+      }
+    });
   }
 
   function normalizeRecentProjectAccountUserId(value = '') {
@@ -7904,6 +8002,50 @@
     return tab;
   }
 
+  function replaceActiveOpenProjectTabFromCurrentState(options = {}) {
+    ensureOpenProjectTabsInitialized();
+    const index = findOpenProjectTabIndex(activeOpenProjectTabId);
+    if (index < 0) {
+      return null;
+    }
+    const current = openProjectTabs[index];
+    const updated = createOpenProjectTabFromCurrentState({
+      tabId: current?.id || activeOpenProjectTabId,
+      source: options.source || current?.source || 'working',
+      projectId: normalizeAutosaveProjectId(options.projectId || autosaveProjectId) || current?.projectId || '',
+      fileName: options.fileName || current?.fileName || '',
+    });
+    openProjectTabs[index] = updated;
+    activeOpenProjectTabId = updated.id;
+    renderOpenProjectTabs();
+    return updated;
+  }
+
+  function canReuseActiveOpenProjectTabForRecentEntry(entry) {
+    const normalizedEntryId = normalizeAutosaveProjectId(entry?.id || '');
+    if (!normalizedEntryId) {
+      return false;
+    }
+    const activeTab = getActiveOpenProjectTab();
+    if (!activeTab || activeTab.id !== activeOpenProjectTabId) {
+      return false;
+    }
+    if (activeTab.source !== 'initial') {
+      return false;
+    }
+    if (activeTab.unsaved || hasDocumentUnsavedChanges()) {
+      return false;
+    }
+    const activeProjectId = normalizeAutosaveProjectId(activeTab.projectId || autosaveProjectId || '');
+    if (!activeProjectId || activeProjectId === normalizedEntryId) {
+      return false;
+    }
+    if (recentProjectsCache.has(activeProjectId)) {
+      return false;
+    }
+    return true;
+  }
+
   async function persistActiveOpenProjectTab({ flushAutosave = false } = {}) {
     ensureOpenProjectTabsInitialized();
     const index = findOpenProjectTabIndex(activeOpenProjectTabId);
@@ -8612,6 +8754,14 @@
   }
 
   function handleAutosavePageHide() {
+    if (RELOAD_SNAPSHOT_ENABLED) {
+      persistReloadSessionSnapshot();
+      persistReloadProjectFallback();
+      persistReloadTargetProjectId();
+    }
+    if (canUseSessionStorage) {
+      persistSessionState();
+    }
     flushPendingTimelapseCapture({ force: true });
     flushAutosaveSnapshotOnLifecycle({ force: true });
   }
@@ -8619,6 +8769,14 @@
   function handleAutosaveVisibilityChange() {
     if (document.visibilityState !== 'hidden') {
       return;
+    }
+    if (RELOAD_SNAPSHOT_ENABLED) {
+      persistReloadSessionSnapshot();
+      persistReloadProjectFallback();
+      persistReloadTargetProjectId();
+    }
+    if (canUseSessionStorage) {
+      persistSessionState();
     }
     flushPendingTimelapseCapture({ force: true });
     flushAutosaveSnapshotOnLifecycle({ force: true });
@@ -13561,15 +13719,17 @@
     updateAutosaveStatus('自動保存: 端末内データを確認中…');
 
     try {
+      if (reloadSnapshotRestored && autosaveProjectId) {
+        startupAutosaveRestoreProjectId = normalizeAutosaveProjectId(autosaveProjectId || '');
+        updateAutosaveStatus('自動保存: 再読み込み復帰のプロジェクトを維持します', 'info');
+        return;
+      }
       const sanitizeResult = await sanitizeRecentProjectsStore({ announce: false });
       const recentEntries = Array.isArray(sanitizeResult?.entries) ? sanitizeResult.entries : [];
       const storedProjectId = await loadStoredAutosaveProjectId();
       const reusableProjectId = normalizeAutosaveProjectId(storedProjectId || '');
       const startupRestoreTargetId = reusableProjectId
-        ? normalizeAutosaveProjectId(
-            recentEntries.find(entry => entry?.id === reusableProjectId)?.id
-            || (recentEntries[0]?.id || '')
-          )
+        ? reusableProjectId
         : normalizeAutosaveProjectId(recentEntries[0]?.id || '');
       startupAutosaveRestoreProjectId = startupRestoreTargetId;
       setActiveAutosaveProjectId(startupRestoreTargetId || reusableProjectId || createAutosaveProjectId());
@@ -14449,6 +14609,7 @@
         );
         return false;
       }
+      const shouldReuseActiveTab = canReuseActiveOpenProjectTabForRecentEntry(entry);
       openProjectTabBusy = true;
       try {
         await persistActiveOpenProjectTab({ flushAutosave: true });
@@ -14459,12 +14620,17 @@
         if (!loaded) {
           return false;
         }
-        const appended = appendOpenProjectTabFromCurrentState({
-          activate: true,
-          source: 'local-recent',
-          projectId: projectId || autosaveProjectId,
-        });
-        if (!appended) {
+        const nextTab = shouldReuseActiveTab
+          ? replaceActiveOpenProjectTabFromCurrentState({
+              source: 'local-recent',
+              projectId: projectId || autosaveProjectId,
+            })
+          : appendOpenProjectTabFromCurrentState({
+              activate: true,
+              source: 'local-recent',
+              projectId: projectId || autosaveProjectId,
+            });
+        if (!nextTab) {
           return false;
         }
         if (hideStartup) {
@@ -18376,18 +18542,21 @@
     if (readMultiInviteFromUrl()) {
       return false;
     }
-    const recentEntries = Array.from(recentProjectsCache.values());
-    if (!recentEntries.length) {
+    const recentEntries = await loadRecentProjectsMetadata();
+    const limitedEntries = enforceSharedRecentProjectLimit(recentEntries);
+    setRecentProjectsCache(limitedEntries);
+    if (!limitedEntries.length) {
       return false;
     }
     const requestedProjectId = normalizeAutosaveProjectId(
-      startupAutosaveRestoreProjectId
+      readReloadTargetProjectId()
+      || startupAutosaveRestoreProjectId
       || autosaveProjectId
       || ''
     );
-    const targetEntry = (requestedProjectId && recentProjectsCache.get(requestedProjectId))
-      || recentEntries[0]
-      || null;
+    const targetEntry = requestedProjectId
+      ? (recentProjectsCache.get(requestedProjectId) || limitedEntries.find(entry => normalizeAutosaveProjectId(entry?.id || '') === requestedProjectId) || null)
+      : (limitedEntries[0] || null);
     if (!targetEntry) {
       return false;
     }
@@ -18406,8 +18575,9 @@
         return false;
       }
     }
-    const restored = await openRecentProjectAsTab(targetEntry, { hideStartup: true });
+    const restored = await openRecentProject(targetEntry, { hideStartup: true, silent: true });
     if (restored) {
+      clearReloadTargetProjectId();
       updateAutosaveStatus(
         localizeText('自動保存: 端末内プロジェクトを復元しました', 'Autosave: restored local project'),
         'success'
@@ -18561,7 +18731,7 @@
         );
         return;
       }
-      const opened = await openRecentProjectAsTab(firstEntry, { hideStartup: true });
+      const opened = await openRecentProject(firstEntry, { hideStartup: true, silent: true });
       if (!opened) {
         refreshRecentProjectsUI().catch(error => {
           console.warn('Failed to refresh recent projects', error);
@@ -18692,7 +18862,7 @@
         return;
       }
       openButton.disabled = true;
-      const success = await openRecentProjectAsTab(entry, { hideStartup: true });
+      const success = await openRecentProject(entry, { hideStartup: true, silent: true });
       if (!success) {
         openButton.disabled = false;
       }
@@ -19233,18 +19403,7 @@
     if (!Array.isArray(entries) || !entries.length) {
       return [];
     }
-    const maxSharedProjects = getMaxSharedProjectCount();
-    let keptOwnedSharedProjects = 0;
-    return entries.filter(entry => {
-      if (!isOwnedSharedRecentProjectEntry(entry)) {
-        return true;
-      }
-      if (keptOwnedSharedProjects >= maxSharedProjects) {
-        return false;
-      }
-      keptOwnedSharedProjects += 1;
-      return true;
-    });
+    return entries.slice();
   }
 
   function buildSharedProjectLimitMessage(maxSharedProjects = getMaxSharedProjectCount()) {
@@ -19265,21 +19424,9 @@
     ownedProjectCount = 0,
     graceUntil = '',
   } = {}) {
-    const graceTimestamp = Date.parse(graceUntil || '');
-    const graceLabel = Number.isFinite(graceTimestamp)
-      ? formatUpdateHistoryDate(graceTimestamp, '')
-      : '';
-    const baseJa = `共有プロジェクトが上限超過です（${ownedProjectCount}件 / 上限${effectiveLimit}件）`;
-    const baseEn = `Shared projects exceed the limit (${ownedProjectCount} / limit ${effectiveLimit})`;
-    if (graceLabel) {
-      return localizeText(
-        `${baseJa}。${graceLabel} までに整理しないと古い共有プロジェクトから自動削除されます。`,
-        `${baseEn}. Older shared projects will be removed automatically if you do not reduce them by ${graceLabel}.`
-      );
-    }
     return localizeText(
-      `${baseJa}。7日以内に整理しないと古い共有プロジェクトから自動削除されます。`,
-      `${baseEn}. Older shared projects will be removed automatically in 7 days unless you reduce them.`
+      `共有プロジェクトが上限超過です（${ownedProjectCount}件 / 目安${effectiveLimit}件）。既存プロジェクトは保持されますが、新規作成は上限内まで整理するまで制限されます。`,
+      `Shared projects exceed the limit (${ownedProjectCount} / target ${effectiveLimit}). Existing projects are preserved, but creating new ones stays blocked until you are back under the limit.`
     );
   }
 
@@ -19310,52 +19457,23 @@
   }
 
   async function enforceSharedProjectOwnershipLimit() {
-    if (!canUseSharedProjectsBackend() && !await ensureSharedProjectBackendSession()) {
-      return null;
+    const effectiveLimit = Math.max(1, getMaxSharedProjectCount());
+    const existingEntries = await loadRecentProjectsMetadata();
+    const ownedProjectCount = getOwnedSharedRecentProjectEntries(existingEntries).length;
+    const result = {
+      effective_limit: effectiveLimit,
+      owned_project_count: ownedProjectCount,
+      deleted_project_keys: [],
+      grace_active: ownedProjectCount > effectiveLimit,
+      grace_until: '',
+    };
+    if (ownedProjectCount > effectiveLimit) {
+      setMultiStatus(buildSharedProjectGraceMessage({
+        effectiveLimit,
+        ownedProjectCount,
+      }), 'warn');
     }
-    try {
-      const supabase = await ensurePixieedAccountClient();
-      if (!supabase) {
-        return null;
-      }
-      const { data, error } = await supabase.rpc('pixieed_enforce_shared_project_limit');
-      if (error) {
-        handleSharedProjectsBackendError(error, 'enforce-shared-project-limit');
-        return null;
-      }
-      const result = Array.isArray(data) ? (data[0] || null) : (data || null);
-      if (!result) {
-        return null;
-      }
-      const effectiveLimit = Math.max(1, Math.round(Number(result.effective_limit) || getMaxSharedProjectCount()));
-      const ownedProjectCount = Math.max(0, Math.round(Number(result.owned_project_count) || 0));
-      const deletedProjectKeys = Array.isArray(result.deleted_project_keys)
-        ? result.deleted_project_keys.map(value => normalizeMultiProjectKey(value || '')).filter(Boolean)
-        : [];
-      if (deletedProjectKeys.length) {
-        const knownProjectKeys = getSharedRecentProjectEntries()
-          .map(entry => normalizeMultiProjectKey(entry.sharedProjectKey || ''))
-          .filter(projectKey => projectKey && !deletedProjectKeys.includes(projectKey));
-        await pruneSharedRecentEntriesToKnownProjects(knownProjectKeys);
-        setMultiStatus(
-          localizeText(
-            `共有プロジェクト上限に合わせて ${deletedProjectKeys.length} 件の古い共有プロジェクトを自動削除しました`,
-            `Automatically removed ${deletedProjectKeys.length} older shared projects to match your limit`
-          ),
-          'warn'
-        );
-      } else if (result.grace_active) {
-        setMultiStatus(buildSharedProjectGraceMessage({
-          effectiveLimit,
-          ownedProjectCount,
-          graceUntil: typeof result.grace_until === 'string' ? result.grace_until : '',
-        }), 'warn');
-      }
-      return result;
-    } catch (error) {
-      handleSharedProjectsBackendError(error, 'enforce-shared-project-limit-exception');
-      return null;
-    }
+    return result;
   }
 
   async function deleteOwnedSharedProjectFromBackend(entry = null) {
@@ -19415,51 +19533,6 @@
       return true;
     }
     const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
-    if (canUseSharedProjectsBackend() || await ensureSharedProjectBackendSession()) {
-      try {
-        const supabase = await ensurePixieedAccountClient();
-        if (supabase) {
-          const { data, error } = await supabase.rpc('pixieed_enforce_shared_project_limit');
-          if (!error) {
-            const result = Array.isArray(data) ? (data[0] || null) : (data || null);
-            const effectiveLimit = Math.max(1, Math.round(Number(result?.effective_limit) || getMaxSharedProjectCount()));
-            const ownedProjectCount = Math.max(0, Math.round(Number(result?.owned_project_count) || 0));
-            const deletedProjectKeys = Array.isArray(result?.deleted_project_keys)
-              ? result.deleted_project_keys.map(value => normalizeMultiProjectKey(value || '')).filter(Boolean)
-              : [];
-            if (deletedProjectKeys.length) {
-              const knownProjectKeys = getSharedRecentProjectEntries()
-                .map(entry => normalizeMultiProjectKey(entry.sharedProjectKey || ''))
-                .filter(projectKeyValue => projectKeyValue && !deletedProjectKeys.includes(projectKeyValue));
-              await pruneSharedRecentEntriesToKnownProjects(knownProjectKeys);
-              for (const deletedProjectKey of deletedProjectKeys) {
-                await purgeDeletedSharedProjectLocalReferences(
-                  deletedProjectKey,
-                  buildSharedRecentProjectId(deletedProjectKey)
-                );
-              }
-            }
-            if (normalizedProjectKey) {
-              const alreadyOwnedOnBackend = getOwnedSharedRecentProjectEntries()
-                .some(entry => normalizeMultiProjectKey(entry.sharedProjectKey || '') === normalizedProjectKey);
-              if (alreadyOwnedOnBackend) {
-                return true;
-              }
-            }
-            if (ownedProjectCount < effectiveLimit) {
-              return true;
-            }
-            if (announce) {
-              setMultiStatus(buildSharedProjectLimitMessage(effectiveLimit), 'warn');
-              openSharedProjectLimitDialog(effectiveLimit);
-            }
-            return false;
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to validate shared project capacity via backend', error);
-      }
-    }
     const existingEntries = await loadRecentProjectsMetadata();
     const existingOwnedSharedEntries = getOwnedSharedRecentProjectEntries(existingEntries);
     const alreadyTracked = existingOwnedSharedEntries.some(entry => normalizeMultiProjectKey(entry.sharedProjectKey || '') === normalizedProjectKey);
@@ -19662,6 +19735,20 @@
 
   async function loadStoredAutosaveProjectId() {
     if (!AUTOSAVE_SUPPORTED) return '';
+    if (canUseSessionStorage) {
+      try {
+        const synced = normalizeAutosaveProjectId(
+          readSessionStorageForLocalRestore(AUTOSAVE_ACTIVE_PROJECT_SYNC_KEY)
+          || readLocalStorageForLocalRestore(AUTOSAVE_ACTIVE_PROJECT_SYNC_KEY)
+          || ''
+        );
+        if (synced) {
+          return synced;
+        }
+      } catch (error) {
+        // Ignore sync-storage read failures and fall back to IndexedDB.
+      }
+    }
     try {
       const db = await openAutosaveDatabase();
       return await new Promise((resolve, reject) => {
@@ -19695,6 +19782,10 @@
     const normalizedId = normalizeAutosaveProjectId(projectId) || createAutosaveProjectId();
     const changed = autosaveProjectId !== normalizedId;
     autosaveProjectId = normalizedId;
+    if (persist && canUseSessionStorage) {
+      writeSessionStorageForLocalRestore(AUTOSAVE_ACTIVE_PROJECT_SYNC_KEY, normalizedId);
+      writeLocalStorageForLocalRestore(AUTOSAVE_ACTIVE_PROJECT_SYNC_KEY, normalizedId);
+    }
     if (persist && changed) {
       storeAutosaveProjectId(normalizedId).catch(error => {
         console.warn('Failed to persist autosave project id', error);
@@ -27191,11 +27282,6 @@
       } catch (error) {
         console.warn('iOS snapshot bootstrap failed', error);
       }
-      try {
-        await initializeAutosave();
-      } catch (error) {
-        console.warn('Autosave bootstrap failed', error);
-      }
       if (RELOAD_SNAPSHOT_ENABLED) {
         try {
           restoreReloadSessionSnapshot();
@@ -27209,6 +27295,11 @@
             }
           }
         }
+      }
+      try {
+        await initializeAutosave();
+      } catch (error) {
+        console.warn('Autosave bootstrap failed', error);
       }
       try {
         await initializeExportDirectoryBinding();
@@ -27249,8 +27340,8 @@
       if (lensImportRequested || skipStartup) {
         hideStartupScreen();
       }
-      let restoredAutosaveProject = false;
-      if (!lensImportRequested && !skipStartup) {
+      let restoredAutosaveProject = Boolean(reloadSnapshotRestored);
+      if (!lensImportRequested && !skipStartup && !reloadSnapshotRestored) {
         try {
           await accountInitTask;
           setStartupProgressLabel(localizeText('前回の作業を確認中…', 'Checking your previous work...'));
@@ -50946,6 +51037,8 @@
 
   function buildReloadSnapshotPayload(maxHistoryItems = 0) {
     const currentSnapshot = compressHistorySnapshot(makeHistorySnapshot({ clonePixelData: false }));
+    const activeProjectTab = getActiveOpenProjectTab();
+    const activeProjectId = normalizeAutosaveProjectId(activeProjectTab?.projectId || '');
     const normalizedHistoryLimit = Math.max(MIN_HISTORY_LIMIT, Math.round(Number(history.limit) || DEFAULT_HISTORY_LIMIT));
     const maxAvailable = Math.max(
       Array.isArray(history.past) ? history.past.length : 0,
@@ -50965,7 +51058,7 @@
     return {
       version: RELOAD_SNAPSHOT_VERSION,
       at: Date.now(),
-      projectId: normalizeAutosaveProjectId(autosaveProjectId || ''),
+      projectId: activeProjectId || normalizeAutosaveProjectId(autosaveProjectId || ''),
       current: currentSnapshot,
       past,
       future,
@@ -51126,16 +51219,8 @@
       return;
     }
     if (isCurrentProjectSharedEntry()) {
-      try {
-        window.sessionStorage.removeItem(getScopedStorageKey(RELOAD_SNAPSHOT_STORAGE_KEY));
-      } catch (error) {
-        // Ignore storage errors.
-      }
-      try {
-        window.localStorage.removeItem(getScopedStorageKey(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY));
-      } catch (error) {
-        // Ignore storage errors.
-      }
+      clearLocalRestoreStorage(RELOAD_SNAPSHOT_STORAGE_KEY);
+      clearLocalRestoreStorage(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY);
       return;
     }
     if (multiState.connected || multiState.connecting) {
@@ -51161,16 +51246,12 @@
         break;
       }
       try {
-        window.sessionStorage.setItem(getScopedStorageKey(RELOAD_SNAPSHOT_STORAGE_KEY), encoded);
-        try {
-          window.localStorage.setItem(getScopedStorageKey(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY), encoded);
-        } catch (fallbackError) {
-          // Ignore localStorage fallback failures.
-        }
+        writeSessionStorageForLocalRestore(RELOAD_SNAPSHOT_STORAGE_KEY, encoded);
+        writeLocalStorageForLocalRestore(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY, encoded);
         return;
       } catch (error) {
         try {
-          window.localStorage.setItem(getScopedStorageKey(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY), encoded);
+          writeLocalStorageForLocalRestore(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY, encoded);
           return;
         } catch (fallbackError) {
           // Continue trimming history below.
@@ -51182,15 +51263,133 @@
       }
       attempt += 1;
     }
-    try {
-      window.sessionStorage.removeItem(getScopedStorageKey(RELOAD_SNAPSHOT_STORAGE_KEY));
-    } catch (error) {
-      // Ignore storage errors.
+    clearLocalRestoreStorage(RELOAD_SNAPSHOT_STORAGE_KEY);
+    clearLocalRestoreStorage(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY);
+  }
+
+  function persistReloadProjectFallback() {
+    if (!canUseSessionStorage || isCurrentProjectSharedEntry()) {
+      return;
     }
     try {
-      window.localStorage.removeItem(getScopedStorageKey(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY));
+      const snapshot = makeHistorySnapshot({ clonePixelData: false });
+      const packaged = buildPackagedProjectPayload(snapshot, { session: buildAutosaveSessionPayload() });
+      const activeProjectTab = getActiveOpenProjectTab();
+      const projectId = normalizeAutosaveProjectId(
+        activeProjectTab?.projectId || autosaveProjectId || readReloadTargetProjectId() || ''
+      );
+      const serialized = JSON.stringify({
+        version: 1,
+        projectId,
+        project: packaged,
+      });
+      if (!serialized) {
+        return;
+      }
+      writeSessionStorageForLocalRestore(RELOAD_PROJECT_FALLBACK_STORAGE_KEY, serialized);
+      writeLocalStorageForLocalRestore(RELOAD_PROJECT_FALLBACK_STORAGE_KEY, serialized);
     } catch (error) {
-      // Ignore storage errors.
+      // Ignore fallback persistence failures.
+    }
+  }
+
+  function persistReloadTargetProjectId() {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    const activeProjectTab = getActiveOpenProjectTab();
+    const activeProjectId = normalizeAutosaveProjectId(
+      activeProjectTab?.projectId || autosaveProjectId || ''
+    );
+    if (!activeProjectId) {
+      return;
+    }
+    try {
+      writeSessionStorageForLocalRestore(RELOAD_TARGET_PROJECT_ID_KEY, activeProjectId);
+      writeLocalStorageForLocalRestore(RELOAD_TARGET_PROJECT_ID_KEY, activeProjectId);
+    } catch (error) {
+      // Ignore storage failures.
+    }
+  }
+
+  function readReloadTargetProjectId() {
+    if (!canUseSessionStorage) {
+      return '';
+    }
+    try {
+      return normalizeAutosaveProjectId(
+        readSessionStorageForLocalRestore(RELOAD_TARGET_PROJECT_ID_KEY)
+        || readLocalStorageForLocalRestore(RELOAD_TARGET_PROJECT_ID_KEY)
+        || ''
+      );
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function clearReloadTargetProjectId() {
+    if (!canUseSessionStorage) {
+      return;
+    }
+    clearLocalRestoreStorage(RELOAD_TARGET_PROJECT_ID_KEY);
+  }
+
+  function restoreReloadProjectFallback() {
+    if (!canUseSessionStorage) {
+      return false;
+    }
+    let raw = '';
+    try {
+      raw = readSessionStorageForLocalRestore(RELOAD_PROJECT_FALLBACK_STORAGE_KEY) || '';
+    } catch (error) {
+      raw = '';
+    }
+    if (!raw) {
+      try {
+        raw = readLocalStorageForLocalRestore(RELOAD_PROJECT_FALLBACK_STORAGE_KEY) || '';
+      } catch (error) {
+        raw = '';
+      }
+    }
+    if (!raw) {
+      return false;
+    }
+    try {
+      let wrappedProjectId = '';
+      let documentText = raw;
+      try {
+        const parsedWrapper = JSON.parse(raw);
+        if (parsedWrapper && typeof parsedWrapper === 'object' && parsedWrapper.project && typeof parsedWrapper.project === 'object') {
+          wrappedProjectId = normalizeAutosaveProjectId(parsedWrapper.projectId || '');
+          documentText = JSON.stringify(parsedWrapper.project);
+        }
+      } catch (error) {
+        // Fallback to legacy raw packaged project payload.
+      }
+      const parsedDocument = snapshotFromDocumentText(documentText);
+      const snapshot = parsedDocument?.snapshot || null;
+      if (!snapshot || isTinyStartupSnapshot(snapshot)) {
+        return false;
+      }
+      applyHistorySnapshot(snapshot);
+      const restoredProjectId = normalizeAutosaveProjectId(
+        wrappedProjectId || readReloadTargetProjectId() || autosaveProjectId || ''
+      );
+      if (restoredProjectId) {
+        startupAutosaveRestoreProjectId = restoredProjectId;
+        setActiveAutosaveProjectId(restoredProjectId, { persist: false });
+      }
+      history.pending = null;
+      history.past = [];
+      history.future = [];
+      resetDocumentUnsavedChanges();
+      updateHistoryButtons();
+      markAutosaveDirty();
+      return true;
+    } catch (error) {
+      return false;
+    } finally {
+        clearLocalRestoreStorage(RELOAD_PROJECT_FALLBACK_STORAGE_KEY);
     }
   }
 
@@ -51208,13 +51407,13 @@
     }
     let raw = '';
     try {
-      raw = window.sessionStorage.getItem(getScopedStorageKey(RELOAD_SNAPSHOT_STORAGE_KEY)) || '';
+      raw = readSessionStorageForLocalRestore(RELOAD_SNAPSHOT_STORAGE_KEY) || '';
     } catch (error) {
       raw = '';
     }
     if (!raw) {
       try {
-        raw = window.localStorage.getItem(getScopedStorageKey(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY)) || '';
+        raw = readLocalStorageForLocalRestore(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY) || '';
       } catch (error) {
         raw = '';
       }
@@ -51269,6 +51468,12 @@
     }
     const payload = readReloadSessionSnapshotPayload();
     if (!payload) {
+      const restoredFromFallback = restoreReloadProjectFallback();
+      if (restoredFromFallback) {
+        reloadSnapshotRestored = true;
+        updateAutosaveStatus('再読み込み復元: 直前のプロジェクトを復元しました', 'success');
+        return true;
+      }
       return false;
     }
     if (isTinyStartupSnapshot(payload.currentSnapshot)) {
@@ -51286,20 +51491,15 @@
       resetDocumentUnsavedChanges();
     }
     const restoredProjectId = normalizeAutosaveProjectId(payload.projectId || '');
-    if (restoredProjectId) {
-      startupAutosaveRestoreProjectId = restoredProjectId;
-      setActiveAutosaveProjectId(restoredProjectId, { persist: false });
+    const resolvedProjectId = normalizeAutosaveProjectId(
+      restoredProjectId || readReloadTargetProjectId() || autosaveProjectId || ''
+    );
+    if (resolvedProjectId) {
+      startupAutosaveRestoreProjectId = resolvedProjectId;
+      setActiveAutosaveProjectId(resolvedProjectId, { persist: false });
     }
-    try {
-      window.sessionStorage.removeItem(getScopedStorageKey(RELOAD_SNAPSHOT_STORAGE_KEY));
-    } catch (error) {
-      // Ignore storage errors.
-    }
-    try {
-      window.localStorage.removeItem(getScopedStorageKey(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY));
-    } catch (error) {
-      // Ignore storage errors.
-    }
+    clearLocalRestoreStorage(RELOAD_SNAPSHOT_STORAGE_KEY);
+    clearLocalRestoreStorage(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY);
     updateHistoryButtons();
     markAutosaveDirty();
     scheduleAutosaveSnapshot();
