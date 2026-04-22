@@ -18232,11 +18232,25 @@
   }
 
   function hasDismissedStartupScreen() {
-    return false;
+    if (!canUseSessionStorage) {
+      return false;
+    }
+    try {
+      return window.localStorage.getItem(STARTUP_SCREEN_DISMISSED_KEY) === '1';
+    } catch (error) {
+      return false;
+    }
   }
 
   function markStartupScreenDismissed() {
-    // Startup screen is intentionally shown on every normal launch.
+    if (!canUseSessionStorage) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(STARTUP_SCREEN_DISMISSED_KEY, '1');
+    } catch (error) {
+      // Ignore localStorage errors.
+    }
   }
 
   function showStartupScreen() {
@@ -18474,8 +18488,8 @@
     if (dom.startup?.hint) {
       dom.startup.hint.textContent = AUTOSAVE_SUPPORTED
         ? localizeText(
-          '毎回ここから始まります。新規作成するか、端末内プロジェクトを選んで開いてください。',
-          'Every launch starts here. Create a new project or choose a local project to open.'
+          '前回の作業はこの端末に自動保存されます。すぐ描くなら「最新の端末内プロジェクトを開く」を使ってください。',
+          'Your work is autosaved on this device. Use "Open Latest Local Project" to continue quickly.'
         )
         : localizeText(
           'このブラウザでは自動保存が利用できません。保存/出力から手動保存してください。',
@@ -18499,17 +18513,7 @@
     }
     const updateToast = dom.startup?.updateToast;
     if (updateToast) {
-      if (updateToast.dataset.updatePublished === 'false') {
-        hideUpdateToast();
-      } else {
-        const updateId = updateToast.dataset.updateId || '';
-        const seen = hasSeenUpdateToast(updateId);
-        if (seen) {
-          hideUpdateToast();
-        } else {
-          showUpdateToast();
-        }
-      }
+      hideUpdateToast();
     }
     dom.startup?.updateToastCloseButton?.addEventListener('click', () => {
       hideUpdateToast();
@@ -20305,6 +20309,7 @@
     const existingEntries = await loadRecentProjectsMetadata();
     const sanitizedEntries = [];
     const seenIds = new Set();
+    const seenLocalPayloadKeys = new Map();
     let changed = false;
     let removedCount = 0;
     let repairedCount = 0;
@@ -20380,13 +20385,40 @@
         nextEntry.name = fallbackName;
         entryChanged = true;
       }
+      const serializedProject = JSON.stringify(original.project);
+      const dedupeKey = `${fallbackFileName}\n${serializedProject}`;
+      const currentUpdatedAtMs = Date.parse(typeof original.updatedAt === 'string' ? original.updatedAt : '');
+      const duplicateLocalEntry = seenLocalPayloadKeys.get(dedupeKey) || null;
+      if (
+        duplicateLocalEntry
+        && Number.isFinite(currentUpdatedAtMs)
+        && Number.isFinite(duplicateLocalEntry.updatedAtMs)
+        && Math.abs(duplicateLocalEntry.updatedAtMs - currentUpdatedAtMs) <= (5 * 60 * 1000)
+      ) {
+        changed = true;
+        removedCount += 1;
+        continue;
+      }
+      seenLocalPayloadKeys.set(dedupeKey, {
+        id: normalizedId,
+        updatedAtMs: currentUpdatedAtMs,
+      });
       const parsedUpdatedAt = Date.parse(typeof original.updatedAt === 'string' ? original.updatedAt : '');
       if (!Number.isFinite(parsedUpdatedAt)) {
         nextEntry.updatedAt = nowIso;
         entryChanged = true;
       }
       if (typeof nextEntry.thumbnail !== 'string' || nextEntry.thumbnail.length <= 0) {
-        if (nextEntry.thumbnail !== null) {
+        let regeneratedThumbnail = null;
+        try {
+          regeneratedThumbnail = await generateSnapshotThumbnail(parsedSnapshot);
+        } catch (error) {
+          regeneratedThumbnail = null;
+        }
+        if (regeneratedThumbnail) {
+          nextEntry.thumbnail = regeneratedThumbnail;
+          entryChanged = true;
+        } else if (nextEntry.thumbnail !== null) {
           nextEntry.thumbnail = null;
           entryChanged = true;
         }
@@ -21365,20 +21397,24 @@
       return false;
     }
     try {
-      if (isSharedRecentProjectEntry(entry)) {
-        return await openSharedRecentProject(entry, {
+      const projectId = normalizeAutosaveProjectId(entry.id || '');
+      const latestEntry = projectId
+        ? ((await loadRecentProjectsMetadata()).find(candidate => candidate?.id === projectId) || entry)
+        : entry;
+      if (isSharedRecentProjectEntry(latestEntry)) {
+        return await openSharedRecentProject(latestEntry, {
           hideStartup: hideStartupOnSuccess,
           silent,
         });
       }
-      if (entry.project && typeof entry.project === 'object') {
-        const loaded = await loadDocumentFromText(JSON.stringify(entry.project), null, {
-          projectId: entry.id || '',
+      if (latestEntry.project && typeof latestEntry.project === 'object') {
+        const loaded = await loadDocumentFromText(JSON.stringify(latestEntry.project), null, {
+          projectId: latestEntry.id || '',
           suppressAutosaveStatus: true,
           openedFromRecent: true,
         });
         if (!loaded) {
-          await removeRecentProjectEntry(entry.id || '', {
+          await removeRecentProjectEntry(latestEntry.id || '', {
             announce: !silent,
             reason: 'データ形式が壊れていたため',
           });
@@ -21393,14 +21429,14 @@
         return true;
       }
 
-      if (entry.handle) {
-        const loaded = await loadDocumentFromHandle(entry.handle, {
-          projectId: entry.id || '',
+      if (latestEntry.handle) {
+        const loaded = await loadDocumentFromHandle(latestEntry.handle, {
+          projectId: latestEntry.id || '',
           suppressAutosaveStatus: true,
           openedFromRecent: true,
         });
         if (!loaded) {
-          await removeRecentProjectEntry(entry.id || '', {
+          await removeRecentProjectEntry(latestEntry.id || '', {
             announce: !silent,
             reason: '旧ファイル権限が無効なため',
           });
@@ -46508,7 +46544,6 @@
       captureSharedProjectRegionCommand(finalizedMoveState.bounds, pointerState.surface || null, 'selectionCut');
       commitHistory();
       clearSelection();
-      requestOverlayRender();
       updateCanvasControlButtons();
       return true;
     }
@@ -46523,7 +46558,7 @@
     clearSelectionSourcePixels(moveState);
     captureSharedProjectRegionCommand(moveState.bounds, pointerState.surface || null, 'selectionCut');
     commitHistory();
-    requestOverlayRender();
+    clearSelection();
     updateCanvasControlButtons();
     return true;
   }
