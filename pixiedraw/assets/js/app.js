@@ -20662,6 +20662,47 @@
     return normalizedEntry;
   }
 
+  async function refreshSharedRecentProjectEntryFromBackend(entry = null) {
+    const normalizedEntry = normalizeSharedRecentProjectEntry(entry);
+    if (!normalizedEntry) {
+      return null;
+    }
+    let project = null;
+    if (normalizedEntry.sharedProjectInviteToken) {
+      project = await fetchSharedProjectRecordByInviteToken(normalizedEntry.sharedProjectInviteToken);
+    }
+    if (!project?.project_key) {
+      project = await loadSharedProjectSnapshotRecord(normalizedEntry.sharedProjectKey, {
+        createIfMissing: false,
+        title: createSharedProjectSnapshotTitle(normalizedEntry.name || state.documentName || DEFAULT_DOCUMENT_NAME),
+      });
+    }
+    if (!project?.project_key) {
+      return normalizedEntry;
+    }
+    let thumbnail = normalizedEntry.thumbnail || null;
+    if ((!thumbnail || typeof thumbnail !== 'string') && project.latest_snapshot && typeof project.latest_snapshot === 'object') {
+      try {
+        thumbnail = await generateSnapshotThumbnail(project.latest_snapshot);
+      } catch (error) {
+        thumbnail = normalizedEntry.thumbnail || null;
+      }
+    }
+    return await upsertSharedRecentProjectEntry({
+      projectKey: normalizeMultiProjectKey(project.project_key),
+      projectId: project.id || '',
+      inviteToken: project.invite_token || normalizedEntry.sharedProjectInviteToken || '',
+      visibility: project.visibility || normalizedEntry.sharedProjectVisibility || 'shared',
+      name: createSharedProjectSnapshotTitle(project.title || normalizedEntry.name || state.documentName || DEFAULT_DOCUMENT_NAME),
+      fileName: normalizedEntry.fileName || normalizeDocumentName(`${normalizedEntry.name || DEFAULT_DOCUMENT_NAME}.pixiedraw`),
+      thumbnail,
+      roleHint: normalizedEntry.sharedRoleHint || 'guest',
+      autoJoin: normalizedEntry.sharedAutoJoin !== false,
+      revision: Math.max(0, Math.round(Number(project.latest_revision) || 0)),
+      structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
+    }) || normalizedEntry;
+  }
+
   function setRecentProjectsCache(entries) {
     recentProjectsCache.clear();
     const sortedEntries = Array.isArray(entries)
@@ -21448,11 +21489,13 @@
   }
 
   async function openSharedRecentProject(entry, { hideStartup = true, silent = false, skipLatestRefresh = true } = {}) {
-    const normalizedEntry = normalizeSharedRecentProjectEntry(entry);
+    let normalizedEntry = normalizeSharedRecentProjectEntry(entry);
     if (!normalizedEntry) {
       return false;
     }
     try {
+      const refreshedEntry = await refreshSharedRecentProjectEntryFromBackend(normalizedEntry);
+      normalizedEntry = normalizeSharedRecentProjectEntry(refreshedEntry || normalizedEntry) || normalizedEntry;
       storePendingSharedInvite({
         inviteToken: normalizedEntry.sharedProjectInviteToken || '',
         projectKey: normalizedEntry.sharedProjectKey || '',
