@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.23-shared-invite-login-fix6';
+  const APP_BUILD_VERSION = '2026.04.23-shared-invite-login-fix7';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -8681,22 +8681,26 @@
       sharedProjectLastRealtimeActivityAt = Date.now();
     }
     ensureSharedProjectRefreshLoop();
+    const hasStableRealtimeTarget = Boolean(normalizedProjectKey && activeSharedProjectId);
     const shouldEnsureRealtimeChannel = (
-      projectChanged
-      || (
-        activeSharedProjectChannelSignature !== nextChannelSignature
-        && sharedProjectRealtimeConnectSignature !== nextChannelSignature
+      hasStableRealtimeTarget
+      && (
+        projectChanged
+        || (
+          activeSharedProjectChannelSignature !== nextChannelSignature
+          && sharedProjectRealtimeConnectSignature !== nextChannelSignature
+        )
+        || (!activeSharedProjectChannel && !sharedProjectRealtimeConnectPromise && Date.now() >= sharedProjectRealtimeRetryBlockedUntil)
       )
-      || (!activeSharedProjectChannel && !sharedProjectRealtimeConnectPromise && Date.now() >= sharedProjectRealtimeRetryBlockedUntil)
     );
     if (shouldEnsureRealtimeChannel) {
       ensureActiveSharedProjectRealtimeChannel().catch(error => {
         reportSharedProjectRealtimeSubscribeFailure(error);
       });
     } else {
-      logSharedProjectRealtimeChannelLifecycle('skip-realtime-rebind', {
+      logSharedProjectRealtimeChannelLifecycle(hasStableRealtimeTarget ? 'skip-realtime-rebind' : 'skip-realtime-until-project-id', {
         caller: 'setActiveSharedProjectSession',
-        reason: 'same-signature-session-update',
+        reason: hasStableRealtimeTarget ? 'same-signature-session-update' : 'missing-project-id',
         projectKey: normalizedProjectKey,
         projectId: activeSharedProjectId,
         channelSignature: nextChannelSignature,
@@ -58456,10 +58460,11 @@
   }
 
   async function ensureActiveSharedProjectRealtimeChannel() {
-    if (!canUseSharedProjectsBackend() || !activeSharedProjectKey) {
+    if (!canUseSharedProjectsBackend() || !activeSharedProjectKey || !activeSharedProjectId) {
       console.debug('[shared-realtime] skipped subscribe: backend unavailable or no active project', {
         canUseSharedProjectsBackend: canUseSharedProjectsBackend(),
         activeSharedProjectKey: activeSharedProjectKey || '',
+        activeSharedProjectId: activeSharedProjectId || '',
       });
       return null;
     }
