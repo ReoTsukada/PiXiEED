@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.23-shared-invite-login-fix7';
+  const APP_BUILD_VERSION = '2026.04.24-shared-open-loading-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -3237,6 +3237,7 @@
   let globalLoadingIndicatorShownAt = 0;
   let globalLoadingIndicatorShowTimer = null;
   let globalLoadingIndicatorHideTimer = null;
+  let globalLoadingIndicatorBlockingDepth = 0;
   let startupProgressDepth = 0;
   let startupProgressClose = null;
   const GLOBAL_LOADING_INDICATOR_SHOW_DELAY = 180;
@@ -8681,26 +8682,22 @@
       sharedProjectLastRealtimeActivityAt = Date.now();
     }
     ensureSharedProjectRefreshLoop();
-    const hasStableRealtimeTarget = Boolean(normalizedProjectKey && activeSharedProjectId);
     const shouldEnsureRealtimeChannel = (
-      hasStableRealtimeTarget
-      && (
-        projectChanged
-        || (
-          activeSharedProjectChannelSignature !== nextChannelSignature
-          && sharedProjectRealtimeConnectSignature !== nextChannelSignature
-        )
-        || (!activeSharedProjectChannel && !sharedProjectRealtimeConnectPromise && Date.now() >= sharedProjectRealtimeRetryBlockedUntil)
+      projectChanged
+      || (
+        activeSharedProjectChannelSignature !== nextChannelSignature
+        && sharedProjectRealtimeConnectSignature !== nextChannelSignature
       )
+      || (!activeSharedProjectChannel && !sharedProjectRealtimeConnectPromise && Date.now() >= sharedProjectRealtimeRetryBlockedUntil)
     );
     if (shouldEnsureRealtimeChannel) {
       ensureActiveSharedProjectRealtimeChannel().catch(error => {
         reportSharedProjectRealtimeSubscribeFailure(error);
       });
     } else {
-      logSharedProjectRealtimeChannelLifecycle(hasStableRealtimeTarget ? 'skip-realtime-rebind' : 'skip-realtime-until-project-id', {
+      logSharedProjectRealtimeChannelLifecycle('skip-realtime-rebind', {
         caller: 'setActiveSharedProjectSession',
-        reason: hasStableRealtimeTarget ? 'same-signature-session-update' : 'missing-project-id',
+        reason: 'same-signature-session-update',
         projectKey: normalizedProjectKey,
         projectId: activeSharedProjectId,
         channelSignature: nextChannelSignature,
@@ -21542,6 +21539,10 @@
     if (!normalizedEntry) {
       return false;
     }
+    const closeBlockingLoading = beginBlockingGlobalLoading(localizeText(
+      '共有プロジェクトを開いています…',
+      'Opening shared project...'
+    ));
     if (
       normalizeMultiProjectKey(normalizedEntry.sharedProjectKey || '') === normalizeMultiProjectKey(activeSharedProjectKey || '')
       && isCurrentProjectSharedEntry()
@@ -21560,9 +21561,11 @@
           'info'
         );
       }
+      closeBlockingLoading();
       return true;
     }
     try {
+      setStartupProgressLabel(localizeText('共有プロジェクトの接続を確認中…', 'Checking shared project connection...'));
       const refreshedEntry = await refreshSharedRecentProjectEntryFromBackend(normalizedEntry);
       normalizedEntry = normalizeSharedRecentProjectEntry(refreshedEntry || normalizedEntry) || normalizedEntry;
       storePendingSharedInvite({
@@ -21588,19 +21591,35 @@
       }
       multiAutoResumeAttempted = true;
       clearStoredMultiResumeSession();
-      const opened = await openSharedProjectAccess({
-        inviteToken: normalizedEntry.sharedProjectInviteToken || '',
-        projectKey: normalizedEntry.sharedProjectKey || '',
-        requestedRole: normalizedEntry.sharedRoleHint || 'guest',
-        autoJoin: normalizedEntry.sharedAutoJoin !== false,
-      }, {
-        hideStartup,
-        silent,
-        successMessage: localizeText(
-          '共有プロジェクトを開きました',
-          'Opened shared project'
-        ),
-      });
+      let opened = false;
+      let latestEntryForFallback = normalizedEntry;
+      const openAttempts = skipLatestRefresh ? 5 : 6;
+      for (let attempt = 0; attempt < openAttempts; attempt += 1) {
+        if (attempt > 0) {
+          setStartupProgressLabel(localizeText('共有プロジェクトの最新内容を再確認中…', 'Retrying the latest shared project state...'));
+          await waitForSharedOpenRetry(220 + (attempt * 180));
+        }
+        const refreshedEntry = await refreshSharedRecentProjectEntryFromBackend(latestEntryForFallback);
+        latestEntryForFallback = normalizeSharedRecentProjectEntry(refreshedEntry || latestEntryForFallback) || latestEntryForFallback;
+        setStartupProgressLabel(localizeText('共有プロジェクトを読み込み中…', 'Loading shared project...'));
+        opened = await openSharedProjectAccess({
+          inviteToken: latestEntryForFallback.sharedProjectInviteToken || '',
+          projectKey: latestEntryForFallback.sharedProjectKey || '',
+          requestedRole: latestEntryForFallback.sharedRoleHint || 'guest',
+          autoJoin: latestEntryForFallback.sharedAutoJoin !== false,
+        }, {
+          hideStartup,
+          silent,
+          successMessage: localizeText(
+            '共有プロジェクトを開きました',
+            'Opened shared project'
+          ),
+        });
+        if (opened) {
+          normalizedEntry = latestEntryForFallback;
+          break;
+        }
+      }
       if (opened) {
         if (!skipLatestRefresh) {
           setStartupProgressLabel(localizeText('共有プロジェクトの最新内容を取得中…', 'Fetching the latest shared project state...'));
@@ -21611,9 +21630,11 @@
         }
         clearPendingSharedInvite();
         setActiveAutosaveProjectId(normalizedEntry.id);
+        closeBlockingLoading();
         return true;
       }
       if (normalizedEntry.project && typeof normalizedEntry.project === 'object') {
+        setStartupProgressLabel(localizeText('一時保存から共有プロジェクトを復元中…', 'Restoring shared project from temporary cache...'));
         const loaded = await loadDocumentFromText(JSON.stringify(normalizedEntry.project), null, {
           projectId: normalizedEntry.id || buildSharedRecentProjectId(normalizedEntry.sharedProjectKey || ''),
           suppressAutosaveStatus: true,
@@ -21634,22 +21655,29 @@
           if (!silent) {
             setMultiStatus(
               localizeText(
-                '共有プロジェクトをローカル保存から開きました。最新同期は接続回復後に続行します。',
-                'Opened the shared project from local cache. Latest sync will continue after the connection recovers.'
+                '共有プロジェクトを一時キャッシュから開きました。最新状態の取得を続けます。',
+                'Opened the shared project from temporary cache. Fetching the latest state continues in the background.'
               ),
               'warn'
             );
           }
+          scheduleSharedProjectLatestRecovery(normalizedEntry, {
+            reason: 'recent-fallback-recovery',
+            immediate: true,
+          });
           clearPendingSharedInvite();
           setActiveAutosaveProjectId(normalizedEntry.id);
+          closeBlockingLoading();
           return true;
         }
       }
       clearPendingSharedInvite();
+      closeBlockingLoading();
       return false;
     } catch (error) {
       console.warn('Failed to open shared recent project', error);
       if (normalizedEntry.project && typeof normalizedEntry.project === 'object') {
+        setStartupProgressLabel(localizeText('一時保存から共有プロジェクトを復元中…', 'Restoring shared project from temporary cache...'));
         const loaded = await loadDocumentFromText(JSON.stringify(normalizedEntry.project), null, {
           projectId: normalizedEntry.id || buildSharedRecentProjectId(normalizedEntry.sharedProjectKey || ''),
           suppressAutosaveStatus: true,
@@ -21670,19 +21698,27 @@
           if (!silent) {
             setMultiStatus(
               localizeText(
-                '共有プロジェクトをローカル保存から開きました。最新同期は接続回復後に続行します。',
-                'Opened the shared project from local cache. Latest sync will continue after the connection recovers.'
+                '共有プロジェクトを一時キャッシュから開きました。最新状態の取得を続けます。',
+                'Opened the shared project from temporary cache. Fetching the latest state continues in the background.'
               ),
               'warn'
             );
           }
+          scheduleSharedProjectLatestRecovery(normalizedEntry, {
+            reason: 'recent-fallback-recovery',
+            immediate: true,
+          });
           clearPendingSharedInvite();
           setActiveAutosaveProjectId(normalizedEntry.id);
+          closeBlockingLoading();
           return true;
         }
       }
       clearPendingSharedInvite();
+      closeBlockingLoading();
       return false;
+    } finally {
+      closeBlockingLoading();
     }
   }
 
@@ -54454,6 +54490,68 @@
     return supportsSharedProjectsBackend && accountState.isLoggedIn && !accountState.isAnonymous;
   }
 
+  function isRecoverableSharedBackendPreflightError(error) {
+    const status = Number(error?.status || 0);
+    const code = String(error?.code || '').trim();
+    const message = String(error?.message || '').toLowerCase();
+    return (
+      status === 0
+      && !code
+      && (
+        message.includes('load failed')
+        || message.includes('failed to fetch')
+        || message.includes('networkerror')
+      )
+    );
+  }
+
+  async function waitForSharedOpenRetry(delayMs = 240) {
+    await new Promise(resolve => {
+      window.setTimeout(resolve, Math.max(48, Math.round(Number(delayMs) || 240)));
+    });
+  }
+
+  function scheduleSharedProjectLatestRecovery(entry = null, {
+    reason = 'recent-fallback-recovery',
+    immediate = false,
+  } = {}) {
+    const normalizedEntry = normalizeSharedRecentProjectEntry(entry);
+    const projectKey = normalizeMultiProjectKey(normalizedEntry?.sharedProjectKey || activeSharedProjectKey || '');
+    if (!projectKey) {
+      return;
+    }
+    const run = async () => {
+      try {
+        if (!accountState.isLoggedIn || accountState.isAnonymous) {
+          return;
+        }
+        await ensurePixieedAccountReady({ forceRefresh: true, silent: true });
+        if (!await ensureSharedProjectBackendSession()) {
+          return;
+        }
+        const refreshedEntry = normalizedEntry
+          ? (await refreshSharedRecentProjectEntryFromBackend(normalizedEntry) || normalizedEntry)
+          : null;
+        if (refreshedEntry?.sharedProjectBackendId && activeSharedProjectKey === projectKey && !activeSharedProjectId) {
+          setActiveSharedProjectSession(
+            projectKey,
+            activeSharedProjectRevision,
+            activeSharedProjectStructureRevision,
+            refreshedEntry.sharedProjectBackendId
+          );
+        }
+        if (activeSharedProjectKey === projectKey) {
+          await refreshActiveSharedProjectSnapshot({ force: true, reason });
+        }
+      } catch (error) {
+        console.warn('Failed to recover latest shared project state after local fallback', error);
+      }
+    };
+    window.setTimeout(() => {
+      run().catch(() => {});
+    }, immediate ? 0 : 400);
+  }
+
   function canLookupSharedProjectsBackend() {
     return supportsSharedProjectsBackend;
   }
@@ -58460,11 +58558,10 @@
   }
 
   async function ensureActiveSharedProjectRealtimeChannel() {
-    if (!canUseSharedProjectsBackend() || !activeSharedProjectKey || !activeSharedProjectId) {
+    if (!canUseSharedProjectsBackend() || !activeSharedProjectKey) {
       console.debug('[shared-realtime] skipped subscribe: backend unavailable or no active project', {
         canUseSharedProjectsBackend: canUseSharedProjectsBackend(),
         activeSharedProjectKey: activeSharedProjectKey || '',
-        activeSharedProjectId: activeSharedProjectId || '',
       });
       return null;
     }
@@ -61360,6 +61457,7 @@
     if (labelNode instanceof HTMLElement && globalLoadingIndicatorLabel) {
       labelNode.textContent = globalLoadingIndicatorLabel;
     }
+    container.classList.toggle('global-loading-indicator--blocking', globalLoadingIndicatorBlockingDepth > 0);
     if (globalLoadingIndicatorHideTimer !== null) {
       window.clearTimeout(globalLoadingIndicatorHideTimer);
       globalLoadingIndicatorHideTimer = null;
@@ -61428,6 +61526,21 @@
       }
       closed = true;
       globalLoadingIndicatorDepth = Math.max(0, globalLoadingIndicatorDepth - 1);
+      syncGlobalLoadingIndicator();
+    };
+  }
+
+  function beginBlockingGlobalLoading(label = '') {
+    globalLoadingIndicatorBlockingDepth += 1;
+    const close = beginGlobalLoading(label);
+    let closed = false;
+    return () => {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      close();
+      globalLoadingIndicatorBlockingDepth = Math.max(0, globalLoadingIndicatorBlockingDepth - 1);
       syncGlobalLoadingIndicator();
     };
   }
