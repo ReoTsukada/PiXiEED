@@ -9009,6 +9009,45 @@ body.is-startup-active {
   pointer-events: none;
 }
 
+.global-loading-indicator.global-loading-indicator--blocking {
+  inset: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2600;
+  min-width: 0;
+  max-width: none;
+  width: 100vw;
+  height: 100vh;
+  padding: 0;
+  border: 0;
+  background:
+    radial-gradient(circle at top, rgba(var(--ui-rgb-focus), 0.16), transparent 44%),
+    rgba(7, 10, 16, 0.86);
+  box-shadow: none;
+  backdrop-filter: blur(12px);
+  clip-path: none;
+  display: grid;
+  place-items: center;
+}
+
+.global-loading-indicator.global-loading-indicator--blocking .global-loading-indicator__label,
+.global-loading-indicator.global-loading-indicator--blocking .global-loading-indicator__bar {
+  width: min(420px, calc(100vw - 48px));
+}
+
+.global-loading-indicator.global-loading-indicator--blocking .global-loading-indicator__label {
+  font-size: 15px;
+  line-height: 1.7;
+  text-align: center;
+  text-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+}
+
+.global-loading-indicator.global-loading-indicator--blocking .global-loading-indicator__bar {
+  margin-top: 14px;
+  height: 10px;
+  border-width: 1px;
+}
+
 .global-loading-indicator__label {
   font-size: 10px;
   line-height: 1.5;
