@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.23-shared-invite-login-fix4';
+  const APP_BUILD_VERSION = '2026.04.23-shared-invite-login-fix5';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -21411,19 +21411,6 @@
       Math.round(Number(freshestProject.latest_snapshot_revision) || Number(freshestProject.latest_revision) || 0)
     );
     const freshestLatestRevision = Math.max(0, Math.round(Number(freshestProject.latest_revision) || 0));
-    if (freshestSnapshotRevision < freshestLatestRevision) {
-      await releaseSharedProjectSessionLock(resolvedProjectKey);
-      if (!silent) {
-        setMultiStatus(
-          localizeText(
-            '共有プロジェクトの最新キャンバスを準備中です。少し待ってから開き直してください。',
-            'The latest shared canvas is still being prepared. Please wait a moment and open it again.'
-          ),
-          'warn'
-        );
-      }
-      return false;
-    }
     const sharedSnapshot = freshestProject.latest_snapshot;
     if (sharedSnapshot && typeof sharedSnapshot === 'object') {
       const snapshotRevision = Math.max(
@@ -21482,6 +21469,15 @@
     markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
     const sharedSnapshotRevision = Math.max(0, Math.round(Number(freshestProject.latest_snapshot_revision) || 0));
     const sharedLatestRevision = freshestLatestRevision;
+    if (sharedSnapshotRevision < sharedLatestRevision && !silent) {
+      setMultiStatus(
+        localizeText(
+          '共有プロジェクトを開きました。最新の変更を取得しています。',
+          'Opened shared project. Fetching the latest changes.'
+        ),
+        'info'
+      );
+    }
     if (shouldTrustSharedProjectSnapshotRevision(sharedSnapshotRevision, sharedLatestRevision)) {
       await applySharedProjectOpsSinceRevision(
         freshestProject,
