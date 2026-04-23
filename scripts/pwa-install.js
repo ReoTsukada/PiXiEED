@@ -38,52 +38,6 @@
     return;
   }
 
-  const IOS_HIDE_KEY = 'pixieedraw_pwa_ios_hide';
-
-  const canUseStorage = (() => {
-    try {
-      const key = '__pixieedraw_pwa_storage_test__';
-      window.localStorage.setItem(key, '1');
-      window.localStorage.removeItem(key);
-      return true;
-    } catch (_error) {
-      return false;
-    }
-  })();
-
-  const readStorage = (key) => {
-    if (!canUseStorage) {
-      return null;
-    }
-    try {
-      return window.localStorage.getItem(key);
-    } catch (_error) {
-      return null;
-    }
-  };
-
-  const writeStorage = (key, value) => {
-    if (!canUseStorage) {
-      return;
-    }
-    try {
-      window.localStorage.setItem(key, value);
-    } catch (_error) {
-      // Ignore storage failures.
-    }
-  };
-
-  const clearStorage = (key) => {
-    if (!canUseStorage) {
-      return;
-    }
-    try {
-      window.localStorage.removeItem(key);
-    } catch (_error) {
-      // Ignore storage failures.
-    }
-  };
-
   const ensureStyles = () => {
     if (document.getElementById('pixieedPwaInstallStyles')) {
       return;
@@ -239,37 +193,36 @@
   ready(() => {
     const dialog = createDialog();
 
-    if (isIOS) {
-      if (readStorage(IOS_HIDE_KEY) === '1') {
-        return;
-      }
-      const isSafari = /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua);
-      const message = isSafari
-        ? 'Safariの共有ボタンをタップして「ホーム画面に追加」を選ぶと、PiXiEEDrawをアプリのように使えます。'
-        : 'この端末ではSafariで開くと「ホーム画面に追加」できます。SafariでPiXiEEDrawを開いて共有メニューを使ってください。';
-
-      window.setTimeout(() => {
-        dialog.open({
-          dialogTitle: 'PiXiEEDrawをインストール',
-          dialogMessage: message,
-          primaryLabel: '閉じる',
-          secondaryLabel: '今後表示しない',
-          onSecondary: () => {
-            writeStorage(IOS_HIDE_KEY, '1');
-          },
-          onPrimary: () => {
-            clearStorage(IOS_HIDE_KEY);
-          }
-        });
-      }, 700);
-      return;
-    }
-
     let deferredPrompt = null;
-    let popupShown = false;
+    let installAvailable = false;
+
+    const notifyState = () => {
+      window.dispatchEvent(new CustomEvent('pixieed:pwa-install-availability-change', {
+        detail: {
+          available: installAvailable || isIOS,
+          ios: isIOS,
+          standalone: isStandalone,
+        },
+      }));
+    };
 
     const openInstallPopup = () => {
-      popupShown = true;
+      if (isStandalone) {
+        return false;
+      }
+      installAvailable = Boolean(deferredPrompt);
+      const isSafari = /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua);
+      if (isIOS) {
+        dialog.open({
+          dialogTitle: 'PiXiEEDrawをインストール',
+          dialogMessage: isSafari
+            ? 'Safariの共有ボタンをタップして「ホーム画面に追加」を選ぶと、PiXiEEDrawをアプリのように使えます。'
+            : 'この端末ではSafariで開くと「ホーム画面に追加」できます。SafariでPiXiEEDrawを開いて共有メニューを使ってください。',
+          primaryLabel: '閉じる',
+          secondaryLabel: 'OK'
+        });
+        return true;
+      }
       dialog.open({
         dialogTitle: 'PiXiEEDrawをインストール',
         dialogMessage: 'ホーム画面やデスクトップに追加すると、PiXiEEDrawをアプリのようにすぐ開けます。',
@@ -290,6 +243,8 @@
             return;
           }
           deferredPrompt = null;
+          installAvailable = false;
+          notifyState();
           try {
             promptEvent.prompt();
             await promptEvent.userChoice;
@@ -298,29 +253,31 @@
           }
         }
       });
+      return true;
+    };
+
+    window.pixieedPwaInstall = {
+      open: openInstallPopup,
+      isAvailable() {
+        return !isStandalone && (Boolean(deferredPrompt) || isIOS);
+      },
+      isStandalone,
+      isIOS,
     };
 
     window.addEventListener('beforeinstallprompt', (event) => {
       event.preventDefault();
       deferredPrompt = event;
-      if (!popupShown) {
-        openInstallPopup();
-      }
+      installAvailable = true;
+      notifyState();
     });
 
     window.addEventListener('appinstalled', () => {
       deferredPrompt = null;
-      popupShown = true;
+      installAvailable = false;
       dialog.close();
+      notifyState();
     });
-
-    if (isAndroid) {
-      window.setTimeout(() => {
-        if (popupShown || deferredPrompt) {
-          return;
-        }
-        openInstallPopup();
-      }, 700);
-    }
+    notifyState();
   });
 })();
