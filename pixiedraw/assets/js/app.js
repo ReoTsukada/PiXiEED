@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.24-shared-open-loading-fix1';
+  const APP_BUILD_VERSION = '2026.04.24-shared-revision-recovery-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -51735,6 +51735,11 @@
       resetDocumentUnsavedChanges();
     }
     const restoredProjectId = normalizeAutosaveProjectId(payload.projectId || '');
+    if (restoredProjectId.startsWith(SHARED_PROJECT_ID_PREFIX)) {
+      clearLocalRestoreStorage(RELOAD_SNAPSHOT_STORAGE_KEY);
+      clearLocalRestoreStorage(RELOAD_SNAPSHOT_FALLBACK_STORAGE_KEY);
+      return false;
+    }
     const resolvedProjectId = normalizeAutosaveProjectId(
       restoredProjectId || readReloadTargetProjectId() || autosaveProjectId || ''
     );
@@ -54541,6 +54546,43 @@
           );
         }
         if (activeSharedProjectKey === projectKey) {
+          const restoredRevision = Math.max(0, Math.round(Number(
+            refreshedEntry?.sharedProjectRevision
+            || normalizedEntry?.sharedProjectRevision
+            || activeSharedProjectRevision
+            || 0
+          )));
+          const restoredStructureRevision = Math.max(0, Math.round(Number(
+            refreshedEntry?.sharedProjectStructureRevision
+            || normalizedEntry?.sharedProjectStructureRevision
+            || activeSharedProjectStructureRevision
+            || 0
+          )));
+          let latestProject = null;
+          if (refreshedEntry?.sharedProjectInviteToken) {
+            latestProject = await loadSharedProjectSnapshotRecordByInvite(refreshedEntry.sharedProjectInviteToken, {
+              createIfMissing: false,
+              title: createSharedProjectSnapshotTitle(refreshedEntry.name || state.documentName || DEFAULT_DOCUMENT_NAME),
+            });
+          }
+          if (!latestProject?.project_key) {
+            latestProject = await loadSharedProjectSnapshotRecord(projectKey, {
+              createIfMissing: false,
+              title: createSharedProjectSnapshotTitle(refreshedEntry?.name || state.documentName || DEFAULT_DOCUMENT_NAME),
+            });
+          }
+          const latestRevision = Math.max(0, Math.round(Number(latestProject?.latest_revision) || 0));
+          const latestStructureRevision = Math.max(0, Math.round(Number(latestProject?.latest_structure_revision) || 0));
+          if (
+            latestProject?.project_key
+            && latestStructureRevision === restoredStructureRevision
+            && latestRevision > restoredRevision
+          ) {
+            const replayed = await applySharedProjectOpsSinceRevision(latestProject, restoredRevision);
+            if (replayed) {
+              return;
+            }
+          }
           await refreshActiveSharedProjectSnapshot({ force: true, reason });
         }
       } catch (error) {
