@@ -18981,23 +18981,28 @@
     const requestedSharedProjectRevision = Math.max(0, Math.round(Number(options?.sharedProjectRevision) || 0));
     const activeEntryAfterLoad = recentProjectsCache.get(normalizeAutosaveProjectId(requestedProjectId || '')) || null;
     const requestedSharedProjectId = requestedProjectId.startsWith(SHARED_PROJECT_ID_PREFIX);
+    const cachedSharedProjectKey = requestedSharedProjectId && isSharedRecentProjectEntry(activeEntryAfterLoad)
+      ? normalizeMultiProjectKey(activeEntryAfterLoad.sharedProjectKey || '')
+      : '';
     const derivedSharedProjectKey = requestedSharedProjectKey
-      || (requestedSharedProjectId && isSharedRecentProjectEntry(activeEntryAfterLoad)
-        ? normalizeMultiProjectKey(activeEntryAfterLoad.sharedProjectKey || '')
-        : '');
-    if (derivedSharedProjectKey || requestedSharedProjectId) {
+      || cachedSharedProjectKey
+      || normalizeMultiProjectKey(activeSharedProjectKey || '');
+    const derivedSharedProjectId = typeof activeEntryAfterLoad?.sharedProjectBackendId === 'string'
+      ? activeEntryAfterLoad.sharedProjectBackendId
+      : '';
+    if (derivedSharedProjectKey) {
       setActiveSharedProjectSession(
         derivedSharedProjectKey,
         requestedSharedProjectRevision
         || Math.max(0, Math.round(Number(activeEntryAfterLoad?.sharedProjectRevision) || 0)),
         Math.max(0, Math.round(Number(activeEntryAfterLoad?.sharedProjectStructureRevision) || 0)),
-        typeof activeEntryAfterLoad?.sharedProjectBackendId === 'string' ? activeEntryAfterLoad.sharedProjectBackendId : ''
+        derivedSharedProjectId
       );
       setMultiStatus(
         localizeText('共有モード: ON', 'Shared mode: ON'),
         'info'
       );
-    } else {
+    } else if (!requestedSharedProjectId) {
       clearActiveSharedProjectSession();
     }
     markAutosaveDirty();
