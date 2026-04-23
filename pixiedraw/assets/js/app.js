@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.08-shared-op-main1';
+  const APP_BUILD_VERSION = '2026.04.23-shared-invite-login-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -52760,9 +52760,14 @@
       return;
     }
     try {
+      window.localStorage.removeItem(MULTI_PENDING_INVITE_STORAGE_KEY);
+    } catch (_error) {
+      // Ignore localStorage cleanup failures.
+    }
+    try {
       window.sessionStorage.removeItem(MULTI_PENDING_INVITE_STORAGE_KEY);
     } catch (_error) {
-      // Ignore storage errors.
+      // Ignore sessionStorage cleanup failures.
     }
   }
 
@@ -52775,7 +52780,7 @@
         clearPendingSharedInvite();
         return;
       }
-      window.sessionStorage.setItem(MULTI_PENDING_INVITE_STORAGE_KEY, JSON.stringify({
+      const serialized = JSON.stringify({
         projectKey: normalizeMultiProjectKey(invite.projectKey || ''),
         inviteToken: typeof invite.inviteToken === 'string' ? invite.inviteToken.trim() : '',
         autoJoin: invite.autoJoin !== false,
@@ -52783,7 +52788,13 @@
           ? invite.requestedRole.trim()
           : (typeof invite.role === 'string' ? invite.role.trim() : ''),
         source: typeof invite.source === 'string' ? invite.source.trim() : '',
-      }));
+      });
+      window.localStorage.setItem(MULTI_PENDING_INVITE_STORAGE_KEY, serialized);
+      try {
+        window.sessionStorage.setItem(MULTI_PENDING_INVITE_STORAGE_KEY, serialized);
+      } catch (_error) {
+        // Ignore sessionStorage mirroring failures.
+      }
     } catch (_error) {
       // Ignore storage errors.
     }
@@ -52794,7 +52805,8 @@
       return null;
     }
     try {
-      const raw = window.sessionStorage.getItem(MULTI_PENDING_INVITE_STORAGE_KEY);
+      const raw = window.localStorage.getItem(MULTI_PENDING_INVITE_STORAGE_KEY)
+        || window.sessionStorage.getItem(MULTI_PENDING_INVITE_STORAGE_KEY);
       if (!raw) {
         return null;
       }
