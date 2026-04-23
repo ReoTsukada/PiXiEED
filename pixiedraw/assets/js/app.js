@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.23-shared-invite-login-fix1';
+  const APP_BUILD_VERSION = '2026.04.23-shared-invite-login-fix3';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -56861,6 +56861,21 @@
         target_session_id: ensureSharedProjectSessionInstanceId(),
       });
       if (error) {
+        if (isRecoverableSharedBackendPreflightError(error)) {
+          setMultiStatus(
+            localizeText(
+              '共有セッション確認に一時失敗したため、ロック確認を省略して共有プロジェクトを開きます。一部の同時利用制御は無効です。',
+              'Shared session checking temporarily failed, so the project will open without session locking. Some concurrent-use protections are disabled.'
+            ),
+            'warn'
+          );
+          console.debug('[shared-backend] bypassing claim-shared-session after recoverable preflight failure', {
+            projectKey: normalizedProjectKey,
+            projectId: normalizedProjectId,
+            message: String(error?.message || ''),
+          });
+          return true;
+        }
         if (String(error?.code || '') === '42804') {
           setMultiStatus(
             localizeText(
@@ -56906,6 +56921,21 @@
       }
       return false;
     } catch (error) {
+      if (isRecoverableSharedBackendPreflightError(error)) {
+        setMultiStatus(
+          localizeText(
+            '共有セッション確認に一時失敗したため、ロック確認を省略して共有プロジェクトを開きます。一部の同時利用制御は無効です。',
+            'Shared session checking temporarily failed, so the project will open without session locking. Some concurrent-use protections are disabled.'
+          ),
+          'warn'
+        );
+        console.debug('[shared-backend] bypassing claim-shared-session exception after recoverable preflight failure', {
+          projectKey: normalizedProjectKey,
+          projectId: normalizedProjectId,
+          message: String(error?.message || ''),
+        });
+        return true;
+      }
       handleSharedProjectsBackendError(error, 'claim-shared-session-exception');
       return false;
     }
