@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.24-shared-revision-recovery-fix1';
+  const APP_BUILD_VERSION = '2026.04.24-startup-loading-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -61558,9 +61558,26 @@
     syncGlobalLoadingIndicator(label);
   }
 
-  function beginGlobalLoading(label = '') {
+  function beginGlobalLoading(label = '', { immediate = false } = {}) {
     globalLoadingIndicatorDepth += 1;
     syncGlobalLoadingIndicator(label);
+    if (immediate) {
+      const container = dom.globalLoadingIndicator;
+      const labelNode = dom.globalLoadingIndicatorLabel;
+      if (globalLoadingIndicatorShowTimer !== null) {
+        window.clearTimeout(globalLoadingIndicatorShowTimer);
+        globalLoadingIndicatorShowTimer = null;
+      }
+      globalLoadingIndicatorVisible = true;
+      globalLoadingIndicatorShownAt = Date.now();
+      if (container instanceof HTMLElement) {
+        container.hidden = false;
+        container.setAttribute('aria-hidden', 'false');
+      }
+      if (labelNode instanceof HTMLElement && globalLoadingIndicatorLabel) {
+        labelNode.textContent = globalLoadingIndicatorLabel;
+      }
+    }
     let closed = false;
     return () => {
       if (closed) {
@@ -61572,9 +61589,9 @@
     };
   }
 
-  function beginBlockingGlobalLoading(label = '') {
+  function beginBlockingGlobalLoading(label = '', { immediate = false } = {}) {
     globalLoadingIndicatorBlockingDepth += 1;
-    const close = beginGlobalLoading(label);
+    const close = beginGlobalLoading(label, { immediate });
     let closed = false;
     return () => {
       if (closed) {
@@ -61591,7 +61608,7 @@
     startupProgressDepth += 1;
     const nextLabel = label || localizeText('起動準備中…', 'Preparing startup...');
     if (startupProgressDepth === 1 || typeof startupProgressClose !== 'function') {
-      startupProgressClose = beginGlobalLoading(nextLabel);
+      startupProgressClose = beginBlockingGlobalLoading(nextLabel, { immediate: true });
     } else {
       setGlobalLoadingIndicatorLabel(nextLabel);
     }
