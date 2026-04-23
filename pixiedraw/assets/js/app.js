@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.23-shared-invite-login-fix3';
+  const APP_BUILD_VERSION = '2026.04.23-shared-invite-login-fix4';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
