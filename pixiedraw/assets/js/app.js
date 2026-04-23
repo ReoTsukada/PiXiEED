@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.24-startup-loading-fix1';
+  const APP_BUILD_VERSION = '2026.04.24-shared-sync-state-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -370,6 +370,9 @@
       multiBlockedHint: document.getElementById('multiBlockedHint'),
       supportTipLink: document.getElementById('supportTipLink'),
       adFreeField: document.getElementById('pixieedAdFreeField'),
+      pwaInstallField: document.getElementById('pixieedPwaInstallField'),
+      pwaInstallStatus: document.getElementById('pixieedPwaInstallStatus'),
+      pwaInstallButton: document.getElementById('pixieedPwaInstallButton'),
       pixieedAccountStatus: document.getElementById('pixieedAccountStatus'),
       pixieedAccountLogin: document.getElementById('pixieedAccountLogin'),
       pixieedAccountLogout: document.getElementById('pixieedAccountLogout'),
@@ -3010,6 +3013,7 @@
   let activeSharedProjectRevision = 0;
   let activeSharedProjectStructureRevision = 0;
   let activeSharedProjectDocumentLoaded = false;
+  let activeSharedProjectSyncState = 'idle';
   let sharedProjectDeviceId = '';
   let sharedProjectSessionInstanceId = '';
   let sharedProjectSessionHeartbeatTimer = null;
@@ -8323,6 +8327,7 @@
     activeSharedProjectRevision = 0;
     activeSharedProjectStructureRevision = 0;
     activeSharedProjectDocumentLoaded = false;
+    activeSharedProjectSyncState = 'idle';
     sharedProjectLastAppliedSeq = 0;
     sharedProjectOpsSinceCheckpoint = 0;
     sharedProjectLastCheckpointAt = 0;
@@ -12879,6 +12884,8 @@
     setLocalizedTextContent('#pixieedAccountLogin', 'ログイン', 'Sign In');
     setLocalizedTextContent('#pixieedAccountLogout', 'ログアウト', 'Sign Out');
     setLocalizedTextContent('#pixieedAccountDock', 'ログイン', 'Sign In');
+    setLocalizedTextContent('#pixieedPwaInstallField > span', 'アプリとして使う', 'Install as App');
+    setLocalizedTextContent('#pixieedPwaInstallButton', 'インストール案内を開く', 'Open Install Guide');
 
     setLocalizedTextContent('#panelSettings .settings-size-row--canvas > span', 'キャンバスサイズ', 'Canvas Size');
     setLocalizedControlLabel('canvasWidth', 'X', 'X');
@@ -21485,10 +21492,14 @@
       );
     }
     if (shouldTrustSharedProjectSnapshotRevision(sharedSnapshotRevision, sharedLatestRevision)) {
+      if (sharedLatestRevision > sharedSnapshotRevision) {
+        setActiveSharedProjectSyncState('catching-up', { announce: true });
+      }
       await applySharedProjectOpsSinceRevision(
         freshestProject,
         sharedSnapshotRevision
       );
+      setActiveSharedProjectSyncState('synced');
     } else {
       setActiveSharedProjectSession(
         resolvedProjectKey,
@@ -21496,6 +21507,7 @@
         Math.max(0, Math.round(Number(freshestProject.latest_structure_revision) || 0)),
         freshestProject.id || ''
       );
+      setActiveSharedProjectSyncState('catching-up', { announce: true });
       console.warn('[shared-realtime] skipped-initial-op-replay-untrusted-snapshot-revision', {
         projectKey: resolvedProjectKey,
         snapshotRevision: sharedSnapshotRevision,
@@ -30309,7 +30321,22 @@
         startPixieedAccountLoginFlow();
       });
     }
+    if (dom.controls.pwaInstallButton instanceof HTMLButtonElement && dom.controls.pwaInstallButton.dataset.bound !== 'true') {
+      dom.controls.pwaInstallButton.dataset.bound = 'true';
+      dom.controls.pwaInstallButton.addEventListener('click', () => {
+        if (window.pixieedPwaInstall?.open) {
+          window.pixieedPwaInstall.open();
+        }
+      });
+    }
+    if (!window.__PIXIEED_PWA_INSTALL_LISTENER_BOUND__) {
+      window.__PIXIEED_PWA_INSTALL_LISTENER_BOUND__ = true;
+      window.addEventListener('pixieed:pwa-install-availability-change', () => {
+        syncPwaInstallUi();
+      });
+    }
     updatePixieedAccountUi();
+    syncPwaInstallUi();
     if (dom.controls.toggleGrid instanceof HTMLInputElement) {
       dom.controls.toggleGrid.addEventListener('change', () => {
         state.showGrid = dom.controls.toggleGrid.checked;
@@ -44046,6 +44073,17 @@
     } else {
       // Non-spectator: existing restrictions for drawing guests
       if (HISTORY_DRAW_TOOLS.has(activeTool)) {
+        if (isSharedProjectCatchingUp()) {
+          logSharedProjectDrawBlock('shared-sync-catching-up');
+          updateAutosaveStatus(
+            localizeText(
+              '共有プロジェクトを最新状態へ同期中です。完了してから描画してください',
+              'The shared project is syncing to the latest state. Please wait until it finishes before drawing.'
+            ),
+            'warn'
+          );
+          return;
+        }
         if (isSharedProjectCollaborativeMode() && !activeSharedProjectDocumentLoaded) {
           if (hasUsableActiveSharedProjectDocumentState()) {
             markActiveSharedProjectDocumentLoaded(activeSharedProjectKey);
@@ -54608,6 +54646,31 @@
     );
   }
 
+  function setActiveSharedProjectSyncState(nextState = 'idle', { announce = false } = {}) {
+    const normalizedState = nextState === 'catching-up' || nextState === 'synced' ? nextState : 'idle';
+    activeSharedProjectSyncState = normalizedState;
+    if (!announce || !isSharedProjectCollaborativeMode()) {
+      return;
+    }
+    if (normalizedState === 'catching-up') {
+      setMultiStatus(
+        localizeText(
+          '共有モード: 最新状態へ同期中… 完了まで描画を一時停止します',
+          'Shared mode: syncing to the latest state... Drawing is temporarily paused until it completes.'
+        ),
+        'info'
+      );
+      return;
+    }
+    if (normalizedState === 'synced') {
+      setMultiStatus(localizeText('共有モード: ON', 'Shared mode: ON'), 'success');
+    }
+  }
+
+  function isSharedProjectCatchingUp(projectKey = '') {
+    return isSharedProjectCollaborativeMode(projectKey) && activeSharedProjectSyncState === 'catching-up';
+  }
+
   function isSharedProjectsBlockedByRuntime() {
     return window.location?.protocol === 'file:';
   }
@@ -57319,8 +57382,10 @@
     const targetRevision = Math.max(0, Math.round(Number(projectRecord?.latest_revision) || 0));
     const targetStructureRevision = Math.max(0, Math.round(Number(projectRecord?.latest_structure_revision) || 0));
     if (targetRevision <= afterRevision) {
+      setActiveSharedProjectSyncState('synced');
       return true;
     }
+    setActiveSharedProjectSyncState('catching-up', { announce: true });
     const ops = await fetchMissingOps(projectKey, afterRevision, Math.max(SHARED_PROJECT_MAX_MISSING_OP_FETCH, targetRevision - afterRevision + 8));
     if (!ops.length) {
       return false;
@@ -57336,6 +57401,9 @@
       Math.max(targetStructureRevision, activeSharedProjectStructureRevision),
       projectRecord?.id || activeSharedProjectId
     );
+    if (sharedProjectLastAppliedSeq >= targetRevision) {
+      setActiveSharedProjectSyncState('synced');
+    }
     return sharedProjectLastAppliedSeq >= targetRevision;
   }
 
@@ -59156,6 +59224,47 @@
     }
     goHome.target = '_blank';
     goHome.rel = 'noopener';
+  }
+
+  function syncPwaInstallUi() {
+    const field = dom.controls.pwaInstallField;
+    const status = dom.controls.pwaInstallStatus;
+    const button = dom.controls.pwaInstallButton;
+    if (!(field instanceof HTMLElement) || !(status instanceof HTMLElement) || !(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    const installer = window.pixieedPwaInstall;
+    const standalone = Boolean(installer?.isStandalone);
+    const available = Boolean(installer?.isAvailable?.());
+    const ios = Boolean(installer?.isIOS);
+    field.hidden = false;
+    button.hidden = false;
+    button.disabled = standalone;
+    if (standalone) {
+      status.textContent = localizeText(
+        'この端末ではすでにアプリとしてインストール済みです。',
+        'This device already has PiXiEEDraw installed as an app.'
+      );
+      button.textContent = localizeText('インストール済み', 'Installed');
+      return;
+    }
+    button.textContent = localizeText('インストール案内を開く', 'Open Install Guide');
+    if (available) {
+      status.textContent = ios
+        ? localizeText(
+          'ホーム画面に追加すると、PiXiEEDrawをアプリのように起動できます。',
+          'Add PiXiEEDraw to the Home Screen to launch it like an app.'
+        )
+        : localizeText(
+          'ホーム画面やデスクトップに追加すると、PiXiEEDrawをアプリのように開けます。',
+          'Install PiXiEEDraw to your Home Screen or desktop to launch it like an app.'
+        );
+      return;
+    }
+    status.textContent = localizeText(
+      'このブラウザでは今すぐインストール案内を出せません。対応ブラウザで開くと利用できます。',
+      'Install guidance is not available in this browser right now. Open PiXiEEDraw in a supported browser to use it.'
+    );
   }
 
   function startPixieedAccountLoginFlow({ closePrompt = false } = {}) {
