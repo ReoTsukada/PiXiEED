@@ -7974,8 +7974,17 @@
       renderOpenProjectTabs();
       return;
     }
-    const normalizedProjectId = normalizeAutosaveProjectId(autosaveProjectId)
+    const reloadRestoreProjectId = normalizeAutosaveProjectId(
+      startupAutosaveRestoreProjectId
+      || readReloadTargetProjectId()
+      || autosaveProjectId
+      || ''
+    );
+    const normalizedProjectId = reloadRestoreProjectId
       || setActiveAutosaveProjectId(createAutosaveProjectId(), { persist: false });
+    if (reloadRestoreProjectId && normalizeAutosaveProjectId(autosaveProjectId || '') !== reloadRestoreProjectId) {
+      setActiveAutosaveProjectId(reloadRestoreProjectId, { persist: false });
+    }
     const initialTab = createOpenProjectTabFromCurrentState({
       projectId: normalizedProjectId,
       source: 'initial',
@@ -13719,8 +13728,17 @@
     updateAutosaveStatus('自動保存: 端末内データを確認中…');
 
     try {
-      if (reloadSnapshotRestored && autosaveProjectId) {
-        startupAutosaveRestoreProjectId = normalizeAutosaveProjectId(autosaveProjectId || '');
+      const reloadRestoreProjectId = normalizeAutosaveProjectId(
+        autosaveProjectId
+        || startupAutosaveRestoreProjectId
+        || readReloadTargetProjectId()
+        || ''
+      );
+      if (reloadSnapshotRestored && reloadRestoreProjectId) {
+        startupAutosaveRestoreProjectId = reloadRestoreProjectId;
+        if (normalizeAutosaveProjectId(autosaveProjectId || '') !== reloadRestoreProjectId) {
+          setActiveAutosaveProjectId(reloadRestoreProjectId, { persist: false });
+        }
         updateAutosaveStatus('自動保存: 再読み込み復帰のプロジェクトを維持します', 'info');
         return;
       }
@@ -21345,6 +21363,26 @@
       }
       return false;
     }
+    if (
+      resolvedProjectKey === normalizeMultiProjectKey(activeSharedProjectKey || '')
+      && isCurrentProjectSharedEntry()
+    ) {
+      storeMultiProjectKey(resolvedProjectKey);
+      syncMultiProjectKeyInputValues(resolvedProjectKey, { preserveFocused: false });
+      if (hideStartup) {
+        hideStartupScreen();
+      }
+      if (!silent) {
+        setMultiStatus(
+          successMessage || localizeText(
+            'この共有プロジェクトはすでに開いています。',
+            'This shared project is already open.'
+          ),
+          'info'
+        );
+      }
+      return true;
+    }
     unhideSharedProjectFromRecentSync(resolvedProjectKey);
     const openingOwnedSharedProject = Boolean(
       accountState.userId
@@ -21497,6 +21535,26 @@
     let normalizedEntry = normalizeSharedRecentProjectEntry(entry);
     if (!normalizedEntry) {
       return false;
+    }
+    if (
+      normalizeMultiProjectKey(normalizedEntry.sharedProjectKey || '') === normalizeMultiProjectKey(activeSharedProjectKey || '')
+      && isCurrentProjectSharedEntry()
+    ) {
+      storeMultiProjectKey(normalizedEntry.sharedProjectKey || '');
+      syncMultiProjectKeyInputValues(normalizedEntry.sharedProjectKey || '', { preserveFocused: false });
+      if (hideStartup) {
+        hideStartupScreen();
+      }
+      if (!silent) {
+        setMultiStatus(
+          localizeText(
+            'この共有プロジェクトはすでに開いています。',
+            'This shared project is already open.'
+          ),
+          'info'
+        );
+      }
+      return true;
     }
     try {
       const refreshedEntry = await refreshSharedRecentProjectEntryFromBackend(normalizedEntry);
