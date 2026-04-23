@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.24-shared-sync-state-fix1';
+  const APP_BUILD_VERSION = '2026.04.24-pwa-settings-only-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -27569,6 +27569,7 @@
       setupTopActionButtons();
       setupLayout();
       setupGlobalFocusDismiss();
+      initPwaInstallSupport();
       setupControls();
       void initPixieedAccount();
       setupExportDialog();
@@ -59224,6 +59225,156 @@
     }
     goHome.target = '_blank';
     goHome.rel = 'noopener';
+  }
+
+  function ensurePwaInstallDialog() {
+    if (window.__PIXIEED_PWA_INSTALL_DIALOG__) {
+      return window.__PIXIEED_PWA_INSTALL_DIALOG__;
+    }
+    const overlay = document.createElement('div');
+    overlay.className = 'pixieed-pwa-install-overlay';
+    overlay.hidden = true;
+    const dialog = document.createElement('div');
+    dialog.className = 'pixieed-pwa-install-dialog';
+    const title = document.createElement('h2');
+    title.className = 'pixieed-pwa-install-title';
+    const message = document.createElement('p');
+    message.className = 'pixieed-pwa-install-text';
+    const actions = document.createElement('div');
+    actions.className = 'pixieed-pwa-install-actions';
+    const secondaryButton = document.createElement('button');
+    secondaryButton.type = 'button';
+    secondaryButton.className = 'pixieed-pwa-install-action pixieed-pwa-install-action--ghost';
+    const primaryButton = document.createElement('button');
+    primaryButton.type = 'button';
+    primaryButton.className = 'pixieed-pwa-install-action pixieed-pwa-install-action--primary';
+    actions.appendChild(secondaryButton);
+    actions.appendChild(primaryButton);
+    dialog.appendChild(title);
+    dialog.appendChild(message);
+    dialog.appendChild(actions);
+    overlay.appendChild(dialog);
+    overlay.addEventListener('click', event => {
+      if (event.target === overlay) {
+        overlay.hidden = true;
+      }
+    });
+    document.body.appendChild(overlay);
+    const api = {
+      open(config = {}) {
+        title.textContent = config.dialogTitle || 'PiXiEEDrawをインストール';
+        message.textContent = config.dialogMessage || '';
+        primaryButton.textContent = config.primaryLabel || '閉じる';
+        secondaryButton.textContent = config.secondaryLabel || 'OK';
+        primaryButton.onclick = () => {
+          overlay.hidden = true;
+          config.onPrimary?.();
+        };
+        secondaryButton.onclick = () => {
+          overlay.hidden = true;
+          config.onSecondary?.();
+        };
+        overlay.hidden = false;
+      },
+      close() {
+        overlay.hidden = true;
+      },
+    };
+    window.__PIXIEED_PWA_INSTALL_DIALOG__ = api;
+    return api;
+  }
+
+  function initPwaInstallSupport() {
+    if (window.pixieedPwaInstall) {
+      syncPwaInstallUi();
+      return;
+    }
+    const nav = window.navigator || {};
+    const ua = nav.userAgent || '';
+    const platform = nav.platform || '';
+    const isIOS = /iPad|iPhone|iPod/.test(ua) || (platform === 'MacIntel' && nav.maxTouchPoints > 1);
+    const isStandalone = (
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+      || nav.standalone === true
+    );
+    let deferredPrompt = null;
+    const notifyState = () => {
+      syncPwaInstallUi();
+      window.dispatchEvent(new CustomEvent('pixieed:pwa-install-availability-change', {
+        detail: {
+          available: !isStandalone && (Boolean(deferredPrompt) || isIOS),
+          standalone: isStandalone,
+          ios: isIOS,
+        },
+      }));
+    };
+    const openInstall = async () => {
+      const dialog = ensurePwaInstallDialog();
+      if (isStandalone) {
+        return false;
+      }
+      if (isIOS) {
+        const isSafari = /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua);
+        dialog.open({
+          dialogTitle: 'PiXiEEDrawをインストール',
+          dialogMessage: isSafari
+            ? 'Safariの共有ボタンをタップして「ホーム画面に追加」を選ぶと、PiXiEEDrawをアプリのように使えます。'
+            : 'この端末ではSafariで開くと「ホーム画面に追加」できます。SafariでPiXiEEDrawを開いて共有メニューを使ってください。',
+          primaryLabel: '閉じる',
+          secondaryLabel: 'OK',
+        });
+        return true;
+      }
+      if (!deferredPrompt) {
+        dialog.open({
+          dialogTitle: 'インストール手順',
+          dialogMessage: localizeText(
+            'このブラウザでは今すぐインストール案内を出せません。対応ブラウザのメニューから「インストール」または「アプリを追加」を選択してください。',
+            'Install guidance is not available right now. Use your supported browser menu and choose Install or Add to Home Screen.'
+          ),
+          primaryLabel: '閉じる',
+          secondaryLabel: 'OK',
+        });
+        return false;
+      }
+      dialog.open({
+        dialogTitle: 'PiXiEEDrawをインストール',
+        dialogMessage: 'ホーム画面やデスクトップに追加すると、PiXiEEDrawをアプリのようにすぐ開けます。',
+        primaryLabel: 'インストール',
+        secondaryLabel: '後で',
+        onPrimary: async () => {
+          const promptEvent = deferredPrompt;
+          deferredPrompt = null;
+          notifyState();
+          try {
+            await promptEvent.prompt();
+            await promptEvent.userChoice;
+          } catch (_error) {
+            // Ignore prompt failures.
+          }
+        },
+      });
+      return true;
+    };
+    window.pixieedPwaInstall = {
+      open: openInstall,
+      isAvailable() {
+        return !isStandalone && (Boolean(deferredPrompt) || isIOS);
+      },
+      isStandalone,
+      isIOS,
+    };
+    window.addEventListener('beforeinstallprompt', event => {
+      event.preventDefault();
+      deferredPrompt = event;
+      notifyState();
+    });
+    window.addEventListener('appinstalled', () => {
+      deferredPrompt = null;
+      ensurePwaInstallDialog().close();
+      notifyState();
+    });
+    notifyState();
   }
 
   function syncPwaInstallUi() {
