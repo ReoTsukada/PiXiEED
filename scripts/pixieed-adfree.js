@@ -454,11 +454,40 @@
     }
   }
 
+  async function waitForSharedPixieedAccountClient(timeoutMs = 1200) {
+    if (!isPixieedrawPage()) {
+      return null;
+    }
+    if (window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__) {
+      return window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__;
+    }
+    const startedAt = Date.now();
+    while ((Date.now() - startedAt) < Math.max(0, Number(timeoutMs) || 0)) {
+      if (window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__) {
+        return window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__;
+      }
+      if (window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__) {
+        try {
+          return await window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT_PROMISE__;
+        } catch (_error) {
+          return null;
+        }
+      }
+      await new Promise(resolve => window.setTimeout(resolve, 32));
+    }
+    return window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__ || null;
+  }
+
   async function ensureSupabase() {
     if (supabasePromise) {
       return supabasePromise;
     }
     supabasePromise = (async () => {
+      const sharedClient = await waitForSharedPixieedAccountClient();
+      if (sharedClient) {
+        window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__ = sharedClient;
+        return sharedClient;
+      }
       if (window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__) {
         return window.__PIXIEED_ACCOUNT_SUPABASE_CLIENT__;
       }
