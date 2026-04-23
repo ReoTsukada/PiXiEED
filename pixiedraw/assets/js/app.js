@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.23-shared-invite-login-fix1';
+  const APP_BUILD_VERSION = '2026.04.23-shared-invite-login-fix2';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -54380,6 +54380,21 @@
     }
   }
 
+  function isRecoverableSharedBackendPreflightError(error) {
+    const status = Number(error?.status || 0);
+    const code = String(error?.code || '').trim();
+    const message = String(error?.message || '').toLowerCase();
+    return (
+      status === 0
+      && !code
+      && (
+        message.includes('load failed')
+        || message.includes('failed to fetch')
+        || message.includes('networkerror')
+      )
+    );
+  }
+
   function canUseSharedProjectsBackend() {
     return supportsSharedProjectsBackend && accountState.isLoggedIn && !accountState.isAnonymous;
   }
@@ -57233,11 +57248,25 @@
           target_invite_token: normalizedInviteToken,
         });
       if (joined.error) {
+        if (isRecoverableSharedBackendPreflightError(joined.error)) {
+          console.debug('[shared-backend] join-by-token preflight skipped', {
+            inviteToken: normalizedInviteToken,
+            message: String(joined.error?.message || ''),
+          });
+          return null;
+        }
         handleSharedProjectsBackendError(joined.error, 'join-by-token');
         return null;
       }
       project = Array.isArray(joined.data) ? (joined.data[0] || null) : (joined.data || null);
     } catch (error) {
+      if (isRecoverableSharedBackendPreflightError(error)) {
+        console.debug('[shared-backend] join-by-token preflight exception skipped', {
+          inviteToken: normalizedInviteToken,
+          message: String(error?.message || ''),
+        });
+        return null;
+      }
       handleSharedProjectsBackendError(error, 'join-by-token-exception');
       return null;
     }
@@ -57996,6 +58025,13 @@
         .select('project_key, role, updated_at, joined_at')
         .eq('user_id', accountState.userId);
       if (membershipResponse.error) {
+        if (isRecoverableSharedBackendPreflightError(membershipResponse.error)) {
+          console.debug('[shared-backend] list-memberships preflight skipped', {
+            userId: accountState.userId || '',
+            message: String(membershipResponse.error?.message || ''),
+          });
+          return [];
+        }
         handleSharedProjectsBackendError(membershipResponse.error, 'list-memberships');
         return [];
       }
@@ -58061,6 +58097,13 @@
       await pruneSharedRecentEntriesToKnownProjects(visibleProjectKeys);
       return normalizedEntries;
     } catch (error) {
+      if (isRecoverableSharedBackendPreflightError(error)) {
+        console.debug('[shared-backend] sync-recent-projects preflight exception skipped', {
+          userId: accountState.userId || '',
+          message: String(error?.message || ''),
+        });
+        return [];
+      }
       handleSharedProjectsBackendError(error, 'sync-recent-projects-exception');
       return [];
     }
