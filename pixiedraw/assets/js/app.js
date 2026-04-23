@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.24-pwa-settings-only-fix1';
+  const APP_BUILD_VERSION = '2026.04.24-shared-server-durability-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -3775,6 +3775,16 @@
   const pointerState = createPointerState();
   window.addEventListener('beforeunload', handleUnsavedBeforeUnload);
   window.addEventListener('pagehide', handleAutosavePageHide);
+  window.addEventListener('beforeunload', () => {
+    if (sharedProjectPendingLocalOps.length && activeSharedProjectKey) {
+      flushSharedProjectPendingLocalOps();
+    }
+  });
+  window.addEventListener('pagehide', () => {
+    if (sharedProjectPendingLocalOps.length && activeSharedProjectKey) {
+      flushSharedProjectPendingLocalOps();
+    }
+  });
   window.addEventListener('beforeunload', () => {
     releaseSharedProjectSessionLock().catch(() => {});
   });
@@ -20466,6 +20476,36 @@
     return resumedCount;
   }
 
+  async function restorePendingSharedLocalOps(projectKey = activeSharedProjectKey, {
+    announce = false,
+    refreshReason = 'resume-pending-local-ops',
+  } = {}) {
+    const normalizedProjectKey = normalizeMultiProjectKey(projectKey || '');
+    if (!normalizedProjectKey) {
+      return 0;
+    }
+    const resumedCount = await resumeSharedLocalOpJournal(normalizedProjectKey);
+    if (!resumedCount) {
+      return 0;
+    }
+    if (announce) {
+      setMultiStatus(
+        localizeText(
+          '未送信の共有描画をサーバーへ再送しています…',
+          'Resending unsynced shared edits to the server...'
+        ),
+        'info'
+      );
+    }
+    setActiveSharedProjectSyncState('catching-up', { announce: announce });
+    queueSharedProjectRefresh({
+      immediate: false,
+      reason: refreshReason,
+      force: true,
+    });
+    return resumedCount;
+  }
+
   async function sanitizeRecentProjectsStore({ announce = false } = {}) {
     if (!AUTOSAVE_SUPPORTED) {
       return { entries: [], changed: false, removedCount: 0, repairedCount: 0 };
@@ -21514,8 +21554,11 @@
         latestRevision: sharedLatestRevision,
       });
     }
-    discardPendingSharedLocalOpJournal(resolvedProjectKey).catch(error => {
-      console.warn('Failed to discard pending shared local op journal after opening shared project', error);
+    restorePendingSharedLocalOps(resolvedProjectKey, {
+      announce: true,
+      refreshReason: 'open-shared-resume-pending-local-ops',
+    }).catch(error => {
+      console.warn('Failed to restore pending shared local op journal after opening shared project', error);
     });
     await upsertSharedRecentProjectEntry({
       projectKey: resolvedProjectKey,
@@ -57933,7 +57976,10 @@
         revision: nextRevision,
         structureRevision: Math.max(0, Math.round(Number(project.latest_structure_revision) || 0)),
       });
-      await discardPendingSharedLocalOpJournal(activeSharedProjectKey);
+      await restorePendingSharedLocalOps(activeSharedProjectKey, {
+        announce: false,
+        refreshReason: `${reason || 'refresh'}-resume-pending-local-ops`,
+      });
       pendingSharedProjectConflictReplay = null;
       maybeReplayPendingSharedProjectConflictAfterRefresh(activeSharedProjectKey);
       if (reason) {
