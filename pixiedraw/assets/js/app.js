@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.24-shared-canonical-snapshot-open-fix1';
+  const APP_BUILD_VERSION = '2026.04.24-shared-provisional-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -3868,10 +3868,18 @@
     'duplicateLayer',
     'pasteLayer',
     'removeLayer',
+    'moveLayer',
+    'reorderLayer',
     'duplicateFrame',
     'pasteFrame',
+    'addFrame',
     'removeFrame',
+    'moveFrame',
+    'reorderFrame',
     'resizeCanvas',
+    'addCanvas',
+    'removeCanvas',
+    'reorderCanvas',
   ]);
   const globalHistoryConfirmState = {
     resolve: null,
@@ -56372,13 +56380,13 @@
       : (typeof payload?.kind === 'string' && payload.kind.trim()
         ? payload.kind.trim()
         : (typeof opRecord?.op_type === 'string' ? opRecord.op_type.trim() : ''));
-    if (opId && sharedProjectSeenOpIds.has(opId)) {
+    if (!provisional && opId && sharedProjectSeenOpIds.has(opId)) {
       const seenSeq = Math.max(0, Math.round(Number(sharedProjectSeenOpSeqById.get(opId)) || 0));
       if ((seq && seenSeq >= seq) || (!seq && seenSeq >= 0)) {
         return true;
       }
     }
-    if (opId && sharedProjectSeenOpIds.has(opId) && !seq) {
+    if (!provisional && opId && sharedProjectSeenOpIds.has(opId) && !seq) {
       return true;
     }
     let applied = false;
@@ -56414,13 +56422,17 @@
       || kind === 'canvas-reorder'
       || kind === 'structure'
     ) {
+      if (provisional) {
+        queueSharedProjectRefresh({ immediate: true, reason: 'structure-broadcast', force: true });
+        return true;
+      }
       applied = applySharedProjectStructureOp(opRecord, { fromRemote });
       if (!applied) {
         queueSharedProjectRefresh({ immediate: true, reason: provisional ? 'structure-broadcast' : 'structure-op', force: true });
         applied = true;
       }
     }
-    if (applied && opId) {
+    if (applied && opId && !provisional) {
       sharedProjectSeenOpIds.add(opId);
       sharedProjectSeenOpSeqById.set(
         opId,
@@ -57376,6 +57388,14 @@
     if (!replayed) {
       return false;
     }
+    if (sharedProjectPendingRemoteOps.size || sharedProjectLastAppliedSeq < targetRevision) {
+      queueSharedProjectRefresh({
+        immediate: true,
+        reason: 'replay-gap-fallback',
+        force: true,
+      });
+      return false;
+    }
     setActiveSharedProjectSession(
       projectKey,
       Math.max(sharedProjectLastAppliedSeq, targetRevision),
@@ -58095,14 +58115,21 @@
         },
       });
       if (error) {
+        if (resolvedOpType === 'draw' || resolvedOpType === 'palette' || resolvedOpType === 'structure') {
+          queueSharedProjectRefresh({ immediate: true, reason: 'commit-failed', force: true });
+        }
         handleSharedProjectsBackendError(error, 'commit-op-rpc');
         return null;
       }
       const result = Array.isArray(data) ? (data[0] || null) : (data || null);
       if (!result) {
+        if (resolvedOpType === 'draw' || resolvedOpType === 'palette' || resolvedOpType === 'structure') {
+          queueSharedProjectRefresh({ immediate: true, reason: 'commit-failed', force: true });
+        }
         return null;
       }
       if (result.commit_status === 'conflict') {
+        queueSharedProjectRefresh({ immediate: true, reason: 'commit-failed', force: true });
         if (retryOnConflict && (resolvedOpType === 'draw' || resolvedOpType === 'palette')) {
           pendingSharedProjectConflictReplay = {
             projectKey: normalizedProjectKey,
@@ -58175,6 +58202,9 @@
       });
       return result;
     } catch (error) {
+      if (resolvedOpType === 'draw' || resolvedOpType === 'palette' || resolvedOpType === 'structure') {
+        queueSharedProjectRefresh({ immediate: true, reason: 'commit-failed', force: true });
+      }
       handleSharedProjectsBackendError(error, 'commit-op-exception');
       return null;
     }
