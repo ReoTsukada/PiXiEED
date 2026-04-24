@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pixiedraw-v2026.04.24-shared-provisional-fix1';
+const CACHE_VERSION = 'pixiedraw-v2026.04.24-shared-open-recoverable-fix1';
 const CORE_ASSETS = [
   '/pixiedraw/',
   '/pixiedraw/index.html',
