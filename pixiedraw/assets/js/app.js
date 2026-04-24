@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.24-shared-provisional-fix1';
+  const APP_BUILD_VERSION = '2026.04.24-shared-open-recoverable-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -21473,12 +21473,12 @@
     );
     const freshestLatestRevision = Math.max(0, Math.round(Number(freshestProject.latest_revision) || 0));
     const sharedSnapshot = freshestProject.latest_snapshot;
-    if (!sharedSnapshot || typeof sharedSnapshot !== 'object' || freshestSnapshotRevision < freshestLatestRevision) {
+    if (!sharedSnapshot || typeof sharedSnapshot !== 'object') {
       if (!silent) {
         setMultiStatus(
           localizeText(
-            '共有プロジェクトの最新スナップショットがまだ準備できていないため、もう一度読み込みます。',
-            'The latest shared project snapshot is not ready yet. Retrying the load.'
+            '共有プロジェクトのスナップショットを取得できないため、もう一度読み込みます。',
+            'The shared project snapshot is not available yet. Retrying the load.'
           ),
           'info'
         );
@@ -21537,7 +21537,16 @@
     markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
     const sharedSnapshotRevision = Math.max(0, Math.round(Number(freshestProject.latest_snapshot_revision) || 0));
     const sharedLatestRevision = freshestLatestRevision;
-    setActiveSharedProjectSyncState('synced');
+    if (sharedSnapshotRevision < sharedLatestRevision) {
+      setActiveSharedProjectSyncState('catching-up', { announce: !silent });
+      queueSharedProjectRefresh({
+        immediate: true,
+        reason: 'open-shared-await-latest-ops',
+        force: true,
+      });
+    } else {
+      setActiveSharedProjectSyncState('synced');
+    }
     restorePendingSharedLocalOps(resolvedProjectKey, {
       announce: true,
       refreshReason: 'open-shared-resume-pending-local-ops',
@@ -57247,11 +57256,25 @@
         target_session_id: ensureSharedProjectSessionInstanceId(),
       });
       if (error) {
+        if (isRecoverableSharedBackendPreflightError(error)) {
+          console.debug('[shared-backend] release-shared-session skipped after recoverable preflight failure', {
+            projectKey: normalizedProjectKey,
+            message: String(error?.message || ''),
+          });
+          return true;
+        }
         handleSharedProjectsBackendError(error, 'release-shared-session');
         return false;
       }
       return data === true || (Array.isArray(data) && data[0] === true);
     } catch (error) {
+      if (isRecoverableSharedBackendPreflightError(error)) {
+        console.debug('[shared-backend] release-shared-session exception skipped after recoverable preflight failure', {
+          projectKey: normalizedProjectKey,
+          message: String(error?.message || ''),
+        });
+        return true;
+      }
       handleSharedProjectsBackendError(error, 'release-shared-session-exception');
       return false;
     }
@@ -57335,6 +57358,10 @@
         max_ops: Math.max(1, Math.round(Number(limit) || 256)),
       });
       if (error) {
+        if (isRecoverableSharedBackendPreflightError(error)) {
+          console.debug('[shared-backend] fetch-ops-since skipped after recoverable preflight failure', rpcDebugInfo);
+          return [];
+        }
         console.warn('[shared-backend] fetch-ops-since failed', rpcDebugInfo);
         handleSharedProjectsBackendError(error, 'fetch-ops-since');
         return [];
@@ -57347,6 +57374,17 @@
       });
       return result;
     } catch (error) {
+      if (isRecoverableSharedBackendPreflightError(error)) {
+        console.debug('[shared-backend] fetch-ops-since exception skipped after recoverable preflight failure', {
+          context: 'fetch-ops-since',
+          projectKey: normalizedProjectKey,
+          afterRevision: Math.max(0, Math.round(Number(afterRevision) || 0)),
+          limit: Math.max(1, Math.round(Number(limit) || 256)),
+          durationMs: Math.max(0, Date.now() - startedAt),
+          message: String(error?.message || error || ''),
+        });
+        return [];
+      }
       console.warn('[shared-backend] fetch-ops-since exception', {
         context: 'fetch-ops-since',
         projectKey: normalizedProjectKey,
