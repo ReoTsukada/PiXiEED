@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.24-shared-open-recoverable-fix1';
+  const APP_BUILD_VERSION = '2026.04.24-shared-rejoin-fallback-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -21681,6 +21681,51 @@
         closeBlockingLoading();
         return true;
       }
+      if (normalizedEntry.project && typeof normalizedEntry.project === 'object') {
+        setStartupProgressLabel(localizeText('一時保存から共有プロジェクトを復元中…', 'Restoring shared project from temporary cache...'));
+        const loaded = await loadDocumentFromText(JSON.stringify(normalizedEntry.project), null, {
+          projectId: normalizedEntry.id || buildSharedRecentProjectId(normalizedEntry.sharedProjectKey || ''),
+          suppressAutosaveStatus: true,
+          openedFromRecent: true,
+          preserveDotStats: true,
+          sharedProjectKey: normalizedEntry.sharedProjectKey || '',
+          sharedProjectRevision: Math.max(0, Math.round(Number(normalizedEntry.sharedProjectRevision) || 0)),
+        });
+        if (loaded) {
+          storeMultiProjectKey(normalizedEntry.sharedProjectKey || '');
+          syncMultiProjectKeyInputValues(normalizedEntry.sharedProjectKey || '', { preserveFocused: false });
+          setMultiDesiredRole(normalizedEntry.sharedRoleHint || 'guest');
+          setMultiUiView(normalizedEntry.sharedRoleHint || 'guest');
+          multiEntryJoinPanelOpen = false;
+          setActiveAutosaveProjectId(normalizedEntry.id || buildSharedRecentProjectId(normalizedEntry.sharedProjectKey || ''));
+          setActiveSharedProjectSession(
+            normalizeMultiProjectKey(normalizedEntry.sharedProjectKey || ''),
+            Math.max(0, Math.round(Number(normalizedEntry.sharedProjectRevision) || 0)),
+            Math.max(0, Math.round(Number(normalizedEntry.sharedProjectStructureRevision) || 0)),
+            typeof normalizedEntry.sharedProjectBackendId === 'string' ? normalizedEntry.sharedProjectBackendId : ''
+          );
+          setActiveSharedProjectSyncState('catching-up', { announce: !silent });
+          scheduleSharedProjectLatestRecovery(normalizedEntry, {
+            reason: 'recent-fallback-recovery',
+            immediate: true,
+          });
+          if (hideStartup) {
+            hideStartupScreen();
+          }
+          if (!silent) {
+            setMultiStatus(
+              localizeText(
+                '共有プロジェクトを一時保存から復元しました。最新状態への再接続を続けます。',
+                'Restored the shared project from temporary cache and will continue reconnecting to the latest state.'
+              ),
+              'warn'
+            );
+          }
+          clearPendingSharedInvite();
+          closeBlockingLoading();
+          return true;
+        }
+      }
       clearPendingSharedInvite();
       if (!silent) {
         setMultiStatus(
@@ -21695,6 +21740,51 @@
       return false;
     } catch (error) {
       console.warn('Failed to open shared recent project', error);
+      if (normalizedEntry.project && typeof normalizedEntry.project === 'object') {
+        setStartupProgressLabel(localizeText('一時保存から共有プロジェクトを復元中…', 'Restoring shared project from temporary cache...'));
+        const loaded = await loadDocumentFromText(JSON.stringify(normalizedEntry.project), null, {
+          projectId: normalizedEntry.id || buildSharedRecentProjectId(normalizedEntry.sharedProjectKey || ''),
+          suppressAutosaveStatus: true,
+          openedFromRecent: true,
+          preserveDotStats: true,
+          sharedProjectKey: normalizedEntry.sharedProjectKey || '',
+          sharedProjectRevision: Math.max(0, Math.round(Number(normalizedEntry.sharedProjectRevision) || 0)),
+        });
+        if (loaded) {
+          storeMultiProjectKey(normalizedEntry.sharedProjectKey || '');
+          syncMultiProjectKeyInputValues(normalizedEntry.sharedProjectKey || '', { preserveFocused: false });
+          setMultiDesiredRole(normalizedEntry.sharedRoleHint || 'guest');
+          setMultiUiView(normalizedEntry.sharedRoleHint || 'guest');
+          multiEntryJoinPanelOpen = false;
+          setActiveAutosaveProjectId(normalizedEntry.id || buildSharedRecentProjectId(normalizedEntry.sharedProjectKey || ''));
+          setActiveSharedProjectSession(
+            normalizeMultiProjectKey(normalizedEntry.sharedProjectKey || ''),
+            Math.max(0, Math.round(Number(normalizedEntry.sharedProjectRevision) || 0)),
+            Math.max(0, Math.round(Number(normalizedEntry.sharedProjectStructureRevision) || 0)),
+            typeof normalizedEntry.sharedProjectBackendId === 'string' ? normalizedEntry.sharedProjectBackendId : ''
+          );
+          setActiveSharedProjectSyncState('catching-up', { announce: !silent });
+          scheduleSharedProjectLatestRecovery(normalizedEntry, {
+            reason: 'recent-fallback-recovery',
+            immediate: true,
+          });
+          if (hideStartup) {
+            hideStartupScreen();
+          }
+          if (!silent) {
+            setMultiStatus(
+              localizeText(
+                '共有プロジェクトを一時保存から復元しました。最新状態への再接続を続けます。',
+                'Restored the shared project from temporary cache and will continue reconnecting to the latest state.'
+              ),
+              'warn'
+            );
+          }
+          clearPendingSharedInvite();
+          closeBlockingLoading();
+          return true;
+        }
+      }
       clearPendingSharedInvite();
       if (!silent) {
         setMultiStatus(
