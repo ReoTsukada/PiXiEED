@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.24-shared-open-after-replay-fix1';
+  const APP_BUILD_VERSION = '2026.04.24-shared-batch-replay-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -3218,6 +3218,9 @@
   const sharedProjectPendingProvisionalOps = new Map();
   const sharedProjectSeenOpIds = new Set();
   const sharedProjectSeenOpSeqById = new Map();
+  let sharedProjectReplayRenderBatchDepth = 0;
+  let sharedProjectReplayRenderNeedsFull = false;
+  let sharedProjectReplayRenderDirtyRect = null;
   const sharedProjectRemoteApplyFailureKeys = new Set();
   let sharedProjectInFlightStroke = null;
   let sharedProjectGapRecoveryPromise = null;
@@ -56484,7 +56487,59 @@
     scheduleSharedProjectCheckpoint({ immediate, historyLabel });
   }
 
+  function beginSharedProjectReplayRenderBatch() {
+    sharedProjectReplayRenderBatchDepth += 1;
+  }
+
+  function flushSharedProjectReplayRenderBatch() {
+    if (sharedProjectReplayRenderNeedsFull) {
+      markCanvasDirty();
+    } else if (sharedProjectReplayRenderDirtyRect) {
+      markDirtyRect(
+        sharedProjectReplayRenderDirtyRect.x0,
+        sharedProjectReplayRenderDirtyRect.y0,
+        sharedProjectReplayRenderDirtyRect.x1,
+        sharedProjectReplayRenderDirtyRect.y1
+      );
+    }
+    sharedProjectReplayRenderNeedsFull = false;
+    sharedProjectReplayRenderDirtyRect = null;
+    invalidateFillPreviewCache();
+    invalidateOnionSkinCache();
+    clearPlaybackFrameCache();
+    requestRender();
+    requestOverlayRender();
+  }
+
+  function endSharedProjectReplayRenderBatch() {
+    if (sharedProjectReplayRenderBatchDepth <= 0) {
+      sharedProjectReplayRenderBatchDepth = 0;
+      sharedProjectReplayRenderNeedsFull = false;
+      sharedProjectReplayRenderDirtyRect = null;
+      return;
+    }
+    sharedProjectReplayRenderBatchDepth -= 1;
+    if (sharedProjectReplayRenderBatchDepth === 0) {
+      flushSharedProjectReplayRenderBatch();
+    }
+  }
+
   function applyIncomingSharedProjectVisualResult(targetCanvas, applyResult) {
+    if (sharedProjectReplayRenderBatchDepth > 0) {
+      if (targetCanvas?.id !== (getActiveProjectCanvasDocument()?.id || '') || !applyResult?.dirtyRect || applyResult.full) {
+        sharedProjectReplayRenderNeedsFull = true;
+      } else if (!sharedProjectReplayRenderNeedsFull && applyResult?.dirtyRect) {
+        if (!sharedProjectReplayRenderDirtyRect) {
+          sharedProjectReplayRenderDirtyRect = { ...applyResult.dirtyRect };
+        } else {
+          sharedProjectReplayRenderDirtyRect.x0 = Math.min(sharedProjectReplayRenderDirtyRect.x0, applyResult.dirtyRect.x0);
+          sharedProjectReplayRenderDirtyRect.y0 = Math.min(sharedProjectReplayRenderDirtyRect.y0, applyResult.dirtyRect.y0);
+          sharedProjectReplayRenderDirtyRect.x1 = Math.max(sharedProjectReplayRenderDirtyRect.x1, applyResult.dirtyRect.x1);
+          sharedProjectReplayRenderDirtyRect.y1 = Math.max(sharedProjectReplayRenderDirtyRect.y1, applyResult.dirtyRect.y1);
+        }
+      }
+      return;
+    }
     if (targetCanvas?.id !== (getActiveProjectCanvasDocument()?.id || '')) {
       markCanvasDirty();
     } else if (!applyResult?.dirtyRect || applyResult.full) {
@@ -56858,37 +56913,42 @@
       return true;
     }
     list.sort(compareSharedProjectOpsForReplay);
-    for (let index = 0; index < list.length; index += 1) {
-      const op = list[index];
-      const seq = getSharedProjectOpSeq(op);
-      if (!seq) {
-        continue;
+    beginSharedProjectReplayRenderBatch();
+    try {
+      for (let index = 0; index < list.length; index += 1) {
+        const op = list[index];
+        const seq = getSharedProjectOpSeq(op);
+        if (!seq) {
+          continue;
+        }
+        if (seq <= sharedProjectLastAppliedSeq) {
+          applyOp(op, { fromRemote, provisional: false });
+          continue;
+        }
+        if (seq > sharedProjectLastAppliedSeq + 1) {
+          sharedProjectPendingRemoteOps.set(seq, op);
+          continue;
+        }
+        if (fromRemote && shouldDeferIncomingSharedProjectRemoteApply()) {
+          sharedProjectPendingRemoteOps.set(seq, op);
+          scheduleDeferredSharedProjectRemoteOpsDrain();
+          continue;
+        }
+        if (!applyOp(op, { fromRemote, provisional: false })) {
+          return false;
+        }
+        sharedProjectLastAppliedSeq = seq;
+        activeSharedProjectRevision = Math.max(activeSharedProjectRevision, seq);
+        activeSharedProjectStructureRevision = Math.max(
+          activeSharedProjectStructureRevision,
+          Math.max(0, Math.round(Number(op?.structure_revision) || 0))
+        );
+        if (!drainPendingSharedProjectRemoteOps()) {
+          return false;
+        }
       }
-      if (seq <= sharedProjectLastAppliedSeq) {
-        applyOp(op, { fromRemote, provisional: false });
-        continue;
-      }
-      if (seq > sharedProjectLastAppliedSeq + 1) {
-        sharedProjectPendingRemoteOps.set(seq, op);
-        continue;
-      }
-      if (fromRemote && shouldDeferIncomingSharedProjectRemoteApply()) {
-        sharedProjectPendingRemoteOps.set(seq, op);
-        scheduleDeferredSharedProjectRemoteOpsDrain();
-        continue;
-      }
-      if (!applyOp(op, { fromRemote, provisional: false })) {
-        return false;
-      }
-      sharedProjectLastAppliedSeq = seq;
-      activeSharedProjectRevision = Math.max(activeSharedProjectRevision, seq);
-      activeSharedProjectStructureRevision = Math.max(
-        activeSharedProjectStructureRevision,
-        Math.max(0, Math.round(Number(op?.structure_revision) || 0))
-      );
-      if (!drainPendingSharedProjectRemoteOps()) {
-        return false;
-      }
+    } finally {
+      endSharedProjectReplayRenderBatch();
     }
     return true;
   }
@@ -58242,6 +58302,14 @@
           opId: resolvedOp.opId || '',
           latestRevision: Math.max(0, Math.round(Number(result.latest_revision) || 0)),
           latestStructureRevision: Math.max(0, Math.round(Number(result.latest_structure_revision) || 0)),
+        });
+      }
+      if (resolvedOpType === 'draw' || resolvedOpType === 'palette' || resolvedOpType === 'structure') {
+        queueSharedProjectCurrentSnapshotCapture({
+          delayMs: 0,
+          projectKey: normalizedProjectKey,
+          title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
+          historyLabel: 'realtimeSnapshotSync',
         });
       }
       if (shouldCreateSharedProjectCheckpoint(resolvedOpType)) {
