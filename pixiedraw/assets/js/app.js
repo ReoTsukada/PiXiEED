@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.24-shared-canonical-open-fix1';
+  const APP_BUILD_VERSION = '2026.04.24-shared-canonical-snapshot-open-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -21465,32 +21465,39 @@
     );
     const freshestLatestRevision = Math.max(0, Math.round(Number(freshestProject.latest_revision) || 0));
     const sharedSnapshot = freshestProject.latest_snapshot;
-    if (sharedSnapshot && typeof sharedSnapshot === 'object') {
-      const snapshotRevision = Math.max(
-        0,
-        Math.round(Number(freshestProject.latest_snapshot_revision) || Number(freshestProject.latest_revision) || 0)
-      );
-      const latestRevision = freshestLatestRevision;
-      const loaded = await loadDocumentFromText(JSON.stringify(sharedSnapshot), null, {
-        projectId: buildSharedRecentProjectId(resolvedProjectKey),
-        suppressAutosaveStatus: true,
-        openedFromRecent: true,
-        preserveDotStats: true,
-        sharedProjectKey: resolvedProjectKey,
-        sharedProjectRevision: snapshotRevision,
-      });
-      if (loaded) {
-        markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
-        if (!shouldTrustSharedProjectSnapshotRevision(snapshotRevision, latestRevision)) {
-          setActiveSharedProjectSession(
-            resolvedProjectKey,
-            latestRevision,
-            Math.max(0, Math.round(Number(freshestProject.latest_structure_revision) || 0)),
-            freshestProject.id || ''
-          );
-        }
+    if (!sharedSnapshot || typeof sharedSnapshot !== 'object' || freshestSnapshotRevision < freshestLatestRevision) {
+      if (!silent) {
+        setMultiStatus(
+          localizeText(
+            '共有プロジェクトの最新スナップショットがまだ準備できていないため、もう一度読み込みます。',
+            'The latest shared project snapshot is not ready yet. Retrying the load.'
+          ),
+          'info'
+        );
       }
+      return false;
     }
+    const loadedSnapshot = await loadDocumentFromText(JSON.stringify(sharedSnapshot), null, {
+      projectId: buildSharedRecentProjectId(resolvedProjectKey),
+      suppressAutosaveStatus: true,
+      openedFromRecent: true,
+      preserveDotStats: true,
+      sharedProjectKey: resolvedProjectKey,
+      sharedProjectRevision: freshestSnapshotRevision,
+    });
+    if (!loadedSnapshot) {
+      if (!silent) {
+        setMultiStatus(
+          localizeText(
+            '共有プロジェクトの最新スナップショットを読み込めませんでした。',
+            'Failed to load the latest shared project snapshot.'
+          ),
+          'error'
+        );
+      }
+      return false;
+    }
+    markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
     setActiveAutosaveProjectId(buildSharedRecentProjectId(resolvedProjectKey));
     try {
       window.localStorage.removeItem(getScopedStorageKey(SESSION_STORAGE_KEY));
@@ -21522,38 +21529,7 @@
     markActiveSharedProjectDocumentLoaded(resolvedProjectKey);
     const sharedSnapshotRevision = Math.max(0, Math.round(Number(freshestProject.latest_snapshot_revision) || 0));
     const sharedLatestRevision = freshestLatestRevision;
-    if (sharedSnapshotRevision < sharedLatestRevision && !silent) {
-      setMultiStatus(
-        localizeText(
-          '共有プロジェクトを開きました。最新の変更を取得しています。',
-          'Opened shared project. Fetching the latest changes.'
-        ),
-        'info'
-      );
-    }
-    if (shouldTrustSharedProjectSnapshotRevision(sharedSnapshotRevision, sharedLatestRevision)) {
-      if (sharedLatestRevision > sharedSnapshotRevision) {
-        setActiveSharedProjectSyncState('catching-up', { announce: true });
-      }
-      await applySharedProjectOpsSinceRevision(
-        freshestProject,
-        sharedSnapshotRevision
-      );
-      setActiveSharedProjectSyncState('synced');
-    } else {
-      setActiveSharedProjectSession(
-        resolvedProjectKey,
-        sharedLatestRevision,
-        Math.max(0, Math.round(Number(freshestProject.latest_structure_revision) || 0)),
-        freshestProject.id || ''
-      );
-      setActiveSharedProjectSyncState('catching-up', { announce: true });
-      console.warn('[shared-realtime] skipped-initial-op-replay-untrusted-snapshot-revision', {
-        projectKey: resolvedProjectKey,
-        snapshotRevision: sharedSnapshotRevision,
-        latestRevision: sharedLatestRevision,
-      });
-    }
+    setActiveSharedProjectSyncState('synced');
     restorePendingSharedLocalOps(resolvedProjectKey, {
       announce: true,
       refreshReason: 'open-shared-resume-pending-local-ops',
