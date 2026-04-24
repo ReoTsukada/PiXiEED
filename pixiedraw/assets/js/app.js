@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.24-shared-server-durability-fix1';
+  const APP_BUILD_VERSION = '2026.04.24-shared-canonical-open-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -21688,88 +21688,30 @@
         closeBlockingLoading();
         return true;
       }
-      if (normalizedEntry.project && typeof normalizedEntry.project === 'object') {
-        setStartupProgressLabel(localizeText('一時保存から共有プロジェクトを復元中…', 'Restoring shared project from temporary cache...'));
-        const loaded = await loadDocumentFromText(JSON.stringify(normalizedEntry.project), null, {
-          projectId: normalizedEntry.id || buildSharedRecentProjectId(normalizedEntry.sharedProjectKey || ''),
-          suppressAutosaveStatus: true,
-          openedFromRecent: true,
-          preserveDotStats: true,
-          sharedProjectKey: normalizedEntry.sharedProjectKey || '',
-          sharedProjectRevision: Math.max(0, Math.round(Number(normalizedEntry.sharedProjectRevision) || 0)),
-        });
-        if (loaded) {
-          storeMultiProjectKey(normalizedEntry.sharedProjectKey || '');
-          syncMultiProjectKeyInputValues(normalizedEntry.sharedProjectKey || '', { preserveFocused: false });
-          setMultiDesiredRole(normalizedEntry.sharedRoleHint || 'guest');
-          setMultiUiView(normalizedEntry.sharedRoleHint || 'guest');
-          multiEntryJoinPanelOpen = false;
-          if (hideStartup) {
-            hideStartupScreen();
-          }
-          if (!silent) {
-            setMultiStatus(
-              localizeText(
-                '共有プロジェクトを一時キャッシュから開きました。最新状態の取得を続けます。',
-                'Opened the shared project from temporary cache. Fetching the latest state continues in the background.'
-              ),
-              'warn'
-            );
-          }
-          scheduleSharedProjectLatestRecovery(normalizedEntry, {
-            reason: 'recent-fallback-recovery',
-            immediate: true,
-          });
-          clearPendingSharedInvite();
-          setActiveAutosaveProjectId(normalizedEntry.id);
-          closeBlockingLoading();
-          return true;
-        }
-      }
       clearPendingSharedInvite();
+      if (!silent) {
+        setMultiStatus(
+          localizeText(
+            '共有プロジェクトの最新内容をサーバーから取得できなかったため開けませんでした。通信を確認して再度お試しください。',
+            'The latest shared project state could not be loaded from the server. Check your connection and try again.'
+          ),
+          'error'
+        );
+      }
       closeBlockingLoading();
       return false;
     } catch (error) {
       console.warn('Failed to open shared recent project', error);
-      if (normalizedEntry.project && typeof normalizedEntry.project === 'object') {
-        setStartupProgressLabel(localizeText('一時保存から共有プロジェクトを復元中…', 'Restoring shared project from temporary cache...'));
-        const loaded = await loadDocumentFromText(JSON.stringify(normalizedEntry.project), null, {
-          projectId: normalizedEntry.id || buildSharedRecentProjectId(normalizedEntry.sharedProjectKey || ''),
-          suppressAutosaveStatus: true,
-          openedFromRecent: true,
-          preserveDotStats: true,
-          sharedProjectKey: normalizedEntry.sharedProjectKey || '',
-          sharedProjectRevision: Math.max(0, Math.round(Number(normalizedEntry.sharedProjectRevision) || 0)),
-        });
-        if (loaded) {
-          storeMultiProjectKey(normalizedEntry.sharedProjectKey || '');
-          syncMultiProjectKeyInputValues(normalizedEntry.sharedProjectKey || '', { preserveFocused: false });
-          setMultiDesiredRole(normalizedEntry.sharedRoleHint || 'guest');
-          setMultiUiView(normalizedEntry.sharedRoleHint || 'guest');
-          multiEntryJoinPanelOpen = false;
-          if (hideStartup) {
-            hideStartupScreen();
-          }
-          if (!silent) {
-            setMultiStatus(
-              localizeText(
-                '共有プロジェクトを一時キャッシュから開きました。最新状態の取得を続けます。',
-                'Opened the shared project from temporary cache. Fetching the latest state continues in the background.'
-              ),
-              'warn'
-            );
-          }
-          scheduleSharedProjectLatestRecovery(normalizedEntry, {
-            reason: 'recent-fallback-recovery',
-            immediate: true,
-          });
-          clearPendingSharedInvite();
-          setActiveAutosaveProjectId(normalizedEntry.id);
-          closeBlockingLoading();
-          return true;
-        }
-      }
       clearPendingSharedInvite();
+      if (!silent) {
+        setMultiStatus(
+          localizeText(
+            '共有プロジェクトの最新内容をサーバーから取得できなかったため開けませんでした。通信を確認して再度お試しください。',
+            'The latest shared project state could not be loaded from the server. Check your connection and try again.'
+          ),
+          'error'
+        );
+      }
       closeBlockingLoading();
       return false;
     } finally {
@@ -56839,6 +56781,25 @@
     return replayed;
   }
 
+  function compareSharedProjectOpsForReplay(left, right) {
+    const leftSeq = getSharedProjectOpSeq(left);
+    const rightSeq = getSharedProjectOpSeq(right);
+    if (leftSeq !== rightSeq) {
+      return leftSeq - rightSeq;
+    }
+    const leftCreatedAt = String(left?.created_at || left?.createdAt || left?.payload?.createdAt || '');
+    const rightCreatedAt = String(right?.created_at || right?.createdAt || right?.payload?.createdAt || '');
+    if (leftCreatedAt && rightCreatedAt && leftCreatedAt !== rightCreatedAt) {
+      return leftCreatedAt.localeCompare(rightCreatedAt);
+    }
+    const leftOpId = String(getSharedProjectOpId(left) || '');
+    const rightOpId = String(getSharedProjectOpId(right) || '');
+    if (leftOpId !== rightOpId) {
+      return leftOpId.localeCompare(rightOpId);
+    }
+    return 0;
+  }
+
   async function fetchMissingOps(projectKey = activeSharedProjectKey, afterSeq = sharedProjectLastAppliedSeq, limit = SHARED_PROJECT_MAX_MISSING_OP_FETCH) {
     return await fetchSharedProjectOpsSince(projectKey, afterSeq, limit);
   }
@@ -56883,7 +56844,7 @@
     if (!list.length) {
       return true;
     }
-    list.sort((left, right) => getSharedProjectOpSeq(left) - getSharedProjectOpSeq(right));
+    list.sort(compareSharedProjectOpsForReplay);
     for (let index = 0; index < list.length; index += 1) {
       const op = list[index];
       const seq = getSharedProjectOpSeq(op);
