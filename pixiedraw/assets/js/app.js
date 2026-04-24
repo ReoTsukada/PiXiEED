@@ -4,7 +4,7 @@
   }
 
   // Bump on release to invalidate PWA caches and detect multiplayer build mismatches.
-  const APP_BUILD_VERSION = '2026.04.24-shared-rejoin-fallback-fix1';
+  const APP_BUILD_VERSION = '2026.04.24-shared-open-after-replay-fix1';
   const APP_SW_VERSION = APP_BUILD_VERSION;
 
   const dom = {
@@ -3775,6 +3775,12 @@
   const pointerState = createPointerState();
   window.addEventListener('beforeunload', handleUnsavedBeforeUnload);
   window.addEventListener('pagehide', handleAutosavePageHide);
+  window.addEventListener('beforeunload', () => {
+    flushActiveSharedProjectFinalSnapshot({ historyLabel: 'sharedFinalSnapshotBeforeUnload' });
+  });
+  window.addEventListener('pagehide', () => {
+    flushActiveSharedProjectFinalSnapshot({ historyLabel: 'sharedFinalSnapshotPageHide' });
+  });
   window.addEventListener('beforeunload', () => {
     if (sharedProjectPendingLocalOps.length && activeSharedProjectKey) {
       flushSharedProjectPendingLocalOps();
@@ -21539,14 +21545,24 @@
     const sharedLatestRevision = freshestLatestRevision;
     if (sharedSnapshotRevision < sharedLatestRevision) {
       setActiveSharedProjectSyncState('catching-up', { announce: !silent });
-      queueSharedProjectRefresh({
-        immediate: true,
-        reason: 'open-shared-await-latest-ops',
-        force: true,
-      });
-    } else {
-      setActiveSharedProjectSyncState('synced');
+      const replayedToLatest = await applySharedProjectOpsSinceRevision(
+        freshestProject,
+        sharedSnapshotRevision
+      );
+      if (!replayedToLatest) {
+        if (!silent) {
+          setMultiStatus(
+            localizeText(
+              '共有プロジェクトの最新差分を取得できなかったため開けませんでした。古い状態は表示していません。',
+              'The latest shared project changes could not be loaded, so the project was not opened. No stale state was shown.'
+            ),
+            'error'
+          );
+        }
+        return false;
+      }
     }
+    setActiveSharedProjectSyncState('synced');
     restorePendingSharedLocalOps(resolvedProjectKey, {
       announce: true,
       refreshReason: 'open-shared-resume-pending-local-ops',
@@ -21681,57 +21697,12 @@
         closeBlockingLoading();
         return true;
       }
-      if (normalizedEntry.project && typeof normalizedEntry.project === 'object') {
-        setStartupProgressLabel(localizeText('一時保存から共有プロジェクトを復元中…', 'Restoring shared project from temporary cache...'));
-        const loaded = await loadDocumentFromText(JSON.stringify(normalizedEntry.project), null, {
-          projectId: normalizedEntry.id || buildSharedRecentProjectId(normalizedEntry.sharedProjectKey || ''),
-          suppressAutosaveStatus: true,
-          openedFromRecent: true,
-          preserveDotStats: true,
-          sharedProjectKey: normalizedEntry.sharedProjectKey || '',
-          sharedProjectRevision: Math.max(0, Math.round(Number(normalizedEntry.sharedProjectRevision) || 0)),
-        });
-        if (loaded) {
-          storeMultiProjectKey(normalizedEntry.sharedProjectKey || '');
-          syncMultiProjectKeyInputValues(normalizedEntry.sharedProjectKey || '', { preserveFocused: false });
-          setMultiDesiredRole(normalizedEntry.sharedRoleHint || 'guest');
-          setMultiUiView(normalizedEntry.sharedRoleHint || 'guest');
-          multiEntryJoinPanelOpen = false;
-          setActiveAutosaveProjectId(normalizedEntry.id || buildSharedRecentProjectId(normalizedEntry.sharedProjectKey || ''));
-          setActiveSharedProjectSession(
-            normalizeMultiProjectKey(normalizedEntry.sharedProjectKey || ''),
-            Math.max(0, Math.round(Number(normalizedEntry.sharedProjectRevision) || 0)),
-            Math.max(0, Math.round(Number(normalizedEntry.sharedProjectStructureRevision) || 0)),
-            typeof normalizedEntry.sharedProjectBackendId === 'string' ? normalizedEntry.sharedProjectBackendId : ''
-          );
-          setActiveSharedProjectSyncState('catching-up', { announce: !silent });
-          scheduleSharedProjectLatestRecovery(normalizedEntry, {
-            reason: 'recent-fallback-recovery',
-            immediate: true,
-          });
-          if (hideStartup) {
-            hideStartupScreen();
-          }
-          if (!silent) {
-            setMultiStatus(
-              localizeText(
-                '共有プロジェクトを一時保存から復元しました。最新状態への再接続を続けます。',
-                'Restored the shared project from temporary cache and will continue reconnecting to the latest state.'
-              ),
-              'warn'
-            );
-          }
-          clearPendingSharedInvite();
-          closeBlockingLoading();
-          return true;
-        }
-      }
       clearPendingSharedInvite();
       if (!silent) {
         setMultiStatus(
           localizeText(
-            '共有プロジェクトの最新内容をサーバーから取得できなかったため開けませんでした。通信を確認して再度お試しください。',
-            'The latest shared project state could not be loaded from the server. Check your connection and try again.'
+            '共有プロジェクトの最新状態をサーバーから取得できなかったため開けませんでした。古い状態は読み込まず停止しました。',
+            'The latest shared project state could not be loaded from the server, so the project was not opened. No stale local state was loaded.'
           ),
           'error'
         );
@@ -21740,57 +21711,12 @@
       return false;
     } catch (error) {
       console.warn('Failed to open shared recent project', error);
-      if (normalizedEntry.project && typeof normalizedEntry.project === 'object') {
-        setStartupProgressLabel(localizeText('一時保存から共有プロジェクトを復元中…', 'Restoring shared project from temporary cache...'));
-        const loaded = await loadDocumentFromText(JSON.stringify(normalizedEntry.project), null, {
-          projectId: normalizedEntry.id || buildSharedRecentProjectId(normalizedEntry.sharedProjectKey || ''),
-          suppressAutosaveStatus: true,
-          openedFromRecent: true,
-          preserveDotStats: true,
-          sharedProjectKey: normalizedEntry.sharedProjectKey || '',
-          sharedProjectRevision: Math.max(0, Math.round(Number(normalizedEntry.sharedProjectRevision) || 0)),
-        });
-        if (loaded) {
-          storeMultiProjectKey(normalizedEntry.sharedProjectKey || '');
-          syncMultiProjectKeyInputValues(normalizedEntry.sharedProjectKey || '', { preserveFocused: false });
-          setMultiDesiredRole(normalizedEntry.sharedRoleHint || 'guest');
-          setMultiUiView(normalizedEntry.sharedRoleHint || 'guest');
-          multiEntryJoinPanelOpen = false;
-          setActiveAutosaveProjectId(normalizedEntry.id || buildSharedRecentProjectId(normalizedEntry.sharedProjectKey || ''));
-          setActiveSharedProjectSession(
-            normalizeMultiProjectKey(normalizedEntry.sharedProjectKey || ''),
-            Math.max(0, Math.round(Number(normalizedEntry.sharedProjectRevision) || 0)),
-            Math.max(0, Math.round(Number(normalizedEntry.sharedProjectStructureRevision) || 0)),
-            typeof normalizedEntry.sharedProjectBackendId === 'string' ? normalizedEntry.sharedProjectBackendId : ''
-          );
-          setActiveSharedProjectSyncState('catching-up', { announce: !silent });
-          scheduleSharedProjectLatestRecovery(normalizedEntry, {
-            reason: 'recent-fallback-recovery',
-            immediate: true,
-          });
-          if (hideStartup) {
-            hideStartupScreen();
-          }
-          if (!silent) {
-            setMultiStatus(
-              localizeText(
-                '共有プロジェクトを一時保存から復元しました。最新状態への再接続を続けます。',
-                'Restored the shared project from temporary cache and will continue reconnecting to the latest state.'
-              ),
-              'warn'
-            );
-          }
-          clearPendingSharedInvite();
-          closeBlockingLoading();
-          return true;
-        }
-      }
       clearPendingSharedInvite();
       if (!silent) {
         setMultiStatus(
           localizeText(
-            '共有プロジェクトの最新内容をサーバーから取得できなかったため開けませんでした。通信を確認して再度お試しください。',
-            'The latest shared project state could not be loaded from the server. Check your connection and try again.'
+            '共有プロジェクトの最新状態をサーバーから取得できなかったため開けませんでした。古い状態は読み込まず停止しました。',
+            'The latest shared project state could not be loaded from the server, so the project was not opened. No stale local state was loaded.'
           ),
           'error'
         );
@@ -58775,6 +58701,25 @@
         historyLabel,
       });
     }, Math.max(0, Math.round(Number(delayMs) || 0)));
+  }
+
+  function flushActiveSharedProjectFinalSnapshot({ historyLabel = 'sharedFinalSnapshot' } = {}) {
+    if (!canUseSharedProjectsBackend() || !activeSharedProjectKey || !hasDocumentUnsavedChanges()) {
+      return false;
+    }
+    if (sharedProjectCaptureTimer !== null) {
+      window.clearTimeout(sharedProjectCaptureTimer);
+      sharedProjectCaptureTimer = null;
+    }
+    const snapshot = makeHistorySnapshot({ clonePixelData: false });
+    const session = buildAutosaveSessionPayload();
+    const packaged = buildPackagedProjectPayload(snapshot, { session });
+    queueSharedProjectSnapshotPersist(packaged, {
+      projectKey: activeSharedProjectKey,
+      title: createSharedProjectSnapshotTitle(state.documentName || DEFAULT_DOCUMENT_NAME),
+      historyLabel,
+    });
+    return true;
   }
 
   async function disconnectActiveSharedProjectRealtimeChannel({ reason = 'disconnect', caller = 'unknown' } = {}) {
