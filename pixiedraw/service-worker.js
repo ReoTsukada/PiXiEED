@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pixiedraw-v2026.04.25-shared-replay-dedupe-fix1';
+const CACHE_VERSION = 'pixiedraw-v2026.04.25-shared-catchup-snapshot-fix1';
 const CORE_ASSETS = [
   '/pixiedraw/',
   '/pixiedraw/index.html',
